@@ -194,12 +194,14 @@ static unsigned char doublefault_stack[DOUBLEFAULT_STACK_SIZE];
 
 asmlinkage void do_double_fault(void)
 {
-    struct tss_struct *tss = &doublefault_tss;
-    unsigned int cpu = ((tss->back_link>>3)-__FIRST_TSS_ENTRY)>>1;
+    struct tss_struct *tss;
+    unsigned int cpu;
 
     watchdog_disable();
 
     console_force_unlock();
+
+    asm ( "lsll %1, %0" : "=r" (cpu) : "rm" (PER_CPU_GDT_ENTRY << 3) );
 
     /* Find information saved during fault and dump it to the console. */
     tss = &init_tss[cpu];
@@ -325,7 +327,7 @@ void __devinit subarch_percpu_traps_init(void)
     tss->eflags = 2;
     tss->bitmap = IOBMP_INVALID_OFFSET;
     _set_tssldt_desc(
-        gdt_table + __DOUBLEFAULT_TSS_ENTRY - FIRST_RESERVED_GDT_ENTRY,
+        boot_cpu_gdt_table + __DOUBLEFAULT_TSS_ENTRY - FIRST_RESERVED_GDT_ENTRY,
         (unsigned long)tss, 235, 9);
 
     set_task_gate(TRAP_double_fault, __DOUBLEFAULT_TSS_ENTRY<<3);

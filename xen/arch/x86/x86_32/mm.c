@@ -132,6 +132,30 @@ void __init setup_idle_pagetable(void)
                                 __PAGE_HYPERVISOR));
 }
 
+unsigned long clone_idle_pagetable(struct vcpu *v)
+{
+    unsigned int i;
+    struct domain *d = v->domain;
+    l3_pgentry_t *l3_table = v->arch.pae_l3_cache.table[0];
+    l2_pgentry_t *l2_table = alloc_xenheap_page();
+
+    if ( !l2_table )
+        return 0;
+
+    memcpy(l3_table, idle_pg_table, L3_PAGETABLE_ENTRIES * sizeof(*l3_table));
+    l3_table[l3_table_offset(PERDOMAIN_VIRT_START)] =
+        l3e_from_page(virt_to_page(l2_table), _PAGE_PRESENT);
+
+    copy_page(l2_table, idle_pg_table_l2 +
+              l3_table_offset(PERDOMAIN_VIRT_START) * L2_PAGETABLE_ENTRIES);
+    for ( i = 0; i < PDPT_L2_ENTRIES; ++i )
+        l2_table[l2_table_offset(PERDOMAIN_VIRT_START) + i] =
+            l2e_from_page(virt_to_page(d->arch.mm_perdomain_pt) + i,
+                          __PAGE_HYPERVISOR);
+
+    return __pa(l3_table);
+}
+
 void __init zap_low_mappings(l2_pgentry_t *dom0_l2)
 {
     int i;
@@ -186,7 +210,7 @@ void __init subarch_init_memory(void)
     {
         /* Guest kernel runs in ring 0, not ring 1. */
         struct desc_struct *d;
-        d = &gdt_table[(FLAT_RING1_CS >> 3) - FIRST_RESERVED_GDT_ENTRY];
+        d = &boot_cpu_gdt_table[(FLAT_RING1_CS >> 3) - FIRST_RESERVED_GDT_ENTRY];
         d[0].b &= ~_SEGMENT_DPL;
         d[1].b &= ~_SEGMENT_DPL;
     }

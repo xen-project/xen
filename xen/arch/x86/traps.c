@@ -2965,13 +2965,13 @@ void set_intr_gate(unsigned int n, void *addr)
 void set_tss_desc(unsigned int n, void *addr)
 {
     _set_tssldt_desc(
-        gdt_table + __TSS(n) - FIRST_RESERVED_GDT_ENTRY,
+        per_cpu(gdt_table, n) + TSS_ENTRY - FIRST_RESERVED_GDT_ENTRY,
         (unsigned long)addr,
         offsetof(struct tss_struct, __cacheline_filler) - 1,
         9);
 #ifdef CONFIG_COMPAT
     _set_tssldt_desc(
-        compat_gdt_table + __TSS(n) - FIRST_RESERVED_GDT_ENTRY,
+        per_cpu(compat_gdt_table, n) + TSS_ENTRY - FIRST_RESERVED_GDT_ENTRY,
         (unsigned long)addr,
         offsetof(struct tss_struct, __cacheline_filler) - 1,
         11);

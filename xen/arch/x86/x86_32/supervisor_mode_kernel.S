@@ -100,15 +100,10 @@ ENTRY(fixup_ring0_guest_stack)
         # %gs:%esi now points to the guest stack before the
         # interrupt/exception occured.
 
-        /*
-         * Reverse the __TSS macro, giving us the CPU number.
-         * The TSS for this cpu is at init_tss + ( cpu * 128 ).
-         */
-        str   %ecx
-        shrl  $3,%ecx                                   # Calculate GDT index for TSS.
-        subl  $(FIRST_RESERVED_GDT_ENTRY+8),%ecx        # %ecx = 2*cpu.
-        shll  $6,%ecx                                   # Each TSS entry is 0x80 bytes
-        addl  $init_tss,%ecx                            # but we have 2*cpu from above.
+        movl  $PER_CPU_GDT_ENTRY*8,%ecx
+        lsll  %ecx,%ecx
+        shll  $7,%ecx                                   # Each TSS entry is 0x80 bytes
+        addl  $init_tss,%ecx
 
         # Load Xen stack from TSS.
         movw  TSS_ss0(%ecx),%ax

@@ -836,10 +836,15 @@ static int __devinit do_boot_cpu(int apicid, int cpu)
  */
 {
 	unsigned long boot_error;
+	unsigned int i;
 	int timeout;
 	unsigned long start_eip;
 	unsigned short nmi_high = 0, nmi_low = 0;
 	struct vcpu *v;
+	struct desc_struct *gdt;
+#ifdef __x86_64__
+        struct page_info *page;
+#endif
 
 	/*
 	 * Save current MTRR state in case it was changed since early boot
@@ -864,6 +869,37 @@ static int __devinit do_boot_cpu(int apicid, int cpu)
 
 	/* Debug build: detect stack overflow by setting up a guard page. */
 	memguard_guard_stack(stack_start.esp);
+
+	gdt = per_cpu(gdt_table, cpu);
+	if (gdt == boot_cpu_gdt_table) {
+		i = get_order_from_pages(NR_RESERVED_GDT_PAGES);
+#ifdef __x86_64__
+#ifdef CONFIG_COMPAT
+		page = alloc_domheap_pages(NULL, i,
+					   MEMF_node(cpu_to_node(cpu)));
+		per_cpu(compat_gdt_table, cpu) = gdt = page_to_virt(page);
+		memcpy(gdt, boot_cpu_compat_gdt_table,
+		       NR_RESERVED_GDT_PAGES * PAGE_SIZE);
+		gdt[PER_CPU_GDT_ENTRY - FIRST_RESERVED_GDT_ENTRY].a = cpu;
+#endif
+		page = alloc_domheap_pages(NULL, i,
+					   MEMF_node(cpu_to_node(cpu)));
+		per_cpu(gdt_table, cpu) = gdt = page_to_virt(page);
+#else
+		per_cpu(gdt_table, cpu) = gdt = alloc_xenheap_pages(i);
+#endif
+		memcpy(gdt, boot_cpu_gdt_table,
+		       NR_RESERVED_GDT_PAGES * PAGE_SIZE);
+		BUILD_BUG_ON(NR_CPUS > 0x10000);
+		gdt[PER_CPU_GDT_ENTRY - FIRST_RESERVED_GDT_ENTRY].a = cpu;
+	}
+
+	for (i = 0; i < NR_RESERVED_GDT_PAGES; ++i)
+		v->domain->arch.mm_perdomain_pt
+			[(v->vcpu_id << GDT_LDT_VCPU_SHIFT) +
+			 FIRST_RESERVED_GDT_PAGE + i]
+			= l1e_from_page(virt_to_page(gdt) + i,
+					__PAGE_HYPERVISOR);
 
 	/*
 	 * This grunge runs the startup process for

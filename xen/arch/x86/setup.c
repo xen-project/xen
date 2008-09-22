@@ -115,6 +115,12 @@ extern void early_cpu_init(void);
 extern void vesa_init(void);
 extern void vesa_mtrr_init(void);
 
+DEFINE_PER_CPU(struct desc_struct *, gdt_table) = boot_cpu_gdt_table;
+#ifdef CONFIG_COMPAT
+DEFINE_PER_CPU(struct desc_struct *, compat_gdt_table)
+    = boot_cpu_compat_gdt_table;
+#endif
+
 struct tss_struct init_tss[NR_CPUS];
 
 char __attribute__ ((__section__(".bss.stack_aligned"))) cpu0_stack[STACK_SIZE];
@@ -224,6 +230,7 @@ static void __init percpu_init_areas(void)
 static void __init init_idle_domain(void)
 {
     struct domain *idle_domain;
+    unsigned int i;
 
     /* Domain creation requires that scheduler structures are initialised. */
     scheduler_init();
@@ -236,6 +243,12 @@ static void __init init_idle_domain(void)
     idle_vcpu[0] = this_cpu(curr_vcpu) = current;
 
     setup_idle_pagetable();
+
+    for (i = 0; i < NR_RESERVED_GDT_PAGES; ++i)
+        idle_domain->arch.mm_perdomain_pt[FIRST_RESERVED_GDT_PAGE + i] =
+            l1e_from_page(virt_to_page(boot_cpu_gdt_table) + i,
+                          __PAGE_HYPERVISOR);
+
 }
 
 static void __init srat_detect_node(int cpu)
@@ -443,7 +456,6 @@ void __init __start_xen(unsigned long mbi_p)
     parse_video_info();
 
     set_current((struct vcpu *)0xfffff000); /* debug sanity */
-    idle_vcpu[0] = current;
     set_processor_id(0); /* needed early, for smp_processor_id() */
     if ( cpu_has_efer )
         rdmsrl(MSR_EFER, this_cpu(efer));

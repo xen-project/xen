@@ -314,24 +314,11 @@ int __init construct_dom0(
 #if defined(__x86_64__)
     if ( compat32 )
     {
-        l1_pgentry_t gdt_l1e;
-
         d->arch.is_32bit_pv = d->arch.has_32bit_shinfo = 1;
         v->vcpu_info = (void *)&d->shared_info->compat.vcpu_info[0];
 
         if ( nr_pages != (unsigned int)nr_pages )
             nr_pages = UINT_MAX;
-
-        /*
-         * Map compatibility Xen segments into every VCPU's GDT. See
-         * arch_domain_create() for further comments.
-         */
-        gdt_l1e = l1e_from_page(virt_to_page(compat_gdt_table),
-                                PAGE_HYPERVISOR);
-        for ( i = 0; i < MAX_VIRT_CPUS; i++ )
-            d->arch.mm_perdomain_pt[((i << GDT_LDT_VCPU_SHIFT) +
-                                     FIRST_RESERVED_GDT_PAGE)] = gdt_l1e;
-        flush_tlb_one_local(GDT_LDT_VIRT_START + FIRST_RESERVED_GDT_BYTE);
     }
 #endif
 

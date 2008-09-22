@@ -575,6 +575,9 @@ void __cpuinit cpu_init(void)
 	if (cpu_has_pat)
 		wrmsrl(MSR_IA32_CR_PAT, host_pat);
 
+	/* Install correct page table. */
+	write_ptbase(current);
+
 	*(unsigned short *)(&gdt_load[0]) = LAST_RESERVED_GDT_BYTE;
 	*(unsigned long  *)(&gdt_load[2]) = GDT_VIRT_START(current);
 	asm volatile ( "lgdt %0" : "=m" (gdt_load) );
@@ -605,9 +608,6 @@ void __cpuinit cpu_init(void)
 #define CD(register) asm volatile ( "mov %0,%%db" #register : : "r"(0UL) );
 	CD(0); CD(1); CD(2); CD(3); /* no db4 and db5 */; CD(6); CD(7);
 #undef CD
-
-	/* Install correct page table. */
-	write_ptbase(current);
 }
 
 #ifdef CONFIG_HOTPLUG_CPU
