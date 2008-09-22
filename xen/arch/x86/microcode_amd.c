@@ -337,10 +337,7 @@ static int cpu_request_microcode(int cpu, const void *buf, size_t size)
          * lets keep searching till the latest version
          */
         if ( error == 1 )
-        {
-            apply_microcode(cpu);
-            error = 0;
-        }
+            error = apply_microcode(cpu);
         xfree(mc);
     }
     if ( offset > 0 )
