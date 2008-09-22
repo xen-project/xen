@@ -61,7 +61,7 @@ extern u32 pmtmr_ioport;
 extern void (*pm_idle) (void);
 
 static void (*pm_idle_save) (void) __read_mostly;
-unsigned int max_cstate __read_mostly = 2;
+unsigned int max_cstate __read_mostly = ACPI_PROCESSOR_MAX_POWER - 1;
 integer_param("max_cstate", max_cstate);
 
 static struct acpi_processor_power processor_powers[NR_CPUS];
@@ -72,17 +72,13 @@ static void print_acpi_power(uint32_t cpu, struct acpi_processor_power *power)
 
     printk("==cpu%d==\n", cpu);
     printk("active state:\t\tC%d\n",
-           (power->last_state) ? power->last_state->type : -1);
+           power->last_state ? (int)(power->last_state - power->states) : -1);
     printk("max_cstate:\t\tC%d\n", max_cstate);
     printk("states:\n");
     
     for ( i = 1; i < power->count; i++ )
     {
-        if ( power->last_state && 
-             power->states[i].type == power->last_state->type )
-            printk("   *");
-        else
-            printk("    ");
+        printk((power->last_state == &power->states[i]) ? "   *" : "    ");
         printk("C%d:\t\t", i);
         printk("type[C%d] ", power->states[i].type);
         printk("latency[%03d] ", power->states[i].latency);
@@ -222,7 +218,7 @@ static void acpi_processor_idle(void)
         if ( power->flags.bm_check && acpi_idle_bm_check()
              && cx->type == ACPI_STATE_C3 )
             cx = power->safe_state;
-        if ( cx->type > max_cstate )
+        if ( cx - &power->states[0] > max_cstate )
             cx = &power->states[max_cstate];
     }
     if ( !cx )
@@ -565,7 +561,11 @@ static void set_cx(
     if ( check_cx(acpi_power, xen_cx) != 0 )
         return;
 
-    cx = &acpi_power->states[xen_cx->type];
+    if ( xen_cx->type == ACPI_STATE_C1 )
+        cx = &acpi_power->states[1];
+    else
+        cx = &acpi_power->states[acpi_power->count];
+
     if ( !cx->valid )
         acpi_power->count++;
 
@@ -718,7 +718,8 @@ int pmstat_get_cx_stat(uint32_t cpuid, struct pm_cx_stat *stat)
     uint64_t usage;
     int i;
 
-    stat->last = (power->last_state) ? power->last_state->type : 0;
+    stat->last = (power->last_state) ?
+        (int)(power->last_state - &power->states[0]) : 0;
     stat->nr = processor_powers[cpuid].count;
     stat->idle_time = v->runstate.time[RUNSTATE_running];
     if ( v->is_running )
