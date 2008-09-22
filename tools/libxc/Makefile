@@ -19,6 +19,7 @@ CTRL_SRCS-y       += xc_sedf.c
 CTRL_SRCS-y       += xc_csched.c
 CTRL_SRCS-y       += xc_tbuf.c
 CTRL_SRCS-y       += xc_pm.c
+CTRL_SRCS-y       += xc_cpu_hotplug.c
 CTRL_SRCS-y       += xc_resume.c
 CTRL_SRCS-$(CONFIG_X86) += xc_pagetab.c
 CTRL_SRCS-$(CONFIG_Linux) += xc_linux.c
