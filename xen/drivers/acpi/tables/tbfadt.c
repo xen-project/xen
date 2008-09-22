@@ -72,7 +72,7 @@ typedef struct acpi_fadt_info {
 #define ACPI_FADT_REQUIRED          1
 #define ACPI_FADT_SEPARATE_LENGTH   2
 
-static struct acpi_fadt_info fadt_info_table[] = {
+static struct acpi_fadt_info __initdata fadt_info_table[] = {
 	{"Pm1aEventBlock", ACPI_FADT_OFFSET(xpm1a_event_block),
 	 ACPI_FADT_OFFSET(pm1a_event_block),
 	 ACPI_FADT_OFFSET(pm1_event_length), ACPI_FADT_REQUIRED},
@@ -157,7 +157,7 @@ acpi_tb_init_generic_address(struct acpi_generic_address *generic_address,
  *
  ******************************************************************************/
 
-void acpi_tb_parse_fadt(acpi_native_uint table_index, u8 flags)
+void __init acpi_tb_parse_fadt(acpi_native_uint table_index, u8 flags)
 {
 	u32 length;
 	struct acpi_table_header *table;
@@ -217,7 +217,7 @@ void acpi_tb_parse_fadt(acpi_native_uint table_index, u8 flags)
  *
  ******************************************************************************/
 
-void acpi_tb_create_local_fadt(struct acpi_table_header *table, u32 length)
+void __init acpi_tb_create_local_fadt(struct acpi_table_header *table, u32 length)
 {
 
 	/*
@@ -278,7 +278,7 @@ void acpi_tb_create_local_fadt(struct acpi_table_header *table, u32 length)
  *
  ******************************************************************************/
 
-static void acpi_tb_convert_fadt(void)
+static void __init acpi_tb_convert_fadt(void)
 {
 	u8 pm1_register_length;
 	struct acpi_generic_address *target;
@@ -393,7 +393,7 @@ static void acpi_tb_convert_fadt(void)
  *
  ******************************************************************************/
 
-static void acpi_tb_validate_fadt(void)
+static void __init acpi_tb_validate_fadt(void)
 {
 	u32 *address32;
 	struct acpi_generic_address *address64;
