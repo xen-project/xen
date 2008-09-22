@@ -95,7 +95,7 @@ ENTRY(idle_pg_table)
         .long ((MACH2PHYS_VIRT_END - 1) >> 12) & 0xffff,                \
               ((MACH2PHYS_VIRT_END - 1) >> 12) & (0xf << 16) | (d)
 ENTRY(boot_cpu_gdt_table)
-        .quad 0x0000000000000000     /* unused */
+        .quad 0x0000000000000000     /* double fault TSS */
         .quad 0x00cf9a000000ffff     /* 0xe008 ring 0 4.00GB code at 0x0 */
         .quad 0x00cf92000000ffff     /* 0xe010 ring 0 4.00GB data at 0x0 */
         GUEST_DESC(0x00c0ba00)       /* 0xe019 ring 1 3.xxGB code at 0x0 */

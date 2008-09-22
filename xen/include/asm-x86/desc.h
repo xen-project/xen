@@ -47,7 +47,7 @@
 #define FLAT_COMPAT_USER_DS   FLAT_USER_DS
 #define FLAT_COMPAT_USER_SS   FLAT_USER_SS
 
-#define __DOUBLEFAULT_TSS_ENTRY FIRST_RESERVED_GDT_ENTRY
+#define DOUBLEFAULT_TSS_ENTRY FIRST_RESERVED_GDT_ENTRY
 
 #define TSS_ENTRY (FIRST_RESERVED_GDT_ENTRY + 8)
 #define LDT_ENTRY (TSS_ENTRY + 1)
@@ -198,6 +198,8 @@ do {                                                     \
         ((u32)(type) << 8) | 0x8000U |                   \
         (((u32)(addr) & 0x00FF0000U) >> 16);             \
 } while (0)
+
+DECLARE_PER_CPU(struct tss_struct *, doublefault_tss);
 
 #endif
 

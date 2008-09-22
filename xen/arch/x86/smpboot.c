@@ -901,6 +901,13 @@ static int __devinit do_boot_cpu(int apicid, int cpu)
 			= l1e_from_page(virt_to_page(gdt) + i,
 					__PAGE_HYPERVISOR);
 
+#ifdef __i386__
+	if (!per_cpu(doublefault_tss, cpu)) {
+		per_cpu(doublefault_tss, cpu) = alloc_xenheap_page();
+		memset(per_cpu(doublefault_tss, cpu), 0, PAGE_SIZE);
+	}
+#endif
+
 	/*
 	 * This grunge runs the startup process for
 	 * the targeted processor.
