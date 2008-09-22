@@ -223,7 +223,8 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
             goto svc_out;
 
         ret = -EINVAL;
-        if ( (vcpu >= MAX_VIRT_CPUS) || ((v = d->vcpu[vcpu]) == NULL) )
+        if ( (d == current->domain) || /* no domain_pause() */
+             (vcpu >= MAX_VIRT_CPUS) || ((v = d->vcpu[vcpu]) == NULL) )
             goto svc_out;
 
         if ( guest_handle_is_null(op->u.vcpucontext.ctxt) )
@@ -392,13 +393,17 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         struct domain *d;
         unsigned int i, max = op->u.max_vcpus.max, cpu;
 
-        ret = -EINVAL;
-        if ( max > MAX_VIRT_CPUS )
-            break;
-
         ret = -ESRCH;
         if ( (d = rcu_lock_domain_by_id(op->domain)) == NULL )
             break;
+
+        ret = -EINVAL;
+        if ( (d == current->domain) || /* no domain_pause() */
+             (max > MAX_VIRT_CPUS) )
+        {
+            rcu_unlock_domain(d);
+            break;
+        }
 
         ret = xsm_max_vcpus(d);
         if ( ret )
@@ -705,6 +710,13 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         d = rcu_lock_domain_by_id(op->domain);
         if ( d == NULL )
             break;
+
+        ret = -EINVAL;
+        if ( d == current->domain ) /* no domain_pause() */
+        {
+            rcu_unlock_domain(d);
+            break;
+        }
 
         ret = xsm_setdebugging(d);
         if ( ret )
