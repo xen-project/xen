@@ -283,9 +283,27 @@ int powernow_cpufreq_init(void)
 
     /* setup cpufreq infrastructure */
     for_each_online_cpu(i) {
-        cpufreq_cpu_policy[i]->cpu = i;
+        struct cpufreq_policy *policy = cpufreq_cpu_policy[i];
 
-        ret = powernow_cpufreq_cpu_init(cpufreq_cpu_policy[i]);
+        if (!policy) {
+            unsigned int firstcpu;
+
+            firstcpu = first_cpu(processor_pminfo[i]->perf.shared_cpu_map);
+            if (i == firstcpu) {
+                policy = xmalloc(struct cpufreq_policy);
+                if (!policy) {
+                    ret = -ENOMEM;
+                    goto cpufreq_init_out;
+                }
+                memset(policy, 0, sizeof(struct cpufreq_policy));
+                policy->cpu = i;
+            } else
+                policy = cpufreq_cpu_policy[firstcpu];
+            cpu_set(i, policy->cpus);
+            cpufreq_cpu_policy[i] = policy;
+        }
+
+        ret = powernow_cpufreq_cpu_init(policy);
         if (ret)
             goto cpufreq_init_out;
     }
