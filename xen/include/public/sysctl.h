@@ -262,6 +262,18 @@ struct xen_sysctl_get_pmstat {
 typedef struct xen_sysctl_get_pmstat xen_sysctl_get_pmstat_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_get_pmstat_t);
 
+#define XEN_SYSCTL_cpu_hotplug       11
+struct xen_sysctl_cpu_hotplug {
+    /* IN variables */
+    uint32_t cpu;   /* Physical cpu. */
+#define XEN_SYSCTL_CPU_HOTPLUG_ONLINE  0
+#define XEN_SYSCTL_CPU_HOTPLUG_OFFLINE 1
+    uint32_t op;    /* hotplug opcode */
+};
+typedef struct xen_sysctl_cpu_hotplug xen_sysctl_cpu_hotplug_t;
+DEFINE_XEN_GUEST_HANDLE(xen_sysctl_cpu_hotplug_t);
+
+
 struct xen_sysctl {
     uint32_t cmd;
     uint32_t interface_version; /* XEN_SYSCTL_INTERFACE_VERSION */
@@ -276,6 +288,7 @@ struct xen_sysctl {
         struct xen_sysctl_getcpuinfo        getcpuinfo;
         struct xen_sysctl_availheap         availheap;
         struct xen_sysctl_get_pmstat        get_pmstat;
+        struct xen_sysctl_cpu_hotplug       cpu_hotplug;
         uint8_t                             pad[128];
     } u;
 };
