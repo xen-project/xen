@@ -41,7 +41,7 @@ struct processor_pminfo {
     struct processor_performance    perf;
 };
 
-extern struct processor_pminfo processor_pminfo[NR_CPUS];
+extern struct processor_pminfo *processor_pminfo[NR_CPUS];
 
 struct px_stat {
     uint8_t total;        /* total Px states */
@@ -58,6 +58,6 @@ struct pm_px {
     uint64_t prev_idle_wall;
 };
 
-extern struct pm_px px_statistic_data[NR_CPUS];
+extern struct pm_px *px_statistic_data[NR_CPUS];
 
 #endif /* __XEN_PROCESSOR_PM_H__ */

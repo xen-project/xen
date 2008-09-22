@@ -49,9 +49,6 @@
 #define MSR_PSTATE_CTRL         0xc0010062 /* Pstate control MSR */
 #define MSR_PSTATE_CUR_LIMIT    0xc0010061 /* pstate current limit MSR */
 
-extern struct processor_pminfo processor_pminfo[NR_CPUS];
-extern struct cpufreq_policy *cpufreq_cpu_policy[NR_CPUS];
-
 struct powernow_cpufreq_data {
     struct processor_performance *acpi_data;
     struct cpufreq_frequency_table *freq_table;
@@ -149,7 +146,7 @@ static int powernow_cpufreq_cpu_init(struct cpufreq_policy *policy)
 
     drv_data[cpu] = data;
 
-    data->acpi_data = &processor_pminfo[cpu].perf;
+    data->acpi_data = &processor_pminfo[cpu]->perf;
 
     perf = data->acpi_data;
     policy->shared_type = perf->shared_type;
@@ -257,8 +254,8 @@ int powernow_cpufreq_init(void)
 	}
         if (ret)
             return ret;
-        if (max_dom < processor_pminfo[i].perf.domain_info.domain)
-            max_dom = processor_pminfo[i].perf.domain_info.domain;
+        if (max_dom < processor_pminfo[i]->perf.domain_info.domain)
+            max_dom = processor_pminfo[i]->perf.domain_info.domain;
     }
     max_dom++;
 
@@ -274,13 +271,13 @@ int powernow_cpufreq_init(void)
 
     /* get cpumask of each psd domain */
     for_each_online_cpu(i) {
-        __set_bit(processor_pminfo[i].perf.domain_info.domain, dom_mask);
-        cpu_set(i, pt[processor_pminfo[i].perf.domain_info.domain]);
+        __set_bit(processor_pminfo[i]->perf.domain_info.domain, dom_mask);
+        cpu_set(i, pt[processor_pminfo[i]->perf.domain_info.domain]);
     }
 
     for_each_online_cpu(i)
-        processor_pminfo[i].perf.shared_cpu_map = 
-            pt[processor_pminfo[i].perf.domain_info.domain];
+        processor_pminfo[i]->perf.shared_cpu_map =
+            pt[processor_pminfo[i]->perf.domain_info.domain];
 
     cpufreq_driver = &powernow_cpufreq_driver;
 

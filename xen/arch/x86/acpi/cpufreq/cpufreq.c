@@ -389,11 +389,14 @@ static int acpi_cpufreq_target(struct cpufreq_policy *policy,
 
 static int acpi_cpufreq_verify(struct cpufreq_policy *policy)
 {
-    struct acpi_cpufreq_data *data = drv_data[policy->cpu];
-    struct processor_performance *perf = &processor_pminfo[policy->cpu].perf;
+    struct acpi_cpufreq_data *data;
+    struct processor_performance *perf;
 
-    if (!policy || !data)
+    if (!policy || !(data = drv_data[policy->cpu]) ||
+        !processor_pminfo[policy->cpu])
         return -EINVAL;
+
+    perf = &processor_pminfo[policy->cpu]->perf;
 
     cpufreq_verify_within_limits(policy, 0, 
         perf->states[perf->platform_limit].core_frequency * 1000);
@@ -447,7 +450,7 @@ acpi_cpufreq_cpu_init(struct cpufreq_policy *policy)
 
     drv_data[cpu] = data;
 
-    data->acpi_data = &processor_pminfo[cpu].perf;
+    data->acpi_data = &processor_pminfo[cpu]->perf;
 
     perf = data->acpi_data;
     policy->shared_type = perf->shared_type;
@@ -580,11 +583,11 @@ static struct cpufreq_driver acpi_cpufreq_driver = {
 
 int cpufreq_limit_change(unsigned int cpu)
 {
-    struct processor_performance *perf = &processor_pminfo[cpu].perf;
+    struct processor_performance *perf = &processor_pminfo[cpu]->perf;
     struct cpufreq_policy *data = cpufreq_cpu_policy[cpu];
     struct cpufreq_policy policy;
 
-    if (!cpu_online(cpu) || !data)
+    if (!cpu_online(cpu) || !data || !processor_pminfo[cpu])
         return -ENODEV;
 
     if ((perf->platform_limit < 0) || 
@@ -607,10 +610,10 @@ int cpufreq_add_cpu(unsigned int cpu)
     unsigned int j;
     struct cpufreq_policy new_policy;
     struct cpufreq_policy *policy;
-    struct processor_performance *perf = &processor_pminfo[cpu].perf;
+    struct processor_performance *perf = &processor_pminfo[cpu]->perf;
 
     /* to protect the case when Px was not controlled by xen */
-    if (!(perf->init & XEN_PX_INIT))
+    if (!processor_pminfo[cpu] || !(perf->init & XEN_PX_INIT))
         return 0;
 
     if (cpu_is_offline(cpu) || cpufreq_cpu_policy[cpu])
@@ -683,10 +686,10 @@ int cpufreq_del_cpu(unsigned int cpu)
 {
     unsigned int dom;
     struct cpufreq_policy *policy;
-    struct processor_performance *perf = &processor_pminfo[cpu].perf;
+    struct processor_performance *perf = &processor_pminfo[cpu]->perf;
 
     /* to protect the case when Px was not controlled by xen */
-    if (!(perf->init & XEN_PX_INIT))
+    if (!processor_pminfo[cpu] || !(perf->init & XEN_PX_INIT))
         return 0;
 
     if (cpu_is_offline(cpu) || !cpufreq_cpu_policy[cpu])

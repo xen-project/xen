@@ -380,8 +380,19 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
                 ret = -EINVAL;
                 break;
             }
-            pmpt = &processor_pminfo[cpuid];
-            pxpt = &processor_pminfo[cpuid].perf;
+            pmpt = processor_pminfo[cpuid];
+            if ( !pmpt )
+            {
+                pmpt = xmalloc(struct processor_pminfo);
+                if ( !pmpt )
+                {
+                    ret = -ENOMEM;
+                    break;
+                }
+                memset(pmpt, 0, sizeof(*pmpt));
+                processor_pminfo[cpuid] = pmpt;
+            }
+            pxpt = &pmpt->perf;
             pmpt->acpi_id = xenpmpt->id;
             pmpt->id = cpuid;
 

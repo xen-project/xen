@@ -40,7 +40,7 @@
 #include <public/sysctl.h>
 #include <acpi/cpufreq/cpufreq.h>
 
-struct pm_px px_statistic_data[NR_CPUS];
+struct pm_px *__read_mostly px_statistic_data[NR_CPUS];
 
 extern uint32_t pmstat_get_cx_nr(uint32_t cpuid);
 extern int pmstat_get_cx_stat(uint32_t cpuid, struct pm_cx_stat *stat);
@@ -49,15 +49,14 @@ extern int pmstat_reset_cx_stat(uint32_t cpuid);
 int do_get_pm_info(struct xen_sysctl_get_pmstat *op)
 {
     int ret = 0;
-    struct pm_px *pxpt = &px_statistic_data[op->cpuid];
-    struct processor_pminfo *pmpt = &processor_pminfo[op->cpuid];
+    const struct processor_pminfo *pmpt = processor_pminfo[op->cpuid];
 
     /* to protect the case when Px was not controlled by xen */
-    if ( (!(pmpt->perf.init & XEN_PX_INIT)) && 
+    if ( (!pmpt || !(pmpt->perf.init & XEN_PX_INIT)) &&
         (op->type & PMSTAT_CATEGORY_MASK) == PMSTAT_PX )
         return -EINVAL;
 
-    if ( !cpu_online(op->cpuid) )
+    if ( op->cpuid >= NR_CPUS || !cpu_online(op->cpuid) )
         return -EINVAL;
 
     switch( op->type )
@@ -73,6 +72,10 @@ int do_get_pm_info(struct xen_sysctl_get_pmstat *op)
         uint64_t now, ct;
         uint64_t total_idle_ns;
         uint64_t tmp_idle_ns;
+        struct pm_px *pxpt = px_statistic_data[op->cpuid];
+
+        if ( !pxpt )
+            return -ENODATA;
 
         total_idle_ns = get_cpu_idle_time(op->cpuid);
         tmp_idle_ns = total_idle_ns - pxpt->prev_idle_wall;

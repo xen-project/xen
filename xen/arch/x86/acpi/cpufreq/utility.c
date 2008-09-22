@@ -32,8 +32,8 @@
 #include <public/sysctl.h>
 
 struct cpufreq_driver   *cpufreq_driver;
-struct processor_pminfo processor_pminfo[NR_CPUS];
-struct cpufreq_policy   *cpufreq_cpu_policy[NR_CPUS];
+struct processor_pminfo *__read_mostly processor_pminfo[NR_CPUS];
+struct cpufreq_policy   *__read_mostly cpufreq_cpu_policy[NR_CPUS];
 
 /*********************************************************************
  *                    Px STATISTIC INFO                              *
@@ -47,10 +47,13 @@ void px_statistic_update(cpumask_t cpumask, uint8_t from, uint8_t to)
     now = NOW();
 
     for_each_cpu_mask(i, cpumask) {
-        struct pm_px *pxpt = &px_statistic_data[i];
-        uint32_t statnum = processor_pminfo[i].perf.state_count;
+        struct pm_px *pxpt = px_statistic_data[i];
+        struct processor_pminfo *pmpt = processor_pminfo[i];
         uint64_t total_idle_ns;
         uint64_t tmp_idle_ns;
+
+        if ( !pxpt || !pmpt )
+            continue;
 
         total_idle_ns = get_cpu_idle_time(i);
         tmp_idle_ns = total_idle_ns - pxpt->prev_idle_wall;
@@ -61,7 +64,7 @@ void px_statistic_update(cpumask_t cpumask, uint8_t from, uint8_t to)
         pxpt->u.pt[from].residency += now - pxpt->prev_state_wall;
         pxpt->u.pt[from].residency -= tmp_idle_ns;
 
-        (*(pxpt->u.trans_pt + from*statnum + to))++;
+        (*(pxpt->u.trans_pt + from * pmpt->perf.state_count + to))++;
 
         pxpt->prev_state_wall = now;
         pxpt->prev_idle_wall = total_idle_ns;
@@ -71,10 +74,22 @@ void px_statistic_update(cpumask_t cpumask, uint8_t from, uint8_t to)
 int px_statistic_init(unsigned int cpuid)
 {
     uint32_t i, count;
-    struct pm_px *pxpt = &px_statistic_data[cpuid];
-    struct processor_pminfo *pmpt = &processor_pminfo[cpuid];
+    struct pm_px *pxpt = px_statistic_data[cpuid];
+    const struct processor_pminfo *pmpt = processor_pminfo[cpuid];
 
     count = pmpt->perf.state_count;
+
+    if ( !pmpt )
+        return -EINVAL;
+
+    if ( !pxpt )
+    {
+        pxpt = xmalloc(struct pm_px);
+        if ( !pxpt )
+            return -ENOMEM;
+        memset(pxpt, 0, sizeof(*pxpt));
+        px_statistic_data[cpuid] = pxpt;
+    }
 
     pxpt->u.trans_pt = xmalloc_array(uint64_t, count * count);
     if (!pxpt->u.trans_pt)
@@ -103,8 +118,10 @@ int px_statistic_init(unsigned int cpuid)
 
 void px_statistic_exit(unsigned int cpuid)
 {
-    struct pm_px *pxpt = &px_statistic_data[cpuid];
+    struct pm_px *pxpt = px_statistic_data[cpuid];
 
+    if (!pxpt)
+        return;
     xfree(pxpt->u.trans_pt);
     xfree(pxpt->u.pt);
     memset(pxpt, 0, sizeof(struct pm_px));
@@ -113,9 +130,13 @@ void px_statistic_exit(unsigned int cpuid)
 void px_statistic_reset(unsigned int cpuid)
 {
     uint32_t i, j, count;
-    struct pm_px *pxpt = &px_statistic_data[cpuid];
+    struct pm_px *pxpt = px_statistic_data[cpuid];
+    const struct processor_pminfo *pmpt = processor_pminfo[cpuid];
 
-    count = processor_pminfo[cpuid].perf.state_count;
+    if ( !pxpt || !pmpt )
+        return;
+
+    count = pmpt->perf.state_count;
 
     for (i=0; i < count; i++) {
         pxpt->u.pt[i].residency = 0;

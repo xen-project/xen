@@ -66,7 +66,7 @@ integer_param("max_cstate", max_cstate);
 static int local_apic_timer_c2_ok __read_mostly = 0;
 boolean_param("lapic_timer_c2_ok", local_apic_timer_c2_ok);
 
-static struct acpi_processor_power processor_powers[NR_CPUS];
+static struct acpi_processor_power *__read_mostly processor_powers[NR_CPUS];
 
 static void print_acpi_power(uint32_t cpu, struct acpi_processor_power *power)
 {
@@ -91,8 +91,11 @@ static void print_acpi_power(uint32_t cpu, struct acpi_processor_power *power)
 
 static void dump_cx(unsigned char key)
 {
-    for( int i = 0; i < num_online_cpus(); i++ )
-        print_acpi_power(i, &processor_powers[i]);
+    unsigned int cpu;
+
+    for_each_online_cpu ( cpu )
+        if (processor_powers[cpu])
+            print_acpi_power(cpu, processor_powers[cpu]);
 }
 
 static int __init cpu_idle_key_init(void)
@@ -193,13 +196,11 @@ static struct {
 
 static void acpi_processor_idle(void)
 {
-    struct acpi_processor_power *power = NULL;
+    struct acpi_processor_power *power = processor_powers[smp_processor_id()];
     struct acpi_processor_cx *cx = NULL;
     int next_state;
     int sleep_ticks = 0;
     u32 t1, t2 = 0;
-
-    power = &processor_powers[smp_processor_id()];
 
     /*
      * Interrupts must be disabled during bus mastering calculations and
@@ -213,7 +214,7 @@ static void acpi_processor_idle(void)
         return;
     }
 
-    next_state = cpuidle_current_governor->select(power);
+    next_state = power ? cpuidle_current_governor->select(power) : -1;
     if ( next_state > 0 )
     {
         cx = &power->states[next_state];
@@ -675,7 +676,15 @@ long set_cx_pminfo(uint32_t cpu, struct xen_processor_power *power)
         return -EFAULT;
     }
 
-    acpi_power = &processor_powers[cpu_id];
+    acpi_power = processor_powers[cpu_id];
+    if ( !acpi_power )
+    {
+        acpi_power = xmalloc(struct acpi_processor_power);
+        if ( !acpi_power )
+            return -ENOMEM;
+        memset(acpi_power, 0, sizeof(*acpi_power));
+        processor_powers[cpu_id] = acpi_power;
+    }
 
     init_cx_pminfo(acpi_power);
 
@@ -713,19 +722,27 @@ long set_cx_pminfo(uint32_t cpu, struct xen_processor_power *power)
 
 uint32_t pmstat_get_cx_nr(uint32_t cpuid)
 {
-    return processor_powers[cpuid].count;
+    return processor_powers[cpuid] ? processor_powers[cpuid]->count : 0;
 }
 
 int pmstat_get_cx_stat(uint32_t cpuid, struct pm_cx_stat *stat)
 {
-    struct acpi_processor_power *power = &processor_powers[cpuid];
+    const struct acpi_processor_power *power = processor_powers[cpuid];
     struct vcpu *v = idle_vcpu[cpuid];
     uint64_t usage;
     int i;
 
+    if ( power == NULL )
+    {
+        stat->last = 0;
+        stat->nr = 0;
+        stat->idle_time = 0;
+        return 0;
+    }
+
     stat->last = (power->last_state) ?
         (int)(power->last_state - &power->states[0]) : 0;
-    stat->nr = processor_powers[cpuid].count;
+    stat->nr = power->count;
     stat->idle_time = v->runstate.time[RUNSTATE_running];
     if ( v->is_running )
         stat->idle_time += NOW() - v->runstate.state_entry_time;
