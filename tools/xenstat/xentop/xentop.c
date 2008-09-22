@@ -419,7 +419,7 @@ int compare_name(xenstat_domain *domain1, xenstat_domain *domain2)
 /* Prints domain name */
 void print_name(xenstat_domain *domain)
 {
-	print("%10s", xenstat_domain_name(domain));
+	print("%10.10s", xenstat_domain_name(domain));
 }
 
 struct {
