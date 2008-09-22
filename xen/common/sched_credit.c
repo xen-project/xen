@@ -1258,14 +1258,15 @@ csched_dump_pcpu(int cpu)
     struct csched_pcpu *spc;
     struct csched_vcpu *svc;
     int loop;
+    char cpustr[100];
 
     spc = CSCHED_PCPU(cpu);
     runq = &spc->runq;
 
-    printk(" sort=%d, sibling=0x%lx, core=0x%lx\n",
-            spc->runq_sort_last,
-            cpu_sibling_map[cpu].bits[0],
-            cpu_core_map[cpu].bits[0]);
+    cpumask_scnprintf(cpustr, sizeof(cpustr), cpu_sibling_map[cpu]);
+    printk(" sort=%d, sibling=%s, ", spc->runq_sort_last, cpustr);
+    cpumask_scnprintf(cpustr, sizeof(cpustr), cpu_core_map[cpu]);
+    printk("core=%s\n", cpustr);
 
     /* current VCPU */
     svc = CSCHED_VCPU(per_cpu(schedule_data, cpu).curr);
@@ -1292,6 +1293,7 @@ csched_dump(void)
 {
     struct list_head *iter_sdom, *iter_svc;
     int loop;
+    char idlers_buf[100];
 
     printk("info:\n"
            "\tncpus              = %u\n"
@@ -1317,7 +1319,8 @@ csched_dump(void)
            CSCHED_TICKS_PER_TSLICE,
            CSCHED_TICKS_PER_ACCT);
 
-    printk("idlers: 0x%lx\n", csched_priv.idlers.bits[0]);
+    cpumask_scnprintf(idlers_buf, sizeof(idlers_buf), csched_priv.idlers);
+    printk("idlers: %s\n", idlers_buf);
 
     CSCHED_STATS_PRINTK();
 

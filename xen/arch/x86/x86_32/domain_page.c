@@ -201,6 +201,9 @@ void *map_domain_page_global(unsigned long mfn)
 
     ASSERT(!in_irq() && local_irq_is_enabled());
 
+    /* At least half the ioremap space should be available to us. */
+    BUILD_BUG_ON(IOREMAP_VIRT_START + (IOREMAP_MBYTES << 19) >= FIXADDR_START);
+
     spin_lock(&globalmap_lock);
 
     idx = find_next_zero_bit(inuse, GLOBALMAP_BITS, inuse_cursor);

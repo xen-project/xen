@@ -145,16 +145,23 @@ static unsigned int default_vcpu0_location(void)
 {
     struct domain *d;
     struct vcpu   *v;
-    unsigned int   i, cpu, cnt[NR_CPUS] = { 0 };
+    unsigned int   i, cpu, nr_cpus, *cnt;
     cpumask_t      cpu_exclude_map;
 
     /* Do an initial CPU placement. Pick the least-populated CPU. */
-    rcu_read_lock(&domlist_read_lock);
-    for_each_domain ( d )
-        for_each_vcpu ( d, v )
-        if ( !test_bit(_VPF_down, &v->pause_flags) )
-            cnt[v->processor]++;
-    rcu_read_unlock(&domlist_read_lock);
+    nr_cpus = last_cpu(cpu_possible_map) + 1;
+    cnt = xmalloc_array(unsigned int, nr_cpus);
+    if ( cnt )
+    {
+        memset(cnt, 0, nr_cpus * sizeof(*cnt));
+
+        rcu_read_lock(&domlist_read_lock);
+        for_each_domain ( d )
+            for_each_vcpu ( d, v )
+                if ( !test_bit(_VPF_down, &v->pause_flags) )
+                    cnt[v->processor]++;
+        rcu_read_unlock(&domlist_read_lock);
+    }
 
     /*
      * If we're on a HT system, we only auto-allocate to a non-primary HT. We 
@@ -172,9 +179,11 @@ static unsigned int default_vcpu0_location(void)
              (cpus_weight(cpu_sibling_map[i]) > 1) )
             continue;
         cpus_or(cpu_exclude_map, cpu_exclude_map, cpu_sibling_map[i]);
-        if ( cnt[i] <= cnt[cpu] )
+        if ( !cnt || cnt[i] <= cnt[cpu] )
             cpu = i;
     }
+
+    xfree(cnt);
 
     return cpu;
 }

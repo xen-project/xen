@@ -1121,7 +1121,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	Dprintk("CPU present map: %lx\n", physids_coerce(phys_cpu_present_map));
 
 	kicked = 1;
-	for (bit = 0; kicked < NR_CPUS && bit < MAX_APICS; bit++) {
+	for (bit = 0; kicked < NR_CPUS && bit < NR_CPUS; bit++) {
 		apicid = cpu_present_to_apicid(bit);
 		/*
 		 * Don't even attempt to start the boot CPU!
