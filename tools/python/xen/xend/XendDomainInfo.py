@@ -2642,9 +2642,6 @@ class XendDomainInfo:
     def _cleanupVm(self):
         """Cleanup VM resources.  Idempotent.  Nothrow guarantee."""
 
-        from xen.xend import XendDomain
-        if not XendDomain.instance().is_domain_managed(self):
-            self.metrics.destroy()
         self._unwatchVm()
 
         try:
@@ -3507,12 +3504,12 @@ class XendDomainInfo:
             except Exception, exn:
                 raise XendError('Failed to destroy device')
 
-    def destroy_xapi_device_instances(self):
-        """Destroy Xen-API device instances stored in XendAPIStore.
+    def destroy_xapi_instances(self):
+        """Destroy Xen-API instances stored in XendAPIStore.
         """
         # Xen-API classes based on XendBase have their instances stored
-        # in XendAPIStore. Cleanup these virtual device instances here
-        # if they are supposed to be destroyed when the parent domain is dead.
+        # in XendAPIStore. Cleanup these instances here, if they are supposed
+        # to be destroyed when the parent domain is dead.
         #
         # Most of the virtual devices (vif, vbd, vfb, etc) are not based on
         # XendBase and there's no need to remove them from XendAPIStore.
@@ -3522,6 +3519,12 @@ class XendDomainInfo:
             # domain still exists.
             return
 
+        # Destroy the VMMetrics instance.
+        if XendAPIStore.get(self.metrics.get_uuid(), self.metrics.getClass()) \
+                is not None:
+            self.metrics.destroy()
+
+        # Destroy DPCI instances.
         for dpci_uuid in XendDPCI.get_by_VM(self.info.get('uuid')):
             XendAPIStore.deregister(dpci_uuid, "DPCI")
             
