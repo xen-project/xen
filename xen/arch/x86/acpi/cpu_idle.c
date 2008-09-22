@@ -63,6 +63,8 @@ extern void (*pm_idle) (void);
 static void (*pm_idle_save) (void) __read_mostly;
 unsigned int max_cstate __read_mostly = ACPI_PROCESSOR_MAX_POWER - 1;
 integer_param("max_cstate", max_cstate);
+static int local_apic_timer_c2_ok __read_mostly = 0;
+boolean_param("lapic_timer_c2_ok", local_apic_timer_c2_ok);
 
 static struct acpi_processor_power processor_powers[NR_CPUS];
 
@@ -267,18 +269,21 @@ static void acpi_processor_idle(void)
         break;
 
     case ACPI_STATE_C2:
-        /* Get start time (ticks) */
-        t1 = inl(pmtmr_ioport);
-        /* Invoke C2 */
-        acpi_idle_do_entry(cx);
-        /* Get end time (ticks) */
-        t2 = inl(pmtmr_ioport);
+        if ( local_apic_timer_c2_ok )
+        {
+            /* Get start time (ticks) */
+            t1 = inl(pmtmr_ioport);
+            /* Invoke C2 */
+            acpi_idle_do_entry(cx);
+            /* Get end time (ticks) */
+            t2 = inl(pmtmr_ioport);
 
-        /* Re-enable interrupts */
-        local_irq_enable();
-        /* Compute time (ticks) that we were actually asleep */
-        sleep_ticks = ticks_elapsed(t1, t2);
-        break;
+            /* Re-enable interrupts */
+            local_irq_enable();
+            /* Compute time (ticks) that we were actually asleep */
+            sleep_ticks = ticks_elapsed(t1, t2);
+            break;
+        }
 
     case ACPI_STATE_C3:
         /*
