@@ -1115,7 +1115,20 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                 goto out;
             }
 
-            if ( !hvm )
+            if ( hvm )
+            {
+                /* Look for and skip completely empty batches. */
+                for ( j = 0; j < batch; j++ )
+                    if ( (pfn_type[j] & XEN_DOMCTL_PFINFO_LTAB_MASK) !=
+                         XEN_DOMCTL_PFINFO_XTAB )
+                        break;
+                if ( j == batch )
+                {
+                    munmap(region_base, batch*PAGE_SIZE);
+                    continue; /* bail on this batch: no valid pages */
+                }
+            }
+            else
             {
                 /* Get page types */
                 for ( j = 0; j < batch; j++ )
