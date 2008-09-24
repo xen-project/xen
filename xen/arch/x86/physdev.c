@@ -75,8 +75,8 @@ static int map_domain_pirq(struct domain *d, int pirq, int vector,
 
     if ( pirq < 0 || pirq >= NR_PIRQS || vector < 0 || vector >= NR_VECTORS )
     {
-        gdprintk(XENLOG_G_ERR,
-                 "invalid pirq %x or vector %x\n", pirq, vector);
+        dprintk(XENLOG_G_ERR, "dom%d: invalid pirq %d or vector %d\n",
+                d->domain_id, pirq, vector);
         return -EINVAL;
     }
 
@@ -86,8 +86,8 @@ static int map_domain_pirq(struct domain *d, int pirq, int vector,
     if ( (old_vector && (old_vector != vector) ) ||
          (old_pirq && (old_pirq != pirq)) )
     {
-        gdprintk(XENLOG_G_ERR, "remap pirq %x vector %x while not unmap\n",
-                 pirq, vector);
+        dprintk(XENLOG_G_ERR, "dom%d: pirq %d or vector %d already mapped\n",
+                d->domain_id, pirq, vector);
         ret = -EINVAL;
         goto done;
     }
@@ -95,8 +95,8 @@ static int map_domain_pirq(struct domain *d, int pirq, int vector,
     ret = irq_permit_access(d, pirq);
     if ( ret )
     {
-        gdprintk(XENLOG_G_ERR, "add irq permit access %x failed\n", pirq);
-        ret = -EINVAL;
+        dprintk(XENLOG_G_ERR, "dom%d: could not permit access to irq %d\n",
+                d->domain_id, pirq);
         goto done;
     }
 
@@ -109,8 +109,8 @@ static int map_domain_pirq(struct domain *d, int pirq, int vector,
 
         spin_lock_irqsave(&desc->lock, flags);
         if ( desc->handler != &no_irq_type )
-            gdprintk(XENLOG_G_ERR, "Map vector %x to msi while it is in use\n",
-                     vector);
+            dprintk(XENLOG_G_ERR, "dom%d: vector %d in use\n",
+                    d->domain_id, vector);
         desc->handler = &pci_msi_type;
 
         msi.bus = map->bus;
@@ -152,8 +152,8 @@ static int unmap_domain_pirq(struct domain *d, int pirq)
 
     if ( !vector )
     {
-        gdprintk(XENLOG_G_ERR, "domain %X: pirq %x not mapped still\n",
-                 d->domain_id, pirq);
+        dprintk(XENLOG_G_ERR, "dom%d: pirq %d not mapped\n",
+                d->domain_id, pirq);
         ret = -EINVAL;
         goto done;
     }
@@ -175,7 +175,8 @@ static int unmap_domain_pirq(struct domain *d, int pirq)
 
     ret = irq_deny_access(d, pirq);
     if ( ret )
-        gdprintk(XENLOG_G_ERR, "deny irq %x access failed\n", pirq);
+        dprintk(XENLOG_G_ERR, "dom%d: could not deny access to irq %d\n",
+                d->domain_id, pirq);
 
  done:
     return ret;
@@ -207,19 +208,19 @@ static int physdev_map_pirq(struct physdev_map_pirq *map)
     switch ( map->type )
     {
         case MAP_PIRQ_TYPE_GSI:
-            if ( map->index >= NR_IRQS )
+            if ( map->index < 0 || map->index >= NR_IRQS )
             {
+                dprintk(XENLOG_G_ERR, "dom%d: map invalid irq %d\n",
+                        d->domain_id, map->index);
                 ret = -EINVAL;
-                gdprintk(XENLOG_G_ERR,
-                         "map invalid irq %x\n", map->index);
                 goto free_domain;
             }
             vector = IO_APIC_VECTOR(map->index);
             if ( !vector )
             {
+                dprintk(XENLOG_G_ERR, "dom%d: map irq with no vector %d\n",
+                        d->domain_id, map->index);
                 ret = -EINVAL;
-                gdprintk(XENLOG_G_ERR,
-                         "map irq with no vector %x\n", map->index);
                 goto free_domain;
             }
             break;
@@ -230,17 +231,16 @@ static int physdev_map_pirq(struct physdev_map_pirq *map)
 
             if ( vector < 0 || vector >= NR_VECTORS )
             {
+                dprintk(XENLOG_G_ERR, "dom%d: map irq with wrong vector %d\n",
+                        d->domain_id, map->index);
                 ret = -EINVAL;
-                gdprintk(XENLOG_G_ERR,
-                         "map_pirq with wrong vector %x\n", map->index);
                 goto free_domain;
             }
             break;
         default:
+            dprintk(XENLOG_G_ERR, "dom%d: wrong map_pirq type %x\n", d->domain_id, map->type);
             ret = -EINVAL;
-            gdprintk(XENLOG_G_ERR, "wrong map_pirq type %x\n", map->type);
             goto free_domain;
-            break;
     }
 
     spin_lock_irqsave(&d->arch.irq_lock, flags);
@@ -248,9 +248,9 @@ static int physdev_map_pirq(struct physdev_map_pirq *map)
     {
         if ( d->arch.vector_pirq[vector] )
         {
-            gdprintk(XENLOG_G_ERR, "%x %x mapped already%x\n",
-                                    map->index, map->pirq,
-                                    d->arch.vector_pirq[vector]);
+            dprintk(XENLOG_G_ERR, "dom%d: %d:%d already mapped to %d\n",
+                    d->domain_id, map->index, map->pirq,
+                    d->arch.vector_pirq[vector]);
             pirq = d->arch.vector_pirq[vector];
         }
         else
@@ -258,8 +258,8 @@ static int physdev_map_pirq(struct physdev_map_pirq *map)
             pirq = get_free_pirq(d, map->type, map->index);
             if ( pirq < 0 )
             {
+                dprintk(XENLOG_G_ERR, "dom%d: no free pirq\n", d->domain_id);
                 ret = pirq;
-                gdprintk(XENLOG_G_ERR, "No free pirq\n");
                 goto done;
             }
         }
@@ -269,8 +269,8 @@ static int physdev_map_pirq(struct physdev_map_pirq *map)
         if ( d->arch.vector_pirq[vector] &&
              d->arch.vector_pirq[vector] != map->pirq )
         {
-            gdprintk(XENLOG_G_ERR, "%x conflict with %x\n",
-              map->index, map->pirq);
+            dprintk(XENLOG_G_ERR, "dom%d: vector %d conflicts with irq %d\n",
+                    d->domain_id, map->index, map->pirq);
             ret = -EEXIST;
             goto done;
         }
