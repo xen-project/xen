@@ -302,9 +302,10 @@ unsigned long clone_idle_pagetable(struct vcpu *);
  * WARNING: This will need to be disabled to run OSes that use the spare PTE
  * bits themselves (e.g., *BSD).
  */
-#ifndef NDEBUG
-#define _PAGE_GNTTAB   _PAGE_AVAIL2
-#else
+#ifdef NDEBUG
+#undef _PAGE_GNTTAB
+#endif
+#ifndef _PAGE_GNTTAB
 #define _PAGE_GNTTAB   0
 #endif
 

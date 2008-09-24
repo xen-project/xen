@@ -104,6 +104,9 @@ typedef l4_pgentry_t root_pgentry_t;
 #define _PAGE_NX_BIT (1U<<23)
 #define _PAGE_NX     (cpu_has_nx ? _PAGE_NX_BIT : 0U)
 
+/* Bit 22 of a 24-bit flag mask. This corresponds to bit 62 of a pte.*/
+#define _PAGE_GNTTAB (1U<<22)
+
 /*
  * Disallow unused flag bits plus PAT/PSE, PCD, PWT and GLOBAL.
  * Permit the NX bit if the hardware supports it.
