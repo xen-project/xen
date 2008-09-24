@@ -67,13 +67,12 @@ The attached console will perform much like a standard serial console,
 so running curses based interfaces over the console B<is not
 advised>.  Vi tends to get very odd when using it over this interface.
 
-=item B<create> [B<-c>] I<configfile> [I<name>=I<value>]..
+=item B<create> I<configfile> [I<OPTIONS>] [I<vars>]..
 
-The create sub command requires a config file and can optionally take a
-series of name value pairs that add to or override variables defined
+The create subcommand requires a config file and can optionally take a
+series of I<vars> that add to or override variables defined
 in the config file.  See L<xmdomain.cfg> for full details of that file
-format, and possible options used in either the configfile or
-I<name>=I<value> combinations.
+format, and possible options used in either the configfile or for I<vars>.
 
 I<configfile> can either be an absolute path to a file, or a relative
 path to a file located in /etc/xen.
@@ -86,9 +85,65 @@ B<OPTIONS>
 
 =over 4 
 
-=item B<-c>
+=item B<--help_config>
 
-Attache console to the domain as soon as it has started.  This is
+Print the available configuration variables I<vars>.  These variables may be
+used on the command line or in the configuration file I<configfile>.
+
+=item B<-q>, B<--quiet>
+
+No console output.
+
+=item B<--path>
+
+Search path for configuration scripts. The value of PATH is a 
+colon-separated directory list.
+
+=item B<-f=FILE>, B<--defconfig=FILE>
+
+Use the given Python configuration script. The configuration 
+script is loaded after arguments have been processed. Each 
+command-line option sets a configuration variable named after 
+its long option name, and these variables are placed in the
+environment of the script before it is loaded. Variables 
+for options that may be repeated have list values. Other 
+variables can be set using name=value on the command line. 
+After the script is loaded, option values that were not set 
+on the command line are replaced by the values set in the script.
+
+=item B<-F=FILE>, B<--config=FILE>
+
+Use the given SXP formated configuration script.
+SXP is the underlying configuration format used by Xen.
+SXP configuration scripts can be hand-written or generated
+from Python configuration scripts, using the -n
+(dryrun) option to print the configuration.  An SXP formatted
+configuration file may also be generated for a given I<domain-id> by 
+redirecting the output from the the B<xm list --long I<domain-id>> 
+to a file.
+
+=item B<-n>, B<--dryrun>
+
+Dry run - prints the resulting configuration in SXP
+but does not create the domain.
+
+=item B<-x>, B<--xmldryrun>
+
+XML dry run - prints the resulting configuration in
+XML but does not create the domain.
+
+=item B<-s>, B<--skipdtd>
+
+Skip DTD checking - skips checks on XML before
+creating. Experimental. Can decrease create time.
+
+=item B<-p>, B<--paused>
+
+Leave the domain paused after it is created.
+
+=item B<-c>, B<--console_autoconnect>
+
+Attach console to the domain as soon as it has started.  This is
 useful for determining issues with crashing domains.
 
 =back
@@ -118,6 +173,11 @@ virtual networking.  (This example comes from the xm-test test suite.)
 
 =back
 
+=item B<delete>
+
+Remove a domain from Xend domain management. The B<xm list> command
+shows the domain names.
+
 =item B<destroy> I<domain-id>
 
 Immediately terminate the domain I<domain-id>.  This doesn't give the
@@ -133,6 +193,28 @@ Converts a domain name to a domain id using xend's internal mapping.
 
 Converts a domain id to a domain name using xend's internal mapping.
 
+=item B<dump-core> [I<OPTIONS>] I<domain-id> [I<filename>]
+
+Dumps the virtual machine's memory for the specified domain to the
+I<filename> specified.  The dump file will be written to a distribution
+specific directory for dump files.  Such as: /var/lib/xen/dump or 
+/var/xen/dump  Defaults to dumping the core without pausing the domain
+if no I<OPTIONS> are specified.
+
+B<OPTIONS>
+
+=over 4
+
+=item B<-L>, B<--live>
+
+Dump core without pausing the domain.
+
+=item B<-C>, B<--crash>
+
+Crash domain after dumping core.
+
+=back
+
 =item B<help> [B<--long>]
 
 Displays the short help message (i.e. common commands).
@@ -140,10 +222,35 @@ Displays the short help message (i.e. common commands).
 The B<--long> option prints out the complete set of B<xm> subcommands,
 grouped by function.
 
-=item B<list> [B<--long> | B<--label>] [I<domain-id> ...]
+=item B<list> [I<OPTIONS>] [I<domain-id> ...]
 
 Prints information about one or more domains.  If no domains are
 specified it prints out information about all domains.
+
+
+B<OPTIONS>
+
+=over 4
+
+=item B<-l>, B<--long>
+
+The output for B<xm list> is not the table view shown below, but 
+instead presents the data in SXP format.
+
+=item B<--label>
+
+Security labels are added to the output of xm list and the lines 
+are sorted by the labels (ignoring case). 
+See the ACCESS CONTROL SUBCOMMAND section of this man page for more 
+information about labels.
+
+=item B<--state=<state>>
+
+Output information for VMs in the specified state.
+
+=back
+
+B<EXAMPLE>
 
 An example format for the list is as follows:
 
@@ -164,10 +271,10 @@ Xen.
 
 B<STATES>
 
-=over 4
-
 The State field lists 6 states for a Xen domain, and which ones the
 current domain is in.
+
+=over 4
 
 =item B<r - running>
 
@@ -204,32 +311,6 @@ crashed.
 FIXME: Is this right?
 
 =back
-
-B<LONG OUTPUT>
-
-=over 4
-
-If B<--long> is specified, the output for B<xm list> is not the table
-view shown above, but instead is an S-Expression representing all
-information known about all domains asked for.  This is mostly only
-useful for external programs to parse the data.
-
-B<Note:> There is no stable guarantees on the format of this data.
-Use at your own risk.
-
-=back
-
-B<LABEL OUTPUT>
-
-=over 4
-
-If B<--label> is specified, the security labels are added to the
-output of B<xm list> and the lines are sorted by the labels (ignoring
-case). The B<--long> option prints the labels by default and cannot be
-combined with B<--label>. See the ACCESS CONTROL SUBCOMMAND section of
-this man page for more information about labels.
-
-==back
 
 B<NOTES>
 
@@ -296,6 +377,90 @@ attempting to do other useful work.
 
 =back
 
+=item B<new> I<configfile> [I<OPTIONS>] [I<vars>]...
+
+Adds a domain to Xend domain management.
+
+The new subcommand requires a config file and can optionally 
+take a series of I<vars> that add to or override variables 
+defined in the config file.  See xmdomain.cfg for full details of that 
+file format, and possible options used in either the configfile or for
+I<vars>.
+
+I<configfile> can either be an absolute path to a file, or a relative 
+path to a file located in /etc/xen.
+
+The new subcommand will return without starting the domain.  The 
+domain needs to be started using the B<xm start> command.
+
+B<OPTIONS>
+
+=over 4
+
+=item B<--help_config>
+
+Print the available configuration variables I<vars>.  These variables may be
+used on the command line or in the configuration file I<configfile>.
+
+=item B<-q>, B<--quiet>
+
+No console output.
+
+=item B<--path>
+
+Search path for configuration scripts. The value of PATH is a 
+colon-separated directory list.
+
+=item B<-f=FILE>, B<--defconfig=FILE>
+
+
+Use the given Python configuration script. The configuration 
+script is loaded after arguments have been processed. Each 
+command-line option sets a configuration variable named after 
+its long option name, and these variables are placed in the
+environment of the script before it is loaded. Variables 
+for options that may be repeated have list values. Other 
+variables can be set using name=value on the command line. 
+After the script is loaded, option values that were not set 
+on the command line are replaced by the values set in the script.
+
+=item B<-F=FILE>, B<--config=FILE>
+
+Use the given SXP formated configuration script.
+SXP is the underlying configuration format used by Xen.
+SXP configuration scripts can be hand-written or generated
+from Python configuration scripts, using the -n
+(dryrun) option to print the configuration.  An SXP formatted
+configuration file may also be generated for a given I<domain-id> by 
+redirecting the output from the the B<xm list --long I<domain-id>> 
+to a file.
+
+=item B<-n>, B<--dryrun>
+
+Dry run - prints the resulting configuration in SXP
+but does not create the domain.
+
+=item B<-x>, B<--xmldryrun>
+
+XML dry run - prints the resulting configuration in
+XML but does not create the domain.
+
+=item B<-s>, B<--skipdtd>
+
+Skip DTD checking - skips checks on XML before
+creating. Experimental. Can decrease create time.
+
+=item B<-p>, B<--paused>
+
+Leave the domain paused after it is created.
+
+=item B<-c>, B<--console_autoconnect>
+
+Attach console to the domain as soon as it has started.  This is
+useful for determining issues with crashing domains.
+
+=back
+
 =item B<pause> I<domain-id>
 
 Pause a domain.  When in a paused state the domain will still consume
@@ -331,6 +496,22 @@ as all services in the domain will have to be shut down cleanly.
 =item B<restore> I<state-file>
 
 Build a domain from an B<xm save> state file.  See B<save> for more info.
+
+=item B<resume> I<domain-name> [I<OPTIONS>]
+
+Moves a domain out of the suspended state and back into memory.  
+
+B<OPTIONS>
+
+=over 4
+
+=item B<-p>, <--paused>
+
+Moves a domain back into memory but leaves the domain in a paused state.
+The B<xm unpause> subcommand may then be used to bring it out of the 
+paused state.
+
+=back
 
 =item B<save> I<domain-id> I<state-file>
 
@@ -369,6 +550,31 @@ a Xen system.
 Wait for the domain to complete shutdown before returning.
 
 =back
+
+=item B<start> I<domain-name> [I<OPTIONS>]
+
+Start a Xend managed domain that was added using the B<xm new> command.
+
+
+B<OPTIONS>
+
+=over 4
+
+=item B<-p>, B<--paused>
+
+Do not unpause domain after starting it.
+
+=item B<-c>, B<--console_autoconnect>
+
+Connect to the console after the domain is created.
+
+=back
+
+=item B<suspend> I<domain-name>
+
+Suspend a domain to a state file so that it can be later
+resumed using the B<xm resume> subcommand.  Similar to the B<xm save> 
+subcommand although the state file may not be specified.
 
 =item B<sysrq> I<domain-id> I<letter>
 
@@ -477,10 +683,10 @@ page more readable):
 
 B<FIELDS>
 
-=over 4
-
 Not all fields will be explained here, but some of the less obvious
 ones deserve explanation:
+
+=over 4
 
 =item B<hw_caps>
 
@@ -514,6 +720,10 @@ Print out the xend log.  This log file can be found in
 Executes the B<xentop> command, which provides real time monitoring of
 domains.  Xentop is a curses interface, and reasonably self
 explanatory.
+
+=item B<uptime>
+
+Prints the current uptime of the domains running.
 
 =back
 
@@ -698,13 +908,19 @@ in the domain.
 List virtual block devices for a domain.  The returned output is
 formatted as a list or as an S-Expression if the B<--long> option was given.
 
+=back
+
 =head2 NETWORK DEVICES
+
+=over 4
 
 =item B<network-attach> I<domain-id> [B<script=>I<scriptname>] [B<ip=>I<ipaddr>]
 [B<mac=>I<macaddr>] [B<bridge=>I<bridge-name>] [B<backend=>I<bedomain-id>]
 
 Creates a new network device in the domain specified by I<domain-id>.  It
 takes the following optional options:
+
+=back
 
 B<OPTIONS>
 
@@ -739,6 +955,8 @@ The backend domain id.  By default this is domain 0.
 
 =back
 
+=over 4
+
 =item B<network-detach> I<domain-id> I<devid>
 
 Removes the network device from the domain specified by I<domain-id>.
@@ -753,7 +971,11 @@ removed from domain 0.
 List virtual network interfaces for a domain.  The returned output is
 formatted as a list or as an S-Expression if the B<--long> option was given.
 
+=back
+
 =head2 VIRTUAL TPM DEVICES
+
+=over 4
 
 =item B<vtpm-list> [B<-l>|B<--long>] I<domain-id>
 
@@ -828,6 +1050,8 @@ security in Xen, you must compile Xen with ACM support enabled as
 described under "Configuring Security" below. There, you will find
 also examples of each subcommand described here.
 
+=over 4
+
 =item B<setpolicy> ACM I<policy>
 
 Makes the given ACM policy available to xend as a I<xend-managed policy>.
@@ -835,6 +1059,8 @@ The policy is compiled and a mapping (.map) as well as a binary (.bin)
 version of the policy is created. The policy is loaded and the system's
 bootloader is prepared to boot the system with this policy the next time
 it is started.
+
+=back
 
 =over 4
 
@@ -848,6 +1074,8 @@ example/chwall_ste/client_v1-security_policy.xml relative to the
 global policy root directory.
 
 =back
+
+=over 4
 
 =item B<resetpolicy>
 
@@ -1152,6 +1380,8 @@ The mapping version of the policy is created during the XML-to-binary
 policy translation (B<setpolicy>) and is used by xend and the management
 tools to translate between label names used as input to the tools and
 their binary identifiers (ssidrefs) used inside Xen.
+
+=back
 
 =back
 
