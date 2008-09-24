@@ -727,7 +727,6 @@ void pci_disable_msi(int vector)
         __pci_disable_msix(vector);
 }
 
-extern struct hw_interrupt_type pci_msi_type;
 static void msi_free_vectors(struct pci_dev* dev)
 {
     struct msi_desc *entry, *tmp;

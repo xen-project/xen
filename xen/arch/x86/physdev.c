@@ -26,17 +26,11 @@ int
 ioapic_guest_write(
     unsigned long physbase, unsigned int reg, u32 pval);
 
-
-extern struct hw_interrupt_type pci_msi_type;
-
 static int get_free_pirq(struct domain *d, int type, int index)
 {
     int i;
 
-    if ( d == NULL )
-        return -EINVAL;
-
-    ASSERT(spin_is_locked(&d->arch.irq_lock));
+    ASSERT(spin_is_locked(&d->evtchn_lock));
 
     if ( type == MAP_PIRQ_TYPE_GSI )
     {
@@ -64,11 +58,10 @@ static int map_domain_pirq(struct domain *d, int pirq, int vector,
     int ret = 0;
     int old_vector, old_pirq;
     struct msi_info msi;
+    irq_desc_t *desc;
+    unsigned long flags;
 
-    if ( d == NULL )
-        return -EINVAL;
-
-    ASSERT(spin_is_locked(&d->arch.irq_lock));
+    ASSERT(spin_is_locked(&d->evtchn_lock));
 
     if ( !IS_PRIV(current->domain) )
         return -EPERM;
@@ -88,8 +81,7 @@ static int map_domain_pirq(struct domain *d, int pirq, int vector,
     {
         dprintk(XENLOG_G_ERR, "dom%d: pirq %d or vector %d already mapped\n",
                 d->domain_id, pirq, vector);
-        ret = -EINVAL;
-        goto done;
+        return -EINVAL;
     }
 
     ret = irq_permit_access(d, pirq);
@@ -97,17 +89,14 @@ static int map_domain_pirq(struct domain *d, int pirq, int vector,
     {
         dprintk(XENLOG_G_ERR, "dom%d: could not permit access to irq %d\n",
                 d->domain_id, pirq);
-        goto done;
+        return ret;
     }
+
+    desc = &irq_desc[vector];
+    spin_lock_irqsave(&desc->lock, flags);
 
     if ( map && MAP_PIRQ_TYPE_MSI == map->type )
     {
-        irq_desc_t         *desc;
-        unsigned long flags;
-
-        desc = &irq_desc[vector];
-
-        spin_lock_irqsave(&desc->lock, flags);
         if ( desc->handler != &no_irq_type )
             dprintk(XENLOG_G_ERR, "dom%d: vector %d in use\n",
                     d->domain_id, vector);
@@ -120,8 +109,6 @@ static int map_domain_pirq(struct domain *d, int pirq, int vector,
         msi.vector = vector;
 
         ret = pci_enable_msi(&msi);
-
-        spin_unlock_irqrestore(&desc->lock, flags);
         if ( ret )
             goto done;
     }
@@ -130,6 +117,7 @@ static int map_domain_pirq(struct domain *d, int pirq, int vector,
     d->arch.vector_pirq[vector] = pirq;
 
 done:
+    spin_unlock_irqrestore(&desc->lock, flags);
     return ret;
 }
 
@@ -139,18 +127,18 @@ static int unmap_domain_pirq(struct domain *d, int pirq)
     unsigned long flags;
     irq_desc_t *desc;
     int vector, ret = 0;
+    bool_t forced_unbind;
 
-    if ( d == NULL || pirq < 0 || pirq >= NR_PIRQS )
+    if ( (pirq < 0) || (pirq >= NR_PIRQS) )
         return -EINVAL;
 
     if ( !IS_PRIV(current->domain) )
         return -EINVAL;
 
-    ASSERT(spin_is_locked(&d->arch.irq_lock));
+    ASSERT(spin_is_locked(&d->evtchn_lock));
 
     vector = d->arch.pirq_vector[pirq];
-
-    if ( !vector )
+    if ( vector <= 0 )
     {
         dprintk(XENLOG_G_ERR, "dom%d: pirq %d not mapped\n",
                 d->domain_id, pirq);
@@ -158,20 +146,34 @@ static int unmap_domain_pirq(struct domain *d, int pirq)
         goto done;
     }
 
+    forced_unbind = (pirq_guest_unbind(d, pirq) == 0);
+    if ( forced_unbind )
+        dprintk(XENLOG_G_WARNING, "dom%d: forcing unbind of pirq %d\n",
+                d->domain_id, pirq);
+
     desc = &irq_desc[vector];
     spin_lock_irqsave(&desc->lock, flags);
+
+    BUG_ON(vector != d->arch.pirq_vector[pirq]);
+
     if ( desc->msi_desc )
         pci_disable_msi(vector);
 
     if ( desc->handler == &pci_msi_type )
-    {
-        /* MSI is not shared, so should be released already */
-        BUG_ON(desc->status & IRQ_GUEST);
-        irq_desc[vector].handler = &no_irq_type;
-    }
-    spin_unlock_irqrestore(&desc->lock, flags);
+        desc->handler = &no_irq_type;
 
-    d->arch.pirq_vector[pirq] = d->arch.vector_pirq[vector] = 0;
+    if ( !forced_unbind )
+    {
+        d->arch.pirq_vector[pirq] = 0;
+        d->arch.vector_pirq[vector] = 0;
+    }
+    else
+    {
+        d->arch.pirq_vector[pirq] = -vector;
+        d->arch.vector_pirq[vector] = -pirq;
+    }
+
+    spin_unlock_irqrestore(&desc->lock, flags);
 
     ret = irq_deny_access(d, pirq);
     if ( ret )
@@ -186,7 +188,6 @@ static int physdev_map_pirq(struct physdev_map_pirq *map)
 {
     struct domain *d;
     int vector, pirq, ret = 0;
-    unsigned long flags;
 
     if ( !IS_PRIV(current->domain) )
         return -EPERM;
@@ -243,8 +244,8 @@ static int physdev_map_pirq(struct physdev_map_pirq *map)
             goto free_domain;
     }
 
-    spin_lock_irqsave(&d->arch.irq_lock, flags);
-    if ( map->pirq == -1 )
+    spin_lock(&d->evtchn_lock);
+    if ( map->pirq < 0 )
     {
         if ( d->arch.vector_pirq[vector] )
         {
@@ -252,6 +253,11 @@ static int physdev_map_pirq(struct physdev_map_pirq *map)
                     d->domain_id, map->index, map->pirq,
                     d->arch.vector_pirq[vector]);
             pirq = d->arch.vector_pirq[vector];
+            if ( pirq < 0 )
+            {
+                ret = -EBUSY;
+                goto done;
+            }
         }
         else
         {
@@ -284,7 +290,7 @@ static int physdev_map_pirq(struct physdev_map_pirq *map)
     if ( !ret )
         map->pirq = pirq;
 done:
-    spin_unlock_irqrestore(&d->arch.irq_lock, flags);
+    spin_unlock(&d->evtchn_lock);
 free_domain:
     rcu_unlock_domain(d);
     return ret;
@@ -293,7 +299,6 @@ free_domain:
 static int physdev_unmap_pirq(struct physdev_unmap_pirq *unmap)
 {
     struct domain *d;
-    unsigned long flags;
     int ret;
 
     if ( !IS_PRIV(current->domain) )
@@ -307,9 +312,9 @@ static int physdev_unmap_pirq(struct physdev_unmap_pirq *unmap)
     if ( d == NULL )
         return -ESRCH;
 
-    spin_lock_irqsave(&d->arch.irq_lock, flags);
+    spin_lock(&d->evtchn_lock);
     ret = unmap_domain_pirq(d, unmap->pirq);
-    spin_unlock_irqrestore(&d->arch.irq_lock, flags);
+    spin_unlock(&d->evtchn_lock);
 
     rcu_unlock_domain(d);
 
@@ -416,7 +421,6 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
 
     case PHYSDEVOP_alloc_irq_vector: {
         struct physdev_irq irq_op;
-        unsigned long flags;
 
         ret = -EFAULT;
         if ( copy_from_guest(&irq_op, arg, 1) != 0 )
@@ -437,9 +441,9 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
 
         irq_op.vector = assign_irq_vector(irq);
 
-        spin_lock_irqsave(&dom0->arch.irq_lock, flags);
+        spin_lock(&dom0->evtchn_lock);
         ret = map_domain_pirq(dom0, irq_op.irq, irq_op.vector, NULL);
-        spin_unlock_irqrestore(&dom0->arch.irq_lock, flags);
+        spin_unlock(&dom0->evtchn_lock);
 
         if ( copy_to_guest(arg, &irq_op, 1) != 0 )
             ret = -EFAULT;

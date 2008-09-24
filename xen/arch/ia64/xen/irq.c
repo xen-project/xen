@@ -459,20 +459,24 @@ int pirq_guest_bind(struct vcpu *v, int irq, int will_share)
     return rc;
 }
 
-void pirq_guest_unbind(struct domain *d, int irq)
+int pirq_guest_unbind(struct domain *d, int irq)
 {
     irq_desc_t         *desc = &irq_desc[irq];
     irq_guest_action_t *action;
     unsigned long       flags;
-    int                 i;
+    int                 i, rc = 0;
 
     spin_lock_irqsave(&desc->lock, flags);
 
     action = (irq_guest_action_t *)desc->action;
 
-    i = 0;
-    while ( action->guest[i] && (action->guest[i] != d) )
-        i++;
+    for ( i = 0; (i < action->nr_guests) && (action->guest[i] != d); i++ )
+        continue;
+    if ( i == action->nr_guests )
+    {
+        rc = -EINVAL;
+        goto out;
+    }
     memmove(&action->guest[i], &action->guest[i+1], IRQ_MAX_GUESTS-i-1);
     action->nr_guests--;
 
@@ -492,7 +496,9 @@ void pirq_guest_unbind(struct domain *d, int irq)
         desc->handler->shutdown(irq);
     }
 
+ out:
     spin_unlock_irqrestore(&desc->lock, flags);    
+    return rc;
 }
 
 void

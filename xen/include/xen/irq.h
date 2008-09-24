@@ -22,7 +22,6 @@ struct irqaction
 #define IRQ_PENDING	4	/* IRQ pending - replay on enable */
 #define IRQ_REPLAY	8	/* IRQ has been replayed but not acked yet */
 #define IRQ_GUEST       16      /* IRQ is handled by guest OS(es) */
-#define IRQ_LEVEL       64      /* IRQ level triggered */
 #define IRQ_PER_CPU     256     /* IRQ is per CPU */
 
 /*
@@ -78,7 +77,7 @@ struct vcpu;
 extern int pirq_guest_eoi(struct domain *d, int irq);
 extern int pirq_guest_unmask(struct domain *d);
 extern int pirq_guest_bind(struct vcpu *v, int irq, int will_share);
-extern void pirq_guest_unbind(struct domain *d, int irq);
+extern int pirq_guest_unbind(struct domain *d, int irq);
 
 static inline void set_native_irq_info(int irq, cpumask_t mask)
 {

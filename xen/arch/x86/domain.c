@@ -414,8 +414,6 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
             goto fail;
     }
 
-    spin_lock_init(&d->arch.irq_lock);
-
     if ( is_hvm_domain(d) )
     {
         if ( (rc = hvm_domain_initialise(d)) != 0 )
