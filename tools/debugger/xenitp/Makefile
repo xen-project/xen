@@ -30,10 +30,16 @@ install: build
 	[ -z "$(LIBBIN)" ] || $(INSTALL_DIR) $(DESTDIR)$(PRIVATE_BINDIR)
 	$(INSTALL_DIR) $(DESTDIR)$(MAN1DIR)
 	$(INSTALL_DIR) $(DESTDIR)$(MAN8DIR)
-	$(INSTALL_PROG) $(BIN) $(SCRIPTS) $(DESTDIR)$(BINDIR)
+	if [ "x$(SCRIPTS)" != "x" ]; then \
+		$(INSTALL_PROG) $(BIN) $(SCRIPTS) $(DESTDIR)$(BINDIR); \
+	fi
 	[ -z "$(LIBBIN)" ] || $(INSTALL_PROG) $(LIBBIN) $(DESTDIR)$(PRIVATE_BINDIR)
-	$(INSTALL_DATA) $(MAN1) $(DESTDIR)$(MAN1DIR)
-	$(INSTALL_DATA) $(MAN8) $(DESTDIR)$(MAN8DIR)
+	if [ "x$(MAN1)" != "x" ]; then \
+		$(INSTALL_DATA) $(MAN1) $(DESTDIR)$(MAN1DIR); \
+	fi
+	if [ "x$(MAN1)" != "x" ]; then \
+		$(INSTALL_DATA) $(MAN8) $(DESTDIR)$(MAN8DIR); \
+	fi
 
 .PHONY: clean
 clean:
