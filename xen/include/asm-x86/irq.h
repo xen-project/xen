@@ -55,4 +55,6 @@ int pirq_shared(struct domain *d , int irq);
 #define domain_irq_to_vector(d, irq) ((d)->arch.pirq_vector[(irq)])
 #define domain_vector_to_irq(d, vec) ((d)->arch.vector_pirq[(vec)])
 
+int pirq_guest_force_unbind(struct domain *d, int irq);
+
 #endif /* _ASM_HW_IRQ_H */

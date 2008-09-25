@@ -387,8 +387,7 @@ static long __evtchn_close(struct domain *d1, int port1)
         break;
 
     case ECS_PIRQ:
-        if ( pirq_guest_unbind(d1, chn1->u.pirq) != 0 )
-            BUG();
+        pirq_guest_unbind(d1, chn1->u.pirq);
         d1->pirq_to_evtchn[chn1->u.pirq] = 0;
         break;
 

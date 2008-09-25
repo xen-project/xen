@@ -146,7 +146,7 @@ static int unmap_domain_pirq(struct domain *d, int pirq)
         goto done;
     }
 
-    forced_unbind = (pirq_guest_unbind(d, pirq) == 0);
+    forced_unbind = pirq_guest_force_unbind(d, pirq);
     if ( forced_unbind )
         dprintk(XENLOG_G_WARNING, "dom%d: forcing unbind of pirq %d\n",
                 d->domain_id, pirq);
