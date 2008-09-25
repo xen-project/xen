@@ -1016,10 +1016,10 @@ ioports_permit_access(struct domain *d, unsigned int fp, unsigned int lp)
     lp = IO_SPACE_PORT(lp);
 
     if (space->sparse) {
-        mmio_start = IO_SPACE_SPARSE_ENCODING(fp) & ~PAGE_MASK;
+        mmio_start = IO_SPACE_SPARSE_ENCODING(fp) & PAGE_MASK;
         mmio_end = PAGE_ALIGN(IO_SPACE_SPARSE_ENCODING(lp));
     } else {
-        mmio_start = fp & ~PAGE_MASK;
+        mmio_start = fp & PAGE_MASK;
         mmio_end = PAGE_ALIGN(lp);
     }
 
@@ -1079,10 +1079,10 @@ ioports_deny_access(struct domain *d, unsigned int fp, unsigned int lp)
     lp_base = IO_SPACE_PORT(lp);
 
     if (space->sparse) {
-        mmio_start = IO_SPACE_SPARSE_ENCODING(fp_base) & ~PAGE_MASK;
+        mmio_start = IO_SPACE_SPARSE_ENCODING(fp_base) & PAGE_MASK;
         mmio_end = PAGE_ALIGN(IO_SPACE_SPARSE_ENCODING(lp_base));
     } else {
-        mmio_start = fp_base & ~PAGE_MASK;
+        mmio_start = fp_base & PAGE_MASK;
         mmio_end = PAGE_ALIGN(lp_base);
     }
 
