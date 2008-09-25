@@ -56,43 +56,18 @@ static int
 suspend_and_state(int (*suspend)(void), int xc_handle, int io_fd,
                   int dom, xc_dominfo_t *info)
 {
-    int i = 0;
-
     if (!(*suspend)()) {
         ERROR("Suspend request failed");
         return -1;
     }
 
-retry:
-
-    if (xc_domain_getinfo(xc_handle, dom, 1, info) != 1) {
+    if ( (xc_domain_getinfo(xc_handle, dom, 1, info) != 1) ||
+         !info->shutdown || (info->shutdown_reason != SHUTDOWN_suspend) ) {
         ERROR("Could not get domain info");
         return -1;
     }
 
-    if (info->shutdown && info->shutdown_reason == SHUTDOWN_suspend)
-        return 0; // success
-
-    if (info->paused) {
-        // try unpausing domain, wait, and retest
-        xc_domain_unpause(xc_handle, dom);
-
-        ERROR("Domain was paused. Wait and re-test.");
-        usleep(10000);  // 10ms
-
-        goto retry;
-    }
-
-
-    if(++i < 100) {
-        ERROR("Retry suspend domain.");
-        usleep(10000);  // 10ms
-        goto retry;
-    }
-
-    ERROR("Unable to suspend domain.");
-
-    return -1;
+    return 0;
 }
 
 static inline int
