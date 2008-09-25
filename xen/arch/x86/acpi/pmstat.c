@@ -36,6 +36,7 @@
 #include <xen/cpumask.h>
 #include <asm/processor.h>
 #include <xen/percpu.h>
+#include <xen/domain.h>
 
 #include <public/sysctl.h>
 #include <acpi/cpufreq/cpufreq.h>
@@ -51,15 +52,26 @@ int do_get_pm_info(struct xen_sysctl_get_pmstat *op)
     int ret = 0;
     const struct processor_pminfo *pmpt = processor_pminfo[op->cpuid];
 
-    /* to protect the case when Px was not controlled by xen */
-    if ( (!pmpt || !(pmpt->perf.init & XEN_PX_INIT)) &&
-        (op->type & PMSTAT_CATEGORY_MASK) == PMSTAT_PX )
+    if ( (op->cpuid >= NR_CPUS) || !cpu_online(op->cpuid) )
         return -EINVAL;
 
-    if ( op->cpuid >= NR_CPUS || !cpu_online(op->cpuid) )
-        return -EINVAL;
+    switch ( op->type & PMSTAT_CATEGORY_MASK )
+    {
+    case PMSTAT_CX:
+        if ( !(xen_processor_pmbits & XEN_PROCESSOR_PM_CX) )
+            return -ENODEV;
+        break;
+    case PMSTAT_PX:
+        if ( !(xen_processor_pmbits & XEN_PROCESSOR_PM_PX) )
+            return -ENODEV;
+        if ( !pmpt || !(pmpt->perf.init & XEN_PX_INIT) )
+            return -EINVAL;
+        break;
+    default:
+        return -ENODEV;
+    }
 
-    switch( op->type )
+    switch ( op->type )
     {
     case PMSTAT_get_max_px:
     {
