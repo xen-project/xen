@@ -183,6 +183,7 @@
 ^tools/misc/xen_cpuperf$
 ^tools/misc/xen-detect$
 ^tools/misc/xenperf$
+^tools/misc/xenpm$
 ^tools/pygrub/build/.*$
 ^tools/python/build/.*$
 ^tools/security/secpol_tool$
