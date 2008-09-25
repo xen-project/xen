@@ -124,10 +124,7 @@
 ^tools/firmware/.*\.bin$
 ^tools/firmware/.*\.sym$
 ^tools/firmware/.*bios/.*bios.*\.txt$
-^tools/firmware/etherboot/eb-rom-list\.h$
-^tools/firmware/etherboot/etherboot-5
-^tools/firmware/etherboot/etherboot-build
-^tools/firmware/etherboot/.*\.zrom\.h$
+^tools/firmware/etherboot/gpxe/.*$
 ^tools/firmware/extboot/extboot.img$
 ^tools/firmware/extboot/signrom$
 ^tools/firmware/hvmloader/acpi/acpigen$

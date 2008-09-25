@@ -1,5 +1,5 @@
 
-This directory builds Etherboot option ROMs from the etherboot source
+This directory builds gPXE option ROMs from the gPXE source
 tarball. We provide this tarball in our source so that the option ROMs
 can be reconstructed from source, allowing easier debugging and
 fulfilling the terms of the GPL.
@@ -9,12 +9,13 @@ to give up, and for stricter DHCP spec compliance.
 
 ----------------------------------------
 
-Since Etherboot upstream do not appear to distribute tarballs, we
-generated one ourselves with the following runes:
+Since gPXE upstream do not appear to distribute tarballs, we
+generated one ourselves with the following runes (to extract the tree
+as on 25th September 2008):
 
- git clone git://git.etherboot.org/scm/etherboot.git
- cd etherboot
- git archive --format=tar --prefix=etherboot-5.4.2/ Eb.5.4.2 | gzip >../etherboot-5.4.2.tar.gz
+ git clone git://git.etherboot.org/scm/gpxe.git
+ cd gpxe
+ git archive --format=tar --prefix=gpxe/ c24bc349ead939d90b5784dbff3cd9fdb9d83ba8 | gzip >../gpxe-git-snapshot.tar.gz
 
 ----------------------------------------
 
