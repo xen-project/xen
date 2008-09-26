@@ -2343,9 +2343,6 @@ int sh_remove_write_access(struct vcpu *v, mfn_t gmfn,
                 return 1;                                               \
             }                                                           \
         } while (0)
-
-        if ( level == 0 && fault_addr )
-            GUESS(fault_addr, 6);
         
         if ( v->arch.paging.mode->guest_levels == 2 )
         {
@@ -2357,6 +2354,10 @@ int sh_remove_write_access(struct vcpu *v, mfn_t gmfn,
             if ((gfn = mfn_to_gfn(v->domain, gmfn)) < 0x38000 ) 
                 GUESS(0xC0000000UL + (gfn << PAGE_SHIFT), 4);
 
+            /* FreeBSD: Linear map at 0xBFC00000 */
+            if ( level == 1 )
+                GUESS(0xBFC00000UL 
+                      + ((fault_addr & VADDR_MASK) >> 10), 6);
         }
         else if ( v->arch.paging.mode->guest_levels == 3 )
         {
@@ -2370,6 +2371,15 @@ int sh_remove_write_access(struct vcpu *v, mfn_t gmfn,
             /* Linux lowmem: first 896MB is mapped 1-to-1 above 0xC0000000 */
             if ((gfn = mfn_to_gfn(v->domain, gmfn)) < 0x38000 ) 
                 GUESS(0xC0000000UL + (gfn << PAGE_SHIFT), 4);
+            
+            /* FreeBSD PAE: Linear map at 0xBF800000 */
+            switch ( level )
+            {
+            case 1: GUESS(0xBF800000UL
+                          + ((fault_addr & VADDR_MASK) >> 9), 6); break;
+            case 2: GUESS(0xBFDFC000UL
+                          + ((fault_addr & VADDR_MASK) >> 18), 6); break;
+            }
         }
 #if CONFIG_PAGING_LEVELS >= 4
         else if ( v->arch.paging.mode->guest_levels == 4 )
@@ -2392,11 +2402,25 @@ int sh_remove_write_access(struct vcpu *v, mfn_t gmfn,
             GUESS(0xffff880000000000UL + (gfn << PAGE_SHIFT), 4);
             GUESS(0xffff810000000000UL + (gfn << PAGE_SHIFT), 4);
             GUESS(0x0000010000000000UL + (gfn << PAGE_SHIFT), 4);
+
             /*
              * 64bit Solaris kernel page map at
              * kpm_vbase; 0xfffffe0000000000UL
              */
             GUESS(0xfffffe0000000000UL + (gfn << PAGE_SHIFT), 4);
+ 
+             /* FreeBSD 64bit: linear map 0xffff800000000000 */
+             switch ( level )
+             {
+             case 1: GUESS(0xffff800000000000
+                           + ((fault_addr & VADDR_MASK) >> 9), 6); break;
+             case 2: GUESS(0xffff804000000000UL
+                           + ((fault_addr & VADDR_MASK) >> 18), 6); break;
+             case 3: GUESS(0xffff804020000000UL
+                           + ((fault_addr & VADDR_MASK) >> 27), 6); break;
+             }
+             /* FreeBSD 64bit: direct map at 0xffffff0000000000 */
+             GUESS(0xffffff0000000000 + (gfn << PAGE_SHIFT), 6);
         }
 #endif /* CONFIG_PAGING_LEVELS >= 4 */
 
