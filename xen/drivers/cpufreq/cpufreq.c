@@ -34,13 +34,12 @@
 #include <xen/sched.h>
 #include <xen/timer.h>
 #include <xen/xmalloc.h>
+#include <xen/domain.h>
 #include <asm/bug.h>
-#include <asm/msr.h>
 #include <asm/io.h>
 #include <asm/config.h>
 #include <asm/processor.h>
 #include <asm/percpu.h>
-#include <asm/cpufeature.h>
 #include <acpi/acpi.h>
 #include <acpi/cpufreq/cpufreq.h>
 
@@ -82,7 +81,7 @@ int cpufreq_add_cpu(unsigned int cpu)
     if (!processor_pminfo[cpu] || !(perf->init & XEN_PX_INIT))
         return 0;
 
-    if (cpu_is_offline(cpu) || cpufreq_cpu_policy[cpu])
+    if (!cpu_online(cpu) || cpufreq_cpu_policy[cpu])
         return -EINVAL;
 
     ret = cpufreq_statistic_init(cpu);
@@ -158,7 +157,7 @@ int cpufreq_del_cpu(unsigned int cpu)
     if (!processor_pminfo[cpu] || !(perf->init & XEN_PX_INIT))
         return 0;
 
-    if (cpu_is_offline(cpu) || !cpufreq_cpu_policy[cpu])
+    if (!cpu_online(cpu) || !cpufreq_cpu_policy[cpu])
         return -EINVAL;
 
     dom = perf->domain_info.domain;
@@ -184,5 +183,125 @@ int cpufreq_del_cpu(unsigned int cpu)
     }
 
     return 0;
+}
+
+static void print_PSS(struct xen_processor_px *ptr, int count)
+{
+    int i;
+    printk(KERN_INFO "\t_PSS:\n");
+    for (i=0; i<count; i++){
+        printk(KERN_INFO "\tState%d: %ldMHz %ldmW %ldus %ldus 0x%lx 0x%lx\n",i,
+                ptr[i].core_frequency,
+                ptr[i].power, 
+                ptr[i].transition_latency,
+                ptr[i].bus_master_latency,
+                ptr[i].control,
+                ptr[i].status
+              );
+    }
+}
+
+static void print_PSD( struct xen_psd_package *ptr)
+{
+    printk(KERN_INFO "\t_PSD: num_entries=%ld rev=%ld domain=%ld coord_type=%ld num_processors=%ld\n",
+            ptr->num_entries, ptr->revision, ptr->domain, ptr->coord_type, 
+            ptr->num_processors);
+}
+
+int set_px_pminfo(uint32_t acpi_id, struct xen_processor_performance *dom0_px_info)
+{
+    int cpu_count = 0, ret=0, cpuid;
+    struct processor_pminfo *pmpt;
+    struct processor_performance *pxpt;
+
+    if ( !(xen_processor_pmbits & XEN_PROCESSOR_PM_PX) )
+    {
+        ret = -ENOSYS;
+        goto out;
+    }
+
+    cpuid = get_cpu_id(acpi_id);
+    if ( cpuid < 0 )
+    {
+        ret = -EINVAL;
+        goto out;
+    }
+    printk(KERN_INFO "Set CPU acpi_id(%d) cpuid(%d) Px State info:\n",
+            acpi_id, cpuid);
+
+    pmpt = processor_pminfo[cpuid];
+    if ( !pmpt )
+    {
+        pmpt = xmalloc(struct processor_pminfo);
+        if ( !pmpt )
+        {
+            ret = -ENOMEM;
+            goto out;
+        }
+        memset(pmpt, 0, sizeof(*pmpt));
+        processor_pminfo[cpuid] = pmpt;
+    }
+    pxpt = &pmpt->perf;
+    pmpt->acpi_id = acpi_id;
+    pmpt->id = cpuid;
+
+    if ( dom0_px_info->flags & XEN_PX_PCT )
+    {
+        memcpy ((void *)&pxpt->control_register,
+                (void *)&dom0_px_info->control_register,
+                sizeof(struct xen_pct_register));
+        memcpy ((void *)&pxpt->status_register,
+                (void *)&dom0_px_info->status_register,
+                sizeof(struct xen_pct_register));
+    }
+    if ( dom0_px_info->flags & XEN_PX_PSS ) 
+    {
+        if ( !(pxpt->states = xmalloc_array(struct xen_processor_px,
+                        dom0_px_info->state_count)) )
+        {
+            ret = -ENOMEM;
+            goto out;
+        }
+        if ( xenpf_copy_px_states(pxpt, dom0_px_info) )
+        {
+            xfree(pxpt->states);
+            ret = -EFAULT;
+            goto out;
+        }
+        pxpt->state_count = dom0_px_info->state_count;
+        print_PSS(pxpt->states,pxpt->state_count);
+    }
+    if ( dom0_px_info->flags & XEN_PX_PSD )
+    {
+        pxpt->shared_type = dom0_px_info->shared_type;
+        memcpy ((void *)&pxpt->domain_info,
+                (void *)&dom0_px_info->domain_info,
+                sizeof(struct xen_psd_package));
+        print_PSD(&pxpt->domain_info);
+    }
+    if ( dom0_px_info->flags & XEN_PX_PPC )
+    {
+        pxpt->platform_limit = dom0_px_info->platform_limit;
+
+        if ( pxpt->init == XEN_PX_INIT )
+        {
+
+            ret = cpufreq_limit_change(cpuid); 
+            goto out;
+        }
+    }
+
+    if ( dom0_px_info->flags == ( XEN_PX_PCT | XEN_PX_PSS |
+                XEN_PX_PSD | XEN_PX_PPC ) )
+    {
+        pxpt->init = XEN_PX_INIT;
+        cpu_count++;
+
+        ret = cpufreq_cpu_init(cpuid);
+        goto out;
+    }
+
+out:
+    return ret;
 }
 

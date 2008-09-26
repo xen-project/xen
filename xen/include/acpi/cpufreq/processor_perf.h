@@ -60,4 +60,8 @@ struct pm_px {
 
 extern struct pm_px *cpufreq_statistic_data[NR_CPUS];
 
+int xenpf_copy_px_states(struct processor_performance *pxpt,
+        struct xen_processor_performance *dom0_px_info);
+
+int cpufreq_cpu_init(unsigned int cpuid);
 #endif /* __XEN_PROCESSOR_PM_H__ */
