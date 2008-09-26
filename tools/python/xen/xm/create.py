@@ -214,7 +214,7 @@ gopts.var('hpet', val='HPET',
           use="Enable virtual high-precision event timer.")
 
 gopts.var('timer_mode', val='TIMER_MODE',
-          fn=set_int, default=0,
+          fn=set_int, default=1,
           use="""Timer mode (0=delay virtual time when ticks are missed;
           1=virtual time is always wallclock time.""")
 
