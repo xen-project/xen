@@ -81,7 +81,7 @@ static void print_acpi_power(uint32_t cpu, struct acpi_processor_power *power)
     for ( i = 1; i < power->count; i++ )
     {
         printk((power->last_state == &power->states[i]) ? "   *" : "    ");
-        printk("C%d:\t\t", i);
+        printk("C%d:\t", i);
         printk("type[C%d] ", power->states[i].type);
         printk("latency[%03d] ", power->states[i].latency);
         printk("usage[%08d] ", power->states[i].usage);
@@ -487,8 +487,12 @@ static int check_cx(struct acpi_processor_power *power, xen_processor_cx_t *cx)
         return -ENODEV;
     }
 
-    if ( cx->type == ACPI_STATE_C3 )
+    switch ( cx->type )
     {
+    case ACPI_STATE_C2:
+        if ( local_apic_timer_c2_ok )
+            break;
+    case ACPI_STATE_C3:
         /* We must be able to use HPET in place of LAPIC timers. */
         if ( hpet_broadcast_is_available() )
         {
@@ -551,6 +555,8 @@ static int check_cx(struct acpi_processor_power *power, xen_processor_cx_t *cx)
             }
             acpi_set_register(ACPI_BITREG_BUS_MASTER_RLD, 0);
         }
+
+        break;
     }
 
     return 0;
