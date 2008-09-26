@@ -41,7 +41,7 @@
 #include <public/sysctl.h>
 #include <acpi/cpufreq/cpufreq.h>
 
-struct pm_px *__read_mostly px_statistic_data[NR_CPUS];
+struct pm_px *__read_mostly cpufreq_statistic_data[NR_CPUS];
 
 extern uint32_t pmstat_get_cx_nr(uint32_t cpuid);
 extern int pmstat_get_cx_stat(uint32_t cpuid, struct pm_cx_stat *stat);
@@ -84,7 +84,7 @@ int do_get_pm_info(struct xen_sysctl_get_pmstat *op)
         uint64_t now, ct;
         uint64_t total_idle_ns;
         uint64_t tmp_idle_ns;
-        struct pm_px *pxpt = px_statistic_data[op->cpuid];
+        struct pm_px *pxpt = cpufreq_statistic_data[op->cpuid];
 
         if ( !pxpt )
             return -ENODATA;
@@ -122,7 +122,7 @@ int do_get_pm_info(struct xen_sysctl_get_pmstat *op)
 
     case PMSTAT_reset_pxstat:
     {
-        px_statistic_reset(op->cpuid);
+        cpufreq_statistic_reset(op->cpuid);
         break;
     }
 

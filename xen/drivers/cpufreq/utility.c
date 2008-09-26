@@ -39,7 +39,7 @@ struct cpufreq_policy   *__read_mostly cpufreq_cpu_policy[NR_CPUS];
  *                    Px STATISTIC INFO                              *
  *********************************************************************/
 
-void px_statistic_update(cpumask_t cpumask, uint8_t from, uint8_t to)
+void cpufreq_statistic_update(cpumask_t cpumask, uint8_t from, uint8_t to)
 {
     uint32_t i;
     uint64_t now;
@@ -47,7 +47,7 @@ void px_statistic_update(cpumask_t cpumask, uint8_t from, uint8_t to)
     now = NOW();
 
     for_each_cpu_mask(i, cpumask) {
-        struct pm_px *pxpt = px_statistic_data[i];
+        struct pm_px *pxpt = cpufreq_statistic_data[i];
         struct processor_pminfo *pmpt = processor_pminfo[i];
         uint64_t total_idle_ns;
         uint64_t tmp_idle_ns;
@@ -71,10 +71,10 @@ void px_statistic_update(cpumask_t cpumask, uint8_t from, uint8_t to)
     }
 }
 
-int px_statistic_init(unsigned int cpuid)
+int cpufreq_statistic_init(unsigned int cpuid)
 {
     uint32_t i, count;
-    struct pm_px *pxpt = px_statistic_data[cpuid];
+    struct pm_px *pxpt = cpufreq_statistic_data[cpuid];
     const struct processor_pminfo *pmpt = processor_pminfo[cpuid];
 
     count = pmpt->perf.state_count;
@@ -88,7 +88,7 @@ int px_statistic_init(unsigned int cpuid)
         if ( !pxpt )
             return -ENOMEM;
         memset(pxpt, 0, sizeof(*pxpt));
-        px_statistic_data[cpuid] = pxpt;
+        cpufreq_statistic_data[cpuid] = pxpt;
     }
 
     pxpt->u.trans_pt = xmalloc_array(uint64_t, count * count);
@@ -116,9 +116,9 @@ int px_statistic_init(unsigned int cpuid)
     return 0;
 }
 
-void px_statistic_exit(unsigned int cpuid)
+void cpufreq_statistic_exit(unsigned int cpuid)
 {
-    struct pm_px *pxpt = px_statistic_data[cpuid];
+    struct pm_px *pxpt = cpufreq_statistic_data[cpuid];
 
     if (!pxpt)
         return;
@@ -127,10 +127,10 @@ void px_statistic_exit(unsigned int cpuid)
     memset(pxpt, 0, sizeof(struct pm_px));
 }
 
-void px_statistic_reset(unsigned int cpuid)
+void cpufreq_statistic_reset(unsigned int cpuid)
 {
     uint32_t i, j, count;
-    struct pm_px *pxpt = px_statistic_data[cpuid];
+    struct pm_px *pxpt = cpufreq_statistic_data[cpuid];
     const struct processor_pminfo *pmpt = processor_pminfo[cpuid];
 
     if ( !pxpt || !pmpt )

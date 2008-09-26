@@ -45,9 +45,6 @@
 #include <acpi/acpi.h>
 #include <acpi/cpufreq/cpufreq.h>
 
-/* TODO: change to link list later as domain number may be sparse */
-static cpumask_t cpufreq_dom_map[NR_CPUS];
-
 enum {
     UNDEFINED_CAPABLE = 0,
     SYSTEM_INTEL_MSR_CAPABLE,
@@ -56,13 +53,6 @@ enum {
 
 #define INTEL_MSR_RANGE         (0xffff)
 #define CPUID_6_ECX_APERFMPERF_CAPABILITY       (0x1)
-
-struct acpi_cpufreq_data {
-    struct processor_performance *acpi_data;
-    struct cpufreq_frequency_table *freq_table;
-    unsigned int max_freq;
-    unsigned int cpu_feature;
-};
 
 static struct acpi_cpufreq_data *drv_data[NR_CPUS];
 
@@ -342,7 +332,7 @@ static int acpi_cpufreq_target(struct cpufreq_policy *policy,
             policy->resume = 0;
         }
         else {
-            printk(KERN_INFO "Already at target state (P%d)\n", 
+            printk(KERN_DEBUG "Already at target state (P%d)\n", 
                 next_perf_state);
             return 0;
         }
@@ -379,7 +369,7 @@ static int acpi_cpufreq_target(struct cpufreq_policy *policy,
     if (!check_freqs(cmd.mask, freqs.new, data))
         return -EAGAIN;
 
-    px_statistic_update(cmd.mask, perf->state, next_perf_state);
+    cpufreq_statistic_update(cmd.mask, perf->state, next_perf_state);
 
     perf->state = next_perf_state;
     policy->cur = freqs.new;
@@ -580,145 +570,6 @@ static struct cpufreq_driver acpi_cpufreq_driver = {
     .init   = acpi_cpufreq_cpu_init,
     .exit   = acpi_cpufreq_cpu_exit,
 };
-
-int cpufreq_limit_change(unsigned int cpu)
-{
-    struct processor_performance *perf = &processor_pminfo[cpu]->perf;
-    struct cpufreq_policy *data = cpufreq_cpu_policy[cpu];
-    struct cpufreq_policy policy;
-
-    if (!cpu_online(cpu) || !data || !processor_pminfo[cpu])
-        return -ENODEV;
-
-    if ((perf->platform_limit < 0) || 
-        (perf->platform_limit >= perf->state_count))
-        return -EINVAL;
-
-    memcpy(&policy, data, sizeof(struct cpufreq_policy)); 
-
-    policy.max =
-        perf->states[perf->platform_limit].core_frequency * 1000;
-
-    return __cpufreq_set_policy(data, &policy);
-}
-
-int cpufreq_add_cpu(unsigned int cpu)
-{
-    int ret = 0;
-    unsigned int firstcpu;
-    unsigned int dom;
-    unsigned int j;
-    struct cpufreq_policy new_policy;
-    struct cpufreq_policy *policy;
-    struct processor_performance *perf = &processor_pminfo[cpu]->perf;
-
-    /* to protect the case when Px was not controlled by xen */
-    if (!processor_pminfo[cpu] || !(perf->init & XEN_PX_INIT))
-        return 0;
-
-    if (cpu_is_offline(cpu) || cpufreq_cpu_policy[cpu])
-        return -EINVAL;
-
-    ret = px_statistic_init(cpu);
-    if (ret)
-        return ret;
-
-    dom = perf->domain_info.domain;
-    if (cpus_weight(cpufreq_dom_map[dom])) {
-        /* share policy with the first cpu since on same boat */
-        firstcpu = first_cpu(cpufreq_dom_map[dom]);
-        policy = cpufreq_cpu_policy[firstcpu];
-
-        cpufreq_cpu_policy[cpu] = policy;
-        cpu_set(cpu, cpufreq_dom_map[dom]);
-        cpu_set(cpu, policy->cpus);
-
-        printk(KERN_EMERG"adding CPU %u\n", cpu);
-    } else {
-        /* for the first cpu, setup policy and do init work */
-        policy = xmalloc(struct cpufreq_policy);
-        if (!policy) {
-            px_statistic_exit(cpu);
-            return -ENOMEM;
-        }
-        memset(policy, 0, sizeof(struct cpufreq_policy));
-
-        cpufreq_cpu_policy[cpu] = policy;
-        cpu_set(cpu, cpufreq_dom_map[dom]);
-        cpu_set(cpu, policy->cpus);
-
-        policy->cpu = cpu;
-        ret = cpufreq_driver->init(policy);
-        if (ret)
-            goto err1;
-        printk(KERN_EMERG"CPU %u initialization completed\n", cpu);
-    }
-
-    /*
-     * After get full cpumap of the coordination domain,
-     * we can safely start gov here.
-     */
-    if (cpus_weight(cpufreq_dom_map[dom]) ==
-        perf->domain_info.num_processors) {
-        memcpy(&new_policy, policy, sizeof(struct cpufreq_policy));
-        policy->governor = NULL;
-        ret = __cpufreq_set_policy(policy, &new_policy);
-        if (ret)
-            goto err2;
-    }
-
-    return 0;
-
-err2:
-    cpufreq_driver->exit(policy);
-err1:
-    for_each_cpu_mask(j, cpufreq_dom_map[dom]) {
-        cpufreq_cpu_policy[j] = NULL;
-        px_statistic_exit(j);
-    }
-
-    cpus_clear(cpufreq_dom_map[dom]);
-    xfree(policy);
-    return ret;
-}
-
-int cpufreq_del_cpu(unsigned int cpu)
-{
-    unsigned int dom;
-    struct cpufreq_policy *policy;
-    struct processor_performance *perf = &processor_pminfo[cpu]->perf;
-
-    /* to protect the case when Px was not controlled by xen */
-    if (!processor_pminfo[cpu] || !(perf->init & XEN_PX_INIT))
-        return 0;
-
-    if (cpu_is_offline(cpu) || !cpufreq_cpu_policy[cpu])
-        return -EINVAL;
-
-    dom = perf->domain_info.domain;
-    policy = cpufreq_cpu_policy[cpu];
-
-    printk(KERN_EMERG"deleting CPU %u\n", cpu);
-
-    /* for the first cpu of the domain, stop gov */
-    if (cpus_weight(cpufreq_dom_map[dom]) ==
-        perf->domain_info.num_processors)
-        __cpufreq_governor(policy, CPUFREQ_GOV_STOP);
-
-    cpufreq_cpu_policy[cpu] = NULL;
-    cpu_clear(cpu, policy->cpus);
-    cpu_clear(cpu, cpufreq_dom_map[dom]);
-    px_statistic_exit(cpu);
-
-    /* for the last cpu of the domain, clean room */
-    /* It's safe here to free freq_table, drv_data and policy */
-    if (!cpus_weight(cpufreq_dom_map[dom])) {
-        cpufreq_driver->exit(policy);
-        xfree(policy);
-    }
-
-    return 0;
-}
 
 static int __init cpufreq_driver_init(void)
 {
