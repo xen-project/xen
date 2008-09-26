@@ -9,7 +9,7 @@
 int get_cpu_id(u8);
 int powernow_cpufreq_init(void);
 
-void cpufreq_statistic_update(cpumask_t, uint8_t, uint8_t);
+void cpufreq_statistic_update(unsigned int, uint8_t, uint8_t);
 int  cpufreq_statistic_init(unsigned int);
 void cpufreq_statistic_exit(unsigned int);
 void cpufreq_statistic_reset(unsigned int);

@@ -66,6 +66,7 @@ int xc_pm_get_pxstat(int xc_handle, int cpuid, struct xc_px_stat *pxpt)
     sysctl.cmd = XEN_SYSCTL_get_pmstat;
     sysctl.u.get_pmstat.type = PMSTAT_get_pxstat;
     sysctl.u.get_pmstat.cpuid = cpuid;
+    sysctl.u.get_pmstat.u.getpx.total = max_px;
     set_xen_guest_handle(sysctl.u.get_pmstat.u.getpx.trans_pt, pxpt->trans_pt);
     set_xen_guest_handle(sysctl.u.get_pmstat.u.getpx.pt, 
                         (pm_px_val_t *)pxpt->pt);

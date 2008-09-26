@@ -39,36 +39,31 @@ struct cpufreq_policy   *__read_mostly cpufreq_cpu_policy[NR_CPUS];
  *                    Px STATISTIC INFO                              *
  *********************************************************************/
 
-void cpufreq_statistic_update(cpumask_t cpumask, uint8_t from, uint8_t to)
+void cpufreq_statistic_update(unsigned int cpu, uint8_t from, uint8_t to)
 {
-    uint32_t i;
     uint64_t now;
+    struct pm_px *pxpt = cpufreq_statistic_data[cpu];
+    struct processor_pminfo *pmpt = processor_pminfo[cpu];
+    uint64_t total_idle_ns;
+    uint64_t tmp_idle_ns;
+
+    if ( !pxpt || !pmpt )
+        return;
 
     now = NOW();
+    total_idle_ns = get_cpu_idle_time(cpu);
+    tmp_idle_ns = total_idle_ns - pxpt->prev_idle_wall;
 
-    for_each_cpu_mask(i, cpumask) {
-        struct pm_px *pxpt = cpufreq_statistic_data[i];
-        struct processor_pminfo *pmpt = processor_pminfo[i];
-        uint64_t total_idle_ns;
-        uint64_t tmp_idle_ns;
+    pxpt->u.last = from;
+    pxpt->u.cur = to;
+    pxpt->u.pt[to].count++;
+    pxpt->u.pt[from].residency += now - pxpt->prev_state_wall;
+    pxpt->u.pt[from].residency -= tmp_idle_ns;
 
-        if ( !pxpt || !pmpt )
-            continue;
+    (*(pxpt->u.trans_pt + from * pmpt->perf.state_count + to))++;
 
-        total_idle_ns = get_cpu_idle_time(i);
-        tmp_idle_ns = total_idle_ns - pxpt->prev_idle_wall;
-
-        pxpt->u.last = from;
-        pxpt->u.cur = to;
-        pxpt->u.pt[to].count++;
-        pxpt->u.pt[from].residency += now - pxpt->prev_state_wall;
-        pxpt->u.pt[from].residency -= tmp_idle_ns;
-
-        (*(pxpt->u.trans_pt + from * pmpt->perf.state_count + to))++;
-
-        pxpt->prev_state_wall = now;
-        pxpt->prev_idle_wall = total_idle_ns;
-    }
+    pxpt->prev_state_wall = now;
+    pxpt->prev_idle_wall = total_idle_ns;
 }
 
 int cpufreq_statistic_init(unsigned int cpuid)

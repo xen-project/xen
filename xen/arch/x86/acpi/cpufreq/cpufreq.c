@@ -307,6 +307,7 @@ static int acpi_cpufreq_target(struct cpufreq_policy *policy,
     struct drv_cmd cmd;
     unsigned int next_state = 0; /* Index into freq_table */
     unsigned int next_perf_state = 0; /* Index into perf table */
+    unsigned int j;
     int result = 0;
 
     if (unlikely(data == NULL ||
@@ -369,7 +370,8 @@ static int acpi_cpufreq_target(struct cpufreq_policy *policy,
     if (!check_freqs(cmd.mask, freqs.new, data))
         return -EAGAIN;
 
-    cpufreq_statistic_update(cmd.mask, perf->state, next_perf_state);
+    for_each_cpu_mask(j, cmd.mask)
+        cpufreq_statistic_update(j, perf->state, next_perf_state);
 
     perf->state = next_perf_state;
     policy->cur = freqs.new;
