@@ -190,7 +190,9 @@ static void print_PSS(struct xen_processor_px *ptr, int count)
     int i;
     printk(KERN_INFO "\t_PSS:\n");
     for (i=0; i<count; i++){
-        printk(KERN_INFO "\tState%d: %ldMHz %ldmW %ldus %ldus 0x%lx 0x%lx\n",i,
+        printk(KERN_INFO "\tState%d: %"PRId64"MHz %"PRId64"mW %"PRId64"us "
+               "%"PRId64"us 0x%"PRIx64" 0x%"PRIx64"\n",
+                i,
                 ptr[i].core_frequency,
                 ptr[i].power, 
                 ptr[i].transition_latency,
@@ -203,7 +205,8 @@ static void print_PSS(struct xen_processor_px *ptr, int count)
 
 static void print_PSD( struct xen_psd_package *ptr)
 {
-    printk(KERN_INFO "\t_PSD: num_entries=%ld rev=%ld domain=%ld coord_type=%ld num_processors=%ld\n",
+    printk(KERN_INFO "\t_PSD: num_entries=%"PRId64" rev=%"PRId64
+           " domain=%"PRId64" coord_type=%"PRId64" num_processors=%"PRId64"\n",
             ptr->num_entries, ptr->revision, ptr->domain, ptr->coord_type, 
             ptr->num_processors);
 }
