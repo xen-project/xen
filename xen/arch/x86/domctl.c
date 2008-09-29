@@ -620,13 +620,13 @@ long arch_do_domctl(
         if ( !iommu_enabled )
             break;
 
-        ret = -EINVAL;
-        bus = (domctl->u.assign_device.machine_bdf >> 16) & 0xff;
-        devfn = (domctl->u.assign_device.machine_bdf >> 8) & 0xff;
-
         ret = xsm_test_assign_device(domctl->u.assign_device.machine_bdf);
         if ( ret )
             break;
+
+        ret = -EINVAL;
+        bus = (domctl->u.assign_device.machine_bdf >> 16) & 0xff;
+        devfn = (domctl->u.assign_device.machine_bdf >> 8) & 0xff;
 
         if ( device_assigned(bus, devfn) )
         {
@@ -670,6 +670,7 @@ long arch_do_domctl(
             break;
         }
 
+        ret = -EINVAL;
         if ( device_assigned(bus, devfn) )
         {
             gdprintk(XENLOG_ERR, "XEN_DOMCTL_assign_device: "
@@ -751,6 +752,7 @@ long arch_do_domctl(
         if ( ret )
             goto bind_out;
 
+        ret = -ESRCH;
         if ( iommu_enabled )
             ret = pt_irq_create_bind_vtd(d, bind);
         if ( ret < 0 )
