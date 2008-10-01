@@ -1,4 +1,5 @@
 subdir-y += oprofile
+subdir-y += cpufreq
 
 obj-y += relocate_kernel.o
 obj-y += machine_kexec.o
