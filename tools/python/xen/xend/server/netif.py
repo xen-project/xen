@@ -142,10 +142,6 @@ class NetifController(DevController):
         if sec_lab:
             back['security_label'] = sec_lab
 
-        config_path = "device/%s/%d/" % (self.deviceClass, devid)
-        for x in back:
-            self.vm._writeVm(config_path + x, back[x])
-
         back['handle'] = "%i" % devid
         back['script'] = os.path.join(xoptions.network_script_dir, script)
         if rate:
@@ -189,40 +185,14 @@ class NetifController(DevController):
 
         result = DevController.getDeviceConfiguration(self, devid, transaction)
 
-        config_path = "device/%s/%d/" % (self.deviceClass, devid)
-        devinfo = ()
         for x in ( 'script', 'ip', 'bridge', 'mac',
                    'type', 'vifname', 'rate', 'uuid', 'model', 'accel',
                    'security_label'):
             if transaction is None:
-                y = self.vm._readVm(config_path + x)
+                y = self.readBackend(devid, x)
             else:
-                y = self.vm._readVmTxn(transaction, config_path + x)
-            devinfo += (y,)
-        (script, ip, bridge, mac, typ, vifname, rate, uuid,
-         model, accel, security_label) = devinfo
-
-        if script:
-            result['script'] = script
-        if ip:
-            result['ip'] = ip
-        if bridge:
-            result['bridge'] = bridge
-        if mac:
-            result['mac'] = mac
-        if typ:
-            result['type'] = typ
-        if vifname:
-            result['vifname'] = vifname
-        if rate:
-            result['rate'] = rate
-        if uuid:
-            result['uuid'] = uuid
-        if model:
-            result['model'] = model
-        if accel:
-            result['accel'] = accel
-        if security_label:
-            result['security_label'] = security_label
+                y = self.readBackendTxn(transaction, devid, x)
+            if y:
+                result[x] = y
 
         return result

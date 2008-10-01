@@ -126,8 +126,11 @@ class DevController:
                     log.debug(
                       'DevController: still waiting to write device entries.')
 
+                devpath = self.devicePath(devid)
+
                 t.remove(frontpath)
                 t.remove(backpath)
+                t.remove(devpath)
 
                 t.mkdir(backpath)
                 t.set_permissions(backpath,
@@ -141,6 +144,14 @@ class DevController:
 
                 t.write2(frontpath, front)
                 t.write2(backpath,  back)
+
+                t.mkdir(devpath)
+                t.write2(devpath, {
+                    'backend' : backpath,
+                    'backend-id' : "%i" % backdom,
+                    'frontend' : frontpath,
+                    'frontend-id' : "%i" % self.vm.getDomid()
+                })
 
                 if t.commit():
                     return devid
@@ -246,11 +257,12 @@ class DevController:
 
         if force:
             frontpath = self.frontendPath(dev)
-            backpath = xstransact.Read(frontpath, "backend")
+            backpath = self.readVm(devid, "backend")
             if backpath:
                 xstransact.Remove(backpath)
             xstransact.Remove(frontpath)
 
+        # xstransact.Remove(self.devicePath()) ?? Below is the same ?
         self.vm._removeVm("device/%s/%d" % (self.deviceClass, dev))
 
     def configurations(self, transaction = None):
@@ -294,9 +306,10 @@ class DevController:
         @return: dict
         """
         if transaction is None:
-            backdomid = xstransact.Read(self.frontendPath(devid), "backend-id")
+            backdomid = xstransact.Read(self.devicePath(devid), "backend-id")
         else:
-            backdomid = transaction.read(self.frontendPath(devid) + "/backend-id")
+            backdomid = transaction.read(self.devicePath(devid) + "/backend-id")
+
         if backdomid is None:
             raise VmError("Device %s not connected" % devid)
 
@@ -438,17 +451,22 @@ class DevController:
         else:
             raise VmError("Device %s not connected" % devid)
 
+    def readVm(self, devid, *args):
+        devpath = self.devicePath(devid)
+        if devpath:
+            return xstransact.Read(devpath, *args)
+        else:
+            raise VmError("Device config %s not found" % devid)
+
     def readBackend(self, devid, *args):
-        frontpath = self.frontendPath(devid)
-        backpath = xstransact.Read(frontpath, "backend")
+        backpath = self.readVm(devid, "backend")
         if backpath:
             return xstransact.Read(backpath, *args)
         else:
             raise VmError("Device %s not connected" % devid)
 
     def readBackendTxn(self, transaction, devid, *args):
-        frontpath = self.frontendPath(devid)
-        backpath = transaction.read(frontpath + "/backend")
+        backpath = self.readVm(devid, "backend")
         if backpath:
             paths = map(lambda x: backpath + "/" + x, args)
             return transaction.read(*paths)
@@ -466,7 +484,7 @@ class DevController:
         """@return The IDs of each of the devices currently configured for
         this instance's deviceClass.
         """
-        fe = self.backendRoot()
+        fe = self.deviceRoot()
 
         if transaction:
             return map(lambda x: int(x.split('/')[-1]), transaction.list(fe))
@@ -475,8 +493,7 @@ class DevController:
 
 
     def writeBackend(self, devid, *args):
-        frontpath = self.frontendPath(devid)
-        backpath = xstransact.Read(frontpath, "backend")
+        backpath = self.readVm(devid, "backend")
 
         if backpath:
             xstransact.Write(backpath, *args)
@@ -541,9 +558,8 @@ class DevController:
 
 
     def waitForBackend(self, devid):
-
         frontpath = self.frontendPath(devid)
-        # lookup a phantom 
+        # lookup a phantom
         phantomPath = xstransact.Read(frontpath, 'phantom_vbd')
         if phantomPath is not None:
             log.debug("Waiting for %s's phantom %s.", devid, phantomPath)
@@ -556,7 +572,7 @@ class DevController:
             if result['status'] != 'Connected':
                 return (result['status'], err)
             
-        backpath = xstransact.Read(frontpath, "backend")
+        backpath = self.readVm(devid, "backend")
 
 
         if backpath:
@@ -621,17 +637,20 @@ class DevController:
     def frontendRoot(self):
         return "%s/device/%s" % (self.vm.getDomainPath(), self.deviceClass)
 
-    def backendRoot(self):
-        """Construct backend root path assuming backend is domain 0."""
-        from xen.xend.XendDomain import DOM0_ID
-        from xen.xend.xenstore.xsutil import GetDomainPath
-        return "%s/backend/%s/%s" % (GetDomainPath(DOM0_ID),
-                                     self.deviceClass, self.vm.getDomid())
-
     def frontendMiscPath(self):
         return "%s/device-misc/%s" % (self.vm.getDomainPath(),
                                       self.deviceClass)
 
+    def deviceRoot(self):
+        """Return the /vm/device. Because backendRoot assumes the
+        backend domain is 0"""
+        return "%s/device/%s" % (self.vm.vmpath, self.deviceClass)
+
+    def devicePath(self, devid):
+        """Return the /device entry of the given VM. We use it to store
+        backend/frontend locations"""
+        return "%s/device/%s/%s" % (self.vm.vmpath,
+                                    self.deviceClass, devid)
 
 def hotplugStatusCallback(statusPath, ev, result):
     log.debug("hotplugStatusCallback %s.", statusPath)
