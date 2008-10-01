@@ -1208,8 +1208,6 @@ class XendDomainInfo:
         return xstransact.Write(self.vmpath, *args)
 
     def _removeVm(self, *args):
-        if len(args) == 0:
-            self._removeVmPath()
         return xstransact.Remove(self.vmpath, *args)
 
     def _gatherVm(self, *args):
@@ -1778,6 +1776,7 @@ class XendDomainInfo:
         self._releaseDevices()
         # Remove existing vm node in xenstore
         self._removeVm()
+        self._removeVmPath()
         new_dom_info = self.info.copy()
         new_dom_info['name_label'] = self.info['name_label']
         new_dom_info['uuid'] = self.info['uuid']
@@ -2358,7 +2357,7 @@ class XendDomainInfo:
 
         paths = self._prepare_phantom_paths()
 
-        self._cleanupVm()
+        self._removeVmPath()
         if self.dompath is not None:
             try:
                 xc.domain_destroy_hook(self.domid)
@@ -2375,6 +2374,7 @@ class XendDomainInfo:
             self.cleanupDomain()
 
         self._cleanup_phantom_devs(paths)
+        self._cleanupVm()
 
         if "transient" in self.info["other_config"] \
            and bool(self.info["other_config"]["transient"]):
