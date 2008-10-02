@@ -90,8 +90,7 @@ static int add_nvram_hob(void* hob_buf, unsigned long nvram_addr);
 static int build_hob(void* hob_buf, unsigned long hob_buf_size,
                      unsigned long dom_mem_size, unsigned long vcpus,
                      unsigned long nvram_addr);
-static int load_hob(int xc_handle,uint32_t dom, void *hob_buf,
-                    unsigned long dom_mem_size);
+static int load_hob(int xc_handle,uint32_t dom, void *hob_buf);
 
 static int
 xc_ia64_build_hob(int xc_handle, uint32_t dom,
@@ -112,7 +111,7 @@ xc_ia64_build_hob(int xc_handle, uint32_t dom,
         return -1;
     }
 
-    if (load_hob(xc_handle, dom, hob_buf, memsize) < 0) {
+    if (load_hob(xc_handle, dom, hob_buf) < 0) {
         free(hob_buf);
         PERROR("Could not load hob");
         return -1;
@@ -240,8 +239,7 @@ err_out:
 }
 
 static int
-load_hob(int xc_handle, uint32_t dom, void *hob_buf,
-         unsigned long dom_mem_size)
+load_hob(int xc_handle, uint32_t dom, void *hob_buf)
 {
     // hob_buf should be page aligned
     int hob_size;
@@ -264,15 +262,18 @@ load_hob(int xc_handle, uint32_t dom, void *hob_buf,
                                         GFW_HOB_START >> PAGE_SHIFT, nr_pages);
 }
 
-#define MIN(x, y) ((x) < (y)) ? (x) : (y)
+#define MIN(x, y) (((x) < (y)) ? (x) : (y))
 static int
 add_mem_hob(void* hob_buf, unsigned long dom_mem_size)
 {
     hob_mem_t memhob;
 
-    // less than 3G
+    // less than 3G accounting VGA RAM hole
     memhob.start = 0;
-    memhob.size = MIN(dom_mem_size, 0xC0000000);
+    if (dom_mem_size < VGA_IO_START)
+        memhob.size = dom_mem_size;
+    else
+        memhob.size = MIN(dom_mem_size + VGA_IO_SIZE, 0xC0000000);
 
     if (hob_add(hob_buf, HOB_TYPE_MEM, &memhob, sizeof(memhob)) < 0)
         return -1;
@@ -280,7 +281,7 @@ add_mem_hob(void* hob_buf, unsigned long dom_mem_size)
     if (dom_mem_size > 0xC0000000) {
         // 4G ~ 4G+remain
         memhob.start = 0x100000000; //4G
-        memhob.size = dom_mem_size - 0xC0000000;
+        memhob.size = dom_mem_size + VGA_IO_SIZE - 0xC0000000;
         if (hob_add(hob_buf, HOB_TYPE_MEM, &memhob, sizeof(memhob)) < 0)
             return -1;
     }
@@ -819,9 +820,10 @@ xc_ia64_setup_memmap_info(int xc_handle, uint32_t dom,
     md = (efi_memory_desc_t*)&memmap_info->memdesc;
     xc_ia64_setup_md(md, 0, min(VGA_IO_START, dom_memsize));
     md++;
-    if (dom_memsize > (VGA_IO_START + VGA_IO_SIZE)) {
+
+    if (dom_memsize > VGA_IO_START) {
         xc_ia64_setup_md(md, VGA_IO_START + VGA_IO_SIZE,
-                         min(MMIO_START, dom_memsize));
+                         min(MMIO_START, dom_memsize + VGA_IO_SIZE));
         md++;
     }
     xc_ia64_setup_md(md, IO_PAGE_START, IO_PAGE_START + IO_PAGE_SIZE);
@@ -840,8 +842,8 @@ xc_ia64_setup_memmap_info(int xc_handle, uint32_t dom,
     md++;
     xc_ia64_setup_md(md, GFW_START, GFW_START + GFW_SIZE);
     md++;
-    if (dom_memsize > MMIO_START) {
-        xc_ia64_setup_md(md, 4 * MEM_G, dom_memsize + (1 * MEM_G));
+    if (dom_memsize + VGA_IO_SIZE > MMIO_START) {
+        xc_ia64_setup_md(md, 4 * MEM_G, dom_memsize + VGA_IO_SIZE + (1 * MEM_G));
         md++;
     }
     nr_mds = md - (efi_memory_desc_t*)&memmap_info->memdesc;
@@ -901,7 +903,8 @@ setup_guest(int xc_handle, uint32_t dom, unsigned long memsize,
     unsigned long memmap_info_num_pages;
     unsigned long nvram_start = NVRAM_START, nvram_fd = 0; 
     int rc;
-    long i;
+    unsigned long i;
+    unsigned long pfn;
     const struct hvm_special_page {
         int             param;
         xen_pfn_t       pfn;
@@ -926,26 +929,28 @@ setup_guest(int xc_handle, uint32_t dom, unsigned long memsize,
         return -1;
     }
 
-    // Allocate pfn for normal memory
-    for (i = 0; i < dom_memsize >> PAGE_SHIFT; i++)
-        pfn_list[i] = i;
+    //
+    // Populate
+    // [0, VGA_IO_START) (VGA_IO_SIZE hole)
+    // [VGA_IO_START + VGA_IO_SIZE, MMIO_START) (1GB hole)
+    // [4GB, end)
+    //                     
+    i = 0;
+    for (pfn = 0;
+         pfn < MIN((dom_memsize >> PAGE_SHIFT), VGA_START_PAGE);
+         pfn++)
+        pfn_list[i++] = pfn;
+    for (pfn = VGA_END_PAGE;
+         pfn < (MIN(dom_memsize + VGA_IO_SIZE, MMIO_START) >> PAGE_SHIFT);
+         pfn++)
+        pfn_list[i++] = pfn;
+    for (pfn = ((4 * MEM_G) >> PAGE_SHIFT); 
+         pfn < ((dom_memsize + VGA_IO_SIZE + 1 * MEM_G) >> PAGE_SHIFT);
+         pfn++)
+        pfn_list[i++] = pfn;
 
-    // If normal memory > 3G. Reserve 3G ~ 4G for MMIO, GFW and others.
-    for (i = (MMIO_START >> PAGE_SHIFT); i < (dom_memsize >> PAGE_SHIFT); i++)
-        pfn_list[i] += ((1 * MEM_G) >> PAGE_SHIFT);
-
-    // Allocate memory for VTI guest, up to VGA hole from 0xA0000-0xC0000. 
-    rc = xc_domain_memory_populate_physmap(xc_handle, dom,
-                                           (nr_pages > VGA_START_PAGE) ?
-                                           VGA_START_PAGE : nr_pages,
-                                           0, 0, &pfn_list[0]);
-
-    // We're not likely to attempt to create a domain with less than
-    // 640k of memory, but test for completeness
-    if (rc == 0 && nr_pages > VGA_END_PAGE)
-        rc = xc_domain_memory_populate_physmap(xc_handle, dom,
-                                               nr_pages - VGA_END_PAGE,
-                                               0, 0, &pfn_list[VGA_END_PAGE]);
+    rc = xc_domain_memory_populate_physmap(xc_handle, dom, nr_pages, 0, 0,
+                                           &pfn_list[0]);
     if (rc != 0) {
         PERROR("Could not allocate normal memory for Vti guest.\n");
         goto error_out;
@@ -983,8 +988,8 @@ setup_guest(int xc_handle, uint32_t dom, unsigned long memsize,
     domctl.u.arch_setup.flags = 0;
     domctl.u.arch_setup.bp = 0;
     domctl.u.arch_setup.maxmem = GFW_START + GFW_SIZE;
-    if (dom_memsize > MMIO_START)
-        domctl.u.arch_setup.maxmem = dom_memsize + 1 * MEM_G;
+    if (dom_memsize + VGA_IO_SIZE > MMIO_START)
+        domctl.u.arch_setup.maxmem = dom_memsize + VGA_IO_SIZE + 1 * MEM_G;
     domctl.cmd = XEN_DOMCTL_arch_setup;
     domctl.domain = (domid_t)dom;
     if (xc_domctl(xc_handle, &domctl))
