@@ -153,6 +153,8 @@ xc_ia64_p2m_unmap(struct xen_ia64_p2m_table *p2m_table)
 #define _PAGE_P                 (1UL << _PAGE_P_BIT)      /* page present bit */
 #define _PAGE_PGC_ALLOCATED_BIT 59      /* _PGC_allocated */
 #define _PAGE_PGC_ALLOCATED     (1UL << _PAGE_PGC_ALLOCATED_BIT)
+#define _PAGE_IO_BIT            60
+#define _PAGE_IO                (1UL << _PAGE_IO_BIT)
 
 #define IA64_MAX_PHYS_BITS      50      /* max. number of physical address bits (architected) */
 #define _PAGE_PPN_MASK  (((1UL << IA64_MAX_PHYS_BITS) - 1) & ~0xfffUL)
@@ -160,8 +162,10 @@ xc_ia64_p2m_unmap(struct xen_ia64_p2m_table *p2m_table)
 int
 xc_ia64_p2m_present(struct xen_ia64_p2m_table *p2m_table, unsigned long gpfn)
 {
-    if (sizeof(p2m_table->p2m[0]) * gpfn < p2m_table->size)
-        return !!(p2m_table->p2m[gpfn] & _PAGE_P);
+    if (sizeof(p2m_table->p2m[0]) * gpfn < p2m_table->size) {
+        unsigned long pte = p2m_table->p2m[gpfn];
+        return !!((pte & _PAGE_P) && !(pte & _PAGE_IO));
+    }
     return 0;
 }
 
@@ -170,7 +174,8 @@ xc_ia64_p2m_allocated(struct xen_ia64_p2m_table *p2m_table, unsigned long gpfn)
 {
     if (sizeof(p2m_table->p2m[0]) * gpfn < p2m_table->size) {
         unsigned long pte = p2m_table->p2m[gpfn];
-        return !!((pte & _PAGE_P) && (pte & _PAGE_PGC_ALLOCATED));
+        return !!((pte & _PAGE_P) && (pte & _PAGE_PGC_ALLOCATED) &&
+                  !(pte & _PAGE_IO));
     }
     return 0;
 }
@@ -183,6 +188,8 @@ xc_ia64_p2m_mfn(struct xen_ia64_p2m_table *p2m_table, unsigned long gpfn)
     if (sizeof(p2m_table->p2m[0]) * gpfn >= p2m_table->size)
         return INVALID_MFN;
     pte = p2m_table->p2m[gpfn];
+    if (pte & _PAGE_IO)
+        return INVALID_MFN;
     if (!(pte & _PAGE_P))
         return INVALID_MFN;
     return (pte & _PAGE_PPN_MASK) >> PAGE_SHIFT;
