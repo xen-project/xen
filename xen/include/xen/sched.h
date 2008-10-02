@@ -364,6 +364,13 @@ int construct_dom0(
  */
 struct domain *rcu_lock_domain_by_id(domid_t dom);
 
+/*
+ * As above function, but accounts for current domain context:
+ *  - Translates target DOMID_SELF into caller's domain id; and
+ *  - Checks that caller has permission to act on the target domain.
+ */
+int rcu_lock_target_domain_by_id(domid_t dom, struct domain **d);
+
 /* Finish a RCU critical region started by rcu_lock_domain_by_id(). */
 static inline void rcu_unlock_domain(struct domain *d)
 {

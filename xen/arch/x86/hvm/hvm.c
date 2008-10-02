@@ -2339,21 +2339,9 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         if ( a.index >= HVM_NR_PARAMS )
             return -EINVAL;
 
-        if ( a.domid == DOMID_SELF )
-        {
-            d = rcu_lock_current_domain();
-        }
-        else
-        {
-            if ( (d = rcu_lock_domain_by_id(a.domid)) == NULL )
-                return -ESRCH;
-            if ( !IS_PRIV_FOR(current->domain, d) )
-            {
-                rc = -EPERM;
-                goto param_fail;
-            }
-        }
-
+        rc = rcu_lock_target_domain_by_id(a.domid, &d);
+        if ( rc != 0 )
+            return rc;
 
         rc = -EINVAL;
         if ( !is_hvm_domain(d) )
@@ -2521,20 +2509,9 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         if ( copy_from_guest(&a, arg, 1) )
             return -EFAULT;
 
-        if ( a.domid == DOMID_SELF )
-        {
-            d = rcu_lock_current_domain();
-        }
-        else
-        {
-            if ( (d = rcu_lock_domain_by_id(a.domid)) == NULL )
-                return -ESRCH;
-            if ( !IS_PRIV_FOR(current->domain, d) )
-            {
-                rc = -EPERM;
-                goto param_fail2;
-            }
-        }
+        rc = rcu_lock_target_domain_by_id(a.domid, &d);
+        if ( rc != 0 )
+            return rc;
 
         rc = -EINVAL;
         if ( !is_hvm_domain(d) )
@@ -2570,20 +2547,9 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         if ( copy_from_guest(&a, arg, 1) )
             return -EFAULT;
 
-        if ( a.domid == DOMID_SELF )
-        {
-            d = rcu_lock_current_domain();
-        }
-        else
-        {
-            if ( (d = rcu_lock_domain_by_id(a.domid)) == NULL )
-                return -ESRCH;
-            if ( !IS_PRIV_FOR(current->domain, d) )
-            {
-                rc = -EPERM;
-                goto param_fail3;
-            }
-        }
+        rc = rcu_lock_target_domain_by_id(a.domid, &d);
+        if ( rc != 0 )
+            return rc;
 
         rc = -EINVAL;
         if ( !is_hvm_domain(d) )
@@ -2637,20 +2603,9 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         if ( copy_from_guest(&a, arg, 1) )
             return -EFAULT;
 
-        if ( a.domid == DOMID_SELF )
-        {
-            d = rcu_lock_current_domain();
-        }
-        else
-        {
-            if ( (d = rcu_lock_domain_by_id(a.domid)) == NULL )
-                return -ESRCH;
-            if ( !IS_PRIV_FOR(current->domain, d) )
-            {
-                rc = -EPERM;
-                goto param_fail4;
-            }
-        }
+        rc = rcu_lock_target_domain_by_id(a.domid, &d);
+        if ( rc != 0 )
+            return rc;
 
         rc = -EINVAL;
         if ( !is_hvm_domain(d) )
