@@ -636,7 +636,7 @@ xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         memset(buffer, 0, sizeof(buffer));
         memmap_info = (xen_ia64_memmap_info_t *)buffer;
         memdesc = (efi_memory_desc_t*)&memmap_info->memdesc[0];
-        memmap_info->efi_memmap_size = sizeof(*memmap_info) + sizeof(*memdesc);
+        memmap_info->efi_memmap_size = sizeof(*memdesc);
         memmap_info->efi_memdesc_size = sizeof(*memdesc);
         memmap_info->efi_memdesc_version = EFI_MEMORY_DESCRIPTOR_VERSION;
 
