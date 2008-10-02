@@ -1,4 +1,5 @@
 #include "xg_private.h"
+#include "xc_efi.h"
 #include "xc_ia64.h"
 
 /* this is a very ugly way of getting FPSR_DEFAULT.  struct ia64_fpreg is
@@ -57,6 +58,59 @@ xc_get_max_pages(int xc_handle, uint32_t domid)
     domctl.domain = (domid_t)domid;
     return ((do_domctl(xc_handle, &domctl) < 0)
             ? -1 : domctl.u.getdomaininfo.max_pages);
+}
+
+int
+xc_ia64_copy_memmap(int xc_handle, uint32_t domid, shared_info_t *live_shinfo,
+                    xen_ia64_memmap_info_t **memmap_info_p,
+                    unsigned long *memmap_info_num_pages_p)
+{
+    unsigned int memmap_info_num_pages;
+    unsigned long memmap_info_pfn;
+    unsigned long memmap_size;
+
+    xen_ia64_memmap_info_t *memmap_info_live;
+    xen_ia64_memmap_info_t *memmap_info;
+
+    /* copy before use in case someone updating them */
+    memmap_info_num_pages = live_shinfo->arch.memmap_info_num_pages;
+    memmap_info_pfn = live_shinfo->arch.memmap_info_pfn;
+    if (memmap_info_num_pages == 0 || memmap_info_pfn == 0) {
+        ERROR("memmap_info_num_pages 0x%x memmap_info_pfn 0x%lx",
+              memmap_info_num_pages, memmap_info_pfn);
+        return -1;
+    }
+
+    memmap_size = memmap_info_num_pages << PAGE_SHIFT;
+    memmap_info_live = xc_map_foreign_range(xc_handle, domid, memmap_size,
+                                            PROT_READ, memmap_info_pfn);
+    if (memmap_info_live == NULL) {
+        PERROR("Could not map memmap info.");
+        return -1;
+    }
+    memmap_info = malloc(memmap_size);
+    if (memmap_info == NULL) {
+        munmap(memmap_info_live, memmap_size);
+        return -1;
+    }
+    memcpy(memmap_info, memmap_info_live, memmap_size); /* copy before use */
+    munmap(memmap_info_live, memmap_size);
+
+    /* reject unknown memmap */
+    if (memmap_info->efi_memdesc_size != sizeof(efi_memory_desc_t) ||
+        (memmap_info->efi_memmap_size / memmap_info->efi_memdesc_size) == 0 ||
+        memmap_info->efi_memmap_size > memmap_size - sizeof(memmap_info) ||
+        memmap_info->efi_memdesc_version != EFI_MEMORY_DESCRIPTOR_VERSION) {
+        PERROR("unknown memmap header. defaulting to compat mode.");
+        free(memmap_info);
+        return -1;
+    }
+
+    *memmap_info_p = memmap_info;
+    if (memmap_info_num_pages_p != NULL)
+        *memmap_info_num_pages_p = memmap_info_num_pages;
+
+    return 0;
 }
 
 /*

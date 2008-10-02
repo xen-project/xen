@@ -21,6 +21,11 @@
 #ifndef _XC_IA64_H_
 #define _XC_IA64_H_
 
+int xc_ia64_copy_memmap(int xc_handle, uint32_t domid,
+                        shared_info_t *live_shinfo,
+                        xen_ia64_memmap_info_t **memmap_info_p,
+                        unsigned long *memmap_info_num_pages_p);
+
 struct xen_ia64_p2m_table {
     unsigned long size;
     unsigned long *p2m;

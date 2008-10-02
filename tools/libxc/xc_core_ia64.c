@@ -175,12 +175,8 @@ xc_core_arch_memory_map_get(int xc_handle,
                             unsigned int *nr_entries)
 {
     int ret = -1;
-    unsigned int memmap_info_num_pages;
-    unsigned long memmap_info_pfn;
 
-    xen_ia64_memmap_info_t *memmap_info_live;
     xen_ia64_memmap_info_t *memmap_info = NULL;
-    unsigned long map_size;
     xc_core_memory_map_t *map;
     char *start;
     char *end;
@@ -194,39 +190,8 @@ xc_core_arch_memory_map_get(int xc_handle,
     }
 
     /* copy before use in case someone updating them */
-    memmap_info_num_pages = live_shinfo->arch.memmap_info_num_pages;
-    memmap_info_pfn = live_shinfo->arch.memmap_info_pfn;
-    if ( memmap_info_num_pages == 0 || memmap_info_pfn == 0 )
-    {
-        ERROR("memmap_info_num_pages 0x%x memmap_info_pfn 0x%lx",
-              memmap_info_num_pages, memmap_info_pfn);
-        goto old;
-    }
-
-    map_size = PAGE_SIZE * memmap_info_num_pages;
-    memmap_info_live = xc_map_foreign_range(xc_handle, info->domid,
-                                       map_size, PROT_READ, memmap_info_pfn);
-    if ( memmap_info_live == NULL )
-    {
-        PERROR("Could not map memmap info.");
-        return -1;
-    }
-    memmap_info = malloc(map_size);
-    if ( memmap_info == NULL )
-    {
-        munmap(memmap_info_live, map_size);
-        return -1;
-    }
-    memcpy(memmap_info, memmap_info_live, map_size);    /* copy before use */
-    munmap(memmap_info_live, map_size);
-    
-    if ( memmap_info->efi_memdesc_size != sizeof(*md) ||
-         (memmap_info->efi_memmap_size / memmap_info->efi_memdesc_size) == 0 ||
-         memmap_info->efi_memmap_size > map_size - sizeof(memmap_info) ||
-         memmap_info->efi_memdesc_version != EFI_MEMORY_DESCRIPTOR_VERSION )
-    {
-        PERROR("unknown memmap header. defaulting to compat mode.");
-        free(memmap_info);
+    if (xc_ia64_copy_memmap(xc_handle, info->domid, live_shinfo, &memmap_info,
+                            NULL)) {
         goto old;
     }
 
