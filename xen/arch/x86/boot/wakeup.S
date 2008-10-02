@@ -168,7 +168,7 @@ wakeup_32:
         .word   0,0,0
 lgdt_descr:
         .word   LAST_RESERVED_GDT_BYTE
-        .quad   gdt_table - FIRST_RESERVED_GDT_BYTE
+        .quad   boot_cpu_gdt_table - FIRST_RESERVED_GDT_BYTE
         
 wakeup_64:
         lgdt    lgdt_descr(%rip)

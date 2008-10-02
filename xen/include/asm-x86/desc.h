@@ -34,11 +34,9 @@
 #define FLAT_COMPAT_USER_CS   FLAT_COMPAT_RING3_CS
 #define FLAT_COMPAT_USER_SS   FLAT_COMPAT_RING3_SS
 
-#define __FIRST_TSS_ENTRY (FIRST_RESERVED_GDT_ENTRY + 8)
-#define __FIRST_LDT_ENTRY (__FIRST_TSS_ENTRY + 2)
-
-#define __TSS(n) (((n)<<2) + __FIRST_TSS_ENTRY)
-#define __LDT(n) (((n)<<2) + __FIRST_LDT_ENTRY)
+#define TSS_ENTRY (FIRST_RESERVED_GDT_ENTRY + 8)
+#define LDT_ENTRY (TSS_ENTRY + 2)
+#define PER_CPU_GDT_ENTRY (LDT_ENTRY + 2)
 
 #elif defined(__i386__)
 
@@ -49,19 +47,17 @@
 #define FLAT_COMPAT_USER_DS   FLAT_USER_DS
 #define FLAT_COMPAT_USER_SS   FLAT_USER_SS
 
-#define __DOUBLEFAULT_TSS_ENTRY FIRST_RESERVED_GDT_ENTRY
+#define DOUBLEFAULT_TSS_ENTRY FIRST_RESERVED_GDT_ENTRY
 
-#define __FIRST_TSS_ENTRY (FIRST_RESERVED_GDT_ENTRY + 8)
-#define __FIRST_LDT_ENTRY (__FIRST_TSS_ENTRY + 1)
-
-#define __TSS(n) (((n)<<1) + __FIRST_TSS_ENTRY)
-#define __LDT(n) (((n)<<1) + __FIRST_LDT_ENTRY)
+#define TSS_ENTRY (FIRST_RESERVED_GDT_ENTRY + 8)
+#define LDT_ENTRY (TSS_ENTRY + 1)
+#define PER_CPU_GDT_ENTRY (LDT_ENTRY + 1)
 
 #endif
 
 #ifndef __ASSEMBLY__
 
-#define load_TR(n)  __asm__ __volatile__ ("ltr  %%ax" : : "a" (__TSS(n)<<3) )
+#define load_TR(n)  __asm__ __volatile__ ("ltr  %%ax" : : "a" (TSS_ENTRY<<3) )
 
 #if defined(__x86_64__)
 #define GUEST_KERNEL_RPL(d) (is_pv_32bit_domain(d) ? 1 : 3)
@@ -203,13 +199,23 @@ do {                                                     \
         (((u32)(addr) & 0x00FF0000U) >> 16);             \
 } while (0)
 
+DECLARE_PER_CPU(struct tss_struct *, doublefault_tss);
+
 #endif
 
-extern struct desc_struct gdt_table[];
+struct desc_ptr {
+	unsigned short limit;
+	unsigned long base;
+} __attribute__((__packed__)) ;
+
+extern struct desc_struct boot_cpu_gdt_table[];
+DECLARE_PER_CPU(struct desc_struct *, gdt_table);
 #ifdef CONFIG_COMPAT
-extern struct desc_struct compat_gdt_table[];
+extern struct desc_struct boot_cpu_compat_gdt_table[];
+DECLARE_PER_CPU(struct desc_struct *, compat_gdt_table);
 #else
-# define compat_gdt_table gdt_table
+# define boot_cpu_compat_gdt_table boot_cpu_gdt_table
+# define per_cpu__compat_gdt_table per_cpu__gdt_table
 #endif
 
 extern void set_intr_gate(unsigned int irq, void * addr);

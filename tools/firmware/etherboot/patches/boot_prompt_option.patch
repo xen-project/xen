@@ -1,0 +1,31 @@
+diff -pruN a/src/arch/i386/prefix/romprefix.S b/src/arch/i386/prefix/romprefix.S
+--- a/src/arch/i386/prefix/romprefix.S	2008-09-25 03:34:26.000000000 +0100
++++ b/src/arch/i386/prefix/romprefix.S	2008-09-25 12:01:33.000000000 +0100
+@@ -320,6 +320,7 @@ no_pmm:
+ 	xorw	%di, %di
+ 	cs rep	movsb
+ 
++#ifndef NO_POST_PROMPT
+ 	/* Prompt for POST-time shell */
+ 	movw	$init_message_prompt, %si
+ 	xorw	%di, %di
+@@ -341,6 +342,7 @@ no_pmm:
+ 	pushw	%cs
+ 	call	exec
+ 1:
++#endif
+ 	/* Restore registers */
+ 	popw	%gs
+ 	popw	%fs
+@@ -371,9 +373,11 @@ init_message_pmm:
+ init_message_int19:
+ 	.asciz	" INT19"
+ 	.size	init_message_int19, . - init_message_int19
++#ifndef NO_POST_PROMPT
+ init_message_prompt:
+ 	.asciz	"\nPress Ctrl-B to configure gPXE..."
+ 	.size	init_message_prompt, . - init_message_prompt
++#endif
+ clear_message:
+ 	.asciz	"\r                                     \n\n"
+ 	.size	clear_message, . - clear_message

@@ -380,6 +380,11 @@ int vcpu_lock_affinity(struct vcpu *v, cpumask_t *affinity)
     return __vcpu_set_affinity(v, affinity, 0, 1);
 }
 
+int vcpu_locked_change_affinity(struct vcpu *v, cpumask_t *affinity)
+{
+    return __vcpu_set_affinity(v, affinity, 1, 1);
+}
+
 void vcpu_unlock_affinity(struct vcpu *v, cpumask_t *affinity)
 {
     cpumask_t online_affinity;

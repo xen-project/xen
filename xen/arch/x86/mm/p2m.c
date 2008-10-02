@@ -953,38 +953,47 @@ guest_physmap_add_entry(struct domain *d, unsigned long gfn,
 
     P2M_DEBUG("adding gfn=%#lx mfn=%#lx\n", gfn, mfn);
 
-    omfn = gfn_to_mfn(d, gfn, &ot);
-    if ( p2m_is_ram(ot) )
+    /* First, remove m->p mappings for existing p->m mappings */
+    for ( i = 0; i < (1UL << page_order); i++ )
     {
-        ASSERT(mfn_valid(omfn));
-        for ( i = 0; i < (1UL << page_order); i++ )
-            set_gpfn_from_mfn(mfn_x(omfn)+i, INVALID_M2P_ENTRY);
-    }
-
-    ogfn = mfn_to_gfn(d, _mfn(mfn));
-    if (
-#ifdef __x86_64__
-        (ogfn != 0x5555555555555555L)
-#else
-        (ogfn != 0x55555555L)
-#endif
-        && (ogfn != INVALID_M2P_ENTRY)
-        && (ogfn != gfn) )
-    {
-        /* This machine frame is already mapped at another physical address */
-        P2M_DEBUG("aliased! mfn=%#lx, old gfn=%#lx, new gfn=%#lx\n",
-                  mfn, ogfn, gfn);
-        omfn = gfn_to_mfn(d, ogfn, &ot);
+        omfn = gfn_to_mfn(d, gfn, &ot);
         if ( p2m_is_ram(ot) )
         {
             ASSERT(mfn_valid(omfn));
-            P2M_DEBUG("old gfn=%#lx -> mfn %#lx\n",
-                      ogfn , mfn_x(omfn));
-            if ( mfn_x(omfn) == mfn )
-                p2m_remove_page(d, ogfn, mfn, page_order);
+            set_gpfn_from_mfn(mfn_x(omfn)+i, INVALID_M2P_ENTRY);
         }
     }
 
+    /* Then, look for m->p mappings for this range and deal with them */
+    for ( i = 0; i < (1UL << page_order); i++ )
+    {
+        ogfn = mfn_to_gfn(d, _mfn(mfn));
+        if (
+#ifdef __x86_64__
+            (ogfn != 0x5555555555555555L)
+#else
+            (ogfn != 0x55555555L)
+#endif
+            && (ogfn != INVALID_M2P_ENTRY)
+            && (ogfn != gfn) )
+        {
+            /* This machine frame is already mapped at another physical
+             * address */
+            P2M_DEBUG("aliased! mfn=%#lx, old gfn=%#lx, new gfn=%#lx\n",
+                      mfn, ogfn, gfn);
+            omfn = gfn_to_mfn(d, ogfn, &ot);
+            if ( p2m_is_ram(ot) )
+            {
+                ASSERT(mfn_valid(omfn));
+                P2M_DEBUG("old gfn=%#lx -> mfn %#lx\n",
+                          ogfn , mfn_x(omfn));
+                if ( mfn_x(omfn) == mfn )
+                    p2m_remove_page(d, ogfn, mfn, 0);
+            }
+        }
+    }
+
+    /* Now, actually do the two-way mapping */
     if ( mfn_valid(_mfn(mfn)) ) 
     {
         if ( !set_p2m_entry(d, gfn, _mfn(mfn), page_order, t) )

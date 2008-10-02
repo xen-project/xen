@@ -6,7 +6,6 @@
 
 static inline void load_LDT(struct vcpu *v)
 {
-    unsigned int cpu;
     struct desc_struct *desc;
     unsigned long ents;
 
@@ -16,11 +15,11 @@ static inline void load_LDT(struct vcpu *v)
     }
     else
     {
-        cpu = smp_processor_id();
-        desc = (!is_pv_32on64_vcpu(v) ? gdt_table : compat_gdt_table)
-               + __LDT(cpu) - FIRST_RESERVED_GDT_ENTRY;
+        desc = (!is_pv_32on64_vcpu(v)
+                ? this_cpu(gdt_table) : this_cpu(compat_gdt_table))
+               + LDT_ENTRY - FIRST_RESERVED_GDT_ENTRY;
         _set_tssldt_desc(desc, LDT_VIRT_START(v), ents*8-1, 2);
-        __asm__ __volatile__ ( "lldt %%ax" : : "a" (__LDT(cpu)<<3) );
+        __asm__ __volatile__ ( "lldt %%ax" : : "a" (LDT_ENTRY << 3) );
     }
 }
 

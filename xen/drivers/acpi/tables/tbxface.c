@@ -65,7 +65,7 @@ ACPI_MODULE_NAME("tbxface")
  *
  ******************************************************************************/
 
-acpi_status acpi_allocate_root_table(u32 initial_table_count)
+acpi_status __init acpi_allocate_root_table(u32 initial_table_count)
 {
 
 	acpi_gbl_root_table_list.size = initial_table_count;
@@ -149,56 +149,6 @@ acpi_initialize_tables(struct acpi_table_desc * initial_table_array,
 	status =
 	    acpi_tb_parse_root_table(rsdp_address, ACPI_TABLE_ORIGIN_MAPPED);
 	return_ACPI_STATUS(status);
-}
-
-/*******************************************************************************
- *
- * FUNCTION:    acpi_reallocate_root_table
- *
- * PARAMETERS:  None
- *
- * RETURN:      Status
- *
- * DESCRIPTION: Reallocate Root Table List into dynamic memory. Copies the
- *              root list from the previously provided scratch area. Should
- *              be called once dynamic memory allocation is available in the
- *              kernel
- *
- ******************************************************************************/
-acpi_status acpi_reallocate_root_table(void)
-{
-	struct acpi_table_desc *tables;
-	acpi_size new_size;
-
-	ACPI_FUNCTION_TRACE(acpi_reallocate_root_table);
-
-	/*
-	 * Only reallocate the root table if the host provided a static buffer
-	 * for the table array in the call to acpi_initialize_tables.
-	 */
-	if (acpi_gbl_root_table_list.flags & ACPI_ROOT_ORIGIN_ALLOCATED) {
-		return_ACPI_STATUS(AE_SUPPORT);
-	}
-
-	new_size =
-	    (acpi_gbl_root_table_list.count +
-	     ACPI_ROOT_TABLE_SIZE_INCREMENT) * sizeof(struct acpi_table_desc);
-
-	/* Create new array and copy the old array */
-
-	tables = ACPI_ALLOCATE_ZEROED(new_size);
-	if (!tables) {
-		return_ACPI_STATUS(AE_NO_MEMORY);
-	}
-
-	ACPI_MEMCPY(tables, acpi_gbl_root_table_list.tables, new_size);
-
-	acpi_gbl_root_table_list.size = acpi_gbl_root_table_list.count;
-	acpi_gbl_root_table_list.tables = tables;
-	acpi_gbl_root_table_list.flags =
-	    ACPI_ROOT_ORIGIN_ALLOCATED | ACPI_ROOT_ALLOW_RESIZE;
-
-	return_ACPI_STATUS(AE_OK);
 }
 
 /*******************************************************************************

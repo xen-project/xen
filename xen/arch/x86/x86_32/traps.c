@@ -188,18 +188,20 @@ void show_page_walk(unsigned long addr)
     unmap_domain_page(l1t);
 }
 
-#define DOUBLEFAULT_STACK_SIZE 2048
-static struct tss_struct doublefault_tss;
-static unsigned char doublefault_stack[DOUBLEFAULT_STACK_SIZE];
+DEFINE_PER_CPU(struct tss_struct *, doublefault_tss);
+static unsigned char __attribute__ ((__section__ (".bss.page_aligned")))
+    boot_cpu_doublefault_space[PAGE_SIZE];
 
 asmlinkage void do_double_fault(void)
 {
-    struct tss_struct *tss = &doublefault_tss;
-    unsigned int cpu = ((tss->back_link>>3)-__FIRST_TSS_ENTRY)>>1;
+    struct tss_struct *tss;
+    unsigned int cpu;
 
     watchdog_disable();
 
     console_force_unlock();
+
+    asm ( "lsll %1, %0" : "=r" (cpu) : "rm" (PER_CPU_GDT_ENTRY << 3) );
 
     /* Find information saved during fault and dump it to the console. */
     tss = &init_tss[cpu];
@@ -301,34 +303,36 @@ static void set_task_gate(unsigned int n, unsigned int sel)
 
 void __devinit subarch_percpu_traps_init(void)
 {
-    struct tss_struct *tss = &doublefault_tss;
+    struct tss_struct *tss = this_cpu(doublefault_tss);
     asmlinkage int hypercall(void);
 
-    if ( smp_processor_id() != 0 )
-        return;
+    if ( !tss )
+    {
+        /* The hypercall entry vector is only accessible from ring 1. */
+        _set_gate(idt_table+HYPERCALL_VECTOR, 14, 1, &hypercall);
 
-    /* The hypercall entry vector is only accessible from ring 1. */
-    _set_gate(idt_table+HYPERCALL_VECTOR, 14, 1, &hypercall);
+        tss = (void *)boot_cpu_doublefault_space;
+        this_cpu(doublefault_tss) = tss;
+    }
 
     /*
      * Make a separate task for double faults. This will get us debug output if
      * we blow the kernel stack.
      */
-    memset(tss, 0, sizeof(*tss));
     tss->ds     = __HYPERVISOR_DS;
     tss->es     = __HYPERVISOR_DS;
     tss->ss     = __HYPERVISOR_DS;
-    tss->esp    = (unsigned long)&doublefault_stack[DOUBLEFAULT_STACK_SIZE];
+    tss->esp    = (unsigned long)tss + PAGE_SIZE;
     tss->__cr3  = __pa(idle_pg_table);
     tss->cs     = __HYPERVISOR_CS;
     tss->eip    = (unsigned long)do_double_fault;
     tss->eflags = 2;
     tss->bitmap = IOBMP_INVALID_OFFSET;
     _set_tssldt_desc(
-        gdt_table + __DOUBLEFAULT_TSS_ENTRY - FIRST_RESERVED_GDT_ENTRY,
+        this_cpu(gdt_table) + DOUBLEFAULT_TSS_ENTRY - FIRST_RESERVED_GDT_ENTRY,
         (unsigned long)tss, 235, 9);
 
-    set_task_gate(TRAP_double_fault, __DOUBLEFAULT_TSS_ENTRY<<3);
+    set_task_gate(TRAP_double_fault, DOUBLEFAULT_TSS_ENTRY << 3);
 }
 
 void init_int80_direct_trap(struct vcpu *v)

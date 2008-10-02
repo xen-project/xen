@@ -1298,8 +1298,18 @@ static int sedf_adjust_weights(struct xen_domctl_scheduler_op *cmd)
 {
     struct vcpu *p;
     struct domain      *d;
-    int                 sumw[NR_CPUS] = { 0 };
-    s_time_t            sumt[NR_CPUS] = { 0 };
+    unsigned int        nr_cpus = last_cpu(cpu_possible_map) + 1;
+    int                *sumw = xmalloc_array(int, nr_cpus);
+    s_time_t           *sumt = xmalloc_array(s_time_t, nr_cpus);
+
+    if ( !sumw || !sumt )
+    {
+        xfree(sumt);
+        xfree(sumw);
+        return -ENOMEM;
+    }
+    memset(sumw, 0, nr_cpus * sizeof(*sumw));
+    memset(sumt, 0, nr_cpus * sizeof(*sumt));
 
     /* Sum across all weights. */
     rcu_read_lock(&domlist_read_lock);
@@ -1348,6 +1358,9 @@ static int sedf_adjust_weights(struct xen_domctl_scheduler_op *cmd)
     }
     rcu_read_unlock(&domlist_read_lock);
 
+    xfree(sumt);
+    xfree(sumw);
+
     return 0;
 }
 
@@ -1356,6 +1369,7 @@ static int sedf_adjust_weights(struct xen_domctl_scheduler_op *cmd)
 static int sedf_adjust(struct domain *p, struct xen_domctl_scheduler_op *op)
 {
     struct vcpu *v;
+    int rc;
 
     PRINT(2,"sedf_adjust was called, domain-id %i new period %"PRIu64" "
           "new slice %"PRIu64"\nlatency %"PRIu64" extra:%s\n",
@@ -1411,8 +1425,9 @@ static int sedf_adjust(struct domain *p, struct xen_domctl_scheduler_op *op)
             }
         }
 
-        if ( sedf_adjust_weights(op) )
-            return -EINVAL;
+        rc = sedf_adjust_weights(op);
+        if ( rc )
+            return rc;
 
         for_each_vcpu ( p, v )
         {

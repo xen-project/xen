@@ -106,7 +106,7 @@ struct msi_desc {
  */
 #define NR_HP_RESERVED_VECTORS 	20
 
-extern int vector_irq[NR_VECTORS];
+extern struct hw_interrupt_type pci_msi_type;
 
 /*
  * MSI-X Address Register

@@ -37,17 +37,11 @@ def make_unstarted_domain(opts, config):
     try:
         server.xend.domain.new(config)
     except xmlrpclib.Fault, ex:
-        import signal
-        if vncpid:
-            os.kill(vncpid, signal.SIGKILL)
         if ex.faultCode == XendClient.ERROR_INVALID_DOMAIN:
             err("the domain '%s' does not exist." % ex.faultString)
         else:
             err("%s" % ex.faultString)
     except Exception, ex:
-        import signal
-        if vncpid:
-            os.kill(vncpid, signal.SIGKILL)
         err(str(ex))
 
 

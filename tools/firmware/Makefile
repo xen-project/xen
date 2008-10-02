@@ -9,7 +9,6 @@ INST_DIR := $(DESTDIR)/usr/lib/xen/boot
 SUBDIRS :=
 SUBDIRS += rombios
 SUBDIRS += vgabios
-SUBDIRS += extboot
 #SUBDIRS += etherboot
 SUBDIRS += hvmloader
 

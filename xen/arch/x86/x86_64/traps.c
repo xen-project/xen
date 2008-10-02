@@ -213,14 +213,13 @@ void show_page_walk(unsigned long addr)
 asmlinkage void double_fault(void);
 asmlinkage void do_double_fault(struct cpu_user_regs *regs)
 {
-    unsigned int cpu, tr;
-
-    asm volatile ( "str %0" : "=r" (tr) );
-    cpu = ((tr >> 3) - __FIRST_TSS_ENTRY) >> 2;
+    unsigned int cpu;
 
     watchdog_disable();
 
     console_force_unlock();
+
+    asm ( "lsll %1, %0" : "=r" (cpu) : "rm" (PER_CPU_GDT_ENTRY << 3) );
 
     /* Find information saved during fault and dump it to the console. */
     printk("*** DOUBLE FAULT ***\n");

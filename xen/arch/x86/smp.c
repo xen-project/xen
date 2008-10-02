@@ -280,7 +280,6 @@ int on_selected_cpus(
     spin_lock(&call_lock);
 
     call_data = &data;
-    wmb();
 
     send_IPI_mask(selected, CALL_FUNCTION_VECTOR);
 

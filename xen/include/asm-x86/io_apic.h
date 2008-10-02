@@ -123,9 +123,12 @@ extern struct mpc_config_intsrc mp_irqs[MAX_IRQ_SOURCES];
 /* non-0 if default (table-less) MP configuration */
 extern int mpc_default_type;
 
+/* Only need to remap ioapic RTE (reg: 10~3Fh) */
+#define ioapic_reg_remapped(reg) (iommu_enabled && ((reg) >= 0x10))
+
 static inline unsigned int io_apic_read(unsigned int apic, unsigned int reg)
 {
-	if (iommu_enabled)
+	if (ioapic_reg_remapped(reg))
 		return io_apic_read_remap_rte(apic, reg);
 	*IO_APIC_BASE(apic) = reg;
 	return *(IO_APIC_BASE(apic)+4);
@@ -133,7 +136,7 @@ static inline unsigned int io_apic_read(unsigned int apic, unsigned int reg)
 
 static inline void io_apic_write(unsigned int apic, unsigned int reg, unsigned int value)
 {
-	if (iommu_enabled)
+	if (ioapic_reg_remapped(reg))
 		return iommu_update_ire_from_apic(apic, reg, value);
 	*IO_APIC_BASE(apic) = reg;
 	*(IO_APIC_BASE(apic)+4) = value;
@@ -152,7 +155,7 @@ extern int sis_apic_bug;
 #endif
 static inline void io_apic_modify(unsigned int apic, unsigned int reg, unsigned int value)
 {
-	if (iommu_enabled)
+	if (ioapic_reg_remapped(reg))
 		return iommu_update_ire_from_apic(apic, reg, value);
 	if (sis_apic_bug)
 		*IO_APIC_BASE(apic) = reg;

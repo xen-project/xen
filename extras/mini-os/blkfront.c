@@ -8,6 +8,7 @@
 #include <events.h>
 #include <errno.h>
 #include <xen/io/blkif.h>
+#include <xen/io/protocols.h>
 #include <gnttab.h>
 #include <xmalloc.h>
 #include <time.h>
@@ -139,6 +140,12 @@ again:
                 "event-channel", "%u", dev->evtchn);
     if (err) {
         message = "writing event-channel";
+        goto abort_transaction;
+    }
+    err = xenbus_printf(xbt, nodename,
+                "protocol", "%s", XEN_IO_PROTO_ABI_NATIVE);
+    if (err) {
+        message = "writing protocol";
         goto abort_transaction;
     }
 

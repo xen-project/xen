@@ -418,7 +418,7 @@ class ImageHandler:
             os.close(null)
             os.close(logfd)
         sentinel_write.close()
-        self.vm.storeDom("image/device-model-pid", self.pid)
+        self.vm.storeVm("image/device-model-pid", self.pid)
         log.info("device model pid: %d", self.pid)
         # we would very much prefer not to have a thread here and instead
         #  have a callback but sadly we don't have Twisted in xend
@@ -502,7 +502,7 @@ class ImageHandler:
         if fifo_fd >= 0:
             self._openSentinel(sentinel_path_fifo)
             os.close(fifo_fd)
-            self.pid = self.vm.gatherDom(('image/device-model-pid', int))
+            self.pid = self.vm._gatherVm(('image/device-model-pid', int))
             log.debug("%s device model rediscovered, pid %s sentinel fifo %s",
                     name, self.pid, sentinel_path_fifo)
             self.sentinel_thread = thread.start_new_thread(self._sentinel_watch,())

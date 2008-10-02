@@ -4,6 +4,7 @@
 #include <xen/compat.h>
 #include <xen/dmi.h>
 #include <asm/e820.h>
+#include <asm/mm.h>
 #include <asm/page.h>
 
 /* opt_mem: Limit of physical RAM. Any RAM beyond this point is ignored. */
@@ -327,7 +328,7 @@ static void __init clip_to_limit(uint64_t limit, char *warnmsg)
             continue;
         if ( warnmsg )
         {
-            snprintf(_warnmsg, sizeof(_warnmsg), warnmsg, (int)(limit>>30));
+            snprintf(_warnmsg, sizeof(_warnmsg), warnmsg, (long)(limit>>30));
             printk("WARNING: %s\n", _warnmsg);
         }
         printk("Truncating memory map to %lukB\n",
@@ -366,8 +367,25 @@ static void __init machine_specific_memory_setup(
 
 #ifdef __i386__
     clip_to_limit((1ULL << 30) * MACHPHYS_MBYTES,
-                  "Only the first %u GB of the physical memory map "
+                  "Only the first %lu GB of the physical memory map "
                   "can be accessed by Xen in 32-bit mode.");
+#else
+    {
+        unsigned long limit, mpt_limit, pft_limit;
+
+        limit = DIRECTMAP_VIRT_END - DIRECTMAP_VIRT_START;
+        mpt_limit = ((RDWR_MPT_VIRT_END - RDWR_MPT_VIRT_START)
+                     / sizeof(unsigned long)) << PAGE_SHIFT;
+        pft_limit = ((FRAMETABLE_VIRT_END - FRAMETABLE_VIRT_START)
+                     / sizeof(struct page_info)) << PAGE_SHIFT;
+        if ( limit > mpt_limit )
+            limit = mpt_limit;
+        if ( limit > pft_limit )
+            limit = pft_limit;
+        clip_to_limit(limit,
+                      "Only the first %lu GB of the physical "
+                      "memory map can be accessed by Xen.");
+    }
 #endif
 
     reserve_dmi_region();

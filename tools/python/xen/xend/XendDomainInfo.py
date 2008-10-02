@@ -142,9 +142,7 @@ def recreate(info, priv):
     xeninfo['is_control_domain'] = priv
     xeninfo['is_a_template'] = False
     domid = xeninfo['domid']
-    uuid1 = uuid.fromString(xeninfo['uuid'])
-    needs_reinitialising = False
-    
+
     dompath = GetDomainPath(domid)
     if not dompath:
         raise XendError('No domain path in store for existing '
@@ -153,42 +151,12 @@ def recreate(info, priv):
     log.info("Recreating domain %d, UUID %s. at %s" %
              (domid, xeninfo['uuid'], dompath))
 
-    # need to verify the path and uuid if not Domain-0
-    # if the required uuid and vm aren't set, then that means
-    # we need to recreate the dom with our own values
-    #
-    # NOTE: this is probably not desirable, really we should just
-    #       abort or ignore, but there may be cases where xenstore's
-    #       entry disappears (eg. xenstore-rm /)
-    #
-    try:
-        vmpath = xstransact.Read(dompath, "vm")
-        if not vmpath:
-            if not priv:
-                log.warn('/local/domain/%d/vm is missing. recreate is '
-                         'confused, trying our best to recover' % domid)
-            needs_reinitialising = True
-            raise XendError('reinit')
-        
-        uuid2_str = xstransact.Read(vmpath, "uuid")
-        if not uuid2_str:
-            log.warn('%s/uuid/ is missing. recreate is confused, '
-                     'trying our best to recover' % vmpath)
-            needs_reinitialising = True
-            raise XendError('reinit')
-        
-        uuid2 = uuid.fromString(uuid2_str)
-        if uuid1 != uuid2:
-            log.warn('UUID in /vm does not match the UUID in /dom/%d.'
-                     'Trying out best to recover' % domid)
-            needs_reinitialising = True
-    except XendError:
-        pass # our best shot at 'goto' in python :)
+    vmpath = xstransact.Read("/vm_path", str(domid))
 
     vm = XendDomainInfo(xeninfo, domid, dompath, augment = True, priv = priv,
                         vmpath = vmpath)
-    
-    if needs_reinitialising:
+
+    if not vmpath:
         vm._recreateDom()
         vm._removeVm()
         vm._storeVmDetails()
@@ -477,8 +445,8 @@ class XendDomainInfo:
             try:
                 self._constructDomain()
                 self._storeVmDetails()
-                self._createDevices()
                 self._createChannels()
+                self._createDevices()
                 self._storeDomDetails()
                 self._endRestore()
             except:
@@ -1254,31 +1222,6 @@ class XendDomainInfo:
     def permissionsVm(self, *args):
         return xstransact.SetPermissions(self.vmpath, *args)
 
-
-    def _readVmTxn(self, transaction,  *args):
-        paths = map(lambda x: self.vmpath + "/" + x, args)
-        return transaction.read(*paths)
-
-    def _writeVmTxn(self, transaction,  *args):
-        paths = map(lambda x: self.vmpath + "/" + x, args)
-        return transaction.write(*paths)
-
-    def _removeVmTxn(self, transaction,  *args):
-        paths = map(lambda x: self.vmpath + "/" + x, args)
-        return transaction.remove(*paths)
-
-    def _gatherVmTxn(self, transaction,  *args):
-        paths = map(lambda x: self.vmpath + "/" + x, args)
-        return transaction.gather(paths)
-
-    def storeVmTxn(self, transaction,  *args):
-        paths = map(lambda x: self.vmpath + "/" + x, args)
-        return transaction.store(*paths)
-
-    def permissionsVmTxn(self, transaction,  *args):
-        paths = map(lambda x: self.vmpath + "/" + x, args)
-        return transaction.set_permissions(*paths)
-
     #
     # Function to update xenstore /dom/*
     #
@@ -1833,6 +1776,7 @@ class XendDomainInfo:
         self._releaseDevices()
         # Remove existing vm node in xenstore
         self._removeVm()
+        self._removeVmPath()
         new_dom_info = self.info.copy()
         new_dom_info['name_label'] = self.info['name_label']
         new_dom_info['uuid'] = self.info['uuid']
@@ -2413,7 +2357,7 @@ class XendDomainInfo:
 
         paths = self._prepare_phantom_paths()
 
-        self._cleanupVm()
+        self._removeVmPath()
         if self.dompath is not None:
             try:
                 xc.domain_destroy_hook(self.domid)
@@ -2430,6 +2374,7 @@ class XendDomainInfo:
             self.cleanupDomain()
 
         self._cleanup_phantom_devs(paths)
+        self._cleanupVm()
 
         if "transient" in self.info["other_config"] \
            and bool(self.info["other_config"]["transient"]):
@@ -2642,9 +2587,6 @@ class XendDomainInfo:
     def _cleanupVm(self):
         """Cleanup VM resources.  Idempotent.  Nothrow guarantee."""
 
-        from xen.xend import XendDomain
-        if not XendDomain.instance().is_domain_managed(self):
-            self.metrics.destroy()
         self._unwatchVm()
 
         try:
@@ -2718,6 +2660,15 @@ class XendDomainInfo:
                 log.info("Dev still active but hit max loop timeout")
                 break
 
+    def _storeVmPath(self):
+        log.info("storeVmPath(%s) => %s", self.domid, self.vmpath)
+        if self.domid is not None:
+            xstransact.Write('/vm_path', str(self.domid), self.vmpath)
+
+    def _removeVmPath(self):
+        if self.domid is not None:
+            xstransact.Remove('/vm_path/%s' % str(self.domid))
+
     def _storeVmDetails(self):
         to_store = {}
 
@@ -2742,7 +2693,7 @@ class XendDomainInfo:
 
         self._writeVm(to_store)
         self._setVmPermissions()
-
+        self._storeVmPath()
 
     def _setVmPermissions(self):
         """Allow the guest domain to read its UUID.  We don't allow it to
@@ -2762,7 +2713,7 @@ class XendDomainInfo:
              log.warn("".join(traceback.format_stack()))
              return self._stateGet()
          else:
-             raise AttributeError()
+             raise AttributeError(name)
 
     def __setattr__(self, name, value):
         if name == "state":
@@ -2871,12 +2822,6 @@ class XendDomainInfo:
         result = self.info.to_sxp(domain = self,
                                   ignore_devices = ignore_store,
                                   legacy_only = legacy_only)
-
-        #if not ignore_store and self.dompath:
-        #    vnc_port = self.readDom('console/vnc-port')
-        #    if vnc_port is not None:
-        #        result.append(['device',
-        #                       ['console', ['vnc-port', str(vnc_port)]]])
 
         return result
 
@@ -3143,7 +3088,7 @@ class XendDomainInfo:
             if not config.has_key('device'):
                 devid = config.get('id')
                 if devid != None:
-                    config['device'] = 'eth%d' % devid
+                    config['device'] = 'eth%s' % devid
                 else:
                     config['device'] = ''
 
@@ -3507,12 +3452,12 @@ class XendDomainInfo:
             except Exception, exn:
                 raise XendError('Failed to destroy device')
 
-    def destroy_xapi_device_instances(self):
-        """Destroy Xen-API device instances stored in XendAPIStore.
+    def destroy_xapi_instances(self):
+        """Destroy Xen-API instances stored in XendAPIStore.
         """
         # Xen-API classes based on XendBase have their instances stored
-        # in XendAPIStore. Cleanup these virtual device instances here
-        # if they are supposed to be destroyed when the parent domain is dead.
+        # in XendAPIStore. Cleanup these instances here, if they are supposed
+        # to be destroyed when the parent domain is dead.
         #
         # Most of the virtual devices (vif, vbd, vfb, etc) are not based on
         # XendBase and there's no need to remove them from XendAPIStore.
@@ -3522,6 +3467,12 @@ class XendDomainInfo:
             # domain still exists.
             return
 
+        # Destroy the VMMetrics instance.
+        if XendAPIStore.get(self.metrics.get_uuid(), self.metrics.getClass()) \
+                is not None:
+            self.metrics.destroy()
+
+        # Destroy DPCI instances.
         for dpci_uuid in XendDPCI.get_by_VM(self.info.get('uuid')):
             XendAPIStore.deregister(dpci_uuid, "DPCI")
             

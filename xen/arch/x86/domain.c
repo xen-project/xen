@@ -211,7 +211,6 @@ static inline int may_switch_mode(struct domain *d)
 
 int switch_native(struct domain *d)
 {
-    l1_pgentry_t gdt_l1e;
     unsigned int vcpuid;
 
     if ( d == NULL )
@@ -223,12 +222,8 @@ int switch_native(struct domain *d)
 
     d->arch.is_32bit_pv = d->arch.has_32bit_shinfo = 0;
 
-    /* switch gdt */
-    gdt_l1e = l1e_from_page(virt_to_page(gdt_table), PAGE_HYPERVISOR);
     for ( vcpuid = 0; vcpuid < MAX_VIRT_CPUS; vcpuid++ )
     {
-        d->arch.mm_perdomain_pt[((vcpuid << GDT_LDT_VCPU_SHIFT) +
-                                 FIRST_RESERVED_GDT_PAGE)] = gdt_l1e;
         if (d->vcpu[vcpuid])
             release_compat_l4(d->vcpu[vcpuid]);
     }
@@ -238,7 +233,6 @@ int switch_native(struct domain *d)
 
 int switch_compat(struct domain *d)
 {
-    l1_pgentry_t gdt_l1e;
     unsigned int vcpuid;
 
     if ( d == NULL )
@@ -250,15 +244,11 @@ int switch_compat(struct domain *d)
 
     d->arch.is_32bit_pv = d->arch.has_32bit_shinfo = 1;
 
-    /* switch gdt */
-    gdt_l1e = l1e_from_page(virt_to_page(compat_gdt_table), PAGE_HYPERVISOR);
     for ( vcpuid = 0; vcpuid < MAX_VIRT_CPUS; vcpuid++ )
     {
         if ( (d->vcpu[vcpuid] != NULL) &&
              (setup_compat_l4(d->vcpu[vcpuid]) != 0) )
             goto undo_and_fail;
-        d->arch.mm_perdomain_pt[((vcpuid << GDT_LDT_VCPU_SHIFT) +
-                                 FIRST_RESERVED_GDT_PAGE)] = gdt_l1e;
     }
 
     domain_set_alloc_bitsize(d);
@@ -267,13 +257,10 @@ int switch_compat(struct domain *d)
 
  undo_and_fail:
     d->arch.is_32bit_pv = d->arch.has_32bit_shinfo = 0;
-    gdt_l1e = l1e_from_page(virt_to_page(gdt_table), PAGE_HYPERVISOR);
     while ( vcpuid-- != 0 )
     {
         if ( d->vcpu[vcpuid] != NULL )
             release_compat_l4(d->vcpu[vcpuid]);
-        d->arch.mm_perdomain_pt[((vcpuid << GDT_LDT_VCPU_SHIFT) +
-                                 FIRST_RESERVED_GDT_PAGE)] = gdt_l1e;
     }
     return -ENOMEM;
 }
@@ -322,7 +309,12 @@ int vcpu_initialise(struct vcpu *v)
         if ( is_idle_domain(d) )
         {
             v->arch.schedule_tail = continue_idle_domain;
-            v->arch.cr3           = __pa(idle_pg_table);
+            if ( v->vcpu_id )
+                v->arch.cr3 = d->vcpu[0]->arch.cr3;
+            else if ( !*idle_vcpu )
+                v->arch.cr3 = __pa(idle_pg_table);
+            else if ( !(v->arch.cr3 = clone_idle_pagetable(v)) )
+                return -ENOMEM;
         }
 
         v->arch.guest_context.ctrlreg[4] =
@@ -349,8 +341,7 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
 #ifdef __x86_64__
     struct page_info *pg;
 #endif
-    l1_pgentry_t gdt_l1e;
-    int i, vcpuid, pdpt_order, paging_initialised = 0;
+    int i, pdpt_order, paging_initialised = 0;
     int rc = -ENOMEM;
 
     d->arch.hvm_domain.hap_enabled =
@@ -368,18 +359,6 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
     if ( d->arch.mm_perdomain_pt == NULL )
         goto fail;
     memset(d->arch.mm_perdomain_pt, 0, PAGE_SIZE << pdpt_order);
-
-    /*
-     * Map Xen segments into every VCPU's GDT, irrespective of whether every
-     * VCPU will actually be used. This avoids an NMI race during context
-     * switch: if we take an interrupt after switching CR3 but before switching
-     * GDT, and the old VCPU# is invalid in the new domain, we would otherwise
-     * try to load CS from an invalid table.
-     */
-    gdt_l1e = l1e_from_page(virt_to_page(gdt_table), PAGE_HYPERVISOR);
-    for ( vcpuid = 0; vcpuid < MAX_VIRT_CPUS; vcpuid++ )
-        d->arch.mm_perdomain_pt[((vcpuid << GDT_LDT_VCPU_SHIFT) +
-                                 FIRST_RESERVED_GDT_PAGE)] = gdt_l1e;
 
 #if defined(__i386__)
 
@@ -434,8 +413,6 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
         if ( (rc = iommu_domain_init(d)) != 0 )
             goto fail;
     }
-
-    spin_lock_init(&d->arch.irq_lock);
 
     if ( is_hvm_domain(d) )
     {
@@ -1193,9 +1170,12 @@ static void paravirt_ctxt_switch_to(struct vcpu *v)
 static void __context_switch(void)
 {
     struct cpu_user_regs *stack_regs = guest_cpu_user_regs();
-    unsigned int          cpu = smp_processor_id();
+    unsigned int          i, cpu = smp_processor_id();
     struct vcpu          *p = per_cpu(curr_vcpu, cpu);
     struct vcpu          *n = current;
+    struct desc_struct   *gdt;
+    struct page_info     *page;
+    struct desc_ptr       gdt_desc;
 
     ASSERT(p != n);
     ASSERT(cpus_empty(n->vcpu_dirty_cpumask));
@@ -1221,14 +1201,30 @@ static void __context_switch(void)
         cpu_set(cpu, n->domain->domain_dirty_cpumask);
     cpu_set(cpu, n->vcpu_dirty_cpumask);
 
+    gdt = !is_pv_32on64_vcpu(n) ? per_cpu(gdt_table, cpu) :
+                                  per_cpu(compat_gdt_table, cpu);
+    page = virt_to_page(gdt);
+    for (i = 0; i < NR_RESERVED_GDT_PAGES; ++i)
+    {
+        l1e_write(n->domain->arch.mm_perdomain_pt +
+                  (n->vcpu_id << GDT_LDT_VCPU_SHIFT) +
+                  FIRST_RESERVED_GDT_PAGE + i,
+                  l1e_from_page(page + i, __PAGE_HYPERVISOR));
+    }
+
+    if ( p->vcpu_id != n->vcpu_id )
+    {
+        gdt_desc.limit = LAST_RESERVED_GDT_BYTE;
+        gdt_desc.base  = (unsigned long)(gdt - FIRST_RESERVED_GDT_ENTRY);
+        asm volatile ( "lgdt %0" : : "m" (gdt_desc) );
+    }
+
     write_ptbase(n);
 
     if ( p->vcpu_id != n->vcpu_id )
     {
-        char gdt_load[10];
-        *(unsigned short *)(&gdt_load[0]) = LAST_RESERVED_GDT_BYTE;
-        *(unsigned long  *)(&gdt_load[2]) = GDT_VIRT_START(n);
-        asm volatile ( "lgdt %0" : "=m" (gdt_load) );
+        gdt_desc.base = GDT_VIRT_START(n);
+        asm volatile ( "lgdt %0" : : "m" (gdt_desc) );
     }
 
     if ( p->domain != n->domain )
@@ -1279,8 +1275,6 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
             uint64_t efer = read_efer();
             if ( !(efer & EFER_SCE) )
                 write_efer(efer | EFER_SCE);
-            flush_tlb_one_local(GDT_VIRT_START(next) +
-                                FIRST_RESERVED_GDT_BYTE);
         }
 #endif
 
@@ -1356,6 +1350,7 @@ struct migrate_info {
     void *data;
     void (*saved_schedule_tail)(struct vcpu *);
     cpumask_t saved_affinity;
+    unsigned int nest;
 };
 
 static void continue_hypercall_on_cpu_helper(struct vcpu *v)
@@ -1363,47 +1358,63 @@ static void continue_hypercall_on_cpu_helper(struct vcpu *v)
     struct cpu_user_regs *regs = guest_cpu_user_regs();
     struct migrate_info *info = v->arch.continue_info;
     cpumask_t mask = info->saved_affinity;
+    void (*saved_schedule_tail)(struct vcpu *) = info->saved_schedule_tail;
 
     regs->eax = info->func(info->data);
 
-    v->arch.schedule_tail = info->saved_schedule_tail;
-    v->arch.continue_info = NULL;
+    if ( info->nest-- == 0 )
+    {
+        xfree(info);
+        v->arch.schedule_tail = saved_schedule_tail;
+        v->arch.continue_info = NULL;
+        vcpu_unlock_affinity(v, &mask);
+    }
 
-    xfree(info);
-
-    vcpu_unlock_affinity(v, &mask);
-    schedule_tail(v);
+    (*saved_schedule_tail)(v);
 }
 
 int continue_hypercall_on_cpu(int cpu, long (*func)(void *data), void *data)
 {
     struct vcpu *v = current;
     struct migrate_info *info;
+    cpumask_t mask = cpumask_of_cpu(cpu);
     int rc;
 
     if ( cpu == smp_processor_id() )
         return func(data);
 
-    info = xmalloc(struct migrate_info);
+    info = v->arch.continue_info;
     if ( info == NULL )
-        return -ENOMEM;
+    {
+        info = xmalloc(struct migrate_info);
+        if ( info == NULL )
+            return -ENOMEM;
+
+        rc = vcpu_lock_affinity(v, &mask);
+        if ( rc )
+        {
+            xfree(info);
+            return rc;
+        }
+
+        info->saved_schedule_tail = v->arch.schedule_tail;
+        info->saved_affinity = mask;
+        info->nest = 0;
+
+        v->arch.schedule_tail = continue_hypercall_on_cpu_helper;
+        v->arch.continue_info = info;
+    }
+    else
+    {
+        BUG_ON(info->nest != 0);
+        rc = vcpu_locked_change_affinity(v, &mask);
+        if ( rc )
+            return rc;
+        info->nest++;
+    }
 
     info->func = func;
     info->data = data;
-    info->saved_schedule_tail = v->arch.schedule_tail;
-    info->saved_affinity = cpumask_of_cpu(cpu);
-
-    v->arch.schedule_tail = continue_hypercall_on_cpu_helper;
-    v->arch.continue_info = info;
-
-    rc = vcpu_lock_affinity(v, &info->saved_affinity);
-    if ( rc )
-    {
-        v->arch.schedule_tail = info->saved_schedule_tail;
-        v->arch.continue_info = NULL;
-        xfree(info);
-        return rc;
-    }
 
     /* Dummy return value will be overwritten by new schedule_tail. */
     BUG_ON(!test_bit(SCHEDULE_SOFTIRQ, &softirq_pending(smp_processor_id())));

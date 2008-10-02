@@ -277,6 +277,35 @@ static void __do_IRQ_guest(int vector)
     }
 }
 
+/*
+ * Retrieve Xen irq-descriptor corresponding to a domain-specific irq.
+ * The descriptor is returned locked. This function is safe against changes
+ * to the per-domain irq-to-vector mapping.
+ */
+static irq_desc_t *domain_spin_lock_irq_desc(
+    struct domain *d, int irq, unsigned long *pflags)
+{
+    unsigned int vector;
+    unsigned long flags;
+    irq_desc_t *desc;
+
+    for ( ; ; )
+    {
+        vector = domain_irq_to_vector(d, irq);
+        if ( vector <= 0 )
+            return NULL;
+        desc = &irq_desc[vector];
+        spin_lock_irqsave(&desc->lock, flags);
+        if ( vector == domain_irq_to_vector(d, irq) )
+            break;
+        spin_unlock_irqrestore(&desc->lock, flags);
+    }
+
+    if ( pflags != NULL )
+        *pflags = flags;
+    return desc;
+}
+
 /* Flush all ready EOIs from the top of this CPU's pending-EOI stack. */
 static void flush_ready_eoi(void *unused)
 {
@@ -342,11 +371,13 @@ static void __pirq_guest_eoi(struct domain *d, int irq)
     cpumask_t           cpu_eoi_map;
     int                 vector;
 
-    vector = domain_irq_to_vector(d, irq);
-    desc   = &irq_desc[vector];
-    action = (irq_guest_action_t *)desc->action;
+    ASSERT(local_irq_is_enabled());
+    desc = domain_spin_lock_irq_desc(d, irq, NULL);
+    if ( desc == NULL )
+        return;
 
-    spin_lock_irq(&desc->lock);
+    action = (irq_guest_action_t *)desc->action;
+    vector = desc - irq_desc;
 
     ASSERT(!test_bit(irq, d->pirq_mask) ||
            (action->ack_type != ACKTYPE_NONE));
@@ -418,7 +449,7 @@ int pirq_acktype(struct domain *d, int irq)
     unsigned int vector;
 
     vector = domain_irq_to_vector(d, irq);
-    if ( vector == 0 )
+    if ( vector <= 0 )
         return ACKTYPE_NONE;
 
     desc = &irq_desc[vector];
@@ -447,13 +478,6 @@ int pirq_acktype(struct domain *d, int irq)
     if ( !strcmp(desc->handler->typename, "XT-PIC") )
         return ACKTYPE_UNMASK;
 
-    if ( strstr(desc->handler->typename, "MPIC") )
-    {
-        if ( desc->status & IRQ_LEVEL )
-            return (desc->status & IRQ_PER_CPU) ? ACKTYPE_EOI : ACKTYPE_UNMASK;
-        return ACKTYPE_NONE; /* edge-triggered => no final EOI */
-    }
-
     printk("Unknown PIC type '%s' for IRQ %d\n", desc->handler->typename, irq);
     BUG();
 
@@ -462,21 +486,18 @@ int pirq_acktype(struct domain *d, int irq)
 
 int pirq_shared(struct domain *d, int irq)
 {
-    unsigned int        vector;
     irq_desc_t         *desc;
     irq_guest_action_t *action;
     unsigned long       flags;
     int                 shared;
 
-    vector = domain_irq_to_vector(d, irq);
-    if ( vector == 0 )
+    desc = domain_spin_lock_irq_desc(d, irq, &flags);
+    if ( desc == NULL )
         return 0;
 
-    desc = &irq_desc[vector];
-
-    spin_lock_irqsave(&desc->lock, flags);
     action = (irq_guest_action_t *)desc->action;
     shared = ((desc->status & IRQ_GUEST) && (action->nr_guests > 1));
+
     spin_unlock_irqrestore(&desc->lock, flags);
 
     return shared;
@@ -487,20 +508,19 @@ int pirq_guest_bind(struct vcpu *v, int irq, int will_share)
     unsigned int        vector;
     irq_desc_t         *desc;
     irq_guest_action_t *action;
-    unsigned long       flags;
     int                 rc = 0;
     cpumask_t           cpumask = CPU_MASK_NONE;
 
+    WARN_ON(!spin_is_locked(&v->domain->evtchn_lock));
+    BUG_ON(!local_irq_is_enabled());
+
  retry:
-    vector = domain_irq_to_vector(v->domain, irq);
-    if ( vector == 0 )
+    desc = domain_spin_lock_irq_desc(v->domain, irq, NULL);
+    if ( desc == NULL )
         return -EINVAL;
 
-    desc = &irq_desc[vector];
-
-    spin_lock_irqsave(&desc->lock, flags);
-
     action = (irq_guest_action_t *)desc->action;
+    vector = desc - irq_desc;
 
     if ( !(desc->status & IRQ_GUEST) )
     {
@@ -555,7 +575,7 @@ int pirq_guest_bind(struct vcpu *v, int irq, int will_share)
          */
         ASSERT(action->ack_type == ACKTYPE_EOI);
         ASSERT(desc->status & IRQ_DISABLED);
-        spin_unlock_irqrestore(&desc->lock, flags);
+        spin_unlock_irq(&desc->lock);
         cpu_relax();
         goto retry;
     }
@@ -571,30 +591,25 @@ int pirq_guest_bind(struct vcpu *v, int irq, int will_share)
     action->guest[action->nr_guests++] = v->domain;
 
  out:
-    spin_unlock_irqrestore(&desc->lock, flags);
+    spin_unlock_irq(&desc->lock);
     return rc;
 }
 
-void pirq_guest_unbind(struct domain *d, int irq)
+static void __pirq_guest_unbind(struct domain *d, int irq, irq_desc_t *desc)
 {
     unsigned int        vector;
-    irq_desc_t         *desc;
     irq_guest_action_t *action;
     cpumask_t           cpu_eoi_map;
-    unsigned long       flags;
     int                 i;
 
-    vector = domain_irq_to_vector(d, irq);
-    desc = &irq_desc[vector];
-    BUG_ON(vector == 0);
-
-    spin_lock_irqsave(&desc->lock, flags);
+    BUG_ON(!(desc->status & IRQ_GUEST));
 
     action = (irq_guest_action_t *)desc->action;
+    vector = desc - irq_desc;
 
-    i = 0;
-    while ( action->guest[i] && (action->guest[i] != d) )
-        i++;
+    for ( i = 0; (i < action->nr_guests) && (action->guest[i] != d); i++ )
+        continue;
+    BUG_ON(i == action->nr_guests);
     memmove(&action->guest[i], &action->guest[i+1], IRQ_MAX_GUESTS-i-1);
     action->nr_guests--;
 
@@ -612,9 +627,9 @@ void pirq_guest_unbind(struct domain *d, int irq)
              (action->nr_guests != 0) )
         {
             cpu_eoi_map = action->cpu_eoi_map;
-            spin_unlock_irqrestore(&desc->lock, flags);    
+            spin_unlock_irq(&desc->lock);
             on_selected_cpus(cpu_eoi_map, set_eoi_ready, desc, 1, 0);
-            spin_lock_irqsave(&desc->lock, flags);
+            spin_lock_irq(&desc->lock);
         }
         break;
     }
@@ -626,7 +641,7 @@ void pirq_guest_unbind(struct domain *d, int irq)
     BUG_ON(test_bit(irq, d->pirq_mask));
 
     if ( action->nr_guests != 0 )
-        goto out;
+        return;
 
     BUG_ON(action->in_flight != 0);
 
@@ -646,9 +661,9 @@ void pirq_guest_unbind(struct domain *d, int irq)
     if ( !cpus_empty(cpu_eoi_map) )
     {
         BUG_ON(action->ack_type != ACKTYPE_EOI);
-        spin_unlock_irqrestore(&desc->lock, flags);
+        spin_unlock_irq(&desc->lock);
         on_selected_cpus(cpu_eoi_map, set_eoi_ready, desc, 1, 1);
-        spin_lock_irqsave(&desc->lock, flags);
+        spin_lock_irq(&desc->lock);
     }
 
     BUG_ON(!cpus_empty(action->cpu_eoi_map));
@@ -659,9 +674,61 @@ void pirq_guest_unbind(struct domain *d, int irq)
     desc->status &= ~IRQ_INPROGRESS;
     kill_timer(&irq_guest_eoi_timer[vector]);
     desc->handler->shutdown(vector);
+}
+
+void pirq_guest_unbind(struct domain *d, int irq)
+{
+    irq_desc_t *desc;
+    int vector;
+
+    WARN_ON(!spin_is_locked(&d->evtchn_lock));
+
+    BUG_ON(!local_irq_is_enabled());
+    desc = domain_spin_lock_irq_desc(d, irq, NULL);
+
+    if ( desc == NULL )
+    {
+        vector = -domain_irq_to_vector(d, irq);
+        BUG_ON(vector <= 0);
+        desc = &irq_desc[vector];
+        spin_lock_irq(&desc->lock);
+        d->arch.pirq_vector[irq] = d->arch.vector_pirq[vector] = 0;
+    }
+    else
+    {
+        __pirq_guest_unbind(d, irq, desc);
+    }
+
+    spin_unlock_irq(&desc->lock);
+}
+
+int pirq_guest_force_unbind(struct domain *d, int irq)
+{
+    irq_desc_t *desc;
+    irq_guest_action_t *action;
+    int i, bound = 0;
+
+    WARN_ON(!spin_is_locked(&d->evtchn_lock));
+
+    BUG_ON(!local_irq_is_enabled());
+    desc = domain_spin_lock_irq_desc(d, irq, NULL);
+    BUG_ON(desc == NULL);
+
+    if ( !(desc->status & IRQ_GUEST) )
+        goto out;
+
+    action = (irq_guest_action_t *)desc->action;
+    for ( i = 0; (i < action->nr_guests) && (action->guest[i] != d); i++ )
+        continue;
+    if ( i == action->nr_guests )
+        goto out;
+
+    bound = 1;
+    __pirq_guest_unbind(d, irq, desc);
 
  out:
-    spin_unlock_irqrestore(&desc->lock, flags);    
+    spin_unlock_irq(&desc->lock);
+    return bound;
 }
 
 extern void dump_ioapic_irq_info(void);

@@ -29,6 +29,12 @@
 
 #define get_xen_guest_handle(val, hnd)  do { val = (hnd).p; } while (0)
 
+static long cpu_down_helper(void *data)
+{
+    int cpu = (unsigned long)data;
+    return cpu_down(cpu);
+}
+
 long arch_do_sysctl(
     struct xen_sysctl *sysctl, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
 {
@@ -92,6 +98,25 @@ long arch_do_sysctl(
     }
     break;
     
+    case XEN_SYSCTL_cpu_hotplug:
+    {
+        unsigned int cpu = sysctl->u.cpu_hotplug.cpu;
+
+        switch ( sysctl->u.cpu_hotplug.op )
+        {
+        case XEN_SYSCTL_CPU_HOTPLUG_ONLINE:
+            ret = cpu_up(cpu);
+            break;
+        case XEN_SYSCTL_CPU_HOTPLUG_OFFLINE:
+            ret = continue_hypercall_on_cpu(
+                0, cpu_down_helper, (void *)(unsigned long)cpu);
+            break;
+        default:
+            ret = -EINVAL;
+            break;
+        }
+    }
+    break;
 
     default:
         ret = -ENOSYS;

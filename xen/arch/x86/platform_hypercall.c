@@ -45,11 +45,21 @@ extern spinlock_t xenpf_lock;
 
 static DEFINE_PER_CPU(uint64_t, freq);
 
+extern int set_px_pminfo(uint32_t cpu, struct xen_processor_performance *perf);
 extern long set_cx_pminfo(uint32_t cpu, struct xen_processor_power *power);
 
 static long cpu_frequency_change_helper(void *data)
 {
     return cpu_frequency_change(this_cpu(freq));
+}
+
+int xenpf_copy_px_states(struct processor_performance *pxpt,
+        struct xen_processor_performance *dom0_px_info)
+{
+    if (!pxpt || !dom0_px_info)
+        return -EINVAL;
+    return  copy_from_compat(pxpt->states, dom0_px_info->states, 
+                    dom0_px_info->state_count);
 }
 
 ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
@@ -363,88 +373,9 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
         {
         case XEN_PM_PX:
         {
-            static int cpu_count = 0;
-            struct xenpf_set_processor_pminfo *xenpmpt = &op->u.set_pminfo;
-            struct xen_processor_performance *xenpxpt = &op->u.set_pminfo.perf;
-            int cpuid = get_cpu_id(xenpmpt->id);
-            struct processor_pminfo *pmpt;
-            struct processor_performance *pxpt;
 
-            if ( !(xen_processor_pmbits & XEN_PROCESSOR_PM_PX) )
-            {
-                ret = -ENOSYS;
-                break;
-            }
-            if ( cpuid < 0 )
-            {
-                ret = -EINVAL;
-                break;
-            }
-            pmpt = &processor_pminfo[cpuid];
-            pxpt = &processor_pminfo[cpuid].perf;
-            pmpt->acpi_id = xenpmpt->id;
-            pmpt->id = cpuid;
-
-            if ( xenpxpt->flags & XEN_PX_PCT )
-            {
-                memcpy ((void *)&pxpt->control_register,
-                    (void *)&xenpxpt->control_register,
-                    sizeof(struct xen_pct_register));
-                memcpy ((void *)&pxpt->status_register,
-                    (void *)&xenpxpt->status_register,
-                    sizeof(struct xen_pct_register));
-            }
-            if ( xenpxpt->flags & XEN_PX_PSS ) 
-            {
-                if ( !(pxpt->states = xmalloc_array(struct xen_processor_px,
-                    xenpxpt->state_count)) )
-                {
-                    ret = -ENOMEM;
-                    break;
-                }
-                if ( copy_from_compat(pxpt->states, xenpxpt->states, 
-                    xenpxpt->state_count) )
-                {
-                    xfree(pxpt->states);
-                    ret = -EFAULT;
-                    break;
-                }
-                pxpt->state_count = xenpxpt->state_count;
-            }
-            if ( xenpxpt->flags & XEN_PX_PSD )
-            {
-                pxpt->shared_type = xenpxpt->shared_type;
-                memcpy ((void *)&pxpt->domain_info,
-                    (void *)&xenpxpt->domain_info,
-                    sizeof(struct xen_psd_package));
-            }
-            if ( xenpxpt->flags & XEN_PX_PPC )
-            {
-                pxpt->platform_limit = xenpxpt->platform_limit;
-
-                if ( pxpt->init == XEN_PX_INIT )
-                {
-                    ret = cpufreq_limit_change(cpuid);
-                    break;
-                }
-            }
-
-            if ( xenpxpt->flags == ( XEN_PX_PCT | XEN_PX_PSS |
-                                     XEN_PX_PSD | XEN_PX_PPC ) )
-            {
-                pxpt->init = XEN_PX_INIT;
-                cpu_count++;
-
-                /* Currently we only handle Intel and AMD processor */
-                if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
-                    ret = cpufreq_add_cpu(cpuid);
-                else if ( (boot_cpu_data.x86_vendor == X86_VENDOR_AMD) &&
-                    (cpu_count == num_online_cpus()) )
-                    ret = powernow_cpufreq_init();
-                else
-                    break;
-            }
-
+            ret = set_px_pminfo(op->u.set_pminfo.id,
+                                &op->u.set_pminfo.perf);
             break;
         }
  

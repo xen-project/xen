@@ -470,9 +470,9 @@ void pirq_guest_unbind(struct domain *d, int irq)
 
     action = (irq_guest_action_t *)desc->action;
 
-    i = 0;
-    while ( action->guest[i] && (action->guest[i] != d) )
-        i++;
+    for ( i = 0; (i < action->nr_guests) && (action->guest[i] != d); i++ )
+        continue;
+    BUG_ON(i == action->nr_guests);
     memmove(&action->guest[i], &action->guest[i+1], IRQ_MAX_GUESTS-i-1);
     action->nr_guests--;
 

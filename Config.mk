@@ -100,9 +100,8 @@ QEMU_REMOTE=http://xenbits.xensource.com/git-http/qemu-xen-unstable.git
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.
-# CONFIG_QEMU   ?= ioemu
-# CONFIG_QEMU   ?= ../qemu-xen.git
-CONFIG_QEMU   ?= $(QEMU_REMOTE)
+# CONFIG_QEMU ?= ../qemu-xen.git
+CONFIG_QEMU ?= $(QEMU_REMOTE)
 
 # Optional components
 XENSTAT_XENTOP     ?= y

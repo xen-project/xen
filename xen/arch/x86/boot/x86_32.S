@@ -78,7 +78,7 @@ idt_descr:
         .word   0
 gdt_descr:
         .word   LAST_RESERVED_GDT_BYTE
-        .long   gdt_table - FIRST_RESERVED_GDT_BYTE
+        .long   boot_cpu_gdt_table - FIRST_RESERVED_GDT_BYTE
 
 
         .align 32
@@ -94,12 +94,14 @@ ENTRY(idle_pg_table)
 #define GUEST_DESC(d)                                                   \
         .long ((MACH2PHYS_VIRT_END - 1) >> 12) & 0xffff,                \
               ((MACH2PHYS_VIRT_END - 1) >> 12) & (0xf << 16) | (d)
-ENTRY(gdt_table)
-        .quad 0x0000000000000000     /* unused */
+ENTRY(boot_cpu_gdt_table)
+        .quad 0x0000000000000000     /* double fault TSS */
         .quad 0x00cf9a000000ffff     /* 0xe008 ring 0 4.00GB code at 0x0 */
         .quad 0x00cf92000000ffff     /* 0xe010 ring 0 4.00GB data at 0x0 */
         GUEST_DESC(0x00c0ba00)       /* 0xe019 ring 1 3.xxGB code at 0x0 */
         GUEST_DESC(0x00c0b200)       /* 0xe021 ring 1 3.xxGB data at 0x0 */
         GUEST_DESC(0x00c0fa00)       /* 0xe02b ring 3 3.xxGB code at 0x0 */
         GUEST_DESC(0x00c0f200)       /* 0xe033 ring 3 3.xxGB data at 0x0 */
+        .fill (PER_CPU_GDT_ENTRY - FLAT_RING3_DS / 8 - 1), 8, 0
+        .quad 0x0000910000000000     /* per-CPU entry (limit == cpu) */
         .align PAGE_SIZE,0

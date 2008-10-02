@@ -204,11 +204,11 @@ static void dump_domains(unsigned char key)
         printk("VCPU information and callbacks for domain %u:\n",
                d->domain_id);
         for_each_vcpu ( d, v ) {
-            printk("    VCPU%d: CPU%d [has=%c] flags=%lx "
+            printk("    VCPU%d: CPU%d [has=%c] flags=%lx poll=%d "
                    "upcall_pend = %02x, upcall_mask = %02x ",
                    v->vcpu_id, v->processor,
                    v->is_running ? 'T':'F',
-                   v->pause_flags,
+                   v->pause_flags, v->poll_evtchn,
                    vcpu_info(v, evtchn_upcall_pending),
                    vcpu_info(v, evtchn_upcall_mask));
             cpuset_print(tmpstr, sizeof(tmpstr), v->vcpu_dirty_cpumask);

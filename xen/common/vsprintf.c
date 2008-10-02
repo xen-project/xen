@@ -272,7 +272,7 @@ int vsnprintf(char *buf, size_t size, const char *fmt, va_list args)
                                 /* 'z' changed to 'Z' --davidm 1/25/99 */
 
     /* Reject out-of-range values early */
-    BUG_ON((int)size < 0);
+    BUG_ON(((int)size < 0) || ((unsigned int)size != size));
 
     str = buf;
     end = buf + size - 1;
@@ -504,8 +504,10 @@ int vscnprintf(char *buf, size_t size, const char *fmt, va_list args)
 {
     int i;
 
-    i=vsnprintf(buf,size,fmt,args);
-    return (i >= size) ? (size - 1) : i;
+    i = vsnprintf(buf,size,fmt,args);
+    if (i >= size)
+        i = size - 1;
+    return (i > 0) ? i : 0;
 }
 
 EXPORT_SYMBOL(vscnprintf);
@@ -772,7 +774,9 @@ int scnprintf(char * buf, size_t size, const char *fmt, ...)
     va_start(args, fmt);
     i = vsnprintf(buf, size, fmt, args);
     va_end(args);
-    return (i >= size) ? (size - 1) : i;
+    if (i >= size)
+        i = size - 1;
+    return (i > 0) ? i : 0;
 }
 EXPORT_SYMBOL(scnprintf);
 

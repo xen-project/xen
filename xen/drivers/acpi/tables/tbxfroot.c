@@ -120,7 +120,7 @@ static acpi_status acpi_tb_validate_rsdp(struct acpi_table_rsdp *rsdp)
  *
  ******************************************************************************/
 
-acpi_status acpi_find_root_pointer(acpi_native_uint * table_address)
+acpi_status __init acpi_find_root_pointer(acpi_native_uint * table_address)
 {
 	u8 *table_ptr;
 	u8 *mem_rover;
@@ -233,7 +233,7 @@ acpi_status acpi_find_root_pointer(acpi_native_uint * table_address)
  * DESCRIPTION: Search a block of memory for the RSDP signature
  *
  ******************************************************************************/
-static u8 *acpi_tb_scan_memory_for_rsdp(u8 * start_address, u32 length)
+static u8 *__init acpi_tb_scan_memory_for_rsdp(u8 * start_address, u32 length)
 {
 	acpi_status status;
 	u8 *mem_rover;

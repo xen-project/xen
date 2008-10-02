@@ -862,6 +862,15 @@ def unify_resname(resource, mustexist=True):
         if mustexist and not os.path.isfile(resfile):
             err("Invalid resource")
 
+    if typ == "vlan":
+        try:
+            vlan = int(resfile)
+            if vlan < 1 or vlan > 4095:
+                err("VLAN ID %d out of range." % vlan)
+        except Exception, e:
+            err("Invalid VLAN : %s" % resfile)
+
+
     #file: resources must be specified with absolute path
     #vlan resources don't start with '/'
     if typ != "vlan":

@@ -297,8 +297,8 @@ static void *init_qemu_maps(int domid, unsigned int bitmap_size)
 int
 main(int argc, char **argv)
 {
-    unsigned int xc_fd, io_fd, domid, maxit, max_f, flags; 
-    int ret;
+    unsigned int domid, maxit, max_f, flags; 
+    int xc_fd, io_fd, ret;
 
     if (argc != 6)
         errx(1, "usage: %s iofd domid maxit maxf flags", argv[0]);

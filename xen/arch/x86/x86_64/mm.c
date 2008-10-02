@@ -21,6 +21,7 @@
 #include <xen/lib.h>
 #include <xen/init.h>
 #include <xen/mm.h>
+#include <xen/numa.h>
 #include <xen/sched.h>
 #include <xen/guest_access.h>
 #include <asm/current.h>
@@ -204,6 +205,24 @@ void __init setup_idle_pagetable(void)
               l4e_from_page(
                   virt_to_page(idle_vcpu[0]->domain->arch.mm_perdomain_l3),
                   __PAGE_HYPERVISOR));
+}
+
+unsigned long clone_idle_pagetable(struct vcpu *v)
+{
+    struct domain *d = v->domain;
+    struct page_info *page = alloc_domheap_page(NULL,
+                                                MEMF_node(vcpu_to_node(v)));
+    l4_pgentry_t *l4_table = page_to_virt(page);
+
+    if ( !page )
+        return 0;
+
+    copy_page(l4_table, idle_pg_table);
+    l4_table[l4_table_offset(PERDOMAIN_VIRT_START)] =
+        l4e_from_page(virt_to_page(d->arch.mm_perdomain_l3),
+                      __PAGE_HYPERVISOR);
+
+    return __pa(l4_table);
 }
 
 void __init zap_low_mappings(void)

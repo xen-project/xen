@@ -2223,10 +2223,6 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             if ( rdmsr_safe(regs->ecx, regs->eax, regs->edx) != 0 )
                 goto fail;
             break;
-        case MSR_EFER:
-            if ( rdmsr_safe(regs->ecx, regs->eax, regs->edx) )
-                goto fail;
-            break;
         case MSR_IA32_MISC_ENABLE:
             if ( rdmsr_safe(regs->ecx, regs->eax, regs->edx) )
                 goto fail;
@@ -2236,12 +2232,9 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                          MSR_IA32_MISC_ENABLE_PEBS_UNAVAIL |
                          MSR_IA32_MISC_ENABLE_XTPR_DISABLE;
             break;
+        case MSR_EFER:
         case MSR_IA32_THERM_CONTROL:
-            if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL )
-                goto fail;
-            if ( rdmsr_safe(regs->ecx, regs->eax, regs->edx) )
-                goto fail;
-            break;
+        case MSR_AMD_PATCHLEVEL:
         default:
             if ( rdmsr_hypervisor_regs(regs->ecx, &l, &h) )
             {
@@ -2972,13 +2965,13 @@ void set_intr_gate(unsigned int n, void *addr)
 void set_tss_desc(unsigned int n, void *addr)
 {
     _set_tssldt_desc(
-        gdt_table + __TSS(n) - FIRST_RESERVED_GDT_ENTRY,
+        per_cpu(gdt_table, n) + TSS_ENTRY - FIRST_RESERVED_GDT_ENTRY,
         (unsigned long)addr,
         offsetof(struct tss_struct, __cacheline_filler) - 1,
         9);
 #ifdef CONFIG_COMPAT
     _set_tssldt_desc(
-        compat_gdt_table + __TSS(n) - FIRST_RESERVED_GDT_ENTRY,
+        per_cpu(compat_gdt_table, n) + TSS_ENTRY - FIRST_RESERVED_GDT_ENTRY,
         (unsigned long)addr,
         offsetof(struct tss_struct, __cacheline_filler) - 1,
         11);

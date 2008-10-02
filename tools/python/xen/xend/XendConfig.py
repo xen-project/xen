@@ -441,7 +441,7 @@ class XendConfig(dict):
 
         if self.is_hvm():
             if 'timer_mode' not in self['platform']:
-                self['platform']['timer_mode'] = 0
+                self['platform']['timer_mode'] = 1
             if 'rtc_timeoffset' not in self['platform']:
                 self['platform']['rtc_timeoffset'] = 0
             if 'hpet' not in self['platform']:

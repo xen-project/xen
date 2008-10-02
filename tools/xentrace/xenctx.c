@@ -785,8 +785,8 @@ int main(int argc, char **argv)
         {"frame-pointers", 0, NULL, 'f'},
 #ifdef __ia64__
         {"regs", 1, NULL, 'r'},
-        {"all", 0, NULL, 'a'},
 #endif
+        {"all", 0, NULL, 'a'},
         {"help", 0, NULL, 'h'},
         {0, 0, 0, 0}
     };

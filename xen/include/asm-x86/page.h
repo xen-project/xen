@@ -278,6 +278,7 @@ extern unsigned int   m2p_compat_vstart;
 #endif
 void paging_init(void);
 void setup_idle_pagetable(void);
+unsigned long clone_idle_pagetable(struct vcpu *);
 #endif /* !defined(__ASSEMBLY__) */
 
 #define _PAGE_PRESENT  0x001U
@@ -301,9 +302,10 @@ void setup_idle_pagetable(void);
  * WARNING: This will need to be disabled to run OSes that use the spare PTE
  * bits themselves (e.g., *BSD).
  */
-#ifndef NDEBUG
-#define _PAGE_GNTTAB   _PAGE_AVAIL2
-#else
+#ifdef NDEBUG
+#undef _PAGE_GNTTAB
+#endif
+#ifndef _PAGE_GNTTAB
 #define _PAGE_GNTTAB   0
 #endif
 

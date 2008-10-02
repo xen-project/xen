@@ -45,16 +45,6 @@
 int (*ioapic_renumber_irq)(int ioapic, int irq);
 atomic_t irq_mis_count;
 
-int domain_irq_to_vector(struct domain *d, int irq)
-{
-    return d->arch.pirq_vector[irq];
-}
-
-int domain_vector_to_irq(struct domain *d, int vector)
-{
-    return d->arch.vector_pirq[vector];
-}
-
 /* Where if anywhere is the i8259 connect in external int mode */
 static struct { int pin, apic; } ioapic_i8259 = { -1, -1 };
 
@@ -721,7 +711,6 @@ next:
 
 static struct hw_interrupt_type ioapic_level_type;
 static struct hw_interrupt_type ioapic_edge_type;
-struct hw_interrupt_type pci_msi_type;
 
 #define IOAPIC_AUTO	-1
 #define IOAPIC_EDGE	0

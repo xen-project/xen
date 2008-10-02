@@ -459,16 +459,6 @@ long arch_do_sysctl(xen_sysctl_t *op, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
     return ret;
 }
 
-int
-do_get_pm_info(struct xen_sysctl_get_pmstat *op)
-{
-    /*
-     * For now just place holder to compile.
-     * xen/common/sysctl.c refers this function.
-     */
-    return -ENOSYS;
-}
-
 static unsigned long
 dom0vp_ioremap(struct domain *d, unsigned long mpaddr, unsigned long size)
 {

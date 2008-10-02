@@ -1224,9 +1224,6 @@ def xm_start(args):
     if console_autoconnect:
         start_do_console(dom)
 
-    if console_autoconnect:
-        console.runVncViewer(domid, vncviewer_autopass, True)
-
     try:
         if serverType == SERVER_XEN_API:
             server.xenapi.VM.start(get_single_vm(dom), paused)
@@ -1240,6 +1237,10 @@ def xm_start(args):
         
     if domid == -1:
         raise xmlrpclib.Fault(0, "Domain '%s' is not started" % dom)
+
+    if vncviewer:
+        console.runVncViewer(domid, vncviewer_autopass, True)
+
 
 def xm_delete(args):
     arg_check(args, "delete", 1)
@@ -2926,6 +2927,7 @@ def _run_cmd(cmd, cmd_name, args):
     except xmlrpclib.Fault, ex:
         if ex.faultCode == XendClient.ERROR_INVALID_DOMAIN:
             err("Domain '%s' does not exist." % ex.faultString)
+            return False, ex.faultCode
         else:
             err(ex.faultString)
             _usage(cmd_name)

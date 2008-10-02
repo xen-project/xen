@@ -9,10 +9,10 @@
 int get_cpu_id(u8);
 int powernow_cpufreq_init(void);
 
-void px_statistic_update(cpumask_t, uint8_t, uint8_t);
-int  px_statistic_init(unsigned int);
-void px_statistic_exit(unsigned int);
-void px_statistic_reset(unsigned int);
+void cpufreq_statistic_update(unsigned int, uint8_t, uint8_t);
+int  cpufreq_statistic_init(unsigned int);
+void cpufreq_statistic_exit(unsigned int);
+void cpufreq_statistic_reset(unsigned int);
 
 int  cpufreq_limit_change(unsigned int);
 
@@ -41,7 +41,7 @@ struct processor_pminfo {
     struct processor_performance    perf;
 };
 
-extern struct processor_pminfo processor_pminfo[NR_CPUS];
+extern struct processor_pminfo *processor_pminfo[NR_CPUS];
 
 struct px_stat {
     uint8_t total;        /* total Px states */
@@ -58,6 +58,10 @@ struct pm_px {
     uint64_t prev_idle_wall;
 };
 
-extern struct pm_px px_statistic_data[NR_CPUS];
+extern struct pm_px *cpufreq_statistic_data[NR_CPUS];
 
+int xenpf_copy_px_states(struct processor_performance *pxpt,
+        struct xen_processor_performance *dom0_px_info);
+
+int cpufreq_cpu_init(unsigned int cpuid);
 #endif /* __XEN_PROCESSOR_PM_H__ */

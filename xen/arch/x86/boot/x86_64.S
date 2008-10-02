@@ -85,7 +85,7 @@ multiboot_ptr:
         .word   0
 gdt_descr:
         .word   LAST_RESERVED_GDT_BYTE
-        .quad   gdt_table - FIRST_RESERVED_GDT_BYTE
+        .quad   boot_cpu_gdt_table - FIRST_RESERVED_GDT_BYTE
 
         .word   0,0,0
 idt_descr:
@@ -96,7 +96,7 @@ ENTRY(stack_start)
         .quad   cpu0_stack
 
         .align PAGE_SIZE, 0
-ENTRY(gdt_table)
+ENTRY(boot_cpu_gdt_table)
         .quad 0x0000000000000000     /* unused */
         .quad 0x00af9a000000ffff     /* 0xe008 ring 0 code, 64-bit mode   */
         .quad 0x00cf92000000ffff     /* 0xe010 ring 0 data                */
@@ -105,11 +105,13 @@ ENTRY(gdt_table)
         .quad 0x00cff2000000ffff     /* 0xe02b ring 3 data                */
         .quad 0x00affa000000ffff     /* 0xe033 ring 3 code, 64-bit mode   */
         .quad 0x00cf9a000000ffff     /* 0xe038 ring 0 code, compatibility */
+        .fill (PER_CPU_GDT_ENTRY - __HYPERVISOR_CS32 / 8 - 1), 8, 0
+        .quad 0x0000910000000000     /* per-CPU entry (limit == cpu)      */
 
         .align PAGE_SIZE, 0
 /* NB. Even rings != 0 get access to the full 4Gb, as only the            */
 /*     (compatibility) machine->physical mapping table lives there.       */
-ENTRY(compat_gdt_table)
+ENTRY(boot_cpu_compat_gdt_table)
         .quad 0x0000000000000000     /* unused */
         .quad 0x00af9a000000ffff     /* 0xe008 ring 0 code, 64-bit mode   */
         .quad 0x00cf92000000ffff     /* 0xe010 ring 0 data                */
@@ -118,4 +120,6 @@ ENTRY(compat_gdt_table)
         .quad 0x00cffa000000ffff     /* 0xe02b ring 3 code, compatibility */
         .quad 0x00cff2000000ffff     /* 0xe033 ring 3 data                */
         .quad 0x00cf9a000000ffff     /* 0xe038 ring 0 code, compatibility */
+        .fill (PER_CPU_GDT_ENTRY - __HYPERVISOR_CS32 / 8 - 1), 8, 0
+        .quad 0x0000910000000000     /* per-CPU entry (limit == cpu)      */
         .align PAGE_SIZE, 0

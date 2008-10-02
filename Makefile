@@ -79,7 +79,7 @@ ifeq (x86_64,$(XEN_TARGET_ARCH))
 endif
 
 tools/ioemu-dir:
-	make -C tools ioemu-dir-find
+	$(MAKE) -C tools ioemu-dir-find
 
 .PHONY: install-docs
 install-docs:

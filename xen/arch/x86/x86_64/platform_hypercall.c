@@ -11,6 +11,8 @@ DEFINE_XEN_GUEST_HANDLE(compat_platform_op_t);
 #define xen_platform_op_t   compat_platform_op_t
 #define do_platform_op(x)   compat_platform_op(_##x)
 
+#define xenpf_copy_px_states compat_xenpf_copy_px_states
+
 #define xen_processor_px    compat_processor_px
 #define xen_processor_px_t  compat_processor_px_t
 #define xen_processor_performance    compat_processor_performance

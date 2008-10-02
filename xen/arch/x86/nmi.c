@@ -96,7 +96,7 @@ int nmi_active;
 
 int __init check_nmi_watchdog (void)
 {
-    unsigned int prev_nmi_count[NR_CPUS];
+    static unsigned int __initdata prev_nmi_count[NR_CPUS];
     int cpu;
     
     if ( !nmi_watchdog )

@@ -58,21 +58,26 @@ unsigned int cpu_mask_to_apicid_x2apic(cpumask_t cpumask)
 
 void send_IPI_mask_x2apic(cpumask_t cpumask, int vector)
 {
-    unsigned int query_cpu;
-    u32 cfg, dest;
+    unsigned int cpu, cfg;
     unsigned long flags;
 
-    ASSERT(cpus_subset(cpumask, cpu_online_map));
-    ASSERT(!cpus_empty(cpumask));
+    /*
+     * Ensure that any synchronisation data written in program order by this
+     * CPU is seen by notified remote CPUs. The WRMSR contained within
+     * apic_icr_write() can otherwise be executed early.
+     * 
+     * The reason mb() is sufficient here is subtle: the register arguments
+     * to WRMSR must depend on a memory read executed after the barrier. This
+     * is guaranteed by cpu_physical_id(), which reads from a global array (and
+     * so cannot be hoisted above the barrier even by a clever compiler).
+     */
+    mb();
 
     local_irq_save(flags);
 
     cfg = APIC_DM_FIXED | 0 /* no shorthand */ | APIC_DEST_PHYSICAL | vector;
-    for_each_cpu_mask(query_cpu, cpumask)
-    {
-        dest =  cpu_physical_id(query_cpu);
-        apic_icr_write(cfg, dest);
-    }
+    for_each_cpu_mask ( cpu, cpumask )
+        apic_wrmsr(APIC_ICR, cfg, cpu_physical_id(cpu));
 
     local_irq_restore(flags);
 }

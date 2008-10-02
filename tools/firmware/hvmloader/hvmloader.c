@@ -315,11 +315,6 @@ static void pci_setup(void)
     }
 }
 
-static int must_load_extboot(void)
-{
-    return (inb(0x404) == 1);
-}
-
 /*
  * Scan the PCI bus for the first NIC supported by etherboot, and copy
  * the corresponding rom data to *copy_rom_dest. Returns the length of the
@@ -461,7 +456,6 @@ static uint16_t init_xen_platform_io_base(void)
 int main(void)
 {
     int vgabios_sz = 0, etherboot_sz = 0, rombios_sz, smbios_sz;
-    int extboot_sz = 0;
     uint32_t vga_ram = 0;
     uint16_t xen_pfiob;
 
@@ -518,14 +512,6 @@ int main(void)
 
     etherboot_sz = scan_etherboot_nic((void*)ETHERBOOT_PHYSICAL_ADDRESS);
 
-    if ( must_load_extboot() )
-    {
-        printf("Loading EXTBOOT ...\n");
-        memcpy((void *)EXTBOOT_PHYSICAL_ADDRESS,
-               extboot, sizeof(extboot));
-        extboot_sz = sizeof(extboot);
-    }
-
     if ( get_acpi_enabled() )
     {
         printf("Loading ACPI ...\n");
@@ -543,10 +529,6 @@ int main(void)
         printf(" %05x-%05x: Etherboot ROM\n",
                ETHERBOOT_PHYSICAL_ADDRESS,
                ETHERBOOT_PHYSICAL_ADDRESS + etherboot_sz - 1);
-    if ( extboot_sz )
-        printf(" %05x-%05x: Extboot ROM\n",
-               EXTBOOT_PHYSICAL_ADDRESS,
-               EXTBOOT_PHYSICAL_ADDRESS + extboot_sz - 1);
     if ( smbios_sz )
         printf(" %05x-%05x: SMBIOS tables\n",
                SMBIOS_PHYSICAL_ADDRESS,

@@ -25,6 +25,7 @@
 #include <xen/iocap.h>
 #include <xen/compat.h>
 #include <xen/guest_access.h>
+#include <xen/keyhandler.h>
 #include <asm/current.h>
 
 #include <public/xen.h>
@@ -1078,6 +1079,77 @@ void evtchn_destroy(struct domain *d)
     }
     spin_unlock(&d->evtchn_lock);
 }
+
+static void domain_dump_evtchn_info(struct domain *d)
+{
+    unsigned int port;
+
+    printk("Domain %d polling vCPUs: %08lx\n", d->domain_id, d->poll_mask[0]);
+
+    if ( !spin_trylock(&d->evtchn_lock) )
+        return;
+
+    printk("Event channel information for domain %d:\n",
+           d->domain_id);
+
+    for ( port = 1; port < MAX_EVTCHNS(d); ++port )
+    {
+        const struct evtchn *chn;
+
+        if ( !port_is_valid(d, port) )
+            continue;
+        chn = evtchn_from_port(d, port);
+        if ( chn->state == ECS_FREE )
+            continue;
+
+        printk("    %4u[%d/%d]: s=%d n=%d",
+               port,
+               test_bit(port, &shared_info(d, evtchn_pending)),
+               test_bit(port, &shared_info(d, evtchn_mask)),
+               chn->state, chn->notify_vcpu_id);
+        switch ( chn->state )
+        {
+        case ECS_UNBOUND:
+            printk(" d=%d", chn->u.unbound.remote_domid);
+            break;
+        case ECS_INTERDOMAIN:
+            printk(" d=%d p=%d",
+                   chn->u.interdomain.remote_dom->domain_id,
+                   chn->u.interdomain.remote_port);
+            break;
+        case ECS_PIRQ:
+            printk(" p=%d", chn->u.pirq);
+            break;
+        case ECS_VIRQ:
+            printk(" v=%d", chn->u.virq);
+            break;
+        }
+        printk(" x=%d\n", chn->consumer_is_xen);
+    }
+
+    spin_unlock(&d->evtchn_lock);
+}
+
+static void dump_evtchn_info(unsigned char key)
+{
+    struct domain *d;
+
+    printk("'%c' pressed -> dumping event-channel info\n", key);
+
+    rcu_read_lock(&domlist_read_lock);
+
+    for_each_domain ( d )
+        domain_dump_evtchn_info(d);
+
+    rcu_read_unlock(&domlist_read_lock);
+}
+
+static int __init dump_evtchn_info_key_init(void)
+{
+    register_keyhandler('e', dump_evtchn_info, "dump evtchn info");
+    return 0;
+}
+__initcall(dump_evtchn_info_key_init);
 
 /*
  * Local variables:

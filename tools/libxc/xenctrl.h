@@ -1156,4 +1156,6 @@ int xc_pm_get_max_cx(int xc_handle, int cpuid, int *max_cx);
 int xc_pm_get_cxstat(int xc_handle, int cpuid, struct xc_cx_stat *cxpt);
 int xc_pm_reset_cxstat(int xc_handle, int cpuid);
 
+int xc_cpu_online(int xc_handle, int cpu);
+int xc_cpu_offline(int xc_handle, int cpu);
 #endif /* XENCTRL_H */

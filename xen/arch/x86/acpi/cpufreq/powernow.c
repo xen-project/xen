@@ -49,9 +49,6 @@
 #define MSR_PSTATE_CTRL         0xc0010062 /* Pstate control MSR */
 #define MSR_PSTATE_CUR_LIMIT    0xc0010061 /* pstate current limit MSR */
 
-extern struct processor_pminfo processor_pminfo[NR_CPUS];
-extern struct cpufreq_policy *cpufreq_cpu_policy[NR_CPUS];
-
 struct powernow_cpufreq_data {
     struct processor_performance *acpi_data;
     struct cpufreq_frequency_table *freq_table;
@@ -149,7 +146,7 @@ static int powernow_cpufreq_cpu_init(struct cpufreq_policy *policy)
 
     drv_data[cpu] = data;
 
-    data->acpi_data = &processor_pminfo[cpu].perf;
+    data->acpi_data = &processor_pminfo[cpu]->perf;
 
     perf = data->acpi_data;
     policy->shared_type = perf->shared_type;
@@ -241,9 +238,8 @@ int powernow_cpufreq_init(void)
 {
     unsigned int i, ret = 0;
     unsigned int dom, max_dom = 0;
-    cpumask_t *pt, dom_mask;
-
-    cpus_clear(dom_mask);
+    cpumask_t *pt;
+    unsigned long *dom_mask;
 
     for_each_online_cpu(i) {
         struct cpuinfo_x86 *c = &cpu_data[i];
@@ -258,11 +254,15 @@ int powernow_cpufreq_init(void)
 	}
         if (ret)
             return ret;
-        cpu_set(processor_pminfo[i].perf.domain_info.domain, dom_mask);
-        if (max_dom < processor_pminfo[i].perf.domain_info.domain)
-            max_dom = processor_pminfo[i].perf.domain_info.domain;
+        if (max_dom < processor_pminfo[i]->perf.domain_info.domain)
+            max_dom = processor_pminfo[i]->perf.domain_info.domain;
     }
     max_dom++;
+
+    dom_mask = xmalloc_array(unsigned long, BITS_TO_LONGS(max_dom));
+    if (!dom_mask)
+        return -ENOMEM;
+    bitmap_zero(dom_mask, max_dom);
 
     pt = xmalloc_array(cpumask_t, max_dom);
     if (!pt)
@@ -270,27 +270,47 @@ int powernow_cpufreq_init(void)
     memset(pt, 0, max_dom * sizeof(cpumask_t));
 
     /* get cpumask of each psd domain */
-    for_each_online_cpu(i)
-        cpu_set(i, pt[processor_pminfo[i].perf.domain_info.domain]);
+    for_each_online_cpu(i) {
+        __set_bit(processor_pminfo[i]->perf.domain_info.domain, dom_mask);
+        cpu_set(i, pt[processor_pminfo[i]->perf.domain_info.domain]);
+    }
 
     for_each_online_cpu(i)
-        processor_pminfo[i].perf.shared_cpu_map = 
-            pt[processor_pminfo[i].perf.domain_info.domain];
+        processor_pminfo[i]->perf.shared_cpu_map =
+            pt[processor_pminfo[i]->perf.domain_info.domain];
 
     cpufreq_driver = &powernow_cpufreq_driver;
 
     /* setup cpufreq infrastructure */
     for_each_online_cpu(i) {
-        cpufreq_cpu_policy[i]->cpu = i;
+        struct cpufreq_policy *policy = cpufreq_cpu_policy[i];
 
-        ret = powernow_cpufreq_cpu_init(cpufreq_cpu_policy[i]);
+        if (!policy) {
+            unsigned int firstcpu;
+
+            firstcpu = first_cpu(processor_pminfo[i]->perf.shared_cpu_map);
+            if (i == firstcpu) {
+                policy = xmalloc(struct cpufreq_policy);
+                if (!policy) {
+                    ret = -ENOMEM;
+                    goto cpufreq_init_out;
+                }
+                memset(policy, 0, sizeof(struct cpufreq_policy));
+                policy->cpu = i;
+            } else
+                policy = cpufreq_cpu_policy[firstcpu];
+            cpu_set(i, policy->cpus);
+            cpufreq_cpu_policy[i] = policy;
+        }
+
+        ret = powernow_cpufreq_cpu_init(policy);
         if (ret)
             goto cpufreq_init_out;
     }
 
     /* setup ondemand cpufreq */
-    for (dom=0; dom<max_dom; dom++) {
-        if (!cpu_isset(dom, dom_mask))
+    for (dom = 0; dom < max_dom; dom++) {
+        if (!test_bit(dom, dom_mask))
             continue;
         i = first_cpu(pt[dom]);
         ret = cpufreq_governor_dbs(cpufreq_cpu_policy[i], CPUFREQ_GOV_START);
@@ -300,6 +320,7 @@ int powernow_cpufreq_init(void)
 
 cpufreq_init_out:
     xfree(pt);
+    xfree(dom_mask);
    
     return ret;
 }

@@ -41,6 +41,7 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
+#include <xen/init.h>
 #include <acpi/acpi.h>
 #include <acpi/acnamesp.h>
 #include <acpi/actables.h>
@@ -105,7 +106,7 @@ acpi_status acpi_tb_verify_table(struct acpi_table_desc *table_desc)
  *
  ******************************************************************************/
 
-acpi_status acpi_tb_resize_root_table_list(void)
+acpi_status __init acpi_tb_resize_root_table_list(void)
 {
 	struct acpi_table_desc *tables;
 

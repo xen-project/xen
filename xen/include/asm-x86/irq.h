@@ -52,6 +52,9 @@ extern atomic_t irq_mis_count;
 int pirq_acktype(struct domain *d, int irq);
 int pirq_shared(struct domain *d , int irq);
 
-extern int domain_irq_to_vector(struct domain *d, int irq);
-extern int domain_vector_to_irq(struct domain *d, int vector);
+#define domain_irq_to_vector(d, irq) ((d)->arch.pirq_vector[(irq)])
+#define domain_vector_to_irq(d, vec) ((d)->arch.vector_pirq[(vec)])
+
+int pirq_guest_force_unbind(struct domain *d, int irq);
+
 #endif /* _ASM_HW_IRQ_H */
