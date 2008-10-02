@@ -132,7 +132,7 @@ int xs_printf(struct xs_handle *h, const char *dir, const char *node,
 		return ENOMEM;
 	}
 
-	ret = xs_write(h, XBT_NULL, path, buf, strlen(buf)+1);
+	ret = xs_write(h, XBT_NULL, path, buf, strlen(buf));
 	
 	free(buf);
 	free(path);
