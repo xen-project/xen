@@ -112,17 +112,16 @@ static int
 get_online_cpumap(int xc_handle, struct xen_domctl_getdomaininfo *d,
                   uint64_t *cpumap)
 {
-    int i, online, retval;
+    int i, online;
 
     *cpumap = 0;
     for (i = 0; i <= d->max_vcpu_id; i++) {
-        if ((retval = fetch_regs(xc_handle, i, &online)))
-            return retval;
+        fetch_regs(xc_handle, i, &online);
         if (online)
             *cpumap |= (1 << i);
     }
-
-    return 0;
+    
+    return (*cpumap == 0) ? -1 : 0;
 }
 
 /*

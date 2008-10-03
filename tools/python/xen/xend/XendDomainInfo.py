@@ -142,7 +142,9 @@ def recreate(info, priv):
     xeninfo['is_control_domain'] = priv
     xeninfo['is_a_template'] = False
     domid = xeninfo['domid']
-
+    uuid1 = uuid.fromString(xeninfo['uuid'])
+    needs_reinitialising = False
+    
     dompath = GetDomainPath(domid)
     if not dompath:
         raise XendError('No domain path in store for existing '
@@ -151,12 +153,42 @@ def recreate(info, priv):
     log.info("Recreating domain %d, UUID %s. at %s" %
              (domid, xeninfo['uuid'], dompath))
 
-    vmpath = xstransact.Read("/vm_path", str(domid))
+    # need to verify the path and uuid if not Domain-0
+    # if the required uuid and vm aren't set, then that means
+    # we need to recreate the dom with our own values
+    #
+    # NOTE: this is probably not desirable, really we should just
+    #       abort or ignore, but there may be cases where xenstore's
+    #       entry disappears (eg. xenstore-rm /)
+    #
+    try:
+        vmpath = xstransact.Read(dompath, "vm")
+        if not vmpath:
+            if not priv:
+                log.warn('/local/domain/%d/vm is missing. recreate is '
+                         'confused, trying our best to recover' % domid)
+            needs_reinitialising = True
+            raise XendError('reinit')
+        
+        uuid2_str = xstransact.Read(vmpath, "uuid")
+        if not uuid2_str:
+            log.warn('%s/uuid/ is missing. recreate is confused, '
+                     'trying our best to recover' % vmpath)
+            needs_reinitialising = True
+            raise XendError('reinit')
+        
+        uuid2 = uuid.fromString(uuid2_str)
+        if uuid1 != uuid2:
+            log.warn('UUID in /vm does not match the UUID in /dom/%d.'
+                     'Trying out best to recover' % domid)
+            needs_reinitialising = True
+    except XendError:
+        pass # our best shot at 'goto' in python :)
 
     vm = XendDomainInfo(xeninfo, domid, dompath, augment = True, priv = priv,
                         vmpath = vmpath)
-
-    if not vmpath:
+    
+    if needs_reinitialising:
         vm._recreateDom()
         vm._removeVm()
         vm._storeVmDetails()
@@ -1269,8 +1301,11 @@ class XendDomainInfo:
     def _recreateDomFunc(self, t):
         t.remove()
         t.mkdir()
-        t.set_permissions({'dom' : self.domid})
+        t.set_permissions({'dom' : self.domid, 'read' : True})
         t.write('vm', self.vmpath)
+        for i in [ 'device', 'control', 'error' ]:
+            t.mkdir(i)
+            t.set_permissions(i, {'dom' : self.domid})
 
     def _storeDomDetails(self):
         to_store = {
@@ -1776,7 +1811,6 @@ class XendDomainInfo:
         self._releaseDevices()
         # Remove existing vm node in xenstore
         self._removeVm()
-        self._removeVmPath()
         new_dom_info = self.info.copy()
         new_dom_info['name_label'] = self.info['name_label']
         new_dom_info['uuid'] = self.info['uuid']
@@ -2357,7 +2391,6 @@ class XendDomainInfo:
 
         paths = self._prepare_phantom_paths()
 
-        self._removeVmPath()
         if self.dompath is not None:
             try:
                 xc.domain_destroy_hook(self.domid)
@@ -2660,15 +2693,6 @@ class XendDomainInfo:
                 log.info("Dev still active but hit max loop timeout")
                 break
 
-    def _storeVmPath(self):
-        log.info("storeVmPath(%s) => %s", self.domid, self.vmpath)
-        if self.domid is not None:
-            xstransact.Write('/vm_path', str(self.domid), self.vmpath)
-
-    def _removeVmPath(self):
-        if self.domid is not None:
-            xstransact.Remove('/vm_path/%s' % str(self.domid))
-
     def _storeVmDetails(self):
         to_store = {}
 
@@ -2693,7 +2717,6 @@ class XendDomainInfo:
 
         self._writeVm(to_store)
         self._setVmPermissions()
-        self._storeVmPath()
 
     def _setVmPermissions(self):
         """Allow the guest domain to read its UUID.  We don't allow it to

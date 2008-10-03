@@ -129,20 +129,9 @@ static long evtchn_alloc_unbound(evtchn_alloc_unbound_t *alloc)
     domid_t        dom = alloc->dom;
     long           rc;
 
-    if ( dom == DOMID_SELF )
-    {
-        d = rcu_lock_current_domain();
-    }
-    else
-    {
-        if ( (d = rcu_lock_domain_by_id(dom)) == NULL )
-            return -ESRCH;
-        if ( !IS_PRIV_FOR(current->domain, d) )
-        {
-            rcu_unlock_domain(d);
-            return -EPERM;
-        }
-    }
+    rc = rcu_lock_target_domain_by_id(dom, &d);
+    if ( rc )
+        return rc;
 
     spin_lock(&d->evtchn_lock);
 
@@ -663,20 +652,9 @@ static long evtchn_status(evtchn_status_t *status)
     struct evtchn   *chn;
     long             rc = 0;
 
-    if ( dom == DOMID_SELF )
-    {
-        d = rcu_lock_current_domain();
-    }
-    else
-    {
-        if ( (d = rcu_lock_domain_by_id(dom)) == NULL )
-            return -ESRCH;
-        if ( !IS_PRIV_FOR(current->domain, d) )
-        {
-            rcu_unlock_domain(d);
-            return -EPERM;
-        }
-    }
+    rc = rcu_lock_target_domain_by_id(dom, &d);
+    if ( rc )
+        return rc;
 
     spin_lock(&d->evtchn_lock);
 
@@ -824,20 +802,9 @@ static long evtchn_reset(evtchn_reset_t *r)
     struct domain *d;
     int i, rc;
 
-    if ( dom == DOMID_SELF )
-    {
-        d = rcu_lock_current_domain();
-    }
-    else
-    {
-        if ( (d = rcu_lock_domain_by_id(dom)) == NULL )
-            return -ESRCH;
-        if ( !IS_PRIV_FOR(current->domain, d) )
-        {
-            rc = -EPERM;
-            goto out;
-        }
-    }
+    rc = rcu_lock_target_domain_by_id(dom, &d);
+    if ( rc )
+        return rc;
 
     rc = xsm_evtchn_reset(current->domain, d);
     if ( rc )

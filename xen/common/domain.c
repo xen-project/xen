@@ -332,6 +332,25 @@ struct domain *rcu_lock_domain_by_id(domid_t dom)
     return NULL;
 }
 
+int rcu_lock_target_domain_by_id(domid_t dom, struct domain **d)
+{
+    if ( dom == DOMID_SELF )
+    {
+        *d = rcu_lock_current_domain();
+        return 0;
+    }
+
+    if ( (*d = rcu_lock_domain_by_id(dom)) == NULL )
+        return -ESRCH;
+
+    if ( !IS_PRIV_FOR(current->domain, *d) )
+    {
+        rcu_unlock_domain(*d);
+        return -EPERM;
+    }
+
+    return 0;
+}
 
 int domain_kill(struct domain *d)
 {

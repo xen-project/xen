@@ -3550,6 +3550,8 @@ DEFINE_XEN_GUEST_HANDLE(e820entry_t);
 long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
 {
     struct page_info *page = NULL;
+    int rc;
+
     switch ( op )
     {
     case XENMEM_add_to_physmap:
@@ -3561,20 +3563,9 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         if ( copy_from_guest(&xatp, arg, 1) )
             return -EFAULT;
 
-        if ( xatp.domid == DOMID_SELF )
-        {
-            d = rcu_lock_current_domain();
-        }
-        else
-        {
-            if ( (d = rcu_lock_domain_by_id(xatp.domid)) == NULL )
-                return -ESRCH;
-            if ( !IS_PRIV_FOR(current->domain, d) )
-            {
-                rcu_unlock_domain(d);
-                return -EPERM;
-            }
-        }
+        rc = rcu_lock_target_domain_by_id(xatp.domid, &d);
+        if ( rc != 0 )
+            return rc;
 
         if ( xsm_add_to_physmap(current->domain, d) )
         {
@@ -3661,20 +3652,9 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         if ( copy_from_guest(&xrfp, arg, 1) )
             return -EFAULT;
 
-        if ( xrfp.domid == DOMID_SELF )
-        {
-            d = rcu_lock_current_domain();
-        }
-        else
-        {
-            if ( (d = rcu_lock_domain_by_id(xrfp.domid)) == NULL )
-                return -ESRCH;
-            if ( !IS_PRIV_FOR(current->domain, d) )
-            {
-                rcu_unlock_domain(d);
-                return -EPERM;
-            }
-        }
+        rc = rcu_lock_target_domain_by_id(xrfp.domid, &d);
+        if ( rc != 0 )
+            return rc;
 
         if ( xsm_remove_from_physmap(current->domain, d) )
         {
@@ -3708,20 +3688,9 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         if ( fmap.map.nr_entries > ARRAY_SIZE(d->arch.e820) )
             return -EINVAL;
 
-        if ( fmap.domid == DOMID_SELF )
-        {
-            d = rcu_lock_current_domain();
-        }
-        else
-        {
-            if ( (d = rcu_lock_domain_by_id(fmap.domid)) == NULL )
-                return -ESRCH;
-            if ( !IS_PRIV_FOR(current->domain, d) )
-            {
-                rcu_unlock_domain(d);
-                return -EPERM;
-            }
-        }
+        rc = rcu_lock_target_domain_by_id(fmap.domid, &d);
+        if ( rc != 0 )
+            return rc;
 
         rc = xsm_domain_memory_map(d);
         if ( rc )

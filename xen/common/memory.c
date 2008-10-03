@@ -222,21 +222,9 @@ static long translate_gpfn_list(
          !guest_handle_subrange_okay(op.mfn_list, *progress, op.nr_gpfns-1) )
         return -EFAULT;
 
-    if ( op.domid == DOMID_SELF )
-    {
-        d = rcu_lock_current_domain();
-    }
-    else
-    {
-        if ( (d = rcu_lock_domain_by_id(op.domid)) == NULL )
-            return -ESRCH;
-        if ( !IS_PRIV_FOR(current->domain, d) )
-        {
-            rcu_unlock_domain(d);
-            return -EPERM;
-        }
-    }
-
+    rc = rcu_lock_target_domain_by_id(op.domid, &d);
+    if ( rc )
+        return rc;
 
     if ( !paging_mode_translate(d) )
     {
@@ -595,20 +583,9 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE(void) arg)
         if ( copy_from_guest(&domid, arg, 1) )
             return -EFAULT;
 
-        if ( likely(domid == DOMID_SELF) )
-        {
-            d = rcu_lock_current_domain();
-        }
-        else
-        {
-            if ( (d = rcu_lock_domain_by_id(domid)) == NULL )
-                return -ESRCH;
-            if ( !IS_PRIV_FOR(current->domain, d) )
-            {
-                rcu_unlock_domain(d);
-                return -EPERM;
-            }
-        }
+        rc = rcu_lock_target_domain_by_id(domid, &d);
+        if ( rc )
+            return rc;
 
         rc = xsm_memory_stat_reservation(current->domain, d);
         if ( rc )
