@@ -187,6 +187,9 @@ static void domain_page_flush_and_put(struct domain* d, unsigned long mpaddr,
                                       volatile pte_t* ptep, pte_t old_pte, 
                                       struct page_info* page);
 
+static void __xencomm_mark_dirty(struct domain *d,
+                                 unsigned long addr, unsigned int len);
+
 extern unsigned long ia64_iobase;
 
 struct domain *dom_xen, *dom_io;
@@ -2141,6 +2144,329 @@ dom0vp_unexpose_foreign_p2m(struct domain* dest_dom,
     rcu_unlock_domain(dest_dom);
     return ret;
 }
+
+/* this lock can be only for memmap_info. domain_lock() is abused here */
+static void
+memmap_lock(struct domain *d)
+{
+    domain_lock(d);
+}
+
+static void
+memmap_unlock(struct domain *d)
+{
+    domain_unlock(d);
+}
+
+/* copy memory range to domain pseudo physical address space */
+static int
+__memmap_copy_to(struct domain *d, unsigned long dest_gpfn,
+               void *src, unsigned long num_pages)
+{
+    BUG_ON(((unsigned long)src & ~PAGE_MASK) != 0);
+    
+    while (num_pages > 0) {
+        unsigned long mfn;
+        struct page_info *page;
+        void *virt;
+
+        mfn = gmfn_to_mfn_foreign(d, dest_gpfn);
+        if (mfn == 0 || mfn == INVALID_MFN)
+            return -EFAULT;
+        page = mfn_to_page(mfn);
+        if (get_page(page, d) == 0)
+            return -EFAULT;
+        virt = mfn_to_virt(mfn);
+        copy_page(virt, src);
+        __xencomm_mark_dirty(d, (unsigned long)virt, PAGE_SIZE);
+        put_page(page);
+
+        src += PAGE_SIZE;
+        dest_gpfn++;
+        num_pages--;
+    }
+
+    return 0;
+}
+
+/* copy memory range from domain pseudo physical address space */
+static int
+__memmap_copy_from(void *dest, struct domain *d, unsigned long src_gpfn,
+                   unsigned long num_pages)
+{
+    BUG_ON(((unsigned long)dest & ~PAGE_MASK) != 0);
+
+    while (num_pages > 0) {
+        unsigned long mfn;
+        struct page_info *page;
+
+        mfn = gmfn_to_mfn_foreign(d, src_gpfn);
+        if (mfn == 0 || mfn == INVALID_MFN)
+            return -EFAULT;
+        page = mfn_to_page(mfn);
+        if (get_page(page, d) == 0)
+            return -EFAULT;
+        copy_page(dest, mfn_to_virt(mfn));
+        put_page(page);
+
+        dest += PAGE_SIZE;
+        src_gpfn++;
+        num_pages--;
+    }
+
+    return 0;
+}
+
+/* This function unlock/lock memmeap_lock.
+ * caller must free (*page, *order) even if error case by ckecking
+ * *page = NULL.
+ */
+static int
+memmap_copy_from(struct domain *d,
+                 struct page_info **page, unsigned long *order)
+{
+    unsigned long num_pages;
+    struct xen_ia64_memmap_info *memmap_info;
+    unsigned long memmap_info_pfn;
+
+    num_pages = d->shared_info->arch.memmap_info_num_pages;
+    memmap_unlock(d);
+
+ again:
+    *order = get_order(num_pages << PAGE_SHIFT);
+    *page = alloc_domheap_pages(NULL, *order, 0);
+    if (*page == NULL)
+        return -ENOMEM;
+    memmap_info = page_to_virt(*page);
+
+    memmap_lock(d);
+    if (d->shared_info->arch.memmap_info_num_pages != num_pages) {
+        num_pages = d->shared_info->arch.memmap_info_num_pages;
+        memmap_unlock(d);
+        free_domheap_pages(*page, *order);
+        goto again;
+    }
+    memmap_info_pfn = d->shared_info->arch.memmap_info_pfn;
+
+    /* copy into local to make them virtually contiguous */
+    return __memmap_copy_from(memmap_info, d, memmap_info_pfn, num_pages);
+}
+
+static int
+memdesc_can_expand(const struct xen_ia64_memmap_info *memmap_info,
+                   unsigned long num_pages)
+{
+    /* Is there room for one more md? */
+    if ((num_pages << PAGE_SHIFT) <
+        (sizeof(*memmap_info) + memmap_info->efi_memmap_size +
+         memmap_info->efi_memdesc_size))
+        return 0;
+
+    return 1;
+}
+
+static int
+memdesc_can_collapse(const efi_memory_desc_t *lhs,
+                     const efi_memory_desc_t *rhs)
+{
+    return (lhs->type == rhs->type && lhs->attribute == rhs->attribute);
+}
+
+static int
+__dom0vp_add_memdesc_one(struct xen_ia64_memmap_info *memmap_info,
+                         unsigned long num_pages,
+                         const efi_memory_desc_t *md)
+{
+    void* const memmap_end = (void*)memmap_info->memdesc +
+        memmap_info->efi_memmap_size;
+    void *p;
+    efi_memory_desc_t *tmp_md;
+    efi_memory_desc_t *s_md;
+    efi_memory_desc_t *e_md;
+    u64 phys_addr;
+    u64 phys_addr_end;
+
+    /* fast path. appending to the last entry */
+    tmp_md = (efi_memory_desc_t*)(memmap_end - memmap_info->efi_memdesc_size);
+    if (MD_END(tmp_md) < md->phys_addr) {
+        /* append one */
+        if (!memdesc_can_expand(memmap_info, num_pages))
+            return -ENOMEM;
+
+        memcpy(memmap_end, md, memmap_info->efi_memdesc_size);
+        memmap_info->efi_memmap_size += memmap_info->efi_memdesc_size;
+        return 0;
+    }
+    /* fast path. expand the last entry */
+    if (tmp_md->phys_addr <= md->phys_addr) {
+        if (!memdesc_can_collapse(tmp_md, md))
+            return -EINVAL;
+
+        phys_addr_end = max(MD_END(tmp_md), MD_END(md));
+        tmp_md->num_pages =
+            (phys_addr_end - tmp_md->phys_addr) >> EFI_PAGE_SHIFT;
+        return 0;
+    }
+
+    /* slow path */
+    s_md = NULL;
+    e_md = NULL;
+    for (p = memmap_info->memdesc;
+         p < memmap_end;
+         p += memmap_info->efi_memdesc_size) {
+        tmp_md = p;
+
+        if (MD_END(tmp_md) < md->phys_addr)
+            continue;
+
+        if (MD_END(md) < tmp_md->phys_addr) {
+            if (s_md == NULL) {
+                void *next_md = p + memmap_info->efi_memdesc_size;
+                size_t left_size = memmap_end - (void*)tmp_md;
+
+                /* found hole. just insert md here*/
+                if (!memdesc_can_expand(memmap_info, num_pages))
+                    return -ENOMEM;
+
+                memmove(next_md, tmp_md, left_size);
+                memcpy(tmp_md, md, memmap_info->efi_memdesc_size);
+                memmap_info->efi_memmap_size += memmap_info->efi_memdesc_size;
+                return 0;
+            }
+            break;
+        }
+
+        if (s_md == NULL)
+            s_md = tmp_md;
+        e_md = tmp_md;
+
+        if (!memdesc_can_collapse(tmp_md, md))
+            return -EINVAL;
+    }
+    BUG_ON(s_md == NULL || e_md == NULL);
+
+    /* collapse into one */
+    phys_addr = min(md->phys_addr, s_md->phys_addr);
+    phys_addr_end = max(MD_END(md), MD_END(e_md));
+    s_md->phys_addr = phys_addr;
+    s_md->num_pages = (phys_addr_end - phys_addr) >> EFI_PAGE_SHIFT;
+    if (s_md != e_md) {
+        void *next_s_md = (void*)s_md + memmap_info->efi_memdesc_size;
+        void *next_e_md = (void*)e_md + memmap_info->efi_memdesc_size;
+        size_t left_size = memmap_end - (void*)next_e_md;
+
+        memmap_info->efi_memmap_size -= (void*)e_md - (void*)s_md;
+        if (left_size > 0)
+            memmove(next_s_md, next_e_md, left_size);
+    }
+
+    return 0;
+}
+
+/*
+ * d->arch.convmem_end is mostly read only and sometimes increased.
+ * It is protected by memmap_lock
+ *
+ * d->arch.convmem_end is also referned by guest(self p2m exposure)
+ * d->shared_info.arch.memmap_info_xxx and memmap_info are
+ * referenced by tools stack(save/dump-core/foreign p2m exposure).
+ *
+ * reader side:
+ *  - get d->arch.convmem_end (via XENMEM_maximum_gpfn)
+ *  - issue get_memmap hypercall to get memmap
+ *    In VMM
+ *    - lock memmap_lock
+ *    - copy memmap from target guest
+ *    - unlock memmap_lock
+ *    - copy memmap into tools stack address space.
+ *  - check d->shared_info.memmap_info_num_pages. try again if necessary
+ *  - get d->arch.convmem_end. try again if changed.
+ *
+ * writer side:
+ *  - lock memmap_lock
+ *  - increase d->arch.convmem_end at first if necessary
+ *  - unlock memmap_lock
+ *  - allocate memory
+ *    In fact page allocation isn't blocking, so unlock/lock isn't necessary.
+ *  - lock memmap_lock
+ *  - update memmap_info
+ *  - unlock memmap_lock
+ */
+static int
+__dom0vp_add_memdesc(struct domain *targ_d,
+                     const struct xen_ia64_memmap_info *u_memmap_info,
+                     const char *u_memmap)
+{
+    int ret = 0;
+    const void* const u_memmap_end = u_memmap + u_memmap_info->efi_memmap_size;
+    const efi_memory_desc_t *md;
+
+    unsigned long md_end_max;
+    unsigned long num_pages;
+    unsigned long order;
+    unsigned long memmap_info_pfn;
+
+    struct page_info *page = NULL;
+    struct xen_ia64_memmap_info *memmap_info;
+    size_t unused_size;
+
+    const void *p;
+
+    /* update d->arch.convmem_end */
+    md_end_max = 0;
+    for (p = u_memmap; p < u_memmap_end;
+         p += u_memmap_info->efi_memdesc_size) {
+        md = p;
+        if (MD_END(md) > md_end_max)
+            md_end_max = MD_END(md);
+    }
+    memmap_lock(targ_d);
+    /* convmem_end is also protected memdesc lock */
+    if (md_end_max > targ_d->arch.convmem_end)
+        targ_d->arch.convmem_end = md_end_max;
+
+    /* memmap_copy_from_guest() unlock/lock memmap_lock() */
+    ret = memmap_copy_from(targ_d, &page, &order);
+    if (ret != 0)
+        goto out;
+    memmap_info = page_to_virt(page);
+    num_pages = targ_d->shared_info->arch.memmap_info_num_pages;
+    memmap_info_pfn = targ_d->shared_info->arch.memmap_info_pfn;
+
+    if (memmap_info->efi_memdesc_size != u_memmap_info->efi_memdesc_size ||
+        memmap_info->efi_memdesc_version !=
+        u_memmap_info->efi_memdesc_version) {
+        ret = -EINVAL;
+        goto out;
+    }
+
+    /* update memdesc */
+    for (p = u_memmap;
+         p < u_memmap_end;
+         p += u_memmap_info->efi_memdesc_size) {
+        md = p;
+        ret = __dom0vp_add_memdesc_one(memmap_info, num_pages, md);
+        if (ret != 0)
+            goto out;
+    }
+
+    /* zero out the unused region to avoid hypervisor bit leak */
+    unused_size = (num_pages << PAGE_SHIFT) -
+        (sizeof(*memmap_info) + memmap_info->efi_memmap_size);
+    if (unused_size > 0)
+        memset((void*)memmap_info->memdesc + memmap_info->efi_memmap_size,
+               0, unused_size);
+
+    /* copy back into domain. */
+    ret = __memmap_copy_to(targ_d, memmap_info_pfn, memmap_info, num_pages);
+
+ out:
+    memmap_unlock(targ_d);
+
+    if (page != NULL)
+        free_domheap_pages(page, order);
+    return ret;
+}
 #endif
 
 // grant table host mapping
@@ -2857,8 +3183,35 @@ arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         case XENMAPSPACE_mfn:
         {
             if ( get_page_from_pagenr(xatp.idx, d) ) {
+                struct xen_ia64_memmap_info memmap_info;
+                efi_memory_desc_t md;
+                int ret;
+
                 mfn = xatp.idx;
                 page = mfn_to_page(mfn);
+
+                memmap_info.efi_memmap_size = sizeof(md);
+                memmap_info.efi_memdesc_size = sizeof(md);
+                memmap_info.efi_memdesc_version =
+                    EFI_MEMORY_DESCRIPTOR_VERSION;
+
+                md.type = EFI_CONVENTIONAL_MEMORY;
+                md.pad = 0;
+                md.phys_addr = xatp.gpfn << PAGE_SHIFT;
+                md.virt_addr = 0;
+                md.num_pages = 1UL << (PAGE_SHIFT - EFI_PAGE_SHIFT);
+                md.attribute = EFI_MEMORY_WB;
+
+                ret = __dom0vp_add_memdesc(d, &memmap_info, (char*)&md);
+                if (ret != 0) {
+                    put_page(page);
+                    rcu_unlock_domain(d);
+                    gdprintk(XENLOG_DEBUG,
+                             "%s:%d td %d gpfn 0x%lx mfn 0x%lx ret %d\n",
+                             __func__, __LINE__,
+                             d->domain_id, xatp.gpfn, xatp.idx, ret);
+                    return ret;
+                }
             }
             break;
         }
@@ -2982,9 +3335,9 @@ int is_iomem_page(unsigned long mfn)
     return (!mfn_valid(mfn) || (page_get_owner(mfn_to_page(mfn)) == dom_io));
 }
 
-void xencomm_mark_dirty(unsigned long addr, unsigned int len)
+static void __xencomm_mark_dirty(struct domain *d,
+                                 unsigned long addr, unsigned int len)
 {
-    struct domain *d = current->domain;
     unsigned long gpfn;
     unsigned long end_addr = addr + len;
 
@@ -2994,6 +3347,11 @@ void xencomm_mark_dirty(unsigned long addr, unsigned int len)
             shadow_mark_page_dirty(d, gpfn);
         }
     }
+}
+
+void xencomm_mark_dirty(unsigned long addr, unsigned int len)
+{
+    __xencomm_mark_dirty(current->domain, addr, len);
 }
 
 int iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn)

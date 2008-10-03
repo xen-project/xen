@@ -455,6 +455,7 @@ extern unsigned long dom0vp_unexpose_foreign_p2m(struct domain* dest_dom, unsign
 #define foreign_p2m_destroy(d)	do { } while (0)
 #define dom0vp_expose_foreign_p2m(dest_dom, dest_gpfn, domid, buffer, flags)	(-ENOSYS)
 #define dom0vp_unexpose_foreign_p2m(dest_dom, dest_gpfn, domid)	(-ENOSYS)
+#define __dom0vp_add_memdesc(d, memmap_info, memdesc)	(-ENOSYS)
 #endif
 
 extern volatile unsigned long *mpt_table;
