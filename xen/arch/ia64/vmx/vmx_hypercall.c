@@ -50,16 +50,9 @@ static int hvmop_set_isa_irq_level(
     if ( op.isa_irq > 15 )
         return -EINVAL;
 
-    if ( op.domid == DOMID_SELF )
-        op.domid = current->domain->domain_id;
-
-    d = rcu_lock_domain_by_id(op.domid);
-    if ( d == NULL )
-        return -ESRCH;
-
-    rc = -EPERM;
-    if ( !IS_PRIV_FOR(current->domain, d) && d != current->domain )
-        goto out;
+    rc = rcu_lock_target_domain_by_id(op.domid, &d);
+    if ( rc != 0 )
+        return rc;
 
     rc = -EINVAL;
     if ( !is_hvm_domain(d) )
@@ -86,16 +79,9 @@ static int hvmop_set_pci_intx_level(
     if ( (op.domain > 0) || (op.bus > 0) || (op.device > 31) || (op.intx > 3) )
         return -EINVAL;
 
-    if ( op.domid == DOMID_SELF )
-        op.domid = current->domain->domain_id;
-
-    d = rcu_lock_domain_by_id(op.domid);
-    if ( d == NULL )
-        return -ESRCH;
-
-    rc = -EPERM;
-    if ( !IS_PRIV_FOR(current->domain, d) && d != current->domain )
-        goto out;
+    rc = rcu_lock_target_domain_by_id(op.domid, &d);
+    if ( rc != 0 )
+        return rc;
 
     rc = -EINVAL;
     if ( !is_hvm_domain(d) )
@@ -129,18 +115,9 @@ do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         if (a.index >= HVM_NR_PARAMS)
             return -EINVAL;
 
-        if (a.domid == DOMID_SELF) {
-            d = rcu_lock_current_domain();
-        }
-        else {
-            d = rcu_lock_domain_by_id(a.domid);
-            if (d == NULL)
-                return -ESRCH;
-            if (!IS_PRIV_FOR(current->domain, d)) {
-                rcu_unlock_domain(d);
-                return -EPERM;
-            }
-        }
+        rc = rcu_lock_target_domain_by_id(a.domid, &d);
+        if (rc != 0)
+            return rc;
 
         if (op == HVMOP_set_param) {
             struct vmx_ioreq_page *iorp;
@@ -213,20 +190,9 @@ do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         if ( copy_from_guest(&a, arg, 1) )
             return -EFAULT;
 
-        if ( a.domid == DOMID_SELF )
-        {
-            d = rcu_lock_current_domain();
-        }
-        else
-        {
-            if ( (d = rcu_lock_domain_by_id(a.domid)) == NULL )
-                return -ESRCH;
-            if ( !IS_PRIV_FOR(current->domain, d) )
-            {
-                rc = -EPERM;
-                goto param_fail3;
-            }
-        }
+        rc = rcu_lock_target_domain_by_id(a.domid, &d);
+        if ( rc != 0 )
+            break;
 
         rc = -EINVAL;
         if ( !is_hvm_domain(d) )

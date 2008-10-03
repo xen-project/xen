@@ -2815,6 +2815,7 @@ long
 arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
 {
     struct page_info *page = NULL;
+    long rc;
 
     switch (op) {
     case XENMEM_add_to_physmap:
@@ -2826,16 +2827,9 @@ arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         if (copy_from_guest(&xatp, arg, 1))
             return -EFAULT;
 
-        if (xatp.domid == DOMID_SELF)
-            d = rcu_lock_current_domain();
-        else {
-            if ((d = rcu_lock_domain_by_id(xatp.domid)) == NULL)
-                return -ESRCH;
-            if (!IS_PRIV_FOR(current->domain,d)) {
-                rcu_lock_domain(d);
-                return -EPERM;
-            }
-        }
+        rc = rcu_lock_target_domain_by_id(xatp.domid, &d);
+        if (rc)
+            return rc;
 
         /* This hypercall is used for VT-i domain only */
         if (!is_hvm_domain(d)) {
@@ -2926,20 +2920,9 @@ arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         if ( copy_from_guest(&xrfp, arg, 1) )
             return -EFAULT;
 
-        if ( xrfp.domid == DOMID_SELF )
-        {
-            d = rcu_lock_current_domain();
-        }
-        else
-        {
-            if ( (d = rcu_lock_domain_by_id(xrfp.domid)) == NULL )
-                return -ESRCH;
-            if ( !IS_PRIV_FOR(current->domain, d) )
-            {
-                rcu_unlock_domain(d);
-                return -EPERM;
-            }
-        }
+        rc = rcu_lock_target_domain_by_id(xrfp.domid, &d);
+        if ( rc != 0 )
+            return rc;
 
         domain_lock(d);
 
