@@ -448,6 +448,7 @@ extern void foreign_p2m_init(struct domain* d);
 extern void foreign_p2m_destroy(struct domain* d);
 extern unsigned long dom0vp_expose_foreign_p2m(struct domain* dest_dom, unsigned long dest_gpfn, domid_t domid, XEN_GUEST_HANDLE(char) buffer, unsigned long flags);
 extern unsigned long dom0vp_unexpose_foreign_p2m(struct domain* dest_dom, unsigned long dest_gpfn, domid_t domid);
+extern unsigned long dom0vp_get_memmap(domid_t domid, XEN_GUEST_HANDLE(char) buffer);
 #else
 #define expose_p2m_init()       do { } while (0)
 #define dom0vp_expose_p2m(d, conv_start_gpfn, assign_start_gpfn, expose_size, granule_pfn)	(-ENOSYS)
@@ -456,6 +457,7 @@ extern unsigned long dom0vp_unexpose_foreign_p2m(struct domain* dest_dom, unsign
 #define dom0vp_expose_foreign_p2m(dest_dom, dest_gpfn, domid, buffer, flags)	(-ENOSYS)
 #define dom0vp_unexpose_foreign_p2m(dest_dom, dest_gpfn, domid)	(-ENOSYS)
 #define __dom0vp_add_memdesc(d, memmap_info, memdesc)	(-ENOSYS)
+#define dom0vp_get_memmap(domid, buffer)		(-ENOSYS)
 #endif
 
 extern volatile unsigned long *mpt_table;

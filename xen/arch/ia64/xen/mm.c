@@ -2467,6 +2467,55 @@ __dom0vp_add_memdesc(struct domain *targ_d,
         free_domheap_pages(page, order);
     return ret;
 }
+
+unsigned long
+dom0vp_get_memmap(domid_t domid, XEN_GUEST_HANDLE(char) buffer)
+{
+    unsigned long ret = 0;
+    struct domain *targ_d;
+
+    struct page_info *page = NULL;
+    unsigned long order;
+
+    struct xen_ia64_memmap_info *memmap_info;
+    unsigned long num_pages;
+    
+    ret = rcu_lock_target_domain_by_id(domid, &targ_d);
+    if (ret != 0)
+        return ret;
+
+    memmap_lock(targ_d);
+
+    ret = memmap_copy_from(targ_d, &page, &order);
+    if (ret != 0)
+        goto unlock_out;
+
+    memmap_info = page_to_virt(page);
+    num_pages = targ_d->shared_info->arch.memmap_info_num_pages;
+    if ((num_pages << PAGE_SHIFT) - sizeof(*memmap_info) <
+        memmap_info->efi_memmap_size) {
+        ret = -EFAULT;
+        goto unlock_out;
+    }
+    memmap_unlock(targ_d);
+    rcu_unlock_domain(targ_d);
+    
+    if (copy_to_guest(buffer, (char*)memmap_info, sizeof(*memmap_info)) ||
+        copy_to_guest_offset(buffer, sizeof(*memmap_info),
+                             (char*)memmap_info->memdesc,
+                             memmap_info->efi_memmap_size))
+        ret = -EFAULT;
+
+ out:
+    if (page != NULL)
+        free_domheap_pages(page, order);
+    return ret;
+
+ unlock_out:
+    memmap_unlock(targ_d);
+    rcu_unlock_domain(targ_d);
+    goto out;
+}
 #endif
 
 // grant table host mapping

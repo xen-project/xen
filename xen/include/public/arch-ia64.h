@@ -453,6 +453,11 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_guest_context_t);
 /* unexpose the foreign domain's p2m table into privileged domain */
 #define IA64_DOM0VP_unexpose_foreign_p2m        13
 
+/* get memmap_info and memmap. It is possible to map the page directly
+   by foreign page mapping, but there is a race between writer.
+   This hypercall avoids such race. */
+#define IA64_DOM0VP_get_memmap          14
+
 // flags for page assignement to pseudo physical address space
 #define _ASSIGN_readonly                0
 #define ASSIGN_readonly                 (1UL << _ASSIGN_readonly)

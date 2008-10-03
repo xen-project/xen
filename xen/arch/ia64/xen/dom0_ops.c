@@ -597,6 +597,12 @@ do_dom0vp_op(unsigned long cmd,
     case IA64_DOM0VP_unexpose_foreign_p2m:
         ret = dom0vp_unexpose_foreign_p2m(d, arg0, arg1);
         break;
+    case IA64_DOM0VP_get_memmap: {
+        XEN_GUEST_HANDLE(char) hnd;
+        set_xen_guest_handle(hnd, (char*)arg1);
+        ret = dom0vp_get_memmap((domid_t)arg0, hnd);
+        break;
+    }
     default:
         ret = -1;
 		printk("unknown dom0_vp_op 0x%lx\n", cmd);
