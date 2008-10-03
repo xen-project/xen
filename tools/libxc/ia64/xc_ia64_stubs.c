@@ -60,46 +60,89 @@ xc_get_max_pages(int xc_handle, uint32_t domid)
             ? -1 : domctl.u.getdomaininfo.max_pages);
 }
 
+/* It is possible to get memmap_info and memmap by
+   foreign domain page mapping. But it's racy. Use hypercall to avoid race. */
+static int
+xc_ia64_get_memmap(int xc_handle,
+                   uint32_t domid, char *buf, unsigned long bufsize)
+{
+    privcmd_hypercall_t hypercall;
+    int ret;
+
+    hypercall.op = __HYPERVISOR_ia64_dom0vp_op;
+    hypercall.arg[0] = IA64_DOM0VP_get_memmap;
+    hypercall.arg[1] = domid;
+    hypercall.arg[2] = (unsigned long)buf;
+    hypercall.arg[3] = bufsize;
+    hypercall.arg[4] = 0;
+
+    if (lock_pages(buf, bufsize) != 0)
+        return -1;
+    ret = do_xen_hypercall(xc_handle, &hypercall);
+    unlock_pages(buf, bufsize);
+    return ret;
+}
+
 int
 xc_ia64_copy_memmap(int xc_handle, uint32_t domid, shared_info_t *live_shinfo,
                     xen_ia64_memmap_info_t **memmap_info_p,
                     unsigned long *memmap_info_num_pages_p)
 {
-    unsigned int memmap_info_num_pages;
-    unsigned long memmap_info_pfn;
-    unsigned long memmap_size;
+    unsigned long gpfn_max_prev;
+    unsigned long gpfn_max_post;
 
-    xen_ia64_memmap_info_t *memmap_info_live;
+    unsigned long num_pages;
+    unsigned long num_pages_post;
+    unsigned long memmap_size;
     xen_ia64_memmap_info_t *memmap_info;
 
-    /* copy before use in case someone updating them */
-    memmap_info_num_pages = live_shinfo->arch.memmap_info_num_pages;
-    memmap_info_pfn = live_shinfo->arch.memmap_info_pfn;
-    if (memmap_info_num_pages == 0 || memmap_info_pfn == 0) {
-        ERROR("memmap_info_num_pages 0x%x memmap_info_pfn 0x%lx",
-              memmap_info_num_pages, memmap_info_pfn);
+    int ret;
+
+    gpfn_max_prev = xc_memory_op(xc_handle, XENMEM_maximum_gpfn, &domid);
+    if (gpfn_max_prev < 0)
+        return -1;
+
+ again:
+    num_pages = live_shinfo->arch.memmap_info_num_pages;
+    if (num_pages == 0) {
+        ERROR("num_pages 0x%x", num_pages);
         return -1;
     }
 
-    memmap_size = memmap_info_num_pages << PAGE_SHIFT;
-    memmap_info_live = xc_map_foreign_range(xc_handle, domid, memmap_size,
-                                            PROT_READ, memmap_info_pfn);
-    if (memmap_info_live == NULL) {
-        PERROR("Could not map memmap info.");
-        return -1;
-    }
+    memmap_size = num_pages << PAGE_SHIFT;
     memmap_info = malloc(memmap_size);
-    if (memmap_info == NULL) {
-        munmap(memmap_info_live, memmap_size);
+    if (memmap_info == NULL)
+        return -1;
+    ret = xc_ia64_get_memmap(xc_handle,
+                             domid, (char*)memmap_info, memmap_size);
+    if (ret != 0) {
+        free(memmap_info);
         return -1;
     }
-    memcpy(memmap_info, memmap_info_live, memmap_size); /* copy before use */
-    munmap(memmap_info_live, memmap_size);
+    xen_rmb();
+    num_pages_post = live_shinfo->arch.memmap_info_num_pages;
+    if (num_pages != num_pages_post) {
+        free(memmap_info);
+        num_pages = num_pages_post;
+        goto again;
+    }
+
+    gpfn_max_post = xc_memory_op(xc_handle, XENMEM_maximum_gpfn, &domid);
+    if (gpfn_max_prev < 0) {
+        free(memmap_info);
+        return -1;
+    }
+    if (gpfn_max_post > gpfn_max_prev) {
+        free(memmap_info);
+        gpfn_max_prev = gpfn_max_post;
+        goto again;
+    }
 
     /* reject unknown memmap */
     if (memmap_info->efi_memdesc_size != sizeof(efi_memory_desc_t) ||
         (memmap_info->efi_memmap_size / memmap_info->efi_memdesc_size) == 0 ||
-        memmap_info->efi_memmap_size > memmap_size - sizeof(memmap_info) ||
+        memmap_info->efi_memmap_size >
+        (num_pages << PAGE_SHIFT) - sizeof(memmap_info) ||
         memmap_info->efi_memdesc_version != EFI_MEMORY_DESCRIPTOR_VERSION) {
         PERROR("unknown memmap header. defaulting to compat mode.");
         free(memmap_info);
@@ -108,7 +151,7 @@ xc_ia64_copy_memmap(int xc_handle, uint32_t domid, shared_info_t *live_shinfo,
 
     *memmap_info_p = memmap_info;
     if (memmap_info_num_pages_p != NULL)
-        *memmap_info_num_pages_p = memmap_info_num_pages;
+        *memmap_info_num_pages_p = num_pages;
 
     return 0;
 }
