@@ -142,7 +142,7 @@ class LiloConfigFile(object):
         self.images.append(image)
 
     def _get_default(self):
-        for i in range(0, len(self.images) - 1):
+        for i in range(len(self.images)):
             if self.images[i].title == self._default:
                 return i
         return 0
@@ -150,8 +150,8 @@ class LiloConfigFile(object):
         self._default = val
     default = property(_get_default, _set_default)
 
-    commands = { "default": "self.default",
-                 "timeout": "self.timeout",
+    commands = { "default": "default",
+                 "timeout": "timeout",
                  "prompt": None,
                  "relocatable": None,
                  }
