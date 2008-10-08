@@ -892,8 +892,6 @@ void free_domain_pirqs(struct domain *d)
 {
     int i;
 
-    ASSERT(d->is_dying == DOMDYING_dying);
-
     spin_lock(&d->evtchn_lock);
 
     for ( i = 0; i < NR_PIRQS; i++ )
