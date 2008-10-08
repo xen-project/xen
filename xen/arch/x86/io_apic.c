@@ -697,8 +697,9 @@ int assign_irq_vector(int irq)
 
     vector = current_vector;
     while (vector_irq[vector] != FREE_TO_ASSIGN) {
-        if (++vector > LAST_DYNAMIC_VECTOR)
-            vector = FIRST_DYNAMIC_VECTOR;
+        vector += 8;
+        if (vector > LAST_DYNAMIC_VECTOR)
+            vector = FIRST_DYNAMIC_VECTOR + ((vector + 1) & 7);
 
         if (vector == current_vector) {
             spin_unlock(&vector_lock);
