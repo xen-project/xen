@@ -33,7 +33,7 @@ define(`create_domain', `
 				getvcpuinfo getaddrsize getvcpuaffinity};
 	allow $1 $2:shadow {enable};
 	allow $1 $2:mmu {map_read map_write memorymap adjust pinpage};
-	allow $2 $2:mmu {map_read map_write pinpage};
+	allow $2 $2:mmu {map_read map_write adjust pinpage};
 	allow $2 domio_t:mmu {map_read};
 	allow $2 $2:grant {query setup};
 	allow $1 $2:grant {map_read unmap};
