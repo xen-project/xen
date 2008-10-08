@@ -110,6 +110,9 @@ allow dom0_t evchn0-U_t:event {send};
 create_channel(domU_t, dom0_t, evchnU-0_t)
 allow domU_t evchnU-0_t:event {send};
 
+allow dom0_t dom0_t:event {send};
+allow dom0_t domU_t:grant {copy};
+
 manage_domain(dom0_t, domU_t)
 
 ################################################################################
