@@ -861,7 +861,10 @@ int unmap_domain_pirq(struct domain *d, int pirq)
         pci_disable_msi(vector);
 
     if ( desc->handler == &pci_msi_type )
+    {
         desc->handler = &no_irq_type;
+        free_irq_vector(vector);
+    }
 
     if ( !forced_unbind )
     {
@@ -883,6 +886,21 @@ int unmap_domain_pirq(struct domain *d, int pirq)
 
  done:
     return ret;
+}
+
+void free_domain_pirqs(struct domain *d)
+{
+    int i;
+
+    ASSERT(d->is_dying == DOMDYING_dying);
+
+    spin_lock(&d->evtchn_lock);
+
+    for ( i = 0; i < NR_PIRQS; i++ )
+        if ( d->arch.pirq_vector[i] > 0 )
+            unmap_domain_pirq(d, i);
+
+    spin_unlock(&d->evtchn_lock);
 }
 
 extern void dump_ioapic_irq_info(void);

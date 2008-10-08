@@ -459,6 +459,7 @@ void arch_domain_destroy(struct domain *d)
         hvm_domain_destroy(d);
 
     pci_release_devices(d);
+    free_domain_pirqs(d);
     if ( !is_idle_domain(d) )
         iommu_domain_destroy(d);
 

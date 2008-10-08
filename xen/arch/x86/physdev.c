@@ -79,7 +79,7 @@ static int physdev_map_pirq(struct physdev_map_pirq *map)
             if ( vector < 0 || vector >= NR_VECTORS )
             {
                 dprintk(XENLOG_G_ERR, "dom%d: map irq with wrong vector %d\n",
-                        d->domain_id, map->index);
+                        d->domain_id, vector);
                 ret = -EINVAL;
                 goto free_domain;
             }
@@ -140,13 +140,14 @@ static int physdev_map_pirq(struct physdev_map_pirq *map)
             pirq = map->pirq;
     }
 
-
     ret = map_domain_pirq(d, pirq, vector, map->type, map_data);
-    if ( !ret )
+    if ( ret == 0 )
         map->pirq = pirq;
 
 done:
     spin_unlock(&d->evtchn_lock);
+    if ( (ret != 0) && (map->type == MAP_PIRQ_TYPE_MSI) && (map->index == -1) )
+        free_irq_vector(vector);
 free_domain:
     rcu_unlock_domain(d);
     return ret;
