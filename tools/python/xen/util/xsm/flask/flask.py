@@ -35,7 +35,10 @@ def calc_dom_ssidref_from_info(info):
     return ssidref
 
 def set_security_label(policy, label):
-    return label
+    if label:
+        return label
+    else:
+        return ""
 
 def ssidref2security_label(ssidref):
     label = ssidref2label(ssidref)
