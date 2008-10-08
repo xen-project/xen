@@ -14,8 +14,11 @@
 #include <xen/sched.h>
 #include <xen/keyhandler.h>
 #include <xen/compat.h>
-#include <asm/current.h>
+#include <xen/iocap.h>
 #include <xen/iommu.h>
+#include <asm/msi.h>
+#include <asm/current.h>
+#include <public/physdev.h>
 
 /* opt_noirqbalance: If true, software IRQ balancing/affinity is disabled. */
 int opt_noirqbalance = 0;
@@ -729,6 +732,157 @@ int pirq_guest_force_unbind(struct domain *d, int irq)
  out:
     spin_unlock_irq(&desc->lock);
     return bound;
+}
+
+int get_free_pirq(struct domain *d, int type, int index)
+{
+    int i;
+
+    ASSERT(spin_is_locked(&d->evtchn_lock));
+
+    if ( type == MAP_PIRQ_TYPE_GSI )
+    {
+        for ( i = 16; i < NR_PIRQS; i++ )
+            if ( !d->arch.pirq_vector[i] )
+                break;
+        if ( i == NR_PIRQS )
+            return -ENOSPC;
+    }
+    else
+    {
+        for ( i = NR_PIRQS - 1; i >= 16; i-- )
+            if ( !d->arch.pirq_vector[i] )
+                break;
+        if ( i == 16 )
+            return -ENOSPC;
+    }
+
+    return i;
+}
+
+int map_domain_pirq(
+    struct domain *d, int pirq, int vector, int type, void *data)
+{
+    int ret = 0;
+    int old_vector, old_pirq;
+    irq_desc_t *desc;
+    unsigned long flags;
+
+    ASSERT(spin_is_locked(&d->evtchn_lock));
+
+    if ( !IS_PRIV(current->domain) )
+        return -EPERM;
+
+    if ( pirq < 0 || pirq >= NR_PIRQS || vector < 0 || vector >= NR_VECTORS )
+    {
+        dprintk(XENLOG_G_ERR, "dom%d: invalid pirq %d or vector %d\n",
+                d->domain_id, pirq, vector);
+        return -EINVAL;
+    }
+
+    old_vector = d->arch.pirq_vector[pirq];
+    old_pirq = d->arch.vector_pirq[vector];
+
+    if ( (old_vector && (old_vector != vector) ) ||
+         (old_pirq && (old_pirq != pirq)) )
+    {
+        dprintk(XENLOG_G_ERR, "dom%d: pirq %d or vector %d already mapped\n",
+                d->domain_id, pirq, vector);
+        return -EINVAL;
+    }
+
+    ret = irq_permit_access(d, pirq);
+    if ( ret )
+    {
+        dprintk(XENLOG_G_ERR, "dom%d: could not permit access to irq %d\n",
+                d->domain_id, pirq);
+        return ret;
+    }
+
+    desc = &irq_desc[vector];
+    spin_lock_irqsave(&desc->lock, flags);
+
+    if ( type == MAP_PIRQ_TYPE_MSI )
+    {
+        struct msi_info *msi = (struct msi_info *)data;
+        if ( desc->handler != &no_irq_type )
+            dprintk(XENLOG_G_ERR, "dom%d: vector %d in use\n",
+                    d->domain_id, vector);
+        desc->handler = &pci_msi_type;
+        ret = pci_enable_msi(msi);
+        if ( ret )
+            goto done;
+    }
+
+    d->arch.pirq_vector[pirq] = vector;
+    d->arch.vector_pirq[vector] = pirq;
+
+done:
+    spin_unlock_irqrestore(&desc->lock, flags);
+    return ret;
+}
+
+/* The pirq should have been unbound before this call. */
+int unmap_domain_pirq(struct domain *d, int pirq)
+{
+    unsigned long flags;
+    irq_desc_t *desc;
+    int vector, ret = 0;
+    bool_t forced_unbind;
+
+    if ( (pirq < 0) || (pirq >= NR_PIRQS) )
+        return -EINVAL;
+
+    if ( !IS_PRIV(current->domain) )
+        return -EINVAL;
+
+    ASSERT(spin_is_locked(&d->evtchn_lock));
+
+    vector = d->arch.pirq_vector[pirq];
+    if ( vector <= 0 )
+    {
+        dprintk(XENLOG_G_ERR, "dom%d: pirq %d not mapped\n",
+                d->domain_id, pirq);
+        ret = -EINVAL;
+        goto done;
+    }
+
+    forced_unbind = pirq_guest_force_unbind(d, pirq);
+    if ( forced_unbind )
+        dprintk(XENLOG_G_WARNING, "dom%d: forcing unbind of pirq %d\n",
+                d->domain_id, pirq);
+
+    desc = &irq_desc[vector];
+    spin_lock_irqsave(&desc->lock, flags);
+
+    BUG_ON(vector != d->arch.pirq_vector[pirq]);
+
+    if ( desc->msi_desc )
+        pci_disable_msi(vector);
+
+    if ( desc->handler == &pci_msi_type )
+        desc->handler = &no_irq_type;
+
+    if ( !forced_unbind )
+    {
+        d->arch.pirq_vector[pirq] = 0;
+        d->arch.vector_pirq[vector] = 0;
+    }
+    else
+    {
+        d->arch.pirq_vector[pirq] = -vector;
+        d->arch.vector_pirq[vector] = -pirq;
+    }
+
+    spin_unlock_irqrestore(&desc->lock, flags);
+
+    ret = irq_deny_access(d, pirq);
+    if ( ret )
+        dprintk(XENLOG_G_ERR, "dom%d: could not deny access to irq %d\n",
+                d->domain_id, pirq);
+
+ done:
+    return ret;
 }
 
 extern void dump_ioapic_irq_info(void);
