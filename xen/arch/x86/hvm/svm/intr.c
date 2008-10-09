@@ -124,11 +124,11 @@ static void svm_dirq_assist(struct vcpu *v)
         if ( !test_and_clear_bit(irq, &hvm_irq_dpci->dirq_mask) )
             continue;
 
-        spin_lock(&d->evtchn_lock);
+        spin_lock(&d->event_lock);
         if ( test_bit(_HVM_IRQ_DPCI_MSI, &hvm_irq_dpci->mirq[irq].flags) )
         {
             hvm_pci_msi_assert(d, irq);
-            spin_unlock(&d->evtchn_lock);
+            spin_unlock(&d->event_lock);
             continue;
         }
 
@@ -151,7 +151,7 @@ static void svm_dirq_assist(struct vcpu *v)
          */
         set_timer(&hvm_irq_dpci->hvm_timer[domain_irq_to_vector(d, irq)],
                   NOW() + PT_IRQ_TIME_OUT);
-        spin_unlock(&d->evtchn_lock);
+        spin_unlock(&d->event_lock);
     }
 }
 

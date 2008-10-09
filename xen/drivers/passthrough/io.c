@@ -30,7 +30,7 @@ static void pt_irq_time_out(void *data)
     struct dev_intx_gsi_link *digl;
     uint32_t device, intx;
 
-    spin_lock(&irq_map->dom->evtchn_lock);
+    spin_lock(&irq_map->dom->event_lock);
 
     dpci = domain_get_irq_dpci(irq_map->dom);
     ASSERT(dpci);
@@ -46,7 +46,7 @@ static void pt_irq_time_out(void *data)
     clear_bit(machine_gsi, dpci->dirq_mask);
     vector = domain_irq_to_vector(irq_map->dom, machine_gsi);
     dpci->mirq[machine_gsi].pending = 0;
-    spin_unlock(&irq_map->dom->evtchn_lock);
+    spin_unlock(&irq_map->dom->event_lock);
     pirq_guest_eoi(irq_map->dom, machine_gsi);
 }
 
@@ -62,7 +62,7 @@ int pt_irq_create_bind_vtd(
     if ( pirq < 0 || pirq >= NR_PIRQS )
         return -EINVAL;
 
-    spin_lock(&d->evtchn_lock);
+    spin_lock(&d->event_lock);
 
     hvm_irq_dpci = domain_get_irq_dpci(d);
     if ( hvm_irq_dpci == NULL )
@@ -70,7 +70,7 @@ int pt_irq_create_bind_vtd(
         hvm_irq_dpci = xmalloc(struct hvm_irq_dpci);
         if ( hvm_irq_dpci == NULL )
         {
-            spin_unlock(&d->evtchn_lock);
+            spin_unlock(&d->event_lock);
             return -ENOMEM;
         }
         memset(hvm_irq_dpci, 0, sizeof(*hvm_irq_dpci));
@@ -81,7 +81,7 @@ int pt_irq_create_bind_vtd(
     if ( domain_set_irq_dpci(d, hvm_irq_dpci) == 0 )
     {
         xfree(hvm_irq_dpci);
-        spin_unlock(&d->evtchn_lock);
+        spin_unlock(&d->event_lock);
         return -EINVAL;
     }
 
@@ -101,7 +101,7 @@ int pt_irq_create_bind_vtd(
                 ||hvm_irq_dpci->msi_gvec_pirq[pt_irq_bind->u.msi.gvec] != pirq)
 
         {
-            spin_unlock(&d->evtchn_lock);
+            spin_unlock(&d->event_lock);
             return -EBUSY;
         }
     }
@@ -117,7 +117,7 @@ int pt_irq_create_bind_vtd(
         digl = xmalloc(struct dev_intx_gsi_link);
         if ( !digl )
         {
-            spin_unlock(&d->evtchn_lock);
+            spin_unlock(&d->event_lock);
             return -ENOMEM;
         }
 
@@ -149,7 +149,7 @@ int pt_irq_create_bind_vtd(
                  "VT-d irq bind: m_irq = %x device = %x intx = %x\n",
                  machine_gsi, device, intx);
     }
-    spin_unlock(&d->evtchn_lock);
+    spin_unlock(&d->event_lock);
     return 0;
 }
 
@@ -172,13 +172,13 @@ int pt_irq_destroy_bind_vtd(
              "pt_irq_destroy_bind_vtd: machine_gsi=%d "
              "guest_gsi=%d, device=%d, intx=%d.\n",
              machine_gsi, guest_gsi, device, intx);
-    spin_lock(&d->evtchn_lock);
+    spin_lock(&d->event_lock);
 
     hvm_irq_dpci = domain_get_irq_dpci(d);
 
     if ( hvm_irq_dpci == NULL )
     {
-        spin_unlock(&d->evtchn_lock);
+        spin_unlock(&d->event_lock);
         return -EINVAL;
     }
 
@@ -213,7 +213,7 @@ int pt_irq_destroy_bind_vtd(
             clear_bit(machine_gsi, hvm_irq_dpci->mapping);
         }
     }
-    spin_unlock(&d->evtchn_lock);
+    spin_unlock(&d->event_lock);
     gdprintk(XENLOG_INFO,
              "XEN_DOMCTL_irq_unmapping: m_irq = %x device = %x intx = %x\n",
              machine_gsi, device, intx);
@@ -254,7 +254,7 @@ void hvm_dpci_msi_eoi(struct domain *d, int vector)
     if ( !iommu_enabled || (hvm_irq_dpci == NULL) )
        return;
 
-    spin_lock(&d->evtchn_lock);
+    spin_lock(&d->event_lock);
     pirq = hvm_irq_dpci->msi_gvec_pirq[vector];
 
     if ( ( pirq >= 0 ) && (pirq < NR_PIRQS) &&
@@ -265,7 +265,7 @@ void hvm_dpci_msi_eoi(struct domain *d, int vector)
          desc = domain_spin_lock_irq_desc(d, pirq, NULL);
          if (!desc)
          {
-            spin_unlock(&d->evtchn_lock);
+            spin_unlock(&d->event_lock);
             return;
          }
 
@@ -275,7 +275,7 @@ void hvm_dpci_msi_eoi(struct domain *d, int vector)
          pirq_guest_eoi(d, pirq);
      }
 
-    spin_unlock(&d->evtchn_lock);
+    spin_unlock(&d->event_lock);
 }
 
 void hvm_dpci_eoi(struct domain *d, unsigned int guest_gsi,
@@ -293,14 +293,14 @@ void hvm_dpci_eoi(struct domain *d, unsigned int guest_gsi,
         return;
     }
 
-    spin_lock(&d->evtchn_lock);
+    spin_lock(&d->event_lock);
     hvm_irq_dpci = domain_get_irq_dpci(d);
 
     if((hvm_irq_dpci == NULL) ||
          (guest_gsi >= NR_ISAIRQS &&
           !hvm_irq_dpci->girq[guest_gsi].valid) )
     {
-        spin_unlock(&d->evtchn_lock);
+        spin_unlock(&d->event_lock);
         return;
     }
 
@@ -322,5 +322,5 @@ void hvm_dpci_eoi(struct domain *d, unsigned int guest_gsi,
             pirq_guest_eoi(d, machine_gsi);
         }
     }
-    spin_unlock(&d->evtchn_lock);
+    spin_unlock(&d->event_lock);
 }

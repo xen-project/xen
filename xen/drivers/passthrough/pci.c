@@ -165,7 +165,7 @@ static void pci_clean_dpci_irqs(struct domain *d)
     if ( !is_hvm_domain(d) && !need_iommu(d) )
         return;
 
-    spin_lock(&d->evtchn_lock);
+    spin_lock(&d->event_lock);
     hvm_irq_dpci = domain_get_irq_dpci(d);
     if ( hvm_irq_dpci != NULL )
     {
@@ -189,7 +189,7 @@ static void pci_clean_dpci_irqs(struct domain *d)
         d->arch.hvm_domain.irq.dpci = NULL;
         xfree(hvm_irq_dpci);
     }
-    spin_unlock(&d->evtchn_lock);
+    spin_unlock(&d->event_lock);
 }
 
 void pci_release_devices(struct domain *d)

@@ -93,13 +93,13 @@ void hvm_dpci_isairq_eoi(struct domain *d, unsigned int isairq)
     if ( !vtd_enabled)
         return;
 
-    spin_lock(&d->evtchn_lock);
+    spin_lock(&d->event_lock);
 
     dpci = domain_get_irq_dpci(d);
 
     if ( !dpci || !test_bit(isairq, dpci->isairq_map) )
     {
-        spin_unlock(&d->evtchn_lock);
+        spin_unlock(&d->event_lock);
         return;
     }
     /* Multiple mirq may be mapped to one isa irq */
@@ -121,5 +121,5 @@ void hvm_dpci_isairq_eoi(struct domain *d, unsigned int isairq)
             }
         }
     }
-    spin_unlock(&d->evtchn_lock);
+    spin_unlock(&d->event_lock);
 }

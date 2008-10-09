@@ -63,7 +63,7 @@ struct hvm_girq_dpci_mapping {
 
 #define NR_ISAIRQS  16
 #define NR_LINK     4
-/* Protected by domain's evtchn_lock */
+/* Protected by domain's event_lock */
 struct hvm_irq_dpci {
     /* Machine IRQ to guest device/intx mapping. */
     DECLARE_BITMAP(mapping, NR_PIRQS);

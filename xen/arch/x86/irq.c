@@ -514,7 +514,7 @@ int pirq_guest_bind(struct vcpu *v, int irq, int will_share)
     int                 rc = 0;
     cpumask_t           cpumask = CPU_MASK_NONE;
 
-    WARN_ON(!spin_is_locked(&v->domain->evtchn_lock));
+    WARN_ON(!spin_is_locked(&v->domain->event_lock));
     BUG_ON(!local_irq_is_enabled());
 
  retry:
@@ -684,7 +684,7 @@ void pirq_guest_unbind(struct domain *d, int irq)
     irq_desc_t *desc;
     int vector;
 
-    WARN_ON(!spin_is_locked(&d->evtchn_lock));
+    WARN_ON(!spin_is_locked(&d->event_lock));
 
     BUG_ON(!local_irq_is_enabled());
     desc = domain_spin_lock_irq_desc(d, irq, NULL);
@@ -711,7 +711,7 @@ int pirq_guest_force_unbind(struct domain *d, int irq)
     irq_guest_action_t *action;
     int i, bound = 0;
 
-    WARN_ON(!spin_is_locked(&d->evtchn_lock));
+    WARN_ON(!spin_is_locked(&d->event_lock));
 
     BUG_ON(!local_irq_is_enabled());
     desc = domain_spin_lock_irq_desc(d, irq, NULL);
@@ -738,7 +738,7 @@ int get_free_pirq(struct domain *d, int type, int index)
 {
     int i;
 
-    ASSERT(spin_is_locked(&d->evtchn_lock));
+    ASSERT(spin_is_locked(&d->event_lock));
 
     if ( type == MAP_PIRQ_TYPE_GSI )
     {
@@ -768,7 +768,7 @@ int map_domain_pirq(
     irq_desc_t *desc;
     unsigned long flags;
 
-    ASSERT(spin_is_locked(&d->evtchn_lock));
+    ASSERT(spin_is_locked(&d->event_lock));
 
     if ( !IS_PRIV(current->domain) )
         return -EPERM;
@@ -836,7 +836,7 @@ int unmap_domain_pirq(struct domain *d, int pirq)
     if ( !IS_PRIV(current->domain) )
         return -EINVAL;
 
-    ASSERT(spin_is_locked(&d->evtchn_lock));
+    ASSERT(spin_is_locked(&d->event_lock));
 
     vector = d->arch.pirq_vector[pirq];
     if ( vector <= 0 )
@@ -892,13 +892,13 @@ void free_domain_pirqs(struct domain *d)
 {
     int i;
 
-    spin_lock(&d->evtchn_lock);
+    spin_lock(&d->event_lock);
 
     for ( i = 0; i < NR_PIRQS; i++ )
         if ( d->arch.pirq_vector[i] > 0 )
             unmap_domain_pirq(d, i);
 
-    spin_unlock(&d->evtchn_lock);
+    spin_unlock(&d->event_lock);
 }
 
 extern void dump_ioapic_irq_info(void);

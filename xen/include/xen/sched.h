@@ -188,7 +188,7 @@ struct domain
 
     /* Event channel information. */
     struct evtchn   *evtchn[NR_EVTCHN_BUCKETS];
-    spinlock_t       evtchn_lock;
+    spinlock_t       event_lock;
 
     struct grant_table *grant_table;
 

@@ -248,11 +248,11 @@ ste_init_state(struct acm_sized_buffer *errors)
         /* a) check for event channel conflicts */
         for ( bucket = 0; bucket < NR_EVTCHN_BUCKETS; bucket++ )
         {
-            spin_lock(&d->evtchn_lock);
+            spin_lock(&d->event_lock);
             ports = d->evtchn[bucket];
             if ( ports == NULL)
             {
-                spin_unlock(&d->evtchn_lock);
+                spin_unlock(&d->event_lock);
                 break;
             }
 
@@ -280,7 +280,7 @@ ste_init_state(struct acm_sized_buffer *errors)
                     printkd("%s: Policy violation in event channel domain "
                             "%x -> domain %x.\n",
                             __func__, d->domain_id, rdomid);
-                    spin_unlock(&d->evtchn_lock);
+                    spin_unlock(&d->event_lock);
 
                     acm_array_append_tuple(errors,
                                            ACM_EVTCHN_SHARING_VIOLATION,
@@ -288,7 +288,7 @@ ste_init_state(struct acm_sized_buffer *errors)
                     goto out;
                 }
             }
-            spin_unlock(&d->evtchn_lock);
+            spin_unlock(&d->event_lock);
         } 
 
 
