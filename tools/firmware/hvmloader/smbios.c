@@ -54,13 +54,13 @@ static void *
 smbios_type_4_init(void *start, unsigned int cpu_number,
                    char *cpu_manufacturer);
 static void *
-smbios_type_16_init(void *start, uint32_t memory_size_mb);
+smbios_type_16_init(void *start, uint32_t memory_size_mb, int nr_mem_devs);
 static void *
-smbios_type_17_init(void *start, uint32_t memory_size_mb);
+smbios_type_17_init(void *start, uint32_t memory_size_mb, int instance);
 static void *
-smbios_type_19_init(void *start, uint32_t memory_size_mb);
+smbios_type_19_init(void *start, uint32_t memory_size_mb, int instance);
 static void *
-smbios_type_20_init(void *start, uint32_t memory_size_mb);
+smbios_type_20_init(void *start, uint32_t memory_size_mb, int instance);
 static void *
 smbios_type_32_init(void *start);
 static void *
@@ -92,6 +92,7 @@ write_smbios_tables(void *start,
     unsigned cpu_num, nr_structs = 0, max_struct_size = 0;
     char *p, *q;
     char cpu_manufacturer[15];
+    int i, nr_mem_devs;
 
     get_cpu_manufacturer(cpu_manufacturer, 15);
 
@@ -111,10 +112,19 @@ write_smbios_tables(void *start,
     do_struct(smbios_type_3_init(p));
     for ( cpu_num = 1; cpu_num <= vcpus; cpu_num++ )
         do_struct(smbios_type_4_init(p, cpu_num, cpu_manufacturer));
-    do_struct(smbios_type_16_init(p, memsize));
-    do_struct(smbios_type_17_init(p, memsize));
-    do_struct(smbios_type_19_init(p, memsize));
-    do_struct(smbios_type_20_init(p, memsize));
+
+    /* Each 'memory device' covers up to 16GB of address space. */
+    nr_mem_devs = (memsize + 0x3fff) >> 14;
+    do_struct(smbios_type_16_init(p, memsize, nr_mem_devs));
+    for ( i = 0; i < nr_mem_devs; i++ )
+    {
+        uint32_t dev_memsize = ((i == (nr_mem_devs - 1))
+                                ? (memsize & 0x3fff) : 0x4000);
+        do_struct(smbios_type_17_init(p, dev_memsize, i));
+        do_struct(smbios_type_19_init(p, dev_memsize, i));
+        do_struct(smbios_type_20_init(p, dev_memsize, i));
+    }
+
     do_struct(smbios_type_32_init(p));
     do_struct(smbios_type_127_init(p));
 
@@ -441,7 +451,7 @@ smbios_type_4_init(
 
 /* Type 16 -- Physical Memory Array */
 static void *
-smbios_type_16_init(void *start, uint32_t memsize)
+smbios_type_16_init(void *start, uint32_t memsize, int nr_mem_devs)
 {
     struct smbios_type_16 *p = (struct smbios_type_16*)start;
 
@@ -456,7 +466,7 @@ smbios_type_16_init(void *start, uint32_t memsize)
     p->error_correction = 0x01; /* other */
     p->maximum_capacity = memsize * 1024;
     p->memory_error_information_handle = 0xfffe; /* none provided */
-    p->number_of_memory_devices = 1;
+    p->number_of_memory_devices = nr_mem_devs;
 
     start += sizeof(struct smbios_type_16);
     *((uint16_t *)start) = 0;
@@ -465,22 +475,22 @@ smbios_type_16_init(void *start, uint32_t memsize)
 
 /* Type 17 -- Memory Device */
 static void *
-smbios_type_17_init(void *start, uint32_t memory_size_mb)
+smbios_type_17_init(void *start, uint32_t memory_size_mb, int instance)
 {
+    char buf[16];
     struct smbios_type_17 *p = (struct smbios_type_17 *)start;
     
     memset(p, 0, sizeof(*p));
 
     p->header.type = 17;
     p->header.length = sizeof(struct smbios_type_17);
-    p->header.handle = 0x1100;
+    p->header.handle = 0x1100 + instance;
 
     p->physical_memory_array_handle = 0x1000;
     p->total_width = 64;
     p->data_width = 64;
-    /* truncate memory_size_mb to 16 bits and clear most significant
-       bit [indicates size in MB] */
-    p->size = (uint16_t) memory_size_mb & 0x7fff;
+    ASSERT((memory_size_mb & ~0x7fff) == 0);
+    p->size = memory_size_mb;
     p->form_factor = 0x09; /* DIMM */
     p->device_set = 0;
     p->device_locator_str = 1;
@@ -489,8 +499,11 @@ smbios_type_17_init(void *start, uint32_t memory_size_mb)
     p->type_detail = 0;
 
     start += sizeof(struct smbios_type_17);
-    strcpy((char *)start, "DIMM 1");
-    start += strlen("DIMM 1") + 1;
+    strcpy(start, "DIMM ");
+    start += strlen("DIMM ");
+    itoa(buf, instance);
+    strcpy(start, buf);
+    start += strlen(buf) + 1;
     *((uint8_t *)start) = 0;
 
     return start+1;
@@ -498,7 +511,7 @@ smbios_type_17_init(void *start, uint32_t memory_size_mb)
 
 /* Type 19 -- Memory Array Mapped Address */
 static void *
-smbios_type_19_init(void *start, uint32_t memory_size_mb)
+smbios_type_19_init(void *start, uint32_t memory_size_mb, int instance)
 {
     struct smbios_type_19 *p = (struct smbios_type_19 *)start;
     
@@ -506,10 +519,10 @@ smbios_type_19_init(void *start, uint32_t memory_size_mb)
 
     p->header.type = 19;
     p->header.length = sizeof(struct smbios_type_19);
-    p->header.handle = 0x1300;
+    p->header.handle = 0x1300 + instance;
 
-    p->starting_address = 0;
-    p->ending_address = (memory_size_mb-1) * 1024;
+    p->starting_address = instance << 24;
+    p->ending_address = p->starting_address + (memory_size_mb << 10) - 1;
     p->memory_array_handle = 0x1000;
     p->partition_width = 1;
 
@@ -520,7 +533,7 @@ smbios_type_19_init(void *start, uint32_t memory_size_mb)
 
 /* Type 20 -- Memory Device Mapped Address */
 static void *
-smbios_type_20_init(void *start, uint32_t memory_size_mb)
+smbios_type_20_init(void *start, uint32_t memory_size_mb, int instance)
 {
     struct smbios_type_20 *p = (struct smbios_type_20 *)start;
 
@@ -528,12 +541,12 @@ smbios_type_20_init(void *start, uint32_t memory_size_mb)
 
     p->header.type = 20;
     p->header.length = sizeof(struct smbios_type_20);
-    p->header.handle = 0x1400;
+    p->header.handle = 0x1400 + instance;
 
-    p->starting_address = 0;
-    p->ending_address = (memory_size_mb-1)*1024;
-    p->memory_device_handle = 0x1100;
-    p->memory_array_mapped_address_handle = 0x1300;
+    p->starting_address = instance << 24;
+    p->ending_address = p->starting_address + (memory_size_mb << 10) - 1;
+    p->memory_device_handle = 0x1100 + instance;
+    p->memory_array_mapped_address_handle = 0x1300 + instance;
     p->partition_row_position = 1;
     p->interleave_position = 0;
     p->interleaved_data_depth = 0;
