@@ -44,7 +44,7 @@ u16 apicid_to_bdf(int apic_id)
 }
 
 static int remap_entry_to_ioapic_rte(
-    struct iommu *iommu, struct IO_APIC_route_entry *old_rte)
+    struct iommu *iommu, struct IO_xAPIC_route_entry *old_rte)
 {
     struct iremap_entry *iremap_entry = NULL, *iremap_entries;
     struct IO_APIC_route_remap_entry *remap_rte;
@@ -90,13 +90,13 @@ static int remap_entry_to_ioapic_rte(
 }
 
 static int ioapic_rte_to_remap_entry(struct iommu *iommu,
-    int apic_id, struct IO_APIC_route_entry *old_rte,
+    int apic_id, struct IO_xAPIC_route_entry *old_rte,
     unsigned int rte_upper, unsigned int value)
 {
     struct iremap_entry *iremap_entry = NULL, *iremap_entries;
     struct iremap_entry new_ire;
     struct IO_APIC_route_remap_entry *remap_rte;
-    struct IO_APIC_route_entry new_rte;
+    struct IO_xAPIC_route_entry new_rte;
     int index;
     unsigned long flags;
     struct ir_ctrl *ir_ctrl = iommu_ir_ctrl(iommu);
@@ -177,7 +177,7 @@ static int ioapic_rte_to_remap_entry(struct iommu *iommu,
 unsigned int io_apic_read_remap_rte(
     unsigned int apic, unsigned int reg)
 {
-    struct IO_APIC_route_entry old_rte = { 0 };
+    struct IO_xAPIC_route_entry old_rte = { 0 };
     struct IO_APIC_route_remap_entry *remap_rte;
     int rte_upper = (reg & 1) ? 1 : 0;
     struct iommu *iommu = ioapic_to_iommu(mp_ioapics[apic].mpc_apicid);
@@ -222,7 +222,7 @@ unsigned int io_apic_read_remap_rte(
 void io_apic_write_remap_rte(
     unsigned int apic, unsigned int reg, unsigned int value)
 {
-    struct IO_APIC_route_entry old_rte = { 0 };
+    struct IO_xAPIC_route_entry old_rte = { 0 };
     struct IO_APIC_route_remap_entry *remap_rte;
     unsigned int rte_upper = (reg & 1) ? 1 : 0;
     struct iommu *iommu = ioapic_to_iommu(mp_ioapics[apic].mpc_apicid);
