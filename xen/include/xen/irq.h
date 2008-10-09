@@ -78,6 +78,8 @@ extern int pirq_guest_eoi(struct domain *d, int irq);
 extern int pirq_guest_unmask(struct domain *d);
 extern int pirq_guest_bind(struct vcpu *v, int irq, int will_share);
 extern void pirq_guest_unbind(struct domain *d, int irq);
+extern irq_desc_t *domain_spin_lock_irq_desc(
+    struct domain *d, int irq, unsigned long *pflags);
 
 static inline void set_native_irq_info(int irq, cpumask_t mask)
 {

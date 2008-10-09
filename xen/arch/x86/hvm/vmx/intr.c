@@ -127,11 +127,13 @@ static void vmx_dirq_assist(struct vcpu *v)
         if ( !test_and_clear_bit(irq, &hvm_irq_dpci->dirq_mask) )
             continue;
 
-		if ( test_bit(_HVM_IRQ_DPCI_MSI, &hvm_irq_dpci->mirq[irq].flags) )
-		{
-			hvm_pci_msi_assert(d, irq);
-			continue;
-		}
+        spin_lock(&d->evtchn_lock);
+        if ( test_bit(_HVM_IRQ_DPCI_MSI, &hvm_irq_dpci->mirq[irq].flags) )
+        {
+            hvm_pci_msi_assert(d, irq);
+            spin_unlock(&d->evtchn_lock);
+            continue;
+        }
 
         stop_timer(&hvm_irq_dpci->hvm_timer[domain_irq_to_vector(d, irq)]);
 
@@ -140,9 +142,7 @@ static void vmx_dirq_assist(struct vcpu *v)
             device = digl->device;
             intx = digl->intx;
             hvm_pci_intx_assert(d, device, intx);
-            spin_lock(&hvm_irq_dpci->dirq_lock);
             hvm_irq_dpci->mirq[irq].pending++;
-            spin_unlock(&hvm_irq_dpci->dirq_lock);
         }
 
         /*
@@ -154,6 +154,7 @@ static void vmx_dirq_assist(struct vcpu *v)
          */
         set_timer(&hvm_irq_dpci->hvm_timer[domain_irq_to_vector(d, irq)],
                   NOW() + PT_IRQ_TIME_OUT);
+        spin_unlock(&d->evtchn_lock);
     }
 }
 

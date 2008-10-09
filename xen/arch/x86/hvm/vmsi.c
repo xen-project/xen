@@ -134,7 +134,7 @@ int vmsi_deliver(struct domain *d, int pirq)
                 "vector=%x trig_mode=%x\n",
                 dest, dest_mode, delivery_mode, vector, trig_mode);
 
-    if ( !(hvm_irq_dpci->mirq[pirq].flags & HVM_IRQ_DPCI_MSI) )
+    if ( !test_bit(_HVM_IRQ_DPCI_MSI, &hvm_irq_dpci->mirq[pirq].flags) )
     {
         gdprintk(XENLOG_WARNING, "pirq %x not msi \n", pirq);
         return 0;

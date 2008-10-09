@@ -285,7 +285,7 @@ static void __do_IRQ_guest(int vector)
  * The descriptor is returned locked. This function is safe against changes
  * to the per-domain irq-to-vector mapping.
  */
-static irq_desc_t *domain_spin_lock_irq_desc(
+irq_desc_t *domain_spin_lock_irq_desc(
     struct domain *d, int irq, unsigned long *pflags)
 {
     unsigned int vector;
