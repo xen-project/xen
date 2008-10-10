@@ -128,6 +128,7 @@ static struct iosapic_intr_info {
 	unsigned char	trigger	: 1;	/* trigger mode (see iosapic.h) */
 } iosapic_intr_info[IA64_NUM_VECTORS];
 
+#ifndef XEN
 static struct iosapic {
 	char __iomem	*addr;		/* base address of IOSAPIC */
 	unsigned int 	gsi_base;	/* first GSI assigned to this IOSAPIC */
@@ -137,6 +138,9 @@ static struct iosapic {
 	unsigned short	node;		/* numa node association via pxm */
 #endif
 } iosapic_lists[NR_IOSAPICS];
+#else
+struct iosapic iosapic_lists[NR_IOSAPICS];
+#endif
 
 static unsigned char pcat_compat __devinitdata;	/* 8259 compatibility flag */
 
@@ -1035,7 +1039,11 @@ iosapic_check_gsi_range (unsigned int gsi_base, unsigned int ver)
 }
 
 int __devinit
+#ifndef XEN
 iosapic_init (unsigned long phys_addr, unsigned int gsi_base)
+#else	
+iosapic_init (unsigned long phys_addr, unsigned int gsi_base, unsigned int id)
+#endif
 {
 	int num_rte, err, index;
 	unsigned int isa_irq, ver;
@@ -1064,6 +1072,9 @@ iosapic_init (unsigned long phys_addr, unsigned int gsi_base)
 		iosapic_lists[index].addr = addr;
 		iosapic_lists[index].gsi_base = gsi_base;
 		iosapic_lists[index].num_rte = num_rte;
+#ifdef XEN
+		iosapic_lists[index].id = id;
+#endif
 #ifdef CONFIG_NUMA
 		iosapic_lists[index].node = MAX_NUMNODES;
 #endif

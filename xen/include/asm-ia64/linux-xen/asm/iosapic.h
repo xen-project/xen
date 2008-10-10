@@ -53,6 +53,34 @@
 
 #define NR_IOSAPICS			256
 
+#ifdef XEN
+struct iosapic {
+	char __iomem    *addr;      /* base address of IOSAPIC */
+	unsigned int    gsi_base;   /* first GSI assigned to this IOSAPIC */
+	unsigned short  num_rte;    /* number of RTE in this IOSAPIC */
+	int     rtes_inuse; /* # of RTEs in use on this IOSAPIC */
+	unsigned int    id;			/*  APIC ID */
+#ifdef CONFIG_NUMA
+	unsigned short  node;       /* numa node association via pxm */
+#endif
+};
+
+extern struct iosapic iosapic_lists[NR_IOSAPICS];
+
+static inline int find_iosapic_by_addr(unsigned long addr)
+{
+	int i;
+
+	for (i = 0; i < NR_IOSAPICS; i++) {
+		if ((unsigned long)iosapic_lists[i].addr == addr)
+			return i;
+	}
+
+	return -1;
+}
+#endif
+
+
 static inline unsigned int iosapic_read(char __iomem *iosapic, unsigned int reg)
 {
 	writel(reg, iosapic + IOSAPIC_REG_SELECT);
@@ -71,8 +99,13 @@ static inline void iosapic_eoi(char __iomem *iosapic, u32 vector)
 }
 
 extern void __init iosapic_system_init (int pcat_compat);
+#ifndef	XEN
 extern int __devinit iosapic_init (unsigned long address,
 				    unsigned int gsi_base);
+#else
+extern int __devinit iosapic_init (unsigned long address,
+				   unsigned int gsi_base, unsigned int id);
+#endif
 #ifdef CONFIG_HOTPLUG
 extern int iosapic_remove (unsigned int gsi_base);
 #else

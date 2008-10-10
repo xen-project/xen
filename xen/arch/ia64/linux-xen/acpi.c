@@ -294,7 +294,12 @@ acpi_parse_iosapic(struct acpi_subtable_header * header, const unsigned long end
 	if (BAD_MADT_ENTRY(iosapic, end))
 		return -EINVAL;
 
+#ifndef XEN
 	return iosapic_init(iosapic->address, iosapic->global_irq_base);
+#else
+	return iosapic_init(iosapic->address, iosapic->global_irq_base,
+			    iosapic->id);
+#endif
 }
 
 static unsigned int __initdata acpi_madt_rev;
