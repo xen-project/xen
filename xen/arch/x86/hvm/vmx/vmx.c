@@ -2115,10 +2115,15 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
              */
             exit_qualification = __vmread(EXIT_QUALIFICATION);
             write_debugreg(6, exit_qualification | 0xffff0ff0);
-            /* fall through */
+            if ( !v->domain->debugger_attached )
+                goto exit_and_crash;
+            domain_pause_for_debugger();
+            break;
         case TRAP_int3:
             if ( !v->domain->debugger_attached )
                 goto exit_and_crash;
+            inst_len = __get_instruction_length(); /* Safe: INT3 */
+            __update_guest_eip(inst_len);
             domain_pause_for_debugger();
             break;
         case TRAP_no_device:
