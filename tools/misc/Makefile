@@ -10,8 +10,8 @@ CFLAGS   += $(INCLUDES)
 
 HDRS     = $(wildcard *.h)
 
-TARGETS-y := xenperf
-TARGETS-$(CONFIG_X86) += xen-detect xenpm
+TARGETS-y := xenperf xenpm
+TARGETS-$(CONFIG_X86) += xen-detect
 TARGETS := $(TARGETS-y)
 
 SUBDIRS-$(CONFIG_LOMOUNT) += lomount
@@ -22,8 +22,7 @@ INSTALL_BIN-y := xencons
 INSTALL_BIN-$(CONFIG_X86) += xen-detect
 INSTALL_BIN := $(INSTALL_BIN-y)
 
-INSTALL_SBIN-y := netfix xm xen-bugtool xen-python-path xend xenperf xsview
-INSTALL_SBIN-$(CONFIG_X86) += xenpm
+INSTALL_SBIN-y := netfix xm xen-bugtool xen-python-path xend xenperf xsview xenpm
 INSTALL_SBIN := $(INSTALL_SBIN-y)
 
 DEFAULT_PYTHON_PATH := $(shell $(XEN_ROOT)/tools/python/get-path)
