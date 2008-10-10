@@ -266,6 +266,39 @@ register_percpu_irq (ia64_vector vec, struct irqaction *action)
 		}
 }
 
+#ifdef XEN
+int request_irq(unsigned int irq,
+		void (*handler)(int, void *, struct cpu_user_regs *),
+		unsigned long irqflags, const char * devname, void *dev_id)
+{
+	struct irqaction * action;
+	int retval=0;
+
+	/*
+	 * Sanity-check: shared interrupts must pass in a real dev-ID,
+	 * otherwise we'll have trouble later trying to figure out
+	 * which interrupt is which (messes up the interrupt freeing logic etc).
+	 *                          */
+	if (irq >= NR_IRQS)
+		return -EINVAL;
+	if (!handler)
+		return -EINVAL;
+
+	action = xmalloc(struct irqaction);
+	if (!action)
+		return -ENOMEM;
+
+	action->handler = handler;
+	action->name = devname;
+	action->dev_id = dev_id;
+	setup_vector(irq, action);
+	if (retval)
+		xfree(action);
+
+	return retval;
+}
+#endif
+
 void __init
 init_IRQ (void)
 {
