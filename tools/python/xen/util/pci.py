@@ -400,12 +400,8 @@ class PciDevice:
             lst = target.split('/')
             parent = lst[len(lst)-2]
             if parent[0:3] == 'pci':
-                parent = parent[3:]
-                lst = parent.split(':')
-                dom = int(lst[0], 16)
-                bus = int(lst[1], 16)
-                dev = 0
-                func = 0
+                # We have reached the upmost one.
+                return None
             else:
                 lst = parent.split(':')
                 dom = int(lst[0], 16)
@@ -424,7 +420,10 @@ class PciDevice:
         (dom, b, d, f) = self.find_parent()
         dev = dev_parent = PciDevice(dom, b, d, f)
         while dev_parent.dev_type != DEV_TYPE_PCIe_BRIDGE:
-            (dom, b, d, f) = dev_parent.find_parent()
+            parent = dev_parent.find_parent()
+            if parent is None:
+                break
+            (dom, b, d, f) = parent
             dev = dev_parent
             dev_parent = PciDevice(dom, b, d, f)
         return dev
