@@ -213,7 +213,7 @@ static void print_PSD( struct xen_psd_package *ptr)
 
 int set_px_pminfo(uint32_t acpi_id, struct xen_processor_performance *dom0_px_info)
 {
-    int cpu_count = 0, ret=0, cpuid;
+    int ret=0, cpuid;
     struct processor_pminfo *pmpt;
     struct processor_performance *pxpt;
 
@@ -298,7 +298,6 @@ int set_px_pminfo(uint32_t acpi_id, struct xen_processor_performance *dom0_px_in
                 XEN_PX_PSD | XEN_PX_PPC ) )
     {
         pxpt->init = XEN_PX_INIT;
-        cpu_count++;
 
         ret = cpufreq_cpu_init(cpuid);
         goto out;
