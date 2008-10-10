@@ -219,6 +219,32 @@ acpi_parse_lapic_addr_ovr(struct acpi_subtable_header * header,
 	return 0;
 }
 
+#ifdef XEN
+
+#define MAX_LOCAL_SAPIC 255
+static u16 ia64_acpiid_to_sapicid[ MAX_LOCAL_SAPIC ] =
+		{[0 ... MAX_LOCAL_SAPIC - 1] = 0xffff };
+
+/* acpi id to cpu id */
+int get_cpu_id(u8 acpi_id)
+{
+	int i;
+	u16 apic_id;
+
+	apic_id = ia64_acpiid_to_sapicid[acpi_id];
+	if ( apic_id == 0xffff )
+		return -EINVAL;
+
+	for ( i = 0; i < NR_CPUS; i++ )
+	{
+		if ( apic_id == ia64_cpu_to_sapicid[i] )
+			return i;
+	}
+
+	return -1;
+}
+#endif
+
 static int __init
 acpi_parse_lsapic(struct acpi_subtable_header * header, const unsigned long end)
 {
@@ -232,6 +258,10 @@ acpi_parse_lsapic(struct acpi_subtable_header * header, const unsigned long end)
 #ifdef CONFIG_SMP
 		smp_boot_data.cpu_phys_id[available_cpus] =
 		    (lsapic->id << 8) | lsapic->eid;
+#endif
+#ifdef XEN
+        ia64_acpiid_to_sapicid[lsapic->processor_id] =
+            (lsapic->id << 8) | lsapic->eid;
 #endif
 		++available_cpus;
 	}

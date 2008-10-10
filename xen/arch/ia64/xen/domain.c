@@ -2160,6 +2160,7 @@ int __init construct_dom0(struct domain *d,
 	snprintf(si->magic, sizeof(si->magic), "xen-3.0-ia64");
 	si->nr_pages     = max_pages;
 	si->flags = SIF_INITDOMAIN|SIF_PRIVILEGED;
+	si->flags |= (xen_processor_pmbits << 8) & SIF_PM_MASK;
 
 	printk("Dom0: 0x%lx\n", (u64)dom0);
 

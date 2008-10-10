@@ -1524,7 +1524,7 @@ ia64_hypercall_table:
 	data8 do_ni_hypercall		/* do_set_callbacks */
 	data8 do_ni_hypercall		/* do_fpu_taskswitch *//*  5 */
 	data8 do_sched_op_compat
-	data8 do_ni_hypercall
+	data8 do_platform_op
 	data8 do_ni_hypercall		/* do_set_debugreg */
 	data8 do_ni_hypercall		/* do_get_debugreg */
 	data8 do_ni_hypercall		/* do_update_descriptor * 10 */

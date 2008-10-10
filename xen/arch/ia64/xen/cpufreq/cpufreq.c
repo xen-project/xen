@@ -305,20 +305,10 @@ static int __init cpufreq_driver_init(void)
 
 	return ret;
 }
+
 __initcall(cpufreq_driver_init);
-
-int get_cpu_id(u8 acpi_id)
-{
-    return -1;
-}
-
-int xenpf_copy_px_states(struct processor_performance *pxpt,
-                         struct xen_processor_performance *dom0_px_info)
-{
-    return -ENOSYS;
-}
 
 int cpufreq_cpu_init(unsigned int cpuid)
 {
-    return -ENOSYS;
+	return cpufreq_add_cpu(cpuid);
 }
