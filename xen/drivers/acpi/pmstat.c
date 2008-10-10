@@ -50,10 +50,11 @@ extern int pmstat_reset_cx_stat(uint32_t cpuid);
 int do_get_pm_info(struct xen_sysctl_get_pmstat *op)
 {
     int ret = 0;
-    const struct processor_pminfo *pmpt = processor_pminfo[op->cpuid];
+    const struct processor_pminfo *pmpt;
 
     if ( (op->cpuid >= NR_CPUS) || !cpu_online(op->cpuid) )
         return -EINVAL;
+    pmpt = processor_pminfo[op->cpuid];
 
     switch ( op->type & PMSTAT_CATEGORY_MASK )
     {
