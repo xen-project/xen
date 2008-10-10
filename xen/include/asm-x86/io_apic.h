@@ -190,5 +190,6 @@ static inline int ioapic_resume(void) {return 0};
 #endif
 
 extern int assign_irq_vector(int irq);
+extern int free_irq_vector(int vector);
 
 #endif

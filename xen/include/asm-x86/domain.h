@@ -235,7 +235,7 @@ struct arch_domain
     /* Shadow translated domain: P2M mapping */
     pagetable_t phys_table;
 
-    /* NB. protected by d->evtchn_lock and by irq_desc[vector].lock */
+    /* NB. protected by d->event_lock and by irq_desc[vector].lock */
     int vector_pirq[NR_VECTORS];
     int pirq_vector[NR_PIRQS];
 

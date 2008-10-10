@@ -3067,7 +3067,7 @@ static int destroy_grant_pte_mapping(
     ol1e = *(l1_pgentry_t *)va;
     
     /* Check that the virtual address supplied is actually mapped to frame. */
-    if ( unlikely((l1e_get_intpte(ol1e) >> PAGE_SHIFT) != frame) )
+    if ( unlikely(l1e_get_pfn(ol1e) != frame) )
     {
         page_unlock(page);
         MEM_LOG("PTE entry %lx for address %"PRIx64" doesn't match frame %lx",

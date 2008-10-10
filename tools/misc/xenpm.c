@@ -161,7 +161,7 @@ int main(int argc, char **argv)
                 break;
             }
 
-            ret = xc_pm_get_pxstat(xc_fd, 0, pxstat);
+            ret = xc_pm_get_pxstat(xc_fd, i, pxstat);
             if( ret ) {
                 fprintf(stderr, "failed to get P-states statistics information\n");
                 free(pxstat->trans_pt);

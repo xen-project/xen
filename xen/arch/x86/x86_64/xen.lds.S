@@ -67,6 +67,7 @@ SECTIONS
   . = ALIGN(PAGE_SIZE);
   __init_end = .;
 
+  __per_cpu_shift = PERCPU_SHIFT; /* kdump assist */
   __per_cpu_start = .;
   .data.percpu : { *(.data.percpu) } :text
   __per_cpu_data_end = .;

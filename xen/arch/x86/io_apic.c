@@ -87,7 +87,8 @@ static struct irq_pin_list {
 } irq_2_pin[PIN_MAP_SIZE];
 static int irq_2_pin_free_entry = NR_IRQS;
 
-int vector_irq[NR_VECTORS] __read_mostly = { [0 ... NR_VECTORS - 1] = -1};
+int vector_irq[NR_VECTORS] __read_mostly = {
+    [0 ... NR_VECTORS - 1] = FREE_TO_ASSIGN};
 
 /*
  * The common case is 1:1 IRQ<->pin mappings. Sometimes there are
@@ -666,40 +667,47 @@ static inline int IO_APIC_irq_trigger(int irq)
 /* irq_vectors is indexed by the sum of all RTEs in all I/O APICs. */
 u8 irq_vector[NR_IRQ_VECTORS] __read_mostly;
 
+int free_irq_vector(int vector)
+{
+    int irq;
+
+    BUG_ON((vector > LAST_DYNAMIC_VECTOR) || (vector < FIRST_DYNAMIC_VECTOR));
+
+    spin_lock(&vector_lock);
+    if ((irq = vector_irq[vector]) == AUTO_ASSIGN)
+        vector_irq[vector] = FREE_TO_ASSIGN;
+    spin_unlock(&vector_lock);
+
+    return (irq == AUTO_ASSIGN) ? 0 : -EINVAL;
+}
+
 int assign_irq_vector(int irq)
 {
-    static unsigned current_vector = FIRST_DYNAMIC_VECTOR, offset = 0;
+    static unsigned current_vector = FIRST_DYNAMIC_VECTOR;
     unsigned vector;
 
     BUG_ON(irq >= NR_IRQ_VECTORS);
+
     spin_lock(&vector_lock);
 
-    if (irq != AUTO_ASSIGN && IO_APIC_VECTOR(irq) > 0) {
+    if ((irq != AUTO_ASSIGN) && (IO_APIC_VECTOR(irq) > 0)) {
         spin_unlock(&vector_lock);
         return IO_APIC_VECTOR(irq);
     }
 
-next:
-    current_vector += 8;
+    vector = current_vector;
+    while (vector_irq[vector] != FREE_TO_ASSIGN) {
+        vector += 8;
+        if (vector > LAST_DYNAMIC_VECTOR)
+            vector = FIRST_DYNAMIC_VECTOR + ((vector + 1) & 7);
 
-    /* Skip the hypercall vector. */
-    if (current_vector == HYPERCALL_VECTOR)
-        goto next;
-
-    /* Skip the Linux/BSD fast-trap vector. */
-    if (current_vector == 0x80)
-        goto next;
-
-    if (current_vector > LAST_DYNAMIC_VECTOR) {
-        offset++;
-        if (!(offset%8)) {
+        if (vector == current_vector) {
             spin_unlock(&vector_lock);
             return -ENOSPC;
         }
-        current_vector = FIRST_DYNAMIC_VECTOR + offset;
     }
 
-    vector = current_vector;
+    current_vector = vector;
     vector_irq[vector] = irq;
     if (irq != AUTO_ASSIGN)
         IO_APIC_VECTOR(irq) = vector;

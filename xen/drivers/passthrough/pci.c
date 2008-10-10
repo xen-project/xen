@@ -154,7 +154,7 @@ int pci_remove_device(u8 bus, u8 devfn)
 
 static void pci_clean_dpci_irqs(struct domain *d)
 {
-    struct hvm_irq_dpci *hvm_irq_dpci = domain_get_irq_dpci(d);
+    struct hvm_irq_dpci *hvm_irq_dpci = NULL;
     uint32_t i;
     struct list_head *digl_list, *tmp;
     struct dev_intx_gsi_link *digl;
@@ -165,13 +165,14 @@ static void pci_clean_dpci_irqs(struct domain *d)
     if ( !is_hvm_domain(d) && !need_iommu(d) )
         return;
 
+    spin_lock(&d->event_lock);
+    hvm_irq_dpci = domain_get_irq_dpci(d);
     if ( hvm_irq_dpci != NULL )
     {
-        for ( i = 0; i < NR_IRQS; i++ )
+        for ( i = find_first_bit(hvm_irq_dpci->mapping, NR_PIRQS);
+              i < NR_PIRQS;
+              i = find_next_bit(hvm_irq_dpci->mapping, NR_PIRQS, i + 1) )
         {
-            if ( !(hvm_irq_dpci->mirq[i].flags & HVM_IRQ_DPCI_VALID) )
-                continue;
-
             pirq_guest_unbind(d, i);
             kill_timer(&hvm_irq_dpci->hvm_timer[irq_to_vector(i)]);
 
@@ -188,6 +189,7 @@ static void pci_clean_dpci_irqs(struct domain *d)
         d->arch.hvm_domain.irq.dpci = NULL;
         xfree(hvm_irq_dpci);
     }
+    spin_unlock(&d->event_lock);
 }
 
 void pci_release_devices(struct domain *d)

@@ -85,37 +85,41 @@ int domain_set_irq_dpci(struct domain *domain, struct hvm_irq_dpci *dpci)
 void hvm_dpci_isairq_eoi(struct domain *d, unsigned int isairq)
 {
     struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
-    struct hvm_irq_dpci *dpci = domain_get_irq_dpci(d);
+    struct hvm_irq_dpci *dpci = NULL;
     struct dev_intx_gsi_link *digl, *tmp;
     int i;
 
     ASSERT(isairq < NR_ISAIRQS);
-    if ( !vtd_enabled || !dpci ||
-         !test_bit(isairq, dpci->isairq_map) )
+    if ( !vtd_enabled)
         return;
 
-    /* Multiple mirq may be mapped to one isa irq */
-    for ( i = 0; i < NR_IRQS; i++ )
-    {
-        if ( !dpci->mirq[i].flags & HVM_IRQ_DPCI_VALID )
-            continue;
+    spin_lock(&d->event_lock);
 
+    dpci = domain_get_irq_dpci(d);
+
+    if ( !dpci || !test_bit(isairq, dpci->isairq_map) )
+    {
+        spin_unlock(&d->event_lock);
+        return;
+    }
+    /* Multiple mirq may be mapped to one isa irq */
+    for ( i = find_first_bit(dpci->mapping, NR_PIRQS);
+          i < NR_PIRQS;
+          i = find_next_bit(dpci->mapping, NR_PIRQS, i + 1) )
+    {
         list_for_each_entry_safe ( digl, tmp,
             &dpci->mirq[i].digl_list, list )
         {
             if ( hvm_irq->pci_link.route[digl->link] == isairq )
             {
                 hvm_pci_intx_deassert(d, digl->device, digl->intx);
-                spin_lock(&dpci->dirq_lock);
                 if ( --dpci->mirq[i].pending == 0 )
                 {
-                    spin_unlock(&dpci->dirq_lock);
                     stop_timer(&dpci->hvm_timer[domain_irq_to_vector(d, i)]);
                     pirq_guest_eoi(d, i);
                 }
-                else
-                    spin_unlock(&dpci->dirq_lock);
             }
         }
     }
+    spin_unlock(&d->event_lock);
 }

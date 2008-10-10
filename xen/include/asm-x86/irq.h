@@ -19,7 +19,9 @@
 
 extern int vector_irq[NR_VECTORS];
 extern u8 irq_vector[NR_IRQ_VECTORS];
-#define AUTO_ASSIGN             -1
+#define AUTO_ASSIGN    -1
+#define NEVER_ASSIGN   -2
+#define FREE_TO_ASSIGN -3
 
 #define platform_legacy_irq(irq)	((irq) < 16)
 
@@ -51,6 +53,12 @@ extern atomic_t irq_mis_count;
 
 int pirq_acktype(struct domain *d, int irq);
 int pirq_shared(struct domain *d , int irq);
+
+int map_domain_pirq(struct domain *d, int pirq, int vector, int type,
+                           void *data);
+int unmap_domain_pirq(struct domain *d, int pirq);
+int get_free_pirq(struct domain *d, int type, int index);
+void free_domain_pirqs(struct domain *d);
 
 #define domain_irq_to_vector(d, irq) ((d)->arch.pirq_vector[(irq)])
 #define domain_vector_to_irq(d, vec) ((d)->arch.vector_pirq[(vec)])

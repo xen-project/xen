@@ -408,6 +408,10 @@ void __init init_IRQ(void)
         irq_desc[LEGACY_VECTOR(i)].handler = &i8259A_irq_type;
     }
 
+    /* Never allocate the hypercall vector or Linux/BSD fast-trap vector. */
+    vector_irq[HYPERCALL_VECTOR] = NEVER_ASSIGN;
+    vector_irq[0x80] = NEVER_ASSIGN;
+
     apic_intr_init();
 
     /* Set the clock to HZ Hz */

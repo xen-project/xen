@@ -23,6 +23,43 @@
 
 #include <xen/iommu.h>
 
+/* Accomodate both IOAPIC and IOSAPIC. */
+struct IO_xAPIC_route_entry {
+    __u32   vector      :  8,
+        delivery_mode   :  3,   /* 000: FIXED
+                                 * 001: lowest prio
+                                 * 111: ExtINT
+                                 */
+        dest_mode       :  1,   /* 0: physical, 1: logical */
+        delivery_status :  1,
+        polarity        :  1,
+        irr             :  1,
+        trigger         :  1,   /* 0: edge, 1: level */
+        mask            :  1,   /* 0: enabled, 1: disabled */
+        __reserved_2    : 15;
+   
+    union {
+        struct { __u32
+            __reserved_1    : 24,
+            physical_dest   :  4,
+            __reserved_2    :  4;
+        } physical;
+
+        struct { __u32
+            __reserved_1    : 24,
+            logical_dest    :  8;
+        } logical;
+
+#ifdef __ia64__
+        struct { __u32
+            __reserved_1    : 16,
+            dest_id         : 16;
+        };
+#endif
+    } dest;
+
+} __attribute__ ((packed));
+
 struct IO_APIC_route_remap_entry {
     union {
         u64 val;

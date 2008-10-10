@@ -25,6 +25,7 @@
 #include <xen/types.h>
 #include <xen/spinlock.h>
 #include <asm/irq.h>
+#include <asm/pirq.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/vpic.h>
 #include <asm/hvm/vioapic.h>
@@ -38,8 +39,6 @@ struct dev_intx_gsi_link {
     uint8_t link;
 };
 
-#define HVM_IRQ_DPCI_VALID 0x1
-#define HVM_IRQ_DPCI_MSI   0x2
 #define _HVM_IRQ_DPCI_MSI  0x1
 
 struct hvm_gmsi_info {
@@ -64,9 +63,10 @@ struct hvm_girq_dpci_mapping {
 
 #define NR_ISAIRQS  16
 #define NR_LINK     4
+/* Protected by domain's event_lock */
 struct hvm_irq_dpci {
-    spinlock_t dirq_lock;
     /* Machine IRQ to guest device/intx mapping. */
+    DECLARE_BITMAP(mapping, NR_PIRQS);
     struct hvm_mirq_dpci_mapping mirq[NR_IRQS];
     /* Guest IRQ to guest device/intx mapping. */
     struct hvm_girq_dpci_mapping girq[NR_IRQS];

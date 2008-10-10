@@ -1303,7 +1303,7 @@ class XendDomainInfo:
         t.mkdir()
         t.set_permissions({'dom' : self.domid, 'read' : True})
         t.write('vm', self.vmpath)
-        for i in [ 'device', 'control', 'error' ]:
+        for i in [ 'device', 'control', 'error', 'memory' ]:
             t.mkdir(i)
             t.set_permissions(i, {'dom' : self.domid})
 
