@@ -37,6 +37,7 @@ obj-y += xentime.o
 obj-y += flushd.o
 obj-y += privop_stat.o
 obj-y += xenpatch.o
+obj-y += pci.o
 
 obj-$(crash_debug) += gdbstub.o
 obj-$(xen_ia64_tlb_track) += tlb_track.o
