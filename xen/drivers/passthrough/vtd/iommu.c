@@ -123,7 +123,7 @@ static void __iommu_flush_cache(void *addr, int size)
         return;
 
     for ( i = 0; i < size; i += clflush_size )
-        clflush((char *)addr + i);
+        cacheline_flush((char *)addr + i);
 }
 
 void iommu_flush_cache_entry(void *addr)
@@ -525,7 +525,7 @@ void iommu_flush_all(void)
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
 
-    wbinvd();
+    flush_all_cache();
     for_each_drhd_unit ( drhd )
     {
         iommu = drhd->iommu;
@@ -962,8 +962,7 @@ static int iommu_alloc(struct acpi_drhd_unit *drhd)
         return -ENOMEM;
     }
 
-    set_fixmap_nocache(FIX_IOMMU_REGS_BASE_0 + nr_iommus, drhd->address);
-    iommu->reg = (void *)fix_to_virt(FIX_IOMMU_REGS_BASE_0 + nr_iommus);
+    iommu->reg = map_to_nocache_virt(nr_iommus, drhd->address);
     iommu->index = nr_iommus++;
 
     iommu->cap = dmar_readq(iommu->reg, DMAR_CAP_REG);
@@ -1768,7 +1767,7 @@ int intel_vtd_setup(void)
         return -ENODEV;
 
     spin_lock_init(&domid_bitmap_lock);
-    clflush_size = get_clflush_size();
+    clflush_size = get_cache_line_size();
 
     for_each_drhd_unit ( drhd )
         if ( iommu_alloc(drhd) != 0 )

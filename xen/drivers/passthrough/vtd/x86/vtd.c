@@ -60,9 +60,25 @@ void free_pgtable_maddr(u64 maddr)
         free_domheap_page(maddr_to_page(maddr));
 }
 
-unsigned int get_clflush_size(void)
+unsigned int get_cache_line_size(void)
 {
     return ((cpuid_ebx(1) >> 8) & 0xff) * 8;
+}
+
+void cacheline_flush(char * addr)
+{
+    clflush(addr);
+}
+
+void flush_all_cache()
+{
+    wbinvd();
+}
+
+void *map_to_nocache_virt(int nr_iommus, u64 maddr)
+{
+    set_fixmap_nocache(FIX_IOMMU_REGS_BASE_0 + nr_iommus, maddr);
+    return (void *)fix_to_virt(FIX_IOMMU_REGS_BASE_0 + nr_iommus);
 }
 
 struct hvm_irq_dpci *domain_get_irq_dpci(struct domain *domain)
