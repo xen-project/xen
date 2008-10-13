@@ -476,15 +476,16 @@ class PciDevice:
         parent_path = sysfs_mnt + SYSFS_PCI_DEVS_PATH + '/' + \
             target_bus + SYSFS_PCI_DEV_CONFIG_PATH
         fd = os.open(parent_path, os.O_RDWR)
-        # Save state of bridge control register - restore after reset
         os.lseek(fd, PCI_CB_BRIDGE_CONTROL, 0)
         br_cntl = (struct.unpack('H', os.read(fd, 2)))[0]
         # Assert Secondary Bus Reset
         os.lseek(fd, PCI_CB_BRIDGE_CONTROL, 0)
-        os.write(fd, struct.pack('I', PCI_BRIDGE_CTL_BUS_RESET))
+        br_cntl |= PCI_BRIDGE_CTL_BUS_RESET
+        os.write(fd, struct.pack('H', br_cntl))
         time.sleep(0.200)
         # De-assert Secondary Bus Reset
         os.lseek(fd, PCI_CB_BRIDGE_CONTROL, 0)
+        br_cntl &= ~PCI_BRIDGE_CTL_BUS_RESET
         os.write(fd, struct.pack('H', br_cntl))
         time.sleep(0.200)
         os.close(fd)
