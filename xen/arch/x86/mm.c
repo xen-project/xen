@@ -1883,8 +1883,7 @@ static int alloc_page_type(struct page_info *page, unsigned long type,
     switch ( type & PGT_type_mask )
     {
     case PGT_l1_page_table:
-        alloc_l1_table(page);
-        rc = 0;
+        rc = alloc_l1_table(page);
         break;
     case PGT_l2_page_table:
         rc = alloc_l2_table(page, type, preemptible);
