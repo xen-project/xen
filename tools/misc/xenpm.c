@@ -81,11 +81,15 @@ int main(int argc, char **argv)
             if ( ret )
             {
                 if ( errno == ENODEV )
+                {
                     fprintf(stderr, "Xen cpuidle is not enabled!\n");
+                    break;
+                }
                 else
-                    fprintf(stderr, "failed to get max C-state\n");
-
-                break;
+                {
+                    fprintf(stderr, "[CPU%d] failed to get max C-state\n", i);
+                    continue;
+                }
             }
 
             cxstat->triggers = malloc(max_cx_num * sizeof(uint64_t));
@@ -105,15 +109,17 @@ int main(int argc, char **argv)
             ret = xc_pm_get_cxstat(xc_fd, i, cxstat);
             if( ret )
             {
-                fprintf(stderr, "failed to get C-states statistics information\n");
+                fprintf(stderr, "[CPU%d] failed to get C-states statistics "
+                        "information\n", i);
                 free(cxstat->triggers);
                 free(cxstat->residencies);
-                break;
+                continue;
             }
 
             printf("cpu id               : %d\n", i);
             printf("total C-states       : %d\n", cxstat->nr);
-            printf("idle time(ms)        : %"PRIu64"\n", cxstat->idle_time/1000000UL);
+            printf("idle time(ms)        : %"PRIu64"\n",
+                   cxstat->idle_time/1000000UL);
             for ( j = 0; j < cxstat->nr; j++ )
             {
                 printf("C%d                   : transition [%020"PRIu64"]\n",
@@ -138,19 +144,26 @@ int main(int argc, char **argv)
         for ( i = 0; i < physinfo.nr_cpus; i++ )
         {
             ret = xc_pm_get_max_px(xc_fd, i, &max_px_num);
-            if ( ret ) {
+            if ( ret )
+            {
                 if ( errno == ENODEV )
+                {
                     printf("Xen cpufreq is not enabled!\n");
+                    break;
+                }
                 else
-                    fprintf(stderr, "failed to get max P-state\n");
-
-                break;
+                {
+                    fprintf(stderr, "[CPU%d] failed to get max P-state\n", i);
+                    continue;
+                }
             }
 
-            pxstat->trans_pt = malloc(max_px_num * max_px_num * sizeof(uint64_t));
+            pxstat->trans_pt = malloc(max_px_num * max_px_num *
+                                      sizeof(uint64_t));
             if ( !pxstat->trans_pt )
             {
-                fprintf(stderr, "failed to malloc for P-states transition table\n");
+                fprintf(stderr, "failed to malloc for P-states "
+                        "transition table\n");
                 break;
             }
             pxstat->pt = malloc(max_px_num * sizeof(struct xc_px_val));
@@ -162,26 +175,32 @@ int main(int argc, char **argv)
             }
 
             ret = xc_pm_get_pxstat(xc_fd, i, pxstat);
-            if( ret ) {
-                fprintf(stderr, "failed to get P-states statistics information\n");
+            if( ret )
+            {
+                fprintf(stderr, "[CPU%d] failed to get P-states "
+                        "statistics information\n", i);
                 free(pxstat->trans_pt);
                 free(pxstat->pt);
-                break;
+                continue;
             }
 
             printf("cpu id               : %d\n", i);
             printf("total P-states       : %d\n", pxstat->total);
             printf("usable P-states      : %d\n", pxstat->usable);
-            printf("current frequency    : %"PRIu64" MHz\n", pxstat->pt[pxstat->cur].freq);
+            printf("current frequency    : %"PRIu64" MHz\n",
+                   pxstat->pt[pxstat->cur].freq);
             for ( j = 0; j < pxstat->total; j++ )
             {
                 if ( pxstat->cur == j )
                     printf("*P%d", j);
                 else
                     printf("P%d ", j);
-                printf("                  : freq       [%04"PRIu64" MHz]\n", pxstat->pt[j].freq);
-                printf("                       transition [%020"PRIu64"]\n", pxstat->pt[j].count);
-                printf("                       residency  [%020"PRIu64" ms]\n", pxstat->pt[j].residency/1000000UL);
+                printf("                  : freq       [%04"PRIu64" MHz]\n",
+                       pxstat->pt[j].freq);
+                printf("                       transition [%020"PRIu64"]\n",
+                       pxstat->pt[j].count);
+                printf("                       residency  [%020"PRIu64" ms]\n",
+                       pxstat->pt[j].residency/1000000UL);
             }
 
             free(pxstat->trans_pt);
