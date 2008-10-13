@@ -21,7 +21,6 @@
 #define _IOMMU_H_
 
 #include <xen/init.h>
-#include <xen/pci.h>
 #include <xen/spinlock.h>
 #include <xen/pci.h>
 #include <public/hvm/ioreq.h>

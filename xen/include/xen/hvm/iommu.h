@@ -17,16 +17,10 @@
  * Copyright (C) Allen Kay <allen.m.kay@intel.com>
  */
 
-#ifndef __ASM_X86_HVM_IOMMU_H__
-#define __ASM_X86_HVM_IOMMU_H__
+#ifndef __XEN_HVM_IOMMU_H__
+#define __XEN_HVM_IOMMU_H__
 
 #include <xen/iommu.h>
-#include <asm/hvm/irq.h>
-#include <asm/hvm/vpt.h>
-#include <asm/hvm/vlapic.h>
-#include <asm/hvm/io.h>
-#include <public/hvm/params.h>
-#include <public/hvm/save.h>
 
 struct g2m_ioport {
     struct list_head list;
@@ -53,4 +47,4 @@ struct hvm_iommu {
     struct iommu_ops *platform_ops;
 };
 
-#endif /* __ASM_X86_HVM_IOMMU_H__ */
+#endif /* __XEN_HVM_IOMMU_H__ */
