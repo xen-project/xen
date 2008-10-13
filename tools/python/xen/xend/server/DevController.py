@@ -257,7 +257,7 @@ class DevController:
 
         if force:
             frontpath = self.frontendPath(dev)
-            backpath = self.readVm(devid, "backend")
+            backpath = self.readVm(dev, "backend")
             if backpath:
                 xstransact.Remove(backpath)
             xstransact.Remove(frontpath)
