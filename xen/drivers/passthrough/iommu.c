@@ -15,6 +15,7 @@
 
 #include <xen/sched.h>
 #include <xen/iommu.h>
+#include <asm/hvm/iommu.h>
 #include <xen/paging.h>
 #include <xen/guest_access.h>
 
@@ -77,18 +78,7 @@ int iommu_domain_init(struct domain *domain)
     if ( !iommu_enabled )
         return 0;
 
-    switch ( boot_cpu_data.x86_vendor )
-    {
-    case X86_VENDOR_INTEL:
-        hd->platform_ops = &intel_iommu_ops;
-        break;
-    case X86_VENDOR_AMD:
-        hd->platform_ops = &amd_iommu_ops;
-        break;
-    default:
-        BUG();
-    }
-
+    hd->platform_ops = iommu_get_ops();
     return hd->platform_ops->init(domain);
 }
 
@@ -239,15 +229,7 @@ static int iommu_setup(void)
     if ( !iommu_enabled )
         goto out;
 
-    switch ( boot_cpu_data.x86_vendor )
-    {
-    case X86_VENDOR_INTEL:
-        rc = intel_vtd_setup();
-        break;
-    case X86_VENDOR_AMD:
-        rc = amd_iov_detect();
-        break;
-    }
+    rc = iommu_hardware_setup();
 
     iommu_enabled = (rc == 0);
 
@@ -308,37 +290,13 @@ int iommu_get_device_group(struct domain *d, u8 bus, u8 devfn,
 void iommu_update_ire_from_apic(
     unsigned int apic, unsigned int reg, unsigned int value)
 {
-    struct iommu_ops *ops = NULL;
-
-    switch ( boot_cpu_data.x86_vendor )
-    {
-    case X86_VENDOR_INTEL:
-        ops = &intel_iommu_ops;
-        break;
-    case X86_VENDOR_AMD:
-        ops = &amd_iommu_ops;
-        break;
-    default:
-        BUG();
-    }
+    struct iommu_ops *ops = iommu_get_ops();
     ops->update_ire_from_apic(apic, reg, value);
 }
 void iommu_update_ire_from_msi(
     struct msi_desc *msi_desc, struct msi_msg *msg)
 {
-    struct iommu_ops *ops = NULL;
-
-    switch ( boot_cpu_data.x86_vendor )
-    {
-    case X86_VENDOR_INTEL:
-        ops = &intel_iommu_ops;
-        break;
-    case X86_VENDOR_AMD:
-        ops = &amd_iommu_ops;
-        break;
-    default:
-        BUG();
-    }
+    struct iommu_ops *ops = iommu_get_ops();
     ops->update_ire_from_msi(msi_desc, msg);
 }
 /*
