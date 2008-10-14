@@ -132,3 +132,21 @@ export XEN_TARGET_ARCH=x86_32
 
 - bootsplash is supported, but the ioemu backend does not yet support restart
 for use by the booted kernel.
+
+
+                                Your own stubdom
+                                ================
+
+  By running
+
+cd stubdom/
+make c-stubdom
+
+  or
+
+cd stubdom/
+make caml-stubdom
+
+  you can compile examples of C or caml stub domain kernels.  You can use these
+and the relevant Makefile rules as basis to build your own stub domain kernel.
+Available libraries are libc, libxc, libxs, zlib and libpci.
