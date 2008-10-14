@@ -53,6 +53,14 @@ name = "ExampleHVMDomain"
 # Note that this option is ignored if vcpus > 1
 #apic=1
 
+# Enable/disable extended power management support within HVM guest, i.e., beyond
+# S3, S4, S5 within guest like exposing battery meter.
+# 0 (default option, extended power management support disabled)
+# 1 (pass-through mode; uses pass-through as needed; efficient but limited in scope)
+# 2 (non pass-through mode; extended scope, likely to work on all applicable environment
+#    but comparitively less efficient than pass-through mode)
+# xen_extended_power_mgmt=0
+
 # List of which CPUS this domain is allowed to use, default Xen picks
 #cpus = ""         # leave to Xen to pick
 #cpus = "0"        # all vcpus run on CPU0

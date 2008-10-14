@@ -862,7 +862,7 @@ def configure_hvm(config_image, vals):
              'sdl', 'display', 'xauthority', 'rtc_timeoffset', 'monitor',
              'acpi', 'apic', 'usb', 'usbdevice', 'keymap', 'pci', 'hpet',
              'guest_os_type', 'hap', 'opengl', 'cpuid', 'cpuid_check',
-             'viridian' ]
+             'viridian', 'xen_extended_power_mgmt' ]
 
     for a in args:
         if a in vals.__dict__ and vals.__dict__[a] is not None:

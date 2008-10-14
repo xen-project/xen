@@ -30,10 +30,10 @@ CFLAGS += -I. -I.. $(CFLAGS_include)
 vpath iasl $(PATH)
 all: acpi.a
 
-ssdt_tpm.h: ssdt_tpm.asl
+ssdt_pm.h ssdt_tpm.h: %.h: %.asl
 	$(MAKE) iasl
-	iasl -tc ssdt_tpm.asl
-	mv ssdt_tpm.hex ssdt_tpm.h
+	iasl -tc $<
+	mv $*.hex $@
 	rm -f *.aml
 
 dsdt.c: dsdt.asl

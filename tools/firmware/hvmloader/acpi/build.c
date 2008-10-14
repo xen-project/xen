@@ -18,6 +18,7 @@
 
 #include "acpi2_0.h"
 #include "ssdt_tpm.h"
+#include "ssdt_pm.h"
 #include "../config.h"
 #include "../util.h"
 
@@ -66,6 +67,11 @@ static int hpet_exists(unsigned long hpet_base)
 {
     uint32_t hpet_id = *(uint32_t *)hpet_base;
     return ((hpet_id >> 16) == 0x8086);
+}
+
+static uint8_t battery_port_exists(void)
+{
+    return (inb(0x88) == 0x1F);
 }
 
 static int construct_bios_info_table(uint8_t *buf)
@@ -208,6 +214,13 @@ static int construct_secondary_tables(uint8_t *buf, unsigned long *table_ptrs)
         hpet = (struct acpi_20_hpet *)&buf[offset];
         offset += construct_hpet(hpet);
         table_ptrs[nr_tables++] = (unsigned long)hpet;
+    }
+
+    if ( battery_port_exists() ) 
+    {
+        table_ptrs[nr_tables++] = (unsigned long)&buf[offset];
+        memcpy(&buf[offset], AmlCode_PM, sizeof(AmlCode_PM));
+        offset += align16(sizeof(AmlCode_PM));
     }
 
     /* TPM TCPA and SSDT. */

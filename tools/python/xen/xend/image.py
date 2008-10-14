@@ -250,6 +250,14 @@ class ImageHandler:
     def parseDeviceModelArgs(self, vmConfig):
         ret = ["-domain-name", str(self.vm.info['name_label'])]
 
+        xen_extended_power_mgmt = int(vmConfig['platform'].get(
+            'xen_extended_power_mgmt', 0))
+        if xen_extended_power_mgmt != 0:
+             xstransact.Store("/local/domain/0/device-model/%i"
+                              % self.vm.getDomid(),
+                              ('xen_extended_power_mgmt',
+                               xen_extended_power_mgmt))
+
         # Find RFB console device, and if it exists, make QEMU enable
         # the VNC console.
         if int(vmConfig['platform'].get('nographic', 0)) != 0:
