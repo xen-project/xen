@@ -18,6 +18,8 @@ static inline struct iommu_ops *iommu_get_ops(void)
     default:
         BUG();
     }
+
+    return NULL;
 }
 
 static inline int iommu_hardware_setup(void)
@@ -31,5 +33,8 @@ static inline int iommu_hardware_setup(void)
     default:
         BUG();
     }
+
+    return 0;
 }
+
 #endif /* __ASM_X86_HVM_IOMMU_H__ */
