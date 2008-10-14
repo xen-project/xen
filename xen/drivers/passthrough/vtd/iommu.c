@@ -29,8 +29,6 @@
 #include <xen/pci.h>
 #include <xen/pci_regs.h>
 #include <xen/keyhandler.h>
-#include <asm/paging.h>
-#include <asm/msi.h>
 #include "iommu.h"
 #include "dmar.h"
 #include "extern.h"

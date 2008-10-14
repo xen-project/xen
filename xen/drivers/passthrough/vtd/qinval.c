@@ -24,7 +24,6 @@
 #include <xen/time.h>
 #include <xen/pci.h>
 #include <xen/pci_regs.h>
-#include <asm/msi.h>
 #include "iommu.h"
 #include "dmar.h"
 #include "vtd.h"

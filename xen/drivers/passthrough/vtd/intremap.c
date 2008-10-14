@@ -24,7 +24,6 @@
 #include <xen/time.h>
 #include <xen/pci.h>
 #include <xen/pci_regs.h>
-#include <asm/msi.h>
 #include "iommu.h"
 #include "dmar.h"
 #include "vtd.h"
@@ -269,6 +268,7 @@ void io_apic_write_remap_rte(
     *(IO_APIC_BASE(apic)+4) = *(((u32 *)&old_rte)+1);
 }
 
+#if defined(__i386__) || defined(__x86_64__)
 static int remap_entry_to_msi_msg(
     struct iommu *iommu, struct msi_msg *msg)
 {
@@ -452,6 +452,19 @@ void msi_msg_write_remap_rte(
 
     msi_msg_to_remap_entry(iommu, pdev, msg);
 }
+#elif defined(__ia64__)
+void msi_msg_read_remap_rte(
+    struct msi_desc *msi_desc, struct msi_msg *msg)
+{
+    /* TODO. */
+}
+
+void msi_msg_write_remap_rte(
+    struct msi_desc *msi_desc, struct msi_msg *msg)
+{
+    /* TODO. */
+}
+#endif
 
 int intremap_setup(struct iommu *iommu)
 {
