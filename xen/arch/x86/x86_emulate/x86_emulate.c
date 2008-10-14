@@ -31,13 +31,14 @@
 #define DstMem      (3<<1) /* Memory operand. */
 #define DstMask     (3<<1)
 /* Source operand type. */
-#define SrcNone     (0<<3) /* No source operand. */
-#define SrcImplicit (0<<3) /* Source operand is implicit in the opcode. */
-#define SrcReg      (1<<3) /* Register operand. */
-#define SrcMem      (2<<3) /* Memory operand. */
-#define SrcMem16    (3<<3) /* Memory operand (16-bit). */
-#define SrcImm      (4<<3) /* Immediate operand. */
-#define SrcImmByte  (5<<3) /* 8-bit sign-extended immediate operand. */
+#define SrcInvalid  (0<<3) /* Unimplemented opcode. */
+#define SrcNone     (1<<3) /* No source operand. */
+#define SrcImplicit (1<<3) /* Source operand is implicit in the opcode. */
+#define SrcReg      (2<<3) /* Register operand. */
+#define SrcMem      (3<<3) /* Memory operand. */
+#define SrcMem16    (4<<3) /* Memory operand (16-bit). */
+#define SrcImm      (5<<3) /* Immediate operand. */
+#define SrcImmByte  (6<<3) /* 8-bit sign-extended immediate operand. */
 #define SrcMask     (7<<3)
 /* Generic ModRM decode. */
 #define ModRM       (1<<6)
