@@ -111,26 +111,37 @@ unsigned long alloc_xen_mmio(unsigned long len)
 
 #ifndef __ia64__
 
-static int init_hypercall_stubs(void)
+static uint32_t xen_cpuid_base(void)
 {
-	uint32_t eax, ebx, ecx, edx, pages, msr, i;
+	uint32_t base, eax, ebx, ecx, edx;
 	char signature[13];
 
-	cpuid(0x40000000, &eax, &ebx, &ecx, &edx);
-	*(uint32_t*)(signature + 0) = ebx;
-	*(uint32_t*)(signature + 4) = ecx;
-	*(uint32_t*)(signature + 8) = edx;
-	signature[12] = 0;
+	for (base = 0x40000000; base < 0x40001000; base += 0x100) {
+		cpuid(base, &eax, &ebx, &ecx, &edx);
+		*(uint32_t*)(signature + 0) = ebx;
+		*(uint32_t*)(signature + 4) = ecx;
+		*(uint32_t*)(signature + 8) = edx;
+		signature[12] = 0;
 
-	if (strcmp("XenVMMXenVMM", signature) || (eax < 0x40000002)) {
+		if (!strcmp("XenVMMXenVMM", signature) && ((eax - base) >= 2))
+			return base;
+	}
+
+	return 0;
+}
+
+static int init_hypercall_stubs(void)
+{
+	uint32_t eax, ebx, ecx, edx, pages, msr, i, base;
+
+	base = xen_cpuid_base();
+	if (base == 0) {
 		printk(KERN_WARNING
-		       "Detected Xen platform device but not Xen VMM?"
-		       " (sig %s, eax %x)\n",
-		       signature, eax);
+		       "Detected Xen platform device but not Xen VMM?\n");
 		return -EINVAL;
 	}
 
-	cpuid(0x40000001, &eax, &ebx, &ecx, &edx);
+	cpuid(base + 1, &eax, &ebx, &ecx, &edx);
 
 	printk(KERN_INFO "Xen version %d.%d.\n", eax >> 16, eax & 0xffff);
 
@@ -138,7 +149,7 @@ static int init_hypercall_stubs(void)
 	 * Find largest supported number of hypercall pages.
 	 * We'll create as many as possible up to this number.
 	 */
-	cpuid(0x40000002, &pages, &msr, &ecx, &edx);
+	cpuid(base + 2, &pages, &msr, &ecx, &edx);
 
 	/*
 	 * Use __vmalloc() because vmalloc_exec() is not an exported symbol.
@@ -174,18 +185,12 @@ static int init_hypercall_stubs(void)
 
 static void resume_hypercall_stubs(void)
 {
-	uint32_t eax, ebx, ecx, edx, pages, msr, i;
-	char signature[13];
+	uint32_t base, ecx, edx, pages, msr, i;
 
-	cpuid(0x40000000, &eax, &ebx, &ecx, &edx);
-	*(uint32_t*)(signature + 0) = ebx;
-	*(uint32_t*)(signature + 4) = ecx;
-	*(uint32_t*)(signature + 8) = edx;
-	signature[12] = 0;
+	base = xen_cpuid_base();
+	BUG_ON(base == 0);
 
-	BUG_ON(strcmp("XenVMMXenVMM", signature) || (eax < 0x40000002));
-
-	cpuid(0x40000002, &pages, &msr, &ecx, &edx);
+	cpuid(base + 2, &pages, &msr, &ecx, &edx);
 
 	if (pages > max_hypercall_stub_pages)
 		pages = max_hypercall_stub_pages;

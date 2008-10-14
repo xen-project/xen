@@ -417,7 +417,7 @@ void vlapic_EOI_set(struct vlapic *vlapic)
     hvm_dpci_msi_eoi(current->domain, vector);
 }
 
-static int vlapic_ipi(
+int vlapic_ipi(
     struct vlapic *vlapic, uint32_t icr_low, uint32_t icr_high)
 {
     unsigned int dest =         GET_xAPIC_DEST_FIELD(icr_high);

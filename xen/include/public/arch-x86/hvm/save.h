@@ -421,9 +421,20 @@ struct hvm_hw_mtrr {
 
 DECLARE_HVM_SAVE_TYPE(MTRR, 14, struct hvm_hw_mtrr);
 
+/*
+ * Viridian hypervisor context.
+ */
+
+struct hvm_viridian_context {
+    uint64_t hypercall_gpa;
+    uint64_t guest_os_id;
+};
+
+DECLARE_HVM_SAVE_TYPE(VIRIDIAN, 15, struct hvm_viridian_context);
+
 /* 
  * Largest type-code in use
  */
-#define HVM_SAVE_CODE_MAX 14
+#define HVM_SAVE_CODE_MAX 15
 
 #endif /* __XEN_PUBLIC_HVM_SAVE_X86_H__ */

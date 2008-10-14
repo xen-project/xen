@@ -218,6 +218,11 @@ gopts.var('timer_mode', val='TIMER_MODE',
           use="""Timer mode (0=delay virtual time when ticks are missed;
           1=virtual time is always wallclock time.""")
 
+gopts.var('viridian', val='VIRIDIAN',
+          fn=set_int, default=0,
+          use="""Expose Viridian interface to x86 HVM guest?
+          (Default is 0).""")
+
 gopts.var('acpi', val='ACPI',
           fn=set_int, default=1,
           use="Disable or enable ACPI of HVM domain.")
@@ -856,7 +861,8 @@ def configure_hvm(config_image, vals):
              'vnc', 'vncdisplay', 'vncunused', 'vncconsole', 'vnclisten',
              'sdl', 'display', 'xauthority', 'rtc_timeoffset', 'monitor',
              'acpi', 'apic', 'usb', 'usbdevice', 'keymap', 'pci', 'hpet',
-             'guest_os_type', 'hap', 'opengl', 'cpuid', 'cpuid_check']
+             'guest_os_type', 'hap', 'opengl', 'cpuid', 'cpuid_check',
+             'viridian' ]
 
     for a in args:
         if a in vals.__dict__ and vals.__dict__[a] is not None:

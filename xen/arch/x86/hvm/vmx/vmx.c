@@ -1677,7 +1677,8 @@ static int vmx_msr_read_intercept(struct cpu_user_regs *regs)
             break;
         }
 
-        if ( rdmsr_hypervisor_regs(ecx, &eax, &edx) ||
+        if ( rdmsr_viridian_regs(ecx, &eax, &edx) ||
+             rdmsr_hypervisor_regs(ecx, &eax, &edx) ||
              rdmsr_safe(ecx, eax, edx) == 0 )
         {
             regs->eax = eax;
@@ -1852,6 +1853,10 @@ static int vmx_msr_write_intercept(struct cpu_user_regs *regs)
     default:
         if ( vpmu_do_wrmsr(regs) )
             return X86EMUL_OKAY;
+
+        if ( wrmsr_viridian_regs(ecx, regs->eax, regs->edx) ) 
+            break;
+
         switch ( long_mode_do_msr_write(regs) )
         {
             case HNDL_unhandled:

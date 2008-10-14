@@ -2078,6 +2078,11 @@ class XendDomainInfo:
             xc.hvm_set_param(self.domid, HVM_PARAM_TIMER_MODE,
                              long(timer_mode))
 
+        # Set Viridian interface configuration of domain
+        viridian = self.info["platform"].get("viridian")
+        if arch.type == "x86" and hvm and viridian is not None:
+            xc.hvm_set_param(self.domid, HVM_PARAM_VIRIDIAN, long(viridian))
+
         # Optionally enable virtual HPET
         hpet = self.info["platform"].get("hpet")
         if hvm and hpet is not None:

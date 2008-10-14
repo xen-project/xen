@@ -577,7 +577,11 @@ DO_ERROR_NOCODE(TRAP_simd_error,      simd_coprocessor_error)
 int rdmsr_hypervisor_regs(
     uint32_t idx, uint32_t *eax, uint32_t *edx)
 {
-    idx -= 0x40000000;
+    struct domain *d = current->domain;
+    /* Optionally shift out of the way of Viridian architectural MSRs. */
+    uint32_t base = is_viridian_domain(d) ? 0x40000200 : 0x40000000;
+
+    idx -= base;
     if ( idx > 0 )
         return 0;
 
@@ -599,8 +603,10 @@ int wrmsr_hypervisor_regs(
     uint32_t idx, uint32_t eax, uint32_t edx)
 {
     struct domain *d = current->domain;
+    /* Optionally shift out of the way of Viridian architectural MSRs. */
+    uint32_t base = is_viridian_domain(d) ? 0x40000200 : 0x40000000;
 
-    idx -= 0x40000000;
+    idx -= base;
     if ( idx > 0 )
         return 0;
 
@@ -628,7 +634,7 @@ int wrmsr_hypervisor_regs(
         {
             gdprintk(XENLOG_WARNING,
                      "Bad GMFN %lx (MFN %lx) to MSR %08x\n",
-                     gmfn, mfn, 0x40000000);
+                     gmfn, mfn, base + idx);
             return 0;
         }
 
@@ -650,14 +656,18 @@ int wrmsr_hypervisor_regs(
 int cpuid_hypervisor_leaves(
     uint32_t idx, uint32_t *eax, uint32_t *ebx, uint32_t *ecx, uint32_t *edx)
 {
-    idx -= 0x40000000;
-    if ( idx > 2 )
+    struct domain *d = current->domain;
+    /* Optionally shift out of the way of Viridian architectural leaves. */
+    uint32_t base = is_viridian_domain(d) ? 0x40000100 : 0x40000000;
+
+    idx -= base;
+    if ( idx > 2 ) 
         return 0;
 
     switch ( idx )
     {
     case 0:
-        *eax = 0x40000002; /* Largest leaf */
+        *eax = base + 2; /* Largest leaf */
         *ebx = XEN_CPUID_SIGNATURE_EBX;
         *ecx = XEN_CPUID_SIGNATURE_ECX;
         *edx = XEN_CPUID_SIGNATURE_EDX;
@@ -673,6 +683,8 @@ int cpuid_hypervisor_leaves(
     case 2:
         *eax = 1;          /* Number of hypercall-transfer pages */
         *ebx = 0x40000000; /* MSR base address */
+        if ( is_viridian_domain(d) )
+            *ebx = 0x40000200;
         *ecx = 0;          /* Features 1 */
         *edx = 0;          /* Features 2 */
         if ( !is_hvm_vcpu(current) )

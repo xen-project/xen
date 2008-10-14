@@ -219,6 +219,9 @@ hvm_set_segment_register(struct vcpu *v, enum x86_segment seg,
     hvm_funcs.set_segment_register(v, seg, reg);
 }
 
+#define is_viridian_domain(_d)                                             \
+ (is_hvm_domain(_d) && ((_d)->arch.hvm_domain.params[HVM_PARAM_VIRIDIAN]))
+
 void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
                                    unsigned int *ecx, unsigned int *edx);
 void hvm_migrate_timers(struct vcpu *v);

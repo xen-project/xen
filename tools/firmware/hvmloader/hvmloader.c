@@ -101,30 +101,36 @@ asm (
 
 static enum { VGA_none, VGA_std, VGA_cirrus } virtual_vga = VGA_none;
 
-static void
-init_hypercalls(void)
+static void init_hypercalls(void)
 {
     uint32_t eax, ebx, ecx, edx;
     unsigned long i;
     char signature[13];
     xen_extraversion_t extraversion;
+    uint32_t base;
 
-    cpuid(0x40000000, &eax, &ebx, &ecx, &edx);
+    for ( base = 0x40000000; base < 0x40001000; base += 0x100 )
+    {
+        cpuid(base, &eax, &ebx, &ecx, &edx);
 
-    *(uint32_t *)(signature + 0) = ebx;
-    *(uint32_t *)(signature + 4) = ecx;
-    *(uint32_t *)(signature + 8) = edx;
-    signature[12] = '\0';
+        *(uint32_t *)(signature + 0) = ebx;
+        *(uint32_t *)(signature + 4) = ecx;
+        *(uint32_t *)(signature + 8) = edx;
+        signature[12] = '\0';
 
-    BUG_ON(strcmp("XenVMMXenVMM", signature) || (eax < 0x40000002));
+        if ( !strcmp("XenVMMXenVMM", signature) )
+            break;
+    }
+
+    BUG_ON(strcmp("XenVMMXenVMM", signature) || ((eax - base) < 2));
 
     /* Fill in hypercall transfer pages. */
-    cpuid(0x40000002, &eax, &ebx, &ecx, &edx);
+    cpuid(base + 2, &eax, &ebx, &ecx, &edx);
     for ( i = 0; i < eax; i++ )
         wrmsr(ebx, HYPERCALL_PHYSICAL_ADDRESS + (i << 12) + i);
 
     /* Print version information. */
-    cpuid(0x40000001, &eax, &ebx, &ecx, &edx);
+    cpuid(base + 1, &eax, &ebx, &ecx, &edx);
     hypercall_xen_version(XENVER_extraversion, extraversion);
     printf("Detected Xen v%u.%u%s\n", eax >> 16, eax & 0xffff, extraversion);
 }

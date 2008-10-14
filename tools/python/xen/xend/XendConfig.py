@@ -155,6 +155,7 @@ XENAPI_PLATFORM_CFG_TYPES = {
     'vncdisplay': int,
     'vnclisten': str,
     'timer_mode': int,
+    'viridian': int,
     'vncpasswd': str,
     'vncunused': int,
     'xauthority': str,
@@ -442,6 +443,8 @@ class XendConfig(dict):
         if self.is_hvm():
             if 'timer_mode' not in self['platform']:
                 self['platform']['timer_mode'] = 1
+            if 'viridian' not in self['platform']:
+                self['platform']['viridian'] = 0
             if 'rtc_timeoffset' not in self['platform']:
                 self['platform']['rtc_timeoffset'] = 0
             if 'hpet' not in self['platform']:

@@ -28,6 +28,7 @@
 #include <asm/hvm/vioapic.h>
 #include <asm/hvm/io.h>
 #include <xen/hvm/iommu.h>
+#include <asm/hvm/viridian.h>
 #include <asm/hvm/vmx/vmcs.h>
 #include <asm/hvm/svm/vmcb.h>
 #include <public/hvm/params.h>
@@ -73,6 +74,8 @@ struct hvm_domain {
 
     /* Pass-through */
     struct hvm_iommu       hvm_iommu;
+
+    struct viridian_domain viridian;
 
     bool_t                 hap_enabled;
     bool_t                 qemu_mapcache_invalidate;

@@ -1005,7 +1005,8 @@ static int svm_msr_read_intercept(struct cpu_user_regs *regs)
         break;
 
     default:
-        if ( rdmsr_hypervisor_regs(ecx, &eax, &edx) ||
+        if ( rdmsr_viridian_regs(ecx, &eax, &edx) ||
+             rdmsr_hypervisor_regs(ecx, &eax, &edx) ||
              rdmsr_safe(ecx, eax, edx) == 0 )
         {
             regs->eax = eax;
@@ -1073,6 +1074,9 @@ static int svm_msr_write_intercept(struct cpu_user_regs *regs)
         break;
 
     default:
+        if ( wrmsr_viridian_regs(ecx, regs->eax, regs->edx) )
+            break;
+
         switch ( long_mode_do_msr_write(regs) )
         {
         case HNDL_unhandled:

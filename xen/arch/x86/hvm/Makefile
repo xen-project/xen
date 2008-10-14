@@ -18,3 +18,4 @@ obj-y += vpic.o
 obj-y += save.o
 obj-y += vmsi.o
 obj-y += stdvga.o
+obj-y += viridian.o

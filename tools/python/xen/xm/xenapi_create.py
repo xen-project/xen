@@ -969,6 +969,7 @@ class sxp2xml:
             'usbdevice',
             'hpet',
             'timer_mode',
+            'viridian',
             'vhpt',
             'guest_os_type',
             'hap',

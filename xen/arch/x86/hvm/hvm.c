@@ -1636,6 +1636,9 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
 {
     struct vcpu *v = current;
 
+    if ( cpuid_viridian_leaves(input, eax, ebx, ecx, edx) )
+        return;
+
     if ( cpuid_hypervisor_leaves(input, eax, ebx, ecx, edx) )
         return;
 
@@ -1953,6 +1956,9 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
     case 0:
         break;
     }
+
+    if ( (eax & 0x80000000) && is_viridian_domain(curr->domain) )
+        return viridian_hypercall(regs);
 
     if ( (eax >= NR_hypercalls) || !hvm_hypercall32_table[eax] )
     {
@@ -2378,6 +2384,10 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
                 break;
             case HVM_PARAM_TIMER_MODE:
                 if ( a.value > HVMPTM_one_missed_tick_pending )
+                    rc = -EINVAL;
+                break;
+            case HVM_PARAM_VIRIDIAN:
+                if ( a.value > 1 )
                     rc = -EINVAL;
                 break;
             case HVM_PARAM_IDENT_PT:

@@ -98,4 +98,8 @@ struct vlapic *apic_round_robin(
 
 int vlapic_match_logical_addr(struct vlapic *vlapic, uint8_t mda);
 
+void vlapic_EOI_set(struct vlapic *vlapic);
+
+int vlapic_ipi(struct vlapic *vlapic, uint32_t icr_low, uint32_t icr_high);
+
 #endif /* __ASM_X86_HVM_VLAPIC_H__ */
