@@ -346,7 +346,7 @@ static int flush_context_reg(
         cpu_relax();
     }
     spin_unlock_irqrestore(&iommu->register_lock, flag);
-    /* flush context entry will implictly flush write buffer */
+    /* flush context entry will implicitly flush write buffer */
     return 0;
 }
 
@@ -453,7 +453,7 @@ static int flush_iotlb_reg(void *_iommu, u16 did,
         dprintk(XENLOG_INFO VTDPREFIX,
                 "IOMMU: tlb flush request %x, actual %x\n",
                (u32)DMA_TLB_IIRG(type), (u32)DMA_TLB_IAIG(val));
-    /* flush context entry will implictly flush write buffer */
+    /* flush iotlb entry will implicitly flush write buffer */
     return 0;
 }
 
