@@ -364,6 +364,7 @@ static struct msi_desc* alloc_msi_entry(void)
 
     INIT_LIST_HEAD(&entry->list);
     entry->dev = NULL;
+    entry->remap_index = -1;
 
     return entry;
 }

@@ -328,7 +328,8 @@ static int remap_entry_to_msi_msg(
 }
 
 static int msi_msg_to_remap_entry(
-    struct iommu *iommu, struct pci_dev *pdev, struct msi_msg *msg)
+    struct iommu *iommu, struct pci_dev *pdev,
+    struct msi_desc *msi_desc, struct msi_msg *msg)
 {
     struct iremap_entry *iremap_entry = NULL, *iremap_entries;
     struct iremap_entry new_ire;
@@ -336,32 +337,18 @@ static int msi_msg_to_remap_entry(
     unsigned int index;
     unsigned long flags;
     struct ir_ctrl *ir_ctrl = iommu_ir_ctrl(iommu);
-    int i = 0;
 
     remap_rte = (struct msi_msg_remap_entry *) msg;
     spin_lock_irqsave(&ir_ctrl->iremap_lock, flags);
 
-    iremap_entries =
-        (struct iremap_entry *)map_vtd_domain_page(ir_ctrl->iremap_maddr);
-
-    /* If the entry for a PCI device has been there, use the old entry,
-     * Or, assign a new entry for it.
-     */
-    for ( i = 0; i <= ir_ctrl->iremap_index; i++ )
+    if ( msi_desc->remap_index < 0 )
     {
-        iremap_entry = &iremap_entries[i];
-        if ( iremap_entry->hi.sid ==
-             ((pdev->bus << 8) | pdev->devfn) )
-           break;
-    }
-
-    if ( i > ir_ctrl->iremap_index )
-    {
-    	ir_ctrl->iremap_index++;
+        ir_ctrl->iremap_index++;
         index = ir_ctrl->iremap_index;
+        msi_desc->remap_index = index;
     }
     else
-        index = i;
+        index = msi_desc->remap_index;
 
     if ( index > IREMAP_ENTRY_NR - 1 )
     {
@@ -369,11 +356,13 @@ static int msi_msg_to_remap_entry(
                 "%s: intremap index (%d) is larger than"
                 " the maximum index (%ld)!\n",
                 __func__, index, IREMAP_ENTRY_NR - 1);
-        unmap_vtd_domain_page(iremap_entries);
+        msi_desc->remap_index = -1;
         spin_unlock_irqrestore(&ir_ctrl->iremap_lock, flags);
         return -EFAULT;
     }
 
+    iremap_entries =
+        (struct iremap_entry *)map_vtd_domain_page(ir_ctrl->iremap_maddr);
     iremap_entry = &iremap_entries[index];
     memcpy(&new_ire, iremap_entry, sizeof(struct iremap_entry));
 
@@ -450,7 +439,7 @@ void msi_msg_write_remap_rte(
     if ( !iommu || !ir_ctrl || ir_ctrl->iremap_maddr == 0 )
         return;
 
-    msi_msg_to_remap_entry(iommu, pdev, msg);
+    msi_msg_to_remap_entry(iommu, pdev, msi_desc, msg);
 }
 #elif defined(__ia64__)
 void msi_msg_read_remap_rte(
