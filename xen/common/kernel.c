@@ -75,8 +75,7 @@ void cmdline_parse(char *cmdline)
                 strlcpy(param->var, optval, param->len);
                 break;
             case OPT_UINT:
-                *(unsigned int *)param->var =
-                    simple_strtol(optval, (const char **)&optval, 0);
+                *(unsigned int *)param->var = simple_strtol(optval, NULL, 0);
                 break;
             case OPT_BOOL:
             case OPT_INVBOOL:
