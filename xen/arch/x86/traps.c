@@ -710,7 +710,7 @@ static void pv_cpuid(struct cpu_user_regs *regs)
     if ( current->domain->domain_id != 0 )
     {
         if ( !cpuid_hypervisor_leaves(a, &a, &b, &c, &d) )
-            domain_cpuid(current->domain, a, b, &a, &b, &c, &d);
+            domain_cpuid(current->domain, a, c, &a, &b, &c, &d);
         goto out;
     }
 
