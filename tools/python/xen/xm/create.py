@@ -583,6 +583,10 @@ gopts.var('machine_address_size', val='BITS',
           fn=set_int, default=None,
           use="""Maximum machine address size""")
 
+gopts.var('suppress_spurious_page_faults', val='yes|no',
+          fn=set_bool, default=None,
+          use="""Do not inject spurious page faults into this guest""")
+
 def err(msg):
     """Print an error to stderr and exit.
     """
@@ -633,6 +637,9 @@ def configure_image(vals):
 
     if vals.machine_address_size:
         config_image.append(['machine_address_size', vals.machine_address_size])
+
+    if vals.suppress_spurious_page_faults:
+        config_image.append(['suppress_spurious_page_faults', vals.suppress_spurious_page_faults])
 
     return config_image
     
@@ -887,7 +894,7 @@ def make_config(vals):
                    'restart', 'on_poweroff',
                    'on_reboot', 'on_crash', 'vcpus', 'vcpu_avail', 'features',
                    'on_xend_start', 'on_xend_stop', 'target', 'cpuid',
-                   'cpuid_check', 'machine_address_size'])
+                   'cpuid_check', 'machine_address_size', 'suppress_spurious_page_faults'])
 
     if vals.uuid is not None:
         config.append(['uuid', vals.uuid])

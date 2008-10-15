@@ -614,6 +614,10 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_subscribe_t);
 #define XEN_DOMCTL_set_machine_address_size  51
 #define XEN_DOMCTL_get_machine_address_size  52
 
+/*
+ * Do not inject spurious page faults into this domain.
+ */
+#define XEN_DOMCTL_suppress_spurious_page_faults 53
 
 struct xen_domctl {
     uint32_t cmd;

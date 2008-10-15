@@ -2241,6 +2241,10 @@ class XendDomainInfo:
             if self.info.has_key('machine_address_size'):
                 log.debug("_initDomain: setting maximum machine address size %d" % self.info['machine_address_size'])
                 xc.domain_set_machine_address_size(self.domid, self.info['machine_address_size'])
+
+            if self.info.has_key('suppress_spurious_page_faults') and self.info['suppress_spurious_page_faults']:
+                log.debug("_initDomain: suppressing spurious page faults")
+                xc.domain_suppress_spurious_page_faults(self.domid)
                 
             self._createChannels()
 

@@ -1242,6 +1242,10 @@ asmlinkage void do_page_fault(struct cpu_user_regs *regs)
               regs->error_code, _p(addr));
     }
 
+    if ( unlikely(current->domain->arch.suppress_spurious_page_faults
+                  && spurious_page_fault(addr, regs)) )
+        return;
+
     propagate_page_fault(addr, regs->error_code);
 }
 

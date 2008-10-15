@@ -1028,6 +1028,21 @@ long arch_do_domctl(
     }
     break;
 
+    case XEN_DOMCTL_suppress_spurious_page_faults:
+    {
+        struct domain *d;
+
+        ret = -ESRCH;
+        d = rcu_lock_domain_by_id(domctl->domain);
+        if ( d != NULL )
+        {
+            d->arch.suppress_spurious_page_faults = 1;
+            rcu_unlock_domain(d);
+            ret = 0;
+        }
+    }
+    break;
+
     default:
         ret = -ENOSYS;
         break;

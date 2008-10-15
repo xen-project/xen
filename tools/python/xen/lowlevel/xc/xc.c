@@ -859,6 +859,21 @@ static PyObject *pyxc_dom_set_machine_address_size(XcObject *self,
     return zero;
 }
 
+static PyObject *pyxc_dom_suppress_spurious_page_faults(XcObject *self,
+						      PyObject *args,
+						      PyObject *kwds)
+{
+    uint32_t dom;
+
+    if (!PyArg_ParseTuple(args, "i", &dom))
+	return NULL;
+
+    if (xc_domain_suppress_spurious_page_faults(self->xc_handle, dom) != 0)
+	return pyxc_error_to_exception();
+
+    Py_INCREF(zero);
+    return zero;
+}
 #endif /* __i386__ || __x86_64__ */
 
 static PyObject *pyxc_hvm_build(XcObject *self,
@@ -1911,6 +1926,12 @@ static PyMethodDef pyxc_methods[] = {
       "Set maximum machine address size for this domain.\n"
       " dom [int]: Identifier of domain.\n"
       " width [int]: Maximum machine address width.\n" },
+
+    { "domain_suppress_spurious_page_faults",
+      (PyCFunction)pyxc_dom_suppress_spurious_page_faults,
+      METH_VARARGS, "\n"
+      "Do not propagate spurious page faults to this guest.\n"
+      " dom [int]: Identifier of domain.\n" },
 #endif
 
     { NULL, NULL, 0, NULL }

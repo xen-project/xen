@@ -250,6 +250,8 @@ struct arch_domain
     bool_t is_32bit_pv;
     /* Is shared-info page in 32-bit format? */
     bool_t has_32bit_shinfo;
+    /* Domain cannot handle spurious page faults? */
+    bool_t suppress_spurious_page_faults;
 
     /* Continuable domain_relinquish_resources(). */
     enum {
