@@ -2235,12 +2235,34 @@ def vscsi_convert_sxp_to_dict(dev_sxp):
     return dev_dict
 
 def xm_scsi_list(args):
-    xenapi_unsupported()
     (use_long, params) = arg_check_for_resource_list(args, "scsi-list")
 
     dom = params[0]
 
-    devs = server.xend.domain.getDeviceSxprs(dom, 'vscsi')
+    devs = []
+    if serverType == SERVER_XEN_API:
+
+        dscsi_refs = server.xenapi.VM.get_DSCSIs(get_single_vm(dom))
+        dscsi_properties = \
+            map(server.xenapi.DSCSI.get_runtime_properties, dscsi_refs)
+        dscsi_dict = {}
+        for dscsi_property in dscsi_properties:
+            devid = int(dscsi_property['dev']['devid'])
+            try:
+                dscsi_sxp = dscsi_dict[devid]
+            except:
+                dscsi_sxp = [['devs', []]]
+                for key, value in dscsi_property.items():
+                    if key != 'dev':
+                        dscsi_sxp.append([key, value])
+            dev_sxp = ['dev']
+            dev_sxp.extend(map2sxp(dscsi_property['dev']))
+            dscsi_sxp[0][1].append(dev_sxp)
+            dscsi_dict[devid] = dscsi_sxp
+        devs = map2sxp(dscsi_dict)
+
+    else:
+        devs = server.xend.domain.getDeviceSxprs(dom, 'vscsi')
 
     if use_long:
         map(PrettyPrint.prettyprint, devs)
@@ -2464,37 +2486,60 @@ def xm_pci_attach(args):
     else:
         server.xend.domain.device_configure(dom, pci)
 
+def parse_scsi_configuration(p_scsi, v_hctl, state):
+    v = v_hctl.split(':')
+    if len(v) != 4:
+        raise OptionError("Invalid argument: %s" % v_hctl)
+
+    if p_scsi is not None:
+        (p_hctl, block) = vscsi_util.vscsi_search_hctl_and_block(p_scsi)
+        if p_hctl == None:
+            raise OptionError("Cannot find device '%s'" % p_scsi)
+    else:
+        p_hctl = ''
+        block = ''
+
+    scsi = ['vscsi']
+    scsi.append(['dev', \
+                 ['state', state], \
+                 ['devid', int(v[0])], \
+                 ['p-dev', p_hctl], \
+                 ['p-devname', block], \
+                 ['v-dev', v_hctl] \
+               ])
+
+    return scsi
+
 def xm_scsi_attach(args):
-    xenapi_unsupported()
-
     arg_check(args, 'scsi-attach', 3, 4)
-    p_devname = args[1]
-    v_dev = args[2]
-
-    v_hctl = v_dev.split(':')
-    if len(v_hctl) != 4:
-        raise OptionError("Invalid argument: %s" % v_dev)
-
-    (p_hctl, block) = vscsi_util.vscsi_search_hctl_and_block(p_devname)
-
-    if p_hctl == None:
-        raise OptionError("Cannot find device \"%s\"" % p_devname)
-
     dom = args[0]
-    vscsi = ['vscsi']
-    vscsi.append(['dev', \
-                ['state', 'Initialising'], \
-                ['devid', v_hctl[0]], \
-                ['p-dev', p_hctl], \
-                ['p-devname', block], \
-                ['v-dev', v_dev] ])
+    p_scsi = args[1]
+    v_hctl = args[2]
+    scsi = parse_scsi_configuration(p_scsi, v_hctl, 'Initialising')
 
-    if len(args) == 4:
-        vscsi.append(['backend', args[3]])
+    if serverType == SERVER_XEN_API:
 
-    vscsi.append(['state', 'Initialising'])
-    vscsi.append(['devid', v_hctl[0]])
-    server.xend.domain.device_configure(dom, vscsi)
+        scsi_dev = sxp.children(scsi, 'dev')[0]
+        p_hctl = sxp.child_value(scsi_dev, 'p-dev')
+        target_ref = None
+        for pscsi_ref in server.xenapi.PSCSI.get_all():
+            if p_hctl == server.xenapi.PSCSI.get_physical_HCTL(pscsi_ref):
+                target_ref = pscsi_ref
+                break
+        if target_ref is None:
+            raise OptionError("Cannot find device '%s'" % p_scsi)
+
+        dscsi_record = {
+            "VM":           get_single_vm(dom),
+            "PSCSI":        target_ref,
+            "virtual_HCTL": v_hctl
+        }
+        server.xenapi.DSCSI.create(dscsi_record)
+
+    else:
+        if len(args) == 4:
+            scsi.append(['backend', args[3]])
+        server.xend.domain.device_configure(dom, scsi)
 
 def detach(args, deviceClass):
     rm_cfg = True
@@ -2587,26 +2632,25 @@ def xm_pci_detach(args):
         server.xend.domain.device_configure(dom, pci)
 
 def xm_scsi_detach(args):
-    xenapi_unsupported()
     arg_check(args, 'scsi-detach', 2)
-
-    v_dev = args[1]
-    v_hctl = v_dev.split(':')
-    if len(v_hctl) != 4:
-        raise OptionError("Invalid argument: %s" % v_dev)
-
     dom = args[0]
-    vscsi = ['vscsi']
-    vscsi.append(['dev', \
-                ['state', 'Closing'], \
-                ['devid', v_hctl[0]], \
-                ['p-dev', ''], \
-                ['p-devname', ''], \
-                ['v-dev', v_dev] ])
+    v_hctl = args[1]
+    scsi = parse_scsi_configuration(None, v_hctl, 'Closing')
 
-    vscsi.append(['state', 'Closing'])
-    vscsi.append(['devid', v_hctl[0]])
-    server.xend.domain.device_configure(dom, vscsi)
+    if serverType == SERVER_XEN_API:
+
+        target_ref = None
+        for dscsi_ref in server.xenapi.VM.get_DSCSIs(get_single_vm(dom)):
+            if v_hctl == server.xenapi.DSCSI.get_virtual_HCTL(dscsi_ref):
+                target_ref = dscsi_ref
+                break
+        if target_ref is None:
+            raise OptionError("Device %s not assigned" % v_hctl)
+
+        server.xenapi.DSCSI.destroy(target_ref)
+
+    else:
+        server.xend.domain.device_configure(dom, scsi)
 
 def xm_vnet_list(args):
     xenapi_unsupported()

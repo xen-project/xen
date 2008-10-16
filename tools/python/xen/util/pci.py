@@ -12,8 +12,8 @@ import re
 import types
 import struct
 import time
+from xen.util import utils
 
-PROC_MNT_PATH = '/proc/mounts'
 PROC_PCI_PATH = '/proc/bus/pci/devices'
 PROC_PCI_NUM_RESOURCES = 7
 
@@ -97,9 +97,6 @@ MSIX_SIZE_MASK = 0x7ff
 # Global variable to store information from lspci
 lspci_info = None
 
-# Global variable to store the sysfs mount point
-sysfs_mnt_point = None
-
 #Calculate PAGE_SHIFT: number of bits to shift an address to get the page number
 PAGE_SIZE = resource.getpagesize()
 PAGE_SHIFT = 0
@@ -141,20 +138,8 @@ def parse_pci_name(pci_name_string):
  
 
 def find_sysfs_mnt():
-    global sysfs_mnt_point
-    if not sysfs_mnt_point is None:
-        return sysfs_mnt_point
-
     try:
-        mounts_file = open(PROC_MNT_PATH,'r')
-
-        for line in mounts_file:
-            sline = line.split()
-            if len(sline)<3:
-                continue
-            if sline[2]=='sysfs':
-                sysfs_mnt_point= sline[1]
-                return sysfs_mnt_point
+        return utils.find_sysfs_mount()
     except IOError, (errno, strerr):
         raise PciDeviceParseError(('Failed to locate sysfs mount: %s: %s (%d)'%
             (PROC_PCI_PATH, strerr, errno)))

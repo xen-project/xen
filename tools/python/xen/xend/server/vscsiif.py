@@ -125,10 +125,10 @@ class VSCSIController(DevController):
             state = self.readBackend(devid, devpath + '/state')
             localdevid = self.readBackend(devid, devpath + '/devid')
             dev_dict = {'p-dev': pdev,
-                            'p-devname': pdevname,
-                            'v-dev': pdevname,
-                            'state': state,
-                            'devid': localdevid }
+                        'p-devname': pdevname,
+                        'v-dev': vdev,
+                        'state': state,
+                        'devid': localdevid }
             vscsi_devs.append(dev_dict)
 
         config['devs'] = vscsi_devs
@@ -168,17 +168,17 @@ class VSCSIController(DevController):
         (devid, back, front) = self.getDeviceDetails(config)
         devid = int(devid)
         vscsi_config = config['devs'][0]
-        states = config.get('states', [])
+        state = vscsi_config.get('state', '')
         driver_state = self.readBackend(devid, 'state')
         if str(xenbusState['Connected']) != driver_state:
             raise VmError("Driver status is not connected")
 
         uuid = self.readBackend(devid, 'uuid')
-        if states[0] == 'Initialising':
+        if state == 'Initialising':
             back['uuid'] = uuid
             self.writeBackend(devid, back)
 
-        elif states[0] == 'Closing':
+        elif state == 'Closing':
             found = False
             devs = self.readBackendList(devid, "vscsi-devs")
             vscsipath = "vscsi-devs/"
@@ -197,8 +197,8 @@ class VSCSIController(DevController):
                 raise VmError("Device %s not connected" % vdev)
 
         else:
-            raise XendError('Error configuring device invalid state %s'
-                                % state)
+            raise XendError("Error configuring device invalid "
+                            "state '%s'" % state)
 
         self.writeBackend(devid, 'state', str(xenbusState['Reconfiguring']))
         return self.readBackend(devid, 'uuid')

@@ -22,6 +22,7 @@ import xen.lowlevel.xc
 
 from xen.util import Brctl
 from xen.util import pci as PciUtil
+from xen.util import vscsi_util
 from xen.xend import XendAPIStore
 from xen.xend import osdep
 
@@ -38,7 +39,8 @@ from XendNetwork import *
 from XendStateStore import XendStateStore
 from XendMonitor import XendMonitor
 from XendPPCI import XendPPCI
-     
+from XendPSCSI import XendPSCSI
+
 class XendNode:
     """XendNode - Represents a Domain 0 Host."""
     
@@ -53,6 +55,7 @@ class XendNode:
         * network
         * Storage Repository
         * PPCI
+        * PSCSI
         """
         
         self.xc = xen.lowlevel.xc.xc()
@@ -269,6 +272,24 @@ class XendNode:
             XendPPCI(ppci_uuid, ppci_record)
 
 
+        # Initialise PSCSIs
+        saved_pscsis = self.state_store.load_state('pscsi')
+        saved_pscsi_table = {}
+        if saved_pscsis:
+            for pscsi_uuid, pscsi_record in saved_pscsis.items():
+                try:
+                    saved_pscsi_table[pscsi_record['scsi_id']] = pscsi_uuid
+                except KeyError:
+                    pass
+
+        for pscsi_record in vscsi_util.get_all_scsi_devices():
+            if pscsi_record['scsi_id']:
+                # If saved uuid exists, use it. Otherwise create one.
+                pscsi_uuid = saved_pscsi_table.get(pscsi_record['scsi_id'],
+                                                   uuid.createString())
+                XendPSCSI(pscsi_uuid, pscsi_record)
+
+
 ##    def network_destroy(self, net_uuid):
  ##       del self.networks[net_uuid]
   ##      self.save_networks()
@@ -320,6 +341,15 @@ class XendNode:
         return None
 
 
+    def get_PSCSI_refs(self):
+        return XendPSCSI.get_all()
+
+    def get_pscsi_by_uuid(self, pscsi_uuid):
+        if pscsi_uuid in self.get_PSCSI_refs():
+            return pscsi_uuid
+        return None
+
+
     def save(self):
         # save state
         host_record = {self.uuid: {'name_label':self.name,
@@ -333,6 +363,7 @@ class XendNode:
         self.save_PBDs()
         self.save_SRs()
         self.save_PPCIs()
+        self.save_PSCSIs()
 
     def save_PIFs(self):
         pif_records = dict([(pif_uuid, XendAPIStore.get(
@@ -362,6 +393,12 @@ class XendNode:
                                  ppci_uuid, "PPCI").get_record())
                             for ppci_uuid in XendPPCI.get_all()])
         self.state_store.save_state('ppci', ppci_records)
+
+    def save_PSCSIs(self):
+        pscsi_records = dict([(pscsi_uuid, XendAPIStore.get(
+                                  pscsi_uuid, "PSCSI").get_record())
+                            for pscsi_uuid in XendPSCSI.get_all()])
+        self.state_store.save_state('pscsi', pscsi_records)
 
     def shutdown(self):
         return 0

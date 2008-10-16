@@ -48,3 +48,29 @@ def daemonize(prog, args, stdin_tmpfile=None):
     os.waitpid(pid, 0)
     return daemon_pid
 
+# Global variable to store the sysfs mount point
+sysfs_mount_point = None
+
+PROC_MOUNTS_PATH = '/proc/mounts'
+
+def find_sysfs_mount():
+    global sysfs_mount_point
+
+    if not sysfs_mount_point is None:
+        return sysfs_mount_point
+
+    try:
+        mounts_file = open(PROC_MOUNTS_PATH, 'r')
+
+        for line in mounts_file:
+            sline = line.split()
+            if len(sline) < 3:
+                continue
+            if sline[2] == 'sysfs':
+                sysfs_mount_point= sline[1]
+                return sysfs_mount_point
+    except IOError, (errno, strerr):
+        raise
+
+    return None
+

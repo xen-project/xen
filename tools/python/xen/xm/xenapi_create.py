@@ -375,6 +375,12 @@ class xenapi_create:
 
             self.create_pcis(vm_ref, pcis)
 
+            # Now create scsis
+
+            scsis = vm.getElementsByTagName("vscsi")
+
+            self.create_scsis(vm_ref, scsis)
+
             return vm_ref
         except:
             server.xenapi.VM.destroy(vm_ref)
@@ -532,6 +538,33 @@ class xenapi_create:
 
         return server.xenapi.DPCI.create(dpci_record)
 
+    def create_scsis(self, vm_ref, scsis):
+        log(DEBUG, "create_scsis")
+        return map(lambda scsi: self.create_scsi(vm_ref, scsi), scsis)
+
+    def create_scsi(self, vm_ref, scsi):
+        log(DEBUG, "create_scsi")
+
+        target_ref = None
+        for pscsi_ref in server.xenapi.PSCSI.get_all():
+            if scsi.attributes["p-dev"].value == server.xenapi.PSCSI.get_physical_HCTL(pscsi_ref):
+                target_ref = pscsi_ref
+                break
+        if target_ref is None:
+            log(DEBUG, "create_scsi: scsi device not found")
+            return None
+
+        dscsi_record = {
+            "VM":
+                vm_ref,
+            "PSCSI":
+                target_ref,
+            "virtual_HCTL":
+                scsi.attributes["v-dev"].value
+        }
+
+        return server.xenapi.DSCSI.create(dscsi_record)
+
 def get_child_by_name(exp, childname, default = None):
     try:
         return [child for child in sxp.children(exp)
@@ -562,6 +595,9 @@ class sxp2xml:
 
         pcis_sxp = map(lambda x: x[1], [device for device in devices
                                         if device[1][0] == "pci"])
+
+        scsis_sxp = map(lambda x: x[1], [device for device in devices
+                                         if device[1][0] == "vscsi"])
 
         # Create XML Document
         
@@ -703,6 +739,12 @@ class sxp2xml:
         pcis = self.extract_pcis(pcis_sxp, document)
 
         map(vm.appendChild, pcis)
+
+        # And now the scsis
+
+        scsis = self.extract_scsis(scsis_sxp, document)
+
+        map(vm.appendChild, scsis)
 
         # Last but not least the consoles...
 
@@ -893,6 +935,23 @@ class sxp2xml:
                 pcis.append(pci)
 
         return pcis
+
+    def extract_scsis(self, scsis_sxp, document):
+
+        scsis = []
+
+        for scsi_sxp in scsis_sxp:
+            for dev_sxp in sxp.children(scsi_sxp, "dev"):
+                scsi = document.createElement("vscsi")
+
+                scsi.attributes["p-dev"] \
+                    = get_child_by_name(dev_sxp, "p-dev")
+                scsi.attributes["v-dev"] \
+                    = get_child_by_name(dev_sxp, "v-dev")
+
+                scsis.append(scsi)
+
+        return scsis
 
     def mk_other_config(self, key, value, document):
         other_config = document.createElement("other_config")
