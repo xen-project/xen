@@ -25,7 +25,7 @@ obj-y += timer.o
 obj-y += trace.o
 obj-y += version.o
 obj-y += vsprintf.o
-obj-y += xmalloc.o
+obj-y += xmalloc_tlsf.o
 obj-y += rcupdate.o
 
 obj-$(perfc)       += perfc.o
