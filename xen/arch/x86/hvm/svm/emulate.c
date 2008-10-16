@@ -61,6 +61,33 @@ static unsigned long svm_rip2pointer(struct vcpu *v)
     return p;
 }
 
+static unsigned long svm_nextrip_insn_length(struct vcpu *v)
+{
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+
+    if ( !cpu_has_svm_nrips || (vmcb->nextrip <= vmcb->rip) )
+        return 0;
+
+    switch ( vmcb->exitcode )
+    {
+    case VMEXIT_CR0_READ... VMEXIT_DR15_WRITE:
+        /* faults due to instruction intercepts */
+        /* (exitcodes 84-95) are reserved */
+    case VMEXIT_IDTR_READ ... VMEXIT_TR_WRITE:
+    case VMEXIT_RDTSC ... VMEXIT_SWINT:
+    case VMEXIT_INVD ... VMEXIT_INVLPGA:
+    case VMEXIT_VMRUN ...  VMEXIT_MWAIT_CONDITIONAL:
+    case VMEXIT_IOIO:
+        /* ...and the rest of the #VMEXITs */
+    case VMEXIT_CR0_SEL_WRITE:
+    case VMEXIT_MSR:
+    case VMEXIT_EXCEPTION_BP:
+        return vmcb->nextrip - vmcb->rip;
+    }
+  
+    return 0;
+}
+
 /* First byte: Length. Following bytes: Opcode bytes. */
 #define MAKE_INSTR(nm, ...) static const u8 OPCODE_##nm[] = { __VA_ARGS__ }
 MAKE_INSTR(INVD,   2, 0x0f, 0x08);
@@ -117,6 +144,9 @@ int __get_instruction_length_from_list(struct vcpu *v,
     const u8 *opcode = NULL;
     unsigned long fetch_addr;
     unsigned int fetch_len;
+
+    if ( (inst_len = svm_nextrip_insn_length(v)) != 0 )
+        return inst_len;
 
     /* Fetch up to the next page break; we'll fetch from the next page
      * later if we have to. */
