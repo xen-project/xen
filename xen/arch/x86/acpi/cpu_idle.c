@@ -40,6 +40,7 @@
 #include <xen/guest_access.h>
 #include <xen/keyhandler.h>
 #include <xen/cpuidle.h>
+#include <xen/trace.h>
 #include <asm/cache.h>
 #include <asm/io.h>
 #include <asm/hpet.h>
@@ -251,6 +252,9 @@ static void acpi_processor_idle(void)
     switch ( cx->type )
     {
     case ACPI_STATE_C1:
+        /* Trace cpu idle entry */
+        TRACE_1D(TRC_PM_IDLE_ENTRY, 1);
+
         /*
          * Invoke C1.
          * Use the appropriate idle routine, the one that would
@@ -260,6 +264,9 @@ static void acpi_processor_idle(void)
             pm_idle_save();
         else 
             acpi_safe_halt();
+
+        /* Trace cpu idle exit */
+        TRACE_1D(TRC_PM_IDLE_EXIT, 1);
 
         /*
          * TBD: Can't get time duration while in C1, as resumes
@@ -272,12 +279,16 @@ static void acpi_processor_idle(void)
     case ACPI_STATE_C2:
         if ( local_apic_timer_c2_ok )
         {
+            /* Trace cpu idle entry */
+            TRACE_1D(TRC_PM_IDLE_ENTRY, 2);
             /* Get start time (ticks) */
             t1 = inl(pmtmr_ioport);
             /* Invoke C2 */
             acpi_idle_do_entry(cx);
             /* Get end time (ticks) */
             t2 = inl(pmtmr_ioport);
+            /* Trace cpu idle exit */
+            TRACE_1D(TRC_PM_IDLE_EXIT, 2);
 
             /* Re-enable interrupts */
             local_irq_enable();
@@ -316,6 +327,8 @@ static void acpi_processor_idle(void)
             ACPI_FLUSH_CPU_CACHE();
         }
 
+        /* Trace cpu idle entry */
+        TRACE_1D(TRC_PM_IDLE_ENTRY, cx - &power->states[0]);
         /*
          * Before invoking C3, be aware that TSC/APIC timer may be 
          * stopped by H/W. Without carefully handling of TSC/APIC stop issues,
@@ -335,6 +348,8 @@ static void acpi_processor_idle(void)
 
         /* recovering TSC */
         cstate_restore_tsc();
+        /* Trace cpu idle exit */
+        TRACE_1D(TRC_PM_IDLE_EXIT, cx - &power->states[0]);
 
         if ( power->flags.bm_check && power->flags.bm_control )
         {
