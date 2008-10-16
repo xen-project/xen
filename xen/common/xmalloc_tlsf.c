@@ -30,9 +30,6 @@
 
 #define MAX_POOL_NAME_LEN       16
 
-typedef void *(get_memory)(size_t bytes);
-typedef void (put_memory)(void *ptr);
-
 /* Some IMPORTANT TLSF parameters */
 #define MEM_ALIGN       (sizeof(void *) * 2)
 #define MEM_ALIGN_MASK  (~(MEM_ALIGN - 1))
@@ -92,7 +89,7 @@ struct bhdr {
     } ptr;
 };
 
-struct pool {
+struct xmem_pool {
     /* First level bitmap (REAL_FLI bits) */
     u32 fl_bitmap;
 
@@ -104,17 +101,17 @@ struct pool {
 
     spinlock_t lock;
 
-    size_t init_size;
-    size_t max_size;
-    size_t grow_size;
+    unsigned long init_size;
+    unsigned long max_size;
+    unsigned long grow_size;
 
     /* Basic stats */
-    size_t used_size;
-    size_t num_regions;
+    unsigned long used_size;
+    unsigned long num_regions;
 
     /* User provided functions for expanding/shrinking pool */
-    get_memory *get_mem;
-    put_memory *put_mem;
+    xmem_pool_get_memory *get_mem;
+    xmem_pool_put_memory *put_mem;
 
     struct list_head list;
 
@@ -129,7 +126,7 @@ struct pool {
 /**
  * Returns indexes (fl, sl) of the list used to serve request of size r
  */
-static inline void MAPPING_SEARCH(size_t *r, int *fl, int *sl)
+static inline void MAPPING_SEARCH(unsigned long *r, int *fl, int *sl)
 {
     int t;
 
@@ -157,7 +154,7 @@ static inline void MAPPING_SEARCH(size_t *r, int *fl, int *sl)
  * for a block of size r. It also rounds up requested size(r) to the
  * next list.
  */
-static inline void MAPPING_INSERT(size_t r, int *fl, int *sl)
+static inline void MAPPING_INSERT(unsigned long r, int *fl, int *sl)
 {
     if ( r < SMALL_BLOCK )
     {
@@ -176,7 +173,7 @@ static inline void MAPPING_INSERT(size_t r, int *fl, int *sl)
  * Returns first block from a list that hold blocks larger than or
  * equal to the one pointed by the indexes (fl, sl)
  */
-static inline struct bhdr *FIND_SUITABLE_BLOCK(struct pool *p, int *fl,
+static inline struct bhdr *FIND_SUITABLE_BLOCK(struct xmem_pool *p, int *fl,
                                                int *sl)
 {
     u32 tmp = p->sl_bitmap[*fl] & (~0 << *sl);
@@ -203,7 +200,7 @@ static inline struct bhdr *FIND_SUITABLE_BLOCK(struct pool *p, int *fl,
 /**
  * Remove first free block(b) from free list with indexes (fl, sl).
  */
-static inline void EXTRACT_BLOCK_HDR(struct bhdr *b, struct pool *p, int fl,
+static inline void EXTRACT_BLOCK_HDR(struct bhdr *b, struct xmem_pool *p, int fl,
                                      int sl)
 {
     p->matrix[fl][sl] = b->ptr.free_ptr.next;
@@ -223,7 +220,7 @@ static inline void EXTRACT_BLOCK_HDR(struct bhdr *b, struct pool *p, int fl,
 /**
  * Removes block(b) from free list with indexes (fl, sl)
  */
-static inline void EXTRACT_BLOCK(struct bhdr *b, struct pool *p, int fl,
+static inline void EXTRACT_BLOCK(struct bhdr *b, struct xmem_pool *p, int fl,
                                  int sl)
 {
     if ( b->ptr.free_ptr.next )
@@ -248,7 +245,7 @@ static inline void EXTRACT_BLOCK(struct bhdr *b, struct pool *p, int fl,
 /**
  * Insert block(b) in free list with indexes (fl, sl)
  */
-static inline void INSERT_BLOCK(struct bhdr *b, struct pool *p, int fl, int sl)
+static inline void INSERT_BLOCK(struct bhdr *b, struct xmem_pool *p, int fl, int sl)
 {
     b->ptr.free_ptr = (struct free_ptr) {NULL, p->matrix[fl][sl]};
     if ( p->matrix[fl][sl] )
@@ -262,8 +259,8 @@ static inline void INSERT_BLOCK(struct bhdr *b, struct pool *p, int fl, int sl)
  * Region is a virtually contiguous memory region and Pool is
  * collection of such regions
  */
-static inline void ADD_REGION(void *region, size_t region_size,
-                              struct pool *pool)
+static inline void ADD_REGION(void *region, unsigned long region_size,
+                              struct xmem_pool *pool)
 {
     int fl, sl;
     struct bhdr *b, *lb;
@@ -283,28 +280,18 @@ static inline void ADD_REGION(void *region, size_t region_size,
 }
 
 /*
- * Allocator code start
+ * TLSF pool-based allocator start.
  */
 
-/**
- * tlsf_create_memory_pool - create dynamic memory pool
- * @name: name of the pool
- * @get_mem: callback function used to expand pool
- * @put_mem: callback function used to shrink pool
- * @init_size: inital pool size (in bytes)
- * @max_size: maximum pool size (in bytes) - set this as 0 for no limit
- * @grow_size: amount of memory (in bytes) added to pool whenever required
- *
- * All size values are rounded up to next page boundary.
- */
-static void *tlsf_create_memory_pool(const char *name,
-                                     get_memory get_mem,
-                                     put_memory put_mem,
-                                     size_t init_size,
-                                     size_t max_size,
-                                     size_t grow_size)
+struct xmem_pool *xmem_pool_create(
+    const char *name,
+    xmem_pool_get_memory get_mem,
+    xmem_pool_put_memory put_mem,
+    unsigned long init_size,
+    unsigned long max_size,
+    unsigned long grow_size)
 {
-    struct pool *pool;
+    struct xmem_pool *pool;
     void *region;
     int pool_bytes, pool_order;
 
@@ -331,7 +318,7 @@ static void *tlsf_create_memory_pool(const char *name,
     pool->grow_size = grow_size;
     pool->get_mem = get_mem;
     pool->put_mem = put_mem;
-    pool->name[0] = '\0';  /* ignore name for now */
+    strlcpy(pool->name, name, sizeof(pool->name));
     region = get_mem(init_size);
     if ( region == NULL )
         goto out_region;
@@ -351,66 +338,37 @@ static void *tlsf_create_memory_pool(const char *name,
     return NULL;
 }
 
-#if 0
-
-/**
- * tlsf_get_used_size - get memory currently used by given pool
- *
- * Used memory includes stored data + metadata + internal fragmentation
- */
-static size_t tlsf_get_used_size(void *mem_pool)
+unsigned long xmem_pool_get_used_size(struct xmem_pool *pool)
 {
-    struct pool *pool = (struct pool *)mem_pool;
     return pool->used_size;
 }
 
-/**
- * tlsf_get_total_size - get total memory currently allocated for given pool
- *
- * This is the total memory currently allocated for this pool which includes
- * used size + free size.
- *
- * (Total - Used) is good indicator of memory efficiency of allocator.
- */
-static size_t tlsf_get_total_size(void *mem_pool)
+unsigned long xmem_pool_get_total_size(struct xmem_pool *pool)
 {
-    size_t total;
-    struct pool *pool = (struct pool *)mem_pool;
+    unsigned long total;
     total = ROUNDUP_SIZE(sizeof(*pool))
         + pool->init_size
         + (pool->num_regions - 1) * pool->grow_size;
     return total;
 }
 
-/**
- * tlsf_destroy_memory_pool - cleanup given pool
- * @mem_pool: Pool to be destroyed
- *
- * Data structures associated with pool are freed.
- * All memory allocated from pool must be freed before
- * destorying it.
- */
-static void tlsf_destroy_memory_pool(void *mem_pool) 
+void xmem_pool_destroy(struct xmem_pool *pool) 
 {
-    struct pool *pool;
-
-    if ( mem_pool == NULL )
+    if ( pool == NULL )
         return;
 
-    pool = (struct pool *)mem_pool;
-
     /* User is destroying without ever allocating from this pool */
-    if ( tlsf_get_used_size(pool) == BHDR_OVERHEAD )
+    if ( xmem_pool_get_used_size(pool) == BHDR_OVERHEAD )
     {
         pool->put_mem(pool->init_region);
         pool->used_size -= BHDR_OVERHEAD;
     }
 
     /* Check for memory leaks in this pool */
-    if ( tlsf_get_used_size(pool) )
+    if ( xmem_pool_get_used_size(pool) )
         printk("memory leak in pool: %s (%p). "
                "%lu bytes still in use.\n",
-               pool->name, pool, (long)tlsf_get_used_size(pool));
+               pool->name, pool, xmem_pool_get_used_size(pool));
 
     spin_lock(&pool_list_lock);
     list_del_init(&pool->list);
@@ -418,19 +376,11 @@ static void tlsf_destroy_memory_pool(void *mem_pool)
     pool->put_mem(pool);
 }
 
-#endif
-
-/**
- * tlsf_malloc - allocate memory from given pool
- * @size: no. of bytes
- * @mem_pool: pool to allocate from
- */
-static void *tlsf_malloc(size_t size, void *mem_pool)
+void *xmem_pool_alloc(unsigned long size, struct xmem_pool *pool)
 {
-    struct pool *pool = (struct pool *)mem_pool;
     struct bhdr *b, *b2, *next_b, *region;
     int fl, sl;
-    size_t tmp_size;
+    unsigned long tmp_size;
 
     size = (size < MIN_BLOCK_SIZE) ? MIN_BLOCK_SIZE : ROUNDUP_SIZE(size);
     /* Rounding up the requested size and calculating fl and sl */
@@ -496,14 +446,8 @@ static void *tlsf_malloc(size_t size, void *mem_pool)
     return NULL;
 }
 
-/**
- * tlsf_free - free memory from given pool
- * @ptr: address of memory to be freed
- * @mem_pool: pool to free from
- */
-static void tlsf_free(void *ptr, void *mem_pool)
+void xmem_pool_free(void *ptr, struct xmem_pool *pool)
 {
-    struct pool *pool = (struct pool *)mem_pool;
     struct bhdr *b, *tmp_b;
     int fl = 0, sl = 0;
 
@@ -556,20 +500,20 @@ static void tlsf_free(void *ptr, void *mem_pool)
  * Glue for xmalloc().
  */
 
-static struct pool *xenpool;
+static struct xmem_pool *xenpool;
 
-static void *tlsf_get_xenheap_page(size_t size)
+static void *xmalloc_pool_get(unsigned long size)
 {
     ASSERT(size == PAGE_SIZE);
     return alloc_xenheap_pages(0);
 }
 
-static void tlsf_put_xenheap_page(void *p)
+static void xmalloc_pool_put(void *p)
 {
     free_xenheap_pages(p,0);
 }
 
-static void *tlsf_xenheap_malloc_whole_pages(size_t size)
+static void *xmalloc_whole_pages(unsigned long size)
 {
     struct bhdr *b;
     unsigned int pageorder = get_order_from_bytes(size + BHDR_OVERHEAD);
@@ -582,13 +526,13 @@ static void *tlsf_xenheap_malloc_whole_pages(size_t size)
     return (void *)b->ptr.buffer;
 }
 
-static void tlsf_xenheap_init(void)
+static void tlsf_init(void)
 {
     INIT_LIST_HEAD(&pool_list_head);
     spin_lock_init(&pool_list_lock);
-    xenpool = tlsf_create_memory_pool(
-        "", tlsf_get_xenheap_page,
-        tlsf_put_xenheap_page, PAGE_SIZE, 0, PAGE_SIZE);
+    xenpool = xmem_pool_create(
+        "xmalloc", xmalloc_pool_get, xmalloc_pool_put,
+        PAGE_SIZE, 0, PAGE_SIZE);
     BUG_ON(!xenpool);
 }
 
@@ -596,7 +540,7 @@ static void tlsf_xenheap_init(void)
  * xmalloc()
  */
 
-void *_xmalloc(size_t size, size_t align)
+void *_xmalloc(unsigned long size, unsigned long align)
 {
     void *p;
     u32 pad;
@@ -609,12 +553,12 @@ void *_xmalloc(size_t size, size_t align)
     size += align - MEM_ALIGN;
 
     if ( !xenpool )
-        tlsf_xenheap_init();
+        tlsf_init();
 
     if ( size >= (PAGE_SIZE - (2*BHDR_OVERHEAD)) )
-        p = tlsf_xenheap_malloc_whole_pages(size);
+        p = xmalloc_whole_pages(size);
     else
-        p = tlsf_malloc(size, xenpool);
+        p = xmem_pool_alloc(size, xenpool);
 
     /* Add alignment padding. */
     if ( (pad = -(long)p & (align - 1)) != 0 )
@@ -651,5 +595,5 @@ void xfree(void *p)
     if ( b->size >= (PAGE_SIZE - (2*BHDR_OVERHEAD)) )
         free_xenheap_pages((void *)b, get_order_from_bytes(b->size));
     else
-        tlsf_free(p, xenpool);
+        xmem_pool_free(p, xenpool);
 }
