@@ -575,7 +575,10 @@ int arch_set_info_guest(
     v->arch.guest_context.user_regs.eflags |= 2;
 
     if ( is_hvm_vcpu(v) )
+    {
+        hvm_set_info_guest(v);
         goto out;
+    }
 
     /* Only CR0.TS is modifiable by guest or admin. */
     v->arch.guest_context.ctrlreg[0] &= X86_CR0_TS;

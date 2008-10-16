@@ -128,6 +128,7 @@ struct hvm_function_table {
     int (*msr_write_intercept)(struct cpu_user_regs *regs);
     void (*invlpg_intercept)(unsigned long vaddr);
     void (*set_uc_mode)(struct vcpu *v);
+    void (*set_info_guest)(struct vcpu *v);
 };
 
 extern struct hvm_function_table hvm_funcs;
@@ -313,5 +314,11 @@ int hvm_virtual_to_linear_addr(
     enum hvm_access_type access_type,
     unsigned int addr_size,
     unsigned long *linear_addr);
+
+static inline void hvm_set_info_guest(struct vcpu *v)
+{
+    if ( hvm_funcs.set_info_guest )
+        return hvm_funcs.set_info_guest(v);
+}
 
 #endif /* __ASM_X86_HVM_HVM_H__ */

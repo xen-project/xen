@@ -1184,6 +1184,13 @@ static void vmx_set_uc_mode(struct vcpu *v)
     vpid_sync_all();
 }
 
+static void vmx_set_info_guest(struct vcpu *v)
+{
+    vmx_vmcs_enter(v);
+    __vmwrite(GUEST_DR7, v->arch.guest_context.debugreg[7]);
+    vmx_vmcs_exit(v);
+}
+
 static struct hvm_function_table vmx_function_table = {
     .name                 = "VMX",
     .domain_initialise    = vmx_domain_initialise,
@@ -1214,7 +1221,8 @@ static struct hvm_function_table vmx_function_table = {
     .msr_read_intercept   = vmx_msr_read_intercept,
     .msr_write_intercept  = vmx_msr_write_intercept,
     .invlpg_intercept     = vmx_invlpg_intercept,
-    .set_uc_mode          = vmx_set_uc_mode
+    .set_uc_mode          = vmx_set_uc_mode,
+    .set_info_guest       = vmx_set_info_guest
 };
 
 static unsigned long *vpid_bitmap;
