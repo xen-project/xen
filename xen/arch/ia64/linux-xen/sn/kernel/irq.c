@@ -350,7 +350,11 @@ static void sn_irq_info_free(struct rcu_head *head)
 }
 #endif
 
+#ifdef XEN
+void sn_irq_fixup(struct sn_pci_dev *pci_dev, struct sn_irq_info *sn_irq_info)
+#else	
 void sn_irq_fixup(struct pci_dev *pci_dev, struct sn_irq_info *sn_irq_info)
+#endif
 {
 	nasid_t nasid = sn_irq_info->irq_nasid;
 	int slice = sn_irq_info->irq_slice;
@@ -377,7 +381,11 @@ void sn_irq_fixup(struct pci_dev *pci_dev, struct sn_irq_info *sn_irq_info)
 	register_intr_pda(sn_irq_info);
 }
 
+#ifdef XEN
+void sn_irq_unfixup(struct sn_pci_dev *pci_dev)
+#else
 void sn_irq_unfixup(struct pci_dev *pci_dev)
+#endif
 {
 #ifndef XEN
 	struct sn_irq_info *sn_irq_info;

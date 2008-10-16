@@ -34,9 +34,12 @@
  *	7:3 = slot
  *	2:0 = function
  */
+
+#ifndef XEN
 #define PCI_DEVFN(slot,func)	((((slot) & 0x1f) << 3) | ((func) & 0x07))
 #define PCI_SLOT(devfn)		(((devfn) >> 3) & 0x1f)
 #define PCI_FUNC(devfn)		((devfn) & 0x07)
+#endif
 
 /* Ioctls for /proc/bus/pci/X/Y nodes. */
 #define PCIIOC_BASE		('P' << 24 | 'C' << 16 | 'I' << 8)
@@ -112,7 +115,11 @@ struct pci_cap_saved_state {
 /*
  * The pci_dev structure is used to describe PCI devices.
  */
+#ifdef XEN
+struct sn_pci_dev {
+#else
 struct pci_dev {
+#endif
 	struct list_head global_list;	/* node in list of all PCI devices */
 	struct list_head bus_list;	/* node in per-bus list */
 	struct pci_bus	*bus;		/* bus this device is on */
@@ -178,6 +185,7 @@ struct pci_dev {
 	struct bin_attribute *res_attr[DEVICE_COUNT_RESOURCE]; /* sysfs file for resources */
 };
 
+#ifndef XEN
 #define pci_dev_g(n) list_entry(n, struct pci_dev, global_list)
 #define pci_dev_b(n) list_entry(n, struct pci_dev, bus_list)
 #define	to_pci_dev(n) container_of(n, struct pci_dev, dev)
@@ -206,6 +214,7 @@ static inline void pci_remove_saved_cap(struct pci_cap_saved_state *cap)
 {
 	hlist_del(&cap->next);
 }
+#endif
 
 /*
  *  For PCI devices, the region numbers are assigned this way:
@@ -230,7 +239,11 @@ struct pci_bus {
 	struct pci_bus	*parent;	/* parent bus this bridge is on */
 	struct list_head children;	/* list of child buses */
 	struct list_head devices;	/* list of devices on this bus */
+#ifdef XEN
+	struct sn_pci_dev	*self;	/* bridge device as seen by parent */
+#else
 	struct pci_dev	*self;		/* bridge device as seen by parent */
+#endif
 	struct resource	*resource[PCI_BUS_NUM_RESOURCES];
 					/* address space routed to this bus */
 
@@ -341,7 +354,7 @@ struct pci_error_handlers
 };
 
 /* ---------------------------------------------------------------- */
-
+#ifndef XEN
 struct module;
 struct pci_driver {
 	struct list_head node;
@@ -715,9 +728,11 @@ static inline void pci_unblock_user_cfg_access(struct pci_dev *dev) { }
 #endif /* CONFIG_PCI */
 
 /* Include architecture-dependent settings and functions */
+#endif
 
 #include <asm/pci.h>
 
+#ifndef XEN
 /* these helpers provide future and backwards compatibility
  * for accessing popular PCI BAR info */
 #define pci_resource_start(dev,bar)   ((dev)->resource[(bar)].start)
@@ -808,6 +823,7 @@ enum pci_fixup_pass {
 void pci_fixup_device(enum pci_fixup_pass pass, struct pci_dev *dev);
 
 extern int pci_pci_problems;
+#endif
 #define PCIPCI_FAIL		1	/* No PCI PCI DMA */
 #define PCIPCI_TRITON		2
 #define PCIPCI_NATOMA		4
