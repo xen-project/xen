@@ -106,7 +106,11 @@ DECLARE_HVM_SAVE_TYPE(VTIME, 5, struct hvm_hw_ia64_vtime);
  */
 #define VIOSAPIC_NUM_PINS     48
 
-union viosapic_rte
+/* To share VT-d code which uses vioapic_redir_entry.
+ * Although on ia64 this is for vsapic, but we have to vioapic_redir_entry
+ * instead of viosapic_redir_entry.
+ */
+union vioapic_redir_entry
 {
     uint64_t bits;
     struct {
@@ -124,7 +128,7 @@ union viosapic_rte
 
         uint8_t reserved[3];
         uint16_t dest_id;
-    }; 
+    } fields;
 };
 
 struct hvm_hw_ia64_viosapic {
@@ -134,7 +138,7 @@ struct hvm_hw_ia64_viosapic {
     uint32_t    pad;
     uint64_t    lowest_vcpu_id;
     uint64_t    base_address;
-    union viosapic_rte  redirtbl[VIOSAPIC_NUM_PINS];
+    union vioapic_redir_entry  redirtbl[VIOSAPIC_NUM_PINS];
 };
 DECLARE_HVM_SAVE_TYPE(VIOSAPIC, 6, struct hvm_hw_ia64_viosapic);
   

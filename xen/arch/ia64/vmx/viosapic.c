@@ -46,9 +46,9 @@
 
 static void viosapic_deliver(struct viosapic *viosapic, int irq)
 {
-    uint16_t dest = viosapic->redirtbl[irq].dest_id;
-    uint8_t delivery_mode = viosapic->redirtbl[irq].delivery_mode;
-    uint8_t vector = viosapic->redirtbl[irq].vector;
+    uint16_t dest = viosapic->redirtbl[irq].fields.dest_id;
+    uint8_t delivery_mode = viosapic->redirtbl[irq].fields.delivery_mode;
+    uint8_t vector = viosapic->redirtbl[irq].fields.vector;
 
     ASSERT(spin_is_locked(&viosapic->lock));
 
@@ -78,7 +78,7 @@ static int get_redir_num(struct viosapic *viosapic, int vector)
 
     ASSERT(spin_is_locked(&viosapic->lock));
     for ( i = 0; i < VIOSAPIC_NUM_PINS; i++ )
-        if ( viosapic->redirtbl[i].vector == vector )
+        if ( viosapic->redirtbl[i].fields.vector == vector )
             return i;
 
     return -1;
@@ -91,7 +91,7 @@ static void service_iosapic(struct viosapic *viosapic)
 
     while ( (irq = iosapic_get_highest_irq(viosapic)) != -1 )
     {
-        if ( viosapic->redirtbl[irq].trig_mode == SAPIC_LEVEL )
+        if ( viosapic->redirtbl[irq].fields.trig_mode == SAPIC_LEVEL )
             viosapic->isr |= (1UL << irq);
 
         viosapic_deliver(viosapic, irq);
@@ -116,7 +116,7 @@ static void viosapic_update_EOI(struct viosapic *viosapic, int vector)
     if ( !test_and_clear_bit(redir_num, &viosapic->isr) )
     {
         spin_unlock(&viosapic->lock);
-        if ( viosapic->redirtbl[redir_num].trig_mode == SAPIC_LEVEL )
+        if ( viosapic->redirtbl[redir_num].fields.trig_mode == SAPIC_LEVEL )
             gdprintk(XENLOG_WARNING, "redir %d not set for %d EOI\n",
                      redir_num, vector);
         return;
@@ -278,7 +278,7 @@ static void viosapic_reset(struct viosapic *viosapic)
 
     for ( i = 0; i < VIOSAPIC_NUM_PINS; i++ )
     {
-        viosapic->redirtbl[i].mask = 0x1;
+        viosapic->redirtbl[i].fields.mask = 0x1;
     }
     spin_lock_init(&viosapic->lock);
 }
@@ -292,11 +292,11 @@ void viosapic_set_irq(struct domain *d, int irq, int level)
     if ( (irq < 0) || (irq >= VIOSAPIC_NUM_PINS) )
         goto out;
 
-    if ( viosapic->redirtbl[irq].mask )
+    if ( viosapic->redirtbl[irq].fields.mask )
         goto out;
 
     bit = 1UL << irq;
-    if ( viosapic->redirtbl[irq].trig_mode == SAPIC_LEVEL )
+    if ( viosapic->redirtbl[irq].fields.trig_mode == SAPIC_LEVEL )
     {
         if ( level )
             viosapic->irr |= bit;

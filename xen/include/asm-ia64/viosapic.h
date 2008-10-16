@@ -59,7 +59,7 @@ struct viosapic {
     spinlock_t lock;
     struct vcpu * lowest_vcpu;
     uint64_t base_address;
-    union viosapic_rte redirtbl[VIOSAPIC_NUM_PINS];
+    union vioapic_redir_entry redirtbl[VIOSAPIC_NUM_PINS];
 };
 
 void viosapic_init(struct domain *d);
