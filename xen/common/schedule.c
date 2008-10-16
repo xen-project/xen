@@ -455,6 +455,10 @@ static long do_poll(struct sched_poll *sched_poll)
         goto out;
 #endif
 
+    rc = 0;
+    if ( local_events_need_delivery() )
+        goto out;
+
     for ( i = 0; i < sched_poll->nr_ports; i++ )
     {
         rc = -EFAULT;
