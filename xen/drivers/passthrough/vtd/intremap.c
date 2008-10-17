@@ -479,10 +479,10 @@ int intremap_setup(struct iommu *iommu)
 #if defined(ENABLED_EXTENDED_INTERRUPT_SUPPORT)
     /* set extended interrupt mode bit */
     ir_ctrl->iremap_maddr |=
-            ecap_ext_intr(iommu->ecap) ? (1 << IRTA_REG_EIMI_SHIFT) : 0;
+            ecap_ext_intr(iommu->ecap) ? (1 << IRTA_REG_EIME_SHIFT) : 0;
 #endif
-    /* size field = 256 entries per 4K page = 8 - 1 */
-    ir_ctrl->iremap_maddr |= 7;
+    /* set size of the interrupt remapping table */ 
+    ir_ctrl->iremap_maddr |= IRTA_REG_TABLE_SIZE;
     dmar_writeq(iommu->reg, DMAR_IRTA_REG, ir_ctrl->iremap_maddr);
 
     /* set SIRTP */
