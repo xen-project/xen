@@ -983,6 +983,32 @@ assign_domain_page(struct domain *d,
                                ASSIGN_writable | ASSIGN_pgc_allocated);
 }
 
+static void
+ioports_get_mmio_addr(const struct io_space *space,
+                      unsigned long fp, unsigned long lp,
+                      unsigned long *mmio_start, unsigned long *mmio_end)
+{
+    if (space->sparse) {
+        *mmio_start = IO_SPACE_SPARSE_ENCODING(fp) & PAGE_MASK;
+        *mmio_end = PAGE_ALIGN(IO_SPACE_SPARSE_ENCODING(lp));
+    } else {
+        *mmio_start = fp & PAGE_MASK;
+        *mmio_end = PAGE_ALIGN(lp);
+    }
+}
+
+static unsigned long
+ioports_get_mmio_base(const struct io_space *space, struct domain *d)
+{
+    if (VMX_DOMAIN(d->vcpu[0]))
+        return LEGACY_IO_START;
+
+    if (space == &io_space[0] && d != dom0)
+        return IO_PORTS_PADDR;
+
+    return __pa(space->mmio_base);
+}
+
 /* 
  * Inpurt
  * fgp: first guest port
@@ -1025,13 +1051,7 @@ ioports_permit_access(struct domain *d, unsigned int fgp,
     fmp = IO_SPACE_PORT(fmp);
     lmp = IO_SPACE_PORT(lmp);
 
-    if (space->sparse) {
-        mach_start = IO_SPACE_SPARSE_ENCODING(fmp) & PAGE_MASK;
-        mach_end = PAGE_ALIGN(IO_SPACE_SPARSE_ENCODING(lmp));
-    } else {
-        mach_start = fmp & PAGE_MASK;
-        mach_end = PAGE_ALIGN(lmp);
-    }
+    ioports_get_mmio_addr(space, fmp, lmp, &mach_start, &mach_end);
 
     /*
      * The "machine first port" is not necessarily identity mapped
@@ -1041,13 +1061,7 @@ ioports_permit_access(struct domain *d, unsigned int fgp,
     mach_end = mach_end | __pa(space->mmio_base);
 
     mmio_start = IO_SPACE_SPARSE_ENCODING(fgp) & PAGE_MASK;
-
-    if (VMX_DOMAIN(d->vcpu[0]))
-        mmio_start |= LEGACY_IO_START;
-    else if (space == &io_space[0])
-        mmio_start |= IO_PORTS_PADDR;
-    else
-        mmio_start |= __pa(space->mmio_base);
+    mmio_start |= ioports_get_mmio_base(space, d);
 
     while (mach_start < mach_end) {
         (void)__assign_domain_page(d, mmio_start, mach_start, ASSIGN_nocache); 
@@ -1090,20 +1104,9 @@ ioports_deny_access(struct domain *d, unsigned int fp, unsigned int lp)
     fp_base = IO_SPACE_PORT(fp);
     lp_base = IO_SPACE_PORT(lp);
 
-    if (space->sparse) {
-        mmio_start = IO_SPACE_SPARSE_ENCODING(fp_base) & PAGE_MASK;
-        mmio_end = PAGE_ALIGN(IO_SPACE_SPARSE_ENCODING(lp_base));
-    } else {
-        mmio_start = fp_base & PAGE_MASK;
-        mmio_end = PAGE_ALIGN(lp_base);
-    }
+    ioports_get_mmio_addr(space, fp_base, lp_base, &mmio_start, &mmio_end);
 
-    if (VMX_DOMAIN(d->vcpu[0]))
-        mmio_base = LEGACY_IO_START;
-    else if (space == &io_space[0] && d != dom0)
-        mmio_base = IO_PORTS_PADDR;
-    else
-        mmio_base = __pa(space->mmio_base);
+    mmio_base = ioports_get_mmio_base(space, d);
 
     for (; mmio_start < mmio_end; mmio_start += PAGE_SIZE) {
         unsigned int port, range;
