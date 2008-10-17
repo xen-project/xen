@@ -72,8 +72,8 @@ int nmi_active;
 #define P6_EVNTSEL_INT		(1 << 20)
 #define P6_EVNTSEL_OS		(1 << 17)
 #define P6_EVNTSEL_USR		(1 << 16)
-#define P6_EVENT_CPU_CLOCKS_NOT_HALTED	0x79
-#define P6_NMI_EVENT		P6_EVENT_CPU_CLOCKS_NOT_HALTED
+#define P6_EVENT_CPU_CLOCKS_NOT_HALTED	 0x79
+#define CORE_EVENT_CPU_CLOCKS_NOT_HALTED 0x3c
 
 #define P4_ESCR_EVENT_SELECT(N)	((N)<<25)
 #define P4_CCCR_OVF_PMI0	(1<<26)
@@ -248,7 +248,7 @@ static void __pminit setup_k7_watchdog(void)
     wrmsr(MSR_K7_EVNTSEL0, evntsel, 0);
 }
 
-static void __pminit setup_p6_watchdog(void)
+static void __pminit setup_p6_watchdog(unsigned counter)
 {
     unsigned int evntsel;
 
@@ -260,7 +260,7 @@ static void __pminit setup_p6_watchdog(void)
     evntsel = P6_EVNTSEL_INT
         | P6_EVNTSEL_OS
         | P6_EVNTSEL_USR
-        | P6_NMI_EVENT;
+        | counter;
 
     wrmsr(MSR_P6_EVNTSEL0, evntsel, 0);
     write_watchdog_counter("P6_PERFCTR0");
@@ -326,7 +326,9 @@ void __pminit setup_apic_nmi_watchdog(void)
     case X86_VENDOR_INTEL:
         switch (boot_cpu_data.x86) {
         case 6:
-            setup_p6_watchdog();
+            setup_p6_watchdog((boot_cpu_data.x86_model < 14) 
+                              ? P6_EVENT_CPU_CLOCKS_NOT_HALTED
+                              : CORE_EVENT_CPU_CLOCKS_NOT_HALTED);
             break;
         case 15:
             if (!setup_p4_watchdog())
