@@ -20,12 +20,15 @@
 #include <asm/system.h>
 #include <asm/types.h>
 #ifdef XEN
+#include <asm/xenpage.h>
 #ifndef __ASSEMBLY__
 #include <xen/sched.h> /* needed for mm_struct (via asm/domain.h) */
 #endif
 #endif
 
+#ifndef XEN
 #define IA64_MAX_PHYS_BITS	50	/* max. number of physical address bits (architected) */
+#endif
 
 /*
  * First, define the various bits in a PTE.  Note that the PTE format

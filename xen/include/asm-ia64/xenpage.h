@@ -1,6 +1,9 @@
 #ifndef _ASM_IA64_XENPAGE_H
 #define _ASM_IA64_XENPAGE_H
 
+/* moved from xen/include/asm-ia64/linux-xen/asm/pgtable.h to compile */
+#define IA64_MAX_PHYS_BITS	50	/* max. number of physical address bits (architected) */
+
 #ifndef __ASSEMBLY__
 #undef mfn_valid
 #undef page_to_mfn
@@ -23,7 +26,12 @@ static inline unsigned long __virt_to_maddr(unsigned long va)
 	if (va - KERNEL_START < xenheap_size)
 		return xen_pstart + (va - KERNEL_START);
 	else
-		return (va & ((1UL << 60) - 1));
+		/* 
+		 * Because the significant 8 bits of VA are used by Xen,
+		 * and xen uses cached/uncached identity mapping.
+		 * IA64_MAX_PHYS_BITS can't be larger than 56
+		 */
+		return (va & ((1UL << IA64_MAX_PHYS_BITS) - 1));
 }
 
 #define virt_to_maddr(va)	(__virt_to_maddr((unsigned long)va))
