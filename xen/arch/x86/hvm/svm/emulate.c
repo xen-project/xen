@@ -68,24 +68,25 @@ static unsigned long svm_nextrip_insn_length(struct vcpu *v)
     if ( !cpu_has_svm_nrips || (vmcb->nextrip <= vmcb->rip) )
         return 0;
 
+#ifndef NDEBUG
     switch ( vmcb->exitcode )
     {
     case VMEXIT_CR0_READ... VMEXIT_DR15_WRITE:
         /* faults due to instruction intercepts */
         /* (exitcodes 84-95) are reserved */
     case VMEXIT_IDTR_READ ... VMEXIT_TR_WRITE:
-    case VMEXIT_RDTSC ... VMEXIT_SWINT:
-    case VMEXIT_INVD ... VMEXIT_INVLPGA:
+    case VMEXIT_RDTSC ... VMEXIT_MSR:
     case VMEXIT_VMRUN ...  VMEXIT_MWAIT_CONDITIONAL:
-    case VMEXIT_IOIO:
         /* ...and the rest of the #VMEXITs */
     case VMEXIT_CR0_SEL_WRITE:
-    case VMEXIT_MSR:
     case VMEXIT_EXCEPTION_BP:
-        return vmcb->nextrip - vmcb->rip;
+        break;
+    default:
+        BUG();
     }
-  
-    return 0;
+#endif
+
+    return vmcb->nextrip - vmcb->rip;
 }
 
 /* First byte: Length. Following bytes: Opcode bytes. */
