@@ -5,11 +5,7 @@
 #define IA64_MAX_PHYS_BITS	50	/* max. number of physical address bits (architected) */
 
 #ifndef __ASSEMBLY__
-#undef mfn_valid
-#undef page_to_mfn
-#undef mfn_to_page
 #ifdef CONFIG_VIRTUAL_FRAME_TABLE
-#undef ia64_mfn_valid
 extern int ia64_mfn_valid (unsigned long pfn);
 # define mfn_valid(_pfn)	(((_pfn) < max_page) && ia64_mfn_valid(_pfn))
 #else
@@ -37,8 +33,6 @@ static inline unsigned long __virt_to_maddr(unsigned long va)
 #define virt_to_maddr(va)	(__virt_to_maddr((unsigned long)va))
 
 
-#undef page_to_maddr
-#undef virt_to_page
 #define page_to_maddr(page)	(page_to_mfn(page) << PAGE_SHIFT)
 #define virt_to_page(kaddr)	(mfn_to_page(virt_to_maddr(kaddr) >> PAGE_SHIFT))
 
@@ -97,8 +91,6 @@ static inline u64 pa_clear_uc(u64 paddr)
     return (paddr << 1) >> 1;
 }
 
-#undef __pa
-#undef __va
 #define __pa(x)		(virt_to_maddr(x))
 #define __va(x)		({xen_va _v; _v.l = (long) (x); _v.f.reg = -1; _v.p;})
 

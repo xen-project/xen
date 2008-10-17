@@ -99,6 +99,7 @@ do {						\
 
 #define virt_addr_valid(kaddr)	mfn_valid(__pa(kaddr) >> PAGE_SHIFT)
 
+#ifndef XEN
 #ifdef CONFIG_VIRTUAL_MEM_MAP
 extern int ia64_mfn_valid (unsigned long pfn);
 #else
@@ -119,6 +120,7 @@ extern unsigned long max_low_pfn;
 
 #define page_to_maddr(page)	(page_to_mfn(page) << PAGE_SHIFT)
 #define virt_to_page(kaddr)	mfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
+#endif
 
 typedef union ia64_va {
 	struct {
