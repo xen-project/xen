@@ -1993,7 +1993,7 @@ static void __init physdev_init_dom0(struct domain *d)
 		BUG();
 	if (irqs_permit_access(d, 0, NR_IRQS-1))
 		BUG();
-	if (ioports_permit_access(d, 0, 0xffff))
+	if (ioports_permit_access(d, 0, 0, 0xffff))
 		BUG();
 }
 

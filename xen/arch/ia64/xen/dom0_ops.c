@@ -203,7 +203,7 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
             ret = 0;
         else {
             if (op->u.ioport_permission.allow_access)
-                ret = ioports_permit_access(d, fp, lp);
+                ret = ioports_permit_access(d, fp, fp, lp);
             else
                 ret = ioports_deny_access(d, fp, lp);
         }
@@ -522,7 +522,7 @@ dom0vp_add_io_space(struct domain *d, unsigned long phys_base,
     fp = space_number << IO_SPACE_BITS;
     lp = fp | 0xffff;
 
-    return ioports_permit_access(d, fp, lp);
+    return ioports_permit_access(d, fp, fp, lp);
 }
 
 unsigned long

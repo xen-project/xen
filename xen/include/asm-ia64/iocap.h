@@ -7,7 +7,7 @@
 #ifndef __IA64_IOCAP_H__
 #define __IA64_IOCAP_H__
 
-extern int ioports_permit_access(struct domain *d,
+extern int ioports_permit_access(struct domain *d, unsigned int gs,
 				 unsigned int s, unsigned int e);
 extern int ioports_deny_access(struct domain *d,
 			       unsigned int s, unsigned int e);
