@@ -1012,7 +1012,7 @@ static int intel_iommu_domain_init(struct domain *d)
 {
     struct hvm_iommu *hd = domain_hvm_iommu(d);
     struct iommu *iommu = NULL;
-    u64 i;
+    u64 i, j, tmp;
     struct acpi_drhd_unit *drhd;
 
     drhd = list_entry(acpi_drhd_units.next, typeof(*drhd), list);
@@ -1031,11 +1031,13 @@ static int intel_iommu_domain_init(struct domain *d)
          */
         for ( i = 0; i < max_page; i++ )
         {
-            if ( xen_in_range(i << PAGE_SHIFT_4K, (i + 1) << PAGE_SHIFT_4K) ||
-                 tboot_in_range(i << PAGE_SHIFT_4K, (i + 1) << PAGE_SHIFT_4K) )
+            if ( xen_in_range(i << PAGE_SHIFT, (i + 1) << PAGE_SHIFT) ||
+                 tboot_in_range(i << PAGE_SHIFT, (i + 1) << PAGE_SHIFT) )
                 continue;
 
-            iommu_map_page(d, i, i);
+            tmp = 1 << (PAGE_SHIFT - PAGE_SHIFT_4K);
+            for ( j = 0; j < tmp; j++ )
+                iommu_map_page(d, (i*tmp+j), (i*tmp+j));
         }
 
         setup_dom0_devices(d);
