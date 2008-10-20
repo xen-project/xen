@@ -93,6 +93,10 @@ def _vscsi_block_scsiid_to_hctl(phyname, scsi_devices):
 def vscsi_get_scsidevices():
     """ get all scsi devices"""
 
+    # KAF: Stubbed out for now due to bogus use of os.chdir() and because
+    # the devices.append() line can fail due to sg and scsi_id not defined.
+    return []
+
     devices = []
     sysfs_mnt = utils.find_sysfs_mount() 
 
