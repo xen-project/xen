@@ -236,7 +236,8 @@ static uint8_t twobyte_table[256] = {
     DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
     ByteOp|DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem16|ModRM|Mov,
     /* 0xC0 - 0xC7 */
-    ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM, 0, 0,
+    ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
+    0, DstMem|SrcReg|ModRM|Mov,
     0, 0, 0, ImplicitOps|ModRM,
     /* 0xC8 - 0xCF */
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
@@ -3909,6 +3910,12 @@ x86_emulate(
         case 8: *src.reg = dst.val; break;
         }
         goto add;
+
+    case 0xc3: /* movnti */
+        /* Ignore the non-temporal hint for now. */
+        generate_exception_if(dst.bytes <= 2, EXC_UD, -1);
+        dst.val = src.val;
+        break;
 
     case 0xc7: /* Grp9 (cmpxchg8b/cmpxchg16b) */ {
         unsigned long old[2], exp[2], new[2];
