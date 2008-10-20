@@ -20,6 +20,8 @@
 		((volatile int *)(__fix_to_virt(FIX_IO_APIC_BASE_0 + idx) \
 		+ (mp_ioapics[idx].mpc_apicaddr & ~PAGE_MASK)))
 
+#define IO_APIC_ID(idx) (mp_ioapics[idx].mpc_apicid)
+
 /*
  * The structure of the IO-APIC:
  */

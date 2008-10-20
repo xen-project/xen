@@ -21,6 +21,7 @@
 #include <xen/irq.h>
 #include <xen/sched.h>
 #include <xen/iommu.h>
+#include <asm/hvm/iommu.h>
 #include <xen/time.h>
 #include <xen/pci.h>
 #include <xen/pci_regs.h>
@@ -179,7 +180,7 @@ unsigned int io_apic_read_remap_rte(
     struct IO_xAPIC_route_entry old_rte = { 0 };
     struct IO_APIC_route_remap_entry *remap_rte;
     int rte_upper = (reg & 1) ? 1 : 0;
-    struct iommu *iommu = ioapic_to_iommu(mp_ioapics[apic].mpc_apicid);
+    struct iommu *iommu = ioapic_to_iommu(IO_APIC_ID(apic));
     struct ir_ctrl *ir_ctrl = iommu_ir_ctrl(iommu);
 
     if ( !iommu || !ir_ctrl || ir_ctrl->iremap_maddr == 0 ||
@@ -224,7 +225,7 @@ void io_apic_write_remap_rte(
     struct IO_xAPIC_route_entry old_rte = { 0 };
     struct IO_APIC_route_remap_entry *remap_rte;
     unsigned int rte_upper = (reg & 1) ? 1 : 0;
-    struct iommu *iommu = ioapic_to_iommu(mp_ioapics[apic].mpc_apicid);
+    struct iommu *iommu = ioapic_to_iommu(IO_APIC_ID(apic));
     struct ir_ctrl *ir_ctrl = iommu_ir_ctrl(iommu);
     int saved_mask;
 
@@ -253,7 +254,7 @@ void io_apic_write_remap_rte(
     *(IO_APIC_BASE(apic)+4) = *(((int *)&old_rte)+0);
     remap_rte->mask = saved_mask;
 
-    if ( ioapic_rte_to_remap_entry(iommu, mp_ioapics[apic].mpc_apicid,
+    if ( ioapic_rte_to_remap_entry(iommu, IO_APIC_ID(apic),
                                    &old_rte, rte_upper, value) )
     {
         *IO_APIC_BASE(apic) = rte_upper ? (reg + 1) : reg;
