@@ -12,9 +12,11 @@
 digraph "Xen-API Class Diagram" {
 fontname="Verdana";
 
-node [ shape=box ]; session VM host network VIF PIF SR VDI VBD PBD user XSPolicy ACMPolicy;
-node [shape=ellipse]; PIF_metrics VIF_metrics VM_metrics VBD_metrics PBD_metrics VM_guest_metrics host_metrics;
-node [shape=box]; DPCI PPCI host_cpu console VTPM
+node [ shape=box ]; session VM host network VIF PIF SR VDI VBD PBD user;
+node [ shape=box ]; XSPolicy ACMPolicy DPCI PPCI host_cpu console VTPM;
+node [ shape=box ]; DSCSI PSCSI;
+node [ shape=ellipse ]; VM_metrics VM_guest_metrics host_metrics;
+node [ shape=ellipse ]; PIF_metrics VIF_metrics VBD_metrics PBD_metrics;
 session -> host [ arrowhead="none" ]
 session -> user [ arrowhead="none" ]
 VM -> VM_metrics [ arrowhead="none" ]
@@ -41,4 +43,7 @@ XSPolicy -> ACMPolicy [ arrowhead="none" ]
 DPCI -> VM [ arrowhead="none", arrowtail="crow" ]
 DPCI -> PPCI [ arrowhead="none" ]
 PPCI -> host [ arrowhead="none", arrowtail="crow" ]
+DSCSI -> VM [ arrowhead="none", arrowtail="crow" ]
+DSCSI -> PSCSI [ arrowhead="none" ]
+PSCSI -> host [ arrowhead="none", arrowtail="crow" ]
 }
