@@ -20,6 +20,9 @@
 
 #include <xen/event.h>
 #include <xen/iommu.h>
+#include <asm/hvm/irq.h>
+#include <asm/hvm/iommu.h>
+#include <xen/hvm/irq.h>
 
 static void pt_irq_time_out(void *data)
 {
@@ -245,6 +248,7 @@ int hvm_do_IRQ_dpci(struct domain *d, unsigned int mirq)
     return 1;
 }
 
+#ifdef SUPPORT_MSI_REMAPPING
 void hvm_dpci_msi_eoi(struct domain *d, int vector)
 {
     struct hvm_irq_dpci *hvm_irq_dpci = d->arch.hvm_domain.irq.dpci;
@@ -277,6 +281,7 @@ void hvm_dpci_msi_eoi(struct domain *d, int vector)
 
     spin_unlock(&d->event_lock);
 }
+#endif
 
 void hvm_dpci_eoi(struct domain *d, unsigned int guest_gsi,
                   union vioapic_redir_entry *ent)

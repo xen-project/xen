@@ -204,6 +204,7 @@ void print_vtd_entries(struct iommu *iommu, int bus, int devfn, u64 gmfn)
 
 void dump_iommu_info(unsigned char key)
 {
+#if defined(__i386__) || defined(__x86_64__)
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
     int i;
@@ -305,6 +306,10 @@ void dump_iommu_info(unsigned char key)
             }
         }
     }
+#else
+    printk("%s: not implemnted on IA64 for now.\n", __func__);
+    /* ia64: TODO */
+#endif
 }
 
 /*

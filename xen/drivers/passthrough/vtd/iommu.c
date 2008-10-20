@@ -24,6 +24,7 @@
 #include <xen/xmalloc.h>
 #include <xen/domain_page.h>
 #include <xen/iommu.h>
+#include <asm/hvm/iommu.h>
 #include <xen/numa.h>
 #include <xen/time.h>
 #include <xen/pci.h>
@@ -857,6 +858,7 @@ static void dma_msi_data_init(struct iommu *iommu, int vector)
     spin_unlock_irqrestore(&iommu->register_lock, flags);
 }
 
+#ifdef SUPPORT_MSI_REMAPPING
 static void dma_msi_addr_init(struct iommu *iommu, int phy_cpu)
 {
     u64 msi_address;
@@ -873,6 +875,12 @@ static void dma_msi_addr_init(struct iommu *iommu, int phy_cpu)
     dmar_writel(iommu->reg, DMAR_FEUADDR_REG, (u32)(msi_address >> 32));
     spin_unlock_irqrestore(&iommu->register_lock, flags);
 }
+#else
+static void dma_msi_addr_init(struct iommu *iommu, int phy_cpu)
+{
+    /* ia64: TODO */
+}
+#endif
 
 static void dma_msi_set_affinity(unsigned int vector, cpumask_t dest)
 {
