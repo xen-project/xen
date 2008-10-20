@@ -15,7 +15,7 @@ typedef struct {
 #define _raw_spin_is_locked(x)                  \
     (*(volatile char *)(&(x)->lock) <= 0)
 
-static inline void _raw_spin_lock(raw_spinlock_t *lock)
+static always_inline void _raw_spin_lock(raw_spinlock_t *lock)
 {
     asm volatile (
         "1:  lock; decw %0         \n"
@@ -28,7 +28,7 @@ static inline void _raw_spin_lock(raw_spinlock_t *lock)
         : "=m" (lock->lock) : : "memory" );
 }
 
-static inline void _raw_spin_unlock(raw_spinlock_t *lock)
+static always_inline void _raw_spin_unlock(raw_spinlock_t *lock)
 {
     ASSERT(_raw_spin_is_locked(lock));
     asm volatile (
@@ -36,7 +36,7 @@ static inline void _raw_spin_unlock(raw_spinlock_t *lock)
         : "=m" (lock->lock) : : "memory" );
 }
 
-static inline int _raw_spin_trylock(raw_spinlock_t *lock)
+static always_inline int _raw_spin_trylock(raw_spinlock_t *lock)
 {
     s16 oldval;
     asm volatile (
@@ -56,12 +56,12 @@ typedef struct {
  * On x86, we implement read-write locks as a 32-bit counter
  * with the high bit (sign) being the "contended" bit.
  */
-static inline void _raw_read_lock(raw_rwlock_t *rw)
+static always_inline void _raw_read_lock(raw_rwlock_t *rw)
 {
     __build_read_lock(rw, "__read_lock_failed");
 }
 
-static inline void _raw_write_lock(raw_rwlock_t *rw)
+static always_inline void _raw_write_lock(raw_rwlock_t *rw)
 {
     __build_write_lock(rw, "__write_lock_failed");
 }
