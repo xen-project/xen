@@ -7,11 +7,11 @@
 
 typedef struct {
     raw_spinlock_t raw;
-    s8 recurse_cpu;
-    u8 recurse_cnt;
+    u16 recurse_cpu:12;
+    u16 recurse_cnt:4;
 } spinlock_t;
 
-#define SPIN_LOCK_UNLOCKED { _RAW_SPIN_LOCK_UNLOCKED, -1, 0 }
+#define SPIN_LOCK_UNLOCKED { _RAW_SPIN_LOCK_UNLOCKED, 0xfffu, 0 }
 #define DEFINE_SPINLOCK(l) spinlock_t l = SPIN_LOCK_UNLOCKED
 #define spin_lock_init(l) (*(l) = (spinlock_t)SPIN_LOCK_UNLOCKED)
 
