@@ -734,8 +734,8 @@ static int tdqcow_open (struct disk_driver *dd, const char *name, td_flag_t flag
 
  	DPRINTF("QCOW: Opening %s\n",name);
 
-	o_flags = O_DIRECT | O_LARGEFILE | 
-		((flags == TD_RDONLY) ? O_RDONLY : O_RDWR);
+	/* Since we don't handle O_DIRECT correctly, don't use it */
+	o_flags = O_LARGEFILE | ((flags == TD_RDONLY) ? O_RDONLY : O_RDWR);
 	fd = open(name, o_flags);
 	if (fd < 0) {
 		DPRINTF("Unable to open %s (%d)\n",name,0 - errno);
@@ -1385,7 +1385,7 @@ static int tdqcow_get_parent_id(struct disk_driver *dd, struct disk_id *id)
 	filename[len]  = '\0';
 
 	id->name       = strdup(filename);
-	id->drivertype = DISK_TYPE_QCOW;
+	id->drivertype = DISK_TYPE_AIO;
 	err            = 0;
  out:
 	free(buf);
@@ -1397,17 +1397,15 @@ static int tdqcow_validate_parent(struct disk_driver *child,
 {
 	struct stat stats;
 	uint64_t psize, csize;
-	struct tdqcow_state *c = (struct tdqcow_state *)child->private;
-	struct tdqcow_state *p = (struct tdqcow_state *)parent->private;
 	
-	if (stat(p->name, &stats))
+	if (stat(parent->name, &stats))
 		return -EINVAL;
-	if (get_filesize(p->name, &psize, &stats))
+	if (get_filesize(parent->name, &psize, &stats))
 		return -EINVAL;
 
-	if (stat(c->name, &stats))
+	if (stat(child->name, &stats))
 		return -EINVAL;
-	if (get_filesize(c->name, &csize, &stats))
+	if (get_filesize(child->name, &csize, &stats))
 		return -EINVAL;
 
 	if (csize != psize)
