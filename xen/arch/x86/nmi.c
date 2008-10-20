@@ -122,10 +122,17 @@ int __init check_nmi_watchdog (void)
 
     printk("\n");
 
-    /* now that we know it works we can reduce NMI frequency to
-       something more reasonable; makes a difference in some configs */
+    /*
+     * Now that we know it works we can reduce NMI frequency to
+     * something more reasonable; makes a difference in some configs.
+     * There's a limit to how slow we can go because writing the perfctr
+     * MSRs only sets the low 32 bits, with the top 8 bits sign-extended
+     * from those, so it's not possible to set up a delay larger than
+     * 2^31 cycles and smaller than (2^40 - 2^31) cycles. 
+     * (Intel SDM, section 18.22.2)
+     */
     if ( nmi_watchdog == NMI_LOCAL_APIC )
-        nmi_hz = 1;
+        nmi_hz = max(1ul, cpu_khz >> 20);
 
     return 0;
 }
