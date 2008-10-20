@@ -26,7 +26,6 @@ SECTIONS
 	*(.fixup)
 	*(.gnu.warning)
 	} :text =0x9090
-  .text.lock : { *(.text.lock) } :text	/* out-of-line lock text */
 
   _etext = .;			/* End of text section */
 

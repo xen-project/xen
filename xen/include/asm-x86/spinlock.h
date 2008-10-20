@@ -18,14 +18,13 @@ typedef struct {
 static inline void _raw_spin_lock(raw_spinlock_t *lock)
 {
     asm volatile (
-        "1:  lock; decb %0         \n"
-        "    js 2f                 \n"
-        ".section .text.lock,\"ax\"\n"
+        "1:  lock; decw %0         \n"
+        "    jns 3f                \n"
         "2:  rep; nop              \n"
-        "    cmpb $0,%0            \n"
+        "    cmpw $0,%0            \n"
         "    jle 2b                \n"
         "    jmp 1b                \n"
-        ".previous"
+        "3:"
         : "=m" (lock->lock) : : "memory" );
 }
 
@@ -33,16 +32,16 @@ static inline void _raw_spin_unlock(raw_spinlock_t *lock)
 {
     ASSERT(_raw_spin_is_locked(lock));
     asm volatile (
-        "movb $1,%0" 
+        "movw $1,%0" 
         : "=m" (lock->lock) : : "memory" );
 }
 
 static inline int _raw_spin_trylock(raw_spinlock_t *lock)
 {
-    char oldval;
+    s16 oldval;
     asm volatile (
-        "xchgb %b0,%1"
-        :"=q" (oldval), "=m" (lock->lock)
+        "xchgw %w0,%1"
+        :"=r" (oldval), "=m" (lock->lock)
         :"0" (0) : "memory" );
     return (oldval > 0);
 }
