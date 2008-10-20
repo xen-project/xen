@@ -2056,8 +2056,12 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
 
     perfc_incra(vmexits, exit_reason);
 
-    if ( exit_reason != EXIT_REASON_EXTERNAL_INTERRUPT )
-        local_irq_enable();
+    /* Handle the interrupt we missed before allowing any more in. */
+    if ( exit_reason == EXIT_REASON_EXTERNAL_INTERRUPT )
+        vmx_do_extint(regs);
+
+    /* Now enable interrupts so it's safe to take locks. */
+    local_irq_enable();
 
     if ( unlikely(exit_reason & VMX_EXIT_REASONS_FAILED_VMENTRY) )
         return vmx_failed_vmentry(exit_reason, regs);
@@ -2185,7 +2189,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         break;
     }
     case EXIT_REASON_EXTERNAL_INTERRUPT:
-        vmx_do_extint(regs);
+        /* Already handled above. */
         break;
     case EXIT_REASON_TRIPLE_FAULT:
         hvm_triple_fault();
