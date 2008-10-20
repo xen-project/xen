@@ -1506,23 +1506,18 @@ class XendDomainInfo:
         return self.info['VCPUs_max']
 
     def setVCpuCount(self, vcpus):
-        if vcpus <= 0:
-            raise XendError('Invalid VCPUs')
+        def vcpus_valid(n):
+            if vcpus <= 0:
+                raise XendError('Zero or less VCPUs is invalid')
+            if self.domid >= 0 and vcpus > self.info['VCPUs_max']:
+                raise XendError('Cannot set vcpus greater than max vcpus on running domain')
+        vcpus_valid(vcpus)
         
         self.info['vcpu_avail'] = (1 << vcpus) - 1
         if self.domid >= 0:
             self.storeVm('vcpu_avail', self.info['vcpu_avail'])
-            # update dom differently depending on whether we are adjusting
-            # vcpu number up or down, otherwise _vcpuDomDetails does not
-            # disable the vcpus
-            if self.info['VCPUs_max'] > vcpus:
-                # decreasing
-                self._writeDom(self._vcpuDomDetails())
-                self.info['VCPUs_live'] = vcpus
-            else:
-                # same or increasing
-                self.info['VCPUs_live'] = vcpus
-                self._writeDom(self._vcpuDomDetails())
+            self._writeDom(self._vcpuDomDetails())
+            self.info['VCPUs_live'] = vcpus
         else:
             if self.info['VCPUs_max'] > vcpus:
                 # decreasing
@@ -1532,7 +1527,7 @@ class XendDomainInfo:
                 for c in range(self.info['VCPUs_max'], vcpus):
                     self.info['cpus'].append(list())
             self.info['VCPUs_max'] = vcpus
-            xen.xend.XendDomain.instance().managed_config_save(self)
+        xen.xend.XendDomain.instance().managed_config_save(self)
         log.info("Set VCPU count on domain %s to %d", self.info['name_label'],
                  vcpus)
 
