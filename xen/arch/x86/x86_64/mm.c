@@ -252,8 +252,6 @@ void __init subarch_init_memory(void)
     BUILD_BUG_ON(offsetof(struct page_info, u.inuse._domain) != 
                  (offsetof(struct page_info, count_info) + sizeof(u32)));
     BUILD_BUG_ON((offsetof(struct page_info, count_info) & 7) != 0);
-    BUILD_BUG_ON(sizeof(struct page_info) !=
-                 (32 + BITS_TO_LONGS(NR_CPUS)*sizeof(long)));
 
     /* M2P table is mappable read-only by privileged domains. */
     for ( v  = RDWR_MPT_VIRT_START;
