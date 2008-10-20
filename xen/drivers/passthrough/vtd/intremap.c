@@ -472,7 +472,7 @@ int intremap_setup(struct iommu *iommu)
         {
             dprintk(XENLOG_WARNING VTDPREFIX,
                     "Cannot allocate memory for ir_ctrl->iremap_maddr\n");
-            return -ENODEV;
+            return -ENOMEM;
         }
         ir_ctrl->iremap_index = -1;
     }

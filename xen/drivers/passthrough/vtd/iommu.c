@@ -219,10 +219,10 @@ static u64 addr_to_dma_page_maddr(struct domain *domain, u64 addr, int alloc)
             if ( !alloc )
                 break;
             maddr = alloc_pgtable_maddr();
+            if ( !maddr )
+                break;
             dma_set_pte_addr(*pte, maddr);
             vaddr = map_vtd_domain_page(maddr);
-            if ( !vaddr )
-                break;
 
             /*
              * high level table always sets r/w, last level
@@ -235,8 +235,6 @@ static u64 addr_to_dma_page_maddr(struct domain *domain, u64 addr, int alloc)
         else
         {
             vaddr = map_vtd_domain_page(pte->val);
-            if ( !vaddr )
-                break;
         }
 
         if ( level == 2 )

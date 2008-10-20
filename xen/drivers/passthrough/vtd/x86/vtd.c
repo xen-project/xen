@@ -41,17 +41,19 @@ u64 alloc_pgtable_maddr(void)
 {
     struct page_info *pg;
     u64 *vaddr;
+    unsigned long mfn;
 
     pg = alloc_domheap_page(NULL, 0);
-    vaddr = map_domain_page(page_to_mfn(pg));
-    if ( !vaddr )
+    if ( !pg )
         return 0;
+    mfn = page_to_mfn(pg);
+    vaddr = map_domain_page(mfn);
     memset(vaddr, 0, PAGE_SIZE);
 
     iommu_flush_cache_page(vaddr);
     unmap_domain_page(vaddr);
 
-    return page_to_maddr(pg);
+    return (u64)mfn << PAGE_SHIFT_4K;
 }
 
 void free_pgtable_maddr(u64 maddr)
