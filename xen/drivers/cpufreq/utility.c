@@ -129,7 +129,7 @@ void cpufreq_statistic_reset(unsigned int cpuid)
     struct pm_px *pxpt = cpufreq_statistic_data[cpuid];
     const struct processor_pminfo *pmpt = processor_pminfo[cpuid];
 
-    if ( !pxpt || !pmpt )
+    if ( !pmpt || !pxpt || !pxpt->u.pt || !pxpt->u.trans_pt )
         return;
 
     count = pmpt->perf.state_count;

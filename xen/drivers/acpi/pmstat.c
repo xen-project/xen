@@ -52,7 +52,7 @@ int do_get_pm_info(struct xen_sysctl_get_pmstat *op)
     int ret = 0;
     const struct processor_pminfo *pmpt;
 
-    if ( (op->cpuid >= NR_CPUS) || !cpu_online(op->cpuid) )
+    if ( !op || (op->cpuid >= NR_CPUS) || !cpu_online(op->cpuid) )
         return -EINVAL;
     pmpt = processor_pminfo[op->cpuid];
 
@@ -87,7 +87,7 @@ int do_get_pm_info(struct xen_sysctl_get_pmstat *op)
         uint64_t tmp_idle_ns;
         struct pm_px *pxpt = cpufreq_statistic_data[op->cpuid];
 
-        if ( !pxpt )
+        if ( !pxpt || !pxpt->u.pt || !pxpt->u.trans_pt )
             return -ENODATA;
 
         total_idle_ns = get_cpu_idle_time(op->cpuid);
