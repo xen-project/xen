@@ -129,7 +129,13 @@ static int ioapic_rte_to_remap_entry(struct iommu *iommu,
     memcpy(&new_ire, iremap_entry, sizeof(struct iremap_entry));
 
     if ( rte_upper )
+    {
+#if defined(__i386__) || defined(__x86_64__)
         new_ire.lo.dst = (value >> 24) << 8;
+#else /* __ia64__ */
+        new_ire.lo.dst = value >> 16;
+#endif
+    }
     else
     {
         *(((u32 *)&new_rte) + 0) = value;
