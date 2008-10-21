@@ -446,7 +446,7 @@ IA64FAULT vmx_vcpu_ptc_ga(VCPU *vcpu, u64 va, u64 ps)
         do {
             cpu = v->processor;
             if (cpu != current->processor) {
-                spin_unlock_wait(&per_cpu(schedule_data, cpu).schedule_lock);
+                spin_barrier(&per_cpu(schedule_data, cpu).schedule_lock);
                 /* Flush VHPT on remote processors. */
                 smp_call_function_single(cpu, &ptc_ga_remote_func,
                                          &args, 0, 1);

@@ -130,7 +130,6 @@ do {											\
 #define _raw_spin_is_locked(x)	((x)->lock != 0)
 #define _raw_spin_unlock(x)	do { barrier(); (x)->lock = 0; } while (0)
 #define _raw_spin_trylock(x)	(cmpxchg_acq(&(x)->lock, 0, 1) == 0)
-#define spin_unlock_wait(x)	do { barrier(); } while ((x)->lock)
 
 typedef struct {
 	volatile unsigned int read_counter	: 31;
@@ -140,9 +139,6 @@ typedef struct {
 #endif
 } raw_rwlock_t;
 #define _RAW_RW_LOCK_UNLOCKED /*(raw_rwlock_t)*/ { 0, 0 }
-
-#define read_can_lock(rw)	(*(volatile int *)(rw) >= 0)
-#define write_can_lock(rw)	(*(volatile int *)(rw) == 0)
 
 #define _raw_read_lock(rw)								\
 do {											\
