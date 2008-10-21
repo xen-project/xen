@@ -36,28 +36,27 @@ SYSFS_SCSI_DEV_TYPEID_PATH = '/type'
 SYSFS_SCSI_DEV_REVISION_PATH = '/rev'
 SYSFS_SCSI_DEV_SCSILEVEL_PATH = '/scsi_level'
 
-def _vscsi_hctl_block(name, scsi_devices):
-    """ block-device name is convert into hctl. (e.g., '/dev/sda',
-    '0:0:0:0')"""
+def _vscsi_get_devname_by(name, scsi_devices):
+    """A device name is gotten by the HCTL.
+    (e.g., '0:0:0:0' to '/dev/sda')
+    """
+
     try:
         search = re.compile(r'' + name + '$', re.DOTALL)
     except Exception, e:
         raise VmError("vscsi: invalid expression. " + str(e))
-    chk = 0
-    for hctl, block, sg, scsi_id in scsi_devices:
+
+    for hctl, devname, sg, scsi_id in scsi_devices:
         if search.match(hctl):
-            chk = 1
-            break
+            return (hctl, devname)
 
-    if chk:
-        return (hctl, block)
-    else:
-        return (None, None)
+    return (None, None)
 
 
-def _vscsi_block_scsiid_to_hctl(phyname, scsi_devices):
-    """ block-device name is convert into hctl. (e.g., '/dev/sda',
-    '0:0:0:0')"""
+def _vscsi_get_hctl_by(phyname, scsi_devices):
+    """An HCTL is gotten by the device name or the scsi_id.
+    (e.g., '/dev/sda' to '0:0:0:0')
+    """
     
     if re.match('/dev/sd[a-z]+([1-9]|1[0-5])?$', phyname):
         # sd driver
@@ -72,30 +71,15 @@ def _vscsi_block_scsiid_to_hctl(phyname, scsi_devices):
         # scsi_id -gu
         name = phyname
 
-    chk = 0
-    for hctl, block, sg, scsi_id in scsi_devices:
-        if block == name:
-            chk = 1
-            break
-        elif sg == name:
-            chk = 1
-            break
-        elif scsi_id == name:
-            chk = 1
-            break
+    for hctl, devname, sg, scsi_id in scsi_devices:
+        if name in [devname, sg, scsi_id]:
+            return (hctl, devname)
 
-    if chk:
-        return (hctl, block)
-    else:
-        return (None, None)
+    return (None, None)
 
 
 def vscsi_get_scsidevices():
     """ get all scsi devices"""
-
-    # KAF: Stubbed out for now due to bogus use of os.chdir() and because
-    # the devices.append() line can fail due to sg and scsi_id not defined.
-    return []
 
     devices = []
     sysfs_mnt = utils.find_sysfs_mount() 
@@ -103,46 +87,36 @@ def vscsi_get_scsidevices():
     for dirpath, dirnames, files in os.walk(sysfs_mnt + SYSFS_SCSI_PATH):
         for hctl in dirnames:
             paths = os.path.join(dirpath, hctl)
-            block = "-"
+            devname = None
+            sg = None
+            scsi_id = None
             for f in os.listdir(paths):
-                if re.match('^block', f):
-                    os.chdir(os.path.join(paths, f))
-                    block = os.path.basename(os.getcwd())
-                elif re.match('^tape', f):
-                    os.chdir(os.path.join(paths, f))
-                    block = os.path.basename(os.getcwd())
-                elif re.match('^scsi_changer', f):
-                    os.chdir(os.path.join(paths, f))
-                    block = os.path.basename(os.getcwd())
-                elif re.match('^onstream_tape', f):
-                    os.chdir(os.path.join(paths, f))
-                    block = os.path.basename(os.getcwd())
+                realpath = os.path.realpath(os.path.join(paths, f))
+                if  re.match('^block', f) or \
+                    re.match('^tape', f) or \
+                    re.match('^scsi_changer', f) or \
+                    re.match('^onstream_tape', f):
+                    devname = os.path.basename(realpath)
 
                 if re.match('^scsi_generic', f):
-                    os.chdir(os.path.join(paths, f))
-                    sg = os.path.basename(os.getcwd())
+                    sg = os.path.basename(realpath)
                     lines = os.popen('/sbin/scsi_id -gu -s /class/scsi_generic/' + sg).read().split()
-                    if len(lines) == 0:
-                        scsi_id = '-'
-                    else:
+                    if len(lines):
                         scsi_id = lines[0]
 
-            devices.append([hctl, block, sg, scsi_id])
+            devices.append([hctl, devname, sg, scsi_id])
 
     return devices
 
 
-def vscsi_search_hctl_and_block(device):
+def vscsi_get_hctl_and_devname_by(target, scsi_devices = None):
+    if scsi_devices is None:
+        scsi_devices = vscsi_get_scsidevices()
 
-    scsi_devices = vscsi_get_scsidevices()
-
-    tmp = device.split(':')
-    if len(tmp) == 4:
-        (hctl, block) = _vscsi_hctl_block(device, scsi_devices)
+    if len(target.split(':')) == 4:
+        return _vscsi_get_devname_by(target, scsi_devices)
     else:
-        (hctl, block) = _vscsi_block_scsiid_to_hctl(device, scsi_devices)
-
-    return (hctl, block)
+        return _vscsi_get_hctl_by(target, scsi_devices)
 
 
 def get_scsi_vendor(pHCTL):
@@ -216,9 +190,9 @@ def get_all_scsi_devices():
             'sg_name': scsi_info[2],
             'scsi_id': None
         }
-        if scsi_info[1] != '-':
+        if scsi_info[1] is not None:
             scsi_dev['dev_name'] = scsi_info[1] 
-        if scsi_info[3] != '-':
+        if scsi_info[3] is not None:
             scsi_dev['scsi_id'] = scsi_info[3] 
 
         scsi_dev['vendor_name'] = \

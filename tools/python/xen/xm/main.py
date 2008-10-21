@@ -2491,20 +2491,20 @@ def parse_scsi_configuration(p_scsi, v_hctl, state):
     if len(v) != 4:
         raise OptionError("Invalid argument: %s" % v_hctl)
 
+    p_hctl = None
+    devname = None
     if p_scsi is not None:
-        (p_hctl, block) = vscsi_util.vscsi_search_hctl_and_block(p_scsi)
-        if p_hctl == None:
+        (p_hctl, devname) = \
+            vscsi_util.vscsi_get_hctl_and_devname_by(p_scsi)
+        if p_hctl is None:
             raise OptionError("Cannot find device '%s'" % p_scsi)
-    else:
-        p_hctl = ''
-        block = ''
 
     scsi = ['vscsi']
     scsi.append(['dev', \
                  ['state', state], \
                  ['devid', int(v[0])], \
                  ['p-dev', p_hctl], \
-                 ['p-devname', block], \
+                 ['p-devname', devname], \
                  ['v-dev', v_hctl] \
                ])
 

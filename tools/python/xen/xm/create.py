@@ -703,11 +703,8 @@ def configure_vscsis(config_devs, vals):
 
     scsi_devices = vscsi_util.vscsi_get_scsidevices()
     for (p_dev, v_dev, backend) in vals.vscsi:
-        tmp = p_dev.split(':')
-        if len(tmp) == 4:
-            (p_hctl, block) = vscsi_util._vscsi_hctl_block(p_dev, scsi_devices)
-        else:
-            (p_hctl, block) = vscsi_util._vscsi_block_scsiid_to_hctl(p_dev, scsi_devices)
+        (p_hctl, devname) = \
+            vscsi_util.vscsi_get_hctl_and_devname_by(p_dev, scsi_devices)
 
         if p_hctl == None:
             raise ValueError("Cannot find device \"%s\"" % p_dev)
@@ -723,7 +720,7 @@ def configure_vscsis(config_devs, vals):
                         ['state', 'Initialising'], \
                         ['devid', devid], \
                         ['p-dev', p_hctl], \
-                        ['p-devname', block], \
+                        ['p-devname', devname], \
                         ['v-dev', v_dev] ])
 
         if vscsi_lookup_devid(devidlist, devid) == 0:
