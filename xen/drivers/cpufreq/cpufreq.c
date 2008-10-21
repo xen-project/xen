@@ -34,6 +34,7 @@
 #include <xen/sched.h>
 #include <xen/timer.h>
 #include <xen/xmalloc.h>
+#include <xen/guest_access.h>
 #include <xen/domain.h>
 #include <asm/bug.h>
 #include <asm/io.h>
@@ -217,14 +218,8 @@ int set_px_pminfo(uint32_t acpi_id, struct xen_processor_performance *dom0_px_in
     struct processor_pminfo *pmpt;
     struct processor_performance *pxpt;
 
-    if ( !(xen_processor_pmbits & XEN_PROCESSOR_PM_PX) )
-    {
-        ret = -ENOSYS;
-        goto out;
-    }
-
     cpuid = get_cpu_id(acpi_id);
-    if ( cpuid < 0 )
+    if ( cpuid < 0 || !dom0_px_info)
     {
         ret = -EINVAL;
         goto out;
@@ -265,12 +260,8 @@ int set_px_pminfo(uint32_t acpi_id, struct xen_processor_performance *dom0_px_in
             ret = -ENOMEM;
             goto out;
         }
-        if ( xenpf_copy_px_states(pxpt, dom0_px_info) )
-        {
-            xfree(pxpt->states);
-            ret = -EFAULT;
-            goto out;
-        }
+        copy_from_guest(pxpt->states, dom0_px_info->states, 
+                                      dom0_px_info->state_count);
         pxpt->state_count = dom0_px_info->state_count;
         print_PSS(pxpt->states,pxpt->state_count);
     }
