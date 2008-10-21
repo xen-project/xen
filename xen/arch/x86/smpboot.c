@@ -473,13 +473,6 @@ static void construct_percpu_idt(unsigned int cpu)
 {
 	unsigned char idt_load[10];
 
-	/* If IDT table exists since last hotplug, reuse it */
-	if (!idt_tables[cpu]) {
-		idt_tables[cpu] = xmalloc_array(idt_entry_t, IDT_ENTRIES);
-		memcpy(idt_tables[cpu], idt_table,
-				IDT_ENTRIES*sizeof(idt_entry_t));
-	}
-
 	*(unsigned short *)(&idt_load[0]) = (IDT_ENTRIES*sizeof(idt_entry_t))-1;
 	*(unsigned long  *)(&idt_load[2]) = (unsigned long)idt_tables[cpu];
 	__asm__ __volatile__ ( "lidt %0" : "=m" (idt_load) );
@@ -907,6 +900,12 @@ static int __devinit do_boot_cpu(int apicid, int cpu)
 		memset(per_cpu(doublefault_tss, cpu), 0, PAGE_SIZE);
 	}
 #endif
+
+	if (!idt_tables[cpu]) {
+		idt_tables[cpu] = xmalloc_array(idt_entry_t, IDT_ENTRIES);
+		memcpy(idt_tables[cpu], idt_table,
+		       IDT_ENTRIES*sizeof(idt_entry_t));
+	}
 
 	/*
 	 * This grunge runs the startup process for
