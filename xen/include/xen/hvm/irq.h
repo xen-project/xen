@@ -94,5 +94,6 @@ void hvm_maybe_deassert_evtchn_irq(void);
 void hvm_assert_evtchn_irq(struct vcpu *v);
 void hvm_set_callback_via(struct domain *d, uint64_t via);
 
+void hvm_dirq_assist(struct vcpu *v);
 
 #endif /* __XEN_HVM_IRQ_H__ */
