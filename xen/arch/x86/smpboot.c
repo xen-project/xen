@@ -101,7 +101,7 @@ static cpumask_t smp_commenced_mask;
 static int __devinitdata tsc_sync_disabled;
 
 /* Per CPU bogomips and other parameters */
-struct cpuinfo_x86 cpu_data[NR_CPUS] __cacheline_aligned;
+struct cpuinfo_x86 cpu_data[NR_CPUS];
 EXPORT_SYMBOL(cpu_data);
 
 u32 x86_cpu_to_apicid[NR_CPUS] __read_mostly =

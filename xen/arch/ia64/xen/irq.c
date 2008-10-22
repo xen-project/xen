@@ -74,7 +74,7 @@ unsigned int __ia64_local_vector_to_irq (ia64_vector vec)
 /*
  * Controller mappings for all interrupt sources:
  */
-irq_desc_t irq_desc[NR_IRQS] __cacheline_aligned = {
+irq_desc_t irq_desc[NR_IRQS] = {
 	[0 ... NR_IRQS-1] = {
 		.status = IRQ_DISABLED,
 		.handler = &no_irq_type,
