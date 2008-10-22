@@ -1063,8 +1063,6 @@ void init_percpu_time(void)
 /* Late init function (after all CPUs are booted). */
 int __init init_xen_time(void)
 {
-    local_irq_disable();
-
     /* check if TSC is invariant during deep C state
        this is a new feature introduced by Nehalem*/
     if ( cpuid_edx(0x80000007) & (1u<<8) )
@@ -1078,8 +1076,6 @@ int __init init_xen_time(void)
     init_platform_timer();
 
     do_settime(get_cmos_time(), 0, NOW());
-
-    local_irq_enable();
 
     return 0;
 }
