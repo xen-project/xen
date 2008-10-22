@@ -368,13 +368,13 @@ void create_periodic_time(
     pt->do_not_freeze = 0;
     pt->irq_issued = 0;
 
-    /* Periodic timer must be at least 0.9ms. */
-    if ( (period < 900000) && period )
+    /* Periodic timer must be at least 0.1ms. */
+    if ( (period < 100000) && period )
     {
         if ( !test_and_set_bool(pt->warned_timeout_too_short) )
             gdprintk(XENLOG_WARNING, "HVM_PlatformTime: program too "
                      "small period %"PRIu64"\n", period);
-        period = 900000;
+        period = 100000;
     }
 
     pt->period = period;

@@ -421,11 +421,11 @@ static int hpet_write(
         {
             /*
              * Clamp period to reasonable min/max values:
-             *  - minimum is 900us, same as timers controlled by vpt.c
+             *  - minimum is 100us, same as timers controlled by vpt.c
              *  - maximum is to prevent overflow in time_after() calculations
              */
-            if ( hpet_tick_to_ns(h, new_val) < MICROSECS(900) )
-                new_val = (MICROSECS(900) << 10) / h->hpet_to_ns_scale;
+            if ( hpet_tick_to_ns(h, new_val) < MICROSECS(100) )
+                new_val = (MICROSECS(100) << 10) / h->hpet_to_ns_scale;
             new_val &= (timer_is_32bit(h, tn) ? ~0u : ~0ull) >> 1;
             h->hpet.period[tn] = new_val;
         }
