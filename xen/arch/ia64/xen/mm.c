@@ -1436,7 +1436,8 @@ zap_domain_page_one(struct domain *d, unsigned long mpaddr,
     again:
         // memory_exchange() calls guest_physmap_remove_page() with
         // a stealed page. i.e. page owner = NULL.
-        BUG_ON(page_get_owner(mfn_to_page(mfn)) != d &&
+        BUG_ON(mfn_valid(mfn) &&
+               page_get_owner(mfn_to_page(mfn)) != d &&
                page_get_owner(mfn_to_page(mfn)) != NULL);
         old_arflags = pte_val(*pte) & ~_PAGE_PPN_MASK;
         old_pte = pfn_pte(mfn, __pgprot(old_arflags));
@@ -1459,12 +1460,39 @@ zap_domain_page_one(struct domain *d, unsigned long mpaddr,
         BUG_ON(mfn != pte_pfn(ret_pte));
     }
 
+    perfc_incr(zap_domain_page_one);
+    if(!mfn_valid(mfn))
+        return;
+
     page = mfn_to_page(mfn);
     BUG_ON((page->count_info & PGC_count_mask) == 0);
 
     BUG_ON(clear_PGC_allocate && (page_get_owner(page) == NULL));
     domain_put_page(d, mpaddr, pte, old_pte, clear_PGC_allocate);
-    perfc_incr(zap_domain_page_one);
+}
+
+int
+deassign_domain_mmio_page(struct domain *d, unsigned long mpaddr,
+                        unsigned long phys_addr, unsigned long size )
+{
+    unsigned long addr = mpaddr & PAGE_MASK;
+    unsigned long end = PAGE_ALIGN(mpaddr + size);
+
+    if (size == 0) {
+        gdprintk(XENLOG_INFO, "%s: domain %p mpaddr 0x%lx size = 0x%lx\n",
+                __func__, d, mpaddr, size);
+    }
+    if (!efi_mmio(phys_addr, size)) {
+#ifndef NDEBUG
+        gdprintk(XENLOG_INFO, "%s: domain %p mpaddr 0x%lx size = 0x%lx\n",
+                __func__, d, mpaddr, size);
+#endif
+        return -EINVAL;
+    }
+
+    for (; addr < end; addr += PAGE_SIZE )
+        zap_domain_page_one(d, addr, 0, INVALID_MFN);
+    return 0;
 }
 
 unsigned long

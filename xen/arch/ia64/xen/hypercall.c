@@ -35,6 +35,7 @@
 #include <public/arch-ia64/debug_op.h>
 #include <asm/sioemu.h>
 #include <public/arch-ia64/sioemu.h>
+#include <xen/pci.h>
 
 static IA64FAULT
 xen_hypercall (struct pt_regs *regs)
@@ -313,6 +314,21 @@ extern int
 iosapic_guest_write(
     unsigned long physbase, unsigned int reg, u32 pval);
 
+
+/*
+ * XXX We don't support MSI for PCI passthrough, so just return ENOSYS
+ */
+static int physdev_map_pirq(struct physdev_map_pirq *map)
+{
+	return -ENOSYS;
+}
+
+static int physdev_unmap_pirq(struct physdev_unmap_pirq *unmap)
+{
+	return -ENOSYS;
+}
+
+
 long do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
 {
     int irq;
@@ -426,18 +442,60 @@ long do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         break;
     }
 
-    /*
-     * XXX We don't support MSI for PCI passthrough, so just return success
-     */
-    case PHYSDEVOP_map_pirq:
-    case PHYSDEVOP_unmap_pirq:
-        ret = 0;
-        break;
+	case PHYSDEVOP_map_pirq: {
+        struct physdev_map_pirq map;
 
-    case PHYSDEVOP_manage_pci_add:
-    case PHYSDEVOP_manage_pci_remove:
+        ret = -EFAULT;
+        if ( copy_from_guest(&map, arg, 1) != 0 )
+             break;
+
+        ret = physdev_map_pirq(&map);
+
+        if ( copy_to_guest(arg, &map, 1) != 0 )
+             ret = -EFAULT;
+        break;
+    }
+
+    case PHYSDEVOP_unmap_pirq: {
+        struct physdev_unmap_pirq unmap;
+
+        ret = -EFAULT;
+        if ( copy_from_guest(&unmap, arg, 1) != 0 )
+            break;
+
+        ret = physdev_unmap_pirq(&unmap);
+            break;
+    }
+
+    case PHYSDEVOP_manage_pci_add: {
+        struct physdev_manage_pci manage_pci;
+        ret = -EPERM;
+        if ( !IS_PRIV(current->domain) )
+            break;
+        ret = -EFAULT;
+        if ( copy_from_guest(&manage_pci, arg, 1) != 0 )
+            break;
+
+        ret = pci_add_device(manage_pci.bus, manage_pci.devfn);
+            break;
+    }
+
+    case PHYSDEVOP_manage_pci_remove: {
+        struct physdev_manage_pci manage_pci;
+        ret = -EPERM;
+        if ( !IS_PRIV(current->domain) )
+            break;
+        ret = -EFAULT;
+        if ( copy_from_guest(&manage_pci, arg, 1) != 0 )
+            break;
+
+        ret = pci_remove_device(manage_pci.bus, manage_pci.devfn);
+            break;
+    }
+
     default:
         ret = -ENOSYS;
+        printk("not implemented do_physdev_op: %d\n", cmd);
         break;
     }
 

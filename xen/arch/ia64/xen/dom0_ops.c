@@ -18,6 +18,7 @@
 #include <xen/trace.h>
 #include <xen/console.h>
 #include <xen/guest_access.h>
+#include <xen/pci.h>
 #include <asm/vmx.h>
 #include <asm/dom_fw.h>
 #include <asm/vhpt.h>
@@ -256,6 +257,266 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     }
     break;
 
+    case XEN_DOMCTL_get_device_group:
+    {
+        struct domain *d;
+        u32 max_sdevs;
+        u8 bus, devfn;
+        XEN_GUEST_HANDLE_64(uint32) sdevs;
+        int num_sdevs;
+
+        ret = -ENOSYS;
+        if ( !iommu_enabled )
+            break;
+
+        ret = -EINVAL;
+        if ( (d = rcu_lock_domain_by_id(op->domain)) == NULL )
+            break;
+
+        bus = (op->u.get_device_group.machine_bdf >> 16) & 0xff;
+        devfn = (op->u.get_device_group.machine_bdf >> 8) & 0xff;
+        max_sdevs = op->u.get_device_group.max_sdevs;
+        sdevs = op->u.get_device_group.sdev_array;
+
+        num_sdevs = iommu_get_device_group(d, bus, devfn, sdevs, max_sdevs);
+        if ( num_sdevs < 0 )
+        {
+            dprintk(XENLOG_ERR, "iommu_get_device_group() failed!\n");
+            ret = -EFAULT;
+            op->u.get_device_group.num_sdevs = 0;
+        }
+        else
+        {
+            ret = 0;
+            op->u.get_device_group.num_sdevs = num_sdevs;
+        }
+        if ( copy_to_guest(u_domctl, op, 1) )
+            ret = -EFAULT;
+        rcu_unlock_domain(d);
+    }
+    break;
+
+    case XEN_DOMCTL_test_assign_device:
+    {
+        u8 bus, devfn;
+
+        ret = -ENOSYS;
+        if ( !iommu_enabled )
+            break;
+
+        ret = -EINVAL;
+        bus = (op->u.assign_device.machine_bdf >> 16) & 0xff;
+        devfn = (op->u.assign_device.machine_bdf >> 8) & 0xff;
+
+        if ( device_assigned(bus, devfn) )
+        {
+            printk( "XEN_DOMCTL_test_assign_device: "
+                     "%x:%x:%x already assigned, or non-existent\n",
+                     bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+            break;
+        }
+        ret = 0;
+    }
+    break;
+
+    case XEN_DOMCTL_assign_device:
+    {
+        struct domain *d;
+        u8 bus, devfn;
+
+        ret = -ENOSYS;
+        if ( !iommu_enabled )
+            break;
+
+        ret = -EINVAL;
+        if ( unlikely((d = get_domain_by_id(op->domain)) == NULL) )
+        {
+            gdprintk(XENLOG_ERR,
+                "XEN_DOMCTL_assign_device: get_domain_by_id() failed\n");
+            break;
+        }
+        bus = (op->u.assign_device.machine_bdf >> 16) & 0xff;
+        devfn = (op->u.assign_device.machine_bdf >> 8) & 0xff;
+
+        if ( !iommu_pv_enabled && !is_hvm_domain(d) )
+        {
+            ret = -ENOSYS;
+            break;
+        }
+
+        if ( device_assigned(bus, devfn) )
+        {
+            gdprintk(XENLOG_ERR, "XEN_DOMCTL_assign_device: "
+                     "%x:%x:%x already assigned, or non-existent\n",
+                     bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+            break;
+        }
+
+        ret = assign_device(d, bus, devfn);
+        gdprintk(XENLOG_INFO, "XEN_DOMCTL_assign_device: bdf = %x:%x:%x\n",
+                 bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+        put_domain(d);
+    }
+    break;
+
+    case XEN_DOMCTL_deassign_device:
+    {
+        struct domain *d;
+        u8 bus, devfn;
+
+        ret = -ENOSYS;
+        if ( !iommu_enabled )
+            break;
+
+        ret = -EINVAL;
+        if ( unlikely((d = get_domain_by_id(op->domain)) == NULL) )
+        {
+            gdprintk(XENLOG_ERR,
+                "XEN_DOMCTL_deassign_device: get_domain_by_id() failed\n");
+            break;
+        }
+        bus = (op->u.assign_device.machine_bdf >> 16) & 0xff;
+        devfn = (op->u.assign_device.machine_bdf >> 8) & 0xff;
+
+        if ( !iommu_pv_enabled && !is_hvm_domain(d) )
+        {
+            ret = -ENOSYS;
+            break;
+        }
+
+        if ( !device_assigned(bus, devfn) )
+            break;
+
+        ret = 0;
+        deassign_device(d, bus, devfn);
+        gdprintk(XENLOG_INFO, "XEN_DOMCTL_deassign_device: bdf = %x:%x:%x\n",
+            bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+        put_domain(d);
+    }
+    break;
+
+    case XEN_DOMCTL_bind_pt_irq:
+    {
+        struct domain * d;
+        xen_domctl_bind_pt_irq_t * bind;
+
+        ret = -ESRCH;
+        if ( (d = rcu_lock_domain_by_id(op->domain)) == NULL )
+            break;
+        bind = &(op->u.bind_pt_irq);
+        if ( iommu_enabled )
+            ret = pt_irq_create_bind_vtd(d, bind);
+        if ( ret < 0 )
+            gdprintk(XENLOG_ERR, "pt_irq_create_bind failed!\n");
+        rcu_unlock_domain(d);
+    }
+    break;
+
+    case XEN_DOMCTL_unbind_pt_irq:
+    {
+        struct domain * d;
+        xen_domctl_bind_pt_irq_t * bind;
+
+        ret = -ESRCH;
+        if ( (d = rcu_lock_domain_by_id(op->domain)) == NULL )
+            break;
+        bind = &(op->u.bind_pt_irq);
+        if ( iommu_enabled )
+            ret = pt_irq_destroy_bind_vtd(d, bind);
+        if ( ret < 0 )
+            gdprintk(XENLOG_ERR, "pt_irq_destroy_bind failed!\n");
+        rcu_unlock_domain(d);
+    }
+    break;
+
+    case XEN_DOMCTL_memory_mapping:
+    {
+        struct domain *d;
+        unsigned long gfn = op->u.memory_mapping.first_gfn;
+        unsigned long mfn = op->u.memory_mapping.first_mfn;
+        unsigned long nr_mfns = op->u.memory_mapping.nr_mfns;
+        int i;
+
+        ret = -EINVAL;
+        if ( (mfn + nr_mfns - 1) < mfn ) /* wrap? */
+            break;
+
+        ret = -ESRCH;
+        if ( unlikely((d = rcu_lock_domain_by_id(op->domain)) == NULL) )
+            break;
+
+        ret=0;
+        if ( op->u.memory_mapping.add_mapping )
+        {
+            gdprintk(XENLOG_INFO,
+                "memory_map:add: gfn=%lx mfn=%lx nr_mfns=%lx\n",
+                gfn, mfn, nr_mfns);
+
+            ret = iomem_permit_access(d, mfn, mfn + nr_mfns - 1);
+            for ( i = 0; i < nr_mfns; i++ )
+                assign_domain_mmio_page(d, (gfn+i)<<PAGE_SHIFT,
+                           (mfn+i)<<PAGE_SHIFT, PAGE_SIZE,
+                           ASSIGN_writable | ASSIGN_nocache);
+        }
+        else
+        {
+            gdprintk(XENLOG_INFO,
+                "memory_map:remove: gfn=%lx mfn=%lx nr_mfns=%lx\n",
+                 gfn, mfn, nr_mfns);
+
+            for ( i = 0; i < nr_mfns; i++ )
+                deassign_domain_mmio_page(d, (gfn+i)<<PAGE_SHIFT,
+                        (mfn+i)<<PAGE_SHIFT, PAGE_SIZE);
+            ret = iomem_deny_access(d, mfn, mfn + nr_mfns - 1);
+        }
+
+        rcu_unlock_domain(d);
+    }
+    break;
+
+    case XEN_DOMCTL_ioport_mapping:
+    {
+
+#define MAX_IOPORTS    0x10000
+        struct domain *d;
+        unsigned int fgp = op->u.ioport_mapping.first_gport;
+        unsigned int fmp = op->u.ioport_mapping.first_mport;
+        unsigned int np = op->u.ioport_mapping.nr_ports;
+
+        ret = -EINVAL;
+        if ( (np == 0) || (fgp > MAX_IOPORTS) || (fmp > MAX_IOPORTS) ||
+            ((fgp + np) > MAX_IOPORTS) || ((fmp + np) > MAX_IOPORTS) )
+        {
+            gdprintk(XENLOG_ERR,
+                "ioport_map:invalid:gport=%x mport=%x nr_ports=%x\n",
+                fgp, fmp, np);
+            break;
+        }
+
+        ret = -ESRCH;
+        if ( unlikely((d = rcu_lock_domain_by_id(op->domain)) == NULL) )
+            break;
+
+        if ( op->u.ioport_mapping.add_mapping )
+        {
+            gdprintk(XENLOG_INFO,
+                    "ioport_map:add f_gport=%x f_mport=%x np=%x\n",
+                    fgp, fmp, np);
+
+            ret = ioports_permit_access(d, fgp, fmp, fmp + np - 1);
+        }
+        else
+        {
+            gdprintk(XENLOG_INFO,
+                    "ioport_map:remove f_gport=%x f_mport=%x np=%x\n",
+                    fgp, fmp, np);
+
+            ret = ioports_deny_access(d,  fgp, fgp + np - 1);
+        }
+        rcu_unlock_domain(d);
+    }
+    break;
+
     case XEN_DOMCTL_sethvmcontext:
     { 
         struct hvm_domain_context c;
@@ -387,10 +648,6 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         rcu_unlock_domain(d);
     }
     break;
-
-    case XEN_DOMCTL_assign_device:
-        ret = -ENOSYS;
-        break;
 
     default:
         printk("arch_do_domctl: unrecognized domctl: %d!!!\n",op->cmd);

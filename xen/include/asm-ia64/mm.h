@@ -428,6 +428,8 @@ extern void assign_new_domain0_page(struct domain *d, unsigned long mpaddr);
 extern int __assign_domain_page(struct domain *d, unsigned long mpaddr, unsigned long physaddr, unsigned long flags);
 extern void assign_domain_page(struct domain *d, unsigned long mpaddr, unsigned long physaddr);
 extern void assign_domain_io_page(struct domain *d, unsigned long mpaddr, unsigned long flags);
+extern int deassign_domain_mmio_page(struct domain *d, unsigned long mpaddr,
+                        unsigned long phys_addr, unsigned long size);
 struct p2m_entry;
 extern unsigned long lookup_domain_mpa(struct domain *d, unsigned long mpaddr, struct p2m_entry* entry);
 extern void *domain_mpa_to_imva(struct domain *d, unsigned long mpaddr);
