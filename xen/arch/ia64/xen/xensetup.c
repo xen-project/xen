@@ -740,3 +740,15 @@ void arch_get_xen_caps(xen_capabilities_info_t *info)
     }
 }
 
+int xen_in_range(paddr_t start, paddr_t end)
+{
+    start = max_t(paddr_t, start, xen_pstart);
+    end = min_t(paddr_t, end, xen_pstart + XENHEAP_DEFAULT_SIZE);
+
+    return start < end;
+}
+
+int tboot_in_range(paddr_t start, paddr_t end)
+{
+    return 0;
+}

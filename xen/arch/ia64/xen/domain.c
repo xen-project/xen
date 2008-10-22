@@ -569,6 +569,7 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
 	if (is_idle_domain(d))
 	    return 0;
 
+	INIT_LIST_HEAD(&d->arch.pdev_list);
 	foreign_p2m_init(d);
 #ifdef CONFIG_XEN_IA64_PERVCPU_VHPT
 	d->arch.has_pervcpu_vhpt = opt_pervcpu_vhpt;

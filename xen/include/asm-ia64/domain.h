@@ -43,6 +43,8 @@ extern int shadow_mode_control(struct domain *d, xen_domctl_shadow_op_t *sc);
 extern void panic_domain(struct pt_regs *, const char *, ...)
      __attribute__ ((noreturn, format (printf, 2, 3)));
 
+#define has_arch_pdevs(d)    (!list_empty(&(d)->arch.pdev_list))
+
 struct mm_struct {
 	volatile pgd_t * pgd;
     //	atomic_t mm_users;			/* How many users with user space? */
@@ -166,6 +168,7 @@ struct arch_domain {
     unsigned char rid_bits;		/* number of virtual rid bits (default: 18) */
     int breakimm;               /* The imm value for hypercalls.  */
 
+    struct list_head pdev_list;
     struct virtual_platform_def     vmx_platform;
 #define	hvm_domain vmx_platform /* platform defs are not vmx specific */
 

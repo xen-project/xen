@@ -315,10 +315,6 @@ out:
     spin_unlock(&viosapic->lock);
 }
 
-#define hvm_pci_intx_gsi(dev, intx)  \
-    (((((dev) << 2) + ((dev) >> 3) + (intx)) & 31) + 16)
-        
-
 void viosapic_set_pci_irq(struct domain *d, int device, int intx, int level)
 {
     int irq;

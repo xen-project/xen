@@ -112,3 +112,45 @@ inject_guest_interruption(VCPU *vcpu, u64 vec)
     debugger_event(vec == IA64_EXTINT_VECTOR ?
                    XEN_IA64_DEBUG_ON_EXTINT : XEN_IA64_DEBUG_ON_EXCEPT);
 }
+
+void hvm_pci_intx_assert(
+        struct domain *d, unsigned int device, unsigned int intx)
+{
+    struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
+    unsigned int gsi;
+
+    ASSERT((device <= 31) && (intx <= 3));
+
+    if ( __test_and_set_bit(device * 4 + intx, &hvm_irq->pci_intx.i) )
+        return;
+    gsi = hvm_pci_intx_gsi(device, intx);
+    if ( ++hvm_irq->gsi_assert_count[gsi] == 1 )
+        viosapic_set_irq(d, gsi, 1);
+}
+
+void hvm_pci_intx_deassert(
+        struct domain *d, unsigned int device, unsigned int intx)
+{
+    struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
+    unsigned int gsi;
+
+    ASSERT((device <= 31) && (intx <= 3));
+
+    if ( !__test_and_clear_bit(device * 4 + intx, &hvm_irq->pci_intx.i) )
+        return;
+
+    gsi = hvm_pci_intx_gsi(device, intx);
+
+    if (--hvm_irq->gsi_assert_count[gsi] == 0)
+        viosapic_set_irq(d, gsi, 0);
+}
+
+void hvm_isa_irq_assert(struct domain *d, unsigned int isa_irq)
+{
+    /* dummy */
+}
+
+void hvm_isa_irq_deassert(struct domain *d, unsigned int isa_irq)
+{
+    /* dummy */
+}

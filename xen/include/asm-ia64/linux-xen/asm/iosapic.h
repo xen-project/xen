@@ -175,5 +175,8 @@ extern unsigned long ia64_vector_mask[];
 extern unsigned long ia64_xen_vector[];
 #endif /* XEN */
 
+#define IO_APIC_BASE(idx) ((unsigned int *)iosapic_lists[idx].addr)
+#define IO_APIC_ID(idx)   (iosapic_lists[idx].id)
+
 # endif /* !__ASSEMBLY__ */
 #endif /* __ASM_IA64_IOSAPIC_H */

@@ -124,13 +124,6 @@ irq_descp (int irq)
 	return irq_desc + irq;
 }
 
-/* Extract the IA-64 vector that corresponds to IRQ.  */
-static inline ia64_vector
-irq_to_vector (int irq)
-{
-	return (ia64_vector) irq;
-}
-
 /*
  * Convert the local IA-64 vector to the corresponding irq number.  This translation is
  * done in the context of the interrupt domain that the currently executing CPU belongs

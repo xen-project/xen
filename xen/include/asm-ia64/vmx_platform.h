@@ -21,8 +21,10 @@
 
 #include <public/xen.h>
 #include <public/hvm/params.h>
+#include <asm/hvm/irq.h>
 #include <asm/viosapic.h>
 #include <asm/hvm/vacpi.h>
+#include <xen/hvm/iommu.h>
 
 struct vmx_ioreq_page {
     spinlock_t          lock;
@@ -41,6 +43,9 @@ typedef struct virtual_platform_def {
     /* One IOSAPIC now... */
     struct viosapic             viosapic;
     struct vacpi                vacpi;
+    /* Pass-throgh VT-d */
+    struct hvm_irq              irq;
+    struct hvm_iommu            hvm_iommu;
 } vir_plat_t;
 
 static inline int __fls(uint32_t word)
