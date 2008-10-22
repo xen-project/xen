@@ -722,11 +722,11 @@ static inline void init_fds(struct disk_driver *dd)
 /* Open the disk file and initialize qcow state. */
 static int tdqcow_open (struct disk_driver *dd, const char *name, td_flag_t flags)
 {
-	int fd, len, i, shift, ret, size, l1_table_size, o_flags;
+	int fd, len, i, shift, ret, size, l1_table_size, o_flags, l1_table_block;
 	int max_aio_reqs;
 	struct td_state     *bs = dd->td_state;
 	struct tdqcow_state *s  = (struct tdqcow_state *)dd->private;
-	char *buf;
+	char *buf, *buf2;
 	QCowHeader *header;
 	QCowHeader_ext *exthdr;
 	uint32_t cksum;
@@ -734,8 +734,8 @@ static int tdqcow_open (struct disk_driver *dd, const char *name, td_flag_t flag
 
  	DPRINTF("QCOW: Opening %s\n",name);
 
-	/* Since we don't handle O_DIRECT correctly, don't use it */
-	o_flags = O_LARGEFILE | ((flags == TD_RDONLY) ? O_RDONLY : O_RDWR);
+	o_flags = O_DIRECT | O_LARGEFILE | 
+		((flags == TD_RDONLY) ? O_RDONLY : O_RDWR);
 	fd = open(name, o_flags);
 	if (fd < 0) {
 		DPRINTF("Unable to open %s (%d)\n",name,0 - errno);
@@ -819,9 +819,14 @@ static int tdqcow_open (struct disk_driver *dd, const char *name, td_flag_t flag
 		(int) (s->l1_size * sizeof(uint64_t)), 
 		l1_table_size);
 
-	lseek(fd, s->l1_table_offset, SEEK_SET);
-	if (read(fd, s->l1_table, l1_table_size) != l1_table_size)
+	lseek(fd, 0, SEEK_SET);
+	l1_table_block = l1_table_size + s->l1_table_offset;
+	l1_table_block = l1_table_block + 512 - (l1_table_block % 512); 
+	ret = posix_memalign((void **)&buf2, 4096, l1_table_block);
+	if (ret != 0) goto fail;
+	if (read(fd, buf2, l1_table_block) != l1_table_block)
 		goto fail;
+	memcpy(s->l1_table, buf2 + s->l1_table_offset, l1_table_size);
 
 	for(i = 0; i < s->l1_size; i++) {
 		be64_to_cpus(&s->l1_table[i]);
@@ -871,8 +876,9 @@ static int tdqcow_open (struct disk_driver *dd, const char *name, td_flag_t flag
 
 			DPRINTF("qcow: Converting image to big endian L1 table\n");
 
-			lseek(fd, s->l1_table_offset, SEEK_SET);
-			if (write(fd, s->l1_table, l1_table_size) != l1_table_size) {
+			memcpy(buf2 + s->l1_table_offset, s->l1_table, l1_table_size);
+			lseek(fd, 0, SEEK_SET);
+			if (write(fd, buf2, l1_table_block) != l1_table_block) {
 				DPRINTF("qcow: Failed to write new L1 table\n");
 				goto fail;
 			}
@@ -917,7 +923,7 @@ static int tdqcow_open (struct disk_driver *dd, const char *name, td_flag_t flag
 	init_fds(dd);
 
 	if (!final_cluster)
-		s->fd_end = s->l1_table_offset + l1_table_size;
+		s->fd_end = l1_table_block;
 	else {
 		s->fd_end = lseek(fd, 0, SEEK_END);
 		if (s->fd_end == (off_t)-1)
