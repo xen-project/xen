@@ -10,6 +10,7 @@
 #include <xen/types.h>
 #include <xen/lib.h>
 #include <xen/sched.h>
+#include <xen/domain.h>
 #include <xen/guest_access.h>
 #include <xen/acpi.h>
 #include <public/platform.h>
@@ -19,15 +20,6 @@ DEFINE_SPINLOCK(xenpf_lock);
 
 extern int set_px_pminfo(uint32_t cpu, struct xen_processor_performance *perf);
 extern long set_cx_pminfo(uint32_t cpu, struct xen_processor_power *power);
-
-int xenpf_copy_px_states(struct processor_performance *pxpt,
-        struct xen_processor_performance *dom0_px_info)
-{
-    if (!pxpt || !dom0_px_info)
-        return -EINVAL;
-    return  copy_from_guest(pxpt->states, dom0_px_info->states,
-                    dom0_px_info->state_count);
-}
 
 long do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
 {
@@ -50,6 +42,11 @@ long do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
         switch ( op->u.set_pminfo.type )
         {
         case XEN_PM_PX:
+            if ( !(xen_processor_pmbits & XEN_PROCESSOR_PM_PX) )
+            {
+                ret = -ENOSYS;
+                break;
+            }
             ret = set_px_pminfo(op->u.set_pminfo.id,
                     &op->u.set_pminfo.perf);
             break;
