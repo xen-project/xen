@@ -54,6 +54,14 @@ void _spin_barrier(spinlock_t *lock)
     mb();
 }
 
+void _spin_barrier_irq(spinlock_t *lock)
+{
+    unsigned long flags;
+    local_irq_save(flags);
+    _spin_barrier(lock);
+    local_irq_restore(flags);
+}
+
 void _spin_lock_recursive(spinlock_t *lock)
 {
     int cpu = smp_processor_id();
