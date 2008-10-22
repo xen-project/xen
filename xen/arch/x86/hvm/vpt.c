@@ -355,8 +355,8 @@ void pt_migrate(struct vcpu *v)
 }
 
 void create_periodic_time(
-    struct vcpu *v, struct periodic_time *pt, uint64_t period,
-    uint8_t irq, char one_shot, time_cb *cb, void *data)
+    struct vcpu *v, struct periodic_time *pt, uint64_t delta,
+    uint64_t period, uint8_t irq, time_cb *cb, void *data)
 {
     ASSERT(pt->source != 0);
 
@@ -369,7 +369,7 @@ void create_periodic_time(
     pt->irq_issued = 0;
 
     /* Periodic timer must be at least 0.9ms. */
-    if ( (period < 900000) && !one_shot )
+    if ( (period < 900000) && period )
     {
         if ( !test_and_set_bool(pt->warned_timeout_too_short) )
             gdprintk(XENLOG_WARNING, "HVM_PlatformTime: program too "
@@ -382,15 +382,15 @@ void create_periodic_time(
     pt->last_plt_gtime = hvm_get_guest_time(pt->vcpu);
     pt->irq = irq;
     pt->period_cycles = (u64)period;
-    pt->one_shot = one_shot;
-    pt->scheduled = NOW() + period;
+    pt->one_shot = !period;
+    pt->scheduled = NOW() + delta;
     /*
      * Offset LAPIC ticks from other timer ticks. Otherwise guests which use
      * LAPIC ticks for process accounting can see long sequences of process
      * ticks incorrectly accounted to interrupt processing.
      */
     if ( pt->source == PTSRC_lapic )
-        pt->scheduled += period >> 1;
+        pt->scheduled += delta >> 1;
     pt->cb = cb;
     pt->priv = data;
 
