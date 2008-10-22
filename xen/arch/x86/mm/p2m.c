@@ -956,18 +956,18 @@ guest_physmap_add_entry(struct domain *d, unsigned long gfn,
     /* First, remove m->p mappings for existing p->m mappings */
     for ( i = 0; i < (1UL << page_order); i++ )
     {
-        omfn = gfn_to_mfn(d, gfn, &ot);
+        omfn = gfn_to_mfn(d, gfn + i, &ot);
         if ( p2m_is_ram(ot) )
         {
             ASSERT(mfn_valid(omfn));
-            set_gpfn_from_mfn(mfn_x(omfn)+i, INVALID_M2P_ENTRY);
+            set_gpfn_from_mfn(mfn_x(omfn), INVALID_M2P_ENTRY);
         }
     }
 
     /* Then, look for m->p mappings for this range and deal with them */
     for ( i = 0; i < (1UL << page_order); i++ )
     {
-        ogfn = mfn_to_gfn(d, _mfn(mfn));
+        ogfn = mfn_to_gfn(d, _mfn(mfn+i));
         if (
 #ifdef __x86_64__
             (ogfn != 0x5555555555555555L)
@@ -975,20 +975,20 @@ guest_physmap_add_entry(struct domain *d, unsigned long gfn,
             (ogfn != 0x55555555L)
 #endif
             && (ogfn != INVALID_M2P_ENTRY)
-            && (ogfn != gfn) )
+            && (ogfn != gfn + i) )
         {
             /* This machine frame is already mapped at another physical
              * address */
             P2M_DEBUG("aliased! mfn=%#lx, old gfn=%#lx, new gfn=%#lx\n",
-                      mfn, ogfn, gfn);
+                      mfn + i, ogfn, gfn + i);
             omfn = gfn_to_mfn(d, ogfn, &ot);
             if ( p2m_is_ram(ot) )
             {
                 ASSERT(mfn_valid(omfn));
                 P2M_DEBUG("old gfn=%#lx -> mfn %#lx\n",
                           ogfn , mfn_x(omfn));
-                if ( mfn_x(omfn) == mfn )
-                    p2m_remove_page(d, ogfn, mfn, 0);
+                if ( mfn_x(omfn) == (mfn + i) )
+                    p2m_remove_page(d, ogfn, mfn + i, 0);
             }
         }
     }
