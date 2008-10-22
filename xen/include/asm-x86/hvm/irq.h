@@ -22,62 +22,11 @@
 #ifndef __ASM_X86_HVM_IRQ_H__
 #define __ASM_X86_HVM_IRQ_H__
 
-#include <xen/types.h>
-#include <xen/spinlock.h>
-#include <asm/irq.h>
 #include <asm/pirq.h>
+#include <xen/hvm/irq.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/vpic.h>
 #include <asm/hvm/vioapic.h>
-#include <public/hvm/save.h>
-
-struct dev_intx_gsi_link {
-    struct list_head list;
-    uint8_t device;
-    uint8_t intx;
-    uint8_t gsi;
-    uint8_t link;
-};
-
-#define _HVM_IRQ_DPCI_MSI  0x1
-
-struct hvm_gmsi_info {
-    uint32_t gvec;
-    uint32_t gflags;
-};
-
-struct hvm_mirq_dpci_mapping {
-    uint32_t flags;
-    int pending;
-    struct list_head digl_list;
-    struct domain *dom;
-    struct hvm_gmsi_info gmsi;
-};
-
-struct hvm_girq_dpci_mapping {
-    uint8_t valid;
-    uint8_t device;
-    uint8_t intx;
-    uint8_t machine_gsi;
-};
-
-#define NR_ISAIRQS  16
-#define NR_LINK     4
-/* Protected by domain's event_lock */
-struct hvm_irq_dpci {
-    /* Machine IRQ to guest device/intx mapping. */
-    DECLARE_BITMAP(mapping, NR_PIRQS);
-    struct hvm_mirq_dpci_mapping mirq[NR_IRQS];
-    /* Guest IRQ to guest device/intx mapping. */
-    struct hvm_girq_dpci_mapping girq[NR_IRQS];
-    uint8_t msi_gvec_pirq[NR_VECTORS];
-    DECLARE_BITMAP(dirq_mask, NR_IRQS);
-    /* Record of mapped ISA IRQs */
-    DECLARE_BITMAP(isairq_map, NR_ISAIRQS);
-    /* Record of mapped Links */
-    uint8_t link_cnt[NR_LINK];
-    struct timer hvm_timer[NR_IRQS];
-};
 
 struct hvm_irq {
     /*
@@ -149,27 +98,16 @@ struct hvm_irq {
 
 #define hvm_isa_irq_to_gsi(isa_irq) ((isa_irq) ? : 2)
 
-/* Modify state of a PCI INTx wire. */
-void hvm_pci_intx_assert(
-    struct domain *d, unsigned int device, unsigned int intx);
-void hvm_pci_intx_deassert(
-    struct domain *d, unsigned int device, unsigned int intx);
-
-/* Modify state of an ISA device's IRQ wire. */
-void hvm_isa_irq_assert(
-    struct domain *d, unsigned int isa_irq);
-void hvm_isa_irq_deassert(
-    struct domain *d, unsigned int isa_irq);
-
-void hvm_set_pci_link_route(struct domain *d, u8 link, u8 isa_irq);
-
-void hvm_maybe_deassert_evtchn_irq(void);
-void hvm_assert_evtchn_irq(struct vcpu *v);
-void hvm_set_callback_via(struct domain *d, uint64_t via);
-
 /* Check/Acknowledge next pending interrupt. */
 struct hvm_intack hvm_vcpu_has_pending_irq(struct vcpu *v);
 struct hvm_intack hvm_vcpu_ack_pending_irq(struct vcpu *v,
                                            struct hvm_intack intack);
+
+/*
+ * Currently IA64 Xen doesn't support MSI. So for x86, we define this macro
+ * to control the conditional compilation of some MSI-related functions.
+ * This macro will be removed once IA64 has MSI support.
+ */
+#define SUPPORT_MSI_REMAPPING 1
 
 #endif /* __ASM_X86_HVM_IRQ_H__ */

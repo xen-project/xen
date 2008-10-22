@@ -1184,6 +1184,13 @@ static void vmx_set_uc_mode(struct vcpu *v)
     vpid_sync_all();
 }
 
+static void vmx_set_info_guest(struct vcpu *v)
+{
+    vmx_vmcs_enter(v);
+    __vmwrite(GUEST_DR7, v->arch.guest_context.debugreg[7]);
+    vmx_vmcs_exit(v);
+}
+
 static struct hvm_function_table vmx_function_table = {
     .name                 = "VMX",
     .domain_initialise    = vmx_domain_initialise,
@@ -1214,7 +1221,8 @@ static struct hvm_function_table vmx_function_table = {
     .msr_read_intercept   = vmx_msr_read_intercept,
     .msr_write_intercept  = vmx_msr_write_intercept,
     .invlpg_intercept     = vmx_invlpg_intercept,
-    .set_uc_mode          = vmx_set_uc_mode
+    .set_uc_mode          = vmx_set_uc_mode,
+    .set_info_guest       = vmx_set_info_guest
 };
 
 static unsigned long *vpid_bitmap;
@@ -2048,8 +2056,12 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
 
     perfc_incra(vmexits, exit_reason);
 
-    if ( exit_reason != EXIT_REASON_EXTERNAL_INTERRUPT )
-        local_irq_enable();
+    /* Handle the interrupt we missed before allowing any more in. */
+    if ( exit_reason == EXIT_REASON_EXTERNAL_INTERRUPT )
+        vmx_do_extint(regs);
+
+    /* Now enable interrupts so it's safe to take locks. */
+    local_irq_enable();
 
     if ( unlikely(exit_reason & VMX_EXIT_REASONS_FAILED_VMENTRY) )
         return vmx_failed_vmentry(exit_reason, regs);
@@ -2177,7 +2189,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         break;
     }
     case EXIT_REASON_EXTERNAL_INTERRUPT:
-        vmx_do_extint(regs);
+        /* Already handled above. */
         break;
     case EXIT_REASON_TRIPLE_FAULT:
         hvm_triple_fault();

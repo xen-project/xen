@@ -34,6 +34,7 @@
 #include <xen/sched.h>
 #include <xen/timer.h>
 #include <xen/xmalloc.h>
+#include <xen/guest_access.h>
 #include <xen/domain.h>
 #include <asm/bug.h>
 #include <asm/io.h>
@@ -185,10 +186,18 @@ int cpufreq_del_cpu(unsigned int cpu)
     return 0;
 }
 
+static void print_PCT(struct xen_pct_register *ptr)
+{
+    printk(KERN_INFO "\t_PCT: descriptor=%d, length=%d, space_id=%d, "
+            "bit_width=%d, bit_offset=%d, reserved=%d, address=%"PRId64"\n",
+            ptr->descriptor, ptr->length, ptr->space_id, ptr->bit_width, 
+            ptr->bit_offset, ptr->reserved, ptr->address);
+}
+
 static void print_PSS(struct xen_processor_px *ptr, int count)
 {
     int i;
-    printk(KERN_INFO "\t_PSS:\n");
+    printk(KERN_INFO "\t_PSS: state_count=%d\n", count);
     for (i=0; i<count; i++){
         printk(KERN_INFO "\tState%d: %"PRId64"MHz %"PRId64"mW %"PRId64"us "
                "%"PRId64"us 0x%"PRIx64" 0x%"PRIx64"\n",
@@ -211,20 +220,19 @@ static void print_PSD( struct xen_psd_package *ptr)
             ptr->num_processors);
 }
 
+static void print_PPC(unsigned int platform_limit)
+{
+    printk(KERN_INFO "\t_PPC: %d\n", platform_limit);
+}
+
 int set_px_pminfo(uint32_t acpi_id, struct xen_processor_performance *dom0_px_info)
 {
     int ret=0, cpuid;
     struct processor_pminfo *pmpt;
     struct processor_performance *pxpt;
 
-    if ( !(xen_processor_pmbits & XEN_PROCESSOR_PM_PX) )
-    {
-        ret = -ENOSYS;
-        goto out;
-    }
-
     cpuid = get_cpu_id(acpi_id);
-    if ( cpuid < 0 )
+    if ( cpuid < 0 || !dom0_px_info)
     {
         ret = -EINVAL;
         goto out;
@@ -256,6 +264,8 @@ int set_px_pminfo(uint32_t acpi_id, struct xen_processor_performance *dom0_px_in
         memcpy ((void *)&pxpt->status_register,
                 (void *)&dom0_px_info->status_register,
                 sizeof(struct xen_pct_register));
+        print_PCT(&pxpt->control_register);
+        print_PCT(&pxpt->status_register);
     }
     if ( dom0_px_info->flags & XEN_PX_PSS ) 
     {
@@ -265,12 +275,8 @@ int set_px_pminfo(uint32_t acpi_id, struct xen_processor_performance *dom0_px_in
             ret = -ENOMEM;
             goto out;
         }
-        if ( xenpf_copy_px_states(pxpt, dom0_px_info) )
-        {
-            xfree(pxpt->states);
-            ret = -EFAULT;
-            goto out;
-        }
+        copy_from_guest(pxpt->states, dom0_px_info->states, 
+                                      dom0_px_info->state_count);
         pxpt->state_count = dom0_px_info->state_count;
         print_PSS(pxpt->states,pxpt->state_count);
     }
@@ -285,6 +291,7 @@ int set_px_pminfo(uint32_t acpi_id, struct xen_processor_performance *dom0_px_in
     if ( dom0_px_info->flags & XEN_PX_PPC )
     {
         pxpt->platform_limit = dom0_px_info->platform_limit;
+        print_PPC(pxpt->platform_limit);
 
         if ( pxpt->init == XEN_PX_INIT )
         {

@@ -100,61 +100,6 @@ static void enable_intr_window(struct vcpu *v, struct hvm_intack intack)
     vmcb->general1_intercepts |= GENERAL1_INTERCEPT_VINTR;
 }
 
-extern int vmsi_deliver(struct domain *d, int pirq);
-static int hvm_pci_msi_assert(struct domain *d, int pirq)
-{
-    return vmsi_deliver(d, pirq);
-}
-
-static void svm_dirq_assist(struct vcpu *v)
-{
-    unsigned int irq;
-    uint32_t device, intx;
-    struct domain *d = v->domain;
-    struct hvm_irq_dpci *hvm_irq_dpci = d->arch.hvm_domain.irq.dpci;
-    struct dev_intx_gsi_link *digl;
-
-    if ( !iommu_enabled || (v->vcpu_id != 0) || (hvm_irq_dpci == NULL) )
-        return;
-
-    for ( irq = find_first_bit(hvm_irq_dpci->dirq_mask, NR_IRQS);
-          irq < NR_IRQS;
-          irq = find_next_bit(hvm_irq_dpci->dirq_mask, NR_IRQS, irq + 1) )
-    {
-        if ( !test_and_clear_bit(irq, &hvm_irq_dpci->dirq_mask) )
-            continue;
-
-        spin_lock(&d->event_lock);
-        if ( test_bit(_HVM_IRQ_DPCI_MSI, &hvm_irq_dpci->mirq[irq].flags) )
-        {
-            hvm_pci_msi_assert(d, irq);
-            spin_unlock(&d->event_lock);
-            continue;
-        }
-
-        stop_timer(&hvm_irq_dpci->hvm_timer[domain_irq_to_vector(d, irq)]);
-
-        list_for_each_entry ( digl, &hvm_irq_dpci->mirq[irq].digl_list, list )
-        {
-            device = digl->device;
-            intx = digl->intx;
-            hvm_pci_intx_assert(d, device, intx);
-            hvm_irq_dpci->mirq[irq].pending++;
-        }
-
-        /*
-         * Set a timer to see if the guest can finish the interrupt or not. For
-         * example, the guest OS may unmask the PIC during boot, before the
-         * guest driver is loaded. hvm_pci_intx_assert() may succeed, but the
-         * guest will never deal with the irq, then the physical interrupt line
-         * will never be deasserted.
-         */
-        set_timer(&hvm_irq_dpci->hvm_timer[domain_irq_to_vector(d, irq)],
-                  NOW() + PT_IRQ_TIME_OUT);
-        spin_unlock(&d->event_lock);
-    }
-}
-
 asmlinkage void svm_intr_assist(void) 
 {
     struct vcpu *v = current;
@@ -163,7 +108,7 @@ asmlinkage void svm_intr_assist(void)
 
     /* Crank the handle on interrupt state. */
     pt_update_irq(v);
-    svm_dirq_assist(v);
+    hvm_dirq_assist(v);
 
     do {
         intack = hvm_vcpu_has_pending_irq(v);

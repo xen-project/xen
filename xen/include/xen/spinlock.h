@@ -3,93 +3,95 @@
 
 #include <xen/config.h>
 #include <asm/system.h>
-
-#define spin_lock_irqsave(lock, flags) \
-    do { local_irq_save(flags); spin_lock(lock); } while ( 0 )
-#define spin_lock_irq(lock) \
-    do { local_irq_disable(); spin_lock(lock); } while ( 0 )
-
-#define read_lock_irqsave(lock, flags) \
-    do { local_irq_save(flags); read_lock(lock); } while ( 0 )
-#define read_lock_irq(lock) \
-    do { local_irq_disable(); read_lock(lock); } while ( 0 )
-
-#define write_lock_irqsave(lock, flags) \
-    do { local_irq_save(flags); write_lock(lock); } while ( 0 )
-#define write_lock_irq(lock) \
-    do { local_irq_disable(); write_lock(lock); } while ( 0 )
-
-#define spin_unlock_irqrestore(lock, flags) \
-    do { spin_unlock(lock); local_irq_restore(flags); } while ( 0 )
-#define spin_unlock_irq(lock) \
-    do { spin_unlock(lock); local_irq_enable(); } while ( 0 )
-
-#define read_unlock_irqrestore(lock, flags) \
-    do { read_unlock(lock); local_irq_restore(flags); } while ( 0 )
-#define read_unlock_irq(lock) \
-    do { read_unlock(lock); local_irq_enable(); } while ( 0 )
-
-#define write_unlock_irqrestore(lock, flags) \
-    do { write_unlock(lock); local_irq_restore(flags); } while ( 0 )
-#define write_unlock_irq(lock) \
-    do { write_unlock(lock); local_irq_enable(); } while ( 0 )
-
-#ifdef CONFIG_SMP
-
 #include <asm/spinlock.h>
 
-#else
+typedef struct {
+    raw_spinlock_t raw;
+    u16 recurse_cpu:12;
+    u16 recurse_cnt:4;
+} spinlock_t;
 
-#if (__GNUC__ > 2)
-typedef struct { } spinlock_t;
-#define SPIN_LOCK_UNLOCKED /*(spinlock_t)*/ { }
-#else
-typedef struct { int gcc_is_buggy; } spinlock_t;
-#define SPIN_LOCK_UNLOCKED /*(spinlock_t)*/ { 0 }
-#endif
+#define SPIN_LOCK_UNLOCKED { _RAW_SPIN_LOCK_UNLOCKED, 0xfffu, 0 }
+#define DEFINE_SPINLOCK(l) spinlock_t l = SPIN_LOCK_UNLOCKED
+#define spin_lock_init(l) (*(l) = (spinlock_t)SPIN_LOCK_UNLOCKED)
 
-#define spin_lock_init(lock)             do { } while(0)
-#define spin_is_locked(lock)             (0)
-#define _raw_spin_lock(lock)             (void)(lock)
-#define _raw_spin_trylock(lock)          ({1; })
-#define _raw_spin_unlock(lock)           do { } while(0)
-#define _raw_spin_lock_recursive(lock)   do { } while(0)
-#define _raw_spin_unlock_recursive(lock) do { } while(0)
+typedef struct {
+    raw_rwlock_t raw;
+} rwlock_t;
 
-#if (__GNUC__ > 2)
-typedef struct { } rwlock_t;
-#define RW_LOCK_UNLOCKED /*(rwlock_t)*/ { }
-#else
-typedef struct { int gcc_is_buggy; } rwlock_t;
-#define RW_LOCK_UNLOCKED /*(rwlock_t)*/ { 0 }
-#endif
+#define RW_LOCK_UNLOCKED { _RAW_RW_LOCK_UNLOCKED }
+#define DEFINE_RWLOCK(l) rwlock_t l = RW_LOCK_UNLOCKED
+#define rwlock_init(l) (*(l) = (rwlock_t)RW_LOCK_UNLOCKED)
 
-#define rwlock_init(lock)            do { } while(0)
-#define _raw_read_lock(lock)         (void)(lock) /* Not "unused variable". */
-#define _raw_read_unlock(lock)       do { } while(0)
-#define _raw_write_lock(lock)        (void)(lock) /* Not "unused variable". */
-#define _raw_write_unlock(lock)      do { } while(0)
+void _spin_lock(spinlock_t *lock);
+void _spin_lock_irq(spinlock_t *lock);
+unsigned long _spin_lock_irqsave(spinlock_t *lock);
 
-#endif
+void _spin_unlock(spinlock_t *lock);
+void _spin_unlock_irq(spinlock_t *lock);
+void _spin_unlock_irqrestore(spinlock_t *lock, unsigned long flags);
 
-#define spin_lock(_lock)             _raw_spin_lock(_lock)
-#define spin_trylock(_lock)          _raw_spin_trylock(_lock)
-#define spin_unlock(_lock)           _raw_spin_unlock(_lock)
-#define spin_lock_recursive(_lock)   _raw_spin_lock_recursive(_lock)
-#define spin_unlock_recursive(_lock) _raw_spin_unlock_recursive(_lock)
-#define read_lock(_lock)             _raw_read_lock(_lock)
-#define read_unlock(_lock)           _raw_read_unlock(_lock)
-#define write_lock(_lock)            _raw_write_lock(_lock)
-#define write_unlock(_lock)          _raw_write_unlock(_lock)
+int _spin_is_locked(spinlock_t *lock);
+int _spin_trylock(spinlock_t *lock);
+void _spin_barrier(spinlock_t *lock);
+
+void _spin_lock_recursive(spinlock_t *lock);
+void _spin_unlock_recursive(spinlock_t *lock);
+
+void _read_lock(rwlock_t *lock);
+void _read_lock_irq(rwlock_t *lock);
+unsigned long _read_lock_irqsave(rwlock_t *lock);
+
+void _read_unlock(rwlock_t *lock);
+void _read_unlock_irq(rwlock_t *lock);
+void _read_unlock_irqrestore(rwlock_t *lock, unsigned long flags);
+
+void _write_lock(rwlock_t *lock);
+void _write_lock_irq(rwlock_t *lock);
+unsigned long _write_lock_irqsave(rwlock_t *lock);
+
+void _write_unlock(rwlock_t *lock);
+void _write_unlock_irq(rwlock_t *lock);
+void _write_unlock_irqrestore(rwlock_t *lock, unsigned long flags);
+
+#define spin_lock(l)                  _spin_lock(l)
+#define spin_lock_irq(l)              _spin_lock_irq(l)
+#define spin_lock_irqsave(l, f)       ((f) = _spin_lock_irqsave(l))
+
+#define spin_unlock(l)                _spin_unlock(l)
+#define spin_unlock_irq(l)            _spin_unlock_irq(l)
+#define spin_unlock_irqrestore(l, f)  _spin_unlock_irqrestore(l, f)
+
+#define spin_is_locked(l)             _raw_spin_is_locked(&(l)->raw)
+#define spin_trylock(l)               _spin_trylock(l)
 
 /* Ensure a lock is quiescent between two critical operations. */
-static inline void spin_barrier(spinlock_t *lock)
-{
-    do { mb(); } while ( spin_is_locked(lock) );
-    mb();
-}
+#define spin_barrier(l)               _spin_barrier(l)
 
-#define DEFINE_SPINLOCK(x) spinlock_t x = SPIN_LOCK_UNLOCKED
-#define DEFINE_RWLOCK(x) rwlock_t x = RW_LOCK_UNLOCKED
+/*
+ * spin_[un]lock_recursive(): Use these forms when the lock can (safely!) be
+ * reentered recursively on the same CPU. All critical regions that may form
+ * part of a recursively-nested set must be protected by these forms. If there
+ * are any critical regions that cannot form part of such a set, they can use
+ * standard spin_[un]lock().
+ */
+#define spin_lock_recursive(l)        _spin_lock_recursive(l)
+#define spin_unlock_recursive(l)      _spin_unlock_recursive(l)
+
+#define read_lock(l)                  _read_lock(l)
+#define read_lock_irq(l)              _read_lock_irq(l)
+#define read_lock_irqsave(l, f)       ((f) = _read_lock_irqsave(l))
+
+#define read_unlock(l)                _read_unlock(l)
+#define read_unlock_irq(l)            _read_unlock_irq(l)
+#define read_unlock_irqrestore(l, f)  _read_unlock_irqrestore(l, f)
+
+#define write_lock(l)                 _write_lock(l)
+#define write_lock_irq(l)             _write_lock_irq(l)
+#define write_lock_irqsave(l, f)      ((f) = _write_lock_irqsave(l))
+
+#define write_unlock(l)               _write_unlock(l)
+#define write_unlock_irq(l)           _write_unlock_irq(l)
+#define write_unlock_irqrestore(l, f) _write_unlock_irqrestore(l, f)
 
 #endif /* __SPINLOCK_H__ */

@@ -114,34 +114,19 @@ static int remove_from_heap(struct timer **heap, struct timer *t)
 
 
 /* Add new entry @t to @heap. Return TRUE if new top of heap. */
-static int add_to_heap(struct timer ***pheap, struct timer *t)
+static int add_to_heap(struct timer **heap, struct timer *t)
 {
-    struct timer **heap = *pheap;
     int sz = GET_HEAP_SIZE(heap);
 
-    /* Copy the heap if it is full. */
+    /* Fail if the heap is full. */
     if ( unlikely(sz == GET_HEAP_LIMIT(heap)) )
-    {
-        /* old_limit == (2^n)-1; new_limit == (2^(n+4))-1 */
-        int old_limit = GET_HEAP_LIMIT(heap);
-        int new_limit = ((old_limit + 1) << 4) - 1;
-        if ( in_irq() )
-            goto out;
-        heap = xmalloc_array(struct timer *, new_limit + 1);
-        if ( heap == NULL )
-            goto out;
-        memcpy(heap, *pheap, (old_limit + 1) * sizeof(*heap));
-        SET_HEAP_LIMIT(heap, new_limit);
-        if ( old_limit != 0 )
-            xfree(*pheap);
-        *pheap = heap;
-    }
+        return 0;
 
     SET_HEAP_SIZE(heap, ++sz);
     heap[sz] = t;
     t->heap_offset = sz;
     up_heap(heap, sz);
- out:
+
     return (t->heap_offset == 1);
 }
 
@@ -210,7 +195,7 @@ static int add_entry(struct timers *timers, struct timer *t)
     /* Try to add to heap. t->heap_offset indicates whether we succeed. */
     t->heap_offset = 0;
     t->status = TIMER_STATUS_in_heap;
-    rc = add_to_heap(&timers->heap, t);
+    rc = add_to_heap(timers->heap, t);
     if ( t->heap_offset != 0 )
         return rc;
 
@@ -368,6 +353,27 @@ static void timer_softirq_action(void)
     void          *data;
 
     ts = &this_cpu(timers);
+    heap = ts->heap;
+
+    /* If we are using overflow linked list, try to allocate a larger heap. */
+    if ( unlikely(ts->list != NULL) )
+    {
+        /* old_limit == (2^n)-1; new_limit == (2^(n+4))-1 */
+        int old_limit = GET_HEAP_LIMIT(heap);
+        int new_limit = ((old_limit + 1) << 4) - 1;
+        struct timer **newheap = xmalloc_array(struct timer *, new_limit + 1);
+        if ( newheap != NULL )
+        {
+            spin_lock_irq(&ts->lock);
+            memcpy(newheap, heap, (old_limit + 1) * sizeof(*heap));
+            SET_HEAP_LIMIT(newheap, new_limit);
+            ts->heap = newheap;
+            spin_unlock_irq(&ts->lock);
+            if ( old_limit != 0 )
+                xfree(heap);
+            heap = newheap;
+        }
+    }
 
     spin_lock_irq(&ts->lock);
 
@@ -380,9 +386,8 @@ static void timer_softirq_action(void)
         t->status = TIMER_STATUS_inactive;
         add_entry(ts, t);
     }
-    
-    heap = ts->heap;
-    now  = NOW();
+
+    now = NOW();
 
     while ( (GET_HEAP_SIZE(heap) != 0) &&
             ((t = heap[1])->expires < (now + TIMER_SLOP)) )
@@ -397,9 +402,6 @@ static void timer_softirq_action(void)
         spin_unlock_irq(&ts->lock);
         (*fn)(data);
         spin_lock_irq(&ts->lock);
-
-        /* Heap may have grown while the lock was released. */
-        heap = ts->heap;
     }
 
     deadline = GET_HEAP_SIZE(heap) ? heap[1]->expires : 0;

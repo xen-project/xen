@@ -55,9 +55,11 @@ from xen.xend.XendAPIConstants import *
 
 from xen.xend.XendVMMetrics import XendVMMetrics
 
+from xen.xend import XendAPIStore
 from xen.xend.XendPPCI import XendPPCI
 from xen.xend.XendDPCI import XendDPCI
-from xen.xend import XendAPIStore
+from xen.xend.XendPSCSI import XendPSCSI
+from xen.xend.XendDSCSI import XendDSCSI
 
 MIGRATE_TIMEOUT = 30.0
 BOOTLOADER_LOOPBACK_DEVICE = '/dev/xvdp'
@@ -663,6 +665,9 @@ class XendDomainInfo:
                 if dev_type == 'pci':
                     for dev in dev_config_dict['devs']:
                         XendAPIStore.deregister(dev['uuid'], 'DPCI')
+                if dev_type == 'vscsi':
+                    for dev in dev_config_dict['devs']:
+                        XendAPIStore.deregister(dev['uuid'], 'DSCSI')
                 elif dev_type == 'tap':
                     self.info['vbd_refs'].remove(dev_uuid)
                 else:
@@ -786,12 +791,11 @@ class XendDomainInfo:
         if dev_class != 'vscsi':
             return False
 
-        dev_config = self.info.pci_convert_sxp_to_dict(dev_sxp)
+        dev_config = self.info.vscsi_convert_sxp_to_dict(dev_sxp)
         dev = dev_config['devs'][0]
-        req_devid = sxp.child_value(dev_sxp, 'devid')
-        req_devid = int(req_devid)
+        req_devid = int(dev['devid'])
         existing_dev_info = self._getDeviceInfo_vscsi(req_devid, dev['v-dev'])
-        state = sxp.child_value(dev_sxp, 'state')
+        state = dev['state']
 
         if state == 'Initialising':
             # new create
@@ -1502,23 +1506,18 @@ class XendDomainInfo:
         return self.info['VCPUs_max']
 
     def setVCpuCount(self, vcpus):
-        if vcpus <= 0:
-            raise XendError('Invalid VCPUs')
+        def vcpus_valid(n):
+            if vcpus <= 0:
+                raise XendError('Zero or less VCPUs is invalid')
+            if self.domid >= 0 and vcpus > self.info['VCPUs_max']:
+                raise XendError('Cannot set vcpus greater than max vcpus on running domain')
+        vcpus_valid(vcpus)
         
         self.info['vcpu_avail'] = (1 << vcpus) - 1
         if self.domid >= 0:
             self.storeVm('vcpu_avail', self.info['vcpu_avail'])
-            # update dom differently depending on whether we are adjusting
-            # vcpu number up or down, otherwise _vcpuDomDetails does not
-            # disable the vcpus
-            if self.info['VCPUs_max'] > vcpus:
-                # decreasing
-                self._writeDom(self._vcpuDomDetails())
-                self.info['VCPUs_live'] = vcpus
-            else:
-                # same or increasing
-                self.info['VCPUs_live'] = vcpus
-                self._writeDom(self._vcpuDomDetails())
+            self._writeDom(self._vcpuDomDetails())
+            self.info['VCPUs_live'] = vcpus
         else:
             if self.info['VCPUs_max'] > vcpus:
                 # decreasing
@@ -1528,7 +1527,7 @@ class XendDomainInfo:
                 for c in range(self.info['VCPUs_max'], vcpus):
                     self.info['cpus'].append(list())
             self.info['VCPUs_max'] = vcpus
-            xen.xend.XendDomain.instance().managed_config_save(self)
+        xen.xend.XendDomain.instance().managed_config_save(self)
         log.info("Set VCPU count on domain %s to %d", self.info['name_label'],
                  vcpus)
 
@@ -2241,6 +2240,10 @@ class XendDomainInfo:
             if self.info.has_key('machine_address_size'):
                 log.debug("_initDomain: setting maximum machine address size %d" % self.info['machine_address_size'])
                 xc.domain_set_machine_address_size(self.domid, self.info['machine_address_size'])
+
+            if self.info.has_key('suppress_spurious_page_faults') and self.info['suppress_spurious_page_faults']:
+                log.debug("_initDomain: suppressing spurious page faults")
+                xc.domain_suppress_spurious_page_faults(self.domid)
                 
             self._createChannels()
 
@@ -3233,6 +3236,9 @@ class XendDomainInfo:
     def get_dpcis(self):
         return XendDPCI.get_by_VM(self.info.get('uuid'))
 
+    def get_dscsis(self):
+        return XendDSCSI.get_by_VM(self.info.get('uuid'))
+
     def create_vbd(self, xenapi_vbd, vdi_image_path):
         """Create a VBD using a VDI from XendStorageRepository.
 
@@ -3413,6 +3419,60 @@ class XendDomainInfo:
 
         return dpci_uuid
 
+    def create_dscsi(self, xenapi_dscsi):
+        """Create scsi device from the passed struct in Xen API format.
+
+        @param xenapi_dscsi: DSCSI struct from Xen API
+        @rtype: string
+        @return: UUID
+        """
+
+        dscsi_uuid = uuid.createString()
+
+        # Convert xenapi to sxp
+        pscsi = XendAPIStore.get(xenapi_dscsi.get('PSCSI'), 'PSCSI')
+        devid = int(xenapi_dscsi.get('virtual_HCTL').split(':')[0])
+        target_vscsi_sxp = \
+            ['vscsi', 
+                ['dev',
+                    ['devid', devid],
+                    ['p-devname', pscsi.get_dev_name()],
+                    ['p-dev', pscsi.get_physical_HCTL()],
+                    ['v-dev', xenapi_dscsi.get('virtual_HCTL')],
+                    ['state', 'Initialising'],
+                    ['uuid', dscsi_uuid]
+                ]
+            ]
+
+        if self._stateGet() != XEN_API_VM_POWER_STATE_RUNNING:
+
+            cur_vscsi_sxp = self._getDeviceInfo_vscsi(devid, None)
+
+            if cur_vscsi_sxp is None:
+                dev_uuid = self.info.device_add('vscsi', cfg_sxp = target_vscsi_sxp)
+                if not dev_uuid:
+                    raise XendError('Failed to create device')
+
+            else:
+                new_vscsi_sxp = ['vscsi']
+                for existing_dev in sxp.children(cur_vscsi_sxp, 'dev'):
+                    new_vscsi_sxp.append(existing_dev)
+                new_vscsi_sxp.append(sxp.child0(target_vscsi_sxp, 'dev'))
+
+                dev_uuid = sxp.child_value(cur_vscsi_sxp, 'uuid')
+                self.info.device_update(dev_uuid, new_vscsi_sxp)
+
+            xen.xend.XendDomain.instance().managed_config_save(self)
+
+        else:
+            try:
+                self.device_configure(target_vscsi_sxp)
+
+            except Exception, exn:
+                raise XendError('Failed to create device')
+
+        return dscsi_uuid
+
 
     def destroy_device_by_uuid(self, dev_type, dev_uuid):
         if dev_uuid not in self.info['devices']:
@@ -3480,6 +3540,41 @@ class XendDomainInfo:
             except Exception, exn:
                 raise XendError('Failed to destroy device')
 
+    def destroy_dscsi(self, dev_uuid):
+        dscsi = XendAPIStore.get(dev_uuid, 'DSCSI')
+        devid = dscsi.get_virtual_host()
+        vHCTL = dscsi.get_virtual_HCTL()
+        cur_vscsi_sxp = self._getDeviceInfo_vscsi(devid, None)
+        dev_uuid = sxp.child_value(cur_vscsi_sxp, 'uuid')
+
+        target_dev = None
+        new_vscsi_sxp = ['vscsi']
+        for dev in sxp.children(cur_vscsi_sxp, 'dev'):
+            if vHCTL == sxp.child_value(dev, 'v-dev'):
+                target_dev = dev
+            else:
+                new_vscsi_sxp.append(dev)
+
+        if target_dev is None:
+            raise XendError('Failed to destroy device')
+
+        target_dev.append(['state', 'Closing'])
+        target_vscsi_sxp = ['vscsi', target_dev]
+
+        if self._stateGet() != XEN_API_VM_POWER_STATE_RUNNING:
+
+            self.info.device_update(dev_uuid, new_vscsi_sxp)
+            if len(sxp.children(new_vscsi_sxp, 'dev')) == 0:
+                del self.info['devices'][dev_uuid]
+            xen.xend.XendDomain.instance().managed_config_save(self)
+
+        else:
+            try:
+                self.device_configure(target_vscsi_sxp)
+
+            except Exception, exn:
+                raise XendError('Failed to destroy device')
+
     def destroy_xapi_instances(self):
         """Destroy Xen-API instances stored in XendAPIStore.
         """
@@ -3503,6 +3598,10 @@ class XendDomainInfo:
         # Destroy DPCI instances.
         for dpci_uuid in XendDPCI.get_by_VM(self.info.get('uuid')):
             XendAPIStore.deregister(dpci_uuid, "DPCI")
+            
+        # Destroy DSCSI instances.
+        for dscsi_uuid in XendDSCSI.get_by_VM(self.info.get('uuid')):
+            XendAPIStore.deregister(dscsi_uuid, "DSCSI")
             
     def has_device(self, dev_class, dev_uuid):
         return (dev_uuid in self.info['%s_refs' % dev_class.lower()])

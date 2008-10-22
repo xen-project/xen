@@ -393,7 +393,9 @@ struct vmcb_struct {
     eventinj_t  eventinj;       /* offset 0xA8 */
     u64 h_cr3;                  /* offset 0xB0 */
     lbrctrl_t lbr_control;      /* offset 0xB8 */
-    u64 res09[104];             /* offset 0xC0 pad to save area */
+    u64 res09;                  /* offset 0xC0 */
+    u64 nextrip;                /* offset 0xC8 */
+    u64 res10a[102];            /* offset 0xD0 pad to save area */
 
     svm_segment_register_t es;      /* offset 1024 */
     svm_segment_register_t cs;

@@ -510,7 +510,7 @@ int pirq_guest_bind(struct vcpu *v, int irq, int will_share)
 {
     unsigned int        vector;
     irq_desc_t         *desc;
-    irq_guest_action_t *action;
+    irq_guest_action_t *action, *newaction = NULL;
     int                 rc = 0;
     cpumask_t           cpumask = CPU_MASK_NONE;
 
@@ -520,7 +520,10 @@ int pirq_guest_bind(struct vcpu *v, int irq, int will_share)
  retry:
     desc = domain_spin_lock_irq_desc(v->domain, irq, NULL);
     if ( desc == NULL )
-        return -EINVAL;
+    {
+        rc = -EINVAL;
+        goto out;
+    }
 
     action = (irq_guest_action_t *)desc->action;
     vector = desc - irq_desc;
@@ -533,18 +536,24 @@ int pirq_guest_bind(struct vcpu *v, int irq, int will_share)
                     "Cannot bind IRQ %d to guest. In use by '%s'.\n",
                     irq, desc->action->name);
             rc = -EBUSY;
-            goto out;
+            goto unlock_out;
         }
 
-        action = xmalloc(irq_guest_action_t);
-        if ( (desc->action = (struct irqaction *)action) == NULL )
+        if ( newaction == NULL )
         {
+            spin_unlock_irq(&desc->lock);
+            if ( (newaction = xmalloc(irq_guest_action_t)) != NULL )
+                goto retry;
             gdprintk(XENLOG_INFO,
-                    "Cannot bind IRQ %d to guest. Out of memory.\n",
-                    irq);
+                     "Cannot bind IRQ %d to guest. Out of memory.\n",
+                     irq);
             rc = -ENOMEM;
             goto out;
         }
+
+        action = newaction;
+        desc->action = (struct irqaction *)action;
+        newaction = NULL;
 
         action->nr_guests   = 0;
         action->in_flight   = 0;
@@ -568,7 +577,7 @@ int pirq_guest_bind(struct vcpu *v, int irq, int will_share)
                "Will not share with others.\n",
                 irq);
         rc = -EBUSY;
-        goto out;
+        goto unlock_out;
     }
     else if ( action->nr_guests == 0 )
     {
@@ -588,17 +597,21 @@ int pirq_guest_bind(struct vcpu *v, int irq, int will_share)
         gdprintk(XENLOG_INFO, "Cannot bind IRQ %d to guest. "
                "Already at max share.\n", irq);
         rc = -EBUSY;
-        goto out;
+        goto unlock_out;
     }
 
     action->guest[action->nr_guests++] = v->domain;
 
- out:
+ unlock_out:
     spin_unlock_irq(&desc->lock);
+ out:
+    if ( newaction != NULL )
+        xfree(newaction);
     return rc;
 }
 
-static void __pirq_guest_unbind(struct domain *d, int irq, irq_desc_t *desc)
+static irq_guest_action_t *__pirq_guest_unbind(
+    struct domain *d, int irq, irq_desc_t *desc)
 {
     unsigned int        vector;
     irq_guest_action_t *action;
@@ -644,7 +657,7 @@ static void __pirq_guest_unbind(struct domain *d, int irq, irq_desc_t *desc)
     BUG_ON(test_bit(irq, d->pirq_mask));
 
     if ( action->nr_guests != 0 )
-        return;
+        return NULL;
 
     BUG_ON(action->in_flight != 0);
 
@@ -672,15 +685,18 @@ static void __pirq_guest_unbind(struct domain *d, int irq, irq_desc_t *desc)
     BUG_ON(!cpus_empty(action->cpu_eoi_map));
 
     desc->action = NULL;
-    xfree(action);
     desc->status &= ~IRQ_GUEST;
     desc->status &= ~IRQ_INPROGRESS;
     kill_timer(&irq_guest_eoi_timer[vector]);
     desc->handler->shutdown(vector);
+
+    /* Caller frees the old guest descriptor block. */
+    return action;
 }
 
 void pirq_guest_unbind(struct domain *d, int irq)
 {
+    irq_guest_action_t *oldaction = NULL;
     irq_desc_t *desc;
     int vector;
 
@@ -699,16 +715,19 @@ void pirq_guest_unbind(struct domain *d, int irq)
     }
     else
     {
-        __pirq_guest_unbind(d, irq, desc);
+        oldaction = __pirq_guest_unbind(d, irq, desc);
     }
 
     spin_unlock_irq(&desc->lock);
+
+    if ( oldaction != NULL )
+        xfree(oldaction);
 }
 
 int pirq_guest_force_unbind(struct domain *d, int irq)
 {
     irq_desc_t *desc;
-    irq_guest_action_t *action;
+    irq_guest_action_t *action, *oldaction = NULL;
     int i, bound = 0;
 
     WARN_ON(!spin_is_locked(&d->event_lock));
@@ -727,10 +746,14 @@ int pirq_guest_force_unbind(struct domain *d, int irq)
         goto out;
 
     bound = 1;
-    __pirq_guest_unbind(d, irq, desc);
+    oldaction = __pirq_guest_unbind(d, irq, desc);
 
  out:
     spin_unlock_irq(&desc->lock);
+
+    if ( oldaction != NULL )
+        xfree(oldaction);
+
     return bound;
 }
 

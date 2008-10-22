@@ -44,7 +44,7 @@ DEFINE_XEN_GUEST_HANDLE(compat_processor_cx_t);
     xlat_page_current = xlat_page_start; \
 } while (0)
 
-static void *xlat_malloc(unsigned long *xlat_page_current, size_t size)
+void *xlat_malloc(unsigned long *xlat_page_current, size_t size)
 {
     void *ret;
 

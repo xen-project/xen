@@ -20,15 +20,22 @@
 
 #include <xen/sched.h>
 #include <xen/domain_page.h>
-#include <asm/paging.h>
 #include <xen/iommu.h>
+#include <asm/xensystem.h>
+#include <asm/sal.h>
 #include "../iommu.h"
 #include "../dmar.h"
 #include "../vtd.h"
 
+
+int vector_irq[NR_VECTORS] __read_mostly = { [0 ... NR_VECTORS - 1] = -1};
+/* irq_vectors is indexed by the sum of all RTEs in all I/O APICs. */
+u8 irq_vector[NR_IRQ_VECTORS] __read_mostly;
+
 void *map_vtd_domain_page(u64 maddr)
 {
-    return map_domain_page(maddr >> PAGE_SHIFT_4K);
+    return (void *)((u64)map_domain_page(maddr >> PAGE_SHIFT) |
+            (maddr & (PAGE_SIZE - PAGE_SIZE_4K)));
 }
 
 void unmap_vtd_domain_page(void *va)
@@ -41,19 +48,17 @@ u64 alloc_pgtable_maddr(void)
 {
     struct page_info *pg;
     u64 *vaddr;
-    unsigned long mfn;
 
     pg = alloc_domheap_page(NULL, 0);
-    if ( !pg )
+    vaddr = map_domain_page(page_to_mfn(pg));
+    if ( !vaddr )
         return 0;
-    mfn = page_to_mfn(pg);
-    vaddr = map_domain_page(mfn);
     memset(vaddr, 0, PAGE_SIZE);
 
     iommu_flush_cache_page(vaddr);
     unmap_domain_page(vaddr);
 
-    return (u64)mfn << PAGE_SHIFT_4K;
+    return page_to_maddr(pg);
 }
 
 void free_pgtable_maddr(u64 maddr)
@@ -64,23 +69,24 @@ void free_pgtable_maddr(u64 maddr)
 
 unsigned int get_cache_line_size(void)
 {
-    return ((cpuid_ebx(1) >> 8) & 0xff) * 8;
+    return L1_CACHE_BYTES;
 }
 
 void cacheline_flush(char * addr)
 {
-    clflush(addr);
+    ia64_fc(addr);
+    ia64_sync_i();
+    ia64_srlz_i();
 }
 
 void flush_all_cache()
 {
-    wbinvd();
+    ia64_sal_cache_flush(3);
 }
 
-void *map_to_nocache_virt(int nr_iommus, u64 maddr)
+void * map_to_nocache_virt(int nr_iommus, u64 maddr)
 {
-    set_fixmap_nocache(FIX_IOMMU_REGS_BASE_0 + nr_iommus, maddr);
-    return (void *)fix_to_virt(FIX_IOMMU_REGS_BASE_0 + nr_iommus);
+  return (void *) ( maddr + __IA64_UNCACHED_OFFSET);
 }
 
 struct hvm_irq_dpci *domain_get_irq_dpci(struct domain *domain)
@@ -102,42 +108,5 @@ int domain_set_irq_dpci(struct domain *domain, struct hvm_irq_dpci *dpci)
 
 void hvm_dpci_isairq_eoi(struct domain *d, unsigned int isairq)
 {
-    struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
-    struct hvm_irq_dpci *dpci = NULL;
-    struct dev_intx_gsi_link *digl, *tmp;
-    int i;
-
-    ASSERT(isairq < NR_ISAIRQS);
-    if ( !vtd_enabled)
-        return;
-
-    spin_lock(&d->event_lock);
-
-    dpci = domain_get_irq_dpci(d);
-
-    if ( !dpci || !test_bit(isairq, dpci->isairq_map) )
-    {
-        spin_unlock(&d->event_lock);
-        return;
-    }
-    /* Multiple mirq may be mapped to one isa irq */
-    for ( i = find_first_bit(dpci->mapping, NR_PIRQS);
-          i < NR_PIRQS;
-          i = find_next_bit(dpci->mapping, NR_PIRQS, i + 1) )
-    {
-        list_for_each_entry_safe ( digl, tmp,
-            &dpci->mirq[i].digl_list, list )
-        {
-            if ( hvm_irq->pci_link.route[digl->link] == isairq )
-            {
-                hvm_pci_intx_deassert(d, digl->device, digl->intx);
-                if ( --dpci->mirq[i].pending == 0 )
-                {
-                    stop_timer(&dpci->hvm_timer[domain_irq_to_vector(d, i)]);
-                    pirq_guest_eoi(d, i);
-                }
-            }
-        }
-    }
-    spin_unlock(&d->event_lock);
+    /* dummy */
 }

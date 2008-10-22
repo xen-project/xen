@@ -90,10 +90,11 @@ struct msi_desc {
 
 	void __iomem *mask_base;
 	struct pci_dev *dev;
-    int vector;
+	int vector;
 
-	/* Last set MSI message */
-	struct msi_msg msg;
+	struct msi_msg msg;		/* Last set MSI message */
+
+	int remap_index;		/* index in interrupt remapping table */
 };
 
 /*

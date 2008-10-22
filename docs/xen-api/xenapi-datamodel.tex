@@ -46,6 +46,8 @@ Name & Description \\
 {\tt console} & A console \\
 {\tt DPCI} & A pass-through PCI device \\
 {\tt PPCI} & A physical PCI device \\
+{\tt DSCSI} & A half-virtualized SCSI device \\
+{\tt PSCSI} & A physical SCSI device \\
 {\tt user} & A user of the system \\
 {\tt debug} & A basic class for testing \\
 {\tt XSPolicy} & A class for handling Xen Security Policies \\
@@ -74,6 +76,8 @@ VTPM.VM & VM.VTPMs & one-to-many\\
 console.VM & VM.consoles & one-to-many\\
 DPCI.VM & VM.DPCIs & one-to-many\\
 PPCI.host & host.PPCIs & one-to-many\\
+DSCSI.VM & VM.DSCSIs & one-to-many\\
+PSCSI.host & host.PSCSIs & one-to-many\\
 host.resident\_VMs & VM.resident\_on & many-to-one\\
 host.host\_CPUs & host\_cpu.host & many-to-one\\
 \hline
@@ -1407,6 +1411,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt VBDs} & (VBD ref) Set & virtual block devices
 $\mathit{RO}_\mathit{run}$ &  {\tt crash\_dumps} & (crashdump ref) Set & crash dumps associated with this VM \\
 $\mathit{RO}_\mathit{run}$ &  {\tt VTPMs} & (VTPM ref) Set & virtual TPMs \\
 $\mathit{RO}_\mathit{run}$ &  {\tt DPCIs} & (DPCI ref) Set & pass-through PCI devices \\
+$\mathit{RO}_\mathit{run}$ &  {\tt DSCSIs} & (DSCSI ref) Set & half-virtualized SCSI devices \\
 $\mathit{RW}$ &  {\tt PV/bootloader} & string & name of or path to bootloader \\
 $\mathit{RW}$ &  {\tt PV/kernel} & string & path to the kernel \\
 $\mathit{RW}$ &  {\tt PV/ramdisk} & string & path to the initrd \\
@@ -3443,6 +3448,38 @@ Get the DPCIs field of the given VM.
  \noindent {\bf Return Type:} 
 {\tt 
 (DPCI ref) Set
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_DSCSIs}
+
+{\bf Overview:} 
+Get the DSCSIs field of the given VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((DSCSI ref) Set) get_DSCSIs (session_id s, VM ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(DSCSI ref) Set
 }
 
 
@@ -5518,6 +5555,7 @@ $\mathit{RW}$ &  {\tt suspend\_image\_sr} & SR ref & The SR in which VDIs for su
 $\mathit{RW}$ &  {\tt crash\_dump\_sr} & SR ref & The SR in which VDIs for crash dumps are created \\
 $\mathit{RO}_\mathit{run}$ &  {\tt PBDs} & (PBD ref) Set & physical blockdevices \\
 $\mathit{RO}_\mathit{run}$ &  {\tt PPCIs} & (PPCI ref) Set & physical PCI devices \\
+$\mathit{RO}_\mathit{run}$ &  {\tt PSCSIs} & (PSCSI ref) Set & physical SCSI devices \\
 $\mathit{RO}_\mathit{run}$ &  {\tt host\_CPUs} & (host\_cpu ref) Set & The physical CPUs on this host \\
 $\mathit{RO}_\mathit{run}$ &  {\tt metrics} & host\_metrics ref & metrics associated with this host \\
 \hline
@@ -6837,6 +6875,38 @@ Get the PPCIs field of the given host.
  \noindent {\bf Return Type:} 
 {\tt 
 (PPCI ref) Set
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_PSCSIs}
+
+{\bf Overview:} 
+Get the PSCSIs field of the given host.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((PSCSI ref) Set) get_PSCSIs (session_id s, host ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt host ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(PSCSI ref) Set
 }
 
 
@@ -15713,6 +15783,1096 @@ Get a record containing the current state of the given PPCI.
  \noindent {\bf Return Type:} 
 {\tt 
 PPCI record
+}
+
+
+all fields from the object
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+
+\vspace{1cm}
+\newpage
+\section{Class: DSCSI}
+\subsection{Fields for class: DSCSI}
+\begin{longtable}{|lllp{0.38\textwidth}|}
+\hline
+\multicolumn{1}{|l}{Name} & \multicolumn{3}{l|}{\bf DSCSI} \\
+\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em A
+half-virtualized SCSI device.}} \\
+\hline
+Quals & Field & Type & Description \\
+\hline
+$\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
+$\mathit{RO}_\mathit{inst}$ &  {\tt VM} & VM ref & the virtual machine \\
+$\mathit{RO}_\mathit{inst}$ &  {\tt PSCSI} & PSCSI ref & the physical SCSI device \\
+$\mathit{RO}_\mathit{run}$ &  {\tt virtual\_host} & int & the virtual host number \\
+$\mathit{RO}_\mathit{run}$ &  {\tt virtual\_channel} & int & the virtual channel number \\
+$\mathit{RO}_\mathit{run}$ &  {\tt virtual\_target} & int & the virtual target number \\
+$\mathit{RO}_\mathit{run}$ &  {\tt virtual\_lun} & int & the virtual logical unit number \\
+$\mathit{RO}_\mathit{inst}$ &  {\tt virtual\_HCTL} & string & the virtual HCTL \\
+$\mathit{RO}_\mathit{run}$ &  {\tt runtime\_properties} & (string $\rightarrow$ string) Map & Device runtime properties \\
+\hline
+\end{longtable}
+\subsection{RPCs associated with class: DSCSI}
+\subsubsection{RPC name:~get\_all}
+
+{\bf Overview:} 
+Return a list of all the DSCSIs known to the system.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((DSCSI ref) Set) get_all (session_id s)\end{verbatim}
+
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(DSCSI ref) Set
+}
+
+
+references to all objects
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_uuid}
+
+{\bf Overview:} 
+Get the uuid field of the given DSCSI.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_uuid (session_id s, DSCSI ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt DSCSI ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_VM}
+
+{\bf Overview:} 
+Get the VM field of the given DSCSI.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (VM ref) get_VM (session_id s, DSCSI ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt DSCSI ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+VM ref
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_PSCSI}
+
+{\bf Overview:} 
+Get the PSCSI field of the given DSCSI.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (PSCSI ref) get_PSCSI (session_id s, DSCSI ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt DSCSI ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+PSCSI ref
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_virtual\_host}
+
+{\bf Overview:} 
+Get the virtual\_host field of the given DSCSI.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} int get_virtual_host (session_id s, DSCSI ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt DSCSI ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+int
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_virtual\_channel}
+
+{\bf Overview:} 
+Get the virtual\_channel field of the given DSCSI.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} int get_virtual_channel (session_id s, DSCSI ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt DSCSI ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+int
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_virtual\_target}
+
+{\bf Overview:} 
+Get the virtual\_target field of the given DSCSI.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} int get_virtual_target (session_id s, DSCSI ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt DSCSI ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+int
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_virtual\_lun}
+
+{\bf Overview:} 
+Get the virtual\_lun field of the given DSCSI.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} int get_virtual_lun (session_id s, DSCSI ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt DSCSI ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+int
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_virtual\_HCTL}
+
+{\bf Overview:} 
+Get the virtual\_HCTL field of the given DSCSI.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_virtual_HCTL (session_id s, DSCSI ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt DSCSI ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_runtime\_properties}
+
+{\bf Overview:} 
+Get the runtime\_properties field of the given DSCSI.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((string -> string) Map) get_runtime_properties (session_id s, DSCSI ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+ 
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt DSCSI ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(string $\rightarrow$ string) Map
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~create}
+
+{\bf Overview:} 
+Create a new DSCSI instance, and return its handle.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (DSCSI ref) create (session_id s, DSCSI record args)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt DSCSI record } & args & All constructor arguments \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+DSCSI ref
+}
+
+
+reference to the newly created object
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~destroy}
+
+{\bf Overview:} 
+Destroy the specified DSCSI instance.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void destroy (session_id s, DSCSI ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt DSCSI ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_by\_uuid}
+
+{\bf Overview:} 
+Get a reference to the DSCSI instance with the specified UUID.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (DSCSI ref) get_by_uuid (session_id s, string uuid)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt string } & uuid & UUID of object to return \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+DSCSI ref
+}
+
+
+reference to the object
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_record}
+
+{\bf Overview:} 
+Get a record containing the current state of the given DSCSI.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (DSCSI record) get_record (session_id s, DSCSI ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt DSCSI ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+DSCSI record
+}
+
+
+all fields from the object
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+
+\vspace{1cm}
+\newpage
+\section{Class: PSCSI}
+\subsection{Fields for class: PSCSI}
+\begin{longtable}{|lllp{0.38\textwidth}|}
+\hline
+\multicolumn{1}{|l}{Name} & \multicolumn{3}{l|}{\bf PSCSI} \\
+\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em A
+physical SCSI device.}} \\
+\hline
+Quals & Field & Type & Description \\
+\hline
+$\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
+$\mathit{RO}_\mathit{run}$ &  {\tt host} & host ref &  the physical machine to which this PSCSI is connected \\
+$\mathit{RO}_\mathit{run}$ &  {\tt physical\_host} & int & the physical host number \\
+$\mathit{RO}_\mathit{run}$ &  {\tt physical\_channel} & int & the physical channel number \\
+$\mathit{RO}_\mathit{run}$ &  {\tt physical\_target} & int & the physical target number \\
+$\mathit{RO}_\mathit{run}$ &  {\tt physical\_lun} & int & the physical logical unit number \\
+$\mathit{RO}_\mathit{run}$ &  {\tt physical\_HCTL} & string & the physical HCTL \\
+$\mathit{RO}_\mathit{run}$ &  {\tt vendor\_name} & string & the vendor name \\
+$\mathit{RO}_\mathit{run}$ &  {\tt model} & string & the model \\
+$\mathit{RO}_\mathit{run}$ &  {\tt type\_id} & int & the SCSI type ID \\
+$\mathit{RO}_\mathit{run}$ &  {\tt type} & string &  the SCSI type \\
+$\mathit{RO}_\mathit{run}$ &  {\tt dev\_name} & string & the SCSI device name (e.g. sda or st0) \\
+$\mathit{RO}_\mathit{run}$ &  {\tt sg\_name} & string & the SCSI generic device name (e.g. sg0) \\
+$\mathit{RO}_\mathit{run}$ &  {\tt revision} & string & the revision \\
+$\mathit{RO}_\mathit{run}$ &  {\tt scsi\_id} & string & the SCSI ID \\
+$\mathit{RO}_\mathit{run}$ &  {\tt scsi\_level} & int & the SCSI level \\
+\hline
+\end{longtable}
+\subsection{RPCs associated with class: PSCSI}
+\subsubsection{RPC name:~get\_all}
+
+{\bf Overview:} 
+Return a list of all the PSCSIs known to the system.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((PSCSI ref) Set) get_all (session_id s)\end{verbatim}
+
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(PSCSI ref) Set
+}
+
+
+references to all objects
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_uuid}
+
+{\bf Overview:} 
+Get the uuid field of the given PSCSI.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_uuid (session_id s, PSCSI ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PSCSI ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_host}
+
+{\bf Overview:} 
+Get the host field of the given PSCSI.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (host ref) get_host (session_id s, PSCSI ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PSCSI ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+host ref
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_physical\_host}
+
+{\bf Overview:} 
+Get the physical\_host field of the given PSCSI.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} int get_physical_host (session_id s, PSCSI ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PSCSI ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+int
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_physical\_channel}
+
+{\bf Overview:} 
+Get the physical\_channel field of the given PSCSI.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} int get_physical_channel (session_id s, PSCSI ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PSCSI ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+int
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_physical\_target}
+
+{\bf Overview:} 
+Get the physical\_target field of the given PSCSI.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} int get_physical_target (session_id s, PSCSI ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PSCSI ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+int
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_physical\_lun}
+
+{\bf Overview:} 
+Get the physical\_lun field of the given PSCSI.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} int get_physical_lun (session_id s, PSCSI ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PSCSI ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+int
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_physical\_HCTL}
+
+{\bf Overview:} 
+Get the physical\_HCTL field of the given PSCSI.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_physical_HCTL (session_id s, PSCSI ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PSCSI ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_vendor\_name}
+
+{\bf Overview:} 
+Get the vendor\_name field of the given PSCSI.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_vendor_name (session_id s, PSCSI ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PSCSI ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_model}
+
+{\bf Overview:} 
+Get the model field of the given PSCSI.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_model (session_id s, PSCSI ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PSCSI ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_type\_id}
+
+{\bf Overview:} 
+Get the type\_id field of the given PSCSI.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} int get_type_id (session_id s, PSCSI ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PSCSI ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+int
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_type}
+
+{\bf Overview:} 
+Get the type field of the given PSCSI.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_type (session_id s, PSCSI ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PSCSI ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_dev\_name}
+
+{\bf Overview:} 
+Get the dev\_name field of the given PSCSI.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_dev_name (session_id s, PSCSI ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PSCSI ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_sg\_name}
+
+{\bf Overview:} 
+Get the sg\_name field of the given PSCSI.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_sg_name (session_id s, PSCSI ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PSCSI ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_revision}
+
+{\bf Overview:} 
+Get the revision field of the given PSCSI.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_revision (session_id s, PSCSI ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PSCSI ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_scsi\_id}
+
+{\bf Overview:} 
+Get the scsi\_id field of the given PSCSI.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_scsi_id (session_id s, PSCSI ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PSCSI ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_scsi\_level}
+
+{\bf Overview:} 
+Get the scsi\_level field of the given PSCSI.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} int get_scsi_level (session_id s, PSCSI ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PSCSI ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+int
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_by\_uuid}
+
+{\bf Overview:} 
+Get a reference to the PSCSI instance with the specified UUID.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (PSCSI ref) get_by_uuid (session_id s, string uuid)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt string } & uuid & UUID of object to return \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+PSCSI ref
+}
+
+
+reference to the object
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_record}
+
+{\bf Overview:} 
+Get a record containing the current state of the given PSCSI.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (PSCSI record) get_record (session_id s, PSCSI ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PSCSI ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+PSCSI record
 }
 
 

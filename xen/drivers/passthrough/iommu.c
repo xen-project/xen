@@ -19,8 +19,6 @@
 #include <xen/paging.h>
 #include <xen/guest_access.h>
 
-extern struct iommu_ops intel_iommu_ops;
-extern struct iommu_ops amd_iommu_ops;
 static void parse_iommu_param(char *s);
 static int iommu_populate_page_table(struct domain *d);
 int intel_vtd_setup(void);

@@ -1049,6 +1049,18 @@ int xc_domain_get_machine_address_size(int xc, uint32_t domid)
     return rc == 0 ? domctl.u.address_size.size : rc;
 }
 
+int xc_domain_suppress_spurious_page_faults(int xc, uint32_t domid)
+{
+    DECLARE_DOMCTL;
+
+    memset(&domctl, 0, sizeof(domctl));
+    domctl.domain = domid;
+    domctl.cmd    = XEN_DOMCTL_suppress_spurious_page_faults;
+
+    return do_domctl(xc, &domctl);
+
+}
+
 /*
  * Local variables:
  * mode: C

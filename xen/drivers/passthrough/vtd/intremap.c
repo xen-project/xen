@@ -21,6 +21,7 @@
 #include <xen/irq.h>
 #include <xen/sched.h>
 #include <xen/iommu.h>
+#include <asm/hvm/iommu.h>
 #include <xen/time.h>
 #include <xen/pci.h>
 #include <xen/pci_regs.h>
@@ -128,7 +129,13 @@ static int ioapic_rte_to_remap_entry(struct iommu *iommu,
     memcpy(&new_ire, iremap_entry, sizeof(struct iremap_entry));
 
     if ( rte_upper )
+    {
+#if defined(__i386__) || defined(__x86_64__)
         new_ire.lo.dst = (value >> 24) << 8;
+#else /* __ia64__ */
+        new_ire.lo.dst = value >> 16;
+#endif
+    }
     else
     {
         *(((u32 *)&new_rte) + 0) = value;
@@ -179,7 +186,7 @@ unsigned int io_apic_read_remap_rte(
     struct IO_xAPIC_route_entry old_rte = { 0 };
     struct IO_APIC_route_remap_entry *remap_rte;
     int rte_upper = (reg & 1) ? 1 : 0;
-    struct iommu *iommu = ioapic_to_iommu(mp_ioapics[apic].mpc_apicid);
+    struct iommu *iommu = ioapic_to_iommu(IO_APIC_ID(apic));
     struct ir_ctrl *ir_ctrl = iommu_ir_ctrl(iommu);
 
     if ( !iommu || !ir_ctrl || ir_ctrl->iremap_maddr == 0 ||
@@ -224,7 +231,7 @@ void io_apic_write_remap_rte(
     struct IO_xAPIC_route_entry old_rte = { 0 };
     struct IO_APIC_route_remap_entry *remap_rte;
     unsigned int rte_upper = (reg & 1) ? 1 : 0;
-    struct iommu *iommu = ioapic_to_iommu(mp_ioapics[apic].mpc_apicid);
+    struct iommu *iommu = ioapic_to_iommu(IO_APIC_ID(apic));
     struct ir_ctrl *ir_ctrl = iommu_ir_ctrl(iommu);
     int saved_mask;
 
@@ -253,7 +260,7 @@ void io_apic_write_remap_rte(
     *(IO_APIC_BASE(apic)+4) = *(((int *)&old_rte)+0);
     remap_rte->mask = saved_mask;
 
-    if ( ioapic_rte_to_remap_entry(iommu, mp_ioapics[apic].mpc_apicid,
+    if ( ioapic_rte_to_remap_entry(iommu, IO_APIC_ID(apic),
                                    &old_rte, rte_upper, value) )
     {
         *IO_APIC_BASE(apic) = rte_upper ? (reg + 1) : reg;
@@ -328,7 +335,8 @@ static int remap_entry_to_msi_msg(
 }
 
 static int msi_msg_to_remap_entry(
-    struct iommu *iommu, struct pci_dev *pdev, struct msi_msg *msg)
+    struct iommu *iommu, struct pci_dev *pdev,
+    struct msi_desc *msi_desc, struct msi_msg *msg)
 {
     struct iremap_entry *iremap_entry = NULL, *iremap_entries;
     struct iremap_entry new_ire;
@@ -336,32 +344,18 @@ static int msi_msg_to_remap_entry(
     unsigned int index;
     unsigned long flags;
     struct ir_ctrl *ir_ctrl = iommu_ir_ctrl(iommu);
-    int i = 0;
 
     remap_rte = (struct msi_msg_remap_entry *) msg;
     spin_lock_irqsave(&ir_ctrl->iremap_lock, flags);
 
-    iremap_entries =
-        (struct iremap_entry *)map_vtd_domain_page(ir_ctrl->iremap_maddr);
-
-    /* If the entry for a PCI device has been there, use the old entry,
-     * Or, assign a new entry for it.
-     */
-    for ( i = 0; i <= ir_ctrl->iremap_index; i++ )
+    if ( msi_desc->remap_index < 0 )
     {
-        iremap_entry = &iremap_entries[i];
-        if ( iremap_entry->hi.sid ==
-             ((pdev->bus << 8) | pdev->devfn) )
-           break;
-    }
-
-    if ( i > ir_ctrl->iremap_index )
-    {
-    	ir_ctrl->iremap_index++;
+        ir_ctrl->iremap_index++;
         index = ir_ctrl->iremap_index;
+        msi_desc->remap_index = index;
     }
     else
-        index = i;
+        index = msi_desc->remap_index;
 
     if ( index > IREMAP_ENTRY_NR - 1 )
     {
@@ -369,11 +363,13 @@ static int msi_msg_to_remap_entry(
                 "%s: intremap index (%d) is larger than"
                 " the maximum index (%ld)!\n",
                 __func__, index, IREMAP_ENTRY_NR - 1);
-        unmap_vtd_domain_page(iremap_entries);
+        msi_desc->remap_index = -1;
         spin_unlock_irqrestore(&ir_ctrl->iremap_lock, flags);
         return -EFAULT;
     }
 
+    iremap_entries =
+        (struct iremap_entry *)map_vtd_domain_page(ir_ctrl->iremap_maddr);
     iremap_entry = &iremap_entries[index];
     memcpy(&new_ire, iremap_entry, sizeof(struct iremap_entry));
 
@@ -450,7 +446,7 @@ void msi_msg_write_remap_rte(
     if ( !iommu || !ir_ctrl || ir_ctrl->iremap_maddr == 0 )
         return;
 
-    msi_msg_to_remap_entry(iommu, pdev, msg);
+    msi_msg_to_remap_entry(iommu, pdev, msi_desc, msg);
 }
 #elif defined(__ia64__)
 void msi_msg_read_remap_rte(
@@ -482,7 +478,7 @@ int intremap_setup(struct iommu *iommu)
         {
             dprintk(XENLOG_WARNING VTDPREFIX,
                     "Cannot allocate memory for ir_ctrl->iremap_maddr\n");
-            return -ENODEV;
+            return -ENOMEM;
         }
         ir_ctrl->iremap_index = -1;
     }
@@ -490,10 +486,10 @@ int intremap_setup(struct iommu *iommu)
 #if defined(ENABLED_EXTENDED_INTERRUPT_SUPPORT)
     /* set extended interrupt mode bit */
     ir_ctrl->iremap_maddr |=
-            ecap_ext_intr(iommu->ecap) ? (1 << IRTA_REG_EIMI_SHIFT) : 0;
+            ecap_ext_intr(iommu->ecap) ? (1 << IRTA_REG_EIME_SHIFT) : 0;
 #endif
-    /* size field = 256 entries per 4K page = 8 - 1 */
-    ir_ctrl->iremap_maddr |= 7;
+    /* set size of the interrupt remapping table */ 
+    ir_ctrl->iremap_maddr |= IRTA_REG_TABLE_SIZE;
     dmar_writeq(iommu->reg, DMAR_IRTA_REG, ir_ctrl->iremap_maddr);
 
     /* set SIRTP */

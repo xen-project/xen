@@ -428,7 +428,11 @@ int qinval_setup(struct iommu *iommu)
     {
         qi_ctrl->qinval_maddr = alloc_pgtable_maddr();
         if ( qi_ctrl->qinval_maddr == 0 )
-            panic("Cannot allocate memory for qi_ctrl->qinval_maddr\n");
+        {
+            dprintk(XENLOG_WARNING VTDPREFIX,
+                    "Cannot allocate memory for qi_ctrl->qinval_maddr\n");
+            return -ENOMEM;
+        }
         flush->context = flush_context_qi;
         flush->iotlb = flush_iotlb_qi;
     }

@@ -22,25 +22,19 @@
 
 #define __build_read_lock_ptr(rw, helper)   \
 	asm volatile(LOCK "subl $1,(%0)\n\t" \
-		     "js 2f\n" \
+		     "jns 1f\n\t" \
+		     "call " helper "\n\t" \
 		     "1:\n" \
-		     ".section .text.lock,\"ax\"\n" \
-		     "2:\tcall " helper "\n\t" \
-		     "jmp 1b\n" \
-		     ".previous" \
 		     ::"a" (rw) : "memory")
 
 #define __build_read_lock_const(rw, helper)   \
 	asm volatile(LOCK "subl $1,%0\n\t" \
-		     "js 2f\n" \
-		     "1:\n" \
-		     ".section .text.lock,\"ax\"\n" \
-		     "2:\tpush %%"__OP"ax\n\t" \
+		     "jns 1f\n\t" \
+		     "push %%"__OP"ax\n\t" \
 		     "lea %0,%%"__OP"ax\n\t" \
 		     "call " helper "\n\t" \
 		     "pop %%"__OP"ax\n\t" \
-		     "jmp 1b\n" \
-		     ".previous" \
+		     "1:\n" \
 		     :"=m" (*(volatile int *)rw) : : "memory")
 
 #define __build_read_lock(rw, helper)	do { \
@@ -52,25 +46,19 @@
 
 #define __build_write_lock_ptr(rw, helper) \
 	asm volatile(LOCK "subl $" RW_LOCK_BIAS_STR ",(%0)\n\t" \
-		     "jnz 2f\n" \
+		     "jz 1f\n\t" \
+		     "call " helper "\n\t" \
 		     "1:\n" \
-		     ".section .text.lock,\"ax\"\n" \
-		     "2:\tcall " helper "\n\t" \
-		     "jmp 1b\n" \
-		     ".previous" \
 		     ::"a" (rw) : "memory")
 
 #define __build_write_lock_const(rw, helper) \
 	asm volatile(LOCK "subl $" RW_LOCK_BIAS_STR ",(%0)\n\t" \
-		     "jnz 2f\n" \
-		     "1:\n" \
-		     ".section .text.lock,\"ax\"\n" \
-		     "2:\tpush %%"__OP"ax\n\t" \
+		     "jz 1f\n\t" \
+		     "push %%"__OP"ax\n\t" \
 		     "lea %0,%%"__OP"ax\n\t" \
 		     "call " helper "\n\t" \
 		     "pop %%"__OP"ax\n\t" \
-		     "jmp 1b\n" \
-		     ".previous" \
+		     "1:\n" \
 		     :"=m" (*(volatile int *)rw) : : "memory")
 
 #define __build_write_lock(rw, helper)	do { \

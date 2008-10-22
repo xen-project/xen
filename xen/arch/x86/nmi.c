@@ -72,8 +72,8 @@ int nmi_active;
 #define P6_EVNTSEL_INT		(1 << 20)
 #define P6_EVNTSEL_OS		(1 << 17)
 #define P6_EVNTSEL_USR		(1 << 16)
-#define P6_EVENT_CPU_CLOCKS_NOT_HALTED	0x79
-#define P6_NMI_EVENT		P6_EVENT_CPU_CLOCKS_NOT_HALTED
+#define P6_EVENT_CPU_CLOCKS_NOT_HALTED	 0x79
+#define CORE_EVENT_CPU_CLOCKS_NOT_HALTED 0x3c
 
 #define P4_ESCR_EVENT_SELECT(N)	((N)<<25)
 #define P4_CCCR_OVF_PMI0	(1<<26)
@@ -122,10 +122,17 @@ int __init check_nmi_watchdog (void)
 
     printk("\n");
 
-    /* now that we know it works we can reduce NMI frequency to
-       something more reasonable; makes a difference in some configs */
+    /*
+     * Now that we know it works we can reduce NMI frequency to
+     * something more reasonable; makes a difference in some configs.
+     * There's a limit to how slow we can go because writing the perfctr
+     * MSRs only sets the low 32 bits, with the top 8 bits sign-extended
+     * from those, so it's not possible to set up a delay larger than
+     * 2^31 cycles and smaller than (2^40 - 2^31) cycles. 
+     * (Intel SDM, section 18.22.2)
+     */
     if ( nmi_watchdog == NMI_LOCAL_APIC )
-        nmi_hz = 1;
+        nmi_hz = max(1ul, cpu_khz >> 20);
 
     return 0;
 }
@@ -248,7 +255,7 @@ static void __pminit setup_k7_watchdog(void)
     wrmsr(MSR_K7_EVNTSEL0, evntsel, 0);
 }
 
-static void __pminit setup_p6_watchdog(void)
+static void __pminit setup_p6_watchdog(unsigned counter)
 {
     unsigned int evntsel;
 
@@ -260,7 +267,7 @@ static void __pminit setup_p6_watchdog(void)
     evntsel = P6_EVNTSEL_INT
         | P6_EVNTSEL_OS
         | P6_EVNTSEL_USR
-        | P6_NMI_EVENT;
+        | counter;
 
     wrmsr(MSR_P6_EVNTSEL0, evntsel, 0);
     write_watchdog_counter("P6_PERFCTR0");
@@ -326,7 +333,9 @@ void __pminit setup_apic_nmi_watchdog(void)
     case X86_VENDOR_INTEL:
         switch (boot_cpu_data.x86) {
         case 6:
-            setup_p6_watchdog();
+            setup_p6_watchdog((boot_cpu_data.x86_model < 14) 
+                              ? P6_EVENT_CPU_CLOCKS_NOT_HALTED
+                              : CORE_EVENT_CPU_CLOCKS_NOT_HALTED);
             break;
         case 15:
             if (!setup_p4_watchdog())

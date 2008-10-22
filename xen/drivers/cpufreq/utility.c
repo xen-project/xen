@@ -27,6 +27,7 @@
 #include <xen/types.h>
 #include <xen/sched.h>
 #include <xen/timer.h>
+#include <xen/trace.h>
 #include <asm/config.h>
 #include <acpi/cpufreq/cpufreq.h>
 #include <public/sysctl.h>
@@ -72,27 +73,30 @@ int cpufreq_statistic_init(unsigned int cpuid)
     struct pm_px *pxpt = cpufreq_statistic_data[cpuid];
     const struct processor_pminfo *pmpt = processor_pminfo[cpuid];
 
-    count = pmpt->perf.state_count;
-
     if ( !pmpt )
         return -EINVAL;
 
+    if ( pxpt )
+        return 0;
+
+    count = pmpt->perf.state_count;
+
+    pxpt = xmalloc(struct pm_px);
     if ( !pxpt )
-    {
-        pxpt = xmalloc(struct pm_px);
-        if ( !pxpt )
-            return -ENOMEM;
-        memset(pxpt, 0, sizeof(*pxpt));
-        cpufreq_statistic_data[cpuid] = pxpt;
-    }
+        return -ENOMEM;
+    memset(pxpt, 0, sizeof(*pxpt));
+    cpufreq_statistic_data[cpuid] = pxpt;
 
     pxpt->u.trans_pt = xmalloc_array(uint64_t, count * count);
-    if (!pxpt->u.trans_pt)
+    if (!pxpt->u.trans_pt) {
+        xfree(pxpt);
         return -ENOMEM;
+    }
 
     pxpt->u.pt = xmalloc_array(struct pm_px_val, count);
     if (!pxpt->u.pt) {
         xfree(pxpt->u.trans_pt);
+        xfree(pxpt);
         return -ENOMEM;
     }
 
@@ -119,7 +123,8 @@ void cpufreq_statistic_exit(unsigned int cpuid)
         return;
     xfree(pxpt->u.trans_pt);
     xfree(pxpt->u.pt);
-    memset(pxpt, 0, sizeof(struct pm_px));
+    xfree(pxpt);
+    cpufreq_statistic_data[cpuid] = NULL;
 }
 
 void cpufreq_statistic_reset(unsigned int cpuid)
@@ -128,7 +133,7 @@ void cpufreq_statistic_reset(unsigned int cpuid)
     struct pm_px *pxpt = cpufreq_statistic_data[cpuid];
     const struct processor_pminfo *pmpt = processor_pminfo[cpuid];
 
-    if ( !pxpt || !pmpt )
+    if ( !pmpt || !pxpt || !pxpt->u.pt || !pxpt->u.trans_pt )
         return;
 
     count = pmpt->perf.state_count;
@@ -293,7 +298,13 @@ int __cpufreq_driver_target(struct cpufreq_policy *policy,
     int retval = -EINVAL;
 
     if (cpu_online(policy->cpu) && cpufreq_driver->target)
+    {
+        unsigned int prev_freq = policy->cur;
+
         retval = cpufreq_driver->target(policy, target_freq, relation);
+        if ( retval == 0 )
+            TRACE_2D(TRC_PM_FREQ_CHANGE, prev_freq/1000, policy->cur/1000);
+    }
 
     return retval;
 }

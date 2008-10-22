@@ -37,8 +37,8 @@ static unsigned int opt_cpuid_mask_ecx, opt_cpuid_mask_edx;
 integer_param("cpuid_mask_ecx", opt_cpuid_mask_ecx);
 integer_param("cpuid_mask_edx", opt_cpuid_mask_edx);
 static unsigned int opt_cpuid_mask_ext_ecx, opt_cpuid_mask_ext_edx;
-integer_param("cpuid_mask_ecx", opt_cpuid_mask_ext_ecx);
-integer_param("cpuid_mask_edx", opt_cpuid_mask_ext_edx);
+integer_param("cpuid_mask_ext_ecx", opt_cpuid_mask_ext_ecx);
+integer_param("cpuid_mask_ext_edx", opt_cpuid_mask_ext_edx);
 
 static inline void wrmsr_amd(unsigned int index, unsigned int lo, 
 		unsigned int hi)

@@ -583,6 +583,10 @@ gopts.var('machine_address_size', val='BITS',
           fn=set_int, default=None,
           use="""Maximum machine address size""")
 
+gopts.var('suppress_spurious_page_faults', val='yes|no',
+          fn=set_bool, default=None,
+          use="""Do not inject spurious page faults into this guest""")
+
 def err(msg):
     """Print an error to stderr and exit.
     """
@@ -633,6 +637,9 @@ def configure_image(vals):
 
     if vals.machine_address_size:
         config_image.append(['machine_address_size', vals.machine_address_size])
+
+    if vals.suppress_spurious_page_faults:
+        config_image.append(['suppress_spurious_page_faults', vals.suppress_spurious_page_faults])
 
     return config_image
     
@@ -696,11 +703,8 @@ def configure_vscsis(config_devs, vals):
 
     scsi_devices = vscsi_util.vscsi_get_scsidevices()
     for (p_dev, v_dev, backend) in vals.vscsi:
-        tmp = p_dev.split(':')
-        if len(tmp) == 4:
-            (p_hctl, block) = vscsi_util._vscsi_hctl_block(p_dev, scsi_devices)
-        else:
-            (p_hctl, block) = vscsi_util._vscsi_block_scsiid_to_hctl(p_dev, scsi_devices)
+        (p_hctl, devname) = \
+            vscsi_util.vscsi_get_hctl_and_devname_by(p_dev, scsi_devices)
 
         if p_hctl == None:
             raise ValueError("Cannot find device \"%s\"" % p_dev)
@@ -716,7 +720,7 @@ def configure_vscsis(config_devs, vals):
                         ['state', 'Initialising'], \
                         ['devid', devid], \
                         ['p-dev', p_hctl], \
-                        ['p-devname', block], \
+                        ['p-devname', devname], \
                         ['v-dev', v_dev] ])
 
         if vscsi_lookup_devid(devidlist, devid) == 0:
@@ -887,7 +891,7 @@ def make_config(vals):
                    'restart', 'on_poweroff',
                    'on_reboot', 'on_crash', 'vcpus', 'vcpu_avail', 'features',
                    'on_xend_start', 'on_xend_stop', 'target', 'cpuid',
-                   'cpuid_check', 'machine_address_size'])
+                   'cpuid_check', 'machine_address_size', 'suppress_spurious_page_faults'])
 
     if vals.uuid is not None:
         config.append(['uuid', vals.uuid])

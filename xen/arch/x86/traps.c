@@ -710,7 +710,7 @@ static void pv_cpuid(struct cpu_user_regs *regs)
     if ( current->domain->domain_id != 0 )
     {
         if ( !cpuid_hypervisor_leaves(a, &a, &b, &c, &d) )
-            domain_cpuid(current->domain, a, b, &a, &b, &c, &d);
+            domain_cpuid(current->domain, a, c, &a, &b, &c, &d);
         goto out;
     }
 
@@ -1241,6 +1241,10 @@ asmlinkage void do_page_fault(struct cpu_user_regs *regs)
               "Faulting linear address: %p\n",
               regs->error_code, _p(addr));
     }
+
+    if ( unlikely(current->domain->arch.suppress_spurious_page_faults
+                  && spurious_page_fault(addr, regs)) )
+        return;
 
     propagate_page_fault(addr, regs->error_code);
 }

@@ -34,6 +34,7 @@
 #include "tapdisk.h"
 #include "tapaio.h"
 #include "bswap.h"
+#include "blk.h"
 
 #define USE_AIO
 
@@ -1902,6 +1903,42 @@ repeat:
 
 #endif	
 
+static int get_filesize(char *filename, uint64_t *size, struct stat *st)
+{
+	int fd;
+	QCowHeader header;
+
+	/*Set to the backing file size*/
+	fd = open(filename, O_RDONLY);
+	if (fd < 0)
+		return -1;
+	if (read(fd, &header, sizeof(header)) < sizeof(header)) {
+		close(fd);
+		return -1;
+	}
+	close(fd);
+	
+	be32_to_cpus(&header.magic);
+	be32_to_cpus(&header.version);
+	be64_to_cpus(&header.size);
+	if (header.magic == QCOW_MAGIC && header.version == QCOW_VERSION) {
+		*size = header.size >> SECTOR_SHIFT;
+		return 0;
+	}
+
+	if(S_ISBLK(st->st_mode)) {
+		fd = open(filename, O_RDONLY);
+		if (fd < 0)
+			return -1;
+		if (blk_getimagesize(fd, size) != 0) {
+			close(fd);
+			return -1;
+		}
+		close(fd);
+	} else *size = (st->st_size >> SECTOR_SHIFT);	
+	return 0;
+}
+
 /**
  * @return 
  *	   0 if parent id successfully retrieved;
@@ -1916,7 +1953,7 @@ static int qcow_get_parent_id(struct disk_driver *dd, struct disk_id *id)
 		return TD_NO_PARENT;
 
 	id->name = strdup(s->backing_file);
-	id->drivertype = DISK_TYPE_QCOW2;
+	id->drivertype = DISK_TYPE_AIO;
 
 	return 0;
 }
@@ -1924,15 +1961,22 @@ static int qcow_get_parent_id(struct disk_driver *dd, struct disk_id *id)
 static int qcow_validate_parent(struct disk_driver *child, 
 		struct disk_driver *parent, td_flag_t flags)
 {
-	struct BDRVQcowState *cs = (struct BDRVQcowState*) child->private;
-	struct BDRVQcowState *ps = (struct BDRVQcowState*) parent->private;
-
-	if (ps->total_sectors != cs->total_sectors) {
-		DPRINTF("qcow_validate_parent(): %#"PRIx64" != %#"PRIx64"\n",
-			ps->total_sectors, cs->total_sectors);
-		return -EINVAL;
-	}
+	struct stat stats;
+	uint64_t psize, csize;
 	
+	if (stat(parent->name, &stats))
+		return -EINVAL;
+	if (get_filesize(parent->name, &psize, &stats))
+		return -EINVAL;
+
+	if (stat(child->name, &stats))
+		return -EINVAL;
+	if (get_filesize(child->name, &csize, &stats))
+		return -EINVAL;
+
+	if (csize != psize)
+		return -EINVAL;
+
 	return 0;
 }
 

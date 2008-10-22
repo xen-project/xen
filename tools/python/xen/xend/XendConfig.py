@@ -26,6 +26,8 @@ from xen.xend import XendOptions
 from xen.xend import XendAPIStore
 from xen.xend.XendPPCI import XendPPCI
 from xen.xend.XendDPCI import XendDPCI
+from xen.xend.XendPSCSI import XendPSCSI
+from xen.xend.XendDSCSI import XendDSCSI
 from xen.xend.XendError import VmError
 from xen.xend.XendDevices import XendDevices
 from xen.xend.PrettyPrint import prettyprintstring
@@ -210,6 +212,7 @@ XENAPI_CFG_TYPES = {
     'cpuid' : dict,
     'cpuid_check' : dict,
     'machine_address_size': int,
+    'suppress_spurious_page_faults': bool0,
 }
 
 # List of legacy configuration keys that have no equivalent in the
@@ -781,8 +784,8 @@ class XendConfig(dict):
         log.debug('_sxp_to_xapi(%s)' % scrub_password(sxp_cfg))
 
         # _parse_sxp() below will call device_add() and construct devices.
-        # Some devices (currently only pci) may require VM's uuid, so
-        # setup self['uuid'] beforehand.
+        # Some devices may require VM's uuid, so setup self['uuid']
+        # beforehand.
         self['uuid'] = sxp.child_value(sxp_cfg, 'uuid', uuid.createString())
 
         cfg = self._parse_sxp(sxp_cfg)
@@ -1221,29 +1224,28 @@ class XendConfig(dict):
             dev_type = sxp.name(config)
             dev_info = {}
 
-            if dev_type == 'pci' or dev_type == 'vscsi':
+            if dev_type == 'pci':
                 pci_devs_uuid = sxp.child_value(config, 'uuid',
                                                 uuid.createString())
 
                 pci_dict = self.pci_convert_sxp_to_dict(config)
                 pci_devs = pci_dict['devs']
 
-                if dev_type != 'vscsi':
-                    # create XenAPI DPCI objects.
-                    for pci_dev in pci_devs:
-                        dpci_uuid = pci_dev.get('uuid')
-                        ppci_uuid = XendPPCI.get_by_sbdf(pci_dev['domain'],
-                                                        pci_dev['bus'],
-                                                        pci_dev['slot'],
-                                                        pci_dev['func'])
-                        if ppci_uuid is None:
-                            continue
-                        dpci_record = {
-                            'VM': self['uuid'],
-                            'PPCI': ppci_uuid,
-                            'hotplug_slot': pci_dev.get('vslot', 0)
-                        }
-                        XendDPCI(dpci_uuid, dpci_record)
+                # create XenAPI DPCI objects.
+                for pci_dev in pci_devs:
+                    dpci_uuid = pci_dev.get('uuid')
+                    ppci_uuid = XendPPCI.get_by_sbdf(pci_dev['domain'],
+                                                     pci_dev['bus'],
+                                                     pci_dev['slot'],
+                                                     pci_dev['func'])
+                    if ppci_uuid is None:
+                        continue
+                    dpci_record = {
+                        'VM': self['uuid'],
+                        'PPCI': ppci_uuid,
+                        'hotplug_slot': pci_dev.get('vslot', 0)
+                    }
+                    XendDPCI(dpci_uuid, dpci_record)
 
                 target['devices'][pci_devs_uuid] = (dev_type,
                                                     {'devs': pci_devs,
@@ -1252,6 +1254,30 @@ class XendConfig(dict):
                 log.debug("XendConfig: reading device: %s" % pci_devs)
 
                 return pci_devs_uuid
+
+            if dev_type == 'vscsi':
+                vscsi_devs_uuid = sxp.child_value(config, 'uuid',
+                                                  uuid.createString())
+                vscsi_dict = self.vscsi_convert_sxp_to_dict(config)
+                vscsi_devs = vscsi_dict['devs']
+
+                # create XenAPI DSCSI objects.
+                for vscsi_dev in vscsi_devs:
+                    dscsi_uuid = vscsi_dev.get('uuid')
+                    pscsi_uuid = XendPSCSI.get_by_HCTL(vscsi_dev['p-dev'])
+                    if pscsi_uuid is None:
+                        continue
+                    dscsi_record = {
+                        'VM': self['uuid'],
+                        'PSCSI': pscsi_uuid,
+                        'virtual_HCTL': vscsi_dev.get('v-dev')
+                    }
+                    XendDSCSI(dscsi_uuid, dscsi_record)
+
+                target['devices'][vscsi_devs_uuid] = \
+                    (dev_type, {'devs': vscsi_devs, 'uuid': vscsi_devs_uuid} )
+                log.debug("XendConfig: reading device: %s" % vscsi_devs)
+                return vscsi_devs_uuid
 
             for opt_val in config[1:]:
                 try:
@@ -1558,6 +1584,86 @@ class XendConfig(dict):
 
         return dev_config
 
+    def vscsi_convert_sxp_to_dict(self, dev_sxp):
+        """Convert vscsi device sxp to dict
+        @param dev_sxp: device configuration
+        @type  dev_sxp: SXP object (parsed config)
+        @return: dev_config
+        @rtype: dictionary
+        """
+        # Parsing the device SXP's. In most cases, the SXP looks
+        # like this:
+        #
+        # [device, [vif, [mac, xx:xx:xx:xx:xx:xx], [ip 1.3.4.5]]]
+        #
+        # However, for SCSI devices it looks like this:
+        #
+        # [device,
+        #   [vscsi,
+        #     [dev,
+        #       [devid, 0], [p-devname, sdb], [p-dev, 1:0:0:1],
+        #       [v-dev, 0:0:0:0], [state, Initialising]
+        #     ],
+        #     [dev,
+        #       [devid, 0], [p-devname, sdc], [p-dev, 1:0:0:2],
+        #       [v-dev, 0:0:0:1], [satet, Initialising]
+        #     ]
+        #   ],
+        #   [vscsi,
+        #     [dev,
+        #       [devid, 1], [p-devname, sdg], [p-dev, 2:0:0:0],
+        #       [v-dev, 1:0:0:0], [state, Initialising]
+        #     ],
+        #     [dev,
+        #       [devid, 1], [p-devname, sdh], [p-dev, 2:0:0:1],
+        #       [v-dev, 1:0:0:1], [satet, Initialising]
+        #     ]
+        #   ]
+        # ]
+        #
+        # It seems the reasoning for this difference is because
+        # vscsiif.py needs all the SCSI device configurations with 
+        # same host number at the same time when creating the devices.
+
+        # For SCSI device hotplug support, the SXP of SCSI devices is
+        # extendend like this:
+        #
+        # [device,
+        #   [vscsi,
+        #     [dev,
+        #       [devid, 0], [p-devname, sdd], [p-dev, 1:0:0:3],
+        #       [v-dev, 0:0:0:2], [state, Initialising]
+        #     ]
+        #   ]
+        # ]
+        #
+        # state 'Initialising' indicates that the device is being attached,
+        # while state 'Closing' indicates that the device is being detached.
+        #
+        # The Dict looks like this:
+        #
+        # { devs: [ {devid: 0, p-devname: sdd, p-dev: 1:0:0:3,
+        #            v-dev: 0:0:0:2, state: Initialising} ] }
+
+        dev_config = {}
+
+        vscsi_devs = []
+        for vscsi_dev in sxp.children(dev_sxp, 'dev'):
+            vscsi_dev_info = {}
+            for opt_val in vscsi_dev[1:]:
+                try:
+                    opt, val = opt_val
+                    vscsi_dev_info[opt] = val
+                except TypeError:
+                    pass
+            # append uuid for each vscsi device.
+            vscsi_uuid = vscsi_dev_info.get('uuid', uuid.createString())
+            vscsi_dev_info['uuid'] = vscsi_uuid
+            vscsi_devs.append(vscsi_dev_info)
+        dev_config['devs'] = vscsi_devs 
+
+        return dev_config
+
     def console_add(self, protocol, location, other_config = {}):
         dev_uuid = uuid.createString()
         if protocol == 'vt100':
@@ -1631,7 +1737,7 @@ class XendConfig(dict):
 
             dev_type, dev_info = self['devices'][dev_uuid]
 
-            if dev_type == 'pci' or dev_type == 'vscsi': # Special case for pci
+            if dev_type == 'pci': # Special case for pci
                 pci_dict = self.pci_convert_sxp_to_dict(config)
                 pci_devs = pci_dict['devs']
 
@@ -1639,26 +1745,50 @@ class XendConfig(dict):
                 for dpci_uuid in XendDPCI.get_by_VM(self['uuid']):
                     XendAPIStore.deregister(dpci_uuid, "DPCI")
 
-                if dev_type != 'vscsi':
-                    # create XenAPI DPCI objects.
-                    for pci_dev in pci_devs:
-                        dpci_uuid = pci_dev.get('uuid')
-                        ppci_uuid = XendPPCI.get_by_sbdf(pci_dev['domain'],
-                                                         pci_dev['bus'],
-                                                         pci_dev['slot'],
-                                                         pci_dev['func'])
-                        if ppci_uuid is None:
-                            continue
-                        dpci_record = {
-                            'VM': self['uuid'],
-                            'PPCI': ppci_uuid,
-                            'hotplug_slot': pci_dev.get('vslot', 0)
-                        }
-                        XendDPCI(dpci_uuid, dpci_record)
+                # create XenAPI DPCI objects.
+                for pci_dev in pci_devs:
+                    dpci_uuid = pci_dev.get('uuid')
+                    ppci_uuid = XendPPCI.get_by_sbdf(pci_dev['domain'],
+                                                     pci_dev['bus'],
+                                                     pci_dev['slot'],
+                                                     pci_dev['func'])
+                    if ppci_uuid is None:
+                        continue
+                    dpci_record = {
+                        'VM': self['uuid'],
+                        'PPCI': ppci_uuid,
+                        'hotplug_slot': pci_dev.get('vslot', 0)
+                    }
+                    XendDPCI(dpci_uuid, dpci_record)
 
                 self['devices'][dev_uuid] = (dev_type,
                                              {'devs': pci_devs,
                                               'uuid': dev_uuid})
+                return True
+                
+            if dev_type == 'vscsi': # Special case for vscsi
+                vscsi_dict = self.vscsi_convert_sxp_to_dict(config)
+                vscsi_devs = vscsi_dict['devs']
+
+                # destroy existing XenAPI DSCSI objects
+                for dscsi_uuid in XendDSCSI.get_by_VM(self['uuid']):
+                    XendAPIStore.deregister(dscsi_uuid, "DSCSI")
+
+                # create XenAPI DSCSI objects.
+                for vscsi_dev in vscsi_devs:
+                    dscsi_uuid = vscsi_dev.get('uuid')
+                    pscsi_uuid = XendPSCSI.get_by_HCTL(vscsi_dev['p-dev'])
+                    if pscsi_uuid is None:
+                        continue
+                    dscsi_record = {
+                        'VM': self['uuid'],
+                        'PSCSI': pscsi_uuid,
+                        'virtual_HCTL': vscsi_dev.get('v-dev')
+                    }
+                    XendDSCSI(dscsi_uuid, dscsi_record)
+
+                self['devices'][dev_uuid] = \
+                    (dev_type, {'devs': vscsi_devs, 'uuid': dev_uuid} )
                 return True
                 
             for opt_val in config[1:]:

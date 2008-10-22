@@ -55,3 +55,7 @@
 !	processor_cx			platform.h
 !	processor_flags			platform.h
 !	processor_power			platform.h
+!	pct_register			platform.h
+!	processor_px			platform.h
+!	psd_package			platform.h
+!	processor_performance		platform.h

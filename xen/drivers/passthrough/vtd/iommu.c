@@ -24,6 +24,7 @@
 #include <xen/xmalloc.h>
 #include <xen/domain_page.h>
 #include <xen/iommu.h>
+#include <asm/hvm/iommu.h>
 #include <xen/numa.h>
 #include <xen/time.h>
 #include <xen/pci.h>
@@ -218,10 +219,10 @@ static u64 addr_to_dma_page_maddr(struct domain *domain, u64 addr, int alloc)
             if ( !alloc )
                 break;
             maddr = alloc_pgtable_maddr();
+            if ( !maddr )
+                break;
             dma_set_pte_addr(*pte, maddr);
             vaddr = map_vtd_domain_page(maddr);
-            if ( !vaddr )
-                break;
 
             /*
              * high level table always sets r/w, last level
@@ -234,8 +235,6 @@ static u64 addr_to_dma_page_maddr(struct domain *domain, u64 addr, int alloc)
         else
         {
             vaddr = map_vtd_domain_page(pte->val);
-            if ( !vaddr )
-                break;
         }
 
         if ( level == 2 )
@@ -569,26 +568,6 @@ static void dma_pte_clear_one(struct domain *domain, u64 addr)
     unmap_vtd_domain_page(page);
 }
 
-/* clear last level pte, a tlb flush should be followed */
-static void dma_pte_clear_range(struct domain *domain, u64 start, u64 end)
-{
-    struct hvm_iommu *hd = domain_hvm_iommu(domain);
-    int addr_width = agaw_to_width(hd->agaw);
-
-    start &= (((u64)1) << addr_width) - 1;
-    end &= (((u64)1) << addr_width) - 1;
-    /* in case it's partial page */
-    start = PAGE_ALIGN_4K(start);
-    end &= PAGE_MASK_4K;
-
-    /* we don't need lock here, nobody else touches the iova range */
-    while ( start < end )
-    {
-        dma_pte_clear_one(domain, start);
-        start += PAGE_SIZE_4K;
-    }
-}
-
 static void iommu_free_pagetable(u64 pt_maddr, int level)
 {
     int i;
@@ -877,6 +856,7 @@ static void dma_msi_data_init(struct iommu *iommu, int vector)
     spin_unlock_irqrestore(&iommu->register_lock, flags);
 }
 
+#ifdef SUPPORT_MSI_REMAPPING
 static void dma_msi_addr_init(struct iommu *iommu, int phy_cpu)
 {
     u64 msi_address;
@@ -893,6 +873,12 @@ static void dma_msi_addr_init(struct iommu *iommu, int phy_cpu)
     dmar_writel(iommu->reg, DMAR_FEUADDR_REG, (u32)(msi_address >> 32));
     spin_unlock_irqrestore(&iommu->register_lock, flags);
 }
+#else
+static void dma_msi_addr_init(struct iommu *iommu, int phy_cpu)
+{
+    /* ia64: TODO */
+}
+#endif
 
 static void dma_msi_set_affinity(unsigned int vector, cpumask_t dest)
 {
@@ -1024,7 +1010,7 @@ static int intel_iommu_domain_init(struct domain *d)
 {
     struct hvm_iommu *hd = domain_hvm_iommu(d);
     struct iommu *iommu = NULL;
-    u64 i;
+    u64 i, j, tmp;
     struct acpi_drhd_unit *drhd;
 
     drhd = list_entry(acpi_drhd_units.next, typeof(*drhd), list);
@@ -1043,11 +1029,13 @@ static int intel_iommu_domain_init(struct domain *d)
          */
         for ( i = 0; i < max_page; i++ )
         {
-            if ( xen_in_range(i << PAGE_SHIFT_4K, (i + 1) << PAGE_SHIFT_4K) ||
-                 tboot_in_range(i << PAGE_SHIFT_4K, (i + 1) << PAGE_SHIFT_4K) )
+            if ( xen_in_range(i << PAGE_SHIFT, (i + 1) << PAGE_SHIFT) ||
+                 tboot_in_range(i << PAGE_SHIFT, (i + 1) << PAGE_SHIFT) )
                 continue;
 
-            iommu_map_page(d, i, i);
+            tmp = 1 << (PAGE_SHIFT - PAGE_SHIFT_4K);
+            for ( j = 0; j < tmp; j++ )
+                iommu_map_page(d, (i*tmp+j), (i*tmp+j));
         }
 
         setup_dom0_devices(d);
@@ -1511,75 +1499,26 @@ int intel_iommu_unmap_page(struct domain *d, unsigned long gfn)
     return 0;
 }
 
-int iommu_page_mapping(struct domain *domain, paddr_t iova,
-                       paddr_t hpa, size_t size, int prot)
-{
-    struct hvm_iommu *hd = domain_hvm_iommu(domain);
-    struct acpi_drhd_unit *drhd;
-    struct iommu *iommu;
-    u64 start_pfn, end_pfn;
-    struct dma_pte *page = NULL, *pte = NULL;
-    int index;
-    u64 pg_maddr;
-
-    if ( (prot & (DMA_PTE_READ|DMA_PTE_WRITE)) == 0 )
-        return -EINVAL;
-
-    iova = (iova >> PAGE_SHIFT_4K) << PAGE_SHIFT_4K;
-    start_pfn = hpa >> PAGE_SHIFT_4K;
-    end_pfn = (PAGE_ALIGN_4K(hpa + size)) >> PAGE_SHIFT_4K;
-    index = 0;
-    while ( start_pfn < end_pfn )
-    {
-        pg_maddr = addr_to_dma_page_maddr(domain, iova + PAGE_SIZE_4K*index, 1);
-        if ( pg_maddr == 0 )
-            return -ENOMEM;
-        page = (struct dma_pte *)map_vtd_domain_page(pg_maddr);
-        pte = page + (start_pfn & LEVEL_MASK);
-        dma_set_pte_addr(*pte, (paddr_t)start_pfn << PAGE_SHIFT_4K);
-        dma_set_pte_prot(*pte, prot);
-        iommu_flush_cache_entry(pte);
-        unmap_vtd_domain_page(page);
-        start_pfn++;
-        index++;
-    }
-
-    if ( index > 0 )
-    {
-        for_each_drhd_unit ( drhd )
-        {
-            iommu = drhd->iommu;
-            if ( test_bit(iommu->index, &hd->iommu_bitmap) )
-                if ( iommu_flush_iotlb_psi(iommu, domain_iommu_domid(domain),
-                                           iova, index, 1))
-                    iommu_flush_write_buffer(iommu);
-        }
-    }
-
-    return 0;
-}
-
-int iommu_page_unmapping(struct domain *domain, paddr_t addr, size_t size)
-{
-    dma_pte_clear_range(domain, addr, addr + size);
-
-    return 0;
-}
-
 static int iommu_prepare_rmrr_dev(struct domain *d,
                                   struct acpi_rmrr_unit *rmrr,
                                   u8 bus, u8 devfn)
 {
-    u64 size;
-    int ret;
+    int ret = 0;
+    u64 base, end;
+    unsigned long base_pfn, end_pfn;
 
-    /* page table init */
-    size = rmrr->end_address - rmrr->base_address + 1;
-    ret = iommu_page_mapping(d, rmrr->base_address,
-                             rmrr->base_address, size,
-                             DMA_PTE_READ|DMA_PTE_WRITE);
-    if ( ret )
-        return ret;
+    ASSERT(rmrr->base_address < rmrr->end_address);
+    
+    base = rmrr->base_address & PAGE_MASK_4K;
+    base_pfn = base >> PAGE_SHIFT_4K;
+    end = PAGE_ALIGN_4K(rmrr->end_address);
+    end_pfn = end >> PAGE_SHIFT_4K;
+
+    while ( base_pfn < end_pfn )
+    {
+        intel_iommu_map_page(d, base_pfn, base_pfn);
+        base_pfn++;
+    }
 
     if ( domain_context_mapped(bus, devfn) == 0 )
         ret = domain_context_mapping(d, bus, devfn);

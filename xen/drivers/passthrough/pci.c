@@ -21,6 +21,8 @@
 #include <xen/list.h>
 #include <xen/prefetch.h>
 #include <xen/iommu.h>
+#include <asm/hvm/iommu.h>
+#include <asm/hvm/irq.h>
 #include <xen/delay.h>
 #include <xen/keyhandler.h>
 
@@ -207,6 +209,7 @@ void pci_release_devices(struct domain *d)
     }
 }
 
+#ifdef SUPPORT_MSI_REMAPPING
 static void dump_pci_devices(unsigned char ch)
 {
     struct pci_dev *pdev;
@@ -236,7 +239,7 @@ static int __init setup_dump_pcidevs(void)
     return 0;
 }
 __initcall(setup_dump_pcidevs);
-
+#endif
 
 
 /*

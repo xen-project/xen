@@ -244,7 +244,6 @@ int rdmsr_viridian_regs(uint32_t idx, uint32_t *eax, uint32_t *edx)
 
 int viridian_hypercall(struct cpu_user_regs *regs)
 {
-    struct domain *d = current->domain;
     int mode = hvm_guest_x86_mode(current);
     unsigned long input_params_gpa, output_params_gpa;
     uint16_t status = HV_STATUS_SUCCESS;
@@ -271,7 +270,7 @@ int viridian_hypercall(struct cpu_user_regs *regs)
         };
     } output = { 0 };
 
-    ASSERT(is_viridian_domain(d));
+    ASSERT(is_viridian_domain(current->domain));
 
     switch ( mode )
     {

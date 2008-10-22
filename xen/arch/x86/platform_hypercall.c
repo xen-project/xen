@@ -53,15 +53,6 @@ static long cpu_frequency_change_helper(void *data)
     return cpu_frequency_change(this_cpu(freq));
 }
 
-int xenpf_copy_px_states(struct processor_performance *pxpt,
-        struct xen_processor_performance *dom0_px_info)
-{
-    if (!pxpt || !dom0_px_info)
-        return -EINVAL;
-    return  copy_from_compat(pxpt->states, dom0_px_info->states, 
-                    dom0_px_info->state_count);
-}
-
 ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
 {
     ret_t ret = 0;
@@ -372,12 +363,13 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
         switch ( op->u.set_pminfo.type )
         {
         case XEN_PM_PX:
-        {
-
-            ret = set_px_pminfo(op->u.set_pminfo.id,
-                                &op->u.set_pminfo.perf);
+            if ( !(xen_processor_pmbits & XEN_PROCESSOR_PM_PX) )
+            {
+                ret = -ENOSYS;
+                break;
+            }
+            ret = set_px_pminfo(op->u.set_pminfo.id, &op->u.set_pminfo.perf);
             break;
-        }
  
         case XEN_PM_CX:
             if ( !(xen_processor_pmbits & XEN_PROCESSOR_PM_CX) )

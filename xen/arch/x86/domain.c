@@ -575,7 +575,10 @@ int arch_set_info_guest(
     v->arch.guest_context.user_regs.eflags |= 2;
 
     if ( is_hvm_vcpu(v) )
+    {
+        hvm_set_info_guest(v);
         goto out;
+    }
 
     /* Only CR0.TS is modifiable by guest or admin. */
     v->arch.guest_context.ctrlreg[0] &= X86_CR0_TS;
@@ -1252,10 +1255,10 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
             flush_tlb_mask(next->vcpu_dirty_cpumask);
     }
 
-    local_irq_disable();
-
     if ( is_hvm_vcpu(prev) && !list_empty(&prev->arch.hvm_vcpu.tm_list) )
         pt_save_timer(prev);
+
+    local_irq_disable();
 
     set_current(next);
 

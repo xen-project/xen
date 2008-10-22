@@ -227,32 +227,40 @@ extern void shadow_audit_tables(struct vcpu *v);
 struct shadow_page_info
 {
     union {
-        /* When in use, guest page we're a shadow of */
-        unsigned long backpointer;
-        /* When free, order of the freelist we're on */
-        unsigned int order;
-    };
-    union {
-        /* When in use, next shadow in this hash chain */
-        struct shadow_page_info *next_shadow;
-        /* When free, TLB flush time when freed */
-        u32 tlbflush_timestamp;
-    };
-    struct {
-        unsigned int type:5;      /* What kind of shadow is this? */
-        unsigned int pinned:1;    /* Is the shadow pinned? */
-        unsigned int count:26;    /* Reference count */
-        u32 mbz;                  /* Must be zero: this is where the owner 
-                                   * field lives in a non-shadow page */
-    } __attribute__((packed));
-    union {
-        /* For unused shadow pages, a list of pages of this order; 
-         * for pinnable shadows, if pinned, a list of other pinned shadows
-         * (see sh_type_is_pinnable() below for the definition of 
-         * "pinnable" shadow types). */
-        struct list_head list;
-        /* For non-pinnable shadows, a higher entry that points at us */
-        paddr_t up;
+        /* Ensures that shadow_page_info is same size as page_info. */
+        struct page_info page_info;
+
+        struct {
+            union {
+                /* When in use, guest page we're a shadow of */
+                unsigned long backpointer;
+                /* When free, order of the freelist we're on */
+                unsigned int order;
+            };
+            union {
+                /* When in use, next shadow in this hash chain */
+                struct shadow_page_info *next_shadow;
+                /* When free, TLB flush time when freed */
+                u32 tlbflush_timestamp;
+            };
+            struct {
+                unsigned int type:5;   /* What kind of shadow is this? */
+                unsigned int pinned:1; /* Is the shadow pinned? */
+                unsigned int count:26; /* Reference count */
+                u32 mbz;               /* Must be zero: this is where the
+                                        * owner field lives in page_info */
+            } __attribute__((packed));
+            union {
+                /* For unused shadow pages, a list of pages of this order; for 
+                 * pinnable shadows, if pinned, a list of other pinned shadows
+                 * (see sh_type_is_pinnable() below for the definition of 
+                 * "pinnable" shadow types). */
+                struct list_head list;
+                /* For non-pinnable shadows, a higher entry that points
+                 * at us. */
+                paddr_t up;
+            };
+        };
     };
 };
 
@@ -261,7 +269,8 @@ struct shadow_page_info
  * Also, the mbz field must line up with the owner field of normal 
  * pages, so they look properly like anonymous/xen pages. */
 static inline void shadow_check_page_struct_offsets(void) {
-    BUILD_BUG_ON(sizeof (struct shadow_page_info) > sizeof (struct page_info));
+    BUILD_BUG_ON(sizeof (struct shadow_page_info) !=
+                 sizeof (struct page_info));
     BUILD_BUG_ON(offsetof(struct shadow_page_info, mbz) !=
                  offsetof(struct page_info, u.inuse._domain));
 };

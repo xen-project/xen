@@ -18,17 +18,19 @@
 #include <asm/io.h>
 
 /*
- * Configure serial port with a string <baud>,DPS,<io-base>,<irq>.
+ * Configure serial port with a string:
+ *   <baud>[/<clock_hz>][,DPS[,<io-base>[,<irq>]]].
  * The tail of the string can be omitted if platform defaults are sufficient.
  * If the baud rate is pre-configured, perhaps by a bootloader, then 'auto'
- * can be specified in place of a numeric baud rate.
+ * can be specified in place of a numeric baud rate. Polled mode is specified
+ * by requesting irq 0.
  */
 static char opt_com1[30] = "", opt_com2[30] = "";
 string_param("com1", opt_com1);
 string_param("com2", opt_com2);
 
 static struct ns16550 {
-    int baud, data_bits, parity, stop_bits, irq;
+    int baud, clock_hz, data_bits, parity, stop_bits, irq;
     unsigned long io_base;   /* I/O port or memory-mapped I/O address. */
     char *remapped_io_base;  /* Remapped virtual address of mmap I/O.  */ 
     /* UART with IRQ line: interrupt-driven I/O. */
@@ -192,7 +194,7 @@ static void __devinit ns16550_init_preirq(struct serial_port *port)
     if ( uart->baud != BAUD_AUTO )
     {
         /* Baud rate specified: program it into the divisor latch. */
-        divisor = UART_CLOCK_HZ / (uart->baud * 16);
+        divisor = uart->clock_hz / (uart->baud << 4);
         ns_write_reg(uart, DLL, (char)divisor);
         ns_write_reg(uart, DLM, (char)(divisor >> 8));
     }
@@ -201,7 +203,7 @@ static void __devinit ns16550_init_preirq(struct serial_port *port)
         /* Baud rate already set: read it out from the divisor latch. */
         divisor  = ns_read_reg(uart, DLL);
         divisor |= ns_read_reg(uart, DLM) << 8;
-        uart->baud = UART_CLOCK_HZ / (divisor * 16);
+        uart->baud = uart->clock_hz / (divisor << 4);
     }
     ns_write_reg(uart, LCR, lcr);
 
@@ -355,6 +357,12 @@ static void __init ns16550_parse_port_config(
     else if ( (baud = simple_strtoul(conf, &conf, 10)) != 0 )
         uart->baud = baud;
 
+    if ( *conf == '/')
+    {
+        conf++;
+        uart->clock_hz = simple_strtoul(conf, &conf, 0) << 4;
+    }
+
     if ( *conf != ',' )
         goto config_parsed;
     conf++;
@@ -408,6 +416,7 @@ void __init ns16550_init(int index, struct ns16550_defaults *defaults)
     uart->baud      = (defaults->baud ? :
                        console_has((index == 0) ? "com1" : "com2")
                        ? BAUD_AUTO : 0);
+    uart->clock_hz  = UART_CLOCK_HZ;
     uart->data_bits = defaults->data_bits;
     uart->parity    = parse_parity_char(defaults->parity);
     uart->stop_bits = defaults->stop_bits;
