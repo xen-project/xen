@@ -9,6 +9,7 @@ void _spin_lock(spinlock_t *lock)
 
 void _spin_lock_irq(spinlock_t *lock)
 {
+    ASSERT(local_irq_is_enabled());
     local_irq_disable();
     _raw_spin_lock(&lock->raw);
 }
@@ -96,6 +97,7 @@ void _read_lock(rwlock_t *lock)
 
 void _read_lock_irq(rwlock_t *lock)
 {
+    ASSERT(local_irq_is_enabled());
     local_irq_disable();
     _raw_read_lock(&lock->raw);
 }
@@ -132,6 +134,7 @@ void _write_lock(rwlock_t *lock)
 
 void _write_lock_irq(rwlock_t *lock)
 {
+    ASSERT(local_irq_is_enabled());
     local_irq_disable();
     _raw_write_lock(&lock->raw);
 }
