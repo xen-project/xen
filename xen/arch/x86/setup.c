@@ -1059,6 +1059,8 @@ void __init __start_xen(unsigned long mbi_p)
                         cmdline) != 0)
         panic("Could not set up DOM0 guest OS\n");
 
+    spin_debug_enable();
+
     /* Scrub RAM that is still free and so may go to an unprivileged domain. */
     scrub_heap_pages();
 

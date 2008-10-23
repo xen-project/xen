@@ -5,21 +5,38 @@
 #include <asm/system.h>
 #include <asm/spinlock.h>
 
+#ifndef NDEBUG
+struct lock_debug {
+    int irq_safe; /* +1: IRQ-safe; 0: not IRQ-safe; -1: don't know yet */
+};
+#define _LOCK_DEBUG { -1 }
+void spin_debug_enable(void);
+void spin_debug_disable(void);
+#else
+struct lock_debug { };
+#define _LOCK_DEBUG { }
+#define spin_debug_enable() ((void)0)
+#define spin_debug_disable() ((void)0)
+#endif
+
 typedef struct {
     raw_spinlock_t raw;
     u16 recurse_cpu:12;
     u16 recurse_cnt:4;
+    struct lock_debug debug;
 } spinlock_t;
 
-#define SPIN_LOCK_UNLOCKED { _RAW_SPIN_LOCK_UNLOCKED, 0xfffu, 0 }
+
+#define SPIN_LOCK_UNLOCKED { _RAW_SPIN_LOCK_UNLOCKED, 0xfffu, 0, _LOCK_DEBUG }
 #define DEFINE_SPINLOCK(l) spinlock_t l = SPIN_LOCK_UNLOCKED
 #define spin_lock_init(l) (*(l) = (spinlock_t)SPIN_LOCK_UNLOCKED)
 
 typedef struct {
     raw_rwlock_t raw;
+    struct lock_debug debug;
 } rwlock_t;
 
-#define RW_LOCK_UNLOCKED { _RAW_RW_LOCK_UNLOCKED }
+#define RW_LOCK_UNLOCKED { _RAW_RW_LOCK_UNLOCKED, _LOCK_DEBUG }
 #define DEFINE_RWLOCK(l) rwlock_t l = RW_LOCK_UNLOCKED
 #define rwlock_init(l) (*(l) = (rwlock_t)RW_LOCK_UNLOCKED)
 
