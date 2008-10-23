@@ -203,7 +203,6 @@ static void dom0_pt_enter(struct vcpu *v)
     };
 
     asm volatile ( "lgdt %0" : : "m" (gdt_desc) );
-    local_irq_disable();
     write_ptbase(v);
 }
 
@@ -216,7 +215,6 @@ static void dom0_pt_exit(void)
     };
 
     write_ptbase(current);
-    local_irq_enable();
     asm volatile ( "lgdt %0" : : "m" (gdt_desc) );
 }
 
