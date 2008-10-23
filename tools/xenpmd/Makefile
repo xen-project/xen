@@ -10,6 +10,11 @@ BIN      = xenpmd
 .PHONY: all
 all: $(BIN)
 
+.PHONY: install
+install: all
+	$(INSTALL_DIR) $(DESTDIR)$(SBINDIR)
+	$(INSTALL_PROG) $(BIN) $(DESTDIR)$(SBINDIR)
+
 .PHONY: clean
 clean:
 	$(RM) -f $(BIN)
