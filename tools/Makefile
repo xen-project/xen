@@ -24,6 +24,7 @@ SUBDIRS-y += libfsimage
 SUBDIRS-$(LIBXENAPI_BINDINGS) += libxen
 SUBDIRS-y += fs-back
 SUBDIRS-$(CONFIG_IOEMU) += ioemu-dir
+SUBDIRS-y += xenpmd
 
 # These don't cross-compile
 ifeq ($(XEN_COMPILE_ARCH),$(XEN_TARGET_ARCH))
