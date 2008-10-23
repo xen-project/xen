@@ -122,6 +122,8 @@ vmx_asm_vmexit_handler:
 
 .globl vmx_asm_do_vmentry
 vmx_asm_do_vmentry:
+        call vmx_intr_assist
+
         get_current(bx)
         cli
 
@@ -130,8 +132,6 @@ vmx_asm_do_vmentry:
         lea  addr_of(irq_stat),r(dx)
         cmpl $0,(r(dx),r(ax),1)
         jnz  .Lvmx_process_softirqs
-
-        call vmx_intr_assist
 
         testb $0xff,VCPU_vmx_emul(r(bx))
         jnz  .Lvmx_goto_realmode
@@ -179,11 +179,13 @@ vmx_asm_do_vmentry:
 
 /*.Lvmx_resume:*/
         VMRESUME
+        sti
         call vm_resume_fail
         ud2
 
 .Lvmx_launch:
         VMLAUNCH
+        sti
         call vm_launch_fail
         ud2
 

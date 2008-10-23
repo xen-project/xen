@@ -1892,6 +1892,54 @@ void domain_cpuid(
     *eax = *ebx = *ecx = *edx = 0;
 }
 
+void vcpu_kick(struct vcpu *v)
+{
+    /*
+     * NB1. 'pause_flags' and 'processor' must be checked /after/ update of
+     * pending flag. These values may fluctuate (after all, we hold no
+     * locks) but the key insight is that each change will cause
+     * evtchn_upcall_pending to be polled.
+     * 
+     * NB2. We save the running flag across the unblock to avoid a needless
+     * IPI for domains that we IPI'd to unblock.
+     */
+    bool_t running = v->is_running;
+    vcpu_unblock(v);
+    if ( running && (in_irq() || (v != current)) )
+        cpu_raise_softirq(v->processor, VCPU_KICK_SOFTIRQ);
+}
+
+void vcpu_mark_events_pending(struct vcpu *v)
+{
+    int already_pending = test_and_set_bit(
+        0, (unsigned long *)&vcpu_info(v, evtchn_upcall_pending));
+
+    if ( already_pending )
+        return;
+
+    if ( is_hvm_vcpu(v) )
+        hvm_assert_evtchn_irq(v);
+    else
+        vcpu_kick(v);
+}
+
+static void vcpu_kick_softirq(void)
+{
+    /*
+     * Nothing to do here: we merely prevent notifiers from racing with checks
+     * executed on return to guest context with interrupts enabled. See, for
+     * example, xxx_intr_assist() executed on return to HVM guest context.
+     */
+}
+
+static int __init init_vcpu_kick_softirq(void)
+{
+    open_softirq(VCPU_KICK_SOFTIRQ, vcpu_kick_softirq);
+    return 0;
+}
+__initcall(init_vcpu_kick_softirq);
+
+
 /*
  * Local variables:
  * mode: C
