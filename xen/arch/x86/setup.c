@@ -969,6 +969,7 @@ void __init __start_xen(unsigned long mbi_p)
     serial_init_postirq();
 
     BUG_ON(!local_irq_is_enabled());
+    spin_debug_enable();
 
     for_each_present_cpu ( i )
     {
@@ -1058,8 +1059,6 @@ void __init __start_xen(unsigned long mbi_p)
                         _initrd_len,
                         cmdline) != 0)
         panic("Could not set up DOM0 guest OS\n");
-
-    spin_debug_enable();
 
     /* Scrub RAM that is still free and so may go to an unprivileged domain. */
     scrub_heap_pages();
