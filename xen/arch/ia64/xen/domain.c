@@ -602,6 +602,11 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
 	if ((d->arch.mm.pgd = pgd_alloc(&d->arch.mm)) == NULL)
 	    goto fail_nomem;
 
+	if ( iommu_enabled && (is_hvm_domain(d) || need_iommu(d)) ){
+		if(iommu_domain_init(d) != 0)
+			goto fail_iommu;
+	}
+
 	/*
 	 * grant_table_create() can't fully initialize grant table for domain
 	 * because it is called before arch_domain_create().
@@ -618,6 +623,8 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
 	dprintk(XENLOG_DEBUG, "arch_domain_create: domain=%p\n", d);
 	return 0;
 
+fail_iommu:
+	iommu_domain_destroy(d);
 fail_nomem:
 	tlb_track_destroy(d);
 fail_nomem1:
@@ -636,6 +643,11 @@ void arch_domain_destroy(struct domain *d)
 	if (d->shared_info != NULL)
 		free_xenheap_pages(d->shared_info,
 				   get_order_from_shift(XSI_SHIFT));
+
+	if ( iommu_enabled && (is_hvm_domain(d) || need_iommu(d)) )	{
+		pci_release_devices(d);
+		iommu_domain_destroy(d);
+	}
 
 	tlb_track_destroy(d);
 

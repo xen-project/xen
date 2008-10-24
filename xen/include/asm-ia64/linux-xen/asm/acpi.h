@@ -38,6 +38,7 @@
 #include <asm/numa.h>
 #ifdef XEN
 #include <xen/nodemask.h>
+extern int acpi_dmar_init(void);
 #endif
 
 #define COMPILER_DEPENDENT_INT64	long

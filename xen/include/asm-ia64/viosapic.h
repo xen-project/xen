@@ -70,5 +70,7 @@ void viosapic_write(struct vcpu *v, unsigned long addr,
 
 unsigned long viosapic_read(struct vcpu *v, unsigned long addr,
                             unsigned long length);
+void hvm_dpci_eoi(struct domain *d, unsigned int guest_gsi,
+                          union vioapic_redir_entry *ent);
 
 #endif /* __ASM_IA64_VMX_VIOSAPIC_H__ */

@@ -54,6 +54,7 @@
 #include <asm/shadow.h>
 #include <asm/sioemu.h>
 #include <public/arch-ia64/sioemu.h>
+#include <xen/hvm/irq.h>
 
 /* reset all PSR field to 0, except up,mfl,mfh,pk,dt,rt,mc,it */
 #define INITIAL_PSR_VALUE_AT_INTERRUPTION 0x0000001808028034
@@ -306,6 +307,7 @@ void leave_hypervisor_tail(void)
                 viosapic_set_irq(d, callback_irq, 0);
             }
         }
+        hvm_dirq_assist(v);
     }
 
     rmb();

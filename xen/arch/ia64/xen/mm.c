@@ -1435,6 +1435,8 @@ zap_domain_page_one(struct domain *d, unsigned long mpaddr,
     if (mfn == INVALID_MFN) {
         // clear pte
         old_pte = ptep_get_and_clear(mm, mpaddr, pte);
+        if(!pte_mem(old_pte))
+            return;
         mfn = pte_pfn(old_pte);
     } else {
         unsigned long old_arflags;
@@ -1471,6 +1473,13 @@ zap_domain_page_one(struct domain *d, unsigned long mpaddr,
     perfc_incr(zap_domain_page_one);
     if(!mfn_valid(mfn))
         return;
+
+    if ( iommu_enabled && (is_hvm_domain(d) || need_iommu(d)) ){
+        int i, j;
+        j = 1 << (PAGE_SHIFT-PAGE_SHIFT_4K);
+        for(i = 0 ; i < j; i++)
+            iommu_unmap_page(d, (mpaddr>>PAGE_SHIFT)*j + i);
+    }
 
     page = mfn_to_page(mfn);
     BUG_ON((page->count_info & PGC_count_mask) == 0);
@@ -2856,6 +2865,12 @@ __guest_physmap_add_page(struct domain *d, unsigned long gpfn,
     smp_mb();
     assign_domain_page_replace(d, gpfn << PAGE_SHIFT, mfn,
                                ASSIGN_writable | ASSIGN_pgc_allocated);
+    if ( iommu_enabled && (is_hvm_domain(d) || need_iommu(d)) ){
+        int i, j;
+        j = 1 << (PAGE_SHIFT-PAGE_SHIFT_4K);
+        for(i = 0 ; i < j; i++)
+            iommu_map_page(d, gpfn*j + i, mfn*j + i);
+    }
 }
 
 int

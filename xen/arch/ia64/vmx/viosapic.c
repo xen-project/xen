@@ -121,6 +121,13 @@ static void viosapic_update_EOI(struct viosapic *viosapic, int vector)
                      redir_num, vector);
         return;
     }
+    if ( iommu_enabled )
+    {
+        spin_unlock(&viosapic->lock);
+        hvm_dpci_eoi(current->domain, redir_num, &viosapic->redirtbl[redir_num]);
+        spin_lock(&viosapic->lock);
+    }
+
     service_iosapic(viosapic);
     spin_unlock(&viosapic->lock);
 }

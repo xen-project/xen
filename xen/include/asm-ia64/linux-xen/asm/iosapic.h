@@ -83,12 +83,25 @@ static inline int find_iosapic_by_addr(unsigned long addr)
 
 static inline unsigned int iosapic_read(char __iomem *iosapic, unsigned int reg)
 {
+#ifdef XEN
+	if(iommu_enabled && (reg >= 10)){
+		int apic = find_iosapic_by_addr((unsigned long)iosapic);
+		return io_apic_read_remap_rte(apic, reg);
+	}
+#endif
 	writel(reg, iosapic + IOSAPIC_REG_SELECT);
 	return readl(iosapic + IOSAPIC_WINDOW);
 }
 
 static inline void iosapic_write(char __iomem *iosapic, unsigned int reg, u32 val)
 {
+#ifdef XEN
+	if (iommu_enabled && (reg >= 10)){
+		int apic = find_iosapic_by_addr((unsigned long)iosapic);
+		iommu_update_ire_from_apic(apic, reg, val);
+		return;
+	}
+#endif
 	writel(reg, iosapic + IOSAPIC_REG_SELECT);
 	writel(val, iosapic + IOSAPIC_WINDOW);
 }

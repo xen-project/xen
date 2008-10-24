@@ -312,12 +312,25 @@ typedef struct {
     struct domain *guest[IRQ_MAX_GUESTS];
 } irq_guest_action_t;
 
+static struct timer irq_guest_eoi_timer[NR_IRQS];
+static void irq_guest_eoi_timer_fn(void *data)
+{
+	irq_desc_t *desc = data;
+	unsigned vector = desc - irq_desc;
+	unsigned long flags;
+
+	spin_lock_irqsave(&desc->lock, flags);
+	desc->status &= ~IRQ_INPROGRESS;
+	desc->handler->enable(vector);
+	spin_unlock_irqrestore(&desc->lock, flags);
+}
+
 void __do_IRQ_guest(int irq)
 {
     irq_desc_t         *desc = &irq_desc[irq];
     irq_guest_action_t *action = (irq_guest_action_t *)desc->action;
     struct domain      *d;
-    int                 i;
+    int                 i, already_pending = 0;
 
     for ( i = 0; i < action->nr_guests; i++ )
     {
@@ -325,8 +338,29 @@ void __do_IRQ_guest(int irq)
         if ( (action->ack_type != ACKTYPE_NONE) &&
              !test_and_set_bit(irq, &d->pirq_mask) )
             action->in_flight++;
-        send_guest_pirq(d, irq);
-    }
+		if ( hvm_do_IRQ_dpci(d, irq) )
+		{
+			if ( action->ack_type == ACKTYPE_NONE )
+			{
+				already_pending += !!(desc->status & IRQ_INPROGRESS);
+				desc->status |= IRQ_INPROGRESS; /* cleared during hvm eoi */
+			}
+		}
+		else if ( send_guest_pirq(d, irq) &&
+				(action->ack_type == ACKTYPE_NONE) )
+		{
+			already_pending++;
+		}
+	}
+
+	if ( already_pending == action->nr_guests )
+	{
+		desc->handler->disable(irq);
+		stop_timer(&irq_guest_eoi_timer[irq]);
+		init_timer(&irq_guest_eoi_timer[irq],
+				irq_guest_eoi_timer_fn, desc, smp_processor_id());
+		set_timer(&irq_guest_eoi_timer[irq], NOW() + MILLISECS(1));
+	}
 }
 
 int pirq_acktype(int irq)

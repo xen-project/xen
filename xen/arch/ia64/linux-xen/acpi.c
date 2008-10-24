@@ -797,6 +797,10 @@ int __init acpi_boot_init(void)
 	if (acpi_table_parse(ACPI_SIG_FADT, acpi_parse_fadt))
 		printk(KERN_ERR PREFIX "Can't find FADT\n");
 
+#ifdef XEN
+	acpi_dmar_init();
+#endif
+
 #ifdef CONFIG_SMP
 	if (available_cpus == 0) {
 		printk(KERN_INFO "ACPI: Found 0 CPUS; assuming 1\n");
