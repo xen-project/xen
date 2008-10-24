@@ -917,10 +917,18 @@ __assign_domain_page(struct domain *d,
 
     old_pte = __pte(0);
     new_pte = pfn_pte(physaddr >> PAGE_SHIFT, __pgprot(prot));
+ again_hvm_page_io:
     ret_pte = ptep_cmpxchg_rel(&d->arch.mm, mpaddr, pte, old_pte, new_pte);
     if (pte_val(ret_pte) == pte_val(old_pte)) {
         smp_mb();
         return 0;
+    }
+    /* in HVM guest, when VTD is enabled,
+     * P2M entry may change from _PAGE_IO type to real MMIO page 
+     */
+    if(VMX_DOMAIN(d->vcpu[0]) && (pte_val(ret_pte) & _PAGE_IO)) {
+        old_pte = ret_pte;
+        goto again_hvm_page_io;
     }
 
     // dom0 tries to map real machine's I/O region, but failed.
