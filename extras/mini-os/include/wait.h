@@ -7,7 +7,7 @@
 
 #define DEFINE_WAIT(name)                               \
 struct wait_queue name = {                              \
-    .thread       = current,                            \
+    .thread       = get_current(),                            \
     .thread_list  = MINIOS_LIST_HEAD_INIT((name).thread_list), \
 }
 
@@ -53,7 +53,7 @@ static inline void wake_up(struct wait_queue_head *head)
     unsigned long flags;        \
     local_irq_save(flags);      \
     add_wait_queue(&wq, &w);    \
-    block(current);             \
+    block(get_current());       \
     local_irq_restore(flags);   \
 } while (0)
 
@@ -74,8 +74,8 @@ static inline void wake_up(struct wait_queue_head *head)
         /* protect the list */                                  \
         local_irq_save(flags);                                  \
         add_wait_queue(&wq, &__wait);                           \
-        current->wakeup_time = deadline;                        \
-        clear_runnable(current);                                \
+        get_current()->wakeup_time = deadline;                  \
+        clear_runnable(get_current());                          \
         local_irq_restore(flags);                               \
         if((condition) || (deadline && NOW() >= deadline))      \
             break;                                              \
@@ -83,7 +83,7 @@ static inline void wake_up(struct wait_queue_head *head)
     }                                                           \
     local_irq_save(flags);                                      \
     /* need to wake up */                                       \
-    wake(current);                                              \
+    wake(get_current());                                        \
     remove_wait_queue(&__wait);                                 \
     local_irq_restore(flags);                                   \
 } while(0) 
