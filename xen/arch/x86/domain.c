@@ -1687,6 +1687,7 @@ static int relinquish_memory(
             {
                 if ( free_page_type(page, x, 0) != 0 )
                     BUG();
+                put_page(page);
                 break;
             }
         }
