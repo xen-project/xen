@@ -52,6 +52,7 @@ from xen.xend.xenstore.xsutil import GetDomainPath, IntroduceDomain, SetTarget, 
 from xen.xend.xenstore.xswatch import xswatch
 from xen.xend.XendConstants import *
 from xen.xend.XendAPIConstants import *
+from xen.xend.server.DevConstants import xenbusState
 
 from xen.xend.XendVMMetrics import XendVMMetrics
 
@@ -797,7 +798,7 @@ class XendDomainInfo:
         existing_dev_info = self._getDeviceInfo_vscsi(req_devid, dev['v-dev'])
         state = dev['state']
 
-        if state == 'Initialising':
+        if state == xenbusState['Initialising']:
             # new create
             # If request devid does not exist, create and exit.
             if existing_dev_info is None:
@@ -806,25 +807,48 @@ class XendDomainInfo:
             elif existing_dev_info == "exists":
                 raise XendError("The virtual device %s is already defined" % dev['v-dev'])
 
-        elif state == 'Closing':
+        elif state == xenbusState['Closing']:
             if existing_dev_info is None:
                 raise XendError("Cannot detach vscsi device does not exist")
 
-        # use DevController.reconfigureDevice to change device config
-        dev_control = self.getDeviceController(dev_class)
-        dev_uuid = dev_control.reconfigureDevice(req_devid, dev_config)
-        dev_control.waitForDevice_reconfigure(req_devid)
-        num_devs = dev_control.cleanupDevice(req_devid)
+        if self.domid is not None:
+            # use DevController.reconfigureDevice to change device config
+            dev_control = self.getDeviceController(dev_class)
+            dev_uuid = dev_control.reconfigureDevice(req_devid, dev_config)
+            dev_control.waitForDevice_reconfigure(req_devid)
+            num_devs = dev_control.cleanupDevice(req_devid)
 
-        # update XendConfig with new device info
-        if dev_uuid:
-            new_dev_sxp = dev_control.configuration(req_devid)
+            # update XendConfig with new device info
+            if dev_uuid:
+                new_dev_sxp = dev_control.configuration(req_devid)
+                self.info.device_update(dev_uuid, new_dev_sxp)
+
+            # If there is no device left, destroy vscsi and remove config.
+            if num_devs == 0:
+                self.destroyDevice('vscsi', req_devid)
+                del self.info['devices'][dev_uuid]
+
+        else:
+            cur_dev_sxp = self._getDeviceInfo_vscsi(req_devid, None)
+            new_dev_sxp = ['vscsi']
+            for cur_dev in sxp.children(cur_dev_sxp, 'dev'):
+                if state == xenbusState['Closing']:
+                    cur_dev_vdev = sxp.child_value(cur_dev, 'v-dev')
+                    if cur_dev_vdev == dev['v-dev']:
+                        continue
+                new_dev_sxp.append(cur_dev)
+
+            if state == xenbusState['Initialising']:
+                new_dev_sxp.append(sxp.child0(dev_sxp, 'dev'))
+
+            dev_uuid = sxp.child_value(cur_dev_sxp, 'uuid')
             self.info.device_update(dev_uuid, new_dev_sxp)
 
-        # If there is no device left, destroy vscsi and remove config.
-        if num_devs == 0:
-            self.destroyDevice('vscsi', req_devid)
-            del self.info['devices'][dev_uuid]
+            # If there is only 'vscsi' in new_dev_sxp, remove the config.
+            if len(sxp.children(new_dev_sxp, 'dev')) == 0:
+                del self.info['devices'][dev_uuid]
+
+        xen.xend.XendDomain.instance().managed_config_save(self)
 
         return True
 
@@ -986,7 +1010,17 @@ class XendDomainInfo:
             sxprs = []
             dev_num = 0
             for dev_type, dev_info in self.info.all_devices_sxpr():
-                if dev_type == deviceClass:
+                if dev_type != deviceClass:
+                    continue
+
+                if deviceClass == 'vscsi':
+                    vscsi_devs = ['devs', []]
+                    for vscsi_dev in sxp.children(dev_info, 'dev'):
+                        vscsi_dev.append(['frontstate', None])
+                        vscsi_devs[1].append(vscsi_dev)
+                        dev_num = int(sxp.child_value(vscsi_dev, 'devid'))
+                    sxprs.append([dev_num, [vscsi_devs]])
+                else:
                     sxprs.append([dev_num, dev_info])
                     dev_num += 1
             return sxprs
@@ -2380,11 +2414,10 @@ class XendDomainInfo:
             time.sleep(2)
         for paths in plist:
             if paths.find('backend') != -1:
-                from xen.xend.server import DevController
                 # Modify online status /before/ updating state (latter is watched by
                 # drivers, so this ordering avoids a race).
                 xstransact.Write(paths, 'online', "0")
-                xstransact.Write(paths, 'state', str(DevController.xenbusState['Closing']))
+                xstransact.Write(paths, 'state', str(xenbusState['Closing']))
             # force
             xstransact.Remove(paths)
 
@@ -3439,7 +3472,7 @@ class XendDomainInfo:
                     ['p-devname', pscsi.get_dev_name()],
                     ['p-dev', pscsi.get_physical_HCTL()],
                     ['v-dev', xenapi_dscsi.get('virtual_HCTL')],
-                    ['state', 'Initialising'],
+                    ['state', xenbusState['Initialising']],
                     ['uuid', dscsi_uuid]
                 ]
             ]
@@ -3558,7 +3591,7 @@ class XendDomainInfo:
         if target_dev is None:
             raise XendError('Failed to destroy device')
 
-        target_dev.append(['state', 'Closing'])
+        target_dev.append(['state', xenbusState['Closing']])
         target_vscsi_sxp = ['vscsi', target_dev]
 
         if self._stateGet() != XEN_API_VM_POWER_STATE_RUNNING:

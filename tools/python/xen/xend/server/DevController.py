@@ -23,41 +23,14 @@ from xen.xend import sxp, XendOptions
 from xen.xend.XendError import VmError
 from xen.xend.XendLogging import log
 import xen.xend.XendConfig
+from xen.xend.server.DevConstants import *
 
 from xen.xend.xenstore.xstransact import xstransact, complete
 from xen.xend.xenstore.xswatch import xswatch
 
 import os
 
-DEVICE_CREATE_TIMEOUT  = 100
-DEVICE_DESTROY_TIMEOUT = 100
-HOTPLUG_STATUS_NODE = "hotplug-status"
-HOTPLUG_ERROR_NODE  = "hotplug-error"
-HOTPLUG_STATUS_ERROR = "error"
-HOTPLUG_STATUS_BUSY  = "busy"
-
-Connected    = 1
-Error        = 2
-Missing      = 3
-Timeout      = 4
-Busy         = 5
-Disconnected = 6
-
-xenbusState = {
-    'Unknown'      : 0,
-    'Initialising' : 1,
-    'InitWait'     : 2,
-    'Initialised'  : 3,
-    'Connected'    : 4,
-    'Closing'      : 5,
-    'Closed'       : 6,
-    'Reconfiguring': 7,
-    'Reconfigured' : 8,
-    }
-
 xoptions = XendOptions.instance()
-
-xenbusState.update(dict(zip(xenbusState.values(), xenbusState.keys())))
 
 
 class DevController:

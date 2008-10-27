@@ -1602,21 +1602,21 @@ class XendConfig(dict):
         #   [vscsi,
         #     [dev,
         #       [devid, 0], [p-devname, sdb], [p-dev, 1:0:0:1],
-        #       [v-dev, 0:0:0:0], [state, Initialising]
+        #       [v-dev, 0:0:0:0], [state, 1]
         #     ],
         #     [dev,
         #       [devid, 0], [p-devname, sdc], [p-dev, 1:0:0:2],
-        #       [v-dev, 0:0:0:1], [satet, Initialising]
+        #       [v-dev, 0:0:0:1], [satet, 1]
         #     ]
         #   ],
         #   [vscsi,
         #     [dev,
         #       [devid, 1], [p-devname, sdg], [p-dev, 2:0:0:0],
-        #       [v-dev, 1:0:0:0], [state, Initialising]
+        #       [v-dev, 1:0:0:0], [state, 1]
         #     ],
         #     [dev,
         #       [devid, 1], [p-devname, sdh], [p-dev, 2:0:0:1],
-        #       [v-dev, 1:0:0:1], [satet, Initialising]
+        #       [v-dev, 1:0:0:1], [satet, 1]
         #     ]
         #   ]
         # ]
@@ -1632,18 +1632,19 @@ class XendConfig(dict):
         #   [vscsi,
         #     [dev,
         #       [devid, 0], [p-devname, sdd], [p-dev, 1:0:0:3],
-        #       [v-dev, 0:0:0:2], [state, Initialising]
+        #       [v-dev, 0:0:0:2], [state, 1]
         #     ]
         #   ]
         # ]
         #
-        # state 'Initialising' indicates that the device is being attached,
-        # while state 'Closing' indicates that the device is being detached.
+        # state xenbusState['Initialising'] indicates that the device is 
+        # being attached, while state xenbusState['Closing'] indicates 
+        # that the device is being detached.
         #
         # The Dict looks like this:
         #
         # { devs: [ {devid: 0, p-devname: sdd, p-dev: 1:0:0:3,
-        #            v-dev: 0:0:0:2, state: Initialising} ] }
+        #            v-dev: 0:0:0:2, state: 1} ] }
 
         dev_config = {}
 

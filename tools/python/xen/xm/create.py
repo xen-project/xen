@@ -32,6 +32,7 @@ from xen.xend import PrettyPrint as SXPPrettyPrint
 from xen.xend import osdep
 import xen.xend.XendClient
 from xen.xend.XendBootloader import bootloader
+from xen.xend.server.DevConstants import xenbusState
 from xen.util import blkif
 from xen.util import vscsi_util
 import xen.util.xsm.xsm as security
@@ -707,7 +708,7 @@ def configure_vscsis(config_devs, vals):
             vscsi_util.vscsi_get_hctl_and_devname_by(p_dev, scsi_devices)
 
         if p_hctl == None:
-            raise ValueError("Cannot find device \"%s\"" % p_dev)
+            raise ValueError('Cannot find device "%s"' % p_dev)
 
         for config in config_scsi:
             dev = vscsi_convert_sxp_to_dict(config)
@@ -717,7 +718,7 @@ def configure_vscsis(config_devs, vals):
         v_hctl = v_dev.split(':')
         devid = int(v_hctl[0])
         config_scsi.append(['dev', \
-                        ['state', 'Initialising'], \
+                        ['state', xenbusState['Initialising']], \
                         ['devid', devid], \
                         ['p-dev', p_hctl], \
                         ['p-devname', devname], \

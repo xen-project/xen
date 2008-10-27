@@ -47,6 +47,7 @@ from xen.xend import PrettyPrint
 from xen.xend import sxp
 from xen.xend import XendClient
 from xen.xend.XendConstants import *
+from xen.xend.server.DevConstants import xenbusState
 
 from xen.xm.opts import OptionError, Opts, wrap, set_true
 from xen.xm import console
@@ -2515,7 +2516,7 @@ def xm_scsi_attach(args):
     dom = args[0]
     p_scsi = args[1]
     v_hctl = args[2]
-    scsi = parse_scsi_configuration(p_scsi, v_hctl, 'Initialising')
+    scsi = parse_scsi_configuration(p_scsi, v_hctl, xenbusState['Initialising'])
 
     if serverType == SERVER_XEN_API:
 
@@ -2635,7 +2636,7 @@ def xm_scsi_detach(args):
     arg_check(args, 'scsi-detach', 2)
     dom = args[0]
     v_hctl = args[1]
-    scsi = parse_scsi_configuration(None, v_hctl, 'Closing')
+    scsi = parse_scsi_configuration(None, v_hctl, xenbusState['Closing'])
 
     if serverType == SERVER_XEN_API:
 

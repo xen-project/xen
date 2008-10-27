@@ -23,7 +23,7 @@ from xen.xend import sxp
 from xen.xend.XendClient import server
 from xen.xend.XendError import XendError
 from xen.xend.xenstore.xstransact import xstransact
-from xen.xend.server import DevController
+from xen.xend.server import DevConstants
 
 import xen.xend.XendProtocol
 
@@ -169,7 +169,7 @@ def diagnose_hotplugging():
 
 
 def stateString(state):
-    return state and DevController.xenbusState[int(state)] or '<None>'
+    return state and DevConstants.xenbusState[int(state)] or '<None>'
 
 
 def main(argv = None):
