@@ -24,7 +24,7 @@ void *map_domain_page(unsigned long mfn);
  * Pass a VA within a page previously mapped in the context of the
  * currently-executing VCPU via a call to map_domain_page().
  */
-void unmap_domain_page(void *va);
+void unmap_domain_page(const void *va);
 
 /*
  * Similar to the above calls, except the mapping is accessible in all
@@ -32,7 +32,7 @@ void unmap_domain_page(void *va);
  * mappings can also be unmapped from any context.
  */
 void *map_domain_page_global(unsigned long mfn);
-void unmap_domain_page_global(void *va);
+void unmap_domain_page_global(const void *va);
 
 #define DMCACHE_ENTRY_VALID 1U
 #define DMCACHE_ENTRY_HELD  2U
@@ -75,7 +75,7 @@ map_domain_page_with_cache(unsigned long mfn, struct domain_mmap_cache *cache)
 }
 
 static inline void
-unmap_domain_page_with_cache(void *va, struct domain_mmap_cache *cache)
+unmap_domain_page_with_cache(const void *va, struct domain_mmap_cache *cache)
 {
     ASSERT(cache != NULL);
     cache->flags &= ~DMCACHE_ENTRY_HELD;

@@ -114,7 +114,7 @@ void *map_domain_page(unsigned long mfn)
     return (void *)va;
 }
 
-void unmap_domain_page(void *va)
+void unmap_domain_page(const void *va)
 {
     unsigned int idx;
     struct vcpu *v;
@@ -241,7 +241,7 @@ void *map_domain_page_global(unsigned long mfn)
     return (void *)va;
 }
 
-void unmap_domain_page_global(void *va)
+void unmap_domain_page_global(const void *va)
 {
     unsigned long __va = (unsigned long)va;
     l2_pgentry_t *pl2e;
