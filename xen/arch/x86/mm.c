@@ -2431,6 +2431,29 @@ static inline cpumask_t vcpumask_to_pcpumask(
     return pmask;
 }
 
+#ifdef __i386__
+static inline void *fixmap_domain_page(unsigned long mfn)
+{
+    unsigned int cpu = smp_processor_id();
+    void *ptr = (void *)fix_to_virt(FIX_PAE_HIGHMEM_0 + cpu);
+
+    l1e_write(fix_pae_highmem_pl1e - cpu,
+              l1e_from_pfn(mfn, __PAGE_HYPERVISOR));
+    flush_tlb_one_local(ptr);
+    return ptr;
+}
+static inline void fixunmap_domain_page(const void *ptr)
+{
+    unsigned int cpu = virt_to_fix((unsigned long)ptr) - FIX_PAE_HIGHMEM_0;
+
+    l1e_write(fix_pae_highmem_pl1e - cpu, l1e_empty());
+    this_cpu(make_cr3_timestamp) = this_cpu(tlbflush_time);
+}
+#else
+#define fixmap_domain_page(mfn) mfn_to_virt(mfn)
+#define fixunmap_domain_page(ptr) ((void)(ptr))
+#endif
+
 int do_mmuext_op(
     XEN_GUEST_HANDLE(mmuext_op_t) uops,
     unsigned int count,
@@ -2697,6 +2720,66 @@ int do_mmuext_op(
                 if ( ents != 0 )
                     this_cpu(percpu_mm_info).deferred_ops |= DOP_RELOAD_LDT;
             }
+            break;
+        }
+
+        case MMUEXT_CLEAR_PAGE:
+        {
+            unsigned char *ptr;
+
+            okay = !get_page_and_type_from_pagenr(mfn, PGT_writable_page,
+                                                  FOREIGNDOM, 0);
+            if ( unlikely(!okay) )
+            {
+                MEM_LOG("Error while clearing mfn %lx", mfn);
+                break;
+            }
+
+            /* A page is dirtied when it's being cleared. */
+            paging_mark_dirty(d, mfn);
+
+            ptr = fixmap_domain_page(mfn);
+            clear_page(ptr);
+            fixunmap_domain_page(ptr);
+
+            put_page_and_type(page);
+            break;
+        }
+
+        case MMUEXT_COPY_PAGE:
+        {
+            const unsigned char *src;
+            unsigned char *dst;
+            unsigned long src_mfn;
+
+            src_mfn = gmfn_to_mfn(FOREIGNDOM, op.arg2.src_mfn);
+            okay = get_page_from_pagenr(src_mfn, FOREIGNDOM);
+            if ( unlikely(!okay) )
+            {
+                MEM_LOG("Error while copying from mfn %lx", src_mfn);
+                break;
+            }
+
+            okay = !get_page_and_type_from_pagenr(mfn, PGT_writable_page,
+                                                  FOREIGNDOM, 0);
+            if ( unlikely(!okay) )
+            {
+                put_page(mfn_to_page(src_mfn));
+                MEM_LOG("Error while copying to mfn %lx", mfn);
+                break;
+            }
+
+            /* A page is dirtied when it's being copied to. */
+            paging_mark_dirty(d, mfn);
+
+            src = map_domain_page(src_mfn);
+            dst = fixmap_domain_page(mfn);
+            copy_page(dst, src);
+            fixunmap_domain_page(dst);
+            unmap_domain_page(src);
+
+            put_page_and_type(page);
+            put_page(mfn_to_page(src_mfn));
             break;
         }
 
