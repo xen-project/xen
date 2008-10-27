@@ -74,7 +74,7 @@ allow dom0_t iomem_t:mmu {map_read map_write};
 allow dom0_t pirq_t:event {vector};
 allow dom0_t xen_t:mmu {memorymap};
 
-allow dom0_t dom0_t:mmu {pinpage map_read map_write adjust};
+allow dom0_t dom0_t:mmu {pinpage map_read map_write adjust updatemp};
 allow dom0_t dom0_t:grant {query setup};
 allow dom0_t dom0_t:domain {scheduler getdomaininfo getvcpuinfo getvcpuaffinity};
 
@@ -112,6 +112,7 @@ allow domU_t evchnU-0_t:event {send};
 
 allow dom0_t dom0_t:event {send};
 allow dom0_t domU_t:grant {copy};
+allow domU_t domU_t:grant {copy};
 
 manage_domain(dom0_t, domU_t)
 
