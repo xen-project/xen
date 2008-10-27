@@ -18,6 +18,8 @@
 #include <xen/sched.h>
 #include <asm/regs.h>
 #include <asm/current.h>
+#include <asm/hvm/vmx/vpmu.h>
+#include <asm/hvm/vmx/vpmu_core2.h>
  
 #include "op_x86_model.h"
 #include "op_counter.h"
@@ -39,9 +41,11 @@
 #define CTRL_SET_KERN(val,k) (val |= ((k & 1) << 17))
 #define CTRL_SET_UM(val, m) (val |= (m << 8))
 #define CTRL_SET_EVENT(val, e) (val |= e)
-
+#define IS_ACTIVE(val) (val & (1 << 22) )  
+#define IS_ENABLE(val) (val & (1 << 20) )
 static unsigned long reset_value[NUM_COUNTERS];
 int ppro_has_global_ctrl = 0;
+extern int is_passive(struct domain *d);
  
 static void ppro_fill_in_addresses(struct op_msrs * const msrs)
 {
@@ -103,6 +107,7 @@ static int ppro_check_ctrs(unsigned int const cpu,
 	int ovf = 0;
 	unsigned long eip = regs->eip;
 	int mode = xenoprofile_get_mode(current, regs);
+	struct arch_msr_pair *msrs_content = vcpu_vpmu(current)->context;
 
 	for (i = 0 ; i < NUM_COUNTERS; ++i) {
 		if (!reset_value[i])
@@ -111,7 +116,18 @@ static int ppro_check_ctrs(unsigned int const cpu,
 		if (CTR_OVERFLOWED(low)) {
 			xenoprof_log_event(current, regs, eip, mode, i);
 			CTR_WRITE(reset_value[i], msrs, i);
-			ovf = 1;
+			if ( is_passive(current->domain) && (mode != 2) && 
+				(vcpu_vpmu(current)->flags & PASSIVE_DOMAIN_ALLOCATED) ) 
+			{
+				if ( IS_ACTIVE(msrs_content[i].control) )
+				{
+					msrs_content[i].counter = (low | (unsigned long)high << 32);
+					if ( IS_ENABLE(msrs_content[i].control) )
+						ovf = 2;
+				}
+			}
+			if ( !ovf )
+				ovf = 1;
 		}
 	}
 
@@ -159,6 +175,82 @@ static void ppro_stop(struct op_msrs const * const msrs)
         wrmsrl(MSR_CORE_PERF_GLOBAL_CTRL, 0);
 }
 
+static int ppro_is_arch_pmu_msr(u64 msr_index, int *type, int *index)
+{
+	if ( (msr_index >= MSR_IA32_PERFCTR0) &&
+            (msr_index < (MSR_IA32_PERFCTR0 + NUM_COUNTERS)) )
+	{
+        	*type = MSR_TYPE_ARCH_COUNTER;
+		*index = msr_index - MSR_IA32_PERFCTR0;
+		return 1;
+        }
+        if ( (msr_index >= MSR_P6_EVNTSEL0) &&
+            (msr_index < (MSR_P6_EVNTSEL0 + NUM_CONTROLS)) )
+        {
+		*type = MSR_TYPE_ARCH_CTRL;
+		*index = msr_index - MSR_P6_EVNTSEL0;
+		return 1;
+        }
+
+        return 0;
+}
+
+static int ppro_allocate_msr(struct vcpu *v)
+{
+	struct vpmu_struct *vpmu = vcpu_vpmu(v);
+	struct arch_msr_pair *msr_content;
+	
+	msr_content = xmalloc_bytes( sizeof(struct arch_msr_pair) * NUM_COUNTERS );
+	if ( !msr_content )
+		goto out;
+	memset(msr_content, 0, sizeof(struct arch_msr_pair) * NUM_COUNTERS);
+	vpmu->context = (void *)msr_content;
+	vpmu->flags = 0;
+	vpmu->flags |= PASSIVE_DOMAIN_ALLOCATED;
+	return 1;
+out:
+        gdprintk(XENLOG_WARNING, "Insufficient memory for oprofile, oprofile is "
+                 "unavailable on domain %d vcpu %d.\n",
+                 v->vcpu_id, v->domain->domain_id);
+        return 0;	
+}
+
+static void ppro_free_msr(struct vcpu *v)
+{
+	struct vpmu_struct *vpmu = vcpu_vpmu(v);
+
+	xfree(vpmu->context);
+	vpmu->flags &= ~PASSIVE_DOMAIN_ALLOCATED;
+}
+
+static void ppro_load_msr(struct vcpu *v, int type, int index, u64 *msr_content)
+{
+	struct arch_msr_pair *msrs = vcpu_vpmu(v)->context;
+	switch ( type )
+	{
+	case MSR_TYPE_ARCH_COUNTER:
+		*msr_content = msrs[index].counter;
+		break;
+	case MSR_TYPE_ARCH_CTRL:
+		*msr_content = msrs[index].control;
+		break;
+	}	
+}
+
+static void ppro_save_msr(struct vcpu *v, int type, int index, u64 msr_content)
+{
+	struct arch_msr_pair *msrs = vcpu_vpmu(v)->context;
+	
+	switch ( type )
+	{
+	case MSR_TYPE_ARCH_COUNTER:
+		msrs[index].counter = msr_content;
+		break;
+	case MSR_TYPE_ARCH_CTRL:
+		msrs[index].control = msr_content;
+		break;
+	}	
+}
 
 struct op_x86_model_spec const op_ppro_spec = {
 	.num_counters = NUM_COUNTERS,
@@ -167,5 +259,10 @@ struct op_x86_model_spec const op_ppro_spec = {
 	.setup_ctrs = &ppro_setup_ctrs,
 	.check_ctrs = &ppro_check_ctrs,
 	.start = &ppro_start,
-	.stop = &ppro_stop
+	.stop = &ppro_stop,
+	.is_arch_pmu_msr = &ppro_is_arch_pmu_msr,
+	.allocated_msr = &ppro_allocate_msr,
+	.free_msr = &ppro_free_msr,
+	.load_msr = &ppro_load_msr,
+	.save_msr = &ppro_save_msr
 };

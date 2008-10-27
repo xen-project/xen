@@ -75,4 +75,7 @@ int xenoprof_add_trace(struct domain *d, struct vcpu *v,
 int acquire_pmu_ownship(int pmu_ownership);
 void release_pmu_ownship(int pmu_ownership);
 
+int passive_domain_do_rdmsr(struct cpu_user_regs *regs);
+int passive_domain_do_wrmsr(struct cpu_user_regs *regs);
+void passive_domain_destroy(struct vcpu *v);
 #endif  /* __XEN__XENOPROF_H__ */

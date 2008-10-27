@@ -85,7 +85,7 @@ int is_active(struct domain *d)
     return ((x != NULL) && (x->domain_type == XENOPROF_DOMAIN_ACTIVE));
 }
 
-static int is_passive(struct domain *d)
+int is_passive(struct domain *d)
 {
     struct xenoprof *x = d->xenoprof;
     return ((x != NULL) && (x->domain_type == XENOPROF_DOMAIN_PASSIVE));

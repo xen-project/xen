@@ -23,28 +23,6 @@
 #ifndef __ASM_X86_HVM_VPMU_CORE_H_
 #define __ASM_X86_HVM_VPMU_CORE_H_
 
-/* Core 2 Non-architectual Performance Counter MSRs. */
-u32 core2_counters_msr[] =   {
-    MSR_CORE_PERF_FIXED_CTR0,
-    MSR_CORE_PERF_FIXED_CTR1,
-    MSR_CORE_PERF_FIXED_CTR2};
-
-/* Core 2 Non-architectual Performance Control MSRs. */
-u32 core2_ctrls_msr[] = {
-    MSR_CORE_PERF_FIXED_CTR_CTRL,
-    MSR_IA32_PEBS_ENABLE,
-    MSR_IA32_DS_AREA};
-
-struct pmumsr core2_counters = {
-    3,
-    core2_counters_msr
-};
-
-struct pmumsr core2_ctrls = {
-    3,
-    core2_ctrls_msr
-};
-
 struct arch_msr_pair {
     u64 counter;
     u64 control;

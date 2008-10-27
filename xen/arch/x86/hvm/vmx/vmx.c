@@ -26,6 +26,7 @@
 #include <xen/domain_page.h>
 #include <xen/hypercall.h>
 #include <xen/perfc.h>
+#include <xen/xenoprof.h>
 #include <asm/current.h>
 #include <asm/io.h>
 #include <asm/regs.h>
@@ -132,6 +133,7 @@ static void vmx_vcpu_destroy(struct vcpu *v)
 {
     vmx_destroy_vmcs(v);
     vpmu_destroy(v);
+    passive_domain_destroy(v);
 }
 
 #ifdef __x86_64__
@@ -1666,6 +1668,8 @@ static int vmx_msr_read_intercept(struct cpu_user_regs *regs)
     default:
         if ( vpmu_do_rdmsr(regs) )
             goto done;
+        if ( passive_domain_do_rdmsr(regs) )
+            goto done;
         switch ( long_mode_do_msr_read(regs) )
         {
             case HNDL_unhandled:
@@ -1860,6 +1864,8 @@ static int vmx_msr_write_intercept(struct cpu_user_regs *regs)
         goto gp_fault;
     default:
         if ( vpmu_do_wrmsr(regs) )
+            return X86EMUL_OKAY;
+        if ( passive_domain_do_wrmsr(regs) )
             return X86EMUL_OKAY;
 
         if ( wrmsr_viridian_regs(ecx, regs->eax, regs->edx) ) 

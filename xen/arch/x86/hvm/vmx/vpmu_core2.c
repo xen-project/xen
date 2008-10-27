@@ -35,6 +35,26 @@
 #include <asm/hvm/vmx/vpmu.h>
 #include <asm/hvm/vmx/vpmu_core2.h>
 
+u32 core2_counters_msr[] =   {
+    MSR_CORE_PERF_FIXED_CTR0,
+    MSR_CORE_PERF_FIXED_CTR1,
+    MSR_CORE_PERF_FIXED_CTR2};
+
+/* Core 2 Non-architectual Performance Control MSRs. */
+u32 core2_ctrls_msr[] = {
+    MSR_CORE_PERF_FIXED_CTR_CTRL,
+    MSR_IA32_PEBS_ENABLE,
+    MSR_IA32_DS_AREA};
+
+struct pmumsr core2_counters = {
+    3,
+    core2_counters_msr
+};
+
+struct pmumsr core2_ctrls = {
+    3,
+    core2_ctrls_msr
+};
 static int arch_pmc_cnt;
 
 static int core2_get_pmc_count(void)

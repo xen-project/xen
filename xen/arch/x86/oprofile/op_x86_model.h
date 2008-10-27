@@ -41,6 +41,11 @@ struct op_x86_model_spec {
 			  struct cpu_user_regs * const regs);
 	void (*start)(struct op_msrs const * const msrs);
 	void (*stop)(struct op_msrs const * const msrs);
+	int (*is_arch_pmu_msr)(u64 msr_index, int *type, int *index);
+	int (*allocated_msr)(struct vcpu *v);
+	void (*free_msr)(struct vcpu *v);
+	void (*load_msr)(struct vcpu * const v, int type, int index, u64 *msr_content);
+        void (*save_msr)(struct vcpu * const v, int type, int index, u64 msr_content);
 };
 
 extern struct op_x86_model_spec const op_ppro_spec;
