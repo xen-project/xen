@@ -43,7 +43,7 @@ static inline struct vcpu *mapcache_current_vcpu(void)
 void *map_domain_page(unsigned long mfn)
 {
     unsigned long va;
-    unsigned int idx, i;
+    unsigned int idx, i, flags;
     struct vcpu *v;
     struct mapcache_domain *dcache;
     struct mapcache_vcpu *vcache;
@@ -69,7 +69,7 @@ void *map_domain_page(unsigned long mfn)
         goto out;
     }
 
-    spin_lock(&dcache->lock);
+    spin_lock_irqsave(&dcache->lock, flags);
 
     /* Has some other CPU caused a wrap? We must flush if so. */
     if ( unlikely(dcache->epoch != vcache->shadow_epoch) )
@@ -105,7 +105,7 @@ void *map_domain_page(unsigned long mfn)
     set_bit(idx, dcache->inuse);
     dcache->cursor = idx + 1;
 
-    spin_unlock(&dcache->lock);
+    spin_unlock_irqrestore(&dcache->lock, flags);
 
     l1e_write(&dcache->l1tab[idx], l1e_from_pfn(mfn, __PAGE_HYPERVISOR));
 
