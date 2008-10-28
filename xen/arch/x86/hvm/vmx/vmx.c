@@ -26,7 +26,6 @@
 #include <xen/domain_page.h>
 #include <xen/hypercall.h>
 #include <xen/perfc.h>
-#include <xen/xenoprof.h>
 #include <asm/current.h>
 #include <asm/io.h>
 #include <asm/regs.h>
@@ -50,6 +49,7 @@
 #include <asm/hvm/vpt.h>
 #include <public/hvm/save.h>
 #include <asm/hvm/trace.h>
+#include <asm/xenoprof.h>
 
 enum handler_return { HNDL_done, HNDL_unhandled, HNDL_exception_raised };
 

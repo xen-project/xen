@@ -121,7 +121,7 @@ static int ppro_check_ctrs(unsigned int const cpu,
 			{
 				if ( IS_ACTIVE(msrs_content[i].control) )
 				{
-					msrs_content[i].counter = (low | (unsigned long)high << 32);
+					msrs_content[i].counter = (low | (u64)high << 32);
 					if ( IS_ENABLE(msrs_content[i].control) )
 						ovf = 2;
 				}
