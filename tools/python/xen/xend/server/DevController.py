@@ -542,7 +542,7 @@ class DevController:
             xswatch(statusPath, hotplugStatusCallback, ev, result)
             ev.wait(DEVICE_CREATE_TIMEOUT)
             err = xstransact.Read(statusPath, HOTPLUG_ERROR_NODE)
-            if result['status'] != 'Connected':
+            if result['status'] != Connected:
                 return (result['status'], err)
             
         backpath = self.readVm(devid, "backend")
