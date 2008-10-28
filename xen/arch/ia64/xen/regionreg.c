@@ -100,6 +100,7 @@ static unsigned long allocate_metaphysical_rr(struct domain *d, int n)
 
 static int implemented_rid_bits = 0;
 static int mp_rid_shift;
+static DEFINE_SPINLOCK(ridblock_lock);
 static struct domain *ridblock_owner[MAX_RID_BLOCKS] = { 0 };
 
 void __init init_rid_allocator (void)
@@ -169,6 +170,7 @@ int allocate_rid_range(struct domain *d, unsigned long ridbits)
 	n_rid_blocks = 1UL << (ridbits - IA64_MIN_IMPL_RID_BITS);
 	
 	// skip over block 0, reserved for "meta-physical mappings (and Xen)"
+	spin_lock(&ridblock_lock);
 	for (i = n_rid_blocks; i < MAX_RID_BLOCKS; i += n_rid_blocks) {
 		if (ridblock_owner[i] == NULL) {
 			for (j = i; j < i + n_rid_blocks; ++j) {
@@ -182,16 +184,19 @@ int allocate_rid_range(struct domain *d, unsigned long ridbits)
 				break;
 		}
 	}
-	
-	if (i >= MAX_RID_BLOCKS)
+
+	if (i >= MAX_RID_BLOCKS) {
+		spin_unlock(&ridblock_lock);
 		return 0;
-	
+	}
+
 	// found an unused block:
 	//   (i << min_rid_bits) <= rid < ((i + n) << min_rid_bits)
 	// mark this block as owned
 	for (j = i; j < i + n_rid_blocks; ++j)
 		ridblock_owner[j] = d;
-	
+	spin_unlock(&ridblock_lock);
+
 	// setup domain struct
 	d->arch.rid_bits = ridbits;
 	d->arch.starting_rid = i << IA64_MIN_IMPL_RID_BITS;
@@ -221,11 +226,12 @@ int deallocate_rid_range(struct domain *d)
 	if (d->arch.rid_bits == 0)
 		return 1;
 
-	
+	spin_lock(&ridblock_lock);
 	for (i = rid_block_start; i < rid_block_end; ++i) {
 	        ASSERT(ridblock_owner[i] == d);
 		ridblock_owner[i] = NULL;
 	}
+	spin_unlock(&ridblock_lock);
 
 	d->arch.rid_bits = 0;
 	d->arch.starting_rid = 0;
