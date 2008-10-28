@@ -154,6 +154,7 @@ processor_set_freq (struct acpi_cpufreq_data *data,
 	cpufreq_statistic_update(cpu, data->acpi_data->state, state);
 
 	data->acpi_data->state = state;
+	policy->cur = data->freq_table[state].frequency;
 
 	return 0;
 }
