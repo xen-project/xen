@@ -1973,6 +1973,7 @@ int free_page_type(struct page_info *page, unsigned long type,
         page->nr_validated_ptes = 1U << PAGETABLE_ORDER;
         page->partial_pte = 0;
     }
+
     switch ( type & PGT_type_mask )
     {
     case PGT_l1_page_table:
@@ -1997,6 +1998,15 @@ int free_page_type(struct page_info *page, unsigned long type,
         rc = -EINVAL;
         BUG();
     }
+
+    return rc;
+}
+
+
+static int __put_final_page_type(
+    struct page_info *page, unsigned long type, int preemptible)
+{
+    int rc = free_page_type(page, type, preemptible);
 
     /* No need for atomic update of type_info here: noone else updates it. */
     if ( rc == 0 )
@@ -2062,7 +2072,7 @@ static int __put_page_type(struct page_info *page,
                                            x, nx)) != x) )
                     continue;
                 /* We cleared the 'valid bit' so we do the clean up. */
-                return free_page_type(page, x, preemptible);
+                return __put_final_page_type(page, x, preemptible);
             }
 
             /*
