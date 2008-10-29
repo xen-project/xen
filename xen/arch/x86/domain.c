@@ -174,9 +174,10 @@ void free_vcpu_struct(struct vcpu *v)
 
 static int setup_compat_l4(struct vcpu *v)
 {
-    struct page_info *pg = alloc_domheap_page(NULL, 0);
+    struct page_info *pg;
     l4_pgentry_t *l4tab;
 
+    pg = alloc_domheap_page(NULL, MEMF_node(vcpu_to_node(v)));
     if ( pg == NULL )
         return -ENOMEM;
 
