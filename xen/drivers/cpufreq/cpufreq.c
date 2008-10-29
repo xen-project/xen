@@ -181,7 +181,7 @@ int cpufreq_del_cpu(unsigned int cpu)
 {
     unsigned int dom, domexist = 0;
     struct list_head *pos;
-    struct cpufreq_dom *cpufreq_dom;
+    struct cpufreq_dom *cpufreq_dom = NULL;
     struct cpufreq_policy *policy;
     struct processor_performance *perf = &processor_pminfo[cpu]->perf;
 
