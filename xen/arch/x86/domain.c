@@ -1688,6 +1688,8 @@ static int relinquish_memory(
             {
                 if ( free_page_type(page, x, 0) != 0 )
                     BUG();
+                if ( x & PGT_partial )
+                    page->u.inuse.type_info--;
                 break;
             }
         }
