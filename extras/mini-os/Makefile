@@ -18,9 +18,6 @@ include minios.mk
 # Set tester flags
 # CFLAGS += -DBLKTEST_WRITE
 
-# Make the headers define our internal stuff
-CFLAGS += -D__MINIOS__
-
 # Define some default flags for linking.
 LDLIBS := 
 APP_LDLIBS := 
