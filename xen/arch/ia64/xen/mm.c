@@ -3365,7 +3365,6 @@ arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         /* Map at new location. */
         /* Here page->count_info = PGC_allocated | N where N >= 1*/
         __guest_physmap_add_page(d, xatp.gpfn, mfn);
-        page = NULL; /* prevent put_page() */
 
     out:
         domain_unlock(d);
