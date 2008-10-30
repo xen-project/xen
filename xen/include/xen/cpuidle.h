@@ -30,13 +30,18 @@
 #define ACPI_PROCESSOR_MAX_POWER        8
 #define CPUIDLE_NAME_LEN                16
 
+#define ACPI_CSTATE_EM_NONE     0
+#define ACPI_CSTATE_EM_SYSIO    1
+#define ACPI_CSTATE_EM_FFH      2
+#define ACPI_CSTATE_EM_HALT     3
+
 struct acpi_processor_cx
 {
     u8 idx;
     u8 valid;
     u8 type;
     u32 address;
-    u8 space_id;
+    u8 entry_method; /* ACPI_CSTATE_EM_xxx */
     u32 latency;
     u32 latency_ticks;
     u32 power;

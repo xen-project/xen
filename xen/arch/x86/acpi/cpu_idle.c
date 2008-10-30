@@ -140,20 +140,26 @@ static void acpi_processor_ffh_cstate_enter(struct acpi_processor_cx *cx)
 
 static void acpi_idle_do_entry(struct acpi_processor_cx *cx)
 {
-    if ( cx->space_id == ACPI_ADR_SPACE_FIXED_HARDWARE )
+    int unused;
+
+    switch ( cx->entry_method )
     {
+    case ACPI_CSTATE_EM_FFH:
         /* Call into architectural FFH based C-state */
         acpi_processor_ffh_cstate_enter(cx);
-    }
-    else
-    {
-        int unused;
+        return;
+    case ACPI_CSTATE_EM_SYSIO:
         /* IO port based C-state */
         inb(cx->address);
         /* Dummy wait op - must do something useless after P_LVL2 read
            because chipsets cannot guarantee that STPCLK# signal
            gets asserted in time to freeze execution properly. */
         unused = inl(pmtmr_ioport);
+        return;
+    case ACPI_CSTATE_EM_HALT:
+        acpi_safe_halt();
+        local_irq_disable();
+        return;
     }
 }
 
@@ -253,35 +259,11 @@ static void acpi_processor_idle(void)
     switch ( cx->type )
     {
     case ACPI_STATE_C1:
-        /* Trace cpu idle entry */
-        TRACE_1D(TRC_PM_IDLE_ENTRY, 1);
-
-        /*
-         * Invoke C1.
-         * Use the appropriate idle routine, the one that would
-         * be used without acpi C-states.
-         */
-        if ( pm_idle_save )
-            pm_idle_save();
-        else 
-            acpi_safe_halt();
-
-        /* Trace cpu idle exit */
-        TRACE_1D(TRC_PM_IDLE_EXIT, 1);
-
-        /*
-         * TBD: Can't get time duration while in C1, as resumes
-         *      go to an ISR rather than here.  Need to instrument
-         *      base interrupt handler.
-         */
-        sleep_ticks = 0xFFFFFFFF;
-        break;
-
     case ACPI_STATE_C2:
-        if ( local_apic_timer_c2_ok )
+        if ( cx->type == ACPI_STATE_C1 || local_apic_timer_c2_ok )
         {
             /* Trace cpu idle entry */
-            TRACE_1D(TRC_PM_IDLE_ENTRY, 2);
+            TRACE_1D(TRC_PM_IDLE_ENTRY, cx->idx);
             /* Get start time (ticks) */
             t1 = inl(pmtmr_ioport);
             /* Invoke C2 */
@@ -289,7 +271,7 @@ static void acpi_processor_idle(void)
             /* Get end time (ticks) */
             t2 = inl(pmtmr_ioport);
             /* Trace cpu idle exit */
-            TRACE_1D(TRC_PM_IDLE_EXIT, 2);
+            TRACE_1D(TRC_PM_IDLE_EXIT, cx->idx);
 
             /* Re-enable interrupts */
             local_irq_enable();
@@ -396,6 +378,7 @@ static int init_cx_pminfo(struct acpi_processor_power *acpi_power)
         acpi_power->states[i].idx = i;
 
     acpi_power->states[ACPI_STATE_C1].type = ACPI_STATE_C1;
+    acpi_power->states[ACPI_STATE_C1].entry_method = ACPI_CSTATE_EM_HALT;
 
     acpi_power->states[ACPI_STATE_C0].valid = 1;
     acpi_power->states[ACPI_STATE_C1].valid = 1;
@@ -492,16 +475,13 @@ static int check_cx(struct acpi_processor_power *power, xen_processor_cx_t *cx)
         break;
 
     case ACPI_ADR_SPACE_FIXED_HARDWARE:
-        if ( cx->type > ACPI_STATE_C1 )
-        {
-            if ( cx->reg.bit_width != VENDOR_INTEL || 
-                 cx->reg.bit_offset != NATIVE_CSTATE_BEYOND_HALT )
-                return -EINVAL;
+        if ( cx->reg.bit_width != VENDOR_INTEL || 
+             cx->reg.bit_offset != NATIVE_CSTATE_BEYOND_HALT )
+            return -EINVAL;
 
-            /* assume all logical cpu has the same support for mwait */
-            if ( acpi_processor_ffh_cstate_probe(cx) )
-                return -EINVAL;
-        }
+        /* assume all logical cpu has the same support for mwait */
+        if ( acpi_processor_ffh_cstate_probe(cx) )
+            return -EINVAL;
         break;
 
     default:
@@ -605,7 +585,23 @@ static void set_cx(
     cx->valid    = 1;
     cx->type     = xen_cx->type;
     cx->address  = xen_cx->reg.address;
-    cx->space_id = xen_cx->reg.space_id;
+
+    switch ( xen_cx->reg.space_id )
+    {
+    case ACPI_ADR_SPACE_FIXED_HARDWARE:
+        if ( xen_cx->reg.bit_width == VENDOR_INTEL &&
+             xen_cx->reg.bit_offset == NATIVE_CSTATE_BEYOND_HALT )
+            cx->entry_method = ACPI_CSTATE_EM_FFH;
+        else
+            cx->entry_method = ACPI_CSTATE_EM_HALT;
+        break;
+    case ACPI_ADR_SPACE_SYSTEM_IO:
+        cx->entry_method = ACPI_CSTATE_EM_SYSIO;
+        break;
+    default:
+        cx->entry_method = ACPI_CSTATE_EM_NONE;
+    }
+
     cx->latency  = xen_cx->latency;
     cx->power    = xen_cx->power;
     
