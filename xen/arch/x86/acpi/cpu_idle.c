@@ -75,13 +75,14 @@ static void print_acpi_power(uint32_t cpu, struct acpi_processor_power *power)
 
     printk("==cpu%d==\n", cpu);
     printk("active state:\t\tC%d\n",
-           power->last_state ? (int)(power->last_state - power->states) : -1);
+           power->last_state ? power->last_state->idx : -1);
     printk("max_cstate:\t\tC%d\n", max_cstate);
     printk("states:\n");
     
     for ( i = 1; i < power->count; i++ )
     {
-        printk((power->last_state == &power->states[i]) ? "   *" : "    ");
+        printk((power->last_state && power->last_state->idx == i) ?
+               "   *" : "    ");
         printk("C%d:\t", i);
         printk("type[C%d] ", power->states[i].type);
         printk("latency[%03d] ", power->states[i].latency);
@@ -222,7 +223,7 @@ static void acpi_processor_idle(void)
         if ( power->flags.bm_check && acpi_idle_bm_check()
              && cx->type == ACPI_STATE_C3 )
             cx = power->safe_state;
-        if ( cx - &power->states[0] > max_cstate )
+        if ( cx->idx > max_cstate )
             cx = &power->states[max_cstate];
     }
     if ( !cx )
@@ -328,7 +329,7 @@ static void acpi_processor_idle(void)
         }
 
         /* Trace cpu idle entry */
-        TRACE_1D(TRC_PM_IDLE_ENTRY, cx - &power->states[0]);
+        TRACE_1D(TRC_PM_IDLE_ENTRY, cx->idx);
         /*
          * Before invoking C3, be aware that TSC/APIC timer may be 
          * stopped by H/W. Without carefully handling of TSC/APIC stop issues,
@@ -349,7 +350,7 @@ static void acpi_processor_idle(void)
         /* recovering TSC */
         cstate_restore_tsc();
         /* Trace cpu idle exit */
-        TRACE_1D(TRC_PM_IDLE_EXIT, cx - &power->states[0]);
+        TRACE_1D(TRC_PM_IDLE_EXIT, cx->idx);
 
         if ( power->flags.bm_check && power->flags.bm_control )
         {
@@ -387,7 +388,12 @@ static void acpi_processor_idle(void)
 
 static int init_cx_pminfo(struct acpi_processor_power *acpi_power)
 {
+    int i;
+
     memset(acpi_power, 0, sizeof(*acpi_power));
+
+    for ( i = 0; i < ACPI_PROCESSOR_MAX_POWER; i++ )
+        acpi_power->states[i].idx = i;
 
     acpi_power->states[ACPI_STATE_C1].type = ACPI_STATE_C1;
 
@@ -761,8 +767,7 @@ int pmstat_get_cx_stat(uint32_t cpuid, struct pm_cx_stat *stat)
         return 0;
     }
 
-    stat->last = (power->last_state) ?
-        (int)(power->last_state - &power->states[0]) : 0;
+    stat->last = power->last_state ? power->last_state->idx : 0;
     stat->nr = power->count;
     stat->idle_time = v->runstate.time[RUNSTATE_running];
     if ( v->is_running )
