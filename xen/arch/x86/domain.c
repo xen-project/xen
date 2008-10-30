@@ -1684,18 +1684,24 @@ static int relinquish_memory(
                     break;
                 case -EINTR:
                     page->u.inuse.type_info |= PGT_validated;
+                    if ( x & PGT_partial )
+                        put_page(page);
                     put_page(page);
                     ret = -EAGAIN;
                     goto out;
                 case -EAGAIN:
                     page->u.inuse.type_info |= PGT_partial;
-                    put_page(page);
+                    if ( x & PGT_partial )
+                        put_page(page);
                     goto out;
                 default:
                     BUG();
                 }
                 if ( x & PGT_partial )
+                {
                     page->u.inuse.type_info--;
+                    put_page(page);
+                }
                 break;
             }
         }
