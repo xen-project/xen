@@ -7216,7 +7216,7 @@ BX_INFO("floppy: drive>1 || head>1 ...\n");
         outb(0x03f5, head);
         outb(0x03f5, sector);
         outb(0x03f5, 2); // 512 byte sector size
-        outb(0x03f5, 0); // last sector number possible on track
+        outb(0x03f5, sector + num_sectors - 1); // last sector to read on track
         outb(0x03f5, 0); // Gap length
         outb(0x03f5, 0xff); // Gap length
 
@@ -7364,7 +7364,7 @@ BX_INFO("floppy: drive>1 || head>1 ...\n");
         outb(0x03f5, head);
         outb(0x03f5, sector);
         outb(0x03f5, 2); // 512 byte sector size
-        outb(0x03f5, 0); // last sector number possible on track
+        outb(0x03f5, sector + num_sectors - 1); // last sector to write on track
         outb(0x03f5, 0); // Gap length
         outb(0x03f5, 0xff); // Gap length
 
