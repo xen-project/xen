@@ -1343,18 +1343,13 @@ static void free_l1_table(struct page_info *page)
 
 static int free_l2_table(struct page_info *page, int preemptible)
 {
-#if defined(CONFIG_COMPAT) || defined(DOMAIN_DESTRUCT_AVOID_RECURSION)
+#ifdef CONFIG_COMPAT
     struct domain *d = page_get_owner(page);
 #endif
     unsigned long pfn = page_to_mfn(page);
     l2_pgentry_t *pl2e;
     unsigned int  i = page->nr_validated_ptes - 1;
     int err = 0;
-
-#ifdef DOMAIN_DESTRUCT_AVOID_RECURSION
-    if ( d->arch.relmem == RELMEM_l3 )
-        return 0;
-#endif
 
     pl2e = map_domain_page(pfn);
 
@@ -1384,11 +1379,6 @@ static int free_l3_table(struct page_info *page, int preemptible)
     l3_pgentry_t *pl3e;
     unsigned int  i = page->nr_validated_ptes - !page->partial_pte;
     int rc = 0;
-
-#ifdef DOMAIN_DESTRUCT_AVOID_RECURSION
-    if ( d->arch.relmem == RELMEM_l4 )
-        return 0;
-#endif
 
     pl3e = map_domain_page(pfn);
 

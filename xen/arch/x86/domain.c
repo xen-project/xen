@@ -1640,31 +1640,22 @@ static int relinquish_memory(
         }
 
         if ( test_and_clear_bit(_PGT_pinned, &page->u.inuse.type_info) )
-            put_page_and_type(page);
+            ret = put_page_and_type_preemptible(page, 1);
+        switch ( ret )
+        {
+        case 0:
+            break;
+        case -EAGAIN:
+        case -EINTR:
+            set_bit(_PGT_pinned, &page->u.inuse.type_info);
+            put_page(page);
+            goto out;
+        default:
+            BUG();
+        }
 
         if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
             put_page(page);
-
-#ifdef DOMAIN_DESTRUCT_AVOID_RECURSION
-        /*
-         * Forcibly drop reference counts of page tables above top most (which
-         * were skipped to prevent long latencies due to deep recursion - see
-         * the special treatment in free_lX_table()).
-         */
-        y = page->u.inuse.type_info;
-        if ( (type < PGT_root_page_table) &&
-             unlikely(((y + PGT_type_mask) &
-                       (PGT_type_mask|PGT_validated)) == type) )
-        {
-            BUG_ON((y & PGT_count_mask) >=
-                   (page->count_info & PGC_count_mask));
-            while ( y & PGT_count_mask )
-            {
-                put_page_and_type(page);
-                y = page->u.inuse.type_info;
-            }
-        }
-#endif
 
         /*
          * Forcibly invalidate top-most, still valid page tables at this point
@@ -1686,8 +1677,23 @@ static int relinquish_memory(
                         x & ~(PGT_validated|PGT_partial));
             if ( likely(y == x) )
             {
-                if ( free_page_type(page, x, 0) != 0 )
+                /* No need for atomic update of type_info here: noone else updates it. */
+                switch ( ret = free_page_type(page, x, 1) )
+                {
+                case 0:
+                    break;
+                case -EINTR:
+                    page->u.inuse.type_info |= PGT_validated;
+                    put_page(page);
+                    ret = -EAGAIN;
+                    goto out;
+                case -EAGAIN:
+                    page->u.inuse.type_info |= PGT_partial;
+                    put_page(page);
+                    goto out;
+                default:
                     BUG();
+                }
                 if ( x & PGT_partial )
                     page->u.inuse.type_info--;
                 break;
@@ -1834,11 +1840,6 @@ int domain_relinquish_resources(struct domain *d)
         /* fallthrough */
 
     case RELMEM_done:
-#ifdef DOMAIN_DESTRUCT_AVOID_RECURSION
-        ret = relinquish_memory(d, &d->page_list, PGT_l1_page_table);
-        if ( ret )
-            return ret;
-#endif
         break;
 
     default:
