@@ -25,10 +25,12 @@
  * We pull handlers off the timer list this far in future,
  * rather than reprogramming the time hardware.
  */
-#define TIMER_SLOP (50*1000) /* ns */
+static unsigned int timer_slop __read_mostly = 50000; /* 50 us */
+integer_param("timer_slop", timer_slop);
 
 struct timers {
     spinlock_t     lock;
+    bool_t         overflow;
     struct timer **heap;
     struct timer  *list;
     struct timer  *running;
@@ -200,6 +202,7 @@ static int add_entry(struct timers *timers, struct timer *t)
         return rc;
 
     /* Fall back to adding to the slower linked list. */
+    timers->overflow = 1;
     t->status = TIMER_STATUS_in_list;
     return add_to_list(&timers->list, t);
 }
@@ -258,6 +261,7 @@ void set_timer(struct timer *timer, s_time_t expires)
         __stop_timer(timer);
 
     timer->expires = expires;
+    timer->expires_end = expires + timer_slop;
 
     if ( likely(timer->status != TIMER_STATUS_killed) )
         __add_timer(timer);
@@ -344,19 +348,30 @@ void kill_timer(struct timer *timer)
 }
 
 
+static void execute_timer(struct timers *ts, struct timer *t)
+{
+    void (*fn)(void *) = t->function;
+    void *data = t->data;
+
+    ts->running = t;
+    spin_unlock_irq(&ts->lock);
+    (*fn)(data);
+    spin_lock_irq(&ts->lock);
+    ts->running = NULL;
+}
+
+
 static void timer_softirq_action(void)
 {
     struct timer  *t, **heap, *next;
     struct timers *ts;
-    s_time_t       now, deadline;
-    void         (*fn)(void *);
-    void          *data;
+    s_time_t       now;
 
     ts = &this_cpu(timers);
     heap = ts->heap;
 
-    /* If we are using overflow linked list, try to allocate a larger heap. */
-    if ( unlikely(ts->list != NULL) )
+    /* If we overflowed the heap, try to allocate a larger heap. */
+    if ( unlikely(ts->overflow) )
     {
         /* old_limit == (2^n)-1; new_limit == (2^(n+4))-1 */
         int old_limit = GET_HEAP_LIMIT(heap);
@@ -377,7 +392,26 @@ static void timer_softirq_action(void)
 
     spin_lock_irq(&ts->lock);
 
-    /* Try to move timers from overflow linked list to more efficient heap. */
+    now = NOW();
+
+    /* Execute ready heap timers. */
+    while ( (GET_HEAP_SIZE(heap) != 0) &&
+            ((t = heap[1])->expires_end < now) )
+    {
+        remove_from_heap(heap, t);
+        t->status = TIMER_STATUS_inactive;
+        execute_timer(ts, t);
+    }
+
+    /* Execute ready list timers. */
+    while ( ((t = ts->list) != NULL) && (t->expires_end < now) )
+    {
+        ts->list = t->list_next;
+        t->status = TIMER_STATUS_inactive;
+        execute_timer(ts, t);
+    }
+
+    /* Try to move timers from linked list to more efficient heap. */
     next = ts->list;
     ts->list = NULL;
     while ( unlikely((t = next) != NULL) )
@@ -387,51 +421,44 @@ static void timer_softirq_action(void)
         add_entry(ts, t);
     }
 
-    now = NOW();
-
-    while ( (GET_HEAP_SIZE(heap) != 0) &&
-            ((t = heap[1])->expires < (now + TIMER_SLOP)) )
+    ts->overflow = (ts->list != NULL);
+    if ( unlikely(ts->overflow) )
     {
-        remove_entry(ts, t);
-
-        ts->running = t;
-
-        fn   = t->function;
-        data = t->data;
-
-        spin_unlock_irq(&ts->lock);
-        (*fn)(data);
-        spin_lock_irq(&ts->lock);
+        /* Find earliest deadline at head of list or top of heap. */
+        this_cpu(timer_deadline) = ts->list->expires;
+        if ( (GET_HEAP_SIZE(heap) != 0) &&
+             ((t = heap[1])->expires < this_cpu(timer_deadline)) )
+            this_cpu(timer_deadline) = t->expires;
     }
-
-    deadline = GET_HEAP_SIZE(heap) ? heap[1]->expires : 0;
-
-    while ( unlikely((t = ts->list) != NULL) )
+    else
     {
-        if ( t->expires >= (now + TIMER_SLOP) )
+        /*
+         * Find the earliest deadline that encompasses largest number of timers
+         * on the heap. To do this we take timers from the heap while their
+         * valid deadline ranges continue to intersect.
+         */
+        s_time_t start = 0, end = STIME_MAX;
+        struct timer **list_tail = &ts->list;
+
+        while ( (GET_HEAP_SIZE(heap) != 0) &&
+                ((t = heap[1])->expires <= end) )
         {
-            if ( (deadline == 0) || (deadline > t->expires) )
-                deadline = t->expires;
-            break;
+            remove_entry(ts, t);
+
+            t->status = TIMER_STATUS_in_list;
+            t->list_next = NULL;
+            *list_tail = t;
+            list_tail = &t->list_next;
+
+            start = t->expires;
+            if ( end > t->expires_end )
+                end = t->expires_end;
         }
 
-        ts->list = t->list_next;
-        t->status = TIMER_STATUS_inactive;
-
-        ts->running = t;
-
-        fn   = t->function;
-        data = t->data;
-
-        spin_unlock_irq(&ts->lock);
-        (*fn)(data);
-        spin_lock_irq(&ts->lock);
+        this_cpu(timer_deadline) = start;
     }
 
-    ts->running = NULL;
-
-    this_cpu(timer_deadline) = deadline;
-    if ( !reprogram_timer(deadline) )
+    if ( !reprogram_timer(this_cpu(timer_deadline)) )
         raise_softirq(TIMER_SOFTIRQ);
 
     spin_unlock_irq(&ts->lock);

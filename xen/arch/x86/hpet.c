@@ -14,8 +14,6 @@
 #include <asm/div64.h>
 #include <asm/hpet.h>
 
-#define STIME_MAX ((s_time_t)((uint64_t)~0ull>>1))
-
 #define MAX_DELTA_NS MILLISECS(10*1000)
 #define MIN_DELTA_NS MICROSECS(20)
 
