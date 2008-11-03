@@ -209,21 +209,6 @@ acpi_cpufreq_cpu_init (struct cpufreq_policy *policy)
 
 	data->acpi_data = &processor_pminfo[cpu]->perf;
 
-	/* capability check */
-	if (data->acpi_data->state_count <= 1) {
-		printk(KERN_WARNING "P-States\n");
-		result = -ENODEV;
-		goto err_unreg;
-	}
-
-	if ((data->acpi_data->control_register.space_id !=
-				ACPI_ADR_SPACE_FIXED_HARDWARE) ||
-			(data->acpi_data->status_register.space_id !=
-			 ACPI_ADR_SPACE_FIXED_HARDWARE)) {
-		result = -ENODEV;
-		goto err_unreg;
-	}
-
 	data->freq_table = xmalloc_array(struct cpufreq_frequency_table,
 			(data->acpi_data->state_count + 1));
 	if (!data->freq_table) {

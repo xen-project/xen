@@ -117,6 +117,15 @@ int cpufreq_add_cpu(unsigned int cpu)
         cpu_set(cpu, cpufreq_dom->map);
         cpu_set(cpu, policy->cpus);
 
+        /* domain coordination sanity check */
+        if ((perf->domain_info.coord_type !=
+             processor_pminfo[firstcpu]->perf.domain_info.coord_type) ||
+            (perf->domain_info.num_processors !=
+             processor_pminfo[firstcpu]->perf.domain_info.num_processors)) {
+            ret = -EINVAL;
+            goto err2;
+        }
+
         printk(KERN_EMERG"adding CPU %u\n", cpu);
     } else {
         cpufreq_dom = xmalloc(struct cpufreq_dom);
@@ -303,6 +312,24 @@ int set_px_pminfo(uint32_t acpi_id, struct xen_processor_performance *dom0_px_in
 
     if ( dom0_px_info->flags & XEN_PX_PCT )
     {
+        /* space_id check */
+        if (dom0_px_info->control_register.space_id != 
+            dom0_px_info->status_register.space_id)
+        {
+            ret = -EINVAL;
+            goto out;
+        }
+
+#ifdef CONFIG_IA64
+        /* for IA64, currently it only supports FFH */
+        if (dom0_px_info->control_register.space_id !=
+            ACPI_ADR_SPACE_FIXED_HARDWARE)
+        {
+            ret = -EINVAL;
+            goto out;
+        }
+#endif
+
         memcpy ((void *)&pxpt->control_register,
                 (void *)&dom0_px_info->control_register,
                 sizeof(struct xen_pct_register));
@@ -312,8 +339,16 @@ int set_px_pminfo(uint32_t acpi_id, struct xen_processor_performance *dom0_px_in
         print_PCT(&pxpt->control_register);
         print_PCT(&pxpt->status_register);
     }
+
     if ( dom0_px_info->flags & XEN_PX_PSS ) 
     {
+        /* capability check */
+        if (dom0_px_info->state_count <= 1)
+        {
+            ret = -EINVAL;
+            goto out;
+        }
+
         if ( !(pxpt->states = xmalloc_array(struct xen_processor_px,
                         dom0_px_info->state_count)) )
         {
@@ -325,14 +360,28 @@ int set_px_pminfo(uint32_t acpi_id, struct xen_processor_performance *dom0_px_in
         pxpt->state_count = dom0_px_info->state_count;
         print_PSS(pxpt->states,pxpt->state_count);
     }
+
     if ( dom0_px_info->flags & XEN_PX_PSD )
     {
+#ifdef CONFIG_X86
+        /* for X86, check domain coordination */
+        /* for IA64, _PSD is optional for current IA64 cpufreq algorithm */
+        if (dom0_px_info->shared_type != CPUFREQ_SHARED_TYPE_ALL &&
+            dom0_px_info->shared_type != CPUFREQ_SHARED_TYPE_ANY &&
+            dom0_px_info->shared_type != CPUFREQ_SHARED_TYPE_HW)
+        {
+            ret = -EINVAL;
+            goto out;
+        }
+#endif
+
         pxpt->shared_type = dom0_px_info->shared_type;
         memcpy ((void *)&pxpt->domain_info,
                 (void *)&dom0_px_info->domain_info,
                 sizeof(struct xen_psd_package));
         print_PSD(&pxpt->domain_info);
     }
+
     if ( dom0_px_info->flags & XEN_PX_PPC )
     {
         pxpt->platform_limit = dom0_px_info->platform_limit;
@@ -340,7 +389,6 @@ int set_px_pminfo(uint32_t acpi_id, struct xen_processor_performance *dom0_px_in
 
         if ( pxpt->init == XEN_PX_INIT )
         {
-
             ret = cpufreq_limit_change(cpuid); 
             goto out;
         }

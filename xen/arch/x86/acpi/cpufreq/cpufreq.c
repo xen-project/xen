@@ -447,18 +447,6 @@ acpi_cpufreq_cpu_init(struct cpufreq_policy *policy)
     perf = data->acpi_data;
     policy->shared_type = perf->shared_type;
 
-    /* capability check */
-    if (perf->state_count <= 1) {
-        printk("No P-States\n");
-        result = -ENODEV;
-        goto err_unreg;
-    }
-
-    if (perf->control_register.space_id != perf->status_register.space_id) {
-        result = -ENODEV;
-        goto err_unreg;
-    }
-
     switch (perf->control_register.space_id) {
     case ACPI_ADR_SPACE_SYSTEM_IO:
         printk("xen_pminfo: @acpi_cpufreq_cpu_init,"
