@@ -1856,7 +1856,8 @@ int get_page(struct page_info *page, struct domain *domain)
         nx = x + 1;
         d  = nd;
         if ( unlikely((x & PGC_count_mask) == 0) ||  /* Not allocated? */
-             unlikely((nx & PGC_count_mask) == 0) || /* Count overflow? */
+             /* Keep one spare reference to be acquired by get_page_light(). */
+             unlikely(((nx + 1) & PGC_count_mask) <= 1) || /* Overflow? */
              unlikely(d != _domain) )                /* Wrong owner? */
         {
             if ( !_shadow_mode_refcounts(domain) && !domain->is_dying )
@@ -1878,16 +1879,34 @@ int get_page(struct page_info *page, struct domain *domain)
     return 1;
 }
 
+/*
+ * Special version of get_page() to be used exclusively when
+ * - a page is known to already have a non-zero reference count
+ * - the page does not need its owner to be checked
+ * - it will not be called more than once without dropping the thus
+ *   acquired reference again.
+ * Due to get_page() reserving one reference, this call cannot fail.
+ */
+static void get_page_light(struct page_info *page)
+{
+    u32 x, nx, y = page->count_info;
+
+    do {
+        x  = y;
+        nx = x + 1;
+        BUG_ON(!(x & PGC_count_mask)); /* Not allocated? */
+        BUG_ON(!(nx & PGC_count_mask)); /* Overflow? */
+        y = cmpxchg(&page->count_info, x, nx);
+    }
+    while ( unlikely(y != x) );
+}
+
 
 static int alloc_page_type(struct page_info *page, unsigned long type,
                            int preemptible)
 {
     struct domain *owner = page_get_owner(page);
     int rc;
-
-    /* Obtain an extra reference to retain if we set PGT_partial. */
-    if ( preemptible && !get_page(page, owner) )
-        return -EINVAL;
 
     /* A page table is dirtied when its type count becomes non-zero. */
     if ( likely(owner != NULL) )
@@ -1922,14 +1941,10 @@ static int alloc_page_type(struct page_info *page, unsigned long type,
     wmb();
     if ( rc == -EAGAIN )
     {
+        get_page_light(page);
         page->u.inuse.type_info |= PGT_partial;
-        return -EAGAIN;
     }
-
-    if ( preemptible )
-        put_page(page);
-
-    if ( rc == -EINTR )
+    else if ( rc == -EINTR )
     {
         ASSERT((page->u.inuse.type_info &
                 (PGT_count_mask|PGT_validated|PGT_partial)) == 1);
@@ -2044,8 +2059,8 @@ static int __put_final_page_type(
     }
     else if ( rc == -EINTR )
     {
-        ASSERT(!(page->u.inuse.type_info &
-                 (PGT_count_mask|PGT_validated|PGT_partial)));
+        ASSERT((page->u.inuse.type_info &
+                (PGT_count_mask|PGT_validated|PGT_partial)) == 1);
         if ( !(shadow_mode_enabled(page_get_owner(page)) &&
                (page->count_info & PGC_page_table)) )
             page->tlbflush_timestamp = tlbflush_current_time();
@@ -2056,13 +2071,9 @@ static int __put_final_page_type(
     {
         BUG_ON(rc != -EAGAIN);
         wmb();
+        get_page_light(page);
         page->u.inuse.type_info |= PGT_partial;
-        /* Must skip put_page() below. */
-        preemptible = 0;
     }
-
-    if ( preemptible )
-        put_page(page);
 
     return rc;
 }
@@ -2072,10 +2083,7 @@ static int __put_page_type(struct page_info *page,
                            int preemptible)
 {
     unsigned long nx, x, y = page->u.inuse.type_info;
-
-    /* Obtain an extra reference to retain if we set PGT_partial. */
-    if ( preemptible && !get_page(page, page_get_owner(page)) )
-        return -EINVAL;
+    int rc = 0;
 
     for ( ; ; )
     {
@@ -2098,10 +2106,11 @@ static int __put_page_type(struct page_info *page,
                 if ( unlikely((y = cmpxchg(&page->u.inuse.type_info,
                                            x, nx)) != x) )
                     continue;
+                /* We cleared the 'valid bit' so we do the clean up. */
+                rc = __put_final_page_type(page, x, preemptible);
                 if ( x & PGT_partial )
                     put_page(page);
-                /* We cleared the 'valid bit' so we do the clean up. */
-                return __put_final_page_type(page, x, preemptible);
+                break;
             }
 
             /*
@@ -2120,17 +2129,10 @@ static int __put_page_type(struct page_info *page,
             break;
 
         if ( preemptible && hypercall_preempt_check() )
-        {
-            if ( preemptible )
-                put_page(page);
             return -EINTR;
-        }
     }
 
-    if ( preemptible )
-        put_page(page);
-
-    return 0;
+    return rc;
 }
 
 
@@ -2138,6 +2140,7 @@ static int __get_page_type(struct page_info *page, unsigned long type,
                            int preemptible)
 {
     unsigned long nx, x, y = page->u.inuse.type_info;
+    int rc = 0;
 
     ASSERT(!(type & ~(PGT_type_mask | PGT_pae_xen_l2)));
 
@@ -2233,11 +2236,7 @@ static int __get_page_type(struct page_info *page, unsigned long type,
         }
 
         if ( likely((y = cmpxchg(&page->u.inuse.type_info, x, nx)) == x) )
-        {
-            if ( (x & PGT_partial) && !(nx & PGT_partial) )
-                put_page(page);
             break;
-        }
 
         if ( preemptible && hypercall_preempt_check() )
             return -EINTR;
@@ -2264,10 +2263,13 @@ static int __get_page_type(struct page_info *page, unsigned long type,
             page->nr_validated_ptes = 0;
             page->partial_pte = 0;
         }
-        return alloc_page_type(page, type, preemptible);
+        rc = alloc_page_type(page, type, preemptible);
     }
 
-    return 0;
+    if ( (x & PGT_partial) && !(nx & PGT_partial) )
+        put_page(page);
+
+    return rc;
 }
 
 void put_page_type(struct page_info *page)
