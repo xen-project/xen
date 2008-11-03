@@ -1036,6 +1036,14 @@ def preprocess_ioports(vals):
         ioports.append(hexd)
     vals.ioports = ioports
         
+def preprocess_irq(vals):
+    if not vals.irq: return
+    irq = []
+    for v in vals.irq:
+        d = repr(v)
+        irq.append(d)
+    vals.irq = irq
+
 def preprocess_vtpm(vals):
     if not vals.vtpm: return
     vtpms = []
@@ -1134,6 +1142,7 @@ def preprocess(vals):
     preprocess_vscsi(vals)
     preprocess_ioports(vals)
     preprocess_ip(vals)
+    preprocess_irq(vals)
     preprocess_nfs(vals)
     preprocess_vtpm(vals)
     preprocess_access_control(vals)
