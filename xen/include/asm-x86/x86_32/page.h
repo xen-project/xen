@@ -105,9 +105,6 @@ extern unsigned int PAGE_HYPERVISOR_NOCACHE;
 #define get_pte_flags(x) (((int)((x) >> 32) & ~0xFFF) | ((int)(x) & 0xFFF))
 #define put_pte_flags(x) (((intpte_t)((x) & ~0xFFF) << 32) | ((x) & 0xFFF))
 
-#define GRANT_PTE_FLAGS \
-    (_PAGE_PRESENT|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_GNTTAB)
-
 /*
  * Disallow unused flag bits plus PAT/PSE, PCD, PWT and GLOBAL.
  * Permit the NX bit if the hardware supports it.
