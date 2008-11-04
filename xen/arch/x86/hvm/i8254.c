@@ -213,13 +213,13 @@ static void pit_load_count(PITState *pit, int channel, int val)
     case 2:
     case 3:
         /* Periodic timer. */
-        create_periodic_time(v, &pit->pt0, period, 0, 0, pit_time_fired, 
+        create_periodic_time(v, &pit->pt0, period, period, 0, pit_time_fired, 
                              &pit->count_load_time[channel]);
         break;
     case 1:
     case 4:
         /* One-shot timer. */
-        create_periodic_time(v, &pit->pt0, period, 0, 1, pit_time_fired,
+        create_periodic_time(v, &pit->pt0, period, 0, 0, pit_time_fired,
                              &pit->count_load_time[channel]);
         break;
     default:

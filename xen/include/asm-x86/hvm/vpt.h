@@ -32,41 +32,6 @@
 #include <asm/hvm/irq.h>
 #include <public/hvm/save.h>
 
-struct HPETState;
-struct HPET_timer_fn_info {
-    struct HPETState *hs;
-    unsigned int tn;
-};
-
-struct hpet_registers {
-    /* Memory-mapped, software visible registers */
-    uint64_t capability;        /* capabilities */
-    uint64_t config;            /* configuration */
-    uint64_t isr;               /* interrupt status reg */
-    uint64_t mc64;              /* main counter */
-    struct {                    /* timers */
-        uint64_t config;        /* configuration/cap */
-        uint64_t cmp;           /* comparator */
-        uint64_t fsb;           /* FSB route, not supported now */
-    } timers[HPET_TIMER_NUM];
-
-    /* Hidden register state */
-    uint64_t period[HPET_TIMER_NUM]; /* Last value written to comparator */
-};
-
-typedef struct HPETState {
-    struct hpet_registers hpet;
-    struct vcpu *vcpu;
-    uint64_t stime_freq;
-    uint64_t hpet_to_ns_scale; /* hpet ticks to ns (multiplied by 2^10) */
-    uint64_t hpet_to_ns_limit; /* max hpet ticks convertable to ns      */
-    uint64_t mc_offset;
-    struct timer timers[HPET_TIMER_NUM];
-    struct HPET_timer_fn_info timer_fn_info[HPET_TIMER_NUM]; 
-    spinlock_t lock;
-} HPETState;
-
-
 /*
  * Abstract layer of periodic time, one short time.
  */
@@ -107,6 +72,34 @@ typedef struct PITState {
     struct periodic_time pt0;
     spinlock_t lock;
 } PITState;
+
+struct hpet_registers {
+    /* Memory-mapped, software visible registers */
+    uint64_t capability;        /* capabilities */
+    uint64_t config;            /* configuration */
+    uint64_t isr;               /* interrupt status reg */
+    uint64_t mc64;              /* main counter */
+    struct {                    /* timers */
+        uint64_t config;        /* configuration/cap */
+        uint64_t cmp;           /* comparator */
+        uint64_t fsb;           /* FSB route, not supported now */
+    } timers[HPET_TIMER_NUM];
+
+    /* Hidden register state */
+    uint64_t period[HPET_TIMER_NUM]; /* Last value written to comparator */
+    uint64_t comparator64[HPET_TIMER_NUM]; /* 64 bit running comparator */
+};
+
+typedef struct HPETState {
+    struct hpet_registers hpet;
+    struct vcpu *vcpu;
+    uint64_t stime_freq;
+    uint64_t hpet_to_ns_scale; /* hpet ticks to ns (multiplied by 2^10) */
+    uint64_t hpet_to_ns_limit; /* max hpet ticks convertable to ns      */
+    uint64_t mc_offset;
+    struct periodic_time pt[HPET_TIMER_NUM];
+    spinlock_t lock;
+} HPETState;
 
 typedef struct RTCState {
     /* Hardware state */
@@ -160,13 +153,13 @@ void pt_migrate(struct vcpu *v);
  * The given periodic timer structure must be initialised with zero bytes,
  * except for the 'source' field which must be initialised with the
  * correct PTSRC_ value. The initialised timer structure can then be passed
- * to {create,destroy}_periodic_time() and number of times and in any order.
+ * to {create,destroy}_periodic_time() any number of times and in any order.
  * Note that, for a given periodic timer, invocations of these functions MUST
  * be serialised.
  */
 void create_periodic_time(
-    struct vcpu *v, struct periodic_time *pt, uint64_t period,
-    uint8_t irq, char one_shot, time_cb *cb, void *data);
+    struct vcpu *v, struct periodic_time *pt, uint64_t delta,
+    uint64_t period, uint8_t irq, time_cb *cb, void *data);
 void destroy_periodic_time(struct periodic_time *pt);
 
 int pv_pit_handler(int port, int data, int write);
@@ -185,7 +178,6 @@ void pmtimer_init(struct vcpu *v);
 void pmtimer_deinit(struct domain *d);
 void pmtimer_reset(struct domain *d);
 
-void hpet_migrate_timers(struct vcpu *v);
 void hpet_init(struct vcpu *v);
 void hpet_deinit(struct domain *d);
 void hpet_reset(struct domain *d);

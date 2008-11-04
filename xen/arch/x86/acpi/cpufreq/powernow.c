@@ -229,9 +229,23 @@ err_unreg:
     return result;
 }
 
+static int powernow_cpufreq_cpu_exit(struct cpufreq_policy *policy)
+{
+    struct powernow_cpufreq_data *data = drv_data[policy->cpu];
+
+    if (data) {
+        drv_data[policy->cpu] = NULL;
+        xfree(data->freq_table);
+        xfree(data);
+    }
+
+    return 0;
+}
+
 static struct cpufreq_driver powernow_cpufreq_driver = {
     .target = powernow_cpufreq_target,
     .init   = powernow_cpufreq_cpu_init,
+    .exit   = powernow_cpufreq_cpu_exit
 };
 
 int powernow_cpufreq_init(void)

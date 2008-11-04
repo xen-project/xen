@@ -174,9 +174,10 @@ void free_vcpu_struct(struct vcpu *v)
 
 static int setup_compat_l4(struct vcpu *v)
 {
-    struct page_info *pg = alloc_domheap_page(NULL, 0);
+    struct page_info *pg;
     l4_pgentry_t *l4tab;
 
+    pg = alloc_domheap_page(NULL, MEMF_node(vcpu_to_node(v)));
     if ( pg == NULL )
         return -ENOMEM;
 
@@ -1639,31 +1640,22 @@ static int relinquish_memory(
         }
 
         if ( test_and_clear_bit(_PGT_pinned, &page->u.inuse.type_info) )
-            put_page_and_type(page);
+            ret = put_page_and_type_preemptible(page, 1);
+        switch ( ret )
+        {
+        case 0:
+            break;
+        case -EAGAIN:
+        case -EINTR:
+            set_bit(_PGT_pinned, &page->u.inuse.type_info);
+            put_page(page);
+            goto out;
+        default:
+            BUG();
+        }
 
         if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
             put_page(page);
-
-#ifdef DOMAIN_DESTRUCT_AVOID_RECURSION
-        /*
-         * Forcibly drop reference counts of page tables above top most (which
-         * were skipped to prevent long latencies due to deep recursion - see
-         * the special treatment in free_lX_table()).
-         */
-        y = page->u.inuse.type_info;
-        if ( (type < PGT_root_page_table) &&
-             unlikely(((y + PGT_type_mask) &
-                       (PGT_type_mask|PGT_validated)) == type) )
-        {
-            BUG_ON((y & PGT_count_mask) >=
-                   (page->count_info & PGC_count_mask));
-            while ( y & PGT_count_mask )
-            {
-                put_page_and_type(page);
-                y = page->u.inuse.type_info;
-            }
-        }
-#endif
 
         /*
          * Forcibly invalidate top-most, still valid page tables at this point
@@ -1685,8 +1677,31 @@ static int relinquish_memory(
                         x & ~(PGT_validated|PGT_partial));
             if ( likely(y == x) )
             {
-                if ( free_page_type(page, x, 0) != 0 )
+                /* No need for atomic update of type_info here: noone else updates it. */
+                switch ( ret = free_page_type(page, x, 1) )
+                {
+                case 0:
+                    break;
+                case -EINTR:
+                    page->u.inuse.type_info |= PGT_validated;
+                    if ( x & PGT_partial )
+                        put_page(page);
+                    put_page(page);
+                    ret = -EAGAIN;
+                    goto out;
+                case -EAGAIN:
+                    page->u.inuse.type_info |= PGT_partial;
+                    if ( x & PGT_partial )
+                        put_page(page);
+                    goto out;
+                default:
                     BUG();
+                }
+                if ( x & PGT_partial )
+                {
+                    page->u.inuse.type_info--;
+                    put_page(page);
+                }
                 break;
             }
         }
@@ -1831,11 +1846,6 @@ int domain_relinquish_resources(struct domain *d)
         /* fallthrough */
 
     case RELMEM_done:
-#ifdef DOMAIN_DESTRUCT_AVOID_RECURSION
-        ret = relinquish_memory(d, &d->page_list, PGT_l1_page_table);
-        if ( ret )
-            return ret;
-#endif
         break;
 
     default:
@@ -1891,6 +1901,54 @@ void domain_cpuid(
 
     *eax = *ebx = *ecx = *edx = 0;
 }
+
+void vcpu_kick(struct vcpu *v)
+{
+    /*
+     * NB1. 'pause_flags' and 'processor' must be checked /after/ update of
+     * pending flag. These values may fluctuate (after all, we hold no
+     * locks) but the key insight is that each change will cause
+     * evtchn_upcall_pending to be polled.
+     * 
+     * NB2. We save the running flag across the unblock to avoid a needless
+     * IPI for domains that we IPI'd to unblock.
+     */
+    bool_t running = v->is_running;
+    vcpu_unblock(v);
+    if ( running && (in_irq() || (v != current)) )
+        cpu_raise_softirq(v->processor, VCPU_KICK_SOFTIRQ);
+}
+
+void vcpu_mark_events_pending(struct vcpu *v)
+{
+    int already_pending = test_and_set_bit(
+        0, (unsigned long *)&vcpu_info(v, evtchn_upcall_pending));
+
+    if ( already_pending )
+        return;
+
+    if ( is_hvm_vcpu(v) )
+        hvm_assert_evtchn_irq(v);
+    else
+        vcpu_kick(v);
+}
+
+static void vcpu_kick_softirq(void)
+{
+    /*
+     * Nothing to do here: we merely prevent notifiers from racing with checks
+     * executed on return to guest context with interrupts enabled. See, for
+     * example, xxx_intr_assist() executed on return to HVM guest context.
+     */
+}
+
+static int __init init_vcpu_kick_softirq(void)
+{
+    open_softirq(VCPU_KICK_SOFTIRQ, vcpu_kick_softirq);
+    return 0;
+}
+__initcall(init_vcpu_kick_softirq);
+
 
 /*
  * Local variables:

@@ -231,6 +231,13 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
  * cmd: MMUEXT_SET_LDT
  * linear_addr: Linear address of LDT base (NB. must be page-aligned).
  * nr_ents: Number of entries in LDT.
+ *
+ * cmd: MMUEXT_CLEAR_PAGE
+ * mfn: Machine frame number to be cleared.
+ *
+ * cmd: MMUEXT_COPY_PAGE
+ * mfn: Machine frame number of the destination page.
+ * src_mfn: Machine frame number of the source page.
  */
 #define MMUEXT_PIN_L1_TABLE      0
 #define MMUEXT_PIN_L2_TABLE      1
@@ -247,12 +254,15 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 #define MMUEXT_FLUSH_CACHE      12
 #define MMUEXT_SET_LDT          13
 #define MMUEXT_NEW_USER_BASEPTR 15
+#define MMUEXT_CLEAR_PAGE       16
+#define MMUEXT_COPY_PAGE        17
 
 #ifndef __ASSEMBLY__
 struct mmuext_op {
     unsigned int cmd;
     union {
-        /* [UN]PIN_TABLE, NEW_BASEPTR, NEW_USER_BASEPTR */
+        /* [UN]PIN_TABLE, NEW_BASEPTR, NEW_USER_BASEPTR
+         * CLEAR_PAGE, COPY_PAGE */
         xen_pfn_t     mfn;
         /* INVLPG_LOCAL, INVLPG_ALL, SET_LDT */
         unsigned long linear_addr;
@@ -266,6 +276,8 @@ struct mmuext_op {
 #else
         void *vcpumask;
 #endif
+        /* COPY_PAGE */
+        xen_pfn_t src_mfn;
     } arg2;
 };
 typedef struct mmuext_op mmuext_op_t;

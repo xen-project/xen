@@ -59,7 +59,7 @@ static int menu_select(struct acpi_processor_power *power)
     data->expected_us = (u32) get_sleep_length_ns() / 1000;
 
     /* find the deepest idle state that satisfies our constraints */
-    for ( i = 1; i < power->count; i++ )
+    for ( i = 2; i < power->count; i++ )
     {
         struct acpi_processor_cx *s = &power->states[i];
 
@@ -81,17 +81,7 @@ static void menu_reflect(struct acpi_processor_power *power)
     unsigned int last_residency; 
     unsigned int measured_us;
 
-    /*
-     * Ugh, this idle state doesn't support residency measurements, so we
-     * are basically lost in the dark.  As a compromise, assume we slept
-     * for one full standard timer tick.  However, be aware that this
-     * could potentially result in a suboptimal state transition.
-     */
-    if ( target->type == ACPI_STATE_C1 )
-        last_residency = USEC_PER_SEC / HZ;
-    else
-        last_residency = power->last_residency;
-
+    last_residency = power->last_residency;
     measured_us = last_residency + data->elapsed_us;
 
     /* if wrapping, set to max uint (-1) */

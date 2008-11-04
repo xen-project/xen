@@ -29,6 +29,7 @@
  * from the end of virtual memory backwards.
  */
 enum fixed_addresses {
+    FIX_RESERVED, /* Index 0 is reserved since fix_to_virt(0) > FIXADDR_TOP. */
 #ifdef __i386__
     FIX_PAE_HIGHMEM_0,
     FIX_PAE_HIGHMEM_END = FIX_PAE_HIGHMEM_0 + NR_CPUS-1,

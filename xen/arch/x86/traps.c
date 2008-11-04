@@ -1030,7 +1030,7 @@ static int handle_gdt_ldt_mapping_fault(
 #endif
 
 static int __spurious_page_fault(
-    unsigned long addr, struct cpu_user_regs *regs)
+    unsigned long addr, unsigned int error_code)
 {
     unsigned long mfn, cr3 = read_cr3();
 #if CONFIG_PAGING_LEVELS >= 4
@@ -1052,17 +1052,17 @@ static int __spurious_page_fault(
         return 0;
 
     /* Reserved bit violations are never spurious faults. */
-    if ( regs->error_code & PFEC_reserved_bit )
+    if ( error_code & PFEC_reserved_bit )
         return 0;
 
     required_flags  = _PAGE_PRESENT;
-    if ( regs->error_code & PFEC_write_access )
+    if ( error_code & PFEC_write_access )
         required_flags |= _PAGE_RW;
-    if ( regs->error_code & PFEC_user_mode )
+    if ( error_code & PFEC_user_mode )
         required_flags |= _PAGE_USER;
 
     disallowed_flags = 0;
-    if ( regs->error_code & PFEC_insn_fetch )
+    if ( error_code & PFEC_insn_fetch )
         disallowed_flags |= _PAGE_NX;
 
     mfn = cr3 >> PAGE_SHIFT;
@@ -1120,7 +1120,7 @@ static int __spurious_page_fault(
     dprintk(XENLOG_WARNING, "Spurious fault in domain %u:%u "
             "at addr %lx, e/c %04x\n",
             current->domain->domain_id, current->vcpu_id,
-            addr, regs->error_code);
+            addr, error_code);
 #if CONFIG_PAGING_LEVELS >= 4
     dprintk(XENLOG_WARNING, " l4e = %"PRIpte"\n", l4e_get_intpte(l4e));
 #endif
@@ -1129,14 +1129,11 @@ static int __spurious_page_fault(
 #endif
     dprintk(XENLOG_WARNING, " l2e = %"PRIpte"\n", l2e_get_intpte(l2e));
     dprintk(XENLOG_WARNING, " l1e = %"PRIpte"\n", l1e_get_intpte(l1e));
-#ifndef NDEBUG
-    show_registers(regs);
-#endif
     return 1;
 }
 
 static int spurious_page_fault(
-    unsigned long addr, struct cpu_user_regs *regs)
+    unsigned long addr, unsigned int error_code)
 {
     unsigned long flags;
     int           is_spurious;
@@ -1146,7 +1143,7 @@ static int spurious_page_fault(
      * page tables from becoming invalid under our feet during the walk.
      */
     local_irq_save(flags);
-    is_spurious = __spurious_page_fault(addr, regs);
+    is_spurious = __spurious_page_fault(addr, error_code);
     local_irq_restore(flags);
 
     return is_spurious;
@@ -1208,8 +1205,12 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
 asmlinkage void do_page_fault(struct cpu_user_regs *regs)
 {
     unsigned long addr, fixup;
+    unsigned int error_code;
 
     addr = read_cr2();
+
+    /* fixup_page_fault() might change regs->error_code, so cache it here. */
+    error_code = regs->error_code;
 
     DEBUGGER_trap_entry(TRAP_page_fault, regs);
 
@@ -1220,7 +1221,7 @@ asmlinkage void do_page_fault(struct cpu_user_regs *regs)
 
     if ( unlikely(!guest_mode(regs)) )
     {
-        if ( spurious_page_fault(addr, regs) )
+        if ( spurious_page_fault(addr, error_code) )
             return;
 
         if ( likely((fixup = search_exception_table(regs->eip)) != 0) )
@@ -1239,11 +1240,11 @@ asmlinkage void do_page_fault(struct cpu_user_regs *regs)
         panic("FATAL PAGE FAULT\n"
               "[error_code=%04x]\n"
               "Faulting linear address: %p\n",
-              regs->error_code, _p(addr));
+              error_code, _p(addr));
     }
 
     if ( unlikely(current->domain->arch.suppress_spurious_page_faults
-                  && spurious_page_fault(addr, regs)) )
+                  && spurious_page_fault(addr, error_code)) )
         return;
 
     propagate_page_fault(addr, regs->error_code);

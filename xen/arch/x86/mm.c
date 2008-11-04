@@ -566,19 +566,21 @@ static int get_page_from_pagenr(unsigned long page_nr, struct domain *d)
 static int get_page_and_type_from_pagenr(unsigned long page_nr, 
                                          unsigned long type,
                                          struct domain *d,
+                                         int partial,
                                          int preemptible)
 {
     struct page_info *page = mfn_to_page(page_nr);
     int rc;
 
-    if ( unlikely(!get_page_from_pagenr(page_nr, d)) )
+    if ( likely(partial >= 0) &&
+         unlikely(!get_page_from_pagenr(page_nr, d)) )
         return -EINVAL;
 
     rc = (preemptible ?
           get_page_type_preemptible(page, type) :
           (get_page_type(page, type) ? 0 : -EINVAL));
 
-    if ( rc )
+    if ( unlikely(rc) && partial >= 0 )
         put_page(page);
 
     return rc;
@@ -761,7 +763,7 @@ get_page_from_l2e(
     }
 
     rc = get_page_and_type_from_pagenr(
-        l2e_get_pfn(l2e), PGT_l1_page_table, d, 0);
+        l2e_get_pfn(l2e), PGT_l1_page_table, d, 0, 0);
     if ( unlikely(rc == -EINVAL) && get_l2_linear_pagetable(l2e, pfn, d) )
         rc = 0;
 
@@ -772,7 +774,7 @@ get_page_from_l2e(
 define_get_linear_pagetable(l3);
 static int
 get_page_from_l3e(
-    l3_pgentry_t l3e, unsigned long pfn, struct domain *d, int preemptible)
+    l3_pgentry_t l3e, unsigned long pfn, struct domain *d, int partial, int preemptible)
 {
     int rc;
 
@@ -786,7 +788,7 @@ get_page_from_l3e(
     }
 
     rc = get_page_and_type_from_pagenr(
-        l3e_get_pfn(l3e), PGT_l2_page_table, d, preemptible);
+        l3e_get_pfn(l3e), PGT_l2_page_table, d, partial, preemptible);
     if ( unlikely(rc == -EINVAL) && get_l3_linear_pagetable(l3e, pfn, d) )
         rc = 0;
 
@@ -797,7 +799,7 @@ get_page_from_l3e(
 define_get_linear_pagetable(l4);
 static int
 get_page_from_l4e(
-    l4_pgentry_t l4e, unsigned long pfn, struct domain *d, int preemptible)
+    l4_pgentry_t l4e, unsigned long pfn, struct domain *d, int partial, int preemptible)
 {
     int rc;
 
@@ -811,7 +813,7 @@ get_page_from_l4e(
     }
 
     rc = get_page_and_type_from_pagenr(
-        l4e_get_pfn(l4e), PGT_l3_page_table, d, preemptible);
+        l4e_get_pfn(l4e), PGT_l3_page_table, d, partial, preemptible);
     if ( unlikely(rc == -EINVAL) && get_l4_linear_pagetable(l4e, pfn, d) )
         rc = 0;
 
@@ -961,23 +963,32 @@ static int put_page_from_l2e(l2_pgentry_t l2e, unsigned long pfn)
     return 1;
 }
 
+static int __put_page_type(struct page_info *, int preemptible);
 
 static int put_page_from_l3e(l3_pgentry_t l3e, unsigned long pfn,
-                             int preemptible)
+                             int partial, int preemptible)
 {
     if ( (l3e_get_flags(l3e) & _PAGE_PRESENT) && 
          (l3e_get_pfn(l3e) != pfn) )
+    {
+        if ( unlikely(partial > 0) )
+            return __put_page_type(l3e_get_page(l3e), preemptible);
         return put_page_and_type_preemptible(l3e_get_page(l3e), preemptible);
+    }
     return 1;
 }
 
 #if CONFIG_PAGING_LEVELS >= 4
 static int put_page_from_l4e(l4_pgentry_t l4e, unsigned long pfn,
-                             int preemptible)
+                             int partial, int preemptible)
 {
     if ( (l4e_get_flags(l4e) & _PAGE_PRESENT) && 
          (l4e_get_pfn(l4e) != pfn) )
+    {
+        if ( unlikely(partial > 0) )
+            return __put_page_type(l4e_get_page(l4e), preemptible);
         return put_page_and_type_preemptible(l4e_get_page(l4e), preemptible);
+    }
     return 1;
 }
 #endif
@@ -1184,7 +1195,7 @@ static int alloc_l3_table(struct page_info *page, int preemptible)
     unsigned long  pfn = page_to_mfn(page);
     l3_pgentry_t  *pl3e;
     unsigned int   i;
-    int            rc = 0;
+    int            rc = 0, partial = page->partial_pte;
 
 #if CONFIG_PAGING_LEVELS == 3
     /*
@@ -1213,7 +1224,8 @@ static int alloc_l3_table(struct page_info *page, int preemptible)
     if ( is_pv_32on64_domain(d) )
         memset(pl3e + 4, 0, (L3_PAGETABLE_ENTRIES - 4) * sizeof(*pl3e));
 
-    for ( i = page->nr_validated_ptes; i < L3_PAGETABLE_ENTRIES; i++ )
+    for ( i = page->nr_validated_ptes; i < L3_PAGETABLE_ENTRIES;
+          i++, partial = 0 )
     {
         if ( is_pv_32bit_domain(d) && (i == 3) )
         {
@@ -1224,16 +1236,17 @@ static int alloc_l3_table(struct page_info *page, int preemptible)
                 rc = get_page_and_type_from_pagenr(l3e_get_pfn(pl3e[i]),
                                                    PGT_l2_page_table |
                                                    PGT_pae_xen_l2,
-                                                   d, preemptible);
+                                                   d, partial, preemptible);
         }
         else if ( !is_guest_l3_slot(i) ||
-                  (rc = get_page_from_l3e(pl3e[i], pfn, d, preemptible)) > 0 )
+                  (rc = get_page_from_l3e(pl3e[i], pfn, d,
+                                          partial, preemptible)) > 0 )
             continue;
 
         if ( rc == -EAGAIN )
         {
             page->nr_validated_ptes = i;
-            page->partial_pte = 1;
+            page->partial_pte = partial ?: 1;
         }
         else if ( rc == -EINTR && i )
         {
@@ -1257,7 +1270,7 @@ static int alloc_l3_table(struct page_info *page, int preemptible)
             if ( !is_guest_l3_slot(i) )
                 continue;
             unadjust_guest_l3e(pl3e[i], d);
-            put_page_from_l3e(pl3e[i], pfn, 0);
+            put_page_from_l3e(pl3e[i], pfn, 0, 0);
         }
     }
 
@@ -1272,18 +1285,20 @@ static int alloc_l4_table(struct page_info *page, int preemptible)
     unsigned long  pfn = page_to_mfn(page);
     l4_pgentry_t  *pl4e = page_to_virt(page);
     unsigned int   i;
-    int            rc = 0;
+    int            rc = 0, partial = page->partial_pte;
 
-    for ( i = page->nr_validated_ptes; i < L4_PAGETABLE_ENTRIES; i++ )
+    for ( i = page->nr_validated_ptes; i < L4_PAGETABLE_ENTRIES;
+          i++, partial = 0 )
     {
         if ( !is_guest_l4_slot(d, i) ||
-             (rc = get_page_from_l4e(pl4e[i], pfn, d, preemptible)) > 0 )
+             (rc = get_page_from_l4e(pl4e[i], pfn, d,
+                                     partial, preemptible)) > 0 )
             continue;
 
         if ( rc == -EAGAIN )
         {
             page->nr_validated_ptes = i;
-            page->partial_pte = 1;
+            page->partial_pte = partial ?: 1;
         }
         else if ( rc == -EINTR )
         {
@@ -1299,7 +1314,7 @@ static int alloc_l4_table(struct page_info *page, int preemptible)
             MEM_LOG("Failure in alloc_l4_table: entry %d", i);
             while ( i-- > 0 )
                 if ( is_guest_l4_slot(d, i) )
-                    put_page_from_l4e(pl4e[i], pfn, 0);
+                    put_page_from_l4e(pl4e[i], pfn, 0, 0);
         }
         if ( rc < 0 )
             return rc;
@@ -1377,24 +1392,20 @@ static int free_l3_table(struct page_info *page, int preemptible)
     struct domain *d = page_get_owner(page);
     unsigned long pfn = page_to_mfn(page);
     l3_pgentry_t *pl3e;
-    unsigned int  i = page->nr_validated_ptes - !page->partial_pte;
-    int rc = 0;
-
-#ifdef DOMAIN_DESTRUCT_AVOID_RECURSION
-    if ( d->arch.relmem == RELMEM_l3 )
-        return 0;
-#endif
+    int rc = 0, partial = page->partial_pte;
+    unsigned int  i = page->nr_validated_ptes - !partial;
 
     pl3e = map_domain_page(pfn);
 
     do {
         if ( is_guest_l3_slot(i) )
         {
-            rc = put_page_from_l3e(pl3e[i], pfn, preemptible);
+            rc = put_page_from_l3e(pl3e[i], pfn, partial, preemptible);
+            if ( rc < 0 )
+                break;
+            partial = 0;
             if ( rc > 0 )
                 continue;
-            if ( rc )
-                break;
             unadjust_guest_l3e(pl3e[i], d);
         }
     } while ( i-- );
@@ -1404,7 +1415,7 @@ static int free_l3_table(struct page_info *page, int preemptible)
     if ( rc == -EAGAIN )
     {
         page->nr_validated_ptes = i;
-        page->partial_pte = 1;
+        page->partial_pte = partial ?: -1;
     }
     else if ( rc == -EINTR && i < L3_PAGETABLE_ENTRIES - 1 )
     {
@@ -1421,23 +1432,21 @@ static int free_l4_table(struct page_info *page, int preemptible)
     struct domain *d = page_get_owner(page);
     unsigned long pfn = page_to_mfn(page);
     l4_pgentry_t *pl4e = page_to_virt(page);
-    unsigned int  i = page->nr_validated_ptes - !page->partial_pte;
-    int rc = 0;
-
-#ifdef DOMAIN_DESTRUCT_AVOID_RECURSION
-    if ( d->arch.relmem == RELMEM_l4 )
-        return 0;
-#endif
+    int rc = 0, partial = page->partial_pte;
+    unsigned int  i = page->nr_validated_ptes - !partial;
 
     do {
         if ( is_guest_l4_slot(d, i) )
-            rc = put_page_from_l4e(pl4e[i], pfn, preemptible);
-    } while ( rc >= 0 && i-- );
+            rc = put_page_from_l4e(pl4e[i], pfn, partial, preemptible);
+        if ( rc < 0 )
+            break;
+        partial = 0;
+    } while ( i-- );
 
     if ( rc == -EAGAIN )
     {
         page->nr_validated_ptes = i;
-        page->partial_pte = 1;
+        page->partial_pte = partial ?: -1;
     }
     else if ( rc == -EINTR && i < L4_PAGETABLE_ENTRIES - 1 )
     {
@@ -1713,7 +1722,7 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
             return rc ? 0 : -EFAULT;
         }
 
-        rc = get_page_from_l3e(nl3e, pfn, d, preemptible);
+        rc = get_page_from_l3e(nl3e, pfn, d, 0, preemptible);
         if ( unlikely(rc < 0) )
             return page_unlock(l3pg), rc;
         rc = 0;
@@ -1742,7 +1751,7 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
     }
 
     page_unlock(l3pg);
-    put_page_from_l3e(ol3e, pfn, 0);
+    put_page_from_l3e(ol3e, pfn, 0, 0);
     return rc;
 }
 
@@ -1791,7 +1800,7 @@ static int mod_l4_entry(l4_pgentry_t *pl4e,
             return rc ? 0 : -EFAULT;
         }
 
-        rc = get_page_from_l4e(nl4e, pfn, d, preemptible);
+        rc = get_page_from_l4e(nl4e, pfn, d, 0, preemptible);
         if ( unlikely(rc < 0) )
             return page_unlock(l4pg), rc;
         rc = 0;
@@ -1812,7 +1821,7 @@ static int mod_l4_entry(l4_pgentry_t *pl4e,
     }
 
     page_unlock(l4pg);
-    put_page_from_l4e(ol4e, pfn, 0);
+    put_page_from_l4e(ol4e, pfn, 0, 0);
     return rc;
 }
 
@@ -1847,7 +1856,8 @@ int get_page(struct page_info *page, struct domain *domain)
         nx = x + 1;
         d  = nd;
         if ( unlikely((x & PGC_count_mask) == 0) ||  /* Not allocated? */
-             unlikely((nx & PGC_count_mask) == 0) || /* Count overflow? */
+             /* Keep one spare reference to be acquired by get_page_light(). */
+             unlikely(((nx + 1) & PGC_count_mask) <= 1) || /* Overflow? */
              unlikely(d != _domain) )                /* Wrong owner? */
         {
             if ( !_shadow_mode_refcounts(domain) && !domain->is_dying )
@@ -1867,6 +1877,28 @@ int get_page(struct page_info *page, struct domain *domain)
     while ( unlikely(nd != d) || unlikely(y != x) );
 
     return 1;
+}
+
+/*
+ * Special version of get_page() to be used exclusively when
+ * - a page is known to already have a non-zero reference count
+ * - the page does not need its owner to be checked
+ * - it will not be called more than once without dropping the thus
+ *   acquired reference again.
+ * Due to get_page() reserving one reference, this call cannot fail.
+ */
+static void get_page_light(struct page_info *page)
+{
+    u32 x, nx, y = page->count_info;
+
+    do {
+        x  = y;
+        nx = x + 1;
+        BUG_ON(!(x & PGC_count_mask)); /* Not allocated? */
+        BUG_ON(!(nx & PGC_count_mask)); /* Overflow? */
+        y = cmpxchg(&page->count_info, x, nx);
+    }
+    while ( unlikely(y != x) );
 }
 
 
@@ -1909,6 +1941,7 @@ static int alloc_page_type(struct page_info *page, unsigned long type,
     wmb();
     if ( rc == -EAGAIN )
     {
+        get_page_light(page);
         page->u.inuse.type_info |= PGT_partial;
     }
     else if ( rc == -EINTR )
@@ -1973,6 +2006,7 @@ int free_page_type(struct page_info *page, unsigned long type,
         page->nr_validated_ptes = 1U << PAGETABLE_ORDER;
         page->partial_pte = 0;
     }
+
     switch ( type & PGT_type_mask )
     {
     case PGT_l1_page_table:
@@ -1998,6 +2032,15 @@ int free_page_type(struct page_info *page, unsigned long type,
         BUG();
     }
 
+    return rc;
+}
+
+
+static int __put_final_page_type(
+    struct page_info *page, unsigned long type, int preemptible)
+{
+    int rc = free_page_type(page, type, preemptible);
+
     /* No need for atomic update of type_info here: noone else updates it. */
     if ( rc == 0 )
     {
@@ -2016,8 +2059,8 @@ int free_page_type(struct page_info *page, unsigned long type,
     }
     else if ( rc == -EINTR )
     {
-        ASSERT(!(page->u.inuse.type_info &
-                 (PGT_count_mask|PGT_validated|PGT_partial)));
+        ASSERT((page->u.inuse.type_info &
+                (PGT_count_mask|PGT_validated|PGT_partial)) == 1);
         if ( !(shadow_mode_enabled(page_get_owner(page)) &&
                (page->count_info & PGC_page_table)) )
             page->tlbflush_timestamp = tlbflush_current_time();
@@ -2028,6 +2071,7 @@ int free_page_type(struct page_info *page, unsigned long type,
     {
         BUG_ON(rc != -EAGAIN);
         wmb();
+        get_page_light(page);
         page->u.inuse.type_info |= PGT_partial;
     }
 
@@ -2039,6 +2083,7 @@ static int __put_page_type(struct page_info *page,
                            int preemptible)
 {
     unsigned long nx, x, y = page->u.inuse.type_info;
+    int rc = 0;
 
     for ( ; ; )
     {
@@ -2062,7 +2107,10 @@ static int __put_page_type(struct page_info *page,
                                            x, nx)) != x) )
                     continue;
                 /* We cleared the 'valid bit' so we do the clean up. */
-                return free_page_type(page, x, preemptible);
+                rc = __put_final_page_type(page, x, preemptible);
+                if ( x & PGT_partial )
+                    put_page(page);
+                break;
             }
 
             /*
@@ -2084,7 +2132,7 @@ static int __put_page_type(struct page_info *page,
             return -EINTR;
     }
 
-    return 0;
+    return rc;
 }
 
 
@@ -2092,6 +2140,7 @@ static int __get_page_type(struct page_info *page, unsigned long type,
                            int preemptible)
 {
     unsigned long nx, x, y = page->u.inuse.type_info;
+    int rc = 0;
 
     ASSERT(!(type & ~(PGT_type_mask | PGT_pae_xen_l2)));
 
@@ -2214,10 +2263,13 @@ static int __get_page_type(struct page_info *page, unsigned long type,
             page->nr_validated_ptes = 0;
             page->partial_pte = 0;
         }
-        return alloc_page_type(page, type, preemptible);
+        rc = alloc_page_type(page, type, preemptible);
     }
 
-    return 0;
+    if ( (x & PGT_partial) && !(nx & PGT_partial) )
+        put_page(page);
+
+    return rc;
 }
 
 void put_page_type(struct page_info *page)
@@ -2296,7 +2348,7 @@ int new_guest_cr3(unsigned long mfn)
 #endif
     okay = paging_mode_refcounts(d)
         ? get_page_from_pagenr(mfn, d)
-        : !get_page_and_type_from_pagenr(mfn, PGT_root_page_table, d, 0);
+        : !get_page_and_type_from_pagenr(mfn, PGT_root_page_table, d, 0, 0);
     if ( unlikely(!okay) )
     {
         MEM_LOG("Error while installing new baseptr %lx", mfn);
@@ -2431,6 +2483,29 @@ static inline cpumask_t vcpumask_to_pcpumask(
     return pmask;
 }
 
+#ifdef __i386__
+static inline void *fixmap_domain_page(unsigned long mfn)
+{
+    unsigned int cpu = smp_processor_id();
+    void *ptr = (void *)fix_to_virt(FIX_PAE_HIGHMEM_0 + cpu);
+
+    l1e_write(fix_pae_highmem_pl1e - cpu,
+              l1e_from_pfn(mfn, __PAGE_HYPERVISOR));
+    flush_tlb_one_local(ptr);
+    return ptr;
+}
+static inline void fixunmap_domain_page(const void *ptr)
+{
+    unsigned int cpu = virt_to_fix((unsigned long)ptr) - FIX_PAE_HIGHMEM_0;
+
+    l1e_write(fix_pae_highmem_pl1e - cpu, l1e_empty());
+    this_cpu(make_cr3_timestamp) = this_cpu(tlbflush_time);
+}
+#else
+#define fixmap_domain_page(mfn) mfn_to_virt(mfn)
+#define fixunmap_domain_page(ptr) ((void)(ptr))
+#endif
+
 int do_mmuext_op(
     XEN_GUEST_HANDLE(mmuext_op_t) uops,
     unsigned int count,
@@ -2517,7 +2592,7 @@ int do_mmuext_op(
             if ( paging_mode_refcounts(FOREIGNDOM) )
                 break;
 
-            rc = get_page_and_type_from_pagenr(mfn, type, FOREIGNDOM, 1);
+            rc = get_page_and_type_from_pagenr(mfn, type, FOREIGNDOM, 0, 1);
             okay = !rc;
             if ( unlikely(!okay) )
             {
@@ -2598,7 +2673,7 @@ int do_mmuext_op(
                     okay = get_page_from_pagenr(mfn, d);
                 else
                     okay = !get_page_and_type_from_pagenr(
-                        mfn, PGT_root_page_table, d, 0);
+                        mfn, PGT_root_page_table, d, 0, 0);
                 if ( unlikely(!okay) )
                 {
                     MEM_LOG("Error while installing new mfn %lx", mfn);
@@ -2697,6 +2772,66 @@ int do_mmuext_op(
                 if ( ents != 0 )
                     this_cpu(percpu_mm_info).deferred_ops |= DOP_RELOAD_LDT;
             }
+            break;
+        }
+
+        case MMUEXT_CLEAR_PAGE:
+        {
+            unsigned char *ptr;
+
+            okay = !get_page_and_type_from_pagenr(mfn, PGT_writable_page,
+                                                  FOREIGNDOM, 0, 0);
+            if ( unlikely(!okay) )
+            {
+                MEM_LOG("Error while clearing mfn %lx", mfn);
+                break;
+            }
+
+            /* A page is dirtied when it's being cleared. */
+            paging_mark_dirty(d, mfn);
+
+            ptr = fixmap_domain_page(mfn);
+            clear_page(ptr);
+            fixunmap_domain_page(ptr);
+
+            put_page_and_type(page);
+            break;
+        }
+
+        case MMUEXT_COPY_PAGE:
+        {
+            const unsigned char *src;
+            unsigned char *dst;
+            unsigned long src_mfn;
+
+            src_mfn = gmfn_to_mfn(FOREIGNDOM, op.arg2.src_mfn);
+            okay = get_page_from_pagenr(src_mfn, FOREIGNDOM);
+            if ( unlikely(!okay) )
+            {
+                MEM_LOG("Error while copying from mfn %lx", src_mfn);
+                break;
+            }
+
+            okay = !get_page_and_type_from_pagenr(mfn, PGT_writable_page,
+                                                  FOREIGNDOM, 0, 0);
+            if ( unlikely(!okay) )
+            {
+                put_page(mfn_to_page(src_mfn));
+                MEM_LOG("Error while copying to mfn %lx", mfn);
+                break;
+            }
+
+            /* A page is dirtied when it's being copied to. */
+            paging_mark_dirty(d, mfn);
+
+            src = map_domain_page(src_mfn);
+            dst = fixmap_domain_page(mfn);
+            copy_page(dst, src);
+            fixunmap_domain_page(dst);
+            unmap_domain_page(src);
+
+            put_page_and_type(page);
+            put_page(mfn_to_page(src_mfn));
             break;
         }
 

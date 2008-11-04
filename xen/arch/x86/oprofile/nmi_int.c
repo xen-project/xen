@@ -36,6 +36,55 @@ static unsigned long saved_lvtpc[NR_CPUS];
 static char *cpu_type;
 
 extern int is_active(struct domain *d);
+extern int is_passive(struct domain *d);
+
+int passive_domain_do_rdmsr(struct cpu_user_regs *regs)
+{
+	u64 msr_content;
+	int type, index;
+	struct vpmu_struct *vpmu = vcpu_vpmu(current);
+
+	if ( model->is_arch_pmu_msr == NULL )
+		return 0;
+	if ( !model->is_arch_pmu_msr((u64)regs->ecx, &type, &index) )
+		return 0;
+	if ( !(vpmu->flags & PASSIVE_DOMAIN_ALLOCATED) )
+		if ( ! model->allocated_msr(current) )
+			return 0;
+
+	model->load_msr(current, type, index, &msr_content);
+	regs->eax = msr_content & 0xFFFFFFFF;
+	regs->edx = msr_content >> 32;
+	return 1;
+}
+
+
+int passive_domain_do_wrmsr(struct cpu_user_regs *regs)
+{
+	u64 msr_content;
+	int type, index;
+	struct vpmu_struct *vpmu = vcpu_vpmu(current);
+
+	if ( model->is_arch_pmu_msr == NULL )
+		return 0;
+	if ( !model->is_arch_pmu_msr((u64)regs->ecx, &type, &index) )
+		return 0;
+
+	if ( !(vpmu->flags & PASSIVE_DOMAIN_ALLOCATED) )
+		if ( ! model->allocated_msr(current) )
+			return 0;
+
+	msr_content = (u32)regs->eax | ((u64)regs->edx << 32);
+	model->save_msr(current, type, index, msr_content);
+	return 1;
+}
+
+void passive_domain_destroy(struct vcpu *v)
+{
+	struct vpmu_struct *vpmu = vcpu_vpmu(v);
+	if ( vpmu->flags & PASSIVE_DOMAIN_ALLOCATED )
+		model->free_msr(v);
+}
 
 static int nmi_callback(struct cpu_user_regs *regs, int cpu)
 {
@@ -46,6 +95,8 @@ static int nmi_callback(struct cpu_user_regs *regs, int cpu)
 	if ( ovf && is_active(current->domain) && !xen_mode )
 		send_guest_vcpu_virq(current, VIRQ_XENOPROF);
 
+	if ( ovf == 2 ) 
+                test_and_set_bool(current->nmi_pending);
 	return 1;
 }
  

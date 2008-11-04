@@ -49,6 +49,7 @@
 #include <asm/hvm/vpt.h>
 #include <public/hvm/save.h>
 #include <asm/hvm/trace.h>
+#include <asm/xenoprof.h>
 
 enum handler_return { HNDL_done, HNDL_unhandled, HNDL_exception_raised };
 
@@ -132,6 +133,7 @@ static void vmx_vcpu_destroy(struct vcpu *v)
 {
     vmx_destroy_vmcs(v);
     vpmu_destroy(v);
+    passive_domain_destroy(v);
 }
 
 #ifdef __x86_64__
@@ -1666,6 +1668,8 @@ static int vmx_msr_read_intercept(struct cpu_user_regs *regs)
     default:
         if ( vpmu_do_rdmsr(regs) )
             goto done;
+        if ( passive_domain_do_rdmsr(regs) )
+            goto done;
         switch ( long_mode_do_msr_read(regs) )
         {
             case HNDL_unhandled:
@@ -1861,6 +1865,8 @@ static int vmx_msr_write_intercept(struct cpu_user_regs *regs)
     default:
         if ( vpmu_do_wrmsr(regs) )
             return X86EMUL_OKAY;
+        if ( passive_domain_do_wrmsr(regs) )
+            return X86EMUL_OKAY;
 
         if ( wrmsr_viridian_regs(ecx, regs->eax, regs->edx) ) 
             break;
@@ -1964,27 +1970,25 @@ static void ept_handle_violation(unsigned long qualification, paddr_t gpa)
 {
     unsigned long gla_validity = qualification & EPT_GLA_VALIDITY_MASK;
     struct domain *d = current->domain;
-    unsigned long gfn = gpa >> PAGE_SHIFT;
+    unsigned long gla, gfn = gpa >> PAGE_SHIFT;
     mfn_t mfn;
     p2m_type_t t;
 
-    if ( unlikely(qualification & EPT_GAW_VIOLATION) )
-    {
-        gdprintk(XENLOG_ERR, "EPT violation: guest physical address %"PRIpaddr
-                 " exceeded its width limit.\n", gpa);
-        goto crash;
-    }
-
-    if ( unlikely(gla_validity == EPT_GLA_VALIDITY_RSVD) ||
-         unlikely(gla_validity == EPT_GLA_VALIDITY_PDPTR_LOAD) )
-    {
-        gdprintk(XENLOG_ERR, "EPT violation: reserved bit or "
-                 "pdptr load violation.\n");
-        goto crash;
-    }
-
     mfn = gfn_to_mfn(d, gfn, &t);
-    if ( (t != p2m_ram_ro) && p2m_is_ram(t) && paging_mode_log_dirty(d) )
+
+    /* There are two legitimate reasons for taking an EPT violation. 
+     * One is a guest access to MMIO space. */
+    if ( gla_validity == EPT_GLA_VALIDITY_MATCH && p2m_is_mmio(t) )
+    {
+        handle_mmio();
+        return;
+    }
+
+    /* The other is log-dirty mode, writing to a read-only page */
+    if ( paging_mode_log_dirty(d)
+         && (gla_validity == EPT_GLA_VALIDITY_MATCH
+             || gla_validity == EPT_GLA_VALIDITY_GPT_WALK)
+         && p2m_is_ram(t) && (t != p2m_ram_ro) )
     {
         paging_mark_dirty(d, mfn_x(mfn));
         p2m_change_type(d, gfn, p2m_ram_logdirty, p2m_ram_rw);
@@ -1992,16 +1996,39 @@ static void ept_handle_violation(unsigned long qualification, paddr_t gpa)
         return;
     }
 
-    /* This can only happen in log-dirty mode, writing back A/D bits. */
-    if ( unlikely(gla_validity == EPT_GLA_VALIDITY_GPT_WALK) )
-        goto crash;
+    /* Everything else is an error. */
+    gla = __vmread(GUEST_LINEAR_ADDRESS);
+    gdprintk(XENLOG_ERR, "EPT violation %#lx (%c%c%c/%c%c%c), "
+             "gpa %#"PRIpaddr", mfn %#lx, type %i.\n", 
+             qualification, 
+             (qualification & EPT_READ_VIOLATION) ? 'r' : '-',
+             (qualification & EPT_WRITE_VIOLATION) ? 'w' : '-',
+             (qualification & EPT_EXEC_VIOLATION) ? 'x' : '-',
+             (qualification & EPT_EFFECTIVE_READ) ? 'r' : '-',
+             (qualification & EPT_EFFECTIVE_WRITE) ? 'w' : '-',
+             (qualification & EPT_EFFECTIVE_EXEC) ? 'x' : '-',
+             gpa, mfn_x(mfn), t);
 
-    ASSERT(gla_validity == EPT_GLA_VALIDITY_MATCH);
-    handle_mmio();
+    if ( qualification & EPT_GAW_VIOLATION )
+        gdprintk(XENLOG_ERR, " --- GPA too wide (max %u bits)\n", 
+                 9 * (unsigned) d->arch.hvm_domain.vmx.ept_control.gaw + 21);
 
-    return;
+    switch ( gla_validity )
+    {
+    case EPT_GLA_VALIDITY_PDPTR_LOAD:
+        gdprintk(XENLOG_ERR, " --- PDPTR load failed\n"); 
+        break;
+    case EPT_GLA_VALIDITY_GPT_WALK:
+        gdprintk(XENLOG_ERR, " --- guest PT walk to %#lx failed\n", gla);
+        break;
+    case EPT_GLA_VALIDITY_RSVD:
+        gdprintk(XENLOG_ERR, " --- GLA_validity 2 (reserved)\n");
+        break;
+    case EPT_GLA_VALIDITY_MATCH:
+        gdprintk(XENLOG_ERR, " --- guest access to %#lx failed\n", gla);
+        break;
+    }
 
- crash:
     domain_crash(d);
 }
 

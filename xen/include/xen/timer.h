@@ -15,12 +15,13 @@
 struct timer {
     /* System time expiry value (nanoseconds since boot). */
     s_time_t expires;
+    s_time_t expires_end;
 
     /* Position in active-timer data structure. */
     union {
         /* Timer-heap offset. */
         unsigned int heap_offset;
-        /* Overflow linked list. */
+        /* Linked list. */
         struct timer *list_next;
     };
 

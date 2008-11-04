@@ -56,34 +56,13 @@ compat_set_px_pminfo(uint32_t cpu, struct compat_processor_performance *perf)
 	return -EFAULT;
 
 #define XLAT_processor_performance_HNDL_states(_d_, _s_) do { \
-    xen_processor_px_t *xen_states = NULL; \
-\
-    if ( likely((_s_)->state_count > 0) ) \
-    { \
-        XEN_GUEST_HANDLE(compat_processor_px_t) states; \
-        compat_processor_px_t state; \
-        int i; \
-\
-        xen_states = xlat_malloc_array(xlat_page_current, \
-                               xen_processor_px_t, (_s_)->state_count); \
-        if ( unlikely(xen_states == NULL) ) \
-            return -EFAULT; \
-\
-        if ( unlikely(!compat_handle_okay((_s_)->states, \
-                                (_s_)->state_count)) ) \
-            return -EFAULT; \
-        guest_from_compat_handle(states, (_s_)->states); \
-\
-        for ( i = 0; i < _s_->state_count; i++ ) \
-        { \
-           if ( unlikely(copy_from_guest_offset(&state, states, i, 1)) ) \
-               return -EFAULT; \
-           XLAT_processor_px(&xen_states[i], &state); \
-        } \
-    } \
-\
-    set_xen_guest_handle((_d_)->states, xen_states); \
+    XEN_GUEST_HANDLE(compat_processor_px_t) states; \
+    if ( unlikely(!compat_handle_okay((_s_)->states, (_s_)->state_count)) ) \
+        return -EFAULT; \
+    guest_from_compat_handle(states, (_s_)->states); \
+    (_d_)->states = guest_handle_cast(states, xen_processor_px_t); \
 } while (0)
+
     XLAT_processor_performance(xen_perf, perf);
 #undef XLAT_processor_performance_HNDL_states
 

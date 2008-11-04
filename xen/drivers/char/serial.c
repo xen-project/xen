@@ -74,7 +74,7 @@ void serial_tx_interrupt(struct serial_port *port, struct cpu_user_regs *regs)
     while ( !spin_trylock(&port->tx_lock) )
     {
         if ( !port->driver->tx_empty(port) )
-            return;
+            goto out;
         cpu_relax();
     }
 
@@ -89,7 +89,10 @@ void serial_tx_interrupt(struct serial_port *port, struct cpu_user_regs *regs)
         }
     }
 
-    spin_unlock_irqrestore(&port->tx_lock, flags);
+    spin_unlock(&port->tx_lock);
+
+ out:
+    local_irq_restore(flags);
 }
 
 static void __serial_putc(struct serial_port *port, char c)

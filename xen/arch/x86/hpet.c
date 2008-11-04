@@ -14,8 +14,6 @@
 #include <asm/div64.h>
 #include <asm/hpet.h>
 
-#define STIME_MAX ((s_time_t)((uint64_t)~0ull>>1))
-
 #define MAX_DELTA_NS MILLISECS(10*1000)
 #define MIN_DELTA_NS MICROSECS(20)
 
@@ -146,7 +144,7 @@ static void handle_hpet_broadcast(struct hpet_event_channel *ch)
     s_time_t now, next_event;
     int cpu;
 
-    spin_lock(&ch->lock);
+    spin_lock_irq(&ch->lock);
 
 again:
     ch->next_event = STIME_MAX;
@@ -171,7 +169,7 @@ again:
         if ( reprogram_hpet_evt_channel(ch, next_event, now, 0) )
             goto again;
     }
-    spin_unlock(&ch->lock);
+    spin_unlock_irq(&ch->lock);
 }
 
 void hpet_broadcast_init(void)
@@ -213,6 +211,7 @@ void hpet_broadcast_enter(void)
 {
     struct hpet_event_channel *ch = &hpet_event;
 
+    ASSERT(!local_irq_is_enabled());
     spin_lock(&ch->lock);
 
     disable_APIC_timer();

@@ -59,8 +59,8 @@ static void rtc_timer_update(RTCState *s)
 
         period = 1 << (period_code - 1); /* period in 32 Khz cycles */
         period = DIV_ROUND((period * 1000000000ULL), 32768); /* period in ns */
-        create_periodic_time(v, &s->pt, period, RTC_IRQ,
-                             0, rtc_periodic_cb, s);
+        create_periodic_time(v, &s->pt, period, period, RTC_IRQ,
+                             rtc_periodic_cb, s);
     }
     else
     {

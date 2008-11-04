@@ -61,12 +61,36 @@ struct page_info
         /*
          * When PGT_partial is true then this field is valid and indicates
          * that PTEs in the range [0, @nr_validated_ptes) have been validated.
-         * If @partial_pte is true then PTE at @nr_validated_ptes+1 has been
-         * partially validated.
+         * An extra page reference must be acquired (or not dropped) whenever
+         * PGT_partial gets set, and it must be dropped when the flag gets
+         * cleared. This is so that a get() leaving a page in partially
+         * validated state (where the caller would drop the reference acquired
+         * due to the getting of the type [apparently] failing [-EAGAIN])
+         * would not accidentally result in a page left with zero general
+         * reference count, but non-zero type reference count (possible when
+         * the partial get() is followed immediately by domain destruction).
+         * Likewise, the ownership of the single type reference for partially
+         * (in-)validated pages is tied to this flag, i.e. the instance
+         * setting the flag must not drop that reference, whereas the instance
+         * clearing it will have to.
+         *
+         * If @partial_pte is positive then PTE at @nr_validated_ptes+1 has
+         * been partially validated. This implies that the general reference
+         * to the page (acquired from get_page_from_lNe()) would be dropped
+         * (again due to the apparent failure) and hence must be re-acquired
+         * when resuming the validation, but must not be dropped when picking
+         * up the page for invalidation.
+         *
+         * If @partial_pte is negative then PTE at @nr_validated_ptes+1 has
+         * been partially invalidated. This is basically the opposite case of
+         * above, i.e. the general reference to the page was not dropped in
+         * put_page_from_lNe() (due to the apparent failure), and hence it
+         * must be dropped when the put operation is resumed (and completes),
+         * but it must not be acquired if picking up the page for validation.
          */
         struct {
             u16 nr_validated_ptes;
-            bool_t partial_pte;
+            s8 partial_pte;
         };
 
         /*

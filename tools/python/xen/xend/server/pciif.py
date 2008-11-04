@@ -25,7 +25,8 @@ from xen.xend import arch
 from xen.xend.XendError import VmError
 from xen.xend.XendLogging import log
 
-from xen.xend.server.DevController import DevController, xenbusState
+from xen.xend.server.DevController import DevController
+from xen.xend.server.DevConstants import xenbusState
 
 import xen.lowlevel.xc
 

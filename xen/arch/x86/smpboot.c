@@ -101,7 +101,7 @@ static cpumask_t smp_commenced_mask;
 static int __devinitdata tsc_sync_disabled;
 
 /* Per CPU bogomips and other parameters */
-struct cpuinfo_x86 cpu_data[NR_CPUS] __cacheline_aligned;
+struct cpuinfo_x86 cpu_data[NR_CPUS];
 EXPORT_SYMBOL(cpu_data);
 
 u32 x86_cpu_to_apicid[NR_CPUS] __read_mostly =
@@ -112,7 +112,7 @@ static void map_cpu_to_logical_apicid(void);
 /* State of each CPU. */
 DEFINE_PER_CPU(int, cpu_state) = { 0 };
 
-static void *stack_base[NR_CPUS] __cacheline_aligned;
+static void *stack_base[NR_CPUS];
 static DEFINE_SPINLOCK(cpu_add_remove_lock);
 
 /*
@@ -805,14 +805,6 @@ static inline int alloc_cpu_id(void)
 	return cpu;
 }
 
-static struct vcpu *prepare_idle_vcpu(unsigned int cpu)
-{
-	if (idle_vcpu[cpu])
-		return idle_vcpu[cpu];
-
-	return alloc_idle_vcpu(cpu);
-}
-
 static void *prepare_idle_stack(unsigned int cpu)
 {
 	if (!stack_base[cpu])
@@ -849,7 +841,7 @@ static int __devinit do_boot_cpu(int apicid, int cpu)
 
 	booting_cpu = cpu;
 
-	v = prepare_idle_vcpu(cpu);
+	v = alloc_idle_vcpu(cpu);
 	BUG_ON(v == NULL);
 
 	/* start_eip had better be page-aligned! */

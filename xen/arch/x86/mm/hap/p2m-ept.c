@@ -157,9 +157,6 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
     {
         if ( mfn_valid(mfn_x(mfn)) || (p2mt == p2m_mmio_direct) )
         {
-            /* Track the highest gfn for which we have ever had a valid mapping */
-            if ( gfn > d->arch.p2m->max_mapped_pfn )
-                d->arch.p2m->max_mapped_pfn = gfn;
             ept_entry->emt = epte_get_entry_emt(d, gfn, mfn_x(mfn));
             ept_entry->sp_avail = walk_level ? 1 : 0;
 
@@ -233,6 +230,11 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
 
         unmap_domain_page(split_table);
     }
+
+    /* Track the highest gfn for which we have ever had a valid mapping */
+    if ( mfn_valid(mfn_x(mfn))
+         && (gfn + (1UL << order) - 1 > d->arch.p2m->max_mapped_pfn) )
+        d->arch.p2m->max_mapped_pfn = gfn + (1UL << order) - 1;
 
     /* Success */
     rv = 1;

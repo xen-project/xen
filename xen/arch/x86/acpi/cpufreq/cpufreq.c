@@ -370,7 +370,7 @@ static int acpi_cpufreq_target(struct cpufreq_policy *policy,
     if (!check_freqs(cmd.mask, freqs.new, data))
         return -EAGAIN;
 
-    for_each_cpu_mask(j, cmd.mask)
+    for_each_cpu_mask(j, online_policy_cpus)
         cpufreq_statistic_update(j, perf->state, next_perf_state);
 
     perf->state = next_perf_state;
@@ -446,18 +446,6 @@ acpi_cpufreq_cpu_init(struct cpufreq_policy *policy)
 
     perf = data->acpi_data;
     policy->shared_type = perf->shared_type;
-
-    /* capability check */
-    if (perf->state_count <= 1) {
-        printk("No P-States\n");
-        result = -ENODEV;
-        goto err_unreg;
-    }
-
-    if (perf->control_register.space_id != perf->status_register.space_id) {
-        result = -ENODEV;
-        goto err_unreg;
-    }
 
     switch (perf->control_register.space_id) {
     case ACPI_ADR_SPACE_SYSTEM_IO:

@@ -793,6 +793,10 @@ int map_domain_pirq(
 
     ASSERT(spin_is_locked(&d->event_lock));
 
+    /* XXX Until pcidev and msi locking is fixed. */
+    if ( type == MAP_PIRQ_TYPE_MSI )
+        return -EINVAL;
+
     if ( !IS_PRIV(current->domain) )
         return -EPERM;
 
@@ -840,7 +844,7 @@ int map_domain_pirq(
     d->arch.pirq_vector[pirq] = vector;
     d->arch.vector_pirq[vector] = pirq;
 
-done:
+ done:
     spin_unlock_irqrestore(&desc->lock, flags);
     return ret;
 }

@@ -52,6 +52,7 @@ struct tm gmtime(unsigned long t);
 #define SECONDS(_s)     ((s_time_t)((_s)  * 1000000000ULL))
 #define MILLISECS(_ms)  ((s_time_t)((_ms) * 1000000ULL))
 #define MICROSECS(_us)  ((s_time_t)((_us) * 1000ULL))
+#define STIME_MAX ((s_time_t)((uint64_t)~0ull>>1))
 
 extern void update_vcpu_system_time(struct vcpu *v);
 extern void update_domain_wallclock_time(struct domain *d);

@@ -57,6 +57,8 @@
 #endif
 
 ENTRY(svm_asm_do_resume)
+        call svm_intr_assist
+
         get_current(bx)
         CLGI
 
@@ -67,7 +69,6 @@ ENTRY(svm_asm_do_resume)
         jnz  .Lsvm_process_softirqs
 
         call svm_asid_handle_vmrun
-        call svm_intr_assist
 
         cmpb $0,addr_of(tb_init_done)
         jnz  .Lsvm_trace

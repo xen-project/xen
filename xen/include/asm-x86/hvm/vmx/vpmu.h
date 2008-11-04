@@ -67,7 +67,7 @@ struct vpmu_struct {
 #define VPMU_CONTEXT_ALLOCATED              0x1
 #define VPMU_CONTEXT_LOADED                 0x2
 #define VPMU_RUNNING                        0x4
-
+#define PASSIVE_DOMAIN_ALLOCATED	    0x8
 int vpmu_do_wrmsr(struct cpu_user_regs *regs);
 int vpmu_do_rdmsr(struct cpu_user_regs *regs);
 int vpmu_do_interrupt(struct cpu_user_regs *regs);

@@ -969,6 +969,7 @@ void __init __start_xen(unsigned long mbi_p)
     serial_init_postirq();
 
     BUG_ON(!local_irq_is_enabled());
+    spin_debug_enable();
 
     for_each_present_cpu ( i )
     {

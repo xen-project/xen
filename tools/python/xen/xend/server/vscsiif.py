@@ -28,7 +28,8 @@ from xen.xend import sxp
 from xen.xend.XendError import VmError
 from xen.xend.XendLogging import log
 
-from xen.xend.server.DevController import DevController, xenbusState
+from xen.xend.server.DevController import DevController
+from xen.xend.server.DevConstants import xenbusState
 from xen.xend.xenstore.xstransact import xstransact
 
 class VSCSIController(DevController):
@@ -92,8 +93,8 @@ class VSCSIController(DevController):
             back[devpath + '/p-devname'] = pdevname
             vdev = vscsi_config.get('v-dev', '')
             back[devpath + '/v-dev'] = vdev
-            state = vscsi_config.get('state', '')
-            back[devpath + '/state'] = str(xenbusState[state])
+            state = vscsi_config.get('state', xenbusState['Unknown'])
+            back[devpath + '/state'] = str(state)
             devid = vscsi_config.get('devid', '')
             back[devpath + '/devid'] = str(devid)
 
@@ -168,17 +169,17 @@ class VSCSIController(DevController):
         (devid, back, front) = self.getDeviceDetails(config)
         devid = int(devid)
         vscsi_config = config['devs'][0]
-        state = vscsi_config.get('state', '')
+        state = vscsi_config.get('state', xenbusState['Unknown'])
         driver_state = self.readBackend(devid, 'state')
         if str(xenbusState['Connected']) != driver_state:
             raise VmError("Driver status is not connected")
 
         uuid = self.readBackend(devid, 'uuid')
-        if state == 'Initialising':
+        if state == xenbusState['Initialising']:
             back['uuid'] = uuid
             self.writeBackend(devid, back)
 
-        elif state == 'Closing':
+        elif state == xenbusState['Closing']:
             found = False
             devs = self.readBackendList(devid, "vscsi-devs")
             vscsipath = "vscsi-devs/"
@@ -198,7 +199,7 @@ class VSCSIController(DevController):
 
         else:
             raise XendError("Error configuring device invalid "
-                            "state '%s'" % state)
+                            "state '%s'" % xenbusState[state])
 
         self.writeBackend(devid, 'state', str(xenbusState['Reconfiguring']))
         return self.readBackend(devid, 'uuid')

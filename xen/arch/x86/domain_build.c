@@ -194,6 +194,30 @@ static void __init process_dom0_ioports_disable(void)
     }
 }
 
+/* We run on dom0's page tables for the final part of the build process. */
+static void dom0_pt_enter(struct vcpu *v)
+{
+    struct desc_ptr gdt_desc = {
+        .limit = LAST_RESERVED_GDT_BYTE,
+        .base = (unsigned long)(this_cpu(gdt_table) - FIRST_RESERVED_GDT_ENTRY)
+    };
+
+    asm volatile ( "lgdt %0" : : "m" (gdt_desc) );
+    write_ptbase(v);
+}
+
+/* Return to idle domain's page tables. */
+static void dom0_pt_exit(void)
+{
+    struct desc_ptr gdt_desc = {
+        .limit = LAST_RESERVED_GDT_BYTE,
+        .base = GDT_VIRT_START(current)
+    };
+
+    write_ptbase(current);
+    asm volatile ( "lgdt %0" : : "m" (gdt_desc) );
+}
+
 int __init construct_dom0(
     struct domain *d,
     unsigned long _image_start, unsigned long image_len, 
@@ -700,14 +724,12 @@ int __init construct_dom0(
         (void)alloc_vcpu(d, i, i % num_online_cpus());
 
     /* Set up CR3 value for write_ptbase */
-    if ( paging_mode_enabled(v->domain) )
+    if ( paging_mode_enabled(d) )
         paging_update_paging_modes(v);
     else
         update_cr3(v);
 
-    /* Install the new page tables. */
-    local_irq_disable();
-    write_ptbase(v);
+    dom0_pt_enter(v);
 
     /* Copy the OS image and free temporary buffer. */
     elf.dest = (void*)vkern_start;
@@ -804,9 +826,7 @@ int __init construct_dom0(
         xlat_start_info(si, XLAT_start_info_console_dom0);
 #endif
 
-    /* Reinstate the caller's page tables. */
-    write_ptbase(current);
-    local_irq_enable();
+    dom0_pt_exit();
 
 #if defined(__i386__)
     /* Destroy low mappings - they were only for our convenience. */

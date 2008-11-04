@@ -14,10 +14,38 @@
 #include <xen/lib.h>
 #include <xen/sched.h>
 #include <xen/paging.h>
+#include <xen/trace.h>
 #include <asm/event.h>
 #include <asm/hvm/emulate.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
+
+#define HVMTRACE_IO_ASSIST_WRITE 0x200
+static void hvmtrace_io_assist(int is_mmio, ioreq_t *p)
+{
+    unsigned int size, event;
+    unsigned char buffer[12];
+
+    if ( likely(!tb_init_done) )
+        return;
+
+    event = is_mmio ? TRC_HVM_MMIO_ASSIST : TRC_HVM_IO_ASSIST;
+    if ( !p->dir )
+        event |= HVMTRACE_IO_ASSIST_WRITE;
+
+    *(uint64_t *)buffer = p->addr;
+    size = (p->addr != (u32)p->addr) ? 8 : 4;
+    if ( size == 8 )
+        event |= TRC_64_FLAG;
+
+    if ( !p->data_is_ptr )
+    {
+        *(uint32_t *)&buffer[size] = p->data;
+        size += 4;
+    }
+
+    trace_var(event, 0/*!cycles*/, size, buffer);
+}
 
 static int hvmemul_do_io(
     int is_mmio, paddr_t addr, unsigned long *reps, int size,
@@ -110,6 +138,8 @@ static int hvmemul_do_io(
     p->df = df;
     p->data = value;
     p->io_count++;
+
+    hvmtrace_io_assist(is_mmio, p);
 
     if ( is_mmio )
     {

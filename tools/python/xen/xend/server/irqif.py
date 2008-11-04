@@ -39,6 +39,18 @@ class IRQController(DevController):
     def __init__(self, vm):
         DevController.__init__(self, vm)
 
+    valid_cfg = ['irq', 'uuid']
+
+    def getDeviceConfiguration(self, devid, transaction = None):
+        result = DevController.getDeviceConfiguration(self, devid, transaction)
+        if transaction is None:
+            devinfo = self.readBackend(devid, *self.valid_cfg)
+        else:
+            devinfo = self.readBackendTxn(transaction, devid, *self.valid_cfg)
+        config = dict(zip(self.valid_cfg, devinfo))
+        config = dict([(key, val) for key, val in config.items()
+                       if val != None])
+        return config
 
     def getDeviceDetails(self, config):
         """@see DevController.getDeviceDetails"""
@@ -75,4 +87,9 @@ class IRQController(DevController):
         if rc < 0:
             raise VmError(
                 'irq: Failed to map irq %x' % (pirq))
-        return (None, {}, {})
+        back = dict([(k, config[k]) for k in self.valid_cfg if k in config])
+        return (self.allocateDeviceID(), back, {})
+
+    def waitForDevice(self, devid):
+        # don't wait for hotplug
+        return

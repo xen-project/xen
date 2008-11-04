@@ -231,6 +231,8 @@ int compat_mmuext_op(XEN_GUEST_HANDLE(mmuext_op_compat_t) cmp_uops,
             case MMUEXT_PIN_L4_TABLE:
             case MMUEXT_UNPIN_TABLE:
             case MMUEXT_NEW_BASEPTR:
+            case MMUEXT_CLEAR_PAGE:
+            case MMUEXT_COPY_PAGE:
                 arg1 = XLAT_mmuext_op_arg1_mfn;
                 break;
             default:
@@ -257,6 +259,9 @@ int compat_mmuext_op(XEN_GUEST_HANDLE(mmuext_op_compat_t) cmp_uops,
             case MMUEXT_TLB_FLUSH_MULTI:
             case MMUEXT_INVLPG_MULTI:
                 arg2 = XLAT_mmuext_op_arg2_vcpumask;
+                break;
+            case MMUEXT_COPY_PAGE:
+                arg2 = XLAT_mmuext_op_arg2_src_mfn;
                 break;
             default:
                 arg2 = -1;

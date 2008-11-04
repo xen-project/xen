@@ -221,7 +221,8 @@ DO(xen_version)(int cmd, XEN_GUEST_HANDLE(void) arg)
                 fi.submap |= 1U << XENFEAT_supervisor_mode_kernel;
 #ifdef CONFIG_X86
             if ( !is_hvm_vcpu(current) )
-                fi.submap |= 1U << XENFEAT_mmu_pt_update_preserve_ad;
+                fi.submap |= (1U << XENFEAT_mmu_pt_update_preserve_ad) |
+                             (1U << XENFEAT_highmem_assist);
 #endif
             break;
         default:
