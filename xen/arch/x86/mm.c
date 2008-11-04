@@ -3332,6 +3332,10 @@ int create_grant_host_mapping(uint64_t addr, unsigned long frame,
     if ( !(flags & GNTMAP_readonly) )
         l1e_add_flags(pte,_PAGE_RW);
 
+    l1e_add_flags(pte,
+                  ((flags >> _GNTMAP_guest_avail0) * _PAGE_AVAIL0)
+                   & _PAGE_AVAIL);
+
     l1e_add_flags(pte, cacheattr_to_pte_flags(cache_flags >> 5));
 
     if ( flags & GNTMAP_contains_pte )
