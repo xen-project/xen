@@ -101,6 +101,20 @@ static DEFINE_PER_CPU(u64, ipi_operation) ____cacheline_aligned;
 
 extern void cpu_halt (void);
 
+#ifdef XEN
+/* work around for spinlock irq check. */
+void
+lock_ipi_calllock(unsigned long *flags)
+{
+	spin_lock_irqsave(&call_lock, *flags);
+}
+
+void
+unlock_ipi_calllock(unsigned long flags)
+{
+	spin_unlock_irqrestore(&call_lock, flags);
+}
+#else
 void
 lock_ipi_calllock(void)
 {
@@ -112,6 +126,7 @@ unlock_ipi_calllock(void)
 {
 	spin_unlock_irq(&call_lock);
 }
+#endif
 
 static void
 stop_this_cpu (void)

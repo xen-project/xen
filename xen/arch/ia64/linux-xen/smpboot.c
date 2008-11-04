@@ -364,6 +364,10 @@ smp_setup_percpu_timer (void)
 static void __devinit
 smp_callin (void)
 {
+#ifdef XEN
+	/* work around for spinlock irq assert. */
+	unsigned long flags;
+#endif
 	int cpuid, phys_id;
 	extern void ia64_init_itm(void);
 
@@ -382,9 +386,17 @@ smp_callin (void)
 
 	fix_b0_for_bsp();
 
+#ifdef XEN
+	lock_ipi_calllock(&flags);
+#else
 	lock_ipi_calllock();
+#endif
 	cpu_set(cpuid, cpu_online_map);
+#ifdef XEN
+	unlock_ipi_calllock(flags);
+#else
 	unlock_ipi_calllock();
+#endif
 	per_cpu(cpu_state, cpuid) = CPU_ONLINE;
 
 	smp_setup_percpu_timer();
