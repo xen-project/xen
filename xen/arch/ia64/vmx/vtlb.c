@@ -522,7 +522,8 @@ static u64 translate_phy_pte(VCPU *v, u64 pte, u64 itir, u64 va)
      * which is required by vga acceleration since qemu maps shared
      * vram buffer with WB.
      */
-    if (mfn_valid(maddr >> PAGE_SHIFT) && phy_pte.ma != VA_MATTR_NATPAGE)
+    if (mfn_valid((maddr & _PAGE_PPN_MASK) >> PAGE_SHIFT)
+				&& phy_pte.ma != VA_MATTR_NATPAGE)
         phy_pte.ma = VA_MATTR_WB;
 
     maddr = ((maddr & _PAGE_PPN_MASK) & PAGE_MASK) | (paddr & ~PAGE_MASK);

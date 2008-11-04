@@ -926,7 +926,8 @@ __assign_domain_page(struct domain *d,
     /* in HVM guest, when VTD is enabled,
      * P2M entry may change from _PAGE_IO type to real MMIO page 
      */
-    if(VMX_DOMAIN(d->vcpu[0]) && (pte_val(ret_pte) & _PAGE_IO)) {
+    if(is_hvm_domain(d) && (pte_val(ret_pte) & _PAGE_IO) &&
+       !mfn_valid(physaddr >> PAGE_SHIFT)) {
         old_pte = ret_pte;
         goto again_hvm_page_io;
     }
