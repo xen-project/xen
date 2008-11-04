@@ -9,6 +9,7 @@ SUBDIRS-y += flask
 SUBDIRS-y += xenstore
 SUBDIRS-y += misc
 SUBDIRS-y += examples
+SUBDIRS-y += hotplug
 SUBDIRS-y += xentrace
 SUBDIRS-$(CONFIG_XCUTILS) += xcutils
 SUBDIRS-$(CONFIG_X86) += firmware
