@@ -50,7 +50,7 @@ from xen.xend.XendAPIConstants import *
 
 from xen.xend.xenstore.xstransact import xstransact
 from xen.xend.xenstore.xswatch import xswatch
-from xen.util import mkdir
+from xen.util import mkdir, rwlock
 from xen.xend import uuid
 
 xc = xen.lowlevel.xc.xc()
@@ -92,6 +92,8 @@ class XendDomain:
         self.domains = {}
         self.managed_domains = {}
         self.domains_lock = threading.RLock()
+
+        self.policy_lock = rwlock.RWLock()
 
         # xen api instance vars
         # TODO: nothing uses this at the moment
@@ -1139,16 +1141,21 @@ class XendDomain:
         """
 
         try:
-            return XendCheckpoint.restore(self, fd, paused=paused, relocating=relocating)
-        except XendError, e:
-            log.exception("Restore failed")
-            raise
-        except:
-            # I don't really want to log this exception here, but the error
-            # handling in the relocation-socket handling code (relocate.py) is
-            # poor, so we need to log this for debugging.
-            log.exception("Restore failed")
-            raise XendError("Restore failed")
+            self.policy_lock.acquire_reader()
+
+            try:
+                return XendCheckpoint.restore(self, fd, paused=paused, relocating=relocating)
+            except XendError, e:
+                log.exception("Restore failed")
+                raise
+            except:
+                # I don't really want to log this exception here, but the error
+                # handling in the relocation-socket handling code (relocate.py) is
+                # poor, so we need to log this for debugging.
+                log.exception("Restore failed")
+                raise XendError("Restore failed")
+        finally:
+            self.policy_lock.release()
  
     def domain_unpause(self, domid):
         """Unpause domain execution.

@@ -3011,64 +3011,69 @@ class XendDomainInfo:
         if not xspol:
             xspol = poladmin.get_policy_by_name(policy)
 
-        if state in [ DOM_STATE_RUNNING, DOM_STATE_PAUSED ]:
-            #if domain is running or paused try to relabel in hypervisor
-            if not xspol:
-                return (-xsconstants.XSERR_POLICY_NOT_LOADED, "", "", 0)
+        try:
+            xen.xend.XendDomain.instance().policy_lock.acquire_writer()
 
-            if typ != xspol.get_type_name() or \
-               policy != xspol.get_name():
-                return (-xsconstants.XSERR_BAD_LABEL, "", "", 0)
-
-            if typ == xsconstants.ACM_POLICY_ID:
-                new_ssidref = xspol.vmlabel_to_ssidref(label)
-                if new_ssidref == xsconstants.INVALID_SSIDREF:
-                    return (-xsconstants.XSERR_BAD_LABEL, "", "", 0)
-
-                # Check that all used resources are accessible under the
-                # new label
-                if not is_policy_update and \
-                   not security.resources_compatible_with_vmlabel(xspol,
-                          self, label):
-                    return (-xsconstants.XSERR_BAD_LABEL, "", "", 0)
-
-                #Check label against expected one. Can only do this
-                # if the policy hasn't changed underneath in the meantime
-                if xspol_old == None:
-                    old_label = self.get_security_label()
-                    if old_label != old_seclab:
-                        log.info("old_label != old_seclab: %s != %s" %
-                                 (old_label, old_seclab))
-                        return (-xsconstants.XSERR_BAD_LABEL, "", "", 0)
-
-                # relabel domain in the hypervisor
-                rc, errors = security.relabel_domains([[domid, new_ssidref]])
-                log.info("rc from relabeling in HV: %d" % rc)
-            else:
-                return (-xsconstants.XSERR_POLICY_TYPE_UNSUPPORTED, "", "", 0)
-
-        if rc == 0:
-            # HALTED, RUNNING or PAUSED
-            if domid == 0:
-                if xspol:
-                    self.info['security_label'] = seclab
-                    ssidref = poladmin.set_domain0_bootlabel(xspol, label)
-                else:
+            if state in [ DOM_STATE_RUNNING, DOM_STATE_PAUSED ]:
+                #if domain is running or paused try to relabel in hypervisor
+                if not xspol:
                     return (-xsconstants.XSERR_POLICY_NOT_LOADED, "", "", 0)
-            else:
-                if self.info.has_key('security_label'):
-                    old_label = self.info['security_label']
-                    # Check label against expected one, unless wildcard
-                    if old_label != old_seclab:
+
+                if typ != xspol.get_type_name() or \
+                   policy != xspol.get_name():
+                    return (-xsconstants.XSERR_BAD_LABEL, "", "", 0)
+
+                if typ == xsconstants.ACM_POLICY_ID:
+                    new_ssidref = xspol.vmlabel_to_ssidref(label)
+                    if new_ssidref == xsconstants.INVALID_SSIDREF:
                         return (-xsconstants.XSERR_BAD_LABEL, "", "", 0)
 
-                self.info['security_label'] = seclab
+                    # Check that all used resources are accessible under the
+                    # new label
+                    if not is_policy_update and \
+                       not security.resources_compatible_with_vmlabel(xspol,
+                              self, label):
+                        return (-xsconstants.XSERR_BAD_LABEL, "", "", 0)
 
-                try:
-                    xen.xend.XendDomain.instance().managed_config_save(self)
-                except:
-                    pass
-        return (rc, errors, old_label, new_ssidref)
+                    #Check label against expected one. Can only do this
+                    # if the policy hasn't changed underneath in the meantime
+                    if xspol_old == None:
+                        old_label = self.get_security_label()
+                        if old_label != old_seclab:
+                            log.info("old_label != old_seclab: %s != %s" %
+                                     (old_label, old_seclab))
+                            return (-xsconstants.XSERR_BAD_LABEL, "", "", 0)
+
+                    # relabel domain in the hypervisor
+                    rc, errors = security.relabel_domains([[domid, new_ssidref]])
+                    log.info("rc from relabeling in HV: %d" % rc)
+                else:
+                    return (-xsconstants.XSERR_POLICY_TYPE_UNSUPPORTED, "", "", 0)
+
+            if rc == 0:
+                # HALTED, RUNNING or PAUSED
+                if domid == 0:
+                    if xspol:
+                        self.info['security_label'] = seclab
+                        ssidref = poladmin.set_domain0_bootlabel(xspol, label)
+                    else:
+                        return (-xsconstants.XSERR_POLICY_NOT_LOADED, "", "", 0)
+                else:
+                    if self.info.has_key('security_label'):
+                        old_label = self.info['security_label']
+                        # Check label against expected one, unless wildcard
+                        if old_label != old_seclab:
+                            return (-xsconstants.XSERR_BAD_LABEL, "", "", 0)
+
+                    self.info['security_label'] = seclab
+
+                    try:
+                        xen.xend.XendDomain.instance().managed_config_save(self)
+                    except:
+                        pass
+            return (rc, errors, old_label, new_ssidref)
+        finally:
+            xen.xend.XendDomain.instance().policy_lock.release()
 
     def get_on_shutdown(self):
         after_shutdown = self.info.get('actions_after_shutdown')
