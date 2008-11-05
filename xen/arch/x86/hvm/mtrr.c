@@ -392,12 +392,13 @@ uint32_t get_pat_flags(struct vcpu *v,
      */
     if ( pat_entry_value == INVALID_MEM_TYPE )
     {
-        gdprintk(XENLOG_WARNING,
-                 "Conflict occurs for a given guest l1e flags:%x "
-                 "at %"PRIx64" (the effective mm type:%d), "
-                 "because the host mtrr type is:%d\n",
-                 gl1e_flags, (uint64_t)gpaddr, guest_eff_mm_type,
-                 shadow_mtrr_type);
+        if (mfn_valid(paddr_to_pfn(spaddr)))
+            gdprintk(XENLOG_WARNING,
+                    "Conflict occurs for a given guest l1e flags:%x "
+                    "at %"PRIx64" (the effective mm type:%d), "
+                    "because the host mtrr type is:%d\n",
+                    gl1e_flags, (uint64_t)gpaddr, guest_eff_mm_type,
+                    shadow_mtrr_type);
         pat_entry_value = PAT_TYPE_UNCACHABLE;
     }
     /* 4. Get the pte flags */
