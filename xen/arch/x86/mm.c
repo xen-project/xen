@@ -4294,7 +4294,7 @@ int map_pages_to_xen(
                 {
                     if ( l3e_get_flags(ol3e) & _PAGE_GLOBAL )
                         flush_flags |= FLUSH_TLB_GLOBAL;
-                    if ( (l1f_to_lNf(l3e_get_flags(ol3e)) ^ flags) &
+                    if ( (lNf_to_l1f(l3e_get_flags(ol3e)) ^ flags) &
                          PAGE_CACHE_ATTRS )
                         flush_flags |= FLUSH_CACHE;
                     flush_area(virt, flush_flags);
