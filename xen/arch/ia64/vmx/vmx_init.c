@@ -457,7 +457,7 @@ int vmx_set_ioreq_page(
 	pte = *lookup_noalloc_domain_pte(d, gpfn << PAGE_SHIFT);
 	if (!pte_present(pte) || !pte_mem(pte))
 		return -EINVAL;
-	mfn = (pte_val(pte) & _PFN_MASK) >> PAGE_SHIFT;
+	mfn = pte_pfn(pte);
 	ASSERT(mfn_valid(mfn));
 
 	page = mfn_to_page(mfn);

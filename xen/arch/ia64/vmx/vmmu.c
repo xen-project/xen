@@ -312,7 +312,7 @@ IA64FAULT vmx_vcpu_itr_d(VCPU *vcpu, u64 slot, u64 pte, u64 itir, u64 ifa)
     */   
     if (ps != _PAGE_SIZE_16M)
         thash_purge_entries(vcpu, va, ps);
-    gpfn = (pte & _PAGE_PPN_MASK)>> PAGE_SHIFT;
+    gpfn = pte_pfn(__pte(pte));
     vcpu_get_rr(vcpu, va, &rid);
     rid &= RR_RID_MASK;
     p_dtr = (thash_data_t *)&vcpu->arch.dtrs[slot];

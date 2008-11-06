@@ -148,7 +148,7 @@ sioemu_set_callback (struct vcpu *v, unsigned long cb_ip, unsigned long paddr)
     pte = *lookup_noalloc_domain_pte(v->domain, paddr);
     if (!pte_present(pte) || !pte_mem(pte))
         return -EINVAL;
-    mfn = (pte_val(pte) & _PFN_MASK) >> PAGE_SHIFT;
+    mfn = pte_pfn(pte);
     ASSERT(mfn_valid(mfn));
 
     page = mfn_to_page(mfn);

@@ -800,7 +800,7 @@ do_dom0vp_op(unsigned long cmd,
             dprintk(XENLOG_INFO, "%s: INVALID_MFN ret: 0x%lx\n",
                      __func__, ret);
         } else {
-            ret = (ret & _PFN_MASK) >> PAGE_SHIFT;//XXX pte_pfn()
+            ret = pte_pfn(__pte(ret));
         }
         perfc_incr(dom0vp_phystomach);
         break;
