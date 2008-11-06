@@ -748,7 +748,7 @@ static void audit_p2m(struct domain *d)
 
         if ( test_linear && (gfn <= d->arch.p2m->max_mapped_pfn) )
         {
-            lp2mfn = mfn_x(gfn_to_mfn_current(gfn, &type));
+            lp2mfn = mfn_x(gfn_to_mfn(d, gfn, &type));
             if ( lp2mfn != mfn_x(p2mfn) )
             {
                 P2M_PRINTK("linear mismatch gfn %#lx -> mfn %#lx "

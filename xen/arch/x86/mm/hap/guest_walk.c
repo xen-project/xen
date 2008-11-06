@@ -83,7 +83,7 @@ unsigned long hap_gva_to_gfn(GUEST_PAGING_LEVELS)(
     gpfn = (gcr3 >> PAGE_SHIFT);
     for ( lev = mode; lev >= 1; lev-- )
     {
-        mfn = mfn_x(gfn_to_mfn_current(gpfn, &p2mt));
+        mfn = mfn_x(gfn_to_mfn(v->domain, gpfn, &p2mt));
         if ( !p2m_is_ram(p2mt) )
         {
             HAP_PRINTK("bad pfn=0x%lx from gva=0x%lx at lev%d\n", gpfn, gva,
