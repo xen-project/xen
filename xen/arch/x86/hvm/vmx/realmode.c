@@ -69,7 +69,7 @@ static void realmode_deliver_exception(
     frame[1] = csr->sel;
     frame[2] = regs->eflags & ~X86_EFLAGS_RF;
 
-    if ( hvmemul_ctxt->ctxt.addr_size == 32 )
+    if ( hvmemul_ctxt->ctxt.sp_size == 32 )
     {
         regs->esp -= 6;
         pstk = regs->esp;
