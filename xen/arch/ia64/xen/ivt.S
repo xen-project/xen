@@ -184,10 +184,12 @@ ENTRY(alt_dtlb_miss)
 late_alt_dtlb_miss:
 	mov r20=cr.isr
 	movl r17=PAGE_KERNEL
-	mov r21=cr.ipsr
+	mov r29=cr.ipsr // frametable_miss is shared by paravirtual and HVM sides
+			// and it assumes ipsr is saved in r29. If change the
+			// registers usage here, please check both sides!   
 	movl r19=(((1 << IA64_MAX_PHYS_BITS) - 1) & ~0xfff)
 	;;
-	extr.u r23=r21,IA64_PSR_CPL0_BIT,2	// extract psr.cpl
+	extr.u r23=r29,IA64_PSR_CPL0_BIT,2	// extract psr.cpl
 	and r22=IA64_ISR_CODE_MASK,r20		// get the isr.code field
 	tbit.nz p6,p7=r20,IA64_ISR_SP_BIT	// is speculation bit on?
 	extr.u r18=r16,XEN_VIRT_UC_BIT,1	// extract UC bit
@@ -234,7 +236,7 @@ late_alt_dtlb_miss:
 	br.cond.spnt page_fault
 	;;
 alt_dtlb_miss_identity_map:
-	dep r21=-1,r21,IA64_PSR_ED_BIT,1
+	dep r29=-1,r29,IA64_PSR_ED_BIT,1
 	or r19=r19,r17		// insert PTE control bits into r19
 	mov cr.itir=r20		// set itir with cleared key
 	;;
@@ -243,7 +245,7 @@ alt_dtlb_miss_identity_map:
 	cmp.eq.or p8,p0=0x18,r22	// Region 6 is UC for EFI
 	;;
 (p8)	dep r19=-1,r19,4,1	// set bit 4 (uncached) if access to UC area
-(p6)	mov cr.ipsr=r21
+(p6)	mov cr.ipsr=r29
 	;;
 (p7)	itc.d r19		// insert the TLB entry
 	mov pr=r31,-1
@@ -288,17 +290,17 @@ GLOBAL_ENTRY(frametable_miss)
 	rfi
 END(frametable_miss)
 
-ENTRY(frametable_fault)
+ENTRY(frametable_fault)		//ipsr saved in r29 before coming here!
 	ssm psr.dt		// switch to using virtual data addressing
 	mov r18=cr.iip
 	movl r19=ia64_frametable_probe
 	;;
 	cmp.eq p6,p7=r18,r19	// is faulting addrress ia64_frametable_probe?
 	mov r8=0		// assumes that 'probe.r' uses r8
-	dep r21=-1,r21,IA64_PSR_RI_BIT+1,1 // return to next instruction in
+	dep r29=-1,r29,IA64_PSR_RI_BIT+1,1 // return to next instruction in
 					   //   bundle 2
 	;;
-(p6)	mov cr.ipsr=r21
+(p6)	mov cr.ipsr=r29
 	mov r19=4		// FAULT(4)
 (p7)	br.spnt.few dispatch_to_fault_handler
 	;;

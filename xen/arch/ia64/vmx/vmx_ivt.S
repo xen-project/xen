@@ -343,7 +343,7 @@ END(vmx_alt_itlb_miss)
 // 0x1000 Entry 4 (size 64 bundles) Alt DTLB (7,46)
 ENTRY(vmx_alt_dtlb_miss)
     VMX_DBG_FAULT(4)
-    mov r29=cr.ipsr
+    mov r29=cr.ipsr	//frametable_miss needs ipsr is saved in r29.
     mov r31=pr
     adds r22=IA64_VCPU_MMU_MODE_OFFSET, r21
     ;;
@@ -356,7 +356,7 @@ vmx_alt_dtlb_miss_vmm:
     // Test for the address of virtual frame_table
     shr r22=r16,56;;
     cmp.eq p8,p0=((VIRT_FRAME_TABLE_ADDR>>56)&0xff)-0x100,r22
-(p8)br.cond.sptk frametable_miss ;;
+(p8)br.cond.sptk frametable_miss ;; //Make sure ipsr is saved in r29
 #endif
     movl r17=PAGE_KERNEL
     mov r20=cr.isr
