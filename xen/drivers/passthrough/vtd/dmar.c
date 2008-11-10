@@ -351,7 +351,9 @@ acpi_parse_one_rmrr(struct acpi_dmar_entry_header *header)
 
     if ( rmrr->base_address >= rmrr->end_address )
     {
-        dprintk(XENLOG_ERR VTDPREFIX, "RMRR is incorrect.\n");
+        dprintk(XENLOG_ERR VTDPREFIX,
+                "RMRR error: base_addr %"PRIx64" end_address %"PRIx64"\n",
+                rmrr->base_address, rmrr->end_address);
         return -EFAULT;
     }
 
