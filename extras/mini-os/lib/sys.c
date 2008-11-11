@@ -34,6 +34,7 @@
 #include <sys/unistd.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
+#include <net/if.h>
 #include <time.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -1323,6 +1324,12 @@ unsupported_function_crash(sysconf);
 unsupported_function(int, tcsetattr, -1);
 unsupported_function(int, tcgetattr, 0);
 unsupported_function(int, poll, -1);
+
+/* net/if.h */
+unsupported_function_log(unsigned int, if_nametoindex, -1);
+unsupported_function_log(char *, if_indextoname, (char *) NULL);
+unsupported_function_log(struct  if_nameindex *, if_nameindex, (struct  if_nameindex *) NULL);
+unsupported_function_crash(if_freenameindex);
 
 /* Linuxish abi for the Caml runtime, don't support */
 unsupported_function_log(struct dirent *, readdir64, NULL);
