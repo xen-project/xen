@@ -351,9 +351,9 @@ static inline int __vmxon(u64 addr)
     return rc;
 }
 
-void vmx_inject_hw_exception(struct vcpu *v, int trap, int error_code);
-void vmx_inject_extint(struct vcpu *v, int trap);
-void vmx_inject_nmi(struct vcpu *v);
+void vmx_inject_hw_exception(int trap, int error_code);
+void vmx_inject_extint(int trap);
+void vmx_inject_nmi(void);
 
 void ept_p2m_init(struct domain *d);
 

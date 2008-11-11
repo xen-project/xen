@@ -140,12 +140,12 @@ asmlinkage void vmx_intr_assist(void)
 
     if ( intack.source == hvm_intsrc_nmi )
     {
-        vmx_inject_nmi(v);
+        vmx_inject_nmi();
     }
     else
     {
         HVMTRACE_2D(INJ_VIRQ, intack.vector, /*fake=*/ 0);
-        vmx_inject_extint(v, intack.vector);
+        vmx_inject_extint(intack.vector);
         pt_intr_post(v, intack);
     }
 
