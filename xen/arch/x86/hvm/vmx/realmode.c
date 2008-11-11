@@ -69,7 +69,8 @@ static void realmode_deliver_exception(
     frame[1] = csr->sel;
     frame[2] = regs->eflags & ~X86_EFLAGS_RF;
 
-    if ( hvmemul_ctxt->ctxt.sp_size == 32 )
+    /* We can't test hvmemul_ctxt->ctxt.sp_size: it may not be initialised. */
+    if ( hvmemul_ctxt->seg_reg[x86_seg_ss].attr.fields.db )
     {
         regs->esp -= 6;
         pstk = regs->esp;
