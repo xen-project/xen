@@ -149,17 +149,25 @@ static void realmode_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt)
             hvmemul_ctxt->exn_insn_len = 0;
         }
 
-        if ( curr->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PE )
+        if ( unlikely(curr->domain->debugger_attached) &&
+             ((hvmemul_ctxt->exn_vector == TRAP_debug) ||
+              (hvmemul_ctxt->exn_vector == TRAP_int3)) )
+        {
+            domain_pause_for_debugger();
+        }
+        else if ( curr->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PE )
         {
             gdprintk(XENLOG_ERR, "Exception %02x in protected mode.\n",
                      hvmemul_ctxt->exn_vector);
             goto fail;
         }
-
-        realmode_deliver_exception(
-            hvmemul_ctxt->exn_vector,
-            hvmemul_ctxt->exn_insn_len,
-            hvmemul_ctxt);
+        else
+        {
+            realmode_deliver_exception(
+                hvmemul_ctxt->exn_vector,
+                hvmemul_ctxt->exn_insn_len,
+                hvmemul_ctxt);
+        }
     }
 
     return;

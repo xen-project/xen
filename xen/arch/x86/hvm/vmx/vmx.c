@@ -1118,6 +1118,24 @@ static void __vmx_inject_exception(int trap, int type, int error_code)
 void vmx_inject_hw_exception(int trap, int error_code)
 {
     unsigned long intr_info = __vmread(VM_ENTRY_INTR_INFO);
+    struct vcpu *curr = current;
+
+    switch ( trap )
+    {
+    case TRAP_debug:
+        if ( guest_cpu_user_regs()->eflags & X86_EFLAGS_TF )
+        {
+            __restore_debug_registers(curr);
+            write_debugreg(6, read_debugreg(6) | 0x4000);
+        }
+    case TRAP_int3:
+        if ( curr->domain->debugger_attached )
+        {
+            /* Debug/Int3: Trap to debugger. */
+            domain_pause_for_debugger();
+            return;
+        }
+    }
 
     if ( unlikely(intr_info & INTR_INFO_VALID_MASK) &&
          (((intr_info >> 8) & 7) == X86_EVENTTYPE_HW_EXCEPTION) )
@@ -1134,13 +1152,6 @@ void vmx_inject_hw_exception(int trap, int error_code)
                          TRC_PAR_LONG(current->arch.hvm_vcpu.guest_cr[2]));
     else
         HVMTRACE_2D(INJ_EXC, trap, error_code);
-
-    if ( (trap == TRAP_debug) &&
-         (guest_cpu_user_regs()->eflags & X86_EFLAGS_TF) )
-    {
-        __restore_debug_registers(current);
-        write_debugreg(6, read_debugreg(6) | 0x4000);
-    }
 }
 
 void vmx_inject_extint(int trap)

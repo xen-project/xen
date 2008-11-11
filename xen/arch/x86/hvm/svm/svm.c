@@ -739,6 +739,23 @@ static void svm_inject_exception(
     struct vmcb_struct *vmcb = curr->arch.hvm_svm.vmcb;
     eventinj_t event = vmcb->eventinj;
 
+    switch ( trapnr )
+    {
+    case TRAP_debug:
+        if ( guest_cpu_user_regs()->eflags & X86_EFLAGS_TF )
+        {
+            __restore_debug_registers(curr);
+            vmcb->dr6 |= 0x4000;
+        }
+    case TRAP_int3:
+        if ( curr->domain->debugger_attached )
+        {
+            /* Debug/Int3: Trap to debugger. */
+            domain_pause_for_debugger();
+            return;
+        }
+    }
+
     if ( unlikely(event.fields.v) &&
          (event.fields.type == X86_EVENTTYPE_HW_EXCEPTION) )
     {
@@ -764,13 +781,6 @@ static void svm_inject_exception(
     else
     {
         HVMTRACE_2D(INJ_EXC, trapnr, errcode);
-    }
-
-    if ( (trapnr == TRAP_debug) &&
-         (guest_cpu_user_regs()->eflags & X86_EFLAGS_TF) )
-    {
-        __restore_debug_registers(curr);
-        vmcb->dr6 |= 0x4000;
     }
 }
 
