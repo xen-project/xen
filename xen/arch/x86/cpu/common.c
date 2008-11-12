@@ -564,7 +564,10 @@ void __cpuinit cpu_init(void)
 {
 	int cpu = smp_processor_id();
 	struct tss_struct *t = &init_tss[cpu];
-	char gdt_load[10];
+	struct desc_ptr gdt_desc = {
+		.base = (unsigned long)(this_cpu(gdt_table) - FIRST_RESERVED_GDT_ENTRY),
+		.limit = LAST_RESERVED_GDT_BYTE
+	};
 
 	if (cpu_test_and_set(cpu, cpu_initialized)) {
 		printk(KERN_WARNING "CPU#%d already initialized!\n", cpu);
@@ -578,9 +581,7 @@ void __cpuinit cpu_init(void)
 	/* Install correct page table. */
 	write_ptbase(current);
 
-	*(unsigned short *)(&gdt_load[0]) = LAST_RESERVED_GDT_BYTE;
-	*(unsigned long  *)(&gdt_load[2]) = GDT_VIRT_START(current);
-	asm volatile ( "lgdt %0" : "=m" (gdt_load) );
+	asm volatile ( "lgdt %0" : : "m" (gdt_desc) );
 
 	/* No nested task. */
 	asm volatile ("pushf ; andw $0xbfff,(%"__OP"sp) ; popf" );

@@ -310,12 +310,7 @@ int vcpu_initialise(struct vcpu *v)
         if ( is_idle_domain(d) )
         {
             v->arch.schedule_tail = continue_idle_domain;
-            if ( v->vcpu_id )
-                v->arch.cr3 = d->vcpu[0]->arch.cr3;
-            else if ( !*idle_vcpu )
-                v->arch.cr3 = __pa(idle_pg_table);
-            else if ( !(v->arch.cr3 = clone_idle_pagetable(v)) )
-                return -ENOMEM;
+            v->arch.cr3           = __pa(idle_pg_table);
         }
 
         v->arch.guest_context.ctrlreg[4] =
@@ -1172,14 +1167,18 @@ static void paravirt_ctxt_switch_to(struct vcpu *v)
     }
 }
 
+static inline int need_full_gdt(struct vcpu *v)
+{
+    return (!is_hvm_vcpu(v) && !is_idle_vcpu(v));
+}
+
 static void __context_switch(void)
 {
     struct cpu_user_regs *stack_regs = guest_cpu_user_regs();
-    unsigned int          i, cpu = smp_processor_id();
+    unsigned int          cpu = smp_processor_id();
     struct vcpu          *p = per_cpu(curr_vcpu, cpu);
     struct vcpu          *n = current;
     struct desc_struct   *gdt;
-    struct page_info     *page;
     struct desc_ptr       gdt_desc;
 
     ASSERT(p != n);
@@ -1208,16 +1207,19 @@ static void __context_switch(void)
 
     gdt = !is_pv_32on64_vcpu(n) ? per_cpu(gdt_table, cpu) :
                                   per_cpu(compat_gdt_table, cpu);
-    page = virt_to_page(gdt);
-    for (i = 0; i < NR_RESERVED_GDT_PAGES; ++i)
+    if ( need_full_gdt(n) )
     {
-        l1e_write(n->domain->arch.mm_perdomain_pt +
-                  (n->vcpu_id << GDT_LDT_VCPU_SHIFT) +
-                  FIRST_RESERVED_GDT_PAGE + i,
-                  l1e_from_page(page + i, __PAGE_HYPERVISOR));
+        struct page_info *page = virt_to_page(gdt);
+        unsigned int i;
+        for ( i = 0; i < NR_RESERVED_GDT_PAGES; i++ )
+            l1e_write(n->domain->arch.mm_perdomain_pt +
+                      (n->vcpu_id << GDT_LDT_VCPU_SHIFT) +
+                      FIRST_RESERVED_GDT_PAGE + i,
+                      l1e_from_page(page + i, __PAGE_HYPERVISOR));
     }
 
-    if ( p->vcpu_id != n->vcpu_id )
+    if ( need_full_gdt(p) &&
+         ((p->vcpu_id != n->vcpu_id) || !need_full_gdt(n)) )
     {
         gdt_desc.limit = LAST_RESERVED_GDT_BYTE;
         gdt_desc.base  = (unsigned long)(gdt - FIRST_RESERVED_GDT_ENTRY);
@@ -1226,8 +1228,10 @@ static void __context_switch(void)
 
     write_ptbase(n);
 
-    if ( p->vcpu_id != n->vcpu_id )
+    if ( need_full_gdt(n) &&
+         ((p->vcpu_id != n->vcpu_id) || !need_full_gdt(p)) )
     {
+        gdt_desc.limit = LAST_RESERVED_GDT_BYTE;
         gdt_desc.base = GDT_VIRT_START(n);
         asm volatile ( "lgdt %0" : : "m" (gdt_desc) );
     }

@@ -278,7 +278,6 @@ extern unsigned int   m2p_compat_vstart;
 #endif
 void paging_init(void);
 void setup_idle_pagetable(void);
-unsigned long clone_idle_pagetable(struct vcpu *);
 #endif /* !defined(__ASSEMBLY__) */
 
 #define _PAGE_PRESENT  0x001U
