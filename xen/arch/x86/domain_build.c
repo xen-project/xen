@@ -455,8 +455,9 @@ int __init construct_dom0(
     /* WARNING: The new domain must have its 'processor' field filled in! */
     l3start = l3tab = (l3_pgentry_t *)mpt_alloc; mpt_alloc += PAGE_SIZE;
     l2start = l2tab = (l2_pgentry_t *)mpt_alloc; mpt_alloc += 4*PAGE_SIZE;
-    memcpy(l2tab, idle_pg_table_l2, 4*PAGE_SIZE);
-    for (i = 0; i < 4; i++) {
+    for (i = 0; i < L3_PAGETABLE_ENTRIES; i++) {
+        copy_page(l2tab + i * L2_PAGETABLE_ENTRIES,
+                  idle_pg_table_l2 + i * L2_PAGETABLE_ENTRIES);
         l3tab[i] = l3e_from_paddr((u32)l2tab + i*PAGE_SIZE, L3_PROT);
         l2tab[(LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT)+i] =
             l2e_from_paddr((u32)l2tab + i*PAGE_SIZE, __PAGE_HYPERVISOR);
