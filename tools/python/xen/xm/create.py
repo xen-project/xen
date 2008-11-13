@@ -1202,8 +1202,9 @@ def make_domain(opts, config):
         except:
             server.xend.domain.destroy(dom)
             err("Failed to unpause domain %s" % dom)
-    opts.info("Started domain %s" % (dom))
-    return int(sxp.child_value(dominfo, 'domid'))
+    domid = int(sxp.child_value(dominfo, 'domid'))
+    opts.info("Started domain %s (id=%d)" % (dom, domid))
+    return domid
 
 
 def get_xauthority():
