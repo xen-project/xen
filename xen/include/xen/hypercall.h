@@ -124,6 +124,12 @@ compat_memory_op(
     unsigned int cmd,
     XEN_GUEST_HANDLE(void) arg);
 
+extern int
+compat_vcpu_op(
+    int cmd,
+    int vcpuid,
+    XEN_GUEST_HANDLE(void) arg);
+
 #endif
 
 #endif /* __XEN_HYPERCALL_H__ */
