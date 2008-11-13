@@ -35,6 +35,7 @@
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/cacheattr.h>
 #include <asm/mtrr.h>
+#include <asm/guest_pt.h>
 #include "private.h"
 #include "types.h"
 
@@ -254,7 +255,7 @@ static uint32_t set_ad_bits(void *guest_p, void *walk_p, int set_dirty)
  * Return 1 to indicate success and 0 for inconsistency
  */
 static inline uint32_t
-shadow_check_gwalk(struct vcpu *v, unsigned long va, walk_t *gw)
+shadow_check_gwalk(struct vcpu *v, unsigned long va, walk_t *gw, int version)
 {
     struct domain *d = v->domain;
     guest_l1e_t *l1p;
@@ -267,9 +268,8 @@ shadow_check_gwalk(struct vcpu *v, unsigned long va, walk_t *gw)
 
     ASSERT(shadow_locked_by_me(d));
 
-    if ( gw->version ==
-         atomic_read(&d->arch.paging.shadow.gtable_dirty_version) )
-        return 1;
+    if ( version == atomic_read(&d->arch.paging.shadow.gtable_dirty_version) )
+         return 1;
 
     /* We may consider caching guest page mapping from last
      * guest table walk. However considering this check happens
@@ -401,9 +401,6 @@ guest_walk_tables(struct vcpu *v, unsigned long va, walk_t *gw, uint32_t pfec)
     perfc_incr(shadow_guest_walk);
     memset(gw, 0, sizeof(*gw));
     gw->va = va;
-
-    gw->version = atomic_read(&d->arch.paging.shadow.gtable_dirty_version);
-    rmb();
 
     /* Mandatory bits that must be set in every entry.  We invert NX, to
      * calculate as if there were an "X" bit that allowed access. 
@@ -3173,6 +3170,7 @@ static int sh_page_fault(struct vcpu *v,
     fetch_type_t ft = 0;
     p2m_type_t p2mt;
     uint32_t rc;
+    int version;
 #if SHADOW_OPTIMIZATIONS & SHOPT_FAST_EMULATION
     int fast_emul = 0;
 #endif
@@ -3316,6 +3314,8 @@ static int sh_page_fault(struct vcpu *v,
     }
 
  rewalk:
+    version = atomic_read(&d->arch.paging.shadow.gtable_dirty_version);
+    rmb();
     rc = guest_walk_tables(v, va, &gw, regs->error_code);
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
@@ -3392,7 +3392,7 @@ static int sh_page_fault(struct vcpu *v,
     }
 #endif /* OOS */
 
-    if ( !shadow_check_gwalk(v, va, &gw) )
+    if ( !shadow_check_gwalk(v, va, &gw, version) )
     {
         perfc_incr(shadow_inconsistent_gwalk);
         shadow_unlock(d);

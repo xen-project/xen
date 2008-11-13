@@ -191,169 +191,13 @@ static inline shadow_l4e_t shadow_l4e_from_mfn(mfn_t mfn, u32 flags)
 })
 #endif
 
-
-/* Type of the guest's frame numbers */
-TYPE_SAFE(unsigned long,gfn)
-#define SH_PRI_gfn "05lx"
-
-#define VALID_GFN(m) (m != INVALID_GFN)
-
-static inline int
-valid_gfn(gfn_t m)
-{
-    return VALID_GFN(gfn_x(m));
-}
-
-static inline paddr_t
-gfn_to_paddr(gfn_t gfn)
-{
-    return ((paddr_t)gfn_x(gfn)) << PAGE_SHIFT;
-}
-
-/* Override gfn_to_mfn to work with gfn_t */
-#undef gfn_to_mfn
-#define gfn_to_mfn(d, g, t) _gfn_to_mfn((d), gfn_x(g), (t))
+/* The shadow types needed for the various levels. */
 
 #if GUEST_PAGING_LEVELS == 2
-
-#include "../page-guest32.h"
-
-#define GUEST_L1_PAGETABLE_ENTRIES     1024
-#define GUEST_L2_PAGETABLE_ENTRIES     1024
-#define GUEST_L1_PAGETABLE_SHIFT         12
-#define GUEST_L2_PAGETABLE_SHIFT         22
-
-/* Types of the guest's page tables */
-typedef l1_pgentry_32_t guest_l1e_t;
-typedef l2_pgentry_32_t guest_l2e_t;
-typedef intpte_32_t guest_intpte_t;
-
-/* Access functions for them */
-static inline paddr_t guest_l1e_get_paddr(guest_l1e_t gl1e)
-{ return l1e_get_paddr_32(gl1e); }
-static inline paddr_t guest_l2e_get_paddr(guest_l2e_t gl2e)
-{ return l2e_get_paddr_32(gl2e); }
-
-static inline gfn_t guest_l1e_get_gfn(guest_l1e_t gl1e)
-{ return _gfn(l1e_get_paddr_32(gl1e) >> PAGE_SHIFT); }
-static inline gfn_t guest_l2e_get_gfn(guest_l2e_t gl2e)
-{ return _gfn(l2e_get_paddr_32(gl2e) >> PAGE_SHIFT); }
-
-static inline u32 guest_l1e_get_flags(guest_l1e_t gl1e)
-{ return l1e_get_flags_32(gl1e); }
-static inline u32 guest_l2e_get_flags(guest_l2e_t gl2e)
-{ return l2e_get_flags_32(gl2e); }
-
-static inline guest_l1e_t guest_l1e_add_flags(guest_l1e_t gl1e, u32 flags)
-{ l1e_add_flags_32(gl1e, flags); return gl1e; }
-static inline guest_l2e_t guest_l2e_add_flags(guest_l2e_t gl2e, u32 flags)
-{ l2e_add_flags_32(gl2e, flags); return gl2e; }
-
-static inline guest_l1e_t guest_l1e_from_gfn(gfn_t gfn, u32 flags)
-{ return l1e_from_pfn_32(gfn_x(gfn), flags); }
-static inline guest_l2e_t guest_l2e_from_gfn(gfn_t gfn, u32 flags)
-{ return l2e_from_pfn_32(gfn_x(gfn), flags); }
-
-#define guest_l1_table_offset(a) l1_table_offset_32(a)
-#define guest_l2_table_offset(a) l2_table_offset_32(a)
-
-/* The shadow types needed for the various levels. */
 #define SH_type_l1_shadow  SH_type_l1_32_shadow
 #define SH_type_l2_shadow  SH_type_l2_32_shadow
 #define SH_type_fl1_shadow SH_type_fl1_32_shadow
-
-#else /* GUEST_PAGING_LEVELS != 2 */
-
-#if GUEST_PAGING_LEVELS == 3
-#define GUEST_L1_PAGETABLE_ENTRIES      512
-#define GUEST_L2_PAGETABLE_ENTRIES      512
-#define GUEST_L3_PAGETABLE_ENTRIES        4
-#define GUEST_L1_PAGETABLE_SHIFT         12
-#define GUEST_L2_PAGETABLE_SHIFT         21
-#define GUEST_L3_PAGETABLE_SHIFT         30
-#else /* GUEST_PAGING_LEVELS == 4 */
-#define GUEST_L1_PAGETABLE_ENTRIES      512
-#define GUEST_L2_PAGETABLE_ENTRIES      512
-#define GUEST_L3_PAGETABLE_ENTRIES      512
-#define GUEST_L4_PAGETABLE_ENTRIES      512
-#define GUEST_L1_PAGETABLE_SHIFT         12
-#define GUEST_L2_PAGETABLE_SHIFT         21
-#define GUEST_L3_PAGETABLE_SHIFT         30
-#define GUEST_L4_PAGETABLE_SHIFT         39
-#endif
-
-/* Types of the guest's page tables */
-typedef l1_pgentry_t guest_l1e_t;
-typedef l2_pgentry_t guest_l2e_t;
-typedef l3_pgentry_t guest_l3e_t;
-#if GUEST_PAGING_LEVELS >= 4
-typedef l4_pgentry_t guest_l4e_t;
-#endif
-typedef intpte_t guest_intpte_t;
-
-/* Access functions for them */
-static inline paddr_t guest_l1e_get_paddr(guest_l1e_t gl1e)
-{ return l1e_get_paddr(gl1e); }
-static inline paddr_t guest_l2e_get_paddr(guest_l2e_t gl2e)
-{ return l2e_get_paddr(gl2e); }
-static inline paddr_t guest_l3e_get_paddr(guest_l3e_t gl3e)
-{ return l3e_get_paddr(gl3e); }
-#if GUEST_PAGING_LEVELS >= 4
-static inline paddr_t guest_l4e_get_paddr(guest_l4e_t gl4e)
-{ return l4e_get_paddr(gl4e); }
-#endif
-
-static inline gfn_t guest_l1e_get_gfn(guest_l1e_t gl1e)
-{ return _gfn(l1e_get_paddr(gl1e) >> PAGE_SHIFT); }
-static inline gfn_t guest_l2e_get_gfn(guest_l2e_t gl2e)
-{ return _gfn(l2e_get_paddr(gl2e) >> PAGE_SHIFT); }
-static inline gfn_t guest_l3e_get_gfn(guest_l3e_t gl3e)
-{ return _gfn(l3e_get_paddr(gl3e) >> PAGE_SHIFT); }
-#if GUEST_PAGING_LEVELS >= 4
-static inline gfn_t guest_l4e_get_gfn(guest_l4e_t gl4e)
-{ return _gfn(l4e_get_paddr(gl4e) >> PAGE_SHIFT); }
-#endif
-
-static inline u32 guest_l1e_get_flags(guest_l1e_t gl1e)
-{ return l1e_get_flags(gl1e); }
-static inline u32 guest_l2e_get_flags(guest_l2e_t gl2e)
-{ return l2e_get_flags(gl2e); }
-static inline u32 guest_l3e_get_flags(guest_l3e_t gl3e)
-{ return l3e_get_flags(gl3e); }
-#if GUEST_PAGING_LEVELS >= 4
-static inline u32 guest_l4e_get_flags(guest_l4e_t gl4e)
-{ return l4e_get_flags(gl4e); }
-#endif
-
-static inline guest_l1e_t guest_l1e_add_flags(guest_l1e_t gl1e, u32 flags)
-{ l1e_add_flags(gl1e, flags); return gl1e; }
-static inline guest_l2e_t guest_l2e_add_flags(guest_l2e_t gl2e, u32 flags)
-{ l2e_add_flags(gl2e, flags); return gl2e; }
-static inline guest_l3e_t guest_l3e_add_flags(guest_l3e_t gl3e, u32 flags)
-{ l3e_add_flags(gl3e, flags); return gl3e; }
-#if GUEST_PAGING_LEVELS >= 4
-static inline guest_l4e_t guest_l4e_add_flags(guest_l4e_t gl4e, u32 flags)
-{ l4e_add_flags(gl4e, flags); return gl4e; }
-#endif
-
-static inline guest_l1e_t guest_l1e_from_gfn(gfn_t gfn, u32 flags)
-{ return l1e_from_pfn(gfn_x(gfn), flags); }
-static inline guest_l2e_t guest_l2e_from_gfn(gfn_t gfn, u32 flags)
-{ return l2e_from_pfn(gfn_x(gfn), flags); }
-static inline guest_l3e_t guest_l3e_from_gfn(gfn_t gfn, u32 flags)
-{ return l3e_from_pfn(gfn_x(gfn), flags); }
-#if GUEST_PAGING_LEVELS >= 4
-static inline guest_l4e_t guest_l4e_from_gfn(gfn_t gfn, u32 flags)
-{ return l4e_from_pfn(gfn_x(gfn), flags); }
-#endif
-
-#define guest_l1_table_offset(a) l1_table_offset(a)
-#define guest_l2_table_offset(a) l2_table_offset(a)
-#define guest_l3_table_offset(a) l3_table_offset(a)
-#define guest_l4_table_offset(a) l4_table_offset(a)
-
-/* The shadow types needed for the various levels. */
-#if GUEST_PAGING_LEVELS == 3
+#elif GUEST_PAGING_LEVELS == 3
 #define SH_type_l1_shadow  SH_type_l1_pae_shadow
 #define SH_type_fl1_shadow SH_type_fl1_pae_shadow
 #define SH_type_l2_shadow  SH_type_l2_pae_shadow
@@ -366,35 +210,6 @@ static inline guest_l4e_t guest_l4e_from_gfn(gfn_t gfn, u32 flags)
 #define SH_type_l3_shadow  SH_type_l3_64_shadow
 #define SH_type_l4_shadow  SH_type_l4_64_shadow
 #endif
-
-#endif /* GUEST_PAGING_LEVELS != 2 */
-
-
-/* Type used for recording a walk through guest pagetables.  It is
- * filled in by the pagetable walk function, and also used as a cache
- * for later walks.  When we encounter a suporpage l2e, we fabricate an
- * l1e for propagation to the shadow (for splintering guest superpages
- * into many shadow l1 entries).  */
-typedef struct shadow_walk_t walk_t;
-struct shadow_walk_t 
-{
-    unsigned long va;           /* Address we were looking for */
-#if GUEST_PAGING_LEVELS >= 3
-#if GUEST_PAGING_LEVELS >= 4
-    guest_l4e_t l4e;            /* Guest's level 4 entry */
-#endif
-    guest_l3e_t l3e;            /* Guest's level 3 entry */
-#endif
-    guest_l2e_t l2e;            /* Guest's level 2 entry */
-    guest_l1e_t l1e;            /* Guest's level 1 entry (or fabrication) */
-#if GUEST_PAGING_LEVELS >= 4
-    mfn_t l4mfn;                /* MFN that the level 4 entry was in */
-    mfn_t l3mfn;                /* MFN that the level 3 entry was in */
-#endif
-    mfn_t l2mfn;                /* MFN that the level 2 entry was in */
-    mfn_t l1mfn;                /* MFN that the level 1 entry was in */
-    int version;                /* Saved guest dirty version */
-};
 
 /* macros for dealing with the naming of the internal function names of the
  * shadow code's external entry points.
@@ -460,17 +275,9 @@ struct shadow_walk_t
 #define MFN_FITS_IN_HVM_CR3(_MFN) !(mfn_x(_MFN) >> 20)
 #endif
 
-#define SH_PRI_pte PRIpte
-
-#if GUEST_PAGING_LEVELS == 2
-#define SH_PRI_gpte "08x"
-#else /* GUEST_PAGING_LEVELS >= 3 */
-#ifndef __x86_64__
-#define SH_PRI_gpte "016llx"
-#else
-#define SH_PRI_gpte "016lx"
-#endif
-#endif /* GUEST_PAGING_LEVELS >= 3 */
+#define SH_PRI_pte  PRIpte
+#define SH_PRI_gpte PRI_gpte
+#define SH_PRI_gfn  PRI_gfn
 
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_FAST_FAULT_PATH)
