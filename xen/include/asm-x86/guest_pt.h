@@ -174,6 +174,32 @@ static inline guest_l4e_t guest_l4e_from_gfn(gfn_t gfn, u32 flags)
 #endif /* GUEST_PAGING_LEVELS != 2 */
 
 
+/* Which pagetable features are supported on this vcpu? */
+
+static inline int
+guest_supports_superpages(struct vcpu *v)
+{
+    /* The _PAGE_PSE bit must be honoured in HVM guests, whenever
+     * CR4.PSE is set or the guest is in PAE or long mode. 
+     * It's also used in the dummy PT for vcpus with CR4.PG cleared. */
+    return (is_hvm_vcpu(v) && 
+            (GUEST_PAGING_LEVELS != 2 
+             || !hvm_paging_enabled(v)
+             || (v->arch.hvm_vcpu.guest_cr[4] & X86_CR4_PSE)));
+}
+
+static inline int
+guest_supports_nx(struct vcpu *v)
+{
+    if ( GUEST_PAGING_LEVELS == 2 || !cpu_has_nx )
+        return 0;
+    if ( !is_hvm_vcpu(v) )
+        return cpu_has_nx;
+    return hvm_nx_enabled(v);
+}
+
+
+
 /* Type used for recording a walk through guest pagetables.  It is
  * filled in by the pagetable walk function, and also used as a cache
  * for later walks.  When we encounter a superpage l2e, we fabricate an
@@ -198,5 +224,68 @@ struct guest_pagetable_walk
     mfn_t l2mfn;                /* MFN that the level 2 entry was in */
     mfn_t l1mfn;                /* MFN that the level 1 entry was in */
 };
+
+/* Given a walk_t, translate the gw->va into the guest's notion of the
+ * corresponding frame number. */
+static inline gfn_t
+guest_walk_to_gfn(walk_t *gw)
+{
+    if ( !(guest_l1e_get_flags(gw->l1e) & _PAGE_PRESENT) )
+        return _gfn(INVALID_GFN);
+    return guest_l1e_get_gfn(gw->l1e);
+}
+
+/* Given a walk_t, translate the gw->va into the guest's notion of the
+ * corresponding physical address. */
+static inline paddr_t
+guest_walk_to_gpa(walk_t *gw)
+{
+    if ( !(guest_l1e_get_flags(gw->l1e) & _PAGE_PRESENT) )
+        return 0;
+    return guest_l1e_get_paddr(gw->l1e) + (gw->va & ~PAGE_MASK);
+}
+
+/* Walk the guest pagetables, after the manner of a hardware walker. 
+ *
+ * Inputs: a vcpu, a virtual address, a walk_t to fill, a 
+ *         pointer to a pagefault code, the MFN of the guest's 
+ *         top-level pagetable, and a mapping of the 
+ *         guest's top-level pagetable.
+ * 
+ * We walk the vcpu's guest pagetables, filling the walk_t with what we
+ * see and adding any Accessed and Dirty bits that are needed in the
+ * guest entries.  Using the pagefault code, we check the permissions as
+ * we go.  For the purposes of reading pagetables we treat all non-RAM
+ * memory as contining zeroes.
+ * 
+ * Returns 0 for success, or the set of permission bits that we failed on 
+ * if the walk did not complete. */
+
+/* Macro-fu so you can call guest_walk_tables() and get the right one. */
+#define GPT_RENAME2(_n, _l) _n ## _ ## _l ## _levels
+#define GPT_RENAME(_n, _l) GPT_RENAME2(_n, _l)
+#define guest_walk_tables GPT_RENAME(guest_walk_tables, GUEST_PAGING_LEVELS)
+
+extern uint32_t 
+guest_walk_tables(struct vcpu *v, unsigned long va, walk_t *gw, 
+                  uint32_t pfec, mfn_t top_mfn, void *top_map);
+
+/* Pretty-print the contents of a guest-walk */
+static inline void print_gw(walk_t *gw)
+{
+    gdprintk(XENLOG_INFO, "GUEST WALK TO %#lx:\n", gw->va);
+#if GUEST_PAGING_LEVELS >= 3 /* PAE or 64... */
+#if GUEST_PAGING_LEVELS >= 4 /* 64-bit only... */
+    gdprintk(XENLOG_INFO, "   l4mfn=%" PRI_mfn "\n", mfn_x(gw->l4mfn));
+    gdprintk(XENLOG_INFO, "   l4e=%" PRI_gpte "\n", gw->l4e.l4);
+    gdprintk(XENLOG_INFO, "   l3mfn=%" PRI_mfn "\n", mfn_x(gw->l3mfn));
+#endif /* PAE or 64... */
+    gdprintk(XENLOG_INFO, "   l3e=%" PRI_gpte "\n", gw->l3e.l3);
+#endif /* All levels... */
+    gdprintk(XENLOG_INFO, "   l2mfn=%" PRI_mfn "\n", mfn_x(gw->l2mfn));
+    gdprintk(XENLOG_INFO, "   l2e=%" PRI_gpte "\n", gw->l2e.l2);
+    gdprintk(XENLOG_INFO, "   l1mfn=%" PRI_mfn "\n", mfn_x(gw->l1mfn));
+    gdprintk(XENLOG_INFO, "   l1e=%" PRI_gpte "\n", gw->l1e.l1);
+}
 
 #endif /* _XEN_ASM_GUEST_PT_H */
