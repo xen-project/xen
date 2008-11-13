@@ -97,6 +97,8 @@ struct msi_desc {
 	int remap_index;		/* index in interrupt remapping table */
 };
 
+int msi_maskable_irq(const struct msi_desc *);
+
 /*
  * Assume the maximum number of hot plug slots supported by the system is about
  * ten. The worstcase is that each of these slots is hot-added with a device,

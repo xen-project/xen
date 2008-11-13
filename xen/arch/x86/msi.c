@@ -298,6 +298,13 @@ static void msix_flush_writes(unsigned int irq)
     }
 }
 
+int msi_maskable_irq(const struct msi_desc *entry)
+{
+    BUG_ON(!entry);
+    return entry->msi_attrib.type != PCI_CAP_ID_MSI
+           || entry->msi_attrib.maskbit;
+}
+
 static void msi_set_mask_bit(unsigned int irq, int flag)
 {
     struct msi_desc *entry = irq_desc[irq].msi_desc;
@@ -318,8 +325,6 @@ static void msi_set_mask_bit(unsigned int irq, int flag)
             mask_bits &= ~(1);
             mask_bits |= flag;
             pci_conf_write32(bus, slot, func, pos, mask_bits);
-        } else {
-            msi_set_enable(entry->dev, !flag);
         }
         break;
     case PCI_CAP_ID_MSIX:
@@ -649,7 +654,7 @@ static int __pci_enable_msix(struct msi_info *msi)
     pos = pci_find_cap_offset(msi->bus, slot, func, PCI_CAP_ID_MSIX);
     control = pci_conf_read16(msi->bus, slot, func, msi_control_reg(pos));
     nr_entries = multi_msix_capable(control);
-    if (msi->entry_nr > nr_entries)
+    if (msi->entry_nr >= nr_entries)
     {
         spin_unlock(&pdev->lock);
         return -EINVAL;
