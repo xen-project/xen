@@ -30,6 +30,10 @@
 #include "vtd.h"
 #include "extern.h"
 
+#ifndef dest_SMI
+#define dest_SMI -1
+#endif
+
 u16 apicid_to_bdf(int apic_id)
 {
     struct acpi_drhd_unit *drhd = ioapic_to_drhd(apic_id);
