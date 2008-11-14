@@ -22,7 +22,6 @@
 #ifndef __ASM_X86_HVM_IRQ_H__
 #define __ASM_X86_HVM_IRQ_H__
 
-#include <asm/pirq.h>
 #include <xen/hvm/irq.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/vpic.h>

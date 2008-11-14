@@ -770,15 +770,15 @@ int get_free_pirq(struct domain *d, int type, int index)
 
     if ( type == MAP_PIRQ_TYPE_GSI )
     {
-        for ( i = 16; i < NR_PIRQS; i++ )
+        for ( i = 16; i < NR_IRQS; i++ )
             if ( !d->arch.pirq_vector[i] )
                 break;
-        if ( i == NR_PIRQS )
+        if ( i == NR_IRQS )
             return -ENOSPC;
     }
     else
     {
-        for ( i = NR_PIRQS - 1; i >= 16; i-- )
+        for ( i = NR_IRQS - 1; i >= 16; i-- )
             if ( !d->arch.pirq_vector[i] )
                 break;
         if ( i == 16 )
@@ -805,7 +805,7 @@ int map_domain_pirq(
     if ( !IS_PRIV(current->domain) )
         return -EPERM;
 
-    if ( pirq < 0 || pirq >= NR_PIRQS || vector < 0 || vector >= NR_VECTORS )
+    if ( pirq < 0 || pirq >= NR_IRQS || vector < 0 || vector >= NR_VECTORS )
     {
         dprintk(XENLOG_G_ERR, "dom%d: invalid pirq %d or vector %d\n",
                 d->domain_id, pirq, vector);
@@ -862,7 +862,7 @@ int unmap_domain_pirq(struct domain *d, int pirq)
     int vector, ret = 0;
     bool_t forced_unbind;
 
-    if ( (pirq < 0) || (pirq >= NR_PIRQS) )
+    if ( (pirq < 0) || (pirq >= NR_IRQS) )
         return -EINVAL;
 
     if ( !IS_PRIV(current->domain) )
@@ -926,7 +926,7 @@ void free_domain_pirqs(struct domain *d)
 
     spin_lock(&d->event_lock);
 
-    for ( i = 0; i < NR_PIRQS; i++ )
+    for ( i = 0; i < NR_IRQS; i++ )
         if ( d->arch.pirq_vector[i] > 0 )
             unmap_domain_pirq(d, i);
 

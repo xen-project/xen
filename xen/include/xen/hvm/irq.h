@@ -63,7 +63,7 @@ struct hvm_girq_dpci_mapping {
 /* Protected by domain's event_lock */
 struct hvm_irq_dpci {
     /* Machine IRQ to guest device/intx mapping. */
-    DECLARE_BITMAP(mapping, NR_PIRQS);
+    DECLARE_BITMAP(mapping, NR_IRQS);
     struct hvm_mirq_dpci_mapping mirq[NR_IRQS];
     /* Guest IRQ to guest device/intx mapping. */
     struct hvm_girq_dpci_mapping girq[NR_IRQS];
