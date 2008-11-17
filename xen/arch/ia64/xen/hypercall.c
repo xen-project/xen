@@ -176,7 +176,7 @@ ia64_hypercall(struct pt_regs *regs)
 				stop_timer(&v->arch.hlt_timer);
 				/* do_block() calls
 				 * local_event_delivery_enable(),
-				 * but PALL CALL must be called with
+				 * but PAL CALL must be called with
 				 * psr.i = 0 and psr.i is unchanged.
 				 * SDM vol.2 Part I 11.10.2
 				 * PAL Calling Conventions.
