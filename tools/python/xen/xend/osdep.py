@@ -38,7 +38,10 @@ _vif_script = {
     "SunOS": "vif-vnic"
 }
 
-def _linux_balloon_stat(label):
+PROC_XEN_BALLOON = '/proc/xen/balloon'
+SYSFS_XEN_MEMORY = '/sys/devices/system/xen_memory/xen_memory0'
+
+def _linux_balloon_stat_proc(label):
     """Returns the value for the named label, or None if an error occurs."""
 
     xend2linux_labels = { 'current'      : 'Current allocation',
@@ -47,7 +50,6 @@ def _linux_balloon_stat(label):
                           'high-balloon' : 'High-mem balloon',
                           'limit'        : 'Xen hard limit' }
 
-    PROC_XEN_BALLOON = '/proc/xen/balloon'
     f = file(PROC_XEN_BALLOON, 'r')
     try:
         for line in f:
@@ -61,6 +63,29 @@ def _linux_balloon_stat(label):
         return None
     finally:
         f.close()
+
+def _linux_balloon_stat_sysfs(label):
+    sysfiles = { 'target'       : 'target_kb',
+                 'current'      : 'info/current_kb',
+                 'low-balloon'  : 'info/low_kb',
+                 'high-balloon' : 'info/high_kb',
+                 'limit'        : 'info/hard_limit_kb' }
+
+    name = os.path.join(SYSFS_XEN_MEMORY, sysfiles[label])
+    f = file(name, 'r')
+
+    val = f.read().strip()
+    if val.isdigit():
+        return int(val)
+    return None
+
+def _linux_balloon_stat(label):
+	if os.access(PROC_XEN_BALLOON, os.F_OK):
+		return _linux_balloon_stat_proc(label)
+	elif os.access(SYSFS_XEN_MEMORY, os.F_OK):
+		return _linux_balloon_stat_sysfs(label)
+
+	return None
 
 def _solaris_balloon_stat(label):
     """Returns the value for the named label, or None if an error occurs."""
