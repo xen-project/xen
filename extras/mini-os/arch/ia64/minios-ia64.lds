@@ -52,7 +52,8 @@ SECTIONS
   .fini_array     : { *(.fini_array) }
   PROVIDE (__fini_array_end = .);
 
-  .ctors : {
+  .ctors : AT(ADDR(.ctors) - (((5<<(61))+0x100000000) - (1 << 20)))
+	{
         __CTOR_LIST__ = .;
         QUAD((__CTOR_END__ - __CTOR_LIST__) / 8 - 2)
         *(.ctors)
@@ -61,7 +62,8 @@ SECTIONS
         __CTOR_END__ = .;
         }
 
-  .dtors : {
+  .dtors : AT(ADDR(.dtors) - (((5<<(61))+0x100000000) - (1 << 20)))
+        {
         __DTOR_LIST__ = .;
         QUAD((__DTOR_END__ - __DTOR_LIST__) / 8 - 2)
         *(.dtors)
