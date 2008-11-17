@@ -2122,7 +2122,7 @@ static int hvmop_set_pci_intx_level(
 
 void hvm_vcpu_reset_state(struct vcpu *v, uint16_t cs, uint16_t ip)
 {
-    struct domain *d = current->domain;
+    struct domain *d = v->domain;
     struct vcpu_guest_context *ctxt;
     struct segment_register reg;
 
