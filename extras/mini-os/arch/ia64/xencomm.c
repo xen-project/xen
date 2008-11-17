@@ -24,6 +24,8 @@
 
 
 #include <os.h>
+#include <mini-os/errno.h>
+#include <mini-os/lib.h>
 #include <hypervisor.h>
 #include <xen/xencomm.h>
 #include <xen/grant_table.h>
@@ -38,6 +40,7 @@ struct xencomm_mini
 
 #define xen_guest_handle(hnd)  ((hnd).p)
 
+struct xencomm_handle;
 
 /* Translate virtual address to physical address.  */
 uint64_t
@@ -50,6 +53,16 @@ xencomm_vaddr_to_paddr(uint64_t vaddr)
 		return __pa(vaddr);
 
 	return 0;
+}
+
+/* Inline version.  To be used only on linear space (kernel space).  */
+static struct xencomm_handle *
+xencomm_create_inline(void *buffer)
+{
+	unsigned long paddr;
+
+	paddr = xencomm_vaddr_to_paddr((unsigned long)buffer);
+	return (struct xencomm_handle *)(paddr | XENCOMM_INLINE_FLAG);
 }
 
 #define min(a,b) (((a) < (b)) ? (a) : (b))
@@ -201,6 +214,14 @@ xencommize_mini_grant_table_op(struct xencomm_mini *xc_area, int *nbr_area,
 	return rc;
 }
 
+static inline int
+xencomm_arch_hypercall_grant_table_op(unsigned int cmd,
+                                      struct xencomm_handle *uop,
+                                      unsigned int count)
+{
+	return _hypercall3(int, grant_table_op, cmd, uop, count);
+}
+
 int
 xencomm_mini_hypercall_grant_table_op(unsigned int cmd, void *op,
                                       unsigned int count)
@@ -266,5 +287,109 @@ HYPERVISOR_suspend(unsigned long srec)
         arg.reason = (uint32_t)SWAP((uint32_t)SHUTDOWN_suspend);
 
         return xencomm_arch_hypercall_suspend(xencomm_create_inline(&arg));
+}
+
+int
+HYPERVISOR_event_channel_op(int cmd, void *arg)
+{
+	int rc;
+	struct xencomm_handle *newArg;
+
+	newArg = xencomm_create_inline(arg);
+	rc = _hypercall2(int, event_channel_op, cmd, newArg);
+	if (unlikely(rc == -ENOSYS)) {
+		struct evtchn_op op;
+
+		op.cmd = SWAP(cmd);
+		memcpy(&op.u, arg, sizeof(op.u));
+		rc = _hypercall1(int, event_channel_op_compat, &op);
+	}
+	return rc;
+}
+
+static int
+xencomm_arch_xen_version(int cmd, struct xencomm_handle *arg)
+{
+	return _hypercall2(int, xen_version, cmd, arg);
+}
+
+static int
+xencomm_arch_xen_feature(int cmd, struct xencomm_handle *arg)
+{
+	struct xencomm_handle *newArg;
+
+	newArg = xencomm_create_inline(arg);
+	return _hypercall2(int, xen_version, cmd, newArg);
+}
+
+int
+HYPERVISOR_xen_version(int cmd, void *arg)
+{
+	switch(cmd) {
+		case XENVER_version:
+			return xencomm_arch_xen_version(cmd, 0);
+		case XENVER_get_features:
+			return xencomm_arch_xen_feature(cmd, arg);
+		default:
+			return -1;
+	}
+}
+
+int
+HYPERVISOR_console_io(int cmd, int count, char *str)
+{
+	struct xencomm_handle *newStr;
+
+	newStr = xencomm_create_inline(str);
+	return _hypercall3(int, console_io, cmd, count, newStr);
+}
+
+int
+HYPERVISOR_sched_op_compat(int cmd, unsigned long arg)
+{
+	return _hypercall2(int, sched_op_compat, cmd, arg);
+}
+
+int
+HYPERVISOR_sched_op(int cmd, void *arg)
+{
+	struct xencomm_handle *newArg;
+
+	newArg = xencomm_create_inline(arg);
+	return _hypercall2(int, sched_op, cmd, newArg);
+}
+
+int
+HYPERVISOR_callback_op(int cmd, void *arg)
+{
+	struct xencomm_handle *newArg;
+
+	newArg = xencomm_create_inline(arg);
+	return _hypercall2(int, callback_op, cmd, newArg);
+}
+
+int
+HYPERVISOR_opt_feature(void *arg)
+{
+	struct xencomm_handle *new_arg;
+
+	new_arg = xencomm_create_inline(arg);
+
+	return _hypercall1(int, opt_feature, new_arg);
+}
+
+int
+HYPERVISOR_shutdown(unsigned int reason)
+{
+	struct sched_shutdown sched_shutdown = {
+		.reason = reason
+	};
+
+	int rc = HYPERVISOR_sched_op(SCHEDOP_shutdown, &sched_shutdown);
+
+	if (rc == -ENOSYS)
+		rc = HYPERVISOR_sched_op_compat(SCHEDOP_shutdown, reason);
+
+	return rc;
 }
 

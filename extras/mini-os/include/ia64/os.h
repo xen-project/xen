@@ -192,21 +192,6 @@ __synch_cmpxchg(volatile void *ptr, uint64_t old, uint64_t new, int size)
 
 extern shared_info_t *HYPERVISOR_shared_info;
 
-static inline int
-HYPERVISOR_shutdown(unsigned int reason)
-{
-	struct sched_shutdown sched_shutdown = {
-		.reason = reason
-	};
-
-	int rc = HYPERVISOR_sched_op(SCHEDOP_shutdown, &sched_shutdown);
-
-	if (rc == -ENOSYS)
-		rc = HYPERVISOR_sched_op_compat(SCHEDOP_shutdown, reason);
-
-	return rc;
-}
-
 
 /*
  * This code is from the originally os.h and should be put in a

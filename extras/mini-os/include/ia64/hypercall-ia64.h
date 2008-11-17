@@ -34,8 +34,6 @@
 #ifndef __HYPERCALL_H__
 #define __HYPERCALL_H__
 
-#include <mini-os/lib.h>	/* memcpy() */
-#include <mini-os/errno.h>	/* ENOSYS() */
 #include <xen/event_channel.h>
 #include <xen/sched.h>
 #include <xen/version.h>
@@ -114,123 +112,24 @@ extern unsigned long __hypercall(unsigned long a1, unsigned long a2,
 })
 
 
-extern unsigned long xencomm_vaddr_to_paddr(unsigned long vaddr);
-struct xencomm_handle;
+int HYPERVISOR_event_channel_op(int cmd, void *arg);
 
-/* Inline version.  To be used only on linear space (kernel space).  */
-static inline struct xencomm_handle *
-xencomm_create_inline(void *buffer)
-{
-	unsigned long paddr;
+int HYPERVISOR_xen_version(int cmd, void *arg);
 
-	paddr = xencomm_vaddr_to_paddr((unsigned long)buffer);
-	return (struct xencomm_handle *)(paddr | XENCOMM_INLINE_FLAG);
-}
+int HYPERVISOR_console_io(int cmd, int count, char *str);
 
-static inline int
-xencomm_arch_event_channel_op(int cmd, void *arg)
-{
-	int rc;
-	struct xencomm_handle *newArg;
+int HYPERVISOR_sched_op_compat(int cmd, unsigned long arg);
 
-	newArg = xencomm_create_inline(arg);
-	rc = _hypercall2(int, event_channel_op, cmd, newArg);
-	if (unlikely(rc == -ENOSYS)) {
-		struct evtchn_op op;
+int HYPERVISOR_sched_op(int cmd, void *arg);
 
-		op.cmd = SWAP(cmd);
-		memcpy(&op.u, arg, sizeof(op.u));
-		rc = _hypercall1(int, event_channel_op_compat, &op);
-	}
-	return rc;
-}
-#define HYPERVISOR_event_channel_op xencomm_arch_event_channel_op
-
-static inline int
-xencomm_arch_xen_version(int cmd, struct xencomm_handle *arg)
-{
-	return _hypercall2(int, xen_version, cmd, arg);
-}
-
-static inline int
-xencomm_arch_xen_feature(int cmd, struct xencomm_handle *arg)
-{
-	struct xencomm_handle *newArg;
-
-	newArg = xencomm_create_inline(arg);
-	return _hypercall2(int, xen_version, cmd, newArg);
-}
-
-static inline int
-HYPERVISOR_xen_version(int cmd, void *arg)
-{
-	switch(cmd) {
-		case XENVER_version:
-			return xencomm_arch_xen_version(cmd, 0);
-		case XENVER_get_features:
-			return xencomm_arch_xen_feature(cmd, arg);
-		default:
-			return -1;
-	}
-}
-
-static inline int
-xencomm_arch_console_io(int cmd, int count, char *str)
-{
-	struct xencomm_handle *newStr;
-
-	newStr = xencomm_create_inline(str);
-	return _hypercall3(int, console_io, cmd, count, newStr);
-}
-
-
-#define HYPERVISOR_console_io xencomm_arch_console_io
-
-static inline int
-HYPERVISOR_sched_op_compat(int cmd, unsigned long arg)
-{
-	return _hypercall2(int, sched_op_compat, cmd, arg);
-}
-
-static inline int
-xencomm_arch_sched_op(int cmd, void *arg)
-{
-	struct xencomm_handle *newArg;
-
-	newArg = xencomm_create_inline(arg);
-	return _hypercall2(int, sched_op, cmd, newArg);
-}
-
-#define HYPERVISOR_sched_op xencomm_arch_sched_op
-
-static inline int
-xencomm_arch_callback_op(int cmd, void *arg)
-{
-	struct xencomm_handle *newArg;
-
-	newArg = xencomm_create_inline(arg);
-	return _hypercall2(int, callback_op, cmd, newArg);
-}
-#define HYPERVISOR_callback_op xencomm_arch_callback_op
-
-static inline int
-xencomm_arch_hypercall_grant_table_op(unsigned int cmd,
-                                      struct xencomm_handle *uop,
-                                      unsigned int count)
-{
-	return _hypercall3(int, grant_table_op, cmd, uop, count);
-}
+int HYPERVISOR_callback_op(int cmd, void *arg);
 
 int HYPERVISOR_grant_table_op(unsigned int cmd, void *uop, unsigned int count);
 
-static inline int
-HYPERVISOR_opt_feature(void *arg)
-{
-	struct xencomm_handle *new_arg;
+int HYPERVISOR_opt_feature(void *arg);
 
-	new_arg = xencomm_create_inline(arg);
+int HYPERVISOR_suspend(unsigned long srec);
 
-	return _hypercall1(int, opt_feature, new_arg);
-}
+int HYPERVISOR_shutdown(unsigned int reason);
 
 #endif /* __HYPERCALL_H__ */
