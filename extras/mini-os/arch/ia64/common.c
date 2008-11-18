@@ -116,8 +116,8 @@ registerCallback(void)
 {
 	struct callback_register event =
 	{
-		.type = SWAP(CALLBACKTYPE_event),
-		.address = SWAP((unsigned long)&hypervisor_callback),
+		.type = CALLBACKTYPE_event,
+		.address = (unsigned long)&hypervisor_callback,
 	};
 	HYPERVISOR_callback_op(CALLBACKOP_register, &event);
 }
@@ -126,46 +126,44 @@ static void
 init_start_info(start_info_t* xen_start_info)
 {
 	/* Make a copy of the start_info structure */
-	start_info.nr_pages = SWAP(xen_start_info->nr_pages);
-	start_info.shared_info = SWAP(xen_start_info->shared_info);
-	start_info.flags = SWAP(xen_start_info->flags);
-	start_info.store_mfn = SWAP(xen_start_info->store_mfn);
-	start_info.store_evtchn	= SWAP(xen_start_info->store_evtchn);
-	start_info.console.domU.mfn = SWAP(xen_start_info->console.domU.mfn);
+	start_info.nr_pages = xen_start_info->nr_pages;
+	start_info.shared_info = xen_start_info->shared_info;
+	start_info.flags = xen_start_info->flags;
+	start_info.store_mfn = xen_start_info->store_mfn;
+	start_info.store_evtchn	= xen_start_info->store_evtchn;
+	start_info.console.domU.mfn = xen_start_info->console.domU.mfn;
 	start_info.console.domU.evtchn =
-				SWAP(xen_start_info->console.domU.evtchn);
-	start_info.pt_base = SWAP(xen_start_info->pt_base);
-	start_info.nr_pt_frames	= SWAP(xen_start_info->nr_pt_frames);
-	start_info.mfn_list = SWAP(xen_start_info->mfn_list);
-	start_info.mod_start = SWAP(xen_start_info->mod_start);
-	start_info.mod_len = SWAP(xen_start_info->mod_len);
+				xen_start_info->console.domU.evtchn;
+	start_info.pt_base = xen_start_info->pt_base;
+	start_info.nr_pt_frames	= xen_start_info->nr_pt_frames;
+	start_info.mfn_list = xen_start_info->mfn_list;
+	start_info.mod_start = xen_start_info->mod_start;
+	start_info.mod_len = xen_start_info->mod_len;
 }
 
 static void
 init_boot_params(void)
 {
-	ia64BootParamG.command_line = SWAP(ia64_boot_paramP->command_line);
-	ia64BootParamG.efi_systab = SWAP(ia64_boot_paramP->efi_systab);
-	ia64BootParamG.efi_memmap = SWAP(ia64_boot_paramP->efi_memmap);
-	ia64BootParamG.efi_memmap_size =
-				SWAP(ia64_boot_paramP->efi_memmap_size);
-	ia64BootParamG.efi_memdesc_size	=
-				SWAP(ia64_boot_paramP->efi_memdesc_size);
+	ia64BootParamG.command_line = ia64_boot_paramP->command_line;
+	ia64BootParamG.efi_systab = ia64_boot_paramP->efi_systab;
+	ia64BootParamG.efi_memmap = ia64_boot_paramP->efi_memmap;
+	ia64BootParamG.efi_memmap_size = ia64_boot_paramP->efi_memmap_size;
+	ia64BootParamG.efi_memdesc_size	= ia64_boot_paramP->efi_memdesc_size;
 	ia64BootParamG.efi_memdesc_version =
-				SWAP(ia64_boot_paramP->efi_memdesc_version);
+				ia64_boot_paramP->efi_memdesc_version;
 	ia64BootParamG.console_info.num_cols =
-				SWAP(ia64_boot_paramP->console_info.num_cols);
+				ia64_boot_paramP->console_info.num_cols;
 	ia64BootParamG.console_info.num_rows =
-				SWAP(ia64_boot_paramP->console_info.num_rows);
+				ia64_boot_paramP->console_info.num_rows;
 	ia64BootParamG.console_info.orig_x =
-				SWAP(ia64_boot_paramP->console_info.orig_x);
+				ia64_boot_paramP->console_info.orig_x;
 	ia64BootParamG.console_info.orig_y =
-				SWAP(ia64_boot_paramP->console_info.orig_y);
-	ia64BootParamG.fpswa = SWAP(ia64_boot_paramP->fpswa);
-	ia64BootParamG.initrd_start = SWAP(ia64_boot_paramP->initrd_start);
-	ia64BootParamG.initrd_size = SWAP(ia64_boot_paramP->initrd_size);
-	ia64BootParamG.domain_start = SWAP(ia64_boot_paramP->domain_start);
-	ia64BootParamG.domain_size = SWAP(ia64_boot_paramP->domain_size);
+				ia64_boot_paramP->console_info.orig_y;
+	ia64BootParamG.fpswa = ia64_boot_paramP->fpswa;
+	ia64BootParamG.initrd_start = ia64_boot_paramP->initrd_start;
+	ia64BootParamG.initrd_size = ia64_boot_paramP->initrd_size;
+	ia64BootParamG.domain_start = ia64_boot_paramP->domain_start;
+	ia64BootParamG.domain_size = ia64_boot_paramP->domain_size;
 
 	/*
 	 * Copy and parse the boot command line.

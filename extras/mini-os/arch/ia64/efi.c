@@ -49,13 +49,6 @@ efi_get_time(efi_time_t* tmP)
 		printk("efi.getTime() failed\n");
 		return 0;
 	}
-
-#if defined(BIG_ENDIAN)
-	tmP->Year = SWAP(tmP->Year);
-	tmP->TimeZone = SWAP(tmP->TimeZone);
-	tmP->Nanosecond = SWAP(tmP->Nanosecond);
-#endif
-
 	return 1;
 }
 
@@ -65,17 +58,7 @@ efi_get_time(efi_time_t* tmP)
 static int
 efi_guid_cmp(efi_guid_t* a_le, efi_guid_t* b)
 {
-#if defined(BIG_ENDIAN)
-	if(SWAP(a_le->Data1) != b->Data1)
-		return 1;
-	if(SWAP(a_le->Data2) != b->Data2)
-		return 1;
-	if(SWAP(a_le->Data3) != b->Data3)
-		return 1;
-	return memcmp(a_le->Data4, b->Data4, sizeof(uint8_t)*8);
-#else
 	return memcmp(a_le, b, sizeof(efi_guid_t));
-#endif
 }
 
 void
@@ -99,20 +82,20 @@ init_efi(void)
 	efiSysTableP = (efi_system_table_t*)__va(ia64BootParamG.efi_systab);
 	machineFwG.efi.efiSysTableP = efiSysTableP;
 	PRINT_BV("EfiSystemTable at: %p\n", efiSysTableP);
-	fwP = (uint16_t*) __va(SWAP(efiSysTableP->FirmwareVendor));
+	fwP = (uint16_t*) __va(efiSysTableP->FirmwareVendor);
 	if (fwP) {
 		for (i = 0; i < (int)sizeof(fwVendor) - 1 && *fwP; ++i)
-			fwVendor[i] = SWAP(*fwP++);
+			fwVendor[i] = *fwP++;
 		fwVendor[i] = '\0';
 	}
 	PRINT_BV("  EFI-FirmwareVendor        : %s\n", fwVendor);
 	PRINT_BV("  EFI-FirmwareRevision      : %d\n",
-		 SWAP(efiSysTableP->FirmwareRevision));
+		 efiSysTableP->FirmwareRevision);
 	PRINT_BV("  EFI-SystemTable-Revision  : %d.%d\n",
-		 SWAP(efiSysTableP->Hdr.Revision)>>16,
-		 SWAP(efiSysTableP->Hdr.Revision)&0xffff);
+		 efiSysTableP->Hdr.Revision >> 16,
+		 efiSysTableP->Hdr.Revision & 0xffff);
 	rsP = (efi_runtime_services_t*)
-		__va(SWAP(efiSysTableP->RuntimeServices));
+		__va(efiSysTableP->RuntimeServices);
 	mdcnt = ia64BootParamG.efi_memmap_size /
 		ia64BootParamG.efi_memdesc_size;
 	memdP = (efi_memory_descriptor_t*) __va(ia64BootParamG.efi_memmap);
@@ -123,10 +106,10 @@ init_efi(void)
 	     mdP = NextMemoryDescriptor(mdP, ia64BootParamG.efi_memdesc_size)) {
 		/* Relocate runtime memory segments for firmware. */
 		PRINT_BV("  %d. Type: %x  Attributes: 0x%lx\n",
-			 i, SWAP(mdP->Type), SWAP(mdP->Attribute));
+			 i, mdP->Type, mdP->Attribute);
 		PRINT_BV("     PhysStart: 0x%lx  NumPages: 0x%lx\n",
-			 SWAP(mdP->PhysicalStart), SWAP(mdP->NumberOfPages));
-		switch (SWAP(mdP->Type)) {
+			 mdP->PhysicalStart, mdP->NumberOfPages);
+		switch (mdP->Type) {
 			case EfiRuntimeServicesData:
 				PRINT_BV("     -> EfiRuntimeServicesData\n");
 				break;
@@ -139,18 +122,17 @@ init_efi(void)
 			case EfiConventionalMemory:
 				PRINT_BV("     -> EfiConventionalMemory\n");
 				PRINT_BV("        start: 0x%lx end: 0x%lx\n",
-					SWAP(mdP->PhysicalStart),
-					SWAP(mdP->PhysicalStart)+
-					SWAP(mdP->NumberOfPages)*EFI_PAGE_SIZE);
+					mdP->PhysicalStart,
+					mdP->PhysicalStart +
+					mdP->NumberOfPages * EFI_PAGE_SIZE);
 				if (numConvMem) {
 					printk("     Currently only one efi "
 						"memory chunk supported !!!\n");
 					break;
 				}
-				machineFwG.mach_mem_start =
-					SWAP(mdP->PhysicalStart);
+				machineFwG.mach_mem_start = mdP->PhysicalStart;
 				machineFwG.mach_mem_size =
-					SWAP(mdP->NumberOfPages)*EFI_PAGE_SIZE;
+					mdP->NumberOfPages * EFI_PAGE_SIZE;
 				numConvMem++;
 				break;
 			case EfiMemoryMappedIOPortSpace:
@@ -158,7 +140,7 @@ init_efi(void)
 				break;
 			case EfiPalCode:
                        		machineFwG.ia64_pal_base =
-					__va(SWAP(mdP->PhysicalStart));
+					__va(mdP->PhysicalStart);
 				PRINT_BV("     -> EfiPalCode\n"
 					 "        start : %p\n",
 					 machineFwG.ia64_pal_base);
@@ -170,12 +152,11 @@ init_efi(void)
 		 * virtual addressing and the efi runtime functions
 		 * may be called directly.
 		 */
-		if (SWAP(mdP->Attribute) & EFI_MEMORY_RUNTIME) {
-			if (SWAP(mdP->Attribute) & EFI_MEMORY_WB)
-				mdP->VirtualStart =
-					SWAP(__va(mdP->PhysicalStart));
+		if (mdP->Attribute & EFI_MEMORY_RUNTIME) {
+			if (mdP->Attribute & EFI_MEMORY_WB)
+				mdP->VirtualStart = __va(mdP->PhysicalStart);
 			else {
-				if (SWAP(mdP->Attribute) & EFI_MEMORY_UC)
+				if (mdP->Attribute & EFI_MEMORY_UC)
 					printk("efi_init: RuntimeMemory with "
 						"UC attribute !!!!!!\n");
 					/*
@@ -187,7 +168,7 @@ init_efi(void)
 	}
 	/* Now switch efi runtime stuff to virtual addressing. */
 	status = ia64_call_efi_physical(
-			(void*)__va(SWAP((uint64_t)rsP->SetVirtualAddressMap)),
+			(void*)__va((uint64_t)rsP->SetVirtualAddressMap),
 			ia64BootParamG.efi_memmap_size,
 			ia64BootParamG.efi_memdesc_size,
 			ia64BootParamG.efi_memdesc_version,
@@ -200,35 +181,35 @@ init_efi(void)
 	}
 	/* Getting efi function pointer for getEfiTime. */
 	machineFwG.efi.getTimeF =
-		(efi_get_time_t)__va(SWAP((uint64_t)rsP->GetTime));
+		(efi_get_time_t)__va((uint64_t)rsP->GetTime);
 	/* Getting efi function pointer for resetSystem. */
 	machineFwG.efi.resetSystemF =
-		(efi_reset_system_t)__va(SWAP((uint64_t)rsP->ResetSystem));
+		(efi_reset_system_t)__va((uint64_t)rsP->ResetSystem);
 
 	/* Scanning the Configuration table of the EfiSystemTable. */
 	PRINT_BV("NumberOfConfigTableEntries: %ld\n",
-		 SWAP(efiSysTableP->NumberOfTableEntries));
+		 efiSysTableP->NumberOfTableEntries);
 
 	confP = (efi_configuration_table_t*)
-			__va(SWAP(efiSysTableP->ConfigurationTable));
-	for (i = 0; i < SWAP(efiSysTableP->NumberOfTableEntries); i++) {
+			__va(efiSysTableP->ConfigurationTable);
+	for (i = 0; i < efiSysTableP->NumberOfTableEntries; i++) {
 		if (!efi_guid_cmp(&confP[i].VendorGuid, &sal)) {
 			machineFwG.ia64_sal_tableP = (sal_system_table_t*)
-				__va(SWAP((uint64_t) confP[i].VendorTable));
+				__va((uint64_t) confP[i].VendorTable);
 			PRINT_BV("  Found SalSystemTable at: 0x%lx\n",
 				 (uint64_t) machineFwG.ia64_sal_tableP);
 			continue;
 		}
 		if (!efi_guid_cmp(&confP[i].VendorGuid, &acpi)) {
 			machineFwG.ia64_efi_acpi_table =
-				__va(SWAP((uint64_t) confP[i].VendorTable));
+				__va((uint64_t) confP[i].VendorTable);
 			PRINT_BV("  Found AcpiTable at:      0x%lx\n",
 				 (uint64_t) machineFwG.ia64_efi_acpi_table);
 			continue;
 		}
 		if (!efi_guid_cmp(&confP[i].VendorGuid, &acpi20)) {
 			machineFwG.ia64_efi_acpi20_table =
-				__va(SWAP((uint64_t) confP[i].VendorTable));
+				__va((uint64_t) confP[i].VendorTable);
 			PRINT_BV("  Found Acpi20Table at:    0x%lx\n",
 				 (uint64_t) machineFwG.ia64_efi_acpi20_table);
 			continue;

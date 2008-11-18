@@ -205,10 +205,6 @@ ENTRY(_start)
 	START_INFO_PFN_ld	r14=[r15]	// load the start_info_pfn
 	add	r16=7, r0
 	;;
-#if defined(BIG_ENDIAN)
-	mux1	r14=r14,@rev		// swap because mini-os is in BE
-#endif
-	;;
 	shl	r15=r14,PAGE_SHIFT_XEN_16K	// pfn << PAGE_SHIFT_XEN_16K
 	shl	r16=r16,IA64_RR_IDX_POS		// (7<<IA64_RR_IDX_POS)
 	;;

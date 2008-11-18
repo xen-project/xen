@@ -102,7 +102,6 @@ static const char *ia64_vector_names[] = {
 
 typedef struct
 {
-#if !defined(BIG_ENDIAN)
 	uint64_t sof	:7;	/* 0-6 size of frame */
 	uint64_t sol	:7;	/* 7-13 size of locals (in + loc) */
 	uint64_t sor	:4;
@@ -111,16 +110,6 @@ typedef struct
 	uint64_t rrb_pr	:6;
 	uint64_t res	:25;	/* reserved */
 	uint64_t v	:1;	/* The v bit */
-#else /* !BIG_ENDIAN */
-	uint64_t v	:1;	/* The v bit */
-	uint64_t res	:25;	/* reserved */
-	uint64_t rrb_pr	:6;
-	uint64_t rrb_fr	:7;
-	uint64_t rrb_gr	:7;
-	uint64_t sor	:4;
-	uint64_t sol	:7;	/* 7-13 size of locals (in + loc) */
-	uint64_t sof	:7;	/* 0-6 size of frame */
-#endif /* BIG_ENDIAN */
 } ifs_t;
 
 void

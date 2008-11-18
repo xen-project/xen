@@ -134,23 +134,16 @@
 #define IA64_PSR_IA		0x0000200000000000
 
 
-/* Endianess of mini-os. */
-#if defined(BIG_ENDIAN)
-#define MOS_IA64_PSR_BE	IA64_PSR_BE
-#else
-#define MOS_IA64_PSR_BE	0
-#endif
-
 #define STARTUP_PSR (IA64_PSR_IT | IA64_PSR_PK | \
-            	     IA64_PSR_DT | IA64_PSR_RT | MOS_IA64_PSR_BE | \
+            	     IA64_PSR_DT | IA64_PSR_RT | \
 		     IA64_PSR_BN | IA64_PSR_CPL_KERN | IA64_PSR_AC)
 
 #define MOS_SYS_PSR (IA64_PSR_IC | IA64_PSR_I | IA64_PSR_IT | \
-            	     IA64_PSR_DT | IA64_PSR_RT | MOS_IA64_PSR_BE | \
+            	     IA64_PSR_DT | IA64_PSR_RT | \
 		     IA64_PSR_BN | IA64_PSR_CPL_KERN | IA64_PSR_AC)
 
 #define MOS_USR_PSR (IA64_PSR_IC | IA64_PSR_I | IA64_PSR_IT | \
-            	     IA64_PSR_DT | IA64_PSR_RT | MOS_IA64_PSR_BE | \
+            	     IA64_PSR_DT | IA64_PSR_RT | \
 		     IA64_PSR_BN | IA64_PSR_CPL_USER | IA64_PSR_AC)
 
 /*
@@ -193,14 +186,7 @@
 #define IA64_DCR_MBZ1_V		0xffffffffffffULL
 
 
-	/* Endianess of DCR register. */
-#if defined(BIG_ENDIAN)
-#define MOS_IA64_DCR_BE	(1 << IA64_DCR_BE)
-#else
-#define MOS_IA64_DCR_BE	(0 << IA64_DCR_BE)
-#endif
-
-#define IA64_DCR_DEFAULT (MOS_IA64_DCR_BE)
+#define IA64_DCR_DEFAULT (IA64_DCR_BE)
 
 /*
  * Vector numbers for various ia64 interrupts.
@@ -262,18 +248,8 @@
 #define IA64_RSC_MODE_LI (0x2) 		/* Load intensive */
 #define IA64_RSC_MODE_EA (0x3) 		/* Eager */
 
-/* RSE endian mode. */
-#if defined(BIG_ENDIAN)
-#define MOS_IA64_RSC_BE	1		/* Big endian rse. */
-#else
-#define MOS_IA64_RSC_BE	0		/* Little endian rse. */
-#endif
-
-#define IA64_RSE_EAGER ((IA64_RSC_MODE_EA<<IA64_RSC_MODE) |	\
-			   (MOS_IA64_RSC_BE << IA64_RSC_BE)	)
-
-#define IA64_RSE_LAZY ((IA64_RSC_MODE_LY<<IA64_RSC_MODE) |	\
-			   (MOS_IA64_RSC_BE << IA64_RSC_BE)	)
+#define IA64_RSE_EAGER (IA64_RSC_MODE_EA<<IA64_RSC_MODE)
+#define IA64_RSE_LAZY (IA64_RSC_MODE_LY<<IA64_RSC_MODE)
 
 
 
@@ -719,19 +695,6 @@ typedef struct trap_frame trap_frame_t;
  */
 typedef struct
 {
-#if defined(BIG_ENDIAN)
-	uint64_t pte_ig	:11;	/* bits 53..63 */
-	uint64_t pte_ed	:1;	/* bits 52..52 */
-	uint64_t pte_rv2:2;	/* bits 50..51 */
-	uint64_t pte_ppn:38;	/* bits 12..49 */
-	uint64_t pte_ar	:3;	/* bits 9..11 */
-	uint64_t pte_pl	:2;	/* bits 7..8 */
-	uint64_t pte_d	:1;	/* bits 6..6 */
-	uint64_t pte_a	:1;	/* bits 5..5 */
-	uint64_t pte_ma	:3;	/* bits 2..4 */
-	uint64_t pte_rv1:1;	/* bits 1..1 */
-	uint64_t pte_p	:1;	/* bits 0..0 */
-#else
 	uint64_t pte_p	:1;	/* bits 0..0 */
 	uint64_t pte_rv1:1;	/* bits 1..1 */
 	uint64_t pte_ma	:3;	/* bits 2..4 */
@@ -743,7 +706,6 @@ typedef struct
 	uint64_t pte_rv2:2;	/* bits 50..51 */
 	uint64_t pte_ed	:1;	/* bits 52..52 */
 	uint64_t pte_ig	:11;	/* bits 53..63 */
-#endif
 } ia64_pte_t;
 
 

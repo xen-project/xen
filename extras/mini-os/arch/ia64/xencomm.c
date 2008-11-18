@@ -95,7 +95,7 @@ xencomm_init_desc(struct xencomm_desc *desc, void *buffer, unsigned long bytes)
 			return -EINVAL;
 		}
 
-		desc->address[i++] = SWAP(paddr);
+		desc->address[i++] = paddr;
 		recorded += chunksz;
 	}
 	if (recorded < bytes) {
@@ -106,8 +106,8 @@ xencomm_init_desc(struct xencomm_desc *desc, void *buffer, unsigned long bytes)
 
 	/* mark remaining addresses invalid (just for safety) */
 	while (i < desc->nr_addrs)
-		desc->address[i++] = SWAP(XENCOMM_INVALID);
-	desc->magic = SWAP(XENCOMM_MAGIC);
+		desc->address[i++] = XENCOMM_INVALID;
+	desc->magic = XENCOMM_MAGIC;
 	return 0;
 }
 
@@ -184,15 +184,14 @@ xencommize_mini_grant_table_op(struct xencomm_mini *xc_area, int *nbr_area,
 			return -EINVAL;
 		rc = xencomm_create_mini
 		        (xc_area, nbr_area,
-		         (void*)SWAP((uint64_t)
-				     xen_guest_handle(setup->frame_list)),
-		         SWAP(setup->nr_frames)
+		         (void*)(uint64_t) xen_guest_handle(setup->frame_list),
+		         setup->nr_frames
 		         * sizeof(*xen_guest_handle(setup->frame_list)),
 		         &desc1);
 		if (rc)
 			return rc;
 		set_xen_guest_handle(setup->frame_list,
-				     (void *)SWAP((uint64_t)desc1));
+				     (void *)(uint64_t)desc1);
 		break;
 	}
 	case GNTTABOP_dump_table:
@@ -284,7 +283,7 @@ HYPERVISOR_suspend(unsigned long srec)
 {
         struct sched_shutdown arg;
 
-        arg.reason = (uint32_t)SWAP((uint32_t)SHUTDOWN_suspend);
+        arg.reason = (uint32_t)SHUTDOWN_suspend;
 
         return xencomm_arch_hypercall_suspend(xencomm_create_inline(&arg));
 }
@@ -300,7 +299,7 @@ HYPERVISOR_event_channel_op(int cmd, void *arg)
 	if (unlikely(rc == -ENOSYS)) {
 		struct evtchn_op op;
 
-		op.cmd = SWAP(cmd);
+		op.cmd = cmd;
 		memcpy(&op.u, arg, sizeof(op.u));
 		rc = _hypercall1(int, event_channel_op_compat, &op);
 	}

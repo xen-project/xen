@@ -76,19 +76,19 @@ ia64_sal_init(struct sal_system_table *saltab)
 		return;
 	}
 	p = (uint8_t *) (saltab + 1);
-	for (i = 0; i < SWAP(saltab->sal_entry_count); i++) {
-		switch (SWAP(*p)) {
+	for (i = 0; i < saltab->sal_entry_count; i++) {
+		switch (*p) {
 		case SAL_DESC_ENTRYPOINT:		// 0
 		{
 			struct sal_entrypoint_descriptor *dp;
 
 			dp = (struct sal_entrypoint_descriptor*)p;
 			ia64_pal_entry =
-				IA64_PHYS_TO_RR7(SWAP(dp->sale_pal_proc));
+				IA64_PHYS_TO_RR7(dp->sale_pal_proc);
 			PRINT_BV("  PAL Proc at 0x%lx\n", ia64_pal_entry);
 			sal_fdesc.func =
-				IA64_PHYS_TO_RR7(SWAP(dp->sale_sal_proc));
-			sal_fdesc.gp = IA64_PHYS_TO_RR7(SWAP(dp->sale_sal_gp));
+				IA64_PHYS_TO_RR7(dp->sale_sal_proc);
+			sal_fdesc.gp = IA64_PHYS_TO_RR7(dp->sale_sal_gp);
 			PRINT_BV("  SAL Proc at 0x%lx, GP at 0x%lx\n",
 				 sal_fdesc.func, sal_fdesc.gp);
 			ia64_sal_entry = (sal_entry_t *) &sal_fdesc;

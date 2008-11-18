@@ -28,7 +28,6 @@
 #if !defined(__ASSEMBLY__)
 
 #include <mini-os/types.h>
-#include "endian.h"
 #include "ia64_cpu.h"
 #include "atomic.h"
 #include "efi.h"
@@ -210,7 +209,7 @@ extern shared_info_t *HYPERVISOR_shared_info;
 do {									\
 	vcpu_info_t *_vcpu;						\
 	_vcpu = &HYPERVISOR_shared_info->vcpu_info[smp_processor_id()];	\
-	_vcpu->evtchn_upcall_mask = SWAP(1);				\
+	_vcpu->evtchn_upcall_mask = 1;					\
 	barrier();							\
 } while (0)
 
@@ -221,7 +220,7 @@ do {									\
 	_vcpu = &HYPERVISOR_shared_info->vcpu_info[smp_processor_id()];	\
 	_vcpu->evtchn_upcall_mask = 0;					\
 	barrier(); /* unmask then check (avoid races) */		\
-	if (unlikely(SWAP(_vcpu->evtchn_upcall_pending)))		\
+	if (unlikely(_vcpu->evtchn_upcall_pending))			\
 		force_evtchn_callback();				\
 } while (0)
 
@@ -229,7 +228,7 @@ do {									\
 do {									\
 	vcpu_info_t *_vcpu;						\
 	_vcpu = &HYPERVISOR_shared_info->vcpu_info[smp_processor_id()];	\
-	(x) = SWAP(_vcpu->evtchn_upcall_mask);				\
+	(x) = _vcpu->evtchn_upcall_mask;				\
 } while (0)
 
 #define __restore_flags(x)						\
@@ -239,7 +238,7 @@ do {									\
 	_vcpu = &HYPERVISOR_shared_info->vcpu_info[smp_processor_id()];	\
 	if ((_vcpu->evtchn_upcall_mask = (x)) == 0) {			\
 		barrier(); /* unmask then check (avoid races) */	\
-		if ( unlikely(SWAP(_vcpu->evtchn_upcall_pending)) )	\
+		if ( unlikely(_vcpu->evtchn_upcall_pending) )		\
 			force_evtchn_callback();			\
 	}\
 } while (0)
@@ -250,8 +249,8 @@ do {									\
 do {									\
 	vcpu_info_t *_vcpu;						\
 	_vcpu = &HYPERVISOR_shared_info->vcpu_info[smp_processor_id()];	\
-	(x) = SWAP(_vcpu->evtchn_upcall_mask);				\
-	_vcpu->evtchn_upcall_mask = SWAP(1);				\
+	(x) = _vcpu->evtchn_upcall_mask;				\
+	_vcpu->evtchn_upcall_mask = 1;					\
 	barrier();							\
 } while (0)
 
@@ -262,7 +261,7 @@ do {									\
 #define local_irq_enable()	__sti()
 
 #define irqs_disabled()			\
-	SWAP(HYPERVISOR_shared_info->vcpu_info[smp_processor_id()].evtchn_upcall_mask)
+	(HYPERVISOR_shared_info->vcpu_info[smp_processor_id()].evtchn_upcall_mask)
 
 /* This is a barrier for the compiler only, NOT the processor! */
 #define barrier() __asm__ __volatile__("": : :"memory")

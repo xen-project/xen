@@ -87,11 +87,6 @@ ENTRY(save_tf_rse_switch)
 	;;
 	ld8	r21=[r21]		// XEN.ipsr
 	ld8	r22=[r22];;		// XEN.iip
-#if defined(BIG_ENDIAN)
-	mux1	r21=r21,@rev		// swap because mini-os is in BE
-	mux1	r22=r22,@rev		// swap because mini-os is in BE
-	;;
-#endif
 	add	r19=TF_IPSR,r18
 	add	r20=TF_IIP,r18
 	;;
@@ -129,10 +124,6 @@ ENTRY(save_tf_rse_switch)
 	//bsw.1		// switch to bank 1 for saving these registers.
 	movl r30=XSI_BANKNUM		// Switch to bank 1.
 	mov r31=1;;
-#if defined(BIG_ENDIAN)
-	mux1	r31=r31,@rev		// swap because mini-os is in BE
-	;;
-#endif
 	st4 [r30]=r31
 	;;
 	/*
@@ -143,38 +134,13 @@ ENTRY(save_tf_rse_switch)
 	movl r30=XSI_BANK1_R16;
 	movl r31=XSI_BANK1_R16+8;; 
 	ld8 r16=[r30],16; ld8 r17=[r31],16;;
-#if defined(BIG_ENDIAN)			// swap because mini-os is in BE
-	mux1	r16=r16,@rev; mux1 r17=r17,@rev;;
-#endif
 	ld8 r18=[r30],16; ld8 r19=[r31],16;;
-#if defined(BIG_ENDIAN)			// swap because mini-os is in BE
-	mux1	r18=r18,@rev; mux1 r19=r19,@rev;;
-#endif
 	ld8 r20=[r30],16; ld8 r21=[r31],16;;
-#if defined(BIG_ENDIAN)			// swap because mini-os is in BE
-	mux1	r20=r20,@rev; mux1 r21=r21,@rev;;
-#endif
 	ld8 r22=[r30],16; ld8 r23=[r31],16;;
-#if defined(BIG_ENDIAN)			// swap because mini-os is in BE
-	mux1	r22=r22,@rev; mux1 r23=r23,@rev;;
-#endif
 	ld8 r24=[r30],16; ld8 r25=[r31],16;;
-#if defined(BIG_ENDIAN)			// swap because mini-os is in BE
-	mux1	r24=r24,@rev; mux1 r25=r25,@rev;;
-#endif
 	ld8 r26=[r30],16; ld8 r27=[r31],16;;
-#if defined(BIG_ENDIAN)			// swap because mini-os is in BE
-	mux1	r26=r26,@rev; mux1 r27=r27,@rev;;
-#endif
 	ld8 r28=[r30],16; ld8 r29=[r31],16;;
-#if defined(BIG_ENDIAN)			// swap because mini-os is in BE
-	mux1	r28=r28,@rev; mux1 r29=r29,@rev;;
-#endif
 	ld8 r30=[r30]; ld8 r31=[r31];;
-#if defined(BIG_ENDIAN)			// swap because mini-os is in BE
-	mux1	r30=r30,@rev; mux1 r31=r31,@rev;;
-#endif
-
 	add	r2=TF_GREG16,r14
 	add	r3=TF_GREG17,r14
 	;;
@@ -251,10 +217,6 @@ ENTRY(save_tf_rse_switch)
 	;;
 	ld8	r21=[r8]
 	;;
-#if defined(BIG_ENDIAN)			// swap because mini-os is in BE
-	mux1	r21=r21,@rev
-	;;
-#endif
 	st8	[r19]=r21		// store cr.ifs
 	dep.z	r22=r21,0,38		// copy ifm part from ifs.ifm
 	;;
@@ -330,12 +292,6 @@ ENTRY(restore_tf_rse_switch)
 	;;
 	ld8	r21=[r19]		// load cr.ipsr
 	ld8	r22=[r20]		// load cr.iip
-#if defined(BIG_ENDIAN)			// swap because mini-os is in BE
-	;;
-	mux1	r21=r21,@rev
-	mux1	r22=r22,@rev
-	;;
-#endif
 	movl	r16=XSI_IPSR		// XEN !!
 	;;
 	st8	[r16]=r21,XSI_IIP_OFS-XSI_IPSR_OFS	// XEN.ipsr
@@ -353,9 +309,6 @@ ENTRY(restore_tf_rse_switch)
 	ld8	r22=[r19]		// ndirty
 	;;
 	shl	r21=r22,16		// value for ar.rsc
-	//mov	r19=(MOS_IA64_RSC_BE << IA64_RSC_BE)
-	;;
-	or	r21=(MOS_IA64_RSC_BE << IA64_RSC_BE),r21
 	;;
 	mov	ar.rsc=r21		// setup for loadrs
 	;;
@@ -386,10 +339,6 @@ ENTRY(restore_tf_rse_switch)
 	ld8	r21=[r19]		// load ar.pfs
 	ld8	r22=[r20]		// load cr.ifs
 	;;
-#if defined(BIG_ENDIAN)			// swap because mini-os is in BE
-	mux1	r22=r22,@rev
-	;;
-#endif
 	add	r19=TF_RSC,r18
 	mov	ar.pfs=r21
 	st8	[r16]=r22		// XEN.ifs
@@ -429,10 +378,6 @@ ENTRY(restore_tf_rse_switch)
 	// bsw.1
 	movl r30=XSI_BANKNUM		// Switch to bank 1.
 	mov r31=1;;
-#if defined(BIG_ENDIAN)			// swap because mini-os is in BE
-	mux1	r31=r31,@rev
-	;;
-#endif
 	st4 [r30]=r31
 	;;
 	add	r2=TF_GREG16,r14
@@ -455,51 +400,27 @@ ENTRY(restore_tf_rse_switch)
 	movl r2=XSI_BANK1_R16
 	movl r3=XSI_BANK1_R16+8
 	;;
-#if defined(BIG_ENDIAN)			// swap because mini-os is in BE
-	mux1	r16=r16,@rev; mux1 r17=r17,@rev;;
-#endif
 	.mem.offset 0,0; st8.spill [r2]=r16,16
 	.mem.offset 8,0; st8.spill [r3]=r17,16
 	;;
-#if defined(BIG_ENDIAN)			// swap because mini-os is in BE
-	mux1	r18=r18,@rev; mux1 r19=r19,@rev;;
-#endif
 	.mem.offset 0,0; st8.spill [r2]=r18,16
 	.mem.offset 8,0; st8.spill [r3]=r19,16
 	;;
-#if defined(BIG_ENDIAN)			// swap because mini-os is in BE
-	mux1	r20=r20,@rev; mux1 r21=r21,@rev;;
-#endif
 	.mem.offset 0,0; st8.spill [r2]=r20,16
 	.mem.offset 8,0; st8.spill [r3]=r21,16
 	;;
-#if defined(BIG_ENDIAN)			// swap because mini-os is in BE
-	mux1	r22=r22,@rev; mux1 r23=r23,@rev;;
-#endif
 	.mem.offset 0,0; st8.spill [r2]=r22,16
 	.mem.offset 8,0; st8.spill [r3]=r23,16
 	;;
-#if defined(BIG_ENDIAN)			// swap because mini-os is in BE
-	mux1	r24=r24,@rev; mux1 r25=r25,@rev;;
-#endif
 	.mem.offset 0,0; st8.spill [r2]=r24,16
 	.mem.offset 8,0; st8.spill [r3]=r25,16
 	;;
-#if defined(BIG_ENDIAN)			// swap because mini-os is in BE
-	mux1	r26=r26,@rev; mux1 r27=r27,@rev;;
-#endif
 	.mem.offset 0,0; st8.spill [r2]=r26,16
 	.mem.offset 8,0; st8.spill [r3]=r27,16
 	;;
-#if defined(BIG_ENDIAN)			// swap because mini-os is in BE
-	mux1	r28=r28,@rev; mux1 r29=r29,@rev;;
-#endif
 	.mem.offset 0,0; st8.spill [r2]=r28,16
 	.mem.offset 8,0; st8.spill [r3]=r29,16
 	;;
-#if defined(BIG_ENDIAN)			// swap because mini-os is in BE
-	mux1	r30=r30,@rev; mux1 r31=r31,@rev;;
-#endif
 	.mem.offset 0,0; st8.spill [r2]=r30,16
 	.mem.offset 8,0; st8.spill [r3]=r31,16
 	;;
@@ -567,17 +488,11 @@ ENTRY(save_special_regs)
 	add	loc5=TF_IFA,in0
 	add	loc6=TF_ISR,in0
 	;;
-#if defined(BIG_ENDIAN)			// swap because mini-os is in BE
-	mux1	loc3=loc3,@rev; mux1 loc4=loc4,@rev;;
-#endif
 	st8	[loc5]=loc3,TF_IIM-TF_IFA	// store cr.ifa
 	st8	[loc6]=loc4			// store cr.isr
 	;;
 	ld8	loc3=[loc1]			// load XEN.iim
 	;;
-#if defined(BIG_ENDIAN)			// swap because mini-os is in BE
-	mux1	loc3=loc3,@rev;;
-#endif
 	st8	[loc5]=loc3			// store cr.iim
 	;;
 	mov	ar.pfs=loc0
@@ -605,9 +520,6 @@ ENTRY(hypervisor_callback)
 	mov	out0=r18		// the trap frame
 	movl	r22=XSI_PSR_IC
 	mov	r23=1;;
-#if defined(BIG_ENDIAN)			// swap because mini-os is in BE
-	mux1	r23=r23,@rev;;
-#endif
 	st8	[r22]=r23		// ssm psr.ic
 	;;
 	br.call.sptk.few rp = do_hypervisor_callback
@@ -649,9 +561,6 @@ ENTRY(trap_error)
 	;;
 	movl r30=XSI_BANKNUM		// bsw.1
 	mov r31=1;;
-#if defined(BIG_ENDIAN)			// swap because mini-os is in BE
-	mux1	r31=r31,@rev;;
-#endif
 	st4 [r30]=r31;;
 
 		/* Save extra interrupt registers to the trap frame. */
@@ -664,9 +573,6 @@ ENTRY(trap_error)
 	ld8	r23=[r23]
 	mov	r25=1
 	;;
-#if defined(BIG_ENDIAN)			// swap because mini-os is in BE
-	mux1	r25=r25,@rev; mux1 r23=r23,@rev;;
-#endif
 	st4	[r22]=r25		// ssm psr.ic
 	st1	[r23]=r0		// ssm psr.i
 	;;
@@ -680,10 +586,6 @@ ENTRY(trap_error)
 	ld8 r23=[r23]
 	mov r25=1
 	;;
-#if defined(BIG_ENDIAN)			// swap because mini-os is in BE
-	mux1	r25=r25,@rev;;
-	mux1	r25=r25,@rev; mux1 r23=r23,@rev;;
-#endif
 	st1 [r23]=r25
 	st4 [r22]=r0            // note: clears both vpsr.i and vpsr.ic!
 	;;

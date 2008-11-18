@@ -427,11 +427,10 @@ atomic_readandclear_64(volatile uint64_t* p)
 static inline void
 set_bit(int num, volatile void *addr)
 {
-	uint32_t bit, b, old, new;
+	uint32_t bit, old, new;
 	volatile uint32_t *p;
 	p = (volatile uint32_t *) addr + (num >> 5);
-	b = 1 << (num & 31);
-	bit = SWAP(b);
+	bit = 1 << (num & 31);
 	do
 	{
 		old = *p;
@@ -442,11 +441,10 @@ set_bit(int num, volatile void *addr)
 static __inline__ void
 clear_bit(int num, volatile void *addr)
 {
-	uint32_t mask, m,  old, new;
+	uint32_t mask, old, new;
 	volatile uint32_t *p;
 	p = (volatile uint32_t *) addr + (num >> 5);
-	m = ~(1 << (num & 31));
-	mask = SWAP(m);
+	mask = ~(1 << (num & 31));
 	do {
 		old = *p;
 		new = old & mask;
@@ -456,7 +454,7 @@ clear_bit(int num, volatile void *addr)
 static __inline__ int
 test_bit(int num, const volatile void *addr)
 {
-	uint32_t val = SWAP(1);
+	uint32_t val = 1;
         return val & (((const volatile uint32_t *) addr)[num >> 5] >> (num & 31));
 }
 
@@ -468,12 +466,11 @@ test_bit(int num, const volatile void *addr)
 static inline int
 test_and_set_bit (int num, volatile void *addr)
 {
-        uint32_t bit, b, old, new;
+        uint32_t bit, old, new;
         volatile uint32_t *m;
 
         m = (volatile uint32_t *) addr + (num >> 5);
-        b = 1 << (num & 31);
-        bit = SWAP(b);
+        bit = 1 << (num & 31);
         do {
                 old = *m;
                 new = old | bit;
@@ -489,12 +486,11 @@ test_and_set_bit (int num, volatile void *addr)
 static
 inline int test_and_clear_bit(int num, volatile unsigned long * addr)
 {
-        uint32_t bit, b, old, new;
+        uint32_t bit, old, new;
         volatile uint32_t* a;
 
         a = (volatile uint32_t *) addr + (num >> 5);
-        b = ~(1 << (num & 31));
-        bit = SWAP(b);
+        bit = ~(1 << (num & 31));
         do {
                 old = *a;
                 new = old & bit;

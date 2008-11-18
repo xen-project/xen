@@ -155,11 +155,6 @@ ENTRY(ia64_call_efi_physical)
 	ld8	r14=[in0],8		// function address
 	;;
 	ld8	gp=[in0]		// function gp value
-#if defined(BIG_ENDIAN)
-	mux1	r14=r14,@rev		// swap because mini-os is in BE
-	mov	ar.rsc=3
-	;;
-#endif
 	mov	out0=in1
 	mov	out1=in2
 	mov	out2=in3
@@ -167,19 +162,7 @@ ENTRY(ia64_call_efi_physical)
 	mov	out4=in5
 	mov	b6=r14
 	;;
-#if defined(BIG_ENDIAN)
-	mux1	gp=gp,@rev		// swap because mini-os is in BE
-	rum IA64_PSR_BE
-	;;
-#endif
-
 	br.call.sptk.many rp=b6		// call EFI procedure
-
-#if defined(BIG_ENDIAN)
-	;;
-	sum IA64_PSR_BE
-	mov	ar.rsc=IA64_RSE_EAGER
-#endif
 	mov	gp=loc3			// restore kernel gp
 	mov	r14=loc2		// psr to restore mode
 	;;
@@ -227,16 +210,8 @@ psrsave	=	loc4
 	mov	b0=palret
 	rsm	psr.i			// disable interrupts
 	;;
-#if defined(BIG_ENDIAN)
-	rum	IA64_PSR_BE		// set psr.be==0
-	;;
-#endif
 	br.cond.sptk b6			// call into firmware
 	;;
-#if defined(BIG_ENDIAN)
-	sum	IA64_PSR_BE		// set psr.be==1
-	;;
-#endif
 	ssm	psr.i			// enable interrupts
 	;;
 2:	mov	psr.l=psrsave
@@ -271,24 +246,8 @@ ENTRY(ia64_call_efi_func)
 	;;
 	ld8	gp=[in0]		// function gp value
 	;;
-#if defined(BIG_ENDIAN)
-	mux1	r14=r14,@rev		// swap if mini-os is in BE
-	mux1	gp=gp,@rev		// swap if mini-os is in BE
-#endif
-	;;
 	mov	b6=r14
-
-#if defined(BIG_ENDIAN)
-	rum	IA64_PSR_BE
-	;;
-#endif
-
 	br.call.sptk.many rp=b6		// call EFI procedure
-	
-#if defined(BIG_ENDIAN)
-	sum	IA64_PSR_BE
-	;;
-#endif
 	
 	mov	ar.pfs=loc0
 	mov	gp=loc1

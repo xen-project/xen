@@ -197,15 +197,6 @@ calculate_frequencies(void)
 	struct ia64_pal_result pal_res;
 
 	pal_res = ia64_call_pal_static(PAL_FREQ_RATIOS, 0, 0, 0);
-	//sal_res = ia64_sal_call(SAL_FREQ_BASE, 0, 0, 0, 0, 0, 0, 0);
-#if defined(BIG_ENDIAN)
-//#warning calculate_frequencies TODO
-	/*
-	 * I have to do an own function with switching psr.be!
-	 * Currently it's running because it's a break into the hypervisor
-	 * behind the call.!
-	 */
-#endif
 	sal_res = ia64_sal_entry(SAL_FREQ_BASE, 0, 0, 0, 0, 0, 0, 0);
 
 	if (sal_res.sal_status == 0 && pal_res.pal_status == 0) {
@@ -260,9 +251,8 @@ init_time(void)
 	if (efi_get_time(&tm)) {
 		printk("  EFI-Time: %d.%d.%d   %d:%d:%d\n", tm.Day,
 		       tm.Month, tm.Year, tm.Hour, tm.Minute, tm.Second);
-		os_time.tv_sec = _mktime(SWAP(tm.Year), SWAP(tm.Month),
-					SWAP(tm.Day), SWAP(tm.Hour),
-					SWAP(tm.Minute), SWAP(tm.Second));
+		os_time.tv_sec = _mktime(tm.Year, tm.Month,
+					tm.Day, tm.Hour, tm.Minute, tm.Second);
 		os_time.tv_nsec = tm.Nanosecond;
 	} else
 		printk("efi_get_time() failed\n");
