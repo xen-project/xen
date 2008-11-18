@@ -60,6 +60,7 @@ struct platform_timesource {
     u64 frequency;
     u64 (*read_counter)(void);
     int (*init)(struct platform_timesource *);
+    void (*resume)(struct platform_timesource *);
     int counter_bits;
 };
 
@@ -396,12 +397,21 @@ static int init_hpet(struct platform_timesource *pts)
     return 1;
 }
 
+static void resume_hpet(struct platform_timesource *pts)
+{
+    u64 hpet_rate = hpet_setup();
+
+    BUG_ON(hpet_rate == 0);
+    pts->frequency = hpet_rate;
+}
+
 static struct platform_timesource plt_hpet =
 {
     .name = "HPET",
     .read_counter = read_hpet_count,
     .counter_bits = 32,
-    .init = init_hpet
+    .init = init_hpet,
+    .resume = resume_hpet
 };
 
 /************************************************************
@@ -566,6 +576,10 @@ static void platform_time_calibration(void)
 
 static void resume_platform_timer(void)
 {
+    /* Timer source can be reset when backing from S3 to S0 */
+    if ( plt_src.resume )
+        plt_src.resume(&plt_src);
+
     /* No change in platform_stime across suspend/resume. */
     platform_timer_stamp = plt_stamp64;
     plt_stamp = plt_src.read_counter();
@@ -1214,12 +1228,12 @@ int time_resume(void)
 {
     /*u64 tmp = */init_pit_and_calibrate_tsc();
 
-    disable_pit_irq();
-
     /* Disable this while calibrate_tsc_ap() also is skipped. */
     /*set_time_scale(&this_cpu(cpu_time).tsc_scale, tmp);*/
 
     resume_platform_timer();
+
+    disable_pit_irq();
 
     init_percpu_time();
 

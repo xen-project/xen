@@ -264,14 +264,9 @@ int hpet_legacy_irq_tick(void)
 
 u64 hpet_setup(void)
 {
-    static u64 hpet_rate;
-    static int initialised;
+    u64 hpet_rate;
     u32 hpet_id, hpet_period, cfg;
     int i;
-
-    if ( initialised )
-        return hpet_rate;
-    initialised = 1;
 
     if ( hpet_address == 0 )
         return 0;
