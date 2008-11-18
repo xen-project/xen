@@ -21,6 +21,7 @@
 #include <xen/sched.h>
 #include <xen/domain_page.h>
 #include <xen/iommu.h>
+#include <xen/numa.h>
 #include <asm/xensystem.h>
 #include <asm/sal.h>
 #include "../iommu.h"
@@ -44,12 +45,12 @@ void unmap_vtd_domain_page(void *va)
 }
 
 /* Allocate page table, return its machine address */
-u64 alloc_pgtable_maddr(void)
+u64 alloc_pgtable_maddr(struct domain *d)
 {
     struct page_info *pg;
     u64 *vaddr;
 
-    pg = alloc_domheap_page(NULL, 0);
+    pg = alloc_domheap_page(NULL, d ? MEMF_node(domain_to_node(d)) : 0);
     vaddr = map_domain_page(page_to_mfn(pg));
     if ( !vaddr )
         return 0;
