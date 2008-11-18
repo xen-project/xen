@@ -344,8 +344,8 @@ static void vioapic_deliver(struct hvm_hw_vioapic *vioapic, int irq)
         }
         else
 #endif
-            target = apic_round_robin(vioapic_domain(vioapic),
-                                      vector, deliver_bitmask);
+            target = apic_lowest_prio(vioapic_domain(vioapic),
+                                      deliver_bitmask);
         if ( target != NULL )
         {
             ioapic_inj_irq(vioapic, target, vector, trig_mode, delivery_mode);
