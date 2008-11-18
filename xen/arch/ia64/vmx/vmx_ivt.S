@@ -314,7 +314,7 @@ vmx_alt_itlb_miss_vmm:
     movl r19=(((1 << IA64_MAX_PHYS_BITS) - 1) & ~0xfff)
     ;;
     and r19=r19,r16     // clear ed, reserved bits, and PTE control bits
-    extr.u r18=r16,XEN_VIRT_UC_BIT, 15    // extract UC bit
+    extr.u r18=r16,XEN_VIRT_UC_BIT, 1     // extract UC bit
     ;;
     or r19=r17,r19      // insert PTE control bits into r19
     mov r20=IA64_GRANULE_SHIFT<<2
