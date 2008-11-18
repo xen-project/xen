@@ -59,6 +59,7 @@ struct platform_timesource {
     char *name;
     u64 frequency;
     u64 (*read_counter)(void);
+    int (*init)(struct platform_timesource *);
     int counter_bits;
 };
 
@@ -360,14 +361,20 @@ static u64 read_pit_count(void)
     return count32;
 }
 
-static void init_pit(struct platform_timesource *pts)
+static int init_pit(struct platform_timesource *pts)
 {
-    pts->name = "PIT";
-    pts->frequency = CLOCK_TICK_RATE;
-    pts->read_counter = read_pit_count;
-    pts->counter_bits = 32;
     using_pit = 1;
+    return 1;
 }
+
+static struct platform_timesource plt_pit =
+{
+    .name = "PIT",
+    .frequency = CLOCK_TICK_RATE,
+    .read_counter = read_pit_count,
+    .counter_bits = 32,
+    .init = init_pit
+};
 
 /************************************************************
  * PLATFORM TIMER 2: HIGH PRECISION EVENT TIMER (HPET)
@@ -385,13 +392,17 @@ static int init_hpet(struct platform_timesource *pts)
     if ( hpet_rate == 0 )
         return 0;
 
-    pts->name = "HPET";
     pts->frequency = hpet_rate;
-    pts->read_counter = read_hpet_count;
-    pts->counter_bits = 32;
-
     return 1;
 }
+
+static struct platform_timesource plt_hpet =
+{
+    .name = "HPET",
+    .read_counter = read_hpet_count,
+    .counter_bits = 32,
+    .init = init_hpet
+};
 
 /************************************************************
  * PLATFORM TIMER 3: IBM 'CYCLONE' TIMER
@@ -440,19 +451,22 @@ static int init_cyclone(struct platform_timesource *pts)
         printk(KERN_ERR "Cyclone: Could not find valid CBAR value.\n");
         return 0;
     }
- 
+
     /* Enable timer and map the counter register. */
     *(map_cyclone_reg(base + CYCLONE_PMCC_OFFSET)) = 1;
     *(map_cyclone_reg(base + CYCLONE_MPCS_OFFSET)) = 1;
     cyclone_timer = map_cyclone_reg(base + CYCLONE_MPMC_OFFSET);
-
-    pts->name = "IBM Cyclone";
-    pts->frequency = CYCLONE_TIMER_FREQ;
-    pts->read_counter = read_cyclone_count;
-    pts->counter_bits = 32;
-
     return 1;
 }
+
+static struct platform_timesource plt_cyclone =
+{
+    .name = "IBM Cyclone",
+    .frequency = CYCLONE_TIMER_FREQ,
+    .read_counter = read_cyclone_count,
+    .counter_bits = 32,
+    .init = init_cyclone
+};
 
 /************************************************************
  * PLATFORM TIMER 4: ACPI PM TIMER
@@ -473,13 +487,17 @@ static int init_pmtimer(struct platform_timesource *pts)
     if ( pmtmr_ioport == 0 )
         return 0;
 
-    pts->name = "ACPI PM Timer";
-    pts->frequency = ACPI_PM_FREQUENCY;
-    pts->read_counter = read_pmtimer_count;
-    pts->counter_bits = 24;
-
     return 1;
 }
+
+static struct platform_timesource plt_pmtimer =
+{
+    .name = "ACPI PM Timer",
+    .frequency = ACPI_PM_FREQUENCY,
+    .read_counter = read_pmtimer_count,
+    .counter_bits = 24,
+    .init = init_pmtimer
+};
 
 /************************************************************
  * GENERIC PLATFORM TIMER INFRASTRUCTURE
@@ -555,19 +573,24 @@ static void resume_platform_timer(void)
 
 static void init_platform_timer(void)
 {
-    struct platform_timesource *pts = &plt_src;
-    int rc = -1;
+    static struct platform_timesource * const plt_timers[] = {
+        &plt_cyclone, &plt_hpet, &plt_pmtimer, &plt_pit
+    };
+
+    struct platform_timesource *pts;
+    int i, rc = -1;
 
     if ( opt_clocksource[0] != '\0' )
     {
-        if ( !strcmp(opt_clocksource, "pit") )
-            rc = (init_pit(pts), 1);
-        else if ( !strcmp(opt_clocksource, "hpet") )
-            rc = init_hpet(pts);
-        else if ( !strcmp(opt_clocksource, "cyclone") )
-            rc = init_cyclone(pts);
-        else if ( !strcmp(opt_clocksource, "acpi") )
-            rc = init_pmtimer(pts);
+        for ( i = 0; i < ARRAY_SIZE(plt_timers); i++ )
+        {
+            pts = plt_timers[i];
+            if ( !strcmp(opt_clocksource, pts->name) )
+            {
+                rc = pts->init(pts);
+                break;
+            }
+        }
 
         if ( rc <= 0 )
             printk("WARNING: %s clocksource '%s'.\n",
@@ -575,11 +598,17 @@ static void init_platform_timer(void)
                    opt_clocksource);
     }
 
-    if ( (rc <= 0) &&
-         !init_cyclone(pts) &&
-         !init_hpet(pts) &&
-         !init_pmtimer(pts) )
-        init_pit(pts);
+    if ( rc <= 0 )
+    {
+        for ( i = 0; i < ARRAY_SIZE(plt_timers); i++ )
+        {
+            pts = plt_timers[i];
+            if ( (rc = pts->init(pts)) > 0 )
+                break;
+        }
+    }
+
+    BUG_ON(rc <= 0);
 
     plt_mask = (u64)~0ull >> (64 - pts->counter_bits);
 
@@ -588,6 +617,7 @@ static void init_platform_timer(void)
     plt_overflow_period = scale_delta(
         1ull << (pts->counter_bits-1), &plt_scale);
     init_timer(&plt_overflow_timer, plt_overflow, NULL, 0);
+    plt_src = *pts;
     plt_overflow(NULL);
 
     platform_timer_stamp = plt_stamp64;
