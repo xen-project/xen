@@ -1604,6 +1604,7 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
     struct domain *d = curr->domain;
     unsigned long mfn;
     struct page_info *l1pg = mfn_to_page(gl1mfn);
+    p2m_type_t p2mt;
     int rc = 1;
 
     page_lock(l1pg);
@@ -1621,8 +1622,8 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
     if ( l1e_get_flags(nl1e) & _PAGE_PRESENT )
     {
         /* Translate foreign guest addresses. */
-        mfn = gmfn_to_mfn(FOREIGNDOM, l1e_get_pfn(nl1e));
-        if ( unlikely(mfn == INVALID_MFN) )
+        mfn = mfn_x(gfn_to_mfn(FOREIGNDOM, l1e_get_pfn(nl1e), &p2mt));
+        if ( !p2m_is_ram(p2mt) || unlikely(mfn == INVALID_MFN) )
             return page_unlock(l1pg), 0;
         ASSERT((mfn & ~(PADDR_MASK >> PAGE_SHIFT)) == 0);
         nl1e = l1e_from_pfn(mfn, l1e_get_flags(nl1e));
