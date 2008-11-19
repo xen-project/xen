@@ -2196,7 +2196,7 @@ int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
     if ( new_rte.vector >= FIRST_DYNAMIC_VECTOR )
         new_irq = vector_irq[new_rte.vector];
 
-    if ( (old_irq != new_irq) && (old_irq != -1) && IO_APIC_IRQ(old_irq) )
+    if ( (old_irq != new_irq) && (old_irq >= 0) && IO_APIC_IRQ(old_irq) )
     {
         if ( irq_desc[IO_APIC_VECTOR(old_irq)].action )
         {
@@ -2208,7 +2208,7 @@ int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
         remove_pin_at_irq(old_irq, apic, pin);
     }
 
-    if ( (new_irq != -1) && IO_APIC_IRQ(new_irq) )
+    if ( (new_irq >= 0) && IO_APIC_IRQ(new_irq) )
     {
         if ( irq_desc[IO_APIC_VECTOR(new_irq)].action )
         {
