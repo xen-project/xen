@@ -1244,8 +1244,7 @@ int time_resume(void)
 
     do_settime(get_cmos_time() + cmos_utc_offset, 0, NOW());
 
-    if ( !is_idle_vcpu(current) )
-        update_vcpu_system_time(current);
+    update_vcpu_system_time(current);
 
     return 0;
 }
