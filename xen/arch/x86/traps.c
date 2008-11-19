@@ -755,6 +755,7 @@ static void pv_cpuid(struct cpu_user_regs *regs)
         __clear_bit(X86_FEATURE_XTPR % 32, &c);
         __clear_bit(X86_FEATURE_PDCM % 32, &c);
         __clear_bit(X86_FEATURE_DCA % 32, &c);
+        __set_bit(X86_FEATURE_HYPERVISOR % 32, &c);
         break;
     case 0x80000001:
         /* Modify Feature Information. */
