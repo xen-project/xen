@@ -595,7 +595,7 @@ static void init_platform_timer(void)
         &plt_cyclone, &plt_hpet, &plt_pmtimer, &plt_pit
     };
 
-    struct platform_timesource *pts;
+    struct platform_timesource *pts = NULL;
     int i, rc = -1;
 
     if ( opt_clocksource[0] != '\0' )
