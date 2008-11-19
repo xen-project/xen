@@ -585,8 +585,7 @@ static void resume_platform_timer(void)
     if ( plt_src.resume )
         plt_src.resume(&plt_src);
 
-    /* No change in platform_stime across suspend/resume. */
-    platform_timer_stamp = plt_stamp64;
+    plt_stamp64 = platform_timer_stamp;
     plt_stamp = plt_src.read_counter();
 }
 
@@ -1221,6 +1220,9 @@ int time_suspend(void)
         cmos_utc_offset = -get_cmos_time();
         cmos_utc_offset += (wc_sec + (wc_nsec + NOW()) / 1000000000ULL);
         kill_timer(&calibration_timer);
+
+        /* Sync platform timer stamps. */
+        platform_time_calibration();
     }
 
     /* Better to cancel calibration timer for accuracy. */
