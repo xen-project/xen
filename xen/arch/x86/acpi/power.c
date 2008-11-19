@@ -30,6 +30,8 @@
 
 #include <acpi/cpufreq/cpufreq.h>
 
+uint32_t system_reset_counter = 1;
+
 static char opt_acpi_sleep[20];
 string_param("acpi_sleep", opt_acpi_sleep);
 
@@ -163,6 +165,7 @@ static int enter_state(u32 state)
     {
     case ACPI_STATE_S3:
         do_suspend_lowlevel();
+        system_reset_counter++;
         break;
     case ACPI_STATE_S5:
         acpi_enter_sleep_state(ACPI_STATE_S5);

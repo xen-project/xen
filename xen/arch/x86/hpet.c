@@ -264,12 +264,14 @@ int hpet_legacy_irq_tick(void)
 
 u64 hpet_setup(void)
 {
-    u64 hpet_rate;
+    static u64 hpet_rate;
+    static u32 system_reset_latch;
     u32 hpet_id, hpet_period, cfg;
     int i;
 
-    if ( hpet_address == 0 )
-        return 0;
+    if ( system_reset_latch == system_reset_counter )
+        return hpet_rate;
+    system_reset_latch = system_reset_counter;
 
     set_fixmap_nocache(FIX_HPET_BASE, hpet_address);
 
