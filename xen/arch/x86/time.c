@@ -56,6 +56,7 @@ struct cpu_time {
 };
 
 struct platform_timesource {
+    char *id;
     char *name;
     u64 frequency;
     u64 (*read_counter)(void);
@@ -370,6 +371,7 @@ static int init_pit(struct platform_timesource *pts)
 
 static struct platform_timesource plt_pit =
 {
+    .id = "pit",
     .name = "PIT",
     .frequency = CLOCK_TICK_RATE,
     .read_counter = read_pit_count,
@@ -407,6 +409,7 @@ static void resume_hpet(struct platform_timesource *pts)
 
 static struct platform_timesource plt_hpet =
 {
+    .id = "hpet",
     .name = "HPET",
     .read_counter = read_hpet_count,
     .counter_bits = 32,
@@ -471,6 +474,7 @@ static int init_cyclone(struct platform_timesource *pts)
 
 static struct platform_timesource plt_cyclone =
 {
+    .id = "cyclone",
     .name = "IBM Cyclone",
     .frequency = CYCLONE_TIMER_FREQ,
     .read_counter = read_cyclone_count,
@@ -502,6 +506,7 @@ static int init_pmtimer(struct platform_timesource *pts)
 
 static struct platform_timesource plt_pmtimer =
 {
+    .id = "acpi",
     .name = "ACPI PM Timer",
     .frequency = ACPI_PM_FREQUENCY,
     .read_counter = read_pmtimer_count,
@@ -599,7 +604,7 @@ static void init_platform_timer(void)
         for ( i = 0; i < ARRAY_SIZE(plt_timers); i++ )
         {
             pts = plt_timers[i];
-            if ( !strcmp(opt_clocksource, pts->name) )
+            if ( !strcmp(opt_clocksource, pts->id) )
             {
                 rc = pts->init(pts);
                 break;
