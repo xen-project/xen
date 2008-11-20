@@ -77,19 +77,47 @@ static void device_power_up(void)
 static void freeze_domains(void)
 {
     struct domain *d;
+    struct vcpu *v;
 
+    rcu_read_lock(&domlist_read_lock);
     for_each_domain ( d )
-        if ( d->domain_id != 0 )
+    {
+        switch ( d->domain_id )
+        {
+        case 0:
+            for_each_vcpu ( d, v )
+                if ( v != current )
+                    vcpu_pause(v);
+            break;
+        default:
             domain_pause(d);
+            break;
+        }
+    }
+    rcu_read_unlock(&domlist_read_lock);
 }
 
 static void thaw_domains(void)
 {
     struct domain *d;
+    struct vcpu *v;
 
+    rcu_read_lock(&domlist_read_lock);
     for_each_domain ( d )
-        if ( d->domain_id != 0 )
+    {
+        switch ( d->domain_id )
+        {
+        case 0:
+            for_each_vcpu ( d, v )
+                if ( v != current )
+                    vcpu_unpause(v);
+            break;
+        default:
             domain_unpause(d);
+            break;
+        }
+    }
+    rcu_read_unlock(&domlist_read_lock);
 }
 
 static void acpi_sleep_prepare(u32 state)
