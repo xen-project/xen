@@ -236,7 +236,7 @@ struct arch_domain
 
     /* NB. protected by d->event_lock and by irq_desc[vector].lock */
     int vector_pirq[NR_VECTORS];
-    int pirq_vector[NR_IRQS];
+    s16 pirq_vector[NR_IRQS];
 
     /* Pseudophysical e820 map (XENMEM_memory_map).  */
     struct e820entry e820[3];

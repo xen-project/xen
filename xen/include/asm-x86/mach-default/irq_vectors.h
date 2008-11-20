@@ -30,7 +30,4 @@
 
 #define NR_VECTORS 256
 
-/* Limited by number of trap vectors. */
-#define NR_IRQS        NR_VECTORS
-
 #endif /* _ASM_IRQ_VECTORS_H */
