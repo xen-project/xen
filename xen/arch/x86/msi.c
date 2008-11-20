@@ -212,9 +212,9 @@ static void write_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
     entry->msg = *msg;
 }
 
-void set_msi_irq_affinity(unsigned int irq, cpumask_t mask)
+void set_msi_affinity(unsigned int vector, cpumask_t mask)
 {
-    struct msi_desc *desc = irq_desc[irq].msi_desc;
+    struct msi_desc *desc = irq_desc[vector].msi_desc;
     struct msi_msg msg;
     unsigned int dest;
 
@@ -227,7 +227,7 @@ void set_msi_irq_affinity(unsigned int irq, cpumask_t mask)
     if ( !desc )
         return;
 
-    ASSERT(spin_is_locked(&irq_desc[irq].lock));
+    ASSERT(spin_is_locked(&irq_desc[vector].lock));
     spin_lock(&desc->dev->lock);
     read_msi_msg(desc, &msg);
 
@@ -276,9 +276,9 @@ static void msix_set_enable(struct pci_dev *dev, int enable)
     }
 }
 
-static void msix_flush_writes(unsigned int irq)
+static void msix_flush_writes(unsigned int vector)
 {
-    struct msi_desc *entry = irq_desc[irq].msi_desc;
+    struct msi_desc *entry = irq_desc[vector].msi_desc;
 
     BUG_ON(!entry || !entry->dev);
     switch (entry->msi_attrib.type) {
@@ -305,11 +305,11 @@ int msi_maskable_irq(const struct msi_desc *entry)
            || entry->msi_attrib.maskbit;
 }
 
-static void msi_set_mask_bit(unsigned int irq, int flag)
+static void msi_set_mask_bit(unsigned int vector, int flag)
 {
-    struct msi_desc *entry = irq_desc[irq].msi_desc;
+    struct msi_desc *entry = irq_desc[vector].msi_desc;
 
-    ASSERT(spin_is_locked(&irq_desc[irq].lock));
+    ASSERT(spin_is_locked(&irq_desc[vector].lock));
     BUG_ON(!entry || !entry->dev);
     switch (entry->msi_attrib.type) {
     case PCI_CAP_ID_MSI:
@@ -342,16 +342,16 @@ static void msi_set_mask_bit(unsigned int irq, int flag)
     entry->msi_attrib.masked = !!flag;
 }
 
-void mask_msi_irq(unsigned int irq)
+void mask_msi_vector(unsigned int vector)
 {
-    msi_set_mask_bit(irq, 1);
-    msix_flush_writes(irq);
+    msi_set_mask_bit(vector, 1);
+    msix_flush_writes(vector);
 }
 
-void unmask_msi_irq(unsigned int irq)
+void unmask_msi_vector(unsigned int vector)
 {
-    msi_set_mask_bit(irq, 0);
-    msix_flush_writes(irq);
+    msi_set_mask_bit(vector, 0);
+    msix_flush_writes(vector);
 }
 
 static struct msi_desc* alloc_msi_entry(void)

@@ -1547,20 +1547,10 @@ static struct hw_interrupt_type ioapic_level_type = {
     .set_affinity 	= set_ioapic_affinity_vector,
 };
 
-static void mask_msi_vector(unsigned int vector)
-{
-    mask_msi_irq(vector);
-}
-
-static void unmask_msi_vector(unsigned int vector)
-{
-    unmask_msi_irq(vector);
-}
-
 static unsigned int startup_msi_vector(unsigned int vector)
 {
     dprintk(XENLOG_INFO, "startup msi vector %x\n", vector);
-    unmask_msi_irq(vector);
+    unmask_msi_vector(vector);
     return 0;
 }
 
@@ -1576,13 +1566,13 @@ static void end_msi_vector(unsigned int vector)
 static void shutdown_msi_vector(unsigned int vector)
 {
     dprintk(XENLOG_INFO, "shutdown msi vector %x\n", vector);
-    mask_msi_irq(vector);
+    mask_msi_vector(vector);
 }
 
 static void set_msi_affinity_vector(unsigned int vector, cpumask_t cpu_mask)
 {
     set_native_irq_info(vector, cpu_mask);
-    set_msi_irq_affinity(vector, cpu_mask);
+    set_msi_affinity(vector, cpu_mask);
 }
 
 /*

@@ -61,7 +61,7 @@ typedef struct {
     cpumask_t affinity;
 } __cacheline_aligned irq_desc_t;
 
-extern irq_desc_t irq_desc[NR_IRQS];
+extern irq_desc_t irq_desc[NR_VECTORS];
 
 extern int setup_irq(unsigned int, struct irqaction *);
 extern void free_irq(unsigned int);
@@ -81,13 +81,16 @@ extern void pirq_guest_unbind(struct domain *d, int irq);
 extern irq_desc_t *domain_spin_lock_irq_desc(
     struct domain *d, int irq, unsigned long *pflags);
 
-static inline void set_native_irq_info(int irq, cpumask_t mask)
+static inline void set_native_irq_info(unsigned int vector, cpumask_t mask)
 {
-    irq_desc[irq].affinity = mask;
+    irq_desc[vector].affinity = mask;
 }
 
+#ifdef irq_to_vector
 static inline void set_irq_info(int irq, cpumask_t mask)
 {
-    set_native_irq_info(irq, mask);
+    set_native_irq_info(irq_to_vector(irq), mask);
 }
+#endif
+
 #endif /* __XEN_IRQ_H__ */

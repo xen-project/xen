@@ -24,7 +24,7 @@
 int opt_noirqbalance = 0;
 boolean_param("noirqbalance", opt_noirqbalance);
 
-irq_desc_t irq_desc[NR_IRQS];
+irq_desc_t irq_desc[NR_VECTORS];
 
 static void __do_IRQ_guest(int vector);
 
@@ -206,7 +206,7 @@ struct pending_eoi {
 static DEFINE_PER_CPU(struct pending_eoi, pending_eoi[NR_VECTORS]);
 #define pending_eoi_sp(p) ((p)[NR_VECTORS-1].vector)
 
-static struct timer irq_guest_eoi_timer[NR_IRQS];
+static struct timer irq_guest_eoi_timer[NR_VECTORS];
 static void irq_guest_eoi_timer_fn(void *data)
 {
     irq_desc_t *desc = data;
@@ -1006,28 +1006,30 @@ __initcall(setup_dump_irqs);
 
 void fixup_irqs(cpumask_t map)
 {
-    unsigned int irq, sp;
+    unsigned int vector, sp;
     static int warned;
     irq_guest_action_t *action;
     struct pending_eoi *peoi;
 
     /* Direct all future interrupts away from this CPU. */
-    for ( irq = 0; irq < NR_IRQS; irq++ )
+    for ( vector = 0; vector < NR_VECTORS; vector++ )
     {
         cpumask_t mask;
-        if ( irq == 2 )
+        if ( vector_to_irq(vector) == 2 )
             continue;
 
-        cpus_and(mask, irq_desc[irq].affinity, map);
+        cpus_and(mask, irq_desc[vector].affinity, map);
         if ( any_online_cpu(mask) == NR_CPUS )
         {
-            printk("Breaking affinity for irq %i\n", irq);
+            printk("Breaking affinity for vector %u (irq %i)\n",
+                   vector, vector_to_irq(vector));
             mask = map;
         }
-        if ( irq_desc[irq].handler->set_affinity )
-            irq_desc[irq].handler->set_affinity(irq, mask);
-        else if ( irq_desc[irq].action && !(warned++) )
-            printk("Cannot set affinity for irq %i\n", irq);
+        if ( irq_desc[vector].handler->set_affinity )
+            irq_desc[vector].handler->set_affinity(vector, mask);
+        else if ( irq_desc[vector].action && !(warned++) )
+            printk("Cannot set affinity for irq %u (irq %i)\n",
+                   vector, vector_to_irq(vector));
     }
 
     /* Service any interrupts that beat us in the re-direction race. */
@@ -1036,11 +1038,11 @@ void fixup_irqs(cpumask_t map)
     local_irq_disable();
 
     /* Clean up cpu_eoi_map of every interrupt to exclude this CPU. */
-    for ( irq = 0; irq < NR_IRQS; irq++ )
+    for ( vector = 0; vector < NR_VECTORS; vector++ )
     {
-        if ( !(irq_desc[irq].status & IRQ_GUEST) )
+        if ( !(irq_desc[vector].status & IRQ_GUEST) )
             continue;
-        action = (irq_guest_action_t *)irq_desc[irq].action;
+        action = (irq_guest_action_t *)irq_desc[vector].action;
         cpu_clear(smp_processor_id(), action->cpu_eoi_map);
     }
 
