@@ -665,7 +665,7 @@ static inline int IO_APIC_irq_trigger(int irq)
 }
 
 /* irq_vectors is indexed by the sum of all RTEs in all I/O APICs. */
-u8 irq_vector[NR_IRQ_VECTORS] __read_mostly;
+u8 irq_vector[NR_IRQS] __read_mostly;
 
 int free_irq_vector(int vector)
 {
@@ -686,7 +686,7 @@ int assign_irq_vector(int irq)
     static unsigned current_vector = FIRST_DYNAMIC_VECTOR;
     unsigned vector;
 
-    BUG_ON(irq >= NR_IRQ_VECTORS);
+    BUG_ON(irq >= NR_IRQS);
 
     spin_lock(&vector_lock);
 
