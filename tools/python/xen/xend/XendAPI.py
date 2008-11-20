@@ -431,7 +431,7 @@ def valid_object(class_name):
            lambda *args, **kwargs: \
            _check_ref(lambda r: \
                           XendAPIStore.get(r, class_name) is not None,
-                      'PIF', func, *args, **kwargs)
+                      class_name, func, *args, **kwargs)
 
 # -----------------------------
 # Bridge to Legacy XM API calls
