@@ -479,7 +479,14 @@ class XendDomainInfo:
         if state in (DOM_STATE_SUSPENDED, DOM_STATE_HALTED):
             try:
                 self._constructDomain()
-                self._setCPUAffinity()
+
+                try:
+                    self._setCPUAffinity()
+                except:
+                    # usually a CPU we want to set affinity to does not exist
+                    # we just ignore it so that the domain can still be restored
+                    log.warn("Cannot restore CPU affinity")
+
                 self._storeVmDetails()
                 self._createChannels()
                 self._createDevices()
