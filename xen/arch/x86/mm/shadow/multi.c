@@ -866,9 +866,6 @@ static int shadow_set_l4e(struct vcpu *v,
             domain_crash(v->domain);
             return SHADOW_SET_ERROR;
         }
-#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC )
-        shadow_resync_all(v, 0);
-#endif
     }
 
     /* Write the new entry */
@@ -914,9 +911,6 @@ static int shadow_set_l3e(struct vcpu *v,
             domain_crash(v->domain);
             return SHADOW_SET_ERROR;
         }
-#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC )
-        shadow_resync_all(v, 0);
-#endif
     }
 
     /* Write the new entry */
@@ -1716,7 +1710,8 @@ static shadow_l4e_t * shadow_get_and_create_l4e(struct vcpu *v,
 static shadow_l3e_t * shadow_get_and_create_l3e(struct vcpu *v, 
                                                 walk_t *gw, 
                                                 mfn_t *sl3mfn,
-                                                fetch_type_t ft)
+                                                fetch_type_t ft,
+                                                int *resync)
 {
     mfn_t sl4mfn;
     shadow_l4e_t *sl4e;
@@ -1746,6 +1741,11 @@ static shadow_l3e_t * shadow_get_and_create_l3e(struct vcpu *v,
         ASSERT((r & SHADOW_SET_FLUSH) == 0);
         if ( r & SHADOW_SET_ERROR )
             return NULL;
+
+#if (SHADOW_OPTIMIZATIONS && SHOPT_OUT_OF_SYNC )
+        *resync |= 1;
+#endif
+
     }
     /* Now follow it down a level.  Guaranteed to succeed. */
     return sh_linear_l3_table(v) + shadow_l3_linear_offset(gw->va);
@@ -1756,14 +1756,15 @@ static shadow_l3e_t * shadow_get_and_create_l3e(struct vcpu *v,
 static shadow_l2e_t * shadow_get_and_create_l2e(struct vcpu *v, 
                                                 walk_t *gw, 
                                                 mfn_t *sl2mfn,
-                                                fetch_type_t ft)
+                                                fetch_type_t ft,
+                                                int *resync)
 {
 #if GUEST_PAGING_LEVELS >= 4 /* 64bit... */
     mfn_t sl3mfn = _mfn(INVALID_MFN);
     shadow_l3e_t *sl3e;
     if ( !mfn_valid(gw->l2mfn) ) return NULL; /* No guest page. */
     /* Get the l3e */
-    sl3e = shadow_get_and_create_l3e(v, gw, &sl3mfn, ft);
+    sl3e = shadow_get_and_create_l3e(v, gw, &sl3mfn, ft, resync);
     if ( sl3e == NULL ) return NULL; 
     if ( shadow_l3e_get_flags(*sl3e) & _PAGE_PRESENT ) 
     {
@@ -1795,6 +1796,11 @@ static shadow_l2e_t * shadow_get_and_create_l2e(struct vcpu *v,
         ASSERT((r & SHADOW_SET_FLUSH) == 0);
         if ( r & SHADOW_SET_ERROR )
             return NULL;        
+
+#if (SHADOW_OPTIMIZATIONS && SHOPT_OUT_OF_SYNC )
+        *resync |= 1;
+#endif
+
     }
     /* Now follow it down a level.  Guaranteed to succeed. */
     return sh_linear_l2_table(v) + shadow_l2_linear_offset(gw->va);
@@ -1827,11 +1833,13 @@ static shadow_l1e_t * shadow_get_and_create_l1e(struct vcpu *v,
                                                 fetch_type_t ft)
 {
     mfn_t sl2mfn;
+    int resync = 0;
     shadow_l2e_t *sl2e;
 
     /* Get the l2e */
-    sl2e = shadow_get_and_create_l2e(v, gw, &sl2mfn, ft);
+    sl2e = shadow_get_and_create_l2e(v, gw, &sl2mfn, ft, &resync);
     if ( sl2e == NULL ) return NULL;
+
     /* Install the sl1 in the l2e if it wasn't there or if we need to
      * re-do it to fix a PSE dirty bit. */
     if ( shadow_l2e_get_flags(*sl2e) & _PAGE_PRESENT 
@@ -1877,6 +1885,14 @@ static shadow_l1e_t * shadow_get_and_create_l1e(struct vcpu *v,
         ASSERT((r & SHADOW_SET_FLUSH) == 0);        
         if ( r & SHADOW_SET_ERROR )
             return NULL;
+
+#if (SHADOW_OPTIMIZATIONS && SHOPT_OUT_OF_SYNC )
+        /* All pages walked are now pagetables. Safe to resync pages
+           in case level 4 or 3 shadows were set. */
+        if ( resync )
+            shadow_resync_all(v, 0);
+#endif
+
         /* This next line is important: in 32-on-PAE and 32-on-64 modes,
          * the guest l1 table has an 8k shadow, and we need to return
          * the right mfn of the pair. This call will set it for us as a
@@ -2158,6 +2174,10 @@ static int validate_gl4e(struct vcpu *v, void *new_ge, mfn_t sl4mfn, void *se)
             sl3mfn = get_shadow_status(v, gl3mfn, SH_type_l3_shadow);
         else
             result |= SHADOW_SET_ERROR;
+
+#if (SHADOW_OPTIMIZATIONS && SHOPT_OUT_OF_SYNC )
+        shadow_resync_all(v, 0);
+#endif
     }
     l4e_propagate_from_guest(v, new_gl4e, sl3mfn, &new_sl4e, ft_prefetch);
 
@@ -2210,6 +2230,10 @@ static int validate_gl3e(struct vcpu *v, void *new_ge, mfn_t sl3mfn, void *se)
             sl2mfn = get_shadow_status(v, gl2mfn, SH_type_l2_shadow);
         else
             result |= SHADOW_SET_ERROR;
+
+#if (SHADOW_OPTIMIZATIONS && SHOPT_OUT_OF_SYNC )
+        shadow_resync_all(v, 0);
+#endif
     }
     l3e_propagate_from_guest(v, new_gl3e, sl2mfn, &new_sl3e, ft_prefetch);
     result |= shadow_set_l3e(v, sl3p, new_sl3e, sl3mfn);
