@@ -35,6 +35,8 @@ import resource
 import re
 
 from xen.xend.server.pciquirk import *
+from xen.xend.xenstore.xstransact import xstransact
+from xen.xend.xenstore.xswatch import xswatch
 
 xc = xen.lowlevel.xc.xc()
 
@@ -58,6 +60,7 @@ def parse_hex(val):
 class PciController(DevController):
 
     def __init__(self, vm):
+        self.aerStateWatch = None
         DevController.__init__(self, vm)
 
 
@@ -431,8 +434,22 @@ class PciController(DevController):
 
         for (domain, bus, slot, func) in pci_dev_list:
             self.setupOneDevice(domain, bus, slot, func)
-
+        wPath = '/local/domain/0/backend/pci/%u/0/aerState' % (self.getDomid())
+        self.aerStatePath = xswatch(wPath, self._handleAerStateWatch)
+        log.debug('pci: register aer watch %s', wPath)
         return
+
+    def _handleAerStateWatch(self, _):
+        log.debug('XendDomainInfo.handleAerStateWatch')
+        if self.getDomid() == 0:
+            raise XendError('Domain 0 cannot be shutdown')
+        readPath = '/local/domain/0/backend/pci/%u/0/aerState' % (self.getDomid())
+        action = xstransact.Read(readPath)
+        if action and action=='aerfail':
+            log.debug('shutdown domain because of aer handle error')
+            self.vm.shutdown('poweroff')
+        return True
+
 
     def cleanupOneDevice(self, domain, bus, slot, func):
         """ Detach I/O resources for device from frontend domain
@@ -545,6 +562,22 @@ class PciController(DevController):
 
         return new_num_devs
 
+    def destroyDevice(self, devid, force):
+        DevController.destroyDevice(self, devid, True)
+        log.debug('pci: unregister aer watch')
+        self.unwatchAerState
+
+    def unwatchAerState(self):
+        """Remove the watch on the domain's aerState node, if any."""
+        try:
+            try:
+                if self.aerStateWatch:
+                    self.aerStateWatch.unwatch()
+            finally:
+                self.aerStateWatch = None
+        except:
+            log.exception("Unwatching aerState failed.")
+  
     def waitForBackend(self,devid):
         return (0, "ok - no hotplug")
 
