@@ -9677,19 +9677,34 @@ block_count_rounded:
   pop ds
   pop ax
 #endif
-  xor  bx, bx   ;; Restore DS back to 0000:
-  mov  ds, bx
   push ax       ;; Save AX
   push di       ;; Save DI
   ;; Push addr of ROM entry point
   push cx       ;; Push seg
   push #0x0003  ;; Push offset
 
+  ;; Get the BDF into ax before invoking the option ROM
+  mov  bl, [2]
+  mov  al, bl
+  shr  al, #7
+  cmp  al, #1
+  jne  fetch_bdf
+  mov  ax, ds ;; Increment the DS since rom size larger than an segment
+  add  ax, #0x1000
+  mov  ds, ax
+fetch_bdf:
+  shl  bx, #9
+  xor  ax, ax
+  mov  al, [bx]
+
   ;; Point ES:DI at "$PnP", which tells the ROM that we are a PnP BIOS.  
   ;; That should stop it grabbing INT 19h; we will use its BEV instead.
-  mov  ax, #0xf000
-  mov  es, ax
+  mov  bx, #0xf000
+  mov  es, bx
   lea  di, pnp_string 
+
+  xor  bx, bx   ;; Restore DS back to 0000:
+  mov  ds, bx
 
   mov  bp, sp   ;; Call ROM init routine using seg:off on stack
   db   0xff     ;; call_far ss:[bp+0]

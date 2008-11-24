@@ -323,13 +323,14 @@ static void pci_setup(void)
 
 /*
  * Scan the list of Option ROMs at @roms for one which supports 
- * PCI (@vendor_id, @device_id). If one is found, copy it to @dest and
- * return its size rounded up to a multiple 2kB. This function will not
- * copy ROMs beyond address 0xE0000.
+ * PCI (@vendor_id, @device_id) found at slot @devfn. If one is found,
+ * copy it to @dest and return its size rounded up to a multiple 2kB. This
+ * function will not copy ROMs beyond address 0xE0000.
  */
 #define round_option_rom(x) (((x) + 2047) & ~2047)
 static int scan_option_rom(
-    uint16_t vendor_id, uint16_t device_id, void *roms, uint32_t dest)
+    uint8_t devfn, uint16_t vendor_id, uint16_t device_id,
+    void *roms, uint32_t dest)
 {
     struct option_rom_header *rom;
     struct option_rom_pnp_header *pnph;
@@ -395,7 +396,7 @@ static int scan_option_rom(
         printf(" - Product name: %s\n",
                (char *)rom + pnph->product_name_offset);
 
-    if ( (dest + rom->rom_size * 512) > 0xe0000u )
+    if ( (dest + rom->rom_size * 512 + 1) > 0xe0000u )
     {
         printf("Option ROM size %x exceeds available space\n",
                rom->rom_size * 512);
@@ -404,7 +405,8 @@ static int scan_option_rom(
 
     orom_ids[nr_roms++] = vendor_id | ((uint32_t)device_id << 16);
     memcpy((void *)dest, rom, rom->rom_size * 512);
-    return round_option_rom(rom->rom_size * 512);
+    *(uint8_t *)(dest + rom->rom_size * 512) = devfn;
+    return round_option_rom(rom->rom_size * 512 + 1);
 }
 
 /*
@@ -414,7 +416,7 @@ static int scan_option_rom(
  */
 static int scan_etherboot_nic(uint32_t copy_rom_dest)
 {
-    uint32_t devfn;
+    uint8_t devfn;
     uint16_t class, vendor_id, device_id;
 
     for ( devfn = 0; devfn < 128; devfn++ )
@@ -428,7 +430,7 @@ static int scan_etherboot_nic(uint32_t copy_rom_dest)
              (device_id != 0xffff) &&
              (class == 0x0200) )
             return scan_option_rom(
-                vendor_id, device_id, etherboot, copy_rom_dest);
+                devfn, vendor_id, device_id, etherboot, copy_rom_dest);
     }
 
     return 0;
@@ -440,9 +442,9 @@ static int scan_etherboot_nic(uint32_t copy_rom_dest)
  */
 static int pci_load_option_roms(uint32_t rom_base_addr)
 {
-    uint32_t devfn, option_rom_addr, rom_phys_addr = rom_base_addr;
+    uint32_t option_rom_addr, rom_phys_addr = rom_base_addr;
     uint16_t vendor_id, device_id;
-    uint8_t class;
+    uint8_t devfn, class;
 
     for ( devfn = 0; devfn < 128; devfn++ )
     {
@@ -468,8 +470,8 @@ static int pci_load_option_roms(uint32_t rom_base_addr)
         pci_writel(devfn, PCI_ROM_ADDRESS, option_rom_addr | 0x1);
 
         rom_phys_addr += scan_option_rom(
-            vendor_id, device_id, (void *)(option_rom_addr & ~2047),
-            rom_phys_addr);
+            devfn, vendor_id, device_id,
+            (void *)(option_rom_addr & ~2047), rom_phys_addr);
 
         /* Restore the default original value of Expansion Bar */
         pci_writel(devfn, PCI_ROM_ADDRESS, option_rom_addr);
