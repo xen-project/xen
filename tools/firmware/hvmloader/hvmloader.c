@@ -322,60 +322,55 @@ static void pci_setup(void)
 }
 
 /*
- * Scan the PCI bus for the first NIC supported by etherboot, and copy
- * the corresponding rom data to *copy_rom_dest. Returns the length of the
- * selected rom, or 0 if no NIC found.
+ * Scan the list of Option ROMs at @roms for one which supports 
+ * PCI (@vendor_id, @device_id). If one is found, copy it to @dest and
+ * return its size rounded up to a multiple 2kB. This function will not
+ * copy ROMs beyond address 0xE0000.
  */
-static int scan_etherboot_nic(void *copy_rom_dest)
+#define round_option_rom(x) (((x) + 2047) & ~2047)
+static int scan_option_rom(
+    uint16_t vendor_id, uint16_t device_id, void *roms, uint32_t dest)
 {
     struct option_rom_header *rom;
     struct option_rom_pnp_header *pnph;
     struct option_rom_pci_header *pcih;
-    uint32_t devfn;
-    uint16_t class, vendor_id, device_id;
     uint8_t csum;
     int i;
 
-    for ( devfn = 0; devfn < 128; devfn++ )
+    static uint32_t orom_ids[64];
+    static int nr_roms;
+
+    /* Avoid duplicate ROMs. */
+    for ( i = 0; i < nr_roms; i++ )
+        if ( orom_ids[i] == (vendor_id | ((uint32_t)device_id << 16)) )
+            return 0;
+
+    rom = roms;
+    for ( ; ; )
     {
-        class     = pci_readw(devfn, PCI_CLASS_DEVICE);
-        vendor_id = pci_readw(devfn, PCI_VENDOR_ID);
-        device_id = pci_readw(devfn, PCI_DEVICE_ID);
+        /* Invalid signature means we're out of option ROMs. */
+        if ( strncmp((char *)rom->signature, "\x55\xaa", 2) ||
+             (rom->rom_size == 0) )
+            break;
 
-        if ( (vendor_id == 0xffff) && (device_id == 0xffff) )
-            continue;
+        /* Invalid checksum means we're out of option ROMs. */
+        csum = 0;
+        for ( i = 0; i < (rom->rom_size * 512); i++ )
+            csum += ((uint8_t *)rom)[i];
+        if ( csum != 0 )
+            break;
 
-        /* We're only interested in NICs. */
-        if ( class != 0x0200 )
-            continue;
+        /* Check the PCI PnP header (if any) for a match. */
+        pcih = (struct option_rom_pci_header *)
+            ((char *)rom + rom->pci_header_offset);
+        if ( (rom->pci_header_offset != 0) &&
+             !strncmp((char *)pcih->signature, "PCIR", 4) &&
+             (pcih->vendor_id == vendor_id) &&
+             (pcih->device_id == device_id) )
+            goto found;
 
-        rom = (struct option_rom_header *)etherboot;
-        for ( ; ; )
-        {
-            /* Invalid signature means we're out of option ROMs. */
-            if ( strncmp((char *)rom->signature, "\x55\xaa", 2) ||
-                 (rom->rom_size == 0) )
-                break;
-
-            /* Invalid checksum means we're out of option ROMs. */
-            csum = 0;
-            for ( i = 0; i < (rom->rom_size * 512); i++ )
-                csum += ((uint8_t *)rom)[i];
-            if ( csum != 0 )
-                break;
-
-            /* Check the PCI PnP header (if any) for a match. */
-            pcih = (struct option_rom_pci_header *)
-                ((char *)rom + rom->pci_header_offset);
-            if ( (rom->pci_header_offset != 0) &&
-                 !strncmp((char *)pcih->signature, "PCIR", 4) &&
-                 (pcih->vendor_id == vendor_id) &&
-                 (pcih->device_id == device_id) )
-                goto found;
-
-            rom = (struct option_rom_header *)
-                ((char *)rom + rom->rom_size * 512);
-        }
+        rom = (struct option_rom_header *)
+            ((char *)rom + rom->rom_size * 512);
     }
 
     return 0;
@@ -392,15 +387,95 @@ static int scan_etherboot_nic(void *copy_rom_dest)
                    ((char *)rom + pnph->next_header_offset))
                 : ((struct option_rom_pnp_header *)NULL));
 
-    printf("Loading PXE ROM ...\n");
+    printf("Loading PCI Option ROM ...\n");
     if ( (pnph != NULL) && (pnph->manufacturer_name_offset != 0) )
         printf(" - Manufacturer: %s\n",
                (char *)rom + pnph->manufacturer_name_offset);
     if ( (pnph != NULL) && (pnph->product_name_offset != 0) )
         printf(" - Product name: %s\n",
                (char *)rom + pnph->product_name_offset);
-    memcpy(copy_rom_dest, rom, rom->rom_size * 512);
-    return rom->rom_size * 512;
+
+    if ( (dest + rom->rom_size * 512) > 0xe0000u )
+    {
+        printf("Option ROM size %x exceeds available space\n",
+               rom->rom_size * 512);
+        return 0;
+    }
+
+    orom_ids[nr_roms++] = vendor_id | ((uint32_t)device_id << 16);
+    memcpy((void *)dest, rom, rom->rom_size * 512);
+    return round_option_rom(rom->rom_size * 512);
+}
+
+/*
+ * Scan the PCI bus for the first NIC supported by etherboot, and copy
+ * the corresponding rom data to *copy_rom_dest. Returns the length of the
+ * selected rom, or 0 if no NIC found.
+ */
+static int scan_etherboot_nic(uint32_t copy_rom_dest)
+{
+    uint32_t devfn;
+    uint16_t class, vendor_id, device_id;
+
+    for ( devfn = 0; devfn < 128; devfn++ )
+    {
+        class     = pci_readw(devfn, PCI_CLASS_DEVICE);
+        vendor_id = pci_readw(devfn, PCI_VENDOR_ID);
+        device_id = pci_readw(devfn, PCI_DEVICE_ID);
+
+        /* We're only interested in NICs. */
+        if ( (vendor_id != 0xffff) &&
+             (device_id != 0xffff) &&
+             (class == 0x0200) )
+            return scan_option_rom(
+                vendor_id, device_id, etherboot, copy_rom_dest);
+    }
+
+    return 0;
+}
+
+/*
+ * Scan the PCI bus for the devices that have an option ROM, and copy
+ * the corresponding rom data to rom_phys_addr.
+ */
+static int pci_load_option_roms(uint32_t rom_base_addr)
+{
+    uint32_t devfn, option_rom_addr, rom_phys_addr = rom_base_addr;
+    uint16_t vendor_id, device_id;
+    uint8_t class;
+
+    for ( devfn = 0; devfn < 128; devfn++ )
+    {
+        class     = pci_readb(devfn, PCI_CLASS_DEVICE + 1);
+        vendor_id = pci_readw(devfn, PCI_VENDOR_ID);
+        device_id = pci_readw(devfn, PCI_DEVICE_ID);
+
+        if ( (vendor_id == 0xffff) && (device_id == 0xffff) )
+            continue;
+
+        /*
+         * Currently only scan options from mass storage devices and serial
+         * bus controller (Fibre Channel included).
+         */
+        if ( (class != 0x1) && (class != 0xc) )
+            continue;
+
+        option_rom_addr = pci_readl(devfn, PCI_ROM_ADDRESS);
+        if ( !option_rom_addr )
+            continue;
+
+        /* Ensure Expansion Bar is enabled before copying */
+        pci_writel(devfn, PCI_ROM_ADDRESS, option_rom_addr | 0x1);
+
+        rom_phys_addr += scan_option_rom(
+            vendor_id, device_id, (void *)(option_rom_addr & ~2047),
+            rom_phys_addr);
+
+        /* Restore the default original value of Expansion Bar */
+        pci_writel(devfn, PCI_ROM_ADDRESS, option_rom_addr);
+    }
+
+    return rom_phys_addr - rom_base_addr;
 }
 
 /* Replace possibly erroneous memory-size CMOS fields with correct values. */
@@ -461,8 +536,9 @@ static uint16_t init_xen_platform_io_base(void)
 
 int main(void)
 {
-    int vgabios_sz = 0, etherboot_sz = 0, rombios_sz, smbios_sz;
-    uint32_t etherboot_phys_addr, vga_ram = 0;
+    int option_rom_sz = 0, vgabios_sz = 0, etherboot_sz = 0;
+    int rombios_sz, smbios_sz;
+    uint32_t etherboot_phys_addr, option_rom_phys_addr, vga_ram = 0;
     uint16_t xen_pfiob;
 
     printf("HVM Loader\n");
@@ -497,13 +573,13 @@ int main(void)
         printf("Loading Cirrus VGABIOS ...\n");
         memcpy((void *)VGABIOS_PHYSICAL_ADDRESS,
                vgabios_cirrusvga, sizeof(vgabios_cirrusvga));
-        vgabios_sz = sizeof(vgabios_cirrusvga);
+        vgabios_sz = round_option_rom(sizeof(vgabios_cirrusvga));
         break;
     case VGA_std:
         printf("Loading Standard VGABIOS ...\n");
         memcpy((void *)VGABIOS_PHYSICAL_ADDRESS,
                vgabios_stdvga, sizeof(vgabios_stdvga));
-        vgabios_sz = sizeof(vgabios_stdvga);
+        vgabios_sz = round_option_rom(sizeof(vgabios_stdvga));
         break;
     default:
         printf("No emulated VGA adaptor ...\n");
@@ -516,10 +592,11 @@ int main(void)
         printf("VGA RAM at %08x\n", vga_ram);
     }
 
-    /* Ethernet ROM is placed after VGA ROM, on next 2kB boundary. */
-    etherboot_phys_addr =
-        (VGABIOS_PHYSICAL_ADDRESS + vgabios_sz + 2047) & ~2047;
-    etherboot_sz = scan_etherboot_nic((void *)etherboot_phys_addr);
+    etherboot_phys_addr = VGABIOS_PHYSICAL_ADDRESS + vgabios_sz;
+    etherboot_sz = scan_etherboot_nic(etherboot_phys_addr);
+
+    option_rom_phys_addr = etherboot_phys_addr + etherboot_sz;
+    option_rom_sz = pci_load_option_roms(option_rom_phys_addr);
 
     if ( get_acpi_enabled() )
     {
@@ -538,6 +615,10 @@ int main(void)
         printf(" %05x-%05x: Etherboot ROM\n",
                etherboot_phys_addr,
                etherboot_phys_addr + etherboot_sz - 1);
+    if ( option_rom_sz )
+        printf(" %05x-%05x: PCI Option ROMs\n",
+               option_rom_phys_addr,
+               option_rom_phys_addr + option_rom_sz - 1);
     if ( smbios_sz )
         printf(" %05x-%05x: SMBIOS tables\n",
                SMBIOS_PHYSICAL_ADDRESS,
