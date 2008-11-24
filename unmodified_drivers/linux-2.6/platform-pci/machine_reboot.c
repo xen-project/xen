@@ -34,7 +34,11 @@ static void ap_suspend(void *_info)
 	atomic_dec(&info->nr_spinning);
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,27)
 #define initiate_ap_suspend(i)	smp_call_function(ap_suspend, i, 0, 0)
+#else
+#define initiate_ap_suspend(i)	smp_call_function(ap_suspend, i, 0)
+#endif
 
 #else /* !defined(CONFIG_SMP) */
 
