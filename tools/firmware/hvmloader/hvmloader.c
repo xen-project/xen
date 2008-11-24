@@ -462,7 +462,7 @@ static uint16_t init_xen_platform_io_base(void)
 int main(void)
 {
     int vgabios_sz = 0, etherboot_sz = 0, rombios_sz, smbios_sz;
-    uint32_t vga_ram = 0;
+    uint32_t etherboot_phys_addr, vga_ram = 0;
     uint16_t xen_pfiob;
 
     printf("HVM Loader\n");
@@ -516,7 +516,10 @@ int main(void)
         printf("VGA RAM at %08x\n", vga_ram);
     }
 
-    etherboot_sz = scan_etherboot_nic((void*)ETHERBOOT_PHYSICAL_ADDRESS);
+    /* Ethernet ROM is placed after VGA ROM, on next 2kB boundary. */
+    etherboot_phys_addr =
+        (VGABIOS_PHYSICAL_ADDRESS + vgabios_sz + 2047) & ~2047;
+    etherboot_sz = scan_etherboot_nic((void *)etherboot_phys_addr);
 
     if ( get_acpi_enabled() )
     {
@@ -533,8 +536,8 @@ int main(void)
                VGABIOS_PHYSICAL_ADDRESS + vgabios_sz - 1);
     if ( etherboot_sz )
         printf(" %05x-%05x: Etherboot ROM\n",
-               ETHERBOOT_PHYSICAL_ADDRESS,
-               ETHERBOOT_PHYSICAL_ADDRESS + etherboot_sz - 1);
+               etherboot_phys_addr,
+               etherboot_phys_addr + etherboot_sz - 1);
     if ( smbios_sz )
         printf(" %05x-%05x: SMBIOS tables\n",
                SMBIOS_PHYSICAL_ADDRESS,
