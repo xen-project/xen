@@ -62,7 +62,7 @@ int pt_irq_create_bind_vtd(
     struct dev_intx_gsi_link *digl;
     int pirq = pt_irq_bind->machine_irq;
 
-    if ( pirq < 0 || pirq >= NR_PIRQS )
+    if ( pirq < 0 || pirq >= NR_IRQS )
         return -EINVAL;
 
     spin_lock(&d->event_lock);
@@ -261,7 +261,7 @@ void hvm_dpci_msi_eoi(struct domain *d, int vector)
     spin_lock(&d->event_lock);
     pirq = hvm_irq_dpci->msi_gvec_pirq[vector];
 
-    if ( ( pirq >= 0 ) && (pirq < NR_PIRQS) &&
+    if ( ( pirq >= 0 ) && (pirq < NR_IRQS) &&
           test_bit(pirq, hvm_irq_dpci->mapping) &&
          (test_bit(_HVM_IRQ_DPCI_MSI, &hvm_irq_dpci->mirq[pirq].flags)))
      {

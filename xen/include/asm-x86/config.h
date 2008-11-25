@@ -51,6 +51,12 @@
 #define NR_CPUS 32
 #endif
 
+#ifdef MAX_PHYS_IRQS
+#define NR_IRQS MAX_PHYS_IRQS
+#else
+#define NR_IRQS 256
+#endif
+
 #if defined(__i386__) && (NR_CPUS > 32)
 #error "Maximum of 32 physical processors supported by Xen on x86_32"
 #endif

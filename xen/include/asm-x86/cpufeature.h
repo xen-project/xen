@@ -94,6 +94,7 @@
 #define X86_FEATURE_SSE4_2	(4*32+20) /* Streaming SIMD Extensions 4.2 */
 #define X86_FEATURE_X2APIC	(4*32+21) /* Extended xAPIC */
 #define X86_FEATURE_POPCNT	(4*32+23) /* POPCNT instruction */
+#define X86_FEATURE_HYPERVISOR	(4*32+31) /* Running under some hypervisor */
 
 /* VIA/Cyrix/Centaur-defined CPU features, CPUID level 0xC0000001, word 5 */
 #define X86_FEATURE_XSTORE	(5*32+ 2) /* on-CPU RNG present (xstore insn) */

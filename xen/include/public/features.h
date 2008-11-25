@@ -62,6 +62,12 @@
 /* x86: Does this Xen host support the MMU_{CLEAR,COPY}_PAGE hypercall? */
 #define XENFEAT_highmem_assist             6
 
+/*
+ * If set, GNTTABOP_map_grant_ref honors flags to be placed into guest kernel
+ * available pte bits.
+ */
+#define XENFEAT_gnttab_map_avail_bits      7
+
 #define XENFEAT_NR_SUBMAPS 1
 
 #endif /* __XEN_PUBLIC_FEATURES_H__ */

@@ -1884,6 +1884,25 @@ static long hvm_memory_op(int cmd, XEN_GUEST_HANDLE(void) arg)
     return rc;
 }
 
+static long hvm_vcpu_op(
+    int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
+{
+    long rc;
+
+    switch ( cmd )
+    {
+    case VCPUOP_register_runstate_memory_area:
+    case VCPUOP_get_runstate_info:
+        rc = do_vcpu_op(cmd, vcpuid, arg);
+        break;
+    default:
+        rc = -ENOSYS;
+        break;
+    }
+
+    return rc;
+}
+
 typedef unsigned long hvm_hypercall_t(
     unsigned long, unsigned long, unsigned long, unsigned long, unsigned long);
 
@@ -1895,6 +1914,7 @@ typedef unsigned long hvm_hypercall_t(
 static hvm_hypercall_t *hvm_hypercall32_table[NR_hypercalls] = {
     [ __HYPERVISOR_memory_op ] = (hvm_hypercall_t *)hvm_memory_op,
     [ __HYPERVISOR_grant_table_op ] = (hvm_hypercall_t *)hvm_grant_table_op,
+    [ __HYPERVISOR_vcpu_op ] = (hvm_hypercall_t *)hvm_vcpu_op,
     HYPERCALL(xen_version),
     HYPERCALL(event_channel_op),
     HYPERCALL(sched_op),
@@ -1911,9 +1931,29 @@ static long hvm_memory_op_compat32(int cmd, XEN_GUEST_HANDLE(void) arg)
     return rc;
 }
 
+static long hvm_vcpu_op_compat32(
+    int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
+{
+    long rc;
+
+    switch ( cmd )
+    {
+    case VCPUOP_register_runstate_memory_area:
+    case VCPUOP_get_runstate_info:
+        rc = compat_vcpu_op(cmd, vcpuid, arg);
+        break;
+    default:
+        rc = -ENOSYS;
+        break;
+    }
+
+    return rc;
+}
+
 static hvm_hypercall_t *hvm_hypercall64_table[NR_hypercalls] = {
     [ __HYPERVISOR_memory_op ] = (hvm_hypercall_t *)hvm_memory_op,
     [ __HYPERVISOR_grant_table_op ] = (hvm_hypercall_t *)hvm_grant_table_op,
+    [ __HYPERVISOR_vcpu_op ] = (hvm_hypercall_t *)hvm_vcpu_op,
     HYPERCALL(xen_version),
     HYPERCALL(event_channel_op),
     HYPERCALL(sched_op),
@@ -1923,6 +1963,7 @@ static hvm_hypercall_t *hvm_hypercall64_table[NR_hypercalls] = {
 static hvm_hypercall_t *hvm_hypercall32_table[NR_hypercalls] = {
     [ __HYPERVISOR_memory_op ] = (hvm_hypercall_t *)hvm_memory_op_compat32,
     [ __HYPERVISOR_grant_table_op ] = (hvm_hypercall_t *)hvm_grant_table_op,
+    [ __HYPERVISOR_vcpu_op ] = (hvm_hypercall_t *)hvm_vcpu_op_compat32,
     HYPERCALL(xen_version),
     HYPERCALL(event_channel_op),
     HYPERCALL(sched_op),
@@ -2081,7 +2122,7 @@ static int hvmop_set_pci_intx_level(
 
 void hvm_vcpu_reset_state(struct vcpu *v, uint16_t cs, uint16_t ip)
 {
-    struct domain *d = current->domain;
+    struct domain *d = v->domain;
     struct vcpu_guest_context *ctxt;
     struct segment_register reg;
 

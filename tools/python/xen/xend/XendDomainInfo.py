@@ -479,6 +479,14 @@ class XendDomainInfo:
         if state in (DOM_STATE_SUSPENDED, DOM_STATE_HALTED):
             try:
                 self._constructDomain()
+
+                try:
+                    self._setCPUAffinity()
+                except:
+                    # usually a CPU we want to set affinity to does not exist
+                    # we just ignore it so that the domain can still be restored
+                    log.warn("Cannot restore CPU affinity")
+
                 self._storeVmDetails()
                 self._createChannels()
                 self._createDevices()
@@ -2166,6 +2174,64 @@ class XendDomainInfo:
             raise XendError(str(exn))
 
 
+    def _setCPUAffinity(self):
+        """ Repin domain vcpus if a restricted cpus list is provided
+        """
+
+        def has_cpus():
+            if self.info['cpus'] is not None:
+                for c in self.info['cpus']:
+                    if c:
+                        return True
+            return False
+
+        if has_cpus():
+            for v in range(0, self.info['VCPUs_max']):
+                if self.info['cpus'][v]:
+                    xc.vcpu_setaffinity(self.domid, v, self.info['cpus'][v])
+        else:
+            def find_relaxed_node(node_list):
+                import sys
+                nr_nodes = info['nr_nodes']
+                if node_list is None:
+                    node_list = range(0, nr_nodes)
+                nodeload = [0]
+                nodeload = nodeload * nr_nodes
+                from xen.xend import XendDomain
+                doms = XendDomain.instance().list('all')
+                for dom in filter (lambda d: d.domid != self.domid, doms):
+                    cpuinfo = dom.getVCPUInfo()
+                    for vcpu in sxp.children(cpuinfo, 'vcpu'):
+                        if sxp.child_value(vcpu, 'online') == 0: continue
+                        cpumap = list(sxp.child_value(vcpu,'cpumap'))
+                        for i in range(0, nr_nodes):
+                            node_cpumask = info['node_to_cpu'][i]
+                            for j in node_cpumask:
+                                if j in cpumap:
+                                    nodeload[i] += 1
+                                    break
+                for i in range(0, nr_nodes):
+                    if len(info['node_to_cpu'][i]) > 0 and i in node_list:
+                        nodeload[i] = int(nodeload[i] * 16 / len(info['node_to_cpu'][i]))
+                    else:
+                        nodeload[i] = sys.maxint
+                index = nodeload.index( min(nodeload) )    
+                return index
+
+            info = xc.physinfo()
+            if info['nr_nodes'] > 1:
+                node_memory_list = info['node_to_memory']
+                needmem = self.image.getRequiredAvailableMemory(self.info['memory_dynamic_max']) / 1024
+                candidate_node_list = []
+                for i in range(0, info['nr_nodes']):
+                    if node_memory_list[i] >= needmem and len(info['node_to_cpu'][i]) > 0:
+                        candidate_node_list.append(i)
+                index = find_relaxed_node(candidate_node_list)
+                cpumask = info['node_to_cpu'][index]
+                for v in range(0, self.info['VCPUs_max']):
+                    xc.vcpu_setaffinity(self.domid, v, cpumask)
+
+
     def _initDomain(self):
         log.debug('XendDomainInfo.initDomain: %s %s',
                   self.domid,
@@ -2185,58 +2251,7 @@ class XendDomainInfo:
             # repin domain vcpus if a restricted cpus list is provided
             # this is done prior to memory allocation to aide in memory
             # distribution for NUMA systems.
-            def has_cpus():
-                if self.info['cpus'] is not None:
-                    for c in self.info['cpus']:
-                        if c:
-                            return True
-                return False
-
-            if has_cpus():
-                for v in range(0, self.info['VCPUs_max']):
-                    if self.info['cpus'][v]:
-                        xc.vcpu_setaffinity(self.domid, v, self.info['cpus'][v])
-            else:
-                def find_relaxed_node(node_list):
-                    import sys
-                    nr_nodes = info['nr_nodes']
-                    if node_list is None:
-                        node_list = range(0, nr_nodes)
-                    nodeload = [0]
-                    nodeload = nodeload * nr_nodes
-                    from xen.xend import XendDomain
-                    doms = XendDomain.instance().list('all')
-                    for dom in filter (lambda d: d.domid != self.domid, doms):
-                        cpuinfo = dom.getVCPUInfo()
-                        for vcpu in sxp.children(cpuinfo, 'vcpu'):
-                            if sxp.child_value(vcpu, 'online') == 0: continue
-                            cpumap = list(sxp.child_value(vcpu,'cpumap'))
-                            for i in range(0, nr_nodes):
-                                node_cpumask = info['node_to_cpu'][i]
-                                for j in node_cpumask:
-                                    if j in cpumap:
-                                        nodeload[i] += 1
-                                        break
-                    for i in range(0, nr_nodes):
-                        if len(info['node_to_cpu'][i]) > 0 and i in node_list:
-                            nodeload[i] = int(nodeload[i] * 16 / len(info['node_to_cpu'][i]))
-                        else:
-                            nodeload[i] = sys.maxint
-                    index = nodeload.index( min(nodeload) )    
-                    return index
-
-                info = xc.physinfo()
-                if info['nr_nodes'] > 1:
-                    node_memory_list = info['node_to_memory']
-                    needmem = self.image.getRequiredAvailableMemory(self.info['memory_dynamic_max']) / 1024
-                    candidate_node_list = []
-                    for i in range(0, info['nr_nodes']):
-                        if node_memory_list[i] >= needmem and len(info['node_to_cpu'][i]) > 0:
-                            candidate_node_list.append(i)
-                    index = find_relaxed_node(candidate_node_list)
-                    cpumask = info['node_to_cpu'][index]
-                    for v in range(0, self.info['VCPUs_max']):
-                        xc.vcpu_setaffinity(self.domid, v, cpumask)
+            self._setCPUAffinity()
 
             # Use architecture- and image-specific calculations to determine
             # the various headrooms necessary, given the raw configured
@@ -3011,64 +3026,69 @@ class XendDomainInfo:
         if not xspol:
             xspol = poladmin.get_policy_by_name(policy)
 
-        if state in [ DOM_STATE_RUNNING, DOM_STATE_PAUSED ]:
-            #if domain is running or paused try to relabel in hypervisor
-            if not xspol:
-                return (-xsconstants.XSERR_POLICY_NOT_LOADED, "", "", 0)
+        try:
+            xen.xend.XendDomain.instance().policy_lock.acquire_writer()
 
-            if typ != xspol.get_type_name() or \
-               policy != xspol.get_name():
-                return (-xsconstants.XSERR_BAD_LABEL, "", "", 0)
-
-            if typ == xsconstants.ACM_POLICY_ID:
-                new_ssidref = xspol.vmlabel_to_ssidref(label)
-                if new_ssidref == xsconstants.INVALID_SSIDREF:
-                    return (-xsconstants.XSERR_BAD_LABEL, "", "", 0)
-
-                # Check that all used resources are accessible under the
-                # new label
-                if not is_policy_update and \
-                   not security.resources_compatible_with_vmlabel(xspol,
-                          self, label):
-                    return (-xsconstants.XSERR_BAD_LABEL, "", "", 0)
-
-                #Check label against expected one. Can only do this
-                # if the policy hasn't changed underneath in the meantime
-                if xspol_old == None:
-                    old_label = self.get_security_label()
-                    if old_label != old_seclab:
-                        log.info("old_label != old_seclab: %s != %s" %
-                                 (old_label, old_seclab))
-                        return (-xsconstants.XSERR_BAD_LABEL, "", "", 0)
-
-                # relabel domain in the hypervisor
-                rc, errors = security.relabel_domains([[domid, new_ssidref]])
-                log.info("rc from relabeling in HV: %d" % rc)
-            else:
-                return (-xsconstants.XSERR_POLICY_TYPE_UNSUPPORTED, "", "", 0)
-
-        if rc == 0:
-            # HALTED, RUNNING or PAUSED
-            if domid == 0:
-                if xspol:
-                    self.info['security_label'] = seclab
-                    ssidref = poladmin.set_domain0_bootlabel(xspol, label)
-                else:
+            if state in [ DOM_STATE_RUNNING, DOM_STATE_PAUSED ]:
+                #if domain is running or paused try to relabel in hypervisor
+                if not xspol:
                     return (-xsconstants.XSERR_POLICY_NOT_LOADED, "", "", 0)
-            else:
-                if self.info.has_key('security_label'):
-                    old_label = self.info['security_label']
-                    # Check label against expected one, unless wildcard
-                    if old_label != old_seclab:
+
+                if typ != xspol.get_type_name() or \
+                   policy != xspol.get_name():
+                    return (-xsconstants.XSERR_BAD_LABEL, "", "", 0)
+
+                if typ == xsconstants.ACM_POLICY_ID:
+                    new_ssidref = xspol.vmlabel_to_ssidref(label)
+                    if new_ssidref == xsconstants.INVALID_SSIDREF:
                         return (-xsconstants.XSERR_BAD_LABEL, "", "", 0)
 
-                self.info['security_label'] = seclab
+                    # Check that all used resources are accessible under the
+                    # new label
+                    if not is_policy_update and \
+                       not security.resources_compatible_with_vmlabel(xspol,
+                              self, label):
+                        return (-xsconstants.XSERR_BAD_LABEL, "", "", 0)
 
-                try:
-                    xen.xend.XendDomain.instance().managed_config_save(self)
-                except:
-                    pass
-        return (rc, errors, old_label, new_ssidref)
+                    #Check label against expected one. Can only do this
+                    # if the policy hasn't changed underneath in the meantime
+                    if xspol_old == None:
+                        old_label = self.get_security_label()
+                        if old_label != old_seclab:
+                            log.info("old_label != old_seclab: %s != %s" %
+                                     (old_label, old_seclab))
+                            return (-xsconstants.XSERR_BAD_LABEL, "", "", 0)
+
+                    # relabel domain in the hypervisor
+                    rc, errors = security.relabel_domains([[domid, new_ssidref]])
+                    log.info("rc from relabeling in HV: %d" % rc)
+                else:
+                    return (-xsconstants.XSERR_POLICY_TYPE_UNSUPPORTED, "", "", 0)
+
+            if rc == 0:
+                # HALTED, RUNNING or PAUSED
+                if domid == 0:
+                    if xspol:
+                        self.info['security_label'] = seclab
+                        ssidref = poladmin.set_domain0_bootlabel(xspol, label)
+                    else:
+                        return (-xsconstants.XSERR_POLICY_NOT_LOADED, "", "", 0)
+                else:
+                    if self.info.has_key('security_label'):
+                        old_label = self.info['security_label']
+                        # Check label against expected one, unless wildcard
+                        if old_label != old_seclab:
+                            return (-xsconstants.XSERR_BAD_LABEL, "", "", 0)
+
+                    self.info['security_label'] = seclab
+
+                    try:
+                        xen.xend.XendDomain.instance().managed_config_save(self)
+                    except:
+                        pass
+            return (rc, errors, old_label, new_ssidref)
+        finally:
+            xen.xend.XendDomain.instance().policy_lock.release()
 
     def get_on_shutdown(self):
         after_shutdown = self.info.get('actions_after_shutdown')

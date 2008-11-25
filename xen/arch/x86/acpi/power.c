@@ -30,6 +30,8 @@
 
 #include <acpi/cpufreq/cpufreq.h>
 
+uint32_t system_reset_counter = 1;
+
 static char opt_acpi_sleep[20];
 string_param("acpi_sleep", opt_acpi_sleep);
 
@@ -75,19 +77,47 @@ static void device_power_up(void)
 static void freeze_domains(void)
 {
     struct domain *d;
+    struct vcpu *v;
 
+    rcu_read_lock(&domlist_read_lock);
     for_each_domain ( d )
-        if ( d->domain_id != 0 )
+    {
+        switch ( d->domain_id )
+        {
+        case 0:
+            for_each_vcpu ( d, v )
+                if ( v != current )
+                    vcpu_pause(v);
+            break;
+        default:
             domain_pause(d);
+            break;
+        }
+    }
+    rcu_read_unlock(&domlist_read_lock);
 }
 
 static void thaw_domains(void)
 {
     struct domain *d;
+    struct vcpu *v;
 
+    rcu_read_lock(&domlist_read_lock);
     for_each_domain ( d )
-        if ( d->domain_id != 0 )
+    {
+        switch ( d->domain_id )
+        {
+        case 0:
+            for_each_vcpu ( d, v )
+                if ( v != current )
+                    vcpu_unpause(v);
+            break;
+        default:
             domain_unpause(d);
+            break;
+        }
+    }
+    rcu_read_unlock(&domlist_read_lock);
 }
 
 static void acpi_sleep_prepare(u32 state)
@@ -163,6 +193,7 @@ static int enter_state(u32 state)
     {
     case ACPI_STATE_S3:
         do_suspend_lowlevel();
+        system_reset_counter++;
         break;
     case ACPI_STATE_S5:
         acpi_enter_sleep_state(ACPI_STATE_S5);

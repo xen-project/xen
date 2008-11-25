@@ -265,23 +265,20 @@ int hpet_legacy_irq_tick(void)
 u64 hpet_setup(void)
 {
     static u64 hpet_rate;
-    static int initialised;
+    static u32 system_reset_latch;
     u32 hpet_id, hpet_period, cfg;
     int i;
 
-    if ( initialised )
+    if ( system_reset_latch == system_reset_counter )
         return hpet_rate;
-    initialised = 1;
-
-    if ( hpet_address == 0 )
-        return 0;
+    system_reset_latch = system_reset_counter;
 
     set_fixmap_nocache(FIX_HPET_BASE, hpet_address);
 
     hpet_id = hpet_read32(HPET_ID);
-    if ( hpet_id == 0 )
+    if ( (hpet_id & HPET_ID_REV) == 0 )
     {
-        printk("BAD HPET vendor id.\n");
+        printk("BAD HPET revision id.\n");
         return 0;
     }
 
@@ -299,9 +296,9 @@ u64 hpet_setup(void)
 
     for ( i = 0; i <= ((hpet_id >> 8) & 31); i++ )
     {
-        cfg = hpet_read32(HPET_T0_CFG + i*0x20);
+        cfg = hpet_read32(HPET_Tn_CFG(i));
         cfg &= ~HPET_TN_ENABLE;
-        hpet_write32(cfg & ~HPET_TN_ENABLE, HPET_T0_CFG);
+        hpet_write32(cfg, HPET_Tn_CFG(i));
     }
 
     cfg = hpet_read32(HPET_CFG);

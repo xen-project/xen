@@ -360,7 +360,7 @@ DEFINE_XEN_GUEST_HANDLE(gnttab_unmap_and_replace_t);
 
 
 /*
- * Bitfield values for update_pin_status.flags.
+ * Bitfield values for gnttab_map_grant_ref.flags.
  */
  /* Map the grant entry for access by I/O devices. */
 #define _GNTMAP_device_map      (0)
@@ -386,6 +386,13 @@ DEFINE_XEN_GUEST_HANDLE(gnttab_unmap_and_replace_t);
   */
 #define _GNTMAP_contains_pte    (4)
 #define GNTMAP_contains_pte     (1<<_GNTMAP_contains_pte)
+
+/*
+ * Bits to be placed in guest kernel available PTE bits (architecture
+ * dependent; only supported when XENFEAT_gnttab_map_avail_bits is set).
+ */
+#define _GNTMAP_guest_avail0    (16)
+#define GNTMAP_guest_avail_mask ((uint32_t)~0 << _GNTMAP_guest_avail0)
 
 /*
  * Values for error status returns. All errors are -ve.

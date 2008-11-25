@@ -14,7 +14,11 @@ EXPORT_SYMBOL(system_state);
 
 void ctrl_alt_del(void)
 {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,27)
 	kill_proc(1, SIGINT, 1); /* interrupt init */
+#else
+	kill_cad_pid(SIGINT, 1);
+#endif
 }
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,8)

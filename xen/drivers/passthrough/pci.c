@@ -171,9 +171,9 @@ static void pci_clean_dpci_irqs(struct domain *d)
     hvm_irq_dpci = domain_get_irq_dpci(d);
     if ( hvm_irq_dpci != NULL )
     {
-        for ( i = find_first_bit(hvm_irq_dpci->mapping, NR_PIRQS);
-              i < NR_PIRQS;
-              i = find_next_bit(hvm_irq_dpci->mapping, NR_PIRQS, i + 1) )
+        for ( i = find_first_bit(hvm_irq_dpci->mapping, NR_IRQS);
+              i < NR_IRQS;
+              i = find_next_bit(hvm_irq_dpci->mapping, NR_IRQS, i + 1) )
         {
             pirq_guest_unbind(d, i);
             kill_timer(&hvm_irq_dpci->hvm_timer[irq_to_vector(i)]);

@@ -30,6 +30,10 @@
 #include "vtd.h"
 #include "extern.h"
 
+#ifndef dest_SMI
+#define dest_SMI -1
+#endif
+
 u16 apicid_to_bdf(int apic_id)
 {
     struct acpi_drhd_unit *drhd = ioapic_to_drhd(apic_id);
@@ -207,7 +211,7 @@ unsigned int io_apic_read_remap_rte(
 
     remap_rte = (struct IO_APIC_route_remap_entry *) &old_rte;
 
-    if ( remap_rte->format == 0 )
+    if ( (remap_rte->format == 0) || (old_rte.delivery_mode == dest_SMI) )
     {
         *IO_APIC_BASE(apic) = rte_upper ? (reg + 1) : reg;
         return *(IO_APIC_BASE(apic)+4);
@@ -252,6 +256,31 @@ void io_apic_write_remap_rte(
     *(((u32 *)&old_rte) + 1) = *(IO_APIC_BASE(apic)+4);
 
     remap_rte = (struct IO_APIC_route_remap_entry *) &old_rte;
+
+    if ( old_rte.delivery_mode == dest_SMI )
+    {
+        /* Some BIOS does not zero out reserve fields in IOAPIC
+         * RTE's.  clear_IO_APIC() zeroes out all RTE's except for RTE
+         * with MSI delivery type.  This is a problem when the host
+         * OS converts SMI delivery type to some other type but leaving
+         * the reserved field uninitialized.  This can cause interrupt
+         * remapping table out of bound error if "format" field is 1
+         * and the "index" field has a value that that is larger than 
+         * the maximum index of interrupt remapping table.
+         */
+        if ( remap_rte->format == 1 )
+        {
+            remap_rte->format = 0;
+            *IO_APIC_BASE(apic) = reg;
+            *(IO_APIC_BASE(apic)+4) = *(((u32 *)&old_rte)+0);
+            *IO_APIC_BASE(apic) = reg + 1;
+            *(IO_APIC_BASE(apic)+4) = *(((u32 *)&old_rte)+1);
+        }
+
+        *IO_APIC_BASE(apic) = rte_upper ? (reg + 1) : reg;
+        *(IO_APIC_BASE(apic)+4) = value;
+        return;
+    }
 
     /* mask the interrupt while we change the intremap table */
     saved_mask = remap_rte->mask;
@@ -473,7 +502,7 @@ int intremap_setup(struct iommu *iommu)
     ir_ctrl = iommu_ir_ctrl(iommu);
     if ( ir_ctrl->iremap_maddr == 0 )
     {
-        ir_ctrl->iremap_maddr = alloc_pgtable_maddr();
+        ir_ctrl->iremap_maddr = alloc_pgtable_maddr(NULL);
         if ( ir_ctrl->iremap_maddr == 0 )
         {
             dprintk(XENLOG_WARNING VTDPREFIX,

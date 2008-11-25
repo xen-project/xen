@@ -148,7 +148,7 @@ static u64 bus_to_context_maddr(struct iommu *iommu, u8 bus)
     root = &root_entries[bus];
     if ( !root_present(*root) )
     {
-        maddr = alloc_pgtable_maddr();
+        maddr = alloc_pgtable_maddr(NULL);
         if ( maddr == 0 )
         {
             unmap_vtd_domain_page(root_entries);
@@ -205,7 +205,7 @@ static u64 addr_to_dma_page_maddr(struct domain *domain, u64 addr, int alloc)
     addr &= (((u64)1) << addr_width) - 1;
     spin_lock_irqsave(&hd->mapping_lock, flags);
     if ( hd->pgd_maddr == 0 )
-        if ( !alloc || ((hd->pgd_maddr = alloc_pgtable_maddr()) == 0) )
+        if ( !alloc || ((hd->pgd_maddr = alloc_pgtable_maddr(domain)) == 0) )
             goto out;
 
     parent = (struct dma_pte *)map_vtd_domain_page(hd->pgd_maddr);
@@ -218,7 +218,7 @@ static u64 addr_to_dma_page_maddr(struct domain *domain, u64 addr, int alloc)
         {
             if ( !alloc )
                 break;
-            maddr = alloc_pgtable_maddr();
+            maddr = alloc_pgtable_maddr(domain);
             if ( !maddr )
                 break;
             dma_set_pte_addr(*pte, maddr);
@@ -605,7 +605,7 @@ static int iommu_set_root_entry(struct iommu *iommu)
     spin_lock_irqsave(&iommu->register_lock, flags);
 
     if ( iommu->root_maddr == 0 )
-        iommu->root_maddr = alloc_pgtable_maddr();
+        iommu->root_maddr = alloc_pgtable_maddr(NULL);
     if ( iommu->root_maddr == 0 )
     {
         spin_unlock_irqrestore(&iommu->register_lock, flags);
@@ -634,7 +634,7 @@ static int iommu_set_root_entry(struct iommu *iommu)
     return 0;
 }
 
-static int iommu_enable_translation(struct iommu *iommu)
+static void iommu_enable_translation(struct iommu *iommu)
 {
     u32 sts;
     unsigned long flags;
@@ -661,7 +661,6 @@ static int iommu_enable_translation(struct iommu *iommu)
     /* Disable PMRs when VT-d engine takes effect per spec definition */
     disable_pmr(iommu);
     spin_unlock_irqrestore(&iommu->register_lock, flags);
-    return 0;
 }
 
 int iommu_disable_translation(struct iommu *iommu)
@@ -1046,8 +1045,7 @@ static int intel_iommu_domain_init(struct domain *d)
         for_each_drhd_unit ( drhd )
         {
             iommu = drhd->iommu;
-            if ( iommu_enable_translation(iommu) )
-                return -EIO;
+            iommu_enable_translation(iommu);
         }
     }
 
@@ -1799,14 +1797,14 @@ static int intel_iommu_group_id(u8 bus, u8 devfn)
 }
 
 static u32 iommu_state[MAX_IOMMUS][MAX_IOMMU_REGS];
-int iommu_suspend(void)
+void iommu_suspend(void)
 {
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
     u32    i;
 
     if ( !vtd_enabled )
-        return 0;
+        return;
 
     iommu_flush_all();
 
@@ -1824,18 +1822,16 @@ int iommu_suspend(void)
         iommu_state[i][DMAR_FEUADDR_REG] =
             (u32) dmar_readl(iommu->reg, DMAR_FEUADDR_REG);
     }
-
-    return 0;
 }
 
-int iommu_resume(void)
+void iommu_resume(void)
 {
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
     u32 i;
 
     if ( !vtd_enabled )
-        return 0;
+        return;
 
     iommu_flush_all();
 
@@ -1855,12 +1851,8 @@ int iommu_resume(void)
                     (u32) iommu_state[i][DMAR_FEADDR_REG]);
         dmar_writel(iommu->reg, DMAR_FEUADDR_REG,
                     (u32) iommu_state[i][DMAR_FEUADDR_REG]);
-
-        if ( iommu_enable_translation(iommu) )
-            return -EIO;
+        iommu_enable_translation(iommu);
     }
-
-    return 0;
 }
 
 struct iommu_ops intel_iommu_ops = {

@@ -665,7 +665,7 @@ static inline int IO_APIC_irq_trigger(int irq)
 }
 
 /* irq_vectors is indexed by the sum of all RTEs in all I/O APICs. */
-u8 irq_vector[NR_IRQ_VECTORS] __read_mostly;
+u8 irq_vector[NR_IRQS] __read_mostly;
 
 int free_irq_vector(int vector)
 {
@@ -686,7 +686,7 @@ int assign_irq_vector(int irq)
     static unsigned current_vector = FIRST_DYNAMIC_VECTOR;
     unsigned vector;
 
-    BUG_ON(irq >= NR_IRQ_VECTORS);
+    BUG_ON(irq >= NR_IRQS);
 
     spin_lock(&vector_lock);
 
@@ -1547,20 +1547,10 @@ static struct hw_interrupt_type ioapic_level_type = {
     .set_affinity 	= set_ioapic_affinity_vector,
 };
 
-static void mask_msi_vector(unsigned int vector)
-{
-    mask_msi_irq(vector);
-}
-
-static void unmask_msi_vector(unsigned int vector)
-{
-    unmask_msi_irq(vector);
-}
-
 static unsigned int startup_msi_vector(unsigned int vector)
 {
     dprintk(XENLOG_INFO, "startup msi vector %x\n", vector);
-    unmask_msi_irq(vector);
+    unmask_msi_vector(vector);
     return 0;
 }
 
@@ -1576,13 +1566,13 @@ static void end_msi_vector(unsigned int vector)
 static void shutdown_msi_vector(unsigned int vector)
 {
     dprintk(XENLOG_INFO, "shutdown msi vector %x\n", vector);
-    mask_msi_irq(vector);
+    mask_msi_vector(vector);
 }
 
 static void set_msi_affinity_vector(unsigned int vector, cpumask_t cpu_mask)
 {
     set_native_irq_info(vector, cpu_mask);
-    set_msi_irq_affinity(vector, cpu_mask);
+    set_msi_affinity(vector, cpu_mask);
 }
 
 /*
@@ -2196,7 +2186,7 @@ int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
     if ( new_rte.vector >= FIRST_DYNAMIC_VECTOR )
         new_irq = vector_irq[new_rte.vector];
 
-    if ( (old_irq != new_irq) && (old_irq != -1) && IO_APIC_IRQ(old_irq) )
+    if ( (old_irq != new_irq) && (old_irq >= 0) && IO_APIC_IRQ(old_irq) )
     {
         if ( irq_desc[IO_APIC_VECTOR(old_irq)].action )
         {
@@ -2208,7 +2198,7 @@ int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
         remove_pin_at_irq(old_irq, apic, pin);
     }
 
-    if ( (new_irq != -1) && IO_APIC_IRQ(new_irq) )
+    if ( (new_irq >= 0) && IO_APIC_IRQ(new_irq) )
     {
         if ( irq_desc[IO_APIC_VECTOR(new_irq)].action )
         {

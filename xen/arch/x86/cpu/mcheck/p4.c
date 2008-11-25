@@ -51,7 +51,7 @@ static void intel_thermal_interrupt(struct cpu_user_regs *regs)
 
 	ack_APIC_irq();
 
-	if (NOW() > next[cpu])
+	if (NOW() < next[cpu])
 		return;
 
 	next[cpu] = NOW() + MILLISECS(5000);

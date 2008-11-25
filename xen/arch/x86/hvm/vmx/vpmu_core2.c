@@ -335,7 +335,7 @@ static int core2_vpmu_do_wrmsr(struct cpu_user_regs *regs)
     case MSR_CORE_PERF_GLOBAL_STATUS:
         gdprintk(XENLOG_INFO, "Can not write readonly MSR: "
                  "MSR_PERF_GLOBAL_STATUS(0x38E)!\n");
-        vmx_inject_hw_exception(current, TRAP_gp_fault, 0);
+        vmx_inject_hw_exception(TRAP_gp_fault, 0);
         return 1;
     case MSR_IA32_PEBS_ENABLE:
         if ( msr_content & 1 )

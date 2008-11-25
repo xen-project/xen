@@ -426,7 +426,7 @@ int qinval_setup(struct iommu *iommu)
 
     if ( qi_ctrl->qinval_maddr == 0 )
     {
-        qi_ctrl->qinval_maddr = alloc_pgtable_maddr();
+        qi_ctrl->qinval_maddr = alloc_pgtable_maddr(NULL);
         if ( qi_ctrl->qinval_maddr == 0 )
         {
             dprintk(XENLOG_WARNING VTDPREFIX,

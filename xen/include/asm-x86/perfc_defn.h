@@ -33,6 +33,7 @@ PERFCOUNTER(ptwr_emulations,        "writable pt emulations")
 
 PERFCOUNTER(exception_fixed,        "pre-exception fixed")
 
+PERFCOUNTER(guest_walk,            "guest pagetable walks")
 
 /* Shadow counters */
 PERFCOUNTER(shadow_alloc,          "calls to shadow_alloc")
@@ -92,7 +93,6 @@ PERFCOUNTER(shadow_unshadow,       "shadow unshadows a page")
 PERFCOUNTER(shadow_up_pointer,     "shadow unshadow by up-pointer")
 PERFCOUNTER(shadow_unshadow_bf,    "shadow unshadow brute-force")
 PERFCOUNTER(shadow_get_page_fail,  "shadow_get_page_from_l1e failed")
-PERFCOUNTER(shadow_guest_walk,     "shadow walks guest tables")
 PERFCOUNTER(shadow_check_gwalk,    "shadow checks gwalk")
 PERFCOUNTER(shadow_inconsistent_gwalk, "shadow check inconsistent gwalk")
 PERFCOUNTER(shadow_rm_write_flush_tlb,

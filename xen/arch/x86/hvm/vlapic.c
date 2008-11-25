@@ -377,26 +377,30 @@ static int vlapic_accept_irq(struct vcpu *v, int delivery_mode,
 }
 
 /* This function is used by both ioapic and lapic.The bitmap is for vcpu_id. */
-struct vlapic *apic_round_robin(
-    struct domain *d, uint8_t vector, uint32_t bitmap)
+struct vlapic *apic_lowest_prio(struct domain *d, uint32_t bitmap)
 {
-    int next, old;
-    struct vlapic *target = NULL;
+    int old = d->arch.hvm_domain.irq.round_robin_prev_vcpu;
+    uint32_t ppr, target_ppr = UINT_MAX;
+    struct vlapic *vlapic, *target = NULL;
+    struct vcpu *v;
 
-    old = next = d->arch.hvm_domain.irq.round_robin_prev_vcpu;
+    if ( unlikely((v = d->vcpu[old]) == NULL) )
+        return NULL;
 
     do {
-        if ( ++next == MAX_VIRT_CPUS ) 
-            next = 0;
-        if ( (d->vcpu[next] == NULL) || !test_bit(next, &bitmap) )
-            continue;
-        target = vcpu_vlapic(d->vcpu[next]);
-        if ( vlapic_enabled(target) )
-            break;
-        target = NULL;
-    } while ( next != old );
+        v = v->next_in_list ? : d->vcpu[0];
+        vlapic = vcpu_vlapic(v);
+        if ( test_bit(v->vcpu_id, &bitmap) && vlapic_enabled(vlapic) &&
+             ((ppr = vlapic_get_ppr(vlapic)) < target_ppr) )
+        {
+            target = vlapic;
+            target_ppr = ppr;
+        }
+    } while ( v->vcpu_id != old );
 
-    d->arch.hvm_domain.irq.round_robin_prev_vcpu = next;
+    if ( target != NULL )
+        d->arch.hvm_domain.irq.round_robin_prev_vcpu =
+            vlapic_vcpu(target)->vcpu_id;
 
     return target;
 }
@@ -456,7 +460,7 @@ int vlapic_ipi(
 
     if ( delivery_mode == APIC_DM_LOWEST )
     {
-        target = apic_round_robin(vlapic_domain(v), vector, lpr_map);
+        target = apic_lowest_prio(vlapic_domain(v), lpr_map);
         if ( target != NULL )
             rc = vlapic_accept_irq(vlapic_vcpu(target), delivery_mode,
                                    vector, level, trig_mode);

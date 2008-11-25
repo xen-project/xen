@@ -1,0 +1,3 @@
+#!/bin/sh
+ifconfig $1 up
+exec /sbin/brconfig $2 add $1

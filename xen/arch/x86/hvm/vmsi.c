@@ -152,7 +152,7 @@ int vmsi_deliver(struct domain *d, int pirq)
     {
     case dest_LowestPrio:
     {
-        target = apic_round_robin(d, vector, deliver_bitmask);
+        target = apic_lowest_prio(d, deliver_bitmask);
         if ( target != NULL )
             vmsi_inj_irq(d, target, vector, trig_mode, delivery_mode);
         else

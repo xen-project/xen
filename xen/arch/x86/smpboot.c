@@ -821,7 +821,7 @@ static int __devinit do_boot_cpu(int apicid, int cpu)
  */
 {
 	unsigned long boot_error;
-	unsigned int i;
+	unsigned int order;
 	int timeout;
 	unsigned long start_eip;
 	unsigned short nmi_high = 0, nmi_low = 0;
@@ -857,34 +857,27 @@ static int __devinit do_boot_cpu(int apicid, int cpu)
 
 	gdt = per_cpu(gdt_table, cpu);
 	if (gdt == boot_cpu_gdt_table) {
-		i = get_order_from_pages(NR_RESERVED_GDT_PAGES);
+		order = get_order_from_pages(NR_RESERVED_GDT_PAGES);
 #ifdef __x86_64__
 #ifdef CONFIG_COMPAT
-		page = alloc_domheap_pages(NULL, i,
+		page = alloc_domheap_pages(NULL, order,
 					   MEMF_node(cpu_to_node(cpu)));
 		per_cpu(compat_gdt_table, cpu) = gdt = page_to_virt(page);
 		memcpy(gdt, boot_cpu_compat_gdt_table,
 		       NR_RESERVED_GDT_PAGES * PAGE_SIZE);
 		gdt[PER_CPU_GDT_ENTRY - FIRST_RESERVED_GDT_ENTRY].a = cpu;
 #endif
-		page = alloc_domheap_pages(NULL, i,
+		page = alloc_domheap_pages(NULL, order,
 					   MEMF_node(cpu_to_node(cpu)));
 		per_cpu(gdt_table, cpu) = gdt = page_to_virt(page);
 #else
-		per_cpu(gdt_table, cpu) = gdt = alloc_xenheap_pages(i);
+		per_cpu(gdt_table, cpu) = gdt = alloc_xenheap_pages(order);
 #endif
 		memcpy(gdt, boot_cpu_gdt_table,
 		       NR_RESERVED_GDT_PAGES * PAGE_SIZE);
 		BUILD_BUG_ON(NR_CPUS > 0x10000);
 		gdt[PER_CPU_GDT_ENTRY - FIRST_RESERVED_GDT_ENTRY].a = cpu;
 	}
-
-	for (i = 0; i < NR_RESERVED_GDT_PAGES; ++i)
-		v->domain->arch.mm_perdomain_pt
-			[(v->vcpu_id << GDT_LDT_VCPU_SHIFT) +
-			 FIRST_RESERVED_GDT_PAGE + i]
-			= l1e_from_page(virt_to_page(gdt) + i,
-					__PAGE_HYPERVISOR);
 
 #ifdef __i386__
 	if (!per_cpu(doublefault_tss, cpu)) {

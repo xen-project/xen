@@ -22,6 +22,7 @@
 #include <xen/domain_page.h>
 #include <asm/paging.h>
 #include <xen/iommu.h>
+#include <xen/numa.h>
 #include "../iommu.h"
 #include "../dmar.h"
 #include "../vtd.h"
@@ -37,13 +38,13 @@ void unmap_vtd_domain_page(void *va)
 }
 
 /* Allocate page table, return its machine address */
-u64 alloc_pgtable_maddr(void)
+u64 alloc_pgtable_maddr(struct domain *d)
 {
     struct page_info *pg;
     u64 *vaddr;
     unsigned long mfn;
 
-    pg = alloc_domheap_page(NULL, 0);
+    pg = alloc_domheap_page(NULL, d ? MEMF_node(domain_to_node(d)) : 0);
     if ( !pg )
         return 0;
     mfn = page_to_mfn(pg);
@@ -121,9 +122,9 @@ void hvm_dpci_isairq_eoi(struct domain *d, unsigned int isairq)
         return;
     }
     /* Multiple mirq may be mapped to one isa irq */
-    for ( i = find_first_bit(dpci->mapping, NR_PIRQS);
-          i < NR_PIRQS;
-          i = find_next_bit(dpci->mapping, NR_PIRQS, i + 1) )
+    for ( i = find_first_bit(dpci->mapping, NR_IRQS);
+          i < NR_IRQS;
+          i = find_next_bit(dpci->mapping, NR_IRQS, i + 1) )
     {
         list_for_each_entry_safe ( digl, tmp,
             &dpci->mirq[i].digl_list, list )

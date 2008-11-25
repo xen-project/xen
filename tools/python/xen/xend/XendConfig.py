@@ -1032,8 +1032,6 @@ class XendConfig(dict):
                     sxpr.append([name, s])
 
         for xenapi, legacy in XENAPI_CFG_TO_LEGACY_CFG.items():
-            if legacy in ('cpus'): # skip this
-                continue
             if self.has_key(xenapi) and self[xenapi] not in (None, []):
                 if type(self[xenapi]) == bool:
                     # convert booleans to ints before making an sxp item

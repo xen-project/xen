@@ -160,6 +160,9 @@ unsigned long total_pages;
 
 #define PAGE_CACHE_ATTRS (_PAGE_PAT|_PAGE_PCD|_PAGE_PWT)
 
+int opt_allow_hugepage;
+boolean_param("allowhugepage", opt_allow_hugepage);
+
 #define l1_disallow_mask(d)                                     \
     ((d != dom_io) &&                                           \
      (rangeset_is_empty((d)->iomem_caps) &&                     \
@@ -586,6 +589,28 @@ static int get_page_and_type_from_pagenr(unsigned long page_nr,
     return rc;
 }
 
+static int get_data_page(
+    struct page_info *page, struct domain *d, int writeable)
+{
+    int rc;
+
+    if ( writeable )
+        rc = get_page_and_type(page, d, PGT_writable_page);
+    else
+        rc = get_page(page, d);
+
+    return rc;
+}
+
+static void put_data_page(
+    struct page_info *page, int writeable)
+{
+    if ( writeable )
+        put_page_and_type(page);
+    else
+        put_page(page);
+}
+
 /*
  * We allow root tables to map each other (a.k.a. linear page tables). It
  * needs some special care with reference counts and access permissions:
@@ -700,10 +725,9 @@ get_page_from_l1e(
      * contribute to writeable mapping refcounts.  (This allows the
      * qemu-dm helper process in dom0 to map the domain's memory without
      * messing up the count of "real" writable mappings.) */
-    okay = (((l1f & _PAGE_RW) && 
-             !(unlikely(paging_mode_external(d) && (d != curr->domain))))
-            ? get_page_and_type(page, d, PGT_writable_page)
-            : get_page(page, d));
+    okay = get_data_page(
+        page, d,
+        (l1f & _PAGE_RW) && !(paging_mode_external(d) && (d != curr->domain)));
     if ( !okay )
     {
         MEM_LOG("Error getting mfn %lx (pfn %lx) from L1 entry %" PRIpte
@@ -751,6 +775,7 @@ static int
 get_page_from_l2e(
     l2_pgentry_t l2e, unsigned long pfn, struct domain *d)
 {
+    unsigned long mfn = l2e_get_pfn(l2e);
     int rc;
 
     if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
@@ -762,10 +787,37 @@ get_page_from_l2e(
         return -EINVAL;
     }
 
-    rc = get_page_and_type_from_pagenr(
-        l2e_get_pfn(l2e), PGT_l1_page_table, d, 0, 0);
-    if ( unlikely(rc == -EINVAL) && get_l2_linear_pagetable(l2e, pfn, d) )
-        rc = 0;
+    if ( !(l2e_get_flags(l2e) & _PAGE_PSE) )
+    {
+        rc = get_page_and_type_from_pagenr(mfn, PGT_l1_page_table, d, 0, 0);
+        if ( unlikely(rc == -EINVAL) && get_l2_linear_pagetable(l2e, pfn, d) )
+            rc = 0;
+    }
+    else if ( !opt_allow_hugepage || (mfn & (L1_PAGETABLE_ENTRIES-1)) )
+    {
+        rc = -EINVAL;
+    }
+    else
+    {
+        unsigned long m = mfn;
+        int writeable = !!(l2e_get_flags(l2e) & _PAGE_RW);
+  
+        do {
+            rc = get_data_page(mfn_to_page(m), d, writeable);
+            if ( unlikely(!rc) )
+            {
+                while ( m-- > mfn )
+                    put_data_page(mfn_to_page(m), writeable);
+                return -EINVAL;
+            }
+        } while ( m++ < (mfn + (L1_PAGETABLE_ENTRIES-1)) );
+
+#ifdef __x86_64__
+        map_pages_to_xen(
+            (unsigned long)mfn_to_virt(mfn), mfn, L1_PAGETABLE_ENTRIES,
+            PAGE_HYPERVISOR | l2e_get_flags(l2e));
+#endif
+    }
 
     return rc;
 }
@@ -954,13 +1006,24 @@ void put_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
  */
 static int put_page_from_l2e(l2_pgentry_t l2e, unsigned long pfn)
 {
-    if ( (l2e_get_flags(l2e) & _PAGE_PRESENT) && 
-         (l2e_get_pfn(l2e) != pfn) )
+    if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) || (l2e_get_pfn(l2e) == pfn) )
+        return 1;
+
+    if ( l2e_get_flags(l2e) & _PAGE_PSE )
+    {
+        unsigned long mfn = l2e_get_pfn(l2e), m = mfn;
+        int writeable = l2e_get_flags(l2e) & _PAGE_RW;
+        ASSERT(opt_allow_hugepage && !(mfn & (L1_PAGETABLE_ENTRIES-1)));
+        do {
+            put_data_page(mfn_to_page(m), writeable);
+        } while ( m++ < (mfn + (L1_PAGETABLE_ENTRIES-1)) );
+    }
+    else
     {
         put_page_and_type(l2e_get_page(l2e));
-        return 0;
     }
-    return 1;
+
+    return 0;
 }
 
 static int __put_page_type(struct page_info *, int preemptible);
@@ -1541,6 +1604,7 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
     struct domain *d = curr->domain;
     unsigned long mfn;
     struct page_info *l1pg = mfn_to_page(gl1mfn);
+    p2m_type_t p2mt;
     int rc = 1;
 
     page_lock(l1pg);
@@ -1558,8 +1622,8 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
     if ( l1e_get_flags(nl1e) & _PAGE_PRESENT )
     {
         /* Translate foreign guest addresses. */
-        mfn = gmfn_to_mfn(FOREIGNDOM, l1e_get_pfn(nl1e));
-        if ( unlikely(mfn == INVALID_MFN) )
+        mfn = mfn_x(gfn_to_mfn(FOREIGNDOM, l1e_get_pfn(nl1e), &p2mt));
+        if ( !p2m_is_ram(p2mt) || unlikely(mfn == INVALID_MFN) )
             return page_unlock(l1pg), 0;
         ASSERT((mfn & ~(PADDR_MASK >> PAGE_SHIFT)) == 0);
         nl1e = l1e_from_pfn(mfn, l1e_get_flags(nl1e));
@@ -3332,6 +3396,10 @@ int create_grant_host_mapping(uint64_t addr, unsigned long frame,
     if ( !(flags & GNTMAP_readonly) )
         l1e_add_flags(pte,_PAGE_RW);
 
+    l1e_add_flags(pte,
+                  ((flags >> _GNTMAP_guest_avail0) * _PAGE_AVAIL0)
+                   & _PAGE_AVAIL);
+
     l1e_add_flags(pte, cacheattr_to_pte_flags(cache_flags >> 5));
 
     if ( flags & GNTMAP_contains_pte )
@@ -4227,7 +4295,7 @@ int map_pages_to_xen(
                 {
                     if ( l3e_get_flags(ol3e) & _PAGE_GLOBAL )
                         flush_flags |= FLUSH_TLB_GLOBAL;
-                    if ( (l1f_to_lNf(l3e_get_flags(ol3e)) ^ flags) &
+                    if ( (lNf_to_l1f(l3e_get_flags(ol3e)) ^ flags) &
                          PAGE_CACHE_ATTRS )
                         flush_flags |= FLUSH_CACHE;
                     flush_area(virt, flush_flags);

@@ -187,7 +187,7 @@ static enum handler_return long_mode_do_msr_read(struct cpu_user_regs *regs)
     check_long_mode:
         if ( !(hvm_long_mode_enabled(v)) )
         {
-            vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
+            vmx_inject_hw_exception(TRAP_gp_fault, 0);
             return HNDL_exception_raised;
         }
         break;
@@ -284,7 +284,7 @@ static enum handler_return long_mode_do_msr_write(struct cpu_user_regs *regs)
  uncanonical_address:
     HVM_DBG_LOG(DBG_LEVEL_0, "Not cano address of msr write %x", ecx);
  gp_fault:
-    vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
+    vmx_inject_hw_exception(TRAP_gp_fault, 0);
  exception_raised:
     return HNDL_exception_raised;
 }
@@ -1094,8 +1094,7 @@ void ept_sync_domain(struct domain *d)
     }
 }
 
-static void __vmx_inject_exception(
-    struct vcpu *v, int trap, int type, int error_code)
+static void __vmx_inject_exception(int trap, int type, int error_code)
 {
     unsigned long intr_fields;
 
@@ -1114,17 +1113,29 @@ static void __vmx_inject_exception(
     }
 
     __vmwrite(VM_ENTRY_INTR_INFO, intr_fields);
-
-    if ( trap == TRAP_page_fault )
-        HVMTRACE_LONG_2D(PF_INJECT, error_code,
-            TRC_PAR_LONG(v->arch.hvm_vcpu.guest_cr[2]));
-    else
-        HVMTRACE_2D(INJ_EXC, trap, error_code);
 }
 
-void vmx_inject_hw_exception(struct vcpu *v, int trap, int error_code)
+void vmx_inject_hw_exception(int trap, int error_code)
 {
     unsigned long intr_info = __vmread(VM_ENTRY_INTR_INFO);
+    struct vcpu *curr = current;
+
+    switch ( trap )
+    {
+    case TRAP_debug:
+        if ( guest_cpu_user_regs()->eflags & X86_EFLAGS_TF )
+        {
+            __restore_debug_registers(curr);
+            write_debugreg(6, read_debugreg(6) | 0x4000);
+        }
+    case TRAP_int3:
+        if ( curr->domain->debugger_attached )
+        {
+            /* Debug/Int3: Trap to debugger. */
+            domain_pause_for_debugger();
+            return;
+        }
+    }
 
     if ( unlikely(intr_info & INTR_INFO_VALID_MASK) &&
          (((intr_info >> 8) & 7) == X86_EVENTTYPE_HW_EXCEPTION) )
@@ -1134,37 +1145,34 @@ void vmx_inject_hw_exception(struct vcpu *v, int trap, int error_code)
             error_code = 0;
     }
 
-    __vmx_inject_exception(v, trap, X86_EVENTTYPE_HW_EXCEPTION, error_code);
+    __vmx_inject_exception(trap, X86_EVENTTYPE_HW_EXCEPTION, error_code);
+
+    if ( trap == TRAP_page_fault )
+        HVMTRACE_LONG_2D(PF_INJECT, error_code,
+                         TRC_PAR_LONG(current->arch.hvm_vcpu.guest_cr[2]));
+    else
+        HVMTRACE_2D(INJ_EXC, trap, error_code);
 }
 
-void vmx_inject_extint(struct vcpu *v, int trap)
+void vmx_inject_extint(int trap)
 {
-    __vmx_inject_exception(v, trap, X86_EVENTTYPE_EXT_INTR,
+    __vmx_inject_exception(trap, X86_EVENTTYPE_EXT_INTR,
                            HVM_DELIVER_NO_ERROR_CODE);
 }
 
-void vmx_inject_nmi(struct vcpu *v)
+void vmx_inject_nmi(void)
 {
-    __vmx_inject_exception(v, 2, X86_EVENTTYPE_NMI,
+    __vmx_inject_exception(2, X86_EVENTTYPE_NMI,
                            HVM_DELIVER_NO_ERROR_CODE);
 }
 
 static void vmx_inject_exception(
     unsigned int trapnr, int errcode, unsigned long cr2)
 {
-    struct vcpu *curr = current;
-
-    vmx_inject_hw_exception(curr, trapnr, errcode);
-
     if ( trapnr == TRAP_page_fault )
-        curr->arch.hvm_vcpu.guest_cr[2] = cr2;
+        current->arch.hvm_vcpu.guest_cr[2] = cr2;
 
-    if ( (trapnr == TRAP_debug) &&
-         (guest_cpu_user_regs()->eflags & X86_EFLAGS_TF) )
-    {
-        __restore_debug_registers(curr);
-        write_debugreg(6, read_debugreg(6) | 0x4000);
-    }
+    vmx_inject_hw_exception(trapnr, errcode);
 }
 
 static int vmx_event_pending(struct vcpu *v)
@@ -1315,7 +1323,7 @@ static void __update_guest_eip(unsigned long inst_len)
     }
 
     if ( regs->eflags & X86_EFLAGS_TF )
-        vmx_inject_exception(TRAP_debug, HVM_DELIVER_NO_ERROR_CODE, 0);
+        vmx_inject_hw_exception(TRAP_debug, HVM_DELIVER_NO_ERROR_CODE);
 }
 
 static void vmx_fpu_dirty_intercept(void)
@@ -1636,7 +1644,6 @@ static int vmx_msr_read_intercept(struct cpu_user_regs *regs)
 {
     u64 msr_content = 0;
     u32 ecx = regs->ecx, eax, edx;
-    struct vcpu *v = current;
 
     HVM_DBG_LOG(DBG_LEVEL_1, "ecx=%x", ecx);
 
@@ -1712,7 +1719,7 @@ done:
     return X86EMUL_OKAY;
 
 gp_fault:
-    vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
+    vmx_inject_hw_exception(TRAP_gp_fault, 0);
     return X86EMUL_EXCEPTION;
 }
 
@@ -1849,7 +1856,7 @@ static int vmx_msr_write_intercept(struct cpu_user_regs *regs)
 
         if ( (rc < 0) ||
              (vmx_add_host_load_msr(ecx) < 0) )
-            vmx_inject_hw_exception(v, TRAP_machine_check, 0);
+            vmx_inject_hw_exception(TRAP_machine_check, 0);
         else
         {
             __vmwrite(GUEST_IA32_DEBUGCTL, msr_content);
@@ -1889,7 +1896,7 @@ static int vmx_msr_write_intercept(struct cpu_user_regs *regs)
     return X86EMUL_OKAY;
 
 gp_fault:
-    vmx_inject_hw_exception(v, TRAP_gp_fault, 0);
+    vmx_inject_hw_exception(TRAP_gp_fault, 0);
     return X86EMUL_EXCEPTION;
 }
 
@@ -2197,7 +2204,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
             }
 
             v->arch.hvm_vcpu.guest_cr[2] = exit_qualification;
-            vmx_inject_hw_exception(v, TRAP_page_fault, regs->error_code);
+            vmx_inject_hw_exception(TRAP_page_fault, regs->error_code);
             break;
         case TRAP_nmi:
             if ( (intr_info & INTR_INFO_INTR_TYPE_MASK) !=
@@ -2317,7 +2324,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
     case EXIT_REASON_VMWRITE:
     case EXIT_REASON_VMXOFF:
     case EXIT_REASON_VMXON:
-        vmx_inject_hw_exception(v, TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE);
+        vmx_inject_hw_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE);
         break;
 
     case EXIT_REASON_TPR_BELOW_THRESHOLD:
@@ -2326,7 +2333,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
     case EXIT_REASON_IO_INSTRUCTION:
     case EXIT_REASON_APIC_ACCESS:
         if ( !handle_mmio() )
-            hvm_inject_exception(TRAP_gp_fault, 0, 0);
+            vmx_inject_hw_exception(TRAP_gp_fault, 0);
         break;
 
     case EXIT_REASON_INVD:

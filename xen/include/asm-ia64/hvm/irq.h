@@ -24,9 +24,7 @@
 
 #include <xen/irq.h>
 
-#define NR_VECTORS 256
 #define VIOAPIC_NUM_PINS  48
-#define NR_PIRQS   256
 
 #include <xen/hvm/irq.h>
 

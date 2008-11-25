@@ -56,9 +56,12 @@ struct cpu_time {
 };
 
 struct platform_timesource {
+    char *id;
     char *name;
     u64 frequency;
     u64 (*read_counter)(void);
+    int (*init)(struct platform_timesource *);
+    void (*resume)(struct platform_timesource *);
     int counter_bits;
 };
 
@@ -360,14 +363,21 @@ static u64 read_pit_count(void)
     return count32;
 }
 
-static void init_pit(struct platform_timesource *pts)
+static int init_pit(struct platform_timesource *pts)
 {
-    pts->name = "PIT";
-    pts->frequency = CLOCK_TICK_RATE;
-    pts->read_counter = read_pit_count;
-    pts->counter_bits = 32;
     using_pit = 1;
+    return 1;
 }
+
+static struct platform_timesource plt_pit =
+{
+    .id = "pit",
+    .name = "PIT",
+    .frequency = CLOCK_TICK_RATE,
+    .read_counter = read_pit_count,
+    .counter_bits = 32,
+    .init = init_pit
+};
 
 /************************************************************
  * PLATFORM TIMER 2: HIGH PRECISION EVENT TIMER (HPET)
@@ -385,13 +395,27 @@ static int init_hpet(struct platform_timesource *pts)
     if ( hpet_rate == 0 )
         return 0;
 
-    pts->name = "HPET";
     pts->frequency = hpet_rate;
-    pts->read_counter = read_hpet_count;
-    pts->counter_bits = 32;
-
     return 1;
 }
+
+static void resume_hpet(struct platform_timesource *pts)
+{
+    u64 hpet_rate = hpet_setup();
+
+    BUG_ON(hpet_rate == 0);
+    pts->frequency = hpet_rate;
+}
+
+static struct platform_timesource plt_hpet =
+{
+    .id = "hpet",
+    .name = "HPET",
+    .read_counter = read_hpet_count,
+    .counter_bits = 32,
+    .init = init_hpet,
+    .resume = resume_hpet
+};
 
 /************************************************************
  * PLATFORM TIMER 3: IBM 'CYCLONE' TIMER
@@ -440,19 +464,23 @@ static int init_cyclone(struct platform_timesource *pts)
         printk(KERN_ERR "Cyclone: Could not find valid CBAR value.\n");
         return 0;
     }
- 
+
     /* Enable timer and map the counter register. */
     *(map_cyclone_reg(base + CYCLONE_PMCC_OFFSET)) = 1;
     *(map_cyclone_reg(base + CYCLONE_MPCS_OFFSET)) = 1;
     cyclone_timer = map_cyclone_reg(base + CYCLONE_MPMC_OFFSET);
-
-    pts->name = "IBM Cyclone";
-    pts->frequency = CYCLONE_TIMER_FREQ;
-    pts->read_counter = read_cyclone_count;
-    pts->counter_bits = 32;
-
     return 1;
 }
+
+static struct platform_timesource plt_cyclone =
+{
+    .id = "cyclone",
+    .name = "IBM Cyclone",
+    .frequency = CYCLONE_TIMER_FREQ,
+    .read_counter = read_cyclone_count,
+    .counter_bits = 32,
+    .init = init_cyclone
+};
 
 /************************************************************
  * PLATFORM TIMER 4: ACPI PM TIMER
@@ -473,13 +501,18 @@ static int init_pmtimer(struct platform_timesource *pts)
     if ( pmtmr_ioport == 0 )
         return 0;
 
-    pts->name = "ACPI PM Timer";
-    pts->frequency = ACPI_PM_FREQUENCY;
-    pts->read_counter = read_pmtimer_count;
-    pts->counter_bits = 24;
-
     return 1;
 }
+
+static struct platform_timesource plt_pmtimer =
+{
+    .id = "acpi",
+    .name = "ACPI PM Timer",
+    .frequency = ACPI_PM_FREQUENCY,
+    .read_counter = read_pmtimer_count,
+    .counter_bits = 24,
+    .init = init_pmtimer
+};
 
 /************************************************************
  * GENERIC PLATFORM TIMER INFRASTRUCTURE
@@ -548,26 +581,34 @@ static void platform_time_calibration(void)
 
 static void resume_platform_timer(void)
 {
-    /* No change in platform_stime across suspend/resume. */
-    platform_timer_stamp = plt_stamp64;
+    /* Timer source can be reset when backing from S3 to S0 */
+    if ( plt_src.resume )
+        plt_src.resume(&plt_src);
+
+    plt_stamp64 = platform_timer_stamp;
     plt_stamp = plt_src.read_counter();
 }
 
 static void init_platform_timer(void)
 {
-    struct platform_timesource *pts = &plt_src;
-    int rc = -1;
+    static struct platform_timesource * const plt_timers[] = {
+        &plt_cyclone, &plt_hpet, &plt_pmtimer, &plt_pit
+    };
+
+    struct platform_timesource *pts = NULL;
+    int i, rc = -1;
 
     if ( opt_clocksource[0] != '\0' )
     {
-        if ( !strcmp(opt_clocksource, "pit") )
-            rc = (init_pit(pts), 1);
-        else if ( !strcmp(opt_clocksource, "hpet") )
-            rc = init_hpet(pts);
-        else if ( !strcmp(opt_clocksource, "cyclone") )
-            rc = init_cyclone(pts);
-        else if ( !strcmp(opt_clocksource, "acpi") )
-            rc = init_pmtimer(pts);
+        for ( i = 0; i < ARRAY_SIZE(plt_timers); i++ )
+        {
+            pts = plt_timers[i];
+            if ( !strcmp(opt_clocksource, pts->id) )
+            {
+                rc = pts->init(pts);
+                break;
+            }
+        }
 
         if ( rc <= 0 )
             printk("WARNING: %s clocksource '%s'.\n",
@@ -575,11 +616,17 @@ static void init_platform_timer(void)
                    opt_clocksource);
     }
 
-    if ( (rc <= 0) &&
-         !init_cyclone(pts) &&
-         !init_hpet(pts) &&
-         !init_pmtimer(pts) )
-        init_pit(pts);
+    if ( rc <= 0 )
+    {
+        for ( i = 0; i < ARRAY_SIZE(plt_timers); i++ )
+        {
+            pts = plt_timers[i];
+            if ( (rc = pts->init(pts)) > 0 )
+                break;
+        }
+    }
+
+    BUG_ON(rc <= 0);
 
     plt_mask = (u64)~0ull >> (64 - pts->counter_bits);
 
@@ -588,6 +635,7 @@ static void init_platform_timer(void)
     plt_overflow_period = scale_delta(
         1ull << (pts->counter_bits-1), &plt_scale);
     init_timer(&plt_overflow_timer, plt_overflow, NULL, 0);
+    plt_src = *pts;
     plt_overflow(NULL);
 
     platform_timer_stamp = plt_stamp64;
@@ -1172,6 +1220,9 @@ int time_suspend(void)
         cmos_utc_offset = -get_cmos_time();
         cmos_utc_offset += (wc_sec + (wc_nsec + NOW()) / 1000000000ULL);
         kill_timer(&calibration_timer);
+
+        /* Sync platform timer stamps. */
+        platform_time_calibration();
     }
 
     /* Better to cancel calibration timer for accuracy. */
@@ -1184,19 +1235,18 @@ int time_resume(void)
 {
     /*u64 tmp = */init_pit_and_calibrate_tsc();
 
-    disable_pit_irq();
-
     /* Disable this while calibrate_tsc_ap() also is skipped. */
     /*set_time_scale(&this_cpu(cpu_time).tsc_scale, tmp);*/
 
     resume_platform_timer();
 
+    disable_pit_irq();
+
     init_percpu_time();
 
     do_settime(get_cmos_time() + cmos_utc_offset, 0, NOW());
 
-    if ( !is_idle_vcpu(current) )
-        update_vcpu_system_time(current);
+    update_vcpu_system_time(current);
 
     return 0;
 }

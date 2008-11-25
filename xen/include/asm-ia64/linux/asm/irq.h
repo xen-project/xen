@@ -11,6 +11,7 @@
  * 02/29/00     D.Mosberger	moved most things into hw_irq.h
  */
 
+#define NR_VECTORS	256
 #define NR_IRQS		256
 #define NR_IRQ_VECTORS	NR_IRQS
 

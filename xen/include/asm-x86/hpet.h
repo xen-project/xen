@@ -24,6 +24,10 @@
 #define HPET_T2_CMP	0x148
 #define HPET_T2_ROUTE	0x150
 
+#define HPET_Tn_CFG(n)      (HPET_T0_CFG + n * 0x20)
+#define HPET_Tn_CMP(n)      (HPET_T0_CMP + n * 0x20)
+#define HPET_Tn_ROUTE(n)    (HPET_T0_ROUTE + n * 0x20)
+
 #define HPET_ID_VENDOR	0xffff0000
 #define HPET_ID_LEGSUP	0x00008000
 #define HPET_ID_NUMBER	0x00001f00

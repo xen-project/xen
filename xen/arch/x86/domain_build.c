@@ -194,30 +194,6 @@ static void __init process_dom0_ioports_disable(void)
     }
 }
 
-/* We run on dom0's page tables for the final part of the build process. */
-static void dom0_pt_enter(struct vcpu *v)
-{
-    struct desc_ptr gdt_desc = {
-        .limit = LAST_RESERVED_GDT_BYTE,
-        .base = (unsigned long)(this_cpu(gdt_table) - FIRST_RESERVED_GDT_ENTRY)
-    };
-
-    asm volatile ( "lgdt %0" : : "m" (gdt_desc) );
-    write_ptbase(v);
-}
-
-/* Return to idle domain's page tables. */
-static void dom0_pt_exit(void)
-{
-    struct desc_ptr gdt_desc = {
-        .limit = LAST_RESERVED_GDT_BYTE,
-        .base = GDT_VIRT_START(current)
-    };
-
-    write_ptbase(current);
-    asm volatile ( "lgdt %0" : : "m" (gdt_desc) );
-}
-
 int __init construct_dom0(
     struct domain *d,
     unsigned long _image_start, unsigned long image_len, 
@@ -479,8 +455,9 @@ int __init construct_dom0(
     /* WARNING: The new domain must have its 'processor' field filled in! */
     l3start = l3tab = (l3_pgentry_t *)mpt_alloc; mpt_alloc += PAGE_SIZE;
     l2start = l2tab = (l2_pgentry_t *)mpt_alloc; mpt_alloc += 4*PAGE_SIZE;
-    memcpy(l2tab, idle_pg_table_l2, 4*PAGE_SIZE);
-    for (i = 0; i < 4; i++) {
+    for (i = 0; i < L3_PAGETABLE_ENTRIES; i++) {
+        copy_page(l2tab + i * L2_PAGETABLE_ENTRIES,
+                  idle_pg_table_l2 + i * L2_PAGETABLE_ENTRIES);
         l3tab[i] = l3e_from_paddr((u32)l2tab + i*PAGE_SIZE, L3_PROT);
         l2tab[(LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT)+i] =
             l2e_from_paddr((u32)l2tab + i*PAGE_SIZE, __PAGE_HYPERVISOR);
@@ -729,7 +706,8 @@ int __init construct_dom0(
     else
         update_cr3(v);
 
-    dom0_pt_enter(v);
+    /* We run on dom0's page tables for the final part of the build process. */
+    write_ptbase(v);
 
     /* Copy the OS image and free temporary buffer. */
     elf.dest = (void*)vkern_start;
@@ -741,11 +719,11 @@ int __init construct_dom0(
              (parms.virt_hypercall >= v_end) )
         {
             write_ptbase(current);
-            local_irq_enable();
             printk("Invalid HYPERCALL_PAGE field in ELF notes.\n");
             return -1;
         }
-        hypercall_page_initialise(d, (void *)(unsigned long)parms.virt_hypercall);
+        hypercall_page_initialise(
+            d, (void *)(unsigned long)parms.virt_hypercall);
     }
 
     /* Copy the initial ramdisk. */
@@ -826,7 +804,8 @@ int __init construct_dom0(
         xlat_start_info(si, XLAT_start_info_console_dom0);
 #endif
 
-    dom0_pt_exit();
+    /* Return to idle domain's page tables. */
+    write_ptbase(current);
 
 #if defined(__i386__)
     /* Destroy low mappings - they were only for our convenience. */

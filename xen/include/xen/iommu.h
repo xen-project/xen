@@ -110,7 +110,7 @@ struct iommu_ops {
 void iommu_update_ire_from_apic(unsigned int apic, unsigned int reg, unsigned int value);
 void iommu_update_ire_from_msi(struct msi_desc *msi_desc, struct msi_msg *msg);
 
-int iommu_suspend(void);
-int iommu_resume(void);
+void iommu_suspend(void);
+void iommu_resume(void);
 
 #endif /* _IOMMU_H_ */

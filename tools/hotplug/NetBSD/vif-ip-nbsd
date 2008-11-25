@@ -1,0 +1,33 @@
+#!/bin/sh -e
+
+# $NetBSD: vif-ip-nbsd,v 1.1.1.1 2008/08/07 20:26:57 cegger Exp $
+# Called by xenbackendd
+# Usage: vif-ip xsdir_backend_path state
+
+PATH=/bin:/usr/bin:/sbin:/usr/sbin
+export PATH
+
+xpath=$1
+xstatus=$2
+
+case $xstatus in
+6)
+	# device removed
+	xenstore-rm $xpath
+	exit 0
+	;;
+2)
+	xip=$(xenstore-read "$xpath/ip")
+	xfid=$(xenstore-read "$xpath/frontend-id")
+	xhandle=$(xenstore-read "$xpath/handle")
+	iface=xvif$xfid.$xhandle
+	echo ifconfig $iface $xip up
+	ifconfig $iface $xip up
+	xenstore-write $xpath/hotplug-status connected
+	echo xenstore-write $xpath/hotplug-status connected
+	exit 0
+	;;
+*)
+	exit 0
+	;;
+esac

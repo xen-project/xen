@@ -69,9 +69,9 @@ struct msi_msg {
 };
 
 /* Helper functions */
-extern void mask_msi_irq(unsigned int irq);
-extern void unmask_msi_irq(unsigned int irq);
-extern void set_msi_irq_affinity(unsigned int irq, cpumask_t mask);
+extern void mask_msi_vector(unsigned int vector);
+extern void unmask_msi_vector(unsigned int vector);
+extern void set_msi_affinity(unsigned int vector, cpumask_t mask);
 extern int pci_enable_msi(struct msi_info *msi);
 extern void pci_disable_msi(int vector);
 extern void pci_cleanup_msi(struct pci_dev *pdev);
@@ -96,6 +96,8 @@ struct msi_desc {
 
 	int remap_index;		/* index in interrupt remapping table */
 };
+
+int msi_maskable_irq(const struct msi_desc *);
 
 /*
  * Assume the maximum number of hot plug slots supported by the system is about

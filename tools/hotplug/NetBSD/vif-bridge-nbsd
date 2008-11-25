@@ -1,0 +1,35 @@
+#!/bin/sh -e
+
+# $NetBSD: vif-bridge-nbsd,v 1.1.1.1 2008/08/07 20:26:57 cegger Exp $
+# Called by xenbackendd
+# Usage: vif-bridge xsdir_backend_path state
+
+PATH=/bin:/usr/bin:/sbin:/usr/sbin
+export PATH
+
+xpath=$1
+xstatus=$2
+
+case $xstatus in
+6)
+	# device removed
+	xenstore-rm $xpath
+	exit 0
+	;;
+2)
+	xbridge=$(xenstore-read "$xpath/bridge")
+	xfid=$(xenstore-read "$xpath/frontend-id")
+	xhandle=$(xenstore-read "$xpath/handle")
+	iface=xvif$xfid.$xhandle
+	echo ifconfig $iface up
+	ifconfig $iface up
+	brconfig $xbridge add $iface
+	echo brconfig $xbridge add $iface
+	xenstore-write $xpath/hotplug-status connected
+	echo xenstore-write $xpath/hotplug-status connected
+	exit 0
+	;;
+*)
+	exit 0
+	;;
+esac

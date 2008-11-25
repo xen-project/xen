@@ -11,6 +11,7 @@ subdir-$(x86_64) += x86_64
 obj-y += apic.o
 obj-y += bitops.o
 obj-y += clear_page.o
+obj-y += copy_page.o
 obj-y += compat.o
 obj-y += delay.o
 obj-y += dmi_scan.o

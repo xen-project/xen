@@ -170,7 +170,7 @@ int main(int argc, char **argv)
             if ( !pxstat->pt )
             {
                 fprintf(stderr, "failed to malloc for P-states table\n");
-                free(pxstat->pt);
+                free(pxstat->trans_pt);
                 break;
             }
 

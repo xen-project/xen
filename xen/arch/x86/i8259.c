@@ -390,7 +390,7 @@ void __init init_IRQ(void)
 
     init_8259A(0);
 
-    for ( i = 0; i < NR_IRQS; i++ )
+    for ( i = 0; i < NR_VECTORS; i++ )
     {
         irq_desc[i].status  = IRQ_DISABLED;
         irq_desc[i].handler = &no_irq_type;

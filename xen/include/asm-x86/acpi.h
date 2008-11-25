@@ -166,4 +166,7 @@ extern u8 x86_acpiid_to_apicid[];
 
 extern int acpi_dmar_init(void);
 
+/* Incremented whenever we transition through S3. Value is 1 during boot. */
+extern uint32_t system_reset_counter;
+
 #endif /*__X86_ASM_ACPI_H*/

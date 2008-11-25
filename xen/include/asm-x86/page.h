@@ -215,7 +215,10 @@ void clear_page_sse2(void *);
 #define clear_page(_p)      (cpu_has_xmm2 ?                             \
                              clear_page_sse2((void *)(_p)) :            \
                              (void)memset((void *)(_p), 0, PAGE_SIZE))
-#define copy_page(_t,_f)    memcpy((void *)(_t), (void *)(_f), PAGE_SIZE)
+void copy_page_sse2(void *, const void *);
+#define copy_page(_t,_f)    (cpu_has_xmm2 ?                             \
+                             copy_page_sse2(_t, _f) :                   \
+                             (void)memcpy(_t, _f, PAGE_SIZE))
 
 #define mfn_valid(mfn)      ((mfn) < max_page)
 
@@ -278,7 +281,6 @@ extern unsigned int   m2p_compat_vstart;
 #endif
 void paging_init(void);
 void setup_idle_pagetable(void);
-unsigned long clone_idle_pagetable(struct vcpu *);
 #endif /* !defined(__ASSEMBLY__) */
 
 #define _PAGE_PRESENT  0x001U

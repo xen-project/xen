@@ -24,7 +24,7 @@
 int opt_noirqbalance = 0;
 boolean_param("noirqbalance", opt_noirqbalance);
 
-irq_desc_t irq_desc[NR_IRQS];
+irq_desc_t irq_desc[NR_VECTORS];
 
 static void __do_IRQ_guest(int vector);
 
@@ -206,7 +206,7 @@ struct pending_eoi {
 static DEFINE_PER_CPU(struct pending_eoi, pending_eoi[NR_VECTORS]);
 #define pending_eoi_sp(p) ((p)[NR_VECTORS-1].vector)
 
-static struct timer irq_guest_eoi_timer[NR_IRQS];
+static struct timer irq_guest_eoi_timer[NR_VECTORS];
 static void irq_guest_eoi_timer_fn(void *data)
 {
     irq_desc_t *desc = data;
@@ -463,12 +463,17 @@ int pirq_acktype(struct domain *d, int irq)
     /*
      * Edge-triggered IO-APIC and LAPIC interrupts need no final
      * acknowledgement: we ACK early during interrupt processing.
-     * MSIs are treated as edge-triggered interrupts.
      */
     if ( !strcmp(desc->handler->typename, "IO-APIC-edge") ||
-         !strcmp(desc->handler->typename, "local-APIC-edge") ||
-         !strcmp(desc->handler->typename, "PCI-MSI") )
+         !strcmp(desc->handler->typename, "local-APIC-edge") )
         return ACKTYPE_NONE;
+
+    /*
+     * MSIs are treated as edge-triggered interrupts, except
+     * when there is no proper way to mask them.
+     */
+    if ( desc->handler == &pci_msi_type )
+        return msi_maskable_irq(desc->msi_desc) ? ACKTYPE_NONE : ACKTYPE_EOI;
 
     /*
      * Level-triggered IO-APIC interrupts need to be acknowledged on the CPU
@@ -765,15 +770,15 @@ int get_free_pirq(struct domain *d, int type, int index)
 
     if ( type == MAP_PIRQ_TYPE_GSI )
     {
-        for ( i = 16; i < NR_PIRQS; i++ )
+        for ( i = 16; i < NR_IRQS; i++ )
             if ( !d->arch.pirq_vector[i] )
                 break;
-        if ( i == NR_PIRQS )
+        if ( i == NR_IRQS )
             return -ENOSPC;
     }
     else
     {
-        for ( i = NR_PIRQS - 1; i >= 16; i-- )
+        for ( i = NR_IRQS - 1; i >= 16; i-- )
             if ( !d->arch.pirq_vector[i] )
                 break;
         if ( i == 16 )
@@ -800,7 +805,7 @@ int map_domain_pirq(
     if ( !IS_PRIV(current->domain) )
         return -EPERM;
 
-    if ( pirq < 0 || pirq >= NR_PIRQS || vector < 0 || vector >= NR_VECTORS )
+    if ( pirq < 0 || pirq >= NR_IRQS || vector < 0 || vector >= NR_VECTORS )
     {
         dprintk(XENLOG_G_ERR, "dom%d: invalid pirq %d or vector %d\n",
                 d->domain_id, pirq, vector);
@@ -857,7 +862,7 @@ int unmap_domain_pirq(struct domain *d, int pirq)
     int vector, ret = 0;
     bool_t forced_unbind;
 
-    if ( (pirq < 0) || (pirq >= NR_PIRQS) )
+    if ( (pirq < 0) || (pirq >= NR_IRQS) )
         return -EINVAL;
 
     if ( !IS_PRIV(current->domain) )
@@ -921,7 +926,7 @@ void free_domain_pirqs(struct domain *d)
 
     spin_lock(&d->event_lock);
 
-    for ( i = 0; i < NR_PIRQS; i++ )
+    for ( i = 0; i < NR_IRQS; i++ )
         if ( d->arch.pirq_vector[i] > 0 )
             unmap_domain_pirq(d, i);
 
@@ -1001,28 +1006,30 @@ __initcall(setup_dump_irqs);
 
 void fixup_irqs(cpumask_t map)
 {
-    unsigned int irq, sp;
+    unsigned int vector, sp;
     static int warned;
     irq_guest_action_t *action;
     struct pending_eoi *peoi;
 
     /* Direct all future interrupts away from this CPU. */
-    for ( irq = 0; irq < NR_IRQS; irq++ )
+    for ( vector = 0; vector < NR_VECTORS; vector++ )
     {
         cpumask_t mask;
-        if ( irq == 2 )
+        if ( vector_to_irq(vector) == 2 )
             continue;
 
-        cpus_and(mask, irq_desc[irq].affinity, map);
+        cpus_and(mask, irq_desc[vector].affinity, map);
         if ( any_online_cpu(mask) == NR_CPUS )
         {
-            printk("Breaking affinity for irq %i\n", irq);
+            printk("Breaking affinity for vector %u (irq %i)\n",
+                   vector, vector_to_irq(vector));
             mask = map;
         }
-        if ( irq_desc[irq].handler->set_affinity )
-            irq_desc[irq].handler->set_affinity(irq, mask);
-        else if ( irq_desc[irq].action && !(warned++) )
-            printk("Cannot set affinity for irq %i\n", irq);
+        if ( irq_desc[vector].handler->set_affinity )
+            irq_desc[vector].handler->set_affinity(vector, mask);
+        else if ( irq_desc[vector].action && !(warned++) )
+            printk("Cannot set affinity for irq %u (irq %i)\n",
+                   vector, vector_to_irq(vector));
     }
 
     /* Service any interrupts that beat us in the re-direction race. */
@@ -1031,11 +1038,11 @@ void fixup_irqs(cpumask_t map)
     local_irq_disable();
 
     /* Clean up cpu_eoi_map of every interrupt to exclude this CPU. */
-    for ( irq = 0; irq < NR_IRQS; irq++ )
+    for ( vector = 0; vector < NR_VECTORS; vector++ )
     {
-        if ( !(irq_desc[irq].status & IRQ_GUEST) )
+        if ( !(irq_desc[vector].status & IRQ_GUEST) )
             continue;
-        action = (irq_guest_action_t *)irq_desc[irq].action;
+        action = (irq_guest_action_t *)irq_desc[vector].action;
         cpu_clear(smp_processor_id(), action->cpu_eoi_map);
     }
 
