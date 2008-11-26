@@ -34,13 +34,13 @@ static void print_qi_regs(struct iommu *iommu)
     u64 val;
 
     val = dmar_readq(iommu->reg, DMAR_IQA_REG);
-    printk("DMAR_IAQ_REG = %"PRIx64"\n", val);
+    printk("DMAR_IQA_REG = %"PRIx64"\n", val);
 
     val = dmar_readq(iommu->reg, DMAR_IQH_REG);
-    printk("DMAR_IAH_REG = %"PRIx64"\n", val);
+    printk("DMAR_IQH_REG = %"PRIx64"\n", val);
 
     val = dmar_readq(iommu->reg, DMAR_IQT_REG);
-    printk("DMAR_IAT_REG = %"PRIx64"\n", val);
+    printk("DMAR_IQT_REG = %"PRIx64"\n", val);
 }
 
 static int qinval_next_index(struct iommu *iommu)
@@ -252,14 +252,15 @@ static int gen_dev_iotlb_inv_dsc(struct iommu *iommu, int index,
     qinval_entry->q.dev_iotlb_inv_dsc.lo.res_3 = 0;
 
     qinval_entry->q.dev_iotlb_inv_dsc.hi.size = size;
-    qinval_entry->q.dev_iotlb_inv_dsc.hi.addr = addr;
+    qinval_entry->q.dev_iotlb_inv_dsc.hi.res_1 = 0;
+    qinval_entry->q.dev_iotlb_inv_dsc.hi.addr = addr >> PAGE_SHIFT_4K;
 
     unmap_vtd_domain_page(qinval_entries);
     spin_unlock_irqrestore(&qi_ctrl->qinval_lock, flags);
     return 0;
 }
 
-int queue_invalidate_device_iotlb(struct iommu *iommu,
+int qinval_device_iotlb(struct iommu *iommu,
     u32 max_invs_pend, u16 sid, u16 size, u64 addr)
 {
     int ret = -1;
