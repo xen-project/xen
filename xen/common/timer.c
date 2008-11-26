@@ -494,12 +494,14 @@ static void dump_timerq(unsigned char key)
         for ( j = 1; j <= GET_HEAP_SIZE(ts->heap); j++ )
         {
             t = ts->heap[j];
-            printk ("  %d : %p ex=0x%08X%08X %p\n",
-                    j, t, (u32)(t->expires>>32), (u32)t->expires, t->data);
+            printk ("  %d : %p ex=0x%08X%08X %p %p\n",
+                    j, t, (u32)(t->expires>>32), (u32)t->expires,
+                    t->data, t->function);
         }
         for ( t = ts->list, j = 0; t != NULL; t = t->list_next, j++ )
-            printk (" L%d : %p ex=0x%08X%08X %p\n",
-                    j, t, (u32)(t->expires>>32), (u32)t->expires, t->data);
+            printk (" L%d : %p ex=0x%08X%08X %p %p\n",
+                    j, t, (u32)(t->expires>>32), (u32)t->expires,
+                    t->data, t->function);
         spin_unlock_irqrestore(&ts->lock, flags);
         printk("\n");
     }
