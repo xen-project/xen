@@ -172,6 +172,28 @@ struct acpi_drhd_unit * acpi_find_matched_drhd_unit(u8 bus, u8 devfn)
     return found ? found : include_all;
 }
 
+struct acpi_atsr_unit * acpi_find_matched_atsr_unit(u8 bus, u8 devfn)
+{
+    struct acpi_atsr_unit *atsr;
+    struct acpi_atsr_unit *found = NULL, *include_all = NULL;
+    int i;
+
+    list_for_each_entry ( atsr, &acpi_atsr_units, list )
+    {
+        for (i = 0; i < atsr->scope.devices_cnt; i++)
+            if ( atsr->scope.devices[i] == PCI_BDF2(bus, devfn) )
+                return atsr;
+
+        if ( test_bit(bus, atsr->scope.buses) )
+            found = atsr;
+
+        if ( atsr->all_ports )
+            include_all = atsr;
+    }
+
+    return found ? found : include_all;
+}
+
 /*
  * Count number of devices in device scope.  Do not include PCI sub
  * hierarchies.
@@ -242,7 +264,6 @@ static int __init acpi_parse_dev_scope(void *start, void *end,
         switch ( acpi_scope->dev_type )
         {
         case ACPI_DEV_P2PBRIDGE:
-        {
             sec_bus = pci_conf_read8(
                 bus, path->dev, path->fn, PCI_SECONDARY_BUS);
             sub_bus = pci_conf_read8(
@@ -253,7 +274,6 @@ static int __init acpi_parse_dev_scope(void *start, void *end,
 
             dmar_scope_add_buses(scope, sec_bus, sub_bus);
             break;
-        }
 
         case ACPI_DEV_MSI_HPET:
             dprintk(XENLOG_INFO VTDPREFIX, "found MSI HPET: bdf = %x:%x.%x\n",
@@ -268,7 +288,6 @@ static int __init acpi_parse_dev_scope(void *start, void *end,
             break;
 
         case ACPI_DEV_IOAPIC:
-        {
             dprintk(XENLOG_INFO VTDPREFIX, "found IOAPIC: bdf = %x:%x.%x\n",
                     bus, path->dev, path->fn);
 
@@ -287,7 +306,6 @@ static int __init acpi_parse_dev_scope(void *start, void *end,
 
             scope->devices[didx++] = PCI_BDF(bus, path->dev, path->fn);
             break;
-        }
         }
 
         start += acpi_scope->length;

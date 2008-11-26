@@ -927,7 +927,7 @@ void panic(const char *fmt, ...)
     console_start_sync();
     printk("\n****************************************\n");
     printk("Panic on CPU %d:\n", smp_processor_id());
-    printk(buf);
+    printk("%s", buf);
     printk("****************************************\n\n");
     if ( opt_noreboot )
         printk("Manual reset required ('noreboot' specified)\n");
