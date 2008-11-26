@@ -193,15 +193,15 @@ guest_walk_tables(struct vcpu *v, unsigned long va, walk_t *gw,
          * access controls are enforced in the shadow l2e. */
         int flags = (_PAGE_PRESENT|_PAGE_USER|_PAGE_RW|
                      _PAGE_ACCESSED|_PAGE_DIRTY);
-        /* PSE level 2 entries use bit 12 for PAT; propagate it to bit 7
-         * of the level 1. */
-        if ( (guest_l2e_get_flags(gw->l2e) & _PAGE_PSE_PAT) ) 
-            flags |= _PAGE_PAT;
-        /* Copy the cache-control bits to the l1 as well, because we
-         * can't represent PAT in the (non-PSE) shadow l2e. :(
-         * This could cause problems if a guest ever maps an area of
-         * memory with superpages using more than one caching mode. */
-        flags |= guest_l2e_get_flags(gw->l2e) & (_PAGE_PWT|_PAGE_PCD);
+        /* Import cache-control bits. Note that _PAGE_PAT is actually
+         * _PAGE_PSE, and it is always set. We will clear it in case
+         * _PAGE_PSE_PAT (bit 12, i.e. first bit of gfn) is clear. */
+        flags |= (guest_l2e_get_flags(gw->l2e)
+                  & (_PAGE_PAT|_PAGE_PWT|_PAGE_PCD));
+        if ( !(gfn_x(start) & 1) )
+            /* _PAGE_PSE_PAT not set: remove _PAGE_PAT from flags. */
+            flags &= ~_PAGE_PAT;
+
         /* Increment the pfn by the right number of 4k pages.  
          * The ~0x1 is to mask out the PAT bit mentioned above. */
         start = _gfn((gfn_x(start) & ~0x1) + guest_l1_table_offset(va));
