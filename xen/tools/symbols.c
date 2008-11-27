@@ -81,7 +81,8 @@ static int read_symbol(FILE *in, struct sym_entry *s)
 	if (rc != 3) {
 		if (rc != EOF) {
 			/* skip line */
-			fgets(str, 500, in);
+			if (fgets(str, 500, in) == NULL)
+				return -1; /* must check fgets result */
 		}
 		return -1;
 	}
