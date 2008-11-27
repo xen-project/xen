@@ -2924,6 +2924,7 @@ static int sh_page_fault(struct vcpu *v,
                writes to an out of sync page. */
             if ( mfn_valid(gmfn) && mfn_is_out_of_sync(gmfn) )
             {
+                fast_emul = 0;
                 v->arch.paging.last_write_emul_ok = 0;
                 goto page_fault_slow_path;
             }
