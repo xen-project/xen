@@ -446,10 +446,6 @@ static int flush_iotlb_reg(void *_iommu, u16 did,
     if ( DMA_TLB_IAIG(val) == 0 )
         dprintk(XENLOG_ERR VTDPREFIX, "IOMMU: flush IOTLB failed\n");
 
-    if ( DMA_TLB_IAIG(val) != DMA_TLB_IIRG(type) )
-        dprintk(XENLOG_INFO VTDPREFIX,
-                "IOMMU: tlb flush request %x, actual %x\n",
-               (u32)DMA_TLB_IIRG(type), (u32)DMA_TLB_IAIG(val));
     /* flush iotlb entry will implicitly flush write buffer */
     return 0;
 }
@@ -1127,10 +1123,11 @@ static int domain_context_mapping_one(
     unmap_vtd_domain_page(context_entries);
 
     /* Context entry was previously non-present (with domid 0). */
-    iommu_flush_context_device(iommu, 0, (((u16)bus) << 8) | devfn,
-                               DMA_CCMD_MASK_NOBIT, 1);
-    if ( iommu_flush_iotlb_dsi(iommu, 0, 1) )
+    if ( iommu_flush_context_device(iommu, 0, (((u16)bus) << 8) | devfn,
+                                    DMA_CCMD_MASK_NOBIT, 1) )
         iommu_flush_write_buffer(iommu);
+    else
+        iommu_flush_iotlb_dsi(iommu, 0, 1);
 
     set_bit(iommu->index, &hd->iommu_bitmap);
     spin_unlock_irqrestore(&iommu->lock, flags);
@@ -1310,8 +1307,12 @@ static int domain_context_unmap_one(
     context_clear_present(*context);
     context_clear_entry(*context);
     iommu_flush_cache_entry(context);
-    iommu_flush_context_domain(iommu, domain_iommu_domid(domain), 0);
-    iommu_flush_iotlb_dsi(iommu, domain_iommu_domid(domain), 0);
+
+    if ( iommu_flush_context_domain(iommu, domain_iommu_domid(domain), 0) )
+        iommu_flush_write_buffer(iommu);
+    else
+        iommu_flush_iotlb_dsi(iommu, domain_iommu_domid(domain), 0);
+
     unmap_vtd_domain_page(context_entries);
     spin_unlock_irqrestore(&iommu->lock, flags);
 
