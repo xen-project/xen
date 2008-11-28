@@ -1990,13 +1990,21 @@ class XendDomainInfo:
             for devclass in XendDevices.valid_devices():
                 for dev in t.list(devclass):
                     try:
+                        true_devclass = devclass
+                        if devclass == 'vbd':
+                            # In the case of "vbd", the true device class
+                            # may possibly be "tap". Just in case, verify
+                            # device class.
+                            devid = dev.split('/')[-1]
+                            true_devclass = self.getBlockDeviceClass(devid)
                         log.debug("Removing %s", dev);
-                        self.destroyDevice(devclass, dev, False);
+                        self.destroyDevice(true_devclass, dev, False);
                     except:
                         # Log and swallow any exceptions in removal --
                         # there's nothing more we can do.
                         log.exception("Device release failed: %s; %s; %s",
-                                      self.info['name_label'], devclass, dev)
+                                      self.info['name_label'],
+                                      true_devclass, dev)
         finally:
             t.abort()
 
