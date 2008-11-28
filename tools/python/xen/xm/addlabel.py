@@ -64,12 +64,13 @@ def validate_config_file(configfile):
         return 0
 
     # sanity check on the data from the file
+    # requiring 'memory,' 'name,' and ether 'kernel' or 'bootloader'
     count = 0
-    required = ['kernel', 'memory', 'name']
+    required = ['kernel', 'bootloader', 'memory', 'name']
     for (k, v) in locs.items():
         if k in required:
             count += 1
-    if count != 3:
+    if count < len(required) - 1:
         print "Invalid configuration file."
         return 0
     else:
