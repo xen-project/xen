@@ -18,6 +18,9 @@
 #define physdev_eoi                compat_physdev_eoi
 #define physdev_eoi_t              physdev_eoi_compat_t
 
+#define physdev_pirq_eoi_mfn       compat_physdev_pirq_eoi_mfn
+#define physdev_pirq_eoi_mfn_t     physdev_pirq_eoi_mfn_compat_t
+
 #define physdev_set_iobitmap       compat_physdev_set_iobitmap
 #define physdev_set_iobitmap_t     physdev_set_iobitmap_compat_t
 

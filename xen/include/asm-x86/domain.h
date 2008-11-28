@@ -238,6 +238,10 @@ struct arch_domain
     int vector_pirq[NR_VECTORS];
     s16 pirq_vector[NR_IRQS];
 
+    /* Shared page for notifying that explicit PIRQ EOI is required. */
+    unsigned long *pirq_eoi_map;
+    unsigned long pirq_eoi_map_mfn;
+
     /* Pseudophysical e820 map (XENMEM_memory_map).  */
     struct e820entry e820[3];
     unsigned int nr_e820;

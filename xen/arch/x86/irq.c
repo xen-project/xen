@@ -18,6 +18,7 @@
 #include <xen/iommu.h>
 #include <asm/msi.h>
 #include <asm/current.h>
+#include <asm/flushtlb.h>
 #include <public/physdev.h>
 
 /* opt_noirqbalance: If true, software IRQ balancing/affinity is disabled. */
@@ -206,16 +207,42 @@ struct pending_eoi {
 static DEFINE_PER_CPU(struct pending_eoi, pending_eoi[NR_VECTORS]);
 #define pending_eoi_sp(p) ((p)[NR_VECTORS-1].vector)
 
+static inline void set_pirq_eoi(struct domain *d, unsigned int irq)
+{
+    if ( d->arch.pirq_eoi_map )
+        set_bit(irq, d->arch.pirq_eoi_map);
+}
+
+static inline void clear_pirq_eoi(struct domain *d, unsigned int irq)
+{
+    if ( d->arch.pirq_eoi_map )
+        clear_bit(irq, d->arch.pirq_eoi_map);
+}
+
+static void _irq_guest_eoi(irq_desc_t *desc)
+{
+    irq_guest_action_t *action = (irq_guest_action_t *)desc->action;
+    unsigned int i, vector = desc - irq_desc;
+
+    if ( !(desc->status & IRQ_GUEST_EOI_PENDING) )
+        return;
+
+    for ( i = 0; i < action->nr_guests; ++i )
+        clear_pirq_eoi(action->guest[i],
+                       domain_vector_to_irq(action->guest[i], vector));
+
+    desc->status &= ~(IRQ_INPROGRESS|IRQ_GUEST_EOI_PENDING);
+    desc->handler->enable(vector);
+}
+
 static struct timer irq_guest_eoi_timer[NR_VECTORS];
 static void irq_guest_eoi_timer_fn(void *data)
 {
     irq_desc_t *desc = data;
-    unsigned vector = desc - irq_desc;
     unsigned long flags;
 
     spin_lock_irqsave(&desc->lock, flags);
-    desc->status &= ~IRQ_INPROGRESS;
-    desc->handler->enable(vector);
+    _irq_guest_eoi(desc);
     spin_unlock_irqrestore(&desc->lock, flags);
 }
 
@@ -272,8 +299,22 @@ static void __do_IRQ_guest(int vector)
 
     if ( already_pending == action->nr_guests )
     {
-        desc->handler->disable(vector);
         stop_timer(&irq_guest_eoi_timer[vector]);
+        desc->handler->disable(vector);
+        desc->status |= IRQ_GUEST_EOI_PENDING;
+        for ( i = 0; i < already_pending; ++i )
+        {
+            d = action->guest[i];
+            set_pirq_eoi(d, domain_vector_to_irq(d, vector));
+            /*
+             * Could check here whether the guest unmasked the event by now
+             * (or perhaps just re-issue the send_guest_pirq()), and if it
+             * can now accept the event,
+             * - clear all the pirq_eoi bits we already set,
+             * - re-enable the vector, and
+             * - skip the timer setup below.
+             */
+        }
         init_timer(&irq_guest_eoi_timer[vector],
                    irq_guest_eoi_timer_fn, desc, smp_processor_id());
         set_timer(&irq_guest_eoi_timer[vector], NOW() + MILLISECS(1));
@@ -382,8 +423,12 @@ static void __pirq_guest_eoi(struct domain *d, int irq)
     action = (irq_guest_action_t *)desc->action;
     vector = desc - irq_desc;
 
-    ASSERT(!test_bit(irq, d->pirq_mask) ||
-           (action->ack_type != ACKTYPE_NONE));
+    if ( action->ack_type == ACKTYPE_NONE )
+    {
+        ASSERT(!test_bit(irq, d->pirq_mask));
+        stop_timer(&irq_guest_eoi_timer[vector]);
+        _irq_guest_eoi(desc);
+    }
 
     if ( unlikely(!test_and_clear_bit(irq, d->pirq_mask)) ||
          unlikely(--action->in_flight != 0) )
@@ -606,6 +651,11 @@ int pirq_guest_bind(struct vcpu *v, int irq, int will_share)
     }
 
     action->guest[action->nr_guests++] = v->domain;
+
+    if ( action->ack_type != ACKTYPE_NONE )
+        set_pirq_eoi(v->domain, irq);
+    else
+        clear_pirq_eoi(v->domain, irq);
 
  unlock_out:
     spin_unlock_irq(&desc->lock);

@@ -191,7 +191,41 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         ret = -EFAULT;
         if ( copy_from_guest(&eoi, arg, 1) != 0 )
             break;
+        ret = -EINVAL;
+        if ( eoi.irq < 0 || eoi.irq >= NR_IRQS )
+            break;
+        if ( v->domain->arch.pirq_eoi_map )
+            evtchn_unmask(v->domain->pirq_to_evtchn[eoi.irq]);
         ret = pirq_guest_eoi(v->domain, eoi.irq);
+        break;
+    }
+
+    case PHYSDEVOP_pirq_eoi_mfn: {
+        struct physdev_pirq_eoi_mfn info;
+        unsigned long *p;
+
+        BUILD_BUG_ON(NR_IRQS > (PAGE_SIZE * 8));
+
+        ret = -EFAULT;
+        if ( copy_from_guest(&info, arg, 1) != 0 )
+            break;
+
+        ret = -EINVAL;
+        if ( !mfn_valid(info.mfn) ||
+             !get_page_and_type(mfn_to_page(info.mfn), v->domain,
+                                PGT_writable_page) )
+            break;
+
+        ret = -ENOSPC;
+        if ( (p = map_domain_page_global(info.mfn)) == NULL )
+            break;
+
+        ret = -EBUSY;
+        if ( cmpxchg(&v->domain->arch.pirq_eoi_map, NULL, p) != NULL )
+            unmap_domain_page_global(p);
+        else
+            v->domain->arch.pirq_eoi_map_mfn = info.mfn;
+
         break;
     }
 

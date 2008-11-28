@@ -41,6 +41,21 @@ typedef struct physdev_eoi physdev_eoi_t;
 DEFINE_XEN_GUEST_HANDLE(physdev_eoi_t);
 
 /*
+ * Register a shared page for the hypervisor to indicate whether the guest
+ * must issue PHYSDEVOP_eoi. The semantics of PHYSDEVOP_eoi change slightly
+ * once the guest used this function in that the associated event channel
+ * will automatically get unmasked. The page registered is used as a bit
+ * array indexed by Xen's PIRQ value.
+ */
+#define PHYSDEVOP_pirq_eoi_mfn          17
+struct physdev_pirq_eoi_mfn {
+    /* IN */
+    xen_pfn_t mfn;
+};
+typedef struct physdev_pirq_eoi_mfn physdev_pirq_eoi_mfn_t;
+DEFINE_XEN_GUEST_HANDLE(physdev_pirq_eoi_mfn_t);
+
+/*
  * Query the status of an IRQ line.
  * @arg == pointer to physdev_irq_status_query structure.
  */
