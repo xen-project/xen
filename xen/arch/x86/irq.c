@@ -351,7 +351,7 @@ irq_desc_t *domain_spin_lock_irq_desc(
 }
 
 /* Flush all ready EOIs from the top of this CPU's pending-EOI stack. */
-static void flush_ready_eoi(void *unused)
+static void flush_ready_eoi(void)
 {
     struct pending_eoi *peoi = this_cpu(pending_eoi);
     irq_desc_t         *desc;
@@ -405,7 +405,7 @@ static void set_eoi_ready(void *data)
     __set_eoi_ready(desc);
     spin_unlock(&desc->lock);
 
-    flush_ready_eoi(NULL);
+    flush_ready_eoi();
 }
 
 static void __pirq_guest_eoi(struct domain *d, int irq)
@@ -453,7 +453,7 @@ static void __pirq_guest_eoi(struct domain *d, int irq)
     {
         __set_eoi_ready(desc);
         spin_unlock(&desc->lock);
-        flush_ready_eoi(NULL);
+        flush_ready_eoi();
         local_irq_enable();
     }
     else
@@ -1100,6 +1100,6 @@ void fixup_irqs(cpumask_t map)
     peoi = this_cpu(pending_eoi);
     for ( sp = 0; sp < pending_eoi_sp(peoi); sp++ )
         peoi[sp].ready = 1;
-    flush_ready_eoi(NULL);
+    flush_ready_eoi();
 }
 #endif
