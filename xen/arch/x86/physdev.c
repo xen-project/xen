@@ -202,7 +202,6 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
 
     case PHYSDEVOP_pirq_eoi_mfn: {
         struct physdev_pirq_eoi_mfn info;
-        unsigned long *p;
 
         BUILD_BUG_ON(NR_IRQS > (PAGE_SIZE * 8));
 
@@ -216,16 +215,23 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
                                 PGT_writable_page) )
             break;
 
-        ret = -ENOSPC;
-        if ( (p = map_domain_page_global(info.mfn)) == NULL )
+        if ( cmpxchg(&v->domain->arch.pirq_eoi_map_mfn, 0, info.mfn) != 0 )
+        {
+            put_page_and_type(mfn_to_page(info.mfn));
+            ret = -EBUSY;
             break;
+        }
 
-        ret = -EBUSY;
-        if ( cmpxchg(&v->domain->arch.pirq_eoi_map, NULL, p) != NULL )
-            unmap_domain_page_global(p);
-        else
-            v->domain->arch.pirq_eoi_map_mfn = info.mfn;
+        v->domain->arch.pirq_eoi_map = map_domain_page_global(info.mfn);
+        if ( v->domain->arch.pirq_eoi_map == NULL )
+        {
+            v->domain->arch.pirq_eoi_map_mfn = 0;
+            put_page_and_type(mfn_to_page(info.mfn));
+            ret = -ENOSPC;
+            break;
+        }
 
+        ret = 0;
         break;
     }
 
