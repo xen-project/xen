@@ -649,7 +649,7 @@ int getrtsecs (void)
 {
     struct timeval tv;
     gettimeofday(&tv, NULL);
-    return tv.tv_sec;
+    return tv.tv_sec % 10 + ((tv.tv_sec / 10) % 6) * 0x10;
 }
 
 int currticks (void)
