@@ -1686,9 +1686,6 @@ int domain_relinquish_resources(struct domain *d)
 	if (is_hvm_domain(d) && d->arch.sal_data)
 		xfree(d->arch.sal_data);
 
-	/* Free page used by xen oprofile buffer */
-	free_xenoprof_pages(d);
-
 	return 0;
 }
 

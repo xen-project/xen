@@ -1864,9 +1864,6 @@ int domain_relinquish_resources(struct domain *d)
         BUG();
     }
 
-    /* Free page used by xen oprofile buffer. */
-    free_xenoprof_pages(d);
-
     if ( is_hvm_domain(d) )
         hvm_domain_relinquish_resources(d);
 
