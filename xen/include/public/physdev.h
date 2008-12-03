@@ -47,13 +47,13 @@ DEFINE_XEN_GUEST_HANDLE(physdev_eoi_t);
  * will automatically get unmasked. The page registered is used as a bit
  * array indexed by Xen's PIRQ value.
  */
-#define PHYSDEVOP_pirq_eoi_mfn          17
-struct physdev_pirq_eoi_mfn {
+#define PHYSDEVOP_pirq_eoi_gmfn         17
+struct physdev_pirq_eoi_gmfn {
     /* IN */
-    xen_pfn_t mfn;
+    xen_pfn_t gmfn;
 };
-typedef struct physdev_pirq_eoi_mfn physdev_pirq_eoi_mfn_t;
-DEFINE_XEN_GUEST_HANDLE(physdev_pirq_eoi_mfn_t);
+typedef struct physdev_pirq_eoi_gmfn physdev_pirq_eoi_gmfn_t;
+DEFINE_XEN_GUEST_HANDLE(physdev_pirq_eoi_gmfn_t);
 
 /*
  * Query the status of an IRQ line.
