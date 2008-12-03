@@ -152,13 +152,33 @@ static void __init set_iommu_translation_control(struct amd_iommu *iommu,
 {
     u32 entry;
 
-    entry = readl(iommu->mmio_base+IOMMU_CONTROL_MMIO_OFFSET);
-    set_field_in_reg_u32(iommu->ht_tunnel_support ? IOMMU_CONTROL_ENABLED :
-                         IOMMU_CONTROL_ENABLED, entry,
+    entry = readl(iommu->mmio_base + IOMMU_CONTROL_MMIO_OFFSET);
+
+    if ( enable )
+    {
+        set_field_in_reg_u32(iommu->ht_tunnel_support ? IOMMU_CONTROL_ENABLED :
+                         IOMMU_CONTROL_DISABLED, entry,
                          IOMMU_CONTROL_HT_TUNNEL_TRANSLATION_MASK,
                          IOMMU_CONTROL_HT_TUNNEL_TRANSLATION_SHIFT, &entry);
+        set_field_in_reg_u32(iommu->isochronous ? IOMMU_CONTROL_ENABLED :
+                         IOMMU_CONTROL_DISABLED, entry,
+                         IOMMU_CONTROL_ISOCHRONOUS_MASK,
+                         IOMMU_CONTROL_ISOCHRONOUS_SHIFT, &entry);
+        set_field_in_reg_u32(iommu->coherent ? IOMMU_CONTROL_ENABLED :
+                         IOMMU_CONTROL_DISABLED, entry,
+                         IOMMU_CONTROL_COHERENT_MASK,
+                         IOMMU_CONTROL_COHERENT_SHIFT, &entry);
+        set_field_in_reg_u32(iommu->res_pass_pw ? IOMMU_CONTROL_ENABLED :
+                         IOMMU_CONTROL_DISABLED, entry,
+                         IOMMU_CONTROL_RESP_PASS_POSTED_WRITE_MASK,
+                         IOMMU_CONTROL_RESP_PASS_POSTED_WRITE_SHIFT, &entry);
+        /* do not set PassPW bit */
+        set_field_in_reg_u32(IOMMU_CONTROL_DISABLED, entry,
+                         IOMMU_CONTROL_PASS_POSTED_WRITE_MASK,
+                         IOMMU_CONTROL_PASS_POSTED_WRITE_SHIFT, &entry);
+    }
     set_field_in_reg_u32(enable ? IOMMU_CONTROL_ENABLED :
-                         IOMMU_CONTROL_ENABLED, entry,
+                         IOMMU_CONTROL_DISABLED, entry,
                          IOMMU_CONTROL_TRANSLATION_ENABLE_MASK,
                          IOMMU_CONTROL_TRANSLATION_ENABLE_SHIFT, &entry);
     writel(entry, iommu->mmio_base+IOMMU_CONTROL_MMIO_OFFSET);
@@ -171,7 +191,7 @@ static void __init set_iommu_command_buffer_control(struct amd_iommu *iommu,
 
     entry = readl(iommu->mmio_base+IOMMU_CONTROL_MMIO_OFFSET);
     set_field_in_reg_u32(enable ? IOMMU_CONTROL_ENABLED :
-                         IOMMU_CONTROL_ENABLED, entry,
+                         IOMMU_CONTROL_DISABLED, entry,
                          IOMMU_CONTROL_COMMAND_BUFFER_ENABLE_MASK,
                          IOMMU_CONTROL_COMMAND_BUFFER_ENABLE_SHIFT, &entry);
     writel(entry, iommu->mmio_base+IOMMU_CONTROL_MMIO_OFFSET);
