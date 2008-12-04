@@ -396,7 +396,7 @@ static void timer_softirq_action(void)
 
     /* Execute ready heap timers. */
     while ( (GET_HEAP_SIZE(heap) != 0) &&
-            ((t = heap[1])->expires_end < now) )
+            ((t = heap[1])->expires < now) )
     {
         remove_from_heap(heap, t);
         t->status = TIMER_STATUS_inactive;
@@ -404,7 +404,7 @@ static void timer_softirq_action(void)
     }
 
     /* Execute ready list timers. */
-    while ( ((t = ts->list) != NULL) && (t->expires_end < now) )
+    while ( ((t = ts->list) != NULL) && (t->expires < now) )
     {
         ts->list = t->list_next;
         t->status = TIMER_STATUS_inactive;
