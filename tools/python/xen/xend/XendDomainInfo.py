@@ -1018,7 +1018,8 @@ class XendDomainInfo:
             sxprs = []
             dev_num = 0
             for dev_type, dev_info in self.info.all_devices_sxpr():
-                if dev_type != deviceClass:
+                if (deviceClass == 'vbd' and dev_type not in ['vbd', 'tap']) or \
+                   (deviceClass != 'vbd' and dev_type != deviceClass):
                     continue
 
                 if deviceClass == 'vscsi':
@@ -1028,6 +1029,16 @@ class XendDomainInfo:
                         vscsi_devs[1].append(vscsi_dev)
                         dev_num = int(sxp.child_value(vscsi_dev, 'devid'))
                     sxprs.append([dev_num, [vscsi_devs]])
+                elif deviceClass == 'vbd':
+                    dev = sxp.child_value(dev_info, 'dev')
+                    if 'ioemu:' in dev:
+                        (_, dev) = dev.split(':', 1)
+                    try:
+                        (dev_name, _) = dev.split(':', 1)  # Remove ":disk" or ":cdrom"
+                    except ValueError:
+                        dev_name = dev
+                    dev_num = self.getDeviceController('vbd').convertToDeviceNumber(dev_name)
+                    sxprs.append([dev_num, dev_info])
                 else:
                     sxprs.append([dev_num, dev_info])
                     dev_num += 1
