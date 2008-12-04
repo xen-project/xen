@@ -303,6 +303,13 @@ static int check_existence(struct ns16550 *uart)
     unsigned char status, scratch, scratch2, scratch3;
 
     /*
+     * We can't poke MMIO UARTs until they get I/O remapped later. Assume that
+     * if we're getting MMIO UARTs, the arch code knows what it's doing.
+     */
+    if ( uart->io_base >= 0x10000 )
+        return 1;
+
+    /*
      * Do a simple existence test first; if we fail this,
      * there's no point trying anything else.
      */
