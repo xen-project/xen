@@ -79,3 +79,10 @@ interesting.
 A possible approach to dealing with boot-time errors, rather than
 crashing the hypervisor. It's particularly appropriate when parsing
 non-critical BIOS tables and detecting extended hardware features.
+
+
+7. BUILD_BUG_ON()
+-----------------
+Useful for assertions which can be evaluated at compile time. For
+example, making explicit assumptions about size and alignment of C
+structures.
