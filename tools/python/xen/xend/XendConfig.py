@@ -256,6 +256,8 @@ LEGACY_CFG_TYPES = {
     'on_xend_start': str,
     'online_vcpus':  int,
     'rtc/timeoffset': str,
+    'bootloader':    str,
+    'bootloader_args': str,
 }
 
 # Values that should be stored in xenstore's /vm/<uuid> that is used
@@ -276,6 +278,8 @@ LEGACY_XENSTORE_VM_PARAMS = [
     'on_reboot',
     'on_xend_start',
     'on_xend_stop',
+    'bootloader',
+    'bootloader_args',
 ]
 
 ##
