@@ -389,6 +389,7 @@ static void deallocate_iommu_page_tables(struct domain *d)
 static void amd_iommu_domain_destroy(struct domain *d)
 {
     deallocate_iommu_page_tables(d);
+    invalidate_all_iommu_pages(d);
 }
 
 static int amd_iommu_return_device(

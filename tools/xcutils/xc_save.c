@@ -24,8 +24,11 @@
 #include <xenguest.h>
 
 static struct suspendinfo {
+    int xc_fd; /* libxc handle */
     int xce; /* event channel handle */
     int suspend_evtchn;
+    int domid;
+    unsigned int flags;
 } si;
 
 /**
@@ -161,6 +164,19 @@ static int evtchn_suspend(void)
 
 static int suspend(void)
 {
+    unsigned long sx_state = 0;
+
+    /* Nothing to do if the guest is in an ACPI sleep state. */
+    if (si.flags & XCFLAGS_HVM)
+        xc_get_hvm_param(si.xc_fd, si.domid,
+                         HVM_PARAM_ACPI_S_STATE, &sx_state);
+    if (sx_state != 0) {
+        /* notify xend that it can do device migration */
+        printf("suspended\n");
+        fflush(stdout);
+        return 1;
+    }
+
     if (si.suspend_evtchn >= 0)
         return evtchn_suspend();
 
@@ -297,32 +313,32 @@ static void *init_qemu_maps(int domid, unsigned int bitmap_size)
 int
 main(int argc, char **argv)
 {
-    unsigned int domid, maxit, max_f, flags; 
-    int xc_fd, io_fd, ret;
+    unsigned int maxit, max_f;
+    int io_fd, ret;
 
     if (argc != 6)
         errx(1, "usage: %s iofd domid maxit maxf flags", argv[0]);
 
-    xc_fd = xc_interface_open();
-    if (xc_fd < 0)
+    si.xc_fd = xc_interface_open();
+    if (si.xc_fd < 0)
         errx(1, "failed to open control interface");
 
     io_fd = atoi(argv[1]);
-    domid = atoi(argv[2]);
+    si.domid = atoi(argv[2]);
     maxit = atoi(argv[3]);
     max_f = atoi(argv[4]);
-    flags = atoi(argv[5]);
+    si.flags = atoi(argv[5]);
 
-    if (suspend_evtchn_init(xc_fd, domid) < 0)
+    if (suspend_evtchn_init(si.xc_fd, si.domid) < 0)
         warnx("suspend event channel initialization failed, using slow path");
 
-    ret = xc_domain_save(xc_fd, io_fd, domid, maxit, max_f, flags, 
-                         &suspend, !!(flags & XCFLAGS_HVM),
+    ret = xc_domain_save(si.xc_fd, io_fd, si.domid, maxit, max_f, si.flags, 
+                         &suspend, !!(si.flags & XCFLAGS_HVM),
                          &init_qemu_maps, &qemu_flip_buffer);
 
     suspend_evtchn_release();
 
-    xc_interface_close(xc_fd);
+    xc_interface_close(si.xc_fd);
 
     return ret;
 }

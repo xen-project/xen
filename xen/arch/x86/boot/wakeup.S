@@ -50,8 +50,7 @@ ENTRY(wakeup_start)
 
         movw    $1, %ax
         lmsw    %ax             # Turn on CR0.PE 
-        jmp     1f
-1:      ljmpl   $BOOT_CS32, $bootsym_phys(wakeup_32)
+        ljmpl   $BOOT_CS32, $bootsym_phys(wakeup_32)
 
 /* This code uses an extended set of video mode numbers. These include:
  * Aliases for standard modes

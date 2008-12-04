@@ -310,6 +310,10 @@ struct iremap_entry {
 struct qinval_entry {
     union {
         struct {
+            u64 lo;
+            u64 hi;
+        }val;
+        struct {
             struct {
                 u64 type    : 4,
                     granu   : 2,

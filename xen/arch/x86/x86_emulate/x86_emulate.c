@@ -28,6 +28,7 @@
 #define DstImplicit (0<<1) /* Destination operand is implicit in the opcode. */
 #define DstBitBase  (1<<1) /* Memory operand, bit string. */
 #define DstReg      (2<<1) /* Register operand. */
+#define DstEax      DstReg /* Register EAX (aka DstReg with no ModRM) */
 #define DstMem      (3<<1) /* Memory operand. */
 #define DstMask     (3<<1)
 /* Source operand type. */
@@ -51,35 +52,35 @@ static uint8_t opcode_table[256] = {
     /* 0x00 - 0x07 */
     ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
     ByteOp|DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
-    ByteOp|DstReg|SrcImm, DstReg|SrcImm, ImplicitOps, ImplicitOps,
+    ByteOp|DstEax|SrcImm, DstEax|SrcImm, ImplicitOps, ImplicitOps,
     /* 0x08 - 0x0F */
     ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
     ByteOp|DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
-    ByteOp|DstReg|SrcImm, DstReg|SrcImm, ImplicitOps, 0,
+    ByteOp|DstEax|SrcImm, DstEax|SrcImm, ImplicitOps, 0,
     /* 0x10 - 0x17 */
     ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
     ByteOp|DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
-    ByteOp|DstReg|SrcImm, DstReg|SrcImm, ImplicitOps, ImplicitOps,
+    ByteOp|DstEax|SrcImm, DstEax|SrcImm, ImplicitOps, ImplicitOps,
     /* 0x18 - 0x1F */
     ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
     ByteOp|DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
-    ByteOp|DstReg|SrcImm, DstReg|SrcImm, ImplicitOps, ImplicitOps,
+    ByteOp|DstEax|SrcImm, DstEax|SrcImm, ImplicitOps, ImplicitOps,
     /* 0x20 - 0x27 */
     ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
     ByteOp|DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
-    ByteOp|DstReg|SrcImm, DstReg|SrcImm, 0, ImplicitOps,
+    ByteOp|DstEax|SrcImm, DstEax|SrcImm, 0, ImplicitOps,
     /* 0x28 - 0x2F */
     ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
     ByteOp|DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
-    ByteOp|DstReg|SrcImm, DstReg|SrcImm, 0, ImplicitOps,
+    ByteOp|DstEax|SrcImm, DstEax|SrcImm, 0, ImplicitOps,
     /* 0x30 - 0x37 */
     ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
     ByteOp|DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
-    ByteOp|DstReg|SrcImm, DstReg|SrcImm, 0, ImplicitOps,
+    ByteOp|DstEax|SrcImm, DstEax|SrcImm, 0, ImplicitOps,
     /* 0x38 - 0x3F */
     ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
     ByteOp|DstReg|SrcMem|ModRM, DstReg|SrcMem|ModRM,
-    ByteOp|DstReg|SrcImm, DstReg|SrcImm, 0, ImplicitOps,
+    ByteOp|DstEax|SrcImm, DstEax|SrcImm, 0, ImplicitOps,
     /* 0x40 - 0x4F */
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
@@ -125,7 +126,7 @@ static uint8_t opcode_table[256] = {
     ByteOp|ImplicitOps|Mov, ImplicitOps|Mov,
     ByteOp|ImplicitOps, ImplicitOps,
     /* 0xA8 - 0xAF */
-    ByteOp|DstReg|SrcImm, DstReg|SrcImm,
+    ByteOp|DstEax|SrcImm, DstEax|SrcImm,
     ByteOp|ImplicitOps|Mov, ImplicitOps|Mov,
     ByteOp|ImplicitOps|Mov, ImplicitOps|Mov,
     ByteOp|ImplicitOps, ImplicitOps,
@@ -687,12 +688,12 @@ static void __put_rep_prefix(
 })
 
 /* Clip maximum repetitions so that the index register only just wraps. */
-#define truncate_ea_and_reps(ea, reps, bytes_per_rep) ({                \
-    unsigned long __todo = (ctxt->regs->eflags & EF_DF) ? (ea) : ~(ea); \
-    __todo = truncate_word(__todo, ad_bytes);                           \
-    __todo = (__todo / (bytes_per_rep)) + 1;                            \
-    (reps) = (__todo < (reps)) ? __todo : (reps);                       \
-    truncate_word((ea), ad_bytes);                                      \
+#define truncate_ea_and_reps(ea, reps, bytes_per_rep) ({                  \
+    unsigned long __todo = (ctxt->regs->eflags & EFLG_DF) ? (ea) : ~(ea); \
+    __todo = truncate_word(__todo, ad_bytes);                             \
+    __todo = (__todo / (bytes_per_rep)) + 1;                              \
+    (reps) = (__todo < (reps)) ? __todo : (reps);                         \
+    truncate_word((ea), ad_bytes);                                        \
 })
 
 /* Compatibility function: read guest memory, zero-extend result to a ulong. */
@@ -1574,59 +1575,35 @@ x86_emulate(
 
     switch ( b )
     {
-    case 0x04 ... 0x05: /* add imm,%%eax */
-        dst.reg = (unsigned long *)&_regs.eax;
-        dst.val = _regs.eax;
-    case 0x00 ... 0x03: add: /* add */
+    case 0x00 ... 0x05: add: /* add */
         emulate_2op_SrcV("add", src, dst, _regs.eflags);
         break;
 
-    case 0x0c ... 0x0d: /* or imm,%%eax */
-        dst.reg = (unsigned long *)&_regs.eax;
-        dst.val = _regs.eax;
-    case 0x08 ... 0x0b: or:  /* or */
+    case 0x08 ... 0x0d: or:  /* or */
         emulate_2op_SrcV("or", src, dst, _regs.eflags);
         break;
 
-    case 0x14 ... 0x15: /* adc imm,%%eax */
-        dst.reg = (unsigned long *)&_regs.eax;
-        dst.val = _regs.eax;
-    case 0x10 ... 0x13: adc: /* adc */
+    case 0x10 ... 0x15: adc: /* adc */
         emulate_2op_SrcV("adc", src, dst, _regs.eflags);
         break;
 
-    case 0x1c ... 0x1d: /* sbb imm,%%eax */
-        dst.reg = (unsigned long *)&_regs.eax;
-        dst.val = _regs.eax;
-    case 0x18 ... 0x1b: sbb: /* sbb */
+    case 0x18 ... 0x1d: sbb: /* sbb */
         emulate_2op_SrcV("sbb", src, dst, _regs.eflags);
         break;
 
-    case 0x24 ... 0x25: /* and imm,%%eax */
-        dst.reg = (unsigned long *)&_regs.eax;
-        dst.val = _regs.eax;
-    case 0x20 ... 0x23: and: /* and */
+    case 0x20 ... 0x25: and: /* and */
         emulate_2op_SrcV("and", src, dst, _regs.eflags);
         break;
 
-    case 0x2c ... 0x2d: /* sub imm,%%eax */
-        dst.reg = (unsigned long *)&_regs.eax;
-        dst.val = _regs.eax;
-    case 0x28 ... 0x2b: sub: /* sub */
+    case 0x28 ... 0x2d: sub: /* sub */
         emulate_2op_SrcV("sub", src, dst, _regs.eflags);
         break;
 
-    case 0x34 ... 0x35: /* xor imm,%%eax */
-        dst.reg = (unsigned long *)&_regs.eax;
-        dst.val = _regs.eax;
-    case 0x30 ... 0x33: xor: /* xor */
+    case 0x30 ... 0x35: xor: /* xor */
         emulate_2op_SrcV("xor", src, dst, _regs.eflags);
         break;
 
-    case 0x3c ... 0x3d: /* cmp imm,%%eax */
-        dst.reg = (unsigned long *)&_regs.eax;
-        dst.val = _regs.eax;
-    case 0x38 ... 0x3b: cmp: /* cmp */
+    case 0x38 ... 0x3d: cmp: /* cmp */
         emulate_2op_SrcV("cmp", src, dst, _regs.eflags);
         dst.type = OP_NONE;
         break;
@@ -1988,8 +1965,6 @@ x86_emulate(
         break;
 
     case 0xa8 ... 0xa9: /* test imm,%%eax */
-        dst.reg = (unsigned long *)&_regs.eax;
-        dst.val = _regs.eax;
     case 0x84 ... 0x85: test: /* test */
         emulate_2op_SrcV("test", src, dst, _regs.eflags);
         dst.type = OP_NONE;

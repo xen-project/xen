@@ -326,13 +326,9 @@ long arch_do_domctl(
 
     case XEN_DOMCTL_sethvmcontext:
     { 
-        struct hvm_domain_context c;
-        struct domain             *d;
+        struct hvm_domain_context c = { .size = domctl->u.hvmcontext.size };
+        struct domain *d;
 
-        c.cur = 0;
-        c.size = domctl->u.hvmcontext.size;
-        c.data = NULL;
-        
         ret = -ESRCH;
         if ( (d = rcu_lock_domain_by_id(domctl->domain)) == NULL )
             break;
@@ -367,8 +363,8 @@ long arch_do_domctl(
 
     case XEN_DOMCTL_gethvmcontext:
     { 
-        struct hvm_domain_context c;
-        struct domain             *d;
+        struct hvm_domain_context c = { 0 };
+        struct domain *d;
 
         ret = -ESRCH;
         if ( (d = rcu_lock_domain_by_id(domctl->domain)) == NULL )
@@ -382,9 +378,7 @@ long arch_do_domctl(
         if ( !is_hvm_domain(d) ) 
             goto gethvmcontext_out;
 
-        c.cur = 0;
         c.size = hvm_save_size(d);
-        c.data = NULL;
 
         if ( guest_handle_is_null(domctl->u.hvmcontext.buffer) )
         {

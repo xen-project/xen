@@ -152,13 +152,33 @@ static void __init set_iommu_translation_control(struct amd_iommu *iommu,
 {
     u32 entry;
 
-    entry = readl(iommu->mmio_base+IOMMU_CONTROL_MMIO_OFFSET);
-    set_field_in_reg_u32(iommu->ht_tunnel_support ? IOMMU_CONTROL_ENABLED :
-                         IOMMU_CONTROL_ENABLED, entry,
+    entry = readl(iommu->mmio_base + IOMMU_CONTROL_MMIO_OFFSET);
+
+    if ( enable )
+    {
+        set_field_in_reg_u32(iommu->ht_tunnel_support ? IOMMU_CONTROL_ENABLED :
+                         IOMMU_CONTROL_DISABLED, entry,
                          IOMMU_CONTROL_HT_TUNNEL_TRANSLATION_MASK,
                          IOMMU_CONTROL_HT_TUNNEL_TRANSLATION_SHIFT, &entry);
+        set_field_in_reg_u32(iommu->isochronous ? IOMMU_CONTROL_ENABLED :
+                         IOMMU_CONTROL_DISABLED, entry,
+                         IOMMU_CONTROL_ISOCHRONOUS_MASK,
+                         IOMMU_CONTROL_ISOCHRONOUS_SHIFT, &entry);
+        set_field_in_reg_u32(iommu->coherent ? IOMMU_CONTROL_ENABLED :
+                         IOMMU_CONTROL_DISABLED, entry,
+                         IOMMU_CONTROL_COHERENT_MASK,
+                         IOMMU_CONTROL_COHERENT_SHIFT, &entry);
+        set_field_in_reg_u32(iommu->res_pass_pw ? IOMMU_CONTROL_ENABLED :
+                         IOMMU_CONTROL_DISABLED, entry,
+                         IOMMU_CONTROL_RESP_PASS_POSTED_WRITE_MASK,
+                         IOMMU_CONTROL_RESP_PASS_POSTED_WRITE_SHIFT, &entry);
+        /* do not set PassPW bit */
+        set_field_in_reg_u32(IOMMU_CONTROL_DISABLED, entry,
+                         IOMMU_CONTROL_PASS_POSTED_WRITE_MASK,
+                         IOMMU_CONTROL_PASS_POSTED_WRITE_SHIFT, &entry);
+    }
     set_field_in_reg_u32(enable ? IOMMU_CONTROL_ENABLED :
-                         IOMMU_CONTROL_ENABLED, entry,
+                         IOMMU_CONTROL_DISABLED, entry,
                          IOMMU_CONTROL_TRANSLATION_ENABLE_MASK,
                          IOMMU_CONTROL_TRANSLATION_ENABLE_SHIFT, &entry);
     writel(entry, iommu->mmio_base+IOMMU_CONTROL_MMIO_OFFSET);
@@ -171,7 +191,7 @@ static void __init set_iommu_command_buffer_control(struct amd_iommu *iommu,
 
     entry = readl(iommu->mmio_base+IOMMU_CONTROL_MMIO_OFFSET);
     set_field_in_reg_u32(enable ? IOMMU_CONTROL_ENABLED :
-                         IOMMU_CONTROL_ENABLED, entry,
+                         IOMMU_CONTROL_DISABLED, entry,
                          IOMMU_CONTROL_COMMAND_BUFFER_ENABLE_MASK,
                          IOMMU_CONTROL_COMMAND_BUFFER_ENABLE_SHIFT, &entry);
     writel(entry, iommu->mmio_base+IOMMU_CONTROL_MMIO_OFFSET);
@@ -235,8 +255,7 @@ static void __init set_iommu_event_log_control(struct amd_iommu *iommu,
                          IOMMU_CONTROL_EVENT_LOG_INT_SHIFT, &entry);
     writel(entry, iommu->mmio_base+IOMMU_CONTROL_MMIO_OFFSET);
 
-    set_field_in_reg_u32(enable ? IOMMU_CONTROL_ENABLED :
-                         IOMMU_CONTROL_DISABLED, entry,
+    set_field_in_reg_u32(IOMMU_CONTROL_DISABLED, entry,
                          IOMMU_CONTROL_COMP_WAIT_INT_MASK,
                          IOMMU_CONTROL_COMP_WAIT_INT_SHIFT, &entry);
     writel(entry, iommu->mmio_base+IOMMU_CONTROL_MMIO_OFFSET);
@@ -391,20 +410,19 @@ static void parse_event_log_entry(u32 entry[])
     u32 code;
     u64 *addr;
     char * event_str[] = {"ILLEGAL_DEV_TABLE_ENTRY",
-                                         "IO_PAGE_FALT",
-                                         "DEV_TABLE_HW_ERROR",
-                                         "PAGE_TABLE_HW_ERROR",
-                                         "ILLEGAL_COMMAND_ERROR",
-                                         "COMMAND_HW_ERROR",
-                                         "IOTLB_INV_TIMEOUT",
-                                         "INVALID_DEV_REQUEST"};
+                          "IO_PAGE_FALT",
+                          "DEV_TABLE_HW_ERROR",
+                          "PAGE_TABLE_HW_ERROR",
+                          "ILLEGAL_COMMAND_ERROR",
+                          "COMMAND_HW_ERROR",
+                          "IOTLB_INV_TIMEOUT",
+                          "INVALID_DEV_REQUEST"};
 
-    code = get_field_from_reg_u32(entry[1],
-                                           IOMMU_EVENT_CODE_MASK,
-                                           IOMMU_EVENT_CODE_SHIFT);
+    code = get_field_from_reg_u32(entry[1], IOMMU_EVENT_CODE_MASK,
+                                            IOMMU_EVENT_CODE_SHIFT);
 
-    if ( (code > IOMMU_EVENT_INVALID_DEV_REQUEST)
-        || (code < IOMMU_EVENT_ILLEGAL_DEV_TABLE_ENTRY) )
+    if ( (code > IOMMU_EVENT_INVALID_DEV_REQUEST) ||
+        (code < IOMMU_EVENT_ILLEGAL_DEV_TABLE_ENTRY) )
     {
         amd_iov_error("Invalid event log entry!\n");
         return;
@@ -428,13 +446,20 @@ static void parse_event_log_entry(u32 entry[])
 static void amd_iommu_page_fault(int vector, void *dev_id,
                              struct cpu_user_regs *regs)
 {
-    u32  event[4];
+    u32 event[4];
+    u32 entry;
     unsigned long flags;
     int ret = 0;
     struct amd_iommu *iommu = dev_id;
 
     spin_lock_irqsave(&iommu->lock, flags);
     ret = amd_iommu_read_event_log(iommu, event);
+    /* reset interrupt status bit */
+    entry = readl(iommu->mmio_base + IOMMU_STATUS_MMIO_OFFSET);
+    set_field_in_reg_u32(IOMMU_CONTROL_ENABLED, entry,
+                         IOMMU_STATUS_EVENT_LOG_INT_MASK,
+                         IOMMU_STATUS_EVENT_LOG_INT_SHIFT, &entry);
+    writel(entry, iommu->mmio_base+IOMMU_STATUS_MMIO_OFFSET);
     spin_unlock_irqrestore(&iommu->lock, flags);
 
     if ( ret != 0 )
@@ -466,7 +491,7 @@ static int set_iommu_interrupt_handler(struct amd_iommu *iommu)
         amd_iov_error("can't request irq\n");
         return 0;
     }
-
+    iommu->vector = vector;
     return vector;
 }
 

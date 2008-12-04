@@ -373,7 +373,7 @@ void write_battery_info_to_xenstore(struct battery_info *info)
              (unsigned int)strlen(info->serial_number), info->serial_number,
              (unsigned int)strlen(info->battery_type), info->battery_type,
              (unsigned int)strlen(info->oem_info), info->oem_info);
-    strncat(val+73, string_info, 1024);
+    strncat(val+73, string_info, 1024-73-1);
     xs_write(xs, XBT_NULL, "/pm/bif", 
              val, 73+8+strlen(info->model_number)+strlen(info->serial_number)+
              strlen(info->battery_type)+strlen(info->oem_info)+1);

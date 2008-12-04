@@ -14,6 +14,7 @@
 #include <public/xen.h>
 #include <public/physdev.h>
 #include <xsm/xsm.h>
+#include <asm/p2m.h>
 
 #ifndef COMPAT
 typedef long ret_t;
@@ -191,7 +192,49 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         ret = -EFAULT;
         if ( copy_from_guest(&eoi, arg, 1) != 0 )
             break;
+        ret = -EINVAL;
+        if ( eoi.irq < 0 || eoi.irq >= NR_IRQS )
+            break;
+        if ( v->domain->arch.pirq_eoi_map )
+            evtchn_unmask(v->domain->pirq_to_evtchn[eoi.irq]);
         ret = pirq_guest_eoi(v->domain, eoi.irq);
+        break;
+    }
+
+    case PHYSDEVOP_pirq_eoi_gmfn: {
+        struct physdev_pirq_eoi_gmfn info;
+        unsigned long mfn;
+
+        BUILD_BUG_ON(NR_IRQS > (PAGE_SIZE * 8));
+
+        ret = -EFAULT;
+        if ( copy_from_guest(&info, arg, 1) != 0 )
+            break;
+
+        ret = -EINVAL;
+        mfn = gmfn_to_mfn(current->domain, info.gmfn);
+        if ( !mfn_valid(mfn) ||
+             !get_page_and_type(mfn_to_page(mfn), v->domain,
+                                PGT_writable_page) )
+            break;
+
+        if ( cmpxchg(&v->domain->arch.pirq_eoi_map_mfn, 0, mfn) != 0 )
+        {
+            put_page_and_type(mfn_to_page(mfn));
+            ret = -EBUSY;
+            break;
+        }
+
+        v->domain->arch.pirq_eoi_map = map_domain_page_global(mfn);
+        if ( v->domain->arch.pirq_eoi_map == NULL )
+        {
+            v->domain->arch.pirq_eoi_map_mfn = 0;
+            put_page_and_type(mfn_to_page(mfn));
+            ret = -ENOSPC;
+            break;
+        }
+
+        ret = 0;
         break;
     }
 

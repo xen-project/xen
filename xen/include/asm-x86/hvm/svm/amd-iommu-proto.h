@@ -63,6 +63,7 @@ void *amd_iommu_get_vptr_from_page_table_entry(u32 *entry);
 int amd_iommu_reserve_domain_unity_map(struct domain *domain,
         unsigned long phys_addr, unsigned long size, int iw, int ir);
 int amd_iommu_sync_p2m(struct domain *d);
+void invalidate_all_iommu_pages(struct domain *d);
 
 /* device table functions */
 void amd_iommu_set_dev_table_entry(u32 *dte, u64 root_ptr, u64 intremap_ptr,

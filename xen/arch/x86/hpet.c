@@ -273,6 +273,9 @@ u64 hpet_setup(void)
         return hpet_rate;
     system_reset_latch = system_reset_counter;
 
+    if ( hpet_address == 0 )
+        return 0;
+
     set_fixmap_nocache(FIX_HPET_BASE, hpet_address);
 
     hpet_id = hpet_read32(HPET_ID);

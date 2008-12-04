@@ -762,10 +762,9 @@ long evtchn_bind_vcpu(unsigned int port, unsigned int vcpu_id)
 }
 
 
-static long evtchn_unmask(evtchn_unmask_t *unmask)
+int evtchn_unmask(unsigned int port)
 {
     struct domain *d = current->domain;
-    int            port = unmask->port;
     struct vcpu   *v;
 
     spin_lock(&d->event_lock);
@@ -916,7 +915,7 @@ long do_event_channel_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         struct evtchn_unmask unmask;
         if ( copy_from_guest(&unmask, arg, 1) != 0 )
             return -EFAULT;
-        rc = evtchn_unmask(&unmask);
+        rc = evtchn_unmask(unmask.port);
         break;
     }
 

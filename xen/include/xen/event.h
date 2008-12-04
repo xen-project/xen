@@ -44,6 +44,9 @@ int evtchn_send(struct domain *d, unsigned int lport);
 /* Bind a local event-channel port to the specified VCPU. */
 long evtchn_bind_vcpu(unsigned int port, unsigned int vcpu_id);
 
+/* Unmask a local event-channel port. */
+int evtchn_unmask(unsigned int port);
+
 /* Allocate/free a Xen-attached event channel port. */
 int alloc_unbound_xen_event_channel(
     struct vcpu *local_vcpu, domid_t remote_domid);

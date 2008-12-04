@@ -446,10 +446,6 @@ static int flush_iotlb_reg(void *_iommu, u16 did,
     if ( DMA_TLB_IAIG(val) == 0 )
         dprintk(XENLOG_ERR VTDPREFIX, "IOMMU: flush IOTLB failed\n");
 
-    if ( DMA_TLB_IAIG(val) != DMA_TLB_IIRG(type) )
-        dprintk(XENLOG_INFO VTDPREFIX,
-                "IOMMU: tlb flush request %x, actual %x\n",
-               (u32)DMA_TLB_IIRG(type), (u32)DMA_TLB_IAIG(val));
     /* flush iotlb entry will implicitly flush write buffer */
     return 0;
 }
@@ -714,22 +710,22 @@ static void iommu_fault_status(u32 fault_status)
     if ( fault_status & DMA_FSTS_PFO )
         dprintk(XENLOG_ERR VTDPREFIX,
             "iommu_fault_status: Fault Overflow\n");
-    else if ( fault_status & DMA_FSTS_PPF )
+    if ( fault_status & DMA_FSTS_PPF )
         dprintk(XENLOG_ERR VTDPREFIX,
             "iommu_fault_status: Primary Pending Fault\n");
-    else if ( fault_status & DMA_FSTS_AFO )
+    if ( fault_status & DMA_FSTS_AFO )
         dprintk(XENLOG_ERR VTDPREFIX,
             "iommu_fault_status: Advanced Fault Overflow\n");
-    else if ( fault_status & DMA_FSTS_APF )
+    if ( fault_status & DMA_FSTS_APF )
         dprintk(XENLOG_ERR VTDPREFIX,
             "iommu_fault_status: Advanced Pending Fault\n");
-    else if ( fault_status & DMA_FSTS_IQE )
+    if ( fault_status & DMA_FSTS_IQE )
         dprintk(XENLOG_ERR VTDPREFIX,
             "iommu_fault_status: Invalidation Queue Error\n");
-    else if ( fault_status & DMA_FSTS_ICE )
+    if ( fault_status & DMA_FSTS_ICE )
         dprintk(XENLOG_ERR VTDPREFIX,
             "iommu_fault_status: Invalidation Completion Error\n");
-    else if ( fault_status & DMA_FSTS_ITE )
+    if ( fault_status & DMA_FSTS_ITE )
         dprintk(XENLOG_ERR VTDPREFIX,
             "iommu_fault_status: Invalidation Time-out Error\n");
 }
@@ -754,10 +750,11 @@ static void iommu_page_fault(int vector, void *dev_id,
 
     /* FIXME: ignore advanced fault log */
     if ( !(fault_status & DMA_FSTS_PPF) )
-        return;
+        goto clear_overflow;
+
     fault_index = dma_fsts_fault_record_index(fault_status);
     reg = cap_fault_reg_offset(iommu->cap);
-    for ( ; ; )
+    while (1)
     {
         u8 fault_reason;
         u16 source_id;
@@ -797,8 +794,9 @@ static void iommu_page_fault(int vector, void *dev_id,
         if ( fault_index > cap_num_fault_regs(iommu->cap) )
             fault_index = 0;
     }
-
+clear_overflow:
     /* clear primary fault overflow */
+    fault_status = readl(iommu->reg + DMAR_FSTS_REG);
     if ( fault_status & DMA_FSTS_PFO )
     {
         spin_lock_irqsave(&iommu->register_lock, flags);
@@ -1125,10 +1123,11 @@ static int domain_context_mapping_one(
     unmap_vtd_domain_page(context_entries);
 
     /* Context entry was previously non-present (with domid 0). */
-    iommu_flush_context_device(iommu, 0, (((u16)bus) << 8) | devfn,
-                               DMA_CCMD_MASK_NOBIT, 1);
-    if ( iommu_flush_iotlb_dsi(iommu, 0, 1) )
+    if ( iommu_flush_context_device(iommu, 0, (((u16)bus) << 8) | devfn,
+                                    DMA_CCMD_MASK_NOBIT, 1) )
         iommu_flush_write_buffer(iommu);
+    else
+        iommu_flush_iotlb_dsi(iommu, 0, 1);
 
     set_bit(iommu->index, &hd->iommu_bitmap);
     spin_unlock_irqrestore(&iommu->lock, flags);
@@ -1308,8 +1307,12 @@ static int domain_context_unmap_one(
     context_clear_present(*context);
     context_clear_entry(*context);
     iommu_flush_cache_entry(context);
-    iommu_flush_context_domain(iommu, domain_iommu_domid(domain), 0);
-    iommu_flush_iotlb_dsi(iommu, domain_iommu_domid(domain), 0);
+
+    if ( iommu_flush_context_domain(iommu, domain_iommu_domid(domain), 0) )
+        iommu_flush_write_buffer(iommu);
+    else
+        iommu_flush_iotlb_dsi(iommu, domain_iommu_domid(domain), 0);
+
     unmap_vtd_domain_page(context_entries);
     spin_unlock_irqrestore(&iommu->lock, flags);
 

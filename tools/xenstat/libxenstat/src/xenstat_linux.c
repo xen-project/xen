@@ -182,12 +182,6 @@ int xenstat_collect_vbds(xenstat_node * node)
 	struct dirent *dp;
 	struct priv_data *priv = get_priv_data(node->handle);
 
-	char *sys_prefix = "statistics/";
-
-	/* 23 = "statistics/" + "xxxx_xx_req" */
-	char ooreq[23], rdreq[23], wrreq[23]; 
-	char *stat_prefix = NULL;
-
 	if (priv == NULL) {
 		perror("Allocation error");
 		return 0;
@@ -215,16 +209,12 @@ int xenstat_collect_vbds(xenstat_node * node)
 		if (ret != 3)
 			continue;
 
-
-		if (strcmp(buf,"vbd") == 0){
-			stat_prefix = "";
+		if (strcmp(buf,"vbd") == 0)
 			vbd.back_type = 1;
-		} else if (strcmp(buf,"tap") == 0){
-			stat_prefix = "tap_";
+		else if (strcmp(buf,"tap") == 0)
 			vbd.back_type = 2;
-		} else {
+		else
 			continue;
-		}
 
 		domain = xenstat_node_domain(node, domid);
 		if (domain == NULL) {
@@ -235,22 +225,19 @@ int xenstat_collect_vbds(xenstat_node * node)
 			continue;
 		}
 
-		snprintf(ooreq, sizeof(ooreq), "%s%soo_req", sys_prefix, stat_prefix);
-		if((read_attributes_vbd(dp->d_name, ooreq, buf, 256)<=0)
+		if((read_attributes_vbd(dp->d_name, "statistics/oo_req", buf, 256)<=0)
 		   || ((ret = sscanf(buf, "%llu", &vbd.oo_reqs)) != 1))
 		{
 			continue;
 		}
 
-		snprintf(rdreq,  sizeof(rdreq),"%s%srd_req", sys_prefix, stat_prefix);
-		if((read_attributes_vbd(dp->d_name, rdreq, buf, 256)<=0)
+		if((read_attributes_vbd(dp->d_name, "statistics/rd_req", buf, 256)<=0)
 		   || ((ret = sscanf(buf, "%llu", &vbd.rd_reqs)) != 1))
 		{
 			continue;
 		}
 
-		snprintf(wrreq,  sizeof(wrreq),"%s%swr_req", sys_prefix, stat_prefix);
-		if((read_attributes_vbd(dp->d_name, wrreq, buf, 256)<=0)
+		if((read_attributes_vbd(dp->d_name, "statistics/wr_req", buf, 256)<=0)
 		   || ((ret = sscanf(buf, "%llu", &vbd.wr_reqs)) != 1))
 		{
 			continue;

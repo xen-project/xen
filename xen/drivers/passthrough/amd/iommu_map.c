@@ -580,3 +580,47 @@ out:
     spin_unlock_irqrestore(&hd->mapping_lock, flags);
     return 0;
 }
+
+void invalidate_all_iommu_pages(struct domain *d)
+{
+    u32 cmd[4], entry;
+    unsigned long flags;
+    struct amd_iommu *iommu;
+    int domain_id = d->domain_id;
+    u64 addr_lo = 0x7FFFFFFFFFFFF000ULL & DMA_32BIT_MASK;
+    u64 addr_hi = 0x7FFFFFFFFFFFF000ULL >> 32;
+
+    set_field_in_reg_u32(domain_id, 0,
+                         IOMMU_INV_IOMMU_PAGES_DOMAIN_ID_MASK,
+                         IOMMU_INV_IOMMU_PAGES_DOMAIN_ID_SHIFT, &entry);
+    set_field_in_reg_u32(IOMMU_CMD_INVALIDATE_IOMMU_PAGES, entry,
+                         IOMMU_CMD_OPCODE_MASK, IOMMU_CMD_OPCODE_SHIFT,
+                         &entry);
+    cmd[1] = entry;
+
+    set_field_in_reg_u32(IOMMU_CONTROL_ENABLED, 0,
+                         IOMMU_INV_IOMMU_PAGES_S_FLAG_MASK,
+                         IOMMU_INV_IOMMU_PAGES_S_FLAG_SHIFT, &entry);
+    set_field_in_reg_u32(IOMMU_CONTROL_ENABLED, entry,
+                         IOMMU_INV_IOMMU_PAGES_PDE_FLAG_MASK,
+                         IOMMU_INV_IOMMU_PAGES_PDE_FLAG_SHIFT, &entry);
+    set_field_in_reg_u32((u32)addr_lo >> PAGE_SHIFT, entry,
+                         IOMMU_INV_IOMMU_PAGES_ADDR_LOW_MASK,
+                         IOMMU_INV_IOMMU_PAGES_ADDR_LOW_SHIFT, &entry);
+    cmd[2] = entry;
+
+    set_field_in_reg_u32((u32)addr_hi, 0,
+                         IOMMU_INV_IOMMU_PAGES_ADDR_HIGH_MASK,
+                         IOMMU_INV_IOMMU_PAGES_ADDR_HIGH_SHIFT, &entry);
+    cmd[3] = entry;
+
+    cmd[0] = 0;
+
+    for_each_amd_iommu ( iommu )
+    {
+        spin_lock_irqsave(&iommu->lock, flags);
+        send_iommu_command(iommu, cmd);
+        flush_command_buffer(iommu);
+        spin_unlock_irqrestore(&iommu->lock, flags);
+    }
+}

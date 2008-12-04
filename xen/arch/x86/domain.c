@@ -1814,6 +1814,13 @@ int domain_relinquish_resources(struct domain *d)
             unmap_vcpu_info(v);
         }
 
+        if ( d->arch.pirq_eoi_map != NULL )
+        {
+            unmap_domain_page_global(d->arch.pirq_eoi_map);
+            put_page_and_type(mfn_to_page(d->arch.pirq_eoi_map_mfn));
+            d->arch.pirq_eoi_map = NULL;
+        }
+
         d->arch.relmem = RELMEM_xen;
         /* fallthrough */
 
@@ -1856,9 +1863,6 @@ int domain_relinquish_resources(struct domain *d)
     default:
         BUG();
     }
-
-    /* Free page used by xen oprofile buffer. */
-    free_xenoprof_pages(d);
 
     if ( is_hvm_domain(d) )
         hvm_domain_relinquish_resources(d);
