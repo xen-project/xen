@@ -517,7 +517,8 @@ class XendDomainInfo:
         # HVM domain shuts itself down only if it has PV drivers
         if self.info.is_hvm():
             hvm_pvdrv = xc.hvm_get_param(self.domid, HVM_PARAM_CALLBACK_IRQ)
-            if not hvm_pvdrv:
+            hvm_s_state = xc.hvm_get_param(self.domid, HVM_PARAM_ACPI_S_STATE)
+            if not hvm_pvdrv or hvm_s_state != 0:
                 code = REVERSE_DOMAIN_SHUTDOWN_REASONS[reason]
                 log.info("HVM save:remote shutdown dom %d!", self.domid)
                 xc.domain_shutdown(self.domid, code)

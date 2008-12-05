@@ -166,18 +166,12 @@ static int suspend(void)
 {
     unsigned long sx_state = 0;
 
-    /* Nothing to do if the guest is in an ACPI sleep state. */
+    /* Cannot notify guest to shut itself down if it's in ACPI sleep state. */
     if (si.flags & XCFLAGS_HVM)
         xc_get_hvm_param(si.xc_fd, si.domid,
                          HVM_PARAM_ACPI_S_STATE, &sx_state);
-    if (sx_state != 0) {
-        /* notify xend that it can do device migration */
-        printf("suspended\n");
-        fflush(stdout);
-        return 1;
-    }
 
-    if (si.suspend_evtchn >= 0)
+    if ((sx_state == 0) && (si.suspend_evtchn >= 0))
         return evtchn_suspend();
 
     return compat_suspend();
