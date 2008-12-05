@@ -1653,6 +1653,11 @@ int domain_relinquish_resources(struct domain *d)
 		/*fallthrough*/
 
 	case RELRES_mm_teardown:
+		if (d->arch.pirq_eoi_map != NULL) {
+			put_page(virt_to_page(d->arch.pirq_eoi_map));
+			d->arch.pirq_eoi_map = NULL;
+		}
+
 		/* Tear down shadow mode stuff. */
 		ret = mm_teardown(d);
 		if (ret != 0)

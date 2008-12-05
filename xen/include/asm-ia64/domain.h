@@ -177,6 +177,10 @@ struct arch_domain {
     /* Address of SAL emulator data  */
     struct xen_sal_data *sal_data;
 
+    /* Shared page for notifying that explicit PIRQ EOI is required. */
+    unsigned long *pirq_eoi_map;
+    unsigned long pirq_eoi_map_mfn;
+
     /* Address of efi_runtime_services_t (placed in domain memory)  */
     void *efi_runtime;
     /* Address of fpswa_interface_t (placed in domain memory)  */

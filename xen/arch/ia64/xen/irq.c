@@ -312,16 +312,41 @@ typedef struct {
     struct domain *guest[IRQ_MAX_GUESTS];
 } irq_guest_action_t;
 
+static inline void set_pirq_eoi(struct domain *d, unsigned int irq)
+{
+    if ( d->arch.pirq_eoi_map )
+        set_bit(irq, d->arch.pirq_eoi_map);
+}
+
+static inline void clear_pirq_eoi(struct domain *d, unsigned int irq)
+{
+    if ( d->arch.pirq_eoi_map )
+        clear_bit(irq, d->arch.pirq_eoi_map);
+}
+
+static void _irq_guest_eoi(irq_desc_t *desc)
+{
+    irq_guest_action_t *action = (irq_guest_action_t *)desc->action;
+    unsigned int i, vector = desc - irq_desc;
+
+    if ( !(desc->status & IRQ_GUEST_EOI_PENDING) )
+        return;
+
+    for ( i = 0; i < action->nr_guests; ++i )
+        clear_pirq_eoi(action->guest[i], vector);
+
+    desc->status &= ~(IRQ_INPROGRESS|IRQ_GUEST_EOI_PENDING);
+    desc->handler->enable(vector);
+}
+
 static struct timer irq_guest_eoi_timer[NR_IRQS];
 static void irq_guest_eoi_timer_fn(void *data)
 {
 	irq_desc_t *desc = data;
-	unsigned vector = desc - irq_desc;
 	unsigned long flags;
 
 	spin_lock_irqsave(&desc->lock, flags);
-	desc->status &= ~IRQ_INPROGRESS;
-	desc->handler->enable(vector);
+	_irq_guest_eoi(desc);
 	spin_unlock_irqrestore(&desc->lock, flags);
 }
 
@@ -355,8 +380,22 @@ void __do_IRQ_guest(int irq)
 
 	if ( already_pending == action->nr_guests )
 	{
-		desc->handler->disable(irq);
 		stop_timer(&irq_guest_eoi_timer[irq]);
+		desc->handler->disable(irq);
+        desc->status |= IRQ_GUEST_EOI_PENDING;
+        for ( i = 0; i < already_pending; ++i )
+        {
+            d = action->guest[i];
+            set_pirq_eoi(d, irq);
+            /*
+             * Could check here whether the guest unmasked the event by now
+             * (or perhaps just re-issue the send_guest_pirq()), and if it
+             * can now accept the event,
+             * - clear all the pirq_eoi bits we already set,
+             * - re-enable the vector, and
+             * - skip the timer setup below.
+             */
+        }
 		init_timer(&irq_guest_eoi_timer[irq],
 				irq_guest_eoi_timer_fn, desc, smp_processor_id());
 		set_timer(&irq_guest_eoi_timer[irq], NOW() + MILLISECS(1));
@@ -379,16 +418,25 @@ int pirq_acktype(int irq)
 int pirq_guest_eoi(struct domain *d, int irq)
 {
     irq_desc_t *desc;
+    irq_guest_action_t *action;
 
     if ( (irq < 0) || (irq >= NR_IRQS) )
         return -EINVAL;
 
     desc = &irq_desc[irq];
     spin_lock_irq(&desc->lock);
-    if ( test_and_clear_bit(irq, &d->pirq_mask) &&
-         (--((irq_guest_action_t *)desc->action)->in_flight == 0) )
+    action = (irq_guest_action_t *)desc->action;
+
+    if ( action->ack_type == ACKTYPE_NONE )
     {
-        ASSERT(((irq_guest_action_t*)desc->action)->ack_type == ACKTYPE_UNMASK);
+        ASSERT(!test_bit(irq, d->pirq_mask));
+        stop_timer(&irq_guest_eoi_timer[irq]);
+        _irq_guest_eoi(desc);
+    }
+
+    if ( test_and_clear_bit(irq, &d->pirq_mask) && (--action->in_flight == 0) )
+    {
+        ASSERT(action->ack_type == ACKTYPE_UNMASK);
         desc->handler->end(irq);
     }
     spin_unlock_irq(&desc->lock);
@@ -487,6 +535,11 @@ int pirq_guest_bind(struct vcpu *v, int irq, int will_share)
     }
 
     action->guest[action->nr_guests++] = v->domain;
+
+    if ( action->ack_type != ACKTYPE_NONE )
+        set_pirq_eoi(v->domain, irq);
+    else
+        clear_pirq_eoi(v->domain, irq);
 
  out:
     spin_unlock_irqrestore(&desc->lock, flags);
