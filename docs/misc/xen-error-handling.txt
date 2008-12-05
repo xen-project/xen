@@ -1,0 +1,88 @@
+Error handling in Xen
+---------------------
+
+1. domain_crash()
+-----------------
+Crash the specified domain due to buggy or unsupported behaviour of the
+guest. This should not be used where the hypervisor itself is in
+error, even if the scope of that error affects only a single
+domain. BUG() is a more appropriate failure method for hypervisor
+bugs. To repeat: domain_crash() is the correct response for erroneous
+or unsupported *guest* behaviour!
+
+Note that this should be used in most cases in preference to
+domain_crash_synchronous(): domain_crash() returns to the caller,
+allowing the crash to be deferred for the currently executing VCPU
+until certain resources (notably, spinlocks) have been released.
+
+Example usages:
+ * Unrecoverable guest kernel stack overflows
+ * Unsupported corners of HVM device models
+
+2. BUG()
+--------
+Crashes the host system with an informative file/line error message
+and a backtrace. Use this to check consistency assumptions within the
+hypervisor.
+
+Be careful not to use BUG() (or BUG_ON(), or ASSERT()) for failures
+*outside* the hypervisor software -- in particular, guest bugs (where
+domain_crash() is more appropriate) or non-critical BIOS or hardware
+errors (where retry or feature disable are more appropriate).
+
+Example usage: In arch/x86/hvm/i8254.c an I/O port handler includes
+the check BUG_ON(bytes != 1). We choose this extreme reaction to the
+unexpected error case because, although it could be handled by failing
+the I/O access or crashing the domain, it is indicative of an
+unexpected inconsistency in the hypervisor itself (since the I/O
+handler was only registered for single-byte accesses).
+
+
+3. BUG_ON()
+-----------
+BUG_ON(...) is merely a convenient short form for "if (...) BUG()". It
+is most commonly used as an 'always on' alternative to ASSERT().
+
+
+4. ASSERT()
+-----------
+Similar to BUG_ON(), except that it is only enabled for debug builds
+of the hypervisor. Typically ASSERT() is used only where the (usually
+small) overheads of an always-on debug check might be considered
+excessive. A good example might be within inner loops of time-critical
+functions, or where an assertion is extreme paranoia (considered
+*particularly* unlikely ever to fail).
+
+In general, if in doubt, use BUG_ON() in preference to ASSERT().
+
+
+5. panic()
+----------
+Like BUG() and ASSERT() this will crash and reboot the host
+system. However it does this after printing only an error message with
+no extra diagnostic information such as a backtrace. panic() is
+generally used where an unsupported system configuration is detected,
+particularly during boot, and where extra diagnostic information about
+CPU context would not be useful. It may also be used before exception
+handling is enabled during Xen bootstrap (on x86, BUG() and ASSERT()
+depend on Xen's exception-handling capabilities).
+
+Example usage: Most commonly for out-of-memory errors during
+bootstrap. The failure is unexpected since a host should always have
+enough memory to boot Xen, but if the failure does occur then the
+context of the failed memory allocation itself is not very
+interesting.
+
+
+6. Feature disable
+------------------
+A possible approach to dealing with boot-time errors, rather than
+crashing the hypervisor. It's particularly appropriate when parsing
+non-critical BIOS tables and detecting extended hardware features.
+
+
+7. BUILD_BUG_ON()
+-----------------
+Useful for assertions which can be evaluated at compile time. For
+example, making explicit assumptions about size and alignment of C
+structures.
