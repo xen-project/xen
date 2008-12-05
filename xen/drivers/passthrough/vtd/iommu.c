@@ -1308,7 +1308,9 @@ static int domain_context_unmap_one(
     context_clear_entry(*context);
     iommu_flush_cache_entry(context);
 
-    if ( iommu_flush_context_domain(iommu, domain_iommu_domid(domain), 0) )
+    if ( iommu_flush_context_device(iommu, domain_iommu_domid(domain),
+                                    (((u16)bus) << 8) | devfn,
+                                    DMA_CCMD_MASK_NOBIT, 0) )
         iommu_flush_write_buffer(iommu);
     else
         iommu_flush_iotlb_dsi(iommu, domain_iommu_domid(domain), 0);
