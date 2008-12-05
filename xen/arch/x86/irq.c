@@ -623,9 +623,11 @@ int pirq_guest_bind(struct vcpu *v, int irq, int will_share)
     }
     else if ( !will_share || !action->shareable )
     {
-        gdprintk(XENLOG_INFO, "Cannot bind IRQ %d to guest. "
-               "Will not share with others.\n",
-                irq);
+        gdprintk(XENLOG_INFO, "Cannot bind IRQ %d to guest. %s.\n",
+                 irq,
+                 will_share ?
+                 "Others do not share" :
+                 "Will not share with others");
         rc = -EBUSY;
         goto unlock_out;
     }
