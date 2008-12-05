@@ -74,6 +74,13 @@ static void enable_intr_window(struct vcpu *v, struct hvm_intack intack)
 
     ASSERT(intack.source != hvm_intsrc_none);
 
+    if ( unlikely(tb_init_done) )
+    {
+        unsigned int intr = __vmread(VM_ENTRY_INTR_INFO);
+        HVMTRACE_3D(INTR_WINDOW, intack.vector, intack.source,
+                    (intr & INTR_INFO_VALID_MASK) ? intr & 0xff : -1);
+    }
+
     if ( (intack.source == hvm_intsrc_nmi) && cpu_has_vmx_vnmi )
     {
         /*
