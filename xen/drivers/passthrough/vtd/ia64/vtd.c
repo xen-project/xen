@@ -31,7 +31,7 @@
 
 int vector_irq[NR_VECTORS] __read_mostly = { [0 ... NR_VECTORS - 1] = -1};
 /* irq_vectors is indexed by the sum of all RTEs in all I/O APICs. */
-u8 irq_vector[NR_IRQ_VECTORS] __read_mostly;
+u8 irq_vector[NR_IRQS] __read_mostly;
 
 void *map_vtd_domain_page(u64 maddr)
 {

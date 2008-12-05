@@ -98,7 +98,7 @@ irq_to_vector (int irq)
 }
 
 
-extern u8 irq_vector[NR_IRQ_VECTORS];
+extern u8 irq_vector[NR_IRQS];
 extern int vector_irq[NR_VECTORS];
 
 #endif /* __ASM_IA64_HVM_IRQ_H__ */
