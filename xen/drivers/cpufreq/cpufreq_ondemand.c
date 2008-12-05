@@ -22,15 +22,22 @@
 #include <acpi/cpufreq/cpufreq.h>
 
 #define DEF_FREQUENCY_UP_THRESHOLD              (80)
+#define MIN_FREQUENCY_UP_THRESHOLD              (11)
+#define MAX_FREQUENCY_UP_THRESHOLD              (100)
 
 #define MIN_DBS_INTERVAL                        (MICROSECS(100))
-#define MIN_SAMPLING_MILLISECS                  (20)
-#define MIN_STAT_SAMPLING_RATE                   \
+#define MIN_SAMPLING_RATE_RATIO                 (2)
+#define MIN_SAMPLING_MILLISECS                  (MIN_SAMPLING_RATE_RATIO * 10)
+#define MIN_STAT_SAMPLING_RATE                  \
     (MIN_SAMPLING_MILLISECS * MILLISECS(1))
+#define MIN_SAMPLING_RATE                       \
+    (def_sampling_rate / MIN_SAMPLING_RATE_RATIO)
+#define MAX_SAMPLING_RATE                       (500 * def_sampling_rate)
 #define DEF_SAMPLING_RATE_LATENCY_MULTIPLIER    (1000)
 #define TRANSITION_LATENCY_LIMIT                (10 * 1000 )
 
 static uint64_t def_sampling_rate;
+static uint64_t usr_sampling_rate;
 
 /* Sampling types */
 enum {DBS_NORMAL_SAMPLE, DBS_SUB_SAMPLE};
@@ -42,11 +49,9 @@ static unsigned int dbs_enable;    /* number of CPUs using this policy */
 static struct dbs_tuners {
     uint64_t     sampling_rate;
     unsigned int up_threshold;
-    unsigned int ignore_nice;
     unsigned int powersave_bias;
 } dbs_tuners_ins = {
     .up_threshold = DEF_FREQUENCY_UP_THRESHOLD,
-    .ignore_nice = 0,
     .powersave_bias = 0,
 };
 
@@ -216,7 +221,20 @@ int cpufreq_governor_dbs(struct cpufreq_policy *policy, unsigned int event)
             if (def_sampling_rate < MIN_STAT_SAMPLING_RATE)
                 def_sampling_rate = MIN_STAT_SAMPLING_RATE;
 
-            dbs_tuners_ins.sampling_rate = def_sampling_rate;
+            if (!usr_sampling_rate)
+                dbs_tuners_ins.sampling_rate = def_sampling_rate;
+            else if (usr_sampling_rate < MIN_SAMPLING_RATE) {
+                printk(KERN_WARNING "cpufreq/ondemand: "
+                       "specified sampling rate too low, using %"PRIu64"\n",
+                       MIN_SAMPLING_RATE);
+                dbs_tuners_ins.sampling_rate = MIN_SAMPLING_RATE;
+            } else if (usr_sampling_rate > MAX_SAMPLING_RATE) {
+                printk(KERN_WARNING "cpufreq/ondemand: "
+                       "specified sampling rate too high, using %"PRIu64"\n",
+                       MAX_SAMPLING_RATE);
+                dbs_tuners_ins.sampling_rate = MAX_SAMPLING_RATE;
+            } else
+                dbs_tuners_ins.sampling_rate = usr_sampling_rate;
         }
         dbs_timer_init(this_dbs_info);
 
@@ -244,3 +262,55 @@ struct cpufreq_governor cpufreq_gov_dbs = {
     .name = "ondemand",
     .governor = cpufreq_governor_dbs,
 };
+
+void __init cpufreq_cmdline_parse(char *str)
+{
+    do {
+        char *val, *end = strchr(str, ',');
+
+        if ( end )
+            *end++ = '\0';
+        val = strchr(str, '=');
+        if ( val )
+            *val = '\0';
+
+        if ( !strcmp(str, "rate") && val )
+        {
+            usr_sampling_rate = simple_strtoull(val, NULL, 0);
+        }
+        else if ( !strcmp(str, "threshold") && val )
+        {
+            unsigned long tmp = simple_strtoul(val, NULL, 0);
+
+            if ( tmp < MIN_FREQUENCY_UP_THRESHOLD )
+            {
+                printk(XENLOG_WARNING "cpufreq/ondemand: "
+                       "specified threshold too low, using %d\n",
+                       MIN_FREQUENCY_UP_THRESHOLD);
+                tmp = MIN_FREQUENCY_UP_THRESHOLD;
+            }
+            else if ( tmp > MAX_FREQUENCY_UP_THRESHOLD )
+            {
+                printk(XENLOG_WARNING "cpufreq/ondemand: "
+                       "specified threshold too high, using %d\n",
+                       MAX_FREQUENCY_UP_THRESHOLD);
+                tmp = MAX_FREQUENCY_UP_THRESHOLD;
+            }
+            dbs_tuners_ins.up_threshold = tmp;
+        }
+        else if ( !strcmp(str, "bias") && val )
+        {
+            unsigned long tmp = simple_strtoul(val, NULL, 0);
+
+            if ( tmp > 1000 )
+            {
+                printk(XENLOG_WARNING "cpufreq/ondemand: "
+                       "specified bias too high, using 1000\n");
+                tmp = 1000;
+            }
+            dbs_tuners_ins.powersave_bias = tmp;
+        }
+
+        str = end;
+    } while ( str );
+}
