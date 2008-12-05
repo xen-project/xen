@@ -146,10 +146,20 @@ void __init vesa_init(void)
     xfree(text_buf);
 }
 
-void __init vesa_endboot(void)
+void __init vesa_endboot(bool_t keep)
 {
-    xpos = 0;
-    vga_puts = vesa_scroll_puts;
+    if ( keep )
+    {
+        xpos = 0;
+        vga_puts = vesa_scroll_puts;
+    }
+    else
+    {
+        unsigned int i, bpp = (vlfb_info.bits_per_pixel + 7) >> 3;
+        for ( i = 0; i < vlfb_info.height; i++ )
+            memset(lfb + i * vlfb_info.bytes_per_line, 0,
+                   vlfb_info.width * bpp);
+    }
 }
 
 #if defined(CONFIG_X86)
