@@ -152,14 +152,23 @@ static inline u64 scale_delta(u64 delta, struct time_scale *scale)
 /* Compute the reciprocal of the given time_scale. */
 static inline struct time_scale scale_reciprocal(struct time_scale scale)
 {
-    u32 q, r;
+    struct time_scale reciprocal;
+    u32 dividend;
+
+    dividend = 0x80000000u;
+    reciprocal.shift = 1 - scale.shift;
+    while ( unlikely(dividend >= scale.mul_frac) )
+    {
+        dividend >>= 1;
+        reciprocal.shift++;
+    }
 
     asm (
         "divl %4"
-        : "=a" (q), "=d" (r)
-        : "0" (1), "1" (0), "r" (scale.mul_frac) );
+        : "=a" (reciprocal.mul_frac), "=d" (dividend)
+        : "0" (0), "1" (dividend), "r" (scale.mul_frac) );
 
-    return (struct time_scale) { .shift = -scale.shift, .mul_frac = q };
+    return reciprocal;
 }
 
 /*
