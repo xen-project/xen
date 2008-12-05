@@ -317,8 +317,6 @@ static void acpi_processor_idle(void)
          * stopped by H/W. Without carefully handling of TSC/APIC stop issues,
          * deep C state can't work correctly.
          */
-        /* preparing TSC stop */
-        cstate_save_tsc();
         /* preparing APIC stop */
         lapic_timer_off();
 

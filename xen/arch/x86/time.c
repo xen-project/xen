@@ -48,11 +48,9 @@ struct time_scale {
 
 struct cpu_time {
     u64 local_tsc_stamp;
-    u64 cstate_tsc_stamp;
     s_time_t stime_local_stamp;
     s_time_t stime_master_stamp;
     struct time_scale tsc_scale;
-    u64 cstate_plt_count_stamp;
 };
 
 struct platform_timesource {
@@ -149,6 +147,19 @@ static inline u64 scale_delta(u64 delta, struct time_scale *scale)
 #endif
 
     return product;
+}
+
+/* Compute the reciprocal of the given time_scale. */
+static inline struct time_scale scale_reciprocal(struct time_scale scale)
+{
+    u32 q, r;
+
+    asm (
+        "divl %4"
+        : "=a" (q), "=d" (r)
+        : "0" (1), "1" (0), "r" (scale.mul_frac) );
+
+    return (struct time_scale) { .shift = -scale.shift, .mul_frac = q };
 }
 
 /*
@@ -644,29 +655,23 @@ static void init_platform_timer(void)
            freq_string(pts->frequency), pts->name);
 }
 
-void cstate_save_tsc(void)
-{
-    struct cpu_time *t = &this_cpu(cpu_time);
-
-    if ( tsc_invariant )
-        return;
-
-    t->cstate_plt_count_stamp = plt_src.read_counter();
-    rdtscll(t->cstate_tsc_stamp);
-}
-
 void cstate_restore_tsc(void)
 {
     struct cpu_time *t = &this_cpu(cpu_time);
-    u64 plt_count_delta, tsc_delta;
+    struct time_scale sys_to_tsc = scale_reciprocal(t->tsc_scale);
+    s_time_t stime_delta;
+    u64 tsc_delta;
 
     if ( tsc_invariant )
         return;
 
-    plt_count_delta = (plt_src.read_counter() -
-                       t->cstate_plt_count_stamp) & plt_mask;
-    tsc_delta = scale_delta(plt_count_delta, &plt_scale) * cpu_khz/1000000UL;
-    wrmsrl(MSR_IA32_TSC, t->cstate_tsc_stamp + tsc_delta);
+    stime_delta = read_platform_stime() - t->stime_master_stamp;
+    if ( stime_delta < 0 )
+        stime_delta = 0;
+
+    tsc_delta = scale_delta(stime_delta, &sys_to_tsc);
+
+    wrmsrl(MSR_IA32_TSC, t->local_tsc_stamp + tsc_delta);
 }
 
 /***************************************************************************
