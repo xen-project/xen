@@ -327,16 +327,10 @@ static int acpi_cpufreq_target(struct cpufreq_policy *policy,
 
     next_perf_state = data->freq_table[next_state].index;
     if (perf->state == next_perf_state) {
-        if (unlikely(policy->resume)) {
-            printk(KERN_INFO "Called after resume, resetting to P%d\n", 
-                next_perf_state);
+        if (unlikely(policy->resume))
             policy->resume = 0;
-        }
-        else {
-            printk(KERN_DEBUG "Already at target state (P%d)\n", 
-                next_perf_state);
+        else
             return 0;
-        }
     }
 
     switch (data->cpu_feature) {
