@@ -60,7 +60,7 @@ int pt_irq_create_bind_vtd(
     uint32_t machine_gsi, guest_gsi;
     uint32_t device, intx, link;
     struct dev_intx_gsi_link *digl;
-    int pirq = pt_irq_bind->machine_irq;
+    int rc, pirq = pt_irq_bind->machine_irq;
 
     if ( pirq < 0 || pirq >= NR_IRQS )
         return -EINVAL;
@@ -98,7 +98,17 @@ int pt_irq_create_bind_vtd(
             hvm_irq_dpci->mirq[pirq].gmsi.gflags = pt_irq_bind->u.msi.gflags;
             hvm_irq_dpci->msi_gvec_pirq[pt_irq_bind->u.msi.gvec] = pirq;
             /* bind after hvm_irq_dpci is setup to avoid race with irq handler*/
-            pirq_guest_bind(d->vcpu[0], pirq, 0);
+            rc = pirq_guest_bind(d->vcpu[0], pirq, 0);
+            if ( unlikely(rc) )
+            {
+                hvm_irq_dpci->msi_gvec_pirq[pt_irq_bind->u.msi.gvec] = 0;
+                hvm_irq_dpci->mirq[pirq].gmsi.gflags = 0;
+                hvm_irq_dpci->mirq[pirq].gmsi.gvec = 0;
+                clear_bit(_HVM_IRQ_DPCI_MSI, &hvm_irq_dpci->mirq[pirq].flags);
+                clear_bit(pirq, hvm_irq_dpci->mapping);
+                spin_unlock(&d->event_lock);
+                return rc;
+            }
         }
         else if (hvm_irq_dpci->mirq[pirq].gmsi.gvec != pt_irq_bind->u.msi.gvec
                 ||hvm_irq_dpci->msi_gvec_pirq[pt_irq_bind->u.msi.gvec] != pirq)
@@ -139,13 +149,30 @@ int pt_irq_create_bind_vtd(
         /* Bind the same mirq once in the same domain */
         if ( !test_and_set_bit(machine_gsi, hvm_irq_dpci->mapping))
         {
+            unsigned int vector = domain_irq_to_vector(d, machine_gsi);
+
             hvm_irq_dpci->mirq[machine_gsi].dom = d;
 
             /* Init timer before binding */
-            init_timer(&hvm_irq_dpci->hvm_timer[domain_irq_to_vector(d, machine_gsi)],
+            init_timer(&hvm_irq_dpci->hvm_timer[vector],
                        pt_irq_time_out, &hvm_irq_dpci->mirq[machine_gsi], 0);
             /* Deal with gsi for legacy devices */
-            pirq_guest_bind(d->vcpu[0], machine_gsi, BIND_PIRQ__WILL_SHARE);
+            rc = pirq_guest_bind(d->vcpu[0], machine_gsi, BIND_PIRQ__WILL_SHARE);
+            if ( unlikely(rc) )
+            {
+                kill_timer(&hvm_irq_dpci->hvm_timer[vector]);
+                hvm_irq_dpci->mirq[machine_gsi].dom = NULL;
+                clear_bit(machine_gsi, hvm_irq_dpci->mapping);
+                hvm_irq_dpci->girq[guest_gsi].machine_gsi = 0;
+                hvm_irq_dpci->girq[guest_gsi].intx = 0;
+                hvm_irq_dpci->girq[guest_gsi].device = 0;
+                hvm_irq_dpci->girq[guest_gsi].valid = 0;
+                list_del(&digl->list);
+                hvm_irq_dpci->link_cnt[link]--;
+                spin_unlock(&d->event_lock);
+                xfree(digl);
+                return rc;
+            }
         }
 
         gdprintk(XENLOG_INFO VTDPREFIX,
