@@ -111,11 +111,11 @@ void __init vga_endboot(void)
     switch ( vga_console_info.video_type )
     {
     case XEN_VGATYPE_TEXT_MODE_3:
-        vesa_endboot(vgacon_keep);
-        break;
-    case XEN_VGATYPE_VESA_LFB:
         if ( !vgacon_keep )
             memset(video, 0, columns * lines * 2);
+        break;
+    case XEN_VGATYPE_VESA_LFB:
+        vesa_endboot(vgacon_keep);
         break;
     default:
         BUG();
