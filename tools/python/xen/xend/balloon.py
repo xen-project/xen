@@ -67,7 +67,7 @@ def get_dom0_target_alloc():
         raise VmError('Failed to query target memory allocation of dom0.')
     return kb
 
-def free(need_mem):
+def free(need_mem ,self):
     """Balloon out memory from the privileged domain so that there is the
     specified required amount (in KiB) free.
     """
@@ -121,6 +121,40 @@ def free(need_mem):
             max_free_mem = total_mem - dom0_alloc
         if need_mem >= max_free_mem:
             retries = rlimit
+
+        # Check whethercurrent machine is a numa system and the new 
+        # created hvm has all its vcpus in the same node, if all the 
+        # conditions above are fit. We will wait until all the pages 
+        # in scrub list are freed (if waiting time go beyond 20s, 
+        # we will stop waiting it.)
+        if physinfo['nr_nodes'] > 1 and retries == 0:
+            oldnode = -1
+            waitscrub = 1
+            vcpus = self.info['cpus'][0]
+            for vcpu in vcpus:
+                nodenum = 0
+                for node in physinfo['node_to_cpu']:
+                    for cpu in node:
+                        if vcpu == cpu:
+                            if oldnode == -1:
+                                oldnode = nodenum
+                            elif oldnode != nodenum:
+                                waitscrub = 0
+                    nodenum = nodenum + 1
+
+            if waitscrub == 1 and scrub_mem > 0:
+                log.debug("wait for scrub %s", scrub_mem)
+                while scrub_mem > 0 and retries < rlimit:
+                    time.sleep(sleep_time)
+                    physinfo = xc.physinfo()
+                    free_mem = physinfo['free_memory']
+                    scrub_mem = physinfo['scrub_memory']
+                    retries += 1
+                    sleep_time += SLEEP_TIME_GROWTH
+                log.debug("scrub for %d times", retries)
+
+            retries = 0
+            sleep_time = SLEEP_TIME_GROWTH
 
         while retries < rlimit:
             physinfo = xc.physinfo()
