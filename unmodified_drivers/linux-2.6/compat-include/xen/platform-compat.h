@@ -147,7 +147,9 @@ extern char *kasprintf(gfp_t gfp, const char *fmt, ...)
  *   RHEL_VERSION
  */
 #if !defined(RHEL_VERSION) || (RHEL_VERSION == 4 && RHEL_UPDATE < 5)
+#if !defined(RHEL_MAJOR) || (RHEL_MAJOR == 4 && RHEL_MINOR < 5)
 typedef irqreturn_t (*irq_handler_t)(int, void *, struct pt_regs *);
+#endif
 #endif
 #endif
 

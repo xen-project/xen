@@ -15,3 +15,4 @@ _XEN_CPPFLAGS += -include $(objtree)/include/linux/autoconf.h
 
 EXTRA_CFLAGS += $(_XEN_CPPFLAGS)
 EXTRA_AFLAGS += $(_XEN_CPPFLAGS)
+CPPFLAGS := -I$(M)/include $(CPPFLAGS)
