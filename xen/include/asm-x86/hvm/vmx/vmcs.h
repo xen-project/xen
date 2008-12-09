@@ -109,11 +109,16 @@ struct arch_vmx_struct {
 
     unsigned long        host_cr0;
 
+    /* Is the guest in real mode? */
+    uint8_t              vmx_realmode;
     /* Are we emulating rather than VMENTERing? */
-#define VMXEMUL_REALMODE 1  /* Yes, because CR0.PE == 0   */
-#define VMXEMUL_BAD_CS   2  /* Yes, because CS.RPL != CPL */
-#define VMXEMUL_BAD_SS   4  /* Yes, because SS.RPL != CPL */
-    uint8_t              vmxemul;
+    uint8_t              vmx_emulate;
+    /* Bitmask of segments that we can't safely use in virtual 8086 mode */
+    uint16_t             vm86_segment_mask;
+    /* Shadow CS, SS, DS, ES, FS, GS, TR while in virtual 8086 mode */
+    struct segment_register vm86_saved_seg[x86_seg_tr + 1];
+    /* Remember EFLAGS while in virtual 8086 mode */
+    uint32_t             vm86_saved_eflags;
 };
 
 int vmx_create_vmcs(struct vcpu *v);

@@ -133,9 +133,15 @@ vmx_asm_do_vmentry:
         cmpl $0,(r(dx),r(ax),1)
         jnz  .Lvmx_process_softirqs
 
-        testb $0xff,VCPU_vmx_emul(r(bx))
-        jnz  .Lvmx_goto_realmode
+        testb $0xff,VCPU_vmx_emulate(r(bx))
+        jnz .Lvmx_goto_emulator
+        testb $0xff,VCPU_vmx_realmode(r(bx))
+        jz .Lvmx_not_realmode
+        cmpw $0,VCPU_vm86_seg_mask(r(bx))
+        jnz .Lvmx_goto_emulator
+        call_with_regs(vmx_enter_realmode) 
 
+.Lvmx_not_realmode:
         mov  VCPU_hvm_guest_cr2(r(bx)),r(ax)
         mov  r(ax),%cr2
         call vmx_trace_vmentry
@@ -189,7 +195,7 @@ vmx_asm_do_vmentry:
         call vm_launch_fail
         ud2
 
-.Lvmx_goto_realmode:
+.Lvmx_goto_emulator:
         sti
         call_with_regs(vmx_realmode)
         jmp  vmx_asm_do_vmentry

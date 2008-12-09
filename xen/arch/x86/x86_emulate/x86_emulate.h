@@ -67,6 +67,7 @@ typedef union segment_attributes {
         uint16_t l:   1;    /* 9;  Bit 53 */
         uint16_t db:  1;    /* 10; Bit 54 */
         uint16_t g:   1;    /* 11; Bit 55 */
+        uint16_t pad: 4;
     } fields;
 } __attribute__ ((packed)) segment_attributes_t;
 

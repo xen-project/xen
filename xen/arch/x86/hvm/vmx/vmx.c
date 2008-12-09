@@ -704,6 +704,26 @@ static void vmx_ctxt_switch_to(struct vcpu *v)
     vpmu_load(v);
 }
 
+
+/* SDM volume 3b section 22.3.1.2: we can only enter virtual 8086 mode
+ * if all of CS, SS, DS, ES, FS and GS are 16bit ring-3 data segments.
+ * The guest thinks it's got ring-0 segments, so we need to fudge
+ * things.  We store the ring-3 version in the VMCS to avoid lots of
+ * shuffling on vmenter and vmexit, and translate in these accessors. */
+
+#define rm_cs_attr (((union segment_attributes) {                       \
+        .fields = { .type = 0xb, .s = 1, .dpl = 0, .p = 1, .avl = 0,    \
+                    .l = 0, .db = 0, .g = 0, .pad = 0 } }).bytes)
+#define rm_ds_attr (((union segment_attributes) {                       \
+        .fields = { .type = 0x3, .s = 1, .dpl = 0, .p = 1, .avl = 0,    \
+                    .l = 0, .db = 0, .g = 0, .pad = 0 } }).bytes)
+#define vm86_ds_attr (((union segment_attributes) {                     \
+        .fields = { .type = 0x3, .s = 1, .dpl = 3, .p = 1, .avl = 0,    \
+                    .l = 0, .db = 0, .g = 0, .pad = 0 } }).bytes)
+#define vm86_tr_attr (((union segment_attributes) {                     \
+        .fields = { .type = 0xb, .s = 0, .dpl = 0, .p = 1, .avl = 0,    \
+                    .l = 0, .db = 0, .g = 0, .pad = 0 } }).bytes)
+
 static void vmx_get_segment_register(struct vcpu *v, enum x86_segment seg,
                                      struct segment_register *reg)
 {
@@ -779,14 +799,85 @@ static void vmx_get_segment_register(struct vcpu *v, enum x86_segment seg,
     /* Unusable flag is folded into Present flag. */
     if ( attr & (1u<<16) )
         reg->attr.fields.p = 0;
+
+    /* Adjust for virtual 8086 mode */
+    if ( v->arch.hvm_vmx.vmx_realmode && seg <= x86_seg_tr 
+         && !(v->arch.hvm_vmx.vm86_segment_mask & (1u << seg)) )
+    {
+        struct segment_register *sreg = &v->arch.hvm_vmx.vm86_saved_seg[seg];
+        if ( seg == x86_seg_tr ) 
+            *reg = *sreg;
+        else if ( reg->base != sreg->base || seg == x86_seg_ss )
+        {
+            /* If the guest's reloaded the segment, remember the new version.
+             * We can't tell if the guest reloaded the segment with another 
+             * one that has the same base.  By default we assume it hasn't,
+             * since we don't want to lose big-real-mode segment attributes,
+             * but for SS we assume it has: the Ubuntu graphical bootloader
+             * does this and gets badly confused if we leave the old SS in 
+             * place. */
+            reg->attr.bytes = (seg == x86_seg_cs ? rm_cs_attr : rm_ds_attr);
+            *sreg = *reg;
+        }
+        else 
+        {
+            /* Always give realmode guests a selector that matches the base
+             * but keep the attr and limit from before */
+            *reg = *sreg;
+            reg->sel = reg->base >> 4;
+        }
+    }
 }
 
 static void vmx_set_segment_register(struct vcpu *v, enum x86_segment seg,
                                      struct segment_register *reg)
 {
-    uint32_t attr;
+    uint32_t attr, sel, limit;
+    uint64_t base;
 
+    sel = reg->sel;
     attr = reg->attr.bytes;
+    limit = reg->limit;
+    base = reg->base;
+
+    /* Adjust CS/SS/DS/ES/FS/GS/TR for virtual 8086 mode */
+    if ( v->arch.hvm_vmx.vmx_realmode && seg <= x86_seg_tr )
+    {
+        /* Remember the proper contents */
+        v->arch.hvm_vmx.vm86_saved_seg[seg] = *reg;
+        
+        if ( seg == x86_seg_tr ) 
+        {
+            if ( v->domain->arch.hvm_domain.params[HVM_PARAM_VM86_TSS] )
+            {
+                sel = 0;
+                attr = vm86_tr_attr;
+                limit = 0xff;
+                base = v->domain->arch.hvm_domain.params[HVM_PARAM_VM86_TSS];
+                v->arch.hvm_vmx.vm86_segment_mask &= ~(1u << seg);
+            }
+            else
+                v->arch.hvm_vmx.vm86_segment_mask |= (1u << seg);
+        }
+        else
+        {
+            /* Try to fake it out as a 16bit data segment.  This could
+             * cause confusion for the guest if it reads the selector,
+             * but otherwise we have to emulate if *any* segment hasn't
+             * been reloaded. */
+            if ( base < 0x100000 && !(base & 0xf) && limit >= 0xffff
+                 && reg->attr.fields.p )
+            {
+                sel = base >> 4;
+                attr = vm86_ds_attr;
+                limit = 0xffff;
+                v->arch.hvm_vmx.vm86_segment_mask &= ~(1u << seg);
+            }
+            else 
+                v->arch.hvm_vmx.vm86_segment_mask |= (1u << seg);
+        }
+    }
+
     attr = ((attr & 0xf00) << 4) | (attr & 0xff);
 
     /* Not-present must mean unusable. */
@@ -794,67 +885,67 @@ static void vmx_set_segment_register(struct vcpu *v, enum x86_segment seg,
         attr |= (1u << 16);
 
     /* VMX has strict consistency requirement for flag G. */
-    attr |= !!(reg->limit >> 20) << 15;
+    attr |= !!(limit >> 20) << 15;
 
     vmx_vmcs_enter(v);
 
     switch ( seg )
     {
     case x86_seg_cs:
-        __vmwrite(GUEST_CS_SELECTOR, reg->sel);
-        __vmwrite(GUEST_CS_LIMIT, reg->limit);
-        __vmwrite(GUEST_CS_BASE, reg->base);
+        __vmwrite(GUEST_CS_SELECTOR, sel);
+        __vmwrite(GUEST_CS_LIMIT, limit);
+        __vmwrite(GUEST_CS_BASE, base);
         __vmwrite(GUEST_CS_AR_BYTES, attr);
         break;
     case x86_seg_ds:
-        __vmwrite(GUEST_DS_SELECTOR, reg->sel);
-        __vmwrite(GUEST_DS_LIMIT, reg->limit);
-        __vmwrite(GUEST_DS_BASE, reg->base);
+        __vmwrite(GUEST_DS_SELECTOR, sel);
+        __vmwrite(GUEST_DS_LIMIT, limit);
+        __vmwrite(GUEST_DS_BASE, base);
         __vmwrite(GUEST_DS_AR_BYTES, attr);
         break;
     case x86_seg_es:
-        __vmwrite(GUEST_ES_SELECTOR, reg->sel);
-        __vmwrite(GUEST_ES_LIMIT, reg->limit);
-        __vmwrite(GUEST_ES_BASE, reg->base);
+        __vmwrite(GUEST_ES_SELECTOR, sel);
+        __vmwrite(GUEST_ES_LIMIT, limit);
+        __vmwrite(GUEST_ES_BASE, base);
         __vmwrite(GUEST_ES_AR_BYTES, attr);
         break;
     case x86_seg_fs:
-        __vmwrite(GUEST_FS_SELECTOR, reg->sel);
-        __vmwrite(GUEST_FS_LIMIT, reg->limit);
-        __vmwrite(GUEST_FS_BASE, reg->base);
+        __vmwrite(GUEST_FS_SELECTOR, sel);
+        __vmwrite(GUEST_FS_LIMIT, limit);
+        __vmwrite(GUEST_FS_BASE, base);
         __vmwrite(GUEST_FS_AR_BYTES, attr);
         break;
     case x86_seg_gs:
-        __vmwrite(GUEST_GS_SELECTOR, reg->sel);
-        __vmwrite(GUEST_GS_LIMIT, reg->limit);
-        __vmwrite(GUEST_GS_BASE, reg->base);
+        __vmwrite(GUEST_GS_SELECTOR, sel);
+        __vmwrite(GUEST_GS_LIMIT, limit);
+        __vmwrite(GUEST_GS_BASE, base);
         __vmwrite(GUEST_GS_AR_BYTES, attr);
         break;
     case x86_seg_ss:
-        __vmwrite(GUEST_SS_SELECTOR, reg->sel);
-        __vmwrite(GUEST_SS_LIMIT, reg->limit);
-        __vmwrite(GUEST_SS_BASE, reg->base);
+        __vmwrite(GUEST_SS_SELECTOR, sel);
+        __vmwrite(GUEST_SS_LIMIT, limit);
+        __vmwrite(GUEST_SS_BASE, base);
         __vmwrite(GUEST_SS_AR_BYTES, attr);
         break;
     case x86_seg_tr:
-        __vmwrite(GUEST_TR_SELECTOR, reg->sel);
-        __vmwrite(GUEST_TR_LIMIT, reg->limit);
-        __vmwrite(GUEST_TR_BASE, reg->base);
+        __vmwrite(GUEST_TR_SELECTOR, sel);
+        __vmwrite(GUEST_TR_LIMIT, limit);
+        __vmwrite(GUEST_TR_BASE, base);
         /* VMX checks that the the busy flag (bit 1) is set. */
         __vmwrite(GUEST_TR_AR_BYTES, attr | 2);
         break;
     case x86_seg_gdtr:
-        __vmwrite(GUEST_GDTR_LIMIT, reg->limit);
-        __vmwrite(GUEST_GDTR_BASE, reg->base);
+        __vmwrite(GUEST_GDTR_LIMIT, limit);
+        __vmwrite(GUEST_GDTR_BASE, base);
         break;
     case x86_seg_idtr:
-        __vmwrite(GUEST_IDTR_LIMIT, reg->limit);
-        __vmwrite(GUEST_IDTR_BASE, reg->base);
+        __vmwrite(GUEST_IDTR_LIMIT, limit);
+        __vmwrite(GUEST_IDTR_BASE, base);
         break;
     case x86_seg_ldtr:
-        __vmwrite(GUEST_LDTR_SELECTOR, reg->sel);
-        __vmwrite(GUEST_LDTR_LIMIT, reg->limit);
-        __vmwrite(GUEST_LDTR_BASE, reg->base);
+        __vmwrite(GUEST_LDTR_SELECTOR, sel);
+        __vmwrite(GUEST_LDTR_LIMIT, limit);
+        __vmwrite(GUEST_LDTR_BASE, base);
         __vmwrite(GUEST_LDTR_AR_BYTES, attr);
         break;
     default:
@@ -970,6 +1061,7 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
     switch ( cr )
     {
     case 0: {
+        int realmode;
         unsigned long hw_cr0_mask =
             X86_CR0_NE | X86_CR0_PG | X86_CR0_PE;
 
@@ -998,9 +1090,44 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
                 vmx_fpu_enter(v);
         }
 
-        v->arch.hvm_vmx.vmxemul &= ~VMXEMUL_REALMODE;
-        if ( !(v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PE) )
-            v->arch.hvm_vmx.vmxemul |= VMXEMUL_REALMODE;
+        realmode = !(v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PE); 
+        if ( realmode != v->arch.hvm_vmx.vmx_realmode )
+        {
+            enum x86_segment s; 
+            struct segment_register reg[x86_seg_tr + 1];
+
+            /* Entering or leaving real mode: adjust the segment registers.
+             * Need to read them all either way, as realmode reads can update
+             * the saved values we'll use when returning to prot mode. */
+            for ( s = x86_seg_cs ; s <= x86_seg_tr ; s++ )
+                vmx_get_segment_register(v, s, &reg[s]);
+            v->arch.hvm_vmx.vmx_realmode = realmode;
+            
+            if ( realmode )
+            {
+                for ( s = x86_seg_cs ; s <= x86_seg_tr ; s++ )
+                    vmx_set_segment_register(v, s, &reg[s]);
+                v->arch.hvm_vcpu.hw_cr[4] |= X86_CR4_VME;
+                __vmwrite(GUEST_CR4, v->arch.hvm_vcpu.hw_cr[4]);
+                __vmwrite(EXCEPTION_BITMAP, 0xffffffff);
+            }
+            else 
+            {
+                for ( s = x86_seg_cs ; s <= x86_seg_tr ; s++ ) 
+                    if ( !(v->arch.hvm_vmx.vm86_segment_mask & (1<<s)) )
+                        vmx_set_segment_register(
+                            v, s, &v->arch.hvm_vmx.vm86_saved_seg[s]);
+                v->arch.hvm_vcpu.hw_cr[4] =
+                    ((v->arch.hvm_vcpu.hw_cr[4] & ~X86_CR4_VME)
+                     |(v->arch.hvm_vcpu.guest_cr[4] & X86_CR4_VME));
+                __vmwrite(GUEST_CR4, v->arch.hvm_vcpu.hw_cr[4]);
+                __vmwrite(EXCEPTION_BITMAP, 
+                          HVM_TRAP_MASK
+                          | (paging_mode_hap(v->domain) ?
+                             0 : (1U << TRAP_page_fault))
+                          | (1U << TRAP_no_device));
+            }
+        }
 
         v->arch.hvm_vcpu.hw_cr[0] =
             v->arch.hvm_vcpu.guest_cr[0] | hw_cr0_mask;
@@ -1028,6 +1155,8 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
         if ( paging_mode_hap(v->domain) )
             v->arch.hvm_vcpu.hw_cr[4] &= ~X86_CR4_PAE;
         v->arch.hvm_vcpu.hw_cr[4] |= v->arch.hvm_vcpu.guest_cr[4];
+        if ( v->arch.hvm_vmx.vmx_realmode ) 
+            v->arch.hvm_vcpu.hw_cr[4] |= X86_CR4_VME;
         if ( paging_mode_hap(v->domain) && !hvm_paging_enabled(v) )
         {
             v->arch.hvm_vcpu.hw_cr[4] |= X86_CR4_PSE;
@@ -1097,6 +1226,7 @@ void ept_sync_domain(struct domain *d)
 static void __vmx_inject_exception(int trap, int type, int error_code)
 {
     unsigned long intr_fields;
+    struct vcpu *curr = current;
 
     /*
      * NB. Callers do not need to worry about clearing STI/MOV-SS blocking:
@@ -1113,6 +1243,11 @@ static void __vmx_inject_exception(int trap, int type, int error_code)
     }
 
     __vmwrite(VM_ENTRY_INTR_INFO, intr_fields);
+
+    /* Can't inject exceptions in virtual 8086 mode because they would 
+     * use the protected-mode IDT.  Emulate at the next vmenter instead. */
+    if ( curr->arch.hvm_vmx.vmx_realmode ) 
+        curr->arch.hvm_vmx.vmx_emulate = 1;
 }
 
 void vmx_inject_hw_exception(int trap, int error_code)
@@ -2072,6 +2207,17 @@ static void vmx_failed_vmentry(unsigned int exit_reason,
     domain_crash(curr->domain);
 }
 
+asmlinkage void vmx_enter_realmode(struct cpu_user_regs *regs)
+{
+    struct vcpu *v = current;
+
+    /* Adjust RFLAGS to enter virtual 8086 mode with IOPL == 3.  Since
+     * we have CR4.VME == 1 and our own TSS with an empty interrupt
+     * redirection bitmap, all software INTs will be handled by vm86 */
+    v->arch.hvm_vmx.vm86_saved_eflags = regs->eflags;
+    regs->eflags |= (X86_EFLAGS_VM | X86_EFLAGS_IOPL);
+}
+
 asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
 {
     unsigned int exit_reason, idtv_info;
@@ -2099,6 +2245,42 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
 
     if ( unlikely(exit_reason & VMX_EXIT_REASONS_FAILED_VMENTRY) )
         return vmx_failed_vmentry(exit_reason, regs);
+
+    if ( v->arch.hvm_vmx.vmx_realmode )
+    {
+        unsigned int vector;
+
+        /* Put RFLAGS back the way the guest wants it */
+        regs->eflags &= ~(X86_EFLAGS_VM | X86_EFLAGS_IOPL);
+        regs->eflags |= (v->arch.hvm_vmx.vm86_saved_eflags & X86_EFLAGS_IOPL);
+
+        /* Unless this exit was for an interrupt, we've hit something
+         * vm86 can't handle.  Try again, using the emulator. */
+        switch ( exit_reason )
+        {
+        case EXIT_REASON_EXCEPTION_NMI:
+            vector = __vmread(VM_EXIT_INTR_INFO) & INTR_INFO_VECTOR_MASK;;
+            if ( vector != TRAP_page_fault
+                 && vector != TRAP_nmi 
+                 && vector != TRAP_machine_check ) 
+            {
+                perfc_incr(realmode_exits);
+                v->arch.hvm_vmx.vmx_emulate = 1;
+                return;
+            }
+        case EXIT_REASON_EXTERNAL_INTERRUPT:
+        case EXIT_REASON_INIT:
+        case EXIT_REASON_SIPI:
+        case EXIT_REASON_PENDING_VIRT_INTR:
+        case EXIT_REASON_PENDING_VIRT_NMI:
+        case EXIT_REASON_MACHINE_CHECK:
+            break;
+        default:
+            v->arch.hvm_vmx.vmx_emulate = 1;
+            perfc_incr(realmode_exits);
+            return;
+        }
+    }
 
     hvm_maybe_deassert_evtchn_irq();
 
