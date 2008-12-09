@@ -9725,6 +9725,30 @@ fetch_bdf:
   mov  ax, 2[bx]
   cmp  ax, #0x506e 
   jne  no_bev
+
+  mov  ax, 0x16[bx] ;; 0x16 is the offset of Boot Connection Vector
+  cmp  ax, #0x0000
+  je   no_bcv
+
+  ;; Option ROM has BCV. Run it now.
+  push cx       ;; Push seg
+  push ax       ;; Push offset
+
+  ;; Point ES:DI at "$PnP", which tells the ROM that we are a PnP BIOS.
+  mov  bx, #0xf000
+  mov  es, bx
+  lea  di, pnp_string
+  /* jump to BCV function entry pointer */
+  mov  bp, sp   ;; Call ROM BCV routine using seg:off on stack
+  db   0xff     ;; call_far ss:[bp+0]
+  db   0x5e
+  db   0
+  cli           ;; In case expansion ROM BIOS turns IF on
+  add  sp, #2   ;; Pop offset value
+  pop  cx       ;; Pop seg value (restore CX)
+  ja   no_bev
+
+no_bcv:
   mov  ax, 0x1a[bx] ;; 0x1A is also the offset into the expansion header of...
   cmp  ax, #0x0000  ;; the Bootstrap Entry Vector, or zero if there is none.
   je   no_bev
