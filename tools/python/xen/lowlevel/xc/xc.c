@@ -678,19 +678,22 @@ static PyObject *pyxc_get_device_group(XcObject *self,
 
     if ( rc < 0 )
     {
-      free(sdev_array); 
-      return pyxc_error_to_exception();
+        free(sdev_array); 
+        return pyxc_error_to_exception();
     }
 
     if ( !num_sdevs )
     {
-       free(sdev_array);
-       return Py_BuildValue("s", "");
+        free(sdev_array);
+        return Py_BuildValue("s", "");
     }
 
     group_str = calloc(num_sdevs, sizeof(dev_str));
     if (group_str == NULL)
+    {
+        free(sdev_array);
         return PyErr_NoMemory();
+    }
 
     for ( i = 0; i < num_sdevs; i++ )
     {
