@@ -1289,7 +1289,6 @@ class XendConfig(dict):
                     pass
 
             if dev_type == 'vbd':
-                dev_info['bootable'] = 0
                 if dev_info.get('dev', '').startswith('ioemu:'):
                     dev_info['driver'] = 'ioemu'
                 else:
@@ -1325,7 +1324,7 @@ class XendConfig(dict):
                 if param not in target:
                     target[param] = []
                 if dev_uuid not in target[param]:
-                    if dev_type == 'vbd':
+                    if dev_type == 'vbd' and 'bootable' not in dev_info:
                         # Compat hack -- mark first disk bootable
                         dev_info['bootable'] = int(not target[param])
                     target[param].append(dev_uuid)
@@ -1333,8 +1332,9 @@ class XendConfig(dict):
                 if 'vbd_refs' not in target:
                     target['vbd_refs'] = []
                 if dev_uuid not in target['vbd_refs']:
-                    # Compat hack -- mark first disk bootable
-                    dev_info['bootable'] = int(not target['vbd_refs'])
+                    if 'bootable' not in dev_info:
+                        # Compat hack -- mark first disk bootable
+                        dev_info['bootable'] = int(not target['vbd_refs'])
                     target['vbd_refs'].append(dev_uuid)
                     
             elif dev_type == 'vfb':
