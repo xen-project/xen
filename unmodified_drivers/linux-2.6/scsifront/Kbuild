@@ -1,0 +1,6 @@
+include $(M)/overrides.mk
+
+obj-m += xen-scsi.o
+
+xen-scsi-objs := scsifront.o xenbus.o
+
