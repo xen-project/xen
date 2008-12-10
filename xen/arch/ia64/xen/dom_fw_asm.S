@@ -1,3 +1,5 @@
+#include <asm/dom_fw.h>
+
 // moved from xenasm.S to be shared by xen and libxc
 /*
  * Assembly support routines for Xen/ia64
@@ -26,14 +28,14 @@
 xen_ia64_pal_call_stub:
 	{
 	 .mii
-	addl r2=0x1000,r0	//  Hypercall number (Value is patched).
+	addl r2=FW_HYPERCALL_PAL_CALL_ASM,r0	//  Hypercall number (Value is patched).
 	mov r9=256
 	;; 
 	cmp.gtu p7,p8=r9,r28		/* r32 <= 255? */
 	}
 	{
 	 .mbb
-	break 0x1000		//  Hypercall vector (Value is patched).
+	break __IA64_XEN_HYPERCALL_DEFAULT	//  Hypercall vector (Value is patched).
 (p7)	br.cond.sptk.few rp
 (p8)	br.ret.sptk.few rp
 	}

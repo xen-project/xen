@@ -561,7 +561,7 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
 
 	// the following will eventually need to be negotiated dynamically
 	d->arch.shared_info_va = DEFAULT_SHAREDINFO_ADDR;
-	d->arch.breakimm = 0x1000;
+	d->arch.breakimm = __IA64_XEN_HYPERCALL_DEFAULT;
 	for (i = 0; i < NR_CPUS; i++) {
 		d->arch.last_vcpu[i].vcpu_id = INVALID_VCPU_ID;
 	}

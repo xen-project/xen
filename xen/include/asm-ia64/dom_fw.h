@@ -5,6 +5,9 @@
  *	Dan Magenheimer (dan.magenheimer@hp.com)
  */
 
+#define __IA64_XEN_HYPERCALL_DEFAULT		0x1000
+#define __IA64_XEN_HYPERCALL_DEFAULT_STR	"0x1000"
+
 /* Portion of guest physical memory space reserved for PAL/SAL/EFI/ACPI
    data and code.  */
 #define FW_BASE_PADDR		0x0000UL
@@ -65,6 +68,7 @@
 #define FW_HYPERCALL_PAL_CALL_INDEX	0x80UL
 #define FW_HYPERCALL_PAL_CALL_PADDR	FW_HYPERCALL_PADDR(FW_HYPERCALL_PAL_CALL_INDEX)
 #define FW_HYPERCALL_PAL_CALL		0x1000UL
+#define FW_HYPERCALL_PAL_CALL_ASM	0x1000
 
 /*
  * SAL consists of a table of descriptors, one of which (type=0)
@@ -164,6 +168,7 @@
 #define FW_HYPERCALL_FPSWA_ENTRY_PADDR			FW_HYPERCALL_PADDR(FW_HYPERCALL_FPSWA_ENTRY_INDEX)
 #define FW_HYPERCALL_FPSWA_PATCH_PADDR			FW_HYPERCALL_PADDR(FW_HYPERCALL_FPSWA_PATCH_INDEX)
 #define FW_HYPERCALL_FPSWA				0x500UL
+#define FW_HYPERCALL_FPSWA_STR				"0x500"
 
 /* Set the shared_info base virtual address.  */
 #define FW_HYPERCALL_SET_SHARED_INFO_VA			0x600UL
@@ -186,7 +191,7 @@
 /* Additionnal OEM SAL.  */
 #define SAL_XEN_SAL_RETURN	0x02000000
 
-#ifdef __XEN__
+#if defined(__XEN__) && !defined(__ASSEMBLY__)
 #include <linux/efi.h>
 extern struct ia64_pal_retval xen_pal_emulator(u64, u64, u64, u64);
 extern struct sal_ret_values sal_emulator (long index, unsigned long in1, unsigned long in2, unsigned long in3, unsigned long in4, unsigned long in5, unsigned long in6, unsigned long in7);
