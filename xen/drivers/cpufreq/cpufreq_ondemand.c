@@ -263,6 +263,18 @@ struct cpufreq_governor cpufreq_gov_dbs = {
     .governor = cpufreq_governor_dbs,
 };
 
+static int __init cpufreq_gov_dbs_init(void)
+{
+    return cpufreq_register_governor(&cpufreq_gov_dbs);
+}
+__initcall(cpufreq_gov_dbs_init);
+
+static void cpufreq_gov_dbs_exit(void)
+{
+    cpufreq_unregister_governor(&cpufreq_gov_dbs);
+}
+__exitcall(cpufreq_gov_dbs_exit);
+
 void __init cpufreq_cmdline_parse(char *str)
 {
     do {

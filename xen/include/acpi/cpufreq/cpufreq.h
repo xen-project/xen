@@ -84,9 +84,12 @@ struct cpufreq_governor {
     char    name[CPUFREQ_NAME_LEN];
     int     (*governor)(struct cpufreq_policy *policy,
                         unsigned int event);
+    struct list_head governor_list;
 };
 
 extern struct cpufreq_governor cpufreq_gov_dbs;
+extern int cpufreq_register_governor(struct cpufreq_governor *governor);
+extern int cpufreq_unregister_governor(struct cpufreq_governor *governor);
 #define CPUFREQ_DEFAULT_GOVERNOR &cpufreq_gov_dbs
 
 /* pass a target to the cpufreq driver */
