@@ -1355,6 +1355,26 @@ vcpu_get_domain_bundle(VCPU * vcpu, REGS * regs, u64 gip,
 		// copy its value to the variable, tr, before use.
 		TR_ENTRY tr;
 
+		// fast path:
+		// try to access gip with guest virtual address directly.
+		// This may cause tlb miss. see vcpu_translate(). Be careful!
+		swap_rr0 = (!region && PSCB(vcpu, metaphysical_mode));
+		if (swap_rr0) {
+			set_virtual_rr0();
+		}
+		*bundle = __get_domain_bundle(gip);
+		if (swap_rr0) {
+			set_metaphysical_rr0();
+		}
+		
+		if (!bundle->i64[0] && !bundle->i64[1]) {
+			dprintk(XENLOG_INFO, "%s gip 0x%lx\n", __func__, gip);
+		} else {
+			// Okay, mDTC successed
+			return 1;
+		}
+		// mDTC failed, so try vTLB.
+
 		trp = vcpu_tr_lookup(vcpu, gip, rid, 0);
 		if (trp != NULL) {
 			tr = *trp;
@@ -1374,28 +1394,13 @@ vcpu_get_domain_bundle(VCPU * vcpu, REGS * regs, u64 gip,
 			tr = *trp;
 			goto found;
 		}
-#if 0
 		tr = PSCBX(vcpu, dtlb);
 		if (vcpu_match_tr_entry(&tr, gip, rid)) {
 			goto found;
 		}
-#endif
 
-		// try to access gip with guest virtual address
-		// This may cause tlb miss. see vcpu_translate(). Be careful!
-		swap_rr0 = (!region && PSCB(vcpu, metaphysical_mode));
-		if (swap_rr0) {
-			set_virtual_rr0();
-		}
-		*bundle = __get_domain_bundle(gip);
-		if (swap_rr0) {
-			set_metaphysical_rr0();
-		}
-		if (bundle->i64[0] == 0 && bundle->i64[1] == 0) {
-			dprintk(XENLOG_INFO, "%s gip 0x%lx\n", __func__, gip);
-			return 0;
-		}
-		return 1;
+		// mDTC and vTLB failed. so reflect tlb miss into the guest.
+		return 0;
 
 	found:
 		gpip = ((tr.pte.ppn >> (tr.ps - 12)) << tr.ps) |
