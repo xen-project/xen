@@ -57,9 +57,9 @@ static fastcall void k7_machine_check(struct cpu_user_regs * regs, long error_co
 	}
 
 	if (recover&2)
-		panic ("CPU context corrupt");
+		mc_panic ("CPU context corrupt");
 	if (recover&1)
-		panic ("Unable to continue");
+		mc_panic ("Unable to continue");
 	printk (KERN_EMERG "Attempting to continue.\n");
 	mcgstl &= ~(1<<2);
 	wrmsr (MSR_IA32_MCG_STATUS,mcgstl, mcgsth);

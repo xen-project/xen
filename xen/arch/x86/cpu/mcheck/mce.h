@@ -24,6 +24,7 @@ struct mc_info *x86_mcinfo_getptr(void);
 void x86_mcinfo_clear(struct mc_info *mi);
 int x86_mcinfo_add(struct mc_info *mi, void *mcinfo);
 void x86_mcinfo_dump(struct mc_info *mi);
+void mc_panic(char *s);
 
 /* Global variables */
 extern int mce_disabled;

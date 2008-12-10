@@ -219,7 +219,7 @@ void k8_machine_check(struct cpu_user_regs *regs, long error_code)
 			show_execution_state(regs);
 		}
 		x86_mcinfo_dump(mc_data);
-		panic("End of MCE. Use mcelog to decode above error codes.\n");
+		mc_panic("End of MCE. Use mcelog to decode above error codes.\n");
 	}
 
 	/* If Dom0 registered a machine check handler, which is only possible
@@ -248,7 +248,7 @@ void k8_machine_check(struct cpu_user_regs *regs, long error_code)
 			/* Dom0 is impacted. Since noone can't handle
 			 * this error, panic! */
 			x86_mcinfo_dump(mc_data);
-			panic("MCE occured in Dom0, which it can't handle\n");
+			mc_panic("MCE occured in Dom0, which it can't handle\n");
 
 			/* UNREACHED */
 		} else {

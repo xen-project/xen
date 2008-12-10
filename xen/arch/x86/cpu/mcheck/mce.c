@@ -9,6 +9,7 @@
 #include <xen/config.h>
 #include <xen/smp.h>
 #include <xen/errno.h>
+#include <xen/console.h>
 
 #include <asm/processor.h> 
 #include <asm/system.h>
@@ -573,4 +574,16 @@ long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)
 	}
 
 	return ret;
+}
+
+void mc_panic(char *s)
+{
+    console_start_sync();
+    printk("Fatal machine check: %s\n", s);
+    printk("\n"
+           "****************************************\n"
+           "\n"
+           "   The processor has reported a hardware error which cannot\n"
+           "   be recovered from.  Xen will now reboot the machine.\n");
+    panic("HARDWARE ERROR");
 }
