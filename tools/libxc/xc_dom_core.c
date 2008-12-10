@@ -244,6 +244,7 @@ int xc_dom_do_gunzip(void *src, size_t srclen, void *dst, size_t dstlen)
         return -1;
     }
     rc = inflate(&zStream, Z_FINISH);
+    inflateEnd(&zStream);
     if ( rc != Z_STREAM_END )
     {
         xc_dom_panic(XC_INTERNAL_ERROR,

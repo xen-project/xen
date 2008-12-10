@@ -131,6 +131,7 @@ char *xc_inflate_buffer(const char *in_buf, unsigned long in_size,
 
     /* Inflate in one pass/call */
     sts = inflate(&zStream, Z_FINISH);
+    inflateEnd(&zStream);
     if ( sts != Z_STREAM_END )
     {
         ERROR("inflate failed, sts %d\n", sts);
