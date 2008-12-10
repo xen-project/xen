@@ -144,13 +144,16 @@ struct vcpu *alloc_vcpu(
     v->domain = d;
     v->vcpu_id = vcpu_id;
 
-    v->runstate.state = is_idle_vcpu(v) ? RUNSTATE_running : RUNSTATE_offline;
-    v->runstate.state_entry_time = NOW();
-
     spin_lock_init(&v->virq_lock);
 
-    if ( !is_idle_domain(d) )
+    if ( is_idle_domain(d) )
     {
+        v->runstate.state = RUNSTATE_running;
+    }
+    else
+    {
+        v->runstate.state = RUNSTATE_offline;        
+        v->runstate.state_entry_time = NOW();
         set_bit(_VPF_down, &v->pause_flags);
         v->vcpu_info = (void *)&shared_info(d, vcpu_info[vcpu_id]);
     }
