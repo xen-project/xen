@@ -337,16 +337,8 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
         for_each_cpu_mask ( cpu, cpumap )
         {
             if ( (v = idle_vcpu[cpu]) != NULL )
-            {
-                idletime = v->runstate.time[RUNSTATE_running];
-                if ( v->is_running )
-                    idletime += now - v->runstate.state_entry_time;
-            }
-            else
-            {
-                idletime = 0;
                 cpu_clear(cpu, cpumap);
-            }
+            idletime = get_cpu_idle_time(cpu);
 
             ret = -EFAULT;
             if ( copy_to_guest_offset(idletimes, cpu, &idletime, 1) )

@@ -95,21 +95,6 @@ int get_cpufreq_ondemand_para(uint32_t *sampling_rate_max,
     return 0;
 }
 
-uint64_t get_cpu_idle_time(unsigned int cpu)
-{
-    uint64_t idle_ns;
-    struct vcpu *v;
-
-    if ((v = idle_vcpu[cpu]) == NULL)
-        return 0;
-
-    idle_ns = v->runstate.time[RUNSTATE_running];
-    if (v->is_running)
-        idle_ns += NOW() - v->runstate.state_entry_time;
-
-    return idle_ns;
-}
-
 static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
 {
     unsigned int load = 0;

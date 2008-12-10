@@ -749,7 +749,6 @@ uint32_t pmstat_get_cx_nr(uint32_t cpuid)
 int pmstat_get_cx_stat(uint32_t cpuid, struct pm_cx_stat *stat)
 {
     const struct acpi_processor_power *power = processor_powers[cpuid];
-    struct vcpu *v = idle_vcpu[cpuid];
     uint64_t usage;
     int i;
 
@@ -763,9 +762,7 @@ int pmstat_get_cx_stat(uint32_t cpuid, struct pm_cx_stat *stat)
 
     stat->last = power->last_state ? power->last_state->idx : 0;
     stat->nr = power->count;
-    stat->idle_time = v->runstate.time[RUNSTATE_running];
-    if ( v->is_running )
-        stat->idle_time += NOW() - v->runstate.state_entry_time;
+    stat->idle_time = get_cpu_idle_time(cpuid);
 
     for ( i = 0; i < power->count; i++ )
     {

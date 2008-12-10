@@ -538,6 +538,7 @@ int vcpu_locked_change_affinity(struct vcpu *v, cpumask_t *affinity);
 void vcpu_unlock_affinity(struct vcpu *v, cpumask_t *affinity);
 
 void vcpu_runstate_get(struct vcpu *v, struct vcpu_runstate_info *runstate);
+uint64_t get_cpu_idle_time(unsigned int cpu);
 
 #define IS_PRIV(_d) ((_d)->is_privileged)
 #define IS_PRIV_FOR(_d, _t) (IS_PRIV(_d) || ((_d)->target && (_d)->target == (_t)))
