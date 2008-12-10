@@ -53,9 +53,9 @@ struct cpufreq_dom {
 };
 static LIST_HEAD(cpufreq_dom_list_head);
 
-static LIST_HEAD(cpufreq_governor_list);
+LIST_HEAD(cpufreq_governor_list);
 
-static struct cpufreq_governor *__find_governor(const char *governor)
+struct cpufreq_governor *__find_governor(const char *governor)
 {
     struct cpufreq_governor *t;
 

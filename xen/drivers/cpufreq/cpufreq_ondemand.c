@@ -51,11 +51,49 @@ static struct dbs_tuners {
     unsigned int up_threshold;
     unsigned int powersave_bias;
 } dbs_tuners_ins = {
+    .sampling_rate = 0,
     .up_threshold = DEF_FREQUENCY_UP_THRESHOLD,
     .powersave_bias = 0,
 };
 
 static struct timer dbs_timer[NR_CPUS];
+
+int write_ondemand_sampling_rate(unsigned int sampling_rate)
+{
+    if ( (sampling_rate > MAX_SAMPLING_RATE / MICROSECS(1)) ||
+         (sampling_rate < MIN_SAMPLING_RATE / MICROSECS(1)) )
+        return -EINVAL;
+
+    dbs_tuners_ins.sampling_rate = sampling_rate * MICROSECS(1);
+    return 0;
+}
+
+int write_ondemand_up_threshold(unsigned int up_threshold)
+{
+    if ( (up_threshold > MAX_FREQUENCY_UP_THRESHOLD) ||
+         (up_threshold < MIN_FREQUENCY_UP_THRESHOLD) )
+        return -EINVAL;
+
+    dbs_tuners_ins.up_threshold = up_threshold;
+    return 0;
+}
+
+int get_cpufreq_ondemand_para(uint32_t *sampling_rate_max,
+                              uint32_t *sampling_rate_min,
+                              uint32_t *sampling_rate,
+                              uint32_t *up_threshold)
+{
+    if (!sampling_rate_max || !sampling_rate_min ||
+        !sampling_rate || !up_threshold)
+        return -EINVAL;
+
+    *sampling_rate_max = MAX_SAMPLING_RATE/MICROSECS(1);
+    *sampling_rate_min = MIN_SAMPLING_RATE/MICROSECS(1);
+    *sampling_rate = dbs_tuners_ins.sampling_rate / MICROSECS(1);
+    *up_threshold = dbs_tuners_ins.up_threshold;
+
+    return 0;
+}
 
 uint64_t get_cpu_idle_time(unsigned int cpu)
 {
@@ -214,7 +252,7 @@ int cpufreq_governor_dbs(struct cpufreq_policy *policy, unsigned int event)
          * Start the timerschedule work, when this governor
          * is used for first time
          */
-        if (dbs_enable == 1) {
+        if ((dbs_enable == 1) && !dbs_tuners_ins.sampling_rate) {
             def_sampling_rate = policy->cpuinfo.transition_latency *
                 DEF_SAMPLING_RATE_LATENCY_MULTIPLIER;
 

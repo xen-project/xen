@@ -273,6 +273,91 @@ struct xen_sysctl_cpu_hotplug {
 typedef struct xen_sysctl_cpu_hotplug xen_sysctl_cpu_hotplug_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_cpu_hotplug_t);
 
+/*
+ * Get/set xen power management, include 
+ * 1. cpufreq governors and related parameters
+ */
+#define XEN_SYSCTL_pm_op        12
+struct xen_userspace {
+    uint32_t scaling_setspeed;
+};
+typedef struct xen_userspace xen_userspace_t;
+
+struct xen_ondemand {
+    uint32_t sampling_rate_max;
+    uint32_t sampling_rate_min;
+
+    uint32_t sampling_rate;
+    uint32_t up_threshold;
+};
+typedef struct xen_ondemand xen_ondemand_t;
+
+/* 
+ * cpufreq para name of this structure named 
+ * same as sysfs file name of native linux
+ */
+#define CPUFREQ_NAME_LEN 16
+struct xen_get_cpufreq_para {
+    /* IN/OUT variable */
+    uint32_t cpu_num;
+    uint32_t freq_num;
+    uint32_t gov_num;
+
+    /* for all governors */
+    /* OUT variable */
+    XEN_GUEST_HANDLE_64(uint32) affected_cpus;
+    XEN_GUEST_HANDLE_64(uint32) scaling_available_frequencies;
+    XEN_GUEST_HANDLE_64(char)   scaling_available_governors;
+    char scaling_driver[CPUFREQ_NAME_LEN];
+
+    uint32_t cpuinfo_cur_freq;
+    uint32_t cpuinfo_max_freq;
+    uint32_t cpuinfo_min_freq;
+    uint32_t scaling_cur_freq;
+
+    char scaling_governor[CPUFREQ_NAME_LEN];
+    uint32_t scaling_max_freq;
+    uint32_t scaling_min_freq;
+
+    /* for specific governor */
+    union {
+        struct  xen_userspace userspace;
+        struct  xen_ondemand ondemand;
+    } u;
+};
+
+struct xen_set_cpufreq_gov {
+    char scaling_governor[CPUFREQ_NAME_LEN];
+};
+
+struct xen_set_cpufreq_para {
+    #define SCALING_MAX_FREQ           1
+    #define SCALING_MIN_FREQ           2
+    #define SCALING_SETSPEED           3
+    #define SAMPLING_RATE              4
+    #define UP_THRESHOLD               5
+
+    uint32_t ctrl_type;
+    uint32_t ctrl_value;
+};
+
+struct xen_sysctl_pm_op {
+    #define PM_PARA_CATEGORY_MASK      0xf0
+    #define CPUFREQ_PARA               0x10
+
+    /* cpufreq command type */
+    #define GET_CPUFREQ_PARA           (CPUFREQ_PARA | 0x01)
+    #define SET_CPUFREQ_GOV            (CPUFREQ_PARA | 0x02)
+    #define SET_CPUFREQ_PARA           (CPUFREQ_PARA | 0x03)
+
+    uint32_t cmd;
+    uint32_t cpuid;
+    union {
+        struct xen_get_cpufreq_para get_para;
+        struct xen_set_cpufreq_gov  set_gov;
+        struct xen_set_cpufreq_para set_para;
+    };
+};
 
 struct xen_sysctl {
     uint32_t cmd;
@@ -289,6 +374,7 @@ struct xen_sysctl {
         struct xen_sysctl_availheap         availheap;
         struct xen_sysctl_get_pmstat        get_pmstat;
         struct xen_sysctl_cpu_hotplug       cpu_hotplug;
+        struct xen_sysctl_pm_op             pm_op;
         uint8_t                             pad[128];
     } u;
 };

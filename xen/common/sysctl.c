@@ -26,6 +26,7 @@
 #include <xsm/xsm.h>
 
 extern int do_get_pm_info(struct xen_sysctl_get_pmstat *op);
+extern int do_pm_op(struct xen_sysctl_pm_op *op);
 
 extern long arch_do_sysctl(
     struct xen_sysctl *op, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl);
@@ -221,6 +222,21 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
             ret = -EFAULT;
             break;
         }
+    }
+    break;
+
+    case XEN_SYSCTL_pm_op:
+    {
+        ret = do_pm_op(&op->u.pm_op);
+        if ( ret && (ret != -EAGAIN) )
+            break;
+
+        if ( op->u.pm_op.cmd == GET_CPUFREQ_PARA )
+            if ( copy_to_guest(u_sysctl, op, 1) )
+            {
+                ret = -EFAULT;
+                break;
+            }
     }
     break;
 

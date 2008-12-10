@@ -17,8 +17,6 @@
 
 #include "processor_perf.h"
 
-#define CPUFREQ_NAME_LEN 16
-
 struct cpufreq_governor;
 
 struct acpi_cpufreq_data {
@@ -88,9 +86,14 @@ struct cpufreq_governor {
 };
 
 extern struct cpufreq_governor cpufreq_gov_dbs;
+extern struct cpufreq_governor cpufreq_gov_userspace;
+extern struct cpufreq_governor cpufreq_gov_performance;
+extern struct cpufreq_governor cpufreq_gov_powersave;
+
 extern int cpufreq_register_governor(struct cpufreq_governor *governor);
 extern int cpufreq_unregister_governor(struct cpufreq_governor *governor);
-#define CPUFREQ_DEFAULT_GOVERNOR &cpufreq_gov_dbs
+extern struct cpufreq_governor *__find_governor(const char *governor);
+#define CPUFREQ_DEFAULT_GOVERNOR &cpufreq_gov_performance
 
 /* pass a target to the cpufreq driver */
 extern int __cpufreq_driver_target(struct cpufreq_policy *policy,
@@ -113,6 +116,7 @@ __cpufreq_governor(struct cpufreq_policy *policy, unsigned int event)
 #define CPUFREQ_RELATION_H 1  /* highest frequency below or at target */
 
 struct cpufreq_driver {
+    char   name[CPUFREQ_NAME_LEN];
     int    (*init)(struct cpufreq_policy *policy);
     int    (*verify)(struct cpufreq_policy *policy);
     int    (*target)(struct cpufreq_policy *policy,
@@ -210,3 +214,9 @@ struct cpu_dbs_info_s {
 };
 
 int cpufreq_governor_dbs(struct cpufreq_policy *policy, unsigned int event);
+int get_cpufreq_ondemand_para(uint32_t *sampling_rate_max,
+                              uint32_t *sampling_rate_min,
+                              uint32_t *sampling_rate,
+                              uint32_t *up_threshold);
+int write_ondemand_sampling_rate(unsigned int sampling_rate);
+int write_ondemand_up_threshold(unsigned int up_threshold);

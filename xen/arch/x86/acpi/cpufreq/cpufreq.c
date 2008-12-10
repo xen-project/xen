@@ -549,6 +549,7 @@ static int acpi_cpufreq_cpu_exit(struct cpufreq_policy *policy)
 }
 
 static struct cpufreq_driver acpi_cpufreq_driver = {
+    .name   = "acpi-cpufreq",
     .verify = acpi_cpufreq_verify,
     .target = acpi_cpufreq_target,
     .init   = acpi_cpufreq_cpu_init,
