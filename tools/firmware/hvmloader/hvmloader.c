@@ -269,6 +269,11 @@ static void pci_setup(void)
             printf("pci dev %02x:%x INT%c->IRQ%u\n",
                    devfn>>3, devfn&7, 'A'+pin-1, isa_irq);
         }
+
+        /* Enable bus mastering. */
+        cmd = pci_readw(devfn, PCI_COMMAND);
+        cmd |= PCI_COMMAND_MASTER;
+        pci_writew(devfn, PCI_COMMAND, cmd);
     }
 
     /* Assign iomem and ioport resources in descending order of size. */
