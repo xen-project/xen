@@ -1257,14 +1257,16 @@ static void __init setup_ioapic_ids_from_mpc(void) { }
 static int __init timer_irq_works(void)
 {
     extern unsigned long pit0_ticks;
-    unsigned long t1;
+    unsigned long t1, flags;
 
     t1 = pit0_ticks;
     mb();
 
+    local_save_flags(flags);
     local_irq_enable();
     /* Let ten ticks pass... */
     mdelay((10 * 1000) / HZ);
+    local_irq_restore(flags);
 
     /*
      * Expect a few ticks at least, to be sure some possible
@@ -1707,6 +1709,9 @@ static inline void check_timer(void)
 {
     int apic1, pin1, apic2, pin2;
     int vector;
+    unsigned long flags;
+
+    local_irq_save(flags);
 
     /*
      * get/set the timer IRQ vector:
@@ -1748,6 +1753,7 @@ static inline void check_timer(void)
          */
         unmask_IO_APIC_irq(0);
         if (timer_irq_works()) {
+            local_irq_restore(flags);
             if (disable_timer_pin_1 > 0)
                 clear_IO_APIC_pin(apic1, pin1);
             return;
@@ -1765,6 +1771,7 @@ static inline void check_timer(void)
          */
         setup_ExtINT_IRQ0_pin(apic2, pin2, vector);
         if (timer_irq_works()) {
+            local_irq_restore(flags);
             printk("works.\n");
             if (pin1 != -1)
                 replace_pin_at_irq(0, apic1, pin1, apic2, pin2);
@@ -1792,6 +1799,7 @@ static inline void check_timer(void)
     enable_8259A_irq(0);
 
     if (timer_irq_works()) {
+        local_irq_restore(flags);
         printk(" works.\n");
         return;
     }
@@ -1806,6 +1814,8 @@ static inline void check_timer(void)
     apic_write_around(APIC_LVT0, APIC_DM_EXTINT);
 
     unlock_ExtINT_logic();
+
+    local_irq_restore(flags);
 
     if (timer_irq_works()) {
         printk(" works.\n");
