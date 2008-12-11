@@ -9746,7 +9746,7 @@ fetch_bdf:
   cli           ;; In case expansion ROM BIOS turns IF on
   add  sp, #2   ;; Pop offset value
   pop  cx       ;; Pop seg value (restore CX)
-  ja   no_bev
+  jmp  no_bev
 
 no_bcv:
   mov  ax, 0x1a[bx] ;; 0x1A is also the offset into the expansion header of...
