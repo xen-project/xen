@@ -36,7 +36,6 @@ struct pci_dev {
     struct domain *domain;
     const u8 bus;
     const u8 devfn;
-    spinlock_t lock;
 };
 
 #define for_each_pdev(domain, pdev) \
@@ -59,6 +58,8 @@ struct pci_dev *pci_lock_domain_pdev(struct domain *d, int bus, int devfn);
 void pci_release_devices(struct domain *d);
 int pci_add_device(u8 bus, u8 devfn);
 int pci_remove_device(u8 bus, u8 devfn);
+struct pci_dev *pci_get_pdev(int bus, int devfn);
+struct pci_dev *pci_get_pdev_by_domain(struct domain *d, int bus, int devfn);
 
 uint8_t pci_conf_read8(
     unsigned int bus, unsigned int dev, unsigned int func, unsigned int reg);

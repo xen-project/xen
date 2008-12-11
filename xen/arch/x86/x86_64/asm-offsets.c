@@ -60,6 +60,8 @@ void __dummy__(void)
     DEFINE(UREGS_user_sizeof, sizeof(struct cpu_user_regs));
     BLANK();
 
+    OFFSET(irq_caps_offset, struct domain, irq_caps);
+    OFFSET(next_in_list_offset, struct domain, next_in_list);
     OFFSET(VCPU_processor, struct vcpu, processor);
     OFFSET(VCPU_domain, struct vcpu, domain);
     OFFSET(VCPU_vcpu_info, struct vcpu, vcpu_info);

@@ -847,12 +847,11 @@ int map_domain_pirq(
     int old_vector, old_pirq;
     irq_desc_t *desc;
     unsigned long flags;
+    struct msi_desc *msi_desc;
+    struct pci_dev *pdev = NULL;
 
+    ASSERT(spin_is_locked(&pcidevs_lock));
     ASSERT(spin_is_locked(&d->event_lock));
-
-    /* XXX Until pcidev and msi locking is fixed. */
-    if ( type == MAP_PIRQ_TYPE_MSI )
-        return -EINVAL;
 
     if ( !IS_PRIV(current->domain) )
         return -EPERM;
@@ -884,25 +883,35 @@ int map_domain_pirq(
     }
 
     desc = &irq_desc[vector];
-    spin_lock_irqsave(&desc->lock, flags);
 
     if ( type == MAP_PIRQ_TYPE_MSI )
     {
         struct msi_info *msi = (struct msi_info *)data;
-        if ( desc->handler != &no_irq_type )
-            dprintk(XENLOG_G_ERR, "dom%d: vector %d in use\n",
-                    d->domain_id, vector);
-        desc->handler = &pci_msi_type;
-        ret = pci_enable_msi(msi);
+
+        pdev = pci_get_pdev(msi->bus, msi->devfn);
+        ret = pci_enable_msi(msi, &msi_desc);
         if ( ret )
             goto done;
+
+        spin_lock_irqsave(&desc->lock, flags);
+
+        if ( desc->handler != &no_irq_type )
+            dprintk(XENLOG_G_ERR, "dom%d: vector %d in use\n",
+              d->domain_id, vector);
+        desc->handler = &pci_msi_type;
+        d->arch.pirq_vector[pirq] = vector;
+        d->arch.vector_pirq[vector] = pirq;
+        setup_msi_irq(pdev, msi_desc);
+        spin_unlock_irqrestore(&desc->lock, flags);
+    } else
+    {
+        spin_lock_irqsave(&desc->lock, flags);
+        d->arch.pirq_vector[pirq] = vector;
+        d->arch.vector_pirq[vector] = pirq;
+        spin_unlock_irqrestore(&desc->lock, flags);
     }
 
-    d->arch.pirq_vector[pirq] = vector;
-    d->arch.vector_pirq[vector] = pirq;
-
  done:
-    spin_unlock_irqrestore(&desc->lock, flags);
     return ret;
 }
 
@@ -913,6 +922,7 @@ int unmap_domain_pirq(struct domain *d, int pirq)
     irq_desc_t *desc;
     int vector, ret = 0;
     bool_t forced_unbind;
+    struct msi_desc *msi_desc = NULL;
 
     if ( (pirq < 0) || (pirq >= NR_IRQS) )
         return -EINVAL;
@@ -920,6 +930,7 @@ int unmap_domain_pirq(struct domain *d, int pirq)
     if ( !IS_PRIV(current->domain) )
         return -EINVAL;
 
+    ASSERT(spin_is_locked(&pcidevs_lock));
     ASSERT(spin_is_locked(&d->event_lock));
 
     vector = d->arch.pirq_vector[pirq];
@@ -937,18 +948,19 @@ int unmap_domain_pirq(struct domain *d, int pirq)
                 d->domain_id, pirq);
 
     desc = &irq_desc[vector];
+
+    if ( (msi_desc = desc->msi_desc) != NULL )
+        pci_disable_msi(msi_desc);
+
     spin_lock_irqsave(&desc->lock, flags);
 
     BUG_ON(vector != d->arch.pirq_vector[pirq]);
 
-    if ( desc->msi_desc )
-        pci_disable_msi(vector);
+    if ( msi_desc )
+        teardown_msi_vector(vector);
 
     if ( desc->handler == &pci_msi_type )
-    {
         desc->handler = &no_irq_type;
-        free_irq_vector(vector);
-    }
 
     if ( !forced_unbind )
     {
@@ -962,6 +974,11 @@ int unmap_domain_pirq(struct domain *d, int pirq)
     }
 
     spin_unlock_irqrestore(&desc->lock, flags);
+    if (msi_desc)
+    {
+        msi_free_vector(msi_desc);
+        free_irq_vector(vector);
+    }
 
     ret = irq_deny_access(d, pirq);
     if ( ret )
@@ -976,6 +993,7 @@ void free_domain_pirqs(struct domain *d)
 {
     int i;
 
+    read_lock(&pcidevs_lock);
     spin_lock(&d->event_lock);
 
     for ( i = 0; i < NR_IRQS; i++ )
@@ -983,6 +1001,7 @@ void free_domain_pirqs(struct domain *d)
             unmap_domain_pirq(d, i);
 
     spin_unlock(&d->event_lock);
+    read_unlock(&pcidevs_lock);
 }
 
 extern void dump_ioapic_irq_info(void);

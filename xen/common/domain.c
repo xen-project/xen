@@ -558,11 +558,11 @@ static void complete_domain_destroy(struct rcu_head *head)
         sched_destroy_vcpu(v);
     }
 
-    rangeset_domain_destroy(d);
-
     grant_table_destroy(d);
 
     arch_domain_destroy(d);
+
+    rangeset_domain_destroy(d);
 
     sched_destroy_domain(d);
 

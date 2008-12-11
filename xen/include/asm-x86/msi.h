@@ -68,13 +68,17 @@ struct msi_msg {
 	u32	data;		/* 16 bits of msi message data */
 };
 
+struct msi_desc;
 /* Helper functions */
 extern void mask_msi_vector(unsigned int vector);
 extern void unmask_msi_vector(unsigned int vector);
 extern void set_msi_affinity(unsigned int vector, cpumask_t mask);
-extern int pci_enable_msi(struct msi_info *msi);
-extern void pci_disable_msi(int vector);
+extern int pci_enable_msi(struct msi_info *msi, struct msi_desc **desc);
+extern void pci_disable_msi(struct msi_desc *desc);
 extern void pci_cleanup_msi(struct pci_dev *pdev);
+extern int setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc);
+extern void teardown_msi_vector(int vector);
+extern int msi_free_vector(struct msi_desc *entry);
 
 struct msi_desc {
 	struct {
