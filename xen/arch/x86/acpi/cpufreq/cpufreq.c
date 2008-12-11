@@ -131,9 +131,12 @@ struct drv_cmd {
     u32 val;
 };
 
-static void do_drv_read(struct drv_cmd *cmd)
+static void do_drv_read(void *drvcmd)
 {
+    struct drv_cmd *cmd;
     u32 h;
+
+    cmd = (struct drv_cmd *)drvcmd;
 
     switch (cmd->type) {
     case SYSTEM_INTEL_MSR_CAPABLE:
@@ -174,7 +177,13 @@ static void drv_read(struct drv_cmd *cmd)
 {
     cmd->val = 0;
 
-    do_drv_read(cmd);
+    ASSERT(cpus_weight(cmd->mask) == 1);
+
+    /* to reduce IPI for the sake of performance */
+    if (cpu_isset(smp_processor_id(), cmd->mask))
+        do_drv_read((void *)cmd);
+    else
+        on_selected_cpus( cmd->mask, do_drv_read, (void *)cmd, 0, 1);
 }
 
 static void drv_write(struct drv_cmd *cmd)
@@ -184,13 +193,21 @@ static void drv_write(struct drv_cmd *cmd)
 
 static u32 get_cur_val(cpumask_t mask)
 {
+    struct cpufreq_policy *policy;
     struct processor_performance *perf;
     struct drv_cmd cmd;
+    unsigned int cpu;
 
     if (unlikely(cpus_empty(mask)))
         return 0;
 
-    switch (drv_data[first_cpu(mask)]->cpu_feature) {
+    cpu = first_cpu(mask);
+    policy = cpufreq_cpu_policy[cpu];
+
+    if (!policy)
+        return 0;    
+
+    switch (drv_data[policy->cpu]->cpu_feature) {
     case SYSTEM_INTEL_MSR_CAPABLE:
         cmd.type = SYSTEM_INTEL_MSR_CAPABLE;
         cmd.addr.msr.reg = MSR_IA32_PERF_STATUS;
@@ -205,7 +222,7 @@ static u32 get_cur_val(cpumask_t mask)
         return 0;
     }
 
-    cmd.mask = mask;
+    cmd.mask = cpumask_of_cpu(cpu);
 
     drv_read(&cmd);
     return cmd.val;
@@ -280,13 +297,18 @@ static unsigned int get_measured_perf(unsigned int cpu)
 
 static unsigned int get_cur_freq_on_cpu(unsigned int cpu)
 {
-    struct acpi_cpufreq_data *data = drv_data[cpu];
+    struct cpufreq_policy *policy;
+    struct acpi_cpufreq_data *data;
     unsigned int freq;
 
-    if (unlikely(data == NULL ||
-        data->acpi_data == NULL || data->freq_table == NULL)) {
+    policy = cpufreq_cpu_policy[cpu];
+    if (!policy)
         return 0;
-    }
+
+    data = drv_data[policy->cpu];
+    if (unlikely(data == NULL ||
+        data->acpi_data == NULL || data->freq_table == NULL))
+        return 0;
 
     freq = extract_freq(get_cur_val(cpumask_of_cpu(cpu)), data);
     return freq;
