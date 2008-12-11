@@ -1,8 +1,7 @@
 #ifndef __ASM_SYSTEM_H
 #define __ASM_SYSTEM_H
 
-#include <xen/config.h>
-#include <xen/types.h>
+#include <xen/lib.h>
 #include <asm/bitops.h>
 
 #define read_segment_register(name)                             \
@@ -171,10 +170,27 @@ static always_inline unsigned long __cmpxchg(
 /* used when interrupts are already enabled or to shutdown the processor */
 #define halt()          asm volatile ( "hlt" : : : "memory" )
 
+#define local_save_flags(x)                                      \
+({                                                               \
+    BUILD_BUG_ON(sizeof(x) != sizeof(long));                     \
+    asm volatile ( "pushf" __OS " ; pop" __OS " %0" : "=g" (x)); \
+})
+#define local_irq_save(x)                                        \
+({                                                               \
+    local_save_flags(x);                                         \
+    local_irq_disable();                                         \
+})
+#define local_irq_restore(x)                                     \
+({                                                               \
+    BUILD_BUG_ON(sizeof(x) != sizeof(long));                     \
+    asm volatile ( "push" __OS " %0 ; popf" __OS                 \
+                   : : "g" (x) : "memory", "cc" );               \
+})
+
 static inline int local_irq_is_enabled(void)
 {
     unsigned long flags;
-    __save_flags(flags);
+    local_save_flags(flags);
     return !!(flags & (1<<9)); /* EFLAGS_IF */
 }
 
