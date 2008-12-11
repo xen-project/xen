@@ -99,7 +99,7 @@ void __init vga_init(void)
 
 void __init vga_endboot(void)
 {
-    if ( !vga_console_info.video_type )
+    if ( vga_puts == vga_noop_puts )
         return;
 
     printk("Xen is %s VGA console.\n",
