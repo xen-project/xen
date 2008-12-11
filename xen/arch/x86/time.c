@@ -1125,19 +1125,19 @@ void init_percpu_time(void)
 /* Late init function (after all CPUs are booted). */
 int __init init_xen_time(void)
 {
-    /* check if TSC is invariant during deep C state
-       this is a new feature introduced by Nehalem*/
+    /* Is TSC invariant during deep C state? */
     if ( cpuid_edx(0x80000007) & (1u<<8) )
         tsc_invariant = 1;
 
     open_softirq(TIME_CALIBRATE_SOFTIRQ, local_time_calibration);
 
-    init_percpu_time();
+    /* NB. get_cmos_time() can take over one second to execute. */
+    do_settime(get_cmos_time(), 0, NOW());
 
-    stime_platform_stamp = 0;
+    stime_platform_stamp = NOW();
     init_platform_timer();
 
-    do_settime(get_cmos_time(), 0, NOW());
+    init_percpu_time();
 
     return 0;
 }
@@ -1146,9 +1146,12 @@ int __init init_xen_time(void)
 /* Early init function. */
 void __init early_time_init(void)
 {
+    struct cpu_time *t = &this_cpu(cpu_time);
     u64 tmp = init_pit_and_calibrate_tsc();
 
-    set_time_scale(&this_cpu(cpu_time).tsc_scale, tmp);
+    /* So we can use get_s_time() during early boot. */
+    set_time_scale(&t->tsc_scale, tmp);
+    rdtscll(t->local_tsc_stamp);
 
     do_div(tmp, 1000);
     cpu_khz = (unsigned long)tmp;
