@@ -255,17 +255,27 @@ static void  __get_measured_perf(void *perf_percent)
 
 static unsigned int get_measured_perf(unsigned int cpu)
 {
-    unsigned int retval, perf_percent;
+    struct cpufreq_policy *policy;
+    unsigned int perf_percent;
     cpumask_t cpumask;
 
     if (!cpu_online(cpu))
         return 0;
 
-    cpumask = cpumask_of_cpu(cpu);
-    on_selected_cpus(cpumask, __get_measured_perf, (void *)&perf_percent,0,1);
+    policy = cpufreq_cpu_policy[cpu];
+    if (!policy)
+        return 0;
 
-    retval = drv_data[cpu]->max_freq * perf_percent / 100;
-    return retval;
+    /* Usually we take the short path (no IPI) for the sake of performance. */
+    if (cpu == smp_processor_id()) {
+        __get_measured_perf((void *)&perf_percent);
+    } else {
+        cpumask = cpumask_of_cpu(cpu);
+        on_selected_cpus(cpumask, __get_measured_perf, 
+                        (void *)&perf_percent,0,1);
+    }
+
+    return drv_data[cpu]->max_freq * perf_percent / 100;
 }
 
 static unsigned int get_cur_freq_on_cpu(unsigned int cpu)
