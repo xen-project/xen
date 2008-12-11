@@ -254,7 +254,7 @@ static void fail(const char *str)
 {
 	if(cwin != NULL && !isendwin())
 		endwin();
-	fprintf(stderr, str);
+	fprintf(stderr, "%s", str);
 	exit(1);
 }
 
