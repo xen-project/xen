@@ -91,14 +91,14 @@ static inline void vcpu_runstate_change(
 
     trace_runstate_change(v, new_state);
 
-    v->runstate.state = new_state;
-
     delta = new_entry_time - v->runstate.state_entry_time;
     if ( delta > 0 )
     {
         v->runstate.time[v->runstate.state] += delta;
         v->runstate.state_entry_time = new_entry_time;
     }
+
+    v->runstate.state = new_state;
 }
 
 void vcpu_runstate_get(struct vcpu *v, struct vcpu_runstate_info *runstate)
