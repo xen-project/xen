@@ -24,9 +24,7 @@
  */
 
 #include <errno.h>
-#include <curses.h>
-#include <linux/kernel.h>
-
+#include <stdbool.h>
 #include "xc_private.h"
 
 /*
@@ -256,8 +254,8 @@ int xc_get_cpufreq_para(int xc_handle, int cpuid,
                 sys_para->scaling_governor, CPUFREQ_NAME_LEN);
 
         /* copy to user_para no matter what cpufreq governor */
-        BUILD_BUG_ON(sizeof(((struct xc_get_cpufreq_para *)0)->u) !=
-                     sizeof(((struct xen_get_cpufreq_para *)0)->u));
+        XC_BUILD_BUG_ON(sizeof(((struct xc_get_cpufreq_para *)0)->u) !=
+                        sizeof(((struct xen_get_cpufreq_para *)0)->u));
 
         memcpy(&user_para->u, &sys_para->u, sizeof(sys_para->u));
     }
