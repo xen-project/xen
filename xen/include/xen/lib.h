@@ -16,7 +16,7 @@ void __warn(char *file, int line);
 #define WARN_ON(p) do { if (p) WARN(); } while (0)
 
 /* Force a compilation error if condition is true */
-#define BUILD_BUG_ON(condition) ((void)sizeof(char[1 - 2 * !!(condition)]))
+#define BUILD_BUG_ON(condition) ((void)sizeof(struct { int:-!!(condition); }))
 
 #ifndef assert_failed
 #define assert_failed(p)                                        \
