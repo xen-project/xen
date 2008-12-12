@@ -471,10 +471,17 @@ ENTRY(daccess_bit)
 	DBG_FAULT(10)
 	mov r16=cr.isr
 	mov r17=cr.ifa
+	mov r18=cr.ipsr
 	mov r31=pr
 	mov r19=10
+	;;
 	mov r20=0x2800
-	br.sptk.many fast_access_reflect
+	extr.u r18=r18,IA64_PSR_CPL0_BIT,2
+	;;
+	cmp.ne p6,p0=r0,r18 	/* cpl != 0? */
+(p6)	br.sptk.many fast_access_reflect
+	/* __domain_get_bundle() may cause this fault. */
+	br.sptk.few dispatch_to_fault_handler
 	;;
 END(daccess_bit)
 

@@ -412,6 +412,13 @@ ia64_fault(unsigned long vector, unsigned long isr, unsigned long ifa,
 		printk("Dirty-bit.\n");
 		break;
 
+	case 10:
+		/* __domain_get_bundle() may cause fault. */
+		if (ia64_done_with_exception(regs))
+			return;
+		printk("Data Access-bit.\n");
+		break;
+
 	case 20:
 		printk("Page Not Found.\n");
 		break;
