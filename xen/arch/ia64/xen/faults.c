@@ -349,8 +349,9 @@ handle_fpu_swa(int fp_fault, struct pt_regs *regs, unsigned long isr)
 
 	if (ret.status) {
 		PSCBX(current, fpswa_ret) = ret;
-		printk("%s(%s): fp_emulate() returned %ld\n",
-		       __FUNCTION__, fp_fault ? "fault" : "trap", ret.status);
+		gdprintk(XENLOG_ERR, "%s(%s): fp_emulate() returned %ld\n",
+			 __FUNCTION__, fp_fault ? "fault" : "trap",
+			 ret.status);
 	}
 
 	return ret.status;
@@ -695,14 +696,12 @@ ia64_handle_reflection(unsigned long ifa, struct pt_regs *regs,
 			vcpu_increment_iip(v);
 			return;
 		}
-		printk("ia64_handle_reflection: handling FP fault\n");
 		vector = IA64_FP_FAULT_VECTOR;
 		break;
 	case 33:
 		status = handle_fpu_swa(0, regs, isr);
 		if (!status)
 			return;
-		printk("ia64_handle_reflection: handling FP trap\n");
 		vector = IA64_FP_TRAP_VECTOR;
 		break;
 	case 34:
