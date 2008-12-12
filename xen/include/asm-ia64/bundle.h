@@ -33,6 +33,11 @@ typedef union U_INST64_B9 {
     struct { unsigned long qp:6, imm20:20, :1, x6:6, :3, i:1, major:4; };
 } INST64_B9;
 
+typedef union U_INST64_I18 {
+    IA64_INST inst;
+    struct { unsigned long qp:6, imm20:20, y:1, x6:6, x3:3, i:1, major:4; };
+} INST64_I18;
+
 typedef union U_INST64_I19 {
     IA64_INST inst;
     struct { unsigned long qp:6, imm20:20, :1, x6:6, x3:3, i:1, major:4; };
@@ -191,6 +196,7 @@ typedef union U_INST64 {
     INST64_B4 B4;	// used in build_hypercall_bundle only
     INST64_B8 B8;	// rfi, bsw.[01]
     INST64_B9 B9;	// break.b
+    INST64_I18 I18;	// nop.i used in build_fpswa_hypercall_bundle only
     INST64_I19 I19;	// used in build_hypercall_bundle only
     INST64_I26 I26;	// mov register to ar (I unit)
     INST64_I27 I27;	// mov immediate to ar (I unit)

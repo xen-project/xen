@@ -323,6 +323,9 @@ ia64_fault(unsigned long vector, unsigned long isr, unsigned long ifa,
            unsigned long iim, unsigned long itir, unsigned long arg5,
            unsigned long arg6, unsigned long arg7, unsigned long stack);
 
+void
+ia64_lazy_load_fpu(struct vcpu *vcpu);
+
 #endif /* __ASM_DOMAIN_H__ */
 
 /*

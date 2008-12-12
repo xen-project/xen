@@ -142,6 +142,117 @@ build_pal_hypercall_bundles(uint64_t *imva, uint64_t brkimm, uint64_t hypnum)
 	ia64_fc(imva + 3);
 }
 
+/* xen fpswa call stub. 14 bundles */
+extern const unsigned long xen_ia64_fpswa_call_stub[];
+extern const unsigned long xen_ia64_fpswa_call_stub_end[];
+extern const unsigned long xen_ia64_fpswa_call_stub_patch[];
+asm(
+	".align 32\n"
+	".proc xen_ia64_fpswa_call_stub;\n"
+	"xen_ia64_fpswa_call_stub:\n"
+	".prologue\n"
+	"alloc r3 = ar.pfs, 8, 0, 0, 0\n"
+	".body\n"
+	"mov r14 = in0\n"
+	"ld8 r15 = [in1], 8\n"
+	";;\n"
+	"ld8 r16 = [in1]\n"
+	"ld8 r17 = [in2]\n"
+	"ld8 r18 = [in3]\n"
+	"ld8 r19 = [in4]\n"
+	"ld8 r20 = [in5]\n"
+	"ld8 r21 = [in6]\n"
+	"ld8 r22 = [in7], 8\n"
+	";;\n"
+	"ld8 r23 = [in7], 8\n"
+	";;\n"
+	"ld8 r24 = [in7], 8\n"
+	";;\n"
+	"cmp.ne p6, p0 = r24, r0\n"
+	"ld8 r25 = [in7], 8\n"
+	";;\n"
+	"(p6) tpa r24 = r24\n"
+	"cmp.ne p7, p0 = r25, r0\n"
+	"ld8 r26 = [in7], 8\n"
+	";;\n"
+	"(p7)tpa r25 = r25\n"
+	"cmp.ne p8, p0 = r26, r0\n"
+	"ld8 r27 = [in7], 8\n"
+	";;\n"
+	"(p8)tpa r26 = r26\n"
+	"cmp.ne p9, p0 = r27, r0\n"
+	";;\n"
+	"tpa r27 = r27\n"
+	"xen_ia64_fpswa_call_stub_patch:"
+	"{\n"
+	"mov r2 = " FW_HYPERCALL_FPSWA_STR "\n"
+	"break " __IA64_XEN_HYPERCALL_DEFAULT_STR "\n"
+	"nop.i 0\n"
+	"}\n"
+	"st8 [in2] = r17\n"
+	"st8 [in3] = r18\n"
+	"st8 [in4] = r19\n"
+	"st8 [in5] = r20\n"
+	"st8 [in6] = r21\n"
+	"br.ret.sptk.many rp\n"
+	"xen_ia64_fpswa_call_stub_end:"
+	".endp xen_ia64_fpswa_call_stub\n"
+);
+
+static void
+build_fpswa_hypercall_bundle(uint64_t *imva, uint64_t brkimm, uint64_t hypnum)
+{
+	INST64_A5 slot0;
+	INST64_I19 slot1;
+	INST64_I18 slot2;
+	IA64_BUNDLE bundle;
+
+	/* slot0: mov r2 = hypnum (low 20 bits) */
+	slot0.inst = 0;
+	slot0.qp = 0;
+	slot0.r1 = 2;
+	slot0.r3 = 0;
+	slot0.major = 0x9;
+
+	slot0.s = 0;
+	slot0.imm9d = hypnum >> 7;
+	slot0.imm5c = hypnum >> 16;
+	slot0.imm7b = hypnum;
+
+	/* slot1: break brkimm */
+	slot1.inst = 0;
+	slot1.qp = 0;
+	slot1.x6 = 0;
+	slot1.x3 = 0;
+	slot1.major = 0x0;
+	slot1.i = brkimm >> 20;
+	slot1.imm20 = brkimm;
+
+	/* slot2: nop.i */
+	slot2.inst = 0;
+	slot2.qp = 0;
+	slot2.imm20 = 0;
+	slot2.y = 0;
+	slot2.x6 = 1;
+	slot2.x3 = 0;
+	slot2.i = 0;
+	slot2.major = 0;
+
+	/* MII bundle */
+	bundle.i64[0] = 0;
+	bundle.i64[1] = 0;
+	bundle.template = 0x0; /* MII */
+	bundle.slot0 = slot0.inst;
+	bundle.slot1a = slot1.inst;
+	bundle.slot1b = slot1.inst >> 18;
+	bundle.slot2 = slot2.inst;
+	
+	imva[0] = bundle.i64[0];
+	imva[1] = bundle.i64[1];
+	ia64_fc(imva);
+	ia64_fc(imva + 1);
+}
+
 // builds a hypercall bundle at domain physical address
 static void
 dom_fpswa_hypercall_patch(uint64_t brkimm, unsigned long imva)
@@ -149,6 +260,10 @@ dom_fpswa_hypercall_patch(uint64_t brkimm, unsigned long imva)
 	unsigned long *entry_imva, *patch_imva;
 	const unsigned long entry_paddr = FW_HYPERCALL_FPSWA_ENTRY_PADDR;
 	const unsigned long patch_paddr = FW_HYPERCALL_FPSWA_PATCH_PADDR;
+	const size_t stub_size =
+		(char*)xen_ia64_fpswa_call_stub_end -
+		(char*)xen_ia64_fpswa_call_stub;
+	size_t i;
 
 	entry_imva = (unsigned long *)(imva + entry_paddr -
 	                               FW_HYPERCALL_BASE_PADDR);
@@ -159,7 +274,17 @@ dom_fpswa_hypercall_patch(uint64_t brkimm, unsigned long imva)
 	*entry_imva++ = patch_paddr;
 	*entry_imva   = 0;
 
-	build_hypercall_bundle(patch_imva, brkimm, FW_HYPERCALL_FPSWA, 1);
+	/* see dom_fw.h */
+	BUILD_BUG_ON((char*)xen_ia64_fpswa_call_stub_end -
+		     (char*)xen_ia64_fpswa_call_stub > 0xff - 16);
+
+	/* call stub */
+	memcpy(patch_imva, xen_ia64_fpswa_call_stub, stub_size);
+	for (i = 0; i < stub_size; i++)
+		ia64_fc(imva + i);
+	patch_imva +=
+		xen_ia64_fpswa_call_stub_patch - xen_ia64_fpswa_call_stub;
+	build_fpswa_hypercall_bundle(patch_imva, brkimm, FW_HYPERCALL_FPSWA);
 }
 
 // builds a hypercall bundle at domain physical address

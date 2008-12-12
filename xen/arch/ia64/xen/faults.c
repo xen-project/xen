@@ -570,6 +570,17 @@ ia64_handle_privop(unsigned long ifa, struct pt_regs *regs, unsigned long isr,
 }
 
 void
+ia64_lazy_load_fpu(struct vcpu *v)
+{
+	if (PSCB(v, hpsr_dfh)) {
+		PSCB(v, hpsr_dfh) = 0;
+		PSCB(v, hpsr_mfh) = 1;
+		if (__ia64_per_cpu_var(fp_owner) != v)
+			__ia64_load_fpu(v->arch._thread.fph);
+	}
+}
+
+void
 ia64_handle_reflection(unsigned long ifa, struct pt_regs *regs,
                        unsigned long isr, unsigned long iim,
                        unsigned long vector)
@@ -617,12 +628,7 @@ ia64_handle_reflection(unsigned long ifa, struct pt_regs *regs,
 		vector = IA64_GENEX_VECTOR;
 		break;
 	case 25:
-		if (PSCB(v, hpsr_dfh)) {
-			PSCB(v, hpsr_dfh) = 0;
-			PSCB(v, hpsr_mfh) = 1;
-			if (__ia64_per_cpu_var(fp_owner) != v)
-				__ia64_load_fpu(v->arch._thread.fph);
-		}
+		ia64_lazy_load_fpu(v);
 		if (!PSCB(v, vpsr_dfh)) {
 			regs->cr_ipsr &= ~IA64_PSR_DFH;
 			return;

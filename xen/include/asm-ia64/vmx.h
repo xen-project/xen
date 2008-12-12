@@ -45,6 +45,7 @@ extern void vmx_relinquish_vcpu_resources(struct vcpu *v);
 extern void vmx_send_assist_req(struct vcpu *v);
 extern void deliver_pal_init(struct vcpu *vcpu);
 extern void vmx_pend_pal_init(struct domain *d);
+extern void vmx_lazy_load_fpu(struct vcpu *vcpu);
 
 static inline vcpu_iodata_t *get_vio(struct vcpu *v)
 {

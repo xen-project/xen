@@ -118,10 +118,128 @@ fw_hypercall_ipi (struct pt_regs *regs)
 	return;
 }
 
-static fpswa_ret_t
-fw_hypercall_fpswa (struct vcpu *v)
+static int
+fpswa_get_domain_addr(struct vcpu *v, unsigned long gpaddr, size_t size,
+		      void **virt, struct page_info **page, const char *name)
 {
-	return PSCBX(v, fpswa_ret);
+	int cross_page_boundary;
+
+	if (gpaddr == 0) {
+		*virt = 0;
+		return 0;
+	}
+
+	cross_page_boundary = (((gpaddr & ~PAGE_MASK) + size) > PAGE_SIZE);
+	if (unlikely(cross_page_boundary)) {
+		/* this case isn't implemented */
+		gdprintk(XENLOG_ERR,
+			 "%s: fpswa hypercall is called with "
+			 "page crossing argument %s 0x%lx\n",
+			 __func__, name, gpaddr);
+		return -ENOSYS;
+	}
+
+again:
+        *virt = domain_mpa_to_imva(v->domain, gpaddr);
+        *page = virt_to_page(*virt);
+        if (get_page(*page, current->domain) == 0) {
+                if (page_get_owner(*page) != current->domain) {
+			*page = NULL;
+			return -EFAULT;
+		}
+                goto again;
+        }
+
+	return 0;
+}
+
+static fpswa_ret_t
+fw_hypercall_fpswa (struct vcpu *v, struct pt_regs *regs)
+{
+	fpswa_ret_t ret = {-1, 0, 0, 0};
+	unsigned long bundle[2] = { regs->r15, regs->r16};
+	fp_state_t fp_state;
+	struct page_info *lp_page = NULL;
+	struct page_info *lv_page = NULL;
+	struct page_info *hp_page = NULL;
+	struct page_info *hv_page = NULL;
+	XEN_EFI_RR_DECLARE(rr6, rr7);
+
+	if (!fpswa_interface)
+		goto error;
+
+	memset(&fp_state, 0, sizeof(fp_state));
+	fp_state.bitmask_low64 = regs->r22;
+	fp_state.bitmask_high64 = regs->r23;
+
+	/* bit6..bit11 */
+	if ((fp_state.bitmask_low64 & 0xfc0) != 0xfc0) {
+		/* other cases isn't supported yet */
+		gdprintk(XENLOG_ERR, "%s unsupported bitmask_low64 0x%lx\n",
+			 __func__, fp_state.bitmask_low64);
+		goto error;
+	}
+	if (regs->r25 == 0)
+		/* fp_state.fp_state_low_volatile must be supplied */
+		goto error;
+
+	/* eager save/lazy restore fpu: f32...f127 */
+	if ((~fp_state.bitmask_low64 & ((1UL << 31) - 1)) != 0 ||
+	    ~fp_state.bitmask_high64 != 0) {
+		if (VMX_DOMAIN(v))
+			vmx_lazy_load_fpu(v);
+		else
+			ia64_lazy_load_fpu(v);
+	}
+
+	if (fpswa_get_domain_addr(v, regs->r24,
+				  sizeof(fp_state.fp_state_low_preserved), 
+				  (void*)&fp_state.fp_state_low_preserved,
+				  &lp_page, "fp_state_low_preserved") < 0)
+		goto error;
+	if (fpswa_get_domain_addr(v, regs->r25,
+				  sizeof(fp_state.fp_state_low_volatile),
+				  (void*)&fp_state.fp_state_low_volatile,
+				  &lv_page, "fp_state_low_volatile") < 0)
+		goto error;
+	if (fpswa_get_domain_addr(v, regs->r26,
+				  sizeof(fp_state.fp_state_high_preserved),
+				  (void*)&fp_state.fp_state_high_preserved,
+				  &hp_page, "fp_state_low_preserved") < 0)
+		goto error;
+	if (fpswa_get_domain_addr(v, regs->r27,
+				  sizeof(fp_state.fp_state_high_volatile),
+				  (void*)&fp_state.fp_state_high_volatile,
+				  &hv_page, "fp_state_high_volatile") < 0)
+		goto error;
+
+	XEN_EFI_RR_ENTER(rr6, rr7);
+	ret = (*fpswa_interface->fpswa)(regs->r14,
+					bundle,
+					&regs->r17,	/* pipsr */
+					&regs->r18,	/* pfsr */
+					&regs->r19,	/* pisr */
+					&regs->r20,	/* ppreds */
+					&regs->r21,	/* pifs	*/
+					&fp_state);
+	XEN_EFI_RR_LEAVE(rr6, rr7);
+
+error:
+	if (lp_page != NULL)
+		put_page(lp_page);
+	if (lv_page != NULL)
+		put_page(lv_page);
+	if (hp_page != NULL)
+		put_page(hp_page);
+	if (hv_page != NULL)
+		put_page(hv_page);
+	return ret;
+}
+
+static fpswa_ret_t
+fw_hypercall_fpswa_error(void)
+{
+	return (fpswa_ret_t) {-1, 0, 0, 0};
 }
 
 IA64FAULT
@@ -226,8 +344,24 @@ ia64_hypercall(struct pt_regs *regs)
 	case FW_HYPERCALL_SET_SHARED_INFO_VA:
 	        regs->r8 = domain_set_shared_info_va (regs->r28);
 		break;
-	case FW_HYPERCALL_FPSWA:
-		fpswa_ret = fw_hypercall_fpswa (v);
+	case FW_HYPERCALL_FPSWA_BASE:
+		switch (regs->r2) {
+		case FW_HYPERCALL_FPSWA_BROKEN:
+			gdprintk(XENLOG_WARNING,
+				 "Old fpswa hypercall was called (0x%lx).\n"
+				 "Please update your domain builder. ip 0x%lx\n",
+				 FW_HYPERCALL_FPSWA_BROKEN, regs->cr_iip);
+			fpswa_ret = fw_hypercall_fpswa_error();
+			break;
+		case FW_HYPERCALL_FPSWA:
+			fpswa_ret = fw_hypercall_fpswa(v, regs);
+			break;
+		default:
+			gdprintk(XENLOG_ERR, "unknown fpswa hypercall %lx\n",
+				 regs->r2);
+			fpswa_ret = fw_hypercall_fpswa_error();
+			break;
+		}
 		regs->r8  = fpswa_ret.status;
 		regs->r9  = fpswa_ret.err0;
 		regs->r10 = fpswa_ret.err1;

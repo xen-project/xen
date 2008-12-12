@@ -161,14 +161,21 @@
 
 /*
  * This is a hypercall number for FPSWA.
- * FPSWA hypercall uses 2 bundles for a pseudo-entry-point and a hypercall-patch.
+ * FPSWA hypercall uses one bundle for a pseudo-entry-point
+ * and 14 bundles for a hypercall-patch.
+ *
+ * 0x500 was used before. But that implemetation is broken.
+ * To keep hypercall abi, 0x500 is obsoleted and allocate 0x501 for 
+ * fspwa hypercall.
  */
 #define FW_HYPERCALL_FPSWA_ENTRY_INDEX			0x90UL
 #define FW_HYPERCALL_FPSWA_PATCH_INDEX			0x91UL
 #define FW_HYPERCALL_FPSWA_ENTRY_PADDR			FW_HYPERCALL_PADDR(FW_HYPERCALL_FPSWA_ENTRY_INDEX)
 #define FW_HYPERCALL_FPSWA_PATCH_PADDR			FW_HYPERCALL_PADDR(FW_HYPERCALL_FPSWA_PATCH_INDEX)
-#define FW_HYPERCALL_FPSWA				0x500UL
-#define FW_HYPERCALL_FPSWA_STR				"0x500"
+#define FW_HYPERCALL_FPSWA_BASE				0x500UL
+#define FW_HYPERCALL_FPSWA_BROKEN			0x500UL
+#define FW_HYPERCALL_FPSWA				0x501UL
+#define FW_HYPERCALL_FPSWA_STR				"0x501"
 
 /* Set the shared_info base virtual address.  */
 #define FW_HYPERCALL_SET_SHARED_INFO_VA			0x600UL
