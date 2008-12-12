@@ -288,7 +288,6 @@ struct arch_vcpu {
     char irq_new_condition;    // vpsr.i/vtpr change, check for pending VHPI
     char hypercall_continuation;
 
-    fpswa_ret_t fpswa_ret;	/* save return values of FPSWA emulation */
     struct timer hlt_timer;
     struct arch_vmx_struct arch_vmx; /* Virtual Machine Extensions */
 

@@ -122,8 +122,7 @@ void vmx_reflect_interruption(u64 ifa, u64 isr, u64 iim,
         if (!status) {
             vcpu_increment_iip(vcpu);
             return;
-        } else if (IA64_RETRY == status)
-            return;
+        }
         break;
 
     case 33:	// IA64_FP_TRAP_VECTOR
@@ -133,10 +132,6 @@ void vmx_reflect_interruption(u64 ifa, u64 isr, u64 iim,
         status = handle_fpu_swa(0, regs, isr);
         if (!status)
             return;
-        else if (IA64_RETRY == status) {
-            vcpu_decrement_iip(vcpu);
-            return;
-        }
         break;
 
     case 29: // IA64_DEBUG_VECTOR

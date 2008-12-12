@@ -314,7 +314,6 @@ fp_emulate(int fp_fault, void *bundle, unsigned long *ipsr,
 unsigned long
 handle_fpu_swa(int fp_fault, struct pt_regs *regs, unsigned long isr)
 {
-	struct vcpu *v = current;
 	IA64_BUNDLE bundle;
 	unsigned long fault_ip;
 	fpswa_ret_t ret;
@@ -348,7 +347,6 @@ handle_fpu_swa(int fp_fault, struct pt_regs *regs, unsigned long isr)
 	                 &isr, &regs->pr, &regs->cr_ifs, regs);
 
 	if (ret.status) {
-		PSCBX(v, fpswa_ret) = ret;
 		printk("%s(%s): fp_emulate() returned %ld\n",
 		       __FUNCTION__, fp_fault ? "fault" : "trap", ret.status);
 	}
@@ -688,9 +686,6 @@ ia64_handle_reflection(unsigned long ifa, struct pt_regs *regs,
 			vcpu_increment_iip(v);
 			return;
 		}
-		// fetch code fail
-		if (IA64_RETRY == status)
-			return;
 		printk("ia64_handle_reflection: handling FP fault\n");
 		vector = IA64_FP_FAULT_VECTOR;
 		break;
@@ -698,11 +693,6 @@ ia64_handle_reflection(unsigned long ifa, struct pt_regs *regs,
 		status = handle_fpu_swa(0, regs, isr);
 		if (!status)
 			return;
-		// fetch code fail
-		if (IA64_RETRY == status) {
-			vcpu_decrement_iip(v);
-			return;
-		}
 		printk("ia64_handle_reflection: handling FP trap\n");
 		vector = IA64_FP_TRAP_VECTOR;
 		break;
