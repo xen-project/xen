@@ -165,6 +165,13 @@ fw_hypercall_fpswa (struct vcpu *v, struct pt_regs *regs)
 	struct page_info *hv_page = NULL;
 	XEN_EFI_RR_DECLARE(rr6, rr7);
 
+	if (unlikely(PSCBX(v, fpswa_ret).status != 0 && 
+		     PSCBX(v, fpswa_ret).status != IA64_RETRY)) {
+		ret = PSCBX(v, fpswa_ret);
+		PSCBX(v, fpswa_ret) = (fpswa_ret_t){0, 0, 0, 0};
+		return ret;
+	}
+
 	if (!fpswa_interface)
 		goto error;
 

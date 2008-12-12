@@ -337,6 +337,7 @@ handle_fpu_swa(int fp_fault, struct pt_regs *regs, unsigned long isr)
 			rc = IA64_RETRY;
 	}
 	if (rc == IA64_RETRY) {
+		PSCBX(current, fpswa_ret) = (fpswa_ret_t){IA64_RETRY, 0, 0, 0};
 		gdprintk(XENLOG_DEBUG,
 			 "%s(%s): floating-point bundle at 0x%lx not mapped\n",
 			 __FUNCTION__, fp_fault ? "fault" : "trap", fault_ip);
@@ -347,6 +348,7 @@ handle_fpu_swa(int fp_fault, struct pt_regs *regs, unsigned long isr)
 	                 &isr, &regs->pr, &regs->cr_ifs, regs);
 
 	if (ret.status) {
+		PSCBX(current, fpswa_ret) = ret;
 		printk("%s(%s): fp_emulate() returned %ld\n",
 		       __FUNCTION__, fp_fault ? "fault" : "trap", ret.status);
 	}
