@@ -12,8 +12,7 @@ typedef struct {
 
 #define _RAW_SPIN_LOCK_UNLOCKED /*(raw_spinlock_t)*/ { 1 }
 
-#define _raw_spin_is_locked(x)                  \
-    (*(volatile char *)(&(x)->lock) <= 0)
+#define _raw_spin_is_locked(x) ((x)->lock <= 0)
 
 static always_inline void _raw_spin_lock(raw_spinlock_t *lock)
 {
@@ -74,5 +73,7 @@ static always_inline void _raw_write_lock(raw_rwlock_t *rw)
     asm volatile (                                      \
         "lock ; addl $" RW_LOCK_BIAS_STR ",%0" :        \
         "=m" ((rw)->lock) : : "memory" )
+
+#define _raw_rw_is_locked(x) ((x)->lock < RW_LOCK_BIAS)
 
 #endif /* __ASM_SPINLOCK_H */

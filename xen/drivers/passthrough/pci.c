@@ -62,7 +62,7 @@ struct pci_dev *pci_get_pdev(int bus, int devfn)
 {
     struct pci_dev *pdev = NULL;
 
-    ASSERT(spin_is_locked(&pcidevs_lock));
+    ASSERT(rw_is_locked(&pcidevs_lock));
 
     list_for_each_entry ( pdev, &alldevs_list, alldevs_list )
         if ( (pdev->bus == bus || bus == -1) &&
@@ -78,7 +78,7 @@ struct pci_dev *pci_get_pdev_by_domain(struct domain *d, int bus, int devfn)
 {
     struct pci_dev *pdev = NULL;
 
-    ASSERT(spin_is_locked(&pcidevs_lock));
+    ASSERT(rw_is_locked(&pcidevs_lock));
 
     list_for_each_entry ( pdev, &alldevs_list, alldevs_list )
          if ( (pdev->bus == bus || bus == -1) &&

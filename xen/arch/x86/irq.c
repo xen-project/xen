@@ -850,7 +850,7 @@ int map_domain_pirq(
     struct msi_desc *msi_desc;
     struct pci_dev *pdev = NULL;
 
-    ASSERT(spin_is_locked(&pcidevs_lock));
+    ASSERT(rw_is_locked(&pcidevs_lock));
     ASSERT(spin_is_locked(&d->event_lock));
 
     if ( !IS_PRIV(current->domain) )
@@ -930,7 +930,7 @@ int unmap_domain_pirq(struct domain *d, int pirq)
     if ( !IS_PRIV(current->domain) )
         return -EINVAL;
 
-    ASSERT(spin_is_locked(&pcidevs_lock));
+    ASSERT(rw_is_locked(&pcidevs_lock));
     ASSERT(spin_is_locked(&d->event_lock));
 
     vector = d->arch.pirq_vector[pirq];

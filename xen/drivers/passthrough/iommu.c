@@ -87,7 +87,7 @@ int iommu_add_device(struct pci_dev *pdev)
     if ( !pdev->domain )
         return -EINVAL;
 
-    ASSERT(spin_is_locked(&pcidevs_lock));
+    ASSERT(rw_is_locked(&pcidevs_lock));
 
     hd = domain_hvm_iommu(pdev->domain);
     if ( !iommu_enabled || !hd->platform_ops )
