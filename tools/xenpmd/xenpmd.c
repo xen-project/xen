@@ -297,7 +297,6 @@ int get_next_battery_info_or_status(DIR *battery_dir,
     if  ( !info_or_status )
         return 0;
 
-    memset(line_info, 0, 256);
     if (type == BIF) 
         memset(info_or_status, 0, sizeof(struct battery_info));
     else 
@@ -307,11 +306,8 @@ int get_next_battery_info_or_status(DIR *battery_dir,
     if ( !file )
         return 0;
 
-    while ( fgets(line_info, 1024, file) != NULL ) 
-    {
+    while ( fgets(line_info, sizeof(line_info), file) != NULL ) 
         parse_battery_info_or_status(line_info, type, info_or_status);
-        memset(line_info, 0, 256);
-    }
 
     fclose(file);
     return 1;
