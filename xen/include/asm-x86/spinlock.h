@@ -4,7 +4,6 @@
 #include <xen/config.h>
 #include <xen/lib.h>
 #include <asm/atomic.h>
-#include <asm/rwlock.h>
 
 typedef struct {
     volatile s16 lock;
@@ -49,30 +48,50 @@ typedef struct {
     volatile unsigned int lock;
 } raw_rwlock_t;
 
+#define RW_LOCK_BIAS		 0x01000000
 #define _RAW_RW_LOCK_UNLOCKED /*(raw_rwlock_t)*/ { RW_LOCK_BIAS }
 
-/*
- * On x86, we implement read-write locks as a 32-bit counter
- * with the high bit (sign) being the "contended" bit.
- */
 static always_inline void _raw_read_lock(raw_rwlock_t *rw)
 {
-    __build_read_lock(rw, "__read_lock_failed");
+    asm volatile (
+        "1:  lock; decl %0         \n"
+        "    jns 3f                \n"
+        "    lock; incl %0         \n"
+        "2:  rep; nop              \n"
+        "    cmpl $1,%0            \n"
+        "    js 2b                 \n"
+        "    jmp 1b                \n"
+        "3:"
+        : "=m" (rw->lock) : : "memory" );
 }
 
 static always_inline void _raw_write_lock(raw_rwlock_t *rw)
 {
-    __build_write_lock(rw, "__write_lock_failed");
+    asm volatile (
+        "1:  lock; subl %1,%0      \n"
+        "    jz 3f                 \n"
+        "    lock; addl %1,%0      \n"
+        "2:  rep; nop              \n"
+        "    cmpl %1,%0            \n"
+        "    jne 2b                \n"
+        "    jmp 1b                \n"
+        "3:"
+        : "=m" (rw->lock) : "i" (RW_LOCK_BIAS) : "memory" );
 }
 
-#define _raw_read_unlock(rw)                    \
-    asm volatile (                              \
-        "lock ; incl %0" :                      \
-        "=m" ((rw)->lock) : : "memory" )
-#define _raw_write_unlock(rw)                           \
-    asm volatile (                                      \
-        "lock ; addl $" RW_LOCK_BIAS_STR ",%0" :        \
-        "=m" ((rw)->lock) : : "memory" )
+static always_inline void _raw_read_unlock(raw_rwlock_t *rw)
+{
+    asm volatile (
+        "lock ; incl %0"
+        : "=m" ((rw)->lock) : : "memory" );
+}
+
+static always_inline void _raw_write_unlock(raw_rwlock_t *rw)
+{
+    asm volatile (
+        "lock ; addl %1,%0"
+        : "=m" ((rw)->lock) : "i" (RW_LOCK_BIAS) : "memory" );
+}
 
 #define _raw_rw_is_locked(x) ((x)->lock < RW_LOCK_BIAS)
 

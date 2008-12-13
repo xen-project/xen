@@ -37,7 +37,6 @@ obj-y += nmi.o
 obj-y += numa.o
 obj-y += pci.o
 obj-y += physdev.o
-obj-y += rwlock.o
 obj-y += setup.o
 obj-y += shutdown.o
 obj-y += smp.o
