@@ -218,6 +218,10 @@ static void __devinit init_intel(struct cpuinfo_x86 *c)
 	if ((c->x86 == 0xf && c->x86_model >= 0x03) ||
 		(c->x86 == 0x6 && c->x86_model >= 0x0e))
 		set_bit(X86_FEATURE_CONSTANT_TSC, c->x86_capability);
+	if (cpuid_edx(0x80000007) & (1u<<8)) {
+		set_bit(X86_FEATURE_CONSTANT_TSC, c->x86_capability);
+		set_bit(X86_FEATURE_NOSTOP_TSC, c->x86_capability);
+	}
 
 	start_vmx();
 }
