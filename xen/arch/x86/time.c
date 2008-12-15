@@ -659,6 +659,7 @@ static void init_platform_timer(void)
     plt_overflow(NULL);
 
     platform_timer_stamp = plt_stamp64;
+    stime_platform_stamp = NOW();
 
     printk("Platform timer is %s %s\n",
            freq_string(pts->frequency), pts->name);
@@ -1109,7 +1110,7 @@ void init_percpu_time(void)
 
     local_irq_save(flags);
     rdtscll(t->local_tsc_stamp);
-    now = !plt_src.read_counter ? 0 : read_platform_stime();
+    now = read_platform_stime();
     local_irq_restore(flags);
 
     t->stime_master_stamp = now;
@@ -1137,7 +1138,6 @@ int __init init_xen_time(void)
     /* NB. get_cmos_time() can take over one second to execute. */
     do_settime(get_cmos_time(), 0, NOW());
 
-    stime_platform_stamp = NOW();
     init_platform_timer();
 
     init_percpu_time();
