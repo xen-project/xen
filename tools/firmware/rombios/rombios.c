@@ -181,7 +181,14 @@
   // EBDA is used for PS/2 mouse support, and IDE BIOS, etc.
 #define EBDA_SEG           0x9FC0
 #define EBDA_SIZE          1              // In KiB
+#define EBDA_SEG_PTR       0x40E /* Find true EBDA segment at 0:40E */
 #define BASE_MEM_IN_K   (640 - EBDA_SIZE)
+
+/* 256 bytes at 0x9ff00 -- 0x9ffff is used for the IPL boot table. */
+#define IPL_TABLE_OFFSET     0x0300  /* offset from EBDA */
+#define IPL_TABLE_ENTRIES    8
+#define IPL_COUNT_OFFSET     0x0380  /* u16: number of valid table entries */
+#define IPL_SEQUENCE_OFFSET  0x0382  /* u16: next boot device */
 
   // Define the application NAME
 #ifdef HVMASSIST
@@ -1963,13 +1970,6 @@ print_bios_banner()
 // http://www.phoenix.com/en/Customer+Services/White+Papers-Specs/pc+industry+specifications.htm
 //--------------------------------------------------------------------------
 
-/* 256 bytes at 0x9ff00 -- 0x9ffff is used for the IPL boot table. */
-#define IPL_SEG              0x9ff0
-#define IPL_TABLE_OFFSET     0x0000
-#define IPL_TABLE_ENTRIES    8
-#define IPL_COUNT_OFFSET     0x0080  /* u16: number of valid table entries */
-#define IPL_SEQUENCE_OFFSET  0x0082  /* u16: next boot device */
-
 struct ipl_entry {
   Bit16u type;
   Bit16u flags;
@@ -1986,29 +1986,29 @@ init_boot_vectors()
   Bit16u ss = get_SS();
 
   /* Clear out the IPL table. */
-  memsetb(IPL_SEG, IPL_TABLE_OFFSET, 0, 0xff);
+  memsetb(EBDA_SEG, IPL_TABLE_OFFSET, 0, 0xff);
 
   /* Floppy drive */
   e.type = 1; e.flags = 0; e.vector = 0; e.description = 0; e.reserved = 0;
-  memcpyb(IPL_SEG, IPL_TABLE_OFFSET + count * sizeof (e), ss, &e, sizeof (e));
+  memcpyb(EBDA_SEG, IPL_TABLE_OFFSET + count * sizeof (e), ss, &e, sizeof (e));
   count++;
 
   /* First HDD */
   e.type = 2; e.flags = 0; e.vector = 0; e.description = 0; e.reserved = 0;
-  memcpyb(IPL_SEG, IPL_TABLE_OFFSET + count * sizeof (e), ss, &e, sizeof (e));
+  memcpyb(EBDA_SEG, IPL_TABLE_OFFSET + count * sizeof (e), ss, &e, sizeof (e));
   count++;
 
 #if BX_ELTORITO_BOOT
   /* CDROM */
   e.type = 3; e.flags = 0; e.vector = 0; e.description = 0; e.reserved = 0;
-  memcpyb(IPL_SEG, IPL_TABLE_OFFSET + count * sizeof (e), ss, &e, sizeof (e));
+  memcpyb(EBDA_SEG, IPL_TABLE_OFFSET + count * sizeof (e), ss, &e, sizeof (e));
   count++;
 #endif  
 
   /* Remember how many devices we have */
-  write_word(IPL_SEG, IPL_COUNT_OFFSET, count);
+  write_word(EBDA_SEG, IPL_COUNT_OFFSET, count);
   /* Not tried booting anything yet */
-  write_word(IPL_SEG, IPL_SEQUENCE_OFFSET, 0xffff);
+  write_word(EBDA_SEG, IPL_SEQUENCE_OFFSET, 0xffff);
 }
 
 static Bit8u
@@ -2017,11 +2017,12 @@ Bit16u i; struct ipl_entry *e;
 {
   Bit16u count;
   Bit16u ss = get_SS();
+  Bit16u ebda_seg = read_word(0x0040, 0x000E);
   /* Get the count of boot devices, and refuse to overrun the array */
-  count = read_word(IPL_SEG, IPL_COUNT_OFFSET);
+  count = read_word(ebda_seg, IPL_COUNT_OFFSET);
   if (i >= count) return 0;
   /* OK to read this device */
-  memcpyb(ss, e, IPL_SEG, IPL_TABLE_OFFSET + i * sizeof (*e), sizeof (*e));
+  memcpyb(ss, e, ebda_seg, IPL_TABLE_OFFSET + i * sizeof (*e), sizeof (*e));
   return 1;
 }
 
@@ -2187,9 +2188,10 @@ int bootmenu(selected)
 {
     Bit8u scode;
     int max;
+    Bit16u ebda_seg = read_word(0x0040, 0x000E);
 
     /* get the number of boot devices */
-    max = read_word(IPL_SEG, IPL_COUNT_OFFSET);
+    max = read_word(ebda_seg, IPL_COUNT_OFFSET);
 
     for(;;) {
         if (selected > max || selected < 1) selected = 1;
@@ -2349,7 +2351,9 @@ s3_resume()
 ASM_START
     push ds
     push ax
-    mov ax, #EBDA_SEG
+    xor ax, ax
+    mov ds, ax
+    mov ax, word ptr [EBDA_SEG_PTR]
     mov ds, ax
     mov al, [EBDA_CMOS_SHUTDOWN_STATUS_OFFSET]
     mov .s3_resume.cmos_shutdown_status[bp], al
@@ -8543,7 +8547,8 @@ int18_handler: ;; Boot Failure recovery: try the next device.
   ;; Get the boot sequence number out of the IPL memory
   ;; The first time we do this it will have been set to -1 so 
   ;; we will start from device 0.
-  mov  bx, #IPL_SEG 
+  mov  ds, ax
+  mov  bx, word ptr [EBDA_SEG_PTR]
   mov  ds, bx                     ;; Set segment
   mov  bx, IPL_SEQUENCE_OFFSET    ;; BX is now the sequence number
   inc  bx                         ;; ++
@@ -8686,8 +8691,8 @@ hard_drive_post:
   SET_INT_VECTOR(0x76, #0xF000, #int76_handler)
   ;; INT 41h: hard disk 0 configuration pointer
   ;; INT 46h: hard disk 1 configuration pointer
-  SET_INT_VECTOR(0x41, #EBDA_SEG, #0x003D)
-  SET_INT_VECTOR(0x46, #EBDA_SEG, #0x004D)
+  SET_INT_VECTOR(0x41, word ptr [EBDA_SEG_PTR], #0x003D)
+  SET_INT_VECTOR(0x46, word ptr [EBDA_SEG_PTR], #0x004D)
 
   ;; move disk geometry data from CMOS to EBDA disk parameter table(s)
   mov  al, #0x12
@@ -8716,7 +8721,9 @@ post_d0_type47:
   ;; 22    landing zone high        D
   ;; 23    sectors/track            E
 
-  mov  ax, #EBDA_SEG
+  xor  ax, ax
+  mov  ds, ax
+  mov  ax, word ptr [EBDA_SEG_PTR]
   mov  ds, ax
 
   ;;; Filling EBDA table for hard disk 0.
@@ -8985,7 +8992,7 @@ ebda_post:
 #endif
   xor ax, ax            ; mov EBDA seg into 40E
   mov ds, ax
-  mov word ptr [0x40E], #EBDA_SEG
+  mov word ptr [EBDA_SEG_PTR], #EBDA_SEG
   ret;;
 
 ;--------------------
@@ -9754,15 +9761,17 @@ no_bcv:
   je   no_bev
 
   ;; Found a device that thinks it can boot the system.  Record its BEV.
-  mov  bx, #IPL_SEG            ;; Go to the segment where the IPL table lives 
+  xor  bx, bx
   mov  ds, bx
+  mov  bx, word ptr [EBDA_SEG_PTR]
+  mov  ds, bx                  ;; Go to the segment where the IPL table lives 
   mov  bx, IPL_COUNT_OFFSET    ;; Read the number of entries so far
   cmp  bx, #IPL_TABLE_ENTRIES
   je   no_bev                  ;; Get out if the table is full
   shl  bx, #0x4                ;; Turn count into offset (entries are 16 bytes)
-  mov  0[bx], #0x80            ;; This entry is a BEV device
-  mov  6[bx], cx               ;; Build a far pointer from the segment...
-  mov  4[bx], ax               ;; and the offset
+  mov  IPL_TABLE_OFFSET+0[bx], #0x80 ;; This entry is a BEV device
+  mov  IPL_TABLE_OFFSET+6[bx], cx    ;; Build a far pointer from the segment...
+  mov  IPL_TABLE_OFFSET+4[bx], ax    ;; and the offset
   shr  bx, #0x4                ;; Turn the offset back into a count
   inc  bx                      ;; We have one more entry now
   mov  IPL_COUNT_OFFSET, bx    ;; Remember that.
