@@ -69,9 +69,6 @@ static DEFINE_PER_CPU(struct cpu_time, cpu_time);
 #define EPOCH MILLISECS(1000)
 static struct timer calibration_timer;
 
-/* TSC is invariant on C state entry? */
-static bool_t tsc_invariant;
-
 /*
  * We simulate a 32-bit platform timer from the 16-bit PIT ch2 counter.
  * Otherwise overflow happens too quickly (~50ms) for us to guarantee that
@@ -672,7 +669,7 @@ void cstate_restore_tsc(void)
     s_time_t stime_delta;
     u64 tsc_delta;
 
-    if ( tsc_invariant )
+    if ( boot_cpu_has(X86_FEATURE_NOSTOP_TSC) )
         return;
 
     stime_delta = read_platform_stime() - t->stime_master_stamp;
@@ -941,6 +938,18 @@ static void local_time_calibration(void)
     /* The overall calibration scale multiplier. */
     u32 calibration_mul_frac;
 
+    if ( boot_cpu_has(X86_FEATURE_CONSTANT_TSC) )
+    {
+        /* Atomically read cpu_calibration struct and write cpu_time struct. */
+        local_irq_disable();
+        t->local_tsc_stamp    = c->local_tsc_stamp;
+        t->stime_local_stamp  = c->stime_master_stamp;
+        t->stime_master_stamp = c->stime_master_stamp;
+        local_irq_enable();
+        update_vcpu_system_time(current);
+        goto out;
+    }
+
     prev_tsc          = t->local_tsc_stamp;
     prev_local_stime  = t->stime_local_stamp;
     prev_master_stime = t->stime_master_stamp;
@@ -1059,6 +1068,7 @@ struct calibration_rendezvous {
     cpumask_t cpu_calibration_map;
     atomic_t nr_cpus;
     s_time_t master_stime;
+    u64 master_tsc_stamp;
 };
 
 static void time_calibration_rendezvous(void *_r)
@@ -1072,18 +1082,22 @@ static void time_calibration_rendezvous(void *_r)
         while ( atomic_read(&r->nr_cpus) != (total_cpus - 1) )
             cpu_relax();
         r->master_stime = read_platform_stime();
-        mb(); /* write r->master_stime /then/ signal */
+        rdtscll(r->master_tsc_stamp);
+        mb(); /* write r->master_* /then/ signal */
         atomic_inc(&r->nr_cpus);
+        c->local_tsc_stamp = r->master_tsc_stamp;
     }
     else
     {
         atomic_inc(&r->nr_cpus);
         while ( atomic_read(&r->nr_cpus) != total_cpus )
             cpu_relax();
-        mb(); /* receive signal /then/ read r->master_stime */
+        mb(); /* receive signal /then/ read r->master_* */
+        if ( boot_cpu_has(X86_FEATURE_CONSTANT_TSC) )
+            wrmsrl(MSR_IA32_TSC, r->master_tsc_stamp);
+        rdtscll(c->local_tsc_stamp);
     }
 
-    rdtscll(c->local_tsc_stamp);
     c->stime_local_stamp = get_s_time();
     c->stime_master_stamp = r->master_stime;
 
@@ -1126,9 +1140,13 @@ void init_percpu_time(void)
 /* Late init function (after all CPUs are booted). */
 int __init init_xen_time(void)
 {
-    /* Is TSC invariant during deep C state? */
-    if ( cpuid_edx(0x80000007) & (1u<<8) )
-        tsc_invariant = 1;
+    /* If we have constant TSCs then scale factor can be shared. */
+    if ( boot_cpu_has(X86_FEATURE_CONSTANT_TSC) )
+    {
+        int cpu;
+        for_each_cpu ( cpu )
+            per_cpu(cpu_time, cpu).tsc_scale = per_cpu(cpu_time, 0).tsc_scale;
+    }
 
     open_softirq(TIME_CALIBRATE_SOFTIRQ, local_time_calibration);
 
