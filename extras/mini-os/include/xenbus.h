@@ -91,6 +91,9 @@ char* xenbus_printf(xenbus_transaction_t xbt,
                                   const char* fmt, ...)
                    __attribute__((__format__(printf, 4, 5)));
 
+/* Utility function to figure out our domain id */
+domid_t xenbus_get_self_id(void);
+
 /* Reset the XenBus system. */
 void fini_xenbus(void);
 

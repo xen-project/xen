@@ -869,18 +869,6 @@ moretodo:
     in_irq = 0;
 }
 
-/* Small utility function to figure out our domain id */
-static domid_t get_self_id(void)
-{
-    char *dom_id;
-    domid_t ret; 
-
-    BUG_ON(xenbus_read(XBT_NIL, "domid", &dom_id));
-    sscanf(dom_id, "%d", &ret);
-
-    return ret;
-}
-
 static void alloc_request_table(struct fs_import *import)
 {
     struct fs_request *requests;
@@ -1066,7 +1054,7 @@ static int init_fs_import(struct fs_import *import)
     unmask_evtchn(import->local_port);
 
     
-    self_id = get_self_id(); 
+    self_id = xenbus_get_self_id(); 
     /* Write the frontend info to a node in our Xenbus */
     sprintf(nodename, "/local/domain/%d/device/vfs/%d", 
                         self_id, import->import_id);
