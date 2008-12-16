@@ -117,6 +117,14 @@ asmlinkage void vmx_intr_assist(void)
     unsigned int tpr_threshold = 0;
     enum hvm_intblk intblk;
 
+    /* Block event injection when single step with MTF. */
+    if ( unlikely(v->arch.hvm_vcpu.single_step) )
+    {
+        v->arch.hvm_vmx.exec_control |= CPU_BASED_MONITOR_TRAP_FLAG;
+        __vmwrite(CPU_BASED_VM_EXEC_CONTROL, v->arch.hvm_vmx.exec_control);
+        return;
+    }
+
     /* Crank the handle on interrupt state. */
     pt_update_irq(v);
     hvm_dirq_assist(v);

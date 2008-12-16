@@ -321,4 +321,6 @@ static inline void hvm_set_info_guest(struct vcpu *v)
         return hvm_funcs.set_info_guest(v);
 }
 
+int hvm_debug_op(struct vcpu *v, int32_t op);
+
 #endif /* __ASM_X86_HVM_HVM_H__ */

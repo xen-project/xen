@@ -59,6 +59,7 @@ struct hvm_vcpu {
 
     bool_t              flag_dr_dirty;
     bool_t              debug_state_latch;
+    bool_t              single_step;
 
     union {
         struct arch_vmx_struct vmx;

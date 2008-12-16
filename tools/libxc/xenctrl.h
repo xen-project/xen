@@ -1111,6 +1111,12 @@ int xc_domain_set_target(int xc_handle,
                          uint32_t domid,
                          uint32_t target);
 
+/* Control the domain for debug */
+int xc_domain_debug_control(int xc_handle,
+                            uint32_t domid,
+                            uint32_t sop,
+                            uint32_t vcpu);
+
 #if defined(__i386__) || defined(__x86_64__)
 int xc_cpuid_check(int xc,
                    const unsigned int *input,

@@ -99,6 +99,7 @@ static void vmx_init_vmcs_config(void)
            (opt_softtsc ? CPU_BASED_RDTSC_EXITING : 0));
     opt = (CPU_BASED_ACTIVATE_MSR_BITMAP |
            CPU_BASED_TPR_SHADOW |
+           CPU_BASED_MONITOR_TRAP_FLAG |
            CPU_BASED_ACTIVATE_SECONDARY_CONTROLS);
     _vmx_cpu_based_exec_control = adjust_vmx_controls(
         min, opt, MSR_IA32_VMX_PROCBASED_CTLS);
@@ -515,6 +516,9 @@ static int construct_vmcs(struct vcpu *v)
         v->arch.hvm_vmx.secondary_exec_control &= ~SECONDARY_EXEC_ENABLE_EPT;
     }
 
+    /* Do not enable Monitor Trap Flag unless start single step debug */
+    v->arch.hvm_vmx.exec_control &= ~CPU_BASED_MONITOR_TRAP_FLAG;
+
     __vmwrite(CPU_BASED_VM_EXEC_CONTROL, v->arch.hvm_vmx.exec_control);
     if ( cpu_has_vmx_secondary_exec_control )
         __vmwrite(SECONDARY_VM_EXEC_CONTROL,
@@ -867,7 +871,11 @@ void vmx_do_resume(struct vcpu *v)
     if ( unlikely(v->arch.hvm_vcpu.debug_state_latch != debug_state) )
     {
         unsigned long intercepts = __vmread(EXCEPTION_BITMAP);
-        unsigned long mask = (1U << TRAP_debug) | (1U << TRAP_int3);
+        unsigned long mask = 1u << TRAP_int3;
+
+        if ( !cpu_has_monitor_trap_flag )
+            mask |= 1u << TRAP_debug;
+
         v->arch.hvm_vcpu.debug_state_latch = debug_state;
         if ( debug_state )
             intercepts |= mask;

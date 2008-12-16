@@ -1022,6 +1022,32 @@ long arch_do_domctl(
     }
     break;
 
+    case XEN_DOMCTL_debug_op:
+    {
+        struct domain *d;
+        struct vcpu *v;
+
+        ret = -ESRCH;
+        d = rcu_lock_domain_by_id(domctl->domain);
+        if ( d == NULL )
+            break;
+
+        ret = -EINVAL;
+        if ( (domctl->u.debug_op.vcpu >= MAX_VIRT_CPUS) ||
+             ((v = d->vcpu[domctl->u.debug_op.vcpu]) == NULL) )
+            goto debug_op_out;
+
+        ret = -EINVAL;
+        if ( !is_hvm_domain(d))
+            goto debug_op_out;
+
+        ret = hvm_debug_op(v, domctl->u.debug_op.op);
+
+    debug_op_out:
+        rcu_unlock_domain(d);
+    }
+    break;
+
     default:
         ret = -ENOSYS;
         break;

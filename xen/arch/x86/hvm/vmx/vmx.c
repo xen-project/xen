@@ -1263,6 +1263,8 @@ void vmx_inject_hw_exception(int trap, int error_code)
             __restore_debug_registers(curr);
             write_debugreg(6, read_debugreg(6) | 0x4000);
         }
+        if ( cpu_has_monitor_trap_flag )
+            break;
     case TRAP_int3:
         if ( curr->domain->debugger_attached )
         {
@@ -2348,7 +2350,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
              */
             exit_qualification = __vmread(EXIT_QUALIFICATION);
             write_debugreg(6, exit_qualification | 0xffff0ff0);
-            if ( !v->domain->debugger_attached )
+            if ( !v->domain->debugger_attached || cpu_has_monitor_trap_flag )
                 goto exit_and_crash;
             domain_pause_for_debugger();
             break;
@@ -2535,6 +2537,15 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
 #endif
         exit_qualification = __vmread(EXIT_QUALIFICATION);
         ept_handle_violation(exit_qualification, gpa);
+        break;
+    }
+
+    case EXIT_REASON_MONITOR_TRAP_FLAG:
+    {
+        v->arch.hvm_vmx.exec_control &= ~CPU_BASED_MONITOR_TRAP_FLAG;
+        __vmwrite(CPU_BASED_VM_EXEC_CONTROL, v->arch.hvm_vmx.exec_control);
+        if ( v->domain->debugger_attached && v->arch.hvm_vcpu.single_step )
+            domain_pause_for_debugger();
         break;
     }
 

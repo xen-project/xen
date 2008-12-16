@@ -142,6 +142,7 @@ void vmx_vmcs_exit(struct vcpu *v);
 #define CPU_BASED_MOV_DR_EXITING              0x00800000
 #define CPU_BASED_UNCOND_IO_EXITING           0x01000000
 #define CPU_BASED_ACTIVATE_IO_BITMAP          0x02000000
+#define CPU_BASED_MONITOR_TRAP_FLAG           0x08000000
 #define CPU_BASED_ACTIVATE_MSR_BITMAP         0x10000000
 #define CPU_BASED_MONITOR_EXITING             0x20000000
 #define CPU_BASED_PAUSE_EXITING               0x40000000
@@ -186,6 +187,8 @@ extern bool_t cpu_has_vmx_ins_outs_instr_info;
     (vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_EPT)
 #define cpu_has_vmx_vpid \
     (vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_VPID)
+#define cpu_has_monitor_trap_flag \
+    (vmx_cpu_based_exec_control & CPU_BASED_MONITOR_TRAP_FLAG)
 
 /* GUEST_INTERRUPTIBILITY_INFO flags. */
 #define VMX_INTR_SHADOW_STI             0x00000001

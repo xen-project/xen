@@ -524,10 +524,20 @@ xc_ptrace(
         /*  XXX we can still have problems if the user switches threads
          *  during single-stepping - but that just seems retarded
          */
-        ctxt[cpu].c.user_regs.eflags |= PSL_T;
-        if ((retval = xc_vcpu_setcontext(xc_handle, current_domid, cpu,
-                                &ctxt[cpu])))
-            goto out_error_domctl;
+        /* Try to enalbe Monitor Trap Flag for HVM, and fall back to TF
+         * if no MTF support
+         */
+        if ( !current_is_hvm ||
+             xc_domain_debug_control(xc_handle,
+                                     current_domid,
+                                     XEN_DOMCTL_DEBUG_OP_SINGLE_STEP_ON,
+                                     cpu) )
+        {
+            ctxt[cpu].c.user_regs.eflags |= PSL_T;
+            if ((retval = xc_vcpu_setcontext(xc_handle, current_domid, cpu,
+                                    &ctxt[cpu])))
+                goto out_error_domctl;
+        }
         /* FALLTHROUGH */
 
     case PTRACE_CONT:
@@ -538,15 +548,22 @@ xc_ptrace(
         {
             FOREACH_CPU(cpumap, index) {
                 cpu = index - 1;
-                if (fetch_regs(xc_handle, cpu, NULL))
-                    goto out_error;
-                /* Clear trace flag */
-                if ( ctxt[cpu].c.user_regs.eflags & PSL_T )
+                if ( !current_is_hvm ||
+                      xc_domain_debug_control(xc_handle,
+                                              current_domid,
+                                              XEN_DOMCTL_DEBUG_OP_SINGLE_STEP_OFF,
+                                              cpu) )
                 {
-                    ctxt[cpu].c.user_regs.eflags &= ~PSL_T;
-                    if ((retval = xc_vcpu_setcontext(xc_handle, current_domid,
-                                                cpu, &ctxt[cpu])))
-                        goto out_error_domctl;
+                    if (fetch_regs(xc_handle, cpu, NULL))
+                        goto out_error;
+                    /* Clear trace flag */
+                    if ( ctxt[cpu].c.user_regs.eflags & PSL_T )
+                    {
+                        ctxt[cpu].c.user_regs.eflags &= ~PSL_T;
+                        if ((retval = xc_vcpu_setcontext(xc_handle, current_domid,
+                                        cpu, &ctxt[cpu])))
+                            goto out_error_domctl;
+                    }
                 }
             }
         }
