@@ -306,9 +306,6 @@ static void vmx_restore_host_msrs(void)
         wrmsrl(msr_index[i], host_msr_state->msrs[i]);
         clear_bit(i, &host_msr_state->flags);
     }
-
-    if ( cpu_has_nx && !(read_efer() & EFER_NX) )
-        write_efer(read_efer() | EFER_NX);
 }
 
 static void vmx_save_guest_msrs(struct vcpu *v)
@@ -342,39 +339,23 @@ static void vmx_restore_guest_msrs(struct vcpu *v)
         clear_bit(i, &guest_flags);
     }
 
-    if ( (v->arch.hvm_vcpu.guest_efer ^ read_efer()) & (EFER_NX | EFER_SCE) )
+    if ( (v->arch.hvm_vcpu.guest_efer ^ read_efer()) & EFER_SCE )
     {
         HVM_DBG_LOG(DBG_LEVEL_2,
                     "restore guest's EFER with value %lx",
                     v->arch.hvm_vcpu.guest_efer);
-        write_efer((read_efer() & ~(EFER_NX | EFER_SCE)) |
-                   (v->arch.hvm_vcpu.guest_efer & (EFER_NX | EFER_SCE)));
+        write_efer((read_efer() & ~EFER_SCE) |
+                   (v->arch.hvm_vcpu.guest_efer & EFER_SCE));
     }
 }
 
 #else  /* __i386__ */
 
 #define vmx_save_host_msrs()        ((void)0)
-
-static void vmx_restore_host_msrs(void)
-{
-    if ( cpu_has_nx && !(read_efer() & EFER_NX) )
-        write_efer(read_efer() | EFER_NX);
-}
+#define vmx_restore_host_msrs()     ((void)0)
 
 #define vmx_save_guest_msrs(v)      ((void)0)
-
-static void vmx_restore_guest_msrs(struct vcpu *v)
-{
-    if ( (v->arch.hvm_vcpu.guest_efer ^ read_efer()) & EFER_NX )
-    {
-        HVM_DBG_LOG(DBG_LEVEL_2,
-                    "restore guest's EFER with value %lx",
-                    v->arch.hvm_vcpu.guest_efer);
-        write_efer((read_efer() & ~EFER_NX) |
-                   (v->arch.hvm_vcpu.guest_efer & EFER_NX));
-    }
-}
+#define vmx_restore_guest_msrs(v)   ((void)0)
 
 static enum handler_return long_mode_do_msr_read(struct cpu_user_regs *regs)
 {
@@ -1190,8 +1171,8 @@ static void vmx_update_guest_efer(struct vcpu *v)
 #endif
 
     if ( v == current )
-        write_efer((read_efer() & ~(EFER_NX|EFER_SCE)) |
-                   (v->arch.hvm_vcpu.guest_efer & (EFER_NX|EFER_SCE)));
+        write_efer((read_efer() & ~EFER_SCE) |
+                   (v->arch.hvm_vcpu.guest_efer & EFER_SCE));
 }
 
 static void vmx_flush_guest_tlbs(void)
