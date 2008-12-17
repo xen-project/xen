@@ -1160,15 +1160,17 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
     if ( in_irq() || !(regs->eflags & X86_EFLAGS_IF) )
         return 0;
 
+    /* Faults from external-mode guests are handled by shadow/hap */
+    if ( paging_mode_external(d) && guest_mode(regs) )
+    {
+        int ret = paging_fault(addr, regs);
+        if ( ret == EXCRET_fault_fixed )
+            trace_trap_two_addr(TRC_PV_PAGING_FIXUP, regs->eip, addr);
+        return ret;
+    }
+
     if ( unlikely(IN_HYPERVISOR_RANGE(addr)) )
     {
-        if ( paging_mode_external(d) && guest_mode(regs) )
-        {
-            int ret = paging_fault(addr, regs);
-            if ( ret == EXCRET_fault_fixed )
-                trace_trap_two_addr(TRC_PV_PAGING_FIXUP, regs->eip, addr);
-            return ret;
-        }
         if ( !(regs->error_code & PFEC_reserved_bit) &&
              (addr >= GDT_LDT_VIRT_START) && (addr < GDT_LDT_VIRT_END) )
             return handle_gdt_ldt_mapping_fault(
@@ -1185,7 +1187,9 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
          ptwr_do_page_fault(v, addr, regs) )
         return EXCRET_fault_fixed;
 
-    if ( paging_mode_enabled(d) )
+    /* For non-external shadowed guests, we fix up both their own 
+     * pagefaults and Xen's, since they share the pagetables. */
+    if ( paging_mode_enabled(d) && !paging_mode_external(d) )
     {
         int ret = paging_fault(addr, regs);
         if ( ret == EXCRET_fault_fixed )
