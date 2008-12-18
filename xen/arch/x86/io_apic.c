@@ -1551,7 +1551,6 @@ static struct hw_interrupt_type ioapic_level_type = {
 
 static unsigned int startup_msi_vector(unsigned int vector)
 {
-    dprintk(XENLOG_INFO, "startup msi vector %x\n", vector);
     unmask_msi_vector(vector);
     return 0;
 }
@@ -1567,7 +1566,6 @@ static void end_msi_vector(unsigned int vector)
 
 static void shutdown_msi_vector(unsigned int vector)
 {
-    dprintk(XENLOG_INFO, "shutdown msi vector %x\n", vector);
     mask_msi_vector(vector);
 }
 
