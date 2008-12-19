@@ -183,6 +183,15 @@ struct physdev_manage_pci {
 typedef struct physdev_manage_pci physdev_manage_pci_t;
 DEFINE_XEN_GUEST_HANDLE(physdev_manage_pci_t);
 
+#define PHYSDEVOP_restore_msi            19
+struct physdev_restore_msi {
+    /* IN */
+    uint8_t bus;
+    uint8_t devfn;
+};
+typedef struct physdev_restore_msi physdev_restore_msi_t;
+DEFINE_XEN_GUEST_HANDLE(physdev_restore_msi_t);
+
 /*
  * Argument to physdev_op_compat() hypercall. Superceded by new physdev_op()
  * hypercall since 0x00030202.

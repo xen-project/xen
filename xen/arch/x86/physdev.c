@@ -415,6 +415,24 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         break;
     }
 
+    case PHYSDEVOP_restore_msi: {
+        struct physdev_restore_msi restore_msi;
+        struct pci_dev *pdev;
+
+        ret = -EPERM;
+        if ( !IS_PRIV(v->domain) )
+            break;
+
+        ret = -EFAULT;
+        if ( copy_from_guest(&restore_msi, arg, 1) != 0 )
+            break;
+
+        spin_lock(&pcidevs_lock);
+        pdev = pci_get_pdev(restore_msi.bus, restore_msi.devfn);
+        ret = pdev ? pci_restore_msi_state(pdev) : -ENODEV;
+        spin_unlock(&pcidevs_lock);
+        break;
+    }
     default:
         ret = -ENOSYS;
         break;

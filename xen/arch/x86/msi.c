@@ -741,3 +741,43 @@ void pci_cleanup_msi(struct pci_dev *pdev)
     msi_free_vectors(pdev);
 }
 
+int pci_restore_msi_state(struct pci_dev *pdev)
+{
+    unsigned long flags;
+    int vector;
+    struct msi_desc *entry, *tmp;
+    irq_desc_t *desc;
+
+    ASSERT(spin_is_locked(&pcidevs_lock));
+
+    if (!pdev)
+        return -EINVAL;
+
+    list_for_each_entry_safe( entry, tmp, &pdev->msi_list, list )
+    {
+        vector = entry->vector;
+        desc = &irq_desc[vector];
+
+        spin_lock_irqsave(&desc->lock, flags);
+
+        ASSERT(desc->msi_desc == entry);
+
+        if (desc->msi_desc != entry)
+        {
+            dprintk(XENLOG_ERR, "Restore MSI for dev %x:%x not set before?\n",
+                                pdev->bus, pdev->devfn);
+            spin_unlock_irqrestore(&desc->lock, flags);
+            return -EINVAL;
+        }
+
+        msi_set_enable(pdev, 0);
+        write_msi_msg(entry, &entry->msg);
+
+        msi_set_enable(pdev, 1);
+        msi_set_mask_bit(vector, entry->msi_attrib.masked);
+        spin_unlock_irqrestore(&desc->lock, flags);
+    }
+
+    return 0;
+}
+
