@@ -1129,8 +1129,8 @@ static int domain_context_mapping_one(
 
 enum {
     DEV_TYPE_PCIe_ENDPOINT,
-    DEV_TYPE_PCIe_BRIDGE,
-    DEV_TYPE_PCI_BRIDGE,
+    DEV_TYPE_PCIe_BRIDGE,    // PCIe root port, switch
+    DEV_TYPE_PCI_BRIDGE,     // PCIe-to-PCI/PCIx bridge, PCI-to-PCI bridge
     DEV_TYPE_PCI,
 };
 
@@ -1144,7 +1144,8 @@ int pdev_type(u8 bus, u8 devfn)
     class_device = pci_conf_read16(bus, d, f, PCI_CLASS_DEVICE);
     if ( class_device == PCI_CLASS_BRIDGE_PCI )
     {
-        pos = pci_find_next_cap(bus, devfn, PCI_CAPABILITY_LIST, PCI_CAP_ID_EXP);
+        pos = pci_find_next_cap(bus, devfn,
+                                PCI_CAPABILITY_LIST, PCI_CAP_ID_EXP);
         if ( !pos )
             return DEV_TYPE_PCI_BRIDGE;
         creg = pci_conf_read16(bus, d, f, pos + PCI_EXP_FLAGS);
@@ -1206,7 +1207,7 @@ static int domain_context_mapping(struct domain *domain, u8 bus, u8 devfn)
 {
     struct acpi_drhd_unit *drhd;
     int ret = 0;
-    u16 sec_bus, sub_bus, ob, odf;
+    u16 sec_bus, sub_bus;
     u32 type;
     u8 secbus;
 
@@ -1220,15 +1221,13 @@ static int domain_context_mapping(struct domain *domain, u8 bus, u8 devfn)
     switch ( type )
     {
     case DEV_TYPE_PCIe_BRIDGE:
+        break;
+
     case DEV_TYPE_PCI_BRIDGE:
         sec_bus = pci_conf_read8(bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
                                  PCI_SECONDARY_BUS);
         sub_bus = pci_conf_read8(bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
                                  PCI_SUBORDINATE_BUS);
-        /*dmar_scope_add_buses(&drhd->scope, sec_bus, sub_bus);*/
-
-        if ( type == DEV_TYPE_PCIe_BRIDGE )
-            break;
 
         spin_lock(&bus2bridge_lock);
         for ( sub_bus &= 0xff; sec_bus <= sub_bus; sec_bus++ )
@@ -1249,25 +1248,25 @@ static int domain_context_mapping(struct domain *domain, u8 bus, u8 devfn)
 
     case DEV_TYPE_PCI:
         gdprintk(XENLOG_INFO VTDPREFIX,
-                 "domain_context_mapping:PCI:  bdf = %x:%x.%x\n",
+                 "domain_context_mapping:PCI: bdf = %x:%x.%x\n",
                  bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
 
-        ob = bus; odf = devfn;
-        if ( !find_pcie_endpoint(&bus, &devfn, &secbus) )
+        ret = domain_context_mapping_one(domain, drhd->iommu, bus, devfn);
+        if ( ret )
+           break;
+
+        secbus = bus;
+        /* dependent devices mapping */
+        while ( bus2bridge[bus].map )
         {
-            gdprintk(XENLOG_WARNING VTDPREFIX,
-                     "domain_context_mapping:invalid\n");
-            break;
+            secbus = bus;
+            devfn = bus2bridge[bus].devfn;
+            bus = bus2bridge[bus].bus;
+            ret = domain_context_mapping_one(domain, drhd->iommu, bus, devfn);
+            if ( ret )
+                return ret;
         }
 
-        if ( ob != bus || odf != devfn )
-            gdprintk(XENLOG_INFO VTDPREFIX,
-                     "domain_context_mapping:map:  "
-                     "bdf = %x:%x.%x -> %x:%x.%x\n",
-                     ob, PCI_SLOT(odf), PCI_FUNC(odf),
-                     bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
-
-        ret = domain_context_mapping_one(domain, drhd->iommu, bus, devfn);
         if ( secbus != bus )
             /*
              * The source-id for transactions on non-PCIe buses seem
@@ -1276,7 +1275,7 @@ static int domain_context_mapping(struct domain *domain, u8 bus, u8 devfn)
              * these scanarios is not particularly well documented
              * anywhere.
              */
-            domain_context_mapping_one(domain, drhd->iommu, secbus, 0);
+            ret = domain_context_mapping_one(domain, drhd->iommu, secbus, 0);
         break;
 
     default:
@@ -1332,7 +1331,6 @@ static int domain_context_unmap_one(
 static int domain_context_unmap(struct domain *domain, u8 bus, u8 devfn)
 {
     struct acpi_drhd_unit *drhd;
-    u16 sec_bus, sub_bus;
     int ret = 0;
     u32 type;
     u8 secbus;
@@ -1346,24 +1344,37 @@ static int domain_context_unmap(struct domain *domain, u8 bus, u8 devfn)
     {
     case DEV_TYPE_PCIe_BRIDGE:
     case DEV_TYPE_PCI_BRIDGE:
-        sec_bus = pci_conf_read8(bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
-                                 PCI_SECONDARY_BUS);
-        sub_bus = pci_conf_read8(bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
-                                 PCI_SUBORDINATE_BUS);
-        /*dmar_scope_remove_buses(&drhd->scope, sec_bus, sub_bus);*/
-        if ( DEV_TYPE_PCI_BRIDGE )
-            ret = domain_context_unmap_one(domain, drhd->iommu, bus, devfn);
         break;
 
     case DEV_TYPE_PCIe_ENDPOINT:
+        gdprintk(XENLOG_INFO VTDPREFIX,
+                 "domain_context_unmap:PCIe: bdf = %x:%x.%x\n",
+                 bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
         ret = domain_context_unmap_one(domain, drhd->iommu, bus, devfn);
         break;
 
     case DEV_TYPE_PCI:
-        if ( find_pcie_endpoint(&bus, &devfn, &secbus) )
+        gdprintk(XENLOG_INFO VTDPREFIX,
+                 "domain_context_unmap:PCI: bdf = %x:%x.%x\n",
+                 bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+        ret = domain_context_unmap_one(domain, drhd->iommu, bus, devfn);
+        if ( ret )
+            break;
+
+        secbus = bus;
+        /* dependent devices unmapping */
+        while ( bus2bridge[bus].map )
+        {
+            secbus = bus;
+            devfn = bus2bridge[bus].devfn;
+            bus = bus2bridge[bus].bus;
             ret = domain_context_unmap_one(domain, drhd->iommu, bus, devfn);
+            if ( ret )
+                return ret;
+        }
+
         if ( bus != secbus )
-            domain_context_unmap_one(domain, drhd->iommu, secbus, 0);
+            ret = domain_context_unmap_one(domain, drhd->iommu, secbus, 0);
         break;
 
     default:
