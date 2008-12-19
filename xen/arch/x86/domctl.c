@@ -708,7 +708,9 @@ long arch_do_domctl(
             break;
         }
         ret = 0;
+        spin_lock(&pcidevs_lock);
         ret = deassign_device(d, bus, devfn);
+        spin_unlock(&pcidevs_lock);
         gdprintk(XENLOG_INFO, "XEN_DOMCTL_deassign_device: bdf = %x:%x:%x\n",
             bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
 

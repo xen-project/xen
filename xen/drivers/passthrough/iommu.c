@@ -87,7 +87,7 @@ int iommu_add_device(struct pci_dev *pdev)
     if ( !pdev->domain )
         return -EINVAL;
 
-    ASSERT(rw_is_locked(&pcidevs_lock));
+    ASSERT(spin_is_locked(&pcidevs_lock));
 
     hd = domain_hvm_iommu(pdev->domain);
     if ( !iommu_enabled || !hd->platform_ops )
@@ -117,7 +117,7 @@ int assign_device(struct domain *d, u8 bus, u8 devfn)
     if ( !iommu_enabled || !hd->platform_ops )
         return 0;
 
-    read_lock(&pcidevs_lock);
+    spin_lock(&pcidevs_lock);
     if ( (rc = hd->platform_ops->assign_device(d, bus, devfn)) )
         goto done;
 
@@ -128,7 +128,7 @@ int assign_device(struct domain *d, u8 bus, u8 devfn)
         goto done;
     }
 done:    
-    read_unlock(&pcidevs_lock);
+    spin_unlock(&pcidevs_lock);
     return rc;
 }
 
@@ -211,7 +211,8 @@ int iommu_unmap_page(struct domain *d, unsigned long gfn)
     return hd->platform_ops->unmap_page(d, gfn);
 }
 
-int  deassign_device(struct domain *d, u8 bus, u8 devfn)
+/* caller should hold the pcidevs_lock */
+int deassign_device(struct domain *d, u8 bus, u8 devfn)
 {
     struct hvm_iommu *hd = domain_hvm_iommu(d);
     struct pci_dev *pdev = NULL;
@@ -219,20 +220,16 @@ int  deassign_device(struct domain *d, u8 bus, u8 devfn)
     if ( !iommu_enabled || !hd->platform_ops )
         return -EINVAL;
 
-    read_lock(&pcidevs_lock);
+    ASSERT(spin_is_locked(&pcidevs_lock));
     pdev = pci_get_pdev(bus, devfn);
     if (!pdev)
-    {
-        read_unlock(&pcidevs_lock);
         return -ENODEV;
-    }
 
     if (pdev->domain != d)
     {
-        read_unlock(&pcidevs_lock);
         gdprintk(XENLOG_ERR VTDPREFIX,
                 "IOMMU: deassign a device not owned\n");
-       return -EINVAL;
+        return -EINVAL;
     }
 
     hd->platform_ops->reassign_device(d, dom0, bus, devfn);
@@ -242,8 +239,6 @@ int  deassign_device(struct domain *d, u8 bus, u8 devfn)
         d->need_iommu = 0;
         hd->platform_ops->teardown(d);
     }
-
-    read_unlock(&pcidevs_lock);
 
     return 0;
 }
@@ -288,7 +283,7 @@ int iommu_get_device_group(struct domain *d, u8 bus, u8 devfn,
 
     group_id = ops->get_device_group_id(bus, devfn);
 
-    read_lock(&pcidevs_lock);
+    spin_lock(&pcidevs_lock);
     for_each_pdev( d, pdev )
     {
         if ( (pdev->bus == bus) && (pdev->devfn == devfn) )
@@ -302,13 +297,13 @@ int iommu_get_device_group(struct domain *d, u8 bus, u8 devfn,
             bdf |= (pdev->devfn & 0xff) << 8;
             if ( unlikely(copy_to_guest_offset(buf, i, &bdf, 1)) )
             {
-                read_unlock(&pcidevs_lock);
+                spin_unlock(&pcidevs_lock);
                 return -1;
             }
             i++;
         }
     }
-    read_unlock(&pcidevs_lock);
+    spin_unlock(&pcidevs_lock);
 
     return i;
 }

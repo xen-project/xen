@@ -850,7 +850,7 @@ int map_domain_pirq(
     struct msi_desc *msi_desc;
     struct pci_dev *pdev = NULL;
 
-    ASSERT(rw_is_locked(&pcidevs_lock));
+    ASSERT(spin_is_locked(&pcidevs_lock));
     ASSERT(spin_is_locked(&d->event_lock));
 
     if ( !IS_PRIV(current->domain) )
@@ -930,7 +930,7 @@ int unmap_domain_pirq(struct domain *d, int pirq)
     if ( !IS_PRIV(current->domain) )
         return -EINVAL;
 
-    ASSERT(rw_is_locked(&pcidevs_lock));
+    ASSERT(spin_is_locked(&pcidevs_lock));
     ASSERT(spin_is_locked(&d->event_lock));
 
     vector = d->arch.pirq_vector[pirq];
@@ -993,7 +993,7 @@ void free_domain_pirqs(struct domain *d)
 {
     int i;
 
-    read_lock(&pcidevs_lock);
+    spin_lock(&pcidevs_lock);
     spin_lock(&d->event_lock);
 
     for ( i = 0; i < NR_IRQS; i++ )
@@ -1001,7 +1001,7 @@ void free_domain_pirqs(struct domain *d)
             unmap_domain_pirq(d, i);
 
     spin_unlock(&d->event_lock);
-    read_unlock(&pcidevs_lock);
+    spin_unlock(&pcidevs_lock);
 }
 
 extern void dump_ioapic_irq_info(void);

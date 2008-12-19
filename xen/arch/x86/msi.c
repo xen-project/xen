@@ -440,7 +440,7 @@ static int msi_capability_init(struct pci_dev *dev,
     u8 slot = PCI_SLOT(dev->devfn);
     u8 func = PCI_FUNC(dev->devfn);
 
-    ASSERT(rw_is_locked(&pcidevs_lock));
+    ASSERT(spin_is_locked(&pcidevs_lock));
     pos = pci_find_cap_offset(bus, slot, func, PCI_CAP_ID_MSI);
     control = pci_conf_read16(bus, slot, func, msi_control_reg(pos));
     /* MSI Entry Initialization */
@@ -509,7 +509,7 @@ static int msix_capability_init(struct pci_dev *dev,
     u8 slot = PCI_SLOT(dev->devfn);
     u8 func = PCI_FUNC(dev->devfn);
 
-    ASSERT(rw_is_locked(&pcidevs_lock));
+    ASSERT(spin_is_locked(&pcidevs_lock));
     ASSERT(desc);
 
     pos = pci_find_cap_offset(bus, slot, func, PCI_CAP_ID_MSIX);
@@ -574,7 +574,7 @@ static int __pci_enable_msi(struct msi_info *msi, struct msi_desc **desc)
     int status;
     struct pci_dev *pdev;
 
-    ASSERT(rw_is_locked(&pcidevs_lock));
+    ASSERT(spin_is_locked(&pcidevs_lock));
     pdev = pci_get_pdev(msi->bus, msi->devfn);
     if ( !pdev )
         return -ENODEV;
@@ -634,7 +634,7 @@ static int __pci_enable_msix(struct msi_info *msi, struct msi_desc **desc)
     u8 slot = PCI_SLOT(msi->devfn);
     u8 func = PCI_FUNC(msi->devfn);
 
-    ASSERT(rw_is_locked(&pcidevs_lock));
+    ASSERT(spin_is_locked(&pcidevs_lock));
     pdev = pci_get_pdev(msi->bus, msi->devfn);
     if ( !pdev )
         return -ENODEV;
@@ -688,7 +688,7 @@ static void __pci_disable_msix(struct msi_desc *entry)
  */
 int pci_enable_msi(struct msi_info *msi, struct msi_desc **desc)
 {
-    ASSERT(rw_is_locked(&pcidevs_lock));
+    ASSERT(spin_is_locked(&pcidevs_lock));
 
     return  msi->table_base ? __pci_enable_msix(msi, desc) :
         __pci_enable_msi(msi, desc);

@@ -126,7 +126,7 @@ static void amd_iommu_setup_dom0_devices(struct domain *d)
     u32 l;
     int bdf;
 
-    write_lock(&pcidevs_lock);
+    spin_lock(&pcidevs_lock);
     for ( bus = 0; bus < 256; bus++ )
     {
         for ( dev = 0; dev < 32; dev++ )
@@ -153,7 +153,7 @@ static void amd_iommu_setup_dom0_devices(struct domain *d)
             }
         }
     }
-    write_unlock(&pcidevs_lock);
+    spin_unlock(&pcidevs_lock);
 }
 
 int amd_iov_detect(void)
@@ -282,11 +282,11 @@ static int reassign_device( struct domain *source, struct domain *target,
     struct amd_iommu *iommu;
     int bdf;
 
-    read_lock(&pcidevs_lock);
+    spin_lock(&pcidevs_lock);
     pdev = pci_get_pdev_by_domain(source, bus, devfn);
     if ( !pdev )
     {
-        read_unlock(&pcidevs_lock);
+        spin_unlock(&pcidevs_lock);
         return -ENODEV;
     }
 
@@ -297,7 +297,7 @@ static int reassign_device( struct domain *source, struct domain *target,
 
     if ( !iommu )
     {
-        read_unlock(&pcidevs_lock);
+        spin_unlock(&pcidevs_lock);
         amd_iov_error("Fail to find iommu."
 		      " %x:%x.%x cannot be assigned to domain %d\n", 
 		      bus, PCI_SLOT(devfn), PCI_FUNC(devfn), target->domain_id);
@@ -314,7 +314,7 @@ static int reassign_device( struct domain *source, struct domain *target,
                  bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
                  source->domain_id, target->domain_id);
 
-    read_unlock(&pcidevs_lock);
+    spin_unlock(&pcidevs_lock);
     return 0;
 }
 

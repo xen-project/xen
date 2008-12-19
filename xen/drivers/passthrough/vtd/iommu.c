@@ -1037,7 +1037,7 @@ static int domain_context_mapping_one(
     struct pci_dev *pdev = NULL;
     int agaw;
 
-    ASSERT(rw_is_locked(&pcidevs_lock));
+    ASSERT(spin_is_locked(&pcidevs_lock));
     spin_lock(&iommu->lock);
     maddr = bus_to_context_maddr(iommu, bus);
     context_entries = (struct context_entry *)map_vtd_domain_page(maddr);
@@ -1215,7 +1215,7 @@ static int domain_context_mapping(struct domain *domain, u8 bus, u8 devfn)
     if ( !drhd )
         return -ENODEV;
 
-    ASSERT(rw_is_locked(&pcidevs_lock));
+    ASSERT(spin_is_locked(&pcidevs_lock));
 
     type = pdev_type(bus, devfn);
     switch ( type )
@@ -1297,7 +1297,7 @@ static int domain_context_unmap_one(
     struct context_entry *context, *context_entries;
     u64 maddr;
 
-    ASSERT(rw_is_locked(&pcidevs_lock));
+    ASSERT(spin_is_locked(&pcidevs_lock));
     spin_lock(&iommu->lock);
 
     maddr = bus_to_context_maddr(iommu, bus);
@@ -1399,7 +1399,7 @@ static int reassign_device_ownership(
     struct iommu *pdev_iommu;
     int ret, found = 0;
 
-    ASSERT(rw_is_locked(&pcidevs_lock));
+    ASSERT(spin_is_locked(&pcidevs_lock));
     pdev = pci_get_pdev_by_domain(source, bus, devfn);
 
     if (!pdev)
@@ -1439,7 +1439,6 @@ void iommu_domain_teardown(struct domain *d)
     if ( list_empty(&acpi_drhd_units) )
         return;
 
-    ASSERT(rw_is_locked(&pcidevs_lock));
     spin_lock(&hd->mapping_lock);
     iommu_free_pagetable(hd->pgd_maddr, agaw_to_level(hd->agaw));
     hd->pgd_maddr = 0;
@@ -1529,7 +1528,7 @@ static int iommu_prepare_rmrr_dev(struct domain *d,
     u64 base, end;
     unsigned long base_pfn, end_pfn;
 
-    ASSERT(rw_is_locked(&pcidevs_lock));
+    ASSERT(spin_is_locked(&pcidevs_lock));
     ASSERT(rmrr->base_address < rmrr->end_address);
     
     base = rmrr->base_address & PAGE_MASK_4K;
@@ -1554,7 +1553,7 @@ static int intel_iommu_add_device(struct pci_dev *pdev)
     u16 bdf;
     int ret, i;
 
-    ASSERT(rw_is_locked(&pcidevs_lock));
+    ASSERT(spin_is_locked(&pcidevs_lock));
 
     if ( !pdev->domain )
         return -EINVAL;
@@ -1617,7 +1616,7 @@ static void setup_dom0_devices(struct domain *d)
 
     hd = domain_hvm_iommu(d);
 
-    write_lock(&pcidevs_lock);
+    spin_lock(&pcidevs_lock);
     for ( bus = 0; bus < 256; bus++ )
     {
         for ( dev = 0; dev < 32; dev++ )
@@ -1637,7 +1636,7 @@ static void setup_dom0_devices(struct domain *d)
             }
         }
     }
-    write_unlock(&pcidevs_lock);
+    spin_unlock(&pcidevs_lock);
 }
 
 void clear_fault_bits(struct iommu *iommu)
@@ -1710,7 +1709,7 @@ static void setup_dom0_rmrr(struct domain *d)
     u16 bdf;
     int ret, i;
 
-    read_lock(&pcidevs_lock);
+    spin_lock(&pcidevs_lock);
     for_each_rmrr_device ( rmrr, bdf, i )
     {
         ret = iommu_prepare_rmrr_dev(d, rmrr, PCI_BUS(bdf), PCI_DEVFN2(bdf));
@@ -1718,7 +1717,7 @@ static void setup_dom0_rmrr(struct domain *d)
             gdprintk(XENLOG_ERR VTDPREFIX,
                      "IOMMU: mapping reserved region failed\n");
     }
-    read_unlock(&pcidevs_lock);
+    spin_unlock(&pcidevs_lock);
 }
 
 int intel_vtd_setup(void)
@@ -1771,15 +1770,15 @@ int device_assigned(u8 bus, u8 devfn)
 {
     struct pci_dev *pdev;
 
-    read_lock(&pcidevs_lock);
+    spin_lock(&pcidevs_lock);
     pdev = pci_get_pdev_by_domain(dom0, bus, devfn);
     if (!pdev)
     {
-        read_unlock(&pcidevs_lock);
+        spin_unlock(&pcidevs_lock);
         return -1;
     }
 
-    read_unlock(&pcidevs_lock);
+    spin_unlock(&pcidevs_lock);
     return 0;
 }
 
@@ -1793,7 +1792,7 @@ int intel_iommu_assign_device(struct domain *d, u8 bus, u8 devfn)
     if ( list_empty(&acpi_drhd_units) )
         return -ENODEV;
 
-    ASSERT(rw_is_locked(&pcidevs_lock));
+    ASSERT(spin_is_locked(&pcidevs_lock));
     pdev = pci_get_pdev(bus, devfn);
     if (!pdev)
         return -ENODEV;

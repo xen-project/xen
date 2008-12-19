@@ -42,13 +42,12 @@ struct pci_dev {
     list_for_each_entry(pdev, &(domain->arch.pdev_list), domain_list)
 
 /*
- * The pcidevs_lock write-lock must be held when doing alloc_pdev() or
- * free_pdev().  Never de-reference pdev without holding pdev->lock or
- * pcidevs_lock.  Always aquire pcidevs_lock before pdev->lock when
- * doing free_pdev().
+ * The pcidevs_lock protect alldevs_list, and the assignment for the 
+ * devices, it also sync the access to the msi capability that is not
+ * interrupt handling related (the mask bit register).
  */
 
-extern rwlock_t pcidevs_lock;
+extern spinlock_t pcidevs_lock;
 
 struct pci_dev *alloc_pdev(u8 bus, u8 devfn);
 void free_pdev(struct pci_dev *pdev);

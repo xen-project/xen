@@ -28,7 +28,7 @@
 
 
 LIST_HEAD(alldevs_list);
-rwlock_t pcidevs_lock = RW_LOCK_UNLOCKED;
+spinlock_t pcidevs_lock = SPIN_LOCK_UNLOCKED;
 
 struct pci_dev *alloc_pdev(u8 bus, u8 devfn)
 {
@@ -62,7 +62,7 @@ struct pci_dev *pci_get_pdev(int bus, int devfn)
 {
     struct pci_dev *pdev = NULL;
 
-    ASSERT(rw_is_locked(&pcidevs_lock));
+    ASSERT(spin_is_locked(&pcidevs_lock));
 
     list_for_each_entry ( pdev, &alldevs_list, alldevs_list )
         if ( (pdev->bus == bus || bus == -1) &&
@@ -78,7 +78,7 @@ struct pci_dev *pci_get_pdev_by_domain(struct domain *d, int bus, int devfn)
 {
     struct pci_dev *pdev = NULL;
 
-    ASSERT(rw_is_locked(&pcidevs_lock));
+    ASSERT(spin_is_locked(&pcidevs_lock));
 
     list_for_each_entry ( pdev, &alldevs_list, alldevs_list )
          if ( (pdev->bus == bus || bus == -1) &&
@@ -96,7 +96,7 @@ int pci_add_device(u8 bus, u8 devfn)
     struct pci_dev *pdev;
     int ret = -ENOMEM;
 
-    write_lock(&pcidevs_lock);
+    spin_lock(&pcidevs_lock);
     pdev = alloc_pdev(bus, devfn);
     if ( !pdev )
         goto out;
@@ -113,7 +113,7 @@ int pci_add_device(u8 bus, u8 devfn)
     }
 
 out:
-    write_unlock(&pcidevs_lock);
+    spin_unlock(&pcidevs_lock);
     printk(XENLOG_DEBUG "PCI add device %02x:%02x.%x\n", bus,
            PCI_SLOT(devfn), PCI_FUNC(devfn));
     return ret;
@@ -124,7 +124,7 @@ int pci_remove_device(u8 bus, u8 devfn)
     struct pci_dev *pdev;
     int ret = -ENODEV;;
 
-    write_lock(&pcidevs_lock);
+    spin_lock(&pcidevs_lock);
     list_for_each_entry ( pdev, &alldevs_list, alldevs_list )
         if ( pdev->bus == bus && pdev->devfn == devfn )
         {
@@ -138,7 +138,7 @@ int pci_remove_device(u8 bus, u8 devfn)
             break;
         }
 
-    write_unlock(&pcidevs_lock);
+    spin_unlock(&pcidevs_lock);
     return ret;
 }
 
@@ -187,7 +187,7 @@ void pci_release_devices(struct domain *d)
     struct pci_dev *pdev;
     u8 bus, devfn;
 
-    read_lock(&pcidevs_lock);
+    spin_lock(&pcidevs_lock);
     pci_clean_dpci_irqs(d);
     while ( (pdev = pci_get_pdev_by_domain(d, -1, -1)) )
     {
@@ -195,7 +195,7 @@ void pci_release_devices(struct domain *d)
         bus = pdev->bus; devfn = pdev->devfn;
         deassign_device(d, bus, devfn);
     }
-    read_unlock(&pcidevs_lock);
+    spin_unlock(&pcidevs_lock);
 }
 
 #ifdef SUPPORT_MSI_REMAPPING
@@ -205,7 +205,7 @@ static void dump_pci_devices(unsigned char ch)
     struct msi_desc *msi;
 
     printk("==== PCI devices ====\n");
-    read_lock(&pcidevs_lock);
+    spin_lock(&pcidevs_lock);
 
     list_for_each_entry ( pdev, &alldevs_list, alldevs_list )
     {
@@ -217,7 +217,7 @@ static void dump_pci_devices(unsigned char ch)
         printk(">\n");
     }
 
-    read_unlock(&pcidevs_lock);
+    spin_unlock(&pcidevs_lock);
 }
 
 static int __init setup_dump_pcidevs(void)

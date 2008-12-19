@@ -100,7 +100,7 @@ static int physdev_map_pirq(struct physdev_map_pirq *map)
             goto free_domain;
     }
 
-    read_lock(&pcidevs_lock);
+    spin_lock(&pcidevs_lock);
     /* Verify or get pirq. */
     spin_lock(&d->event_lock);
     if ( map->pirq < 0 )
@@ -148,7 +148,7 @@ static int physdev_map_pirq(struct physdev_map_pirq *map)
 
 done:
     spin_unlock(&d->event_lock);
-    read_unlock(&pcidevs_lock);
+    spin_unlock(&pcidevs_lock);
     if ( (ret != 0) && (map->type == MAP_PIRQ_TYPE_MSI) && (map->index == -1) )
         free_irq_vector(vector);
 free_domain:
@@ -172,11 +172,11 @@ static int physdev_unmap_pirq(struct physdev_unmap_pirq *unmap)
     if ( d == NULL )
         return -ESRCH;
 
-    read_lock(&pcidevs_lock);
+    spin_lock(&pcidevs_lock);
     spin_lock(&d->event_lock);
     ret = unmap_domain_pirq(d, unmap->pirq);
     spin_unlock(&d->event_lock);
-    read_unlock(&pcidevs_lock);
+    spin_unlock(&pcidevs_lock);
 
     rcu_unlock_domain(d);
 
@@ -345,12 +345,12 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
 
         irq_op.vector = assign_irq_vector(irq);
 
-        read_lock(&pcidevs_lock);
+        spin_lock(&pcidevs_lock);
         spin_lock(&dom0->event_lock);
         ret = map_domain_pirq(dom0, irq_op.irq, irq_op.vector,
                               MAP_PIRQ_TYPE_GSI, NULL);
         spin_unlock(&dom0->event_lock);
-        read_unlock(&pcidevs_lock);
+        spin_unlock(&pcidevs_lock);
 
         if ( copy_to_guest(arg, &irq_op, 1) != 0 )
             ret = -EFAULT;
