@@ -71,7 +71,8 @@ static struct acpi_processor_power *__read_mostly processor_powers[NR_CPUS];
 
 static void print_acpi_power(uint32_t cpu, struct acpi_processor_power *power)
 {
-    uint32_t i;
+    uint32_t i, idle_usage = 0;
+    uint64_t res, idle_res = 0;
 
     printk("==cpu%d==\n", cpu);
     printk("active state:\t\tC%d\n",
@@ -81,14 +82,21 @@ static void print_acpi_power(uint32_t cpu, struct acpi_processor_power *power)
     
     for ( i = 1; i < power->count; i++ )
     {
+        res = acpi_pm_tick_to_ns(power->states[i].time);
+        idle_usage += power->states[i].usage;
+        idle_res += res;
+
         printk((power->last_state && power->last_state->idx == i) ?
                "   *" : "    ");
         printk("C%d:\t", i);
         printk("type[C%d] ", power->states[i].type);
         printk("latency[%03d] ", power->states[i].latency);
         printk("usage[%08d] ", power->states[i].usage);
-        printk("duration[%"PRId64"]\n", power->states[i].time);
+        printk("duration[%"PRId64"]\n", res);
     }
+    printk("    C0:\tusage[%08d] duration[%"PRId64"]\n",
+           idle_usage, NOW() - idle_res);
+
 }
 
 static void dump_cx(unsigned char key)
@@ -749,7 +757,7 @@ uint32_t pmstat_get_cx_nr(uint32_t cpuid)
 int pmstat_get_cx_stat(uint32_t cpuid, struct pm_cx_stat *stat)
 {
     const struct acpi_processor_power *power = processor_powers[cpuid];
-    uint64_t usage;
+    uint64_t usage, res, idle_usage = 0, idle_res = 0;
     int i;
 
     if ( power == NULL )
@@ -764,16 +772,24 @@ int pmstat_get_cx_stat(uint32_t cpuid, struct pm_cx_stat *stat)
     stat->nr = power->count;
     stat->idle_time = get_cpu_idle_time(cpuid);
 
-    for ( i = 0; i < power->count; i++ )
+    for ( i = power->count - 1; i >= 0; i-- )
     {
-        usage = power->states[i].usage;
-        if ( copy_to_guest_offset(stat->triggers, i, &usage, 1) )
+        if ( i != 0 )
+        {
+            usage = power->states[i].usage;
+            res = acpi_pm_tick_to_ns(power->states[i].time);
+            idle_usage += usage;
+            idle_res += res;
+        }
+        else
+        {
+            usage = idle_usage;
+            res = NOW() - idle_res;
+        }
+        if ( copy_to_guest_offset(stat->triggers, i, &usage, 1) ||
+             copy_to_guest_offset(stat->residencies, i, &res, 1) )
             return -EFAULT;
     }
-    for ( i = 0; i < power->count; i++ )
-        if ( copy_to_guest_offset(stat->residencies, i, 
-                                  &power->states[i].time, 1) )
-            return -EFAULT;
 
     return 0;
 }

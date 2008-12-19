@@ -108,7 +108,7 @@ static int show_cx_cpuid(int xc_fd, int cpuid)
         printf("C%d                   : transition [%020"PRIu64"]\n",
                i, cxstat->triggers[i]);
         printf("                       residency  [%020"PRIu64" ms]\n",
-               cxstat->residencies[i]*1000000UL/3579/1000000UL);
+               cxstat->residencies[i]/1000000UL);
     }
 
     free(cxstat->triggers);

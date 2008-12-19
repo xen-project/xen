@@ -38,4 +38,6 @@ void pit_broadcast_enter(void);
 void pit_broadcast_exit(void);
 int pit_broadcast_is_available(void);
 
+uint64_t acpi_pm_tick_to_ns(uint64_t ticks);
+
 #endif /* __X86_TIME_H__ */

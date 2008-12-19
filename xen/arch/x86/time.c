@@ -531,6 +531,19 @@ static struct platform_timesource plt_pmtimer =
     .init = init_pmtimer
 };
 
+static struct time_scale pmt_scale;
+static __init int init_pmtmr_scale(void)
+{
+    set_time_scale(&pmt_scale, ACPI_PM_FREQUENCY);
+    return 0;
+}
+__initcall(init_pmtmr_scale);
+
+uint64_t acpi_pm_tick_to_ns(uint64_t ticks)
+{
+    return scale_delta(ticks, &pmt_scale);
+}
+
 /************************************************************
  * GENERIC PLATFORM TIMER INFRASTRUCTURE
  */
