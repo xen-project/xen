@@ -239,7 +239,7 @@ static int machine_check_poll(struct mc_info *mi, int calltype)
         add_taint(TAINT_MACHINE_CHECK);
         /*Clear state for this bank */
         wrmsrl(MSR_IA32_MC0_STATUS + 4 * i, 0);
-        printk(KERN_DEBUG "mcheck_poll: bank%i CPU%d status[%lx]\n", 
+        printk(KERN_DEBUG "mcheck_poll: bank%i CPU%d status[%"PRIx64"]\n", 
                 i, cpu, status);
         printk(KERN_DEBUG "mcheck_poll: CPU%d, SOCKET%d, CORE%d, APICID[%d], "
                 "thread[%d]\n", cpu, mcg.mc_socketid, 
@@ -609,8 +609,8 @@ static void mce_intel_work_fn(void *data)
     on_each_cpu(mce_intel_checkregs, data, 1, 1);
     if (adjust) {
         period = period / (adjust + 1);
-        printk(KERN_DEBUG "mcheck_poll: Find error, shorten interval to %ld",
-            period);
+        printk(KERN_DEBUG "mcheck_poll: Find error, shorten interval "
+               "to %"PRIu64"\n", period);
     }
     else {
         period *= 2;
