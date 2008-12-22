@@ -2030,7 +2030,8 @@ static void vmx_do_extint(struct cpu_user_regs *regs)
     fastcall void smp_spurious_interrupt(struct cpu_user_regs *regs);
     fastcall void smp_error_interrupt(struct cpu_user_regs *regs);
     fastcall void smp_pmu_apic_interrupt(struct cpu_user_regs *regs);
-#ifdef CONFIG_X86_MCE_P4THERMAL
+    fastcall void smp_cmci_interrupt(struct cpu_user_regs *regs);
+#ifdef CONFIG_X86_MCE_THERMAL
     fastcall void smp_thermal_interrupt(struct cpu_user_regs *regs);
 #endif
 
@@ -2060,10 +2061,13 @@ static void vmx_do_extint(struct cpu_user_regs *regs)
     case ERROR_APIC_VECTOR:
         smp_error_interrupt(regs);
         break;
+    case CMCI_APIC_VECTOR:
+        smp_cmci_interrupt(regs);
+        break;
     case PMU_APIC_VECTOR:
         smp_pmu_apic_interrupt(regs);
         break;
-#ifdef CONFIG_X86_MCE_P4THERMAL
+#ifdef CONFIG_X86_MCE_THERMAL
     case THERMAL_APIC_VECTOR:
         smp_thermal_interrupt(regs);
         break;

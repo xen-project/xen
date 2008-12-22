@@ -1237,11 +1237,25 @@ remove_siblinginfo(int cpu)
 }
 
 extern void fixup_irqs(cpumask_t map);
-int __cpu_disable(void)
+
+/*
+ * Functions called when offline cpu. 
+ * We need to process some new feature such as 
+ * CMCI owner change when do cpu hotplug in latest 
+ * Intel CPU families
+*/
+void (*cpu_down_handler)(int down_cpu) = NULL;
+void (*cpu_down_rollback_handler)(int down_cpu) = NULL;
+
+
+int __cpu_disable(int down_cpu)
 {
 	cpumask_t map = cpu_online_map;
 	int cpu = smp_processor_id();
 
+	/*Only down_cpu need to execute this function*/
+	if (cpu != down_cpu)
+		return 0;
 	/*
 	 * Perhaps use cpufreq to drop frequency, but that could go
 	 * into generic code.
@@ -1293,10 +1307,14 @@ void __cpu_die(unsigned int cpu)
 	}
  	printk(KERN_ERR "CPU %u didn't die...\n", cpu);
 }
-
-static int take_cpu_down(void *unused)
+static int take_cpu_down(void *down_cpu)
 {
-    return __cpu_disable();
+
+    if (cpu_down_handler)
+        cpu_down_handler(*(int *)down_cpu);
+    wmb();
+
+    return __cpu_disable(*(int *)down_cpu);
 }
 
 int cpu_down(unsigned int cpu)
@@ -1322,7 +1340,7 @@ int cpu_down(unsigned int cpu)
 
 	printk("Prepare to bring CPU%d down...\n", cpu);
 
-	err = stop_machine_run(take_cpu_down, NULL, cpu);
+	err = stop_machine_run(take_cpu_down, &cpu, cpu_online_map);
 	if ( err < 0 )
 		goto out;
 
@@ -1333,6 +1351,10 @@ int cpu_down(unsigned int cpu)
 		err = -EBUSY;
 	}
 out:
+	/*if cpu_offline failed, re-check cmci_owner*/
+
+	if ( err < 0 && cpu_down_rollback_handler) 
+		cpu_down_rollback_handler(cpu); 
 	spin_unlock(&cpu_add_remove_lock);
 	return err;
 }

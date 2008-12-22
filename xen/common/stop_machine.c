@@ -45,7 +45,7 @@ struct stopmachine_data {
     enum stopmachine_state state;
     atomic_t done;
 
-    unsigned int fn_cpu;
+    cpumask_t fn_cpus;
     int fn_result;
     int (*fn)(void *);
     void *fn_data;
@@ -63,21 +63,22 @@ static void stopmachine_set_state(enum stopmachine_state state)
         cpu_relax();
 }
 
-int stop_machine_run(int (*fn)(void *), void *data, unsigned int cpu)
+int stop_machine_run(int (*fn)(void *), void *data, cpumask_t cpus)
 {
     cpumask_t allbutself;
     unsigned int i, nr_cpus;
-    int ret;
+    int cur_cpu, ret;
 
     BUG_ON(!local_irq_is_enabled());
 
     allbutself = cpu_online_map;
-    cpu_clear(smp_processor_id(), allbutself);
+    cur_cpu = smp_processor_id();
+    cpu_clear(cur_cpu, allbutself);
     nr_cpus = cpus_weight(allbutself);
 
     if ( nr_cpus == 0 )
     {
-        BUG_ON(cpu != smp_processor_id());
+        BUG_ON(!cpu_isset(cur_cpu, cpus));
         return (*fn)(data);
     }
 
@@ -91,7 +92,8 @@ int stop_machine_run(int (*fn)(void *), void *data, unsigned int cpu)
     stopmachine_data.fn = fn;
     stopmachine_data.fn_data = data;
     stopmachine_data.nr_cpus = nr_cpus;
-    stopmachine_data.fn_cpu = cpu;
+    stopmachine_data.fn_cpus = cpus;
+    stopmachine_data.fn_result = 0;
     atomic_set(&stopmachine_data.done, 0);
     stopmachine_data.state = STOPMACHINE_START;
 
@@ -105,8 +107,13 @@ int stop_machine_run(int (*fn)(void *), void *data, unsigned int cpu)
     local_irq_disable();
     stopmachine_set_state(STOPMACHINE_DISABLE_IRQ);
 
-    if ( cpu == smp_processor_id() )
-        stopmachine_data.fn_result = (*fn)(data);
+    /* callback will run on each cpu of the input map.
+     * If callback fails on any CPU, the stop_machine_run
+     * will return the  *ORed* the failure
+     */
+    if ( cpu_isset(cur_cpu, cpus) ){
+        stopmachine_data.fn_result |= (*fn)(data);
+    }
     stopmachine_set_state(STOPMACHINE_INVOKE);
     ret = stopmachine_data.fn_result;
 
@@ -121,7 +128,6 @@ int stop_machine_run(int (*fn)(void *), void *data, unsigned int cpu)
 static void stopmachine_softirq(void)
 {
     enum stopmachine_state state = STOPMACHINE_START;
-
     smp_mb();
 
     while ( state != STOPMACHINE_EXIT )
@@ -136,10 +142,11 @@ static void stopmachine_softirq(void)
             local_irq_disable();
             break;
         case STOPMACHINE_INVOKE:
-            if ( stopmachine_data.fn_cpu == smp_processor_id() )
-                stopmachine_data.fn_result =
+            if ( cpu_isset(smp_processor_id(), stopmachine_data.fn_cpus )) {
+                stopmachine_data.fn_result |= 
                     stopmachine_data.fn(stopmachine_data.fn_data);
-            break;
+            }
+           break;
         default:
             break;
         }

@@ -19,8 +19,8 @@
 #include <asm/msr.h>
 
 #include "mce.h"
-
-static int firstbank;
+#include "x86_mca.h"
+int firstbank = 0;
 static struct timer mce_timer;
 
 #define MCE_PERIOD MILLISECS(15000)
@@ -61,13 +61,8 @@ static int __init init_nonfatal_mce_checker(void)
 	struct cpuinfo_x86 *c = &boot_cpu_data;
 
 	/* Check for MCE support */
-	if (!cpu_has(c, X86_FEATURE_MCE))
+	if (!mce_available(c))
 		return -ENODEV;
-
-	/* Check for PPro style MCA */
-	if (!cpu_has(c, X86_FEATURE_MCA))
-		return -ENODEV;
-
 	/*
 	 * Check for non-fatal errors every MCE_RATE s
 	 */
@@ -85,12 +80,20 @@ static int __init init_nonfatal_mce_checker(void)
 		break;
 
 	case X86_VENDOR_INTEL:
-		init_timer(&mce_timer, mce_work_fn, NULL, 0);
-		set_timer(&mce_timer, NOW() + MCE_PERIOD);
+		/* p5 family is different. P4/P6 and latest CPUs shares the
+		 * same polling methods
+		*/
+		if ( c->x86 != 5 )
+		{
+			/* some CPUs or banks don't support cmci, we need to 
+			 * enable this feature anyway
+			 */
+			intel_mcheck_timer(c);
+		}
 		break;
 	}
 
-	printk(KERN_INFO "MCA: Machine check polling timer started.\n");
+	printk(KERN_INFO "mcheck_poll: Machine check polling timer started.\n");
 	return 0;
 }
 __initcall(init_nonfatal_mce_checker);

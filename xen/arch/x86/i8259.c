@@ -74,6 +74,7 @@ BUILD_SMP_INTERRUPT(error_interrupt,ERROR_APIC_VECTOR)
 BUILD_SMP_INTERRUPT(spurious_interrupt,SPURIOUS_APIC_VECTOR)
 BUILD_SMP_INTERRUPT(pmu_apic_interrupt,PMU_APIC_VECTOR)
 BUILD_SMP_INTERRUPT(thermal_interrupt,THERMAL_APIC_VECTOR)
+BUILD_SMP_INTERRUPT(cmci_interrupt, CMCI_APIC_VECTOR)
 
 #define IRQ(x,y) \
     IRQ##x##y##_interrupt

@@ -14,6 +14,7 @@
 #include <asm/msr.h>
 
 #include "mce.h"
+#include "x86_mca.h"
 
 /* Machine Check Handler For AMD Athlon/Duron */
 static fastcall void k7_machine_check(struct cpu_user_regs * regs, long error_code)

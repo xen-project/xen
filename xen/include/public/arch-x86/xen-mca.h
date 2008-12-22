@@ -106,7 +106,10 @@ struct mcinfo_common {
 
 #define MC_FLAG_CORRECTABLE     (1 << 0)
 #define MC_FLAG_UNCORRECTABLE   (1 << 1)
-
+#define MC_FLAG_RECOVERABLE	(1 << 2)
+#define MC_FLAG_POLLED		(1 << 3)
+#define MC_FLAG_RESET		(1 << 4)
+#define MC_FLAG_CMCI		(1 << 5)
 /* contains global x86 mc information */
 struct mcinfo_global {
     struct mcinfo_common common;
@@ -115,6 +118,7 @@ struct mcinfo_global {
     uint16_t mc_domid;
     uint32_t mc_socketid; /* physical socket of the physical core */
     uint16_t mc_coreid; /* physical impacted core */
+    uint8_t  mc_apicid;
     uint16_t mc_core_threadid; /* core thread of physical core */
     uint16_t mc_vcpuid; /* virtual cpu scheduled for mc_domid */
     uint64_t mc_gstatus; /* global status */
@@ -132,6 +136,8 @@ struct mcinfo_bank {
     uint64_t mc_addr;   /* bank address, only valid
                          * if addr bit is set in mc_status */
     uint64_t mc_misc;
+    uint64_t mc_ctrl2;
+    uint64_t mc_tsc;
 };
 
 
@@ -150,7 +156,12 @@ struct mcinfo_extended {
      * multiple times. */
 
     uint32_t mc_msrs; /* Number of msr with valid values. */
-    struct mcinfo_msr mc_msr[5];
+    /*
+     * Currently Intel extended MSR (32/64) including all gp registers
+     * and E(R)DI, E(R)BP, E(R)SP, E(R)FLAGS, E(R)IP, E(R)MISC, only 10
+     * of them might be useful. So expend this array to 10.
+    */
+    struct mcinfo_msr mc_msr[10];
 };
 
 #define MCINFO_HYPERCALLSIZE	1024

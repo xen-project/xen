@@ -5,7 +5,7 @@
  * stop_machine_run: freeze the machine on all CPUs and run this function
  * @fn: the function to run
  * @data: the data ptr for the @fn()
- * @cpu: the cpu to run @fn() on (or any, if @cpu == NR_CPUS).
+ * @cpus: cpus to run @fn() on.
  *
  * Description: This causes every other cpu to enter a safe point, with
  * each of which disables interrupts, and finally interrupts are disabled
@@ -14,6 +14,6 @@
  *
  * This can be thought of as a very heavy write lock, equivalent to
  * grabbing every spinlock in the kernel. */
-int stop_machine_run(int (*fn)(void *), void *data, unsigned int cpu);
+int stop_machine_run(int (*fn)(void *), void *data, cpumask_t cpu);
 
 #endif /* __XEN_STOP_MACHINE_H__ */
