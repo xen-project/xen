@@ -18,7 +18,7 @@ extern int firstbank;
 
 #ifdef CONFIG_X86_MCE_THERMAL
 static void unexpected_thermal_interrupt(struct cpu_user_regs *regs)
-{	
+{
     printk(KERN_ERR "Thermal: CPU%d: Unexpected LVT TMR interrupt!\n",
                 smp_processor_id());
     add_taint(TAINT_MACHINE_CHECK);
@@ -67,11 +67,11 @@ static void intel_init_thermal(struct cpuinfo_x86 *c)
 
     /* Thermal monitoring */
     if (!cpu_has(c, X86_FEATURE_ACPI))
-        return;	/* -ENODEV */
+        return; /* -ENODEV */
 
     /* Clock modulation */
     if (!cpu_has(c, X86_FEATURE_ACC))
-        return;	/* -ENODEV */
+        return; /* -ENODEV */
 
     /* first check if its enabled already, in which case there might
      * be some SMM goo which handles it, so we can't even put a handler
@@ -87,7 +87,7 @@ static void intel_init_thermal(struct cpuinfo_x86 *c)
     if (cpu_has(c, X86_FEATURE_TM2) && (l & (1 << 13)))
         tm2 = 1;
 
-	/* check whether a vector already exists, temporarily masked? */
+    /* check whether a vector already exists, temporarily masked? */
     if (h & APIC_VECTOR_MASK) {
         printk(KERN_DEBUG "CPU%d: Thermal LVT vector (%#x) already installed\n",
                  cpu, (h & APIC_VECTOR_MASK));
@@ -95,8 +95,8 @@ static void intel_init_thermal(struct cpuinfo_x86 *c)
     }
 
     /* The temperature transition interrupt handler setup */
-    h = THERMAL_APIC_VECTOR;		/* our delivery vector */
-    h |= (APIC_DM_FIXED | APIC_LVT_MASKED);	/* we'll mask till we're ready */
+    h = THERMAL_APIC_VECTOR;    /* our delivery vector */
+    h |= (APIC_DM_FIXED | APIC_LVT_MASKED);  /* we'll mask till we're ready */
     apic_write_around(APIC_LVTTHMR, h);
 
     rdmsr (MSR_IA32_THERM_INTERRUPT, l, h);
@@ -121,7 +121,7 @@ static inline void intel_get_extended_msrs(struct mcinfo_extended *mc_ext)
     if (nr_intel_ext_msrs == 0)
         return;
 
-	/*this function will called when CAP(9).MCG_EXT_P = 1*/
+    /*this function will called when CAP(9).MCG_EXT_P = 1*/
     memset(mc_ext, 0, sizeof(struct mcinfo_extended));
     mc_ext->common.type = MC_TYPE_EXTENDED;
     mc_ext->common.size = sizeof(mc_ext);
@@ -198,7 +198,7 @@ static int machine_check_poll(struct mc_info *mi, int calltype)
         struct mcinfo_bank mcb;
         /*For CMCI, only owners checks the owned MSRs*/
         if ( !test_bit(i, __get_cpu_var(mce_banks_owned)) &&
-			(calltype & MC_FLAG_CMCI) )
+             (calltype & MC_FLAG_CMCI) )
             continue;
         rdmsrl(MSR_IA32_MC0_STATUS + 4 * i, status);
 
@@ -277,38 +277,38 @@ static fastcall void intel_machine_check(struct cpu_user_regs * regs, long error
     u32 mcgstl, mcgsth;
     int i;
    
-    rdmsr (MSR_IA32_MCG_STATUS, mcgstl, mcgsth);
-    if (mcgstl & (1<<0))	/* Recoverable ? */
-    	recover=0;
+    rdmsr(MSR_IA32_MCG_STATUS, mcgstl, mcgsth);
+    if (mcgstl & (1<<0))       /* Recoverable ? */
+        recover=0;
     
-    printk (KERN_EMERG "CPU %d: Machine Check Exception: %08x%08x\n",
-    	smp_processor_id(), mcgsth, mcgstl);
+    printk(KERN_EMERG "CPU %d: Machine Check Exception: %08x%08x\n",
+           smp_processor_id(), mcgsth, mcgstl);
     
     for (i=0; i<nr_mce_banks; i++) {
-    	rdmsr (MSR_IA32_MC0_STATUS+i*4,low, high);
-    	if (high & (1<<31)) {
-    		if (high & (1<<29))
-    			recover |= 1;
-    		if (high & (1<<25))
-    			recover |= 2;
-    		printk (KERN_EMERG "Bank %d: %08x%08x", i, high, low);
-    		high &= ~(1<<31);
-    		if (high & (1<<27)) {
-    			rdmsr (MSR_IA32_MC0_MISC+i*4, alow, ahigh);
-    			printk ("[%08x%08x]", ahigh, alow);
-    		}
-    		if (high & (1<<26)) {
-    			rdmsr (MSR_IA32_MC0_ADDR+i*4, alow, ahigh);
-    			printk (" at %08x%08x", ahigh, alow);
-    		}
-    		printk ("\n");
-    	}
+        rdmsr (MSR_IA32_MC0_STATUS+i*4,low, high);
+        if (high & (1<<31)) {
+            if (high & (1<<29))
+                recover |= 1;
+            if (high & (1<<25))
+                recover |= 2;
+            printk (KERN_EMERG "Bank %d: %08x%08x", i, high, low);
+            high &= ~(1<<31);
+            if (high & (1<<27)) {
+                rdmsr (MSR_IA32_MC0_MISC+i*4, alow, ahigh);
+                printk ("[%08x%08x]", ahigh, alow);
+            }
+            if (high & (1<<26)) {
+                rdmsr (MSR_IA32_MC0_ADDR+i*4, alow, ahigh);
+                printk (" at %08x%08x", ahigh, alow);
+            }
+            printk ("\n");
+        }
     }
     
     if (recover & 2)
-    	mc_panic ("CPU context corrupt");
+        mc_panic ("CPU context corrupt");
     if (recover & 1)
-    	mc_panic ("Unable to continue");
+        mc_panic ("Unable to continue");
     
     printk(KERN_EMERG "Attempting to continue.\n");
     /* 
@@ -317,25 +317,21 @@ static fastcall void intel_machine_check(struct cpu_user_regs * regs, long error
      * for errors if the OS could not log the error.
      */
     for (i=0; i<nr_mce_banks; i++) {
-    	u32 msr;
-    	msr = MSR_IA32_MC0_STATUS+i*4;
-    	rdmsr (msr, low, high);
-    	if (high&(1<<31)) {
-    		/* Clear it */
-    		wrmsr(msr, 0UL, 0UL);
-    		/* Serialize */
-    		wmb();
-    		add_taint(TAINT_MACHINE_CHECK);
-    	}
+        u32 msr;
+        msr = MSR_IA32_MC0_STATUS+i*4;
+        rdmsr (msr, low, high);
+        if (high&(1<<31)) {
+            /* Clear it */
+            wrmsr(msr, 0UL, 0UL);
+            /* Serialize */
+            wmb();
+            add_taint(TAINT_MACHINE_CHECK);
+        }
     }
     mcgstl &= ~(1<<2);
     wrmsr (MSR_IA32_MCG_STATUS,mcgstl, mcgsth);
 }
 
-extern void (*cpu_down_handler)(int down_cpu);
-extern void (*cpu_down_rollback_handler)(int down_cpu);
-extern void mce_disable_cpu(void);
-static bool_t cmci_clear_lock = 0;
 static DEFINE_SPINLOCK(cmci_discover_lock);
 static DEFINE_PER_CPU(cpu_banks_t, no_cmci_banks);
 
@@ -350,19 +346,16 @@ static int do_cmci_discover(int i)
     rdmsrl(msr, val);
     /* Some other CPU already owns this bank. */
     if (val & CMCI_EN) {
-    	clear_bit(i, __get_cpu_var(mce_banks_owned));
-    	goto out;
+        clear_bit(i, __get_cpu_var(mce_banks_owned));
+        goto out;
     }
     wrmsrl(msr, val | CMCI_EN | CMCI_THRESHOLD);
     rdmsrl(msr, val);
 
     if (!(val & CMCI_EN)) {
-     /*
-      * This bank does not support CMCI. The polling
-      * timer has to handle it. 
-      */
-    	set_bit(i, __get_cpu_var(no_cmci_banks));
-    	return 0;
+        /* This bank does not support CMCI. Polling timer has to handle it. */
+        set_bit(i, __get_cpu_var(no_cmci_banks));
+        return 0;
     }
     set_bit(i, __get_cpu_var(mce_banks_owned));
 out:
@@ -370,23 +363,25 @@ out:
     return 1;
 }
 
-void cmci_discover(void)
+static void cmci_discover(void)
 {
+    unsigned long flags;
     int i;
 
     printk(KERN_DEBUG "CMCI: find owner on CPU%d\n", smp_processor_id());
-    spin_lock(&cmci_discover_lock);
-    for (i = 0; i < nr_mce_banks; i++) {
-        /*If the cpu is the bank owner, need not re-discover*/
-        if (test_bit(i, __get_cpu_var(mce_banks_owned)))
-            continue;
-        do_cmci_discover(i);
-    }
-    spin_unlock(&cmci_discover_lock);
+
+    spin_lock_irqsave(&cmci_discover_lock, flags);
+
+    for (i = 0; i < nr_mce_banks; i++)
+        if (!test_bit(i, __get_cpu_var(mce_banks_owned)))
+            do_cmci_discover(i);
+
+    spin_unlock_irqrestore(&cmci_discover_lock, flags);
+
     printk(KERN_DEBUG "CMCI: CPU%d owner_map[%lx], no_cmci_map[%lx]\n", 
-            smp_processor_id(), 
-            *((unsigned long *)__get_cpu_var(mce_banks_owned)), 
-            *((unsigned long *)__get_cpu_var(no_cmci_banks)));
+           smp_processor_id(), 
+           *((unsigned long *)__get_cpu_var(mce_banks_owned)), 
+           *((unsigned long *)__get_cpu_var(no_cmci_banks)));
 }
 
 /*
@@ -402,11 +397,21 @@ void cmci_discover(void)
 
 static void mce_set_owner(void)
 {
-
     if (!cmci_support || mce_disabled == 1)
         return;
 
     cmci_discover();
+}
+
+static void __cpu_mcheck_distribute_cmci(void *unused)
+{
+    cmci_discover();
+}
+
+void cpu_mcheck_distribute_cmci(void)
+{
+    if (cmci_support && !mce_disabled)
+        on_each_cpu(__cpu_mcheck_distribute_cmci, NULL, 0, 0);
 }
 
 static void clear_cmci(void)
@@ -431,62 +436,12 @@ static void clear_cmci(void)
     }
 }
 
-/*we need to re-set cmci owners when cpu_down fail or cpu_up*/
-static void cmci_reenable_cpu(void *h)
+void cpu_mcheck_disable(void)
 {
-    if (!mce_available(&current_cpu_data) || mce_disabled == 1)
-         return;
-    printk(KERN_DEBUG "CMCI: reenable mce on CPU%d\n", smp_processor_id());
-    mce_set_owner();
-    set_in_cr4(X86_CR4_MCE);
-}
+    clear_in_cr4(X86_CR4_MCE);
 
-/* When take cpu_down, we need to execute the impacted cmci_owner judge algorithm 
- * First, we need to clear the ownership on the dead CPU
- * Then,  other CPUs will check whether to take the bank's ownership from down_cpu
- * CPU0 need not and "never" execute this path
-*/
-void  __cpu_clear_cmci( int down_cpu)
-{
-    int cpu = smp_processor_id();
-
-    if (!cmci_support && mce_disabled == 1)
-        return;
-
-    if (cpu == 0) {
-        printk(KERN_DEBUG "CMCI: CPU0 need not be cleared\n");
-        return;
-    }
-
-    local_irq_disable();
-    if (cpu == down_cpu){
-        mce_disable_cpu();
+    if (cmci_support && !mce_disabled)
         clear_cmci();
-        wmb();
-        test_and_set_bool(cmci_clear_lock);
-        return;
-    }
-    while (!cmci_clear_lock)
-        cpu_relax();
-    if (cpu != down_cpu)
-        mce_set_owner();
-
-    test_and_clear_bool(cmci_clear_lock);
-    local_irq_enable();
-
-}
-
-void  __cpu_clear_cmci_rollback( int down_cpu)
-{
-    cpumask_t down_map;
-    if (!cmci_support || mce_disabled == 1) 
-        return;
-
-    cpus_clear(down_map);
-    cpu_set(down_cpu, down_map);
-    printk(KERN_ERR "CMCI: cpu_down fail. "
-        "Reenable cmci on CPU%d\n", down_cpu);
-    on_selected_cpus(down_map, cmci_reenable_cpu, NULL, 1, 1);
 }
 
 static void intel_init_cmci(struct cpuinfo_x86 *c)
@@ -511,11 +466,8 @@ static void intel_init_cmci(struct cpuinfo_x86 *c)
     apic |= (APIC_DM_FIXED | APIC_LVT_MASKED);
     apic_write_around(APIC_CMCI, apic);
 
-	/*now clear mask flag*/
     l = apic_read(APIC_CMCI);
     apic_write_around(APIC_CMCI, l & ~APIC_LVT_MASKED);
-    cpu_down_handler =  __cpu_clear_cmci;
-    cpu_down_rollback_handler = __cpu_clear_cmci_rollback; 
 }
 
 fastcall void smp_cmci_interrupt(struct cpu_user_regs *regs)
@@ -588,7 +540,7 @@ static void mce_init(void)
 
     set_in_cr4(X86_CR4_MCE);
     rdmsr (MSR_IA32_MCG_CAP, l, h);
-    if (l & MCG_CTL_P)	/* Control register present ? */
+    if (l & MCG_CTL_P) /* Control register present ? */
         wrmsr(MSR_IA32_MCG_CTL, 0xffffffff, 0xffffffff);
 
     for (i = firstbank; i < nr_mce_banks; i++)
@@ -611,15 +563,14 @@ static void mce_init(void)
 /*p4/p6 faimily has similar MCA initialization process*/
 void intel_mcheck_init(struct cpuinfo_x86 *c)
 {
-	
-	mce_cap_init(c);
-	printk (KERN_INFO "Intel machine check reporting enabled on CPU#%d.\n",
-		smp_processor_id());
-	/* machine check is available */
-	machine_check_vector = intel_machine_check;
-	mce_init();
-	mce_intel_feature_init(c);
-	mce_set_owner();
+    mce_cap_init(c);
+    printk (KERN_INFO "Intel machine check reporting enabled on CPU#%d.\n",
+            smp_processor_id());
+    /* machine check is available */
+    machine_check_vector = intel_machine_check;
+    mce_init();
+    mce_intel_feature_init(c);
+    mce_set_owner();
 }
 
 /*

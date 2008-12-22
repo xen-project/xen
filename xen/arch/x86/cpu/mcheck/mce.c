@@ -116,16 +116,6 @@ int mce_available(struct cpuinfo_x86 *c)
 	return cpu_has(c, X86_FEATURE_MCE) && cpu_has(c, X86_FEATURE_MCA);
 }
 
-/*Make sure there are no machine check on offlined or suspended CPUs*/
-void mce_disable_cpu(void)
-{
-    if (!mce_available(&current_cpu_data) || mce_disabled == 1)
-         return;
-    printk(KERN_DEBUG "MCE: disable mce on CPU%d\n", smp_processor_id());
-    clear_in_cr4(X86_CR4_MCE);
-}
-
-
 /* This has to be run for each processor */
 void mcheck_init(struct cpuinfo_x86 *c)
 {

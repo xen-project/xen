@@ -1237,25 +1237,11 @@ remove_siblinginfo(int cpu)
 }
 
 extern void fixup_irqs(cpumask_t map);
-
-/*
- * Functions called when offline cpu. 
- * We need to process some new feature such as 
- * CMCI owner change when do cpu hotplug in latest 
- * Intel CPU families
-*/
-void (*cpu_down_handler)(int down_cpu) = NULL;
-void (*cpu_down_rollback_handler)(int down_cpu) = NULL;
-
-
-int __cpu_disable(int down_cpu)
+int __cpu_disable(void)
 {
 	cpumask_t map = cpu_online_map;
 	int cpu = smp_processor_id();
 
-	/*Only down_cpu need to execute this function*/
-	if (cpu != down_cpu)
-		return 0;
 	/*
 	 * Perhaps use cpufreq to drop frequency, but that could go
 	 * into generic code.
@@ -1278,6 +1264,8 @@ int __cpu_disable(int down_cpu)
 
 	time_suspend();
 
+	cpu_mcheck_disable();
+
 	remove_siblinginfo(cpu);
 
 	cpu_clear(cpu, map);
@@ -1293,28 +1281,25 @@ int __cpu_disable(int down_cpu)
 void __cpu_die(unsigned int cpu)
 {
 	/* We don't do anything here: idle task is faking death itself. */
-	unsigned int i;
+	unsigned int i = 0;
 
-	for (i = 0; i < 10; i++) {
+	for (;;) {
 		/* They ack this in play_dead by setting CPU_DEAD */
 		if (per_cpu(cpu_state, cpu) == CPU_DEAD) {
-			printk ("CPU %d is now offline\n", cpu);
+			printk ("CPU %u is now offline\n", cpu);
 			return;
 		}
 		mdelay(100);
 		mb();
 		process_pending_timers();
+		if ((++i % 10) == 0)
+			printk(KERN_ERR "CPU %u still not dead...\n", cpu);
 	}
- 	printk(KERN_ERR "CPU %u didn't die...\n", cpu);
 }
-static int take_cpu_down(void *down_cpu)
+
+static int take_cpu_down(void *unused)
 {
-
-    if (cpu_down_handler)
-        cpu_down_handler(*(int *)down_cpu);
-    wmb();
-
-    return __cpu_disable(*(int *)down_cpu);
+    return __cpu_disable();
 }
 
 int cpu_down(unsigned int cpu)
@@ -1340,21 +1325,17 @@ int cpu_down(unsigned int cpu)
 
 	printk("Prepare to bring CPU%d down...\n", cpu);
 
-	err = stop_machine_run(take_cpu_down, &cpu, cpu_online_map);
-	if ( err < 0 )
+	err = stop_machine_run(take_cpu_down, NULL, cpu);
+	if (err < 0)
 		goto out;
 
 	__cpu_die(cpu);
 
-	if (cpu_online(cpu)) {
-		printk("Bad state (DEAD, but in online map) on CPU%d\n", cpu);
-		err = -EBUSY;
-	}
-out:
-	/*if cpu_offline failed, re-check cmci_owner*/
+	BUG_ON(cpu_online(cpu));
 
-	if ( err < 0 && cpu_down_rollback_handler) 
-		cpu_down_rollback_handler(cpu); 
+	cpu_mcheck_distribute_cmci();
+
+out:
 	spin_unlock(&cpu_add_remove_lock);
 	return err;
 }
