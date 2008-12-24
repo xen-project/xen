@@ -665,14 +665,6 @@ long arch_do_domctl(
         }
 
         ret = -EINVAL;
-        if ( device_assigned(bus, devfn) )
-        {
-            gdprintk(XENLOG_ERR, "XEN_DOMCTL_assign_device: "
-                     "%x:%x:%x already assigned, or non-existent\n",
-                     bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
-            put_domain(d);
-            break;
-        }
 
         ret = assign_device(d, bus, devfn);
         if ( ret )
@@ -715,15 +707,10 @@ long arch_do_domctl(
             put_domain(d);
             break;
         }
-
-        if ( !device_assigned(bus, devfn) )
-        {
-            put_domain(d);
-            break;
-        }
-
         ret = 0;
-        deassign_device(d, bus, devfn);
+        spin_lock(&pcidevs_lock);
+        ret = deassign_device(d, bus, devfn);
+        spin_unlock(&pcidevs_lock);
         gdprintk(XENLOG_INFO, "XEN_DOMCTL_deassign_device: bdf = %x:%x:%x\n",
             bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
 
@@ -1034,6 +1021,32 @@ long arch_do_domctl(
             rcu_unlock_domain(d);
             ret = 0;
         }
+    }
+    break;
+
+    case XEN_DOMCTL_debug_op:
+    {
+        struct domain *d;
+        struct vcpu *v;
+
+        ret = -ESRCH;
+        d = rcu_lock_domain_by_id(domctl->domain);
+        if ( d == NULL )
+            break;
+
+        ret = -EINVAL;
+        if ( (domctl->u.debug_op.vcpu >= MAX_VIRT_CPUS) ||
+             ((v = d->vcpu[domctl->u.debug_op.vcpu]) == NULL) )
+            goto debug_op_out;
+
+        ret = -EINVAL;
+        if ( !is_hvm_domain(d))
+            goto debug_op_out;
+
+        ret = hvm_debug_op(v, domctl->u.debug_op.op);
+
+    debug_op_out:
+        rcu_unlock_domain(d);
     }
     break;
 

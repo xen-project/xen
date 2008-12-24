@@ -43,6 +43,9 @@
 #define INFO     1
 #define PROGRESS 0
 
+/* Force a compilation error if condition is true */
+#define XC_BUILD_BUG_ON(p) ((void)sizeof(struct { int:-!!(p); }))
+
 /*
 ** Define max dirty page cache to permit during save/restore -- need to balance 
 ** keeping cache usage down with CPU impact of invalidating too often.

@@ -627,6 +627,15 @@ void oos_fixup_add(struct vcpu *v, mfn_t gmfn,
             idx = (idx + 1) % SHADOW_OOS_PAGES;
         if ( mfn_x(oos[idx]) == mfn_x(gmfn) )
         {
+            int i;
+            for ( i = 0; i < SHADOW_OOS_FIXUPS; i++ )
+            {
+                if ( mfn_valid(oos_fixup[idx].smfn[i])
+                     && (mfn_x(oos_fixup[idx].smfn[i]) == mfn_x(smfn))
+                     && (oos_fixup[idx].off[i] == off) )
+                    return;
+            }
+
             next = oos_fixup[idx].next;
 
             if ( mfn_x(oos_fixup[idx].smfn[next]) != INVALID_MFN )

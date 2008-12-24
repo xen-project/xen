@@ -109,11 +109,16 @@ struct arch_vmx_struct {
 
     unsigned long        host_cr0;
 
+    /* Is the guest in real mode? */
+    uint8_t              vmx_realmode;
     /* Are we emulating rather than VMENTERing? */
-#define VMXEMUL_REALMODE 1  /* Yes, because CR0.PE == 0   */
-#define VMXEMUL_BAD_CS   2  /* Yes, because CS.RPL != CPL */
-#define VMXEMUL_BAD_SS   4  /* Yes, because SS.RPL != CPL */
-    uint8_t              vmxemul;
+    uint8_t              vmx_emulate;
+    /* Bitmask of segments that we can't safely use in virtual 8086 mode */
+    uint16_t             vm86_segment_mask;
+    /* Shadow CS, SS, DS, ES, FS, GS, TR while in virtual 8086 mode */
+    struct segment_register vm86_saved_seg[x86_seg_tr + 1];
+    /* Remember EFLAGS while in virtual 8086 mode */
+    uint32_t             vm86_saved_eflags;
 };
 
 int vmx_create_vmcs(struct vcpu *v);
@@ -137,6 +142,7 @@ void vmx_vmcs_exit(struct vcpu *v);
 #define CPU_BASED_MOV_DR_EXITING              0x00800000
 #define CPU_BASED_UNCOND_IO_EXITING           0x01000000
 #define CPU_BASED_ACTIVATE_IO_BITMAP          0x02000000
+#define CPU_BASED_MONITOR_TRAP_FLAG           0x08000000
 #define CPU_BASED_ACTIVATE_MSR_BITMAP         0x10000000
 #define CPU_BASED_MONITOR_EXITING             0x20000000
 #define CPU_BASED_PAUSE_EXITING               0x40000000
@@ -181,6 +187,8 @@ extern bool_t cpu_has_vmx_ins_outs_instr_info;
     (vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_EPT)
 #define cpu_has_vmx_vpid \
     (vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_VPID)
+#define cpu_has_monitor_trap_flag \
+    (vmx_cpu_based_exec_control & CPU_BASED_MONITOR_TRAP_FLAG)
 
 /* GUEST_INTERRUPTIBILITY_INFO flags. */
 #define VMX_INTR_SHADOW_STI             0x00000001

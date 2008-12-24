@@ -129,6 +129,16 @@ static int powernow_cpufreq_target(struct cpufreq_policy *policy,
     return result;
 }
 
+static int powernow_cpufreq_verify(struct cpufreq_policy *policy)
+{
+    struct powernow_cpufreq_data *data;
+
+    if (!policy || !(data = drv_data[policy->cpu]))
+        return -EINVAL;
+
+    return cpufreq_frequency_table_verify(policy, data->freq_table);
+}
+
 static int powernow_cpufreq_cpu_init(struct cpufreq_policy *policy)
 {
     unsigned int i;
@@ -243,6 +253,7 @@ static int powernow_cpufreq_cpu_exit(struct cpufreq_policy *policy)
 }
 
 static struct cpufreq_driver powernow_cpufreq_driver = {
+    .verify = powernow_cpufreq_verify,
     .target = powernow_cpufreq_target,
     .init   = powernow_cpufreq_cpu_init,
     .exit   = powernow_cpufreq_cpu_exit

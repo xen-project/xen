@@ -234,6 +234,7 @@ ENTRY(compat_syscall)
         call  compat_create_bounce_frame
         jmp   compat_test_all_events
 2:      movl  $TRAP_gp_fault,UREGS_entry_vector(%rsp)
+        subl  $2,UREGS_rip(%rsp)
         movq  VCPU_gp_fault_addr(%rbx),%rax
         movzwl VCPU_gp_fault_sel(%rbx),%esi
         movb  $(TBF_EXCEPTION|TBF_EXCEPTION_ERRCODE|TBF_INTERRUPT),%cl

@@ -36,20 +36,18 @@ struct pci_dev {
     struct domain *domain;
     const u8 bus;
     const u8 devfn;
-    spinlock_t lock;
 };
 
 #define for_each_pdev(domain, pdev) \
     list_for_each_entry(pdev, &(domain->arch.pdev_list), domain_list)
 
 /*
- * The pcidevs_lock write-lock must be held when doing alloc_pdev() or
- * free_pdev().  Never de-reference pdev without holding pdev->lock or
- * pcidevs_lock.  Always aquire pcidevs_lock before pdev->lock when
- * doing free_pdev().
+ * The pcidevs_lock protect alldevs_list, and the assignment for the 
+ * devices, it also sync the access to the msi capability that is not
+ * interrupt handling related (the mask bit register).
  */
 
-extern rwlock_t pcidevs_lock;
+extern spinlock_t pcidevs_lock;
 
 struct pci_dev *alloc_pdev(u8 bus, u8 devfn);
 void free_pdev(struct pci_dev *pdev);
@@ -59,6 +57,8 @@ struct pci_dev *pci_lock_domain_pdev(struct domain *d, int bus, int devfn);
 void pci_release_devices(struct domain *d);
 int pci_add_device(u8 bus, u8 devfn);
 int pci_remove_device(u8 bus, u8 devfn);
+struct pci_dev *pci_get_pdev(int bus, int devfn);
+struct pci_dev *pci_get_pdev_by_domain(struct domain *d, int bus, int devfn);
 
 uint8_t pci_conf_read8(
     unsigned int bus, unsigned int dev, unsigned int func, unsigned int reg);

@@ -420,7 +420,9 @@ static unsigned long demand_map_area_start;
 #define DEMAND_MAP_PAGES ((2ULL << 30) / PAGE_SIZE)
 #endif
 
-#ifdef HAVE_LIBC
+#ifndef HAVE_LIBC
+#define HEAP_PAGES 0
+#else
 unsigned long heap, brk, heap_mapped, heap_end;
 #ifdef __x86_64__
 #define HEAP_PAGES ((128ULL << 30) / PAGE_SIZE)
@@ -591,7 +593,7 @@ void arch_init_p2m(unsigned long max_pfn)
 void arch_init_mm(unsigned long* start_pfn_p, unsigned long* max_pfn_p)
 {
 
-    unsigned long start_pfn, max_pfn;
+    unsigned long start_pfn, max_pfn, virt_pfns;
 
     printk("  _text:        %p\n", &_text);
     printk("  _etext:       %p\n", &_etext);
@@ -604,7 +606,12 @@ void arch_init_mm(unsigned long* start_pfn_p, unsigned long* max_pfn_p)
     start_pfn = PFN_UP(to_phys(start_info.pt_base)) + 
                 start_info.nr_pt_frames + 3;
     max_pfn = start_info.nr_pages;
-   
+
+    /* We need room for demand mapping and heap, clip available memory */
+    virt_pfns = DEMAND_MAP_PAGES + HEAP_PAGES;
+    if (max_pfn + virt_pfns + 1 < max_pfn)
+        max_pfn = -(virt_pfns + 1);
+
     printk("  start_pfn:    %lx\n", start_pfn);
     printk("  max_pfn:      %lx\n", max_pfn);
 

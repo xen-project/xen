@@ -1111,6 +1111,12 @@ int xc_domain_set_target(int xc_handle,
                          uint32_t domid,
                          uint32_t target);
 
+/* Control the domain for debug */
+int xc_domain_debug_control(int xc_handle,
+                            uint32_t domid,
+                            uint32_t sop,
+                            uint32_t vcpu);
+
 #if defined(__i386__) || defined(__x86_64__)
 int xc_cpuid_check(int xc,
                    const unsigned int *input,
@@ -1161,4 +1167,46 @@ int xc_pm_reset_cxstat(int xc_handle, int cpuid);
 
 int xc_cpu_online(int xc_handle, int cpu);
 int xc_cpu_offline(int xc_handle, int cpu);
+
+/* 
+ * cpufreq para name of this structure named 
+ * same as sysfs file name of native linux
+ */
+typedef xen_userspace_t xc_userspace_t;
+typedef xen_ondemand_t xc_ondemand_t;
+
+struct xc_get_cpufreq_para {
+    /* IN/OUT variable */
+    uint32_t cpu_num;
+    uint32_t freq_num;
+    uint32_t gov_num;
+
+    /* for all governors */
+    /* OUT variable */
+    uint32_t *affected_cpus;
+    uint32_t *scaling_available_frequencies;
+    char     *scaling_available_governors;
+    char scaling_driver[CPUFREQ_NAME_LEN];
+
+    uint32_t cpuinfo_cur_freq;
+    uint32_t cpuinfo_max_freq;
+    uint32_t cpuinfo_min_freq;
+    uint32_t scaling_cur_freq;
+
+    char scaling_governor[CPUFREQ_NAME_LEN];
+    uint32_t scaling_max_freq;
+    uint32_t scaling_min_freq;
+
+    /* for specific governor */
+    union {
+        xc_userspace_t userspace;
+        xc_ondemand_t ondemand;
+    } u;
+};
+
+int xc_get_cpufreq_para(int xc_handle, int cpuid,
+                        struct xc_get_cpufreq_para *user_para);
+int xc_set_cpufreq_gov(int xc_handle, int cpuid, char *govname);
+int xc_set_cpufreq_para(int xc_handle, int cpuid,
+                        int ctrl_type, int ctrl_value);
 #endif /* XENCTRL_H */

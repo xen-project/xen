@@ -72,6 +72,8 @@ void _write_unlock(rwlock_t *lock);
 void _write_unlock_irq(rwlock_t *lock);
 void _write_unlock_irqrestore(rwlock_t *lock, unsigned long flags);
 
+int _rw_is_locked(rwlock_t *lock);
+
 #define spin_lock(l)                  _spin_lock(l)
 #define spin_lock_irq(l)              _spin_lock_irq(l)
 #define spin_lock_irqsave(l, f)       ((f) = _spin_lock_irqsave(l))
@@ -80,7 +82,7 @@ void _write_unlock_irqrestore(rwlock_t *lock, unsigned long flags);
 #define spin_unlock_irq(l)            _spin_unlock_irq(l)
 #define spin_unlock_irqrestore(l, f)  _spin_unlock_irqrestore(l, f)
 
-#define spin_is_locked(l)             _raw_spin_is_locked(&(l)->raw)
+#define spin_is_locked(l)             _spin_is_locked(l)
 #define spin_trylock(l)               _spin_trylock(l)
 
 /* Ensure a lock is quiescent between two critical operations. */
@@ -112,5 +114,7 @@ void _write_unlock_irqrestore(rwlock_t *lock, unsigned long flags);
 #define write_unlock(l)               _write_unlock(l)
 #define write_unlock_irq(l)           _write_unlock_irq(l)
 #define write_unlock_irqrestore(l, f) _write_unlock_irqrestore(l, f)
+
+#define rw_is_locked(l)               _rw_is_locked(l)
 
 #endif /* __SPINLOCK_H__ */

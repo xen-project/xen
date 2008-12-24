@@ -23,8 +23,13 @@
  *
  */
 
+#include <errno.h>
+#include <stdbool.h>
 #include "xc_private.h"
 
+/*
+ * Get PM statistic info
+ */
 int xc_pm_get_max_px(int xc_handle, int cpuid, int *max_px)
 {
     DECLARE_SYSCTL;
@@ -165,6 +170,139 @@ int xc_pm_reset_cxstat(int xc_handle, int cpuid)
     sysctl.cmd = XEN_SYSCTL_get_pmstat;
     sysctl.u.get_pmstat.type = PMSTAT_reset_cxstat;
     sysctl.u.get_pmstat.cpuid = cpuid;
+
+    return xc_sysctl(xc_handle, &sysctl);
+}
+
+
+/*
+ * 1. Get PM parameter
+ * 2. Provide user PM control
+ */
+int xc_get_cpufreq_para(int xc_handle, int cpuid,
+                        struct xc_get_cpufreq_para *user_para)
+{
+    DECLARE_SYSCTL;
+    int ret = 0;
+    struct xen_get_cpufreq_para *sys_para = &sysctl.u.pm_op.get_para;
+    bool has_num = user_para->cpu_num &&
+                     user_para->freq_num &&
+                     user_para->gov_num;
+
+    if ( (xc_handle < 0) || !user_para )
+        return -EINVAL;
+
+    if ( has_num )
+    {
+        if ( (!user_para->affected_cpus)                    ||
+             (!user_para->scaling_available_frequencies)    ||
+             (!user_para->scaling_available_governors) )
+            return -EINVAL;
+
+        if ( (ret = lock_pages(user_para->affected_cpus,
+                               user_para->cpu_num * sizeof(uint32_t))) )
+            goto unlock_1;
+        if ( (ret = lock_pages(user_para->scaling_available_frequencies,
+                               user_para->freq_num * sizeof(uint32_t))) )
+            goto unlock_2;
+        if ( (ret = lock_pages(user_para->scaling_available_governors,
+                 user_para->gov_num * CPUFREQ_NAME_LEN * sizeof(char))) )
+            goto unlock_3;
+
+        set_xen_guest_handle(sys_para->affected_cpus,
+                             user_para->affected_cpus);
+        set_xen_guest_handle(sys_para->scaling_available_frequencies,
+                             user_para->scaling_available_frequencies);
+        set_xen_guest_handle(sys_para->scaling_available_governors,
+                             user_para->scaling_available_governors);
+    }
+
+    sysctl.cmd = XEN_SYSCTL_pm_op;
+    sysctl.u.pm_op.cmd = GET_CPUFREQ_PARA;
+    sysctl.u.pm_op.cpuid = cpuid;
+    sys_para->cpu_num  = user_para->cpu_num;
+    sys_para->freq_num = user_para->freq_num;
+    sys_para->gov_num  = user_para->gov_num;
+
+    ret = xc_sysctl(xc_handle, &sysctl);
+    if ( ret )
+    {
+        if ( errno == EAGAIN )
+        {
+            user_para->cpu_num  = sys_para->cpu_num;
+            user_para->freq_num = sys_para->freq_num;
+            user_para->gov_num  = sys_para->gov_num;
+            ret = -errno;
+        }
+
+        if ( has_num )
+            goto unlock_4;
+        goto unlock_1;
+    }
+    else
+    {
+        user_para->cpuinfo_cur_freq = sys_para->cpuinfo_cur_freq;
+        user_para->cpuinfo_max_freq = sys_para->cpuinfo_max_freq;
+        user_para->cpuinfo_min_freq = sys_para->cpuinfo_min_freq;
+        user_para->scaling_cur_freq = sys_para->scaling_cur_freq;
+        user_para->scaling_max_freq = sys_para->scaling_max_freq;
+        user_para->scaling_min_freq = sys_para->scaling_min_freq;
+
+        memcpy(user_para->scaling_driver, 
+                sys_para->scaling_driver, CPUFREQ_NAME_LEN);
+        memcpy(user_para->scaling_governor,
+                sys_para->scaling_governor, CPUFREQ_NAME_LEN);
+
+        /* copy to user_para no matter what cpufreq governor */
+        XC_BUILD_BUG_ON(sizeof(((struct xc_get_cpufreq_para *)0)->u) !=
+                        sizeof(((struct xen_get_cpufreq_para *)0)->u));
+
+        memcpy(&user_para->u, &sys_para->u, sizeof(sys_para->u));
+    }
+
+unlock_4:
+    unlock_pages(user_para->scaling_available_governors,
+                 user_para->gov_num * CPUFREQ_NAME_LEN * sizeof(char));
+unlock_3:
+    unlock_pages(user_para->scaling_available_frequencies,
+                 user_para->freq_num * sizeof(uint32_t));
+unlock_2:
+    unlock_pages(user_para->affected_cpus,
+                 user_para->cpu_num * sizeof(uint32_t));
+unlock_1:
+    return ret;
+}
+
+int xc_set_cpufreq_gov(int xc_handle, int cpuid, char *govname)
+{
+    DECLARE_SYSCTL;
+    char *scaling_governor = sysctl.u.pm_op.set_gov.scaling_governor;
+
+    if ( (xc_handle < 0) || (!govname) )
+        return -EINVAL;
+
+    sysctl.cmd = XEN_SYSCTL_pm_op;
+    sysctl.u.pm_op.cmd = SET_CPUFREQ_GOV;
+    sysctl.u.pm_op.cpuid = cpuid;
+    strncpy(scaling_governor, govname, CPUFREQ_NAME_LEN);
+    scaling_governor[CPUFREQ_NAME_LEN - 1] = '\0';
+
+    return xc_sysctl(xc_handle, &sysctl);
+}
+
+int xc_set_cpufreq_para(int xc_handle, int cpuid, 
+                        int ctrl_type, int ctrl_value)
+{
+    DECLARE_SYSCTL;
+
+    if ( xc_handle < 0 )
+        return -EINVAL;
+
+    sysctl.cmd = XEN_SYSCTL_pm_op;
+    sysctl.u.pm_op.cmd = SET_CPUFREQ_PARA;
+    sysctl.u.pm_op.cpuid = cpuid;
+    sysctl.u.pm_op.set_para.ctrl_type = ctrl_type;
+    sysctl.u.pm_op.set_para.ctrl_value = ctrl_value;
 
     return xc_sysctl(xc_handle, &sysctl);
 }

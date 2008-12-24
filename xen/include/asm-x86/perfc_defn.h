@@ -127,4 +127,7 @@ PERFCOUNTER(mshv_wrmsr_icr,             "MS Hv wrmsr icr")
 PERFCOUNTER(mshv_wrmsr_tpr,             "MS Hv wrmsr tpr")
 PERFCOUNTER(mshv_wrmsr_eoi,             "MS Hv wrmsr eoi")
 
+PERFCOUNTER(realmode_emulations, "realmode instructions emulated")
+PERFCOUNTER(realmode_exits,      "vmexits from realmode")
+
 /*#endif*/ /* __XEN_PERFC_DEFN_H__ */

@@ -99,8 +99,11 @@ void __init apic_intr_init(void)
     /* Performance Counters Interrupt */
     set_intr_gate(PMU_APIC_VECTOR, pmu_apic_interrupt);
 
-    /* thermal monitor LVT interrupt */
-#ifdef CONFIG_X86_MCE_P4THERMAL
+    /* CMCI Correctable Machine Check Interrupt */
+    set_intr_gate(CMCI_APIC_VECTOR, cmci_interrupt);
+
+    /* thermal monitor LVT interrupt, for P4 and latest Intel CPU*/
+#ifdef CONFIG_X86_MCE_THERMAL
     set_intr_gate(THERMAL_APIC_VECTOR, thermal_interrupt);
 #endif
 }
@@ -172,12 +175,17 @@ void clear_local_APIC(void)
     }
 
 /* lets not touch this if we didn't frob it */
-#ifdef CONFIG_X86_MCE_P4THERMAL
+#ifdef CONFIG_X86_MCE_THERMAL
     if (maxlvt >= 5) {
         v = apic_read(APIC_LVTTHMR);
         apic_write_around(APIC_LVTTHMR, v | APIC_LVT_MASKED);
     }
 #endif
+
+    if (maxlvt >= 6) {
+        v = apic_read(APIC_CMCI);
+        apic_write_around(APIC_CMCI, v | APIC_LVT_MASKED);
+    }
     /*
      * Clean APIC state for other OSs:
      */
@@ -189,10 +197,13 @@ void clear_local_APIC(void)
     if (maxlvt >= 4)
         apic_write_around(APIC_LVTPC, APIC_LVT_MASKED);
 
-#ifdef CONFIG_X86_MCE_P4THERMAL
+#ifdef CONFIG_X86_MCE_THERMAL
     if (maxlvt >= 5)
         apic_write_around(APIC_LVTTHMR, APIC_LVT_MASKED);
 #endif
+    if (maxlvt >= 6)
+        apic_write_around(APIC_CMCI, APIC_LVT_MASKED);
+
     v = GET_APIC_VERSION(apic_read(APIC_LVR));
     if (APIC_INTEGRATED(v)) {  /* !82489DX */
         if (maxlvt > 3)        /* Due to Pentium errata 3AP and 11AP. */
@@ -597,6 +608,7 @@ static struct {
     unsigned int apic_spiv;
     unsigned int apic_lvtt;
     unsigned int apic_lvtpc;
+    unsigned int apic_lvtcmci;
     unsigned int apic_lvt0;
     unsigned int apic_lvt1;
     unsigned int apic_lvterr;
@@ -608,7 +620,7 @@ static struct {
 int lapic_suspend(void)
 {
     unsigned long flags;
-
+    int maxlvt = get_maxlvt();
     if (!apic_pm_state.active)
         return 0;
 
@@ -620,6 +632,11 @@ int lapic_suspend(void)
     apic_pm_state.apic_spiv = apic_read(APIC_SPIV);
     apic_pm_state.apic_lvtt = apic_read(APIC_LVTT);
     apic_pm_state.apic_lvtpc = apic_read(APIC_LVTPC);
+
+    if (maxlvt >= 6) {
+        apic_pm_state.apic_lvtcmci = apic_read(APIC_CMCI);
+    }
+
     apic_pm_state.apic_lvt0 = apic_read(APIC_LVT0);
     apic_pm_state.apic_lvt1 = apic_read(APIC_LVT1);
     apic_pm_state.apic_lvterr = apic_read(APIC_LVTERR);
@@ -637,6 +654,7 @@ int lapic_resume(void)
 {
     unsigned int l, h;
     unsigned long flags;
+    int maxlvt = get_maxlvt();
 
     if (!apic_pm_state.active)
         return 0;
@@ -669,6 +687,11 @@ int lapic_resume(void)
     apic_write(APIC_LVT0, apic_pm_state.apic_lvt0);
     apic_write(APIC_LVT1, apic_pm_state.apic_lvt1);
     apic_write(APIC_LVTTHMR, apic_pm_state.apic_thmr);
+
+    if (maxlvt >= 6) {
+        apic_write(APIC_CMCI, apic_pm_state.apic_lvtcmci);
+    }
+
     apic_write(APIC_LVTPC, apic_pm_state.apic_lvtpc);
     apic_write(APIC_LVTT, apic_pm_state.apic_lvtt);
     apic_write(APIC_TDCR, apic_pm_state.apic_tdcr);

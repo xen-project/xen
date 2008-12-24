@@ -131,9 +131,12 @@ struct drv_cmd {
     u32 val;
 };
 
-static void do_drv_read(struct drv_cmd *cmd)
+static void do_drv_read(void *drvcmd)
 {
+    struct drv_cmd *cmd;
     u32 h;
+
+    cmd = (struct drv_cmd *)drvcmd;
 
     switch (cmd->type) {
     case SYSTEM_INTEL_MSR_CAPABLE:
@@ -174,7 +177,13 @@ static void drv_read(struct drv_cmd *cmd)
 {
     cmd->val = 0;
 
-    do_drv_read(cmd);
+    ASSERT(cpus_weight(cmd->mask) == 1);
+
+    /* to reduce IPI for the sake of performance */
+    if (cpu_isset(smp_processor_id(), cmd->mask))
+        do_drv_read((void *)cmd);
+    else
+        on_selected_cpus( cmd->mask, do_drv_read, (void *)cmd, 0, 1);
 }
 
 static void drv_write(struct drv_cmd *cmd)
@@ -184,13 +193,21 @@ static void drv_write(struct drv_cmd *cmd)
 
 static u32 get_cur_val(cpumask_t mask)
 {
+    struct cpufreq_policy *policy;
     struct processor_performance *perf;
     struct drv_cmd cmd;
+    unsigned int cpu;
 
     if (unlikely(cpus_empty(mask)))
         return 0;
 
-    switch (drv_data[first_cpu(mask)]->cpu_feature) {
+    cpu = first_cpu(mask);
+    policy = cpufreq_cpu_policy[cpu];
+
+    if (!policy)
+        return 0;    
+
+    switch (drv_data[policy->cpu]->cpu_feature) {
     case SYSTEM_INTEL_MSR_CAPABLE:
         cmd.type = SYSTEM_INTEL_MSR_CAPABLE;
         cmd.addr.msr.reg = MSR_IA32_PERF_STATUS;
@@ -205,7 +222,7 @@ static u32 get_cur_val(cpumask_t mask)
         return 0;
     }
 
-    cmd.mask = mask;
+    cmd.mask = cpumask_of_cpu(cpu);
 
     drv_read(&cmd);
     return cmd.val;
@@ -255,28 +272,43 @@ static void  __get_measured_perf(void *perf_percent)
 
 static unsigned int get_measured_perf(unsigned int cpu)
 {
-    unsigned int retval, perf_percent;
+    struct cpufreq_policy *policy;
+    unsigned int perf_percent;
     cpumask_t cpumask;
 
     if (!cpu_online(cpu))
         return 0;
 
-    cpumask = cpumask_of_cpu(cpu);
-    on_selected_cpus(cpumask, __get_measured_perf, (void *)&perf_percent,0,1);
+    policy = cpufreq_cpu_policy[cpu];
+    if (!policy)
+        return 0;
 
-    retval = drv_data[cpu]->max_freq * perf_percent / 100;
-    return retval;
+    /* Usually we take the short path (no IPI) for the sake of performance. */
+    if (cpu == smp_processor_id()) {
+        __get_measured_perf((void *)&perf_percent);
+    } else {
+        cpumask = cpumask_of_cpu(cpu);
+        on_selected_cpus(cpumask, __get_measured_perf, 
+                        (void *)&perf_percent,0,1);
+    }
+
+    return drv_data[cpu]->max_freq * perf_percent / 100;
 }
 
 static unsigned int get_cur_freq_on_cpu(unsigned int cpu)
 {
-    struct acpi_cpufreq_data *data = drv_data[cpu];
+    struct cpufreq_policy *policy;
+    struct acpi_cpufreq_data *data;
     unsigned int freq;
 
-    if (unlikely(data == NULL ||
-        data->acpi_data == NULL || data->freq_table == NULL)) {
+    policy = cpufreq_cpu_policy[cpu];
+    if (!policy)
         return 0;
-    }
+
+    data = drv_data[policy->cpu];
+    if (unlikely(data == NULL ||
+        data->acpi_data == NULL || data->freq_table == NULL))
+        return 0;
 
     freq = extract_freq(get_cur_val(cpumask_of_cpu(cpu)), data);
     return freq;
@@ -327,16 +359,10 @@ static int acpi_cpufreq_target(struct cpufreq_policy *policy,
 
     next_perf_state = data->freq_table[next_state].index;
     if (perf->state == next_perf_state) {
-        if (unlikely(policy->resume)) {
-            printk(KERN_INFO "Called after resume, resetting to P%d\n", 
-                next_perf_state);
+        if (unlikely(policy->resume))
             policy->resume = 0;
-        }
-        else {
-            printk(KERN_DEBUG "Already at target state (P%d)\n", 
-                next_perf_state);
+        else
             return 0;
-        }
     }
 
     switch (data->cpu_feature) {
@@ -555,6 +581,7 @@ static int acpi_cpufreq_cpu_exit(struct cpufreq_policy *policy)
 }
 
 static struct cpufreq_driver acpi_cpufreq_driver = {
+    .name   = "acpi-cpufreq",
     .verify = acpi_cpufreq_verify,
     .target = acpi_cpufreq_target,
     .init   = acpi_cpufreq_cpu_init,

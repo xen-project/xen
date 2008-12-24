@@ -93,8 +93,12 @@ endif
 $(OBJ_DIR)/$(TARGET)_app.o: $(APP_OBJS) app.lds
 	$(LD) -r -d $(LDFLAGS) -\( $^ -\) $(APP_LDLIBS) --undefined main -o $@
 
-$(OBJ_DIR)/$(TARGET): links $(OBJS) $(OBJ_DIR)/$(TARGET)_app.o arch_lib
-	$(LD) -r $(LDFLAGS) $(HEAD_OBJ) $(OBJ_DIR)/$(TARGET)_app.o $(OBJS) $(LDARCHLIB) $(LDLIBS) -o $@.o
+ifneq ($(APP_OBJS),)
+APP_O=$(OBJ_DIR)/$(TARGET)_app.o 
+endif
+
+$(OBJ_DIR)/$(TARGET): links $(OBJS) $(APP_O) arch_lib
+	$(LD) -r $(LDFLAGS) $(HEAD_OBJ) $(APP_O) $(OBJS) $(LDARCHLIB) $(LDLIBS) -o $@.o
 	$(OBJCOPY) -w -G $(GLOBAL_PREFIX)* -G _start $@.o $@.o
 	$(LD) $(LDFLAGS) $(LDFLAGS_FINAL) $@.o $(EXTRA_OBJS) -o $@
 	gzip -f -9 -c $@ >$@.gz

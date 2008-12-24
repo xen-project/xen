@@ -55,6 +55,7 @@ static PyObject *pyflask_context_to_sid(PyObject *self, PyObject *args,
     xc_handle = xc_interface_open();
     if (xc_handle < 0) {
         errno = xc_handle;
+        free(buf);
         return PyErr_SetFromErrno(xc_error_obj);
     }
     

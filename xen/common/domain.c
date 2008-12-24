@@ -25,6 +25,7 @@
 #include <xen/percpu.h>
 #include <xen/multicall.h>
 #include <xen/rcupdate.h>
+#include <acpi/cpufreq/cpufreq.h>
 #include <asm/debugger.h>
 #include <public/sched.h>
 #include <public/vcpu.h>
@@ -41,16 +42,25 @@ boolean_param("dom0_vcpus_pin", opt_dom0_vcpus_pin);
 enum cpufreq_controller cpufreq_controller;
 static void __init setup_cpufreq_option(char *str)
 {
+    char *arg;
+
     if ( !strcmp(str, "dom0-kernel") )
     {
         xen_processor_pmbits &= ~XEN_PROCESSOR_PM_PX;
         cpufreq_controller = FREQCTL_dom0_kernel;
         opt_dom0_vcpus_pin = 1;
+        return;
     }
-    else if ( !strcmp(str, "xen") )
+
+    if ( (arg = strpbrk(str, ",:")) != NULL )
+        *arg++ = '\0';
+
+    if ( !strcmp(str, "xen") )
     {
         xen_processor_pmbits |= XEN_PROCESSOR_PM_PX;
         cpufreq_controller = FREQCTL_xen;
+        if ( arg && *arg )
+            cpufreq_cmdline_parse(arg);
     }
 }
 custom_param("cpufreq", setup_cpufreq_option);
@@ -134,13 +144,16 @@ struct vcpu *alloc_vcpu(
     v->domain = d;
     v->vcpu_id = vcpu_id;
 
-    v->runstate.state = is_idle_vcpu(v) ? RUNSTATE_running : RUNSTATE_offline;
-    v->runstate.state_entry_time = NOW();
-
     spin_lock_init(&v->virq_lock);
 
-    if ( !is_idle_domain(d) )
+    if ( is_idle_domain(d) )
     {
+        v->runstate.state = RUNSTATE_running;
+    }
+    else
+    {
+        v->runstate.state = RUNSTATE_offline;        
+        v->runstate.state_entry_time = NOW();
         set_bit(_VPF_down, &v->pause_flags);
         v->vcpu_info = (void *)&shared_info(d, vcpu_info[vcpu_id]);
     }
@@ -545,11 +558,11 @@ static void complete_domain_destroy(struct rcu_head *head)
         sched_destroy_vcpu(v);
     }
 
-    rangeset_domain_destroy(d);
-
     grant_table_destroy(d);
 
     arch_domain_destroy(d);
+
+    rangeset_domain_destroy(d);
 
     sched_destroy_domain(d);
 

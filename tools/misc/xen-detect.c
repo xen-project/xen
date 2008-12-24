@@ -50,17 +50,25 @@ static int check_for_xen(void)
 {
     uint32_t eax, ebx, ecx, edx;
     char signature[13];
+    uint32_t base;
 
-    cpuid(0x40000000, &eax, &ebx, &ecx, &edx);
-    *(uint32_t *)(signature + 0) = ebx;
-    *(uint32_t *)(signature + 4) = ecx;
-    *(uint32_t *)(signature + 8) = edx;
-    signature[12] = '\0';
+    for ( base = 0x40000000; base < 0x40001000; base += 0x100 )
+    {
+        cpuid(base, &eax, &ebx, &ecx, &edx);
 
-    if ( strcmp("XenVMMXenVMM", signature) || (eax < 0x40000002) )
-        return 0;
+        *(uint32_t *)(signature + 0) = ebx;
+        *(uint32_t *)(signature + 4) = ecx;
+        *(uint32_t *)(signature + 8) = edx;
+        signature[12] = '\0';
 
-    cpuid(0x40000001, &eax, &ebx, &ecx, &edx);
+        if ( !strcmp("XenVMMXenVMM", signature) && (eax >= (base + 2)) )
+            goto found;
+    }
+
+    return 0;
+
+ found:
+    cpuid(base + 1, &eax, &ebx, &ecx, &edx);
     printf("Running in %s context on Xen v%d.%d.\n",
            pv_context ? "PV" : "HVM", (uint16_t)(eax >> 16), (uint16_t)eax);
     return 1;

@@ -1061,6 +1061,20 @@ int xc_domain_suppress_spurious_page_faults(int xc, uint32_t domid)
 
 }
 
+int xc_domain_debug_control(int xc, uint32_t domid, uint32_t sop, uint32_t vcpu)
+{
+    DECLARE_DOMCTL;
+
+    memset(&domctl, 0, sizeof(domctl));
+    domctl.domain = (domid_t)domid;
+    domctl.cmd = XEN_DOMCTL_debug_op;
+    domctl.u.debug_op.op     = sop;
+    domctl.u.debug_op.vcpu   = vcpu;
+
+    return do_domctl(xc, &domctl);
+}
+
+
 /*
  * Local variables:
  * mode: C

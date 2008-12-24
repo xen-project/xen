@@ -619,6 +619,17 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_subscribe_t);
  */
 #define XEN_DOMCTL_suppress_spurious_page_faults 53
 
+#define XEN_DOMCTL_debug_op    54
+#define XEN_DOMCTL_DEBUG_OP_SINGLE_STEP_OFF         0
+#define XEN_DOMCTL_DEBUG_OP_SINGLE_STEP_ON          1
+struct xen_domctl_debug_op {
+    uint32_t op;   /* IN */
+    uint32_t vcpu; /* IN */
+};
+typedef struct xen_domctl_debug_op xen_domctl_debug_op_t;
+DEFINE_XEN_GUEST_HANDLE(xen_domctl_debug_op_t);
+
+
 struct xen_domctl {
     uint32_t cmd;
     uint32_t interface_version; /* XEN_DOMCTL_INTERFACE_VERSION */
@@ -658,6 +669,7 @@ struct xen_domctl {
         struct xen_domctl_set_opt_feature   set_opt_feature;
         struct xen_domctl_set_target        set_target;
         struct xen_domctl_subscribe         subscribe;
+        struct xen_domctl_debug_op          debug_op;
 #if defined(__i386__) || defined(__x86_64__)
         struct xen_domctl_cpuid             cpuid;
 #endif

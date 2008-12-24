@@ -490,6 +490,22 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
             continue;
         }
 
+        if ( j == -4 )
+        {
+            uint64_t vm86_tss;
+
+            /* Skip padding 4 bytes then read the vm86 TSS location. */
+            if ( read_exact(io_fd, &vm86_tss, sizeof(uint32_t)) ||
+                 read_exact(io_fd, &vm86_tss, sizeof(uint64_t)) )
+            {
+                ERROR("error read the address of the vm86 TSS");
+                goto out;
+            }
+
+            xc_set_hvm_param(xc_handle, dom, HVM_PARAM_VM86_TSS, vm86_tss);
+            continue;
+        }
+
         if ( j == 0 )
             break;  /* our work here is done */
 

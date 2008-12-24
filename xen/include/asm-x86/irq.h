@@ -33,6 +33,7 @@ fastcall void error_interrupt(void);
 fastcall void pmu_apic_interrupt(void);
 fastcall void spurious_interrupt(void);
 fastcall void thermal_interrupt(void);
+fastcall void cmci_interrupt(void);
 
 void disable_8259A_irq(unsigned int irq);
 void enable_8259A_irq(unsigned int irq);

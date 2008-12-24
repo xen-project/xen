@@ -83,8 +83,11 @@ int iommu_domain_init(struct domain *domain)
 int iommu_add_device(struct pci_dev *pdev)
 {
     struct hvm_iommu *hd;
+
     if ( !pdev->domain )
         return -EINVAL;
+
+    ASSERT(spin_is_locked(&pcidevs_lock));
 
     hd = domain_hvm_iommu(pdev->domain);
     if ( !iommu_enabled || !hd->platform_ops )
@@ -109,20 +112,24 @@ int iommu_remove_device(struct pci_dev *pdev)
 int assign_device(struct domain *d, u8 bus, u8 devfn)
 {
     struct hvm_iommu *hd = domain_hvm_iommu(d);
-    int rc;
+    int rc = 0;
 
     if ( !iommu_enabled || !hd->platform_ops )
         return 0;
 
+    spin_lock(&pcidevs_lock);
     if ( (rc = hd->platform_ops->assign_device(d, bus, devfn)) )
-        return rc;
+        goto done;
 
     if ( has_arch_pdevs(d) && !is_hvm_domain(d) && !need_iommu(d) )
     {
         d->need_iommu = 1;
-        return iommu_populate_page_table(d);
+        rc = iommu_populate_page_table(d);
+        goto done;
     }
-    return 0;
+done:    
+    spin_unlock(&pcidevs_lock);
+    return rc;
 }
 
 static int iommu_populate_page_table(struct domain *d)
@@ -204,12 +211,26 @@ int iommu_unmap_page(struct domain *d, unsigned long gfn)
     return hd->platform_ops->unmap_page(d, gfn);
 }
 
-void deassign_device(struct domain *d, u8 bus, u8 devfn)
+/* caller should hold the pcidevs_lock */
+int deassign_device(struct domain *d, u8 bus, u8 devfn)
 {
     struct hvm_iommu *hd = domain_hvm_iommu(d);
+    struct pci_dev *pdev = NULL;
 
     if ( !iommu_enabled || !hd->platform_ops )
-        return;
+        return -EINVAL;
+
+    ASSERT(spin_is_locked(&pcidevs_lock));
+    pdev = pci_get_pdev(bus, devfn);
+    if (!pdev)
+        return -ENODEV;
+
+    if (pdev->domain != d)
+    {
+        gdprintk(XENLOG_ERR VTDPREFIX,
+                "IOMMU: deassign a device not owned\n");
+        return -EINVAL;
+    }
 
     hd->platform_ops->reassign_device(d, dom0, bus, devfn);
 
@@ -218,6 +239,8 @@ void deassign_device(struct domain *d, u8 bus, u8 devfn)
         d->need_iommu = 0;
         hd->platform_ops->teardown(d);
     }
+
+    return 0;
 }
 
 static int iommu_setup(void)
@@ -260,7 +283,7 @@ int iommu_get_device_group(struct domain *d, u8 bus, u8 devfn,
 
     group_id = ops->get_device_group_id(bus, devfn);
 
-    read_lock(&pcidevs_lock);
+    spin_lock(&pcidevs_lock);
     for_each_pdev( d, pdev )
     {
         if ( (pdev->bus == bus) && (pdev->devfn == devfn) )
@@ -274,13 +297,13 @@ int iommu_get_device_group(struct domain *d, u8 bus, u8 devfn,
             bdf |= (pdev->devfn & 0xff) << 8;
             if ( unlikely(copy_to_guest_offset(buf, i, &bdf, 1)) )
             {
-                read_unlock(&pcidevs_lock);
+                spin_unlock(&pcidevs_lock);
                 return -1;
             }
             i++;
         }
     }
-    read_unlock(&pcidevs_lock);
+    spin_unlock(&pcidevs_lock);
 
     return i;
 }

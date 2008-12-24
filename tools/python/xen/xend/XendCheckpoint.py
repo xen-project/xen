@@ -253,7 +253,7 @@ def restore(xd, fd, dominfo = None, paused = False, relocating = False):
         # set memory limit
         xc.domain_setmaxmem(dominfo.getDomid(), maxmem)
 
-        balloon.free(memory + shadow)
+        balloon.free(memory + shadow, dominfo)
 
         shadow_cur = xc.shadow_mem_control(dominfo.getDomid(), shadow / 1024)
         dominfo.info['shadow_memory'] = shadow_cur

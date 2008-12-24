@@ -941,6 +941,9 @@ void __init __start_xen(unsigned long mbi_p)
         set_in_cr4(X86_CR4_OSFXSR);
     if ( cpu_has_xmm )
         set_in_cr4(X86_CR4_OSXMMEXCPT);
+
+    local_irq_enable();
+
 #ifdef CONFIG_X86_64
     vesa_mtrr_init();
 #endif
@@ -949,6 +952,8 @@ void __init __start_xen(unsigned long mbi_p)
         max_cpus = 0;
 
     smp_prepare_cpus(max_cpus);
+
+    spin_debug_enable();
 
     /*
      * Initialise higher-level timer functions. We do this fairly late
@@ -961,9 +966,6 @@ void __init __start_xen(unsigned long mbi_p)
     initialize_keytable();
 
     serial_init_postirq();
-
-    BUG_ON(!local_irq_is_enabled());
-    spin_debug_enable();
 
     for_each_present_cpu ( i )
     {

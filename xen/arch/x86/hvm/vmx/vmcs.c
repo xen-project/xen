@@ -99,6 +99,7 @@ static void vmx_init_vmcs_config(void)
            (opt_softtsc ? CPU_BASED_RDTSC_EXITING : 0));
     opt = (CPU_BASED_ACTIVATE_MSR_BITMAP |
            CPU_BASED_TPR_SHADOW |
+           CPU_BASED_MONITOR_TRAP_FLAG |
            CPU_BASED_ACTIVATE_SECONDARY_CONTROLS);
     _vmx_cpu_based_exec_control = adjust_vmx_controls(
         min, opt, MSR_IA32_VMX_PROCBASED_CTLS);
@@ -515,6 +516,9 @@ static int construct_vmcs(struct vcpu *v)
         v->arch.hvm_vmx.secondary_exec_control &= ~SECONDARY_EXEC_ENABLE_EPT;
     }
 
+    /* Do not enable Monitor Trap Flag unless start single step debug */
+    v->arch.hvm_vmx.exec_control &= ~CPU_BASED_MONITOR_TRAP_FLAG;
+
     __vmwrite(CPU_BASED_VM_EXEC_CONTROL, v->arch.hvm_vmx.exec_control);
     if ( cpu_has_vmx_secondary_exec_control )
         __vmwrite(SECONDARY_VM_EXEC_CONTROL,
@@ -867,7 +871,11 @@ void vmx_do_resume(struct vcpu *v)
     if ( unlikely(v->arch.hvm_vcpu.debug_state_latch != debug_state) )
     {
         unsigned long intercepts = __vmread(EXCEPTION_BITMAP);
-        unsigned long mask = (1U << TRAP_debug) | (1U << TRAP_int3);
+        unsigned long mask = 1u << TRAP_int3;
+
+        if ( !cpu_has_monitor_trap_flag )
+            mask |= 1u << TRAP_debug;
+
         v->arch.hvm_vcpu.debug_state_latch = debug_state;
         if ( debug_state )
             intercepts |= mask;
@@ -880,21 +888,34 @@ void vmx_do_resume(struct vcpu *v)
     reset_stack_and_jump(vmx_asm_do_vmentry);
 }
 
-static void vmx_dump_sel(char *name, enum x86_segment seg)
-{
-    struct segment_register sreg;
-    hvm_get_segment_register(current, seg, &sreg);
-    printk("%s: sel=0x%04x, attr=0x%05x, limit=0x%08x, base=0x%016llx\n", 
-           name, sreg.sel, sreg.attr.bytes, sreg.limit,
-           (unsigned long long)sreg.base);
-}
-
 static unsigned long vmr(unsigned long field)
 {
     int rc;
     unsigned long val;
     val = __vmread_safe(field, &rc);
     return rc ? 0 : val;
+}
+
+static void vmx_dump_sel(char *name, uint32_t selector)
+{
+    uint32_t sel, attr, limit;
+    uint64_t base;
+    sel = vmr(selector);
+    attr = vmr(selector + (GUEST_ES_AR_BYTES - GUEST_ES_SELECTOR));
+    limit = vmr(selector + (GUEST_ES_LIMIT - GUEST_ES_SELECTOR));
+    base = vmr(selector + (GUEST_ES_BASE - GUEST_ES_SELECTOR));
+    printk("%s: sel=0x%04x, attr=0x%05x, limit=0x%08x, base=0x%016"PRIx64"\n",
+           name, sel, attr, limit, base);
+}
+
+static void vmx_dump_sel2(char *name, uint32_t lim)
+{
+    uint32_t limit;
+    uint64_t base;
+    limit = vmr(lim);
+    base = vmr(lim + (GUEST_GDTR_BASE - GUEST_GDTR_LIMIT));
+    printk("%s:                           limit=0x%08x, base=0x%016"PRIx64"\n",
+           name, limit, base);
 }
 
 void vmcs_dump_vcpu(struct vcpu *v)
@@ -938,16 +959,16 @@ void vmcs_dump_vcpu(struct vcpu *v)
            (unsigned long long)vmr(GUEST_SYSENTER_ESP),
            (int)vmr(GUEST_SYSENTER_CS),
            (unsigned long long)vmr(GUEST_SYSENTER_EIP));
-    vmx_dump_sel("CS", x86_seg_cs);
-    vmx_dump_sel("DS", x86_seg_ds);
-    vmx_dump_sel("SS", x86_seg_ss);
-    vmx_dump_sel("ES", x86_seg_es);
-    vmx_dump_sel("FS", x86_seg_fs);
-    vmx_dump_sel("GS", x86_seg_gs);
-    vmx_dump_sel("GDTR", x86_seg_gdtr);
-    vmx_dump_sel("LDTR", x86_seg_ldtr);
-    vmx_dump_sel("IDTR", x86_seg_idtr);
-    vmx_dump_sel("TR", x86_seg_tr);
+    vmx_dump_sel("CS", GUEST_CS_SELECTOR);
+    vmx_dump_sel("DS", GUEST_DS_SELECTOR);
+    vmx_dump_sel("SS", GUEST_SS_SELECTOR);
+    vmx_dump_sel("ES", GUEST_ES_SELECTOR);
+    vmx_dump_sel("FS", GUEST_FS_SELECTOR);
+    vmx_dump_sel("GS", GUEST_GS_SELECTOR);
+    vmx_dump_sel2("GDTR", GUEST_GDTR_LIMIT);
+    vmx_dump_sel("LDTR", GUEST_LDTR_SELECTOR);
+    vmx_dump_sel2("IDTR", GUEST_IDTR_LIMIT);
+    vmx_dump_sel("TR", GUEST_TR_SELECTOR);
     x  = (unsigned long long)vmr(TSC_OFFSET_HIGH) << 32;
     x |= (uint32_t)vmr(TSC_OFFSET);
     printk("TSC Offset = %016llx\n", x);

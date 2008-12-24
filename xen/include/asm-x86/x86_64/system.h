@@ -55,14 +55,4 @@ static inline void atomic_write64(uint64_t *p, uint64_t v)
 #define mb()                    \
     asm volatile ( "mfence" : : : "memory" )
 
-#define __save_flags(x)         \
-    asm volatile ( "pushfq ; popq %q0" : "=g" (x) : :"memory" )
-#define __restore_flags(x)      \
-    asm volatile ( "pushq %0 ; popfq" : : "g" (x) : "memory", "cc" )
-
-#define local_irq_save(x)       \
-    asm volatile ( "pushfq ; popq %0 ; cli" : "=g" (x) : : "memory" )
-#define local_irq_restore(x)    \
-    __restore_flags(x)
-
 #endif /* __X86_64_SYSTEM_H__ */

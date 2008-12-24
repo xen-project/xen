@@ -1388,18 +1388,30 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     if ( hvm )
     {
         struct {
-            int minusthree;
+            int id;
             uint32_t pad;
-            uint64_t ident_pt;
-        } chunk = { -3, 0 };
+            uint64_t data;
+        } chunk = { 0, };
 
+        chunk.id = -3;
         xc_get_hvm_param(xc_handle, dom, HVM_PARAM_IDENT_PT,
-                         (unsigned long *)&chunk.ident_pt);
+                         (unsigned long *)&chunk.data);
 
-        if ( (chunk.ident_pt != 0) &&
+        if ( (chunk.data != 0) &&
              write_exact(io_fd, &chunk, sizeof(chunk)) )
         {
             PERROR("Error when writing the ident_pt for EPT guest");
+            goto out;
+        }
+
+        chunk.id = -4;
+        xc_get_hvm_param(xc_handle, dom, HVM_PARAM_VM86_TSS,
+                         (unsigned long *)&chunk.data);
+
+        if ( (chunk.data != 0) &&
+             write_exact(io_fd, &chunk, sizeof(chunk)) )
+        {
+            PERROR("Error when writing the vm86 TSS for guest");
             goto out;
         }
     }

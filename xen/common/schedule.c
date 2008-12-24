@@ -84,33 +84,49 @@ static inline void trace_runstate_change(struct vcpu *v, int new_state)
 static inline void vcpu_runstate_change(
     struct vcpu *v, int new_state, s_time_t new_entry_time)
 {
+    s_time_t delta;
+
     ASSERT(v->runstate.state != new_state);
     ASSERT(spin_is_locked(&per_cpu(schedule_data,v->processor).schedule_lock));
 
     trace_runstate_change(v, new_state);
 
-    v->runstate.time[v->runstate.state] +=
-        new_entry_time - v->runstate.state_entry_time;
-    v->runstate.state_entry_time = new_entry_time;
+    delta = new_entry_time - v->runstate.state_entry_time;
+    if ( delta > 0 )
+    {
+        v->runstate.time[v->runstate.state] += delta;
+        v->runstate.state_entry_time = new_entry_time;
+    }
+
     v->runstate.state = new_state;
 }
 
 void vcpu_runstate_get(struct vcpu *v, struct vcpu_runstate_info *runstate)
 {
-    if ( likely(v == current) )
-    {
-        /* Fast lock-free path. */
-        memcpy(runstate, &v->runstate, sizeof(*runstate));
-        ASSERT(runstate->state == RUNSTATE_running);
-        runstate->time[RUNSTATE_running] += NOW() - runstate->state_entry_time;
-    }
-    else
-    {
+    s_time_t delta;
+
+    if ( unlikely(v != current) )
         vcpu_schedule_lock_irq(v);
-        memcpy(runstate, &v->runstate, sizeof(*runstate));
-        runstate->time[runstate->state] += NOW() - runstate->state_entry_time;
+
+    memcpy(runstate, &v->runstate, sizeof(*runstate));
+    delta = NOW() - runstate->state_entry_time;
+    if ( delta > 0 )
+        runstate->time[runstate->state] += delta;
+
+    if ( unlikely(v != current) )
         vcpu_schedule_unlock_irq(v);
-    }
+}
+
+uint64_t get_cpu_idle_time(unsigned int cpu)
+{
+    struct vcpu_runstate_info state = { .state = RUNSTATE_running };
+    struct vcpu *v;
+
+    if ( (v = idle_vcpu[cpu]) == NULL )
+        return 0;
+
+    vcpu_runstate_get(v, &state);
+    return state.time[RUNSTATE_running];
 }
 
 int sched_init_vcpu(struct vcpu *v, unsigned int processor) 

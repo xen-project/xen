@@ -28,7 +28,10 @@
 /* Bitfield of the MSR_IA32_MCG_CAP register */
 #define MCG_CAP_COUNT           0x00000000000000ffULL
 #define MCG_CTL_P               0x0000000000000100ULL
-/* Bits 9-63 are reserved */
+#define MCG_EXT_P		(1UL<<9)
+#define MCG_EXT_CNT		(16)
+#define MCG_CMCI_P		(1UL<<10)
+/* Other bits are reserved */
 
 /* Bitfield of the MSR_IA32_MCG_STATUS register */
 #define MCG_STATUS_RIPV         0x0000000000000001ULL
@@ -69,4 +72,18 @@
 #define MCi_STATUS_OTHER_ECC_SYNDROME   0x007f800000000000ULL
 /* reserved bits */
 #define MCi_STATUS_OTHER_RESERVED2      0x0180000000000000ULL
+
+/*Intel Specific bitfield*/
+#define CMCI_THRESHOLD			0x2
+
+
+#define MAX_NR_BANKS 128
+
+typedef DECLARE_BITMAP(cpu_banks_t, MAX_NR_BANKS);
+DECLARE_PER_CPU(cpu_banks_t, mce_banks_owned);
+
+/* Global variables */
+extern int mce_disabled;
+extern unsigned int nr_mce_banks;
+extern int firstbank;
 

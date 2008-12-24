@@ -336,15 +336,19 @@ static PyObject *xspy_set_permissions(XsHandle *self, PyObject *args)
 	xs_set_error(EINVAL);
         goto exit;
     }
+
     xsperms_n = PyList_Size(perms);
-    xsperms = calloc(xsperms_n, sizeof(struct xs_permissions));
+    /* NB. alloc +1 so we can change the owner if necessary. */
+    xsperms = calloc(xsperms_n + 1, sizeof(struct xs_permissions));
     if (!xsperms) {
 	xs_set_error(ENOMEM);
         goto exit;
     }
+
     tuple0 = PyTuple_New(0);
     if (!tuple0)
         goto exit;
+
     for (i = 0; i < xsperms_n; i++) {
         /* Read/write perms. Set these. */
         int p_read = 0, p_write = 0;
@@ -357,6 +361,17 @@ static PyObject *xspy_set_permissions(XsHandle *self, PyObject *args)
         if (p_write)
             xsperms[i].perms |= XS_PERM_WRITE;
     }
+
+    /*
+     * Is the caller trying to restrict access to the first specified
+     * domain? If so then it cannot be owner, so we force dom0 as owner.
+     */
+    if (xsperms_n && xsperms[0].perms && xsperms[0].id) {
+        memmove(&xsperms[1], &xsperms[0], xsperms_n * sizeof(*xsperms));
+        xsperms[0].id = xsperms[0].perms = 0;
+        xsperms_n++;
+    }
+
     Py_BEGIN_ALLOW_THREADS
     result = xs_set_permissions(xh, th, path, xsperms, xsperms_n);
     Py_END_ALLOW_THREADS

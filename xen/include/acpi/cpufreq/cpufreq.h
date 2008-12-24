@@ -17,8 +17,6 @@
 
 #include "processor_perf.h"
 
-#define CPUFREQ_NAME_LEN 16
-
 struct cpufreq_governor;
 
 struct acpi_cpufreq_data {
@@ -55,6 +53,8 @@ extern struct cpufreq_policy *cpufreq_cpu_policy[NR_CPUS];
 extern int __cpufreq_set_policy(struct cpufreq_policy *data,
                                 struct cpufreq_policy *policy);
 
+void cpufreq_cmdline_parse(char *);
+
 #define CPUFREQ_SHARED_TYPE_NONE (0) /* None */
 #define CPUFREQ_SHARED_TYPE_HW   (1) /* HW does needed coordination */
 #define CPUFREQ_SHARED_TYPE_ALL  (2) /* All dependent CPUs should set freq */
@@ -82,10 +82,18 @@ struct cpufreq_governor {
     char    name[CPUFREQ_NAME_LEN];
     int     (*governor)(struct cpufreq_policy *policy,
                         unsigned int event);
+    struct list_head governor_list;
 };
 
 extern struct cpufreq_governor cpufreq_gov_dbs;
-#define CPUFREQ_DEFAULT_GOVERNOR &cpufreq_gov_dbs
+extern struct cpufreq_governor cpufreq_gov_userspace;
+extern struct cpufreq_governor cpufreq_gov_performance;
+extern struct cpufreq_governor cpufreq_gov_powersave;
+
+extern int cpufreq_register_governor(struct cpufreq_governor *governor);
+extern int cpufreq_unregister_governor(struct cpufreq_governor *governor);
+extern struct cpufreq_governor *__find_governor(const char *governor);
+#define CPUFREQ_DEFAULT_GOVERNOR &cpufreq_gov_performance
 
 /* pass a target to the cpufreq driver */
 extern int __cpufreq_driver_target(struct cpufreq_policy *policy,
@@ -108,6 +116,7 @@ __cpufreq_governor(struct cpufreq_policy *policy, unsigned int event)
 #define CPUFREQ_RELATION_H 1  /* highest frequency below or at target */
 
 struct cpufreq_driver {
+    char   name[CPUFREQ_NAME_LEN];
     int    (*init)(struct cpufreq_policy *policy);
     int    (*verify)(struct cpufreq_policy *policy);
     int    (*target)(struct cpufreq_policy *policy,
@@ -205,3 +214,9 @@ struct cpu_dbs_info_s {
 };
 
 int cpufreq_governor_dbs(struct cpufreq_policy *policy, unsigned int event);
+int get_cpufreq_ondemand_para(uint32_t *sampling_rate_max,
+                              uint32_t *sampling_rate_min,
+                              uint32_t *sampling_rate,
+                              uint32_t *up_threshold);
+int write_ondemand_sampling_rate(unsigned int sampling_rate);
+int write_ondemand_up_threshold(unsigned int up_threshold);

@@ -1264,6 +1264,8 @@ int __cpu_disable(void)
 
 	time_suspend();
 
+	cpu_mcheck_disable();
+
 	remove_siblinginfo(cpu);
 
 	cpu_clear(cpu, map);
@@ -1279,19 +1281,20 @@ int __cpu_disable(void)
 void __cpu_die(unsigned int cpu)
 {
 	/* We don't do anything here: idle task is faking death itself. */
-	unsigned int i;
+	unsigned int i = 0;
 
-	for (i = 0; i < 10; i++) {
+	for (;;) {
 		/* They ack this in play_dead by setting CPU_DEAD */
 		if (per_cpu(cpu_state, cpu) == CPU_DEAD) {
-			printk ("CPU %d is now offline\n", cpu);
+			printk ("CPU %u is now offline\n", cpu);
 			return;
 		}
 		mdelay(100);
 		mb();
 		process_pending_timers();
+		if ((++i % 10) == 0)
+			printk(KERN_ERR "CPU %u still not dead...\n", cpu);
 	}
- 	printk(KERN_ERR "CPU %u didn't die...\n", cpu);
 }
 
 static int take_cpu_down(void *unused)
@@ -1323,15 +1326,15 @@ int cpu_down(unsigned int cpu)
 	printk("Prepare to bring CPU%d down...\n", cpu);
 
 	err = stop_machine_run(take_cpu_down, NULL, cpu);
-	if ( err < 0 )
+	if (err < 0)
 		goto out;
 
 	__cpu_die(cpu);
 
-	if (cpu_online(cpu)) {
-		printk("Bad state (DEAD, but in online map) on CPU%d\n", cpu);
-		err = -EBUSY;
-	}
+	BUG_ON(cpu_online(cpu));
+
+	cpu_mcheck_distribute_cmci();
+
 out:
 	spin_unlock(&cpu_add_remove_lock);
 	return err;

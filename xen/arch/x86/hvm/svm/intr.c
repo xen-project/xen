@@ -80,7 +80,8 @@ static void enable_intr_window(struct vcpu *v, struct hvm_intack intack)
 
     ASSERT(intack.source != hvm_intsrc_none);
 
-    HVMTRACE_2D(INJ_VIRQ, 0x0, /*fake=*/ 1);
+    HVMTRACE_3D(INTR_WINDOW, intack.vector, intack.source,
+                vmcb->eventinj.fields.v?vmcb->eventinj.fields.vector:-1);
 
     /*
      * Create a dummy virtual interrupt to intercept as soon as the

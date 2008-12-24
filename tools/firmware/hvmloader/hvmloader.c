@@ -269,6 +269,11 @@ static void pci_setup(void)
             printf("pci dev %02x:%x INT%c->IRQ%u\n",
                    devfn>>3, devfn&7, 'A'+pin-1, isa_irq);
         }
+
+        /* Enable bus mastering. */
+        cmd = pci_readw(devfn, PCI_COMMAND);
+        cmd |= PCI_COMMAND_MASTER;
+        pci_writew(devfn, PCI_COMMAND, cmd);
     }
 
     /* Assign iomem and ioport resources in descending order of size. */
@@ -536,6 +541,23 @@ static uint16_t init_xen_platform_io_base(void)
     return bios_info->xen_pfiob;
 }
 
+/* Set up an empty TSS area for virtual 8086 mode to use. 
+ * The only important thing is that it musn't have any bits set 
+ * in the interrupt redirection bitmap, so all zeros will do.  */
+static void init_vm86_tss(void)
+{
+    uint32_t tss;
+    struct xen_hvm_param p;
+
+    tss = e820_malloc(128, 128);
+    memset((char *)tss, 0, 128);
+    p.domid = DOMID_SELF;
+    p.index = HVM_PARAM_VM86_TSS;
+    p.value = tss;
+    hypercall_hvm_op(HVMOP_set_param, &p);
+    printf("vm86 TSS at %08x\n", tss);
+}
+
 int main(void)
 {
     int option_rom_sz = 0, vgabios_sz = 0, etherboot_sz = 0;
@@ -605,6 +627,8 @@ int main(void)
         printf("Loading ACPI ...\n");
         acpi_build_tables();
     }
+
+    init_vm86_tss();
 
     cmos_write_memory_size();
 

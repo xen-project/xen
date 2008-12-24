@@ -517,7 +517,8 @@ class XendDomainInfo:
         # HVM domain shuts itself down only if it has PV drivers
         if self.info.is_hvm():
             hvm_pvdrv = xc.hvm_get_param(self.domid, HVM_PARAM_CALLBACK_IRQ)
-            if not hvm_pvdrv:
+            hvm_s_state = xc.hvm_get_param(self.domid, HVM_PARAM_ACPI_S_STATE)
+            if not hvm_pvdrv or hvm_s_state != 0:
                 code = REVERSE_DOMAIN_SHUTDOWN_REASONS[reason]
                 log.info("HVM save:remote shutdown dom %d!", self.domid)
                 xc.domain_shutdown(self.domid, code)
@@ -2104,7 +2105,7 @@ class XendDomainInfo:
         # overhead is greater for some types of domain than others. For
         # example, an x86 HVM domain will have a default shadow-pagetable
         # allocation of 1MB. We free up 2MB here to be on the safe side.
-        balloon.free(2*1024) # 2MB should be plenty
+        balloon.free(2*1024, self) # 2MB should be plenty
 
         ssidref = 0
         if security.on() == xsconstants.XS_POLICY_USE:
@@ -2298,7 +2299,7 @@ class XendDomainInfo:
             vtd_mem = ((vtd_mem + 1023) / 1024) * 1024
 
             # Make sure there's enough RAM available for the domain
-            balloon.free(memory + shadow + vtd_mem)
+            balloon.free(memory + shadow + vtd_mem, self)
 
             # Set up the shadow memory
             shadow_cur = xc.shadow_mem_control(self.domid, shadow / 1024)
@@ -2715,7 +2716,7 @@ class XendDomainInfo:
             # The domain might already have some shadow memory
             overhead_kb -= xc.shadow_mem_control(self.domid) * 1024
         if overhead_kb > 0:
-            balloon.free(overhead_kb)
+            balloon.free(overhead_kb, self)
 
     def _unwatchVm(self):
         """Remove the watch on the VM path, if any.  Idempotent.  Nothrow

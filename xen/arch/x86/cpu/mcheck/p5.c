@@ -13,6 +13,7 @@
 #include <asm/msr.h>
 
 #include "mce.h"
+#include "x86_mca.h"
 
 /* Machine check handler for Pentium class Intel */
 static fastcall void pentium_machine_check(struct cpu_user_regs * regs, long error_code)

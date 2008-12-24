@@ -9,6 +9,7 @@
 #include <xen/config.h>
 #include <xen/smp.h>
 #include <xen/errno.h>
+#include <xen/console.h>
 
 #include <asm/processor.h> 
 #include <asm/system.h>
@@ -26,7 +27,7 @@ EXPORT_SYMBOL_GPL(nr_mce_banks);	/* non-fatal.o */
  * to physical cpus present in the machine.
  * The more physical cpus are available, the more entries you need.
  */
-#define MAX_MCINFO	10
+#define MAX_MCINFO	20
 
 struct mc_machine_notify {
 	struct mc_info mc;
@@ -109,6 +110,12 @@ static void amd_mcheck_init(struct cpuinfo_x86 *ci)
 	}
 }
 
+/*check the existence of Machine Check*/
+int mce_available(struct cpuinfo_x86 *c)
+{
+	return cpu_has(c, X86_FEATURE_MCE) && cpu_has(c, X86_FEATURE_MCA);
+}
+
 /* This has to be run for each processor */
 void mcheck_init(struct cpuinfo_x86 *c)
 {
@@ -134,11 +141,13 @@ void mcheck_init(struct cpuinfo_x86 *c)
 #ifndef CONFIG_X86_64
 		if (c->x86==5)
 			intel_p5_mcheck_init(c);
-		if (c->x86==6)
-			intel_p6_mcheck_init(c);
 #endif
-		if (c->x86==15)
-			intel_p4_mcheck_init(c);
+		/*If it is P6 or P4 family, including CORE 2 DUO series*/
+		if (c->x86 == 6 || c->x86==15)
+		{
+			printk(KERN_DEBUG "MCE: Intel newly family MC Init\n");
+			intel_mcheck_init(c);
+		}
 		break;
 
 #ifndef CONFIG_X86_64
@@ -412,7 +421,7 @@ void x86_mcinfo_dump(struct mc_info *mi)
 		if (mic == NULL)
 			return;
 		if (mic->type != MC_TYPE_BANK)
-			continue;
+			goto next;
 
 		mc_bank = (struct mcinfo_bank *)mic;
 	
@@ -425,6 +434,7 @@ void x86_mcinfo_dump(struct mc_info *mi)
 			printk(" at %16"PRIx64, mc_bank->mc_addr);
 
 		printk("\n");
+next:
 		mic = x86_mcinfo_next(mic); /* next entry */
 		if ((mic == NULL) || (mic->size == 0))
 			break;
@@ -573,4 +583,16 @@ long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)
 	}
 
 	return ret;
+}
+
+void mc_panic(char *s)
+{
+    console_start_sync();
+    printk("Fatal machine check: %s\n", s);
+    printk("\n"
+           "****************************************\n"
+           "\n"
+           "   The processor has reported a hardware error which cannot\n"
+           "   be recovered from.  Xen will now reboot the machine.\n");
+    panic("HARDWARE ERROR");
 }

@@ -48,11 +48,9 @@ struct time_scale {
 
 struct cpu_time {
     u64 local_tsc_stamp;
-    u64 cstate_tsc_stamp;
     s_time_t stime_local_stamp;
     s_time_t stime_master_stamp;
     struct time_scale tsc_scale;
-    u64 cstate_plt_count_stamp;
 };
 
 struct platform_timesource {
@@ -70,9 +68,6 @@ static DEFINE_PER_CPU(struct cpu_time, cpu_time);
 /* Calibrate all CPUs to platform timer every EPOCH. */
 #define EPOCH MILLISECS(1000)
 static struct timer calibration_timer;
-
-/* TSC is invariant on C state entry? */
-static bool_t tsc_invariant;
 
 /*
  * We simulate a 32-bit platform timer from the 16-bit PIT ch2 counter.
@@ -149,6 +144,28 @@ static inline u64 scale_delta(u64 delta, struct time_scale *scale)
 #endif
 
     return product;
+}
+
+/* Compute the reciprocal of the given time_scale. */
+static inline struct time_scale scale_reciprocal(struct time_scale scale)
+{
+    struct time_scale reciprocal;
+    u32 dividend;
+
+    dividend = 0x80000000u;
+    reciprocal.shift = 1 - scale.shift;
+    while ( unlikely(dividend >= scale.mul_frac) )
+    {
+        dividend >>= 1;
+        reciprocal.shift++;
+    }
+
+    asm (
+        "divl %4"
+        : "=a" (reciprocal.mul_frac), "=d" (dividend)
+        : "0" (0), "1" (dividend), "r" (scale.mul_frac) );
+
+    return reciprocal;
 }
 
 /*
@@ -514,6 +531,19 @@ static struct platform_timesource plt_pmtimer =
     .init = init_pmtimer
 };
 
+static struct time_scale pmt_scale;
+static __init int init_pmtmr_scale(void)
+{
+    set_time_scale(&pmt_scale, ACPI_PM_FREQUENCY);
+    return 0;
+}
+__initcall(init_pmtmr_scale);
+
+uint64_t acpi_pm_tick_to_ns(uint64_t ticks)
+{
+    return scale_delta(ticks, &pmt_scale);
+}
+
 /************************************************************
  * GENERIC PLATFORM TIMER INFRASTRUCTURE
  */
@@ -639,34 +669,29 @@ static void init_platform_timer(void)
     plt_overflow(NULL);
 
     platform_timer_stamp = plt_stamp64;
+    stime_platform_stamp = NOW();
 
     printk("Platform timer is %s %s\n",
            freq_string(pts->frequency), pts->name);
 }
 
-void cstate_save_tsc(void)
-{
-    struct cpu_time *t = &this_cpu(cpu_time);
-
-    if ( tsc_invariant )
-        return;
-
-    t->cstate_plt_count_stamp = plt_src.read_counter();
-    rdtscll(t->cstate_tsc_stamp);
-}
-
 void cstate_restore_tsc(void)
 {
     struct cpu_time *t = &this_cpu(cpu_time);
-    u64 plt_count_delta, tsc_delta;
+    struct time_scale sys_to_tsc = scale_reciprocal(t->tsc_scale);
+    s_time_t stime_delta;
+    u64 tsc_delta;
 
-    if ( tsc_invariant )
+    if ( boot_cpu_has(X86_FEATURE_NOSTOP_TSC) )
         return;
 
-    plt_count_delta = (plt_src.read_counter() -
-                       t->cstate_plt_count_stamp) & plt_mask;
-    tsc_delta = scale_delta(plt_count_delta, &plt_scale) * cpu_khz/1000000UL;
-    wrmsrl(MSR_IA32_TSC, t->cstate_tsc_stamp + tsc_delta);
+    stime_delta = read_platform_stime() - t->stime_master_stamp;
+    if ( stime_delta < 0 )
+        stime_delta = 0;
+
+    tsc_delta = scale_delta(stime_delta, &sys_to_tsc);
+
+    wrmsrl(MSR_IA32_TSC, t->local_tsc_stamp + tsc_delta);
 }
 
 /***************************************************************************
@@ -926,6 +951,18 @@ static void local_time_calibration(void)
     /* The overall calibration scale multiplier. */
     u32 calibration_mul_frac;
 
+    if ( boot_cpu_has(X86_FEATURE_CONSTANT_TSC) )
+    {
+        /* Atomically read cpu_calibration struct and write cpu_time struct. */
+        local_irq_disable();
+        t->local_tsc_stamp    = c->local_tsc_stamp;
+        t->stime_local_stamp  = c->stime_master_stamp;
+        t->stime_master_stamp = c->stime_master_stamp;
+        local_irq_enable();
+        update_vcpu_system_time(current);
+        goto out;
+    }
+
     prev_tsc          = t->local_tsc_stamp;
     prev_local_stime  = t->stime_local_stamp;
     prev_master_stime = t->stime_master_stamp;
@@ -1044,6 +1081,7 @@ struct calibration_rendezvous {
     cpumask_t cpu_calibration_map;
     atomic_t nr_cpus;
     s_time_t master_stime;
+    u64 master_tsc_stamp;
 };
 
 static void time_calibration_rendezvous(void *_r)
@@ -1057,18 +1095,22 @@ static void time_calibration_rendezvous(void *_r)
         while ( atomic_read(&r->nr_cpus) != (total_cpus - 1) )
             cpu_relax();
         r->master_stime = read_platform_stime();
-        mb(); /* write r->master_stime /then/ signal */
+        rdtscll(r->master_tsc_stamp);
+        mb(); /* write r->master_* /then/ signal */
         atomic_inc(&r->nr_cpus);
+        c->local_tsc_stamp = r->master_tsc_stamp;
     }
     else
     {
         atomic_inc(&r->nr_cpus);
         while ( atomic_read(&r->nr_cpus) != total_cpus )
             cpu_relax();
-        mb(); /* receive signal /then/ read r->master_stime */
+        mb(); /* receive signal /then/ read r->master_* */
+        if ( boot_cpu_has(X86_FEATURE_CONSTANT_TSC) )
+            wrmsrl(MSR_IA32_TSC, r->master_tsc_stamp);
+        rdtscll(c->local_tsc_stamp);
     }
 
-    rdtscll(c->local_tsc_stamp);
     c->stime_local_stamp = get_s_time();
     c->stime_master_stamp = r->master_stime;
 
@@ -1095,7 +1137,7 @@ void init_percpu_time(void)
 
     local_irq_save(flags);
     rdtscll(t->local_tsc_stamp);
-    now = !plt_src.read_counter ? 0 : read_platform_stime();
+    now = read_platform_stime();
     local_irq_restore(flags);
 
     t->stime_master_stamp = now;
@@ -1111,19 +1153,25 @@ void init_percpu_time(void)
 /* Late init function (after all CPUs are booted). */
 int __init init_xen_time(void)
 {
-    /* check if TSC is invariant during deep C state
-       this is a new feature introduced by Nehalem*/
-    if ( cpuid_edx(0x80000007) & (1u<<8) )
-        tsc_invariant = 1;
+    /* If we have constant TSCs then scale factor can be shared. */
+    if ( boot_cpu_has(X86_FEATURE_CONSTANT_TSC) )
+    {
+        int cpu;
+        for_each_cpu ( cpu )
+            per_cpu(cpu_time, cpu).tsc_scale = per_cpu(cpu_time, 0).tsc_scale;
+    }
 
     open_softirq(TIME_CALIBRATE_SOFTIRQ, local_time_calibration);
 
-    init_percpu_time();
+    /* System time (get_s_time()) starts ticking from now. */
+    rdtscll(this_cpu(cpu_time).local_tsc_stamp);
 
-    stime_platform_stamp = 0;
+    /* NB. get_cmos_time() can take over one second to execute. */
+    do_settime(get_cmos_time(), 0, NOW());
+
     init_platform_timer();
 
-    do_settime(get_cmos_time(), 0, NOW());
+    init_percpu_time();
 
     return 0;
 }

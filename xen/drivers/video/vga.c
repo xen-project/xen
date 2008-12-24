@@ -57,10 +57,10 @@ static unsigned int columns, lines;
 
 #ifdef CONFIG_X86_64
 void vesa_early_init(void);
-void vesa_endboot(void);
+void vesa_endboot(bool_t keep);
 #else
 #define vesa_early_init() ((void)0)
-#define vesa_endboot()    ((void)0)
+#define vesa_endboot(x)   ((void)0)
 #endif
 
 void __init vga_init(void)
@@ -105,10 +105,21 @@ void __init vga_endboot(void)
     printk("Xen is %s VGA console.\n",
            vgacon_keep ? "keeping" : "relinquishing");
 
-    vesa_endboot();
-
     if ( !vgacon_keep )
         vga_puts = vga_noop_puts;
+
+    switch ( vga_console_info.video_type )
+    {
+    case XEN_VGATYPE_TEXT_MODE_3:
+        if ( !vgacon_keep )
+            memset(video, 0, columns * lines * 2);
+        break;
+    case XEN_VGATYPE_VESA_LFB:
+        vesa_endboot(vgacon_keep);
+        break;
+    default:
+        BUG();
+    }
 }
 
 static void vga_text_puts(const char *s)

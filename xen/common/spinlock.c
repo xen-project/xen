@@ -215,3 +215,9 @@ void _write_unlock_irqrestore(rwlock_t *lock, unsigned long flags)
     _raw_write_unlock(&lock->raw);
     local_irq_restore(flags);
 }
+
+int _rw_is_locked(rwlock_t *lock)
+{
+    check_lock(&lock->debug);
+    return _raw_rw_is_locked(&lock->raw);
+}

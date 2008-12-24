@@ -216,4 +216,6 @@ do {										\
 	clear_bit(31, (x));								\
 })
 
+#define _raw_rw_is_locked(x) (*(int *)(x) != 0)
+
 #endif /*  _ASM_IA64_SPINLOCK_H */

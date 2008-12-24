@@ -78,6 +78,10 @@ class BlkifController(DevController):
         if uuid:
             back['uuid'] = uuid
 
+        bootable = config.get('bootable', None)
+        if bootable != None:
+            back['bootable'] = str(bootable)
+
         if security.on() == xsconstants.XS_POLICY_USE:
             self.do_access_control(config, uname)
 
@@ -143,11 +147,12 @@ class BlkifController(DevController):
         config = DevController.getDeviceConfiguration(self, devid, transaction)
         if transaction is None:
             devinfo = self.readBackend(devid, 'dev', 'type', 'params', 'mode',
-                                       'uuid')
+                                       'uuid', 'bootable')
         else:
             devinfo = self.readBackendTxn(transaction, devid,
-                                          'dev', 'type', 'params', 'mode', 'uuid')
-        dev, typ, params, mode, uuid = devinfo
+                                          'dev', 'type', 'params', 'mode', 'uuid',
+                                          'bootable')
+        dev, typ, params, mode, uuid, bootable = devinfo
         
         if dev:
             if transaction is None:
@@ -165,6 +170,8 @@ class BlkifController(DevController):
             config['mode'] = mode
         if uuid:
             config['uuid'] = uuid
+        if bootable != None:
+            config['bootable'] = int(bootable)
 
         proto = self.readFrontend(devid, 'protocol')
         if proto:

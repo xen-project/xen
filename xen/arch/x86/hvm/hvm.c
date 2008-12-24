@@ -2700,6 +2700,32 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
     return rc;
 }
 
+int hvm_debug_op(struct vcpu *v, int32_t op)
+{
+    int rc;
+
+    switch ( op )
+    {
+        case XEN_DOMCTL_DEBUG_OP_SINGLE_STEP_ON:
+        case XEN_DOMCTL_DEBUG_OP_SINGLE_STEP_OFF:
+            rc = -ENOSYS;
+            if ( !cpu_has_monitor_trap_flag )
+                break;
+            rc = 0;
+            vcpu_pause(v);
+            v->arch.hvm_vcpu.single_step =
+                (op == XEN_DOMCTL_DEBUG_OP_SINGLE_STEP_ON);
+            vcpu_unpause(v); /* guest will latch new state */
+            break;
+        default:
+            rc = -ENOSYS;
+            break;
+    }
+
+    return rc;
+}
+
+
 /*
  * Local variables:
  * mode: C

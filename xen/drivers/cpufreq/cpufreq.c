@@ -33,6 +33,7 @@
 #include <xen/cpumask.h>
 #include <xen/list.h>
 #include <xen/sched.h>
+#include <xen/string.h>
 #include <xen/timer.h>
 #include <xen/xmalloc.h>
 #include <xen/guest_access.h>
@@ -51,6 +52,53 @@ struct cpufreq_dom {
     struct list_head	node;
 };
 static LIST_HEAD(cpufreq_dom_list_head);
+
+LIST_HEAD(cpufreq_governor_list);
+
+struct cpufreq_governor *__find_governor(const char *governor)
+{
+    struct cpufreq_governor *t;
+
+    if (!governor)
+        return NULL;
+
+    list_for_each_entry(t, &cpufreq_governor_list, governor_list)
+        if (!strnicmp(governor, t->name, CPUFREQ_NAME_LEN))
+            return t;
+
+    return NULL;
+}
+
+int cpufreq_register_governor(struct cpufreq_governor *governor)
+{
+    if (!governor)
+        return -EINVAL;
+
+    if (__find_governor(governor->name) != NULL)
+        return -EEXIST;
+
+    list_add(&governor->governor_list, &cpufreq_governor_list);
+    return 0;
+}
+
+int cpufreq_unregister_governor(struct cpufreq_governor *governor)
+{
+    int cpu = smp_processor_id();
+    struct cpufreq_policy *policy = cpufreq_cpu_policy[cpu];
+
+    if (!governor || !policy)
+        return -EINVAL;
+
+    /* error if unregister current cpufreq governor */
+    if (governor == policy->governor)
+        return -EBUSY;
+
+    if (__find_governor(governor->name) == NULL)
+        return -ENOENT;
+
+    list_del(&governor->governor_list);
+    return 0;
+}
 
 int cpufreq_limit_change(unsigned int cpu)
 {

@@ -65,6 +65,8 @@ int passive_domain_do_wrmsr(struct cpu_user_regs *regs)
 	int type, index;
 	struct vpmu_struct *vpmu = vcpu_vpmu(current);
 
+	if ( model == NULL )
+		return 0;
 	if ( model->is_arch_pmu_msr == NULL )
 		return 0;
 	if ( !model->is_arch_pmu_msr((u64)regs->ecx, &type, &index) )
@@ -366,11 +368,10 @@ static int __init ppro_init(char ** cpu_type)
 	case 14:
 		*cpu_type = "i386/core";
 		break;
-	case 15: case 23:
-		*cpu_type = "i386/core_2";
-		ppro_has_global_ctrl = 1;
-		break;
+	case 15:
+	case 23:
 	case 26:
+	case 29:
 		*cpu_type = "i386/core_2";
 		ppro_has_global_ctrl = 1;
 		break;
