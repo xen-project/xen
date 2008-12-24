@@ -38,7 +38,7 @@ typedef struct xc_dom_image domain_t;
 #define printk(fmt, args ...)	xc_dom_printf(fmt, ## args)
 
 #define BUG_ON(p)	assert(!(p))
-#define BUILD_BUG_ON(condition) ((void)sizeof(char[1 - 2 * !!(condition)]))
+#define BUILD_BUG_ON(condition) ((void)sizeof(struct { int:-!!(condition); }))
 
 //for sort in linux/sort.h.
 #define sort(base, num, size, cmp, swap) qsort((base), (num), (size), (cmp))
