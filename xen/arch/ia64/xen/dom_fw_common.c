@@ -275,8 +275,8 @@ dom_fpswa_hypercall_patch(uint64_t brkimm, unsigned long imva)
 	*entry_imva   = 0;
 
 	/* see dom_fw.h */
-	BUILD_BUG_ON((char*)xen_ia64_fpswa_call_stub_end -
-		     (char*)xen_ia64_fpswa_call_stub > 0xff - 16);
+	BUG_ON((char*)xen_ia64_fpswa_call_stub_end -
+	       (char*)xen_ia64_fpswa_call_stub > 0xff - 16 + 1);
 
 	/* call stub */
 	memcpy(patch_imva, xen_ia64_fpswa_call_stub, stub_size);
