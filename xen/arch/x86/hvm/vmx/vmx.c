@@ -1314,8 +1314,29 @@ static void vmx_set_uc_mode(struct vcpu *v)
 
 static void vmx_set_info_guest(struct vcpu *v)
 {
+    unsigned long intr_shadow;
+
     vmx_vmcs_enter(v);
+
     __vmwrite(GUEST_DR7, v->arch.guest_context.debugreg[7]);
+
+    /* 
+     * If the interruptibility-state field indicates blocking by STI,
+     * setting the TF flag in the EFLAGS may cause VM entry to fail
+     * and crash the guest. See SDM 3B 22.3.1.5.
+     * Resetting the VMX_INTR_SHADOW_STI flag looks hackish but
+     * to set the GUEST_PENDING_DBG_EXCEPTIONS.BS here incurs
+     * immediately vmexit and hence make no progress.
+     */
+    intr_shadow = __vmread(GUEST_INTERRUPTIBILITY_INFO);
+    if ( v->domain->debugger_attached &&
+         (v->arch.guest_context.user_regs.eflags & X86_EFLAGS_TF) &&
+         (intr_shadow & VMX_INTR_SHADOW_STI) )
+    {
+        intr_shadow &= ~VMX_INTR_SHADOW_STI;
+        __vmwrite(GUEST_INTERRUPTIBILITY_INFO, intr_shadow);
+    }
+
     vmx_vmcs_exit(v);
 }
 
