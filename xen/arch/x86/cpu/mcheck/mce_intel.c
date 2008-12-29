@@ -358,6 +358,12 @@ static int do_cmci_discover(int i)
         return 0;
     }
     set_bit(i, __get_cpu_var(mce_banks_owned));
+    /* Clear Corected Error Counter field, make sure CMCI could 
+     * be triggered on the new owner
+     */
+    msr = MSR_IA32_MC0_STATUS + 4 * i;
+    rdmsrl(msr, val);
+    wrmsrl(msr, val & ~MCi_STATUS_ERRCOUNT);
 out:
     clear_bit(i, __get_cpu_var(no_cmci_banks));
     return 1;
