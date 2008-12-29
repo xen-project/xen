@@ -11012,7 +11012,6 @@ post_default_ints:
   call _clobber_entry_point
   call _copy_e820_table
   call smbios_init
-  call _disable_rom_write_access
 #endif
 
   call _init_boot_vectors
@@ -11020,6 +11019,10 @@ post_default_ints:
   mov  cx, #0xc800  ;; init option roms
   mov  ax, #0xe000
   call rom_scan
+
+#ifdef HVMASSIST
+  call _disable_rom_write_access
+#endif
 
 #if BX_ELTORITO_BOOT
   call _interactive_bootkey
