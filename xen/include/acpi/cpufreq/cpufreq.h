@@ -11,6 +11,9 @@
  * published by the Free Software Foundation.
  */
 
+#ifndef __XEN_CPUFREQ_PM_H__
+#define __XEN_CPUFREQ_PM_H__
+
 #include <xen/types.h>
 #include <xen/list.h>
 #include <xen/cpumask.h>
@@ -85,6 +88,7 @@ struct cpufreq_governor {
     struct list_head governor_list;
 };
 
+extern struct cpufreq_governor *cpufreq_opt_governor;
 extern struct cpufreq_governor cpufreq_gov_dbs;
 extern struct cpufreq_governor cpufreq_gov_userspace;
 extern struct cpufreq_governor cpufreq_gov_performance;
@@ -93,7 +97,7 @@ extern struct cpufreq_governor cpufreq_gov_powersave;
 extern int cpufreq_register_governor(struct cpufreq_governor *governor);
 extern int cpufreq_unregister_governor(struct cpufreq_governor *governor);
 extern struct cpufreq_governor *__find_governor(const char *governor);
-#define CPUFREQ_DEFAULT_GOVERNOR &cpufreq_gov_performance
+#define CPUFREQ_DEFAULT_GOVERNOR &cpufreq_gov_userspace
 
 /* pass a target to the cpufreq driver */
 extern int __cpufreq_driver_target(struct cpufreq_policy *policy,
@@ -220,3 +224,4 @@ int get_cpufreq_ondemand_para(uint32_t *sampling_rate_max,
                               uint32_t *up_threshold);
 int write_ondemand_sampling_rate(unsigned int sampling_rate);
 int write_ondemand_up_threshold(unsigned int up_threshold);
+#endif /* __XEN_CPUFREQ_PM_H__ */

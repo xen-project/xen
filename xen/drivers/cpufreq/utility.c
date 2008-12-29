@@ -360,10 +360,15 @@ int __cpufreq_set_policy(struct cpufreq_policy *data,
         /* start new governor */
         data->governor = policy->governor;
         if (__cpufreq_governor(data, CPUFREQ_GOV_START)) {
+            printk(KERN_WARNING "Fail change to %s governor\n",
+                                 data->governor->name);
+
             /* new governor failed, so re-start old one */
             if (old_gov) {
                 data->governor = old_gov;
                 __cpufreq_governor(data, CPUFREQ_GOV_START);
+                printk(KERN_WARNING "Still stay at %s governor\n",
+                                     data->governor->name);
             }
             return -EINVAL;
         }

@@ -226,7 +226,8 @@ acpi_cpufreq_cpu_init (struct cpufreq_policy *policy)
 				data->acpi_data->states[i].transition_latency * 1000;
 		}
 	}
-	policy->governor = CPUFREQ_DEFAULT_GOVERNOR;
+
+	policy->governor = cpufreq_opt_governor ? : CPUFREQ_DEFAULT_GOVERNOR;
 
 	policy->cur = acpi_cpufreq_get(policy->cpu);
 	printk(KERN_INFO "Current freq of CPU %u is %u\n", cpu, policy->cur);

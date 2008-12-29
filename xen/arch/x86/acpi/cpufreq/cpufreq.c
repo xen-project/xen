@@ -393,8 +393,10 @@ static int acpi_cpufreq_target(struct cpufreq_policy *policy,
 
     drv_write(&cmd);
 
-    if (!check_freqs(cmd.mask, freqs.new, data))
+    if (!check_freqs(cmd.mask, freqs.new, data)) {
+        printk(KERN_WARNING "Fail transfer to new freq %d\n", freqs.new);
         return -EAGAIN;
+    }
 
     for_each_cpu_mask(j, online_policy_cpus)
         cpufreq_statistic_update(j, perf->state, next_perf_state);
@@ -508,7 +510,8 @@ acpi_cpufreq_cpu_init(struct cpufreq_policy *policy)
             policy->cpuinfo.transition_latency =
                 perf->states[i].transition_latency * 1000;
     }
-    policy->governor = CPUFREQ_DEFAULT_GOVERNOR;
+
+    policy->governor = cpufreq_opt_governor ? : CPUFREQ_DEFAULT_GOVERNOR;
 
     data->max_freq = perf->states[0].core_frequency * 1000;
     /* table init */
