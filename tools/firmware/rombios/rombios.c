@@ -10473,8 +10473,6 @@ rom_scan_loop:
   add  al, #0x04
 block_count_rounded:
 
-  xor  bx, bx   ;; Restore DS back to 0000:
-  mov  ds, bx
 #if BX_TCGBIOS
   push ax
   push ds
