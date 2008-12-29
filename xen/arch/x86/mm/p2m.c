@@ -935,11 +935,12 @@ guest_physmap_add_entry(struct domain *d, unsigned long gfn,
 
 #if CONFIG_PAGING_LEVELS == 3
     /*
-     * 32bit PAE nested paging does not support over 4GB guest due to 
+     * 32bit AMD nested paging does not support over 4GB guest due to 
      * hardware translation limit. This limitation is checked by comparing
      * gfn with 0xfffffUL.
      */
-    if ( paging_mode_hap(d) && (gfn > 0xfffffUL) )
+    if ( paging_mode_hap(d) && (gfn > 0xfffffUL) &&
+         (boot_cpu_data.x86_vendor == X86_VENDOR_AMD) )
     {
         if ( !test_and_set_bool(d->arch.hvm_domain.svm.npt_4gb_warning) )
             dprintk(XENLOG_WARNING, "Dom%d failed to populate memory beyond"
