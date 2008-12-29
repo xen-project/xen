@@ -158,8 +158,9 @@ static inline void intel_get_extended_msrs(struct mcinfo_extended *mc_ext)
  * It will generate a new mc_info item if found CE/UC errors. DOM0 is the 
  * consumer.
 */
-static int machine_check_poll(struct mc_info *mi, int calltype)
+static struct mc_info *machine_check_poll(int calltype)
 {
+    struct mc_info *mi = NULL;
     int exceptions = (read_cr4() & X86_CR4_MCE);
     int i, nr_unit = 0, uc = 0, pcc = 0;
     uint64_t status, addr;
@@ -169,12 +170,6 @@ static int machine_check_poll(struct mc_info *mi, int calltype)
     struct domain *d;
 
     cpu = smp_processor_id();
-
-    if (!mi) {
-        printk(KERN_ERR "mcheck_poll: Failed to get mc_info entry\n");
-        return 0;
-    }
-    x86_mcinfo_clear(mi);
 
     memset(&mcg, 0, sizeof(mcg));
     mcg.common.type = MC_TYPE_GLOBAL;
@@ -217,6 +212,14 @@ static int machine_check_poll(struct mc_info *mi, int calltype)
         if (status & MCi_STATUS_PCC)
             pcc = 1;
 
+        if (!mi) {
+            mi = x86_mcinfo_getptr();
+            if (!mi) {
+                printk(KERN_ERR "mcheck_poll: Failed to get mc_info entry\n");
+                return NULL;
+            }
+            x86_mcinfo_clear(mi);
+        }
         memset(&mcb, 0, sizeof(mcb));
         mcb.common.type = MC_TYPE_BANK;
         mcb.common.size = sizeof(mcb);
@@ -262,7 +265,7 @@ static int machine_check_poll(struct mc_info *mi, int calltype)
     if (nr_unit) 
         x86_mcinfo_add(mi, &mcg);
     /*Clear global state*/
-    return nr_unit;
+    return mi;
 }
 
 static fastcall void intel_machine_check(struct cpu_user_regs * regs, long error_code)
@@ -478,15 +481,14 @@ static void intel_init_cmci(struct cpuinfo_x86 *c)
 
 fastcall void smp_cmci_interrupt(struct cpu_user_regs *regs)
 {
-    int nr_unit;
-    struct mc_info *mi =  x86_mcinfo_getptr();
+    struct mc_info *mi = NULL;
     int cpu = smp_processor_id();
 
     ack_APIC_irq();
     irq_enter();
     printk(KERN_DEBUG "CMCI: cmci_intr happen on CPU%d\n", cpu);
-    nr_unit = machine_check_poll(mi, MC_FLAG_CMCI);
-    if (nr_unit) {
+    mi = machine_check_poll(MC_FLAG_CMCI);
+    if (mi) {
         x86_mcinfo_dump(mi);
         if (dom0 && guest_enabled_event(dom0->vcpu[0], VIRQ_MCA))
             send_guest_global_virq(dom0, VIRQ_MCA);
@@ -532,16 +534,16 @@ static void mce_cap_init(struct cpuinfo_x86 *c)
 static void mce_init(void)
 {
     u32 l, h;
-    int i, nr_unit;
-    struct mc_info *mi =  x86_mcinfo_getptr();
+    int i;
+    struct mc_info *mi;
     clear_in_cr4(X86_CR4_MCE);
     /* log the machine checks left over from the previous reset.
      * This also clears all registers*/
 
-    nr_unit = machine_check_poll(mi, MC_FLAG_RESET);
+    mi = machine_check_poll(MC_FLAG_RESET);
     /*in the boot up stage, not expect inject to DOM0, but go print out
     */
-    if (nr_unit > 0)
+    if (mi)
         x86_mcinfo_dump(mi);
 
     set_in_cr4(X86_CR4_MCE);
@@ -595,13 +597,12 @@ static int adjust = 0;
 
 static void mce_intel_checkregs(void *info)
 {
-    int nr_unit;
-    struct mc_info *mi =  x86_mcinfo_getptr();
+    struct mc_info *mi;
 
     if( !mce_available(&current_cpu_data))
         return;
-    nr_unit = machine_check_poll(mi, MC_FLAG_POLLED);
-    if (nr_unit)
+    mi = machine_check_poll(MC_FLAG_POLLED);
+    if (mi)
     {
         x86_mcinfo_dump(mi);
         adjust++;
