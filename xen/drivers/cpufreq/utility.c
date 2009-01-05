@@ -36,7 +36,7 @@ struct cpufreq_driver   *cpufreq_driver;
 struct processor_pminfo *__read_mostly processor_pminfo[NR_CPUS];
 struct cpufreq_policy   *__read_mostly cpufreq_cpu_policy[NR_CPUS];
 
-DEFINE_PER_CPU(spinlock_t, cpufreq_statistic_lock);
+DEFINE_PER_CPU(spinlock_t, cpufreq_statistic_lock) = SPIN_LOCK_UNLOCKED;
 
 /*********************************************************************
  *                    Px STATISTIC INFO                              *
@@ -197,22 +197,6 @@ void cpufreq_statistic_reset(unsigned int cpuid)
 
     spin_unlock_irq(cpufreq_statistic_lock);
 }
-
-static int __init cpufreq_statistic_lock_init(void)
-{
-    unsigned int cpu;
-    spinlock_t *cpufreq_statistic_lock; 
-
-    for (cpu=0; cpu<NR_CPUS; cpu++) {
-        cpufreq_statistic_lock = 
-                &per_cpu(cpufreq_statistic_lock, cpu);
-
-        spin_lock_init(cpufreq_statistic_lock);
-    }
-
-    return 0;
-}
-__initcall(cpufreq_statistic_lock_init);
 
 
 /*********************************************************************
