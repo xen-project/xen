@@ -678,11 +678,20 @@ thash_data_t *vtlb_lookup(VCPU *v, u64 va,int is_data)
         cch = vtlb_thash(hcb->pta, va, vrr.rrval, &tag);
         do {
             if (cch->etag == tag && cch->ps == ps)
-                return cch;
+                goto found;
             cch = cch->next;
         } while(cch);
     }
     return NULL;
+found:
+    if (unlikely(!cch->ed && is_data == ISIDE_TLB)) {
+        /*The case is very rare, and it may lead to incorrect setting
+          for itlb's ed bit! Purge it from hash vTLB and let guest os
+          determin the ed bit of the itlb entry.*/
+        vtlb_purge(v, va, ps);
+        cch = NULL;
+    }
+    return cch;
 }
 
 
