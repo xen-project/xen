@@ -323,6 +323,70 @@ p2m_pod_cache_add(struct domain *d,
     return 0;
 }
 
+/* Get a page of size order from the populate-on-demand cache.  Will break
+ * down 2-meg pages into singleton pages automatically.  Returns null if
+ * a superpage is requested and no superpages are available.  Must be called
+ * with the d->page_lock held. */
+static struct page_info * p2m_pod_cache_get(struct domain *d,
+                                            unsigned long order)
+{
+    struct p2m_domain *p2md = d->arch.p2m;
+    struct page_info *p = NULL;
+    int i;
+
+    if ( order == 9 && list_empty(&p2md->pod.super) )
+    {
+        return NULL;
+    }
+    else if ( order == 0 && list_empty(&p2md->pod.single) )
+    {
+        unsigned long mfn;
+        struct page_info *q;
+
+        BUG_ON( list_empty(&p2md->pod.super) );
+
+        /* Break up a superpage to make single pages. NB count doesn't
+         * need to be adjusted. */
+        printk("%s: Breaking up superpage.\n", __func__);
+        p = list_entry(p2md->pod.super.next, struct page_info, list);
+        list_del(&p->list);
+        mfn = mfn_x(page_to_mfn(p));
+
+        for ( i=0; i<(1<<9); i++ )
+        {
+            q = mfn_to_page(_mfn(mfn+i));
+            list_add_tail(&q->list, &p2md->pod.single);
+        }
+    }
+
+    switch ( order )
+    {
+    case 9:
+        BUG_ON( list_empty(&p2md->pod.super) );
+        p = list_entry(p2md->pod.super.next, struct page_info, list); 
+        p2md->pod.count -= 1 << order; /* Lock: page_alloc */
+        break;
+    case 0:
+        BUG_ON( list_empty(&p2md->pod.single) );
+        p = list_entry(p2md->pod.single.next, struct page_info, list);
+        p2md->pod.count -= 1;
+        break;
+    default:
+        BUG();
+    }
+
+    list_del(&p->list);
+
+    /* Put the pages back on the domain page_list */
+    for ( i = 0 ; i < (1 << order) ; i++ )
+    {
+        BUG_ON(page_get_owner(p + i) != d);
+        list_add_tail(&p[i].list, &d->page_list);
+    }
+
+    return p;
+}
+
 void
 p2m_pod_empty_cache(struct domain *d)
 {
@@ -824,35 +888,14 @@ p2m_pod_demand_populate(struct domain *d, unsigned long gfn,
     if ( p2md->pod.count == 0 )
         goto out_of_memory;
 
-    /* FIXME -- use single pages / splinter superpages if need be */
-    switch ( order )
-    {
-    case 9:
-        BUG_ON( list_empty(&p2md->pod.super) );
-        p = list_entry(p2md->pod.super.next, struct page_info, list); 
-        p2md->pod.count -= 1 << order; /* Lock: page_alloc */
-        break;
-    case 0:
-        BUG_ON( list_empty(&p2md->pod.single) );
-        p = list_entry(p2md->pod.single.next, struct page_info, list);
-        p2md->pod.count -= 1;
-        break;
-    default:
-        BUG();
-    }
-        
-    list_del(&p->list);
+    /* Get a page f/ the cache.  A NULL return value indicates that the
+     * 2-meg range should be marked singleton PoD, and retried */
+    if ( (p = p2m_pod_cache_get(d, order)) == NULL )
+        goto remap_and_retry;
 
     mfn = page_to_mfn(p);
 
     BUG_ON((mfn_x(mfn) & ((1 << order)-1)) != 0);
-
-    /* Put the pages back on the domain page_list */
-    for ( i = 0 ; i < (1 << order) ; i++ )
-    {
-        BUG_ON(page_get_owner(p + i) != d);
-        list_add_tail(&p[i].list, &d->page_list);
-    }
 
     spin_unlock(&d->page_alloc_lock);
 
@@ -897,6 +940,18 @@ out_of_memory:
     printk("%s: Out of populate-on-demand memory!\n", __func__);
     domain_crash(d);
     return -1;
+remap_and_retry:
+    BUG_ON(order != 9);
+    spin_unlock(&d->page_alloc_lock);
+
+    /* Remap this 2-meg region in singleton chunks */
+    gfn_aligned = (gfn>>order)<<order;
+    for(i=0; i<(1<<order); i++)
+        set_p2m_entry(d, gfn_aligned+i, _mfn(POPULATE_ON_DEMAND_MFN), 0,
+                      p2m_populate_on_demand);
+    audit_p2m(d);
+    p2m_unlock(p2md);
+    return 0;
 }
 
 // Returns 0 on error (out of memory)
