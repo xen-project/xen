@@ -20,6 +20,8 @@
 
 #include "processor_perf.h"
 
+DECLARE_PER_CPU(spinlock_t, cpufreq_statistic_lock);
+
 struct cpufreq_governor;
 
 struct acpi_cpufreq_data {
