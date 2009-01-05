@@ -2124,9 +2124,9 @@ static void ept_handle_violation(unsigned long qualification, paddr_t gpa)
     mfn_t mfn;
     p2m_type_t t;
 
-    mfn = gfn_to_mfn(d, gfn, &t);
+    mfn = gfn_to_mfn_guest(d, gfn, &t);
 
-    /* There are two legitimate reasons for taking an EPT violation. 
+    /* There are three legitimate reasons for taking an EPT violation. 
      * One is a guest access to MMIO space. */
     if ( gla_validity == EPT_GLA_VALIDITY_MATCH && p2m_is_mmio(t) )
     {
@@ -2134,15 +2134,18 @@ static void ept_handle_violation(unsigned long qualification, paddr_t gpa)
         return;
     }
 
-    /* The other is log-dirty mode, writing to a read-only page */
-    if ( paging_mode_log_dirty(d)
-         && (gla_validity == EPT_GLA_VALIDITY_MATCH
-             || gla_validity == EPT_GLA_VALIDITY_GPT_WALK)
+    /* The second is log-dirty mode, writing to a read-only page;
+     * The third is populating a populate-on-demand page. */
+    if ( (gla_validity == EPT_GLA_VALIDITY_MATCH
+          || gla_validity == EPT_GLA_VALIDITY_GPT_WALK)
          && p2m_is_ram(t) && (t != p2m_ram_ro) )
     {
-        paging_mark_dirty(d, mfn_x(mfn));
-        p2m_change_type(d, gfn, p2m_ram_logdirty, p2m_ram_rw);
-        flush_tlb_mask(d->domain_dirty_cpumask);
+        if ( paging_mode_log_dirty(d) )
+        {
+            paging_mark_dirty(d, mfn_x(mfn));
+            p2m_change_type(d, gfn, p2m_ram_logdirty, p2m_ram_rw);
+            flush_tlb_mask(d->domain_dirty_cpumask);
+        }
         return;
     }
 

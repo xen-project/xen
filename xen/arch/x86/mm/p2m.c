@@ -732,7 +732,7 @@ static void audit_p2m(struct domain *d)
             continue;
         }
 
-        p2mfn = gfn_to_mfn_foreign(d, gfn, &type);
+        p2mfn = gfn_to_mfn_type_foreign(d, gfn, &type, p2m_query);
         if ( mfn_x(p2mfn) != mfn )
         {
             mpbad++;
@@ -750,7 +750,7 @@ static void audit_p2m(struct domain *d)
 
         if ( test_linear && (gfn <= d->arch.p2m->max_mapped_pfn) )
         {
-            lp2mfn = mfn_x(gfn_to_mfn(d, gfn, &type));
+            lp2mfn = mfn_x(gfn_to_mfn_query(d, gfn, &type));
             if ( lp2mfn != mfn_x(p2mfn) )
             {
                 P2M_PRINTK("linear mismatch gfn %#lx -> mfn %#lx "
@@ -960,7 +960,7 @@ guest_physmap_add_entry(struct domain *d, unsigned long gfn,
     /* First, remove m->p mappings for existing p->m mappings */
     for ( i = 0; i < (1UL << page_order); i++ )
     {
-        omfn = gfn_to_mfn(d, gfn + i, &ot);
+        omfn = gfn_to_mfn_query(d, gfn + i, &ot);
         if ( p2m_is_ram(ot) )
         {
             ASSERT(mfn_valid(omfn));
@@ -985,7 +985,7 @@ guest_physmap_add_entry(struct domain *d, unsigned long gfn,
              * address */
             P2M_DEBUG("aliased! mfn=%#lx, old gfn=%#lx, new gfn=%#lx\n",
                       mfn + i, ogfn, gfn + i);
-            omfn = gfn_to_mfn(d, ogfn, &ot);
+            omfn = gfn_to_mfn_query(d, ogfn, &ot);
             if ( p2m_is_ram(ot) )
             {
                 ASSERT(mfn_valid(omfn));
@@ -1154,7 +1154,7 @@ set_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
     if ( !paging_mode_translate(d) )
         return 0;
 
-    omfn = gfn_to_mfn(d, gfn, &ot);
+    omfn = gfn_to_mfn_query(d, gfn, &ot);
     if ( p2m_is_ram(ot) )
     {
         ASSERT(mfn_valid(omfn));
