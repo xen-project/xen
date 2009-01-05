@@ -1653,6 +1653,8 @@ static void audit_p2m(struct domain *d)
     if ( test_linear )
         flush_tlb_local();
 
+    spin_lock(&d->page_alloc_lock);
+
     /* Audit part one: walk the domain's page allocation list, checking
      * the m2p entries. */
     for ( entry = d->page_list.next;
@@ -1720,6 +1722,8 @@ static void audit_p2m(struct domain *d)
         //                mfn, gfn, p2mfn, lp2mfn);
     }
 
+    spin_unlock(&d->page_alloc_lock);
+
     /* Audit part two: walk the domain's p2m table, checking the entries. */
     if ( pagetable_get_pfn(d->arch.phys_table) != 0 )
     {
@@ -1779,7 +1783,7 @@ static void audit_p2m(struct domain *d)
                         for ( i1 = 0; i1 < L1_PAGETABLE_ENTRIES; i1++)
                         {
                             m2pfn = get_gpfn_from_mfn(mfn+i1);
-                            if ( m2pfn != (gfn + i) )
+                            if ( m2pfn != (gfn + i1) )
                             {
                                 pmbad++;
                                 P2M_PRINTK("mismatch: gfn %#lx -> mfn %#lx"
