@@ -1104,10 +1104,10 @@ class XendDomainInfo:
                   self.info['name_label'], str(self.domid), target)
         
         MiB = 1024 * 1024
+        memory_cur = self.get_memory_dynamic_max() / MiB
 
         if self.domid == 0:
             dom0_min_mem = xoptions.get_dom0_min_mem()
-            memory_cur = self.get_memory_dynamic_max() / MiB
             if target < memory_cur and dom0_min_mem > target:
                 raise XendError("memory_dynamic_max too small")
 
@@ -1115,8 +1115,12 @@ class XendDomainInfo:
         self._safe_set_memory('memory_dynamic_max', target * MiB)
 
         if self.domid >= 0:
+            if target > memory_cur:
+                balloon.free( (target-memory_cur)*1024 )
             self.storeVm("memory", target)
             self.storeDom("memory/target", target << 10)
+            xc.domain_set_target_mem(self.domid,
+                                     (target * 1024))
         xen.xend.XendDomain.instance().managed_config_save(self)
 
     def setMemoryMaximum(self, limit):

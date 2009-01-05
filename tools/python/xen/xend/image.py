@@ -799,19 +799,22 @@ class HVMImageHandler(ImageHandler):
     def buildDomain(self):
         store_evtchn = self.vm.getStorePort()
 
+        memmax_mb = self.getRequiredMaximumReservation() / 1024
         mem_mb = self.getRequiredInitialReservation() / 1024
 
         log.debug("domid          = %d", self.vm.getDomid())
         log.debug("image          = %s", self.loader)
         log.debug("store_evtchn   = %d", store_evtchn)
-        log.debug("memsize        = %d", mem_mb)
+        log.debug("memsize        = %d", memmax_mb)
+        log.debug("target         = %d", mem_mb)
         log.debug("vcpus          = %d", self.vm.getVCpuCount())
         log.debug("acpi           = %d", self.acpi)
         log.debug("apic           = %d", self.apic)
 
         rc = xc.hvm_build(domid          = self.vm.getDomid(),
                           image          = self.loader,
-                          memsize        = mem_mb,
+                          memsize        = memmax_mb,
+                          target         = mem_mb,
                           vcpus          = self.vm.getVCpuCount(),
                           acpi           = self.acpi,
                           apic           = self.apic)
