@@ -276,7 +276,7 @@ def check_FLR_capability(dev_list):
                     coassigned_pci_list = dev.find_all_the_multi_functions()
                     need_transform = True
                 elif dev.dev_type == DEV_TYPE_PCI and not dev.pci_af_flr:
-                    coassigned_pci_list = dev.find_coassigned_devices(True)
+                    coassigned_pci_list = dev.find_coassigned_pci_devices(True)
                     del coassigned_pci_list[0]
                     need_transform = True
 
@@ -434,7 +434,7 @@ class PciDevice:
                 list = list + [dev.name]
         return list
         
-    def find_coassigned_devices(self, ignore_bridge = True):
+    def find_coassigned_pci_devices(self, ignore_bridge = True):
         ''' Here'self' is a PCI device, we need find the uppermost PCI/PCI-X
             bridge, and all devices behind it must be co-assigned to the same
             guest.
@@ -531,6 +531,16 @@ class PciDevice:
         p = p[0 : p.rfind('.')] + '.[0-7]'
         funcs = re.findall(p, pci_names)
         return funcs
+
+    def find_coassigned_devices(self):
+        if self.dev_type == DEV_TYPE_PCIe_ENDPOINT and not self.pcie_flr:
+            return self.find_all_the_multi_functions()
+        elif self.dev_type == DEV_TYPE_PCI and not self.pci_af_flr:
+            coassigned_pci_list = self.find_coassigned_pci_devices(True)
+            del coassigned_pci_list[0]
+            return coassigned_pci_list
+        else:
+            return [self.name]
 
     def find_cap_offset(self, cap):
         path = find_sysfs_mnt()+SYSFS_PCI_DEVS_PATH+'/'+ \
@@ -718,7 +728,7 @@ class PciDevice:
                 if self.bus == 0:
                     self.do_FLR_for_integrated_device()
                 else:
-                    devs = self.find_coassigned_devices(False)
+                    devs = self.find_coassigned_pci_devices(False)
                     # Remove the element 0 which is a bridge
                     target_bus = devs[0]
                     del devs[0]

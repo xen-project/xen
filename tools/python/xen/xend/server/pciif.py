@@ -417,7 +417,7 @@ class PciController(DevController):
                 else:
                     # All devices behind the uppermost PCI/PCI-X bridge must be\
                     # co-assigned to the same guest.
-                    devs_str = dev.find_coassigned_devices(True)
+                    devs_str = dev.find_coassigned_pci_devices(True)
                     # Remove the element 0 which is a bridge
                     del devs_str[0]
 

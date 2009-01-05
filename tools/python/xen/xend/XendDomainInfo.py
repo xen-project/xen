@@ -290,19 +290,21 @@ def dom_get(dom):
         log.trace("domain_getinfo(%d) failed, ignoring: %s", dom, str(err))
     return None
 
-def do_FLR(domid):
-    from xen.xend.server.pciif import parse_pci_name, PciDevice
+def get_assigned_pci_devices(domid):
+    dev_str_list = []
     path = '/local/domain/0/backend/pci/%u/0/' % domid
     num_devs = xstransact.Read(path + 'num_devs');
     if num_devs is None or num_devs == "":
-        return;
-
-    num_devs = int(xstransact.Read(path + 'num_devs'));
-
-    dev_str_list = []
+        return dev_str_list
+    num_devs = int(num_devs);
     for i in range(num_devs):
         dev_str = xstransact.Read(path + 'dev-%i' % i)
         dev_str_list = dev_str_list + [dev_str]
+    return dev_str_list 
+
+def do_FLR(domid):
+    from xen.xend.server.pciif import parse_pci_name, PciDevice
+    dev_str_list = get_assigned_pci_devices(domid)
 
     for dev_str in dev_str_list:
         (dom, b, d, f) = parse_pci_name(dev_str)
@@ -645,6 +647,55 @@ class XendDomainInfo:
                           " already been assigned to other domain, or maybe"
                           " it doesn't exist." % (bus, dev, func))
 
+        # Here, we duplicate some checkings (in some cases, we mustn't allow
+        # a device to be hot-plugged into an HVM guest) that are also done in
+        # pci_device_configure()'s self.device_create(dev_sxp) or
+        # dev_control.reconfigureDevice(devid, dev_config).
+        # We must make the checkings before sending the command 'pci-ins' to
+        # ioemu.
+
+        # Test whether the device is owned by pciback. For instance, we can't
+        # hotplug a device being used by Dom0 itself to an HVM guest.
+        from xen.xend.server.pciif import PciDevice, parse_pci_name
+        domain = int(new_dev['domain'],16)
+        bus    = int(new_dev['bus'],16)
+        dev    = int(new_dev['slot'],16)
+        func   = int(new_dev['func'],16)
+        try:
+            pci_device = PciDevice(domain, bus, dev, func)
+        except Exception, e:
+            raise VmError("pci: failed to locate device and "+
+                    "parse it's resources - "+str(e))
+        if pci_device.driver!='pciback':
+            raise VmError(("pci: PCI Backend does not own device "+ \
+                    "%s\n"+ \
+                    "See the pciback.hide kernel "+ \
+                    "command-line parameter or\n"+ \
+                    "bind your slot/device to the PCI backend using sysfs" \
+                    )%(pci_device.name))
+
+        # Check non-page-aligned MMIO BAR.
+        if pci_device.has_non_page_aligned_bar and arch.type != "ia64":
+            raise VmError("pci: %s: non-page-aligned MMIO BAR found." % \
+                pci_device.name)
+
+        # Check the co-assignment.
+        # To pci-attach a device D to domN, we should ensure each of D's
+        # co-assignment devices hasn't been assigned, or has been assigned to
+        # domN.
+        coassignment_list = pci_device.find_coassigned_devices()
+        assigned_pci_device_str_list = get_assigned_pci_devices(self.domid)
+        for pci_str in coassignment_list:
+            (domain, bus, dev, func) = parse_pci_name(pci_str) 
+            dev_str =  '0x%x,0x%x,0x%x,0x%x' % (domain, bus, dev, func)
+            if xc.test_assign_device(self.domid, dev_str) == 0:
+                continue
+            if not pci_str in assigned_pci_device_str_list:
+                raise VmError(('pci: failed to pci-attach %s to dom%d" + \
+                    " because one of its co-assignment device %s has been" + \
+                    " assigned to other domain.' \
+                    )% (pci_device.name, self.domid, pci_str))
+
         bdf_str = "%s:%s:%s.%s@%s" % (new_dev['domain'],
                 new_dev['bus'],
                 new_dev['slot'],
@@ -934,6 +985,31 @@ class XendDomainInfo:
 
         if vslot == 0:
             raise VmError("Device @ vslot 0x%x do not support hotplug." % (vslot))
+
+        # Check the co-assignment.
+        # To pci-detach a device D from domN, we should ensure: for each DD in the
+        # list of D's co-assignment devices, DD is not assigned (to domN).
+        # 
+        from xen.xend.server.pciif import PciDevice
+        domain = int(x['domain'],16)
+        bus    = int(x['bus'],16)
+        dev    = int(x['slot'],16)
+        func   = int(x['func'],16)
+        try:
+            pci_device = PciDevice(domain, bus, dev, func)
+        except Exception, e:
+            raise VmError("pci: failed to locate device and "+
+                    "parse it's resources - "+str(e))
+        coassignment_list = pci_device.find_coassigned_devices()
+        coassignment_list.remove(pci_device.name)
+        assigned_pci_device_str_list = get_assigned_pci_devices(self.domid)
+        for pci_str in coassignment_list:
+            if pci_str in assigned_pci_device_str_list:
+                raise VmError(('pci: failed to pci-detach %s from dom%d" + \
+                    " because one of its co-assignment device %s is still " + \
+                    " assigned to the domain.' \
+                    )% (pci_device.name, self.domid, pci_str))
+
 
         bdf_str = "%s:%s:%s.%s" % (x['domain'], x['bus'], x['slot'], x['func'])
         log.info("hvm_destroyPCIDevice:%s:%s!", x, bdf_str)
