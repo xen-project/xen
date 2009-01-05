@@ -23,6 +23,8 @@
 #define _ASM_IA64_VT_H
 
 #include <public/hvm/ioreq.h>
+#include <asm/ia64_int.h>
+
 #define vmx_user_mode(regs) (((struct ia64_psr *)&(regs)->cr_ipsr)->vm == 1)
 
 #define VCPU_LID(v) (((u64)(v)->vcpu_id)<<24)
@@ -36,7 +38,7 @@ extern void vmx_load_state(struct vcpu *v);
 extern int vmx_setup_platform(struct domain *d);
 extern void vmx_do_resume(struct vcpu *v);
 extern void vmx_io_assist(struct vcpu *v);
-extern int ia64_hypercall (struct pt_regs *regs);
+extern IA64FAULT ia64_hypercall (struct pt_regs *regs);
 extern unsigned long __gpfn_to_mfn_foreign(struct domain *d, unsigned long gpfn);
 extern void set_privileged_operation_isr (struct vcpu *vcpu,int inst);
 extern void set_rsv_reg_field_isr (struct vcpu *vcpu);

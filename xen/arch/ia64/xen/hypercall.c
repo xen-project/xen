@@ -17,6 +17,7 @@
 #include <asm/sal.h>	/* FOR struct ia64_sal_retval */
 #include <asm/fpswa.h>	/* FOR struct fpswa_ret_t */
 
+#include <asm/vmx.h>
 #include <asm/vmx_vcpu.h>
 #include <asm/vcpu.h>
 #include <asm/dom_fw.h>
