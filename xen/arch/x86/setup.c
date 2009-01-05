@@ -386,6 +386,7 @@ void init_done(void)
     extern char __init_begin[], __init_end[];
 
     /* Free (or page-protect) the init areas. */
+    memset(__init_begin, 0xcc, __init_end - __init_begin); /* int3 poison */
 #ifndef MEMORY_GUARD
     init_xenheap_pages(__pa(__init_begin), __pa(__init_end));
 #endif
