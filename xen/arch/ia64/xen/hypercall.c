@@ -61,11 +61,19 @@ xen_fast_hypercall (struct pt_regs *regs)
 	return IA64_NO_FAULT;
 }
 
+static long __do_pirq_guest_eoi(struct domain *d, int pirq)
+{
+	if ( pirq < 0 || pirq >= NR_IRQS )
+		return -EINVAL;
+	if ( d->arch.pirq_eoi_map )
+		evtchn_unmask(d->pirq_to_evtchn[pirq]);
+	return pirq_guest_eoi(d, pirq);
+}
+
 long do_pirq_guest_eoi(int pirq)
 {
-	return pirq_guest_eoi(current->domain, pirq);
+	return __do_pirq_guest_eoi(current->domain, pirq);
 }
-    
 
 static void
 fw_hypercall_ipi (struct pt_regs *regs)
@@ -483,12 +491,7 @@ long do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         ret = -EFAULT;
         if ( copy_from_guest(&eoi, arg, 1) != 0 )
             break;
-        ret = -EINVAL;
-        if ( eoi.irq < 0 || eoi.irq >= NR_IRQS )
-            break;
-        if ( current->domain->arch.pirq_eoi_map )
-            evtchn_unmask(current->domain->pirq_to_evtchn[eoi.irq]);
-        ret = pirq_guest_eoi(current->domain, eoi.irq);
+        ret = __do_pirq_guest_eoi(current->domain, eoi.irq);
         break;
     }
 
