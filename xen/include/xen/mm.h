@@ -72,6 +72,8 @@ int assign_pages(
 /* memflags: */
 #define _MEMF_no_refcount 0
 #define  MEMF_no_refcount (1U<<_MEMF_no_refcount)
+#define _MEMF_populate_on_demand 1
+#define  MEMF_populate_on_demand (1U<<_MEMF_populate_on_demand)
 #define _MEMF_node        8
 #define  MEMF_node(n)     ((((n)+1)&0xff)<<_MEMF_node)
 #define _MEMF_bits        24

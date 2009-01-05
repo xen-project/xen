@@ -387,6 +387,150 @@ static struct page_info * p2m_pod_cache_get(struct domain *d,
     return p;
 }
 
+/* Set the size of the cache, allocating or freeing as necessary. */
+static int
+p2m_pod_set_cache_target(struct domain *d, unsigned long pod_target)
+{
+    struct p2m_domain *p2md = d->arch.p2m;
+    int ret = 0;
+
+    /* Increasing the target */
+    while ( pod_target > p2md->pod.count )
+    {
+        struct page_info * page;
+        int order;
+
+        if ( (pod_target - p2md->pod.count) >= (1>>9) )
+            order = 9;
+        else
+            order = 0;
+
+        page = alloc_domheap_pages(d, order, 0);
+        if ( unlikely(page == NULL) )
+            goto out;
+
+        p2m_pod_cache_add(d, page, order);
+    }
+
+    /* Decreasing the target */
+    /* We hold the p2m lock here, so we don't need to worry about
+     * cache disappearing under our feet. */
+    while ( pod_target < p2md->pod.count )
+    {
+        struct page_info * page;
+        int order, i;
+
+        /* Grab the lock before checking that pod.super is empty, or the last
+         * entries may disappear before we grab the lock. */
+        spin_lock(&d->page_alloc_lock);
+
+        if ( (p2md->pod.count - pod_target) > (1>>9)
+             && !list_empty(&p2md->pod.super) )
+            order = 9;
+        else
+            order = 0;
+
+        page = p2m_pod_cache_get(d, order);
+
+        ASSERT(page != NULL);
+
+        spin_unlock(&d->page_alloc_lock);
+
+        /* Then free them */
+        for ( i = 0 ; i < (1 << order) ; i++ )
+        {
+            /* Copied from common/memory.c:guest_remove_page() */
+            if ( unlikely(!get_page(page+i, d)) )
+            {
+                gdprintk(XENLOG_INFO, "Bad page free for domain %u\n", d->domain_id);
+                ret = -EINVAL;
+                goto out;
+            }
+
+            if ( test_and_clear_bit(_PGT_pinned, &(page+i)->u.inuse.type_info) )
+                put_page_and_type(page+i);
+            
+            if ( test_and_clear_bit(_PGC_allocated, &(page+i)->count_info) )
+                put_page(page+i);
+
+            put_page(page+i);
+        }
+    }
+
+out:
+    return ret;
+}
+
+/*
+ * The "right behavior" here requires some careful thought.  First, some
+ * definitions:
+ * + M: static_max
+ * + B: number of pages the balloon driver has ballooned down to.
+ * + P: Number of populated pages. 
+ * + T: Old target
+ * + T': New target
+ *
+ * The following equations should hold:
+ *  0 <= P <= T <= B <= M
+ *  d->arch.p2m->pod.entry_count == B - P
+ *  d->tot_pages == P + d->arch.p2m->pod.count
+ *
+ * Now we have the following potential cases to cover:
+ *     B <T': Set the PoD cache size equal to the number of outstanding PoD
+ *   entries.  The balloon driver will deflate the balloon to give back
+ *   the remainder of the ram to the guest OS.
+ *  T <T'<B : Increase PoD cache size.
+ *  T'<T<=B : Here we have a choice.  We can decrease the size of the cache,
+ *   get the memory right away.  However, that means every time we 
+ *   reduce the memory target we risk the guest attempting to populate the 
+ *   memory before the balloon driver has reached its new target.  Safer to
+ *   never reduce the cache size here, but only when the balloon driver frees 
+ *   PoD ranges.
+ *
+ * If there are many zero pages, we could reach the target also by doing
+ * zero sweeps and marking the ranges PoD; but the balloon driver will have
+ * to free this memory eventually anyway, so we don't actually gain that much
+ * by doing so.
+ *
+ * NB that the equation (B<T') may require adjustment to the cache
+ * size as PoD pages are freed as well; i.e., freeing a PoD-backed
+ * entry when pod.entry_count == pod.count requires us to reduce both
+ * pod.entry_count and pod.count.
+ */
+int
+p2m_pod_set_mem_target(struct domain *d, unsigned long target)
+{
+    unsigned pod_target;
+    struct p2m_domain *p2md = d->arch.p2m;
+    int ret = 0;
+    unsigned long populated;
+
+    /* P == B: Nothing to do. */
+    if ( p2md->pod.entry_count == 0 )
+        goto out;
+
+    /* T' < B: Don't reduce the cache size; let the balloon driver
+     * take care of it. */
+    if ( target < d->tot_pages )
+        goto out;
+
+    populated  = d->tot_pages - p2md->pod.count;
+
+    pod_target = target - populated;
+
+    /* B < T': Set the cache size equal to # of outstanding entries,
+     * let the balloon driver fill in the rest. */
+    if ( pod_target > p2md->pod.entry_count )
+        pod_target = p2md->pod.entry_count;
+
+    ASSERT( pod_target > p2md->pod.count );
+
+    ret = p2m_pod_set_cache_target(d, pod_target);
+
+out:
+    return ret;
+}
+
 void
 p2m_pod_empty_cache(struct domain *d)
 {
@@ -537,6 +681,13 @@ p2m_pod_decrease_reservation(struct domain *d,
             ram--;
         }
     }    
+
+    /* If we've reduced our "liabilities" beyond our "assets", free some */
+    if ( p2md->pod.entry_count < p2md->pod.count )
+    {
+        printk("b %d\n", p2md->pod.entry_count);
+        p2m_pod_set_cache_target(d, p2md->pod.entry_count);
+    }
 
     /* If there are no more non-PoD entries, tell decrease_reservation() that
      * there's nothing left to do. */
@@ -786,7 +937,7 @@ p2m_pod_emergency_sweep_super(struct domain *d)
         /* Stop if we're past our limit and we have found *something*.
          *
          * NB that this is a zero-sum game; we're increasing our cache size
-         * by re-increasing our 'debt'.  Since we hold the p2m lock,
+         * by increasing our 'debt'.  Since we hold the p2m lock,
          * (entry_count - count) must remain the same. */
         if ( !list_empty(&p2md->pod.super) &&  i < limit )
             break;

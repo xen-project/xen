@@ -111,31 +111,40 @@ static void populate_physmap(struct memop_args *a)
         if ( unlikely(__copy_from_guest_offset(&gpfn, a->extent_list, i, 1)) )
             goto out;
 
-        page = alloc_domheap_pages(d, a->extent_order, a->memflags);
-        if ( unlikely(page == NULL) ) 
+        if ( a->memflags & MEMF_populate_on_demand )
         {
-            gdprintk(XENLOG_INFO, "Could not allocate order=%d extent: "
-                     "id=%d memflags=%x (%ld of %d)\n",
-                     a->extent_order, d->domain_id, a->memflags,
-                     i, a->nr_extents);
-            goto out;
-        }
-
-        mfn = page_to_mfn(page);
-        guest_physmap_add_page(d, gpfn, mfn, a->extent_order);
-
-        if ( !paging_mode_translate(d) )
-        {
-            for ( j = 0; j < (1 << a->extent_order); j++ )
-                set_gpfn_from_mfn(mfn + j, gpfn + j);
-
-            /* Inform the domain of the new page's machine address. */ 
-            if ( unlikely(__copy_to_guest_offset(a->extent_list, i, &mfn, 1)) )
+            if ( guest_physmap_mark_populate_on_demand(d, gpfn,
+                                                       a->extent_order) < 0 )
                 goto out;
+        }
+        else
+        {
+            page = alloc_domheap_pages(d, a->extent_order, a->memflags);
+            if ( unlikely(page == NULL) ) 
+            {
+                gdprintk(XENLOG_INFO, "Could not allocate order=%d extent: "
+                         "id=%d memflags=%x (%ld of %d)\n",
+                         a->extent_order, d->domain_id, a->memflags,
+                         i, a->nr_extents);
+                goto out;
+            }
+
+            mfn = page_to_mfn(page);
+            guest_physmap_add_page(d, gpfn, mfn, a->extent_order);
+
+            if ( !paging_mode_translate(d) )
+            {
+                for ( j = 0; j < (1 << a->extent_order); j++ )
+                    set_gpfn_from_mfn(mfn + j, gpfn + j);
+
+                /* Inform the domain of the new page's machine address. */ 
+                if ( unlikely(__copy_to_guest_offset(a->extent_list, i, &mfn, 1)) )
+                    goto out;
+            }
         }
     }
 
- out:
+out:
     a->nr_done = i;
 }
 
@@ -526,6 +535,10 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE(void) arg)
         }
 
         args.memflags |= MEMF_node(XENMEMF_get_node(reservation.mem_flags));
+
+        if ( op == XENMEM_populate_physmap
+             && (reservation.mem_flags & XENMEMF_populate_on_demand) )
+            args.memflags |= MEMF_populate_on_demand;
 
         if ( likely(reservation.domid == DOMID_SELF) )
         {

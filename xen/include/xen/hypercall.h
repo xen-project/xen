@@ -48,7 +48,7 @@ do_platform_op(
  * at what point in the page list to resume. For this purpose I steal the
  * high-order bits of the @cmd parameter, which are otherwise unused and zero.
  */
-#define MEMOP_EXTENT_SHIFT 4 /* cmd[:4] == start_extent */
+#define MEMOP_EXTENT_SHIFT 6 /* cmd[:6] == start_extent */
 #define MEMOP_CMD_MASK     ((1 << MEMOP_EXTENT_SHIFT) - 1)
 
 extern long

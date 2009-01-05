@@ -48,6 +48,8 @@
 /* NUMA node to allocate from. */
 #define XENMEMF_node(x)     (((x) + 1) << 8)
 #define XENMEMF_get_node(x) ((((x) >> 8) - 1) & 0xffu)
+/* Flag to populate physmap with populate-on-demand entries */
+#define XENMEMF_populate_on_demand (1<<16)
 #endif
 
 struct xen_memory_reservation {
@@ -299,6 +301,19 @@ struct xen_foreign_memory_map {
 typedef struct xen_foreign_memory_map xen_foreign_memory_map_t;
 DEFINE_XEN_GUEST_HANDLE(xen_foreign_memory_map_t);
 
+#define XENMEM_set_pod_target       16
+#define XENMEM_get_pod_target       17
+struct xen_pod_target {
+    /* IN */
+    uint64_t target_pages;
+    /* OUT */
+    uint64_t tot_pages;
+    uint64_t pod_cache_pages;
+    uint64_t pod_entries;
+    /* IN */
+    domid_t domid;
+};
+typedef struct xen_pod_target xen_pod_target_t;
 #endif /* __XEN_PUBLIC_MEMORY_H__ */
 
 /*

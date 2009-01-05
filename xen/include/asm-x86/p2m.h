@@ -261,6 +261,10 @@ void p2m_pod_dump_data(struct domain *d);
  * (usually in preparation for domain destruction) */
 void p2m_pod_empty_cache(struct domain *d);
 
+/* Set populate-on-demand cache size so that the total memory allocated to a
+ * domain matches target */
+int p2m_pod_set_mem_target(struct domain *d, unsigned long target);
+
 /* Call when decreasing memory reservation to handle PoD entries properly.
  * Will return '1' if all entries were handled and nothing more need be done.*/
 int
