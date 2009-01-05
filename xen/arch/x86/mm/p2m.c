@@ -118,9 +118,16 @@ static unsigned long p2m_type_to_flags(p2m_type_t t)
         return flags;
     case p2m_mmio_direct:
         return flags | P2M_BASE_FLAGS | _PAGE_RW | _PAGE_PCD;
+    case p2m_populate_on_demand:
+        return flags;
     }
 }
 
+#if P2M_AUDIT
+static void audit_p2m(struct domain *d);
+#else
+# define audit_p2m(_d) do { (void)(_d); } while(0)
+#endif /* P2M_AUDIT */
 
 // Find the next level's P2M entry, checking for out-of-range gfn's...
 // Returns NULL on error.
@@ -162,7 +169,8 @@ p2m_next_level(struct domain *d, mfn_t *table_mfn, void **table,
                                       shift, max)) )
         return 0;
 
-    if ( !(l1e_get_flags(*p2m_entry) & _PAGE_PRESENT) )
+    /* PoD: Not present doesn't imply empty. */
+    if ( !l1e_get_flags(*p2m_entry) )
     {
         struct page_info *pg = d->arch.p2m->alloc_page(d);
         if ( pg == NULL )
@@ -197,7 +205,7 @@ p2m_next_level(struct domain *d, mfn_t *table_mfn, void **table,
         }
     }
 
-    ASSERT(l1e_get_flags(*p2m_entry) & _PAGE_PRESENT);
+    ASSERT(l1e_get_flags(*p2m_entry) & (_PAGE_PRESENT|_PAGE_PSE));
 
     /* split single large page into 4KB page in P2M table */
     if ( type == PGT_l1_page_table && (l1e_get_flags(*p2m_entry) & _PAGE_PSE) )
@@ -240,6 +248,236 @@ p2m_next_level(struct domain *d, mfn_t *table_mfn, void **table,
     *table = next;
 
     return 1;
+}
+
+/*
+ * Populate-on-demand functionality
+ */
+int
+p2m_pod_cache_add(struct domain *d,
+                  struct page_info *page,
+                  unsigned long order)
+{
+    int i;
+    struct page_info *p;
+    struct p2m_domain *p2md = d->arch.p2m;
+
+#ifndef NDEBUG
+    mfn_t mfn;
+
+    mfn = page_to_mfn(page);
+
+    /* Check to make sure this is a contiguous region */
+    if( mfn_x(mfn) & ((1 << order) - 1) )
+    {
+        printk("%s: mfn %lx not aligned order %lu! (mask %lx)\n",
+               __func__, mfn_x(mfn), order, ((1UL << order) - 1));
+        return -1;
+    }
+    
+    for(i=0; i < 1 << order ; i++) {
+        struct domain * od;
+
+        p = mfn_to_page(_mfn(mfn_x(mfn) + i));
+        od = page_get_owner(p);
+        if(od != d)
+        {
+            printk("%s: mfn %lx expected owner d%d, got owner d%d!\n",
+                   __func__, mfn_x(mfn), d->domain_id,
+                   od?od->domain_id:-1);
+            return -1;
+        }
+    }
+#endif
+
+    spin_lock(&d->page_alloc_lock);
+
+    /* First, take all pages off the domain list */
+    for(i=0; i < 1 << order ; i++)
+    {
+        p = page + i;
+        list_del(&p->list);
+    }
+
+    /* Then add the first one to the appropriate populate-on-demand list */
+    switch(order)
+    {
+    case 9:
+        list_add_tail(&page->list, &p2md->pod.super); /* lock: page_alloc */
+        p2md->pod.count += 1 << order;
+        break;
+    case 0:
+        list_add_tail(&page->list, &p2md->pod.single); /* lock: page_alloc */
+        p2md->pod.count += 1 ;
+        break;
+    default:
+        BUG();
+    }
+
+    spin_unlock(&d->page_alloc_lock);
+
+    return 0;
+}
+
+void
+p2m_pod_empty_cache(struct domain *d)
+{
+    struct p2m_domain *p2md = d->arch.p2m;
+    struct list_head *q, *p;
+
+    spin_lock(&d->page_alloc_lock);
+
+    list_for_each_safe(p, q, &p2md->pod.super) /* lock: page_alloc */
+    {
+        int i;
+        struct page_info *page;
+            
+        list_del(p);
+            
+        page = list_entry(p, struct page_info, list);
+
+        for ( i = 0 ; i < (1 << 9) ; i++ )
+        {
+            BUG_ON(page_get_owner(page + i) != d);
+            list_add_tail(&page[i].list, &d->page_list);
+        }
+
+        p2md->pod.count -= 1<<9;
+    }
+
+    list_for_each_safe(p, q, &p2md->pod.single)
+    {
+        struct page_info *page;
+            
+        list_del(p);
+            
+        page = list_entry(p, struct page_info, list);
+
+        BUG_ON(page_get_owner(page) != d);
+        list_add_tail(&page->list, &d->page_list);
+
+        p2md->pod.count -= 1;
+    }
+
+    BUG_ON(p2md->pod.count != 0);
+
+    spin_unlock(&d->page_alloc_lock);
+}
+
+void
+p2m_pod_dump_data(struct domain *d)
+{
+    struct p2m_domain *p2md = d->arch.p2m;
+    
+    printk("    PoD entries=%d cachesize=%d\n",
+           p2md->pod.entry_count, p2md->pod.count);
+}
+
+static int
+p2m_pod_demand_populate(struct domain *d, unsigned long gfn,
+                        mfn_t table_mfn,
+                        l1_pgentry_t *p2m_entry,
+                        unsigned int order,
+                        p2m_query_t q)
+{
+    struct page_info *p = NULL; /* Compiler warnings */
+    unsigned long gfn_aligned;
+    mfn_t mfn;
+    l1_pgentry_t entry_content = l1e_empty();
+    struct p2m_domain *p2md = d->arch.p2m;
+    int i;
+
+    /* We need to grab the p2m lock here and re-check the entry to make
+     * sure that someone else hasn't populated it for us, then hold it
+     * until we're done. */
+    p2m_lock(p2md);
+    audit_p2m(d);
+
+    /* Check to make sure this is still PoD */
+    if ( p2m_flags_to_type(l1e_get_flags(*p2m_entry)) != p2m_populate_on_demand )
+    {
+        p2m_unlock(p2md);
+        return 0;
+    }
+
+    spin_lock(&d->page_alloc_lock);
+
+    if ( p2md->pod.count == 0 )
+        goto out_of_memory;
+
+    /* FIXME -- use single pages / splinter superpages if need be */
+    switch ( order )
+    {
+    case 9:
+        BUG_ON( list_empty(&p2md->pod.super) );
+        p = list_entry(p2md->pod.super.next, struct page_info, list); 
+        p2md->pod.count -= 1 << order; /* Lock: page_alloc */
+        break;
+    case 0:
+        BUG_ON( list_empty(&p2md->pod.single) );
+        p = list_entry(p2md->pod.single.next, struct page_info, list);
+        p2md->pod.count -= 1;
+        break;
+    default:
+        BUG();
+    }
+        
+    list_del(&p->list);
+
+    mfn = page_to_mfn(p);
+
+    BUG_ON((mfn_x(mfn) & ((1 << order)-1)) != 0);
+
+    /* Put the pages back on the domain page_list */
+    for ( i = 0 ; i < (1 << order) ; i++ )
+    {
+        BUG_ON(page_get_owner(p + i) != d);
+        list_add_tail(&p[i].list, &d->page_list);
+    }
+
+    spin_unlock(&d->page_alloc_lock);
+
+    /* Fill in the entry in the p2m */
+    switch ( order )
+    {
+    case 9:
+    {
+        l2_pgentry_t l2e_content;
+        
+        l2e_content = l2e_from_pfn(mfn_x(mfn),
+                                   p2m_type_to_flags(p2m_ram_rw) | _PAGE_PSE);
+
+        entry_content.l1 = l2e_content.l2;
+    }
+    break;
+    case 0:
+        entry_content = l1e_from_pfn(mfn_x(mfn),
+                                     p2m_type_to_flags(p2m_ram_rw));
+        break;
+        
+    }
+
+    gfn_aligned = (gfn >> order) << order;
+
+    paging_write_p2m_entry(d, gfn_aligned, p2m_entry, table_mfn,
+                           entry_content, (order==9)?2:1);
+
+    for( i = 0 ; i < (1UL << order) ; i++ )
+        set_gpfn_from_mfn(mfn_x(mfn) + i, gfn_aligned + i);
+    
+    p2md->pod.entry_count -= (1 << order); /* Lock: p2m */
+    BUG_ON(p2md->pod.entry_count < 0);
+    audit_p2m(d);
+    p2m_unlock(p2md);
+
+    return 0;
+out_of_memory:
+    spin_unlock(&d->page_alloc_lock);
+    audit_p2m(d);
+    p2m_unlock(p2md);
+    printk("%s: Out of populate-on-demand memory!\n", __func__);
+    domain_crash(d);
+    return -1;
 }
 
 // Returns 0 on error (out of memory)
@@ -303,6 +541,7 @@ p2m_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
                                    L2_PAGETABLE_ENTRIES);
         ASSERT(p2m_entry);
         
+        /* FIXME: Deal with 4k replaced by 2meg pages */
         if ( (l1e_get_flags(*p2m_entry) & _PAGE_PRESENT) &&
              !(l1e_get_flags(*p2m_entry) & _PAGE_PSE) )
         {
@@ -311,7 +550,7 @@ p2m_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
             goto out;
         }
         
-        if ( mfn_valid(mfn) )
+        if ( mfn_valid(mfn) || p2m_is_magic(p2mt) )
             l2e_content = l2e_from_pfn(mfn_x(mfn),
                                        p2m_type_to_flags(p2mt) | _PAGE_PSE);
         else
@@ -403,8 +642,21 @@ p2m_gfn_to_mfn(struct domain *d, unsigned long gfn, p2m_type_t *t,
 
     l2e = map_domain_page(mfn_x(mfn));
     l2e += l2_table_offset(addr);
+
+pod_retry_l2:
     if ( (l2e_get_flags(*l2e) & _PAGE_PRESENT) == 0 )
     {
+        /* PoD: Try to populate a 2-meg chunk */
+        if ( p2m_flags_to_type(l2e_get_flags(*l2e)) == p2m_populate_on_demand )
+        {
+            if ( q != p2m_query ) {
+                if( !p2m_pod_demand_populate(d, gfn, mfn,
+                                             (l1_pgentry_t *)l2e, 9, q) )
+                    goto pod_retry_l2;
+            } else
+                *t = p2m_populate_on_demand;
+        }
+    
         unmap_domain_page(l2e);
         return _mfn(INVALID_MFN);
     }
@@ -423,8 +675,20 @@ p2m_gfn_to_mfn(struct domain *d, unsigned long gfn, p2m_type_t *t,
 
     l1e = map_domain_page(mfn_x(mfn));
     l1e += l1_table_offset(addr);
+pod_retry_l1:
     if ( (l1e_get_flags(*l1e) & _PAGE_PRESENT) == 0 )
     {
+        /* PoD: Try to populate */
+        if ( p2m_flags_to_type(l1e_get_flags(*l1e)) == p2m_populate_on_demand )
+        {
+            if ( q != p2m_query ) {
+                if( !p2m_pod_demand_populate(d, gfn, mfn,
+                                             (l1_pgentry_t *)l1e, 0, q) )
+                    goto pod_retry_l1;
+            } else
+                *t = p2m_populate_on_demand;
+        }
+    
         unmap_domain_page(l1e);
         return _mfn(INVALID_MFN);
     }
@@ -450,48 +714,114 @@ static mfn_t p2m_gfn_to_mfn_current(unsigned long gfn, p2m_type_t *t,
 
     if ( gfn <= current->domain->arch.p2m->max_mapped_pfn )
     {
-        l1_pgentry_t l1e = l1e_empty();
+        l1_pgentry_t l1e = l1e_empty(), *p2m_entry;
         l2_pgentry_t l2e = l2e_empty();
         int ret;
 
         ASSERT(gfn < (RO_MPT_VIRT_END - RO_MPT_VIRT_START) 
                / sizeof(l1_pgentry_t));
 
+        /*
+         * Read & process L2
+         */
+        p2m_entry = &__linear_l1_table[l1_linear_offset(RO_MPT_VIRT_START)
+                                       + l2_linear_offset(addr)];
+
+    pod_retry_l2:
         ret = __copy_from_user(&l2e,
-                               &__linear_l1_table[l1_linear_offset(RO_MPT_VIRT_START) + l2_linear_offset(addr)],
+                               p2m_entry,
                                sizeof(l2e));
+        if ( ret != 0
+             || !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
+        {
+            if( (l2e_get_flags(l2e) & _PAGE_PSE)
+                && ( p2m_flags_to_type(l2e_get_flags(l2e))
+                     == p2m_populate_on_demand ) )
+            {
+                /* The read has succeeded, so we know that the mapping
+                 * exits at this point.  */
+                if ( q != p2m_query )
+                {
+                    if( !p2m_pod_demand_populate(current->domain, gfn, mfn,
+                                                 p2m_entry, 9, q) )
+                        goto pod_retry_l2;
+
+                    /* Allocate failed. */
+                    p2mt = p2m_invalid;
+                    printk("%s: Allocate failed!\n", __func__);
+                    goto out;
+                }
+                else
+                {
+                    p2mt = p2m_populate_on_demand;
+                    goto out;
+                }
+            }
+
+            goto pod_retry_l1;
+        }
         
-        if ( (ret == 0) && (l2e_get_flags(l2e) & _PAGE_PRESENT) && 
-             (l2e_get_flags(l2e) & _PAGE_PSE) ) 
+        if (l2e_get_flags(l2e) & _PAGE_PSE)
         {
             p2mt = p2m_flags_to_type(l2e_get_flags(l2e));
             ASSERT(l2e_get_pfn(l2e) != INVALID_MFN || !p2m_is_ram(p2mt));
+
             if ( p2m_is_valid(p2mt) )
                 mfn = _mfn(l2e_get_pfn(l2e) + l1_table_offset(addr));
             else
                 p2mt = p2m_mmio_dm;
+
+            goto out;
         }
-        else
-        {
-        
-            /* Need to __copy_from_user because the p2m is sparse and this
-             * part might not exist */
-            ret = __copy_from_user(&l1e,
-                                   &phys_to_machine_mapping[gfn],
-                                   sizeof(l1e));
+
+        /*
+         * Read and process L1
+         */
+
+        /* Need to __copy_from_user because the p2m is sparse and this
+         * part might not exist */
+    pod_retry_l1:
+        p2m_entry = &phys_to_machine_mapping[gfn];
+
+        ret = __copy_from_user(&l1e,
+                               p2m_entry,
+                               sizeof(l1e));
             
-            if ( ret == 0 ) {
-                p2mt = p2m_flags_to_type(l1e_get_flags(l1e));
-                ASSERT(l1e_get_pfn(l1e) != INVALID_MFN || !p2m_is_ram(p2mt));
-                if ( p2m_is_valid(p2mt) )
-                    mfn = _mfn(l1e_get_pfn(l1e));
-                else 
-                    /* XXX see above */
-                    p2mt = p2m_mmio_dm;
+        if ( ret == 0 ) {
+            p2mt = p2m_flags_to_type(l1e_get_flags(l1e));
+            ASSERT(l1e_get_pfn(l1e) != INVALID_MFN || !p2m_is_ram(p2mt));
+
+            if ( p2m_flags_to_type(l1e_get_flags(l1e))
+                 == p2m_populate_on_demand )
+            {
+                /* The read has succeeded, so we know that the mapping
+                 * exits at this point.  */
+                if ( q != p2m_query )
+                {
+                    if( !p2m_pod_demand_populate(current->domain, gfn, mfn,
+                                                 (l1_pgentry_t *)p2m_entry, 0,
+                                                 q) )
+                        goto pod_retry_l1;
+
+                    /* Allocate failed. */
+                    p2mt = p2m_invalid;
+                    goto out;
+                }
+                else
+                {
+                    p2mt = p2m_populate_on_demand;
+                    goto out;
+                }
             }
+
+            if ( p2m_is_valid(p2mt) )
+                mfn = _mfn(l1e_get_pfn(l1e));
+            else 
+                /* XXX see above */
+                p2mt = p2m_mmio_dm;
         }
     }
-
+out:
     *t = p2mt;
     return mfn;
 }
@@ -510,6 +840,8 @@ int p2m_init(struct domain *d)
     memset(p2m, 0, sizeof(*p2m));
     p2m_lock_init(p2m);
     INIT_LIST_HEAD(&p2m->pages);
+    INIT_LIST_HEAD(&p2m->pod.super);
+    INIT_LIST_HEAD(&p2m->pod.single);
 
     p2m->set_entry = p2m_set_entry;
     p2m->get_entry = p2m_gfn_to_mfn;
@@ -680,6 +1012,7 @@ static void audit_p2m(struct domain *d)
     struct page_info *page;
     struct domain *od;
     unsigned long mfn, gfn, m2pfn, lp2mfn = 0;
+    int entry_count = 0;
     mfn_t p2mfn;
     unsigned long orphans_d = 0, orphans_i = 0, mpbad = 0, pmbad = 0;
     int test_linear;
@@ -805,6 +1138,10 @@ static void audit_p2m(struct domain *d)
                 {
                     if ( !(l2e_get_flags(l2e[i2]) & _PAGE_PRESENT) )
                     {
+                        if ( (l2e_get_flags(l2e[i2]) & _PAGE_PSE)
+                             && ( p2m_flags_to_type(l2e_get_flags(l2e[i2]))
+                                  == p2m_populate_on_demand ) )
+                            entry_count+=(1<<9);
                         gfn += 1 << (L2_PAGETABLE_SHIFT - PAGE_SHIFT);
                         continue;
                     }
@@ -835,13 +1172,20 @@ static void audit_p2m(struct domain *d)
                     for ( i1 = 0; i1 < L1_PAGETABLE_ENTRIES; i1++, gfn++ )
                     {
                         if ( !(l1e_get_flags(l1e[i1]) & _PAGE_PRESENT) )
+                        {
+                            if ( p2m_flags_to_type(l1e_get_flags(l1e[i1]))
+                                 == p2m_populate_on_demand )
+                            entry_count++;
                             continue;
+                        }
                         mfn = l1e_get_pfn(l1e[i1]);
                         ASSERT(mfn_valid(_mfn(mfn)));
                         m2pfn = get_gpfn_from_mfn(mfn);
                         if ( m2pfn != gfn )
                         {
                             pmbad++;
+                            printk("mismatch: gfn %#lx -> mfn %#lx"
+                                   " -> gfn %#lx\n", gfn, mfn, m2pfn);
                             P2M_PRINTK("mismatch: gfn %#lx -> mfn %#lx"
                                        " -> gfn %#lx\n", gfn, mfn, m2pfn);
                             BUG();
@@ -864,6 +1208,15 @@ static void audit_p2m(struct domain *d)
 
     }
 
+    if ( entry_count != d->arch.p2m->pod.entry_count )
+    {
+        printk("%s: refcounted entry count %d, audit count %d!\n",
+               __func__,
+               d->arch.p2m->pod.entry_count,
+               entry_count);
+        BUG();
+    }
+        
     //P2M_PRINTK("p2m audit complete\n");
     //if ( orphans_i | orphans_d | mpbad | pmbad )
     //    P2M_PRINTK("p2m audit found %lu orphans (%lu inval %lu debug)\n",
@@ -872,8 +1225,6 @@ static void audit_p2m(struct domain *d)
         P2M_PRINTK("p2m audit found %lu odd p2m, %lu bad m2p entries\n",
                    pmbad, mpbad);
 }
-#else
-#define audit_p2m(_d) do { (void)(_d); } while(0)
 #endif /* P2M_AUDIT */
 
 
@@ -911,6 +1262,77 @@ guest_physmap_remove_page(struct domain *d, unsigned long gfn,
 }
 
 int
+guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn,
+                                      unsigned int order)
+{
+    struct p2m_domain *p2md = d->arch.p2m;
+    unsigned long i;
+    p2m_type_t ot;
+    mfn_t omfn;
+    int pod_count = 0;
+    int rc = 0;
+
+    BUG_ON(!paging_mode_translate(d));
+
+#if CONFIG_PAGING_LEVELS == 3
+    /*
+     * 32bit PAE nested paging does not support over 4GB guest due to 
+     * hardware translation limit. This limitation is checked by comparing
+     * gfn with 0xfffffUL.
+     */
+    if ( paging_mode_hap(d) && (gfn > 0xfffffUL) )
+    {
+        if ( !test_and_set_bool(d->arch.hvm_domain.svm.npt_4gb_warning) )
+            dprintk(XENLOG_WARNING, "Dom%d failed to populate memory beyond"
+                    " 4GB: specify 'hap=0' domain config option.\n",
+                    d->domain_id);
+        return -EINVAL;
+    }
+#endif
+
+    p2m_lock(p2md);
+    audit_p2m(d);
+
+    P2M_DEBUG("adding gfn=%#lx mfn=%#lx\n", gfn, mfn);
+
+    /* Make sure all gpfns are unused */
+    for ( i = 0; i < (1UL << order); i++ )
+    {
+        omfn = gfn_to_mfn_query(d, gfn + i, &ot);
+        if ( p2m_is_ram(ot) )
+        {
+            printk("%s: gfn_to_mfn returned type %d!\n",
+                   __func__, ot);
+            rc = -EBUSY;
+            goto out;
+        }
+        else if ( ot == p2m_populate_on_demand )
+        {
+            /* Count how man PoD entries we'll be replacing if successful */
+            pod_count++;
+        }
+    }
+
+    /* Now, actually do the two-way mapping */
+    if ( !set_p2m_entry(d, gfn, _mfn(POPULATE_ON_DEMAND_MFN), order,
+                        p2m_populate_on_demand) )
+        rc = -EINVAL;
+    else
+    {
+        p2md->pod.entry_count += 1 << order; /* Lock: p2m */
+        p2md->pod.entry_count -= pod_count;
+        BUG_ON(p2md->pod.entry_count < 0);
+    }
+
+    audit_p2m(d);
+    p2m_unlock(p2md);
+
+out:
+    return rc;
+
+}
+
+int
 guest_physmap_add_entry(struct domain *d, unsigned long gfn,
                         unsigned long mfn, unsigned int page_order, 
                         p2m_type_t t)
@@ -918,6 +1340,7 @@ guest_physmap_add_entry(struct domain *d, unsigned long gfn,
     unsigned long i, ogfn;
     p2m_type_t ot;
     mfn_t omfn;
+    int pod_count = 0;
     int rc = 0;
 
     if ( !paging_mode_translate(d) )
@@ -966,6 +1389,11 @@ guest_physmap_add_entry(struct domain *d, unsigned long gfn,
             ASSERT(mfn_valid(omfn));
             set_gpfn_from_mfn(mfn_x(omfn), INVALID_M2P_ENTRY);
         }
+        else if ( ot == p2m_populate_on_demand )
+        {
+            /* Count how man PoD entries we'll be replacing if successful */
+            pod_count++;
+        }
     }
 
     /* Then, look for m->p mappings for this range and deal with them */
@@ -1012,6 +1440,11 @@ guest_physmap_add_entry(struct domain *d, unsigned long gfn,
         if ( !set_p2m_entry(d, gfn, _mfn(INVALID_MFN), page_order, 
                             p2m_invalid) )
             rc = -EINVAL;
+        else
+        {
+            d->arch.p2m->pod.entry_count -= pod_count; /* Lock: p2m */
+            BUG_ON(d->arch.p2m->pod.entry_count < 0);
+        }
     }
 
     audit_p2m(d);

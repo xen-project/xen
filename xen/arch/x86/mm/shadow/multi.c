@@ -2173,7 +2173,7 @@ static int validate_gl4e(struct vcpu *v, void *new_ge, mfn_t sl4mfn, void *se)
         mfn_t gl3mfn = gfn_to_mfn_query(d, gl3gfn, &p2mt);
         if ( p2m_is_ram(p2mt) )
             sl3mfn = get_shadow_status(v, gl3mfn, SH_type_l3_shadow);
-        else
+        else if ( p2mt != p2m_populate_on_demand )
             result |= SHADOW_SET_ERROR;
 
 #if (SHADOW_OPTIMIZATIONS && SHOPT_OUT_OF_SYNC )
@@ -2230,7 +2230,7 @@ static int validate_gl3e(struct vcpu *v, void *new_ge, mfn_t sl3mfn, void *se)
         mfn_t gl2mfn = gfn_to_mfn_query(v->domain, gl2gfn, &p2mt);
         if ( p2m_is_ram(p2mt) )
             sl2mfn = get_shadow_status(v, gl2mfn, SH_type_l2_shadow);
-        else
+        else if ( p2mt != p2m_populate_on_demand )
             result |= SHADOW_SET_ERROR;
 
 #if (SHADOW_OPTIMIZATIONS && SHOPT_OUT_OF_SYNC )
@@ -2278,8 +2278,8 @@ static int validate_gl2e(struct vcpu *v, void *new_ge, mfn_t sl2mfn, void *se)
         {
             mfn_t gl1mfn = gfn_to_mfn_query(v->domain, gl1gfn, &p2mt);
             if ( p2m_is_ram(p2mt) )
-                sl1mfn = get_shadow_status(v, gl1mfn, SH_type_l1_shadow);
-            else
+                sl1mfn = get_shadow_status(v, gl1mfn, SH_type_l1_shadow); 
+            else if ( p2mt != p2m_populate_on_demand )
                 result |= SHADOW_SET_ERROR;
         }
     }

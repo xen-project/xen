@@ -64,6 +64,7 @@ typedef enum {
     p2m_ram_ro = 3,             /* Read-only; writes are silently dropped */
     p2m_mmio_dm = 4,            /* Reads and write go to the device model */
     p2m_mmio_direct = 5,        /* Read/write mapping of genuine MMIO area */
+    p2m_populate_on_demand = 6, /* Place-holder for empty memory */
 } p2m_type_t;
 
 typedef enum {
@@ -88,11 +89,19 @@ typedef enum {
 #define P2M_RO_TYPES (p2m_to_mask(p2m_ram_logdirty)     \
                       | p2m_to_mask(p2m_ram_ro))
 
+#define P2M_MAGIC_TYPES (p2m_to_mask(p2m_populate_on_demand))
+
 /* Useful predicates */
 #define p2m_is_ram(_t) (p2m_to_mask(_t) & P2M_RAM_TYPES)
 #define p2m_is_mmio(_t) (p2m_to_mask(_t) & P2M_MMIO_TYPES)
 #define p2m_is_readonly(_t) (p2m_to_mask(_t) & P2M_RO_TYPES)
+#define p2m_is_magic(_t) (p2m_to_mask(_t) & P2M_MAGIC_TYPES)
 #define p2m_is_valid(_t) (p2m_to_mask(_t) & (P2M_RAM_TYPES | P2M_MMIO_TYPES))
+
+/* Populate-on-demand */
+#define POPULATE_ON_DEMAND_MFN  (1<<9)
+#define POD_PAGE_ORDER 9
+
 
 struct p2m_domain {
     /* Lock that protects updates to the p2m */
@@ -122,6 +131,28 @@ struct p2m_domain {
 
     /* Highest guest frame that's ever been mapped in the p2m */
     unsigned long max_mapped_pfn;
+
+    /* Populate-on-demand variables
+     * NB on locking.  {super,single,count} are
+     * covered by d->page_alloc_lock, since they're almost always used in
+     * conjunction with that functionality.  {entry_count} is covered by
+     * the domain p2m lock, since it's almost always used in conjunction
+     * with changing the p2m tables.
+     *
+     * At this point, both locks are held in two places.  In both,
+     * the order is [p2m,page_alloc]:
+     * + p2m_pod_decrease_reservation() calls p2m_pod_cache_add(),
+     *   which grabs page_alloc
+     * + p2m_pod_demand_populate() grabs both; the p2m lock to avoid
+     *   double-demand-populating of pages, the page_alloc lock to
+     *   protect moving stuff from the PoD cache to the domain page list.
+     */
+    struct {
+        struct list_head super,        /* List of superpages                */
+                         single;       /* Non-super lists                   */
+        int              count,        /* # of pages in cache lists         */
+                         entry_count;  /* # of pages in p2m marked pod      */
+    } pod;
 };
 
 /* Extract the type from the PTE flags that store it */
@@ -220,10 +251,21 @@ int p2m_alloc_table(struct domain *d,
 void p2m_teardown(struct domain *d);
 void p2m_final_teardown(struct domain *d);
 
+/* Dump PoD information about the domain */
+void p2m_pod_dump_data(struct domain *d);
+
+/* Move all pages from the populate-on-demand cache to the domain page_list
+ * (usually in preparation for domain destruction) */
+void p2m_pod_empty_cache(struct domain *d);
+
 /* Add a page to a domain's p2m table */
 int guest_physmap_add_entry(struct domain *d, unsigned long gfn,
                             unsigned long mfn, unsigned int page_order, 
                             p2m_type_t t);
+
+/* Set a p2m range as populate-on-demand */
+int guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn,
+                                          unsigned int order);
 
 /* Untyped version for RAM only, for compatibility 
  *

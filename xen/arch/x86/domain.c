@@ -149,6 +149,11 @@ void dump_pageframe_info(struct domain *d)
         }
     }
 
+    if ( is_hvm_domain(d) )
+    {
+        p2m_pod_dump_data(d);
+    }
+
     list_for_each_entry ( page, &d->xenpage_list, list )
     {
         printk("    XenPage %p: caf=%08x, taf=%" PRtype_info "\n",
