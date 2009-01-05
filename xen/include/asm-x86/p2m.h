@@ -66,6 +66,12 @@ typedef enum {
     p2m_mmio_direct = 5,        /* Read/write mapping of genuine MMIO area */
 } p2m_type_t;
 
+typedef enum {
+    p2m_query = 0,              /* Do not populate a PoD entries      */
+    p2m_alloc = 1,              /* Automatically populate PoD entries */
+    p2m_guest = 2,              /* Guest demand-fault; implies alloc  */
+} p2m_query_t;
+
 /* We use bitmaps and maks to handle groups of types */
 #define p2m_to_mask(_t) (1UL << (_t))
 
@@ -105,9 +111,11 @@ struct p2m_domain {
                                        mfn_t mfn, unsigned int page_order,
                                        p2m_type_t p2mt);
     mfn_t              (*get_entry   )(struct domain *d, unsigned long gfn,
-                                       p2m_type_t *p2mt);
+                                       p2m_type_t *p2mt,
+                                       p2m_query_t q);
     mfn_t              (*get_entry_current)(unsigned long gfn,
-                                            p2m_type_t *p2mt);
+                                            p2m_type_t *p2mt,
+                                            p2m_query_t q);
     void               (*change_entry_type_global)(struct domain *d,
                                                    p2m_type_t ot,
                                                    p2m_type_t nt);
@@ -123,23 +131,26 @@ static inline p2m_type_t p2m_flags_to_type(unsigned long flags)
     return (flags >> 9) & 0x7;
 }
 
-/* Read the current domain's p2m table. */
-static inline mfn_t gfn_to_mfn_current(unsigned long gfn, p2m_type_t *t)
+/* Read the current domain's p2m table.  Do not populate PoD pages. */
+static inline mfn_t gfn_to_mfn_type_current(unsigned long gfn, p2m_type_t *t,
+                                            p2m_query_t q)
 {
-    return current->domain->arch.p2m->get_entry_current(gfn, t);
+    return current->domain->arch.p2m->get_entry_current(gfn, t, q);
 }
 
-/* Read another domain's P2M table, mapping pages as we go */
+/* Read another domain's P2M table, mapping pages as we go.
+ * Do not populate PoD pages. */
 static inline
-mfn_t gfn_to_mfn_foreign(struct domain *d, unsigned long gfn, p2m_type_t *t)
+mfn_t gfn_to_mfn_type_foreign(struct domain *d, unsigned long gfn, p2m_type_t *t,
+                              p2m_query_t q)
 {
-    return d->arch.p2m->get_entry(d, gfn, t);
+    return d->arch.p2m->get_entry(d, gfn, t, q);
 }
 
 /* General conversion function from gfn to mfn */
-#define gfn_to_mfn(d, g, t) _gfn_to_mfn((d), (g), (t))
-static inline mfn_t _gfn_to_mfn(struct domain *d,
-                                unsigned long gfn, p2m_type_t *t)
+static inline mfn_t _gfn_to_mfn_type(struct domain *d,
+                                     unsigned long gfn, p2m_type_t *t,
+                                     p2m_query_t q)
 {
     if ( !paging_mode_translate(d) )
     {
@@ -149,10 +160,17 @@ static inline mfn_t _gfn_to_mfn(struct domain *d,
         return _mfn(gfn);
     }
     if ( likely(current->domain == d) )
-        return gfn_to_mfn_current(gfn, t);
+        return gfn_to_mfn_type_current(gfn, t, q);
     else
-        return gfn_to_mfn_foreign(d, gfn, t);
+        return gfn_to_mfn_type_foreign(d, gfn, t, q);
 }
+
+#define gfn_to_mfn(d, g, t) _gfn_to_mfn_type((d), (g), (t), p2m_alloc)
+#define gfn_to_mfn_query(d, g, t) _gfn_to_mfn_type((d), (g), (t), p2m_query)
+#define gfn_to_mfn_guest(d, g, t) _gfn_to_mfn_type((d), (g), (t), p2m_guest)
+
+#define gfn_to_mfn_current(g, t) gfn_to_mfn_type_current((g), (t), p2m_alloc)
+#define gfn_to_mfn_foreign(d, g, t) gfn_to_mfn_type_foreign((d), (g), (t), p2m_alloc)
 
 /* Compatibility function exporting the old untyped interface */
 static inline unsigned long gmfn_to_mfn(struct domain *d, unsigned long gpfn)

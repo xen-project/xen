@@ -345,7 +345,8 @@ p2m_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
 }
 
 static mfn_t
-p2m_gfn_to_mfn(struct domain *d, unsigned long gfn, p2m_type_t *t)
+p2m_gfn_to_mfn(struct domain *d, unsigned long gfn, p2m_type_t *t,
+               p2m_query_t q)
 {
     mfn_t mfn;
     paddr_t addr = ((paddr_t)gfn) << PAGE_SHIFT;
@@ -436,7 +437,8 @@ p2m_gfn_to_mfn(struct domain *d, unsigned long gfn, p2m_type_t *t)
 }
 
 /* Read the current domain's p2m table (through the linear mapping). */
-static mfn_t p2m_gfn_to_mfn_current(unsigned long gfn, p2m_type_t *t)
+static mfn_t p2m_gfn_to_mfn_current(unsigned long gfn, p2m_type_t *t,
+                                    p2m_query_t q)
 {
     mfn_t mfn = _mfn(INVALID_MFN);
     p2m_type_t p2mt = p2m_mmio_dm;
