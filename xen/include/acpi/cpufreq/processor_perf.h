@@ -19,8 +19,6 @@ int  cpufreq_limit_change(unsigned int);
 int  cpufreq_add_cpu(unsigned int);
 int  cpufreq_del_cpu(unsigned int);
 
-uint64_t get_cpu_idle_time(unsigned int);
-
 struct processor_performance {
     uint32_t state;
     uint32_t platform_limit;
