@@ -130,6 +130,12 @@ int xc_hvm_build(int xc_handle,
                  int memsize,
                  const char *image_name);
 
+int xc_hvm_build_target_mem(int xc_handle,
+                            uint32_t domid,
+                            int memsize,
+                            int target,
+                            const char *image_name);
+
 int xc_hvm_build_mem(int xc_handle,
                      uint32_t domid,
                      int memsize,

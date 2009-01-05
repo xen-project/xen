@@ -634,6 +634,19 @@ int xc_domain_memory_translate_gpfn_list(int xc_handle,
                                          xen_pfn_t *gpfn_list,
                                          xen_pfn_t *mfn_list);
 
+int xc_domain_memory_set_pod_target(int xc_handle,
+                                    uint32_t domid,
+                                    uint64_t target_pages,
+                                    uint64_t *tot_pages,
+                                    uint64_t *pod_cache_pages,
+                                    uint64_t *pod_entries);
+
+int xc_domain_memory_get_pod_target(int xc_handle,
+                                    uint32_t domid,
+                                    uint64_t *tot_pages,
+                                    uint64_t *pod_cache_pages,
+                                    uint64_t *pod_entries);
+
 int xc_domain_ioport_permission(int xc_handle,
                                 uint32_t domid,
                                 uint32_t first_port,

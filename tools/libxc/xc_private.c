@@ -323,6 +323,14 @@ int xc_memory_op(int xc_handle,
             goto out1;
         }
         break;
+    case XENMEM_set_pod_target:
+    case XENMEM_get_pod_target:
+        if ( lock_pages(arg, sizeof(struct xen_pod_target)) )
+        {
+            PERROR("Could not lock");
+            goto out1;
+        }
+        break;
     }
 
     ret = do_xen_hypercall(xc_handle, &hypercall);
@@ -354,6 +362,10 @@ int xc_memory_op(int xc_handle,
     case XENMEM_maximum_reservation:
     case XENMEM_maximum_gpfn:
         unlock_pages(arg, sizeof(domid_t));
+        break;
+    case XENMEM_set_pod_target:
+    case XENMEM_get_pod_target:
+        unlock_pages(arg, sizeof(struct xen_pod_target));
         break;
     }
 
