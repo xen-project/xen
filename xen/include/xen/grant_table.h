@@ -32,6 +32,7 @@
 struct active_grant_entry {
     u32           pin;    /* Reference count information.  */
     domid_t       domid;  /* Domain being granted access.  */
+    unsigned long gfn;    /* Guest's idea of the frame being granted. */
     unsigned long frame;  /* Frame being granted.          */
 };
 
@@ -145,5 +146,8 @@ nr_active_grant_frames(struct grant_table *gt)
 {
     return num_act_frames_from_sha_frames(nr_grant_frames(gt));
 }
+
+int
+gnttab_is_granted(struct domain *d, xen_pfn_t gfn, int order);
 
 #endif /* __XEN_GRANT_TABLE_H__ */

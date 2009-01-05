@@ -496,6 +496,289 @@ p2m_pod_dump_data(struct domain *d)
            p2md->pod.entry_count, p2md->pod.count);
 }
 
+#define superpage_aligned(_x)  (((_x)&((1<<9)-1))==0)
+
+/* Must be called w/ p2m lock held, page_alloc lock not held */
+static int
+p2m_pod_zero_check_superpage(struct domain *d, unsigned long gfn)
+{
+    mfn_t mfns[1<<9];
+    p2m_type_t types[1<<9];
+    unsigned long * map[1<<9] = { NULL };
+    int ret=0, reset = 0, reset_max = 0;
+    int i, j;
+
+    if ( !superpage_aligned(gfn) )
+        goto out;
+
+    /* Look up the mfns, checking to make sure they're the same mfn
+     * and aligned, and mapping them. */
+    for ( i=0; i<(1<<9); i++ )
+    {
+        mfns[i] = gfn_to_mfn_query(d, gfn + i, types + i);
+
+        /* Conditions that must be met for superpage-superpage:
+         * + All gfns are ram types
+         * + All gfns have the same type
+         * + None of the mfns are used as pagetables
+         * + The first mfn is 2-meg aligned
+         * + All the other mfns are in sequence
+         */
+        if ( p2m_is_ram(types[i])
+             && types[i] == types[0]
+             && ( (mfn_to_page(mfns[i])->count_info & PGC_page_table) == 0 )
+             && ( ( i == 0 && superpage_aligned(mfn_x(mfns[0])) )
+                  || ( i != 0 && mfn_x(mfns[i]) == mfn_x(mfns[0]) + i ) ) )
+            map[i] = map_domain_page(mfn_x(mfns[i]));
+        else
+            goto out_unmap;
+    }
+
+    /* Now, do a quick check to see if it may be zero before unmapping. */
+    for ( i=0; i<(1<<9); i++ )
+    {
+        /* Quick zero-check */
+        for ( j=0; j<16; j++ )
+            if( *(map[i]+j) != 0 )
+                break;
+
+        if ( j < 16 )
+            goto out_unmap;
+
+    }
+
+    /* Try to remove the page, restoring old mapping if it fails. */
+    reset_max = 1<<9;
+    set_p2m_entry(d, gfn,
+                  _mfn(POPULATE_ON_DEMAND_MFN), 9,
+                  p2m_populate_on_demand);
+
+    if ( (mfn_to_page(mfns[0])->u.inuse.type_info & PGT_count_mask) != 0 )
+    {
+        reset = 1;
+        goto out_reset;
+    }
+
+    /* Timing here is important.  We need to make sure not to reclaim
+     * a page which has been grant-mapped to another domain.  But we
+     * can't grab the grant table lock, because we may be invoked from
+     * the grant table code!  So we first remove the page from the
+     * p2m, then check to see if the gpfn has been granted.  Once this
+     * gpfn is marked PoD, any future gfn_to_mfn() call will block
+     * waiting for the p2m lock.  If we find that it has been granted, we
+     * simply restore the old value.
+     */
+    if ( gnttab_is_granted(d, gfn, 9) )
+    {
+        printk("gfn contains grant table %lx\n", gfn);
+        reset = 1;
+        goto out_reset;
+    }
+
+    /* Finally, do a full zero-check */
+    for ( i=0; i < (1<<9); i++ )
+    {
+        for ( j=0; j<PAGE_SIZE/sizeof(*map[i]); j++ )
+            if( *(map[i]+j) != 0 )
+            {
+                reset = 1;
+                break;
+            }
+
+        if ( reset )
+            goto out_reset;
+    }
+
+    /* Finally!  We've passed all the checks, and can add the mfn superpage
+     * back on the PoD cache, and account for the new p2m PoD entries */
+    p2m_pod_cache_add(d, mfn_to_page(mfns[0]), 9);
+    d->arch.p2m->pod.entry_count += (1<<9);
+
+out_reset:
+    if ( reset )
+    {
+        if (reset_max == (1<<9) )
+            set_p2m_entry(d, gfn, mfns[0], 9, types[0]);
+        else
+            for ( i=0; i<reset_max; i++)
+                set_p2m_entry(d, gfn + i, mfns[i], 0, types[i]);
+    }
+    
+out_unmap:
+    for ( i=0; i<(1<<9); i++ )
+        if ( map[i] )
+            unmap_domain_page(map[i]);
+out:
+    return ret;
+}
+
+static void
+p2m_pod_zero_check(struct domain *d, unsigned long *gfns, int count)
+{
+    mfn_t mfns[count];
+    p2m_type_t types[count];
+    unsigned long * map[count];
+
+    int i, j;
+
+    /* First, get the gfn list, translate to mfns, and map the pages. */
+    for ( i=0; i<count; i++ )
+    {
+        mfns[i] = gfn_to_mfn_query(d, gfns[i], types + i);
+        /* If this is ram, and not a pagetable, map it; otherwise,
+         * skip. */
+        if ( p2m_is_ram(types[i])
+             && ( (mfn_to_page(mfns[i])->count_info & PGC_page_table) == 0 ) )
+            map[i] = map_domain_page(mfn_x(mfns[i]));
+        else
+            map[i] = NULL;
+    }
+
+    /* Then, go through and check for zeroed pages, removing write permission
+     * for those with zeroes. */
+    for ( i=0; i<count; i++ )
+    {
+        if(!map[i])
+            continue;
+
+        /* Quick zero-check */
+        for ( j=0; j<16; j++ )
+            if( *(map[i]+j) != 0 )
+                break;
+
+        if ( j < 16 )
+        {
+            unmap_domain_page(map[i]);
+            map[i] = NULL;
+            continue;
+        }
+
+        /* Try to remove the page, restoring old mapping if it fails. */
+        set_p2m_entry(d, gfns[i],
+                      _mfn(POPULATE_ON_DEMAND_MFN), 0,
+                      p2m_populate_on_demand);
+
+        if ( (mfn_to_page(mfns[i])->u.inuse.type_info & PGT_count_mask) != 0 )
+        {
+            unmap_domain_page(map[i]);
+            map[i] = NULL;
+
+            set_p2m_entry(d, gfns[i], mfns[i], 0, types[i]);
+
+            continue;
+        }
+    }
+
+    /* Now check each page for real */
+    for ( i=0; i < count; i++ )
+    {
+        if(!map[i])
+            continue;
+
+        for ( j=0; j<PAGE_SIZE/sizeof(*map[i]); j++ )
+            if( *(map[i]+j) != 0 )
+                break;
+
+        /* See comment in p2m_pod_zero_check_superpage() re gnttab
+         * check timing.  */
+        if ( j < PAGE_SIZE/sizeof(*map[i])
+             || gnttab_is_granted(d, gfns[i], 0) )
+        {
+            set_p2m_entry(d, gfns[i], mfns[i], 0, types[i]);
+            continue;
+        }
+        else
+        {
+            /* Add to cache, and account for the new p2m PoD entry */
+            p2m_pod_cache_add(d, mfn_to_page(mfns[i]), 0);
+            d->arch.p2m->pod.entry_count++;
+        }
+
+        unmap_domain_page(map[i]);
+        map[i] = NULL;
+    }
+    
+}
+
+#define POD_SWEEP_LIMIT 1024
+static void
+p2m_pod_emergency_sweep_super(struct domain *d)
+{
+    struct p2m_domain *p2md = d->arch.p2m;
+    unsigned long i, start, limit;
+
+    if ( p2md->pod.reclaim_super == 0 )
+    {
+        p2md->pod.reclaim_super = (p2md->pod.max_guest>>9)<<9;
+        p2md->pod.reclaim_super -= (1<<9);
+    }
+    
+    start = p2md->pod.reclaim_super;
+    limit = (start > POD_SWEEP_LIMIT) ? (start - POD_SWEEP_LIMIT) : 0;
+
+    for ( i=p2md->pod.reclaim_super ; i > 0 ; i-=(1<<9) )
+    {
+        p2m_pod_zero_check_superpage(d, i);
+        /* Stop if we're past our limit and we have found *something*.
+         *
+         * NB that this is a zero-sum game; we're increasing our cache size
+         * by re-increasing our 'debt'.  Since we hold the p2m lock,
+         * (entry_count - count) must remain the same. */
+        if ( !list_empty(&p2md->pod.super) &&  i < limit )
+            break;
+    }
+
+    p2md->pod.reclaim_super = i ? i - (1<<9) : 0;
+
+}
+
+#define POD_SWEEP_STRIDE  16
+static void
+p2m_pod_emergency_sweep(struct domain *d)
+{
+    struct p2m_domain *p2md = d->arch.p2m;
+    unsigned long gfns[POD_SWEEP_STRIDE];
+    unsigned long i, j=0, start, limit;
+    p2m_type_t t;
+
+
+    if ( p2md->pod.reclaim_single == 0 )
+        p2md->pod.reclaim_single = p2md->pod.max_guest;
+
+    start = p2md->pod.reclaim_single;
+    limit = (start > POD_SWEEP_LIMIT) ? (start - POD_SWEEP_LIMIT) : 0;
+
+    /* FIXME: Figure out how to avoid superpages */
+    for ( i=p2md->pod.reclaim_single ; i > 0 ; i-- )
+    {
+        gfn_to_mfn_query(d, i, &t );
+        if ( p2m_is_ram(t) )
+        {
+            gfns[j] = i;
+            j++;
+            BUG_ON(j > POD_SWEEP_STRIDE);
+            if ( j == POD_SWEEP_STRIDE )
+            {
+                p2m_pod_zero_check(d, gfns, j);
+                j = 0;
+            }
+        }
+        /* Stop if we're past our limit and we have found *something*.
+         *
+         * NB that this is a zero-sum game; we're increasing our cache size
+         * by re-increasing our 'debt'.  Since we hold the p2m lock,
+         * (entry_count - count) must remain the same. */
+        if ( p2md->pod.count > 0 && i < limit )
+            break;
+    }
+
+    if ( j )
+        p2m_pod_zero_check(d, gfns, j);
+
+    p2md->pod.reclaim_single = i ? i - 1 : i;
+
+}
+
 static int
 p2m_pod_demand_populate(struct domain *d, unsigned long gfn,
                         mfn_t table_mfn,
@@ -522,6 +805,19 @@ p2m_pod_demand_populate(struct domain *d, unsigned long gfn,
         p2m_unlock(p2md);
         return 0;
     }
+
+    /* If we're low, start a sweep */
+    if ( order == 9 && list_empty(&p2md->pod.super) )
+        p2m_pod_emergency_sweep_super(d);
+
+    if ( list_empty(&p2md->pod.single) &&
+         ( ( order == 0 )
+           || (order == 9 && list_empty(&p2md->pod.super) ) ) )
+        p2m_pod_emergency_sweep(d);
+
+    /* Keep track of the highest gfn demand-populated by a guest fault */
+    if ( q == p2m_guest && gfn > p2md->pod.max_guest )
+        p2md->pod.max_guest = gfn;
 
     spin_lock(&d->page_alloc_lock);
 
