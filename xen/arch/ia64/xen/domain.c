@@ -719,6 +719,48 @@ nats_update(unsigned int* nats, unsigned int reg, char nat)
 		*nats &= ~(1UL << reg);
 }
 
+static unsigned long
+__vcpu_get_itc(struct vcpu *v)
+{
+	unsigned long itc_last;
+	unsigned long itc_offset;
+	unsigned long itc;
+
+	if (unlikely(v->arch.privregs == NULL))
+		return ia64_get_itc();
+	
+	itc_last = v->arch.privregs->itc_last;
+	itc_offset = v->arch.privregs->itc_offset;
+	itc = ia64_get_itc();
+	itc += itc_offset;
+	if (itc_last >= itc)
+		itc = itc_last;
+	return itc;
+}
+
+static void
+__vcpu_set_itc(struct vcpu *v, u64 val)
+{
+	unsigned long itc;
+	unsigned long itc_offset;
+	unsigned long itc_last;
+
+	BUG_ON(v->arch.privregs == NULL);
+
+	if (v != current)
+		vcpu_pause(v);
+	
+	itc = ia64_get_itc();
+	itc_offset = val - itc;
+	itc_last = val;
+	
+	v->arch.privregs->itc_offset = itc_offset;
+	v->arch.privregs->itc_last = itc_last;
+
+	if (v != current)
+		vcpu_unpause(v);
+}
+
 void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 {
 	int i;
@@ -757,6 +799,10 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 		unw_get_ar(&info, UNW_AR_LC, &c.nat->regs.ar.lc);
 		unw_get_ar(&info, UNW_AR_EC, &c.nat->regs.ar.ec);
 	}
+
+	if (!is_hvm)
+		c.nat->regs.ar.itc = __vcpu_get_itc(v);
+
 	c.nat->regs.ar.csd = uregs->ar_csd;
 	c.nat->regs.ar.ssd = uregs->ar_ssd;
 
@@ -1244,6 +1290,10 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 		unw_set_ar(&info, UNW_AR_LC, c.nat->regs.ar.lc);
 		unw_set_ar(&info, UNW_AR_EC, c.nat->regs.ar.ec);
 	}
+
+	if (!is_hvm_domain(d) && (c.nat->flags & VGCF_SET_AR_ITC))
+		__vcpu_set_itc(v, c.nat->regs.ar.itc);
+
 	uregs->ar_csd = c.nat->regs.ar.csd;
 	uregs->ar_ssd = c.nat->regs.ar.ssd;
 	

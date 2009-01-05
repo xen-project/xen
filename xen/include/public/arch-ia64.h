@@ -198,6 +198,15 @@ struct mapped_regs {
             unsigned long rrs[8]; // region registers
             unsigned long krs[8]; // kernel registers
             unsigned long tmp[16]; // temp registers (e.g. for hyperprivops)
+
+            /* itc paravirtualization
+             * vAR.ITC = mAR.ITC + itc_offset
+             * itc_last is one which was lastly passed to
+             * the guest OS in order to prevent it from
+             * going backwords.
+             */
+            unsigned long itc_offset;
+            unsigned long itc_last;
         };
     };
 };
@@ -392,6 +401,7 @@ struct vcpu_guest_context {
 #define VGCF_EXTRA_REGS (1UL << 1)	/* Set extra regs.  */
 #define VGCF_SET_CR_IRR (1UL << 2)	/* Set cr_irr[0:3]. */
 #define VGCF_online     (1UL << 3)  /* make this vcpu online */
+#define VGCF_SET_AR_ITC (1UL << 4)  /* set pv ar.itc. itc_offset, itc_last */
     unsigned long flags;       /* VGCF_* flags */
 
     struct vcpu_guest_context_regs regs;
