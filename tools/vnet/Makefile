@@ -17,7 +17,8 @@ SUBDIRS+= vnet-module
 all: compile
 
 gc.tar.gz:
-	wget http://www.hpl.hp.com/personal/Hans_Boehm/gc/gc_source/$@
+	#wget http://www.hpl.hp.com/personal/Hans_Boehm/gc/gc_source/$@
+	wget $(XEN_EXTFILES_URL)/$@
 
 .PHONY: gc
 gc: gc.tar.gz

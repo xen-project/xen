@@ -23,7 +23,8 @@ H_SRC = $(wildcard *.h)
 OBJS  = $(patsubst %.c,%.o,$(C_SRC))
 
 IASL_VER = acpica-unix-20080729
-IASL_URL = http://acpica.org/download/$(IASL_VER).tar.gz
+#IASL_URL = http://acpica.org/download/$(IASL_VER).tar.gz
+IASL_URL = $(XEN_EXTFILES_URL)/$(IASL_VER).tar.gz
 
 CFLAGS += -I. -I.. $(CFLAGS_include)
 

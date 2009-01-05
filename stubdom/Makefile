@@ -8,15 +8,25 @@ export debug=y
 include $(XEN_ROOT)/Config.mk
 
 IOEMU_OPTIONS=--disable-sdl --disable-opengl --disable-vnc-tls --disable-brlapi --disable-kqemu
-ZLIB_URL?=http://www.zlib.net
+
+#ZLIB_URL?=http://www.zlib.net
+ZLIB_URL=$(XEN_EXTFILES_URL)
 ZLIB_VERSION=1.2.3
-LIBPCI_URL?=http://www.kernel.org/pub/software/utils/pciutils
+
+#LIBPCI_URL?=http://www.kernel.org/pub/software/utils/pciutils
+LIBPCI_URL?=$(XEN_EXTFILES_URL)
 LIBPCI_VERSION=2.2.9
-NEWLIB_URL?=ftp://sources.redhat.com/pub/newlib
+
+#NEWLIB_URL?=ftp://sources.redhat.com/pub/newlib
+NEWLIB_URL?=$(XEN_EXTFILES_URL)
 NEWLIB_VERSION=1.16.0
-LWIP_URL?=http://download.savannah.gnu.org/releases/lwip
+
+#LWIP_URL?=http://download.savannah.gnu.org/releases/lwip
+LWIP_URL?=$(XEN_EXTFILES_URL)
 LWIP_VERSION=1.3.0
-GRUB_URL?=http://alpha.gnu.org/gnu/grub
+
+#GRUB_URL?=http://alpha.gnu.org/gnu/grub
+GRUB_URL?=$(XEN_EXTFILES_URL)
 GRUB_VERSION=0.97
 
 WGET=wget -c
