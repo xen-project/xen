@@ -1209,7 +1209,7 @@ static int domain_context_mapping(struct domain *domain, u8 bus, u8 devfn)
     int ret = 0;
     u16 sec_bus, sub_bus;
     u32 type;
-    u8 secbus;
+    u8 secbus, secdevfn;
 
     drhd = acpi_find_matched_drhd_unit(bus, devfn);
     if ( !drhd )
@@ -1256,10 +1256,12 @@ static int domain_context_mapping(struct domain *domain, u8 bus, u8 devfn)
            break;
 
         secbus = bus;
+        secdevfn = devfn;
         /* dependent devices mapping */
         while ( bus2bridge[bus].map )
         {
             secbus = bus;
+            secdevfn = devfn;
             devfn = bus2bridge[bus].devfn;
             bus = bus2bridge[bus].bus;
             ret = domain_context_mapping_one(domain, drhd->iommu, bus, devfn);
@@ -1267,7 +1269,7 @@ static int domain_context_mapping(struct domain *domain, u8 bus, u8 devfn)
                 return ret;
         }
 
-        if ( secbus != bus )
+        if ( (secbus != bus) && (secdevfn != 0) )
             /*
              * The source-id for transactions on non-PCIe buses seem
              * to originate from devfn=0 on the secondary bus behind
@@ -1333,7 +1335,7 @@ static int domain_context_unmap(struct domain *domain, u8 bus, u8 devfn)
     struct acpi_drhd_unit *drhd;
     int ret = 0;
     u32 type;
-    u8 secbus;
+    u8 secbus, secdevfn;
 
     drhd = acpi_find_matched_drhd_unit(bus, devfn);
     if ( !drhd )
@@ -1362,10 +1364,12 @@ static int domain_context_unmap(struct domain *domain, u8 bus, u8 devfn)
             break;
 
         secbus = bus;
+        secdevfn = devfn;
         /* dependent devices unmapping */
         while ( bus2bridge[bus].map )
         {
             secbus = bus;
+            secdevfn = devfn;
             devfn = bus2bridge[bus].devfn;
             bus = bus2bridge[bus].bus;
             ret = domain_context_unmap_one(domain, drhd->iommu, bus, devfn);
@@ -1373,7 +1377,7 @@ static int domain_context_unmap(struct domain *domain, u8 bus, u8 devfn)
                 return ret;
         }
 
-        if ( bus != secbus )
+        if ( (secbus != bus) && (secdevfn != 0) )
             ret = domain_context_unmap_one(domain, drhd->iommu, secbus, 0);
         break;
 
