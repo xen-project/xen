@@ -192,6 +192,11 @@ static void decrease_reservation(struct memop_args *a)
         if ( unlikely(__copy_from_guest_offset(&gmfn, a->extent_list, i, 1)) )
             goto out;
 
+        /* See if populate-on-demand wants to handle this */
+        if ( is_hvm_domain(a->domain)
+             && p2m_pod_decrease_reservation(a->domain, gmfn, a->extent_order) )
+            continue;
+
         for ( j = 0; j < (1 << a->extent_order); j++ )
             if ( !guest_remove_page(a->domain, gmfn + j) )
                 goto out;

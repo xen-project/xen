@@ -253,6 +253,10 @@ p2m_next_level(struct domain *d, mfn_t *table_mfn, void **table,
 /*
  * Populate-on-demand functionality
  */
+static
+int set_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn, 
+                  unsigned int page_order, p2m_type_t p2mt);
+
 int
 p2m_pod_cache_add(struct domain *d,
                   struct page_info *page,
@@ -362,6 +366,125 @@ p2m_pod_empty_cache(struct domain *d)
     BUG_ON(p2md->pod.count != 0);
 
     spin_unlock(&d->page_alloc_lock);
+}
+
+/* This function is needed for two reasons:
+ * + To properly handle clearing of PoD entries
+ * + To "steal back" memory being freed for the PoD cache, rather than
+ *   releasing it.
+ *
+ * Once both of these functions have been completed, we can return and
+ * allow decrease_reservation() to handle everything else.
+ */
+int
+p2m_pod_decrease_reservation(struct domain *d,
+                             xen_pfn_t gpfn,
+                             unsigned int order)
+{
+    struct p2m_domain *p2md = d->arch.p2m;
+    int ret=0;
+    int i;
+
+    int steal_for_cache = 0;
+    int pod = 0, nonpod = 0, ram = 0;
+    
+
+    /* If we don't have any outstanding PoD entries, let things take their
+     * course */
+    if ( p2md->pod.entry_count == 0 )
+        goto out;
+
+    /* Figure out if we need to steal some freed memory for our cache */
+    steal_for_cache =  ( p2md->pod.entry_count > p2md->pod.count );
+
+    p2m_lock(p2md);
+    audit_p2m(d);
+
+    /* See what's in here. */
+    /* FIXME: Add contiguous; query for PSE entries? */
+    for ( i=0; i<(1<<order); i++)
+    {
+        p2m_type_t t;
+
+        gfn_to_mfn_query(d, gpfn + i, &t);
+
+        if ( t == p2m_populate_on_demand )
+            pod++;
+        else
+        {
+            nonpod++;
+            if ( p2m_is_ram(t) )
+                ram++;
+        }
+    }
+
+    /* No populate-on-demand?  Don't need to steal anything?  Then we're done!*/
+    if(!pod && !steal_for_cache)
+        goto out_unlock;
+
+    if ( !nonpod )
+    {
+        /* All PoD: Mark the whole region invalid and tell caller
+         * we're done. */
+        set_p2m_entry(d, gpfn, _mfn(INVALID_MFN), order, p2m_invalid);
+        p2md->pod.entry_count-=(1<<order); /* Lock: p2m */
+        BUG_ON(p2md->pod.entry_count < 0);
+        ret = 1;
+        goto out_unlock;
+    }
+
+    /* FIXME: Steal contig 2-meg regions for cache */
+
+    /* Process as long as:
+     * + There are PoD entries to handle, or
+     * + There is ram left, and we want to steal it
+     */
+    for ( i=0;
+          i<(1<<order) && (pod>0 || (steal_for_cache && ram > 0));
+          i++)
+    {
+        mfn_t mfn;
+        p2m_type_t t;
+
+        mfn = gfn_to_mfn_query(d, gpfn + i, &t);
+        if ( t == p2m_populate_on_demand )
+        {
+            set_p2m_entry(d, gpfn + i, _mfn(INVALID_MFN), 0, p2m_invalid);
+            p2md->pod.entry_count--; /* Lock: p2m */
+            BUG_ON(p2md->pod.entry_count < 0);
+            pod--;
+        }
+        else if ( steal_for_cache && p2m_is_ram(t) )
+        {
+            struct page_info *page;
+
+            ASSERT(mfn_valid(mfn));
+
+            page = mfn_to_page(mfn);
+
+            set_p2m_entry(d, gpfn + i, _mfn(INVALID_MFN), 0, p2m_invalid);
+            set_gpfn_from_mfn(mfn_x(mfn), INVALID_M2P_ENTRY);
+
+            p2m_pod_cache_add(d, page, 0);
+
+            steal_for_cache =  ( p2md->pod.entry_count > p2md->pod.count );
+
+            nonpod--;
+            ram--;
+        }
+    }    
+
+    /* If there are no more non-PoD entries, tell decrease_reservation() that
+     * there's nothing left to do. */
+    if ( nonpod == 0 )
+        ret = 1;
+
+out_unlock:
+    audit_p2m(d);
+    p2m_unlock(p2md);
+
+out:
+    return ret;
 }
 
 void

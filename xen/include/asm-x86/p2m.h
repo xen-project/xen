@@ -258,6 +258,13 @@ void p2m_pod_dump_data(struct domain *d);
  * (usually in preparation for domain destruction) */
 void p2m_pod_empty_cache(struct domain *d);
 
+/* Call when decreasing memory reservation to handle PoD entries properly.
+ * Will return '1' if all entries were handled and nothing more need be done.*/
+int
+p2m_pod_decrease_reservation(struct domain *d,
+                             xen_pfn_t gpfn,
+                             unsigned int order);
+
 /* Add a page to a domain's p2m table */
 int guest_physmap_add_entry(struct domain *d, unsigned long gfn,
                             unsigned long mfn, unsigned int page_order, 
