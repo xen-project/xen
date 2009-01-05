@@ -24,6 +24,8 @@
 #include <getopt.h>
 
 #include "xenctrl.h"
+#include <xen/foreign/x86_32.h>
+#include <xen/foreign/x86_64.h>
 
 int xc_handle = 0;
 int domid = 0;
@@ -31,28 +33,18 @@ int frame_ptrs = 0;
 int stack_trace = 0;
 int disp_all = 0;
 
-#if defined (__i386__)
-#if defined (__OpenBSD__)
-#define FMT_SIZE_T		"%08lx"
-#define INSTR_POINTER(regs)	(unsigned long)(regs->eip)
-#else
-#define FMT_SIZE_T		"%08x"
-#define INSTR_POINTER(regs)	(regs->eip)
-#endif
-#define STACK_POINTER(regs)	(regs->esp)
-#define FRAME_POINTER(regs)	(regs->ebp)
-#define STACK_ROWS		4
-#define STACK_COLS		8
-#elif defined (__x86_64__)
-#define FMT_SIZE_T		"%016lx"
-#define STACK_POINTER(regs)	(regs->rsp)
-#define FRAME_POINTER(regs)	(regs->rbp)
-#define INSTR_POINTER(regs)	(regs->rip)
-#define STACK_ROWS		4
-#define STACK_COLS		4
+#if defined (__i386__) || defined (__x86_64__)
+typedef unsigned long long guest_word_t;
+#define FMT_32B_WORD "%08llx"
+#define FMT_64B_WORD "%016llx"
+/* Word-length of the guest's own data structures */
+int guest_word_size = sizeof (unsigned long);
+/* Word-length of the context record we get from xen */
+int ctxt_word_size = sizeof (unsigned long);
 #elif defined (__ia64__)
 /* On ia64, we can't translate virtual address to physical address.  */
 #define NO_TRANSLATION
+typedef size_t guest_word_t;
 
 /* Which registers should be displayed.  */
 int disp_cr_regs;
@@ -63,22 +55,19 @@ int disp_tlb;
 #endif
 
 struct symbol {
-    size_t address;
+    guest_word_t address;
     char type;
     char *name;
     struct symbol *next;
 } *symbol_table = NULL;
 
-size_t kernel_stext, kernel_etext, kernel_sinittext, kernel_einittext, kernel_hypercallpage;
+guest_word_t kernel_stext, kernel_etext, kernel_sinittext, kernel_einittext, kernel_hypercallpage;
 
-static int is_kernel_text(size_t addr)
+static int is_kernel_text(guest_word_t addr)
 {
-#if defined (__i386__)
+#if defined (__i386__) || defined (__x86_64__)
     if (symbol_table == NULL)
-        return (addr > 0xc000000);
-#elif defined (__x86_64__)
-    if (symbol_table == NULL)
-        return (addr > 0xffffffff80000000UL);
+        return (addr > ((guest_word_size == 4) ? 0xc000000 : 0xffffffff80000000ULL));
 #elif defined (__ia64__)
     if (symbol_table == NULL)
         return (addr > 0xa000000000000000UL);
@@ -134,7 +123,7 @@ static void insert_symbol(struct symbol *symbol)
     prev = symbol;
 }
 
-static struct symbol *lookup_symbol(size_t address)
+static struct symbol *lookup_symbol(guest_word_t address)
 {
     struct symbol *s = symbol_table;
 
@@ -147,7 +136,7 @@ static struct symbol *lookup_symbol(size_t address)
     return NULL;
 }
 
-static void print_symbol(size_t addr)
+static void print_symbol(guest_word_t addr)
 {
     struct symbol *s;
 
@@ -255,21 +244,23 @@ static void print_flags(uint64_t flags)
     printf("\n");
 }
 
-static void print_special(unsigned long *regs, const char *name, unsigned int mask)
+static void print_special(void *regs, const char *name, unsigned int mask, int width)
 {
     unsigned int i;
 
     printf("\n");
     for (i = 0; mask; mask >>= 1, ++i)
-        if (mask & 1)
-            printf("%s%u: " FMT_SIZE_T "\n", name, i, (size_t)regs[i]);
+        if (mask & 1) {
+            if (width == 4)
+                printf("%s%u: %08"PRIx32"\n", name, i, ((uint32_t *) regs)[i]);
+            else
+                printf("%s%u: %08"PRIx64"\n", name, i, ((uint64_t *) regs)[i]);
+        }
 }
-#endif
 
-#ifdef __i386__
-static void print_ctx(vcpu_guest_context_t *ctx1)
+static void print_ctx_32(vcpu_guest_context_x86_32_t *ctx)
 {
-    struct cpu_user_regs *regs = &ctx1->user_regs;
+    struct cpu_user_regs_x86_32 *regs = &ctx->user_regs;
 
     printf("cs:eip: %04x:%08x ", regs->cs, regs->eip);
     print_symbol(regs->eip);
@@ -291,54 +282,87 @@ static void print_ctx(vcpu_guest_context_t *ctx1)
     printf(" gs:     %04x\n", regs->gs);
 
     if (disp_all) {
-        print_special(ctx1->ctrlreg, "cr", 0x1d);
-        print_special(ctx1->debugreg, "dr", 0xcf);
+        print_special(ctx->ctrlreg, "cr", 0x1d, 4);
+        print_special(ctx->debugreg, "dr", 0xcf, 4);
     }
 }
-#elif defined(__x86_64__)
-static void print_ctx(vcpu_guest_context_t *ctx1)
-{
-    struct cpu_user_regs *regs = &ctx1->user_regs;
 
-    printf("rip: %016lx ", regs->rip);
+static void print_ctx_64(vcpu_guest_context_x86_64_t *ctx)
+{
+    struct cpu_user_regs_x86_64 *regs = &ctx->user_regs;
+
+    printf("rip: %016"PRIx64" ", regs->rip);
     print_symbol(regs->rip);
     print_flags(regs->rflags);
-    printf("rsp: %016lx\n", regs->rsp);
+    printf("rsp: %016"PRIx64"\n", regs->rsp);
 
-    printf("rax: %016lx\t", regs->rax);
-    printf("rcx: %016lx\t", regs->rcx);
-    printf("rdx: %016lx\n", regs->rdx);
+    printf("rax: %016"PRIx64"\t", regs->rax);
+    printf("rcx: %016"PRIx64"\t", regs->rcx);
+    printf("rdx: %016"PRIx64"\n", regs->rdx);
 
-    printf("rbx: %016lx\t", regs->rbx);
-    printf("rsi: %016lx\t", regs->rsi);
-    printf("rdi: %016lx\n", regs->rdi);
+    printf("rbx: %016"PRIx64"\t", regs->rbx);
+    printf("rsi: %016"PRIx64"\t", regs->rsi);
+    printf("rdi: %016"PRIx64"\n", regs->rdi);
 
-    printf("rbp: %016lx\t", regs->rbp);
-    printf(" r8: %016lx\t", regs->r8);
-    printf(" r9: %016lx\n", regs->r9);
+    printf("rbp: %016"PRIx64"\t", regs->rbp);
+    printf(" r8: %016"PRIx64"\t", regs->r8);
+    printf(" r9: %016"PRIx64"\n", regs->r9);
 
-    printf("r10: %016lx\t", regs->r10);
-    printf("r11: %016lx\t", regs->r11);
-    printf("r12: %016lx\n", regs->r12);
+    printf("r10: %016"PRIx64"\t", regs->r10);
+    printf("r11: %016"PRIx64"\t", regs->r11);
+    printf("r12: %016"PRIx64"\n", regs->r12);
 
-    printf("r13: %016lx\t", regs->r13);
-    printf("r14: %016lx\t", regs->r14);
-    printf("r15: %016lx\n", regs->r15);
+    printf("r13: %016"PRIx64"\t", regs->r13);
+    printf("r14: %016"PRIx64"\t", regs->r14);
+    printf("r15: %016"PRIx64"\n", regs->r15);
 
     printf(" cs: %04x\t", regs->cs);
     printf(" ss: %04x\t", regs->ss);
     printf(" ds: %04x\t", regs->ds);
     printf(" es: %04x\n", regs->es);
 
-    printf(" fs: %04x @ %016lx\n", regs->fs, ctx1->fs_base);
-    printf(" gs: %04x @ %016lx/%016lx\n", regs->gs,
-           ctx1->gs_base_kernel, ctx1->gs_base_user);
+    printf(" fs: %04x @ %016"PRIx64"\n", regs->fs, ctx->fs_base);
+    printf(" gs: %04x @ %016"PRIx64"/%016"PRIx64"\n", regs->gs,
+           ctx->gs_base_kernel, ctx->gs_base_user);
 
     if (disp_all) {
-        print_special(ctx1->ctrlreg, "cr", 0x1d);
-        print_special(ctx1->debugreg, "dr", 0xcf);
+        print_special(ctx->ctrlreg, "cr", 0x1d, 8);
+        print_special(ctx->debugreg, "dr", 0xcf, 8);
     }
 }
+
+static void print_ctx(vcpu_guest_context_any_t *ctx)
+{
+    if (ctxt_word_size == 4) 
+        print_ctx_32(&ctx->x32);
+    else 
+        print_ctx_64(&ctx->x64);
+}
+
+static guest_word_t instr_pointer(vcpu_guest_context_any_t *ctx)
+{
+    if (ctxt_word_size == 4) 
+        return ctx->x32.user_regs.eip;
+    else 
+        return ctx->x64.user_regs.rip;
+}
+
+static guest_word_t stack_pointer(vcpu_guest_context_any_t *ctx)
+{
+    if (ctxt_word_size == 4) 
+        return ctx->x32.user_regs.esp;
+    else 
+        return ctx->x64.user_regs.rsp;
+}
+
+static guest_word_t frame_pointer(vcpu_guest_context_any_t *ctx)
+{
+    if (ctxt_word_size == 4) 
+        return ctx->x32.user_regs.ebp;
+    else 
+        return ctx->x64.user_regs.rbp;
+}
+
 #elif defined(__ia64__)
 
 #define PTE_ED_SHIFT              52
@@ -401,9 +425,9 @@ static void print_tr(int i, const struct ia64_tr_entry *tr)
            tr->itir >> ITIR_KEY_SHIFT & ITIR_KEY_MASK);
 }
 
-void print_ctx(vcpu_guest_context_t *ctx)
+void print_ctx(vcpu_guest_context_any_t *ctx)
 {
-    struct vcpu_guest_context_regs *regs = &ctx->regs;
+    struct vcpu_guest_context_regs *regs = &ctx.c->regs;
     struct vcpu_tr_regs *tr = &ctx->regs.tr;
     int i;
     unsigned int rbs_size, cfm_sof;
@@ -584,7 +608,7 @@ void print_ctx(vcpu_guest_context_t *ctx)
 #endif
 
 #ifndef NO_TRANSLATION
-static void *map_page(vcpu_guest_context_t *ctx, int vcpu, size_t virt)
+static void *map_page(vcpu_guest_context_any_t *ctx, int vcpu, guest_word_t virt)
 {
     static unsigned long previous_mfn = 0;
     static void *mapped = NULL;
@@ -611,33 +635,53 @@ static void *map_page(vcpu_guest_context_t *ctx, int vcpu, size_t virt)
     return (void *)(mapped + offset);
 }
 
-static void print_stack(vcpu_guest_context_t *ctx, int vcpu)
+static guest_word_t read_stack_word(guest_word_t *src, int width)
 {
-    struct cpu_user_regs *regs = &ctx->user_regs;
-    size_t stack = STACK_POINTER(regs);
-    size_t stack_limit = (STACK_POINTER(regs) & XC_PAGE_MASK) + XC_PAGE_SIZE;
-    size_t frame;
-    size_t instr;
-    size_t *p;
+    guest_word_t word = 0;
+    /* Little-endian only */
+    memcpy(&word, src, width);
+    return word;
+}
+
+static void print_stack_word(guest_word_t word, int width)
+{
+    if (width == 4)
+        printf(FMT_32B_WORD, word);
+    else
+        printf(FMT_64B_WORD, word);
+}
+
+static void print_stack(vcpu_guest_context_any_t *ctx, int vcpu, int width)
+{
+    guest_word_t stack = stack_pointer(ctx);
+    guest_word_t stack_limit;
+    guest_word_t frame;
+    guest_word_t instr;
+    guest_word_t word;
+    guest_word_t *p;
     int i;
 
+    stack_limit = ((stack_pointer(ctx) + XC_PAGE_SIZE)
+                   & ~((guest_word_t) XC_PAGE_SIZE - 1)); 
     printf("\n");
     printf("Stack:\n");
-    for (i=1; i<STACK_ROWS+1 && stack < stack_limit; i++) {
-        while(stack < stack_limit && stack < STACK_POINTER(regs) + i*STACK_COLS*sizeof(stack)) {
+    for (i=1; i<5 && stack < stack_limit; i++) {
+        while(stack < stack_limit && stack < stack_pointer(ctx) + i*32) {
             p = map_page(ctx, vcpu, stack);
-            printf(" " FMT_SIZE_T, *p);
-            stack += sizeof(stack);
+            word = read_stack_word(p, width);
+            printf(" ");
+            print_stack_word(word, width);
+            stack += width;
         }
         printf("\n");
     }
     printf("\n");
 
     printf("Code:\n");
-    instr = INSTR_POINTER(regs) - 21;
+    instr = instr_pointer(ctx) - 21;
     for(i=0; i<32; i++) {
         unsigned char *c = map_page(ctx, vcpu, instr+i);
-        if (instr+i == INSTR_POINTER(regs))
+        if (instr+i == instr_pointer(ctx))
             printf("<%02x> ", *c);
         else
             printf("%02x ", *c);
@@ -650,52 +694,65 @@ static void print_stack(vcpu_guest_context_t *ctx, int vcpu)
         printf("Stack Trace:\n");
     else
         printf("Call Trace:\n");
-    printf("%c [<" FMT_SIZE_T ">] ",
-        stack_trace ? '*' : ' ', INSTR_POINTER(regs));
+    printf("%c [<", stack_trace ? '*' : ' ');
+    print_stack_word(instr_pointer(ctx), width);
+    printf(">] ");
 
-    print_symbol(INSTR_POINTER(regs));
+    print_symbol(instr_pointer(ctx));
     printf(" <--\n");
     if (frame_ptrs) {
-        stack = STACK_POINTER(regs);
-        frame = FRAME_POINTER(regs);
+        stack = stack_pointer(ctx);
+        frame = frame_pointer(ctx);
         while(frame && stack < stack_limit) {
             if (stack_trace) {
                 while (stack < frame) {
                     p = map_page(ctx, vcpu, stack);
-                    printf("|   " FMT_SIZE_T "   ", *p);
-                    printf("\n");
-                    stack += sizeof(*p);
+                    printf("|   ");
+                    print_stack_word(read_stack_word(p, width), width);
+                    printf("   \n");
+                    stack += width;
                 }
             } else {
                 stack = frame;
             }
 
             p = map_page(ctx, vcpu, stack);
-            frame = *p;
-            if (stack_trace)
-                printf("|-- " FMT_SIZE_T "\n", *p);
-            stack += sizeof(*p);
+            frame = read_stack_word(p, width);
+            if (stack_trace) {
+                printf("|-- ");
+                print_stack_word(read_stack_word(p, width), width);
+                printf("\n");
+            }
+            stack += width;
 
             if (frame) {
                 p = map_page(ctx, vcpu, stack);
-                printf("%c [<" FMT_SIZE_T ">] ", stack_trace ? '|' : ' ', *p);
-                print_symbol(*p);
+                word = read_stack_word(p, width);
+                printf("%c [<", stack_trace ? '|' : ' ');
+                print_stack_word(word, width);
+                printf(">] ");
+                print_symbol(word);
                 printf("\n");
-                stack += sizeof(*p);
+                stack += width;
             }
         }
     } else {
-        stack = STACK_POINTER(regs);
+        stack = stack_pointer(ctx);
         while(stack < stack_limit) {
             p = map_page(ctx, vcpu, stack);
-            if (is_kernel_text(*p)) {
-                printf("  [<" FMT_SIZE_T ">] ", *p);
-                print_symbol(*p);
+            word = read_stack_word(p, width);
+            if (is_kernel_text(word)) {
+                printf("  [<");
+                print_stack_word(word, width);
+                printf(">] ");
+                print_symbol(word);
                 printf("\n");
             } else if (stack_trace) {
-                printf("    " FMT_SIZE_T "\n", *p);
+                printf("    ");
+                print_stack_word(word, width);
+                printf("\n");
             }
-            stack += sizeof(*p);
+            stack += width;
         }
     }
 }
@@ -729,10 +786,33 @@ static void dump_ctx(int vcpu)
         exit(-1);
     }
 
-    print_ctx(&ctx.c);
+#if defined(__i386__) || defined(__x86_64__)
+    {
+        struct xen_domctl domctl;
+        memset(&domctl, 0, sizeof domctl);
+        domctl.domain = domid;
+        domctl.cmd = XEN_DOMCTL_get_address_size;
+        if (xc_domctl(xc_handle, &domctl) == 0)
+            ctxt_word_size = guest_word_size = domctl.u.address_size.size / 8;
+        if (dominfo.hvm) {
+            xen_capabilities_info_t xen_caps = "";
+            if (xc_version(xc_handle, XENVER_capabilities, &xen_caps) != 0) {
+                perror("xc_version");
+                exit(-1);
+            }
+            /* HVM guest context records are always host-sized */
+            ctxt_word_size = (strstr(xen_caps, "xen-3.0-x86_64")) ? 8 : 4;
+            /* XXX For now we can't tell whether a HVM guest is in long
+             * XXX mode; eventually fix this here and in xc_pagetab.c */
+            guest_word_size = 4;
+        }
+    }
+#endif
+
+    print_ctx(&ctx);
 #ifndef NO_TRANSLATION
-    if (is_kernel_text(INSTR_POINTER((&ctx.c.user_regs))))
-        print_stack(&ctx.c, vcpu);
+    if (is_kernel_text(instr_pointer(&ctx)))
+        print_stack(&ctx, vcpu, guest_word_size);
 #endif
 
     if (!dominfo.paused) {
@@ -774,9 +854,9 @@ static void usage(void)
 int main(int argc, char **argv)
 {
     int ch;
-    static const char *sopts = "fs:h"
+    static const char *sopts = "fs:ha"
 #ifdef __ia64__
-        "ar:"
+        "r:"
 #endif
         ;
     static const struct option lopts[] = {
