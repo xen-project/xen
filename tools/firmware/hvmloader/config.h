@@ -23,11 +23,18 @@
 /* Memory map. */
 #define HYPERCALL_PHYSICAL_ADDRESS    0x00080000
 #define VGABIOS_PHYSICAL_ADDRESS      0x000C0000
-#define SMBIOS_PHYSICAL_ADDRESS       0x000E9000
-#define SMBIOS_MAXIMUM_SIZE           0x00001000
+#define OPTIONROM_PHYSICAL_ADDRESS    0x000C8000
+#define OPTIONROM_PHYSICAL_END        0x000EA000
 #define ACPI_PHYSICAL_ADDRESS         0x000EA000
+#define E820_PHYSICAL_ADDRESS         0x000EA100
+#define SMBIOS_PHYSICAL_ADDRESS       0x000EB000
+#define SMBIOS_MAXIMUM_SIZE           0x00005000
 #define ROMBIOS_PHYSICAL_ADDRESS      0x000F0000
 #define SCRATCH_PHYSICAL_ADDRESS      0x00010000
+
+/* Offsets from E820_PHYSICAL_ADDRESS. */
+#define E820_NR_OFFSET                0x0
+#define E820_OFFSET                   0x8
 
 /* Xen Platform Device */
 #define PFFLAG_ROM_LOCK 1 /* Sets whether ROM memory area is RW or RO */

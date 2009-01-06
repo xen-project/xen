@@ -177,6 +177,8 @@
 #  define BIOS_BUILD_DATE "06/23/99"
 #endif
 
+#define E820_SEG (Bit16u)(E820_PHYSICAL_ADDRESS >> 4)
+
   // 1K of base memory used for Extended Bios Data Area (EBDA)
   // EBDA is used for PS/2 mouse support, and IDE BIOS, etc.
 #define EBDA_SEG           0x9FC0
@@ -883,7 +885,6 @@ static Bit16u         read_word();
 static void           write_byte();
 static void           write_word();
 static void           bios_printf();
-static void           copy_e820_table();
 
 static Bit8u          inhibit_mouse_int_and_events();
 static void           enable_mouse_int_and_events();
@@ -1405,19 +1406,13 @@ ASM_END
 
 #ifdef HVMASSIST
 void
-copy_e820_table()
+fixup_base_mem_in_k()
 {
-  Bit8u nr_entries = read_byte(0x9000, 0x1e8);
-  Bit32u base_mem;
-  if (nr_entries > 32)
-       nr_entries = 32;
-  write_word(0xe000, 0x8, nr_entries);
-  memcpyb(0xe000, 0x10, 0x9000, 0x2d0, nr_entries * 0x14);
   /* Report the proper base memory size at address 0x0413: otherwise
    * non-e820 code will clobber things if BASE_MEM_IN_K is bigger than
    * the first e820 entry.  Get the size by reading the second 64bit 
    * field of the first e820 slot. */ 
-  base_mem = read_dword(0x9000, 0x2d0 + 8);
+  Bit32u base_mem = read_dword(E820_SEG, E820_OFFSET + 8);
   write_word(0x40, 0x13, base_mem >> 10);
 }
 
@@ -4669,7 +4664,8 @@ ASM_END
         {
 #ifdef HVMASSIST
        case 0x20: {
-            Bit16u e820_table_size = read_word(0xe000, 0x8) * 0x14;
+            Bit16u e820_table_size =
+                read_word(E820_SEG, E820_NR_OFFSET) * 0x14;
 
             if (regs.u.r32.edx != 0x534D4150) /* SMAP */
                 goto int15_unimplemented;
@@ -4677,7 +4673,7 @@ ASM_END
             if ((regs.u.r16.bx / 0x14) * 0x14 == regs.u.r16.bx) {
                 if (regs.u.r16.bx + 0x14 <= e820_table_size)
                     memcpyb(ES, regs.u.r16.di,
-                            0xe000, 0x10 + regs.u.r16.bx, 0x14);
+                            E820_SEG, E820_OFFSET + regs.u.r16.bx, 0x14);
                 regs.u.r32.ebx += 0x14;
                 if ((regs.u.r32.ebx + 0x14 - 1) > e820_table_size)
                     regs.u.r32.ebx = 0;
@@ -4685,8 +4681,8 @@ ASM_END
                 Bit32u base, type;
                 Bit16u off;
                 for (off = 0; off < e820_table_size; off += 0x14) {
-                    base = read_dword(0xe000, 0x10 + off);
-                    type = read_dword(0xe000, 0x20 + off);
+                    base = read_dword(E820_SEG, E820_OFFSET + off);
+                    type = read_dword(E820_SEG, E820_OFFSET + 0x10 + off);
                     if ((base >= 0x100000) && (type == 1))
                         break;
                 }
@@ -4694,7 +4690,7 @@ ASM_END
                     SET_CF();
                     break;
                 }
-                memcpyb(ES, regs.u.r16.di, 0xe000, 0x10 + off, 0x14);
+                memcpyb(ES, regs.u.r16.di, E820_SEG, E820_OFFSET + off, 0x14);
                 regs.u.r32.ebx = 0;
             } else { /* AX=E820, DX=534D4150, BX unrecognized */
                 goto int15_unimplemented;
@@ -4707,7 +4703,8 @@ ASM_END
         }
 
         case 0x01: {
-            Bit16u off, e820_table_size = read_word(0xe000, 0x8) * 0x14;
+            Bit16u off, e820_table_size =
+                read_word(E820_SEG, E820_NR_OFFSET) * 0x14;
             Bit32u base, type, size;
 
             // do we have any reason to fail here ?
@@ -4723,8 +4720,8 @@ ASM_END
 
             // Find first RAM E820 entry >= 1MB.
             for (off = 0; off < e820_table_size; off += 0x14) {
-                base = read_dword(0xe000, 0x10 + off);
-                type = read_dword(0xe000, 0x20 + off);
+                base = read_dword(E820_SEG, E820_OFFSET + off);
+                type = read_dword(E820_SEG, E820_OFFSET + 0x10 + off);
                 if ((base >= 0x100000) && (type == 1))
                     break;
             }
@@ -4732,7 +4729,7 @@ ASM_END
             // If there is RAM above 16MB, return amount in 64kB chunks.
             regs.u.r16.dx = 0;
             if (off != e820_table_size) {
-                size = base + read_dword(0xe000, 0x18 + off);
+                size = base + read_dword(E820_SEG, E820_OFFSET + 0x8 + off);
                 if (size > 0x1000000) {
                     size -= 0x1000000;
                     regs.u.r16.dx = (Bit16u)(size >> 16);
@@ -10441,8 +10438,8 @@ pnp_string:
 rom_scan:
   ;; Scan for existence of valid expansion ROMS.
   ;;   Video ROM:   from 0xC0000..0xC7FFF in 2k increments
-  ;;   General ROM: from 0xC8000..0xDFFFF in 2k increments
-  ;;   System  ROM: only 0xE0000
+  ;;   General ROM: from 0xC8000..0xE9FFF in 2k increments
+  ;;   System  ROM: only 0xF0000
   ;;
   ;; Header:
   ;;   Offset    Value
@@ -10814,7 +10811,6 @@ post_default_ints:
   mov  ax, #BASE_MEM_IN_K
   mov  0x0413, ax
 
-
   ;; Manufacturing Test 40:12
   ;;   zerod out above
 
@@ -11008,14 +11004,14 @@ post_default_ints:
 #ifdef HVMASSIST
   call _enable_rom_write_access
   call _clobber_entry_point
-  call _copy_e820_table
+  call _fixup_base_mem_in_k
   call smbios_init
 #endif
 
   call _init_boot_vectors
 
-  mov  cx, #0xc800  ;; init option roms
-  mov  ax, #0xe000
+  mov  cx, #(OPTIONROM_PHYSICAL_ADDRESS >> 4)  ;; init option roms
+  mov  ax, #(OPTIONROM_PHYSICAL_END >> 4)
   call rom_scan
 
 #ifdef HVMASSIST
