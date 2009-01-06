@@ -7,7 +7,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <zlib.h>
-#include <strings.h>
 #include <malloc.h>
 
 #include "xg_private.h"

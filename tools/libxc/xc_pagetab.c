@@ -4,7 +4,6 @@
  * Function to translate virtual to physical addresses.
  */
 #include "xc_private.h"
-#include <strings.h>
 
 #define CR0_PG  0x80000000
 #define CR4_PAE 0x20
@@ -77,7 +76,7 @@ unsigned long xc_translate_foreign_address(int xc_handle, uint32_t dom,
 
     /* Walk the pagetables */
     for (level = pt_levels; level > 0; level--) {
-        paddr += ((virt & mask) >> (ffsll(mask) - 1)) * size;
+        paddr += ((virt & mask) >> (xc_ffs64(mask) - 1)) * size;
         map = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE, PROT_READ, 
                                    paddr >>PAGE_SHIFT);
         if (!map) 

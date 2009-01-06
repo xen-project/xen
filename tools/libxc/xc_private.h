@@ -218,4 +218,9 @@ int xc_flush_mmu_updates(int xc_handle, struct xc_mmu *mmu);
 int read_exact(int fd, void *data, size_t size);
 int write_exact(int fd, const void *data, size_t size);
 
+int xc_ffs8(uint8_t x);
+int xc_ffs16(uint16_t x);
+int xc_ffs32(uint32_t x);
+int xc_ffs64(uint64_t x);
+
 #endif /* __XC_PRIVATE_H__ */
