@@ -726,7 +726,7 @@ class XendDomainInfo:
                 if dev_type == 'pci':
                     for dev in dev_config_dict['devs']:
                         XendAPIStore.deregister(dev['uuid'], 'DPCI')
-                if dev_type == 'vscsi':
+                elif dev_type == 'vscsi':
                     for dev in dev_config_dict['devs']:
                         XendAPIStore.deregister(dev['uuid'], 'DSCSI')
                 elif dev_type == 'tap':
