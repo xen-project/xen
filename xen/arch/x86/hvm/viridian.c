@@ -37,6 +37,7 @@
 
 /* Viridian CPUID 4000004, Implementation Recommendations. */
 #define CPUID4A_MSR_BASED_APIC  (1 << 3)
+#define CPUID4A_RELAX_TIMER_INT (1 << 5)
 
 int cpuid_viridian_leaves(unsigned int leaf, unsigned int *eax,
                           unsigned int *ebx, unsigned int *ecx,
@@ -84,7 +85,8 @@ int cpuid_viridian_leaves(unsigned int leaf, unsigned int *eax,
         if ( (d->arch.hvm_domain.viridian.guest_os_id.raw == 0) ||
              (d->arch.hvm_domain.viridian.guest_os_id.fields.os < 4) )
             break;
-        *eax = CPUID4A_MSR_BASED_APIC;
+        *eax = (CPUID4A_MSR_BASED_APIC |
+                CPUID4A_RELAX_TIMER_INT);
         *ebx = 2047; /* long spin count */
         break;
     }
