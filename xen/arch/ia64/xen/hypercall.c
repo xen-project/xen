@@ -466,16 +466,20 @@ iosapic_guest_write(
 
 
 /*
- * XXX We don't support MSI for PCI passthrough, so just return ENOSYS
+ * XXX: We don't support MSI for PCI passthrough at present, so make the
+ * following 2 functions dummy for now. They shouldn't return -ENOSYS
+ * because xend invokes them (the x86 version of them is necessary for
+ * x86 Xen); if they return -ENOSYS, xend would disallow us to create
+ * IPF HVM guest with devices assigned so here they can return 0.
  */
 static int physdev_map_pirq(struct physdev_map_pirq *map)
 {
-	return -ENOSYS;
+	return 0;
 }
 
 static int physdev_unmap_pirq(struct physdev_unmap_pirq *unmap)
 {
-	return -ENOSYS;
+	return 0;
 }
 
 

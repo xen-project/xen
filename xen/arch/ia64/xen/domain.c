@@ -602,10 +602,8 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
 	if ((d->arch.mm.pgd = pgd_alloc(&d->arch.mm)) == NULL)
 	    goto fail_nomem;
 
-	if ( iommu_enabled && (is_hvm_domain(d) || need_iommu(d)) ){
-		if(iommu_domain_init(d) != 0)
-			goto fail_iommu;
-	}
+	if(iommu_domain_init(d) != 0)
+		goto fail_iommu;
 
 	/*
 	 * grant_table_create() can't fully initialize grant table for domain
