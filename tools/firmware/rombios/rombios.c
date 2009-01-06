@@ -2141,64 +2141,62 @@ interactive_bootkey()
   Bit16u valid_choice = 0;
   Bit16u ebda_seg = read_word(0x0040, 0x000E);
 
+  printf("\n\nPress F12 for boot menu.\n\n");
+
   while (check_for_keystroke())
-    get_keystroke();
-
-  printf("\nPress F12 for boot menu.\n\n");
-
-  delay_ticks_and_check_for_keystroke(11, 5); /* ~3 seconds */
-  if (check_for_keystroke())
   {
     scan_code = get_keystroke();
-    if (scan_code == 0x86) /* F12 */
+    if (scan_code != 0x86) /* F12 */
+      continue;
+
+    while (check_for_keystroke())
+      get_keystroke();
+
+    printf("Select boot device:\n\n");
+
+    count = read_word(ebda_seg, IPL_COUNT_OFFSET);
+    for (i = 0; i < count; i++)
     {
-      while (check_for_keystroke())
-        get_keystroke();
-
-      printf("Select boot device:\n\n");
-
-      count = read_word(ebda_seg, IPL_COUNT_OFFSET);
-      for (i = 0; i < count; i++)
+      memcpyb(ss, &e, ebda_seg, IPL_TABLE_OFFSET + i * sizeof (e), sizeof (e));
+      printf("%d. ", i+1);
+      switch(e.type)
       {
-        memcpyb(ss, &e, ebda_seg, IPL_TABLE_OFFSET + i * sizeof (e), sizeof (e));
-        printf("%d. ", i+1);
-        switch(e.type)
-        {
-          case IPL_TYPE_FLOPPY:
-          case IPL_TYPE_HARDDISK:
-          case IPL_TYPE_CDROM:
-            printf("%s\n", drivetypes[e.type]);
-            break;
-          case IPL_TYPE_BEV:
-            printf("%s", drivetypes[4]);
-            if (e.description != 0)
-            {
-              memcpyb(ss, &description, (Bit16u)(e.description >> 16), (Bit16u)(e.description & 0xffff), 32);
-              description[32] = 0;
-              printf(" [%S]", ss, description);
-           }
-           printf("\n");
-           break;
-        }
+        case IPL_TYPE_FLOPPY:
+        case IPL_TYPE_HARDDISK:
+        case IPL_TYPE_CDROM:
+          printf("%s\n", drivetypes[e.type]);
+          break;
+        case IPL_TYPE_BEV:
+          printf("%s", drivetypes[4]);
+          if (e.description != 0)
+          {
+            memcpyb(ss, &description, (Bit16u)(e.description >> 16), (Bit16u)(e.description & 0xffff), 32);
+            description[32] = 0;
+            printf(" [%S]", ss, description);
+         }
+         printf("\n");
+         break;
       }
-
-      count++;
-      while (!valid_choice) {
-        scan_code = get_keystroke();
-        if (scan_code == 0x01 || scan_code == 0x58) /* ESC or F12 */
-        {
-          valid_choice = 1;
-        }
-        else if (scan_code <= count)
-        {
-          valid_choice = 1;
-          scan_code -= 1;
-          /* Set user selected device */
-          write_word(ebda_seg, IPL_BOOTFIRST_OFFSET, scan_code);
-        }
-      }
-    printf("\n");
     }
+
+    count++;
+    while (!valid_choice) {
+      scan_code = get_keystroke();
+      if (scan_code == 0x01 || scan_code == 0x58) /* ESC or F12 */
+      {
+        valid_choice = 1;
+      }
+      else if (scan_code <= count)
+      {
+        valid_choice = 1;
+        scan_code -= 1;
+        /* Set user selected device */
+        write_word(ebda_seg, IPL_BOOTFIRST_OFFSET, scan_code);
+      }
+    }
+
+    printf("\n");
+    break;
   }
 }
 #endif // BX_ELTORITO_BOOT
