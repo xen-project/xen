@@ -10026,7 +10026,7 @@ pci_routing_table_structure_start:
   db 0 ;; reserved
 pci_routing_table_structure_end:
 
-#if !BX_ROMBIOS32
+#if !BX_ROMBIOS32 && !defined(HVMASSIST)
 pci_irq_list:
   db 11, 10, 9, 5;
 
@@ -10970,7 +10970,7 @@ post_default_ints:
 #if BX_ROMBIOS32
   call rombios32_init
 #else
-#if BX_PCIBIOS
+#if BX_PCIBIOS && !defined(HVMASSIST)
   call pcibios_init_iomem_bases
   call pcibios_init_irqs
 #endif //BX_PCIBIOS
