@@ -68,10 +68,10 @@ void cpufreq_statistic_update(unsigned int cpu, uint8_t from, uint8_t to)
     spinlock_t *cpufreq_statistic_lock = 
                &per_cpu(cpufreq_statistic_lock, cpu);
 
-    spin_lock_irq(cpufreq_statistic_lock);
+    spin_lock(cpufreq_statistic_lock);
 
     if ( !pxpt || !pmpt ) {
-        spin_unlock_irq(cpufreq_statistic_lock);
+        spin_unlock(cpufreq_statistic_lock);
         return;
     }
 
@@ -83,7 +83,7 @@ void cpufreq_statistic_update(unsigned int cpu, uint8_t from, uint8_t to)
 
     (*(pxpt->u.trans_pt + from * pmpt->perf.state_count + to))++;
 
-    spin_unlock_irq(cpufreq_statistic_lock);
+    spin_unlock(cpufreq_statistic_lock);
 }
 
 int cpufreq_statistic_init(unsigned int cpuid)
@@ -97,10 +97,10 @@ int cpufreq_statistic_init(unsigned int cpuid)
     if ( !pmpt )
         return -EINVAL;
 
-    spin_lock_irq(cpufreq_statistic_lock);
+    spin_lock(cpufreq_statistic_lock);
 
     if ( pxpt ) {
-        spin_unlock_irq(cpufreq_statistic_lock);
+        spin_unlock(cpufreq_statistic_lock);
         return 0;
     }
 
@@ -108,7 +108,7 @@ int cpufreq_statistic_init(unsigned int cpuid)
 
     pxpt = xmalloc(struct pm_px);
     if ( !pxpt ) {
-        spin_unlock_irq(cpufreq_statistic_lock);
+        spin_unlock(cpufreq_statistic_lock);
         return -ENOMEM;
     }
     memset(pxpt, 0, sizeof(*pxpt));
@@ -117,7 +117,7 @@ int cpufreq_statistic_init(unsigned int cpuid)
     pxpt->u.trans_pt = xmalloc_array(uint64_t, count * count);
     if (!pxpt->u.trans_pt) {
         xfree(pxpt);
-        spin_unlock_irq(cpufreq_statistic_lock);
+        spin_unlock(cpufreq_statistic_lock);
         return -ENOMEM;
     }
 
@@ -125,7 +125,7 @@ int cpufreq_statistic_init(unsigned int cpuid)
     if (!pxpt->u.pt) {
         xfree(pxpt->u.trans_pt);
         xfree(pxpt);
-        spin_unlock_irq(cpufreq_statistic_lock);
+        spin_unlock(cpufreq_statistic_lock);
         return -ENOMEM;
     }
 
@@ -141,7 +141,7 @@ int cpufreq_statistic_init(unsigned int cpuid)
     pxpt->prev_state_wall = NOW();
     pxpt->prev_idle_wall = get_cpu_idle_time(cpuid);
 
-    spin_unlock_irq(cpufreq_statistic_lock);
+    spin_unlock(cpufreq_statistic_lock);
 
     return 0;
 }
@@ -152,10 +152,10 @@ void cpufreq_statistic_exit(unsigned int cpuid)
     spinlock_t *cpufreq_statistic_lock = 
                &per_cpu(cpufreq_statistic_lock, cpuid);
 
-    spin_lock_irq(cpufreq_statistic_lock);
+    spin_lock(cpufreq_statistic_lock);
 
     if (!pxpt) {
-        spin_unlock_irq(cpufreq_statistic_lock);
+        spin_unlock(cpufreq_statistic_lock);
         return;
     }
 
@@ -164,7 +164,7 @@ void cpufreq_statistic_exit(unsigned int cpuid)
     xfree(pxpt);
     cpufreq_statistic_data[cpuid] = NULL;
 
-    spin_unlock_irq(cpufreq_statistic_lock);
+    spin_unlock(cpufreq_statistic_lock);
 }
 
 void cpufreq_statistic_reset(unsigned int cpuid)
@@ -175,10 +175,10 @@ void cpufreq_statistic_reset(unsigned int cpuid)
     spinlock_t *cpufreq_statistic_lock = 
                &per_cpu(cpufreq_statistic_lock, cpuid);
 
-    spin_lock_irq(cpufreq_statistic_lock);
+    spin_lock(cpufreq_statistic_lock);
 
     if ( !pmpt || !pxpt || !pxpt->u.pt || !pxpt->u.trans_pt ) {
-        spin_unlock_irq(cpufreq_statistic_lock);
+        spin_unlock(cpufreq_statistic_lock);
         return;
     }
 
@@ -195,7 +195,7 @@ void cpufreq_statistic_reset(unsigned int cpuid)
     pxpt->prev_state_wall = NOW();
     pxpt->prev_idle_wall = get_cpu_idle_time(cpuid);
 
-    spin_unlock_irq(cpufreq_statistic_lock);
+    spin_unlock(cpufreq_statistic_lock);
 }
 
 

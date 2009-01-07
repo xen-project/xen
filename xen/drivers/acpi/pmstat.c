@@ -92,11 +92,11 @@ int do_get_pm_info(struct xen_sysctl_get_pmstat *op)
         spinlock_t *cpufreq_statistic_lock = 
                    &per_cpu(cpufreq_statistic_lock, op->cpuid);
 
-        spin_lock_irq(cpufreq_statistic_lock);
+        spin_lock(cpufreq_statistic_lock);
 
         if ( !pxpt || !pxpt->u.pt || !pxpt->u.trans_pt )
         {
-            spin_unlock_irq(cpufreq_statistic_lock);
+            spin_unlock(cpufreq_statistic_lock);
             return -ENODATA;
         }
 
@@ -107,14 +107,14 @@ int do_get_pm_info(struct xen_sysctl_get_pmstat *op)
         ct = pmpt->perf.state_count;
         if ( copy_to_guest(op->u.getpx.trans_pt, pxpt->u.trans_pt, ct*ct) )
         {
-            spin_unlock_irq(cpufreq_statistic_lock);
+            spin_unlock(cpufreq_statistic_lock);
             ret = -EFAULT;
             break;
         }
 
         if ( copy_to_guest(op->u.getpx.pt, pxpt->u.pt, ct) )
         {
-            spin_unlock_irq(cpufreq_statistic_lock);
+            spin_unlock(cpufreq_statistic_lock);
             ret = -EFAULT;
             break;
         }
@@ -124,7 +124,7 @@ int do_get_pm_info(struct xen_sysctl_get_pmstat *op)
         op->u.getpx.last = pxpt->u.last;
         op->u.getpx.cur = pxpt->u.cur;
 
-        spin_unlock_irq(cpufreq_statistic_lock);
+        spin_unlock(cpufreq_statistic_lock);
 
         break;
     }
