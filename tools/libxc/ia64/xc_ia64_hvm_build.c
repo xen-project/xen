@@ -1099,6 +1099,22 @@ error_out:
     return -1;
 }
 
+/* xc_hvm_build_target_mem: 
+ * Create a domain for a pre-ballooned virtualized Linux, using
+ * files/filenames.  If target < memsize, domain is created with
+ * memsize pages marked populate-on-demand, and with a PoD cache size
+ * of target.  If target == memsize, pages are populated normally.
+ */
+int xc_hvm_build_target_mem(int xc_handle,
+                            uint32_t domid,
+                            int memsize,
+                            int target,
+                            const char *image_name)
+{
+    /* XXX:PoD isn't supported yet */
+    return xc_hvm_build(xc_handle, domid, target, image_name);
+}
+
 /*
  * From asm/pgtable.h
  */
