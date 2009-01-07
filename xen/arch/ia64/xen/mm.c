@@ -3468,6 +3468,23 @@ void xencomm_mark_dirty(unsigned long addr, unsigned int len)
     __xencomm_mark_dirty(current->domain, addr, len);
 }
 
+/* stubs for populate on demand */
+int
+guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn,
+                                      unsigned int order)
+{
+    gdprintk(XENLOG_WARNING, "populate on demand isn't supported yet\n");
+    return -ENOSYS;
+}
+
+int
+p2m_pod_decrease_reservation(struct domain *d, xen_pfn_t gpfn,
+                             unsigned int order)
+{
+    gdprintk(XENLOG_WARNING, "populate on demand isn't supported yet\n");
+    return 1;
+}
+
 /*
  * Local variables:
  * mode: C
