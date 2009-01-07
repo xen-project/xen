@@ -240,7 +240,8 @@ linux26:
 #
 
 TBOOT_TARFILE = tboot-20080613.tar.gz
-TBOOT_BASE_URL = http://downloads.sourceforge.net/tboot
+#TBOOT_BASE_URL = http://downloads.sourceforge.net/tboot
+TBOOT_BASE_URL = $(XEN_EXTFILES_URL)
 
 .PHONY: build-tboot
 build-tboot: download_tboot

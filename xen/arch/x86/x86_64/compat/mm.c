@@ -128,6 +128,29 @@ int compat_arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         break;
     }
 
+    case XENMEM_set_pod_target:
+    case XENMEM_get_pod_target:
+    {
+        struct compat_pod_target cmp;
+        struct xen_pod_target *nat = (void *)COMPAT_ARG_XLAT_VIRT_BASE;
+
+        if ( copy_from_guest(&cmp, arg, 1) )
+            return -EFAULT;
+
+        XLAT_pod_target(nat, &cmp);
+
+        rc = arch_memory_op(op, guest_handle_from_ptr(nat, void));
+        if ( rc < 0 )
+            break;
+
+        XLAT_pod_target(&cmp, nat);
+
+        if ( copy_to_guest(arg, &cmp, 1) )
+            rc = -EFAULT;
+
+        break;
+    }
+
     case XENMEM_machphys_mapping:
     {
         struct domain *d = current->domain;

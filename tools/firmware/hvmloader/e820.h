@@ -17,7 +17,7 @@ struct e820entry {
     uint32_t type;
 } __attribute__((packed));
 
-#define HVM_E820_NR ((unsigned char *)HVM_E820_PAGE + HVM_E820_NR_OFFSET)
-#define HVM_E820    ((struct e820entry *)(HVM_E820_PAGE + HVM_E820_OFFSET))
+#define E820_NR ((uint16_t *)(E820_PHYSICAL_ADDRESS + E820_NR_OFFSET))
+#define E820    ((struct e820entry *)(E820_PHYSICAL_ADDRESS + E820_OFFSET))
 
 #endif /* __HVMLOADER_E820_H__ */

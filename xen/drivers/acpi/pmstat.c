@@ -87,33 +87,34 @@ int do_get_pm_info(struct xen_sysctl_get_pmstat *op)
 
     case PMSTAT_get_pxstat:
     {
-        uint64_t now, ct;
-        uint64_t total_idle_ns;
-        uint64_t tmp_idle_ns;
+        uint32_t ct;
         struct pm_px *pxpt = cpufreq_statistic_data[op->cpuid];
+        spinlock_t *cpufreq_statistic_lock = 
+                   &per_cpu(cpufreq_statistic_lock, op->cpuid);
+
+        spin_lock_irq(cpufreq_statistic_lock);
 
         if ( !pxpt || !pxpt->u.pt || !pxpt->u.trans_pt )
+        {
+            spin_unlock_irq(cpufreq_statistic_lock);
             return -ENODATA;
+        }
 
-        total_idle_ns = get_cpu_idle_time(op->cpuid);
-        tmp_idle_ns = total_idle_ns - pxpt->prev_idle_wall;
-
-        now = NOW();
         pxpt->u.usable = pmpt->perf.state_count - pmpt->perf.platform_limit;
-        pxpt->u.pt[pxpt->u.cur].residency += now - pxpt->prev_state_wall;
-        pxpt->u.pt[pxpt->u.cur].residency -= tmp_idle_ns;
-        pxpt->prev_state_wall = now;
-        pxpt->prev_idle_wall = total_idle_ns;
+
+        cpufreq_residency_update(op->cpuid, pxpt->u.cur);
 
         ct = pmpt->perf.state_count;
         if ( copy_to_guest(op->u.getpx.trans_pt, pxpt->u.trans_pt, ct*ct) )
         {
+            spin_unlock_irq(cpufreq_statistic_lock);
             ret = -EFAULT;
             break;
         }
 
         if ( copy_to_guest(op->u.getpx.pt, pxpt->u.pt, ct) )
         {
+            spin_unlock_irq(cpufreq_statistic_lock);
             ret = -EFAULT;
             break;
         }
@@ -122,6 +123,8 @@ int do_get_pm_info(struct xen_sysctl_get_pmstat *op)
         op->u.getpx.usable = pxpt->u.usable;
         op->u.getpx.last = pxpt->u.last;
         op->u.getpx.cur = pxpt->u.cur;
+
+        spin_unlock_irq(cpufreq_statistic_lock);
 
         break;
     }

@@ -3976,6 +3976,49 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         return 0;
     }
 
+    case XENMEM_set_pod_target:
+    case XENMEM_get_pod_target:
+    {
+        xen_pod_target_t target;
+        struct domain *d;
+
+        /* Support DOMID_SELF? */
+        if ( !IS_PRIV(current->domain) )
+            return -EINVAL;
+
+        if ( copy_from_guest(&target, arg, 1) )
+            return -EFAULT;
+
+        rc = rcu_lock_target_domain_by_id(target.domid, &d);
+        if ( rc != 0 )
+            return rc;
+
+        if ( op == XENMEM_set_pod_target )
+        {
+            if ( target.target_pages > d->max_pages )
+            {
+                rc = -EINVAL;
+                goto pod_target_out_unlock;
+            }
+            
+            rc = p2m_pod_set_mem_target(d, target.target_pages);
+        }
+
+        target.tot_pages       = d->tot_pages;
+        target.pod_cache_pages = d->arch.p2m->pod.count;
+        target.pod_entries     = d->arch.p2m->pod.entry_count;
+
+        if ( copy_to_guest(arg, &target, 1) )
+        {
+            rc= -EFAULT;
+            goto pod_target_out_unlock;
+        }
+        
+    pod_target_out_unlock:
+        rcu_unlock_domain(d);
+        return rc;
+    }
+
     default:
         return subarch_memory_op(op, arg);
     }

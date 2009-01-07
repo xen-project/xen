@@ -890,17 +890,20 @@ static PyObject *pyxc_hvm_build(XcObject *self,
     int i;
 #endif
     char *image;
-    int memsize, vcpus = 1, acpi = 0, apic = 1;
+    int memsize, target=-1, vcpus = 1, acpi = 0, apic = 1;
 
     static char *kwd_list[] = { "domid",
-                                "memsize", "image", "vcpus", "acpi",
+                                "memsize", "image", "target", "vcpus", "acpi",
                                 "apic", NULL };
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iis|iii", kwd_list,
-                                      &dom, &memsize,
-                                      &image, &vcpus, &acpi, &apic) )
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iis|iiii", kwd_list,
+                                      &dom, &memsize, &image, &target, &vcpus,
+                                      &acpi, &apic) )
         return NULL;
 
-    if ( xc_hvm_build(self->xc_handle, dom, memsize, image) != 0 )
+    if ( target == -1 )
+        target = memsize;
+
+    if ( xc_hvm_build_target_mem(self->xc_handle, dom, memsize, target, image) != 0 )
         return pyxc_error_to_exception();
 
 #if !defined(__ia64__)
@@ -1329,6 +1332,24 @@ static PyObject *pyxc_domain_setmaxmem(XcObject *self, PyObject *args)
         return NULL;
 
     if (xc_domain_setmaxmem(self->xc_handle, dom, maxmem_kb) != 0)
+        return pyxc_error_to_exception();
+    
+    Py_INCREF(zero);
+    return zero;
+}
+
+static PyObject *pyxc_domain_set_target_mem(XcObject *self, PyObject *args)
+{
+    uint32_t dom;
+    unsigned int mem_kb, mem_pages;
+
+    if (!PyArg_ParseTuple(args, "ii", &dom, &mem_kb))
+        return NULL;
+
+    mem_pages = mem_kb / 4; 
+
+    if (xc_domain_memory_set_pod_target(self->xc_handle, dom, mem_pages,
+                                        NULL, NULL, NULL) != 0)
         return pyxc_error_to_exception();
     
     Py_INCREF(zero);
@@ -1813,6 +1834,14 @@ static PyMethodDef pyxc_methods[] = {
       "Set a domain's memory limit\n"
       " dom [int]: Identifier of domain.\n"
       " maxmem_kb [int]: .\n"
+      "Returns: [int] 0 on success; -1 on error.\n" },
+
+    { "domain_set_target_mem", 
+      (PyCFunction)pyxc_domain_set_target_mem, 
+      METH_VARARGS, "\n"
+      "Set a domain's memory target\n"
+      " dom [int]: Identifier of domain.\n"
+      " mem_kb [int]: .\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "domain_set_memmap_limit", 

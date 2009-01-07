@@ -9,6 +9,7 @@
 int get_cpu_id(u8);
 int powernow_cpufreq_init(void);
 
+void cpufreq_residency_update(unsigned int, uint8_t);
 void cpufreq_statistic_update(unsigned int, uint8_t, uint8_t);
 int  cpufreq_statistic_init(unsigned int);
 void cpufreq_statistic_exit(unsigned int);
@@ -18,8 +19,6 @@ int  cpufreq_limit_change(unsigned int);
 
 int  cpufreq_add_cpu(unsigned int);
 int  cpufreq_del_cpu(unsigned int);
-
-uint64_t get_cpu_idle_time(unsigned int);
 
 struct processor_performance {
     uint32_t state;

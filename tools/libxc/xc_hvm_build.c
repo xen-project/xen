@@ -146,11 +146,13 @@ static int loadelfimage(
 }
 
 static int setup_guest(int xc_handle,
-                       uint32_t dom, int memsize,
+                       uint32_t dom, int memsize, int target,
                        char *image, unsigned long image_size)
 {
     xen_pfn_t *page_array = NULL;
     unsigned long i, nr_pages = (unsigned long)memsize << (20 - PAGE_SHIFT);
+    unsigned long target_pages = (unsigned long)target << (20 - PAGE_SHIFT);
+    unsigned long pod_pages = 0;
     unsigned long special_page_nr, entry_eip, cur_pages;
     struct xen_add_to_physmap xatp;
     struct shared_info *shared_info;
@@ -160,10 +162,15 @@ static int setup_guest(int xc_handle,
     uint64_t v_start, v_end;
     int rc;
     xen_capabilities_info_t caps;
+    int pod_mode = 0;
+    
 
     /* An HVM guest must be initialised with at least 2MB memory. */
-    if ( memsize < 2 )
+    if ( memsize < 2 || target < 2 )
         goto error_out;
+
+    if ( memsize > target )
+        pod_mode = 1;
 
     if ( elf_init(&elf, image, image_size) != 0 )
         goto error_out;
@@ -235,6 +242,10 @@ static int setup_guest(int xc_handle,
                 .extent_order = SUPERPAGE_PFN_SHIFT,
                 .domid        = dom
             };
+
+            if ( pod_mode )
+                sp_req.mem_flags = XENMEMF_populate_on_demand;
+
             set_xen_guest_handle(sp_req.extent_start, sp_extents);
             for ( i = 0; i < sp_req.nr_extents; i++ )
                 sp_extents[i] = page_array[cur_pages+(i<<SUPERPAGE_PFN_SHIFT)];
@@ -242,6 +253,11 @@ static int setup_guest(int xc_handle,
             if ( done > 0 )
             {
                 done <<= SUPERPAGE_PFN_SHIFT;
+                if ( pod_mode && target_pages > cur_pages )
+                {
+                    int d = target_pages - cur_pages;
+                    pod_pages += ( done < d ) ? done : d;
+                }
                 cur_pages += done;
                 count -= done;
             }
@@ -253,8 +269,16 @@ static int setup_guest(int xc_handle,
             rc = xc_domain_memory_populate_physmap(
                 xc_handle, dom, count, 0, 0, &page_array[cur_pages]);
             cur_pages += count;
+            if ( pod_mode )
+                pod_pages -= count;
         }
     }
+
+    if ( pod_mode )
+        rc = xc_domain_memory_set_pod_target(xc_handle,
+                                             dom,
+                                             pod_pages,
+                                             NULL, NULL, NULL);
 
     if ( rc != 0 )
     {
@@ -354,6 +378,7 @@ static int setup_guest(int xc_handle,
 static int xc_hvm_build_internal(int xc_handle,
                                  uint32_t domid,
                                  int memsize,
+                                 int target,
                                  char *image,
                                  unsigned long image_size)
 {
@@ -363,7 +388,7 @@ static int xc_hvm_build_internal(int xc_handle,
         return -1;
     }
 
-    return setup_guest(xc_handle, domid, memsize, image, image_size);
+    return setup_guest(xc_handle, domid, memsize, target, image, image_size);
 }
 
 static inline int is_loadable_phdr(Elf32_Phdr *phdr)
@@ -388,7 +413,34 @@ int xc_hvm_build(int xc_handle,
          ((image = xc_read_image(image_name, &image_size)) == NULL) )
         return -1;
 
-    sts = xc_hvm_build_internal(xc_handle, domid, memsize, image, image_size);
+    sts = xc_hvm_build_internal(xc_handle, domid, memsize, memsize, image, image_size);
+
+    free(image);
+
+    return sts;
+}
+
+/* xc_hvm_build_target_mem: 
+ * Create a domain for a pre-ballooned virtualized Linux, using
+ * files/filenames.  If target < memsize, domain is created with
+ * memsize pages marked populate-on-demand, and with a PoD cache size
+ * of target.  If target == memsize, pages are populated normally.
+ */
+int xc_hvm_build_target_mem(int xc_handle,
+                           uint32_t domid,
+                           int memsize,
+                           int target,
+                           const char *image_name)
+{
+    char *image;
+    int  sts;
+    unsigned long image_size;
+
+    if ( (image_name == NULL) ||
+         ((image = xc_read_image(image_name, &image_size)) == NULL) )
+        return -1;
+
+    sts = xc_hvm_build_internal(xc_handle, domid, memsize, target, image, image_size);
 
     free(image);
 
@@ -423,7 +475,7 @@ int xc_hvm_build_mem(int xc_handle,
         return -1;
     }
 
-    sts = xc_hvm_build_internal(xc_handle, domid, memsize,
+    sts = xc_hvm_build_internal(xc_handle, domid, memsize, memsize,
                                 img, img_len);
 
     /* xc_inflate_buffer may return the original buffer pointer (for

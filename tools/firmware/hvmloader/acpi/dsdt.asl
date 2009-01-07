@@ -122,6 +122,20 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
            Name (_ADR, 0x00)
            Name (_BBN, 0x00)
 
+           /*
+            * Reserve the IO port ranges [0x10c0, 0x10c2] and [0xb044, 0xb047].
+            * Or else, for a hotplugged-in device, the port IO BAR assigned
+            * by guest OS may conflict with the ranges here.
+            */
+           Device(HP0)
+           {
+               Name(_HID, EISAID("PNP0C02"))
+               Name(_CRS, ResourceTemplate() {
+                   IO (Decode16, 0x10c0, 0x10c0, 0x00, 0x03)
+                   IO (Decode16, 0xb044, 0xb044, 0x00, 0x04)
+               })
+           }
+
            Method (_CRS, 0, NotSerialized)
            {
                Name (PRT0, ResourceTemplate ()

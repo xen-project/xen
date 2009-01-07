@@ -214,8 +214,20 @@ int cpufreq_add_cpu(unsigned int cpu)
         memcpy(&new_policy, policy, sizeof(struct cpufreq_policy));
         policy->governor = NULL;
         ret = __cpufreq_set_policy(policy, &new_policy);
-        if (ret)
-            goto err2;
+        if (ret) {
+            if (new_policy.governor == CPUFREQ_DEFAULT_GOVERNOR)
+                /* if default governor fail, cpufreq really meet troubles */
+                goto err2;
+            else {
+                /* grub option governor fail */
+                /* give one more chance to default gov */
+                memcpy(&new_policy, policy, sizeof(struct cpufreq_policy));
+                new_policy.governor = CPUFREQ_DEFAULT_GOVERNOR;
+                ret = __cpufreq_set_policy(policy, &new_policy);
+                if (ret)
+                    goto err2;
+            }
+        }
     }
 
     return 0;

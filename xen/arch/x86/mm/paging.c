@@ -585,6 +585,9 @@ void paging_teardown(struct domain *d)
 
     /* clean up log dirty resources. */
     paging_log_dirty_teardown(d);
+
+    /* Move populate-on-demand cache back to domain_list for destruction */
+    p2m_pod_empty_cache(d);
 }
 
 /* Call once all of the references to the domain have gone away */

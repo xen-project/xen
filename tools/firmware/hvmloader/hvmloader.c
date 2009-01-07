@@ -330,7 +330,7 @@ static void pci_setup(void)
  * Scan the list of Option ROMs at @roms for one which supports 
  * PCI (@vendor_id, @device_id) found at slot @devfn. If one is found,
  * copy it to @dest and return its size rounded up to a multiple 2kB. This
- * function will not copy ROMs beyond address 0xE0000.
+ * function will not copy ROMs beyond address OPTIONROM_PHYSICAL_END.
  */
 #define round_option_rom(x) (((x) + 2047) & ~2047)
 static int scan_option_rom(
@@ -401,7 +401,7 @@ static int scan_option_rom(
         printf(" - Product name: %s\n",
                (char *)rom + pnph->product_name_offset);
 
-    if ( (dest + rom->rom_size * 512 + 1) > 0xe0000u )
+    if ( (dest + rom->rom_size * 512 + 1) > OPTIONROM_PHYSICAL_END )
     {
         printf("Option ROM size %x exceeds available space\n",
                rom->rom_size * 512);
@@ -488,8 +488,8 @@ static int pci_load_option_roms(uint32_t rom_base_addr)
 /* Replace possibly erroneous memory-size CMOS fields with correct values. */
 static void cmos_write_memory_size(void)
 {
-    struct e820entry *map = HVM_E820;
-    int i, nr = *HVM_E820_NR;
+    struct e820entry *map = E820;
+    int i, nr = *E820_NR;
     uint32_t base_mem = 640, ext_mem = 0, alt_mem = 0;
 
     for ( i = 0; i < nr; i++ )
@@ -541,9 +541,11 @@ static uint16_t init_xen_platform_io_base(void)
     return bios_info->xen_pfiob;
 }
 
-/* Set up an empty TSS area for virtual 8086 mode to use. 
+/*
+ * Set up an empty TSS area for virtual 8086 mode to use. 
  * The only important thing is that it musn't have any bits set 
- * in the interrupt redirection bitmap, so all zeros will do.  */
+ * in the interrupt redirection bitmap, so all zeros will do.
+ */
 static void init_vm86_tss(void)
 {
     uint32_t tss;
@@ -558,6 +560,18 @@ static void init_vm86_tss(void)
     printf("vm86 TSS at %08x\n", tss);
 }
 
+/*
+ * Copy the E820 table provided by the HVM domain builder into the correct
+ * place in the memory map we share with the rombios.
+ */
+static void copy_e820_table(void)
+{
+    uint8_t nr = *(uint8_t *)(HVM_E820_PAGE + HVM_E820_NR_OFFSET);
+    BUG_ON(nr > 16);
+    memcpy(E820, (char *)HVM_E820_PAGE + HVM_E820_OFFSET, nr * sizeof(*E820));
+    *E820_NR = nr;
+}
+
 int main(void)
 {
     int option_rom_sz = 0, vgabios_sz = 0, etherboot_sz = 0;
@@ -566,6 +580,8 @@ int main(void)
     uint16_t xen_pfiob;
 
     printf("HVM Loader\n");
+
+    copy_e820_table();
 
     init_hypercalls();
 
@@ -617,6 +633,8 @@ int main(void)
     }
 
     etherboot_phys_addr = VGABIOS_PHYSICAL_ADDRESS + vgabios_sz;
+    if ( etherboot_phys_addr < OPTIONROM_PHYSICAL_ADDRESS )
+        etherboot_phys_addr = OPTIONROM_PHYSICAL_ADDRESS;
     etherboot_sz = scan_etherboot_nic(etherboot_phys_addr);
 
     option_rom_phys_addr = etherboot_phys_addr + etherboot_sz;

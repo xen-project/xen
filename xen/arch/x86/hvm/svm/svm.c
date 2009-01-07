@@ -888,7 +888,7 @@ static void svm_do_nested_pgfault(paddr_t gpa, struct cpu_user_regs *regs)
      * If this GFN is emulated MMIO or marked as read-only, pass the fault
      * to the mmio handler.
      */
-    mfn = gfn_to_mfn_current(gfn, &p2mt);
+    mfn = gfn_to_mfn_type_current(gfn, &p2mt, p2m_guest);
     if ( (p2mt == p2m_mmio_dm) || (p2mt == p2m_ram_ro) )
     {
         if ( !handle_mmio() )

@@ -307,11 +307,11 @@ void __init cpufreq_cmdline_parse(char *str)
             *end++ = '\0';
         val = strchr(str, '=');
         if ( val )
-            *val = '\0';
+            *val++ = '\0';
 
         if ( !strcmp(str, "rate") && val )
         {
-            usr_sampling_rate = simple_strtoull(val, NULL, 0);
+            usr_sampling_rate = simple_strtoull(val, NULL, 0) * MICROSECS(1);
         }
         else if ( !strcmp(str, "threshold") && val )
         {

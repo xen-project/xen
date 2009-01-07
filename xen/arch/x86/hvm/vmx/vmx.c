@@ -1314,8 +1314,29 @@ static void vmx_set_uc_mode(struct vcpu *v)
 
 static void vmx_set_info_guest(struct vcpu *v)
 {
+    unsigned long intr_shadow;
+
     vmx_vmcs_enter(v);
+
     __vmwrite(GUEST_DR7, v->arch.guest_context.debugreg[7]);
+
+    /* 
+     * If the interruptibility-state field indicates blocking by STI,
+     * setting the TF flag in the EFLAGS may cause VM entry to fail
+     * and crash the guest. See SDM 3B 22.3.1.5.
+     * Resetting the VMX_INTR_SHADOW_STI flag looks hackish but
+     * to set the GUEST_PENDING_DBG_EXCEPTIONS.BS here incurs
+     * immediately vmexit and hence make no progress.
+     */
+    intr_shadow = __vmread(GUEST_INTERRUPTIBILITY_INFO);
+    if ( v->domain->debugger_attached &&
+         (v->arch.guest_context.user_regs.eflags & X86_EFLAGS_TF) &&
+         (intr_shadow & VMX_INTR_SHADOW_STI) )
+    {
+        intr_shadow &= ~VMX_INTR_SHADOW_STI;
+        __vmwrite(GUEST_INTERRUPTIBILITY_INFO, intr_shadow);
+    }
+
     vmx_vmcs_exit(v);
 }
 
@@ -2103,9 +2124,9 @@ static void ept_handle_violation(unsigned long qualification, paddr_t gpa)
     mfn_t mfn;
     p2m_type_t t;
 
-    mfn = gfn_to_mfn(d, gfn, &t);
+    mfn = gfn_to_mfn_guest(d, gfn, &t);
 
-    /* There are two legitimate reasons for taking an EPT violation. 
+    /* There are three legitimate reasons for taking an EPT violation. 
      * One is a guest access to MMIO space. */
     if ( gla_validity == EPT_GLA_VALIDITY_MATCH && p2m_is_mmio(t) )
     {
@@ -2113,15 +2134,18 @@ static void ept_handle_violation(unsigned long qualification, paddr_t gpa)
         return;
     }
 
-    /* The other is log-dirty mode, writing to a read-only page */
-    if ( paging_mode_log_dirty(d)
-         && (gla_validity == EPT_GLA_VALIDITY_MATCH
-             || gla_validity == EPT_GLA_VALIDITY_GPT_WALK)
+    /* The second is log-dirty mode, writing to a read-only page;
+     * The third is populating a populate-on-demand page. */
+    if ( (gla_validity == EPT_GLA_VALIDITY_MATCH
+          || gla_validity == EPT_GLA_VALIDITY_GPT_WALK)
          && p2m_is_ram(t) && (t != p2m_ram_ro) )
     {
-        paging_mark_dirty(d, mfn_x(mfn));
-        p2m_change_type(d, gfn, p2m_ram_logdirty, p2m_ram_rw);
-        flush_tlb_mask(d->domain_dirty_cpumask);
+        if ( paging_mode_log_dirty(d) )
+        {
+            paging_mark_dirty(d, mfn_x(mfn));
+            p2m_change_type(d, gfn, p2m_ram_logdirty, p2m_ram_rw);
+            flush_tlb_mask(d->domain_dirty_cpumask);
+        }
         return;
     }
 

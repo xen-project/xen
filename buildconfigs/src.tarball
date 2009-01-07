@@ -10,7 +10,7 @@ vpath linux-%.tar.bz2 $(LINUX_SRC_PATH)
 # download a pristine Linux kernel tarball if there isn't one in LINUX_SRC_PATH
 linux-%.tar.bz2:
 	@echo "Cannot find $@ in path $(LINUX_SRC_PATH)"
-	wget $(XEN_LINUX_MIRROR)/$@ -O./$@
+	false wget $(XEN_LINUX_MIRROR)/$@ -O./$@
 
 # XXX create a pristine tree for diff -Nurp convenience
 

@@ -564,6 +564,76 @@ int xc_domain_memory_translate_gpfn_list(int xc_handle,
     return err;
 }
 
+static int xc_domain_memory_pod_target(int xc_handle,
+                                       int op,
+                                       uint32_t domid,
+                                       uint64_t target_pages,
+                                       uint64_t *tot_pages,
+                                       uint64_t *pod_cache_pages,
+                                       uint64_t *pod_entries)
+{
+    int err;
+
+    struct xen_pod_target pod_target = {
+        .domid = domid,
+        .target_pages = target_pages
+    };
+
+    err = xc_memory_op(xc_handle, op, &pod_target);
+
+    if ( err < 0 )
+    {
+        DPRINTF("Failed %s_memory_target dom %d\n",
+                (op==XENMEM_set_pod_target)?"set":"get",
+                domid);
+        errno = -err;
+        err = -1;
+    }
+    else
+        err = 0;
+
+    if ( tot_pages )
+        *tot_pages = pod_target.tot_pages;
+    if ( pod_cache_pages )
+        *pod_cache_pages = pod_target.pod_cache_pages;
+    if ( pod_entries )
+        *pod_entries = pod_target.pod_entries;
+
+    return err;
+}
+                                       
+
+int xc_domain_memory_set_pod_target(int xc_handle,
+                                    uint32_t domid,
+                                    uint64_t target_pages,
+                                    uint64_t *tot_pages,
+                                    uint64_t *pod_cache_pages,
+                                    uint64_t *pod_entries)
+{
+    return xc_domain_memory_pod_target(xc_handle,
+                                       XENMEM_set_pod_target,
+                                       domid,
+                                       target_pages,
+                                       tot_pages,
+                                       pod_cache_pages,
+                                       pod_entries);
+}
+
+int xc_domain_memory_get_pod_target(int xc_handle,
+                                    uint32_t domid,
+                                    uint64_t *tot_pages,
+                                    uint64_t *pod_cache_pages,
+                                    uint64_t *pod_entries)
+{
+    return xc_domain_memory_pod_target(xc_handle,
+                                       XENMEM_get_pod_target,
+                                       domid,
+                                       -1,
+                                       tot_pages,
+                                       pod_cache_pages,
+                                       pod_entries);
+}
+
 int xc_domain_max_vcpus(int xc_handle, uint32_t domid, unsigned int max)
 {
     DECLARE_DOMCTL;

@@ -55,6 +55,25 @@ static DEFINE_PER_CPU(struct list_head, active_vmcs_list);
 
 static u32 vmcs_revision_id __read_mostly;
 
+static void __init vmx_display_features(void)
+{
+    int printed = 0;
+
+    printk("VMX: Supported advanced features:\n");
+
+#define P(p,s) if ( p ) { printk(" - %s\n", s); printed = 1; }
+    P(cpu_has_vmx_virtualize_apic_accesses, "APIC MMIO access virtualisation");
+    P(cpu_has_vmx_tpr_shadow, "APIC TPR shadow");
+    P(cpu_has_vmx_ept, "Extended Page Tables (EPT)");
+    P(cpu_has_vmx_vpid, "Virtual-Processor Identifiers (VPID)");
+    P(cpu_has_vmx_vnmi, "Virtual NMI");
+    P(cpu_has_vmx_msr_bitmap, "MSR direct-access bitmap");
+#undef P
+
+    if ( !printed )
+        printk(" - none\n");
+}
+
 static u32 adjust_vmx_controls(u32 ctl_min, u32 ctl_opt, u32 msr)
 {
     u32 vmx_msr_low, vmx_msr_high, ctl = ctl_min | ctl_opt;
@@ -169,6 +188,7 @@ static void vmx_init_vmcs_config(void)
         vmx_vmexit_control         = _vmx_vmexit_control;
         vmx_vmentry_control        = _vmx_vmentry_control;
         cpu_has_vmx_ins_outs_instr_info = !!(vmx_basic_msr_high & (1U<<22));
+        vmx_display_features();
     }
     else
     {

@@ -96,6 +96,11 @@ XSM_ENABLE ?= n
 FLASK_ENABLE ?= n
 ACM_SECURITY ?= n
 
+XEN_EXTFILES_URL=http://xenbits.xensource.com/xen-extfiles
+# All the files at that location were downloaded from elsewhere on
+# the internet.  The original download URL is preserved as a comment
+# near the place in the Xen Makefiles where the file is used.
+
 QEMU_REMOTE=http://xenbits.xensource.com/git-http/qemu-xen-unstable.git
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old

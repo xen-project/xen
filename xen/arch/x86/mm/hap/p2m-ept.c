@@ -274,7 +274,8 @@ out:
 }
 
 /* Read ept p2m entries */
-static mfn_t ept_get_entry(struct domain *d, unsigned long gfn, p2m_type_t *t)
+static mfn_t ept_get_entry(struct domain *d, unsigned long gfn, p2m_type_t *t,
+    p2m_query_t q)
 {
     ept_entry_t *table =
         map_domain_page(mfn_x(pagetable_get_mfn(d->arch.phys_table)));
@@ -359,9 +360,10 @@ static uint64_t ept_get_entry_content(struct domain *d, unsigned long gfn)
     return content;
 }
 
-static mfn_t ept_get_entry_current(unsigned long gfn, p2m_type_t *t)
+static mfn_t ept_get_entry_current(unsigned long gfn, p2m_type_t *t,
+                                   p2m_query_t q)
 {
-    return ept_get_entry(current->domain, gfn, t);
+    return ept_get_entry(current->domain, gfn, t, q);
 }
 
 void ept_change_entry_emt_with_range(struct domain *d, unsigned long start_gfn,

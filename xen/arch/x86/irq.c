@@ -853,6 +853,10 @@ int map_domain_pirq(
     ASSERT(spin_is_locked(&pcidevs_lock));
     ASSERT(spin_is_locked(&d->event_lock));
 
+    /* XXX Until pcidev and msi locking is fixed. */
+    if ( type == MAP_PIRQ_TYPE_MSI )
+        return -EINVAL;
+
     if ( !IS_PRIV(current->domain) )
         return -EPERM;
 

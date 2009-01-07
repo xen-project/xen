@@ -27,7 +27,7 @@
 #else
 #  define BX_ROMBIOS32     0
 #endif
-#define DEBUG_ROMBIOS    1
+#define DEBUG_ROMBIOS    0
 
 #define PANIC_PORT  0x400
 #define PANIC_PORT2 0x401

@@ -44,8 +44,7 @@ static uint64_t                         online_cpumap;
 static uint64_t                         regs_valid;
 static vcpu_guest_context_any_t      ctxt[MAX_VIRT_CPUS];
 
-extern int ffsll(long long int);
-#define FOREACH_CPU(cpumap, i)  for ( cpumap = online_cpumap; (i = ffsll(cpumap)); cpumap &= ~(1 << (index - 1)) )
+#define FOREACH_CPU(cpumap, i)  for ( cpumap = online_cpumap; (i = xc_ffs64(cpumap)); cpumap &= ~(1 << (index - 1)) )
 
 static int
 fetch_regs(int xc_handle, int cpu, int *online)
@@ -136,7 +135,7 @@ online_vcpus_changed(uint64_t cpumap)
     uint64_t changed_cpumap = cpumap ^ online_cpumap;
     int index;
 
-    while ( (index = ffsll(changed_cpumap)) ) {
+    while ( (index = xc_ffs64(changed_cpumap)) ) {
         if ( cpumap & (1 << (index - 1)) )
         {
             if (handlers.td_create) handlers.td_create(index - 1);

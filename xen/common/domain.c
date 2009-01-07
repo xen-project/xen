@@ -33,13 +33,16 @@
 
 /* Linux config option: propageted to domain0 */
 /* xen_processor_pmbits: xen control Cx, Px, ... */
-unsigned int xen_processor_pmbits = 0;
+unsigned int xen_processor_pmbits = XEN_PROCESSOR_PM_PX;
 
 /* opt_dom0_vcpus_pin: If true, dom0 VCPUs are pinned. */
 static unsigned int opt_dom0_vcpus_pin;
 boolean_param("dom0_vcpus_pin", opt_dom0_vcpus_pin);
 
-enum cpufreq_controller cpufreq_controller;
+/* set xen as default cpufreq */
+enum cpufreq_controller cpufreq_controller = FREQCTL_xen;
+struct cpufreq_governor *cpufreq_opt_governor;
+
 static void __init setup_cpufreq_option(char *str)
 {
     char *arg;
@@ -52,18 +55,34 @@ static void __init setup_cpufreq_option(char *str)
         return;
     }
 
+    if ( !strcmp(str, "none") )
+    {
+        xen_processor_pmbits &= ~XEN_PROCESSOR_PM_PX;
+        cpufreq_controller = FREQCTL_none;
+        return;
+    }
+
     if ( (arg = strpbrk(str, ",:")) != NULL )
         *arg++ = '\0';
 
     if ( !strcmp(str, "xen") )
-    {
-        xen_processor_pmbits |= XEN_PROCESSOR_PM_PX;
-        cpufreq_controller = FREQCTL_xen;
         if ( arg && *arg )
             cpufreq_cmdline_parse(arg);
-    }
 }
 custom_param("cpufreq", setup_cpufreq_option);
+
+static void __init setup_cpufreq_gov_option(char *str)
+{
+    if ( !strcmp(str, "userspace") )
+        cpufreq_opt_governor = &cpufreq_gov_userspace;
+    else if ( !strcmp(str, "performance") )
+        cpufreq_opt_governor = &cpufreq_gov_performance;
+    else if ( !strcmp(str, "powersave") )
+        cpufreq_opt_governor = &cpufreq_gov_powersave;
+    else if ( !strcmp(str, "ondemand") )
+        cpufreq_opt_governor = &cpufreq_gov_dbs;
+}
+custom_param("cpufreq_governor", setup_cpufreq_gov_option);
 
 /* Protect updates/reads (resp.) of domain_list and domain_hash. */
 DEFINE_SPINLOCK(domlist_update_lock);

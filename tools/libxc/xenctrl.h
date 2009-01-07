@@ -634,6 +634,19 @@ int xc_domain_memory_translate_gpfn_list(int xc_handle,
                                          xen_pfn_t *gpfn_list,
                                          xen_pfn_t *mfn_list);
 
+int xc_domain_memory_set_pod_target(int xc_handle,
+                                    uint32_t domid,
+                                    uint64_t target_pages,
+                                    uint64_t *tot_pages,
+                                    uint64_t *pod_cache_pages,
+                                    uint64_t *pod_entries);
+
+int xc_domain_memory_get_pod_target(int xc_handle,
+                                    uint32_t domid,
+                                    uint64_t *tot_pages,
+                                    uint64_t *pod_cache_pages,
+                                    uint64_t *pod_entries);
+
 int xc_domain_ioport_permission(int xc_handle,
                                 uint32_t domid,
                                 uint32_t first_port,
@@ -703,8 +716,8 @@ void *xc_map_foreign_batch(int xc_handle, uint32_t dom, int prot,
 
 /**
  * Translates a virtual address in the context of a given domain and
- * vcpu returning the machine page frame number of the associated
- * page.
+ * vcpu returning the GFN containing the address (that is, an MFN for 
+ * PV guests, a PFN for HVM guests).  Returns 0 for failure.
  *
  * @parm xc_handle a handle on an open hypervisor interface
  * @parm dom the domain to perform the translation in
