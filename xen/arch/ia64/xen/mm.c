@@ -3437,6 +3437,45 @@ arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         return 0;
     }
 
+    case XENMEM_get_pod_target:
+    case XENMEM_set_pod_target: {
+        /* XXX: PoD populate on demand isn't supported yet. */
+        xen_pod_target_t target;
+        struct domain *d;
+
+        /* Support DOMID_SELF? */
+        if ( !IS_PRIV(current->domain) )
+            return -EINVAL;
+
+        if ( copy_from_guest(&target, arg, 1) )
+            return -EFAULT;
+
+        rc = rcu_lock_target_domain_by_id(target.domid, &d);
+        if ( rc != 0 )
+            return rc;
+
+        if ( op == XENMEM_set_pod_target )
+        {
+            /* if -ENOSYS is returned,
+               domain builder aborts domain creation. */
+            /* rc = -ENOSYS; */
+        }
+
+        target.tot_pages       = d->tot_pages;
+        target.pod_cache_pages = 0;
+        target.pod_entries     = 0;
+
+        if ( copy_to_guest(arg, &target, 1) )
+        {
+            rc= -EFAULT;
+            goto pod_target_out_unlock;
+        }
+        
+    pod_target_out_unlock:
+        rcu_unlock_domain(d);
+        return rc;
+    }
+
     default:
         return -ENOSYS;
     }
