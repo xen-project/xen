@@ -427,8 +427,8 @@ static void print_tr(int i, const struct ia64_tr_entry *tr)
 
 void print_ctx(vcpu_guest_context_any_t *ctx)
 {
-    struct vcpu_guest_context_regs *regs = &ctx.c->regs;
-    struct vcpu_tr_regs *tr = &ctx->regs.tr;
+    struct vcpu_guest_context_regs *regs = &ctx->c.regs;
+    struct vcpu_tr_regs *tr = &ctx->c.regs.tr;
     int i;
     unsigned int rbs_size, cfm_sof;
 
@@ -481,7 +481,7 @@ void print_ctx(vcpu_guest_context_any_t *ctx)
         printf(" cmcv: %016lx\n", regs->cr.cmcv);
         printf(" lrr0: %016lx  ", regs->cr.lrr0);
         printf(" lrr1: %016lx  ", regs->cr.lrr1);
-        printf(" ev_cb:%016lx\n", ctx->event_callback_ip);
+        printf(" ev_cb:%016lx\n", ctx->c.event_callback_ip);
 
     }
     if (disp_ar_regs) {
