@@ -2500,7 +2500,7 @@ def xm_pci_attach(args):
             "VM":           get_single_vm(dom),
             "PPCI":         target_ref,
             "hotplug_slot": vslt,
-            "options":      dict([k, v] for k, v in config_pci_opts)
+            "options":      dict(config_pci_opts)
         }
         server.xenapi.DPCI.create(dpci_record)
 
