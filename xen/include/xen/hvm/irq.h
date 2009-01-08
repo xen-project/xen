@@ -35,7 +35,16 @@ struct dev_intx_gsi_link {
     uint8_t link;
 };
 
-#define _HVM_IRQ_DPCI_MSI  0x1
+#define _HVM_IRQ_DPCI_MACH_PCI_SHIFT            0
+#define _HVM_IRQ_DPCI_MACH_MSI_SHIFT            1
+#define _HVM_IRQ_DPCI_GUEST_PCI_SHIFT           4
+#define _HVM_IRQ_DPCI_GUEST_MSI_SHIFT           5
+#define _HVM_IRQ_DPCI_TRANSLATE_SHIFT          15
+#define HVM_IRQ_DPCI_MACH_PCI        (1 << _HVM_IRQ_DPCI_MACH_PCI_SHIFT)
+#define HVM_IRQ_DPCI_MACH_MSI        (1 << _HVM_IRQ_DPCI_MACH_MSI_SHIFT)
+#define HVM_IRQ_DPCI_GUEST_PCI       (1 << _HVM_IRQ_DPCI_GUEST_PCI_SHIFT)
+#define HVM_IRQ_DPCI_GUEST_MSI       (1 << _HVM_IRQ_DPCI_GUEST_MSI_SHIFT)
+#define HVM_IRQ_DPCI_TRANSLATE       (1 << _HVM_IRQ_DPCI_TRANSLATE_SHIFT)
 
 struct hvm_gmsi_info {
     uint32_t gvec;

@@ -466,6 +466,7 @@ typedef enum pt_irq_type_e {
     PT_IRQ_TYPE_PCI,
     PT_IRQ_TYPE_ISA,
     PT_IRQ_TYPE_MSI,
+    PT_IRQ_TYPE_MSI_TRANSLATE,
 } pt_irq_type_t;
 struct xen_domctl_bind_pt_irq {
     uint32_t machine_irq;
