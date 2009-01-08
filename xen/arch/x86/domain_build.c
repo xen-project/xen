@@ -341,6 +341,12 @@ int __init construct_dom0(
 #endif
     }
 
+    if ( (parms.p2m_base != UNSET_ADDR) && elf_32bit(&elf) )
+    {
+        printk(XENLOG_WARNING "P2M table base ignored\n");
+        parms.p2m_base = UNSET_ADDR;
+    }
+
     domain_set_alloc_bitsize(d);
 
     /*
@@ -359,6 +365,8 @@ int __init construct_dom0(
     vphysmap_end     = vphysmap_start + (nr_pages * (!is_pv_32on64_domain(d) ?
                                                      sizeof(unsigned long) :
                                                      sizeof(unsigned int)));
+    if ( parms.p2m_base != UNSET_ADDR )
+        vphysmap_end = vphysmap_start;
     vstartinfo_start = round_pgup(vphysmap_end);
     vstartinfo_end   = (vstartinfo_start +
                         sizeof(struct start_info) +
@@ -400,6 +408,11 @@ int __init construct_dom0(
     /* Ensure that our low-memory 1:1 mapping covers the allocation. */
     page = alloc_domheap_pages(d, order, MEMF_bits(30));
 #else
+    if ( parms.p2m_base != UNSET_ADDR )
+    {
+        vphysmap_start = parms.p2m_base;
+        vphysmap_end   = vphysmap_start + nr_pages * sizeof(unsigned long);
+    }
     page = alloc_domheap_pages(d, order, 0);
 #endif
     if ( page == NULL )
@@ -740,8 +753,109 @@ int __init construct_dom0(
     snprintf(si->magic, sizeof(si->magic), "xen-3.0-x86_%d%s",
              elf_64bit(&elf) ? 64 : 32, parms.pae ? "p" : "");
 
+    count = d->tot_pages;
+#ifdef __x86_64__
+    /* Set up the phys->machine table if not part of the initial mapping. */
+    if ( parms.p2m_base != UNSET_ADDR )
+    {
+        unsigned long va = vphysmap_start;
+
+        if ( v_start <= vphysmap_end && vphysmap_start <= v_end )
+            panic("DOM0 P->M table overlaps initial mapping");
+
+        while ( va < vphysmap_end )
+        {
+            if ( d->tot_pages + ((round_pgup(vphysmap_end) - va)
+                                 >> PAGE_SHIFT) + 3 > nr_pages )
+                panic("Dom0 allocation too small for initial P->M table.\n");
+
+            l4tab = l4start + l4_table_offset(va);
+            if ( !l4e_get_intpte(*l4tab) )
+            {
+                page = alloc_domheap_pages(d, 0, 0);
+                if ( !page )
+                    break;
+                /* No mapping, PGC_allocated + page-table page. */
+                page->count_info = PGC_allocated | 2;
+                page->u.inuse.type_info =
+                    PGT_l3_page_table | PGT_validated | 1;
+                clear_page(page_to_virt(page));
+                *l4tab = l4e_from_page(page, L4_PROT);
+            }
+            l3tab = page_to_virt(l4e_get_page(*l4tab));
+            l3tab += l3_table_offset(va);
+            if ( !l3e_get_intpte(*l3tab) )
+            {
+                if ( cpu_has_page1gb &&
+                     !(va & ((1UL << L3_PAGETABLE_SHIFT) - 1)) &&
+                     vphysmap_end >= va + (1UL << L3_PAGETABLE_SHIFT) &&
+                     (page = alloc_domheap_pages(d,
+                                                 L3_PAGETABLE_SHIFT -
+                                                     PAGE_SHIFT,
+                                                 0)) != NULL )
+                {
+                    *l3tab = l3e_from_page(page,
+                                           L1_PROT|_PAGE_DIRTY|_PAGE_PSE);
+                    va += 1UL << L3_PAGETABLE_SHIFT;
+                    continue;
+                }
+                if ( (page = alloc_domheap_pages(d, 0, 0)) == NULL )
+                    break;
+                else
+                {
+                    /* No mapping, PGC_allocated + page-table page. */
+                    page->count_info = PGC_allocated | 2;
+                    page->u.inuse.type_info =
+                        PGT_l2_page_table | PGT_validated | 1;
+                    clear_page(page_to_virt(page));
+                    *l3tab = l3e_from_page(page, L3_PROT);
+                }
+            }
+            l2tab = page_to_virt(l3e_get_page(*l3tab));
+            l2tab += l2_table_offset(va);
+            if ( !l2e_get_intpte(*l2tab) )
+            {
+                if ( !(va & ((1UL << L2_PAGETABLE_SHIFT) - 1)) &&
+                     vphysmap_end >= va + (1UL << L2_PAGETABLE_SHIFT) &&
+                     (page = alloc_domheap_pages(d,
+                                                 L2_PAGETABLE_SHIFT -
+                                                     PAGE_SHIFT,
+                                                 0)) != NULL )
+                {
+                    *l2tab = l2e_from_page(page,
+                                           L1_PROT|_PAGE_DIRTY|_PAGE_PSE);
+                    va += 1UL << L2_PAGETABLE_SHIFT;
+                    continue;
+                }
+                if ( (page = alloc_domheap_pages(d, 0, 0)) == NULL )
+                    break;
+                else
+                {
+                    /* No mapping, PGC_allocated + page-table page. */
+                    page->count_info = PGC_allocated | 2;
+                    page->u.inuse.type_info =
+                        PGT_l1_page_table | PGT_validated | 1;
+                    clear_page(page_to_virt(page));
+                    *l2tab = l2e_from_page(page, L2_PROT);
+                }
+            }
+            l1tab = page_to_virt(l2e_get_page(*l2tab));
+            l1tab += l1_table_offset(va);
+            BUG_ON(l1e_get_intpte(*l1tab));
+            page = alloc_domheap_pages(d, 0, 0);
+            if ( !page )
+                break;
+            *l1tab = l1e_from_page(page, L1_PROT|_PAGE_DIRTY);
+            va += PAGE_SIZE;
+            va &= PAGE_MASK;
+        }
+        if ( !page )
+            panic("Not enough RAM for DOM0 P->M table.\n");
+    }
+#endif
+
     /* Write the phys->machine and machine->phys table entries. */
-    for ( pfn = 0; pfn < d->tot_pages; pfn++ )
+    for ( pfn = 0; pfn < count; pfn++ )
     {
         mfn = pfn + alloc_spfn;
 #ifndef NDEBUG
@@ -755,6 +869,26 @@ int __init construct_dom0(
             ((unsigned int *)vphysmap_start)[pfn] = mfn;
         set_gpfn_from_mfn(mfn, pfn);
     }
+    si->first_p2m_pfn = pfn;
+    si->nr_p2m_frames = d->tot_pages - count;
+    list_for_each_entry ( page, &d->page_list, list )
+    {
+        mfn = page_to_mfn(page);
+        if ( get_gpfn_from_mfn(mfn) >= count )
+        {
+            BUG_ON(is_pv_32bit_domain(d));
+            if ( !page->u.inuse.type_info &&
+                 !get_page_and_type(page, d, PGT_writable_page) )
+                BUG();
+            ((unsigned long *)vphysmap_start)[pfn] = mfn;
+            set_gpfn_from_mfn(mfn, pfn);
+            ++pfn;
+#ifndef NDEBUG
+            ++alloc_epfn;
+#endif
+        }
+    }
+    BUG_ON(pfn != d->tot_pages);
     while ( pfn < nr_pages )
     {
         if ( (page = alloc_chunk(d, nr_pages - d->tot_pages)) == NULL )

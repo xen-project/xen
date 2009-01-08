@@ -1013,7 +1013,8 @@ static int put_page_from_l2e(l2_pgentry_t l2e, unsigned long pfn)
     {
         unsigned long mfn = l2e_get_pfn(l2e), m = mfn;
         int writeable = l2e_get_flags(l2e) & _PAGE_RW;
-        ASSERT(opt_allow_hugepage && !(mfn & (L1_PAGETABLE_ENTRIES-1)));
+
+        ASSERT(!(mfn & (L1_PAGETABLE_ENTRIES-1)));
         do {
             put_data_page(mfn_to_page(m), writeable);
         } while ( m++ < (mfn + (L1_PAGETABLE_ENTRIES-1)) );
@@ -1031,14 +1032,28 @@ static int __put_page_type(struct page_info *, int preemptible);
 static int put_page_from_l3e(l3_pgentry_t l3e, unsigned long pfn,
                              int partial, int preemptible)
 {
-    if ( (l3e_get_flags(l3e) & _PAGE_PRESENT) && 
-         (l3e_get_pfn(l3e) != pfn) )
+    if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) || (l3e_get_pfn(l3e) == pfn) )
+        return 1;
+
+#ifdef __x86_64__
+    if ( unlikely(l3e_get_flags(l3e) & _PAGE_PSE) )
     {
-        if ( unlikely(partial > 0) )
-            return __put_page_type(l3e_get_page(l3e), preemptible);
-        return put_page_and_type_preemptible(l3e_get_page(l3e), preemptible);
+        unsigned long mfn = l3e_get_pfn(l3e);
+        int writeable = l3e_get_flags(l3e) & _PAGE_RW;
+
+        ASSERT(!(mfn & ((1UL << (L3_PAGETABLE_SHIFT - PAGE_SHIFT)) - 1)));
+        do {
+            put_data_page(mfn_to_page(mfn), writeable);
+        } while ( ++mfn & ((1UL << (L3_PAGETABLE_SHIFT - PAGE_SHIFT)) - 1) );
+
+        return 0;
     }
-    return 1;
+#endif
+
+    if ( unlikely(partial > 0) )
+        return __put_page_type(l3e_get_page(l3e), preemptible);
+
+    return put_page_and_type_preemptible(l3e_get_page(l3e), preemptible);
 }
 
 #if CONFIG_PAGING_LEVELS >= 4

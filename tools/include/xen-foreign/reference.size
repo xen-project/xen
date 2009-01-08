@@ -1,7 +1,7 @@
 
 structs                   |  x86_32  x86_64    ia64
 
-start_info                |    1104    1152    1152
+start_info                |    1112    1168    1168
 trap_info                 |       8      16       -
 pt_fpreg                  |       -       -      16
 cpu_user_regs             |      68     200       -

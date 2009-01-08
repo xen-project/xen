@@ -513,6 +513,7 @@ typedef struct shared_info shared_info_t;
  *      a. relocated kernel image
  *      b. initial ram disk              [mod_start, mod_len]
  *      c. list of allocated page frames [mfn_list, nr_pages]
+ *         (unless relocated due to XEN_ELFNOTE_INIT_P2M)
  *      d. start_info_t structure        [register ESI (x86)]
  *      e. bootstrap page tables         [pt_base, CR3 (x86)]
  *      f. bootstrap stack               [register ESP (x86)]
@@ -554,6 +555,9 @@ struct start_info {
     unsigned long mod_start;    /* VIRTUAL address of pre-loaded module.  */
     unsigned long mod_len;      /* Size (bytes) of pre-loaded module.     */
     int8_t cmd_line[MAX_GUEST_CMDLINE];
+    /* The pfn range here covers both page table and p->m table frames.   */
+    unsigned long first_p2m_pfn;/* 1st pfn forming initial P->M table.    */
+    unsigned long nr_p2m_frames;/* # of pfns forming initial P->M table.  */
 };
 typedef struct start_info start_info_t;
 

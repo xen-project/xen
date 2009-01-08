@@ -232,6 +232,7 @@ struct elf_dom_parms {
     uint64_t virt_entry;
     uint64_t virt_hypercall;
     uint64_t virt_hv_start_low;
+    uint64_t p2m_base;
     uint64_t elf_paddr_offset;
     uint32_t f_supported[XENFEAT_NR_SUBMAPS];
     uint32_t f_required[XENFEAT_NR_SUBMAPS];
