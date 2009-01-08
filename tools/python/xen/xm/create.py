@@ -667,9 +667,20 @@ def configure_pci(config_devs, vals):
     """Create the config for pci devices.
     """
     config_pci = []
-    for (domain, bus, slot, func) in vals.pci:
-        config_pci.append(['dev', ['domain', domain], ['bus', bus], \
-                        ['slot', slot], ['func', func]])
+    for (domain, bus, slot, func, opts) in vals.pci:
+        config_pci_opts = []
+        d = comma_sep_kv_to_dict(opts)
+
+        def f(k):
+            config_pci_opts.append([k, d[k]])
+
+        config_pci_bdf = ['dev', ['domain', domain], ['bus', bus], \
+                          ['slot', slot], ['func', func]]
+        map(f, d.keys())
+        if len(config_pci_opts)>0:
+            config_pci_bdf.append(['opts', config_pci_opts])
+
+        config_pci.append(config_pci_bdf)
 
     if len(config_pci)>0:
         config_pci.insert(0, 'pci')
@@ -991,14 +1002,18 @@ def preprocess_pci(vals):
         pci_match = re.match(r"((?P<domain>[0-9a-fA-F]{1,4})[:,])?" + \
                 r"(?P<bus>[0-9a-fA-F]{1,2})[:,]" + \
                 r"(?P<slot>[0-9a-fA-F]{1,2})[.,]" + \
-                r"(?P<func>[0-7])$", pci_dev_str)
+                r"(?P<func>[0-7])" + \
+                r"(,(?P<opts>.*))?$", pci_dev_str)
         if pci_match!=None:
-            pci_dev_info = pci_match.groupdict('0')
+            pci_dev_info = pci_match.groupdict('')
+            if pci_dev_info['domain']=='':
+                pci_dev_info['domain']='0'
             try:
                 pci.append( ('0x'+pci_dev_info['domain'], \
                         '0x'+pci_dev_info['bus'], \
                         '0x'+pci_dev_info['slot'], \
-                        '0x'+pci_dev_info['func']))
+                        '0x'+pci_dev_info['func'], \
+                        pci_dev_info['opts']))
             except IndexError:
                 err('Error in PCI slot syntax "%s"'%(pci_dev_str))
     vals.pci = pci

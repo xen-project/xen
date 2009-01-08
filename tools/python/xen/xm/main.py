@@ -187,7 +187,7 @@ SUBCOMMAND_HELP = {
     'vnet-delete'   :  ('<VnetId>', 'Delete a Vnet.'),
     'vnet-list'     :  ('[-l|--long]', 'List Vnets.'),
     'vtpm-list'     :  ('<Domain> [--long]', 'List virtual TPM devices.'),
-    'pci-attach'    :  ('<Domain> <domain:bus:slot.func> [virtual slot]',
+    'pci-attach'    :  ('[-o|--options=<opt>] <Domain> <domain:bus:slot.func> [virtual slot]',
                         'Insert a new pass-through pci device.'),
     'pci-detach'    :  ('<Domain> <domain:bus:slot.func>',
                         'Remove a domain\'s pass-through pci device.'),
@@ -2428,7 +2428,7 @@ def xm_network_attach(args):
             vif.append(vif_param)
         server.xend.domain.device_create(dom, vif)
 
-def parse_pci_configuration(args, state):
+def parse_pci_configuration(args, state, opts = ''):
     dom = args[0]
     pci_dev_str = args[1]
     if len(args) == 3:
@@ -2443,12 +2443,17 @@ def parse_pci_configuration(args, state):
     if pci_match == None:
         raise OptionError("Invalid argument: %s %s" % (pci_dev_str,vslt))
     pci_dev_info = pci_match.groupdict('0')
+
     try:
-        pci.append(['dev', ['domain', '0x'+ pci_dev_info['domain']], \
+        pci_bdf =['dev', ['domain', '0x'+ pci_dev_info['domain']], \
                 ['bus', '0x'+ pci_dev_info['bus']],
                 ['slot', '0x'+ pci_dev_info['slot']],
                 ['func', '0x'+ pci_dev_info['func']],
-                ['vslt', '0x%x' % int(vslt, 16)]])
+                ['vslt', '0x%x' % int(vslt, 16)]]
+        if len(opts) > 0:
+            pci_bdf.append(['opts', opts])
+        pci.append(pci_bdf)
+
     except:
         raise OptionError("Invalid argument: %s %s" % (pci_dev_str,vslt))
     pci.append(['state', state])
@@ -2456,8 +2461,22 @@ def parse_pci_configuration(args, state):
     return (dom, pci)
 
 def xm_pci_attach(args):
-    arg_check(args, 'pci-attach', 2, 3)
-    (dom, pci) = parse_pci_configuration(args, 'Initialising')
+    config_pci_opts = []
+    (options, params) = getopt.gnu_getopt(args, 'o:', ['options='])
+    for (k, v) in options:
+        if k in ('-o', '--options'):
+            if len(v.split('=')) != 2:
+                err("Invalid pci attach option: %s" % v)
+                usage('pci-attach')
+            config_pci_opts.append(v.split('='))
+
+    n = len([i for i in params if i != '--'])
+    if n < 2 or n > 3:
+        err("Invalid argument for 'xm pci-attach'")
+        usage('pci-attach')
+
+    (dom, pci) = parse_pci_configuration(params, 'Initialising',
+                     config_pci_opts)
 
     if serverType == SERVER_XEN_API:
 
