@@ -143,28 +143,18 @@ write_smbios_tables(void *start,
 static uint64_t
 get_memsize(void)
 {
-    struct e820entry *map = E820;
-    uint8_t num_entries = *E820_NR;
-    uint64_t memsize = 0;
-    int i;
+    uint64_t sz;
 
-    /*
-     * Walk through e820map, ignoring any entries that aren't marked
-     * as usable or reserved.
-     */
-    for ( i = 0; i < num_entries; i++ )
-    {
-        if ( (map->type == E820_RAM) || (map->type == E820_RESERVED) )
-            memsize += map->size;
-        map++;
-    }
+    sz = (uint64_t)hvm_info->low_mem_pgend << PAGE_SHIFT;
+    if ( hvm_info->high_mem_pgend )
+        sz += (hvm_info->high_mem_pgend << PAGE_SHIFT) - (1ull << 32);
 
     /*
      * Round up to the nearest MB.  The user specifies domU pseudo-physical 
      * memory in megabytes, so not doing this could easily lead to reporting 
      * one less MB than the user specified.
      */
-    return (memsize + (1 << 20) - 1) >> 20;
+    return (sz + (1ul << 20) - 1) >> 20;
 }
 
 int

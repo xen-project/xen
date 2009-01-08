@@ -76,7 +76,7 @@ static void relocate_32bitbios(char *elfarray, uint32_t elfarraysize)
      */
     reloc_size = reloc_off;
     printf("%d bytes of ROMBIOS high-memory extensions:\n", reloc_size);
-    highbiosarea = (char *)(long)e820_malloc(reloc_size, 0);
+    highbiosarea = mem_alloc(reloc_size, 0);
     BUG_ON(highbiosarea == NULL);
     printf("  Relocating to 0x%x-0x%x ... ",
            (uint32_t)&highbiosarea[0],

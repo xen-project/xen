@@ -17,6 +17,10 @@
 #define PCI_MEMBASE         0xf0000000
 #define PCI_MEMSIZE         0x0c000000
 
+/* We reserve 16MB at the top of the 4GB memory hole. */
+#define RESERVED_MEMBASE    0xff000000
+#define RESERVED_MEMSIZE    0x01000000
+
 #define ROMBIOS_SEG            0xF000
 #define ROMBIOS_BEGIN          0x000F0000
 #define ROMBIOS_SIZE           0x00010000

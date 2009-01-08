@@ -131,8 +131,9 @@ void uuid_to_string(char *dest, uint8_t *uuid);
 int printf(const char *fmt, ...) __attribute__ ((format (printf, 1, 2)));
 int vprintf(const char *fmt, va_list ap);
 
-/* Reserve a RAM region in the e820 table. */
-uint32_t e820_malloc(uint32_t size, uint32_t align);
+/* Allocate memory in a reserved region below 4GB. */
+void *mem_alloc(uint32_t size, uint32_t align);
+#define virt_to_phys(v) ((unsigned long)(v))
 
 /* Prepare the 32bit BIOS */
 void highbios_setup(void);

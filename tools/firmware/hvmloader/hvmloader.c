@@ -488,22 +488,13 @@ static int pci_load_option_roms(uint32_t rom_base_addr)
 /* Replace possibly erroneous memory-size CMOS fields with correct values. */
 static void cmos_write_memory_size(void)
 {
-    struct e820entry *map = E820;
-    int i, nr = *E820_NR;
-    uint32_t base_mem = 640, ext_mem = 0, alt_mem = 0;
+    uint32_t base_mem = 640, ext_mem, alt_mem;
 
-    for ( i = 0; i < nr; i++ )
-        if ( (map[i].addr >= 0x100000) && (map[i].type == E820_RAM) )
-            break;
-
-    if ( i != nr )
-    {
-        alt_mem = ext_mem = map[i].addr + map[i].size;
-        ext_mem = (ext_mem > 0x0100000) ? (ext_mem - 0x0100000) >> 10 : 0;
-        if ( ext_mem > 0xffff )
-            ext_mem = 0xffff;
-        alt_mem = (alt_mem > 0x1000000) ? (alt_mem - 0x1000000) >> 16 : 0;
-    }
+    alt_mem = ext_mem = hvm_info->low_mem_pgend << PAGE_SHIFT;
+    ext_mem = (ext_mem > 0x0100000) ? (ext_mem - 0x0100000) >> 10 : 0;
+    if ( ext_mem > 0xffff )
+        ext_mem = 0xffff;
+    alt_mem = (alt_mem > 0x1000000) ? (alt_mem - 0x1000000) >> 16 : 0;
 
     /* All BIOSes: conventional memory (CMOS *always* reports 640kB). */
     cmos_outb(0x15, (uint8_t)(base_mem >> 0));
@@ -548,16 +539,16 @@ static uint16_t init_xen_platform_io_base(void)
  */
 static void init_vm86_tss(void)
 {
-    uint32_t tss;
+    void *tss;
     struct xen_hvm_param p;
 
-    tss = e820_malloc(128, 128);
-    memset((char *)tss, 0, 128);
+    tss = mem_alloc(128, 128);
+    memset(tss, 0, 128);
     p.domid = DOMID_SELF;
     p.index = HVM_PARAM_VM86_TSS;
-    p.value = tss;
+    p.value = virt_to_phys(tss);
     hypercall_hvm_op(HVMOP_set_param, &p);
-    printf("vm86 TSS at %08x\n", tss);
+    printf("vm86 TSS at %08lx\n", virt_to_phys(tss));
 }
 
 /* Create an E820 table based on memory parameters provided in hvm_info. */
@@ -603,14 +594,11 @@ static void build_e820_table(void)
     e820[nr].type = E820_RAM;
     nr++;
 
-    if ( hvm_info->reserved_mem_pgstart )
-    {
-        /* Explicitly reserve space for special pages. */
-        e820[nr].addr = hvm_info->reserved_mem_pgstart << PAGE_SHIFT;
-        e820[nr].size = (uint32_t)-e820[nr].addr;
-        e820[nr].type = E820_RESERVED;
-        nr++;
-    }
+    /* Explicitly reserve space for special pages. */
+    e820[nr].addr = RESERVED_MEMBASE;
+    e820[nr].size = (uint32_t)-e820[nr].addr;
+    e820[nr].type = E820_RESERVED;
+    nr++;
 
     if ( hvm_info->high_mem_pgend )
     {
@@ -632,8 +620,6 @@ int main(void)
     uint16_t xen_pfiob;
 
     printf("HVM Loader\n");
-
-    build_e820_table();
 
     init_hypercalls();
 
@@ -680,7 +666,7 @@ int main(void)
 
     if ( virtual_vga != VGA_none )
     {
-        vga_ram = e820_malloc(8 << 20, 4096);
+        vga_ram = virt_to_phys(mem_alloc(8 << 20, 4096));
         printf("VGA RAM at %08x\n", vga_ram);
     }
 
@@ -727,6 +713,8 @@ int main(void)
     xen_pfiob = init_xen_platform_io_base();
     if ( xen_pfiob && vga_ram )
         outl(xen_pfiob + 4, vga_ram);
+
+    build_e820_table();
 
     printf("Invoking ROMBIOS ...\n");
     return 0;

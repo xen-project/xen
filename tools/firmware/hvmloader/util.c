@@ -303,63 +303,62 @@ uuid_to_string(char *dest, uint8_t *uuid)
     *p = '\0';
 }
 
-static void e820_collapse(void)
+void *mem_alloc(uint32_t size, uint32_t align)
 {
-    int i = 0;
-    struct e820entry *ent = E820;
-
-    while ( i < (*E820_NR-1) )
-    {
-        if ( (ent[i].type == ent[i+1].type) &&
-             ((ent[i].addr + ent[i].size) == ent[i+1].addr) )
-        {
-            ent[i].size += ent[i+1].size;
-            memcpy(&ent[i+1], &ent[i+2], (*E820_NR-i-2) * sizeof(*ent));
-            (*E820_NR)--;
-        }
-        else
-        {
-            i++;
-        }
-    }
-}
-
-uint32_t e820_malloc(uint32_t size, uint32_t align)
-{
-    uint32_t addr;
-    int i;
-    struct e820entry *ent = E820;
+    static uint32_t reserve = RESERVED_MEMBASE - 1;
+    static int over_allocated;
+    struct xen_memory_reservation xmr;
+    xen_pfn_t mfn;
+    uint32_t s, e;
 
     /* Align to at least one kilobyte. */
     if ( align < 1024 )
         align = 1024;
 
-    for ( i = *E820_NR - 1; i >= 0; i-- )
+    s = (reserve + align) & ~(align - 1);
+    e = s + size - 1;
+
+    BUG_ON((e < s) || (e >> PAGE_SHIFT) >= hvm_info->reserved_mem_pgstart);
+
+    while ( (reserve >> PAGE_SHIFT) != (e >> PAGE_SHIFT) )
     {
-        addr = (ent[i].addr + ent[i].size - size) & ~(align-1);
-        if ( (ent[i].type != E820_RAM) || /* not ram? */
-             (addr < ent[i].addr) ||      /* too small or starts above 4gb? */
-             ((addr + size) < addr) )     /* ends above 4gb? */
+        reserve += PAGE_SIZE;
+
+        /* Try to allocate another page in the reserved area. */
+        xmr.domid = DOMID_SELF;
+        xmr.mem_flags = 0;
+        xmr.extent_order = 0;
+        xmr.nr_extents = 1;
+        set_xen_guest_handle(xmr.extent_start, &mfn);
+        mfn = reserve >> PAGE_SHIFT;
+        if ( !over_allocated &&
+             (hypercall_memory_op(XENMEM_populate_physmap, &xmr) == 1) )
             continue;
 
-        if ( addr != ent[i].addr )
+        /* If we fail, steal a page from the ordinary RAM map. */
+        over_allocated = 1;
+        if ( hvm_info->high_mem_pgend )
         {
-            memmove(&ent[i+1], &ent[i], (*E820_NR-i) * sizeof(*ent));
-            (*E820_NR)++;
-            ent[i].size = addr - ent[i].addr;
-            ent[i+1].addr = addr;
-            ent[i+1].size -= ent[i].size;
-            i++;
+            mfn = --hvm_info->high_mem_pgend;
+            if ( mfn == (1ull << (32 - PAGE_SHIFT)) )
+                hvm_info->high_mem_pgend = 0;
         }
+        else
+        {
+            mfn = --hvm_info->low_mem_pgend;
+        }
+        if ( hypercall_memory_op(XENMEM_decrease_reservation, &xmr) != 1 )
+            BUG();
 
-        ent[i].type = E820_RESERVED;
-
-        e820_collapse();
-
-        return addr;
+        /* Now try the allocation again. Must not fail. */
+        mfn = reserve >> PAGE_SHIFT;
+        if ( hypercall_memory_op(XENMEM_populate_physmap, &xmr) != 1 )
+            BUG();
     }
 
-    return 0;
+    reserve = e;
+
+    return (void *)(unsigned long)s;
 }
 
 uint32_t ioapic_read(uint32_t reg)
