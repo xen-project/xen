@@ -65,13 +65,13 @@ AFLAGS-y                += -D__ASSEMBLY__
 ALL_OBJS := $(ALL_OBJS-y)
 
 CFLAGS_tmp := $(strip $(CFLAGS) $(CFLAGS-y))
-CFLAGS = $(CFLAGS_tmp) -Wp,-MD,.$(@F).d
+CFLAGS = $(CFLAGS_tmp) -MMD -MF .$(@F).d
 
 # Most CFLAGS are safe for assembly files:
 #  -std=gnu{89,99} gets confused by #-prefixed end-of-line comments
 AFLAGS_tmp := $(strip $(AFLAGS) $(AFLAGS-y))
 AFLAGS_tmp += $(patsubst -std=gnu%,,$(CFLAGS_tmp))
-AFLAGS = $(AFLAGS_tmp) -Wp,-MD,.$(@F).d
+AFLAGS = $(AFLAGS_tmp) -MMD -MF .$(@F).d
 
 # LDFLAGS are only passed directly to $(LD)
 LDFLAGS  := $(strip $(LDFLAGS) $(LDFLAGS_DIRECT))
