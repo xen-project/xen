@@ -95,6 +95,9 @@ class PciController(DevController):
 
         back['num_devs']=str(pcidevid)
         back['uuid'] = config.get('uuid','')
+        if 'pci_msitranslate' in self.vm.info['platform']:
+            back['msitranslate']=str(self.vm.info['platform']['pci_msitranslate'])
+
         return (0, back, {})
 
 

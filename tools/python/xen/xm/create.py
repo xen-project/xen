@@ -318,11 +318,14 @@ gopts.var('disk', val='phy:DEV,VDEV,MODE[,DOM]',
           backend driver domain to use for the disk.
           The option may be repeated to add more than one disk.""")
 
-gopts.var('pci', val='BUS:DEV.FUNC',
+gopts.var('pci', val='BUS:DEV.FUNC[,msitranslate=0|1]',
           fn=append_value, default=[],
           use="""Add a PCI device to a domain, using given params (in hex).
-         For example 'pci=c0:02.1'.
-         The option may be repeated to add more than one pci device.""")
+          For example 'pci=c0:02.1'.
+          If msitranslate is set, MSI-INTx translation is enabled if possible.
+          Guest that doesn't support MSI will get IO-APIC type IRQs
+          translated from physical MSI, HVM only. Default is 1.
+          The option may be repeated to add more than one pci device.""")
 
 gopts.var('vscsi', val='PDEV,VDEV[,DOM]',
           fn=append_value, default=[],
@@ -588,6 +591,11 @@ gopts.var('suppress_spurious_page_faults', val='yes|no',
           fn=set_bool, default=None,
           use="""Do not inject spurious page faults into this guest""")
 
+gopts.var('pci_msitranslate', val='TRANSLATE',
+          fn=set_int, default=1,
+          use="""Global PCI MSI-INTx translation flag (0=disable;
+          1=enable.""")
+
 def err(msg):
     """Print an error to stderr and exit.
     """
@@ -672,6 +680,9 @@ def configure_pci(config_devs, vals):
         d = comma_sep_kv_to_dict(opts)
 
         def f(k):
+            if k not in ['msitranslate']:
+                err('Invalid pci option: ' + k)
+
             config_pci_opts.append([k, d[k]])
 
         config_pci_bdf = ['dev', ['domain', domain], ['bus', bus], \
@@ -878,7 +889,7 @@ def configure_hvm(config_image, vals):
              'sdl', 'display', 'xauthority', 'rtc_timeoffset', 'monitor',
              'acpi', 'apic', 'usb', 'usbdevice', 'keymap', 'pci', 'hpet',
              'guest_os_type', 'hap', 'opengl', 'cpuid', 'cpuid_check',
-             'viridian', 'xen_extended_power_mgmt' ]
+             'viridian', 'xen_extended_power_mgmt', 'pci_msitranslate' ]
 
     for a in args:
         if a in vals.__dict__ and vals.__dict__[a] is not None:
