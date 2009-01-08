@@ -560,15 +560,67 @@ static void init_vm86_tss(void)
     printf("vm86 TSS at %08x\n", tss);
 }
 
-/*
- * Copy the E820 table provided by the HVM domain builder into the correct
- * place in the memory map we share with the rombios.
- */
-static void copy_e820_table(void)
+/* Create an E820 table based on memory parameters provided in hvm_info. */
+static void build_e820_table(void)
 {
-    uint8_t nr = *(uint8_t *)(HVM_E820_PAGE + HVM_E820_NR_OFFSET);
-    BUG_ON(nr > 16);
-    memcpy(E820, (char *)HVM_E820_PAGE + HVM_E820_OFFSET, nr * sizeof(*E820));
+    struct e820entry *e820 = E820;
+    unsigned int nr = 0;
+
+    /* 0x0-0x9FC00: Ordinary RAM. */
+    e820[nr].addr = 0x0;
+    e820[nr].size = 0x9FC00;
+    e820[nr].type = E820_RAM;
+    nr++;
+
+    /* 0x9FC00-0xA0000: Extended BIOS Data Area (EBDA). */
+    e820[nr].addr = 0x9FC00;
+    e820[nr].size = 0x400;
+    e820[nr].type = E820_RESERVED;
+    nr++;
+
+    /*
+     * Following regions are standard regions of the PC memory map.
+     * They are not covered by e820 regions. OSes will not use as RAM.
+     * 0xA0000-0xC0000: VGA memory-mapped I/O. Not covered by E820.
+     * 0xC0000-0xE0000: 16-bit devices, expansion ROMs (inc. vgabios).
+     * TODO: free pages which turn out to be unused.
+     */
+
+    /*
+     * 0xE0000-0x0F0000: PC-specific area. We place various tables here.
+     * 0xF0000-0x100000: System BIOS.
+     * TODO: free pages which turn out to be unused.
+     */
+    e820[nr].addr = 0xE0000;
+    e820[nr].size = 0x20000;
+    e820[nr].type = E820_RESERVED;
+    nr++;
+
+    /* Low RAM goes here. Reserve space for special pages. */
+    BUG_ON((hvm_info->low_mem_pgend << PAGE_SHIFT) < (2u << 20));
+    e820[nr].addr = 0x100000;
+    e820[nr].size = (hvm_info->low_mem_pgend << PAGE_SHIFT) - e820[nr].addr;
+    e820[nr].type = E820_RAM;
+    nr++;
+
+    if ( hvm_info->reserved_mem_pgstart )
+    {
+        /* Explicitly reserve space for special pages. */
+        e820[nr].addr = hvm_info->reserved_mem_pgstart << PAGE_SHIFT;
+        e820[nr].size = (uint32_t)-e820[nr].addr;
+        e820[nr].type = E820_RESERVED;
+        nr++;
+    }
+
+    if ( hvm_info->high_mem_pgend )
+    {
+        e820[nr].addr = ((uint64_t)1 << 32);
+        e820[nr].size =
+            ((uint64_t)hvm_info->high_mem_pgend << PAGE_SHIFT) - e820[nr].addr;
+        e820[nr].type = E820_RAM;
+        nr++;
+    }
+
     *E820_NR = nr;
 }
 
@@ -581,7 +633,7 @@ int main(void)
 
     printf("HVM Loader\n");
 
-    copy_e820_table();
+    build_e820_table();
 
     init_hypercalls();
 

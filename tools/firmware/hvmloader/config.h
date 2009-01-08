@@ -1,6 +1,9 @@
 #ifndef __HVMLOADER_CONFIG_H__
 #define __HVMLOADER_CONFIG_H__
 
+#define PAGE_SHIFT 12
+#define PAGE_SIZE  (1ul << PAGE_SHIFT)
+
 #define IOAPIC_BASE_ADDRESS 0xfec00000
 #define IOAPIC_ID           0x01
 #define IOAPIC_VERSION      0x11

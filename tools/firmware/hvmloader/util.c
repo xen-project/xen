@@ -542,27 +542,32 @@ void __bug(char *file, int line)
         asm volatile ( "ud2" );
 }
 
-static int validate_hvm_info(struct hvm_info_table *t)
+static void validate_hvm_info(struct hvm_info_table *t)
 {
-    char signature[] = "HVM INFO";
     uint8_t *ptr = (uint8_t *)t;
     uint8_t sum = 0;
     int i;
 
-    /* strncmp(t->signature, "HVM INFO", 8) */
-    for ( i = 0; i < 8; i++ )
+    if ( strncmp(t->signature, "HVM INFO", 8) )
     {
-        if ( signature[i] != t->signature[i] )
-        {
-            printf("Bad hvm info signature\n");
-            return 0;
-        }
+        printf("Bad hvm info signature\n");
+        BUG();
+    }
+
+    if ( t->length < sizeof(struct hvm_info_table) )
+    {
+        printf("Bad hvm info length\n");
+        BUG();
     }
 
     for ( i = 0; i < t->length; i++ )
         sum += ptr[i];
 
-    return (sum == 0);
+    if ( sum != 0 )
+    {
+        printf("Bad hvm info checksum\n");
+        BUG();
+    }
 }
 
 struct hvm_info_table *get_hvm_info_table(void)
@@ -575,11 +580,7 @@ struct hvm_info_table *get_hvm_info_table(void)
 
     t = (struct hvm_info_table *)HVM_INFO_PADDR;
 
-    if ( !validate_hvm_info(t) )
-    {
-        printf("Bad hvm info table\n");
-        BUG();
-    }
+    validate_hvm_info(t);
 
     table = t;
 
