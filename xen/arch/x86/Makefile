@@ -78,10 +78,10 @@ $(TARGET)-syms: $(ALL_OBJS) xen.lds
 	    $(@D)/.$(@F).1.o -o $@
 	rm -f $(@D)/.$(@F).[0-9]*
 
-asm-offsets.s: $(TARGET_SUBARCH)/asm-offsets.c $(HDRS)
+asm-offsets.s: $(TARGET_SUBARCH)/asm-offsets.c
 	$(CC) $(CFLAGS) -S -o $@ $<
 
-xen.lds: $(TARGET_SUBARCH)/xen.lds.S $(HDRS)
+xen.lds: $(TARGET_SUBARCH)/xen.lds.S
 	$(CC) -P -E -Ui386 $(AFLAGS) -o $@ $<
 
 boot/mkelf32: boot/mkelf32.c
@@ -90,4 +90,4 @@ boot/mkelf32: boot/mkelf32.c
 .PHONY: clean
 clean::
 	rm -f asm-offsets.s xen.lds boot/*.o boot/*~ boot/core boot/mkelf32
-	rm -f $(BASEDIR)/.xen-syms.[0-9]*
+	rm -f $(BASEDIR)/.xen-syms.[0-9]* boot/.*.d
