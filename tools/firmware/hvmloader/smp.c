@@ -121,7 +121,7 @@ static void boot_cpu(unsigned int cpu)
 
 void smp_initialise(void)
 {
-    unsigned int i, nr_cpus = get_vcpu_nr();
+    unsigned int i, nr_cpus = hvm_info->nr_vcpus;
 
     memcpy((void *)AP_BOOT_EIP, ap_boot_start, ap_boot_end - ap_boot_start);
 

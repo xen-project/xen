@@ -150,7 +150,7 @@ static int construct_madt(struct acpi_20_madt *madt)
     offset += sizeof(*io_apic);
 
     lapic = (struct acpi_20_madt_lapic *)(io_apic + 1);
-    for ( i = 0; i < get_vcpu_nr(); i++ )
+    for ( i = 0; i < hvm_info->nr_vcpus; i++ )
     {
         memset(lapic, 0, sizeof(*lapic));
         lapic->type    = ACPI_PROCESSOR_LOCAL_APIC;
@@ -201,7 +201,7 @@ static int construct_secondary_tables(uint8_t *buf, unsigned long *table_ptrs)
     uint16_t *tis_hdr;
 
     /* MADT. */
-    if ( (get_vcpu_nr() > 1) || get_apic_mode() )
+    if ( (hvm_info->nr_vcpus > 1) || hvm_info->apic_mode )
     {
         madt = (struct acpi_20_madt *)&buf[offset];
         offset += construct_madt(madt);

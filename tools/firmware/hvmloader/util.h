@@ -3,6 +3,7 @@
 
 #include <stdarg.h>
 #include <stdint.h>
+#include <xen/hvm/hvm_info_table.h>
 
 #undef offsetof
 #define offsetof(t, m) ((unsigned long)&((t *)0)->m)
@@ -103,9 +104,8 @@ static inline void cpu_relax(void)
 })
 
 /* HVM-builder info. */
-int get_vcpu_nr(void);
-int get_acpi_enabled(void);
-int get_apic_mode(void);
+struct hvm_info_table *get_hvm_info_table(void);
+#define hvm_info (get_hvm_info_table())
 
 /* String and memory functions */
 int strcmp(const char *cs, const char *ct);

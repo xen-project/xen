@@ -604,7 +604,7 @@ int main(void)
     apic_setup();
     pci_setup();
 
-    if ( (get_vcpu_nr() > 1) || get_apic_mode() )
+    if ( (hvm_info->nr_vcpus > 1) || hvm_info->apic_mode )
         create_mp_tables();
 
     switch ( virtual_vga )
@@ -640,7 +640,7 @@ int main(void)
     option_rom_phys_addr = etherboot_phys_addr + etherboot_sz;
     option_rom_sz = pci_load_option_roms(option_rom_phys_addr);
 
-    if ( get_acpi_enabled() )
+    if ( hvm_info->acpi_enabled )
     {
         printf("Loading ACPI ...\n");
         acpi_build_tables();

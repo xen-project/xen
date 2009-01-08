@@ -25,7 +25,6 @@
 #include <stdint.h>
 #include <xen/xen.h>
 #include <xen/memory.h>
-#include <xen/hvm/hvm_info_table.h>
 
 void wrmsr(uint32_t idx, uint64_t v)
 {
@@ -566,7 +565,7 @@ static int validate_hvm_info(struct hvm_info_table *t)
     return (sum == 0);
 }
 
-static struct hvm_info_table *get_hvm_info_table(void)
+struct hvm_info_table *get_hvm_info_table(void)
 {
     static struct hvm_info_table *table;
     struct hvm_info_table *t;
@@ -579,30 +578,12 @@ static struct hvm_info_table *get_hvm_info_table(void)
     if ( !validate_hvm_info(t) )
     {
         printf("Bad hvm info table\n");
-        return NULL;
+        BUG();
     }
 
     table = t;
 
     return table;
-}
-
-int get_vcpu_nr(void)
-{
-    struct hvm_info_table *t = get_hvm_info_table();
-    return (t ? t->nr_vcpus : 1);
-}
-
-int get_acpi_enabled(void)
-{
-    struct hvm_info_table *t = get_hvm_info_table();
-    return (t ? t->acpi_enabled : 1);
-}
-
-int get_apic_mode(void)
-{
-    struct hvm_info_table *t = get_hvm_info_table();
-    return (t ? t->apic_mode : 1);
 }
 
 uint16_t get_cpu_mhz(void)

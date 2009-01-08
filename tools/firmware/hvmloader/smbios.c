@@ -229,7 +229,7 @@ hvm_write_smbios_tables(void)
 
     /* SCRATCH_PHYSICAL_ADDRESS is a safe large memory area for scratch. */
     len = write_smbios_tables((void *)SCRATCH_PHYSICAL_ADDRESS,
-                              get_vcpu_nr(), get_memsize(),
+                              hvm_info->nr_vcpus, get_memsize(),
                               uuid, xen_version_str,
                               xen_major_version, xen_minor_version);
     if ( len > SMBIOS_MAXIMUM_SIZE )

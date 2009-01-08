@@ -155,7 +155,7 @@ static void fill_mp_config_table(struct mp_config_table *mpct, int length)
     int vcpu_nr, i;
     uint8_t checksum;
 
-    vcpu_nr = get_vcpu_nr();
+    vcpu_nr = hvm_info->nr_vcpus;
 
     /* fill in the MP configuration table signature, "PCMP" */
     mpct->signature[0] = 'P';
@@ -317,7 +317,7 @@ void create_mp_tables(void)
     char *p;
     int vcpu_nr, i, length;
 
-    vcpu_nr = get_vcpu_nr();
+    vcpu_nr = hvm_info->nr_vcpus;
 
     printf("Creating MP tables ...\n");
 
