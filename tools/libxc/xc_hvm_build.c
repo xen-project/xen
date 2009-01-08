@@ -17,7 +17,7 @@
 #include <xen/hvm/params.h>
 #include "xc_e820.h"
 
-#include <xen/libelf.h>
+#include <xen/libelf/libelf.h>
 
 #define SUPERPAGE_PFN_SHIFT  9
 #define SUPERPAGE_NR_PFNS    (1UL << SUPERPAGE_PFN_SHIFT)

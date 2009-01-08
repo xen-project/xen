@@ -1,5 +1,5 @@
-#ifndef __XEN_PUBLIC_ELFSTRUCTS_H__
-#define __XEN_PUBLIC_ELFSTRUCTS_H__ 1
+#ifndef __XEN_ELFSTRUCTS_H__
+#define __XEN_ELFSTRUCTS_H__
 /*
  * Copyright (c) 1995, 1996 Erik Theisen.  All rights reserved.
  *
@@ -49,7 +49,7 @@ typedef uint16_t	Elf64_Quarter;
 
 /*
  * e_ident[] identification indexes
- * See http://www.caldera.com/developers/gabi/2000-07-17/ch4.eheader.html
+ * See http://www.caldera.com/developers/gabi/2000-07-17/ch4.eheader.html 
  */
 #define EI_MAG0		0		/* file ID */
 #define EI_MAG1		1		/* file ID */
@@ -524,4 +524,4 @@ typedef struct {
 #define AuxInfo		Aux64Info
 #endif
 
-#endif /* __XEN_PUBLIC_ELFSTRUCTS_H__ */
+#endif /* __XEN_ELFSTRUCTS_H__ */

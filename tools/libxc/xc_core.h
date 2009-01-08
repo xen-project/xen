@@ -23,7 +23,7 @@
 
 #include "xen/version.h"
 #include "xg_private.h"
-#include "xen/elfstructs.h"
+#include "xen/libelf/elfstructs.h"
 
 /* section names */
 #define XEN_DUMPCORE_SEC_NOTE                   ".note.Xen"

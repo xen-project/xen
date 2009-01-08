@@ -1,6 +1,6 @@
 /******************************************************************************
  * libelf.h
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
  * deal in the Software without restriction, including without limitation the
@@ -20,8 +20,8 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef __XC_LIBELF__
-#define __XC_LIBELF__ 1
+#ifndef __XEN_LIBELF_H__
+#define __XEN_LIBELF_H__
 
 #if defined(__i386__) || defined(__x86_64__) || defined(__ia64__)
 #define XEN_ELF_LITTLE_ENDIAN
@@ -30,9 +30,14 @@
 #endif
 
 #undef ELFSIZE
-#include "elfnote.h"
 #include "elfstructs.h"
-#include "features.h"
+#ifdef __XEN__
+#include <public/elfnote.h>
+#include <public/features.h>
+#else
+#include <xen/elfnote.h>
+#include <xen/features.h>
+#endif
 
 /* ------------------------------------------------------------------------ */
 
@@ -220,7 +225,7 @@ struct elf_dom_parms {
     const void *elf_note_start;
     const void *elf_note_end;
     struct xen_elfnote elf_notes[XEN_ELFNOTE_MAX + 1];
-  
+
     /* parsed */
     char guest_os[16];
     char guest_ver[16];
@@ -263,4 +268,4 @@ int elf_xen_parse_guest_info(struct elf_binary *elf,
 int elf_xen_parse(struct elf_binary *elf,
                   struct elf_dom_parms *parms);
 
-#endif /* __XC_LIBELF__ */
+#endif /* __XEN_LIBELF_H__ */

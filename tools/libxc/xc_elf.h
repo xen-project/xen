@@ -1,1 +1,1 @@
-#include <xen/elfstructs.h>
+#include <xen/libelf/elfstructs.h>

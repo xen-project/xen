@@ -19,6 +19,7 @@
 #include <xen/iocap.h>
 #include <xen/bitops.h>
 #include <xen/compat.h>
+#include <xen/libelf.h>
 #include <asm/regs.h>
 #include <asm/system.h>
 #include <asm/io.h>
@@ -30,7 +31,6 @@
 #include <asm/e820.h>
 
 #include <public/version.h>
-#include <public/libelf.h>
 
 extern unsigned long initial_images_nrpages(void);
 extern void discard_initial_images(void);

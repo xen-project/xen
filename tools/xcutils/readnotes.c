@@ -13,7 +13,7 @@
 #include <xg_private.h>
 #include <xc_dom.h> /* gunzip bits */
 
-#include <xen/libelf.h>
+#include <xen/libelf/libelf.h>
 
 static void print_string_note(const char *prefix, struct elf_binary *elf,
 			      const elf_note *note)

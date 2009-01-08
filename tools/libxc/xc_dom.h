@@ -1,4 +1,4 @@
-#include <xen/libelf.h>
+#include <xen/libelf/libelf.h>
 
 #define INVALID_P2M_ENTRY   ((xen_pfn_t)-1)
 

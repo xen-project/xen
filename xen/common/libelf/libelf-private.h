@@ -7,9 +7,9 @@
 #include <xen/types.h>
 #include <xen/string.h>
 #include <xen/lib.h>
+#include <xen/libelf.h>
 #include <asm/byteorder.h>
 #include <public/elfnote.h>
-#include <public/libelf.h>
 
 #define elf_msg(elf, fmt, args ... ) \
    if (elf->verbose) printk(fmt, ## args )
@@ -49,7 +49,7 @@
 #error Unsupported OS
 #endif
 #include <xen/elfnote.h>
-#include <xen/libelf.h>
+#include <xen/libelf/libelf.h>
 
 #include "xenctrl.h"
 #include "xc_private.h"
