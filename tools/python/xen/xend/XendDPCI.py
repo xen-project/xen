@@ -41,7 +41,8 @@ class XendDPCI(XendBase):
                   'virtual_name',
                   'VM',
                   'PPCI',
-                  'hotplug_slot']
+                  'hotplug_slot',
+                  'options']
         return XendBase.getAttrRO() + attrRO
 
     def getAttrRW(self):
@@ -119,6 +120,8 @@ class XendDPCI(XendBase):
         self.VM = record['VM']
         self.PPCI = record['PPCI']
         self.hotplug_slot = record['hotplug_slot']
+        if 'options' in record.keys():
+            self.options = record['options']
 
     def destroy(self):
         xendom = XendDomain.instance()
@@ -152,3 +155,5 @@ class XendDPCI(XendBase):
     def get_hotplug_slot(self):
         return self.hotplug_slot
 
+    def get_options(self):
+        return self.options

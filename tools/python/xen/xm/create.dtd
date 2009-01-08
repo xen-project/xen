@@ -82,11 +82,12 @@
 <!ELEMENT vtpm   (name*)>
 <!ATTLIST vtpm   backend         CDATA #REQUIRED>
 
-<!ELEMENT pci    EMPTY>
+<!ELEMENT pci    (pci_opt*)>
 <!ATTLIST pci    domain          CDATA #REQUIRED
                  bus             CDATA #REQUIRED
                  slot            CDATA #REQUIRED
                  func            CDATA #REQUIRED
+                 opts_str        CDATA #IMPLIED
                  vslt            CDATA #IMPLIED>
 
 <!ELEMENT vscsi  EMPTY>
@@ -136,6 +137,10 @@
 
 <!ELEMENT vcpu_param EMPTY>
 <!ATTLIST vcpu_param key   CDATA #REQUIRED
+                     value CDATA #REQUIRED>
+
+<!ELEMENT pci_opt    EMPTY>
+<!ATTLIST pci_opt    key   CDATA #REQUIRED
                      value CDATA #REQUIRED>
 
 <!ELEMENT other_config EMPTY>

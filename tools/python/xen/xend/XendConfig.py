@@ -1247,6 +1247,11 @@ class XendConfig(dict):
                         'PPCI': ppci_uuid,
                         'hotplug_slot': pci_dev.get('vslot', 0)
                     }
+
+                    dpci_opts = pci_dev.get('opts')
+                    if dpci_opts and len(dpci_opts) > 0:
+                        dpci_record['options'] = dpci_opts
+
                     XendDPCI(dpci_uuid, dpci_record)
 
                 target['devices'][pci_devs_uuid] = (dev_type,
@@ -1762,6 +1767,11 @@ class XendConfig(dict):
                         'PPCI': ppci_uuid,
                         'hotplug_slot': pci_dev.get('vslot', 0)
                     }
+
+                    dpci_opts = pci_dev.get('opts')
+                    if dpci_opts and len(dpci_opts) > 0:
+                        dpci_record['options'] = dpci_opts
+
                     XendDPCI(dpci_uuid, dpci_record)
 
                 self['devices'][dev_uuid] = (dev_type,

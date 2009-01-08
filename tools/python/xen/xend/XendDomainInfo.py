@@ -3538,6 +3538,11 @@ class XendDomainInfo:
 
         dpci_uuid = uuid.createString()
 
+        dpci_opts = []
+        opts_dict = xenapi_pci.get('options')
+        for k in opts_dict.keys():
+            dpci_opts.append([k, opts_dict[k]])
+
         # Convert xenapi to sxp
         ppci = XendAPIStore.get(xenapi_pci.get('PPCI'), 'PPCI')
 
@@ -3549,6 +3554,7 @@ class XendDomainInfo:
                     ['slot', '0x%02x' % ppci.get_slot()],
                     ['func', '0x%1x' % ppci.get_func()],
                     ['vslt', '0x%02x' % xenapi_pci.get('hotplug_slot')],
+                    ['opts', dpci_opts],
                     ['uuid', dpci_uuid]
                 ],
                 ['state', 'Initialising']
