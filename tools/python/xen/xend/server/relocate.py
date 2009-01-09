@@ -122,6 +122,8 @@ class RelocationProtocol(protocol.Protocol):
         if self.transport:
             self.send_reply(["ready", name])
             p2cread, p2cwrite = os.pipe()
+            from xen.util import oshelp
+            oshelp.fcntl_setfd_cloexec(p2cwrite, True)
             threading.Thread(target=connection.SSLSocketServerConnection.recv2fd,
                              args=(self.transport.sock, p2cwrite)).start()
             try:
