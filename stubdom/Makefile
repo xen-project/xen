@@ -194,6 +194,7 @@ mk-headers-$(XEN_TARGET_ARCH): ioemu/linkfarm.stamp
           ln -sf $(addprefix ../../,$(wildcard $(XEN_ROOT)/xen/include/public/*.h)) include/xen && \
           ln -sf $(addprefix ../../$(XEN_ROOT)/xen/include/public/,arch-ia64 arch-x86 hvm io xsm) include/xen && \
           ( [ -h include/xen/sys ] || ln -sf ../../$(XEN_ROOT)/tools/include/xen-sys/MiniOS include/xen/sys ) && \
+          ( [ -h include/xen/libelf ] || ln -sf ../../$(XEN_ROOT)/tools/include/xen/libelf include/xen/libelf ) && \
 	  mkdir -p include/xen-foreign && \
 	  ln -sf $(addprefix ../../,$(wildcard $(XEN_ROOT)/tools/include/xen-foreign/*)) include/xen-foreign/ && \
 	  $(MAKE) -C include/xen-foreign/ && \
