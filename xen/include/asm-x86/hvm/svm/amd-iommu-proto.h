@@ -23,6 +23,7 @@
 
 #include <xen/sched.h>
 #include <asm/amd-iommu.h>
+#include <xen/domain_page.h>
 
 #define for_each_amd_iommu(amd_iommu) \
     list_for_each_entry(amd_iommu, \
@@ -59,7 +60,7 @@ int __init amd_iommu_setup_shared_tables(void);
 /* mapping functions */
 int amd_iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn);
 int amd_iommu_unmap_page(struct domain *d, unsigned long gfn);
-void *amd_iommu_get_vptr_from_page_table_entry(u32 *entry);
+u64 amd_iommu_get_next_table_from_pte(u32 *entry);
 int amd_iommu_reserve_domain_unity_map(struct domain *domain,
         unsigned long phys_addr, unsigned long size, int iw, int ir);
 int amd_iommu_sync_p2m(struct domain *d);
@@ -69,8 +70,7 @@ void invalidate_all_iommu_pages(struct domain *d);
 void amd_iommu_set_dev_table_entry(u32 *dte, u64 root_ptr, u64 intremap_ptr,
         u16 domain_id, u8 sys_mgt, u8 dev_ex, u8 paging_mode);
 int amd_iommu_is_dte_page_translation_valid(u32 *entry);
-void invalidate_dev_table_entry(struct amd_iommu *iommu,
-            u16 devic_id);
+void invalidate_dev_table_entry(struct amd_iommu *iommu, u16 devic_id);
 
 /* send cmd to iommu */
 int send_iommu_command(struct amd_iommu *iommu, u32 cmd[]);
@@ -115,6 +115,38 @@ static inline u8 get_field_from_byte(u8 value, u8 mask, u8 shift)
 static inline unsigned long region_to_pages(unsigned long addr, unsigned long size)
 {
     return (PAGE_ALIGN(addr + size) - (addr & PAGE_MASK)) >> PAGE_SHIFT;
+}
+
+static inline struct page_info* alloc_amd_iommu_pgtable(void)
+{
+    struct page_info *pg;
+    void *vaddr;
+
+    pg = alloc_domheap_page(NULL, 0);
+    vaddr = map_domain_page(page_to_mfn(pg));
+    if ( !vaddr )
+        return 0;
+    memset(vaddr, 0, PAGE_SIZE);
+    unmap_domain_page(vaddr);
+    return pg;
+}
+
+static inline void free_amd_iommu_pgtable(struct page_info *pg)
+{
+    if ( pg != 0 )
+        free_domheap_page(pg);
+}
+
+static inline void* __alloc_amd_iommu_tables(int order)
+{
+    void *buf;
+    buf = alloc_xenheap_pages(order);
+    return buf;
+}
+
+static inline void __free_amd_iommu_tables(void *table, int order)
+{
+    free_xenheap_pages(table, order);
 }
 
 #endif /* _ASM_X86_64_AMD_IOMMU_PROTO_H */

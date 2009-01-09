@@ -535,10 +535,11 @@ void __init enable_iommu(struct amd_iommu *iommu)
 static void __init deallocate_iommu_table_struct(
     struct table_struct *table)
 {
+    int order = 0;
     if ( table->buffer )
     {
-        free_xenheap_pages(table->buffer,
-            get_order_from_bytes(table->alloc_size));
+        order = get_order_from_bytes(table->alloc_size);
+        __free_amd_iommu_tables(table->buffer, order);
         table->buffer = NULL;
     }
 }
@@ -552,16 +553,19 @@ static void __init deallocate_iommu_tables(struct amd_iommu *iommu)
 static int __init allocate_iommu_table_struct(struct table_struct *table,
                                               const char *name)
 {
-    table->buffer = (void *) alloc_xenheap_pages(
-        get_order_from_bytes(table->alloc_size));
-
-    if ( !table->buffer )
+    int order = 0;
+    if ( table->buffer == NULL )
     {
-        amd_iov_error("Error allocating %s\n", name);
-        return -ENOMEM;
-    }
+        order = get_order_from_bytes(table->alloc_size);
+        table->buffer = __alloc_amd_iommu_tables(order);
 
-    memset(table->buffer, 0, table->alloc_size);
+        if ( table->buffer == NULL )
+        {
+            amd_iov_error("Error allocating %s\n", name);
+            return -ENOMEM;
+        }
+        memset(table->buffer, 0, PAGE_SIZE * (1UL << order));
+    }
     return 0;
 }
 
