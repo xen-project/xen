@@ -3295,38 +3295,40 @@ arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
 
             spin_unlock(&d->grant_table->lock);
             break;
-        case XENMAPSPACE_mfn:
-        {
-            if ( get_page_from_pagenr(xatp.idx, d) ) {
-                struct xen_ia64_memmap_info memmap_info;
-                efi_memory_desc_t md;
-                int ret;
+        case XENMAPSPACE_gmfn:
+            xatp.idx = gmfn_to_mfn(d, xatp.idx);
+        case XENMAPSPACE_mfn: {
+            struct xen_ia64_memmap_info memmap_info;
+            efi_memory_desc_t md;
+            int ret;
 
-                mfn = xatp.idx;
-                page = mfn_to_page(mfn);
+            if ( !get_page_from_pagenr(xatp.idx, d) )
+                break;
 
-                memmap_info.efi_memmap_size = sizeof(md);
-                memmap_info.efi_memdesc_size = sizeof(md);
-                memmap_info.efi_memdesc_version =
-                    EFI_MEMORY_DESCRIPTOR_VERSION;
+            mfn = xatp.idx;
+            page = mfn_to_page(mfn);
 
-                md.type = EFI_CONVENTIONAL_MEMORY;
-                md.pad = 0;
-                md.phys_addr = xatp.gpfn << PAGE_SHIFT;
-                md.virt_addr = 0;
-                md.num_pages = 1UL << (PAGE_SHIFT - EFI_PAGE_SHIFT);
-                md.attribute = EFI_MEMORY_WB;
+            memmap_info.efi_memmap_size = sizeof(md);
+            memmap_info.efi_memdesc_size = sizeof(md);
+            memmap_info.efi_memdesc_version =
+                EFI_MEMORY_DESCRIPTOR_VERSION;
 
-                ret = __dom0vp_add_memdesc(d, &memmap_info, (char*)&md);
-                if (ret != 0) {
-                    put_page(page);
-                    rcu_unlock_domain(d);
-                    gdprintk(XENLOG_DEBUG,
-                             "%s:%d td %d gpfn 0x%lx mfn 0x%lx ret %d\n",
-                             __func__, __LINE__,
-                             d->domain_id, xatp.gpfn, xatp.idx, ret);
-                    return ret;
-                }
+            md.type = EFI_CONVENTIONAL_MEMORY;
+            md.pad = 0;
+            md.phys_addr = xatp.gpfn << PAGE_SHIFT;
+            md.virt_addr = 0;
+            md.num_pages = 1UL << (PAGE_SHIFT - EFI_PAGE_SHIFT);
+            md.attribute = EFI_MEMORY_WB;
+
+            ret = __dom0vp_add_memdesc(d, &memmap_info, (char*)&md);
+            if (ret != 0) {
+                put_page(page);
+                rcu_unlock_domain(d);
+                gdprintk(XENLOG_DEBUG,
+                         "%s:%d td %d gpfn 0x%lx mfn 0x%lx ret %d\n",
+                         __func__, __LINE__,
+                         d->domain_id, xatp.gpfn, xatp.idx, ret);
+                return ret;
             }
             break;
         }
