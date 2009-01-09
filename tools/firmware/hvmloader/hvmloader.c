@@ -31,6 +31,7 @@
 #include "option_rom.h"
 #include <xen/version.h>
 #include <xen/hvm/params.h>
+#include <xen/memory.h>
 
 asm (
     "    .text                       \n"
@@ -99,6 +100,9 @@ asm (
     "    .text                       \n"
     );
 
+unsigned long pci_mem_start = PCI_MEM_START;
+unsigned long pci_mem_end = PCI_MEM_END;
+
 static enum { VGA_none, VGA_std, VGA_cirrus } virtual_vga = VGA_none;
 
 static void init_hypercalls(void)
@@ -148,16 +152,14 @@ static void apic_setup(void)
 
 static void pci_setup(void)
 {
-    uint32_t base, devfn, bar_reg, bar_data, bar_sz, cmd;
+    uint32_t base, devfn, bar_reg, bar_data, bar_sz, cmd, mmio_total = 0;
     uint16_t class, vendor_id, device_id;
     unsigned int bar, pin, link, isa_irq;
 
     /* Resources assignable to PCI devices via BARs. */
     struct resource {
         uint32_t base, max;
-    } *resource;
-    struct resource mem_resource = { PCI_MEMBASE, PCI_MEMBASE + PCI_MEMSIZE };
-    struct resource io_resource  = { 0xc000, 0x10000 };
+    } *resource, mem_resource, io_resource;
 
     /* Create a list of device BARs in descending order of size. */
     struct bars {
@@ -248,6 +250,10 @@ static void pci_setup(void)
             bars[i].bar_reg = bar_reg;
             bars[i].bar_sz  = bar_sz;
 
+            if ( (bar_data & PCI_BASE_ADDRESS_SPACE) ==
+                 PCI_BASE_ADDRESS_SPACE_MEMORY )
+                mmio_total += bar_sz;
+
             nr_bars++;
 
             /* Skip the upper-half of the address for a 64-bit BAR. */
@@ -275,6 +281,28 @@ static void pci_setup(void)
         cmd |= PCI_COMMAND_MASTER;
         pci_writew(devfn, PCI_COMMAND, cmd);
     }
+
+    while ( (mmio_total > (pci_mem_end - pci_mem_start)) &&
+            ((pci_mem_start << 1) != 0) )
+        pci_mem_start <<= 1;
+
+    while ( (pci_mem_start >> PAGE_SHIFT) < hvm_info->low_mem_pgend )
+    {
+        struct xen_add_to_physmap xatp;
+        if ( hvm_info->high_mem_pgend == 0 )
+            hvm_info->high_mem_pgend = 1ull << (32 - PAGE_SHIFT);
+        xatp.domid = DOMID_SELF;
+        xatp.space = XENMAPSPACE_gmfn;
+        xatp.idx   = --hvm_info->low_mem_pgend;
+        xatp.gpfn  = hvm_info->high_mem_pgend++;
+        if ( hypercall_memory_op(XENMEM_add_to_physmap, &xatp) != 0 )
+            BUG();
+    }
+
+    mem_resource.base = pci_mem_start;
+    mem_resource.max = pci_mem_end;
+    io_resource.base = 0xc000;
+    io_resource.max = 0x10000;
 
     /* Assign iomem and ioport resources in descending order of size. */
     for ( i = 0; i < nr_bars; i++ )
@@ -625,6 +653,9 @@ int main(void)
 
     printf("CPU speed is %u MHz\n", get_cpu_mhz());
 
+    apic_setup();
+    pci_setup();
+
     smp_initialise();
 
     perform_tests();
@@ -638,9 +669,6 @@ int main(void)
         rombios_sz = 0x10000;
     memcpy((void *)ROMBIOS_PHYSICAL_ADDRESS, rombios, rombios_sz);
     highbios_setup();
-
-    apic_setup();
-    pci_setup();
 
     if ( (hvm_info->nr_vcpus > 1) || hvm_info->apic_mode )
         create_mp_tables();

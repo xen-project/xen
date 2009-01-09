@@ -89,9 +89,11 @@ void cacheattr_init(void)
     if ( nr_var_ranges != 0 )
     {
         /* A single UC range covering PCI space. */
-        wrmsr(MSR_MTRRphysBase(0), PCI_MEMBASE);
+        /* pci_mem_start must be of the binary form 1....10....0 */
+        BUG_ON(~(pci_mem_start | (pci_mem_start - 1)));
+        wrmsr(MSR_MTRRphysBase(0), pci_mem_start);
         wrmsr(MSR_MTRRphysMask(0),
-              ((uint64_t)(int32_t)PCI_MEMBASE & addr_mask) | (1u << 11));
+              ((uint64_t)(int32_t)pci_mem_start & addr_mask) | (1u << 11));
         printf("var MTRRs ... ");
     }
 

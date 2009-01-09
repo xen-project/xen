@@ -307,6 +307,7 @@ void *mem_alloc(uint32_t size, uint32_t align)
 {
     static uint32_t reserve = RESERVED_MEMBASE - 1;
     static int over_allocated;
+    struct xen_add_to_physmap xatp;
     struct xen_memory_reservation xmr;
     xen_pfn_t mfn;
     uint32_t s, e;
@@ -323,36 +324,36 @@ void *mem_alloc(uint32_t size, uint32_t align)
     while ( (reserve >> PAGE_SHIFT) != (e >> PAGE_SHIFT) )
     {
         reserve += PAGE_SIZE;
-
-        /* Try to allocate another page in the reserved area. */
-        xmr.domid = DOMID_SELF;
-        xmr.mem_flags = 0;
-        xmr.extent_order = 0;
-        xmr.nr_extents = 1;
-        set_xen_guest_handle(xmr.extent_start, &mfn);
         mfn = reserve >> PAGE_SHIFT;
-        if ( !over_allocated &&
-             (hypercall_memory_op(XENMEM_populate_physmap, &xmr) == 1) )
-            continue;
 
-        /* If we fail, steal a page from the ordinary RAM map. */
-        over_allocated = 1;
+        /* Try to allocate a brand new page in the reserved area. */
+        if ( !over_allocated )
+        {
+            xmr.domid = DOMID_SELF;
+            xmr.mem_flags = 0;
+            xmr.extent_order = 0;
+            xmr.nr_extents = 1;
+            set_xen_guest_handle(xmr.extent_start, &mfn);
+            if ( hypercall_memory_op(XENMEM_populate_physmap, &xmr) == 1 )
+                continue;
+            over_allocated = 1;
+        }
+
+        /* Otherwise, relocate a page from the ordinary RAM map. */
         if ( hvm_info->high_mem_pgend )
         {
-            mfn = --hvm_info->high_mem_pgend;
-            if ( mfn == (1ull << (32 - PAGE_SHIFT)) )
+            xatp.idx = --hvm_info->high_mem_pgend;
+            if ( xatp.idx == (1ull << (32 - PAGE_SHIFT)) )
                 hvm_info->high_mem_pgend = 0;
         }
         else
         {
-            mfn = --hvm_info->low_mem_pgend;
+            xatp.idx = --hvm_info->low_mem_pgend;
         }
-        if ( hypercall_memory_op(XENMEM_decrease_reservation, &xmr) != 1 )
-            BUG();
-
-        /* Now try the allocation again. Must not fail. */
-        mfn = reserve >> PAGE_SHIFT;
-        if ( hypercall_memory_op(XENMEM_populate_physmap, &xmr) != 1 )
+        xatp.domid = DOMID_SELF;
+        xatp.space = XENMAPSPACE_gmfn;
+        xatp.gpfn  = mfn;
+        if ( hypercall_memory_op(XENMEM_add_to_physmap, &xatp) != 0 )
             BUG();
     }
 

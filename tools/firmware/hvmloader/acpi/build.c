@@ -85,8 +85,8 @@ static int construct_bios_info_table(uint8_t *buf)
 
     bios_info->hpet_present = hpet_exists(ACPI_HPET_ADDRESS);
 
-    bios_info->pci_min = PCI_MEMBASE;
-    bios_info->pci_len = PCI_MEMSIZE;
+    bios_info->pci_min = pci_mem_start;
+    bios_info->pci_len = pci_mem_end - pci_mem_start;
     bios_info->xen_pfiob = 0xdead;
 
     return align16(sizeof(*bios_info));
