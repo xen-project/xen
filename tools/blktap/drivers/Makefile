@@ -18,7 +18,7 @@ CFLAGS += -DUSE_GCRYPT
 CRYPT_LIB := -lgcrypt
 else
 CRYPT_LIB := -lcrypto
-$(warning *** libgcrypt not installed: falling back to libcrypto ***)
+$(warning === libgcrypt not installed: falling back to libcrypto ===)
 endif
 
 LDFLAGS_blktapctrl := $(LDFLAGS_libxenctrl) $(LDFLAGS_libxenstore) -L../lib -lblktap

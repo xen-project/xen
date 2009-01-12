@@ -15,10 +15,10 @@ SUBDIRS += hvmloader
 .PHONY: all
 all:
 	@set -e; if [ $$((`( bcc -v 2>&1 | grep version || echo 0.0.0 ) | cut -d' ' -f 3 | awk -F. '{ printf "0x%02x%02x%02x", $$1, $$2, $$3}'`)) -lt $$((0x00100e)) ] ; then \
-	echo "***********************************************************"; \
+	echo "==========================================================="; \
 	echo "Require dev86 package version >= 0.16.14 to build firmware!"; \
 	echo "(visit http://www.cix.co.uk/~mayday for more information)"; \
-	echo "***********************************************************"; \
+	echo "==========================================================="; \
 	else \
 	$(MAKE) subdirs-$@; \
 	fi

@@ -100,10 +100,10 @@ ifneq ($(EXTRAVERSION),)
 endif
 	$(__NONINT_CONFIG) $(MAKE) -C $(LINUX_SRCDIR) ARCH=$(LINUX_ARCH) oldconfig O=$$(/bin/pwd)/$(LINUX_DIR)
 	@set -e ; if [ ! -f $(LINUX_DIR)/Makefile ] ; then \
-	    echo "***********************************"; \
+	    echo "==================================="; \
 	    echo "oldconfig did not create a Makefile"; \
 	    echo "Generating $(LINUX_DIR)/Makefile   "; \
-	    echo "***********************************"; \
+	    echo "==================================="; \
 	    ( echo "# Automatically generated: don't edit"; \
 	      echo ""; \
 	      echo "VERSION = 2"; \
