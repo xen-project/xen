@@ -12,7 +12,10 @@ CFLAGS += $(CFLAGS_include) -I.. -I../.. -DGCC_PROTOS
 all: $(TARGET)
 
 clean:
-	rm -rf *.o $(TARGET)
+	rm -rf *.o $(TARGET) $(DEPS)
 
 $(TARGET): $(OBJECTS)
 	$(LD) $(LDFLAGS_DIRECT) -r $^ -o $@
+
+-include $(DEPS)
+

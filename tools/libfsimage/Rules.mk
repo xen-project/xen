@@ -1,8 +1,6 @@
 include $(XEN_ROOT)/tools/Rules.mk
 
-DEPS = .*.d
-
-CFLAGS += -I$(XEN_ROOT)/tools/libfsimage/common/ -Werror -Wp,-MD,.$(@F).d
+CFLAGS += -I$(XEN_ROOT)/tools/libfsimage/common/ -Werror
 LDFLAGS += -L../common/
 
 PIC_OBJS := $(patsubst %.c,%.opic,$(LIB_SRCS-y))

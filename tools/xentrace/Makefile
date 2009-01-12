@@ -46,9 +46,12 @@ install: build
 
 .PHONY: clean
 clean:
-	$(RM) *.a *.so *.o *.rpm $(BIN) $(LIBBIN)
+	$(RM) *.a *.so *.o *.rpm $(BIN) $(LIBBIN) $(DEPS)
 
 %: %.c $(HDRS) Makefile
 	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
 xentrace_%: %.c $(HDRS) Makefile
 	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
+
+-include $(DEPS)
+

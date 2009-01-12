@@ -17,4 +17,6 @@ install: all
 
 .PHONY: clean
 clean:
-	$(RM) -f $(BIN)
+	$(RM) -f $(BIN) $(DEPS)
+
+-include $(DEPS)

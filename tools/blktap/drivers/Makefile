@@ -13,10 +13,6 @@ CFLAGS   += $(CFLAGS_libxenstore)
 CFLAGS   += -I $(LIBAIO_DIR)
 CFLAGS   += -D_GNU_SOURCE
 
-# Get gcc to generate the dependencies for us.
-CFLAGS   += -Wp,-MD,.$(@F).d
-DEPS      = .*.d
-
 ifeq ($(shell . ./check_gcrypt),"yes")
 CFLAGS += -DUSE_GCRYPT
 CRYPT_LIB := -lgcrypt

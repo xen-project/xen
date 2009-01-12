@@ -28,10 +28,6 @@ CFLAGS   += -Werror -fno-strict-aliasing $(call cc-option,$(CC),-fgnu89-inline,)
 CFLAGS   += -O3
 #CFLAGS   += -g
 
-# Get gcc to generate the dependencies for us.
-CFLAGS   += -Wp,-MD,.$(@F).d
-DEPS     = .*.d
-
 MAJOR    := 3.0
 MINOR    := 0
 LIB      := libxutil.so 

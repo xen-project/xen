@@ -16,7 +16,7 @@ all: $(BIN)
 
 .PHONY: clean
 clean:
-	$(RM) *.a *.so *.o *.rpm $(BIN)
+	$(RM) *.a *.so *.o *.rpm $(BIN) $(DEPS)
 	$(RM) client/*.o daemon/*.o
 
 xenconsoled: $(patsubst %.c,%.o,$(wildcard daemon/*.c))
@@ -33,3 +33,5 @@ install: $(BIN)
 	$(INSTALL_PROG) xenconsoled $(DESTDIR)/$(SBINDIR)
 	$(INSTALL_DIR) $(DESTDIR)$(PRIVATE_BINDIR)
 	$(INSTALL_PROG) xenconsole $(DESTDIR)$(PRIVATE_BINDIR)
+
+-include $(DEPS)

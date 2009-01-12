@@ -155,4 +155,6 @@ endif
 .PHONY: clean
 clean:
 	rm -f $(LIB) $(SHLIB) $(SHLIB_LINKS) $(OBJECTS-y) \
-	      $(BINDINGS) $(BINDINGSRC)
+	      $(BINDINGS) $(BINDINGSRC) $(DEPS)
+
+-include $(DEPS)

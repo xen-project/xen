@@ -16,7 +16,7 @@ all: subdirs-all
 
 .PHONY: clean
 clean: subdirs-clean
-	rm -rf *.o $(TARGET)
+	rm -rf *.o $(TARGET) $(DEPS)
 
 $(TARGET): 32bitbios.o $(MODULES) util.o
 	$(LD) $(LDFLAGS_DIRECT) -s -r $^ -o 32bitbios_all.o
@@ -27,3 +27,5 @@ $(TARGET): 32bitbios.o $(MODULES) util.o
 	    exit 11;                                         \
 	  } || :
 	sh mkhex highbios_array 32bitbios_all.o > $@
+
+-include $(DEPS)

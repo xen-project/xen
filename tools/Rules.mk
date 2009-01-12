@@ -29,6 +29,10 @@ X11_LDPATH = -L/usr/X11R6/$(LIBLEAFDIR)
 
 CFLAGS += -D__XEN_TOOLS__
 
+# Get gcc to generate the dependencies for us.
+CFLAGS += -MMD -MF .$(@F).d
+DEPS = .*.d
+
 # Enable implicit LFS support *and* explicit LFS names.
 CFLAGS  += $(shell getconf LFS_CFLAGS)
 CFLAGS  += -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE
@@ -59,4 +63,3 @@ subdirs-all subdirs-clean subdirs-install: .phony
 
 subdir-all-% subdir-clean-% subdir-install-%: .phony
 	$(MAKE) -C $* $(patsubst subdir-%-$*,%,$@)
-

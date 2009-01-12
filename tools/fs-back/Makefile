@@ -13,10 +13,6 @@ CFLAGS   += $(CFLAGS_libxenstore)
 CFLAGS   += $(INCLUDES) -I.
 CFLAGS   += -D_GNU_SOURCE
 
-# Get gcc to generate the dependencies for us.
-CFLAGS   += -Wp,-MD,.$(@F).d
-DEPS      = .*.d
-
 LIBS      := -L. -L.. -L../lib
 LIBS      += $(LDFLAGS_libxenctrl)
 LIBS      += $(LDFLAGS_libxenstore)

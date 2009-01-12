@@ -63,6 +63,8 @@ acpi.a: $(OBJS)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c -o $@ $<
 
 clean:
-	rm -rf *.a *.o $(IASL_VER) $(IASL_VER).tar.gz
+	rm -rf *.a *.o $(IASL_VER) $(IASL_VER).tar.gz $(DEPS)
 
 install: all
+
+-include $(DEPS)

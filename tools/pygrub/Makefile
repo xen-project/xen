@@ -22,4 +22,6 @@ endif
 
 .PHONY: clean
 clean:
-	rm -rf build tmp *.pyc *.pyo *.o *.a *~ a.out
+	rm -rf build tmp *.pyc *.pyo *.o *.a *~ a.out $(DEPS)
+
+-include $(DEPS)

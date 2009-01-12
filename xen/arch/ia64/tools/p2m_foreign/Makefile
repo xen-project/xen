@@ -24,10 +24,6 @@ include $(XEN_ROOT)/tools/Rules.mk
 CFLAGS += -Werror -ggdb3
 CFLAGS += -I$(XEN_LIBXC) -I$(XEN_XENSTORE)
 
-# Make gcc generate dependencies.
-CFLAGS += -Wp,-MD,.$(@F).d
-DEPS = .*.d
-
 PROGRAMS = p2m_foreign
 LDLIBS   = -L$(XEN_LIBXC) -L$(XEN_XENSTORE) -lxenguest -lxenctrl
 
