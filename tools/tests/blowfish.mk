@@ -1,7 +1,7 @@
 
 override XEN_TARGET_ARCH = x86_32
 XEN_ROOT = ../..
-CFLAGS :=
+CFLAGS =
 include $(XEN_ROOT)/tools/Rules.mk
 
 # Disable PIE/SSP if GCC supports them. They can break us.
