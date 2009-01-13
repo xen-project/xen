@@ -195,6 +195,10 @@ static void __init set_iommu_command_buffer_control(struct amd_iommu *iommu,
                          IOMMU_CONTROL_COMMAND_BUFFER_ENABLE_MASK,
                          IOMMU_CONTROL_COMMAND_BUFFER_ENABLE_SHIFT, &entry);
     writel(entry, iommu->mmio_base+IOMMU_CONTROL_MMIO_OFFSET);
+
+    /*reset head and tail pointer */
+    writel(0x0, iommu->mmio_base + IOMMU_CMD_BUFFER_HEAD_OFFSET);
+    writel(0x0, iommu->mmio_base + IOMMU_CMD_BUFFER_TAIL_OFFSET);
 }
 
 static void __init register_iommu_exclusion_range(struct amd_iommu *iommu)
@@ -259,6 +263,10 @@ static void __init set_iommu_event_log_control(struct amd_iommu *iommu,
                          IOMMU_CONTROL_COMP_WAIT_INT_MASK,
                          IOMMU_CONTROL_COMP_WAIT_INT_SHIFT, &entry);
     writel(entry, iommu->mmio_base+IOMMU_CONTROL_MMIO_OFFSET);
+
+    /*reset head and tail pointer */
+    writel(0x0, iommu->mmio_base + IOMMU_EVENT_LOG_HEAD_OFFSET);
+    writel(0x0, iommu->mmio_base + IOMMU_EVENT_LOG_TAIL_OFFSET);
 }
 
 static int amd_iommu_read_event_log(struct amd_iommu *iommu, u32 event[])
