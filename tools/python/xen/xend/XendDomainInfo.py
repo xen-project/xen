@@ -1199,7 +1199,7 @@ class XendDomainInfo:
 
         if self.domid >= 0:
             if target > memory_cur:
-                balloon.free( (target-memory_cur)*1024 )
+                balloon.free((target - memory_cur) * 1024, self)
             self.storeVm("memory", target)
             self.storeDom("memory/target", target << 10)
             xc.domain_set_target_mem(self.domid,
