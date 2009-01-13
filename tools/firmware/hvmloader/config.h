@@ -19,8 +19,8 @@
 #define PCI_MEM_END         0xfc000000
 extern unsigned long pci_mem_start, pci_mem_end;
 
-/* We reserve 16MB at the top of the 4GB memory hole. */
-#define RESERVED_MEMBASE    0xff000000
+/* We reserve 16MB for special BIOS mappings, etc. */
+#define RESERVED_MEMBASE    0xfc000000
 #define RESERVED_MEMSIZE    0x01000000
 
 #define ROMBIOS_SEG            0xF000

@@ -622,7 +622,11 @@ static void build_e820_table(void)
     e820[nr].type = E820_RAM;
     nr++;
 
-    /* Explicitly reserve space for special pages. */
+    /*
+     * Explicitly reserve space for special pages.
+     * This space starts at RESERVED_MEMBASE an extends to cover various
+     * fixed hardware mappings (e.g., LAPIC, IOAPIC, default SVGA framebuffer).
+     */
     e820[nr].addr = RESERVED_MEMBASE;
     e820[nr].size = (uint32_t)-e820[nr].addr;
     e820[nr].type = E820_RESERVED;
@@ -644,7 +648,7 @@ int main(void)
 {
     int option_rom_sz = 0, vgabios_sz = 0, etherboot_sz = 0;
     int rombios_sz, smbios_sz;
-    uint32_t etherboot_phys_addr, option_rom_phys_addr, vga_ram = 0;
+    uint32_t etherboot_phys_addr, option_rom_phys_addr;
     uint16_t xen_pfiob;
 
     printf("HVM Loader\n");
@@ -692,12 +696,6 @@ int main(void)
         break;
     }
 
-    if ( virtual_vga != VGA_none )
-    {
-        vga_ram = virt_to_phys(mem_alloc(8 << 20, 4096));
-        printf("VGA RAM at %08x\n", vga_ram);
-    }
-
     etherboot_phys_addr = VGABIOS_PHYSICAL_ADDRESS + vgabios_sz;
     if ( etherboot_phys_addr < OPTIONROM_PHYSICAL_ADDRESS )
         etherboot_phys_addr = OPTIONROM_PHYSICAL_ADDRESS;
@@ -739,8 +737,6 @@ int main(void)
                ROMBIOS_PHYSICAL_ADDRESS + rombios_sz - 1);
 
     xen_pfiob = init_xen_platform_io_base();
-    if ( xen_pfiob && vga_ram )
-        outl(xen_pfiob + 4, vga_ram);
 
     build_e820_table();
 
