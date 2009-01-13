@@ -45,8 +45,9 @@ ifeq ($(TARGET_SUBARCH),x86_64)
 CFLAGS += -mno-red-zone -fpic -fno-reorder-blocks
 CFLAGS += -fno-asynchronous-unwind-tables
 # -fvisibility=hidden reduces -fpic cost, if it's available
-CFLAGS += $(call cc-option,$(CC),-fvisibility=hidden,)
-CFLAGS := $(subst -fvisibility=hidden,-DGCC_HAS_VISIBILITY_ATTRIBUTE,$(CFLAGS))
+ifneq ($(call cc-option,$(CC),-fvisibility=hidden,n),n)
+CFLAGS += -DGCC_HAS_VISIBILITY_ATTRIBUTE
+endif
 x86_32 := n
 x86_64 := y
 endif

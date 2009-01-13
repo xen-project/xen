@@ -23,9 +23,6 @@ endif
 ifeq ($(perfc_arrays),y)
 perfc := y
 endif
-ifeq ($(frame_pointer),y)
-CFLAGS := $(shell echo $(CFLAGS) | sed -e 's/-f[^ ]*omit-frame-pointer//g')
-endif
 
 # Set ARCH/SUBARCH appropriately.
 override TARGET_SUBARCH  := $(XEN_TARGET_ARCH)
@@ -64,17 +61,18 @@ AFLAGS-y                += -D__ASSEMBLY__
 
 ALL_OBJS := $(ALL_OBJS-y)
 
-CFLAGS_tmp := $(strip $(CFLAGS) $(CFLAGS-y))
-CFLAGS = $(CFLAGS_tmp) -MMD -MF .$(@F).d
+# Get gcc to generate the dependencies for us.
+CFLAGS-y += -MMD -MF .$(@F).d
+DEPS = .*.d
+
+CFLAGS += $(CFLAGS-y)
 
 # Most CFLAGS are safe for assembly files:
 #  -std=gnu{89,99} gets confused by #-prefixed end-of-line comments
-AFLAGS_tmp := $(strip $(AFLAGS) $(AFLAGS-y))
-AFLAGS_tmp += $(patsubst -std=gnu%,,$(CFLAGS_tmp))
-AFLAGS = $(AFLAGS_tmp) -MMD -MF .$(@F).d
+AFLAGS += $(AFLAGS-y) $(filter-out -std=gnu%,$(CFLAGS))
 
 # LDFLAGS are only passed directly to $(LD)
-LDFLAGS  := $(strip $(LDFLAGS) $(LDFLAGS_DIRECT))
+LDFLAGS += $(LDFLAGS_DIRECT)
 
 include Makefile
 
@@ -91,8 +89,6 @@ subdir-y += $(filter %/,$(obj-y))
 obj-y    := $(patsubst %/,%/built-in.o,$(obj-y))
 
 subdir-all := $(subdir-y) $(subdir-n)
-
-DEPS = .*.d
 
 built_in.o: $(obj-y)
 	$(LD) $(LDFLAGS) -r -o $@ $^

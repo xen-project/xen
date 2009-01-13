@@ -72,4 +72,4 @@ ifeq ($(xen_ia64_disable_optvfault),y)
 CFLAGS += -DCONFIG_XEN_IA64_DISABLE_OPTVFAULT
 endif
 
-LDFLAGS := -g
+LDFLAGS = -g
