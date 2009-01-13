@@ -24,7 +24,8 @@ LIB_SRCS += util.c
 LIB_OBJS := $(LIB_SRCS:.c=.o)
 PIC_OBJS := $(LIB_SRCS:.c=.opic)
 
-CFLAGS   += -Werror -fno-strict-aliasing $(call cc-option,$(CC),-fgnu89-inline,)
+$(call cc-option-add,CFLAGS,CC,-fgnu89-inline)
+CFLAGS   += -Werror -fno-strict-aliasing
 CFLAGS   += -O3
 #CFLAGS   += -g
 

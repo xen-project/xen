@@ -26,9 +26,9 @@ CFLAGS += -I$(BASEDIR)/include/asm-x86/mach-default
 CFLAGS += -msoft-float
 
 # Disable PIE/SSP if GCC supports them. They can break us.
-CFLAGS += $(call cc-option,$(CC),-nopie,)
-CFLAGS += $(call cc-option,$(CC),-fno-stack-protector,)
-CFLAGS += $(call cc-option,$(CC),-fno-stack-protector-all,)
+$(call cc-option-add,CFLAGS,CC,-nopie)
+$(call cc-option-add,CFLAGS,CC,-fno-stack-protector)
+$(call cc-option-add,CFLAGS,CC,-fno-stack-protector-all)
 
 ifeq ($(supervisor_mode_kernel),y)
 CFLAGS += -DCONFIG_X86_SUPERVISOR_MODE_KERNEL=1

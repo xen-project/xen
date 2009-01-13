@@ -13,9 +13,9 @@ endif
 CFLAGS += -Werror
 
 # Disable PIE/SSP if GCC supports them. They can break us.
-CFLAGS += $(call cc-option,$(CC),-nopie,)
-CFLAGS += $(call cc-option,$(CC),-fno-stack-protector,)
-CFLAGS += $(call cc-option,$(CC),-fno-stack-protector-all,)
+$(call cc-option-add,CFLAGS,CC,-nopie)
+$(call cc-option-add,CFLAGS,CC,-fno-stack-protector)
+$(call cc-option-add,CFLAGS,CC,-fno-stack-protector-all)
 
 # Extra CFLAGS suitable for an embedded type of environment.
 CFLAGS += -fno-builtin -msoft-float

@@ -5,9 +5,9 @@ CFLAGS =
 include $(XEN_ROOT)/tools/Rules.mk
 
 # Disable PIE/SSP if GCC supports them. They can break us.
-CFLAGS += $(call cc-option,$(CC),-nopie,)
-CFLAGS += $(call cc-option,$(CC),-fno-stack-protector,)
-CFLAGS += $(call cc-option,$(CC),-fno-stack-protector-all,)
+$(call cc-option-add,CFLAGS,CC,-nopie)
+$(call cc-option-add,CFLAGS,CC,-fno-stack-protector)
+$(call cc-option-add,CFLAGS,CC,-fno-stack-protector-all)
 
 CFLAGS += -fno-builtin -msoft-float
 
