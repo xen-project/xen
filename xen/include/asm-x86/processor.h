@@ -191,6 +191,7 @@ extern int phys_proc_id[NR_CPUS];
 extern int cpu_core_id[NR_CPUS];
 
 extern void identify_cpu(struct cpuinfo_x86 *);
+extern void setup_clear_cpu_cap(unsigned int);
 extern void print_cpu_info(struct cpuinfo_x86 *);
 extern unsigned int init_intel_cacheinfo(struct cpuinfo_x86 *c);
 extern void dodgy_tsc(void);

@@ -61,8 +61,12 @@ int unmap_domain_pirq(struct domain *d, int pirq);
 int get_free_pirq(struct domain *d, int type, int index);
 void free_domain_pirqs(struct domain *d);
 
-#define domain_irq_to_vector(d, irq) ((d)->arch.pirq_vector[(irq)])
-#define domain_vector_to_irq(d, vec) ((d)->arch.vector_pirq[(vec)])
+#define domain_irq_to_vector(d, irq) ((d)->arch.pirq_vector[irq] ?: \
+                                      IO_APIC_IRQ(irq) ? 0 : LEGACY_VECTOR(irq))
+#define domain_vector_to_irq(d, vec) ((d)->arch.vector_pirq[vec] ?: \
+                                      ((vec) < FIRST_LEGACY_VECTOR || \
+                                       (vec) > LAST_LEGACY_VECTOR) ? \
+                                      0 : LEGACY_IRQ_FROM_VECTOR(vec))
 
 int pirq_guest_force_unbind(struct domain *d, int irq);
 

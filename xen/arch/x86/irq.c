@@ -867,8 +867,8 @@ int map_domain_pirq(
         return -EINVAL;
     }
 
-    old_vector = d->arch.pirq_vector[pirq];
-    old_pirq = d->arch.vector_pirq[vector];
+    old_vector = domain_irq_to_vector(d, pirq);
+    old_pirq = domain_vector_to_irq(d, vector);
 
     if ( (old_vector && (old_vector != vector) ) ||
          (old_pirq && (old_pirq != pirq)) )
@@ -891,6 +891,10 @@ int map_domain_pirq(
     if ( type == MAP_PIRQ_TYPE_MSI )
     {
         struct msi_info *msi = (struct msi_info *)data;
+
+        ret = -ENODEV;
+        if ( !cpu_has_apic )
+            goto done;
 
         pdev = pci_get_pdev(msi->bus, msi->devfn);
         ret = pci_enable_msi(msi, &msi_desc);
@@ -937,7 +941,7 @@ int unmap_domain_pirq(struct domain *d, int pirq)
     ASSERT(spin_is_locked(&pcidevs_lock));
     ASSERT(spin_is_locked(&d->event_lock));
 
-    vector = d->arch.pirq_vector[pirq];
+    vector = domain_irq_to_vector(d, pirq);
     if ( vector <= 0 )
     {
         dprintk(XENLOG_G_ERR, "dom%d: pirq %d not mapped\n",
@@ -958,7 +962,7 @@ int unmap_domain_pirq(struct domain *d, int pirq)
 
     spin_lock_irqsave(&desc->lock, flags);
 
-    BUG_ON(vector != d->arch.pirq_vector[pirq]);
+    BUG_ON(vector != domain_irq_to_vector(d, pirq));
 
     if ( msi_desc )
         teardown_msi_vector(vector);

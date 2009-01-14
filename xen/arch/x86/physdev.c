@@ -103,14 +103,14 @@ static int physdev_map_pirq(struct physdev_map_pirq *map)
     spin_lock(&pcidevs_lock);
     /* Verify or get pirq. */
     spin_lock(&d->event_lock);
+    pirq = domain_vector_to_irq(d, vector);
     if ( map->pirq < 0 )
     {
-        if ( d->arch.vector_pirq[vector] )
+        if ( pirq )
         {
             dprintk(XENLOG_G_ERR, "dom%d: %d:%d already mapped to %d\n",
                     d->domain_id, map->index, map->pirq,
-                    d->arch.vector_pirq[vector]);
-            pirq = d->arch.vector_pirq[vector];
+                    pirq);
             if ( pirq < 0 )
             {
                 ret = -EBUSY;
@@ -130,8 +130,7 @@ static int physdev_map_pirq(struct physdev_map_pirq *map)
     }
     else
     {
-        if ( d->arch.vector_pirq[vector] &&
-             d->arch.vector_pirq[vector] != map->pirq )
+        if ( pirq && pirq != map->pirq )
         {
             dprintk(XENLOG_G_ERR, "dom%d: vector %d conflicts with irq %d\n",
                     d->domain_id, map->index, map->pirq);
