@@ -206,8 +206,7 @@ struct xen_add_to_physmap {
     /* Source mapping space. */
 #define XENMAPSPACE_shared_info 0 /* shared info page */
 #define XENMAPSPACE_grant_table 1 /* grant table page */
-#define XENMAPSPACE_mfn         2 /* MFN */
-#define XENMAPSPACE_gmfn        3 /* GMFN */
+#define XENMAPSPACE_gmfn        2 /* GMFN */
     unsigned int space;
 
     /* Index into source mapping space. */

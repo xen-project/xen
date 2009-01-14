@@ -3295,13 +3295,12 @@ arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
 
             spin_unlock(&d->grant_table->lock);
             break;
-        case XENMAPSPACE_gmfn:
-            xatp.idx = gmfn_to_mfn(d, xatp.idx);
-        case XENMAPSPACE_mfn: {
+        case XENMAPSPACE_gmfn: {
             struct xen_ia64_memmap_info memmap_info;
             efi_memory_desc_t md;
             int ret;
 
+            xatp.idx = gmfn_to_mfn(d, xatp.idx);
             if ( !get_page_from_pagenr(xatp.idx, d) )
                 break;
 

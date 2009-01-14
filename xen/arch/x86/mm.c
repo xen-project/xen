@@ -3810,7 +3810,6 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
             break;
         case XENMAPSPACE_gmfn:
             xatp.idx = gmfn_to_mfn(d, xatp.idx);
-        case XENMAPSPACE_mfn:
             if ( !get_page_from_pagenr(xatp.idx, d) )
                 break;
             mfn = xatp.idx;
