@@ -265,6 +265,10 @@ class ImageHandler:
             ret.append('-nographic')
             return ret
 
+        vram = str(vmConfig['platform'].get('videoram',4))
+        ret.append('-videoram')
+        ret.append(vram)
+
         vnc_config = {}
         has_vnc = int(vmConfig['platform'].get('vnc', 0)) != 0
         has_sdl = int(vmConfig['platform'].get('sdl', 0)) != 0
@@ -833,6 +837,7 @@ class IA64_HVM_ImageHandler(HVMImageHandler):
     def configure(self, vmConfig):
         HVMImageHandler.configure(self, vmConfig)
         self.vhpt = int(vmConfig['platform'].get('vhpt',  0))
+        self.vramsize = int(vmConfig['platform'].get('videoram',4)) * 1024
 
     def buildDomain(self):
         xc.nvram_init(self.vm.getName(), self.vm.getDomid())
@@ -847,8 +852,8 @@ class IA64_HVM_ImageHandler(HVMImageHandler):
         # buffer io page, buffer pio page and memmap info page
         extra_pages = 1024 + 5
         mem_kb += extra_pages * page_kb
-        # Add 8 MiB overhead for QEMU's video RAM.
-        return mem_kb + 8192
+        mem_kb += self.vramsize
+        return mem_kb
 
     def getRequiredInitialReservation(self):
         return self.vm.getMemoryTarget()
@@ -882,6 +887,7 @@ class X86_HVM_ImageHandler(HVMImageHandler):
     def configure(self, vmConfig):
         HVMImageHandler.configure(self, vmConfig)
         self.pae = int(vmConfig['platform'].get('pae',  0))
+        self.vramsize = int(vmConfig['platform'].get('videoram',4)) * 1024
 
     def buildDomain(self):
         xc.hvm_set_param(self.vm.getDomid(), HVM_PARAM_PAE_ENABLED, self.pae)
@@ -890,8 +896,7 @@ class X86_HVM_ImageHandler(HVMImageHandler):
         return rc
 
     def getRequiredAvailableMemory(self, mem_kb):
-        # Add 8 MiB overhead for QEMU's video RAM.
-        return mem_kb + 8192
+        return mem_kb + self.vramsize
 
     def getRequiredInitialReservation(self):
         return self.vm.getMemoryTarget()

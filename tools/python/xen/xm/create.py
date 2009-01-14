@@ -526,9 +526,9 @@ gopts.var('vncunused', val='',
           use="""Try to find an unused port for the VNC server.
           Only valid when vnc=1.""")
 
-gopts.var('videoram', val='',
-          fn=set_value, default=None,
-          use="""Maximum amount of videoram PV guest can allocate
+gopts.var('videoram', val='MEMORY',
+          fn=set_int, default=4,
+          use="""Maximum amount of videoram a guest can allocate
           for frame buffer.""")
 
 gopts.var('sdl', val='',
@@ -884,7 +884,7 @@ def configure_hvm(config_image, vals):
     """Create the config for HVM devices.
     """
     args = [ 'device_model', 'pae', 'vcpus', 'boot', 'fda', 'fdb', 'timer_mode',
-             'localtime', 'serial', 'stdvga', 'isa', 'nographic', 'soundhw',
+             'localtime', 'serial', 'stdvga', 'videoram', 'isa', 'nographic', 'soundhw',
              'vnc', 'vncdisplay', 'vncunused', 'vncconsole', 'vnclisten',
              'sdl', 'display', 'xauthority', 'rtc_timeoffset', 'monitor',
              'acpi', 'apic', 'usb', 'usbdevice', 'keymap', 'pci', 'hpet',

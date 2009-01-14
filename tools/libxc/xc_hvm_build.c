@@ -28,7 +28,7 @@
 #define SPECIALPAGE_IDENT_PT 3
 #define SPECIALPAGE_SHINFO   4
 #define NR_SPECIAL_PAGES     5
-#define special_pfn(x) (0x100000u - NR_SPECIAL_PAGES + (x))
+#define special_pfn(x) (0xff000u - NR_SPECIAL_PAGES + (x))
 
 static void build_hvm_info(void *hvm_info_page, uint64_t mem_size)
 {

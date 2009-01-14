@@ -149,6 +149,7 @@ XENAPI_PLATFORM_CFG_TYPES = {
     'opengl': int,
     'soundhw': str,
     'stdvga': int,
+    'videoram': int,
     'usb': int,
     'usbdevice': str,
     'hpet': int,

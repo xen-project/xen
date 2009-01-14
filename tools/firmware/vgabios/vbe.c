@@ -38,8 +38,6 @@
 #include "vbe.h"
 #include "vbetables.h"
 
-#define VBE_TOTAL_VIDEO_MEMORY_DIV_64K (VBE_DISPI_TOTAL_VIDEO_MEMORY_MB*1024/64)
-
 // The current OEM Software Revision of this VBE Bios
 #define VBE_OEM_SOFTWARE_REV 0x0002;
 
@@ -821,7 +819,8 @@ Bit16u *AX;Bit16u ES;Bit16u DI;
         vbe_info_block.VideoModePtr_Off= DI + 34;
 
         // VBE Total Memory (in 64b blocks)
-        vbe_info_block.TotalMemory = VBE_TOTAL_VIDEO_MEMORY_DIV_64K;
+        outw(VBE_DISPI_IOPORT_INDEX, VBE_DISPI_INDEX_VIDEO_MEMORY_64K);
+        vbe_info_block.TotalMemory = inw(VBE_DISPI_IOPORT_DATA);
 
         if (vbe2_info)
 	{
@@ -846,7 +845,8 @@ Bit16u *AX;Bit16u ES;Bit16u DI;
         do
         {
                 if ((cur_info->info.XResolution <= dispi_get_max_xres()) &&
-                    (cur_info->info.BitsPerPixel <= dispi_get_max_bpp())) {
+                    (cur_info->info.BitsPerPixel <= dispi_get_max_bpp()) &&
+                    (cur_info->info.XResolution * cur_info->info.XResolution * cur_info->info.BitsPerPixel <= vbe_info_block.TotalMemory << 19 )) {
 #ifdef DEBUG
                   printf("VBE found mode %x => %x\n", cur_info->mode,cur_mode);
 #endif
@@ -855,7 +855,7 @@ Bit16u *AX;Bit16u ES;Bit16u DI;
                   cur_ptr+=2;
                 } else {
 #ifdef DEBUG
-                  printf("VBE mode %x (xres=%x / bpp=%02x) not supported by display\n", cur_info->mode,cur_info->info.XResolution,cur_info->info.BitsPerPixel);
+                  printf("VBE mode %x (xres=%x / bpp=%02x) not supported \n", cur_info->mode,cur_info->info.XResolution,cur_info->info.BitsPerPixel);
 #endif
                 }
                 cur_info++;
@@ -913,7 +913,13 @@ Bit16u *AX;Bit16u CX; Bit16u ES;Bit16u DI;
                   info.WinFuncPtr = 0xC0000000UL;
                   *(Bit16u *)&(info.WinFuncPtr) = (Bit16u)(dispi_set_bank_farcall);
                 }
-                
+                outw(VBE_DISPI_IOPORT_INDEX,VBE_DISPI_INDEX_LFB_ADDRESS_H);
+                info.PhysBasePtr = inw(VBE_DISPI_IOPORT_DATA);
+                info.PhysBasePtr = info.PhysBasePtr << 16;
+#if 0					
+                outw(VBE_DISPI_IOPORT_INDEX,VBE_DISPI_INDEX_LFB_ADDRESS_L);
+                info.PhysBasePtr |= inw(VBE_DISPI_IOPORT_DATA);
+#endif 							
                 result = 0x4f;
         }
         else

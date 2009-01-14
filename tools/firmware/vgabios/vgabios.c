@@ -3811,9 +3811,9 @@ void printf(s)
         for (i=0; i<format_width; i++) {
           nibble = (arg >> (4 * digit)) & 0x000f;
           if (nibble <= 9)
-            outb(0x0500, nibble + '0');
+            outb(0xe9, nibble + '0');
           else
-            outb(0x0500, (nibble - 10) + 'A');
+            outb(0xe9, (nibble - 10) + 'A');
           digit--;
           }
         in_format = 0;
@@ -3823,7 +3823,7 @@ void printf(s)
       //  }
       }
     else {
-      outb(0x0500, c);
+      outb(0xe9, c);
       }
     s ++;
     }
