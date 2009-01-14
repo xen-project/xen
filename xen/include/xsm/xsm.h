@@ -96,7 +96,6 @@ struct xsm_operations {
     int (*alloc_security_evtchn) (struct evtchn *chn);
     void (*free_security_evtchn) (struct evtchn *chn);
 
-    int (*translate_gpfn_list) (struct domain *d, unsigned long mfn);
     int (*memory_adjust_reservation) (struct domain *d1, struct domain *d2);
     int (*memory_stat_reservation) (struct domain *d1, struct domain *d2);
     int (*memory_pin_page) (struct domain *d, struct page_info *page);
@@ -365,11 +364,6 @@ static inline int xsm_alloc_security_evtchn (struct evtchn *chn)
 static inline void xsm_free_security_evtchn (struct evtchn *chn)
 {
     xsm_call(free_security_evtchn(chn));
-}
-
-static inline int xsm_translate_gpfn_list (struct domain *d, unsigned long mfn)
-{
-    return xsm_call(translate_gpfn_list(d, mfn));
 }
 
 static inline int xsm_memory_adjust_reservation (struct domain *d1, struct

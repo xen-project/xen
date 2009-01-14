@@ -235,29 +235,8 @@ struct xen_remove_from_physmap {
 typedef struct xen_remove_from_physmap xen_remove_from_physmap_t;
 DEFINE_XEN_GUEST_HANDLE(xen_remove_from_physmap_t);
 
-/*
- * Translates a list of domain-specific GPFNs into MFNs. Returns a -ve error
- * code on failure. This call only works for auto-translated guests.
- */
-#define XENMEM_translate_gpfn_list  8
-struct xen_translate_gpfn_list {
-    /* Which domain to translate for? */
-    domid_t domid;
-
-    /* Length of list. */
-    xen_ulong_t nr_gpfns;
-
-    /* List of GPFNs to translate. */
-    XEN_GUEST_HANDLE(xen_pfn_t) gpfn_list;
-
-    /*
-     * Output list to contain MFN translations. May be the same as the input
-     * list (in which case each input GPFN is overwritten with the output MFN).
-     */
-    XEN_GUEST_HANDLE(xen_pfn_t) mfn_list;
-};
-typedef struct xen_translate_gpfn_list xen_translate_gpfn_list_t;
-DEFINE_XEN_GUEST_HANDLE(xen_translate_gpfn_list_t);
+/*** REMOVED ***/
+/*#define XENMEM_translate_gpfn_list  8*/
 
 /*
  * Returns the pseudo-physical memory map as it was when the domain

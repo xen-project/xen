@@ -39,7 +39,6 @@
 !	memory_map			memory.h
 !	memory_reservation		memory.h
 !	pod_target			memory.h
-!	translate_gpfn_list		memory.h
 !	sched_poll			sched.h
 ?	sched_remote_shutdown		sched.h
 ?	sched_shutdown			sched.h

@@ -367,20 +367,6 @@ static int get_mfn_sid(unsigned long mfn, u32 *sid)
     return rc;    
 }
 
-static int flask_translate_gpfn_list(struct domain *d, unsigned long mfn)
-{
-    int rc = 0;
-    u32 sid;
-    struct domain_security_struct *dsec;
-    dsec = d->ssid;
-
-    rc = get_mfn_sid(mfn, &sid);
-    if ( rc )
-        return rc;
-
-    return avc_has_perm(dsec->sid, sid, SECCLASS_MMU, MMU__TRANSLATEGP, NULL);
-}
-
 static int flask_memory_adjust_reservation(struct domain *d1, struct domain *d2)
 {
     return domain_has_perm(d1, d2, SECCLASS_MMU, MMU__ADJUST);
@@ -1280,7 +1266,6 @@ static struct xsm_operations flask_ops = {
     .alloc_security_evtchn = flask_alloc_security_evtchn,
     .free_security_evtchn = flask_free_security_evtchn,
 
-    .translate_gpfn_list = flask_translate_gpfn_list,
     .memory_adjust_reservation = flask_memory_adjust_reservation,
     .memory_stat_reservation = flask_memory_stat_reservation,
     .memory_pin_page = flask_memory_pin_page,

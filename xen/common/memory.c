@@ -215,72 +215,6 @@ static void decrease_reservation(struct memop_args *a)
     a->nr_done = i;
 }
 
-static long translate_gpfn_list(
-    XEN_GUEST_HANDLE(xen_translate_gpfn_list_t) uop, unsigned long *progress)
-{
-    struct xen_translate_gpfn_list op;
-    unsigned long i;
-    xen_pfn_t gpfn;
-    xen_pfn_t mfn;
-    struct domain *d;
-    int rc;
-
-    if ( copy_from_guest(&op, uop, 1) )
-        return -EFAULT;
-
-    /* Is size too large for us to encode a continuation? */
-    if ( op.nr_gpfns > (ULONG_MAX >> MEMOP_EXTENT_SHIFT) )
-        return -EINVAL;
-
-    if ( !guest_handle_subrange_okay(op.gpfn_list, *progress, op.nr_gpfns-1) ||
-         !guest_handle_subrange_okay(op.mfn_list, *progress, op.nr_gpfns-1) )
-        return -EFAULT;
-
-    rc = rcu_lock_target_domain_by_id(op.domid, &d);
-    if ( rc )
-        return rc;
-
-    if ( !paging_mode_translate(d) )
-    {
-        rcu_unlock_domain(d);
-        return -EINVAL;
-    }
-
-    for ( i = *progress; i < op.nr_gpfns; i++ )
-    {
-        if ( hypercall_preempt_check() )
-        {
-            rcu_unlock_domain(d);
-            *progress = i;
-            return -EAGAIN;
-        }
-
-        if ( unlikely(__copy_from_guest_offset(&gpfn, op.gpfn_list, i, 1)) )
-        {
-            rcu_unlock_domain(d);
-            return -EFAULT;
-        }
-
-        mfn = gmfn_to_mfn(d, gpfn);
-
-        rc = xsm_translate_gpfn_list(current->domain, mfn);
-        if ( rc )
-        {
-            rcu_unlock_domain(d);
-            return rc;
-        }
-
-        if ( unlikely(__copy_to_guest_offset(op.mfn_list, i, &mfn, 1)) )
-        {
-            rcu_unlock_domain(d);
-            return -EFAULT;
-        }
-    }
-
-    rcu_unlock_domain(d);
-    return 0;
-}
-
 static long memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
 {
     struct xen_memory_exchange exch;
@@ -494,7 +428,7 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE(void) arg)
     struct domain *d;
     int rc, op;
     unsigned int address_bits;
-    unsigned long start_extent, progress;
+    unsigned long start_extent;
     struct xen_memory_reservation reservation;
     struct memop_args args;
     domid_t domid;
@@ -628,17 +562,6 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE(void) arg)
 
         rcu_unlock_domain(d);
 
-        break;
-
-    case XENMEM_translate_gpfn_list:
-        progress = cmd >> MEMOP_EXTENT_SHIFT;
-        rc = translate_gpfn_list(
-            guest_handle_cast(arg, xen_translate_gpfn_list_t),
-            &progress);
-        if ( rc == -EAGAIN )
-            return hypercall_create_continuation(
-                __HYPERVISOR_memory_op, "lh",
-                op | (progress << MEMOP_EXTENT_SHIFT), arg);
         break;
 
     default:

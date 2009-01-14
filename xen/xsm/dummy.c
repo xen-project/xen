@@ -180,11 +180,6 @@ static int dummy_grant_query_size (struct domain *d1, struct domain *d2)
     return 0;
 }
 
-static int dummy_translate_gpfn_list (struct domain *d, unsigned long mfn)
-{
-    return 0;
-}
-
 static int dummy_memory_adjust_reservation (struct domain *d1,
                                                             struct domain *d2)
 {
@@ -522,7 +517,6 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, alloc_security_evtchn);
     set_to_dummy_if_null(ops, free_security_evtchn);
 
-    set_to_dummy_if_null(ops, translate_gpfn_list);
     set_to_dummy_if_null(ops, memory_adjust_reservation);
     set_to_dummy_if_null(ops, memory_stat_reservation);
     set_to_dummy_if_null(ops, memory_pin_page);
