@@ -29,6 +29,7 @@
 
 #include <xenctrl.h>
 #include <inttypes.h>
+#include <sys/time.h>
 
 #define ARRAY_SIZE(a) (sizeof (a) / sizeof ((a)[0]))
 
