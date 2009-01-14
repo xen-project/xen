@@ -56,6 +56,11 @@ sdl = 0
 
 vfb = [ 'type=sdl' ]
 
+    by default qemu will use sdl together with opengl for rendering, if
+    you do not want qemu to use opengl then also pass opengl=0:
+
+vfb = [ 'type=sdl, opengl=0' ]
+
 * Using a VNC server in the stub domain
 
   - In hvmconfig, set vnclisten to "172.30.206.1" for instance.  Do not use a
