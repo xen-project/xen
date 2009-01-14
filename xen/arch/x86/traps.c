@@ -723,6 +723,8 @@ static void pv_cpuid(struct cpu_user_regs *regs)
     {
         /* Modify Feature Information. */
         __clear_bit(X86_FEATURE_VME, &d);
+        if ( !cpu_has_apic )
+            __clear_bit(X86_FEATURE_APIC, &d);
         if ( !opt_allow_hugepage )
             __clear_bit(X86_FEATURE_PSE, &d);
         __clear_bit(X86_FEATURE_PGE, &d);
@@ -755,6 +757,8 @@ static void pv_cpuid(struct cpu_user_regs *regs)
         __clear_bit(X86_FEATURE_XTPR % 32, &c);
         __clear_bit(X86_FEATURE_PDCM % 32, &c);
         __clear_bit(X86_FEATURE_DCA % 32, &c);
+        if ( !cpu_has_apic )
+           __clear_bit(X86_FEATURE_X2APIC % 32, &c);
         __set_bit(X86_FEATURE_HYPERVISOR % 32, &c);
         break;
     case 0x80000001:
@@ -773,6 +777,8 @@ static void pv_cpuid(struct cpu_user_regs *regs)
         __clear_bit(X86_FEATURE_RDTSCP % 32, &d);
 
         __clear_bit(X86_FEATURE_SVME % 32, &c);
+        if ( !cpu_has_apic )
+           __clear_bit(X86_FEATURE_EXTAPICSPACE % 32, &c);
         __clear_bit(X86_FEATURE_OSVW % 32, &c);
         __clear_bit(X86_FEATURE_IBS % 32, &c);
         __clear_bit(X86_FEATURE_SKINIT % 32, &c);
