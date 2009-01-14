@@ -69,20 +69,6 @@ int compat_arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         break;
     }
 
-    case XENMEM_remove_from_physmap:
-    {
-        struct compat_remove_from_physmap cmp;
-        struct xen_remove_from_physmap *nat = (void *)COMPAT_ARG_XLAT_VIRT_BASE;
-
-        if ( copy_from_guest(&cmp, arg, 1) )
-            return -EFAULT;
-
-        XLAT_remove_from_physmap(nat, &cmp);
-        rc = arch_memory_op(op, guest_handle_from_ptr(nat, void));
-
-        break;
-    }
-
     case XENMEM_set_memory_map:
     {
         struct compat_foreign_memory_map cmp;

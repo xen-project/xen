@@ -452,10 +452,6 @@ static int dummy_ext_vcpucontext (struct domain *d, uint32_t cmd)
     return 0;
 }
 
-static int dummy_remove_from_physmap (struct domain *d1, struct domain *d2)
-{
-    return 0;
-}
 #endif
 
 struct xsm_operations dummy_xsm_ops;
@@ -562,7 +558,6 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, mmu_machphys_update);
     set_to_dummy_if_null(ops, update_va_mapping);
     set_to_dummy_if_null(ops, add_to_physmap);
-    set_to_dummy_if_null(ops, remove_from_physmap);
     set_to_dummy_if_null(ops, sendtrigger);
     set_to_dummy_if_null(ops, test_assign_device);
     set_to_dummy_if_null(ops, assign_device);

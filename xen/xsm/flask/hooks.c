@@ -1057,11 +1057,6 @@ static int flask_add_to_physmap(struct domain *d1, struct domain *d2)
     return domain_has_perm(d1, d2, SECCLASS_MMU, MMU__PHYSMAP);
 }
 
-static int flask_remove_from_physmap(struct domain *d1, struct domain *d2)
-{
-    return domain_has_perm(d1, d2, SECCLASS_MMU, MMU__PHYSMAP);
-}
-
 static int flask_sendtrigger(struct domain *d)
 {
     return domain_has_perm(current->domain, d, SECCLASS_DOMAIN, DOMAIN__TRIGGER);
@@ -1310,7 +1305,6 @@ static struct xsm_operations flask_ops = {
     .mmu_machphys_update = flask_mmu_machphys_update,
     .update_va_mapping = flask_update_va_mapping,
     .add_to_physmap = flask_add_to_physmap,
-    .remove_from_physmap = flask_remove_from_physmap,
     .sendtrigger = flask_sendtrigger,
     .test_assign_device = flask_test_assign_device,
     .assign_device = flask_assign_device,

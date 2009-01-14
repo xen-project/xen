@@ -3860,39 +3860,6 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         break;
     }
 
-    case XENMEM_remove_from_physmap:
-    {
-        struct xen_remove_from_physmap xrfp;
-        unsigned long mfn;
-        struct domain *d;
-
-        if ( copy_from_guest(&xrfp, arg, 1) )
-            return -EFAULT;
-
-        rc = rcu_lock_target_domain_by_id(xrfp.domid, &d);
-        if ( rc != 0 )
-            return rc;
-
-        if ( xsm_remove_from_physmap(current->domain, d) )
-        {
-            rcu_unlock_domain(d);
-            return -EPERM;
-        }
-
-        domain_lock(d);
-
-        mfn = gmfn_to_mfn(d, xrfp.gpfn);
-
-        if ( mfn_valid(mfn) )
-            guest_physmap_remove_page(d, xrfp.gpfn, mfn, 0);
-
-        domain_unlock(d);
-
-        rcu_unlock_domain(d);
-
-        break;
-    }
-
     case XENMEM_set_memory_map:
     {
         struct xen_foreign_memory_map fmap;
