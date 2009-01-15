@@ -58,9 +58,6 @@
 /* number of pages to write at a time */
 #define DUMP_INCREMENT (4 * 1024)
 
-/* Don't yet support cross-address-size core dump */
-#define guest_width (sizeof (unsigned long))
-
 /* string table */
 struct xc_core_strtab {
     char       *strings;
@@ -240,7 +237,7 @@ xc_core_ehdr_init(Elf64_Ehdr *ehdr)
     ehdr->e_ident[EI_ABIVERSION] = EV_CURRENT;
 
     ehdr->e_type = ET_CORE;
-    ehdr->e_machine = ELF_ARCH_MACHINE;
+    /* e_machine will be filled in later */
     ehdr->e_version = EV_CURRENT;
     ehdr->e_entry = 0;
     ehdr->e_phoff = 0;
@@ -359,7 +356,8 @@ elfnote_dump_core_header(
 }
 
 static int
-elfnote_dump_xen_version(void *args, dumpcore_rtn_t dump_rtn, int xc_handle)
+elfnote_dump_xen_version(void *args, dumpcore_rtn_t dump_rtn, int xc_handle,
+                         unsigned int guest_width)
 {
     int sts;
     struct elfnote elfnote;
@@ -371,6 +369,12 @@ elfnote_dump_xen_version(void *args, dumpcore_rtn_t dump_rtn, int xc_handle)
     elfnote.descsz = sizeof(xen_version);
     elfnote.type = XEN_ELFNOTE_DUMPCORE_XEN_VERSION;
     elfnote_fill_xen_version(xc_handle, &xen_version);
+    if (guest_width < sizeof(unsigned long))
+    {
+        // 32 bit elf file format differs in pagesize's alignment
+        char *p = (char *)&xen_version.pagesize;
+        memmove(p - 4, p, sizeof(xen_version.pagesize));
+    }
     sts = dump_rtn(args, (char*)&elfnote, sizeof(elfnote));
     if ( sts != 0 )
         return sts;
@@ -396,6 +400,24 @@ elfnote_dump_format_version(void *args, dumpcore_rtn_t dump_rtn)
     return dump_rtn(args, (char*)&format_version, sizeof(format_version));
 }
 
+static int
+get_guest_width(int xc_handle,
+                uint32_t domid,
+                unsigned int *guest_width)
+{
+    DECLARE_DOMCTL;
+
+    memset(&domctl, 0, sizeof(domctl));
+    domctl.domain = domid;
+    domctl.cmd = XEN_DOMCTL_get_address_size;
+
+    if ( do_domctl(xc_handle, &domctl) != 0 )
+        return 1;
+        
+    *guest_width = domctl.u.address_size.size / 8;
+    return 0;
+}
+
 int
 xc_domain_dumpcore_via_callback(int xc_handle,
                                 uint32_t domid,
@@ -403,7 +425,8 @@ xc_domain_dumpcore_via_callback(int xc_handle,
                                 dumpcore_rtn_t dump_rtn)
 {
     xc_dominfo_t info;
-    shared_info_t *live_shinfo = NULL;
+    shared_info_any_t *live_shinfo = NULL;
+    unsigned int guest_width; 
 
     int nr_vcpus = 0;
     char *dump_mem, *dump_mem_start = NULL;
@@ -437,6 +460,12 @@ xc_domain_dumpcore_via_callback(int xc_handle,
     uint16_t strtab_idx;
     struct xc_core_section_headers *sheaders = NULL;
     Elf64_Shdr *shdr;
+ 
+    if ( get_guest_width(xc_handle, domid, &guest_width) != 0 )
+    {
+        PERROR("Could not get address size for domain");
+        return sts;
+    }
 
     xc_core_arch_context_init(&arch_ctxt);
     if ( (dump_mem_start = malloc(DUMP_INCREMENT*PAGE_SIZE)) == NULL )
@@ -500,7 +529,7 @@ xc_domain_dumpcore_via_callback(int xc_handle,
             goto out;
         }
 
-        sts = xc_core_arch_map_p2m(xc_handle, &info, live_shinfo,
+        sts = xc_core_arch_map_p2m(xc_handle, guest_width, &info, live_shinfo,
                                    &p2m, &p2m_size);
         if ( sts != 0 )
             goto out;
@@ -676,6 +705,7 @@ xc_domain_dumpcore_via_callback(int xc_handle,
     /* write out elf header */
     ehdr.e_shnum = sheaders->num;
     ehdr.e_shstrndx = strtab_idx;
+    ehdr.e_machine = ELF_ARCH_MACHINE;
     sts = dump_rtn(args, (char*)&ehdr, sizeof(ehdr));
     if ( sts != 0 )
         goto out;
@@ -697,7 +727,7 @@ xc_domain_dumpcore_via_callback(int xc_handle,
         goto out;
 
     /* elf note section: xen version */
-    sts = elfnote_dump_xen_version(args, dump_rtn, xc_handle);
+    sts = elfnote_dump_xen_version(args, dump_rtn, xc_handle, guest_width);
     if ( sts != 0 )
         goto out;
 
@@ -757,9 +787,21 @@ xc_domain_dumpcore_via_callback(int xc_handle,
 
             if ( !auto_translated_physmap )
             {
-                gmfn = p2m[i];
-                if ( gmfn == INVALID_P2M_ENTRY )
-                    continue;
+                if ( guest_width >= sizeof(unsigned long) )
+                {
+                    if ( guest_width == sizeof(unsigned long) )
+                        gmfn = p2m[i];
+                    else
+                        gmfn = ((uint64_t *)p2m)[i];
+                    if ( gmfn == INVALID_P2M_ENTRY )
+                        continue;
+                }
+                else
+                {
+                    gmfn = ((uint32_t *)p2m)[i];
+                    if ( gmfn == (uint32_t)INVALID_P2M_ENTRY )
+                       continue;
+                }
 
                 p2m_array[j].pfn = i;
                 p2m_array[j].gmfn = gmfn;
@@ -802,7 +844,7 @@ copy_done:
         /* When live dump-mode (-L option) is specified,
          * guest domain may reduce memory. pad with zero pages.
          */
-        IPRINTF("j (%ld) != nr_pages (%ld)", j , nr_pages);
+        IPRINTF("j (%ld) != nr_pages (%ld)", j, nr_pages);
         memset(dump_mem_start, 0, PAGE_SIZE);
         for (; j < nr_pages; j++) {
             sts = dump_rtn(args, dump_mem_start, PAGE_SIZE);
@@ -891,7 +933,7 @@ xc_domain_dumpcore(int xc_handle,
     struct dump_args da;
     int sts;
 
-    if ( (da.fd = open(corename, O_CREAT|O_RDWR, S_IWUSR|S_IRUSR)) < 0 )
+    if ( (da.fd = open(corename, O_CREAT|O_RDWR|O_TRUNC, S_IWUSR|S_IRUSR)) < 0 )
     {
         PERROR("Could not open corefile %s", corename);
         return -errno;

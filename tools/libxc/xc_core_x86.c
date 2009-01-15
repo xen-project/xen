@@ -20,9 +20,25 @@
 
 #include "xg_private.h"
 #include "xc_core.h"
+#include "xc_e820.h"
 
-/* Don't yet support cross-address-size core dump */
-#define guest_width (sizeof (unsigned long))
+#define GET_FIELD(_p, _f) ((guest_width==8) ? ((_p)->x64._f) : ((_p)->x32._f))
+
+#ifndef MAX
+#define MAX(_a, _b) ((_a) >= (_b) ? (_a) : (_b))
+#endif
+
+int
+xc_core_arch_gpfn_may_present(struct xc_core_arch_context *arch_ctxt,
+                              unsigned long pfn)
+{
+    if ((pfn >= 0xa0 && pfn < 0xc0) /* VGA hole */
+        || (pfn >= (HVM_BELOW_4G_MMIO_START >> PAGE_SHIFT)
+            && pfn < (1ULL<<32) >> PAGE_SHIFT)) /* MMIO */
+        return 0;
+    return 1;
+}
+
 
 static int nr_gpfns(int xc_handle, domid_t domid)
 {
@@ -37,7 +53,7 @@ xc_core_arch_auto_translated_physmap(const xc_dominfo_t *info)
 
 int
 xc_core_arch_memory_map_get(int xc_handle, struct xc_core_arch_context *unused,
-                            xc_dominfo_t *info, shared_info_t *live_shinfo,
+                            xc_dominfo_t *info, shared_info_any_t *live_shinfo,
                             xc_core_memory_map_t **mapp,
                             unsigned int *nr_entries)
 {
@@ -60,17 +76,22 @@ xc_core_arch_memory_map_get(int xc_handle, struct xc_core_arch_context *unused,
 }
 
 int
-xc_core_arch_map_p2m(int xc_handle, xc_dominfo_t *info,
-                     shared_info_t *live_shinfo, xen_pfn_t **live_p2m,
+xc_core_arch_map_p2m(int xc_handle, unsigned int guest_width, xc_dominfo_t *info,
+                     shared_info_any_t *live_shinfo, xen_pfn_t **live_p2m,
                      unsigned long *pfnp)
 {
     /* Double and single indirect references to the live P2M table */
     xen_pfn_t *live_p2m_frame_list_list = NULL;
     xen_pfn_t *live_p2m_frame_list = NULL;
+    /* Copies of the above. */
+    xen_pfn_t *p2m_frame_list_list = NULL;
+    xen_pfn_t *p2m_frame_list = NULL;
+
     uint32_t dom = info->domid;
     unsigned long p2m_size = nr_gpfns(xc_handle, info->domid);
     int ret = -1;
     int err;
+    int i;
 
     if ( p2m_size < info->nr_pages  )
     {
@@ -80,7 +101,7 @@ xc_core_arch_map_p2m(int xc_handle, xc_dominfo_t *info,
 
     live_p2m_frame_list_list =
         xc_map_foreign_range(xc_handle, dom, PAGE_SIZE, PROT_READ,
-                             live_shinfo->arch.pfn_to_mfn_frame_list_list);
+                             GET_FIELD(live_shinfo, arch.pfn_to_mfn_frame_list_list));
 
     if ( !live_p2m_frame_list_list )
     {
@@ -88,9 +109,28 @@ xc_core_arch_map_p2m(int xc_handle, xc_dominfo_t *info,
         goto out;
     }
 
+    /* Get a local copy of the live_P2M_frame_list_list */
+    if ( !(p2m_frame_list_list = malloc(PAGE_SIZE)) )
+    {
+        ERROR("Couldn't allocate p2m_frame_list_list array");
+        goto out;
+    }
+    memcpy(p2m_frame_list_list, live_p2m_frame_list_list, PAGE_SIZE);
+
+    /* Canonicalize guest's unsigned long vs ours */
+    if ( guest_width > sizeof(unsigned long) )
+        for ( i = 0; i < PAGE_SIZE/sizeof(unsigned long); i++ )
+            if ( i < PAGE_SIZE/guest_width )
+                p2m_frame_list_list[i] = ((uint64_t *)p2m_frame_list_list)[i];
+            else
+                p2m_frame_list_list[i] = 0;
+    else if ( guest_width < sizeof(unsigned long) )
+        for ( i = PAGE_SIZE/sizeof(unsigned long) - 1; i >= 0; i-- )
+            p2m_frame_list_list[i] = ((uint32_t *)p2m_frame_list_list)[i];
+
     live_p2m_frame_list =
         xc_map_foreign_pages(xc_handle, dom, PROT_READ,
-                             live_p2m_frame_list_list,
+                             p2m_frame_list_list,
                              P2M_FLL_ENTRIES);
 
     if ( !live_p2m_frame_list )
@@ -99,8 +139,25 @@ xc_core_arch_map_p2m(int xc_handle, xc_dominfo_t *info,
         goto out;
     }
 
+    /* Get a local copy of the live_P2M_frame_list */
+    if ( !(p2m_frame_list = malloc(P2M_TOOLS_FL_SIZE)) )
+    {
+        ERROR("Couldn't allocate p2m_frame_list array");
+        goto out;
+    }
+    memset(p2m_frame_list, 0, P2M_TOOLS_FL_SIZE);
+    memcpy(p2m_frame_list, live_p2m_frame_list, P2M_GUEST_FL_SIZE);
+
+    /* Canonicalize guest's unsigned long vs ours */
+    if ( guest_width > sizeof(unsigned long) )
+        for ( i = 0; i < P2M_FL_ENTRIES; i++ )
+            p2m_frame_list[i] = ((uint64_t *)p2m_frame_list)[i];
+    else if ( guest_width < sizeof(unsigned long) )
+        for ( i = P2M_FL_ENTRIES - 1; i >= 0; i-- )
+            p2m_frame_list[i] = ((uint32_t *)p2m_frame_list)[i];
+
     *live_p2m = xc_map_foreign_pages(xc_handle, dom, PROT_READ,
-                                    live_p2m_frame_list,
+                                    p2m_frame_list,
                                     P2M_FL_ENTRIES);
 
     if ( !*live_p2m )
@@ -121,6 +178,12 @@ out:
 
     if ( live_p2m_frame_list )
         munmap(live_p2m_frame_list, P2M_FLL_ENTRIES * PAGE_SIZE);
+
+    if ( p2m_frame_list_list )
+        free(p2m_frame_list_list);
+
+    if ( p2m_frame_list )
+        free(p2m_frame_list);
 
     errno = err;
     return ret;

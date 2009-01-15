@@ -21,15 +21,8 @@
 #ifndef XC_CORE_X86_H
 #define XC_CORE_X86_H
 
-#if defined(__i386__) || defined(__x86_64__)
 #define ELF_ARCH_DATA           ELFDATA2LSB
-#if defined (__i386__)
-# define ELF_ARCH_MACHINE       EM_386
-#else
-# define ELF_ARCH_MACHINE       EM_X86_64
-#endif
-#endif /* __i386__ or __x86_64__ */
-
+#define ELF_ARCH_MACHINE       (guest_width == 8 ? EM_X86_64 : EM_386)
 
 struct xc_core_arch_context {
     /* nothing */
@@ -40,8 +33,10 @@ struct xc_core_arch_context {
 #define xc_core_arch_context_get(arch_ctxt, ctxt, xc_handle, domid) \
                                                                 (0)
 #define xc_core_arch_context_dump(arch_ctxt, args, dump_rtn)    (0)
-#define xc_core_arch_gpfn_may_present(arch_ctxt, i)             (1)
 
+int
+xc_core_arch_gpfn_may_present(struct xc_core_arch_context *arch_ctxt,
+                              unsigned long pfn);
 static inline int
 xc_core_arch_context_get_shdr(struct xc_core_arch_context *arch_ctxt, 
                               struct xc_core_section_headers *sheaders,

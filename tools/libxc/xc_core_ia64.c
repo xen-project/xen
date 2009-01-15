@@ -235,7 +235,7 @@ old:
 }
 
 int
-xc_core_arch_map_p2m(int xc_handle, xc_dominfo_t *info,
+xc_core_arch_map_p2m(int xc_handle, unsigned int guest_width, xc_dominfo_t *info,
                      shared_info_t *live_shinfo, xen_pfn_t **live_p2m,
                      unsigned long *pfnp)
 {
