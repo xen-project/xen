@@ -126,18 +126,18 @@ gdt_base:
 gdt_entry_pm_cs:
     ; 32 bit code segment for protected mode
     .word 0xffff, 0x0000
-    .byte 0x00, 0x9a, 0xcf, 0x00
+    .byte 0x00, 0x9b, 0xcf, 0x00
 
 gdt_entry_pm_16bit_cs:
     ; temp. 16 bit code segment used while in protected mode
     .word 0xffff, 0x0000
-    .byte SEGMENT_OFFSET >> 16, 0x9a, 0x0, 0x0
+    .byte SEGMENT_OFFSET >> 16, 0x9b, 0x0, 0x0
 
 gdt_entry_pm_32bit_ds:
     ; (32 bit) data segment (r/w) reaching all possible areas in 32bit memory
     ; 4kb granularity
     .word 0xffff, 0x0000
-    .byte 0x0, 0x92, 0xcf, 0x0
+    .byte 0x0, 0x93, 0xcf, 0x0
 gdt_entry_end:
 
 my_gdtdesc:
@@ -356,9 +356,6 @@ Upcall:
 	call _store_returnaddress	; store away
 	pop ax
 
-	; XXX GDT munging requires ROM to be writable!
-	call _enable_rom_write_access
-
 	rol bx, #2
 	mov si, #jmptable
 	seg cs
@@ -384,8 +381,6 @@ Upcall:
 	push bp
 	mov bp,sp
 	push eax			; preserve work register
-
-	call _disable_rom_write_access
 
 	call _get_returnaddress
 	mov 2[bp], ax			; 16bit return address onto stack
