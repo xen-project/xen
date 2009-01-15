@@ -10447,7 +10447,9 @@ rom_scan:
   ;;   3         ROM initialization entry point (FAR CALL)
 
 #if BX_TCGBIOS
+  push ax
   call _tcpa_start_option_rom_scan    /* specs: 3.2.3.3 + 10.4.3 */
+  pop ax
 #endif
 
 rom_scan_loop:
