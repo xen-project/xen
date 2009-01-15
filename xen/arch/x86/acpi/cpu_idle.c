@@ -50,11 +50,6 @@
 
 #define DEBUG_PM_CX
 
-#define US_TO_PM_TIMER_TICKS(t)     ((t * (PM_TIMER_FREQUENCY/1000)) / 1000)
-#define PM_TIMER_TICKS_TO_US(t)     ((t * 1000) / (PM_TIMER_FREQUENCY / 1000))
-#define C2_OVERHEAD         4   /* 1us (3.579 ticks per us) */
-#define C3_OVERHEAD         4   /* 1us (3.579 ticks per us) */
-
 static void (*lapic_timer_off)(void);
 static void (*lapic_timer_on)(void);
 
@@ -366,7 +361,7 @@ static void acpi_processor_idle(void)
     cx->usage++;
     if ( sleep_ticks > 0 )
     {
-        power->last_residency = PM_TIMER_TICKS_TO_US(sleep_ticks);
+        power->last_residency = acpi_pm_tick_to_ns(sleep_ticks) / 1000UL;
         cx->time += sleep_ticks;
     }
 
@@ -611,7 +606,7 @@ static void set_cx(
     cx->latency  = xen_cx->latency;
     cx->power    = xen_cx->power;
     
-    cx->latency_ticks = US_TO_PM_TIMER_TICKS(cx->latency);
+    cx->latency_ticks = ns_to_acpi_pm_tick(cx->latency * 1000UL);
     cx->target_residency = cx->latency * latency_factor;
     if ( cx->type == ACPI_STATE_C1 || cx->type == ACPI_STATE_C2 )
         acpi_power->safe_state = cx;
