@@ -1999,7 +1999,7 @@ guest_physmap_add_entry(struct domain *d, unsigned long gfn,
         return 0;
     }
 
-    rc = gfn_check_limit(d, gfn, order);
+    rc = gfn_check_limit(d, gfn, page_order);
     if ( rc != 0 )
         return rc;
 
