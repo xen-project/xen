@@ -2178,6 +2178,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             if ( wrmsr_safe(MSR_FAM10H_MMIO_CONF_BASE, eax, edx) != 0 )
                 goto fail;
             break;
+        case MSR_IA32_MPERF:
+        case MSR_IA32_APERF:
         case MSR_IA32_PERF_CTL:
             if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL )
                 goto fail;
