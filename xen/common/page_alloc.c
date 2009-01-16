@@ -634,6 +634,8 @@ void __init scrub_heap_pages(void)
  * XEN-HEAP SUB-ALLOCATOR
  */
 
+#ifndef __x86_64__
+
 void init_xenheap_pages(paddr_t ps, paddr_t pe)
 {
     ps = round_pgup(ps);
@@ -688,6 +690,55 @@ void free_xenheap_pages(void *v, unsigned int order)
 
     free_heap_pages(MEMZONE_XEN, virt_to_page(v), order);
 }
+
+#else
+
+void init_xenheap_pages(paddr_t ps, paddr_t pe)
+{
+    init_domheap_pages(ps, pe);
+}
+
+void *alloc_xenheap_pages(unsigned int order)
+{
+    struct page_info *pg;
+    unsigned int i;
+
+    ASSERT(!in_irq());
+
+    pg = alloc_heap_pages(
+        MEMZONE_XEN+1, 31, cpu_to_node(smp_processor_id()), order);
+    if ( unlikely(pg == NULL) )
+        goto no_memory;
+
+    for ( i = 0; i < (1u << order); i++ )
+        pg[i].count_info |= PGC_xen_heap;
+
+    return page_to_virt(pg);
+
+ no_memory:
+    printk("Cannot handle page request order %d!\n", order);
+    return NULL;
+}
+
+void free_xenheap_pages(void *v, unsigned int order)
+{
+    struct page_info *pg;
+    unsigned int i;
+
+    ASSERT(!in_irq());
+
+    if ( v == NULL )
+        return;
+
+    pg = virt_to_page(v);
+
+    for ( i = 0; i < (1u << order); i++ )
+        pg[i].count_info &= ~PGC_xen_heap;
+
+    free_heap_pages(pfn_dom_zone_type(page_to_mfn(pg)), pg, order);
+}
+
+#endif
 
 
 

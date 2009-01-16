@@ -329,7 +329,7 @@ void share_xen_page_with_guest(
 
     page_set_owner(page, d);
     wmb(); /* install valid domain ptr before updating refcnt. */
-    ASSERT(page->count_info == 0);
+    ASSERT((page->count_info & (PGC_allocated|PGC_count_mask)) == 0);
 
     /* Only add to the allocation list if the domain isn't dying. */
     if ( !d->is_dying )
@@ -4722,12 +4722,18 @@ void __set_fixmap(
 void memguard_init(void)
 {
     unsigned long start = max_t(unsigned long, xen_phys_start, 1UL << 20);
+#ifdef __i386__
     map_pages_to_xen(
         (unsigned long)__va(start),
         start >> PAGE_SHIFT,
         (xenheap_phys_end - start) >> PAGE_SHIFT,
         __PAGE_HYPERVISOR|MAP_SMALL_PAGES);
-#ifdef __x86_64__
+#else
+    map_pages_to_xen(
+        (unsigned long)__va(start),
+        start >> PAGE_SHIFT,
+        (__pa(&_end) + PAGE_SIZE - 1 - start) >> PAGE_SHIFT,
+        __PAGE_HYPERVISOR|MAP_SMALL_PAGES);
     BUG_ON(start != xen_phys_start);
     map_pages_to_xen(
         XEN_VIRT_START,

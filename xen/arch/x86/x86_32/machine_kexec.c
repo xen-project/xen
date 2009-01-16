@@ -6,8 +6,6 @@
  * - Magnus Damm <magnus@valinux.co.jp>
  */
 
-#ifndef CONFIG_COMPAT
-
 #include <xen/types.h>
 #include <xen/kernel.h>
 #include <asm/page.h>
@@ -20,7 +18,6 @@ int machine_kexec_get_xen(xen_kexec_range_t *range)
                       (unsigned long)range->start;
         return 0;
 }
-#endif
 
 /*
  * Local variables:

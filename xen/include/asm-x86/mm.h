@@ -135,6 +135,10 @@ struct page_info
  /* Page is locked? */
 # define _PGC_locked        30
 # define PGC_locked         (1U<<_PGC_out_of_sync)
+#else
+ /* Page is Xen heap? */
+# define _PGC_xen_heap      30
+# define PGC_xen_heap       (1U<<_PGC_xen_heap)
 #endif
  /* Set when is using a page as a page table */
 #define _PGC_page_table     29
@@ -145,12 +149,17 @@ struct page_info
  /* 26-bit count of references to this frame. */
 #define PGC_count_mask      ((1U<<26)-1)
 
+#if defined(__i386__)
 #define is_xen_heap_page(page) is_xen_heap_mfn(page_to_mfn(page))
 #define is_xen_heap_mfn(mfn) ({                         \
     unsigned long _mfn = (mfn);                         \
     ((_mfn >= paddr_to_pfn(xenheap_phys_start)) &&      \
      (_mfn < paddr_to_pfn(xenheap_phys_end)));          \
 })
+#else
+#define is_xen_heap_page(page) ((page)->count_info & PGC_xen_heap)
+#define is_xen_heap_mfn(mfn) is_xen_heap_page(&frame_table[mfn])
+#endif
 
 #if defined(__i386__)
 #define pickle_domptr(_d)   ((u32)(unsigned long)(_d))

@@ -6,20 +6,17 @@
  * - Magnus Damm <magnus@valinux.co.jp>
  */
 
-#ifndef CONFIG_COMPAT
-
 #include <xen/types.h>
+#include <xen/kernel.h>
 #include <asm/page.h>
 #include <public/kexec.h>
 
 int machine_kexec_get_xen(xen_kexec_range_t *range)
 {
-        range->start = xenheap_phys_start;
-        range->size = (unsigned long)xenheap_phys_end -
-                      (unsigned long)range->start;
+        range->start = virt_to_maddr(_start);
+        range->size = virt_to_maddr(_end) - (unsigned long)range->start;
         return 0;
 }
-#endif
 
 /*
  * Local variables:

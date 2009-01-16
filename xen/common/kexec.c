@@ -336,7 +336,6 @@ static void crash_save_vmcoreinfo(void)
     VMCOREINFO_SYMBOL(frame_table);
     VMCOREINFO_SYMBOL(alloc_bitmap);
     VMCOREINFO_SYMBOL(max_page);
-    VMCOREINFO_SYMBOL(xenheap_phys_end);
 
     VMCOREINFO_STRUCT_SIZE(page_info);
     VMCOREINFO_STRUCT_SIZE(domain);

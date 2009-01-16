@@ -117,8 +117,6 @@ extern unsigned int video_mode, video_flags;
 
 #define asmlinkage
 
-#define XENHEAP_DEFAULT_MB (16)
-
 #define PML4_ENTRY_BITS  39
 #ifndef __ASSEMBLY__
 #define PML4_ENTRY_BYTES (1UL << PML4_ENTRY_BITS)
@@ -310,7 +308,6 @@ extern unsigned int video_mode, video_flags;
 #define RO_MPT_VIRT_END		FRAMETABLE_VIRT_START
 #define RO_MPT_VIRT_START	(RO_MPT_VIRT_END - (MACHPHYS_MBYTES<<20))
 
-#define XENHEAP_DEFAULT_MB	(DIRECTMAP_MBYTES)
 #define DIRECTMAP_PHYS_END	(DIRECTMAP_MBYTES<<20)
 
 /* Maximum linear address accessible via guest memory segments. */
@@ -340,7 +337,10 @@ extern unsigned int video_mode, video_flags;
 #endif /* __i386__ */
 
 #ifndef __ASSEMBLY__
-extern unsigned long xen_phys_start, xenheap_phys_start, xenheap_phys_end;
+extern unsigned long xen_phys_start;
+#if defined(__i386__)
+extern unsigned long xenheap_phys_start, xenheap_phys_end;
+#endif
 #endif
 
 /* GDT/LDT shadow mapping area. The first per-domain-mapping sub-area. */

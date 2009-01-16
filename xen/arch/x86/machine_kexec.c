@@ -150,6 +150,9 @@ void arch_crash_save_vmcoreinfo(void)
 	VMCOREINFO_SYMBOL(dom_xen);
 	VMCOREINFO_SYMBOL(dom_io);
 
+#ifdef CONFIG_X86_32
+    VMCOREINFO_SYMBOL(xenheap_phys_end);
+#endif
 #ifdef CONFIG_X86_PAE
 	VMCOREINFO_SYMBOL_ALIAS(pgd_l3, idle_pg_table);
 #endif
