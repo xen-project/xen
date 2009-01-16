@@ -68,7 +68,7 @@ xc_core_arch_auto_translated_physmap(const xc_dominfo_t *info)
 /* see setup_guest() @ xc_linux_build.c */
 static int
 memory_map_get_old_domu(int xc_handle, xc_dominfo_t *info,
-                        shared_info_t *live_shinfo,
+                        shared_info_any_t *live_shinfo,
                         xc_core_memory_map_t **mapp, unsigned int *nr_entries)
 {
     xc_core_memory_map_t *map = NULL;
@@ -96,7 +96,7 @@ out:
 /* see setup_guest() @ xc_ia64_hvm_build.c */
 static int
 memory_map_get_old_hvm(int xc_handle, xc_dominfo_t *info, 
-                       shared_info_t *live_shinfo,
+                       shared_info_any_t *live_shinfo,
                        xc_core_memory_map_t **mapp, unsigned int *nr_entries)
 {
     const xc_core_memory_map_t gfw_map[] = {
@@ -155,7 +155,7 @@ out:
 
 static int
 memory_map_get_old(int xc_handle, xc_dominfo_t *info, 
-                   shared_info_t *live_shinfo,
+                   shared_info_any_t *live_shinfo,
                    xc_core_memory_map_t **mapp, unsigned int *nr_entries)
 {
     if ( info->hvm )
@@ -170,7 +170,8 @@ memory_map_get_old(int xc_handle, xc_dominfo_t *info,
 int
 xc_core_arch_memory_map_get(int xc_handle,
                             struct xc_core_arch_context *arch_ctxt,
-                            xc_dominfo_t *info, shared_info_t *live_shinfo,
+                            xc_dominfo_t *info,
+                            shared_info_any_t *live_shinfo,
                             xc_core_memory_map_t **mapp,
                             unsigned int *nr_entries)
 {
@@ -190,8 +191,8 @@ xc_core_arch_memory_map_get(int xc_handle,
     }
 
     /* copy before use in case someone updating them */
-    if (xc_ia64_copy_memmap(xc_handle, info->domid, live_shinfo, &memmap_info,
-                            NULL)) {
+    if (xc_ia64_copy_memmap(xc_handle, info->domid, &live_shinfo->s,
+                            &memmap_info, NULL)) {
         goto old;
     }
 
@@ -236,7 +237,7 @@ old:
 
 int
 xc_core_arch_map_p2m(int xc_handle, unsigned int guest_width, xc_dominfo_t *info,
-                     shared_info_t *live_shinfo, xen_pfn_t **live_p2m,
+                     shared_info_any_t *live_shinfo, xen_pfn_t **live_p2m,
                      unsigned long *pfnp)
 {
     /*
