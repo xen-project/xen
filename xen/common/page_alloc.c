@@ -70,6 +70,8 @@ integer_param("dma_bits", dma_bitsize);
 #define scrub_page(p) clear_page(p)
 #endif
 
+#define bits_to_zone(b) (((b) < (PAGE_SHIFT + 1)) ? 0 : ((b) - PAGE_SHIFT - 1))
+
 static DEFINE_SPINLOCK(page_scrub_lock);
 LIST_HEAD(page_scrub_list);
 static unsigned long scrub_pages;
@@ -706,7 +708,8 @@ void *alloc_xenheap_pages(unsigned int order)
     ASSERT(!in_irq());
 
     pg = alloc_heap_pages(
-        MEMZONE_XEN+1, 31, cpu_to_node(smp_processor_id()), order);
+        MEMZONE_XEN+1, bits_to_zone(32),
+        cpu_to_node(smp_processor_id()), order);
     if ( unlikely(pg == NULL) )
         goto no_memory;
 
@@ -756,9 +759,10 @@ void init_domheap_pages(paddr_t ps, paddr_t pe)
     s_tot = round_pgup(ps) >> PAGE_SHIFT;
     e_tot = round_pgdown(pe) >> PAGE_SHIFT;
 
-    zone = fls(s_tot);
-    BUG_ON(zone <= MEMZONE_XEN + 1);
-    for ( --zone; s_tot < e_tot; ++zone )
+    zone = fls(s_tot) - 1;
+    BUG_ON(zone <= MEMZONE_XEN);
+
+    while ( s_tot < e_tot )
     {
         unsigned long end = e_tot;
 
@@ -767,6 +771,7 @@ void init_domheap_pages(paddr_t ps, paddr_t pe)
             end = 1UL << (zone + 1);
         init_heap_pages(zone, mfn_to_page(s_tot), end - s_tot);
         s_tot = end;
+        zone++;
     }
 }
 
@@ -827,7 +832,7 @@ struct page_info *alloc_domheap_pages(
 {
     struct page_info *pg = NULL;
     unsigned int bits = memflags >> _MEMF_bits, zone_hi = NR_ZONES - 1;
-    unsigned int node = (uint8_t)((memflags >> _MEMF_node) - 1);
+    unsigned int node = (uint8_t)((memflags >> _MEMF_node) - 1), dma_zone;
 
     ASSERT(!in_irq());
 
@@ -835,16 +840,11 @@ struct page_info *alloc_domheap_pages(
         node = domain_to_node(d);
 
     bits = domain_clamp_alloc_bitsize(d, bits ? : (BITS_PER_LONG+PAGE_SHIFT));
-    if ( bits <= (PAGE_SHIFT + 1) )
+    if ( (zone_hi = min_t(unsigned int, bits_to_zone(bits), zone_hi)) == 0 )
         return NULL;
 
-    bits -= PAGE_SHIFT + 1;
-    if ( bits < zone_hi )
-        zone_hi = bits;
-
-    if ( (dma_bitsize > PAGE_SHIFT) &&
-         ((zone_hi + PAGE_SHIFT) >= dma_bitsize) )
-        pg = alloc_heap_pages(dma_bitsize - PAGE_SHIFT, zone_hi, node, order);
+    if ( dma_bitsize && ((dma_zone = bits_to_zone(dma_bitsize)) < zone_hi) )
+        pg = alloc_heap_pages(dma_zone + 1, zone_hi, node, order);
 
     if ( (pg == NULL) &&
          ((pg = alloc_heap_pages(MEMZONE_XEN + 1, zone_hi,
@@ -933,13 +933,11 @@ unsigned long avail_domheap_pages_region(
 {
     int zone_lo, zone_hi;
 
-    zone_lo = min_width ? (min_width - (PAGE_SHIFT + 1)) : (MEMZONE_XEN + 1);
-    zone_lo = max_t(int, MEMZONE_XEN + 1, zone_lo);
-    zone_lo = min_t(int, NR_ZONES - 1, zone_lo);
+    zone_lo = min_width ? bits_to_zone(min_width) : (MEMZONE_XEN + 1);
+    zone_lo = max_t(int, MEMZONE_XEN + 1, min_t(int, NR_ZONES - 1, zone_lo));
 
-    zone_hi = max_width ? (max_width - (PAGE_SHIFT + 1)) : (NR_ZONES - 1);
-    zone_hi = max_t(int, MEMZONE_XEN + 1, zone_hi);
-    zone_hi = min_t(int, NR_ZONES - 1, zone_hi);
+    zone_hi = max_width ? bits_to_zone(max_width) : (NR_ZONES - 1);
+    zone_hi = max_t(int, MEMZONE_XEN + 1, min_t(int, NR_ZONES - 1, zone_hi));
 
     return avail_heap_pages(zone_lo, zone_hi, node);
 }
