@@ -2,12 +2,13 @@
 #define ASM_X86__MICROCODE_H
 
 struct cpu_signature;
+struct ucode_cpu_info;
 
 struct microcode_ops {
-    int (*get_matching_microcode)(void *mc, int cpu);
-    int (*cpu_request_microcode)(int cpu, const void *buf, size_t size);
-    int (*collect_cpu_info)(int cpu_num, struct cpu_signature *csig);
-    int (*apply_microcode)(int cpu);
+    int (*cpu_request_microcode)(struct ucode_cpu_info *uci,
+                                 int cpu, const void *buf, size_t size);
+    int (*collect_cpu_info)(int cpu, struct cpu_signature *csig);
+    int (*apply_microcode)(struct ucode_cpu_info *uci, int cpu);
 };
 
 struct microcode_header_intel {
@@ -43,28 +44,29 @@ struct extended_sigtable {
 };
 
 struct equiv_cpu_entry {
-    unsigned int installed_cpu;
-    unsigned int fixed_errata_mask;
-    unsigned int fixed_errata_compare;
-    unsigned int equiv_cpu;
-};
+    uint32_t installed_cpu;
+    uint32_t fixed_errata_mask;
+    uint32_t fixed_errata_compare;
+    uint16_t equiv_cpu;
+    uint16_t reserved;
+} __attribute__((packed));
 
 struct microcode_header_amd {
-    unsigned int  data_code;
-    unsigned int  patch_id;
-    unsigned char mc_patch_data_id[2];
-    unsigned char mc_patch_data_len;
-    unsigned char init_flag;
-    unsigned int  mc_patch_data_checksum;
-    unsigned int  nb_dev_id;
-    unsigned int  sb_dev_id;
-    unsigned char processor_rev_id[2];
-    unsigned char nb_rev_id;
-    unsigned char sb_rev_id;
-    unsigned char bios_api_rev;
-    unsigned char reserved1[3];
-    unsigned int  match_reg[8];
-};
+    uint32_t data_code;
+    uint32_t patch_id;
+    uint8_t  mc_patch_data_id[2];
+    uint8_t  mc_patch_data_len;
+    uint8_t  init_flag;
+    uint32_t mc_patch_data_checksum;
+    uint32_t nb_dev_id;
+    uint32_t sb_dev_id;
+    uint16_t processor_rev_id;
+    uint8_t  nb_rev_id;
+    uint8_t  sb_rev_id;
+    uint8_t  bios_api_rev;
+    uint8_t  reserved1[3];
+    uint32_t match_reg[8];
+} __attribute__((packed));
 
 struct microcode_amd {
     struct microcode_header_amd hdr;
@@ -79,11 +81,10 @@ struct cpu_signature {
 
 struct ucode_cpu_info {
     struct cpu_signature cpu_sig;
-    int valid;
     union {
         struct microcode_intel *mc_intel;
         struct microcode_amd *mc_amd;
-        void *valid_mc;
+        void *mc_valid;
     } mc;
 };
 
