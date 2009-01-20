@@ -22,10 +22,6 @@ C_SRC = build.c dsdt.c static_tables.c
 H_SRC = $(wildcard *.h)
 OBJS  = $(patsubst %.c,%.o,$(C_SRC))
 
-IASL_VER = acpica-unix-20080729
-#IASL_URL = http://acpica.org/download/$(IASL_VER).tar.gz
-IASL_URL = $(XEN_EXTFILES_URL)/$(IASL_VER).tar.gz
-
 CFLAGS += -I. -I.. $(CFLAGS_include)
 
 vpath iasl $(PATH)
@@ -46,15 +42,11 @@ dsdt.c: dsdt.asl
 
 iasl:
 	@echo
-	@echo "ACPI ASL compiler(iasl) is needed"
-	@echo "Download Intel ACPI CA"
-	@echo "If wget failed, please download and compile manually from"
+	@echo "ACPI ASL compiler (iasl) is needed"
+	@echo "Download and install Intel ACPI CA from"
 	@echo "http://acpica.org/downloads/"
 	@echo 
-	wget $(IASL_URL)
-	tar xzf $(IASL_VER).tar.gz
-	make -C $(IASL_VER)/compiler
-	$(INSTALL_PROG) $(IASL_VER)/compiler/iasl $(DESTDIR)$(BINDIR)/iasl
+	@exit 1
 
 acpi.a: $(OBJS)
 	$(AR) rc $@ $(OBJS)
