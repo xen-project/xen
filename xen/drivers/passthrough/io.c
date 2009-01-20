@@ -84,13 +84,13 @@ int pt_irq_create_bind_vtd(
         memset(hvm_irq_dpci, 0, sizeof(*hvm_irq_dpci));
         for ( int i = 0; i < NR_IRQS; i++ )
             INIT_LIST_HEAD(&hvm_irq_dpci->mirq[i].digl_list);
-    }
 
-    if ( domain_set_irq_dpci(d, hvm_irq_dpci) == 0 )
-    {
-        xfree(hvm_irq_dpci);
-        spin_unlock(&d->event_lock);
-        return -EINVAL;
+        if ( domain_set_irq_dpci(d, hvm_irq_dpci) == 0 )
+        {
+            xfree(hvm_irq_dpci);
+            spin_unlock(&d->event_lock);
+            return -EINVAL;
+        }
     }
 
     if ( pt_irq_bind->irq_type == PT_IRQ_TYPE_MSI )
