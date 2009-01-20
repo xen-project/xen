@@ -153,8 +153,7 @@ struct page_info
 #define is_xen_heap_page(page) is_xen_heap_mfn(page_to_mfn(page))
 #define is_xen_heap_mfn(mfn) ({                         \
     unsigned long _mfn = (mfn);                         \
-    ((_mfn >= paddr_to_pfn(xenheap_phys_start)) &&      \
-     (_mfn < paddr_to_pfn(xenheap_phys_end)));          \
+    (_mfn < paddr_to_pfn(xenheap_phys_end));            \
 })
 #else
 #define is_xen_heap_page(page) ((page)->count_info & PGC_xen_heap)

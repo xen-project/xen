@@ -43,7 +43,7 @@ static unsigned long mpt_size;
 void *alloc_xen_pagetable(void)
 {
     extern int early_boot;
-    extern unsigned long xenheap_phys_start;
+    extern unsigned long xenheap_initial_phys_start;
     unsigned long mfn;
 
     if ( !early_boot )
@@ -53,8 +53,8 @@ void *alloc_xen_pagetable(void)
         return v;
     }
 
-    mfn = xenheap_phys_start >> PAGE_SHIFT;
-    xenheap_phys_start += PAGE_SIZE;
+    mfn = xenheap_initial_phys_start >> PAGE_SHIFT;
+    xenheap_initial_phys_start += PAGE_SIZE;
     return mfn_to_virt(mfn);
 }
 

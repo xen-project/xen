@@ -98,7 +98,7 @@ unsigned long xen_phys_start;
 
 #ifdef CONFIG_X86_32
 /* Limits of Xen heap, used to initialise the allocator. */
-unsigned long xenheap_phys_start, xenheap_phys_end;
+unsigned long xenheap_initial_phys_start, xenheap_phys_end;
 #endif
 
 extern void arch_init_memory(void);
@@ -741,8 +741,8 @@ void __init __start_xen(unsigned long mbi_p)
     /* Initialise boot heap. */
     allocator_bitmap_end = init_boot_allocator(__pa(&_end));
 #if defined(CONFIG_X86_32)
-    xenheap_phys_start = allocator_bitmap_end;
-    xenheap_phys_end   = DIRECTMAP_MBYTES << 20;
+    xenheap_initial_phys_start = allocator_bitmap_end;
+    xenheap_phys_end = DIRECTMAP_MBYTES << 20;
 #else
     if ( !xen_phys_start )
         EARLY_FAIL("Not enough memory to relocate Xen.\n");
@@ -841,9 +841,8 @@ void __init __start_xen(unsigned long mbi_p)
 
 #if defined(CONFIG_X86_32)
     /* Initialise the Xen heap. */
-    init_xenheap_pages(xenheap_phys_start, xenheap_phys_end);
-    nr_pages = (xenheap_phys_end - xenheap_phys_start) >> PAGE_SHIFT;
-    xenheap_phys_start = xen_phys_start;
+    init_xenheap_pages(xenheap_initial_phys_start, xenheap_phys_end);
+    nr_pages = (xenheap_phys_end - xenheap_initial_phys_start) >> PAGE_SHIFT;
     printk("Xen heap: %luMB (%lukB)\n", 
            nr_pages >> (20 - PAGE_SHIFT),
            nr_pages << (PAGE_SHIFT - 10));
@@ -1094,7 +1093,7 @@ void arch_get_xen_caps(xen_capabilities_info_t *info)
 int xen_in_range(paddr_t start, paddr_t end)
 {
 #if defined(CONFIG_X86_32)
-    paddr_t xs = xenheap_phys_start;
+    paddr_t xs = 0;
     paddr_t xe = xenheap_phys_end;
 #else
     paddr_t xs = __pa(&_start);

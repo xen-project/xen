@@ -339,7 +339,7 @@ extern unsigned int video_mode, video_flags;
 #ifndef __ASSEMBLY__
 extern unsigned long xen_phys_start;
 #if defined(__i386__)
-extern unsigned long xenheap_phys_start, xenheap_phys_end;
+extern unsigned long xenheap_phys_end;
 #endif
 #endif
 
