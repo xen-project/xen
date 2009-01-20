@@ -20,6 +20,7 @@
  */
 
 #include <xen/config.h>
+#include <xen/ctype.h>
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/trace.h>
@@ -272,6 +273,10 @@ static int hvm_print_line(
     char c = *val;
 
     BUG_ON(bytes != 1);
+
+    /* Accept only printable characters, newline, and horizontal tab. */
+    if ( !isprint(c) && (c != '\n') && (c != '\t') )
+        return X86EMUL_OKAY;
 
     spin_lock(&hd->pbuf_lock);
     hd->pbuf[hd->pbuf_idx++] = c;
