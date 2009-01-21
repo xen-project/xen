@@ -681,6 +681,8 @@ int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg)
     {
     case XENOPROF_init:
         ret = xenoprof_op_init(arg);
+        if ( !ret )
+            xenoprof_state = XENOPROF_INITIALIZED;
         break;
 
     case XENOPROF_get_buffer:
@@ -693,21 +695,19 @@ int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg)
         break;
 
     case XENOPROF_reset_active_list:
-    {
         reset_active_list();
         ret = 0;
         break;
-    }
+
     case XENOPROF_reset_passive_list:
-    {
         reset_passive_list();
         ret = 0;
         break;
-    }
+
     case XENOPROF_set_active:
     {
         domid_t domid;
-        if ( xenoprof_state != XENOPROF_IDLE )
+        if ( xenoprof_state != XENOPROF_INITIALIZED )
         {
             ret = -EPERM;
             break;
@@ -720,18 +720,18 @@ int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg)
         ret = add_active_list(domid);
         break;
     }
+
     case XENOPROF_set_passive:
-    {
-        if ( xenoprof_state != XENOPROF_IDLE )
+        if ( xenoprof_state != XENOPROF_INITIALIZED )
         {
             ret = -EPERM;
             break;
         }
         ret = add_passive_list(arg);
         break;
-    }
+
     case XENOPROF_reserve_counters:
-        if ( xenoprof_state != XENOPROF_IDLE )
+        if ( xenoprof_state != XENOPROF_INITIALIZED )
         {
             ret = -EPERM;
             break;
@@ -748,7 +748,6 @@ int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg)
             ret = -EPERM;
             break;
         }
-
         ret = xenoprof_arch_counter(arg);
         break;
 
@@ -766,8 +765,14 @@ int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg)
     case XENOPROF_enable_virq:
     {
         int i;
+
         if ( current->domain == xenoprof_primary_profiler )
         {
+            if ( xenoprof_state != XENOPROF_READY )
+            {
+                ret = -EPERM;
+                break;
+            }
             xenoprof_arch_enable_virq();
             xenoprof_reset_stat();
             for ( i = 0; i < pdomains; i++ )
@@ -835,7 +840,7 @@ int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg)
         if ( (xenoprof_state == XENOPROF_COUNTERS_RESERVED) ||
              (xenoprof_state == XENOPROF_READY) )
         {
-            xenoprof_state = XENOPROF_IDLE;
+            xenoprof_state = XENOPROF_INITIALIZED;
             xenoprof_arch_release_counters();
             xenoprof_arch_disable_virq();
             reset_passive_list();
@@ -845,7 +850,7 @@ int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg)
 
     case XENOPROF_shutdown:
         ret = -EPERM;
-        if ( xenoprof_state == XENOPROF_IDLE )
+        if ( xenoprof_state == XENOPROF_INITIALIZED )
         {
             activated = 0;
             adomains=0;
