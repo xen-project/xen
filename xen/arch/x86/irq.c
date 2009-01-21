@@ -705,6 +705,10 @@ static irq_guest_action_t *__pirq_guest_unbind(
             spin_lock_irq(&desc->lock);
         }
         break;
+    case ACKTYPE_NONE:
+        stop_timer(&irq_guest_eoi_timer[vector]);
+        _irq_guest_eoi(desc);
+        break;
     }
 
     /*
@@ -852,10 +856,6 @@ int map_domain_pirq(
 
     ASSERT(spin_is_locked(&pcidevs_lock));
     ASSERT(spin_is_locked(&d->event_lock));
-
-    /* XXX Until pcidev and msi locking is fixed. */
-    if ( type == MAP_PIRQ_TYPE_MSI )
-        return -EINVAL;
 
     if ( !IS_PRIV(current->domain) )
         return -EPERM;

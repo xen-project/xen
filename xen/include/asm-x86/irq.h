@@ -52,7 +52,6 @@ extern unsigned long io_apic_irqs;
 extern atomic_t irq_err_count;
 extern atomic_t irq_mis_count;
 
-int pirq_acktype(struct domain *d, int irq);
 int pirq_shared(struct domain *d , int irq);
 
 int map_domain_pirq(struct domain *d, int pirq, int vector, int type,

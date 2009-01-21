@@ -1554,11 +1554,14 @@ static unsigned int startup_msi_vector(unsigned int vector)
 
 static void ack_msi_vector(unsigned int vector)
 {
-    ack_APIC_irq();
+    if ( msi_maskable_irq(irq_desc[vector].msi_desc) )
+        ack_APIC_irq(); /* ACKTYPE_NONE */
 }
 
 static void end_msi_vector(unsigned int vector)
 {
+    if ( !msi_maskable_irq(irq_desc[vector].msi_desc) )
+        ack_APIC_irq(); /* ACKTYPE_EOI */
 }
 
 static void shutdown_msi_vector(unsigned int vector)

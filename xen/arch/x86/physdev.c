@@ -257,8 +257,15 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         if ( (irq < 0) || (irq >= NR_IRQS) )
             break;
         irq_status_query.flags = 0;
-        if ( pirq_acktype(v->domain, irq) != 0 )
-            irq_status_query.flags |= XENIRQSTAT_needs_eoi;
+        /*
+         * Even edge-triggered or message-based IRQs can need masking from
+         * time to time. If teh guest is not dynamically checking for this
+         * via the new pirq_eoi_map mechanism, it must conservatively always
+         * execute the EOI hypercall. In practice, this only really makes a
+         * difference for maskable MSI sources, and if those are supported
+         * then dom0 is probably modern anyway.
+         */
+        irq_status_query.flags |= XENIRQSTAT_needs_eoi;
         if ( pirq_shared(v->domain, irq) )
             irq_status_query.flags |= XENIRQSTAT_shared;
         ret = copy_to_guest(arg, &irq_status_query, 1) ? -EFAULT : 0;
