@@ -49,25 +49,22 @@ struct microcode_info {
     char buffer[1];
 };
 
-static void microcode_fini_cpu(int cpu)
+static void __microcode_fini_cpu(int cpu)
 {
     struct ucode_cpu_info *uci = ucode_cpu_info + cpu;
 
-    spin_lock(&microcode_mutex);
     xfree(uci->mc.mc_valid);
-    uci->mc.mc_valid = NULL;
+    memset(uci, 0, sizeof(*uci));
+}
+
+static void microcode_fini_cpu(int cpu)
+{
+    spin_lock(&microcode_mutex);
+    __microcode_fini_cpu(cpu);
     spin_unlock(&microcode_mutex);
 }
 
-static int collect_cpu_info(int cpu)
-{
-    struct ucode_cpu_info *uci = ucode_cpu_info + cpu;
-
-    memset(uci, 0, sizeof(*uci));
-    return microcode_ops->collect_cpu_info(cpu, &uci->cpu_sig);
-}
-
-static int microcode_resume_cpu(int cpu)
+int microcode_resume_cpu(int cpu)
 {
     int err = 0;
     struct ucode_cpu_info *uci = ucode_cpu_info + cpu;
@@ -107,17 +104,11 @@ static int microcode_update_cpu(const void *buf, size_t size)
 
     spin_lock(&microcode_mutex);
 
-    /*
-     * Check if the system resume is in progress (uci->mc.mc_valid != NULL),
-     * otherwise just request a firmware:
-     */
-    if ( uci->mc.mc_valid ) {
-        err = microcode_resume_cpu(cpu);
-    } else {
-        err = collect_cpu_info(cpu);
-        if ( !err )
-            err = microcode_ops->cpu_request_microcode(cpu, buf, size);
-    }
+    err = microcode_ops->collect_cpu_info(cpu, &uci->cpu_sig);
+    if ( likely(!err) )
+        err = microcode_ops->cpu_request_microcode(cpu, buf, size);
+    else
+        __microcode_fini_cpu(cpu);
 
     spin_unlock(&microcode_mutex);
 

@@ -64,6 +64,8 @@ static int collect_cpu_info(int cpu_num, struct cpu_signature *csig)
     struct cpuinfo_x86 *c = &cpu_data[cpu_num];
     unsigned int val[2];
 
+    BUG_ON(cpu_num != smp_processor_id());
+
     memset(csig, 0, sizeof(*csig));
 
     if ( (c->x86_vendor != X86_VENDOR_INTEL) || (c->x86 < 6) ||
