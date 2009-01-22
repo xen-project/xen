@@ -32,6 +32,9 @@
 
 #include <public/version.h>
 
+int __init bzimage_parse(
+    char *output, char **image_start, unsigned long *image_len);
+
 extern unsigned long initial_images_nrpages(void);
 extern void discard_initial_images(void);
 
@@ -196,7 +199,8 @@ static void __init process_dom0_ioports_disable(void)
 
 int __init construct_dom0(
     struct domain *d,
-    unsigned long _image_start, unsigned long image_len, 
+    unsigned long _image_base,
+    unsigned long _image_start, unsigned long image_len,
     unsigned long _initrd_start, unsigned long initrd_len,
     char *cmdline)
 {
@@ -213,9 +217,11 @@ int __init construct_dom0(
     struct vcpu *v = d->vcpu[0];
     unsigned long long value;
 #if defined(__i386__)
+    char *image_base   = (char *)_image_base;   /* use lowmem mappings */
     char *image_start  = (char *)_image_start;  /* use lowmem mappings */
     char *initrd_start = (char *)_initrd_start; /* use lowmem mappings */
 #elif defined(__x86_64__)
+    char *image_base   = __va(_image_base);
     char *image_start  = __va(_image_start);
     char *initrd_start = __va(_initrd_start);
 #endif
@@ -261,6 +267,9 @@ int __init construct_dom0(
     d->max_pages = ~0U;
 
     nr_pages = compute_dom0_nr_pages();
+
+    if ( (rc = bzimage_parse(image_base, &image_start, &image_len)) != 0 )
+        return rc;
 
     if ( (rc = elf_init(&elf, image_start, image_len)) != 0 )
         return rc;

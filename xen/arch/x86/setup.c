@@ -39,6 +39,8 @@
 #include <xsm/xsm.h>
 #include <asm/tboot.h>
 
+int __init bzimage_headroom(char *image_start, unsigned long image_length);
+
 #if defined(CONFIG_X86_64)
 #define BOOTSTRAP_DIRECTMAP_END (1UL << 32) /* 4GB */
 #define maddr_to_bootstrap_virt(m) maddr_to_virt(m)
@@ -171,19 +173,21 @@ static void __init do_initcalls(void)
     for ( ; ; ) halt();                         \
 } while (0)
 
-static unsigned long __initdata initial_images_start, initial_images_end;
+static unsigned long __initdata initial_images_base;
+static unsigned long __initdata initial_images_start;
+static unsigned long __initdata initial_images_end;
 
 unsigned long __init initial_images_nrpages(void)
 {
-    ASSERT(!(initial_images_start & ~PAGE_MASK));
+    ASSERT(!(initial_images_base & ~PAGE_MASK));
     ASSERT(!(initial_images_end   & ~PAGE_MASK));
     return ((initial_images_end >> PAGE_SHIFT) -
-            (initial_images_start >> PAGE_SHIFT));
+            (initial_images_base >> PAGE_SHIFT));
 }
 
 void __init discard_initial_images(void)
 {
-    init_domheap_pages(initial_images_start, initial_images_end);
+    init_domheap_pages(initial_images_base, initial_images_end);
 }
 
 extern char __per_cpu_start[], __per_cpu_data_end[], __per_cpu_end[];
@@ -413,7 +417,7 @@ void __init __start_xen(unsigned long mbi_p)
     unsigned int initrdidx = 1;
     multiboot_info_t *mbi = __va(mbi_p);
     module_t *mod = (module_t *)__va(mbi->mods_addr);
-    unsigned long nr_pages, modules_length;
+    unsigned long nr_pages, modules_length, modules_headroom;
     unsigned long allocator_bitmap_end;
     int i, e820_warn = 0, bytes = 0;
     struct ns16550_defaults ns16550 = {
@@ -613,6 +617,10 @@ void __init __start_xen(unsigned long mbi_p)
      * x86/64, we relocate Xen to higher memory.
      */
     modules_length = mod[mbi->mods_count-1].mod_end - mod[0].mod_start;
+    modules_headroom = bzimage_headroom(
+        (char *)(unsigned long)mod[0].mod_start,
+        (unsigned long)(mod[0].mod_end - mod[0].mod_start));
+
     for ( i = boot_e820.nr_map-1; i >= 0; i-- )
     {
         uint64_t s, e, mask = (1UL << L2_PAGETABLE_SHIFT) - 1;
@@ -717,12 +725,15 @@ void __init __start_xen(unsigned long mbi_p)
 #endif
 
         /* Is the region suitable for relocating the multiboot modules? */
-        if ( !initial_images_start && (s < e) && ((e-s) >= modules_length) )
+        if ( !initial_images_start && (s < e) &&
+             ((e-s) >= (modules_length+modules_headroom)) )
         {
             initial_images_end = e;
             e = (e - modules_length) & PAGE_MASK;
             initial_images_start = e;
-            move_memory(initial_images_start, 
+            e -= modules_headroom;
+            initial_images_base = e;
+            move_memory(initial_images_start,
                         mod[0].mod_start, mod[mbi->mods_count-1].mod_end);
         }
 
@@ -736,7 +747,7 @@ void __init __start_xen(unsigned long mbi_p)
 
     if ( !initial_images_start )
         EARLY_FAIL("Not enough memory to relocate the dom0 kernel image.\n");
-    reserve_e820_ram(&boot_e820, initial_images_start, initial_images_end);
+    reserve_e820_ram(&boot_e820, initial_images_base, initial_images_end);
 
     /* Initialise boot heap. */
     allocator_bitmap_end = init_boot_allocator(__pa(&_end));
@@ -1027,7 +1038,8 @@ void __init __start_xen(unsigned long mbi_p)
      * above our heap. The second module, if present, is an initrd ramdisk.
      */
     if ( construct_dom0(dom0,
-                        initial_images_start, 
+                        initial_images_base,
+                        initial_images_start,
                         mod[0].mod_end-mod[0].mod_start,
                         _initrd_start,
                         _initrd_len,

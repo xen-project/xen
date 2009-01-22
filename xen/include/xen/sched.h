@@ -351,7 +351,8 @@ struct domain *domain_create(
 
 int construct_dom0(
     struct domain *d,
-    unsigned long image_start, unsigned long image_len, 
+    unsigned long image_base,
+    unsigned long image_start, unsigned long image_len,
     unsigned long initrd_start, unsigned long initrd_len,
     char *cmdline);
 
