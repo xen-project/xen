@@ -326,7 +326,7 @@ static int __init p4_init(char ** cpu_type)
 	model = &op_p4_spec;
 	return 1;
 #else
-	switch (smp_num_siblings) {
+	switch (current_cpu_data.x86_num_siblings) {
 		case 1:
 			*cpu_type = "i386/p4";
 			model = &op_p4_spec;

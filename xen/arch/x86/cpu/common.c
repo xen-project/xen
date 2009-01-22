@@ -338,6 +338,7 @@ void __cpuinit identify_cpu(struct cpuinfo_x86 *c)
 	c->x86_vendor_id[0] = '\0'; /* Unset */
 	c->x86_model_id[0] = '\0';  /* Unset */
 	c->x86_max_cores = 1;
+	c->x86_num_siblings = 1;
 	c->x86_clflush_size = 0;
 	memset(&c->x86_capability, 0, sizeof c->x86_capability);
 
@@ -480,27 +481,27 @@ void __cpuinit detect_ht(struct cpuinfo_x86 *c)
 	if (!cpu_has(c, X86_FEATURE_HT) || cpu_has(c, X86_FEATURE_CMP_LEGACY))
 		return;
 
-	smp_num_siblings = (ebx & 0xff0000) >> 16;
+	c->x86_num_siblings = (ebx & 0xff0000) >> 16;
 
-	if (smp_num_siblings == 1) {
+	if (c->x86_num_siblings == 1) {
 		printk(KERN_INFO  "CPU: Hyper-Threading is disabled\n");
-	} else if (smp_num_siblings > 1 ) {
+	} else if (c->x86_num_siblings > 1 ) {
 
-		if (smp_num_siblings > NR_CPUS) {
-			printk(KERN_WARNING "CPU: Unsupported number of the siblings %d", smp_num_siblings);
-			smp_num_siblings = 1;
+		if (c->x86_num_siblings > NR_CPUS) {
+			printk(KERN_WARNING "CPU: Unsupported number of the siblings %d", c->x86_num_siblings);
+			c->x86_num_siblings = 1;
 			return;
 		}
 
-		index_msb = get_count_order(smp_num_siblings);
+		index_msb = get_count_order(c->x86_num_siblings);
 		phys_proc_id[cpu] = phys_pkg_id((ebx >> 24) & 0xFF, index_msb);
 
 		printk(KERN_INFO  "CPU: Physical Processor ID: %d\n",
 		       phys_proc_id[cpu]);
 
-		smp_num_siblings = smp_num_siblings / c->x86_max_cores;
+		c->x86_num_siblings = c->x86_num_siblings / c->x86_max_cores;
 
-		index_msb = get_count_order(smp_num_siblings) ;
+		index_msb = get_count_order(c->x86_num_siblings) ;
 
 		core_bits = get_count_order(c->x86_max_cores);
 

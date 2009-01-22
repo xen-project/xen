@@ -169,6 +169,7 @@ struct cpuinfo_x86 {
     int  x86_power;
     __u32 x86_max_cores; /* cpuid returned max cores value */
     __u32 booted_cores;  /* number of cores as seen by OS */
+    __u32 x86_num_siblings; /* cpuid logical cpus per chip value */
     __u32 apicid;
     unsigned short x86_clflush_size;
 } __cacheline_aligned;

@@ -63,12 +63,6 @@
 /* Set if we find a B stepping CPU */
 static int __devinitdata smp_b_stepping;
 
-/* Number of siblings per CPU package */
-int smp_num_siblings = 1;
-#ifdef CONFIG_X86_HT
-EXPORT_SYMBOL(smp_num_siblings);
-#endif
-
 /* Package ID of each logical CPU */
 int phys_proc_id[NR_CPUS] __read_mostly = {[0 ... NR_CPUS-1] = BAD_APICID};
 
@@ -423,7 +417,7 @@ set_cpu_sibling_map(int cpu)
 
 	cpu_set(cpu, cpu_sibling_setup_map);
 
-	if (smp_num_siblings > 1) {
+	if (c[cpu].x86_num_siblings > 1) {
 		for_each_cpu_mask(i, cpu_sibling_setup_map) {
 			if (phys_proc_id[cpu] == phys_proc_id[i] &&
 			    cpu_core_id[cpu] == cpu_core_id[i]) {
@@ -437,7 +431,7 @@ set_cpu_sibling_map(int cpu)
 		cpu_set(cpu, cpu_sibling_map[cpu]);
 	}
 
-	if (current_cpu_data.x86_max_cores == 1) {
+	if (c[cpu].x86_max_cores == 1) {
 		cpu_core_map[cpu] = cpu_sibling_map[cpu];
 		c[cpu].booted_cores = 1;
 		return;
