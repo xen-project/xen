@@ -360,7 +360,16 @@ static int cpu_request_microcode(int cpu, const void *buf, size_t size)
     return error;
 }
 
+static int microcode_resume_match(int cpu, struct cpu_signature *nsig)
+{
+    struct ucode_cpu_info *uci = ucode_cpu_info + cpu;
+
+    return (sigmatch(nsig->sig, uci->cpu_sig.sig, nsig->pf, uci->cpu_sig.pf) &&
+            (uci->cpu_sig.rev > nsig->rev));
+}
+
 static struct microcode_ops microcode_intel_ops = {
+    .microcode_resume_match           = microcode_resume_match,
     .cpu_request_microcode            = cpu_request_microcode,
     .collect_cpu_info                 = collect_cpu_info,
     .apply_microcode                  = apply_microcode,

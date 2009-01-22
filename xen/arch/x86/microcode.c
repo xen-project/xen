@@ -86,14 +86,15 @@ int microcode_resume_cpu(int cpu)
         return err;
     }
 
-    if ( memcmp(&nsig, &uci->cpu_sig, sizeof(nsig)) )
+    if ( microcode_ops->microcode_resume_match(cpu, &nsig) )
+    {
+        return microcode_ops->apply_microcode(cpu);
+    }
+    else
     {
         microcode_fini_cpu(cpu);
-        /* Should we look for a new ucode here? */
         return -EIO;
     }
-
-    return microcode_ops->apply_microcode(cpu);
 }
 
 static int microcode_update_cpu(const void *buf, size_t size)

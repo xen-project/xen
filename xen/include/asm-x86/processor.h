@@ -553,6 +553,7 @@ int wrmsr_hypervisor_regs(
     uint32_t idx, uint32_t eax, uint32_t edx);
 
 int microcode_update(XEN_GUEST_HANDLE(const_void), unsigned long len);
+int microcode_resume_cpu(int cpu);
 
 #endif /* !__ASSEMBLY__ */
 

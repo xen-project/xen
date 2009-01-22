@@ -318,7 +318,13 @@ out:
     return error;
 }
 
+static int microcode_resume_match(int cpu, struct cpu_signature *nsig)
+{
+    return 0;
+}
+
 static struct microcode_ops microcode_amd_ops = {
+    .microcode_resume_match           = microcode_resume_match,
     .cpu_request_microcode            = cpu_request_microcode,
     .collect_cpu_info                 = collect_cpu_info,
     .apply_microcode                  = apply_microcode,

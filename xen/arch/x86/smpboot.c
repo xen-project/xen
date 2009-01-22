@@ -525,6 +525,8 @@ void __devinit start_secondary(void *unused)
 	/* We can take interrupts now: we're officially "up". */
 	local_irq_enable();
 
+	microcode_resume_cpu(cpu);
+
 	wmb();
 	startup_cpu_idle_loop();
 }

@@ -221,6 +221,7 @@ static int enter_state(u32 state)
 
  enable_cpu:
     cpufreq_add_cpu(0);
+    microcode_resume_cpu(0);
     enable_nonboot_cpus();
     thaw_domains();
     spin_unlock(&pm_lock);
