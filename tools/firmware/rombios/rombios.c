@@ -726,7 +726,7 @@ typedef struct {
     } cdemu_t;
 #endif // BX_ELTORITO_BOOT
 
-#include "32bitgateway.h"
+#include "32bitprotos.h"
 
   // for access to EBDA area
   //     The EBDA structure should conform to
@@ -752,8 +752,6 @@ typedef struct {
     // El Torito Emulation data
     cdemu_t cdemu;
 #endif // BX_ELTORITO_BOOT
-
-    upcall_t upcall;
     } ebda_data_t;
 
   #define EBDA_CMOS_SHUTDOWN_STATUS_OFFSET 1
