@@ -167,14 +167,15 @@ static void vmx_init_vmcs_config(void)
 #endif
 
     min = VM_EXIT_ACK_INTR_ON_EXIT;
-    opt = 0;
+    opt = VM_EXIT_SAVE_GUEST_PAT | VM_EXIT_LOAD_HOST_PAT;
 #ifdef __x86_64__
     min |= VM_EXIT_IA32E_MODE;
 #endif
     _vmx_vmexit_control = adjust_vmx_controls(
         min, opt, MSR_IA32_VMX_EXIT_CTLS);
 
-    min = opt = 0;
+    min = 0;
+    opt = VM_ENTRY_LOAD_GUEST_PAT;
     _vmx_vmentry_control = adjust_vmx_controls(
         min, opt, MSR_IA32_VMX_ENTRY_CTLS);
 
@@ -519,8 +520,6 @@ static int construct_vmcs(struct vcpu *v)
 
     /* VMCS controls. */
     __vmwrite(PIN_BASED_VM_EXEC_CONTROL, vmx_pin_based_exec_control);
-    __vmwrite(VM_EXIT_CONTROLS, vmx_vmexit_control);
-    __vmwrite(VM_ENTRY_CONTROLS, vmx_vmentry_control);
 
     v->arch.hvm_vmx.exec_control = vmx_cpu_based_exec_control;
     v->arch.hvm_vmx.secondary_exec_control = vmx_secondary_exec_control;
@@ -534,12 +533,18 @@ static int construct_vmcs(struct vcpu *v)
     else
     {
         v->arch.hvm_vmx.secondary_exec_control &= ~SECONDARY_EXEC_ENABLE_EPT;
+        vmx_vmexit_control &= ~(VM_EXIT_SAVE_GUEST_PAT |
+                                VM_EXIT_LOAD_HOST_PAT);
+        vmx_vmentry_control &= ~VM_ENTRY_LOAD_GUEST_PAT;
     }
 
     /* Do not enable Monitor Trap Flag unless start single step debug */
     v->arch.hvm_vmx.exec_control &= ~CPU_BASED_MONITOR_TRAP_FLAG;
 
     __vmwrite(CPU_BASED_VM_EXEC_CONTROL, v->arch.hvm_vmx.exec_control);
+    __vmwrite(VM_EXIT_CONTROLS, vmx_vmexit_control);
+    __vmwrite(VM_ENTRY_CONTROLS, vmx_vmentry_control);
+
     if ( cpu_has_vmx_secondary_exec_control )
         __vmwrite(SECONDARY_VM_EXEC_CONTROL,
                   v->arch.hvm_vmx.secondary_exec_control);
@@ -561,6 +566,8 @@ static int construct_vmcs(struct vcpu *v)
         vmx_disable_intercept_for_msr(v, MSR_IA32_SYSENTER_CS);
         vmx_disable_intercept_for_msr(v, MSR_IA32_SYSENTER_ESP);
         vmx_disable_intercept_for_msr(v, MSR_IA32_SYSENTER_EIP);
+        if ( cpu_has_vmx_pat && paging_mode_hap(d) )
+            vmx_disable_intercept_for_msr(v, MSR_IA32_CR_PAT);
     }
 
     /* I/O access bitmap. */
@@ -690,6 +697,21 @@ static int construct_vmcs(struct vcpu *v)
         v->arch.hvm_vmx.vpid =
             v->domain->arch.hvm_domain.vmx.vpid_base + v->vcpu_id;
         __vmwrite(VIRTUAL_PROCESSOR_ID, v->arch.hvm_vmx.vpid);
+    }
+
+    if ( cpu_has_vmx_pat && paging_mode_hap(d) )
+    {
+        u64 host_pat, guest_pat;
+
+        rdmsrl(MSR_IA32_CR_PAT, host_pat);
+        guest_pat = 0x7040600070406ULL;
+
+        __vmwrite(HOST_PAT, host_pat);
+        __vmwrite(GUEST_PAT, guest_pat);
+#ifdef __i386__
+        __vmwrite(HOST_PAT_HIGH, host_pat >> 32);
+        __vmwrite(GUEST_PAT_HIGH, guest_pat >> 32);
+#endif
     }
 
     vmx_vmcs_exit(v);
@@ -989,6 +1011,8 @@ void vmcs_dump_vcpu(struct vcpu *v)
     vmx_dump_sel("LDTR", GUEST_LDTR_SELECTOR);
     vmx_dump_sel2("IDTR", GUEST_IDTR_LIMIT);
     vmx_dump_sel("TR", GUEST_TR_SELECTOR);
+    printk("Guest PAT = 0x%08x%08x\n",
+           (uint32_t)vmr(GUEST_PAT_HIGH), (uint32_t)vmr(GUEST_PAT));
     x  = (unsigned long long)vmr(TSC_OFFSET_HIGH) << 32;
     x |= (uint32_t)vmr(TSC_OFFSET);
     printk("TSC Offset = %016llx\n", x);
@@ -1027,6 +1051,8 @@ void vmcs_dump_vcpu(struct vcpu *v)
            (unsigned long long)vmr(HOST_SYSENTER_ESP),
            (int)vmr(HOST_SYSENTER_CS),
            (unsigned long long)vmr(HOST_SYSENTER_EIP));
+    printk("Host PAT = 0x%08x%08x\n",
+           (uint32_t)vmr(HOST_PAT_HIGH), (uint32_t)vmr(HOST_PAT));
 
     printk("*** Control State ***\n");
     printk("PinBased=%08x CPUBased=%08x SecondaryExec=%08x\n",

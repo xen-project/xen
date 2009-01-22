@@ -156,11 +156,14 @@ extern u32 vmx_pin_based_exec_control;
 
 #define VM_EXIT_IA32E_MODE              0x00000200
 #define VM_EXIT_ACK_INTR_ON_EXIT        0x00008000
+#define VM_EXIT_SAVE_GUEST_PAT          0x00040000
+#define VM_EXIT_LOAD_HOST_PAT           0x00080000
 extern u32 vmx_vmexit_control;
 
 #define VM_ENTRY_IA32E_MODE             0x00000200
 #define VM_ENTRY_SMM                    0x00000400
 #define VM_ENTRY_DEACT_DUAL_MONITOR     0x00000800
+#define VM_ENTRY_LOAD_GUEST_PAT         0x00004000
 extern u32 vmx_vmentry_control;
 
 #define SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES 0x00000001
@@ -189,6 +192,8 @@ extern bool_t cpu_has_vmx_ins_outs_instr_info;
     (vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_VPID)
 #define cpu_has_monitor_trap_flag \
     (vmx_cpu_based_exec_control & CPU_BASED_MONITOR_TRAP_FLAG)
+#define cpu_has_vmx_pat \
+    (vmx_vmentry_control & VM_ENTRY_LOAD_GUEST_PAT)
 
 /* GUEST_INTERRUPTIBILITY_INFO flags. */
 #define VMX_INTR_SHADOW_STI             0x00000001
@@ -240,6 +245,8 @@ enum vmcs_field {
     VMCS_LINK_POINTER_HIGH          = 0x00002801,
     GUEST_IA32_DEBUGCTL             = 0x00002802,
     GUEST_IA32_DEBUGCTL_HIGH        = 0x00002803,
+    GUEST_PAT                       = 0x00002804,
+    GUEST_PAT_HIGH                  = 0x00002805,
     GUEST_PDPTR0                    = 0x0000280a,
     GUEST_PDPTR0_HIGH               = 0x0000280b,
     GUEST_PDPTR1                    = 0x0000280c,
@@ -248,6 +255,8 @@ enum vmcs_field {
     GUEST_PDPTR2_HIGH               = 0x0000280f,
     GUEST_PDPTR3                    = 0x00002810,
     GUEST_PDPTR3_HIGH               = 0x00002811,
+    HOST_PAT                        = 0x00002c00,
+    HOST_PAT_HIGH                   = 0x00002c01,
     PIN_BASED_VM_EXEC_CONTROL       = 0x00004000,
     CPU_BASED_VM_EXEC_CONTROL       = 0x00004002,
     EXCEPTION_BITMAP                = 0x00004004,
