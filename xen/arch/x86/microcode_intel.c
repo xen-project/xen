@@ -325,6 +325,7 @@ static int cpu_request_microcode(int cpu, const void *buf, size_t size)
     long offset = 0;
     int error = 0;
     void *mc;
+    unsigned int matching_count = 0;
 
     /* We should bind the task to the CPU */
     BUG_ON(cpu != raw_smp_processor_id());
@@ -343,7 +344,7 @@ static int cpu_request_microcode(int cpu, const void *buf, size_t size)
          */
         if ( error == 1 )
         {
-            apply_microcode(cpu);
+            matching_count++;
             error = 0;
         }
         xfree(mc);
@@ -352,6 +353,9 @@ static int cpu_request_microcode(int cpu, const void *buf, size_t size)
         xfree(mc);
     if ( offset < 0 )
         error = offset;
+
+    if ( !error && matching_count )
+        apply_microcode(cpu);
 
     return error;
 }
