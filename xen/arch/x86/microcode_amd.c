@@ -122,9 +122,10 @@ out:
     return 0;
 }
 
-static int apply_microcode(struct ucode_cpu_info *uci, int cpu)
+static int apply_microcode(int cpu)
 {
     unsigned long flags;
+    struct ucode_cpu_info *uci = ucode_cpu_info + cpu;
     uint32_t rev, dummy;
     struct microcode_amd *mc_amd = uci->mc.mc_amd;
 
@@ -246,18 +247,17 @@ static int install_equiv_cpu_table(const void *buf, uint32_t size,
     return 0;
 }
 
-static int cpu_request_microcode(struct ucode_cpu_info *uci,
-				int cpu, const void *buf, size_t size)
+static int cpu_request_microcode(int cpu, const void *buf, size_t size)
 {
     const uint32_t *buf_pos;
     unsigned long offset = 0;
     int error = 0;
     int ret;
+    struct ucode_cpu_info *uci = ucode_cpu_info + cpu;
     void *mc;
 
     /* We should bind the task to the CPU */
     BUG_ON(cpu != raw_smp_processor_id());
-    BUG_ON(uci != &ucode_cpu_info[cpu]);
 
     buf_pos = (const uint32_t *)buf;
 
@@ -297,7 +297,7 @@ static int cpu_request_microcode(struct ucode_cpu_info *uci,
         if (error != 0)
             continue;
 
-        error = apply_microcode(uci, cpu);
+        error = apply_microcode(cpu);
         if (error == 0)
             break;
     }

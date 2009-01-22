@@ -5,10 +5,9 @@ struct cpu_signature;
 struct ucode_cpu_info;
 
 struct microcode_ops {
-    int (*cpu_request_microcode)(struct ucode_cpu_info *uci,
-                                 int cpu, const void *buf, size_t size);
+    int (*cpu_request_microcode)(int cpu, const void *buf, size_t size);
     int (*collect_cpu_info)(int cpu, struct cpu_signature *csig);
-    int (*apply_microcode)(struct ucode_cpu_info *uci, int cpu);
+    int (*apply_microcode)(int cpu);
 };
 
 struct microcode_header_intel {

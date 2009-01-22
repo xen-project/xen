@@ -49,23 +49,28 @@ struct microcode_info {
     char buffer[1];
 };
 
-static void microcode_fini_cpu(struct ucode_cpu_info *uci, int cpu)
+static void microcode_fini_cpu(int cpu)
 {
+    struct ucode_cpu_info *uci = ucode_cpu_info + cpu;
+
     spin_lock(&microcode_mutex);
     xfree(uci->mc.mc_valid);
     uci->mc.mc_valid = NULL;
     spin_unlock(&microcode_mutex);
 }
 
-static int collect_cpu_info(struct ucode_cpu_info *uci, int cpu)
+static int collect_cpu_info(int cpu)
 {
+    struct ucode_cpu_info *uci = ucode_cpu_info + cpu;
+
     memset(uci, 0, sizeof(*uci));
     return microcode_ops->collect_cpu_info(cpu, &uci->cpu_sig);
 }
 
-static int microcode_resume_cpu(struct ucode_cpu_info *uci, int cpu)
+static int microcode_resume_cpu(int cpu)
 {
     int err = 0;
+    struct ucode_cpu_info *uci = ucode_cpu_info + cpu;
     struct cpu_signature nsig;
 
     gdprintk(XENLOG_INFO, "microcode: CPU%d resumed\n", cpu);
@@ -80,25 +85,25 @@ static int microcode_resume_cpu(struct ucode_cpu_info *uci, int cpu)
     err = microcode_ops->collect_cpu_info(cpu, &nsig);
     if ( err )
     {
-        microcode_fini_cpu(uci, cpu);
+        microcode_fini_cpu(cpu);
         return err;
     }
 
     if ( memcmp(&nsig, &uci->cpu_sig, sizeof(nsig)) )
     {
-        microcode_fini_cpu(uci, cpu);
+        microcode_fini_cpu(cpu);
         /* Should we look for a new ucode here? */
         return -EIO;
     }
 
-    return microcode_ops->apply_microcode(uci, cpu);
+    return microcode_ops->apply_microcode(cpu);
 }
 
 static int microcode_update_cpu(const void *buf, size_t size)
 {
     int err;
     unsigned int cpu = smp_processor_id();
-    struct ucode_cpu_info *uci = &ucode_cpu_info[cpu];
+    struct ucode_cpu_info *uci = ucode_cpu_info + cpu;
 
     spin_lock(&microcode_mutex);
 
@@ -107,11 +112,11 @@ static int microcode_update_cpu(const void *buf, size_t size)
      * otherwise just request a firmware:
      */
     if ( uci->mc.mc_valid ) {
-        err = microcode_resume_cpu(uci, cpu);
+        err = microcode_resume_cpu(cpu);
     } else {
-        err = collect_cpu_info(uci, cpu);
+        err = collect_cpu_info(cpu);
         if ( !err )
-            err = microcode_ops->cpu_request_microcode(uci, cpu, buf, size);
+            err = microcode_ops->cpu_request_microcode(cpu, buf, size);
     }
 
     spin_unlock(&microcode_mutex);

@@ -244,11 +244,12 @@ static int get_matching_microcode(void *mc, int cpu)
     return 1;
 }
 
-static int apply_microcode(struct ucode_cpu_info *uci, int cpu)
+static int apply_microcode(int cpu)
 {
     unsigned long flags;
     unsigned int val[2];
     int cpu_num = raw_smp_processor_id();
+    struct ucode_cpu_info *uci = ucode_cpu_info + cpu_num;
 
     /* We should bind the task to the CPU */
     BUG_ON(cpu_num != cpu);
@@ -317,8 +318,7 @@ static long get_next_ucode_from_buffer(void **mc, const u8 *buf,
     return offset + total_size;
 }
 
-static int cpu_request_microcode(struct ucode_cpu_info *uci,
-                                int cpu, const void *buf, size_t size)
+static int cpu_request_microcode(int cpu, const void *buf, size_t size)
 {
     long offset = 0;
     int error = 0;
@@ -341,7 +341,7 @@ static int cpu_request_microcode(struct ucode_cpu_info *uci,
          */
         if ( error == 1 )
         {
-            apply_microcode(uci, cpu);
+            apply_microcode(cpu);
             error = 0;
         }
         xfree(mc);
