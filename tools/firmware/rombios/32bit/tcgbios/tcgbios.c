@@ -26,7 +26,6 @@
 
 #include "util.h"
 #include "tcgbios.h"
-#include "32bitprotos.h"
 
 /* local structure and variables */
 struct ptti_cust {
@@ -259,6 +258,10 @@ uint8_t acpi_validate_entry(struct acpi_header *hdr)
 }
 
 
+/*
+   initialize the TCPA ACPI subsystem; find the ACPI tables and determine
+   where the TCPA table is.
+ */
 void tcpa_acpi_init(void)
 {
 	struct acpi_20_rsdt *rsdt;
@@ -313,6 +316,16 @@ static void tcpa_reset_acpi_log(void)
 }
 
 
+/*
+ * Extend the ACPI log with the given entry by copying the
+ * entry data into the log.
+ * Input
+ *  Pointer to the structure to be copied into the log
+ *
+ * Output:
+ *  lower 16 bits of return code contain entry number
+ *  if entry number is '0', then upper 16 bits contain error code.
+ */
 uint32_t tcpa_extend_acpi_log(uint32_t entry_ptr)
 {
 	uint32_t res = 0;
@@ -622,7 +635,8 @@ void tcpa_wake_event()
 }
 
 /*
- * add the boot device to the measurement log
+ * Add a measurement regarding the boot device (CDRom, Floppy, HDD) to
+ * the list of measurements.
  */
 void tcpa_add_bootdevice(uint32_t bootcd, uint32_t bootdrv)
 {

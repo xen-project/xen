@@ -47,8 +47,6 @@
 #define PM_32BIT_DS  (gdt_entry_pm_32bit_ds - gdt_base)
 #define PM_16BIT_DS  (gdt_entry_pm_16bit_ds - gdt_base)
 
-ASM_START
-
     .align 16
 gdt_base:
     .word 0,0
@@ -178,20 +176,11 @@ upcall4:
     popf
     ret
 
-/* macro for functions to declare their call into 32bit space */
 MACRO DoUpcall
     mov bx, #?1
     jmp Upcall
 MEND
 
-ASM_END
-
+#define X(idx, ret, fn, args...) _ ## fn: DoUpcall(idx)
 #include "32bitprotos.h"
-#include "tcgbios.c"
-
-Bit32u get_s3_waking_vector()
-{
-    ASM_START
-    DoUpcall(IDX_GET_S3_WAKING_VECTOR)
-    ASM_END
-}
+#undef X

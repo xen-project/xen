@@ -726,7 +726,9 @@ typedef struct {
     } cdemu_t;
 #endif // BX_ELTORITO_BOOT
 
+#define X(idx, ret, fn, arg...) ret fn ();
 #include "32bitprotos.h"
+#undef X
 
   // for access to EBDA area
   //     The EBDA structure should conform to
@@ -9497,8 +9499,9 @@ use16 386
 
 #endif
 
-ASM_END
 #include "32bitgateway.c"
+ASM_END
+#include "tcgbios.c"
 ASM_START
 
 ;--------------------
