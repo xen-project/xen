@@ -161,6 +161,8 @@
 
 #define BX_TCGBIOS       0   /* main switch for TCG BIOS ext. */
 
+#define BX_PMM           1   /* POST Memory Manager */
+
 #define BX_MAX_ATA_INTERFACES   4
 #define BX_MAX_ATA_DEVICES      (BX_MAX_ATA_INTERFACES*2)
 
@@ -2054,7 +2056,10 @@ print_bios_banner()
   "rombios32 "
 #endif
 #if BX_TCGBIOS
-  "TCG-enabled"
+  "TCG-enabled "
+#endif
+#if BX_PMM
+  "PMM "
 #endif
   "\n\n");
 }
@@ -10356,6 +10361,32 @@ rombios32_gdt:
   dw 0xffff, 0, 0x9300, 0x0000 ; 16 bit data segment base=0x0 limit=0xffff
 #endif // BX_ROMBIOS32
 
+#if BX_PMM
+; according to POST Memory Manager Specification Version 1.01
+.align 16
+pmm_structure:
+  db 0x24,0x50,0x4d,0x4d ;; "$PMM" signature
+  db 0x01 ;; revision
+  db 16 ;; length
+  db (-((pmm_entry_point>>8)+pmm_entry_point+0x20f))&0xff;; checksum
+  dw pmm_entry_point,0xf000 ;; far call entrypoint
+  db 0,0,0,0,0 ;; reserved
+
+pmm_entry_point:
+  pushad
+  mov   eax, esp
+  add   eax, #(8*4+2+2) ;; skip regs of pushad, ip, cs
+  push  eax ;; pointer to PMM function args
+  call _pmm
+  mov   bx, sp
+SEG SS
+  mov   [bx+(4+7*4)], ax
+SEG SS
+  mov   [bx+(4+5*4)], dx
+  pop   eax
+  popad
+  db 0xcb ;; lret
+#endif // BX_PMM
 
 ; parallel port detection: base address in DX, index in BX, timeout in CL
 detect_parport:

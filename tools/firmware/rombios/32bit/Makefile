@@ -18,7 +18,7 @@ all: subdirs-all
 clean: subdirs-clean
 	rm -rf *.o $(TARGET) $(DEPS)
 
-$(TARGET): 32bitbios.o $(MODULES) util.o
+$(TARGET): 32bitbios.o $(MODULES) util.o pmm.o
 	$(LD) $(LDFLAGS_DIRECT) -s -r $^ -o 32bitbios_all.o
 	@nm 32bitbios_all.o |                                \
 	  egrep '^ +U ' >/dev/null && {                      \
