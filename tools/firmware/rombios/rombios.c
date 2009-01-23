@@ -1418,31 +1418,24 @@ fixup_base_mem_in_k()
   write_word(0x40, 0x13, base_mem >> 10);
 }
 
-void
-set_rom_write_access(action)
-  Bit16u action;
-{
-    Bit16u off = (Bit16u)&((struct bios_info *)0)->xen_pfiob;
 ASM_START
-    mov si,.set_rom_write_access.off[bp]
+_rom_write_access_control:
     push ds
-    mov ax,#(ACPI_PHYSICAL_ADDRESS >> 4)
+    mov ax,#(BIOS_INFO_PHYSICAL_ADDRESS >> 4)
     mov ds,ax
-    mov dx,[si]
+    mov ax,[BIOSINFO_OFF_xen_pfiob]
     pop ds
-    mov ax,.set_rom_write_access.action[bp]
-    out dx,al
+    ret
 ASM_END
-}
 
 void enable_rom_write_access()
 {
-    set_rom_write_access(0);
+    outb(rom_write_access_control(), 0);
 }
 
 void disable_rom_write_access()
 {
-    set_rom_write_access(PFFLAG_ROM_LOCK);
+    outb(rom_write_access_control(), PFFLAG_ROM_LOCK);
 }
     
 #endif /* HVMASSIST */
@@ -11823,15 +11816,6 @@ static Bit8u vgafont8[128*8]=
 
 #ifdef HVMASSIST
 ASM_START
-
-// space for addresses in 32bit BIOS area; currently 256/4 entries
-// are allocated
-.org 0xcb00
-jmptable:
-db 0x5F, 0x5F, 0x5F, 0x4A, 0x4D, 0x50, 0x54 ;; ___JMPT
-dw 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;;  64 bytes
-dw 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;; 128 bytes
-dw 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;; 192 bytes
 
 //
 // MP Tables

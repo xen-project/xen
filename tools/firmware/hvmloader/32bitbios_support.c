@@ -32,15 +32,13 @@
 
 #include "../rombios/32bit/32bitbios_flat.h"
 
-static void relocate_32bitbios(char *elfarray, uint32_t elfarraysize)
+static uint32_t relocate_32bitbios(char *elfarray, uint32_t elfarraysize)
 {
     Elf32_Ehdr *ehdr = (Elf32_Ehdr *)elfarray;
     Elf32_Shdr *shdr = (Elf32_Shdr *)&elfarray[ehdr->e_shoff];
-    char *secstrings = &elfarray[shdr[ehdr->e_shstrndx].sh_offset];
-    char *jump_table;
     uint32_t reloc_off, reloc_size;
     char *highbiosarea;
-    int i, jump_sec_idx = 0;
+    int i;
 
     /*
      * Step 1. General elf cleanup, and compute total relocation size.
@@ -50,13 +48,6 @@ static void relocate_32bitbios(char *elfarray, uint32_t elfarraysize)
     {
         /* By default all section data points into elf image data array. */
         shdr[i].sh_addr = (Elf32_Addr)&elfarray[shdr[i].sh_offset];
-
-        if ( !strcmp(".biosjumptable", secstrings + shdr[i].sh_name) )
-        {
-            /* We do not relocate the BIOS jump table to high memory. */
-            shdr[i].sh_flags &= ~SHF_ALLOC;
-            jump_sec_idx = i;
-        }
 
         /* Fix up a corner case of address alignment. */
         if ( shdr[i].sh_addralign == 0 )
@@ -148,21 +139,12 @@ static void relocate_32bitbios(char *elfarray, uint32_t elfarraysize)
         }
     }
 
-    /* Step 5. Find the ROMBIOS jump-table stub and copy in the real table. */
-    for ( jump_table = (char *)ROMBIOS_BEGIN;
-          jump_table != (char *)ROMBIOS_END;
-          jump_table++ )
-        if ( !strncmp(jump_table, "___JMPT", 7) )
-            break;
-    BUG_ON(jump_table == NULL);
-    BUG_ON(jump_sec_idx == 0);
-    memcpy(jump_table, (char *)shdr[jump_sec_idx].sh_addr,
-           shdr[jump_sec_idx].sh_size);
-
     printf("done\n");
+
+    return (uint32_t)highbiosarea;
 }
 
-void highbios_setup(void)
+uint32_t highbios_setup(void)
 {
-    relocate_32bitbios((char *)highbios_array, sizeof(highbios_array));
+    return relocate_32bitbios((char *)highbios_array, sizeof(highbios_array));
 }

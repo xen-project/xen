@@ -48,48 +48,9 @@ static void set_checksum(
     p[checksum_offset] = -sum;
 }
 
-static int uart_exists(uint16_t uart_base)
-{
-    uint16_t ier = uart_base + 1;
-    uint8_t a, b, c;
-
-    a = inb(ier);
-    outb(ier, 0);
-    b = inb(ier);
-    outb(ier, 0xf);
-    c = inb(ier);
-    outb(ier, a);
-
-    return ((b == 0) && (c == 0xf));
-}
-
-static int hpet_exists(unsigned long hpet_base)
-{
-    uint32_t hpet_id = *(uint32_t *)hpet_base;
-    return ((hpet_id >> 16) == 0x8086);
-}
-
 static uint8_t battery_port_exists(void)
 {
     return (inb(0x88) == 0x1F);
-}
-
-static int construct_bios_info_table(uint8_t *buf)
-{
-    struct bios_info *bios_info = (struct bios_info *)buf;
-
-    memset(bios_info, 0, sizeof(*bios_info));
-
-    bios_info->com1_present = uart_exists(0x3f8);
-    bios_info->com2_present = uart_exists(0x2f8);
-
-    bios_info->hpet_present = hpet_exists(ACPI_HPET_ADDRESS);
-
-    bios_info->pci_min = pci_mem_start;
-    bios_info->pci_len = pci_mem_end - pci_mem_start;
-    bios_info->xen_pfiob = 0xdead;
-
-    return align16(sizeof(*bios_info));
 }
 
 static int construct_madt(struct acpi_20_madt *madt)
@@ -349,9 +310,7 @@ static void __acpi_build_tables(uint8_t *buf, int *low_sz, int *high_sz)
     buf = (uint8_t *)ACPI_PHYSICAL_ADDRESS;
     offset = 0;
 
-    offset += construct_bios_info_table(&buf[offset]);
     rsdp = (struct acpi_20_rsdp *)&buf[offset];
-
     memcpy(rsdp, &Rsdp, sizeof(struct acpi_20_rsdp));
     offset += align16(sizeof(struct acpi_20_rsdp));
     rsdp->rsdt_address = (unsigned long)rsdt;

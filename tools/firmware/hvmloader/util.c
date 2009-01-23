@@ -629,6 +629,27 @@ uint16_t get_cpu_mhz(void)
     return cpu_mhz;
 }
 
+int uart_exists(uint16_t uart_base)
+{
+    uint16_t ier = uart_base + 1;
+    uint8_t a, b, c;
+
+    a = inb(ier);
+    outb(ier, 0);
+    b = inb(ier);
+    outb(ier, 0xf);
+    c = inb(ier);
+    outb(ier, a);
+
+    return ((b == 0) && (c == 0xf));
+}
+
+int hpet_exists(unsigned long hpet_base)
+{
+    uint32_t hpet_id = *(uint32_t *)hpet_base;
+    return ((hpet_id >> 16) == 0x8086);
+}
+
 /*
  * Local variables:
  * mode: C

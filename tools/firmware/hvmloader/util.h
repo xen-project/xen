@@ -57,6 +57,10 @@ void pci_write(uint32_t devfn, uint32_t reg, uint32_t len, uint32_t val);
 /* Get CPU speed in MHz. */
 uint16_t get_cpu_mhz(void);
 
+/* Hardware detection. */
+int uart_exists(uint16_t uart_base);
+int hpet_exists(unsigned long hpet_base);
+
 /* Do cpuid instruction, with operation 'idx' */
 void cpuid(uint32_t idx, uint32_t *eax, uint32_t *ebx,
            uint32_t *ecx, uint32_t *edx);
@@ -136,7 +140,7 @@ void *mem_alloc(uint32_t size, uint32_t align);
 #define virt_to_phys(v) ((unsigned long)(v))
 
 /* Prepare the 32bit BIOS */
-void highbios_setup(void);
+uint32_t highbios_setup(void);
 
 /* Miscellaneous. */
 void cacheattr_init(void);

@@ -539,25 +539,23 @@ static void cmos_write_memory_size(void)
     cmos_outb(0x35, (uint8_t)( alt_mem >> 8));
 }
 
-static uint16_t init_xen_platform_io_base(void)
+static uint16_t xen_platform_io_base(void)
 {
-    struct bios_info *bios_info = (struct bios_info *)ACPI_PHYSICAL_ADDRESS;
     uint32_t devfn, bar_data;
     uint16_t vendor_id, device_id;
-
-    bios_info->xen_pfiob = 0;
 
     for ( devfn = 0; devfn < 128; devfn++ )
     {
         vendor_id = pci_readw(devfn, PCI_VENDOR_ID);
         device_id = pci_readw(devfn, PCI_DEVICE_ID);
-        if ( (vendor_id != 0x5853) || (device_id != 0x0001) )
-            continue;
-        bar_data = pci_readl(devfn, PCI_BASE_ADDRESS_0);
-        bios_info->xen_pfiob = bar_data & PCI_BASE_ADDRESS_IO_MASK;
+        if ( (vendor_id == 0x5853) && (device_id == 0x0001) )
+        {
+            bar_data = pci_readl(devfn, PCI_BASE_ADDRESS_0);
+            return bar_data & PCI_BASE_ADDRESS_IO_MASK;
+        }
     }
 
-    return bios_info->xen_pfiob;
+    return 0;
 }
 
 /*
@@ -648,8 +646,8 @@ int main(void)
 {
     int option_rom_sz = 0, vgabios_sz = 0, etherboot_sz = 0;
     int rombios_sz, smbios_sz;
-    uint32_t etherboot_phys_addr, option_rom_phys_addr;
-    uint16_t xen_pfiob;
+    uint32_t etherboot_phys_addr, option_rom_phys_addr, bios32_addr;
+    struct bios_info *bios_info;
 
     printf("HVM Loader\n");
 
@@ -672,7 +670,7 @@ int main(void)
     if ( rombios_sz > 0x10000 )
         rombios_sz = 0x10000;
     memcpy((void *)ROMBIOS_PHYSICAL_ADDRESS, rombios, rombios_sz);
-    highbios_setup();
+    bios32_addr = highbios_setup();
 
     if ( (hvm_info->nr_vcpus > 1) || hvm_info->apic_mode )
         create_mp_tables();
@@ -736,9 +734,17 @@ int main(void)
                ROMBIOS_PHYSICAL_ADDRESS,
                ROMBIOS_PHYSICAL_ADDRESS + rombios_sz - 1);
 
-    xen_pfiob = init_xen_platform_io_base();
-
     build_e820_table();
+
+    bios_info = (struct bios_info *)BIOS_INFO_PHYSICAL_ADDRESS;
+    memset(bios_info, 0, sizeof(*bios_info));
+    bios_info->com1_present = uart_exists(0x3f8);
+    bios_info->com2_present = uart_exists(0x2f8);
+    bios_info->hpet_present = hpet_exists(ACPI_HPET_ADDRESS);
+    bios_info->pci_min = pci_mem_start;
+    bios_info->pci_len = pci_mem_end - pci_mem_start;
+    bios_info->bios32_entry = bios32_addr;
+    bios_info->xen_pfiob = xen_platform_io_base();
 
     printf("Invoking ROMBIOS ...\n");
     return 0;

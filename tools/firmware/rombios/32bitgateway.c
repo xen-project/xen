@@ -96,15 +96,6 @@ Upcall:
     push ss
     push esp
 
-    ; Find the 32-bit function address via a table lookup
-    push si
-    rol bx, #2
-    mov si, #jmptable
-    seg cs
-    mov eax, dword ptr [si+bx]
-    pop si
-    push eax
-
     ; Calculate protected-mode esp from ss:sp
     and esp, #0xffff
     xor eax, eax
@@ -127,11 +118,11 @@ upcall1:
     mov ss, ax
 
     ; Marshal arguments and call 32-bit function
-    pop eax
     mov ecx, #MAX_ARG_BYTES/4
 upcall2:
     push MAX_ARG_BYTES-4+args_off[esp]
     loop upcall2
+    mov eax, [BIOS_INFO_PHYSICAL_ADDRESS + BIOSINFO_OFF_bios32_entry]
     call eax
     add esp, #MAX_ARG_BYTES
     mov ecx, eax  ; Result in ecx

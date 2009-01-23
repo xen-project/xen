@@ -22,14 +22,13 @@
 
 #include "rombios_compat.h"
 
-/*
-   the jumptable that will be copied into the rombios in the 0xf000 segment
-   for every function that is to be called from the lower BIOS, make an entry
-   here.
- */
-uint32_t jumptable[] __attribute__((section (".biosjumptable"))) =
-{
-#define X(idx, ret, fn, args...) [idx] = (uint32_t)fn,
+asm (
+    "    .text                       \n"
+    "     movzwl %bx,%eax            \n"
+    "     jmp *jumptable(,%eax,4)    \n"
+    "    .data                       \n"
+    "jumptable:                      \n"
+#define X(idx, ret, fn, args...) " .long "#fn"\n"
 #include "32bitprotos.h"
 #undef X
-};
+    );

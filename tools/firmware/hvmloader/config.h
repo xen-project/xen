@@ -35,7 +35,8 @@ extern unsigned long pci_mem_start, pci_mem_end;
 #define VGABIOS_PHYSICAL_ADDRESS      0x000C0000
 #define OPTIONROM_PHYSICAL_ADDRESS    0x000C8000
 #define OPTIONROM_PHYSICAL_END        0x000EA000
-#define ACPI_PHYSICAL_ADDRESS         0x000EA000
+#define BIOS_INFO_PHYSICAL_ADDRESS    0x000EA000
+#define ACPI_PHYSICAL_ADDRESS         0x000EA020
 #define E820_PHYSICAL_ADDRESS         0x000EA100
 #define SMBIOS_PHYSICAL_ADDRESS       0x000EB000
 #define SMBIOS_MAXIMUM_SIZE           0x00005000
@@ -48,12 +49,16 @@ extern unsigned long pci_mem_start, pci_mem_end;
 /* Xen Platform Device */
 #define PFFLAG_ROM_LOCK 1 /* Sets whether ROM memory area is RW or RO */
 
+/* Located at BIOS_INFO_PHYSICAL_ADDRESS. */
 struct bios_info {
-    uint8_t  com1_present:1;
-    uint8_t  com2_present:1;
-    uint8_t  hpet_present:1;
-    uint32_t pci_min, pci_len;
-    uint16_t xen_pfiob;
+    uint8_t  com1_present:1;    /* 0[0] - System has COM1? */
+    uint8_t  com2_present:1;    /* 0[1] - System has COM2? */
+    uint8_t  hpet_present:1;    /* 0[2] - System has HPET? */
+    uint32_t pci_min, pci_len;  /* 4, 8 - PCI I/O hole boundaries */
+    uint32_t bios32_entry;      /* 12   - Entry point for 32-bit BIOS */
+    uint16_t xen_pfiob;         /* 16   - Xen platform device I/O ports */
 };
+#define BIOSINFO_OFF_bios32_entry 12
+#define BIOSINFO_OFF_xen_pfiob    16
 
 #endif /* __HVMLOADER_CONFIG_H__ */
