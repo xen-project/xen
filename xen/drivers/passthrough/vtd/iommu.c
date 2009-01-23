@@ -1482,6 +1482,11 @@ int intel_iommu_map_page(
     pte_present = dma_pte_present(*pte);
     dma_set_pte_addr(*pte, (paddr_t)mfn << PAGE_SHIFT_4K);
     dma_set_pte_prot(*pte, DMA_PTE_READ | DMA_PTE_WRITE);
+
+    /* Set the SNP on leaf page table if Snoop Control available */
+    if ( iommu_snoop )
+        dma_set_pte_snp(*pte);
+
     iommu_flush_cache_entry(pte);
     spin_unlock(&hd->mapping_lock);
     unmap_vtd_domain_page(page);

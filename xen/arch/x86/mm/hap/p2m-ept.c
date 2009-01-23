@@ -66,6 +66,7 @@ static int ept_set_middle_entry(struct domain *d, ept_entry_t *ept_entry)
     list_add_tail(&pg->list, &d->arch.p2m->pages);
 
     ept_entry->emt = 0;
+    ept_entry->igmt = 0;
     ept_entry->sp_avail = 0;
     ept_entry->avail1 = 0;
     ept_entry->mfn = page_to_mfn(pg);
@@ -114,9 +115,13 @@ static int ept_next_level(struct domain *d, bool_t read_only,
     }
 }
 
+/*
+ * TODO: ept_set_entry() computes 'need_modify_vtd_table' for itself,
+ * by observing whether any gfn->mfn translations are modified.
+ */
 static int
-ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn, 
-              unsigned int order, p2m_type_t p2mt)
+_ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn, 
+              unsigned int order, p2m_type_t p2mt, int need_modify_vtd_table)
 {
     ept_entry_t *table = NULL;
     unsigned long gfn_remainder = gfn, offset = 0;
@@ -124,6 +129,8 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
     u32 index;
     int i, rv = 0, ret = 0;
     int walk_level = order / EPT_TABLE_ORDER;
+    int direct_mmio = (p2mt == p2m_mmio_direct);
+    uint8_t igmt = 0;
 
     /* we only support 4k and 2m pages now */
 
@@ -157,7 +164,9 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
     {
         if ( mfn_valid(mfn_x(mfn)) || (p2mt == p2m_mmio_direct) )
         {
-            ept_entry->emt = epte_get_entry_emt(d, gfn, mfn_x(mfn));
+            ept_entry->emt = epte_get_entry_emt(d, gfn, mfn_x(mfn),
+                                &igmt, direct_mmio);
+            ept_entry->igmt = igmt;
             ept_entry->sp_avail = walk_level ? 1 : 0;
 
             if ( ret == GUEST_TABLE_SUPER_PAGE )
@@ -208,7 +217,10 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
         {
             split_ept_entry = split_table + i;
             split_ept_entry->emt = epte_get_entry_emt(d,
-                                        gfn-offset+i, split_mfn+i);
+                                        gfn-offset+i, split_mfn+i, 
+                                        &igmt, direct_mmio);
+            split_ept_entry->igmt = igmt;
+
             split_ept_entry->sp_avail =  0;
 
             split_ept_entry->mfn = split_mfn+i;
@@ -223,7 +235,10 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
 
         /* Set the destinated 4k page as normal */
         split_ept_entry = split_table + offset;
-        split_ept_entry->emt = epte_get_entry_emt(d, gfn, mfn_x(mfn));
+        split_ept_entry->emt = epte_get_entry_emt(d, gfn, mfn_x(mfn), 
+                                                &igmt, direct_mmio);
+        split_ept_entry->igmt = igmt;
+
         split_ept_entry->mfn = mfn_x(mfn);
         split_ept_entry->avail1 = p2mt;
         ept_p2m_type_to_flags(split_ept_entry, p2mt);
@@ -246,7 +261,8 @@ out:
 
     /* Now the p2m table is not shared with vt-d page table */
 
-    if ( iommu_enabled && is_hvm_domain(d) )
+    if ( iommu_enabled && is_hvm_domain(d)  
+             && need_modify_vtd_table )
     {
         if ( p2mt == p2m_ram_rw )
         {
@@ -271,6 +287,17 @@ out:
     }
 
     return rv;
+}
+
+static int
+ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
+              unsigned int order, p2m_type_t p2mt)
+{
+    /* ept_set_entry() are called from set_entry(),
+     * We should always create VT-d page table acording 
+     * to the gfn to mfn translations changes.
+     */
+    return _ept_set_entry(d, gfn, mfn, order, p2mt, 1); 
 }
 
 /* Read ept p2m entries */
@@ -395,18 +422,30 @@ void ept_change_entry_emt_with_range(struct domain *d, unsigned long start_gfn,
                  * Set emt for super page.
                  */
                 order = EPT_TABLE_ORDER;
-                ept_set_entry(d, gfn, _mfn(mfn), order, p2mt);
+                /* vmx_set_uc_mode() dont' touch the gfn to mfn
+                 * translations, only modify the emt field of the EPT entries.
+                 * so we need not modify the current VT-d page tables.
+                 */
+                _ept_set_entry(d, gfn, _mfn(mfn), order, p2mt, 0);
                 gfn += 0x1FF;
             }
             else
             {
-                /* change emt for partial entries of the 2m area */
-                ept_set_entry(d, gfn, _mfn(mfn), order, p2mt);
+                /* 1)change emt for partial entries of the 2m area.
+                 * 2)vmx_set_uc_mode() dont' touch the gfn to mfn
+                 * translations, only modify the emt field of the EPT entries.
+                 * so we need not modify the current VT-d page tables.
+                 */
+                _ept_set_entry(d, gfn, _mfn(mfn), order, p2mt,0);
                 gfn = ((gfn >> EPT_TABLE_ORDER) << EPT_TABLE_ORDER) + 0x1FF;
             }
         }
-        else /* gfn assigned with 4k */
-            ept_set_entry(d, gfn, _mfn(mfn), order, p2mt);
+        else /* 1)gfn assigned with 4k
+              * 2)vmx_set_uc_mode() dont' touch the gfn to mfn
+              * translations, only modify the emt field of the EPT entries.
+              * so we need not modify the current VT-d page tables.
+             */
+            _ept_set_entry(d, gfn, _mfn(mfn), order, p2mt, 0);
     }
 }
 

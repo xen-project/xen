@@ -39,6 +39,7 @@ int iommu_enabled = 0;
 int iommu_pv_enabled = 0;
 int force_iommu = 0;
 int iommu_passthrough = 0;
+int iommu_snoop = 0;
 
 static void __init parse_iommu_param(char *s)
 {

@@ -104,6 +104,7 @@
 #define ecap_ext_intr(e)         ((e >> 4) & 0x1)
 #define ecap_cache_hints(e)      ((e >> 5) & 0x1)
 #define ecap_pass_thru(e)        ((e >> 6) & 0x1)
+#define ecap_snp_ctl(e)          ((e >> 7) & 0x1)
 
 /* IOTLB_REG */
 #define DMA_TLB_FLUSH_GRANU_OFFSET  60
@@ -260,10 +261,12 @@ struct dma_pte {
 };
 #define DMA_PTE_READ (1)
 #define DMA_PTE_WRITE (2)
+#define DMA_PTE_SNP  (1 << 11)
 #define dma_clear_pte(p)    do {(p).val = 0;} while(0)
 #define dma_set_pte_readable(p) do {(p).val |= DMA_PTE_READ;} while(0)
 #define dma_set_pte_writable(p) do {(p).val |= DMA_PTE_WRITE;} while(0)
 #define dma_set_pte_superpage(p) do {(p).val |= (1 << 7);} while(0)
+#define dma_set_pte_snp(p)  do {(p).val |= DMA_PTE_SNP;} while(0)
 #define dma_set_pte_prot(p, prot) \
             do {(p).val = ((p).val & ~3) | ((prot) & 3); } while (0)
 #define dma_pte_addr(p) ((p).val & PAGE_MASK_4K)
