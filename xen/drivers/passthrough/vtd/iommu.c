@@ -1003,7 +1003,8 @@ static int intel_iommu_domain_init(struct domain *d)
         for ( i = 0; i < max_page; i++ )
         {
             if ( xen_in_range(i << PAGE_SHIFT, (i + 1) << PAGE_SHIFT) ||
-                 tboot_in_range(i << PAGE_SHIFT, (i + 1) << PAGE_SHIFT) )
+                 tboot_in_range(i << PAGE_SHIFT, (i + 1) << PAGE_SHIFT) ||
+                 !memory_is_conventional_ram(i << PAGE_SHIFT) )
                 continue;
 
             tmp = 1 << (PAGE_SHIFT - PAGE_SHIFT_4K);
