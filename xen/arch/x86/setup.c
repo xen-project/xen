@@ -1108,8 +1108,8 @@ int xen_in_range(paddr_t start, paddr_t end)
     paddr_t xs = 0;
     paddr_t xe = xenheap_phys_end;
 #else
-    paddr_t xs = __pa(&_start);
-    paddr_t xe = __pa(&_end);
+    paddr_t xs = __pa(&_stext);
+    paddr_t xe = __pa(&_etext);
 #endif
 
     return (start < xe) && (end > xs);
