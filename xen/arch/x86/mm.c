@@ -298,7 +298,7 @@ int memory_is_conventional_ram(paddr_t p)
     {
         if ( (e820.map[i].type == E820_RAM) &&
              (e820.map[i].addr <= p) &&
-             (e820.map[i].size > p) )
+             ((e820.map[i].addr + e820.map[i].size) > p) )
             return 1;
     }
 
