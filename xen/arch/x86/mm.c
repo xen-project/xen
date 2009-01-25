@@ -290,15 +290,16 @@ void __init arch_init_memory(void)
     subarch_init_memory();
 }
 
-int memory_is_conventional_ram(paddr_t p)
+int page_is_conventional_ram(unsigned long mfn)
 {
+    uint64_t maddr = pfn_to_paddr(mfn);
     int i;
 
     for ( i = 0; i < e820.nr_map; i++ )
     {
         if ( (e820.map[i].type == E820_RAM) &&
-             (e820.map[i].addr <= p) &&
-             ((e820.map[i].addr + e820.map[i].size) > p) )
+             (e820.map[i].addr <= maddr) &&
+             ((e820.map[i].addr + e820.map[i].size) >= (maddr + PAGE_SIZE)) )
             return 1;
     }
 

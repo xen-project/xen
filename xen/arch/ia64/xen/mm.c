@@ -3246,9 +3246,9 @@ int get_page_type(struct page_info *page, u32 type)
     return 1;
 }
 
-int memory_is_conventional_ram(paddr_t p)
+int page_is_conventional_ram(unsigned long mfn)
 {
-    return (efi_mem_type(p) == EFI_CONVENTIONAL_MEMORY);
+    return (efi_mem_type(pfn_to_paddr(mfn)) == EFI_CONVENTIONAL_MEMORY);
 }
 
 

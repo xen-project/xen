@@ -998,8 +998,8 @@ static int intel_iommu_domain_init(struct domain *d)
         /* Set up 1:1 page table for dom0 for all RAM except Xen bits. */
         for ( i = 0; i < max_page; i++ )
         {
-            if ( xen_in_range(i << PAGE_SHIFT, (i + 1) << PAGE_SHIFT) ||
-                 !memory_is_conventional_ram(i << PAGE_SHIFT) )
+            if ( !page_is_conventional_ram(i) ||
+                 xen_in_range(i << PAGE_SHIFT, (i + 1) << PAGE_SHIFT) )
                 continue;
 
             tmp = 1 << (PAGE_SHIFT - PAGE_SHIFT_4K);
