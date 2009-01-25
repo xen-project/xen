@@ -994,16 +994,11 @@ static int intel_iommu_domain_init(struct domain *d)
     if ( d->domain_id == 0 )
     {
         extern int xen_in_range(paddr_t start, paddr_t end);
-        extern int tboot_in_range(paddr_t start, paddr_t end);
 
-        /* 
-         * Set up 1:1 page table for dom0 except the critical segments
-         * like Xen and tboot.
-         */
+        /* Set up 1:1 page table for dom0 for all RAM except Xen bits. */
         for ( i = 0; i < max_page; i++ )
         {
             if ( xen_in_range(i << PAGE_SHIFT, (i + 1) << PAGE_SHIFT) ||
-                 tboot_in_range(i << PAGE_SHIFT, (i + 1) << PAGE_SHIFT) ||
                  !memory_is_conventional_ram(i << PAGE_SHIFT) )
                 continue;
 

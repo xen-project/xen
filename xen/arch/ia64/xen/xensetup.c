@@ -747,8 +747,3 @@ int xen_in_range(paddr_t start, paddr_t end)
 
     return start < end;
 }
-
-int tboot_in_range(paddr_t start, paddr_t end)
-{
-    return 0;
-}
