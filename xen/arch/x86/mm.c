@@ -1927,36 +1927,29 @@ void put_page(struct page_info *page)
 
 int get_page(struct page_info *page, struct domain *domain)
 {
-    u32 x, nx, y = page->count_info;
-    u32 d, nd = page->u.inuse._domain;
-    u32 _domain = pickle_domptr(domain);
+    u32 x, y = page->count_info;
 
     do {
-        x  = y;
-        nx = x + 1;
-        d  = nd;
+        x = y;
         if ( unlikely((x & PGC_count_mask) == 0) ||  /* Not allocated? */
              /* Keep one spare reference to be acquired by get_page_light(). */
-             unlikely(((nx + 1) & PGC_count_mask) <= 1) || /* Overflow? */
-             unlikely(d != _domain) )                /* Wrong owner? */
-        {
-            if ( !_shadow_mode_refcounts(domain) && !domain->is_dying )
-                gdprintk(XENLOG_INFO,
-                         "Error pfn %lx: rd=%p, od=%p, caf=%08x, taf=%"
-                         PRtype_info "\n",
-                         page_to_mfn(page), domain, unpickle_domptr(d),
-                         x, page->u.inuse.type_info);
-            return 0;
-        }
-        asm volatile (
-            LOCK_PREFIX "cmpxchg8b %2"
-            : "=d" (nd), "=a" (y),
-            "=m" (*(volatile u64 *)(&page->count_info))
-            : "0" (d), "1" (x), "c" (d), "b" (nx) );
+             unlikely(((x + 2) & PGC_count_mask) <= 1) ) /* Overflow? */
+            goto fail;
     }
-    while ( unlikely(nd != d) || unlikely(y != x) );
+    while ( (y = cmpxchg(&page->count_info, x, x + 1)) != x );
 
-    return 1;
+    if ( likely(page_get_owner(page) == domain) )
+        return 1;
+
+    put_page(page);
+
+ fail:
+    if ( !_shadow_mode_refcounts(domain) && !domain->is_dying )
+        gdprintk(XENLOG_INFO,
+                 "Error pfn %lx: rd=%p, od=%p, caf=%08x, taf=%" PRtype_info,
+                 page_to_mfn(page), domain, page_get_owner(page),
+                 y, page->u.inuse.type_info);
+    return 0;
 }
 
 /*
@@ -3478,49 +3471,47 @@ int replace_grant_host_mapping(
 int steal_page(
     struct domain *d, struct page_info *page, unsigned int memflags)
 {
-    u32 _d, _nd, x, y;
+    u32 x, y;
 
     spin_lock(&d->page_alloc_lock);
 
-    /*
-     * The tricky bit: atomically release ownership while there is just one 
-     * benign reference to the page (PGC_allocated). If that reference 
-     * disappears then the deallocation routine will safely spin.
-     */
-    _d  = pickle_domptr(d);
-    _nd = page->u.inuse._domain;
-    y   = page->count_info;
-    do {
-        x = y;
-        if ( unlikely((x & (PGC_count_mask|PGC_allocated)) !=
-                      (1 | PGC_allocated)) || unlikely(_nd != _d) )
-        { 
-            MEM_LOG("gnttab_transfer: Bad page %p: ed=%p(%u), sd=%p,"
-                    " caf=%08x, taf=%" PRtype_info "\n", 
-                    (void *) page_to_mfn(page),
-                    d, d->domain_id, unpickle_domptr(_nd), x, 
-                    page->u.inuse.type_info);
-            spin_unlock(&d->page_alloc_lock);
-            return -1;
-        }
-        asm volatile (
-            LOCK_PREFIX "cmpxchg8b %2"
-            : "=d" (_nd), "=a" (y),
-            "=m" (*(volatile u64 *)(&page->count_info))
-            : "0" (_d), "1" (x), "c" (NULL), "b" (x) );
-    } while (unlikely(_nd != _d) || unlikely(y != x));
+    if ( is_xen_heap_page(page) || (page_get_owner(page) != d) )
+        goto fail;
 
     /*
-     * Unlink from 'd'. At least one reference remains (now anonymous), so 
-     * noone else is spinning to try to delete this page from 'd'.
+     * We require there is just one reference (PGC_allocated). We temporarily
+     * drop this reference now so that we can safely swizzle the owner.
      */
+    y = page->count_info;
+    do {
+        x = y;
+        if ( (x & (PGC_count_mask|PGC_allocated)) != (1 | PGC_allocated) )
+            goto fail;
+        y = cmpxchg(&page->count_info, x, x & ~PGC_count_mask);
+    } while ( y != x );
+
+    /* Swizzle the owner then reinstate the PGC_allocated reference. */
+    page_set_owner(page, NULL);
+    y = page->count_info;
+    do {
+        x = y;
+        BUG_ON((x & (PGC_count_mask|PGC_allocated)) != PGC_allocated);
+    } while ( (y = cmpxchg(&page->count_info, x, x | 1)) != x );
+
+    /* Unlink from original owner. */
     if ( !(memflags & MEMF_no_refcount) )
         d->tot_pages--;
     list_del(&page->list);
 
     spin_unlock(&d->page_alloc_lock);
-
     return 0;
+
+ fail:
+    spin_unlock(&d->page_alloc_lock);
+    MEM_LOG("Bad page %p: ed=%p(%u), sd=%p, caf=%08x, taf=%" PRtype_info,
+            (void *)page_to_mfn(page), d, d->domain_id,
+            page_get_owner(page), page->count_info, page->u.inuse.type_info);
+    return -1;
 }
 
 int do_update_va_mapping(unsigned long va, u64 val64,
