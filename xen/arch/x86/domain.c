@@ -405,8 +405,17 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
         if ( d->arch.ioport_caps == NULL )
             goto fail;
 
+#ifdef __i386__
         if ( (d->shared_info = alloc_xenheap_page()) == NULL )
             goto fail;
+#else
+        pg = alloc_domheap_page(
+            NULL, MEMF_node(domain_to_node(d)) | MEMF_bits(32));
+        if ( pg == NULL )
+            goto fail;
+        pg->count_info |= PGC_xen_heap;
+        d->shared_info = page_to_virt(pg);
+#endif
 
         clear_page(d->shared_info);
         share_xen_page_with_guest(
