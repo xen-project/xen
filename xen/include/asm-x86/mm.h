@@ -166,13 +166,8 @@ struct page_info
 #endif
 
 #if defined(__i386__)
-#define pickle_domptr(_d)   ((u32)(unsigned long)(_d))
-static inline struct domain *unpickle_domptr(u32 _domain)
-{ return (_domain & 1) ? NULL : (void *)_domain; }
 #define PRtype_info "08lx" /* should only be used for printk's */
 #elif defined(__x86_64__)
-#define unpickle_domptr(d) ((struct domain *)(d))
-#define pickle_domptr(d) ((unsigned long)(d))
 #define PRtype_info "016lx"/* should only be used for printk's */
 #endif
 
@@ -185,8 +180,8 @@ static inline struct domain *unpickle_domptr(u32 _domain)
 /* OOS fixup entries */
 #define SHADOW_OOS_FIXUPS 2
 
-#define page_get_owner(_p)    (unpickle_domptr((_p)->u.inuse._domain))
-#define page_set_owner(_p,_d) ((_p)->u.inuse._domain = pickle_domptr(_d))
+#define page_get_owner(_p)    ((struct domain *)(_p)->u.inuse._domain)
+#define page_set_owner(_p,_d) ((_p)->u.inuse._domain = (unsigned long)(_d))
 
 #define maddr_get_owner(ma)   (page_get_owner(maddr_to_page((ma))))
 #define vaddr_get_owner(va)   (page_get_owner(virt_to_page((va))))
