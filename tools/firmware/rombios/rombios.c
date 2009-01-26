@@ -10366,19 +10366,35 @@ pmm_structure:
   db 0,0,0,0,0 ;; reserved
 
 pmm_entry_point:
+  pushf
   pushad
-  mov   eax, esp
-  add   eax, #(8*4+2+2) ;; skip regs of pushad, ip, cs
-  push  eax ;; pointer to PMM function args
+; Calculate protected-mode address of PMM function args
+  xor	eax, eax
+  mov	ax, sp
+  xor	ebx, ebx
+  mov	bx, ss
+  shl	ebx, 4
+  lea	ebx, [eax+ebx+38] ;; ebx=(ss<<4)+sp+4(far call)+2(pushf)+32(pushad)
+  push	ebx
+;
+; Stack layout at this point:
+;
+;        : +0x0    +0x2    +0x4    +0x6    +0x8    +0xa    +0xc    +0xe
+; -----------------------------------------------------------------------
+; sp     : [&arg1         ][edi           ][esi           ][ebp           ]
+; sp+0x10: [esp           ][ebx           ][edx           ][ecx           ]
+; sp+0x20: [eax           ][flags ][ip    ][cs    ][arg1  ][arg2, ...
+;
   call _pmm
-  mov   bx, sp
+  mov	bx, sp
 SEG SS
-  mov   [bx+(4+7*4)], ax
+  mov	[bx+0x20], ax
 SEG SS
-  mov   [bx+(4+5*4)], dx
-  pop   eax
+  mov	[bx+0x18], dx
+  pop	ebx
   popad
-  db 0xcb ;; lret
+  popf
+  retf
 #endif // BX_PMM
 
 ; parallel port detection: base address in DX, index in BX, timeout in CL
