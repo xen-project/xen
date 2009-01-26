@@ -330,7 +330,11 @@ void share_xen_page_with_guest(
 
     page_set_owner(page, d);
     wmb(); /* install valid domain ptr before updating refcnt. */
-    ASSERT((page->count_info & (PGC_allocated|PGC_count_mask)) == 0);
+#ifdef __i386__
+    ASSERT(page->count_info == 0);
+#else
+    ASSERT((page->count_info & ~PGC_xen_heap) == 0);
+#endif
 
     /* Only add to the allocation list if the domain isn't dying. */
     if ( !d->is_dying )
@@ -1946,7 +1950,8 @@ int get_page(struct page_info *page, struct domain *domain)
  fail:
     if ( !_shadow_mode_refcounts(domain) && !domain->is_dying )
         gdprintk(XENLOG_INFO,
-                 "Error pfn %lx: rd=%p, od=%p, caf=%08lx, taf=%" PRtype_info,
+                 "Error pfn %lx: rd=%p, od=%p, caf=%08lx, taf=%"
+                 PRtype_info "\n",
                  page_to_mfn(page), domain, page_get_owner(page),
                  y, page->u.inuse.type_info);
     return 0;
