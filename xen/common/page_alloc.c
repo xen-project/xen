@@ -703,8 +703,7 @@ void *alloc_xenheap_pages(unsigned int order)
     ASSERT(!in_irq());
 
     pg = alloc_heap_pages(
-        MEMZONE_XEN+1, bits_to_zone(32),
-        cpu_to_node(smp_processor_id()), order);
+        MEMZONE_XEN+1, NR_ZONES-1, cpu_to_node(smp_processor_id()), order);
     if ( unlikely(pg == NULL) )
         goto no_memory;
 
