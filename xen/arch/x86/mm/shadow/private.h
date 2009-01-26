@@ -244,16 +244,10 @@ struct shadow_page_info
                 u32 tlbflush_timestamp;
             };
             struct {
-                unsigned int type:5;   /* What kind of shadow is this? */
-                unsigned int pinned:1; /* Is the shadow pinned? */
-                unsigned int count:26; /* Reference count */
-#ifdef __x86_64__
-                u32 pad;
-                u64 mbz;               /* Must be zero: this is where the
-                                        * owner field lives in page_info */
-#else
-                u32 mbz;
-#endif
+                unsigned long mbz;     /* Must be zero: count_info is here. */
+                unsigned long type:5;   /* What kind of shadow is this? */
+                unsigned long pinned:1; /* Is the shadow pinned? */
+                unsigned long count:26; /* Reference count */
             } __attribute__((packed));
             union {
                 /* For unused shadow pages, a list of pages of this order; for 
@@ -277,7 +271,7 @@ static inline void shadow_check_page_struct_offsets(void) {
     BUILD_BUG_ON(sizeof (struct shadow_page_info) !=
                  sizeof (struct page_info));
     BUILD_BUG_ON(offsetof(struct shadow_page_info, mbz) !=
-                 offsetof(struct page_info, u.inuse._domain));
+                 offsetof(struct page_info, count_info));
 };
 
 /* Shadow type codes */
