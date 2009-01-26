@@ -136,23 +136,23 @@ share_xenoprof_page_with_guest(struct domain *d, unsigned long mfn, int npages)
 {
     int i;
 
-   /* Check if previous page owner has released the page. */
-   for ( i = 0; i < npages; i++ )
-   {
-       struct page_info *page = mfn_to_page(mfn + i);
-       if ( (page->count_info & (PGC_allocated|PGC_count_mask)) != 0 )
-       {
-           gdprintk(XENLOG_INFO, "mfn 0x%lx page->count_info 0x%lx\n",
-                    mfn + i, (unsigned long)page->count_info);
-           return -EBUSY;
-       }
-       page_set_owner(page, NULL);
-   }
+    /* Check if previous page owner has released the page. */
+    for ( i = 0; i < npages; i++ )
+    {
+        struct page_info *page = mfn_to_page(mfn + i);
+        if ( (page->count_info & (PGC_allocated|PGC_count_mask)) != 0 )
+        {
+            gdprintk(XENLOG_INFO, "mfn 0x%lx page->count_info 0x%lx\n",
+                     mfn + i, (unsigned long)page->count_info);
+            return -EBUSY;
+        }
+        page_set_owner(page, NULL);
+    }
 
-   for ( i = 0; i < npages; i++ )
-       share_xen_page_with_guest(mfn_to_page(mfn + i), d, XENSHARE_writable);
+    for ( i = 0; i < npages; i++ )
+        share_xen_page_with_guest(mfn_to_page(mfn + i), d, XENSHARE_writable);
 
-   return 0;
+    return 0;
 }
 
 static void
