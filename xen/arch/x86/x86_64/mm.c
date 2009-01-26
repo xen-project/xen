@@ -225,15 +225,6 @@ void __init subarch_init_memory(void)
     l3_pgentry_t l3e;
     l2_pgentry_t l2e;
 
-    /*
-     * We are rather picky about the layout of 'struct page_info'. The
-     * count_info and domain fields must be adjacent, as we perform atomic
-     * 64-bit operations on them.
-     */
-    BUILD_BUG_ON(offsetof(struct page_info, u.inuse._domain) != 
-                 (offsetof(struct page_info, count_info) + sizeof(u32)));
-    BUILD_BUG_ON((offsetof(struct page_info, count_info) & 7) != 0);
-
     /* M2P table is mappable read-only by privileged domains. */
     for ( v  = RDWR_MPT_VIRT_START;
           v != RDWR_MPT_VIRT_END;

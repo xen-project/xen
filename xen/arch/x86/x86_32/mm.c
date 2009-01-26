@@ -159,15 +159,6 @@ void __init subarch_init_memory(void)
     unsigned long m2p_start_mfn;
     unsigned int i, j;
 
-    /*
-     * We are rather picky about the layout of 'struct page_info'. The
-     * count_info and domain fields must be adjacent, as we perform atomic
-     * 64-bit operations on them. Also, just for sanity, we assert the size
-     * of the structure here.
-     */
-    BUILD_BUG_ON(offsetof(struct page_info, u.inuse._domain) != 
-                 (offsetof(struct page_info, count_info) + sizeof(u32)));
-    BUILD_BUG_ON((offsetof(struct page_info, count_info) & 7) != 0);
     BUILD_BUG_ON(sizeof(struct page_info) != 24);
 
     /* M2P table is mappable read-only by privileged domains. */

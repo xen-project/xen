@@ -247,8 +247,13 @@ struct shadow_page_info
                 unsigned int type:5;   /* What kind of shadow is this? */
                 unsigned int pinned:1; /* Is the shadow pinned? */
                 unsigned int count:26; /* Reference count */
-                u32 mbz;               /* Must be zero: this is where the
+#ifdef __x86_64__
+                u32 pad;
+                u64 mbz;               /* Must be zero: this is where the
                                         * owner field lives in page_info */
+#else
+                u32 mbz;
+#endif
             } __attribute__((packed));
             union {
                 /* For unused shadow pages, a list of pages of this order; for 

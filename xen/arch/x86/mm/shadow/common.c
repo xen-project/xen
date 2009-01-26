@@ -1715,7 +1715,7 @@ shadow_free_p2m_page(struct domain *d, struct page_info *pg)
     /* Should have just the one ref we gave it in alloc_p2m_page() */
     if ( (pg->count_info & PGC_count_mask) != 1 )
     {
-        SHADOW_ERROR("Odd p2m page count c=%#x t=%"PRtype_info"\n",
+        SHADOW_ERROR("Odd p2m page count c=%#lx t=%"PRtype_info"\n",
                      pg->count_info, pg->u.inuse.type_info);
     }
     pg->count_info = 0;
@@ -2593,7 +2593,7 @@ int sh_remove_all_mappings(struct vcpu *v, mfn_t gmfn)
                && (page->u.inuse.type_info & PGT_count_mask) == 0) )
         {
             SHADOW_ERROR("can't find all mappings of mfn %lx: "
-                          "c=%08x t=%08lx\n", mfn_x(gmfn), 
+                          "c=%08lx t=%08lx\n", mfn_x(gmfn), 
                           page->count_info, page->u.inuse.type_info);
         }
     }

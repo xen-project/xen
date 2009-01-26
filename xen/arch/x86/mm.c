@@ -739,8 +739,8 @@ get_page_from_l1e(
     else if ( pte_flags_to_cacheattr(l1f) !=
               ((page->count_info >> PGC_cacheattr_base) & 7) )
     {
-        uint32_t x, nx, y = page->count_info;
-        uint32_t cacheattr = pte_flags_to_cacheattr(l1f);
+        unsigned long x, nx, y = page->count_info;
+        unsigned long cacheattr = pte_flags_to_cacheattr(l1f);
 
         if ( is_xen_heap_page(page) )
         {
@@ -1909,7 +1909,7 @@ static int mod_l4_entry(l4_pgentry_t *pl4e,
 
 void put_page(struct page_info *page)
 {
-    u32 nx, x, y = page->count_info;
+    unsigned long nx, x, y = page->count_info;
 
     do {
         x  = y;
@@ -1927,7 +1927,7 @@ void put_page(struct page_info *page)
 
 int get_page(struct page_info *page, struct domain *domain)
 {
-    u32 x, y = page->count_info;
+    unsigned long x, y = page->count_info;
 
     do {
         x = y;
@@ -1946,7 +1946,7 @@ int get_page(struct page_info *page, struct domain *domain)
  fail:
     if ( !_shadow_mode_refcounts(domain) && !domain->is_dying )
         gdprintk(XENLOG_INFO,
-                 "Error pfn %lx: rd=%p, od=%p, caf=%08x, taf=%" PRtype_info,
+                 "Error pfn %lx: rd=%p, od=%p, caf=%08lx, taf=%" PRtype_info,
                  page_to_mfn(page), domain, page_get_owner(page),
                  y, page->u.inuse.type_info);
     return 0;
@@ -1962,7 +1962,7 @@ int get_page(struct page_info *page, struct domain *domain)
  */
 static void get_page_light(struct page_info *page)
 {
-    u32 x, nx, y = page->count_info;
+    unsigned long x, nx, y = page->count_info;
 
     do {
         x  = y;
@@ -2003,7 +2003,7 @@ static int alloc_page_type(struct page_info *page, unsigned long type,
         rc = alloc_segdesc_page(page);
         break;
     default:
-        printk("Bad type in alloc_page_type %lx t=%" PRtype_info " c=%x\n", 
+        printk("Bad type in alloc_page_type %lx t=%" PRtype_info " c=%lx\n", 
                type, page->u.inuse.type_info,
                page->count_info);
         rc = -EINVAL;
@@ -2027,7 +2027,7 @@ static int alloc_page_type(struct page_info *page, unsigned long type,
     {
         ASSERT(rc < 0);
         MEM_LOG("Error while validating mfn %lx (pfn %lx) for type %"
-                PRtype_info ": caf=%08x taf=%" PRtype_info,
+                PRtype_info ": caf=%08lx taf=%" PRtype_info,
                 page_to_mfn(page), get_gpfn_from_mfn(page_to_mfn(page)),
                 type, page->count_info, page->u.inuse.type_info);
         page->u.inuse.type_info = 0;
@@ -3184,7 +3184,7 @@ static int create_grant_pte_mapping(
     void *va;
     unsigned long gmfn, mfn;
     struct page_info *page;
-    u32 type;
+    unsigned long type;
     l1_pgentry_t ol1e;
     struct domain *d = v->domain;
 
@@ -3245,7 +3245,7 @@ static int destroy_grant_pte_mapping(
     void *va;
     unsigned long gmfn, mfn;
     struct page_info *page;
-    u32 type;
+    unsigned long type;
     l1_pgentry_t ol1e;
 
     gmfn = addr >> PAGE_SHIFT;
@@ -3471,7 +3471,7 @@ int replace_grant_host_mapping(
 int steal_page(
     struct domain *d, struct page_info *page, unsigned int memflags)
 {
-    u32 x, y;
+    unsigned long x, y;
 
     spin_lock(&d->page_alloc_lock);
 
@@ -3508,7 +3508,7 @@ int steal_page(
 
  fail:
     spin_unlock(&d->page_alloc_lock);
-    MEM_LOG("Bad page %p: ed=%p(%u), sd=%p, caf=%08x, taf=%" PRtype_info,
+    MEM_LOG("Bad page %p: ed=%p(%u), sd=%p, caf=%08lx, taf=%" PRtype_info,
             (void *)page_to_mfn(page), d, d->domain_id,
             page_get_owner(page), page->count_info, page->u.inuse.type_info);
     return -1;
