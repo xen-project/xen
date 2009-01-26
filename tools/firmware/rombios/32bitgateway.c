@@ -130,9 +130,9 @@ upcall2:
     ; Restore real-mode stack pointer
     xor eax, eax
     mov ax, ss_off[esp]
+    mov bx, ax    ; Real-mode ss in bx
     shl eax, 4
     sub esp, eax
-    mov bx, ax    ; Real-mode ss in bx
 
     ; Return to real mode
     jmpf upcall3, #PM_16BIT_CS
