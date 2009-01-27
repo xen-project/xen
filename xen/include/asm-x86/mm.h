@@ -34,7 +34,7 @@ struct page_info
             unsigned long _domain; /* pickled format */
             /* Type reference count and various PGT_xxx flags and fields. */
             unsigned long type_info;
-        } __attribute__ ((packed)) inuse;
+        } inuse;
 
         /* Page is on a free list: ((count_info & PGC_count_mask) == 0). */
         struct {
@@ -42,7 +42,7 @@ struct page_info
             u32 order;
             /* Mask of possibly-tainted TLBs. */
             cpumask_t cpumask;
-        } __attribute__ ((packed)) free;
+        } free;
 
     } u;
 
