@@ -491,7 +491,7 @@ int pirq_guest_unmask(struct domain *d)
 }
 
 extern int ioapic_ack_new;
-int pirq_acktype(struct domain *d, int irq)
+static int pirq_acktype(struct domain *d, int irq)
 {
     irq_desc_t  *desc;
     unsigned int vector;
