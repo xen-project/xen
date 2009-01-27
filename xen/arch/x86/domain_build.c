@@ -781,7 +781,7 @@ int __init construct_dom0(
             l4tab = l4start + l4_table_offset(va);
             if ( !l4e_get_intpte(*l4tab) )
             {
-                page = alloc_domheap_pages(d, 0, 0);
+                page = alloc_domheap_page(d, 0);
                 if ( !page )
                     break;
                 /* No mapping, PGC_allocated + page-table page. */
@@ -808,7 +808,7 @@ int __init construct_dom0(
                     va += 1UL << L3_PAGETABLE_SHIFT;
                     continue;
                 }
-                if ( (page = alloc_domheap_pages(d, 0, 0)) == NULL )
+                if ( (page = alloc_domheap_page(d, 0)) == NULL )
                     break;
                 else
                 {
@@ -836,7 +836,7 @@ int __init construct_dom0(
                     va += 1UL << L2_PAGETABLE_SHIFT;
                     continue;
                 }
-                if ( (page = alloc_domheap_pages(d, 0, 0)) == NULL )
+                if ( (page = alloc_domheap_page(d, 0)) == NULL )
                     break;
                 else
                 {
@@ -851,7 +851,7 @@ int __init construct_dom0(
             l1tab = page_to_virt(l2e_get_page(*l2tab));
             l1tab += l1_table_offset(va);
             BUG_ON(l1e_get_intpte(*l1tab));
-            page = alloc_domheap_pages(d, 0, 0);
+            page = alloc_domheap_page(d, 0);
             if ( !page )
                 break;
             *l1tab = l1e_from_page(page, L1_PROT|_PAGE_DIRTY);
