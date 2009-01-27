@@ -336,7 +336,7 @@ void paging_dump_vcpu_info(struct vcpu *v);
  * Access to the guest pagetables */
 
 /* Get a mapping of a PV guest's l1e for this virtual address. */
-static inline void *
+static inline l1_pgentry_t *
 guest_map_l1e(struct vcpu *v, unsigned long addr, unsigned long *gl1mfn)
 {
     l2_pgentry_t l2e;
@@ -354,15 +354,14 @@ guest_map_l1e(struct vcpu *v, unsigned long addr, unsigned long *gl1mfn)
          != _PAGE_PRESENT )
         return NULL;
     *gl1mfn = l2e_get_pfn(l2e);
-    return &__linear_l1_table[l1_linear_offset(addr)];
+    return (l1_pgentry_t *)map_domain_page(*gl1mfn) + l1_table_offset(addr);
 }
 
 /* Pull down the mapping we got from guest_map_l1e() */
 static inline void
 guest_unmap_l1e(struct vcpu *v, void *p)
 {
-    if ( unlikely(paging_mode_translate(v->domain)) )
-        unmap_domain_page(p);
+    unmap_domain_page(p);
 }
 
 /* Read the guest's l1e that maps this address. */

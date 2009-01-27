@@ -1722,9 +1722,6 @@ shadow_free_p2m_page(struct domain *d, struct page_info *pg)
     /* Free should not decrement domain's total allocation, since 
      * these pages were allocated without an owner. */
     page_set_owner(pg, NULL); 
-#if defined(__x86_64__)
-    spin_lock_init(&pg->lock);
-#endif
     free_domheap_pages(pg, 0);
     d->arch.paging.shadow.p2m_pages--;
     perfc_decr(shadow_alloc_count);
@@ -1833,14 +1830,6 @@ static unsigned int sh_set_allocation(struct domain *d,
             sp = list_entry(d->arch.paging.shadow.freelists[order].next,
                             struct shadow_page_info, list);
             list_del(&sp->list);
-#if defined(__x86_64__)
-            /*
-             * Re-instate lock field which we overwrite with shadow_page_info.
-             * This was safe, since the lock is only used on guest pages.
-             */
-            for ( j = 0; j < 1U << order; j++ )
-                spin_lock_init(&((struct page_info *)sp)[j].lock);
-#endif
             d->arch.paging.shadow.free_pages -= 1 << order;
             d->arch.paging.shadow.total_pages -= 1 << order;
             free_domheap_pages((struct page_info *)sp, order);

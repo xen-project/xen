@@ -46,10 +46,6 @@ struct page_info
 
     } u;
 
-#if defined(__x86_64__)
-    spinlock_t lock;
-#endif
-
     union {
         /*
          * Timestamp from 'TLB clock', used to avoid extra safety flushes.
@@ -127,23 +123,20 @@ struct page_info
 /* Has this page been *partially* validated for use as its current type? */
 #define _PGT_partial      PG_shift(7)
 #define PGT_partial       PG_mask(1, 7)
+ /* Page is locked? */
+#define _PGT_locked       PG_shift(8)
+#define PGT_locked        PG_mask(1, 8)
 
  /* Count of uses of this frame as its current type. */
-#define PGT_count_width   PG_shift(7)
+#define PGT_count_width   PG_shift(8)
 #define PGT_count_mask    ((1UL<<PGT_count_width)-1)
 
  /* Cleared when the owning guest 'frees' this page. */
 #define _PGC_allocated    PG_shift(1)
 #define PGC_allocated     PG_mask(1, 1)
-#if defined(__i386__)
- /* Page is locked? */
-# define _PGC_locked      PG_shift(2)
-# define PGC_locked       PG_mask(1, 2)
-#else
  /* Page is Xen heap? */
-# define _PGC_xen_heap    PG_shift(2)
-# define PGC_xen_heap     PG_mask(1, 2)
-#endif
+#define _PGC_xen_heap     PG_shift(2)
+#define PGC_xen_heap      PG_mask(1, 2)
  /* Set when is using a page as a page table */
 #define _PGC_page_table   PG_shift(3)
 #define PGC_page_table    PG_mask(1, 3)
