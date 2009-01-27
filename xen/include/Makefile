@@ -51,7 +51,7 @@ compat/%.h: compat/%.i Makefile
 	mv -f $@.new $@
 
 compat/%.i: compat/%.c Makefile
-	$(CPP) $(CFLAGS) $(cppflags-y) -o $@ $<
+	$(CPP) $(filter-out -M% .%.d,$(CFLAGS)) $(cppflags-y) -o $@ $<
 
 compat/%.c: public/%.h xlat.lst Makefile
 	mkdir -p $(@D)
