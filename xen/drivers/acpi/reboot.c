@@ -21,7 +21,7 @@ void acpi_reboot(void)
 	 * on a device on bus 0. */
 	switch (rr->space_id) {
 	case ACPI_ADR_SPACE_PCI_CONFIG:
-		printk("Resetting with ACPI PCI RESET_REG.");
+		printk("Resetting with ACPI PCI RESET_REG.\n");
 		/* Write the value that resets us. */
 		pci_conf_write8(0,
 				(rr->address >> 32) & 31,
@@ -31,7 +31,7 @@ void acpi_reboot(void)
 		break;
 	case ACPI_ADR_SPACE_SYSTEM_MEMORY:
 	case ACPI_ADR_SPACE_SYSTEM_IO:
-		printk("ACPI MEMORY or I/O RESET_REG.");
+		printk("Resetting with ACPI MEMORY or I/O RESET_REG.\n");
 		acpi_hw_low_level_write(8, reset_value, rr);
 		break;
 	}
