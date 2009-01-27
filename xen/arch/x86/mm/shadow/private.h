@@ -265,8 +265,8 @@ struct shadow_page_info
 
 /* The structure above *must* be no larger than a struct page_info
  * from mm.h, since we'll be using the same space in the frametable. 
- * Also, the mbz field must line up with the owner field of normal 
- * pages, so they look properly like anonymous/xen pages. */
+ * Also, the mbz field must line up with the count_info field of normal 
+ * pages, so they cannot be successfully get_page()d. */
 static inline void shadow_check_page_struct_offsets(void) {
     BUILD_BUG_ON(sizeof (struct shadow_page_info) !=
                  sizeof (struct page_info));
