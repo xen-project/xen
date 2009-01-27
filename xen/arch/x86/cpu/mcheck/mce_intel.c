@@ -14,7 +14,6 @@ DEFINE_PER_CPU(cpu_banks_t, mce_banks_owned);
 
 static int nr_intel_ext_msrs = 0;
 static int cmci_support = 0;
-extern int firstbank;
 
 #ifdef CONFIG_X86_MCE_THERMAL
 static void unexpected_thermal_interrupt(struct cpu_user_regs *regs)
@@ -121,7 +120,7 @@ static inline void intel_get_extended_msrs(struct mcinfo_extended *mc_ext)
     if (nr_intel_ext_msrs == 0)
         return;
 
-    /*this function will called when CAP(9).MCG_EXT_P = 1*/
+    /* this function will called when CAP(9).MCG_EXT_P = 1 */
     memset(mc_ext, 0, sizeof(struct mcinfo_extended));
     mc_ext->common.type = MC_TYPE_EXTENDED;
     mc_ext->common.size = sizeof(mc_ext);
@@ -157,7 +156,7 @@ static inline void intel_get_extended_msrs(struct mcinfo_extended *mc_ext)
  * 3. called in polling handler
  * It will generate a new mc_info item if found CE/UC errors. DOM0 is the 
  * consumer.
-*/
+ */
 static struct mc_info *machine_check_poll(int calltype)
 {
     struct mc_info *mi = NULL;
@@ -174,9 +173,9 @@ static struct mc_info *machine_check_poll(int calltype)
     memset(&mcg, 0, sizeof(mcg));
     mcg.common.type = MC_TYPE_GLOBAL;
     mcg.common.size = sizeof(mcg);
-    /*If called from cpu-reset check, don't need to fill them.
-     *If called from cmci context, we'll try to fill domid by memory addr
-    */
+    /* If called from cpu-reset check, don't need to fill them.
+     * If called from cmci context, we'll try to fill domid by memory addr
+     */
     mcg.mc_domid = -1;
     mcg.mc_vcpuid = -1;
     if (calltype == MC_FLAG_POLLED || calltype == MC_FLAG_RESET)
@@ -192,7 +191,7 @@ static struct mc_info *machine_check_poll(int calltype)
 
     for ( i = 0; i < nr_mce_banks; i++ ) {
         struct mcinfo_bank mcb;
-        /*For CMCI, only owners checks the owned MSRs*/
+        /* For CMCI, only owners checks the owned MSRs */
         if ( !test_bit(i, __get_cpu_var(mce_banks_owned)) &&
              (calltype & MC_FLAG_CMCI) )
             continue;
@@ -241,7 +240,7 @@ static struct mc_info *machine_check_poll(int calltype)
         x86_mcinfo_add(mi, &mcb);
         nr_unit++;
         add_taint(TAINT_MACHINE_CHECK);
-        /*Clear state for this bank */
+        /* Clear state for this bank */
         wrmsrl(MSR_IA32_MC0_STATUS + 4 * i, 0);
         printk(KERN_DEBUG "mcheck_poll: bank%i CPU%d status[%"PRIx64"]\n", 
                 i, cpu, status);
@@ -250,12 +249,12 @@ static struct mc_info *machine_check_poll(int calltype)
                 mcg.mc_coreid, mcg.mc_apicid, mcg.mc_core_threadid);
  
     }
-    /*if pcc = 1, uc must be 1*/
+    /* if pcc = 1, uc must be 1 */
     if (pcc)
         mcg.mc_flags |= MC_FLAG_UNCORRECTABLE;
     else if (uc)
         mcg.mc_flags |= MC_FLAG_RECOVERABLE;
-    else /*correctable*/
+    else /* correctable */
         mcg.mc_flags |= MC_FLAG_CORRECTABLE;
 
     if (nr_unit && nr_intel_ext_msrs && 
@@ -265,7 +264,7 @@ static struct mc_info *machine_check_poll(int calltype)
     }
     if (nr_unit) 
         x86_mcinfo_add(mi, &mcg);
-    /*Clear global state*/
+    /* Clear global state */
     return mi;
 }
 
@@ -542,8 +541,7 @@ static void mce_init(void)
      * This also clears all registers*/
 
     mi = machine_check_poll(MC_FLAG_RESET);
-    /*in the boot up stage, not expect inject to DOM0, but go print out
-    */
+    /* in the boot up stage, don't inject to DOM0, but print out */
     if (mi)
         x86_mcinfo_dump(mi);
 
@@ -554,22 +552,22 @@ static void mce_init(void)
 
     for (i = firstbank; i < nr_mce_banks; i++)
     {
-        /*Some banks are shared across cores, use MCi_CTRL to judge whether
-         * this bank has been initialized by other cores already.*/
+        /* Some banks are shared across cores, use MCi_CTRL to judge whether
+         * this bank has been initialized by other cores already. */
         rdmsr(MSR_IA32_MC0_CTL + 4*i, l, h);
-        if (!l & !h)
+        if (!(l | h))
         {
-            /*if ctl is 0, this bank is never initialized*/
+            /* if ctl is 0, this bank is never initialized */
             printk(KERN_DEBUG "mce_init: init bank%d\n", i);
             wrmsr (MSR_IA32_MC0_CTL + 4*i, 0xffffffff, 0xffffffff);
             wrmsr (MSR_IA32_MC0_STATUS + 4*i, 0x0, 0x0);
-       }
+        }
     }
-    if (firstbank) /*if cmci enabled, firstbank = 0*/
+    if (firstbank) /* if cmci enabled, firstbank = 0 */
         wrmsr (MSR_IA32_MC0_STATUS, 0x0, 0x0);
 }
 
-/*p4/p6 faimily has similar MCA initialization process*/
+/* p4/p6 family have similar MCA initialization process */
 void intel_mcheck_init(struct cpuinfo_x86 *c)
 {
     mce_cap_init(c);
