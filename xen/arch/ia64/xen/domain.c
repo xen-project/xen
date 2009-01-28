@@ -405,6 +405,16 @@ void relinquish_vcpu_resources(struct vcpu *v)
 	kill_timer(&v->arch.hlt_timer);
 }
 
+struct domain *alloc_domain_struct(void)
+{
+    return xmalloc(struct domain);
+}
+
+void free_domain_struct(struct domain *d)
+{
+    xfree(d);
+}
+
 struct vcpu *alloc_vcpu_struct(void)
 {
 	struct page_info *page;

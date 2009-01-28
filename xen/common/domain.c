@@ -102,16 +102,6 @@ int current_domain_id(void)
     return current->domain->domain_id;
 }
 
-static struct domain *alloc_domain_struct(void)
-{
-    return xmalloc(struct domain);
-}
-
-static void free_domain_struct(struct domain *d)
-{
-    xfree(d);
-}
-
 static void __domain_finalise_shutdown(struct domain *d)
 {
     struct vcpu *v;

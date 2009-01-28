@@ -162,6 +162,25 @@ void dump_pageframe_info(struct domain *d)
     }
 }
 
+struct domain *alloc_domain_struct(void)
+{
+    struct domain *d;
+    /*
+     * We pack the MFN of the domain structure into a 32-bit field within
+     * the page_info structure. Hence the MEMF_bits() restriction.
+     */
+    d = alloc_xenheap_pages(
+        get_order_from_bytes(sizeof(*d)), MEMF_bits(32 + PAGE_SHIFT));
+    if ( d != NULL )
+        memset(d, 0, sizeof(*d));
+    return d;
+}
+
+void free_domain_struct(struct domain *d)
+{
+    free_xenheap_pages(d, get_order_from_bytes(sizeof(*d)));
+}
+
 struct vcpu *alloc_vcpu_struct(void)
 {
     struct vcpu *v;
