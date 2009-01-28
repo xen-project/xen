@@ -165,14 +165,21 @@ void dump_pageframe_info(struct domain *d)
 struct vcpu *alloc_vcpu_struct(void)
 {
     struct vcpu *v;
-    if ( (v = xmalloc(struct vcpu)) != NULL )
+    /*
+     * This structure contains embedded PAE PDPTEs, used when an HVM guest
+     * runs on shadow pagetables outside of 64-bit mode. In this case the CPU
+     * may require that the shadow CR3 points below 4GB, and hence the whole
+     * structure must satisfy this restriction. Thus we specify MEMF_bits(32).
+     */
+    v = alloc_xenheap_pages(get_order_from_bytes(sizeof(*v)), MEMF_bits(32));
+    if ( v != NULL )
         memset(v, 0, sizeof(*v));
     return v;
 }
 
 void free_vcpu_struct(struct vcpu *v)
 {
-    xfree(v);
+    free_xenheap_pages(v, get_order_from_bytes(sizeof(*v)));
 }
 
 #ifdef CONFIG_COMPAT
