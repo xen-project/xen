@@ -696,10 +696,17 @@ class XendDomainInfo:
                     " assigned to other domain.' \
                     )% (pci_device.name, self.domid, pci_str))
 
-        bdf_str = "%s:%s:%s.%s@%s" % (new_dev['domain'],
+        opts = ''
+        if 'opts' in new_dev and len(new_dev['opts']) > 0:
+            config_opts = new_dev['opts']
+            config_opts = map(lambda (x, y): x+'='+y, config_opts)
+            opts = ',' + reduce(lambda x, y: x+','+y, config_opts)
+
+        bdf_str = "%s:%s:%s.%s%s@%s" % (new_dev['domain'],
                 new_dev['bus'],
                 new_dev['slot'],
                 new_dev['func'],
+                opts,
                 new_dev['vslt'])
         self.image.signalDeviceModel('pci-ins', 'pci-inserted', bdf_str)
 
@@ -1192,7 +1199,7 @@ class XendDomainInfo:
 
         if self.domid >= 0:
             if target > memory_cur:
-                balloon.free( (target-memory_cur)*1024 )
+                balloon.free((target - memory_cur) * 1024, self)
             self.storeVm("memory", target)
             self.storeDom("memory/target", target << 10)
             xc.domain_set_target_mem(self.domid,
@@ -2234,7 +2241,11 @@ class XendDomainInfo:
         xc.domain_max_vcpus(self.domid, int(self.info['VCPUs_max']))
 
         # Test whether the devices can be assigned with VT-d
-        pci_str = str(self.info["platform"].get("pci"))
+        pci = self.info["platform"].get("pci")
+        pci_str = ''
+        if pci and len(pci) > 0:
+            pci = map(lambda x: x[0:4], pci)  # strip options 
+            pci_str = str(pci)
         if hvm and pci_str:
             bdf = xc.test_assign_device(self.domid, pci_str)
             if bdf != 0:
@@ -3527,6 +3538,11 @@ class XendDomainInfo:
 
         dpci_uuid = uuid.createString()
 
+        dpci_opts = []
+        opts_dict = xenapi_pci.get('options')
+        for k in opts_dict.keys():
+            dpci_opts.append([k, opts_dict[k]])
+
         # Convert xenapi to sxp
         ppci = XendAPIStore.get(xenapi_pci.get('PPCI'), 'PPCI')
 
@@ -3538,6 +3554,7 @@ class XendDomainInfo:
                     ['slot', '0x%02x' % ppci.get_slot()],
                     ['func', '0x%1x' % ppci.get_func()],
                     ['vslt', '0x%02x' % xenapi_pci.get('hotplug_slot')],
+                    ['opts', dpci_opts],
                     ['uuid', dpci_uuid]
                 ],
                 ['state', 'Initialising']

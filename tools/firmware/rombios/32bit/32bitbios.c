@@ -19,35 +19,16 @@
  *
  * Author: Stefan Berger <stefanb@us.ibm.com>
  */
+
 #include "rombios_compat.h"
+
+asm (
+    "    .text                       \n"
+    "     movzwl %bx,%eax            \n"
+    "     jmp *jumptable(,%eax,4)    \n"
+    "    .data                       \n"
+    "jumptable:                      \n"
+#define X(idx, ret, fn, args...) " .long "#fn"\n"
 #include "32bitprotos.h"
-
-/*
-   the jumptable that will be copied into the rombios in the 0xf000 segment
-   for every function that is to be called from the lower BIOS, make an entry
-   here.
- */
-#define TABLE_ENTRY(idx, func) [idx] = (uint32_t)func
-uint32_t jumptable[IDX_LAST+1] __attribute__((section (".biosjumptable"))) =
-{
-	TABLE_ENTRY(IDX_TCPA_ACPI_INIT, tcpa_acpi_init),
-	TABLE_ENTRY(IDX_TCPA_EXTEND_ACPI_LOG, tcpa_extend_acpi_log),
-
-	TABLE_ENTRY(IDX_TCGINTERRUPTHANDLER, TCGInterruptHandler),
-
-	TABLE_ENTRY(IDX_TCPA_CALLING_INT19H, tcpa_calling_int19h),
-	TABLE_ENTRY(IDX_TCPA_RETURNED_INT19H, tcpa_returned_int19h),
-	TABLE_ENTRY(IDX_TCPA_ADD_EVENT_SEPARATORS, tcpa_add_event_separators),
-	TABLE_ENTRY(IDX_TCPA_WAKE_EVENT, tcpa_wake_event),
-	TABLE_ENTRY(IDX_TCPA_ADD_BOOTDEVICE, tcpa_add_bootdevice),
-	TABLE_ENTRY(IDX_TCPA_START_OPTION_ROM_SCAN, tcpa_start_option_rom_scan),
-	TABLE_ENTRY(IDX_TCPA_OPTION_ROM, tcpa_option_rom),
-	TABLE_ENTRY(IDX_TCPA_IPL, tcpa_ipl),
-	TABLE_ENTRY(IDX_TCPA_MEASURE_POST, tcpa_measure_post),
-
-	TABLE_ENTRY(IDX_TCPA_INITIALIZE_TPM, tcpa_initialize_tpm),
-
-	TABLE_ENTRY(IDX_GET_S3_WAKING_VECTOR, get_s3_waking_vector),
-
-	TABLE_ENTRY(IDX_LAST       , 0)     /* keep last */
-};
+#undef X
+    );

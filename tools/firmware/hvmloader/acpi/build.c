@@ -48,48 +48,9 @@ static void set_checksum(
     p[checksum_offset] = -sum;
 }
 
-static int uart_exists(uint16_t uart_base)
-{
-    uint16_t ier = uart_base + 1;
-    uint8_t a, b, c;
-
-    a = inb(ier);
-    outb(ier, 0);
-    b = inb(ier);
-    outb(ier, 0xf);
-    c = inb(ier);
-    outb(ier, a);
-
-    return ((b == 0) && (c == 0xf));
-}
-
-static int hpet_exists(unsigned long hpet_base)
-{
-    uint32_t hpet_id = *(uint32_t *)hpet_base;
-    return ((hpet_id >> 16) == 0x8086);
-}
-
 static uint8_t battery_port_exists(void)
 {
     return (inb(0x88) == 0x1F);
-}
-
-static int construct_bios_info_table(uint8_t *buf)
-{
-    struct bios_info *bios_info = (struct bios_info *)buf;
-
-    memset(bios_info, 0, sizeof(*bios_info));
-
-    bios_info->com1_present = uart_exists(0x3f8);
-    bios_info->com2_present = uart_exists(0x2f8);
-
-    bios_info->hpet_present = hpet_exists(ACPI_HPET_ADDRESS);
-
-    bios_info->pci_min = PCI_MEMBASE;
-    bios_info->pci_len = PCI_MEMSIZE;
-    bios_info->xen_pfiob = 0xdead;
-
-    return align16(sizeof(*bios_info));
 }
 
 static int construct_madt(struct acpi_20_madt *madt)
@@ -150,7 +111,7 @@ static int construct_madt(struct acpi_20_madt *madt)
     offset += sizeof(*io_apic);
 
     lapic = (struct acpi_20_madt_lapic *)(io_apic + 1);
-    for ( i = 0; i < get_vcpu_nr(); i++ )
+    for ( i = 0; i < hvm_info->nr_vcpus; i++ )
     {
         memset(lapic, 0, sizeof(*lapic));
         lapic->type    = ACPI_PROCESSOR_LOCAL_APIC;
@@ -199,9 +160,10 @@ static int construct_secondary_tables(uint8_t *buf, unsigned long *table_ptrs)
     struct acpi_20_tcpa *tcpa;
     static const uint16_t tis_signature[] = {0x0001, 0x0001, 0x0001};
     uint16_t *tis_hdr;
+    void *lasa;
 
     /* MADT. */
-    if ( (get_vcpu_nr() > 1) || get_apic_mode() )
+    if ( (hvm_info->nr_vcpus > 1) || hvm_info->apic_mode )
     {
         madt = (struct acpi_20_madt *)&buf[offset];
         offset += construct_madt(madt);
@@ -246,11 +208,11 @@ static int construct_secondary_tables(uint8_t *buf, unsigned long *table_ptrs)
         tcpa->header.oem_revision = ACPI_OEM_REVISION;
         tcpa->header.creator_id   = ACPI_CREATOR_ID;
         tcpa->header.creator_revision = ACPI_CREATOR_REVISION;
-        tcpa->lasa = e820_malloc(ACPI_2_0_TCPA_LAML_SIZE, 0);
-        if ( tcpa->lasa )
+        if ( (lasa = mem_alloc(ACPI_2_0_TCPA_LAML_SIZE, 0)) != NULL )
         {
+            tcpa->lasa = virt_to_phys(lasa);
             tcpa->laml = ACPI_2_0_TCPA_LAML_SIZE;
-            memset((char *)(unsigned long)tcpa->lasa, 0, tcpa->laml);
+            memset(lasa, 0, tcpa->laml);
             set_checksum(tcpa,
                          offsetof(struct acpi_header, checksum),
                          tcpa->header.length);
@@ -348,9 +310,7 @@ static void __acpi_build_tables(uint8_t *buf, int *low_sz, int *high_sz)
     buf = (uint8_t *)ACPI_PHYSICAL_ADDRESS;
     offset = 0;
 
-    offset += construct_bios_info_table(&buf[offset]);
     rsdp = (struct acpi_20_rsdp *)&buf[offset];
-
     memcpy(rsdp, &Rsdp, sizeof(struct acpi_20_rsdp));
     offset += align16(sizeof(struct acpi_20_rsdp));
     rsdp->rsdt_address = (unsigned long)rsdt;
@@ -376,7 +336,7 @@ void acpi_build_tables(void)
     memset(buf, 0, high_sz);
 
     /* Allocate data area and set up ACPI tables there. */
-    buf = (uint8_t *)e820_malloc(high_sz, 0);
+    buf = mem_alloc(high_sz, 0);
     __acpi_build_tables(buf, &low_sz, &high_sz);
 
     printf(" - Lo data: %08lx-%08lx\n"

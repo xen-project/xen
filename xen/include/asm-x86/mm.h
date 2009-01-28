@@ -23,7 +23,7 @@ struct page_info
     struct list_head list;
 
     /* Reference count and various PGC_xxx flags and fields. */
-    u32 count_info;
+    unsigned long count_info;
 
     /* Context-dependent fields follow... */
     union {
@@ -31,10 +31,10 @@ struct page_info
         /* Page is in use: ((count_info & PGC_count_mask) != 0). */
         struct {
             /* Owner of this page (NULL if page is anonymous). */
-            u32 _domain; /* pickled format */
+            unsigned long _domain; /* pickled format */
             /* Type reference count and various PGT_xxx flags and fields. */
             unsigned long type_info;
-        } __attribute__ ((packed)) inuse;
+        } inuse;
 
         /* Page is on a free list: ((count_info & PGC_count_mask) == 0). */
         struct {
@@ -42,13 +42,9 @@ struct page_info
             u32 order;
             /* Mask of possibly-tainted TLBs. */
             cpumask_t cpumask;
-        } __attribute__ ((packed)) free;
+        } free;
 
     } u;
-
-#if defined(__x86_64__)
-    spinlock_t lock;
-#endif
 
     union {
         /*
@@ -102,66 +98,69 @@ struct page_info
     };
 };
 
+#define PG_shift(idx)   (BITS_PER_LONG - (idx))
+#define PG_mask(x, idx) (x ## UL << PG_shift(idx))
+
  /* The following page types are MUTUALLY EXCLUSIVE. */
-#define PGT_none            (0U<<29) /* no special uses of this page */
-#define PGT_l1_page_table   (1U<<29) /* using this page as an L1 page table? */
-#define PGT_l2_page_table   (2U<<29) /* using this page as an L2 page table? */
-#define PGT_l3_page_table   (3U<<29) /* using this page as an L3 page table? */
-#define PGT_l4_page_table   (4U<<29) /* using this page as an L4 page table? */
-#define PGT_seg_desc_page   (5U<<29) /* using this page in a GDT/LDT? */
-#define PGT_writable_page   (7U<<29) /* has writable mappings of this page? */
-#define PGT_type_mask       (7U<<29) /* Bits 29-31. */
+#define PGT_none          PG_mask(0, 3) /* no special uses of this page */
+#define PGT_l1_page_table PG_mask(1, 3) /* using as an L1 page table? */
+#define PGT_l2_page_table PG_mask(2, 3) /* using as an L2 page table? */
+#define PGT_l3_page_table PG_mask(3, 3) /* using as an L3 page table? */
+#define PGT_l4_page_table PG_mask(4, 3) /* using as an L4 page table? */
+#define PGT_seg_desc_page PG_mask(5, 3) /* using this page in a GDT/LDT? */
+#define PGT_writable_page PG_mask(7, 3) /* has writable mappings? */
+#define PGT_type_mask     PG_mask(7, 3) /* Bits 29-31. */
 
  /* Owning guest has pinned this page to its current type? */
-#define _PGT_pinned         28
-#define PGT_pinned          (1U<<_PGT_pinned)
+#define _PGT_pinned       PG_shift(4)
+#define PGT_pinned        PG_mask(1, 4)
  /* Has this page been validated for use as its current type? */
-#define _PGT_validated      27
-#define PGT_validated       (1U<<_PGT_validated)
+#define _PGT_validated    PG_shift(5)
+#define PGT_validated     PG_mask(1, 5)
  /* PAE only: is this an L2 page directory containing Xen-private mappings? */
-#define _PGT_pae_xen_l2     26
-#define PGT_pae_xen_l2      (1U<<_PGT_pae_xen_l2)
+#define _PGT_pae_xen_l2   PG_shift(6)
+#define PGT_pae_xen_l2    PG_mask(1, 6)
 /* Has this page been *partially* validated for use as its current type? */
-#define _PGT_partial        25
-#define PGT_partial         (1U<<_PGT_partial)
+#define _PGT_partial      PG_shift(7)
+#define PGT_partial       PG_mask(1, 7)
+ /* Page is locked? */
+#define _PGT_locked       PG_shift(8)
+#define PGT_locked        PG_mask(1, 8)
 
- /* 25-bit count of uses of this frame as its current type. */
-#define PGT_count_mask      ((1U<<25)-1)
+ /* Count of uses of this frame as its current type. */
+#define PGT_count_width   PG_shift(8)
+#define PGT_count_mask    ((1UL<<PGT_count_width)-1)
 
  /* Cleared when the owning guest 'frees' this page. */
-#define _PGC_allocated      31
-#define PGC_allocated       (1U<<_PGC_allocated)
-#if defined(__i386__)
- /* Page is locked? */
-# define _PGC_locked        30
-# define PGC_locked         (1U<<_PGC_out_of_sync)
-#endif
+#define _PGC_allocated    PG_shift(1)
+#define PGC_allocated     PG_mask(1, 1)
+ /* Page is Xen heap? */
+#define _PGC_xen_heap     PG_shift(2)
+#define PGC_xen_heap      PG_mask(1, 2)
  /* Set when is using a page as a page table */
-#define _PGC_page_table     29
-#define PGC_page_table      (1U<<_PGC_page_table)
+#define _PGC_page_table   PG_shift(3)
+#define PGC_page_table    PG_mask(1, 3)
  /* 3-bit PAT/PCD/PWT cache-attribute hint. */
-#define PGC_cacheattr_base  26
-#define PGC_cacheattr_mask  (7U<<PGC_cacheattr_base)
- /* 26-bit count of references to this frame. */
-#define PGC_count_mask      ((1U<<26)-1)
+#define PGC_cacheattr_base PG_shift(6)
+#define PGC_cacheattr_mask PG_mask(7, 6)
+ /* Count of references to this frame. */
+#define PGC_count_width   PG_shift(6)
+#define PGC_count_mask    ((1UL<<PGC_count_width)-1)
 
+#if defined(__i386__)
 #define is_xen_heap_page(page) is_xen_heap_mfn(page_to_mfn(page))
 #define is_xen_heap_mfn(mfn) ({                         \
     unsigned long _mfn = (mfn);                         \
-    ((_mfn >= paddr_to_pfn(xenheap_phys_start)) &&      \
-     (_mfn < paddr_to_pfn(xenheap_phys_end)));          \
+    (_mfn < paddr_to_pfn(xenheap_phys_end));            \
 })
+#else
+#define is_xen_heap_page(page) ((page)->count_info & PGC_xen_heap)
+#define is_xen_heap_mfn(mfn) is_xen_heap_page(&frame_table[mfn])
+#endif
 
 #if defined(__i386__)
-#define pickle_domptr(_d)   ((u32)(unsigned long)(_d))
-static inline struct domain *unpickle_domptr(u32 _domain)
-{ return (_domain & 1) ? NULL : (void *)_domain; }
 #define PRtype_info "08lx" /* should only be used for printk's */
 #elif defined(__x86_64__)
-static inline struct domain *unpickle_domptr(u32 _domain)
-{ return ((_domain == 0) || (_domain & 1)) ? NULL : __va(_domain); }
-static inline u32 pickle_domptr(struct domain *domain)
-{ return (domain == NULL) ? 0 : (u32)__pa(domain); }
 #define PRtype_info "016lx"/* should only be used for printk's */
 #endif
 
@@ -174,8 +173,8 @@ static inline u32 pickle_domptr(struct domain *domain)
 /* OOS fixup entries */
 #define SHADOW_OOS_FIXUPS 2
 
-#define page_get_owner(_p)    (unpickle_domptr((_p)->u.inuse._domain))
-#define page_set_owner(_p,_d) ((_p)->u.inuse._domain = pickle_domptr(_d))
+#define page_get_owner(_p)    ((struct domain *)(_p)->u.inuse._domain)
+#define page_set_owner(_p,_d) ((_p)->u.inuse._domain = (unsigned long)(_d))
 
 #define maddr_get_owner(ma)   (page_get_owner(maddr_to_page((ma))))
 #define vaddr_get_owner(va)   (page_get_owner(virt_to_page((va))))

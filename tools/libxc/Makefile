@@ -1,7 +1,7 @@
 XEN_ROOT = ../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-MAJOR    = 3.2
+MAJOR    = 3.4
 MINOR    = 0
 
 CTRL_SRCS-y       :=
@@ -62,10 +62,7 @@ CFLAGS-$(CONFIG_Linux) += -D_GNU_SOURCE
 # libraries.
 #CFLAGS   += -DVALGRIND -O0 -ggdb3
 
-# Get gcc to generate the dependencies for us.
-CFLAGS   += -Wp,-MD,.$(@F).d
 LDFLAGS  += -L.
-DEPS     = .*.d
 
 CTRL_LIB_OBJS := $(patsubst %.c,%.o,$(CTRL_SRCS-y))
 CTRL_PIC_OBJS := $(patsubst %.c,%.opic,$(CTRL_SRCS-y))

@@ -349,12 +349,6 @@ struct domain *domain_create(
 #define _DOMCRF_dummy 2
 #define DOMCRF_dummy  (1U<<_DOMCRF_dummy)
 
-int construct_dom0(
-    struct domain *d,
-    unsigned long image_start, unsigned long image_len, 
-    unsigned long initrd_start, unsigned long initrd_len,
-    char *cmdline);
-
 /*
  * rcu_lock_domain_by_id() is more efficient than get_domain_by_id().
  * This is the preferred function if the returned domain reference

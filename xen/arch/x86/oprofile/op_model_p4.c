@@ -41,7 +41,7 @@ static unsigned int num_counters = NUM_COUNTERS_NON_HT;
 static inline void setup_num_counters(void)
 {
 #ifdef CONFIG_SMP
-	if (smp_num_siblings == 2)
+	if (boot_cpu_data.x86_num_siblings == 2) 	/* XXX */
 		num_counters = NUM_COUNTERS_HT2;
 #endif
 }
@@ -49,7 +49,7 @@ static inline void setup_num_counters(void)
 static int inline addr_increment(void)
 {
 #ifdef CONFIG_SMP
-	return smp_num_siblings == 2 ? 2 : 1;
+	return boot_cpu_data.x86_num_siblings == 2 ? 2 : 1;
 #else
 	return 1;
 #endif

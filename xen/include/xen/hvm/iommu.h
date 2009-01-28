@@ -40,7 +40,7 @@ struct hvm_iommu {
     /* amd iommu support */
     int domain_id;
     int paging_mode;
-    void *root_table;
+    struct page_info *root_table;
     bool_t p2m_synchronized;
 
     /* iommu_ops */

@@ -27,7 +27,7 @@
 #ifndef __XEN_ELF_H__
 #define __XEN_ELF_H__
 
-#include <public/elfstructs.h>
+#include <xen/elfstructs.h>
 
 #define ELFNOTE_ALIGN(_n_) (((_n_)+3)&~3)
 #define ELFNOTE_NAME(_n_) ((char*)(_n_) + sizeof(*(_n_)))

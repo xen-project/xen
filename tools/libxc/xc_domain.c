@@ -537,33 +537,6 @@ int xc_domain_memory_populate_physmap(int xc_handle,
     return err;
 }
 
-int xc_domain_memory_translate_gpfn_list(int xc_handle,
-                                         uint32_t domid,
-                                         unsigned long nr_gpfns,
-                                         xen_pfn_t *gpfn_list,
-                                         xen_pfn_t *mfn_list)
-{
-    int err;
-    struct xen_translate_gpfn_list translate_gpfn_list = {
-        .domid    = domid,
-        .nr_gpfns = nr_gpfns,
-    };
-    set_xen_guest_handle(translate_gpfn_list.gpfn_list, gpfn_list);
-    set_xen_guest_handle(translate_gpfn_list.mfn_list, mfn_list);
-
-    err = xc_memory_op(xc_handle, XENMEM_translate_gpfn_list, &translate_gpfn_list);
-
-    if ( err != 0 )
-    {
-        DPRINTF("Failed translation for dom %d (%ld PFNs)\n",
-                domid, nr_gpfns);
-        errno = -err;
-        err = -1;
-    }
-
-    return err;
-}
-
 static int xc_domain_memory_pod_target(int xc_handle,
                                        int op,
                                        uint32_t domid,
@@ -958,7 +931,8 @@ int xc_domain_bind_pt_irq(
     bind->hvm_domid = domid;
     bind->irq_type = irq_type;
     bind->machine_irq = machine_irq;
-    if ( irq_type == PT_IRQ_TYPE_PCI )
+    if ( irq_type == PT_IRQ_TYPE_PCI ||
+         irq_type == PT_IRQ_TYPE_MSI_TRANSLATE )
     {
         bind->u.pci.bus = bus;
         bind->u.pci.device = device;    

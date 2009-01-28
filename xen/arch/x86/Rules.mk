@@ -26,9 +26,9 @@ CFLAGS += -I$(BASEDIR)/include/asm-x86/mach-default
 CFLAGS += -msoft-float
 
 # Disable PIE/SSP if GCC supports them. They can break us.
-CFLAGS += $(call cc-option,$(CC),-nopie,)
-CFLAGS += $(call cc-option,$(CC),-fno-stack-protector,)
-CFLAGS += $(call cc-option,$(CC),-fno-stack-protector-all,)
+$(call cc-option-add,CFLAGS,CC,-nopie)
+$(call cc-option-add,CFLAGS,CC,-fno-stack-protector)
+$(call cc-option-add,CFLAGS,CC,-fno-stack-protector-all)
 
 ifeq ($(supervisor_mode_kernel),y)
 CFLAGS += -DCONFIG_X86_SUPERVISOR_MODE_KERNEL=1
@@ -45,16 +45,12 @@ ifeq ($(TARGET_SUBARCH),x86_64)
 CFLAGS += -mno-red-zone -fpic -fno-reorder-blocks
 CFLAGS += -fno-asynchronous-unwind-tables
 # -fvisibility=hidden reduces -fpic cost, if it's available
-CFLAGS += $(call cc-option,$(CC),-fvisibility=hidden,)
-CFLAGS := $(subst -fvisibility=hidden,-DGCC_HAS_VISIBILITY_ATTRIBUTE,$(CFLAGS))
+ifneq ($(call cc-option,$(CC),-fvisibility=hidden,n),n)
+CFLAGS += -DGCC_HAS_VISIBILITY_ATTRIBUTE
+endif
 x86_32 := n
 x86_64 := y
 endif
-
-HDRS += $(wildcard $(BASEDIR)/include/asm-x86/hvm/*.h)
-HDRS += $(wildcard $(BASEDIR)/include/asm-x86/hvm/svm/*.h)
-HDRS += $(wildcard $(BASEDIR)/include/asm-x86/hvm/vmx/*.h)
-HDRS += $(wildcard $(BASEDIR)/include/asm-x86/mach-*/*.h)
 
 # Require GCC v3.4+ (to avoid issues with alignment constraints in Xen headers)
 $(call cc-ver-check,CC,0x030400,"Xen requires at least gcc-3.4")

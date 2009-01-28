@@ -89,6 +89,6 @@ build_sub:
 			$(MAKE) -C $(TPM_EMULATOR_DIR); \
 		fi \
 	else \
-		echo "*** Unable to build VTPMs. libgmp could not be found."; \
+		echo "=== Unable to build VTPMs. libgmp could not be found."; \
 	fi
 

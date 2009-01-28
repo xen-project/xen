@@ -30,6 +30,7 @@
 #include <asm/fixmap.h>
 #include <asm/hypercall.h>
 #include <asm/msr.h>
+#include <asm/numa.h>
 #include <public/memory.h>
 
 #ifdef CONFIG_COMPAT
@@ -105,6 +106,7 @@ l2_pgentry_t *virt_to_xen_l2e(unsigned long v)
 void __init paging_init(void)
 {
     unsigned long i, mpt_size, va;
+    unsigned int memflags;
     l3_pgentry_t *l3_ro_mpt;
     l2_pgentry_t *l2_ro_mpt = NULL;
     struct page_info *l1_pg, *l2_pg, *l3_pg;
@@ -125,7 +127,36 @@ void __init paging_init(void)
     mpt_size &= ~((1UL << L2_PAGETABLE_SHIFT) - 1UL);
     for ( i = 0; i < (mpt_size >> L2_PAGETABLE_SHIFT); i++ )
     {
-        if ( (l1_pg = alloc_domheap_pages(NULL, PAGETABLE_ORDER, 0)) == NULL )
+        BUILD_BUG_ON(RO_MPT_VIRT_START & ((1UL << L3_PAGETABLE_SHIFT) - 1));
+        va = RO_MPT_VIRT_START + (i << L2_PAGETABLE_SHIFT);
+        memflags = MEMF_node(phys_to_nid(i <<
+            (L2_PAGETABLE_SHIFT - 3 + PAGE_SHIFT)));
+
+        if ( cpu_has_page1gb &&
+             !((unsigned long)l2_ro_mpt & ~PAGE_MASK) &&
+             (mpt_size >> L3_PAGETABLE_SHIFT) > (i >> PAGETABLE_ORDER) &&
+             (l1_pg = alloc_domheap_pages(NULL, 2 * PAGETABLE_ORDER,
+                                          memflags)) != NULL )
+        {
+            map_pages_to_xen(
+                RDWR_MPT_VIRT_START + (i << L2_PAGETABLE_SHIFT),
+                page_to_mfn(l1_pg),
+                1UL << (2 * PAGETABLE_ORDER),
+                PAGE_HYPERVISOR);
+            memset((void *)(RDWR_MPT_VIRT_START + (i << L2_PAGETABLE_SHIFT)),
+                   0x77, 1UL << L3_PAGETABLE_SHIFT);
+
+            ASSERT(!l2_table_offset(va));
+            /* NB. Cannot be GLOBAL as shadow_mode_translate reuses this area. */
+            l3e_write(&l3_ro_mpt[l3_table_offset(va)],
+                l3e_from_page(l1_pg,
+                    /*_PAGE_GLOBAL|*/_PAGE_PSE|_PAGE_USER|_PAGE_PRESENT));
+            i += (1UL << PAGETABLE_ORDER) - 1;
+            continue;
+        }
+
+        if ( (l1_pg = alloc_domheap_pages(NULL, PAGETABLE_ORDER,
+                                          memflags)) == NULL )
             goto nomem;
         map_pages_to_xen(
             RDWR_MPT_VIRT_START + (i << L2_PAGETABLE_SHIFT),
@@ -136,14 +167,13 @@ void __init paging_init(void)
                1UL << L2_PAGETABLE_SHIFT);
         if ( !((unsigned long)l2_ro_mpt & ~PAGE_MASK) )
         {
-            if ( (l2_pg = alloc_domheap_page(NULL, 0)) == NULL )
+            if ( (l2_pg = alloc_domheap_page(NULL, memflags)) == NULL )
                 goto nomem;
-            va = RO_MPT_VIRT_START + (i << L2_PAGETABLE_SHIFT);
             l2_ro_mpt = page_to_virt(l2_pg);
             clear_page(l2_ro_mpt);
             l3e_write(&l3_ro_mpt[l3_table_offset(va)],
                       l3e_from_page(l2_pg, __PAGE_HYPERVISOR | _PAGE_USER));
-            l2_ro_mpt += l2_table_offset(va);
+            ASSERT(!l2_table_offset(va));
         }
         /* NB. Cannot be GLOBAL as shadow_mode_translate reuses this area. */
         l2e_write(l2_ro_mpt, l2e_from_page(
@@ -172,7 +202,10 @@ void __init paging_init(void)
         m2p_compat_vstart = MACH2PHYS_COMPAT_VIRT_END - mpt_size;
     for ( i = 0; i < (mpt_size >> L2_PAGETABLE_SHIFT); i++ )
     {
-        if ( (l1_pg = alloc_domheap_pages(NULL, PAGETABLE_ORDER, 0)) == NULL )
+        memflags = MEMF_node(phys_to_nid(i <<
+            (L2_PAGETABLE_SHIFT - 2 + PAGE_SHIFT)));
+        if ( (l1_pg = alloc_domheap_pages(NULL, PAGETABLE_ORDER,
+                                          memflags)) == NULL )
             goto nomem;
         map_pages_to_xen(
             RDWR_COMPAT_MPT_VIRT_START + (i << L2_PAGETABLE_SHIFT),
@@ -221,34 +254,36 @@ void __init zap_low_mappings(void)
 
 void __init subarch_init_memory(void)
 {
-    unsigned long i, v, m2p_start_mfn;
+    unsigned long i, n, v, m2p_start_mfn;
     l3_pgentry_t l3e;
     l2_pgentry_t l2e;
 
-    /*
-     * We are rather picky about the layout of 'struct page_info'. The
-     * count_info and domain fields must be adjacent, as we perform atomic
-     * 64-bit operations on them.
-     */
-    BUILD_BUG_ON(offsetof(struct page_info, u.inuse._domain) != 
-                 (offsetof(struct page_info, count_info) + sizeof(u32)));
-    BUILD_BUG_ON((offsetof(struct page_info, count_info) & 7) != 0);
-
+    BUILD_BUG_ON(RDWR_MPT_VIRT_START & ((1UL << L3_PAGETABLE_SHIFT) - 1));
+    BUILD_BUG_ON(RDWR_MPT_VIRT_END   & ((1UL << L3_PAGETABLE_SHIFT) - 1));
     /* M2P table is mappable read-only by privileged domains. */
     for ( v  = RDWR_MPT_VIRT_START;
           v != RDWR_MPT_VIRT_END;
-          v += 1 << L2_PAGETABLE_SHIFT )
+          v += n << PAGE_SHIFT )
     {
+        n = L2_PAGETABLE_ENTRIES * L1_PAGETABLE_ENTRIES;
         l3e = l4e_to_l3e(idle_pg_table[l4_table_offset(v)])[
             l3_table_offset(v)];
         if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) )
             continue;
-        l2e = l3e_to_l2e(l3e)[l2_table_offset(v)];
-        if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
-            continue;
-        m2p_start_mfn = l2e_get_pfn(l2e);
+        if ( !(l3e_get_flags(l3e) & _PAGE_PSE) )
+        {
+            n = L1_PAGETABLE_ENTRIES;
+            l2e = l3e_to_l2e(l3e)[l2_table_offset(v)];
+            if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
+                continue;
+            m2p_start_mfn = l2e_get_pfn(l2e);
+        }
+        else
+        {
+            m2p_start_mfn = l3e_get_pfn(l3e);
+        }
 
-        for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
+        for ( i = 0; i < n; i++ )
         {
             struct page_info *page = mfn_to_page(m2p_start_mfn + i);
             share_xen_page_with_privileged_guests(page, XENSHARE_readonly);
@@ -292,18 +327,29 @@ long subarch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         if ( copy_from_guest(&xmml, arg, 1) )
             return -EFAULT;
 
+        BUILD_BUG_ON(RDWR_MPT_VIRT_START & ((1UL << L3_PAGETABLE_SHIFT) - 1));
+        BUILD_BUG_ON(RDWR_MPT_VIRT_END   & ((1UL << L3_PAGETABLE_SHIFT) - 1));
         for ( i = 0, v = RDWR_MPT_VIRT_START;
               (i != xmml.max_extents) && (v != RDWR_MPT_VIRT_END);
-              i++, v += 1 << 21 )
+              i++, v += 1UL << L2_PAGETABLE_SHIFT )
         {
             l3e = l4e_to_l3e(idle_pg_table[l4_table_offset(v)])[
                 l3_table_offset(v)];
             if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) )
                 break;
-            l2e = l3e_to_l2e(l3e)[l2_table_offset(v)];
-            if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
-                break;
-            mfn = l2e_get_pfn(l2e) + l1_table_offset(v);
+            if ( !(l3e_get_flags(l3e) & _PAGE_PSE) )
+            {
+                l2e = l3e_to_l2e(l3e)[l2_table_offset(v)];
+                if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
+                    break;
+                mfn = l2e_get_pfn(l2e);
+            }
+            else
+            {
+                mfn = l3e_get_pfn(l3e)
+                    + (l2_table_offset(v) << PAGETABLE_ORDER);
+            }
+            ASSERT(!l1_table_offset(v));
             if ( copy_to_guest_offset(xmml.extent_start, i, &mfn, 1) )
                 return -EFAULT;
         }

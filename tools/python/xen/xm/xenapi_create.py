@@ -533,7 +533,10 @@ class xenapi_create:
             "PPCI":
                 target_ref,
             "hotplug_slot":
-                int(pci.attributes["func"].value, 16)
+                int(pci.attributes["func"].value, 16),
+            "options":
+                get_child_nodes_as_dict(pci,
+                  "pci_opt", "key", "value")
         }
 
         return server.xenapi.DPCI.create(dpci_record)
@@ -931,6 +934,12 @@ class sxp2xml:
                     = get_child_by_name(dev_sxp, "func", "0")
                 pci.attributes["vslt"] \
                     = get_child_by_name(dev_sxp, "vslt", "0")
+                for opt in get_child_by_name(dev_sxp, "opts", ""):
+                    if len(opt) > 0:
+                        pci_opt = document.createElement("pci_opt")
+                        pci_opt.attributes["key"] = opt[0]
+                        pci_opt.attributes["value"] = opt[1]
+                        pci.appendChild(pci_opt)
 
                 pcis.append(pci)
 
@@ -1032,6 +1041,7 @@ class sxp2xml:
             'vhpt',
             'guest_os_type',
             'hap',
+            'pci_msitranslate',
         ]
 
         platform_configs = []

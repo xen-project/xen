@@ -38,19 +38,29 @@ static char *cpu_type;
 extern int is_active(struct domain *d);
 extern int is_passive(struct domain *d);
 
+static int passive_domain_msr_op_checks(struct cpu_user_regs *regs ,int *typep, int *indexp)
+{
+	struct vpmu_struct *vpmu = vcpu_vpmu(current);
+	if ( model == NULL )
+		return 0;
+	if ( model->is_arch_pmu_msr == NULL )
+		return 0;
+	if ( !model->is_arch_pmu_msr((u64)regs->ecx, typep, indexp) )
+		return 0;
+
+	if ( !(vpmu->flags & PASSIVE_DOMAIN_ALLOCATED) )
+		if ( ! model->allocated_msr(current) )
+			return 0;
+	return 1;
+}
+
 int passive_domain_do_rdmsr(struct cpu_user_regs *regs)
 {
 	u64 msr_content;
 	int type, index;
-	struct vpmu_struct *vpmu = vcpu_vpmu(current);
 
-	if ( model->is_arch_pmu_msr == NULL )
+	if ( !passive_domain_msr_op_checks(regs, &type, &index))
 		return 0;
-	if ( !model->is_arch_pmu_msr((u64)regs->ecx, &type, &index) )
-		return 0;
-	if ( !(vpmu->flags & PASSIVE_DOMAIN_ALLOCATED) )
-		if ( ! model->allocated_msr(current) )
-			return 0;
 
 	model->load_msr(current, type, index, &msr_content);
 	regs->eax = msr_content & 0xFFFFFFFF;
@@ -58,23 +68,13 @@ int passive_domain_do_rdmsr(struct cpu_user_regs *regs)
 	return 1;
 }
 
-
 int passive_domain_do_wrmsr(struct cpu_user_regs *regs)
 {
 	u64 msr_content;
 	int type, index;
-	struct vpmu_struct *vpmu = vcpu_vpmu(current);
 
-	if ( model == NULL )
+	if ( !passive_domain_msr_op_checks(regs, &type, &index))
 		return 0;
-	if ( model->is_arch_pmu_msr == NULL )
-		return 0;
-	if ( !model->is_arch_pmu_msr((u64)regs->ecx, &type, &index) )
-		return 0;
-
-	if ( !(vpmu->flags & PASSIVE_DOMAIN_ALLOCATED) )
-		if ( ! model->allocated_msr(current) )
-			return 0;
 
 	msr_content = (u32)regs->eax | ((u64)regs->edx << 32);
 	model->save_msr(current, type, index, msr_content);
@@ -326,7 +326,7 @@ static int __init p4_init(char ** cpu_type)
 	model = &op_p4_spec;
 	return 1;
 #else
-	switch (smp_num_siblings) {
+	switch (current_cpu_data.x86_num_siblings) {
 		case 1:
 			*cpu_type = "i386/p4";
 			model = &op_p4_spec;

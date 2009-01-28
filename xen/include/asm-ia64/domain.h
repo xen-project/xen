@@ -326,6 +326,12 @@ ia64_fault(unsigned long vector, unsigned long isr, unsigned long ifa,
 void
 ia64_lazy_load_fpu(struct vcpu *vcpu);
 
+int construct_dom0(
+    struct domain *d,
+    unsigned long image_start, unsigned long image_len,
+    unsigned long initrd_start, unsigned long initrd_len,
+    char *cmdline);
+
 #endif /* __ASM_DOMAIN_H__ */
 
 /*

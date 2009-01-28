@@ -286,7 +286,7 @@ static int __pminit setup_p4_watchdog(void)
 
     nmi_perfctr_msr = MSR_P4_IQ_PERFCTR0;
     nmi_p4_cccr_val = P4_NMI_IQ_CCCR0;
-    if ( smp_num_siblings == 2 )
+    if ( boot_cpu_data.x86_num_siblings == 2 )
         nmi_p4_cccr_val |= P4_CCCR_OVF_PMI1;
 
     if (!(misc_enable & MSR_IA32_MISC_ENABLE_PEBS_UNAVAIL))

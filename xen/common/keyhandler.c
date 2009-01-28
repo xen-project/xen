@@ -184,9 +184,9 @@ static void dump_domains(unsigned char key)
         printk("General information for domain %u:\n", d->domain_id);
         cpuset_print(tmpstr, sizeof(tmpstr), d->domain_dirty_cpumask);
         printk("    refcnt=%d dying=%d nr_pages=%d xenheap_pages=%d "
-               "dirty_cpus=%s\n",
+               "dirty_cpus=%s max_pages=%u\n",
                atomic_read(&d->refcnt), d->is_dying,
-               d->tot_pages, d->xenheap_pages, tmpstr);
+               d->tot_pages, d->xenheap_pages, tmpstr, d->max_pages);
         printk("    handle=%02x%02x%02x%02x-%02x%02x-%02x%02x-"
                "%02x%02x-%02x%02x%02x%02x%02x%02x vm_assist=%08lx\n",
                d->handle[ 0], d->handle[ 1], d->handle[ 2], d->handle[ 3],

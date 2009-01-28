@@ -1,47 +1,16 @@
-#ifndef PROTOS_HIGHBIOS
-#define PROTOS_HIGHBIOS
-
-/* shared include file for bcc and gcc */
-
-/* bcc does not like 'enum' */
-#define IDX_TCGINTERRUPTHANDLER            0
-#define IDX_TCPA_ACPI_INIT                 1
-#define IDX_TCPA_EXTEND_ACPI_LOG           2
-#define IDX_TCPA_CALLING_INT19H            3
-#define IDX_TCPA_RETURNED_INT19H           4
-#define IDX_TCPA_ADD_EVENT_SEPARATORS      5
-#define IDX_TCPA_WAKE_EVENT                6
-#define IDX_TCPA_ADD_BOOTDEVICE            7
-#define IDX_TCPA_START_OPTION_ROM_SCAN     8
-#define IDX_TCPA_OPTION_ROM                9
-#define IDX_TCPA_IPL                       10
-#define IDX_TCPA_INITIALIZE_TPM            11
-#define IDX_TCPA_MEASURE_POST              12
-#define IDX_GET_S3_WAKING_VECTOR           13
-#define IDX_LAST                           14 /* keep last! */
-
-#ifdef GCC_PROTOS
-  #define PARMS(x...) x
-#else
-  /* bcc doesn't want any parameter types in prototypes */
-  #define PARMS(x...)
-#endif
-
-Bit32u TCGInterruptHandler( PARMS(pushad_regs_t *regs, Bit32u esds, Bit32u flags_ptr));
-
-void tcpa_acpi_init( PARMS(void) );
-Bit32u tcpa_extend_acpi_log( PARMS(Bit32u entry_ptr) );
-void tcpa_calling_int19h( PARMS(void) );
-void tcpa_returned_int19h( PARMS(void) );
-void tcpa_add_event_separators( PARMS(void) );
-void tcpa_wake_event( PARMS(void) );
-void tcpa_add_bootdevice( PARMS(Bit32u bootcd, Bit32u bootdrv) );
-void tcpa_start_option_rom_scan( PARMS(void) );
-void tcpa_option_rom( PARMS(Bit32u seg) );
-void tcpa_ipl( PARMS(Bit32u bootcd,Bit32u seg,Bit32u off,Bit32u count) );
-void tcpa_measure_post( PARMS(Bit32u from, Bit32u to) );
-Bit32u tcpa_initialize_tpm( PARMS(Bit32u physpres) );
-
-Bit32u get_s3_waking_vector( PARMS(void) );
-
-#endif
+X(0,  Bit32u, TCGInterruptHandler,
+  pushad_regs_t *regs, Bit32u esds, Bit32u flags_ptr)
+X(1,  void,   tcpa_acpi_init, void)
+X(2,  Bit32u, tcpa_extend_acpi_log, Bit32u entry_ptr)
+X(3,  void,   tcpa_calling_int19h,void)
+X(4,  void,   tcpa_returned_int19h, void)
+X(5,  void,   tcpa_add_event_separators, void)
+X(6,  void,   tcpa_wake_event, void)
+X(7,  void,   tcpa_add_bootdevice, Bit32u bootcd, Bit32u bootdrv)
+X(8,  void,   tcpa_start_option_rom_scan, void)
+X(9,  void,   tcpa_option_rom, Bit32u seg)
+X(10, void,   tcpa_ipl, Bit32u bootcd, Bit32u seg, Bit32u off, Bit32u count)
+X(11, void,   tcpa_measure_post, Bit32u from, Bit32u to)
+X(12, Bit32u, tcpa_initialize_tpm, Bit32u physpres)
+X(13, Bit32u, get_s3_waking_vector, void)
+X(14, Bit32u, pmm, void *argp)

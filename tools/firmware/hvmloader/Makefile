@@ -58,4 +58,6 @@ roms.h: ../rombios/BIOS-bochs-latest ../vgabios/VGABIOS-lgpl-latest.bin \
 .PHONY: clean
 clean: subdirs-clean
 	rm -f roms.h acpi.h
-	rm -f hvmloader hvmloader.tmp *.o
+	rm -f hvmloader hvmloader.tmp *.o $(DEPS)
+
+-include $(DEPS)

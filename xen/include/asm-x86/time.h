@@ -39,5 +39,6 @@ void pit_broadcast_exit(void);
 int pit_broadcast_is_available(void);
 
 uint64_t acpi_pm_tick_to_ns(uint64_t ticks);
+uint64_t ns_to_acpi_pm_tick(uint64_t ns);
 
 #endif /* __X86_TIME_H__ */

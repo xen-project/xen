@@ -90,6 +90,7 @@ int elf_xen_parse_note(struct elf_binary *elf,
         [XEN_ELFNOTE_ENTRY] = { "ENTRY", 0},
         [XEN_ELFNOTE_HYPERCALL_PAGE] = { "HYPERCALL_PAGE", 0},
         [XEN_ELFNOTE_VIRT_BASE] = { "VIRT_BASE", 0},
+        [XEN_ELFNOTE_INIT_P2M] = { "INIT_P2M", 0},
         [XEN_ELFNOTE_PADDR_OFFSET] = { "PADDR_OFFSET", 0},
         [XEN_ELFNOTE_HV_START_LOW] = { "HV_START_LOW", 0},
         [XEN_ELFNOTE_XEN_VERSION] = { "XEN_VERSION", 1},
@@ -163,6 +164,9 @@ int elf_xen_parse_note(struct elf_binary *elf,
         break;
     case XEN_ELFNOTE_ENTRY:
         parms->virt_entry = val;
+        break;
+    case XEN_ELFNOTE_INIT_P2M:
+        parms->p2m_base = val;
         break;
     case XEN_ELFNOTE_PADDR_OFFSET:
         parms->elf_paddr_offset = val;
@@ -392,6 +396,7 @@ static int elf_xen_addr_calc_check(struct elf_binary *elf,
     elf_msg(elf, "    virt_kstart      = 0x%" PRIx64 "\n", parms->virt_kstart);
     elf_msg(elf, "    virt_kend        = 0x%" PRIx64 "\n", parms->virt_kend);
     elf_msg(elf, "    virt_entry       = 0x%" PRIx64 "\n", parms->virt_entry);
+    elf_msg(elf, "    p2m_base         = 0x%" PRIx64 "\n", parms->p2m_base);
 
     if ( (parms->virt_kstart > parms->virt_kend) ||
          (parms->virt_entry < parms->virt_kstart) ||
@@ -399,6 +404,15 @@ static int elf_xen_addr_calc_check(struct elf_binary *elf,
          (parms->virt_base > parms->virt_kstart) )
     {
         elf_err(elf, "%s: ERROR: ELF start or entries are out of bounds.\n",
+                __FUNCTION__);
+        return -1;
+    }
+
+    if ( (parms->p2m_base != UNSET_ADDR) &&
+         (parms->p2m_base >= parms->virt_kstart) &&
+         (parms->p2m_base < parms->virt_kend) )
+    {
+        elf_err(elf, "%s: ERROR: P->M table base is out of bounds.\n",
                 __FUNCTION__);
         return -1;
     }
@@ -422,6 +436,7 @@ int elf_xen_parse(struct elf_binary *elf,
     parms->virt_entry = UNSET_ADDR;
     parms->virt_hypercall = UNSET_ADDR;
     parms->virt_hv_start_low = UNSET_ADDR;
+    parms->p2m_base = UNSET_ADDR;
     parms->elf_paddr_offset = UNSET_ADDR;
 
     /* Find and parse elf notes. */

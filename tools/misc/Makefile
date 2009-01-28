@@ -47,7 +47,7 @@ install: build
 
 .PHONY: clean
 clean:
-	$(RM) *.o $(TARGETS) *~
+	$(RM) *.o $(TARGETS) *~ $(DEPS)
 	set -e; for d in $(SUBDIRS); do $(MAKE) -C $$d clean; done
 
 %.o: %.c $(HDRS) Makefile
@@ -55,3 +55,5 @@ clean:
 
 xenperf xenpm: %: %.o Makefile
 	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS) $(LDFLAGS_libxenctrl)
+
+-include $(DEPS)

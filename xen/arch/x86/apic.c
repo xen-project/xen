@@ -40,7 +40,7 @@
 /*
  * Knob to control our willingness to enable the local APIC.
  */
-int enable_local_apic __initdata = 0; /* -1=force-disable, +1=force-enable */
+static int enable_local_apic __initdata = 0; /* -1=force-disable, +1=force-enable */
 
 /*
  * Debug level
@@ -742,7 +742,7 @@ static void apic_pm_activate(void)
 static void __init lapic_disable(char *str)
 {
     enable_local_apic = -1;
-    clear_bit(X86_FEATURE_APIC, boot_cpu_data.x86_capability);
+    setup_clear_cpu_cap(X86_FEATURE_APIC);
 }
 custom_param("nolapic", lapic_disable);
 

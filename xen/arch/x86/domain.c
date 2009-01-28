@@ -143,7 +143,7 @@ void dump_pageframe_info(struct domain *d)
     {
         list_for_each_entry ( page, &d->page_list, list )
         {
-            printk("    DomPage %p: caf=%08x, taf=%" PRtype_info "\n",
+            printk("    DomPage %p: caf=%08lx, taf=%" PRtype_info "\n",
                    _p(page_to_mfn(page)),
                    page->count_info, page->u.inuse.type_info);
         }
@@ -156,7 +156,7 @@ void dump_pageframe_info(struct domain *d)
 
     list_for_each_entry ( page, &d->xenpage_list, list )
     {
-        printk("    XenPage %p: caf=%08x, taf=%" PRtype_info "\n",
+        printk("    XenPage %p: caf=%08lx, taf=%" PRtype_info "\n",
                _p(page_to_mfn(page)),
                page->count_info, page->u.inuse.type_info);
     }
@@ -405,8 +405,17 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
         if ( d->arch.ioport_caps == NULL )
             goto fail;
 
+#ifdef __i386__
         if ( (d->shared_info = alloc_xenheap_page()) == NULL )
             goto fail;
+#else
+        pg = alloc_domheap_page(
+            NULL, MEMF_node(domain_to_node(d)) | MEMF_bits(32));
+        if ( pg == NULL )
+            goto fail;
+        pg->count_info |= PGC_xen_heap;
+        d->shared_info = page_to_virt(pg);
+#endif
 
         clear_page(d->shared_info);
         share_xen_page_with_guest(

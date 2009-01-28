@@ -96,7 +96,6 @@ struct xsm_operations {
     int (*alloc_security_evtchn) (struct evtchn *chn);
     void (*free_security_evtchn) (struct evtchn *chn);
 
-    int (*translate_gpfn_list) (struct domain *d, unsigned long mfn);
     int (*memory_adjust_reservation) (struct domain *d1, struct domain *d2);
     int (*memory_stat_reservation) (struct domain *d1, struct domain *d2);
     int (*memory_pin_page) (struct domain *d, struct page_info *page);
@@ -143,7 +142,6 @@ struct xsm_operations {
     int (*update_va_mapping) (struct domain *d, struct domain *f, 
                                                             l1_pgentry_t pte);
     int (*add_to_physmap) (struct domain *d1, struct domain *d2);
-    int (*remove_from_physmap) (struct domain *d1, struct domain *d2);
     int (*sendtrigger) (struct domain *d);
     int (*test_assign_device) (uint32_t machine_bdf);
     int (*assign_device) (struct domain *d, uint32_t machine_bdf);
@@ -367,11 +365,6 @@ static inline void xsm_free_security_evtchn (struct evtchn *chn)
     xsm_call(free_security_evtchn(chn));
 }
 
-static inline int xsm_translate_gpfn_list (struct domain *d, unsigned long mfn)
-{
-    return xsm_call(translate_gpfn_list(d, mfn));
-}
-
 static inline int xsm_memory_adjust_reservation (struct domain *d1, struct
                                                                     domain *d2)
 {
@@ -582,11 +575,6 @@ static inline int xsm_update_va_mapping(struct domain *d, struct domain *f,
 static inline int xsm_add_to_physmap(struct domain *d1, struct domain *d2)
 {
     return xsm_call(add_to_physmap(d1, d2));
-}
-
-static inline int xsm_remove_from_physmap(struct domain *d1, struct domain *d2)
-{
-    return xsm_call(remove_from_physmap(d1, d2));
 }
 
 static inline int xsm_sendtrigger(struct domain *d)

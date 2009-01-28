@@ -195,6 +195,7 @@ int machine_kexec_get(xen_kexec_range_t *range)
 
 void arch_crash_save_vmcoreinfo(void)
 {
+    VMCOREINFO_SYMBOL(xenheap_phys_end);
 	VMCOREINFO_SYMBOL(dom_xen);
 	VMCOREINFO_SYMBOL(dom_io);
 	VMCOREINFO_SYMBOL(xen_pstart);

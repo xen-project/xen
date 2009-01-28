@@ -169,6 +169,7 @@ struct cpuinfo_x86 {
     int  x86_power;
     __u32 x86_max_cores; /* cpuid returned max cores value */
     __u32 booted_cores;  /* number of cores as seen by OS */
+    __u32 x86_num_siblings; /* cpuid logical cpus per chip value */
     __u32 apicid;
     unsigned short x86_clflush_size;
 } __cacheline_aligned;
@@ -191,6 +192,7 @@ extern int phys_proc_id[NR_CPUS];
 extern int cpu_core_id[NR_CPUS];
 
 extern void identify_cpu(struct cpuinfo_x86 *);
+extern void setup_clear_cpu_cap(unsigned int);
 extern void print_cpu_info(struct cpuinfo_x86 *);
 extern unsigned int init_intel_cacheinfo(struct cpuinfo_x86 *c);
 extern void dodgy_tsc(void);
@@ -551,6 +553,7 @@ int wrmsr_hypervisor_regs(
     uint32_t idx, uint32_t eax, uint32_t edx);
 
 int microcode_update(XEN_GUEST_HANDLE(const_void), unsigned long len);
+int microcode_resume_cpu(int cpu);
 
 #endif /* !__ASSEMBLY__ */
 

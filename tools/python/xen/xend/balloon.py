@@ -67,7 +67,7 @@ def get_dom0_target_alloc():
         raise VmError('Failed to query target memory allocation of dom0.')
     return kb
 
-def free(need_mem ,self):
+def free(need_mem, dominfo):
     """Balloon out memory from the privileged domain so that there is the
     specified required amount (in KiB) free.
     """
@@ -130,7 +130,7 @@ def free(need_mem ,self):
         if physinfo['nr_nodes'] > 1 and retries == 0:
             oldnode = -1
             waitscrub = 1
-            vcpus = self.info['cpus'][0]
+            vcpus = dominfo.info['cpus'][0]
             for vcpu in vcpus:
                 nodenum = 0
                 for node in physinfo['node_to_cpu']:

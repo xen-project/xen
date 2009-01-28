@@ -49,31 +49,22 @@ struct microcode_info {
     char buffer[1];
 };
 
-static void microcode_fini_cpu(int cpu)
+static void __microcode_fini_cpu(int cpu)
 {
     struct ucode_cpu_info *uci = ucode_cpu_info + cpu;
 
+    xfree(uci->mc.mc_valid);
+    memset(uci, 0, sizeof(*uci));
+}
+
+static void microcode_fini_cpu(int cpu)
+{
     spin_lock(&microcode_mutex);
-    xfree(uci->mc.valid_mc);
-    uci->mc.valid_mc = NULL;
-    uci->valid = 0;
+    __microcode_fini_cpu(cpu);
     spin_unlock(&microcode_mutex);
 }
 
-static int collect_cpu_info(int cpu)
-{
-    int err = 0;
-    struct ucode_cpu_info *uci = ucode_cpu_info + cpu;
-
-    memset(uci, 0, sizeof(*uci));
-    err = microcode_ops->collect_cpu_info(cpu, &uci->cpu_sig);
-    if ( !err )
-        uci->valid = 1;
-
-    return err;
-}
-
-static int microcode_resume_cpu(int cpu)
+int microcode_resume_cpu(int cpu)
 {
     int err = 0;
     struct ucode_cpu_info *uci = ucode_cpu_info + cpu;
@@ -81,7 +72,7 @@ static int microcode_resume_cpu(int cpu)
 
     gdprintk(XENLOG_INFO, "microcode: CPU%d resumed\n", cpu);
 
-    if ( !uci->mc.valid_mc )
+    if ( !uci->mc.mc_valid )
         return -EIO;
 
     /*
@@ -95,16 +86,15 @@ static int microcode_resume_cpu(int cpu)
         return err;
     }
 
-    if ( memcmp(&nsig, &uci->cpu_sig, sizeof(nsig)) )
+    if ( microcode_ops->microcode_resume_match(cpu, &nsig) )
+    {
+        return microcode_ops->apply_microcode(cpu);
+    }
+    else
     {
         microcode_fini_cpu(cpu);
-        /* Should we look for a new ucode here? */
         return -EIO;
     }
-
-    err = microcode_ops->apply_microcode(cpu);
-
-    return err;
 }
 
 static int microcode_update_cpu(const void *buf, size_t size)
@@ -115,20 +105,11 @@ static int microcode_update_cpu(const void *buf, size_t size)
 
     spin_lock(&microcode_mutex);
 
-    /*
-     * Check if the system resume is in progress (uci->valid != NULL),
-     * otherwise just request a firmware:
-     */
-    if ( uci->valid )
-    {
-        err = microcode_resume_cpu(cpu);
-    }
+    err = microcode_ops->collect_cpu_info(cpu, &uci->cpu_sig);
+    if ( likely(!err) )
+        err = microcode_ops->cpu_request_microcode(cpu, buf, size);
     else
-    {
-        err = collect_cpu_info(cpu);
-        if ( !err && uci->valid )
-            err = microcode_ops->cpu_request_microcode(cpu, buf, size);
-    }
+        __microcode_fini_cpu(cpu);
 
     spin_unlock(&microcode_mutex);
 
@@ -153,7 +134,6 @@ static long do_microcode_update(void *_info)
     error = info->error;
     xfree(info);
     return error;
-
 }
 
 int microcode_update(XEN_GUEST_HANDLE(const_void) buf, unsigned long len)

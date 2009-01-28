@@ -72,19 +72,4 @@ ifeq ($(xen_ia64_disable_optvfault),y)
 CFLAGS += -DCONFIG_XEN_IA64_DISABLE_OPTVFAULT
 endif
 
-LDFLAGS := -g
-
-# Additionnal IA64 include dirs.
-HDRS += $(wildcard $(BASEDIR)/include/asm-ia64/linux-null/asm/*.h)
-HDRS += $(wildcard $(BASEDIR)/include/asm-ia64/linux-null/asm/sn/*.h)
-HDRS += $(wildcard $(BASEDIR)/include/asm-ia64/linux-null/linux/*.h)
-HDRS += $(wildcard $(BASEDIR)/include/asm-ia64/linux-xen/asm/*.h)
-HDRS += $(wildcard $(BASEDIR)/include/asm-ia64/linux-xen/asm/sn/*.h)
-HDRS += $(wildcard $(BASEDIR)/include/asm-ia64/linux-xen/linux/*.h)
-HDRS += $(wildcard $(BASEDIR)/include/asm-ia64/linux/*.h)
-HDRS += $(wildcard $(BASEDIR)/include/asm-ia64/linux/asm-generic/*.h)
-HDRS += $(wildcard $(BASEDIR)/include/asm-ia64/linux/asm/*.h)
-HDRS += $(wildcard $(BASEDIR)/include/asm-ia64/linux/byteorder/*.h)
-HDRS += $(wildcard $(BASEDIR)/include/asm-ia64/hvm/*.h)
-
-HDRS := $(filter-out %/include/asm-ia64/asm-xsi-offsets.h,$(HDRS))
+LDFLAGS = -g

@@ -79,7 +79,7 @@ void __init vga_init(void)
     switch ( vga_console_info.video_type )
     {
     case XEN_VGATYPE_TEXT_MODE_3:
-        if ( memory_is_conventional_ram(0xB8000) ||
+        if ( page_is_conventional_ram(paddr_to_pfn(0xB8000)) ||
              ((video = ioremap(0xB8000, 0x8000)) == NULL) )
             return;
         outw(0x200a, 0x3d4); /* disable cursor */

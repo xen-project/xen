@@ -7,9 +7,6 @@ LIBFLASK_ROOT = $(XEN_ROOT)/tools/flask/libflask
 
 PROFILE=#-pg
 BASECFLAGS=-Wall -g -Werror
-# Make gcc generate dependencies.
-BASECFLAGS += -Wp,-MD,.$(@F).d
-PROG_DEP = .*.d
 BASECFLAGS+= $(PROFILE)
 #BASECFLAGS+= -I$(XEN_ROOT)/tools
 BASECFLAGS+= $(CFLAGS_libxenctrl)
@@ -39,7 +36,7 @@ $(CLIENTS_OBJS): $(CLIENTS_SRCS)
 clean: 
 	rm -f *.o *.opic *.so
 	rm -f $(CLIENTS)
-	$(RM) $(PROG_DEP)
+	$(RM) $(DEPS)
 
 .PHONY: print-dir
 print-dir:
@@ -54,7 +51,7 @@ install: all
 	$(INSTALL_DIR) $(DESTDIR)$(SBINDIR)
 	$(INSTALL_PROG) $(CLIENTS) $(DESTDIR)$(SBINDIR)
 
--include $(PROG_DEP)
+-include $(DEPS)
 
 # never delete any intermediate files.
 .SECONDARY:

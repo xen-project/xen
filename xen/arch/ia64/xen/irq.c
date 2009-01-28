@@ -402,7 +402,7 @@ void __do_IRQ_guest(int irq)
 	}
 }
 
-int pirq_acktype(int irq)
+static int pirq_acktype(int irq)
 {
     irq_desc_t *desc = &irq_desc[irq];
 

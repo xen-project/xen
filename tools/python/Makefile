@@ -85,3 +85,6 @@ test:
 .PHONY: clean
 clean:
 	rm -rf build *.pyc *.pyo *.o *.a *~ $(CATALOGS) xen/util/auxbin.pyc
+	rm -f $(DEPS)
+
+-include $(DEPS)

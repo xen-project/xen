@@ -903,26 +903,24 @@ static PyObject *pyxc_hvm_build(XcObject *self,
     if ( target == -1 )
         target = memsize;
 
-    if ( xc_hvm_build_target_mem(self->xc_handle, dom, memsize, target, image) != 0 )
+    if ( xc_hvm_build_target_mem(self->xc_handle, dom, memsize,
+                                 target, image) != 0 )
         return pyxc_error_to_exception();
 
 #if !defined(__ia64__)
-    /* Set up the HVM info table. */
+    /* Fix up the HVM info table. */
     va_map = xc_map_foreign_range(self->xc_handle, dom, XC_PAGE_SIZE,
                                   PROT_READ | PROT_WRITE,
                                   HVM_INFO_PFN);
     if ( va_map == NULL )
         return PyErr_SetFromErrno(xc_error_obj);
     va_hvm = (struct hvm_info_table *)(va_map + HVM_INFO_OFFSET);
-    memset(va_hvm, 0, sizeof(*va_hvm));
-    strncpy(va_hvm->signature, "HVM INFO", 8);
-    va_hvm->length       = sizeof(struct hvm_info_table);
     va_hvm->acpi_enabled = acpi;
     va_hvm->apic_mode    = apic;
     va_hvm->nr_vcpus     = vcpus;
     for ( i = 0, sum = 0; i < va_hvm->length; i++ )
         sum += ((uint8_t *)va_hvm)[i];
-    va_hvm->checksum = -sum;
+    va_hvm->checksum -= sum;
     munmap(va_map, XC_PAGE_SIZE);
 #endif
 

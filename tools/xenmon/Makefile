@@ -38,10 +38,12 @@ install: build
 
 .PHONY: clean
 clean:
-	rm -f $(BIN)
+	rm -f $(BIN) $(DEPS)
 
 
 %: %.c Makefile
 	$(CC) $(CFLAGS) $< $(LDFLAGS) -o $@
 xentrace_%: %.c Makefile
 	$(CC) $(CFLAGS) $< $(LDFLAGS) -o $@
+
+-include $(DEPS)

@@ -1715,16 +1715,13 @@ shadow_free_p2m_page(struct domain *d, struct page_info *pg)
     /* Should have just the one ref we gave it in alloc_p2m_page() */
     if ( (pg->count_info & PGC_count_mask) != 1 )
     {
-        SHADOW_ERROR("Odd p2m page count c=%#x t=%"PRtype_info"\n",
+        SHADOW_ERROR("Odd p2m page count c=%#lx t=%"PRtype_info"\n",
                      pg->count_info, pg->u.inuse.type_info);
     }
     pg->count_info = 0;
     /* Free should not decrement domain's total allocation, since 
      * these pages were allocated without an owner. */
     page_set_owner(pg, NULL); 
-#if defined(__x86_64__)
-    spin_lock_init(&pg->lock);
-#endif
     free_domheap_pages(pg, 0);
     d->arch.paging.shadow.p2m_pages--;
     perfc_decr(shadow_alloc_count);
@@ -1833,14 +1830,6 @@ static unsigned int sh_set_allocation(struct domain *d,
             sp = list_entry(d->arch.paging.shadow.freelists[order].next,
                             struct shadow_page_info, list);
             list_del(&sp->list);
-#if defined(__x86_64__)
-            /*
-             * Re-instate lock field which we overwrite with shadow_page_info.
-             * This was safe, since the lock is only used on guest pages.
-             */
-            for ( j = 0; j < 1U << order; j++ )
-                spin_lock_init(&((struct page_info *)sp)[j].lock);
-#endif
             d->arch.paging.shadow.free_pages -= 1 << order;
             d->arch.paging.shadow.total_pages -= 1 << order;
             free_domheap_pages((struct page_info *)sp, order);
@@ -2593,7 +2582,7 @@ int sh_remove_all_mappings(struct vcpu *v, mfn_t gmfn)
                && (page->u.inuse.type_info & PGT_count_mask) == 0) )
         {
             SHADOW_ERROR("can't find all mappings of mfn %lx: "
-                          "c=%08x t=%08lx\n", mfn_x(gmfn), 
+                          "c=%08lx t=%08lx\n", mfn_x(gmfn), 
                           page->count_info, page->u.inuse.type_info);
         }
     }

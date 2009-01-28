@@ -288,6 +288,39 @@ serial='pty'
 #  'x' -> we don't care (do not check)
 #  's' -> the bit must be the same as on the host that started this VM
 
+#-----------------------------------------------------------------------------
+#   Configure passthrough PCI{,-X,e} devices:
+#
+#   pci=[ '[SSSS:]BB:DD.F[,option1[,option2[...]]]', ... ]
+#
+#   [SSSS]:BB:DD.F  "bus segment:bus:device.function"(1) of the device to
+#                   be assigned, bus segment is optional. All fields are
+#                   in hexadecimal and no field should be longer than that
+#                   as shown in the pattern. Successful assignment may need
+#                   certain hardware support and additional configurations
+#                   (e.g. VT-d, see docs/misc/vtd.txt for more details).
+#
+#       (1) bus segment is sometimes also referred to as the PCI "domain",
+#           not to be confused with Xen domain.
+#
+#
+#   optionN         per-device options in "key=val" format. Current
+#                   available options are:
+#                   - msitranslate=0|1
+#                      per-device overriden of pci_msitranslate, see below
+#
+#pci=[ '07:00.0', '07:00.1' ]
+
+#   MSI-INTx translation for MSI capable devices:
+#
+#   If it's set, Xen will enable MSI for the device that supports it even
+# if the guest don't use MSI. In the case, an IO-APIC type interrupt will
+# be injected to the guest every time a corresponding MSI message is
+# received.
+#   If the guest enables MSI or MSI-X, the translation is automatically
+# turned off.
+# 
+#pci_msitranslate=1
 
 #-----------------------------------------------------------------------------
 #   Configure PVSCSI devices:

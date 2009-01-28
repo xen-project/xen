@@ -3,6 +3,7 @@
 
 #include <stdarg.h>
 #include <stdint.h>
+#include <xen/hvm/hvm_info_table.h>
 
 #undef offsetof
 #define offsetof(t, m) ((unsigned long)&((t *)0)->m)
@@ -56,6 +57,10 @@ void pci_write(uint32_t devfn, uint32_t reg, uint32_t len, uint32_t val);
 /* Get CPU speed in MHz. */
 uint16_t get_cpu_mhz(void);
 
+/* Hardware detection. */
+int uart_exists(uint16_t uart_base);
+int hpet_exists(unsigned long hpet_base);
+
 /* Do cpuid instruction, with operation 'idx' */
 void cpuid(uint32_t idx, uint32_t *eax, uint32_t *ebx,
            uint32_t *ecx, uint32_t *edx);
@@ -103,9 +108,8 @@ static inline void cpu_relax(void)
 })
 
 /* HVM-builder info. */
-int get_vcpu_nr(void);
-int get_acpi_enabled(void);
-int get_apic_mode(void);
+struct hvm_info_table *get_hvm_info_table(void);
+#define hvm_info (get_hvm_info_table())
 
 /* String and memory functions */
 int strcmp(const char *cs, const char *ct);
@@ -131,11 +135,12 @@ void uuid_to_string(char *dest, uint8_t *uuid);
 int printf(const char *fmt, ...) __attribute__ ((format (printf, 1, 2)));
 int vprintf(const char *fmt, va_list ap);
 
-/* Reserve a RAM region in the e820 table. */
-uint32_t e820_malloc(uint32_t size, uint32_t align);
+/* Allocate memory in a reserved region below 4GB. */
+void *mem_alloc(uint32_t size, uint32_t align);
+#define virt_to_phys(v) ((unsigned long)(v))
 
 /* Prepare the 32bit BIOS */
-void highbios_setup(void);
+uint32_t highbios_setup(void);
 
 /* Miscellaneous. */
 void cacheattr_init(void);

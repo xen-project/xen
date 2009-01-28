@@ -89,4 +89,8 @@ static inline void write_byte(Bit16u seg, Bit16u off, Bit8u val)
 	*addr = val;
 }
 
+#define X(idx, ret, fn, args...) ret fn (args);
+#include "32bitprotos.h"
+#undef X
+
 #endif

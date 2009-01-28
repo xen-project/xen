@@ -29,11 +29,11 @@ $(TARGET): $(TARGET)-syms
 # Headers do not depend on auto-generated header, but object files do.
 $(ALL_OBJS): $(BASEDIR)/include/asm-ia64/asm-xsi-offsets.h
 
-asm-offsets.s: asm-offsets.c $(HDRS) \
+asm-offsets.s: asm-offsets.c \
     $(BASEDIR)/include/asm-ia64/.offsets.h.stamp 
 	$(CC) $(CFLAGS) -DGENERATE_ASM_OFFSETS -DIA64_TASK_SIZE=0 -S -o $@ $<
 
-asm-xsi-offsets.s: asm-xsi-offsets.c $(HDRS)
+asm-xsi-offsets.s: asm-xsi-offsets.c
 	$(CC) $(CFLAGS) -S -o $@ $<
 
 $(BASEDIR)/include/asm-ia64/asm-xsi-offsets.h: asm-xsi-offsets.s
@@ -61,7 +61,7 @@ $(BASEDIR)/include/asm-ia64/.offsets.h.stamp:
 	touch $@
 
 # I'm sure a Makefile wizard would know a better way to do this
-xen.lds.s: xen/xen.lds.S $(HDRS)
+xen.lds.s: xen/xen.lds.S
 	$(CC) -E $(CPPFLAGS) -P -DXEN $(AFLAGS) \
 		-o xen.lds.s xen/xen.lds.S
 

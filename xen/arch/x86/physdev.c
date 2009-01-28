@@ -103,14 +103,14 @@ static int physdev_map_pirq(struct physdev_map_pirq *map)
     spin_lock(&pcidevs_lock);
     /* Verify or get pirq. */
     spin_lock(&d->event_lock);
+    pirq = domain_vector_to_irq(d, vector);
     if ( map->pirq < 0 )
     {
-        if ( d->arch.vector_pirq[vector] )
+        if ( pirq )
         {
             dprintk(XENLOG_G_ERR, "dom%d: %d:%d already mapped to %d\n",
                     d->domain_id, map->index, map->pirq,
-                    d->arch.vector_pirq[vector]);
-            pirq = d->arch.vector_pirq[vector];
+                    pirq);
             if ( pirq < 0 )
             {
                 ret = -EBUSY;
@@ -130,8 +130,7 @@ static int physdev_map_pirq(struct physdev_map_pirq *map)
     }
     else
     {
-        if ( d->arch.vector_pirq[vector] &&
-             d->arch.vector_pirq[vector] != map->pirq )
+        if ( pirq && pirq != map->pirq )
         {
             dprintk(XENLOG_G_ERR, "dom%d: vector %d conflicts with irq %d\n",
                     d->domain_id, map->index, map->pirq);
@@ -258,8 +257,15 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         if ( (irq < 0) || (irq >= NR_IRQS) )
             break;
         irq_status_query.flags = 0;
-        if ( pirq_acktype(v->domain, irq) != 0 )
-            irq_status_query.flags |= XENIRQSTAT_needs_eoi;
+        /*
+         * Even edge-triggered or message-based IRQs can need masking from
+         * time to time. If teh guest is not dynamically checking for this
+         * via the new pirq_eoi_map mechanism, it must conservatively always
+         * execute the EOI hypercall. In practice, this only really makes a
+         * difference for maskable MSI sources, and if those are supported
+         * then dom0 is probably modern anyway.
+         */
+        irq_status_query.flags |= XENIRQSTAT_needs_eoi;
         if ( pirq_shared(v->domain, irq) )
             irq_status_query.flags |= XENIRQSTAT_shared;
         ret = copy_to_guest(arg, &irq_status_query, 1) ? -EFAULT : 0;

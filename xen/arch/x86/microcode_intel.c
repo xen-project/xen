@@ -64,6 +64,8 @@ static int collect_cpu_info(int cpu_num, struct cpu_signature *csig)
     struct cpuinfo_x86 *c = &cpu_data[cpu_num];
     unsigned int val[2];
 
+    BUG_ON(cpu_num != smp_processor_id());
+
     memset(csig, 0, sizeof(*csig));
 
     if ( (c->x86_vendor != X86_VENDOR_INTEL) || (c->x86 < 6) ||
@@ -323,6 +325,7 @@ static int cpu_request_microcode(int cpu, const void *buf, size_t size)
     long offset = 0;
     int error = 0;
     void *mc;
+    unsigned int matching_count = 0;
 
     /* We should bind the task to the CPU */
     BUG_ON(cpu != raw_smp_processor_id());
@@ -341,7 +344,7 @@ static int cpu_request_microcode(int cpu, const void *buf, size_t size)
          */
         if ( error == 1 )
         {
-            apply_microcode(cpu);
+            matching_count++;
             error = 0;
         }
         xfree(mc);
@@ -351,11 +354,22 @@ static int cpu_request_microcode(int cpu, const void *buf, size_t size)
     if ( offset < 0 )
         error = offset;
 
+    if ( !error && matching_count )
+        apply_microcode(cpu);
+
     return error;
 }
 
+static int microcode_resume_match(int cpu, struct cpu_signature *nsig)
+{
+    struct ucode_cpu_info *uci = ucode_cpu_info + cpu;
+
+    return (sigmatch(nsig->sig, uci->cpu_sig.sig, nsig->pf, uci->cpu_sig.pf) &&
+            (uci->cpu_sig.rev > nsig->rev));
+}
+
 static struct microcode_ops microcode_intel_ops = {
-    .get_matching_microcode           = get_matching_microcode,
+    .microcode_resume_match           = microcode_resume_match,
     .cpu_request_microcode            = cpu_request_microcode,
     .collect_cpu_info                 = collect_cpu_info,
     .apply_microcode                  = apply_microcode,

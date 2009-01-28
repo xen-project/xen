@@ -23,9 +23,6 @@ endif
 ifeq ($(perfc_arrays),y)
 perfc := y
 endif
-ifeq ($(frame_pointer),y)
-CFLAGS := $(shell echo $(CFLAGS) | sed -e 's/-f[^ ]*omit-frame-pointer//g')
-endif
 
 # Set ARCH/SUBARCH appropriately.
 override TARGET_SUBARCH  := $(XEN_TARGET_ARCH)
@@ -34,20 +31,7 @@ override TARGET_ARCH     := $(shell echo $(XEN_TARGET_ARCH) | \
 
 TARGET := $(BASEDIR)/xen
 
-HDRS := $(wildcard *.h)
-HDRS += $(wildcard $(BASEDIR)/include/xen/*.h)
-HDRS += $(wildcard $(BASEDIR)/include/xen/hvm/*.h)
-HDRS += $(wildcard $(BASEDIR)/include/public/*.h)
-HDRS += $(wildcard $(BASEDIR)/include/public/*/*.h)
-HDRS += $(wildcard $(BASEDIR)/include/compat/*.h)
-HDRS += $(wildcard $(BASEDIR)/include/asm-$(TARGET_ARCH)/*.h)
-HDRS += $(wildcard $(BASEDIR)/include/asm-$(TARGET_ARCH)/$(TARGET_SUBARCH)/*.h)
-
 include $(BASEDIR)/arch/$(TARGET_ARCH)/Rules.mk
-
-# Do not depend on auto-generated header files.
-AHDRS := $(filter-out %/include/xen/compile.h,$(HDRS))
-HDRS  := $(filter-out %/asm-offsets.h,$(AHDRS))
 
 # Note that link order matters!
 ALL_OBJS-y               += $(BASEDIR)/common/built_in.o
@@ -77,15 +61,18 @@ AFLAGS-y                += -D__ASSEMBLY__
 
 ALL_OBJS := $(ALL_OBJS-y)
 
-CFLAGS   := $(strip $(CFLAGS) $(CFLAGS-y))
+# Get gcc to generate the dependencies for us.
+CFLAGS-y += -MMD -MF .$(@F).d
+DEPS = .*.d
+
+CFLAGS += $(CFLAGS-y)
 
 # Most CFLAGS are safe for assembly files:
 #  -std=gnu{89,99} gets confused by #-prefixed end-of-line comments
-AFLAGS   := $(strip $(AFLAGS) $(AFLAGS-y))
-AFLAGS   += $(patsubst -std=gnu%,,$(CFLAGS))
+AFLAGS += $(AFLAGS-y) $(filter-out -std=gnu%,$(CFLAGS))
 
 # LDFLAGS are only passed directly to $(LD)
-LDFLAGS  := $(strip $(LDFLAGS) $(LDFLAGS_DIRECT))
+LDFLAGS += $(LDFLAGS_DIRECT)
 
 include Makefile
 
@@ -115,19 +102,21 @@ FORCE:
 
 .PHONY: clean
 clean:: $(addprefix _clean_, $(subdir-all))
-	rm -f *.o *~ core
+	rm -f *.o *~ core $(DEPS)
 _clean_%/: FORCE
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C $* clean
 
-%.o: %.c $(HDRS) Makefile
+%.o: %.c Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
-%.o: %.S $(AHDRS) Makefile
+%.o: %.S Makefile
 	$(CC) $(AFLAGS) -c $< -o $@
 
-%.i: %.c $(HDRS) Makefile
+%.i: %.c Makefile
 	$(CPP) $(CFLAGS) $< -o $@
 
 # -std=gnu{89,99} gets confused by # as an end-of-line comment marker
-%.s: %.S $(AHDRS) Makefile
+%.s: %.S Makefile
 	$(CPP) $(AFLAGS) $< -o $@
+
+-include $(DEPS)

@@ -149,6 +149,7 @@ XENAPI_PLATFORM_CFG_TYPES = {
     'opengl': int,
     'soundhw': str,
     'stdvga': int,
+    'videoram': int,
     'usb': int,
     'usbdevice': str,
     'hpet': int,
@@ -166,6 +167,7 @@ XENAPI_PLATFORM_CFG_TYPES = {
     'guest_os_type': str,
     'hap': int,
     'xen_extended_power_mgmt': int,
+    'pci_msitranslate': int,
 }
 
 # Xen API console 'other_config' keys.
@@ -1247,6 +1249,11 @@ class XendConfig(dict):
                         'PPCI': ppci_uuid,
                         'hotplug_slot': pci_dev.get('vslot', 0)
                     }
+
+                    dpci_opts = pci_dev.get('opts')
+                    if dpci_opts and len(dpci_opts) > 0:
+                        dpci_record['options'] = dpci_opts
+
                     XendDPCI(dpci_uuid, dpci_record)
 
                 target['devices'][pci_devs_uuid] = (dev_type,
@@ -1762,6 +1769,11 @@ class XendConfig(dict):
                         'PPCI': ppci_uuid,
                         'hotplug_slot': pci_dev.get('vslot', 0)
                     }
+
+                    dpci_opts = pci_dev.get('opts')
+                    if dpci_opts and len(dpci_opts) > 0:
+                        dpci_record['options'] = dpci_opts
+
                     XendDPCI(dpci_uuid, dpci_record)
 
                 self['devices'][dev_uuid] = (dev_type,

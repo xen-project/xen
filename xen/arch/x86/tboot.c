@@ -96,18 +96,6 @@ int tboot_in_measured_env(void)
     return (g_tboot_shared != NULL);
 }
 
-int tboot_in_range(paddr_t start, paddr_t end)
-{
-    if ( g_tboot_shared == NULL || g_tboot_shared->version < 0x02 )
-        return 0;
-
-    start = max_t(paddr_t, start, g_tboot_shared->tboot_base);
-    end = min_t(paddr_t, end, 
-                g_tboot_shared->tboot_base + g_tboot_shared->tboot_size);
- 
-    return start < end; 
-}
-
 /*
  * Local variables:
  * mode: C

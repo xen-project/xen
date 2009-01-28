@@ -11,11 +11,6 @@ TOOLS_INSTALL_DIR = $(DESTDIR)/usr/bin
 # General compiler flags
 CFLAGS	= -Werror -g3 -I.
 
-# For generating dependencies
-CFLAGS	+= -Wp,-MD,.$(@F).d
-
-DEP_FILES	= .*.d
-
 # Generic project files
 HDRS	= $(wildcard *.h)
 SRCS	= $(wildcard *.c)
@@ -26,7 +21,7 @@ $(SRCS): Makefile $(XEN_ROOT)/tools/Rules.mk $(XEN_ROOT)/tools/vtpm_manager/Rule
 
 $(OBJS): $(SRCS)
 
--include $(DEP_FILES)
+-include $(FILES)
 
 # Make sure these are just rules
 .PHONY : all build install clean

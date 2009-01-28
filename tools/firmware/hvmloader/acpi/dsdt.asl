@@ -86,7 +86,7 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
 
     Scope (\_SB)
     {
-       /* ACPI_PHYSICAL_ADDRESS == 0xEA000 */
+       /* BIOS_INFO_PHYSICAL_ADDRESS == 0xEA000 */
        OperationRegion(BIOS, SystemMemory, 0xEA000, 16)
        Field(BIOS, ByteAcc, NoLock, Preserve) {
            UAR1, 1,

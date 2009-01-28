@@ -19,9 +19,10 @@
 #define XENOPROF_DOMAIN_PASSIVE    2
 
 #define XENOPROF_IDLE              0
-#define XENOPROF_COUNTERS_RESERVED 1
-#define XENOPROF_READY             2
-#define XENOPROF_PROFILING         3
+#define XENOPROF_INITIALIZED       1
+#define XENOPROF_COUNTERS_RESERVED 2
+#define XENOPROF_READY             3
+#define XENOPROF_PROFILING         4
 
 #ifndef CONFIG_COMPAT
 typedef struct xenoprof_buf xenoprof_buf_t;

@@ -318,11 +318,14 @@ gopts.var('disk', val='phy:DEV,VDEV,MODE[,DOM]',
           backend driver domain to use for the disk.
           The option may be repeated to add more than one disk.""")
 
-gopts.var('pci', val='BUS:DEV.FUNC',
+gopts.var('pci', val='BUS:DEV.FUNC[,msitranslate=0|1]',
           fn=append_value, default=[],
           use="""Add a PCI device to a domain, using given params (in hex).
-         For example 'pci=c0:02.1'.
-         The option may be repeated to add more than one pci device.""")
+          For example 'pci=c0:02.1'.
+          If msitranslate is set, MSI-INTx translation is enabled if possible.
+          Guest that doesn't support MSI will get IO-APIC type IRQs
+          translated from physical MSI, HVM only. Default is 1.
+          The option may be repeated to add more than one pci device.""")
 
 gopts.var('vscsi', val='PDEV,VDEV[,DOM]',
           fn=append_value, default=[],
@@ -523,9 +526,9 @@ gopts.var('vncunused', val='',
           use="""Try to find an unused port for the VNC server.
           Only valid when vnc=1.""")
 
-gopts.var('videoram', val='',
-          fn=set_value, default=None,
-          use="""Maximum amount of videoram PV guest can allocate
+gopts.var('videoram', val='MEMORY',
+          fn=set_int, default=4,
+          use="""Maximum amount of videoram a guest can allocate
           for frame buffer.""")
 
 gopts.var('sdl', val='',
@@ -587,6 +590,11 @@ gopts.var('machine_address_size', val='BITS',
 gopts.var('suppress_spurious_page_faults', val='yes|no',
           fn=set_bool, default=None,
           use="""Do not inject spurious page faults into this guest""")
+
+gopts.var('pci_msitranslate', val='TRANSLATE',
+          fn=set_int, default=1,
+          use="""Global PCI MSI-INTx translation flag (0=disable;
+          1=enable.""")
 
 def err(msg):
     """Print an error to stderr and exit.
@@ -667,9 +675,23 @@ def configure_pci(config_devs, vals):
     """Create the config for pci devices.
     """
     config_pci = []
-    for (domain, bus, slot, func) in vals.pci:
-        config_pci.append(['dev', ['domain', domain], ['bus', bus], \
-                        ['slot', slot], ['func', func]])
+    for (domain, bus, slot, func, opts) in vals.pci:
+        config_pci_opts = []
+        d = comma_sep_kv_to_dict(opts)
+
+        def f(k):
+            if k not in ['msitranslate']:
+                err('Invalid pci option: ' + k)
+
+            config_pci_opts.append([k, d[k]])
+
+        config_pci_bdf = ['dev', ['domain', domain], ['bus', bus], \
+                          ['slot', slot], ['func', func]]
+        map(f, d.keys())
+        if len(config_pci_opts)>0:
+            config_pci_bdf.append(['opts', config_pci_opts])
+
+        config_pci.append(config_pci_bdf)
 
     if len(config_pci)>0:
         config_pci.insert(0, 'pci')
@@ -862,12 +884,12 @@ def configure_hvm(config_image, vals):
     """Create the config for HVM devices.
     """
     args = [ 'device_model', 'pae', 'vcpus', 'boot', 'fda', 'fdb', 'timer_mode',
-             'localtime', 'serial', 'stdvga', 'isa', 'nographic', 'soundhw',
+             'localtime', 'serial', 'stdvga', 'videoram', 'isa', 'nographic', 'soundhw',
              'vnc', 'vncdisplay', 'vncunused', 'vncconsole', 'vnclisten',
              'sdl', 'display', 'xauthority', 'rtc_timeoffset', 'monitor',
              'acpi', 'apic', 'usb', 'usbdevice', 'keymap', 'pci', 'hpet',
              'guest_os_type', 'hap', 'opengl', 'cpuid', 'cpuid_check',
-             'viridian', 'xen_extended_power_mgmt' ]
+             'viridian', 'xen_extended_power_mgmt', 'pci_msitranslate' ]
 
     for a in args:
         if a in vals.__dict__ and vals.__dict__[a] is not None:
@@ -991,14 +1013,18 @@ def preprocess_pci(vals):
         pci_match = re.match(r"((?P<domain>[0-9a-fA-F]{1,4})[:,])?" + \
                 r"(?P<bus>[0-9a-fA-F]{1,2})[:,]" + \
                 r"(?P<slot>[0-9a-fA-F]{1,2})[.,]" + \
-                r"(?P<func>[0-7])$", pci_dev_str)
+                r"(?P<func>[0-7])" + \
+                r"(,(?P<opts>.*))?$", pci_dev_str)
         if pci_match!=None:
-            pci_dev_info = pci_match.groupdict('0')
+            pci_dev_info = pci_match.groupdict('')
+            if pci_dev_info['domain']=='':
+                pci_dev_info['domain']='0'
             try:
                 pci.append( ('0x'+pci_dev_info['domain'], \
                         '0x'+pci_dev_info['bus'], \
                         '0x'+pci_dev_info['slot'], \
-                        '0x'+pci_dev_info['func']))
+                        '0x'+pci_dev_info['func'], \
+                        pci_dev_info['opts']))
             except IndexError:
                 err('Error in PCI slot syntax "%s"'%(pci_dev_str))
     vals.pci = pci

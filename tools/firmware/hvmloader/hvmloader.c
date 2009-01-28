@@ -31,6 +31,7 @@
 #include "option_rom.h"
 #include <xen/version.h>
 #include <xen/hvm/params.h>
+#include <xen/memory.h>
 
 asm (
     "    .text                       \n"
@@ -99,6 +100,9 @@ asm (
     "    .text                       \n"
     );
 
+unsigned long pci_mem_start = PCI_MEM_START;
+unsigned long pci_mem_end = PCI_MEM_END;
+
 static enum { VGA_none, VGA_std, VGA_cirrus } virtual_vga = VGA_none;
 
 static void init_hypercalls(void)
@@ -148,16 +152,14 @@ static void apic_setup(void)
 
 static void pci_setup(void)
 {
-    uint32_t base, devfn, bar_reg, bar_data, bar_sz, cmd;
+    uint32_t base, devfn, bar_reg, bar_data, bar_sz, cmd, mmio_total = 0;
     uint16_t class, vendor_id, device_id;
     unsigned int bar, pin, link, isa_irq;
 
     /* Resources assignable to PCI devices via BARs. */
     struct resource {
         uint32_t base, max;
-    } *resource;
-    struct resource mem_resource = { PCI_MEMBASE, PCI_MEMBASE + PCI_MEMSIZE };
-    struct resource io_resource  = { 0xc000, 0x10000 };
+    } *resource, mem_resource, io_resource;
 
     /* Create a list of device BARs in descending order of size. */
     struct bars {
@@ -248,6 +250,10 @@ static void pci_setup(void)
             bars[i].bar_reg = bar_reg;
             bars[i].bar_sz  = bar_sz;
 
+            if ( (bar_data & PCI_BASE_ADDRESS_SPACE) ==
+                 PCI_BASE_ADDRESS_SPACE_MEMORY )
+                mmio_total += bar_sz;
+
             nr_bars++;
 
             /* Skip the upper-half of the address for a 64-bit BAR. */
@@ -275,6 +281,28 @@ static void pci_setup(void)
         cmd |= PCI_COMMAND_MASTER;
         pci_writew(devfn, PCI_COMMAND, cmd);
     }
+
+    while ( (mmio_total > (pci_mem_end - pci_mem_start)) &&
+            ((pci_mem_start << 1) != 0) )
+        pci_mem_start <<= 1;
+
+    while ( (pci_mem_start >> PAGE_SHIFT) < hvm_info->low_mem_pgend )
+    {
+        struct xen_add_to_physmap xatp;
+        if ( hvm_info->high_mem_pgend == 0 )
+            hvm_info->high_mem_pgend = 1ull << (32 - PAGE_SHIFT);
+        xatp.domid = DOMID_SELF;
+        xatp.space = XENMAPSPACE_gmfn;
+        xatp.idx   = --hvm_info->low_mem_pgend;
+        xatp.gpfn  = hvm_info->high_mem_pgend++;
+        if ( hypercall_memory_op(XENMEM_add_to_physmap, &xatp) != 0 )
+            BUG();
+    }
+
+    mem_resource.base = pci_mem_start;
+    mem_resource.max = pci_mem_end;
+    io_resource.base = 0xc000;
+    io_resource.max = 0x10000;
 
     /* Assign iomem and ioport resources in descending order of size. */
     for ( i = 0; i < nr_bars; i++ )
@@ -488,22 +516,13 @@ static int pci_load_option_roms(uint32_t rom_base_addr)
 /* Replace possibly erroneous memory-size CMOS fields with correct values. */
 static void cmos_write_memory_size(void)
 {
-    struct e820entry *map = E820;
-    int i, nr = *E820_NR;
-    uint32_t base_mem = 640, ext_mem = 0, alt_mem = 0;
+    uint32_t base_mem = 640, ext_mem, alt_mem;
 
-    for ( i = 0; i < nr; i++ )
-        if ( (map[i].addr >= 0x100000) && (map[i].type == E820_RAM) )
-            break;
-
-    if ( i != nr )
-    {
-        alt_mem = ext_mem = map[i].addr + map[i].size;
-        ext_mem = (ext_mem > 0x0100000) ? (ext_mem - 0x0100000) >> 10 : 0;
-        if ( ext_mem > 0xffff )
-            ext_mem = 0xffff;
-        alt_mem = (alt_mem > 0x1000000) ? (alt_mem - 0x1000000) >> 16 : 0;
-    }
+    alt_mem = ext_mem = hvm_info->low_mem_pgend << PAGE_SHIFT;
+    ext_mem = (ext_mem > 0x0100000) ? (ext_mem - 0x0100000) >> 10 : 0;
+    if ( ext_mem > 0xffff )
+        ext_mem = 0xffff;
+    alt_mem = (alt_mem > 0x1000000) ? (alt_mem - 0x1000000) >> 16 : 0;
 
     /* All BIOSes: conventional memory (CMOS *always* reports 640kB). */
     cmos_outb(0x15, (uint8_t)(base_mem >> 0));
@@ -520,25 +539,23 @@ static void cmos_write_memory_size(void)
     cmos_outb(0x35, (uint8_t)( alt_mem >> 8));
 }
 
-static uint16_t init_xen_platform_io_base(void)
+static uint16_t xen_platform_io_base(void)
 {
-    struct bios_info *bios_info = (struct bios_info *)ACPI_PHYSICAL_ADDRESS;
     uint32_t devfn, bar_data;
     uint16_t vendor_id, device_id;
-
-    bios_info->xen_pfiob = 0;
 
     for ( devfn = 0; devfn < 128; devfn++ )
     {
         vendor_id = pci_readw(devfn, PCI_VENDOR_ID);
         device_id = pci_readw(devfn, PCI_DEVICE_ID);
-        if ( (vendor_id != 0x5853) || (device_id != 0x0001) )
-            continue;
-        bar_data = pci_readl(devfn, PCI_BASE_ADDRESS_0);
-        bios_info->xen_pfiob = bar_data & PCI_BASE_ADDRESS_IO_MASK;
+        if ( (vendor_id == 0x5853) && (device_id == 0x0001) )
+        {
+            bar_data = pci_readl(devfn, PCI_BASE_ADDRESS_0);
+            return bar_data & PCI_BASE_ADDRESS_IO_MASK;
+        }
     }
 
-    return bios_info->xen_pfiob;
+    return 0;
 }
 
 /*
@@ -548,27 +565,80 @@ static uint16_t init_xen_platform_io_base(void)
  */
 static void init_vm86_tss(void)
 {
-    uint32_t tss;
+    void *tss;
     struct xen_hvm_param p;
 
-    tss = e820_malloc(128, 128);
-    memset((char *)tss, 0, 128);
+    tss = mem_alloc(128, 128);
+    memset(tss, 0, 128);
     p.domid = DOMID_SELF;
     p.index = HVM_PARAM_VM86_TSS;
-    p.value = tss;
+    p.value = virt_to_phys(tss);
     hypercall_hvm_op(HVMOP_set_param, &p);
-    printf("vm86 TSS at %08x\n", tss);
+    printf("vm86 TSS at %08lx\n", virt_to_phys(tss));
 }
 
-/*
- * Copy the E820 table provided by the HVM domain builder into the correct
- * place in the memory map we share with the rombios.
- */
-static void copy_e820_table(void)
+/* Create an E820 table based on memory parameters provided in hvm_info. */
+static void build_e820_table(void)
 {
-    uint8_t nr = *(uint8_t *)(HVM_E820_PAGE + HVM_E820_NR_OFFSET);
-    BUG_ON(nr > 16);
-    memcpy(E820, (char *)HVM_E820_PAGE + HVM_E820_OFFSET, nr * sizeof(*E820));
+    struct e820entry *e820 = E820;
+    unsigned int nr = 0;
+
+    /* 0x0-0x9FC00: Ordinary RAM. */
+    e820[nr].addr = 0x0;
+    e820[nr].size = 0x9FC00;
+    e820[nr].type = E820_RAM;
+    nr++;
+
+    /* 0x9FC00-0xA0000: Extended BIOS Data Area (EBDA). */
+    e820[nr].addr = 0x9FC00;
+    e820[nr].size = 0x400;
+    e820[nr].type = E820_RESERVED;
+    nr++;
+
+    /*
+     * Following regions are standard regions of the PC memory map.
+     * They are not covered by e820 regions. OSes will not use as RAM.
+     * 0xA0000-0xC0000: VGA memory-mapped I/O. Not covered by E820.
+     * 0xC0000-0xE0000: 16-bit devices, expansion ROMs (inc. vgabios).
+     * TODO: free pages which turn out to be unused.
+     */
+
+    /*
+     * 0xE0000-0x0F0000: PC-specific area. We place various tables here.
+     * 0xF0000-0x100000: System BIOS.
+     * TODO: free pages which turn out to be unused.
+     */
+    e820[nr].addr = 0xE0000;
+    e820[nr].size = 0x20000;
+    e820[nr].type = E820_RESERVED;
+    nr++;
+
+    /* Low RAM goes here. Reserve space for special pages. */
+    BUG_ON((hvm_info->low_mem_pgend << PAGE_SHIFT) < (2u << 20));
+    e820[nr].addr = 0x100000;
+    e820[nr].size = (hvm_info->low_mem_pgend << PAGE_SHIFT) - e820[nr].addr;
+    e820[nr].type = E820_RAM;
+    nr++;
+
+    /*
+     * Explicitly reserve space for special pages.
+     * This space starts at RESERVED_MEMBASE an extends to cover various
+     * fixed hardware mappings (e.g., LAPIC, IOAPIC, default SVGA framebuffer).
+     */
+    e820[nr].addr = RESERVED_MEMBASE;
+    e820[nr].size = (uint32_t)-e820[nr].addr;
+    e820[nr].type = E820_RESERVED;
+    nr++;
+
+    if ( hvm_info->high_mem_pgend )
+    {
+        e820[nr].addr = ((uint64_t)1 << 32);
+        e820[nr].size =
+            ((uint64_t)hvm_info->high_mem_pgend << PAGE_SHIFT) - e820[nr].addr;
+        e820[nr].type = E820_RAM;
+        nr++;
+    }
+
     *E820_NR = nr;
 }
 
@@ -576,16 +646,17 @@ int main(void)
 {
     int option_rom_sz = 0, vgabios_sz = 0, etherboot_sz = 0;
     int rombios_sz, smbios_sz;
-    uint32_t etherboot_phys_addr, option_rom_phys_addr, vga_ram = 0;
-    uint16_t xen_pfiob;
+    uint32_t etherboot_phys_addr, option_rom_phys_addr, bios32_addr;
+    struct bios_info *bios_info;
 
     printf("HVM Loader\n");
-
-    copy_e820_table();
 
     init_hypercalls();
 
     printf("CPU speed is %u MHz\n", get_cpu_mhz());
+
+    apic_setup();
+    pci_setup();
 
     smp_initialise();
 
@@ -599,12 +670,9 @@ int main(void)
     if ( rombios_sz > 0x10000 )
         rombios_sz = 0x10000;
     memcpy((void *)ROMBIOS_PHYSICAL_ADDRESS, rombios, rombios_sz);
-    highbios_setup();
+    bios32_addr = highbios_setup();
 
-    apic_setup();
-    pci_setup();
-
-    if ( (get_vcpu_nr() > 1) || get_apic_mode() )
+    if ( (hvm_info->nr_vcpus > 1) || hvm_info->apic_mode )
         create_mp_tables();
 
     switch ( virtual_vga )
@@ -626,12 +694,6 @@ int main(void)
         break;
     }
 
-    if ( virtual_vga != VGA_none )
-    {
-        vga_ram = e820_malloc(8 << 20, 4096);
-        printf("VGA RAM at %08x\n", vga_ram);
-    }
-
     etherboot_phys_addr = VGABIOS_PHYSICAL_ADDRESS + vgabios_sz;
     if ( etherboot_phys_addr < OPTIONROM_PHYSICAL_ADDRESS )
         etherboot_phys_addr = OPTIONROM_PHYSICAL_ADDRESS;
@@ -640,7 +702,7 @@ int main(void)
     option_rom_phys_addr = etherboot_phys_addr + etherboot_sz;
     option_rom_sz = pci_load_option_roms(option_rom_phys_addr);
 
-    if ( get_acpi_enabled() )
+    if ( hvm_info->acpi_enabled )
     {
         printf("Loading ACPI ...\n");
         acpi_build_tables();
@@ -672,9 +734,17 @@ int main(void)
                ROMBIOS_PHYSICAL_ADDRESS,
                ROMBIOS_PHYSICAL_ADDRESS + rombios_sz - 1);
 
-    xen_pfiob = init_xen_platform_io_base();
-    if ( xen_pfiob && vga_ram )
-        outl(xen_pfiob + 4, vga_ram);
+    build_e820_table();
+
+    bios_info = (struct bios_info *)BIOS_INFO_PHYSICAL_ADDRESS;
+    memset(bios_info, 0, sizeof(*bios_info));
+    bios_info->com1_present = uart_exists(0x3f8);
+    bios_info->com2_present = uart_exists(0x2f8);
+    bios_info->hpet_present = hpet_exists(ACPI_HPET_ADDRESS);
+    bios_info->pci_min = pci_mem_start;
+    bios_info->pci_len = pci_mem_end - pci_mem_start;
+    bios_info->bios32_entry = bios32_addr;
+    bios_info->xen_pfiob = xen_platform_io_base();
 
     printf("Invoking ROMBIOS ...\n");
     return 0;

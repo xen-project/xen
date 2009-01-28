@@ -84,7 +84,9 @@ int disable_timer_pin_1 __initdata;
 
 static struct irq_pin_list {
     int apic, pin, next;
-} irq_2_pin[PIN_MAP_SIZE];
+} irq_2_pin[PIN_MAP_SIZE] = {
+    [0 ... PIN_MAP_SIZE-1].pin = -1
+};
 static int irq_2_pin_free_entry = NR_IRQS;
 
 int vector_irq[NR_VECTORS] __read_mostly = {
@@ -1018,11 +1020,6 @@ static void __init enable_IO_APIC(void)
     int i, apic;
     unsigned long flags;
 
-    for (i = 0; i < PIN_MAP_SIZE; i++) {
-        irq_2_pin[i].pin = -1;
-        irq_2_pin[i].next = 0;
-    }
-
     /* Initialise dynamic irq_2_pin free list. */
     for (i = NR_IRQS; i < PIN_MAP_SIZE; i++)
         irq_2_pin[i].next = i + 1;
@@ -1557,11 +1554,14 @@ static unsigned int startup_msi_vector(unsigned int vector)
 
 static void ack_msi_vector(unsigned int vector)
 {
-    ack_APIC_irq();
+    if ( msi_maskable_irq(irq_desc[vector].msi_desc) )
+        ack_APIC_irq(); /* ACKTYPE_NONE */
 }
 
 static void end_msi_vector(unsigned int vector)
 {
+    if ( !msi_maskable_irq(irq_desc[vector].msi_desc) )
+        ack_APIC_irq(); /* ACKTYPE_EOI */
 }
 
 static void shutdown_msi_vector(unsigned int vector)

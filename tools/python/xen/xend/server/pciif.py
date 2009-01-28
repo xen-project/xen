@@ -75,6 +75,12 @@ class PciController(DevController):
             slot = parse_hex(pci_config.get('slot', 0))
             func = parse_hex(pci_config.get('func', 0))            
 
+            opts = pci_config.get('opts', '')
+            if len(opts) > 0:
+                opts = map(lambda (x, y): x+'='+y, opts)
+                opts = reduce(lambda x, y: x+','+y, opts)
+                back['opts-%i' % pcidevid] = opts
+
             vslt = pci_config.get('vslt')
             if vslt is not None:
                 vslots = vslots + vslt + ";"
@@ -89,6 +95,9 @@ class PciController(DevController):
 
         back['num_devs']=str(pcidevid)
         back['uuid'] = config.get('uuid','')
+        if 'pci_msitranslate' in self.vm.info['platform']:
+            back['msitranslate']=str(self.vm.info['platform']['pci_msitranslate'])
+
         return (0, back, {})
 
 
@@ -108,6 +117,9 @@ class PciController(DevController):
                 dev = back['dev-%i' % i]
                 state = states[i]
                 uuid = back['uuid-%i' %i]
+                opts = ''
+                if 'opts-%i' % i in back:
+                    opts = back['opts-%i' % i]
             except:
                 raise XendError('Error reading config')
 
@@ -129,6 +141,8 @@ class PciController(DevController):
                 self.writeBackend(devid, 'state-%i' % (num_olddevs + i),
                                   str(xenbusState['Initialising']))
                 self.writeBackend(devid, 'uuid-%i' % (num_olddevs + i), uuid)
+                if len(opts) > 0:
+                    self.writeBackend(devid, 'opts-%i' % (num_olddevs + i), opts)
                 self.writeBackend(devid, 'num_devs', str(num_olddevs + i + 1))
 
                 # Update vslots
@@ -540,6 +554,9 @@ class PciController(DevController):
                 self.removeBackend(devid, 'vdev-%i' % i)
                 self.removeBackend(devid, 'state-%i' % i)
                 self.removeBackend(devid, 'uuid-%i' % i)
+                tmpopts = self.readBackend(devid, 'opts-%i' % i)
+                if tmpopts is not None:
+                    self.removeBackend(devid, 'opts-%i' % i)
             else:
                 if new_num_devs != i:
                     tmpdev = self.readBackend(devid, 'dev-%i' % i)
@@ -556,6 +573,9 @@ class PciController(DevController):
                     tmpuuid = self.readBackend(devid, 'uuid-%i' % i)
                     self.writeBackend(devid, 'uuid-%i' % new_num_devs, tmpuuid)
                     self.removeBackend(devid, 'uuid-%i' % i)
+                    tmpopts = self.readBackend(devid, 'opts-%i' % i)
+                    if tmpopts is not None:
+                        self.removeBackend(devid, 'opts-%i' % i)
                 new_num_devs = new_num_devs + 1
 
         self.writeBackend(devid, 'num_devs', str(new_num_devs))

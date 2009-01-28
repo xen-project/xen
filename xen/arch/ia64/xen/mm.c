@@ -3246,9 +3246,9 @@ int get_page_type(struct page_info *page, u32 type)
     return 1;
 }
 
-int memory_is_conventional_ram(paddr_t p)
+int page_is_conventional_ram(unsigned long mfn)
 {
-    return (efi_mem_type(p) == EFI_CONVENTIONAL_MEMORY);
+    return (efi_mem_type(pfn_to_paddr(mfn)) == EFI_CONVENTIONAL_MEMORY);
 }
 
 
@@ -3295,38 +3295,39 @@ arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
 
             spin_unlock(&d->grant_table->lock);
             break;
-        case XENMAPSPACE_mfn:
-        {
-            if ( get_page_from_pagenr(xatp.idx, d) ) {
-                struct xen_ia64_memmap_info memmap_info;
-                efi_memory_desc_t md;
-                int ret;
+        case XENMAPSPACE_gmfn: {
+            struct xen_ia64_memmap_info memmap_info;
+            efi_memory_desc_t md;
+            int ret;
 
-                mfn = xatp.idx;
-                page = mfn_to_page(mfn);
+            xatp.idx = gmfn_to_mfn(d, xatp.idx);
+            if ( !get_page_from_pagenr(xatp.idx, d) )
+                break;
 
-                memmap_info.efi_memmap_size = sizeof(md);
-                memmap_info.efi_memdesc_size = sizeof(md);
-                memmap_info.efi_memdesc_version =
-                    EFI_MEMORY_DESCRIPTOR_VERSION;
+            mfn = xatp.idx;
+            page = mfn_to_page(mfn);
 
-                md.type = EFI_CONVENTIONAL_MEMORY;
-                md.pad = 0;
-                md.phys_addr = xatp.gpfn << PAGE_SHIFT;
-                md.virt_addr = 0;
-                md.num_pages = 1UL << (PAGE_SHIFT - EFI_PAGE_SHIFT);
-                md.attribute = EFI_MEMORY_WB;
+            memmap_info.efi_memmap_size = sizeof(md);
+            memmap_info.efi_memdesc_size = sizeof(md);
+            memmap_info.efi_memdesc_version =
+                EFI_MEMORY_DESCRIPTOR_VERSION;
 
-                ret = __dom0vp_add_memdesc(d, &memmap_info, (char*)&md);
-                if (ret != 0) {
-                    put_page(page);
-                    rcu_unlock_domain(d);
-                    gdprintk(XENLOG_DEBUG,
-                             "%s:%d td %d gpfn 0x%lx mfn 0x%lx ret %d\n",
-                             __func__, __LINE__,
-                             d->domain_id, xatp.gpfn, xatp.idx, ret);
-                    return ret;
-                }
+            md.type = EFI_CONVENTIONAL_MEMORY;
+            md.pad = 0;
+            md.phys_addr = xatp.gpfn << PAGE_SHIFT;
+            md.virt_addr = 0;
+            md.num_pages = 1UL << (PAGE_SHIFT - EFI_PAGE_SHIFT);
+            md.attribute = EFI_MEMORY_WB;
+
+            ret = __dom0vp_add_memdesc(d, &memmap_info, (char*)&md);
+            if (ret != 0) {
+                put_page(page);
+                rcu_unlock_domain(d);
+                gdprintk(XENLOG_DEBUG,
+                         "%s:%d td %d gpfn 0x%lx mfn 0x%lx ret %d\n",
+                         __func__, __LINE__,
+                         d->domain_id, xatp.gpfn, xatp.idx, ret);
+                return ret;
             }
             break;
         }
@@ -3377,34 +3378,6 @@ arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
 
         break;
     }
-
-    case XENMEM_remove_from_physmap:
-    {
-        struct xen_remove_from_physmap xrfp;
-        unsigned long mfn;
-        struct domain *d;
-
-        if ( copy_from_guest(&xrfp, arg, 1) )
-            return -EFAULT;
-
-        rc = rcu_lock_target_domain_by_id(xrfp.domid, &d);
-        if ( rc != 0 )
-            return rc;
-
-        domain_lock(d);
-
-        mfn = gmfn_to_mfn(d, xrfp.gpfn);
-
-        if ( mfn_valid(mfn) )
-            guest_physmap_remove_page(d, xrfp.gpfn, mfn, 0);
-
-        domain_unlock(d);
-
-        rcu_unlock_domain(d);
-
-        break;
-    }
-
 
     case XENMEM_machine_memory_map:
     {

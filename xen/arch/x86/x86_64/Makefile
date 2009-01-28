@@ -14,16 +14,3 @@ obj-$(CONFIG_COMPAT) += physdev.o
 obj-$(CONFIG_COMPAT) += platform_hypercall.o
 obj-$(CONFIG_COMPAT) += cpu_idle.o
 obj-$(CONFIG_COMPAT) += cpufreq.o
-
-ifeq ($(CONFIG_COMPAT),y)
-# extra dependencies
-compat.o:	../compat.c
-domctl.o:	../domctl.c
-mm.o:		compat/mm.c
-physdev.o:	../physdev.c
-platform_hypercall.o: ../platform_hypercall.c
-sysctl.o:	../sysctl.c
-traps.o:	compat/traps.c
-cpu_idle.o:	../acpi/cpu_idle.c
-cpufreq.o:	../../../drivers/cpufreq/cpufreq.c
-endif

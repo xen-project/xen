@@ -29,6 +29,7 @@
 #include <xen/pci_regs.h>
 #include <asm/string.h>
 #include "dmar.h"
+#include "iommu.h"
 
 int vtd_enabled = 1;
 
@@ -508,6 +509,8 @@ static int __init acpi_parse_dmar(struct acpi_table_header *table)
 int acpi_dmar_init(void)
 {
     int rc;
+    struct acpi_drhd_unit *drhd;
+    struct iommu *iommu;
 
     rc = -ENODEV;
     if ( force_iommu )
@@ -524,7 +527,20 @@ int acpi_dmar_init(void)
     if ( list_empty(&acpi_drhd_units) )
         goto fail;
 
-    printk("Intel VT-d has been enabled\n");
+    /* Giving that all devices within guest use same io page table,
+     * enable snoop control only if all VT-d engines support it.
+     */
+    iommu_snoop = 1;
+    for_each_drhd_unit ( drhd )
+    {
+        iommu = drhd->iommu;
+        if ( !ecap_snp_ctl(iommu->ecap) ) {
+            iommu_snoop = 0;
+            break;
+        }
+    }
+
+    printk("Intel VT-d has been enabled, snoop_control=%d.\n", iommu_snoop);
 
     return 0;
 

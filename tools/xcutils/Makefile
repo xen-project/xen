@@ -14,10 +14,6 @@ include $(XEN_ROOT)/tools/Rules.mk
 CFLAGS += -Werror
 CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenguest) $(CFLAGS_libxenstore)
 
-# Make gcc generate dependencies.
-CFLAGS += -Wp,-MD,.$(@F).d
-PROG_DEP = .*.d
-
 PROGRAMS = xc_restore xc_save readnotes lsevtchn
 
 LDLIBS   = $(LDFLAGS_libxenctrl) $(LDFLAGS_libxenguest) $(LDFLAGS_libxenstore)
@@ -40,6 +36,6 @@ install: build
 .PHONY: clean
 clean:
 	$(RM) *.o $(PROGRAMS)
-	$(RM) $(PROG_DEP)
+	$(RM) $(DEPS)
 
--include $(PROG_DEP)
+-include $(DEPS)

@@ -103,8 +103,8 @@ unsigned long avail_scrub_pages(void);
 
 int guest_remove_page(struct domain *d, unsigned long gmfn);
 
-/* Returns TRUE if the memory at address @p is ordinary RAM. */
-int memory_is_conventional_ram(paddr_t p);
+/* Returns TRUE if the whole page at @mfn is ordinary RAM. */
+int page_is_conventional_ram(unsigned long mfn);
 
 extern unsigned long *alloc_bitmap;	/* for vmcoreinfo */
 

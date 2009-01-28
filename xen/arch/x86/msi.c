@@ -671,7 +671,7 @@ static void __pci_disable_msix(struct msi_desc *entry)
 
     pos = pci_find_cap_offset(bus, slot, func, PCI_CAP_ID_MSIX);
     control = pci_conf_read16(bus, slot, func, msix_control_reg(pos));
-    msi_set_enable(dev, 0);
+    msix_set_enable(dev, 0);
 
     BUG_ON(list_empty(&dev->msi_list));
 
@@ -770,11 +770,20 @@ int pci_restore_msi_state(struct pci_dev *pdev)
             return -EINVAL;
         }
 
-        msi_set_enable(pdev, 0);
+        if ( entry->msi_attrib.type == PCI_CAP_ID_MSI )
+            msi_set_enable(pdev, 0);
+        else if ( entry->msi_attrib.type == PCI_CAP_ID_MSIX )
+            msix_set_enable(pdev, 0);
+
         write_msi_msg(entry, &entry->msg);
 
-        msi_set_enable(pdev, 1);
         msi_set_mask_bit(vector, entry->msi_attrib.masked);
+
+        if ( entry->msi_attrib.type == PCI_CAP_ID_MSI )
+            msi_set_enable(pdev, 1);
+        else if ( entry->msi_attrib.type == PCI_CAP_ID_MSIX )
+            msix_set_enable(pdev, 1);
+
         spin_unlock_irqrestore(&desc->lock, flags);
     }
 

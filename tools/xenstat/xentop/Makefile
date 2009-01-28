@@ -37,4 +37,6 @@ endif
 
 .PHONY: clean
 clean:
-	rm -f xentop xentop.o
+	rm -f xentop xentop.o $(DEPS)
+
+-include $(DEPS)

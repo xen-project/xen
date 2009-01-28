@@ -118,8 +118,9 @@ write_smbios_tables(void *start,
     do_struct(smbios_type_16_init(p, memsize, nr_mem_devs));
     for ( i = 0; i < nr_mem_devs; i++ )
     {
-        uint32_t dev_memsize = ((i == (nr_mem_devs - 1))
-                                ? (memsize & 0x3fff) : 0x4000);
+        uint32_t dev_memsize = 0x4000; /* all but last covers 16GB */
+        if ( (i == (nr_mem_devs - 1)) && ((memsize & 0x3fff) != 0) )
+            dev_memsize = memsize & 0x3fff; /* last dev is <16GB */
         do_struct(smbios_type_17_init(p, dev_memsize, i));
         do_struct(smbios_type_19_init(p, dev_memsize, i));
         do_struct(smbios_type_20_init(p, dev_memsize, i));
@@ -143,28 +144,18 @@ write_smbios_tables(void *start,
 static uint64_t
 get_memsize(void)
 {
-    struct e820entry *map = E820;
-    uint8_t num_entries = *E820_NR;
-    uint64_t memsize = 0;
-    int i;
+    uint64_t sz;
 
-    /*
-     * Walk through e820map, ignoring any entries that aren't marked
-     * as usable or reserved.
-     */
-    for ( i = 0; i < num_entries; i++ )
-    {
-        if ( (map->type == E820_RAM) || (map->type == E820_RESERVED) )
-            memsize += map->size;
-        map++;
-    }
+    sz = (uint64_t)hvm_info->low_mem_pgend << PAGE_SHIFT;
+    if ( hvm_info->high_mem_pgend )
+        sz += (hvm_info->high_mem_pgend << PAGE_SHIFT) - (1ull << 32);
 
     /*
      * Round up to the nearest MB.  The user specifies domU pseudo-physical 
      * memory in megabytes, so not doing this could easily lead to reporting 
      * one less MB than the user specified.
      */
-    return (memsize + (1 << 20) - 1) >> 20;
+    return (sz + (1ul << 20) - 1) >> 20;
 }
 
 int
@@ -229,7 +220,7 @@ hvm_write_smbios_tables(void)
 
     /* SCRATCH_PHYSICAL_ADDRESS is a safe large memory area for scratch. */
     len = write_smbios_tables((void *)SCRATCH_PHYSICAL_ADDRESS,
-                              get_vcpu_nr(), get_memsize(),
+                              hvm_info->nr_vcpus, get_memsize(),
                               uuid, xen_version_str,
                               xen_major_version, xen_minor_version);
     if ( len > SMBIOS_MAXIMUM_SIZE )

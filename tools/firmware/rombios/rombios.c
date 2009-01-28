@@ -161,6 +161,8 @@
 
 #define BX_TCGBIOS       0   /* main switch for TCG BIOS ext. */
 
+#define BX_PMM           1   /* POST Memory Manager */
+
 #define BX_MAX_ATA_INTERFACES   4
 #define BX_MAX_ATA_DEVICES      (BX_MAX_ATA_INTERFACES*2)
 
@@ -726,7 +728,9 @@ typedef struct {
     } cdemu_t;
 #endif // BX_ELTORITO_BOOT
 
-#include "32bitgateway.h"
+#define X(idx, ret, fn, arg...) ret fn ();
+#include "32bitprotos.h"
+#undef X
 
   // for access to EBDA area
   //     The EBDA structure should conform to
@@ -752,8 +756,6 @@ typedef struct {
     // El Torito Emulation data
     cdemu_t cdemu;
 #endif // BX_ELTORITO_BOOT
-
-    upcall_t upcall;
     } ebda_data_t;
 
   #define EBDA_CMOS_SHUTDOWN_STATUS_OFFSET 1
@@ -1416,31 +1418,24 @@ fixup_base_mem_in_k()
   write_word(0x40, 0x13, base_mem >> 10);
 }
 
-void
-set_rom_write_access(action)
-  Bit16u action;
-{
-    Bit16u off = (Bit16u)&((struct bios_info *)0)->xen_pfiob;
 ASM_START
-    mov si,.set_rom_write_access.off[bp]
+_rom_write_access_control:
     push ds
-    mov ax,#(ACPI_PHYSICAL_ADDRESS >> 4)
+    mov ax,#(BIOS_INFO_PHYSICAL_ADDRESS >> 4)
     mov ds,ax
-    mov dx,[si]
+    mov ax,[BIOSINFO_OFF_xen_pfiob]
     pop ds
-    mov ax,.set_rom_write_access.action[bp]
-    out dx,al
+    ret
 ASM_END
-}
 
 void enable_rom_write_access()
 {
-    set_rom_write_access(0);
+    outb(rom_write_access_control(), 0);
 }
 
 void disable_rom_write_access()
 {
-    set_rom_write_access(PFFLAG_ROM_LOCK);
+    outb(rom_write_access_control(), PFFLAG_ROM_LOCK);
 }
     
 #endif /* HVMASSIST */
@@ -2054,7 +2049,10 @@ print_bios_banner()
   "rombios32 "
 #endif
 #if BX_TCGBIOS
-  "TCG-enabled"
+  "TCG-enabled "
+#endif
+#if BX_PMM
+  "PMM "
 #endif
   "\n\n");
 }
@@ -9499,8 +9497,9 @@ use16 386
 
 #endif
 
-ASM_END
 #include "32bitgateway.c"
+ASM_END
+#include "tcgbios.c"
 ASM_START
 
 ;--------------------
@@ -10355,6 +10354,48 @@ rombios32_gdt:
   dw 0xffff, 0, 0x9300, 0x0000 ; 16 bit data segment base=0x0 limit=0xffff
 #endif // BX_ROMBIOS32
 
+#if BX_PMM
+; according to POST Memory Manager Specification Version 1.01
+.align 16
+pmm_structure:
+  db 0x24,0x50,0x4d,0x4d ;; "$PMM" signature
+  db 0x01 ;; revision
+  db 16 ;; length
+  db (-((pmm_entry_point>>8)+pmm_entry_point+0x20f))&0xff;; checksum
+  dw pmm_entry_point,0xf000 ;; far call entrypoint
+  db 0,0,0,0,0 ;; reserved
+
+pmm_entry_point:
+  pushf
+  pushad
+; Calculate protected-mode address of PMM function args
+  xor	eax, eax
+  mov	ax, sp
+  xor	ebx, ebx
+  mov	bx, ss
+  shl	ebx, 4
+  lea	ebx, [eax+ebx+38] ;; ebx=(ss<<4)+sp+4(far call)+2(pushf)+32(pushad)
+  push	ebx
+;
+; Stack layout at this point:
+;
+;        : +0x0    +0x2    +0x4    +0x6    +0x8    +0xa    +0xc    +0xe
+; -----------------------------------------------------------------------
+; sp     : [&arg1         ][edi           ][esi           ][ebp           ]
+; sp+0x10: [esp           ][ebx           ][edx           ][ecx           ]
+; sp+0x20: [eax           ][flags ][ip    ][cs    ][arg1  ][arg2, ...
+;
+  call _pmm
+  mov	bx, sp
+SEG SS
+  mov	[bx+0x20], ax
+SEG SS
+  mov	[bx+0x18], dx
+  pop	ebx
+  popad
+  popf
+  retf
+#endif // BX_PMM
 
 ; parallel port detection: base address in DX, index in BX, timeout in CL
 detect_parport:
@@ -10447,7 +10488,9 @@ rom_scan:
   ;;   3         ROM initialization entry point (FAR CALL)
 
 #if BX_TCGBIOS
+  push ax
   call _tcpa_start_option_rom_scan    /* specs: 3.2.3.3 + 10.4.3 */
+  pop ax
 #endif
 
 rom_scan_loop:
@@ -11789,15 +11832,6 @@ static Bit8u vgafont8[128*8]=
 
 #ifdef HVMASSIST
 ASM_START
-
-// space for addresses in 32bit BIOS area; currently 256/4 entries
-// are allocated
-.org 0xcb00
-jmptable:
-db 0x5F, 0x5F, 0x5F, 0x4A, 0x4D, 0x50, 0x54 ;; ___JMPT
-dw 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;;  64 bytes
-dw 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;; 128 bytes
-dw 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;; 192 bytes
 
 //
 // MP Tables

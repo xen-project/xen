@@ -1,14 +1,11 @@
 XEN_ROOT = ../../../..
 include $(XEN_ROOT)/tools/firmware/Rules.mk
 
-SOURCES = util.c
 TARGET = 32bitbios_flat.h
 
-CFLAGS += $(CFLAGS_include) -I.. -DGCC_PROTOS
+CFLAGS += $(CFLAGS_include) -I..
 
 SUBDIRS = tcgbios
-
-MODULES = tcgbios/tcgbiosext.o
 
 .PHONY: all
 all: subdirs-all
@@ -16,9 +13,12 @@ all: subdirs-all
 
 .PHONY: clean
 clean: subdirs-clean
-	rm -rf *.o $(TARGET)
+	rm -rf *.o $(TARGET) $(DEPS)
 
-$(TARGET): 32bitbios.o $(MODULES) util.o
+$(TARGET): 32bitbios_all.o
+	sh mkhex highbios_array 32bitbios_all.o > $@
+
+32bitbios_all.o: 32bitbios.o tcgbios/tcgbiosext.o util.o pmm.o
 	$(LD) $(LDFLAGS_DIRECT) -s -r $^ -o 32bitbios_all.o
 	@nm 32bitbios_all.o |                                \
 	  egrep '^ +U ' >/dev/null && {                      \
@@ -26,4 +26,5 @@ $(TARGET): 32bitbios.o $(MODULES) util.o
 	    nm -u 32bitbios_all.o;                           \
 	    exit 11;                                         \
 	  } || :
-	sh mkhex highbios_array 32bitbios_all.o > $@
+
+-include $(DEPS)

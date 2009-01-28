@@ -20,6 +20,7 @@
  */
 
 #include <xen/config.h>
+#include <xen/ctype.h>
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/trace.h>
@@ -272,6 +273,10 @@ static int hvm_print_line(
     char c = *val;
 
     BUG_ON(bytes != 1);
+
+    /* Accept only printable characters, newline, and horizontal tab. */
+    if ( !isprint(c) && (c != '\n') && (c != '\t') )
+        return X86EMUL_OKAY;
 
     spin_lock(&hd->pbuf_lock);
     hd->pbuf[hd->pbuf_idx++] = c;
@@ -1503,7 +1508,15 @@ static enum hvm_copy_result __hvm_copy(
 
         if ( flags & HVMCOPY_to_guest )
         {
-            if ( p2mt != p2m_ram_ro )
+            if ( p2mt == p2m_ram_ro )
+            {
+                static unsigned long lastpage;
+                if ( xchg(&lastpage, gfn) != gfn )
+                    gdprintk(XENLOG_DEBUG, "guest attempted write to read-only"
+                             " memory page. gfn=%#lx, mfn=%#lx\n",
+                             gfn, mfn);
+            }
+            else
             {
                 memcpy(p, buf, count);
                 paging_mark_dirty(curr->domain, mfn);

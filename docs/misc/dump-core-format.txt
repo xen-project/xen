@@ -30,8 +30,13 @@ The elf header members are set as follows
         e_ident[EI_OSABI] = ELFOSABI_SYSV = 0
         e_type = ET_CORE = 4
 ELFCLASS64 is always used independent of architecture.
-e_ident[EI_DATA] and e_flags are set according to the dumping system's
-architecture. Other members are set as usual.
+e_ident[EI_DATA] is set as follows
+  For x86 PV domain case, it is set according to the guest configuration
+  (i.e. if guest is 32bit it is set to EM_386 even when the dom0 is 64 bit.)
+  For other domain case (x86 HVM domain case and ia64 domain case),
+  it is set according to the dumping system's architecture.
+e_flags is set according to the dumping system's architecture.
+Other members are set as usual.
 
 Sections
 --------
@@ -241,3 +246,7 @@ Currently only (major, minor) = (0, 1) is used.
   The format version isn't bumped because analysis tools can distinguish it.
 - .xen_ia64_mapped_regs section was made only for ia64 PV domain.
   In case of IA64 HVM domain, this section doesn't exist.
+- elf header e_ident[EI_DATA]
+  On x86 PV domain case, it is set according to the guest configuration.
+  I.e. 32-on-64 case, the file will be set EM_386 instead of EM_X86_64.
+  This is the same as 32-on-32 case, so there is no impact on analysis tools.

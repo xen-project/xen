@@ -38,6 +38,30 @@ Enable MSI/MSI-x for assigned devices
 Add "msi=1" option in kernel line of host grub.
 
 
+MSI-INTx translation for passthrough devices in HVM
+---------------------------------------------------
+
+If the assigned device uses a physical IRQ that is shared by more than
+one device among multiple domains, there may be significant impact on
+device performance. Unfortunately, this is quite a common case if the
+IO-APIC (INTx) IRQ is used. MSI can avoid this issue, but was only
+available if the guest enables it.
+
+With MSI-INTx translation turned on, Xen enables device MSI if it's
+available, regardless of whether the guest uses INTx or MSI. If the
+guest uses INTx IRQ, Xen will inject a translated INTx IRQ to guest's
+virtual ioapic whenever an MSI message is received. This reduces the
+interrupt sharing of the system. If the guest OS enables MSI or MSI-X,
+the translation is automatically turned off.
+
+To enable or disable MSI-INTx translation globally, add "pci_msitranslate"
+in the config file:
+	pci_msitranslate = 1         (default is 1)
+
+To override for a specific device:
+	pci = [ '01:00.0,msitranslate=0', '03:00.0' ]
+
+
 Caveat on Conventional PCI Device Passthrough
 ---------------------------------------------
 
@@ -79,6 +103,11 @@ VTd device hotplug:
  3. Attach a PCI device to the guest by the physical BDF and desired virtual slot(optional). Following command would insert the physical device into guest's virtual slot 7
 
 	[root@vt-vtd ~]# xm pci-attach HVMDomainVtd 0:2:0.0 7
+
+    To specify options for the device, use -o or --options=. Following command would disable MSI-INTx translation for the device
+
+	[root@vt-vtd ~]# xm pci-attach -o msitranslate=0 0:2:0.0 7
+
 
 VTd hotplug usage model:
 ------------------------

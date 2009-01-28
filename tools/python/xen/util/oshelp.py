@@ -5,7 +5,7 @@ def fcntl_setfd_cloexec(file, bool):
         f = fcntl.fcntl(file, fcntl.F_GETFD)
         if bool: f |= fcntl.FD_CLOEXEC
         else: f &= ~fcntl.FD_CLOEXEC
-        fcntl.fcntl(file, fcntl.F_SETFD)
+        fcntl.fcntl(file, fcntl.F_SETFD, f)
 
 def waitstatus_description(st):
         if os.WIFEXITED(st):

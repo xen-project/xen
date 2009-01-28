@@ -25,7 +25,6 @@
 #include <stdint.h>
 #include <xen/xen.h>
 #include <xen/memory.h>
-#include <xen/hvm/hvm_info_table.h>
 
 void wrmsr(uint32_t idx, uint64_t v)
 {
@@ -304,63 +303,63 @@ uuid_to_string(char *dest, uint8_t *uuid)
     *p = '\0';
 }
 
-static void e820_collapse(void)
+void *mem_alloc(uint32_t size, uint32_t align)
 {
-    int i = 0;
-    struct e820entry *ent = E820;
-
-    while ( i < (*E820_NR-1) )
-    {
-        if ( (ent[i].type == ent[i+1].type) &&
-             ((ent[i].addr + ent[i].size) == ent[i+1].addr) )
-        {
-            ent[i].size += ent[i+1].size;
-            memcpy(&ent[i+1], &ent[i+2], (*E820_NR-i-2) * sizeof(*ent));
-            (*E820_NR)--;
-        }
-        else
-        {
-            i++;
-        }
-    }
-}
-
-uint32_t e820_malloc(uint32_t size, uint32_t align)
-{
-    uint32_t addr;
-    int i;
-    struct e820entry *ent = E820;
+    static uint32_t reserve = RESERVED_MEMBASE - 1;
+    static int over_allocated;
+    struct xen_add_to_physmap xatp;
+    struct xen_memory_reservation xmr;
+    xen_pfn_t mfn;
+    uint32_t s, e;
 
     /* Align to at least one kilobyte. */
     if ( align < 1024 )
         align = 1024;
 
-    for ( i = *E820_NR - 1; i >= 0; i-- )
-    {
-        addr = (ent[i].addr + ent[i].size - size) & ~(align-1);
-        if ( (ent[i].type != E820_RAM) || /* not ram? */
-             (addr < ent[i].addr) ||      /* too small or starts above 4gb? */
-             ((addr + size) < addr) )     /* ends above 4gb? */
-            continue;
+    s = (reserve + align) & ~(align - 1);
+    e = s + size - 1;
 
-        if ( addr != ent[i].addr )
+    BUG_ON((e < s) || (e >> PAGE_SHIFT) >= hvm_info->reserved_mem_pgstart);
+
+    while ( (reserve >> PAGE_SHIFT) != (e >> PAGE_SHIFT) )
+    {
+        reserve += PAGE_SIZE;
+        mfn = reserve >> PAGE_SHIFT;
+
+        /* Try to allocate a brand new page in the reserved area. */
+        if ( !over_allocated )
         {
-            memmove(&ent[i+1], &ent[i], (*E820_NR-i) * sizeof(*ent));
-            (*E820_NR)++;
-            ent[i].size = addr - ent[i].addr;
-            ent[i+1].addr = addr;
-            ent[i+1].size -= ent[i].size;
-            i++;
+            xmr.domid = DOMID_SELF;
+            xmr.mem_flags = 0;
+            xmr.extent_order = 0;
+            xmr.nr_extents = 1;
+            set_xen_guest_handle(xmr.extent_start, &mfn);
+            if ( hypercall_memory_op(XENMEM_populate_physmap, &xmr) == 1 )
+                continue;
+            over_allocated = 1;
         }
 
-        ent[i].type = E820_RESERVED;
-
-        e820_collapse();
-
-        return addr;
+        /* Otherwise, relocate a page from the ordinary RAM map. */
+        if ( hvm_info->high_mem_pgend )
+        {
+            xatp.idx = --hvm_info->high_mem_pgend;
+            if ( xatp.idx == (1ull << (32 - PAGE_SHIFT)) )
+                hvm_info->high_mem_pgend = 0;
+        }
+        else
+        {
+            xatp.idx = --hvm_info->low_mem_pgend;
+        }
+        xatp.domid = DOMID_SELF;
+        xatp.space = XENMAPSPACE_gmfn;
+        xatp.gpfn  = mfn;
+        if ( hypercall_memory_op(XENMEM_add_to_physmap, &xatp) != 0 )
+            BUG();
     }
 
-    return 0;
+    reserve = e;
+
+    return (void *)(unsigned long)s;
 }
 
 uint32_t ioapic_read(uint32_t reg)
@@ -543,30 +542,35 @@ void __bug(char *file, int line)
         asm volatile ( "ud2" );
 }
 
-static int validate_hvm_info(struct hvm_info_table *t)
+static void validate_hvm_info(struct hvm_info_table *t)
 {
-    char signature[] = "HVM INFO";
     uint8_t *ptr = (uint8_t *)t;
     uint8_t sum = 0;
     int i;
 
-    /* strncmp(t->signature, "HVM INFO", 8) */
-    for ( i = 0; i < 8; i++ )
+    if ( strncmp(t->signature, "HVM INFO", 8) )
     {
-        if ( signature[i] != t->signature[i] )
-        {
-            printf("Bad hvm info signature\n");
-            return 0;
-        }
+        printf("Bad hvm info signature\n");
+        BUG();
+    }
+
+    if ( t->length < sizeof(struct hvm_info_table) )
+    {
+        printf("Bad hvm info length\n");
+        BUG();
     }
 
     for ( i = 0; i < t->length; i++ )
         sum += ptr[i];
 
-    return (sum == 0);
+    if ( sum != 0 )
+    {
+        printf("Bad hvm info checksum\n");
+        BUG();
+    }
 }
 
-static struct hvm_info_table *get_hvm_info_table(void)
+struct hvm_info_table *get_hvm_info_table(void)
 {
     static struct hvm_info_table *table;
     struct hvm_info_table *t;
@@ -576,33 +580,11 @@ static struct hvm_info_table *get_hvm_info_table(void)
 
     t = (struct hvm_info_table *)HVM_INFO_PADDR;
 
-    if ( !validate_hvm_info(t) )
-    {
-        printf("Bad hvm info table\n");
-        return NULL;
-    }
+    validate_hvm_info(t);
 
     table = t;
 
     return table;
-}
-
-int get_vcpu_nr(void)
-{
-    struct hvm_info_table *t = get_hvm_info_table();
-    return (t ? t->nr_vcpus : 1);
-}
-
-int get_acpi_enabled(void)
-{
-    struct hvm_info_table *t = get_hvm_info_table();
-    return (t ? t->acpi_enabled : 1);
-}
-
-int get_apic_mode(void)
-{
-    struct hvm_info_table *t = get_hvm_info_table();
-    return (t ? t->apic_mode : 1);
 }
 
 uint16_t get_cpu_mhz(void)
@@ -645,6 +627,27 @@ uint16_t get_cpu_mhz(void)
 
     cpu_mhz = (uint16_t)(((uint32_t)cpu_khz + 500) / 1000);
     return cpu_mhz;
+}
+
+int uart_exists(uint16_t uart_base)
+{
+    uint16_t ier = uart_base + 1;
+    uint8_t a, b, c;
+
+    a = inb(ier);
+    outb(ier, 0);
+    b = inb(ier);
+    outb(ier, 0xf);
+    c = inb(ier);
+    outb(ier, a);
+
+    return ((b == 0) && (c == 0xf));
+}
+
+int hpet_exists(unsigned long hpet_base)
+{
+    uint32_t hpet_id = *(uint32_t *)hpet_base;
+    return ((hpet_id >> 16) == 0x8086);
 }
 
 /*

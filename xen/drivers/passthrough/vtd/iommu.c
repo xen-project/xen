@@ -994,16 +994,12 @@ static int intel_iommu_domain_init(struct domain *d)
     if ( d->domain_id == 0 )
     {
         extern int xen_in_range(paddr_t start, paddr_t end);
-        extern int tboot_in_range(paddr_t start, paddr_t end);
 
-        /* 
-         * Set up 1:1 page table for dom0 except the critical segments
-         * like Xen and tboot.
-         */
+        /* Set up 1:1 page table for dom0 for all RAM except Xen bits. */
         for ( i = 0; i < max_page; i++ )
         {
-            if ( xen_in_range(i << PAGE_SHIFT, (i + 1) << PAGE_SHIFT) ||
-                 tboot_in_range(i << PAGE_SHIFT, (i + 1) << PAGE_SHIFT) )
+            if ( !page_is_conventional_ram(i) ||
+                 xen_in_range(i << PAGE_SHIFT, (i + 1) << PAGE_SHIFT) )
                 continue;
 
             tmp = 1 << (PAGE_SHIFT - PAGE_SHIFT_4K);
@@ -1482,6 +1478,11 @@ int intel_iommu_map_page(
     pte_present = dma_pte_present(*pte);
     dma_set_pte_addr(*pte, (paddr_t)mfn << PAGE_SHIFT_4K);
     dma_set_pte_prot(*pte, DMA_PTE_READ | DMA_PTE_WRITE);
+
+    /* Set the SNP on leaf page table if Snoop Control available */
+    if ( iommu_snoop )
+        dma_set_pte_snp(*pte);
+
     iommu_flush_cache_entry(pte);
     spin_unlock(&hd->mapping_lock);
     unmap_vtd_domain_page(page);

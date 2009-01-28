@@ -159,21 +159,39 @@ void flush_command_buffer(struct amd_iommu *iommu)
     }
 }
 
-static void clear_page_table_entry_present(u32 *pte)
+static void clear_iommu_l1e_present(u64 l2e, unsigned long gfn)
 {
-    set_field_in_reg_u32(IOMMU_CONTROL_DISABLED, pte[0],
-                         IOMMU_PTE_PRESENT_MASK,
-                         IOMMU_PTE_PRESENT_SHIFT, &pte[0]);
+    u32 *l1e;
+    int offset;
+    void *l1_table;
+
+    l1_table = map_domain_page(l2e >> PAGE_SHIFT);
+
+    offset = gfn & (~PTE_PER_TABLE_MASK);
+    l1e = (u32*)(l1_table + (offset * IOMMU_PAGE_TABLE_ENTRY_SIZE));
+
+    /* clear l1 entry */
+    l1e[0] = l1e[1] = 0;
+
+    unmap_domain_page(l1_table);
 }
 
-static void set_page_table_entry_present(u32 *pte, u64 page_addr,
-                                         int iw, int ir)
+static void set_iommu_l1e_present(u64 l2e, unsigned long gfn,
+                                 u64 maddr, int iw, int ir)
 {
     u64 addr_lo, addr_hi;
     u32 entry;
+    void *l1_table;
+    int offset;
+    u32 *l1e;
 
-    addr_lo = page_addr & DMA_32BIT_MASK;
-    addr_hi = page_addr >> 32;
+    l1_table = map_domain_page(l2e >> PAGE_SHIFT);
+
+    offset = gfn & (~PTE_PER_TABLE_MASK);
+    l1e = (u32*)((u8*)l1_table + (offset * IOMMU_PAGE_TABLE_ENTRY_SIZE));
+
+    addr_lo = maddr & DMA_32BIT_MASK;
+    addr_hi = maddr >> 32;
 
     set_field_in_reg_u32((u32)addr_hi, 0,
                          IOMMU_PTE_ADDR_HIGH_MASK,
@@ -186,7 +204,7 @@ static void set_page_table_entry_present(u32 *pte, u64 page_addr,
                          IOMMU_CONTROL_DISABLED, entry,
                          IOMMU_PTE_IO_READ_PERMISSION_MASK,
                          IOMMU_PTE_IO_READ_PERMISSION_SHIFT, &entry);
-    pte[1] = entry;
+    l1e[1] = entry;
 
     set_field_in_reg_u32((u32)addr_lo >> PAGE_SHIFT, 0,
                          IOMMU_PTE_ADDR_LOW_MASK,
@@ -197,9 +215,10 @@ static void set_page_table_entry_present(u32 *pte, u64 page_addr,
     set_field_in_reg_u32(IOMMU_CONTROL_ENABLED, entry,
                          IOMMU_PTE_PRESENT_MASK,
                          IOMMU_PTE_PRESENT_SHIFT, &entry);
-    pte[0] = entry;
-}
+    l1e[0] = entry;
 
+    unmap_domain_page(l1_table);
+}
 
 static void amd_iommu_set_page_directory_entry(u32 *pde, 
                                                u64 next_ptr, u8 next_level)
@@ -327,7 +346,7 @@ void amd_iommu_set_dev_table_entry(u32 *dte, u64 root_ptr, u64 intremap_ptr,
     dte[0] = entry;
 }
 
-void *amd_iommu_get_vptr_from_page_table_entry(u32 *entry)
+u64 amd_iommu_get_next_table_from_pte(u32 *entry)
 {
     u64 addr_lo, addr_hi, ptr;
 
@@ -342,7 +361,7 @@ void *amd_iommu_get_vptr_from_page_table_entry(u32 *entry)
         IOMMU_DEV_TABLE_PAGE_TABLE_PTR_HIGH_SHIFT);
 
     ptr = (addr_hi << 32) | (addr_lo << PAGE_SHIFT);
-    return ptr ? maddr_to_virt((unsigned long)ptr) : NULL;
+    return ptr;
 }
 
 static int amd_iommu_is_pte_present(u32 *entry)
@@ -381,54 +400,53 @@ int amd_iommu_is_dte_page_translation_valid(u32 *entry)
                                    IOMMU_DEV_TABLE_TRANSLATION_VALID_SHIFT));
 }
 
-static void *get_pte_from_page_tables(void *table, int level,
-                                      unsigned long io_pfn)
+static u64 iommu_l2e_from_pfn(struct page_info *table, int level,
+                              unsigned long io_pfn)
 {
     unsigned long offset;
     void *pde = NULL;
+    void *table_vaddr;
+    u64 next_table_maddr = 0;
 
-    BUG_ON(table == NULL);
+    BUG_ON( table == NULL || level == 0 );
 
-    while ( level > 0 )
+    while ( level > 1 )
     {
         offset = io_pfn >> ((PTE_PER_TABLE_SHIFT *
                              (level - IOMMU_PAGING_MODE_LEVEL_1)));
         offset &= ~PTE_PER_TABLE_MASK;
-        pde = table + (offset * IOMMU_PAGE_TABLE_ENTRY_SIZE);
 
-        if ( level == 1 )
-            break;
-        if ( !pde )
-            return NULL;
+        table_vaddr = map_domain_page(page_to_mfn(table));
+        pde = table_vaddr + (offset * IOMMU_PAGE_TABLE_ENTRY_SIZE);
+        next_table_maddr = amd_iommu_get_next_table_from_pte(pde);
+
         if ( !amd_iommu_is_pte_present(pde) )
         {
-            void *next_table = alloc_xenheap_page();
-            if ( next_table == NULL )
-                return NULL;
-            memset(next_table, 0, PAGE_SIZE);
-            if ( *(u64 *)pde == 0 )
+            if ( next_table_maddr == 0 )
             {
-                unsigned long next_ptr = (u64)virt_to_maddr(next_table);
+                table = alloc_amd_iommu_pgtable();
+                if ( table == NULL )
+                    return 0;
+                next_table_maddr = page_to_maddr(table);
                 amd_iommu_set_page_directory_entry(
-                    (u32 *)pde, next_ptr, level - 1);
+                    (u32 *)pde, next_table_maddr, level - 1);
             }
-            else
-            {
-                free_xenheap_page(next_table);
-            }
+            else /* should never reach here */
+                return 0;
         }
-        table = amd_iommu_get_vptr_from_page_table_entry(pde);
+
+        unmap_domain_page(table_vaddr);
+        table = maddr_to_page(next_table_maddr);
         level--;
     }
 
-    return pde;
+    return next_table_maddr;
 }
 
 int amd_iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn)
 {
-    void *pte;
+    u64 iommu_l2e;
     unsigned long flags;
-    u64 maddr;
     struct hvm_iommu *hd = domain_hvm_iommu(d);
     int iw = IOMMU_IO_WRITE_ENABLED;
     int ir = IOMMU_IO_READ_ENABLED;
@@ -440,16 +458,15 @@ int amd_iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn)
     if ( is_hvm_domain(d) && !hd->p2m_synchronized )
         goto out;
 
-    maddr = (u64)mfn << PAGE_SHIFT;
-    pte = get_pte_from_page_tables(hd->root_table, hd->paging_mode, gfn);
-    if ( pte == NULL )
+    iommu_l2e = iommu_l2e_from_pfn(hd->root_table, hd->paging_mode, gfn);
+    if ( iommu_l2e == 0 )
     {
         amd_iov_error("Invalid IO pagetable entry gfn = %lx\n", gfn);
         spin_unlock_irqrestore(&hd->mapping_lock, flags);
         return -EFAULT;
     }
+    set_iommu_l1e_present(iommu_l2e, gfn, (u64)mfn << PAGE_SHIFT, iw, ir);
 
-    set_page_table_entry_present((u32 *)pte, maddr, iw, ir);
 out:
     spin_unlock_irqrestore(&hd->mapping_lock, flags);
     return 0;
@@ -457,10 +474,8 @@ out:
 
 int amd_iommu_unmap_page(struct domain *d, unsigned long gfn)
 {
-    void *pte;
+    u64 iommu_l2e;
     unsigned long flags;
-    u64 io_addr = gfn;
-    int requestor_id;
     struct amd_iommu *iommu;
     struct hvm_iommu *hd = domain_hvm_iommu(d);
 
@@ -474,11 +489,9 @@ int amd_iommu_unmap_page(struct domain *d, unsigned long gfn)
         return 0;
     }
 
-    requestor_id = hd->domain_id;
-    io_addr = (u64)gfn << PAGE_SHIFT;
+    iommu_l2e = iommu_l2e_from_pfn(hd->root_table, hd->paging_mode, gfn);
 
-    pte = get_pte_from_page_tables(hd->root_table, hd->paging_mode, gfn);
-    if ( pte == NULL )
+    if ( iommu_l2e == 0 )
     {
         amd_iov_error("Invalid IO pagetable entry gfn = %lx\n", gfn);
         spin_unlock_irqrestore(&hd->mapping_lock, flags);
@@ -486,14 +499,14 @@ int amd_iommu_unmap_page(struct domain *d, unsigned long gfn)
     }
 
     /* mark PTE as 'page not present' */
-    clear_page_table_entry_present((u32 *)pte);
+    clear_iommu_l1e_present(iommu_l2e, gfn);
     spin_unlock_irqrestore(&hd->mapping_lock, flags);
 
     /* send INVALIDATE_IOMMU_PAGES command */
     for_each_amd_iommu ( iommu )
     {
         spin_lock_irqsave(&iommu->lock, flags);
-        invalidate_iommu_page(iommu, io_addr, requestor_id);
+        invalidate_iommu_page(iommu, (u64)gfn << PAGE_SHIFT, hd->domain_id);
         flush_command_buffer(iommu);
         spin_unlock_irqrestore(&iommu->lock, flags);
     }
@@ -506,8 +519,8 @@ int amd_iommu_reserve_domain_unity_map(
     unsigned long phys_addr,
     unsigned long size, int iw, int ir)
 {
+    u64 iommu_l2e;
     unsigned long flags, npages, i;
-    void *pte;
     struct hvm_iommu *hd = domain_hvm_iommu(domain);
 
     npages = region_to_pages(phys_addr, size);
@@ -515,17 +528,20 @@ int amd_iommu_reserve_domain_unity_map(
     spin_lock_irqsave(&hd->mapping_lock, flags);
     for ( i = 0; i < npages; ++i )
     {
-        pte = get_pte_from_page_tables(
+        iommu_l2e = iommu_l2e_from_pfn(
             hd->root_table, hd->paging_mode, phys_addr >> PAGE_SHIFT);
-        if ( pte == NULL )
+
+        if ( iommu_l2e == 0 )
         {
             amd_iov_error(
             "Invalid IO pagetable entry phys_addr = %lx\n", phys_addr);
             spin_unlock_irqrestore(&hd->mapping_lock, flags);
             return -EFAULT;
         }
-        set_page_table_entry_present((u32 *)pte,
-                                     phys_addr, iw, ir);
+
+        set_iommu_l1e_present(iommu_l2e,
+            (phys_addr >> PAGE_SHIFT), phys_addr, iw, ir);
+
         phys_addr += PAGE_SIZE;
     }
     spin_unlock_irqrestore(&hd->mapping_lock, flags);
@@ -535,8 +551,7 @@ int amd_iommu_reserve_domain_unity_map(
 int amd_iommu_sync_p2m(struct domain *d)
 {
     unsigned long mfn, gfn, flags;
-    void *pte;
-    u64 maddr;
+    u64 iommu_l2e;
     struct list_head *entry;
     struct page_info *page;
     struct hvm_iommu *hd;
@@ -563,15 +578,16 @@ int amd_iommu_sync_p2m(struct domain *d)
         if ( gfn == INVALID_M2P_ENTRY )
             continue;
 
-        maddr = (u64)mfn << PAGE_SHIFT;
-        pte = get_pte_from_page_tables(hd->root_table, hd->paging_mode, gfn);
-        if ( pte == NULL )
+        iommu_l2e = iommu_l2e_from_pfn(hd->root_table, hd->paging_mode, gfn);
+
+        if ( iommu_l2e == 0 )
         {
             amd_iov_error("Invalid IO pagetable entry gfn = %lx\n", gfn);
             spin_unlock_irqrestore(&hd->mapping_lock, flags);
             return -EFAULT;
         }
-        set_page_table_entry_present((u32 *)pte, maddr, iw, ir);
+
+        set_iommu_l1e_present(iommu_l2e, gfn, (u64)mfn << PAGE_SHIFT, iw, ir);
     }
 
     hd->p2m_synchronized = 1;

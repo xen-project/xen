@@ -15,100 +15,55 @@
 #include <xen/foreign/x86_64.h>
 #include <xen/hvm/hvm_info_table.h>
 #include <xen/hvm/params.h>
-#include "xc_e820.h"
+#include <xen/hvm/e820.h>
 
-#include <xen/libelf.h>
+#include <xen/libelf/libelf.h>
 
 #define SUPERPAGE_PFN_SHIFT  9
 #define SUPERPAGE_NR_PFNS    (1UL << SUPERPAGE_PFN_SHIFT)
 
-#define SCRATCH_PFN 0xFFFFF
-
-#define SPECIALPAGE_GUARD    0
-#define SPECIALPAGE_BUFIOREQ 1
-#define SPECIALPAGE_XENSTORE 2
-#define SPECIALPAGE_IOREQ    3
-#define SPECIALPAGE_IDENT_PT 4
+#define SPECIALPAGE_BUFIOREQ 0
+#define SPECIALPAGE_XENSTORE 1
+#define SPECIALPAGE_IOREQ    2
+#define SPECIALPAGE_IDENT_PT 3
+#define SPECIALPAGE_SHINFO   4
 #define NR_SPECIAL_PAGES     5
+#define special_pfn(x) (0xff000u - NR_SPECIAL_PAGES + (x))
 
-static void build_e820map(void *e820_page, unsigned long long mem_size)
+static void build_hvm_info(void *hvm_info_page, uint64_t mem_size)
 {
-    struct e820entry *e820entry =
-        (struct e820entry *)(((unsigned char *)e820_page) + HVM_E820_OFFSET);
-    unsigned long long extra_mem_size = 0;
-    unsigned char nr_map = 0;
+    struct hvm_info_table *hvm_info = (struct hvm_info_table *)
+        (((unsigned char *)hvm_info_page) + HVM_INFO_OFFSET);
+    uint64_t lowmem_end = mem_size, highmem_end = 0;
+    uint8_t sum;
+    int i;
 
-    /*
-     * Physical address space from HVM_BELOW_4G_RAM_END to 4G is reserved
-     * for PCI devices MMIO. So if HVM has more than HVM_BELOW_4G_RAM_END
-     * RAM, memory beyond HVM_BELOW_4G_RAM_END will go to 4G above.
-     */
-    if ( mem_size > HVM_BELOW_4G_RAM_END )
+    if ( lowmem_end > HVM_BELOW_4G_RAM_END )
     {
-        extra_mem_size = mem_size - HVM_BELOW_4G_RAM_END;
-        mem_size = HVM_BELOW_4G_RAM_END;
+        highmem_end = lowmem_end + (1ull<<32) - HVM_BELOW_4G_RAM_END;
+        lowmem_end = HVM_BELOW_4G_RAM_END;
     }
 
-    /* 0x0-0x9FC00: Ordinary RAM. */
-    e820entry[nr_map].addr = 0x0;
-    e820entry[nr_map].size = 0x9FC00;
-    e820entry[nr_map].type = E820_RAM;
-    nr_map++;
+    memset(hvm_info_page, 0, PAGE_SIZE);
 
-    /* 0x9FC00-0xA0000: Extended BIOS Data Area (EBDA). */
-    e820entry[nr_map].addr = 0x9FC00;
-    e820entry[nr_map].size = 0x400;
-    e820entry[nr_map].type = E820_RESERVED;
-    nr_map++;
+    /* Fill in the header. */
+    strncpy(hvm_info->signature, "HVM INFO", 8);
+    hvm_info->length = sizeof(struct hvm_info_table);
 
-    /*
-     * Following regions are standard regions of the PC memory map.
-     * They are not covered by e820 regions. OSes will not use as RAM.
-     * 0xA0000-0xC0000: VGA memory-mapped I/O. Not covered by E820.
-     * 0xC0000-0xE0000: 16-bit devices, expansion ROMs (inc. vgabios).
-     * TODO: hvmloader should free pages which turn out to be unused.
-     */
+    /* Sensible defaults: these can be overridden by the caller. */
+    hvm_info->acpi_enabled = 1;
+    hvm_info->apic_mode = 1;
+    hvm_info->nr_vcpus = 1;
 
-    /*
-     * 0xE0000-0x0F0000: PC-specific area. We place ACPI tables here.
-     *                   We *cannot* mark as E820_ACPI, for two reasons:
-     *                    1. ACPI spec. says that E820_ACPI regions below
-     *                       16MB must clip INT15h 0x88 and 0xe801 queries.
-     *                       Our rombios doesn't do this.
-     *                    2. The OS is allowed to reclaim ACPI memory after
-     *                       parsing the tables. But our FACS is in this
-     *                       region and it must not be reclaimed (it contains
-     *                       the ACPI global lock!).
-     * 0xF0000-0x100000: System BIOS.
-     * TODO: hvmloader should free pages which turn out to be unused.
-     */
-    e820entry[nr_map].addr = 0xE0000;
-    e820entry[nr_map].size = 0x20000;
-    e820entry[nr_map].type = E820_RESERVED;
-    nr_map++;
+    /* Memory parameters. */
+    hvm_info->low_mem_pgend = lowmem_end >> PAGE_SHIFT;
+    hvm_info->high_mem_pgend = highmem_end >> PAGE_SHIFT;
+    hvm_info->reserved_mem_pgstart = special_pfn(0);
 
-    /* Low RAM goes here. Reserve space for special pages. */
-    e820entry[nr_map].addr = 0x100000;
-    e820entry[nr_map].size = (mem_size - 0x100000 -
-                              PAGE_SIZE * NR_SPECIAL_PAGES);
-    e820entry[nr_map].type = E820_RAM;
-    nr_map++;
-
-    /* Explicitly reserve space for special pages (excluding guard page). */
-    e820entry[nr_map].addr = mem_size - PAGE_SIZE * (NR_SPECIAL_PAGES - 1);
-    e820entry[nr_map].size = PAGE_SIZE * (NR_SPECIAL_PAGES - 1);
-    e820entry[nr_map].type = E820_RESERVED;
-    nr_map++;
-
-    if ( extra_mem_size )
-    {
-        e820entry[nr_map].addr = (1ULL << 32);
-        e820entry[nr_map].size = extra_mem_size;
-        e820entry[nr_map].type = E820_RAM;
-        nr_map++;
-    }
-
-    *(((unsigned char *)e820_page) + HVM_E820_NR_OFFSET) = nr_map;
+    /* Finish with the checksum. */
+    for ( i = 0, sum = 0; i < hvm_info->length; i++ )
+        sum += ((uint8_t *)hvm_info)[i];
+    hvm_info->checksum = -sum;
 }
 
 static int loadelfimage(
@@ -153,10 +108,10 @@ static int setup_guest(int xc_handle,
     unsigned long i, nr_pages = (unsigned long)memsize << (20 - PAGE_SHIFT);
     unsigned long target_pages = (unsigned long)target << (20 - PAGE_SHIFT);
     unsigned long pod_pages = 0;
-    unsigned long special_page_nr, entry_eip, cur_pages;
+    unsigned long entry_eip, cur_pages;
     struct xen_add_to_physmap xatp;
     struct shared_info *shared_info;
-    void *e820_page;
+    void *hvm_info_page;
     uint32_t *ident_pt;
     struct elf_binary elf;
     uint64_t v_start, v_end;
@@ -289,23 +244,22 @@ static int setup_guest(int xc_handle,
     if ( loadelfimage(&elf, xc_handle, dom, page_array) != 0 )
         goto error_out;
 
-    if ( (e820_page = xc_map_foreign_range(
+    if ( (hvm_info_page = xc_map_foreign_range(
               xc_handle, dom, PAGE_SIZE, PROT_READ | PROT_WRITE,
-              HVM_E820_PAGE >> PAGE_SHIFT)) == NULL )
+              HVM_INFO_PFN)) == NULL )
         goto error_out;
-    memset(e820_page, 0, PAGE_SIZE);
-    build_e820map(e820_page, v_end);
-    munmap(e820_page, PAGE_SIZE);
+    build_hvm_info(hvm_info_page, v_end);
+    munmap(hvm_info_page, PAGE_SIZE);
 
     /* Map and initialise shared_info page. */
     xatp.domid = dom;
     xatp.space = XENMAPSPACE_shared_info;
     xatp.idx   = 0;
-    xatp.gpfn  = SCRATCH_PFN;
+    xatp.gpfn  = special_pfn(SPECIALPAGE_SHINFO);
     if ( (xc_memory_op(xc_handle, XENMEM_add_to_physmap, &xatp) != 0) ||
          ((shared_info = xc_map_foreign_range(
              xc_handle, dom, PAGE_SIZE, PROT_READ | PROT_WRITE,
-             SCRATCH_PFN)) == NULL) )
+             special_pfn(SPECIALPAGE_SHINFO))) == NULL) )
         goto error_out;
     memset(shared_info, 0, PAGE_SIZE);
     /* NB. evtchn_upcall_mask is unused: leave as zero. */
@@ -313,31 +267,28 @@ static int setup_guest(int xc_handle,
            sizeof(shared_info->evtchn_mask));
     munmap(shared_info, PAGE_SIZE);
 
-    special_page_nr = (((v_end > HVM_BELOW_4G_RAM_END)
-                        ? (HVM_BELOW_4G_RAM_END >> PAGE_SHIFT)
-                        : (v_end >> PAGE_SHIFT))
-                       - NR_SPECIAL_PAGES);
-
-    /* Paranoia: clean special pages. */
+    /* Allocate and clear special pages. */
     for ( i = 0; i < NR_SPECIAL_PAGES; i++ )
-        if ( xc_clear_domain_page(xc_handle, dom, special_page_nr + i) )
-            goto error_out;
-
-    /* Free the guard page that separates low RAM from special pages. */
-    rc = xc_domain_memory_decrease_reservation(
-        xc_handle, dom, 1, 0, &page_array[special_page_nr]);
-    if ( rc != 0 )
     {
-        PERROR("Could not deallocate guard page for HVM guest.\n");
-        goto error_out;
+        xen_pfn_t pfn = special_pfn(i);
+        if ( i == SPECIALPAGE_SHINFO )
+            continue;
+        rc = xc_domain_memory_populate_physmap(xc_handle, dom, 1, 0, 0, &pfn);
+        if ( rc != 0 )
+        {
+            PERROR("Could not allocate %d'th special page.\n", i);
+            goto error_out;
+        }
+        if ( xc_clear_domain_page(xc_handle, dom, special_pfn(i)) )
+            goto error_out;
     }
 
     xc_set_hvm_param(xc_handle, dom, HVM_PARAM_STORE_PFN,
-                     special_page_nr + SPECIALPAGE_XENSTORE);
+                     special_pfn(SPECIALPAGE_XENSTORE));
     xc_set_hvm_param(xc_handle, dom, HVM_PARAM_BUFIOREQ_PFN,
-                     special_page_nr + SPECIALPAGE_BUFIOREQ);
+                     special_pfn(SPECIALPAGE_BUFIOREQ));
     xc_set_hvm_param(xc_handle, dom, HVM_PARAM_IOREQ_PFN,
-                     special_page_nr + SPECIALPAGE_IOREQ);
+                     special_pfn(SPECIALPAGE_IOREQ));
 
     /*
      * Identity-map page table is required for running with CR0.PG=0 when
@@ -345,14 +296,14 @@ static int setup_guest(int xc_handle,
      */
     if ( (ident_pt = xc_map_foreign_range(
               xc_handle, dom, PAGE_SIZE, PROT_READ | PROT_WRITE,
-              special_page_nr + SPECIALPAGE_IDENT_PT)) == NULL )
+              special_pfn(SPECIALPAGE_IDENT_PT))) == NULL )
         goto error_out;
     for ( i = 0; i < PAGE_SIZE / sizeof(*ident_pt); i++ )
         ident_pt[i] = ((i << 22) | _PAGE_PRESENT | _PAGE_RW | _PAGE_USER |
                        _PAGE_ACCESSED | _PAGE_DIRTY | _PAGE_PSE);
     munmap(ident_pt, PAGE_SIZE);
     xc_set_hvm_param(xc_handle, dom, HVM_PARAM_IDENT_PT,
-                     (special_page_nr + SPECIALPAGE_IDENT_PT) << PAGE_SHIFT);
+                     special_pfn(SPECIALPAGE_IDENT_PT) << PAGE_SHIFT);
 
     /* Insert JMP <rel32> instruction at address 0x0 to reach entry point. */
     entry_eip = elf_uval(&elf, elf.ehdr, e_entry);

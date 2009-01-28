@@ -88,11 +88,25 @@ void cacheattr_init(void)
     nr_var_ranges = (uint8_t)mtrr_cap;
     if ( nr_var_ranges != 0 )
     {
-        /* A single UC range covering PCI space. */
-        wrmsr(MSR_MTRRphysBase(0), PCI_MEMBASE);
-        wrmsr(MSR_MTRRphysMask(0),
-              ((uint64_t)(int32_t)PCI_MEMBASE & addr_mask) | (1u << 11));
-        printf("var MTRRs ... ");
+        unsigned long base = pci_mem_start, size;
+        int i;
+
+        for ( i = 0; (base != pci_mem_end) && (i < nr_var_ranges); i++ )
+        {
+            size = PAGE_SIZE;
+            while ( !(base & size) )
+                size <<= 1;
+            while ( ((base + size) < base) || ((base + size) > pci_mem_end) )
+                size >>= 1;
+
+            wrmsr(MSR_MTRRphysBase(i), base);
+            wrmsr(MSR_MTRRphysMask(i),
+                  (~(uint64_t)(size-1) & addr_mask) | (1u << 11));
+
+            base += size;
+        }
+
+        printf("var MTRRs [%d/%d] ... ", i, nr_var_ranges);
     }
 
     wrmsr(MSR_MTRRdefType, mtrr_def);

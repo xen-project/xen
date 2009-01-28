@@ -4,9 +4,6 @@ include $(XEN_ROOT)/tools/Rules.mk
 MAJOR = 1.0
 MINOR = 0
 
-CFLAGS += -Werror -Wp,-MD,.$(@F).d
-DEPS = .*.d
-
 LDFLAGS-$(CONFIG_SunOS) = -Wl,-M -Wl,mapfile-SunOS
 LDFLAGS-$(CONFIG_Linux) = -Wl,mapfile-GNU
 LDFLAGS = $(LDFLAGS-y)

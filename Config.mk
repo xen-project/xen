@@ -1,7 +1,7 @@
 # -*- mode: Makefile; -*-
 
 # A debug build of Xen and tools?
-debug ?= n
+debug ?= y ## TEMPORARILY ENABLED
 
 XEN_COMPILE_ARCH    ?= $(shell uname -m | sed -e s/i.86/x86_32/ \
                          -e s/i86pc/x86_32/ -e s/amd64/x86_64/)
@@ -37,6 +37,15 @@ endif
 # Usage: cflags-y += $(call cc-option,$(CC),-march=winchip-c6,-march=i586)
 cc-option = $(shell if test -z "`$(1) $(2) -S -o /dev/null -xc \
               /dev/null 2>&1`"; then echo "$(2)"; else echo "$(3)"; fi ;)
+
+# cc-option-add: Add an option to compilation flags, but only if supported.
+# Usage: $(call cc-option-add CFLAGS,CC,-march=winchip-c6)
+cc-option-add = $(eval $(call cc-option-add-closure,$(1),$(2),$(3)))
+define cc-option-add-closure
+    ifneq ($$(call cc-option,$$($(2)),$(3),n),n)
+        $(1) += $(3)
+    endif
+endef
 
 # cc-ver: Check compiler is at least specified version. Return boolean 'y'/'n'.
 # Usage: ifeq ($(call cc-ver,$(CC),0x030400),y)
@@ -84,8 +93,8 @@ CFLAGS += -Wall -Wstrict-prototypes
 # result of any casted expression causes a warning.
 CFLAGS += -Wno-unused-value
 
-HOSTCFLAGS += $(call cc-option,$(HOSTCC),-Wdeclaration-after-statement,)
-CFLAGS     += $(call cc-option,$(CC),-Wdeclaration-after-statement,)
+$(call cc-option-add,HOSTCFLAGS,HOSTCC,-Wdeclaration-after-statement)
+$(call cc-option-add,CFLAGS,CC,-Wdeclaration-after-statement)
 
 LDFLAGS += $(foreach i, $(EXTRA_LIB), -L$(i)) 
 CFLAGS += $(foreach i, $(EXTRA_INCLUDES), -I$(i))

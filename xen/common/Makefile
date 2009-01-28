@@ -42,13 +42,3 @@ subdir-$(x86_64) += hvm
 subdir-$(ia64) += hvm
 
 subdir-y += libelf
-
-# Object file contains changeset and compiler information.
-version.o: $(BASEDIR)/include/xen/compile.h
-
-ifeq ($(CONFIG_COMPAT),y)
-# extra dependencies
-grant_table.o: compat/grant_table.c
-schedule.o: compat/schedule.c
-xenoprof.o: compat/xenoprof.c
-endif

@@ -39,6 +39,8 @@
 #include <xsm/xsm.h>
 #include <asm/tboot.h>
 
+int __init bzimage_headroom(char *image_start, unsigned long image_length);
+
 #if defined(CONFIG_X86_64)
 #define BOOTSTRAP_DIRECTMAP_END (1UL << 32) /* 4GB */
 #define maddr_to_bootstrap_virt(m) maddr_to_virt(m)
@@ -53,15 +55,6 @@ extern void numa_initmem_init(unsigned long start_pfn, unsigned long end_pfn);
 extern u16 boot_edid_caps;
 extern u8 boot_edid_info[128];
 extern struct boot_video_info boot_vid_info;
-
-/*
- * opt_xenheap_megabytes: Size of Xen heap in megabytes, excluding the
- * page_info table and allocation bitmap.
- */
-static unsigned int opt_xenheap_megabytes = XENHEAP_DEFAULT_MB;
-#if defined(CONFIG_X86_64)
-integer_param("xenheap_megabytes", opt_xenheap_megabytes);
-#endif
 
 /* opt_nosmp: If true, secondary processors are ignored. */
 static int opt_nosmp = 0;
@@ -105,8 +98,10 @@ cpumask_t cpu_present_map;
 
 unsigned long xen_phys_start;
 
+#ifdef CONFIG_X86_32
 /* Limits of Xen heap, used to initialise the allocator. */
-unsigned long xenheap_phys_start, xenheap_phys_end;
+unsigned long xenheap_initial_phys_start, xenheap_phys_end;
+#endif
 
 extern void arch_init_memory(void);
 extern void init_IRQ(void);
@@ -178,19 +173,21 @@ static void __init do_initcalls(void)
     for ( ; ; ) halt();                         \
 } while (0)
 
-static unsigned long __initdata initial_images_start, initial_images_end;
+static unsigned long __initdata initial_images_base;
+static unsigned long __initdata initial_images_start;
+static unsigned long __initdata initial_images_end;
 
 unsigned long __init initial_images_nrpages(void)
 {
-    ASSERT(!(initial_images_start & ~PAGE_MASK));
+    ASSERT(!(initial_images_base & ~PAGE_MASK));
     ASSERT(!(initial_images_end   & ~PAGE_MASK));
     return ((initial_images_end >> PAGE_SHIFT) -
-            (initial_images_start >> PAGE_SHIFT));
+            (initial_images_base >> PAGE_SHIFT));
 }
 
 void __init discard_initial_images(void)
 {
-    init_domheap_pages(initial_images_start, initial_images_end);
+    init_domheap_pages(initial_images_base, initial_images_end);
 }
 
 extern char __per_cpu_start[], __per_cpu_data_end[], __per_cpu_end[];
@@ -420,7 +417,8 @@ void __init __start_xen(unsigned long mbi_p)
     unsigned int initrdidx = 1;
     multiboot_info_t *mbi = __va(mbi_p);
     module_t *mod = (module_t *)__va(mbi->mods_addr);
-    unsigned long nr_pages, modules_length;
+    unsigned long nr_pages, modules_length, modules_headroom;
+    unsigned long allocator_bitmap_end;
     int i, e820_warn = 0, bytes = 0;
     struct ns16550_defaults ns16550 = {
         .data_bits = 8,
@@ -599,23 +597,6 @@ void __init __start_xen(unsigned long mbi_p)
     /* Sanitise the raw E820 map to produce a final clean version. */
     max_page = init_e820(memmap_type, e820_raw, &e820_raw_nr);
 
-#ifdef CONFIG_X86_64
-    /*
-     * On x86/64 we are able to account for the allocation bitmap
-     * (allocated in common/page_alloc.c:init_boot_allocator()) stealing
-     * from the Xen heap. Here we make the Xen heap appropriately larger.
-     */
-    opt_xenheap_megabytes += (max_page / 8) >> 20;
-#endif
-
-    /*
-     * Since there are some stubs getting built on the stacks which use
-     * direct calls/jumps, the heap must be confined to the lower 2G so
-     * that those branches can reach their targets.
-     */
-    if ( opt_xenheap_megabytes > 2048 )
-        opt_xenheap_megabytes = 2048;
-
     /* Create a temporary copy of the E820 map. */
     memcpy(&boot_e820, &e820, sizeof(e820));
 
@@ -636,6 +617,10 @@ void __init __start_xen(unsigned long mbi_p)
      * x86/64, we relocate Xen to higher memory.
      */
     modules_length = mod[mbi->mods_count-1].mod_end - mod[0].mod_start;
+    modules_headroom = bzimage_headroom(
+        (char *)(unsigned long)mod[0].mod_start,
+        (unsigned long)(mod[0].mod_end - mod[0].mod_start));
+
     for ( i = boot_e820.nr_map-1; i >= 0; i-- )
     {
         uint64_t s, e, mask = (1UL << L2_PAGETABLE_SHIFT) - 1;
@@ -654,8 +639,9 @@ void __init __start_xen(unsigned long mbi_p)
             s >> PAGE_SHIFT, (e-s) >> PAGE_SHIFT, PAGE_HYPERVISOR);
 
 #if defined(CONFIG_X86_64)
+#define reloc_size ((__pa(&_end) + mask) & ~mask)
         /* Is the region suitable for relocating Xen? */
-        if ( !xen_phys_start && (((e-s) >> 20) >= opt_xenheap_megabytes) )
+        if ( !xen_phys_start && ((e-s) >= reloc_size) )
         {
             extern l2_pgentry_t l2_xenmap[];
             l4_pgentry_t *pl4e;
@@ -664,7 +650,7 @@ void __init __start_xen(unsigned long mbi_p)
             int i, j, k;
 
             /* Select relocation address. */
-            e = (e - (opt_xenheap_megabytes << 20)) & ~mask;
+            e -= reloc_size;
             xen_phys_start = e;
             bootsym(trampoline_xen_phys_start) = e;
 
@@ -739,12 +725,15 @@ void __init __start_xen(unsigned long mbi_p)
 #endif
 
         /* Is the region suitable for relocating the multiboot modules? */
-        if ( !initial_images_start && (s < e) && ((e-s) >= modules_length) )
+        if ( !initial_images_start && (s < e) &&
+             ((e-s) >= (modules_length+modules_headroom)) )
         {
             initial_images_end = e;
             e = (e - modules_length) & PAGE_MASK;
             initial_images_start = e;
-            move_memory(initial_images_start, 
+            e -= modules_headroom;
+            initial_images_base = e;
+            move_memory(initial_images_start,
                         mod[0].mod_start, mod[mbi->mods_count-1].mod_end);
         }
 
@@ -758,17 +747,17 @@ void __init __start_xen(unsigned long mbi_p)
 
     if ( !initial_images_start )
         EARLY_FAIL("Not enough memory to relocate the dom0 kernel image.\n");
-    reserve_e820_ram(&boot_e820, initial_images_start, initial_images_end);
+    reserve_e820_ram(&boot_e820, initial_images_base, initial_images_end);
 
-    /* Initialise Xen heap and boot heap. */
-    xenheap_phys_start = init_boot_allocator(__pa(&_end));
-    xenheap_phys_end   = opt_xenheap_megabytes << 20;
-#if defined(CONFIG_X86_64)
+    /* Initialise boot heap. */
+    allocator_bitmap_end = init_boot_allocator(__pa(&_end));
+#if defined(CONFIG_X86_32)
+    xenheap_initial_phys_start = allocator_bitmap_end;
+    xenheap_phys_end = DIRECTMAP_MBYTES << 20;
+#else
     if ( !xen_phys_start )
         EARLY_FAIL("Not enough memory to relocate Xen.\n");
-    xenheap_phys_end += xen_phys_start;
-    reserve_e820_ram(&boot_e820, xen_phys_start,
-                     xen_phys_start + (opt_xenheap_megabytes<<20));
+    reserve_e820_ram(&boot_e820, __pa(&_start), allocator_bitmap_end);
 #endif
 
     /* Late kexec reservation (dynamic start address). */
@@ -861,22 +850,21 @@ void __init __start_xen(unsigned long mbi_p)
 
     numa_initmem_init(0, max_page);
 
-    /* Initialise the Xen heap, skipping RAM holes. */
-    init_xenheap_pages(xenheap_phys_start, xenheap_phys_end);
-    nr_pages = (xenheap_phys_end - xenheap_phys_start) >> PAGE_SHIFT;
-#ifdef __x86_64__
-    init_xenheap_pages(xen_phys_start, __pa(&_start));
-    nr_pages += (__pa(&_start) - xen_phys_start) >> PAGE_SHIFT;
-    vesa_init();
-#endif
-    xenheap_phys_start = xen_phys_start;
+#if defined(CONFIG_X86_32)
+    /* Initialise the Xen heap. */
+    init_xenheap_pages(xenheap_initial_phys_start, xenheap_phys_end);
+    nr_pages = (xenheap_phys_end - xenheap_initial_phys_start) >> PAGE_SHIFT;
     printk("Xen heap: %luMB (%lukB)\n", 
            nr_pages >> (20 - PAGE_SHIFT),
            nr_pages << (PAGE_SHIFT - 10));
+#endif
 
     end_boot_allocator();
-
     early_boot = 0;
+
+#if defined(CONFIG_X86_64)
+    vesa_init();
+#endif
 
     softirq_init();
 
@@ -1050,7 +1038,8 @@ void __init __start_xen(unsigned long mbi_p)
      * above our heap. The second module, if present, is an initrd ramdisk.
      */
     if ( construct_dom0(dom0,
-                        initial_images_start, 
+                        initial_images_base,
+                        initial_images_start,
                         mod[0].mod_end-mod[0].mod_start,
                         _initrd_start,
                         _initrd_len,
@@ -1115,10 +1104,15 @@ void arch_get_xen_caps(xen_capabilities_info_t *info)
 
 int xen_in_range(paddr_t start, paddr_t end)
 {
-    start = max_t(paddr_t, start, xenheap_phys_start);
-    end = min_t(paddr_t, end, xenheap_phys_end);
- 
-    return start < end; 
+#if defined(CONFIG_X86_32)
+    paddr_t xs = 0;
+    paddr_t xe = xenheap_phys_end;
+#else
+    paddr_t xs = __pa(&_stext);
+    paddr_t xe = __pa(&_etext);
+#endif
+
+    return (start < xe) && (end > xs);
 }
 
 /*

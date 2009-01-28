@@ -244,11 +244,10 @@ struct shadow_page_info
                 u32 tlbflush_timestamp;
             };
             struct {
-                unsigned int type:5;   /* What kind of shadow is this? */
-                unsigned int pinned:1; /* Is the shadow pinned? */
-                unsigned int count:26; /* Reference count */
-                u32 mbz;               /* Must be zero: this is where the
-                                        * owner field lives in page_info */
+                unsigned long mbz;     /* Must be zero: count_info is here. */
+                unsigned long type:5;   /* What kind of shadow is this? */
+                unsigned long pinned:1; /* Is the shadow pinned? */
+                unsigned long count:26; /* Reference count */
             } __attribute__((packed));
             union {
                 /* For unused shadow pages, a list of pages of this order; for 
@@ -266,13 +265,13 @@ struct shadow_page_info
 
 /* The structure above *must* be no larger than a struct page_info
  * from mm.h, since we'll be using the same space in the frametable. 
- * Also, the mbz field must line up with the owner field of normal 
- * pages, so they look properly like anonymous/xen pages. */
+ * Also, the mbz field must line up with the count_info field of normal 
+ * pages, so they cannot be successfully get_page()d. */
 static inline void shadow_check_page_struct_offsets(void) {
     BUILD_BUG_ON(sizeof (struct shadow_page_info) !=
                  sizeof (struct page_info));
     BUILD_BUG_ON(offsetof(struct shadow_page_info, mbz) !=
-                 offsetof(struct page_info, u.inuse._domain));
+                 offsetof(struct page_info, count_info));
 };
 
 /* Shadow type codes */

@@ -31,7 +31,7 @@
 #include <xen/event.h>
 #include <xen/console.h>
 #include <xen/version.h>
-#include <public/libelf.h>
+#include <xen/libelf.h>
 #include <asm/pgalloc.h>
 #include <asm/offsets.h>  /* for IA64_THREAD_INFO_SIZE */
 #include <asm/vcpu.h>   /* for function declarations */

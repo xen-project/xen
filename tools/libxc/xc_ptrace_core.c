@@ -540,7 +540,9 @@ xc_waitdomain_core_elf(
                              XEN_ELFNOTE_DUMPCORE_XEN_VERSION,
                              (void**)&xen_version) < 0)
         goto out;
-    if (xen_version->xen_version.pagesize != PAGE_SIZE)
+    /* shifted case covers 32 bit FV guest core file created on 64 bit Dom0 */
+    if (xen_version->xen_version.pagesize != PAGE_SIZE &&
+        (xen_version->xen_version.pagesize >> 32) != PAGE_SIZE)
         goto out;
 
     /* .note.Xen: format_version */

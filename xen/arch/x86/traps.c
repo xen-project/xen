@@ -723,6 +723,8 @@ static void pv_cpuid(struct cpu_user_regs *regs)
     {
         /* Modify Feature Information. */
         __clear_bit(X86_FEATURE_VME, &d);
+        if ( !cpu_has_apic )
+            __clear_bit(X86_FEATURE_APIC, &d);
         if ( !opt_allow_hugepage )
             __clear_bit(X86_FEATURE_PSE, &d);
         __clear_bit(X86_FEATURE_PGE, &d);
@@ -755,6 +757,8 @@ static void pv_cpuid(struct cpu_user_regs *regs)
         __clear_bit(X86_FEATURE_XTPR % 32, &c);
         __clear_bit(X86_FEATURE_PDCM % 32, &c);
         __clear_bit(X86_FEATURE_DCA % 32, &c);
+        if ( !cpu_has_apic )
+           __clear_bit(X86_FEATURE_X2APIC % 32, &c);
         __set_bit(X86_FEATURE_HYPERVISOR % 32, &c);
         break;
     case 0x80000001:
@@ -773,6 +777,8 @@ static void pv_cpuid(struct cpu_user_regs *regs)
         __clear_bit(X86_FEATURE_RDTSCP % 32, &d);
 
         __clear_bit(X86_FEATURE_SVME % 32, &c);
+        if ( !cpu_has_apic )
+           __clear_bit(X86_FEATURE_EXTAPICSPACE % 32, &c);
         __clear_bit(X86_FEATURE_OSVW % 32, &c);
         __clear_bit(X86_FEATURE_IBS % 32, &c);
         __clear_bit(X86_FEATURE_SKINIT % 32, &c);
@@ -1626,6 +1632,12 @@ void (*pv_post_outb_hook)(unsigned int port, u8 value);
 # define read_sreg(regs, sr) read_segment_register(sr)
 #endif
 
+static int is_cpufreq_controller(struct domain *d)
+{
+    return ((cpufreq_controller == FREQCTL_dom0_kernel) &&
+            (d->domain_id == 0));
+}
+
 static int emulate_privileged_op(struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
@@ -2137,7 +2149,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         case MSR_K8_PSTATE7:
             if ( boot_cpu_data.x86_vendor != X86_VENDOR_AMD )
                 goto fail;
-            if ( cpufreq_controller != FREQCTL_dom0_kernel )
+            if ( !is_cpufreq_controller(v->domain) )
                 break;
             if ( wrmsr_safe(regs->ecx, eax, edx) != 0 )
                 goto fail;
@@ -2172,17 +2184,14 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             if ( wrmsr_safe(MSR_FAM10H_MMIO_CONF_BASE, eax, edx) != 0 )
                 goto fail;
             break;
+        case MSR_IA32_MPERF:
+        case MSR_IA32_APERF:
         case MSR_IA32_PERF_CTL:
-            if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL )
-                goto fail;
-            if ( cpufreq_controller != FREQCTL_dom0_kernel )
-                break;
-            if ( wrmsr_safe(regs->ecx, eax, edx) != 0 )
-                goto fail;
-            break;
         case MSR_IA32_THERM_CONTROL:
             if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL )
                 goto fail;
+            if ( !is_cpufreq_controller(v->domain) )
+                break;
             if ( wrmsr_safe(regs->ecx, eax, edx) != 0 )
                 goto fail;
             break;
@@ -2241,7 +2250,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         case MSR_K8_PSTATE7:
             if ( boot_cpu_data.x86_vendor != X86_VENDOR_AMD )
                 goto fail;
-            if ( cpufreq_controller != FREQCTL_dom0_kernel )
+            if ( !is_cpufreq_controller(v->domain) )
             {
                 regs->eax = regs->edx = 0;
                 break;
@@ -2259,7 +2268,6 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                          MSR_IA32_MISC_ENABLE_XTPR_DISABLE;
             break;
         case MSR_EFER:
-        case MSR_IA32_THERM_CONTROL:
         case MSR_AMD_PATCHLEVEL:
         default:
             if ( rdmsr_hypervisor_regs(regs->ecx, &l, &h) )

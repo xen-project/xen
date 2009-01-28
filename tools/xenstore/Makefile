@@ -8,10 +8,6 @@ CFLAGS += -Werror
 CFLAGS += -I.
 CFLAGS += $(CFLAGS_libxenctrl)
 
-# Make gcc generate dependencies.
-CFLAGS += -Wp,-MD,.$(@F).d
-DEP    = .*.d
-
 CLIENTS := xenstore-exists xenstore-list xenstore-read xenstore-rm xenstore-chmod
 CLIENTS += xenstore-write xenstore-ls
 
@@ -82,7 +78,7 @@ clean:
 	rm -f xenstored xs_random xs_stress xs_crashme
 	rm -f xs_tdb_dump xenstore-control
 	rm -f xenstore $(CLIENTS)
-	$(RM) $(DEP)
+	$(RM) $(DEPS)
 
 .PHONY: TAGS
 TAGS:
@@ -113,7 +109,7 @@ install: all
 	$(INSTALL_DATA) xs.h $(DESTDIR)$(INCLUDEDIR)
 	$(INSTALL_DATA) xs_lib.h $(DESTDIR)$(INCLUDEDIR)
 
--include $(DEP)
+-include $(DEPS)
 
 # never delete any intermediate files.
 .SECONDARY:
