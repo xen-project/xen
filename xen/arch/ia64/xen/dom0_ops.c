@@ -649,6 +649,39 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     }
     break;
 
+    case XEN_DOMCTL_set_address_size:
+    {
+        struct domain *d = rcu_lock_domain_by_id(op->domain);
+
+        ret = -ESRCH;
+        if (d == NULL)
+            break;
+
+        ret = -EINVAL;
+        if (op->u.address_size.size == BITS_PER_LONG)
+            ret = 0;
+
+        rcu_unlock_domain(d);
+    }
+    break;
+
+    case XEN_DOMCTL_get_address_size:
+    {
+        struct domain *d = rcu_lock_domain_by_id(op->domain);
+
+        ret = -ESRCH;
+        if (d  == NULL)
+            break;
+
+        ret = 0;
+        op->u.address_size.size = BITS_PER_LONG;
+        rcu_unlock_domain(d);
+
+        if (copy_to_guest(u_domctl, op, 1))
+            ret = -EFAULT;
+    }
+    break;
+
     default:
         printk("arch_do_domctl: unrecognized domctl: %d!!!\n",op->cmd);
         ret = -ENOSYS;
