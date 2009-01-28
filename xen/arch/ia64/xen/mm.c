@@ -3076,7 +3076,7 @@ void *pgtable_quicklist_alloc(void)
         clear_page(p);
         return p;
     }
-    p = alloc_xenheap_pages(0);
+    p = alloc_xenheap_page();
     if (p) {
         clear_page(p);
         /*

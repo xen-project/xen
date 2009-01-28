@@ -138,7 +138,7 @@ static int construct_vmcb(struct vcpu *v)
                             CR_INTERCEPT_CR8_WRITE);
 
     /* I/O and MSR permission bitmaps. */
-    arch_svm->msrpm = alloc_xenheap_pages(get_order_from_bytes(MSRPM_SIZE));
+    arch_svm->msrpm = alloc_xenheap_pages(get_order_from_bytes(MSRPM_SIZE), 0);
     if ( arch_svm->msrpm == NULL )
         return -ENOMEM;
     memset(arch_svm->msrpm, 0xff, MSRPM_SIZE);

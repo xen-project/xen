@@ -804,7 +804,7 @@ static inline int alloc_cpu_id(void)
 static void *prepare_idle_stack(unsigned int cpu)
 {
 	if (!stack_base[cpu])
-		stack_base[cpu] = alloc_xenheap_pages(STACK_ORDER);
+		stack_base[cpu] = alloc_xenheap_pages(STACK_ORDER, 0);
 
 	return stack_base[cpu];
 }
@@ -867,7 +867,7 @@ static int __devinit do_boot_cpu(int apicid, int cpu)
 					   MEMF_node(cpu_to_node(cpu)));
 		per_cpu(gdt_table, cpu) = gdt = page_to_virt(page);
 #else
-		per_cpu(gdt_table, cpu) = gdt = alloc_xenheap_pages(order);
+		per_cpu(gdt_table, cpu) = gdt = alloc_xenheap_pages(order, 0);
 #endif
 		memcpy(gdt, boot_cpu_gdt_table,
 		       NR_RESERVED_GDT_PAGES * PAGE_SIZE);

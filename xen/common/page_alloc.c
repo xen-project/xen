@@ -655,7 +655,7 @@ void init_xenheap_pages(paddr_t ps, paddr_t pe)
 }
 
 
-void *alloc_xenheap_pages(unsigned int order)
+void *alloc_xenheap_pages(unsigned int order, unsigned int memflags)
 {
     struct page_info *pg;
 
@@ -664,15 +664,11 @@ void *alloc_xenheap_pages(unsigned int order)
     pg = alloc_heap_pages(
         MEMZONE_XEN, MEMZONE_XEN, cpu_to_node(smp_processor_id()), order);
     if ( unlikely(pg == NULL) )
-        goto no_memory;
+        return NULL;
 
     memguard_unguard_range(page_to_virt(pg), 1 << (order + PAGE_SHIFT));
 
     return page_to_virt(pg);
-
- no_memory:
-    printk("Cannot handle page request order %d!\n", order);
-    return NULL;
 }
 
 
@@ -695,26 +691,21 @@ void init_xenheap_pages(paddr_t ps, paddr_t pe)
     init_domheap_pages(ps, pe);
 }
 
-void *alloc_xenheap_pages(unsigned int order)
+void *alloc_xenheap_pages(unsigned int order, unsigned int memflags)
 {
     struct page_info *pg;
     unsigned int i;
 
     ASSERT(!in_irq());
 
-    pg = alloc_heap_pages(
-        MEMZONE_XEN+1, NR_ZONES-1, cpu_to_node(smp_processor_id()), order);
+    pg = alloc_domheap_pages(NULL, order, memflags);
     if ( unlikely(pg == NULL) )
-        goto no_memory;
+        return NULL;
 
     for ( i = 0; i < (1u << order); i++ )
         pg[i].count_info |= PGC_xen_heap;
 
     return page_to_virt(pg);
-
- no_memory:
-    printk("Cannot handle page request order %d!\n", order);
-    return NULL;
 }
 
 void free_xenheap_pages(void *v, unsigned int order)

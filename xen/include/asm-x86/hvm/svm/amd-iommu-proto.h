@@ -140,7 +140,7 @@ static inline void free_amd_iommu_pgtable(struct page_info *pg)
 static inline void* __alloc_amd_iommu_tables(int order)
 {
     void *buf;
-    buf = alloc_xenheap_pages(order);
+    buf = alloc_xenheap_pages(order, 0);
     return buf;
 }
 

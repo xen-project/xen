@@ -110,7 +110,7 @@ static  __init int perform_gunzip(char *output, char **_image_start, unsigned lo
 
     window = (unsigned char *)output;
 
-    free_mem_ptr = (unsigned long)alloc_xenheap_pages(HEAPORDER);
+    free_mem_ptr = (unsigned long)alloc_xenheap_pages(HEAPORDER, 0);
     free_mem_end_ptr = free_mem_ptr + (PAGE_SIZE << HEAPORDER);
 
     inbuf = (unsigned char *)image;

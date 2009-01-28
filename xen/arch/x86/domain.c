@@ -357,7 +357,7 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
     INIT_LIST_HEAD(&d->arch.relmem_list);
 
     pdpt_order = get_order_from_bytes(PDPT_L1_ENTRIES * sizeof(l1_pgentry_t));
-    d->arch.mm_perdomain_pt = alloc_xenheap_pages(pdpt_order);
+    d->arch.mm_perdomain_pt = alloc_xenheap_pages(pdpt_order, 0);
     if ( d->arch.mm_perdomain_pt == NULL )
         goto fail;
     memset(d->arch.mm_perdomain_pt, 0, PAGE_SIZE << pdpt_order);
@@ -405,17 +405,12 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
         if ( d->arch.ioport_caps == NULL )
             goto fail;
 
-#ifdef __i386__
-        if ( (d->shared_info = alloc_xenheap_page()) == NULL )
+        /*
+         * The shared_info machine address must fit in a 32-bit field within a
+         * 32-bit guest's start_info structure. Hence we specify MEMF_bits(32).
+         */
+        if ( (d->shared_info = alloc_xenheap_pages(0, MEMF_bits(32))) == NULL )
             goto fail;
-#else
-        pg = alloc_domheap_page(
-            NULL, MEMF_node(domain_to_node(d)) | MEMF_bits(32));
-        if ( pg == NULL )
-            goto fail;
-        pg->count_info |= PGC_xen_heap;
-        d->shared_info = page_to_virt(pg);
-#endif
 
         clear_page(d->shared_info);
         share_xen_page_with_guest(

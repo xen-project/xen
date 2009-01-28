@@ -64,7 +64,7 @@ paging_init (void)
 	mpt_table_size = max_page * sizeof(unsigned long);
 	mpt_order = get_order(mpt_table_size);
 	ASSERT(mpt_order <= MAX_ORDER);
-	if ((mpt_table = alloc_xenheap_pages(mpt_order)) == NULL)
+	if ((mpt_table = alloc_xenheap_pages(mpt_order, 0)) == NULL)
 		panic("Not enough memory to bootstrap Xen.\n");
 
 	printk("machine to physical table: 0x%lx mpt_table_size 0x%lx\n"
