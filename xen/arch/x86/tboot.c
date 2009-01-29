@@ -30,23 +30,24 @@ void __init tboot_probe(void)
     /* Map and check for tboot UUID. */
     set_fixmap(FIX_TBOOT_SHARED_BASE, p_tboot_shared);
     tboot_shared = (tboot_shared_t *)fix_to_virt(FIX_TBOOT_SHARED_BASE);
+    if ( tboot_shared == NULL )
+        return;
     if ( memcmp(&tboot_shared_uuid, (uuid_t *)tboot_shared, sizeof(uuid_t)) )
         return;
+
+    /* new tboot_shared (w/ GAS support) is not backwards compatible */
+    if ( tboot_shared->version < 3 ) {
+        printk("unsupported version of tboot (%u)\n", tboot_shared->version);
+        return;
+    }
 
     g_tboot_shared = tboot_shared;
     printk("TBOOT: found shared page at phys addr %lx:\n", p_tboot_shared);
     printk("  version: %d\n", tboot_shared->version);
     printk("  log_addr: 0x%08x\n", tboot_shared->log_addr);
     printk("  shutdown_entry: 0x%08x\n", tboot_shared->shutdown_entry);
-    printk("  shutdown_type: %d\n", tboot_shared->shutdown_type);
-    printk("  s3_tb_wakeup_entry: 0x%08x\n", tboot_shared->s3_tb_wakeup_entry);
-    printk("  s3_k_wakeup_entry: 0x%08x\n", tboot_shared->s3_k_wakeup_entry);
-    printk("  &acpi_sinfo: 0x%p\n", &tboot_shared->acpi_sinfo);
-    if ( tboot_shared->version >= 0x02 )
-    {
-        printk("  tboot_base: 0x%08x\n", tboot_shared->tboot_base);
-        printk("  tboot_size: 0x%x\n", tboot_shared->tboot_size);
-    }
+    printk("  tboot_base: 0x%08x\n", tboot_shared->tboot_base);
+    printk("  tboot_size: 0x%x\n", tboot_shared->tboot_size);
 }
 
 void tboot_shutdown(uint32_t shutdown_type)
@@ -59,16 +60,8 @@ void tboot_shutdown(uint32_t shutdown_type)
     local_irq_disable();
 
     /* Create identity map for tboot shutdown code. */
-    if ( g_tboot_shared->version >= 0x02 )
-    {
-        map_base = PFN_DOWN(g_tboot_shared->tboot_base);
-        map_size = PFN_UP(g_tboot_shared->tboot_size);
-    }
-    else
-    {
-        map_base = 0;
-        map_size = PFN_UP(0xa0000);
-    }
+    map_base = PFN_DOWN(g_tboot_shared->tboot_base);
+    map_size = PFN_UP(g_tboot_shared->tboot_size);
 
     err = map_pages_to_xen(map_base << PAGE_SHIFT, map_base, map_size,
                            __PAGE_HYPERVISOR);

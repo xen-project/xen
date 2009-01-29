@@ -129,20 +129,15 @@ static void acpi_sleep_prepare(u32 state)
 
     wakeup_vector_va = __acpi_map_table(
         acpi_sinfo.wakeup_vector, sizeof(uint64_t));
+
+    /* TBoot will set resume vector itself (when it is safe to do so). */
+    if ( tboot_in_measured_env() )
+        return;
+
     if ( acpi_sinfo.vector_width == 32 )
-    {
-            *(uint32_t *)wakeup_vector_va =
-                tboot_in_measured_env() ?
-                (uint32_t)g_tboot_shared->s3_tb_wakeup_entry :
-                (uint32_t)bootsym_phys(wakeup_start);
-    }
+        *(uint32_t *)wakeup_vector_va = bootsym_phys(wakeup_start);
     else
-    {
-            *(uint64_t *)wakeup_vector_va =
-                tboot_in_measured_env() ?
-                (uint64_t)g_tboot_shared->s3_tb_wakeup_entry :
-                (uint64_t)bootsym_phys(wakeup_start);
-    }
+        *(uint64_t *)wakeup_vector_va = bootsym_phys(wakeup_start);
 }
 
 static void acpi_sleep_post(u32 state) {}
@@ -279,37 +274,47 @@ static int acpi_get_wake_status(void)
 
 static void tboot_sleep(u8 sleep_state)
 {
-   uint32_t shutdown_type;
+    uint32_t shutdown_type;
 
-   g_tboot_shared->acpi_sinfo.pm1a_cnt =
-                           (uint16_t)acpi_sinfo.pm1a_cnt_blk.address;
-   g_tboot_shared->acpi_sinfo.pm1b_cnt =
-                           (uint16_t)acpi_sinfo.pm1b_cnt_blk.address;
-   g_tboot_shared->acpi_sinfo.pm1a_evt =
-                           (uint16_t)acpi_sinfo.pm1a_evt_blk.address;
-   g_tboot_shared->acpi_sinfo.pm1b_evt =
-                           (uint16_t)acpi_sinfo.pm1b_evt_blk.address;
-   g_tboot_shared->acpi_sinfo.pm1a_cnt_val = acpi_sinfo.pm1a_cnt_val;
-   g_tboot_shared->acpi_sinfo.pm1b_cnt_val = acpi_sinfo.pm1b_cnt_val;
+#define TB_COPY_GAS(tbg, g)             \
+    tbg.space_id = g.space_id;          \
+    tbg.bit_width = g.bit_width;        \
+    tbg.bit_offset = g.bit_offset;      \
+    tbg.access_width = g.access_width;  \
+    tbg.address = g.address;
 
-   switch ( sleep_state )
-   {
-       case ACPI_STATE_S3:
-           shutdown_type = TB_SHUTDOWN_S3;
-           g_tboot_shared->s3_k_wakeup_entry =
-               (uint32_t)bootsym_phys(wakeup_start);
-           break;
-       case ACPI_STATE_S4:
-           shutdown_type = TB_SHUTDOWN_S4;
-           break;
-       case ACPI_STATE_S5:
-           shutdown_type = TB_SHUTDOWN_S5;
-           break;
-       default:
-           return;
-   }
+    /* sizes are not same (due to packing) so copy each one */
+    TB_COPY_GAS(g_tboot_shared->acpi_sinfo.pm1a_cnt_blk,
+                acpi_sinfo.pm1a_cnt_blk);
+    TB_COPY_GAS(g_tboot_shared->acpi_sinfo.pm1b_cnt_blk,
+                acpi_sinfo.pm1b_cnt_blk);
+    TB_COPY_GAS(g_tboot_shared->acpi_sinfo.pm1a_evt_blk,
+                acpi_sinfo.pm1a_evt_blk);
+    TB_COPY_GAS(g_tboot_shared->acpi_sinfo.pm1b_evt_blk,
+                acpi_sinfo.pm1b_evt_blk);
+    g_tboot_shared->acpi_sinfo.pm1a_cnt_val = acpi_sinfo.pm1a_cnt_val;
+    g_tboot_shared->acpi_sinfo.pm1b_cnt_val = acpi_sinfo.pm1b_cnt_val;
+    g_tboot_shared->acpi_sinfo.wakeup_vector = acpi_sinfo.wakeup_vector;
+    g_tboot_shared->acpi_sinfo.vector_width = acpi_sinfo.vector_width;
+    g_tboot_shared->acpi_sinfo.kernel_s3_resume_vector =
+                                              bootsym_phys(wakeup_start);
 
-   tboot_shutdown(shutdown_type);
+    switch ( sleep_state )
+    {
+        case ACPI_STATE_S3:
+            shutdown_type = TB_SHUTDOWN_S3;
+            break;
+        case ACPI_STATE_S4:
+            shutdown_type = TB_SHUTDOWN_S4;
+            break;
+        case ACPI_STATE_S5:
+            shutdown_type = TB_SHUTDOWN_S5;
+            break;
+        default:
+            return;
+    }
+
+    tboot_shutdown(shutdown_type);
 }
          
 /* System is really put into sleep state by this stub */
