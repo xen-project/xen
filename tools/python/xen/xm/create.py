@@ -635,6 +635,8 @@ def configure_image(vals):
     if vals.root:
         cmdline_root = strip('root=', vals.root)
         config_image.append(['root', cmdline_root])
+    if vals.videoram:
+        config_image.append(['videoram', vals.videoram])
     if vals.extra:
         config_image.append(['args', vals.extra])
 
@@ -884,7 +886,7 @@ def configure_hvm(config_image, vals):
     """Create the config for HVM devices.
     """
     args = [ 'device_model', 'pae', 'vcpus', 'boot', 'fda', 'fdb', 'timer_mode',
-             'localtime', 'serial', 'stdvga', 'videoram', 'isa', 'nographic', 'soundhw',
+             'localtime', 'serial', 'stdvga', 'isa', 'nographic', 'soundhw',
              'vnc', 'vncdisplay', 'vncunused', 'vncconsole', 'vnclisten',
              'sdl', 'display', 'xauthority', 'rtc_timeoffset', 'monitor',
              'acpi', 'apic', 'usb', 'usbdevice', 'keymap', 'pci', 'hpet',

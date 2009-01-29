@@ -633,6 +633,8 @@ class LinuxImageHandler(ImageHandler):
 
     def configure(self, vmConfig):
         ImageHandler.configure(self, vmConfig)
+        self.vramsize = int(vmConfig['platform'].get('videoram',4)) * 1024
+        self.is_stubdom = (self.kernel.find('stubdom') >= 0)
 
     def buildDomain(self):
         store_evtchn = self.vm.getStorePort()
@@ -663,6 +665,17 @@ class LinuxImageHandler(ImageHandler):
                               features       = self.vm.getFeatures(),
                               flags          = self.flags,
                               vhpt           = self.vhpt)
+
+    def getRequiredAvailableMemory(self, mem_kb):
+        if self.is_stubdom :
+            mem_kb += self.vramsize
+        return mem_kb
+
+    def getRequiredInitialReservation(self):
+        return self.vm.getMemoryTarget()
+
+    def getRequiredMaximumReservation(self):
+        return self.vm.getMemoryMaximum()
 
     def parseDeviceModelArgs(self, vmConfig):
         ret = ImageHandler.parseDeviceModelArgs(self, vmConfig)
