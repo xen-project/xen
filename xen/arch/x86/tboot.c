@@ -37,8 +37,7 @@ void __init tboot_probe(void)
     printk("TBOOT: found shared page at phys addr %lx:\n", p_tboot_shared);
     printk("  version: %d\n", tboot_shared->version);
     printk("  log_addr: 0x%08x\n", tboot_shared->log_addr);
-    printk("  shutdown_entry32: 0x%08x\n", tboot_shared->shutdown_entry32);
-    printk("  shutdown_entry64: 0x%08x\n", tboot_shared->shutdown_entry64);
+    printk("  shutdown_entry: 0x%08x\n", tboot_shared->shutdown_entry);
     printk("  shutdown_type: %d\n", tboot_shared->shutdown_type);
     printk("  s3_tb_wakeup_entry: 0x%08x\n", tboot_shared->s3_tb_wakeup_entry);
     printk("  s3_k_wakeup_entry: 0x%08x\n", tboot_shared->s3_k_wakeup_entry);
@@ -82,11 +81,7 @@ void tboot_shutdown(uint32_t shutdown_type)
 
     write_ptbase(idle_vcpu[0]);
 
-#ifdef __x86_64__
-    asm volatile ( "call *%%rdi" :: "D" (g_tboot_shared->shutdown_entry64) );
-#else
-    asm volatile ( "call *%0" :: "r" (g_tboot_shared->shutdown_entry32) );
-#endif
+    ((void(*)(void))(unsigned long)g_tboot_shared->shutdown_entry)();
 
     BUG(); /* should not reach here */
 }
