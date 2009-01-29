@@ -18,6 +18,7 @@
 
 import re
 import string
+import os
 
 from xen.util import blkif
 import xen.util.xsm.xsm as security
@@ -34,6 +35,13 @@ class BlkifController(DevController):
         """Create a block device controller.
         """
         DevController.__init__(self, vm)
+
+    def _isValidProtocol(self, protocol):
+        if protocol in ('phy', 'file', 'tap'):
+            return True
+
+        return os.access('/etc/xen/scripts/block-%s' % protocol, os.X_OK)
+
 
     def getDeviceDetails(self, config):
         """@see DevController.getDeviceDetails"""
@@ -56,10 +64,8 @@ class BlkifController(DevController):
         else:
             try:
                 (typ, params) = string.split(uname, ':', 1)
-                if typ not in ('phy', 'file', 'tap'):
-                    raise VmError(
-                        'Block device must have "phy", "file" or "tap" '
-                        'specified to type')
+                if not self._isValidProtocol(typ):
+                    raise VmError('Block device type "%s" is invalid.' % typ)
             except ValueError:
                 raise VmError(
                     'Block device must have physical details specified')
