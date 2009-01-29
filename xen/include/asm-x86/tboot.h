@@ -109,6 +109,7 @@ extern tboot_shared_t *g_tboot_shared;
 void tboot_probe(void);
 void tboot_shutdown(uint32_t shutdown_type);
 int tboot_in_measured_env(void);
+int tboot_protect_mem_regions(void);
 
 #endif /* __TBOOT_H__ */
 

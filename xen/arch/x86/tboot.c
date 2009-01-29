@@ -6,6 +6,7 @@
 #include <asm/fixmap.h>
 #include <asm/page.h>
 #include <asm/processor.h>
+#include <asm/e820.h>
 #include <asm/tboot.h>
 
 /* tboot=<physical address of shared page> */
@@ -16,6 +17,23 @@ string_param("tboot", opt_tboot);
 tboot_shared_t *g_tboot_shared;
 
 static const uuid_t tboot_shared_uuid = TBOOT_SHARED_UUID;
+
+/*
+ * TXT configuration registers (offsets from TXT_{PUB, PRIV}_CONFIG_REGS_BASE)
+ */
+
+#define TXT_PUB_CONFIG_REGS_BASE       0xfed30000
+#define TXT_PRIV_CONFIG_REGS_BASE      0xfed20000
+
+/* # pages for each config regs space - used by fixmap */
+#define NR_TXT_CONFIG_PAGES     ((TXT_PUB_CONFIG_REGS_BASE -                \
+                                  TXT_PRIV_CONFIG_REGS_BASE) >> PAGE_SHIFT)
+
+/* offsets from pub/priv config space */
+#define TXTCR_SINIT_BASE            0x0270
+#define TXTCR_SINIT_SIZE            0x0278
+#define TXTCR_HEAP_BASE             0x0300
+#define TXTCR_HEAP_SIZE             0x0308
 
 extern char __init_begin[], __per_cpu_start[], __per_cpu_end[], __bss_start[];
 
@@ -103,6 +121,53 @@ void tboot_shutdown(uint32_t shutdown_type)
 int tboot_in_measured_env(void)
 {
     return (g_tboot_shared != NULL);
+}
+
+int __init tboot_protect_mem_regions(void)
+{
+    uint64_t base, size;
+    uint32_t map_base, map_size;
+    unsigned long map_addr;
+    int rc;
+
+    if ( !tboot_in_measured_env() )
+        return 1;
+
+    map_base = PFN_DOWN(TXT_PUB_CONFIG_REGS_BASE);
+    map_size = PFN_UP(NR_TXT_CONFIG_PAGES * PAGE_SIZE);
+    map_addr = (unsigned long)__va(map_base << PAGE_SHIFT);
+    if ( map_pages_to_xen(map_addr, map_base, map_size, __PAGE_HYPERVISOR) )
+        return 0;
+
+    /* TXT Heap */
+    base = *(uint64_t *)__va(TXT_PUB_CONFIG_REGS_BASE + TXTCR_HEAP_BASE);
+    size = *(uint64_t *)__va(TXT_PUB_CONFIG_REGS_BASE + TXTCR_HEAP_SIZE);
+    rc = e820_change_range_type(
+        &e820, base, base + size, E820_RESERVED, E820_UNUSABLE);
+    if ( !rc )
+        return 0;
+
+    /* SINIT */
+    base = *(uint64_t *)__va(TXT_PUB_CONFIG_REGS_BASE + TXTCR_SINIT_BASE);
+    size = *(uint64_t *)__va(TXT_PUB_CONFIG_REGS_BASE + TXTCR_SINIT_SIZE);
+    rc = e820_change_range_type(
+        &e820, base, base + size, E820_RESERVED, E820_UNUSABLE);
+    if ( !rc )
+        return 0;
+
+    /* TXT Private Space */
+    rc = e820_change_range_type(
+        &e820, TXT_PRIV_CONFIG_REGS_BASE,
+        TXT_PRIV_CONFIG_REGS_BASE + NR_TXT_CONFIG_PAGES * PAGE_SIZE,
+        E820_RESERVED, E820_UNUSABLE);
+    if ( !rc )
+        return 0;
+
+    destroy_xen_mappings(
+        (unsigned long)__va(map_base << PAGE_SHIFT),
+        (unsigned long)__va((map_base + map_size) << PAGE_SHIFT));
+
+    return 1;
 }
 
 /*
