@@ -37,6 +37,8 @@
 #ifndef __TBOOT_H__
 #define __TBOOT_H__
 
+#include <xen/acpi.h>
+
 #ifndef __packed
 #define __packed   __attribute__ ((packed))
 #endif
@@ -110,6 +112,7 @@ void tboot_probe(void);
 void tboot_shutdown(uint32_t shutdown_type);
 int tboot_in_measured_env(void);
 int tboot_protect_mem_regions(void);
+int tboot_parse_dmar_table(acpi_table_handler dmar_handler);
 
 #endif /* __TBOOT_H__ */
 
