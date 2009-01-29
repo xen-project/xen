@@ -793,7 +793,8 @@ p2m_pod_zero_check_superpage(struct domain *d, unsigned long gfn)
      * being allocated to the domain. */
     for ( i=0; i < (1<<9); i++ )
     {
-        if ( (mfn_to_page(mfn0+i)->count_info & PGC_count_mask) > 1 )
+        mfn = _mfn(mfn_x(mfn0) + i);
+        if ( (mfn_to_page(mfn)->count_info & PGC_count_mask) > 1 )
         {
             reset = 1;
             goto out_reset;
