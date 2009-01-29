@@ -185,7 +185,7 @@ static __init int bzimage_check(struct setup_header *hdr, unsigned long len)
     if ( hdr->version < VERSION(2,8) ) {
         printk("Cannot load bzImage v%d.%02d at least v2.08 is required\n",
            hdr->version >> 8, hdr->version & 0xff);
-        return 0;
+        return -EINVAL;
     }
     return 1;
 }
@@ -198,7 +198,7 @@ int __init bzimage_headroom(char *image_start, unsigned long image_length)
 
     err = bzimage_check(hdr, image_length);
     if (err < 1)
-        return err;
+        return 0;
 
     img = image_start + (hdr->setup_sects+1) * 512;
     img += hdr->payload_offset;
