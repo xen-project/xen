@@ -51,6 +51,12 @@ typedef struct __packed {
 
 /* used to communicate between tboot and the launched kernel (i.e. Xen) */
 
+#define MAX_TB_MAC_REGIONS      32
+typedef struct __packed {
+    uint64_t  start;
+    uint64_t  end;
+} tboot_mac_region_t;
+
 /* GAS - Generic Address Structure (ACPI 2.0+) */
 typedef struct __packed {
 	uint8_t  space_id;
@@ -83,6 +89,9 @@ typedef struct __packed {
               acpi_sinfo;        /* where kernel put acpi sleep info in Sx */
     uint32_t  tboot_base;        /* starting addr for tboot */
     uint32_t  tboot_size;        /* size of tboot */
+    uint8_t   num_mac_regions;   /* number mem regions to MAC on S3 */
+                                 /* contig regions memory to MAC on S3 */
+    tboot_mac_region_t mac_regions[MAX_TB_MAC_REGIONS];
 } tboot_shared_t;
 
 #define TB_SHUTDOWN_REBOOT      0

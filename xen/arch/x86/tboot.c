@@ -17,6 +17,8 @@ tboot_shared_t *g_tboot_shared;
 
 static const uuid_t tboot_shared_uuid = TBOOT_SHARED_UUID;
 
+extern char __init_begin[], __per_cpu_start[], __per_cpu_end[], __bss_start[];
+
 void __init tboot_probe(void)
 {
     tboot_shared_t *tboot_shared;
@@ -58,6 +60,25 @@ void tboot_shutdown(uint32_t shutdown_type)
     g_tboot_shared->shutdown_type = shutdown_type;
 
     local_irq_disable();
+
+    /* if this is S3 then set regions to MAC */
+    if ( shutdown_type == TB_SHUTDOWN_S3 ) {
+        g_tboot_shared->num_mac_regions = 4;
+        /* S3 resume code (and other real mode trampoline code) */
+        g_tboot_shared->mac_regions[0].start =
+            (uint64_t)bootsym_phys(trampoline_start);
+        g_tboot_shared->mac_regions[0].end =
+            (uint64_t)bootsym_phys(trampoline_end);
+        /* hypervisor code + data */
+        g_tboot_shared->mac_regions[1].start = (uint64_t)__pa(&_stext);
+        g_tboot_shared->mac_regions[1].end = (uint64_t)__pa(&__init_begin);
+        /* per-cpu data */
+        g_tboot_shared->mac_regions[2].start = (uint64_t)__pa(&__per_cpu_start);
+        g_tboot_shared->mac_regions[2].end = (uint64_t)__pa(&__per_cpu_end);
+        /* bss */
+        g_tboot_shared->mac_regions[3].start = (uint64_t)__pa(&__bss_start);
+        g_tboot_shared->mac_regions[3].end = (uint64_t)__pa(&_end);
+    }
 
     /* Create identity map for tboot shutdown code. */
     map_base = PFN_DOWN(g_tboot_shared->tboot_base);
