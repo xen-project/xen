@@ -185,7 +185,7 @@ static __init int bzimage_check(struct setup_header *hdr, unsigned long len)
     if ( hdr->version < VERSION(2,8) ) {
         printk("Cannot load bzImage v%d.%02d at least v2.08 is required\n",
            hdr->version >> 8, hdr->version & 0xff);
-        return -EINVAL;
+        return 0;
     }
     return 1;
 }
