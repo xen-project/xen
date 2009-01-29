@@ -111,33 +111,6 @@ static unsigned inline int max_nr_maptrack_frames(void)
 #define active_entry(t, e) \
     ((t)->active[(e)/ACGNT_PER_PAGE][(e)%ACGNT_PER_PAGE])
 
-/* The p2m emergency sweep code should not reclaim a frame that is currenlty
- * grant mapped by another domain.  That would involve checking all other
- * domains grant maps, which is impractical.  Instead, we check the active
- * grant table for this domain to see if it's been granted.  Since this
- * may be called as a result of a grant table op, we can't grab the lock. */
-int
-gnttab_is_granted(struct domain *d, xen_pfn_t gfn, int order)
-{
-    int i, found=0;
-    struct active_grant_entry *act;
-
-    /* We need to compare with active grant entries to make sure that
-     * pinned (== currently mapped) entries don't disappear under our
-     * feet. */
-    for ( i=0; i<nr_grant_entries(d->grant_table); i++ )
-    {
-        act = &active_entry(d->grant_table, i);
-        if ( act->gfn >> order == gfn >> order )
-        {
-            found = 1;
-            break;
-        }
-    }
-
-    return found;
-}
-
 static inline int
 __get_maptrack_handle(
     struct grant_table *t)

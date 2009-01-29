@@ -723,9 +723,14 @@ p2m_pod_zero_check_superpage(struct domain *d, unsigned long gfn)
     unsigned long * map = NULL;
     int ret=0, reset = 0;
     int i, j;
+    int max_ref = 1;
 
     if ( !superpage_aligned(gfn) )
         goto out;
+
+    /* Allow an extra refcount for one shadow pt mapping in shadowed domains */
+    if ( paging_mode_shadow(d) )
+        max_ref++;
 
     /* Look up the mfns, checking to make sure they're the same mfn
      * and aligned, and mapping them. */
@@ -743,13 +748,19 @@ p2m_pod_zero_check_superpage(struct domain *d, unsigned long gfn)
         /* Conditions that must be met for superpage-superpage:
          * + All gfns are ram types
          * + All gfns have the same type
+         * + All of the mfns are allocated to a domain
          * + None of the mfns are used as pagetables
          * + The first mfn is 2-meg aligned
          * + All the other mfns are in sequence
+         * Adding for good measure:
+         * + None of the mfns are likely to be mapped elsewhere (refcount
+         *   2 or less for shadow, 1 for hap)
          */
         if ( !p2m_is_ram(type)
              || type != type0
+             || ( (mfn_to_page(mfn)->count_info & PGC_allocated) == 0 )
              || ( (mfn_to_page(mfn)->count_info & PGC_page_table) != 0 )
+             || ( (mfn_to_page(mfn)->count_info & PGC_count_mask) > max_ref )
              || !( ( i == 0 && superpage_aligned(mfn_x(mfn0)) )
                    || ( i != 0 && mfn_x(mfn) == (mfn_x(mfn0) + i) ) ) )
             goto out;
@@ -777,26 +788,16 @@ p2m_pod_zero_check_superpage(struct domain *d, unsigned long gfn)
                   _mfn(POPULATE_ON_DEMAND_MFN), 9,
                   p2m_populate_on_demand);
 
-    if ( (mfn_to_page(mfn0)->u.inuse.type_info & PGT_count_mask) != 0 )
+    /* Make none of the MFNs are used elsewhere... for example, mapped
+     * via the grant table interface, or by qemu.  Allow one refcount for
+     * being allocated to the domain. */
+    for ( i=0; i < (1<<9); i++ )
     {
-        reset = 1;
-        goto out_reset;
-    }
-
-    /* Timing here is important.  We need to make sure not to reclaim
-     * a page which has been grant-mapped to another domain.  But we
-     * can't grab the grant table lock, because we may be invoked from
-     * the grant table code!  So we first remove the page from the
-     * p2m, then check to see if the gpfn has been granted.  Once this
-     * gpfn is marked PoD, any future gfn_to_mfn() call will block
-     * waiting for the p2m lock.  If we find that it has been granted, we
-     * simply restore the old value.
-     */
-    if ( gnttab_is_granted(d, gfn, 9) )
-    {
-        printk("gfn contains grant table %lx\n", gfn);
-        reset = 1;
-        goto out_reset;
+        if ( (mfn_to_page(mfn0+i)->count_info & PGC_count_mask) > 1 )
+        {
+            reset = 1;
+            goto out_reset;
+        }
     }
 
     /* Finally, do a full zero-check */
@@ -838,15 +839,22 @@ p2m_pod_zero_check(struct domain *d, unsigned long *gfns, int count)
     unsigned long * map[count];
 
     int i, j;
+    int max_ref = 1;
+
+    /* Allow an extra refcount for one shadow pt mapping in shadowed domains */
+    if ( paging_mode_shadow(d) )
+        max_ref++;
 
     /* First, get the gfn list, translate to mfns, and map the pages. */
     for ( i=0; i<count; i++ )
     {
         mfns[i] = gfn_to_mfn_query(d, gfns[i], types + i);
-        /* If this is ram, and not a pagetable, map it; otherwise,
-         * skip. */
+        /* If this is ram, and not a pagetable, and probably not mapped
+           elsewhere, map it; otherwise, skip. */
         if ( p2m_is_ram(types[i])
-             && ( (mfn_to_page(mfns[i])->count_info & PGC_page_table) == 0 ) )
+             && ( (mfn_to_page(mfns[i])->count_info & PGC_allocated) != 0 ) 
+             && ( (mfn_to_page(mfns[i])->count_info & PGC_page_table) == 0 ) 
+             && ( (mfn_to_page(mfns[i])->count_info & PGC_count_mask) <= max_ref ) )
             map[i] = map_domain_page(mfn_x(mfns[i]));
         else
             map[i] = NULL;
@@ -876,7 +884,9 @@ p2m_pod_zero_check(struct domain *d, unsigned long *gfns, int count)
                       _mfn(POPULATE_ON_DEMAND_MFN), 0,
                       p2m_populate_on_demand);
 
-        if ( (mfn_to_page(mfns[i])->u.inuse.type_info & PGT_count_mask) != 0 )
+        /* See if the page was successfully unmapped.  (Allow one refcount
+         * for being allocated to a domain.) */
+        if ( (mfn_to_page(mfns[i])->count_info & PGC_count_mask) > 1 )
         {
             unmap_domain_page(map[i]);
             map[i] = NULL;
@@ -899,8 +909,7 @@ p2m_pod_zero_check(struct domain *d, unsigned long *gfns, int count)
 
         /* See comment in p2m_pod_zero_check_superpage() re gnttab
          * check timing.  */
-        if ( j < PAGE_SIZE/sizeof(*map[i])
-             || gnttab_is_granted(d, gfns[i], 0) )
+        if ( j < PAGE_SIZE/sizeof(*map[i]) )
         {
             set_p2m_entry(d, gfns[i], mfns[i], 0, types[i]);
             continue;
