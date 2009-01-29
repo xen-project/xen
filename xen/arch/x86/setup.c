@@ -417,7 +417,7 @@ void __init __start_xen(unsigned long mbi_p)
     unsigned int initrdidx = 1;
     multiboot_info_t *mbi = __va(mbi_p);
     module_t *mod = (module_t *)__va(mbi->mods_addr);
-    unsigned long nr_pages, modules_length, modules_headroom;
+    unsigned long nr_pages, modules_length, modules_headroom = -1;
     unsigned long allocator_bitmap_end;
     int i, e820_warn = 0, bytes = 0;
     struct ns16550_defaults ns16550 = {
@@ -617,9 +617,6 @@ void __init __start_xen(unsigned long mbi_p)
      * x86/64, we relocate Xen to higher memory.
      */
     modules_length = mod[mbi->mods_count-1].mod_end - mod[0].mod_start;
-    modules_headroom = bzimage_headroom(
-        (char *)(unsigned long)mod[0].mod_start,
-        (unsigned long)(mod[0].mod_end - mod[0].mod_start));
 
     for ( i = boot_e820.nr_map-1; i >= 0; i-- )
     {
@@ -723,6 +720,11 @@ void __init __start_xen(unsigned long mbi_p)
                 "D" (__va(__pa(cpu0_stack))), "c" (STACK_SIZE) : "memory" );
         }
 #endif
+
+        if ( modules_headroom == -1 )
+            modules_headroom = bzimage_headroom(
+                      (char *)(unsigned long)mod[0].mod_start,
+                      (unsigned long)(mod[0].mod_end - mod[0].mod_start));
 
         /* Is the region suitable for relocating the multiboot modules? */
         if ( !initial_images_start && (s < e) &&
