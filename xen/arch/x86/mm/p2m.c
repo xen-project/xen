@@ -713,14 +713,15 @@ p2m_pod_dump_data(struct domain *d)
 
 #define superpage_aligned(_x)  (((_x)&((1<<9)-1))==0)
 
-/* Must be called w/ p2m lock held, page_alloc lock not held */
+/* Search for all-zero superpages to be reclaimed as superpages for the
+ * PoD cache. Must be called w/ p2m lock held, page_alloc lock not held. */
 static int
 p2m_pod_zero_check_superpage(struct domain *d, unsigned long gfn)
 {
-    mfn_t mfns[1<<9];
-    p2m_type_t types[1<<9];
-    unsigned long * map[1<<9] = { NULL };
-    int ret=0, reset = 0, reset_max = 0;
+    mfn_t mfn, mfn0 = _mfn(INVALID_MFN);
+    p2m_type_t type, type0 = 0;
+    unsigned long * map = NULL;
+    int ret=0, reset = 0;
     int i, j;
 
     if ( !superpage_aligned(gfn) )
@@ -730,7 +731,14 @@ p2m_pod_zero_check_superpage(struct domain *d, unsigned long gfn)
      * and aligned, and mapping them. */
     for ( i=0; i<(1<<9); i++ )
     {
-        mfns[i] = gfn_to_mfn_query(d, gfn + i, types + i);
+        
+        mfn = gfn_to_mfn_query(d, gfn + i, &type);
+
+        if ( i == 0 )
+        {
+            mfn0 = mfn;
+            type0 = type;
+        }
 
         /* Conditions that must be met for superpage-superpage:
          * + All gfns are ram types
@@ -739,36 +747,37 @@ p2m_pod_zero_check_superpage(struct domain *d, unsigned long gfn)
          * + The first mfn is 2-meg aligned
          * + All the other mfns are in sequence
          */
-        if ( p2m_is_ram(types[i])
-             && types[i] == types[0]
-             && ( (mfn_to_page(mfns[i])->count_info & PGC_page_table) == 0 )
-             && ( ( i == 0 && superpage_aligned(mfn_x(mfns[0])) )
-                  || ( i != 0 && mfn_x(mfns[i]) == mfn_x(mfns[0]) + i ) ) )
-            map[i] = map_domain_page(mfn_x(mfns[i]));
-        else
-            goto out_unmap;
+        if ( !p2m_is_ram(type)
+             || type != type0
+             || ( (mfn_to_page(mfn)->count_info & PGC_page_table) != 0 )
+             || !( ( i == 0 && superpage_aligned(mfn_x(mfn0)) )
+                   || ( i != 0 && mfn_x(mfn) == (mfn_x(mfn0) + i) ) ) )
+            goto out;
     }
 
     /* Now, do a quick check to see if it may be zero before unmapping. */
     for ( i=0; i<(1<<9); i++ )
     {
         /* Quick zero-check */
+        map = map_domain_page(mfn_x(mfn0) + i);
+
         for ( j=0; j<16; j++ )
-            if( *(map[i]+j) != 0 )
+            if( *(map+j) != 0 )
                 break;
 
+        unmap_domain_page(map);
+
         if ( j < 16 )
-            goto out_unmap;
+            goto out;
 
     }
 
     /* Try to remove the page, restoring old mapping if it fails. */
-    reset_max = 1<<9;
     set_p2m_entry(d, gfn,
                   _mfn(POPULATE_ON_DEMAND_MFN), 9,
                   p2m_populate_on_demand);
 
-    if ( (mfn_to_page(mfns[0])->u.inuse.type_info & PGT_count_mask) != 0 )
+    if ( (mfn_to_page(mfn0)->u.inuse.type_info & PGT_count_mask) != 0 )
     {
         reset = 1;
         goto out_reset;
@@ -793,12 +802,16 @@ p2m_pod_zero_check_superpage(struct domain *d, unsigned long gfn)
     /* Finally, do a full zero-check */
     for ( i=0; i < (1<<9); i++ )
     {
-        for ( j=0; j<PAGE_SIZE/sizeof(*map[i]); j++ )
-            if( *(map[i]+j) != 0 )
+        map = map_domain_page(mfn_x(mfn0) + i);
+
+        for ( j=0; j<PAGE_SIZE/sizeof(*map); j++ )
+            if( *(map+j) != 0 )
             {
                 reset = 1;
                 break;
             }
+
+        unmap_domain_page(map);
 
         if ( reset )
             goto out_reset;
@@ -806,23 +819,13 @@ p2m_pod_zero_check_superpage(struct domain *d, unsigned long gfn)
 
     /* Finally!  We've passed all the checks, and can add the mfn superpage
      * back on the PoD cache, and account for the new p2m PoD entries */
-    p2m_pod_cache_add(d, mfn_to_page(mfns[0]), 9);
+    p2m_pod_cache_add(d, mfn_to_page(mfn0), 9);
     d->arch.p2m->pod.entry_count += (1<<9);
 
 out_reset:
     if ( reset )
-    {
-        if (reset_max == (1<<9) )
-            set_p2m_entry(d, gfn, mfns[0], 9, types[0]);
-        else
-            for ( i=0; i<reset_max; i++)
-                set_p2m_entry(d, gfn + i, mfns[i], 0, types[i]);
-    }
+        set_p2m_entry(d, gfn, mfn0, 9, type0);
     
-out_unmap:
-    for ( i=0; i<(1<<9); i++ )
-        if ( map[i] )
-            unmap_domain_page(map[i]);
 out:
     return ret;
 }
