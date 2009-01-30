@@ -33,7 +33,7 @@
 #include <asm/sn/simulator.h>
 #include <asm/sal.h>
 
-unsigned long xenheap_phys_end, total_pages;
+unsigned long total_pages;
 
 char saved_command_line[COMMAND_LINE_SIZE];
 char __initdata dom0_command_line[COMMAND_LINE_SIZE];
@@ -72,24 +72,10 @@ integer_param("xencons", opt_xencons);
 static int __initdata opt_xencons_poll;
 boolean_param("xencons_poll", opt_xencons_poll);
 
+#define XENHEAP_DEFAULT_SIZE    KERNEL_TR_PAGE_SIZE
+#define XENHEAP_SIZE_MIN        (16 * 1024 * 1024)      /* 16MBytes */
 unsigned long xenheap_size = XENHEAP_DEFAULT_SIZE;
 unsigned long xen_pstart;
-
-static void __init parse_xenheap_megabytes(char *s)
-{
-    unsigned long megabytes = simple_strtoll(s, NULL, 0);
-
-#define XENHEAP_MEGABYTES_MIN   16UL
-    if (megabytes < XENHEAP_MEGABYTES_MIN)
-        megabytes = XENHEAP_MEGABYTES_MIN;
-
-#define XENHEAP_MEGABYTES_MAX   4096UL  /* need more? */
-    if (megabytes > XENHEAP_MEGABYTES_MAX)
-        megabytes = XENHEAP_MEGABYTES_MAX;
-
-    xenheap_size =  megabytes * 1024 * 1024;
-}
-custom_param("xenheap_megabytes", parse_xenheap_megabytes);
 
 static int __init
 xen_count_pages(u64 start, u64 end, void *arg)
@@ -315,7 +301,7 @@ init_xenheap_mds(unsigned long start, unsigned long end, void *arg)
             unsigned long s = max(start, max(__pa(desc->xen_heap_start),
                                              md->phys_addr));
             unsigned long e = min(end, min(md_end, desc->xenheap_phys_end));
-            init_xenheap_pages(s, e);
+            init_boot_pages(s, e);
         }
     }
 
@@ -362,6 +348,7 @@ void __init start_kernel(void)
     struct domain *idle_domain;
     struct vcpu *dom0_vcpu0;
     efi_memory_desc_t *kern_md, *last_md, *md;
+    unsigned long xenheap_phys_end;
     void *xen_heap_start;
     struct xen_heap_desc heap_desc;
 #ifdef CONFIG_SMP
@@ -422,10 +409,8 @@ void __init start_kernel(void)
      * for the actual xenheap.
      */
     max_page = efi_get_max_addr() >> PAGE_SHIFT;
-    while ((max_page >> 3) > xenheap_size - (XENHEAP_MEGABYTES_MIN << 20))
+    while ((max_page >> 3) > xenheap_size - XENHEAP_SIZE_MIN)
         xenheap_size <<= 1;
-
-    BUG_ON(xenheap_size > (XENHEAP_MEGABYTES_MAX << 20));
 
     xenheap_phys_end = xen_pstart + xenheap_size;
     printk("xen image pstart: 0x%lx, xenheap pend: 0x%lx\n",
@@ -731,8 +716,8 @@ void arch_get_xen_caps(xen_capabilities_info_t *info)
 
 int xen_in_range(paddr_t start, paddr_t end)
 {
-    start = max_t(paddr_t, start, xen_pstart);
-    end = min_t(paddr_t, end, xen_pstart + XENHEAP_DEFAULT_SIZE);
+    paddr_t xs = __pa(&_start);
+    paddr_t xe = __pa(&_end);
 
-    return start < end;
+    return (start < xe) && (end > xs);
 }

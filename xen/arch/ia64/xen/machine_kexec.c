@@ -159,8 +159,10 @@ static int machine_kexec_get_xen(xen_kexec_range_t *range)
 static int machine_kexec_get_xenheap(xen_kexec_range_t *range)
 {
 	range->start = (ia64_tpa(_end) + (ELF_PAGE_SIZE - 1)) & ELF_PAGE_MASK;
-	range->size = (unsigned long)xenheap_phys_end -
-		      (unsigned long)range->start;
+	range->size =
+		(((unsigned long)range->start + KERNEL_TR_PAGE_SIZE) &
+         ~(KERNEL_TR_PAGE_SIZE - 1))
+		- (unsigned long)range->start;
 	return 0;
 }
 
@@ -195,7 +197,6 @@ int machine_kexec_get(xen_kexec_range_t *range)
 
 void arch_crash_save_vmcoreinfo(void)
 {
-    VMCOREINFO_SYMBOL(xenheap_phys_end);
 	VMCOREINFO_SYMBOL(dom_xen);
 	VMCOREINFO_SYMBOL(dom_io);
 	VMCOREINFO_SYMBOL(xen_pstart);

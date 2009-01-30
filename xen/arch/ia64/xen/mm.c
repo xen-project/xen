@@ -466,7 +466,7 @@ share_xen_page_with_guest(struct page_info *page,
 
     page_set_owner(page, d);
     wmb(); /* install valid domain ptr before updating refcnt. */
-    ASSERT(page->count_info == 0);
+    ASSERT((page->count_info & ~PGC_xen_heap)== 0);
 
     /* Only add to the allocation list if the domain isn't dying. */
     if ( !d->is_dying )
@@ -987,7 +987,7 @@ assign_domain_page(struct domain *d,
     struct page_info* page = mfn_to_page(physaddr >> PAGE_SHIFT);
 
     BUG_ON((physaddr & _PAGE_PPN_MASK) != physaddr);
-    BUG_ON(page->count_info != (PGC_allocated | 1));
+    BUG_ON((page->count_info & ~PGC_xen_heap) != (PGC_allocated | 1));
     set_gpfn_from_mfn(physaddr >> PAGE_SHIFT, mpaddr >> PAGE_SHIFT);
     // because __assign_domain_page() uses set_pte_rel() which has
     // release semantics, smp_mb() isn't needed.
@@ -2894,7 +2894,8 @@ guest_physmap_add_page(struct domain *d, unsigned long gpfn,
 
     for (i = 0; i < (1UL << page_order); i++) {
         BUG_ON(!mfn_valid(mfn));
-        BUG_ON(mfn_to_page(mfn)->count_info != (PGC_allocated | 1));
+        BUG_ON((mfn_to_page(mfn)->count_info & ~PGC_xen_heap) !=
+               (PGC_allocated | 1));
         __guest_physmap_add_page(d, gpfn, mfn);
         mfn++;
         gpfn++;

@@ -146,7 +146,7 @@ vmx_init_env(void *start, unsigned long end_in_pa)
 			VM_BUFFER_ALIGN_UP((unsigned long)start);
 		unsigned long e_vm_buffer = s_vm_buffer + buffer_size;
 		if (__pa(e_vm_buffer) < end_in_pa) {
-			init_xenheap_pages(__pa(start), __pa(s_vm_buffer));
+			init_boot_pages(__pa(start), __pa(s_vm_buffer));
 			start = (void*)e_vm_buffer;
 			vm_buffer = virt_to_xenva(s_vm_buffer);
 			printk("vm_buffer: 0x%lx\n", vm_buffer);

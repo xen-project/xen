@@ -86,7 +86,6 @@ typedef unsigned long paddr_t;
 // FIXME?: x86-ism used in xen/mm.h
 #define LOCK_PREFIX
 
-extern unsigned long xenheap_phys_end;
 extern unsigned long total_pages;
 extern unsigned long xen_pstart;
 extern unsigned long xenheap_size;
@@ -119,9 +118,6 @@ extern char _end[]; /* standard ELF symbol */
 // FIXME SMP: leave SMP for a later time
 ///////////////////////////////////////////////////////////////
 // xen/include/asm/config.h
-// Natural boundary upon TR size to define xenheap space
-#define XENHEAP_DEFAULT_MB (1 << (KERNEL_TR_PAGE_SHIFT - 20))
-#define XENHEAP_DEFAULT_SIZE	(1 << KERNEL_TR_PAGE_SHIFT)
 #define	ELFSIZE	64
 
 ///////////////////////////////////////////////////////////////

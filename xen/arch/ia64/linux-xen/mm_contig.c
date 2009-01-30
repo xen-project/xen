@@ -190,7 +190,7 @@ per_cpu_allocate(void *xen_heap_start, unsigned long end_in_pa)
 	unsigned long end = start + size;
 
 	if (__pa(end) < end_in_pa) {
-		init_xenheap_pages(__pa(xen_heap_start), __pa(start));
+		init_boot_pages(__pa(xen_heap_start), __pa(start));
 		xen_heap_start = (void*)end;
 		percpu_area = (void*)virt_to_xenva(start);
 		printk("allocate percpu area 0x%lx@0x%lx 0x%p\n",

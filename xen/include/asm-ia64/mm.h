@@ -114,16 +114,18 @@ struct page_info
  /* Cleared when the owning guest 'frees' this page. */
 #define _PGC_allocated    PG_shift(1)
 #define PGC_allocated     PG_mask(1, 1)
- /* bit PG_shift(2) reserved. See asm-x86/mm.h */
+ /* Page is Xen heap? */
+# define _PGC_xen_heap    PG_shift(2)
+# define PGC_xen_heap     PG_mask(1, 2)
  /* bit PG_shift(3) reserved. See asm-x86/mm.h */
  /* PG_mask(7, 6) reserved. See asm-x86/mm.h*/
  /* Count of references to this frame. */
 #define PGC_count_width   PG_shift(6)
 #define PGC_count_mask    ((1UL<<PGC_count_width)-1)
 
-#define is_xen_heap_mfn(mfn)   (((mfn) < paddr_to_pfn(xenheap_phys_end)) \
-                                && ((mfn) >= paddr_to_pfn(xen_pstart)))
-#define is_xen_heap_page(page) is_xen_heap_mfn(page_to_mfn(page))
+#define is_xen_heap_page(page)  ((page)->count_info & PGC_xen_heap)
+#define is_xen_heap_mfn(mfn)    (mfn_valid(mfn) &&                      \
+                                 is_xen_heap_page(mfn_to_page(mfn)))
 
 #define page_get_owner(_p)      ((struct domain *)(_p)->u.inuse._domain)
 #define page_set_owner(_p, _d)	((_p)->u.inuse._domain = (unsigned long)(_d))
