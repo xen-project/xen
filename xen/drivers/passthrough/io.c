@@ -87,8 +87,8 @@ int pt_irq_create_bind_vtd(
 
         if ( domain_set_irq_dpci(d, hvm_irq_dpci) == 0 )
         {
-            xfree(hvm_irq_dpci);
             spin_unlock(&d->event_lock);
+            xfree(hvm_irq_dpci);
             return -EINVAL;
         }
     }
