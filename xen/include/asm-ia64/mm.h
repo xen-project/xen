@@ -46,7 +46,7 @@ struct page_info
     struct list_head list;
 
     /* Reference count and various PGC_xxx flags and fields. */
-    u32 count_info;
+    unsigned long count_info;
 
     /* Context-dependent fields follow... */
     union {
@@ -54,10 +54,10 @@ struct page_info
         /* Page is in use: ((count_info & PGC_count_mask) != 0). */
         struct {
             /* Owner of this page (NULL if page is anonymous). */
-            u32 _domain; /* pickled format */
+            unsigned long _domain; /* pickled format */
             /* Type reference count and various PGT_xxx flags and fields. */
             unsigned long type_info;
-        } __attribute__ ((packed)) inuse;
+        } inuse;
 
         /* Page is on a free list: ((count_info & PGC_count_mask) == 0). */
         struct {
@@ -65,7 +65,7 @@ struct page_info
             u32 order;
             /* Mask of possibly-tainted TLBs. */
             cpumask_t cpumask;
-        } __attribute__ ((packed)) free;
+        } free;
 
     } u;
 
@@ -86,50 +86,47 @@ struct page_info
  * Still small set of flags defined by far on IA-64.
  * IA-64 should make it a definition same as x86_64.
  */
+#define PG_shift(idx)   (BITS_PER_LONG - (idx))
+#define PG_mask(x, idx) (x ## UL << PG_shift(idx))
+
 /* The following page types are MUTUALLY EXCLUSIVE. */
-#define PGT_none            (0UL<<29) /* no special uses of this page */
-#define PGT_l1_page_table   (1UL<<29) /* using this page as an L1 page table? */
-#define PGT_l2_page_table   (2UL<<29) /* using this page as an L2 page table? */
-#define PGT_l3_page_table   (3UL<<29) /* using this page as an L3 page table? */
-#define PGT_l4_page_table   (4UL<<29) /* using this page as an L4 page table? */
+#define PGT_none          PG_mask(0, 3) /* no special uses of this page */
+#define PGT_l1_page_table PG_mask(1, 3) /* using as an L1 page table? */
+#define PGT_l2_page_table PG_mask(2, 3) /* using as an L2 page table? */
+#define PGT_l3_page_table PG_mask(3, 3) /* using as an L3 page table? */
+#define PGT_l4_page_table PG_mask(4, 3) /* using as an L4 page table? */
  /* Value 5 reserved. See asm-x86/mm.h */
  /* Value 6 reserved. See asm-x86/mm.h */
-#define PGT_writable_page   (7UL<<29) /* has writable mappings of this page? */
-#define PGT_type_mask       (7UL<<29) /* Bits 29-31. */
+#define PGT_writable_page PG_mask(7, 3) /* has writable mappings? */
+#define PGT_type_mask     PG_mask(7, 3) /* Bits 29-31. */
 
- /* Has this page been validated for use as its current type? */
-#define _PGT_validated      28
-#define PGT_validated       (1UL<<_PGT_validated)
  /* Owning guest has pinned this page to its current type? */
-#define _PGT_pinned         27
-#define PGT_pinned          (1UL<<_PGT_pinned)
+#define _PGT_pinned       PG_shift(4)
+#define PGT_pinned        PG_mask(1, 4)
+ /* Has this page been validated for use as its current type? */
+#define _PGT_validated    PG_shift(5)
+#define PGT_validated     PG_mask(1, 5)
 
- /* 16-bit count of uses of this frame as its current type. */
-#define PGT_count_mask      ((1UL<<16)-1)
+ /* Count of uses of this frame as its current type. */
+#define PGT_count_width   PG_shift(7)
+#define PGT_count_mask    ((1UL<<PGT_count_width)-1)
 
  /* Cleared when the owning guest 'frees' this page. */
-#define _PGC_allocated      31
-#define PGC_allocated       (1UL<<_PGC_allocated)
- /* Bit 30 reserved. See asm-x86/mm.h */
- /* Bit 29 reserved. See asm-x86/mm.h */
- /* 29-bit count of references to this frame. */
-#define PGC_count_mask      ((1UL<<29)-1)
+#define _PGC_allocated    PG_shift(1)
+#define PGC_allocated     PG_mask(1, 1)
+ /* bit PG_shift(2) reserved. See asm-x86/mm.h */
+ /* bit PG_shift(3) reserved. See asm-x86/mm.h */
+ /* PG_mask(7, 6) reserved. See asm-x86/mm.h*/
+ /* Count of references to this frame. */
+#define PGC_count_width   PG_shift(6)
+#define PGC_count_mask    ((1UL<<PGC_count_width)-1)
 
 #define is_xen_heap_mfn(mfn)   (((mfn) < paddr_to_pfn(xenheap_phys_end)) \
                                 && ((mfn) >= paddr_to_pfn(xen_pstart)))
 #define is_xen_heap_page(page) is_xen_heap_mfn(page_to_mfn(page))
 
-extern void* xen_pickle_offset;
-#define __pickle(a)	((unsigned long)a - (unsigned long)xen_pickle_offset)
-#define __unpickle(a)	(void *)(a + xen_pickle_offset)
-
-static inline struct domain *unpickle_domptr(u64 _d)
-{ return (_d == 0) ? NULL : __unpickle(_d); }
-static inline u32 pickle_domptr(struct domain *_d)
-{ return (_d == NULL) ? 0 : (u32)__pickle(_d); }
-
-#define page_get_owner(_p)	(unpickle_domptr((_p)->u.inuse._domain))
-#define page_set_owner(_p, _d)	((_p)->u.inuse._domain = pickle_domptr(_d))
+#define page_get_owner(_p)      ((struct domain *)(_p)->u.inuse._domain)
+#define page_set_owner(_p, _d)	((_p)->u.inuse._domain = (unsigned long)(_d))
 
 #define XENSHARE_writable 0
 #define XENSHARE_readonly 1
@@ -151,23 +148,23 @@ void add_to_domain_alloc_list(unsigned long ps, unsigned long pe);
 
 static inline void put_page(struct page_info *page)
 {
-    u32 nx, x, y = page->count_info;
+    unsigned long nx, x, y = page->count_info;
 
     do {
-	x = y;
-	nx = x - 1;
+        x = y;
+        nx = x - 1;
     }
     while (unlikely((y = cmpxchg_rel(&page->count_info, x, nx)) != x));
 
     if (unlikely((nx & PGC_count_mask) == 0))
-	free_domheap_page(page);
+        free_domheap_page(page);
 }
 
 /* count_info and ownership are checked atomically. */
 static inline int get_page(struct page_info *page,
                            struct domain *domain)
 {
-    u32 x, y = page->count_info;
+    unsigned long x, y = page->count_info;
 
     do {
         x = y;
@@ -185,7 +182,7 @@ static inline int get_page(struct page_info *page,
 fail:
     /* if (!domain->is_dying) */ /* XXX: header inclusion hell */
     gdprintk(XENLOG_INFO,
-             "Error pfn %lx: rd=%p, od=%p, caf=%016x, taf=%" PRtype_info "\n",
+             "Error pfn %lx: rd=%p, od=%p, caf=%016lx, taf=%" PRtype_info "\n",
              page_to_mfn(page), domain,
              page_get_owner(page), y, page->u.inuse.type_info);
     return 0;
@@ -194,7 +191,7 @@ fail:
 int is_iomem_page(unsigned long mfn);
 
 extern void put_page_type(struct page_info *page);
-extern int get_page_type(struct page_info *page, u32 type);
+extern int get_page_type(struct page_info *page, unsigned long type);
 
 static inline void put_page_and_type(struct page_info *page)
 {
@@ -205,7 +202,7 @@ static inline void put_page_and_type(struct page_info *page)
 
 static inline int get_page_and_type(struct page_info *page,
                                     struct domain *domain,
-                                    u32 type)
+                                    unsigned long type)
 {
     int rc = get_page(page, domain);
 

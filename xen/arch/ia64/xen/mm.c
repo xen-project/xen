@@ -1261,17 +1261,18 @@ adjust_page_count_info(struct page_info* page)
         int ret = get_page(page, d);
         BUG_ON(ret == 0);
     } else {
-        u64 x, nx, y;
+        unsigned long x, nx, y;
 
-        y = *((u64*)&page->count_info);
+        y = page->count_info;
         do {
             x = y;
             nx = x + 1;
 
             BUG_ON((x >> 32) != 0);
             BUG_ON((nx & PGC_count_mask) != 2);
-            y = cmpxchg((u64*)&page->count_info, x, nx);
+            y = cmpxchg(&page->count_info, x, nx);
         } while (unlikely(y != x));
+        BUG_ON(page_get_owner(page) != NULL);
     }
 }
 
@@ -2748,7 +2749,7 @@ steal_page(struct domain *d, struct page_info *page, unsigned int memflags)
 #if 0 /* if big endian */
 # error "implement big endian version of steal_page()"
 #endif
-    u32 x, y;
+    unsigned long x, y;
 
     if (page_get_owner(page) != d) {
         gdprintk(XENLOG_INFO, "%s d 0x%p owner 0x%p\n",
@@ -2808,7 +2809,6 @@ steal_page(struct domain *d, struct page_info *page, unsigned int memflags)
     y = page->count_info;
     do {
         x = y;
-        // page->count_info: untouched
 
         if (unlikely(((x & (PGC_count_mask | PGC_allocated)) !=
                       (1 | PGC_allocated)))) {
@@ -2817,7 +2817,7 @@ steal_page(struct domain *d, struct page_info *page, unsigned int memflags)
                 gdprintk(XENLOG_INFO, "gnttab_transfer: "
                         "Bad page %p: ed=%p(%u), "
                         "sd=%p,"
-                        " caf=%016x, taf=%" PRtype_info
+                        " caf=%016lx, taf=%" PRtype_info
                         " memflags 0x%x\n",
                         (void *) page_to_mfn(page),
                         d, d->domain_id,
@@ -2829,7 +2829,7 @@ steal_page(struct domain *d, struct page_info *page, unsigned int memflags)
                 gdprintk(XENLOG_WARNING, "gnttab_transfer: "
                         "Bad page %p: ed=%p(%u), "
                         "sd=%p(%u),"
-                        " caf=%016x, taf=%" PRtype_info
+                        " caf=%016lx, taf=%" PRtype_info
                         " memflags 0x%x\n",
                         (void *) page_to_mfn(page),
                         d, d->domain_id,
@@ -2864,7 +2864,7 @@ steal_page(struct domain *d, struct page_info *page, unsigned int memflags)
 
  fail:
     spin_unlock(&d->page_alloc_lock);
-    MEM_LOG("Bad page %p: ed=%p(%u), sd=%p, caf=%08x, taf=%" PRtype_info,
+    MEM_LOG("Bad page %p: ed=%p(%u), sd=%p, caf=%016lx, taf=%" PRtype_info,
             (void *)page_to_mfn(page), d, d->domain_id,
             page_get_owner(page), page->count_info, page->u.inuse.type_info);
     return -1;
@@ -3055,11 +3055,11 @@ void domain_cache_flush (struct domain *d, int sync_only)
     //printk ("domain_cache_flush: %d %d pages\n", d->domain_id, nbr_page);
 }
 
-static void free_page_type(struct page_info *page, u32 type)
+static void free_page_type(struct page_info *page, unsigned long type)
 {
 }
 
-static int alloc_page_type(struct page_info *page, u32 type)
+static int alloc_page_type(struct page_info *page, unsigned long type)
 {
 	return 1;
 }
@@ -3150,7 +3150,7 @@ static int get_page_from_pagenr(unsigned long page_nr, struct domain *d)
 }
 
 
-int get_page_type(struct page_info *page, u32 type)
+int get_page_type(struct page_info *page, unsigned long type)
 {
     u64 nx, x, y = page->u.inuse.type_info;
 
@@ -3198,7 +3198,7 @@ int get_page_type(struct page_info *page, u32 type)
         {
             if ( ((x & PGT_type_mask) != PGT_l2_page_table) ||
                  (type != PGT_l1_page_table) )
-                MEM_LOG("Bad type (saw %08lx != exp %08x) "
+                MEM_LOG("Bad type (saw %08lx != exp %08lx) "
                         "for mfn %016lx (pfn %016lx)",
                         x, type, page_to_mfn(page),
                         get_gpfn_from_mfn(page_to_mfn(page)));
@@ -3219,8 +3219,8 @@ int get_page_type(struct page_info *page, u32 type)
         /* Try to validate page type; drop the new reference on failure. */
         if ( unlikely(!alloc_page_type(page, type)) )
         {
-            MEM_LOG("Error while validating mfn %lx (pfn %lx) for type %08x"
-                    ": caf=%08x taf=%" PRtype_info,
+            MEM_LOG("Error while validating mfn %lx (pfn %lx) for type %08lx"
+                    ": caf=%016lx taf=%" PRtype_info,
                     page_to_mfn(page), get_gpfn_from_mfn(page_to_mfn(page)),
                     type, page->count_info, page->u.inuse.type_info);
             /* Noone else can get a reference. We hold the only ref. */

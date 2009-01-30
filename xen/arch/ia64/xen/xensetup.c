@@ -74,7 +74,6 @@ boolean_param("xencons_poll", opt_xencons_poll);
 
 unsigned long xenheap_size = XENHEAP_DEFAULT_SIZE;
 unsigned long xen_pstart;
-void *xen_pickle_offset __read_mostly;
 
 static void __init parse_xenheap_megabytes(char *s)
 {
@@ -84,9 +83,7 @@ static void __init parse_xenheap_megabytes(char *s)
     if (megabytes < XENHEAP_MEGABYTES_MIN)
         megabytes = XENHEAP_MEGABYTES_MIN;
 
-#define XENHEAP_MEGABYTES_MAX   4096UL  /* need more? If so,
-                                           __pickle()/__unpickle() must be
-                                           revised. */
+#define XENHEAP_MEGABYTES_MAX   4096UL  /* need more? */
     if (megabytes > XENHEAP_MEGABYTES_MAX)
         megabytes = XENHEAP_MEGABYTES_MAX;
 
@@ -530,14 +527,6 @@ skip_move:
     printk("find_memory: efi_memmap_walk returns max_page=%lx\n",max_page);
     efi_print();
     
-    /*
-     * later [__init_begin, __init_end) will be freed up as xen heap
-     * so that struct domain might be allocated from the init area
-     * which is < xen_heap_start. so we can't simply set
-     * xen_pickle_offset = xen_heap_start.
-     */
-    xen_pickle_offset = ia64_imva(__init_begin);
-
     xen_heap_start = memguard_init(ia64_imva(&_end));
     printk("Before xen_heap_start: %p\n", xen_heap_start);
     xen_heap_start = __va(init_boot_allocator(__pa(xen_heap_start)));

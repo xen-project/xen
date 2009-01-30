@@ -200,7 +200,6 @@ void arch_crash_save_vmcoreinfo(void)
 	VMCOREINFO_SYMBOL(dom_io);
 	VMCOREINFO_SYMBOL(xen_pstart);
 	VMCOREINFO_SYMBOL(frametable_pg_dir);
-	VMCOREINFO_SYMBOL_ALIAS(xen_heap_start, xen_pickle_offset);
 }
 
 /*
