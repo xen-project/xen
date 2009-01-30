@@ -479,7 +479,6 @@ static void free_heap_pages(
  * latter is not on a MAX_ORDER boundary, then we reserve the page by
  * not freeing it to the buddy allocator.
  */
-#define MAX_ORDER_ALIGNED (1UL << (MAX_ORDER))
 static void init_heap_pages(
     struct page_info *pg, unsigned long nr_pages)
 {
@@ -496,15 +495,15 @@ static void init_heap_pages(
             init_node_heap(nid_curr);
 
         /*
-         * free pages of the same node, or if they differ, but are on a
-         * MAX_ORDER alignement boundary (which already get reserved)
+         * Free pages of the same node, or if they differ, but are on a
+         * MAX_ORDER alignment boundary (which already get reserved).
          */
-         if ( (nid_curr == nid_prev) || (page_to_maddr(pg+i) &
-                                         MAX_ORDER_ALIGNED) )
-             free_heap_pages(pg+i, 0);
-         else
-             printk("Reserving non-aligned node boundary @ mfn %lu\n",
-                    page_to_mfn(pg+i));
+        if ( (nid_curr == nid_prev) ||
+             !(page_to_mfn(pg+i) & ((1UL << MAX_ORDER) - 1)) )
+            free_heap_pages(pg+i, 0);
+        else
+            printk("Reserving non-aligned node boundary @ mfn %#lx\n",
+                   page_to_mfn(pg+i));
 
         nid_prev = nid_curr;
     }
