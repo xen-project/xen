@@ -79,10 +79,10 @@ struct shadow_domain {
     int               locker; /* processor which holds the lock */
     const char       *locker_function; /* Func that took it */
     unsigned int      opt_flags;    /* runtime tunable optimizations on/off */
-    struct list_head  pinned_shadows;
+    struct page_list_head pinned_shadows;
 
     /* Memory allocation */
-    struct list_head  freelists[SHADOW_MAX_ORDER + 1];
+    struct page_list_head freelists[SHADOW_MAX_ORDER + 1];
     struct page_list_head p2m_freelist;
     unsigned int      total_pages;  /* number of pages allocated */
     unsigned int      free_pages;   /* number of pages on freelists */

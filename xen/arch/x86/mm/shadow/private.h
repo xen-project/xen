@@ -220,60 +220,6 @@ extern void shadow_audit_tables(struct vcpu *v);
 #undef GUEST_LEVELS
 #endif /* CONFIG_PAGING_LEVELS == 4 */
 
-/******************************************************************************
- * Page metadata for shadow pages.
- */
-
-struct shadow_page_info
-{
-    union {
-        /* Ensures that shadow_page_info is same size as page_info. */
-        struct page_info page_info;
-
-        struct {
-            union {
-                /* When in use, guest page we're a shadow of */
-                unsigned long backpointer;
-                /* When free, order of the freelist we're on */
-                unsigned int order;
-            };
-            union {
-                /* When in use, next shadow in this hash chain */
-                struct shadow_page_info *next_shadow;
-                /* When free, TLB flush time when freed */
-                u32 tlbflush_timestamp;
-            };
-            struct {
-                unsigned long mbz;     /* Must be zero: count_info is here. */
-                unsigned long type:5;   /* What kind of shadow is this? */
-                unsigned long pinned:1; /* Is the shadow pinned? */
-                unsigned long count:26; /* Reference count */
-            } __attribute__((packed));
-            union {
-                /* For unused shadow pages, a list of pages of this order; for 
-                 * pinnable shadows, if pinned, a list of other pinned shadows
-                 * (see sh_type_is_pinnable() below for the definition of 
-                 * "pinnable" shadow types). */
-                struct list_head list;
-                /* For non-pinnable shadows, a higher entry that points
-                 * at us. */
-                paddr_t up;
-            };
-        };
-    };
-};
-
-/* The structure above *must* be no larger than a struct page_info
- * from mm.h, since we'll be using the same space in the frametable. 
- * Also, the mbz field must line up with the count_info field of normal 
- * pages, so they cannot be successfully get_page()d. */
-static inline void shadow_check_page_struct_offsets(void) {
-    BUILD_BUG_ON(sizeof (struct shadow_page_info) !=
-                 sizeof (struct page_info));
-    BUILD_BUG_ON(offsetof(struct shadow_page_info, mbz) !=
-                 offsetof(struct page_info, count_info));
-};
-
 /* Shadow type codes */
 #define SH_type_none           (0U) /* on the shadow free list */
 #define SH_type_min_shadow     (1U)
@@ -532,13 +478,13 @@ mfn_t oos_snapshot_lookup(struct vcpu *v, mfn_t gmfn);
 // in order to make it work with our mfn type.
 #undef mfn_to_page
 #define mfn_to_page(_m) (frame_table + mfn_x(_m))
-#define mfn_to_shadow_page(_m) ((struct shadow_page_info *)mfn_to_page(_m))
+#define mfn_to_shadow_page mfn_to_page
 
 // Override page_to_mfn from asm/page.h, which was #include'd above,
 // in order to make it work with our mfn type.
 #undef page_to_mfn
 #define page_to_mfn(_pg) (_mfn((_pg) - frame_table))
-#define shadow_page_to_mfn(_spg) (page_to_mfn((struct page_info *)_spg))
+#define shadow_page_to_mfn page_to_mfn
 
 // Override mfn_valid from asm/page.h, which was #include'd above,
 // in order to make it work with our mfn type.
@@ -679,22 +625,22 @@ static inline int sh_get_ref(struct vcpu *v, mfn_t smfn, paddr_t entry_pa)
 
     ASSERT(mfn_valid(smfn));
 
-    x = sp->count;
+    x = sp->u.sh.count;
     nx = x + 1;
 
     if ( unlikely(nx >= 1U<<26) )
     {
-        SHADOW_PRINTK("shadow ref overflow, gmfn=%" PRtype_info " smfn=%lx\n",
-                       sp->backpointer, mfn_x(smfn));
+        SHADOW_PRINTK("shadow ref overflow, gmfn=%" PRpgmfn " smfn=%lx\n",
+                       sp->u.sh.back, mfn_x(smfn));
         return 0;
     }
     
     /* Guarded by the shadow lock, so no need for atomic update */
-    sp->count = nx;
+    sp->u.sh.count = nx;
 
     /* We remember the first shadow entry that points to each shadow. */
     if ( entry_pa != 0 
-         && !sh_type_is_pinnable(v, sp->type) 
+         && !sh_type_is_pinnable(v, sp->u.sh.type)
          && sp->up == 0 ) 
         sp->up = entry_pa;
     
@@ -710,26 +656,26 @@ static inline void sh_put_ref(struct vcpu *v, mfn_t smfn, paddr_t entry_pa)
     struct shadow_page_info *sp = mfn_to_shadow_page(smfn);
 
     ASSERT(mfn_valid(smfn));
-    ASSERT(sp->mbz == 0);
+    ASSERT(sp->count_info == 0);
 
     /* If this is the entry in the up-pointer, remove it */
     if ( entry_pa != 0 
-         && !sh_type_is_pinnable(v, sp->type) 
+         && !sh_type_is_pinnable(v, sp->u.sh.type)
          && sp->up == entry_pa ) 
         sp->up = 0;
 
-    x = sp->count;
+    x = sp->u.sh.count;
     nx = x - 1;
 
     if ( unlikely(x == 0) ) 
     {
         SHADOW_ERROR("shadow ref underflow, smfn=%lx oc=%08x t=%#x\n",
-                     mfn_x(smfn), sp->count, sp->type);
+                     mfn_x(smfn), sp->u.sh.count, sp->u.sh.type);
         BUG();
     }
 
     /* Guarded by the shadow lock, so no need for atomic update */
-    sp->count = nx;
+    sp->u.sh.count = nx;
 
     if ( unlikely(nx == 0) ) 
         sh_destroy_shadow(v, smfn);
@@ -745,22 +691,22 @@ static inline int sh_pin(struct vcpu *v, mfn_t smfn)
     
     ASSERT(mfn_valid(smfn));
     sp = mfn_to_shadow_page(smfn);
-    ASSERT(sh_type_is_pinnable(v, sp->type));
-    if ( sp->pinned ) 
+    ASSERT(sh_type_is_pinnable(v, sp->u.sh.type));
+    if ( sp->u.sh.pinned )
     {
         /* Already pinned: take it out of the pinned-list so it can go 
          * at the front */
-        list_del(&sp->list);
+        page_list_del(sp, &v->domain->arch.paging.shadow.pinned_shadows);
     }
     else
     {
         /* Not pinned: pin it! */
         if ( !sh_get_ref(v, smfn, 0) )
             return 0;
-        sp->pinned = 1;
+        sp->u.sh.pinned = 1;
     }
     /* Put it at the head of the list of pinned shadows */
-    list_add(&sp->list, &v->domain->arch.paging.shadow.pinned_shadows);
+    page_list_add(sp, &v->domain->arch.paging.shadow.pinned_shadows);
     return 1;
 }
 
@@ -772,11 +718,11 @@ static inline void sh_unpin(struct vcpu *v, mfn_t smfn)
     
     ASSERT(mfn_valid(smfn));
     sp = mfn_to_shadow_page(smfn);
-    ASSERT(sh_type_is_pinnable(v, sp->type));
-    if ( sp->pinned )
+    ASSERT(sh_type_is_pinnable(v, sp->u.sh.type));
+    if ( sp->u.sh.pinned )
     {
-        sp->pinned = 0;
-        list_del(&sp->list);
+        sp->u.sh.pinned = 0;
+        page_list_del(sp, &v->domain->arch.paging.shadow.pinned_shadows);
         sp->up = 0; /* in case this stops being a pinnable type in future */
         sh_put_ref(v, smfn, 0);
     }

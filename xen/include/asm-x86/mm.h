@@ -17,19 +17,39 @@
  */
 #define PFN_ORDER(_pfn) ((_pfn)->u.free.order)
 
+/*
+ * This definition is solely for the use in struct page_info (and
+ * struct page_list_head), intended to allow easy adjustment once x86-64
+ * wants to support more than 16Tb.
+ * 'unsigned long' should be used for MFNs everywhere else.
+ */
+#define __mfn_t unsigned int
+#define PRpgmfn "08x"
+
 #ifndef __i386__
 # undef page_list_entry
 struct page_list_entry
 {
-    unsigned int next, prev;
-    unsigned long _pad_for_sh_; /* until struct shadow_page_info gets updated */
+    __mfn_t next, prev;
 };
 #endif
 
 struct page_info
+/* Until all uses of the old type get cleaned up: */
+#define shadow_page_info page_info
 {
-    /* Each frame can be threaded onto a doubly-linked list. */
-    struct page_list_entry list;
+    union {
+        /* Each frame can be threaded onto a doubly-linked list.
+         *
+         * For unused shadow pages, a list of pages of this order; for
+         * pinnable shadows, if pinned, a list of other pinned shadows
+         * (see sh_type_is_pinnable() below for the definition of
+         * "pinnable" shadow types).
+         */
+        struct page_list_entry list;
+        /* For non-pinnable shadows, a higher entry that points at us. */
+        paddr_t up;
+    };
 
     /* Reference count and various PGC_xxx flags and fields. */
     unsigned long count_info;
@@ -44,6 +64,19 @@ struct page_info
             /* Type reference count and various PGT_xxx flags and fields. */
             unsigned long type_info;
         } inuse;
+
+        /* Page is in use as a shadow: count_info == 0. */
+        struct {
+            unsigned long type:5;   /* What kind of shadow is this? */
+            unsigned long pinned:1; /* Is the shadow pinned? */
+            unsigned long count:26; /* Reference count */
+            union {
+                /* When in use, GMFN of guest page we're a shadow of. */
+                __mfn_t back;
+                /* When free, order of the freelist we're on. */
+                unsigned int order;
+            };
+        } sh;
 
         /* Page is on a free list: ((count_info & PGC_count_mask) == 0). */
         struct {
@@ -104,8 +137,13 @@ struct page_info
          * tracked for TLB-flush avoidance when a guest runs in shadow mode.
          */
         u32 shadow_flags;
+
+        /* When in use as a shadow, next shadow in this hash chain. */
+        struct shadow_page_info *next_shadow;
     };
 };
+
+#undef __mfn_t
 
 #define PG_shift(idx)   (BITS_PER_LONG - (idx))
 #define PG_mask(x, idx) (x ## UL << PG_shift(idx))
