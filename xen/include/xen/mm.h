@@ -45,9 +45,9 @@ void end_boot_allocator(void);
 
 /* Xen suballocator. These functions are interrupt-safe. */
 void init_xenheap_pages(paddr_t ps, paddr_t pe);
-void *alloc_xenheap_pages(unsigned int order);
+void *alloc_xenheap_pages(unsigned int order, unsigned int memflags);
 void free_xenheap_pages(void *v, unsigned int order);
-#define alloc_xenheap_page() (alloc_xenheap_pages(0))
+#define alloc_xenheap_page() (alloc_xenheap_pages(0,0))
 #define free_xenheap_page(v) (free_xenheap_pages(v,0))
 
 /* Domain suballocator. These functions are *not* interrupt-safe.*/

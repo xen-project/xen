@@ -31,7 +31,7 @@ struct page_info
         /* Page is in use: ((count_info & PGC_count_mask) != 0). */
         struct {
             /* Owner of this page (NULL if page is anonymous). */
-            unsigned long _domain; /* pickled format */
+            u32 _domain; /* pickled format */
             /* Type reference count and various PGT_xxx flags and fields. */
             unsigned long type_info;
         } inuse;
@@ -173,8 +173,11 @@ struct page_info
 /* OOS fixup entries */
 #define SHADOW_OOS_FIXUPS 2
 
-#define page_get_owner(_p)    ((struct domain *)(_p)->u.inuse._domain)
-#define page_set_owner(_p,_d) ((_p)->u.inuse._domain = (unsigned long)(_d))
+#define page_get_owner(_p)                                              \
+    ((struct domain *)((_p)->u.inuse._domain ?                          \
+                       mfn_to_virt((_p)->u.inuse._domain) : NULL))
+#define page_set_owner(_p,_d)                                           \
+    ((_p)->u.inuse._domain = (_d) ? virt_to_mfn(_d) : 0)
 
 #define maddr_get_owner(ma)   (page_get_owner(maddr_to_page((ma))))
 #define vaddr_get_owner(va)   (page_get_owner(virt_to_page((va))))

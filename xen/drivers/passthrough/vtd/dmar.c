@@ -506,6 +506,15 @@ static int __init acpi_parse_dmar(struct acpi_table_header *table)
     return ret;
 }
 
+#ifdef CONFIG_X86
+#include <asm/tboot.h>
+/* ACPI tables may not be DMA protected by tboot, so use DMAR copy */
+/* SINIT saved in SinitMleData in TXT heap (which is DMA protected) */
+#define parse_dmar_table(h) tboot_parse_dmar_table(h)
+#else
+#define parse_dmar_table(h) acpi_table_parse(ACPI_SIG_DMAR, h)
+#endif
+
 int acpi_dmar_init(void)
 {
     int rc;
@@ -519,7 +528,7 @@ int acpi_dmar_init(void)
     if ( !iommu_enabled )
         goto fail;
 
-    rc = acpi_table_parse(ACPI_SIG_DMAR, acpi_parse_dmar);
+    rc = parse_dmar_table(acpi_parse_dmar);
     if ( rc )
         goto fail;
 

@@ -162,17 +162,43 @@ void dump_pageframe_info(struct domain *d)
     }
 }
 
+struct domain *alloc_domain_struct(void)
+{
+    struct domain *d;
+    /*
+     * We pack the MFN of the domain structure into a 32-bit field within
+     * the page_info structure. Hence the MEMF_bits() restriction.
+     */
+    d = alloc_xenheap_pages(
+        get_order_from_bytes(sizeof(*d)), MEMF_bits(32 + PAGE_SHIFT));
+    if ( d != NULL )
+        memset(d, 0, sizeof(*d));
+    return d;
+}
+
+void free_domain_struct(struct domain *d)
+{
+    free_xenheap_pages(d, get_order_from_bytes(sizeof(*d)));
+}
+
 struct vcpu *alloc_vcpu_struct(void)
 {
     struct vcpu *v;
-    if ( (v = xmalloc(struct vcpu)) != NULL )
+    /*
+     * This structure contains embedded PAE PDPTEs, used when an HVM guest
+     * runs on shadow pagetables outside of 64-bit mode. In this case the CPU
+     * may require that the shadow CR3 points below 4GB, and hence the whole
+     * structure must satisfy this restriction. Thus we specify MEMF_bits(32).
+     */
+    v = alloc_xenheap_pages(get_order_from_bytes(sizeof(*v)), MEMF_bits(32));
+    if ( v != NULL )
         memset(v, 0, sizeof(*v));
     return v;
 }
 
 void free_vcpu_struct(struct vcpu *v)
 {
-    xfree(v);
+    free_xenheap_pages(v, get_order_from_bytes(sizeof(*v)));
 }
 
 #ifdef CONFIG_COMPAT
@@ -357,7 +383,7 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
     INIT_LIST_HEAD(&d->arch.relmem_list);
 
     pdpt_order = get_order_from_bytes(PDPT_L1_ENTRIES * sizeof(l1_pgentry_t));
-    d->arch.mm_perdomain_pt = alloc_xenheap_pages(pdpt_order);
+    d->arch.mm_perdomain_pt = alloc_xenheap_pages(pdpt_order, 0);
     if ( d->arch.mm_perdomain_pt == NULL )
         goto fail;
     memset(d->arch.mm_perdomain_pt, 0, PAGE_SIZE << pdpt_order);
@@ -405,17 +431,12 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
         if ( d->arch.ioport_caps == NULL )
             goto fail;
 
-#ifdef __i386__
-        if ( (d->shared_info = alloc_xenheap_page()) == NULL )
+        /*
+         * The shared_info machine address must fit in a 32-bit field within a
+         * 32-bit guest's start_info structure. Hence we specify MEMF_bits(32).
+         */
+        if ( (d->shared_info = alloc_xenheap_pages(0, MEMF_bits(32))) == NULL )
             goto fail;
-#else
-        pg = alloc_domheap_page(
-            NULL, MEMF_node(domain_to_node(d)) | MEMF_bits(32));
-        if ( pg == NULL )
-            goto fail;
-        pg->count_info |= PGC_xen_heap;
-        d->shared_info = page_to_virt(pg);
-#endif
 
         clear_page(d->shared_info);
         share_xen_page_with_guest(

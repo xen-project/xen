@@ -23,6 +23,10 @@ void getdomaininfo(struct domain *d, struct xen_domctl_getdomaininfo *info);
  * Arch-specifics.
  */
 
+/* Allocate/free a domain structure. */
+struct domain *alloc_domain_struct(void);
+void free_domain_struct(struct domain *d);
+
 /* Allocate/free a VCPU structure. */
 struct vcpu *alloc_vcpu_struct(void);
 void free_vcpu_struct(struct vcpu *v);

@@ -391,8 +391,9 @@ static void __init machine_specific_memory_setup(
     reserve_dmi_region();
 }
 
-/* Reserve RAM area (@s,@e) in the specified e820 map. */
-int __init reserve_e820_ram(struct e820map *e820, uint64_t s, uint64_t e)
+int __init e820_change_range_type(
+    struct e820map *e820, uint64_t s, uint64_t e,
+    uint32_t orig_type, uint32_t new_type)
 {
     uint64_t rs = 0, re = 0;
     int i;
@@ -406,55 +407,79 @@ int __init reserve_e820_ram(struct e820map *e820, uint64_t s, uint64_t e)
             break;
     }
 
-    if ( (i == e820->nr_map) || (e820->map[i].type != E820_RAM) )
+    if ( (i == e820->nr_map) || (e820->map[i].type != orig_type) )
         return 0;
 
     if ( (s == rs) && (e == re) )
     {
-        /* Complete excision. */
-        memmove(&e820->map[i], &e820->map[i+1],
-                (e820->nr_map-i-1) * sizeof(e820->map[0]));
-        e820->nr_map--;
+        e820->map[i].type = new_type;
     }
-    else if ( s == rs )
+    else if ( (s == rs) || (e == re) )
     {
-        /* Truncate start. */
-        e820->map[i].addr += e - s;
-        e820->map[i].size -= e - s;
-    }
-    else if ( e == re )
-    {
-        /* Truncate end. */
-        e820->map[i].size -= e - s;
-    }
-    else if ( e820->nr_map < ARRAY_SIZE(e820->map) )
-    {
-        /* Split in two. */
+        if ( (e820->nr_map + 1) > ARRAY_SIZE(e820->map) )
+            goto overflow;
+
         memmove(&e820->map[i+1], &e820->map[i],
                 (e820->nr_map-i) * sizeof(e820->map[0]));
         e820->nr_map++;
-        e820->map[i].size = s - rs;
-        i++;
-        e820->map[i].addr = e;
-        e820->map[i].size = re - e;
-    }
-    else
-    {
-        /* e820map is at maximum size. We have to leak some space. */
-        if ( (s - rs) > (re - e) )
+
+        if ( s == rs )
         {
-            printk("e820 overflow: leaking RAM %"PRIx64"-%"PRIx64"\n", e, re);
-            e820->map[i].size = s - rs;
+            e820->map[i].size = e - s;
+            e820->map[i].type = new_type;
+            e820->map[i+1].addr = e;
+            e820->map[i+1].size = re - e;
         }
         else
         {
-            printk("e820 overflow: leaking RAM %"PRIx64"-%"PRIx64"\n", rs, s);
-            e820->map[i].addr = e;
-            e820->map[i].size = re - e;
+            e820->map[i].size = s - rs;
+            e820->map[i+1].addr = s;
+            e820->map[i+1].size = e - s;
+            e820->map[i+1].type = new_type;
         }
+    }
+    else if ( e820->nr_map+1 < ARRAY_SIZE(e820->map) )
+    {
+        if ( (e820->nr_map + 2) > ARRAY_SIZE(e820->map) )
+            goto overflow;
+
+        memmove(&e820->map[i+2], &e820->map[i],
+                (e820->nr_map-i) * sizeof(e820->map[0]));
+        e820->nr_map += 2;
+
+        e820->map[i].size = s - rs;
+        e820->map[i+1].addr = s;
+        e820->map[i+1].size = e - s;
+        e820->map[i+1].type = new_type;
+        e820->map[i+2].addr = e;
+        e820->map[i+2].size = re - e;
+    }
+
+    /* Finally, look for any opportunities to merge adjacent e820 entries. */
+    for ( i = 0; i < (e820->nr_map - 1); i++ )
+    {
+        if ( (e820->map[i].type != e820->map[i+1].type) ||
+             ((e820->map[i].addr + e820->map[i].size) != e820->map[i+1].addr) )
+            continue;
+        e820->map[i].size += e820->map[i+1].size;
+        memmove(&e820->map[i+1], &e820->map[i+2],
+                (e820->nr_map-i-2) * sizeof(e820->map[0]));
+        e820->nr_map--;
+        i--;
     }
 
     return 1;
+
+ overflow:
+    printk("Overflow in e820 while reserving region %"PRIx64"-%"PRIx64"\n",
+           s, e);
+    return 0;
+}
+
+/* Set E820_RAM area (@s,@e) as RESERVED in specified e820 map. */
+int __init reserve_e820_ram(struct e820map *e820, uint64_t s, uint64_t e)
+{
+    return e820_change_range_type(e820, s, e, E820_RAM, E820_RESERVED);
 }
 
 unsigned long __init init_e820(

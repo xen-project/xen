@@ -225,7 +225,7 @@ static int alloc_xenoprof_struct(
     bufsize += (max_samples - 1) * i;
     npages = (nvcpu * bufsize - 1) / PAGE_SIZE + 1;
 
-    d->xenoprof->rawbuf = alloc_xenheap_pages(get_order_from_pages(npages));
+    d->xenoprof->rawbuf = alloc_xenheap_pages(get_order_from_pages(npages), 0);
     if ( d->xenoprof->rawbuf == NULL )
     {
         xfree(d->xenoprof);

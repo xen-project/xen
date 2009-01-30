@@ -405,6 +405,16 @@ void relinquish_vcpu_resources(struct vcpu *v)
 	kill_timer(&v->arch.hlt_timer);
 }
 
+struct domain *alloc_domain_struct(void)
+{
+    return xmalloc(struct domain);
+}
+
+void free_domain_struct(struct domain *d)
+{
+    xfree(d);
+}
+
 struct vcpu *alloc_vcpu_struct(void)
 {
 	struct page_info *page;
@@ -509,7 +519,7 @@ int vcpu_late_initialise(struct vcpu *v)
 
 	/* Create privregs page. */
 	order = get_order_from_shift(XMAPPEDREGS_SHIFT);
-	v->arch.privregs = alloc_xenheap_pages(order);
+	v->arch.privregs = alloc_xenheap_pages(order, 0);
 	if (v->arch.privregs == NULL)
 		return -ENOMEM;
 	BUG_ON(v->arch.privregs == NULL);
@@ -578,7 +588,8 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
 #endif
 	if (tlb_track_create(d) < 0)
 		goto fail_nomem1;
-	d->shared_info = alloc_xenheap_pages(get_order_from_shift(XSI_SHIFT));
+	d->shared_info = alloc_xenheap_pages(
+		get_order_from_shift(XSI_SHIFT), 0);
 	if (d->shared_info == NULL)
 		goto fail_nomem;
 	BUG_ON(d->shared_info == NULL);

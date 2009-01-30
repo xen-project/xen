@@ -300,7 +300,7 @@ struct xmem_pool *xmem_pool_create(
     pool_bytes = ROUNDUP_SIZE(sizeof(*pool));
     pool_order = get_order_from_bytes(pool_bytes);
 
-    pool = (void *)alloc_xenheap_pages(pool_order);
+    pool = (void *)alloc_xenheap_pages(pool_order, 0);
     if ( pool == NULL )
         return NULL;
     memset(pool, 0, pool_bytes);
@@ -505,12 +505,12 @@ static struct xmem_pool *xenpool;
 static void *xmalloc_pool_get(unsigned long size)
 {
     ASSERT(size == PAGE_SIZE);
-    return alloc_xenheap_pages(0);
+    return alloc_xenheap_page();
 }
 
 static void xmalloc_pool_put(void *p)
 {
-    free_xenheap_pages(p,0);
+    free_xenheap_page(p);
 }
 
 static void *xmalloc_whole_pages(unsigned long size)
@@ -518,7 +518,7 @@ static void *xmalloc_whole_pages(unsigned long size)
     struct bhdr *b;
     unsigned int pageorder = get_order_from_bytes(size + BHDR_OVERHEAD);
 
-    b = alloc_xenheap_pages(pageorder);
+    b = alloc_xenheap_pages(pageorder, 0);
     if ( b == NULL )
         return NULL;
 

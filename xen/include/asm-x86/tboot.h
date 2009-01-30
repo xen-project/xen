@@ -37,7 +37,13 @@
 #ifndef __TBOOT_H__
 #define __TBOOT_H__
 
-typedef struct __attribute__ ((__packed__)) {
+#include <xen/acpi.h>
+
+#ifndef __packed
+#define __packed   __attribute__ ((packed))
+#endif
+
+typedef struct __packed {
   uint32_t    data1;
   uint16_t    data2;
   uint16_t    data3;
@@ -47,31 +53,47 @@ typedef struct __attribute__ ((__packed__)) {
 
 /* used to communicate between tboot and the launched kernel (i.e. Xen) */
 
-typedef struct __attribute__ ((__packed__)) {
-    uint16_t pm1a_cnt;
-    uint16_t pm1b_cnt;
-    uint16_t pm1a_evt;
-    uint16_t pm1b_evt;
+#define MAX_TB_MAC_REGIONS      32
+typedef struct __packed {
+    uint64_t  start;
+    uint64_t  end;
+} tboot_mac_region_t;
+
+/* GAS - Generic Address Structure (ACPI 2.0+) */
+typedef struct __packed {
+	uint8_t  space_id;
+	uint8_t  bit_width;
+	uint8_t  bit_offset;
+	uint8_t  access_width;
+	uint64_t address;
+} tboot_acpi_generic_address_t;
+
+typedef struct __packed {
+    tboot_acpi_generic_address_t pm1a_cnt_blk;
+    tboot_acpi_generic_address_t pm1b_cnt_blk;
+    tboot_acpi_generic_address_t pm1a_evt_blk;
+    tboot_acpi_generic_address_t pm1b_evt_blk;
     uint16_t pm1a_cnt_val;
     uint16_t pm1b_cnt_val;
-} tboot_acpi_sleep_info;
+    uint64_t wakeup_vector;
+    uint32_t vector_width;
+    uint64_t kernel_s3_resume_vector;
+} tboot_acpi_sleep_info_t;
 
-typedef struct __attribute__ ((__packed__)) {
-    /* version 0x01+ fields: */
+typedef struct __packed {
+    /* version 3+ fields: */
     uuid_t    uuid;              /* {663C8DFF-E8B3-4b82-AABF-19EA4D057A08} */
-    uint32_t  version;           /* Version number: 0x01, 0x02, ... */
+    uint32_t  version;           /* Version number; currently supports 0.3 */
     uint32_t  log_addr;          /* physical addr of tb_log_t log */
-    uint32_t  shutdown_entry32;  /* entry point for tboot shutdown from 32b */
-    uint32_t  shutdown_entry64;  /* entry point for tboot shutdown from 64b */
+    uint32_t  shutdown_entry;    /* entry point for tboot shutdown */
     uint32_t  shutdown_type;     /* type of shutdown (TB_SHUTDOWN_*) */
-    uint32_t  s3_tb_wakeup_entry;/* entry point for tboot s3 wake up */
-    uint32_t  s3_k_wakeup_entry; /* entry point for xen s3 wake up */
-    tboot_acpi_sleep_info
+    tboot_acpi_sleep_info_t
               acpi_sinfo;        /* where kernel put acpi sleep info in Sx */
-    uint8_t   reserved[52];      /* this pad is for compat with old field */
-    /* version 0x02+ fields: */
     uint32_t  tboot_base;        /* starting addr for tboot */
     uint32_t  tboot_size;        /* size of tboot */
+    uint8_t   num_mac_regions;   /* number mem regions to MAC on S3 */
+                                 /* contig regions memory to MAC on S3 */
+    tboot_mac_region_t mac_regions[MAX_TB_MAC_REGIONS];
 } tboot_shared_t;
 
 #define TB_SHUTDOWN_REBOOT      0
@@ -89,6 +111,8 @@ extern tboot_shared_t *g_tboot_shared;
 void tboot_probe(void);
 void tboot_shutdown(uint32_t shutdown_type);
 int tboot_in_measured_env(void);
+int tboot_protect_mem_regions(void);
+int tboot_parse_dmar_table(acpi_table_handler dmar_handler);
 
 #endif /* __TBOOT_H__ */
 
