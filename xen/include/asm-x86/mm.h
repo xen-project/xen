@@ -15,7 +15,7 @@
  *  1. 'struct page_info' contains a 'struct page_list_entry list'.
  *  2. Provide a PFN_ORDER() macro for accessing the order of a free page.
  */
-#define PFN_ORDER(_pfn) ((_pfn)->u.free.order)
+#define PFN_ORDER(_pfn) ((_pfn)->v.free.order)
 
 /*
  * This definition is solely for the use in struct page_info (and
@@ -59,8 +59,6 @@ struct page_info
 
         /* Page is in use: ((count_info & PGC_count_mask) != 0). */
         struct {
-            /* Owner of this page (NULL if page is anonymous). */
-            u32 _domain; /* pickled format */
             /* Type reference count and various PGT_xxx flags and fields. */
             unsigned long type_info;
         } inuse;
@@ -70,23 +68,37 @@ struct page_info
             unsigned long type:5;   /* What kind of shadow is this? */
             unsigned long pinned:1; /* Is the shadow pinned? */
             unsigned long count:26; /* Reference count */
-            union {
-                /* When in use, GMFN of guest page we're a shadow of. */
-                __mfn_t back;
-                /* When free, order of the freelist we're on. */
-                unsigned int order;
-            };
         } sh;
 
         /* Page is on a free list: ((count_info & PGC_count_mask) == 0). */
         struct {
-            /* Order-size of the free chunk this page is the head of. */
-            u32 order;
             /* Mask of possibly-tainted TLBs. */
             cpumask_t cpumask;
         } free;
 
     } u;
+
+    union {
+
+        /* Page is in use, but not as a shadow. */
+        struct {
+            /* Owner of this page (NULL if page is anonymous). */
+            u32 _domain; /* pickled format */
+        } inuse;
+
+        /* Page is in use as a shadow. */
+        struct {
+            /* GMFN of guest page we're a shadow of. */
+            __mfn_t back;
+        } sh;
+
+        /* Page is on a free list (including shadow code free lists). */
+        struct {
+            /* Order-size of the free chunk this page is the head of. */
+            unsigned int order;
+        } free;
+
+    } v;
 
     union {
         /*
@@ -225,10 +237,10 @@ struct page_info
 #define SHADOW_OOS_FIXUPS 2
 
 #define page_get_owner(_p)                                              \
-    ((struct domain *)((_p)->u.inuse._domain ?                          \
-                       mfn_to_virt((_p)->u.inuse._domain) : NULL))
+    ((struct domain *)((_p)->v.inuse._domain ?                          \
+                       mfn_to_virt((_p)->v.inuse._domain) : NULL))
 #define page_set_owner(_p,_d)                                           \
-    ((_p)->u.inuse._domain = (_d) ? virt_to_mfn(_d) : 0)
+    ((_p)->v.inuse._domain = (_d) ? virt_to_mfn(_d) : 0)
 
 #define maddr_get_owner(ma)   (page_get_owner(maddr_to_page((ma))))
 #define vaddr_get_owner(va)   (page_get_owner(virt_to_page((va))))

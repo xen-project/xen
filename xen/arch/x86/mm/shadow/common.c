@@ -1334,7 +1334,7 @@ static inline void trace_shadow_prealloc_unpin(struct domain *d, mfn_t smfn)
         /* Convert smfn to gfn */
         unsigned long gfn;
         ASSERT(mfn_valid(smfn));
-        gfn = mfn_to_gfn(d, _mfn(mfn_to_shadow_page(smfn)->u.sh.back));
+        gfn = mfn_to_gfn(d, _mfn(mfn_to_shadow_page(smfn)->v.sh.back));
         __trace_var(TRC_SHADOW_PREALLOC_UNPIN, 0/*!tsc*/,
                     sizeof(gfn), (unsigned char*)&gfn);
     }
@@ -1542,7 +1542,7 @@ mfn_t shadow_alloc(struct domain *d,
     while ( i != order )
     {
         i--;
-        sp->u.sh.order = i;
+        sp->v.free.order = i;
         page_list_add_tail(sp, &d->arch.paging.shadow.freelists[i]);
         sp += 1 << i;
     }
@@ -1569,7 +1569,7 @@ mfn_t shadow_alloc(struct domain *d,
         sp[i].u.sh.type = shadow_type;
         sp[i].u.sh.pinned = 0;
         sp[i].u.sh.count = 0;
-        sp[i].u.sh.back = backpointer;
+        sp[i].v.sh.back = backpointer;
         set_next_shadow(&sp[i], NULL);
         perfc_incr(shadow_alloc_count);
     }
@@ -1629,20 +1629,20 @@ void shadow_free(struct domain *d, mfn_t smfn)
         if ( (mfn_x(shadow_page_to_mfn(sp)) & mask) ) {
             /* Merge with predecessor block? */
             if ( ((sp-mask)->u.sh.type != PGT_none) ||
-                 ((sp-mask)->u.sh.order != order) )
+                 ((sp-mask)->v.free.order != order) )
                 break;
             sp -= mask;
             page_list_del(sp, &d->arch.paging.shadow.freelists[order]);
         } else {
             /* Merge with successor block? */
             if ( ((sp+mask)->u.sh.type != PGT_none) ||
-                 ((sp+mask)->u.sh.order != order) )
+                 ((sp+mask)->v.free.order != order) )
                 break;
             page_list_del(sp + mask, &d->arch.paging.shadow.freelists[order]);
         }
     }
 
-    sp->u.sh.order = order;
+    sp->v.free.order = order;
     page_list_add_tail(sp, &d->arch.paging.shadow.freelists[order]);
 }
 
@@ -1825,7 +1825,7 @@ static unsigned int sh_set_allocation(struct domain *d,
                 sp[j].u.sh.count = 0;
                 sp[j].tlbflush_timestamp = 0; /* Not in any TLB */
             }
-            sp->u.sh.order = order;
+            sp->v.free.order = order;
             page_list_add_tail(sp, &d->arch.paging.shadow.freelists[order]);
         } 
         else if ( d->arch.paging.shadow.total_pages > pages ) 
@@ -1904,17 +1904,17 @@ static void sh_hash_audit_bucket(struct domain *d, int bucket)
         BUG_ON( sp->u.sh.type == 0 );
         BUG_ON( sp->u.sh.type > SH_type_max_shadow );
         /* Wrong bucket? */
-        BUG_ON( sh_hash(sp->u.sh.back, sp->u.sh.type) != bucket );
+        BUG_ON( sh_hash(sp->v.sh.back, sp->u.sh.type) != bucket );
         /* Duplicate entry? */
         for ( x = next_shadow(sp); x; x = next_shadow(x) )
-            BUG_ON( x->u.sh.back == sp->u.sh.back &&
+            BUG_ON( x->v.sh.back == sp->v.sh.back &&
                     x->u.sh.type == sp->u.sh.type );
         /* Follow the backpointer to the guest pagetable */
         if ( sp->u.sh.type != SH_type_fl1_32_shadow
              && sp->u.sh.type != SH_type_fl1_pae_shadow
              && sp->u.sh.type != SH_type_fl1_64_shadow )
         {
-            struct page_info *gpg = mfn_to_page(_mfn(sp->u.sh.back));
+            struct page_info *gpg = mfn_to_page(_mfn(sp->v.sh.back));
             /* Bad shadow flags on guest page? */
             BUG_ON( !(gpg->shadow_flags & (1<<sp->u.sh.type)) );
             /* Bad type count on guest page? */
@@ -1930,7 +1930,7 @@ static void sh_hash_audit_bucket(struct domain *d, int bucket)
                     {
                         SHADOW_ERROR("MFN %#"PRpgmfn" shadowed (by %#"PRI_mfn")"
                                      " and not OOS but has typecount %#lx\n",
-                                     sp->u.sh.back,
+                                     sp->v.sh.back,
                                      mfn_x(shadow_page_to_mfn(sp)), 
                                      gpg->u.inuse.type_info);
                         BUG();
@@ -1944,7 +1944,7 @@ static void sh_hash_audit_bucket(struct domain *d, int bucket)
             {
                 SHADOW_ERROR("MFN %#"PRpgmfn" shadowed (by %#"PRI_mfn")"
                              " but has typecount %#lx\n",
-                             sp->u.sh.back, mfn_x(shadow_page_to_mfn(sp)),
+                             sp->v.sh.back, mfn_x(shadow_page_to_mfn(sp)),
                              gpg->u.inuse.type_info);
                 BUG();
             }
@@ -2030,7 +2030,7 @@ mfn_t shadow_hash_lookup(struct vcpu *v, unsigned long n, unsigned int t)
     prev = NULL;
     while(sp)
     {
-        if ( sp->u.sh.back == n && sp->u.sh.type == t )
+        if ( sp->v.sh.back == n && sp->u.sh.type == t )
         {
             /* Pull-to-front if 'sp' isn't already the head item */
             if ( unlikely(sp != d->arch.paging.shadow.hash_table[key]) )
@@ -2197,7 +2197,7 @@ void sh_destroy_shadow(struct vcpu *v, mfn_t smfn)
            t == SH_type_fl1_64_shadow  || 
            t == SH_type_monitor_table  || 
            (is_pv_32on64_vcpu(v) && t == SH_type_l4_64_shadow) ||
-           (page_get_owner(mfn_to_page(_mfn(sp->u.sh.back)))
+           (page_get_owner(mfn_to_page(_mfn(sp->v.sh.back)))
             == v->domain)); 
 
     /* The down-shifts here are so that the switch statement is on nice

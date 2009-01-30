@@ -631,7 +631,7 @@ static inline int sh_get_ref(struct vcpu *v, mfn_t smfn, paddr_t entry_pa)
     if ( unlikely(nx >= 1U<<26) )
     {
         SHADOW_PRINTK("shadow ref overflow, gmfn=%" PRpgmfn " smfn=%lx\n",
-                       sp->u.sh.back, mfn_x(smfn));
+                       sp->v.sh.back, mfn_x(smfn));
         return 0;
     }
     
