@@ -17,18 +17,22 @@ extern int ia64_mfn_valid (unsigned long pfn);
 
 #include <asm/xensystem.h>
 
-static inline unsigned long __virt_to_maddr(unsigned long va)
-{
-	if (va - KERNEL_START < xenheap_size)
-		return xen_pstart + (va - KERNEL_START);
-	else
-		/* 
-		 * Because the significant 8 bits of VA are used by Xen,
-		 * and xen uses cached/uncached identity mapping.
-		 * IA64_MAX_PHYS_BITS can't be larger than 56
-		 */
-		return (va & ((1UL << IA64_MAX_PHYS_BITS) - 1));
-}
+/*
+ * macro: avoid header inclustion hell
+ * static inline unsigned long __virt_to_maddr(unsigned long va)
+ */
+/*
+ * Because the significant 8 bits of VA are used by Xen,
+ * and xen uses cached/uncached identity mapping.
+ * IA64_MAX_PHYS_BITS can't be larger than 56
+ */
+#define __virt_to_maddr(va)						\
+	({								\
+		unsigned long __va__ = (va);				\
+		(__va__ - KERNEL_START < KERNEL_TR_PAGE_SIZE) ?		\
+			xen_pstart + (__va__ - KERNEL_START) :		\
+			(__va__ & ((1UL << IA64_MAX_PHYS_BITS) - 1));	\
+	})
 
 #define virt_to_maddr(va)	(__virt_to_maddr((unsigned long)va))
 

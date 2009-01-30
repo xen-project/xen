@@ -23,6 +23,9 @@
 
 #include <asm/page.h>
 #include <asm/system.h>
+#ifdef XEN
+#include <asm/pgtable.h>
+#endif
 
 #define EFI_SUCCESS		0
 #define EFI_LOAD_ERROR          ( 1 | (1UL << (BITS_PER_LONG-1)))
