@@ -1489,6 +1489,22 @@ static __init int shadow_blow_tables_keyhandler_init(void)
 __initcall(shadow_blow_tables_keyhandler_init);
 #endif /* !NDEBUG */
 
+#ifdef __i386__
+# define next_shadow(pg) ((pg)->next_shadow)
+# define set_next_shadow(pg, n) ((void)((pg)->next_shadow = (n)))
+#else
+static inline struct shadow_page_info *
+next_shadow(const struct shadow_page_info *sp)
+{
+    return sp->next_shadow ? mfn_to_shadow_page(_mfn(sp->next_shadow)) : NULL;
+}
+static inline void
+set_next_shadow(struct shadow_page_info *sp, struct shadow_page_info *next)
+{
+    sp->next_shadow = next ? mfn_x(shadow_page_to_mfn(next)) : 0;
+}
+#endif
+
 /* Allocate another shadow's worth of (contiguous, aligned) pages,
  * and fill in the type and backpointer fields of their page_infos. 
  * Never fails to allocate. */
@@ -1554,7 +1570,7 @@ mfn_t shadow_alloc(struct domain *d,
         sp[i].u.sh.pinned = 0;
         sp[i].u.sh.count = 0;
         sp[i].u.sh.back = backpointer;
-        sp[i].next_shadow = NULL;
+        set_next_shadow(&sp[i], NULL);
         perfc_incr(shadow_alloc_count);
     }
     return shadow_page_to_mfn(sp);
@@ -1890,7 +1906,7 @@ static void sh_hash_audit_bucket(struct domain *d, int bucket)
         /* Wrong bucket? */
         BUG_ON( sh_hash(sp->u.sh.back, sp->u.sh.type) != bucket );
         /* Duplicate entry? */
-        for ( x = sp->next_shadow; x; x = x->next_shadow )
+        for ( x = next_shadow(sp); x; x = next_shadow(x) )
             BUG_ON( x->u.sh.back == sp->u.sh.back &&
                     x->u.sh.type == sp->u.sh.type );
         /* Follow the backpointer to the guest pagetable */
@@ -1934,7 +1950,7 @@ static void sh_hash_audit_bucket(struct domain *d, int bucket)
             }
         }
         /* That entry was OK; on we go */
-        sp = sp->next_shadow;
+        sp = next_shadow(sp);
     }
 }
 
@@ -2028,7 +2044,7 @@ mfn_t shadow_hash_lookup(struct vcpu *v, unsigned long n, unsigned int t)
                     /* Delete sp from the list */
                     prev->next_shadow = sp->next_shadow;                    
                     /* Re-insert it at the head of the list */
-                    sp->next_shadow = d->arch.paging.shadow.hash_table[key];
+                    set_next_shadow(sp, d->arch.paging.shadow.hash_table[key]);
                     d->arch.paging.shadow.hash_table[key] = sp;
                 }
             }
@@ -2039,7 +2055,7 @@ mfn_t shadow_hash_lookup(struct vcpu *v, unsigned long n, unsigned int t)
             return shadow_page_to_mfn(sp);
         }
         prev = sp;
-        sp = sp->next_shadow;
+        sp = next_shadow(sp);
     }
 
     perfc_incr(shadow_hash_lookup_miss);
@@ -2066,7 +2082,7 @@ void shadow_hash_insert(struct vcpu *v, unsigned long n, unsigned int t,
     
     /* Insert this shadow at the top of the bucket */
     sp = mfn_to_shadow_page(smfn);
-    sp->next_shadow = d->arch.paging.shadow.hash_table[key];
+    set_next_shadow(sp, d->arch.paging.shadow.hash_table[key]);
     d->arch.paging.shadow.hash_table[key] = sp;
     
     sh_hash_audit_bucket(d, key);
@@ -2093,7 +2109,7 @@ void shadow_hash_delete(struct vcpu *v, unsigned long n, unsigned int t,
     sp = mfn_to_shadow_page(smfn);
     if ( d->arch.paging.shadow.hash_table[key] == sp ) 
         /* Easy case: we're deleting the head item. */
-        d->arch.paging.shadow.hash_table[key] = sp->next_shadow;
+        d->arch.paging.shadow.hash_table[key] = next_shadow(sp);
     else 
     {
         /* Need to search for the one we want */
@@ -2102,15 +2118,15 @@ void shadow_hash_delete(struct vcpu *v, unsigned long n, unsigned int t,
         {
             ASSERT(x); /* We can't have hit the end, since our target is
                         * still in the chain somehwere... */
-            if ( x->next_shadow == sp ) 
+            if ( next_shadow(x) == sp )
             {
                 x->next_shadow = sp->next_shadow;
                 break;
             }
-            x = x->next_shadow;
+            x = next_shadow(x);
         }
     }
-    sp->next_shadow = NULL;
+    set_next_shadow(sp, NULL);
 
     sh_hash_audit_bucket(d, key);
 }
@@ -2144,7 +2160,7 @@ static void hash_foreach(struct vcpu *v,
         /* WARNING: This is not safe against changes to the hash table.
          * The callback *must* return non-zero if it has inserted or
          * deleted anything from the hash (lookups are OK, though). */
-        for ( x = d->arch.paging.shadow.hash_table[i]; x; x = x->next_shadow )
+        for ( x = d->arch.paging.shadow.hash_table[i]; x; x = next_shadow(x) )
         {
             if ( callback_mask & (1 << x->u.sh.type) )
             {

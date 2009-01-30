@@ -139,7 +139,11 @@ struct page_info
         u32 shadow_flags;
 
         /* When in use as a shadow, next shadow in this hash chain. */
+#ifdef __i386__
         struct shadow_page_info *next_shadow;
+#else
+        __mfn_t next_shadow;
+#endif
     };
 };
 
