@@ -462,6 +462,12 @@ extern unsigned long dom0vp_get_memmap(domid_t domid, XEN_GUEST_HANDLE(char) buf
 #define dom0vp_get_memmap(domid, buffer)		(-ENOSYS)
 #endif
 
+int
+p2m_pod_decrease_reservation(struct domain *d,
+                             xen_pfn_t gpfn, unsigned int order);
+int guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn,
+                                          unsigned int order);
+
 extern volatile unsigned long *mpt_table;
 extern unsigned long gmfn_to_mfn_foreign(struct domain *d, unsigned long gpfn);
 extern u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__,
