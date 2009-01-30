@@ -3060,31 +3060,18 @@ static int alloc_page_type(struct page_info *page, u32 type)
 	return 1;
 }
 
-static int opt_p2m_xenheap;
-boolean_param("p2m_xenheap", opt_p2m_xenheap);
-
 void *pgtable_quicklist_alloc(void)
 {
+    struct page_info *page;
     void *p;
 
     BUG_ON(dom_p2m == NULL);
-    if (!opt_p2m_xenheap) {
-        struct page_info *page = alloc_domheap_page(dom_p2m, 0);
-        if (page == NULL)
-            return NULL;
-        p = page_to_virt(page);
-        clear_page(p);
-        return p;
-    }
-    p = alloc_xenheap_page();
-    if (p) {
-        clear_page(p);
-        /*
-         * This page should be read only.  At this moment, the third
-         * argument doesn't make sense.  It should be 1 when supported.
-         */
-        share_xen_page_with_guest(virt_to_page(p), dom_p2m, 0);
-    }
+    page = alloc_domheap_page(dom_p2m, 0);
+    if (page == NULL)
+        return NULL;
+
+    p = page_to_virt(page);
+    clear_page(p);
     return p;
 }
 
@@ -3096,8 +3083,6 @@ void pgtable_quicklist_free(void *pgtable_entry)
     BUG_ON(page->count_info != (1 | PGC_allocated));
 
     put_page(page);
-    if (opt_p2m_xenheap)
-        free_xenheap_page(pgtable_entry);
 }
 
 void put_page_type(struct page_info *page)
