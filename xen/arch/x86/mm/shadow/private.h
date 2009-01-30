@@ -478,13 +478,11 @@ mfn_t oos_snapshot_lookup(struct vcpu *v, mfn_t gmfn);
 // in order to make it work with our mfn type.
 #undef mfn_to_page
 #define mfn_to_page(_m) (frame_table + mfn_x(_m))
-#define mfn_to_shadow_page mfn_to_page
 
 // Override page_to_mfn from asm/page.h, which was #include'd above,
 // in order to make it work with our mfn type.
 #undef page_to_mfn
 #define page_to_mfn(_pg) (_mfn((_pg) - frame_table))
-#define shadow_page_to_mfn page_to_mfn
 
 // Override mfn_valid from asm/page.h, which was #include'd above,
 // in order to make it work with our mfn type.
@@ -621,7 +619,7 @@ void sh_destroy_shadow(struct vcpu *v, mfn_t smfn);
 static inline int sh_get_ref(struct vcpu *v, mfn_t smfn, paddr_t entry_pa)
 {
     u32 x, nx;
-    struct shadow_page_info *sp = mfn_to_shadow_page(smfn);
+    struct page_info *sp = mfn_to_page(smfn);
 
     ASSERT(mfn_valid(smfn));
 
@@ -653,7 +651,7 @@ static inline int sh_get_ref(struct vcpu *v, mfn_t smfn, paddr_t entry_pa)
 static inline void sh_put_ref(struct vcpu *v, mfn_t smfn, paddr_t entry_pa)
 {
     u32 x, nx;
-    struct shadow_page_info *sp = mfn_to_shadow_page(smfn);
+    struct page_info *sp = mfn_to_page(smfn);
 
     ASSERT(mfn_valid(smfn));
     ASSERT(sp->count_info == 0);
@@ -687,10 +685,10 @@ static inline void sh_put_ref(struct vcpu *v, mfn_t smfn, paddr_t entry_pa)
  * Returns 0 for failure, 1 for success. */
 static inline int sh_pin(struct vcpu *v, mfn_t smfn)
 {
-    struct shadow_page_info *sp;
+    struct page_info *sp;
     
     ASSERT(mfn_valid(smfn));
-    sp = mfn_to_shadow_page(smfn);
+    sp = mfn_to_page(smfn);
     ASSERT(sh_type_is_pinnable(v, sp->u.sh.type));
     if ( sp->u.sh.pinned )
     {
@@ -714,10 +712,10 @@ static inline int sh_pin(struct vcpu *v, mfn_t smfn)
  * of pinned shadows, and release the extra ref. */
 static inline void sh_unpin(struct vcpu *v, mfn_t smfn)
 {
-    struct shadow_page_info *sp;
+    struct page_info *sp;
     
     ASSERT(mfn_valid(smfn));
-    sp = mfn_to_shadow_page(smfn);
+    sp = mfn_to_page(smfn);
     ASSERT(sh_type_is_pinnable(v, sp->u.sh.type));
     if ( sp->u.sh.pinned )
     {

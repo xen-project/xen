@@ -92,7 +92,7 @@ struct shadow_domain {
     pagetable_t unpaged_pagetable;
 
     /* Shadow hashtable */
-    struct shadow_page_info **hash_table;
+    struct page_info **hash_table;
     int hash_walking;  /* Some function is walking the hash table */
 
     /* Fast MMIO path heuristic */

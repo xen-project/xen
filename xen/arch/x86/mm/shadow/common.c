@@ -1291,7 +1291,7 @@ static inline int space_is_available(
     for ( ; order <= shadow_max_order(d); ++order )
     {
         unsigned int n = count;
-        const struct shadow_page_info *sp;
+        const struct page_info *sp;
 
         page_list_for_each ( sp, &d->arch.paging.shadow.freelists[order] )
             if ( --n == 0 )
@@ -1306,7 +1306,7 @@ static inline int space_is_available(
  * non-Xen mappings in this top-level shadow mfn */
 static void shadow_unhook_mappings(struct vcpu *v, mfn_t smfn)
 {
-    struct shadow_page_info *sp = mfn_to_shadow_page(smfn);
+    struct page_info *sp = mfn_to_page(smfn);
     switch ( sp->u.sh.type )
     {
     case SH_type_l2_32_shadow:
@@ -1334,7 +1334,7 @@ static inline void trace_shadow_prealloc_unpin(struct domain *d, mfn_t smfn)
         /* Convert smfn to gfn */
         unsigned long gfn;
         ASSERT(mfn_valid(smfn));
-        gfn = mfn_to_gfn(d, _mfn(mfn_to_shadow_page(smfn)->v.sh.back));
+        gfn = mfn_to_gfn(d, _mfn(mfn_to_page(smfn)->v.sh.back));
         __trace_var(TRC_SHADOW_PREALLOC_UNPIN, 0/*!tsc*/,
                     sizeof(gfn), (unsigned char*)&gfn);
     }
@@ -1350,7 +1350,7 @@ static void _shadow_prealloc(
     /* Need a vpcu for calling unpins; for now, since we don't have
      * per-vcpu shadows, any will do */
     struct vcpu *v, *v2;
-    struct shadow_page_info *sp, *t;
+    struct page_info *sp, *t;
     mfn_t smfn;
     int i;
 
@@ -1366,7 +1366,7 @@ static void _shadow_prealloc(
     perfc_incr(shadow_prealloc_1);
     page_list_for_each_safe_reverse(sp, t, &d->arch.paging.shadow.pinned_shadows)
     {
-        smfn = shadow_page_to_mfn(sp);
+        smfn = page_to_mfn(sp);
 
         /* Unpin this top-level shadow */
         trace_shadow_prealloc_unpin(d, smfn);
@@ -1425,7 +1425,7 @@ void shadow_prealloc(struct domain *d, u32 type, unsigned int count)
  * this domain's shadows */
 static void shadow_blow_tables(struct domain *d) 
 {
-    struct shadow_page_info *sp, *t;
+    struct page_info *sp, *t;
     struct vcpu *v = d->vcpu[0];
     mfn_t smfn;
     int i;
@@ -1435,7 +1435,7 @@ static void shadow_blow_tables(struct domain *d)
     /* Pass one: unpin all pinned pages */
     page_list_for_each_safe_reverse(sp, t, &d->arch.paging.shadow.pinned_shadows)
     {
-        smfn = shadow_page_to_mfn(sp);
+        smfn = page_to_mfn(sp);
         sh_unpin(v, smfn);
     }
         
@@ -1489,21 +1489,17 @@ static __init int shadow_blow_tables_keyhandler_init(void)
 __initcall(shadow_blow_tables_keyhandler_init);
 #endif /* !NDEBUG */
 
-#ifdef __i386__
-# define next_shadow(pg) ((pg)->next_shadow)
-# define set_next_shadow(pg, n) ((void)((pg)->next_shadow = (n)))
-#else
-static inline struct shadow_page_info *
-next_shadow(const struct shadow_page_info *sp)
+static inline struct page_info *
+next_shadow(const struct page_info *sp)
 {
-    return sp->next_shadow ? mfn_to_shadow_page(_mfn(sp->next_shadow)) : NULL;
+    return sp->next_shadow ? mfn_to_page(_mfn(sp->next_shadow)) : NULL;
 }
+
 static inline void
-set_next_shadow(struct shadow_page_info *sp, struct shadow_page_info *next)
+set_next_shadow(struct page_info *sp, struct page_info *next)
 {
-    sp->next_shadow = next ? mfn_x(shadow_page_to_mfn(next)) : 0;
+    sp->next_shadow = next ? mfn_x(page_to_mfn(next)) : 0;
 }
-#endif
 
 /* Allocate another shadow's worth of (contiguous, aligned) pages,
  * and fill in the type and backpointer fields of their page_infos. 
@@ -1512,7 +1508,7 @@ mfn_t shadow_alloc(struct domain *d,
                     u32 shadow_type,
                     unsigned long backpointer)
 {
-    struct shadow_page_info *sp = NULL;
+    struct page_info *sp = NULL;
     unsigned int order = shadow_order(shadow_type);
     cpumask_t mask;
     void *p;
@@ -1561,7 +1557,7 @@ mfn_t shadow_alloc(struct domain *d,
             flush_tlb_mask(mask);
         }
         /* Now safe to clear the page for reuse */
-        p = sh_map_domain_page(shadow_page_to_mfn(sp+i));
+        p = sh_map_domain_page(page_to_mfn(sp+i));
         ASSERT(p != NULL);
         clear_page(p);
         sh_unmap_domain_page(p);
@@ -1573,14 +1569,14 @@ mfn_t shadow_alloc(struct domain *d,
         set_next_shadow(&sp[i], NULL);
         perfc_incr(shadow_alloc_count);
     }
-    return shadow_page_to_mfn(sp);
+    return page_to_mfn(sp);
 }
 
 
 /* Return some shadow pages to the pool. */
 void shadow_free(struct domain *d, mfn_t smfn)
 {
-    struct shadow_page_info *sp = mfn_to_shadow_page(smfn); 
+    struct page_info *sp = mfn_to_page(smfn); 
     u32 shadow_type;
     unsigned long order;
     unsigned long mask;
@@ -1626,7 +1622,7 @@ void shadow_free(struct domain *d, mfn_t smfn)
     for ( ; order < shadow_max_order(d); ++order )
     {
         mask = 1 << order;
-        if ( (mfn_x(shadow_page_to_mfn(sp)) & mask) ) {
+        if ( (mfn_x(page_to_mfn(sp)) & mask) ) {
             /* Merge with predecessor block? */
             if ( ((sp-mask)->u.sh.type != PGT_none) ||
                  ((sp-mask)->v.free.order != order) )
@@ -1787,7 +1783,7 @@ static unsigned int sh_set_allocation(struct domain *d,
                                       unsigned int pages,
                                       int *preempted)
 {
-    struct shadow_page_info *sp;
+    struct page_info *sp;
     unsigned int lower_bound;
     unsigned int j, order = shadow_max_order(d);
 
@@ -1809,7 +1805,7 @@ static unsigned int sh_set_allocation(struct domain *d,
         if ( d->arch.paging.shadow.total_pages < pages ) 
         {
             /* Need to allocate more memory from domheap */
-            sp = (struct shadow_page_info *)
+            sp = (struct page_info *)
                 alloc_domheap_pages(NULL, order, MEMF_node(domain_to_node(d)));
             if ( sp == NULL ) 
             { 
@@ -1890,7 +1886,7 @@ static inline key_t sh_hash(unsigned long n, unsigned int t)
 static void sh_hash_audit_bucket(struct domain *d, int bucket)
 /* Audit one bucket of the hash table */
 {
-    struct shadow_page_info *sp, *x;
+    struct page_info *sp, *x;
 
     if ( !(SHADOW_AUDIT_ENABLE) )
         return;
@@ -1931,7 +1927,7 @@ static void sh_hash_audit_bucket(struct domain *d, int bucket)
                         SHADOW_ERROR("MFN %#"PRpgmfn" shadowed (by %#"PRI_mfn")"
                                      " and not OOS but has typecount %#lx\n",
                                      sp->v.sh.back,
-                                     mfn_x(shadow_page_to_mfn(sp)), 
+                                     mfn_x(page_to_mfn(sp)), 
                                      gpg->u.inuse.type_info);
                         BUG();
                     }
@@ -1944,7 +1940,7 @@ static void sh_hash_audit_bucket(struct domain *d, int bucket)
             {
                 SHADOW_ERROR("MFN %#"PRpgmfn" shadowed (by %#"PRI_mfn")"
                              " but has typecount %#lx\n",
-                             sp->v.sh.back, mfn_x(shadow_page_to_mfn(sp)),
+                             sp->v.sh.back, mfn_x(page_to_mfn(sp)),
                              gpg->u.inuse.type_info);
                 BUG();
             }
@@ -1983,15 +1979,15 @@ static void sh_hash_audit(struct domain *d)
  * Returns 0 for success, 1 for error. */
 static int shadow_hash_alloc(struct domain *d)
 {
-    struct shadow_page_info **table;
+    struct page_info **table;
 
     ASSERT(shadow_locked_by_me(d));
     ASSERT(!d->arch.paging.shadow.hash_table);
 
-    table = xmalloc_array(struct shadow_page_info *, SHADOW_HASH_BUCKETS);
+    table = xmalloc_array(struct page_info *, SHADOW_HASH_BUCKETS);
     if ( !table ) return 1;
     memset(table, 0, 
-           SHADOW_HASH_BUCKETS * sizeof (struct shadow_page_info *));
+           SHADOW_HASH_BUCKETS * sizeof (struct page_info *));
     d->arch.paging.shadow.hash_table = table;
     return 0;
 }
@@ -2013,7 +2009,7 @@ mfn_t shadow_hash_lookup(struct vcpu *v, unsigned long n, unsigned int t)
  * or INVALID_MFN if it doesn't exist */
 {
     struct domain *d = v->domain;
-    struct shadow_page_info *sp, *prev;
+    struct page_info *sp, *prev;
     key_t key;
 
     ASSERT(shadow_locked_by_me(d));
@@ -2037,7 +2033,7 @@ mfn_t shadow_hash_lookup(struct vcpu *v, unsigned long n, unsigned int t)
             {
                 if ( unlikely(d->arch.paging.shadow.hash_walking != 0) )
                     /* Can't reorder: someone is walking the hash chains */
-                    return shadow_page_to_mfn(sp);
+                    return page_to_mfn(sp);
                 else 
                 {
                     ASSERT(prev);
@@ -2052,7 +2048,7 @@ mfn_t shadow_hash_lookup(struct vcpu *v, unsigned long n, unsigned int t)
             {
                 perfc_incr(shadow_hash_lookup_head);
             }
-            return shadow_page_to_mfn(sp);
+            return page_to_mfn(sp);
         }
         prev = sp;
         sp = next_shadow(sp);
@@ -2067,7 +2063,7 @@ void shadow_hash_insert(struct vcpu *v, unsigned long n, unsigned int t,
 /* Put a mapping (n,t)->smfn into the hash table */
 {
     struct domain *d = v->domain;
-    struct shadow_page_info *sp;
+    struct page_info *sp;
     key_t key;
     
     ASSERT(shadow_locked_by_me(d));
@@ -2081,7 +2077,7 @@ void shadow_hash_insert(struct vcpu *v, unsigned long n, unsigned int t,
     sh_hash_audit_bucket(d, key);
     
     /* Insert this shadow at the top of the bucket */
-    sp = mfn_to_shadow_page(smfn);
+    sp = mfn_to_page(smfn);
     set_next_shadow(sp, d->arch.paging.shadow.hash_table[key]);
     d->arch.paging.shadow.hash_table[key] = sp;
     
@@ -2093,7 +2089,7 @@ void shadow_hash_delete(struct vcpu *v, unsigned long n, unsigned int t,
 /* Excise the mapping (n,t)->smfn from the hash table */
 {
     struct domain *d = v->domain;
-    struct shadow_page_info *sp, *x;
+    struct page_info *sp, *x;
     key_t key;
 
     ASSERT(shadow_locked_by_me(d));
@@ -2106,7 +2102,7 @@ void shadow_hash_delete(struct vcpu *v, unsigned long n, unsigned int t,
     key = sh_hash(n, t);
     sh_hash_audit_bucket(d, key);
     
-    sp = mfn_to_shadow_page(smfn);
+    sp = mfn_to_page(smfn);
     if ( d->arch.paging.shadow.hash_table[key] == sp ) 
         /* Easy case: we're deleting the head item. */
         d->arch.paging.shadow.hash_table[key] = next_shadow(sp);
@@ -2148,7 +2144,7 @@ static void hash_foreach(struct vcpu *v,
 {
     int i, done = 0;
     struct domain *d = v->domain;
-    struct shadow_page_info *x;
+    struct page_info *x;
 
     /* Say we're here, to stop hash-lookups reordering the chains */
     ASSERT(shadow_locked_by_me(d));
@@ -2166,7 +2162,7 @@ static void hash_foreach(struct vcpu *v,
             {
                 ASSERT(x->u.sh.type <= 15);
                 ASSERT(callbacks[x->u.sh.type] != NULL);
-                done = callbacks[x->u.sh.type](v, shadow_page_to_mfn(x),
+                done = callbacks[x->u.sh.type](v, page_to_mfn(x),
                                                callback_mfn);
                 if ( done ) break;
             }
@@ -2184,7 +2180,7 @@ static void hash_foreach(struct vcpu *v,
 
 void sh_destroy_shadow(struct vcpu *v, mfn_t smfn)
 {
-    struct shadow_page_info *sp = mfn_to_shadow_page(smfn);
+    struct page_info *sp = mfn_to_page(smfn);
     unsigned int t = sp->u.sh.type;
 
 
@@ -2449,7 +2445,7 @@ int sh_remove_write_access(struct vcpu *v, mfn_t gmfn,
     {
         unsigned long old_count = (pg->u.inuse.type_info & PGT_count_mask);
         mfn_t last_smfn = _mfn(v->arch.paging.shadow.last_writeable_pte_smfn);
-        int shtype = mfn_to_shadow_page(last_smfn)->u.sh.type;
+        int shtype = mfn_to_page(last_smfn)->u.sh.type;
 
         if ( callbacks[shtype] ) 
             callbacks[shtype](v, last_smfn, gmfn);
@@ -2492,7 +2488,7 @@ int sh_remove_write_access(struct vcpu *v, mfn_t gmfn,
 int sh_remove_write_access_from_sl1p(struct vcpu *v, mfn_t gmfn,
                                      mfn_t smfn, unsigned long off)
 {
-    struct shadow_page_info *sp = mfn_to_shadow_page(smfn);
+    struct page_info *sp = mfn_to_page(smfn);
     
     ASSERT(mfn_valid(smfn));
     ASSERT(mfn_valid(gmfn));
@@ -2612,7 +2608,7 @@ static int sh_remove_shadow_via_pointer(struct vcpu *v, mfn_t smfn)
 /* Follow this shadow's up-pointer, if it has one, and remove the reference
  * found there.  Returns 1 if that was the only reference to this shadow */
 {
-    struct shadow_page_info *sp = mfn_to_shadow_page(smfn);
+    struct page_info *sp = mfn_to_page(smfn);
     mfn_t pmfn;
     void *vaddr;
     int rc;

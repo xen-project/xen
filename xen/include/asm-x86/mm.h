@@ -20,23 +20,19 @@
 /*
  * This definition is solely for the use in struct page_info (and
  * struct page_list_head), intended to allow easy adjustment once x86-64
- * wants to support more than 16Tb.
+ * wants to support more than 16TB.
  * 'unsigned long' should be used for MFNs everywhere else.
  */
 #define __mfn_t unsigned int
 #define PRpgmfn "08x"
 
-#ifndef __i386__
-# undef page_list_entry
+#undef page_list_entry
 struct page_list_entry
 {
     __mfn_t next, prev;
 };
-#endif
 
 struct page_info
-/* Until all uses of the old type get cleaned up: */
-#define shadow_page_info page_info
 {
     union {
         /* Each frame can be threaded onto a doubly-linked list.
@@ -151,11 +147,7 @@ struct page_info
         u32 shadow_flags;
 
         /* When in use as a shadow, next shadow in this hash chain. */
-#ifdef __i386__
-        struct shadow_page_info *next_shadow;
-#else
         __mfn_t next_shadow;
-#endif
     };
 };
 
