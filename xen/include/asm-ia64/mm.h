@@ -167,24 +167,28 @@ static inline void put_page(struct page_info *page)
 static inline int get_page(struct page_info *page,
                            struct domain *domain)
 {
-    u64 x, nx, y = *((u64*)&page->count_info);
-    u32 _domain = pickle_domptr(domain);
+    u32 x, y = page->count_info;
 
     do {
-	x = y;
-	nx = x + 1;
-	if (unlikely((x & PGC_count_mask) == 0) ||	/* Not allocated? */
-	    unlikely((nx & PGC_count_mask) == 0) ||	/* Count overflow? */
-	    unlikely((x >> 32) != _domain)) {		/* Wrong owner? */
+        x = y;
+        if (unlikely((x & PGC_count_mask) == 0) ||  /* Not allocated? */
+            unlikely(((x + 1) & PGC_count_mask) == 0) ) {/* Count overflow? */
+            goto fail;
+        }
+        y = cmpxchg_acq(&page->count_info, x, x + 1);
+    } while (unlikely(y != x));
 
-	    gdprintk(XENLOG_INFO, "Error pfn %lx: rd=%p, od=%p, caf=%016lx, taf=%"
-		PRtype_info "\n", page_to_mfn(page), domain,
-		unpickle_domptr(x >> 32), x, page->u.inuse.type_info);
-	    return 0;
-	}
-    }
-    while(unlikely((y = cmpxchg_acq((u64*)&page->count_info, x, nx)) != x));
-    return 1;
+    if (likely(page_get_owner(page) == domain))
+        return 1;
+
+    put_page(page);
+fail:
+    /* if (!domain->is_dying) */ /* XXX: header inclusion hell */
+    gdprintk(XENLOG_INFO,
+             "Error pfn %lx: rd=%p, od=%p, caf=%016x, taf=%" PRtype_info "\n",
+             page_to_mfn(page), domain,
+             page_get_owner(page), y, page->u.inuse.type_info);
+    return 0;
 }
 
 int is_iomem_page(unsigned long mfn);

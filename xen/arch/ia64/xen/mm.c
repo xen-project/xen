@@ -183,6 +183,9 @@
 #include <asm/event.h>
 #include <asm/debugger.h>
 
+
+#define MEM_LOG(_f, _a...) gdprintk(XENLOG_WARNING, _f "\n", ## _a)
+
 static void domain_page_flush_and_put(struct domain* d, unsigned long mpaddr,
                                       volatile pte_t* ptep, pte_t old_pte, 
                                       struct page_info* page);
@@ -2745,8 +2748,7 @@ steal_page(struct domain *d, struct page_info *page, unsigned int memflags)
 #if 0 /* if big endian */
 # error "implement big endian version of steal_page()"
 #endif
-    u32 _d, _nd;
-    u64 x, nx, y;
+    u32 x, y;
 
     if (page_get_owner(page) != d) {
         gdprintk(XENLOG_INFO, "%s d 0x%p owner 0x%p\n",
@@ -2794,61 +2796,64 @@ steal_page(struct domain *d, struct page_info *page, unsigned int memflags)
     }
 
     spin_lock(&d->page_alloc_lock);
+    /* check again */
+    if (is_xen_heap_page(page) || page_get_owner(page) != d) {
+        goto fail;
+    }
 
     /*
-     * The tricky bit: atomically release ownership while there is just one
-     * benign reference to the page (PGC_allocated). If that reference
-     * disappears then the deallocation routine will safely spin.
+     * We require there is just one reference (PGC_allocated). We temporarily
+     * drop this reference now so that we can safely swizzle the owner.
      */
-    _d  = pickle_domptr(d);
-    y = *((u64*)&page->count_info);
+    y = page->count_info;
     do {
         x = y;
-        nx = x & 0xffffffff;
         // page->count_info: untouched
-        // page->u.inused._domain = 0;
-        _nd = x >> 32;
 
         if (unlikely(((x & (PGC_count_mask | PGC_allocated)) !=
-                      (1 | PGC_allocated))) ||
-            unlikely(_nd != _d)) {
-            struct domain* nd = unpickle_domptr(_nd);
+                      (1 | PGC_allocated)))) {
+            struct domain* nd = page_get_owner(page);
             if (nd == NULL) {
                 gdprintk(XENLOG_INFO, "gnttab_transfer: "
-                        "Bad page %p: ed=%p(%u) 0x%x, "
-                        "sd=%p 0x%x,"
-                        " caf=%016lx, taf=%" PRtype_info
+                        "Bad page %p: ed=%p(%u), "
+                        "sd=%p,"
+                        " caf=%016x, taf=%" PRtype_info
                         " memflags 0x%x\n",
                         (void *) page_to_mfn(page),
-                        d, d->domain_id, _d,
-                        nd, _nd,
+                        d, d->domain_id,
+                        nd,
                         x,
                         page->u.inuse.type_info,
                         memflags);
             } else {
                 gdprintk(XENLOG_WARNING, "gnttab_transfer: "
-                        "Bad page %p: ed=%p(%u) 0x%x, "
-                        "sd=%p(%u) 0x%x,"
-                        " caf=%016lx, taf=%" PRtype_info
+                        "Bad page %p: ed=%p(%u), "
+                        "sd=%p(%u),"
+                        " caf=%016x, taf=%" PRtype_info
                         " memflags 0x%x\n",
                         (void *) page_to_mfn(page),
-                        d, d->domain_id, _d,
-                        nd, nd->domain_id, _nd,
+                        d, d->domain_id,
+                        nd, nd->domain_id,
                         x,
                         page->u.inuse.type_info,
                         memflags);
             }
-            spin_unlock(&d->page_alloc_lock);
-            return -1;
+            goto fail;
         }
 
-        y = cmpxchg((u64*)&page->count_info, x, nx);
+        y = cmpxchg(&page->count_info, x, x & ~PGC_count_mask);
     } while (unlikely(y != x));
 
-    /*
-     * Unlink from 'd'. At least one reference remains (now anonymous), so
-     * noone else is spinning to try to delete this page from 'd'.
-     */
+    /* Swizzle the owner then reinstate the PGC_allocated reference. */
+    page_set_owner(page, NULL);
+    y = page->count_info;
+    do {
+        x = y;
+        BUG_ON((x & (PGC_count_mask | PGC_allocated)) != PGC_allocated);
+        y = cmpxchg(&page->count_info, x, x | 1);
+    } while (unlikely(y != x));
+
+    /* Unlink from original owner. */
     if ( !(memflags & MEMF_no_refcount) )
         d->tot_pages--;
     list_del(&page->list);
@@ -2856,6 +2861,13 @@ steal_page(struct domain *d, struct page_info *page, unsigned int memflags)
     spin_unlock(&d->page_alloc_lock);
     perfc_incr(steal_page);
     return 0;
+
+ fail:
+    spin_unlock(&d->page_alloc_lock);
+    MEM_LOG("Bad page %p: ed=%p(%u), sd=%p, caf=%08x, taf=%" PRtype_info,
+            (void *)page_to_mfn(page), d, d->domain_id,
+            page_get_owner(page), page->count_info, page->u.inuse.type_info);
+    return -1;
 }
 
 static void
@@ -3042,14 +3054,6 @@ void domain_cache_flush (struct domain *d, int sync_only)
     }
     //printk ("domain_cache_flush: %d %d pages\n", d->domain_id, nbr_page);
 }
-
-#ifdef VERBOSE
-#define MEM_LOG(_f, _a...)                           \
-  printk("DOM%u: (file=mm.c, line=%d) " _f "\n", \
-         current->domain->domain_id , __LINE__ , ## _a )
-#else
-#define MEM_LOG(_f, _a...) ((void)0)
-#endif
 
 static void free_page_type(struct page_info *page, u32 type)
 {
