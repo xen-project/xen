@@ -272,13 +272,16 @@ static unsigned long *avail[MAX_NUMNODES];
 
 static DEFINE_SPINLOCK(heap_lock);
 
-static void init_node_heap(int node)
+static unsigned long init_node_heap(int node, unsigned long mfn,
+                                    unsigned long nr)
 {
     /* First node to be discovered has its heap metadata statically alloced. */
     static heap_by_zone_and_order_t _heap_static;
     static unsigned long avail_static[NR_ZONES];
     static int first_node_initialised;
-
+    unsigned long needed = (sizeof(**_heap) +
+                            sizeof(**avail) * NR_ZONES +
+                            PAGE_SIZE - 1) >> PAGE_SHIFT;
     int i, j;
 
     if ( !first_node_initialised )
@@ -286,12 +289,31 @@ static void init_node_heap(int node)
         _heap[node] = &_heap_static;
         avail[node] = avail_static;
         first_node_initialised = 1;
+        needed = 0;
+    }
+#ifdef DIRECTMAP_VIRT_END
+    else if ( nr >= needed &&
+              mfn + needed <= virt_to_mfn(DIRECTMAP_VIRT_END) )
+    {
+        _heap[node] = mfn_to_virt(mfn);
+        avail[node] = mfn_to_virt(mfn + needed) - sizeof(**avail) * NR_ZONES;
+    }
+#endif
+    else if ( get_order_from_bytes(sizeof(**_heap)) ==
+              get_order_from_pages(needed) )
+    {
+        _heap[node] = alloc_xenheap_pages(get_order_from_pages(needed), 0);
+        BUG_ON(!_heap[node]);
+        avail[node] = (void *)_heap[node] + (needed << PAGE_SHIFT) -
+                      sizeof(**avail) * NR_ZONES;
+        needed = 0;
     }
     else
     {
         _heap[node] = xmalloc(heap_by_zone_and_order_t);
         avail[node] = xmalloc_array(unsigned long, NR_ZONES);
         BUG_ON(!_heap[node] || !avail[node]);
+        needed = 0;
     }
 
     memset(avail[node], 0, NR_ZONES * sizeof(long));
@@ -299,6 +321,8 @@ static void init_node_heap(int node)
     for ( i = 0; i < NR_ZONES; i++ )
         for ( j = 0; j <= MAX_ORDER; j++ )
             INIT_PAGE_LIST_HEAD(&(*_heap[node])[i][j]);
+
+    return needed;
 }
 
 /* Allocate 2^@order contiguous pages. */
@@ -487,12 +511,22 @@ static void init_heap_pages(
 
     nid_prev = phys_to_nid(page_to_maddr(pg-1));
 
-    for ( i = 0; i < nr_pages; i++ )
+    for ( i = 0; i < nr_pages; nid_prev = nid_curr, i++ )
     {
         nid_curr = phys_to_nid(page_to_maddr(pg+i));
 
         if ( unlikely(!avail[nid_curr]) )
-            init_node_heap(nid_curr);
+        {
+            unsigned long n;
+
+            n = init_node_heap(nid_curr, page_to_mfn(pg+i), nr_pages - i);
+            if ( n )
+            {
+                BUG_ON(i + n > nr_pages);
+                i += n - 1;
+                continue;
+            }
+        }
 
         /*
          * Free pages of the same node, or if they differ, but are on a
@@ -504,8 +538,6 @@ static void init_heap_pages(
         else
             printk("Reserving non-aligned node boundary @ mfn %#lx\n",
                    page_to_mfn(pg+i));
-
-        nid_prev = nid_curr;
     }
 }
 
@@ -533,7 +565,7 @@ static unsigned long avail_heap_pages(
 #define avail_for_domheap(mfn) !(allocated_in_map(mfn) || is_xen_heap_mfn(mfn))
 void __init end_boot_allocator(void)
 {
-    unsigned long i;
+    unsigned long i, nr = 0;
     int curr_free, next_free;
 
     /* Pages that are free now go to the domain sub-allocator. */
@@ -546,8 +578,15 @@ void __init end_boot_allocator(void)
         if ( next_free )
             map_alloc(i+1, 1); /* prevent merging in free_heap_pages() */
         if ( curr_free )
-            init_heap_pages(mfn_to_page(i), 1);
+            ++nr;
+        else if ( nr )
+        {
+            init_heap_pages(mfn_to_page(i - nr), nr);
+            nr = 0;
+        }
     }
+    if ( nr )
+        init_heap_pages(mfn_to_page(i - nr), nr);
 
     if ( !dma_bitsize && (num_online_nodes() > 1) )
     {
