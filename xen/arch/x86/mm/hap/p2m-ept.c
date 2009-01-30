@@ -63,7 +63,7 @@ static int ept_set_middle_entry(struct domain *d, ept_entry_t *ept_entry)
 
     pg->count_info = 1;
     pg->u.inuse.type_info = 1 | PGT_validated;
-    list_add_tail(&pg->list, &d->arch.p2m->pages);
+    page_list_add_tail(pg, &d->arch.p2m->pages);
 
     ept_entry->emt = 0;
     ept_entry->igmt = 0;

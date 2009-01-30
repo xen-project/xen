@@ -141,7 +141,7 @@ static int iommu_populate_page_table(struct domain *d)
 
     spin_lock(&d->page_alloc_lock);
 
-    list_for_each_entry ( page, &d->page_list, list )
+    page_list_for_each ( page, &d->page_list )
     {
         if ( (page->u.inuse.type_info & PGT_type_mask) == PGT_writable_page )
         {

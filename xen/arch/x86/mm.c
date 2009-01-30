@@ -333,7 +333,7 @@ void share_xen_page_with_guest(
         page->count_info |= PGC_allocated | 1;
         if ( unlikely(d->xenheap_pages++ == 0) )
             get_knownalive_domain(d);
-        list_add_tail(&page->list, &d->xenpage_list);
+        page_list_add_tail(page, &d->xenpage_list);
     }
 
     spin_unlock(&d->page_alloc_lock);
@@ -3508,7 +3508,7 @@ int steal_page(
     /* Unlink from original owner. */
     if ( !(memflags & MEMF_no_refcount) )
         d->tot_pages--;
-    list_del(&page->list);
+    page_list_del(page, &d->page_list);
 
     spin_unlock(&d->page_alloc_lock);
     return 0;

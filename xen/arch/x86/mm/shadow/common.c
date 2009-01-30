@@ -49,7 +49,7 @@ void shadow_domain_init(struct domain *d)
     shadow_lock_init(d);
     for ( i = 0; i <= SHADOW_MAX_ORDER; i++ )
         INIT_LIST_HEAD(&d->arch.paging.shadow.freelists[i]);
-    INIT_LIST_HEAD(&d->arch.paging.shadow.p2m_freelist);
+    INIT_PAGE_LIST_HEAD(&d->arch.paging.shadow.p2m_freelist);
     INIT_LIST_HEAD(&d->arch.paging.shadow.pinned_shadows);
 
     /* Use shadow pagetables for log-dirty support */
@@ -1672,7 +1672,7 @@ sh_alloc_p2m_pages(struct domain *d)
          */
         page_set_owner(&pg[i], d);
         pg[i].count_info = 1;
-        list_add_tail(&pg[i].list, &d->arch.paging.shadow.p2m_freelist);
+        page_list_add_tail(&pg[i], &d->arch.paging.shadow.p2m_freelist);
     }
     return 1;
 }
@@ -1681,25 +1681,22 @@ sh_alloc_p2m_pages(struct domain *d)
 static struct page_info *
 shadow_alloc_p2m_page(struct domain *d)
 {
-    struct list_head *entry;
     struct page_info *pg;
     mfn_t mfn;
     void *p;
     
     shadow_lock(d);
 
-    if ( list_empty(&d->arch.paging.shadow.p2m_freelist) &&
+    if ( page_list_empty(&d->arch.paging.shadow.p2m_freelist) &&
          !sh_alloc_p2m_pages(d) )
     {
         shadow_unlock(d);
         return NULL;
     }
-    entry = d->arch.paging.shadow.p2m_freelist.next;
-    list_del(entry);
+    pg = page_list_remove_head(&d->arch.paging.shadow.p2m_freelist);
 
     shadow_unlock(d);
 
-    pg = list_entry(entry, struct page_info, list);
     mfn = page_to_mfn(pg);
     p = sh_map_domain_page(mfn);
     clear_page(p);
@@ -3156,7 +3153,6 @@ void shadow_teardown(struct domain *d)
 {
     struct vcpu *v;
     mfn_t mfn;
-    struct list_head *entry, *n;
     struct page_info *pg;
 
     ASSERT(d->is_dying);
@@ -3208,12 +3204,8 @@ void shadow_teardown(struct domain *d)
     }
 #endif /* (SHADOW_OPTIMIZATIONS & (SHOPT_VIRTUAL_TLB|SHOPT_OUT_OF_SYNC)) */
 
-    list_for_each_safe(entry, n, &d->arch.paging.shadow.p2m_freelist)
-    {
-        list_del(entry);
-        pg = list_entry(entry, struct page_info, list);
+    while ( (pg = page_list_remove_head(&d->arch.paging.shadow.p2m_freelist)) )
         shadow_free_p2m_page(d, pg);
-    }
 
     if ( d->arch.paging.shadow.total_pages != 0 )
     {

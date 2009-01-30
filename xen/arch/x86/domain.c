@@ -141,7 +141,7 @@ void dump_pageframe_info(struct domain *d)
     }
     else
     {
-        list_for_each_entry ( page, &d->page_list, list )
+        page_list_for_each ( page, &d->page_list )
         {
             printk("    DomPage %p: caf=%08lx, taf=%" PRtype_info "\n",
                    _p(page_to_mfn(page)),
@@ -154,7 +154,7 @@ void dump_pageframe_info(struct domain *d)
         p2m_pod_dump_data(d);
     }
 
-    list_for_each_entry ( page, &d->xenpage_list, list )
+    page_list_for_each ( page, &d->xenpage_list )
     {
         printk("    XenPage %p: caf=%08lx, taf=%" PRtype_info "\n",
                _p(page_to_mfn(page)),
@@ -380,7 +380,7 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
     INIT_LIST_HEAD(&d->arch.pdev_list);
 
     d->arch.relmem = RELMEM_not_started;
-    INIT_LIST_HEAD(&d->arch.relmem_list);
+    INIT_PAGE_LIST_HEAD(&d->arch.relmem_list);
 
     pdpt_order = get_order_from_bytes(PDPT_L1_ENTRIES * sizeof(l1_pgentry_t));
     d->arch.mm_perdomain_pt = alloc_xenheap_pages(pdpt_order, 0);
@@ -1655,27 +1655,25 @@ int hypercall_xlat_continuation(unsigned int *id, unsigned int mask, ...)
 #endif
 
 static int relinquish_memory(
-    struct domain *d, struct list_head *list, unsigned long type)
+    struct domain *d, struct page_list_head *list, unsigned long type)
 {
-    struct list_head *ent;
-    struct page_info  *page;
+    struct page_info  *page, *cur;
     unsigned long     x, y;
     int               ret = 0;
 
     /* Use a recursive lock, as we may enter 'free_domheap_page'. */
     spin_lock_recursive(&d->page_alloc_lock);
 
-    ent = list->next;
-    while ( ent != list )
+    page = page_list_first(list);
+    while ( !page_list_is_eol(page, list) )
     {
-        page = list_entry(ent, struct page_info, list);
-
         /* Grab a reference to the page so it won't disappear from under us. */
         if ( unlikely(!get_page(page, d)) )
         {
             /* Couldn't get a reference -- someone is freeing this page. */
-            ent = ent->next;
-            list_move_tail(&page->list, &d->arch.relmem_list);
+            cur = page;
+            page = page_list_next(page, list);
+            page_list_move_tail(cur, list, &d->arch.relmem_list);
             continue;
         }
 
@@ -1747,9 +1745,10 @@ static int relinquish_memory(
         }
 
         /* Follow the list chain and /then/ potentially free the page. */
-        ent = ent->next;
-        list_move_tail(&page->list, &d->arch.relmem_list);
-        put_page(page);
+        cur = page;
+        page = page_list_next(page, list);
+        page_list_move_tail(cur, list, &d->arch.relmem_list);
+        put_page(cur);
 
         if ( hypercall_preempt_check() )
         {
@@ -1758,7 +1757,7 @@ static int relinquish_memory(
         }
     }
 
-    list_splice_init(&d->arch.relmem_list, list);
+    page_list_splice_init(&d->arch.relmem_list, list);
 
  out:
     spin_unlock_recursive(&d->page_alloc_lock);

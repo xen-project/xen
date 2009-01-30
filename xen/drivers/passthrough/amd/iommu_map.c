@@ -552,7 +552,6 @@ int amd_iommu_sync_p2m(struct domain *d)
 {
     unsigned long mfn, gfn, flags;
     u64 iommu_l2e;
-    struct list_head *entry;
     struct page_info *page;
     struct hvm_iommu *hd;
     int iw = IOMMU_IO_WRITE_ENABLED;
@@ -568,10 +567,8 @@ int amd_iommu_sync_p2m(struct domain *d)
     if ( hd->p2m_synchronized )
         goto out;
 
-    for ( entry = d->page_list.next; entry != &d->page_list;
-            entry = entry->next )
+    page_list_for_each ( page, &d->page_list )
     {
-        page = list_entry(entry, struct page_info, list);
         mfn = page_to_mfn(page);
         gfn = get_gpfn_from_mfn(mfn);
 

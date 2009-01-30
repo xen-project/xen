@@ -175,7 +175,7 @@ p2m_next_level(struct domain *d, mfn_t *table_mfn, void **table,
         struct page_info *pg = d->arch.p2m->alloc_page(d);
         if ( pg == NULL )
             return 0;
-        list_add_tail(&pg->list, &d->arch.p2m->pages);
+        page_list_add_tail(pg, &d->arch.p2m->pages);
         pg->u.inuse.type_info = type | 1 | PGT_validated;
         pg->count_info = 1;
 
@@ -214,7 +214,7 @@ p2m_next_level(struct domain *d, mfn_t *table_mfn, void **table,
         struct page_info *pg = d->arch.p2m->alloc_page(d);
         if ( pg == NULL )
             return 0;
-        list_add_tail(&pg->list, &d->arch.p2m->pages);
+        page_list_add_tail(pg, &d->arch.p2m->pages);
         pg->u.inuse.type_info = PGT_l1_page_table | 1 | PGT_validated;
         pg->count_info = 1;
         
@@ -300,18 +300,18 @@ p2m_pod_cache_add(struct domain *d,
     for(i=0; i < 1 << order ; i++)
     {
         p = page + i;
-        list_del(&p->list);
+        page_list_del(p, &d->page_list);
     }
 
     /* Then add the first one to the appropriate populate-on-demand list */
     switch(order)
     {
     case 9:
-        list_add_tail(&page->list, &p2md->pod.super); /* lock: page_alloc */
+        page_list_add_tail(page, &p2md->pod.super); /* lock: page_alloc */
         p2md->pod.count += 1 << order;
         break;
     case 0:
-        list_add_tail(&page->list, &p2md->pod.single); /* lock: page_alloc */
+        page_list_add_tail(page, &p2md->pod.single); /* lock: page_alloc */
         p2md->pod.count += 1 ;
         break;
     default:
@@ -334,54 +334,51 @@ static struct page_info * p2m_pod_cache_get(struct domain *d,
     struct page_info *p = NULL;
     int i;
 
-    if ( order == 9 && list_empty(&p2md->pod.super) )
+    if ( order == 9 && page_list_empty(&p2md->pod.super) )
     {
         return NULL;
     }
-    else if ( order == 0 && list_empty(&p2md->pod.single) )
+    else if ( order == 0 && page_list_empty(&p2md->pod.single) )
     {
         unsigned long mfn;
         struct page_info *q;
 
-        BUG_ON( list_empty(&p2md->pod.super) );
+        BUG_ON( page_list_empty(&p2md->pod.super) );
 
         /* Break up a superpage to make single pages. NB count doesn't
          * need to be adjusted. */
         printk("%s: Breaking up superpage.\n", __func__);
-        p = list_entry(p2md->pod.super.next, struct page_info, list);
-        list_del(&p->list);
+        p = page_list_remove_head(&p2md->pod.super);
         mfn = mfn_x(page_to_mfn(p));
 
         for ( i=0; i<(1<<9); i++ )
         {
             q = mfn_to_page(_mfn(mfn+i));
-            list_add_tail(&q->list, &p2md->pod.single);
+            page_list_add_tail(q, &p2md->pod.single);
         }
     }
 
     switch ( order )
     {
     case 9:
-        BUG_ON( list_empty(&p2md->pod.super) );
-        p = list_entry(p2md->pod.super.next, struct page_info, list); 
+        BUG_ON( page_list_empty(&p2md->pod.super) );
+        p = page_list_remove_head(&p2md->pod.super);
         p2md->pod.count -= 1 << order; /* Lock: page_alloc */
         break;
     case 0:
-        BUG_ON( list_empty(&p2md->pod.single) );
-        p = list_entry(p2md->pod.single.next, struct page_info, list);
+        BUG_ON( page_list_empty(&p2md->pod.single) );
+        p = page_list_remove_head(&p2md->pod.single);
         p2md->pod.count -= 1;
         break;
     default:
         BUG();
     }
 
-    list_del(&p->list);
-
     /* Put the pages back on the domain page_list */
     for ( i = 0 ; i < (1 << order) ; i++ )
     {
         BUG_ON(page_get_owner(p + i) != d);
-        list_add_tail(&p[i].list, &d->page_list);
+        page_list_add_tail(p + i, &d->page_list);
     }
 
     return p;
@@ -425,7 +422,7 @@ p2m_pod_set_cache_target(struct domain *d, unsigned long pod_target)
         spin_lock(&d->page_alloc_lock);
 
         if ( (p2md->pod.count - pod_target) > (1>>9)
-             && !list_empty(&p2md->pod.super) )
+             && !page_list_empty(&p2md->pod.super) )
             order = 9;
         else
             order = 0;
@@ -535,38 +532,27 @@ void
 p2m_pod_empty_cache(struct domain *d)
 {
     struct p2m_domain *p2md = d->arch.p2m;
-    struct list_head *q, *p;
+    struct page_info *page;
 
     spin_lock(&d->page_alloc_lock);
 
-    list_for_each_safe(p, q, &p2md->pod.super) /* lock: page_alloc */
+    while ( (page = page_list_remove_head(&p2md->pod.super)) )
     {
         int i;
-        struct page_info *page;
             
-        list_del(p);
-            
-        page = list_entry(p, struct page_info, list);
-
         for ( i = 0 ; i < (1 << 9) ; i++ )
         {
             BUG_ON(page_get_owner(page + i) != d);
-            list_add_tail(&page[i].list, &d->page_list);
+            page_list_add_tail(page + i, &d->page_list);
         }
 
         p2md->pod.count -= 1<<9;
     }
 
-    list_for_each_safe(p, q, &p2md->pod.single)
+    while ( (page = page_list_remove_head(&p2md->pod.single)) )
     {
-        struct page_info *page;
-            
-        list_del(p);
-            
-        page = list_entry(p, struct page_info, list);
-
         BUG_ON(page_get_owner(page) != d);
-        list_add_tail(&page->list, &d->page_list);
+        page_list_add_tail(page, &d->page_list);
 
         p2md->pod.count -= 1;
     }
@@ -952,7 +938,7 @@ p2m_pod_emergency_sweep_super(struct domain *d)
          * NB that this is a zero-sum game; we're increasing our cache size
          * by increasing our 'debt'.  Since we hold the p2m lock,
          * (entry_count - count) must remain the same. */
-        if ( !list_empty(&p2md->pod.super) &&  i < limit )
+        if ( !page_list_empty(&p2md->pod.super) &&  i < limit )
             break;
     }
 
@@ -1035,12 +1021,12 @@ p2m_pod_demand_populate(struct domain *d, unsigned long gfn,
     }
 
     /* If we're low, start a sweep */
-    if ( order == 9 && list_empty(&p2md->pod.super) )
+    if ( order == 9 && page_list_empty(&p2md->pod.super) )
         p2m_pod_emergency_sweep_super(d);
 
-    if ( list_empty(&p2md->pod.single) &&
+    if ( page_list_empty(&p2md->pod.single) &&
          ( ( order == 0 )
-           || (order == 9 && list_empty(&p2md->pod.super) ) ) )
+           || (order == 9 && page_list_empty(&p2md->pod.super) ) ) )
         p2m_pod_emergency_sweep(d);
 
     /* Keep track of the highest gfn demand-populated by a guest fault */
@@ -1477,9 +1463,9 @@ int p2m_init(struct domain *d)
 
     memset(p2m, 0, sizeof(*p2m));
     p2m_lock_init(p2m);
-    INIT_LIST_HEAD(&p2m->pages);
-    INIT_LIST_HEAD(&p2m->pod.super);
-    INIT_LIST_HEAD(&p2m->pod.single);
+    INIT_PAGE_LIST_HEAD(&p2m->pages);
+    INIT_PAGE_LIST_HEAD(&p2m->pod.super);
+    INIT_PAGE_LIST_HEAD(&p2m->pod.single);
 
     p2m->set_entry = p2m_set_entry;
     p2m->get_entry = p2m_gfn_to_mfn;
@@ -1540,7 +1526,6 @@ int p2m_alloc_table(struct domain *d,
 
 {
     mfn_t mfn = _mfn(INVALID_MFN);
-    struct list_head *entry;
     struct page_info *page, *p2m_top;
     unsigned int page_count = 0;
     unsigned long gfn = -1UL;
@@ -1566,7 +1551,7 @@ int p2m_alloc_table(struct domain *d,
         p2m_unlock(p2m);
         return -ENOMEM;
     }
-    list_add_tail(&p2m_top->list, &p2m->pages);
+    page_list_add_tail(p2m_top, &p2m->pages);
 
     p2m_top->count_info = 1;
     p2m_top->u.inuse.type_info =
@@ -1587,11 +1572,8 @@ int p2m_alloc_table(struct domain *d,
         goto error;
 
     /* Copy all existing mappings from the page list and m2p */
-    for ( entry = d->page_list.next;
-          entry != &d->page_list;
-          entry = entry->next )
+    page_list_for_each(page, &d->page_list)
     {
-        page = list_entry(entry, struct page_info, list);
         mfn = page_to_mfn(page);
         gfn = get_gpfn_from_mfn(mfn_x(mfn));
         page_count++;
@@ -1621,19 +1603,14 @@ void p2m_teardown(struct domain *d)
 /* Return all the p2m pages to Xen.
  * We know we don't have any extra mappings to these pages */
 {
-    struct list_head *entry, *n;
     struct page_info *pg;
     struct p2m_domain *p2m = d->arch.p2m;
 
     p2m_lock(p2m);
     d->arch.phys_table = pagetable_null();
 
-    list_for_each_safe(entry, n, &p2m->pages)
-    {
-        pg = list_entry(entry, struct page_info, list);
-        list_del(entry);
+    while ( (pg = page_list_remove_head(&p2m->pages)) )
         p2m->free_page(d, pg);
-    }
     p2m_unlock(p2m);
 }
 

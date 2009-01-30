@@ -12,15 +12,24 @@
  * Per-page-frame information.
  * 
  * Every architecture must ensure the following:
- *  1. 'struct page_info' contains a 'struct list_head list'.
+ *  1. 'struct page_info' contains a 'struct page_list_entry list'.
  *  2. Provide a PFN_ORDER() macro for accessing the order of a free page.
  */
 #define PFN_ORDER(_pfn) ((_pfn)->u.free.order)
 
+#ifndef __i386__
+# undef page_list_entry
+struct page_list_entry
+{
+    unsigned int next, prev;
+    unsigned long _pad_for_sh_; /* until struct shadow_page_info gets updated */
+};
+#endif
+
 struct page_info
 {
     /* Each frame can be threaded onto a doubly-linked list. */
-    struct list_head list;
+    struct page_list_entry list;
 
     /* Reference count and various PGC_xxx flags and fields. */
     unsigned long count_info;

@@ -240,7 +240,7 @@ long arch_do_domctl(
         struct domain *d = rcu_lock_domain_by_id(domctl->domain);
         unsigned long max_pfns = domctl->u.getmemlist.max_pfns;
         uint64_t mfn;
-        struct list_head *list_ent;
+        struct page_info *page;
 
         ret = -EINVAL;
         if ( d != NULL )
@@ -259,19 +259,19 @@ long arch_do_domctl(
                 goto getmemlist_out;
             }
 
-            ret = 0;
-            list_ent = d->page_list.next;
-            for ( i = 0; (i < max_pfns) && (list_ent != &d->page_list); i++ )
+            ret = i = 0;
+            page_list_for_each(page, &d->page_list)
             {
-                mfn = page_to_mfn(list_entry(
-                    list_ent, struct page_info, list));
+                if ( i >= max_pfns )
+                    break;
+                mfn = page_to_mfn(page);
                 if ( copy_to_guest_offset(domctl->u.getmemlist.buffer,
                                           i, &mfn, 1) )
                 {
                     ret = -EFAULT;
                     break;
                 }
-                list_ent = mfn_to_page(mfn)->list.next;
+                ++i;
             }
             
             spin_unlock(&d->page_alloc_lock);

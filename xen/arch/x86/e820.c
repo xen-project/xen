@@ -1,10 +1,10 @@
 #include <xen/config.h>
 #include <xen/init.h>
 #include <xen/lib.h>
+#include <xen/mm.h>
 #include <xen/compat.h>
 #include <xen/dmi.h>
 #include <asm/e820.h>
-#include <asm/mm.h>
 #include <asm/page.h>
 
 /* opt_mem: Limit of physical RAM. Any RAM beyond this point is ignored. */

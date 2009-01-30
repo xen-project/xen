@@ -85,21 +85,220 @@ int assign_pages(
 #define MAX_ORDER 20 /* 2^20 contiguous pages */
 #endif
 
+#define page_list_entry list_head
+
+#include <asm/mm.h>
+
+#ifndef page_list_entry
+struct page_list_head
+{
+    struct page_info *next, *tail;
+};
+/* These must only have instances in struct page_info. */
+# define page_list_entry
+
+# define PAGE_LIST_HEAD_INIT(name) { NULL, NULL }
+# define PAGE_LIST_HEAD(name) \
+    struct page_list_head name = PAGE_LIST_HEAD_INIT(name)
+# define INIT_PAGE_LIST_HEAD(head) ((head)->tail = (head)->next = NULL)
+# define INIT_PAGE_LIST_ENTRY(ent) ((ent)->prev = (ent)->next = ~0)
+
+static inline int
+page_list_empty(const struct page_list_head *head)
+{
+    return !head->next;
+}
+static inline struct page_info *
+page_list_first(const struct page_list_head *head)
+{
+    return head->next;
+}
+static inline struct page_info *
+page_list_next(const struct page_info *page,
+               const struct page_list_head *head)
+{
+    return page != head->tail ? mfn_to_page(page->list.next) : NULL;
+}
+static inline struct page_info *
+page_list_prev(const struct page_info *page,
+               const struct page_list_head *head)
+{
+    return page != head->next ? mfn_to_page(page->list.prev) : NULL;
+}
+static inline int
+page_list_is_eol(const struct page_info *page,
+                 const struct page_list_head *head)
+{
+    return !page;
+}
+static inline void
+page_list_add(struct page_info *page, struct page_list_head *head)
+{
+    if ( head->next )
+    {
+        page->list.next = page_to_mfn(head->next);
+        head->next->list.prev = page_to_mfn(page);
+    }
+    else
+    {
+        head->tail = page;
+        page->list.next = ~0;
+    }
+    page->list.prev = ~0;
+    head->next = page;
+}
+static inline void
+page_list_add_tail(struct page_info *page, struct page_list_head *head)
+{
+    page->list.next = ~0;
+    if ( head->next )
+    {
+        page->list.prev = page_to_mfn(head->tail);
+        head->tail->list.next = page_to_mfn(page);
+    }
+    else
+    {
+        page->list.prev = ~0;
+        head->next = page;
+    }
+    head->tail = page;
+}
+static inline bool_t
+__page_list_del_head(struct page_info *page, struct page_list_head *head,
+                     struct page_info *next, struct page_info *prev)
+{
+    if ( head->next == page )
+    {
+        if ( head->tail != page )
+        {
+            next->list.prev = ~0;
+            head->next = next;
+        }
+        else
+            head->tail = head->next = NULL;
+        return 1;
+    }
+
+    if ( head->tail == page )
+    {
+        prev->list.next = ~0;
+        head->tail = prev;
+        return 1;
+    }
+
+    return 0;
+}
+static inline void
+page_list_del(struct page_info *page, struct page_list_head *head)
+{
+    struct page_info *next = mfn_to_page(page->list.next);
+    struct page_info *prev = mfn_to_page(page->list.prev);
+
+    if ( !__page_list_del_head(page, head, next, prev) )
+    {
+        next->list.prev = page->list.prev;
+        prev->list.next = page->list.next;
+    }
+}
+static inline void
+page_list_del2(struct page_info *page, struct page_list_head *head1,
+               struct page_list_head *head2)
+{
+    struct page_info *next = mfn_to_page(page->list.next);
+    struct page_info *prev = mfn_to_page(page->list.prev);
+
+    if ( !__page_list_del_head(page, head1, next, prev) &&
+         !__page_list_del_head(page, head2, next, prev) )
+    {
+        next->list.prev = page->list.prev;
+        prev->list.next = page->list.next;
+    }
+}
+static inline void
+page_list_move_tail(struct page_info *page, struct page_list_head *list,
+                    struct page_list_head *head)
+{
+    page_list_del(page, list);
+    page_list_add_tail(page, head);
+}
+static inline struct page_info *
+page_list_remove_head(struct page_list_head *head)
+{
+    struct page_info *page = head->next;
+
+    if ( page )
+        page_list_del(page, head);
+
+    return page;
+}
+static inline void
+page_list_splice_init(struct page_list_head *list, struct page_list_head *head)
+{
+    if ( !page_list_empty(list) )
+    {
+        if ( head->next )
+            head->tail->list.next = page_to_mfn(list->next);
+        else
+            head->next = list->next;
+        head->tail = list->tail;
+        INIT_PAGE_LIST_HEAD(list);
+    }
+}
+
+#define page_list_for_each(pos, head) \
+    for ( pos = (head)->next; pos; pos = page_list_next(pos, head) )
+#define page_list_for_each_safe(pos, tmp, head) \
+    for ( pos = (head)->next; \
+          pos ? (tmp = page_list_next(pos, head), 1) : 0; \
+          pos = tmp )
+#define page_list_for_each_safe_reverse(pos, tmp, head) \
+    for ( pos = (head)->tail; \
+          pos ? (tmp = page_list_prev(pos, head), 1) : 0; \
+          pos = tmp )
+#else
+# define page_list_head                  list_head
+# define PAGE_LIST_HEAD_INIT             LIST_HEAD_INIT
+# define PAGE_LIST_HEAD                  LIST_HEAD
+# define INIT_PAGE_LIST_HEAD             INIT_LIST_HEAD
+# define INIT_PAGE_LIST_ENTRY            INIT_LIST_HEAD
+# define page_list_empty                 list_empty
+# define page_list_first(hd)             list_entry((hd)->next, \
+                                                    struct page_info, list)
+# define page_list_next(pg, hd)          list_entry((pg)->list.next, \
+                                                    struct page_info, list)
+# define page_list_is_eol(pg, hd)        (&(pg)->list == (hd))
+# define page_list_add(pg, hd)           list_add(&(pg)->list, hd)
+# define page_list_add_tail(pg, hd)      list_add_tail(&(pg)->list, hd)
+# define page_list_del(pg, hd)           list_del(&(pg)->list)
+# define page_list_del2(pg, hd1, hd2)    list_del(&(pg)->list)
+# define page_list_move_tail(pg, o, n)   list_move_tail(&(pg)->list, n)
+# define page_list_remove_head(hd)       (!page_list_empty(hd) ? \
+    ({ \
+        struct page_info *__pg = page_list_first(hd); \
+        list_del(&__pg->list); \
+        __pg; \
+    }) : NULL)
+# define page_list_splice_init           list_splice_init
+# define page_list_for_each(pos, head)   list_for_each_entry(pos, head, list)
+# define page_list_for_each_safe(pos, tmp, head) \
+    list_for_each_entry_safe(pos, tmp, head, list)
+# define page_list_for_each_safe_reverse(pos, tmp, head) \
+    list_for_each_entry_safe_reverse(pos, tmp, head, list)
+#endif
+
 /* Automatic page scrubbing for dead domains. */
-extern struct list_head page_scrub_list;
-#define page_scrub_schedule_work()              \
-    do {                                        \
-        if ( !list_empty(&page_scrub_list) )    \
-            raise_softirq(PAGE_SCRUB_SOFTIRQ);  \
+extern struct page_list_head page_scrub_list;
+#define page_scrub_schedule_work()                 \
+    do {                                           \
+        if ( !page_list_empty(&page_scrub_list) )  \
+            raise_softirq(PAGE_SCRUB_SOFTIRQ);     \
     } while ( 0 )
 #define page_scrub_kick()                                               \
     do {                                                                \
-        if ( !list_empty(&page_scrub_list) )                            \
+        if ( !page_list_empty(&page_scrub_list) )                       \
             cpumask_raise_softirq(cpu_online_map, PAGE_SCRUB_SOFTIRQ);  \
     } while ( 0 )
 unsigned long avail_scrub_pages(void);
-
-#include <asm/mm.h>
 
 int guest_remove_page(struct domain *d, unsigned long gmfn);
 

@@ -233,8 +233,8 @@ struct domain *domain_create(
     spin_lock_init(&d->page_alloc_lock);
     spin_lock_init(&d->shutdown_lock);
     spin_lock_init(&d->hypercall_deadlock_mutex);
-    INIT_LIST_HEAD(&d->page_list);
-    INIT_LIST_HEAD(&d->xenpage_list);
+    INIT_PAGE_LIST_HEAD(&d->page_list);
+    INIT_PAGE_LIST_HEAD(&d->xenpage_list);
 
     if ( domcr_flags & DOMCRF_hvm )
         d->is_hvm = 1;

@@ -71,7 +71,7 @@ integer_param("dma_bits", dma_bitsize);
 #endif
 
 static DEFINE_SPINLOCK(page_scrub_lock);
-LIST_HEAD(page_scrub_list);
+PAGE_LIST_HEAD(page_scrub_list);
 static unsigned long scrub_pages;
 
 /*********************
@@ -264,7 +264,7 @@ unsigned long __init alloc_boot_pages(
 #define page_to_zone(pg) (is_xen_heap_page(pg) ? MEMZONE_XEN :  \
                           (fls(page_to_mfn(pg)) - 1))
 
-typedef struct list_head heap_by_zone_and_order_t[NR_ZONES][MAX_ORDER+1];
+typedef struct page_list_head heap_by_zone_and_order_t[NR_ZONES][MAX_ORDER+1];
 static heap_by_zone_and_order_t *_heap[MAX_NUMNODES];
 #define heap(node, zone, order) ((*_heap[node])[zone][order])
 
@@ -298,7 +298,7 @@ static void init_node_heap(int node)
 
     for ( i = 0; i < NR_ZONES; i++ )
         for ( j = 0; j <= MAX_ORDER; j++ )
-            INIT_LIST_HEAD(&(*_heap[node])[i][j]);
+            INIT_PAGE_LIST_HEAD(&(*_heap[node])[i][j]);
 }
 
 /* Allocate 2^@order contiguous pages. */
@@ -340,7 +340,7 @@ static struct page_info *alloc_heap_pages(
 
             /* Find smallest order which can satisfy the request. */
             for ( j = order; j <= MAX_ORDER; j++ )
-                if ( !list_empty(&heap(node, zone, j)) )
+                if ( (pg = page_list_remove_head(&heap(node, zone, j))) )
                     goto found;
         } while ( zone-- > zone_lo ); /* careful: unsigned zone may wrap */
 
@@ -354,14 +354,11 @@ static struct page_info *alloc_heap_pages(
     return NULL;
 
  found: 
-    pg = list_entry(heap(node, zone, j).next, struct page_info, list);
-    list_del(&pg->list);
-
     /* We may have to halve the chunk a number of times. */
     while ( j != order )
     {
         PFN_ORDER(pg) = --j;
-        list_add_tail(&pg->list, &heap(node, zone, j));
+        page_list_add_tail(pg, &heap(node, zone, j));
         pg += 1 << j;
     }
     
@@ -452,8 +449,8 @@ static void free_heap_pages(
             if ( allocated_in_map(page_to_mfn(pg)-mask) ||
                  (PFN_ORDER(pg-mask) != order) )
                 break;
-            list_del(&(pg-mask)->list);
             pg -= mask;
+            page_list_del(pg, &heap(node, zone, order));
         }
         else
         {
@@ -461,7 +458,7 @@ static void free_heap_pages(
             if ( allocated_in_map(page_to_mfn(pg)+mask) ||
                  (PFN_ORDER(pg+mask) != order) )
                 break;
-            list_del(&(pg+mask)->list);
+            page_list_del(pg + mask, &heap(node, zone, order));
         }
         
         order++;
@@ -471,7 +468,7 @@ static void free_heap_pages(
     }
 
     PFN_ORDER(pg) = order;
-    list_add_tail(&pg->list, &heap(node, zone, order));
+    page_list_add_tail(pg, &heap(node, zone, order));
 
     spin_unlock(&heap_lock);
 }
@@ -786,7 +783,7 @@ int assign_pages(
         page_set_owner(&pg[i], d);
         wmb(); /* Domain pointer must be visible before updating refcnt. */
         pg[i].count_info = PGC_allocated | 1;
-        list_add_tail(&pg[i].list, &d->page_list);
+        page_list_add_tail(&pg[i], &d->page_list);
     }
 
     spin_unlock(&d->page_alloc_lock);
@@ -844,7 +841,7 @@ void free_domheap_pages(struct page_info *pg, unsigned int order)
         spin_lock_recursive(&d->page_alloc_lock);
 
         for ( i = 0; i < (1 << order); i++ )
-            list_del(&pg[i].list);
+            page_list_del2(&pg[i], &d->xenpage_list, &d->arch.relmem_list);
 
         d->xenheap_pages -= 1 << order;
         drop_dom_ref = (d->xenheap_pages == 0);
@@ -859,7 +856,7 @@ void free_domheap_pages(struct page_info *pg, unsigned int order)
         for ( i = 0; i < (1 << order); i++ )
         {
             BUG_ON((pg[i].u.inuse.type_info & PGT_count_mask) != 0);
-            list_del(&pg[i].list);
+            page_list_del2(&pg[i], &d->page_list, &d->arch.relmem_list);
         }
 
         d->tot_pages -= 1 << order;
@@ -882,7 +879,7 @@ void free_domheap_pages(struct page_info *pg, unsigned int order)
             {
                 page_set_owner(&pg[i], NULL);
                 spin_lock(&page_scrub_lock);
-                list_add(&pg[i].list, &page_scrub_list);
+                page_list_add(&pg[i], &page_scrub_list);
                 scrub_pages++;
                 spin_unlock(&page_scrub_lock);
             }
@@ -965,7 +962,7 @@ static DEFINE_PER_CPU(struct timer, page_scrub_timer);
 
 static void page_scrub_softirq(void)
 {
-    struct list_head *ent;
+    PAGE_LIST_HEAD(list);
     struct page_info  *pg;
     void             *p;
     int               i;
@@ -983,32 +980,26 @@ static void page_scrub_softirq(void)
     do {
         spin_lock(&page_scrub_lock);
 
-        if ( unlikely((ent = page_scrub_list.next) == &page_scrub_list) )
+        /* Peel up to 16 pages from the list. */
+        for ( i = 0; i < 16; i++ )
+        {
+            if ( !(pg = page_list_remove_head(&page_scrub_list)) )
+                break;
+            page_list_add_tail(pg, &list);
+        }
+        
+        if ( unlikely(i == 0) )
         {
             spin_unlock(&page_scrub_lock);
             goto out;
         }
-        
-        /* Peel up to 16 pages from the list. */
-        for ( i = 0; i < 16; i++ )
-        {
-            if ( ent->next == &page_scrub_list )
-                break;
-            ent = ent->next;
-        }
-        
-        /* Remove peeled pages from the list. */
-        ent->next->prev = &page_scrub_list;
-        page_scrub_list.next = ent->next;
-        scrub_pages -= (i+1);
+
+        scrub_pages -= i;
 
         spin_unlock(&page_scrub_lock);
 
-        /* Working backwards, scrub each page in turn. */
-        while ( ent != &page_scrub_list )
-        {
-            pg = list_entry(ent, struct page_info, list);
-            ent = ent->prev;
+        /* Scrub each page in turn. */
+        while ( (pg = page_list_remove_head(&list)) ) {
             p = map_domain_page(page_to_mfn(pg));
             scrub_page(p);
             unmap_domain_page(p);

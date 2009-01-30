@@ -110,7 +110,7 @@ struct p2m_domain {
     const char        *locker_function; /* Func that took it */
 
     /* Pages used to construct the p2m */
-    struct list_head   pages;
+    struct page_list_head pages;
 
     /* Functions to call to get or free pages for the p2m */
     struct page_info * (*alloc_page  )(struct domain *d);
@@ -148,7 +148,7 @@ struct p2m_domain {
      *   protect moving stuff from the PoD cache to the domain page list.
      */
     struct {
-        struct list_head super,        /* List of superpages                */
+        struct page_list_head super,   /* List of superpages                */
                          single;       /* Non-super lists                   */
         int              count,        /* # of pages in cache lists         */
                          entry_count;  /* # of pages in p2m marked pod      */
