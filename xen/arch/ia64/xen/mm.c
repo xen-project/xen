@@ -3484,7 +3484,7 @@ p2m_pod_decrease_reservation(struct domain *d, xen_pfn_t gpfn,
                              unsigned int order)
 {
     gdprintk(XENLOG_WARNING, "populate on demand isn't supported yet\n");
-    return 1;
+    return 0;
 }
 
 /*
