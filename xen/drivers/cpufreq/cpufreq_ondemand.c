@@ -333,7 +333,7 @@ static int __init cpufreq_gov_dbs_init(void)
 }
 __initcall(cpufreq_gov_dbs_init);
 
-static void cpufreq_gov_dbs_exit(void)
+static void __exit cpufreq_gov_dbs_exit(void)
 {
     cpufreq_unregister_governor(&cpufreq_gov_dbs);
 }

@@ -61,7 +61,7 @@ static int __init cpufreq_gov_userspace_init(void)
 }
 __initcall(cpufreq_gov_userspace_init);
 
-static void cpufreq_gov_userspace_exit(void)
+static void __exit cpufreq_gov_userspace_exit(void)
 {
     cpufreq_unregister_governor(&cpufreq_gov_userspace);
 }
@@ -106,7 +106,7 @@ static int __init cpufreq_gov_performance_init(void)
 }
 __initcall(cpufreq_gov_performance_init);
 
-static void cpufreq_gov_performance_exit(void)
+static void __exit cpufreq_gov_performance_exit(void)
 {
     cpufreq_unregister_governor(&cpufreq_gov_performance);
 }
@@ -151,7 +151,7 @@ static int __init cpufreq_gov_powersave_init(void)
 }
 __initcall(cpufreq_gov_powersave_init);
 
-static void cpufreq_gov_powersave_exit(void)
+static void __exit cpufreq_gov_powersave_exit(void)
 {
     cpufreq_unregister_governor(&cpufreq_gov_powersave);
 }
