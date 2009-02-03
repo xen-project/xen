@@ -41,7 +41,6 @@ boolean_param("dom0_vcpus_pin", opt_dom0_vcpus_pin);
 
 /* set xen as default cpufreq */
 enum cpufreq_controller cpufreq_controller = FREQCTL_xen;
-struct cpufreq_governor *cpufreq_opt_governor;
 
 static void __init setup_cpufreq_option(char *str)
 {
@@ -70,19 +69,6 @@ static void __init setup_cpufreq_option(char *str)
             cpufreq_cmdline_parse(arg);
 }
 custom_param("cpufreq", setup_cpufreq_option);
-
-static void __init setup_cpufreq_gov_option(char *str)
-{
-    if ( !strcmp(str, "userspace") )
-        cpufreq_opt_governor = &cpufreq_gov_userspace;
-    else if ( !strcmp(str, "performance") )
-        cpufreq_opt_governor = &cpufreq_gov_performance;
-    else if ( !strcmp(str, "powersave") )
-        cpufreq_opt_governor = &cpufreq_gov_powersave;
-    else if ( !strcmp(str, "ondemand") )
-        cpufreq_opt_governor = &cpufreq_gov_dbs;
-}
-custom_param("cpufreq_governor", setup_cpufreq_gov_option);
 
 /* Protect updates/reads (resp.) of domain_list and domain_hash. */
 DEFINE_SPINLOCK(domlist_update_lock);

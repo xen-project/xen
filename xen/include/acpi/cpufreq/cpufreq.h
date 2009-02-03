@@ -87,6 +87,7 @@ struct cpufreq_governor {
     char    name[CPUFREQ_NAME_LEN];
     int     (*governor)(struct cpufreq_policy *policy,
                         unsigned int event);
+    void    (*handle_option)(const char *name, const char *value);
     struct list_head governor_list;
 };
 

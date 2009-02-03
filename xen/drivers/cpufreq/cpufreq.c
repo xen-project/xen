@@ -53,6 +53,7 @@ struct cpufreq_dom {
 };
 static LIST_HEAD(cpufreq_dom_list_head);
 
+struct cpufreq_governor *cpufreq_opt_governor;
 LIST_HEAD(cpufreq_governor_list);
 
 struct cpufreq_governor *__find_governor(const char *governor)
@@ -467,3 +468,47 @@ out:
     return ret;
 }
 
+void __init cpufreq_cmdline_parse(char *str)
+{
+    static struct cpufreq_governor *__initdata cpufreq_governors[] =
+    {
+        &cpufreq_gov_userspace,
+        &cpufreq_gov_dbs,
+        &cpufreq_gov_performance,
+        &cpufreq_gov_powersave
+    };
+
+    do {
+        char *val, *end = strchr(str, ',');
+        unsigned int i;
+
+        if ( end )
+            *end++ = '\0';
+        val = strchr(str, '=');
+        if ( val )
+            *val++ = '\0';
+
+        if ( !cpufreq_opt_governor )
+        {
+            if ( !val )
+            {
+                for ( i = 0; i < ARRAY_SIZE(cpufreq_governors); ++i )
+                    if ( !strcmp(str, cpufreq_governors[i]->name) )
+                    {
+                        cpufreq_opt_governor = cpufreq_governors[i];
+                        str = NULL;
+                        break;
+                    }
+            }
+            else
+                cpufreq_opt_governor = CPUFREQ_DEFAULT_GOVERNOR;
+        }
+
+        if ( str )
+            for ( i = 0; i < ARRAY_SIZE(cpufreq_governors); ++i )
+                if ( cpufreq_governors[i]->handle_option )
+                    cpufreq_governors[i]->handle_option(str, val);
+
+        str = end;
+    } while ( str );
+}
