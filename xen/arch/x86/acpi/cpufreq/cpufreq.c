@@ -58,6 +58,9 @@ static struct acpi_cpufreq_data *drv_data[NR_CPUS];
 
 static struct cpufreq_driver acpi_cpufreq_driver;
 
+static unsigned int __read_mostly acpi_pstate_strict;
+integer_param("acpi_pstate_strict", acpi_pstate_strict);
+
 static int check_est_cpu(unsigned int cpuid)
 {
     struct cpuinfo_x86 *cpu = &cpu_data[cpuid];
@@ -193,28 +196,27 @@ static void drv_write(struct drv_cmd *cmd)
 
 static u32 get_cur_val(cpumask_t mask)
 {
-    struct cpufreq_policy *policy;
     struct processor_performance *perf;
     struct drv_cmd cmd;
-    unsigned int cpu;
+    unsigned int cpu = smp_processor_id();
 
     if (unlikely(cpus_empty(mask)))
         return 0;
 
-    cpu = first_cpu(mask);
-    policy = cpufreq_cpu_policy[cpu];
+    if (!cpu_isset(cpu, mask))
+        cpu = first_cpu(mask);
 
-    if (!policy)
+    if (cpu >= NR_CPUS || !drv_data[cpu])
         return 0;    
 
-    switch (drv_data[policy->cpu]->cpu_feature) {
+    switch (drv_data[cpu]->cpu_feature) {
     case SYSTEM_INTEL_MSR_CAPABLE:
         cmd.type = SYSTEM_INTEL_MSR_CAPABLE;
         cmd.addr.msr.reg = MSR_IA32_PERF_STATUS;
         break;
     case SYSTEM_IO_CAPABLE:
         cmd.type = SYSTEM_IO_CAPABLE;
-        perf = drv_data[first_cpu(mask)]->acpi_data;
+        perf = drv_data[cpu]->acpi_data;
         cmd.addr.io.port = perf->control_register.address;
         cmd.addr.io.bit_width = perf->control_register.bit_width;
         break;
@@ -393,7 +395,7 @@ static int acpi_cpufreq_target(struct cpufreq_policy *policy,
 
     drv_write(&cmd);
 
-    if (!check_freqs(cmd.mask, freqs.new, data)) {
+    if (acpi_pstate_strict && !check_freqs(cmd.mask, freqs.new, data)) {
         printk(KERN_WARNING "Fail transfer to new freq %d\n", freqs.new);
         return -EAGAIN;
     }
