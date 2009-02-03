@@ -3659,7 +3659,6 @@ int shadow_track_dirty_vram(struct domain *d,
         for ( i = 0; i < nr; i++ ) {
             mfn_t mfn = gfn_to_mfn(d, begin_pfn + i, &t);
             struct page_info *page;
-            u32 count_info;
             int dirty = 0;
             paddr_t sl1ma = d->dirty_vram->sl1ma[i];
 
@@ -3670,8 +3669,7 @@ int shadow_track_dirty_vram(struct domain *d,
             else
             {
                 page = mfn_to_page(mfn);
-                count_info = page->u.inuse.type_info & PGT_count_mask;
-                switch (count_info)
+                switch (page->u.inuse.type_info & PGT_count_mask)
                 {
                 case 0:
                     /* No guest reference, nothing to track. */
