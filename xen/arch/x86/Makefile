@@ -92,3 +92,4 @@ boot/mkelf32: boot/mkelf32.c
 clean::
 	rm -f asm-offsets.s xen.lds boot/*.o boot/*~ boot/core boot/mkelf32
 	rm -f $(BASEDIR)/.xen-syms.[0-9]* boot/.*.d
+	rm -f boot/reloc.S boot/reloc.lnk boot/reloc.bin
