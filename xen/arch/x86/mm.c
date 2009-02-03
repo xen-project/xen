@@ -2773,7 +2773,7 @@ int do_mmuext_op(
         }
 
         case MMUEXT_TLB_FLUSH_ALL:
-            flush_tlb_mask(d->domain_dirty_cpumask);
+            this_cpu(percpu_mm_info).deferred_ops |= DOP_FLUSH_ALL_TLBS;
             break;
     
         case MMUEXT_INVLPG_ALL:
@@ -3567,34 +3567,40 @@ int do_update_va_mapping(unsigned long va, u64 val64,
     if ( pl1e )
         guest_unmap_l1e(v, pl1e);
 
-    process_deferred_ops();
-
     switch ( flags & UVMF_FLUSHTYPE_MASK )
     {
     case UVMF_TLB_FLUSH:
         switch ( (bmap_ptr = flags & ~UVMF_FLUSHTYPE_MASK) )
         {
         case UVMF_LOCAL:
-            flush_tlb_local();
+            this_cpu(percpu_mm_info).deferred_ops |= DOP_FLUSH_TLB;
             break;
         case UVMF_ALL:
-            flush_tlb_mask(d->domain_dirty_cpumask);
+            this_cpu(percpu_mm_info).deferred_ops |= DOP_FLUSH_ALL_TLBS;
             break;
         default:
+            if ( this_cpu(percpu_mm_info).deferred_ops & DOP_FLUSH_ALL_TLBS )
+                break;
             if ( unlikely(!is_pv_32on64_domain(d) ?
                           get_user(vmask, (unsigned long *)bmap_ptr) :
                           get_user(vmask, (unsigned int *)bmap_ptr)) )
-                rc = -EFAULT;
+                rc = -EFAULT, vmask = 0;
             pmask = vcpumask_to_pcpumask(d, vmask);
+            if ( cpu_isset(smp_processor_id(), pmask) )
+                this_cpu(percpu_mm_info).deferred_ops &= ~DOP_FLUSH_TLB;
             flush_tlb_mask(pmask);
             break;
         }
         break;
 
     case UVMF_INVLPG:
+        if ( this_cpu(percpu_mm_info).deferred_ops & DOP_FLUSH_ALL_TLBS )
+            break;
         switch ( (bmap_ptr = flags & ~UVMF_FLUSHTYPE_MASK) )
         {
         case UVMF_LOCAL:
+            if ( this_cpu(percpu_mm_info).deferred_ops & DOP_FLUSH_TLB )
+                break;
             if ( !paging_mode_enabled(d) ||
                  (paging_invlpg(v, va) != 0) ) 
                 flush_tlb_one_local(va);
@@ -3606,13 +3612,17 @@ int do_update_va_mapping(unsigned long va, u64 val64,
             if ( unlikely(!is_pv_32on64_domain(d) ?
                           get_user(vmask, (unsigned long *)bmap_ptr) :
                           get_user(vmask, (unsigned int *)bmap_ptr)) )
-                rc = -EFAULT;
+                rc = -EFAULT, vmask = 0;
             pmask = vcpumask_to_pcpumask(d, vmask);
+            if ( this_cpu(percpu_mm_info).deferred_ops & DOP_FLUSH_TLB )
+                cpu_clear(smp_processor_id(), pmask);
             flush_tlb_one_mask(pmask, va);
             break;
         }
         break;
     }
+
+    process_deferred_ops();
 
     return rc;
 }
