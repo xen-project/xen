@@ -47,7 +47,6 @@ ia64_get_lid (void)
 #define SMP_IPI_REDIRECTION	(1 << 1)
 
 #ifdef XEN
-#include <xen/sched.h>
 #define raw_smp_processor_id() (current->processor)
 #else
 #define raw_smp_processor_id() (current_thread_info()->cpu)

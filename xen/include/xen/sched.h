@@ -19,6 +19,7 @@
 #include <xen/xenoprof.h>
 #include <xen/rcupdate.h>
 #include <xen/irq.h>
+#include <xen/mm.h>
 
 #ifdef CONFIG_COMPAT
 #include <compat/vcpu.h>

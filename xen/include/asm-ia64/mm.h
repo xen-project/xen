@@ -13,7 +13,6 @@
 #include <xen/list.h>
 #include <xen/spinlock.h>
 #include <xen/perfc.h>
-#include <xen/sched.h>
 
 #include <asm/processor.h>
 #include <asm/atomic.h>

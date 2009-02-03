@@ -21,6 +21,7 @@
 
 #include <xen/init.h>
 #include <xen/bitmap.h>
+#include <xen/errno.h>
 #include <xen/kernel.h>
 #include <xen/acpi.h>
 #include <xen/mm.h>
