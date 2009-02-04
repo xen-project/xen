@@ -179,12 +179,6 @@ l2_pgentry_t *compat_idle_pg_table_l2 = NULL;
 #define l3_disallow_mask(d) L3_DISALLOW_MASK
 #endif
 
-static void queue_deferred_ops(struct domain *d, unsigned int ops)
-{
-    ASSERT(d == current->domain);
-    this_cpu(percpu_mm_info).deferred_ops |= ops;
-}
-
 void __init init_frametable(void)
 {
     unsigned long nr_pages, page_step, i, mfn;
@@ -464,14 +458,18 @@ void update_cr3(struct vcpu *v)
 }
 
 
-static void invalidate_shadow_ldt(struct vcpu *v)
+static void invalidate_shadow_ldt(struct vcpu *v, int flush)
 {
     int i;
     unsigned long pfn;
     struct page_info *page;
 
+    BUG_ON(unlikely(in_irq()));
+
+    spin_lock(&v->arch.shadow_ldt_lock);
+
     if ( v->arch.shadow_ldt_mapcnt == 0 )
-        return;
+        goto out;
 
     v->arch.shadow_ldt_mapcnt = 0;
 
@@ -486,11 +484,12 @@ static void invalidate_shadow_ldt(struct vcpu *v)
         put_page_and_type(page);
     }
 
-    /* Dispose of the (now possibly invalid) mappings from the TLB.  */
-    if ( v == current )
-        queue_deferred_ops(v->domain, DOP_FLUSH_TLB | DOP_RELOAD_LDT);
-    else
-        flush_tlb_mask(v->domain->domain_dirty_cpumask);
+    /* Rid TLBs of stale mappings (guest mappings and shadow mappings). */
+    if ( flush )
+        flush_tlb_mask(v->vcpu_dirty_cpumask);
+
+ out:
+    spin_unlock(&v->arch.shadow_ldt_lock);
 }
 
 
@@ -541,8 +540,10 @@ int map_ldt_shadow_page(unsigned int off)
 
     nl1e = l1e_from_pfn(mfn, l1e_get_flags(l1e) | _PAGE_RW);
 
+    spin_lock(&v->arch.shadow_ldt_lock);
     l1e_write(&v->arch.perdomain_ptes[off + 16], nl1e);
     v->arch.shadow_ldt_mapcnt++;
+    spin_unlock(&v->arch.shadow_ldt_lock);
 
     return 1;
 }
@@ -989,7 +990,7 @@ void put_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
              (d == e) )
         {
             for_each_vcpu ( d, v )
-                invalidate_shadow_ldt(v);
+                invalidate_shadow_ldt(v, 1);
         }
         put_page(page);
     }
@@ -2375,7 +2376,7 @@ int new_guest_cr3(unsigned long mfn)
             return 0;
         }
 
-        invalidate_shadow_ldt(curr);
+        invalidate_shadow_ldt(curr, 0);
         write_ptbase(curr);
 
         return 1;
@@ -2390,7 +2391,7 @@ int new_guest_cr3(unsigned long mfn)
         return 0;
     }
 
-    invalidate_shadow_ldt(curr);
+    invalidate_shadow_ldt(curr, 0);
 
     old_base_mfn = pagetable_get_pfn(curr->arch.guest_table);
 
@@ -2427,6 +2428,10 @@ static void process_deferred_ops(void)
             flush_tlb_local();
     }
 
+    /*
+     * Do this after flushing TLBs, to ensure we see fresh LDT mappings
+     * via the linear pagetable mapping.
+     */
     if ( deferred_ops & DOP_RELOAD_LDT )
         (void)map_ldt_shadow_page(0);
 
@@ -2799,7 +2804,8 @@ int do_mmuext_op(
             else if ( (curr->arch.guest_context.ldt_ents != ents) || 
                       (curr->arch.guest_context.ldt_base != ptr) )
             {
-                invalidate_shadow_ldt(curr);
+                invalidate_shadow_ldt(curr, 0);
+                this_cpu(percpu_mm_info).deferred_ops |= DOP_FLUSH_TLB;
                 curr->arch.guest_context.ldt_base = ptr;
                 curr->arch.guest_context.ldt_ents = ents;
                 load_LDT(curr);

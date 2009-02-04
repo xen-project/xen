@@ -352,6 +352,8 @@ int vcpu_initialise(struct vcpu *v)
     v->arch.perdomain_ptes =
         d->arch.mm_perdomain_pt + (v->vcpu_id << GDT_LDT_VCPU_SHIFT);
 
+    spin_lock_init(&v->arch.shadow_ldt_lock);
+
     return (is_pv_32on64_vcpu(v) ? setup_compat_l4(v) : 0);
 }
 

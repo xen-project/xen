@@ -352,6 +352,7 @@ struct arch_vcpu
 
     /* Current LDT details. */
     unsigned long shadow_ldt_mapcnt;
+    spinlock_t shadow_ldt_lock;
 
     struct paging_vcpu paging;
 
