@@ -125,12 +125,6 @@ page_list_prev(const struct page_info *page,
 {
     return page != head->next ? mfn_to_page(page->list.prev) : NULL;
 }
-static inline int
-page_list_is_eol(const struct page_info *page,
-                 const struct page_list_head *head)
-{
-    return !page;
-}
 static inline void
 page_list_add(struct page_info *page, struct page_list_head *head)
 {
@@ -214,13 +208,6 @@ page_list_del2(struct page_info *page, struct page_list_head *head1,
         prev->list.next = page->list.next;
     }
 }
-static inline void
-page_list_move_tail(struct page_info *page, struct page_list_head *list,
-                    struct page_list_head *head)
-{
-    page_list_del(page, list);
-    page_list_add_tail(page, head);
-}
 static inline struct page_info *
 page_list_remove_head(struct page_list_head *head)
 {
@@ -230,19 +217,6 @@ page_list_remove_head(struct page_list_head *head)
         page_list_del(page, head);
 
     return page;
-}
-static inline void
-page_list_splice_init(struct page_list_head *list, struct page_list_head *head)
-{
-    if ( !page_list_empty(list) )
-    {
-        if ( head->next )
-            head->tail->list.next = page_to_mfn(list->next);
-        else
-            head->next = list->next;
-        head->tail = list->tail;
-        INIT_PAGE_LIST_HEAD(list);
-    }
 }
 
 #define page_list_for_each(pos, head) \
@@ -266,19 +240,16 @@ page_list_splice_init(struct page_list_head *list, struct page_list_head *head)
                                                     struct page_info, list)
 # define page_list_next(pg, hd)          list_entry((pg)->list.next, \
                                                     struct page_info, list)
-# define page_list_is_eol(pg, hd)        (&(pg)->list == (hd))
 # define page_list_add(pg, hd)           list_add(&(pg)->list, hd)
 # define page_list_add_tail(pg, hd)      list_add_tail(&(pg)->list, hd)
 # define page_list_del(pg, hd)           list_del(&(pg)->list)
 # define page_list_del2(pg, hd1, hd2)    list_del(&(pg)->list)
-# define page_list_move_tail(pg, o, n)   list_move_tail(&(pg)->list, n)
 # define page_list_remove_head(hd)       (!page_list_empty(hd) ? \
     ({ \
         struct page_info *__pg = page_list_first(hd); \
         list_del(&__pg->list); \
         __pg; \
     }) : NULL)
-# define page_list_splice_init           list_splice_init
 # define page_list_for_each(pos, head)   list_for_each_entry(pos, head, list)
 # define page_list_for_each_safe(pos, tmp, head) \
     list_for_each_entry_safe(pos, tmp, head, list)

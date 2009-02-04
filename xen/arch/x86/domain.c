@@ -1657,23 +1657,20 @@ int hypercall_xlat_continuation(unsigned int *id, unsigned int mask, ...)
 static int relinquish_memory(
     struct domain *d, struct page_list_head *list, unsigned long type)
 {
-    struct page_info  *page, *cur;
+    struct page_info  *page;
     unsigned long     x, y;
     int               ret = 0;
 
     /* Use a recursive lock, as we may enter 'free_domheap_page'. */
     spin_lock_recursive(&d->page_alloc_lock);
 
-    page = page_list_first(list);
-    while ( !page_list_is_eol(page, list) )
+    while ( (page = page_list_remove_head(list)) )
     {
         /* Grab a reference to the page so it won't disappear from under us. */
         if ( unlikely(!get_page(page, d)) )
         {
             /* Couldn't get a reference -- someone is freeing this page. */
-            cur = page;
-            page = page_list_next(page, list);
-            page_list_move_tail(cur, list, &d->arch.relmem_list);
+            page_list_add_tail(page, &d->arch.relmem_list);
             continue;
         }
 
@@ -1685,6 +1682,7 @@ static int relinquish_memory(
             break;
         case -EAGAIN:
         case -EINTR:
+            page_list_add(page, list);
             set_bit(_PGT_pinned, &page->u.inuse.type_info);
             put_page(page);
             goto out;
@@ -1721,6 +1719,7 @@ static int relinquish_memory(
                 case 0:
                     break;
                 case -EINTR:
+                    page_list_add(page, list);
                     page->u.inuse.type_info |= PGT_validated;
                     if ( x & PGT_partial )
                         put_page(page);
@@ -1728,6 +1727,7 @@ static int relinquish_memory(
                     ret = -EAGAIN;
                     goto out;
                 case -EAGAIN:
+                    page_list_add(page, list);
                     page->u.inuse.type_info |= PGT_partial;
                     if ( x & PGT_partial )
                         put_page(page);
@@ -1744,11 +1744,9 @@ static int relinquish_memory(
             }
         }
 
-        /* Follow the list chain and /then/ potentially free the page. */
-        cur = page;
-        page = page_list_next(page, list);
-        page_list_move_tail(cur, list, &d->arch.relmem_list);
-        put_page(cur);
+        /* Put the page on the list and /then/ potentially free it. */
+        page_list_add_tail(page, &d->arch.relmem_list);
+        put_page(page);
 
         if ( hypercall_preempt_check() )
         {
@@ -1757,7 +1755,12 @@ static int relinquish_memory(
         }
     }
 
-    page_list_splice_init(&d->arch.relmem_list, list);
+    /* list is empty at this point. */
+    if ( !page_list_empty(&d->arch.relmem_list) )
+    {
+        *list = d->arch.relmem_list;
+        INIT_PAGE_LIST_HEAD(&d->arch.relmem_list);
+    }
 
  out:
     spin_unlock_recursive(&d->page_alloc_lock);
