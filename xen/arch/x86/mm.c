@@ -2023,30 +2023,17 @@ int free_page_type(struct page_info *page, unsigned long type,
     unsigned long gmfn;
     int rc;
 
-    if ( likely(owner != NULL) )
+    if ( likely(owner != NULL) && unlikely(paging_mode_enabled(owner)) )
     {
-        /*
-         * We have to flush before the next use of the linear mapping
-         * (e.g., update_va_mapping()) or we could end up modifying a page
-         * that is no longer a page table (and hence screw up ref counts).
-         */
-        if ( current->domain == owner )
-            queue_deferred_ops(owner, DOP_FLUSH_ALL_TLBS);
-        else
-            flush_tlb_mask(owner->domain_dirty_cpumask);
+        /* A page table is dirtied when its type count becomes zero. */
+        paging_mark_dirty(owner, page_to_mfn(page));
 
-        if ( unlikely(paging_mode_enabled(owner)) )
-        {
-            /* A page table is dirtied when its type count becomes zero. */
-            paging_mark_dirty(owner, page_to_mfn(page));
+        if ( shadow_mode_refcounts(owner) )
+            return 0;
 
-            if ( shadow_mode_refcounts(owner) )
-                return 0;
-
-            gmfn = mfn_to_gmfn(owner, page_to_mfn(page));
-            ASSERT(VALID_M2P(gmfn));
-            shadow_remove_all_shadows(owner->vcpu[0], _mfn(gmfn));
-        }
+        gmfn = mfn_to_gmfn(owner, page_to_mfn(page));
+        ASSERT(VALID_M2P(gmfn));
+        shadow_remove_all_shadows(owner->vcpu[0], _mfn(gmfn));
     }
 
     if ( !(type & PGT_partial) )
