@@ -66,12 +66,6 @@ struct page_info
             unsigned long count:26; /* Reference count */
         } sh;
 
-        /* Page is on a free list: ((count_info & PGC_count_mask) == 0). */
-        struct {
-            /* Mask of possibly-tainted TLBs. */
-            cpumask_t cpumask;
-        } free;
-
     } u;
 
     union {

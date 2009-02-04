@@ -400,7 +400,7 @@ static struct page_info *alloc_heap_pages(
         BUG_ON(pg[i].count_info != 0);
 
         /* Add in any extra CPUs that need flushing because of this page. */
-        cpus_andnot(extra_cpus_mask, pg[i].u.free.cpumask, mask);
+        cpus_andnot(extra_cpus_mask, cpu_online_map, mask);
         tlbflush_filter(extra_cpus_mask, pg[i].tlbflush_timestamp);
         cpus_or(mask, mask, extra_cpus_mask);
 
@@ -425,7 +425,6 @@ static void free_heap_pages(
     unsigned long mask;
     unsigned int i, node = phys_to_nid(page_to_maddr(pg));
     unsigned int zone = page_to_zone(pg);
-    struct domain *d;
 
     ASSERT(order <= MAX_ORDER);
     ASSERT(node >= 0);
@@ -446,15 +445,9 @@ static void free_heap_pages(
          */
         pg[i].count_info = 0;
 
-        if ( (d = page_get_owner(&pg[i])) != NULL )
-        {
-            pg[i].tlbflush_timestamp = tlbflush_current_time();
-            pg[i].u.free.cpumask     = d->domain_dirty_cpumask;
-        }
-        else
-        {
-            cpus_clear(pg[i].u.free.cpumask);
-        }
+        /* If a page has no owner it will need no safety TLB flush. */
+        pg[i].tlbflush_timestamp =
+            page_get_owner(&pg[i]) ? tlbflush_current_time() : 0;
     }
 
     spin_lock(&heap_lock);

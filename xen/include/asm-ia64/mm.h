@@ -62,21 +62,12 @@ struct page_info
         struct {
             /* Order-size of the free chunk this page is the head of. */
             u32 order;
-            /* Mask of possibly-tainted TLBs. */
-            cpumask_t cpumask;
         } free;
 
     } u;
 
     /* Timestamp from 'TLB clock', used to reduce need for safety flushes. */
     u32 tlbflush_timestamp;
-
-#if 0
-// following added for Linux compiling
-    page_flags_t flags;
-    atomic_t _count;
-    struct list_head lru;	// is this the same as above "list"?
-#endif
 };
 
 #define set_page_count(p,v) 	atomic_set(&(p)->_count, v - 1)
