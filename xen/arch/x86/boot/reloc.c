@@ -48,22 +48,31 @@ static void *reloc_mbi_struct(void *old, unsigned int bytes)
     return memcpy(alloc, old, bytes);
 }
 
+static char *reloc_mbi_string(char *old)
+{
+    char *p;
+    for ( p = old; *p != '\0'; p++ )
+        continue;
+    return reloc_mbi_struct(old, p - old + 1);
+}
+
 multiboot_info_t *reloc(multiboot_info_t *mbi_old)
 {
     multiboot_info_t *mbi = reloc_mbi_struct(mbi_old, sizeof(*mbi));
+    int i;
 
     if ( mbi->flags & MBI_CMDLINE )
-    {
-        char *cmdline_old, *p;
-        cmdline_old = (char *)mbi->cmdline;
-        for ( p = cmdline_old; *p != '\0'; p++ )
-            continue;
-        mbi->cmdline = (u32)reloc_mbi_struct(cmdline_old, p - cmdline_old + 1);
-    }
+        mbi->cmdline = (u32)reloc_mbi_string((char *)mbi->cmdline);
 
     if ( mbi->flags & MBI_MODULES )
-        mbi->mods_addr = (u32)reloc_mbi_struct(
+    {
+        module_t *mods = reloc_mbi_struct(
             (module_t *)mbi->mods_addr, mbi->mods_count * sizeof(module_t));
+        mbi->mods_addr = (u32)mods;
+        for ( i = 0; i < mbi->mods_count; i++ )
+            if ( mods[i].string )
+                mods[i].string = (u32)reloc_mbi_string((char *)mods[i].string);
+    }
 
     if ( mbi->flags & MBI_MEMMAP )
         mbi->mmap_addr = (u32)reloc_mbi_struct(
