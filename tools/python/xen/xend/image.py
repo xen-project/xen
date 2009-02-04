@@ -372,8 +372,6 @@ class ImageHandler:
             env['DISPLAY'] = self.display
         if self.xauthority:
             env['XAUTHORITY'] = self.xauthority
-        if self.vncconsole:
-            args = args + ([ "-vncviewer" ])
         unique_id = "%i-%i" % (self.vm.getDomid(), time.time())
         sentinel_path = sentinel_path_prefix + unique_id
         sentinel_path_fifo = sentinel_path + '.fifo'
