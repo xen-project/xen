@@ -59,7 +59,11 @@ from xen.util.acmpolicy import ACM_LABEL_UNLABELED_DISPLAY
 import XenAPI
 
 import xen.lowlevel.xc
-xc = xen.lowlevel.xc.xc()
+try:
+    xc = xen.lowlevel.xc.xc()
+except Exception, ex:
+    print >>sys.stderr, ("Is xen kernel running?")
+    sys.exit(1)
 
 import inspect
 from xen.xend import XendOptions
