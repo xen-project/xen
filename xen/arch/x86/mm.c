@@ -469,7 +469,7 @@ static void invalidate_shadow_ldt(struct vcpu *v)
     int i;
     unsigned long pfn;
     struct page_info *page;
-    
+
     if ( v->arch.shadow_ldt_mapcnt == 0 )
         return;
 
@@ -2353,8 +2353,8 @@ void cleanup_page_cacheattr(struct page_info *page)
 
 int new_guest_cr3(unsigned long mfn)
 {
-    struct vcpu *v = current;
-    struct domain *d = v->domain;
+    struct vcpu *curr = current;
+    struct domain *d = curr->domain;
     int okay;
     unsigned long old_base_mfn;
 
@@ -2364,19 +2364,19 @@ int new_guest_cr3(unsigned long mfn)
         okay = paging_mode_refcounts(d)
             ? 0 /* Old code was broken, but what should it be? */
             : mod_l4_entry(
-                    __va(pagetable_get_paddr(v->arch.guest_table)),
+                    __va(pagetable_get_paddr(curr->arch.guest_table)),
                     l4e_from_pfn(
                         mfn,
                         (_PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED)),
-                    pagetable_get_pfn(v->arch.guest_table), 0, 0) == 0;
+                    pagetable_get_pfn(curr->arch.guest_table), 0, 0) == 0;
         if ( unlikely(!okay) )
         {
             MEM_LOG("Error while installing new compat baseptr %lx", mfn);
             return 0;
         }
 
-        invalidate_shadow_ldt(v);
-        write_ptbase(v);
+        invalidate_shadow_ldt(curr);
+        write_ptbase(curr);
 
         return 1;
     }
@@ -2390,14 +2390,14 @@ int new_guest_cr3(unsigned long mfn)
         return 0;
     }
 
-    invalidate_shadow_ldt(v);
+    invalidate_shadow_ldt(curr);
 
-    old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
+    old_base_mfn = pagetable_get_pfn(curr->arch.guest_table);
 
-    v->arch.guest_table = pagetable_from_pfn(mfn);
-    update_cr3(v);
+    curr->arch.guest_table = pagetable_from_pfn(mfn);
+    update_cr3(curr);
 
-    write_ptbase(v);
+    write_ptbase(curr);
 
     if ( likely(old_base_mfn != 0) )
     {
@@ -2552,8 +2552,8 @@ int do_mmuext_op(
     unsigned long mfn = 0, gmfn = 0, type;
     unsigned int done = 0;
     struct page_info *page;
-    struct vcpu *v = current;
-    struct domain *d = v->domain;
+    struct vcpu *curr = current;
+    struct domain *d = curr->domain;
 
     if ( unlikely(count & MMU_UPDATE_PREEMPTED) )
     {
@@ -2716,8 +2716,8 @@ int do_mmuext_op(
                 }
             }
 
-            old_mfn = pagetable_get_pfn(v->arch.guest_table_user);
-            v->arch.guest_table_user = pagetable_from_pfn(mfn);
+            old_mfn = pagetable_get_pfn(curr->arch.guest_table_user);
+            curr->arch.guest_table_user = pagetable_from_pfn(mfn);
 
             if ( old_mfn != 0 )
             {
@@ -2737,7 +2737,7 @@ int do_mmuext_op(
     
         case MMUEXT_INVLPG_LOCAL:
             if ( !paging_mode_enabled(d) 
-                 || paging_invlpg(v, op.arg1.linear_addr) != 0 )
+                 || paging_invlpg(curr, op.arg1.linear_addr) != 0 )
                 flush_tlb_one_local(op.arg1.linear_addr);
             break;
 
@@ -2796,13 +2796,13 @@ int do_mmuext_op(
                 okay = 0;
                 MEM_LOG("Bad args to SET_LDT: ptr=%lx, ents=%lx", ptr, ents);
             }
-            else if ( (v->arch.guest_context.ldt_ents != ents) || 
-                      (v->arch.guest_context.ldt_base != ptr) )
+            else if ( (curr->arch.guest_context.ldt_ents != ents) || 
+                      (curr->arch.guest_context.ldt_base != ptr) )
             {
-                invalidate_shadow_ldt(v);
-                v->arch.guest_context.ldt_base = ptr;
-                v->arch.guest_context.ldt_ents = ents;
-                load_LDT(v);
+                invalidate_shadow_ldt(curr);
+                curr->arch.guest_context.ldt_base = ptr;
+                curr->arch.guest_context.ldt_ents = ents;
+                load_LDT(curr);
                 this_cpu(percpu_mm_info).deferred_ops &= ~DOP_RELOAD_LDT;
                 if ( ents != 0 )
                     this_cpu(percpu_mm_info).deferred_ops |= DOP_RELOAD_LDT;
@@ -2918,8 +2918,7 @@ int do_mmu_update(
     struct page_info *page;
     int rc = 0, okay = 1, i = 0;
     unsigned int cmd, done = 0;
-    struct vcpu *v = current;
-    struct domain *d = v->domain;
+    struct domain *d = current->domain;
     struct domain_mmap_cache mapcache;
 
     if ( unlikely(count & MMU_UPDATE_PREEMPTED) )
@@ -3029,7 +3028,8 @@ int do_mmu_update(
 #endif
                 case PGT_writable_page:
                     perfc_incr(writable_mmu_updates);
-                    okay = paging_write_guest_entry(v, va, req.val, _mfn(mfn));
+                    okay = paging_write_guest_entry(
+                        current, va, req.val, _mfn(mfn));
                     break;
                 }
                 page_unlock(page);
@@ -3039,7 +3039,8 @@ int do_mmu_update(
             else if ( get_page_type(page, PGT_writable_page) )
             {
                 perfc_incr(writable_mmu_updates);
-                okay = paging_write_guest_entry(v, va, req.val, _mfn(mfn));
+                okay = paging_write_guest_entry(
+                    current, va, req.val, _mfn(mfn));
                 put_page_type(page);
             }
 
