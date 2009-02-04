@@ -540,13 +540,15 @@ int acpi_dmar_init(void)
     /* Giving that all devices within guest use same io page table,
      * enable snoop control only if all VT-d engines support it.
      */
-    iommu_snoop = 1;
-    for_each_drhd_unit ( drhd )
+    if ( iommu_snoop )
     {
-        iommu = drhd->iommu;
-        if ( !ecap_snp_ctl(iommu->ecap) ) {
-            iommu_snoop = 0;
-            break;
+        for_each_drhd_unit ( drhd )
+        {
+            iommu = drhd->iommu;
+            if ( !ecap_snp_ctl(iommu->ecap) ) {
+                iommu_snoop = 0;
+                break;
+            }
         }
     }
 

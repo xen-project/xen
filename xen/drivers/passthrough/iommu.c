@@ -33,6 +33,8 @@ int amd_iov_detect(void);
  *   no-pv                      Disable IOMMU for PV domains (default)
  *   force|required             Don't boot unless IOMMU is enabled
  *   passthrough                Bypass VT-d translation for Dom0
+ *   snoop                      Utilize the snoop control for IOMMU (default)
+ *   no-snoop                   Dont utilize the snoop control for IOMMU
  */
 custom_param("iommu", parse_iommu_param);
 int iommu_enabled = 0;
@@ -45,6 +47,7 @@ static void __init parse_iommu_param(char *s)
 {
     char *ss;
     iommu_enabled = 1;
+    iommu_snoop = 1;
 
     do {
         ss = strchr(s, ',');
@@ -62,6 +65,10 @@ static void __init parse_iommu_param(char *s)
             force_iommu = 1;
         else if ( !strcmp(s, "passthrough") )
             iommu_passthrough = 1;
+        else if ( !strcmp(s, "snoop") )
+            iommu_snoop = 1;
+        else if ( !strcmp(s, "no-snoop") )
+            iommu_snoop = 0;
 
         s = ss + 1;
     } while ( ss );
