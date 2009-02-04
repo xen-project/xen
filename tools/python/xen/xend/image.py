@@ -558,24 +558,30 @@ class ImageHandler:
                     os.kill(self.pid, signal.SIGHUP)
                 except OSError, exn:
                     log.exception(exn)
-                try:
-                    # Try to reap the child every 100ms for 10s. Then SIGKILL it.
-                    for i in xrange(100):
+                # Try to reap the child every 100ms for 10s. Then SIGKILL it.
+                for i in xrange(100):
+                    try:
                         (p, rv) = os.waitpid(self.pid, os.WNOHANG)
                         if p == self.pid:
                             break
-                        time.sleep(0.1)
-                    else:
-                        log.warning("DeviceModel %d took more than 10s "
-                                    "to terminate: sending SIGKILL" % self.pid)
+                    except OSError:
+                        # This is expected if Xend has been restarted within
+                        # the life of this domain.  In this case, we can kill
+                        # the process, but we can't wait for it because it's
+                        # not our child. We continue this loop, and after it is
+                        # terminated make really sure the process is going away
+                        # (SIGKILL).
+                        pass
+                    time.sleep(0.1)
+                else:
+                    log.warning("DeviceModel %d took more than 10s "
+                                "to terminate: sending SIGKILL" % self.pid)
+                    try:
                         os.kill(self.pid, signal.SIGKILL)
                         os.waitpid(self.pid, 0)
-                except OSError, exn:
-                    # This is expected if Xend has been restarted within the
-                    # life of this domain.  In this case, we can kill the process,
-                    # but we can't wait for it because it's not our child.
-                    # We just make really sure it's going away (SIGKILL) first.
-                    os.kill(self.pid, signal.SIGKILL)
+                    except OSError:
+                        # This happens if the process doesn't exist.
+                        pass
                 state = xstransact.Remove("/local/domain/0/device-model/%i"
                                           % self.vm.getDomid())
             finally:
