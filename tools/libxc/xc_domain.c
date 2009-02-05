@@ -271,6 +271,38 @@ int xc_domain_hvm_getcontext(int xc_handle,
     return (ret < 0 ? -1 : domctl.u.hvmcontext.size);
 }
 
+/* Get just one element of the HVM guest context.
+ * size must be >= HVM_SAVE_LENGTH(type) */
+int xc_domain_hvm_getcontext_partial(int xc_handle,
+                                     uint32_t domid,
+                                     uint16_t typecode,
+                                     uint16_t instance,
+                                     void *ctxt_buf,
+                                     uint32_t size)
+{
+    int ret;
+    DECLARE_DOMCTL;
+
+    if ( !ctxt_buf ) 
+        return -EINVAL;
+
+    domctl.cmd = XEN_DOMCTL_gethvmcontext_partial;
+    domctl.domain = (domid_t) domid;
+    domctl.u.hvmcontext_partial.type = typecode;
+    domctl.u.hvmcontext_partial.instance = instance;
+    set_xen_guest_handle(domctl.u.hvmcontext_partial.buffer, ctxt_buf);
+
+    if ( (ret = lock_pages(ctxt_buf, size)) != 0 )
+        return ret;
+    
+    ret = do_domctl(xc_handle, &domctl);
+
+    if ( ctxt_buf ) 
+        unlock_pages(ctxt_buf, size);
+
+    return ret ? -1 : 0;
+}
+
 /* set info to hvm guest for restore */
 int xc_domain_hvm_setcontext(int xc_handle,
                              uint32_t domid,

@@ -375,6 +375,25 @@ int xc_domain_hvm_getcontext(int xc_handle,
                              uint8_t *ctxt_buf,
                              uint32_t size);
 
+
+/**
+ * This function returns one element of the context of a hvm domain
+ * @parm xc_handle a handle to an open hypervisor interface
+ * @parm domid the domain to get information from
+ * @parm typecode which type of elemnt required 
+ * @parm instance which instance of the type
+ * @parm ctxt_buf a pointer to a structure to store the execution context of
+ *            the hvm domain
+ * @parm size the size of ctxt_buf (must be >= HVM_SAVE_LENGTH(typecode))
+ * @return 0 on success, -1 on failure
+ */
+int xc_domain_hvm_getcontext_partial(int xc_handle,
+                                     uint32_t domid,
+                                     uint16_t typecode,
+                                     uint16_t instance,
+                                     void *ctxt_buf,
+                                     uint32_t size);
+
 /**
  * This function will set the context for hvm domain
  *
