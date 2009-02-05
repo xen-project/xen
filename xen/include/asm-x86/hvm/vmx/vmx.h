@@ -48,7 +48,11 @@ typedef union {
 #define EPTE_SUPER_PAGE_MASK    0x80
 #define EPTE_MFN_MASK           0x1fffffffffff000
 #define EPTE_AVAIL1_MASK        0xF00
-#define EPTE_EMT_MASK           0x78
+#define EPTE_EMT_MASK           0x38
+#define EPTE_IGMT_MASK          0x40
+#define EPTE_AVAIL1_SHIFT       8
+#define EPTE_EMT_SHIFT          3
+#define EPTE_IGMT_SHIFT         6
 
 void vmx_asm_vmexit_handler(struct cpu_user_regs);
 void vmx_asm_do_vmentry(void);
