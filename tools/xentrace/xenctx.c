@@ -26,6 +26,7 @@
 #include "xenctrl.h"
 #include <xen/foreign/x86_32.h>
 #include <xen/foreign/x86_64.h>
+#include <xen/hvm/save.h>
 
 int xc_handle = 0;
 int domid = 0;
@@ -788,23 +789,29 @@ static void dump_ctx(int vcpu)
 
 #if defined(__i386__) || defined(__x86_64__)
     {
-        struct xen_domctl domctl;
-        memset(&domctl, 0, sizeof domctl);
-        domctl.domain = domid;
-        domctl.cmd = XEN_DOMCTL_get_address_size;
-        if (xc_domctl(xc_handle, &domctl) == 0)
-            ctxt_word_size = guest_word_size = domctl.u.address_size.size / 8;
         if (dominfo.hvm) {
+            struct hvm_hw_cpu cpuctx;
             xen_capabilities_info_t xen_caps = "";
+            if (xc_domain_hvm_getcontext_partial(
+                    xc_handle, domid, HVM_SAVE_CODE(CPU), 
+                    vcpu, &cpuctx, sizeof cpuctx) != 0) {
+                perror("xc_domain_hvm_getcontext_partial");
+                exit(-1);
+            }
+            guest_word_size = (cpuctx.msr_efer & 0x400) ? 8 : 4;
+            /* HVM guest context records are always host-sized */
             if (xc_version(xc_handle, XENVER_capabilities, &xen_caps) != 0) {
                 perror("xc_version");
                 exit(-1);
             }
-            /* HVM guest context records are always host-sized */
             ctxt_word_size = (strstr(xen_caps, "xen-3.0-x86_64")) ? 8 : 4;
-            /* XXX For now we can't tell whether a HVM guest is in long
-             * XXX mode; eventually fix this here and in xc_pagetab.c */
-            guest_word_size = 4;
+        } else {
+            struct xen_domctl domctl;
+            memset(&domctl, 0, sizeof domctl);
+            domctl.domain = domid;
+            domctl.cmd = XEN_DOMCTL_get_address_size;
+            if (xc_domctl(xc_handle, &domctl) == 0)
+                ctxt_word_size = guest_word_size = domctl.u.address_size.size / 8;
         }
     }
 #endif
