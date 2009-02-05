@@ -399,10 +399,13 @@ static struct page_info *alloc_heap_pages(
         /* Reference count must continuously be zero for free pages. */
         BUG_ON(pg[i].count_info != 0);
 
-        /* Add in any extra CPUs that need flushing because of this page. */
-        cpus_andnot(extra_cpus_mask, cpu_online_map, mask);
-        tlbflush_filter(extra_cpus_mask, pg[i].tlbflush_timestamp);
-        cpus_or(mask, mask, extra_cpus_mask);
+        if ( pg[i].u.free.need_tlbflush )
+        {
+            /* Add in extra CPUs that need flushing because of this page. */
+            cpus_andnot(extra_cpus_mask, cpu_online_map, mask);
+            tlbflush_filter(extra_cpus_mask, pg[i].tlbflush_timestamp);
+            cpus_or(mask, mask, extra_cpus_mask);
+        }
 
         /* Initialise fields which have other uses for free pages. */
         pg[i].u.inuse.type_info = 0;
@@ -446,8 +449,9 @@ static void free_heap_pages(
         pg[i].count_info = 0;
 
         /* If a page has no owner it will need no safety TLB flush. */
-        pg[i].tlbflush_timestamp =
-            page_get_owner(&pg[i]) ? tlbflush_current_time() : 0;
+        pg[i].u.free.need_tlbflush = (page_get_owner(&pg[i]) != NULL);
+        if ( pg[i].u.free.need_tlbflush )
+            pg[i].tlbflush_timestamp = tlbflush_current_time();
     }
 
     spin_lock(&heap_lock);

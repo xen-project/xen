@@ -66,6 +66,12 @@ struct page_info
             unsigned long count:26; /* Reference count */
         } sh;
 
+        /* Page is on a free list: ((count_info & PGC_count_mask) == 0). */
+        struct {
+            /* Do TLBs need flushing for safety before next page use? */
+            bool_t need_tlbflush;
+        } free;
+
     } u;
 
     union {

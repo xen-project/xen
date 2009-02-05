@@ -62,6 +62,8 @@ struct page_info
         struct {
             /* Order-size of the free chunk this page is the head of. */
             u32 order;
+            /* Do TLBs need flushing for safety before next page use? */
+            bool_t need_tlbflush;
         } free;
 
     } u;
