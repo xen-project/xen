@@ -820,6 +820,7 @@ static int flask_hvmcontext(struct domain *d, uint32_t cmd)
             perm = HVM__SETHVMC;
         break;
         case XEN_DOMCTL_gethvmcontext:
+        case XEN_DOMCTL_gethvmcontext_partial:
             perm = HVM__GETHVMC;
         break;
         default:

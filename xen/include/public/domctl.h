@@ -630,6 +630,17 @@ struct xen_domctl_debug_op {
 typedef struct xen_domctl_debug_op xen_domctl_debug_op_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_debug_op_t);
 
+/*
+ * Request a particular record from the HVM context
+ */
+#define XEN_DOMCTL_gethvmcontext_partial   55
+typedef struct xen_domctl_hvmcontext_partial {
+    uint32_t type;                      /* IN: Type of record required */
+    uint32_t instance;                  /* IN: Instance of that type */
+    XEN_GUEST_HANDLE_64(uint8) buffer;  /* OUT: buffer to write record into */
+} xen_domctl_hvmcontext_partial_t;
+DEFINE_XEN_GUEST_HANDLE(xen_domctl_hvmcontext_partial_t);
+
 
 struct xen_domctl {
     uint32_t cmd;
@@ -658,6 +669,7 @@ struct xen_domctl {
         struct xen_domctl_settimeoffset     settimeoffset;
         struct xen_domctl_real_mode_area    real_mode_area;
         struct xen_domctl_hvmcontext        hvmcontext;
+        struct xen_domctl_hvmcontext_partial hvmcontext_partial;
         struct xen_domctl_address_size      address_size;
         struct xen_domctl_sendtrigger       sendtrigger;
         struct xen_domctl_get_device_group  get_device_group;

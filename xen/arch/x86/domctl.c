@@ -417,6 +417,34 @@ long arch_do_domctl(
     }
     break;
 
+    case XEN_DOMCTL_gethvmcontext_partial:
+    { 
+        struct domain *d;
+
+        ret = -ESRCH;
+        if ( (d = rcu_lock_domain_by_id(domctl->domain)) == NULL )
+            break;
+
+        ret = xsm_hvmcontext(d, domctl->cmd);
+        if ( ret )
+            goto gethvmcontext_partial_out;
+
+        ret = -EINVAL;
+        if ( !is_hvm_domain(d) ) 
+            goto gethvmcontext_partial_out;
+
+        domain_pause(d);
+        ret = hvm_save_one(d, domctl->u.hvmcontext_partial.type,
+                           domctl->u.hvmcontext_partial.instance,
+                           domctl->u.hvmcontext_partial.buffer);
+        domain_unpause(d);
+
+    gethvmcontext_partial_out:
+        rcu_unlock_domain(d);
+    }
+    break;
+
+
     case XEN_DOMCTL_set_address_size:
     {
         struct domain *d;

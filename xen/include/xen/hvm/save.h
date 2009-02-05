@@ -152,6 +152,8 @@ __initcall(__hvm_register_##_x##_save_and_restore);
 /* Entry points for saving and restoring HVM domain state */
 size_t hvm_save_size(struct domain *d);
 int hvm_save(struct domain *d, hvm_domain_context_t *h);
+int hvm_save_one(struct domain *d,  uint16_t typecode, uint16_t instance, 
+                 XEN_GUEST_HANDLE_64(uint8) handle);
 int hvm_load(struct domain *d, hvm_domain_context_t *h);
 
 /* Arch-specific definitions. */
