@@ -62,7 +62,7 @@ static int physdev_map_pirq(struct physdev_map_pirq *map)
                 ret = -EINVAL;
                 goto free_domain;
             }
-            vector = IO_APIC_VECTOR(map->index);
+            vector = domain_irq_to_vector(current->domain, map->index);
             if ( !vector )
             {
                 dprintk(XENLOG_G_ERR, "dom%d: map irq with no vector %d\n",
