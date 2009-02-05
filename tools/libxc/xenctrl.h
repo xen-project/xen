@@ -1094,6 +1094,12 @@ int xc_domain_update_msi_irq(
     uint32_t pirq,
     uint32_t gflags);
 
+int xc_domain_unbind_msi_irq(int xc_handle,
+                             uint32_t domid,
+                             uint32_t gvec,
+                             uint32_t pirq,
+                             uint32_t gflags);
+
 int xc_domain_bind_pt_irq(int xc_handle,
                           uint32_t domid,
                           uint8_t machine_irq,
