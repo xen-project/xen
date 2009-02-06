@@ -220,31 +220,47 @@ void copy_page_sse2(void *, const void *);
                              copy_page_sse2(_t, _f) :                   \
                              (void)memcpy(_t, _f, PAGE_SIZE))
 
-#define mfn_valid(mfn)      ((mfn) < max_page)
+#define __mfn_valid(mfn)    ((mfn) < max_page)
 
 /* Convert between Xen-heap virtual addresses and machine addresses. */
 #define __pa(x)             (virt_to_maddr(x))
 #define __va(x)             (maddr_to_virt(x))
 
 /* Convert between Xen-heap virtual addresses and machine frame numbers. */
-#define virt_to_mfn(va)     (virt_to_maddr(va) >> PAGE_SHIFT)
-#define mfn_to_virt(mfn)    (maddr_to_virt((paddr_t)(mfn) << PAGE_SHIFT))
+#define __virt_to_mfn(va)   (virt_to_maddr(va) >> PAGE_SHIFT)
+#define __mfn_to_virt(mfn)  (maddr_to_virt((paddr_t)(mfn) << PAGE_SHIFT))
 
 /* Convert between machine frame numbers and page-info structures. */
-#define mfn_to_page(mfn)    (frame_table + (mfn))
-#define page_to_mfn(pg)     ((unsigned long)((pg) - frame_table))
+#define __mfn_to_page(mfn)  (frame_table + (mfn))
+#define __page_to_mfn(pg)   ((unsigned long)((pg) - frame_table))
 
 /* Convert between machine addresses and page-info structures. */
-#define maddr_to_page(ma)   (frame_table + ((ma) >> PAGE_SHIFT))
-#define page_to_maddr(pg)   ((paddr_t)((pg) - frame_table) << PAGE_SHIFT)
+#define __maddr_to_page(ma) (frame_table + ((ma) >> PAGE_SHIFT))
+#define __page_to_maddr(pg) ((paddr_t)((pg) - frame_table) << PAGE_SHIFT)
 
 /* Convert between Xen-heap virtual addresses and page-info structures. */
-#define virt_to_page(va)    (frame_table + (__pa(va) >> PAGE_SHIFT))
-#define page_to_virt(pg)    (maddr_to_virt(page_to_maddr(pg)))
+#define __virt_to_page(va)  (frame_table + (__pa(va) >> PAGE_SHIFT))
+#define __page_to_virt(pg)  (maddr_to_virt(page_to_maddr(pg)))
 
 /* Convert between frame number and address formats.  */
-#define pfn_to_paddr(pfn)   ((paddr_t)(pfn) << PAGE_SHIFT)
-#define paddr_to_pfn(pa)    ((unsigned long)((pa) >> PAGE_SHIFT))
+#define __pfn_to_paddr(pfn) ((paddr_t)(pfn) << PAGE_SHIFT)
+#define __paddr_to_pfn(pa)  ((unsigned long)((pa) >> PAGE_SHIFT))
+
+/*
+ * We define non-underscored wrappers for above conversion functions. These are
+ * overridden in various source files while underscored versions remain intact.
+ */
+#define mfn_valid(mfn)      __mfn_valid(mfn)
+#define virt_to_mfn(va)     __virt_to_mfn(va)
+#define mfn_to_virt(mfn)    __mfn_to_virt(mfn)
+#define mfn_to_page(mfn)    __mfn_to_page(mfn)
+#define page_to_mfn(pg)     __page_to_mfn(pg)
+#define maddr_to_page(ma)   __maddr_to_page(ma)
+#define page_to_maddr(pg)   __page_to_maddr(pg)
+#define virt_to_page(va)    __virt_to_page(va)
+#define page_to_virt(pg)    __page_to_virt(pg)
+#define pfn_to_paddr(pfn)   __pfn_to_paddr(pfn)
+#define paddr_to_pfn(pa)    __paddr_to_pfn(pa)
 
 #endif /* !defined(__ASSEMBLY__) */
 

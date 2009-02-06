@@ -474,20 +474,13 @@ mfn_t oos_snapshot_lookup(struct vcpu *v, mfn_t gmfn);
  * MFN/page-info handling 
  */
 
-// Override mfn_to_page from asm/page.h, which was #include'd above,
-// in order to make it work with our mfn type.
+/* Override macros from asm/page.h to make them work with mfn_t */
 #undef mfn_to_page
-#define mfn_to_page(_m) (frame_table + mfn_x(_m))
-
-// Override page_to_mfn from asm/page.h, which was #include'd above,
-// in order to make it work with our mfn type.
-#undef page_to_mfn
-#define page_to_mfn(_pg) (_mfn((_pg) - frame_table))
-
-// Override mfn_valid from asm/page.h, which was #include'd above,
-// in order to make it work with our mfn type.
+#define mfn_to_page(_m) __mfn_to_page(mfn_x(_m))
 #undef mfn_valid
-#define mfn_valid(_mfn) (mfn_x(_mfn) < max_page)
+#define mfn_valid(_mfn) __mfn_valid(mfn_x(_mfn))
+#undef page_to_mfn
+#define page_to_mfn(_pg) _mfn(__page_to_mfn(_pg))
 
 /* Override pagetable_t <-> struct page_info conversions to work with mfn_t */
 #undef pagetable_get_page

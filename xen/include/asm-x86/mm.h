@@ -210,7 +210,8 @@ struct page_info
 })
 #else
 #define is_xen_heap_page(page) ((page)->count_info & PGC_xen_heap)
-#define is_xen_heap_mfn(mfn) is_xen_heap_page(&frame_table[mfn])
+#define is_xen_heap_mfn(mfn) \
+    (__mfn_valid(mfn) && is_xen_heap_page(__mfn_to_page(mfn)))
 #endif
 
 #if defined(__i386__)
