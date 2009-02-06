@@ -27,6 +27,11 @@ boolean_param("noirqbalance", opt_noirqbalance);
 
 irq_desc_t irq_desc[NR_VECTORS];
 
+static DEFINE_SPINLOCK(vector_lock);
+int vector_irq[NR_VECTORS] __read_mostly = {
+    [0 ... NR_VECTORS - 1] = FREE_TO_ASSIGN
+};
+
 static void __do_IRQ_guest(int vector);
 
 void no_action(int cpl, void *dev_id, struct cpu_user_regs *regs) { }
@@ -53,6 +58,56 @@ struct hw_interrupt_type no_irq_type = {
 };
 
 atomic_t irq_err_count;
+
+int free_irq_vector(int vector)
+{
+    int irq;
+
+    BUG_ON((vector > LAST_DYNAMIC_VECTOR) || (vector < FIRST_DYNAMIC_VECTOR));
+
+    spin_lock(&vector_lock);
+    if ((irq = vector_irq[vector]) == AUTO_ASSIGN)
+        vector_irq[vector] = FREE_TO_ASSIGN;
+    spin_unlock(&vector_lock);
+
+    return (irq == AUTO_ASSIGN) ? 0 : -EINVAL;
+}
+
+int assign_irq_vector(int irq)
+{
+    static unsigned current_vector = FIRST_DYNAMIC_VECTOR;
+    unsigned vector;
+
+    BUG_ON(irq >= NR_IRQS);
+
+    spin_lock(&vector_lock);
+
+    if ((irq != AUTO_ASSIGN) && (IO_APIC_VECTOR(irq) > 0)) {
+        spin_unlock(&vector_lock);
+        return IO_APIC_VECTOR(irq);
+    }
+
+    vector = current_vector;
+    while (vector_irq[vector] != FREE_TO_ASSIGN) {
+        vector += 8;
+        if (vector > LAST_DYNAMIC_VECTOR)
+            vector = FIRST_DYNAMIC_VECTOR + ((vector + 1) & 7);
+
+        if (vector == current_vector) {
+            spin_unlock(&vector_lock);
+            return -ENOSPC;
+        }
+    }
+
+    current_vector = vector;
+    vector_irq[vector] = irq;
+    if (irq != AUTO_ASSIGN)
+        IO_APIC_VECTOR(irq) = vector;
+
+    spin_unlock(&vector_lock);
+
+    return vector;
+}
 
 asmlinkage void do_IRQ(struct cpu_user_regs *regs)
 {
