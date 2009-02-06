@@ -147,7 +147,7 @@ void free_irq(unsigned int irq)
     desc->action  = NULL;
     desc->depth   = 1;
     desc->status |= IRQ_DISABLED;
-    desc->handler->shutdown(irq);
+    desc->handler->shutdown(vector);
     spin_unlock_irqrestore(&desc->lock,flags);
 
     /* Wait to make sure it's not being used on another CPU */
