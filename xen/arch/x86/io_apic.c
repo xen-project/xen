@@ -39,6 +39,10 @@
 #include <io_ports.h>
 #include <public/physdev.h>
 
+
+#define IO_APIC_IRQ(irq)    (!IS_LEGACY_IRQ(irq))
+#define IO_APIC_VECTOR(irq) (ioapic_irq_vector[irq])
+
 /* Different to Linux: our implementation can be simpler. */
 #define make_8259A_irq(irq) (io_apic_irqs &= ~(1<<(irq)))
 
@@ -662,8 +666,8 @@ static inline int IO_APIC_irq_trigger(int irq)
     return 0;
 }
 
-/* irq_vectors is indexed by the sum of all RTEs in all I/O APICs. */
-u8 irq_vector[NR_IRQS] __read_mostly;
+/* irq vectors are indexed by the sum of all RTEs in all I/O APICs. */
+u8 ioapic_irq_vector[NR_IRQS] __read_mostly;
 
 static struct hw_interrupt_type ioapic_level_type;
 static struct hw_interrupt_type ioapic_edge_type;
@@ -740,6 +744,7 @@ static void __init setup_IO_APIC_irqs(void)
 
             if (IO_APIC_IRQ(irq)) {
                 vector = assign_irq_vector(irq);
+                ioapic_irq_vector[irq] = vector;
                 entry.vector = vector;
                 ioapic_register_intr(irq, vector, IOAPIC_AUTO);
 		
@@ -933,9 +938,9 @@ void /*__init*/ __print_IO_APIC(void)
         struct irq_pin_list *entry = irq_2_pin + i;
         if (entry->pin < 0)
             continue;
-        printk(KERN_DEBUG "IRQ%d ", IO_APIC_VECTOR(i));
+        printk(KERN_DEBUG "IRQ%-3d (vec %3d)", i, IO_APIC_VECTOR(i));
         for (;;) {
-            printk("-> %d:%d", entry->apic, entry->pin);
+            printk(" -> %d:%d", entry->apic, entry->pin);
             if (!entry->next)
                 break;
             entry = irq_2_pin + entry->next;
@@ -1662,6 +1667,7 @@ static inline void check_timer(void)
      */
     disable_8259A_irq(0);
     vector = assign_irq_vector(0);
+    ioapic_irq_vector[0] = vector;
 
     irq_desc[IO_APIC_VECTOR(0)].action = irq_desc[LEGACY_VECTOR(0)].action;
     irq_desc[IO_APIC_VECTOR(0)].depth  = 0;
@@ -2019,6 +2025,7 @@ int io_apic_set_pci_routing (int ioapic, int pin, int irq, int edge_level, int a
         add_pin_to_irq(irq, ioapic, pin);
 
     entry.vector = assign_irq_vector(irq);
+    ioapic_irq_vector[irq] = entry.vector;
 
     apic_printk(APIC_DEBUG, KERN_DEBUG "IOAPIC[%d]: Set PCI routing entry "
 		"(%d-%d -> 0x%x -> IRQ %d Mode:%i Active:%i)\n", ioapic,
