@@ -875,13 +875,7 @@ int iommu_set_interrupt(struct iommu *iommu)
     int vector, ret;
 
     vector = assign_irq_vector(AUTO_ASSIGN);
-    vector_to_iommu[vector] = iommu;
-
-    /* VT-d fault is a MSI, make irq == vector */
-    irq_vector[vector] = vector;
-    vector_irq[vector] = vector;
-
-    if ( !vector )
+    if ( vector <= 0 )
     {
         gdprintk(XENLOG_ERR VTDPREFIX, "IOMMU: no vectors\n");
         return -EINVAL;
@@ -890,7 +884,17 @@ int iommu_set_interrupt(struct iommu *iommu)
     irq_desc[vector].handler = &dma_msi_type;
     ret = request_irq(vector, iommu_page_fault, 0, "dmar", iommu);
     if ( ret )
+    {
+        irq_desc[vector].handler = &no_irq_type;
+        free_irq_vector(vector);
         gdprintk(XENLOG_ERR VTDPREFIX, "IOMMU: can't request irq\n");
+        return ret;
+    }
+
+    /* Make sure that vector is never re-used. */
+    vector_irq[vector] = NEVER_ASSIGN;
+    vector_to_iommu[vector] = iommu;
+
     return vector;
 }
 
@@ -1677,6 +1681,11 @@ static int init_vtd_hw(void)
         }
 
         vector = iommu_set_interrupt(iommu);
+        if ( vector < 0 )
+        {
+            gdprintk(XENLOG_ERR VTDPREFIX, "IOMMU: interrupt setup failed\n");
+            return vector;
+        }
         dma_msi_data_init(iommu, vector);
         dma_msi_addr_init(iommu, cpu_physical_id(first_cpu(cpu_online_map)));
         iommu->vector = vector;
