@@ -550,9 +550,15 @@ static void clear_bootstrap(void)
 
 void arch_init_p2m(unsigned long max_pfn)
 {
+#ifdef __x86_64__
 #define L1_P2M_SHIFT    9
 #define L2_P2M_SHIFT    18    
 #define L3_P2M_SHIFT    27    
+#else
+#define L1_P2M_SHIFT    10
+#define L2_P2M_SHIFT    20    
+#define L3_P2M_SHIFT    30    
+#endif
 #define L1_P2M_ENTRIES  (1 << L1_P2M_SHIFT)    
 #define L2_P2M_ENTRIES  (1 << (L2_P2M_SHIFT - L1_P2M_SHIFT))    
 #define L3_P2M_ENTRIES  (1 << (L3_P2M_SHIFT - L2_P2M_SHIFT))    
