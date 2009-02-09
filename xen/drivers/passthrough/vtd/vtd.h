@@ -101,12 +101,12 @@ unsigned int get_cache_line_size(void);
 void cacheline_flush(char *);
 void flush_all_cache(void);
 void *map_to_nocache_virt(int nr_iommus, u64 maddr);
-u64 alloc_pgtable_maddr(struct domain *d);
+u64 alloc_pgtable_maddr(struct domain *d, unsigned long npages);
 void free_pgtable_maddr(u64 maddr);
 void *map_vtd_domain_page(u64 maddr);
 void unmap_vtd_domain_page(void *va);
 
 void iommu_flush_cache_entry(void *addr);
-void iommu_flush_cache_page(void *addr);
+void iommu_flush_cache_page(void *addr, unsigned long npages);
 
 #endif // _VTD_H_

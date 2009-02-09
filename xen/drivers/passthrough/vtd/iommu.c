@@ -129,9 +129,9 @@ void iommu_flush_cache_entry(void *addr)
     __iommu_flush_cache(addr, 8);
 }
 
-void iommu_flush_cache_page(void *addr)
+void iommu_flush_cache_page(void *addr, unsigned long npages)
 {
-    __iommu_flush_cache(addr, PAGE_SIZE_4K);
+    __iommu_flush_cache(addr, PAGE_SIZE_4K * npages);
 }
 
 int nr_iommus;
@@ -146,7 +146,7 @@ static u64 bus_to_context_maddr(struct iommu *iommu, u8 bus)
     root = &root_entries[bus];
     if ( !root_present(*root) )
     {
-        maddr = alloc_pgtable_maddr(NULL);
+        maddr = alloc_pgtable_maddr(NULL, 1);
         if ( maddr == 0 )
         {
             unmap_vtd_domain_page(root_entries);
@@ -174,7 +174,7 @@ static u64 addr_to_dma_page_maddr(struct domain *domain, u64 addr, int alloc)
     addr &= (((u64)1) << addr_width) - 1;
     ASSERT(spin_is_locked(&hd->mapping_lock));
     if ( hd->pgd_maddr == 0 )
-        if ( !alloc || ((hd->pgd_maddr = alloc_pgtable_maddr(domain)) == 0) )
+        if ( !alloc || ((hd->pgd_maddr = alloc_pgtable_maddr(domain, 1)) == 0) )
             goto out;
 
     parent = (struct dma_pte *)map_vtd_domain_page(hd->pgd_maddr);
@@ -187,7 +187,7 @@ static u64 addr_to_dma_page_maddr(struct domain *domain, u64 addr, int alloc)
         {
             if ( !alloc )
                 break;
-            maddr = alloc_pgtable_maddr(domain);
+            maddr = alloc_pgtable_maddr(domain, 1);
             if ( !maddr )
                 break;
             dma_set_pte_addr(*pte, maddr);
@@ -577,7 +577,7 @@ static int iommu_set_root_entry(struct iommu *iommu)
     spin_lock(&iommu->lock);
 
     if ( iommu->root_maddr == 0 )
-        iommu->root_maddr = alloc_pgtable_maddr(NULL);
+        iommu->root_maddr = alloc_pgtable_maddr(NULL, 1);
     if ( iommu->root_maddr == 0 )
     {
         spin_unlock(&iommu->lock);
