@@ -82,9 +82,9 @@ int assign_irq_vector(int irq)
 
     spin_lock(&vector_lock);
 
-    if ((irq != AUTO_ASSIGN) && (ioapic_irq_vector[irq] > 0)) {
+    if ((irq != AUTO_ASSIGN) && (IO_APIC_VECTOR(irq) > 0)) {
         spin_unlock(&vector_lock);
-        return ioapic_irq_vector[irq];
+        return IO_APIC_VECTOR(irq);
     }
 
     vector = current_vector;
@@ -101,6 +101,8 @@ int assign_irq_vector(int irq)
 
     current_vector = vector;
     vector_irq[vector] = irq;
+    if (irq != AUTO_ASSIGN)
+        IO_APIC_VECTOR(irq) = vector;
 
     spin_unlock(&vector_lock);
 

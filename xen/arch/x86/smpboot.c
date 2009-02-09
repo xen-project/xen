@@ -1477,6 +1477,7 @@ void __init smp_intr_init(void)
 	 * IRQ0 must be given a fixed assignment and initialized,
 	 * because it's used before the IO-APIC is set up.
 	 */
+	irq_vector[0] = FIRST_HIPRIORITY_VECTOR;
 	vector_irq[FIRST_HIPRIORITY_VECTOR] = 0;
 
 	/*
@@ -1486,6 +1487,7 @@ void __init smp_intr_init(void)
 	for (seridx = 0; seridx < 2; seridx++) {
 		if ((irq = serial_irq(seridx)) < 0)
 			continue;
+		irq_vector[irq] = FIRST_HIPRIORITY_VECTOR + seridx + 1;
 		vector_irq[FIRST_HIPRIORITY_VECTOR + seridx + 1] = irq;
 	}
 
