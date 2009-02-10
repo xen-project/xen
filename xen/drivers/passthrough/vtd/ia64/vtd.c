@@ -57,7 +57,7 @@ u64 alloc_pgtable_maddr(struct domain *d, unsigned long npages)
         return 0;
     memset(vaddr, 0, PAGE_SIZE * npages);
 
-    iommu_flush_cache_page(vaddr);
+    iommu_flush_cache_page(vaddr, npages);
     unmap_domain_page(vaddr);
 
     return page_to_maddr(pg);
