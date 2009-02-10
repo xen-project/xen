@@ -95,6 +95,7 @@ void mce_amd_checkregs(void *info)
 	mc_data = NULL;
 
 	cpu_nr = smp_processor_id();
+	BUG_ON(cpu_nr != vcpu->processor);
 	event_enabled = guest_enabled_event(dom0->vcpu[0], VIRQ_MCA);
 	error_found = 0;
 
@@ -103,14 +104,12 @@ void mce_amd_checkregs(void *info)
 	mc_global.common.size = sizeof(mc_global);
 
 	mc_global.mc_domid = vcpu->domain->domain_id; /* impacted domain */
-	mc_global.mc_coreid = vcpu->processor; /* impacted physical cpu */
-	BUG_ON(cpu_nr != vcpu->processor);
-	mc_global.mc_core_threadid = 0;
 	mc_global.mc_vcpuid = vcpu->vcpu_id; /* impacted vcpu */
-#if 0 /* TODO: on which socket is this physical core?
-         It's not clear to me how to figure this out. */
-	mc_global.mc_socketid = ???;
-#endif
+
+	x86_mc_get_cpu_info(cpu_nr, &mc_global.mc_socketid,
+	    &mc_global.mc_coreid, &mc_global.mc_core_threadid,
+	    &mc_global.mc_apicid, NULL, NULL, NULL);
+
 	mc_global.mc_flags |= MC_FLAG_CORRECTABLE;
 	rdmsrl(MSR_IA32_MCG_STATUS, mc_global.mc_gstatus);
 

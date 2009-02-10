@@ -56,7 +56,7 @@
 /* Hypercall */
 #define __HYPERVISOR_mca __HYPERVISOR_arch_0
 
-#define XEN_MCA_INTERFACE_VERSION 0x03000001
+#define XEN_MCA_INTERFACE_VERSION 0x03000002
 
 /* IN: Dom0 calls hypercall from MC event handler. */
 #define XEN_MC_CORRECTABLE  0x0
@@ -118,7 +118,7 @@ struct mcinfo_global {
     uint16_t mc_domid;
     uint32_t mc_socketid; /* physical socket of the physical core */
     uint16_t mc_coreid; /* physical impacted core */
-    uint8_t  mc_apicid;
+    uint32_t mc_apicid;
     uint16_t mc_core_threadid; /* core thread of physical core */
     uint16_t mc_vcpuid; /* virtual cpu scheduled for mc_domid */
     uint64_t mc_gstatus; /* global status */
@@ -175,6 +175,41 @@ struct mc_info {
 };
 typedef struct mc_info mc_info_t;
 
+#define __MC_MSR_ARRAYSIZE 8
+#define __MC_NMSRS 1
+#define MC_NCAPS	7	/* 7 CPU feature flag words */
+#define MC_CAPS_STD_EDX	0	/* cpuid level 0x00000001 (%edx) */
+#define MC_CAPS_AMD_EDX	1	/* cpuid level 0x80000001 (%edx) */
+#define MC_CAPS_TM	2	/* cpuid level 0x80860001 (TransMeta) */
+#define MC_CAPS_LINUX	3	/* Linux-defined */
+#define MC_CAPS_STD_ECX	4	/* cpuid level 0x00000001 (%ecx) */
+#define MC_CAPS_VIA	5	/* cpuid level 0xc0000001 */
+#define MC_CAPS_AMD_ECX	6	/* cpuid level 0x80000001 (%ecx) */
+
+typedef struct mcinfo_logical_cpu {
+    uint32_t mc_cpunr;          
+    uint32_t mc_chipid; 
+    uint16_t mc_coreid;
+    uint16_t mc_threadid;
+    uint32_t mc_apicid;
+    uint32_t mc_clusterid;
+    uint32_t mc_ncores;
+    uint32_t mc_ncores_active;
+    uint32_t mc_nthreads;
+    int32_t mc_cpuid_level;
+    uint32_t mc_family;
+    uint32_t mc_vendor;
+    uint32_t mc_model;
+    uint32_t mc_step;
+    char mc_vendorid[16];
+    char mc_brandid[64];
+    uint32_t mc_cpu_caps[MC_NCAPS];
+    uint32_t mc_cache_size;
+    uint32_t mc_cache_alignment;
+    int32_t mc_nmsrvals;
+    struct mcinfo_msr mc_msrvalues[__MC_MSR_ARRAYSIZE];
+} xen_mc_logical_cpu_t;
+DEFINE_XEN_GUEST_HANDLE(xen_mc_logical_cpu_t);
 
 
 /* 
@@ -272,6 +307,14 @@ struct xen_mc_notifydomain {
 typedef struct xen_mc_notifydomain xen_mc_notifydomain_t;
 DEFINE_XEN_GUEST_HANDLE(xen_mc_notifydomain_t);
 
+#define XEN_MC_physcpuinfo 3
+struct xen_mc_physcpuinfo {
+	/* IN/OUT */
+	uint32_t ncpus;
+	uint32_t pad0;
+	/* OUT */
+	XEN_GUEST_HANDLE(xen_mc_logical_cpu_t) info;
+};
 
 struct xen_mc {
     uint32_t cmd;
@@ -279,6 +322,7 @@ struct xen_mc {
     union {
         struct xen_mc_fetch        mc_fetch;
         struct xen_mc_notifydomain mc_notifydomain;
+        struct xen_mc_physcpuinfo  mc_physcpuinfo;
         uint8_t pad[MCINFO_HYPERCALLSIZE];
     } u;
 };

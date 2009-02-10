@@ -34,4 +34,5 @@ void x86_mcinfo_clear(struct mc_info *mi);
 int x86_mcinfo_add(struct mc_info *mi, void *mcinfo);
 void x86_mcinfo_dump(struct mc_info *mi);
 void mc_panic(char *s);
-
+void x86_mc_get_cpu_info(unsigned, uint32_t *, uint16_t *, uint16_t *,
+			 uint32_t *, uint32_t *, uint32_t *, uint32_t *);
