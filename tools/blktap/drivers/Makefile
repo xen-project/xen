@@ -13,7 +13,7 @@ CFLAGS   += $(CFLAGS_libxenstore)
 CFLAGS   += -I $(LIBAIO_DIR)
 CFLAGS   += -D_GNU_SOURCE
 
-ifeq ($(shell . ./check_gcrypt),"yes")
+ifeq ($(shell . ./check_gcrypt $(CC)),yes)
 CFLAGS += -DUSE_GCRYPT
 CRYPT_LIB := -lgcrypt
 else
