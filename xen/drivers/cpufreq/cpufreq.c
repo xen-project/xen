@@ -501,13 +501,12 @@ void __init cpufreq_cmdline_parse(char *str)
 {
     static struct cpufreq_governor *__initdata cpufreq_governors[] =
     {
-        #define CPUFREQ_DEFAULT_GOVERNOR_INDEX 0;
         &cpufreq_gov_userspace,
         &cpufreq_gov_dbs,
         &cpufreq_gov_performance,
         &cpufreq_gov_powersave
     };
-    unsigned int gov_index = CPUFREQ_DEFAULT_GOVERNOR_INDEX;
+    unsigned int gov_index = 0;
 
     do {
         char *val, *end = strchr(str, ',');
@@ -520,24 +519,23 @@ void __init cpufreq_cmdline_parse(char *str)
             *val++ = '\0';
 
         if (!cpufreq_opt_governor) {
-            if (!val)
-                for (i = 0; i < ARRAY_SIZE(cpufreq_governors); ++i)
+            if (!val) {
+                for (i = 0; i < ARRAY_SIZE(cpufreq_governors); ++i) {
                     if (!strcmp(str, cpufreq_governors[i]->name)) {
                         cpufreq_opt_governor = cpufreq_governors[i];
                         gov_index = i;
                         str = NULL;
                         break;
                     }
-            else
+                }
+            } else {
                 cpufreq_opt_governor = CPUFREQ_DEFAULT_GOVERNOR;
+            }
         }
 
-        if (str) {
-            if (cpufreq_handle_common_option(str, val))
-                ;
-            else if (cpufreq_governors[gov_index]->handle_option)
-                cpufreq_governors[gov_index]->handle_option(str, val);
-        }
+        if (str && !cpufreq_handle_common_option(str, val) &&
+            cpufreq_governors[gov_index]->handle_option)
+            cpufreq_governors[gov_index]->handle_option(str, val);
 
         str = end;
     } while (str);
