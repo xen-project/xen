@@ -183,7 +183,7 @@ static void drv_read(struct drv_cmd *cmd)
     ASSERT(cpus_weight(cmd->mask) == 1);
 
     /* to reduce IPI for the sake of performance */
-    if (cpu_isset(smp_processor_id(), cmd->mask))
+    if (likely(cpu_isset(smp_processor_id(), cmd->mask)))
         do_drv_read((void *)cmd);
     else
         on_selected_cpus( cmd->mask, do_drv_read, (void *)cmd, 0, 1);
@@ -196,6 +196,7 @@ static void drv_write(struct drv_cmd *cmd)
 
 static u32 get_cur_val(cpumask_t mask)
 {
+    struct cpufreq_policy *policy;
     struct processor_performance *perf;
     struct drv_cmd cmd;
     unsigned int cpu = smp_processor_id();
@@ -205,18 +206,19 @@ static u32 get_cur_val(cpumask_t mask)
 
     if (!cpu_isset(cpu, mask))
         cpu = first_cpu(mask);
+    policy = cpufreq_cpu_policy[cpu];
 
-    if (cpu >= NR_CPUS || !drv_data[cpu])
+    if (cpu >= NR_CPUS || !policy || !drv_data[policy->cpu])
         return 0;    
 
-    switch (drv_data[cpu]->cpu_feature) {
+    switch (drv_data[policy->cpu]->cpu_feature) {
     case SYSTEM_INTEL_MSR_CAPABLE:
         cmd.type = SYSTEM_INTEL_MSR_CAPABLE;
         cmd.addr.msr.reg = MSR_IA32_PERF_STATUS;
         break;
     case SYSTEM_IO_CAPABLE:
         cmd.type = SYSTEM_IO_CAPABLE;
-        perf = drv_data[cpu]->acpi_data;
+        perf = drv_data[policy->cpu]->acpi_data;
         cmd.addr.io.port = perf->control_register.address;
         cmd.addr.io.bit_width = perf->control_register.bit_width;
         break;
