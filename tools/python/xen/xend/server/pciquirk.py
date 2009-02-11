@@ -123,7 +123,8 @@ class PCIQuirk:
             log.info("Config file does not exist: %s" % PERMISSIVE_CONFIG_FILE)
             self.pci_perm_dev_config = ['xend-pci-perm-devs']
 
-        devices = child_at(child(pci_perm_dev_config, 'unconstrained_dev_ids'),0)
+        devices = child_at(child(self.pci_perm_dev_config,
+                                 'unconstrained_dev_ids'),0)
         if self.__matchPCIdev( devices ):
             log.debug("Permissive mode enabled for PCI device [%s]" %
                       self.devid)
