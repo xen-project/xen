@@ -18,6 +18,7 @@
 #include <xen/sched.h>
 #include <acpi/cpufreq/cpufreq.h>
 
+static unsigned int usr_speed;
 
 /*
  * cpufreq userspace governor
@@ -26,6 +27,7 @@ static int cpufreq_governor_userspace(struct cpufreq_policy *policy,
                                       unsigned int event)
 {
     int ret = 0;
+    unsigned int freq;
 
     if (!policy)
         return -EINVAL;
@@ -35,12 +37,17 @@ static int cpufreq_governor_userspace(struct cpufreq_policy *policy,
     case CPUFREQ_GOV_STOP:
         break;
     case CPUFREQ_GOV_LIMITS:
-        if (policy->max < policy->cur)
+        freq = usr_speed ? : policy->cur;
+        if (policy->max < freq)
             ret = __cpufreq_driver_target(policy, policy->max,
                         CPUFREQ_RELATION_H);
-        else if (policy->min > policy->cur)
+        else if (policy->min > freq)
             ret = __cpufreq_driver_target(policy, policy->min,
                         CPUFREQ_RELATION_L);
+        else if (usr_speed)
+            ret = __cpufreq_driver_target(policy, freq,
+                        CPUFREQ_RELATION_L);
+
         break;
     default:
         ret = -EINVAL;
@@ -50,9 +57,17 @@ static int cpufreq_governor_userspace(struct cpufreq_policy *policy,
     return ret;
 }
 
+static void __init 
+cpufreq_userspace_handle_option(const char *name, const char *val)
+{
+    if (!strcmp(name, "speed") && val)
+        usr_speed = simple_strtoul(val, NULL, 0);
+}
+
 struct cpufreq_governor cpufreq_gov_userspace = {
     .name = "userspace",
     .governor = cpufreq_governor_userspace,
+    .handle_option = cpufreq_userspace_handle_option
 };
 
 static int __init cpufreq_gov_userspace_init(void)

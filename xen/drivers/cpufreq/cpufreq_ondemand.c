@@ -287,7 +287,7 @@ static void __init cpufreq_dbs_handle_option(const char *name, const char *val)
     {
         usr_sampling_rate = simple_strtoull(val, NULL, 0) * MICROSECS(1);
     }
-    else if ( !strcmp(name, "threshold") && val )
+    else if ( !strcmp(name, "up_threshold") && val )
     {
         unsigned long tmp = simple_strtoul(val, NULL, 0);
 
