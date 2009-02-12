@@ -1765,6 +1765,23 @@ int intel_vtd_setup(void)
     if ( init_vtd_hw() )
         goto error;
 
+    /* Giving that all devices within guest use same io page table,
+     * enable snoop control only if all VT-d engines support it.
+     */
+
+    if ( iommu_snoop )
+    {
+        for_each_drhd_unit ( drhd )
+        {
+            iommu = drhd->iommu;
+            if ( !ecap_snp_ctl(iommu->ecap) ) {
+                iommu_snoop = 0;
+                break;
+            }
+        }
+    }
+    
+    printk("Intel VT-d snoop control %sabled\n", iommu_snoop ? "en" : "dis");
     register_keyhandler('V', dump_iommu_info, "dump iommu info");
 
     return 0;
@@ -1773,6 +1790,7 @@ int intel_vtd_setup(void)
     for_each_drhd_unit ( drhd )
         iommu_free(drhd);
     vtd_enabled = 0;
+    iommu_snoop = 0;
     return -ENOMEM;
 }
 
