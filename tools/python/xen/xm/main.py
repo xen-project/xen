@@ -739,7 +739,7 @@ def xm_save(args):
         (options, params) = getopt.gnu_getopt(args, 'c', ['checkpoint'])
     except getopt.GetoptError, opterr:
         err(opterr)
-        sys.exit(1)
+        usage('save')
 
     checkpoint = False
     for (k, v) in options:
