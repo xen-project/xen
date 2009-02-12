@@ -410,8 +410,8 @@ void __init init_IRQ(void)
     }
 
     /* Never allocate the hypercall vector or Linux/BSD fast-trap vector. */
-    vector_irq[HYPERCALL_VECTOR] = NEVER_ASSIGN;
-    vector_irq[0x80] = NEVER_ASSIGN;
+    vector_irq[HYPERCALL_VECTOR] = NEVER_ASSIGN_IRQ;
+    vector_irq[0x80] = NEVER_ASSIGN_IRQ;
 
     apic_intr_init();
 

@@ -250,6 +250,7 @@ void
 register_percpu_irq (ia64_vector vec, struct irqaction *action)
 {
 	irq_desc_t *desc;
+#ifndef XEN
 	unsigned int irq;
 
 	for (irq = 0; irq < NR_IRQS; ++irq)
@@ -258,16 +259,19 @@ register_percpu_irq (ia64_vector vec, struct irqaction *action)
 			desc->status |= IRQ_PER_CPU;
 			desc->handler = &irq_type_ia64_lsapic;
 			if (action)
-#ifdef XEN
-				setup_vector(irq, action);
-#else
 				setup_irq(irq, action);
-#endif
 		}
+#else
+	desc = irq_descp(vec);
+	desc->status |= IRQ_PER_CPU;
+	desc->handler = &irq_type_ia64_lsapic;
+	if (action)
+		setup_vector(vec, action);
+#endif
 }
 
 #ifdef XEN
-int request_irq(unsigned int irq,
+int request_irq_vector(unsigned int vector,
 		void (*handler)(int, void *, struct cpu_user_regs *),
 		unsigned long irqflags, const char * devname, void *dev_id)
 {
@@ -279,7 +283,7 @@ int request_irq(unsigned int irq,
 	 * otherwise we'll have trouble later trying to figure out
 	 * which interrupt is which (messes up the interrupt freeing logic etc).
 	 *                          */
-	if (irq >= NR_IRQS)
+	if (vector >= NR_VECTORS)
 		return -EINVAL;
 	if (!handler)
 		return -EINVAL;
@@ -291,7 +295,7 @@ int request_irq(unsigned int irq,
 	action->handler = handler;
 	action->name = devname;
 	action->dev_id = dev_id;
-	setup_vector(irq, action);
+	setup_vector(vector, action);
 	if (retval)
 		xfree(action);
 

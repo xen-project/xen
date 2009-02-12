@@ -29,7 +29,9 @@
 #include "../vtd.h"
 
 
-int vector_irq[NR_VECTORS] __read_mostly = { [0 ... NR_VECTORS - 1] = -1};
+int vector_irq[NR_VECTORS] __read_mostly = {
+    [0 ... NR_VECTORS - 1] = FREE_TO_ASSIGN_IRQ
+};
 /* irq_vectors is indexed by the sum of all RTEs in all I/O APICs. */
 u8 irq_vector[NR_IRQS] __read_mostly;
 

@@ -19,9 +19,6 @@
 
 extern int vector_irq[NR_VECTORS];
 extern u8 irq_vector[NR_IRQS];
-#define AUTO_ASSIGN    -1
-#define NEVER_ASSIGN   -2
-#define FREE_TO_ASSIGN -3
 
 #define platform_legacy_irq(irq)	((irq) < 16)
 

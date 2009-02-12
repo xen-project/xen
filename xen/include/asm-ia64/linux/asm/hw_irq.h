@@ -34,7 +34,7 @@ typedef u8 ia64_vector;
 #define IA64_MAX_VECTORED_IRQ		255
 #define IA64_NUM_VECTORS		256
 
-#define AUTO_ASSIGN			-1
+#define AUTO_ASSIGN_IRQ			(-1)
 
 #define IA64_SPURIOUS_INT_VECTOR	0x0f
 

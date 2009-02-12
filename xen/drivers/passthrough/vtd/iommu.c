@@ -874,7 +874,7 @@ int iommu_set_interrupt(struct iommu *iommu)
 {
     int vector, ret;
 
-    vector = assign_irq_vector(AUTO_ASSIGN);
+    vector = assign_irq_vector(AUTO_ASSIGN_IRQ);
     if ( vector <= 0 )
     {
         gdprintk(XENLOG_ERR VTDPREFIX, "IOMMU: no vectors\n");
@@ -882,7 +882,7 @@ int iommu_set_interrupt(struct iommu *iommu)
     }
 
     irq_desc[vector].handler = &dma_msi_type;
-    ret = request_irq(vector, iommu_page_fault, 0, "dmar", iommu);
+    ret = request_irq_vector(vector, iommu_page_fault, 0, "dmar", iommu);
     if ( ret )
     {
         irq_desc[vector].handler = &no_irq_type;
@@ -892,7 +892,7 @@ int iommu_set_interrupt(struct iommu *iommu)
     }
 
     /* Make sure that vector is never re-used. */
-    vector_irq[vector] = NEVER_ASSIGN;
+    vector_irq[vector] = NEVER_ASSIGN_IRQ;
     vector_to_iommu[vector] = iommu;
 
     return vector;
@@ -970,7 +970,7 @@ static void iommu_free(struct acpi_drhd_unit *drhd)
         iounmap(iommu->reg);
 
     free_intel_iommu(iommu->intel);
-    free_irq(iommu->vector);
+    release_irq_vector(iommu->vector);
     xfree(iommu);
 
     drhd->iommu = NULL;

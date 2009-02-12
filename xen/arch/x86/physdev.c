@@ -75,7 +75,7 @@ static int physdev_map_pirq(struct physdev_map_pirq *map)
         case MAP_PIRQ_TYPE_MSI:
             vector = map->index;
             if ( vector == -1 )
-                vector = assign_irq_vector(AUTO_ASSIGN);
+                vector = assign_irq_vector(AUTO_ASSIGN_IRQ);
 
             if ( vector < 0 || vector >= NR_VECTORS )
             {

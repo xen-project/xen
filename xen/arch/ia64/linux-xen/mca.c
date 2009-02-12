@@ -114,7 +114,6 @@ extern void			ia64_monarch_init_handler (void);
 extern void			ia64_slave_init_handler (void);
 #ifdef XEN
 extern void setup_vector (unsigned int vec, struct irqaction *action);
-#define setup_irq(irq, action)	setup_vector(irq, action)
 #endif
 
 static ia64_mc_info_t		ia64_mc_info;
@@ -1922,12 +1921,18 @@ ia64_mca_late_init(void)
 		if (cpe_vector >= 0) {
 			/* If platform supports CPEI, enable the irq. */
 			cpe_poll_enabled = 0;
+#ifndef XEN
 			for (irq = 0; irq < NR_IRQS; ++irq)
 				if (irq_to_vector(irq) == cpe_vector) {
 					desc = irq_descp(irq);
 					desc->status |= IRQ_PER_CPU;
-					setup_irq(irq, &mca_cpe_irqaction);
+					setup_vector(irq, &mca_cpe_irqaction);
 				}
+#else
+			desc = irq_descp(cpe_vector);
+			desc->status |= IRQ_PER_CPU;
+			setup_vector(cpe_vector, &mca_cpe_irqaction);
+#endif
 			ia64_mca_register_cpev(cpe_vector);
 			IA64_MCA_DEBUG("%s: CPEI/P setup and enabled.\n", __FUNCTION__);
 		} else {

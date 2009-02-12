@@ -479,7 +479,7 @@ static int set_iommu_interrupt_handler(struct amd_iommu *iommu)
 {
     int vector, ret;
 
-    vector = assign_irq_vector(AUTO_ASSIGN);
+    vector = assign_irq_vector(AUTO_ASSIGN_IRQ);
     if ( vector <= 0 )
     {
         gdprintk(XENLOG_ERR VTDPREFIX, "IOMMU: no vectors\n");
@@ -487,7 +487,8 @@ static int set_iommu_interrupt_handler(struct amd_iommu *iommu)
     }
 
     irq_desc[vector].handler = &iommu_msi_type;
-    ret = request_irq(vector, amd_iommu_page_fault, 0, "amd_iommu", iommu);
+    ret = request_irq_vector(vector, amd_iommu_page_fault, 0,
+                             "amd_iommu", iommu);
     if ( ret )
     {
         irq_desc[vector].handler = &no_irq_type;
@@ -497,7 +498,7 @@ static int set_iommu_interrupt_handler(struct amd_iommu *iommu)
     }
 
     /* Make sure that vector is never re-used. */
-    vector_irq[vector] = NEVER_ASSIGN;
+    vector_irq[vector] = NEVER_ASSIGN_IRQ;
     vector_to_iommu[vector] = iommu;
     iommu->vector = vector;
     return vector;

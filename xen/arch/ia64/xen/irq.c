@@ -228,11 +228,11 @@ out:
  * disabled.
  */
 
-int setup_vector(unsigned int irq, struct irqaction * new)
+int setup_vector(unsigned int vector, struct irqaction * new)
 {
 	unsigned long flags;
 	struct irqaction *old, **p;
-	irq_desc_t *desc = irq_descp(irq);
+	irq_desc_t *desc = irq_descp(vector);
 
 	/*
 	 * The following block of code has to be executed atomically
@@ -248,8 +248,8 @@ int setup_vector(unsigned int irq, struct irqaction * new)
 
 	desc->depth = 0;
 	desc->status &= ~(IRQ_DISABLED | IRQ_INPROGRESS | IRQ_GUEST);
-	desc->handler->startup(irq);
-	desc->handler->enable(irq);
+	desc->handler->startup(vector);
+	desc->handler->enable(vector);
 	spin_unlock_irqrestore(&desc->lock,flags);
 
 	return 0;
@@ -258,13 +258,11 @@ int setup_vector(unsigned int irq, struct irqaction * new)
 /* Vectors reserved by xen (and thus not sharable with domains).  */
 unsigned long ia64_xen_vector[BITS_TO_LONGS(NR_IRQS)];
 
-int setup_irq(unsigned int irq, struct irqaction * new)
+int setup_irq_vector(unsigned int vec, struct irqaction * new)
 {
-	unsigned int vec;
 	int res;
 
-	/* Get vector for IRQ.  */
-	if (acpi_gsi_to_irq (irq, &vec) < 0)
+	if ( vec == IA64_INVALID_VECTOR )
 		return -ENOSYS;
 	/* Reserve the vector (and thus the irq).  */
 	if (test_and_set_bit(vec, ia64_xen_vector))
@@ -273,14 +271,12 @@ int setup_irq(unsigned int irq, struct irqaction * new)
 	return res;
 }
 
-void free_irq(unsigned int irq)
+void release_irq_vector(unsigned int vec)
 {
-	unsigned int vec;
 	unsigned long flags;
 	irq_desc_t *desc;
 
-	/* Get vector for IRQ.  */
-	if (acpi_gsi_to_irq(irq, &vec) < 0)
+	if ( vec == IA64_INVALID_VECTOR )
 		return;
 
 	desc = irq_descp(vec);
