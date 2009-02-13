@@ -608,7 +608,7 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
 	memset(&d->arch.mm, 0, sizeof(d->arch.mm));
 	d->arch.relres = RELRES_not_started;
 	d->arch.mm_teardown_offset = 0;
-	INIT_LIST_HEAD(&d->arch.relmem_list);
+	INIT_PAGE_LIST_HEAD(&d->arch.relmem_list);
 
 	if ((d->arch.mm.pgd = pgd_alloc(&d->arch.mm)) == NULL)
 	    goto fail_nomem;
@@ -1626,9 +1626,8 @@ int arch_set_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 	return rc;
 }
 
-static int relinquish_memory(struct domain *d, struct list_head *list)
+static int relinquish_memory(struct domain *d, struct page_list_head *list)
 {
-    struct list_head *ent;
     struct page_info *page;
 #ifndef __ia64__
     unsigned long     x, y;
@@ -1637,16 +1636,14 @@ static int relinquish_memory(struct domain *d, struct list_head *list)
 
     /* Use a recursive lock, as we may enter 'free_domheap_page'. */
     spin_lock_recursive(&d->page_alloc_lock);
-    ent = list->next;
-    while ( ent != list )
+
+    while ( (page = page_list_remove_head(list)) )
     {
-        page = list_entry(ent, struct page_info, list);
         /* Grab a reference to the page so it won't disappear from under us. */
         if ( unlikely(!get_page(page, d)) )
         {
             /* Couldn't get a reference -- someone is freeing this page. */
-            ent = ent->next;
-            list_move_tail(&page->list, &d->arch.relmem_list);
+            page_list_add_tail(page, &d->arch.relmem_list);
             continue;
         }
 
@@ -1681,9 +1678,8 @@ static int relinquish_memory(struct domain *d, struct list_head *list)
 #endif
 
         /* Follow the list chain and /then/ potentially free the page. */
-        ent = ent->next;
         BUG_ON(get_gpfn_from_mfn(page_to_mfn(page)) != INVALID_M2P_ENTRY);
-        list_move_tail(&page->list, &d->arch.relmem_list);
+        page_list_add_tail(page, &d->arch.relmem_list);
         put_page(page);
 
         if (hypercall_preempt_check()) {
@@ -1692,7 +1688,13 @@ static int relinquish_memory(struct domain *d, struct list_head *list)
         }
     }
 
-    list_splice_init(&d->arch.relmem_list, list);
+    /* list is empty at this point. */
+    if ( !page_list_empty(&d->arch.relmem_list) )
+    {
+        *list = d->arch.relmem_list;
+        INIT_PAGE_LIST_HEAD(&d->arch.relmem_list);
+    }
+
 
  out:
     spin_unlock_recursive(&d->page_alloc_lock);

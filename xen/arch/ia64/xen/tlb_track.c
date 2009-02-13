@@ -56,7 +56,7 @@ tlb_track_allocate_entries(struct tlb_track* tlb_track)
         return -ENOMEM;
     }
 
-    list_add(&entry_page->list, &tlb_track->page_list);
+    page_list_add(entry_page, &tlb_track->page_list);
     track_entries = (struct tlb_track_entry*)page_to_virt(entry_page);
     allocated = PAGE_SIZE / sizeof(track_entries[0]);
     tlb_track->num_entries += allocated;
@@ -93,7 +93,7 @@ tlb_track_create(struct domain* d)
     tlb_track->limit = TLB_TRACK_LIMIT_ENTRIES;
     tlb_track->num_entries = 0;
     tlb_track->num_free = 0;
-    INIT_LIST_HEAD(&tlb_track->page_list);
+    INIT_PAGE_LIST_HEAD(&tlb_track->page_list);
     if (tlb_track_allocate_entries(tlb_track) < 0)
         goto out;
 
@@ -136,8 +136,8 @@ tlb_track_destroy(struct domain* d)
     spin_lock(&tlb_track->free_list_lock);
     BUG_ON(tlb_track->num_free != tlb_track->num_entries);
 
-    list_for_each_entry_safe(page, next, &tlb_track->page_list, list) {
-        list_del(&page->list);
+    page_list_for_each_safe(page, next, &tlb_track->page_list) {
+        page_list_del(page, &tlb_track->page_list);
         free_domheap_page(page);
     }
 

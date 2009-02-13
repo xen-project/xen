@@ -10,6 +10,7 @@
 #include <asm/vmx_platform.h>
 #include <xen/list.h>
 #include <xen/cpumask.h>
+#include <xen/mm.h>
 #include <asm/fpswa.h>
 #include <xen/rangeset.h>
 
@@ -224,7 +225,7 @@ struct arch_domain {
     /* Continuable mm_teardown() */
     unsigned long mm_teardown_offset;
     /* Continuable domain_relinquish_resources() */
-    struct list_head relmem_list;
+    struct page_list_head relmem_list;
 };
 #define INT_ENABLE_OFFSET(v) 		  \
     (sizeof(vcpu_info_t) * (v)->vcpu_id + \

@@ -39,10 +39,23 @@ typedef unsigned long page_flags_t;
 
 #define PRtype_info "016lx"
 
+#if 0
+/*
+ * See include/xen/mm.h.
+ * For now, abandon to compress struct page_info
+ * seeing IA64_MAX_PHYS_BITS and page size.
+ */
+#undef page_list_entry
+struct page_list_entry
+{
+    unsigned long next, prev;
+};
+#endif
+
 struct page_info
 {
     /* Each frame can be threaded onto a doubly-linked list. */
-    struct list_head list;
+    struct page_list_entry list;
 
     /* Reference count and various PGC_xxx flags and fields. */
     unsigned long count_info;

@@ -72,7 +72,7 @@ struct tlb_track {
     unsigned int                limit;
     unsigned int                num_entries;
     unsigned int                num_free;
-    struct list_head            page_list;
+    struct page_list_head       page_list;
 
     /* XXX hash table size */
     spinlock_t                  hash_lock;
