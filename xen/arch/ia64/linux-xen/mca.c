@@ -1925,7 +1925,9 @@ ia64_mca_late_init(void)
 
 	{
 		irq_desc_t *desc;
+#ifndef XEN
 		unsigned int irq;
+#endif
 
 		if (cpe_vector >= 0) {
 			/* If platform supports CPEI, enable the irq. */
