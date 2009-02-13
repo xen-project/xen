@@ -311,7 +311,6 @@ int hvm_domain_initialise(struct domain *d)
     hvm_init_guest_time(d);
 
     d->arch.hvm_domain.params[HVM_PARAM_HPET_ENABLED] = 1;
-    d->arch.hvm_domain.params[HVM_PARAM_VPT_ALIGN]    = 1;
 
     hvm_init_cacheattr_region_list(d);
 
