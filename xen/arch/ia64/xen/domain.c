@@ -1705,13 +1705,7 @@ static int relinquish_memory(struct domain *d, struct page_list_head *list)
         }
     }
 
-    /* list is empty at this point. */
-    if ( !page_list_empty(&d->arch.relmem_list) )
-    {
-        *list = d->arch.relmem_list;
-        INIT_PAGE_LIST_HEAD(&d->arch.relmem_list);
-    }
-
+    page_list_splice_init(&d->arch.relmem_list, list);
 
  out:
     spin_unlock_recursive(&d->page_alloc_lock);
