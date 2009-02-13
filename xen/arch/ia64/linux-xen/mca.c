@@ -210,6 +210,7 @@ static ia64_state_log_t ia64_state_log[IA64_MAX_LOG_TYPES];
 #define IA64_LOG_COUNT(it)         ia64_state_log[it].isl_count
 
 #ifdef XEN
+sal_queue_entry_t sal_entry[NR_CPUS][IA64_MAX_LOG_TYPES];
 struct list_head *sal_queue, sal_log_queues[IA64_MAX_LOG_TYPES];
 sal_log_record_header_t *sal_record;
 DEFINE_SPINLOCK(sal_queue_lock);
@@ -358,6 +359,7 @@ ia64_log_queue(int sal_info_type, int virq)
 
 	if (total_len) {
 		int queue_type;
+		int cpuid = smp_processor_id();
 
 		spin_lock_irqsave(&sal_queue_lock, flags);
 
@@ -366,15 +368,22 @@ ia64_log_queue(int sal_info_type, int virq)
 		else
 			queue_type = sal_info_type;
 
-		e = xmalloc(sal_queue_entry_t);
-		BUG_ON(e == NULL);
-		e->cpuid = smp_processor_id();
+		/* Skip if sal_entry is already listed in sal_queue */
+		list_for_each_entry(e, &sal_queue[queue_type], list) {
+			if (e == &sal_entry[cpuid][queue_type])
+				goto found;
+		}
+		e = &sal_entry[cpuid][queue_type];
+		memset(e, 0, sizeof(sal_queue_entry_t));
+		e->cpuid = cpuid;
 		e->sal_info_type = sal_info_type;
 		e->vector = IA64_CMC_VECTOR;
 		e->virq = virq;
 		e->length = total_len;
 
 		list_add_tail(&e->list, &sal_queue[queue_type]);
+
+	found:
 		spin_unlock_irqrestore(&sal_queue_lock, flags);
 
 		IA64_LOG_INDEX_INC(sal_info_type);

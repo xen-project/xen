@@ -95,7 +95,7 @@ void get_state_info_on(void *data) {
 	               rec_name[arg->type], smp_processor_id(), arg->ret);
 	if (arg->corrected) {
 		sal_record->severity = sal_log_severity_corrected;
-		IA64_SAL_DEBUG("%s: IA64_SAL_CLEAR_STATE_INFO(SAL_INFO_TYPE_MCA)"
+		IA64_SAL_DEBUG("%s: IA64_SAL_GET_STATE_INFO(SAL_INFO_TYPE_MCA)"
 		               " force\n", __FUNCTION__);
 	}
 	if (arg->ret > 0) {
@@ -293,9 +293,7 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 			}
 			r9 = arg.ret;
 			status = arg.status;
-			if (r9 == 0) {
-				xfree(e);
-			} else {
+			if (r9 != 0) {
 				/* Re-add the entry to sal_queue */
 				spin_lock_irqsave(&sal_queue_lock, flags);
 				list_add(&e->list, &sal_queue[in1]);
@@ -359,7 +357,12 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 			}
 			r9 = arg.ret;
 			status = arg.status;
-			xfree(e);
+			if (r9 >= 0) {
+				IA64_SAL_DEBUG("SAL_CLEAR_STATE_INFO: more errors are available\n");
+				spin_lock_irqsave(&sal_queue_lock, flags);
+				list_add(&e->list, &sal_queue[in1]);
+				spin_unlock_irqrestore(&sal_queue_lock, flags);
+			}
 		}
 		break;
 	    case SAL_MC_RENDEZ:
