@@ -39,17 +39,24 @@ typedef unsigned long page_flags_t;
 
 #define PRtype_info "016lx"
 
-#if 0
+#ifdef CONFIG_IA64_SHRINK_PAGE_LIST
 /*
  * See include/xen/mm.h.
- * For now, abandon to compress struct page_info
- * seeing IA64_MAX_PHYS_BITS and page size.
+ * To compress page_list_entry, all the physical address must
+ * be addressed by (32 + PAGE_SHIFT) .
+ * However this is lower than IA64_MAX_PHYS_BITS = 50.
  */
 #undef page_list_entry
 struct page_list_entry
 {
-    unsigned long next, prev;
+    u32 next, prev;
 };
+#endif
+
+#ifdef CONFIG_IA64_PICKLE_DOMAIN
+typedef u32 __ia64_domain_t;
+#else
+typedef unsigned long __ia64_domain_t;
 #endif
 
 struct page_info
@@ -65,10 +72,10 @@ struct page_info
 
         /* Page is in use: ((count_info & PGC_count_mask) != 0). */
         struct {
-            /* Owner of this page (NULL if page is anonymous). */
-            unsigned long _domain; /* pickled format */
             /* Type reference count and various PGT_xxx flags and fields. */
             unsigned long type_info;
+            /* Owner of this page (NULL if page is anonymous). */
+            __ia64_domain_t _domain; /* pickled format */
         } inuse;
 
         /* Page is on a free list: ((count_info & PGC_count_mask) == 0). */
@@ -132,8 +139,16 @@ struct page_info
 #define is_xen_heap_mfn(mfn)    (mfn_valid(mfn) &&                      \
                                  is_xen_heap_page(mfn_to_page(mfn)))
 
+#ifdef CONFIG_IA64_PICKLE_DOMAIN
+#define page_get_owner(_p)                                              \
+    ((struct domain *)((_p)->v.inuse._domain ?                          \
+                       mfn_to_virt((_p)->v.inuse._domain) : NULL))
+#define page_set_owner(_p,_d)                                           \
+    ((_p)->v.inuse._domain = (_d) ? virt_to_mfn(_d) : 0)
+#else
 #define page_get_owner(_p)      ((struct domain *)(_p)->u.inuse._domain)
 #define page_set_owner(_p, _d)	((_p)->u.inuse._domain = (unsigned long)(_d))
+#endif
 
 #define XENSHARE_writable 0
 #define XENSHARE_readonly 1

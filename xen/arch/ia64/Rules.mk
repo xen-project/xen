@@ -16,6 +16,13 @@ xen_ia64_tlb_track_cnt	?= n
 xen_ia64_tlbflush_clock	?= y
 xen_ia64_disable_optvfault ?= n
 
+# If they are enabled,
+# shrink struct page_info assuming all mfn can be addressed by 32 bits.
+# However, with 50bit ia64 architected physical address and 16KB page size,
+# mfn isn't always assessed by 32bit. So they are disabled by default.
+xen_ia64_shrink_page_list ?= n
+xen_ia64_pickle_domain ?= n
+
 # Used only by linux/Makefile.
 AFLAGS_KERNEL  += -mconstant-gp -nostdinc $(CPPFLAGS)
 
@@ -70,6 +77,12 @@ CFLAGS += -DVHPT_ENABLED=0
 endif
 ifeq ($(xen_ia64_disable_optvfault),y)
 CFLAGS += -DCONFIG_XEN_IA64_DISABLE_OPTVFAULT
+endif
+ifeq ($(xen_ia64_shrink_page_list),y)
+CFLAGS += -DCONFIG_IA64_SHRINK_PAGE_LIST
+endif
+ifeq ($(xen_ia64_pickle_domain),y)
+CFLAGS += -DCONFIG_IA64_PICKLE_DOMAIN
 endif
 
 LDFLAGS = -g
