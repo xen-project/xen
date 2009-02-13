@@ -158,6 +158,7 @@ XENAPI_PLATFORM_CFG_TYPES = {
     'vncdisplay': int,
     'vnclisten': str,
     'timer_mode': int,
+    'vpt_align': int,
     'viridian': int,
     'vncpasswd': str,
     'vncunused': int,
@@ -459,6 +460,8 @@ class XendConfig(dict):
                 self['platform']['rtc_timeoffset'] = 0
             if 'hpet' not in self['platform']:
                 self['platform']['hpet'] = 0
+            if 'vpt_align' not in self['platform']:
+                self['platform']['vpt_align'] = 1
             if 'loader' not in self['platform']:
                 # Old configs may have hvmloader set as PV_kernel param
                 if self.has_key('PV_kernel') and self['PV_kernel'] != '':
