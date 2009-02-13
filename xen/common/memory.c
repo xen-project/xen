@@ -218,8 +218,8 @@ static void decrease_reservation(struct memop_args *a)
 static long memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
 {
     struct xen_memory_exchange exch;
-    LIST_HEAD(in_chunk_list);
-    LIST_HEAD(out_chunk_list);
+    PAGE_LIST_HEAD(in_chunk_list);
+    PAGE_LIST_HEAD(out_chunk_list);
     unsigned long in_chunk_order, out_chunk_order;
     xen_pfn_t     gpfn, gmfn, mfn;
     unsigned long i, j, k;
@@ -325,7 +325,7 @@ static long memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
                     goto fail;
                 }
 
-                list_add(&page->list, &in_chunk_list);
+                page_list_add(page, &in_chunk_list);
             }
         }
 
@@ -339,7 +339,7 @@ static long memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
                 goto fail;
             }
 
-            list_add(&page->list, &out_chunk_list);
+            page_list_add(page, &out_chunk_list);
         }
 
         /*
@@ -347,10 +347,8 @@ static long memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
          */
 
         /* Destroy final reference to each input page. */
-        while ( !list_empty(&in_chunk_list) )
+        while ( (page = page_list_remove_head(&in_chunk_list)) )
         {
-            page = list_entry(in_chunk_list.next, struct page_info, list);
-            list_del(&page->list);
             if ( !test_and_clear_bit(_PGC_allocated, &page->count_info) )
                 BUG();
             mfn = page_to_mfn(page);
@@ -360,10 +358,8 @@ static long memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
 
         /* Assign each output page to the domain. */
         j = 0;
-        while ( !list_empty(&out_chunk_list) )
+        while ( (page = page_list_remove_head(&out_chunk_list)) )
         {
-            page = list_entry(out_chunk_list.next, struct page_info, list);
-            list_del(&page->list);
             if ( assign_pages(d, page, exch.out.extent_order,
                               MEMF_no_refcount) )
                 BUG();
@@ -399,21 +395,13 @@ static long memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
      */
  fail:
     /* Reassign any input pages we managed to steal. */
-    while ( !list_empty(&in_chunk_list) )
-    {
-        page = list_entry(in_chunk_list.next, struct page_info, list);
-        list_del(&page->list);
+    while ( (page = page_list_remove_head(&in_chunk_list)) )
         if ( assign_pages(d, page, 0, MEMF_no_refcount) )
             BUG();
-    }
 
     /* Free any output pages we managed to allocate. */
-    while ( !list_empty(&out_chunk_list) )
-    {
-        page = list_entry(out_chunk_list.next, struct page_info, list);
-        list_del(&page->list);
+    while ( (page = page_list_remove_head(&out_chunk_list)) )
         free_domheap_pages(page, exch.out.extent_order);
-    }
 
     exch.nr_exchanged = i << in_chunk_order;
 

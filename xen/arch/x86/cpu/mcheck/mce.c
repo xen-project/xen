@@ -443,6 +443,96 @@ next:
 
 
 
+static void do_mc_get_cpu_info(void *v)
+{
+	int cpu = smp_processor_id();
+	int cindex, cpn;
+	struct cpuinfo_x86 *c;
+	xen_mc_logical_cpu_t *log_cpus, *xcp;
+	uint32_t junk, ebx;
+
+	log_cpus = v;
+	c = &cpu_data[cpu];
+	cindex = 0;
+	cpn = cpu - 1;
+
+	/*
+	 * Deal with sparse masks, condensed into a contig array.
+	 */
+	while (cpn >= 0) {
+		if (cpu_isset(cpn, cpu_online_map))
+			cindex++;
+		cpn--;
+	}
+
+	xcp = &log_cpus[cindex];
+	c = &cpu_data[cpu];
+	xcp->mc_cpunr = cpu;
+	x86_mc_get_cpu_info(cpu, &xcp->mc_chipid,
+	    &xcp->mc_coreid, &xcp->mc_threadid,
+	    &xcp->mc_apicid, &xcp->mc_ncores,
+	    &xcp->mc_ncores_active, &xcp->mc_nthreads);
+	xcp->mc_cpuid_level = c->cpuid_level;
+	xcp->mc_family = c->x86;
+	xcp->mc_vendor = c->x86_vendor;
+	xcp->mc_model = c->x86_model;
+	xcp->mc_step = c->x86_mask;
+	xcp->mc_cache_size = c->x86_cache_size;
+	xcp->mc_cache_alignment = c->x86_cache_alignment;
+	memcpy(xcp->mc_vendorid, c->x86_vendor_id, sizeof xcp->mc_vendorid);
+	memcpy(xcp->mc_brandid, c->x86_model_id, sizeof xcp->mc_brandid);
+	memcpy(xcp->mc_cpu_caps, c->x86_capability, sizeof xcp->mc_cpu_caps);
+
+	/*
+	 * This part needs to run on the CPU itself.
+	 */
+	xcp->mc_nmsrvals = __MC_NMSRS;
+	xcp->mc_msrvalues[0].reg = MSR_IA32_MCG_CAP;
+	rdmsrl(MSR_IA32_MCG_CAP, xcp->mc_msrvalues[0].value);
+
+	if (c->cpuid_level >= 1) {
+		cpuid(1, &junk, &ebx, &junk, &junk);
+		xcp->mc_clusterid = (ebx >> 24) & 0xff;
+	} else
+		xcp->mc_clusterid = hard_smp_processor_id();
+}
+
+
+void x86_mc_get_cpu_info(unsigned cpu, uint32_t *chipid, uint16_t *coreid,
+			 uint16_t *threadid, uint32_t *apicid,
+			 unsigned *ncores, unsigned *ncores_active,
+			 unsigned *nthreads)
+{
+	struct cpuinfo_x86 *c;
+
+	*apicid = cpu_physical_id(cpu);
+	c = &cpu_data[cpu];
+	if (c->apicid == BAD_APICID) {
+		*chipid = cpu;
+		*coreid = 0;
+		*threadid = 0;
+		if (ncores != NULL)
+			*ncores = 1;
+		if (ncores_active != NULL)
+			*ncores_active = 1;
+		if (nthreads != NULL)
+			*nthreads = 1;
+	} else {
+		*chipid = phys_proc_id[cpu];
+		if (c->x86_max_cores > 1)
+			*coreid = cpu_core_id[cpu];
+		else
+			*coreid = 0;
+		*threadid = c->apicid & ((1 << (c->x86_num_siblings - 1)) - 1);
+		if (ncores != NULL)
+			*ncores = c->x86_max_cores;
+		if (ncores_active != NULL)
+			*ncores_active = c->booted_cores;
+		if (nthreads != NULL)
+			*nthreads = c->x86_num_siblings;
+	}
+}
+
 /* Machine Check Architecture Hypercall */
 long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)
 {
@@ -452,6 +542,7 @@ long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)
 	struct domain *domU;
 	struct xen_mc_fetch *mc_fetch;
 	struct xen_mc_notifydomain *mc_notifydomain;
+	struct xen_mc_physcpuinfo *mc_physcpuinfo;
 	struct mc_info *mi;
 	uint32_t flags;
 	uint32_t fetch_idx;
@@ -460,6 +551,8 @@ long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)
 	 * a DomU to fetch mc data while Dom0 notifies another DomU. */
 	static DEFINE_SPINLOCK(mc_lock);
 	static DEFINE_SPINLOCK(mc_notify_lock);
+	int nlcpu;
+	xen_mc_logical_cpu_t *log_cpus = NULL;
 
 	if ( copy_from_guest(op, u_xen_mc, 1) )
 		return -EFAULT;
@@ -580,6 +673,43 @@ long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)
 
 		spin_unlock(&mc_notify_lock);
 		break;
+
+       case XEN_MC_physcpuinfo:
+	       if ( !IS_PRIV(v->domain) )
+		       return -EPERM;
+ 
+	       mc_physcpuinfo = &op->u.mc_physcpuinfo;
+	       nlcpu = num_online_cpus();
+ 
+	       if (!guest_handle_is_null(mc_physcpuinfo->info)) {
+		       if (mc_physcpuinfo->ncpus <= 0)
+			       return -EINVAL;
+		       nlcpu = min(nlcpu, (int)mc_physcpuinfo->ncpus);
+		       log_cpus = xmalloc_array(xen_mc_logical_cpu_t, nlcpu);
+		       if (log_cpus == NULL)
+			       return -ENOMEM;
+ 
+		       if (on_each_cpu(do_mc_get_cpu_info, log_cpus,
+			   1, 1) != 0) {
+			       xfree(log_cpus);
+			       return -EIO;
+		       }
+	       }
+ 
+	       mc_physcpuinfo->ncpus = nlcpu;
+ 
+	       if (copy_to_guest(u_xen_mc, op, 1)) {
+		       if (log_cpus != NULL)
+			       xfree(log_cpus);
+		       return -EFAULT;
+	       }
+ 
+	       if (!guest_handle_is_null(mc_physcpuinfo->info)) {
+		       if (copy_to_guest(mc_physcpuinfo->info,
+			   log_cpus, nlcpu))
+			       ret = -EFAULT;
+		       xfree(log_cpus);
+	       }
 	}
 
 	return ret;

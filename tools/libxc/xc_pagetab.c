@@ -4,50 +4,42 @@
  * Function to translate virtual to physical addresses.
  */
 #include "xc_private.h"
+#include <xen/hvm/save.h>
 
 #define CR0_PG  0x80000000
 #define CR4_PAE 0x20
 #define PTE_PSE 0x80
+#define EFER_LMA 0x400
+
 
 unsigned long xc_translate_foreign_address(int xc_handle, uint32_t dom,
                                            int vcpu, unsigned long long virt)
 {
     xc_dominfo_t dominfo;
-    vcpu_guest_context_any_t ctx;
     uint64_t paddr, mask, pte = 0;
     int size, level, pt_levels = 2;
     void *map;
 
     if (xc_domain_getinfo(xc_handle, dom, 1, &dominfo) != 1 
-        || dominfo.domid != dom
-        || xc_vcpu_getcontext(xc_handle, dom, vcpu, &ctx) != 0)
+        || dominfo.domid != dom)
         return 0;
 
     /* What kind of paging are we dealing with? */
     if (dominfo.hvm) {
-        unsigned long cr0, cr3, cr4;
-        xen_capabilities_info_t xen_caps = "";
-        if (xc_version(xc_handle, XENVER_capabilities, &xen_caps) != 0)
+        struct hvm_hw_cpu ctx;
+        if (xc_domain_hvm_getcontext_partial(xc_handle, dom,
+                                             HVM_SAVE_CODE(CPU), vcpu,
+                                             &ctx, sizeof ctx) != 0)
             return 0;
-        /* HVM context records are always host-sized */
-        if (strstr(xen_caps, "xen-3.0-x86_64")) {
-            cr0 = ctx.x64.ctrlreg[0];
-            cr3 = ctx.x64.ctrlreg[3];
-            cr4 = ctx.x64.ctrlreg[4];
-        } else {
-            cr0 = ctx.x32.ctrlreg[0];
-            cr3 = ctx.x32.ctrlreg[3];
-            cr4 = ctx.x32.ctrlreg[4];
-        }
-        if (!(cr0 & CR0_PG))
+        if (!(ctx.cr0 & CR0_PG))
             return virt;
-        if (0 /* XXX how to get EFER.LMA? */) 
-            pt_levels = 4;
-        else
-            pt_levels = (cr4 & CR4_PAE) ? 3 : 2;
-        paddr = cr3 & ((pt_levels == 3) ? ~0x1full : ~0xfffull);
+        pt_levels = (ctx.msr_efer&EFER_LMA) ? 4 : (ctx.cr4&CR4_PAE) ? 3 : 2;
+        paddr = ctx.cr3 & ((pt_levels == 3) ? ~0x1full : ~0xfffull);
     } else {
         DECLARE_DOMCTL;
+        vcpu_guest_context_any_t ctx;
+        if (xc_vcpu_getcontext(xc_handle, dom, vcpu, &ctx) != 0)
+            return 0;
         domctl.domain = dom;
         domctl.cmd = XEN_DOMCTL_get_address_size;
         if ( do_domctl(xc_handle, &domctl) != 0 )

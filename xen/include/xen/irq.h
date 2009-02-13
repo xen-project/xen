@@ -25,6 +25,11 @@ struct irqaction
 #define IRQ_GUEST_EOI_PENDING 32 /* IRQ was disabled, pending a guest EOI */
 #define IRQ_PER_CPU     256     /* IRQ is per CPU */
 
+/* Special IRQ numbers. */
+#define AUTO_ASSIGN_IRQ         (-1)
+#define NEVER_ASSIGN_IRQ        (-2)
+#define FREE_TO_ASSIGN_IRQ      (-3)
+
 /*
  * Interrupt controller descriptor. This is all we need
  * to describe about the low-level hardware. 
@@ -64,11 +69,20 @@ typedef struct {
 
 extern irq_desc_t irq_desc[NR_VECTORS];
 
-extern int setup_irq(unsigned int, struct irqaction *);
-extern void free_irq(unsigned int);
-extern int request_irq(unsigned int irq,
+extern int setup_irq_vector(unsigned int, struct irqaction *);
+extern void release_irq_vector(unsigned int);
+extern int request_irq_vector(unsigned int vector,
                void (*handler)(int, void *, struct cpu_user_regs *),
                unsigned long irqflags, const char * devname, void *dev_id);
+
+#define setup_irq(irq, action) \
+    setup_irq_vector(irq_to_vector(irq), action)
+
+#define release_irq(irq) \
+    release_irq_vector(irq_to_vector(irq))
+
+#define request_irq(irq, handler, irqflags, devname, devid) \
+    request_irq_vector(irq_to_vector(irq), handler, irqflags, defname, devid)
 
 extern hw_irq_controller no_irq_type;
 extern void no_action(int cpl, void *dev_id, struct cpu_user_regs *regs);

@@ -312,7 +312,7 @@ static void dump_numa(unsigned char key)
 		for_each_online_node(i)
 			page_num_node[i] = 0;
 
-		list_for_each_entry(page, &d->page_list, list)
+		page_list_for_each(page, &d->page_list)
 		{
 			i = phys_to_nid(page_to_mfn(page) << PAGE_SHIFT);
 			page_num_node[i]++;

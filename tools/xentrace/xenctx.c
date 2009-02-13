@@ -26,6 +26,7 @@
 #include "xenctrl.h"
 #include <xen/foreign/x86_32.h>
 #include <xen/foreign/x86_64.h>
+#include <xen/hvm/save.h>
 
 int xc_handle = 0;
 int domid = 0;
@@ -287,6 +288,35 @@ static void print_ctx_32(vcpu_guest_context_x86_32_t *ctx)
     }
 }
 
+static void print_ctx_32on64(vcpu_guest_context_x86_64_t *ctx)
+{
+    struct cpu_user_regs_x86_64 *regs = &ctx->user_regs;
+
+    printf("cs:eip: %04x:%08x ", regs->cs, (uint32_t)regs->eip);
+    print_symbol((uint32_t)regs->eip);
+    print_flags((uint32_t)regs->eflags);
+    printf("ss:esp: %04x:%08x\n", regs->ss, (uint32_t)regs->esp);
+
+    printf("eax: %08x\t", (uint32_t)regs->eax);
+    printf("ebx: %08x\t", (uint32_t)regs->ebx);
+    printf("ecx: %08x\t", (uint32_t)regs->ecx);
+    printf("edx: %08x\n", (uint32_t)regs->edx);
+
+    printf("esi: %08x\t", (uint32_t)regs->esi);
+    printf("edi: %08x\t", (uint32_t)regs->edi);
+    printf("ebp: %08x\n", (uint32_t)regs->ebp);
+
+    printf(" ds:     %04x\t", regs->ds);
+    printf(" es:     %04x\t", regs->es);
+    printf(" fs:     %04x\t", regs->fs);
+    printf(" gs:     %04x\n", regs->gs);
+
+    if (disp_all) {
+        print_special(ctx->ctrlreg, "cr", 0x1d, 4);
+        print_special(ctx->debugreg, "dr", 0xcf, 4);
+    }
+}
+
 static void print_ctx_64(vcpu_guest_context_x86_64_t *ctx)
 {
     struct cpu_user_regs_x86_64 *regs = &ctx->user_regs;
@@ -335,6 +365,8 @@ static void print_ctx(vcpu_guest_context_any_t *ctx)
 {
     if (ctxt_word_size == 4) 
         print_ctx_32(&ctx->x32);
+    else if (guest_word_size == 4)
+        print_ctx_32on64(&ctx->x64);
     else 
         print_ctx_64(&ctx->x64);
 }
@@ -788,23 +820,29 @@ static void dump_ctx(int vcpu)
 
 #if defined(__i386__) || defined(__x86_64__)
     {
-        struct xen_domctl domctl;
-        memset(&domctl, 0, sizeof domctl);
-        domctl.domain = domid;
-        domctl.cmd = XEN_DOMCTL_get_address_size;
-        if (xc_domctl(xc_handle, &domctl) == 0)
-            ctxt_word_size = guest_word_size = domctl.u.address_size.size / 8;
         if (dominfo.hvm) {
+            struct hvm_hw_cpu cpuctx;
             xen_capabilities_info_t xen_caps = "";
+            if (xc_domain_hvm_getcontext_partial(
+                    xc_handle, domid, HVM_SAVE_CODE(CPU), 
+                    vcpu, &cpuctx, sizeof cpuctx) != 0) {
+                perror("xc_domain_hvm_getcontext_partial");
+                exit(-1);
+            }
+            guest_word_size = (cpuctx.msr_efer & 0x400) ? 8 : 4;
+            /* HVM guest context records are always host-sized */
             if (xc_version(xc_handle, XENVER_capabilities, &xen_caps) != 0) {
                 perror("xc_version");
                 exit(-1);
             }
-            /* HVM guest context records are always host-sized */
             ctxt_word_size = (strstr(xen_caps, "xen-3.0-x86_64")) ? 8 : 4;
-            /* XXX For now we can't tell whether a HVM guest is in long
-             * XXX mode; eventually fix this here and in xc_pagetab.c */
-            guest_word_size = 4;
+        } else {
+            struct xen_domctl domctl;
+            memset(&domctl, 0, sizeof domctl);
+            domctl.domain = domid;
+            domctl.cmd = XEN_DOMCTL_get_address_size;
+            if (xc_domctl(xc_handle, &domctl) == 0)
+                ctxt_word_size = guest_word_size = domctl.u.address_size.size / 8;
         }
     }
 #endif

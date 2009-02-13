@@ -46,6 +46,9 @@
 #include <acpi/acpi.h>
 #include <acpi/cpufreq/cpufreq.h>
 
+static unsigned int usr_max_freq, usr_min_freq;
+static void cpufreq_cmdline_common_para(struct cpufreq_policy *new_policy);
+
 struct cpufreq_dom {
     unsigned int	dom;
     cpumask_t		map;
@@ -53,6 +56,7 @@ struct cpufreq_dom {
 };
 static LIST_HEAD(cpufreq_dom_list_head);
 
+struct cpufreq_governor *cpufreq_opt_governor;
 LIST_HEAD(cpufreq_governor_list);
 
 struct cpufreq_governor *__find_governor(const char *governor)
@@ -213,6 +217,9 @@ int cpufreq_add_cpu(unsigned int cpu)
         perf->domain_info.num_processors) {
         memcpy(&new_policy, policy, sizeof(struct cpufreq_policy));
         policy->governor = NULL;
+
+        cpufreq_cmdline_common_para(&new_policy);
+
         ret = __cpufreq_set_policy(policy, &new_policy);
         if (ret) {
             if (new_policy.governor == CPUFREQ_DEFAULT_GOVERNOR)
@@ -467,3 +474,69 @@ out:
     return ret;
 }
 
+static void cpufreq_cmdline_common_para(struct cpufreq_policy *new_policy)
+{
+    if (usr_max_freq)
+        new_policy->max = usr_max_freq;
+    if (usr_min_freq)
+        new_policy->min = usr_min_freq;
+}
+
+static int __init cpufreq_handle_common_option(const char *name, const char *val)
+{
+    if (!strcmp(name, "maxfreq") && val) {
+        usr_max_freq = simple_strtoul(val, NULL, 0);
+        return 1;
+    }
+
+    if (!strcmp(name, "minfreq") && val) {
+        usr_min_freq = simple_strtoul(val, NULL, 0);
+        return 1;
+    }
+
+    return 0;
+}
+
+void __init cpufreq_cmdline_parse(char *str)
+{
+    static struct cpufreq_governor *__initdata cpufreq_governors[] =
+    {
+        &cpufreq_gov_userspace,
+        &cpufreq_gov_dbs,
+        &cpufreq_gov_performance,
+        &cpufreq_gov_powersave
+    };
+    unsigned int gov_index = 0;
+
+    do {
+        char *val, *end = strchr(str, ',');
+        unsigned int i;
+
+        if (end)
+            *end++ = '\0';
+        val = strchr(str, '=');
+        if (val)
+            *val++ = '\0';
+
+        if (!cpufreq_opt_governor) {
+            if (!val) {
+                for (i = 0; i < ARRAY_SIZE(cpufreq_governors); ++i) {
+                    if (!strcmp(str, cpufreq_governors[i]->name)) {
+                        cpufreq_opt_governor = cpufreq_governors[i];
+                        gov_index = i;
+                        str = NULL;
+                        break;
+                    }
+                }
+            } else {
+                cpufreq_opt_governor = CPUFREQ_DEFAULT_GOVERNOR;
+            }
+        }
+
+        if (str && !cpufreq_handle_common_option(str, val) &&
+            cpufreq_governors[gov_index]->handle_option)
+            cpufreq_governors[gov_index]->handle_option(str, val);
+
+        str = end;
+    } while (str);
+}

@@ -79,8 +79,11 @@ __start:
         cmp     $0x2BADB002,%eax
         jne     not_multiboot
 
-        /* Save the Multiboot info structure for later use. */
-        mov     %ebx,sym_phys(multiboot_ptr)
+        /* Save the Multiboot info struct (after relocation) for later use. */
+        mov     $sym_phys(cpu0_stack)+1024,%esp
+        push    %ebx
+        call    reloc
+        mov     %eax,sym_phys(multiboot_ptr)
 
         /* Initialize BSS (no nasty surprises!) */
         mov     $sym_phys(__bss_start),%edi
@@ -191,6 +194,9 @@ __start:
         jmp     $BOOT_CS32,$bootsym_phys(trampoline_boot_cpu_entry)
 
 #include "cmdline.S"
+
+reloc:
+#include "reloc.S"
 
         .align 16
         .globl trampoline_start, trampoline_end

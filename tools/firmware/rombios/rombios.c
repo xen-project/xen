@@ -4609,6 +4609,10 @@ int15_function32(regs, ES, DS, FLAGS)
 {
   Bit32u  extended_memory_size=0; // 64bits long
   Bit16u  CX,DX;
+#ifdef HVMASSIST
+  Bit16u off, e820_table_size;
+  Bit32u base, type, size;
+#endif
 
 BX_DEBUG_INT15("int15 AX=%04x\n",regs.u.r16.ax);
 
@@ -4625,8 +4629,10 @@ ASM_START
 
       ;; Get the count in eax
       mov  bx, sp
+SEG SS
       mov  ax, _int15_function32.CX [bx]
       shl  eax, #16
+SEG SS
       mov  ax, _int15_function32.DX [bx]
 
       ;; convert to numbers of 15usec ticks
@@ -4660,8 +4666,7 @@ ASM_END
         {
 #ifdef HVMASSIST
        case 0x20: {
-            Bit16u e820_table_size =
-                read_word(E820_SEG, E820_NR_OFFSET) * 0x14;
+            e820_table_size = read_word(E820_SEG, E820_NR_OFFSET) * 0x14;
 
             if (regs.u.r32.edx != 0x534D4150) /* SMAP */
                 goto int15_unimplemented;
@@ -4674,8 +4679,6 @@ ASM_END
                 if ((regs.u.r32.ebx + 0x14 - 1) > e820_table_size)
                     regs.u.r32.ebx = 0;
             } else if (regs.u.r16.bx == 1) {
-                Bit32u base, type;
-                Bit16u off;
                 for (off = 0; off < e820_table_size; off += 0x14) {
                     base = read_dword(E820_SEG, E820_OFFSET + off);
                     type = read_dword(E820_SEG, E820_OFFSET + 0x10 + off);
@@ -4699,9 +4702,7 @@ ASM_END
         }
 
         case 0x01: {
-            Bit16u off, e820_table_size =
-                read_word(E820_SEG, E820_NR_OFFSET) * 0x14;
-            Bit32u base, type, size;
+            e820_table_size = read_word(E820_SEG, E820_NR_OFFSET) * 0x14;
 
             // do we have any reason to fail here ?
             CLEAR_CF();

@@ -14,7 +14,8 @@
 #define ioports_access_permitted(d, s, e)               \
     rangeset_contains_range((d)->arch.ioport_caps, s, e)
 
-#define cache_flush_permitted(d)                       \
-    (!rangeset_is_empty((d)->iomem_caps))
+#define cache_flush_permitted(d)                        \
+    (!rangeset_is_empty((d)->iomem_caps) ||             \
+     !rangeset_is_empty((d)->arch.ioport_caps))
 
 #endif /* __X86_IOCAP_H__ */

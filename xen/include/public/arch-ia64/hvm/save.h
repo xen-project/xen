@@ -23,8 +23,8 @@
 #ifndef __XEN_PUBLIC_HVM_SAVE_IA64_H__
 #define __XEN_PUBLIC_HVM_SAVE_IA64_H__
 
-#include <public/hvm/save.h>
-#include <public/arch-ia64.h>
+#include "../../hvm/save.h"
+#include "../../arch-ia64.h"
 
 /* 
  * Save/restore header: general info about the save file. 

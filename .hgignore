@@ -256,6 +256,7 @@
 ^xen/arch/x86/asm-offsets\.s$
 ^xen/arch/x86/boot/mkelf32$
 ^xen/arch/x86/xen\.lds$
+^xen/arch/x86/boot/reloc.S$
 ^xen/ddb/.*$
 ^xen/include/asm$
 ^xen/include/asm-.*/asm-offsets\.h$
@@ -279,15 +280,6 @@
 ^xen/arch/ia64/asm-xsi-offsets\.s$
 ^xen/arch/ia64/map\.out$
 ^xen/arch/ia64/xen\.lds\.s$
-^xen/arch/powerpc/dom0\.bin$
-^xen/arch/powerpc/asm-offsets\.s$
-^xen/arch/powerpc/firmware$
-^xen/arch/powerpc/firmware.dbg$
-^xen/arch/powerpc/firmware_image.bin$
-^xen/arch/powerpc/xen\.lds$
-^xen/arch/powerpc/\.xen-syms$
-^xen/arch/powerpc/xen-syms\.S$
-^xen/arch/powerpc/cmdline.dep$
 ^unmodified_drivers/linux-2.6/\.tmp_versions
 ^unmodified_drivers/linux-2.6/.*\.cmd$
 ^unmodified_drivers/linux-2.6/.*\.ko$

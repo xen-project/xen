@@ -461,8 +461,8 @@ int amd_iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn)
     iommu_l2e = iommu_l2e_from_pfn(hd->root_table, hd->paging_mode, gfn);
     if ( iommu_l2e == 0 )
     {
-        amd_iov_error("Invalid IO pagetable entry gfn = %lx\n", gfn);
         spin_unlock_irqrestore(&hd->mapping_lock, flags);
+        amd_iov_error("Invalid IO pagetable entry gfn = %lx\n", gfn);
         return -EFAULT;
     }
     set_iommu_l1e_present(iommu_l2e, gfn, (u64)mfn << PAGE_SHIFT, iw, ir);
@@ -493,8 +493,8 @@ int amd_iommu_unmap_page(struct domain *d, unsigned long gfn)
 
     if ( iommu_l2e == 0 )
     {
-        amd_iov_error("Invalid IO pagetable entry gfn = %lx\n", gfn);
         spin_unlock_irqrestore(&hd->mapping_lock, flags);
+        amd_iov_error("Invalid IO pagetable entry gfn = %lx\n", gfn);
         return -EFAULT;
     }
 
@@ -533,9 +533,9 @@ int amd_iommu_reserve_domain_unity_map(
 
         if ( iommu_l2e == 0 )
         {
-            amd_iov_error(
-            "Invalid IO pagetable entry phys_addr = %lx\n", phys_addr);
             spin_unlock_irqrestore(&hd->mapping_lock, flags);
+            amd_iov_error("Invalid IO pagetable entry phys_addr = %lx\n",
+                          phys_addr);
             return -EFAULT;
         }
 
@@ -552,7 +552,6 @@ int amd_iommu_sync_p2m(struct domain *d)
 {
     unsigned long mfn, gfn, flags;
     u64 iommu_l2e;
-    struct list_head *entry;
     struct page_info *page;
     struct hvm_iommu *hd;
     int iw = IOMMU_IO_WRITE_ENABLED;
@@ -568,10 +567,10 @@ int amd_iommu_sync_p2m(struct domain *d)
     if ( hd->p2m_synchronized )
         goto out;
 
-    for ( entry = d->page_list.next; entry != &d->page_list;
-            entry = entry->next )
+    spin_lock(&d->page_alloc_lock);
+
+    page_list_for_each ( page, &d->page_list )
     {
-        page = list_entry(entry, struct page_info, list);
         mfn = page_to_mfn(page);
         gfn = get_gpfn_from_mfn(mfn);
 
@@ -582,13 +581,16 @@ int amd_iommu_sync_p2m(struct domain *d)
 
         if ( iommu_l2e == 0 )
         {
-            amd_iov_error("Invalid IO pagetable entry gfn = %lx\n", gfn);
+            spin_unlock(&d->page_alloc_lock);
             spin_unlock_irqrestore(&hd->mapping_lock, flags);
+            amd_iov_error("Invalid IO pagetable entry gfn = %lx\n", gfn);
             return -EFAULT;
         }
 
         set_iommu_l1e_present(iommu_l2e, gfn, (u64)mfn << PAGE_SHIFT, iw, ir);
     }
+
+    spin_unlock(&d->page_alloc_lock);
 
     hd->p2m_synchronized = 1;
 

@@ -63,7 +63,7 @@ static int ept_set_middle_entry(struct domain *d, ept_entry_t *ept_entry)
 
     pg->count_info = 1;
     pg->u.inuse.type_info = 1 | PGT_validated;
-    list_add_tail(&pg->list, &d->arch.p2m->pages);
+    page_list_add_tail(pg, &d->arch.p2m->pages);
 
     ept_entry->emt = 0;
     ept_entry->igmt = 0;
@@ -116,12 +116,12 @@ static int ept_next_level(struct domain *d, bool_t read_only,
 }
 
 /*
- * TODO: ept_set_entry() computes 'need_modify_vtd_table' for itself,
+ * ept_set_entry() computes 'need_modify_vtd_table' for itself,
  * by observing whether any gfn->mfn translations are modified.
  */
 static int
-_ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn, 
-              unsigned int order, p2m_type_t p2mt, int need_modify_vtd_table)
+ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn, 
+              unsigned int order, p2m_type_t p2mt)
 {
     ept_entry_t *table = NULL;
     unsigned long gfn_remainder = gfn, offset = 0;
@@ -131,6 +131,7 @@ _ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
     int walk_level = order / EPT_TABLE_ORDER;
     int direct_mmio = (p2mt == p2m_mmio_direct);
     uint8_t igmt = 0;
+    int need_modify_vtd_table = 1;
 
     /* we only support 4k and 2m pages now */
 
@@ -171,14 +172,23 @@ _ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
 
             if ( ret == GUEST_TABLE_SUPER_PAGE )
             {
-                ept_entry->mfn = mfn_x(mfn) - offset;
+                if ( ept_entry->mfn == (mfn_x(mfn) - offset) )
+                    need_modify_vtd_table = 0;  
+                else                  
+                    ept_entry->mfn = mfn_x(mfn) - offset;
+
                 if ( ept_entry->avail1 == p2m_ram_logdirty &&
                   p2mt == p2m_ram_rw )
                     for ( i = 0; i < 512; i++ )
                         paging_mark_dirty(d, mfn_x(mfn)-offset+i);
             }
             else
-                ept_entry->mfn = mfn_x(mfn);
+            {
+                if ( ept_entry->mfn == mfn_x(mfn) )
+                    need_modify_vtd_table = 0;
+                else
+                    ept_entry->mfn = mfn_x(mfn);
+            }
 
             ept_entry->avail1 = p2mt;
             ept_entry->rsvd = 0;
@@ -239,7 +249,10 @@ _ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
                                                 &igmt, direct_mmio);
         split_ept_entry->igmt = igmt;
 
-        split_ept_entry->mfn = mfn_x(mfn);
+        if ( split_ept_entry->mfn == mfn_x(mfn) )
+            need_modify_vtd_table = 0;
+        else
+            split_ept_entry->mfn = mfn_x(mfn);
         split_ept_entry->avail1 = p2mt;
         ept_p2m_type_to_flags(split_ept_entry, p2mt);
 
@@ -287,17 +300,6 @@ out:
     }
 
     return rv;
-}
-
-static int
-ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
-              unsigned int order, p2m_type_t p2mt)
-{
-    /* ept_set_entry() are called from set_entry(),
-     * We should always create VT-d page table acording 
-     * to the gfn to mfn translations changes.
-     */
-    return _ept_set_entry(d, gfn, mfn, order, p2mt, 1); 
 }
 
 /* Read ept p2m entries */
@@ -393,6 +395,21 @@ static mfn_t ept_get_entry_current(unsigned long gfn, p2m_type_t *t,
     return ept_get_entry(current->domain, gfn, t, q);
 }
 
+/* To test if the new emt type is the same with old,
+ * return 1 to not to reset ept entry.
+ */
+static int need_modify_ept_entry(struct domain *d, unsigned long gfn,
+                                    unsigned long mfn, uint8_t o_igmt,
+                                    uint8_t o_emt, p2m_type_t p2mt)
+{
+    uint8_t igmt, emt;
+    emt = epte_get_entry_emt(d, gfn, mfn, &igmt, 
+                                (p2mt == p2m_mmio_direct));
+    if ( (emt == o_emt) && (igmt == o_igmt) )
+        return 0;
+    return 1; 
+}
+
 void ept_change_entry_emt_with_range(struct domain *d, unsigned long start_gfn,
                  unsigned long end_gfn)
 {
@@ -401,6 +418,7 @@ void ept_change_entry_emt_with_range(struct domain *d, unsigned long start_gfn,
     uint64_t epte;
     int order = 0;
     unsigned long mfn;
+    uint8_t o_igmt, o_emt;
 
     for ( gfn = start_gfn; gfn <= end_gfn; gfn++ )
     {
@@ -410,7 +428,9 @@ void ept_change_entry_emt_with_range(struct domain *d, unsigned long start_gfn,
         mfn = (epte & EPTE_MFN_MASK) >> PAGE_SHIFT;
         if ( !mfn_valid(mfn) )
             continue;
-        p2mt = (epte & EPTE_AVAIL1_MASK) >> 8;
+        p2mt = (epte & EPTE_AVAIL1_MASK) >> EPTE_AVAIL1_SHIFT;
+        o_igmt = (epte & EPTE_IGMT_MASK) >> EPTE_IGMT_SHIFT;
+        o_emt = (epte & EPTE_EMT_MASK) >> EPTE_EMT_SHIFT;
         order = 0;
 
         if ( epte & EPTE_SUPER_PAGE_MASK )
@@ -422,30 +442,26 @@ void ept_change_entry_emt_with_range(struct domain *d, unsigned long start_gfn,
                  * Set emt for super page.
                  */
                 order = EPT_TABLE_ORDER;
-                /* vmx_set_uc_mode() dont' touch the gfn to mfn
-                 * translations, only modify the emt field of the EPT entries.
-                 * so we need not modify the current VT-d page tables.
-                 */
-                _ept_set_entry(d, gfn, _mfn(mfn), order, p2mt, 0);
+                if ( need_modify_ept_entry(d, gfn, mfn, 
+                                            o_igmt, o_emt, p2mt) )
+                    ept_set_entry(d, gfn, _mfn(mfn), order, p2mt);
                 gfn += 0x1FF;
             }
             else
             {
-                /* 1)change emt for partial entries of the 2m area.
-                 * 2)vmx_set_uc_mode() dont' touch the gfn to mfn
-                 * translations, only modify the emt field of the EPT entries.
-                 * so we need not modify the current VT-d page tables.
-                 */
-                _ept_set_entry(d, gfn, _mfn(mfn), order, p2mt,0);
+                /* change emt for partial entries of the 2m area. */
+                if ( need_modify_ept_entry(d, gfn, mfn, 
+                                            o_igmt, o_emt, p2mt) )
+                    ept_set_entry(d, gfn, _mfn(mfn), order, p2mt);
                 gfn = ((gfn >> EPT_TABLE_ORDER) << EPT_TABLE_ORDER) + 0x1FF;
             }
         }
-        else /* 1)gfn assigned with 4k
-              * 2)vmx_set_uc_mode() dont' touch the gfn to mfn
-              * translations, only modify the emt field of the EPT entries.
-              * so we need not modify the current VT-d page tables.
-             */
-            _ept_set_entry(d, gfn, _mfn(mfn), order, p2mt, 0);
+        else /* gfn assigned with 4k */
+        {
+            if ( need_modify_ept_entry(d, gfn, mfn, 
+                                            o_igmt, o_emt, p2mt) )
+                ept_set_entry(d, gfn, _mfn(mfn), order, p2mt);
+        }
     }
 }
 

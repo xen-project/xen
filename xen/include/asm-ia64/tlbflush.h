@@ -1,7 +1,8 @@
 #ifndef __FLUSHTLB_H__
 #define __FLUSHTLB_H__
 
-#include <xen/sched.h>
+struct vcpu;
+struct domain;
 
 /* TLB flushes can be either local (current vcpu only) or domain wide (on
    all vcpus).

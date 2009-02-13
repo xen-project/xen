@@ -543,7 +543,7 @@ long do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
             break;
         irq_status_query.flags = 0;
         /* Edge-triggered interrupts don't need an explicit unmask downcall. */
-        if ( !strstr(irq_desc[irq_to_vector(irq)].handler->typename, "edge") )
+        if ( !strstr(irq_descp(irq)->handler->typename, "edge") )
             irq_status_query.flags |= XENIRQSTAT_needs_eoi;
         ret = copy_to_guest(arg, &irq_status_query, 1) ? -EFAULT : 0;
         break;

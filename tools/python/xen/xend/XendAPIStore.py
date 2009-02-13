@@ -33,7 +33,8 @@ def register(uuid, type, inst):
 
 def deregister(uuid, type):
     old = get(uuid, type)
-    del __classes[(uuid, type)]
+    if old is not None:
+        del __classes[(uuid, type)]
     return old
 
 def get(uuid, type):

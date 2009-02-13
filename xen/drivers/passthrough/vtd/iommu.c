@@ -129,9 +129,9 @@ void iommu_flush_cache_entry(void *addr)
     __iommu_flush_cache(addr, 8);
 }
 
-void iommu_flush_cache_page(void *addr)
+void iommu_flush_cache_page(void *addr, unsigned long npages)
 {
-    __iommu_flush_cache(addr, PAGE_SIZE_4K);
+    __iommu_flush_cache(addr, PAGE_SIZE_4K * npages);
 }
 
 int nr_iommus;
@@ -146,7 +146,7 @@ static u64 bus_to_context_maddr(struct iommu *iommu, u8 bus)
     root = &root_entries[bus];
     if ( !root_present(*root) )
     {
-        maddr = alloc_pgtable_maddr(NULL);
+        maddr = alloc_pgtable_maddr(NULL, 1);
         if ( maddr == 0 )
         {
             unmap_vtd_domain_page(root_entries);
@@ -174,7 +174,7 @@ static u64 addr_to_dma_page_maddr(struct domain *domain, u64 addr, int alloc)
     addr &= (((u64)1) << addr_width) - 1;
     ASSERT(spin_is_locked(&hd->mapping_lock));
     if ( hd->pgd_maddr == 0 )
-        if ( !alloc || ((hd->pgd_maddr = alloc_pgtable_maddr(domain)) == 0) )
+        if ( !alloc || ((hd->pgd_maddr = alloc_pgtable_maddr(domain, 1)) == 0) )
             goto out;
 
     parent = (struct dma_pte *)map_vtd_domain_page(hd->pgd_maddr);
@@ -187,7 +187,7 @@ static u64 addr_to_dma_page_maddr(struct domain *domain, u64 addr, int alloc)
         {
             if ( !alloc )
                 break;
-            maddr = alloc_pgtable_maddr(domain);
+            maddr = alloc_pgtable_maddr(domain, 1);
             if ( !maddr )
                 break;
             dma_set_pte_addr(*pte, maddr);
@@ -577,7 +577,7 @@ static int iommu_set_root_entry(struct iommu *iommu)
     spin_lock(&iommu->lock);
 
     if ( iommu->root_maddr == 0 )
-        iommu->root_maddr = alloc_pgtable_maddr(NULL);
+        iommu->root_maddr = alloc_pgtable_maddr(NULL, 1);
     if ( iommu->root_maddr == 0 )
     {
         spin_unlock(&iommu->lock);
@@ -874,23 +874,27 @@ int iommu_set_interrupt(struct iommu *iommu)
 {
     int vector, ret;
 
-    vector = assign_irq_vector(AUTO_ASSIGN);
-    vector_to_iommu[vector] = iommu;
-
-    /* VT-d fault is a MSI, make irq == vector */
-    irq_vector[vector] = vector;
-    vector_irq[vector] = vector;
-
-    if ( !vector )
+    vector = assign_irq_vector(AUTO_ASSIGN_IRQ);
+    if ( vector <= 0 )
     {
         gdprintk(XENLOG_ERR VTDPREFIX, "IOMMU: no vectors\n");
         return -EINVAL;
     }
 
     irq_desc[vector].handler = &dma_msi_type;
-    ret = request_irq(vector, iommu_page_fault, 0, "dmar", iommu);
+    ret = request_irq_vector(vector, iommu_page_fault, 0, "dmar", iommu);
     if ( ret )
+    {
+        irq_desc[vector].handler = &no_irq_type;
+        free_irq_vector(vector);
         gdprintk(XENLOG_ERR VTDPREFIX, "IOMMU: can't request irq\n");
+        return ret;
+    }
+
+    /* Make sure that vector is never re-used. */
+    vector_irq[vector] = NEVER_ASSIGN_IRQ;
+    vector_to_iommu[vector] = iommu;
+
     return vector;
 }
 
@@ -966,7 +970,7 @@ static void iommu_free(struct acpi_drhd_unit *drhd)
         iounmap(iommu->reg);
 
     free_intel_iommu(iommu->intel);
-    free_irq(iommu->vector);
+    release_irq_vector(iommu->vector);
     xfree(iommu);
 
     drhd->iommu = NULL;
@@ -1677,6 +1681,11 @@ static int init_vtd_hw(void)
         }
 
         vector = iommu_set_interrupt(iommu);
+        if ( vector < 0 )
+        {
+            gdprintk(XENLOG_ERR VTDPREFIX, "IOMMU: interrupt setup failed\n");
+            return vector;
+        }
         dma_msi_data_init(iommu, vector);
         dma_msi_addr_init(iommu, cpu_physical_id(first_cpu(cpu_online_map)));
         iommu->vector = vector;
@@ -1756,6 +1765,23 @@ int intel_vtd_setup(void)
     if ( init_vtd_hw() )
         goto error;
 
+    /* Giving that all devices within guest use same io page table,
+     * enable snoop control only if all VT-d engines support it.
+     */
+
+    if ( iommu_snoop )
+    {
+        for_each_drhd_unit ( drhd )
+        {
+            iommu = drhd->iommu;
+            if ( !ecap_snp_ctl(iommu->ecap) ) {
+                iommu_snoop = 0;
+                break;
+            }
+        }
+    }
+    
+    printk("Intel VT-d snoop control %sabled\n", iommu_snoop ? "en" : "dis");
     register_keyhandler('V', dump_iommu_info, "dump iommu info");
 
     return 0;
@@ -1764,6 +1790,7 @@ int intel_vtd_setup(void)
     for_each_drhd_unit ( drhd )
         iommu_free(drhd);
     vtd_enabled = 0;
+    iommu_snoop = 0;
     return -ENOMEM;
 }
 

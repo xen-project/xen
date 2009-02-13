@@ -397,7 +397,9 @@ struct poll_info {
     u32 udata;
 };
 
-#define QINVAL_ENTRY_NR (PAGE_SIZE_4K/sizeof(struct qinval_entry))
+#define MAX_QINVAL_PAGES 8
+#define NUM_QINVAL_PAGES 1
+#define QINVAL_ENTRY_NR (PAGE_SIZE_4K*NUM_QINVAL_PAGES/sizeof(struct qinval_entry))
 #define qinval_present(v) ((v).lo & 1)
 #define qinval_fault_disable(v) (((v).lo >> 1) & 1)
 

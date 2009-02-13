@@ -91,6 +91,7 @@ SECTIONS
 	*(.exit.text)
 	*(.exit.data)
 	*(.exitcall.exit)
+	*(.eh_frame)
 	}
 
   /* Stabs debugging sections.  */

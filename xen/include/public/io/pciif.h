@@ -29,7 +29,7 @@
 
 /* xen_pci_sharedinfo flags */
 #define _XEN_PCIF_active     (0)
-#define XEN_PCIF_active      (1<<_XEN_PCI_active)
+#define XEN_PCIF_active      (1<<_XEN_PCIF_active)
 #define _XEN_PCIB_AERHANDLER (1)
 #define XEN_PCIB_AERHANDLER  (1<<_XEN_PCIB_AERHANDLER)
 #define _XEN_PCIB_active     (2)

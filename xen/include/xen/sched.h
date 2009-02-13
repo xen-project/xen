@@ -19,6 +19,7 @@
 #include <xen/xenoprof.h>
 #include <xen/rcupdate.h>
 #include <xen/irq.h>
+#include <xen/mm.h>
 
 #ifdef CONFIG_COMPAT
 #include <compat/vcpu.h>
@@ -171,8 +172,8 @@ struct domain
     spinlock_t       domain_lock;
 
     spinlock_t       page_alloc_lock; /* protects all the following fields  */
-    struct list_head page_list;       /* linked list, of size tot_pages     */
-    struct list_head xenpage_list;    /* linked list, of size xenheap_pages */
+    struct page_list_head page_list;  /* linked list, of size tot_pages     */
+    struct page_list_head xenpage_list; /* linked list (size xenheap_pages) */
     unsigned int     tot_pages;       /* number of pages currently possesed */
     unsigned int     max_pages;       /* maximum value for tot_pages        */
     unsigned int     xenheap_pages;   /* # pages allocated from Xen heap    */

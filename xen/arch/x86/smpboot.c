@@ -1256,8 +1256,6 @@ int __cpu_disable(void)
 	mdelay(1);
 	local_irq_disable();
 
-	cpufreq_del_cpu(cpu);
-
 	time_suspend();
 
 	cpu_mcheck_disable();
@@ -1320,6 +1318,8 @@ int cpu_down(unsigned int cpu)
 	}
 
 	printk("Prepare to bring CPU%d down...\n", cpu);
+
+	cpufreq_del_cpu(cpu);
 
 	err = stop_machine_run(take_cpu_down, NULL, cpu);
 	if (err < 0)

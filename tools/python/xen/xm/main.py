@@ -59,7 +59,11 @@ from xen.util.acmpolicy import ACM_LABEL_UNLABELED_DISPLAY
 import XenAPI
 
 import xen.lowlevel.xc
-xc = xen.lowlevel.xc.xc()
+try:
+    xc = xen.lowlevel.xc.xc()
+except Exception, ex:
+    print >>sys.stderr, ("Is xen kernel running?")
+    sys.exit(1)
 
 import inspect
 from xen.xend import XendOptions
@@ -735,7 +739,7 @@ def xm_save(args):
         (options, params) = getopt.gnu_getopt(args, 'c', ['checkpoint'])
     except getopt.GetoptError, opterr:
         err(opterr)
-        sys.exit(1)
+        usage('save')
 
     checkpoint = False
     for (k, v) in options:

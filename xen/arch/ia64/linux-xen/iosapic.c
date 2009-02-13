@@ -93,6 +93,16 @@
 #include <asm/ptrace.h>
 #include <asm/system.h>
 
+#ifdef XEN
+static inline int iosapic_irq_to_vector (int irq)
+{
+	return irq;
+}
+
+#undef irq_to_vector
+#define irq_to_vector(irq)      iosapic_irq_to_vector(irq)
+#define AUTO_ASSIGN	AUTO_ASSIGN_IRQ
+#endif
 
 #undef DEBUG_INTERRUPT_ROUTING
 

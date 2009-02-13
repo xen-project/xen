@@ -49,7 +49,6 @@ atomic_t irq_mis_count;
 static struct { int pin, apic; } ioapic_i8259 = { -1, -1 };
 
 static DEFINE_SPINLOCK(ioapic_lock);
-static DEFINE_SPINLOCK(vector_lock);
 
 int skip_ioapic_setup;
 
@@ -88,9 +87,6 @@ static struct irq_pin_list {
     [0 ... PIN_MAP_SIZE-1].pin = -1
 };
 static int irq_2_pin_free_entry = NR_IRQS;
-
-int vector_irq[NR_VECTORS] __read_mostly = {
-    [0 ... NR_VECTORS - 1] = FREE_TO_ASSIGN};
 
 /*
  * The common case is 1:1 IRQ<->pin mappings. Sometimes there are
@@ -668,56 +664,6 @@ static inline int IO_APIC_irq_trigger(int irq)
 
 /* irq_vectors is indexed by the sum of all RTEs in all I/O APICs. */
 u8 irq_vector[NR_IRQS] __read_mostly;
-
-int free_irq_vector(int vector)
-{
-    int irq;
-
-    BUG_ON((vector > LAST_DYNAMIC_VECTOR) || (vector < FIRST_DYNAMIC_VECTOR));
-
-    spin_lock(&vector_lock);
-    if ((irq = vector_irq[vector]) == AUTO_ASSIGN)
-        vector_irq[vector] = FREE_TO_ASSIGN;
-    spin_unlock(&vector_lock);
-
-    return (irq == AUTO_ASSIGN) ? 0 : -EINVAL;
-}
-
-int assign_irq_vector(int irq)
-{
-    static unsigned current_vector = FIRST_DYNAMIC_VECTOR;
-    unsigned vector;
-
-    BUG_ON(irq >= NR_IRQS);
-
-    spin_lock(&vector_lock);
-
-    if ((irq != AUTO_ASSIGN) && (IO_APIC_VECTOR(irq) > 0)) {
-        spin_unlock(&vector_lock);
-        return IO_APIC_VECTOR(irq);
-    }
-
-    vector = current_vector;
-    while (vector_irq[vector] != FREE_TO_ASSIGN) {
-        vector += 8;
-        if (vector > LAST_DYNAMIC_VECTOR)
-            vector = FIRST_DYNAMIC_VECTOR + ((vector + 1) & 7);
-
-        if (vector == current_vector) {
-            spin_unlock(&vector_lock);
-            return -ENOSPC;
-        }
-    }
-
-    current_vector = vector;
-    vector_irq[vector] = irq;
-    if (irq != AUTO_ASSIGN)
-        IO_APIC_VECTOR(irq) = vector;
-
-    spin_unlock(&vector_lock);
-
-    return vector;
-}
 
 static struct hw_interrupt_type ioapic_level_type;
 static struct hw_interrupt_type ioapic_edge_type;

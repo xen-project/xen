@@ -417,7 +417,7 @@ void __init __start_xen(unsigned long mbi_p)
     unsigned int initrdidx = 1;
     multiboot_info_t *mbi = __va(mbi_p);
     module_t *mod = (module_t *)__va(mbi->mods_addr);
-    unsigned long nr_pages, modules_length, modules_headroom = -1;
+    unsigned long nr_pages, modules_length, modules_headroom;
     unsigned long allocator_bitmap_end;
     int i, e820_warn = 0, bytes = 0;
     struct ns16550_defaults ns16550 = {
@@ -618,6 +618,12 @@ void __init __start_xen(unsigned long mbi_p)
      */
     modules_length = mod[mbi->mods_count-1].mod_end - mod[0].mod_start;
 
+    /* ensure mod[0] is mapped before parsing */
+    bootstrap_map(mod[0].mod_start, mod[0].mod_end);
+    modules_headroom = bzimage_headroom(
+                      (char *)(unsigned long)mod[0].mod_start,
+                      (unsigned long)(mod[0].mod_end - mod[0].mod_start));
+
     for ( i = boot_e820.nr_map-1; i >= 0; i-- )
     {
         uint64_t s, e, mask = (1UL << L2_PAGETABLE_SHIFT) - 1;
@@ -636,7 +642,8 @@ void __init __start_xen(unsigned long mbi_p)
             s >> PAGE_SHIFT, (e-s) >> PAGE_SHIFT, PAGE_HYPERVISOR);
 
 #if defined(CONFIG_X86_64)
-#define reloc_size ((__pa(&_end) + mask) & ~mask)
+/* Relocate Xen image, allocation bitmap, and one page of padding. */
+#define reloc_size ((__pa(&_end) + max_page/8 + PAGE_SIZE + mask) & ~mask)
         /* Is the region suitable for relocating Xen? */
         if ( !xen_phys_start && ((e-s) >= reloc_size) )
         {
@@ -720,11 +727,6 @@ void __init __start_xen(unsigned long mbi_p)
                 "D" (__va(__pa(cpu0_stack))), "c" (STACK_SIZE) : "memory" );
         }
 #endif
-
-        if ( modules_headroom == -1 )
-            modules_headroom = bzimage_headroom(
-                      (char *)(unsigned long)mod[0].mod_start,
-                      (unsigned long)(mod[0].mod_end - mod[0].mod_start));
 
         /* Is the region suitable for relocating the multiboot modules? */
         if ( !initial_images_start && (s < e) &&

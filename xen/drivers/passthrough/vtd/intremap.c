@@ -502,7 +502,7 @@ int intremap_setup(struct iommu *iommu)
     ir_ctrl = iommu_ir_ctrl(iommu);
     if ( ir_ctrl->iremap_maddr == 0 )
     {
-        ir_ctrl->iremap_maddr = alloc_pgtable_maddr(NULL);
+        ir_ctrl->iremap_maddr = alloc_pgtable_maddr(NULL, 1);
         if ( ir_ctrl->iremap_maddr == 0 )
         {
             dprintk(XENLOG_WARNING VTDPREFIX,

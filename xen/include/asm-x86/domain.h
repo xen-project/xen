@@ -79,11 +79,11 @@ struct shadow_domain {
     int               locker; /* processor which holds the lock */
     const char       *locker_function; /* Func that took it */
     unsigned int      opt_flags;    /* runtime tunable optimizations on/off */
-    struct list_head  pinned_shadows;
+    struct page_list_head pinned_shadows;
 
     /* Memory allocation */
-    struct list_head  freelists[SHADOW_MAX_ORDER + 1];
-    struct list_head  p2m_freelist;
+    struct page_list_head freelists[SHADOW_MAX_ORDER + 1];
+    struct page_list_head p2m_freelist;
     unsigned int      total_pages;  /* number of pages allocated */
     unsigned int      free_pages;   /* number of pages on freelists */
     unsigned int      p2m_pages;    /* number of pages allocates to p2m */
@@ -92,7 +92,7 @@ struct shadow_domain {
     pagetable_t unpaged_pagetable;
 
     /* Shadow hashtable */
-    struct shadow_page_info **hash_table;
+    struct page_info **hash_table;
     int hash_walking;  /* Some function is walking the hash table */
 
     /* Fast MMIO path heuristic */
@@ -143,7 +143,7 @@ struct hap_domain {
     int               locker;
     const char       *locker_function;
 
-    struct list_head  freelist;
+    struct page_list_head freelist;
     unsigned int      total_pages;  /* number of pages allocated */
     unsigned int      free_pages;   /* number of pages on freelists */
     unsigned int      p2m_pages;    /* number of pages allocates to p2m */
@@ -265,7 +265,7 @@ struct arch_domain
         RELMEM_l2,
         RELMEM_done,
     } relmem;
-    struct list_head relmem_list;
+    struct page_list_head relmem_list;
 
     cpuid_input_t cpuids[MAX_CPUID_INPUT];
 } __cacheline_aligned;
@@ -352,6 +352,7 @@ struct arch_vcpu
 
     /* Current LDT details. */
     unsigned long shadow_ldt_mapcnt;
+    spinlock_t shadow_ldt_lock;
 
     struct paging_vcpu paging;
 

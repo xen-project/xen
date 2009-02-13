@@ -26,6 +26,7 @@
 #include <xen/version.h>
 #include <public/version.h>
 #include <xen/sched.h>
+#include <xen/guest_access.h>
 
 #include <asm/hvm/support.h>
 
@@ -75,6 +76,53 @@ size_t hvm_save_size(struct domain *d)
     return sz;
 }
 
+/* Extract a single instance of a save record, by marshalling all
+ * records of that type and copying out the one we need. */
+int hvm_save_one(struct domain *d, uint16_t typecode, uint16_t instance, 
+                 XEN_GUEST_HANDLE_64(uint8) handle)
+{
+    int rv = 0;
+    size_t sz = 0;
+    struct vcpu *v;
+    hvm_domain_context_t ctxt = { 0, };
+
+    if ( d->is_dying 
+         || typecode > HVM_SAVE_CODE_MAX 
+         || hvm_sr_handlers[typecode].size < sizeof(struct hvm_save_descriptor)
+         || hvm_sr_handlers[typecode].save == NULL )
+        return -EINVAL;
+
+    if ( hvm_sr_handlers[typecode].kind == HVMSR_PER_VCPU )
+        for_each_vcpu(d, v)
+            sz += hvm_sr_handlers[typecode].size;
+    else 
+        sz = hvm_sr_handlers[typecode].size;
+    
+    if ( (instance + 1) * hvm_sr_handlers[typecode].size > sz )
+        return -EINVAL;
+
+    ctxt.size = sz;
+    ctxt.data = xmalloc_bytes(sz);
+    if ( !ctxt.data )
+        return -ENOMEM;
+
+    if ( hvm_sr_handlers[typecode].save(d, &ctxt) != 0 )
+    {
+        gdprintk(XENLOG_ERR, 
+                 "HVM save: failed to save type %"PRIu16"\n", typecode);
+        rv = -EFAULT;
+    }
+    else if ( copy_to_guest(handle,
+                            ctxt.data 
+                            + (instance * hvm_sr_handlers[typecode].size) 
+                            + sizeof (struct hvm_save_descriptor), 
+                            hvm_sr_handlers[typecode].size
+                            - sizeof (struct hvm_save_descriptor)) )
+        rv = -EFAULT;
+
+    xfree(ctxt.data);
+    return rv;
+}
 
 int hvm_save(struct domain *d, hvm_domain_context_t *h)
 {

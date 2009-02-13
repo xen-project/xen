@@ -880,7 +880,7 @@ int __init construct_dom0(
     }
     si->first_p2m_pfn = pfn;
     si->nr_p2m_frames = d->tot_pages - count;
-    list_for_each_entry ( page, &d->page_list, list )
+    page_list_for_each ( page, &d->page_list )
     {
         mfn = page_to_mfn(page);
         if ( get_gpfn_from_mfn(mfn) >= count )

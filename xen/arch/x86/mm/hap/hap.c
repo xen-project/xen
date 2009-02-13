@@ -45,11 +45,11 @@
 
 /* Override macros from asm/page.h to make them work with mfn_t */
 #undef mfn_to_page
-#define mfn_to_page(_m) (frame_table + mfn_x(_m))
+#define mfn_to_page(_m) __mfn_to_page(mfn_x(_m))
 #undef mfn_valid
-#define mfn_valid(_mfn) (mfn_x(_mfn) < max_page)
+#define mfn_valid(_mfn) __mfn_valid(mfn_x(_mfn))
 #undef page_to_mfn
-#define page_to_mfn(_pg) (_mfn((_pg) - frame_table))
+#define page_to_mfn(_pg) _mfn(__page_to_mfn(_pg))
 
 /************************************************/
 /*            HAP LOG DIRTY SUPPORT             */
@@ -96,11 +96,10 @@ static struct page_info *hap_alloc(struct domain *d)
 
     ASSERT(hap_locked_by_me(d));
 
-    if ( unlikely(list_empty(&d->arch.paging.hap.freelist)) )
+    pg = page_list_remove_head(&d->arch.paging.hap.freelist);
+    if ( unlikely(!pg) )
         return NULL;
 
-    pg = list_entry(d->arch.paging.hap.freelist.next, struct page_info, list);
-    list_del(&pg->list);
     d->arch.paging.hap.free_pages--;
 
     p = hap_map_domain_page(page_to_mfn(pg));
@@ -118,7 +117,7 @@ static void hap_free(struct domain *d, mfn_t mfn)
     ASSERT(hap_locked_by_me(d));
 
     d->arch.paging.hap.free_pages++;
-    list_add_tail(&pg->list, &d->arch.paging.hap.freelist);
+    page_list_add_tail(pg, &d->arch.paging.hap.freelist);
 }
 
 static struct page_info *hap_alloc_p2m_page(struct domain *d)
@@ -210,15 +209,13 @@ hap_set_allocation(struct domain *d, unsigned int pages, int *preempted)
             }
             d->arch.paging.hap.free_pages++;
             d->arch.paging.hap.total_pages++;
-            list_add_tail(&pg->list, &d->arch.paging.hap.freelist);
+            page_list_add_tail(pg, &d->arch.paging.hap.freelist);
         }
         else if ( d->arch.paging.hap.total_pages > pages )
         {
             /* Need to return memory to domheap */
-            ASSERT(!list_empty(&d->arch.paging.hap.freelist));
-            pg = list_entry(d->arch.paging.hap.freelist.next,
-                            struct page_info, list);
-            list_del(&pg->list);
+            pg = page_list_remove_head(&d->arch.paging.hap.freelist);
+            ASSERT(pg);
             d->arch.paging.hap.free_pages--;
             d->arch.paging.hap.total_pages--;
             pg->count_info = 0;
@@ -393,7 +390,7 @@ static void hap_destroy_monitor_table(struct vcpu* v, mfn_t mmfn)
 void hap_domain_init(struct domain *d)
 {
     hap_lock_init(d);
-    INIT_LIST_HEAD(&d->arch.paging.hap.freelist);
+    INIT_PAGE_LIST_HEAD(&d->arch.paging.hap.freelist);
 
     /* This domain will use HAP for log-dirty mode */
     paging_log_dirty_init(d, hap_enable_log_dirty, hap_disable_log_dirty,

@@ -141,7 +141,7 @@ void dump_pageframe_info(struct domain *d)
     }
     else
     {
-        list_for_each_entry ( page, &d->page_list, list )
+        page_list_for_each ( page, &d->page_list )
         {
             printk("    DomPage %p: caf=%08lx, taf=%" PRtype_info "\n",
                    _p(page_to_mfn(page)),
@@ -154,7 +154,7 @@ void dump_pageframe_info(struct domain *d)
         p2m_pod_dump_data(d);
     }
 
-    list_for_each_entry ( page, &d->xenpage_list, list )
+    page_list_for_each ( page, &d->xenpage_list )
     {
         printk("    XenPage %p: caf=%08lx, taf=%" PRtype_info "\n",
                _p(page_to_mfn(page)),
@@ -352,6 +352,8 @@ int vcpu_initialise(struct vcpu *v)
     v->arch.perdomain_ptes =
         d->arch.mm_perdomain_pt + (v->vcpu_id << GDT_LDT_VCPU_SHIFT);
 
+    spin_lock_init(&v->arch.shadow_ldt_lock);
+
     return (is_pv_32on64_vcpu(v) ? setup_compat_l4(v) : 0);
 }
 
@@ -380,7 +382,7 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
     INIT_LIST_HEAD(&d->arch.pdev_list);
 
     d->arch.relmem = RELMEM_not_started;
-    INIT_LIST_HEAD(&d->arch.relmem_list);
+    INIT_PAGE_LIST_HEAD(&d->arch.relmem_list);
 
     pdpt_order = get_order_from_bytes(PDPT_L1_ENTRIES * sizeof(l1_pgentry_t));
     d->arch.mm_perdomain_pt = alloc_xenheap_pages(pdpt_order, 0);
@@ -1655,9 +1657,8 @@ int hypercall_xlat_continuation(unsigned int *id, unsigned int mask, ...)
 #endif
 
 static int relinquish_memory(
-    struct domain *d, struct list_head *list, unsigned long type)
+    struct domain *d, struct page_list_head *list, unsigned long type)
 {
-    struct list_head *ent;
     struct page_info  *page;
     unsigned long     x, y;
     int               ret = 0;
@@ -1665,17 +1666,13 @@ static int relinquish_memory(
     /* Use a recursive lock, as we may enter 'free_domheap_page'. */
     spin_lock_recursive(&d->page_alloc_lock);
 
-    ent = list->next;
-    while ( ent != list )
+    while ( (page = page_list_remove_head(list)) )
     {
-        page = list_entry(ent, struct page_info, list);
-
         /* Grab a reference to the page so it won't disappear from under us. */
         if ( unlikely(!get_page(page, d)) )
         {
             /* Couldn't get a reference -- someone is freeing this page. */
-            ent = ent->next;
-            list_move_tail(&page->list, &d->arch.relmem_list);
+            page_list_add_tail(page, &d->arch.relmem_list);
             continue;
         }
 
@@ -1687,6 +1684,7 @@ static int relinquish_memory(
             break;
         case -EAGAIN:
         case -EINTR:
+            page_list_add(page, list);
             set_bit(_PGT_pinned, &page->u.inuse.type_info);
             put_page(page);
             goto out;
@@ -1723,6 +1721,7 @@ static int relinquish_memory(
                 case 0:
                     break;
                 case -EINTR:
+                    page_list_add(page, list);
                     page->u.inuse.type_info |= PGT_validated;
                     if ( x & PGT_partial )
                         put_page(page);
@@ -1730,6 +1729,7 @@ static int relinquish_memory(
                     ret = -EAGAIN;
                     goto out;
                 case -EAGAIN:
+                    page_list_add(page, list);
                     page->u.inuse.type_info |= PGT_partial;
                     if ( x & PGT_partial )
                         put_page(page);
@@ -1746,9 +1746,8 @@ static int relinquish_memory(
             }
         }
 
-        /* Follow the list chain and /then/ potentially free the page. */
-        ent = ent->next;
-        list_move_tail(&page->list, &d->arch.relmem_list);
+        /* Put the page on the list and /then/ potentially free it. */
+        page_list_add_tail(page, &d->arch.relmem_list);
         put_page(page);
 
         if ( hypercall_preempt_check() )
@@ -1758,7 +1757,12 @@ static int relinquish_memory(
         }
     }
 
-    list_splice_init(&d->arch.relmem_list, list);
+    /* list is empty at this point. */
+    if ( !page_list_empty(&d->arch.relmem_list) )
+    {
+        *list = d->arch.relmem_list;
+        INIT_PAGE_LIST_HEAD(&d->arch.relmem_list);
+    }
 
  out:
     spin_unlock_recursive(&d->page_alloc_lock);

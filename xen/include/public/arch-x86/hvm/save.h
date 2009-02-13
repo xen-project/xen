@@ -287,7 +287,7 @@ struct hvm_hw_pci_irqs {
      * Indexed by: device*4 + INTx#.
      */
     union {
-        DECLARE_BITMAP(i, 32*4);
+        unsigned long i[16 / sizeof (unsigned long)]; /* DECLARE_BITMAP(i, 32*4); */
         uint64_t pad[2];
     };
 };
@@ -300,7 +300,7 @@ struct hvm_hw_isa_irqs {
      * Indexed by ISA IRQ (assumes no ISA-device IRQ sharing).
      */
     union {
-        DECLARE_BITMAP(i, 16);
+        unsigned long i[1];  /* DECLARE_BITMAP(i, 16); */
         uint64_t pad[1];
     };
 };

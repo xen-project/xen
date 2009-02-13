@@ -90,13 +90,17 @@ struct hvm_irq {
 #define hvm_pci_intx_link(dev, intx) \
     (((dev) + (intx)) & 3)
 
-/* Extract the IA-64 vector that corresponds to IRQ.  */
-static inline int
-irq_to_vector (int irq)
+#define IA64_INVALID_VECTOR	((unsigned int)((int)-1))
+static inline unsigned int irq_to_vector(int irq)
 {
-    return irq;
-}
+    int acpi_gsi_to_irq (u32 gsi, unsigned int *irq);
+    unsigned int vector;
 
+    if ( acpi_gsi_to_irq(irq, &vector) < 0)
+        return 0;
+
+    return vector;
+}
 
 extern u8 irq_vector[NR_IRQS];
 extern int vector_irq[NR_VECTORS];

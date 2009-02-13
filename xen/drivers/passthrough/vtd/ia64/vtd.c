@@ -29,7 +29,9 @@
 #include "../vtd.h"
 
 
-int vector_irq[NR_VECTORS] __read_mostly = { [0 ... NR_VECTORS - 1] = -1};
+int vector_irq[NR_VECTORS] __read_mostly = {
+    [0 ... NR_VECTORS - 1] = FREE_TO_ASSIGN_IRQ
+};
 /* irq_vectors is indexed by the sum of all RTEs in all I/O APICs. */
 u8 irq_vector[NR_IRQS] __read_mostly;
 
@@ -45,18 +47,19 @@ void unmap_vtd_domain_page(void *va)
 }
 
 /* Allocate page table, return its machine address */
-u64 alloc_pgtable_maddr(struct domain *d)
+u64 alloc_pgtable_maddr(struct domain *d, unsigned long npages)
 {
     struct page_info *pg;
     u64 *vaddr;
 
-    pg = alloc_domheap_page(NULL, d ? MEMF_node(domain_to_node(d)) : 0);
+    pg = alloc_domheap_pages(NULL, get_order_from_pages(npages),
+                             d ? MEMF_node(domain_to_node(d)) : 0);
     vaddr = map_domain_page(page_to_mfn(pg));
     if ( !vaddr )
         return 0;
-    memset(vaddr, 0, PAGE_SIZE);
+    memset(vaddr, 0, PAGE_SIZE * npages);
 
-    iommu_flush_cache_page(vaddr);
+    iommu_flush_cache_page(vaddr, npages);
     unmap_domain_page(vaddr);
 
     return page_to_maddr(pg);

@@ -281,9 +281,50 @@ int cpufreq_governor_dbs(struct cpufreq_policy *policy, unsigned int event)
     return 0;
 }
 
+static void __init cpufreq_dbs_handle_option(const char *name, const char *val)
+{
+    if ( !strcmp(name, "rate") && val )
+    {
+        usr_sampling_rate = simple_strtoull(val, NULL, 0) * MICROSECS(1);
+    }
+    else if ( !strcmp(name, "up_threshold") && val )
+    {
+        unsigned long tmp = simple_strtoul(val, NULL, 0);
+
+        if ( tmp < MIN_FREQUENCY_UP_THRESHOLD )
+        {
+            printk(XENLOG_WARNING "cpufreq/ondemand: "
+                   "specified threshold too low, using %d\n",
+                   MIN_FREQUENCY_UP_THRESHOLD);
+            tmp = MIN_FREQUENCY_UP_THRESHOLD;
+        }
+        else if ( tmp > MAX_FREQUENCY_UP_THRESHOLD )
+        {
+            printk(XENLOG_WARNING "cpufreq/ondemand: "
+                   "specified threshold too high, using %d\n",
+                   MAX_FREQUENCY_UP_THRESHOLD);
+            tmp = MAX_FREQUENCY_UP_THRESHOLD;
+        }
+        dbs_tuners_ins.up_threshold = tmp;
+    }
+    else if ( !strcmp(name, "bias") && val )
+    {
+        unsigned long tmp = simple_strtoul(val, NULL, 0);
+
+        if ( tmp > 1000 )
+        {
+            printk(XENLOG_WARNING "cpufreq/ondemand: "
+                   "specified bias too high, using 1000\n");
+            tmp = 1000;
+        }
+        dbs_tuners_ins.powersave_bias = tmp;
+    }
+}
+
 struct cpufreq_governor cpufreq_gov_dbs = {
     .name = "ondemand",
     .governor = cpufreq_governor_dbs,
+    .handle_option = cpufreq_dbs_handle_option
 };
 
 static int __init cpufreq_gov_dbs_init(void)
@@ -292,60 +333,8 @@ static int __init cpufreq_gov_dbs_init(void)
 }
 __initcall(cpufreq_gov_dbs_init);
 
-static void cpufreq_gov_dbs_exit(void)
+static void __exit cpufreq_gov_dbs_exit(void)
 {
     cpufreq_unregister_governor(&cpufreq_gov_dbs);
 }
 __exitcall(cpufreq_gov_dbs_exit);
-
-void __init cpufreq_cmdline_parse(char *str)
-{
-    do {
-        char *val, *end = strchr(str, ',');
-
-        if ( end )
-            *end++ = '\0';
-        val = strchr(str, '=');
-        if ( val )
-            *val++ = '\0';
-
-        if ( !strcmp(str, "rate") && val )
-        {
-            usr_sampling_rate = simple_strtoull(val, NULL, 0) * MICROSECS(1);
-        }
-        else if ( !strcmp(str, "threshold") && val )
-        {
-            unsigned long tmp = simple_strtoul(val, NULL, 0);
-
-            if ( tmp < MIN_FREQUENCY_UP_THRESHOLD )
-            {
-                printk(XENLOG_WARNING "cpufreq/ondemand: "
-                       "specified threshold too low, using %d\n",
-                       MIN_FREQUENCY_UP_THRESHOLD);
-                tmp = MIN_FREQUENCY_UP_THRESHOLD;
-            }
-            else if ( tmp > MAX_FREQUENCY_UP_THRESHOLD )
-            {
-                printk(XENLOG_WARNING "cpufreq/ondemand: "
-                       "specified threshold too high, using %d\n",
-                       MAX_FREQUENCY_UP_THRESHOLD);
-                tmp = MAX_FREQUENCY_UP_THRESHOLD;
-            }
-            dbs_tuners_ins.up_threshold = tmp;
-        }
-        else if ( !strcmp(str, "bias") && val )
-        {
-            unsigned long tmp = simple_strtoul(val, NULL, 0);
-
-            if ( tmp > 1000 )
-            {
-                printk(XENLOG_WARNING "cpufreq/ondemand: "
-                       "specified bias too high, using 1000\n");
-                tmp = 1000;
-            }
-            dbs_tuners_ins.powersave_bias = tmp;
-        }
-
-        str = end;
-    } while ( str );
-}

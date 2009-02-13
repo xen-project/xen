@@ -179,12 +179,6 @@ l2_pgentry_t *compat_idle_pg_table_l2 = NULL;
 #define l3_disallow_mask(d) L3_DISALLOW_MASK
 #endif
 
-static void queue_deferred_ops(struct domain *d, unsigned int ops)
-{
-    ASSERT(d == current->domain);
-    this_cpu(percpu_mm_info).deferred_ops |= ops;
-}
-
 void __init init_frametable(void)
 {
     unsigned long nr_pages, page_step, i, mfn;
@@ -333,7 +327,7 @@ void share_xen_page_with_guest(
         page->count_info |= PGC_allocated | 1;
         if ( unlikely(d->xenheap_pages++ == 0) )
             get_knownalive_domain(d);
-        list_add_tail(&page->list, &d->xenpage_list);
+        page_list_add_tail(page, &d->xenpage_list);
     }
 
     spin_unlock(&d->page_alloc_lock);
@@ -464,14 +458,18 @@ void update_cr3(struct vcpu *v)
 }
 
 
-static void invalidate_shadow_ldt(struct vcpu *v)
+static void invalidate_shadow_ldt(struct vcpu *v, int flush)
 {
     int i;
     unsigned long pfn;
     struct page_info *page;
-    
+
+    BUG_ON(unlikely(in_irq()));
+
+    spin_lock(&v->arch.shadow_ldt_lock);
+
     if ( v->arch.shadow_ldt_mapcnt == 0 )
-        return;
+        goto out;
 
     v->arch.shadow_ldt_mapcnt = 0;
 
@@ -486,11 +484,12 @@ static void invalidate_shadow_ldt(struct vcpu *v)
         put_page_and_type(page);
     }
 
-    /* Dispose of the (now possibly invalid) mappings from the TLB.  */
-    if ( v == current )
-        queue_deferred_ops(v->domain, DOP_FLUSH_TLB | DOP_RELOAD_LDT);
-    else
-        flush_tlb_mask(v->domain->domain_dirty_cpumask);
+    /* Rid TLBs of stale mappings (guest mappings and shadow mappings). */
+    if ( flush )
+        flush_tlb_mask(v->vcpu_dirty_cpumask);
+
+ out:
+    spin_unlock(&v->arch.shadow_ldt_lock);
 }
 
 
@@ -541,8 +540,10 @@ int map_ldt_shadow_page(unsigned int off)
 
     nl1e = l1e_from_pfn(mfn, l1e_get_flags(l1e) | _PAGE_RW);
 
+    spin_lock(&v->arch.shadow_ldt_lock);
     l1e_write(&v->arch.perdomain_ptes[off + 16], nl1e);
     v->arch.shadow_ldt_mapcnt++;
+    spin_unlock(&v->arch.shadow_ldt_lock);
 
     return 1;
 }
@@ -989,7 +990,7 @@ void put_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
              (d == e) )
         {
             for_each_vcpu ( d, v )
-                invalidate_shadow_ldt(v);
+                invalidate_shadow_ldt(v, 1);
         }
         put_page(page);
     }
@@ -2023,30 +2024,17 @@ int free_page_type(struct page_info *page, unsigned long type,
     unsigned long gmfn;
     int rc;
 
-    if ( likely(owner != NULL) )
+    if ( likely(owner != NULL) && unlikely(paging_mode_enabled(owner)) )
     {
-        /*
-         * We have to flush before the next use of the linear mapping
-         * (e.g., update_va_mapping()) or we could end up modifying a page
-         * that is no longer a page table (and hence screw up ref counts).
-         */
-        if ( current->domain == owner )
-            queue_deferred_ops(owner, DOP_FLUSH_ALL_TLBS);
-        else
-            flush_tlb_mask(owner->domain_dirty_cpumask);
+        /* A page table is dirtied when its type count becomes zero. */
+        paging_mark_dirty(owner, page_to_mfn(page));
 
-        if ( unlikely(paging_mode_enabled(owner)) )
-        {
-            /* A page table is dirtied when its type count becomes zero. */
-            paging_mark_dirty(owner, page_to_mfn(page));
+        if ( shadow_mode_refcounts(owner) )
+            return 0;
 
-            if ( shadow_mode_refcounts(owner) )
-                return 0;
-
-            gmfn = mfn_to_gmfn(owner, page_to_mfn(page));
-            ASSERT(VALID_M2P(gmfn));
-            shadow_remove_all_shadows(owner->vcpu[0], _mfn(gmfn));
-        }
+        gmfn = mfn_to_gmfn(owner, page_to_mfn(page));
+        ASSERT(VALID_M2P(gmfn));
+        shadow_remove_all_shadows(owner->vcpu[0], _mfn(gmfn));
     }
 
     if ( !(type & PGT_partial) )
@@ -2366,8 +2354,8 @@ void cleanup_page_cacheattr(struct page_info *page)
 
 int new_guest_cr3(unsigned long mfn)
 {
-    struct vcpu *v = current;
-    struct domain *d = v->domain;
+    struct vcpu *curr = current;
+    struct domain *d = curr->domain;
     int okay;
     unsigned long old_base_mfn;
 
@@ -2377,19 +2365,19 @@ int new_guest_cr3(unsigned long mfn)
         okay = paging_mode_refcounts(d)
             ? 0 /* Old code was broken, but what should it be? */
             : mod_l4_entry(
-                    __va(pagetable_get_paddr(v->arch.guest_table)),
+                    __va(pagetable_get_paddr(curr->arch.guest_table)),
                     l4e_from_pfn(
                         mfn,
                         (_PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED)),
-                    pagetable_get_pfn(v->arch.guest_table), 0, 0) == 0;
+                    pagetable_get_pfn(curr->arch.guest_table), 0, 0) == 0;
         if ( unlikely(!okay) )
         {
             MEM_LOG("Error while installing new compat baseptr %lx", mfn);
             return 0;
         }
 
-        invalidate_shadow_ldt(v);
-        write_ptbase(v);
+        invalidate_shadow_ldt(curr, 0);
+        write_ptbase(curr);
 
         return 1;
     }
@@ -2403,14 +2391,14 @@ int new_guest_cr3(unsigned long mfn)
         return 0;
     }
 
-    invalidate_shadow_ldt(v);
+    invalidate_shadow_ldt(curr, 0);
 
-    old_base_mfn = pagetable_get_pfn(v->arch.guest_table);
+    old_base_mfn = pagetable_get_pfn(curr->arch.guest_table);
 
-    v->arch.guest_table = pagetable_from_pfn(mfn);
-    update_cr3(v);
+    curr->arch.guest_table = pagetable_from_pfn(mfn);
+    update_cr3(curr);
 
-    write_ptbase(v);
+    write_ptbase(curr);
 
     if ( likely(old_base_mfn != 0) )
     {
@@ -2440,6 +2428,10 @@ static void process_deferred_ops(void)
             flush_tlb_local();
     }
 
+    /*
+     * Do this after flushing TLBs, to ensure we see fresh LDT mappings
+     * via the linear pagetable mapping.
+     */
     if ( deferred_ops & DOP_RELOAD_LDT )
         (void)map_ldt_shadow_page(0);
 
@@ -2565,8 +2557,8 @@ int do_mmuext_op(
     unsigned long mfn = 0, gmfn = 0, type;
     unsigned int done = 0;
     struct page_info *page;
-    struct vcpu *v = current;
-    struct domain *d = v->domain;
+    struct vcpu *curr = current;
+    struct domain *d = curr->domain;
 
     if ( unlikely(count & MMU_UPDATE_PREEMPTED) )
     {
@@ -2729,8 +2721,8 @@ int do_mmuext_op(
                 }
             }
 
-            old_mfn = pagetable_get_pfn(v->arch.guest_table_user);
-            v->arch.guest_table_user = pagetable_from_pfn(mfn);
+            old_mfn = pagetable_get_pfn(curr->arch.guest_table_user);
+            curr->arch.guest_table_user = pagetable_from_pfn(mfn);
 
             if ( old_mfn != 0 )
             {
@@ -2750,7 +2742,7 @@ int do_mmuext_op(
     
         case MMUEXT_INVLPG_LOCAL:
             if ( !paging_mode_enabled(d) 
-                 || paging_invlpg(v, op.arg1.linear_addr) != 0 )
+                 || paging_invlpg(curr, op.arg1.linear_addr) != 0 )
                 flush_tlb_one_local(op.arg1.linear_addr);
             break;
 
@@ -2773,7 +2765,7 @@ int do_mmuext_op(
         }
 
         case MMUEXT_TLB_FLUSH_ALL:
-            flush_tlb_mask(d->domain_dirty_cpumask);
+            this_cpu(percpu_mm_info).deferred_ops |= DOP_FLUSH_ALL_TLBS;
             break;
     
         case MMUEXT_INVLPG_ALL:
@@ -2809,13 +2801,14 @@ int do_mmuext_op(
                 okay = 0;
                 MEM_LOG("Bad args to SET_LDT: ptr=%lx, ents=%lx", ptr, ents);
             }
-            else if ( (v->arch.guest_context.ldt_ents != ents) || 
-                      (v->arch.guest_context.ldt_base != ptr) )
+            else if ( (curr->arch.guest_context.ldt_ents != ents) || 
+                      (curr->arch.guest_context.ldt_base != ptr) )
             {
-                invalidate_shadow_ldt(v);
-                v->arch.guest_context.ldt_base = ptr;
-                v->arch.guest_context.ldt_ents = ents;
-                load_LDT(v);
+                invalidate_shadow_ldt(curr, 0);
+                this_cpu(percpu_mm_info).deferred_ops |= DOP_FLUSH_TLB;
+                curr->arch.guest_context.ldt_base = ptr;
+                curr->arch.guest_context.ldt_ents = ents;
+                load_LDT(curr);
                 this_cpu(percpu_mm_info).deferred_ops &= ~DOP_RELOAD_LDT;
                 if ( ents != 0 )
                     this_cpu(percpu_mm_info).deferred_ops |= DOP_RELOAD_LDT;
@@ -2931,8 +2924,7 @@ int do_mmu_update(
     struct page_info *page;
     int rc = 0, okay = 1, i = 0;
     unsigned int cmd, done = 0;
-    struct vcpu *v = current;
-    struct domain *d = v->domain;
+    struct domain *d = current->domain;
     struct domain_mmap_cache mapcache;
 
     if ( unlikely(count & MMU_UPDATE_PREEMPTED) )
@@ -3042,7 +3034,8 @@ int do_mmu_update(
 #endif
                 case PGT_writable_page:
                     perfc_incr(writable_mmu_updates);
-                    okay = paging_write_guest_entry(v, va, req.val, _mfn(mfn));
+                    okay = paging_write_guest_entry(
+                        current, va, req.val, _mfn(mfn));
                     break;
                 }
                 page_unlock(page);
@@ -3052,7 +3045,8 @@ int do_mmu_update(
             else if ( get_page_type(page, PGT_writable_page) )
             {
                 perfc_incr(writable_mmu_updates);
-                okay = paging_write_guest_entry(v, va, req.val, _mfn(mfn));
+                okay = paging_write_guest_entry(
+                    current, va, req.val, _mfn(mfn));
                 put_page_type(page);
             }
 
@@ -3508,7 +3502,7 @@ int steal_page(
     /* Unlink from original owner. */
     if ( !(memflags & MEMF_no_refcount) )
         d->tot_pages--;
-    list_del(&page->list);
+    page_list_del(page, &d->page_list);
 
     spin_unlock(&d->page_alloc_lock);
     return 0;
@@ -3567,34 +3561,40 @@ int do_update_va_mapping(unsigned long va, u64 val64,
     if ( pl1e )
         guest_unmap_l1e(v, pl1e);
 
-    process_deferred_ops();
-
     switch ( flags & UVMF_FLUSHTYPE_MASK )
     {
     case UVMF_TLB_FLUSH:
         switch ( (bmap_ptr = flags & ~UVMF_FLUSHTYPE_MASK) )
         {
         case UVMF_LOCAL:
-            flush_tlb_local();
+            this_cpu(percpu_mm_info).deferred_ops |= DOP_FLUSH_TLB;
             break;
         case UVMF_ALL:
-            flush_tlb_mask(d->domain_dirty_cpumask);
+            this_cpu(percpu_mm_info).deferred_ops |= DOP_FLUSH_ALL_TLBS;
             break;
         default:
+            if ( this_cpu(percpu_mm_info).deferred_ops & DOP_FLUSH_ALL_TLBS )
+                break;
             if ( unlikely(!is_pv_32on64_domain(d) ?
                           get_user(vmask, (unsigned long *)bmap_ptr) :
                           get_user(vmask, (unsigned int *)bmap_ptr)) )
-                rc = -EFAULT;
+                rc = -EFAULT, vmask = 0;
             pmask = vcpumask_to_pcpumask(d, vmask);
+            if ( cpu_isset(smp_processor_id(), pmask) )
+                this_cpu(percpu_mm_info).deferred_ops &= ~DOP_FLUSH_TLB;
             flush_tlb_mask(pmask);
             break;
         }
         break;
 
     case UVMF_INVLPG:
+        if ( this_cpu(percpu_mm_info).deferred_ops & DOP_FLUSH_ALL_TLBS )
+            break;
         switch ( (bmap_ptr = flags & ~UVMF_FLUSHTYPE_MASK) )
         {
         case UVMF_LOCAL:
+            if ( this_cpu(percpu_mm_info).deferred_ops & DOP_FLUSH_TLB )
+                break;
             if ( !paging_mode_enabled(d) ||
                  (paging_invlpg(v, va) != 0) ) 
                 flush_tlb_one_local(va);
@@ -3606,13 +3606,17 @@ int do_update_va_mapping(unsigned long va, u64 val64,
             if ( unlikely(!is_pv_32on64_domain(d) ?
                           get_user(vmask, (unsigned long *)bmap_ptr) :
                           get_user(vmask, (unsigned int *)bmap_ptr)) )
-                rc = -EFAULT;
+                rc = -EFAULT, vmask = 0;
             pmask = vcpumask_to_pcpumask(d, vmask);
+            if ( this_cpu(percpu_mm_info).deferred_ops & DOP_FLUSH_TLB )
+                cpu_clear(smp_processor_id(), pmask);
             flush_tlb_one_mask(pmask, va);
             break;
         }
         break;
     }
+
+    process_deferred_ops();
 
     return rc;
 }

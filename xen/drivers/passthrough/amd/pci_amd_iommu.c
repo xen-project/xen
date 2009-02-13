@@ -23,7 +23,6 @@
 #include <xen/pci_regs.h>
 #include <asm/amd-iommu.h>
 #include <asm/hvm/svm/amd-iommu-proto.h>
-#include <asm/mm.h>
 
 extern unsigned short ivrs_bdf_entries;
 extern struct ivrs_mappings *ivrs_mappings;

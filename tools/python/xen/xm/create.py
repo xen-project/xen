@@ -1337,7 +1337,7 @@ def main(argv):
     elif not opts.is_xml:
         dom = make_domain(opts, config)
         
-    if opts.vals.vncviewer:
+    if opts.vals.vncconsole:
         domid = domain_name_to_domid(sxp.child_value(config, 'name', -1))
         vncviewer_autopass = getattr(opts.vals,'vncviewer-autopass', False)
         console.runVncViewer(domid, vncviewer_autopass, True)

@@ -52,10 +52,10 @@ struct irqaction {
 };
 
 extern irqreturn_t no_action(int cpl, void *dev_id, struct pt_regs *regs);
-extern int request_irq(unsigned int,
+extern int request_irq_vector(unsigned int,
 		       irqreturn_t (*handler)(int, void *, struct pt_regs *),
 		       unsigned long, const char *, void *);
-extern void free_irq(unsigned int, void *);
+extern void release_irq_vector(unsigned int, void *);
 #endif
 
 

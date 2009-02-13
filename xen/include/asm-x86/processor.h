@@ -188,6 +188,7 @@ extern struct cpuinfo_x86 cpu_data[];
 #define current_cpu_data boot_cpu_data
 #endif
 
+extern u64 host_pat;
 extern int phys_proc_id[NR_CPUS];
 extern int cpu_core_id[NR_CPUS];
 

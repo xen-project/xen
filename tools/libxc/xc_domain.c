@@ -271,6 +271,38 @@ int xc_domain_hvm_getcontext(int xc_handle,
     return (ret < 0 ? -1 : domctl.u.hvmcontext.size);
 }
 
+/* Get just one element of the HVM guest context.
+ * size must be >= HVM_SAVE_LENGTH(type) */
+int xc_domain_hvm_getcontext_partial(int xc_handle,
+                                     uint32_t domid,
+                                     uint16_t typecode,
+                                     uint16_t instance,
+                                     void *ctxt_buf,
+                                     uint32_t size)
+{
+    int ret;
+    DECLARE_DOMCTL;
+
+    if ( !ctxt_buf ) 
+        return -EINVAL;
+
+    domctl.cmd = XEN_DOMCTL_gethvmcontext_partial;
+    domctl.domain = (domid_t) domid;
+    domctl.u.hvmcontext_partial.type = typecode;
+    domctl.u.hvmcontext_partial.instance = instance;
+    set_xen_guest_handle(domctl.u.hvmcontext_partial.buffer, ctxt_buf);
+
+    if ( (ret = lock_pages(ctxt_buf, size)) != 0 )
+        return ret;
+    
+    ret = do_domctl(xc_handle, &domctl);
+
+    if ( ctxt_buf ) 
+        unlock_pages(ctxt_buf, size);
+
+    return ret ? -1 : 0;
+}
+
 /* set info to hvm guest for restore */
 int xc_domain_hvm_setcontext(int xc_handle,
                              uint32_t domid,
@@ -896,6 +928,32 @@ int xc_domain_update_msi_irq(
     DECLARE_DOMCTL;
 
     domctl.cmd = XEN_DOMCTL_bind_pt_irq;
+    domctl.domain = (domid_t)domid;
+
+    bind = &(domctl.u.bind_pt_irq);
+    bind->hvm_domid = domid;
+    bind->irq_type = PT_IRQ_TYPE_MSI;
+    bind->machine_irq = pirq;
+    bind->u.msi.gvec = gvec;
+    bind->u.msi.gflags = gflags;
+
+    rc = do_domctl(xc_handle, &domctl);
+    return rc;
+}
+
+int xc_domain_unbind_msi_irq(
+    int xc_handle,
+    uint32_t domid,
+    uint32_t gvec,
+    uint32_t pirq,
+    uint32_t gflags)
+{
+    int rc;
+    xen_domctl_bind_pt_irq_t *bind;
+
+    DECLARE_DOMCTL;
+
+    domctl.cmd = XEN_DOMCTL_unbind_pt_irq;
     domctl.domain = (domid_t)domid;
 
     bind = &(domctl.u.bind_pt_irq);

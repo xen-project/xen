@@ -182,11 +182,9 @@ static struct mc_info *machine_check_poll(int calltype)
         mcg.mc_flags = MC_FLAG_POLLED;
     else if (calltype == MC_FLAG_CMCI)
         mcg.mc_flags = MC_FLAG_CMCI;
-    mcg.mc_socketid = phys_proc_id[cpu];
-    mcg.mc_coreid = cpu_core_id[cpu];
-    mcg.mc_apicid = cpu_physical_id(cpu);
-    mcg.mc_core_threadid =
-        mcg.mc_apicid & ( 1 << (cpu_data[cpu].x86_num_siblings - 1)); 
+    x86_mc_get_cpu_info(
+        cpu, &mcg.mc_socketid, &mcg.mc_coreid,
+        &mcg.mc_core_threadid, &mcg.mc_apicid, NULL, NULL, NULL);
     rdmsrl(MSR_IA32_MCG_STATUS, mcg.mc_gstatus);
 
     for ( i = 0; i < nr_mce_banks; i++ ) {

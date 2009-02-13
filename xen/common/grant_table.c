@@ -1192,7 +1192,7 @@ gnttab_transfer(
         /* Okay, add the page to 'e'. */
         if ( unlikely(e->tot_pages++ == 0) )
             get_knownalive_domain(e);
-        list_add_tail(&page->list, &e->page_list);
+        page_list_add_tail(page, &e->page_list);
         page_set_owner(page, e);
 
         spin_unlock(&e->page_alloc_lock);

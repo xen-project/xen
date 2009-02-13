@@ -28,7 +28,6 @@ static inline void pci_cleanup_msi(struct pci_dev *pdev)
     /* TODO */
 }
 
-#define AUTO_ASSIGN         -1
 
 extern int assign_irq_vector (int irq);
 
