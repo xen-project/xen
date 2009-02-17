@@ -233,7 +233,7 @@ start()
                     XMR=`xm restore $dom 2>&1 1>/dev/null`
                     #xm restore $dom
                     if [ $? -ne 0 ]; then
-                	echo -e "\nAn error occured while restoring domain ${dom##*/}:\n$XMR"
+                        echo -e "\nAn error occurred while restoring domain ${dom##*/}:\n$XMR"
                         rc_failed $?
                         echo -e '!'
                     else
@@ -267,8 +267,8 @@ start()
 		echo -n "(skip)"
 	    else
 		XMC=`xm create --quiet --defconfig $dom`
-            	if [ $? -ne 0 ]; then
-                    echo -e "\nAn error occured while creating domain ${dom##*/}: $XMC\n"
+		if [ $? -ne 0 ]; then
+		    echo -e "\nAn error occurred while creating domain ${dom##*/}: $XMC\n"
 		    rc_failed $?
 		    echo -e '!'
 		else
@@ -357,7 +357,7 @@ stop()
 		echo -n "(SR-$sysrq)"
 		XMR=`xm sysrq $id $sysrq 2>&1 1>/dev/null`
 		if test $? -ne 0; then
-                    echo -e "\nAn error occured while doing sysrq on domain:\n$XMR\n"
+		    echo -e "\nAn error occurred while doing sysrq on domain:\n$XMR\n"
 		    rc_failed $?
 		    echo -n '!'
 		fi
@@ -375,7 +375,7 @@ stop()
 	    WDOG_PID=$!
 	    XMR=`xm migrate $id $XENDOMAINS_MIGRATE 2>&1 1>/dev/null`
 	    if test $? -ne 0; then
-                echo -e "\nAn error occured while migrating domain:\n$XMR\n"
+		echo -e "\nAn error occurred while migrating domain:\n$XMR\n"
 		rc_failed $?
 		echo -e '!'
 
@@ -395,7 +395,7 @@ stop()
 	    mkdir -p "$XENDOMAINS_SAVE"
 	    XMR=`xm save $id $XENDOMAINS_SAVE/$name 2>&1 1>/dev/null`
 	    if test $? -ne 0; then
-                echo -e "\nAn error occured while saving domain:\n$XMR\n"
+		echo -e "\nAn error occurred while saving domain:\n$XMR\n"
 		rc_failed $?
 		echo -e '!'
 		kill $WDOG_PID >/dev/null 2>&1
@@ -413,7 +413,7 @@ stop()
 	    WDOG_PID=$!
 	    XMR=`xm shutdown $id $XENDOMAINS_SHUTDOWN 2>&1 1>/dev/null`
 	    if test $? -ne 0; then
-                echo -e "\nAn error occured while shutting down domain:\n$XMR\n"
+		echo -e "\nAn error occurred while shutting down domain:\n$XMR\n"
 		rc_failed $?
 		echo -e '!'
 	    fi
@@ -432,7 +432,7 @@ stop()
 	WDOG_PID=$!
 	XMR=`xm shutdown $XENDOMAINS_SHUTDOWN_ALL 2>&1 1>/dev/null`
 	if test $? -ne 0; then
-            echo -e "\nAn error occured while shutting down all domains: $XMR\n"
+	    echo -e "\nAn error occurred while shutting down all domains: $XMR\n"
 	    rc_failed $?
 	    echo -e '!'
 	fi
