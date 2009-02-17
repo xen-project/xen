@@ -431,6 +431,8 @@ class XendConfig(dict):
     def _vcpus_sanity_check(self):
         if 'VCPUs_max' in self and 'vcpu_avail' not in self:
             self['vcpu_avail'] = (1 << self['VCPUs_max']) - 1
+        if 'online_vcpus' in self:
+            self['VCPUs_live'] = self['online_vcpus']
 
     def _uuid_sanity_check(self):
         """Make sure UUID is in proper string format with hyphens."""
