@@ -317,9 +317,9 @@ int queue_invalidate_iec(struct iommu *iommu, u8 granu, u8 im, u16 iidx)
     return ret;
 }
 
-u64 iec_cap;
 int __iommu_flush_iec(struct iommu *iommu, u8 granu, u8 im, u16 iidx)
 {
+    u64 iec_cap;
     int ret;
     ret = queue_invalidate_iec(iommu, granu, im, iidx);
     ret |= invalidate_sync(iommu);
