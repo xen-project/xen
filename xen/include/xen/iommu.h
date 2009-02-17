@@ -114,4 +114,6 @@ void iommu_update_ire_from_msi(struct msi_desc *msi_desc, struct msi_msg *msg);
 void iommu_suspend(void);
 void iommu_resume(void);
 
+void iommu_set_dom0_mapping(struct domain *d);
+
 #endif /* _IOMMU_H_ */

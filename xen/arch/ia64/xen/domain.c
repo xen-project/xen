@@ -2023,6 +2023,7 @@ static void __init calc_dom0_size(void)
 	unsigned long p2m_pages;
 	unsigned long spare_hv_pages;
 	unsigned long max_dom0_size;
+	unsigned long iommu_pg_table_pages = 0;
 
 	/* Estimate maximum memory we can safely allocate for dom0
 	 * by subtracting the p2m table allocation and a chunk of memory
@@ -2033,8 +2034,13 @@ static void __init calc_dom0_size(void)
 	domheap_pages = avail_domheap_pages();
 	p2m_pages = domheap_pages / PTRS_PER_PTE;
 	spare_hv_pages = 8192 + (domheap_pages / 4096);
-	max_dom0_size = (domheap_pages - (p2m_pages + spare_hv_pages))
-			 * PAGE_SIZE;
+
+	if (iommu_enabled)
+		iommu_pg_table_pages = domheap_pages * 4 / 512;
+		/* There are 512 ptes in one 4K vtd page. */
+
+	max_dom0_size = (domheap_pages - (p2m_pages + spare_hv_pages) -
+			iommu_pg_table_pages) * PAGE_SIZE;
 	printk("Maximum permitted dom0 size: %luMB\n",
 	       max_dom0_size / (1024*1024));
 

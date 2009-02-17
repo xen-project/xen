@@ -143,3 +143,23 @@ void hvm_dpci_isairq_eoi(struct domain *d, unsigned int isairq)
     }
     spin_unlock(&d->event_lock);
 }
+
+void iommu_set_dom0_mapping(struct domain *d)
+{
+    u64 i, j, tmp;
+    extern int xen_in_range(paddr_t start, paddr_t end);
+
+    BUG_ON(d != dom0);
+
+    for ( i = 0; i < max_page; i++ )
+    {
+        /* Set up 1:1 mapping for dom0 for all RAM except Xen bits. */
+        if ( !page_is_conventional_ram(i) ||
+             xen_in_range(i << PAGE_SHIFT, (i + 1) << PAGE_SHIFT) )
+            continue;
+
+        tmp = 1 << (PAGE_SHIFT - PAGE_SHIFT_4K);
+        for ( j = 0; j < tmp; j++ )
+            iommu_map_page(d, (i*tmp+j), (i*tmp+j));
+    }
+}

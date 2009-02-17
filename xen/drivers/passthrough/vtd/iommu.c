@@ -30,6 +30,7 @@
 #include <xen/pci.h>
 #include <xen/pci_regs.h>
 #include <xen/keyhandler.h>
+#include <asm/msi.h>
 #include "iommu.h"
 #include "dmar.h"
 #include "extern.h"
@@ -829,7 +830,6 @@ static void dma_msi_data_init(struct iommu *iommu, int vector)
     spin_unlock_irqrestore(&iommu->register_lock, flags);
 }
 
-#ifdef SUPPORT_MSI_REMAPPING
 static void dma_msi_addr_init(struct iommu *iommu, int phy_cpu)
 {
     u64 msi_address;
@@ -846,12 +846,6 @@ static void dma_msi_addr_init(struct iommu *iommu, int phy_cpu)
     dmar_writel(iommu->reg, DMAR_FEUADDR_REG, (u32)(msi_address >> 32));
     spin_unlock_irqrestore(&iommu->register_lock, flags);
 }
-#else
-static void dma_msi_addr_init(struct iommu *iommu, int phy_cpu)
-{
-    /* ia64: TODO */
-}
-#endif
 
 static void dma_msi_set_affinity(unsigned int vector, cpumask_t dest)
 {
@@ -988,7 +982,6 @@ static int intel_iommu_domain_init(struct domain *d)
 {
     struct hvm_iommu *hd = domain_hvm_iommu(d);
     struct iommu *iommu = NULL;
-    u64 i, j, tmp;
     struct acpi_drhd_unit *drhd;
 
     drhd = list_entry(acpi_drhd_units.next, typeof(*drhd), list);
@@ -1000,17 +993,8 @@ static int intel_iommu_domain_init(struct domain *d)
     {
         extern int xen_in_range(paddr_t start, paddr_t end);
 
-        /* Set up 1:1 page table for dom0 for all RAM except Xen bits. */
-        for ( i = 0; i < max_page; i++ )
-        {
-            if ( !page_is_conventional_ram(i) ||
-                 xen_in_range(i << PAGE_SHIFT, (i + 1) << PAGE_SHIFT) )
-                continue;
-
-            tmp = 1 << (PAGE_SHIFT - PAGE_SHIFT_4K);
-            for ( j = 0; j < tmp; j++ )
-                iommu_map_page(d, (i*tmp+j), (i*tmp+j));
-        }
+        /* Set up 1:1 page table for dom0 */
+        iommu_set_dom0_mapping(d);
 
         setup_dom0_devices(d);
         setup_dom0_rmrr(d);
