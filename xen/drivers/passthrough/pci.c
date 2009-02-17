@@ -48,6 +48,7 @@ struct pci_dev *alloc_pdev(u8 bus, u8 devfn)
     pdev->domain = NULL;
     INIT_LIST_HEAD(&pdev->msi_list);
     list_add(&pdev->alldevs_list, &alldevs_list);
+    spin_lock_init(&pdev->msix_table_lock);
 
     return pdev;
 }

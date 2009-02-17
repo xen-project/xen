@@ -29,10 +29,16 @@
 #define PCI_BDF(b,d,f)  ((((b) & 0xff) << 8) | PCI_DEVFN(d,f))
 #define PCI_BDF2(b,df)  ((((b) & 0xff) << 8) | ((df) & 0xff))
 
+#define MAX_MSIX_TABLE_PAGES    8    /* 2048 entries */
 struct pci_dev {
     struct list_head alldevs_list;
     struct list_head domain_list;
+
     struct list_head msi_list;
+    int msix_table_refcnt[MAX_MSIX_TABLE_PAGES];
+    int msix_table_idx[MAX_MSIX_TABLE_PAGES];
+    spinlock_t msix_table_lock;
+
     struct domain *domain;
     const u8 bus;
     const u8 devfn;
