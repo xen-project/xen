@@ -717,7 +717,7 @@ def vscsi_lookup_devid(devlist, req_devid):
     if len(devlist) == 0:
         return 0
     else:
-        for devid, backend in devlist:
+        for (devid, _, _) in devlist:
             if devid == req_devid:
                 return 1
         return 0
@@ -725,6 +725,10 @@ def vscsi_lookup_devid(devlist, req_devid):
 def configure_vscsis(config_devs, vals):
     """Create the config for vscsis (virtual scsi devices).
     """
+
+    def get_devid(hctl):
+        return int(hctl.split(':')[0])
+
     devidlist = []
     config_scsi = []
     if len(vals.vscsi) == 0:
@@ -738,31 +742,40 @@ def configure_vscsis(config_devs, vals):
         if p_hctl == None:
             raise ValueError('Cannot find device "%s"' % p_dev)
 
+        host_mode = 0
+        if v_dev == 'host':
+            host_mode = 1
+            scsi_info = []
+            devid = get_devid(p_hctl)
+            for (pHCTL, devname, _, _) in scsi_devices:
+                if get_devid(pHCTL) == devid:
+                    scsi_info.append([devid, pHCTL, devname, pHCTL])
+        else:
+            scsi_info = [[get_devid(v_dev), p_hctl, devname, v_dev]]
+
         for config in config_scsi:
             dev = vscsi_convert_sxp_to_dict(config)
-            if dev['v-dev'] == v_dev:
+            if dev['v-dev'] in [scsi_info[x][3] for x in range(len(scsi_info))]:
                 raise ValueError('The virtual device "%s" is already defined' % v_dev)
 
-        v_hctl = v_dev.split(':')
-        devid = int(v_hctl[0])
-        config_scsi.append(['dev', \
-                        ['state', xenbusState['Initialising']], \
-                        ['devid', devid], \
-                        ['p-dev', p_hctl], \
-                        ['p-devname', devname], \
-                        ['v-dev', v_dev] ])
+        for (devid, pHCTL, devname, vHCTL) in scsi_info:
+            config_scsi.append(['dev', \
+                                ['state', xenbusState['Initialising']], \
+                                ['devid', devid], \
+                                ['p-dev', pHCTL], \
+                                ['p-devname', devname], \
+                                ['v-dev', vHCTL] ])
 
         if vscsi_lookup_devid(devidlist, devid) == 0:
-            devidlist.append([devid, backend])
+            devidlist.append([devid, backend, host_mode])
 
-    for devid, backend in devidlist:
-        tmp = []
+    for (devid, backend, host_mode) in devidlist:
+        tmp = ['vscsi', ['feature-host', host_mode]]
         for config in config_scsi:
             dev = vscsi_convert_sxp_to_dict(config)
             if dev['devid'] == devid:
                 tmp.append(config)
 
-        tmp.insert(0, 'vscsi')
         if backend:
             tmp.append(['backend', backend])
         config_devs.append(['device', tmp])
@@ -1044,7 +1057,7 @@ def preprocess_vscsi(vals):
         n = len(d)
         if n == 2:
             tmp = d[1].split(':')
-            if len(tmp) != 4:
+            if d[1] != 'host' and len(tmp) != 4:
                 err('vscsi syntax error "%s"' % d[1])
             else:
                 d.append(None)

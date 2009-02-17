@@ -1274,6 +1274,7 @@ class XendConfig(dict):
                                                   uuid.createString())
                 vscsi_dict = self.vscsi_convert_sxp_to_dict(config)
                 vscsi_devs = vscsi_dict['devs']
+                vscsi_mode = vscsi_dict['feature-host']
 
                 # create XenAPI DSCSI objects.
                 for vscsi_dev in vscsi_devs:
@@ -1288,9 +1289,14 @@ class XendConfig(dict):
                     }
                     XendDSCSI(dscsi_uuid, dscsi_record)
 
-                target['devices'][vscsi_devs_uuid] = \
-                    (dev_type, {'devs': vscsi_devs, 'uuid': vscsi_devs_uuid} )
-                log.debug("XendConfig: reading device: %s" % vscsi_devs)
+                vscsi_info = {
+                    'devs': vscsi_devs,
+                    'feature-host': vscsi_mode,
+                    'uuid': vscsi_devs_uuid
+                }
+                target['devices'][vscsi_devs_uuid] = (dev_type, vscsi_info)
+                log.debug("XendConfig: reading device: %s,%s" % \
+                          (vscsi_devs, vscsi_mode))
                 return vscsi_devs_uuid
 
             for opt_val in config[1:]:
@@ -1614,6 +1620,7 @@ class XendConfig(dict):
         #
         # [device,
         #   [vscsi,
+        #     [feature-host, 0],
         #     [dev,
         #       [devid, 0], [p-devname, sdb], [p-dev, 1:0:0:1],
         #       [v-dev, 0:0:0:0], [state, 1]
@@ -1624,6 +1631,7 @@ class XendConfig(dict):
         #     ]
         #   ],
         #   [vscsi,
+        #     [feature-host, 1],
         #     [dev,
         #       [devid, 1], [p-devname, sdg], [p-dev, 2:0:0:0],
         #       [v-dev, 1:0:0:0], [state, 1]
@@ -1644,6 +1652,7 @@ class XendConfig(dict):
         #
         # [device,
         #   [vscsi,
+        #     [feature-host, 0],
         #     [dev,
         #       [devid, 0], [p-devname, sdd], [p-dev, 1:0:0:3],
         #       [v-dev, 0:0:0:2], [state, 1]
@@ -1658,7 +1667,8 @@ class XendConfig(dict):
         # The Dict looks like this:
         #
         # { devs: [ {devid: 0, p-devname: sdd, p-dev: 1:0:0:3,
-        #            v-dev: 0:0:0:2, state: 1} ] }
+        #            v-dev: 0:0:0:2, state: 1} ],
+        #   feature-host: 1 }
 
         dev_config = {}
 
@@ -1676,6 +1686,9 @@ class XendConfig(dict):
             vscsi_dev_info['uuid'] = vscsi_uuid
             vscsi_devs.append(vscsi_dev_info)
         dev_config['devs'] = vscsi_devs 
+
+        vscsi_mode = sxp.children(dev_sxp, 'feature-host')[0]
+        dev_config['feature-host'] = vscsi_mode[1]
 
         return dev_config
 
@@ -1789,6 +1802,7 @@ class XendConfig(dict):
             if dev_type == 'vscsi': # Special case for vscsi
                 vscsi_dict = self.vscsi_convert_sxp_to_dict(config)
                 vscsi_devs = vscsi_dict['devs']
+                vscsi_mode = vscsi_dict['feature-host']
 
                 # destroy existing XenAPI DSCSI objects
                 for dscsi_uuid in XendDSCSI.get_by_VM(self['uuid']):
@@ -1807,8 +1821,12 @@ class XendConfig(dict):
                     }
                     XendDSCSI(dscsi_uuid, dscsi_record)
 
-                self['devices'][dev_uuid] = \
-                    (dev_type, {'devs': vscsi_devs, 'uuid': dev_uuid} )
+                vscsi_info = { 
+                    'devs': vscsi_devs,
+                    'feature-host': vscsi_mode,
+                    'uuid': dev_uuid
+                }
+                self['devices'][dev_uuid] = (dev_type, vscsi_info)
                 return True
                 
             for opt_val in config[1:]:
@@ -1885,7 +1903,6 @@ class XendConfig(dict):
     def all_devices_sxpr(self, target = None):
         """Returns the SXPR for all devices in the current configuration."""
         sxprs = []
-        pci_devs = []
 
         if target == None:
             target = self
@@ -1900,7 +1917,8 @@ class XendConfig(dict):
                 if dev_type == 'pci':
                     sxpr = ['pci', ['uuid', dev_info['uuid']]]
                 elif dev_type == 'vscsi':
-                    sxpr = ['vscsi', ['uuid', dev_info['uuid']]]
+                    sxpr = ['vscsi', ['uuid', dev_info['uuid']],
+                                     ['feature-host', dev_info['feature-host']]]
                 for pci_dev_info in dev_info['devs']:
                     pci_dev_sxpr = ['dev']
                     for opt, val in pci_dev_info.items():

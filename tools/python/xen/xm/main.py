@@ -2032,6 +2032,8 @@ def parse_dev_info(info):
         'mac'        : get_info('mac',          str,   '??'),
         #block-device specific
         'ring-ref'   : get_info('ring-ref',     int,   -1),
+        #vscsi specific
+        'feature-host'   : get_info('feature-host',     int,   -1),
         }
 
 def arg_check_for_resource_list(args, name):
@@ -2275,14 +2277,14 @@ def xm_scsi_list(args):
         hdr = 0
         for x in devs:
             if hdr == 0:
-                print "%-3s %-3s %-5s  %-10s %-5s %-10s %-4s" \
-                        % ('Idx', 'BE', 'state', 'phy-hctl', 'phy', 'vir-hctl', 'devstate')
+                print "%-3s %-3s %-5s %-4s  %-10s %-5s %-10s %-4s" \
+                        % ('Idx', 'BE', 'state', 'host', 'phy-hctl', 'phy', 'vir-hctl', 'devstate')
                 hdr = 1
             ni = parse_dev_info(x[1])
             ni['idx'] = int(x[0])
             for dev in x[1][0][1]:
                 mi = vscsi_convert_sxp_to_dict(dev)
-                print "%(idx)-3d %(backend-id)-3d %(state)-5d " % ni,
+                print "%(idx)-3d %(backend-id)-3d %(state)-5d %(feature-host)-4d " % ni,
                 print "%(p-dev)-10s %(p-devname)-5s %(v-dev)-10s %(frontstate)-4s" % mi
 
 def parse_block_configuration(args):
@@ -2512,27 +2514,46 @@ def xm_pci_attach(args):
         server.xend.domain.device_configure(dom, pci)
 
 def parse_scsi_configuration(p_scsi, v_hctl, state):
-    v = v_hctl.split(':')
-    if len(v) != 4:
-        raise OptionError("Invalid argument: %s" % v_hctl)
+    def get_devid(hctl):
+        return int(hctl.split(':')[0])
 
-    p_hctl = None
-    devname = None
+    host_mode = 0
+    scsi_devices = None
+
     if p_scsi is not None:
+        # xm scsi-attach
+        if v_hctl == "host":
+            host_mode = 1
+            scsi_devices = vscsi_util.vscsi_get_scsidevices()
+        elif len(v_hctl.split(':')) != 4:
+            raise OptionError("Invalid argument: %s" % v_hctl)
         (p_hctl, devname) = \
-            vscsi_util.vscsi_get_hctl_and_devname_by(p_scsi)
+            vscsi_util.vscsi_get_hctl_and_devname_by(p_scsi, scsi_devices)
         if p_hctl is None:
             raise OptionError("Cannot find device '%s'" % p_scsi)
+        if host_mode:
+            scsi_info = []
+            devid = get_devid(p_hctl)
+            for pHCTL, devname, _, _ in scsi_devices:
+                if get_devid(pHCTL) == devid:
+                    scsi_info.append([devid, pHCTL, devname, pHCTL])
+        else:
+            scsi_info = [[get_devid(v_hctl), p_hctl, devname, v_hctl]] 
+    else:
+        # xm scsi-detach
+        if len(v_hctl.split(':')) != 4:
+            raise OptionError("Invalid argument: %s" % v_hctl)
+        scsi_info = [[get_devid(v_hctl), None, None, v_hctl]]
 
-    scsi = ['vscsi']
-    scsi.append(['dev', \
-                 ['state', state], \
-                 ['devid', int(v[0])], \
-                 ['p-dev', p_hctl], \
-                 ['p-devname', devname], \
-                 ['v-dev', v_hctl] \
-               ])
-
+    scsi = ['vscsi', ['feature-host', host_mode]]
+    for devid, pHCTL, devname, vHCTL in scsi_info:
+        scsi.append(['dev', \
+                     ['state', state], \
+                     ['devid', devid], \
+                     ['p-dev', pHCTL], \
+                     ['p-devname', devname], \
+                     ['v-dev', vHCTL] \
+                   ])
     return scsi
 
 def xm_scsi_attach(args):

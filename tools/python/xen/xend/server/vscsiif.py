@@ -68,6 +68,8 @@ class VSCSIController(DevController):
             vscsi_config.append(['devs', devs])
             state = self.readFrontend(devid, 'state')
             vscsi_config.append(['state', state])
+            hostmode = self.readBackend(devid, 'feature-host')
+            vscsi_config.append(['feature-host', hostmode])
             backid = self.readFrontend(devid, 'backend-id')
             vscsi_config.append(['backend-id', backid])
             backpath = self.readFrontend(devid, 'backend')
@@ -98,6 +100,8 @@ class VSCSIController(DevController):
             devid = vscsi_config.get('devid', '')
             back[devpath + '/devid'] = str(devid)
 
+        host_mode = config.get('feature-host','')
+        back['feature-host'] = str(host_mode)
         back['uuid'] = config.get('uuid','')
         devid = int(devid)
         return (devid, back, {})
@@ -133,6 +137,7 @@ class VSCSIController(DevController):
             vscsi_devs.append(dev_dict)
 
         config['devs'] = vscsi_devs
+        config['feature-host'] = self.readBackend(devid, 'feature-host')
         config['uuid'] = self.readBackend(devid, 'uuid')
         return config
 
@@ -171,6 +176,7 @@ class VSCSIController(DevController):
         vscsi_config = config['devs'][0]
         state = vscsi_config.get('state', xenbusState['Unknown'])
         driver_state = self.readBackend(devid, 'state')
+
         if str(xenbusState['Connected']) != driver_state:
             raise VmError("Driver status is not connected")
 
@@ -182,13 +188,20 @@ class VSCSIController(DevController):
         elif state == xenbusState['Closing']:
             found = False
             devs = self.readBackendList(devid, "vscsi-devs")
+            hostmode = int(self.readBackend(devid, 'feature-host'))
             vscsipath = "vscsi-devs/"
             vdev = vscsi_config.get('v-dev', '')
 
             for dev in devs:
                 devpath = vscsipath + dev
                 old_vdev = self.readBackend(devid, devpath + '/v-dev')
-                if vdev == old_vdev:
+
+                if hostmode == 1:
+                    #At hostmode, all v-dev that belongs to devid is deleted.
+                    found = True
+                    self.writeBackend(devid, devpath + '/state', \
+                                    str(xenbusState['Closing']))
+                elif vdev == old_vdev:
                     found = True
                     self.writeBackend(devid, devpath + '/state', \
                                     str(xenbusState['Closing']))

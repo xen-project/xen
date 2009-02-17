@@ -898,15 +898,21 @@ class XendDomainInfo:
         else:
             cur_dev_sxp = self._getDeviceInfo_vscsi(req_devid, None)
             new_dev_sxp = ['vscsi']
+            cur_mode = sxp.children(cur_dev_sxp, 'feature-host')[0]
+            new_dev_sxp.append(cur_mode)
+
             for cur_dev in sxp.children(cur_dev_sxp, 'dev'):
                 if state == xenbusState['Closing']:
+                    if int(cur_mode[1]) == 1:
+                        continue
                     cur_dev_vdev = sxp.child_value(cur_dev, 'v-dev')
                     if cur_dev_vdev == dev['v-dev']:
                         continue
                 new_dev_sxp.append(cur_dev)
 
             if state == xenbusState['Initialising']:
-                new_dev_sxp.append(sxp.child0(dev_sxp, 'dev'))
+                for new_dev in sxp.children(dev_sxp, 'dev'):
+                    new_dev_sxp.append(new_dev)
 
             dev_uuid = sxp.child_value(cur_dev_sxp, 'uuid')
             self.info.device_update(dev_uuid, new_dev_sxp)
@@ -1112,7 +1118,8 @@ class XendDomainInfo:
                         vscsi_dev.append(['frontstate', None])
                         vscsi_devs[1].append(vscsi_dev)
                         dev_num = int(sxp.child_value(vscsi_dev, 'devid'))
-                    sxprs.append([dev_num, [vscsi_devs]])
+                    vscsi_mode = sxp.children(dev_info, 'feature-host')[0]
+                    sxprs.append([dev_num, [vscsi_devs, vscsi_mode]])
                 elif deviceClass == 'vbd':
                     dev = sxp.child_value(dev_info, 'dev')
                     if 'ioemu:' in dev:
