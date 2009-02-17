@@ -303,35 +303,34 @@ static void signal_int_handler(int signo)
     printf("Elapsed time (ms): %"PRIu64"\n", (usec_end - usec_start) / 1000UL);
     for ( i = 0; i < max_cpu_nr; i++ )
     {
-        uint64_t temp;
-        printf("CPU%d:\n\tresidency\tpercentage\n", i);
-        if ( cx_cap )
+        uint64_t res, triggers;
+        double avg_res;
+
+        printf("\nCPU%d:\tResidency(ms)\t\tAvg Res(ms)\n",i);
+        if ( cx_cap && sum_cx[i] > 0 )
         {
             for ( j = 0; j < cxstat_end[i].nr; j++ )
             {
-                if ( sum_cx[i] > 0 )
-                {
-                    temp = cxstat_end[i].residencies[j] -
-                           cxstat_start[i].residencies[j];
-                    printf("  C%d\t%"PRIu64" ms\t%.2f%%\n", j,
-                           temp / 1000000UL, 100UL * temp / (double)sum_cx[i]);
-                }
+                res = cxstat_end[i].residencies[j] -
+                    cxstat_start[i].residencies[j];
+                triggers = cxstat_end[i].triggers[j] -
+                    cxstat_start[i].triggers[j];
+                avg_res = (triggers==0) ? 0: (double)res/triggers/1000000.0;
+                printf("  C%d\t%"PRIu64"\t(%5.2f%%)\t%.2f\n", j, res/1000000UL,
+                        100 * res / (double)sum_cx[i], avg_res );
             }
+            printf("\n");
         }
-        if ( px_cap )
+        if ( px_cap && sum_px[i]>0 )
         {
             for ( j = 0; j < pxstat_end[i].total; j++ )
             {
-                if ( sum_px[i] > 0 )
-                {
-                    temp = pxstat_end[i].pt[j].residency -
-                           pxstat_start[i].pt[j].residency;
-                    printf("  P%d\t%"PRIu64" ms\t%.2f%%\n", j,
-                           temp / 1000000UL, 100UL * temp / (double)sum_px[i]);
-                }
+                res = pxstat_end[i].pt[j].residency -
+                    pxstat_start[i].pt[j].residency;
+                printf("  P%d\t%"PRIu64"\t(%5.2f%%)\n", j,
+                        res / 1000000UL, 100UL * res / (double)sum_px[i]);
             }
         }
-        printf("\n");
     }
 
     /* some clean up and then exits */
@@ -408,6 +407,7 @@ void start_gather_func(int argc, char *argv[])
         free(cxstat);
         return ;
     }
+    printf("Start sampling, waiting for CTRL-C or SIGINT signal ...\n");
 
     pause();
 }
