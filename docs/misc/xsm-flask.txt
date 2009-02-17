@@ -1,0 +1,148 @@
+These notes are compiled from xen-devel questions and postings that have occured
+since the inclusion of XSM.  These notes are not intended to be definitive
+documentation but should address many common problems that arrise when
+experimenting with XSM:FLASK.
+
+Xen XSM:FLASK configuration
+---------------------------
+
+1) cd xen-unstable.hg
+2) edit Config.mk in the toplevel xen directory as follows:
+
+	XSM_ENABLE ?= y
+	FLASK_ENABLE ?= y
+	ACM_SECURITY ?= n
+	
+NB: Only one security module can be selected at a time.  If no module is
+selected, then the default DUMMY module will be enforced.  The DUMMY module
+only exercises the security framework and does not enforce any security
+policies.  Changing the security module selection will require recompiling xen.
+These settings will also configure the corresponding toolchain support.  
+
+3) make xen
+4) make tools
+
+
+Xen XSM:FLASK policy
+--------------------
+
+These instructions will enable the configuration and build of the sample policy.
+The sample policy provides the MINIMUM policy necessary to boot a
+paravirtualized dom0 and create a paravirtualized domU.  Many of the 
+default capabilities and usages supported by dom0/domU are disallowed by the
+sample policy.  Further, the policy is comprised of a limited number of types and 
+must be adjusted to meet the specific security goals of the installation. 
+Modification of the policy is straightforward and is covered in a later section.
+
+NB: The policy is not automatically built as part of the tool support because 
+of an external dependancy on the checkpolicy compiler.  The FLASK policy uses 
+the same syntax and structure as SELinux and compiling the policy relies on 
+the SELinux policy toolchain.  This toolchain is available under many 
+distributions as well as the following URL,
+
+	http://userspace.selinuxproject.org/releases/20080909/stable/checkpolicy-1.34.7.tar.gz
+
+1) cd xen-unstable.hg/tools/flask/policy
+2) make policy
+3) cp policy.20 /boot/xenpolicy.20
+4) edit /etc/grub.conf, add a module line to the xen entry,
+
+	module /xenpolicy.20
+
+5) reboot, and select the updated xen entry
+
+NB: The module entry can be inserted on any line after the xen kernel line.  Typical
+configurations use the last module entry or the module entry that immediately 
+follows the xen kernel entry.
+
+Xen configuration of xend
+-------------------------
+
+1) cd /etc/xen
+2) edit xend-config.sxp
+3) uncomment the line containing the key:value pair entry, 
+
+	#(xsm_module_name dummy)
+
+4) change the value entry to 'flask'
+
+	(xsm_module_name flask)
+
+5) restart xend
+
+Creating policy controlled domains
+----------------------------------
+
+2) Edit the domain config file and add the following entry,
+
+	access_control = ["policy=,label=system_u:object_r:domU_t"]
+
+NB: The 'policy' field is not used by XSM:FLASK.  The 'label' must exist in the 
+loaded policy. 'system_u:object_r:domU_t' is one of the existing labels from 
+the sample policy and shown for example purposes.
+
+2) Create the domain using the 'xm create' command.
+3) Use the 'xm list -l' command to list the running domains and their labels.
+
+Updating the XSM:FLASK policy
+-----------------------------
+
+It is recommended that the XSM:FLASK policy be tailored to meet the specific
+security goals of the platform.  The policy is tailored by editing the xen.te 
+file in the 'policy' subdirectory.
+
+1) cd xen-unstable.hg/tools/flask/policy
+2) edit policy/modules/xen/xen.te - make changes to support platform security goals.
+3) make policy
+4) cp policy.20 /boot/xenpolicy.20
+5) reboot
+
+Alternatively, one may reload the policy using the 'flask_loadpolicy' tool
+installed by the xen tools.
+
+1) flask_loadpolicy policy.20
+
+NB: The sample policy permits policy reloads as well as general manipulation of
+the Flask security server only from dom0.  The policy can be tailored further to
+restrict policy reloads and other manipulations to boot-time only, by removing 
+the corresponding statements from the policy.
+
+Enforcing the XSM:FLASK policy
+------------------------------
+
+By default, XSM:FLASK is compiled and installed in permissive mode.  This
+configuration will allow an XSM:FLASK system to start in enforcing mode.
+
+1) edit /etc/grub.conf
+2) append the parameter 'flask_enforcing=1' to the xen kernel line.
+3) reboot, and select the updated xen entry
+
+
+Additional notes on XSM:FLASK
+-----------------------------
+
+1) xen command line parameters
+
+	a) flask_enforcing
+	
+	The default value for flask_enforcing is '0'.  This parameter causes the 
+	platform to boot in permissive mode which means that the policy is loaded 
+	but not enforced.  This mode is often helpful for developing new systems 
+	and policies as the policy violations are reported on the xen console and 
+	may be viewed in dom0 through 'xm dmesg'.
+	
+	To boot the platform into enforcing mode, which means that the policy is
+	loaded and enforced, append 'flask_enforcing=1' on the grub line.
+	
+	This parameter may also be changed through the flask hyercall.
+	
+	b) flask_enabled
+	
+	The default value for flask_enabled is '1'.  This parameter causes the
+	platform to enable the FLASK security module under the XSM framework.
+	The parameter may be enabled/disabled only once per boot.  If the parameter
+	is set to '0', only a reboot can re-enable flask.  When flask_enabled is '0'
+	the DUMMY module is enforced.
+
+	This parameter may also be changed through the flask hypercall.  But may
+	only be performed once per boot.

@@ -2237,6 +2237,12 @@ class XendDomainInfo:
             xc.hvm_set_param(self.domid, HVM_PARAM_HPET_ENABLED,
                              long(hpet))
 
+        # Optionally enable periodic vpt aligning
+        vpt_align = self.info["platform"].get("vpt_align")
+        if hvm and vpt_align is not None:
+            xc.hvm_set_param(self.domid, HVM_PARAM_VPT_ALIGN,
+                             long(vpt_align))
+
         # Set maximum number of vcpus in domain
         xc.domain_max_vcpus(self.domid, int(self.info['VCPUs_max']))
 

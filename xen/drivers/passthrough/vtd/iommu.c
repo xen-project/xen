@@ -870,7 +870,7 @@ static struct hw_interrupt_type dma_msi_type = {
     .set_affinity = dma_msi_set_affinity,
 };
 
-int iommu_set_interrupt(struct iommu *iommu)
+static int iommu_set_interrupt(struct iommu *iommu)
 {
     int vector, ret;
 
@@ -882,10 +882,12 @@ int iommu_set_interrupt(struct iommu *iommu)
     }
 
     irq_desc[vector].handler = &dma_msi_type;
+    vector_to_iommu[vector] = iommu;
     ret = request_irq_vector(vector, iommu_page_fault, 0, "dmar", iommu);
     if ( ret )
     {
         irq_desc[vector].handler = &no_irq_type;
+        vector_to_iommu[vector] = NULL;
         free_irq_vector(vector);
         gdprintk(XENLOG_ERR VTDPREFIX, "IOMMU: can't request irq\n");
         return ret;
@@ -893,7 +895,6 @@ int iommu_set_interrupt(struct iommu *iommu)
 
     /* Make sure that vector is never re-used. */
     vector_irq[vector] = NEVER_ASSIGN_IRQ;
-    vector_to_iommu[vector] = iommu;
 
     return vector;
 }
