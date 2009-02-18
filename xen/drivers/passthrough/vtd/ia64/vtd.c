@@ -141,6 +141,7 @@ static int do_dom0_iommu_mapping(unsigned long start, unsigned long end,
 
 void iommu_set_dom0_mapping(struct domain *d)
 {
-	BUG_ON(d != dom0);
+	if (dom0)
+	    BUG_ON(d != dom0);
 	efi_memmap_walk(do_dom0_iommu_mapping, d);
 }
