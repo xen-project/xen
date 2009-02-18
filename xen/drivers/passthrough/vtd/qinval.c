@@ -445,8 +445,7 @@ int qinval_setup(struct iommu *iommu)
      * registers are automatically reset to 0 with write
      * to IQA register.
      */
-    if ( NUM_QINVAL_PAGES <= MAX_QINVAL_PAGES )
-        qi_ctrl->qinval_maddr |= NUM_QINVAL_PAGES - 1;
+    qi_ctrl->qinval_maddr |= IQA_REG_QS;
     dmar_writeq(iommu->reg, DMAR_IQA_REG, qi_ctrl->qinval_maddr);
 
     /* enable queued invalidation hardware */
