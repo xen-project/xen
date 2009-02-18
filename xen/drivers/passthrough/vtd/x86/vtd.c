@@ -149,7 +149,7 @@ void iommu_set_dom0_mapping(struct domain *d)
     u64 i, j, tmp;
     extern int xen_in_range(paddr_t start, paddr_t end);
 
-    BUG_ON(d != dom0);
+    BUG_ON(d->domain_id != 0);
 
     for ( i = 0; i < max_page; i++ )
     {
