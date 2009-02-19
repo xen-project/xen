@@ -41,6 +41,7 @@
 static spinlock_t domid_bitmap_lock;    /* protect domain id bitmap */
 static int domid_bitmap_size;           /* domain id bitmap size in bits */
 static unsigned long *domid_bitmap;     /* iommu domain id bitmap */
+static bool_t rwbf_quirk;
 
 static void setup_dom0_devices(struct domain *d);
 static void setup_dom0_rmrr(struct domain *d);
@@ -231,7 +232,7 @@ static void iommu_flush_write_buffer(struct iommu *iommu)
     unsigned long flag;
     s_time_t start_time;
 
-    if ( !cap_rwbf(iommu->cap) )
+    if ( !rwbf_quirk && !cap_rwbf(iommu->cap) )
         return;
     val = iommu->gcmd | DMA_GCMD_WBF;
 
@@ -1719,6 +1720,19 @@ static void setup_dom0_rmrr(struct domain *d)
     spin_unlock(&pcidevs_lock);
 }
 
+static void platform_quirks(void)
+{
+    u32 id;
+
+    /* Mobile 4 Series Chipset neglects to set RWBF capability. */
+    id = pci_conf_read32(0, 0, 0, 0);
+    if ( id == 0x2a408086 )
+    {
+        dprintk(XENLOG_INFO VTDPREFIX, "DMAR: Forcing write-buffer flush\n");
+        rwbf_quirk = 1;
+    }
+}
+
 int intel_vtd_setup(void)
 {
     struct acpi_drhd_unit *drhd;
@@ -1726,6 +1740,8 @@ int intel_vtd_setup(void)
 
     if ( !vtd_enabled )
         return -ENODEV;
+
+    platform_quirks();
 
     spin_lock_init(&domid_bitmap_lock);
     clflush_size = get_cache_line_size();
