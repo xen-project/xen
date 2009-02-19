@@ -1586,7 +1586,7 @@ class XendConfig(dict):
                 try:
                     opt, val = opt_val
                     pci_dev_info[opt] = val
-                except TypeError:
+                except (TypeError, ValueError):
                     pass
             # append uuid for each pci device.
             dpci_uuid = pci_dev_info.get('uuid', uuid.createString())
