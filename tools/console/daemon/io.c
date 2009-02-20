@@ -420,6 +420,14 @@ static int domain_create_tty(struct domain *dom)
 		goto out;
 	}
 
+	/* Close the slave fd or the guest console output disappears,
+	 * otherwise.
+	 */
+	if (dom->slave_fd != -1) {
+		close(dom->slave_fd);
+		dom->slave_fd = -1;
+	}
+
 	if (dom->use_consolepath) {
 		success = asprintf(&path, "%s/limit", dom->conspath) !=
 			-1;
