@@ -11,6 +11,7 @@
 #define MTRR_TYPE_WRBACK     6
 #define MTRR_NUM_TYPES       7
 #define MEMORY_NUM_TYPES     MTRR_NUM_TYPES
+#define NO_HARDCODE_MEM_TYPE    MTRR_NUM_TYPES
 
 #define NORMAL_CACHE_MODE          0
 #define NO_FILL_CACHE_MODE         2
@@ -63,7 +64,7 @@ extern int mtrr_del(int reg, unsigned long base, unsigned long size);
 extern int mtrr_del_page(int reg, unsigned long base, unsigned long size);
 extern void mtrr_centaur_report_mcr(int mcr, u32 lo, u32 hi);
 extern u32 get_pat_flags(struct vcpu *v, u32 gl1e_flags, paddr_t gpaddr,
-                  paddr_t spaddr);
+                  paddr_t spaddr, uint8_t gmtrr_mtype);
 extern uint8_t epte_get_entry_emt(
     struct domain *d, unsigned long gfn, unsigned long mfn,
     uint8_t *igmt, int direct_mmio);
