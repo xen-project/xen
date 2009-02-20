@@ -501,7 +501,7 @@ def get_entry_idx(cf, entry):
 
     return None
 
-def run_grub(file, entry, fs):
+def run_grub(file, entry, fs, arg):
     global g
     global sel
 
@@ -534,7 +534,7 @@ def run_grub(file, entry, fs):
     if img.initrd:
         grubcfg["ramdisk"] = img.initrd[1]
     if img.args:
-        grubcfg["args"] = img.args
+        grubcfg["args"] = img.args + " " + arg
 
     return grubcfg
 
@@ -659,7 +659,7 @@ if __name__ == "__main__":
     chosencfg = sniff_solaris(fs, incfg)
 
     if not chosencfg["kernel"]:
-        chosencfg = run_grub(file, entry, fs)
+        chosencfg = run_grub(file, entry, fs, incfg["args"])
 
     data = fs.open_file(chosencfg["kernel"]).read()
     (tfd, bootcfg["kernel"]) = tempfile.mkstemp(prefix="boot_kernel.",
