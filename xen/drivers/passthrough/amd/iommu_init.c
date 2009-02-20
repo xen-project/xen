@@ -37,9 +37,6 @@ struct ivrs_mappings *ivrs_mappings;
 struct list_head amd_iommu_head;
 struct table_struct device_table;
 
-extern void *int_remap_table;
-extern spinlock_t int_remap_table_lock;
-
 static int __init map_iommu_mmio_region(struct amd_iommu *iommu)
 {
     unsigned long mfn;

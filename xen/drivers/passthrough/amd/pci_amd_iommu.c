@@ -172,22 +172,18 @@ int amd_iov_detect(void)
 static int allocate_domain_resources(struct hvm_iommu *hd)
 {
     /* allocate root table */
-    unsigned long flags;
-
-    spin_lock_irqsave(&hd->mapping_lock, flags);
+    spin_lock(&hd->mapping_lock);
     if ( !hd->root_table )
     {
         hd->root_table = alloc_amd_iommu_pgtable();
         if ( !hd->root_table )
-            goto error_out;
+        {
+            spin_unlock(&hd->mapping_lock);
+            return -ENOMEM;
+        }
     }
-    spin_unlock_irqrestore(&hd->mapping_lock, flags);
-
+    spin_unlock(&hd->mapping_lock);
     return 0;
-
- error_out:
-    spin_unlock_irqrestore(&hd->mapping_lock, flags);
-    return -ENOMEM;
 }
 
 static int get_paging_mode(unsigned long entries)
@@ -298,7 +294,6 @@ static int reassign_device( struct domain *source, struct domain *target,
                  bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
                  source->domain_id, target->domain_id);
 
-    spin_unlock(&pcidevs_lock);
     return 0;
 }
 
@@ -352,11 +347,13 @@ static void deallocate_iommu_page_tables(struct domain *d)
 {
     struct hvm_iommu *hd  = domain_hvm_iommu(d);
 
+    spin_lock(&hd->mapping_lock);
     if ( hd->root_table )
     {
         deallocate_next_page_table(hd->root_table, hd->paging_mode);
         hd->root_table = NULL;
     }
+    spin_unlock(&hd->mapping_lock);
 }
 
 
