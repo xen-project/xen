@@ -1779,6 +1779,20 @@ static inline void check_timer(void)
  */
 #define PIC_IRQS	(1 << PIC_CASCADE_IR)
 
+static struct IO_APIC_route_entry *ioapic_pm_state;
+
+void ioapic_pm_state_alloc(void)
+{
+    int i, nr_entry = 0;
+
+    for (i = 0; i < nr_ioapics; i++)
+        nr_entry += nr_ioapic_registers[i];
+
+    ioapic_pm_state = _xmalloc(sizeof(struct IO_APIC_route_entry)*nr_entry,
+                               sizeof(struct IO_APIC_route_entry));
+    BUG_ON(ioapic_pm_state == NULL);
+}
+
 void __init setup_IO_APIC(void)
 {
     enable_IO_APIC();
@@ -1801,40 +1815,16 @@ void __init setup_IO_APIC(void)
     init_IO_APIC_traps();
     check_timer();
     print_IO_APIC();
+    ioapic_pm_state_alloc();
 
     register_keyhandler('z', print_IO_APIC_keyhandler, "print ioapic info");
 }
 
-struct IO_APIC_route_entry *ioapic_pm_state=NULL;
-
-void ioapic_pm_state_alloc(void)
+void ioapic_suspend(void)
 {
-    int i, nr_entry = 0;
-
-    if (ioapic_pm_state != NULL)
-        return;
-
-    for (i = 0; i < nr_ioapics; i++)
-        nr_entry += nr_ioapic_registers[i];
-
-    ioapic_pm_state = _xmalloc(sizeof(struct IO_APIC_route_entry)*nr_entry,
-                               sizeof(struct IO_APIC_route_entry));
-}
-
-int ioapic_suspend(void)
-{
-    struct IO_APIC_route_entry *entry;
+    struct IO_APIC_route_entry *entry = ioapic_pm_state;
     unsigned long flags;
-    int apic,i;
-
-    ioapic_pm_state_alloc();
-
-    if (ioapic_pm_state == NULL) {
-        printk("Cannot suspend ioapic due to lack of memory\n");
-        return 1;
-    }
-
-    entry = ioapic_pm_state;
+    int apic, i;
 
     spin_lock_irqsave(&ioapic_lock, flags);
     for (apic = 0; apic < nr_ioapics; apic++) {
@@ -1844,23 +1834,14 @@ int ioapic_suspend(void)
         }
     }
     spin_unlock_irqrestore(&ioapic_lock, flags);
-
-    return 0;
 }
 
-int ioapic_resume(void)
+void ioapic_resume(void)
 {
-    struct IO_APIC_route_entry *entry;
+    struct IO_APIC_route_entry *entry = ioapic_pm_state;
     unsigned long flags;
     union IO_APIC_reg_00 reg_00;
-    int i,apic;
-    
-    if (ioapic_pm_state == NULL){
-        printk("Cannot resume ioapic due to lack of memory\n");
-        return 1;
-    }
-    
-    entry = ioapic_pm_state;
+    int i, apic;
 
     spin_lock_irqsave(&ioapic_lock, flags);
     for (apic = 0; apic < nr_ioapics; apic++){
@@ -1875,8 +1856,6 @@ int ioapic_resume(void)
         }
     }
     spin_unlock_irqrestore(&ioapic_lock, flags);
-
-    return 0;
 }
 
 /* --------------------------------------------------------------------------
