@@ -302,6 +302,7 @@ void machine_restart(unsigned int delay_millisecs)
 
     watchdog_disable();
     console_start_sync();
+    spin_debug_disable();
 
     local_irq_enable();
 
