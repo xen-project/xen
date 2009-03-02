@@ -900,6 +900,11 @@ class XendDomainInfo:
             new_dev_sxp = ['vscsi']
             cur_mode = sxp.children(cur_dev_sxp, 'feature-host')[0]
             new_dev_sxp.append(cur_mode)
+            try:
+                cur_be = sxp.children(cur_dev_sxp, 'backend')[0]
+                new_dev_sxp.append(cur_be)
+            except IndexError:
+                pass
 
             for cur_dev in sxp.children(cur_dev_sxp, 'dev'):
                 if state == xenbusState['Closing']:

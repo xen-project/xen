@@ -1275,6 +1275,7 @@ class XendConfig(dict):
                 vscsi_dict = self.vscsi_convert_sxp_to_dict(config)
                 vscsi_devs = vscsi_dict['devs']
                 vscsi_mode = vscsi_dict['feature-host']
+                vscsi_be = vscsi_dict.get('backend', None)
 
                 # create XenAPI DSCSI objects.
                 for vscsi_dev in vscsi_devs:
@@ -1294,6 +1295,8 @@ class XendConfig(dict):
                     'feature-host': vscsi_mode,
                     'uuid': vscsi_devs_uuid
                 }
+                if vscsi_be is not None:
+                    vscsi_info['backend'] = vscsi_be
                 target['devices'][vscsi_devs_uuid] = (dev_type, vscsi_info)
                 log.debug("XendConfig: reading device: %s,%s" % \
                           (vscsi_devs, vscsi_mode))
@@ -1621,6 +1624,7 @@ class XendConfig(dict):
         # [device,
         #   [vscsi,
         #     [feature-host, 0],
+        #     [backend, 0],
         #     [dev,
         #       [devid, 0], [p-devname, sdb], [p-dev, 1:0:0:1],
         #       [v-dev, 0:0:0:0], [state, 1]
@@ -1632,6 +1636,7 @@ class XendConfig(dict):
         #   ],
         #   [vscsi,
         #     [feature-host, 1],
+        #     [backend, 0],
         #     [dev,
         #       [devid, 1], [p-devname, sdg], [p-dev, 2:0:0:0],
         #       [v-dev, 1:0:0:0], [state, 1]
@@ -1653,6 +1658,7 @@ class XendConfig(dict):
         # [device,
         #   [vscsi,
         #     [feature-host, 0],
+        #     [backend, 0],
         #     [dev,
         #       [devid, 0], [p-devname, sdd], [p-dev, 1:0:0:3],
         #       [v-dev, 0:0:0:2], [state, 1]
@@ -1668,7 +1674,7 @@ class XendConfig(dict):
         #
         # { devs: [ {devid: 0, p-devname: sdd, p-dev: 1:0:0:3,
         #            v-dev: 0:0:0:2, state: 1} ],
-        #   feature-host: 1 }
+        #   feature-host: 1 , backend: 0 }
 
         dev_config = {}
 
@@ -1689,6 +1695,11 @@ class XendConfig(dict):
 
         vscsi_mode = sxp.children(dev_sxp, 'feature-host')[0]
         dev_config['feature-host'] = vscsi_mode[1]
+        try:
+            vscsi_be = sxp.children(dev_sxp, 'backend')[0]
+            dev_config['backend'] = vscsi_be[1]
+        except IndexError:
+            pass
 
         return dev_config
 
@@ -1803,6 +1814,7 @@ class XendConfig(dict):
                 vscsi_dict = self.vscsi_convert_sxp_to_dict(config)
                 vscsi_devs = vscsi_dict['devs']
                 vscsi_mode = vscsi_dict['feature-host']
+                vscsi_be = vscsi_dict.get('backend', None)
 
                 # destroy existing XenAPI DSCSI objects
                 for dscsi_uuid in XendDSCSI.get_by_VM(self['uuid']):
@@ -1826,6 +1838,8 @@ class XendConfig(dict):
                     'feature-host': vscsi_mode,
                     'uuid': dev_uuid
                 }
+                if vscsi_be is not None:
+                    vscsi_info['backend'] = vscsi_be
                 self['devices'][dev_uuid] = (dev_type, vscsi_info)
                 return True
                 
@@ -1919,6 +1933,8 @@ class XendConfig(dict):
                 elif dev_type == 'vscsi':
                     sxpr = ['vscsi', ['uuid', dev_info['uuid']],
                                      ['feature-host', dev_info['feature-host']]]
+                    if dev_info.has_key('backend'):
+                        sxpr.append(['backend', dev_info['backend']])
                 for pci_dev_info in dev_info['devs']:
                     pci_dev_sxpr = ['dev']
                     for opt, val in pci_dev_info.items():
