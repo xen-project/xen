@@ -58,7 +58,9 @@ DEFINE_PER_CPU(u64, efer);
 DEFINE_PER_CPU(unsigned long, cr4);
 
 static void default_idle(void);
+static void default_dead_idle(void);
 void (*pm_idle) (void) = default_idle;
+void (*dead_idle) (void) = default_dead_idle;
 
 static void paravirt_ctxt_switch_from(struct vcpu *v);
 static void paravirt_ctxt_switch_to(struct vcpu *v);
@@ -84,6 +86,12 @@ static void default_idle(void)
         local_irq_enable();
 }
 
+static void default_dead_idle(void)
+{
+    for ( ; ; )
+        halt();
+}
+
 static void play_dead(void)
 {
     /*
@@ -102,8 +110,7 @@ static void play_dead(void)
 
     /* With physical CPU hotplug, we should halt the cpu. */
     local_irq_disable();
-    for ( ; ; )
-        halt();
+    (*dead_idle)();
 }
 
 void idle_loop(void)
