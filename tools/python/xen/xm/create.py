@@ -219,6 +219,10 @@ gopts.var('timer_mode', val='TIMER_MODE',
           use="""Timer mode (0=delay virtual time when ticks are missed;
           1=virtual time is always wallclock time.""")
 
+gopts.var('vpt_align', val='VPT_ALIGN',
+          fn=set_int, default=1,
+          use="Enable aligning all periodic vpt to reduce timer interrupts.")
+
 gopts.var('viridian', val='VIRIDIAN',
           fn=set_int, default=0,
           use="""Expose Viridian interface to x86 HVM guest?
@@ -699,32 +703,19 @@ def configure_pci(config_devs, vals):
         config_pci.insert(0, 'pci')
         config_devs.append(['device', config_pci])
 
-def vscsi_convert_sxp_to_dict(dev_sxp):
-    dev_dict = {}
-    for opt_val in dev_sxp[1:]:
-        try:
-            opt, val = opt_val
-            dev_dict[opt] = val
-        except TypeError:
-            pass
-    return dev_dict
-
-def vscsi_lookup_devid(devlist, req_devid):
-    if len(devlist) == 0:
-        return 0
-    else:
-        for devid, backend in devlist:
-            if devid == req_devid:
-                return 1
-        return 0
-
 def configure_vscsis(config_devs, vals):
     """Create the config for vscsis (virtual scsi devices).
     """
-    devidlist = []
-    config_scsi = []
+
+    def get_devid(hctl):
+        return int(hctl.split(':')[0])
+
     if len(vals.vscsi) == 0:
         return 0
+
+    config_scsi = {}
+    pHCTL_list = []
+    vHCTL_list = []
 
     scsi_devices = vscsi_util.vscsi_get_scsidevices()
     for (p_dev, v_dev, backend) in vals.vscsi:
@@ -734,34 +725,55 @@ def configure_vscsis(config_devs, vals):
         if p_hctl == None:
             raise ValueError('Cannot find device "%s"' % p_dev)
 
-        for config in config_scsi:
-            dev = vscsi_convert_sxp_to_dict(config)
-            if dev['v-dev'] == v_dev:
-                raise ValueError('The virtual device "%s" is already defined' % v_dev)
+        feature_host = 0
+        if v_dev == 'host':
+            feature_host = 1
+            scsi_info = []
+            devid = get_devid(p_hctl)
+            for (pHCTL, devname, _, _) in scsi_devices:
+                if get_devid(pHCTL) == devid:
+                    scsi_info.append([devid, pHCTL, devname, pHCTL])
+        else:
+            scsi_info = [[get_devid(v_dev), p_hctl, devname, v_dev]]
 
-        v_hctl = v_dev.split(':')
-        devid = int(v_hctl[0])
-        config_scsi.append(['dev', \
-                        ['state', xenbusState['Initialising']], \
-                        ['devid', devid], \
-                        ['p-dev', p_hctl], \
-                        ['p-devname', devname], \
-                        ['v-dev', v_dev] ])
+        devid_key = scsi_info[0][0]
+        try:
+            config = config_scsi[devid_key]
+        except KeyError:
+            config = {'feature-host': feature_host, 'backend': backend, 'devs': []}
 
-        if vscsi_lookup_devid(devidlist, devid) == 0:
-            devidlist.append([devid, backend])
+        devs = config['devs']
+        for (devid, pHCTL, devname, vHCTL) in scsi_info:
+            if pHCTL in pHCTL_list:
+                raise ValueError('The physical device "%s" is already defined' % pHCTL)
+            if vHCTL in vHCTL_list:
+                raise ValueError('The virtual device "%s" is already defined' % vHCTL)
+            pHCTL_list.append(pHCTL)
+            vHCTL_list.append(vHCTL)
+            devs.append(['dev', \
+                         ['state', xenbusState['Initialising']], \
+                         ['devid', devid], \
+                         ['p-dev', pHCTL], \
+                         ['p-devname', devname], \
+                         ['v-dev', vHCTL] ])
 
-    for devid, backend in devidlist:
-        tmp = []
-        for config in config_scsi:
-            dev = vscsi_convert_sxp_to_dict(config)
-            if dev['devid'] == devid:
-                tmp.append(config)
+        if config['feature-host'] != feature_host:
+            raise ValueError('The physical device "%s" cannot define '
+                             'because mode is different' % scsi_info[0][1])
+        if config['backend'] != backend:
+            raise ValueError('The physical device "%s" cannot define '
+                             'because backend is different' % scsi_info[0][1])
 
-        tmp.insert(0, 'vscsi')
-        if backend:
-            tmp.append(['backend', backend])
-        config_devs.append(['device', tmp])
+        config['devs'] = devs
+        config_scsi[devid_key] = config
+
+    for config in config_scsi.values():
+        device = ['vscsi', ['feature-host', config['feature-host']]]
+        for dev in config['devs']:
+            device.append(dev)
+        if config['backend']:
+            device.append(['backend', config['backend']])
+        config_devs.append(['device', device])
 
 def configure_ioports(config_devs, vals):
     """Create the config for legacy i/o ranges.
@@ -891,7 +903,8 @@ def configure_hvm(config_image, vals):
              'sdl', 'display', 'xauthority', 'rtc_timeoffset', 'monitor',
              'acpi', 'apic', 'usb', 'usbdevice', 'keymap', 'pci', 'hpet',
              'guest_os_type', 'hap', 'opengl', 'cpuid', 'cpuid_check',
-             'viridian', 'xen_extended_power_mgmt', 'pci_msitranslate' ]
+             'viridian', 'xen_extended_power_mgmt', 'pci_msitranslate',
+             'vpt_align' ]
 
     for a in args:
         if a in vals.__dict__ and vals.__dict__[a] is not None:
@@ -1039,7 +1052,7 @@ def preprocess_vscsi(vals):
         n = len(d)
         if n == 2:
             tmp = d[1].split(':')
-            if len(tmp) != 4:
+            if d[1] != 'host' and len(tmp) != 4:
                 err('vscsi syntax error "%s"' % d[1])
             else:
                 d.append(None)

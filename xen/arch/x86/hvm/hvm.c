@@ -542,6 +542,22 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
         return -EINVAL;
     }
 
+    /* Older Xen versions used to save the segment arbytes directly 
+     * from the VMCS on Intel hosts.  Detect this and rearrange them
+     * into the struct segment_register format. */
+#define UNFOLD_ARBYTES(_r)                          \
+    if ( (_r & 0xf000) && !(_r & 0x0f00) )          \
+        _r = ((_r & 0xff) | ((_r >> 4) & 0xf00))
+    UNFOLD_ARBYTES(ctxt.cs_arbytes);
+    UNFOLD_ARBYTES(ctxt.ds_arbytes);
+    UNFOLD_ARBYTES(ctxt.es_arbytes);
+    UNFOLD_ARBYTES(ctxt.fs_arbytes);
+    UNFOLD_ARBYTES(ctxt.gs_arbytes);
+    UNFOLD_ARBYTES(ctxt.ss_arbytes);
+    UNFOLD_ARBYTES(ctxt.tr_arbytes);
+    UNFOLD_ARBYTES(ctxt.ldtr_arbytes);
+#undef UNFOLD_ARBYTES
+
     /* Architecture-specific vmcs/vmcb bits */
     if ( hvm_funcs.load_cpu_ctxt(v, &ctxt) < 0 )
         return -EINVAL;

@@ -351,11 +351,18 @@ static uint8_t page_pat_type(uint64_t pat_cr, uint32_t pte_flags)
 static uint8_t effective_mm_type(struct mtrr_state *m,
                                  uint64_t pat,
                                  paddr_t gpa,
-                                 uint32_t pte_flags)
+                                 uint32_t pte_flags,
+                                 uint8_t gmtrr_mtype)
 {
     uint8_t mtrr_mtype, pat_value, effective;
-
-    mtrr_mtype = get_mtrr_type(m, gpa);
+   
+    /* if get_pat_flags() gives a dedicated MTRR type,
+     * just use it
+     */ 
+    if ( gmtrr_mtype == NO_HARDCODE_MEM_TYPE )
+        mtrr_mtype = get_mtrr_type(m, gpa);
+    else
+        mtrr_mtype = gmtrr_mtype;
 
     pat_value = page_pat_type(pat, pte_flags);
 
@@ -367,7 +374,8 @@ static uint8_t effective_mm_type(struct mtrr_state *m,
 uint32_t get_pat_flags(struct vcpu *v,
                        uint32_t gl1e_flags,
                        paddr_t gpaddr,
-                       paddr_t spaddr)
+                       paddr_t spaddr,
+                       uint8_t gmtrr_mtype)
 {
     uint8_t guest_eff_mm_type;
     uint8_t shadow_mtrr_type;
@@ -378,7 +386,8 @@ uint32_t get_pat_flags(struct vcpu *v,
     /* 1. Get the effective memory type of guest physical address,
      * with the pair of guest MTRR and PAT
      */
-    guest_eff_mm_type = effective_mm_type(g, pat, gpaddr, gl1e_flags);
+    guest_eff_mm_type = effective_mm_type(g, pat, gpaddr, 
+                                          gl1e_flags, gmtrr_mtype);
     /* 2. Get the memory type of host physical address, with MTRR */
     shadow_mtrr_type = get_mtrr_type(&mtrr_state, spaddr);
 

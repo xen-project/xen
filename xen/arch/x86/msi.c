@@ -29,17 +29,17 @@
 
 /* bitmap indicate which fixed map is free */
 DEFINE_SPINLOCK(msix_fixmap_lock);
-DECLARE_BITMAP(msix_fixmap_pages, MAX_MSIX_PAGES);
+DECLARE_BITMAP(msix_fixmap_pages, FIX_MSIX_MAX_PAGES);
 
 static int msix_fixmap_alloc(void)
 {
-    int i, rc = -1;
+    int i, rc = -ENOMEM;
 
     spin_lock(&msix_fixmap_lock);
-    for ( i = 0; i < MAX_MSIX_PAGES; i++ )
+    for ( i = 0; i < FIX_MSIX_MAX_PAGES; i++ )
         if ( !test_bit(i, &msix_fixmap_pages) )
             break;
-    if ( i == MAX_MSIX_PAGES )
+    if ( i == FIX_MSIX_MAX_PAGES )
         goto out;
     rc = FIX_MSIX_IO_RESERV_BASE + i;
     set_bit(i, &msix_fixmap_pages);
@@ -51,8 +51,66 @@ static int msix_fixmap_alloc(void)
 
 static void msix_fixmap_free(int idx)
 {
+    spin_lock(&msix_fixmap_lock);
     if ( idx >= FIX_MSIX_IO_RESERV_BASE )
         clear_bit(idx - FIX_MSIX_IO_RESERV_BASE, &msix_fixmap_pages);
+    spin_unlock(&msix_fixmap_lock);
+}
+
+static int msix_get_fixmap(struct pci_dev *dev, unsigned long table_paddr,
+                           unsigned long entry_paddr)
+{
+    int nr_page, idx;
+
+    nr_page = (entry_paddr >> PAGE_SHIFT) - (table_paddr >> PAGE_SHIFT);
+
+    if ( nr_page < 0 || nr_page >= MAX_MSIX_TABLE_PAGES )
+        return -EINVAL;
+
+    spin_lock(&dev->msix_table_lock);
+    if ( dev->msix_table_refcnt[nr_page]++ == 0 )
+    {
+        idx = msix_fixmap_alloc();
+        if ( idx < 0 )
+        {
+            dev->msix_table_refcnt[nr_page]--;
+            goto out;
+        }
+        set_fixmap_nocache(idx, entry_paddr);
+        dev->msix_table_idx[nr_page] = idx;
+    }
+    else
+        idx = dev->msix_table_idx[nr_page];
+
+ out:
+    spin_unlock(&dev->msix_table_lock);
+    return idx;
+}
+
+static void msix_put_fixmap(struct pci_dev *dev, int idx)
+{
+    int i;
+    unsigned long start;
+
+    spin_lock(&dev->msix_table_lock);
+    for ( i = 0; i < MAX_MSIX_TABLE_PAGES; i++ )
+    {
+        if ( dev->msix_table_idx[i] == idx )
+            break;
+    }
+    if ( i == MAX_MSIX_TABLE_PAGES )
+        goto out;
+
+    if ( --dev->msix_table_refcnt[i] == 0 )
+    {
+        start = fix_to_virt(idx);
+        destroy_xen_mappings(start, start + PAGE_SIZE);
+        msix_fixmap_free(idx);
+        dev->msix_table_idx[i] = 0;
+    }
+
+ out:
+    spin_unlock(&dev->msix_table_lock);
 }
 
 /*
@@ -122,8 +180,7 @@ static void read_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
     case PCI_CAP_ID_MSIX:
     {
         void __iomem *base;
-        base = entry->mask_base +
-            entry->msi_attrib.entry_nr * PCI_MSIX_ENTRY_SIZE;
+        base = entry->mask_base;
 
         msg->address_lo = readl(base + PCI_MSIX_ENTRY_LOWER_ADDR_OFFSET);
         msg->address_hi = readl(base + PCI_MSIX_ENTRY_UPPER_ADDR_OFFSET);
@@ -199,8 +256,7 @@ static void write_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
     case PCI_CAP_ID_MSIX:
     {
         void __iomem *base;
-        base = entry->mask_base +
-            entry->msi_attrib.entry_nr * PCI_MSIX_ENTRY_SIZE;
+        base = entry->mask_base;
 
         writel(msg->address_lo,
                base + PCI_MSIX_ENTRY_LOWER_ADDR_OFFSET);
@@ -288,8 +344,7 @@ static void msix_flush_writes(unsigned int vector)
         break;
     case PCI_CAP_ID_MSIX:
     {
-        int offset = entry->msi_attrib.entry_nr * PCI_MSIX_ENTRY_SIZE +
-            PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET;
+        int offset = PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET;
         readl(entry->mask_base + offset);
         break;
     }
@@ -330,8 +385,7 @@ static void msi_set_mask_bit(unsigned int vector, int flag)
         break;
     case PCI_CAP_ID_MSIX:
     {
-        int offset = entry->msi_attrib.entry_nr * PCI_MSIX_ENTRY_SIZE +
-            PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET;
+        int offset = PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET;
         writel(flag, entry->mask_base + offset);
         readl(entry->mask_base + offset);
         break;
@@ -392,13 +446,10 @@ int msi_free_vector(struct msi_desc *entry)
     {
         unsigned long start;
 
-        writel(1, entry->mask_base + entry->msi_attrib.entry_nr
-               * PCI_MSIX_ENTRY_SIZE
-               + PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET);
+        writel(1, entry->mask_base + PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET);
 
         start = (unsigned long)entry->mask_base & ~(PAGE_SIZE - 1);
-        msix_fixmap_free(virt_to_fix(start));
-        destroy_xen_mappings(start, start + PAGE_SIZE);
+        msix_put_fixmap(entry->dev, virt_to_fix(start));
     }
     list_del(&entry->list);
     xfree(entry);
@@ -500,8 +551,8 @@ static int msix_capability_init(struct pci_dev *dev,
     struct msi_desc *entry;
     int pos;
     u16 control;
-    unsigned long phys_addr;
-    u32 table_offset;
+    unsigned long table_paddr, entry_paddr;
+    u32 table_offset, entry_offset;
     u8 bir;
     void __iomem *base;
     int idx;
@@ -525,15 +576,17 @@ static int msix_capability_init(struct pci_dev *dev,
     table_offset = pci_conf_read32(bus, slot, func, msix_table_offset_reg(pos));
     bir = (u8)(table_offset & PCI_MSIX_FLAGS_BIRMASK);
     table_offset &= ~PCI_MSIX_FLAGS_BIRMASK;
-    phys_addr = msi->table_base + table_offset;
-    idx = msix_fixmap_alloc();
+    entry_offset = msi->entry_nr * PCI_MSIX_ENTRY_SIZE;
+
+    table_paddr = msi->table_base + table_offset;
+    entry_paddr = table_paddr + entry_offset;
+    idx = msix_get_fixmap(dev, table_paddr, entry_paddr);
     if ( idx < 0 )
     {
         xfree(entry);
-        return -ENOMEM;
+        return idx;
     }
-    set_fixmap_nocache(idx, phys_addr);
-    base = (void *)(fix_to_virt(idx) + (phys_addr & ((1UL << PAGE_SHIFT) - 1)));
+    base = (void *)(fix_to_virt(idx) + (entry_paddr & ((1UL << PAGE_SHIFT) - 1)));
 
     entry->msi_attrib.type = PCI_CAP_ID_MSIX;
     entry->msi_attrib.is_64 = 1;
@@ -548,9 +601,7 @@ static int msix_capability_init(struct pci_dev *dev,
     list_add_tail(&entry->list, &dev->msi_list);
 
     /* Mask interrupt here */
-    writel(1, entry->mask_base + entry->msi_attrib.entry_nr
-                * PCI_MSIX_ENTRY_SIZE
-                + PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET);
+    writel(1, entry->mask_base + PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET);
 
     *desc = entry;
     /* Restore MSI-X enabled bits */
@@ -675,9 +726,7 @@ static void __pci_disable_msix(struct msi_desc *entry)
 
     BUG_ON(list_empty(&dev->msi_list));
 
-    writel(1, entry->mask_base + entry->msi_attrib.entry_nr
-      * PCI_MSIX_ENTRY_SIZE
-      + PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET);
+    writel(1, entry->mask_base + PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET);
 
     pci_conf_write16(bus, slot, func, msix_control_reg(pos), control);
 }

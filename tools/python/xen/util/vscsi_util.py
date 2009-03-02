@@ -78,8 +78,38 @@ def _vscsi_get_hctl_by(phyname, scsi_devices):
     return (None, None)
 
 
-def vscsi_get_scsidevices():
-    """ get all scsi devices"""
+def _vscsi_get_scsiid(sg):
+    scsi_id = os.popen('/sbin/scsi_id -gu -s /class/scsi_generic/' + sg).read().split()
+    if len(scsi_id):
+        return scsi_id[0]
+    return None
+
+
+def _vscsi_get_scsidevices_by_lsscsi(option = ""):
+    """ get all scsi devices information by lsscsi """
+
+    devices = []
+
+    for scsiinfo in os.popen('lsscsi -g %s' % option).readlines():
+        s = scsiinfo.split()
+        hctl = s[0][1:-1]
+        try:
+            devname = s[-2].split('/dev/')[1]
+        except IndexError:
+            devname = None
+        try:
+            sg = s[-1].split('/dev/')[1]
+            scsi_id = _vscsi_get_scsiid(sg)
+        except IndexError:
+            sg = None
+            scsi_id = None
+        devices.append([hctl, devname, sg, scsi_id])
+
+    return devices
+
+
+def _vscsi_get_scsidevices_by_sysfs():
+    """ get all scsi devices information by sysfs """
 
     devices = []
     sysfs_mnt = utils.find_sysfs_mount() 
@@ -100,18 +130,29 @@ def vscsi_get_scsidevices():
 
                 if re.match('^scsi_generic', f):
                     sg = os.path.basename(realpath)
-                    lines = os.popen('/sbin/scsi_id -gu -s /class/scsi_generic/' + sg).read().split()
-                    if len(lines):
-                        scsi_id = lines[0]
-
+                    scsi_id = _vscsi_get_scsiid(sg)
             devices.append([hctl, devname, sg, scsi_id])
 
     return devices
 
 
+def vscsi_get_scsidevices():
+    """ get all scsi devices information """
+
+    devices = _vscsi_get_scsidevices_by_lsscsi("")
+    if devices:
+        return devices
+    return _vscsi_get_scsidevices_by_sysfs()
+
+
 def vscsi_get_hctl_and_devname_by(target, scsi_devices = None):
     if scsi_devices is None:
-        scsi_devices = vscsi_get_scsidevices()
+        if len(target.split(':')) == 4:
+            scsi_devices = _vscsi_get_scsidevices_by_lsscsi(target)
+        elif target.startswith('/dev/'): 
+            scsi_devices = _vscsi_get_scsidevices_by_lsscsi("| grep %s" % target)
+        else:
+            scsi_devices = vscsi_get_scsidevices()
 
     if len(target.split(':')) == 4:
         return _vscsi_get_devname_by(target, scsi_devices)

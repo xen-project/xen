@@ -23,7 +23,7 @@
 #include <asm/hvm/svm/amd-iommu-proto.h>
 
 #define INTREMAP_TABLE_ORDER    1
-DEFINE_SPINLOCK(int_remap_table_lock);
+static DEFINE_SPINLOCK(int_remap_table_lock);
 void *int_remap_table = NULL;
 
 static u8 *get_intremap_entry(u8 vector, u8 dm)
@@ -110,21 +110,13 @@ static void update_intremap_entry_from_ioapic(
 
 int __init amd_iommu_setup_intremap_table(void)
 {
-    unsigned long flags;
-
-    spin_lock_irqsave(&int_remap_table_lock, flags);
-
     if ( int_remap_table == NULL )
     {
         int_remap_table = __alloc_amd_iommu_tables(INTREMAP_TABLE_ORDER);
         if ( int_remap_table == NULL )
-        {
-            spin_unlock_irqrestore(&int_remap_table_lock, flags);
             return -ENOMEM;
-        }
         memset(int_remap_table, 0, PAGE_SIZE * (1UL << INTREMAP_TABLE_ORDER));
     }
-    spin_unlock_irqrestore(&int_remap_table_lock, flags);
 
     return 0;
 }
@@ -210,15 +202,11 @@ void amd_iommu_msi_msg_update_ire(
 
 int __init deallocate_intremap_table(void)
 {
-    unsigned long flags;
-
-    spin_lock_irqsave(&int_remap_table_lock, flags);
     if ( int_remap_table )
     {
         __free_amd_iommu_tables(int_remap_table, INTREMAP_TABLE_ORDER);
         int_remap_table = NULL;
     }
-    spin_unlock_irqrestore(&int_remap_table_lock, flags);
 
     return 0;
 }

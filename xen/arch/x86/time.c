@@ -607,13 +607,14 @@ static void platform_time_calibration(void)
 {
     u64 count;
     s_time_t stamp;
+    unsigned long flags;
 
-    spin_lock_irq(&platform_timer_lock);
+    spin_lock_irqsave(&platform_timer_lock, flags);
     count = plt_stamp64 + ((plt_src.read_counter() - plt_stamp) & plt_mask);
     stamp = __read_platform_stime(count);
     stime_platform_stamp = stamp;
     platform_timer_stamp = count;
-    spin_unlock_irq(&platform_timer_lock);
+    spin_unlock_irqrestore(&platform_timer_lock, flags);
 }
 
 static void resume_platform_timer(void)

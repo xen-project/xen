@@ -1937,14 +1937,17 @@ int main(int argc, char *argv[])
 			handle_event();
 
 		next = list_entry(connections.next, typeof(*conn), list);
+		if (&next->list != &connections)
+			talloc_increase_ref_count(next);
 		while (&next->list != &connections) {
 			conn = next;
 
 			next = list_entry(conn->list.next,
 					  typeof(*conn), list);
+			if (&next->list != &connections)
+				talloc_increase_ref_count(next);
 
 			if (conn->domain) {
-				talloc_increase_ref_count(conn);
 				if (domain_can_read(conn))
 					handle_input(conn);
 				if (talloc_free(conn) == 0)
@@ -1957,7 +1960,6 @@ int main(int argc, char *argv[])
 				if (talloc_free(conn) == 0)
 					continue;
 			} else {
-				talloc_increase_ref_count(conn);
 				if (FD_ISSET(conn->fd, &inset))
 					handle_input(conn);
 				if (talloc_free(conn) == 0)

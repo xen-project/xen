@@ -122,6 +122,9 @@ DECLARE_PER_CPU(s_time_t, timer_deadline);
 /* Arch-defined function to reprogram timer hardware for new deadline. */
 extern int reprogram_timer(s_time_t timeout);
 
+/* calculate the aligned first tick time for a given periodic timer */ 
+extern s_time_t align_timer(s_time_t firsttick, uint64_t period);
+
 #endif /* _TIMER_H_ */
 
 /*

@@ -49,9 +49,9 @@
 
 /* MAX fixed pages reserved for mapping MSIX tables. */
 #if defined(__x86_64__)
-#define MAX_MSIX_PAGES              512
+#define FIX_MSIX_MAX_PAGES              512
 #else
-#define MAX_MSIX_PAGES              32
+#define FIX_MSIX_MAX_PAGES              32
 #endif
 
 struct msi_info {
@@ -93,7 +93,7 @@ struct msi_desc {
 
 	struct list_head list;
 
-	void __iomem *mask_base;
+	void __iomem *mask_base;        /* va for the entry in mask table */
 	struct pci_dev *dev;
 	int vector;
 

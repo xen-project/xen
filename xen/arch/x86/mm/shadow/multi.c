@@ -546,15 +546,32 @@ _sh_propagate(struct vcpu *v,
          !is_xen_heap_mfn(mfn_x(target_mfn)) )
     {
         unsigned int type;
+
+        /* compute the PAT index for shadow page entry when VT-d is enabled
+         * and device assigned. 
+         * 1) direct MMIO: compute the PAT index with gMTRR=UC and gPAT.
+         * 2) if enables snoop control, compute the PAT index as WB.
+         * 3) if disables snoop control, compute the PAT index with
+         *    gMTRR and gPAT.
+         */
         if ( hvm_get_mem_pinned_cacheattr(d, gfn_x(target_gfn), &type) )
             sflags |= pat_type_2_pte_flags(type);
         else if ( d->arch.hvm_domain.is_in_uc_mode )
             sflags |= pat_type_2_pte_flags(PAT_TYPE_UNCACHABLE);
+        else if ( p2mt == p2m_mmio_direct )
+            sflags |= get_pat_flags(v,
+                                    gflags,
+                                    gfn_to_paddr(target_gfn),
+                                    ((paddr_t)mfn_x(target_mfn)) << PAGE_SHIFT,
+                                    MTRR_TYPE_UNCACHABLE); 
+        else if ( iommu_snoop )
+            sflags |= pat_type_2_pte_flags(PAT_TYPE_WRBACK);
         else
             sflags |= get_pat_flags(v,
                                     gflags,
                                     gfn_to_paddr(target_gfn),
-                                    ((paddr_t)mfn_x(target_mfn)) << PAGE_SHIFT);
+                                    ((paddr_t)mfn_x(target_mfn)) << PAGE_SHIFT,
+                                    NO_HARDCODE_MEM_TYPE);
     }
 
     // Set the A&D bits for higher level shadows.

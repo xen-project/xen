@@ -30,6 +30,7 @@
 #include <xen/pci.h>
 #include <xen/pci_regs.h>
 #include <xen/keyhandler.h>
+#include <asm/msi.h>
 #include "iommu.h"
 #include "dmar.h"
 #include "extern.h"
@@ -40,6 +41,7 @@
 static spinlock_t domid_bitmap_lock;    /* protect domain id bitmap */
 static int domid_bitmap_size;           /* domain id bitmap size in bits */
 static unsigned long *domid_bitmap;     /* iommu domain id bitmap */
+static bool_t rwbf_quirk;
 
 static void setup_dom0_devices(struct domain *d);
 static void setup_dom0_rmrr(struct domain *d);
@@ -230,7 +232,7 @@ static void iommu_flush_write_buffer(struct iommu *iommu)
     unsigned long flag;
     s_time_t start_time;
 
-    if ( !cap_rwbf(iommu->cap) )
+    if ( !rwbf_quirk && !cap_rwbf(iommu->cap) )
         return;
     val = iommu->gcmd | DMA_GCMD_WBF;
 
@@ -829,7 +831,6 @@ static void dma_msi_data_init(struct iommu *iommu, int vector)
     spin_unlock_irqrestore(&iommu->register_lock, flags);
 }
 
-#ifdef SUPPORT_MSI_REMAPPING
 static void dma_msi_addr_init(struct iommu *iommu, int phy_cpu)
 {
     u64 msi_address;
@@ -846,12 +847,6 @@ static void dma_msi_addr_init(struct iommu *iommu, int phy_cpu)
     dmar_writel(iommu->reg, DMAR_FEUADDR_REG, (u32)(msi_address >> 32));
     spin_unlock_irqrestore(&iommu->register_lock, flags);
 }
-#else
-static void dma_msi_addr_init(struct iommu *iommu, int phy_cpu)
-{
-    /* ia64: TODO */
-}
-#endif
 
 static void dma_msi_set_affinity(unsigned int vector, cpumask_t dest)
 {
@@ -870,7 +865,7 @@ static struct hw_interrupt_type dma_msi_type = {
     .set_affinity = dma_msi_set_affinity,
 };
 
-int iommu_set_interrupt(struct iommu *iommu)
+static int iommu_set_interrupt(struct iommu *iommu)
 {
     int vector, ret;
 
@@ -882,10 +877,12 @@ int iommu_set_interrupt(struct iommu *iommu)
     }
 
     irq_desc[vector].handler = &dma_msi_type;
+    vector_to_iommu[vector] = iommu;
     ret = request_irq_vector(vector, iommu_page_fault, 0, "dmar", iommu);
     if ( ret )
     {
         irq_desc[vector].handler = &no_irq_type;
+        vector_to_iommu[vector] = NULL;
         free_irq_vector(vector);
         gdprintk(XENLOG_ERR VTDPREFIX, "IOMMU: can't request irq\n");
         return ret;
@@ -893,7 +890,6 @@ int iommu_set_interrupt(struct iommu *iommu)
 
     /* Make sure that vector is never re-used. */
     vector_irq[vector] = NEVER_ASSIGN_IRQ;
-    vector_to_iommu[vector] = iommu;
 
     return vector;
 }
@@ -987,7 +983,6 @@ static int intel_iommu_domain_init(struct domain *d)
 {
     struct hvm_iommu *hd = domain_hvm_iommu(d);
     struct iommu *iommu = NULL;
-    u64 i, j, tmp;
     struct acpi_drhd_unit *drhd;
 
     drhd = list_entry(acpi_drhd_units.next, typeof(*drhd), list);
@@ -999,17 +994,8 @@ static int intel_iommu_domain_init(struct domain *d)
     {
         extern int xen_in_range(paddr_t start, paddr_t end);
 
-        /* Set up 1:1 page table for dom0 for all RAM except Xen bits. */
-        for ( i = 0; i < max_page; i++ )
-        {
-            if ( !page_is_conventional_ram(i) ||
-                 xen_in_range(i << PAGE_SHIFT, (i + 1) << PAGE_SHIFT) )
-                continue;
-
-            tmp = 1 << (PAGE_SHIFT - PAGE_SHIFT_4K);
-            for ( j = 0; j < tmp; j++ )
-                iommu_map_page(d, (i*tmp+j), (i*tmp+j));
-        }
+        /* Set up 1:1 page table for dom0 */
+        iommu_set_dom0_mapping(d);
 
         setup_dom0_devices(d);
         setup_dom0_rmrr(d);
@@ -1734,6 +1720,19 @@ static void setup_dom0_rmrr(struct domain *d)
     spin_unlock(&pcidevs_lock);
 }
 
+static void platform_quirks(void)
+{
+    u32 id;
+
+    /* Mobile 4 Series Chipset neglects to set RWBF capability. */
+    id = pci_conf_read32(0, 0, 0, 0);
+    if ( id == 0x2a408086 )
+    {
+        dprintk(XENLOG_INFO VTDPREFIX, "DMAR: Forcing write-buffer flush\n");
+        rwbf_quirk = 1;
+    }
+}
+
 int intel_vtd_setup(void)
 {
     struct acpi_drhd_unit *drhd;
@@ -1741,6 +1740,8 @@ int intel_vtd_setup(void)
 
     if ( !vtd_enabled )
         return -ENODEV;
+
+    platform_quirks();
 
     spin_lock_init(&domid_bitmap_lock);
     clflush_size = get_cache_line_size();

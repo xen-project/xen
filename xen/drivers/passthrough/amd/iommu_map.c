@@ -446,14 +446,13 @@ static u64 iommu_l2e_from_pfn(struct page_info *table, int level,
 int amd_iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn)
 {
     u64 iommu_l2e;
-    unsigned long flags;
     struct hvm_iommu *hd = domain_hvm_iommu(d);
     int iw = IOMMU_IO_WRITE_ENABLED;
     int ir = IOMMU_IO_READ_ENABLED;
 
     BUG_ON( !hd->root_table );
 
-    spin_lock_irqsave(&hd->mapping_lock, flags);
+    spin_lock(&hd->mapping_lock);
 
     if ( is_hvm_domain(d) && !hd->p2m_synchronized )
         goto out;
@@ -461,14 +460,14 @@ int amd_iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn)
     iommu_l2e = iommu_l2e_from_pfn(hd->root_table, hd->paging_mode, gfn);
     if ( iommu_l2e == 0 )
     {
-        spin_unlock_irqrestore(&hd->mapping_lock, flags);
+        spin_unlock(&hd->mapping_lock);
         amd_iov_error("Invalid IO pagetable entry gfn = %lx\n", gfn);
         return -EFAULT;
     }
     set_iommu_l1e_present(iommu_l2e, gfn, (u64)mfn << PAGE_SHIFT, iw, ir);
 
 out:
-    spin_unlock_irqrestore(&hd->mapping_lock, flags);
+    spin_unlock(&hd->mapping_lock);
     return 0;
 }
 
@@ -481,11 +480,11 @@ int amd_iommu_unmap_page(struct domain *d, unsigned long gfn)
 
     BUG_ON( !hd->root_table );
 
-    spin_lock_irqsave(&hd->mapping_lock, flags);
+    spin_lock(&hd->mapping_lock);
 
     if ( is_hvm_domain(d) && !hd->p2m_synchronized )
     {
-        spin_unlock_irqrestore(&hd->mapping_lock, flags);
+        spin_unlock(&hd->mapping_lock);
         return 0;
     }
 
@@ -493,14 +492,14 @@ int amd_iommu_unmap_page(struct domain *d, unsigned long gfn)
 
     if ( iommu_l2e == 0 )
     {
-        spin_unlock_irqrestore(&hd->mapping_lock, flags);
+        spin_unlock(&hd->mapping_lock);
         amd_iov_error("Invalid IO pagetable entry gfn = %lx\n", gfn);
         return -EFAULT;
     }
 
     /* mark PTE as 'page not present' */
     clear_iommu_l1e_present(iommu_l2e, gfn);
-    spin_unlock_irqrestore(&hd->mapping_lock, flags);
+    spin_unlock(&hd->mapping_lock);
 
     /* send INVALIDATE_IOMMU_PAGES command */
     for_each_amd_iommu ( iommu )
@@ -520,12 +519,12 @@ int amd_iommu_reserve_domain_unity_map(
     unsigned long size, int iw, int ir)
 {
     u64 iommu_l2e;
-    unsigned long flags, npages, i;
+    unsigned long npages, i;
     struct hvm_iommu *hd = domain_hvm_iommu(domain);
 
     npages = region_to_pages(phys_addr, size);
 
-    spin_lock_irqsave(&hd->mapping_lock, flags);
+    spin_lock(&hd->mapping_lock);
     for ( i = 0; i < npages; ++i )
     {
         iommu_l2e = iommu_l2e_from_pfn(
@@ -533,7 +532,7 @@ int amd_iommu_reserve_domain_unity_map(
 
         if ( iommu_l2e == 0 )
         {
-            spin_unlock_irqrestore(&hd->mapping_lock, flags);
+            spin_unlock(&hd->mapping_lock);
             amd_iov_error("Invalid IO pagetable entry phys_addr = %lx\n",
                           phys_addr);
             return -EFAULT;
@@ -544,13 +543,13 @@ int amd_iommu_reserve_domain_unity_map(
 
         phys_addr += PAGE_SIZE;
     }
-    spin_unlock_irqrestore(&hd->mapping_lock, flags);
+    spin_unlock(&hd->mapping_lock);
     return 0;
 }
 
 int amd_iommu_sync_p2m(struct domain *d)
 {
-    unsigned long mfn, gfn, flags;
+    unsigned long mfn, gfn;
     u64 iommu_l2e;
     struct page_info *page;
     struct hvm_iommu *hd;
@@ -562,7 +561,7 @@ int amd_iommu_sync_p2m(struct domain *d)
 
     hd = domain_hvm_iommu(d);
 
-    spin_lock_irqsave(&hd->mapping_lock, flags);
+    spin_lock(&hd->mapping_lock);
 
     if ( hd->p2m_synchronized )
         goto out;
@@ -582,7 +581,7 @@ int amd_iommu_sync_p2m(struct domain *d)
         if ( iommu_l2e == 0 )
         {
             spin_unlock(&d->page_alloc_lock);
-            spin_unlock_irqrestore(&hd->mapping_lock, flags);
+            spin_unlock(&hd->mapping_lock);
             amd_iov_error("Invalid IO pagetable entry gfn = %lx\n", gfn);
             return -EFAULT;
         }
@@ -595,7 +594,7 @@ int amd_iommu_sync_p2m(struct domain *d)
     hd->p2m_synchronized = 1;
 
 out:
-    spin_unlock_irqrestore(&hd->mapping_lock, flags);
+    spin_unlock(&hd->mapping_lock);
     return 0;
 }
 

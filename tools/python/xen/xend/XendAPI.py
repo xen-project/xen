@@ -29,6 +29,7 @@ import xmlrpclib
 import XendDomain, XendDomainInfo, XendNode, XendDmesg
 import XendLogging, XendTaskManager, XendAPIStore
 
+from xen.xend import uuid as genuuid
 from XendAPIVersion import *
 from XendAuthSessions import instance as auth_manager
 from XendError import *
@@ -1867,7 +1868,7 @@ class XendAPI(object):
         dom = xendom.get_vm_by_uuid(vbd_struct['VM'])
         vdi = xennode.get_vdi_by_uuid(vbd_struct['VDI'])
         if not vdi:
-            return xen_api_error(['HANDLE_INVALID', 'VDI', vdi_ref])
+            return xen_api_error(['HANDLE_INVALID', 'VDI', vbd_struct['VDI']])
 
         # new VBD via VDI/SR
         vdi_image = vdi.get_location()
@@ -2392,7 +2393,7 @@ class XendAPI(object):
             tpmif.destroy_vtpmstate(dom.getName())
             return xen_api_success_void()
         else:
-            return xen_api_error(['HANDLE_INVALID', 'VM', vtpm_struct['VM']])
+            return xen_api_error(['HANDLE_INVALID', 'VTPM', vtpm_ref])
 
     # class methods
     def VTPM_create(self, session, vtpm_struct):
@@ -2614,7 +2615,7 @@ class XendAPI(object):
         return xen_api_success_void()
 
     def event_unregister(self, session, unreg_classes):
-        event_unregister(session, reg_classes)
+        event_unregister(session, unreg_classes)
         return xen_api_success_void()
 
     def event_next(self, session):
@@ -2641,7 +2642,7 @@ class XendAPI(object):
         return xen_api_error(['DEBUG_FAIL', session])
 
     def debug_create(self, session):
-        debug_uuid = uuid.createString()
+        debug_uuid = genuuid.createString()
         self._debug[debug_uuid] = None
         return xen_api_success(debug_uuid)
 

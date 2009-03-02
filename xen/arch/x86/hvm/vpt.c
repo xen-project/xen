@@ -384,13 +384,25 @@ void create_periodic_time(
     pt->period_cycles = (u64)period;
     pt->one_shot = !period;
     pt->scheduled = NOW() + delta;
-    /*
-     * Offset LAPIC ticks from other timer ticks. Otherwise guests which use
-     * LAPIC ticks for process accounting can see long sequences of process
-     * ticks incorrectly accounted to interrupt processing.
-     */
-    if ( !pt->one_shot && (pt->source == PTSRC_lapic) )
-        pt->scheduled += delta >> 1;
+
+    if ( !pt->one_shot )
+    {
+        if ( v->domain->arch.hvm_domain.params[HVM_PARAM_VPT_ALIGN] )
+        {
+            pt->scheduled = align_timer(pt->scheduled, pt->period);
+        }
+        else if ( pt->source == PTSRC_lapic )
+        {
+            /*
+             * Offset LAPIC ticks from other timer ticks. Otherwise guests
+             * which use LAPIC ticks for process accounting can see long
+             * sequences of process ticks incorrectly accounted to interrupt
+             * processing (seen with RHEL3 guest).
+             */
+            pt->scheduled += delta >> 1;
+        }
+    }
+
     pt->cb = cb;
     pt->priv = data;
 

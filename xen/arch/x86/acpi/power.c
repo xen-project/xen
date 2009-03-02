@@ -175,6 +175,7 @@ static int enter_state(u32 state)
     printk("Entering ACPI S%d state.\n", state);
 
     local_irq_save(flags);
+    spin_debug_disable();
 
     if ( (error = device_power_down()) )
     {
@@ -208,6 +209,7 @@ static int enter_state(u32 state)
     printk(XENLOG_INFO "Finishing wakeup from ACPI S%d state.", state);
 
  done:
+    spin_debug_enable();
     local_irq_restore(flags);
     console_end_sync();
     acpi_sleep_post(state);

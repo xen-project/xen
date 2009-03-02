@@ -37,9 +37,6 @@ struct ivrs_mappings *ivrs_mappings;
 struct list_head amd_iommu_head;
 struct table_struct device_table;
 
-extern void *int_remap_table;
-extern spinlock_t int_remap_table_lock;
-
 static int __init map_iommu_mmio_region(struct amd_iommu *iommu)
 {
     unsigned long mfn;
@@ -487,11 +484,13 @@ static int set_iommu_interrupt_handler(struct amd_iommu *iommu)
     }
 
     irq_desc[vector].handler = &iommu_msi_type;
+    vector_to_iommu[vector] = iommu;
     ret = request_irq_vector(vector, amd_iommu_page_fault, 0,
                              "amd_iommu", iommu);
     if ( ret )
     {
         irq_desc[vector].handler = &no_irq_type;
+        vector_to_iommu[vector] = NULL;
         free_irq_vector(vector);
         amd_iov_error("can't request irq\n");
         return 0;
@@ -499,7 +498,6 @@ static int set_iommu_interrupt_handler(struct amd_iommu *iommu)
 
     /* Make sure that vector is never re-used. */
     vector_irq[vector] = NEVER_ASSIGN_IRQ;
-    vector_to_iommu[vector] = iommu;
     iommu->vector = vector;
     return vector;
 }

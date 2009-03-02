@@ -67,9 +67,23 @@ def bootloader(blexec, disk, dom, quiet = False, blargs = '', kernel = '',
     # listening on the bootloader's fifo for the results.
 
     (m1, s1) = pty.openpty()
-    tty.setraw(m1);
-    fcntl.fcntl(m1, fcntl.F_SETFL, os.O_NDELAY);
-    os.close(s1)
+
+    # On Solaris, the pty master side will get cranky if we try
+    # to write to it while there is no slave. To work around this,
+    # keep the slave descriptor open until we're done. Set it
+    # to raw terminal parameters, otherwise it will echo back
+    # characters, which will confuse the I/O loop below.
+    # Furthermore, a raw master pty device has no terminal
+    # semantics on Solaris, so don't try to set any attributes
+    # for it.
+    if os.uname()[0] != 'SunOS' and os.uname()[0] != 'NetBSD':
+        tty.setraw(m1)
+        os.close(s1)
+    else:
+        tty.setraw(s1)
+
+    fcntl.fcntl(m1, fcntl.F_SETFL, os.O_NDELAY)
+
     slavename = ptsname.ptsname(m1)
     dom.storeDom("console/tty", slavename)
 
@@ -108,7 +122,11 @@ def bootloader(blexec, disk, dom, quiet = False, blargs = '', kernel = '',
     # record that this domain is bootloading
     dom.bootloader_pid = child
 
-    tty.setraw(m2);
+    # On Solaris, the master pty side does not have terminal semantics,
+    # so don't try to set any attributes, as it will fail.
+    if os.uname()[0] != 'SunOS':
+        tty.setraw(m2);
+
     fcntl.fcntl(m2, fcntl.F_SETFL, os.O_NDELAY);
     while True:
         try:
@@ -117,32 +135,55 @@ def bootloader(blexec, disk, dom, quiet = False, blargs = '', kernel = '',
             if e.errno == errno.EINTR:
                 continue
         break
+
+    fcntl.fcntl(r, fcntl.F_SETFL, os.O_NDELAY);
+
     ret = ""
     inbuf=""; outbuf="";
+    # filedescriptors:
+    #   r - input from the bootloader (bootstring output)
+    #   m1 - input/output from/to xenconsole
+    #   m2 - input/output from/to pty that controls the bootloader
+    # The filedescriptors are NDELAY, so it's ok to try to read
+    # bigger chunks than may be available, to keep e.g. curses
+    # screen redraws in the bootloader efficient. m1 is the side that
+    # gets xenconsole input, which will be keystrokes, so a small number
+    # is sufficient. m2 is pygrub output, which will be curses screen
+    # updates, so a larger number (1024) is appropriate there.
+    #
+    # For writeable descriptors, only include them in the set for select
+    # if there is actual data to write, otherwise this would loop too fast,
+    # eating up CPU time.
+
     while True:
-        sel = select.select([r, m1, m2], [m1, m2], [])
+        wsel = []
+        if len(outbuf) != 0:
+            wsel = wsel + [m1]
+        if len(inbuf) != 0:
+            wsel = wsel + [m2]
+        sel = select.select([r, m1, m2], wsel, [])
         try: 
             if m1 in sel[0]:
-                s = os.read(m1, 1)
+                s = os.read(m1, 16)
                 inbuf += s
-            if m2 in sel[1] and len(inbuf) != 0:
-                os.write(m2, inbuf[0])
-                inbuf = inbuf[1:]
+            if m2 in sel[1]:
+                n = os.write(m2, inbuf)
+                inbuf = inbuf[n:]
         except OSError, e:
             if e.errno == errno.EIO:
                 pass
         try:
             if m2 in sel[0]:
-                s = os.read(m2, 1)
+                s = os.read(m2, 1024)
                 outbuf += s
-            if m1 in sel[1] and len(outbuf) != 0:
-                os.write(m1, outbuf[0])
-                outbuf = outbuf[1:]
+            if m1 in sel[1]:
+                n = os.write(m1, outbuf)
+                outbuf = outbuf[n:]
         except OSError, e:
             if e.errno == errno.EIO:
                 pass
         if r in sel[0]:
-            s = os.read(r, 1)
+            s = os.read(r, 128)
             ret = ret + s
             if len(s) == 0:
                 break
@@ -152,6 +193,8 @@ def bootloader(blexec, disk, dom, quiet = False, blargs = '', kernel = '',
     os.close(r)
     os.close(m2)
     os.close(m1)
+    if os.uname()[0] == 'SunOS' or os.uname()[0] == 'NetBSD':
+        os.close(s1)
     os.unlink(fifo)
 
     # Re-acquire the lock to cover the changes we're about to make

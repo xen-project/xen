@@ -473,6 +473,13 @@ void process_pending_timers(void)
         timer_softirq_action();
 }
 
+s_time_t align_timer(s_time_t firsttick, uint64_t period)
+{
+    if ( !period )
+        return firsttick;
+
+    return firsttick + (period - 1) - ((firsttick - 1) % period);
+}
 
 static void dump_timerq(unsigned char key)
 {

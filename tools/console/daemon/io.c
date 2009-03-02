@@ -402,14 +402,28 @@ static int domain_create_tty(struct domain *dom)
 	assert(dom->slave_fd == -1);
 	assert(dom->master_fd == -1);
 
-	cfmakeraw(&term);
-
-	if (openpty(&dom->master_fd, &dom->slave_fd, NULL, &term, NULL) < 0) {
+	if (openpty(&dom->master_fd, &dom->slave_fd, NULL, NULL, NULL) < 0) {
 		err = errno;
 		dolog(LOG_ERR, "Failed to create tty for domain-%d "
 		      "(errno = %i, %s)",
 		      dom->domid, err, strerror(err));
 		return 0;
+	}
+
+	if (tcgetattr(dom->slave_fd, &term) < 0) {
+		err = errno;
+		dolog(LOG_ERR, "Failed to get tty attributes for domain-%d "
+			"(errno = %i, %s)",
+			dom->domid, err, strerror(err));
+		goto out;
+	}
+	cfmakeraw(&term);
+	if (tcsetattr(dom->slave_fd, TCSANOW, &term) < 0) {
+		err = errno;
+		dolog(LOG_ERR, "Failed to set tty attributes for domain-%d "
+			"(errno = %i, %s)",
+			dom->domid, err, strerror(err));
+		goto out;
 	}
 
 	if ((slave = ptsname(dom->master_fd)) == NULL) {
