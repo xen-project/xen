@@ -378,13 +378,12 @@ static void del_msixtbl_entry(struct msixtbl_entry *entry)
     call_rcu(&entry->rcu, free_msixtbl_entry);
 }
 
-int msixtbl_pt_register(struct domain *d, int pirq, uint64_t gtable)
+void msixtbl_pt_register(struct domain *d, int pirq, uint64_t gtable)
 {
     irq_desc_t *irq_desc;
     struct msi_desc *msi_desc;
     struct pci_dev *pdev;
     struct msixtbl_entry *entry;
-    int r = -EINVAL;
 
     /* pcidevs_lock already held */
     irq_desc = domain_spin_lock_irq_desc(d, pirq, NULL);
@@ -418,8 +417,6 @@ found:
 
 out:
     spin_unlock_irq(&irq_desc->lock);
-    return r;
-
 }
 
 void msixtbl_pt_unregister(struct domain *d, int pirq)
@@ -461,6 +458,7 @@ found:
     spin_unlock(&d->arch.hvm_domain.msixtbl_list_lock);
     spin_unlock(&irq_desc->lock);
 }
+
 void msixtbl_pt_cleanup(struct domain *d, int pirq)
 {
     struct msixtbl_entry *entry, *temp;

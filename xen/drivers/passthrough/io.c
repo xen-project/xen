@@ -58,8 +58,13 @@ static void pt_irq_time_out(void *data)
     pirq_guest_eoi(irq_map->dom, machine_gsi);
 }
 
-extern int msixtbl_pt_register(struct domain *d, int pirq, uint64_t gtable);
-extern int msixtbl_pt_unregister(struct domain *d, int pirq);
+#ifdef CONFIG_X86
+extern void msixtbl_pt_register(struct domain *d, int pirq, uint64_t gtable);
+extern void msixtbl_pt_unregister(struct domain *d, int pirq);
+#else
+#define msixtbl_pt_register(d, p, g) ((void)0)
+#define msixtbl_pt_unregister(d, p)  ((void)0)
+#endif
 
 int pt_irq_create_bind_vtd(
     struct domain *d, xen_domctl_bind_pt_irq_t *pt_irq_bind)
