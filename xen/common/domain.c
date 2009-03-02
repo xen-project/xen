@@ -465,7 +465,9 @@ void domain_shutdown(struct domain *d, u8 reason)
 
     for_each_vcpu ( d, v )
     {
-        if ( v->defer_shutdown )
+        if ( reason == SHUTDOWN_crash )
+            v->defer_shutdown = 0;
+        else if ( v->defer_shutdown )
             continue;
         vcpu_pause_nosync(v);
         v->paused_for_shutdown = 1;
