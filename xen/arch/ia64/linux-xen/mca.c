@@ -112,9 +112,6 @@ unsigned long __per_cpu_mca[NR_CPUS];
 /* In mca_asm.S */
 extern void			ia64_monarch_init_handler (void);
 extern void			ia64_slave_init_handler (void);
-#ifdef XEN
-extern void setup_vector (unsigned int vec, struct irqaction *action);
-#endif
 
 static ia64_mc_info_t		ia64_mc_info;
 

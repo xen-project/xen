@@ -4,8 +4,8 @@
 #include <asm/hvm/irq.h>
 #include <public/event_channel.h>
 #include <public/arch-ia64/hvm/save.h>
-#include <asm/linux/asm/hw_irq.h>
-#include <asm/linux-xen/asm/iosapic.h>
+#include <asm/hw_irq.h>
+#include <asm/iosapic.h>
 
 struct iommu_ops;
 extern struct iommu_ops intel_iommu_ops;

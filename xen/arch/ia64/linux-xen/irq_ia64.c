@@ -242,10 +242,6 @@ static struct irqaction ipi_irqaction = {
 };
 #endif
 
-#ifdef XEN
-extern void setup_vector (unsigned int vec, struct irqaction *action);
-#endif
-
 void
 register_percpu_irq (ia64_vector vec, struct irqaction *action)
 {
@@ -276,7 +272,7 @@ int request_irq_vector(unsigned int vector,
 		unsigned long irqflags, const char * devname, void *dev_id)
 {
 	struct irqaction * action;
-	int retval=0;
+	int retval;
 
 	/*
 	 * Sanity-check: shared interrupts must pass in a real dev-ID,
@@ -295,7 +291,8 @@ int request_irq_vector(unsigned int vector,
 	action->handler = handler;
 	action->name = devname;
 	action->dev_id = dev_id;
-	setup_vector(vector, action);
+
+	retval = setup_vector(vector, action);
 	if (retval)
 		xfree(action);
 
