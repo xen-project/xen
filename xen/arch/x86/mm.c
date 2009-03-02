@@ -279,15 +279,39 @@ void __init arch_init_memory(void)
     subarch_init_memory();
 }
 
-int page_is_conventional_ram(unsigned long mfn)
+int page_is_ram_type(unsigned long mfn, unsigned long mem_type)
 {
     uint64_t maddr = pfn_to_paddr(mfn);
     int i;
 
     for ( i = 0; i < e820.nr_map; i++ )
     {
-        if ( (e820.map[i].type == E820_RAM) &&
-             (e820.map[i].addr <= maddr) &&
+        switch ( e820.map[i].type )
+        {
+        case E820_RAM:
+            if ( mem_type & RAM_TYPE_CONVENTIONAL )
+                break;
+            continue;
+        case E820_RESERVED:
+            if ( mem_type & RAM_TYPE_RESERVED )
+                break;
+            continue;
+        case E820_UNUSABLE:
+            if ( mem_type & RAM_TYPE_UNUSABLE )
+                break;
+            continue;
+        case E820_ACPI:
+        case E820_NVS:
+            if ( mem_type & RAM_TYPE_ACPI )
+                break;
+            continue;
+        default:
+            /* unknown */
+            continue;
+        }
+        
+        /* Test the range. */
+        if ( (e820.map[i].addr <= maddr) &&
              ((e820.map[i].addr + e820.map[i].size) >= (maddr + PAGE_SIZE)) )
             return 1;
     }

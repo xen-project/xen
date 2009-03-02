@@ -985,6 +985,9 @@ void __init __start_xen(unsigned long mbi_p)
 
     if ( opt_watchdog ) 
         watchdog_enable();
+    
+    if ( !tboot_protect_mem_regions() )
+        panic("Could not protect TXT memory regions\n");
 
     /* Create initial domain 0. */
     dom0 = domain_create(0, 0, DOM0_SSIDREF);
@@ -1036,9 +1039,6 @@ void __init __start_xen(unsigned long mbi_p)
 
     if ( xen_cpuidle )
         xen_processor_pmbits |= XEN_PROCESSOR_PM_CX;
-
-    if ( !tboot_protect_mem_regions() )
-        panic("Could not protect TXT memory regions\n");
 
     /*
      * We're going to setup domain0 using the module(s) that we stashed safely

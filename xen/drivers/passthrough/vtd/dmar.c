@@ -377,6 +377,19 @@ acpi_parse_one_rmrr(struct acpi_dmar_entry_header *header)
         return -EFAULT;
     }
 
+#ifdef CONFIG_X86
+    /* This check is here simply to detect when RMRR values are not properly represented in the 
+       system memory map and inform the user */
+    if ( (!page_is_ram_type(paddr_to_pfn(rmrr->base_address), RAM_TYPE_RESERVED))||
+         (!page_is_ram_type(paddr_to_pfn(rmrr->end_address) - 1, RAM_TYPE_RESERVED)) )
+    {
+        dprintk(XENLOG_WARNING VTDPREFIX,
+                "RMRR address range not in reserved memory base = %"PRIx64" end = %"PRIx64"; " \
+                "iommu_inclusive_mapping=1 parameter may be needed.\n",
+                rmrr->base_address, rmrr->end_address);
+    }
+#endif
+
     rmrru = xmalloc(struct acpi_rmrr_unit);
     if ( !rmrru )
         return -ENOMEM;
