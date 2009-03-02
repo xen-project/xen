@@ -316,31 +316,60 @@ static void set_readonly(void *text, void *etext)
     }
 }
 
-void mem_test(unsigned long *start_add, unsigned long *end_add)
+/*
+ * A useful mem testing function. Write the address to every address in the
+ * range provided and read back the value. If verbose, print page walk to
+ * some VA
+ * 
+ * If we get MEM_TEST_MAX_ERRORS we might as well stop
+ */
+#define MEM_TEST_MAX_ERRORS 10 
+int mem_test(unsigned long *start_va, unsigned long *end_va, int verbose)
 {
     unsigned long mask = 0x10000;
     unsigned long *pointer;
-
-    for(pointer = start_add; pointer < end_add; pointer++)
+    int error_count = 0;
+ 
+    /* write values and print page walks */
+    if ( verbose && (((unsigned long)start_va) & 0xfffff) )
     {
-        if(!(((unsigned long)pointer) & 0xfffff))
+        printk("MemTest Start: 0x%lx\n", start_va);
+        page_walk((unsigned long)start_va);
+    }
+    for ( pointer = start_va; pointer < end_va; pointer++ )
+    {
+        if ( verbose && !(((unsigned long)pointer) & 0xfffff) )
         {
             printk("Writing to %lx\n", pointer);
             page_walk((unsigned long)pointer);
         }
         *pointer = (unsigned long)pointer & ~mask;
     }
-
-    for(pointer = start_add; pointer < end_add; pointer++)
+    if ( verbose && (((unsigned long)end_va) & 0xfffff) )
     {
-        if(((unsigned long)pointer & ~mask) != *pointer)
-            printk("Read error at 0x%lx. Read: 0x%lx, should read 0x%lx\n",
-                (unsigned long)pointer, 
-                *pointer, 
-                ((unsigned long)pointer & ~mask));
+        printk("MemTest End: %lx\n", end_va-1);
+        page_walk((unsigned long)end_va-1);
     }
-
+ 
+    /* verify values */
+    for ( pointer = start_va; pointer < end_va; pointer++ )
+    {
+        if ( ((unsigned long)pointer & ~mask) != *pointer )
+        {
+            printk("Read error at 0x%lx. Read: 0x%lx, should read 0x%lx\n",
+                   (unsigned long)pointer, *pointer, 
+                   ((unsigned long)pointer & ~mask));
+            error_count++;
+            if ( error_count >= MEM_TEST_MAX_ERRORS )
+            {
+                printk("mem_test: too many errors\n");
+                return -1;
+            }
+        }
+    }
+    return 0;
 }
+
 
 static pgentry_t *get_pgt(unsigned long addr)
 {
@@ -537,6 +566,72 @@ void *map_frames_ex(unsigned long *f, unsigned long n, unsigned long stride,
     return (void *)addr;
 }
 
+/*
+ * Unmap nun_frames frames mapped at virtual address va.
+ */
+#define UNMAP_BATCH ((STACK_SIZE / 2) / sizeof(multicall_entry_t))
+int unmap_frames(unsigned long va, unsigned long num_frames)
+{
+    int n = UNMAP_BATCH;
+    multicall_entry_t call[n];
+    int ret;
+    int i;
+
+    ASSERT(!((unsigned long)va & ~PAGE_MASK));
+
+    DEBUG("va=%p, num=0x%lx\n", va, num_frames);
+
+    while ( num_frames ) {
+        if ( n > num_frames )
+            n = num_frames;
+
+        for ( i = 0; i < n; i++ )
+        {
+            int arg = 0;
+            /* simply update the PTE for the VA and invalidate TLB */
+            call[i].op = __HYPERVISOR_update_va_mapping;
+            call[i].args[arg++] = va;
+            call[i].args[arg++] = 0;
+#ifdef __i386__
+            call[i].args[arg++] = 0;
+#endif  
+            call[i].args[arg++] = UVMF_INVLPG;
+
+            va += PAGE_SIZE;
+        }
+
+        ret = HYPERVISOR_multicall(call, n);
+        if ( ret )
+        {
+            printk("update_va_mapping hypercall failed with rc=%d.\n", ret);
+            return -ret;
+        }
+
+        for ( i = 0; i < n; i++ )
+        {
+            if ( call[i].result ) 
+            {
+                printk("update_va_mapping failed for with rc=%d.\n", ret);
+                return -(call[i].result);
+            }
+        }
+        num_frames -= n;
+    }
+    return 0;
+}
+
+/*
+ * Check if a given MFN refers to real memory
+ */
+static long system_ram_end_mfn;
+int mfn_is_ram(unsigned long mfn)
+{
+    /* very crude check if a given MFN is memory or not. Probably should
+     * make this a little more sophisticated ;) */
+    return (mfn <= system_ram_end_mfn) ? 1 : 0;
+}
+
+
 static void clear_bootstrap(void)
 {
     pte_t nullpte = { };
@@ -624,6 +719,10 @@ void arch_init_mm(unsigned long* start_pfn_p, unsigned long* max_pfn_p)
     build_pagetable(&start_pfn, &max_pfn);
     clear_bootstrap();
     set_readonly(&_text, &_erodata);
+
+    /* get the number of physical pages the system has. Used to check for
+     * system memory. */
+    system_ram_end_mfn = HYPERVISOR_memory_op(XENMEM_maximum_ram_page, NULL);
 
     *start_pfn_p = start_pfn;
     *max_pfn_p = max_pfn;
