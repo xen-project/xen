@@ -193,3 +193,283 @@ int vmsi_deliver(struct domain *d, int pirq)
     return 1;
 }
 
+/* MSI-X mask bit hypervisor interception */
+struct msixtbl_entry
+{
+    struct list_head list;
+    atomic_t refcnt;    /* how many bind_pt_irq called for the device */
+
+    /* TODO: resolve the potential race by destruction of pdev */
+    struct pci_dev *pdev;
+    unsigned long gtable;       /* gpa of msix table */
+    unsigned long table_len;
+    unsigned long table_flags[MAX_MSIX_TABLE_ENTRIES / BITS_PER_LONG + 1];
+
+    struct rcu_head rcu;
+};
+
+static struct msixtbl_entry *msixtbl_find_entry(
+    struct vcpu *v, unsigned long addr)
+{
+    struct msixtbl_entry *entry;
+    struct domain *d = v->domain;
+
+    list_for_each_entry( entry, &d->arch.hvm_domain.msixtbl_list, list )
+        if ( addr >= entry->gtable &&
+             addr < entry->gtable + entry->table_len )
+            return entry;
+
+    return NULL;
+}
+
+static void __iomem *msixtbl_addr_to_virt(
+    struct msixtbl_entry *entry, unsigned long addr)
+{
+    int idx, nr_page;
+
+    if ( !entry )
+        return NULL;
+
+    nr_page = (addr >> PAGE_SHIFT) -
+              (entry->gtable >> PAGE_SHIFT);
+
+    if ( !entry->pdev )
+        return NULL;
+
+    idx = entry->pdev->msix_table_idx[nr_page];
+    if ( !idx )
+        return NULL;
+
+    return (void *)(fix_to_virt(idx) +
+                    (addr & ((1UL << PAGE_SHIFT) - 1)));
+}
+
+static int msixtbl_read(
+    struct vcpu *v, unsigned long address,
+    unsigned long len, unsigned long *pval)
+{
+    unsigned long offset;
+    struct msixtbl_entry *entry;
+    void *virt;
+    int r = X86EMUL_UNHANDLEABLE;
+
+    rcu_read_lock();
+
+    if ( len != 4 )
+        goto out;
+
+    offset = address & (PCI_MSIX_ENTRY_SIZE - 1);
+    if ( offset != PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET)
+        goto out;
+
+    entry = msixtbl_find_entry(v, address);
+    virt = msixtbl_addr_to_virt(entry, address);
+    if ( !virt )
+        goto out;
+
+    *pval = readl(virt);
+    r = X86EMUL_OKAY;
+
+out:
+    rcu_read_unlock();
+    return r;
+}
+
+static int msixtbl_write(struct vcpu *v, unsigned long address,
+                        unsigned long len, unsigned long val)
+{
+    unsigned long offset;
+    struct msixtbl_entry *entry;
+    void *virt;
+    int nr_entry;
+    int r = X86EMUL_UNHANDLEABLE;
+
+    rcu_read_lock();
+
+    if ( len != 4 )
+        goto out;
+
+    entry = msixtbl_find_entry(v, address);
+    nr_entry = (address - entry->gtable) % PCI_MSIX_ENTRY_SIZE;
+
+    offset = address & (PCI_MSIX_ENTRY_SIZE - 1);
+    if ( offset != PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET)
+    {
+        set_bit(nr_entry, &entry->table_flags);
+        goto out;
+    }
+
+    /* exit to device model if address/data has been modified */
+    if ( test_and_clear_bit(nr_entry, &entry->table_flags) )
+        goto out;
+
+    virt = msixtbl_addr_to_virt(entry, address);
+    if ( !virt )
+        goto out;
+
+    writel(val, virt);
+    r = X86EMUL_OKAY;
+
+out:
+    rcu_read_unlock();
+    return r;
+}
+
+static int msixtbl_range(struct vcpu *v, unsigned long addr)
+{
+    struct msixtbl_entry *entry;
+    void *virt;
+
+    rcu_read_lock();
+
+    entry = msixtbl_find_entry(v, addr);
+    virt = msixtbl_addr_to_virt(entry, addr);
+
+    rcu_read_unlock();
+
+    return !!virt;
+}
+
+struct hvm_mmio_handler msixtbl_mmio_handler = {
+    .check_handler = msixtbl_range,
+    .read_handler = msixtbl_read,
+    .write_handler = msixtbl_write
+};
+
+static struct msixtbl_entry *add_msixtbl_entry(struct domain *d,
+                                               struct pci_dev *pdev,
+                                               uint64_t gtable)
+{
+    struct msixtbl_entry *entry;
+    u32 len;
+
+    entry = xmalloc(struct msixtbl_entry);
+    if ( !entry )
+        return NULL;
+
+    memset(entry, 0, sizeof(struct msixtbl_entry));
+        
+    INIT_LIST_HEAD(&entry->list);
+    INIT_RCU_HEAD(&entry->rcu);
+    atomic_set(&entry->refcnt, 0);
+
+    len = pci_msix_get_table_len(pdev);
+    entry->table_len = len;
+    entry->pdev = pdev;
+    entry->gtable = (unsigned long) gtable;
+
+    list_add_rcu(&entry->list, &d->arch.hvm_domain.msixtbl_list);
+
+    return entry;
+}
+
+static void free_msixtbl_entry(struct rcu_head *rcu)
+{
+    struct msixtbl_entry *entry;
+
+    entry = container_of (rcu, struct msixtbl_entry, rcu);
+
+    xfree(entry);
+}
+
+static void del_msixtbl_entry(struct msixtbl_entry *entry)
+{
+    list_del_rcu(&entry->list);
+    call_rcu(&entry->rcu, free_msixtbl_entry);
+}
+
+int msixtbl_pt_register(struct domain *d, int pirq, uint64_t gtable)
+{
+    irq_desc_t *irq_desc;
+    struct msi_desc *msi_desc;
+    struct pci_dev *pdev;
+    struct msixtbl_entry *entry;
+    int r = -EINVAL;
+
+    /* pcidevs_lock already held */
+    irq_desc = domain_spin_lock_irq_desc(d, pirq, NULL);
+
+    if ( irq_desc->handler != &pci_msi_type )
+        goto out;
+
+    msi_desc = irq_desc->msi_desc;
+    if ( !msi_desc )
+        goto out;
+
+    pdev = msi_desc->dev;
+
+    spin_lock(&d->arch.hvm_domain.msixtbl_list_lock);
+
+    list_for_each_entry( entry, &d->arch.hvm_domain.msixtbl_list, list )
+        if ( pdev == entry->pdev )
+            goto found;
+
+    entry = add_msixtbl_entry(d, pdev, gtable);
+    if ( !entry )
+    {
+        spin_unlock(&d->arch.hvm_domain.msixtbl_list_lock);
+        goto out;
+    }
+
+found:
+    atomic_inc(&entry->refcnt);
+
+    spin_unlock(&d->arch.hvm_domain.msixtbl_list_lock);
+
+out:
+    spin_unlock_irq(&irq_desc->lock);
+    return r;
+
+}
+
+void msixtbl_pt_unregister(struct domain *d, int pirq)
+{
+    irq_desc_t *irq_desc;
+    struct msi_desc *msi_desc;
+    struct pci_dev *pdev;
+    struct msixtbl_entry *entry;
+
+    /* pcidevs_lock already held */
+    irq_desc = domain_spin_lock_irq_desc(d, pirq, NULL);
+
+    if ( irq_desc->handler != &pci_msi_type )
+        goto out;
+
+    msi_desc = irq_desc->msi_desc;
+    if ( !msi_desc )
+        goto out;
+
+    pdev = msi_desc->dev;
+
+    spin_lock(&d->arch.hvm_domain.msixtbl_list_lock);
+
+    list_for_each_entry( entry, &d->arch.hvm_domain.msixtbl_list, list )
+        if ( pdev == entry->pdev )
+            goto found;
+
+    spin_unlock(&d->arch.hvm_domain.msixtbl_list_lock);
+
+
+out:
+    spin_unlock(&irq_desc->lock);
+    return;
+
+found:
+    if ( !atomic_dec_and_test(&entry->refcnt) )
+        del_msixtbl_entry(entry);
+
+    spin_unlock(&d->arch.hvm_domain.msixtbl_list_lock);
+    spin_unlock(&irq_desc->lock);
+}
+void msixtbl_pt_cleanup(struct domain *d, int pirq)
+{
+    struct msixtbl_entry *entry, *temp;
+
+    spin_lock(&d->arch.hvm_domain.msixtbl_list_lock);
+
+    list_for_each_entry_safe( entry, temp,
+                              &d->arch.hvm_domain.msixtbl_list, list )
+        del_msixtbl_entry(entry);
+
+    spin_unlock(&d->arch.hvm_domain.msixtbl_list_lock);
+}

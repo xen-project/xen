@@ -839,3 +839,23 @@ int pci_restore_msi_state(struct pci_dev *pdev)
     return 0;
 }
 
+unsigned int pci_msix_get_table_len(struct pci_dev *pdev)
+{
+    int pos;
+    u16 control;
+    u8 bus, slot, func;
+    unsigned int len;
+
+    bus = pdev->bus;
+    slot = PCI_SLOT(pdev->devfn);
+    func = PCI_FUNC(pdev->devfn);
+
+    pos = pci_find_cap_offset(bus, slot, func, PCI_CAP_ID_MSIX);
+    if ( !pos )
+        return 0;
+
+    control = pci_conf_read16(bus, slot, func, msix_control_reg(pos));
+    len = msix_table_size(control) * PCI_MSIX_ENTRY_SIZE;
+
+    return len;
+}

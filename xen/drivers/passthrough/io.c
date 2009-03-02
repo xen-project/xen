@@ -58,6 +58,9 @@ static void pt_irq_time_out(void *data)
     pirq_guest_eoi(irq_map->dom, machine_gsi);
 }
 
+extern int msixtbl_pt_register(struct domain *d, int pirq, uint64_t gtable);
+extern int msixtbl_pt_unregister(struct domain *d, int pirq);
+
 int pt_irq_create_bind_vtd(
     struct domain *d, xen_domctl_bind_pt_irq_t *pt_irq_bind)
 {
@@ -115,6 +118,8 @@ int pt_irq_create_bind_vtd(
                 spin_unlock(&d->event_lock);
                 return rc;
             }
+            if ( pt_irq_bind->u.msi.gtable )
+                msixtbl_pt_register(d, pirq, pt_irq_bind->u.msi.gtable);
         }
         else if (hvm_irq_dpci->mirq[pirq].gmsi.gvec != pt_irq_bind->u.msi.gvec
                 ||hvm_irq_dpci->msi_gvec_pirq[pt_irq_bind->u.msi.gvec] != pirq)
@@ -259,6 +264,7 @@ int pt_irq_destroy_bind_vtd(
         if ( list_empty(&hvm_irq_dpci->mirq[machine_gsi].digl_list) )
         {
             pirq_guest_unbind(d, machine_gsi);
+            msixtbl_pt_unregister(d, machine_gsi);
             if ( pt_irq_need_timer(hvm_irq_dpci->mirq[machine_gsi].flags) )
                 kill_timer(&hvm_irq_dpci->hvm_timer[domain_irq_to_vector(d, machine_gsi)]);
             hvm_irq_dpci->mirq[machine_gsi].dom   = NULL;

@@ -920,7 +920,8 @@ int xc_domain_update_msi_irq(
     uint32_t domid,
     uint32_t gvec,
     uint32_t pirq,
-    uint32_t gflags)
+    uint32_t gflags,
+    uint64_t gtable)
 {
     int rc;
     xen_domctl_bind_pt_irq_t *bind;
@@ -936,6 +937,7 @@ int xc_domain_update_msi_irq(
     bind->machine_irq = pirq;
     bind->u.msi.gvec = gvec;
     bind->u.msi.gflags = gflags;
+    bind->u.msi.gtable = gtable;
 
     rc = do_domctl(xc_handle, &domctl);
     return rc;

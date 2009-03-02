@@ -485,6 +485,7 @@ struct xen_domctl_bind_pt_irq {
         struct {
             uint8_t gvec;
             uint32_t gflags;
+            uint64_t gtable;
         } msi;
     } u;
 };
