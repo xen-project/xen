@@ -63,10 +63,12 @@ void failsafe_callback(void);
 static
 shared_info_t *map_shared_info(unsigned long pa)
 {
-	if ( HYPERVISOR_update_va_mapping(
-		(unsigned long)shared_info, __pte(pa | 7), UVMF_INVLPG) )
+    int rc;
+
+	if ( (rc = HYPERVISOR_update_va_mapping(
+              (unsigned long)shared_info, __pte(pa | 7), UVMF_INVLPG)) )
 	{
-		printk("Failed to map shared_info!!\n");
+		printk("Failed to map shared_info!! rc=%d\n", rc);
 		do_exit();
 	}
 	return (shared_info_t *)shared_info;

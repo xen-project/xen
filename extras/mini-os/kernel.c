@@ -490,14 +490,16 @@ void start_kernel(start_info_t *si)
 
     /* print out some useful information  */
     printk("Xen Minimal OS!\n");
-    printk("start_info:   %p\n",    si);
-    printk("  nr_pages:   %lu",     si->nr_pages);
-    printk("  shared_inf: %08lx\n", si->shared_info);
-    printk("  pt_base:    %p",      (void *)si->pt_base); 
-    printk("  mod_start:  0x%lx\n", si->mod_start);
-    printk("  mod_len:    %lu\n",   si->mod_len); 
-    printk("  flags:      0x%x\n",  (unsigned int)si->flags);
-    printk("  cmd_line:   %s\n",  
+    printk("  start_info: %p(VA)\n", si);
+    printk("    nr_pages: 0x%lx\n", si->nr_pages);
+    printk("  shared_inf: 0x%08lx(MA)\n", si->shared_info);
+    printk("     pt_base: %p(VA)\n", (void *)si->pt_base); 
+    printk("nr_pt_frames: 0x%lx\n", si->nr_pt_frames);
+    printk("    mfn_list: %p(VA)\n", (void *)si->mfn_list); 
+    printk("   mod_start: 0x%lx(VA)\n", si->mod_start);
+    printk("     mod_len: %lu\n", si->mod_len); 
+    printk("       flags: 0x%x\n", (unsigned int)si->flags);
+    printk("    cmd_line: %s\n",  
            si->cmd_line ? (const char *)si->cmd_line : "NULL");
 
     /* Set up events. */
