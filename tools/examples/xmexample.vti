@@ -7,8 +7,10 @@
 #============================================================================
 
 import os, re
-arch = os.uname()[4]
 arch_libdir = 'lib'
+arch = os.uname()[4]
+if os.uname()[0] == 'Linux' and re.search('64', arch):
+    arch_libdir = 'lib64'
 
 #----------------------------------------------------------------------------
 # Kernel image file.
