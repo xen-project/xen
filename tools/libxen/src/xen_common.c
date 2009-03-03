@@ -90,6 +90,8 @@ add_param(xmlNode *, const char *, const char *);
 static xmlNode *
 add_param_struct(xmlNode *);
 static xmlNode *
+add_param_array(xmlNode *);
+static xmlNode *
 add_struct_array(xmlNode *, const char *);
 static xmlNode *
 add_nested_struct(xmlNode *, const char *);
@@ -1292,7 +1294,7 @@ make_body_add_type(enum abstract_typename typename, abstract_value *v,
         const struct abstract_type *member_type = v->type->child;
         arbitrary_set *set_val = v->u.struct_val;
         abstract_value v;
-        xmlNode *data_node = add_param_struct(params_node);
+        xmlNode *data_node = add_param_array(params_node);
 
         for (size_t i = 0; i < set_val->size; i++)
         {
@@ -1608,6 +1610,16 @@ add_param_struct(xmlNode *params_node)
     xmlNode *value_node = add_container(param_node,  "value");
 
     return xmlNewChild(value_node, NULL, BAD_CAST "struct", NULL);
+}
+
+
+static xmlNode *
+add_param_array(xmlNode *params_node)
+{
+    xmlNode *param_node = add_container(params_node, "param");
+    xmlNode *value_node = add_container(param_node,  "value");
+
+    return xmlNewChild(value_node, NULL, BAD_CAST "array", NULL);
 }
 
 
