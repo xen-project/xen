@@ -190,6 +190,7 @@ static int enter_state(u32 state)
     case ACPI_STATE_S3:
         do_suspend_lowlevel();
         system_reset_counter++;
+        error = tboot_s3_resume();
         break;
     case ACPI_STATE_S5:
         acpi_enter_sleep_state(ACPI_STATE_S5);
@@ -206,7 +207,10 @@ static int enter_state(u32 state)
 
     device_power_up();
 
-    printk(XENLOG_INFO "Finishing wakeup from ACPI S%d state.", state);
+    printk(XENLOG_INFO "Finishing wakeup from ACPI S%d state.\n", state);
+
+    if ( (state == ACPI_STATE_S3) && error )
+        panic("Memory integrity was lost on resume (%d)\n", error);
 
  done:
     spin_debug_enable();
@@ -318,7 +322,7 @@ static void tboot_sleep(u8 sleep_state)
 
     tboot_shutdown(shutdown_type);
 }
-         
+
 /* System is really put into sleep state by this stub */
 acpi_status asmlinkage acpi_enter_sleep_state(u8 sleep_state)
 {
