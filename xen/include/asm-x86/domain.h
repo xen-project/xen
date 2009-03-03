@@ -221,6 +221,8 @@ struct arch_domain
     unsigned int hv_compat_vstart;
 #endif
 
+    bool_t s3_integrity;
+
     /* I/O-port admin-specified access capabilities. */
     struct rangeset *ioport_caps;
     uint32_t pci_cf8;

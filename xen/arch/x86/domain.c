@@ -386,6 +386,8 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
         hvm_funcs.hap_supported &&
         (domcr_flags & DOMCRF_hap);
 
+    d->arch.s3_integrity = !!(domcr_flags & DOMCRF_s3_integrity);
+
     INIT_LIST_HEAD(&d->arch.pdev_list);
 
     d->arch.relmem = RELMEM_not_started;

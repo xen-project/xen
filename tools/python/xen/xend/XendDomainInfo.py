@@ -2212,12 +2212,15 @@ class XendDomainInfo:
             if security.has_authorization(ssidref) == False:
                 raise VmError("VM is not authorized to run.")
 
+        s3_integrity = self.info['s3_integrity']
+        flags = (int(hvm) << 0) | (int(hap) << 1) | (int(s3_integrity) << 2)
+
         try:
             self.domid = xc.domain_create(
                 domid = 0,
                 ssidref = ssidref,
                 handle = uuid.fromString(self.info['uuid']),
-                flags = (int(hvm) << 0) | (int(hap) << 1),
+                flags = flags,
                 target = self.info.target())
         except Exception, e:
             # may get here if due to ACM the operation is not permitted

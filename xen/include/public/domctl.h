@@ -51,11 +51,14 @@ struct xen_domctl_createdomain {
     uint32_t ssidref;
     xen_domain_handle_t handle;
  /* Is this an HVM guest (as opposed to a PV guest)? */
-#define _XEN_DOMCTL_CDF_hvm_guest 0
-#define XEN_DOMCTL_CDF_hvm_guest  (1U<<_XEN_DOMCTL_CDF_hvm_guest)
+#define _XEN_DOMCTL_CDF_hvm_guest     0
+#define XEN_DOMCTL_CDF_hvm_guest      (1U<<_XEN_DOMCTL_CDF_hvm_guest)
  /* Use hardware-assisted paging if available? */
-#define _XEN_DOMCTL_CDF_hap       1
-#define XEN_DOMCTL_CDF_hap        (1U<<_XEN_DOMCTL_CDF_hap)
+#define _XEN_DOMCTL_CDF_hap           1
+#define XEN_DOMCTL_CDF_hap            (1U<<_XEN_DOMCTL_CDF_hap)
+ /* Should domain memory integrity be verifed by tboot during Sx? */
+#define _XEN_DOMCTL_CDF_s3_integrity  2
+#define XEN_DOMCTL_CDF_s3_integrity   (1U<<_XEN_DOMCTL_CDF_s3_integrity)
     uint32_t flags;
 };
 typedef struct xen_domctl_createdomain xen_domctl_createdomain_t;

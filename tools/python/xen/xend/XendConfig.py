@@ -216,6 +216,7 @@ XENAPI_CFG_TYPES = {
     'cpuid_check' : dict,
     'machine_address_size': int,
     'suppress_spurious_page_faults': bool0,
+    's3_integrity' : int,
 }
 
 # List of legacy configuration keys that have no equivalent in the
