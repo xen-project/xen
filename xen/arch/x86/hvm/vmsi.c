@@ -378,14 +378,16 @@ static void del_msixtbl_entry(struct msixtbl_entry *entry)
     call_rcu(&entry->rcu, free_msixtbl_entry);
 }
 
-void msixtbl_pt_register(struct domain *d, int pirq, uint64_t gtable)
+int msixtbl_pt_register(struct domain *d, int pirq, uint64_t gtable)
 {
     irq_desc_t *irq_desc;
     struct msi_desc *msi_desc;
     struct pci_dev *pdev;
     struct msixtbl_entry *entry;
+    int r = -EINVAL;
 
-    /* pcidevs_lock already held */
+    ASSERT(spin_is_locked(&pcidevs_lock));
+
     irq_desc = domain_spin_lock_irq_desc(d, pirq, NULL);
 
     if ( irq_desc->handler != &pci_msi_type )
@@ -412,11 +414,13 @@ void msixtbl_pt_register(struct domain *d, int pirq, uint64_t gtable)
 
 found:
     atomic_inc(&entry->refcnt);
-
     spin_unlock(&d->arch.hvm_domain.msixtbl_list_lock);
+    r = 0;
 
 out:
     spin_unlock_irq(&irq_desc->lock);
+    return r;
+
 }
 
 void msixtbl_pt_unregister(struct domain *d, int pirq)
@@ -426,7 +430,8 @@ void msixtbl_pt_unregister(struct domain *d, int pirq)
     struct pci_dev *pdev;
     struct msixtbl_entry *entry;
 
-    /* pcidevs_lock already held */
+    ASSERT(spin_is_locked(&pcidevs_lock));
+
     irq_desc = domain_spin_lock_irq_desc(d, pirq, NULL);
 
     if ( irq_desc->handler != &pci_msi_type )

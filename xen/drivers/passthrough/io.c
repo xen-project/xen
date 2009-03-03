@@ -58,14 +58,6 @@ static void pt_irq_time_out(void *data)
     pirq_guest_eoi(irq_map->dom, machine_gsi);
 }
 
-#ifdef CONFIG_X86
-extern void msixtbl_pt_register(struct domain *d, int pirq, uint64_t gtable);
-extern void msixtbl_pt_unregister(struct domain *d, int pirq);
-#else
-#define msixtbl_pt_register(d, p, g) ((void)0)
-#define msixtbl_pt_unregister(d, p)  ((void)0)
-#endif
-
 int pt_irq_create_bind_vtd(
     struct domain *d, xen_domctl_bind_pt_irq_t *pt_irq_bind)
 {
@@ -113,6 +105,12 @@ int pt_irq_create_bind_vtd(
             hvm_irq_dpci->msi_gvec_pirq[pt_irq_bind->u.msi.gvec] = pirq;
             /* bind after hvm_irq_dpci is setup to avoid race with irq handler*/
             rc = pirq_guest_bind(d->vcpu[0], pirq, 0);
+            if ( rc == 0 && pt_irq_bind->u.msi.gtable )
+            {
+                rc = msixtbl_pt_register(d, pirq, pt_irq_bind->u.msi.gtable);
+                if ( unlikely(rc) )
+                    pirq_guest_unbind(d, pirq);
+            }
             if ( unlikely(rc) )
             {
                 hvm_irq_dpci->msi_gvec_pirq[pt_irq_bind->u.msi.gvec] = 0;
@@ -123,8 +121,6 @@ int pt_irq_create_bind_vtd(
                 spin_unlock(&d->event_lock);
                 return rc;
             }
-            if ( pt_irq_bind->u.msi.gtable )
-                msixtbl_pt_register(d, pirq, pt_irq_bind->u.msi.gtable);
         }
         else if (hvm_irq_dpci->mirq[pirq].gmsi.gvec != pt_irq_bind->u.msi.gvec
                 ||hvm_irq_dpci->msi_gvec_pirq[pt_irq_bind->u.msi.gvec] != pirq)

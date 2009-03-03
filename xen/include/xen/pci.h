@@ -85,4 +85,7 @@ void pci_conf_write32(
 int pci_find_cap_offset(u8 bus, u8 dev, u8 func, u8 cap);
 int pci_find_next_cap(u8 bus, unsigned int devfn, u8 pos, int cap);
 
+int msixtbl_pt_register(struct domain *d, int pirq, uint64_t gtable);
+void msixtbl_pt_unregister(struct domain *d, int pirq);
+
 #endif /* __XEN_PCI_H__ */
