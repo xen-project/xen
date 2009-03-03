@@ -37,10 +37,8 @@
 #define xen_t_buf t_buf
 CHECK_t_buf;
 #undef xen_t_buf
-#define TB_COMPAT IS_COMPAT(dom0)
 #else
 #define compat_t_rec t_rec
-#define TB_COMPAT 0
 #endif
 
 /* opt_tbuf_size: trace buffer size (in pages) */

@@ -30,12 +30,11 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_runstate_info_compat_t);
 extern struct domain *dom0;
 
 #ifndef CONFIG_COMPAT
-#define MAX_EVTCHNS(d)     NR_EVENT_CHANNELS
+#define BITS_PER_EVTCHN_WORD(d) BITS_PER_LONG
 #else
-#define MAX_EVTCHNS(d)     (!IS_COMPAT(d) ? \
-                            NR_EVENT_CHANNELS : \
-                            sizeof(unsigned int) * sizeof(unsigned int) * 64)
+#define BITS_PER_EVTCHN_WORD(d) (has_32bit_shinfo(d) ? 32 : BITS_PER_LONG)
 #endif
+#define MAX_EVTCHNS(d) (BITS_PER_EVTCHN_WORD(d) * BITS_PER_EVTCHN_WORD(d) * 64)
 #define EVTCHNS_PER_BUCKET 128
 #define NR_EVTCHN_BUCKETS  (NR_EVENT_CHANNELS / EVTCHNS_PER_BUCKET)
 
@@ -541,10 +540,6 @@ uint64_t get_cpu_idle_time(unsigned int cpu);
 
 #define IS_PRIV(_d) ((_d)->is_privileged)
 #define IS_PRIV_FOR(_d, _t) (IS_PRIV(_d) || ((_d)->target && (_d)->target == (_t)))
-
-#ifndef IS_COMPAT
-#define IS_COMPAT(d) 0
-#endif
 
 #define VM_ASSIST(_d,_t) (test_bit((_t), &(_d)->vm_assist))
 

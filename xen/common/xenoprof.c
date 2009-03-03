@@ -208,7 +208,7 @@ static int alloc_xenoprof_struct(
     bufsize = sizeof(struct xenoprof_buf);
     i = sizeof(struct event_log);
 #ifdef CONFIG_COMPAT
-    d->xenoprof->is_compat = IS_COMPAT(is_passive ? dom0 : d);
+    d->xenoprof->is_compat = is_pv_32on64_domain(is_passive ? dom0 : d);
     if ( XENOPROF_COMPAT(d->xenoprof) )
     {
         bufsize = sizeof(struct compat_oprof_buf);

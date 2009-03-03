@@ -242,13 +242,15 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         if ( (c.nat = xmalloc(struct vcpu_guest_context)) == NULL )
             goto svc_out;
 
-        if ( !IS_COMPAT(v->domain) )
-            ret = copy_from_guest(c.nat, op->u.vcpucontext.ctxt, 1);
 #ifdef CONFIG_COMPAT
+        if ( !is_pv_32on64_vcpu(v) )
+            ret = copy_from_guest(c.nat, op->u.vcpucontext.ctxt, 1);
         else
             ret = copy_from_guest(c.cmp,
                                   guest_handle_cast(op->u.vcpucontext.ctxt,
                                                     void), 1);
+#else
+        ret = copy_from_guest(c.nat, op->u.vcpucontext.ctxt, 1);
 #endif
         ret = ret ? -EFAULT : 0;
 
@@ -596,12 +598,14 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         if ( v != current )
             vcpu_unpause(v);
 
-        if ( !IS_COMPAT(v->domain) )
-            ret = copy_to_guest(op->u.vcpucontext.ctxt, c.nat, 1);
 #ifdef CONFIG_COMPAT
+        if ( !is_pv_32on64_vcpu(v) )
+            ret = copy_to_guest(op->u.vcpucontext.ctxt, c.nat, 1);
         else
             ret = copy_to_guest(guest_handle_cast(op->u.vcpucontext.ctxt,
                                                   void), c.cmp, 1);
+#else
+        ret = copy_to_guest(op->u.vcpucontext.ctxt, c.nat, 1);
 #endif
 
         if ( copy_to_guest(u_domctl, op, 1) || ret )

@@ -3095,7 +3095,8 @@ long register_guest_nmi_callback(unsigned long address)
 
     t->vector  = TRAP_nmi;
     t->flags   = 0;
-    t->cs      = !IS_COMPAT(d) ? FLAT_KERNEL_CS : FLAT_COMPAT_KERNEL_CS;
+    t->cs      = (is_pv_32on64_domain(d) ?
+                  FLAT_COMPAT_KERNEL_CS : FLAT_KERNEL_CS);
     t->address = address;
     TI_SET_IF(t, 1);
 
