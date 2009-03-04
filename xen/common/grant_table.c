@@ -195,7 +195,7 @@ static void
 __gnttab_map_grant_ref(
     struct gnttab_map_grant_ref *op)
 {
-    struct domain *ld, *rd;
+    struct domain *ld, *rd, *owner;
     struct vcpu   *led;
     int            handle;
     unsigned long  frame = 0, nr_gets = 0;
@@ -336,8 +336,13 @@ __gnttab_map_grant_ref(
 
     spin_unlock(&rd->grant_table->lock);
 
-    if ( is_iomem_page(frame) )
+    if ( !mfn_valid(frame) ||
+         (owner = page_get_owner_and_reference(mfn_to_page(frame))) == dom_io )
     {
+        /* Only needed the reference to confirm dom_io ownership. */
+        if ( mfn_valid(frame) )
+            put_page(mfn_to_page(frame));
+
         if ( !iomem_access_permitted(rd, frame, frame) )
         {
             gdprintk(XENLOG_WARNING,
@@ -352,20 +357,11 @@ __gnttab_map_grant_ref(
         if ( rc != GNTST_okay )
             goto undo_out;
     }
-    else
+    else if ( owner == rd )
     {
-        if ( unlikely(!mfn_valid(frame)) ||
-             unlikely(!(gnttab_host_mapping_get_page_type(op, ld, rd) ?
-                        get_page_and_type(mfn_to_page(frame), rd,
-                                          PGT_writable_page) :
-                        get_page(mfn_to_page(frame), rd))) )
-        {
-            if ( !rd->is_dying )
-                gdprintk(XENLOG_WARNING, "Could not pin grant frame %lx\n",
-                         frame);
-            rc = GNTST_general_error;
-            goto undo_out;
-        }
+        if ( gnttab_host_mapping_get_page_type(op, ld, rd) &&
+             !get_page_type(mfn_to_page(frame), PGT_writable_page) )
+            goto could_not_pin;
 
         nr_gets++;
         if ( op->flags & GNTMAP_host_map )
@@ -382,6 +378,17 @@ __gnttab_map_grant_ref(
                     get_page_type(mfn_to_page(frame), PGT_writable_page);
             }
         }
+    }
+    else
+    {
+    could_not_pin:
+        if ( !rd->is_dying )
+            gdprintk(XENLOG_WARNING, "Could not pin grant frame %lx\n",
+                     frame);
+        if ( owner != NULL )
+            put_page(mfn_to_page(frame));
+        rc = GNTST_general_error;
+        goto undo_out;
     }
 
     if ( need_iommu(ld) &&

@@ -371,14 +371,14 @@ void share_xen_page_with_privileged_guests(
 #else
 /*
  * In debug builds we shadow a selection of <4GB PDPTs to exercise code paths.
- * We cannot safely shadow the idle page table, nor shadow (v1) page tables
- * (detected by lack of an owning domain). As required for correctness, we
+ * We cannot safely shadow the idle page table, nor shadow page tables
+ * (detected by zero reference count). As required for correctness, we
  * always shadow PDPTs above 4GB.
  */
-#define l3tab_needs_shadow(mfn)                         \
-    (((((mfn) << PAGE_SHIFT) != __pa(idle_pg_table)) && \
-      (page_get_owner(mfn_to_page(mfn)) != NULL) &&     \
-      ((mfn) & 1)) || /* odd MFNs are shadowed */       \
+#define l3tab_needs_shadow(mfn)                          \
+    (((((mfn) << PAGE_SHIFT) != __pa(idle_pg_table)) &&  \
+      (mfn_to_page(mfn)->count_info & PGC_count_mask) && \
+      ((mfn) & 1)) || /* odd MFNs are shadowed */        \
      ((mfn) >= 0x100000))
 #endif
 
@@ -690,7 +690,16 @@ get_##level##_linear_pagetable(                                             \
 
 int is_iomem_page(unsigned long mfn)
 {
-    return (!mfn_valid(mfn) || (page_get_owner(mfn_to_page(mfn)) == dom_io));
+    struct page_info *page;
+
+    if ( !mfn_valid(mfn) )
+        return 1;
+
+    /* Caller must know that it is an iomem page, or a reference is held. */
+    page = mfn_to_page(mfn);
+    ASSERT((page->count_info & PGC_count_mask) != 0);
+
+    return (page_get_owner(page) == dom_io);
 }
 
 
@@ -703,7 +712,6 @@ get_page_from_l1e(
     uint32_t l1f = l1e_get_flags(l1e);
     struct vcpu *curr = current;
     struct domain *owner;
-    int okay;
 
     if ( !(l1f & _PAGE_PRESENT) )
         return 1;
@@ -714,8 +722,13 @@ get_page_from_l1e(
         return 0;
     }
 
-    if ( is_iomem_page(mfn) )
+    if ( !mfn_valid(mfn) ||
+         (owner = page_get_owner_and_reference(page)) == dom_io )
     {
+        /* Only needed the reference to confirm dom_io ownership. */
+        if ( mfn_valid(mfn) )
+            put_page(page);
+
         /* DOMID_IO reverts to caller for privilege checks. */
         if ( d == dom_io )
             d = curr->domain;
@@ -731,33 +744,29 @@ get_page_from_l1e(
         return 1;
     }
 
+    if ( owner == NULL )
+        goto could_not_pin;
+
     /*
      * Let privileged domains transfer the right to map their target
      * domain's pages. This is used to allow stub-domain pvfb export to dom0,
      * until pvfb supports granted mappings. At that time this minor hack
      * can go away.
      */
-    owner = page_get_owner(page);
-    if ( unlikely(d != owner) && (owner != NULL) &&
-         (d != curr->domain) && IS_PRIV_FOR(d, owner) )
+    if ( unlikely(d != owner) && (d != curr->domain) && IS_PRIV_FOR(d, owner) )
         d = owner;
 
     /* Foreign mappings into guests in shadow external mode don't
      * contribute to writeable mapping refcounts.  (This allows the
      * qemu-dm helper process in dom0 to map the domain's memory without
      * messing up the count of "real" writable mappings.) */
-    okay = get_data_page(
-        page, d,
-        (l1f & _PAGE_RW) && !(paging_mode_external(d) && (d != curr->domain)));
-    if ( !okay )
-    {
-        MEM_LOG("Error getting mfn %lx (pfn %lx) from L1 entry %" PRIpte
-                " for dom%d",
-                mfn, get_gpfn_from_mfn(mfn),
-                l1e_get_intpte(l1e), d->domain_id);
-    }
-    else if ( pte_flags_to_cacheattr(l1f) !=
-              ((page->count_info >> PGC_cacheattr_base) & 7) )
+    if ( (l1f & _PAGE_RW) &&
+         !(paging_mode_external(d) && (d != curr->domain)) &&
+         !get_page_type(page, PGT_writable_page) )
+        goto could_not_pin;
+
+    if ( pte_flags_to_cacheattr(l1f) !=
+         ((page->count_info >> PGC_cacheattr_base) & 7) )
     {
         unsigned long x, nx, y = page->count_info;
         unsigned long cacheattr = pte_flags_to_cacheattr(l1f);
@@ -786,7 +795,16 @@ get_page_from_l1e(
 #endif
     }
 
-    return okay;
+    return 1;
+
+ could_not_pin:
+    MEM_LOG("Error getting mfn %lx (pfn %lx) from L1 entry %" PRIpte
+            " for dom%d",
+            mfn, get_gpfn_from_mfn(mfn),
+            l1e_get_intpte(l1e), d->domain_id);
+    if ( owner != NULL )
+        put_page(page);
+    return 0;
 }
 
 
@@ -1174,7 +1192,7 @@ static int create_pae_xen_mappings(struct domain *d, l3_pgentry_t *pl3e)
     for ( i = 0; i < PDPT_L2_ENTRIES; i++ )
     {
         l2e = l2e_from_page(
-            virt_to_page(page_get_owner(page)->arch.mm_perdomain_pt) + i,
+            virt_to_page(d->arch.mm_perdomain_pt) + i,
             __PAGE_HYPERVISOR);
         l2e_write(&pl2e[l2_table_offset(PERDOMAIN_VIRT_START) + i], l2e);
     }
@@ -1924,7 +1942,7 @@ void put_page(struct page_info *page)
 }
 
 
-int get_page(struct page_info *page, struct domain *domain)
+struct domain *page_get_owner_and_reference(struct page_info *page)
 {
     unsigned long x, y = page->count_info;
 
@@ -1933,22 +1951,29 @@ int get_page(struct page_info *page, struct domain *domain)
         if ( unlikely((x & PGC_count_mask) == 0) ||  /* Not allocated? */
              /* Keep one spare reference to be acquired by get_page_light(). */
              unlikely(((x + 2) & PGC_count_mask) <= 1) ) /* Overflow? */
-            goto fail;
+            return NULL;
     }
     while ( (y = cmpxchg(&page->count_info, x, x + 1)) != x );
 
-    if ( likely(page_get_owner(page) == domain) )
+    return page_get_owner(page);
+}
+
+
+int get_page(struct page_info *page, struct domain *domain)
+{
+    struct domain *owner = page_get_owner_and_reference(page);
+
+    if ( likely(owner == domain) )
         return 1;
 
     put_page(page);
 
- fail:
     if ( !_shadow_mode_refcounts(domain) && !domain->is_dying )
         gdprintk(XENLOG_INFO,
                  "Error pfn %lx: rd=%p, od=%p, caf=%08lx, taf=%"
                  PRtype_info "\n",
-                 page_to_mfn(page), domain, page_get_owner(page),
-                 y, page->u.inuse.type_info);
+                 page_to_mfn(page), domain, owner,
+                 page->count_info, page->u.inuse.type_info);
     return 0;
 }
 
@@ -1973,7 +1998,6 @@ static void get_page_light(struct page_info *page)
     }
     while ( unlikely(y != x) );
 }
-
 
 static int alloc_page_type(struct page_info *page, unsigned long type,
                            int preemptible)

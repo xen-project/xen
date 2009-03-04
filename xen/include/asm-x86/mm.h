@@ -258,6 +258,7 @@ void cleanup_page_cacheattr(struct page_info *page);
 
 int is_iomem_page(unsigned long mfn);
 
+struct domain *page_get_owner_and_reference(struct page_info *page);
 void put_page(struct page_info *page);
 int  get_page(struct page_info *page, struct domain *domain);
 void put_page_type(struct page_info *page);
