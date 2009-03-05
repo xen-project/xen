@@ -2212,7 +2212,9 @@ class XendDomainInfo:
             if security.has_authorization(ssidref) == False:
                 raise VmError("VM is not authorized to run.")
 
-        s3_integrity = self.info['s3_integrity']
+        s3_integrity = 0
+        if self.info.has_key('s3_integrity'):
+            s3_integrity = self.info['s3_integrity']
         flags = (int(hvm) << 0) | (int(hap) << 1) | (int(s3_integrity) << 2)
 
         try:
