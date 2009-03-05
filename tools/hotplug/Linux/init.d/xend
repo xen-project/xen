@@ -39,11 +39,13 @@ function await_daemons_up
 
 case "$1" in
   start)
+	touch /var/lock/subsys/xend
 	xend start
 	await_daemons_up
 	;;
   stop)
 	xend stop
+	rm -f /var/lock/subsys/xend
 	;;
   status)
 	xend status
