@@ -2187,10 +2187,17 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         case MSR_IA32_MPERF:
         case MSR_IA32_APERF:
         case MSR_IA32_PERF_CTL:
-        case MSR_IA32_THERM_CONTROL:
             if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL )
                 goto fail;
             if ( !is_cpufreq_controller(v->domain) )
+                break;
+            if ( wrmsr_safe(regs->ecx, eax, edx) != 0 )
+                goto fail;
+            break;
+        case MSR_IA32_THERM_CONTROL:
+            if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL )
+                goto fail;
+            if ( (v->domain->domain_id != 0) || !v->domain->is_pinned )
                 break;
             if ( wrmsr_safe(regs->ecx, eax, edx) != 0 )
                 goto fail;
