@@ -33,7 +33,7 @@ def blkdev_name_to_number(name):
         major = scsi_major[((ord(n[7:8]) - ord('a') + 1) * 26 + (ord(n[8:9]) - ord('a'))) / 16 ]
         minor = (((ord(n[7:8]) - ord('a') + 1 ) * 26 + (ord(n[8:9]) - ord('a'))) % 16) * 16 + int(n[9:] or 0)
         devnum = major * 256 + minor
-    elif re.match( '/dev/hd[a-t]([1-9]|[1-5][0-9]|6[0-3])?', n):
+    elif re.match( '/dev/hd[a-t]([1-9]|[1-5][0-9]|6[0-3])?$', n):
         ide_majors = [ 3, 22, 33, 34, 56, 57, 88, 89, 90, 91 ]
         major = ide_majors[(ord(n[7:8]) - ord('a')) / 2]
         minor = ((ord(n[7:8]) - ord('a')) % 2) * 64 + int(n[8:] or 0)
