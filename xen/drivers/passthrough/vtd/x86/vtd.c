@@ -27,8 +27,11 @@
 #include "../dmar.h"
 #include "../vtd.h"
 
-/* iommu_inclusive_mapping: when set, all memory below 4GB is included in dom0 1-1 iommu mappings except xen and unusable regions */
-static int iommu_inclusive_mapping = 0;
+/*
+ * iommu_inclusive_mapping: when set, all memory below 4GB is included in dom0
+ * 1:1 iommu mappings except xen and unusable regions.
+ */
+static int iommu_inclusive_mapping;
 boolean_param("iommu_inclusive_mapping", iommu_inclusive_mapping);
 
 void *map_vtd_domain_page(u64 maddr)
@@ -151,25 +154,23 @@ void hvm_dpci_isairq_eoi(struct domain *d, unsigned int isairq)
 void iommu_set_dom0_mapping(struct domain *d)
 {
     u64 i, j, tmp;
+    unsigned long max_pfn = max(max_page, 0x100000000ul >> PAGE_SHIFT);
     extern int xen_in_range(paddr_t start, paddr_t end);
 
     BUG_ON(d->domain_id != 0);
 
-    for ( i = 0; i < max_page; i++ )
+    for ( i = 0; i < max_pfn; i++ )
     {
-        /* Set up 1:1 mapping for dom0 */
-        if ( !page_is_ram_type(i, RAM_TYPE_CONVENTIONAL) )
-        {
-            /* Default it to use only conventional RAM areas and let RMRRs include needed reserved regions */
-            if (iommu_inclusive_mapping)
-            {
-                /* When set, the inclusive mapping maps in everything below 4GB except unusable ranges */
-                if ( (i >= 0x100000) || page_is_ram_type(i, RAM_TYPE_UNUSABLE) )
-                    continue;
-            }
-            else
-                continue;
-        }
+        /*
+         * Set up 1:1 mapping for dom0. Default to use only conventional RAM 
+         * areas and let RMRRs include needed reserved regions. When set, the 
+         * inclusive mapping maps in everything below 4GB except unusable
+         * ranges. 
+         */
+        if ( !page_is_ram_type(i, RAM_TYPE_CONVENTIONAL) &&
+             (!iommu_inclusive_mapping ||
+              page_is_ram_type(i, RAM_TYPE_UNUSABLE)) )
+            continue;
 
         /* Exclude Xen bits */
         if ( xen_in_range(i << PAGE_SHIFT, (i + 1) << PAGE_SHIFT) )
