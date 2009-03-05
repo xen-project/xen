@@ -200,7 +200,8 @@ static inline void put_page(struct page_info *page)
         free_domheap_page(page);
 }
 
-static inline page_get_owner_and_reference(struct page_info *page)
+static inline struct domain *page_get_owner_and_reference(
+    struct page_info *page)
 {
     unsigned long x, y = page->count_info;
 
@@ -226,7 +227,7 @@ static inline int get_page(struct page_info *page,
         return 1;
 
     put_page(page);
-fail:
+
     /* if (!domain->is_dying) */ /* XXX: header inclusion hell */
     gdprintk(XENLOG_INFO,
              "Error pfn %lx: rd=%p, od=%p, caf=%016lx, taf=%" PRtype_info "\n",

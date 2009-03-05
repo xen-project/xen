@@ -51,7 +51,7 @@ xencomm_get_page(unsigned long paddr, struct page_info **page)
         return -EFAULT;
         
     *page = maddr_to_page(maddr);
-    if ( !get_page(*page, current->domain) == 0 )
+    if ( !get_page(*page, current->domain) )
     {
         /*
          * This page might be a page granted by another domain, or this page 
