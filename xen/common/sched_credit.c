@@ -250,15 +250,6 @@ static struct csched_private csched_priv;
 static void csched_tick(void *_cpu);
 
 static inline int
-__cycle_cpu(int cpu, const cpumask_t *mask)
-{
-    int nxt = next_cpu(cpu, *mask);
-    if (nxt == NR_CPUS)
-        nxt = first_cpu(*mask);
-    return nxt;
-}
-
-static inline int
 __vcpu_on_runq(struct csched_vcpu *svc)
 {
     return !list_empty(&svc->runq_elem);
@@ -428,7 +419,7 @@ csched_cpu_pick(struct vcpu *vc)
     cpus_and(cpus, cpu_online_map, vc->cpu_affinity);
     cpu = cpu_isset(vc->processor, cpus)
             ? vc->processor
-            : __cycle_cpu(vc->processor, &cpus);
+            : cycle_cpu(vc->processor, cpus);
     ASSERT( !cpus_empty(cpus) && cpu_isset(cpu, cpus) );
 
     /*
@@ -454,7 +445,7 @@ csched_cpu_pick(struct vcpu *vc)
         cpumask_t nxt_idlers;
         int nxt;
 
-        nxt = __cycle_cpu(cpu, &cpus);
+        nxt = cycle_cpu(cpu, cpus);
 
         if ( cpu_isset(cpu, cpu_core_map[nxt]) )
         {
@@ -1128,7 +1119,7 @@ csched_load_balance(int cpu, struct csched_vcpu *snext)
 
     while ( !cpus_empty(workers) )
     {
-        peer_cpu = __cycle_cpu(peer_cpu, &workers);
+        peer_cpu = cycle_cpu(peer_cpu, workers);
         cpu_clear(peer_cpu, workers);
 
         /*

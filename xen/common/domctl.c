@@ -433,7 +433,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 
             cpu = (i == 0) ?
                 default_vcpu0_location() :
-                (d->vcpu[i-1]->processor + 1) % num_online_cpus();
+                cycle_cpu(d->vcpu[i-1]->processor, cpu_online_map);
 
             if ( alloc_vcpu(d, i, cpu) == NULL )
                 goto maxvcpu_out;
