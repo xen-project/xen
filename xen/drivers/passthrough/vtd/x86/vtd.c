@@ -153,11 +153,12 @@ void hvm_dpci_isairq_eoi(struct domain *d, unsigned int isairq)
 
 void iommu_set_dom0_mapping(struct domain *d)
 {
-    u64 i, j, tmp;
-    unsigned long max_pfn = max(max_page, 0x100000000ul >> PAGE_SHIFT);
+    u64 i, j, tmp, max_pfn;
     extern int xen_in_range(paddr_t start, paddr_t end);
 
     BUG_ON(d->domain_id != 0);
+
+    max_pfn = max_t(u64, max_page, 0x100000000ull >> PAGE_SHIFT);
 
     for ( i = 0; i < max_pfn; i++ )
     {
