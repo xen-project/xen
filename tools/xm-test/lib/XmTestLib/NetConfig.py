@@ -57,11 +57,13 @@ def getXendNetConfig():
     while val[0] != 'network-script':
         val = pin.get_val()
 
-    if val[1] == "network-bridge":
+    # split network command into script name and its parameters
+    sub_val = val[1].split()
+    if sub_val[0] == "network-bridge":
         netenv = "bridge"
-    elif val[1] == "network-route":
+    elif sub_val[0] == "network-route":
         netenv = "route"
-    elif val[1] == "network-nat":
+    elif sub_val[0] == "network-nat":
         netenv = "nat"
     else:
         raise NetworkError("Failed to get network env from xend config")
