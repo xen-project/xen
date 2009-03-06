@@ -97,6 +97,8 @@ class PciController(DevController):
         back['uuid'] = config.get('uuid','')
         if 'pci_msitranslate' in self.vm.info['platform']:
             back['msitranslate']=str(self.vm.info['platform']['pci_msitranslate'])
+        if 'pci_power_mgmt' in self.vm.info['platform']:
+            back['power_mgmt']=str(self.vm.info['platform']['pci_power_mgmt'])
 
         return (0, back, {})
 

@@ -322,14 +322,16 @@ gopts.var('disk', val='phy:DEV,VDEV,MODE[,DOM]',
           backend driver domain to use for the disk.
           The option may be repeated to add more than one disk.""")
 
-gopts.var('pci', val='BUS:DEV.FUNC[,msitranslate=0|1]',
+gopts.var('pci', val='BUS:DEV.FUNC[,msitranslate=0|1][,power_mgmt=0|1]',
           fn=append_value, default=[],
           use="""Add a PCI device to a domain, using given params (in hex).
           For example 'pci=c0:02.1'.
           If msitranslate is set, MSI-INTx translation is enabled if possible.
           Guest that doesn't support MSI will get IO-APIC type IRQs
           translated from physical MSI, HVM only. Default is 1.
-          The option may be repeated to add more than one pci device.""")
+          The option may be repeated to add more than one pci device.
+          If power_mgmt is set, the guest OS will be able to program the power
+          states D0-D3hot of the device, HVM only. Default=0.""")
 
 gopts.var('vscsi', val='PDEV,VDEV[,DOM]',
           fn=append_value, default=[],
@@ -605,6 +607,10 @@ gopts.var('pci_msitranslate', val='TRANSLATE',
           use="""Global PCI MSI-INTx translation flag (0=disable;
           1=enable.""")
 
+gopts.var('pci_power_mgmt', val='POWERMGMT',
+          fn=set_int, default=0,
+          use="""Global PCI Power Management flag (0=disable;1=enable).""")
+
 def err(msg):
     """Print an error to stderr and exit.
     """
@@ -691,7 +697,7 @@ def configure_pci(config_devs, vals):
         d = comma_sep_kv_to_dict(opts)
 
         def f(k):
-            if k not in ['msitranslate']:
+            if k not in ['msitranslate', 'power_mgmt']:
                 err('Invalid pci option: ' + k)
 
             config_pci_opts.append([k, d[k]])
@@ -913,7 +919,7 @@ def configure_hvm(config_image, vals):
              'acpi', 'apic', 'usb', 'usbdevice', 'keymap', 'pci', 'hpet',
              'guest_os_type', 'hap', 'opengl', 'cpuid', 'cpuid_check',
              'viridian', 'xen_extended_power_mgmt', 'pci_msitranslate',
-             'vpt_align' ]
+             'vpt_align', 'pci_power_mgmt' ]
 
     for a in args:
         if a in vals.__dict__ and vals.__dict__[a] is not None:

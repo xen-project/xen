@@ -169,6 +169,7 @@ XENAPI_PLATFORM_CFG_TYPES = {
     'hap': int,
     'xen_extended_power_mgmt': int,
     'pci_msitranslate': int,
+    'pci_power_mgmt': int,
 }
 
 # Xen API console 'other_config' keys.
