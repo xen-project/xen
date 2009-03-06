@@ -35,6 +35,7 @@
 #include <xen/perfc.h>
 #include <xen/numa.h>
 #include <xen/nodemask.h>
+#include <public/sysctl.h>
 #include <asm/page.h>
 #include <asm/numa.h>
 #include <asm/flushtlb.h>
@@ -74,6 +75,11 @@ static DEFINE_SPINLOCK(page_scrub_lock);
 PAGE_LIST_HEAD(page_scrub_list);
 static unsigned long scrub_pages;
 
+/* Offlined page list, protected by heap_lock */
+PAGE_LIST_HEAD(page_offlined_list);
+
+/* Broken page list, protected by heap_lock */
+PAGE_LIST_HEAD(page_broken_list);
 /*********************
  * ALLOCATION BITMAP
  *  One bit per page of memory. Bit set => page is allocated.
@@ -421,12 +427,92 @@ static struct page_info *alloc_heap_pages(
     return pg;
 }
 
+/*
+ * Remove any offlined page in the buddy poined by head
+ */
+static int reserve_offlined_page(struct page_info *head)
+{
+    unsigned int node = phys_to_nid(page_to_maddr(head));
+    int zone = page_to_zone(head), i, head_order = PFN_ORDER(head), count = 0;
+    struct page_info *cur_head;
+    int cur_order;
+
+    ASSERT(spin_is_locked(&heap_lock));
+
+    cur_head = head;
+
+    page_list_del(head, &heap(node, zone, head_order));
+
+    while ( cur_head < (head + (1 << head_order)) )
+    {
+        struct page_info *pg;
+        int next_order;
+
+        if (test_bit(_PGC_offlined, &cur_head->count_info))
+        {
+            cur_head++;
+            continue;
+        }
+
+        next_order = cur_order = 0;
+
+        while (cur_order < head_order)
+        {
+            next_order = cur_order + 1;
+
+            if ( (cur_head + (1 << next_order)) >= (head + ( 1 << head_order)))
+                goto merge;
+
+            for (i = (1 << cur_order), pg = cur_head + (1 << cur_order);
+              i < (1 << next_order);
+              i++, pg ++)
+                if (test_bit(_PGC_offlined, &pg->count_info))
+                    break;
+            if (i == ( 1 << next_order))
+            {
+                cur_order = next_order;
+                continue;
+            }
+            else
+            {
+                /*
+                 * We don't need considering merge outside the head_order
+                 */
+merge:
+                page_list_add_tail(cur_head, &heap(node, zone, cur_order));
+                PFN_ORDER(cur_head) = cur_order;
+                cur_head += (1 << cur_order);
+                break;
+            }
+        }
+    }
+
+    for (cur_head = head; cur_head < head + ( 1UL << head_order); cur_head++)
+    {
+        if (!test_bit(_PGC_offlined, &cur_head->count_info))
+            continue;
+
+        avail[node][zone] --;
+
+        map_alloc(page_to_mfn(cur_head), 1);
+
+        if (test_bit(_PGC_broken, &cur_head->count_info))
+            page_list_add_tail(cur_head, &page_broken_list);
+        else
+            page_list_add_tail(cur_head, &page_offlined_list);
+
+        count ++;
+    }
+
+    return count;
+}
+
 /* Free 2^@order set of pages. */
 static void free_heap_pages(
     struct page_info *pg, unsigned int order)
 {
     unsigned long mask;
-    unsigned int i, node = phys_to_nid(page_to_maddr(pg));
+    unsigned int i, node = phys_to_nid(page_to_maddr(pg)), tainted = 0;
     unsigned int zone = page_to_zone(pg);
 
     ASSERT(order <= MAX_ORDER);
@@ -446,7 +532,14 @@ static void free_heap_pages(
          *     in its pseudophysical address space).
          * In all the above cases there can be no guest mappings of this page.
          */
-        pg[i].count_info = 0;
+        ASSERT(!(pg[i].count_info & PGC_offlined));
+        pg[i].count_info &= PGC_offlining | PGC_broken;
+        if (pg[i].count_info & PGC_offlining)
+        {
+            pg[i].count_info &= ~PGC_offlining;
+            pg[i].count_info |= PGC_offlined;
+            tainted = 1;
+        }
 
         /* If a page has no owner it will need no safety TLB flush. */
         pg[i].u.free.need_tlbflush = (page_get_owner(&pg[i]) != NULL);
@@ -481,7 +574,7 @@ static void free_heap_pages(
                 break;
             page_list_del(pg + mask, &heap(node, zone, order));
         }
-        
+
         order++;
 
         /* After merging, pg should remain in the same node. */
@@ -491,7 +584,249 @@ static void free_heap_pages(
     PFN_ORDER(pg) = order;
     page_list_add_tail(pg, &heap(node, zone, order));
 
+    if (tainted)
+        reserve_offlined_page(pg);
+
     spin_unlock(&heap_lock);
+}
+
+
+/*
+ * Following possible status for a page:
+ * free and Online; free and offlined; free and offlined and broken;
+ * assigned and online; assigned and offlining; assigned and offling and broken
+ *
+ * Following rules applied for page offline:
+ * Once a page is broken, it can't be assigned anymore
+ * A page will be offlined only if it is free
+ * return original count_info
+ *
+ */
+static unsigned long mark_page_offline(struct page_info *pg, int broken)
+{
+    unsigned long nx, x, y = pg->count_info;
+
+    ASSERT(page_is_ram_type(page_to_mfn(pg), RAM_TYPE_CONVENTIONAL));
+    /*
+     * Caller gurantee the page will not be reassigned during this process
+     */
+    ASSERT(spin_is_locked(&heap_lock));
+
+    do {
+        nx = x = y;
+
+        if ( ((x & PGC_offlined_broken) == PGC_offlined_broken) )
+            return y;
+        /* PGC_offlined means it is free pages */
+        if (x & PGC_offlined)
+        {
+            if (broken && !(nx & PGC_broken))
+                nx |= PGC_broken;
+            else
+                return y;
+        }
+        /* It is not offlined, not reserved page */
+        else if ( allocated_in_map(page_to_mfn(pg)) )
+            nx |= PGC_offlining;
+        else
+            nx |= PGC_offlined;
+
+        if (broken)
+            nx |= PGC_broken;
+    } while ( (y = cmpxchg(&pg->count_info, x, nx)) != x );
+
+    return y;
+}
+
+static int reserve_heap_page(struct page_info *pg)
+{
+    struct page_info *head = NULL;
+    unsigned int i, node = phys_to_nid(page_to_maddr(pg));
+    unsigned int zone = page_to_zone(pg);
+
+    /* get the header */
+    for ( i = 0; i <= MAX_ORDER; i++ )
+    {
+        struct page_info *tmp;
+
+        if ( page_list_empty(&heap(node, zone, i)) )
+            continue;
+
+        page_list_for_each_safe(head, tmp, &heap(node, zone, i))
+        {
+            if ( (head <= pg) &&
+                 (head + (1UL << i) > pg) )
+                return reserve_offlined_page(head);
+        }
+    }
+
+    return -EINVAL;
+
+}
+
+/*
+ * offline one page
+ */
+int offline_page(unsigned long mfn, int broken, uint32_t *status)
+{
+    unsigned long old_info = 0;
+    struct domain *owner;
+    int ret = 0;
+    struct page_info *pg;
+
+    if (mfn > max_page)
+    {
+        dprintk(XENLOG_WARNING,
+                "try to offline page out of range %lx\n", mfn);
+        return -EINVAL;
+    }
+
+    *status = 0;
+    pg = mfn_to_page(mfn);
+
+
+#if defined(__x86_64__)
+     /* Xen's txt mfn in x86_64 is reserved in e820 */
+    if ( is_xen_fixed_mfn(mfn) )
+#elif defined(__i386__)
+    if ( is_xen_heap_mfn(mfn) )
+#endif
+    {
+        *status = PG_OFFLINE_XENPAGE | PG_OFFLINE_FAILED |
+          (DOMID_XEN << PG_OFFLINE_OWNER_SHIFT);
+        return -EPERM;
+    }
+
+    /*
+     * N.B. xen's txt in x86_64 is marked reserved and handled already
+     *  Also kexec range is reserved
+     */
+     if (!page_is_ram_type(mfn, RAM_TYPE_CONVENTIONAL))
+     {
+        *status = PG_OFFLINE_FAILED | PG_OFFLINE_NOT_CONV_RAM;
+        return -EINVAL;
+     }
+
+    spin_lock(&heap_lock);
+
+    old_info = mark_page_offline(pg, broken);
+
+    if ( !allocated_in_map(mfn) )
+    {
+        /* Free pages are reserve directly */
+        reserve_heap_page(pg);
+        *status = PG_OFFLINE_OFFLINED;
+    }
+    else if (test_bit(_PGC_offlined, &pg->count_info))
+    {
+        *status = PG_OFFLINE_OFFLINED;
+    }
+    else if ((owner = page_get_owner_and_reference(pg)))
+    {
+            *status = PG_OFFLINE_OWNED | PG_OFFLINE_PENDING |
+              (owner->domain_id << PG_OFFLINE_OWNER_SHIFT);
+            /* Release the reference since it will not be allocated anymore */
+            put_page(pg);
+    }
+    else if ( old_info & PGC_xen_heap)
+    {
+        *status = PG_OFFLINE_XENPAGE | PG_OFFLINE_PENDING |
+          (DOMID_XEN << PG_OFFLINE_OWNER_SHIFT);
+    }
+    else
+    {
+        /*
+         * assign_pages does not hold heap_lock, so small window that the owner
+         * may be set later, but please notice owner will only change from
+         * NULL to be set, not verse, since page is offlining now.
+         * No windows If called from #MC handler, since all CPU are in softirq
+         * If called from user space like CE handling, tools can wait some time
+         * before call again.
+         */
+        *status = PG_OFFLINE_ANONYMOUS | PG_OFFLINE_FAILED |
+                  (DOMID_INVALID << PG_OFFLINE_OWNER_SHIFT );
+    }
+
+    if (broken)
+        *status |= PG_OFFLINE_BROKEN;
+
+    spin_unlock(&heap_lock);
+
+    return ret;
+}
+
+/*
+ * Online the memory.
+ *   The caller should make sure end_pfn <= max_page,
+ *   if not, expand_pages() should be called prior to online_page().
+ */
+unsigned int online_page(unsigned long mfn, uint32_t *status)
+{
+    struct page_info *pg;
+    int ret = 0, free = 0;
+
+    if ( mfn > max_page )
+    {
+        dprintk(XENLOG_WARNING, "call expand_pages() first\n");
+        return -EINVAL;
+    }
+
+    pg = mfn_to_page(mfn);
+
+    *status = 0;
+
+    spin_lock(&heap_lock);
+
+    if ( unlikely(is_page_broken(pg)) )
+    {
+        ret = -EINVAL;
+        *status = PG_ONLINE_FAILED |PG_ONLINE_BROKEN;
+    }
+    else if (pg->count_info & PGC_offlined)
+    {
+        clear_bit(_PGC_offlined, &pg->count_info);
+        page_list_del(pg, &page_offlined_list);
+        *status = PG_ONLINE_ONLINED;
+        free = 1;
+    }
+    else if (pg->count_info & PGC_offlining)
+    {
+        clear_bit(_PGC_offlining, &pg->count_info);
+        *status = PG_ONLINE_ONLINED;
+    }
+    spin_unlock(&heap_lock);
+
+    if (free)
+        free_heap_pages(pg, 0);
+
+    return ret;
+}
+
+int query_page_offline(unsigned long mfn, uint32_t *status)
+{
+    struct page_info *pg;
+
+    if ( (mfn > max_page) || !page_is_ram_type(mfn, RAM_TYPE_CONVENTIONAL) )
+    {
+        dprintk(XENLOG_WARNING, "call expand_pages() first\n");
+        return -EINVAL;
+    }
+
+    *status = 0;
+    spin_lock(&heap_lock);
+
+    pg = mfn_to_page(mfn);
+
+    if (pg->count_info & PGC_offlining)
+        *status |= PG_OFFLINE_STATUS_OFFLINE_PENDING;
+    if (pg->count_info & PGC_broken)
+        *status |= PG_OFFLINE_STATUS_BROKEN;
+    if (pg->count_info & PGC_offlined)
+        *status |= PG_OFFLINE_STATUS_OFFLINED;
+
+    spin_unlock(&heap_lock);
+
+    return 0;
 }
 
 /*

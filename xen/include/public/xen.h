@@ -354,6 +354,9 @@ typedef uint16_t domid_t;
  */
 #define DOMID_XEN  (0x7FF2U)
 
+/* DOMID_INVALID is used to identity invalid domid */
+#define DOMID_INVALID (0x7FFFU)
+
 /*
  * Send an array of these to HYPERVISOR_mmu_update().
  * NB. The fields are natural pointer/address size for this architecture.

@@ -198,8 +198,25 @@ struct page_info
  /* 3-bit PAT/PCD/PWT cache-attribute hint. */
 #define PGC_cacheattr_base PG_shift(6)
 #define PGC_cacheattr_mask PG_mask(7, 6)
+
+  /* Page is broken? */
+ #define _PGC_broken         PG_shift(7)
+ #define PGC_broken          PG_mask(1, 7)
+  /* Page is offline pending ? */
+ #define _PGC_offlining      PG_shift(8)
+ #define PGC_offlining       PG_mask(1, 8)
+  /* Page is offlined */
+ #define _PGC_offlined       PG_shift(9)
+ #define PGC_offlined        PG_mask(1, 9)
+ #define PGC_offlined_broken (PGC_offlined | PGC_broken)
+
+ #define is_page_offlining(page)          ((page)->count_info & PGC_offlining)
+ #define is_page_offlined(page)          ((page)->count_info & PGC_offlined)
+ #define is_page_broken(page)           ((page)->count_info & PGC_broken)
+ #define is_page_online(page)           (!is_page_offlined(page))
+
  /* Count of references to this frame. */
-#define PGC_count_width   PG_shift(6)
+#define PGC_count_width   PG_shift(9)
 #define PGC_count_mask    ((1UL<<PGC_count_width)-1)
 
 #if defined(__i386__)
@@ -209,9 +226,13 @@ struct page_info
     (_mfn < paddr_to_pfn(xenheap_phys_end));            \
 })
 #else
+extern unsigned long allocator_bitmap_end;
 #define is_xen_heap_page(page) ((page)->count_info & PGC_xen_heap)
 #define is_xen_heap_mfn(mfn) \
     (__mfn_valid(mfn) && is_xen_heap_page(__mfn_to_page(mfn)))
+#define is_xen_fixed_mfn(mfn) \
+    ( (mfn << PAGE_SHIFT) >= __pa(&_start) &&    \
+          (mfn << PAGE_SHIFT) <= allocator_bitmap_end )
 #endif
 
 #if defined(__i386__)
