@@ -174,7 +174,7 @@ XENAPI_PLATFORM_CFG_TYPES = {
 
 # Xen API console 'other_config' keys.
 XENAPI_CONSOLE_OTHER_CFG = ['vncunused', 'vncdisplay', 'vnclisten',
-                            'vncpasswd', 'type', 'display', 'xauthority',
+                            'vncpasswd', 'sdl', 'vnc', 'display', 'xauthority',
                             'keymap', 'opengl']
 
 # List of XendConfig configuration keys that have no direct equivalent
@@ -865,7 +865,7 @@ class XendConfig(dict):
             # add vfb device if it isn't there already
             if not self.has_rfb():
                 dev_config = ['vfb']
-                dev_config.append(['type', 'vnc'])
+                dev_config.append(['vnc', '1'])
                 # copy VNC related params from platform config to vfb dev conf
                 for key in ['vncpasswd', 'vncunused', 'vncdisplay',
                             'vnclisten']:
@@ -1470,7 +1470,8 @@ class XendConfig(dict):
                     # collapse other config into devinfo for things
                     # such as vncpasswd, vncunused, etc.                    
                     dev_info.update(console_other_config)
-                    dev_info['type'] = console_other_config.get('type', 'vnc') 
+                    dev_info['vnc'] = console_other_config.get('vnc', '0')
+                    dev_info['sdl'] = console_other_config.get('sdl', '0')
                     target['devices'][dev_uuid] = ('vfb', dev_info)
                     target['console_refs'].append(dev_uuid)
 

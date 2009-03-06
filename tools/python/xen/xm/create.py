@@ -350,16 +350,16 @@ gopts.var('irq', val='IRQ',
          For example 'irq=7'.
          This option may be repeated to add more than one IRQ.""")
 
-gopts.var('vfb', val="type={vnc,sdl},vncunused=1,vncdisplay=N,vnclisten=ADDR,display=DISPLAY,xauthority=XAUTHORITY,vncpasswd=PASSWORD,opengl=1,keymap=FILE",
+gopts.var('vfb', val="vnc=1,sdl=1,vncunused=1,vncdisplay=N,vnclisten=ADDR,display=DISPLAY,xauthority=XAUTHORITY,vncpasswd=PASSWORD,opengl=1,keymap=FILE",
           fn=append_value, default=[],
           use="""Make the domain a framebuffer backend.
-          The backend type should be either sdl or vnc.
-          For type=vnc, connect an external vncviewer.  The server will listen
+          Both sdl=1 and vnc=1 can be enabled at the same time.
+          For vnc=1, connect an external vncviewer.  The server will listen
           on ADDR (default 127.0.0.1) on port N+5900.  N defaults to the
           domain id.  If vncunused=1, the server will try to find an arbitrary
           unused port above 5900.  vncpasswd overrides the XenD configured
           default password.
-          For type=sdl, a viewer will be started automatically using the
+          For sdl=1, a viewer will be started automatically using the
           given DISPLAY and XAUTHORITY, which default to the current user's
           ones.  OpenGL will be used by default unless opengl is set to 0.
           keymap overrides the XendD configured default layout file.""")
@@ -804,11 +804,13 @@ def configure_vfbs(config_devs, vals):
     for f in vals.vfb:
         d = comma_sep_kv_to_dict(f)
         config = ['vfb']
-        if not d.has_key("type"):
-            d['type'] = 'sdl'
+        #handle the legacy case
+        if d.has_key("type"):
+            d[d['type']] = '1'
+            del d['type']
         for (k,v) in d.iteritems():
             if not k in [ 'vnclisten', 'vncunused', 'vncdisplay', 'display',
-                          'videoram', 'xauthority', 'type', 'vncpasswd',
+                          'videoram', 'xauthority', 'sdl', 'vnc', 'vncpasswd',
                           'opengl', 'keymap' ]:
                 err("configuration option %s unknown to vfbs" % k)
             config.append([k,v])
