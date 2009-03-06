@@ -58,7 +58,9 @@ DEFINE_PER_CPU(u64, efer);
 DEFINE_PER_CPU(unsigned long, cr4);
 
 static void default_idle(void);
+static void default_dead_idle(void);
 void (*pm_idle) (void) = default_idle;
+void (*dead_idle) (void) = default_dead_idle;
 
 static void paravirt_ctxt_switch_from(struct vcpu *v);
 static void paravirt_ctxt_switch_to(struct vcpu *v);
@@ -84,6 +86,12 @@ static void default_idle(void)
         local_irq_enable();
 }
 
+static void default_dead_idle(void)
+{
+    for ( ; ; )
+        halt();
+}
+
 static void play_dead(void)
 {
     /*
@@ -102,8 +110,7 @@ static void play_dead(void)
 
     /* With physical CPU hotplug, we should halt the cpu. */
     local_irq_disable();
-    for ( ; ; )
-        halt();
+    (*dead_idle)();
 }
 
 void idle_loop(void)
@@ -378,6 +385,8 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
         is_hvm_domain(d) &&
         hvm_funcs.hap_supported &&
         (domcr_flags & DOMCRF_hap);
+
+    d->arch.s3_integrity = !!(domcr_flags & DOMCRF_s3_integrity);
 
     INIT_LIST_HEAD(&d->arch.pdev_list);
 
@@ -831,7 +840,7 @@ map_vcpu_info(struct vcpu *v, unsigned long mfn, unsigned offset)
      * lost.  The domain will get a spurious event, but it can cope.
      */
     vcpu_info(v, evtchn_upcall_pending) = 1;
-    for ( i = 0; i < BITS_PER_GUEST_LONG(d); i++ )
+    for ( i = 0; i < BITS_PER_EVTCHN_WORD(d); i++ )
         set_bit(i, &vcpu_info(v, evtchn_pending_sel));
 
     return 0;

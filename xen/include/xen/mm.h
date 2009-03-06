@@ -273,8 +273,12 @@ unsigned long avail_scrub_pages(void);
 
 int guest_remove_page(struct domain *d, unsigned long gmfn);
 
-/* Returns TRUE if the whole page at @mfn is ordinary RAM. */
-int page_is_conventional_ram(unsigned long mfn);
+#define RAM_TYPE_CONVENTIONAL 0x00000001
+#define RAM_TYPE_RESERVED     0x00000002
+#define RAM_TYPE_UNUSABLE     0x00000004
+#define RAM_TYPE_ACPI         0x00000008
+/* Returns TRUE if the whole page at @mfn is of the requested RAM type(s) above. */
+int page_is_ram_type(unsigned long mfn, unsigned long mem_type);
 
 extern unsigned long *alloc_bitmap;	/* for vmcoreinfo */
 

@@ -46,8 +46,6 @@
 #define MCi_STATUS_MSEC         0x00000000ffff0000ULL
 /* Other information */
 #define MCi_STATUS_OTHER        0x01ffffff00000000ULL
-/*Corrected Error Count*/
-#define MCi_STATUS_ERRCOUNT     0x001FFFC0000000000ULL 
 /* processor context corrupt */
 #define MCi_STATUS_PCC          0x0200000000000000ULL
 /* MSR_K8_MCi_ADDR register valid */

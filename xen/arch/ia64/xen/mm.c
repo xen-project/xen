@@ -3236,9 +3236,56 @@ int get_page_type(struct page_info *page, unsigned long type)
     return 1;
 }
 
-int page_is_conventional_ram(unsigned long mfn)
+int page_is_ram_type(unsigned long mfn, unsigned long type)
 {
-    return (efi_mem_type(pfn_to_paddr(mfn)) == EFI_CONVENTIONAL_MEMORY);
+    u32 mem_type = efi_mem_type(pfn_to_paddr(mfn));
+
+    if (type & RAM_TYPE_CONVENTIONAL)
+    {
+        switch (mem_type)
+        {
+        case EFI_BOOT_SERVICES_CODE:
+        case EFI_BOOT_SERVICES_DATA:
+        case EFI_LOADER_CODE:
+        case EFI_LOADER_DATA:
+        case EFI_CONVENTIONAL_MEMORY:
+            return 1;
+        default:
+            break;
+        }       
+    }
+    if (type & RAM_TYPE_RESERVED)
+    {
+        switch (mem_type)
+        {
+        case EFI_RUNTIME_SERVICES_CODE:
+        case EFI_RUNTIME_SERVICES_DATA:
+        case EFI_RESERVED_TYPE:
+        case EFI_MEMORY_MAPPED_IO:
+        case EFI_MEMORY_MAPPED_IO_PORT_SPACE:
+        case EFI_PAL_CODE:
+            return 1;
+        default:
+            break;
+        }
+    }
+    if (type & RAM_TYPE_ACPI)
+    {
+        switch (mem_type)
+        {
+        case EFI_ACPI_RECLAIM_MEMORY:
+        case EFI_ACPI_MEMORY_NVS:
+            return 1;
+        default:
+            break;
+        }
+    }
+    else if (type & RAM_TYPE_UNUSABLE)
+    {
+        return (mem_type == EFI_UNUSABLE_MEMORY);
+    }
+
+    return 0;
 }
 
 

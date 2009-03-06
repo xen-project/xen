@@ -178,14 +178,9 @@ void xlat_vcpu_runstate_info(struct vcpu_runstate_info *);
 int switch_compat(struct domain *);
 int switch_native(struct domain *);
 
-#define BITS_PER_GUEST_LONG(d) \
-    (!IS_COMPAT(d) ? BITS_PER_LONG : COMPAT_BITS_PER_LONG)
-
 #else
 
 #define compat_handle_is_null(hnd) 0
-
-#define BITS_PER_GUEST_LONG(d) BITS_PER_LONG
 
 #endif
 

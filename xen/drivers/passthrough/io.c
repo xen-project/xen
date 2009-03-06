@@ -105,6 +105,12 @@ int pt_irq_create_bind_vtd(
             hvm_irq_dpci->msi_gvec_pirq[pt_irq_bind->u.msi.gvec] = pirq;
             /* bind after hvm_irq_dpci is setup to avoid race with irq handler*/
             rc = pirq_guest_bind(d->vcpu[0], pirq, 0);
+            if ( rc == 0 && pt_irq_bind->u.msi.gtable )
+            {
+                rc = msixtbl_pt_register(d, pirq, pt_irq_bind->u.msi.gtable);
+                if ( unlikely(rc) )
+                    pirq_guest_unbind(d, pirq);
+            }
             if ( unlikely(rc) )
             {
                 hvm_irq_dpci->msi_gvec_pirq[pt_irq_bind->u.msi.gvec] = 0;
@@ -259,6 +265,7 @@ int pt_irq_destroy_bind_vtd(
         if ( list_empty(&hvm_irq_dpci->mirq[machine_gsi].digl_list) )
         {
             pirq_guest_unbind(d, machine_gsi);
+            msixtbl_pt_unregister(d, machine_gsi);
             if ( pt_irq_need_timer(hvm_irq_dpci->mirq[machine_gsi].flags) )
                 kill_timer(&hvm_irq_dpci->hvm_timer[domain_irq_to_vector(d, machine_gsi)]);
             hvm_irq_dpci->mirq[machine_gsi].dom   = NULL;

@@ -35,14 +35,16 @@
 extern struct hvm_mmio_handler hpet_mmio_handler;
 extern struct hvm_mmio_handler vlapic_mmio_handler;
 extern struct hvm_mmio_handler vioapic_mmio_handler;
+extern struct hvm_mmio_handler msixtbl_mmio_handler;
 
-#define HVM_MMIO_HANDLER_NR 3
+#define HVM_MMIO_HANDLER_NR 4
 
 static struct hvm_mmio_handler *hvm_mmio_handlers[HVM_MMIO_HANDLER_NR] =
 {
     &hpet_mmio_handler,
     &vlapic_mmio_handler,
-    &vioapic_mmio_handler
+    &vioapic_mmio_handler,
+    &msixtbl_mmio_handler
 };
 
 static int hvm_mmio_access(struct vcpu *v,

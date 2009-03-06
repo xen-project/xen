@@ -66,9 +66,10 @@ PCI_EXP_DEVCTL_FLR = (0x1 << 15)
 
 PCI_CAP_ID_PM = 0x01
 PCI_PM_CTRL = 4
-PCI_PM_CTRL_NO_SOFT_RESET = 0x0004
+PCI_PM_CTRL_NO_SOFT_RESET = 0x0008
 PCI_PM_CTRL_STATE_MASK = 0x0003
 PCI_D3hot = 3
+PCI_D0hot = 0
 
 VENDOR_INTEL  = 0x8086
 PCI_CAP_ID_VENDOR_SPECIFIC_CAP = 0x09
@@ -234,7 +235,7 @@ def find_all_devices_owned_by_pciback():
     return dev_list
 
 def transform_list(target, src):
-    ''' src: its element is pci string (Format: xxxx:xx:xx:x).
+    ''' src: its element is pci string (Format: xxxx:xx:xx.x).
         target: its element is pci string, or a list of pci string.
 
         If all the elements in src are in target, we remove them from target
@@ -467,12 +468,12 @@ class PciDevice:
         os.lseek(fd, PCI_CB_BRIDGE_CONTROL, 0)
         br_cntl |= PCI_BRIDGE_CTL_BUS_RESET
         os.write(fd, struct.pack('H', br_cntl))
-        time.sleep(0.200)
+        time.sleep(0.100)
         # De-assert Secondary Bus Reset
         os.lseek(fd, PCI_CB_BRIDGE_CONTROL, 0)
         br_cntl &= ~PCI_BRIDGE_CTL_BUS_RESET
         os.write(fd, struct.pack('H', br_cntl))
-        time.sleep(0.200)
+        time.sleep(0.100)
         os.close(fd)
 
         # Restore the config spaces
@@ -483,18 +484,25 @@ class PciDevice:
         if pos == 0:
             return False
         
+        # No_Soft_Reset - When set 1, this bit indicates that
+        # devices transitioning from D3hot to D0 because of
+        # PowerState commands do not perform an internal reset.
+        pm_ctl = self.pci_conf_read32(pos + PCI_PM_CTRL)
+        if (pm_ctl & PCI_PM_CTRL_NO_SOFT_RESET) == 1:
+            return False
+
         (pci_list, cfg_list) = save_pci_conf_space([self.name])
         
-        # Enter D3hot without soft reset
-        pm_ctl = self.pci_conf_read32(pos + PCI_PM_CTRL)
-        pm_ctl |= PCI_PM_CTRL_NO_SOFT_RESET
+        # Enter D3hot
         pm_ctl &= ~PCI_PM_CTRL_STATE_MASK
         pm_ctl |= PCI_D3hot
         self.pci_conf_write32(pos + PCI_PM_CTRL, pm_ctl)
         time.sleep(0.010)
 
         # From D3hot to D0
-        self.pci_conf_write32(pos + PCI_PM_CTRL, 0)
+        pm_ctl &= ~PCI_PM_CTRL_STATE_MASK
+        pm_ctl |= PCI_D0hot
+        self.pci_conf_write32(pos + PCI_PM_CTRL, pm_ctl)
         time.sleep(0.010)
 
         restore_pci_conf_space((pci_list, cfg_list))
@@ -516,7 +524,7 @@ class PciDevice:
         (pci_list, cfg_list) = save_pci_conf_space([self.name])
 
         self.pci_conf_write8(pos + PCI_USB_FLRCTRL, 1)
-        time.sleep(0.010)
+        time.sleep(0.100)
 
         restore_pci_conf_space((pci_list, cfg_list))
 
@@ -636,7 +644,7 @@ class PciDevice:
                 self.dev_type = DEV_TYPE_PCI_BRIDGE
             else:
                 creg = self.pci_conf_read16(pos + PCI_EXP_FLAGS)
-                if ((creg & PCI_EXP_TYPE_PCI_BRIDGE) >> 4) == \
+                if ((creg & PCI_EXP_FLAGS_TYPE) >> 4) == \
                     PCI_EXP_TYPE_PCI_BRIDGE:
                     self.dev_type = DEV_TYPE_PCI_BRIDGE
                 else:
@@ -701,7 +709,7 @@ class PciDevice:
                 pos = self.find_cap_offset(PCI_CAP_ID_EXP)
                 self.pci_conf_write32(pos + PCI_EXP_DEVCTL, PCI_EXP_DEVCTL_FLR)
                 # We must sleep at least 100ms for the completion of FLR
-                time.sleep(0.200)
+                time.sleep(0.100)
                 restore_pci_conf_space((pci_list, cfg_list))
             else:
                 if self.bus == 0:
@@ -722,7 +730,7 @@ class PciDevice:
                 # We use Advanced Capability to do FLR.
                 pos = self.find_cap_offset(PCI_CAP_ID_AF)
                 self.pci_conf_write8(pos + PCI_AF_CTL, PCI_AF_CTL_FLR)
-                time.sleep(0.200)
+                time.sleep(0.100)
                 restore_pci_conf_space((pci_list, cfg_list))
             else:
                 if self.bus == 0:

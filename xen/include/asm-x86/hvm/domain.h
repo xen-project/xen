@@ -75,6 +75,10 @@ struct hvm_domain {
     /* Pass-through */
     struct hvm_iommu       hvm_iommu;
 
+    /* hypervisor intercepted msix table */
+    struct list_head       msixtbl_list;
+    spinlock_t             msixtbl_list_lock;
+
     struct viridian_domain viridian;
 
     bool_t                 hap_enabled;

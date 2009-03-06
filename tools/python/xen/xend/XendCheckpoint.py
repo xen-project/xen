@@ -66,6 +66,13 @@ def insert_after(list, pred, value):
 
 
 def save(fd, dominfo, network, live, dst, checkpoint=False, node=-1):
+    try:
+        if not os.path.isdir("/var/lib/xen"):
+            os.makedirs("/var/lib/xen")
+    except Exception, exn:
+        log.exception("Can't create directory '/var/lib/xen'")
+        raise XendError("Can't create directory '/var/lib/xen'")
+
     write_exact(fd, SIGNATURE, "could not write guest state file: signature")
 
     sxprep = dominfo.sxpr()
@@ -166,6 +173,13 @@ def save(fd, dominfo, network, live, dst, checkpoint=False, node=-1):
 
 
 def restore(xd, fd, dominfo = None, paused = False, relocating = False):
+    try:
+        if not os.path.isdir("/var/lib/xen"):
+            os.makedirs("/var/lib/xen")
+    except Exception, exn:
+        log.exception("Can't create directory '/var/lib/xen'")
+        raise XendError("Can't create directory '/var/lib/xen'")
+
     signature = read_exact(fd, len(SIGNATURE),
         "not a valid guest state file: signature read")
     if signature != SIGNATURE:

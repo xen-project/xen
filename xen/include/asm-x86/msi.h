@@ -81,6 +81,8 @@ extern void teardown_msi_vector(int vector);
 extern int msi_free_vector(struct msi_desc *entry);
 extern int pci_restore_msi_state(struct pci_dev *pdev);
 
+extern unsigned int pci_msix_get_table_len(struct pci_dev *pdev);
+
 struct msi_desc {
 	struct {
 		__u8	type	: 5; 	/* {0: unused, 5h:MSI, 11h:MSI-X} */

@@ -359,12 +359,6 @@ static int do_cmci_discover(int i)
         return 0;
     }
     set_bit(i, __get_cpu_var(mce_banks_owned));
-    /* Clear Corected Error Counter field, make sure CMCI could 
-     * be triggered on the new owner
-     */
-    msr = MSR_IA32_MC0_STATUS + 4 * i;
-    rdmsrl(msr, val);
-    wrmsrl(msr, val & ~MCi_STATUS_ERRCOUNT);
 out:
     clear_bit(i, __get_cpu_var(no_cmci_banks));
     return 1;
@@ -374,6 +368,7 @@ static void cmci_discover(void)
 {
     unsigned long flags;
     int i;
+    struct mc_info *mi = NULL;
 
     printk(KERN_DEBUG "CMCI: find owner on CPU%d\n", smp_processor_id());
 
@@ -384,6 +379,18 @@ static void cmci_discover(void)
             do_cmci_discover(i);
 
     spin_unlock_irqrestore(&cmci_discover_lock, flags);
+
+    /* In case CMCI happended when do owner change.
+     * If CMCI happened yet not processed immediately,
+     * MCi_status (error_count bit 38~52) is not cleared,
+     * the CMCI interrupt will never be triggered again.
+     */
+    mi = machine_check_poll(MC_FLAG_CMCI);
+    if (mi) {
+        x86_mcinfo_dump(mi);
+        if (dom0 && guest_enabled_event(dom0->vcpu[0], VIRQ_MCA))
+            send_guest_global_virq(dom0, VIRQ_MCA);
+    }
 
     printk(KERN_DEBUG "CMCI: CPU%d owner_map[%lx], no_cmci_map[%lx]\n", 
            smp_processor_id(), 

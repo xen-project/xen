@@ -579,6 +579,11 @@ gopts.var('hap', val='HAP',
           use="""Hap status (0=hap is disabled;
           1=hap is enabled.""")
 
+gopts.var('s3_integrity', val='TBOOT_MEMORY_PROTECT',
+          fn=set_int, default=1,
+          use="""Should domain memory integrity be verified during S3?
+          (0=protection is disabled; 1=protection is enabled.""")
+
 gopts.var('cpuid', val="IN[,SIN]:eax=EAX,ebx=EBX,ecx=ECX,edx=EDX",
           fn=append_value, default=[],
           use="""Cpuid description.""")
@@ -832,6 +837,10 @@ def configure_security(config, vals):
     elif num > 1:
         err("VM config error: Multiple access_control definitions!")
 
+def configure_mem_prot(config_image, vals):
+    """Create the config for S3 memory integrity verification under tboot.
+    """
+    config_image.append(['s3_integrity', vals.s3_integrity])
 
 def configure_vtpm(config_devs, vals):
     """Create the config for virtual TPM interfaces.
@@ -964,6 +973,7 @@ def make_config(vals):
             else:
                 config.append(['bootloader_args', '-q'])
     config.append(['image', config_image])
+    configure_mem_prot(config, vals);
 
     config_devs = []
     configure_disks(config_devs, vals)

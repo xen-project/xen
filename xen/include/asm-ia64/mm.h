@@ -200,9 +200,8 @@ static inline void put_page(struct page_info *page)
         free_domheap_page(page);
 }
 
-/* count_info and ownership are checked atomically. */
-static inline int get_page(struct page_info *page,
-                           struct domain *domain)
+static inline struct domain *page_get_owner_and_reference(
+    struct page_info *page)
 {
     unsigned long x, y = page->count_info;
 
@@ -210,21 +209,30 @@ static inline int get_page(struct page_info *page,
         x = y;
         if (unlikely((x & PGC_count_mask) == 0) ||  /* Not allocated? */
             unlikely(((x + 1) & PGC_count_mask) == 0) ) {/* Count overflow? */
-            goto fail;
+            return NULL;
         }
         y = cmpxchg_acq(&page->count_info, x, x + 1);
     } while (unlikely(y != x));
 
-    if (likely(page_get_owner(page) == domain))
+    return page_get_owner(page);
+}
+
+/* count_info and ownership are checked atomically. */
+static inline int get_page(struct page_info *page,
+                           struct domain *domain)
+{
+    struct domain *owner = page_get_owner_and_reference(page);
+
+    if (likely(owner == domain))
         return 1;
 
     put_page(page);
-fail:
+
     /* if (!domain->is_dying) */ /* XXX: header inclusion hell */
     gdprintk(XENLOG_INFO,
              "Error pfn %lx: rd=%p, od=%p, caf=%016lx, taf=%" PRtype_info "\n",
              page_to_mfn(page), domain,
-             page_get_owner(page), y, page->u.inuse.type_info);
+             owner, page->count_info, page->u.inuse.type_info);
     return 0;
 }
 

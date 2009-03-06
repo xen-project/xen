@@ -52,7 +52,7 @@ static void help(void)
 {
 	fprintf(stderr, "Qcow-utils: v1.0.0\n");
 	fprintf(stderr, 
-		"usage: qcow-create [-h help] [-r reserve] <SIZE(MB)> <FILENAME> "
+		"usage: qcow-create [-h help] [-r reserve] [-f format] <SIZE(MB)> <FILENAME> "
 		"[<BACKING_FILENAME>]\n"); 
 	exit(-1);
 }
@@ -61,17 +61,22 @@ int main(int argc, char *argv[])
 {
 	int ret = -1, c, backed = 0;
 	int sparse =  1;
+	char *fmt = "qcow";
 	uint64_t size;
 	char filename[MAX_NAME_LEN], bfilename[MAX_NAME_LEN];
+	char *tmpfile;
 
         for(;;) {
-                c = getopt(argc, argv, "hr");
+                c = getopt(argc, argv, "hrf");
                 if (c == -1)
                         break;
                 switch(c) {
                 case 'h':
                         help();
                         exit(0);
+                        break;
+                case 'f':
+                        fmt = argv[optind++];
                         break;
                 case 'r':
 			sparse = 0;
@@ -105,11 +110,16 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	DFPRINTF("Creating file size %llu, name %s\n",(long long unsigned)size, filename);
-	if (!backed)
-		ret = qcow_create(filename,size,NULL,sparse);
-	else
-		ret = qcow_create(filename,size,bfilename,sparse);
+    tmpfile = backed ? bfilename: NULL; 
+    if (!strcmp(fmt, "qcow")) {
+        ret = qcow_create(filename, size, tmpfile, sparse);
+    } else if(!strcmp(fmt, "qcow2")) {
+        ret = qcow2_create(filename, size, tmpfile, sparse);
+    } else {
+        fprintf(stderr,"Unsupport format:%s\n", fmt);
+        exit(-1);
+    } 
+    DFPRINTF("Creating file size %llu, name %s\n",(long long unsigned)size, filename);
 
 	if (ret < 0)
 		DPRINTF("Unable to create QCOW file\n");

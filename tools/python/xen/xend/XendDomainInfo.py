@@ -900,6 +900,11 @@ class XendDomainInfo:
             new_dev_sxp = ['vscsi']
             cur_mode = sxp.children(cur_dev_sxp, 'feature-host')[0]
             new_dev_sxp.append(cur_mode)
+            try:
+                cur_be = sxp.children(cur_dev_sxp, 'backend')[0]
+                new_dev_sxp.append(cur_be)
+            except IndexError:
+                pass
 
             for cur_dev in sxp.children(cur_dev_sxp, 'dev'):
                 if state == xenbusState['Closing']:
@@ -2207,12 +2212,17 @@ class XendDomainInfo:
             if security.has_authorization(ssidref) == False:
                 raise VmError("VM is not authorized to run.")
 
+        s3_integrity = 0
+        if self.info.has_key('s3_integrity'):
+            s3_integrity = self.info['s3_integrity']
+        flags = (int(hvm) << 0) | (int(hap) << 1) | (int(s3_integrity) << 2)
+
         try:
             self.domid = xc.domain_create(
                 domid = 0,
                 ssidref = ssidref,
                 handle = uuid.fromString(self.info['uuid']),
-                flags = (int(hvm) << 0) | (int(hap) << 1),
+                flags = flags,
                 target = self.info.target())
         except Exception, e:
             # may get here if due to ACM the operation is not permitted

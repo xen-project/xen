@@ -266,4 +266,7 @@ typedef struct fd_list_entry {
 
 int qcow_create(const char *filename, uint64_t total_size,
 		const char *backing_file, int flags);
+
+int qcow2_create(const char *filename, uint64_t total_size,
+		const char *backing_file, int flags);
 #endif /*TAPDISK_H_*/

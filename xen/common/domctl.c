@@ -242,13 +242,15 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         if ( (c.nat = xmalloc(struct vcpu_guest_context)) == NULL )
             goto svc_out;
 
-        if ( !IS_COMPAT(v->domain) )
-            ret = copy_from_guest(c.nat, op->u.vcpucontext.ctxt, 1);
 #ifdef CONFIG_COMPAT
+        if ( !is_pv_32on64_vcpu(v) )
+            ret = copy_from_guest(c.nat, op->u.vcpucontext.ctxt, 1);
         else
             ret = copy_from_guest(c.cmp,
                                   guest_handle_cast(op->u.vcpucontext.ctxt,
                                                     void), 1);
+#else
+        ret = copy_from_guest(c.nat, op->u.vcpucontext.ctxt, 1);
 #endif
         ret = ret ? -EFAULT : 0;
 
@@ -339,7 +341,8 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         ret = -EINVAL;
         if ( supervisor_mode_kernel ||
              (op->u.createdomain.flags &
-             ~(XEN_DOMCTL_CDF_hvm_guest | XEN_DOMCTL_CDF_hap)) )
+             ~(XEN_DOMCTL_CDF_hvm_guest | XEN_DOMCTL_CDF_hap |
+               XEN_DOMCTL_CDF_s3_integrity)) )
             break;
 
         dom = op->domain;
@@ -371,6 +374,8 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
             domcr_flags |= DOMCRF_hvm;
         if ( op->u.createdomain.flags & XEN_DOMCTL_CDF_hap )
             domcr_flags |= DOMCRF_hap;
+        if ( op->u.createdomain.flags & XEN_DOMCTL_CDF_s3_integrity )
+            domcr_flags |= DOMCRF_s3_integrity;
 
         ret = -ENOMEM;
         d = domain_create(dom, domcr_flags, op->u.createdomain.ssidref);
@@ -593,12 +598,14 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         if ( v != current )
             vcpu_unpause(v);
 
-        if ( !IS_COMPAT(v->domain) )
-            ret = copy_to_guest(op->u.vcpucontext.ctxt, c.nat, 1);
 #ifdef CONFIG_COMPAT
+        if ( !is_pv_32on64_vcpu(v) )
+            ret = copy_to_guest(op->u.vcpucontext.ctxt, c.nat, 1);
         else
             ret = copy_to_guest(guest_handle_cast(op->u.vcpucontext.ctxt,
                                                   void), c.cmp, 1);
+#else
+        ret = copy_to_guest(op->u.vcpucontext.ctxt, c.nat, 1);
 #endif
 
         if ( copy_to_guest(u_domctl, op, 1) || ret )

@@ -1104,7 +1104,8 @@ static void dump_irqs(unsigned char key)
                        (test_bit(d->pirq_to_evtchn[irq],
                                  &shared_info(d, evtchn_pending)) ?
                         'P' : '-'),
-                       (test_bit(d->pirq_to_evtchn[irq]/BITS_PER_GUEST_LONG(d),
+                       (test_bit(d->pirq_to_evtchn[irq] /
+                                 BITS_PER_EVTCHN_WORD(d),
                                  &vcpu_info(d->vcpu[0], evtchn_pending_sel)) ?
                         'S' : '-'),
                        (test_bit(d->pirq_to_evtchn[irq],

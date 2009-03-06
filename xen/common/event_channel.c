@@ -548,7 +548,7 @@ static int evtchn_set_pending(struct vcpu *v, int port)
         return 1;
 
     if ( !test_bit        (port, &shared_info(d, evtchn_mask)) &&
-         !test_and_set_bit(port / BITS_PER_GUEST_LONG(d),
+         !test_and_set_bit(port / BITS_PER_EVTCHN_WORD(d),
                            &vcpu_info(v, evtchn_pending_sel)) )
     {
         vcpu_mark_events_pending(v);
@@ -783,7 +783,7 @@ int evtchn_unmask(unsigned int port)
      */
     if ( test_and_clear_bit(port, &shared_info(d, evtchn_mask)) &&
          test_bit          (port, &shared_info(d, evtchn_pending)) &&
-         !test_and_set_bit (port / BITS_PER_GUEST_LONG(d),
+         !test_and_set_bit (port / BITS_PER_EVTCHN_WORD(d),
                             &vcpu_info(v, evtchn_pending_sel)) )
     {
         vcpu_mark_events_pending(v);

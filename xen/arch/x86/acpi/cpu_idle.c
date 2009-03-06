@@ -55,6 +55,7 @@ static void (*lapic_timer_on)(void);
 
 extern u32 pmtmr_ioport;
 extern void (*pm_idle) (void);
+extern void (*dead_idle) (void);
 
 static void (*pm_idle_save) (void) __read_mostly;
 unsigned int max_cstate __read_mostly = ACPI_PROCESSOR_MAX_POWER - 1;
@@ -367,6 +368,43 @@ static void acpi_processor_idle(void)
 
     if ( cpuidle_current_governor->reflect )
         cpuidle_current_governor->reflect(power);
+}
+
+static void acpi_dead_idle(void)
+{
+    struct acpi_processor_power *power;
+    struct acpi_processor_cx *cx;
+    int unused;
+
+    if ( (power = processor_powers[smp_processor_id()]) == NULL )
+        goto default_halt;
+
+    if ( (cx = &power->states[power->count-1]) == NULL )
+        goto default_halt;
+
+    for ( ; ; )
+    {
+        if ( !power->flags.bm_check && cx->type == ACPI_STATE_C3 )
+            ACPI_FLUSH_CPU_CACHE();
+
+        switch ( cx->entry_method )
+        {
+            case ACPI_CSTATE_EM_FFH:
+                /* Not treat interrupt as break event */
+                mwait_idle_with_hints(cx->address, 0);
+                break;
+            case ACPI_CSTATE_EM_SYSIO:
+                inb(cx->address);
+                unused = inl(pmtmr_ioport);
+                break;
+            default:
+                goto default_halt;
+        }
+    }
+
+default_halt:
+    for ( ; ; )
+        halt();
 }
 
 static int init_cx_pminfo(struct acpi_processor_power *acpi_power)
@@ -739,6 +777,11 @@ long set_cx_pminfo(uint32_t cpu, struct xen_processor_power *power)
     {
         pm_idle_save = pm_idle;
         pm_idle = acpi_processor_idle;
+    }
+
+    if ( cpu_id == 0 )
+    {
+        dead_idle = acpi_dead_idle;
     }
         
     return 0;

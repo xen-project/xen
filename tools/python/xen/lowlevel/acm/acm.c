@@ -68,8 +68,6 @@ static void *__getssid(int domid, uint32_t *buflen)
         goto out2;
     } else {
         *buflen = SSID_BUFFER_SIZE;
-        free(buf);
-        buf = NULL;
         goto out2;
     }
  out2:

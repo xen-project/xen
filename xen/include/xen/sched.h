@@ -30,12 +30,11 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_runstate_info_compat_t);
 extern struct domain *dom0;
 
 #ifndef CONFIG_COMPAT
-#define MAX_EVTCHNS(d)     NR_EVENT_CHANNELS
+#define BITS_PER_EVTCHN_WORD(d) BITS_PER_LONG
 #else
-#define MAX_EVTCHNS(d)     (!IS_COMPAT(d) ? \
-                            NR_EVENT_CHANNELS : \
-                            sizeof(unsigned int) * sizeof(unsigned int) * 64)
+#define BITS_PER_EVTCHN_WORD(d) (has_32bit_shinfo(d) ? 32 : BITS_PER_LONG)
 #endif
+#define MAX_EVTCHNS(d) (BITS_PER_EVTCHN_WORD(d) * BITS_PER_EVTCHN_WORD(d) * 64)
 #define EVTCHNS_PER_BUCKET 128
 #define NR_EVTCHN_BUCKETS  (NR_EVENT_CHANNELS / EVTCHNS_PER_BUCKET)
 
@@ -341,14 +340,18 @@ static inline struct domain *get_current_domain(void)
 struct domain *domain_create(
     domid_t domid, unsigned int domcr_flags, ssidref_t ssidref);
  /* DOMCRF_hvm: Create an HVM domain, as opposed to a PV domain. */
-#define _DOMCRF_hvm   0
-#define DOMCRF_hvm    (1U<<_DOMCRF_hvm)
+#define _DOMCRF_hvm           0
+#define DOMCRF_hvm            (1U<<_DOMCRF_hvm)
  /* DOMCRF_hap: Create a domain with hardware-assisted paging. */
-#define _DOMCRF_hap   1
-#define DOMCRF_hap    (1U<<_DOMCRF_hap)
+#define _DOMCRF_hap           1
+#define DOMCRF_hap            (1U<<_DOMCRF_hap)
+ /* DOMCRF_s3_integrity: Create a domain with tboot memory integrity protection
+                        by tboot */
+#define _DOMCRF_s3_integrity  2
+#define DOMCRF_s3_integrity   (1U<<_DOMCRF_s3_integrity)
  /* DOMCRF_dummy: Create a dummy domain (not scheduled; not on domain list) */
-#define _DOMCRF_dummy 2
-#define DOMCRF_dummy  (1U<<_DOMCRF_dummy)
+#define _DOMCRF_dummy         3
+#define DOMCRF_dummy          (1U<<_DOMCRF_dummy)
 
 /*
  * rcu_lock_domain_by_id() is more efficient than get_domain_by_id().
@@ -537,10 +540,6 @@ uint64_t get_cpu_idle_time(unsigned int cpu);
 
 #define IS_PRIV(_d) ((_d)->is_privileged)
 #define IS_PRIV_FOR(_d, _t) (IS_PRIV(_d) || ((_d)->target && (_d)->target == (_t)))
-
-#ifndef IS_COMPAT
-#define IS_COMPAT(d) 0
-#endif
 
 #define VM_ASSIST(_d,_t) (test_bit((_t), &(_d)->vm_assist))
 

@@ -16,7 +16,6 @@
 #define is_pv_32on64_domain(d) (0)
 #endif
 #define is_pv_32on64_vcpu(v)   (is_pv_32on64_domain((v)->domain))
-#define IS_COMPAT(d)           (is_pv_32on64_domain(d))
 
 struct trap_bounce {
     uint32_t      error_code;
@@ -220,6 +219,8 @@ struct arch_domain
 #ifdef CONFIG_COMPAT
     unsigned int hv_compat_vstart;
 #endif
+
+    bool_t s3_integrity;
 
     /* I/O-port admin-specified access capabilities. */
     struct rangeset *ioport_caps;

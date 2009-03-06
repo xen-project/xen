@@ -1087,38 +1087,69 @@ static void local_time_calibration(void)
  */
 struct calibration_rendezvous {
     cpumask_t cpu_calibration_map;
-    atomic_t nr_cpus;
+    atomic_t count_start;
+    atomic_t count_end;
     s_time_t master_stime;
     u64 master_tsc_stamp;
 };
 
+#define NR_LOOPS 5
+
 static void time_calibration_rendezvous(void *_r)
 {
+    int i;
     struct cpu_calibration *c = &this_cpu(cpu_calibration);
     struct calibration_rendezvous *r = _r;
     unsigned int total_cpus = cpus_weight(r->cpu_calibration_map);
 
-    if ( smp_processor_id() == 0 )
+    /* 
+     * Loop is used here to get rid of the cache's side effect to enlarge
+     * the TSC difference among CPUs.
+     */
+    for ( i = 0; i < NR_LOOPS; i++ )
     {
-        while ( atomic_read(&r->nr_cpus) != (total_cpus - 1) )
-            cpu_relax();
-        r->master_stime = read_platform_stime();
-        rdtscll(r->master_tsc_stamp);
-        mb(); /* write r->master_* /then/ signal */
-        atomic_inc(&r->nr_cpus);
-        c->local_tsc_stamp = r->master_tsc_stamp;
-    }
-    else
-    {
-        atomic_inc(&r->nr_cpus);
-        while ( atomic_read(&r->nr_cpus) != total_cpus )
-            cpu_relax();
-        mb(); /* receive signal /then/ read r->master_* */
-        if ( boot_cpu_has(X86_FEATURE_CONSTANT_TSC) )
-            wrmsrl(MSR_IA32_TSC, r->master_tsc_stamp);
-        rdtscll(c->local_tsc_stamp);
+        if ( smp_processor_id() == 0 )
+        {
+            while ( atomic_read(&r->count_start) != (total_cpus - 1) )
+                mb();
+   
+            if ( r->master_stime == 0 )
+            {
+                r->master_stime = read_platform_stime();
+                if ( boot_cpu_has(X86_FEATURE_CONSTANT_TSC) )
+                    rdtscll(r->master_tsc_stamp);
+            }
+            atomic_set(&r->count_end, 0);
+            wmb();
+            atomic_inc(&r->count_start);
+    
+            if ( boot_cpu_has(X86_FEATURE_CONSTANT_TSC) && 
+                 i == NR_LOOPS - 1 )
+                write_tsc((u32)r->master_tsc_stamp, (u32)(r->master_tsc_stamp >> 32));
+    
+            while (atomic_read(&r->count_end) != total_cpus - 1)
+                mb();
+            atomic_set(&r->count_start, 0);
+            wmb();
+            atomic_inc(&r->count_end);
+        }
+        else
+        {
+            atomic_inc(&r->count_start);
+            while ( atomic_read(&r->count_start) != total_cpus )
+                mb();
+    
+            if ( boot_cpu_has(X86_FEATURE_CONSTANT_TSC) && 
+                 i == NR_LOOPS - 1 )
+                write_tsc((u32)r->master_tsc_stamp, (u32)(r->master_tsc_stamp >> 32));
+    
+            atomic_inc(&r->count_end);
+            while (atomic_read(&r->count_end) != total_cpus)
+                mb();
+        }
     }
 
+    rdtscll(c->local_tsc_stamp);
     c->stime_local_stamp = get_s_time();
     c->stime_master_stamp = r->master_stime;
 
@@ -1129,7 +1160,9 @@ static void time_calibration(void *unused)
 {
     struct calibration_rendezvous r = {
         .cpu_calibration_map = cpu_online_map,
-        .nr_cpus = ATOMIC_INIT(0)
+        .count_start = ATOMIC_INIT(0),
+        .count_end = ATOMIC_INIT(0),
+        .master_stime = 0
     };
 
     /* @wait=1 because we must wait for all cpus before freeing @r. */

@@ -97,6 +97,7 @@ int early_boot = 1;
 cpumask_t cpu_present_map;
 
 unsigned long xen_phys_start;
+unsigned long allocator_bitmap_end;
 
 #ifdef CONFIG_X86_32
 /* Limits of Xen heap, used to initialise the allocator. */
@@ -418,7 +419,6 @@ void __init __start_xen(unsigned long mbi_p)
     multiboot_info_t *mbi = __va(mbi_p);
     module_t *mod = (module_t *)__va(mbi->mods_addr);
     unsigned long nr_pages, modules_length, modules_headroom;
-    unsigned long allocator_bitmap_end;
     int i, e820_warn = 0, bytes = 0;
     struct ns16550_defaults ns16550 = {
         .data_bits = 8,
@@ -985,9 +985,12 @@ void __init __start_xen(unsigned long mbi_p)
 
     if ( opt_watchdog ) 
         watchdog_enable();
+    
+    if ( !tboot_protect_mem_regions() )
+        panic("Could not protect TXT memory regions\n");
 
     /* Create initial domain 0. */
-    dom0 = domain_create(0, 0, DOM0_SSIDREF);
+    dom0 = domain_create(0, DOMCRF_s3_integrity, DOM0_SSIDREF);
     if ( (dom0 == NULL) || (alloc_vcpu(dom0, 0, 0) == NULL) )
         panic("Error creating domain 0\n");
 
@@ -1036,9 +1039,6 @@ void __init __start_xen(unsigned long mbi_p)
 
     if ( xen_cpuidle )
         xen_processor_pmbits |= XEN_PROCESSOR_PM_CX;
-
-    if ( !tboot_protect_mem_regions() )
-        panic("Could not protect TXT memory regions\n");
 
     /*
      * We're going to setup domain0 using the module(s) that we stashed safely

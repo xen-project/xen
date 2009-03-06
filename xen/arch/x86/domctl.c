@@ -494,7 +494,8 @@ long arch_do_domctl(
             break;
         }
 
-        domctl->u.address_size.size = BITS_PER_GUEST_LONG(d);
+        domctl->u.address_size.size =
+            is_pv_32on64_domain(d) ? 32 : BITS_PER_LONG;
 
         ret = 0;
         rcu_unlock_domain(d);

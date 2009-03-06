@@ -235,8 +235,8 @@ class DevController:
                 xstransact.Remove(backpath)
             xstransact.Remove(frontpath)
 
-        # xstransact.Remove(self.devicePath()) ?? Below is the same ?
-        self.vm._removeVm("device/%s/%d" % (self.deviceClass, dev))
+            # xstransact.Remove(self.devicePath()) ?? Below is the same ?
+            self.vm._removeVm("device/%s/%d" % (self.deviceClass, dev))
 
     def configurations(self, transaction = None):
         return map(lambda x: self.configuration(x, transaction), self.deviceIDs(transaction))

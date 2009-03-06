@@ -156,6 +156,12 @@ map_frames_ex(unsigned long* frames, unsigned long n, unsigned long stride,
 	return (void*) __va(frames[0] << PAGE_SHIFT);
 }
 
+int unmap_frames(unsigned long virt_addr, unsigned long num_frames)
+{  
+    /* TODO */
+    ASSERT(0);
+}
+
 void arch_init_p2m(unsigned long max_pfn)
 {
     printk("Warn: p2m map not implemented.\n");

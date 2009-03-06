@@ -38,6 +38,7 @@ ALL_OBJS-y               += $(BASEDIR)/common/built_in.o
 ALL_OBJS-y               += $(BASEDIR)/drivers/built_in.o
 ALL_OBJS-y               += $(BASEDIR)/xsm/built_in.o
 ALL_OBJS-y               += $(BASEDIR)/arch/$(TARGET_ARCH)/built_in.o
+ALL_OBJS-$(x86)          += $(BASEDIR)/crypto/built_in.o
 
 CFLAGS-y                += -g -D__XEN__
 CFLAGS-$(XSM_ENABLE)    += -DXSM_ENABLE

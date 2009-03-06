@@ -29,7 +29,8 @@
 #define PCI_BDF(b,d,f)  ((((b) & 0xff) << 8) | PCI_DEVFN(d,f))
 #define PCI_BDF2(b,df)  ((((b) & 0xff) << 8) | ((df) & 0xff))
 
-#define MAX_MSIX_TABLE_PAGES    8    /* 2048 entries */
+#define MAX_MSIX_TABLE_ENTRIES  2048
+#define MAX_MSIX_TABLE_PAGES    8
 struct pci_dev {
     struct list_head alldevs_list;
     struct list_head domain_list;
@@ -83,5 +84,8 @@ void pci_conf_write32(
     uint32_t data);
 int pci_find_cap_offset(u8 bus, u8 dev, u8 func, u8 cap);
 int pci_find_next_cap(u8 bus, unsigned int devfn, u8 pos, int cap);
+
+int msixtbl_pt_register(struct domain *d, int pirq, uint64_t gtable);
+void msixtbl_pt_unregister(struct domain *d, int pirq);
 
 #endif /* __XEN_PCI_H__ */

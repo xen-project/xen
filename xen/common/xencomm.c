@@ -51,24 +51,16 @@ xencomm_get_page(unsigned long paddr, struct page_info **page)
         return -EFAULT;
         
     *page = maddr_to_page(maddr);
-    if ( get_page(*page, current->domain) == 0 )
+    if ( !get_page(*page, current->domain) )
     {
-        if ( page_get_owner(*page) != current->domain )
-        {
-            /*
-             * This page might be a page granted by another domain, or
-             * this page is freed with decrease reservation hypercall at
-             * the same time.
-             */
-            gdprintk(XENLOG_WARNING,
-                     "bad page is passed. paddr 0x%lx maddr 0x%lx\n",
-                     paddr, maddr);
-            return -EFAULT;
-        }
-
-        /* Try again. */
-        cpu_relax();
-        return -EAGAIN;
+        /*
+         * This page might be a page granted by another domain, or this page 
+         * is freed with decrease reservation hypercall at the same time.
+         */
+        gdprintk(XENLOG_WARNING,
+                 "bad page is passed. paddr 0x%lx maddr 0x%lx\n",
+                 paddr, maddr);
+        return -EFAULT;
     }
 
     return 0;

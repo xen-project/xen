@@ -308,6 +308,9 @@ int hvm_domain_initialise(struct domain *d)
     spin_lock_init(&d->arch.hvm_domain.irq_lock);
     spin_lock_init(&d->arch.hvm_domain.uc_lock);
 
+    INIT_LIST_HEAD(&d->arch.hvm_domain.msixtbl_list);
+    spin_lock_init(&d->arch.hvm_domain.msixtbl_list_lock);
+
     hvm_init_guest_time(d);
 
     d->arch.hvm_domain.params[HVM_PARAM_HPET_ENABLED] = 1;
@@ -348,10 +351,14 @@ int hvm_domain_initialise(struct domain *d)
     return rc;
 }
 
+extern void msixtbl_pt_cleanup(struct domain *d);
+
 void hvm_domain_relinquish_resources(struct domain *d)
 {
     hvm_destroy_ioreq_page(d, &d->arch.hvm_domain.ioreq);
     hvm_destroy_ioreq_page(d, &d->arch.hvm_domain.buf_ioreq);
+
+    msixtbl_pt_cleanup(d);
 
     /* Stop all asynchronous timer actions. */
     rtc_deinit(d);

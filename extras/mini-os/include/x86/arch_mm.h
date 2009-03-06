@@ -133,6 +133,10 @@ typedef unsigned long pgentry_t;
 #define L4_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
 #endif /* __i386__ || __x86_64__ */
 
+/* flags for ioremap */
+#define IO_PROT (L1_PROT)
+#define IO_PROT_NOCACHE (L1_PROT | _PAGE_PCD)
+
 #include "arch_limits.h"
 #define PAGE_SIZE       __PAGE_SIZE
 #define PAGE_SHIFT      __PAGE_SHIFT
@@ -222,5 +226,6 @@ static __inline__ paddr_t machine_to_phys(maddr_t machine)
 #define do_map_zero(start, n) do_map_frames(start, &mfn_zero, n, 0, 0, DOMID_SELF, 0, L1_PROT_RO)
 
 pgentry_t *need_pgt(unsigned long addr);
+int mfn_is_ram(unsigned long mfn);
 
 #endif /* _ARCH_MM_H_ */
