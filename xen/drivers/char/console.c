@@ -315,6 +315,12 @@ static void serial_rx(char c, struct cpu_user_regs *regs)
     __serial_rx(c, regs);
 }
 
+static void notify_dom0_con_ring(unsigned long unused)
+{
+    send_guest_global_virq(dom0, VIRQ_CON_RING);
+}
+static DECLARE_TASKLET(notify_dom0_con_ring_tasklet, notify_dom0_con_ring, 0);
+
 static long guest_console_write(XEN_GUEST_HANDLE(char) buffer, int count)
 {
     char kbuf[128], *kptr;
@@ -348,7 +354,7 @@ static long guest_console_write(XEN_GUEST_HANDLE(char) buffer, int count)
         {
             for ( kptr = kbuf; *kptr != '\0'; kptr++ )
                 putchar_console_ring(*kptr);
-            send_guest_global_virq(dom0, VIRQ_CON_RING);
+            tasklet_schedule(&notify_dom0_con_ring_tasklet);
         }
 
         spin_unlock_irq(&console_lock);
@@ -426,7 +432,7 @@ static void __putstr(const char *str)
     while ( (c = *str++) != '\0' )
         putchar_console_ring(c);
 
-    send_guest_global_virq(dom0, VIRQ_CON_RING);
+    tasklet_schedule(&notify_dom0_con_ring_tasklet);
 }
 
 static int printk_prefix_check(char *p, char **pp)
