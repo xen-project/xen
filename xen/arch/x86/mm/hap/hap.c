@@ -152,7 +152,7 @@ static struct page_info *hap_alloc_p2m_page(struct domain *d)
         d->arch.paging.hap.total_pages--;
         d->arch.paging.hap.p2m_pages++;
         page_set_owner(pg, d);
-        pg->count_info = 1;
+        pg->count_info |= 1;
     }
 
     hap_unlock(d);
@@ -167,7 +167,7 @@ void hap_free_p2m_page(struct domain *d, struct page_info *pg)
     if ( (pg->count_info & PGC_count_mask) != 1 )
         HAP_ERROR("Odd p2m page count c=%#lx t=%"PRtype_info"\n",
                   pg->count_info, pg->u.inuse.type_info);
-    pg->count_info = 0;
+    pg->count_info &= ~PGC_count_mask;
     /* Free should not decrement domain's total allocation, since
      * these pages were allocated without an owner. */
     page_set_owner(pg, NULL);
@@ -218,7 +218,6 @@ hap_set_allocation(struct domain *d, unsigned int pages, int *preempted)
             ASSERT(pg);
             d->arch.paging.hap.free_pages--;
             d->arch.paging.hap.total_pages--;
-            pg->count_info = 0;
             free_domheap_page(pg);
         }
 

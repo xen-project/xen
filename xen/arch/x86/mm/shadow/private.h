@@ -647,7 +647,7 @@ static inline void sh_put_ref(struct vcpu *v, mfn_t smfn, paddr_t entry_pa)
     struct page_info *sp = mfn_to_page(smfn);
 
     ASSERT(mfn_valid(smfn));
-    ASSERT(sp->count_info == 0);
+    ASSERT(!(sp->count_info & PGC_count_mask));
 
     /* If this is the entry in the up-pointer, remove it */
     if ( entry_pa != 0 
