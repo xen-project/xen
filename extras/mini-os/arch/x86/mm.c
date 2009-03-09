@@ -778,8 +778,7 @@ void arch_init_p2m(unsigned long max_pfn)
 
 void arch_init_mm(unsigned long* start_pfn_p, unsigned long* max_pfn_p)
 {
-
-    unsigned long start_pfn, max_pfn, virt_pfns;
+    unsigned long start_pfn, max_pfn;
 
     printk("      _text: %p(VA)\n", &_text);
     printk("     _etext: %p(VA)\n", &_etext);
@@ -794,9 +793,13 @@ void arch_init_mm(unsigned long* start_pfn_p, unsigned long* max_pfn_p)
     max_pfn = start_info.nr_pages;
 
     /* We need room for demand mapping and heap, clip available memory */
-    virt_pfns = DEMAND_MAP_PAGES + HEAP_PAGES;
-    if ( max_pfn + virt_pfns + 1 < max_pfn )
-        max_pfn = -(virt_pfns + 1);
+#if defined(__i386__)
+    {
+        unsigned long virt_pfns = 1 + DEMAND_MAP_PAGES + 1 + HEAP_PAGES;
+        if (max_pfn + virt_pfns >= 0x100000)
+            max_pfn = 0x100000 - virt_pfns - 1;
+    }
+#endif
 
     printk("  start_pfn: %lx\n", start_pfn);
     printk("    max_pfn: %lx\n", max_pfn);
