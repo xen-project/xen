@@ -470,6 +470,102 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
                 Package(){0x000fffff, 1, \_SB.PCI0.LNKA, 0},
                 Package(){0x000fffff, 2, \_SB.PCI0.LNKB, 0},
                 Package(){0x000fffff, 3, \_SB.PCI0.LNKC, 0},
+
+                /* Device 16, INTA - INTD */
+                Package(){0x0010ffff, 0, \_SB.PCI0.LNKA, 0},
+                Package(){0x0010ffff, 1, \_SB.PCI0.LNKB, 0},
+                Package(){0x0010ffff, 2, \_SB.PCI0.LNKC, 0},
+                Package(){0x0010ffff, 3, \_SB.PCI0.LNKD, 0},
+
+                /* Device 17, INTA - INTD */
+                Package(){0x0011ffff, 0, \_SB.PCI0.LNKB, 0},
+                Package(){0x0011ffff, 1, \_SB.PCI0.LNKC, 0},
+                Package(){0x0011ffff, 2, \_SB.PCI0.LNKD, 0},
+                Package(){0x0011ffff, 3, \_SB.PCI0.LNKA, 0},
+
+                /* Device 18, INTA - INTD */
+                Package(){0x0012ffff, 0, \_SB.PCI0.LNKC, 0},
+                Package(){0x0012ffff, 1, \_SB.PCI0.LNKD, 0},
+                Package(){0x0012ffff, 2, \_SB.PCI0.LNKA, 0},
+                Package(){0x0012ffff, 3, \_SB.PCI0.LNKB, 0},
+
+                /* Device 19, INTA - INTD */
+                Package(){0x0013ffff, 0, \_SB.PCI0.LNKD, 0},
+                Package(){0x0013ffff, 1, \_SB.PCI0.LNKA, 0},
+                Package(){0x0013ffff, 2, \_SB.PCI0.LNKB, 0},
+                Package(){0x0013ffff, 3, \_SB.PCI0.LNKC, 0},
+
+                /* Device 20, INTA - INTD */
+                Package(){0x0014ffff, 0, \_SB.PCI0.LNKA, 0},
+                Package(){0x0014ffff, 1, \_SB.PCI0.LNKB, 0},
+                Package(){0x0014ffff, 2, \_SB.PCI0.LNKC, 0},
+                Package(){0x0014ffff, 3, \_SB.PCI0.LNKD, 0},
+
+                /* Device 21, INTA - INTD */
+                Package(){0x0015ffff, 0, \_SB.PCI0.LNKB, 0},
+                Package(){0x0015ffff, 1, \_SB.PCI0.LNKC, 0},
+                Package(){0x0015ffff, 2, \_SB.PCI0.LNKD, 0},
+                Package(){0x0015ffff, 3, \_SB.PCI0.LNKA, 0},
+
+                /* Device 22, INTA - INTD */
+                Package(){0x0016ffff, 0, \_SB.PCI0.LNKC, 0},
+                Package(){0x0016ffff, 1, \_SB.PCI0.LNKD, 0},
+                Package(){0x0016ffff, 2, \_SB.PCI0.LNKA, 0},
+                Package(){0x0016ffff, 3, \_SB.PCI0.LNKB, 0},
+
+                /* Device 23, INTA - INTD */
+                Package(){0x0017ffff, 0, \_SB.PCI0.LNKD, 0},
+                Package(){0x0017ffff, 1, \_SB.PCI0.LNKA, 0},
+                Package(){0x0017ffff, 2, \_SB.PCI0.LNKB, 0},
+                Package(){0x0017ffff, 3, \_SB.PCI0.LNKC, 0},
+
+                /* Device 24, INTA - INTD */
+                Package(){0x0018ffff, 0, \_SB.PCI0.LNKA, 0},
+                Package(){0x0018ffff, 1, \_SB.PCI0.LNKB, 0},
+                Package(){0x0018ffff, 2, \_SB.PCI0.LNKC, 0},
+                Package(){0x0018ffff, 3, \_SB.PCI0.LNKD, 0},
+
+                /* Device 25, INTA - INTD */
+                Package(){0x0019ffff, 0, \_SB.PCI0.LNKB, 0},
+                Package(){0x0019ffff, 1, \_SB.PCI0.LNKC, 0},
+                Package(){0x0019ffff, 2, \_SB.PCI0.LNKD, 0},
+                Package(){0x0019ffff, 3, \_SB.PCI0.LNKA, 0},
+
+                /* Device 26, INTA - INTD */
+                Package(){0x001affff, 0, \_SB.PCI0.LNKC, 0},
+                Package(){0x001affff, 1, \_SB.PCI0.LNKD, 0},
+                Package(){0x001affff, 2, \_SB.PCI0.LNKA, 0},
+                Package(){0x001affff, 3, \_SB.PCI0.LNKB, 0},
+
+                /* Device 27, INTA - INTD */
+                Package(){0x001bffff, 0, \_SB.PCI0.LNKD, 0},
+                Package(){0x001bffff, 1, \_SB.PCI0.LNKA, 0},
+                Package(){0x001bffff, 2, \_SB.PCI0.LNKB, 0},
+                Package(){0x001bffff, 3, \_SB.PCI0.LNKC, 0},
+
+                /* Device 28, INTA - INTD */
+                Package(){0x001cffff, 0, \_SB.PCI0.LNKA, 0},
+                Package(){0x001cffff, 1, \_SB.PCI0.LNKB, 0},
+                Package(){0x001cffff, 2, \_SB.PCI0.LNKC, 0},
+                Package(){0x001cffff, 3, \_SB.PCI0.LNKD, 0},
+
+                /* Device 29, INTA - INTD */
+                Package(){0x001dffff, 0, \_SB.PCI0.LNKB, 0},
+                Package(){0x001dffff, 1, \_SB.PCI0.LNKC, 0},
+                Package(){0x001dffff, 2, \_SB.PCI0.LNKD, 0},
+                Package(){0x001dffff, 3, \_SB.PCI0.LNKA, 0},
+
+                /* Device 30, INTA - INTD */
+                Package(){0x001effff, 0, \_SB.PCI0.LNKC, 0},
+                Package(){0x001effff, 1, \_SB.PCI0.LNKD, 0},
+                Package(){0x001effff, 2, \_SB.PCI0.LNKA, 0},
+                Package(){0x001effff, 3, \_SB.PCI0.LNKB, 0},
+
+                /* Device 31, INTA - INTD */
+                Package(){0x001fffff, 0, \_SB.PCI0.LNKD, 0},
+                Package(){0x001fffff, 1, \_SB.PCI0.LNKA, 0},
+                Package(){0x001fffff, 2, \_SB.PCI0.LNKB, 0},
+                Package(){0x001fffff, 3, \_SB.PCI0.LNKC, 0},
             })
 
             Name(PRTA, Package() {
@@ -562,6 +658,102 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
                 Package(){0x000fffff, 1, 0, 46},
                 Package(){0x000fffff, 2, 0, 47},
                 Package(){0x000fffff, 3, 0, 16},
+
+                /* Device 16, INTA - INTD */
+                Package(){0x0010ffff, 0, 0, 18},
+                Package(){0x0010ffff, 1, 0, 19},
+                Package(){0x0010ffff, 2, 0, 20},
+                Package(){0x0010ffff, 3, 0, 21},
+
+                /* Device 17, INTA - INTD */
+                Package(){0x0011ffff, 0, 0, 22},
+                Package(){0x0011ffff, 1, 0, 23},
+                Package(){0x0011ffff, 2, 0, 24},
+                Package(){0x0011ffff, 3, 0, 25},
+
+                /* Device 18, INTA - INTD */
+                Package(){0x0012ffff, 0, 0, 26},
+                Package(){0x0012ffff, 1, 0, 27},
+                Package(){0x0012ffff, 2, 0, 28},
+                Package(){0x0012ffff, 3, 0, 29},
+
+                /* Device 19, INTA - INTD */
+                Package(){0x0013ffff, 0, 0, 30},
+                Package(){0x0013ffff, 1, 0, 31},
+                Package(){0x0013ffff, 2, 0, 32},
+                Package(){0x0013ffff, 3, 0, 33},
+
+                /* Device 20, INTA - INTD */
+                Package(){0x0014ffff, 0, 0, 34},
+                Package(){0x0014ffff, 1, 0, 35},
+                Package(){0x0014ffff, 2, 0, 36},
+                Package(){0x0014ffff, 3, 0, 37},
+
+                /* Device 21, INTA - INTD */
+                Package(){0x0015ffff, 0, 0, 38},
+                Package(){0x0015ffff, 1, 0, 39},
+                Package(){0x0015ffff, 2, 0, 40},
+                Package(){0x0015ffff, 3, 0, 41},
+
+                /* Device 22, INTA - INTD */
+                Package(){0x0016ffff, 0, 0, 42},
+                Package(){0x0016ffff, 1, 0, 43},
+                Package(){0x0016ffff, 2, 0, 44},
+                Package(){0x0016ffff, 3, 0, 45},
+
+                /* Device 23, INTA - INTD */
+                Package(){0x0017ffff, 0, 0, 46},
+                Package(){0x0017ffff, 1, 0, 47},
+                Package(){0x0017ffff, 2, 0, 16},
+                Package(){0x0017ffff, 3, 0, 17},
+
+                /* Device 24, INTA - INTD */
+                Package(){0x0018ffff, 0, 0, 19},
+                Package(){0x0018ffff, 1, 0, 20},
+                Package(){0x0018ffff, 2, 0, 21},
+                Package(){0x0018ffff, 3, 0, 22},
+
+                /* Device 25, INTA - INTD */
+                Package(){0x0019ffff, 0, 0, 23},
+                Package(){0x0019ffff, 1, 0, 24},
+                Package(){0x0019ffff, 2, 0, 25},
+                Package(){0x0019ffff, 3, 0, 26},
+
+                /* Device 26, INTA - INTD */
+                Package(){0x001affff, 0, 0, 27},
+                Package(){0x001affff, 1, 0, 28},
+                Package(){0x001affff, 2, 0, 29},
+                Package(){0x001affff, 3, 0, 30},
+
+                /* Device 27, INTA - INTD */
+                Package(){0x001bffff, 0, 0, 31},
+                Package(){0x001bffff, 1, 0, 32},
+                Package(){0x001bffff, 2, 0, 33},
+                Package(){0x001bffff, 3, 0, 34},
+
+                /* Device 28, INTA - INTD */
+                Package(){0x001cffff, 0, 0, 35},
+                Package(){0x001cffff, 1, 0, 36},
+                Package(){0x001cffff, 2, 0, 37},
+                Package(){0x001cffff, 3, 0, 38},
+
+                /* Device 29, INTA - INTD */
+                Package(){0x001dffff, 0, 0, 39},
+                Package(){0x001dffff, 1, 0, 40},
+                Package(){0x001dffff, 2, 0, 41},
+                Package(){0x001dffff, 3, 0, 42},
+
+                /* Device 30, INTA - INTD */
+                Package(){0x001effff, 0, 0, 43},
+                Package(){0x001effff, 1, 0, 44},
+                Package(){0x001effff, 2, 0, 45},
+                Package(){0x001effff, 3, 0, 46},
+
+                /* Device 31, INTA - INTD */
+                Package(){0x001fffff, 0, 0, 47},
+                Package(){0x001fffff, 1, 0, 16},
+                Package(){0x001fffff, 2, 0, 17},
+                Package(){0x001fffff, 3, 0, 18},
             })
             
             Device (ISA)
