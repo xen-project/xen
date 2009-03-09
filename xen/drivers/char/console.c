@@ -420,6 +420,8 @@ long do_console_io(int cmd, int count, XEN_GUEST_HANDLE(char) buffer)
  * *****************************************************
  */
 
+static bool_t console_locks_busted;
+
 static void __putstr(const char *str)
 {
     int c;
@@ -429,10 +431,12 @@ static void __putstr(const char *str)
     sercon_puts(str);
     vga_puts(str);
 
-    while ( (c = *str++) != '\0' )
-        putchar_console_ring(c);
-
-    tasklet_schedule(&notify_dom0_con_ring_tasklet);
+    if ( !console_locks_busted )
+    {
+        while ( (c = *str++) != '\0' )
+            putchar_console_ring(c);
+        tasklet_schedule(&notify_dom0_con_ring_tasklet);
+    }
 }
 
 static int printk_prefix_check(char *p, char **pp)
@@ -665,6 +669,7 @@ void console_force_unlock(void)
 {
     spin_lock_init(&console_lock);
     serial_force_unlock(sercon_handle);
+    console_locks_busted = 1;
     console_start_sync();
 }
 
