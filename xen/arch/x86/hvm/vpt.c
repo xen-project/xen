@@ -209,7 +209,8 @@ static void pt_timer_fn(void *data)
         set_timer(&pt->timer, pt->scheduled);
     }
 
-    vcpu_kick(pt->vcpu);
+    if ( !pt_irq_masked(pt) )
+        vcpu_kick(pt->vcpu);
 
     pt_unlock(pt);
 }
