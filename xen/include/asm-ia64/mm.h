@@ -149,13 +149,34 @@ page_list_splice_init(struct page_list_head *list, struct page_list_head *head)
 # define PGC_xen_heap     PG_mask(1, 2)
  /* bit PG_shift(3) reserved. See asm-x86/mm.h */
  /* PG_mask(7, 6) reserved. See asm-x86/mm.h*/
+
+ /* Page is broken? */
+#define _PGC_broken       PG_shift(7)
+#define PGC_broken        PG_mask(1, 7)
+ /* Page is offline pending ? */
+#define _PGC_offlining    PG_shift(8)
+#define PGC_offlining     PG_mask(1, 8)
+ /* Page is offlined */
+#define _PGC_offlined     PG_shift(9)
+#define PGC_offlined      PG_mask(1, 9)
+#define PGC_offlined_broken (PGC_offlined | PGC_broken)
+
+#define is_page_offlining(page) ((page)->count_info & PGC_offlining)
+#define is_page_offlined(page)  ((page)->count_info & PGC_offlined)
+#define is_page_broken(page)    ((page)->count_info & PGC_broken)
+#define is_page_online(page)    (!is_page_offlined(page))
+
  /* Count of references to this frame. */
-#define PGC_count_width   PG_shift(6)
+#define PGC_count_width   PG_shift(9)
 #define PGC_count_mask    ((1UL<<PGC_count_width)-1)
 
+extern unsigned long xen_fixed_mfn_start;
+extern unsigned long xen_fixed_mfn_end;
 #define is_xen_heap_page(page)  ((page)->count_info & PGC_xen_heap)
 #define is_xen_heap_mfn(mfn)    (mfn_valid(mfn) &&                      \
                                  is_xen_heap_page(mfn_to_page(mfn)))
+#define is_xen_fixed_mfn(mfn)                                           \
+    (xen_fixed_mfn_start <= (mfn) && (mfn) <= xen_fixed_mfn_end)
 
 #ifdef CONFIG_IA64_PICKLE_DOMAIN
 #define page_get_owner(_p)                                              \
