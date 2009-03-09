@@ -1984,6 +1984,7 @@ int qcow2_create(const char *filename, uint64_t total_size,
                       const char *backing_file, int flags)
 {
     int fd, header_size, backing_filename_len, l1_size, i, shift, l2_bits;
+    int ret = 0;
     QCowHeader header;
     uint64_t tmp, offset;
     QCowCreateState s1, *s = &s1;
@@ -2042,25 +2043,37 @@ int qcow2_create(const char *filename, uint64_t total_size,
     create_refcount_update(s, s->refcount_block_offset, s->cluster_size);
 
     /* write all the data */
-    write(fd, &header, sizeof(header));
+    ret = write(fd, &header, sizeof(header));
+    if (ret < 0)
+        goto out;
     if (backing_file) {
-        write(fd, backing_file, backing_filename_len);
+        ret = write(fd, backing_file, backing_filename_len);
+        if (ret < 0)
+            goto out;
     }
     lseek(fd, s->l1_table_offset, SEEK_SET);
     tmp = 0;
     for(i = 0;i < l1_size; i++) {
-        write(fd, &tmp, sizeof(tmp));
+        ret = write(fd, &tmp, sizeof(tmp));
+        if (ret < 0)
+            goto out;
     }
     lseek(fd, s->refcount_table_offset, SEEK_SET);
-    write(fd, s->refcount_table, s->cluster_size);
+    ret = write(fd, s->refcount_table, s->cluster_size);
+    if (ret < 0)
+        goto out;
 
     lseek(fd, s->refcount_block_offset, SEEK_SET);
-    write(fd, s->refcount_block, s->cluster_size);
+    ret = write(fd, s->refcount_block, s->cluster_size);
+    if (ret < 0)
+        goto out;
+    ret = 0;
 
+  out:
     qemu_free(s->refcount_table);
     qemu_free(s->refcount_block);
     close(fd);
-    return 0;
+    return ret;
 }
 
 
