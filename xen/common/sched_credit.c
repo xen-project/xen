@@ -123,7 +123,8 @@
     _MACRO(dom_init)                        \
     _MACRO(dom_destroy)                     \
     _MACRO(vcpu_init)                       \
-    _MACRO(vcpu_destroy)
+    _MACRO(vcpu_destroy)                    \
+    _MACRO(vcpu_hot)
 
 #ifndef NDEBUG
 #define CSCHED_STATS_EXPAND_CHECKS(_MACRO)  \
@@ -395,14 +396,37 @@ __csched_vcpu_check(struct vcpu *vc)
 #define CSCHED_VCPU_CHECK(_vc)
 #endif
 
+/*
+ * Delay, in microseconds, between migrations of a VCPU between PCPUs.
+ * This prevents rapid fluttering of a VCPU between CPUs, and reduces the
+ * implicit overheads such as cache-warming. 1ms (1000) has been measured
+ * as a good value.
+ */
+static unsigned int vcpu_migration_delay;
+integer_param("vcpu_migration_delay", vcpu_migration_delay);
+
+static inline int
+__csched_vcpu_is_cache_hot(struct vcpu *v)
+{
+    int hot = ((NOW() - v->runstate.state_entry_time) <
+               ((uint64_t)vcpu_migration_delay * 1000u));
+
+    if ( hot )
+        CSCHED_STAT_CRANK(vcpu_hot);
+
+    return hot;
+}
+
 static inline int
 __csched_vcpu_is_migrateable(struct vcpu *vc, int dest_cpu)
 {
     /*
-     * Don't pick up work that's in the peer's scheduling tail. Also only pick
-     * up work that's allowed to run on our CPU.
+     * Don't pick up work that's in the peer's scheduling tail or hot on
+     * peer PCPU. Only pick up work that's allowed to run on our CPU.
      */
-    return !vc->is_running && cpu_isset(dest_cpu, vc->cpu_affinity);
+    return !vc->is_running &&
+           !__csched_vcpu_is_cache_hot(vc) &&
+           cpu_isset(dest_cpu, vc->cpu_affinity);
 }
 
 static int
@@ -1297,7 +1321,8 @@ csched_dump(void)
            "\tmsecs per tick     = %dms\n"
            "\tcredits per tick   = %d\n"
            "\tticks per tslice   = %d\n"
-           "\tticks per acct     = %d\n",
+           "\tticks per acct     = %d\n"
+           "\tmigration delay    = %uus\n",
            csched_priv.ncpus,
            csched_priv.master,
            csched_priv.credit,
@@ -1308,7 +1333,8 @@ csched_dump(void)
            CSCHED_MSECS_PER_TICK,
            CSCHED_CREDITS_PER_TICK,
            CSCHED_TICKS_PER_TSLICE,
-           CSCHED_TICKS_PER_ACCT);
+           CSCHED_TICKS_PER_ACCT,
+           vcpu_migration_delay);
 
     cpumask_scnprintf(idlers_buf, sizeof(idlers_buf), csched_priv.idlers);
     printk("idlers: %s\n", idlers_buf);
