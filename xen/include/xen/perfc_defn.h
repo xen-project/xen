@@ -49,6 +49,7 @@ PERFCOUNTER(dom_init,               "csched: dom_init")
 PERFCOUNTER(dom_destroy,            "csched: dom_destroy")
 PERFCOUNTER(vcpu_init,              "csched: vcpu_init")
 PERFCOUNTER(vcpu_destroy,           "csched: vcpu_destroy")
+PERFCOUNTER(vcpu_hot,               "csched: vcpu_hot")
 
 PERFCOUNTER(need_flush_tlb_flush,   "PG_need_flush tlb flushes")
 
