@@ -605,7 +605,7 @@ if __name__ == "__main__":
     isconfig = False
 
     # what was passed in
-    incfg = { "kernel": None, "ramdisk": None, "args": None }
+    incfg = { "kernel": None, "ramdisk": None, "args": "" }
     # what grub or sniffing chose
     chosencfg = { "kernel": None, "ramdisk": None, "args": None }
     # what to boot
@@ -641,7 +641,7 @@ if __name__ == "__main__":
 
     # debug
     if isconfig:
-        chosencfg = run_grub(file, entry)
+        chosencfg = run_grub(file, entry, fs, incfg["args"])
         print "  kernel: %s" % chosencfg["kernel"]
         if img.initrd:
             print "  initrd: %s" % chosencfg["ramdisk"]
