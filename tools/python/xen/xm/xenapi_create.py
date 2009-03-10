@@ -1047,6 +1047,7 @@ class sxp2xml:
             'guest_os_type',
             'hap',
             'pci_msitranslate',
+            'pci_power_mgmt',
         ]
 
         platform_configs = []

@@ -1677,7 +1677,7 @@ sh_alloc_p2m_pages(struct domain *d)
          * believed to be a concern.
          */
         page_set_owner(&pg[i], d);
-        pg[i].count_info = 1;
+        pg[i].count_info |= 1;
         page_list_add_tail(&pg[i], &d->arch.paging.shadow.p2m_freelist);
     }
     return 1;
@@ -1721,7 +1721,7 @@ shadow_free_p2m_page(struct domain *d, struct page_info *pg)
         SHADOW_ERROR("Odd p2m page count c=%#lx t=%"PRtype_info"\n",
                      pg->count_info, pg->u.inuse.type_info);
     }
-    pg->count_info = 0;
+    pg->count_info &= ~PGC_count_mask;
     /* Free should not decrement domain's total allocation, since 
      * these pages were allocated without an owner. */
     page_set_owner(pg, NULL); 
@@ -1895,7 +1895,7 @@ static void sh_hash_audit_bucket(struct domain *d, int bucket)
     while ( sp )
     {
         /* Not a shadow? */
-        BUG_ON( sp->count_info != 0 );
+        BUG_ON( (sp->count_info & PGC_count_mask )!= 0 ) ;
         /* Bogus type? */
         BUG_ON( sp->u.sh.type == 0 );
         BUG_ON( sp->u.sh.type > SH_type_max_shadow );

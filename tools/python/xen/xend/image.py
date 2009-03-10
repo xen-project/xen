@@ -279,15 +279,16 @@ class ImageHandler:
             if dev_type == 'vfb':
                 if 'keymap' in dev_info:
                     keymap = dev_info.get('keymap',{})
-                vfb_type = dev_info.get('type', {})
-                if vfb_type == 'sdl':
+                if int(dev_info.get('vnc', 0)) != 0 :
+                    has_vnc = True
+                if int(dev_info.get('sdl', 0)) != 0 :
+                    has_sdl = True
+                if has_sdl:
                     self.display = dev_info.get('display', {})
                     self.xauthority = dev_info.get('xauthority', {})
                     opengl = int(dev_info.get('opengl', opengl))
-                    has_sdl = True
-                else:
+                if has_vnc:
                     vnc_config = dev_info.get('other_config', {})
-                    has_vnc = True
                 break
 
         if keymap:
@@ -335,11 +336,12 @@ class ImageHandler:
             if int(vnc_config.get('vncunused', 1)) != 0:
                 ret.append('-vncunused')
 
-        elif has_sdl:
-            # SDL is default in QEMU.
+        if has_sdl:
+            ret.append('-sdl')
             if int(vmConfig['platform'].get('opengl', opengl)) != 1 :
                 ret.append('-disable-opengl')
-        else:
+
+        if not has_sdl and not has_vnc :
             ret.append('-nographic')
 
         if int(vmConfig['platform'].get('monitor', 0)) != 0:
@@ -714,6 +716,8 @@ class HVMImageHandler(ImageHandler):
 
         rtc_timeoffset = vmConfig['platform'].get('rtc_timeoffset')
 
+        if not self.display :
+            self.display = ''
         self.vm.storeVm(("image/dmargs", " ".join(self.dmargs)),
                         ("image/device-model", self.device_model),
                         ("image/display", self.display))

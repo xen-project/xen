@@ -855,27 +855,73 @@ class XendDomainInfo:
         """Configure an existing vscsi device.
             quoted pci funciton
         """
+        def _is_vscsi_defined(dev_info, p_devs = None, v_devs = None):
+            if not dev_info:
+                return False
+            for dev in sxp.children(dev_info, 'dev'):
+                if p_devs is not None:
+                    if sxp.child_value(dev, 'p-dev') in p_devs:
+                        return True
+                if v_devs is not None:
+                    if sxp.child_value(dev, 'v-dev') in v_devs:
+                        return True
+            return False
+
+        def _vscsi_be(be):
+            be_xdi = xen.xend.XendDomain.instance().domain_lookup_nr(be)
+            if be_xdi is not None:
+                be_domid = be_xdi.getDomid()
+                if be_domid is not None:
+                    return str(be_domid)
+            return str(be)
+
         dev_class = sxp.name(dev_sxp)
         if dev_class != 'vscsi':
             return False
 
         dev_config = self.info.vscsi_convert_sxp_to_dict(dev_sxp)
-        dev = dev_config['devs'][0]
-        req_devid = int(dev['devid'])
-        existing_dev_info = self._getDeviceInfo_vscsi(req_devid, dev['v-dev'])
-        state = dev['state']
+        devs = dev_config['devs']
+        v_devs = [d['v-dev'] for d in devs]
+        state = devs[0]['state']
+        req_devid = int(devs[0]['devid'])
+        cur_dev_sxp = self._getDeviceInfo_vscsi(req_devid)
 
         if state == xenbusState['Initialising']:
             # new create
             # If request devid does not exist, create and exit.
-            if existing_dev_info is None:
+            p_devs = [d['p-dev'] for d in devs]
+            for dev_type, dev_info in self.info.all_devices_sxpr():
+                if dev_type != 'vscsi':
+                    continue
+                if _is_vscsi_defined(dev_info, p_devs = p_devs):
+                    raise XendError('The physical device "%s" is already defined' % \
+                                    p_devs[0])
+            if cur_dev_sxp is None:
                 self.device_create(dev_sxp)
                 return True
-            elif existing_dev_info == "exists":
-                raise XendError("The virtual device %s is already defined" % dev['v-dev'])
+
+            if _is_vscsi_defined(cur_dev_sxp, v_devs = v_devs):
+                raise XendError('The virtual device "%s" is already defined' % \
+                                v_devs[0])
+
+            if int(dev_config['feature-host']) != \
+               int(sxp.child_value(cur_dev_sxp, 'feature-host')):
+                raise XendError('The physical device "%s" cannot define '
+                                'because mode is different' % devs[0]['p-dev'])
+
+            new_be = dev_config.get('backend', None)
+            if new_be is not None:
+                cur_be = sxp.child_value(cur_dev_sxp, 'backend', None)
+                if cur_be is None:
+                    cur_be = xen.xend.XendDomain.DOM0_ID
+                new_be_dom = _vscsi_be(new_be)
+                cur_be_dom = _vscsi_be(cur_be)
+                if new_be_dom != cur_be_dom:
+                    raise XendError('The physical device "%s" cannot define '
+                                    'because backend is different' % devs[0]['p-dev'])
 
         elif state == xenbusState['Closing']:
-            if existing_dev_info is None:
+            if not _is_vscsi_defined(cur_dev_sxp, v_devs = v_devs):
                 raise XendError("Cannot detach vscsi device does not exist")
 
         if self.domid is not None:
@@ -896,7 +942,6 @@ class XendDomainInfo:
                 del self.info['devices'][dev_uuid]
 
         else:
-            cur_dev_sxp = self._getDeviceInfo_vscsi(req_devid, None)
             new_dev_sxp = ['vscsi']
             cur_mode = sxp.children(cur_dev_sxp, 'feature-host')[0]
             new_dev_sxp.append(cur_mode)
@@ -910,8 +955,7 @@ class XendDomainInfo:
                 if state == xenbusState['Closing']:
                     if int(cur_mode[1]) == 1:
                         continue
-                    cur_dev_vdev = sxp.child_value(cur_dev, 'v-dev')
-                    if cur_dev_vdev == dev['v-dev']:
+                    if sxp.child_value(cur_dev, 'v-dev') in v_devs:
                         continue
                 new_dev_sxp.append(cur_dev)
 
@@ -1172,23 +1216,14 @@ class XendDomainInfo:
             return dev_info
         return None
 
-    def _getDeviceInfo_vscsi(self, devid, vdev):
+    def _getDeviceInfo_vscsi(self, devid):
         devid = int(devid)
         for dev_type, dev_info in self.info.all_devices_sxpr():
             if dev_type != 'vscsi':
                 continue
-            existing_dev_uuid = sxp.child_value(dev_info, 'uuid')
-            existing_conf = self.info['devices'][existing_dev_uuid][1]
-            existing_dev = existing_conf['devs'][0]
-            existing_devid = int(existing_dev['devid'])
-            existing_vdev = existing_dev['v-dev']
-
-            if vdev == existing_vdev:
-                return "exists"
-
-            if devid == existing_devid:
+            devs = sxp.children(dev_info, 'dev')
+            if devid == int(sxp.child_value(devs[0], 'devid')):
                 return dev_info
-
         return None
 
     def setMemoryTarget(self, target):
@@ -3639,7 +3674,7 @@ class XendDomainInfo:
 
         if self._stateGet() != XEN_API_VM_POWER_STATE_RUNNING:
 
-            cur_vscsi_sxp = self._getDeviceInfo_vscsi(devid, None)
+            cur_vscsi_sxp = self._getDeviceInfo_vscsi(devid)
 
             if cur_vscsi_sxp is None:
                 dev_uuid = self.info.device_add('vscsi', cfg_sxp = target_vscsi_sxp)
@@ -3737,7 +3772,7 @@ class XendDomainInfo:
         dscsi = XendAPIStore.get(dev_uuid, 'DSCSI')
         devid = dscsi.get_virtual_host()
         vHCTL = dscsi.get_virtual_HCTL()
-        cur_vscsi_sxp = self._getDeviceInfo_vscsi(devid, None)
+        cur_vscsi_sxp = self._getDeviceInfo_vscsi(devid)
         dev_uuid = sxp.child_value(cur_vscsi_sxp, 'uuid')
 
         target_dev = None

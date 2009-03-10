@@ -25,12 +25,14 @@
 /*
  * CSCHED_STATS
  *
- * Manage very basic counters and stats.
+ * Manage very basic per-vCPU counters and stats.
  *
  * Useful for debugging live systems. The stats are displayed
  * with runq dumps ('r' on the Xen console).
  */
+#ifdef PERF_COUNTERS
 #define CSCHED_STATS
+#endif
 
 
 /*
@@ -77,85 +79,9 @@
 /*
  * Stats
  */
+#define CSCHED_STAT_CRANK(_X)               (perfc_incr(_X))
+
 #ifdef CSCHED_STATS
-
-#define CSCHED_STAT(_X)         (csched_priv.stats._X)
-#define CSCHED_STAT_DEFINE(_X)  uint32_t _X;
-#define CSCHED_STAT_PRINTK(_X)                                  \
-    do                                                          \
-    {                                                           \
-        printk("\t%-30s = %u\n", #_X, CSCHED_STAT(_X));  \
-    } while ( 0 );
-
-/*
- * Try and keep often cranked stats on top so they'll fit on one
- * cache line.
- */
-#define CSCHED_STATS_EXPAND_SCHED(_MACRO)   \
-    _MACRO(schedule)                        \
-    _MACRO(acct_run)                        \
-    _MACRO(acct_no_work)                    \
-    _MACRO(acct_balance)                    \
-    _MACRO(acct_reorder)                    \
-    _MACRO(acct_min_credit)                 \
-    _MACRO(acct_vcpu_active)                \
-    _MACRO(acct_vcpu_idle)                  \
-    _MACRO(vcpu_sleep)                      \
-    _MACRO(vcpu_wake_running)               \
-    _MACRO(vcpu_wake_onrunq)                \
-    _MACRO(vcpu_wake_runnable)              \
-    _MACRO(vcpu_wake_not_runnable)          \
-    _MACRO(vcpu_park)                       \
-    _MACRO(vcpu_unpark)                     \
-    _MACRO(tickle_local_idler)              \
-    _MACRO(tickle_local_over)               \
-    _MACRO(tickle_local_under)              \
-    _MACRO(tickle_local_other)              \
-    _MACRO(tickle_idlers_none)              \
-    _MACRO(tickle_idlers_some)              \
-    _MACRO(load_balance_idle)               \
-    _MACRO(load_balance_over)               \
-    _MACRO(load_balance_other)              \
-    _MACRO(steal_trylock_failed)            \
-    _MACRO(steal_peer_idle)                 \
-    _MACRO(migrate_queued)                  \
-    _MACRO(migrate_running)                 \
-    _MACRO(dom_init)                        \
-    _MACRO(dom_destroy)                     \
-    _MACRO(vcpu_init)                       \
-    _MACRO(vcpu_destroy)
-
-#ifndef NDEBUG
-#define CSCHED_STATS_EXPAND_CHECKS(_MACRO)  \
-    _MACRO(vcpu_check)
-#else
-#define CSCHED_STATS_EXPAND_CHECKS(_MACRO)
-#endif
-
-#define CSCHED_STATS_EXPAND(_MACRO)         \
-    CSCHED_STATS_EXPAND_CHECKS(_MACRO)      \
-    CSCHED_STATS_EXPAND_SCHED(_MACRO)
-
-#define CSCHED_STATS_RESET()                                        \
-    do                                                              \
-    {                                                               \
-        memset(&csched_priv.stats, 0, sizeof(csched_priv.stats));   \
-    } while ( 0 )
-
-#define CSCHED_STATS_DEFINE()                   \
-    struct                                      \
-    {                                           \
-        CSCHED_STATS_EXPAND(CSCHED_STAT_DEFINE) \
-    } stats;
-
-#define CSCHED_STATS_PRINTK()                   \
-    do                                          \
-    {                                           \
-        printk("stats:\n");                     \
-        CSCHED_STATS_EXPAND(CSCHED_STAT_PRINTK) \
-    } while ( 0 )
-
-#define CSCHED_STAT_CRANK(_X)               (CSCHED_STAT(_X)++)
 
 #define CSCHED_VCPU_STATS_RESET(_V)                     \
     do                                                  \
@@ -169,10 +95,6 @@
 
 #else /* CSCHED_STATS */
 
-#define CSCHED_STATS_RESET()                do {} while ( 0 )
-#define CSCHED_STATS_DEFINE()
-#define CSCHED_STATS_PRINTK()               do {} while ( 0 )
-#define CSCHED_STAT_CRANK(_X)               do {} while ( 0 )
 #define CSCHED_VCPU_STATS_RESET(_V)         do {} while ( 0 )
 #define CSCHED_VCPU_STAT_CRANK(_V, _X)      do {} while ( 0 )
 #define CSCHED_VCPU_STAT_SET(_V, _X, _Y)    do {} while ( 0 )
@@ -238,7 +160,6 @@ struct csched_private {
     uint32_t credit;
     int credit_balance;
     uint32_t runq_sort;
-    CSCHED_STATS_DEFINE()
 };
 
 
@@ -248,15 +169,6 @@ struct csched_private {
 static struct csched_private csched_priv;
 
 static void csched_tick(void *_cpu);
-
-static inline int
-__cycle_cpu(int cpu, const cpumask_t *mask)
-{
-    int nxt = next_cpu(cpu, *mask);
-    if (nxt == NR_CPUS)
-        nxt = first_cpu(*mask);
-    return nxt;
-}
 
 static inline int
 __vcpu_on_runq(struct csched_vcpu *svc)
@@ -404,14 +316,37 @@ __csched_vcpu_check(struct vcpu *vc)
 #define CSCHED_VCPU_CHECK(_vc)
 #endif
 
+/*
+ * Delay, in microseconds, between migrations of a VCPU between PCPUs.
+ * This prevents rapid fluttering of a VCPU between CPUs, and reduces the
+ * implicit overheads such as cache-warming. 1ms (1000) has been measured
+ * as a good value.
+ */
+static unsigned int vcpu_migration_delay;
+integer_param("vcpu_migration_delay", vcpu_migration_delay);
+
+static inline int
+__csched_vcpu_is_cache_hot(struct vcpu *v)
+{
+    int hot = ((NOW() - v->runstate.state_entry_time) <
+               ((uint64_t)vcpu_migration_delay * 1000u));
+
+    if ( hot )
+        CSCHED_STAT_CRANK(vcpu_hot);
+
+    return hot;
+}
+
 static inline int
 __csched_vcpu_is_migrateable(struct vcpu *vc, int dest_cpu)
 {
     /*
-     * Don't pick up work that's in the peer's scheduling tail. Also only pick
-     * up work that's allowed to run on our CPU.
+     * Don't pick up work that's in the peer's scheduling tail or hot on
+     * peer PCPU. Only pick up work that's allowed to run on our CPU.
      */
-    return !vc->is_running && cpu_isset(dest_cpu, vc->cpu_affinity);
+    return !vc->is_running &&
+           !__csched_vcpu_is_cache_hot(vc) &&
+           cpu_isset(dest_cpu, vc->cpu_affinity);
 }
 
 static int
@@ -428,7 +363,7 @@ csched_cpu_pick(struct vcpu *vc)
     cpus_and(cpus, cpu_online_map, vc->cpu_affinity);
     cpu = cpu_isset(vc->processor, cpus)
             ? vc->processor
-            : __cycle_cpu(vc->processor, &cpus);
+            : cycle_cpu(vc->processor, cpus);
     ASSERT( !cpus_empty(cpus) && cpu_isset(cpu, cpus) );
 
     /*
@@ -454,7 +389,7 @@ csched_cpu_pick(struct vcpu *vc)
         cpumask_t nxt_idlers;
         int nxt;
 
-        nxt = __cycle_cpu(cpu, &cpus);
+        nxt = cycle_cpu(cpu, cpus);
 
         if ( cpu_isset(cpu, cpu_core_map[nxt]) )
         {
@@ -1128,7 +1063,7 @@ csched_load_balance(int cpu, struct csched_vcpu *snext)
 
     while ( !cpus_empty(workers) )
     {
-        peer_cpu = __cycle_cpu(peer_cpu, &workers);
+        peer_cpu = cycle_cpu(peer_cpu, workers);
         cpu_clear(peer_cpu, workers);
 
         /*
@@ -1306,7 +1241,8 @@ csched_dump(void)
            "\tmsecs per tick     = %dms\n"
            "\tcredits per tick   = %d\n"
            "\tticks per tslice   = %d\n"
-           "\tticks per acct     = %d\n",
+           "\tticks per acct     = %d\n"
+           "\tmigration delay    = %uus\n",
            csched_priv.ncpus,
            csched_priv.master,
            csched_priv.credit,
@@ -1317,12 +1253,11 @@ csched_dump(void)
            CSCHED_MSECS_PER_TICK,
            CSCHED_CREDITS_PER_TICK,
            CSCHED_TICKS_PER_TSLICE,
-           CSCHED_TICKS_PER_ACCT);
+           CSCHED_TICKS_PER_ACCT,
+           vcpu_migration_delay);
 
     cpumask_scnprintf(idlers_buf, sizeof(idlers_buf), csched_priv.idlers);
     printk("idlers: %s\n", idlers_buf);
-
-    CSCHED_STATS_PRINTK();
 
     printk("active vcpus:\n");
     loop = 0;
@@ -1354,7 +1289,6 @@ csched_init(void)
     csched_priv.credit = 0U;
     csched_priv.credit_balance = 0;
     csched_priv.runq_sort = 0U;
-    CSCHED_STATS_RESET();
 }
 
 /* Tickers cannot be kicked until SMP subsystem is alive. */

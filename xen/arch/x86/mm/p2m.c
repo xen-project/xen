@@ -177,7 +177,7 @@ p2m_next_level(struct domain *d, mfn_t *table_mfn, void **table,
             return 0;
         page_list_add_tail(pg, &d->arch.p2m->pages);
         pg->u.inuse.type_info = type | 1 | PGT_validated;
-        pg->count_info = 1;
+        pg->count_info |= 1;
 
         new_entry = l1e_from_pfn(mfn_x(page_to_mfn(pg)),
                                  __PAGE_HYPERVISOR|_PAGE_USER);
@@ -216,7 +216,7 @@ p2m_next_level(struct domain *d, mfn_t *table_mfn, void **table,
             return 0;
         page_list_add_tail(pg, &d->arch.p2m->pages);
         pg->u.inuse.type_info = PGT_l1_page_table | 1 | PGT_validated;
-        pg->count_info = 1;
+        pg->count_info |= 1;
         
         /* New splintered mappings inherit the flags of the old superpage, 
          * with a little reorganisation for the _PAGE_PSE_PAT bit. */

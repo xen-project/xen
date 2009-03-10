@@ -44,6 +44,7 @@ _clean: delete-unfresh-files
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C common clean
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C drivers clean
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C xsm clean
+	$(MAKE) -f $(BASEDIR)/Rules.mk -C crypto clean
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C arch/$(TARGET_ARCH) clean
 	rm -f include/asm *.o $(TARGET)* *~ core
 	rm -f include/asm-*/asm-offsets.h

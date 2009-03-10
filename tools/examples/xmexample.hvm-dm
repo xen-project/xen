@@ -11,4 +11,4 @@ vif = [ '', 'type=ioemu, bridge=xenbr0' ]
 disk = [ 'file:/var/images/min-el3-i386.img,hda,w', ',hdc:cdrom,r' ]
 
 # Actual output via PVFB
-vfb = [ 'type=sdl' ]
+vfb = [ 'sdl=1' ]

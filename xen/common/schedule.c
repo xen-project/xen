@@ -81,6 +81,20 @@ static inline void trace_runstate_change(struct vcpu *v, int new_state)
     __trace_var(event, 1/*tsc*/, sizeof(d), (unsigned char *)&d);
 }
 
+static inline void trace_continue_running(struct vcpu *v)
+{
+    struct { uint32_t vcpu:16, domain:16; } d;
+
+    if ( likely(!tb_init_done) )
+        return;
+
+    d.vcpu = v->vcpu_id;
+    d.domain = v->domain->domain_id;
+
+    __trace_var(TRC_SCHED_CONTINUE_RUNNING, 1/*tsc*/, sizeof(d),
+                (unsigned char *)&d);
+}
+
 static inline void vcpu_runstate_change(
     struct vcpu *v, int new_state, s_time_t new_entry_time)
 {
@@ -803,6 +817,7 @@ static void schedule(void)
     if ( unlikely(prev == next) )
     {
         spin_unlock_irq(&sd->schedule_lock);
+        trace_continue_running(next);
         return continue_running(prev);
     }
 

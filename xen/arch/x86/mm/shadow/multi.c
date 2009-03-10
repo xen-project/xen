@@ -4281,7 +4281,7 @@ int sh_rm_write_access_from_sl1p(struct vcpu *v, mfn_t gmfn,
 
     sp = mfn_to_page(smfn);
 
-    if ( sp->count_info != 0
+    if ( ((sp->count_info & PGC_count_mask) != 0)
          || (sp->u.sh.type != SH_type_l1_shadow
              && sp->u.sh.type != SH_type_fl1_shadow) )
         goto fail;

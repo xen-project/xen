@@ -1111,15 +1111,43 @@ void arch_get_xen_caps(xen_capabilities_info_t *info)
 
 int xen_in_range(paddr_t start, paddr_t end)
 {
-#if defined(CONFIG_X86_32)
-    paddr_t xs = 0;
-    paddr_t xe = xenheap_phys_end;
-#else
-    paddr_t xs = __pa(&_stext);
-    paddr_t xe = __pa(&_etext);
-#endif
+    int i;
+    static struct {
+        paddr_t s, e;
+    } xen_regions[5];
 
-    return (start < xe) && (end > xs);
+    /* initialize first time */
+    if ( !xen_regions[0].s )
+    {
+        extern char __init_begin[], __per_cpu_start[], __per_cpu_end[],
+                    __bss_start[];
+        extern unsigned long allocator_bitmap_end;
+
+        /* S3 resume code (and other real mode trampoline code) */
+        xen_regions[0].s = bootsym_phys(trampoline_start);
+        xen_regions[0].e = bootsym_phys(trampoline_end);
+        /* hypervisor code + data */
+        xen_regions[1].s =__pa(&_stext);
+        xen_regions[1].e = __pa(&__init_begin);
+        /* per-cpu data */
+        xen_regions[2].s = __pa(&__per_cpu_start);
+        xen_regions[2].e = __pa(&__per_cpu_end);
+        /* bss + boot allocator bitmap */
+        xen_regions[3].s = __pa(&__bss_start);
+        xen_regions[3].e = allocator_bitmap_end;
+        /* frametable */
+        xen_regions[4].s = (unsigned long)frame_table;
+        xen_regions[4].e = (unsigned long)frame_table +
+                           PFN_UP(max_page * sizeof(*frame_table));
+    }
+
+    for ( i = 0; i < ARRAY_SIZE(xen_regions); i++ )
+    {
+        if ( (start < xen_regions[i].e) && (end > xen_regions[i].s) )
+            return 1;
+    }
+
+    return 0;
 }
 
 /*

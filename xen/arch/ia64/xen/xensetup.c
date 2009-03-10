@@ -337,6 +337,8 @@ is_platform_hp_ski(void)
 static int __initdata dom0_vhpt_size_log2;
 integer_param("dom0_vhpt_size_log2", dom0_vhpt_size_log2);
 #endif
+unsigned long xen_fixed_mfn_start __read_mostly;
+unsigned long xen_fixed_mfn_end __read_mostly;
 
 void __init start_kernel(void)
 {
@@ -555,6 +557,10 @@ skip_move:
     printk("Xen heap: %luMB (%lukB)\n",
            (xenheap_phys_end-__pa(xen_heap_start)) >> 20,
            (xenheap_phys_end-__pa(xen_heap_start)) >> 10);
+
+    /* for is_xen_fixed_mfn() */
+    xen_fixed_mfn_start = virt_to_mfn(&_start);
+    xen_fixed_mfn_end = virt_to_mfn(xen_heap_start);
 
     end_boot_allocator();
 

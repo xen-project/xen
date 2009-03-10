@@ -308,6 +308,8 @@ serial='pty'
 #                   available options are:
 #                   - msitranslate=0|1
 #                      per-device overriden of pci_msitranslate, see below
+#                   - power_mgmt=0|1
+#                      per-device overriden of pci_power_mgmt, see below
 #
 #pci=[ '07:00.0', '07:00.1' ]
 
@@ -321,6 +323,13 @@ serial='pty'
 # turned off.
 # 
 #pci_msitranslate=1
+
+#   PCI Power Management:
+#
+#   If it's set, the guest OS will be able to program D0-D3hot states of the
+# PCI device for the purpose of low power consumption.
+# 
+#pci_power_mgmt=0
 
 #-----------------------------------------------------------------------------
 #   Configure PVSCSI devices:

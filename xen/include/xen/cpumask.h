@@ -38,6 +38,8 @@
  *
  * int first_cpu(mask)			Number lowest set bit, or NR_CPUS
  * int next_cpu(cpu, mask)		Next cpu past 'cpu', or NR_CPUS
+ * int last_cpu(mask)			Number highest set bit, or NR_CPUS
+ * int cycle_cpu(cpu, mask)		Next cpu cycling from 'cpu', or NR_CPUS
  *
  * cpumask_t cpumask_of_cpu(cpu)	Return cpumask with bit 'cpu' set
  * CPU_MASK_ALL				Initializer - all bits set
@@ -225,10 +227,21 @@ static inline int __next_cpu(int n, const cpumask_t *srcp, int nbits)
 #define last_cpu(src) __last_cpu(&(src), NR_CPUS)
 static inline int __last_cpu(const cpumask_t *srcp, int nbits)
 {
-	int cpu, pcpu = NR_CPUS;
-	for (cpu = first_cpu(*srcp); cpu < NR_CPUS; cpu = next_cpu(cpu, *srcp))
+	int cpu, pcpu = nbits;
+	for (cpu = __first_cpu(srcp, nbits);
+	     cpu < nbits;
+	     cpu = __next_cpu(cpu, srcp, nbits))
 		pcpu = cpu;
 	return pcpu;
+}
+
+#define cycle_cpu(n, src) __cycle_cpu((n), &(src), NR_CPUS)
+static inline int __cycle_cpu(int n, const cpumask_t *srcp, int nbits)
+{
+    int nxt = __next_cpu(n, srcp, nbits);
+    if (nxt == nbits)
+        nxt = __first_cpu(srcp, nbits);
+    return nxt;
 }
 
 #define cpumask_of_cpu(cpu)						\

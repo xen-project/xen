@@ -359,6 +359,54 @@ struct xen_sysctl_pm_op {
     };
 };
 
+#define XEN_SYSCTL_page_offline_op        14
+struct xen_sysctl_page_offline_op {
+    /* IN: range of page to be offlined */
+#define sysctl_page_offline     1
+#define sysctl_page_online      2
+#define sysctl_query_page_offline  3
+    uint32_t cmd;
+    uint32_t start;
+    uint32_t end;
+    /* OUT: result of page offline request */
+    /*
+     * bit 0~15: result flags
+     * bit 16~31: owner
+     */
+    XEN_GUEST_HANDLE(uint32) status;
+};
+
+#define PG_OFFLINE_STATUS_MASK    (0xFFUL)
+
+/* The result is invalid, i.e. HV does not handle it */
+#define PG_OFFLINE_INVALID   (0x1UL << 0)
+
+#define PG_OFFLINE_OFFLINED  (0x1UL << 1)
+#define PG_OFFLINE_PENDING   (0x1UL << 2)
+#define PG_OFFLINE_FAILED    (0x1UL << 3)
+
+#define PG_ONLINE_FAILED     PG_OFFLINE_FAILED
+#define PG_ONLINE_ONLINED    PG_OFFLINE_OFFLINED
+
+#define PG_OFFLINE_STATUS_OFFLINED              (0x1UL << 1)
+#define PG_OFFLINE_STATUS_ONLINE                (0x1UL << 2)
+#define PG_OFFLINE_STATUS_OFFLINE_PENDING       (0x1UL << 3)
+#define PG_OFFLINE_STATUS_BROKEN                (0x1UL << 4)
+
+#define PG_OFFLINE_MISC_MASK    (0xFFUL << 4)
+
+/* only valid when PG_OFFLINE_FAILED */
+#define PG_OFFLINE_XENPAGE   (0x1UL << 8)
+#define PG_OFFLINE_DOM0PAGE  (0x1UL << 9)
+#define PG_OFFLINE_ANONYMOUS (0x1UL << 10)
+#define PG_OFFLINE_NOT_CONV_RAM   (0x1UL << 11)
+#define PG_OFFLINE_OWNED     (0x1UL << 12)
+
+#define PG_OFFLINE_BROKEN    (0x1UL << 13)
+#define PG_ONLINE_BROKEN     PG_OFFLINE_BROKEN
+
+#define PG_OFFLINE_OWNER_SHIFT 16
+
 struct xen_sysctl {
     uint32_t cmd;
     uint32_t interface_version; /* XEN_SYSCTL_INTERFACE_VERSION */
@@ -375,6 +423,7 @@ struct xen_sysctl {
         struct xen_sysctl_get_pmstat        get_pmstat;
         struct xen_sysctl_cpu_hotplug       cpu_hotplug;
         struct xen_sysctl_pm_op             pm_op;
+        struct xen_sysctl_page_offline_op   page_offline;
         uint8_t                             pad[128];
     } u;
 };

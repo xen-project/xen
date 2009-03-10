@@ -450,7 +450,7 @@ int tboot_s3_resume(void)
 
     tboot_gen_domain_integrity(g_tboot_shared->s3_key, &mac);
     if ( mac != domain_mac )
-        return 0; /* -3 */
+        return -3;
 
     return 0;
 }

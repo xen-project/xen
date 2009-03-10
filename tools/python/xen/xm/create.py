@@ -322,14 +322,16 @@ gopts.var('disk', val='phy:DEV,VDEV,MODE[,DOM]',
           backend driver domain to use for the disk.
           The option may be repeated to add more than one disk.""")
 
-gopts.var('pci', val='BUS:DEV.FUNC[,msitranslate=0|1]',
+gopts.var('pci', val='BUS:DEV.FUNC[,msitranslate=0|1][,power_mgmt=0|1]',
           fn=append_value, default=[],
           use="""Add a PCI device to a domain, using given params (in hex).
           For example 'pci=c0:02.1'.
           If msitranslate is set, MSI-INTx translation is enabled if possible.
           Guest that doesn't support MSI will get IO-APIC type IRQs
           translated from physical MSI, HVM only. Default is 1.
-          The option may be repeated to add more than one pci device.""")
+          The option may be repeated to add more than one pci device.
+          If power_mgmt is set, the guest OS will be able to program the power
+          states D0-D3hot of the device, HVM only. Default=0.""")
 
 gopts.var('vscsi', val='PDEV,VDEV[,DOM]',
           fn=append_value, default=[],
@@ -348,16 +350,16 @@ gopts.var('irq', val='IRQ',
          For example 'irq=7'.
          This option may be repeated to add more than one IRQ.""")
 
-gopts.var('vfb', val="type={vnc,sdl},vncunused=1,vncdisplay=N,vnclisten=ADDR,display=DISPLAY,xauthority=XAUTHORITY,vncpasswd=PASSWORD,opengl=1,keymap=FILE",
+gopts.var('vfb', val="vnc=1,sdl=1,vncunused=1,vncdisplay=N,vnclisten=ADDR,display=DISPLAY,xauthority=XAUTHORITY,vncpasswd=PASSWORD,opengl=1,keymap=FILE",
           fn=append_value, default=[],
           use="""Make the domain a framebuffer backend.
-          The backend type should be either sdl or vnc.
-          For type=vnc, connect an external vncviewer.  The server will listen
+          Both sdl=1 and vnc=1 can be enabled at the same time.
+          For vnc=1, connect an external vncviewer.  The server will listen
           on ADDR (default 127.0.0.1) on port N+5900.  N defaults to the
           domain id.  If vncunused=1, the server will try to find an arbitrary
           unused port above 5900.  vncpasswd overrides the XenD configured
           default password.
-          For type=sdl, a viewer will be started automatically using the
+          For sdl=1, a viewer will be started automatically using the
           given DISPLAY and XAUTHORITY, which default to the current user's
           ones.  OpenGL will be used by default unless opengl is set to 0.
           keymap overrides the XendD configured default layout file.""")
@@ -605,6 +607,10 @@ gopts.var('pci_msitranslate', val='TRANSLATE',
           use="""Global PCI MSI-INTx translation flag (0=disable;
           1=enable.""")
 
+gopts.var('pci_power_mgmt', val='POWERMGMT',
+          fn=set_int, default=0,
+          use="""Global PCI Power Management flag (0=disable;1=enable).""")
+
 def err(msg):
     """Print an error to stderr and exit.
     """
@@ -691,7 +697,7 @@ def configure_pci(config_devs, vals):
         d = comma_sep_kv_to_dict(opts)
 
         def f(k):
-            if k not in ['msitranslate']:
+            if k not in ['msitranslate', 'power_mgmt']:
                 err('Invalid pci option: ' + k)
 
             config_pci_opts.append([k, d[k]])
@@ -798,11 +804,13 @@ def configure_vfbs(config_devs, vals):
     for f in vals.vfb:
         d = comma_sep_kv_to_dict(f)
         config = ['vfb']
-        if not d.has_key("type"):
-            d['type'] = 'sdl'
+        #handle the legacy case
+        if d.has_key("type"):
+            d[d['type']] = '1'
+            del d['type']
         for (k,v) in d.iteritems():
             if not k in [ 'vnclisten', 'vncunused', 'vncdisplay', 'display',
-                          'videoram', 'xauthority', 'type', 'vncpasswd',
+                          'videoram', 'xauthority', 'sdl', 'vnc', 'vncpasswd',
                           'opengl', 'keymap' ]:
                 err("configuration option %s unknown to vfbs" % k)
             config.append([k,v])
@@ -913,7 +921,7 @@ def configure_hvm(config_image, vals):
              'acpi', 'apic', 'usb', 'usbdevice', 'keymap', 'pci', 'hpet',
              'guest_os_type', 'hap', 'opengl', 'cpuid', 'cpuid_check',
              'viridian', 'xen_extended_power_mgmt', 'pci_msitranslate',
-             'vpt_align' ]
+             'vpt_align', 'pci_power_mgmt' ]
 
     for a in args:
         if a in vals.__dict__ and vals.__dict__[a] is not None:

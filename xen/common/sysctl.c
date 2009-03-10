@@ -233,6 +233,61 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
     }
     break;
 
+    case XEN_SYSCTL_page_offline_op:
+    {
+        uint32_t *status, *ptr;
+        unsigned long pfn;
+
+        ptr = status = xmalloc_bytes( sizeof(uint32_t) *
+                                (op->u.page_offline.end -
+                                  op->u.page_offline.start + 1));
+        if (!status)
+        {
+            dprintk(XENLOG_WARNING, "Out of memory for page offline op\n");
+            ret = -ENOMEM;
+            break;
+        }
+
+        memset(status, PG_OFFLINE_INVALID, sizeof(uint32_t) *
+                      (op->u.page_offline.end - op->u.page_offline.start + 1));
+
+        for ( pfn = op->u.page_offline.start;
+              pfn <= op->u.page_offline.end;
+              pfn ++ )
+        {
+            switch (op->u.page_offline.cmd)
+            {
+                /* Shall revert her if failed, or leave caller do it? */
+                case sysctl_page_offline:
+                    ret = offline_page(pfn, 0, ptr++);
+                    break;
+                case sysctl_page_online:
+                    ret = online_page(pfn, ptr++);
+                    break;
+                case sysctl_query_page_offline:
+                    ret = query_page_offline(pfn, ptr++);
+                    break;
+                default:
+                    gdprintk(XENLOG_WARNING, "invalid page offline op %x\n",
+                            op->u.page_offline.cmd);
+                    ret = -EINVAL;
+                    break;
+            }
+
+            if (ret)
+                break;
+        }
+
+        if (copy_to_guest(op->u.page_offline.status, status,
+                          op->u.page_offline.end - op->u.page_offline.start + 1))
+        {
+            ret = -EFAULT;
+            break;
+        }
+        xfree(status);
+    }
+    break;
+
     default:
         ret = arch_do_sysctl(op, u_sysctl);
         break;
