@@ -328,7 +328,7 @@ integer_param("vcpu_migration_delay", vcpu_migration_delay);
 static inline int
 __csched_vcpu_is_cache_hot(struct vcpu *v)
 {
-    int hot = ((NOW() - v->runstate.state_entry_time) <
+    int hot = ((NOW() - v->last_run_time) <
                ((uint64_t)vcpu_migration_delay * 1000u));
 
     if ( hot )
