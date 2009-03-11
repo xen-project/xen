@@ -90,7 +90,7 @@ def _vscsi_get_scsidevices_by_lsscsi(option = ""):
 
     devices = []
 
-    for scsiinfo in os.popen('lsscsi -g %s' % option).readlines():
+    for scsiinfo in os.popen('lsscsi -g %s 2>/dev/null' % option).readlines():
         s = scsiinfo.split()
         hctl = s[0][1:-1]
         try:
@@ -248,7 +248,7 @@ def get_all_scsi_devices():
             get_scsi_scsilevel(scsi_dev['physical_HCTL'])
 
         try:
-            lsscsi_info = os.popen('lsscsi ' + scsi_dev['physical_HCTL']).read().split()
+            lsscsi_info = os.popen('lsscsi %s 2>/dev/null' % scsi_dev['physical_HCTL']).read().split()
             scsi_dev['type'] = lsscsi_info[1]
         except:
             scsi_dev['type'] = None
