@@ -2888,7 +2888,9 @@ class XendDomainInfo:
         while True:
             test = 0
             diff = time.time() - start
-            for i in self.getDeviceController('vbd').deviceIDs():
+            vbds = self.getDeviceController('vbd').deviceIDs()
+            taps = self.getDeviceController('tap').deviceIDs()
+            for i in vbds + taps:
                 test = 1
                 log.info("Dev %s still active, looping...", i)
                 time.sleep(0.1)
