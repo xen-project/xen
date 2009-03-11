@@ -30,6 +30,7 @@
 #include <public/sched.h>
 #include <public/vcpu.h>
 #include <xsm/xsm.h>
+#include <xen/trace.h>
 
 /* Linux config option: propageted to domain0 */
 /* xen_processor_pmbits: xen control Cx, Px, ... */
@@ -595,6 +596,7 @@ void domain_destroy(struct domain *d)
         return;
 
     /* Delete from task list and task hashtable. */
+    TRACE_1D(TRC_SCHED_DOM_REM, d->domain_id);
     spin_lock(&domlist_update_lock);
     pd = &domain_list;
     while ( *pd != d ) 
