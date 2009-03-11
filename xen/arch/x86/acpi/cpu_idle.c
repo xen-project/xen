@@ -167,25 +167,6 @@ static void acpi_idle_do_entry(struct acpi_processor_cx *cx)
     }
 }
 
-static inline void acpi_idle_update_bm_rld(struct acpi_processor_power *power,
-                                           struct acpi_processor_cx *target)
-{
-    if ( !power->flags.bm_check )
-        return;
-
-    if ( power->flags.bm_rld_set && target->type != ACPI_STATE_C3 )
-    {
-        acpi_set_register(ACPI_BITREG_BUS_MASTER_RLD, 0);
-        power->flags.bm_rld_set = 0;
-    }
-
-    if ( !power->flags.bm_rld_set && target->type == ACPI_STATE_C3 )
-    {
-        acpi_set_register(ACPI_BITREG_BUS_MASTER_RLD, 1);
-        power->flags.bm_rld_set = 1;
-    }
-}
-
 static int acpi_idle_bm_check(void)
 {
     u32 bm_status = 0;
@@ -258,8 +239,6 @@ static void acpi_processor_idle(void)
      * ------
      * Invoke the current Cx state to put the processor to sleep.
      */
-    acpi_idle_update_bm_rld(power, cx);
-
     switch ( cx->type )
     {
     case ACPI_STATE_C1:
@@ -579,6 +558,15 @@ static int check_cx(struct acpi_processor_power *power, xen_processor_cx_t *cx)
                         "C3 support without BM control\n"));
                 }
             }
+            /*
+             * On older chipsets, BM_RLD needs to be set
+             * in order for Bus Master activity to wake the
+             * system from C3.  Newer chipsets handle DMA
+             * during C3 automatically and BM_RLD is a NOP.
+             * In either case, the proper way to
+             * handle BM_RLD is to set it and leave it set.
+             */
+            acpi_set_register(ACPI_BITREG_BUS_MASTER_RLD, 1);
         }
         else
         {
