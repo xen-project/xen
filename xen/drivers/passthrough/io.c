@@ -37,6 +37,9 @@ static void pt_irq_time_out(void *data)
     struct hvm_irq_dpci *dpci = NULL;
     struct dev_intx_gsi_link *digl;
     uint32_t device, intx;
+    DECLARE_BITMAP(machine_gsi_map, NR_IRQS);
+
+    bitmap_zero(machine_gsi_map, NR_IRQS);
 
     spin_lock(&irq_map->dom->event_lock);
 
@@ -46,16 +49,31 @@ static void pt_irq_time_out(void *data)
     {
         guest_gsi = digl->gsi;
         machine_gsi = dpci->girq[guest_gsi].machine_gsi;
+        set_bit(machine_gsi, machine_gsi_map);
         device = digl->device;
         intx = digl->intx;
         hvm_pci_intx_deassert(irq_map->dom, device, intx);
     }
 
-    clear_bit(machine_gsi, dpci->dirq_mask);
-    vector = domain_irq_to_vector(irq_map->dom, machine_gsi);
-    dpci->mirq[machine_gsi].pending = 0;
+    for ( machine_gsi = find_first_bit(machine_gsi_map, NR_IRQS);
+          machine_gsi < NR_IRQS;
+          machine_gsi = find_next_bit(machine_gsi_map, NR_IRQS,
+                                      machine_gsi + 1) )
+    {
+        clear_bit(machine_gsi, dpci->dirq_mask);
+        vector = domain_irq_to_vector(irq_map->dom, machine_gsi);
+        dpci->mirq[machine_gsi].pending = 0;
+    }
+
     spin_unlock(&irq_map->dom->event_lock);
-    pirq_guest_eoi(irq_map->dom, machine_gsi);
+
+    for ( machine_gsi = find_first_bit(machine_gsi_map, NR_IRQS);
+          machine_gsi < NR_IRQS;
+          machine_gsi = find_next_bit(machine_gsi_map, NR_IRQS,
+                                      machine_gsi + 1) )
+    {
+        pirq_guest_eoi(irq_map->dom, machine_gsi);
+    }
 }
 
 int pt_irq_create_bind_vtd(
