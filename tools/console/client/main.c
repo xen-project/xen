@@ -71,6 +71,21 @@ static void usage(const char *program) {
 	       , program);
 }
 
+#ifdef	__sun__
+void cfmakeraw (struct termios *termios_p)
+{
+	termios_p->c_iflag &=
+	    ~(IGNBRK|BRKINT|PARMRK|ISTRIP|INLCR|IGNCR|ICRNL|IXON);
+	termios_p->c_oflag &= ~OPOST;
+	termios_p->c_lflag &= ~(ECHO|ECHONL|ICANON|ISIG|IEXTEN);
+	termios_p->c_cflag &= ~(CSIZE|PARENB);
+	termios_p->c_cflag |= CS8;
+
+	termios_p->c_cc[VMIN] = 0;
+	termios_p->c_cc[VTIME] = 0;
+}
+#endif
+
 static int get_pty_fd(struct xs_handle *xs, char *path, int seconds)
 /* Check for a pty in xenstore, open it and return its fd.
  * Assumes there is already a watch set in the store for this path. */

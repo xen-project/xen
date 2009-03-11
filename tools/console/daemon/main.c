@@ -86,7 +86,9 @@ int main(int argc, char **argv)
 			version(argv[0]);
 			exit(0);
 		case 'v':
+#ifndef __sun__
 			syslog_option |= LOG_PERROR;
+#endif
 			syslog_mask = LOG_DEBUG;
 			break;
 		case 'i':
