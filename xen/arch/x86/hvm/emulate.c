@@ -793,7 +793,7 @@ static int hvmemul_read_msr(
     if ( (rc = hvm_msr_read_intercept(&_regs)) != 0 )
         return rc;
 
-    *val = ((uint64_t)(uint32_t)_regs.edx << 32) || (uint32_t)_regs.eax;
+    *val = ((uint64_t)(uint32_t)_regs.edx << 32) | (uint32_t)_regs.eax;
     return X86EMUL_OKAY;
 }
 
