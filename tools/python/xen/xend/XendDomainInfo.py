@@ -1495,7 +1495,8 @@ class XendDomainInfo:
         t.mkdir()
         t.set_permissions({'dom' : self.domid, 'read' : True})
         t.write('vm', self.vmpath)
-        for i in [ 'device', 'control', 'error', 'memory' ]:
+        # NB. Solaris guests use guest/ and hvmpv/ xenstore directories
+        for i in [ 'device', 'control', 'error', 'memory', 'guest', 'hvmpv' ]:
             t.mkdir(i)
             t.set_permissions(i, {'dom' : self.domid})
 
