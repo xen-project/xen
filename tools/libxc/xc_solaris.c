@@ -134,6 +134,8 @@ void *xc_map_foreign_ranges(int xc_handle, uint32_t dom,
     if (rc)
         goto ioctl_failed;
 
+    return addr;
+
 ioctl_failed:
     rc = munmap(addr, size);
     if (rc == -1)
