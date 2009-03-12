@@ -481,7 +481,7 @@ static void core2_vpmu_destroy(struct vcpu *v)
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
     struct core2_vpmu_context *core2_vpmu_cxt = vpmu->context;
 
-    if ( !vpmu->flags & VPMU_CONTEXT_ALLOCATED )
+    if ( !(vpmu->flags & VPMU_CONTEXT_ALLOCATED) )
         return;
     xfree(core2_vpmu_cxt->pmu_enable);
     xfree(vpmu->context);
