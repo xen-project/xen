@@ -40,6 +40,7 @@ from xen.xend import arch
 from xen.xend import XendOptions
 from xen.util import oshelp
 from xen.util import utils
+from xen.xend import osdep
 
 xc = xen.lowlevel.xc.xc()
 
@@ -407,9 +408,12 @@ class ImageHandler:
         logfd = os.open(self.logfile, logfile_mode)
         
         sys.stderr.flush()
+        contract = osdep.prefork("%s:%d" %
+                                 (self.vm.getName(), self.vm.getDomid()))
         pid = os.fork()
         if pid == 0: #child
             try:
+                osdep.postfork(contract)
                 os.dup2(null, 0)
                 os.dup2(logfd, 1)
                 os.dup2(logfd, 2)
@@ -426,6 +430,7 @@ class ImageHandler:
             except:
                 os._exit(127)
         else:
+            osdep.postfork(contract, abandon=True)
             self.pid = pid
             os.close(null)
             os.close(logfd)

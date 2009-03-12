@@ -192,6 +192,32 @@ _get_cpuinfo = {
     "SunOS": _solaris_get_cpuinfo
 }
 
+def _default_prefork(name):
+    pass
+
+def _default_postfork(ct, abandon=False):
+    pass
+
+# call this for long-running processes that should survive a xend
+# restart
+def _solaris_prefork(name):
+    from xen.lowlevel import process
+    return process.activate(name)
+
+def _solaris_postfork(ct, abandon=False):
+    from xen.lowlevel import process
+    process.clear(ct)
+    if abandon:
+        process.abandon_latest()
+
+_get_prefork = {
+    "SunOS": _solaris_prefork
+}
+
+_get_postfork = {
+    "SunOS": _solaris_postfork
+}
+
 def _get(var, default=None):
     return var.get(os.uname()[0], default)
 
@@ -201,3 +227,5 @@ pygrub_path = _get(_pygrub_path, "/usr/bin/pygrub")
 vif_script = _get(_vif_script, "vif-bridge")
 lookup_balloon_stat = _get(_balloon_stat, _linux_balloon_stat)
 get_cpuinfo = _get(_get_cpuinfo, _linux_get_cpuinfo)
+prefork = _get(_get_prefork, _default_prefork)
+postfork = _get(_get_postfork, _default_postfork)
