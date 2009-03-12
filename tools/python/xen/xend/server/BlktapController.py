@@ -15,7 +15,8 @@ blktap_disk_types = [
     'qcow',
     'qcow2',
 
-    'ioemu'
+    'ioemu',
+    'tapdisk',
     ]
 
 class BlktapController(BlkifController):
