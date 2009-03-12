@@ -11,13 +11,6 @@ dir=$(dirname "$0")
 # This is pretty horrible, but there's not really a nicer way of solving this.
 claim_lock "block"
 
-# split backend/DEVCLASS/VMID/DEVID on slashes
-path_array=( ${XENBUS_PATH//\// } )
-# get /vm/UUID path
-vm=$(xenstore-read "/local/domain/${path_array[2]}/vm")
-# construct /vm/UUID/device/DEVCLASS/DEVID
-vm_dev="$vm/device/${path_array[1]}/${path_array[3]}"
-
 # remove device frontend store entries
 xenstore-rm -t \
   $(xenstore-read "$XENBUS_PATH/frontend" 2>/dev/null) 2>/dev/null || true
@@ -25,8 +18,5 @@ xenstore-rm -t \
 # remove device backend store entries
 xenstore-rm -t "$XENBUS_PATH"        2>/dev/null || true
 xenstore-rm -t "error/$XENBUS_PATH"  2>/dev/null || true
-
-# remove device path from /vm/UUID
-xenstore-rm -t "$vm_dev" 2>/dev/null || true
 
 release_lock "block"
