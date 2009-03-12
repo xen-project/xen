@@ -231,6 +231,24 @@ static void add_disktype(blkif_t *blkif, int type)
 	entry->pprev = pprev;
 }
 
+static int qemu_instance_has_disks(pid_t pid)
+{
+	int i;
+	int count = 0;
+	driver_list_entry_t *entry;
+
+	for (i = 0; i < MAX_DISK_TYPES; i++) {
+		entry = active_disks[i];
+		while (entry) {
+			if ((entry->blkif->tappid == pid) && dtypes[i]->use_ioemu)
+				count++;
+			entry = entry->next;
+		}
+	}
+
+	return (count != 0);
+}
+
 static int del_disktype(blkif_t *blkif)
 {
 	driver_list_entry_t *entry, **pprev;
@@ -254,6 +272,14 @@ static int del_disktype(blkif_t *blkif)
 
 	DPRINTF("DEL_DISKTYPE: Freeing entry\n");
 	free(entry);
+
+	/*
+	 * When using ioemu, all disks of one VM are connected to the same
+	 * qemu-dm instance. We may close the file handle only if there is
+	 * no other disk left for this domain.
+	 */
+	if (dtypes[type]->use_ioemu)
+		return !qemu_instance_has_disks(blkif->tappid);
 
 	/* Caller should close() if no single controller, or list is empty. */
 	return (!dtypes[type]->single_handler || (active_disks[type] == NULL));
@@ -721,6 +747,7 @@ static int unmap_blktapctrl(blkif_t *blkif)
 	}
 
 	if (del_disktype(blkif)) {
+		DPRINTF("Closing communication pipe to pid %d\n", blkif->tappid);
 		close(blkif->fds[WRITE]);
 		close(blkif->fds[READ]);
 	}
