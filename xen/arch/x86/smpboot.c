@@ -385,9 +385,7 @@ void __devinit smp_callin(void)
 	/*
 	 * Save our processor parameters
 	 */
- 	smp_store_cpu_info(cpuid);
-
-	disable_APIC_timer();
+	smp_store_cpu_info(cpuid);
 
 	/*
 	 * Allow the master to continue.
