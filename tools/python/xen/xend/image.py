@@ -28,6 +28,7 @@ import sys
 import errno
 import glob
 import traceback
+import platform
 
 import xen.lowlevel.xc
 from xen.xend.XendConstants import *
@@ -227,23 +228,19 @@ class ImageHandler:
         if self.device_model is None:
             return
 
-        # If we use a device model, the pipes for communication between
-        # blktapctrl and ioemu must be present before the devices are 
-        # created (blktapctrl must access them for new block devices)
+        if platform.system() != 'SunOS':
+            # If we use a device model, the pipes for communication between
+            # blktapctrl and ioemu must be present before the devices are 
+            # created (blktapctrl must access them for new block devices)
+            os.makedirs('/var/run/tap', 0755)
 
-        # mkdir throws an exception if the path already exists
-        try:
-            os.mkdir('/var/run/tap', 0755)
-        except:
-            pass
-
-        try:
-            os.mkfifo('/var/run/tap/qemu-read-%d' % domid, 0600)
-            os.mkfifo('/var/run/tap/qemu-write-%d' % domid, 0600)
-        except OSError, e:
-            log.warn('Could not create blktap pipes for domain %d' % domid)
-            log.exception(e)
-            pass
+            try:
+                os.mkfifo('/var/run/tap/qemu-read-%d' % domid, 0600)
+                os.mkfifo('/var/run/tap/qemu-write-%d' % domid, 0600)
+            except OSError, e:
+                log.warn('Could not create blktap pipes for domain %d' % domid)
+                log.exception(e)
+                pass
 
 
     # Return a list of cmd line args to the device models based on the
