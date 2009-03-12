@@ -2544,6 +2544,31 @@ class XendDomainInfo:
         finally:
             self.state_updated.release()
 
+    def waitForSuspend(self):
+        """Wait for the guest to respond to a suspend request by
+        shutting down.  If the guest hasn't re-written control/shutdown
+        after a certain amount of time, it's obviously not listening and
+        won't suspend, so we give up.  HVM guests with no PV drivers
+        should already be shutdown.
+        """
+        state = "suspend"
+        nr_tries = 60
+
+        self.state_updated.acquire()
+        try:
+            while self._stateGet() in (DOM_STATE_RUNNING,DOM_STATE_PAUSED):
+                self.state_updated.wait(1.0)
+                if state == "suspend":
+                    if nr_tries == 0:
+                        msg = ('Timeout waiting for domain %s to suspend'
+                            % self.domid)
+                        self._writeDom('control/shutdown', '')
+                        raise XendError(msg)
+                    state = self.readDom('control/shutdown')
+                    nr_tries -= 1
+        finally:
+            self.state_updated.release()
+
     #
     # TODO: recategorise - called from XendCheckpoint
     # 
