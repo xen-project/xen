@@ -48,6 +48,7 @@
 #include <poll.h>
 #include <time.h>
 #include <sys/time.h>
+#include <unistd.h>
 #include "blktaplib.h"
 #include "list.h"
 #include "xs_api.h"
@@ -149,6 +150,137 @@ static int backend_remove(struct xs_handle *h, struct backend_info *be)
 	return 0;
 }
 
+static int check_sharing(struct xs_handle *h, struct backend_info *be)
+{
+	char *dom_uuid;
+	char *cur_dom_uuid;
+	char *path;
+	char *mode;
+	char *params;
+	char **domains;
+	char **devices;
+	int i, j;
+	unsigned int num_dom, num_dev;
+	blkif_info_t *info;
+	int ret = 0;
+
+	/* If the mode contains '!' or doesn't contain 'w' don't check anything */
+	xs_gather(h, be->backpath, "mode", NULL, &mode, NULL);
+	if (strchr(mode, '!'))
+		goto out;
+	if (strchr(mode, 'w') == NULL)
+		goto out;
+
+	/* Get the UUID of the domain we want to attach to */
+	if (asprintf(&path, "/local/domain/%ld", be->frontend_id) == -1)
+		goto fail;
+	xs_gather(h, path, "vm", NULL, &dom_uuid, NULL);
+	free(path);
+
+	/* Iterate through the devices of all VMs */
+	domains = xs_directory(h, XBT_NULL, "backend/tap", &num_dom);
+	if (domains == NULL)
+		num_dom = 0;
+
+	for (i = 0; !ret && (i < num_dom); i++) {
+
+		/* If it's the same VM, no action needed */
+		if (asprintf(&path, "/local/domain/%s", domains[i]) == -1) {
+			ret = -1;
+			break;
+		}
+		xs_gather(h, path, "vm", NULL, &cur_dom_uuid, NULL);
+		free(path);
+
+		if (!strcmp(cur_dom_uuid, dom_uuid)) {
+			free(cur_dom_uuid);
+			continue;
+		}
+
+		/* Check the devices */
+		if (asprintf(&path, "backend/tap/%s", domains[i]) == -1) {
+			ret = -1;
+			free(cur_dom_uuid);
+			break;
+		}
+		devices = xs_directory(h, XBT_NULL, path, &num_dev);
+		if (devices == NULL)
+			num_dev = 0;
+		free(path);
+
+		for (j = 0; !ret && (j < num_dev); j++) {
+			if (asprintf(&path, "backend/tap/%s/%s", domains[i], devices[j]) == -1) {
+				ret = -1;
+				break;
+			}
+			xs_gather(h, path, "params", NULL, &params, NULL);
+			free(path);
+
+			info =  be->blkif->info;
+			if (strcmp(params, info->params)) {
+				ret = -1;
+			}
+
+			free(params);
+		}
+
+		free(cur_dom_uuid);
+		free(devices);
+	}
+	free(domains);
+	free(dom_uuid);
+	goto out;
+
+fail:
+	ret = -1;
+out:
+	free(mode);
+	return ret;
+}
+
+static int check_image(struct xs_handle *h, struct backend_info *be,
+	const char** errmsg)
+{
+	const char *tmp;
+	const char *path;
+	int mode;
+	blkif_t *blkif = be->blkif;
+	blkif_info_t *info = blkif->info;
+
+	/* Strip off the image type */
+	path = info->params;
+
+	if (!strncmp(path, "tapdisk:", strlen("tapdisk:"))) {
+		path += strlen("tapdisk:");
+	} else if (!strncmp(path, "ioemu:", strlen("ioemu:"))) {
+		path += strlen("ioemu:");
+	}
+
+	tmp = strchr(path, ':');
+	if (tmp != NULL)
+		path = tmp + 1;
+
+	/* Check if the image exists and access is permitted */
+	mode = R_OK;
+	if (!be->readonly)
+		mode |= W_OK;
+	if (access(path, mode)) {
+		if (errno == ENOENT)
+			*errmsg = "File not found.";
+		else
+			*errmsg = "Insufficient file permissions.";
+		return -1;
+	}
+
+	/* Check that the image is not attached to a different VM */
+	if (check_sharing(h, be)) {
+		*errmsg = "File already in use by other domain";
+		return -1;
+	}
+
+	return 0;
+}
+
 static void ueblktap_setup(struct xs_handle *h, char *bepath)
 {
 	struct backend_info *be;
@@ -156,6 +288,7 @@ static void ueblktap_setup(struct xs_handle *h, char *bepath)
 	int len, er, deverr;
 	long int pdev = 0, handle;
 	blkif_info_t *blk;
+	const char* errmsg = NULL;
 	
 	be = be_lookup_be(bepath);
 	if (be == NULL)
@@ -211,6 +344,9 @@ static void ueblktap_setup(struct xs_handle *h, char *bepath)
 			be->pdev = pdev;
 		}
 
+		if (check_image(h, be, &errmsg))
+			goto fail;
+
 		er = blkif_init(be->blkif, handle, be->pdev, be->readonly);
 		if (er != 0) {
 			DPRINTF("Unable to open device %s\n",blk->params);
@@ -246,12 +382,21 @@ static void ueblktap_setup(struct xs_handle *h, char *bepath)
 	}
 
 	be->blkif->state = CONNECTED;
+	xs_printf(h, be->backpath, "hotplug-status", "connected");
+
 	DPRINTF("[SETUP] Complete\n\n");
 	goto close;
 	
 fail:
-	if ( (be != NULL) && (be->blkif != NULL) ) 
+	if (be) {
+		if (errmsg == NULL)
+			errmsg = "Setting up the backend failed. See the log "
+				"files in /var/log/xen/ for details.";
+		xs_printf(h, be->backpath, "hotplug-error", errmsg);
+		xs_printf(h, be->backpath, "hotplug-status", "error");
+
 		backend_remove(h, be);
+	}
 close:
 	if (path)
 		free(path);
@@ -286,7 +431,8 @@ static void ueblktap_probe(struct xs_handle *h, struct xenbus_watch *w,
 	len = strsep_len(bepath, '/', 7);
 	if (len < 0) 
 		goto free_be;
-	bepath[len] = '\0';
+	if (bepath[len] != '\0')
+		goto free_be;
 	
 	be = malloc(sizeof(*be));
 	if (!be) {

@@ -659,9 +659,6 @@ static int blktapctrl_new_blkif(blkif_t *blkif)
 
 	DPRINTF("Received a poll for a new vbd\n");
 	if ( ((blk=blkif->info) != NULL) && (blk->params != NULL) ) {
-		if (blktap_interface_create(ctlfd, &major, &minor, blkif) < 0)
-			return -1;
-
 		if (test_path(blk->params, &ptr, &type, &exist, &use_ioemu) != 0) {
                         DPRINTF("Error in blktap device string(%s).\n",
                                 blk->params);
@@ -684,10 +681,6 @@ static int blktapctrl_new_blkif(blkif_t *blkif)
 			blkif->fds[READ] = exist->fds[READ];
 			blkif->fds[WRITE] = exist->fds[WRITE];
 		}
-
-		add_disktype(blkif, type);
-		blkif->major = major;
-		blkif->minor = minor;
 
 		image = (image_t *)malloc(sizeof(image_t));
 		blkif->prv = (void *)image;
@@ -712,11 +705,18 @@ static int blktapctrl_new_blkif(blkif_t *blkif)
 			goto fail;
 		}
 
+		if (blktap_interface_create(ctlfd, &major, &minor, blkif) < 0)
+			return -1;
+
+		blkif->major = major;
+		blkif->minor = minor;
+
+		add_disktype(blkif, type);
+
 	} else return -1;
 
 	return 0;
 fail:
-	ioctl(ctlfd, BLKTAP_IOCTL_FREEINTF, minor);
 	return -EINVAL;
 }
 
