@@ -487,11 +487,7 @@ class ImageHandler:
 
     def _dmfailed(self, message):
         log.warning("domain %s: %s", self.vm.getName(), message)
-        # ideally we would like to forcibly crash the domain with
-        # something like
-        #    xc.domain_shutdown(self.vm.getDomid(), DOMAIN_CRASH)
-        # but this can easily lead to very rapid restart loops against
-        # which we currently have no protection
+        xc.domain_shutdown(self.vm.getDomid(), DOMAIN_CRASH)
 
     def recreate(self):
         if self.device_model is None:

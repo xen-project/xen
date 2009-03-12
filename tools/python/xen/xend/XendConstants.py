@@ -96,7 +96,7 @@ SHUTDOWN_TIMEOUT = (60.0 * 5)
 ZOMBIE_PREFIX = 'Zombie-'
 
 """Minimum time between domain restarts in seconds."""
-MINIMUM_RESTART_TIME = 20
+MINIMUM_RESTART_TIME = 60
 
 RESTART_IN_PROGRESS = 'xend/restart_in_progress'
 DUMPCORE_IN_PROGRESS = 'xend/dumpcore_in_progress'
