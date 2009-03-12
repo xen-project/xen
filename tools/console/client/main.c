@@ -35,6 +35,9 @@
 #include <err.h>
 #include <errno.h>
 #include <string.h>
+#ifdef __sun__
+#include <sys/stropts.h>
+#endif
 
 #include "xs.h"
 
@@ -72,7 +75,7 @@ static void usage(const char *program) {
 }
 
 #ifdef	__sun__
-void cfmakeraw (struct termios *termios_p)
+void cfmakeraw(struct termios *termios_p)
 {
 	termios_p->c_iflag &=
 	    ~(IGNBRK|BRKINT|PARMRK|ISTRIP|INLCR|IGNCR|ICRNL|IXON);
@@ -95,7 +98,7 @@ static int get_pty_fd(struct xs_handle *xs, char *path, int seconds)
 	int xs_fd = xs_fileno(xs), pty_fd = -1;
 	int start, now;
 	unsigned int len = 0;
-	char *pty_path, **watch_paths;;
+	char *pty_path, **watch_paths;
 
 	start = now = time(NULL);
 	do {
@@ -119,6 +122,29 @@ static int get_pty_fd(struct xs_handle *xs, char *path, int seconds)
 			}
 		}
 	} while (pty_fd == -1 && (now = time(NULL)) < start + seconds);
+
+#ifdef __sun__
+	if (pty_fd != -1) {
+		struct termios term;
+
+		/*
+		 * The pty may come from either xend (with pygrub) or
+		 * xenconsoled.  It may have tty semantics set up, or not.
+		 * While it isn't strictly necessary to have those
+		 * semantics here, it is good to have a consistent
+		 * state that is the same as under Linux.
+		 *
+		 * If tcgetattr fails, they have not been set up,
+		 * so go ahead and set them up now, by pushing the
+		 * ptem and ldterm streams modules.
+		 */
+		if (tcgetattr(pty_fd, &term) < 0) {
+			ioctl(pty_fd, I_PUSH, "ptem");
+			ioctl(pty_fd, I_PUSH, "ldterm");
+		}
+	}
+#endif
+
 	return pty_fd;
 }
 
@@ -134,12 +160,12 @@ static void init_term(int fd, struct termios *old)
 	new_term = *old;
 	cfmakeraw(&new_term);
 
-	tcsetattr(fd, TCSAFLUSH, &new_term);
+	tcsetattr(fd, TCSANOW, &new_term);
 }
 
 static void restore_term(int fd, struct termios *old)
 {
-	tcsetattr(fd, TCSAFLUSH, old);
+	tcsetattr(fd, TCSANOW, old);
 }
 
 static int console_loop(int fd, struct xs_handle *xs, char *pty_path)
@@ -167,7 +193,8 @@ static int console_loop(int fd, struct xs_handle *xs, char *pty_path)
 
 		if (FD_ISSET(xs_fileno(xs), &fds)) {
 			int newfd = get_pty_fd(xs, pty_path, 0);
-			close(fd);
+			if (fd != -1)
+				close(fd);
                         if (newfd == -1) 
 				/* Console PTY has become invalid */
 				return 0;
