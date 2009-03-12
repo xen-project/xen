@@ -2027,26 +2027,31 @@ class XendDomainInfo:
         @raise: XendError if core dumping failed.
         """
         
-        try:
-            if not corefile:
-                this_time = time.strftime("%Y-%m%d-%H%M.%S", time.localtime())
-                corefile = "/var/xen/dump/%s-%s.%s.core" % (this_time,
-                                  self.info['name_label'], self.domid)
+        if not corefile:
+            this_time = time.strftime("%Y-%m%d-%H%M.%S", time.localtime())
+            corefile = "/var/xen/dump/%s-%s.%s.core" % (this_time,
+                              self.info['name_label'], self.domid)
                 
-            if os.path.isdir(corefile):
-                raise XendError("Cannot dump core in a directory: %s" %
-                                corefile)
-            
-            self._writeVm(DUMPCORE_IN_PROGRESS, 'True')
-            xc.domain_dumpcore(self.domid, corefile)
+        if os.path.isdir(corefile):
+            raise XendError("Cannot dump core in a directory: %s" %
+                            corefile)
+
+        try:
+            try:
+                self._writeVm(DUMPCORE_IN_PROGRESS, 'True')
+                xc.domain_dumpcore(self.domid, corefile)
+            except RuntimeError, ex:
+                corefile_incomp = corefile+'-incomplete'
+                try:
+                    os.rename(corefile, corefile_incomp)
+                except:
+                    pass
+
+                log.error("core dump failed: id = %s name = %s: %s",
+                          self.domid, self.info['name_label'], str(ex))
+                raise XendError("Failed to dump core: %s" %  str(ex))
+        finally:
             self._removeVm(DUMPCORE_IN_PROGRESS)
-        except RuntimeError, ex:
-            corefile_incomp = corefile+'-incomplete'
-            os.rename(corefile, corefile_incomp)
-            self._removeVm(DUMPCORE_IN_PROGRESS)
-            log.exception("XendDomainInfo.dumpCore failed: id = %s name = %s",
-                          self.domid, self.info['name_label'])
-            raise XendError("Failed to dump core: %s" %  str(ex))
 
     #
     # Device creation/deletion functions

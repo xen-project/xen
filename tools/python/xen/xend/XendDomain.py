@@ -1237,13 +1237,23 @@ class XendDomain:
                              POWER_STATE_NAMES[DOM_STATE_PAUSED],
                              POWER_STATE_NAMES[dominfo._stateGet()])
 
+        dopause = (not live and dominfo._stateGet() == DOM_STATE_RUNNING)
+        if dopause:
+            dominfo.pause()
+
         try:
-            log.info("Domain core dump requested for domain %s (%d) "
-                     "live=%d crash=%d.",
-                     dominfo.getName(), dominfo.getDomid(), live, crash)
-            return dominfo.dumpCore(filename)
-        except Exception, ex:
-            raise XendError(str(ex))
+            try:
+                log.info("Domain core dump requested for domain %s (%d) "
+                         "live=%d crash=%d.",
+                         dominfo.getName(), dominfo.getDomid(), live, crash)
+                dominfo.dumpCore(filename)
+                if crash:
+                    self.domain_destroy(domid)
+            except Exception, ex:
+                raise XendError(str(ex))
+        finally:
+            if dopause and not crash:
+                dominfo.unpause()
 
     def domain_destroy(self, domid):
         """Terminate domain immediately.

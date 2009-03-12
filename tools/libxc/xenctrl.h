@@ -158,7 +158,7 @@ typedef struct xc_dominfo {
                   paused:1, blocked:1, running:1,
                   hvm:1, debugged:1;
     unsigned int  shutdown_reason; /* only meaningful if shutdown==1 */
-    unsigned long nr_pages;
+    unsigned long nr_pages; /* current number, not maximum */
     unsigned long shared_info_frame;
     uint64_t      cpu_time;
     unsigned long max_memkb;
