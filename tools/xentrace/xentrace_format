@@ -81,7 +81,11 @@ signal.signal(signal.SIGINT,  sighand)
 
 interrupted = 0
 
-defs = read_defs(arg[0])
+try:
+    defs = read_defs(arg[0])
+except IOError, exn:
+    print exn
+    sys.exit(1)
 
 # structure of trace record (as output by xentrace):
 # HDR(I) {TSC(Q)} D1(I) D2(I) D3(I) D4(I) D5(I) D6(I) D7(I)
