@@ -161,15 +161,6 @@ extern struct tap_disk tapdisk_ram;
 extern struct tap_disk tapdisk_qcow;
 extern struct tap_disk tapdisk_qcow2;
 
-#define MAX_DISK_TYPES     20
-
-#define DISK_TYPE_AIO      0
-#define DISK_TYPE_SYNC     1
-#define DISK_TYPE_VMDK     2
-#define DISK_TYPE_RAM      3
-#define DISK_TYPE_QCOW     4
-#define DISK_TYPE_QCOW2    5
-
 
 /*Define Individual Disk Parameters here */
 static disk_info_t aio_disk = {
