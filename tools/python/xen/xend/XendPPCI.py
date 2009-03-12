@@ -20,6 +20,8 @@ from xen.xend.XendBase import XendBase
 from xen.xend.XendBase import XendAPIStore
 from xen.xend import uuid as genuuid
 
+from xen.util.pci import parse_hex
+
 class XendPPCI(XendBase):
     """Representation of a physical PCI device."""
 
@@ -72,10 +74,10 @@ class XendPPCI(XendBase):
  
     def get_by_sbdf(self, domain, bus, slot, func):
         for ppci in XendAPIStore.get_all("PPCI"):
-            if ppci.get_domain() == int(domain, 16) and \
-               ppci.get_bus() == int(bus, 16) and \
-               ppci.get_slot() == int(slot, 16) and \
-               ppci.get_func() == int(func, 16):
+            if ppci.get_domain() == parse_hex(domain) and \
+               ppci.get_bus() == parse_hex(bus) and \
+               ppci.get_slot() == parse_hex(slot) and \
+               ppci.get_func() == parse_hex(func):
                 return ppci.get_uuid()
         return None
 
