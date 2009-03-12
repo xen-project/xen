@@ -583,6 +583,15 @@ def sniff_solaris(fs, cfg):
 
     return cfg
  
+def sniff_netware(fs, cfg):
+    if not fs.file_exists("/nwserver/xnloader.sys"):
+        return cfg
+
+    if not cfg["kernel"]:
+        cfg["kernel"] = "/nwserver/xnloader.sys"
+
+    return cfg
+
 if __name__ == "__main__":
     sel = None
     
@@ -661,6 +670,9 @@ if __name__ == "__main__":
         fs = fsimage.open(file, get_fs_offset(file))
 
     chosencfg = sniff_solaris(fs, incfg)
+
+    if not chosencfg["kernel"]:
+        chosencfg = sniff_netware(fs, incfg)
 
     if not chosencfg["kernel"]:
         chosencfg = run_grub(file, entry, fs, incfg["args"])
