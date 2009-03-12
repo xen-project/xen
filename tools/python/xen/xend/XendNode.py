@@ -18,6 +18,7 @@
 
 import os
 import socket
+import time
 import xen.lowlevel.xc
 
 from xen.util import Brctl
@@ -157,7 +158,16 @@ class XendNode:
                 
         # Next discover any existing bridges and check
         # they are not already configured
-        bridges = Brctl.get_state().keys()
+
+        # 'tmpbridge' is a temporary bridge created by network-bridge script.
+        # Wait a couple of seconds for it to be renamed.
+        for i in xrange(20):
+            bridges = Brctl.get_state().keys()
+            if 'tmpbridge' in bridges:
+                time.sleep(0.1)
+            else:
+                break
+            
         configured_bridges = [XendAPIStore.get(
                                   network_uuid, "network")
                                       .get_name_label()
@@ -166,7 +176,8 @@ class XendNode:
                                 for bridge in bridges
                                 if bridge not in configured_bridges]
         for unconfigured_bridge in unconfigured_bridges:
-            XendNetwork.create_phy(unconfigured_bridge)
+            if unconfigured_bridge != 'tmpbridge':
+                XendNetwork.create_phy(unconfigured_bridge)
 
         # Initialise PIFs
         # First configure ones off disk
