@@ -232,7 +232,11 @@ class ImageHandler:
             # If we use a device model, the pipes for communication between
             # blktapctrl and ioemu must be present before the devices are 
             # created (blktapctrl must access them for new block devices)
-            os.makedirs('/var/run/tap', 0755)
+
+            try:
+                os.makedirs('/var/run/tap', 0755)
+            except:
+                pass
 
             try:
                 os.mkfifo('/var/run/tap/qemu-read-%d' % domid, 0600)
