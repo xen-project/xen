@@ -20,7 +20,7 @@ import types
 from xen.xend import sxp
 from xen.xend import PrettyPrint
 from xen.xend.Args import ArgError
-from xen.xend.XendError import XendError
+from xen.xend.XendError import XendError, XendInvalidDomain
 #from xen.xend.XendLogging import log
 
 import resource
@@ -70,6 +70,8 @@ class SrvDir(SrvBase):
         try:
             val = self.get(x)
         except XendError, ex:
+            return self.noChild(str(ex))
+        except XendInvalidDomain, ex:
             return self.noChild(str(ex))
         if val is None:
             return self.noChild('Not found: ' + str(x))
