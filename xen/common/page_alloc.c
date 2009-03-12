@@ -403,6 +403,9 @@ static struct page_info *alloc_heap_pages(
     for ( i = 0; i < (1 << order); i++ )
     {
         /* Reference count must continuously be zero for free pages. */
+        if ( pg[i].count_info != 0 )
+            printk("** %s:%d -- %u/%u %lx\n", __FILE__, __LINE__,
+                   i, 1 << order, pg[i].count_info);
         BUG_ON(pg[i].count_info != 0);
 
         if ( pg[i].u.free.need_tlbflush )
@@ -527,7 +530,10 @@ static void free_heap_pages(
          *     in its pseudophysical address space).
          * In all the above cases there can be no guest mappings of this page.
          */
-        ASSERT(!(pg[i].count_info & PGC_offlined));
+        if ( pg[i].count_info & PGC_offlined )
+            printk("** %s:%d -- %u/%u %lx\n", __FILE__, __LINE__,
+                   i, 1 << order, pg[i].count_info);
+        BUG_ON(pg[i].count_info & PGC_offlined);
         pg[i].count_info &= PGC_offlining | PGC_broken;
         if ( pg[i].count_info & PGC_offlining )
         {
