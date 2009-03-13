@@ -152,7 +152,9 @@ def vscsi_get_hctl_and_devname_by(target, scsi_devices = None):
         elif target.startswith('/dev/'): 
             scsi_devices = _vscsi_get_scsidevices_by_lsscsi("| grep %s" % target)
         else:
-            scsi_devices = vscsi_get_scsidevices()
+            scsi_devices = _vscsi_get_scsidevices_by_lsscsi("")
+        if not scsi_devices:
+            scsi_devices = _vscsi_get_scsidevices_by_sysfs()
 
     if len(target.split(':')) == 4:
         return _vscsi_get_devname_by(target, scsi_devices)
