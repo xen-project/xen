@@ -339,6 +339,24 @@ struct xen_set_cpufreq_para {
 
     uint32_t ctrl_type;
     uint32_t ctrl_value;
+}
+;
+/* Get physical CPU topology information. */
+
+
+#define INVALID_TOPOLOGY_ID  (~0U)
+struct xen_get_cputopo {
+     /* IN: maximum addressable entry in
+      * the caller-provided cpu_to_core/socket.
+      */
+    uint32_t max_cpus;
+    XEN_GUEST_HANDLE_64(uint32) cpu_to_core;
+    XEN_GUEST_HANDLE_64(uint32) cpu_to_socket;
+
+    /* OUT: number of cpus returned
+     * If OUT is greater than IN then the cpu_to_core/socket is truncated!
+     */
+    uint32_t nr_cpus;
 };
 
 struct xen_sysctl_pm_op {
@@ -350,12 +368,16 @@ struct xen_sysctl_pm_op {
     #define SET_CPUFREQ_GOV            (CPUFREQ_PARA | 0x02)
     #define SET_CPUFREQ_PARA           (CPUFREQ_PARA | 0x03)
 
+    /* get CPU topology */
+    #define XEN_SYSCTL_pm_op_get_cputopo  0x20
+
     uint32_t cmd;
     uint32_t cpuid;
     union {
         struct xen_get_cpufreq_para get_para;
         struct xen_set_cpufreq_gov  set_gov;
         struct xen_set_cpufreq_para set_para;
+        struct xen_get_cputopo      get_topo;
     };
 };
 

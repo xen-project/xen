@@ -58,6 +58,7 @@ void show_help(void)
             "                                     it is used in ondemand governor.\n"
             " set-up-threshold      [cpuid] <num> set up threshold on CPU <cpuid> or all\n"
             "                                     it is used in ondemand governor.\n"
+            " get-cpu-topology                    get thread/core/socket topology info\n"
             " start                               start collect Cx/Px statistics,\n"
             "                                     output after CTRL-C or SIGINT.\n"
             );
@@ -750,6 +751,40 @@ out:
     fprintf(stderr, "failed to set governor name\n");
 }
 
+#define MAX_NR_CPU 512
+
+void cpu_topology_func(int argc, char *argv[])
+{
+    uint32_t cpu_to_core[MAX_NR_CPU];
+    uint32_t cpu_to_socket[MAX_NR_CPU];
+    struct xc_get_cputopo info;
+    int i, ret;
+
+    info.cpu_to_core = cpu_to_core;
+    info.cpu_to_socket = cpu_to_socket;
+    info.max_cpus = MAX_NR_CPU;
+    ret = xc_get_cputopo(xc_fd, &info);
+    if (!ret)
+    {
+        printf("CPU\tcore\tsocket\n");
+        for (i=0; i<info.nr_cpus; i++)
+        {
+            if ( info.cpu_to_core[i] != INVALID_TOPOLOGY_ID &&
+                    info.cpu_to_socket[i] != INVALID_TOPOLOGY_ID )
+            {
+            printf("CPU%d\t %d\t %d\n", i, info.cpu_to_core[i],
+                    info.cpu_to_socket[i]);
+            }
+        }
+    }
+    else
+    {
+        printf("Can not get Xen CPU topology!\n");
+    }
+
+    return ;
+}
+
 struct {
     const char *name;
     void (*function)(int argc, char *argv[]);
@@ -765,6 +800,7 @@ struct {
     { "set-scaling-speed", scaling_speed_func },
     { "set-sampling-rate", scaling_sampling_rate_func },
     { "set-up-threshold", scaling_up_threshold_func },
+    { "get-cpu-topology", cpu_topology_func},
 };
 
 int main(int argc, char *argv[])

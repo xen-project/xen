@@ -1242,4 +1242,21 @@ int xc_get_cpufreq_para(int xc_handle, int cpuid,
 int xc_set_cpufreq_gov(int xc_handle, int cpuid, char *govname);
 int xc_set_cpufreq_para(int xc_handle, int cpuid,
                         int ctrl_type, int ctrl_value);
+
+struct xc_get_cputopo {
+     /* IN: maximum addressable entry in
+      * the caller-provided cpu_to_core/socket.
+      */
+    uint32_t max_cpus;
+    uint32_t *cpu_to_core;
+    uint32_t *cpu_to_socket;
+
+    /* OUT: number of cpus returned
+     * If OUT is greater than IN then the cpu_to_core/socket is truncated!
+     */
+    uint32_t nr_cpus;
+};
+
+int xc_get_cputopo(int xc_handle, struct xc_get_cputopo *info);
+
 #endif /* XENCTRL_H */

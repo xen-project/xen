@@ -306,3 +306,24 @@ int xc_set_cpufreq_para(int xc_handle, int cpuid,
 
     return xc_sysctl(xc_handle, &sysctl);
 }
+
+int xc_get_cputopo(int xc_handle, struct xc_get_cputopo *info)
+{
+    int rc;
+    DECLARE_SYSCTL;
+
+    sysctl.cmd = XEN_SYSCTL_pm_op;
+    sysctl.u.pm_op.cmd = XEN_SYSCTL_pm_op_get_cputopo;
+    sysctl.u.pm_op.cpuid = 0;
+    set_xen_guest_handle( sysctl.u.pm_op.get_topo.cpu_to_core,
+                         info->cpu_to_core );
+    set_xen_guest_handle( sysctl.u.pm_op.get_topo.cpu_to_socket,
+                         info->cpu_to_socket );
+    sysctl.u.pm_op.get_topo.max_cpus = info->max_cpus;
+
+    rc = do_sysctl(xc_handle, &sysctl);
+    info->nr_cpus = sysctl.u.pm_op.get_topo.nr_cpus;
+
+    return rc;
+}
+

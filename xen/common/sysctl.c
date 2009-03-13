@@ -224,12 +224,11 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
         if ( ret && (ret != -EAGAIN) )
             break;
 
-        if ( op->u.pm_op.cmd == GET_CPUFREQ_PARA )
-            if ( copy_to_guest(u_sysctl, op, 1) )
-            {
-                ret = -EFAULT;
-                break;
-            }
+        if ( copy_to_guest(u_sysctl, op, 1) )
+        {
+            ret = -EFAULT;
+            break;
+        }
     }
     break;
 
