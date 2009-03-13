@@ -1223,7 +1223,7 @@ class XendDomain:
             log.exception("domain_pause")
             raise XendError(str(ex))
 
-    def domain_dump(self, domid, filename, live, crash):
+    def domain_dump(self, domid, filename=None, live=False, crash=False, reset=False):
         """Dump domain core."""
 
         dominfo = self.domain_lookup_nr(domid)
@@ -1244,15 +1244,17 @@ class XendDomain:
         try:
             try:
                 log.info("Domain core dump requested for domain %s (%d) "
-                         "live=%d crash=%d.",
-                         dominfo.getName(), dominfo.getDomid(), live, crash)
+                         "live=%d crash=%d reset=%d.",
+                         dominfo.getName(), dominfo.getDomid(), live, crash, reset)
                 dominfo.dumpCore(filename)
                 if crash:
                     self.domain_destroy(domid)
+                elif reset:
+                    self.domain_reset(domid)
             except Exception, ex:
                 raise XendError(str(ex))
         finally:
-            if dopause and not crash:
+            if dopause and not crash and not reset:
                 dominfo.unpause()
 
     def domain_destroy(self, domid):

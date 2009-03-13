@@ -1352,9 +1352,7 @@ def xm_dump_core(args):
         filename = None
 
     print "Dumping core of domain: %s ..." % str(dom)
-    server.xend.domain.dump(dom, filename, live, crash)
-    if reset:
-        server.xend.domain.reset(dom)
+    server.xend.domain.dump(dom, filename, live, crash, reset)
 
 def xm_rename(args):
     arg_check(args, "rename", 2)
