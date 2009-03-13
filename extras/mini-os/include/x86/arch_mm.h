@@ -137,6 +137,9 @@ typedef unsigned long pgentry_t;
 #define IO_PROT (L1_PROT)
 #define IO_PROT_NOCACHE (L1_PROT | _PAGE_PCD)
 
+/* for P2M */
+#define INVALID_P2M_ENTRY (~0UL)
+
 #include "arch_limits.h"
 #define PAGE_SIZE       __PAGE_SIZE
 #define PAGE_SHIFT      __PAGE_SHIFT

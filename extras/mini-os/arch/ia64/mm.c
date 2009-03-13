@@ -162,6 +162,12 @@ int unmap_frames(unsigned long virt_addr, unsigned long num_frames)
     ASSERT(0);
 }
 
+unsigned long alloc_contig_pages(int order, unsigned int addr_bits)
+{
+    /* TODO */
+    ASSERT(0);
+}
+
 void arch_init_p2m(unsigned long max_pfn)
 {
     printk("Warn: p2m map not implemented.\n");
