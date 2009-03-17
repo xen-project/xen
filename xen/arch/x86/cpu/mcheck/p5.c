@@ -16,7 +16,7 @@
 #include "x86_mca.h"
 
 /* Machine check handler for Pentium class Intel */
-static fastcall void pentium_machine_check(struct cpu_user_regs * regs, long error_code)
+static void pentium_machine_check(struct cpu_user_regs * regs, long error_code)
 {
 	u32 loaddr, hi, lotype;
 	rdmsr(MSR_IA32_P5_MC_ADDR, loaddr, hi);
@@ -28,19 +28,14 @@ static fastcall void pentium_machine_check(struct cpu_user_regs * regs, long err
 }
 
 /* Set up machine check reporting for processors with Intel style MCE */
-void intel_p5_mcheck_init(struct cpuinfo_x86 *c)
+int intel_p5_mcheck_init(struct cpuinfo_x86 *c)
 {
 	u32 l, h;
 	
-	/*Check for MCE support */
-	if( !cpu_has(c, X86_FEATURE_MCE) )
-		return;	
-
 	/* Default P5 to off as its often misconnected */
 	if(mce_disabled != -1)
-		return;
-	machine_check_vector = pentium_machine_check;
-	wmb();
+		return 0;
+	x86_mce_vector_register(pentium_machine_check);
 
 	/* Read registers before enabling */
 	rdmsr(MSR_IA32_P5_MC_ADDR, l, h);
@@ -50,4 +45,6 @@ void intel_p5_mcheck_init(struct cpuinfo_x86 *c)
  	/* Enable MCE */
 	set_in_cr4(X86_CR4_MCE);
 	printk(KERN_INFO "Intel old style machine check reporting enabled on CPU#%d.\n", smp_processor_id());
+
+	return 1;
 }

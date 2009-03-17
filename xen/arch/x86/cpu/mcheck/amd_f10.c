@@ -49,20 +49,21 @@
 #include "x86_mca.h"
 
 
-static int amd_f10_handler(struct mc_info *mi, uint16_t bank, uint64_t status)
+static enum mca_extinfo
+amd_f10_handler(struct mc_info *mi, uint16_t bank, uint64_t status)
 {
 	struct mcinfo_extended mc_ext;
 
 	/* Family 0x10 introduced additional MSR that belong to the
 	 * northbridge bank (4). */
-	if (bank != 4)
-		return 0;
+	if (mi == NULL || bank != 4)
+		return MCA_EXTINFO_IGNORED;
 
 	if (!(status & MCi_STATUS_VAL))
-		return 0;
+		return MCA_EXTINFO_IGNORED;
 
 	if (!(status & MCi_STATUS_MISCV))
-		return 0;
+		return MCA_EXTINFO_IGNORED;
 
 	memset(&mc_ext, 0, sizeof(mc_ext));
 	mc_ext.common.type = MC_TYPE_EXTENDED;
@@ -78,23 +79,25 @@ static int amd_f10_handler(struct mc_info *mi, uint16_t bank, uint64_t status)
 	rdmsrl(MSR_F10_MC4_MISC3, mc_ext.mc_msr[2].value);
 	
 	x86_mcinfo_add(mi, &mc_ext);
-	return 1;
+	return MCA_EXTINFO_LOCAL;
 }
 
 
 extern void k8_machine_check(struct cpu_user_regs *regs, long error_code);
 
 /* AMD Family10 machine check */
-void amd_f10_mcheck_init(struct cpuinfo_x86 *c) 
+int amd_f10_mcheck_init(struct cpuinfo_x86 *c) 
 { 
 	uint64_t value;
 	uint32_t i;
 	int cpu_nr;
 
-	machine_check_vector = k8_machine_check;
-	mc_callback_bank_extended = amd_f10_handler;
+	if (!cpu_has(c, X86_FEATURE_MCA))
+		return 0;
+
+	x86_mce_vector_register(k8_machine_check);
+	x86_mce_callback_register(amd_f10_handler);
 	cpu_nr = smp_processor_id();
-	wmb();
 
 	rdmsrl(MSR_IA32_MCG_CAP, value);
 	if (value & MCG_CTL_P)	/* Control register present ? */
@@ -104,18 +107,9 @@ void amd_f10_mcheck_init(struct cpuinfo_x86 *c)
 	for (i = 0; i < nr_mce_banks; i++) {
 		switch (i) {
 		case 4: /* Northbridge */
-			/* Enable error reporting of all errors,
-			 * enable error checking and
-			 * disable sync flooding */
-			wrmsrl(MSR_IA32_MC4_CTL, 0x02c3c008ffffffffULL);
+			/* Enable error reporting of all errors */
+			wrmsrl(MSR_IA32_MC4_CTL, 0xffffffffffffffffULL);
 			wrmsrl(MSR_IA32_MC4_STATUS, 0x0ULL);
-
-			/* XXX: We should write the value 0x1087821UL into
-			 * to register F3x180 here, which sits in
-			 * the PCI extended configuration space.
-			 * Since this is not possible here, we can only hope,
-			 * Dom0 is doing that.
-			 */
 			break;
 
 		default:
@@ -128,4 +122,5 @@ void amd_f10_mcheck_init(struct cpuinfo_x86 *c)
 
 	set_in_cr4(X86_CR4_MCE);
 	printk("CPU%i: AMD Family10h machine check reporting enabled.\n", cpu_nr);
+	return 1;
 }

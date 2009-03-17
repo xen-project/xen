@@ -14,6 +14,7 @@ DEFINE_PER_CPU(cpu_banks_t, mce_banks_owned);
 
 static int nr_intel_ext_msrs = 0;
 static int cmci_support = 0;
+static int firstbank;
 
 #ifdef CONFIG_X86_MCE_THERMAL
 static void unexpected_thermal_interrupt(struct cpu_user_regs *regs)
@@ -115,222 +116,51 @@ static void intel_init_thermal(struct cpuinfo_x86 *c)
 }
 #endif /* CONFIG_X86_MCE_THERMAL */
 
-static inline void intel_get_extended_msrs(struct mcinfo_extended *mc_ext)
+static enum mca_extinfo
+intel_get_extended_msrs(struct mc_info *mci, uint16_t bank, uint64_t status)
 {
-    if (nr_intel_ext_msrs == 0)
-        return;
+    struct mcinfo_extended mc_ext;
+
+    if (mci == NULL || nr_intel_ext_msrs == 0 || !(status & MCG_STATUS_EIPV))
+        return MCA_EXTINFO_IGNORED;
 
     /* this function will called when CAP(9).MCG_EXT_P = 1 */
-    memset(mc_ext, 0, sizeof(struct mcinfo_extended));
-    mc_ext->common.type = MC_TYPE_EXTENDED;
-    mc_ext->common.size = sizeof(mc_ext);
-    mc_ext->mc_msrs = 10;
+    memset(&mc_ext, 0, sizeof(struct mcinfo_extended));
+    mc_ext.common.type = MC_TYPE_EXTENDED;
+    mc_ext.common.size = sizeof(mc_ext);
+    mc_ext.mc_msrs = 10;
 
-    mc_ext->mc_msr[0].reg = MSR_IA32_MCG_EAX;
-    rdmsrl(MSR_IA32_MCG_EAX, mc_ext->mc_msr[0].value);
-    mc_ext->mc_msr[1].reg = MSR_IA32_MCG_EBX;
-    rdmsrl(MSR_IA32_MCG_EBX, mc_ext->mc_msr[1].value);
-    mc_ext->mc_msr[2].reg = MSR_IA32_MCG_ECX;
-    rdmsrl(MSR_IA32_MCG_ECX, mc_ext->mc_msr[2].value);
+    mc_ext.mc_msr[0].reg = MSR_IA32_MCG_EAX;
+    rdmsrl(MSR_IA32_MCG_EAX, mc_ext.mc_msr[0].value);
+    mc_ext.mc_msr[1].reg = MSR_IA32_MCG_EBX;
+    rdmsrl(MSR_IA32_MCG_EBX, mc_ext.mc_msr[1].value);
+    mc_ext.mc_msr[2].reg = MSR_IA32_MCG_ECX;
+    rdmsrl(MSR_IA32_MCG_ECX, mc_ext.mc_msr[2].value);
 
-    mc_ext->mc_msr[3].reg = MSR_IA32_MCG_EDX;
-    rdmsrl(MSR_IA32_MCG_EDX, mc_ext->mc_msr[3].value);
-    mc_ext->mc_msr[4].reg = MSR_IA32_MCG_ESI;
-    rdmsrl(MSR_IA32_MCG_ESI, mc_ext->mc_msr[4].value);
-    mc_ext->mc_msr[5].reg = MSR_IA32_MCG_EDI;
-    rdmsrl(MSR_IA32_MCG_EDI, mc_ext->mc_msr[5].value);
+    mc_ext.mc_msr[3].reg = MSR_IA32_MCG_EDX;
+    rdmsrl(MSR_IA32_MCG_EDX, mc_ext.mc_msr[3].value);
+    mc_ext.mc_msr[4].reg = MSR_IA32_MCG_ESI;
+    rdmsrl(MSR_IA32_MCG_ESI, mc_ext.mc_msr[4].value);
+    mc_ext.mc_msr[5].reg = MSR_IA32_MCG_EDI;
+    rdmsrl(MSR_IA32_MCG_EDI, mc_ext.mc_msr[5].value);
 
-    mc_ext->mc_msr[6].reg = MSR_IA32_MCG_EBP;
-    rdmsrl(MSR_IA32_MCG_EBP, mc_ext->mc_msr[6].value);
-    mc_ext->mc_msr[7].reg = MSR_IA32_MCG_ESP;
-    rdmsrl(MSR_IA32_MCG_ESP, mc_ext->mc_msr[7].value);
-    mc_ext->mc_msr[8].reg = MSR_IA32_MCG_EFLAGS;
-    rdmsrl(MSR_IA32_MCG_EFLAGS, mc_ext->mc_msr[8].value);
-    mc_ext->mc_msr[9].reg = MSR_IA32_MCG_EIP;
-    rdmsrl(MSR_IA32_MCG_EIP, mc_ext->mc_msr[9].value);
+    mc_ext.mc_msr[6].reg = MSR_IA32_MCG_EBP;
+    rdmsrl(MSR_IA32_MCG_EBP, mc_ext.mc_msr[6].value);
+    mc_ext.mc_msr[7].reg = MSR_IA32_MCG_ESP;
+    rdmsrl(MSR_IA32_MCG_ESP, mc_ext.mc_msr[7].value);
+    mc_ext.mc_msr[8].reg = MSR_IA32_MCG_EFLAGS;
+    rdmsrl(MSR_IA32_MCG_EFLAGS, mc_ext.mc_msr[8].value);
+    mc_ext.mc_msr[9].reg = MSR_IA32_MCG_EIP;
+    rdmsrl(MSR_IA32_MCG_EIP, mc_ext.mc_msr[9].value);
+
+    x86_mcinfo_add(mci, &mc_ext);
+
+    return MCA_EXTINFO_GLOBAL;
 }
 
-/* machine_check_poll might be called by following types:
- * 1. called when do mcheck_init.
- * 2. called in cmci interrupt handler
- * 3. called in polling handler
- * It will generate a new mc_info item if found CE/UC errors. DOM0 is the 
- * consumer.
- */
-static struct mc_info *machine_check_poll(int calltype)
+static void intel_machine_check(struct cpu_user_regs * regs, long error_code)
 {
-    struct mc_info *mi = NULL;
-    int exceptions = (read_cr4() & X86_CR4_MCE);
-    int i, nr_unit = 0, uc = 0, pcc = 0;
-    uint64_t status, addr;
-    struct mcinfo_global mcg;
-    struct mcinfo_extended mce;
-    unsigned int cpu;
-    struct domain *d;
-
-    cpu = smp_processor_id();
-
-    memset(&mcg, 0, sizeof(mcg));
-    mcg.common.type = MC_TYPE_GLOBAL;
-    mcg.common.size = sizeof(mcg);
-    /* If called from cpu-reset check, don't need to fill them.
-     * If called from cmci context, we'll try to fill domid by memory addr
-     */
-    mcg.mc_domid = -1;
-    mcg.mc_vcpuid = -1;
-    if (calltype == MC_FLAG_POLLED || calltype == MC_FLAG_RESET)
-        mcg.mc_flags = MC_FLAG_POLLED;
-    else if (calltype == MC_FLAG_CMCI)
-        mcg.mc_flags = MC_FLAG_CMCI;
-    x86_mc_get_cpu_info(
-        cpu, &mcg.mc_socketid, &mcg.mc_coreid,
-        &mcg.mc_core_threadid, &mcg.mc_apicid, NULL, NULL, NULL);
-    rdmsrl(MSR_IA32_MCG_STATUS, mcg.mc_gstatus);
-
-    for ( i = 0; i < nr_mce_banks; i++ ) {
-        struct mcinfo_bank mcb;
-        /* For CMCI, only owners checks the owned MSRs */
-        if ( !test_bit(i, __get_cpu_var(mce_banks_owned)) &&
-             (calltype & MC_FLAG_CMCI) )
-            continue;
-        rdmsrl(MSR_IA32_MC0_STATUS + 4 * i, status);
-
-        if (! (status & MCi_STATUS_VAL) )
-            continue;
-        /*
-         * Uncorrected events are handled by the exception
-         * handler when it is enabled. But when the exception
-         * is disabled such as when mcheck_init, log everything.
-         */
-        if ((status & MCi_STATUS_UC) && exceptions)
-            continue;
-
-        if (status & MCi_STATUS_UC)
-            uc = 1;
-        if (status & MCi_STATUS_PCC)
-            pcc = 1;
-
-        if (!mi) {
-            mi = x86_mcinfo_getptr();
-            if (!mi) {
-                printk(KERN_ERR "mcheck_poll: Failed to get mc_info entry\n");
-                return NULL;
-            }
-            x86_mcinfo_clear(mi);
-        }
-        memset(&mcb, 0, sizeof(mcb));
-        mcb.common.type = MC_TYPE_BANK;
-        mcb.common.size = sizeof(mcb);
-        mcb.mc_bank = i;
-        mcb.mc_status = status;
-        if (status & MCi_STATUS_MISCV)
-            rdmsrl(MSR_IA32_MC0_MISC + 4 * i, mcb.mc_misc);
-        if (status & MCi_STATUS_ADDRV) {
-            rdmsrl(MSR_IA32_MC0_ADDR + 4 * i, addr);
-            d = maddr_get_owner(addr);
-            if ( d && (calltype == MC_FLAG_CMCI || calltype == MC_FLAG_POLLED) )
-                mcb.mc_domid = d->domain_id;
-        }
-        if (cmci_support)
-            rdmsrl(MSR_IA32_MC0_CTL2 + i, mcb.mc_ctrl2);
-        if (calltype == MC_FLAG_CMCI)
-            rdtscll(mcb.mc_tsc);
-        x86_mcinfo_add(mi, &mcb);
-        nr_unit++;
-        add_taint(TAINT_MACHINE_CHECK);
-        /* Clear state for this bank */
-        wrmsrl(MSR_IA32_MC0_STATUS + 4 * i, 0);
-        printk(KERN_DEBUG "mcheck_poll: bank%i CPU%d status[%"PRIx64"]\n", 
-                i, cpu, status);
-        printk(KERN_DEBUG "mcheck_poll: CPU%d, SOCKET%d, CORE%d, APICID[%d], "
-                "thread[%d]\n", cpu, mcg.mc_socketid, 
-                mcg.mc_coreid, mcg.mc_apicid, mcg.mc_core_threadid);
- 
-    }
-    /* if pcc = 1, uc must be 1 */
-    if (pcc)
-        mcg.mc_flags |= MC_FLAG_UNCORRECTABLE;
-    else if (uc)
-        mcg.mc_flags |= MC_FLAG_RECOVERABLE;
-    else /* correctable */
-        mcg.mc_flags |= MC_FLAG_CORRECTABLE;
-
-    if (nr_unit && nr_intel_ext_msrs && 
-                    (mcg.mc_gstatus & MCG_STATUS_EIPV)) {
-        intel_get_extended_msrs(&mce);
-        x86_mcinfo_add(mi, &mce);
-    }
-    if (nr_unit) 
-        x86_mcinfo_add(mi, &mcg);
-    /* Clear global state */
-    return mi;
-}
-
-static fastcall void intel_machine_check(struct cpu_user_regs * regs, long error_code)
-{
-    /* MACHINE CHECK Error handler will be sent in another patch,
-     * simply copy old solutions here. This code will be replaced
-     * by upcoming machine check patches
-     */
-
-    int recover=1;
-    u32 alow, ahigh, high, low;
-    u32 mcgstl, mcgsth;
-    int i;
-   
-    rdmsr(MSR_IA32_MCG_STATUS, mcgstl, mcgsth);
-    if (mcgstl & (1<<0))       /* Recoverable ? */
-        recover=0;
-    
-    printk(KERN_EMERG "CPU %d: Machine Check Exception: %08x%08x\n",
-           smp_processor_id(), mcgsth, mcgstl);
-    
-    for (i=0; i<nr_mce_banks; i++) {
-        rdmsr (MSR_IA32_MC0_STATUS+i*4,low, high);
-        if (high & (1<<31)) {
-            if (high & (1<<29))
-                recover |= 1;
-            if (high & (1<<25))
-                recover |= 2;
-            printk (KERN_EMERG "Bank %d: %08x%08x", i, high, low);
-            high &= ~(1<<31);
-            if (high & (1<<27)) {
-                rdmsr (MSR_IA32_MC0_MISC+i*4, alow, ahigh);
-                printk ("[%08x%08x]", ahigh, alow);
-            }
-            if (high & (1<<26)) {
-                rdmsr (MSR_IA32_MC0_ADDR+i*4, alow, ahigh);
-                printk (" at %08x%08x", ahigh, alow);
-            }
-            printk ("\n");
-        }
-    }
-    
-    if (recover & 2)
-        mc_panic ("CPU context corrupt");
-    if (recover & 1)
-        mc_panic ("Unable to continue");
-    
-    printk(KERN_EMERG "Attempting to continue.\n");
-    /* 
-     * Do not clear the MSR_IA32_MCi_STATUS if the error is not 
-     * recoverable/continuable.This will allow BIOS to look at the MSRs
-     * for errors if the OS could not log the error.
-     */
-    for (i=0; i<nr_mce_banks; i++) {
-        u32 msr;
-        msr = MSR_IA32_MC0_STATUS+i*4;
-        rdmsr (msr, low, high);
-        if (high&(1<<31)) {
-            /* Clear it */
-            wrmsr(msr, 0UL, 0UL);
-            /* Serialize */
-            wmb();
-            add_taint(TAINT_MACHINE_CHECK);
-        }
-    }
-    mcgstl &= ~(1<<2);
-    wrmsr (MSR_IA32_MCG_STATUS,mcgstl, mcgsth);
+	mcheck_cmn_handler(regs, error_code, mca_allbanks);
 }
 
 static DEFINE_SPINLOCK(cmci_discover_lock);
@@ -369,6 +199,8 @@ static void cmci_discover(void)
     unsigned long flags;
     int i;
     struct mc_info *mi = NULL;
+    mctelem_cookie_t mctc;
+    struct mca_summary bs;
 
     printk(KERN_DEBUG "CMCI: find owner on CPU%d\n", smp_processor_id());
 
@@ -385,12 +217,20 @@ static void cmci_discover(void)
      * MCi_status (error_count bit 38~52) is not cleared,
      * the CMCI interrupt will never be triggered again.
      */
-    mi = machine_check_poll(MC_FLAG_CMCI);
-    if (mi) {
-        x86_mcinfo_dump(mi);
-        if (dom0 && guest_enabled_event(dom0->vcpu[0], VIRQ_MCA))
+
+    mctc = mcheck_mca_logout(
+        MCA_CMCI_HANDLER, __get_cpu_var(mce_banks_owned), &bs);
+
+    if (bs.errcnt && mctc != NULL) {
+        if (guest_enabled_event(dom0->vcpu[0], VIRQ_MCA)) {
+            mctelem_commit(mctc);
             send_guest_global_virq(dom0, VIRQ_MCA);
-    }
+        } else {
+            x86_mcinfo_dump(mi);
+            mctelem_dismiss(mctc);
+       }
+    } else if (mctc != NULL)
+        mctelem_dismiss(mctc);
 
     printk(KERN_DEBUG "CMCI: CPU%d owner_map[%lx], no_cmci_map[%lx]\n", 
            smp_processor_id(), 
@@ -487,17 +327,26 @@ static void intel_init_cmci(struct cpuinfo_x86 *c)
 fastcall void smp_cmci_interrupt(struct cpu_user_regs *regs)
 {
     struct mc_info *mi = NULL;
-    int cpu = smp_processor_id();
+    mctelem_cookie_t mctc;
+    struct mca_summary bs;
 
     ack_APIC_irq();
     irq_enter();
-    printk(KERN_DEBUG "CMCI: cmci_intr happen on CPU%d\n", cpu);
-    mi = machine_check_poll(MC_FLAG_CMCI);
-    if (mi) {
-        x86_mcinfo_dump(mi);
-        if (dom0 && guest_enabled_event(dom0->vcpu[0], VIRQ_MCA))
+
+    mctc = mcheck_mca_logout(
+        MCA_CMCI_HANDLER, __get_cpu_var(mce_banks_owned), &bs);
+
+    if (bs.errcnt && mctc != NULL) {
+        if (guest_enabled_event(dom0->vcpu[0], VIRQ_MCA)) {
+            mctelem_commit(mctc);
             send_guest_global_virq(dom0, VIRQ_MCA);
-    }
+        } else {
+            x86_mcinfo_dump(mi);
+            mctelem_dismiss(mctc);
+       }
+    } else if (mctc != NULL)
+        mctelem_dismiss(mctc);
+
     irq_exit();
 }
 
@@ -527,28 +376,28 @@ static void mce_cap_init(struct cpuinfo_x86 *c)
         printk (KERN_INFO "CPU%d: Intel Extended MCE MSRs (%d) available\n",
             smp_processor_id(), nr_intel_ext_msrs);
     }
-    /* for most of p6 family, bank 0 is an alias bios MSR.
-     * But after model>1a, bank 0 is available*/
-    if ( c->x86 == 6 && c->x86_vendor == X86_VENDOR_INTEL
-            && c->x86_model < 0x1A)
-        firstbank = 1;
-    else
-        firstbank = 0;
+    firstbank = mce_firstbank(c);
 }
 
 static void mce_init(void)
 {
     u32 l, h;
     int i;
-    struct mc_info *mi;
+    mctelem_cookie_t mctc;
+    struct mca_summary bs;
+
     clear_in_cr4(X86_CR4_MCE);
+
     /* log the machine checks left over from the previous reset.
      * This also clears all registers*/
 
-    mi = machine_check_poll(MC_FLAG_RESET);
+    mctc = mcheck_mca_logout(MCA_RESET, mca_allbanks, &bs);
+
     /* in the boot up stage, don't inject to DOM0, but print out */
-    if (mi)
-        x86_mcinfo_dump(mi);
+    if (bs.errcnt && mctc != NULL) {
+        x86_mcinfo_dump(mctelem_dataptr(mctc));
+        mctelem_dismiss(mctc);
+    }
 
     set_in_cr4(X86_CR4_MCE);
     rdmsr (MSR_IA32_MCG_CAP, l, h);
@@ -573,71 +422,19 @@ static void mce_init(void)
 }
 
 /* p4/p6 family have similar MCA initialization process */
-void intel_mcheck_init(struct cpuinfo_x86 *c)
+int intel_mcheck_init(struct cpuinfo_x86 *c)
 {
     mce_cap_init(c);
     printk (KERN_INFO "Intel machine check reporting enabled on CPU#%d.\n",
             smp_processor_id());
+
     /* machine check is available */
-    machine_check_vector = intel_machine_check;
+    x86_mce_vector_register(intel_machine_check);
+    x86_mce_callback_register(intel_get_extended_msrs);
+
     mce_init();
     mce_intel_feature_init(c);
     mce_set_owner();
+
+    return 1;
 }
-
-/*
- * Periodic polling timer for "silent" machine check errors. If the
- * poller finds an MCE, poll faster. When the poller finds no more 
- * errors, poll slower
-*/
-static struct timer mce_timer;
-
-#define MCE_PERIOD 4000
-#define MCE_MIN    2000
-#define MCE_MAX    32000
-
-static u64 period = MCE_PERIOD;
-static int adjust = 0;
-
-static void mce_intel_checkregs(void *info)
-{
-    struct mc_info *mi;
-
-    if( !mce_available(&current_cpu_data))
-        return;
-    mi = machine_check_poll(MC_FLAG_POLLED);
-    if (mi)
-    {
-        x86_mcinfo_dump(mi);
-        adjust++;
-        if (dom0 && guest_enabled_event(dom0->vcpu[0], VIRQ_MCA))
-            send_guest_global_virq(dom0, VIRQ_MCA);
-    }
-}
-
-static void mce_intel_work_fn(void *data)
-{
-    on_each_cpu(mce_intel_checkregs, data, 1, 1);
-    if (adjust) {
-        period = period / (adjust + 1);
-        printk(KERN_DEBUG "mcheck_poll: Find error, shorten interval "
-               "to %"PRIu64"\n", period);
-    }
-    else {
-        period *= 2;
-    }
-    if (period > MCE_MAX) 
-        period = MCE_MAX;
-    if (period < MCE_MIN)
-        period = MCE_MIN;
-    set_timer(&mce_timer, NOW() + MILLISECS(period));
-    adjust = 0;
-}
-
-void intel_mcheck_timer(struct cpuinfo_x86 *c)
-{
-    printk(KERN_DEBUG "mcheck_poll: Init_mcheck_timer\n");
-    init_timer(&mce_timer, mce_intel_work_fn, NULL, 0);
-    set_timer(&mce_timer, NOW() + MILLISECS(MCE_PERIOD));
-}
-

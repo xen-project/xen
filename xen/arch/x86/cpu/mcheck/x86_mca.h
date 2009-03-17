@@ -17,6 +17,10 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#ifndef X86_MCA_H
+
+#define X86_MCA_H
+
 
 /* The MCA/MCE MSRs should not be used anywhere else.
  * They are cpu family/model specific and are only for use
@@ -73,6 +77,9 @@
 /* reserved bits */
 #define MCi_STATUS_OTHER_RESERVED2      0x0180000000000000ULL
 
+/* Bitfield of MSR_K8_HWCR register */
+#define K8_HWCR_MCi_STATUS_WREN		(1ULL << 18)
+
 /*Intel Specific bitfield*/
 #define CMCI_THRESHOLD			0x2
 
@@ -87,3 +94,4 @@ extern int mce_disabled;
 extern unsigned int nr_mce_banks;
 extern int firstbank;
 
+#endif /* X86_MCA_H */

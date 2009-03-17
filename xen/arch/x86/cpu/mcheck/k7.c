@@ -68,13 +68,16 @@ static fastcall void k7_machine_check(struct cpu_user_regs * regs, long error_co
 
 
 /* AMD K7 machine check */
-void amd_k7_mcheck_init(struct cpuinfo_x86 *c)
+int amd_k7_mcheck_init(struct cpuinfo_x86 *c)
 {
 	u32 l, h;
 	int i;
 
-	machine_check_vector = k7_machine_check;
-	wmb();
+	/* Check for PPro style MCA; our caller has confirmed MCE support. */
+	if (!cpu_has(c, X86_FEATURE_MCA))
+		return 0;
+
+	x86_mce_vector_register(k7_machine_check);
 
 	rdmsr (MSR_IA32_MCG_CAP, l, h);
 	if (l & (1<<8))	/* Control register present ? */
@@ -92,4 +95,6 @@ void amd_k7_mcheck_init(struct cpuinfo_x86 *c)
 	set_in_cr4 (X86_CR4_MCE);
 	printk (KERN_INFO "CPU%d: AMD K7 machine check reporting enabled.\n",
 		smp_processor_id());
+
+	return 1;
 }

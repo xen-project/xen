@@ -1,0 +1,443 @@
+/*
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation, version 2 of the
+ * License.
+ */
+
+/*
+ * mctelem.c - x86 Machine Check Telemetry Transport
+ */
+
+#include <xen/init.h>
+#include <xen/types.h>
+#include <xen/kernel.h>
+#include <xen/config.h>
+#include <xen/smp.h>
+#include <xen/errno.h>
+#include <xen/sched.h>
+#include <xen/sched-if.h>
+#include <xen/cpumask.h>
+#include <xen/event.h>
+
+#include <asm/processor.h>
+#include <asm/system.h>
+#include <asm/msr.h>
+
+#include "mce.h"
+
+struct mctelem_ent {
+	struct mctelem_ent *mcte_next;	/* next in chronological order */
+	struct mctelem_ent *mcte_prev;	/* previous in chronological order */
+	uint32_t mcte_flags;		/* See MCTE_F_* below */
+	uint32_t mcte_refcnt;		/* Reference count */
+	void *mcte_data;		/* corresponding data payload */
+};
+
+#define	MCTE_F_HOME_URGENT		0x0001U	/* free to urgent freelist */
+#define	MCTE_F_HOME_NONURGENT		0x0002U /* free to nonurgent freelist */
+#define	MCTE_F_CLASS_URGENT		0x0004U /* in use - urgent errors */
+#define	MCTE_F_CLASS_NONURGENT		0x0008U /* in use - nonurgent errors */
+#define	MCTE_F_STATE_FREE		0x0010U	/* on a freelist */
+#define	MCTE_F_STATE_UNCOMMITTED	0x0020U	/* reserved; on no list */
+#define	MCTE_F_STATE_COMMITTED		0x0040U	/* on a committed list */
+#define	MCTE_F_STATE_PROCESSING		0x0080U	/* on a processing list */
+
+#define	MCTE_F_MASK_HOME	(MCTE_F_HOME_URGENT | MCTE_F_HOME_NONURGENT)
+#define	MCTE_F_MASK_CLASS	(MCTE_F_CLASS_URGENT | MCTE_F_CLASS_NONURGENT)
+#define	MCTE_F_MASK_STATE	(MCTE_F_STATE_FREE | \
+				MCTE_F_STATE_UNCOMMITTED | \
+				MCTE_F_STATE_COMMITTED | \
+				MCTE_F_STATE_PROCESSING)
+
+#define	MCTE_HOME(tep) ((tep)->mcte_flags & MCTE_F_MASK_HOME)
+
+#define	MCTE_CLASS(tep) ((tep)->mcte_flags & MCTE_F_MASK_CLASS)
+#define	MCTE_SET_CLASS(tep, new) do { \
+    (tep)->mcte_flags &= ~MCTE_F_MASK_CLASS; \
+    (tep)->mcte_flags |= MCTE_F_CLASS_##new; } while (0)
+
+#define	MCTE_STATE(tep) ((tep)->mcte_flags & MCTE_F_MASK_STATE)
+#define	MCTE_TRANSITION_STATE(tep, old, new) do { \
+    BUG_ON(MCTE_STATE(tep) != (MCTE_F_STATE_##old)); \
+    (tep)->mcte_flags &= ~MCTE_F_MASK_STATE; \
+    (tep)->mcte_flags |= (MCTE_F_STATE_##new); } while (0)
+
+#define	MC_URGENT_NENT		10
+#define	MC_NONURGENT_NENT	20
+
+#define	MC_NCLASSES		(MC_NONURGENT + 1)
+
+#define	COOKIE2MCTE(c)		((struct mctelem_ent *)(c))
+#define	MCTE2COOKIE(tep)	((mctelem_cookie_t)(tep))
+
+static struct mc_telem_ctl {
+	/* Linked lists that thread the array members together.
+	 *
+	 * The free lists are singly-linked via mcte_next, and we allocate
+	 * from them by atomically unlinking an element from the head.
+	 * Consumed entries are returned to the head of the free list.
+	 * When an entry is reserved off the free list it is not linked
+	 * on any list until it is committed or dismissed.
+	 *
+	 * The committed list grows at the head and we do not maintain a
+	 * tail pointer; insertions are performed atomically.  The head
+	 * thus has the most-recently committed telemetry, i.e. the
+	 * list is in reverse chronological order.  The committed list
+	 * is singly-linked via mcte_prev pointers, and mcte_next is NULL.
+	 * When we move telemetry from the committed list to the processing
+	 * list we atomically unlink the committed list and keep a pointer
+	 * to the head of that list;  we then traverse the list following
+	 * mcte_prev and fill in mcte_next to doubly-link the list, and then
+	 * append the tail of the list onto the processing list.  If we panic
+	 * during this manipulation of the committed list we still have
+	 * the pointer to its head so we can recover all entries during
+	 * the panic flow (albeit in reverse chronological order).
+	 *
+	 * The processing list is updated in a controlled context, and
+	 * we can lock it for updates.  The head of the processing list
+	 * always has the oldest telemetry, and we append (as above)
+	 * at the tail of the processing list. */
+	struct mctelem_ent *mctc_free[MC_NCLASSES];
+	struct mctelem_ent *mctc_committed[MC_NCLASSES];
+	struct mctelem_ent *mctc_processing_head[MC_NCLASSES];
+	struct mctelem_ent *mctc_processing_tail[MC_NCLASSES];
+	/*
+	 * Telemetry array
+	 */
+	struct mctelem_ent *mctc_elems;
+} mctctl;
+
+/* Lock protecting all processing lists */
+static DEFINE_SPINLOCK(processing_lock);
+
+static void *cmpxchgptr(void *ptr, void *old, void *new)
+{
+	unsigned long *ulp = (unsigned long *)ptr;
+	unsigned long a = (unsigned long)old;
+	unsigned long b = (unsigned long)new;
+
+	return (void *)cmpxchg(ulp, a, b);
+}
+
+/* Free an entry to its native free list; the entry must not be linked on
+ * any list.
+ */
+static void mctelem_free(struct mctelem_ent *tep)
+{
+	mctelem_class_t target = MCTE_HOME(tep) == MCTE_F_HOME_URGENT ?
+	    MC_URGENT : MC_NONURGENT;
+	struct mctelem_ent **freelp;
+	struct mctelem_ent *oldhead;
+
+	BUG_ON(tep->mcte_refcnt != 0);
+	BUG_ON(MCTE_STATE(tep) != MCTE_F_STATE_FREE);
+
+	tep->mcte_prev = NULL;
+	freelp = &mctctl.mctc_free[target];
+	for (;;) {
+		oldhead = *freelp;
+		tep->mcte_next = oldhead;
+		wmb();
+		if (cmpxchgptr(freelp, oldhead, tep) == oldhead)
+			break;
+	}
+}
+
+/* Increment the reference count of an entry that is not linked on to
+ * any list and which only the caller has a pointer to.
+ */
+static void mctelem_hold(struct mctelem_ent *tep)
+{
+	tep->mcte_refcnt++;
+}
+
+/* Increment the reference count on an entry that is linked at the head of
+ * a processing list.  The caller is responsible for locking the list.
+ */
+static void mctelem_processing_hold(struct mctelem_ent *tep)
+{
+	int which = MCTE_CLASS(tep) == MCTE_F_CLASS_URGENT ?
+	    MC_URGENT : MC_NONURGENT;
+
+	BUG_ON(tep != mctctl.mctc_processing_head[which]);
+	tep->mcte_refcnt++;
+}
+
+/* Decrement the reference count on an entry that is linked at the head of
+ * a processing list.  The caller is responsible for locking the list.
+ */
+static void mctelem_processing_release(struct mctelem_ent *tep)
+{
+	int which = MCTE_CLASS(tep) == MCTE_F_CLASS_URGENT ?
+	    MC_URGENT : MC_NONURGENT;
+
+	BUG_ON(tep != mctctl.mctc_processing_head[which]);
+	if (--tep->mcte_refcnt == 0) {
+		MCTE_TRANSITION_STATE(tep, PROCESSING, FREE);
+		mctctl.mctc_processing_head[which] = tep->mcte_next;
+		mctelem_free(tep);
+	}
+}
+
+void mctelem_init(int reqdatasz)
+{
+	static int called = 0;
+	static int datasz = 0, realdatasz = 0;
+	char *datarr;
+	int i;
+	
+	BUG_ON(MC_URGENT != 0 || MC_NONURGENT != 1 || MC_NCLASSES != 2);
+
+	/* Called from mcheck_init for all processors; initialize for the
+	 * first call only (no race here since the boot cpu completes
+	 * init before others start up). */
+	if (++called == 1) {
+		realdatasz = reqdatasz;
+		datasz = (reqdatasz & ~0xf) + 0x10;	/* 16 byte roundup */
+	} else {
+		BUG_ON(reqdatasz != realdatasz);
+		return;
+	}
+
+	if ((mctctl.mctc_elems = xmalloc_array(struct mctelem_ent,
+	    MC_URGENT_NENT + MC_NONURGENT_NENT)) == NULL ||
+	    (datarr = xmalloc_bytes((MC_URGENT_NENT + MC_NONURGENT_NENT) *
+	    datasz)) == NULL) {
+		if (mctctl.mctc_elems)
+			xfree(mctctl.mctc_elems);
+		printk("Allocations for MCA telemetry failed\n");
+		return;
+	}
+
+	for (i = 0; i < MC_URGENT_NENT + MC_NONURGENT_NENT; i++) {
+		struct mctelem_ent *tep, **tepp;
+
+		tep = mctctl.mctc_elems + i;
+		tep->mcte_flags = MCTE_F_STATE_FREE;
+		tep->mcte_refcnt = 0;
+		tep->mcte_data = datarr + i * datasz;
+
+		if (i < MC_URGENT_NENT) {
+			tepp = &mctctl.mctc_free[MC_URGENT];
+			tep->mcte_flags |= MCTE_F_HOME_URGENT;
+		} else {
+			tepp = &mctctl.mctc_free[MC_NONURGENT];
+			tep->mcte_flags |= MCTE_F_HOME_NONURGENT;
+		}
+
+		tep->mcte_next = *tepp;
+		tep->mcte_prev = NULL;
+		*tepp = tep;
+	}
+}
+
+/* incremented non-atomically when reserve fails */
+static int mctelem_drop_count;
+
+/* Reserve a telemetry entry, or return NULL if none available.
+ * If we return an entry then the caller must subsequently call exactly one of
+ * mctelem_unreserve or mctelem_commit for that entry.
+ */
+mctelem_cookie_t mctelem_reserve(mctelem_class_t which)
+{
+	struct mctelem_ent **freelp;
+	struct mctelem_ent *oldhead, *newhead;
+	mctelem_class_t target = (which == MC_URGENT) ?
+	    MC_URGENT : MC_NONURGENT;
+
+	freelp = &mctctl.mctc_free[target];
+	for (;;) {
+		if ((oldhead = *freelp) == NULL) {
+			if (which == MC_URGENT && target == MC_URGENT) {
+				/* raid the non-urgent freelist */
+				target = MC_NONURGENT;
+				freelp = &mctctl.mctc_free[target];
+				continue;
+			} else {
+				mctelem_drop_count++;
+				return (NULL);
+			}
+		}
+
+		newhead = oldhead->mcte_next;
+		if (cmpxchgptr(freelp, oldhead, newhead) == oldhead) {
+			struct mctelem_ent *tep = oldhead;
+
+			mctelem_hold(tep);
+			MCTE_TRANSITION_STATE(tep, FREE, UNCOMMITTED);
+			tep->mcte_next = NULL;
+			tep->mcte_prev = NULL;
+			if (which == MC_URGENT)
+				MCTE_SET_CLASS(tep, URGENT);
+			else
+				MCTE_SET_CLASS(tep, NONURGENT);
+			return MCTE2COOKIE(tep);
+		}
+	}
+}
+
+void *mctelem_dataptr(mctelem_cookie_t cookie)
+{
+	struct mctelem_ent *tep = COOKIE2MCTE(cookie);
+
+	return tep->mcte_data;
+}
+
+/* Release a previously reserved entry back to the freelist without
+ * submitting it for logging.  The entry must not be linked on to any
+ * list - that's how mctelem_reserve handed it out.
+ */
+void mctelem_dismiss(mctelem_cookie_t cookie)
+{
+	struct mctelem_ent *tep = COOKIE2MCTE(cookie);
+
+	tep->mcte_refcnt--;
+	MCTE_TRANSITION_STATE(tep, UNCOMMITTED, FREE);
+	mctelem_free(tep);
+}
+
+/* Commit an entry with completed telemetry for logging.  The caller must
+ * not reference the entry after this call.  Note that we add entries
+ * at the head of the committed list, so that list therefore has entries
+ * in reverse chronological order.
+ */
+void mctelem_commit(mctelem_cookie_t cookie)
+{
+	struct mctelem_ent *tep = COOKIE2MCTE(cookie);
+	struct mctelem_ent **commlp;
+	struct mctelem_ent *oldhead;
+	mctelem_class_t target = MCTE_CLASS(tep) == MCTE_F_CLASS_URGENT ?
+	    MC_URGENT : MC_NONURGENT;
+
+	BUG_ON(tep->mcte_next != NULL || tep->mcte_prev != NULL);
+	MCTE_TRANSITION_STATE(tep, UNCOMMITTED, COMMITTED);
+
+	commlp = &mctctl.mctc_committed[target];
+	for (;;) {
+		oldhead = *commlp;
+		tep->mcte_prev = oldhead;
+		wmb();
+		if (cmpxchgptr(commlp, oldhead, tep) == oldhead)
+			break;
+	}
+}
+
+/* Move telemetry from committed list to processing list, reversing the
+ * list into chronological order.  The processing list has been
+ * locked by the caller, and may be non-empty.  We append the
+ * reversed committed list on to the tail of the processing list.
+ * The committed list may grow even while we run, so use atomic
+ * operations to swap NULL to the freelist head.
+ *
+ * Note that "chronological order" means the order in which producers
+ * won additions to the processing list, which may not reflect the
+ * strict chronological order of the associated events if events are
+ * closely spaced in time and contend for the processing list at once.
+ */
+
+static struct mctelem_ent *dangling[MC_NCLASSES];
+
+static void mctelem_append_processing(mctelem_class_t which)
+{
+	mctelem_class_t target = which == MC_URGENT ?
+	    MC_URGENT : MC_NONURGENT;
+	struct mctelem_ent **commlp = &mctctl.mctc_committed[target];
+	struct mctelem_ent **proclhp = &mctctl.mctc_processing_head[target];
+	struct mctelem_ent **procltp = &mctctl.mctc_processing_tail[target];
+	struct mctelem_ent *tep, *ltep;
+
+	/* Check for an empty list; no race since we hold the processing lock */
+	if (*commlp == NULL)
+		return;
+
+	/* Atomically unlink the committed list, and keep a pointer to
+	 * the list we unlink in a well-known location so it can be
+	 * picked up in panic code should we panic between this unlink
+	 * and the append to the processing list. */
+	for (;;) {
+		dangling[target] = *commlp;
+		wmb();
+		if (cmpxchgptr(commlp, dangling[target], NULL) ==
+		    dangling[target])
+			break;
+	}
+
+	if (dangling[target] == NULL)
+		return;
+
+	/* Traverse the list following the previous pointers (reverse
+	 * chronological order).  For each entry fill in the next pointer
+	 * and transition the element state.  */
+	for (tep = dangling[target], ltep = NULL; tep != NULL;
+	    tep = tep->mcte_prev) {
+		MCTE_TRANSITION_STATE(tep, COMMITTED, PROCESSING);
+		tep->mcte_next = ltep;
+		ltep = tep;
+	}
+
+	/* ltep points to the head of a chronologically ordered linked
+	 * list of telemetry entries ending at the most recent entry
+	 * dangling[target] if mcte_next is followed; tack this on to
+	 * the processing list.
+	 */
+	if (*proclhp == NULL) {
+		*proclhp = ltep;
+		*procltp = dangling[target];
+	} else {
+		(*procltp)->mcte_next = ltep;
+		ltep->mcte_prev = *procltp;
+		*procltp = dangling[target];
+	}
+	wmb();
+	dangling[target] = NULL;
+	wmb();
+}
+
+mctelem_cookie_t mctelem_consume_oldest_begin(mctelem_class_t which)
+{
+	mctelem_class_t target = (which == MC_URGENT) ?
+	    MC_URGENT : MC_NONURGENT;
+	struct mctelem_ent *tep;
+
+	spin_lock(&processing_lock);
+	mctelem_append_processing(target);
+	if ((tep = mctctl.mctc_processing_head[target]) == NULL) {
+		spin_unlock(&processing_lock);
+		return NULL;
+	}
+
+	mctelem_processing_hold(tep);
+	wmb();
+	spin_unlock(&processing_lock);
+	return MCTE2COOKIE(tep);
+}
+
+void mctelem_consume_oldest_end(mctelem_cookie_t cookie)
+{
+	struct mctelem_ent *tep = COOKIE2MCTE(cookie);
+
+	spin_lock(&processing_lock);
+	mctelem_processing_release(tep);
+	wmb();
+	spin_unlock(&processing_lock);
+}
+
+void mctelem_ack(mctelem_class_t which, mctelem_cookie_t cookie)
+{
+	mctelem_class_t target = (which == MC_URGENT) ?
+	    MC_URGENT : MC_NONURGENT;
+	struct mctelem_ent *tep = COOKIE2MCTE(cookie);
+
+	if (tep == NULL)
+		return;
+
+	spin_lock(&processing_lock);
+	if (tep == mctctl.mctc_processing_head[target])
+		mctelem_processing_release(tep);
+	wmb();
+	spin_unlock(&processing_lock);
+}
