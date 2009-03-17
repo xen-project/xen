@@ -7,7 +7,7 @@ export stubdom=y
 export debug=y
 include $(XEN_ROOT)/Config.mk
 
-IOEMU_OPTIONS=--disable-sdl --disable-opengl --disable-vnc-tls --disable-brlapi --disable-kqemu
+IOEMU_OPTIONS=--disable-sdl --disable-opengl --disable-vnc-tls --disable-brlapi --disable-kqemu --disable-vde
 
 #ZLIB_URL?=http://www.zlib.net
 ZLIB_URL=$(XEN_EXTFILES_URL)
