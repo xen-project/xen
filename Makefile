@@ -203,6 +203,8 @@ uninstall:
 	rm -rf $(D)/etc/hotplug/xen-backend.agent
 	rm -f  $(D)/etc/udev/rules.d/xen-backend.rules
 	rm -f  $(D)/etc/udev/xen-backend.rules
+	rm -f  $(D)/etc/udev/rules.d/xend.rules
+	rm -f  $(D)/etc/udev/xend.rules
 	rm -f  $(D)/etc/sysconfig/xendomains
 	rm -rf $(D)/var/run/xen* $(D)/var/lib/xen*
 	rm -rf $(D)/boot/*xen*

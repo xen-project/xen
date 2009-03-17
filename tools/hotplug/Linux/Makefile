@@ -29,7 +29,7 @@ XEN_HOTPLUG_DIR = /etc/hotplug
 XEN_HOTPLUG_SCRIPTS = xen-backend.agent
 
 UDEV_RULES_DIR = /etc/udev
-UDEV_RULES = xen-backend.rules
+UDEV_RULES = xen-backend.rules xend.rules
 
 DI = $(if $(DISTDIR),$(shell readlink -f $(DISTDIR)),)
 DE = $(if $(DESTDIR),$(shell readlink -f $(DESTDIR)),)
