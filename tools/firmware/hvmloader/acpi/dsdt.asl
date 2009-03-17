@@ -981,60 +981,1027 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
              * handle the hotplug action and status, which is beyond the ACPI
              * scope.
              */
-
-            Device (S1F0)
+            Device(S00)
             {
-                Name (_ADR, 0x00060000) /* Dev 6, Func 0 */
-                Name (_SUN, 0x00000001)
+                Name (_ADR, 0x00000000) /* Dev 0, Func 0 */
+                Name (_SUN, 0x00000000)
 
                 Method (_PS0, 0)
                 {
+                    Store (0x00, \_GPE.DPT1)
                     Store (0x80, \_GPE.DPT2)
                 }
 
                 Method (_PS3, 0)
                 {
+                    Store (0x00, \_GPE.DPT1)
                     Store (0x83, \_GPE.DPT2)
                 }
 
                 Method (_EJ0, 1)
                 {
+                    Store (0x00, \_GPE.DPT1)
                     Store (0x88, \_GPE.DPT2)
-                    Store (0x1, \_GPE.PHP1) /* eject php slot 1*/
+                    Store (0x1, \_GPE.PH00) /* eject php slot 0x00 */
                 }
 
                 Method (_STA, 0)
                 {
+                    Store (0x00, \_GPE.DPT1)
                     Store (0x89, \_GPE.DPT2)
-                    Return ( \_GPE.PHP1 )   /* IN status as the _STA */
+                    Return (\_GPE.PH00) /* IN status as the _STA */
                 }
             }
 
-            Device (S2F0)
+            Device(S01)
             {
-                Name (_ADR, 0x00070000) /* Dev 7, Func 0 */
-                Name (_SUN, 0x00000002)
+                Name (_ADR, 0x00010000) /* Dev 1, Func 0 */
+                Name (_SUN, 0x00000001)
 
                 Method (_PS0, 0)
                 {
-                    Store (0x90, \_GPE.DPT2)
+                    Store (0x01, \_GPE.DPT1)
+                    Store (0x80, \_GPE.DPT2)
                 }
 
                 Method (_PS3, 0)
                 {
-                    Store (0x93, \_GPE.DPT2)
+                    Store (0x01, \_GPE.DPT1)
+                    Store (0x83, \_GPE.DPT2)
                 }
 
                 Method (_EJ0, 1)
                 {
-                    Store (0x98, \_GPE.DPT2)
-                    Store (0x1, \_GPE.PHP2) /* eject php slot 1*/
+                    Store (0x01, \_GPE.DPT1)
+                    Store (0x88, \_GPE.DPT2)
+                    Store (0x1, \_GPE.PH01) /* eject php slot 0x01 */
                 }
 
                 Method (_STA, 0)
                 {
-                    Store (0x99, \_GPE.DPT2)
-                    Return ( \_GPE.PHP2 )   /* IN status as the _STA */
+                    Store (0x01, \_GPE.DPT1)
+                    Store (0x89, \_GPE.DPT2)
+                    Return (\_GPE.PH01) /* IN status as the _STA */
+                }
+            }
+
+            Device(S02)
+            {
+                Name (_ADR, 0x00020000) /* Dev 2, Func 0 */
+                Name (_SUN, 0x00000002)
+
+                Method (_PS0, 0)
+                {
+                    Store (0x02, \_GPE.DPT1)
+                    Store (0x80, \_GPE.DPT2)
+                }
+
+                Method (_PS3, 0)
+                {
+                    Store (0x02, \_GPE.DPT1)
+                    Store (0x83, \_GPE.DPT2)
+                }
+
+                Method (_EJ0, 1)
+                {
+                    Store (0x02, \_GPE.DPT1)
+                    Store (0x88, \_GPE.DPT2)
+                    Store (0x1, \_GPE.PH02) /* eject php slot 0x02 */
+                }
+
+                Method (_STA, 0)
+                {
+                    Store (0x02, \_GPE.DPT1)
+                    Store (0x89, \_GPE.DPT2)
+                    Return (\_GPE.PH02) /* IN status as the _STA */
+                }
+            }
+
+            Device(S03)
+            {
+                Name (_ADR, 0x00030000) /* Dev 3, Func 0 */
+                Name (_SUN, 0x00000003)
+
+                Method (_PS0, 0)
+                {
+                    Store (0x03, \_GPE.DPT1)
+                    Store (0x80, \_GPE.DPT2)
+                }
+
+                Method (_PS3, 0)
+                {
+                    Store (0x03, \_GPE.DPT1)
+                    Store (0x83, \_GPE.DPT2)
+                }
+
+                Method (_EJ0, 1)
+                {
+                    Store (0x03, \_GPE.DPT1)
+                    Store (0x88, \_GPE.DPT2)
+                    Store (0x1, \_GPE.PH03) /* eject php slot 0x03 */
+                }
+
+                Method (_STA, 0)
+                {
+                    Store (0x03, \_GPE.DPT1)
+                    Store (0x89, \_GPE.DPT2)
+                    Return (\_GPE.PH03) /* IN status as the _STA */
+                }
+            }
+
+            Device(S04)
+            {
+                Name (_ADR, 0x00040000) /* Dev 4, Func 0 */
+                Name (_SUN, 0x00000004)
+
+                Method (_PS0, 0)
+                {
+                    Store (0x04, \_GPE.DPT1)
+                    Store (0x80, \_GPE.DPT2)
+                }
+
+                Method (_PS3, 0)
+                {
+                    Store (0x04, \_GPE.DPT1)
+                    Store (0x83, \_GPE.DPT2)
+                }
+
+                Method (_EJ0, 1)
+                {
+                    Store (0x04, \_GPE.DPT1)
+                    Store (0x88, \_GPE.DPT2)
+                    Store (0x1, \_GPE.PH04) /* eject php slot 0x04 */
+                }
+
+                Method (_STA, 0)
+                {
+                    Store (0x04, \_GPE.DPT1)
+                    Store (0x89, \_GPE.DPT2)
+                    Return (\_GPE.PH04) /* IN status as the _STA */
+                }
+            }
+
+            Device(S05)
+            {
+                Name (_ADR, 0x00050000) /* Dev 5, Func 0 */
+                Name (_SUN, 0x00000005)
+
+                Method (_PS0, 0)
+                {
+                    Store (0x05, \_GPE.DPT1)
+                    Store (0x80, \_GPE.DPT2)
+                }
+
+                Method (_PS3, 0)
+                {
+                    Store (0x05, \_GPE.DPT1)
+                    Store (0x83, \_GPE.DPT2)
+                }
+
+                Method (_EJ0, 1)
+                {
+                    Store (0x05, \_GPE.DPT1)
+                    Store (0x88, \_GPE.DPT2)
+                    Store (0x1, \_GPE.PH05) /* eject php slot 0x05 */
+                }
+
+                Method (_STA, 0)
+                {
+                    Store (0x05, \_GPE.DPT1)
+                    Store (0x89, \_GPE.DPT2)
+                    Return (\_GPE.PH05) /* IN status as the _STA */
+                }
+            }
+
+            Device(S06)
+            {
+                Name (_ADR, 0x00060000) /* Dev 6, Func 0 */
+                Name (_SUN, 0x00000006)
+
+                Method (_PS0, 0)
+                {
+                    Store (0x06, \_GPE.DPT1)
+                    Store (0x80, \_GPE.DPT2)
+                }
+
+                Method (_PS3, 0)
+                {
+                    Store (0x06, \_GPE.DPT1)
+                    Store (0x83, \_GPE.DPT2)
+                }
+
+                Method (_EJ0, 1)
+                {
+                    Store (0x06, \_GPE.DPT1)
+                    Store (0x88, \_GPE.DPT2)
+                    Store (0x1, \_GPE.PH06) /* eject php slot 0x06 */
+                }
+
+                Method (_STA, 0)
+                {
+                    Store (0x06, \_GPE.DPT1)
+                    Store (0x89, \_GPE.DPT2)
+                    Return (\_GPE.PH06) /* IN status as the _STA */
+                }
+            }
+
+            Device(S07)
+            {
+                Name (_ADR, 0x00070000) /* Dev 7, Func 0 */
+                Name (_SUN, 0x00000007)
+
+                Method (_PS0, 0)
+                {
+                    Store (0x07, \_GPE.DPT1)
+                    Store (0x80, \_GPE.DPT2)
+                }
+
+                Method (_PS3, 0)
+                {
+                    Store (0x07, \_GPE.DPT1)
+                    Store (0x83, \_GPE.DPT2)
+                }
+
+                Method (_EJ0, 1)
+                {
+                    Store (0x07, \_GPE.DPT1)
+                    Store (0x88, \_GPE.DPT2)
+                    Store (0x1, \_GPE.PH07) /* eject php slot 0x07 */
+                }
+
+                Method (_STA, 0)
+                {
+                    Store (0x07, \_GPE.DPT1)
+                    Store (0x89, \_GPE.DPT2)
+                    Return (\_GPE.PH07) /* IN status as the _STA */
+                }
+            }
+
+            Device(S08)
+            {
+                Name (_ADR, 0x00080000) /* Dev 8, Func 0 */
+                Name (_SUN, 0x00000008)
+
+                Method (_PS0, 0)
+                {
+                    Store (0x08, \_GPE.DPT1)
+                    Store (0x80, \_GPE.DPT2)
+                }
+
+                Method (_PS3, 0)
+                {
+                    Store (0x08, \_GPE.DPT1)
+                    Store (0x83, \_GPE.DPT2)
+                }
+
+                Method (_EJ0, 1)
+                {
+                    Store (0x08, \_GPE.DPT1)
+                    Store (0x88, \_GPE.DPT2)
+                    Store (0x1, \_GPE.PH08) /* eject php slot 0x08 */
+                }
+
+                Method (_STA, 0)
+                {
+                    Store (0x08, \_GPE.DPT1)
+                    Store (0x89, \_GPE.DPT2)
+                    Return (\_GPE.PH08) /* IN status as the _STA */
+                }
+            }
+
+            Device(S09)
+            {
+                Name (_ADR, 0x00090000) /* Dev 9, Func 0 */
+                Name (_SUN, 0x00000009)
+
+                Method (_PS0, 0)
+                {
+                    Store (0x09, \_GPE.DPT1)
+                    Store (0x80, \_GPE.DPT2)
+                }
+
+                Method (_PS3, 0)
+                {
+                    Store (0x09, \_GPE.DPT1)
+                    Store (0x83, \_GPE.DPT2)
+                }
+
+                Method (_EJ0, 1)
+                {
+                    Store (0x09, \_GPE.DPT1)
+                    Store (0x88, \_GPE.DPT2)
+                    Store (0x1, \_GPE.PH09) /* eject php slot 0x09 */
+                }
+
+                Method (_STA, 0)
+                {
+                    Store (0x09, \_GPE.DPT1)
+                    Store (0x89, \_GPE.DPT2)
+                    Return (\_GPE.PH09) /* IN status as the _STA */
+                }
+            }
+
+            Device(S0A)
+            {
+                Name (_ADR, 0x000a0000) /* Dev 10, Func 0 */
+                Name (_SUN, 0x0000000a)
+
+                Method (_PS0, 0)
+                {
+                    Store (0x0a, \_GPE.DPT1)
+                    Store (0x80, \_GPE.DPT2)
+                }
+
+                Method (_PS3, 0)
+                {
+                    Store (0x0a, \_GPE.DPT1)
+                    Store (0x83, \_GPE.DPT2)
+                }
+
+                Method (_EJ0, 1)
+                {
+                    Store (0x0a, \_GPE.DPT1)
+                    Store (0x88, \_GPE.DPT2)
+                    Store (0x1, \_GPE.PH0A) /* eject php slot 0x0a */
+                }
+
+                Method (_STA, 0)
+                {
+                    Store (0x0a, \_GPE.DPT1)
+                    Store (0x89, \_GPE.DPT2)
+                    Return (\_GPE.PH0A) /* IN status as the _STA */
+                }
+            }
+
+            Device(S0B)
+            {
+                Name (_ADR, 0x000b0000) /* Dev 11, Func 0 */
+                Name (_SUN, 0x0000000b)
+
+                Method (_PS0, 0)
+                {
+                    Store (0x0b, \_GPE.DPT1)
+                    Store (0x80, \_GPE.DPT2)
+                }
+
+                Method (_PS3, 0)
+                {
+                    Store (0x0b, \_GPE.DPT1)
+                    Store (0x83, \_GPE.DPT2)
+                }
+
+                Method (_EJ0, 1)
+                {
+                    Store (0x0b, \_GPE.DPT1)
+                    Store (0x88, \_GPE.DPT2)
+                    Store (0x1, \_GPE.PH0B) /* eject php slot 0x0b */
+                }
+
+                Method (_STA, 0)
+                {
+                    Store (0x0b, \_GPE.DPT1)
+                    Store (0x89, \_GPE.DPT2)
+                    Return (\_GPE.PH0B) /* IN status as the _STA */
+                }
+            }
+
+            Device(S0C)
+            {
+                Name (_ADR, 0x000c0000) /* Dev 12, Func 0 */
+                Name (_SUN, 0x0000000c)
+
+                Method (_PS0, 0)
+                {
+                    Store (0x0c, \_GPE.DPT1)
+                    Store (0x80, \_GPE.DPT2)
+                }
+
+                Method (_PS3, 0)
+                {
+                    Store (0x0c, \_GPE.DPT1)
+                    Store (0x83, \_GPE.DPT2)
+                }
+
+                Method (_EJ0, 1)
+                {
+                    Store (0x0c, \_GPE.DPT1)
+                    Store (0x88, \_GPE.DPT2)
+                    Store (0x1, \_GPE.PH0C) /* eject php slot 0x0c */
+                }
+
+                Method (_STA, 0)
+                {
+                    Store (0x0c, \_GPE.DPT1)
+                    Store (0x89, \_GPE.DPT2)
+                    Return (\_GPE.PH0C) /* IN status as the _STA */
+                }
+            }
+
+            Device(S0D)
+            {
+                Name (_ADR, 0x000d0000) /* Dev 13, Func 0 */
+                Name (_SUN, 0x0000000d)
+
+                Method (_PS0, 0)
+                {
+                    Store (0x0d, \_GPE.DPT1)
+                    Store (0x80, \_GPE.DPT2)
+                }
+
+                Method (_PS3, 0)
+                {
+                    Store (0x0d, \_GPE.DPT1)
+                    Store (0x83, \_GPE.DPT2)
+                }
+
+                Method (_EJ0, 1)
+                {
+                    Store (0x0d, \_GPE.DPT1)
+                    Store (0x88, \_GPE.DPT2)
+                    Store (0x1, \_GPE.PH0D) /* eject php slot 0x0d */
+                }
+
+                Method (_STA, 0)
+                {
+                    Store (0x0d, \_GPE.DPT1)
+                    Store (0x89, \_GPE.DPT2)
+                    Return (\_GPE.PH0D) /* IN status as the _STA */
+                }
+            }
+
+            Device(S0E)
+            {
+                Name (_ADR, 0x000e0000) /* Dev 14, Func 0 */
+                Name (_SUN, 0x0000000e)
+
+                Method (_PS0, 0)
+                {
+                    Store (0x0e, \_GPE.DPT1)
+                    Store (0x80, \_GPE.DPT2)
+                }
+
+                Method (_PS3, 0)
+                {
+                    Store (0x0e, \_GPE.DPT1)
+                    Store (0x83, \_GPE.DPT2)
+                }
+
+                Method (_EJ0, 1)
+                {
+                    Store (0x0e, \_GPE.DPT1)
+                    Store (0x88, \_GPE.DPT2)
+                    Store (0x1, \_GPE.PH0E) /* eject php slot 0x0e */
+                }
+
+                Method (_STA, 0)
+                {
+                    Store (0x0e, \_GPE.DPT1)
+                    Store (0x89, \_GPE.DPT2)
+                    Return (\_GPE.PH0E) /* IN status as the _STA */
+                }
+            }
+
+            Device(S0F)
+            {
+                Name (_ADR, 0x000f0000) /* Dev 15, Func 0 */
+                Name (_SUN, 0x0000000f)
+
+                Method (_PS0, 0)
+                {
+                    Store (0x0f, \_GPE.DPT1)
+                    Store (0x80, \_GPE.DPT2)
+                }
+
+                Method (_PS3, 0)
+                {
+                    Store (0x0f, \_GPE.DPT1)
+                    Store (0x83, \_GPE.DPT2)
+                }
+
+                Method (_EJ0, 1)
+                {
+                    Store (0x0f, \_GPE.DPT1)
+                    Store (0x88, \_GPE.DPT2)
+                    Store (0x1, \_GPE.PH0F) /* eject php slot 0x0f */
+                }
+
+                Method (_STA, 0)
+                {
+                    Store (0x0f, \_GPE.DPT1)
+                    Store (0x89, \_GPE.DPT2)
+                    Return (\_GPE.PH0F) /* IN status as the _STA */
+                }
+            }
+
+            Device(S10)
+            {
+                Name (_ADR, 0x00100000) /* Dev 16, Func 0 */
+                Name (_SUN, 0x00000010)
+
+                Method (_PS0, 0)
+                {
+                    Store (0x10, \_GPE.DPT1)
+                    Store (0x80, \_GPE.DPT2)
+                }
+
+                Method (_PS3, 0)
+                {
+                    Store (0x10, \_GPE.DPT1)
+                    Store (0x83, \_GPE.DPT2)
+                }
+
+                Method (_EJ0, 1)
+                {
+                    Store (0x10, \_GPE.DPT1)
+                    Store (0x88, \_GPE.DPT2)
+                    Store (0x1, \_GPE.PH10) /* eject php slot 0x10 */
+                }
+
+                Method (_STA, 0)
+                {
+                    Store (0x10, \_GPE.DPT1)
+                    Store (0x89, \_GPE.DPT2)
+                    Return (\_GPE.PH10) /* IN status as the _STA */
+                }
+            }
+
+            Device(S11)
+            {
+                Name (_ADR, 0x00110000) /* Dev 17, Func 0 */
+                Name (_SUN, 0x00000011)
+
+                Method (_PS0, 0)
+                {
+                    Store (0x11, \_GPE.DPT1)
+                    Store (0x80, \_GPE.DPT2)
+                }
+
+                Method (_PS3, 0)
+                {
+                    Store (0x11, \_GPE.DPT1)
+                    Store (0x83, \_GPE.DPT2)
+                }
+
+                Method (_EJ0, 1)
+                {
+                    Store (0x11, \_GPE.DPT1)
+                    Store (0x88, \_GPE.DPT2)
+                    Store (0x1, \_GPE.PH11) /* eject php slot 0x11 */
+                }
+
+                Method (_STA, 0)
+                {
+                    Store (0x11, \_GPE.DPT1)
+                    Store (0x89, \_GPE.DPT2)
+                    Return (\_GPE.PH11) /* IN status as the _STA */
+                }
+            }
+
+            Device(S12)
+            {
+                Name (_ADR, 0x00120000) /* Dev 18, Func 0 */
+                Name (_SUN, 0x00000012)
+
+                Method (_PS0, 0)
+                {
+                    Store (0x12, \_GPE.DPT1)
+                    Store (0x80, \_GPE.DPT2)
+                }
+
+                Method (_PS3, 0)
+                {
+                    Store (0x12, \_GPE.DPT1)
+                    Store (0x83, \_GPE.DPT2)
+                }
+
+                Method (_EJ0, 1)
+                {
+                    Store (0x12, \_GPE.DPT1)
+                    Store (0x88, \_GPE.DPT2)
+                    Store (0x1, \_GPE.PH12) /* eject php slot 0x12 */
+                }
+
+                Method (_STA, 0)
+                {
+                    Store (0x12, \_GPE.DPT1)
+                    Store (0x89, \_GPE.DPT2)
+                    Return (\_GPE.PH12) /* IN status as the _STA */
+                }
+            }
+
+            Device(S13)
+            {
+                Name (_ADR, 0x00130000) /* Dev 19, Func 0 */
+                Name (_SUN, 0x00000013)
+
+                Method (_PS0, 0)
+                {
+                    Store (0x13, \_GPE.DPT1)
+                    Store (0x80, \_GPE.DPT2)
+                }
+
+                Method (_PS3, 0)
+                {
+                    Store (0x13, \_GPE.DPT1)
+                    Store (0x83, \_GPE.DPT2)
+                }
+
+                Method (_EJ0, 1)
+                {
+                    Store (0x13, \_GPE.DPT1)
+                    Store (0x88, \_GPE.DPT2)
+                    Store (0x1, \_GPE.PH13) /* eject php slot 0x13 */
+                }
+
+                Method (_STA, 0)
+                {
+                    Store (0x13, \_GPE.DPT1)
+                    Store (0x89, \_GPE.DPT2)
+                    Return (\_GPE.PH13) /* IN status as the _STA */
+                }
+            }
+
+            Device(S14)
+            {
+                Name (_ADR, 0x00140000) /* Dev 20, Func 0 */
+                Name (_SUN, 0x00000014)
+
+                Method (_PS0, 0)
+                {
+                    Store (0x14, \_GPE.DPT1)
+                    Store (0x80, \_GPE.DPT2)
+                }
+
+                Method (_PS3, 0)
+                {
+                    Store (0x14, \_GPE.DPT1)
+                    Store (0x83, \_GPE.DPT2)
+                }
+
+                Method (_EJ0, 1)
+                {
+                    Store (0x14, \_GPE.DPT1)
+                    Store (0x88, \_GPE.DPT2)
+                    Store (0x1, \_GPE.PH14) /* eject php slot 0x14 */
+                }
+
+                Method (_STA, 0)
+                {
+                    Store (0x14, \_GPE.DPT1)
+                    Store (0x89, \_GPE.DPT2)
+                    Return (\_GPE.PH14) /* IN status as the _STA */
+                }
+            }
+
+            Device(S15)
+            {
+                Name (_ADR, 0x00150000) /* Dev 21, Func 0 */
+                Name (_SUN, 0x00000015)
+
+                Method (_PS0, 0)
+                {
+                    Store (0x15, \_GPE.DPT1)
+                    Store (0x80, \_GPE.DPT2)
+                }
+
+                Method (_PS3, 0)
+                {
+                    Store (0x15, \_GPE.DPT1)
+                    Store (0x83, \_GPE.DPT2)
+                }
+
+                Method (_EJ0, 1)
+                {
+                    Store (0x15, \_GPE.DPT1)
+                    Store (0x88, \_GPE.DPT2)
+                    Store (0x1, \_GPE.PH15) /* eject php slot 0x15 */
+                }
+
+                Method (_STA, 0)
+                {
+                    Store (0x15, \_GPE.DPT1)
+                    Store (0x89, \_GPE.DPT2)
+                    Return (\_GPE.PH15) /* IN status as the _STA */
+                }
+            }
+
+            Device(S16)
+            {
+                Name (_ADR, 0x00160000) /* Dev 22, Func 0 */
+                Name (_SUN, 0x00000016)
+
+                Method (_PS0, 0)
+                {
+                    Store (0x16, \_GPE.DPT1)
+                    Store (0x80, \_GPE.DPT2)
+                }
+
+                Method (_PS3, 0)
+                {
+                    Store (0x16, \_GPE.DPT1)
+                    Store (0x83, \_GPE.DPT2)
+                }
+
+                Method (_EJ0, 1)
+                {
+                    Store (0x16, \_GPE.DPT1)
+                    Store (0x88, \_GPE.DPT2)
+                    Store (0x1, \_GPE.PH16) /* eject php slot 0x16 */
+                }
+
+                Method (_STA, 0)
+                {
+                    Store (0x16, \_GPE.DPT1)
+                    Store (0x89, \_GPE.DPT2)
+                    Return (\_GPE.PH16) /* IN status as the _STA */
+                }
+            }
+
+            Device(S17)
+            {
+                Name (_ADR, 0x00170000) /* Dev 23, Func 0 */
+                Name (_SUN, 0x00000017)
+
+                Method (_PS0, 0)
+                {
+                    Store (0x17, \_GPE.DPT1)
+                    Store (0x80, \_GPE.DPT2)
+                }
+
+                Method (_PS3, 0)
+                {
+                    Store (0x17, \_GPE.DPT1)
+                    Store (0x83, \_GPE.DPT2)
+                }
+
+                Method (_EJ0, 1)
+                {
+                    Store (0x17, \_GPE.DPT1)
+                    Store (0x88, \_GPE.DPT2)
+                    Store (0x1, \_GPE.PH17) /* eject php slot 0x17 */
+                }
+
+                Method (_STA, 0)
+                {
+                    Store (0x17, \_GPE.DPT1)
+                    Store (0x89, \_GPE.DPT2)
+                    Return (\_GPE.PH17) /* IN status as the _STA */
+                }
+            }
+
+            Device(S18)
+            {
+                Name (_ADR, 0x00180000) /* Dev 24, Func 0 */
+                Name (_SUN, 0x00000018)
+
+                Method (_PS0, 0)
+                {
+                    Store (0x18, \_GPE.DPT1)
+                    Store (0x80, \_GPE.DPT2)
+                }
+
+                Method (_PS3, 0)
+                {
+                    Store (0x18, \_GPE.DPT1)
+                    Store (0x83, \_GPE.DPT2)
+                }
+
+                Method (_EJ0, 1)
+                {
+                    Store (0x18, \_GPE.DPT1)
+                    Store (0x88, \_GPE.DPT2)
+                    Store (0x1, \_GPE.PH18) /* eject php slot 0x18 */
+                }
+
+                Method (_STA, 0)
+                {
+                    Store (0x18, \_GPE.DPT1)
+                    Store (0x89, \_GPE.DPT2)
+                    Return (\_GPE.PH18) /* IN status as the _STA */
+                }
+            }
+
+            Device(S19)
+            {
+                Name (_ADR, 0x00190000) /* Dev 25, Func 0 */
+                Name (_SUN, 0x00000019)
+
+                Method (_PS0, 0)
+                {
+                    Store (0x19, \_GPE.DPT1)
+                    Store (0x80, \_GPE.DPT2)
+                }
+
+                Method (_PS3, 0)
+                {
+                    Store (0x19, \_GPE.DPT1)
+                    Store (0x83, \_GPE.DPT2)
+                }
+
+                Method (_EJ0, 1)
+                {
+                    Store (0x19, \_GPE.DPT1)
+                    Store (0x88, \_GPE.DPT2)
+                    Store (0x1, \_GPE.PH19) /* eject php slot 0x19 */
+                }
+
+                Method (_STA, 0)
+                {
+                    Store (0x19, \_GPE.DPT1)
+                    Store (0x89, \_GPE.DPT2)
+                    Return (\_GPE.PH19) /* IN status as the _STA */
+                }
+            }
+
+            Device(S1A)
+            {
+                Name (_ADR, 0x001a0000) /* Dev 26, Func 0 */
+                Name (_SUN, 0x0000001a)
+
+                Method (_PS0, 0)
+                {
+                    Store (0x1a, \_GPE.DPT1)
+                    Store (0x80, \_GPE.DPT2)
+                }
+
+                Method (_PS3, 0)
+                {
+                    Store (0x1a, \_GPE.DPT1)
+                    Store (0x83, \_GPE.DPT2)
+                }
+
+                Method (_EJ0, 1)
+                {
+                    Store (0x1a, \_GPE.DPT1)
+                    Store (0x88, \_GPE.DPT2)
+                    Store (0x1, \_GPE.PH1A) /* eject php slot 0x1a */
+                }
+
+                Method (_STA, 0)
+                {
+                    Store (0x1a, \_GPE.DPT1)
+                    Store (0x89, \_GPE.DPT2)
+                    Return (\_GPE.PH1A) /* IN status as the _STA */
+                }
+            }
+
+            Device(S1B)
+            {
+                Name (_ADR, 0x001b0000) /* Dev 27, Func 0 */
+                Name (_SUN, 0x0000001b)
+
+                Method (_PS0, 0)
+                {
+                    Store (0x1b, \_GPE.DPT1)
+                    Store (0x80, \_GPE.DPT2)
+                }
+
+                Method (_PS3, 0)
+                {
+                    Store (0x1b, \_GPE.DPT1)
+                    Store (0x83, \_GPE.DPT2)
+                }
+
+                Method (_EJ0, 1)
+                {
+                    Store (0x1b, \_GPE.DPT1)
+                    Store (0x88, \_GPE.DPT2)
+                    Store (0x1, \_GPE.PH1B) /* eject php slot 0x1b */
+                }
+
+                Method (_STA, 0)
+                {
+                    Store (0x1b, \_GPE.DPT1)
+                    Store (0x89, \_GPE.DPT2)
+                    Return (\_GPE.PH1B) /* IN status as the _STA */
+                }
+            }
+
+            Device(S1C)
+            {
+                Name (_ADR, 0x001c0000) /* Dev 28, Func 0 */
+                Name (_SUN, 0x0000001c)
+
+                Method (_PS0, 0)
+                {
+                    Store (0x1c, \_GPE.DPT1)
+                    Store (0x80, \_GPE.DPT2)
+                }
+
+                Method (_PS3, 0)
+                {
+                    Store (0x1c, \_GPE.DPT1)
+                    Store (0x83, \_GPE.DPT2)
+                }
+
+                Method (_EJ0, 1)
+                {
+                    Store (0x1c, \_GPE.DPT1)
+                    Store (0x88, \_GPE.DPT2)
+                    Store (0x1, \_GPE.PH1C) /* eject php slot 0x1c */
+                }
+
+                Method (_STA, 0)
+                {
+                    Store (0x1c, \_GPE.DPT1)
+                    Store (0x89, \_GPE.DPT2)
+                    Return (\_GPE.PH1C) /* IN status as the _STA */
+                }
+            }
+
+            Device(S1D)
+            {
+                Name (_ADR, 0x001d0000) /* Dev 29, Func 0 */
+                Name (_SUN, 0x0000001d)
+
+                Method (_PS0, 0)
+                {
+                    Store (0x1d, \_GPE.DPT1)
+                    Store (0x80, \_GPE.DPT2)
+                }
+
+                Method (_PS3, 0)
+                {
+                    Store (0x1d, \_GPE.DPT1)
+                    Store (0x83, \_GPE.DPT2)
+                }
+
+                Method (_EJ0, 1)
+                {
+                    Store (0x1d, \_GPE.DPT1)
+                    Store (0x88, \_GPE.DPT2)
+                    Store (0x1, \_GPE.PH1D) /* eject php slot 0x1d */
+                }
+
+                Method (_STA, 0)
+                {
+                    Store (0x1d, \_GPE.DPT1)
+                    Store (0x89, \_GPE.DPT2)
+                    Return (\_GPE.PH1D) /* IN status as the _STA */
+                }
+            }
+
+            Device(S1E)
+            {
+                Name (_ADR, 0x001e0000) /* Dev 30, Func 0 */
+                Name (_SUN, 0x0000001e)
+
+                Method (_PS0, 0)
+                {
+                    Store (0x1e, \_GPE.DPT1)
+                    Store (0x80, \_GPE.DPT2)
+                }
+
+                Method (_PS3, 0)
+                {
+                    Store (0x1e, \_GPE.DPT1)
+                    Store (0x83, \_GPE.DPT2)
+                }
+
+                Method (_EJ0, 1)
+                {
+                    Store (0x1e, \_GPE.DPT1)
+                    Store (0x88, \_GPE.DPT2)
+                    Store (0x1, \_GPE.PH1E) /* eject php slot 0x1e */
+                }
+
+                Method (_STA, 0)
+                {
+                    Store (0x1e, \_GPE.DPT1)
+                    Store (0x89, \_GPE.DPT2)
+                    Return (\_GPE.PH1E) /* IN status as the _STA */
+                }
+            }
+
+            Device(S1F)
+            {
+                Name (_ADR, 0x001f0000) /* Dev 31, Func 0 */
+                Name (_SUN, 0x0000001f)
+
+                Method (_PS0, 0)
+                {
+                    Store (0x1f, \_GPE.DPT1)
+                    Store (0x80, \_GPE.DPT2)
+                }
+
+                Method (_PS3, 0)
+                {
+                    Store (0x1f, \_GPE.DPT1)
+                    Store (0x83, \_GPE.DPT2)
+                }
+
+                Method (_EJ0, 1)
+                {
+                    Store (0x1f, \_GPE.DPT1)
+                    Store (0x88, \_GPE.DPT2)
+                    Store (0x1, \_GPE.PH1F) /* eject php slot 0x1f */
+                }
+
+                Method (_STA, 0)
+                {
+                    Store (0x1f, \_GPE.DPT1)
+                    Store (0x89, \_GPE.DPT2)
+                    Return (\_GPE.PH1F) /* IN status as the _STA */
                 }
             }
         }
@@ -1042,39 +2009,162 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
 
     Scope (\_GPE)
     {
-        OperationRegion (PHP, SystemIO, 0x10c0, 0x03)
+        OperationRegion (PHP, SystemIO, 0x10c0, 0x22)
         Field (PHP, ByteAcc, NoLock, Preserve)
         {
-            PSTA,   8, /* hotplug controller status reg */
-            PHP1,   8, /* hotplug slot 1 control reg */
-            PHP2,   8  /* hotplug slot 2 control reg */
-        }
+            PSTA,  8, /* hotplug controller event reg */
+            PSTB,  8, /* hotplug controller slot  reg */
+            PH00,  8, /* hotplug slot 0x00 control reg */
+            PH01,  8, /* hotplug slot 0x01 control reg */
+            PH02,  8, /* hotplug slot 0x02 control reg */
+            PH03,  8, /* hotplug slot 0x03 control reg */
+            PH04,  8, /* hotplug slot 0x04 control reg */
+            PH05,  8, /* hotplug slot 0x05 control reg */
+            PH06,  8, /* hotplug slot 0x06 control reg */
+            PH07,  8, /* hotplug slot 0x07 control reg */
+            PH08,  8, /* hotplug slot 0x08 control reg */
+            PH09,  8, /* hotplug slot 0x09 control reg */
+            PH0A,  8, /* hotplug slot 0x0a control reg */
+            PH0B,  8, /* hotplug slot 0x0b control reg */
+            PH0C,  8, /* hotplug slot 0x0c control reg */
+            PH0D,  8, /* hotplug slot 0x0d control reg */
+            PH0E,  8, /* hotplug slot 0x0e control reg */
+            PH0F,  8, /* hotplug slot 0x0f control reg */
+            PH10,  8, /* hotplug slot 0x10 control reg */
+            PH11,  8, /* hotplug slot 0x11 control reg */
+            PH12,  8, /* hotplug slot 0x12 control reg */
+            PH13,  8, /* hotplug slot 0x13 control reg */
+            PH14,  8, /* hotplug slot 0x14 control reg */
+            PH15,  8, /* hotplug slot 0x15 control reg */
+            PH16,  8, /* hotplug slot 0x16 control reg */
+            PH17,  8, /* hotplug slot 0x17 control reg */
+            PH18,  8, /* hotplug slot 0x18 control reg */
+            PH19,  8, /* hotplug slot 0x19 control reg */
+            PH1A,  8, /* hotplug slot 0x1a control reg */
+            PH1B,  8, /* hotplug slot 0x1b control reg */
+            PH1C,  8, /* hotplug slot 0x1c control reg */
+            PH1D,  8, /* hotplug slot 0x1d control reg */
+            PH1E,  8, /* hotplug slot 0x1e control reg */
+            PH1F,  8  /* hotplug slot 0x1f control reg */
+       }
         OperationRegion (DG1, SystemIO, 0xb044, 0x04)
         Field (DG1, ByteAcc, NoLock, Preserve)
         {
             DPT1,   8,
             DPT2,   8
         }
-        Method (_L03, 0, NotSerialized)
+        Method (_L03, 0, Serialized)
         {
             /* detect slot and event(remove/add) */
             Name (SLT, 0x0)
             Name (EVT, 0x0)
             Store (PSTA, Local1)
-            ShiftRight (Local1, 0x4, SLT)
             And (Local1, 0xf, EVT)
+            Store (PSTB, Local1)           /* XXX: Store (PSTB, SLT) ? */
+            And (Local1, 0xff, SLT)
 
             /* debug */
             Store (SLT, DPT1)
             Store (EVT, DPT2)
 
-            If ( LEqual(SLT, 0x1) )
+            Switch (SLT)
             {
-                Notify (\_SB.PCI0.S1F0, EVT)
-            }
-            ElseIf ( LEqual(SLT, 0x2) )
-            {
-                Notify (\_SB.PCI0.S2F0, EVT)
+                Case (0x00) {
+                    Notify (\_SB.PCI0.S00, EVT)
+                }
+                Case (0x01) {
+                    Notify (\_SB.PCI0.S01, EVT)
+                }
+                Case (0x02) {
+                    Notify (\_SB.PCI0.S02, EVT)
+                }
+                Case (0x03) {
+                    Notify (\_SB.PCI0.S03, EVT)
+                }
+                Case (0x04) {
+                    Notify (\_SB.PCI0.S04, EVT)
+                }
+                Case (0x05) {
+                    Notify (\_SB.PCI0.S05, EVT)
+                }
+                Case (0x06) {
+                    Notify (\_SB.PCI0.S06, EVT)
+                }
+                Case (0x07) {
+                    Notify (\_SB.PCI0.S07, EVT)
+                }
+                Case (0x08) {
+                    Notify (\_SB.PCI0.S08, EVT)
+                }
+                Case (0x09) {
+                    Notify (\_SB.PCI0.S09, EVT)
+                }
+                Case (0x0a) {
+                    Notify (\_SB.PCI0.S0A, EVT)
+                }
+                Case (0x0b) {
+                    Notify (\_SB.PCI0.S0B, EVT)
+                }
+                Case (0x0c) {
+                    Notify (\_SB.PCI0.S0C, EVT)
+                }
+                Case (0x0d) {
+                    Notify (\_SB.PCI0.S0D, EVT)
+                }
+                Case (0x0e) {
+                    Notify (\_SB.PCI0.S0E, EVT)
+                }
+                Case (0x0f) {
+                    Notify (\_SB.PCI0.S0F, EVT)
+                }
+                Case (0x10) {
+                    Notify (\_SB.PCI0.S10, EVT)
+                }
+                Case (0x11) {
+                    Notify (\_SB.PCI0.S11, EVT)
+                }
+                Case (0x12) {
+                    Notify (\_SB.PCI0.S12, EVT)
+                }
+                Case (0x13) {
+                    Notify (\_SB.PCI0.S13, EVT)
+                }
+                Case (0x14) {
+                    Notify (\_SB.PCI0.S14, EVT)
+                }
+                Case (0x15) {
+                    Notify (\_SB.PCI0.S15, EVT)
+                }
+                Case (0x16) {
+                    Notify (\_SB.PCI0.S16, EVT)
+                }
+                Case (0x17) {
+                    Notify (\_SB.PCI0.S17, EVT)
+                }
+                Case (0x18) {
+                    Notify (\_SB.PCI0.S18, EVT)
+                }
+                Case (0x19) {
+                    Notify (\_SB.PCI0.S19, EVT)
+                }
+                Case (0x1a) {
+                    Notify (\_SB.PCI0.S1A, EVT)
+                }
+                Case (0x1b) {
+                    Notify (\_SB.PCI0.S1B, EVT)
+                }
+                Case (0x1c) {
+                    Notify (\_SB.PCI0.S1C, EVT)
+                }
+                Case (0x1d) {
+                    Notify (\_SB.PCI0.S1D, EVT)
+                }
+                Case (0x1e) {
+                    Notify (\_SB.PCI0.S1E, EVT)
+                }
+                Case (0x1f) {
+                    Notify (\_SB.PCI0.S1F, EVT)
+                }
             }
         }
     }
