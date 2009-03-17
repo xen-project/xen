@@ -1948,9 +1948,12 @@ struct domain *page_get_owner_and_reference(struct page_info *page)
 
     do {
         x = y;
-        if ( unlikely((x & PGC_count_mask) == 0) ||  /* Not allocated? */
-             /* Keep one spare reference to be acquired by get_page_light(). */
-             unlikely(((x + 2) & PGC_count_mask) <= 1) ) /* Overflow? */
+        /*
+         * Count ==  0: Page is not allocated, so we cannot take a reference.
+         * Count == -1: Reference count would wrap, which is invalid. 
+         * Count == -2: Remaining unused ref is reserved for get_page_light().
+         */
+        if ( unlikely(((x + 2) & PGC_count_mask) <= 2) )
             return NULL;
     }
     while ( (y = cmpxchg(&page->count_info, x, x + 1)) != x );
@@ -1966,7 +1969,8 @@ int get_page(struct page_info *page, struct domain *domain)
     if ( likely(owner == domain) )
         return 1;
 
-    put_page(page);
+    if ( owner != NULL )
+        put_page(page);
 
     if ( !_shadow_mode_refcounts(domain) && !domain->is_dying )
         gdprintk(XENLOG_INFO,
