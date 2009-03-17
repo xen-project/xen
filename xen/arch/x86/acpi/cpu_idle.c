@@ -470,12 +470,22 @@ static void acpi_processor_power_init_bm_check(struct acpi_processor_flags *flag
     else if ( c->x86_vendor == X86_VENDOR_INTEL )
     {
         /*
-         * Today all CPUs that support C3 share cache.
-         * TBD: This needs to look at cache shared map, once
-         * multi-core detection patch makes to the base.
+         * Today all MP CPUs that support C3 share cache.
+         * And caches should not be flushed by software while
+         * entering C3 type state.
          */
         flags->bm_check = 1;
     }
+
+    /*
+     * On all recent platforms, ARB_DISABLE is a nop.
+     * So, set bm_control to zero to indicate that ARB_DISABLE
+     * is not required while entering C3 type state on
+     * P4, Core and beyond CPUs
+     */
+    if ( c->x86_vendor == X86_VENDOR_INTEL &&
+        (c->x86 > 0x6 || (c->x86 == 6 && c->x86_model >= 14)) )
+            flags->bm_control = 0;
 }
 
 #define VENDOR_INTEL                   (1)
@@ -483,7 +493,8 @@ static void acpi_processor_power_init_bm_check(struct acpi_processor_flags *flag
 
 static int check_cx(struct acpi_processor_power *power, xen_processor_cx_t *cx)
 {
-    static int bm_check_flag;
+    static int bm_check_flag = -1;
+    static int bm_control_flag = -1;
 
     switch ( cx->reg.space_id )
     {
@@ -529,15 +540,17 @@ static int check_cx(struct acpi_processor_power *power, xen_processor_cx_t *cx)
         }
 
         /* All the logic here assumes flags.bm_check is same across all CPUs */
-        if ( !bm_check_flag )
+        if ( bm_check_flag == -1 )
         {
             /* Determine whether bm_check is needed based on CPU  */
             acpi_processor_power_init_bm_check(&(power->flags));
             bm_check_flag = power->flags.bm_check;
+            bm_control_flag = power->flags.bm_control;
         }
         else
         {
             power->flags.bm_check = bm_check_flag;
+            power->flags.bm_control = bm_control_flag;
         }
 
         if ( power->flags.bm_check )
