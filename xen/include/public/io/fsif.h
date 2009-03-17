@@ -185,7 +185,8 @@ DEFINE_RING_TYPES(fsif, struct fsif_request, struct fsif_response);
 
 #define STATE_INITIALISED     "init"
 #define STATE_READY           "ready"
-
+#define STATE_CLOSING         "closing"
+#define STATE_CLOSED          "closed"
 
 
 #endif

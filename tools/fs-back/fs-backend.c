@@ -3,105 +3,71 @@
 #include <string.h>
 #include <assert.h>
 #include <malloc.h>
-#include <pthread.h>
 #include <xenctrl.h>
 #include <aio.h>
 #include <sys/mman.h>
 #include <sys/select.h>
+#include <sys/socket.h>
 #include <xen/io/ring.h>
+#include <err.h>
+#include "sys-queue.h"
 #include "fs-backend.h"
+#include "fs-debug.h"
 
 struct xs_handle *xsh = NULL;
 static struct fs_export *fs_exports = NULL;
 static int export_id = 0;
 static int mount_id = 0;
+static int pipefds[2];
+static LIST_HEAD(mount_requests_head, fs_mount) mount_requests_head;
 
-static void dispatch_response(struct fs_mount *mount, int priv_req_id)
+static void free_mount_request(struct fs_mount *mount);
+
+static void dispatch_response(struct fs_request *request)
 {
     int i;
     struct fs_op *op;
-    struct fs_request *req = &mount->requests[priv_req_id];
 
     for(i=0;;i++)
     {
         op = fsops[i];
         /* We should dispatch a response before reaching the end of the array */
         assert(op != NULL);
-        if(op->type == req->req_shadow.type)
+        if(op->type == request->req_shadow.type)
         {
-            printf("Found op for type=%d\n", op->type);
+            FS_DEBUG("Found op for type=%d\n", op->type);
             /* There needs to be a response handler */
             assert(op->response_handler != NULL);
-            op->response_handler(mount, req);
+            op->response_handler(request->mount, request);
             break;
         }
     }
 
-    req->active = 0;
-    add_id_to_freelist(priv_req_id, mount->freelist);
+    request->active = 0;
+    add_id_to_freelist(request->id, request->mount->freelist);
 }
 
-static void handle_aio_events(struct fs_mount *mount)
+static void handle_aio_event(struct fs_request *request)
 {
-    int fd, ret, count, i, notify;
-    evtchn_port_t port;
-    /* AIO control block for the evtchn file destriptor */
-    struct aiocb evtchn_cb;
-    const struct aiocb * cb_list[mount->nr_entries];
-    int request_ids[mount->nr_entries];
+    int ret, notify;
 
-    /* Prepare the AIO control block for evtchn */ 
-    fd = xc_evtchn_fd(mount->evth); 
-    bzero(&evtchn_cb, sizeof(struct aiocb));
-    evtchn_cb.aio_fildes = fd;
-    evtchn_cb.aio_nbytes = sizeof(port);
-    evtchn_cb.aio_buf = &port;
-    assert(aio_read(&evtchn_cb) == 0);
-
-wait_again:   
-    /* Create list of active AIO requests */
-    count = 0;
-    for(i=0; i<mount->nr_entries; i++)
-        if(mount->requests[i].active)
-        {
-            cb_list[count] = &mount->requests[i].aiocb;
-            request_ids[count] = i;
-            count++;
-        }
-    /* Add the event channel at the end of the list. Event channel needs to be
-     * handled last as it exits this function. */
-    cb_list[count] = &evtchn_cb;
-    request_ids[count] = -1;
-    count++;
-
-    /* Block till an AIO requset finishes, or we get an event */ 
-    while(1) {
-	int ret = aio_suspend(cb_list, count, NULL);
-	if (!ret)
-	    break;
-	assert(errno == EINTR);
+    FS_DEBUG("handle_aio_event: mount %s request %d\n", request->mount->frontend, request->id);
+    if (request->active < 0) {
+        request->mount->nr_entries++;
+        if (!request->mount->nr_entries)
+            free_mount_request(request->mount);
+        return;
     }
-    for(i=0; i<count; i++)
-        if(aio_error(cb_list[i]) != EINPROGRESS)
-        {
-            if(request_ids[i] >= 0)
-                dispatch_response(mount, request_ids[i]);
-            else
-                goto read_event_channel;
-        }
- 
-    RING_PUSH_RESPONSES_AND_CHECK_NOTIFY(&mount->ring, notify);
-    printf("Pushed responces and notify=%d\n", notify);
+
+    ret = aio_error(&request->aiocb);
+    if(ret != EINPROGRESS && ret != ECANCELED)
+        dispatch_response(request);
+
+    RING_PUSH_RESPONSES_AND_CHECK_NOTIFY(&request->mount->ring, notify);
+    FS_DEBUG("Pushed responces and notify=%d\n", notify);
     if(notify)
-        xc_evtchn_notify(mount->evth, mount->local_evtchn);
-    
-    goto wait_again;
-
-read_event_channel:    
-    assert(aio_return(&evtchn_cb) == sizeof(evtchn_port_t)); 
-    assert(xc_evtchn_unmask(mount->evth, mount->local_evtchn) >= 0);
+        xc_evtchn_notify(request->mount->evth, request->mount->local_evtchn);
 }
-
 
 static void allocate_request_array(struct fs_mount *mount)
 {
@@ -116,6 +82,7 @@ static void allocate_request_array(struct fs_mount *mount)
     for(i=0; i< nr_entries; i++)
     {
         requests[i].active = 0; 
+        requests[i].mount = mount; 
         add_id_to_freelist(i, freelist);
     }
     mount->requests = requests;
@@ -123,73 +90,91 @@ static void allocate_request_array(struct fs_mount *mount)
 }
 
 
-static void *handle_mount(void *data)
+static void handle_mount(struct fs_mount *mount)
 {
     int more, notify;
-    struct fs_mount *mount = (struct fs_mount *)data;
-    
-    printf("Starting a thread for mount: %d\n", mount->mount_id);
-    allocate_request_array(mount);
+    int nr_consumed=0;
+    RING_IDX cons, rp;
+    struct fsif_request *req;
 
-    for(;;)
-    {
-        int nr_consumed=0;
-        RING_IDX cons, rp;
-        struct fsif_request *req;
-
-        handle_aio_events(mount);
 moretodo:
-        rp = mount->ring.sring->req_prod;
-        xen_rmb(); /* Ensure we see queued requests up to 'rp'. */
+    rp = mount->ring.sring->req_prod;
+    xen_rmb(); /* Ensure we see queued requests up to 'rp'. */
 
-        while ((cons = mount->ring.req_cons) != rp)
+    while ((cons = mount->ring.req_cons) != rp)
+    {
+        int i;
+        struct fs_op *op;
+
+        FS_DEBUG("Got a request at %d (of %d)\n", 
+                cons, RING_SIZE(&mount->ring));
+        req = RING_GET_REQUEST(&mount->ring, cons);
+        FS_DEBUG("Request type=%d\n", req->type); 
+        for(i=0;;i++)
         {
-            int i;
-            struct fs_op *op;
-
-            printf("Got a request at %d (of %d)\n", 
-                    cons, RING_SIZE(&mount->ring));
-            req = RING_GET_REQUEST(&mount->ring, cons);
-            printf("Request type=%d\n", req->type); 
-            for(i=0;;i++)
+            op = fsops[i];
+            if(op == NULL)
             {
-                op = fsops[i];
-                if(op == NULL)
-                {
-                    /* We've reached the end of the array, no appropirate
-                     * handler found. Warn, ignore and continue. */
-                    printf("WARN: Unknown request type: %d\n", req->type);
-                    mount->ring.req_cons++; 
-                    break;
-                }
-                if(op->type == req->type)
-                {
-                    /* There needs to be a dispatch handler */
-                    assert(op->dispatch_handler != NULL);
-                    op->dispatch_handler(mount, req);
-                    break;
-                }
-             }
-
-            nr_consumed++;
+                /* We've reached the end of the array, no appropirate
+                 * handler found. Warn, ignore and continue. */
+                FS_DEBUG("WARN: Unknown request type: %d\n", req->type);
+                mount->ring.req_cons++; 
+                break;
+            }
+            if(op->type == req->type)
+            {
+                /* There needs to be a dispatch handler */
+                assert(op->dispatch_handler != NULL);
+                op->dispatch_handler(mount, req);
+                break;
+            }
         }
-        printf("Backend consumed: %d requests\n", nr_consumed);
-        RING_FINAL_CHECK_FOR_REQUESTS(&mount->ring, more);
-        if(more) goto moretodo;
 
-        RING_PUSH_RESPONSES_AND_CHECK_NOTIFY(&mount->ring, notify);
-        printf("Pushed responces and notify=%d\n", notify);
-        if(notify)
-            xc_evtchn_notify(mount->evth, mount->local_evtchn);
+        nr_consumed++;
     }
- 
-    printf("Destroying thread for mount: %d\n", mount->mount_id);
+    FS_DEBUG("Backend consumed: %d requests\n", nr_consumed);
+    RING_FINAL_CHECK_FOR_REQUESTS(&mount->ring, more);
+    if(more) goto moretodo;
+
+    RING_PUSH_RESPONSES_AND_CHECK_NOTIFY(&mount->ring, notify);
+    FS_DEBUG("Pushed responces and notify=%d\n", notify);
+    if(notify)
+        xc_evtchn_notify(mount->evth, mount->local_evtchn);
+}
+
+static void terminate_mount_request(struct fs_mount *mount) {
+    int count = 0, i;
+
+    FS_DEBUG("terminate_mount_request %s\n", mount->frontend);
+    xenbus_write_backend_state(mount, STATE_CLOSING);
+
+    for(i=0; i<mount->nr_entries; i++)
+        if(mount->requests[i].active) {
+            mount->requests[i].active = -1;
+            aio_cancel(mount->requests[i].aiocb.aio_fildes, &mount->requests[i].aiocb);
+            count--;
+        }
+    mount->nr_entries = count;
+
+    while (!xenbus_frontend_state_changed(mount, STATE_CLOSING));
+    xenbus_write_backend_state(mount, STATE_CLOSED);
+
     xc_gnttab_munmap(mount->gnth, mount->ring.sring, 1);
     xc_gnttab_close(mount->gnth);
     xc_evtchn_unbind(mount->evth, mount->local_evtchn);
     xc_evtchn_close(mount->evth);
+
+    if (!count)
+        free_mount_request(mount);
+}
+
+static void free_mount_request(struct fs_mount *mount) {
+    FS_DEBUG("free_mount_request %s\n", mount->frontend);
     free(mount->frontend);
-    pthread_exit(NULL);
+    free(mount->requests);
+    free(mount->freelist);
+    LIST_REMOVE (mount, entries);
+    free(mount);
 }
 
 static void handle_connection(int frontend_dom_id, int export_id, char *frontend)
@@ -197,12 +182,11 @@ static void handle_connection(int frontend_dom_id, int export_id, char *frontend
     struct fs_mount *mount;
     struct fs_export *export;
     int evt_port;
-    pthread_t handling_thread;
     struct fsif_sring *sring;
     uint32_t dom_ids[MAX_RING_SIZE];
     int i;
 
-    printf("Handling connection from dom=%d, for export=%d\n", 
+    FS_DEBUG("Handling connection from dom=%d, for export=%d\n", 
             frontend_dom_id, export_id);
     /* Try to find the export on the list */
     export = fs_exports;
@@ -214,7 +198,7 @@ static void handle_connection(int frontend_dom_id, int export_id, char *frontend
     }
     if(!export)
     {
-        printf("Could not find the export (the id is unknown).\n");
+        FS_DEBUG("Could not find the export (the id is unknown).\n");
         return;
     }
 
@@ -223,7 +207,7 @@ static void handle_connection(int frontend_dom_id, int export_id, char *frontend
     mount->export = export;
     mount->mount_id = mount_id++;
     xenbus_read_mount_request(mount, frontend);
-    printf("Frontend found at: %s (gref=%d, evtchn=%d)\n", 
+    FS_DEBUG("Frontend found at: %s (gref=%d, evtchn=%d)\n", 
             mount->frontend, mount->grefs[0], mount->remote_evtchn);
     xenbus_write_backend_node(mount);
     mount->evth = -1;
@@ -249,18 +233,24 @@ static void handle_connection(int frontend_dom_id, int export_id, char *frontend
     mount->nr_entries = mount->ring.nr_ents; 
     for (i = 0; i < MAX_FDS; i++)
         mount->fds[i] = -1;
-    xenbus_write_backend_ready(mount);
 
-    pthread_create(&handling_thread, NULL, &handle_mount, mount);
+    LIST_INSERT_HEAD(&mount_requests_head, mount, entries);
+    xenbus_watch_frontend_state(mount);
+    xenbus_write_backend_state(mount, STATE_READY);
+    
+    allocate_request_array(mount);
 }
 
 static void await_connections(void)
 {
-    int fd, ret, dom_id, export_id; 
+    int fd, max_fd, ret, dom_id, export_id; 
     fd_set fds;
     char **watch_paths;
     unsigned int len;
     char d;
+    struct fs_mount *pointer;
+
+    LIST_INIT (&mount_requests_head);
 
     assert(xsh != NULL);
     fd = xenbus_get_watch_fd(); 
@@ -268,28 +258,101 @@ static void await_connections(void)
     do {
 	FD_ZERO(&fds);
 	FD_SET(fd, &fds);
-        ret = select(fd+1, &fds, NULL, NULL, NULL);
-        assert(ret == 1);
-        watch_paths = xs_read_watch(xsh, &len);
-        assert(len == 2);
-        assert(strcmp(watch_paths[1], "conn-watch") == 0);
-        dom_id = -1;
-        export_id = -1;
-	d = 0;
-        printf("Path changed %s\n", watch_paths[0]);
-        sscanf(watch_paths[0], WATCH_NODE"/%d/%d/fronten%c", 
-                &dom_id, &export_id, &d);
-        if((dom_id >= 0) && (export_id >= 0) && d == 'd') {
-	    char *frontend = xs_read(xsh, XBT_NULL, watch_paths[0], NULL);
-	    if (frontend) {
-		handle_connection(dom_id, export_id, frontend);
-		xs_rm(xsh, XBT_NULL, watch_paths[0]);
-	    }
-	}
-next_select:        
-        printf("Awaiting next connection.\n");
-        /* TODO - we need to figure out what to free */
-	free(watch_paths);
+	FD_SET(pipefds[0], &fds);
+        max_fd = fd > pipefds[0] ? fd : pipefds[0];
+        LIST_FOREACH(pointer, &mount_requests_head, entries) {
+            int tfd = xc_evtchn_fd(pointer->evth);
+            FD_SET(tfd, &fds);
+            if (tfd > max_fd) max_fd = tfd;
+        }
+        ret = select(max_fd+1, &fds, NULL, NULL, NULL);
+        if (ret < 0) {
+            if (errno == EINTR) continue;
+            /* try to recover */
+            else if (errno == EBADF) {
+                struct timeval timeout;
+                memset(&timeout, 0x00, sizeof(timeout));
+                FD_ZERO(&fds);
+                FD_SET(fd, &fds);
+                FD_SET(pipefds[0], &fds);
+                max_fd = fd > pipefds[0] ? fd : pipefds[0];
+                ret = select(max_fd + 1, &fds, NULL, NULL, &timeout);
+                if (ret < 0)
+                    err(1, "select: unrecoverable error occurred: %d\n", errno);
+
+                /* trying to find the bogus fd among the open event channels */
+                LIST_FOREACH(pointer, &mount_requests_head, entries) {
+                    int tfd = xc_evtchn_fd(pointer->evth);
+                    memset(&timeout, 0x00, sizeof(timeout));
+                    FD_ZERO(&fds);
+                    FD_SET(tfd, &fds);
+                    ret = select(tfd + 1, &fds, NULL, NULL, &timeout);
+                    if (ret < 0) {
+                        FS_DEBUG("fd %d is bogus, closing the related connection\n", tfd);
+                        pointer->evth = fd;
+                        terminate_mount_request(pointer);
+                        continue;
+                    }
+                }
+                continue;
+            } else
+                err(1, "select: unrecoverable error occurred: %d\n", errno);
+        }
+        if (FD_ISSET(fd, &fds)) {
+            watch_paths = xs_read_watch(xsh, &len);
+            if (!strcmp(watch_paths[XS_WATCH_TOKEN], "conn-watch")) {
+                dom_id = -1;
+                export_id = -1;
+                d = 0;
+                FS_DEBUG("Path changed %s\n", watch_paths[0]);
+                sscanf(watch_paths[XS_WATCH_PATH], WATCH_NODE"/%d/%d/fronten%c", 
+                        &dom_id, &export_id, &d);
+                if((dom_id >= 0) && (export_id >= 0) && d == 'd') {
+                    char *frontend = xs_read(xsh, XBT_NULL, watch_paths[XS_WATCH_PATH], NULL);
+                    if (frontend) {
+                        handle_connection(dom_id, export_id, frontend);
+                        xs_rm(xsh, XBT_NULL, watch_paths[XS_WATCH_PATH]);
+                    }
+                }
+            } else if (!strcmp(watch_paths[XS_WATCH_TOKEN], "frontend-state")) {
+                LIST_FOREACH(pointer, &mount_requests_head, entries) {
+                    if (!strncmp(pointer->frontend, watch_paths[XS_WATCH_PATH], strlen(pointer->frontend))) {
+                        char *state = xenbus_read_frontend_state(pointer);
+                        if (!state || strcmp(state, STATE_READY)) {
+                            xenbus_unwatch_frontend_state(pointer);
+                            terminate_mount_request(pointer);
+                        }
+                        free(state);
+                        break;
+                    }
+                }
+            } else {
+                FS_DEBUG("xenstore watch event unrecognized\n");
+            }
+            FS_DEBUG("Awaiting next connection.\n");
+            /* TODO - we need to figure out what to free */
+            free(watch_paths);
+        }
+        if (FD_ISSET(pipefds[0], &fds)) {
+            struct fs_request *request;
+            int ret;
+            ret = read(pipefds[0], &request, sizeof(struct fs_request *));
+            if (ret != sizeof(struct fs_request *)) {
+                fprintf(stderr, "read request failed\n");
+                continue;
+            }
+            handle_aio_event(request); 
+        }
+        LIST_FOREACH(pointer, &mount_requests_head, entries) {
+            if (FD_ISSET(xc_evtchn_fd(pointer->evth), &fds)) {
+                evtchn_port_t port;
+                port = xc_evtchn_pending(pointer->evth);
+                if (port != -1) {
+                    handle_mount(pointer);
+                    xc_evtchn_unmask(pointer->evth, port);
+                }
+            }
+        }
     } while (1);
 }
 
@@ -312,10 +375,28 @@ static struct fs_export* create_export(char *name, char *export_path)
     return curr_export;
 }
 
+static void aio_signal_handler(int signo, siginfo_t *info, void *context)
+{
+    struct fs_request *request = (struct fs_request*) info->si_value.sival_ptr;
+    int saved_errno = errno;
+    write(pipefds[1], &request, sizeof(struct fs_request *));
+    errno = saved_errno;
+}
 
 int main(void)
 {
     struct fs_export *export;
+    struct sigaction act;
+    sigset_t enable;
+
+    sigemptyset(&enable);
+    sigaddset(&enable, SIGUSR2);
+    pthread_sigmask(SIG_UNBLOCK, &enable, NULL);
+
+    sigfillset(&act.sa_mask);
+    act.sa_flags = SA_SIGINFO; /* do not restart syscalls to interrupt select(); use sa_sigaction */
+    act.sa_sigaction = aio_signal_handler;
+    sigaction(SIGUSR2, &act, NULL);
 
     /* Open the connection to XenStore first */
     xsh = xs_domain_open();
@@ -327,6 +408,9 @@ int main(void)
     /* Create & register the default export */
     export = create_export("default", "/exports");
     xenbus_register_export(export);
+
+    if (socketpair(PF_UNIX,SOCK_STREAM, 0, pipefds) == -1)
+        err(1, "failed to create pipe\n");
 
     await_connections();
     /* Close the connection to XenStore when we are finished with everything */

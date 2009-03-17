@@ -14,6 +14,7 @@
 #include <sys/mount.h>
 #include <unistd.h>
 #include "fs-backend.h"
+#include "fs-debug.h"
 
 /* For debugging only */
 #include <sys/time.h>
@@ -22,12 +23,11 @@
 
 #define BUFFER_SIZE 1024
 
-
 static unsigned short get_request(struct fs_mount *mount, struct fsif_request *req)
 {
     unsigned short id = get_id_from_freelist(mount->freelist); 
 
-    printf("Private Request id: %d\n", id);
+    FS_DEBUG("Private Request id: %d\n", id);
     memcpy(&mount->requests[id].req_shadow, req, sizeof(struct fsif_request));
     mount->requests[id].active = 1;
 
@@ -54,7 +54,7 @@ static void dispatch_file_open(struct fs_mount *mount, struct fsif_request *req)
     fsif_response_t *rsp;
     uint16_t req_id;
 
-    printf("Dispatching file open operation (gref=%d).\n", req->u.fopen.gref);
+    FS_DEBUG("Dispatching file open operation (gref=%d).\n", req->u.fopen.gref);
     /* Read the request, and open file */
     file_name = xc_gnttab_map_grant_ref(mount->gnth,
                                         mount->dom_id,
@@ -62,13 +62,13 @@ static void dispatch_file_open(struct fs_mount *mount, struct fsif_request *req)
                                         PROT_READ);
    
     req_id = req->id;
-    printf("File open issued for %s\n", file_name); 
+    FS_DEBUG("File open issued for %s\n", file_name); 
     assert(BUFFER_SIZE > 
            strlen(file_name) + strlen(mount->export->export_path) + 1); 
     snprintf(full_path, sizeof(full_path), "%s/%s",
            mount->export->export_path, file_name);
     assert(xc_gnttab_munmap(mount->gnth, file_name, 1) == 0);
-    printf("Issuing open for %s\n", full_path);
+    FS_DEBUG("Issuing open for %s\n", full_path);
     fd = get_fd(mount);
     if (fd >= 0) {
         int real_fd = open(full_path, O_RDWR);
@@ -77,7 +77,7 @@ static void dispatch_file_open(struct fs_mount *mount, struct fsif_request *req)
         else
         {
             mount->fds[fd] = real_fd;
-            printf("Got FD: %d for real %d\n", fd, real_fd);
+            FS_DEBUG("Got FD: %d for real %d\n", fd, real_fd);
         }
     }
     /* We can advance the request consumer index, from here on, the request
@@ -87,7 +87,7 @@ static void dispatch_file_open(struct fs_mount *mount, struct fsif_request *req)
 
     /* Get a response from the ring */
     rsp_idx = mount->ring.rsp_prod_pvt++;
-    printf("Writing response at: idx=%d, id=%d\n", rsp_idx, req_id);
+    FS_DEBUG("Writing response at: idx=%d, id=%d\n", rsp_idx, req_id);
     rsp = RING_GET_RESPONSE(&mount->ring, rsp_idx);
     rsp->id = req_id; 
     rsp->ret_val = (uint64_t)fd;
@@ -100,7 +100,7 @@ static void dispatch_file_close(struct fs_mount *mount, struct fsif_request *req
     fsif_response_t *rsp;
     uint16_t req_id;
 
-    printf("Dispatching file close operation (fd=%d).\n", req->u.fclose.fd);
+    FS_DEBUG("Dispatching file close operation (fd=%d).\n", req->u.fclose.fd);
    
     req_id = req->id;
     if (req->u.fclose.fd < MAX_FDS) {
@@ -109,7 +109,7 @@ static void dispatch_file_close(struct fs_mount *mount, struct fsif_request *req
         mount->fds[req->u.fclose.fd] = -1;
     } else
         ret = -1;
-    printf("Got ret: %d\n", ret);
+    FS_DEBUG("Got ret: %d\n", ret);
     /* We can advance the request consumer index, from here on, the request
      * should not be used (it may be overrinden by a response) */
     mount->ring.req_cons++;
@@ -117,7 +117,7 @@ static void dispatch_file_close(struct fs_mount *mount, struct fsif_request *req
 
     /* Get a response from the ring */
     rsp_idx = mount->ring.rsp_prod_pvt++;
-    printf("Writing response at: idx=%d, id=%d\n", rsp_idx, req_id);
+    FS_DEBUG("Writing response at: idx=%d, id=%d\n", rsp_idx, req_id);
     rsp = RING_GET_RESPONSE(&mount->ring, rsp_idx);
     rsp->id = req_id; 
     rsp->ret_val = (uint64_t)ret;
@@ -143,7 +143,7 @@ static void dispatch_file_read(struct fs_mount *mount, struct fsif_request *req)
                                           PROT_WRITE);
    
     req_id = req->id;
-    printf("File read issued for FD=%d (len=%"PRIu64", offest=%"PRIu64")\n", 
+    FS_DEBUG("File read issued for FD=%d (len=%"PRIu64", offest=%"PRIu64")\n", 
             req->u.fread.fd, req->u.fread.len, req->u.fread.offset); 
 
     if (req->u.fread.fd < MAX_FDS)
@@ -152,10 +152,11 @@ static void dispatch_file_read(struct fs_mount *mount, struct fsif_request *req)
         fd = -1;
 
     priv_id = get_request(mount, req);
-    printf("Private id is: %d\n", priv_id);
+    FS_DEBUG("Private id is: %d\n", priv_id);
     priv_req = &mount->requests[priv_id];
     priv_req->page = buf;
     priv_req->count = count;
+    priv_req->id = priv_id;
 
     /* Dispatch AIO read request */
     bzero(&priv_req->aiocb, sizeof(struct aiocb));
@@ -163,6 +164,9 @@ static void dispatch_file_read(struct fs_mount *mount, struct fsif_request *req)
     priv_req->aiocb.aio_nbytes = req->u.fread.len;
     priv_req->aiocb.aio_offset = req->u.fread.offset;
     priv_req->aiocb.aio_buf = buf;
+    priv_req->aiocb.aio_sigevent.sigev_notify = SIGEV_SIGNAL;
+    priv_req->aiocb.aio_sigevent.sigev_signo = SIGUSR2;
+    priv_req->aiocb.aio_sigevent.sigev_value.sival_ptr = priv_req;
     assert(aio_read(&priv_req->aiocb) >= 0);
 
 out: 
@@ -185,7 +189,7 @@ static void end_file_read(struct fs_mount *mount, struct fs_request *priv_req)
     /* Get a response from the ring */
     rsp_idx = mount->ring.rsp_prod_pvt++;
     req_id = priv_req->req_shadow.id; 
-    printf("Writing response at: idx=%d, id=%d\n", rsp_idx, req_id);
+    FS_DEBUG("Writing response at: idx=%d, id=%d\n", rsp_idx, req_id);
     rsp = RING_GET_RESPONSE(&mount->ring, rsp_idx);
     rsp->id = req_id; 
     rsp->ret_val = (uint64_t)aio_return(&priv_req->aiocb);
@@ -210,7 +214,7 @@ static void dispatch_file_write(struct fs_mount *mount, struct fsif_request *req
                                           PROT_READ);
    
     req_id = req->id;
-    printf("File write issued for FD=%d (len=%"PRIu64", offest=%"PRIu64")\n", 
+    FS_DEBUG("File write issued for FD=%d (len=%"PRIu64", offest=%"PRIu64")\n", 
             req->u.fwrite.fd, req->u.fwrite.len, req->u.fwrite.offset); 
    
     if (req->u.fwrite.fd < MAX_FDS)
@@ -219,10 +223,11 @@ static void dispatch_file_write(struct fs_mount *mount, struct fsif_request *req
         fd = -1;
 
     priv_id = get_request(mount, req);
-    printf("Private id is: %d\n", priv_id);
+    FS_DEBUG("Private id is: %d\n", priv_id);
     priv_req = &mount->requests[priv_id];
     priv_req->page = buf;
     priv_req->count = count;
+    priv_req->id = priv_id;
 
     /* Dispatch AIO write request */
     bzero(&priv_req->aiocb, sizeof(struct aiocb));
@@ -230,6 +235,9 @@ static void dispatch_file_write(struct fs_mount *mount, struct fsif_request *req
     priv_req->aiocb.aio_nbytes = req->u.fwrite.len;
     priv_req->aiocb.aio_offset = req->u.fwrite.offset;
     priv_req->aiocb.aio_buf = buf;
+    priv_req->aiocb.aio_sigevent.sigev_notify = SIGEV_SIGNAL;
+    priv_req->aiocb.aio_sigevent.sigev_signo = SIGUSR2;
+    priv_req->aiocb.aio_sigevent.sigev_value.sival_ptr = priv_req;
     assert(aio_write(&priv_req->aiocb) >= 0);
 
      
@@ -252,7 +260,7 @@ static void end_file_write(struct fs_mount *mount, struct fs_request *priv_req)
     /* Get a response from the ring */
     rsp_idx = mount->ring.rsp_prod_pvt++;
     req_id = priv_req->req_shadow.id; 
-    printf("Writing response at: idx=%d, id=%d\n", rsp_idx, req_id);
+    FS_DEBUG("Writing response at: idx=%d, id=%d\n", rsp_idx, req_id);
     rsp = RING_GET_RESPONSE(&mount->ring, rsp_idx);
     rsp->id = req_id; 
     rsp->ret_val = (uint64_t)aio_return(&priv_req->aiocb);
@@ -273,7 +281,7 @@ static void dispatch_stat(struct fs_mount *mount, struct fsif_request *req)
     else
         fd = -1;
 
-    printf("File stat issued for FD=%d\n", req->u.fstat.fd); 
+    FS_DEBUG("File stat issued for FD=%d\n", req->u.fstat.fd); 
    
     /* We can advance the request consumer index, from here on, the request
      * should not be used (it may be overrinden by a response) */
@@ -281,12 +289,12 @@ static void dispatch_stat(struct fs_mount *mount, struct fsif_request *req)
    
     /* Stat, and create the response */ 
     ret = fstat(fd, &stat);
-    printf("Mode=%o, uid=%d, a_time=%ld\n",
+    FS_DEBUG("Mode=%o, uid=%d, a_time=%ld\n",
             stat.st_mode, stat.st_uid, (long)stat.st_atime);
     
     /* Get a response from the ring */
     rsp_idx = mount->ring.rsp_prod_pvt++;
-    printf("Writing response at: idx=%d, id=%d\n", rsp_idx, req_id);
+    FS_DEBUG("Writing response at: idx=%d, id=%d\n", rsp_idx, req_id);
     rsp = RING_GET_RESPONSE(&mount->ring, rsp_idx);
     rsp->id = req_id; 
     rsp->fstat.stat_ret = (uint32_t)ret;
@@ -320,7 +328,7 @@ static void dispatch_truncate(struct fs_mount *mount, struct fsif_request *req)
 
     req_id = req->id;
     length = req->u.ftruncate.length;
-    printf("File truncate issued for FD=%d, length=%"PRId64"\n", req->u.ftruncate.fd, length); 
+    FS_DEBUG("File truncate issued for FD=%d, length=%"PRId64"\n", req->u.ftruncate.fd, length); 
    
     if (req->u.ftruncate.fd < MAX_FDS)
         fd = mount->fds[req->u.ftruncate.fd];
@@ -336,7 +344,7 @@ static void dispatch_truncate(struct fs_mount *mount, struct fsif_request *req)
 
     /* Get a response from the ring */
     rsp_idx = mount->ring.rsp_prod_pvt++;
-    printf("Writing response at: idx=%d, id=%d\n", rsp_idx, req_id);
+    FS_DEBUG("Writing response at: idx=%d, id=%d\n", rsp_idx, req_id);
     rsp = RING_GET_RESPONSE(&mount->ring, rsp_idx);
     rsp->id = req_id; 
     rsp->ret_val = (uint64_t)ret;
@@ -350,7 +358,7 @@ static void dispatch_remove(struct fs_mount *mount, struct fsif_request *req)
     fsif_response_t *rsp;
     uint16_t req_id;
 
-    printf("Dispatching remove operation (gref=%d).\n", req->u.fremove.gref);
+    FS_DEBUG("Dispatching remove operation (gref=%d).\n", req->u.fremove.gref);
     /* Read the request, and open file */
     file_name = xc_gnttab_map_grant_ref(mount->gnth,
                                         mount->dom_id,
@@ -358,15 +366,15 @@ static void dispatch_remove(struct fs_mount *mount, struct fsif_request *req)
                                         PROT_READ);
    
     req_id = req->id;
-    printf("File remove issued for %s\n", file_name); 
+    FS_DEBUG("File remove issued for %s\n", file_name); 
     assert(BUFFER_SIZE > 
            strlen(file_name) + strlen(mount->export->export_path) + 1); 
     snprintf(full_path, sizeof(full_path), "%s/%s",
            mount->export->export_path, file_name);
     assert(xc_gnttab_munmap(mount->gnth, file_name, 1) == 0);
-    printf("Issuing remove for %s\n", full_path);
+    FS_DEBUG("Issuing remove for %s\n", full_path);
     ret = remove(full_path);
-    printf("Got ret: %d\n", ret);
+    FS_DEBUG("Got ret: %d\n", ret);
     /* We can advance the request consumer index, from here on, the request
      * should not be used (it may be overrinden by a response) */
     mount->ring.req_cons++;
@@ -374,7 +382,7 @@ static void dispatch_remove(struct fs_mount *mount, struct fsif_request *req)
 
     /* Get a response from the ring */
     rsp_idx = mount->ring.rsp_prod_pvt++;
-    printf("Writing response at: idx=%d, id=%d\n", rsp_idx, req_id);
+    FS_DEBUG("Writing response at: idx=%d, id=%d\n", rsp_idx, req_id);
     rsp = RING_GET_RESPONSE(&mount->ring, rsp_idx);
     rsp->id = req_id; 
     rsp->ret_val = (uint64_t)ret;
@@ -390,7 +398,7 @@ static void dispatch_rename(struct fs_mount *mount, struct fsif_request *req)
     fsif_response_t *rsp;
     uint16_t req_id;
 
-    printf("Dispatching rename operation (gref=%d).\n", req->u.fremove.gref);
+    FS_DEBUG("Dispatching rename operation (gref=%d).\n", req->u.fremove.gref);
     /* Read the request, and open file */
     buf = xc_gnttab_map_grant_ref(mount->gnth,
                                   mount->dom_id,
@@ -400,7 +408,7 @@ static void dispatch_rename(struct fs_mount *mount, struct fsif_request *req)
     req_id = req->id;
     old_file_name = buf + req->u.frename.old_name_offset;
     new_file_name = buf + req->u.frename.new_name_offset;
-    printf("File rename issued for %s -> %s (buf=%s)\n", 
+    FS_DEBUG("File rename issued for %s -> %s (buf=%s)\n", 
             old_file_name, new_file_name, buf); 
     assert(BUFFER_SIZE > 
            strlen(old_file_name) + strlen(mount->export->export_path) + 1); 
@@ -411,9 +419,9 @@ static void dispatch_rename(struct fs_mount *mount, struct fsif_request *req)
     snprintf(new_full_path, sizeof(new_full_path), "%s/%s",
            mount->export->export_path, new_file_name);
     assert(xc_gnttab_munmap(mount->gnth, buf, 1) == 0);
-    printf("Issuing rename for %s -> %s\n", old_full_path, new_full_path);
+    FS_DEBUG("Issuing rename for %s -> %s\n", old_full_path, new_full_path);
     ret = rename(old_full_path, new_full_path);
-    printf("Got ret: %d\n", ret);
+    FS_DEBUG("Got ret: %d\n", ret);
     /* We can advance the request consumer index, from here on, the request
      * should not be used (it may be overrinden by a response) */
     mount->ring.req_cons++;
@@ -421,7 +429,7 @@ static void dispatch_rename(struct fs_mount *mount, struct fsif_request *req)
 
     /* Get a response from the ring */
     rsp_idx = mount->ring.rsp_prod_pvt++;
-    printf("Writing response at: idx=%d, id=%d\n", rsp_idx, req_id);
+    FS_DEBUG("Writing response at: idx=%d, id=%d\n", rsp_idx, req_id);
     rsp = RING_GET_RESPONSE(&mount->ring, rsp_idx);
     rsp->id = req_id; 
     rsp->ret_val = (uint64_t)ret;
@@ -438,7 +446,7 @@ static void dispatch_create(struct fs_mount *mount, struct fsif_request *req)
     fsif_response_t *rsp;
     uint16_t req_id;
 
-    printf("Dispatching file create operation (gref=%d).\n", req->u.fcreate.gref);
+    FS_DEBUG("Dispatching file create operation (gref=%d).\n", req->u.fcreate.gref);
     /* Read the request, and create file/directory */
     mode = req->u.fcreate.mode;
     directory = req->u.fcreate.directory;
@@ -448,7 +456,7 @@ static void dispatch_create(struct fs_mount *mount, struct fsif_request *req)
                                         PROT_READ);
    
     req_id = req->id;
-    printf("File create issued for %s\n", file_name); 
+    FS_DEBUG("File create issued for %s\n", file_name); 
     assert(BUFFER_SIZE > 
            strlen(file_name) + strlen(mount->export->export_path) + 1); 
     snprintf(full_path, sizeof(full_path), "%s/%s",
@@ -460,12 +468,12 @@ static void dispatch_create(struct fs_mount *mount, struct fsif_request *req)
 
     if(directory)
     {
-        printf("Issuing create for directory: %s\n", full_path);
+        FS_DEBUG("Issuing create for directory: %s\n", full_path);
         ret = mkdir(full_path, mode);
     }
     else
     {
-        printf("Issuing create for file: %s\n", full_path);
+        FS_DEBUG("Issuing create for file: %s\n", full_path);
         ret = get_fd(mount);
         if (ret >= 0) {
             int real_fd = creat(full_path, mode); 
@@ -474,15 +482,15 @@ static void dispatch_create(struct fs_mount *mount, struct fsif_request *req)
             else
             {
                 mount->fds[ret] = real_fd;
-                printf("Got FD: %d for real %d\n", ret, real_fd);
+                FS_DEBUG("Got FD: %d for real %d\n", ret, real_fd);
             }
         }
     }
-    printf("Got ret %d (errno=%d)\n", ret, errno);
+    FS_DEBUG("Got ret %d (errno=%d)\n", ret, errno);
 
     /* Get a response from the ring */
     rsp_idx = mount->ring.rsp_prod_pvt++;
-    printf("Writing response at: idx=%d, id=%d\n", rsp_idx, req_id);
+    FS_DEBUG("Writing response at: idx=%d, id=%d\n", rsp_idx, req_id);
     rsp = RING_GET_RESPONSE(&mount->ring, rsp_idx);
     rsp->id = req_id; 
     rsp->ret_val = (uint64_t)ret;
@@ -499,7 +507,7 @@ static void dispatch_list(struct fs_mount *mount, struct fsif_request *req)
     DIR *dir;
     struct dirent *dirent = NULL;
 
-    printf("Dispatching list operation (gref=%d).\n", req->u.flist.gref);
+    FS_DEBUG("Dispatching list operation (gref=%d).\n", req->u.flist.gref);
     /* Read the request, and list directory */
     offset = req->u.flist.offset;
     buf = file_name = xc_gnttab_map_grant_ref(mount->gnth,
@@ -508,7 +516,7 @@ static void dispatch_list(struct fs_mount *mount, struct fsif_request *req)
                                         PROT_READ | PROT_WRITE);
    
     req_id = req->id;
-    printf("Dir list issued for %s\n", file_name); 
+    FS_DEBUG("Dir list issued for %s\n", file_name); 
     assert(BUFFER_SIZE > 
            strlen(file_name) + strlen(mount->export->export_path) + 1); 
     snprintf(full_path, sizeof(full_path), "%s/%s",
@@ -552,7 +560,7 @@ error_out:
     
     /* Get a response from the ring */
     rsp_idx = mount->ring.rsp_prod_pvt++;
-    printf("Writing response at: idx=%d, id=%d\n", rsp_idx, req_id);
+    FS_DEBUG("Writing response at: idx=%d, id=%d\n", rsp_idx, req_id);
     rsp = RING_GET_RESPONSE(&mount->ring, rsp_idx);
     rsp->id = req_id; 
     rsp->ret_val = ret_val;
@@ -566,7 +574,7 @@ static void dispatch_chmod(struct fs_mount *mount, struct fsif_request *req)
     uint16_t req_id;
     int32_t mode;
 
-    printf("Dispatching file chmod operation (fd=%d, mode=%o).\n", 
+    FS_DEBUG("Dispatching file chmod operation (fd=%d, mode=%o).\n", 
             req->u.fchmod.fd, req->u.fchmod.mode);
     req_id = req->id;
     if (req->u.fchmod.fd < MAX_FDS)
@@ -583,7 +591,7 @@ static void dispatch_chmod(struct fs_mount *mount, struct fsif_request *req)
 
     /* Get a response from the ring */
     rsp_idx = mount->ring.rsp_prod_pvt++;
-    printf("Writing response at: idx=%d, id=%d\n", rsp_idx, req_id);
+    FS_DEBUG("Writing response at: idx=%d, id=%d\n", rsp_idx, req_id);
     rsp = RING_GET_RESPONSE(&mount->ring, rsp_idx);
     rsp->id = req_id; 
     rsp->ret_val = (uint64_t)ret;
@@ -598,7 +606,7 @@ static void dispatch_fs_space(struct fs_mount *mount, struct fsif_request *req)
     struct statvfs stat;
     int64_t ret;
 
-    printf("Dispatching fs space operation (gref=%d).\n", req->u.fspace.gref);
+    FS_DEBUG("Dispatching fs space operation (gref=%d).\n", req->u.fspace.gref);
     /* Read the request, and open file */
     file_name = xc_gnttab_map_grant_ref(mount->gnth,
                                         mount->dom_id,
@@ -606,13 +614,13 @@ static void dispatch_fs_space(struct fs_mount *mount, struct fsif_request *req)
                                         PROT_READ);
    
     req_id = req->id;
-    printf("Fs space issued for %s\n", file_name); 
+    FS_DEBUG("Fs space issued for %s\n", file_name); 
     assert(BUFFER_SIZE > 
            strlen(file_name) + strlen(mount->export->export_path) + 1); 
     snprintf(full_path, sizeof(full_path), "%s/%s",
            mount->export->export_path, file_name);
     assert(xc_gnttab_munmap(mount->gnth, file_name, 1) == 0);
-    printf("Issuing fs space for %s\n", full_path);
+    FS_DEBUG("Issuing fs space for %s\n", full_path);
     ret = statvfs(full_path, &stat);
     if(ret >= 0)
         ret = stat.f_bsize * stat.f_bfree;
@@ -624,7 +632,7 @@ static void dispatch_fs_space(struct fs_mount *mount, struct fsif_request *req)
 
     /* Get a response from the ring */
     rsp_idx = mount->ring.rsp_prod_pvt++;
-    printf("Writing response at: idx=%d, id=%d\n", rsp_idx, req_id);
+    FS_DEBUG("Writing response at: idx=%d, id=%d\n", rsp_idx, req_id);
     rsp = RING_GET_RESPONSE(&mount->ring, rsp_idx);
     rsp->id = req_id; 
     rsp->ret_val = (uint64_t)ret;
@@ -643,15 +651,19 @@ static void dispatch_file_sync(struct fs_mount *mount, struct fsif_request *req)
     else
         fd = -1;
 
-    printf("File sync issued for FD=%d\n", req->u.fsync.fd); 
+    FS_DEBUG("File sync issued for FD=%d\n", req->u.fsync.fd); 
    
     priv_id = get_request(mount, req);
-    printf("Private id is: %d\n", priv_id);
+    FS_DEBUG("Private id is: %d\n", priv_id);
     priv_req = &mount->requests[priv_id];
+    priv_req->id = priv_id;
 
     /* Dispatch AIO read request */
     bzero(&priv_req->aiocb, sizeof(struct aiocb));
     priv_req->aiocb.aio_fildes = fd;
+    priv_req->aiocb.aio_sigevent.sigev_notify = SIGEV_SIGNAL;
+    priv_req->aiocb.aio_sigevent.sigev_signo = SIGUSR2;
+    priv_req->aiocb.aio_sigevent.sigev_value.sival_ptr = priv_req;
     assert(aio_fsync(O_SYNC, &priv_req->aiocb) >= 0);
 
      
@@ -669,7 +681,7 @@ static void end_file_sync(struct fs_mount *mount, struct fs_request *priv_req)
     /* Get a response from the ring */
     rsp_idx = mount->ring.rsp_prod_pvt++;
     req_id = priv_req->req_shadow.id; 
-    printf("Writing response at: idx=%d, id=%d\n", rsp_idx, req_id);
+    FS_DEBUG("Writing response at: idx=%d, id=%d\n", rsp_idx, req_id);
     rsp = RING_GET_RESPONSE(&mount->ring, rsp_idx);
     rsp->id = req_id; 
     rsp->ret_val = (uint64_t)aio_return(&priv_req->aiocb);
