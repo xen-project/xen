@@ -12,6 +12,7 @@ import re
 import types
 import struct
 import time
+import threading
 from xen.util import utils
 
 PROC_PCI_PATH = '/proc/bus/pci/devices'
@@ -97,6 +98,7 @@ MSIX_SIZE_MASK = 0x7ff
 
 # Global variable to store information from lspci
 lspci_info = None
+lspci_info_lock = threading.RLock()
 
 #Calculate PAGE_SHIFT: number of bits to shift an address to get the page number
 PAGE_SIZE = resource.getpagesize()
@@ -174,12 +176,16 @@ def get_all_pci_devices():
 
     return pci_devs
 
-def create_lspci_info():
+def _create_lspci_info():
+    """Execute 'lspci' command and parse the result.
+    If the command does not exist, lspci_info will be kept blank ({}).
+
+    Expects to be protected by lspci_info_lock.
+    """
     global lspci_info
+    
     lspci_info = {}
 
-    # Execute 'lspci' command and parse the result.
-    # If the command does not exist, lspci_info will be kept blank ({}).
     for paragraph in os.popen(LSPCI_CMD + ' -vmm').read().split('\n\n'):
         device_name = None
         device_info = {}
@@ -194,6 +200,14 @@ def create_lspci_info():
                 pass
         if device_name is not None:
             lspci_info[device_name] = device_info
+
+def create_lspci_info():
+    global lspci_info_lock
+    lspci_info_lock.acquire()
+    try:
+        _create_lspci_info()
+    finally:
+        lspci_info_lock.release()
 
 def save_pci_conf_space(devs_string):
     pci_list = []
@@ -911,22 +925,27 @@ class PciDevice:
         Since we cannot obtain these data from sysfs, use 'lspci' command.
         """
         global lspci_info
+        global lspci_info_lock
 
-        if lspci_info is None:
-            create_lspci_info()
-
+        lspci_info_lock.acquire()
         try:
-            device_info = lspci_info[self.name]
-            self.revision = int(device_info['Rev'], 16)
-            self.vendorname = device_info['Vendor']
-            self.devicename = device_info['Device']
-            self.classname = device_info['Class']
-            self.subvendorname = device_info['SVendor']
-            self.subdevicename = device_info['SDevice']
-        except KeyError:
-            pass
+            if lspci_info is None:
+                _create_lspci_info()
 
-        return True
+            try:
+                device_info = lspci_info[self.name]
+                self.revision = int(device_info['Rev'], 16)
+                self.vendorname = device_info['Vendor']
+                self.devicename = device_info['Device']
+                self.classname = device_info['Class']
+                self.subvendorname = device_info['SVendor']
+                self.subdevicename = device_info['SDevice']
+            except KeyError:
+                pass
+
+            return True
+        finally:
+            lspci_info_lock.release()
 
     def __str__(self):
         str = "PCI Device %s\n" % (self.name)
