@@ -2480,14 +2480,13 @@ int sh_safe_not_to_sync(struct vcpu *v, mfn_t gl1mfn)
         return 0;
     smfn = _mfn(sp->up >> PAGE_SHIFT);
     ASSERT(mfn_valid(smfn));
+#endif
 
-#if (GUEST_PAGING_LEVELS == 2)
+#if (GUEST_PAGING_LEVELS == 2 && SHADOW_PAGING_LEVELS == 3)
     /* In 2-on-3 shadow mode the up pointer contains the link to the
      * shadow page, but the shadow_table contains only the first of the
      * four pages that makes the PAE top shadow tables. */
     smfn = _mfn(mfn_x(smfn) & ~0x3UL);
-#endif
-
 #endif
 
     if ( pagetable_get_pfn(v->arch.shadow_table[0]) == mfn_x(smfn)
