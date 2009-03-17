@@ -237,8 +237,6 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
         uint32_t *status, *ptr;
         unsigned long pfn;
 
-        BUG();
-
         ptr = status = xmalloc_bytes( sizeof(uint32_t) *
                                 (op->u.page_offline.end -
                                   op->u.page_offline.start + 1));
