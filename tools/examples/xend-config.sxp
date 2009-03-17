@@ -64,6 +64,7 @@
 #(xend-relocation-server no)
 (xend-relocation-server yes)
 #(xend-relocation-ssl-server no)
+#(xend-udev-event-server no)
 
 #(xend-unix-path /var/lib/xend/xend-socket)
 
