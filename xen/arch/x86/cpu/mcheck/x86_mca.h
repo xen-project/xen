@@ -92,6 +92,5 @@ DECLARE_PER_CPU(cpu_banks_t, mce_banks_owned);
 /* Global variables */
 extern int mce_disabled;
 extern unsigned int nr_mce_banks;
-extern int firstbank;
 
 #endif /* X86_MCA_H */
