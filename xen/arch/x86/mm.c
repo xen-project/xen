@@ -1929,6 +1929,7 @@ void put_page(struct page_info *page)
     unsigned long nx, x, y = page->count_info;
 
     do {
+        ASSERT((y & PGC_count_mask) != 0);
         x  = y;
         nx = x - 1;
     }
