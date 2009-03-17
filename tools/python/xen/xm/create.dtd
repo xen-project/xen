@@ -47,6 +47,7 @@
                  other_config*)> 
 <!ATTLIST vm     is_a_template          CDATA #REQUIRED
                  auto_power_on          CDATA #REQUIRED
+                 s3_integrity           CDATA #REQUIRED
                  vcpus_max              CDATA #REQUIRED
                  vcpus_at_startup       CDATA #REQUIRED
                  actions_after_shutdown %NORMAL_EXIT; #REQUIRED 
