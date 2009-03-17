@@ -292,3 +292,40 @@ def hostAllowed(addrport, hosts_allowed):
                 return True
         log.warn("Rejected connection from %s (%s).", addrport[0], fqdn)
         return False
+
+
+class SocketDgramListener:
+    """A connectionless server socket, running listen in a thread.
+    """
+
+    def __init__(self, protocol_class):
+        self.protocol = protocol_class()
+        self.sock = self.createSocket()
+        threading.Thread(target=self.main).start()
+
+
+    def close(self):
+        try:
+            self.sock.close()
+        except:
+            pass
+
+
+    def createSocket(self):
+        raise NotImplementedError()
+
+
+    def main(self):
+        try:
+            while True:
+                try:
+                    data = self.sock.recv(BUFFER_SIZE)
+                    self.protocol.dataReceived(data)
+                except socket.error, ex:
+                    if ex.args[0] not in (EWOULDBLOCK, EAGAIN, EINTR):
+                        break
+        finally:
+            try:
+                self.close()
+            except:
+                pass

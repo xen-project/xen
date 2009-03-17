@@ -27,16 +27,19 @@ from xen.util import mkdir
 import connection
 
 
-def bind(path):
-    """Create a Unix socket, and bind it to the given path.  The socket is
-created such that only the current user may access it."""
+def bind(path, type = socket.SOCK_STREAM):
+    """Create a Unix socket, and bind it to the given path.
+    The socket is created such that only the current user may access it."""
 
-    parent = os.path.dirname(path)
-    mkdir.parents(parent, stat.S_IRWXU, True)
-    if os.path.exists(path):
-        os.unlink(path)
+    if path[0] == '\0': # Abstract namespace is used for the path
+        pass
+    else:
+        parent = os.path.dirname(path)
+        mkdir.parents(parent, stat.S_IRWXU, True)
+        if os.path.exists(path):
+            os.unlink(path)
 
-    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    sock = socket.socket(socket.AF_UNIX, type)
     sock.bind(path)
     return sock
 
@@ -48,8 +51,19 @@ class UnixListener(connection.SocketListener):
 
 
     def createSocket(self):
-        return bind(self.path)
+        return bind(self.path, socket.SOCK_STREAM)
 
 
     def acceptConnection(self, sock, _):
         connection.SocketServerConnection(sock, self.protocol_class)
+
+
+class UnixDgramListener(connection.SocketDgramListener):
+    def __init__(self, path, protocol_class):
+        self.path = path
+        connection.SocketDgramListener.__init__(self, protocol_class)
+
+
+    def createSocket(self):
+        return bind(self.path, socket.SOCK_DGRAM)
+
