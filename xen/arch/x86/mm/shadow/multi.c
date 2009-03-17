@@ -3123,6 +3123,19 @@ static int sh_page_fault(struct vcpu *v,
     shadow_lock(d);
 
     TRACE_CLEAR_PATH_FLAGS;
+
+    /* Make sure there is enough free shadow memory to build a chain of
+     * shadow tables. (We never allocate a top-level shadow on this path,
+     * only a 32b l1, pae l1, or 64b l3+2+1. Note that while
+     * SH_type_l1_shadow isn't correct in the latter case, all page
+     * tables are the same size there.)
+     *
+     * Preallocate shadow pages *before* removing writable accesses
+     * otherwhise an OOS L1 might be demoted and promoted again with
+     * writable mappings. */
+    shadow_prealloc(d,
+                    SH_type_l1_shadow,
+                    GUEST_PAGING_LEVELS < 4 ? 1 : GUEST_PAGING_LEVELS - 1);
     
     rc = gw_remove_write_accesses(v, va, &gw);
 
@@ -3155,15 +3168,6 @@ static int sh_page_fault(struct vcpu *v,
 
     shadow_audit_tables(v);
     sh_audit_gw(v, &gw);
-
-    /* Make sure there is enough free shadow memory to build a chain of
-     * shadow tables. (We never allocate a top-level shadow on this path,
-     * only a 32b l1, pae l1, or 64b l3+2+1. Note that while
-     * SH_type_l1_shadow isn't correct in the latter case, all page
-     * tables are the same size there.) */
-    shadow_prealloc(d,
-                    SH_type_l1_shadow,
-                    GUEST_PAGING_LEVELS < 4 ? 1 : GUEST_PAGING_LEVELS - 1);
 
     /* Acquire the shadow.  This must happen before we figure out the rights 
      * for the shadow entry, since we might promote a page here. */
