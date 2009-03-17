@@ -24,6 +24,7 @@ from xen.xend import sxp
 from xen.xend import arch
 from xen.xend.XendError import VmError
 from xen.xend.XendLogging import log
+from xen.xend.XendConstants import *
 
 from xen.xend.server.DevController import DevController
 from xen.xend.server.DevConstants import xenbusState
@@ -218,7 +219,7 @@ class PciController(DevController):
                     try:
                         dev_dict['vslt'] = slot_list[i]
                     except IndexError:
-                        dev_dict['vslt'] = '0x0'
+                        dev_dict['vslt'] = AUTO_PHP_SLOT_STR
 
                 pci_devs.append(dev_dict)
 

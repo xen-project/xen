@@ -793,7 +793,7 @@ class XendDomainInfo:
                 existing_dev_uuid = sxp.child_value(existing_dev_info, 'uuid')
                 existing_pci_conf = self.info['devices'][existing_dev_uuid][1]
                 existing_pci_devs = existing_pci_conf['devs']
-                vslt = '0x0'
+                vslt = AUTO_PHP_SLOT_STR
                 for x in existing_pci_devs:
                     if ( int(x['domain'], 16) == int(dev['domain'], 16) and
                          int(x['bus'], 16) == int(dev['bus'], 16) and
@@ -801,7 +801,7 @@ class XendDomainInfo:
                          int(x['func'], 16) == int(dev['func'], 16) ):
                         vslt = x['vslt']
                         break
-                if vslt == '0x0':
+                if vslt == AUTO_PHP_SLOT_STR:
                     raise VmError("Device %04x:%02x:%02x.%01x is not connected"
                                   % (int(dev['domain'],16), int(dev['bus'],16),
                                      int(dev['slot'],16), int(dev['func'],16)))

@@ -2456,7 +2456,7 @@ def parse_pci_configuration(args, state, opts = ''):
     if len(args) == 3:
         vslt = args[2]
     else:
-        vslt = '0x0' #chose a free virtual PCI slot
+        vslt = AUTO_PHP_SLOT_STR
     pci=['pci']
     pci_match = re.match(r"((?P<domain>[0-9a-fA-F]{1,4})[:,])?" + \
             r"(?P<bus>[0-9a-fA-F]{1,2})[:,]" + \

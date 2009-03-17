@@ -135,3 +135,6 @@ VTPM_DELETE_SCRIPT = '/etc/xen/scripts/vtpm-delete'
 
 XS_VMROOT = "/vm/"
 
+NR_PCI_DEV = 32
+AUTO_PHP_SLOT = NR_PCI_DEV
+AUTO_PHP_SLOT_STR = "%02x" % NR_PCI_DEV
