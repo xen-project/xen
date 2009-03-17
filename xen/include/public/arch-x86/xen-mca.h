@@ -324,10 +324,31 @@ struct xen_mc_physcpuinfo {
 	XEN_GUEST_HANDLE(xen_mc_logical_cpu_t) info;
 };
 
+#define XEN_MC_msrinject    4
+#define MC_MSRINJ_MAXMSRS       8
+struct xen_mc_msrinject {
+       /* IN */
+	unsigned int mcinj_cpunr;       /* target processor id */
+	uint32_t mcinj_flags;           /* see MC_MSRINJ_F_* below */
+	uint32_t mcinj_count;           /* 0 .. count-1 in array are valid */
+	uint32_t mcinj_pad0;
+	struct mcinfo_msr mcinj_msr[MC_MSRINJ_MAXMSRS];
+};
+
+/* Flags for mcinj_flags above; bits 16-31 are reserved */
+#define MC_MSRINJ_F_INTERPOSE   0x1
+
+#define XEN_MC_mceinject    5
+struct xen_mc_mceinject {
+	unsigned int mceinj_cpunr;      /* target processor id */
+};
+
 typedef union {
     struct xen_mc_fetch        mc_fetch;
     struct xen_mc_notifydomain mc_notifydomain;
     struct xen_mc_physcpuinfo  mc_physcpuinfo;
+    struct xen_mc_msrinject    mc_msrinject;
+    struct xen_mc_mceinject    mc_mceinject;
 } xen_mc_arg_t;
 
 struct xen_mc {

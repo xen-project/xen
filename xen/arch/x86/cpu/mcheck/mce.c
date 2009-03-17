@@ -27,9 +27,11 @@ unsigned int nr_mce_banks;
 
 EXPORT_SYMBOL_GPL(nr_mce_banks);	/* non-fatal.o */
 
+static void intpose_init(void);
 static void mcinfo_clear(struct mc_info *);
 
-#define	SEG_PL(segsel) ((segsel) & 0x3)
+#define	SEG_PL(segsel)			((segsel) & 0x3)
+#define _MC_MSRINJ_F_REQ_HWCR_WREN	(1 << 16)
 
 #if 1	/* XXFM switch to 0 for putback */
 
@@ -109,7 +111,7 @@ mctelem_cookie_t mcheck_mca_logout(enum mca_source who, cpu_banks_t bankmask,
 	cpu_nr = smp_processor_id();
 	BUG_ON(cpu_nr != v->processor);
 
-	rdmsrl(MSR_IA32_MCG_STATUS, gstatus);
+	mca_rdmsrl(MSR_IA32_MCG_STATUS, gstatus);
 
 	memset(&mcg, 0, sizeof (mcg));
 	mcg.common.type = MC_TYPE_GLOBAL;
@@ -156,7 +158,7 @@ mctelem_cookie_t mcheck_mca_logout(enum mca_source who, cpu_banks_t bankmask,
 		if (!test_bit(i, bankmask))
 			continue;
 
-		rdmsrl(MSR_IA32_MC0_STATUS + i * 4, status);
+		mca_rdmsrl(MSR_IA32_MC0_STATUS + i * 4, status);
 		if (!(status & MCi_STATUS_VAL))
 			continue;	/* this bank has no valid telemetry */
 
@@ -189,7 +191,7 @@ mctelem_cookie_t mcheck_mca_logout(enum mca_source who, cpu_banks_t bankmask,
 		addr = misc = 0;
 
 		if (status & MCi_STATUS_ADDRV) {
-			rdmsrl(MSR_IA32_MC0_ADDR + 4 * i, addr);
+			mca_rdmsrl(MSR_IA32_MC0_ADDR + 4 * i, addr);
 			d = maddr_get_owner(addr);
 			if (d != NULL && (who == MCA_POLLER ||
 			    who == MCA_CMCI_HANDLER))
@@ -197,13 +199,13 @@ mctelem_cookie_t mcheck_mca_logout(enum mca_source who, cpu_banks_t bankmask,
 		}
 
 		if (status & MCi_STATUS_MISCV)
-			rdmsrl(MSR_IA32_MC0_MISC + 4 * i, misc);
+			mca_rdmsrl(MSR_IA32_MC0_MISC + 4 * i, misc);
 
 		mcb.mc_addr = addr;
 		mcb.mc_misc = misc;
 
 		if (who == MCA_CMCI_HANDLER) {
-			rdmsrl(MSR_IA32_MC0_CTL2 + i, mcb.mc_ctrl2);
+			mca_rdmsrl(MSR_IA32_MC0_CTL2 + i, mcb.mc_ctrl2);
 			rdtscll(mcb.mc_tsc);
 		}
 
@@ -221,7 +223,7 @@ mctelem_cookie_t mcheck_mca_logout(enum mca_source who, cpu_banks_t bankmask,
 		}
 
 		/* Clear status */
-		wrmsrl(MSR_IA32_MC0_STATUS + 4 * i, 0x0ULL);
+		mca_wrmsrl(MSR_IA32_MC0_STATUS + 4 * i, 0x0ULL);
 		wmb();
 	}
 
@@ -281,7 +283,7 @@ void mcheck_cmn_handler(struct cpu_user_regs *regs, long error_code,
 
 	/* Read global status;  if it does not indicate machine check
 	 * in progress then bail as long as we have a valid ip to return to. */
-	rdmsrl(MSR_IA32_MCG_STATUS, gstatus);
+	mca_rdmsrl(MSR_IA32_MCG_STATUS, gstatus);
 	ripv = ((gstatus & MCG_STATUS_RIPV) != 0);
 	if (!(gstatus & MCG_STATUS_MCIP) && ripv) {
 		add_taint(TAINT_MACHINE_CHECK); /* questionable */
@@ -300,7 +302,7 @@ void mcheck_cmn_handler(struct cpu_user_regs *regs, long error_code,
 
 	/* Clear MCIP or another #MC will enter shutdown state */
 	gstatus &= ~MCG_STATUS_MCIP;
-	wrmsrl(MSR_IA32_MCG_STATUS, gstatus);
+	mca_wrmsrl(MSR_IA32_MCG_STATUS, gstatus);
 	wmb();
 
 	/* If no valid errors and our stack is intact, we're done */
@@ -540,6 +542,7 @@ void mcheck_init(struct cpuinfo_x86 *c)
 		return;
 	}
 
+	intpose_init();
 	mctelem_init(sizeof (struct mc_info));
 
 	switch (c->x86_vendor) {
@@ -768,6 +771,203 @@ void x86_mc_get_cpu_info(unsigned cpu, uint32_t *chipid, uint16_t *coreid,
 	}
 }
 
+#define	INTPOSE_NENT	50
+
+static struct intpose_ent {
+	unsigned  int cpu_nr;
+	uint64_t msr;
+	uint64_t val;
+} intpose_arr[INTPOSE_NENT];
+
+static void intpose_init(void)
+{
+	static int done;
+	int i;
+
+	if (done++ > 0)
+		return;
+
+	for (i = 0; i < INTPOSE_NENT; i++) {
+		intpose_arr[i].cpu_nr = -1;
+	}
+
+}
+
+struct intpose_ent *intpose_lookup(unsigned int cpu_nr, uint64_t msr,
+    uint64_t *valp)
+{
+	int i;
+
+	for (i = 0; i < INTPOSE_NENT; i++) {
+		if (intpose_arr[i].cpu_nr == cpu_nr &&
+		    intpose_arr[i].msr == msr) {
+			if (valp != NULL)
+				*valp = intpose_arr[i].val;
+			return &intpose_arr[i];
+		}
+	}
+
+	return NULL;
+}
+
+static void intpose_add(unsigned int cpu_nr, uint64_t msr, uint64_t val)
+{
+	struct intpose_ent *ent;
+	int i;
+
+	if ((ent = intpose_lookup(cpu_nr, msr, NULL)) != NULL) {
+		ent->val = val;
+		return;
+	}
+
+	for (i = 0, ent = &intpose_arr[0]; i < INTPOSE_NENT; i++, ent++) {
+		if (ent->cpu_nr == -1) {
+			ent->cpu_nr = cpu_nr;
+			ent->msr = msr;
+			ent->val = val;
+			return;
+		}
+	}
+
+	printk("intpose_add: interpose array full - request dropped\n");
+}
+
+void intpose_inval(unsigned int cpu_nr, uint64_t msr)
+{
+	struct intpose_ent *ent;
+
+	if ((ent = intpose_lookup(cpu_nr, msr, NULL)) != NULL) {
+		ent->cpu_nr = -1;
+	}
+}
+
+#define	IS_MCA_BANKREG(r) \
+    ((r) >= MSR_IA32_MC0_CTL && \
+    (r) <= MSR_IA32_MC0_MISC + (nr_mce_banks - 1) * 4 && \
+    ((r) - MSR_IA32_MC0_CTL) % 4 != 0)	/* excludes MCi_CTL */
+
+static int x86_mc_msrinject_verify(struct xen_mc_msrinject *mci)
+{
+	struct cpuinfo_x86 *c;
+	int i, errs = 0;
+
+	c = &cpu_data[smp_processor_id()];
+
+	for (i = 0; i < mci->mcinj_count; i++) {
+		uint64_t reg = mci->mcinj_msr[i].reg;
+		const char *reason = NULL;
+
+		if (IS_MCA_BANKREG(reg)) {
+			if (c->x86_vendor == X86_VENDOR_AMD) {
+				/* On AMD we can set MCi_STATUS_WREN in the
+				 * HWCR MSR to allow non-zero writes to banks
+				 * MSRs not to #GP.  The injector in dom0
+				 * should set that bit, but we detect when it
+				 * is necessary and set it as a courtesy to
+				 * avoid #GP in the hypervisor. */
+				mci->mcinj_flags |=
+				    _MC_MSRINJ_F_REQ_HWCR_WREN;
+				continue;
+			} else {
+				/* No alternative but to interpose, so require
+				 * that the injector specified as such. */
+				if (!(mci->mcinj_flags &
+				    MC_MSRINJ_F_INTERPOSE)) {
+					reason = "must specify interposition";
+				}
+			}
+		} else {
+			switch (reg) {
+			/* MSRs acceptable on all x86 cpus */
+			case MSR_IA32_MCG_STATUS:
+				break;
+
+			/* MSRs that the HV will take care of */
+			case MSR_K8_HWCR:
+				if (c->x86_vendor == X86_VENDOR_AMD)
+					reason = "HV will operate HWCR";
+				else
+					reason ="only supported on AMD";
+				break;
+
+			default:
+				reason = "not a recognized MCA MSR";
+				break;
+			}
+		}
+
+		if (reason != NULL) {
+			printk("HV MSR INJECT ERROR: MSR 0x%llx %s\n",
+			    (unsigned long long)mci->mcinj_msr[i].reg, reason);
+			errs++;
+		}
+	}
+
+	return !errs;
+}
+
+static uint64_t x86_mc_hwcr_wren(void)
+{
+	uint64_t old;
+
+	rdmsrl(MSR_K8_HWCR, old);
+
+	if (!(old & K8_HWCR_MCi_STATUS_WREN)) {
+		uint64_t new = old | K8_HWCR_MCi_STATUS_WREN;
+		wrmsrl(MSR_K8_HWCR, new);
+	}
+
+	return old;
+}
+
+static void x86_mc_hwcr_wren_restore(uint64_t hwcr)
+{
+	if (!(hwcr & K8_HWCR_MCi_STATUS_WREN))
+		wrmsrl(MSR_K8_HWCR, hwcr);
+}
+
+static void x86_mc_msrinject(void *data)
+{
+	struct xen_mc_msrinject *mci = data;
+	struct mcinfo_msr *msr;
+	struct cpuinfo_x86 *c;
+	uint64_t hwcr = 0;
+	int intpose;
+	int i;
+
+	c = &cpu_data[smp_processor_id()];
+
+	if (mci->mcinj_flags & _MC_MSRINJ_F_REQ_HWCR_WREN)
+		hwcr = x86_mc_hwcr_wren();
+
+	intpose = (mci->mcinj_flags & MC_MSRINJ_F_INTERPOSE) != 0;
+
+	for (i = 0, msr = &mci->mcinj_msr[0];
+	    i < mci->mcinj_count; i++, msr++) {
+		printk("HV MSR INJECT (%s) target %u actual %u MSR 0x%llx "
+		    "<-- 0x%llx\n",
+		    intpose ?  "interpose" : "hardware",
+		    mci->mcinj_cpunr, smp_processor_id(),
+		    (unsigned long long)msr->reg,
+		    (unsigned long long)msr->value);
+
+		if (intpose)
+			intpose_add(mci->mcinj_cpunr, msr->reg, msr->value);
+		else
+			wrmsrl(msr->reg, msr->value);
+	}
+
+	if (mci->mcinj_flags & _MC_MSRINJ_F_REQ_HWCR_WREN)
+		x86_mc_hwcr_wren_restore(hwcr);
+}
+
+/*ARGSUSED*/
+static void x86_mc_mceinject(void *data)
+{
+	printk("Simulating #MC on cpu %d\n", smp_processor_id());
+	__asm__ __volatile__("int $0x12");
+}
+
 #if BITS_PER_LONG == 64
 
 #define	ID2COOKIE(id)	((mctelem_cookie_t)(id))
@@ -797,6 +997,9 @@ long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)
 	xen_mc_logical_cpu_t *log_cpus = NULL;
 	mctelem_cookie_t mctc;
 	mctelem_class_t which;
+	unsigned int target;
+	struct xen_mc_msrinject *mc_msrinject;
+	struct xen_mc_mceinject *mc_mceinject;
 
 	if ( copy_from_guest(op, u_xen_mc, 1) )
 		return x86_mcerr("do_mca: failed copyin of xen_mc_t", -EFAULT);
@@ -899,6 +1102,59 @@ long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)
 				ret = -EFAULT;
 			xfree(log_cpus);
 		}
+		break;
+
+	case XEN_MC_msrinject:
+		if ( !IS_PRIV(v->domain) )
+			return x86_mcerr("do_mca inject", -EPERM);
+
+		if (nr_mce_banks == 0)
+			return x86_mcerr("do_mca inject", -ENODEV);
+
+		mc_msrinject = &op->u.mc_msrinject;
+		target = mc_msrinject->mcinj_cpunr;
+
+		if (target >= NR_CPUS)
+			return x86_mcerr("do_mca inject: bad target", -EINVAL);
+
+		if (!cpu_isset(target, cpu_online_map))
+			return x86_mcerr("do_mca inject: target offline",
+			    -EINVAL);
+
+		if (mc_msrinject->mcinj_count == 0)
+			return 0;
+
+		if (!x86_mc_msrinject_verify(mc_msrinject))
+			return x86_mcerr("do_mca inject: illegal MSR", -EINVAL);
+
+		add_taint(TAINT_ERROR_INJECT);
+
+		on_selected_cpus(cpumask_of_cpu(target),
+		    x86_mc_msrinject, mc_msrinject, 1, 1);
+
+		break;
+
+	case XEN_MC_mceinject:
+		if ( !IS_PRIV(v->domain) )
+			return x86_mcerr("do_mca #MC", -EPERM);
+
+		if (nr_mce_banks == 0)
+			return x86_mcerr("do_mca #MC", -ENODEV);
+
+		mc_mceinject = &op->u.mc_mceinject;
+		target = mc_mceinject->mceinj_cpunr;
+
+		if (target >= NR_CPUS)
+			return x86_mcerr("do_mca #MC: bad target", -EINVAL);
+		       
+		if (!cpu_isset(target, cpu_online_map))
+			return x86_mcerr("do_mca #MC: target offline", -EINVAL);
+
+		add_taint(TAINT_ERROR_INJECT);
+
+		on_selected_cpus(cpumask_of_cpu(target),
+		    x86_mc_mceinject, mc_mceinject, 1, 1);
+
 		break;
 
 	default:

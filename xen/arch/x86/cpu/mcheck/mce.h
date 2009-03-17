@@ -42,6 +42,23 @@ extern void x86_mce_vector_register(x86_mce_vector_t);
  * via x86_mce_vector_register. */
 extern void mcheck_cmn_handler(struct cpu_user_regs *, long, cpu_banks_t);
 
+/* Read an MSR, checking for an interposed value first */
+extern struct intpose_ent *intpose_lookup(unsigned int, uint64_t,
+    uint64_t *);
+extern void intpose_inval(unsigned int, uint64_t);
+
+#define mca_rdmsrl(msr, var) do { \
+       if (intpose_lookup(smp_processor_id(), msr, &var) == NULL) \
+               rdmsrl(msr, var); \
+} while (0)
+
+/* Write an MSR, invalidating any interposed value */
+#define        mca_wrmsrl(msr, val) do { \
+       intpose_inval(smp_processor_id(), msr); \
+       wrmsrl(msr, val); \
+} while (0)
+
+
 /* Utility function to "logout" all architectural MCA telemetry from the MCA
  * banks of the current processor.  A cookie is returned which may be
  * uses to reference the data so logged (the cookie can be NULL if

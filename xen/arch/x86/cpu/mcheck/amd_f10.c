@@ -74,9 +74,9 @@ amd_f10_handler(struct mc_info *mi, uint16_t bank, uint64_t status)
 	mc_ext.mc_msr[1].reg = MSR_F10_MC4_MISC2;
 	mc_ext.mc_msr[2].reg = MSR_F10_MC4_MISC3;
 
-	rdmsrl(MSR_F10_MC4_MISC1, mc_ext.mc_msr[0].value);
-	rdmsrl(MSR_F10_MC4_MISC2, mc_ext.mc_msr[1].value);
-	rdmsrl(MSR_F10_MC4_MISC3, mc_ext.mc_msr[2].value);
+	mca_rdmsrl(MSR_F10_MC4_MISC1, mc_ext.mc_msr[0].value);
+	mca_rdmsrl(MSR_F10_MC4_MISC2, mc_ext.mc_msr[1].value);
+	mca_rdmsrl(MSR_F10_MC4_MISC3, mc_ext.mc_msr[2].value);
 	
 	x86_mcinfo_add(mi, &mc_ext);
 	return MCA_EXTINFO_LOCAL;
