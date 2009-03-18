@@ -802,6 +802,31 @@ bool xs_is_domain_introduced(struct xs_handle *h, unsigned int domid)
 	return rc;
 }
 
+int xs_suspend_evtchn_port(int domid)
+{
+    char path[128];
+    char *portstr;
+    int port;
+    unsigned int plen;
+    struct xs_handle *xs;
+
+    xs = xs_daemon_open();
+    if (!xs)
+        return -1;
+
+    sprintf(path, "/local/domain/%d/device/suspend/event-channel", domid);
+    portstr = xs_read(xs, XBT_NULL, path, &plen);
+    xs_daemon_close(xs);
+
+    if (!portstr || !plen)
+        return -1;
+
+    port = atoi(portstr);
+    free(portstr);
+
+    return port;
+}
+
 /* Only useful for DEBUG versions */
 char *xs_debug_command(struct xs_handle *h, const char *cmd,
 		       void *data, unsigned int len)

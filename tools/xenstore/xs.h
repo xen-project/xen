@@ -163,6 +163,7 @@ bool xs_is_domain_introduced(struct xs_handle *h, unsigned int domid);
 char *xs_debug_command(struct xs_handle *h, const char *cmd,
 		       void *data, unsigned int len);
 
+int xs_suspend_evtchn_port(int domid);
 #endif /* _XS_H */
 
 /*
