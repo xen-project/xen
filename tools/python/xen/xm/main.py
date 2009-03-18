@@ -2539,6 +2539,9 @@ def parse_scsi_configuration(p_scsi, v_hctl, state):
     if p_scsi is not None:
         # xm scsi-attach
         if v_hctl == "host":
+            if serverType == SERVER_XEN_API:
+                # TODO
+                raise OptionError("SCSI devices assignment by HBA is not implemeted")
             host_mode = 1
             scsi_devices = vscsi_util.vscsi_get_scsidevices()
         elif len(v_hctl.split(':')) != 4:

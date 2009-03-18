@@ -1848,8 +1848,11 @@ class XendConfig(dict):
                 vscsi_be = vscsi_dict.get('backend', None)
 
                 # destroy existing XenAPI DSCSI objects
+                vscsi_devid = int(dev_info['devs'][0]['devid'])
                 for dscsi_uuid in XendDSCSI.get_by_VM(self['uuid']):
-                    XendAPIStore.deregister(dscsi_uuid, "DSCSI")
+                    dscsi_inst = XendAPIStore.get(dscsi_uuid, 'DSCSI')
+                    if vscsi_devid == dscsi_inst.get_virtual_host():
+                        XendAPIStore.deregister(dscsi_uuid, "DSCSI")
 
                 # create XenAPI DSCSI objects.
                 for vscsi_dev in vscsi_devs:

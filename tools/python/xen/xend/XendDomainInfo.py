@@ -3703,7 +3703,8 @@ class XendDomainInfo:
                     ['v-dev', xenapi_dscsi.get('virtual_HCTL')],
                     ['state', xenbusState['Initialising']],
                     ['uuid', dscsi_uuid]
-                ]
+                ],
+                ['feature-host', 0]
             ]
 
         if self._stateGet() != XEN_API_VM_POWER_STATE_RUNNING:
@@ -3716,7 +3717,7 @@ class XendDomainInfo:
                     raise XendError('Failed to create device')
 
             else:
-                new_vscsi_sxp = ['vscsi']
+                new_vscsi_sxp = ['vscsi', ['feature-host', 0]]
                 for existing_dev in sxp.children(cur_vscsi_sxp, 'dev'):
                     new_vscsi_sxp.append(existing_dev)
                 new_vscsi_sxp.append(sxp.child0(target_vscsi_sxp, 'dev'))
@@ -3810,7 +3811,7 @@ class XendDomainInfo:
         dev_uuid = sxp.child_value(cur_vscsi_sxp, 'uuid')
 
         target_dev = None
-        new_vscsi_sxp = ['vscsi']
+        new_vscsi_sxp = ['vscsi', ['feature-host', 0]]
         for dev in sxp.children(cur_vscsi_sxp, 'dev'):
             if vHCTL == sxp.child_value(dev, 'v-dev'):
                 target_dev = dev
@@ -3821,7 +3822,7 @@ class XendDomainInfo:
             raise XendError('Failed to destroy device')
 
         target_dev.append(['state', xenbusState['Closing']])
-        target_vscsi_sxp = ['vscsi', target_dev]
+        target_vscsi_sxp = ['vscsi', target_dev, ['feature-host', 0]]
 
         if self._stateGet() != XEN_API_VM_POWER_STATE_RUNNING:
 
