@@ -1657,12 +1657,12 @@ static inline int update_intpte(intpte_t *p,
                   (_m), (_v), (_ad))
 
 /* Update the L1 entry at pl1e to new value nl1e. */
-static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e, 
-                        unsigned long gl1mfn, int preserve_ad)
+static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
+                        unsigned long gl1mfn, int preserve_ad,
+                        struct vcpu *vcpu)
 {
     l1_pgentry_t ol1e;
-    struct vcpu *curr = current;
-    struct domain *d = curr->domain;
+    struct domain *d = vcpu->domain;
     unsigned long mfn;
     p2m_type_t p2mt;
     int rc = 1;
@@ -1672,7 +1672,7 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
 
     if ( unlikely(paging_mode_refcounts(d)) )
     {
-        rc = UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, curr, preserve_ad);
+        rc = UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, vcpu, preserve_ad);
         return rc;
     }
 
@@ -1696,7 +1696,7 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
         if ( !l1e_has_changed(ol1e, nl1e, _PAGE_RW | _PAGE_PRESENT) )
         {
             adjust_guest_l1e(nl1e, d);
-            rc = UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, curr,
+            rc = UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, vcpu,
                               preserve_ad);
             return rc;
         }
@@ -1705,14 +1705,14 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
             return 0;
         
         adjust_guest_l1e(nl1e, d);
-        if ( unlikely(!UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, curr,
+        if ( unlikely(!UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, vcpu,
                                     preserve_ad)) )
         {
             ol1e = nl1e;
             rc = 0;
         }
     }
-    else if ( unlikely(!UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, curr,
+    else if ( unlikely(!UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, vcpu,
                                      preserve_ad)) )
     {
         return 0;
@@ -1727,11 +1727,11 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
 static int mod_l2_entry(l2_pgentry_t *pl2e, 
                         l2_pgentry_t nl2e, 
                         unsigned long pfn,
-                        int preserve_ad)
+                        int preserve_ad,
+                        struct vcpu *vcpu)
 {
     l2_pgentry_t ol2e;
-    struct vcpu *curr = current;
-    struct domain *d = curr->domain;
+    struct domain *d = vcpu->domain;
     struct page_info *l2pg = mfn_to_page(pfn);
     unsigned long type = l2pg->u.inuse.type_info;
     int rc = 1;
@@ -1758,7 +1758,7 @@ static int mod_l2_entry(l2_pgentry_t *pl2e,
         if ( !l2e_has_changed(ol2e, nl2e, _PAGE_PRESENT) )
         {
             adjust_guest_l2e(nl2e, d);
-            rc = UPDATE_ENTRY(l2, pl2e, ol2e, nl2e, pfn, curr, preserve_ad);
+            rc = UPDATE_ENTRY(l2, pl2e, ol2e, nl2e, pfn, vcpu, preserve_ad);
             return rc;
         }
 
@@ -1766,14 +1766,14 @@ static int mod_l2_entry(l2_pgentry_t *pl2e,
             return 0;
 
         adjust_guest_l2e(nl2e, d);
-        if ( unlikely(!UPDATE_ENTRY(l2, pl2e, ol2e, nl2e, pfn, curr,
+        if ( unlikely(!UPDATE_ENTRY(l2, pl2e, ol2e, nl2e, pfn, vcpu,
                                     preserve_ad)) )
         {
             ol2e = nl2e;
             rc = 0;
         }
     }
-    else if ( unlikely(!UPDATE_ENTRY(l2, pl2e, ol2e, nl2e, pfn, curr,
+    else if ( unlikely(!UPDATE_ENTRY(l2, pl2e, ol2e, nl2e, pfn, vcpu,
                                      preserve_ad)) )
     {
         return 0;
@@ -1788,11 +1788,11 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
                         l3_pgentry_t nl3e, 
                         unsigned long pfn,
                         int preserve_ad,
-                        int preemptible)
+                        int preemptible,
+                        struct vcpu *vcpu)
 {
     l3_pgentry_t ol3e;
-    struct vcpu *curr = current;
-    struct domain *d = curr->domain;
+    struct domain *d = vcpu->domain;
     int rc = 0;
 
     if ( unlikely(!is_guest_l3_slot(pgentry_ptr_to_slot(pl3e))) )
@@ -1824,7 +1824,7 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
         if ( !l3e_has_changed(ol3e, nl3e, _PAGE_PRESENT) )
         {
             adjust_guest_l3e(nl3e, d);
-            rc = UPDATE_ENTRY(l3, pl3e, ol3e, nl3e, pfn, curr, preserve_ad);
+            rc = UPDATE_ENTRY(l3, pl3e, ol3e, nl3e, pfn, vcpu, preserve_ad);
             return rc ? 0 : -EFAULT;
         }
 
@@ -1834,14 +1834,14 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
         rc = 0;
 
         adjust_guest_l3e(nl3e, d);
-        if ( unlikely(!UPDATE_ENTRY(l3, pl3e, ol3e, nl3e, pfn, curr,
+        if ( unlikely(!UPDATE_ENTRY(l3, pl3e, ol3e, nl3e, pfn, vcpu,
                                     preserve_ad)) )
         {
             ol3e = nl3e;
             rc = -EFAULT;
         }
     }
-    else if ( unlikely(!UPDATE_ENTRY(l3, pl3e, ol3e, nl3e, pfn, curr,
+    else if ( unlikely(!UPDATE_ENTRY(l3, pl3e, ol3e, nl3e, pfn, vcpu,
                                      preserve_ad)) )
     {
         return -EFAULT;
@@ -1866,10 +1866,10 @@ static int mod_l4_entry(l4_pgentry_t *pl4e,
                         l4_pgentry_t nl4e, 
                         unsigned long pfn,
                         int preserve_ad,
-                        int preemptible)
+                        int preemptible,
+                        struct vcpu *vcpu)
 {
-    struct vcpu *curr = current;
-    struct domain *d = curr->domain;
+    struct domain *d = vcpu->domain;
     l4_pgentry_t ol4e;
     int rc = 0;
 
@@ -1895,7 +1895,7 @@ static int mod_l4_entry(l4_pgentry_t *pl4e,
         if ( !l4e_has_changed(ol4e, nl4e, _PAGE_PRESENT) )
         {
             adjust_guest_l4e(nl4e, d);
-            rc = UPDATE_ENTRY(l4, pl4e, ol4e, nl4e, pfn, curr, preserve_ad);
+            rc = UPDATE_ENTRY(l4, pl4e, ol4e, nl4e, pfn, vcpu, preserve_ad);
             return rc ? 0 : -EFAULT;
         }
 
@@ -1905,14 +1905,14 @@ static int mod_l4_entry(l4_pgentry_t *pl4e,
         rc = 0;
 
         adjust_guest_l4e(nl4e, d);
-        if ( unlikely(!UPDATE_ENTRY(l4, pl4e, ol4e, nl4e, pfn, curr,
+        if ( unlikely(!UPDATE_ENTRY(l4, pl4e, ol4e, nl4e, pfn, vcpu,
                                     preserve_ad)) )
         {
             ol4e = nl4e;
             rc = -EFAULT;
         }
     }
-    else if ( unlikely(!UPDATE_ENTRY(l4, pl4e, ol4e, nl4e, pfn, curr,
+    else if ( unlikely(!UPDATE_ENTRY(l4, pl4e, ol4e, nl4e, pfn, vcpu,
                                      preserve_ad)) )
     {
         return -EFAULT;
@@ -2422,7 +2422,7 @@ int new_guest_cr3(unsigned long mfn)
                     l4e_from_pfn(
                         mfn,
                         (_PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED)),
-                    pagetable_get_pfn(curr->arch.guest_table), 0, 0) == 0;
+                    pagetable_get_pfn(curr->arch.guest_table), 0, 0, curr) == 0;
         if ( unlikely(!okay) )
         {
             MEM_LOG("Error while installing new compat baseptr %lx", mfn);
@@ -3057,21 +3057,24 @@ int do_mmu_update(
                 {
                     l1_pgentry_t l1e = l1e_from_intpte(req.val);
                     okay = mod_l1_entry(va, l1e, mfn,
-                                        cmd == MMU_PT_UPDATE_PRESERVE_AD);
+                                        cmd == MMU_PT_UPDATE_PRESERVE_AD,
+                                        current);
                 }
                 break;
                 case PGT_l2_page_table:
                 {
                     l2_pgentry_t l2e = l2e_from_intpte(req.val);
                     okay = mod_l2_entry(va, l2e, mfn,
-                                        cmd == MMU_PT_UPDATE_PRESERVE_AD);
+                                        cmd == MMU_PT_UPDATE_PRESERVE_AD,
+                                        current);
                 }
                 break;
                 case PGT_l3_page_table:
                 {
                     l3_pgentry_t l3e = l3e_from_intpte(req.val);
                     rc = mod_l3_entry(va, l3e, mfn,
-                                      cmd == MMU_PT_UPDATE_PRESERVE_AD, 1);
+                                      cmd == MMU_PT_UPDATE_PRESERVE_AD, 1,
+                                      current);
                     okay = !rc;
                 }
                 break;
@@ -3080,7 +3083,8 @@ int do_mmu_update(
                 {
                     l4_pgentry_t l4e = l4e_from_intpte(req.val);
                     rc = mod_l4_entry(va, l4e, mfn,
-                                      cmd == MMU_PT_UPDATE_PRESERVE_AD, 1);
+                                      cmd == MMU_PT_UPDATE_PRESERVE_AD, 1,
+                                      current);
                     okay = !rc;
                 }
                 break;
@@ -3605,7 +3609,7 @@ int do_update_va_mapping(unsigned long va, u64 val64,
         goto out;
     }
 
-    rc = mod_l1_entry(pl1e, val, gl1mfn, 0) ? 0 : -EINVAL;
+    rc = mod_l1_entry(pl1e, val, gl1mfn, 0, v) ? 0 : -EINVAL;
 
     page_unlock(gl1pg);
     put_page(gl1pg);
