@@ -548,7 +548,7 @@ int acpi_dmar_init(void)
     if ( list_empty(&acpi_drhd_units) )
         goto fail;
 
-    printk("Intel VT-d has been enabled\n");
+    printk("Intel VT-d DMAR tables have been parsed.\n");
 
     return 0;
 

@@ -32,9 +32,11 @@ int amd_iov_detect(void);
  *   pv                         Enable IOMMU for PV domains
  *   no-pv                      Disable IOMMU for PV domains (default)
  *   force|required             Don't boot unless IOMMU is enabled
- *   passthrough                Bypass VT-d translation for Dom0
- *   snoop                      Utilize the snoop control for IOMMU (default)
- *   no-snoop                   Dont utilize the snoop control for IOMMU
+ *   passthrough                Enable VT-d DMA passthrough (no DMA
+ *                              translation for Dom0)
+ *   no-snoop                   Disable VT-d Snoop Control
+ *   no-qinval                  Disable VT-d Queued Invalidation
+ *   no-intremap                Disable VT-d Interrupt Remapping
  */
 custom_param("iommu", parse_iommu_param);
 int iommu_enabled = 0;
@@ -42,12 +44,16 @@ int iommu_pv_enabled = 0;
 int force_iommu = 0;
 int iommu_passthrough = 0;
 int iommu_snoop = 0;
+int iommu_qinval = 0;
+int iommu_intremap = 0;
 
 static void __init parse_iommu_param(char *s)
 {
     char *ss;
     iommu_enabled = 1;
     iommu_snoop = 1;
+    iommu_qinval = 1;
+    iommu_intremap = 1;
 
     do {
         ss = strchr(s, ',');
@@ -65,10 +71,12 @@ static void __init parse_iommu_param(char *s)
             force_iommu = 1;
         else if ( !strcmp(s, "passthrough") )
             iommu_passthrough = 1;
-        else if ( !strcmp(s, "snoop") )
-            iommu_snoop = 1;
         else if ( !strcmp(s, "no-snoop") )
             iommu_snoop = 0;
+        else if ( !strcmp(s, "no-qinval") )
+            iommu_qinval = 0;
+        else if ( !strcmp(s, "no-intremap") )
+            iommu_intremap = 0;
 
         s = ss + 1;
     } while ( ss );
