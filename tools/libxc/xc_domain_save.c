@@ -747,7 +747,7 @@ static xen_pfn_t *map_and_save_p2m_table(int xc_handle,
 #define SUSPEND_LOCK_FILE "/var/lib/xen/suspend_evtchn_lock.d"
 static int lock_suspend_event(void)
 {
-    int fd;
+    int fd, rc;
     mode_t mask;
     char buf[128];
 
@@ -761,10 +761,10 @@ static int lock_suspend_event(void)
     umask(mask);
     snprintf(buf, sizeof(buf), "%10ld", (long)getpid());
 
-    write(fd, buf, strlen(buf));
+    rc = write_exact(fd, buf, strlen(buf));
     close(fd);
 
-    return 0;
+    return rc;
 }
 
 static int unlock_suspend_event(void)
