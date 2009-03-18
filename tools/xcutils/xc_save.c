@@ -46,50 +46,41 @@ static int compat_suspend(void)
             !strncmp(ans, "done\n", 5));
 }
 
-static int suspend_evtchn_release(void)
+static int suspend_evtchn_release(int xce, int suspend_evtchn)
 {
-    if (si.suspend_evtchn >= 0) {
-        xc_evtchn_unbind(si.xce, si.suspend_evtchn);
-        si.suspend_evtchn = -1;
-    }
-    if (si.xce >= 0) {
-        xc_evtchn_close(si.xce);
-        si.xce = -1;
-    }
+    if (suspend_evtchn >= 0)
+        xc_evtchn_unbind(xce, suspend_evtchn);
 
     return 0;
 }
 
-static int await_suspend(void)
+static int await_suspend(int xce, int suspend_evtchn)
 {
     int rc;
 
     do {
-        rc = xc_evtchn_pending(si.xce);
+        rc = xc_evtchn_pending(xce);
         if (rc < 0) {
             warnx("error polling suspend notification channel: %d", rc);
             return -1;
         }
-    } while (rc != si.suspend_evtchn);
+    } while (rc != suspend_evtchn);
 
     /* harmless for one-off suspend */
-    if (xc_evtchn_unmask(si.xce, si.suspend_evtchn) < 0)
+    if (xc_evtchn_unmask(xce, suspend_evtchn) < 0)
         warnx("failed to unmask suspend notification channel: %d", rc);
 
     return 0;
 }
 
-static int suspend_evtchn_init(int xc, int domid)
+static int suspend_evtchn_init(int xc, int xce, int domid)
 {
     struct xs_handle *xs;
     char path[128];
     char *portstr;
     unsigned int plen;
     int port;
-    int rc;
-
-    si.xce = -1;
-    si.suspend_evtchn = -1;
+    int rc, suspend_evtchn = -1;
 
     xs = xs_daemon_open();
     if (!xs) {
@@ -108,14 +99,8 @@ static int suspend_evtchn_init(int xc, int domid)
     port = atoi(portstr);
     free(portstr);
 
-    si.xce = xc_evtchn_open();
-    if (si.xce < 0) {
-        warnx("failed to open event channel handle");
-        goto cleanup;
-    }
-
-    si.suspend_evtchn = xc_evtchn_bind_interdomain(si.xce, domid, port);
-    if (si.suspend_evtchn < 0) {
+    suspend_evtchn = xc_evtchn_bind_interdomain(xce, domid, port);
+    if (suspend_evtchn < 0) {
         warnx("failed to bind suspend event channel: %d", si.suspend_evtchn);
         goto cleanup;
     }
@@ -127,12 +112,13 @@ static int suspend_evtchn_init(int xc, int domid)
     }
 
     /* event channel is pending immediately after binding */
-    await_suspend();
+    await_suspend(xce, suspend_evtchn);
 
-    return 0;
+    return suspend_evtchn;
 
-  cleanup:
-    suspend_evtchn_release();
+cleanup:
+    if (suspend_evtchn > 0)
+        suspend_evtchn_release(xce, suspend_evtchn);
 
     return -1;
 }
@@ -150,7 +136,7 @@ static int evtchn_suspend(void)
         return 0;
     }
 
-    if (await_suspend() < 0) {
+    if (await_suspend(si.xce, si.suspend_evtchn) < 0) {
         warnx("suspend failed");
         return 0;
     }
@@ -323,14 +309,23 @@ main(int argc, char **argv)
     max_f = atoi(argv[4]);
     si.flags = atoi(argv[5]);
 
-    if (suspend_evtchn_init(si.xc_fd, si.domid) < 0)
+
+    si.xce = xc_evtchn_open();
+    if (si.xce < 0)
+        errx(1, "failed to open event channel handle");
+
+    si.suspend_evtchn = suspend_evtchn_init(si.xc_fd, si.xce, si.domid);
+
+    if (si.suspend_evtchn < 0)
         warnx("suspend event channel initialization failed, using slow path");
 
     ret = xc_domain_save(si.xc_fd, io_fd, si.domid, maxit, max_f, si.flags, 
                          &suspend, !!(si.flags & XCFLAGS_HVM),
                          &init_qemu_maps, &qemu_flip_buffer);
 
-    suspend_evtchn_release();
+    suspend_evtchn_release(si.xce, si.suspend_evtchn);
+
+    xc_evtchn_close(si.xce);
 
     xc_interface_close(si.xc_fd);
 
