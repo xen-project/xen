@@ -49,7 +49,6 @@ static void dispatch_file_open(struct fs_mount *mount, struct fsif_request *req)
 {
     char *file_name, full_path[BUFFER_SIZE];
     int fd;
-    struct timeval tv1, tv2;
     RING_IDX rsp_idx;
     fsif_response_t *rsp;
     uint16_t req_id;
@@ -127,7 +126,7 @@ static void dispatch_file_close(struct fs_mount *mount, struct fsif_request *req
 static void dispatch_file_read(struct fs_mount *mount, struct fsif_request *req)
 {
     void *buf;
-    int fd, i, count;
+    int fd, count;
     uint16_t req_id;
     unsigned short priv_id;
     struct fs_request *priv_req;
@@ -169,7 +168,6 @@ static void dispatch_file_read(struct fs_mount *mount, struct fsif_request *req)
     priv_req->aiocb.aio_sigevent.sigev_value.sival_ptr = priv_req;
     assert(aio_read(&priv_req->aiocb) >= 0);
 
-out: 
     /* We can advance the request consumer index, from here on, the request
      * should not be used (it may be overrinden by a response) */
     mount->ring.req_cons++;
@@ -198,7 +196,7 @@ static void end_file_read(struct fs_mount *mount, struct fs_request *priv_req)
 static void dispatch_file_write(struct fs_mount *mount, struct fsif_request *req)
 {
     void *buf;
-    int fd, count, i;
+    int fd, count;
     uint16_t req_id;
     unsigned short priv_id;
     struct fs_request *priv_req;
@@ -268,7 +266,6 @@ static void end_file_write(struct fs_mount *mount, struct fs_request *priv_req)
 
 static void dispatch_stat(struct fs_mount *mount, struct fsif_request *req)
 {
-    struct fsif_stat_response *buf;
     struct stat stat;
     int fd, ret;
     uint16_t req_id;

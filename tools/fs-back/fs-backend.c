@@ -10,6 +10,7 @@
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <xen/io/ring.h>
+#include <xc_private.h>
 #include <err.h>
 #include "sys-queue.h"
 #include "fs-backend.h"
@@ -182,7 +183,6 @@ static void handle_connection(int frontend_dom_id, int export_id, char *frontend
 {
     struct fs_mount *mount;
     struct fs_export *export;
-    int evt_port;
     struct fsif_sring *sring;
     uint32_t dom_ids[MAX_RING_SIZE];
     int i;
@@ -336,12 +336,8 @@ static void await_connections(void)
         }
         if (FD_ISSET(pipefds[0], &fds)) {
             struct fs_request *request;
-            int ret;
-            ret = read(pipefds[0], &request, sizeof(struct fs_request *));
-            if (ret != sizeof(struct fs_request *)) {
-                fprintf(stderr, "read request failed\n");
-                continue;
-            }
+            if (read_exact(pipefds[0], &request, sizeof(struct fs_request *)) < 0)
+                err(1, "read request failed\n");
             handle_aio_event(request); 
         }
         LIST_FOREACH(pointer, &mount_requests_head, entries) {
@@ -380,7 +376,8 @@ static void aio_signal_handler(int signo, siginfo_t *info, void *context)
 {
     struct fs_request *request = (struct fs_request*) info->si_value.sival_ptr;
     int saved_errno = errno;
-    write(pipefds[1], &request, sizeof(struct fs_request *));
+    if (write_exact(pipefds[1], &request, sizeof(struct fs_request *)) < 0)
+        err(1, "write request filed\n");
     errno = saved_errno;
 }
 
