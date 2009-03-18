@@ -1410,7 +1410,8 @@ class XendDomainInfo:
             for dev_uuid, (dev_type, dev_info) in self.info['devices'].items():
                 if dev_type == 'vfb':
                     old_location = dev_info.get('location')
-                    listen_host = dev_info.get('vnclisten', 'localhost')
+                    listen_host = dev_info.get('vnclisten', \
+                                XendOptions.instance().get_vnclisten_address())
                     new_location = '%s:%s' % (listen_host, str(vnc_port))
                     if old_location == new_location:
                         break
