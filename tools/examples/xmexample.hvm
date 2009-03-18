@@ -225,6 +225,10 @@ serial='pty'
 #keymap='ja'
 
 #-----------------------------------------------------------------------------
+#   Enable/disable xen platform PCI device, default=1 (enabled)
+#xen_platform_pci=1
+
+#-----------------------------------------------------------------------------
 #   Configure guest CPUID responses:
 #
 #cpuid=[ '1:ecx=xxxxxxxxxxx00xxxxxxxxxxxxxxxxxxx,

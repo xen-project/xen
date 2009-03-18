@@ -539,25 +539,6 @@ static void cmos_write_memory_size(void)
     cmos_outb(0x35, (uint8_t)( alt_mem >> 8));
 }
 
-static uint16_t xen_platform_io_base(void)
-{
-    uint32_t devfn, bar_data;
-    uint16_t vendor_id, device_id;
-
-    for ( devfn = 0; devfn < 128; devfn++ )
-    {
-        vendor_id = pci_readw(devfn, PCI_VENDOR_ID);
-        device_id = pci_readw(devfn, PCI_DEVICE_ID);
-        if ( (vendor_id == 0x5853) && (device_id == 0x0001) )
-        {
-            bar_data = pci_readl(devfn, PCI_BASE_ADDRESS_0);
-            return bar_data & PCI_BASE_ADDRESS_IO_MASK;
-        }
-    }
-
-    return 0;
-}
-
 /*
  * Set up an empty TSS area for virtual 8086 mode to use. 
  * The only important thing is that it musn't have any bits set 
@@ -744,7 +725,6 @@ int main(void)
     bios_info->pci_min = pci_mem_start;
     bios_info->pci_len = pci_mem_end - pci_mem_start;
     bios_info->bios32_entry = bios32_addr;
-    bios_info->xen_pfiob = xen_platform_io_base();
 
     printf("Invoking ROMBIOS ...\n");
     return 0;

@@ -170,6 +170,7 @@ XENAPI_PLATFORM_CFG_TYPES = {
     'xen_extended_power_mgmt': int,
     'pci_msitranslate': int,
     'pci_power_mgmt': int,
+    'xen_platform_pci': int,
 }
 
 # Xen API console 'other_config' keys.
@@ -464,6 +465,8 @@ class XendConfig(dict):
                 self['platform']['rtc_timeoffset'] = 0
             if 'hpet' not in self['platform']:
                 self['platform']['hpet'] = 0
+            if 'xen_platform_pci' not in self['platform']:
+                self['platform']['xen_platform_pci'] = 1
             if 'vpt_align' not in self['platform']:
                 self['platform']['vpt_align'] = 1
             if 'loader' not in self['platform']:

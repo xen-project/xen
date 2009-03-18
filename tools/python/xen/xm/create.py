@@ -611,6 +611,10 @@ gopts.var('pci_power_mgmt', val='POWERMGMT',
           fn=set_int, default=0,
           use="""Global PCI Power Management flag (0=disable;1=enable).""")
 
+gopts.var('xen_platform_pci', val='0|1',
+           fn=set_int, default=1,
+           use="Is xen_platform_pci used?")
+
 def err(msg):
     """Print an error to stderr and exit.
     """
@@ -924,7 +928,7 @@ def configure_hvm(config_image, vals):
              'acpi', 'apic', 'usb', 'usbdevice', 'keymap', 'pci', 'hpet',
              'guest_os_type', 'hap', 'opengl', 'cpuid', 'cpuid_check',
              'viridian', 'xen_extended_power_mgmt', 'pci_msitranslate',
-             'vpt_align', 'pci_power_mgmt' ]
+             'vpt_align', 'pci_power_mgmt', 'xen_platform_pci' ]
 
     for a in args:
         if a in vals.__dict__ and vals.__dict__[a] is not None:

@@ -47,6 +47,7 @@ extern unsigned long pci_mem_start, pci_mem_end;
 #define E820_OFFSET                   0x8
 
 /* Xen Platform Device */
+#define XEN_PF_IOBASE   0x10
 #define PFFLAG_ROM_LOCK 1 /* Sets whether ROM memory area is RW or RO */
 
 /* Located at BIOS_INFO_PHYSICAL_ADDRESS. */
@@ -56,9 +57,7 @@ struct bios_info {
     uint8_t  hpet_present:1;    /* 0[2] - System has HPET? */
     uint32_t pci_min, pci_len;  /* 4, 8 - PCI I/O hole boundaries */
     uint32_t bios32_entry;      /* 12   - Entry point for 32-bit BIOS */
-    uint16_t xen_pfiob;         /* 16   - Xen platform device I/O ports */
 };
 #define BIOSINFO_OFF_bios32_entry 12
-#define BIOSINFO_OFF_xen_pfiob    16
 
 #endif /* __HVMLOADER_CONFIG_H__ */

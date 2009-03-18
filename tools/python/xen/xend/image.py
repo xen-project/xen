@@ -716,6 +716,7 @@ class HVMImageHandler(ImageHandler):
         if 'hvm' not in info['xen_caps']:
             raise HVMRequired()
 
+        xen_platform_pci = int(vmConfig['platform'].get('xen_platform_pci',1))
         rtc_timeoffset = vmConfig['platform'].get('rtc_timeoffset')
 
         if not self.display :
@@ -724,13 +725,23 @@ class HVMImageHandler(ImageHandler):
                         ("image/device-model", self.device_model),
                         ("image/display", self.display))
         self.vm.permissionsVm("image/dmargs", { 'dom': self.vm.getDomid(), 'read': True } )
+
+        if xen_platform_pci == 0:
+            disable_pf = 1
+            log.info("No need to create platform device.[domid:%d]", self.vm.getDomid())
+        else:
+            disable_pf = 0
+            log.info("Need to create platform device.[domid:%d]", self.vm.getDomid())
+
+        xstransact.Store("/local/domain/0/device-model/%i"%self.vm.getDomid(),
+                                      ('disable_pf', disable_pf))
         self.vm.storeVm(("rtc/timeoffset", rtc_timeoffset))
         self.vm.permissionsVm("rtc/timeoffset", { 'dom': self.vm.getDomid(), 'read': True } )
 
         self.apic = int(vmConfig['platform'].get('apic', 0))
         self.acpi = int(vmConfig['platform'].get('acpi', 0))
         self.guest_os_type = vmConfig['platform'].get('guest_os_type')
-           
+
 
     # Return a list of cmd line args to the device models based on the
     # xm config file
