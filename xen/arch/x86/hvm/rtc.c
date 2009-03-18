@@ -160,6 +160,7 @@ static inline int from_bcd(RTCState *s, int a)
 static void rtc_set_time(RTCState *s)
 {
     struct tm *tm = &s->current_tm;
+    struct domain *d = vrtc_domain(s);
     unsigned long before, after; /* XXX s_time_t */
       
     ASSERT(spin_is_locked(&s->lock));
@@ -180,6 +181,12 @@ static void rtc_set_time(RTCState *s)
 
     after = mktime(tm->tm_year, tm->tm_mon, tm->tm_mday,
                    tm->tm_hour, tm->tm_min, tm->tm_sec);
+
+    /* We use the guest's setting of the RTC to define the local-time 
+     * offset for this domain. */
+    d->time_offset_seconds += (after - before);
+    update_domain_wallclock_time(d);
+    /* Also tell qemu-dm about it so it will be remembered for next boot. */
     send_timeoffset_req(after - before);
 }
 
