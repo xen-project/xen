@@ -7,8 +7,6 @@ export stubdom=y
 export debug=y
 include $(XEN_ROOT)/Config.mk
 
-IOEMU_OPTIONS=--disable-sdl --disable-opengl --disable-vnc-tls --disable-brlapi --disable-kqemu --disable-vde
-
 #ZLIB_URL?=http://www.zlib.net
 ZLIB_URL=$(XEN_EXTFILES_URL)
 ZLIB_VERSION=1.2.3
@@ -237,8 +235,12 @@ ioemu: cross-zlib cross-libpci libxc
 	[ -f ioemu/config-host.mak ] || \
 	  ( $(absolutify_xen_root); \
 	    cd ioemu ; \
-          CONFIG_STUBDOM=yes XEN_TARGET_ARCH=$(XEN_TARGET_ARCH) CFLAGS="$(TARGET_CFLAGS)" sh ./xen-setup --cc=$(CC) --disable-gcc-check $(IOEMU_OPTIONS))
-	CPPFLAGS= TARGET_CPPFLAGS="$(TARGET_CPPFLAGS)" $(MAKE) -C ioemu LWIPDIR=$(CURDIR)/lwip-$(XEN_TARGET_ARCH) TOOLS= CONFIG_STUBDOM=yes
+	    LWIPDIR=$(CURDIR)/lwip-$(XEN_TARGET_ARCH) \
+	    TARGET_CPPFLAGS="$(TARGET_CPPFLAGS)" \
+	    TARGET_CFLAGS="$(TARGET_CFLAGS)" \
+	    TARGET_LDFLAGS="$(TARGET_LDFLAGS)" \
+	    ./xen-setup-stubdom )
+	$(MAKE) -C ioemu
 
 ######
 # caml
