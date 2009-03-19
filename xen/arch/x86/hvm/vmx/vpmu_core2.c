@@ -296,7 +296,8 @@ static int core2_vpmu_msr_common_check(u32 msr_index, int *type, int *index)
         return 0;
 
     if ( unlikely(!(vpmu->flags & VPMU_CONTEXT_ALLOCATED)) &&
-         !core2_vpmu_alloc_resource(current) )
+	 (vpmu->context != NULL ||
+	  !core2_vpmu_alloc_resource(current)) )
         return 0;
     vpmu->flags |= VPMU_CONTEXT_ALLOCATED;
 
@@ -488,6 +489,7 @@ static void core2_vpmu_destroy(struct vcpu *v)
     if ( cpu_has_vmx_msr_bitmap )
         core2_vpmu_unset_msr_bitmap(v->arch.hvm_vmx.msr_bitmap);
     release_pmu_ownship(PMU_OWNER_HVM);
+    vpmu->flags &= ~VPMU_CONTEXT_ALLOCATED;
 }
 
 struct arch_vpmu_ops core2_vpmu_ops = {

@@ -219,6 +219,8 @@ static void ppro_free_msr(struct vcpu *v)
 {
 	struct vpmu_struct *vpmu = vcpu_vpmu(v);
 
+	if ( !(vpmu->flags & PASSIVE_DOMAIN_ALLOCATED) )
+		return;
 	xfree(vpmu->context);
 	vpmu->flags &= ~PASSIVE_DOMAIN_ALLOCATED;
 }
