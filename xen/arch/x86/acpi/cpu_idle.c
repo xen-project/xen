@@ -245,16 +245,16 @@ static void acpi_processor_idle(void)
     case ACPI_STATE_C2:
         if ( cx->type == ACPI_STATE_C1 || local_apic_timer_c2_ok )
         {
-            /* Trace cpu idle entry */
-            TRACE_1D(TRC_PM_IDLE_ENTRY, cx->idx);
             /* Get start time (ticks) */
             t1 = inl(pmtmr_ioport);
+            /* Trace cpu idle entry */
+            TRACE_2D(TRC_PM_IDLE_ENTRY, cx->idx, t1);
             /* Invoke C2 */
             acpi_idle_do_entry(cx);
             /* Get end time (ticks) */
             t2 = inl(pmtmr_ioport);
             /* Trace cpu idle exit */
-            TRACE_1D(TRC_PM_IDLE_EXIT, cx->idx);
+            TRACE_2D(TRC_PM_IDLE_EXIT, cx->idx, t2);
 
             /* Re-enable interrupts */
             local_irq_enable();
@@ -293,8 +293,6 @@ static void acpi_processor_idle(void)
             ACPI_FLUSH_CPU_CACHE();
         }
 
-        /* Trace cpu idle entry */
-        TRACE_1D(TRC_PM_IDLE_ENTRY, cx->idx);
         /*
          * Before invoking C3, be aware that TSC/APIC timer may be 
          * stopped by H/W. Without carefully handling of TSC/APIC stop issues,
@@ -305,6 +303,8 @@ static void acpi_processor_idle(void)
 
         /* Get start time (ticks) */
         t1 = inl(pmtmr_ioport);
+        /* Trace cpu idle entry */
+        TRACE_2D(TRC_PM_IDLE_ENTRY, cx->idx, t1);
         /* Invoke C3 */
         acpi_idle_do_entry(cx);
         /* Get end time (ticks) */
@@ -313,7 +313,7 @@ static void acpi_processor_idle(void)
         /* recovering TSC */
         cstate_restore_tsc();
         /* Trace cpu idle exit */
-        TRACE_1D(TRC_PM_IDLE_EXIT, cx->idx);
+        TRACE_2D(TRC_PM_IDLE_EXIT, cx->idx, t2);
 
         if ( power->flags.bm_check && power->flags.bm_control )
         {
