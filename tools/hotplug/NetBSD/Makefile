@@ -2,14 +2,12 @@ XEN_ROOT = ../../../
 include $(XEN_ROOT)/tools/Rules.mk
 
 # Xen configuration dir and configs to go there.
-XEN_CONFIG_DIR = $(PREFIX)/etc/xen
+XEN_CONFIG_DIR = /etc/xen
 
 # Xen script dir and scripts to go there.
-XEN_SCRIPT_DIR = $(PREFIX)/etc/xen/scripts
+XEN_SCRIPT_DIR = $(XEN_CONFIG_DIR)/scripts
 XEN_SCRIPTS =
 XEN_SCRIPTS += block-nbsd
-XEN_SCRIPTS += hvm-nbsd
-XEN_SCRIPTS += netbsd1-nbsd
 XEN_SCRIPTS += qemu-ifup-nbsd
 XEN_SCRIPTS += vif-bridge-nbsd
 XEN_SCRIPTS += vif-ip-nbsd
@@ -27,7 +25,7 @@ install: all install-scripts
 
 .PHONY: install-scripts
 install-scripts:
-	$(INSTALL_DATA_DIR) $(DESTDIR)$(XEN_SCRIPT_DIR)
+	$(INSTALL_DIR) $(DESTDIR)$(XEN_SCRIPT_DIR)
 	set -e; for i in $(XEN_SCRIPTS); \
 	   do \
 	   $(INSTALL_DATA) $$i $(DESTDIR)$(XEN_SCRIPT_DIR); \

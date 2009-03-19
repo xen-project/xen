@@ -314,14 +314,14 @@ install-readme:
 	$(INSTALL_DATA) README $(DESTDIR)$(DOCDIR)/README.stubdom
 
 install-ioemu: ioemu-stubdom
-	$(INSTALL_DIR) "$(DESTDIR)/usr/lib/xen/bin"
-	$(INSTALL_PROG) stubdom-dm "$(DESTDIR)/usr/lib/xen/bin"
-	$(INSTALL_DIR) "$(DESTDIR)/usr/lib/xen/boot"
-	$(INSTALL_DATA) mini-os-$(XEN_TARGET_ARCH)-ioemu/mini-os.gz "$(DESTDIR)/usr/lib/xen/boot/ioemu-stubdom.gz"
+	$(INSTALL_DIR) "$(DESTDIR)$(LIBEXEC)"
+	$(INSTALL_PROG) stubdom-dm "$(DESTDIR)$(LIBEXEC)"
+	$(INSTALL_DIR) "$(DESTDIR)$(LIBDIR_x86_32)/xen/boot"
+	$(INSTALL_DATA) mini-os-$(XEN_TARGET_ARCH)-ioemu/mini-os.gz "$(DESTDIR)$(LIBDIR_x86_32)/xen/boot/ioemu-stubdom.gz"
 
 install-grub: pv-grub
-	$(INSTALL_DIR) "$(DESTDIR)/usr/lib/xen/boot"
-	$(INSTALL_DATA) mini-os-$(XEN_TARGET_ARCH)-grub/mini-os.gz "$(DESTDIR)/usr/lib/xen/boot/pv-grub-$(XEN_TARGET_ARCH).gz"
+	$(INSTALL_DIR) "$(DESTDIR)$(LIBDIR_x86_32)/xen/boot"
+	$(INSTALL_DATA) mini-os-$(XEN_TARGET_ARCH)-grub/mini-os.gz "$(DESTDIR)$(LIBDIR_x86_32)/xen/boot/pv-grub-$(XEN_TARGET_ARCH).gz"
 
 #######
 # clean
