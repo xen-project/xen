@@ -3004,20 +3004,31 @@ void set_intr_gate(unsigned int n, void *addr)
     __set_intr_gate(n, 0, addr);
 }
 
-void set_tss_desc(unsigned int n, void *addr)
+void load_TR(void)
 {
+    struct tss_struct *tss = &init_tss[smp_processor_id()];
+    struct desc_ptr old_gdt, tss_gdt = {
+        .base = (long)(this_cpu(gdt_table) - FIRST_RESERVED_GDT_ENTRY),
+        .limit = LAST_RESERVED_GDT_BYTE
+    };
+
     _set_tssldt_desc(
-        per_cpu(gdt_table, n) + TSS_ENTRY - FIRST_RESERVED_GDT_ENTRY,
-        (unsigned long)addr,
+        this_cpu(gdt_table) + TSS_ENTRY - FIRST_RESERVED_GDT_ENTRY,
+        (unsigned long)tss,
         offsetof(struct tss_struct, __cacheline_filler) - 1,
         9);
 #ifdef CONFIG_COMPAT
     _set_tssldt_desc(
-        per_cpu(compat_gdt_table, n) + TSS_ENTRY - FIRST_RESERVED_GDT_ENTRY,
-        (unsigned long)addr,
+        this_cpu(compat_gdt_table) + TSS_ENTRY - FIRST_RESERVED_GDT_ENTRY,
+        (unsigned long)tss,
         offsetof(struct tss_struct, __cacheline_filler) - 1,
         11);
 #endif
+
+    /* Switch to non-compat GDT (which has B bit clear) to execute LTR. */
+    asm volatile (
+        "sgdt %1; lgdt %2; ltr %%ax; lgdt %1"
+        : : "a" (TSS_ENTRY << 3), "m" (old_gdt), "m" (tss_gdt) : "memory" );
 }
 
 void __devinit percpu_traps_init(void)

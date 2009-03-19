@@ -614,8 +614,7 @@ void __cpuinit cpu_init(void)
 	BUG_ON((get_stack_bottom() & 15) != 0);
 	t->rsp0 = get_stack_bottom();
 #endif
-	set_tss_desc(cpu,t);
-	load_TR(cpu);
+	load_TR();
 	asm volatile ( "lldt %%ax" : : "a" (0) );
 
 	/* Clear all 6 debug registers: */
