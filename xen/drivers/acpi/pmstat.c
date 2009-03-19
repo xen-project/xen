@@ -368,14 +368,7 @@ static int set_cpufreq_para(struct xen_sysctl_pm_op *op)
 
         if ( !strnicmp(policy->governor->name,
                        "userspace", CPUFREQ_NAME_LEN) )
-        {
-            if ( freq < policy->min )
-                freq = policy->min;
-            if ( freq > policy->max )
-                freq = policy->max;
-
-            ret = __cpufreq_driver_target(policy, freq, CPUFREQ_RELATION_L);
-        }
+            ret = write_userspace_scaling_setspeed(op->cpuid, freq);
         else
             ret = -EINVAL;
 

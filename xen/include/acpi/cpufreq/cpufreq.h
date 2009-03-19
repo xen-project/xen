@@ -227,4 +227,6 @@ int get_cpufreq_ondemand_para(uint32_t *sampling_rate_max,
                               uint32_t *up_threshold);
 int write_ondemand_sampling_rate(unsigned int sampling_rate);
 int write_ondemand_up_threshold(unsigned int up_threshold);
+
+int write_userspace_scaling_setspeed(unsigned int cpu, unsigned int freq);
 #endif /* __XEN_CPUFREQ_PM_H__ */
