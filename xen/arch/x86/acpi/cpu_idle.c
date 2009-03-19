@@ -220,15 +220,9 @@ static void acpi_processor_idle(void)
     if ( !cx )
     {
         if ( pm_idle_save )
-        {
-            printk(XENLOG_DEBUG "call pm_idle_save()\n");
             pm_idle_save();
-        }
         else
-        {
-            printk(XENLOG_DEBUG "call acpi_safe_halt()\n");
             acpi_safe_halt();
-        }
         return;
     }
 

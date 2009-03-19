@@ -16,9 +16,6 @@
  * Place - Suite 330, Boston, MA 02111-1307 USA.
  */
 
-/* to eliminate warning on `strndup' */
-#define _GNU_SOURCE
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
