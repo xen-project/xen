@@ -143,6 +143,47 @@ int pci_remove_device(u8 bus, u8 devfn)
     return ret;
 }
 
+int pci_add_device_ext(u8 bus, u8 devfn, struct pci_dev_info *info)
+{
+    int ret;
+    char *pdev_type;
+    struct pci_dev *pdev;
+
+    if (info->is_extfn)
+        pdev_type = "Extended Function";
+    else if (info->is_virtfn)
+        pdev_type = "Virtual Function";
+    else
+    	return -EINVAL;;
+
+
+    ret = -ENOMEM;
+    spin_lock(&pcidevs_lock);
+    pdev = alloc_pdev(bus, devfn);
+    if ( !pdev )
+        goto out;
+
+    pdev->info = *info;
+
+    ret = 0;
+    if ( !pdev->domain )
+    {
+        pdev->domain = dom0;
+        ret = iommu_add_device(pdev);
+        if ( ret )
+            goto out;
+
+        list_add(&pdev->domain_list, &dom0->arch.pdev_list);
+    }
+
+out:
+    spin_unlock(&pcidevs_lock);
+    printk(XENLOG_DEBUG "PCI add %s %02x:%02x.%x\n", pdev_type,
+           bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+
+    return ret;
+}
+
 static void pci_clean_dpci_irqs(struct domain *d)
 {
     struct hvm_irq_dpci *hvm_irq_dpci = NULL;

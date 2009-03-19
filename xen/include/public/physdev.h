@@ -183,6 +183,22 @@ struct physdev_manage_pci {
 typedef struct physdev_manage_pci physdev_manage_pci_t;
 DEFINE_XEN_GUEST_HANDLE(physdev_manage_pci_t);
 
+#define PHYSDEVOP_manage_pci_add_ext    20
+struct physdev_manage_pci_ext {
+    /* IN */
+    uint8_t bus;
+    uint8_t devfn;
+    unsigned is_extfn;
+    unsigned is_virtfn;
+    struct {
+        uint8_t bus;
+        uint8_t devfn;
+    } physfn;
+};
+
+typedef struct physdev_manage_pci_ext physdev_manage_pci_ext_t;
+DEFINE_XEN_GUEST_HANDLE(physdev_manage_pci_ext_t);
+
 #define PHYSDEVOP_restore_msi            19
 struct physdev_restore_msi {
     /* IN */

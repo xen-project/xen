@@ -1193,8 +1193,11 @@ static int domain_context_mapping(struct domain *domain, u8 bus, u8 devfn)
     u16 sec_bus, sub_bus;
     u32 type;
     u8 secbus, secdevfn;
+    struct pci_dev *pdev = pci_get_pdev(bus, devfn);
 
-    drhd = acpi_find_matched_drhd_unit(bus, devfn);
+    BUG_ON(!pdev);
+
+    drhd = acpi_find_matched_drhd_unit(pdev);
     if ( !drhd )
         return -ENODEV;
 
@@ -1319,8 +1322,11 @@ static int domain_context_unmap(struct domain *domain, u8 bus, u8 devfn)
     int ret = 0;
     u32 type;
     u8 secbus, secdevfn;
+    struct pci_dev *pdev = pci_get_pdev(bus, devfn);
 
-    drhd = acpi_find_matched_drhd_unit(bus, devfn);
+    BUG_ON(!pdev);
+
+    drhd = acpi_find_matched_drhd_unit(pdev);
     if ( !drhd )
         return -ENODEV;
 
@@ -1392,7 +1398,7 @@ static int reassign_device_ownership(
     if (!pdev)
         return -ENODEV;
 
-    drhd = acpi_find_matched_drhd_unit(bus, devfn);
+    drhd = acpi_find_matched_drhd_unit(pdev);
     pdev_iommu = drhd->iommu;
     domain_context_unmap(source, bus, devfn);
 
@@ -1405,7 +1411,7 @@ static int reassign_device_ownership(
 
     for_each_pdev ( source, pdev )
     {
-        drhd = acpi_find_matched_drhd_unit(pdev->bus, pdev->devfn);
+        drhd = acpi_find_matched_drhd_unit(pdev);
         if ( drhd->iommu == pdev_iommu )
         {
             found = 1;
