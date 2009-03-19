@@ -59,8 +59,8 @@ void show_help(void)
             " set-up-threshold      [cpuid] <num> set up threshold on CPU <cpuid> or all\n"
             "                                     it is used in ondemand governor.\n"
             " get-cpu-topology                    get thread/core/socket topology info\n"
-            " start                               start collect Cx/Px statistics,\n"
-            "                                     output after CTRL-C or SIGINT.\n"
+            " start [seconds]                     start collect Cx/Px statistics,\n"
+            "                                     output after CTRL-C or SIGINT or several seconds.\n"
             );
 }
 /* wrapper function */
@@ -353,6 +353,16 @@ void start_gather_func(int argc, char *argv[])
 {
     int i;
     struct timeval tv;
+    int timeout = 0;
+
+    if ( argc == 1 )
+    {
+        sscanf(argv[0], "%d", &timeout);
+        if ( timeout <= 0 )
+            fprintf(stderr, "failed to set timeout seconds, falling back...\n");
+        else
+            printf("Timeout set to %d seconds\n", timeout);
+    }
 
     if ( gettimeofday(&tv, NULL) == -1 )
     {
@@ -408,7 +418,21 @@ void start_gather_func(int argc, char *argv[])
         free(cxstat);
         return ;
     }
-    printf("Start sampling, waiting for CTRL-C or SIGINT signal ...\n");
+
+    if ( timeout > 0 )
+    {
+        if ( signal(SIGALRM, signal_int_handler) == SIG_ERR )
+        {
+            fprintf(stderr, "failed to set signal alarm handler\n");
+            free(sum);
+            free(pxstat);
+            free(cxstat);
+            return ;
+        }
+        alarm(timeout);
+    }
+
+    printf("Start sampling, waiting for CTRL-C or SIGINT or SIGALARM signal ...\n");
 
     pause();
 }
