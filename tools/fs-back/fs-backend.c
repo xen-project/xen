@@ -161,7 +161,7 @@ static void terminate_mount_request(struct fs_mount *mount) {
     while (!xenbus_frontend_state_changed(mount, STATE_CLOSING));
     xenbus_write_backend_state(mount, STATE_CLOSED);
 
-    xc_gnttab_munmap(mount->gnth, mount->ring.sring, 1);
+    xc_gnttab_munmap(mount->gnth, mount->ring.sring, mount->shared_ring_size);
     xc_gnttab_close(mount->gnth);
     xc_evtchn_unbind(mount->evth, mount->local_evtchn);
     xc_evtchn_close(mount->evth);
