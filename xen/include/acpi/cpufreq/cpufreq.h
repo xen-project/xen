@@ -106,7 +106,10 @@ extern struct cpufreq_governor *__find_governor(const char *governor);
 extern int __cpufreq_driver_target(struct cpufreq_policy *policy,
                                    unsigned int target_freq,
                                    unsigned int relation);
-extern int __cpufreq_driver_getavg(struct cpufreq_policy *policy);
+
+#define GOV_GETAVG     1
+#define USR_GETAVG     2
+extern int cpufreq_driver_getavg(unsigned int cpu, unsigned int flag);
 
 static __inline__ int 
 __cpufreq_governor(struct cpufreq_policy *policy, unsigned int event)
@@ -130,7 +133,7 @@ struct cpufreq_driver {
                      unsigned int target_freq,
                      unsigned int relation);
     unsigned int    (*get)(unsigned int cpu);
-    unsigned int    (*getavg)(unsigned int cpu);
+    unsigned int    (*getavg)(unsigned int cpu, unsigned int flag);
     int    (*exit)(struct cpufreq_policy *policy);
 };
 

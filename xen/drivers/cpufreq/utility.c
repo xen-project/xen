@@ -357,17 +357,23 @@ int __cpufreq_driver_target(struct cpufreq_policy *policy,
     return retval;
 }
 
-int __cpufreq_driver_getavg(struct cpufreq_policy *policy)
+int cpufreq_driver_getavg(unsigned int cpu, unsigned int flag)
 {
-    int ret = 0;
+    struct cpufreq_policy *policy;
+    int freq_avg;
 
-    if (!policy)
-        return -EINVAL;
+    policy = cpufreq_cpu_policy[cpu];
+    if (!cpu_online(cpu) || !policy)
+        return 0;
 
-    if (cpu_online(policy->cpu) && cpufreq_driver->getavg)
-        ret = cpufreq_driver->getavg(policy->cpu);
+    if (cpufreq_driver->getavg)
+    {
+        freq_avg = cpufreq_driver->getavg(cpu, flag);
+        if (freq_avg > 0)
+            return freq_avg;
+    }
 
-    return ret;
+    return policy->cur;
 }
 
 
