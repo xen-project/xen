@@ -40,7 +40,7 @@ static inline unsigned long __virt_to_maddr(unsigned long va)
     ASSERT(va >= XEN_VIRT_START);
     ASSERT(va < DIRECTMAP_VIRT_END);
     ASSERT((va < XEN_VIRT_END) || (va >= DIRECTMAP_VIRT_START));
-    if ( va > DIRECTMAP_VIRT_START )
+    if ( va >= DIRECTMAP_VIRT_START )
         return va - DIRECTMAP_VIRT_START;
     return va - XEN_VIRT_START + xen_phys_start;
 }
