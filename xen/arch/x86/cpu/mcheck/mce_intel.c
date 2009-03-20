@@ -198,7 +198,6 @@ static void cmci_discover(void)
 {
     unsigned long flags;
     int i;
-    struct mc_info *mi = NULL;
     mctelem_cookie_t mctc;
     struct mca_summary bs;
 
@@ -226,7 +225,7 @@ static void cmci_discover(void)
             mctelem_commit(mctc);
             send_guest_global_virq(dom0, VIRQ_MCA);
         } else {
-            x86_mcinfo_dump(mi);
+            x86_mcinfo_dump(mctelem_dataptr(mctc));
             mctelem_dismiss(mctc);
        }
     } else if (mctc != NULL)
@@ -326,7 +325,6 @@ static void intel_init_cmci(struct cpuinfo_x86 *c)
 
 fastcall void smp_cmci_interrupt(struct cpu_user_regs *regs)
 {
-    struct mc_info *mi = NULL;
     mctelem_cookie_t mctc;
     struct mca_summary bs;
 
@@ -341,9 +339,9 @@ fastcall void smp_cmci_interrupt(struct cpu_user_regs *regs)
             mctelem_commit(mctc);
             send_guest_global_virq(dom0, VIRQ_MCA);
         } else {
-            x86_mcinfo_dump(mi);
+            x86_mcinfo_dump(mctelem_dataptr(mctc));
             mctelem_dismiss(mctc);
-       }
+        }
     } else if (mctc != NULL)
         mctelem_dismiss(mctc);
 
