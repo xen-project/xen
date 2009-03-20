@@ -1782,6 +1782,14 @@ int intel_vtd_setup(void)
         if ( iommu_intremap && !ecap_intr_remap(iommu->ecap) )
             iommu_intremap = 0;
     }
+
+    if ( !iommu_qinval && iommu_intremap )
+    {
+        iommu_intremap = 0;
+        gdprintk(XENLOG_WARNING VTDPREFIX, "Interrupt Remapping disabled "
+            "since Queued Invalidation isn't supported or enabled.\n");
+    }
+
 #define P(p,s) printk("Intel VT-d %s %ssupported.\n", s, (p)? "" : "not ")
     P(iommu_snoop, "Snoop Control");
     P(iommu_passthrough, "DMA Passthrough");
