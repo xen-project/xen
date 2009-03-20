@@ -47,6 +47,11 @@
 #define HPET_TN_PERIODIC_CAP	0x010
 #define HPET_TN_SETVAL		0x040
 #define HPET_TN_32BIT		0x100
+#define HPET_TN_ROUTE		0x3e00
+#define HPET_TN_FSB		0x4000
+#define HPET_TN_FSB_CAP		0x8000
+#define HPET_TN_ROUTE_SHIFT	9
+
 
 #define hpet_read32(x)    \
     (*(volatile u32 *)(fix_to_virt(FIX_HPET_BASE) + (x)))
