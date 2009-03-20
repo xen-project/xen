@@ -307,6 +307,24 @@ int xc_set_cpufreq_para(int xc_handle, int cpuid,
     return xc_sysctl(xc_handle, &sysctl);
 }
 
+int xc_get_cpufreq_avgfreq(int xc_handle, int cpuid, int *avg_freq)
+{
+    int ret = 0;
+    DECLARE_SYSCTL;
+
+    if ( (xc_handle < 0) || (!avg_freq) )
+        return -EINVAL;
+
+    sysctl.cmd = XEN_SYSCTL_pm_op;
+    sysctl.u.pm_op.cmd = GET_CPUFREQ_AVGFREQ;
+    sysctl.u.pm_op.cpuid = cpuid;
+    ret = xc_sysctl(xc_handle, &sysctl);
+
+    *avg_freq = sysctl.u.pm_op.get_avgfreq;
+
+    return ret;
+}
+
 int xc_get_cputopo(int xc_handle, struct xc_get_cputopo *info)
 {
     int rc;

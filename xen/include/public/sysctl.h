@@ -376,6 +376,7 @@ struct xen_sysctl_pm_op {
     #define GET_CPUFREQ_PARA           (CPUFREQ_PARA | 0x01)
     #define SET_CPUFREQ_GOV            (CPUFREQ_PARA | 0x02)
     #define SET_CPUFREQ_PARA           (CPUFREQ_PARA | 0x03)
+    #define GET_CPUFREQ_AVGFREQ        (CPUFREQ_PARA | 0x04)
 
     /* get CPU topology */
     #define XEN_SYSCTL_pm_op_get_cputopo  0x20
@@ -386,6 +387,7 @@ struct xen_sysctl_pm_op {
         struct xen_get_cpufreq_para get_para;
         struct xen_set_cpufreq_gov  set_gov;
         struct xen_set_cpufreq_para set_para;
+        uint64_t get_avgfreq;
         struct xen_get_cputopo      get_topo;
     };
 };

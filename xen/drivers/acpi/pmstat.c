@@ -409,6 +409,16 @@ static int set_cpufreq_para(struct xen_sysctl_pm_op *op)
     return ret;
 }
 
+static int get_cpufreq_avgfreq(struct xen_sysctl_pm_op *op)
+{
+    if ( !op || !cpu_online(op->cpuid) )
+        return -EINVAL;
+
+    op->get_avgfreq = cpufreq_driver_getavg(op->cpuid, USR_GETAVG);
+
+    return 0;
+}
+
 static int get_cputopo (struct xen_sysctl_pm_op *op)
 {
     uint32_t i, nr_cpus;
@@ -491,6 +501,12 @@ int do_pm_op(struct xen_sysctl_pm_op *op)
     case SET_CPUFREQ_PARA:
     {
         ret = set_cpufreq_para(op);
+        break;
+    }
+
+    case GET_CPUFREQ_AVGFREQ:
+    {
+        ret = get_cpufreq_avgfreq(op);
         break;
     }
 

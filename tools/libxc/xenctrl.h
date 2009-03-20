@@ -1242,6 +1242,7 @@ int xc_get_cpufreq_para(int xc_handle, int cpuid,
 int xc_set_cpufreq_gov(int xc_handle, int cpuid, char *govname);
 int xc_set_cpufreq_para(int xc_handle, int cpuid,
                         int ctrl_type, int ctrl_value);
+int xc_get_cpufreq_avgfreq(int xc_handle, int cpuid, int *avg_freq);
 
 struct xc_get_cputopo {
      /* IN: maximum addressable entry in
