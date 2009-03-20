@@ -30,8 +30,10 @@ void print_iommu_regs(struct acpi_drhd_unit *drhd);
 void print_vtd_entries(struct iommu *iommu, int bus, int devfn, u64 gmfn);
 void dump_iommu_info(unsigned char key);
 
-int qinval_setup(struct iommu *iommu);
-int intremap_setup(struct iommu *iommu);
+int enable_qinval(struct iommu *iommu);
+void disable_qinval(struct iommu *iommu);
+int enable_intremap(struct iommu *iommu);
+void disable_intremap(struct iommu *iommu);
 int queue_invalidate_context(struct iommu *iommu,
     u16 did, u16 source_id, u8 function_mask, u8 granu);
 int queue_invalidate_iotlb(struct iommu *iommu,

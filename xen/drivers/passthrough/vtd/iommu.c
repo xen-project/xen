@@ -639,7 +639,7 @@ static void iommu_enable_translation(struct iommu *iommu)
     spin_unlock_irqrestore(&iommu->register_lock, flags);
 }
 
-int iommu_disable_translation(struct iommu *iommu)
+static void iommu_disable_translation(struct iommu *iommu)
 {
     u32 sts;
     unsigned long flags;
@@ -662,7 +662,6 @@ int iommu_disable_translation(struct iommu *iommu)
         cpu_relax();
     }
     spin_unlock_irqrestore(&iommu->register_lock, flags);
-    return 0;
 }
 
 static struct iommu *vector_to_iommu[NR_VECTORS];
@@ -1690,7 +1689,7 @@ static int init_vtd_hw(void)
         for_each_drhd_unit ( drhd )
         {
             iommu = drhd->iommu;
-            if ( qinval_setup(iommu) != 0 )
+            if ( enable_qinval(iommu) != 0 )
             {
                 dprintk(XENLOG_INFO VTDPREFIX,
                         "Failed to enable Queued Invalidation!\n");
@@ -1704,7 +1703,7 @@ static int init_vtd_hw(void)
         for_each_drhd_unit ( drhd )
         {
             iommu = drhd->iommu;
-            if ( intremap_setup(iommu) != 0 )
+            if ( enable_intremap(iommu) != 0 )
             {
                 dprintk(XENLOG_INFO VTDPREFIX,
                         "Failed to enable Interrupt Remapping!\n");
@@ -1934,6 +1933,14 @@ void iommu_suspend(void)
             (u32) dmar_readl(iommu->reg, DMAR_FEADDR_REG);
         iommu_state[i][DMAR_FEUADDR_REG] =
             (u32) dmar_readl(iommu->reg, DMAR_FEUADDR_REG);
+
+        iommu_disable_translation(iommu);
+
+        if ( iommu_intremap )
+            disable_intremap(iommu);
+
+        if ( iommu_qinval )
+            disable_qinval(iommu);
     }
 }
 
@@ -1946,7 +1953,11 @@ void iommu_resume(void)
     if ( !vtd_enabled )
         return;
 
-    iommu_flush_all();
+    /* Not sure whether the flush operation is required to meet iommu
+     * specification. Note that BIOS also executes in S3 resume and iommu may
+     * be touched again, so let us do the flush operation for safety.
+     */
+    flush_all_cache();
 
     if ( init_vtd_hw() != 0  && force_iommu )
          panic("IOMMU setup failed, crash Xen for security purpose!\n");
@@ -1964,6 +1975,7 @@ void iommu_resume(void)
                     (u32) iommu_state[i][DMAR_FEADDR_REG]);
         dmar_writel(iommu->reg, DMAR_FEUADDR_REG,
                     (u32) iommu_state[i][DMAR_FEUADDR_REG]);
+
         iommu_enable_translation(iommu);
     }
 }

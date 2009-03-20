@@ -44,16 +44,16 @@ void do_suspend_lowlevel(void);
 
 static int device_power_down(void)
 {
-    iommu_suspend();
-
     console_suspend();
 
     time_suspend();
 
     i8259A_suspend();
-    
+
     ioapic_suspend();
-    
+
+    iommu_suspend();
+
     lapic_suspend();
 
     return 0;
@@ -62,16 +62,16 @@ static int device_power_down(void)
 static void device_power_up(void)
 {
     lapic_resume();
-    
+
+    iommu_resume();
+
     ioapic_resume();
 
     i8259A_resume();
-    
+
     time_resume();
 
     console_resume();
-
-    iommu_resume();
 }
 
 static void freeze_domains(void)
