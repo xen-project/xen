@@ -516,6 +516,17 @@ int do_pm_op(struct xen_sysctl_pm_op *op)
         break;
     }
 
+    case XEN_SYSCTL_pm_op_set_sched_opt_smt:
+    {
+        uint32_t saved_value;
+
+        saved_value = sched_smt_power_savings;
+        sched_smt_power_savings = !!op->set_sched_opt_smt;
+        op->set_sched_opt_smt = saved_value;
+
+        break;
+    }
+
     default:
         printk("not defined sub-hypercall @ do_pm_op\n");
         ret = -ENOSYS;

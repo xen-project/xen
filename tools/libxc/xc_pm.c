@@ -345,3 +345,20 @@ int xc_get_cputopo(int xc_handle, struct xc_get_cputopo *info)
     return rc;
 }
 
+/* value:   0 - disable sched_smt_power_savings 
+            1 - enable sched_smt_power_savings
+ */
+int xc_set_sched_opt_smt(int xc_handle, uint32_t value)
+{
+   int rc;
+   DECLARE_SYSCTL;
+
+   sysctl.cmd = XEN_SYSCTL_pm_op;
+   sysctl.u.pm_op.cmd = XEN_SYSCTL_pm_op_set_sched_opt_smt;
+   sysctl.u.pm_op.cpuid = 0;
+   sysctl.u.pm_op.set_sched_opt_smt = value;
+   rc = do_sysctl(xc_handle, &sysctl);
+
+   return rc;
+}
+

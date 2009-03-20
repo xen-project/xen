@@ -56,6 +56,7 @@ void show_help(void)
             " set-up-threshold      [cpuid] <num> set up threshold on CPU <cpuid> or all\n"
             "                                     it is used in ondemand governor.\n"
             " get-cpu-topology                    get thread/core/socket topology info\n"
+            " set-sched-smt           enable|disable enable/disable scheduler smt power saving\n"
             " start [seconds]                     start collect Cx/Px statistics,\n"
             "                                     output after CTRL-C or SIGINT or several seconds.\n"
             );
@@ -838,6 +839,36 @@ void cpu_topology_func(int argc, char *argv[])
     return ;
 }
 
+void set_sched_smt_func(int argc, char *argv[])
+{
+    int value, rc;
+
+    if (argc != 1){
+        show_help();
+        exit(-1);
+    }
+
+    if ( !strncmp(argv[0], "disable", sizeof("disable")) )
+    {
+        value = 0;
+    }
+    else if ( !strncmp(argv[0], "enable", sizeof("enable")) )
+    {
+        value = 1;
+    }
+    else
+    {
+        show_help();
+        exit(-1);
+    }
+
+    rc = xc_set_sched_opt_smt(xc_fd, value);
+    printf("%s sched_smt_power_savings %s\n", argv[0],
+                    rc? "failed":"successeed" );
+
+    return;
+}
+
 struct {
     const char *name;
     void (*function)(int argc, char *argv[]);
@@ -854,6 +885,7 @@ struct {
     { "set-sampling-rate", scaling_sampling_rate_func },
     { "set-up-threshold", scaling_up_threshold_func },
     { "get-cpu-topology", cpu_topology_func},
+    { "set-sched-smt", set_sched_smt_func},
 };
 
 int main(int argc, char *argv[])

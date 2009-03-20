@@ -1260,4 +1260,6 @@ struct xc_get_cputopo {
 
 int xc_get_cputopo(int xc_handle, struct xc_get_cputopo *info);
 
+int xc_set_sched_opt_smt(int xc_handle, uint32_t value);
+
 #endif /* XENCTRL_H */

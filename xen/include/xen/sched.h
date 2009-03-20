@@ -550,6 +550,8 @@ uint64_t get_cpu_idle_time(unsigned int cpu);
 #define is_hvm_vcpu(v)   (is_hvm_domain(v->domain))
 #define need_iommu(d)    ((d)->need_iommu && !(d)->is_hvm)
 
+extern int sched_smt_power_savings;
+
 extern enum cpufreq_controller {
     FREQCTL_none, FREQCTL_dom0_kernel, FREQCTL_xen
 } cpufreq_controller;

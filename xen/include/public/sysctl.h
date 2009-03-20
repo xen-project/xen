@@ -348,11 +348,9 @@ struct xen_set_cpufreq_para {
 
     uint32_t ctrl_type;
     uint32_t ctrl_value;
-}
-;
+};
+
 /* Get physical CPU topology information. */
-
-
 #define INVALID_TOPOLOGY_ID  (~0U)
 struct xen_get_cputopo {
      /* IN: maximum addressable entry in
@@ -381,6 +379,9 @@ struct xen_sysctl_pm_op {
     /* get CPU topology */
     #define XEN_SYSCTL_pm_op_get_cputopo  0x20
 
+    /* set/reset scheduler power saving option */
+    #define XEN_SYSCTL_pm_op_set_sched_opt_smt    0x21
+
     uint32_t cmd;
     uint32_t cpuid;
     union {
@@ -389,6 +390,7 @@ struct xen_sysctl_pm_op {
         struct xen_set_cpufreq_para set_para;
         uint64_t get_avgfreq;
         struct xen_get_cputopo      get_topo;
+        uint32_t                    set_sched_opt_smt;
     };
 };
 

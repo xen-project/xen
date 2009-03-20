@@ -387,7 +387,7 @@ csched_cpu_pick(struct vcpu *vc)
     {
         cpumask_t cpu_idlers;
         cpumask_t nxt_idlers;
-        int nxt;
+        int nxt, weight_cpu, weight_nxt;
 
         nxt = cycle_cpu(cpu, cpus);
 
@@ -404,7 +404,10 @@ csched_cpu_pick(struct vcpu *vc)
             cpus_and(nxt_idlers, idlers, cpu_core_map[nxt]);
         }
 
-        if ( cpus_weight(cpu_idlers) < cpus_weight(nxt_idlers) )
+        weight_cpu = cpus_weight(cpu_idlers);
+        weight_nxt = cpus_weight(nxt_idlers);
+        if ( ( (weight_cpu < weight_nxt) ^ sched_smt_power_savings )
+                && (weight_cpu != weight_nxt) )
         {
             cpu = nxt;
             cpu_clear(cpu, cpus);
