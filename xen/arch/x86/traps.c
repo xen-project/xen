@@ -2208,13 +2208,13 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         default:
             if ( wrmsr_hypervisor_regs(regs->ecx, eax, edx) )
                 break;
-            if (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL) {
-                if ( intel_mce_wrmsr(regs->ecx, eax, edx) != 0) {
-                    gdprintk(XENLOG_ERR, "MCE: vMCE MSRS(%lx) Write"
-                        " (%x:%x) Fails! ", regs->ecx, edx, eax);
+            if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
+            {
+                int rc = intel_mce_wrmsr(regs->ecx, eax, edx);
+                if ( rc == -1 )
                     goto fail;
-                }
-                break;
+                if ( rc == 0 )
+                    break;
             }
 
             if ( (rdmsr_safe(regs->ecx, l, h) != 0) ||
@@ -2301,9 +2301,13 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             if ( rdmsr_safe(regs->ecx, regs->eax, regs->edx) )
                 goto fail;
 
-            if (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL) {
-                if ( intel_mce_rdmsr(regs->ecx, &eax, &edx) != 0)
-                    printk(KERN_ERR "MCE: Not MCE MSRs %lx\n", regs->ecx);
+            if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
+            {
+                int rc = intel_mce_rdmsr(regs->ecx, &eax, &edx);
+                if ( rc == -1 )
+                    goto fail;
+                if ( rc == 0 )
+                    break;
             }
 
             break;
