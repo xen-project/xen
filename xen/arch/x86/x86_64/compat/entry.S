@@ -408,6 +408,7 @@ ENTRY(compat_hypercall_table)
         .quad do_sysctl                 /* 35 */
         .quad do_domctl
         .quad compat_kexec_op
+        .quad do_tmem_op
         .rept __HYPERVISOR_arch_0-((.-compat_hypercall_table)/8)
         .quad compat_ni_hypercall
         .endr
@@ -455,6 +456,7 @@ ENTRY(compat_hypercall_args_table)
         .byte 1 /* do_sysctl                */  /* 35 */
         .byte 1 /* do_domctl                */
         .byte 2 /* compat_kexec_op          */
+        .byte 1 /* do_tmem_op               */
         .rept __HYPERVISOR_arch_0-(.-compat_hypercall_args_table)
         .byte 0 /* compat_ni_hypercall      */
         .endr

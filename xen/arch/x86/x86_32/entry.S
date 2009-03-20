@@ -703,6 +703,7 @@ ENTRY(hypercall_table)
         .long do_sysctl             /* 35 */
         .long do_domctl
         .long do_kexec_op
+        .long do_tmem_op
         .rept __HYPERVISOR_arch_0-((.-hypercall_table)/4)
         .long do_ni_hypercall
         .endr
@@ -750,6 +751,7 @@ ENTRY(hypercall_args_table)
         .byte 1 /* do_sysctl            */  /* 35 */
         .byte 1 /* do_domctl            */
         .byte 2 /* do_kexec_op          */
+        .byte 1 /* do_tmem_op           */
         .rept __HYPERVISOR_arch_0-(.-hypercall_args_table)
         .byte 0 /* do_ni_hypercall      */
         .endr
