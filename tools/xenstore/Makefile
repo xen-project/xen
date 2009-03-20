@@ -97,9 +97,9 @@ install: all
 	$(INSTALL_DIR) $(DESTDIR)$(INCLUDEDIR)
 	$(INSTALL_PROG) xenstored $(DESTDIR)$(SBINDIR)
 	$(INSTALL_PROG) xenstore-control $(DESTDIR)$(BINDIR)
-	$(INSTALL_PROG) xenstore $(DESTDIR)/usr/bin
+	$(INSTALL_PROG) xenstore $(DESTDIR)$(BINDIR)
 	set -e ; for c in $(CLIENTS) ; do \
-		ln -f $(DESTDIR)/usr/bin/xenstore $(DESTDIR)/usr/bin/$${c} ; \
+		ln -f $(DESTDIR)$(BINDIR)/xenstore $(DESTDIR)$(BINDIR)/$${c} ; \
 	done
 	$(INSTALL_DIR) $(DESTDIR)$(LIBDIR)
 	$(INSTALL_PROG) libxenstore.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)
