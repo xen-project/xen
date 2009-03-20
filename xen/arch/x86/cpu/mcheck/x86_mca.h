@@ -87,6 +87,53 @@
 typedef DECLARE_BITMAP(cpu_banks_t, MAX_NR_BANKS);
 DECLARE_PER_CPU(cpu_banks_t, mce_banks_owned);
 
+/* Below interfaces are defined for MCA internal processing:
+ * a. pre_handler will be called early in MCA ISR context, mainly for early
+ *    need_reset detection for avoiding log missing. Also, it is used to judge
+ *    impacted DOMAIN if possible.
+ * b. mca_error_handler is actually a (error_action_index,
+ *    recovery_hanlder pointer) pair. The defined recovery_handler
+ *    performs the actual recovery operations such as page_offline, cpu_offline
+ *    in softIRQ context when the per_bank MCA error matching the corresponding
+ *    mca_code index. If pre_handler can't judge the impacted domain,
+ *    recovery_handler must figure it out.
+*/
+
+/* MCA error has been recovered successfully by the recovery action*/
+#define MCA_RECOVERED (0x1 < 0)
+/* MCA error impact the specified DOMAIN in owner field below */
+#define MCA_OWNER (0x1 < 1)
+/* MCA error can't be recovered and need reset */
+#define MCA_NEED_RESET (0x1 < 2)
+/* MCA error need further actions in softIRQ context for recovery */
+#define MCA_MORE_ACTION (0x1 < 3)
+
+struct mca_handle_result
+{
+    uint32_t result;
+    /* Used one result & MCA_OWNER */
+    domid_t owner;
+    /* Used by mca_error_handler, result & MCA_RECOVRED */
+    struct recovery_action *action;
+};
+
+extern void (*mca_prehandler)( struct cpu_user_regs *regs,
+                        struct mca_handle_result *result);
+
+struct mca_error_handler
+{
+    /* Assume corresponding recovery action could be uniquely
+     * identified by mca_code. Otherwise, we might need to have
+     * a seperate function to decode the corresponding actions
+     * for the particular mca error later.
+    */
+    uint16_t mca_code;
+    void (*recovery_handler)( struct mcinfo_bank *bank,
+                    struct mcinfo_global *global,
+                    struct mcinfo_extended *extension,
+                    struct mca_handle_result *result);
+};
+
 /* Global variables */
 extern int mce_disabled;
 extern unsigned int nr_mce_banks;

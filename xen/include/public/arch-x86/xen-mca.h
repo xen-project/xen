@@ -104,6 +104,7 @@
 #define MC_TYPE_GLOBAL          0
 #define MC_TYPE_BANK            1
 #define MC_TYPE_EXTENDED        2
+#define MC_TYPE_RECOVERY        3
 
 struct mcinfo_common {
     uint16_t type;      /* structure type */
@@ -171,6 +172,68 @@ struct mcinfo_extended {
     */
     struct mcinfo_msr mc_msr[10];
 };
+
+/* Recovery Action flags. Giving recovery result information to DOM0 */
+
+/* Xen takes successful recovery action, the error is recovered */
+#define REC_ACTION_RECOVERED (0x1 << 0)
+/* No action is performed by XEN */
+#define REC_ACTION_NONE (0x1 << 1)
+/* It's possible DOM0 might take action ownership in some case */
+#define REC_ACTION_NEED_RESET (0x1 << 2)
+
+/* Different Recovery Action types, if the action is performed successfully,
+ * REC_ACTION_RECOVERED flag will be returned.
+ */
+
+/* Page Offline Action */
+#define MC_ACTION_PAGE_OFFLINE (0x1 << 0)
+/* CPU offline Action */
+#define MC_ACTION_CPU_OFFLINE (0x1 << 1)
+/* L3 cache disable Action */
+#define MC_ACTION_CACHE_SHRINK (0x1 << 2)
+
+/* Below interface used between XEN/DOM0 for passing XEN's recovery action 
+ * information to DOM0. 
+ * usage Senario: After offlining broken page, XEN might pass its page offline
+ * recovery action result to DOM0. DOM0 will save the information in 
+ * non-volatile memory for further proactive actions, such as offlining the
+ * easy broken page earlier when doing next reboot.
+*/
+struct page_offline_action
+{
+    /* Params for passing the offlined page number to DOM0 */
+    uint64_t mfn;
+    uint64_t status;
+};
+
+struct cpu_offline_action
+{
+    /* Params for passing the identity of the offlined CPU to DOM0 */
+    uint32_t mc_socketid;
+    uint16_t mc_coreid;
+    uint16_t mc_core_threadid;
+};
+
+#define MAX_UNION_SIZE 16
+struct mc_recovery
+{
+    uint16_t mc_bank; /* bank nr */
+    uint8_t action_flags;
+    uint8_t action_types;
+    union {
+        struct page_offline_action page_retire;
+        struct cpu_offline_action cpu_offline;
+        uint8_t pad[MAX_UNION_SIZE];
+    } action_info;
+};
+
+struct mcinfo_recovery
+{
+    struct mcinfo_common common;
+    struct mc_recovery mc_action;
+};
+
 
 #define MCINFO_HYPERCALLSIZE	1024
 #define MCINFO_MAXSIZE		768
