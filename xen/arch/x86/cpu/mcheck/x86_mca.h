@@ -83,9 +83,7 @@
 /*Intel Specific bitfield*/
 #define CMCI_THRESHOLD			0x2
 
-
-#define MAX_NR_BANKS 128
-
+#include <asm/domain.h>
 typedef DECLARE_BITMAP(cpu_banks_t, MAX_NR_BANKS);
 DECLARE_PER_CPU(cpu_banks_t, mce_banks_owned);
 

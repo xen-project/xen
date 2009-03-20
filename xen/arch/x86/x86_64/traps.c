@@ -14,6 +14,8 @@
 #include <xen/nmi.h>
 #include <asm/current.h>
 #include <asm/flushtlb.h>
+#include <asm/traps.h>
+#include <asm/event.h>
 #include <asm/msr.h>
 #include <asm/page.h>
 #include <asm/shared.h>
@@ -265,6 +267,9 @@ unsigned long do_iret(void)
     struct cpu_user_regs *regs = guest_cpu_user_regs();
     struct iret_context iret_saved;
     struct vcpu *v = current;
+    struct domain *d = v->domain;
+    struct bank_entry *entry;
+    int cpu = smp_processor_id();
 
     if ( unlikely(copy_from_user(&iret_saved, (void *)regs->rsp,
                                  sizeof(iret_saved))) )
@@ -304,6 +309,48 @@ unsigned long do_iret(void)
        && !cpus_equal(v->cpu_affinity_tmp, v->cpu_affinity))
         vcpu_set_affinity(v, &v->cpu_affinity_tmp);
 
+   /*Currently, only inject vMCE to DOM0.*/
+    if (v->trap_priority >= VCPU_TRAP_NMI) {
+        printk(KERN_DEBUG "MCE: Return from vMCE# trap!");
+        if (d->domain_id == 0 && v->vcpu_id == 0) {
+            if ( !d->arch.vmca_msrs.nr_injection ) {
+                printk(KERN_WARNING "MCE: Ret from vMCE#, nr_injection is 0\n");
+                goto end;
+            }
+
+            d->arch.vmca_msrs.nr_injection--;
+            if (!list_empty(&d->arch.vmca_msrs.impact_header)) {
+                entry = list_entry(d->arch.vmca_msrs.impact_header.next,
+                    struct bank_entry, list);
+                printk(KERN_DEBUG "MCE: Delete last injection Node\n");
+                list_del(&entry->list);
+            }
+            else
+                printk(KERN_DEBUG "MCE: Not found last injection "
+                    "Node, something Wrong!\n");
+
+            /* futher injection*/
+            if ( d->arch.vmca_msrs.nr_injection > 0) {
+                if ( d->arch.vmca_msrs.nr_injection > 0 &&
+                        guest_has_trap_callback(d, v->vcpu_id,
+                            TRAP_machine_check) &&
+                        !test_and_set_bool(dom0->vcpu[0]->mce_pending)) {
+                    cpumask_t affinity;
+
+                    dom0->vcpu[0]->cpu_affinity_tmp =
+                            dom0->vcpu[0]->cpu_affinity;
+                    cpus_clear(affinity);
+                    cpu_set(cpu, affinity);
+                    printk(KERN_DEBUG "MCE: CPU%d set affinity, old %d\n", cpu,
+                        dom0->vcpu[0]->processor);
+                    vcpu_set_affinity(dom0->vcpu[0], &affinity);
+                    vcpu_kick(dom0->vcpu[0]);
+                }
+            }
+        }
+    } /* end of outer-if */
+
+end:
     /* Restore previous trap priority */
     v->trap_priority = v->old_trap_priority;
 

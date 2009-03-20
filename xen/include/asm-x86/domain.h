@@ -203,6 +203,31 @@ typedef xen_domctl_cpuid_t cpuid_input_t;
 
 struct p2m_domain;
 
+/* Define for GUEST MCA handling */
+#define MAX_NR_BANKS 30
+
+/* This entry is for recording bank nodes for the impacted domain,
+ * put into impact_header list. */
+struct bank_entry {
+    struct list_head list;
+    int32_t cpu;
+    uint16_t bank;
+    uint64_t mci_status;
+    uint64_t mci_addr;
+    uint64_t mci_misc;
+};
+
+struct domain_mca_msrs
+{
+    /* Guest should not change below values after DOM boot up */
+    uint64_t mcg_cap;
+    uint64_t mcg_ctl;
+    uint64_t mcg_status;
+    uint64_t mci_ctl[MAX_NR_BANKS];
+    uint16_t nr_injection;
+    struct list_head impact_header;
+};
+
 struct arch_domain
 {
     l1_pgentry_t *mm_perdomain_pt;
@@ -269,6 +294,9 @@ struct arch_domain
     struct page_list_head relmem_list;
 
     cpuid_input_t cpuids[MAX_CPUID_INPUT];
+
+    /* For Guest vMCA handling */
+    struct domain_mca_msrs vmca_msrs;
 } __cacheline_aligned;
 
 #define has_arch_pdevs(d)    (!list_empty(&(d)->arch.pdev_list))

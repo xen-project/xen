@@ -373,6 +373,7 @@ void vcpu_destroy(struct vcpu *v)
         hvm_vcpu_destroy(v);
 }
 
+extern uint64_t g_mcg_cap;
 int arch_domain_create(struct domain *d, unsigned int domcr_flags)
 {
 #ifdef __x86_64__
@@ -455,6 +456,16 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
 
         if ( (rc = iommu_domain_init(d)) != 0 )
             goto fail;
+
+        /* For Guest vMCE MSRs virtualization */
+        d->arch.vmca_msrs.mcg_status = 0x0;
+        d->arch.vmca_msrs.mcg_cap = g_mcg_cap;
+        d->arch.vmca_msrs.mcg_ctl = (uint64_t)~0x0;
+        d->arch.vmca_msrs.nr_injection = 0;
+        memset(d->arch.vmca_msrs.mci_ctl, 0x1,
+            sizeof(d->arch.vmca_msrs.mci_ctl));
+        INIT_LIST_HEAD(&d->arch.vmca_msrs.impact_header);
+
     }
 
     if ( is_hvm_domain(d) )
