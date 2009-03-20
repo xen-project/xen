@@ -75,6 +75,7 @@ class PciController(DevController):
             bus = parse_hex(pci_config.get('bus', 0))
             slot = parse_hex(pci_config.get('slot', 0))
             func = parse_hex(pci_config.get('func', 0))            
+            vslot = parse_hex(pci_config.get('vslot', 0))
 
             opts = pci_config.get('opts', '')
             if len(opts) > 0:
