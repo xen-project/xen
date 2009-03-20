@@ -43,7 +43,7 @@ void restore_rest_processor_state(void)
     wrmsr(MSR_SYSCALL_MASK, EF_VM|EF_RF|EF_NT|EF_DF|EF_IE|EF_TF, 0U);    
 #else /* !defined(CONFIG_X86_64) */
     if ( supervisor_mode_kernel && cpu_has_sep )
-        wrmsr(MSR_IA32_SYSENTER_ESP, &t->esp1, 0);
+        wrmsr(MSR_IA32_SYSENTER_ESP, &init_tss[smp_processor_id()].esp1, 0);
 #endif
 
     /* Maybe load the debug registers. */
