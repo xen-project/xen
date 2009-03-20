@@ -728,8 +728,6 @@ static void pv_cpuid(struct cpu_user_regs *regs)
         if ( !opt_allow_hugepage )
             __clear_bit(X86_FEATURE_PSE, &d);
         __clear_bit(X86_FEATURE_PGE, &d);
-        __clear_bit(X86_FEATURE_MCE, &d);
-        __clear_bit(X86_FEATURE_MCA, &d);
         __clear_bit(X86_FEATURE_PSE36, &d);
     }
     switch ( (uint32_t)regs->eax )
@@ -1639,6 +1637,10 @@ static int is_cpufreq_controller(struct domain *d)
             (d->domain_id == 0));
 }
 
+/*Intel vMCE MSRs virtualization*/
+extern int intel_mce_wrmsr(u32 msr, u32 lo,  u32 hi);
+extern int intel_mce_rdmsr(u32 msr, u32 *lo,  u32 *hi);
+
 static int emulate_privileged_op(struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
@@ -2206,6 +2208,15 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         default:
             if ( wrmsr_hypervisor_regs(regs->ecx, eax, edx) )
                 break;
+            if (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL) {
+                if ( intel_mce_wrmsr(regs->ecx, eax, edx) != 0) {
+                    gdprintk(XENLOG_ERR, "MCE: vMCE MSRS(%lx) Write"
+                        " (%x:%x) Fails! ", regs->ecx, edx, eax);
+                    goto fail;
+                }
+                break;
+            }
+
             if ( (rdmsr_safe(regs->ecx, l, h) != 0) ||
                  (eax != l) || (edx != h) )
         invalid:
@@ -2289,6 +2300,12 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                         _p(regs->ecx));*/
             if ( rdmsr_safe(regs->ecx, regs->eax, regs->edx) )
                 goto fail;
+
+            if (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL) {
+                if ( intel_mce_rdmsr(regs->ecx, &eax, &edx) != 0)
+                    printk(KERN_ERR "MCE: Not MCE MSRs %lx\n", regs->ecx);
+            }
+
             break;
         }
         break;

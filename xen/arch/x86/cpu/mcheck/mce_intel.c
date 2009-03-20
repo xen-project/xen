@@ -812,3 +812,260 @@ int intel_mcheck_init(struct cpuinfo_x86 *c)
     open_softirq(MACHINE_CHECK_SOFTIRQ, mce_softirq);
     return 1;
 }
+
+/* Guest vMCE# MSRs virtualization ops (rdmsr/wrmsr) */
+int intel_mce_wrmsr(u32 msr, u32 lo, u32 hi)
+{
+    struct domain *d = current->domain;
+    struct bank_entry *entry = NULL;
+    uint64_t value = (u64)hi << 32 | lo;
+    int ret = 0;
+
+    spin_lock(&mce_locks);
+    switch(msr)
+    {
+        case MSR_IA32_MCG_CTL:
+            if (value != (u64)~0x0 && value != 0x0) {
+                printk(KERN_ERR "MCE: value writen to MCG_CTL"
+                    "should be all 0s or 1s\n");
+                ret = -1;
+                break;
+            }
+            if (!d || is_idle_domain(d)) {
+                printk(KERN_ERR "MCE: wrmsr not in DOM context, skip\n");
+                break;
+            }
+            d->arch.vmca_msrs.mcg_ctl = value;
+            break;
+        case MSR_IA32_MCG_STATUS:
+            if (!d || is_idle_domain(d)) {
+                printk(KERN_ERR "MCE: wrmsr not in DOM context, skip\n");
+                break;
+            }
+            d->arch.vmca_msrs.mcg_status = value;
+            printk(KERN_DEBUG "MCE: wrmsr MCG_CTL %lx\n", value);
+            break;
+        case MSR_IA32_MC0_CTL2:
+        case MSR_IA32_MC1_CTL2:
+        case MSR_IA32_MC2_CTL2:
+        case MSR_IA32_MC3_CTL2:
+        case MSR_IA32_MC4_CTL2:
+        case MSR_IA32_MC5_CTL2:
+        case MSR_IA32_MC6_CTL2:
+        case MSR_IA32_MC7_CTL2:
+        case MSR_IA32_MC8_CTL2:
+            printk(KERN_ERR "We have disabled CMCI capability, "
+                    "Guest should not write this MSR!\n");
+            break;
+        case MSR_IA32_MC0_CTL:
+        case MSR_IA32_MC1_CTL:
+        case MSR_IA32_MC2_CTL:
+        case MSR_IA32_MC3_CTL:
+        case MSR_IA32_MC4_CTL:
+        case MSR_IA32_MC5_CTL:
+        case MSR_IA32_MC6_CTL:
+        case MSR_IA32_MC7_CTL:
+        case MSR_IA32_MC8_CTL:
+            if (value != (u64)~0x0 && value != 0x0) {
+                printk(KERN_ERR "MCE: value writen to MCi_CTL"
+                    "should be all 0s or 1s\n");
+                ret = -1;
+                break;
+            }
+            if (!d || is_idle_domain(d)) {
+                printk(KERN_ERR "MCE: wrmsr not in DOM context, skip\n");
+                break;
+            }
+            d->arch.vmca_msrs.mci_ctl[(msr - MSR_IA32_MC0_CTL)/4] = value;
+            break;
+        case MSR_IA32_MC0_STATUS:
+        case MSR_IA32_MC1_STATUS:
+        case MSR_IA32_MC2_STATUS:
+        case MSR_IA32_MC3_STATUS:
+        case MSR_IA32_MC4_STATUS:
+        case MSR_IA32_MC5_STATUS:
+        case MSR_IA32_MC6_STATUS:
+        case MSR_IA32_MC7_STATUS:
+        case MSR_IA32_MC8_STATUS:
+            if (!d || is_idle_domain(d)) {
+                /* Just skip */
+                printk(KERN_ERR "mce wrmsr: not in domain context!\n");
+                break;
+            }
+            /* Give the first entry of the list, it corresponds to current
+             * vMCE# injection. When vMCE# is finished processing by the
+             * the guest, this node will be deleted.
+             * Only error bank is written. Non-error bank simply return.
+             */
+            if ( !list_empty(&d->arch.vmca_msrs.impact_header) ) {
+                entry = list_entry(d->arch.vmca_msrs.impact_header.next,
+                    struct bank_entry, list);
+                if ( entry->bank == (msr - MSR_IA32_MC0_STATUS)/4 ) {
+                    entry->mci_status = value;
+                }
+                printk(KERN_DEBUG "MCE: wmrsr mci_status in vMCE# context\n");
+            }
+            printk(KERN_DEBUG "MCE: wrmsr mci_status val:%lx\n", value);
+            break;
+    }
+    spin_unlock(&mce_locks);
+    return ret;
+}
+
+int intel_mce_rdmsr(u32 msr, u32 *lo, u32 *hi)
+{
+    struct domain *d = current->domain;
+    int ret = 0;
+    struct bank_entry *entry = NULL;
+
+    *lo = *hi = 0x0;
+    spin_lock(&mce_locks);
+    switch(msr)
+    {
+        case MSR_IA32_MCG_STATUS:
+            if (!d || is_idle_domain(d)) {
+                printk(KERN_ERR "MCE: rdmsr not in domain context!\n");
+                *lo = *hi = 0x0;
+                break;
+            }
+            *lo = (u32)d->arch.vmca_msrs.mcg_status;
+            *hi = (u32)(d->arch.vmca_msrs.mcg_status >> 32);
+            printk(KERN_DEBUG "MCE: rd MCG_STATUS lo %x hi %x\n", *lo, *hi);
+            break;
+        case MSR_IA32_MCG_CAP:
+            if (!d || is_idle_domain(d)) {
+                printk(KERN_ERR "MCE: rdmsr not in domain context!\n");
+                *lo = *hi = 0x0;
+                break;
+            }
+            *lo = (u32)d->arch.vmca_msrs.mcg_cap;
+            *hi = (u32)(d->arch.vmca_msrs.mcg_cap >> 32);
+            printk(KERN_DEBUG "MCE: rdmsr MCG_CAP lo %x hi %x\n", *lo, *hi);
+            break;
+        case MSR_IA32_MCG_CTL:
+            if (!d || is_idle_domain(d)) {
+                printk(KERN_ERR "MCE: rdmsr not in domain context!\n");
+                *lo = *hi = 0x0;
+                break;
+            }
+            *lo = (u32)d->arch.vmca_msrs.mcg_ctl;
+            *hi = (u32)(d->arch.vmca_msrs.mcg_ctl >> 32);
+            printk(KERN_DEBUG "MCE: rdmsr MCG_CTL lo %x hi %x\n", *lo, *hi);
+            break;
+        case MSR_IA32_MC0_CTL2:
+        case MSR_IA32_MC1_CTL2:
+        case MSR_IA32_MC2_CTL2:
+        case MSR_IA32_MC3_CTL2:
+        case MSR_IA32_MC4_CTL2:
+        case MSR_IA32_MC5_CTL2:
+        case MSR_IA32_MC6_CTL2:
+        case MSR_IA32_MC7_CTL2:
+        case MSR_IA32_MC8_CTL2:
+            printk(KERN_WARNING "We have disabled CMCI capability, "
+                    "Guest should not read this MSR!\n");
+            break;
+        case MSR_IA32_MC0_CTL:
+        case MSR_IA32_MC1_CTL:
+        case MSR_IA32_MC2_CTL:
+        case MSR_IA32_MC3_CTL:
+        case MSR_IA32_MC4_CTL:
+        case MSR_IA32_MC5_CTL:
+        case MSR_IA32_MC6_CTL:
+        case MSR_IA32_MC7_CTL:
+        case MSR_IA32_MC8_CTL:
+            if (!d || is_idle_domain(d)) {
+                printk(KERN_ERR "MCE: rdmsr not in domain context!\n");
+                *lo = *hi = 0x0;
+                break;
+            }
+            *lo = (u32)d->arch.vmca_msrs.mci_ctl[(msr - MSR_IA32_MC0_CTL)/4];
+            *hi =
+                (u32)(d->arch.vmca_msrs.mci_ctl[(msr - MSR_IA32_MC0_CTL)/4]
+                    >> 32);
+            printk(KERN_DEBUG "MCE: rdmsr MCi_CTL lo %x hi %x\n", *lo, *hi);
+            break;
+        case MSR_IA32_MC0_STATUS:
+        case MSR_IA32_MC1_STATUS:
+        case MSR_IA32_MC2_STATUS:
+        case MSR_IA32_MC3_STATUS:
+        case MSR_IA32_MC4_STATUS:
+        case MSR_IA32_MC5_STATUS:
+        case MSR_IA32_MC6_STATUS:
+        case MSR_IA32_MC7_STATUS:
+        case MSR_IA32_MC8_STATUS:
+            /* Only error bank is read. Non-error bank simply return */
+            *lo = *hi = 0x0;
+            printk(KERN_DEBUG "MCE: rdmsr mci_status\n");
+            if (!d || is_idle_domain(d)) {
+                printk(KERN_ERR "mce_rdmsr: not in domain context!\n");
+                break;
+            }
+            if (!list_empty(&d->arch.vmca_msrs.impact_header)) {
+                entry = list_entry(d->arch.vmca_msrs.impact_header.next,
+                    struct bank_entry, list);
+                if ( entry->bank == (msr - MSR_IA32_MC0_STATUS)/4 ) {
+                    *lo = entry->mci_status;
+                    *hi = entry->mci_status >> 32;
+                    printk(KERN_DEBUG "MCE: rdmsr MCi_STATUS in vmCE# context "
+                        "lo %x hi %x\n", *lo, *hi);
+                }
+            }
+            break;
+        case MSR_IA32_MC0_ADDR:
+        case MSR_IA32_MC1_ADDR:
+        case MSR_IA32_MC2_ADDR:
+        case MSR_IA32_MC3_ADDR:
+        case MSR_IA32_MC4_ADDR:
+        case MSR_IA32_MC5_ADDR:
+        case MSR_IA32_MC6_ADDR:
+        case MSR_IA32_MC7_ADDR:
+        case MSR_IA32_MC8_ADDR:
+            *lo = *hi = 0x0;
+            if (!d || is_idle_domain(d)) {
+                printk(KERN_ERR "mce_rdmsr: not in domain context!\n");
+                break;
+            }
+            if (!list_empty(&d->arch.vmca_msrs.impact_header)) {
+                entry = list_entry(d->arch.vmca_msrs.impact_header.next,
+                    struct bank_entry, list);
+                if ( entry->bank == (msr - MSR_IA32_MC0_ADDR)/4 ) {
+                    *lo = entry->mci_addr;
+                    *hi = entry->mci_addr >> 32;
+                    printk(KERN_DEBUG "MCE: rdmsr MCi_ADDR in vMCE# context "
+                        "lo %x hi %x\n", *lo, *hi);
+                }
+            }
+            break;
+        case MSR_IA32_MC0_MISC:
+        case MSR_IA32_MC1_MISC:
+        case MSR_IA32_MC2_MISC:
+        case MSR_IA32_MC3_MISC:
+        case MSR_IA32_MC4_MISC:
+        case MSR_IA32_MC5_MISC:
+        case MSR_IA32_MC6_MISC:
+        case MSR_IA32_MC7_MISC:
+        case MSR_IA32_MC8_MISC:
+            *lo = *hi = 0x0;
+            if (!d || is_idle_domain(d)) {
+                printk(KERN_ERR "MCE: rdmsr not in domain context!\n");
+                break;
+            }
+            if (!list_empty(&d->arch.vmca_msrs.impact_header)) {
+                entry = list_entry(d->arch.vmca_msrs.impact_header.next,
+                    struct bank_entry, list);
+                if ( entry->bank == (msr - MSR_IA32_MC0_MISC)/4 ) {
+                    *lo = entry->mci_misc;
+                    *hi = entry->mci_misc >> 32;
+                    printk(KERN_DEBUG "MCE: rdmsr MCi_MISC in vMCE# context "
+                        " lo %x hi %x\n", *lo, *hi);
+                }
+            }
+            break;
+        default:
+            break;
+    }
+    spin_unlock(&mce_locks);
+    return ret;
+}
+
+
