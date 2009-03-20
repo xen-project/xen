@@ -222,6 +222,20 @@ static int get_pxstat_by_cpuid(int xc_fd, int cpuid, struct xc_px_stat *pxstat)
     return 0;
 }
 
+/* show cpu actual average freq information on CPU cpuid */
+static int get_avgfreq_by_cpuid(int xc_fd, int cpuid, int *avgfreq)
+{
+    int ret = 0;
+
+    ret = xc_get_cpufreq_avgfreq(xc_fd, cpuid, avgfreq);
+    if ( ret )
+    {
+        return errno;
+    }
+
+    return 0;
+}
+
 static int show_pxstat_by_cpuid(int xc_fd, int cpuid)
 {
     int ret = 0;
@@ -263,6 +277,7 @@ void pxstat_func(int argc, char *argv[])
 static uint64_t usec_start, usec_end;
 static struct xc_cx_stat *cxstat, *cxstat_start, *cxstat_end;
 static struct xc_px_stat *pxstat, *pxstat_start, *pxstat_end;
+static int *avgfreq;
 static uint64_t *sum, *sum_cx, *sum_px;
 
 static void signal_int_handler(int signo)
@@ -298,6 +313,9 @@ static void signal_int_handler(int signo)
                                  pxstat_start[i].pt[j].residency;
     }
 
+    for ( i = 0; i < max_cpu_nr; i++ )
+        get_avgfreq_by_cpuid(xc_fd, i, &avgfreq[i]);
+
     printf("Elapsed time (ms): %"PRIu64"\n", (usec_end - usec_start) / 1000UL);
     for ( i = 0; i < max_cpu_nr; i++ )
     {
@@ -329,6 +347,7 @@ static void signal_int_handler(int signo)
                         res / 1000000UL, 100UL * res / (double)sum_px[i]);
             }
         }
+        printf("  Avg freq\t%d\tKHz\n", avgfreq[i]);
     }
 
     /* some clean up and then exits */
@@ -342,6 +361,7 @@ static void signal_int_handler(int signo)
     free(cxstat);
     free(pxstat);
     free(sum);
+    free(avgfreq);
     xc_interface_close(xc_fd);
     exit(0);
 }
@@ -384,9 +404,18 @@ void start_gather_func(int argc, char *argv[])
         free(cxstat);
         return ;
     }
+    avgfreq = malloc(sizeof(int) * max_cpu_nr);
+    if ( avgfreq == NULL )
+    {
+        free(sum);
+        free(cxstat);
+        free(pxstat);
+        return ;
+    }
     memset(sum, 0, sizeof(uint64_t) * 2 * max_cpu_nr);
     memset(cxstat, 0, sizeof(struct xc_cx_stat) * 2 * max_cpu_nr);
     memset(pxstat, 0, sizeof(struct xc_px_stat) * 2 * max_cpu_nr);
+    memset(avgfreq, 0, sizeof(int) * max_cpu_nr);
     sum_cx = sum;
     sum_px = sum + max_cpu_nr;
     cxstat_start = cxstat;
@@ -405,6 +434,7 @@ void start_gather_func(int argc, char *argv[])
     {
         get_cxstat_by_cpuid(xc_fd, i, &cxstat_start[i]);
         get_pxstat_by_cpuid(xc_fd, i, &pxstat_start[i]);
+        get_avgfreq_by_cpuid(xc_fd, i, &avgfreq[i]);
     }
 
     if (signal(SIGINT, signal_int_handler) == SIG_ERR)
@@ -413,6 +443,7 @@ void start_gather_func(int argc, char *argv[])
         free(sum);
         free(pxstat);
         free(cxstat);
+        free(avgfreq);
         return ;
     }
 
@@ -424,6 +455,7 @@ void start_gather_func(int argc, char *argv[])
             free(sum);
             free(pxstat);
             free(cxstat);
+            free(avgfreq);
             return ;
         }
         alarm(timeout);
