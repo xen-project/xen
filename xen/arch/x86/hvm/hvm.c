@@ -74,11 +74,12 @@ void hvm_enable(struct hvm_function_table *fns)
     printk("HVM: %s enabled\n", fns->name);
 
     /*
-     * Allow direct access to the PC debug port (it is often used for I/O
-     * delays, but the vmexits simply slow things down).
+     * Allow direct access to the PC debug ports 0x80 and 0xed (they are
+     * often used for I/O delays, but the vmexits simply slow things down).
      */
     memset(hvm_io_bitmap, ~0, sizeof(hvm_io_bitmap));
     __clear_bit(0x80, hvm_io_bitmap);
+    __clear_bit(0xed, hvm_io_bitmap);
 
     hvm_funcs   = *fns;
     hvm_enabled = 1;
