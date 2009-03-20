@@ -299,7 +299,7 @@ static unsigned long init_node_heap(int node, unsigned long mfn,
     }
 #ifdef DIRECTMAP_VIRT_END
     else if ( nr >= needed &&
-              mfn + needed <= virt_to_mfn(DIRECTMAP_VIRT_END) )
+              (mfn + needed) <= (virt_to_mfn(DIRECTMAP_VIRT_END - 1) + 1) )
     {
         _heap[node] = mfn_to_virt(mfn);
         avail[node] = mfn_to_virt(mfn + needed) - sizeof(**avail) * NR_ZONES;
