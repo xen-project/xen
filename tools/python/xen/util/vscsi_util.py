@@ -112,7 +112,10 @@ def _vscsi_get_scsidevices_by_sysfs():
     """ get all scsi devices information by sysfs """
 
     devices = []
-    sysfs_mnt = utils.find_sysfs_mount() 
+    try:
+        sysfs_mnt = utils.find_sysfs_mount() 
+    except:
+        return devices
 
     for dirpath, dirnames, files in os.walk(sysfs_mnt + SYSFS_SCSI_PATH):
         for hctl in dirnames:
