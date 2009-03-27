@@ -71,10 +71,13 @@
 
 #define DEBUG_PMM 0
 
+#define __stringify(a) #a
+#define stringify(a) __stringify(a)
+
 #define ASSERT(_expr, _action)                                  \
     if (!(_expr)) {                                             \
         printf("ASSERTION FAIL: %s %s:%d %s()\n",               \
-               __STRING(_expr), __FILE__, __LINE__, __func__);  \
+               stringify(_expr), __FILE__, __LINE__, __func__); \
         _action;                                                \
     } else
 

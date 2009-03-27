@@ -116,7 +116,7 @@ static void msix_put_fixmap(struct pci_dev *dev, int idx)
 /*
  * MSI message composition
  */
-static void msi_compose_msg(struct pci_dev *pdev, int vector,
+void msi_compose_msg(struct pci_dev *pdev, int vector,
                             struct msi_msg *msg)
 {
     unsigned dest;

@@ -114,7 +114,7 @@ def save(fd, dominfo, network, live, dst, checkpoint=False, node=-1):
             if line == "suspend":
                 log.debug("Suspending %d ...", dominfo.getDomid())
                 dominfo.shutdown('suspend')
-                dominfo.waitForShutdown()
+                dominfo.waitForSuspend()
             if line in ('suspend', 'suspended'):
                 dominfo.migrateDevices(network, dst, DEV_MIGRATE_STEP2,
                                        domain_name)

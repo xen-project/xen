@@ -14,9 +14,13 @@ claim_lock "block"
 # split backend/DEVCLASS/VMID/DEVID on slashes
 path_array=( ${XENBUS_PATH//\// } )
 # get /vm/UUID path
-vm=$(xenstore-read "/local/domain/${path_array[2]}/vm")
+vm=$(xenstore_read_default "/local/domain/${path_array[2]}/vm" "")
 # construct /vm/UUID/device/DEVCLASS/DEVID
-vm_dev="$vm/device/${path_array[1]}/${path_array[3]}"
+if [ "$vm" != "" ]; then
+  vm_dev="$vm/device/${path_array[1]}/${path_array[3]}"
+else
+  vm_dev=
+fi
 
 # remove device frontend store entries
 xenstore-rm -t \
@@ -27,6 +31,6 @@ xenstore-rm -t "$XENBUS_PATH"        2>/dev/null || true
 xenstore-rm -t "error/$XENBUS_PATH"  2>/dev/null || true
 
 # remove device path from /vm/UUID
-xenstore-rm -t "$vm_dev" 2>/dev/null || true
+[ "$vm_dev" != "" ] && xenstore-rm -t "$vm_dev" 2>/dev/null || true
 
 release_lock "block"

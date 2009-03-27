@@ -108,7 +108,7 @@ char *xc_inflate_buffer(const char *in_buf, unsigned long in_size,
                 (256 * ((unsigned char)in_buf[in_size-2] +
                         (256 * (unsigned char)in_buf[in_size-1])))));
 
-    bzero(&zStream, sizeof(zStream));
+    memset(&zStream, 0, sizeof(zStream));
     out_buf = malloc(out_len + 16);        /* Leave a little extra space */
     if ( out_buf == NULL )
     {

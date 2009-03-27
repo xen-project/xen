@@ -702,6 +702,148 @@ int unmap_frames(unsigned long va, unsigned long num_frames)
 }
 
 /*
+ * Allocate pages which are contiguous in machine memory.
+ * Returns a VA to where they are mapped or 0 on failure.
+ * 
+ * addr_bits indicates if the region has restrictions on where it is
+ * located. Typical values are 32 (if for example PCI devices can't access
+ * 64bit memory) or 0 for no restrictions.
+ *
+ * Allocated pages can be freed using the page allocators free_pages() 
+ * function.
+ *
+ * based on Linux function xen_create_contiguous_region()
+ */
+#define MAX_CONTIG_ORDER 9 /* 2MB */
+unsigned long alloc_contig_pages(int order, unsigned int addr_bits)
+{
+    unsigned long in_va, va;
+    unsigned long in_frames[1UL << order], out_frames, mfn;
+    multicall_entry_t call[1UL << order];
+    unsigned int i, num_pages = 1UL << order;
+    int ret, exch_success;
+
+    /* pass in num_pages 'extends' of size 1 and
+     * request 1 extend of size 'order */
+    struct xen_memory_exchange exchange = {
+        .in = {
+            .nr_extents   = num_pages,
+            .extent_order = 0,
+            .domid        = DOMID_SELF
+        },
+        .out = {
+            .nr_extents   = 1,
+            .extent_order = order,
+            .address_bits = addr_bits,
+            .domid        = DOMID_SELF
+        },
+        .nr_exchanged = 0
+    };
+
+    if ( order > MAX_CONTIG_ORDER )
+    {
+        printk("alloc_contig_pages: order too large 0x%x > 0x%x\n",
+               order, MAX_CONTIG_ORDER);
+        return 0;
+    }
+
+    /* Allocate some potentially discontiguous pages */
+    in_va = alloc_pages(order);
+    if ( !in_va )
+    {
+        printk("alloc_contig_pages: could not get enough pages (order=0x%x\n",
+               order);
+        return 0;
+    }
+
+    /* set up arguments for exchange hyper call */
+    set_xen_guest_handle(exchange.in.extent_start, in_frames);
+    set_xen_guest_handle(exchange.out.extent_start, &out_frames);
+
+    /* unmap current frames, keep a list of MFNs */
+    for ( i = 0; i < num_pages; i++ )
+    {
+        int arg = 0;
+
+        va = in_va + (PAGE_SIZE * i);
+        in_frames[i] = virt_to_mfn(va);
+
+        /* update P2M mapping */
+        phys_to_machine_mapping[virt_to_pfn(va)] = INVALID_P2M_ENTRY;
+
+        /* build multi call */
+        call[i].op = __HYPERVISOR_update_va_mapping;
+        call[i].args[arg++] = va;
+        call[i].args[arg++] = 0;
+#ifdef __i386__
+        call[i].args[arg++] = 0;
+#endif  
+        call[i].args[arg++] = UVMF_INVLPG;
+    }
+
+    ret = HYPERVISOR_multicall(call, i);
+    if ( ret )
+    {
+        printk("Odd, update_va_mapping hypercall failed with rc=%d.\n", ret);
+        return 0;
+    }
+
+    /* try getting a contig range of MFNs */
+    out_frames = virt_to_pfn(in_va); /* PFNs to populate */
+    ret = HYPERVISOR_memory_op(XENMEM_exchange, &exchange);
+    if ( ret ) {
+        printk("mem exchanged order=0x%x failed with rc=%d, nr_exchanged=%d\n", 
+               order, ret, exchange.nr_exchanged);
+        /* we still need to return the allocated pages above to the pool
+         * ie. map them back into the 1:1 mapping etc. so we continue but 
+         * in the end return the pages to the page allocator and return 0. */
+        exch_success = 0;
+    }
+    else
+        exch_success = 1;
+
+    /* map frames into 1:1 and update p2m */
+    for ( i = 0; i < num_pages; i++ )
+    {
+        int arg = 0;
+        pte_t pte;
+
+        va = in_va + (PAGE_SIZE * i);
+        mfn = i < exchange.nr_exchanged ? (out_frames + i) : in_frames[i];
+        pte = __pte(mfn << PAGE_SHIFT | L1_PROT);
+
+        /* update P2M mapping */
+        phys_to_machine_mapping[virt_to_pfn(va)] = mfn;
+
+        /* build multi call */
+        call[i].op = __HYPERVISOR_update_va_mapping;
+        call[i].args[arg++] = va;
+#ifdef __x86_64__
+        call[i].args[arg++] = (pgentry_t)pte.pte;
+#else
+        call[i].args[arg++] = pte.pte_low;
+        call[i].args[arg++] = pte.pte_high;
+#endif  
+        call[i].args[arg++] = UVMF_INVLPG;
+    }
+    ret = HYPERVISOR_multicall(call, i);
+    if ( ret )
+    {
+        printk("update_va_mapping hypercall no. 2 failed with rc=%d.\n", ret);
+        return 0;
+    }
+
+    if ( !exch_success )
+    {
+        /* since the exchanged failed we just free the pages as well */
+        free_pages((void *) in_va, order);
+        return 0;
+    }
+    
+    return in_va;
+}
+
+/*
  * Check if a given MFN refers to real memory
  */
 static long system_ram_end_mfn;

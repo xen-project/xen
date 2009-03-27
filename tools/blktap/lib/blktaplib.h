@@ -210,6 +210,16 @@ typedef struct msg_pid {
 #define CTLMSG_PID         9
 #define CTLMSG_PID_RSP     10
 
+/* disk driver types */
+#define MAX_DISK_TYPES     20
+
+#define DISK_TYPE_AIO      0
+#define DISK_TYPE_SYNC     1
+#define DISK_TYPE_VMDK     2
+#define DISK_TYPE_RAM      3
+#define DISK_TYPE_QCOW     4
+#define DISK_TYPE_QCOW2    5
+
 /* xenstore/xenbus: */
 #define DOMNAME "Domain-0"
 int setup_probe_watch(struct xs_handle *h);

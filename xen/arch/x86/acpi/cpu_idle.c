@@ -167,25 +167,6 @@ static void acpi_idle_do_entry(struct acpi_processor_cx *cx)
     }
 }
 
-static inline void acpi_idle_update_bm_rld(struct acpi_processor_power *power,
-                                           struct acpi_processor_cx *target)
-{
-    if ( !power->flags.bm_check )
-        return;
-
-    if ( power->flags.bm_rld_set && target->type != ACPI_STATE_C3 )
-    {
-        acpi_set_register(ACPI_BITREG_BUS_MASTER_RLD, 0);
-        power->flags.bm_rld_set = 0;
-    }
-
-    if ( !power->flags.bm_rld_set && target->type == ACPI_STATE_C3 )
-    {
-        acpi_set_register(ACPI_BITREG_BUS_MASTER_RLD, 1);
-        power->flags.bm_rld_set = 1;
-    }
-}
-
 static int acpi_idle_bm_check(void)
 {
     u32 bm_status = 0;
@@ -239,15 +220,9 @@ static void acpi_processor_idle(void)
     if ( !cx )
     {
         if ( pm_idle_save )
-        {
-            printk(XENLOG_DEBUG "call pm_idle_save()\n");
             pm_idle_save();
-        }
         else
-        {
-            printk(XENLOG_DEBUG "call acpi_safe_halt()\n");
             acpi_safe_halt();
-        }
         return;
     }
 
@@ -258,24 +233,22 @@ static void acpi_processor_idle(void)
      * ------
      * Invoke the current Cx state to put the processor to sleep.
      */
-    acpi_idle_update_bm_rld(power, cx);
-
     switch ( cx->type )
     {
     case ACPI_STATE_C1:
     case ACPI_STATE_C2:
         if ( cx->type == ACPI_STATE_C1 || local_apic_timer_c2_ok )
         {
-            /* Trace cpu idle entry */
-            TRACE_1D(TRC_PM_IDLE_ENTRY, cx->idx);
             /* Get start time (ticks) */
             t1 = inl(pmtmr_ioport);
+            /* Trace cpu idle entry */
+            TRACE_2D(TRC_PM_IDLE_ENTRY, cx->idx, t1);
             /* Invoke C2 */
             acpi_idle_do_entry(cx);
             /* Get end time (ticks) */
             t2 = inl(pmtmr_ioport);
             /* Trace cpu idle exit */
-            TRACE_1D(TRC_PM_IDLE_EXIT, cx->idx);
+            TRACE_2D(TRC_PM_IDLE_EXIT, cx->idx, t2);
 
             /* Re-enable interrupts */
             local_irq_enable();
@@ -314,8 +287,6 @@ static void acpi_processor_idle(void)
             ACPI_FLUSH_CPU_CACHE();
         }
 
-        /* Trace cpu idle entry */
-        TRACE_1D(TRC_PM_IDLE_ENTRY, cx->idx);
         /*
          * Before invoking C3, be aware that TSC/APIC timer may be 
          * stopped by H/W. Without carefully handling of TSC/APIC stop issues,
@@ -326,6 +297,8 @@ static void acpi_processor_idle(void)
 
         /* Get start time (ticks) */
         t1 = inl(pmtmr_ioport);
+        /* Trace cpu idle entry */
+        TRACE_2D(TRC_PM_IDLE_ENTRY, cx->idx, t1);
         /* Invoke C3 */
         acpi_idle_do_entry(cx);
         /* Get end time (ticks) */
@@ -334,7 +307,7 @@ static void acpi_processor_idle(void)
         /* recovering TSC */
         cstate_restore_tsc();
         /* Trace cpu idle exit */
-        TRACE_1D(TRC_PM_IDLE_EXIT, cx->idx);
+        TRACE_2D(TRC_PM_IDLE_EXIT, cx->idx, t2);
 
         if ( power->flags.bm_check && power->flags.bm_control )
         {
@@ -491,12 +464,22 @@ static void acpi_processor_power_init_bm_check(struct acpi_processor_flags *flag
     else if ( c->x86_vendor == X86_VENDOR_INTEL )
     {
         /*
-         * Today all CPUs that support C3 share cache.
-         * TBD: This needs to look at cache shared map, once
-         * multi-core detection patch makes to the base.
+         * Today all MP CPUs that support C3 share cache.
+         * And caches should not be flushed by software while
+         * entering C3 type state.
          */
         flags->bm_check = 1;
     }
+
+    /*
+     * On all recent platforms, ARB_DISABLE is a nop.
+     * So, set bm_control to zero to indicate that ARB_DISABLE
+     * is not required while entering C3 type state on
+     * P4, Core and beyond CPUs
+     */
+    if ( c->x86_vendor == X86_VENDOR_INTEL &&
+        (c->x86 > 0x6 || (c->x86 == 6 && c->x86_model >= 14)) )
+            flags->bm_control = 0;
 }
 
 #define VENDOR_INTEL                   (1)
@@ -504,7 +487,8 @@ static void acpi_processor_power_init_bm_check(struct acpi_processor_flags *flag
 
 static int check_cx(struct acpi_processor_power *power, xen_processor_cx_t *cx)
 {
-    static int bm_check_flag;
+    static int bm_check_flag = -1;
+    static int bm_control_flag = -1;
 
     switch ( cx->reg.space_id )
     {
@@ -550,15 +534,17 @@ static int check_cx(struct acpi_processor_power *power, xen_processor_cx_t *cx)
         }
 
         /* All the logic here assumes flags.bm_check is same across all CPUs */
-        if ( !bm_check_flag )
+        if ( bm_check_flag == -1 )
         {
             /* Determine whether bm_check is needed based on CPU  */
             acpi_processor_power_init_bm_check(&(power->flags));
             bm_check_flag = power->flags.bm_check;
+            bm_control_flag = power->flags.bm_control;
         }
         else
         {
             power->flags.bm_check = bm_check_flag;
+            power->flags.bm_control = bm_control_flag;
         }
 
         if ( power->flags.bm_check )
@@ -579,6 +565,15 @@ static int check_cx(struct acpi_processor_power *power, xen_processor_cx_t *cx)
                         "C3 support without BM control\n"));
                 }
             }
+            /*
+             * On older chipsets, BM_RLD needs to be set
+             * in order for Bus Master activity to wake the
+             * system from C3.  Newer chipsets handle DMA
+             * during C3 automatically and BM_RLD is a NOP.
+             * In either case, the proper way to
+             * handle BM_RLD is to set it and leave it set.
+             */
+            acpi_set_register(ACPI_BITREG_BUS_MASTER_RLD, 1);
         }
         else
         {

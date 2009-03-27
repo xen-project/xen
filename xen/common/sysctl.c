@@ -224,12 +224,11 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
         if ( ret && (ret != -EAGAIN) )
             break;
 
-        if ( op->u.pm_op.cmd == GET_CPUFREQ_PARA )
-            if ( copy_to_guest(u_sysctl, op, 1) )
-            {
-                ret = -EFAULT;
-                break;
-            }
+        if ( copy_to_guest(u_sysctl, op, 1) )
+        {
+            ret = -EFAULT;
+            break;
+        }
     }
     break;
 
@@ -241,7 +240,7 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
         ptr = status = xmalloc_bytes( sizeof(uint32_t) *
                                 (op->u.page_offline.end -
                                   op->u.page_offline.start + 1));
-        if (!status)
+        if ( !status )
         {
             dprintk(XENLOG_WARNING, "Out of memory for page offline op\n");
             ret = -ENOMEM;
@@ -255,7 +254,7 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
               pfn <= op->u.page_offline.end;
               pfn ++ )
         {
-            switch (op->u.page_offline.cmd)
+            switch ( op->u.page_offline.cmd )
             {
                 /* Shall revert her if failed, or leave caller do it? */
                 case sysctl_page_offline:
@@ -278,12 +277,14 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
                 break;
         }
 
-        if (copy_to_guest(op->u.page_offline.status, status,
-                          op->u.page_offline.end - op->u.page_offline.start + 1))
+        if ( copy_to_guest(
+            op->u.page_offline.status, status,
+            op->u.page_offline.end - op->u.page_offline.start + 1) )
         {
             ret = -EFAULT;
             break;
         }
+
         xfree(status);
     }
     break;

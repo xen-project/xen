@@ -104,7 +104,8 @@ class SrvDomain(SrvDir):
                     [['dom',         'int'],
                      ['file',        'str'],
                      ['live',        'int'],
-                     ['crash',       'int']])
+                     ['crash',       'int'],
+                     ['reset',       'int']])
         return fn(req.args, {'dom': self.dom.domid})
 
     def op_migrate(self, op, req):

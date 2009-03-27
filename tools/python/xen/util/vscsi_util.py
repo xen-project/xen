@@ -90,7 +90,7 @@ def _vscsi_get_scsidevices_by_lsscsi(option = ""):
 
     devices = []
 
-    for scsiinfo in os.popen('lsscsi -g %s' % option).readlines():
+    for scsiinfo in os.popen('{ lsscsi -g %s; } 2>/dev/null' % option).readlines():
         s = scsiinfo.split()
         hctl = s[0][1:-1]
         try:
@@ -112,7 +112,10 @@ def _vscsi_get_scsidevices_by_sysfs():
     """ get all scsi devices information by sysfs """
 
     devices = []
-    sysfs_mnt = utils.find_sysfs_mount() 
+    try:
+        sysfs_mnt = utils.find_sysfs_mount() 
+    except:
+        return devices
 
     for dirpath, dirnames, files in os.walk(sysfs_mnt + SYSFS_SCSI_PATH):
         for hctl in dirnames:
@@ -152,7 +155,9 @@ def vscsi_get_hctl_and_devname_by(target, scsi_devices = None):
         elif target.startswith('/dev/'): 
             scsi_devices = _vscsi_get_scsidevices_by_lsscsi("| grep %s" % target)
         else:
-            scsi_devices = vscsi_get_scsidevices()
+            scsi_devices = _vscsi_get_scsidevices_by_lsscsi("")
+        if not scsi_devices:
+            scsi_devices = _vscsi_get_scsidevices_by_sysfs()
 
     if len(target.split(':')) == 4:
         return _vscsi_get_devname_by(target, scsi_devices)
@@ -248,7 +253,7 @@ def get_all_scsi_devices():
             get_scsi_scsilevel(scsi_dev['physical_HCTL'])
 
         try:
-            lsscsi_info = os.popen('lsscsi ' + scsi_dev['physical_HCTL']).read().split()
+            lsscsi_info = os.popen('lsscsi %s 2>/dev/null' % scsi_dev['physical_HCTL']).read().split()
             scsi_dev['type'] = lsscsi_info[1]
         except:
             scsi_dev['type'] = None

@@ -26,7 +26,18 @@ title Xen-Fedora Core (2.6.18-xen)
         module /boot/vmlinuz-2.6.18.8-xen root=LABEL=/ ro xencons=ttyS console=tty0 console=ttyS0, pciback.hide=(01:00.0)(03:00.0)
         module /boot/initrd-2.6.18-xen.img
 
-12) reboot system
+    or use dynamic hiding via PCI backend sysfs interface:
+        a) check if the driver has binded to the device
+            ls -l /sys/bus/pci/devices/0000:01:00.0/driver
+            ... /sys/bus/pci/devices/0000:01:00.0/driver -> ../../../../bus/pci/drivers/igb
+        b) if yes, then unload the driver first
+            echo -n 0000:01:00.0 >/sys/bus/pci/drivers/igb/unbind
+        c) add the device to the PCI backend
+            echo -n 0000:01:00.0 >/sys/bus/pci/drivers/pciback/new_slot
+        d) let the PCI backend bind to the device
+            echo -n 0000:01:00.0 >/sys/bus/pci/drivers/pciback/bind
+
+12) reboot system (not requires if you use the dynamic hiding method)
 13) add "pci" line in /etc/xen/hvm.conf for to assigned devices
         pci = [ '01:00.0', '03:00.0' ]
 15) start hvm guest and use "lspci" to see the passthru device and
@@ -160,3 +171,82 @@ driver's view are different. As a result, device can't access to the
 buffer specified by driver.
 
 Such devices assigned to HVM domain currently do not work.
+
+
+Using SR-IOV with VT-d
+--------------------------------
+
+The Single Root I/O Virtualization is a PCI Express feature supported by
+some devices such as Intel 82576 which allows you to create virtual PCI
+devices (Virtual Function) and assign them to the HVM guest.
+
+You can use latest lspci (v3.1 and above) to check if your PCIe device
+supports the SR-IOV capability or not.
+
+  $ lspci -s 01:00.0 -vvv
+
+  01:00.0 Ethernet controller: Intel Corporation 82576 Gigabit Network Connection (rev 01)
+        Subsystem: Intel Corporation Gigabit ET Dual Port Server Adapter
+
+        ...
+
+        Capabilities: [160] Single Root I/O Virtualization (SR-IOV)
+                IOVCap: Migration-, Interrupt Message Number: 000
+                IOVCtl: Enable+ Migration- Interrupt- MSE+ ARIHierarchy+
+                IOVSta: Migration-
+                Initial VFs: 8, Total VFs: 8, Number of VFs: 7, Function Dependency Link: 00
+                VF offset: 128, stride: 2, Device ID: 10ca
+                Supported Page Size: 00000553, System Page Size: 00000001
+                VF Migration: offset: 00000000, BIR: 0
+        Kernel driver in use: igb
+
+
+The function that has the SR-IOV capability is also known as Physical
+Function. You need the Physical Function driver (runs in the Dom0 and
+controls the physical resources allocation) to enable the Virtual Function.
+Following is the Virtual Functions associated with above Physical Function.
+
+  $ lspci | grep -e 01:1[01].[0246]
+
+  01:10.0 Ethernet controller: Intel Corporation Device 10ca (rev 01)
+  01:10.2 Ethernet controller: Intel Corporation Device 10ca (rev 01)
+  01:10.4 Ethernet controller: Intel Corporation Device 10ca (rev 01)
+  01:10.6 Ethernet controller: Intel Corporation Device 10ca (rev 01)
+  01:11.0 Ethernet controller: Intel Corporation Device 10ca (rev 01)
+  01:11.2 Ethernet controller: Intel Corporation Device 10ca (rev 01)
+  01:11.4 Ethernet controller: Intel Corporation Device 10ca (rev 01)
+
+We can tell that Physical Function 01:00.0 has 7 Virtual Functions (01:10.0,
+01:10.2, 01:10.4, 01:10.6, 01:11.0, 01:11.2, 01:11.4). And the Virtual
+Function PCI Configuration Space looks just like normal PCI device.
+
+  $ lspci -s 01:10.0 -vvv
+
+  01:10.0 Ethernet controller: Intel Corporation 82576 Gigabit Virtual Function
+        Subsystem: Intel Corporation Gigabit Virtual Function
+        Control: I/O- Mem- BusMaster- SpecCycle- MemWINV- VGASnoop- ParErr- Stepping- SERR- FastB2B- DisINTx-
+        Status: Cap+ 66MHz- UDF- FastB2B- ParErr- DEVSEL=fast >TAbort- <TAbort- <MAbort- >SERR- <PERR- INTx-
+        Region 0: [virtual] Memory at d2840000 (64-bit, non-prefetchable) [size=16K]
+        Region 3: [virtual] Memory at d2860000 (64-bit, non-prefetchable) [size=16K]
+        Capabilities: [70] MSI-X: Enable+ Mask- TabSize=3
+                Vector table: BAR=3 offset=00000000
+                PBA: BAR=3 offset=00002000
+        Capabilities: [a0] Express (v2) Endpoint, MSI 00
+
+        ...
+
+
+The Virtual Function only appears after the Physical Function driver
+is loaded. Once the Physical Function driver is unloaded. All Virtual
+Functions associated with this Physical Function disappear.
+
+The Virtual Function is essentially same as the normal PCI device when
+using it in VT-d environment. You need to hide the Virtual Function,
+use the Virtual Function bus, device and function number in the HVM
+guest configuration file and then boot the HVM guest. You also need the
+Virtual Function driver which is the normal PCI device driver in the
+HMV guest to drive the Virtual Function. The PCIe SR-IOV specification
+requires that the Virtual Function can only support MSI/MSI-x if it
+uses interrupt. This means you also need to enable Xen/MSI support.
+Since the Virtual Function is dynamically allocated by Physical Function
+driver, you might want to use the dynamic hiding method mentioned above.

@@ -19,11 +19,11 @@ SUBDIRS-y += xenmon
 SUBDIRS-$(VTPM_TOOLS) += vtpm_manager
 SUBDIRS-$(VTPM_TOOLS) += vtpm
 SUBDIRS-y += xenstat
-SUBDIRS-y += libaio
-SUBDIRS-y += blktap
+SUBDIRS-$(CONFIG_Linux) += libaio
+SUBDIRS-$(CONFIG_Linux) += blktap
 SUBDIRS-y += libfsimage
 SUBDIRS-$(LIBXENAPI_BINDINGS) += libxen
-SUBDIRS-y += fs-back
+SUBDIRS-$(CONFIG_Linux) += fs-back
 SUBDIRS-$(CONFIG_IOEMU) += ioemu-dir
 SUBDIRS-y += xenpmd
 

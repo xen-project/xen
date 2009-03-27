@@ -694,7 +694,7 @@ static int x86_shadow(int xc, domid_t domid)
 int arch_setup_meminit(struct xc_dom_image *dom)
 {
     int rc;
-    xen_pfn_t pfn;
+    xen_pfn_t pfn, allocsz, i;
 
     rc = x86_compat(dom->guest_xc, dom->guest_domid, dom->guest_type);
     if ( rc )
@@ -713,9 +713,15 @@ int arch_setup_meminit(struct xc_dom_image *dom)
         dom->p2m_host[pfn] = pfn;
 
     /* allocate guest memory */
-    rc = xc_domain_memory_populate_physmap(dom->guest_xc, dom->guest_domid,
-                                           dom->total_pages, 0, 0,
-                                           dom->p2m_host);
+    for ( i = rc = allocsz = 0; (i < dom->total_pages) && !rc; i += allocsz )
+    {
+        allocsz = dom->total_pages - i;
+        if ( allocsz > 1024*1024 )
+            allocsz = 1024*1024;
+        rc = xc_domain_memory_populate_physmap(
+            dom->guest_xc, dom->guest_domid, allocsz, 0, 0, &dom->p2m_host[i]);
+    }
+
     return rc;
 }
 

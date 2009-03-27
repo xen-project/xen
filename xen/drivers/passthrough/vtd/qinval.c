@@ -319,7 +319,6 @@ int queue_invalidate_iec(struct iommu *iommu, u8 granu, u8 im, u16 iidx)
 
 int __iommu_flush_iec(struct iommu *iommu, u8 granu, u8 im, u16 iidx)
 {
-    u64 iec_cap;
     int ret;
     ret = queue_invalidate_iec(iommu, granu, im, iidx);
     ret |= invalidate_sync(iommu);
@@ -328,7 +327,7 @@ int __iommu_flush_iec(struct iommu *iommu, u8 granu, u8 im, u16 iidx)
      * reading vt-d architecture register will ensure
      * draining happens in implementation independent way.
      */
-    iec_cap = dmar_readq(iommu->reg, DMAR_CAP_REG);
+    (void)dmar_readq(iommu->reg, DMAR_CAP_REG);
     return ret;
 }
 
@@ -413,7 +412,7 @@ static int flush_iotlb_qi(
     return ret;
 }
 
-int qinval_setup(struct iommu *iommu)
+int enable_qinval(struct iommu *iommu)
 {
     s_time_t start_time;
     struct qi_ctrl *qi_ctrl;
@@ -422,8 +421,7 @@ int qinval_setup(struct iommu *iommu)
     qi_ctrl = iommu_qi_ctrl(iommu);
     flush = iommu_get_flush(iommu);
 
-    if ( !ecap_queued_inval(iommu->ecap) )
-        return -ENODEV;
+    ASSERT(ecap_queued_inval(iommu->ecap) && iommu_qinval);
 
     if ( qi_ctrl->qinval_maddr == 0 )
     {
@@ -448,6 +446,8 @@ int qinval_setup(struct iommu *iommu)
     qi_ctrl->qinval_maddr |= IQA_REG_QS;
     dmar_writeq(iommu->reg, DMAR_IQA_REG, qi_ctrl->qinval_maddr);
 
+    dmar_writeq(iommu->reg, DMAR_IQT_REG, 0);
+
     /* enable queued invalidation hardware */
     iommu->gcmd |= DMA_GCMD_QIE;
     dmar_writel(iommu->reg, DMAR_GCMD_REG, iommu->gcmd);
@@ -462,4 +462,23 @@ int qinval_setup(struct iommu *iommu)
     }
 
     return 0;
+}
+
+void disable_qinval(struct iommu *iommu)
+{
+    s_time_t start_time;
+
+    ASSERT(ecap_queued_inval(iommu->ecap) && iommu_qinval);
+
+    iommu->gcmd &= ~DMA_GCMD_QIE;
+    dmar_writel(iommu->reg, DMAR_GCMD_REG, iommu->gcmd);
+
+    /* Make sure hardware complete it */
+    start_time = NOW();
+    while ( dmar_readl(iommu->reg, DMAR_GSTS_REG) & DMA_GSTS_QIES )
+    {
+        if ( NOW() > (start_time + DMAR_OPERATION_TIMEOUT) )
+            panic("Cannot clear QIE field for queue invalidation\n");
+        cpu_relax();
+    }
 }

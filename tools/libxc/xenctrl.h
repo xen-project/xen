@@ -158,7 +158,7 @@ typedef struct xc_dominfo {
                   paused:1, blocked:1, running:1,
                   hvm:1, debugged:1;
     unsigned int  shutdown_reason; /* only meaningful if shutdown==1 */
-    unsigned long nr_pages;
+    unsigned long nr_pages; /* current number, not maximum */
     unsigned long shared_info_frame;
     uint64_t      cpu_time;
     unsigned long max_memkb;
@@ -1242,4 +1242,24 @@ int xc_get_cpufreq_para(int xc_handle, int cpuid,
 int xc_set_cpufreq_gov(int xc_handle, int cpuid, char *govname);
 int xc_set_cpufreq_para(int xc_handle, int cpuid,
                         int ctrl_type, int ctrl_value);
+int xc_get_cpufreq_avgfreq(int xc_handle, int cpuid, int *avg_freq);
+
+struct xc_get_cputopo {
+     /* IN: maximum addressable entry in
+      * the caller-provided cpu_to_core/socket.
+      */
+    uint32_t max_cpus;
+    uint32_t *cpu_to_core;
+    uint32_t *cpu_to_socket;
+
+    /* OUT: number of cpus returned
+     * If OUT is greater than IN then the cpu_to_core/socket is truncated!
+     */
+    uint32_t nr_cpus;
+};
+
+int xc_get_cputopo(int xc_handle, struct xc_get_cputopo *info);
+
+int xc_set_sched_opt_smt(int xc_handle, uint32_t value);
+
 #endif /* XENCTRL_H */

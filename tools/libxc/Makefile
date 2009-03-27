@@ -29,7 +29,7 @@ CTRL_SRCS-$(CONFIG_NetBSD) += xc_netbsd.c
 CTRL_SRCS-$(CONFIG_MiniOS) += xc_minios.c
 
 GUEST_SRCS-y :=
-GUEST_SRCS-y += xg_private.c
+GUEST_SRCS-y += xg_private.c xc_suspend.c
 GUEST_SRCS-$(CONFIG_MIGRATE) += xc_domain_restore.c xc_domain_save.c
 GUEST_SRCS-$(CONFIG_HVM) += xc_hvm_build.c
 

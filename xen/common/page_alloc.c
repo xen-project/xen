@@ -75,11 +75,11 @@ static DEFINE_SPINLOCK(page_scrub_lock);
 PAGE_LIST_HEAD(page_scrub_list);
 static unsigned long scrub_pages;
 
-/* Offlined page list, protected by heap_lock */
+/* Offlined page list, protected by heap_lock. */
 PAGE_LIST_HEAD(page_offlined_list);
-
-/* Broken page list, protected by heap_lock */
+/* Broken page list, protected by heap_lock. */
 PAGE_LIST_HEAD(page_broken_list);
+
 /*********************
  * ALLOCATION BITMAP
  *  One bit per page of memory. Bit set => page is allocated.
@@ -299,7 +299,7 @@ static unsigned long init_node_heap(int node, unsigned long mfn,
     }
 #ifdef DIRECTMAP_VIRT_END
     else if ( nr >= needed &&
-              mfn + needed <= virt_to_mfn(DIRECTMAP_VIRT_END) )
+              (mfn + needed) <= (virt_to_mfn(DIRECTMAP_VIRT_END - 1) + 1) )
     {
         _heap[node] = mfn_to_virt(mfn);
         avail[node] = mfn_to_virt(mfn + needed) - sizeof(**avail) * NR_ZONES;
@@ -427,9 +427,7 @@ static struct page_info *alloc_heap_pages(
     return pg;
 }
 
-/*
- * Remove any offlined page in the buddy poined by head
- */
+/* Remove any offlined page in the buddy pointed to by head. */
 static int reserve_offlined_page(struct page_info *head)
 {
     unsigned int node = phys_to_nid(page_to_maddr(head));
@@ -448,7 +446,7 @@ static int reserve_offlined_page(struct page_info *head)
         struct page_info *pg;
         int next_order;
 
-        if (test_bit(_PGC_offlined, &cur_head->count_info))
+        if ( test_bit(_PGC_offlined, &cur_head->count_info) )
         {
             cur_head++;
             continue;
@@ -456,29 +454,27 @@ static int reserve_offlined_page(struct page_info *head)
 
         next_order = cur_order = 0;
 
-        while (cur_order < head_order)
+        while ( cur_order < head_order )
         {
             next_order = cur_order + 1;
 
-            if ( (cur_head + (1 << next_order)) >= (head + ( 1 << head_order)))
+            if ( (cur_head + (1 << next_order)) >= (head + ( 1 << head_order)) )
                 goto merge;
 
-            for (i = (1 << cur_order), pg = cur_head + (1 << cur_order);
-              i < (1 << next_order);
-              i++, pg ++)
-                if (test_bit(_PGC_offlined, &pg->count_info))
+            for ( i = (1 << cur_order), pg = cur_head + (1 << cur_order );
+                  i < (1 << next_order);
+                  i++, pg++ )
+                if ( test_bit(_PGC_offlined, &pg->count_info) )
                     break;
-            if (i == ( 1 << next_order))
+            if ( i == ( 1 << next_order) )
             {
                 cur_order = next_order;
                 continue;
             }
             else
             {
-                /*
-                 * We don't need considering merge outside the head_order
-                 */
-merge:
+            merge:
+                /* We don't consider merging outside the head_order. */
                 page_list_add_tail(cur_head, &heap(node, zone, cur_order));
                 PFN_ORDER(cur_head) = cur_order;
                 cur_head += (1 << cur_order);
@@ -487,21 +483,20 @@ merge:
         }
     }
 
-    for (cur_head = head; cur_head < head + ( 1UL << head_order); cur_head++)
+    for ( cur_head = head; cur_head < head + ( 1UL << head_order); cur_head++ )
     {
-        if (!test_bit(_PGC_offlined, &cur_head->count_info))
+        if ( !test_bit(_PGC_offlined, &cur_head->count_info) )
             continue;
 
-        avail[node][zone] --;
+        avail[node][zone]--;
 
         map_alloc(page_to_mfn(cur_head), 1);
 
-        if (test_bit(_PGC_broken, &cur_head->count_info))
-            page_list_add_tail(cur_head, &page_broken_list);
-        else
-            page_list_add_tail(cur_head, &page_offlined_list);
+        page_list_add_tail(cur_head,
+                           test_bit(_PGC_broken, &cur_head->count_info) ?
+                           &page_broken_list : &page_offlined_list);
 
-        count ++;
+        count++;
     }
 
     return count;
@@ -534,7 +529,7 @@ static void free_heap_pages(
          */
         ASSERT(!(pg[i].count_info & PGC_offlined));
         pg[i].count_info &= PGC_offlining | PGC_broken;
-        if (pg[i].count_info & PGC_offlining)
+        if ( pg[i].count_info & PGC_offlining )
         {
             pg[i].count_info &= ~PGC_offlining;
             pg[i].count_info |= PGC_offlined;
@@ -584,7 +579,7 @@ static void free_heap_pages(
     PFN_ORDER(pg) = order;
     page_list_add_tail(pg, &heap(node, zone, order));
 
-    if (tainted)
+    if ( tainted )
         reserve_offlined_page(pg);
 
     spin_unlock(&heap_lock);
@@ -607,9 +602,6 @@ static unsigned long mark_page_offline(struct page_info *pg, int broken)
     unsigned long nx, x, y = pg->count_info;
 
     ASSERT(page_is_ram_type(page_to_mfn(pg), RAM_TYPE_CONVENTIONAL));
-    /*
-     * Caller gurantee the page will not be reassigned during this process
-     */
     ASSERT(spin_is_locked(&heap_lock));
 
     do {
@@ -617,21 +609,23 @@ static unsigned long mark_page_offline(struct page_info *pg, int broken)
 
         if ( ((x & PGC_offlined_broken) == PGC_offlined_broken) )
             return y;
-        /* PGC_offlined means it is free pages */
-        if (x & PGC_offlined)
+
+        if ( x & PGC_offlined )
         {
-            if (broken && !(nx & PGC_broken))
+            /* PGC_offlined means it is a free page. */
+            if ( broken && !(nx & PGC_broken) )
                 nx |= PGC_broken;
             else
                 return y;
         }
-        /* It is not offlined, not reserved page */
-        else if ( allocated_in_map(page_to_mfn(pg)) )
-            nx |= PGC_offlining;
         else
-            nx |= PGC_offlined;
+        {
+            /* It is not offlined, not reserved page */
+            nx |= (allocated_in_map(page_to_mfn(pg)) ?
+                   PGC_offlining : PGC_offlined);
+        }
 
-        if (broken)
+        if ( broken )
             nx |= PGC_broken;
     } while ( (y = cmpxchg(&pg->count_info, x, nx)) != x );
 
@@ -644,7 +638,6 @@ static int reserve_heap_page(struct page_info *pg)
     unsigned int i, node = phys_to_nid(page_to_maddr(pg));
     unsigned int zone = page_to_zone(pg);
 
-    /* get the header */
     for ( i = 0; i <= MAX_ORDER; i++ )
     {
         struct page_info *tmp;
@@ -652,7 +645,7 @@ static int reserve_heap_page(struct page_info *pg)
         if ( page_list_empty(&heap(node, zone, i)) )
             continue;
 
-        page_list_for_each_safe(head, tmp, &heap(node, zone, i))
+        page_list_for_each_safe ( head, tmp, &heap(node, zone, i) )
         {
             if ( (head <= pg) &&
                  (head + (1UL << i) > pg) )
@@ -664,9 +657,6 @@ static int reserve_heap_page(struct page_info *pg)
 
 }
 
-/*
- * offline one page
- */
 int offline_page(unsigned long mfn, int broken, uint32_t *status)
 {
     unsigned long old_info = 0;
@@ -674,7 +664,7 @@ int offline_page(unsigned long mfn, int broken, uint32_t *status)
     int ret = 0;
     struct page_info *pg;
 
-    if (mfn > max_page)
+    if ( mfn > max_page )
     {
         dprintk(XENLOG_WARNING,
                 "try to offline page out of range %lx\n", mfn);
@@ -683,7 +673,6 @@ int offline_page(unsigned long mfn, int broken, uint32_t *status)
 
     *status = 0;
     pg = mfn_to_page(mfn);
-
 
 #if defined(__x86_64__)
      /* Xen's txt mfn in x86_64 is reserved in e820 */
@@ -701,7 +690,7 @@ int offline_page(unsigned long mfn, int broken, uint32_t *status)
      * N.B. xen's txt in x86_64 is marked reserved and handled already
      *  Also kexec range is reserved
      */
-     if (!page_is_ram_type(mfn, RAM_TYPE_CONVENTIONAL))
+     if ( !page_is_ram_type(mfn, RAM_TYPE_CONVENTIONAL) )
      {
         *status = PG_OFFLINE_FAILED | PG_OFFLINE_NOT_CONV_RAM;
         return -EINVAL;
@@ -717,11 +706,11 @@ int offline_page(unsigned long mfn, int broken, uint32_t *status)
         reserve_heap_page(pg);
         *status = PG_OFFLINE_OFFLINED;
     }
-    else if (test_bit(_PGC_offlined, &pg->count_info))
+    else if ( test_bit(_PGC_offlined, &pg->count_info) )
     {
         *status = PG_OFFLINE_OFFLINED;
     }
-    else if ((owner = page_get_owner_and_reference(pg)))
+    else if ( (owner = page_get_owner_and_reference(pg)) )
     {
             *status = PG_OFFLINE_OWNED | PG_OFFLINE_PENDING |
               (owner->domain_id << PG_OFFLINE_OWNER_SHIFT);
@@ -747,7 +736,7 @@ int offline_page(unsigned long mfn, int broken, uint32_t *status)
                   (DOMID_INVALID << PG_OFFLINE_OWNER_SHIFT );
     }
 
-    if (broken)
+    if ( broken )
         *status |= PG_OFFLINE_BROKEN;
 
     spin_unlock(&heap_lock);
@@ -782,21 +771,21 @@ unsigned int online_page(unsigned long mfn, uint32_t *status)
         ret = -EINVAL;
         *status = PG_ONLINE_FAILED |PG_ONLINE_BROKEN;
     }
-    else if (pg->count_info & PGC_offlined)
+    else if ( pg->count_info & PGC_offlined )
     {
         clear_bit(_PGC_offlined, &pg->count_info);
         page_list_del(pg, &page_offlined_list);
         *status = PG_ONLINE_ONLINED;
         free = 1;
     }
-    else if (pg->count_info & PGC_offlining)
+    else if ( pg->count_info & PGC_offlining )
     {
         clear_bit(_PGC_offlining, &pg->count_info);
         *status = PG_ONLINE_ONLINED;
     }
     spin_unlock(&heap_lock);
 
-    if (free)
+    if ( free )
         free_heap_pages(pg, 0);
 
     return ret;

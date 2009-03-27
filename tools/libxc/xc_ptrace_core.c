@@ -154,7 +154,7 @@ xc_waitdomain_core_compat(
             IPRINTF("Could not allocate m2p array\n");
             return -1;
         }
-        bzero(m2p_array_compat, sizeof(unsigned long)* 1 << 20);
+        memset(m2p_array_compat, 0, sizeof(unsigned long)* 1 << 20);
 
         for (i = 0; i < nr_pages_compat; i++)
             m2p_array_compat[p2m_array_compat[i]] = i;

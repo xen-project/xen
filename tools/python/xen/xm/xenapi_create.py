@@ -1048,6 +1048,7 @@ class sxp2xml:
             'hap',
             'pci_msitranslate',
             'pci_power_mgmt',
+            'xen_platform_pci',
         ]
 
         platform_configs = []

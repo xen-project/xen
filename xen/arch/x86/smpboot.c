@@ -385,9 +385,7 @@ void __devinit smp_callin(void)
 	/*
 	 * Save our processor parameters
 	 */
- 	smp_store_cpu_info(cpuid);
-
-	disable_APIC_timer();
+	smp_store_cpu_info(cpuid);
 
 	/*
 	 * Allow the master to continue.
@@ -1428,8 +1426,10 @@ int __devinit __cpu_up(unsigned int cpu)
 	 * cpu_callin_map is set during AP kickstart process. Its reset
 	 * when a cpu is taken offline from cpu_exit_clear().
 	 */
-	if (!cpu_isset(cpu, cpu_callin_map))
+	if (!cpu_isset(cpu, cpu_callin_map)) {
 		ret = __smp_prepare_cpu(cpu);
+		smpboot_restore_warm_reset_vector();
+	}
 
 	if (ret)
 		return -EIO;

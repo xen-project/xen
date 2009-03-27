@@ -74,11 +74,12 @@ void hvm_enable(struct hvm_function_table *fns)
     printk("HVM: %s enabled\n", fns->name);
 
     /*
-     * Allow direct access to the PC debug port (it is often used for I/O
-     * delays, but the vmexits simply slow things down).
+     * Allow direct access to the PC debug ports 0x80 and 0xed (they are
+     * often used for I/O delays, but the vmexits simply slow things down).
      */
     memset(hvm_io_bitmap, ~0, sizeof(hvm_io_bitmap));
     __clear_bit(0x80, hvm_io_bitmap);
+    __clear_bit(0xed, hvm_io_bitmap);
 
     hvm_funcs   = *fns;
     hvm_enabled = 1;
@@ -1775,6 +1776,15 @@ int hvm_msr_read_intercept(struct cpu_user_regs *regs)
         index = regs->ecx - MSR_IA32_MTRR_PHYSBASE0;
         msr_content = var_range_base[index];
         break;
+
+    case MSR_K8_ENABLE_C1E:
+         /* There's no point in letting the guest see C-States.
+          * Further, this AMD-only register may be accessed if this HVM guest
+          * has been migrated to an Intel host. This fixes a guest crash
+          * in this case.
+          */
+         msr_content = 0;
+         break;
 
     default:
         return hvm_funcs.msr_read_intercept(regs);

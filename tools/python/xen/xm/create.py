@@ -1,4 +1,4 @@
-#============================================================================
+#============================================================================UTO
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of version 2.1 of the GNU Lesser General Public
 # License as published by the Free Software Foundation.
@@ -32,6 +32,7 @@ from xen.xend import PrettyPrint as SXPPrettyPrint
 from xen.xend import osdep
 import xen.xend.XendClient
 from xen.xend.XendBootloader import bootloader
+from xen.xend.XendConstants import *
 from xen.xend.server.DevConstants import xenbusState
 from xen.util import blkif
 from xen.util import vscsi_util
@@ -322,10 +323,12 @@ gopts.var('disk', val='phy:DEV,VDEV,MODE[,DOM]',
           backend driver domain to use for the disk.
           The option may be repeated to add more than one disk.""")
 
-gopts.var('pci', val='BUS:DEV.FUNC[,msitranslate=0|1][,power_mgmt=0|1]',
+gopts.var('pci', val='BUS:DEV.FUNC[@VSLOT][,msitranslate=0|1][,power_mgmt=0|1]',
           fn=append_value, default=[],
           use="""Add a PCI device to a domain, using given params (in hex).
           For example 'pci=c0:02.1'.
+          If VSLOT is supplied the device will be inserted into that
+          virtual slot in the guest, else a free slot is selected.
           If msitranslate is set, MSI-INTx translation is enabled if possible.
           Guest that doesn't support MSI will get IO-APIC type IRQs
           translated from physical MSI, HVM only. Default is 1.
@@ -611,6 +614,10 @@ gopts.var('pci_power_mgmt', val='POWERMGMT',
           fn=set_int, default=0,
           use="""Global PCI Power Management flag (0=disable;1=enable).""")
 
+gopts.var('xen_platform_pci', val='0|1',
+           fn=set_int, default=1,
+           use="Is xen_platform_pci used?")
+
 def err(msg):
     """Print an error to stderr and exit.
     """
@@ -692,7 +699,7 @@ def configure_pci(config_devs, vals):
     """Create the config for pci devices.
     """
     config_pci = []
-    for (domain, bus, slot, func, opts) in vals.pci:
+    for (domain, bus, slot, func, vslot, opts) in vals.pci:
         config_pci_opts = []
         d = comma_sep_kv_to_dict(opts)
 
@@ -703,7 +710,7 @@ def configure_pci(config_devs, vals):
             config_pci_opts.append([k, d[k]])
 
         config_pci_bdf = ['dev', ['domain', domain], ['bus', bus], \
-                          ['slot', slot], ['func', func]]
+                          ['slot', slot], ['func', func], ['vslot', vslot]]
         map(f, d.keys())
         if len(config_pci_opts)>0:
             config_pci_bdf.append(['opts', config_pci_opts])
@@ -738,6 +745,9 @@ def configure_vscsis(config_devs, vals):
 
         feature_host = 0
         if v_dev == 'host':
+            if serverType == SERVER_XEN_API:
+                # TODO
+                raise ValueError("SCSI devices assignment by HBA is not implemeted")
             feature_host = 1
             scsi_info = []
             devid = get_devid(p_hctl)
@@ -921,7 +931,7 @@ def configure_hvm(config_image, vals):
              'acpi', 'apic', 'usb', 'usbdevice', 'keymap', 'pci', 'hpet',
              'guest_os_type', 'hap', 'opengl', 'cpuid', 'cpuid_check',
              'viridian', 'xen_extended_power_mgmt', 'pci_msitranslate',
-             'vpt_align', 'pci_power_mgmt' ]
+             'vpt_align', 'pci_power_mgmt', 'xen_platform_pci' ]
 
     for a in args:
         if a in vals.__dict__ and vals.__dict__[a] is not None:
@@ -1047,16 +1057,21 @@ def preprocess_pci(vals):
                 r"(?P<bus>[0-9a-fA-F]{1,2})[:,]" + \
                 r"(?P<slot>[0-9a-fA-F]{1,2})[.,]" + \
                 r"(?P<func>[0-7])" + \
-                r"(,(?P<opts>.*))?$", pci_dev_str)
+                r"(@(?P<vslot>[0-9a-fA-F]))?" + \
+                r"(,(?P<opts>.*))?$", \
+                pci_dev_str)
         if pci_match!=None:
             pci_dev_info = pci_match.groupdict('')
             if pci_dev_info['domain']=='':
                 pci_dev_info['domain']='0'
+            if pci_dev_info['vslot']=='':
+                pci_dev_info['vslot']="%02x" % AUTO_PHP_SLOT
             try:
                 pci.append( ('0x'+pci_dev_info['domain'], \
                         '0x'+pci_dev_info['bus'], \
                         '0x'+pci_dev_info['slot'], \
                         '0x'+pci_dev_info['func'], \
+                        '0x'+pci_dev_info['vslot'], \
                         pci_dev_info['opts']))
             except IndexError:
                 err('Error in PCI slot syntax "%s"'%(pci_dev_str))

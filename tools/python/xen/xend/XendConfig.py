@@ -170,6 +170,7 @@ XENAPI_PLATFORM_CFG_TYPES = {
     'xen_extended_power_mgmt': int,
     'pci_msitranslate': int,
     'pci_power_mgmt': int,
+    'xen_platform_pci': int,
 }
 
 # Xen API console 'other_config' keys.
@@ -464,6 +465,8 @@ class XendConfig(dict):
                 self['platform']['rtc_timeoffset'] = 0
             if 'hpet' not in self['platform']:
                 self['platform']['hpet'] = 0
+            if 'xen_platform_pci' not in self['platform']:
+                self['platform']['xen_platform_pci'] = 1
             if 'vpt_align' not in self['platform']:
                 self['platform']['vpt_align'] = 1
             if 'loader' not in self['platform']:
@@ -1155,7 +1158,7 @@ class XendConfig(dict):
                     return None
         return devid
     
-    def device_duplicate_check(self, dev_type, dev_info, defined_config):
+    def device_duplicate_check(self, dev_type, dev_info, defined_config, config):
         defined_devices_sxpr = self.all_devices_sxpr(target = defined_config)
         
         if dev_type == 'vbd' or dev_type == 'tap':
@@ -1174,9 +1177,34 @@ class XendConfig(dict):
                         if blkdev_file == o_blkdev_file:
                             raise XendConfigError('The file "%s" is already used' %
                                                   blkdev_file)
+                    if dev_uname == o_dev_uname:
+                        raise XendConfigError('The uname "%s" is already defined' %
+                                             dev_uname)
                     o_blkdev_name = sxp.child_value(o_dev_info, 'dev')
                     o_devid = self._blkdev_name_to_number(o_blkdev_name)
                     if o_devid != None and devid == o_devid:
+                        name_array = blkdev_name.split(':', 2)
+                        if len(name_array) == 2 and name_array[1] == 'cdrom':
+                            #
+                            # Since the device is a cdrom, we are most likely
+                            # inserting, changing, or removing a cd.  We can
+                            # update the old device instead of creating a new
+                            # one.
+                            #
+                            if o_dev_uname != None and dev_uname == None:
+                                #
+                                # We are removing a cd.  We can simply update
+                                # the uname on the existing device.
+                                #
+                                merge_sxp = sxp.from_string("('vbd' ('uname' ''))")
+                            else:
+                                merge_sxp = config
+
+                            dev_uuid = sxp.child_value(o_dev_info, 'uuid')
+                            if dev_uuid != None and \
+                               self.device_update(dev_uuid, cfg_sxp = merge_sxp):
+                                return dev_uuid
+
                         raise XendConfigError('The device "%s" is already defined' %
                                               blkdev_name)
                     
@@ -1188,6 +1216,7 @@ class XendConfig(dict):
                     if dev_mac.lower() == sxp.child_value(o_dev_info, 'mac').lower():
                         raise XendConfigError('The mac "%s" is already defined' %
                                               dev_mac)
+        return None
     
     def device_add(self, dev_type, cfg_sxp = None, cfg_xenapi = None,
                    target = None):
@@ -1326,7 +1355,9 @@ class XendConfig(dict):
                 if not dev_info.get('mac'):
                     dev_info['mac'] = randomMAC()
 
-            self.device_duplicate_check(dev_type, dev_info, target)
+            ret_uuid = self.device_duplicate_check(dev_type, dev_info, target, config)
+            if ret_uuid != None:
+                return ret_uuid
 
             if dev_type == 'vif':
                 if dev_info.get('policy') and dev_info.get('label'):
@@ -1820,8 +1851,11 @@ class XendConfig(dict):
                 vscsi_be = vscsi_dict.get('backend', None)
 
                 # destroy existing XenAPI DSCSI objects
+                vscsi_devid = int(dev_info['devs'][0]['devid'])
                 for dscsi_uuid in XendDSCSI.get_by_VM(self['uuid']):
-                    XendAPIStore.deregister(dscsi_uuid, "DSCSI")
+                    dscsi_inst = XendAPIStore.get(dscsi_uuid, 'DSCSI')
+                    if vscsi_devid == dscsi_inst.get_virtual_host():
+                        XendAPIStore.deregister(dscsi_uuid, "DSCSI")
 
                 # create XenAPI DSCSI objects.
                 for vscsi_dev in vscsi_devs:

@@ -24,6 +24,7 @@ from xen.xend import osdep
 from xen.util import mkdir
 
 import relocate
+import udevevent
 import SrvServer
 from params import *
 
@@ -336,6 +337,7 @@ class Daemon:
             del xc
 
             relocate.listenRelocation()
+            udevevent.listenUdevEvent()
             servers = SrvServer.create()
             servers.start(status)
             del servers

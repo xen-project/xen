@@ -31,6 +31,15 @@
 
 #define MAX_MSIX_TABLE_ENTRIES  2048
 #define MAX_MSIX_TABLE_PAGES    8
+struct pci_dev_info {
+    unsigned is_extfn;
+    unsigned is_virtfn;
+    struct {
+        u8 bus;
+        u8 devfn;
+    } physfn;
+};
+
 struct pci_dev {
     struct list_head alldevs_list;
     struct list_head domain_list;
@@ -43,6 +52,7 @@ struct pci_dev {
     struct domain *domain;
     const u8 bus;
     const u8 devfn;
+    struct pci_dev_info info;
 };
 
 #define for_each_pdev(domain, pdev) \
@@ -64,6 +74,7 @@ struct pci_dev *pci_lock_domain_pdev(struct domain *d, int bus, int devfn);
 void pci_release_devices(struct domain *d);
 int pci_add_device(u8 bus, u8 devfn);
 int pci_remove_device(u8 bus, u8 devfn);
+int pci_add_device_ext(u8 bus, u8 devfn, struct pci_dev_info *info);
 struct pci_dev *pci_get_pdev(int bus, int devfn);
 struct pci_dev *pci_get_pdev_by_domain(struct domain *d, int bus, int devfn);
 

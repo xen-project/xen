@@ -38,6 +38,13 @@
 static char opt_sched[10] = "credit";
 string_param("sched", opt_sched);
 
+/* if sched_smt_power_savings is set,
+ * scheduler will give preferrence to partially idle package compared to
+ * the full idle package, when picking pCPU to schedule vCPU.
+ */
+int sched_smt_power_savings = 0;
+boolean_param("sched_smt_power_savings", sched_smt_power_savings);
+
 #define TIME_SLOP      (s32)MICROSECS(50)     /* allow time to slip a bit */
 
 /* Various timer handlers. */
@@ -836,6 +843,7 @@ static void schedule(void)
         (test_bit(_VPF_blocked, &prev->pause_flags) ? RUNSTATE_blocked :
          (vcpu_runnable(prev) ? RUNSTATE_runnable : RUNSTATE_offline)),
         now);
+    prev->last_run_time = now;
 
     ASSERT(next->runstate.state != RUNSTATE_running);
     vcpu_runstate_change(next, RUNSTATE_running, now);
@@ -941,6 +949,8 @@ void dump_runq(unsigned char key)
 
     printk("Scheduler: %s (%s)\n", ops.name, ops.opt_name);
     SCHED_OP(dump_settings);
+    printk("sched_smt_power_savings: %s\n",
+            sched_smt_power_savings? "enabled":"disabled");
     printk("NOW=0x%08X%08X\n",  (u32)(now>>32), (u32)now);
 
     for_each_online_cpu ( i )

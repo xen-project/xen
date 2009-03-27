@@ -82,7 +82,7 @@ extern int request_irq_vector(unsigned int vector,
     release_irq_vector(irq_to_vector(irq))
 
 #define request_irq(irq, handler, irqflags, devname, devid) \
-    request_irq_vector(irq_to_vector(irq), handler, irqflags, defname, devid)
+    request_irq_vector(irq_to_vector(irq), handler, irqflags, devname, devid)
 
 extern hw_irq_controller no_irq_type;
 extern void no_action(int cpl, void *dev_id, struct cpu_user_regs *regs);

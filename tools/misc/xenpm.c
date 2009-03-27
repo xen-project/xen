@@ -16,9 +16,6 @@
  * Place - Suite 330, Boston, MA 02111-1307 USA.
  */
 
-/* to eliminate warning on `strndup' */
-#define _GNU_SOURCE
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -58,8 +55,10 @@ void show_help(void)
             "                                     it is used in ondemand governor.\n"
             " set-up-threshold      [cpuid] <num> set up threshold on CPU <cpuid> or all\n"
             "                                     it is used in ondemand governor.\n"
-            " start                               start collect Cx/Px statistics,\n"
-            "                                     output after CTRL-C or SIGINT.\n"
+            " get-cpu-topology                    get thread/core/socket topology info\n"
+            " set-sched-smt           enable|disable enable/disable scheduler smt power saving\n"
+            " start [seconds]                     start collect Cx/Px statistics,\n"
+            "                                     output after CTRL-C or SIGINT or several seconds.\n"
             );
 }
 /* wrapper function */
@@ -224,6 +223,20 @@ static int get_pxstat_by_cpuid(int xc_fd, int cpuid, struct xc_px_stat *pxstat)
     return 0;
 }
 
+/* show cpu actual average freq information on CPU cpuid */
+static int get_avgfreq_by_cpuid(int xc_fd, int cpuid, int *avgfreq)
+{
+    int ret = 0;
+
+    ret = xc_get_cpufreq_avgfreq(xc_fd, cpuid, avgfreq);
+    if ( ret )
+    {
+        return errno;
+    }
+
+    return 0;
+}
+
 static int show_pxstat_by_cpuid(int xc_fd, int cpuid)
 {
     int ret = 0;
@@ -265,6 +278,7 @@ void pxstat_func(int argc, char *argv[])
 static uint64_t usec_start, usec_end;
 static struct xc_cx_stat *cxstat, *cxstat_start, *cxstat_end;
 static struct xc_px_stat *pxstat, *pxstat_start, *pxstat_end;
+static int *avgfreq;
 static uint64_t *sum, *sum_cx, *sum_px;
 
 static void signal_int_handler(int signo)
@@ -300,6 +314,9 @@ static void signal_int_handler(int signo)
                                  pxstat_start[i].pt[j].residency;
     }
 
+    for ( i = 0; i < max_cpu_nr; i++ )
+        get_avgfreq_by_cpuid(xc_fd, i, &avgfreq[i]);
+
     printf("Elapsed time (ms): %"PRIu64"\n", (usec_end - usec_start) / 1000UL);
     for ( i = 0; i < max_cpu_nr; i++ )
     {
@@ -331,6 +348,7 @@ static void signal_int_handler(int signo)
                         res / 1000000UL, 100UL * res / (double)sum_px[i]);
             }
         }
+        printf("  Avg freq\t%d\tKHz\n", avgfreq[i]);
     }
 
     /* some clean up and then exits */
@@ -344,6 +362,7 @@ static void signal_int_handler(int signo)
     free(cxstat);
     free(pxstat);
     free(sum);
+    free(avgfreq);
     xc_interface_close(xc_fd);
     exit(0);
 }
@@ -352,6 +371,16 @@ void start_gather_func(int argc, char *argv[])
 {
     int i;
     struct timeval tv;
+    int timeout = 0;
+
+    if ( argc == 1 )
+    {
+        sscanf(argv[0], "%d", &timeout);
+        if ( timeout <= 0 )
+            fprintf(stderr, "failed to set timeout seconds, falling back...\n");
+        else
+            printf("Timeout set to %d seconds\n", timeout);
+    }
 
     if ( gettimeofday(&tv, NULL) == -1 )
     {
@@ -376,9 +405,18 @@ void start_gather_func(int argc, char *argv[])
         free(cxstat);
         return ;
     }
+    avgfreq = malloc(sizeof(int) * max_cpu_nr);
+    if ( avgfreq == NULL )
+    {
+        free(sum);
+        free(cxstat);
+        free(pxstat);
+        return ;
+    }
     memset(sum, 0, sizeof(uint64_t) * 2 * max_cpu_nr);
     memset(cxstat, 0, sizeof(struct xc_cx_stat) * 2 * max_cpu_nr);
     memset(pxstat, 0, sizeof(struct xc_px_stat) * 2 * max_cpu_nr);
+    memset(avgfreq, 0, sizeof(int) * max_cpu_nr);
     sum_cx = sum;
     sum_px = sum + max_cpu_nr;
     cxstat_start = cxstat;
@@ -397,6 +435,7 @@ void start_gather_func(int argc, char *argv[])
     {
         get_cxstat_by_cpuid(xc_fd, i, &cxstat_start[i]);
         get_pxstat_by_cpuid(xc_fd, i, &pxstat_start[i]);
+        get_avgfreq_by_cpuid(xc_fd, i, &avgfreq[i]);
     }
 
     if (signal(SIGINT, signal_int_handler) == SIG_ERR)
@@ -405,9 +444,25 @@ void start_gather_func(int argc, char *argv[])
         free(sum);
         free(pxstat);
         free(cxstat);
+        free(avgfreq);
         return ;
     }
-    printf("Start sampling, waiting for CTRL-C or SIGINT signal ...\n");
+
+    if ( timeout > 0 )
+    {
+        if ( signal(SIGALRM, signal_int_handler) == SIG_ERR )
+        {
+            fprintf(stderr, "failed to set signal alarm handler\n");
+            free(sum);
+            free(pxstat);
+            free(cxstat);
+            free(avgfreq);
+            return ;
+        }
+        alarm(timeout);
+    }
+
+    printf("Start sampling, waiting for CTRL-C or SIGINT or SIGALARM signal ...\n");
 
     pause();
 }
@@ -750,6 +805,70 @@ out:
     fprintf(stderr, "failed to set governor name\n");
 }
 
+#define MAX_NR_CPU 512
+
+void cpu_topology_func(int argc, char *argv[])
+{
+    uint32_t cpu_to_core[MAX_NR_CPU];
+    uint32_t cpu_to_socket[MAX_NR_CPU];
+    struct xc_get_cputopo info;
+    int i, ret;
+
+    info.cpu_to_core = cpu_to_core;
+    info.cpu_to_socket = cpu_to_socket;
+    info.max_cpus = MAX_NR_CPU;
+    ret = xc_get_cputopo(xc_fd, &info);
+    if (!ret)
+    {
+        printf("CPU\tcore\tsocket\n");
+        for (i=0; i<info.nr_cpus; i++)
+        {
+            if ( info.cpu_to_core[i] != INVALID_TOPOLOGY_ID &&
+                    info.cpu_to_socket[i] != INVALID_TOPOLOGY_ID )
+            {
+            printf("CPU%d\t %d\t %d\n", i, info.cpu_to_core[i],
+                    info.cpu_to_socket[i]);
+            }
+        }
+    }
+    else
+    {
+        printf("Can not get Xen CPU topology!\n");
+    }
+
+    return ;
+}
+
+void set_sched_smt_func(int argc, char *argv[])
+{
+    int value, rc;
+
+    if (argc != 1){
+        show_help();
+        exit(-1);
+    }
+
+    if ( !strncmp(argv[0], "disable", sizeof("disable")) )
+    {
+        value = 0;
+    }
+    else if ( !strncmp(argv[0], "enable", sizeof("enable")) )
+    {
+        value = 1;
+    }
+    else
+    {
+        show_help();
+        exit(-1);
+    }
+
+    rc = xc_set_sched_opt_smt(xc_fd, value);
+    printf("%s sched_smt_power_savings %s\n", argv[0],
+                    rc? "failed":"successeed" );
+
+    return;
+}
+
 struct {
     const char *name;
     void (*function)(int argc, char *argv[]);
@@ -765,6 +884,8 @@ struct {
     { "set-scaling-speed", scaling_speed_func },
     { "set-sampling-rate", scaling_sampling_rate_func },
     { "set-up-threshold", scaling_up_threshold_func },
+    { "get-cpu-topology", cpu_topology_func},
+    { "set-sched-smt", set_sched_smt_func},
 };
 
 int main(int argc, char *argv[])

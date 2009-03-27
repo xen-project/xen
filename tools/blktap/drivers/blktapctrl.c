@@ -148,7 +148,8 @@ static int get_tapdisk_pid(blkif_t *blkif)
  *   return 0 on success, -1 on error.
  */
 
-static int test_path(char *path, char **dev, int *type, blkif_t **blkif)
+static int test_path(char *path, char **dev, int *type, blkif_t **blkif,
+	int* use_ioemu)
 {
 	char *ptr, handle[10];
 	int i, size, found = 0;
@@ -157,6 +158,17 @@ static int test_path(char *path, char **dev, int *type, blkif_t **blkif)
 	size = sizeof(dtypes)/sizeof(disk_info_t *);
 	*type = MAX_DISK_TYPES + 1;
         *blkif = NULL;
+
+	if (!strncmp(path, "tapdisk:", strlen("tapdisk:"))) {
+		*use_ioemu = 0;
+		path += strlen("tapdisk:");
+	} else if (!strncmp(path, "ioemu:", strlen("ioemu:"))) {
+		*use_ioemu = 1;
+		path += strlen("ioemu:");
+	} else {
+		// Use the default for the image type
+		*use_ioemu = -1;
+	}
 
 	if ( (ptr = strstr(path, ":"))!=NULL) {
 		handle_len = (ptr - path);
@@ -174,6 +186,8 @@ static int test_path(char *path, char **dev, int *type, blkif_t **blkif)
                         }
 
 			if (found) {
+				if (*use_ioemu == -1)
+					*use_ioemu = dtypes[i]->use_ioemu;
 				*type = dtypes[i]->idnum;
                         
                         if (dtypes[i]->single_handler == 1) {
@@ -185,6 +199,7 @@ static int test_path(char *path, char **dev, int *type, blkif_t **blkif)
                                         *blkif = active_disks[dtypes[i]
                                                              ->idnum]->blkif;
                         }
+
                         return 0;
                 }
             }
@@ -216,6 +231,24 @@ static void add_disktype(blkif_t *blkif, int type)
 	entry->pprev = pprev;
 }
 
+static int qemu_instance_has_disks(pid_t pid)
+{
+	int i;
+	int count = 0;
+	driver_list_entry_t *entry;
+
+	for (i = 0; i < MAX_DISK_TYPES; i++) {
+		entry = active_disks[i];
+		while (entry) {
+			if ((entry->blkif->tappid == pid) && dtypes[i]->use_ioemu)
+				count++;
+			entry = entry->next;
+		}
+	}
+
+	return (count != 0);
+}
+
 static int del_disktype(blkif_t *blkif)
 {
 	driver_list_entry_t *entry, **pprev;
@@ -239,6 +272,14 @@ static int del_disktype(blkif_t *blkif)
 
 	DPRINTF("DEL_DISKTYPE: Freeing entry\n");
 	free(entry);
+
+	/*
+	 * When using ioemu, all disks of one VM are connected to the same
+	 * qemu-dm instance. We may close the file handle only if there is
+	 * no other disk left for this domain.
+	 */
+	if (dtypes[type]->use_ioemu)
+		return !qemu_instance_has_disks(blkif->tappid);
 
 	/* Caller should close() if no single controller, or list is empty. */
 	return (!dtypes[type]->single_handler || (active_disks[type] == NULL));
@@ -504,7 +545,8 @@ static int connect_qemu(blkif_t *blkif, int domid)
 	static int tapdisk_ioemu_pid = 0;
 	static int dom0_readfd = 0;
 	static int dom0_writefd = 0;
-	
+	int refresh_pid = 0;
+
 	if (asprintf(&rdctldev, BLKTAP_CTRL_DIR "/qemu-read-%d", domid) < 0)
 		return -1;
 
@@ -523,15 +565,23 @@ static int connect_qemu(blkif_t *blkif, int domid)
 		if (tapdisk_ioemu_pid == 0 || kill(tapdisk_ioemu_pid, 0)) {
 			/* No device model and tapdisk-ioemu doesn't run yet */
 			DPRINTF("Launching tapdisk-ioemu\n");
-			tapdisk_ioemu_pid = launch_tapdisk_ioemu();
+			launch_tapdisk_ioemu();
 			
 			dom0_readfd = open_ctrl_socket(wrctldev);
 			dom0_writefd = open_ctrl_socket(rdctldev);
+
+			refresh_pid = 1;
 		}
 
 		DPRINTF("Using tapdisk-ioemu connection\n");
 		blkif->fds[READ] = dom0_readfd;
 		blkif->fds[WRITE] = dom0_writefd;
+
+		if (refresh_pid) {
+			get_tapdisk_pid(blkif);
+			tapdisk_ioemu_pid = blkif->tappid;
+		}
+
 	} else if (access(rdctldev, R_OK | W_OK) == 0) {
 		/* Use existing pipe to the device model */
 		DPRINTF("Using qemu-dm connection\n");
@@ -605,13 +655,11 @@ static int blktapctrl_new_blkif(blkif_t *blkif)
 	image_t *image;
 	blkif_t *exist = NULL;
 	static uint16_t next_cookie = 0;
+	int use_ioemu;
 
 	DPRINTF("Received a poll for a new vbd\n");
 	if ( ((blk=blkif->info) != NULL) && (blk->params != NULL) ) {
-		if (blktap_interface_create(ctlfd, &major, &minor, blkif) < 0)
-			return -1;
-
-		if (test_path(blk->params, &ptr, &type, &exist) != 0) {
+		if (test_path(blk->params, &ptr, &type, &exist, &use_ioemu) != 0) {
                         DPRINTF("Error in blktap device string(%s).\n",
                                 blk->params);
                         goto fail;
@@ -620,7 +668,7 @@ static int blktapctrl_new_blkif(blkif_t *blkif)
 		blkif->cookie = next_cookie++;
 
 		if (!exist) {
-			if (type == DISK_TYPE_IOEMU) {
+			if (use_ioemu) {
 				if (connect_qemu(blkif, blkif->domid))
 					goto fail;
 			} else {
@@ -633,10 +681,6 @@ static int blktapctrl_new_blkif(blkif_t *blkif)
 			blkif->fds[READ] = exist->fds[READ];
 			blkif->fds[WRITE] = exist->fds[WRITE];
 		}
-
-		add_disktype(blkif, type);
-		blkif->major = major;
-		blkif->minor = minor;
 
 		image = (image_t *)malloc(sizeof(image_t));
 		blkif->prv = (void *)image;
@@ -661,11 +705,18 @@ static int blktapctrl_new_blkif(blkif_t *blkif)
 			goto fail;
 		}
 
+		if (blktap_interface_create(ctlfd, &major, &minor, blkif) < 0)
+			return -1;
+
+		blkif->major = major;
+		blkif->minor = minor;
+
+		add_disktype(blkif, type);
+
 	} else return -1;
 
 	return 0;
 fail:
-	ioctl(ctlfd, BLKTAP_IOCTL_FREEINTF, minor);
 	return -EINVAL;
 }
 
@@ -696,6 +747,7 @@ static int unmap_blktapctrl(blkif_t *blkif)
 	}
 
 	if (del_disktype(blkif)) {
+		DPRINTF("Closing communication pipe to pid %d\n", blkif->tappid);
 		close(blkif->fds[WRITE]);
 		close(blkif->fds[READ]);
 	}

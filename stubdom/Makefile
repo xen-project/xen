@@ -7,8 +7,6 @@ export stubdom=y
 export debug=y
 include $(XEN_ROOT)/Config.mk
 
-IOEMU_OPTIONS=--disable-sdl --disable-opengl --disable-vnc-tls --disable-brlapi --disable-kqemu
-
 #ZLIB_URL?=http://www.zlib.net
 ZLIB_URL=$(XEN_EXTFILES_URL)
 ZLIB_VERSION=1.2.3
@@ -237,8 +235,12 @@ ioemu: cross-zlib cross-libpci libxc
 	[ -f ioemu/config-host.mak ] || \
 	  ( $(absolutify_xen_root); \
 	    cd ioemu ; \
-          CONFIG_STUBDOM=yes XEN_TARGET_ARCH=$(XEN_TARGET_ARCH) CFLAGS="$(TARGET_CFLAGS)" sh ./xen-setup --cc=$(CC) --disable-gcc-check $(IOEMU_OPTIONS))
-	CPPFLAGS= TARGET_CPPFLAGS="$(TARGET_CPPFLAGS)" $(MAKE) -C ioemu LWIPDIR=$(CURDIR)/lwip-$(XEN_TARGET_ARCH) TOOLS= CONFIG_STUBDOM=yes
+	    LWIPDIR=$(CURDIR)/lwip-$(XEN_TARGET_ARCH) \
+	    TARGET_CPPFLAGS="$(TARGET_CPPFLAGS)" \
+	    TARGET_CFLAGS="$(TARGET_CFLAGS)" \
+	    TARGET_LDFLAGS="$(TARGET_LDFLAGS)" \
+	    ./xen-setup-stubdom )
+	$(MAKE) -C ioemu
 
 ######
 # caml
@@ -312,14 +314,14 @@ install-readme:
 	$(INSTALL_DATA) README $(DESTDIR)$(DOCDIR)/README.stubdom
 
 install-ioemu: ioemu-stubdom
-	$(INSTALL_DIR) "$(DESTDIR)/usr/lib/xen/bin"
-	$(INSTALL_PROG) stubdom-dm "$(DESTDIR)/usr/lib/xen/bin"
-	$(INSTALL_DIR) "$(DESTDIR)/usr/lib/xen/boot"
-	$(INSTALL_DATA) mini-os-$(XEN_TARGET_ARCH)-ioemu/mini-os.gz "$(DESTDIR)/usr/lib/xen/boot/ioemu-stubdom.gz"
+	$(INSTALL_DIR) "$(DESTDIR)$(LIBEXEC)"
+	$(INSTALL_PROG) stubdom-dm "$(DESTDIR)$(LIBEXEC)"
+	$(INSTALL_DIR) "$(DESTDIR)$(LIBDIR_x86_32)/xen/boot"
+	$(INSTALL_DATA) mini-os-$(XEN_TARGET_ARCH)-ioemu/mini-os.gz "$(DESTDIR)$(LIBDIR_x86_32)/xen/boot/ioemu-stubdom.gz"
 
 install-grub: pv-grub
-	$(INSTALL_DIR) "$(DESTDIR)/usr/lib/xen/boot"
-	$(INSTALL_DATA) mini-os-$(XEN_TARGET_ARCH)-grub/mini-os.gz "$(DESTDIR)/usr/lib/xen/boot/pv-grub-$(XEN_TARGET_ARCH).gz"
+	$(INSTALL_DIR) "$(DESTDIR)$(LIBDIR_x86_32)/xen/boot"
+	$(INSTALL_DATA) mini-os-$(XEN_TARGET_ARCH)-grub/mini-os.gz "$(DESTDIR)$(LIBDIR_x86_32)/xen/boot/pv-grub-$(XEN_TARGET_ARCH).gz"
 
 #######
 # clean

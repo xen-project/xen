@@ -60,7 +60,7 @@ struct hvm_mirq_dpci_mapping {
 };
 
 struct hvm_girq_dpci_mapping {
-    uint8_t valid;
+    struct list_head list;
     uint8_t device;
     uint8_t intx;
     uint8_t machine_gsi;
@@ -75,7 +75,7 @@ struct hvm_irq_dpci {
     DECLARE_BITMAP(mapping, NR_IRQS);
     struct hvm_mirq_dpci_mapping mirq[NR_IRQS];
     /* Guest IRQ to guest device/intx mapping. */
-    struct hvm_girq_dpci_mapping girq[NR_IRQS];
+    struct list_head girq[NR_IRQS];
     uint8_t msi_gvec_pirq[NR_VECTORS];
     DECLARE_BITMAP(dirq_mask, NR_IRQS);
     /* Record of mapped ISA IRQs */

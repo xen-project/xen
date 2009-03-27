@@ -674,6 +674,28 @@ long do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
             break;
     }
 
+    case PHYSDEVOP_manage_pci_add_ext: {
+        struct physdev_manage_pci_ext manage_pci_ext;
+        struct pci_dev_info pdev_info;
+
+        ret = -EPERM;
+        if ( !IS_PRIV(current->domain) )
+            break;
+
+        ret = -EFAULT;
+        if ( copy_from_guest(&manage_pci_ext, arg, 1) != 0 )
+            break;
+
+        pdev_info.is_extfn = manage_pci_ext.is_extfn;
+        pdev_info.is_virtfn = manage_pci_ext.is_virtfn;
+        pdev_info.physfn.bus = manage_pci_ext.physfn.bus;
+        pdev_info.physfn.devfn = manage_pci_ext.physfn.devfn;
+        ret = pci_add_device_ext(manage_pci_ext.bus,
+                                 manage_pci_ext.devfn,
+                                 &pdev_info);
+            break;
+    }
+
     default:
         ret = -ENOSYS;
         printk("not implemented do_physdev_op: %d\n", cmd);

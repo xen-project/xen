@@ -232,6 +232,26 @@ static u32 get_cur_val(cpumask_t mask)
     return cmd.val;
 }
 
+struct perf_pair {
+    union {
+        struct {
+            uint32_t lo;
+            uint32_t hi;
+        } split;
+        uint64_t whole;
+    } aperf, mperf;
+};
+static DEFINE_PER_CPU(struct perf_pair, gov_perf_pair);
+static DEFINE_PER_CPU(struct perf_pair, usr_perf_pair);
+
+static void read_measured_perf_ctrs(void *_readin)
+{
+    struct perf_pair *readin = _readin;
+
+    rdmsr(MSR_IA32_APERF, readin->aperf.split.lo, readin->aperf.split.hi);
+    rdmsr(MSR_IA32_MPERF, readin->mperf.split.lo, readin->mperf.split.hi);
+}
+
 /*
  * Return the measured active (C0) frequency on this CPU since last call
  * to this function.
@@ -245,40 +265,13 @@ static u32 get_cur_val(cpumask_t mask)
  * Only IA32_APERF/IA32_MPERF ratio is architecturally defined and
  * no meaning should be associated with absolute values of these MSRs.
  */
-static void  __get_measured_perf(void *perf_percent)
+static unsigned int get_measured_perf(unsigned int cpu, unsigned int flag)
 {
-    unsigned int *ratio = perf_percent;
-    union {
-        struct {
-            uint32_t lo;
-            uint32_t hi;
-        } split;
-        uint64_t whole;
-    } aperf_cur, mperf_cur;
-
-    rdmsr(MSR_IA32_APERF, aperf_cur.split.lo, aperf_cur.split.hi);
-    rdmsr(MSR_IA32_MPERF, mperf_cur.split.lo, mperf_cur.split.hi);
-
-    wrmsr(MSR_IA32_APERF, 0,0);
-    wrmsr(MSR_IA32_MPERF, 0,0);
-
-    if (unlikely(((unsigned long)(-1) / 100) < aperf_cur.whole)) {
-        int shift_count = 7;
-        aperf_cur.whole >>= shift_count;
-        mperf_cur.whole >>= shift_count;
-    }
-
-    if (aperf_cur.whole && mperf_cur.whole)
-        *ratio = (aperf_cur.whole * 100) / mperf_cur.whole;
-    else
-        *ratio = 0;
-}
-
-static unsigned int get_measured_perf(unsigned int cpu)
-{
-    struct cpufreq_policy *policy;
+    struct cpufreq_policy *policy;    
+    struct perf_pair readin, cur, *saved;
     unsigned int perf_percent;
     cpumask_t cpumask;
+    unsigned int retval;
 
     if (!cpu_online(cpu))
         return 0;
@@ -287,16 +280,80 @@ static unsigned int get_measured_perf(unsigned int cpu)
     if (!policy)
         return 0;
 
-    /* Usually we take the short path (no IPI) for the sake of performance. */
-    if (cpu == smp_processor_id()) {
-        __get_measured_perf((void *)&perf_percent);
-    } else {
-        cpumask = cpumask_of_cpu(cpu);
-        on_selected_cpus(cpumask, __get_measured_perf, 
-                        (void *)&perf_percent,0,1);
+    switch (flag)
+    {
+    case GOV_GETAVG:
+    {
+        saved = &per_cpu(gov_perf_pair, cpu);
+        break;
+    }
+    case USR_GETAVG:
+    {
+        saved = &per_cpu(usr_perf_pair, cpu);
+        break;
+    }
+    default:
+        return 0;
     }
 
-    return drv_data[cpu]->max_freq * perf_percent / 100;
+    if (cpu == smp_processor_id()) {
+        read_measured_perf_ctrs((void *)&readin);
+    } else {
+        cpumask = cpumask_of_cpu(cpu);
+        on_selected_cpus(cpumask, read_measured_perf_ctrs, 
+                        (void *)&readin, 0, 1);
+    }
+
+    cur.aperf.whole = readin.aperf.whole - saved->aperf.whole;
+    cur.mperf.whole = readin.mperf.whole - saved->mperf.whole;
+    saved->aperf.whole = readin.aperf.whole;
+    saved->mperf.whole = readin.mperf.whole;
+
+#ifdef __i386__
+    /*
+     * We dont want to do 64 bit divide with 32 bit kernel
+     * Get an approximate value. Return failure in case we cannot get
+     * an approximate value.
+     */
+    if (unlikely(cur.aperf.split.hi || cur.mperf.split.hi)) {
+        int shift_count;
+        uint32_t h;
+
+        h = max_t(uint32_t, cur.aperf.split.hi, cur.mperf.split.hi);
+        shift_count = fls(h);
+
+        cur.aperf.whole >>= shift_count;
+        cur.mperf.whole >>= shift_count;
+    }
+
+    if (((unsigned long)(-1) / 100) < cur.aperf.split.lo) {
+        int shift_count = 7;
+        cur.aperf.split.lo >>= shift_count;
+        cur.mperf.split.lo >>= shift_count;
+    }
+
+    if (cur.aperf.split.lo && cur.mperf.split.lo)
+        perf_percent = (cur.aperf.split.lo * 100) / cur.mperf.split.lo;
+    else
+        perf_percent = 0;
+
+#else
+    if (unlikely(((unsigned long)(-1) / 100) < cur.aperf.whole)) {
+        int shift_count = 7;
+        cur.aperf.whole >>= shift_count;
+        cur.mperf.whole >>= shift_count;
+    }
+
+    if (cur.aperf.whole && cur.mperf.whole)
+        perf_percent = (cur.aperf.whole * 100) / cur.mperf.whole;
+    else
+        perf_percent = 0;
+
+#endif
+
+    retval = drv_data[policy->cpu]->max_freq * perf_percent / 100;
+
+    return retval;
 }
 
 static unsigned int get_cur_freq_on_cpu(unsigned int cpu)

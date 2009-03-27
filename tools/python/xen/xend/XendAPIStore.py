@@ -25,36 +25,59 @@ You must register both the uuid and type, and get objects
 by type, to ensure safety
 """
 
+import threading
+
 __classes = {}
+__classes_lock = threading.RLock()
 
 def register(uuid, type, inst):
-    __classes[(uuid, type)] = inst
-    return inst
+    __classes_lock.acquire()
+    try:
+        __classes[(uuid, type)] = inst
+        return inst
+    finally:
+        __classes_lock.release()
 
 def deregister(uuid, type):
-    old = get(uuid, type)
-    if old is not None:
-        del __classes[(uuid, type)]
-    return old
+    __classes_lock.acquire()
+    try:
+        old = get(uuid, type)
+        if old is not None:
+            del __classes[(uuid, type)]
+        return old
+    finally:
+        __classes_lock.release()
 
 def get(uuid, type):
     """
     Get the instances by uuid and type
     """
-    return __classes.get((uuid, type), None)
+    __classes_lock.acquire()
+    try:
+        return __classes.get((uuid, type), None)
+    finally:
+        __classes_lock.release()
 
 def get_all(all_type):
     """
     Get all instances by type
     """
-    return [inst
-            for ((uuid, t), inst) in __classes.items()
-            if t == all_type]        
+    __classes_lock.acquire()
+    try:
+        return [inst
+                for ((uuid, t), inst) in __classes.items()
+                if t == all_type]        
+    finally:
+        __classes_lock.release()
 
 def get_all_uuid(all_type):
     """
     Get all uuids by type
     """
-    return [uuid
-            for (uuid, t) in __classes.keys()
-            if t == all_type]
+    __classes_lock.acquire()
+    try:
+        return [uuid
+                for (uuid, t) in __classes.keys()
+                if t == all_type]
+    finally:
+        __classes_lock.release()

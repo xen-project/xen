@@ -34,6 +34,15 @@
 #define dest_SMI -1
 #endif
 
+/* The max number of IOAPIC (or IOSAPIC) pin. The typical values can be 24 or
+ * 48 on x86 and Itanium platforms. Here we use a biger number 256. This
+ * should be big enough. Actually now IREMAP_ENTRY_NR is also 256.
+ */
+#define MAX_IOAPIC_PIN_NUM  256
+
+static int ioapic_pin_to_intremap_index[MAX_IOAPIC_PIN_NUM] =
+    { [0 ... MAX_IOAPIC_PIN_NUM-1] = -1 };
+
 u16 apicid_to_bdf(int apic_id)
 {
     struct acpi_drhd_unit *drhd = ioapic_to_drhd(apic_id);
@@ -94,7 +103,7 @@ static int remap_entry_to_ioapic_rte(
 }
 
 static int ioapic_rte_to_remap_entry(struct iommu *iommu,
-    int apic_id, struct IO_xAPIC_route_entry *old_rte,
+    int apic_id, unsigned int ioapic_pin, struct IO_xAPIC_route_entry *old_rte,
     unsigned int rte_upper, unsigned int value)
 {
     struct iremap_entry *iremap_entry = NULL, *iremap_entries;
@@ -108,13 +117,14 @@ static int ioapic_rte_to_remap_entry(struct iommu *iommu,
     remap_rte = (struct IO_APIC_route_remap_entry *) old_rte;
     spin_lock_irqsave(&ir_ctrl->iremap_lock, flags);
 
-    if ( remap_rte->format == 0 )
+    if ( ioapic_pin_to_intremap_index[ioapic_pin] < 0 )
     {
         ir_ctrl->iremap_index++;
         index = ir_ctrl->iremap_index;
+        ioapic_pin_to_intremap_index[ioapic_pin] = index;
     }
     else
-        index = (remap_rte->index_15 << 15) | remap_rte->index_0_14;
+        index = ioapic_pin_to_intremap_index[ioapic_pin];
 
     if ( index > IREMAP_ENTRY_NR - 1 )
     {
@@ -232,6 +242,7 @@ unsigned int io_apic_read_remap_rte(
 void io_apic_write_remap_rte(
     unsigned int apic, unsigned int reg, unsigned int value)
 {
+    unsigned int ioapic_pin = (reg - 0x10) / 2;
     struct IO_xAPIC_route_entry old_rte = { 0 };
     struct IO_APIC_route_remap_entry *remap_rte;
     unsigned int rte_upper = (reg & 1) ? 1 : 0;
@@ -289,7 +300,8 @@ void io_apic_write_remap_rte(
     *(IO_APIC_BASE(apic)+4) = *(((int *)&old_rte)+0);
     remap_rte->mask = saved_mask;
 
-    if ( ioapic_rte_to_remap_entry(iommu, IO_APIC_ID(apic),
+    ASSERT(ioapic_pin < MAX_IOAPIC_PIN_NUM);
+    if ( ioapic_rte_to_remap_entry(iommu, IO_APIC_ID(apic), ioapic_pin,
                                    &old_rte, rte_upper, value) )
     {
         *IO_APIC_BASE(apic) = rte_upper ? (reg + 1) : reg;
@@ -450,7 +462,7 @@ void msi_msg_read_remap_rte(
     struct iommu *iommu = NULL;
     struct ir_ctrl *ir_ctrl;
 
-    drhd = acpi_find_matched_drhd_unit(pdev->bus, pdev->devfn);
+    drhd = acpi_find_matched_drhd_unit(pdev);
     iommu = drhd->iommu;
 
     ir_ctrl = iommu_ir_ctrl(iommu);
@@ -468,7 +480,7 @@ void msi_msg_write_remap_rte(
     struct iommu *iommu = NULL;
     struct ir_ctrl *ir_ctrl;
 
-    drhd = acpi_find_matched_drhd_unit(pdev->bus, pdev->devfn);
+    drhd = acpi_find_matched_drhd_unit(pdev);
     iommu = drhd->iommu;
 
     ir_ctrl = iommu_ir_ctrl(iommu);
@@ -491,13 +503,12 @@ void msi_msg_write_remap_rte(
 }
 #endif
 
-int intremap_setup(struct iommu *iommu)
+int enable_intremap(struct iommu *iommu)
 {
     struct ir_ctrl *ir_ctrl;
     s_time_t start_time;
 
-    if ( !ecap_intr_remap(iommu->ecap) )
-        return -ENODEV;
+    ASSERT(ecap_intr_remap(iommu->ecap) && iommu_intremap);
 
     ir_ctrl = iommu_ir_ctrl(iommu);
     if ( ir_ctrl->iremap_maddr == 0 )
@@ -517,7 +528,7 @@ int intremap_setup(struct iommu *iommu)
     ir_ctrl->iremap_maddr |=
             ecap_ext_intr(iommu->ecap) ? (1 << IRTA_REG_EIME_SHIFT) : 0;
 #endif
-    /* set size of the interrupt remapping table */ 
+    /* set size of the interrupt remapping table */
     ir_ctrl->iremap_maddr |= IRTA_REG_TABLE_SIZE;
     dmar_writeq(iommu->reg, DMAR_IRTA_REG, ir_ctrl->iremap_maddr);
 
@@ -530,11 +541,7 @@ int intremap_setup(struct iommu *iommu)
     while ( !(dmar_readl(iommu->reg, DMAR_GSTS_REG) & DMA_GSTS_SIRTPS) )
     {
         if ( NOW() > (start_time + DMAR_OPERATION_TIMEOUT) )
-        {
-            dprintk(XENLOG_ERR VTDPREFIX,
-                    "Cannot set SIRTP field for interrupt remapping\n");
-            return -ENODEV;
-        }
+            panic("Cannot set SIRTP field for interrupt remapping\n");
         cpu_relax();
     }
 
@@ -546,11 +553,7 @@ int intremap_setup(struct iommu *iommu)
     while ( !(dmar_readl(iommu->reg, DMAR_GSTS_REG) & DMA_GSTS_CFIS) )
     {
         if ( NOW() > (start_time + DMAR_OPERATION_TIMEOUT) )
-        {
-            dprintk(XENLOG_ERR VTDPREFIX,
-                    "Cannot set CFI field for interrupt remapping\n");
-            return -ENODEV;
-        }
+            panic("Cannot set CFI field for interrupt remapping\n");
         cpu_relax();
     }
 
@@ -561,12 +564,8 @@ int intremap_setup(struct iommu *iommu)
     start_time = NOW();
     while ( !(dmar_readl(iommu->reg, DMAR_GSTS_REG) & DMA_GSTS_IRES) )
     {
-        if ( NOW() > (start_time + DMAR_OPERATION_TIMEOUT) ) 
-        {
-            dprintk(XENLOG_ERR VTDPREFIX,
-                    "Cannot set IRE field for interrupt remapping\n");
-            return -ENODEV;
-        }
+        if ( NOW() > (start_time + DMAR_OPERATION_TIMEOUT) )
+            panic("Cannot set IRE field for interrupt remapping\n");
         cpu_relax();
     }
 
@@ -574,4 +573,22 @@ int intremap_setup(struct iommu *iommu)
     iommu_flush_iec_global(iommu);
 
     return 0;
+}
+
+void disable_intremap(struct iommu *iommu)
+{
+    s_time_t start_time;
+
+    ASSERT(ecap_intr_remap(iommu->ecap) && iommu_intremap);
+
+    iommu->gcmd &= ~(DMA_GCMD_SIRTP | DMA_GCMD_CFI | DMA_GCMD_IRE);
+    dmar_writel(iommu->reg, DMAR_GCMD_REG, iommu->gcmd);
+
+    start_time = NOW();
+    while ( dmar_readl(iommu->reg, DMAR_GSTS_REG) & DMA_GSTS_IRES )
+    {
+        if ( NOW() > (start_time + DMAR_OPERATION_TIMEOUT) )
+            panic("Cannot clear IRE field for interrupt remapping\n");
+        cpu_relax();
+    }
 }

@@ -744,8 +744,6 @@ static xen_pfn_t *map_and_save_p2m_table(int xc_handle,
     return success ? p2m : NULL;
 }
 
-
-
 int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                    uint32_t max_factor, uint32_t flags, int (*suspend)(void),
                    int hvm, void *(*init_qemu_maps)(int, unsigned), 

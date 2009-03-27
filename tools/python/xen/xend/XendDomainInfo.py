@@ -793,7 +793,7 @@ class XendDomainInfo:
                 existing_dev_uuid = sxp.child_value(existing_dev_info, 'uuid')
                 existing_pci_conf = self.info['devices'][existing_dev_uuid][1]
                 existing_pci_devs = existing_pci_conf['devs']
-                vslt = '0x0'
+                vslt = AUTO_PHP_SLOT_STR
                 for x in existing_pci_devs:
                     if ( int(x['domain'], 16) == int(dev['domain'], 16) and
                          int(x['bus'], 16) == int(dev['bus'], 16) and
@@ -801,7 +801,7 @@ class XendDomainInfo:
                          int(x['func'], 16) == int(dev['func'], 16) ):
                         vslt = x['vslt']
                         break
-                if vslt == '0x0':
+                if vslt == AUTO_PHP_SLOT_STR:
                     raise VmError("Device %04x:%02x:%02x.%01x is not connected"
                                   % (int(dev['domain'],16), int(dev['bus'],16),
                                      int(dev['slot'],16), int(dev['func'],16)))
@@ -1410,7 +1410,8 @@ class XendDomainInfo:
             for dev_uuid, (dev_type, dev_info) in self.info['devices'].items():
                 if dev_type == 'vfb':
                     old_location = dev_info.get('location')
-                    listen_host = dev_info.get('vnclisten', 'localhost')
+                    listen_host = dev_info.get('vnclisten', \
+                                XendOptions.instance().get_vnclisten_address())
                     new_location = '%s:%s' % (listen_host, str(vnc_port))
                     if old_location == new_location:
                         break
@@ -1495,7 +1496,8 @@ class XendDomainInfo:
         t.mkdir()
         t.set_permissions({'dom' : self.domid, 'read' : True})
         t.write('vm', self.vmpath)
-        for i in [ 'device', 'control', 'error', 'memory' ]:
+        # NB. Solaris guests use guest/ and hvmpv/ xenstore directories
+        for i in [ 'device', 'control', 'error', 'memory', 'guest', 'hvmpv' ]:
             t.mkdir(i)
             t.set_permissions(i, {'dom' : self.domid})
 
@@ -2027,26 +2029,31 @@ class XendDomainInfo:
         @raise: XendError if core dumping failed.
         """
         
-        try:
-            if not corefile:
-                this_time = time.strftime("%Y-%m%d-%H%M.%S", time.localtime())
-                corefile = "/var/xen/dump/%s-%s.%s.core" % (this_time,
-                                  self.info['name_label'], self.domid)
+        if not corefile:
+            this_time = time.strftime("%Y-%m%d-%H%M.%S", time.localtime())
+            corefile = "/var/xen/dump/%s-%s.%s.core" % (this_time,
+                              self.info['name_label'], self.domid)
                 
-            if os.path.isdir(corefile):
-                raise XendError("Cannot dump core in a directory: %s" %
-                                corefile)
-            
-            self._writeVm(DUMPCORE_IN_PROGRESS, 'True')
-            xc.domain_dumpcore(self.domid, corefile)
+        if os.path.isdir(corefile):
+            raise XendError("Cannot dump core in a directory: %s" %
+                            corefile)
+
+        try:
+            try:
+                self._writeVm(DUMPCORE_IN_PROGRESS, 'True')
+                xc.domain_dumpcore(self.domid, corefile)
+            except RuntimeError, ex:
+                corefile_incomp = corefile+'-incomplete'
+                try:
+                    os.rename(corefile, corefile_incomp)
+                except:
+                    pass
+
+                log.error("core dump failed: id = %s name = %s: %s",
+                          self.domid, self.info['name_label'], str(ex))
+                raise XendError("Failed to dump core: %s" %  str(ex))
+        finally:
             self._removeVm(DUMPCORE_IN_PROGRESS)
-        except RuntimeError, ex:
-            corefile_incomp = corefile+'-incomplete'
-            os.rename(corefile, corefile_incomp)
-            self._removeVm(DUMPCORE_IN_PROGRESS)
-            log.exception("XendDomainInfo.dumpCore failed: id = %s name = %s",
-                          self.domid, self.info['name_label'])
-            raise XendError("Failed to dump core: %s" %  str(ex))
 
     #
     # Device creation/deletion functions
@@ -2544,6 +2551,31 @@ class XendDomainInfo:
         finally:
             self.state_updated.release()
 
+    def waitForSuspend(self):
+        """Wait for the guest to respond to a suspend request by
+        shutting down.  If the guest hasn't re-written control/shutdown
+        after a certain amount of time, it's obviously not listening and
+        won't suspend, so we give up.  HVM guests with no PV drivers
+        should already be shutdown.
+        """
+        state = "suspend"
+        nr_tries = 60
+
+        self.state_updated.acquire()
+        try:
+            while self._stateGet() in (DOM_STATE_RUNNING,DOM_STATE_PAUSED):
+                self.state_updated.wait(1.0)
+                if state == "suspend":
+                    if nr_tries == 0:
+                        msg = ('Timeout waiting for domain %s to suspend'
+                            % self.domid)
+                        self._writeDom('control/shutdown', '')
+                        raise XendError(msg)
+                    state = self.readDom('control/shutdown')
+                    nr_tries -= 1
+        finally:
+            self.state_updated.release()
+
     #
     # TODO: recategorise - called from XendCheckpoint
     # 
@@ -2888,7 +2920,9 @@ class XendDomainInfo:
         while True:
             test = 0
             diff = time.time() - start
-            for i in self.getDeviceController('vbd').deviceIDs():
+            vbds = self.getDeviceController('vbd').deviceIDs()
+            taps = self.getDeviceController('tap').deviceIDs()
+            for i in vbds + taps:
                 test = 1
                 log.info("Dev %s still active, looping...", i)
                 time.sleep(0.1)
@@ -3669,7 +3703,8 @@ class XendDomainInfo:
                     ['v-dev', xenapi_dscsi.get('virtual_HCTL')],
                     ['state', xenbusState['Initialising']],
                     ['uuid', dscsi_uuid]
-                ]
+                ],
+                ['feature-host', 0]
             ]
 
         if self._stateGet() != XEN_API_VM_POWER_STATE_RUNNING:
@@ -3682,7 +3717,7 @@ class XendDomainInfo:
                     raise XendError('Failed to create device')
 
             else:
-                new_vscsi_sxp = ['vscsi']
+                new_vscsi_sxp = ['vscsi', ['feature-host', 0]]
                 for existing_dev in sxp.children(cur_vscsi_sxp, 'dev'):
                     new_vscsi_sxp.append(existing_dev)
                 new_vscsi_sxp.append(sxp.child0(target_vscsi_sxp, 'dev'))
@@ -3776,7 +3811,7 @@ class XendDomainInfo:
         dev_uuid = sxp.child_value(cur_vscsi_sxp, 'uuid')
 
         target_dev = None
-        new_vscsi_sxp = ['vscsi']
+        new_vscsi_sxp = ['vscsi', ['feature-host', 0]]
         for dev in sxp.children(cur_vscsi_sxp, 'dev'):
             if vHCTL == sxp.child_value(dev, 'v-dev'):
                 target_dev = dev
@@ -3787,7 +3822,7 @@ class XendDomainInfo:
             raise XendError('Failed to destroy device')
 
         target_dev.append(['state', xenbusState['Closing']])
-        target_vscsi_sxp = ['vscsi', target_dev]
+        target_vscsi_sxp = ['vscsi', target_dev, ['feature-host', 0]]
 
         if self._stateGet() != XEN_API_VM_POWER_STATE_RUNNING:
 

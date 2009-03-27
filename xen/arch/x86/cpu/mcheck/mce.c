@@ -10,104 +10,492 @@
 #include <xen/smp.h>
 #include <xen/errno.h>
 #include <xen/console.h>
+#include <xen/sched.h>
+#include <xen/sched-if.h>
+#include <xen/cpumask.h>
+#include <xen/event.h>
+#include <xen/guest_access.h>
 
-#include <asm/processor.h> 
+#include <asm/processor.h>
 #include <asm/system.h>
+#include <asm/msr.h>
 
 #include "mce.h"
-#include "x86_mca.h"
 
 int mce_disabled = 0;
 unsigned int nr_mce_banks;
 
 EXPORT_SYMBOL_GPL(nr_mce_banks);	/* non-fatal.o */
 
-/* XXX For now a fixed array is used. Later this should be changed
- * to a dynamic allocated array with the size calculated in relation
- * to physical cpus present in the machine.
- * The more physical cpus are available, the more entries you need.
- */
-#define MAX_MCINFO	20
+static void intpose_init(void);
+static void mcinfo_clear(struct mc_info *);
 
-struct mc_machine_notify {
-	struct mc_info mc;
-	uint32_t fetch_idx;
-	uint32_t valid;
-};
+#define	SEG_PL(segsel)			((segsel) & 0x3)
+#define _MC_MSRINJ_F_REQ_HWCR_WREN	(1 << 16)
 
-struct mc_machine {
+#if 1	/* XXFM switch to 0 for putback */
 
-	/* Array structure used for collecting machine check error telemetry. */
-	struct mc_info mc[MAX_MCINFO];
+#define	x86_mcerr(str, err) _x86_mcerr(str, err)
 
-	/* We handle multiple machine check reports lockless by
-	 * iterating through the array using the producer/consumer concept.
-	 */
-	/* Producer array index to fill with machine check error data.
-	 * Index must be increased atomically. */
-	uint32_t error_idx;
+static int _x86_mcerr(const char *msg, int err)
+{
+	printk("x86_mcerr: %s, returning %d\n",
+	    msg != NULL ? msg : "", err);
+	return err;
+}
+#else
+#define x86_mcerr(str,err)
+#endif
 
-	/* Consumer array index to fetch machine check error data from.
-	 * Index must be increased atomically. */
-	uint32_t fetch_idx;
-
-	/* Integer array holding the indeces of the mc array that allows
-         * a Dom0 to notify a DomU to re-fetch the same machine check error
-         * data. The notification and refetch also uses its own 
-	 * producer/consumer mechanism, because Dom0 may decide to not report
-	 * every error to the impacted DomU.
-	 */
-	struct mc_machine_notify notify[MAX_MCINFO];
-
-	/* Array index to get fetch_idx from.
-	 * Index must be increased atomically. */
-	uint32_t notifyproducer_idx;
-	uint32_t notifyconsumer_idx;
-};
-
-/* Global variable with machine check information. */
-struct mc_machine mc_data;
+cpu_banks_t mca_allbanks;
 
 /* Handle unconfigured int18 (should never happen) */
 static void unexpected_machine_check(struct cpu_user_regs *regs, long error_code)
-{	
+{
 	printk(XENLOG_ERR "CPU#%d: Unexpected int18 (Machine Check).\n",
 		smp_processor_id());
 }
 
 
+static x86_mce_vector_t _machine_check_vector = unexpected_machine_check;
+
+void x86_mce_vector_register(x86_mce_vector_t hdlr)
+{
+	_machine_check_vector = hdlr;
+	wmb();
+}
+
 /* Call the installed machine check handler for this CPU setup. */
-void (*machine_check_vector)(struct cpu_user_regs *regs, long error_code) = unexpected_machine_check;
+
+void machine_check_vector(struct cpu_user_regs *regs, long error_code)
+{
+	_machine_check_vector(regs, error_code);
+}
 
 /* Init machine check callback handler
  * It is used to collect additional information provided by newer
  * CPU families/models without the need to duplicate the whole handler.
  * This avoids having many handlers doing almost nearly the same and each
  * with its own tweaks ands bugs. */
-int (*mc_callback_bank_extended)(struct mc_info *, uint16_t, uint64_t) = NULL;
+static x86_mce_callback_t mc_callback_bank_extended = NULL;
 
-
-static void amd_mcheck_init(struct cpuinfo_x86 *ci)
+void x86_mce_callback_register(x86_mce_callback_t cbfunc)
 {
+	mc_callback_bank_extended = cbfunc;
+}
+
+/* Utility function to perform MCA bank telemetry readout and to push that
+ * telemetry towards an interested dom0 for logging and diagnosis.
+ * The caller - #MC handler or MCA poll function - must arrange that we
+ * do not migrate cpus. */
+
+/* XXFM Could add overflow counting? */
+mctelem_cookie_t mcheck_mca_logout(enum mca_source who, cpu_banks_t bankmask,
+    struct mca_summary *sp)
+{
+	struct vcpu *v = current;
+	struct domain *d;
+	uint64_t gstatus, status, addr, misc;
+	struct mcinfo_global mcg;	/* on stack */
+	struct mcinfo_common *mic;
+	struct mcinfo_global *mig;	/* on stack */
+	mctelem_cookie_t mctc = NULL;
+	uint32_t uc = 0, pcc = 0;
+	struct mc_info *mci = NULL;
+	mctelem_class_t which = MC_URGENT;	/* XXXgcc */
+	unsigned int cpu_nr;
+	int errcnt = 0;
+	int i;
+	enum mca_extinfo cbret = MCA_EXTINFO_IGNORED;
+
+	cpu_nr = smp_processor_id();
+	BUG_ON(cpu_nr != v->processor);
+
+	mca_rdmsrl(MSR_IA32_MCG_STATUS, gstatus);
+
+	memset(&mcg, 0, sizeof (mcg));
+	mcg.common.type = MC_TYPE_GLOBAL;
+	mcg.common.size = sizeof (mcg);
+	if (v != NULL && ((d = v->domain) != NULL)) {
+		mcg.mc_domid = d->domain_id;
+		mcg.mc_vcpuid = v->vcpu_id;
+	} else {
+		mcg.mc_domid = -1;
+		mcg.mc_vcpuid = -1;
+	}
+	mcg.mc_gstatus = gstatus;	/* MCG_STATUS */
+
+	switch (who) {
+	case MCA_MCE_HANDLER:
+		mcg.mc_flags = MC_FLAG_MCE;
+		which = MC_URGENT;
+		break;
+
+	case MCA_POLLER:
+	case MCA_RESET:
+		mcg.mc_flags = MC_FLAG_POLLED;
+		which = MC_NONURGENT;
+		break;
+
+	case MCA_CMCI_HANDLER:
+		mcg.mc_flags = MC_FLAG_CMCI;
+		which = MC_NONURGENT;
+		break;
+
+	default:
+		BUG();
+	}
+
+	/* Retrieve detector information */
+	x86_mc_get_cpu_info(cpu_nr, &mcg.mc_socketid,
+	    &mcg.mc_coreid, &mcg.mc_core_threadid,
+	    &mcg.mc_apicid, NULL, NULL, NULL);
+
+	for (i = 0; i < 32 && i < nr_mce_banks; i++) {
+		struct mcinfo_bank mcb;		/* on stack */
+
+		/* Skip bank if corresponding bit in bankmask is clear */
+		if (!test_bit(i, bankmask))
+			continue;
+
+		mca_rdmsrl(MSR_IA32_MC0_STATUS + i * 4, status);
+		if (!(status & MCi_STATUS_VAL))
+			continue;	/* this bank has no valid telemetry */
+
+		/* If this is the first bank with valid MCA DATA, then
+		 * try to reserve an entry from the urgent/nonurgent queue
+		 * depending on whethere we are called from an exception or
+		 * a poller;  this can fail (for example dom0 may not
+		 * yet have consumed past telemetry). */
+		if (errcnt == 0) {
+			if ((mctc = mctelem_reserve(which)) != NULL) {
+				mci = mctelem_dataptr(mctc);
+				mcinfo_clear(mci);
+			}
+		}
+
+		memset(&mcb, 0, sizeof (mcb));
+		mcb.common.type = MC_TYPE_BANK;
+		mcb.common.size = sizeof (mcb);
+		mcb.mc_bank = i;
+		mcb.mc_status = status;
+
+		/* form a mask of which banks have logged uncorrected errors */
+		if ((status & MCi_STATUS_UC) != 0)
+			uc |= (1 << i);
+
+		/* likewise for those with processor context corrupt */
+		if ((status & MCi_STATUS_PCC) != 0)
+			pcc |= (1 << i);
+
+		addr = misc = 0;
+
+		if (status & MCi_STATUS_ADDRV) {
+			mca_rdmsrl(MSR_IA32_MC0_ADDR + 4 * i, addr);
+			d = maddr_get_owner(addr);
+			if (d != NULL && (who == MCA_POLLER ||
+			    who == MCA_CMCI_HANDLER))
+				mcb.mc_domid = d->domain_id;
+		}
+
+		if (status & MCi_STATUS_MISCV)
+			mca_rdmsrl(MSR_IA32_MC0_MISC + 4 * i, misc);
+
+		mcb.mc_addr = addr;
+		mcb.mc_misc = misc;
+
+		if (who == MCA_CMCI_HANDLER) {
+			mca_rdmsrl(MSR_IA32_MC0_CTL2 + i, mcb.mc_ctrl2);
+			rdtscll(mcb.mc_tsc);
+		}
+
+		/* Increment the error count;  if this is the first bank
+		 * with a valid error then add the global info to the mcinfo. */
+		if (errcnt++ == 0 && mci != NULL)
+			x86_mcinfo_add(mci, &mcg);
+
+		/* Add the bank data */
+		if (mci != NULL)
+			x86_mcinfo_add(mci, &mcb);
+
+		if (mc_callback_bank_extended && cbret != MCA_EXTINFO_GLOBAL) {
+			cbret = mc_callback_bank_extended(mci, i, status);
+		}
+
+		/* Clear status */
+		mca_wrmsrl(MSR_IA32_MC0_STATUS + 4 * i, 0x0ULL);
+		wmb();
+	}
+
+	if (mci != NULL && errcnt > 0) {
+		x86_mcinfo_lookup(mic, mci, MC_TYPE_GLOBAL);
+		mig = (struct mcinfo_global *)mic;
+		if (pcc)
+			mcg.mc_flags |= MC_FLAG_UNCORRECTABLE;
+		else if (uc)
+			mcg.mc_flags |= MC_FLAG_RECOVERABLE;
+		else
+			mcg.mc_flags |= MC_FLAG_CORRECTABLE;
+	}
+
+
+	if (sp) {
+		sp->errcnt = errcnt;
+		sp->ripv = (gstatus & MCG_STATUS_RIPV) != 0;
+		sp->eipv = (gstatus & MCG_STATUS_EIPV) != 0;
+		sp->uc = uc;
+		sp->pcc = pcc;
+	}
+
+	return mci != NULL ? mctc : NULL;	/* may be NULL */
+}
+
+#define DOM_NORMAL	0
+#define DOM0_TRAP	1
+#define DOMU_TRAP	2
+#define DOMU_KILLED	4
+
+/* Shared #MC handler. */
+void mcheck_cmn_handler(struct cpu_user_regs *regs, long error_code,
+    cpu_banks_t bankmask)
+{
+	int xen_state_lost, dom0_state_lost, domU_state_lost;
+	struct vcpu *v = current;
+	struct domain *curdom = v->domain;
+	domid_t domid = curdom->domain_id;
+	int ctx_xen, ctx_dom0, ctx_domU;
+	uint32_t dom_state = DOM_NORMAL;
+	mctelem_cookie_t mctc = NULL;
+	struct mca_summary bs;
+	struct mc_info *mci = NULL;
+	int irqlocked = 0;
+	uint64_t gstatus;
+	int ripv;
+
+	/* This handler runs as interrupt gate. So IPIs from the
+	 * polling service routine are defered until we're finished.
+	 */
+
+	/* Disable interrupts for the _vcpu_. It may not re-scheduled to
+	 * another physical CPU. */
+	vcpu_schedule_lock_irq(v);
+	irqlocked = 1;
+
+	/* Read global status;  if it does not indicate machine check
+	 * in progress then bail as long as we have a valid ip to return to. */
+	mca_rdmsrl(MSR_IA32_MCG_STATUS, gstatus);
+	ripv = ((gstatus & MCG_STATUS_RIPV) != 0);
+	if (!(gstatus & MCG_STATUS_MCIP) && ripv) {
+		add_taint(TAINT_MACHINE_CHECK); /* questionable */
+		vcpu_schedule_unlock_irq(v);
+		irqlocked = 0;
+		goto cmn_handler_done;
+	}
+
+	/* Go and grab error telemetry.  We must choose whether to commit
+	 * for logging or dismiss the cookie that is returned, and must not
+	 * reference the cookie after that action.
+	 */
+	mctc = mcheck_mca_logout(MCA_MCE_HANDLER, bankmask, &bs);
+	if (mctc != NULL)
+		mci = (struct mc_info *)mctelem_dataptr(mctc);
+
+	/* Clear MCIP or another #MC will enter shutdown state */
+	gstatus &= ~MCG_STATUS_MCIP;
+	mca_wrmsrl(MSR_IA32_MCG_STATUS, gstatus);
+	wmb();
+
+	/* If no valid errors and our stack is intact, we're done */
+	if (ripv && bs.errcnt == 0) {
+		vcpu_schedule_unlock_irq(v);
+		irqlocked = 0;
+		goto cmn_handler_done;
+	}
+
+	if (bs.uc || bs.pcc)
+		add_taint(TAINT_MACHINE_CHECK);
+
+	/* Machine check exceptions will usually be for UC and/or PCC errors,
+	 * but it is possible to configure machine check for some classes
+	 * of corrected error.
+	 *
+	 * UC errors could compromise any domain or the hypervisor
+	 * itself - for example a cache writeback of modified data that
+	 * turned out to be bad could be for data belonging to anyone, not
+	 * just the current domain.  In the absence of known data poisoning
+	 * to prevent consumption of such bad data in the system we regard
+	 * all UC errors as terminal.  It may be possible to attempt some
+	 * heuristics based on the address affected, which guests have
+	 * mappings to that mfn etc.
+	 *
+	 * PCC errors apply to the current context.
+	 *
+	 * If MCG_STATUS indicates !RIPV then even a #MC that is not UC
+	 * and not PCC is terminal - the return instruction pointer
+	 * pushed onto the stack is bogus.  If the interrupt context is
+	 * the hypervisor or dom0 the game is over, otherwise we can
+	 * limit the impact to a single domU but only if we trampoline
+	 * somewhere safely - we can't return and unwind the stack.
+	 * Since there is no trampoline in place we will treat !RIPV
+	 * as terminal for any context.
+	 */
+	ctx_xen = SEG_PL(regs->cs) == 0;
+	ctx_dom0 = !ctx_xen && (domid == dom0->domain_id);
+	ctx_domU = !ctx_xen && !ctx_dom0;
+
+	xen_state_lost = bs.uc != 0 || (ctx_xen && (bs.pcc || !ripv)) ||
+	    !ripv;
+	dom0_state_lost = bs.uc != 0 || (ctx_dom0 && (bs.pcc || !ripv));
+	domU_state_lost = bs.uc != 0 || (ctx_domU && (bs.pcc || !ripv));
+
+	if (xen_state_lost) {
+		/* Now we are going to panic anyway. Allow interrupts, so that
+		 * printk on serial console can work. */
+		vcpu_schedule_unlock_irq(v);
+		irqlocked = 0;
+
+		printk("Terminal machine check exception occured in "
+		    "hypervisor context.\n");
+
+		/* If MCG_STATUS_EIPV indicates, the IP on the stack is related
+		 * to the error then it makes sense to print a stack trace.
+		 * That can be useful for more detailed error analysis and/or
+		 * error case studies to figure out, if we can clear
+		 * xen_impacted and kill a DomU instead
+		 * (i.e. if a guest only control structure is affected, but then
+		 * we must ensure the bad pages are not re-used again).
+		 */
+		if (bs.eipv & MCG_STATUS_EIPV) {
+			printk("MCE: Instruction Pointer is related to the "
+			    "error, therefore print the execution state.\n");
+			show_execution_state(regs);
+		}
+
+		/* Commit the telemetry so that panic flow can find it. */
+		if (mctc != NULL) {
+			x86_mcinfo_dump(mci);
+			mctelem_commit(mctc);
+		}
+		mc_panic("Hypervisor state lost due to machine check "
+		    "exception.\n");
+		/*NOTREACHED*/
+	}
+
+	/*
+	 * Xen hypervisor state is intact.  If dom0 state is lost then
+	 * give it a chance to decide what to do if it has registered
+	 * a handler for this event, otherwise panic.
+	 *
+	 * XXFM Could add some Solaris dom0 contract kill here?
+	 */
+	if (dom0_state_lost) {
+		if (guest_has_trap_callback(dom0, 0, TRAP_machine_check)) {
+			dom_state = DOM0_TRAP;
+			send_guest_trap(dom0, 0, TRAP_machine_check);
+			/* XXFM case of return with !ripv ??? */
+		} else {
+			/* Commit telemetry for panic flow. */
+			if (mctc != NULL) {
+				x86_mcinfo_dump(mci);
+				mctelem_commit(mctc);
+			}
+			mc_panic("Dom0 state lost due to machine check "
+			    "exception\n");
+			/*NOTREACHED*/
+		}
+	}
+
+	/*
+	 * If a domU has lost state then send it a trap if it has registered
+	 * a handler, otherwise crash the domain.
+	 * XXFM Revisit this functionality.
+	 */
+	if (domU_state_lost) {
+		if (guest_has_trap_callback(v->domain, v->vcpu_id,
+		    TRAP_machine_check)) {
+			dom_state = DOMU_TRAP;
+			send_guest_trap(curdom, v->vcpu_id,
+			    TRAP_machine_check);
+		} else {
+			dom_state = DOMU_KILLED;
+			/* Enable interrupts. This basically results in
+			 * calling sti on the *physical* cpu. But after
+			 * domain_crash() the vcpu pointer is invalid.
+			 * Therefore, we must unlock the irqs before killing
+			 * it. */
+			vcpu_schedule_unlock_irq(v);
+			irqlocked = 0;
+
+			/* DomU is impacted. Kill it and continue. */
+			domain_crash(curdom);
+		}
+	}
+
+	switch (dom_state) {
+	case DOM0_TRAP:
+	case DOMU_TRAP:
+		/* Enable interrupts. */
+		vcpu_schedule_unlock_irq(v);
+		irqlocked = 0;
+
+		/* guest softirqs and event callbacks are scheduled
+		 * immediately after this handler exits. */
+		break;
+	case DOMU_KILLED:
+		/* Nothing to do here. */
+		break;
+
+	case DOM_NORMAL:
+		vcpu_schedule_unlock_irq(v);
+		irqlocked = 0;
+		break;
+	}
+
+cmn_handler_done:
+	BUG_ON(irqlocked);
+	BUG_ON(!ripv);
+
+	if (bs.errcnt) {
+		/* Not panicing, so forward telemetry to dom0 now if it
+		 * is interested. */
+		if (guest_enabled_event(dom0->vcpu[0], VIRQ_MCA)) {
+			if (mctc != NULL)
+				mctelem_commit(mctc);
+			send_guest_global_virq(dom0, VIRQ_MCA);
+		} else {
+			x86_mcinfo_dump(mci);
+			if (mctc != NULL)
+				mctelem_dismiss(mctc);
+		}
+	} else if (mctc != NULL) {
+		mctelem_dismiss(mctc);
+	}
+}
+
+static int amd_mcheck_init(struct cpuinfo_x86 *ci)
+{
+	int rc = 0;
 
 	switch (ci->x86) {
 	case 6:
-		amd_k7_mcheck_init(ci);
+		rc = amd_k7_mcheck_init(ci);
 		break;
 
 	case 0xf:
-		amd_k8_mcheck_init(ci);
+		rc = amd_k8_mcheck_init(ci);
 		break;
 
 	case 0x10:
-		amd_f10_mcheck_init(ci);
+		rc = amd_f10_mcheck_init(ci);
 		break;
 
 	default:
 		/* Assume that machine check support is available.
 		 * The minimum provided support is at least the K8. */
-		amd_k8_mcheck_init(ci);
+		rc = amd_k8_mcheck_init(ci);
 	}
+
+	return rc;
 }
 
 /*check the existence of Machine Check*/
@@ -116,50 +504,82 @@ int mce_available(struct cpuinfo_x86 *c)
 	return cpu_has(c, X86_FEATURE_MCE) && cpu_has(c, X86_FEATURE_MCA);
 }
 
+/*
+ * Check if bank 0 is usable for MCE. It isn't for AMD K7,
+ * and Intel P6 family before model 0x1a.
+ */
+int mce_firstbank(struct cpuinfo_x86 *c)
+{
+	if (c->x86 == 6) {
+		if (c->x86_vendor == X86_VENDOR_AMD)
+			return 1;
+
+		if (c->x86_vendor == X86_VENDOR_INTEL && c->x86_model < 0x1a)
+			return 1;
+	}
+
+	return 0;
+}
+
 /* This has to be run for each processor */
 void mcheck_init(struct cpuinfo_x86 *c)
 {
+	int inited = 0, i;
+
 	if (mce_disabled == 1) {
 		printk(XENLOG_INFO "MCE support disabled by bootparam\n");
 		return;
 	}
 
+	for (i = 0; i < MAX_NR_BANKS; i++)
+		set_bit(i,mca_allbanks);
+
+	/* Enforce at least MCE support in CPUID information.  Individual
+	 * families may also need to enforce a check for MCA support. */
 	if (!cpu_has(c, X86_FEATURE_MCE)) {
 		printk(XENLOG_INFO "CPU%i: No machine check support available\n",
 			smp_processor_id());
 		return;
 	}
 
-	memset(&mc_data, 0, sizeof(struct mc_machine));
+	intpose_init();
+	mctelem_init(sizeof (struct mc_info));
 
 	switch (c->x86_vendor) {
 	case X86_VENDOR_AMD:
-		amd_mcheck_init(c);
+		inited = amd_mcheck_init(c);
 		break;
 
 	case X86_VENDOR_INTEL:
+		switch (c->x86) {
+		case 5:
 #ifndef CONFIG_X86_64
-		if (c->x86==5)
-			intel_p5_mcheck_init(c);
+			inited = intel_p5_mcheck_init(c);
 #endif
-		/*If it is P6 or P4 family, including CORE 2 DUO series*/
-		if (c->x86 == 6 || c->x86==15)
-		{
-			printk(KERN_DEBUG "MCE: Intel newly family MC Init\n");
-			intel_mcheck_init(c);
+			break;
+
+		case 6:
+		case 15:
+			inited = intel_mcheck_init(c);
+			break;
 		}
 		break;
 
 #ifndef CONFIG_X86_64
 	case X86_VENDOR_CENTAUR:
-		if (c->x86==5)
-			winchip_mcheck_init(c);
+		if (c->x86==5) {
+			inited = winchip_mcheck_init(c);
+		}
 		break;
 #endif
 
 	default:
 		break;
 	}
+
+	if (!inited)
+		printk(XENLOG_INFO "CPU%i: No machine check initialization\n",
+		    smp_processor_id());
 }
 
 
@@ -176,190 +596,11 @@ static void __init mcheck_enable(char *str)
 custom_param("nomce", mcheck_disable);
 custom_param("mce", mcheck_enable);
 
-
-#include <xen/guest_access.h>
-#include <asm/traps.h>
-
-struct mc_info *x86_mcinfo_getptr(void)
-{
-	struct mc_info *mi;
-	uint32_t entry, next;
-
-	for (;;) {
-		entry = mc_data.error_idx;
-		smp_rmb();
-		next = entry + 1;
-		if (cmpxchg(&mc_data.error_idx, entry, next) == entry)
-			break;
-	}
-
-	mi = &(mc_data.mc[(entry % MAX_MCINFO)]);
-	BUG_ON(mc_data.error_idx < mc_data.fetch_idx);
-
-	return mi;
-}
-
-static int x86_mcinfo_matches_guest(const struct mc_info *mi,
-			const struct domain *d, const struct vcpu *v)
-{
-	struct mcinfo_common *mic;
-	struct mcinfo_global *mig;
-
-	x86_mcinfo_lookup(mic, mi, MC_TYPE_GLOBAL);
-	mig = (struct mcinfo_global *)mic;
-	if (mig == NULL)
-		return 0;
-
-	if (d->domain_id != mig->mc_domid)
-		return 0;
-
-	if (v->vcpu_id != mig->mc_vcpuid)
-		return 0;
-
-	return 1;
-}
-
-
-#define x86_mcinfo_mcdata(idx) (mc_data.mc[(idx % MAX_MCINFO)])
-
-static struct mc_info *x86_mcinfo_getfetchptr(uint32_t *fetch_idx,
-				const struct domain *d, const struct vcpu *v)
-{
-	struct mc_info *mi;
-
-	/* This function is called from the fetch hypercall with
-	 * the mc_lock spinlock held. Thus, no need for locking here.
-	 */
-	mi = &(x86_mcinfo_mcdata(mc_data.fetch_idx));
-	if ((d != dom0) && !x86_mcinfo_matches_guest(mi, d, v)) {
-		/* Bogus domU command detected. */
-		*fetch_idx = 0;
-		return NULL;
-	}
-
-	*fetch_idx = mc_data.fetch_idx;
-	mc_data.fetch_idx++;
-	BUG_ON(mc_data.fetch_idx > mc_data.error_idx);
-
-	return mi;
-}
-
-
-static void x86_mcinfo_marknotified(struct xen_mc_notifydomain *mc_notifydomain)
-{
-	struct mc_machine_notify *mn;
-	struct mcinfo_common *mic = NULL;
-	struct mcinfo_global *mig;
-	struct domain *d;
-	int i;
-
-	/* This function is called from the notifier hypercall with
-	 * the mc_notify_lock spinlock held. Thus, no need for locking here.
-	 */
-
-	/* First invalidate entries for guests that disappeared after
-	 * notification (e.g. shutdown/crash). This step prevents the
-	 * notification array from filling up with stalling/leaking entries.
-	 */
-	for (i = mc_data.notifyconsumer_idx; i < mc_data.notifyproducer_idx; i++) {
-		mn = &(mc_data.notify[(i % MAX_MCINFO)]);
-		x86_mcinfo_lookup(mic, &mn->mc, MC_TYPE_GLOBAL);
-		BUG_ON(mic == NULL);
-		mig = (struct mcinfo_global *)mic;
-		d = get_domain_by_id(mig->mc_domid);
-		if (d == NULL) {
-			/* Domain does not exist. */
-			mn->valid = 0;
-		}
-		if ((!mn->valid) && (i == mc_data.notifyconsumer_idx))
-			mc_data.notifyconsumer_idx++;
-	}
-
-	/* Now put in the error telemetry. Since all error data fetchable
-	 * by domUs are uncorrectable errors, they are very important.
-	 * So we dump them before overriding them. When a guest takes that long,
-	 * then we can assume something bad already happened (crash, hang, etc.)
-	 */
-	mn = &(mc_data.notify[(mc_data.notifyproducer_idx % MAX_MCINFO)]);
-
-	if (mn->valid) {
-		struct mcinfo_common *mic = NULL;
-		struct mcinfo_global *mig;
-
-		/* To not loose the information, we dump it. */
-		x86_mcinfo_lookup(mic, &mn->mc, MC_TYPE_GLOBAL);
-		BUG_ON(mic == NULL);
-		mig = (struct mcinfo_global *)mic;
-		printk(XENLOG_WARNING "Domain ID %u was notified by Dom0 to "
-			"fetch machine check error telemetry. But Domain ID "
-			"did not do that in time.\n",
-			mig->mc_domid);
-		x86_mcinfo_dump(&mn->mc);
-	}
-
-	memcpy(&mn->mc, &(x86_mcinfo_mcdata(mc_notifydomain->fetch_idx)),
-		sizeof(struct mc_info));
-	mn->fetch_idx = mc_notifydomain->fetch_idx;
-	mn->valid = 1;
-
-	mc_data.notifyproducer_idx++;
-
-	/* By design there can never be more notifies than machine check errors.
-	 * If that ever happens, then we hit a bug. */
-	BUG_ON(mc_data.notifyproducer_idx > mc_data.fetch_idx);
-	BUG_ON(mc_data.notifyconsumer_idx > mc_data.notifyproducer_idx);
-}
-
-static struct mc_info *x86_mcinfo_getnotifiedptr(uint32_t *fetch_idx,
-				const struct domain *d, const struct vcpu *v)
-{
-	struct mc_machine_notify *mn = NULL;
-	uint32_t i;
-	int found;
-
-	/* This function is called from the fetch hypercall with
-	 * the mc_notify_lock spinlock held. Thus, no need for locking here.
-	 */
-
-	/* The notifier data is filled in the order guests get notified, but
-	 * guests may fetch them in a different order. That's why we need
-	 * the game with valid/invalid entries. */
-	found = 0;
-	for (i = mc_data.notifyconsumer_idx; i < mc_data.notifyproducer_idx; i++) {
-		mn = &(mc_data.notify[(i % MAX_MCINFO)]);
-		if (!mn->valid) {
-			if (i == mc_data.notifyconsumer_idx)
-				mc_data.notifyconsumer_idx++;
-			continue;
-		}
-		if (x86_mcinfo_matches_guest(&mn->mc, d, v)) {
-			found = 1;
-			break;
-		}
-	}
-
-	if (!found) {
-		/* This domain has never been notified. This must be
-		 * a bogus domU command. */
-		*fetch_idx = 0;
-		return NULL;
-	}
-
-	BUG_ON(mn == NULL);
-	*fetch_idx = mn->fetch_idx;
-	mn->valid = 0;
-
-	BUG_ON(mc_data.notifyconsumer_idx > mc_data.notifyproducer_idx);
-	return &mn->mc;
-}
-
-
-void x86_mcinfo_clear(struct mc_info *mi)
+static void mcinfo_clear(struct mc_info *mi)
 {
 	memset(mi, 0, sizeof(struct mc_info));
 	x86_mcinfo_nentries(mi) = 0;
 }
-
 
 int x86_mcinfo_add(struct mc_info *mi, void *mcinfo)
 {
@@ -380,7 +621,7 @@ int x86_mcinfo_add(struct mc_info *mi, void *mcinfo)
 	end2 = (unsigned long)((uint8_t *)mic_index + mic->size);
 
 	if (end1 < end2)
-		return -ENOSPC; /* No space. Can't add entry. */
+		return x86_mcerr("mcinfo_add: no more sparc", -ENOSPC);
 
 	/* there's enough space. add entry. */
 	memcpy(mic_index, mic, mic->size);
@@ -388,7 +629,6 @@ int x86_mcinfo_add(struct mc_info *mi, void *mcinfo)
 
 	return 0;
 }
-
 
 /* Dump machine check information in a format,
  * mcelog can parse. This is used only when
@@ -404,7 +644,7 @@ void x86_mcinfo_dump(struct mc_info *mi)
 	if (mic == NULL)
 		return;
 	mc_global = (struct mcinfo_global *)mic;
-	if (mc_global->mc_flags & MC_FLAG_UNCORRECTABLE) {
+	if (mc_global->mc_flags & MC_FLAG_MCE) {
 		printk(XENLOG_WARNING
 			"CPU%d: Machine Check Exception: %16"PRIx64"\n",
 			mc_global->mc_coreid, mc_global->mc_gstatus);
@@ -424,7 +664,7 @@ void x86_mcinfo_dump(struct mc_info *mi)
 			goto next;
 
 		mc_bank = (struct mcinfo_bank *)mic;
-	
+
 		printk(XENLOG_WARNING "Bank %d: %16"PRIx64,
 			mc_bank->mc_bank,
 			mc_bank->mc_status);
@@ -440,8 +680,6 @@ next:
 			break;
 	} while (1);
 }
-
-
 
 static void do_mc_get_cpu_info(void *v)
 {
@@ -533,183 +771,394 @@ void x86_mc_get_cpu_info(unsigned cpu, uint32_t *chipid, uint16_t *coreid,
 	}
 }
 
+#define	INTPOSE_NENT	50
+
+static struct intpose_ent {
+	unsigned  int cpu_nr;
+	uint64_t msr;
+	uint64_t val;
+} intpose_arr[INTPOSE_NENT];
+
+static void intpose_init(void)
+{
+	static int done;
+	int i;
+
+	if (done++ > 0)
+		return;
+
+	for (i = 0; i < INTPOSE_NENT; i++) {
+		intpose_arr[i].cpu_nr = -1;
+	}
+
+}
+
+struct intpose_ent *intpose_lookup(unsigned int cpu_nr, uint64_t msr,
+    uint64_t *valp)
+{
+	int i;
+
+	for (i = 0; i < INTPOSE_NENT; i++) {
+		if (intpose_arr[i].cpu_nr == cpu_nr &&
+		    intpose_arr[i].msr == msr) {
+			if (valp != NULL)
+				*valp = intpose_arr[i].val;
+			return &intpose_arr[i];
+		}
+	}
+
+	return NULL;
+}
+
+static void intpose_add(unsigned int cpu_nr, uint64_t msr, uint64_t val)
+{
+	struct intpose_ent *ent;
+	int i;
+
+	if ((ent = intpose_lookup(cpu_nr, msr, NULL)) != NULL) {
+		ent->val = val;
+		return;
+	}
+
+	for (i = 0, ent = &intpose_arr[0]; i < INTPOSE_NENT; i++, ent++) {
+		if (ent->cpu_nr == -1) {
+			ent->cpu_nr = cpu_nr;
+			ent->msr = msr;
+			ent->val = val;
+			return;
+		}
+	}
+
+	printk("intpose_add: interpose array full - request dropped\n");
+}
+
+void intpose_inval(unsigned int cpu_nr, uint64_t msr)
+{
+	struct intpose_ent *ent;
+
+	if ((ent = intpose_lookup(cpu_nr, msr, NULL)) != NULL) {
+		ent->cpu_nr = -1;
+	}
+}
+
+#define	IS_MCA_BANKREG(r) \
+    ((r) >= MSR_IA32_MC0_CTL && \
+    (r) <= MSR_IA32_MC0_MISC + (nr_mce_banks - 1) * 4 && \
+    ((r) - MSR_IA32_MC0_CTL) % 4 != 0)	/* excludes MCi_CTL */
+
+static int x86_mc_msrinject_verify(struct xen_mc_msrinject *mci)
+{
+	struct cpuinfo_x86 *c;
+	int i, errs = 0;
+
+	c = &cpu_data[smp_processor_id()];
+
+	for (i = 0; i < mci->mcinj_count; i++) {
+		uint64_t reg = mci->mcinj_msr[i].reg;
+		const char *reason = NULL;
+
+		if (IS_MCA_BANKREG(reg)) {
+			if (c->x86_vendor == X86_VENDOR_AMD) {
+				/* On AMD we can set MCi_STATUS_WREN in the
+				 * HWCR MSR to allow non-zero writes to banks
+				 * MSRs not to #GP.  The injector in dom0
+				 * should set that bit, but we detect when it
+				 * is necessary and set it as a courtesy to
+				 * avoid #GP in the hypervisor. */
+				mci->mcinj_flags |=
+				    _MC_MSRINJ_F_REQ_HWCR_WREN;
+				continue;
+			} else {
+				/* No alternative but to interpose, so require
+				 * that the injector specified as such. */
+				if (!(mci->mcinj_flags &
+				    MC_MSRINJ_F_INTERPOSE)) {
+					reason = "must specify interposition";
+				}
+			}
+		} else {
+			switch (reg) {
+			/* MSRs acceptable on all x86 cpus */
+			case MSR_IA32_MCG_STATUS:
+				break;
+
+			/* MSRs that the HV will take care of */
+			case MSR_K8_HWCR:
+				if (c->x86_vendor == X86_VENDOR_AMD)
+					reason = "HV will operate HWCR";
+				else
+					reason ="only supported on AMD";
+				break;
+
+			default:
+				reason = "not a recognized MCA MSR";
+				break;
+			}
+		}
+
+		if (reason != NULL) {
+			printk("HV MSR INJECT ERROR: MSR 0x%llx %s\n",
+			    (unsigned long long)mci->mcinj_msr[i].reg, reason);
+			errs++;
+		}
+	}
+
+	return !errs;
+}
+
+static uint64_t x86_mc_hwcr_wren(void)
+{
+	uint64_t old;
+
+	rdmsrl(MSR_K8_HWCR, old);
+
+	if (!(old & K8_HWCR_MCi_STATUS_WREN)) {
+		uint64_t new = old | K8_HWCR_MCi_STATUS_WREN;
+		wrmsrl(MSR_K8_HWCR, new);
+	}
+
+	return old;
+}
+
+static void x86_mc_hwcr_wren_restore(uint64_t hwcr)
+{
+	if (!(hwcr & K8_HWCR_MCi_STATUS_WREN))
+		wrmsrl(MSR_K8_HWCR, hwcr);
+}
+
+static void x86_mc_msrinject(void *data)
+{
+	struct xen_mc_msrinject *mci = data;
+	struct mcinfo_msr *msr;
+	struct cpuinfo_x86 *c;
+	uint64_t hwcr = 0;
+	int intpose;
+	int i;
+
+	c = &cpu_data[smp_processor_id()];
+
+	if (mci->mcinj_flags & _MC_MSRINJ_F_REQ_HWCR_WREN)
+		hwcr = x86_mc_hwcr_wren();
+
+	intpose = (mci->mcinj_flags & MC_MSRINJ_F_INTERPOSE) != 0;
+
+	for (i = 0, msr = &mci->mcinj_msr[0];
+	    i < mci->mcinj_count; i++, msr++) {
+		printk("HV MSR INJECT (%s) target %u actual %u MSR 0x%llx "
+		    "<-- 0x%llx\n",
+		    intpose ?  "interpose" : "hardware",
+		    mci->mcinj_cpunr, smp_processor_id(),
+		    (unsigned long long)msr->reg,
+		    (unsigned long long)msr->value);
+
+		if (intpose)
+			intpose_add(mci->mcinj_cpunr, msr->reg, msr->value);
+		else
+			wrmsrl(msr->reg, msr->value);
+	}
+
+	if (mci->mcinj_flags & _MC_MSRINJ_F_REQ_HWCR_WREN)
+		x86_mc_hwcr_wren_restore(hwcr);
+}
+
+/*ARGSUSED*/
+static void x86_mc_mceinject(void *data)
+{
+	printk("Simulating #MC on cpu %d\n", smp_processor_id());
+	__asm__ __volatile__("int $0x12");
+}
+
+#if BITS_PER_LONG == 64
+
+#define	ID2COOKIE(id)	((mctelem_cookie_t)(id))
+#define	COOKIE2ID(c) ((uint64_t)(c))
+
+#elif BITS_PER_LONG == 32
+
+#define	ID2COOKIE(id)	((mctelem_cookie_t)(uint32_t)((id) & 0xffffffffU))
+#define	COOKIE2ID(c)	((uint64_t)(uint32_t)(c))
+
+#elif defined(BITS_PER_LONG)
+#error BITS_PER_LONG has unexpected value
+#else
+#error BITS_PER_LONG definition absent
+#endif
+
 /* Machine Check Architecture Hypercall */
 long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)
 {
 	long ret = 0;
 	struct xen_mc curop, *op = &curop;
 	struct vcpu *v = current;
-	struct domain *domU;
 	struct xen_mc_fetch *mc_fetch;
-	struct xen_mc_notifydomain *mc_notifydomain;
 	struct xen_mc_physcpuinfo *mc_physcpuinfo;
-	struct mc_info *mi;
-	uint32_t flags;
-	uint32_t fetch_idx;
-        uint16_t vcpuid;
-	/* Use a different lock for the notify hypercall in order to allow
-	 * a DomU to fetch mc data while Dom0 notifies another DomU. */
-	static DEFINE_SPINLOCK(mc_lock);
-	static DEFINE_SPINLOCK(mc_notify_lock);
+	uint32_t flags, cmdflags;
 	int nlcpu;
 	xen_mc_logical_cpu_t *log_cpus = NULL;
+	mctelem_cookie_t mctc;
+	mctelem_class_t which;
+	unsigned int target;
+	struct xen_mc_msrinject *mc_msrinject;
+	struct xen_mc_mceinject *mc_mceinject;
 
 	if ( copy_from_guest(op, u_xen_mc, 1) )
-		return -EFAULT;
+		return x86_mcerr("do_mca: failed copyin of xen_mc_t", -EFAULT);
 
 	if ( op->interface_version != XEN_MCA_INTERFACE_VERSION )
-		return -EACCES;
+		return x86_mcerr("do_mca: interface version mismatch", -EACCES);
 
-	switch ( op->cmd ) {
+	switch (op->cmd) {
 	case XEN_MC_fetch:
-		/* This hypercall is for any domain */
 		mc_fetch = &op->u.mc_fetch;
+		cmdflags = mc_fetch->flags;
 
-		switch (mc_fetch->flags) {
-		case XEN_MC_CORRECTABLE:
-			/* But polling mode is Dom0 only, because
-			 * correctable errors are reported to Dom0 only */
-			if ( !IS_PRIV(v->domain) )
-				return -EPERM;
+		/* This hypercall is for Dom0 only */
+		if (!IS_PRIV(v->domain) )
+			return x86_mcerr(NULL, -EPERM);
+
+		switch (cmdflags & (XEN_MC_NONURGENT | XEN_MC_URGENT)) {
+		case XEN_MC_NONURGENT:
+			which = MC_NONURGENT;
 			break;
 
-		case XEN_MC_TRAP:
+		case XEN_MC_URGENT:
+			which = MC_URGENT;
 			break;
+
 		default:
-			return -EFAULT;
+			return x86_mcerr("do_mca fetch: bad cmdflags", -EINVAL);
 		}
 
 		flags = XEN_MC_OK;
-		spin_lock(&mc_lock);
 
-		if ( IS_PRIV(v->domain) ) {
-			/* this must be Dom0. So a notify hypercall
-			 * can't have happened before. */
-			mi = x86_mcinfo_getfetchptr(&fetch_idx, dom0, v);
+		if (cmdflags & XEN_MC_ACK) {
+			mctelem_cookie_t cookie = ID2COOKIE(mc_fetch->fetch_id);
+			mctelem_ack(which, cookie);
 		} else {
-			/* Hypercall comes from an unprivileged domain */
-			domU = v->domain;
-			if (guest_has_trap_callback(dom0, 0, TRAP_machine_check)) {
-				/* Dom0 must have notified this DomU before
-				 * via the notify hypercall. */
-				mi = x86_mcinfo_getnotifiedptr(&fetch_idx, domU, v);
+			if (guest_handle_is_null(mc_fetch->data))
+				return x86_mcerr("do_mca fetch: guest buffer "
+				    "invalid", -EINVAL);
+
+			if ((mctc = mctelem_consume_oldest_begin(which))) {
+				struct mc_info *mcip = mctelem_dataptr(mctc);
+				if (copy_to_guest(mc_fetch->data, mcip, 1)) {
+					ret = -EFAULT;
+					flags |= XEN_MC_FETCHFAILED;
+					mc_fetch->fetch_id = 0;
+				} else {
+					mc_fetch->fetch_id = COOKIE2ID(mctc);
+				}
+				mctelem_consume_oldest_end(mctc);
 			} else {
-				/* Xen notified the DomU. */
-				mi = x86_mcinfo_getfetchptr(&fetch_idx, domU, v);
+				/* There is no data */
+				flags |= XEN_MC_NODATA;
+				mc_fetch->fetch_id = 0;
 			}
+
+			mc_fetch->flags = flags;
+			if (copy_to_guest(u_xen_mc, op, 1) != 0)
+				ret = -EFAULT;
 		}
 
-		if (mi) {
-			memcpy(&mc_fetch->mc_info, mi,
-				sizeof(struct mc_info));
-		} else {
-			/* There is no data for a bogus DomU command. */
-			flags |= XEN_MC_NODATA;
-			memset(&mc_fetch->mc_info, 0, sizeof(struct mc_info));
-		}
-
-		mc_fetch->flags = flags;
-		mc_fetch->fetch_idx = fetch_idx;
-
-		if ( copy_to_guest(u_xen_mc, op, 1) )
-			ret = -EFAULT;
-
-		spin_unlock(&mc_lock);
 		break;
 
 	case XEN_MC_notifydomain:
-		/* This hypercall is for Dom0 only */
+		return x86_mcerr("do_mca notify unsupported", -EINVAL);
+
+	case XEN_MC_physcpuinfo:
 		if ( !IS_PRIV(v->domain) )
-			return -EPERM;
+			return x86_mcerr("do_mca cpuinfo", -EPERM);
 
-		spin_lock(&mc_notify_lock);
+		mc_physcpuinfo = &op->u.mc_physcpuinfo;
+		nlcpu = num_online_cpus();
 
-		mc_notifydomain = &op->u.mc_notifydomain;
-		domU = get_domain_by_id(mc_notifydomain->mc_domid);
-		vcpuid = mc_notifydomain->mc_vcpuid;
+		if (!guest_handle_is_null(mc_physcpuinfo->info)) {
+			if (mc_physcpuinfo->ncpus <= 0)
+				return x86_mcerr("do_mca cpuinfo: ncpus <= 0",
+				    -EINVAL);
+			nlcpu = min(nlcpu, (int)mc_physcpuinfo->ncpus);
+			log_cpus = xmalloc_array(xen_mc_logical_cpu_t, nlcpu);
+			if (log_cpus == NULL)
+				return x86_mcerr("do_mca cpuinfo", -ENOMEM);
 
-		if ((domU == NULL) || (domU == dom0)) {
-			/* It's not possible to notify a non-existent domain
-			 * or the dom0. */
-			spin_unlock(&mc_notify_lock);
-			return -EACCES;
+			if (on_each_cpu(do_mc_get_cpu_info, log_cpus,
+			    1, 1) != 0) {
+				xfree(log_cpus);
+				return x86_mcerr("do_mca cpuinfo", -EIO);
+			}
 		}
 
-		if (vcpuid >= MAX_VIRT_CPUS) {
-			/* It's not possible to notify a vcpu, Xen can't
-			 * assign to a domain. */
-			spin_unlock(&mc_notify_lock);
-			return -EACCES;
+		mc_physcpuinfo->ncpus = nlcpu;
+
+		if (copy_to_guest(u_xen_mc, op, 1)) {
+			if (log_cpus != NULL)
+				xfree(log_cpus);
+			return x86_mcerr("do_mca cpuinfo", -EFAULT);
 		}
 
-		mc_notifydomain->flags = XEN_MC_OK;
-
-		mi = &(x86_mcinfo_mcdata(mc_notifydomain->fetch_idx));
-		if (!x86_mcinfo_matches_guest(mi, domU, domU->vcpu[vcpuid])) {
-			/* The error telemetry is not for the guest, Dom0
-			 * wants to notify. */
-			mc_notifydomain->flags |= XEN_MC_NOMATCH;
-		} else if ( guest_has_trap_callback(domU, vcpuid,
-						TRAP_machine_check) )
-		{
-			/* Send notification */
-			if ( send_guest_trap(domU, vcpuid, TRAP_machine_check) )
-				mc_notifydomain->flags |= XEN_MC_NOTDELIVERED;
-		} else
-			mc_notifydomain->flags |= XEN_MC_CANNOTHANDLE;
-
-#ifdef DEBUG
-		/* sanity check - these two flags are mutually exclusive */
-		if ((flags & XEN_MC_CANNOTHANDLE) && (flags & XEN_MC_NOTDELIVERED))
-			BUG();
-#endif
-
-		if ( copy_to_guest(u_xen_mc, op, 1) )
-			ret = -EFAULT;
-
-		if (ret == 0) {
-			x86_mcinfo_marknotified(mc_notifydomain);
+		if (!guest_handle_is_null(mc_physcpuinfo->info)) {
+			if (copy_to_guest(mc_physcpuinfo->info,
+			    log_cpus, nlcpu))
+				ret = -EFAULT;
+			xfree(log_cpus);
 		}
-
-		spin_unlock(&mc_notify_lock);
 		break;
 
-       case XEN_MC_physcpuinfo:
-	       if ( !IS_PRIV(v->domain) )
-		       return -EPERM;
- 
-	       mc_physcpuinfo = &op->u.mc_physcpuinfo;
-	       nlcpu = num_online_cpus();
- 
-	       if (!guest_handle_is_null(mc_physcpuinfo->info)) {
-		       if (mc_physcpuinfo->ncpus <= 0)
-			       return -EINVAL;
-		       nlcpu = min(nlcpu, (int)mc_physcpuinfo->ncpus);
-		       log_cpus = xmalloc_array(xen_mc_logical_cpu_t, nlcpu);
-		       if (log_cpus == NULL)
-			       return -ENOMEM;
- 
-		       if (on_each_cpu(do_mc_get_cpu_info, log_cpus,
-			   1, 1) != 0) {
-			       xfree(log_cpus);
-			       return -EIO;
-		       }
-	       }
- 
-	       mc_physcpuinfo->ncpus = nlcpu;
- 
-	       if (copy_to_guest(u_xen_mc, op, 1)) {
-		       if (log_cpus != NULL)
-			       xfree(log_cpus);
-		       return -EFAULT;
-	       }
- 
-	       if (!guest_handle_is_null(mc_physcpuinfo->info)) {
-		       if (copy_to_guest(mc_physcpuinfo->info,
-			   log_cpus, nlcpu))
-			       ret = -EFAULT;
-		       xfree(log_cpus);
-	       }
+	case XEN_MC_msrinject:
+		if ( !IS_PRIV(v->domain) )
+			return x86_mcerr("do_mca inject", -EPERM);
+
+		if (nr_mce_banks == 0)
+			return x86_mcerr("do_mca inject", -ENODEV);
+
+		mc_msrinject = &op->u.mc_msrinject;
+		target = mc_msrinject->mcinj_cpunr;
+
+		if (target >= NR_CPUS)
+			return x86_mcerr("do_mca inject: bad target", -EINVAL);
+
+		if (!cpu_isset(target, cpu_online_map))
+			return x86_mcerr("do_mca inject: target offline",
+			    -EINVAL);
+
+		if (mc_msrinject->mcinj_count == 0)
+			return 0;
+
+		if (!x86_mc_msrinject_verify(mc_msrinject))
+			return x86_mcerr("do_mca inject: illegal MSR", -EINVAL);
+
+		add_taint(TAINT_ERROR_INJECT);
+
+		on_selected_cpus(cpumask_of_cpu(target),
+		    x86_mc_msrinject, mc_msrinject, 1, 1);
+
+		break;
+
+	case XEN_MC_mceinject:
+		if ( !IS_PRIV(v->domain) )
+			return x86_mcerr("do_mca #MC", -EPERM);
+
+		if (nr_mce_banks == 0)
+			return x86_mcerr("do_mca #MC", -ENODEV);
+
+		mc_mceinject = &op->u.mc_mceinject;
+		target = mc_mceinject->mceinj_cpunr;
+
+		if (target >= NR_CPUS)
+			return x86_mcerr("do_mca #MC: bad target", -EINVAL);
+		       
+		if (!cpu_isset(target, cpu_online_map))
+			return x86_mcerr("do_mca #MC: target offline", -EINVAL);
+
+		add_taint(TAINT_ERROR_INJECT);
+
+		on_selected_cpus(cpumask_of_cpu(target),
+		    x86_mc_mceinject, mc_mceinject, 1, 1);
+
+		break;
+
+	default:
+		return x86_mcerr("do_mca: bad command", -EINVAL);
 	}
 
 	return ret;

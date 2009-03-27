@@ -96,7 +96,7 @@ SHUTDOWN_TIMEOUT = (60.0 * 5)
 ZOMBIE_PREFIX = 'Zombie-'
 
 """Minimum time between domain restarts in seconds."""
-MINIMUM_RESTART_TIME = 20
+MINIMUM_RESTART_TIME = 60
 
 RESTART_IN_PROGRESS = 'xend/restart_in_progress'
 DUMPCORE_IN_PROGRESS = 'xend/dumpcore_in_progress'
@@ -135,3 +135,6 @@ VTPM_DELETE_SCRIPT = '/etc/xen/scripts/vtpm-delete'
 
 XS_VMROOT = "/vm/"
 
+NR_PCI_DEV = 32
+AUTO_PHP_SLOT = NR_PCI_DEV
+AUTO_PHP_SLOT_STR = "%02x" % NR_PCI_DEV

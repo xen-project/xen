@@ -518,7 +518,17 @@ xc_domain_dumpcore_via_callback(int xc_handle,
     if ( sts != 0 )
         goto out;
 
+    /*
+     * Note: this is the *current* number of pages and may change under
+     * a live dump-core.  We'll just take this value, and if more pages
+     * exist, we'll skip them.  If there's less, then we'll just not use
+     * all the array...
+     *
+     * We don't want to use the total potential size of the memory map
+     * since that is usually much higher than info.nr_pages.
+     */
     nr_pages = info.nr_pages;
+
     if ( !auto_translated_physmap )
     {
         /* obtain p2m table */

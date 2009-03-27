@@ -639,7 +639,7 @@ static void iommu_enable_translation(struct iommu *iommu)
     spin_unlock_irqrestore(&iommu->register_lock, flags);
 }
 
-int iommu_disable_translation(struct iommu *iommu)
+static void iommu_disable_translation(struct iommu *iommu)
 {
     u32 sts;
     unsigned long flags;
@@ -662,7 +662,6 @@ int iommu_disable_translation(struct iommu *iommu)
         cpu_relax();
     }
     spin_unlock_irqrestore(&iommu->register_lock, flags);
-    return 0;
 }
 
 static struct iommu *vector_to_iommu[NR_VECTORS];
@@ -1041,8 +1040,7 @@ static int domain_context_mapping_one(
         return res;
     }
 
-    if ( iommu_passthrough &&
-         ecap_pass_thru(iommu->ecap) && (domain->domain_id == 0) )
+    if ( iommu_passthrough && (domain->domain_id == 0) )
     {
         context_set_translation_type(*context, CONTEXT_TT_PASS_THRU);
         agaw = level_to_agaw(iommu->nr_pt_levels);
@@ -1194,8 +1192,11 @@ static int domain_context_mapping(struct domain *domain, u8 bus, u8 devfn)
     u16 sec_bus, sub_bus;
     u32 type;
     u8 secbus, secdevfn;
+    struct pci_dev *pdev = pci_get_pdev(bus, devfn);
 
-    drhd = acpi_find_matched_drhd_unit(bus, devfn);
+    BUG_ON(!pdev);
+
+    drhd = acpi_find_matched_drhd_unit(pdev);
     if ( !drhd )
         return -ENODEV;
 
@@ -1320,8 +1321,11 @@ static int domain_context_unmap(struct domain *domain, u8 bus, u8 devfn)
     int ret = 0;
     u32 type;
     u8 secbus, secdevfn;
+    struct pci_dev *pdev = pci_get_pdev(bus, devfn);
 
-    drhd = acpi_find_matched_drhd_unit(bus, devfn);
+    BUG_ON(!pdev);
+
+    drhd = acpi_find_matched_drhd_unit(pdev);
     if ( !drhd )
         return -ENODEV;
 
@@ -1393,7 +1397,7 @@ static int reassign_device_ownership(
     if (!pdev)
         return -ENODEV;
 
-    drhd = acpi_find_matched_drhd_unit(bus, devfn);
+    drhd = acpi_find_matched_drhd_unit(pdev);
     pdev_iommu = drhd->iommu;
     domain_context_unmap(source, bus, devfn);
 
@@ -1406,7 +1410,7 @@ static int reassign_device_ownership(
 
     for_each_pdev ( source, pdev )
     {
-        drhd = acpi_find_matched_drhd_unit(pdev->bus, pdev->devfn);
+        drhd = acpi_find_matched_drhd_unit(pdev);
         if ( drhd->iommu == pdev_iommu )
         {
             found = 1;
@@ -1449,8 +1453,7 @@ int intel_iommu_map_page(
     iommu = drhd->iommu;
 
     /* do nothing if dom0 and iommu supports pass thru */
-    if ( iommu_passthrough &&
-         ecap_pass_thru(iommu->ecap) && (d->domain_id == 0) )
+    if ( iommu_passthrough && (d->domain_id == 0) )
         return 0;
 
     spin_lock(&hd->mapping_lock);
@@ -1504,8 +1507,7 @@ int intel_iommu_unmap_page(struct domain *d, unsigned long gfn)
     iommu = drhd->iommu;
 
     /* do nothing if dom0 and iommu supports pass thru */
-    if ( iommu_passthrough &&
-         ecap_pass_thru(iommu->ecap) && (d->domain_id == 0) )
+    if ( iommu_passthrough && (d->domain_id == 0) )
         return 0;
 
     dma_pte_clear_one(d, (paddr_t)gfn << PAGE_SHIFT_4K);
@@ -1682,20 +1684,32 @@ static int init_vtd_hw(void)
         flush->iotlb = flush_iotlb_reg;
     }
 
-    for_each_drhd_unit ( drhd )
+    if ( iommu_qinval )
     {
-        iommu = drhd->iommu;
-        if ( qinval_setup(iommu) != 0 )
-            dprintk(XENLOG_INFO VTDPREFIX,
-                    "Queued Invalidation hardware not found\n");
+        for_each_drhd_unit ( drhd )
+        {
+            iommu = drhd->iommu;
+            if ( enable_qinval(iommu) != 0 )
+            {
+                dprintk(XENLOG_INFO VTDPREFIX,
+                        "Failed to enable Queued Invalidation!\n");
+                break;
+            }
+        }
     }
 
-    for_each_drhd_unit ( drhd )
+    if ( iommu_intremap )
     {
-        iommu = drhd->iommu;
-        if ( intremap_setup(iommu) != 0 )
-            dprintk(XENLOG_INFO VTDPREFIX,
-                    "Interrupt Remapping hardware not found\n");
+        for_each_drhd_unit ( drhd )
+        {
+            iommu = drhd->iommu;
+            if ( enable_intremap(iommu) != 0 )
+            {
+                dprintk(XENLOG_INFO VTDPREFIX,
+                        "Failed to enable Interrupt Remapping!\n");
+                break;
+            }
+        }
     }
 
     return 0;
@@ -1744,9 +1758,43 @@ int intel_vtd_setup(void)
     spin_lock_init(&domid_bitmap_lock);
     clflush_size = get_cache_line_size();
 
+    /* We enable the following features only if they are supported by all VT-d
+     * engines: Snoop Control, DMA passthrough, Queued Invalidation and
+     * Interrupt Remapping.
+     */
     for_each_drhd_unit ( drhd )
+    {
         if ( iommu_alloc(drhd) != 0 )
             goto error;
+
+        iommu = drhd->iommu;
+
+        if ( iommu_snoop && !ecap_snp_ctl(iommu->ecap) )
+            iommu_snoop = 0;
+
+        if ( iommu_passthrough && !ecap_pass_thru(iommu->ecap) )
+            iommu_passthrough = 0;
+
+        if ( iommu_qinval && !ecap_queued_inval(iommu->ecap) )
+            iommu_qinval = 0;
+
+        if ( iommu_intremap && !ecap_intr_remap(iommu->ecap) )
+            iommu_intremap = 0;
+    }
+
+    if ( !iommu_qinval && iommu_intremap )
+    {
+        iommu_intremap = 0;
+        gdprintk(XENLOG_WARNING VTDPREFIX, "Interrupt Remapping disabled "
+            "since Queued Invalidation isn't supported or enabled.\n");
+    }
+
+#define P(p,s) printk("Intel VT-d %s %ssupported.\n", s, (p)? "" : "not ")
+    P(iommu_snoop, "Snoop Control");
+    P(iommu_passthrough, "DMA Passthrough");
+    P(iommu_qinval, "Queued Invalidation");
+    P(iommu_intremap, "Interrupt Remapping");
+#undef P
 
     /* Allocate IO page directory page for the domain. */
     drhd = list_entry(acpi_drhd_units.next, typeof(*drhd), list);
@@ -1764,23 +1812,6 @@ int intel_vtd_setup(void)
     if ( init_vtd_hw() )
         goto error;
 
-    /* Giving that all devices within guest use same io page table,
-     * enable snoop control only if all VT-d engines support it.
-     */
-
-    if ( iommu_snoop )
-    {
-        for_each_drhd_unit ( drhd )
-        {
-            iommu = drhd->iommu;
-            if ( !ecap_snp_ctl(iommu->ecap) ) {
-                iommu_snoop = 0;
-                break;
-            }
-        }
-    }
-    
-    printk("Intel VT-d snoop control %sabled\n", iommu_snoop ? "en" : "dis");
     register_keyhandler('V', dump_iommu_info, "dump iommu info");
 
     return 0;
@@ -1790,6 +1821,9 @@ int intel_vtd_setup(void)
         iommu_free(drhd);
     vtd_enabled = 0;
     iommu_snoop = 0;
+    iommu_passthrough = 0;
+    iommu_qinval = 0;
+    iommu_intremap = 0;
     return -ENOMEM;
 }
 
@@ -1899,6 +1933,14 @@ void iommu_suspend(void)
             (u32) dmar_readl(iommu->reg, DMAR_FEADDR_REG);
         iommu_state[i][DMAR_FEUADDR_REG] =
             (u32) dmar_readl(iommu->reg, DMAR_FEUADDR_REG);
+
+        iommu_disable_translation(iommu);
+
+        if ( iommu_intremap )
+            disable_intremap(iommu);
+
+        if ( iommu_qinval )
+            disable_qinval(iommu);
     }
 }
 
@@ -1911,7 +1953,11 @@ void iommu_resume(void)
     if ( !vtd_enabled )
         return;
 
-    iommu_flush_all();
+    /* Not sure whether the flush operation is required to meet iommu
+     * specification. Note that BIOS also executes in S3 resume and iommu may
+     * be touched again, so let us do the flush operation for safety.
+     */
+    flush_all_cache();
 
     if ( init_vtd_hw() != 0  && force_iommu )
          panic("IOMMU setup failed, crash Xen for security purpose!\n");
@@ -1929,6 +1975,7 @@ void iommu_resume(void)
                     (u32) iommu_state[i][DMAR_FEADDR_REG]);
         dmar_writel(iommu->reg, DMAR_FEUADDR_REG,
                     (u32) iommu_state[i][DMAR_FEUADDR_REG]);
+
         iommu_enable_translation(iommu);
     }
 }

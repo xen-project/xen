@@ -152,11 +152,23 @@ static int __init acpi_register_atsr_unit(struct acpi_atsr_unit *atsr)
     return 0;
 }
 
-struct acpi_drhd_unit * acpi_find_matched_drhd_unit(u8 bus, u8 devfn)
+struct acpi_drhd_unit * acpi_find_matched_drhd_unit(struct pci_dev *pdev)
 {
+    u8 bus, devfn;
     struct acpi_drhd_unit *drhd;
     struct acpi_drhd_unit *found = NULL, *include_all = NULL;
     int i;
+
+    if (pdev->info.is_extfn) {
+        bus = pdev->bus;
+        devfn = 0;
+    } else if (pdev->info.is_virtfn) {
+        bus = pdev->info.physfn.bus;
+        devfn = PCI_SLOT(pdev->info.physfn.devfn) ? 0 : pdev->info.physfn.devfn;
+    } else {
+        bus = pdev->bus;
+        devfn = pdev->devfn;
+    }
 
     list_for_each_entry ( drhd, &acpi_drhd_units, list )
     {
@@ -548,7 +560,7 @@ int acpi_dmar_init(void)
     if ( list_empty(&acpi_drhd_units) )
         goto fail;
 
-    printk("Intel VT-d has been enabled\n");
+    printk("Intel VT-d DMAR tables have been parsed.\n");
 
     return 0;
 

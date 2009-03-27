@@ -58,22 +58,23 @@
 #include <xen/smp.h>
 #include <xen/timer.h>
 #include <xen/event.h>
-#include <asm/processor.h> 
+
+#include <asm/processor.h>
 #include <asm/system.h>
 #include <asm/msr.h>
 
 #include "mce.h"
-#include "x86_mca.h"
 
 static struct timer mce_timer;
 
-#define MCE_PERIOD MILLISECS(15000)
+#define MCE_PERIOD MILLISECS(10000)
 #define MCE_MIN    MILLISECS(2000)
 #define MCE_MAX    MILLISECS(30000)
 
 static s_time_t period = MCE_PERIOD;
 static int hw_threshold = 0;
 static int adjust = 0;
+static int variable_period = 1;
 
 /* The polling service routine:
  * Collects information of correctable errors and notifies
@@ -81,99 +82,46 @@ static int adjust = 0;
  */
 void mce_amd_checkregs(void *info)
 {
-	struct vcpu *vcpu = current;
-	struct mc_info *mc_data;
-	struct mcinfo_global mc_global;
-	struct mcinfo_bank mc_info;
-	uint64_t status, addrv, miscv;
-	unsigned int i;
+	mctelem_cookie_t mctc;
+	struct mca_summary bs;
 	unsigned int event_enabled;
-	unsigned int cpu_nr;
-	int error_found;
 
-	/* We don't need a slot yet. Only allocate one on error. */
-	mc_data = NULL;
+	mctc = mcheck_mca_logout(MCA_POLLER, mca_allbanks, &bs);
 
-	cpu_nr = smp_processor_id();
-	BUG_ON(cpu_nr != vcpu->processor);
 	event_enabled = guest_enabled_event(dom0->vcpu[0], VIRQ_MCA);
-	error_found = 0;
 
-	memset(&mc_global, 0, sizeof(mc_global));
-	mc_global.common.type = MC_TYPE_GLOBAL;
-	mc_global.common.size = sizeof(mc_global);
+	if (bs.errcnt && mctc != NULL) {
+		static uint64_t dumpcount = 0;
 
-	mc_global.mc_domid = vcpu->domain->domain_id; /* impacted domain */
-	mc_global.mc_vcpuid = vcpu->vcpu_id; /* impacted vcpu */
+		/* If Dom0 enabled the VIRQ_MCA event, then notify it.
+		 * Otherwise, if dom0 has had plenty of time to register
+		 * the virq handler but still hasn't then dump telemetry
+		 * to the Xen console.  The call count may be incremented
+		 * on multiple cpus at once and is indicative only - just
+		 * a simple-minded attempt to avoid spamming the console
+		 * for corrected errors in early startup. */
 
-	x86_mc_get_cpu_info(cpu_nr, &mc_global.mc_socketid,
-	    &mc_global.mc_coreid, &mc_global.mc_core_threadid,
-	    &mc_global.mc_apicid, NULL, NULL, NULL);
-
-	mc_global.mc_flags |= MC_FLAG_CORRECTABLE;
-	rdmsrl(MSR_IA32_MCG_STATUS, mc_global.mc_gstatus);
-
-	for (i = 0; i < nr_mce_banks; i++) {
-		struct domain *d;
-
-		rdmsrl(MSR_IA32_MC0_STATUS + i * 4, status);
-
-		if (!(status & MCi_STATUS_VAL))
-			continue;
-
-		if (mc_data == NULL) {
-			/* Now we need a slot to fill in error telemetry. */
-			mc_data = x86_mcinfo_getptr();
-			BUG_ON(mc_data == NULL);
-			x86_mcinfo_clear(mc_data);
-			x86_mcinfo_add(mc_data, &mc_global);
-		}
-
-		memset(&mc_info, 0, sizeof(mc_info));
-		mc_info.common.type = MC_TYPE_BANK;
-		mc_info.common.size = sizeof(mc_info);
-		mc_info.mc_bank = i;
-		mc_info.mc_status = status;
-
-		/* Increase polling frequency */
-		error_found = 1;
-
-		addrv = 0;
-		if (status & MCi_STATUS_ADDRV) {
-			rdmsrl(MSR_IA32_MC0_ADDR + i * 4, addrv);
-
-			d = maddr_get_owner(addrv);
-			if (d != NULL)
-				mc_info.mc_domid = d->domain_id;
-		}
-
-		miscv = 0;
-		if (status & MCi_STATUS_MISCV)
-			rdmsrl(MSR_IA32_MC0_MISC + i * 4, miscv);
-
-		mc_info.mc_addr = addrv;
-		mc_info.mc_misc = miscv;
-		x86_mcinfo_add(mc_data, &mc_info);
-
-		if (mc_callback_bank_extended)
-			mc_callback_bank_extended(mc_data, i, status);
-
-		/* clear status */
-		wrmsrl(MSR_IA32_MC0_STATUS + i * 4, 0x0ULL);
-		wmb();
-	}
-
-	if (error_found > 0) {
-		/* If Dom0 enabled the VIRQ_MCA event, then ... */
-		if (event_enabled)
-			/* ... notify it. */
+		if (event_enabled) {
+			mctelem_commit(mctc);
 			send_guest_global_virq(dom0, VIRQ_MCA);
-		else
-			/* ... or dump it */
-			x86_mcinfo_dump(mc_data);
+		} else if (++dumpcount >= 10) {
+			x86_mcinfo_dump((struct mc_info *)mctelem_dataptr(mctc));
+			mctelem_dismiss(mctc);
+		} else {
+			mctelem_dismiss(mctc);
+		}
+		
+	} else if (mctc != NULL) {
+		mctelem_dismiss(mctc);
 	}
 
-	adjust += error_found;
+	/* adjust is global and all cpus may attempt to increment it without
+	 * synchronisation, so they race and the final adjust count
+	 * (number of cpus seeing any error) is approximate.  We can
+	 * guarantee that if any cpu observes an error that the
+	 * adjust count is at least 1. */
+	if (bs.errcnt)
+		adjust++;
 }
 
 /* polling service routine invoker:
@@ -188,7 +136,7 @@ static void mce_amd_work_fn(void *data)
 	on_each_cpu(mce_amd_checkregs, data, 1, 1);
 
 	if (adjust > 0) {
-		if ( !guest_enabled_event(dom0->vcpu[0], VIRQ_MCA) ) {
+		if (!guest_enabled_event(dom0->vcpu[0], VIRQ_MCA) ) {
 			/* Dom0 did not enable VIRQ_MCA, so Xen is reporting. */
 			printk("MCE: polling routine found correctable error. "
 				" Use mcelog to parse above error output.\n");
@@ -199,7 +147,7 @@ static void mce_amd_work_fn(void *data)
 		uint64_t value;
 		uint32_t counter;
 
-		rdmsrl(MSR_IA32_MC4_MISC, value);
+		mca_rdmsrl(MSR_IA32_MC4_MISC, value);
 		/* Only the error counter field is of interest
 		 * Bit field is described in AMD K8 BKDG chapter 6.4.5.5
 		 */
@@ -224,24 +172,24 @@ static void mce_amd_work_fn(void *data)
 			value &= ~(0x60FFF00000000ULL);
 			/* Counter enable */
 			value |= (1ULL << 51);
-			wrmsrl(MSR_IA32_MC4_MISC, value);
+			mca_wrmsrl(MSR_IA32_MC4_MISC, value);
 			wmb();
 		}
 	}
 
-	if (adjust > 0) {
+	if (variable_period && adjust > 0) {
 		/* Increase polling frequency */
 		adjust++; /* adjust == 1 must have an effect */
 		period /= adjust;
-	} else {
+	} else if (variable_period) {
 		/* Decrease polling frequency */
 		period *= 2;
 	}
-	if (period > MCE_MAX) {
+	if (variable_period && period > MCE_MAX) {
 		/* limit: Poll at least every 30s */
 		period = MCE_MAX;
 	}
-	if (period < MCE_MIN) {
+	if (variable_period && period < MCE_MIN) {
 		/* limit: Poll every 2s.
 		 * When this is reached an uncorrectable error
 		 * is expected to happen, if Dom0 does nothing.
@@ -262,7 +210,7 @@ void amd_nonfatal_mcheck_init(struct cpuinfo_x86 *c)
 
 	/* The threshold bitfields in MSR_IA32_MC4_MISC has
 	 * been introduced along with the SVME feature bit. */
-	if (cpu_has(c, X86_FEATURE_SVME)) {
+	if (variable_period && cpu_has(c, X86_FEATURE_SVME)) {
 		uint64_t value;
 
 		/* hw threshold registers present */

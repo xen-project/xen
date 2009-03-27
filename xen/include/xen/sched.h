@@ -34,7 +34,7 @@ extern struct domain *dom0;
 #else
 #define BITS_PER_EVTCHN_WORD(d) (has_32bit_shinfo(d) ? 32 : BITS_PER_LONG)
 #endif
-#define MAX_EVTCHNS(d) (BITS_PER_EVTCHN_WORD(d) * BITS_PER_EVTCHN_WORD(d) * 64)
+#define MAX_EVTCHNS(d) (BITS_PER_EVTCHN_WORD(d) * BITS_PER_EVTCHN_WORD(d))
 #define EVTCHNS_PER_BUCKET 128
 #define NR_EVTCHN_BUCKETS  (NR_EVENT_CHANNELS / EVTCHNS_PER_BUCKET)
 
@@ -101,6 +101,9 @@ struct vcpu
         XEN_GUEST_HANDLE(vcpu_runstate_info_compat_t) compat;
     } runstate_guest; /* guest address */
 #endif
+
+    /* last time when vCPU is scheduled out */
+    uint64_t last_run_time;
 
     /* Has the FPU been initialised? */
     bool_t           fpu_initialised;
@@ -546,6 +549,8 @@ uint64_t get_cpu_idle_time(unsigned int cpu);
 #define is_hvm_domain(d) ((d)->is_hvm)
 #define is_hvm_vcpu(v)   (is_hvm_domain(v->domain))
 #define need_iommu(d)    ((d)->need_iommu && !(d)->is_hvm)
+
+extern int sched_smt_power_savings;
 
 extern enum cpufreq_controller {
     FREQCTL_none, FREQCTL_dom0_kernel, FREQCTL_xen

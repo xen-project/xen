@@ -18,6 +18,7 @@
 
 import os
 import socket
+import time
 import xen.lowlevel.xc
 
 from xen.util import Brctl
@@ -145,6 +146,18 @@ class XendNode:
 
         self.srs = {}
 
+        self._init_networks()
+        self._init_PIFs()
+
+        self._init_SRs()
+        self._init_PBDs()
+
+        self._init_PPCIs()
+
+        self._init_PSCSIs()
+
+
+    def _init_networks(self):
         # Initialise networks
         # First configure ones off disk
         saved_networks = self.state_store.load_state('network')
@@ -157,7 +170,16 @@ class XendNode:
                 
         # Next discover any existing bridges and check
         # they are not already configured
-        bridges = Brctl.get_state().keys()
+
+        # 'tmpbridge' is a temporary bridge created by network-bridge script.
+        # Wait a couple of seconds for it to be renamed.
+        for i in xrange(20):
+            bridges = Brctl.get_state().keys()
+            if 'tmpbridge' in bridges:
+                time.sleep(0.1)
+            else:
+                break
+            
         configured_bridges = [XendAPIStore.get(
                                   network_uuid, "network")
                                       .get_name_label()
@@ -166,8 +188,10 @@ class XendNode:
                                 for bridge in bridges
                                 if bridge not in configured_bridges]
         for unconfigured_bridge in unconfigured_bridges:
-            XendNetwork.create_phy(unconfigured_bridge)
+            if unconfigured_bridge != 'tmpbridge':
+                XendNetwork.create_phy(unconfigured_bridge)
 
+    def _init_PIFs(self):
         # Initialise PIFs
         # First configure ones off disk
         saved_pifs = self.state_store.load_state('pif')
@@ -210,7 +234,8 @@ class XendNode:
                     log.debug("Cannot find network for bridge %s "
                               "when configuring PIF %s",
                               (bridge_name, name))     
-        
+
+    def _init_SRs(self):
         # initialise storage
         saved_srs = self.state_store.load_state('sr')
         if saved_srs:
@@ -229,6 +254,7 @@ class XendNode:
             qcow_sr_uuid = uuid.createString()
             self.srs[qcow_sr_uuid] = XendQCoWStorageRepo(qcow_sr_uuid)
 
+    def _init_PBDs(self):
         saved_pbds = self.state_store.load_state('pbd')
         if saved_pbds:
             for pbd_uuid, pbd_cfg in saved_pbds.items():
@@ -237,8 +263,7 @@ class XendNode:
                 except CreateUnspecifiedAttributeError:
                     log.warn("Error recreating PBD %s", pbd_uuid) 
 
-
-        # Initialise PPCIs
+    def _init_PPCIs(self):
         saved_ppcis = self.state_store.load_state('ppci')
         saved_ppci_table = {}
         if saved_ppcis:
@@ -271,7 +296,7 @@ class XendNode:
             ppci_uuid = saved_ppci_table.get(pci_dev.name, uuid.createString())
             XendPPCI(ppci_uuid, ppci_record)
 
-
+    def _init_PSCSIs(self):
         # Initialise PSCSIs
         saved_pscsis = self.state_store.load_state('pscsi')
         saved_pscsi_table = {}
@@ -288,6 +313,75 @@ class XendNode:
                 pscsi_uuid = saved_pscsi_table.get(pscsi_record['scsi_id'],
                                                    uuid.createString())
                 XendPSCSI(pscsi_uuid, pscsi_record)
+
+
+    def add_network(self, interface):
+        # TODO
+        log.debug("add_network(): Not implemented.")
+
+
+    def remove_network(self, interface):
+        # TODO
+        log.debug("remove_network(): Not implemented.")
+
+
+    def add_PPCI(self, pci_name):
+        # Update lspci info
+        PciUtil.create_lspci_info()
+
+        # Initialise the PPCI
+        saved_ppcis = self.state_store.load_state('ppci')
+        saved_ppci_table = {}
+        if saved_ppcis:
+            for ppci_uuid, ppci_record in saved_ppcis.items():
+                try:
+                    saved_ppci_table[ppci_record['name']] = ppci_uuid
+                except KeyError:
+                    pass
+
+        (domain, bus, slot, func) = PciUtil.parse_pci_name(pci_name)
+        pci_dev = PciUtil.PciDevice(domain, bus, slot, func)
+        ppci_record = {
+            'domain':                   pci_dev.domain,
+            'bus':                      pci_dev.bus,
+            'slot':                     pci_dev.slot,
+            'func':                     pci_dev.func,
+            'vendor_id':                pci_dev.vendor,
+            'vendor_name':              pci_dev.vendorname,
+            'device_id':                pci_dev.device,
+            'device_name':              pci_dev.devicename,
+            'revision_id':              pci_dev.revision,
+            'class_code':               pci_dev.classcode,
+            'class_name':               pci_dev.classname,
+            'subsystem_vendor_id':      pci_dev.subvendor,
+            'subsystem_vendor_name':    pci_dev.subvendorname,
+            'subsystem_id':             pci_dev.subdevice,
+            'subsystem_name':           pci_dev.subdevicename,
+            'driver':                   pci_dev.driver
+            }
+        # If saved uuid exists, use it. Otherwise create one.
+        ppci_uuid = saved_ppci_table.get(pci_dev.name, uuid.createString())
+        XendPPCI(ppci_uuid, ppci_record)
+
+
+    def remove_PPCI(self, pci_name):
+        # Update lspci info
+        PciUtil.create_lspci_info()
+
+        # Remove the PPCI
+        (domain, bus, slot, func) = PciUtil.parse_pci_name(pci_name)
+        ppci_ref = XendPPCI.get_by_sbdf(domain, bus, slot, func)
+        XendAPIStore.get(ppci_ref, "PPCI").destroy()
+
+
+    def add_PSCSI(self):
+        # TODO
+        log.debug("add_network(): Not implemented.")
+
+
+    def remove_PSCSI(self):
+        # TODO
+        log.debug("add_network(): Not implemented.")
 
 
 ##    def network_destroy(self, net_uuid):

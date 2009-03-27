@@ -488,28 +488,40 @@ static void svm_get_segment_register(struct vcpu *v, enum x86_segment seg,
     {
     case x86_seg_cs:
         memcpy(reg, &vmcb->cs, sizeof(*reg));
+        reg->attr.fields.g = reg->limit > 0xFFFFF;
         break;
     case x86_seg_ds:
         memcpy(reg, &vmcb->ds, sizeof(*reg));
+        if ( reg->attr.fields.type != 0 )
+            reg->attr.fields.type |= 0x1;
         break;
     case x86_seg_es:
         memcpy(reg, &vmcb->es, sizeof(*reg));
+        if ( reg->attr.fields.type != 0 )
+            reg->attr.fields.type |= 0x1;
         break;
     case x86_seg_fs:
         svm_sync_vmcb(v);
         memcpy(reg, &vmcb->fs, sizeof(*reg));
+        if ( reg->attr.fields.type != 0 )
+            reg->attr.fields.type |= 0x1;
         break;
     case x86_seg_gs:
         svm_sync_vmcb(v);
         memcpy(reg, &vmcb->gs, sizeof(*reg));
+        if ( reg->attr.fields.type != 0 )
+            reg->attr.fields.type |= 0x1;
         break;
     case x86_seg_ss:
         memcpy(reg, &vmcb->ss, sizeof(*reg));
         reg->attr.fields.dpl = vmcb->cpl;
+        if ( reg->attr.fields.type == 0 )
+            reg->attr.fields.db = 0;
         break;
     case x86_seg_tr:
         svm_sync_vmcb(v);
         memcpy(reg, &vmcb->tr, sizeof(*reg));
+        reg->attr.fields.type |= 0x2;
         break;
     case x86_seg_gdtr:
         memcpy(reg, &vmcb->gdtr, sizeof(*reg));

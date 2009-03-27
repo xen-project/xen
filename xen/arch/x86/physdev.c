@@ -421,6 +421,32 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         break;
     }
 
+    case PHYSDEVOP_manage_pci_add_ext: {
+        struct physdev_manage_pci_ext manage_pci_ext;
+        struct pci_dev_info pdev_info;
+
+        ret = -EPERM;
+        if ( !IS_PRIV(current->domain) )
+            break;
+
+        ret = -EFAULT;
+        if ( copy_from_guest(&manage_pci_ext, arg, 1) != 0 )
+            break;
+
+        ret = -EINVAL;
+        if ( (manage_pci_ext.is_extfn > 1) || (manage_pci_ext.is_virtfn > 1) )
+            break;
+
+        pdev_info.is_extfn = manage_pci_ext.is_extfn;
+        pdev_info.is_virtfn = manage_pci_ext.is_virtfn;
+        pdev_info.physfn.bus = manage_pci_ext.physfn.bus;
+        pdev_info.physfn.devfn = manage_pci_ext.physfn.devfn;
+        ret = pci_add_device_ext(manage_pci_ext.bus,
+                                 manage_pci_ext.devfn,
+                                 &pdev_info);
+        break;
+    }
+
     case PHYSDEVOP_restore_msi: {
         struct physdev_restore_msi restore_msi;
         struct pci_dev *pdev;

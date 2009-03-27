@@ -1351,22 +1351,8 @@ def xm_dump_core(args):
     else:
         filename = None
 
-    if not live:
-        ds = server.xend.domain.pause(dom, True)
-
-    try:
-        print "Dumping core of domain: %s ..." % str(dom)
-        server.xend.domain.dump(dom, filename, live, crash)
-
-        if crash:
-            print "Destroying domain: %s ..." % str(dom)
-            server.xend.domain.destroy(dom)
-        elif reset:
-            print "Resetting domain: %s ..." % str(dom)
-            server.xend.domain.reset(dom)
-    finally:
-        if not live and not crash and not reset and ds == DOM_STATE_RUNNING:
-            server.xend.domain.unpause(dom)
+    print "Dumping core of domain: %s ..." % str(dom)
+    server.xend.domain.dump(dom, filename, live, crash, reset)
 
 def xm_rename(args):
     arg_check(args, "rename", 2)
@@ -2231,6 +2217,33 @@ def xm_pci_list_assignable_devices(args):
             print d.name,
         print
 
+def vscsi_sort(devs):
+    def sort_hctl(ds, l):
+        s = []
+        for d1 in ds:
+            for d2 in d1:
+                v_dev = sxp.child_value(d2, 'v-dev')
+                n = int(v_dev.split(':')[l])
+                try:
+                    j = s[n]
+                except IndexError:
+                    j = []
+                    s.extend([ [] for _ in range(len(s), n+1) ])
+                j.append(d2)
+                s[n] = j
+        return s
+
+    for i in range(len(devs)):
+        ds1 = [ devs[i][1][0][1] ]
+        ds1 = sort_hctl(ds1, 3)
+        ds1 = sort_hctl(ds1, 2)
+        ds1 = sort_hctl(ds1, 1)
+        ds2 = []
+        for d in ds1:
+            ds2.extend(d)
+        devs[i][1][0][1] = ds2
+    return devs
+
 def vscsi_convert_sxp_to_dict(dev_sxp):
     dev_dict = {}
     for opt_val in dev_sxp[1:]:
@@ -2270,6 +2283,9 @@ def xm_scsi_list(args):
 
     else:
         devs = server.xend.domain.getDeviceSxprs(dom, 'vscsi')
+
+    # Sort devs by virtual HCTL.
+    devs = vscsi_sort(devs)
 
     if use_long:
         map(PrettyPrint.prettyprint, devs)
@@ -2440,7 +2456,7 @@ def parse_pci_configuration(args, state, opts = ''):
     if len(args) == 3:
         vslt = args[2]
     else:
-        vslt = '0x0' #chose a free virtual PCI slot
+        vslt = AUTO_PHP_SLOT_STR
     pci=['pci']
     pci_match = re.match(r"((?P<domain>[0-9a-fA-F]{1,4})[:,])?" + \
             r"(?P<bus>[0-9a-fA-F]{1,2})[:,]" + \
@@ -2523,6 +2539,9 @@ def parse_scsi_configuration(p_scsi, v_hctl, state):
     if p_scsi is not None:
         # xm scsi-attach
         if v_hctl == "host":
+            if serverType == SERVER_XEN_API:
+                # TODO
+                raise OptionError("SCSI devices assignment by HBA is not implemeted")
             host_mode = 1
             scsi_devices = vscsi_util.vscsi_get_scsidevices()
         elif len(v_hctl.split(':')) != 4:

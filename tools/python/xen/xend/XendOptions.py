@@ -75,6 +75,9 @@ class XendOptions:
     """Default for the flag indicating whether xend should run a ssl relocation server."""
     xend_relocation_ssl_server_default = 'no'
 
+    """Default for the flag indicating whether xend should run a udev event server."""
+    xend_udev_event_server_default = 'no'
+
     """Default interface address the xend relocation server listens at. """
     xend_relocation_address_default = ''
 
@@ -215,6 +218,10 @@ class XendOptions:
 
     def get_xend_relocation_server_ssl_cert_file(self):
         return self.get_config_string("xend-relocation-server-ssl-cert-file")
+
+    def get_xend_udev_event_server(self):
+        return self.get_config_bool("xend-udev-event-server",
+                                    self.xend_udev_event_server_default)
 
     def get_xend_port(self):
         """Get the port xend listens at for its HTTP interface.

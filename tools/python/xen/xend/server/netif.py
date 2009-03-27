@@ -24,7 +24,7 @@ import os
 import random
 import re
 
-from xen.xend import XendOptions
+from xen.xend import XendOptions, sxp
 from xen.xend.server.DevController import DevController
 from xen.xend.XendError import VmError
 from xen.xend.XendXSPolicyAdmin import XSPolicyAdminInstance
@@ -196,3 +196,23 @@ class NetifController(DevController):
                 result[x] = y
 
         return result
+
+    # match a VIF ID from xenstore, or a MAC address stored in the domain config
+    def convertToDeviceNumber(self, devid):
+        try:
+            return int(devid)
+        except ValueError:
+            if type(devid) is not str:
+                raise VmError("devid %s is wrong type" % str(devid))
+            try:
+                dev = devid.split('/')[-1]
+                return (int(dev))
+            except ValueError:
+                devs = [d for d in self.vm.info.all_devices_sxpr()
+                    if d[0] == 'vif']
+                for nr in range(len(devs)):
+                    dev_type, dev_info = devs[nr]
+                    if (sxp.child_value(dev_info, 'mac').lower() ==
+                        devid.lower()):
+                        return nr
+                raise VmError("unknown devid %s" % str(devid))

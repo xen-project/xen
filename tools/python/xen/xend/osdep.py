@@ -18,6 +18,7 @@
 # Use is subject to license terms.
 
 import os
+import commands
 
 _scripts_dir = {
     "Linux": "/etc/xen/scripts",
@@ -142,7 +143,79 @@ def _linux_get_cpuinfo():
     finally:
         f.close()
 
+def _solaris_get_cpuinfo():
+    cpuinfo = {}
+
+    # call kstat to extrace specific cpu_info output
+    cmd = "/usr/bin/kstat -p -c misc -m cpu_info"
+    kstatoutput = commands.getoutput (cmd)
+
+    # walk each line
+    for kstatline in kstatoutput.split('\n'):
+
+        # split the line on 
+        # module:cpu #:module#:name value
+        (module, cpunum, combo, namevalue) = kstatline.split (":")
+
+        # check to see if this cpunum is already a key.  If not,
+        # initialize an empty hash table
+        if not cpuinfo.has_key (int(cpunum)):
+            cpuinfo[int(cpunum)] = {}
+
+        # split the namevalue output on whitespace
+        data = namevalue.split()
+
+        # the key will be data[0]
+        key = data[0]
+
+        # check the length of the data list.  If it's larger than
+        # 2, join the rest of the list together with a space.
+        # Otherwise, value is just data[1]
+        if len (data) > 2:
+            value = ' '.join (data[1:])
+        else:
+            value = data[1]
+
+        # add this key/value pair to the cpuhash
+        cpuinfo[int(cpunum)][key] = value
+    
+    # Translate Solaris tokens into what Xend expects
+    for key in cpuinfo.keys():
+        cpuinfo[key]["flags"] = ""
+        cpuinfo[key]["model name"] = cpuinfo[key]["brand"]
+        cpuinfo[key]["cpu MHz"] = cpuinfo[key]["clock_MHz"]
+
+    # return the hash table
+    return cpuinfo
+
 _get_cpuinfo = {
+    "SunOS": _solaris_get_cpuinfo
+}
+
+def _default_prefork(name):
+    pass
+
+def _default_postfork(ct, abandon=False):
+    pass
+
+# call this for long-running processes that should survive a xend
+# restart
+def _solaris_prefork(name):
+    from xen.lowlevel import process
+    return process.activate(name)
+
+def _solaris_postfork(ct, abandon=False):
+    from xen.lowlevel import process
+    process.clear(ct)
+    if abandon:
+        process.abandon_latest()
+
+_get_prefork = {
+    "SunOS": _solaris_prefork
+}
+
+_get_postfork = {
+    "SunOS": _solaris_postfork
 }
 
 def _get(var, default=None):
@@ -154,3 +227,5 @@ pygrub_path = _get(_pygrub_path, "/usr/bin/pygrub")
 vif_script = _get(_vif_script, "vif-bridge")
 lookup_balloon_stat = _get(_balloon_stat, _linux_balloon_stat)
 get_cpuinfo = _get(_get_cpuinfo, _linux_get_cpuinfo)
+prefork = _get(_get_prefork, _default_prefork)
+postfork = _get(_get_postfork, _default_postfork)

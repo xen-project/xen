@@ -95,6 +95,7 @@ unsigned long long parse_size_and_unit(const char *s, const char **ps);
 #define TAINT_MACHINE_CHECK             (1<<1)
 #define TAINT_BAD_PAGE                  (1<<2)
 #define TAINT_SYNC_CONSOLE              (1<<3)
+#define TAINT_ERROR_INJECT              (1<<4)
 extern int tainted;
 #define TAINT_STRING_MAX_LEN            20
 extern char *print_tainted(char *str);

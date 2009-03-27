@@ -560,6 +560,17 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE(void) arg)
     return rc;
 }
 
+/* Temporary placeholder. */
+int do_tmem_op(void *tmem_op)
+{
+    static bool_t warned;
+
+    if ( !test_and_set_bool(warned) )
+        printk("tmem: not implemented\n");
+
+    return -ENOSYS;
+}
+
 /*
  * Local variables:
  * mode: C

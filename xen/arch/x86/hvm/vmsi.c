@@ -336,16 +336,12 @@ struct hvm_mmio_handler msixtbl_mmio_handler = {
     .write_handler = msixtbl_write
 };
 
-static struct msixtbl_entry *add_msixtbl_entry(struct domain *d,
-                                               struct pci_dev *pdev,
-                                               uint64_t gtable)
+static void add_msixtbl_entry(struct domain *d,
+                              struct pci_dev *pdev,
+                              uint64_t gtable,
+                              struct msixtbl_entry *entry)
 {
-    struct msixtbl_entry *entry;
     u32 len;
-
-    entry = xmalloc(struct msixtbl_entry);
-    if ( !entry )
-        return NULL;
 
     memset(entry, 0, sizeof(struct msixtbl_entry));
         
@@ -359,8 +355,6 @@ static struct msixtbl_entry *add_msixtbl_entry(struct domain *d,
     entry->gtable = (unsigned long) gtable;
 
     list_add_rcu(&entry->list, &d->arch.hvm_domain.msixtbl_list);
-
-    return entry;
 }
 
 static void free_msixtbl_entry(struct rcu_head *rcu)
@@ -383,12 +377,25 @@ int msixtbl_pt_register(struct domain *d, int pirq, uint64_t gtable)
     irq_desc_t *irq_desc;
     struct msi_desc *msi_desc;
     struct pci_dev *pdev;
-    struct msixtbl_entry *entry;
+    struct msixtbl_entry *entry, *new_entry;
     int r = -EINVAL;
 
     ASSERT(spin_is_locked(&pcidevs_lock));
 
+    /*
+     * xmalloc() with irq_disabled causes the failure of check_lock() 
+     * for xenpool->lock. So we allocate an entry beforehand.
+     */
+    new_entry = xmalloc(struct msixtbl_entry);
+    if ( !new_entry )
+        return -ENOMEM;
+
     irq_desc = domain_spin_lock_irq_desc(d, pirq, NULL);
+    if ( !irq_desc )
+    {
+        xfree(new_entry);
+        return r;
+    }
 
     if ( irq_desc->handler != &pci_msi_type )
         goto out;
@@ -405,12 +412,9 @@ int msixtbl_pt_register(struct domain *d, int pirq, uint64_t gtable)
         if ( pdev == entry->pdev )
             goto found;
 
-    entry = add_msixtbl_entry(d, pdev, gtable);
-    if ( !entry )
-    {
-        spin_unlock(&d->arch.hvm_domain.msixtbl_list_lock);
-        goto out;
-    }
+    entry = new_entry;
+    new_entry = NULL;
+    add_msixtbl_entry(d, pdev, gtable, entry);
 
 found:
     atomic_inc(&entry->refcnt);
@@ -419,8 +423,8 @@ found:
 
 out:
     spin_unlock_irq(&irq_desc->lock);
+    xfree(new_entry);
     return r;
-
 }
 
 void msixtbl_pt_unregister(struct domain *d, int pirq)
@@ -433,6 +437,8 @@ void msixtbl_pt_unregister(struct domain *d, int pirq)
     ASSERT(spin_is_locked(&pcidevs_lock));
 
     irq_desc = domain_spin_lock_irq_desc(d, pirq, NULL);
+    if ( !irq_desc )
+        return;
 
     if ( irq_desc->handler != &pci_msi_type )
         goto out;
@@ -453,7 +459,7 @@ void msixtbl_pt_unregister(struct domain *d, int pirq)
 
 
 out:
-    spin_unlock(&irq_desc->lock);
+    spin_unlock_irq(&irq_desc->lock);
     return;
 
 found:
@@ -461,13 +467,16 @@ found:
         del_msixtbl_entry(entry);
 
     spin_unlock(&d->arch.hvm_domain.msixtbl_list_lock);
-    spin_unlock(&irq_desc->lock);
+    spin_unlock_irq(&irq_desc->lock);
 }
 
 void msixtbl_pt_cleanup(struct domain *d, int pirq)
 {
     struct msixtbl_entry *entry, *temp;
+    unsigned long flags;
 
+    /* msixtbl_list_lock must be acquired with irq_disabled for check_lock() */
+    local_irq_save(flags); 
     spin_lock(&d->arch.hvm_domain.msixtbl_list_lock);
 
     list_for_each_entry_safe( entry, temp,
@@ -475,4 +484,5 @@ void msixtbl_pt_cleanup(struct domain *d, int pirq)
         del_msixtbl_entry(entry);
 
     spin_unlock(&d->arch.hvm_domain.msixtbl_list_lock);
+    local_irq_restore(flags);
 }

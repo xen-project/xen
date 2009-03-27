@@ -145,6 +145,8 @@ typedef struct disk_info {
 	char handle[10];     /* xend handle, e.g. 'ram' */
 	int  single_handler; /* is there a single controller for all */
 	                     /* instances of disk type? */
+	int  use_ioemu;      /* backend provider: 0 = tapdisk; 1 = ioemu */
+
 #ifdef TAPDISK
 	struct tap_disk *drv;	
 #endif
@@ -159,22 +161,13 @@ extern struct tap_disk tapdisk_ram;
 extern struct tap_disk tapdisk_qcow;
 extern struct tap_disk tapdisk_qcow2;
 
-#define MAX_DISK_TYPES     20
-
-#define DISK_TYPE_AIO      0
-#define DISK_TYPE_SYNC     1
-#define DISK_TYPE_VMDK     2
-#define DISK_TYPE_RAM      3
-#define DISK_TYPE_QCOW     4
-#define DISK_TYPE_QCOW2    5
-#define DISK_TYPE_IOEMU    6
-
 
 /*Define Individual Disk Parameters here */
 static disk_info_t aio_disk = {
 	DISK_TYPE_AIO,
 	"raw image (aio)",
 	"aio",
+	0,
 	0,
 #ifdef TAPDISK
 	&tapdisk_aio,
@@ -186,6 +179,7 @@ static disk_info_t sync_disk = {
 	"raw image (sync)",
 	"sync",
 	0,
+	0,
 #ifdef TAPDISK
 	&tapdisk_sync,
 #endif
@@ -196,6 +190,7 @@ static disk_info_t vmdk_disk = {
 	"vmware image (vmdk)",
 	"vmdk",
 	1,
+	0,
 #ifdef TAPDISK
 	&tapdisk_vmdk,
 #endif
@@ -206,6 +201,7 @@ static disk_info_t ram_disk = {
 	"ramdisk image (ram)",
 	"ram",
 	1,
+	0,
 #ifdef TAPDISK
 	&tapdisk_ram,
 #endif
@@ -215,6 +211,7 @@ static disk_info_t qcow_disk = {
 	DISK_TYPE_QCOW,
 	"qcow disk (qcow)",
 	"qcow",
+	0,
 	0,
 #ifdef TAPDISK
 	&tapdisk_qcow,
@@ -226,18 +223,9 @@ static disk_info_t qcow2_disk = {
 	"qcow2 disk (qcow2)",
 	"qcow2",
 	0,
+	0,
 #ifdef TAPDISK
 	&tapdisk_qcow2,
-#endif
-};
-
-static disk_info_t ioemu_disk = {
-	DISK_TYPE_IOEMU,
-	"ioemu disk",
-	"ioemu",
-	1,
-#ifdef TAPDISK
-	NULL
 #endif
 };
 
@@ -249,7 +237,6 @@ static disk_info_t *dtypes[] = {
 	&ram_disk,
 	&qcow_disk,
 	&qcow2_disk,
-	&ioemu_disk,
 };
 
 typedef struct driver_list_entry {

@@ -38,6 +38,13 @@ scf = Extension("scf",
                libraries          = libraries,
                sources            = [ "xen/lowlevel/scf/scf.c" ])
              
+process = Extension("process",
+               extra_compile_args = extra_compile_args,
+               include_dirs       = include_dirs + [ "xen/lowlevel/process" ],
+               library_dirs       = library_dirs,
+               libraries          = libraries + [ "contract" ],
+               sources            = [ "xen/lowlevel/process/process.c" ])
+
 acm = Extension("acm",
                extra_compile_args = extra_compile_args,
                include_dirs       = include_dirs + [ "xen/lowlevel/acm" ],
@@ -63,6 +70,7 @@ ptsname = Extension("ptsname",
 modules = [ xc, xs, ptsname, acm, flask ]
 if os.uname()[0] == 'SunOS':
     modules.append(scf)
+    modules.append(process)
 
 setup(name            = 'xen',
       version         = '3.0',

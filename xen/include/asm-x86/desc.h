@@ -57,8 +57,6 @@
 
 #ifndef __ASSEMBLY__
 
-#define load_TR(n)  __asm__ __volatile__ ("ltr  %%ax" : : "a" (TSS_ENTRY<<3) )
-
 #if defined(__x86_64__)
 #define GUEST_KERNEL_RPL(d) (is_pv_32bit_domain(d) ? 1 : 3)
 #elif defined(__i386__)
@@ -219,7 +217,7 @@ DECLARE_PER_CPU(struct desc_struct *, compat_gdt_table);
 #endif
 
 extern void set_intr_gate(unsigned int irq, void * addr);
-extern void set_tss_desc(unsigned int n, void *addr);
+extern void load_TR(void);
 
 #endif /* !__ASSEMBLY__ */
 

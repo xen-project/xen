@@ -4,10 +4,12 @@
 #include <stdarg.h>
 #include <string.h>
 #include <assert.h>
+#include <sys/select.h>
 #include <xenctrl.h>
 #include <xs.h>
 #include <xen/io/fsif.h>
 #include "fs-backend.h"
+#include "fs-debug.h"
 
 
 static bool xenbus_printf(struct xs_handle *xsh,
@@ -25,7 +27,7 @@ static bool xenbus_printf(struct xs_handle *xsh,
     snprintf(fullpath, sizeof(fullpath), "%s/%s", node, path);
     vsnprintf(val, sizeof(val), fmt, args);
     va_end(args);
-    printf("xenbus_printf (%s) <= %s.\n", fullpath, val);    
+    FS_DEBUG("xenbus_printf (%s) <= %s.\n", fullpath, val);    
 
     return xs_write(xsh, xbt, fullpath, val, strlen(val));
 }
@@ -57,19 +59,19 @@ int xenbus_register_export(struct fs_export *export)
     assert(xsh != NULL);
     if(xsh == NULL)
     {
-        printf("Could not open connection to xenbus deamon.\n");
+        FS_DEBUG("Could not open connection to xenbus deamon.\n");
         goto error_exit;
     }
-    printf("Connection to the xenbus deamon opened successfully.\n");
+    FS_DEBUG("Connection to the xenbus deamon opened successfully.\n");
 
     /* Start transaction */
     xst = xs_transaction_start(xsh);
     if(xst == 0)
     {
-        printf("Could not start a transaction.\n");
+        FS_DEBUG("Could not start a transaction.\n");
         goto error_exit;
     }
-    printf("XS transaction is %d\n", xst); 
+    FS_DEBUG("XS transaction is %d\n", xst); 
  
     /* Create node string */
     snprintf(node, sizeof(node), "%s/%d", EXPORTS_NODE, export->export_id); 
@@ -78,7 +80,7 @@ int xenbus_register_export(struct fs_export *export)
 
     if(!xenbus_printf(xsh, xst, node, "name", "%s", export->name))
     {
-        printf("Could not write the export node.\n");
+        FS_DEBUG("Could not write the export node.\n");
         goto error_exit;
     }
 
@@ -87,7 +89,7 @@ int xenbus_register_export(struct fs_export *export)
     perms.perms = XS_PERM_READ;
     if(!xs_set_permissions(xsh, xst, EXPORTS_NODE, &perms, 1))
     {
-        printf("Could not set permissions on the export node.\n");
+        FS_DEBUG("Could not set permissions on the export node.\n");
         goto error_exit;
     }
 
@@ -166,7 +168,7 @@ void xenbus_write_backend_node(struct fs_mount *mount)
 
     assert(xsh != NULL);
     self_id = get_self_id();
-    printf("Our own dom_id=%d\n", self_id);
+    FS_DEBUG("Our own dom_id=%d\n", self_id);
     snprintf(node, sizeof(node), "%s/backend", mount->frontend);
     snprintf(backend_node, sizeof(backend_node), "/local/domain/%d/"ROOT_NODE"/%d",
                                 self_id, mount->mount_id);
@@ -176,7 +178,7 @@ void xenbus_write_backend_node(struct fs_mount *mount)
     xs_write(xsh, XBT_NULL, node, STATE_INITIALISED, strlen(STATE_INITIALISED));
 }
 
-void xenbus_write_backend_ready(struct fs_mount *mount)
+void xenbus_write_backend_state(struct fs_mount *mount, const char *state)
 {
     char node[1024];
     int self_id;
@@ -184,6 +186,59 @@ void xenbus_write_backend_ready(struct fs_mount *mount)
     assert(xsh != NULL);
     self_id = get_self_id();
     snprintf(node, sizeof(node), ROOT_NODE"/%d/state", mount->mount_id);
-    xs_write(xsh, XBT_NULL, node, STATE_READY, strlen(STATE_READY));
+    xs_write(xsh, XBT_NULL, node, state, strlen(state));
+}
+
+void xenbus_watch_frontend_state(struct fs_mount *mount)
+{
+    int res;
+    char statepath[1024];
+
+    assert(xsh != NULL);
+    snprintf(statepath, sizeof(statepath), "%s/state", mount->frontend);
+    res = xs_watch(xsh, statepath, "frontend-state");
+    assert(res);
+}
+
+void xenbus_unwatch_frontend_state(struct fs_mount *mount)
+{
+    int res;
+    char statepath[1024];
+
+    assert(xsh != NULL);
+    snprintf(statepath, sizeof(statepath), "%s/state", mount->frontend);
+    res = xs_unwatch(xsh, statepath, "frontend-state");
+    assert(res);
+}
+
+int xenbus_frontend_state_changed(struct fs_mount *mount, const char *oldstate)
+{
+    unsigned int len;
+    char statepath[1024];
+    char *state = NULL;
+
+    assert(xsh != NULL);
+    snprintf(statepath, sizeof(statepath), "%s/state", mount->frontend);
+    state = xs_read(xsh, XBT_NULL, statepath, &len);
+    if (state && len > 0) {
+        if (strcmp(state, oldstate)) {
+            free(state);
+            return 1;
+        } else {
+            free(state);
+            return 0;
+        }
+    } else
+        return 1;
+}
+
+char* xenbus_read_frontend_state(struct fs_mount *mount)
+{
+    unsigned int len;
+    char statepath[1024];
+
+    assert(xsh != NULL);
+    snprintf(statepath, sizeof(statepath), "%s/state", mount->frontend);
+    return xs_read(xsh, XBT_NULL, statepath, &len);
 }
 

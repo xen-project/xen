@@ -728,8 +728,6 @@ static void pv_cpuid(struct cpu_user_regs *regs)
         if ( !opt_allow_hugepage )
             __clear_bit(X86_FEATURE_PSE, &d);
         __clear_bit(X86_FEATURE_PGE, &d);
-        __clear_bit(X86_FEATURE_MCE, &d);
-        __clear_bit(X86_FEATURE_MCA, &d);
         __clear_bit(X86_FEATURE_PSE36, &d);
     }
     switch ( (uint32_t)regs->eax )
@@ -1639,6 +1637,10 @@ static int is_cpufreq_controller(struct domain *d)
             (d->domain_id == 0));
 }
 
+/*Intel vMCE MSRs virtualization*/
+extern int intel_mce_wrmsr(u32 msr, u32 lo,  u32 hi);
+extern int intel_mce_rdmsr(u32 msr, u32 *lo,  u32 *hi);
+
 static int emulate_privileged_op(struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
@@ -2206,6 +2208,15 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         default:
             if ( wrmsr_hypervisor_regs(regs->ecx, eax, edx) )
                 break;
+            if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
+            {
+                int rc = intel_mce_wrmsr(regs->ecx, eax, edx);
+                if ( rc == -1 )
+                    goto fail;
+                if ( rc == 0 )
+                    break;
+            }
+
             if ( (rdmsr_safe(regs->ecx, l, h) != 0) ||
                  (eax != l) || (edx != h) )
         invalid:
@@ -2289,6 +2300,16 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                         _p(regs->ecx));*/
             if ( rdmsr_safe(regs->ecx, regs->eax, regs->edx) )
                 goto fail;
+
+            if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
+            {
+                int rc = intel_mce_rdmsr(regs->ecx, &eax, &edx);
+                if ( rc == -1 )
+                    goto fail;
+                if ( rc == 0 )
+                    break;
+            }
+
             break;
         }
         break;
@@ -3004,20 +3025,31 @@ void set_intr_gate(unsigned int n, void *addr)
     __set_intr_gate(n, 0, addr);
 }
 
-void set_tss_desc(unsigned int n, void *addr)
+void load_TR(void)
 {
+    struct tss_struct *tss = &init_tss[smp_processor_id()];
+    struct desc_ptr old_gdt, tss_gdt = {
+        .base = (long)(this_cpu(gdt_table) - FIRST_RESERVED_GDT_ENTRY),
+        .limit = LAST_RESERVED_GDT_BYTE
+    };
+
     _set_tssldt_desc(
-        per_cpu(gdt_table, n) + TSS_ENTRY - FIRST_RESERVED_GDT_ENTRY,
-        (unsigned long)addr,
+        this_cpu(gdt_table) + TSS_ENTRY - FIRST_RESERVED_GDT_ENTRY,
+        (unsigned long)tss,
         offsetof(struct tss_struct, __cacheline_filler) - 1,
         9);
 #ifdef CONFIG_COMPAT
     _set_tssldt_desc(
-        per_cpu(compat_gdt_table, n) + TSS_ENTRY - FIRST_RESERVED_GDT_ENTRY,
-        (unsigned long)addr,
+        this_cpu(compat_gdt_table) + TSS_ENTRY - FIRST_RESERVED_GDT_ENTRY,
+        (unsigned long)tss,
         offsetof(struct tss_struct, __cacheline_filler) - 1,
         11);
 #endif
+
+    /* Switch to non-compat GDT (which has B bit clear) to execute LTR. */
+    asm volatile (
+        "sgdt %1; lgdt %2; ltr %%ax; lgdt %1"
+        : : "a" (TSS_ENTRY << 3), "m" (old_gdt), "m" (tss_gdt) : "memory" );
 }
 
 void __devinit percpu_traps_init(void)

@@ -28,6 +28,7 @@ import sys
 import errno
 import glob
 import traceback
+import platform
 
 import xen.lowlevel.xc
 from xen.xend.XendConstants import *
@@ -40,6 +41,7 @@ from xen.xend import arch
 from xen.xend import XendOptions
 from xen.util import oshelp
 from xen.util import utils
+from xen.xend import osdep
 
 xc = xen.lowlevel.xc.xc()
 
@@ -226,23 +228,23 @@ class ImageHandler:
         if self.device_model is None:
             return
 
-        # If we use a device model, the pipes for communication between
-        # blktapctrl and ioemu must be present before the devices are 
-        # created (blktapctrl must access them for new block devices)
+        if platform.system() != 'SunOS':
+            # If we use a device model, the pipes for communication between
+            # blktapctrl and ioemu must be present before the devices are 
+            # created (blktapctrl must access them for new block devices)
 
-        # mkdir throws an exception if the path already exists
-        try:
-            os.mkdir('/var/run/tap', 0755)
-        except:
-            pass
+            try:
+                os.makedirs('/var/run/tap', 0755)
+            except:
+                pass
 
-        try:
-            os.mkfifo('/var/run/tap/qemu-read-%d' % domid, 0600)
-            os.mkfifo('/var/run/tap/qemu-write-%d' % domid, 0600)
-        except OSError, e:
-            log.warn('Could not create blktap pipes for domain %d' % domid)
-            log.exception(e)
-            pass
+            try:
+                os.mkfifo('/var/run/tap/qemu-read-%d' % domid, 0600)
+                os.mkfifo('/var/run/tap/qemu-write-%d' % domid, 0600)
+            except OSError, e:
+                log.warn('Could not create blktap pipes for domain %d' % domid)
+                log.exception(e)
+                pass
 
 
     # Return a list of cmd line args to the device models based on the
@@ -407,9 +409,12 @@ class ImageHandler:
         logfd = os.open(self.logfile, logfile_mode)
         
         sys.stderr.flush()
+        contract = osdep.prefork("%s:%d" %
+                                 (self.vm.getName(), self.vm.getDomid()))
         pid = os.fork()
         if pid == 0: #child
             try:
+                osdep.postfork(contract)
                 os.dup2(null, 0)
                 os.dup2(logfd, 1)
                 os.dup2(logfd, 2)
@@ -426,6 +431,7 @@ class ImageHandler:
             except:
                 os._exit(127)
         else:
+            osdep.postfork(contract, abandon=True)
             self.pid = pid
             os.close(null)
             os.close(logfd)
@@ -482,11 +488,7 @@ class ImageHandler:
 
     def _dmfailed(self, message):
         log.warning("domain %s: %s", self.vm.getName(), message)
-        # ideally we would like to forcibly crash the domain with
-        # something like
-        #    xc.domain_shutdown(self.vm.getDomid(), DOMAIN_CRASH)
-        # but this can easily lead to very rapid restart loops against
-        # which we currently have no protection
+        xc.domain_shutdown(self.vm.getDomid(), DOMAIN_CRASH)
 
     def recreate(self):
         if self.device_model is None:
@@ -714,6 +716,7 @@ class HVMImageHandler(ImageHandler):
         if 'hvm' not in info['xen_caps']:
             raise HVMRequired()
 
+        xen_platform_pci = int(vmConfig['platform'].get('xen_platform_pci',1))
         rtc_timeoffset = vmConfig['platform'].get('rtc_timeoffset')
 
         if not self.display :
@@ -722,13 +725,23 @@ class HVMImageHandler(ImageHandler):
                         ("image/device-model", self.device_model),
                         ("image/display", self.display))
         self.vm.permissionsVm("image/dmargs", { 'dom': self.vm.getDomid(), 'read': True } )
+
+        if xen_platform_pci == 0:
+            disable_pf = 1
+            log.info("No need to create platform device.[domid:%d]", self.vm.getDomid())
+        else:
+            disable_pf = 0
+            log.info("Need to create platform device.[domid:%d]", self.vm.getDomid())
+
+        xstransact.Store("/local/domain/0/device-model/%i"%self.vm.getDomid(),
+                                      ('disable_pf', disable_pf))
         self.vm.storeVm(("rtc/timeoffset", rtc_timeoffset))
         self.vm.permissionsVm("rtc/timeoffset", { 'dom': self.vm.getDomid(), 'read': True } )
 
         self.apic = int(vmConfig['platform'].get('apic', 0))
         self.acpi = int(vmConfig['platform'].get('acpi', 0))
         self.guest_os_type = vmConfig['platform'].get('guest_os_type')
-           
+
 
     # Return a list of cmd line args to the device models based on the
     # xm config file

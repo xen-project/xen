@@ -441,7 +441,11 @@ class Grub:
                 # Timed out waiting for a keypress
                 if mytime != -1:
                     mytime += 1
-                    if mytime >= int(timeout):
+                    # curses.timeout() does not work properly on Solaris
+                    # So we may come here even after a key has been pressed.
+                    # Check both timeout and mytime to avoid exiting
+                    # when we shouldn't.
+                    if timeout != -1 and mytime >= int(timeout):
                         self.isdone = True
                         break
             else:
@@ -526,7 +530,11 @@ def run_grub(file, entry, fs, arg):
         print "No kernel image selected!"
         sys.exit(1)
 
-    img = g.cf.images[sel]
+    try:
+        img = g.cf.images[sel]
+    except:
+        log.debug("PyGrub: Default selection is not valid, using first boot configuration...")
+        img = g.cf.images[0]
 
     grubcfg = { "kernel": None, "ramdisk": None, "args": None }
 
@@ -579,6 +587,15 @@ def sniff_solaris(fs, cfg):
 
     return cfg
  
+def sniff_netware(fs, cfg):
+    if not fs.file_exists("/nwserver/xnloader.sys"):
+        return cfg
+
+    if not cfg["kernel"]:
+        cfg["kernel"] = "/nwserver/xnloader.sys"
+
+    return cfg
+
 if __name__ == "__main__":
     sel = None
     
@@ -657,6 +674,9 @@ if __name__ == "__main__":
         fs = fsimage.open(file, get_fs_offset(file))
 
     chosencfg = sniff_solaris(fs, incfg)
+
+    if not chosencfg["kernel"]:
+        chosencfg = sniff_netware(fs, incfg)
 
     if not chosencfg["kernel"]:
         chosencfg = run_grub(file, entry, fs, incfg["args"])

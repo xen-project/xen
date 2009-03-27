@@ -1418,24 +1418,14 @@ fixup_base_mem_in_k()
   write_word(0x40, 0x13, base_mem >> 10);
 }
 
-ASM_START
-_rom_write_access_control:
-    push ds
-    mov ax,#(BIOS_INFO_PHYSICAL_ADDRESS >> 4)
-    mov ds,ax
-    mov ax,[BIOSINFO_OFF_xen_pfiob]
-    pop ds
-    ret
-ASM_END
-
 void enable_rom_write_access()
 {
-    outb(rom_write_access_control(), 0);
+    outb(XEN_PF_IOBASE, 0);
 }
 
 void disable_rom_write_access()
 {
-    outb(rom_write_access_control(), PFFLAG_ROM_LOCK);
+    outb(XEN_PF_IOBASE, PFFLAG_ROM_LOCK);
 }
     
 #endif /* HVMASSIST */

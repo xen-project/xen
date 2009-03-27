@@ -46,97 +46,6 @@ static int compat_suspend(void)
             !strncmp(ans, "done\n", 5));
 }
 
-static int suspend_evtchn_release(void)
-{
-    if (si.suspend_evtchn >= 0) {
-        xc_evtchn_unbind(si.xce, si.suspend_evtchn);
-        si.suspend_evtchn = -1;
-    }
-    if (si.xce >= 0) {
-        xc_evtchn_close(si.xce);
-        si.xce = -1;
-    }
-
-    return 0;
-}
-
-static int await_suspend(void)
-{
-    int rc;
-
-    do {
-        rc = xc_evtchn_pending(si.xce);
-        if (rc < 0) {
-            warnx("error polling suspend notification channel: %d", rc);
-            return -1;
-        }
-    } while (rc != si.suspend_evtchn);
-
-    /* harmless for one-off suspend */
-    if (xc_evtchn_unmask(si.xce, si.suspend_evtchn) < 0)
-        warnx("failed to unmask suspend notification channel: %d", rc);
-
-    return 0;
-}
-
-static int suspend_evtchn_init(int xc, int domid)
-{
-    struct xs_handle *xs;
-    char path[128];
-    char *portstr;
-    unsigned int plen;
-    int port;
-    int rc;
-
-    si.xce = -1;
-    si.suspend_evtchn = -1;
-
-    xs = xs_daemon_open();
-    if (!xs) {
-        warnx("failed to get xenstore handle");
-        return -1;
-    }
-    sprintf(path, "/local/domain/%d/device/suspend/event-channel", domid);
-    portstr = xs_read(xs, XBT_NULL, path, &plen);
-    xs_daemon_close(xs);
-
-    if (!portstr || !plen) {
-        warnx("could not read suspend event channel");
-        return -1;
-    }
-
-    port = atoi(portstr);
-    free(portstr);
-
-    si.xce = xc_evtchn_open();
-    if (si.xce < 0) {
-        warnx("failed to open event channel handle");
-        goto cleanup;
-    }
-
-    si.suspend_evtchn = xc_evtchn_bind_interdomain(si.xce, domid, port);
-    if (si.suspend_evtchn < 0) {
-        warnx("failed to bind suspend event channel: %d", si.suspend_evtchn);
-        goto cleanup;
-    }
-
-    rc = xc_domain_subscribe_for_suspend(xc, domid, port);
-    if (rc < 0) {
-        warnx("failed to subscribe to domain: %d", rc);
-        goto cleanup;
-    }
-
-    /* event channel is pending immediately after binding */
-    await_suspend();
-
-    return 0;
-
-  cleanup:
-    suspend_evtchn_release();
-
-    return -1;
-}
-
 /**
  * Issue a suspend request to a dedicated event channel in the guest, and
  * receive the acknowledgement from the subscribe event channel. */
@@ -150,7 +59,7 @@ static int evtchn_suspend(void)
         return 0;
     }
 
-    if (await_suspend() < 0) {
+    if (xc_await_suspend(si.xce, si.suspend_evtchn) < 0) {
         warnx("suspend failed");
         return 0;
     }
@@ -303,12 +212,11 @@ static void *init_qemu_maps(int domid, unsigned int bitmap_size)
     return seg;
 }
 
-
 int
 main(int argc, char **argv)
 {
     unsigned int maxit, max_f;
-    int io_fd, ret;
+    int io_fd, ret, port;
 
     if (argc != 6)
         errx(1, "usage: %s iofd domid maxit maxf flags", argv[0]);
@@ -323,14 +231,37 @@ main(int argc, char **argv)
     max_f = atoi(argv[4]);
     si.flags = atoi(argv[5]);
 
-    if (suspend_evtchn_init(si.xc_fd, si.domid) < 0)
-        warnx("suspend event channel initialization failed, using slow path");
+    si.suspend_evtchn = si.xce = -1;
 
+    si.xce = xc_evtchn_open();
+    if (si.xce < 0)
+        warnx("failed to open event channel handle");
+
+    if (si.xce > 0)
+    {
+        port = xs_suspend_evtchn_port(si.domid);
+
+        if (port < 0)
+            warnx("faield to get the suspend evtchn port\n");
+        else
+        {
+            si.suspend_evtchn =
+              xc_suspend_evtchn_init(si.xc_fd, si.xce, si.domid, port);
+
+            if (si.suspend_evtchn < 0)
+                warnx("suspend event channel initialization failed"
+                       "using slow path");
+        }
+    }
     ret = xc_domain_save(si.xc_fd, io_fd, si.domid, maxit, max_f, si.flags, 
                          &suspend, !!(si.flags & XCFLAGS_HVM),
                          &init_qemu_maps, &qemu_flip_buffer);
 
-    suspend_evtchn_release();
+    if (si.suspend_evtchn > 0)
+        xc_suspend_evtchn_release(si.xce, si.suspend_evtchn);
+
+    if (si.xce > 0)
+        xc_evtchn_close(si.xce);
 
     xc_interface_close(si.xc_fd);
 

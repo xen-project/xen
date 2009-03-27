@@ -7,6 +7,7 @@
 #include <xen/event_channel.h>
 #include <xen/io/ring.h>
 #include <xen/io/fsif.h>
+#include "sys-queue.h"
 
 #define ROOT_NODE           "backend/vfs"
 #define EXPORTS_SUBNODE     "exports"
@@ -25,6 +26,8 @@ struct fs_export
 
 struct fs_request
 {
+    struct fs_mount *mount;
+    int id;
     int active;
     void *page;                         /* Pointer to mapped grant */
     int count;
@@ -50,6 +53,7 @@ struct fs_mount
     struct fs_request *requests;
     unsigned short *freelist;
     int fds[MAX_FDS];
+    LIST_ENTRY(fs_mount) entries;
 };
 
 
@@ -61,7 +65,11 @@ int xenbus_register_export(struct fs_export *export);
 int xenbus_get_watch_fd(void);
 void xenbus_read_mount_request(struct fs_mount *mount, char *frontend);
 void xenbus_write_backend_node(struct fs_mount *mount);
-void xenbus_write_backend_ready(struct fs_mount *mount);
+void xenbus_write_backend_state(struct fs_mount *mount, const char *state);
+int xenbus_frontend_state_changed(struct fs_mount *mount, const char *oldstate);
+void xenbus_watch_frontend_state(struct fs_mount *mount);
+void xenbus_unwatch_frontend_state(struct fs_mount *mount);
+char* xenbus_read_frontend_state(struct fs_mount *mount);
 
 /* File operations, implemented in fs-ops.c */
 struct fs_op
