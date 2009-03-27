@@ -228,10 +228,18 @@ static inline struct domain *page_get_owner_and_reference(
 
     do {
         x = y;
-        if (unlikely((x & PGC_count_mask) == 0) ||  /* Not allocated? */
-            unlikely(((x + 1) & PGC_count_mask) == 0) ) {/* Count overflow? */
+        /*
+         * Count ==  0: Page is not allocated, so we cannot take a reference.
+         * Count == -1: Reference count would wrap, which is invalid.
+         * Count == -2: Remaining unused ref is reserved for get_page_light().
+         */
+        /*
+         * On ia64, get_page_light() isn't defined so that it doesn't
+         * make sense to take care of Count == -2.
+         * Just for consistency with x86.
+         */
+        if ( unlikely(((x + 2) & PGC_count_mask) <= 2) )
             return NULL;
-        }
         y = cmpxchg_acq(&page->count_info, x, x + 1);
     } while (unlikely(y != x));
 
@@ -247,7 +255,8 @@ static inline int get_page(struct page_info *page,
     if (likely(owner == domain))
         return 1;
 
-    put_page(page);
+    if (owner != NULL)
+        put_page(page);
 
     /* if (!domain->is_dying) */ /* XXX: header inclusion hell */
     gdprintk(XENLOG_INFO,
