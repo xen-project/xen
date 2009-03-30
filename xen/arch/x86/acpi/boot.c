@@ -283,25 +283,6 @@ acpi_parse_nmi_src(struct acpi_subtable_header * header, const unsigned long end
 
 #endif /* CONFIG_X86_IO_APIC */
 
-static unsigned long __init
-acpi_scan_rsdp(unsigned long start, unsigned long length)
-{
-	unsigned long offset = 0;
-	unsigned long sig_len = sizeof("RSD PTR ") - 1;
-
-	/*
-	 * Scan all 16-byte boundaries of the physical memory region for the
-	 * RSDP signature.
-	 */
-	for (offset = 0; offset < length; offset += 16) {
-		if (strncmp((char *)(start + offset), "RSD PTR ", sig_len))
-			continue;
-		return (start + offset);
-	}
-
-	return 0;
-}
-
 static int __init acpi_parse_sbf(struct acpi_table_header *table)
 {
 	struct acpi_table_boot *sb;
@@ -371,15 +352,8 @@ extern u32 pmtmr_ioport;
 static void __init
 acpi_fadt_parse_sleep_info(struct acpi_table_fadt *fadt)
 {
-	struct acpi_table_rsdp *rsdp;
-	unsigned long rsdp_phys;
 	struct acpi_table_facs *facs = NULL;
 	uint64_t facs_pa;
-
-	rsdp_phys = acpi_find_rsdp();
-	if (!rsdp_phys || acpi_disabled)
-		goto bad;
-	rsdp = __va(rsdp_phys);
 
 	acpi_fadt_copy_address(pm1a_cnt, pm1a_control, pm1_control);
 	acpi_fadt_copy_address(pm1b_cnt, pm1b_control, pm1_control);
@@ -481,29 +455,6 @@ static int __init acpi_parse_fadt(struct acpi_table_header *table)
 #endif
 
 	return 0;
-}
-
-unsigned long __init acpi_find_rsdp(void)
-{
-	unsigned long rsdp_phys = 0;
-
-#if 0
-	if (efi_enabled) {
-		if (efi.acpi20 != EFI_INVALID_TABLE_ADDR)
-			return efi.acpi20;
-		else if (efi.acpi != EFI_INVALID_TABLE_ADDR)
-			return efi.acpi;
-	}
-#endif
-	/*
-	 * Scan memory looking for the RSDP signature. First search EBDA (low
-	 * memory) paragraphs and then search upper memory (E0000-FFFFF).
-	 */
-	rsdp_phys = acpi_scan_rsdp(0, 0x400);
-	if (!rsdp_phys)
-		rsdp_phys = acpi_scan_rsdp(0xE0000, 0x20000);
-
-	return rsdp_phys;
 }
 
 #ifdef	CONFIG_X86_LOCAL_APIC

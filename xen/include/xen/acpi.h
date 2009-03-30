@@ -282,7 +282,6 @@ typedef int (*acpi_table_entry_handler) (struct acpi_subtable_header *header, co
 
 unsigned int acpi_get_processor_id (unsigned int cpu);
 char * __acpi_map_table (unsigned long phys_addr, unsigned long size);
-unsigned long acpi_find_rsdp (void);
 int acpi_boot_init (void);
 int acpi_boot_table_init (void);
 int acpi_numa_init (void);

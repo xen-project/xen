@@ -76,11 +76,7 @@ unsigned int acpi_cpei_phys_cpuid;
 unsigned long acpi_wakeup_address = 0;
 
 #ifdef CONFIG_IA64_GENERIC
-#ifndef XEN
 static unsigned long __init acpi_find_rsdp(void)
-#else
-unsigned long __init acpi_find_rsdp(void)
-#endif
 {
 	unsigned long rsdp_phys = 0;
 
