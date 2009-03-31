@@ -90,6 +90,7 @@ class PciController(DevController):
             back['dev-%i' % pcidevid] = "%04x:%02x:%02x.%01x" % \
                                         (domain, bus, slot, func)
             back['uuid-%i' % pcidevid] = pci_config.get('uuid', '')
+            back['vslot-%i' % pcidevid] = "%02x" % vslot
             pcidevid += 1
 
         if vslots != "":
