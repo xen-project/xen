@@ -1057,7 +1057,7 @@ def preprocess_pci(vals):
                 r"(?P<bus>[0-9a-fA-F]{1,2})[:,]" + \
                 r"(?P<slot>[0-9a-fA-F]{1,2})[.,]" + \
                 r"(?P<func>[0-7])" + \
-                r"(@(?P<vslot>[0-9a-fA-F]))?" + \
+                r"(@(?P<vslot>[01]?[0-9a-fA-F]))?" + \
                 r"(,(?P<opts>.*))?$", \
                 pci_dev_str)
         if pci_match!=None:
