@@ -218,8 +218,8 @@ class xenapi_create:
             "SR":               self.DEFAULT_STORAGE_REPOSITORY,  
             "virtual_size":     vdi.attributes["size"].value,
             "type":             vdi.attributes["type"].value,
-            "sharable":         bool(vdi.attributes["sharable"].value),
-            "read_only":        bool(vdi.attributes["read_only"].value),
+            "sharable":         vdi.attributes["sharable"].value == "True",
+            "read_only":        vdi.attributes["read_only"].value == "True",
             "other_config":     {"location":
                 vdi.attributes["src"].value}
             }
@@ -804,6 +804,7 @@ class sxp2xml:
 
     def extract_vbd(self, vbd_sxp, document):
         src = get_child_by_name(vbd_sxp, "uname")
+        mode = get_child_by_name(vbd_sxp, "mode")
         name = str(src.__hash__())
 
         vbd = document.createElement("vbd")
@@ -811,8 +812,7 @@ class sxp2xml:
         vbd.attributes["name"] = "vdb" + name
         vbd.attributes["vdi"] = "vdi" + name
         vbd.attributes["mode"] \
-            = get_child_by_name(vbd_sxp, "mode") != "w" \
-              and "RO" or "RW"
+            = re.search("^w!{0,1}$", mode) and "RW" or "RO"
         vbd.attributes["device"] \
             = re.sub(":cdrom$", "", get_child_by_name(vbd_sxp, "dev"))
         vbd.attributes["bootable"] = "1"
@@ -825,17 +825,18 @@ class sxp2xml:
 
     def extract_vdi(self, vbd_sxp, document):
         src = get_child_by_name(vbd_sxp, "uname")
+        mode = get_child_by_name(vbd_sxp, "mode")
         name = "vdi" + str(src.__hash__())
 
         vdi = document.createElement("vdi")
 
         vdi.attributes["src"] = src
         vdi.attributes["read_only"] \
-            = (get_child_by_name(vbd_sxp, "mode") != "w") \
-               and "True" or "False"
+            = re.search("^w!{0,1}$", mode) and "False" or "True"
         vdi.attributes["size"] = '-1'
         vdi.attributes["type"] = "system"
-        vdi.attributes["sharable"] = "False"
+        vdi.attributes["sharable"] \
+            = re.search("^w!$", mode) and "True" or "False"
         vdi.attributes["name"] = name
 
         vdi.appendChild(self.make_name_tag(name, document))
