@@ -25,6 +25,7 @@ name_label                      name
 name_description
 user_version
 is_a_template
+auto_power_on
 resident_on
 memory_static_min               memory
 memory_static_max               maxmem

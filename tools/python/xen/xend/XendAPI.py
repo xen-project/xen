@@ -1352,6 +1352,9 @@ class XendAPI(object):
     def VM_get_is_a_template(self, session, ref):
         return self.VM_get('is_a_template', session, ref)
     
+    def VM_get_auto_power_on(self, session, vm_ref):
+        return self.VM_get('auto_power_on', session, vm_ref)
+    
     def VM_get_memory_dynamic_max(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_success(dom.get_memory_dynamic_max())
@@ -1440,6 +1443,9 @@ class XendAPI(object):
     def VM_set_is_a_template(self, session, vm_ref, is_template):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_todo()
+    
+    def VM_set_auto_power_on(self, session, vm_ref, val):
+        return self.VM_set('auto_power_on', session, vm_ref, val)
     
     def VM_set_memory_dynamic_max(self, session, vm_ref, mem):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
@@ -1682,7 +1688,7 @@ class XendAPI(object):
             'name_description': xeninfo.getName(),
             'user_version': 1,
             'is_a_template': xeninfo.info['is_a_template'],
-            'auto_power_on': False,
+            'auto_power_on': xeninfo.info['auto_power_on'],
             'resident_on': XendNode.instance().uuid,
             'memory_static_min': xeninfo.get_memory_static_min(),
             'memory_static_max': xeninfo.get_memory_static_max(),

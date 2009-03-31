@@ -144,6 +144,7 @@ def recreate(info, priv):
     xeninfo = XendConfig.XendConfig(dominfo = info)
     xeninfo['is_control_domain'] = priv
     xeninfo['is_a_template'] = False
+    xeninfo['auto_power_on'] = False
     domid = xeninfo['domid']
     uuid1 = uuid.fromString(xeninfo['uuid'])
     needs_reinitialising = False

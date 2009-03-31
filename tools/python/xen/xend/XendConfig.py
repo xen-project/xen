@@ -187,6 +187,7 @@ XENAPI_CFG_TYPES = {
     'name_description': str,
     'user_version': str,
     'is_a_template': bool0,
+    'auto_power_on': bool0,
     'resident_on': str,
     'memory_static_min': int,  # note these are stored in bytes, not KB!
     'memory_static_max': int,
@@ -361,6 +362,7 @@ class XendConfig(dict):
             'actions_after_crash': 'restart',
             'actions_after_suspend': '',
             'is_a_template': False,
+            'auto_power_on': False,
             'is_control_domain': False,
             'features': '',
             'PV_bootloader': '',
