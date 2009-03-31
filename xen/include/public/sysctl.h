@@ -382,6 +382,10 @@ struct xen_sysctl_pm_op {
     /* set/reset scheduler power saving option */
     #define XEN_SYSCTL_pm_op_set_sched_opt_smt    0x21
 
+    /* cpuidle max_cstate access command */
+    #define XEN_SYSCTL_pm_op_get_max_cstate       0x22
+    #define XEN_SYSCTL_pm_op_set_max_cstate       0x23
+
     uint32_t cmd;
     uint32_t cpuid;
     union {
@@ -391,6 +395,8 @@ struct xen_sysctl_pm_op {
         uint64_t get_avgfreq;
         struct xen_get_cputopo      get_topo;
         uint32_t                    set_sched_opt_smt;
+        uint32_t                    get_max_cstate;
+        uint32_t                    set_max_cstate;
     };
 };
 

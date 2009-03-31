@@ -362,3 +362,36 @@ int xc_set_sched_opt_smt(int xc_handle, uint32_t value)
    return rc;
 }
 
+int xc_get_cpuidle_max_cstate(int xc_handle, uint32_t *value)
+{
+    int rc;
+    DECLARE_SYSCTL;
+
+    if ( xc_handle < 0 || !value )
+        return -EINVAL;
+
+    sysctl.cmd = XEN_SYSCTL_pm_op;
+    sysctl.u.pm_op.cmd = XEN_SYSCTL_pm_op_get_max_cstate;
+    sysctl.u.pm_op.cpuid = 0;
+    sysctl.u.pm_op.get_max_cstate = 0;
+    rc = do_sysctl(xc_handle, &sysctl);
+    *value = sysctl.u.pm_op.get_max_cstate;
+
+    return rc;
+}
+
+int xc_set_cpuidle_max_cstate(int xc_handle, uint32_t value)
+{
+    DECLARE_SYSCTL;
+
+    if ( xc_handle < 0 )
+        return -EINVAL;
+
+    sysctl.cmd = XEN_SYSCTL_pm_op;
+    sysctl.u.pm_op.cmd = XEN_SYSCTL_pm_op_set_max_cstate;
+    sysctl.u.pm_op.cpuid = 0;
+    sysctl.u.pm_op.set_max_cstate = value;
+
+    return do_sysctl(xc_handle, &sysctl);
+}
+

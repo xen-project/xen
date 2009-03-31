@@ -37,6 +37,7 @@
 #include <asm/processor.h>
 #include <xen/percpu.h>
 #include <xen/domain.h>
+#include <xen/acpi.h>
 
 #include <public/sysctl.h>
 #include <acpi/cpufreq/cpufreq.h>
@@ -524,6 +525,18 @@ int do_pm_op(struct xen_sysctl_pm_op *op)
         sched_smt_power_savings = !!op->set_sched_opt_smt;
         op->set_sched_opt_smt = saved_value;
 
+        break;
+    }
+
+    case XEN_SYSCTL_pm_op_get_max_cstate:
+    {
+        op->get_max_cstate = max_cstate;
+        break;
+    }
+
+    case XEN_SYSCTL_pm_op_set_max_cstate:
+    {
+        max_cstate = op->set_max_cstate;
         break;
     }
 
