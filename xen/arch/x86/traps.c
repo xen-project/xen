@@ -1637,10 +1637,6 @@ static int is_cpufreq_controller(struct domain *d)
             (d->domain_id == 0));
 }
 
-/*Intel vMCE MSRs virtualization*/
-extern int intel_mce_wrmsr(u32 msr, u32 lo,  u32 hi);
-extern int intel_mce_rdmsr(u32 msr, u32 *lo,  u32 *hi);
-
 static int emulate_privileged_op(struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
@@ -2210,10 +2206,10 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                 break;
             if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
             {
-                int rc = intel_mce_wrmsr(regs->ecx, eax, edx);
-                if ( rc == -1 )
+                int rc = intel_mce_wrmsr(regs->ecx, res);
+                if ( rc < 0 )
                     goto fail;
-                if ( rc == 0 )
+                if ( rc )
                     break;
             }
 
@@ -2291,25 +2287,27 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         default:
             if ( rdmsr_hypervisor_regs(regs->ecx, &l, &h) )
             {
+ rdmsr_writeback:
                 regs->eax = l;
                 regs->edx = h;
                 break;
             }
+
+            if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
+            {
+                int rc = intel_mce_rdmsr(regs->ecx, &l, &h);
+
+                if ( rc < 0 )
+                    goto fail;
+                if ( rc )
+                    goto rdmsr_writeback;
+            }
+
             /* Everyone can read the MSR space. */
             /* gdprintk(XENLOG_WARNING,"Domain attempted RDMSR %p.\n",
                         _p(regs->ecx));*/
             if ( rdmsr_safe(regs->ecx, regs->eax, regs->edx) )
                 goto fail;
-
-            if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
-            {
-                int rc = intel_mce_rdmsr(regs->ecx, &eax, &edx);
-                if ( rc == -1 )
-                    goto fail;
-                if ( rc == 0 )
-                    break;
-            }
-
             break;
         }
         break;
