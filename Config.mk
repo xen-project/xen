@@ -19,14 +19,16 @@ HOSTCFLAGS += -fno-strict-aliasing
 
 DISTDIR     ?= $(XEN_ROOT)/dist
 DESTDIR     ?= /
-DOCDIR      ?= /usr/share/doc/xen
-MANDIR      ?= /usr/share/man
 
 # Allow phony attribute to be listed as dependency rather than fake target
 .PHONY: .phony
 
 include $(XEN_ROOT)/config/$(XEN_OS).mk
 include $(XEN_ROOT)/config/$(XEN_TARGET_ARCH).mk
+
+SHAREDIR    ?= $(PREFIX)/share
+DOCDIR      ?= $(SHAREDIR)/doc/xen
+MANDIR      ?= $(SHAREDIR)/man
 
 ifneq ($(EXTRA_PREFIX),)
 EXTRA_INCLUDES += $(EXTRA_PREFIX)/include

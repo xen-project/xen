@@ -12,7 +12,7 @@ build:
 ifndef XEN_PYTHON_NATIVE_INSTALL
 install: LIBPATH=$(shell PYTHONPATH=../python/xen/util python -c "import auxbin; print auxbin.libpath()")
 install: all
-	CC="$(CC)" CFLAGS="$(CFLAGS)" python setup.py install --home="$(DESTDIR)/usr" --prefix="" --install-lib="$(DESTDIR)$(LIBPATH)/python"
+	CC="$(CC)" CFLAGS="$(CFLAGS)" python setup.py install --home="$(DESTDIR)$(PREFIX)" --prefix="" --install-lib="$(DESTDIR)$(LIBDIR)/python"
 	$(INSTALL_DIR) $(DESTDIR)/var/run/xend/boot
 else
 install: all
