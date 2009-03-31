@@ -27,9 +27,6 @@
 #define __PAGE_OFFSET           (0xFF000000)
 #define __XEN_VIRT_START        __PAGE_OFFSET
 
-#define virt_to_maddr(va) ((unsigned long)(va)-DIRECTMAP_VIRT_START)
-#define maddr_to_virt(ma) ((void *)((unsigned long)(ma)+DIRECTMAP_VIRT_START))
-
 #define VADDR_BITS              32
 #define VADDR_MASK              (~0UL)
 
@@ -43,6 +40,22 @@
 
 #include <xen/config.h>
 #include <asm/types.h>
+
+static inline unsigned long __virt_to_maddr(unsigned long va)
+{
+    ASSERT(va >= DIRECTMAP_VIRT_START && va < DIRECTMAP_VIRT_END);
+    return va - DIRECTMAP_VIRT_START;
+}
+#define virt_to_maddr(va)       \
+    (__virt_to_maddr((unsigned long)(va)))
+
+static inline void *__maddr_to_virt(unsigned long ma)
+{
+    ASSERT(ma < DIRECTMAP_VIRT_END - DIRECTMAP_VIRT_START);
+    return (void *)(ma + DIRECTMAP_VIRT_START);
+}
+#define maddr_to_virt(ma)       \
+    (__maddr_to_virt((unsigned long)(ma)))
 
 /* read access (should only be used for debug printk's) */
 typedef u64 intpte_t;
