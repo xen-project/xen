@@ -57,6 +57,7 @@ void show_help(void)
             "                                     it is used in ondemand governor.\n"
             " get-cpu-topology                    get thread/core/socket topology info\n"
             " set-sched-smt           enable|disable enable/disable scheduler smt power saving\n"
+            " set-max-cstate        <num>         set the C-State limitation (<num> >= 0)\n"
             " start [seconds]                     start collect Cx/Px statistics,\n"
             "                                     output after CTRL-C or SIGINT or several seconds.\n"
             );
@@ -122,6 +123,18 @@ static int get_cxstat_by_cpuid(int xc_fd, int cpuid, struct xc_cx_stat *cxstat)
     return 0;
 }
 
+static int show_max_cstate(int xc_fd)
+{
+    int ret = 0;
+    uint32_t value;
+
+    if ( (ret = xc_get_cpuidle_max_cstate(xc_fd, &value)) )
+        return ret;
+
+    printf("Max C-state: C%d\n\n", value);
+    return 0;
+}
+
 static int show_cxstat_by_cpuid(int xc_fd, int cpuid)
 {
     int ret = 0;
@@ -147,6 +160,8 @@ void cxstat_func(int argc, char *argv[])
 
     if ( cpuid >= max_cpu_nr )
         cpuid = -1;
+
+    show_max_cstate(xc_fd);
 
     if ( cpuid < 0 )
     {
@@ -864,7 +879,24 @@ void set_sched_smt_func(int argc, char *argv[])
 
     rc = xc_set_sched_opt_smt(xc_fd, value);
     printf("%s sched_smt_power_savings %s\n", argv[0],
-                    rc? "failed":"successeed" );
+                    rc? "failed":"succeeded" );
+
+    return;
+}
+
+void set_max_cstate_func(int argc, char *argv[])
+{
+    int value, rc;
+
+    if ( argc != 1 || sscanf(argv[0], "%d", &value) != 1 || value < 0 )
+    {
+        show_help();
+        exit(-1);
+    }
+
+    rc = xc_set_cpuidle_max_cstate(xc_fd, (uint32_t)value);
+    printf("set max_cstate to C%d %s\n", value,
+                    rc? "failed":"succeeded" );
 
     return;
 }
@@ -886,6 +918,7 @@ struct {
     { "set-up-threshold", scaling_up_threshold_func },
     { "get-cpu-topology", cpu_topology_func},
     { "set-sched-smt", set_sched_smt_func},
+    { "set-max-cstate", set_max_cstate_func},
 };
 
 int main(int argc, char *argv[])
