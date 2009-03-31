@@ -18,4 +18,28 @@ struct bug_frame {
 #define BUGFRAME_bug    2
 #define BUGFRAME_assert 3
 
+#define dump_execution_state()                     \
+    asm volatile (                                 \
+        "ud2 ; ret $0"                             \
+        : : "i" (BUGFRAME_dump) )
+
+#define WARN()                                     \
+    asm volatile (                                 \
+        "ud2 ; ret %0" BUG_STR(1)                  \
+        : : "i" (BUGFRAME_warn | (__LINE__<<2)),   \
+            "i" (__FILE__) )
+
+#define BUG()                                      \
+    asm volatile (                                 \
+        "ud2 ; ret %0" BUG_STR(1)                  \
+        : : "i" (BUGFRAME_bug | (__LINE__<<2)),    \
+            "i" (__FILE__) )
+
+#define assert_failed(p)                           \
+    asm volatile (                                 \
+        "ud2 ; ret %0" BUG_STR(1) BUG_STR(2)       \
+        : : "i" (BUGFRAME_assert | (__LINE__<<2)), \
+            "i" (__FILE__), "i" (#p) )
+
+
 #endif /* __X86_BUG_H__ */

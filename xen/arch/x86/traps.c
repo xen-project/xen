@@ -841,7 +841,7 @@ asmlinkage void do_invalid_op(struct cpu_user_regs *regs)
 {
     struct bug_frame bug;
     struct bug_frame_str bug_str;
-    char *filename, *predicate, *eip = (char *)regs->eip;
+    const char *filename, *predicate, *eip = (char *)regs->eip;
     unsigned long fixup;
     int id, lineno;
 
@@ -873,11 +873,13 @@ asmlinkage void do_invalid_op(struct cpu_user_regs *regs)
     /* WARN, BUG or ASSERT: decode the filename pointer and line number. */
     if ( !is_kernel(eip) ||
          __copy_from_user(&bug_str, eip, sizeof(bug_str)) ||
-         memcmp(bug_str.mov, BUG_MOV_STR, sizeof(bug_str.mov)) )
+         (bug_str.mov != 0xbc) )
         goto die;
+    filename = bug_str(bug_str, eip);
     eip += sizeof(bug_str);
 
-    filename = is_kernel(bug_str.str) ? (char *)bug_str.str : "<unknown>";
+    if ( !is_kernel(filename) )
+        filename = "<unknown>";
     lineno   = bug.id >> 2;
 
     if ( id == BUGFRAME_warn )
@@ -900,11 +902,13 @@ asmlinkage void do_invalid_op(struct cpu_user_regs *regs)
     ASSERT(id == BUGFRAME_assert);
     if ( !is_kernel(eip) ||
          __copy_from_user(&bug_str, eip, sizeof(bug_str)) ||
-         memcmp(bug_str.mov, BUG_MOV_STR, sizeof(bug_str.mov)) )
+         (bug_str.mov != 0xbc) )
         goto die;
+    predicate = bug_str(bug_str, eip);
     eip += sizeof(bug_str);
 
-    predicate = is_kernel(bug_str.str) ? (char *)bug_str.str : "<unknown>";
+    if ( !is_kernel(predicate) )
+        predicate = "<unknown>";
     printk("Assertion '%s' failed at %.50s:%d\n",
            predicate, filename, lineno);
     DEBUGGER_trap_fatal(TRAP_invalid_op, regs);
