@@ -13,19 +13,6 @@ typedef struct {
 
 #define _raw_spin_is_locked(x) ((x)->lock <= 0)
 
-static always_inline void _raw_spin_lock(raw_spinlock_t *lock)
-{
-    asm volatile (
-        "1:  lock; decw %0         \n"
-        "    jns 3f                \n"
-        "2:  rep; nop              \n"
-        "    cmpw $0,%0            \n"
-        "    jle 2b                \n"
-        "    jmp 1b                \n"
-        "3:"
-        : "=m" (lock->lock) : : "memory" );
-}
-
 static always_inline void _raw_spin_unlock(raw_spinlock_t *lock)
 {
     ASSERT(_raw_spin_is_locked(lock));
