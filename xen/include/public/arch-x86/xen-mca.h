@@ -166,11 +166,11 @@ struct mcinfo_extended {
 
     uint32_t mc_msrs; /* Number of msr with valid values. */
     /*
-     * Currently Intel extended MSR (32/64) including all gp registers
-     * and E(R)DI, E(R)BP, E(R)SP, E(R)FLAGS, E(R)IP, E(R)MISC, only 10
-     * of them might be useful. So expend this array to 10.
-    */
-    struct mcinfo_msr mc_msr[10];
+     * Currently Intel extended MSR (32/64) include all gp registers
+     * and E(R)FLAGS, E(R)IP, E(R)MISC, up to 11/19 of them might be
+     * useful at present. So expand this array to 16/32 to leave room.
+     */
+    struct mcinfo_msr mc_msr[sizeof(void *) * 4];
 };
 
 /* Recovery Action flags. Giving recovery result information to DOM0 */

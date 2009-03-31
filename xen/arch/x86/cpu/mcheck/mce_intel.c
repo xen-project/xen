@@ -117,6 +117,16 @@ static void intel_init_thermal(struct cpuinfo_x86 *c)
 }
 #endif /* CONFIG_X86_MCE_THERMAL */
 
+static inline void intel_get_extended_msr(struct mcinfo_extended *ext, u32 msr)
+{
+    if ( ext->mc_msrs < ARRAY_SIZE(ext->mc_msr)
+         && msr < MSR_IA32_MCG_EAX + nr_intel_ext_msrs ) {
+        ext->mc_msr[ext->mc_msrs].reg = msr;
+        rdmsrl(msr, ext->mc_msr[ext->mc_msrs].value);
+        ++ext->mc_msrs;
+    }
+}
+
 static enum mca_extinfo
 intel_get_extended_msrs(struct mc_info *mci, uint16_t bank, uint64_t status)
 {
@@ -129,30 +139,29 @@ intel_get_extended_msrs(struct mc_info *mci, uint16_t bank, uint64_t status)
     memset(&mc_ext, 0, sizeof(struct mcinfo_extended));
     mc_ext.common.type = MC_TYPE_EXTENDED;
     mc_ext.common.size = sizeof(mc_ext);
-    mc_ext.mc_msrs = 10;
 
-    mc_ext.mc_msr[0].reg = MSR_IA32_MCG_EAX;
-    rdmsrl(MSR_IA32_MCG_EAX, mc_ext.mc_msr[0].value);
-    mc_ext.mc_msr[1].reg = MSR_IA32_MCG_EBX;
-    rdmsrl(MSR_IA32_MCG_EBX, mc_ext.mc_msr[1].value);
-    mc_ext.mc_msr[2].reg = MSR_IA32_MCG_ECX;
-    rdmsrl(MSR_IA32_MCG_ECX, mc_ext.mc_msr[2].value);
+    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_EAX);
+    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_EBX);
+    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_ECX);
+    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_EDX);
+    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_ESI);
+    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_EDI);
+    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_EBP);
+    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_ESP);
+    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_EFLAGS);
+    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_EIP);
+    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_MISC);
 
-    mc_ext.mc_msr[3].reg = MSR_IA32_MCG_EDX;
-    rdmsrl(MSR_IA32_MCG_EDX, mc_ext.mc_msr[3].value);
-    mc_ext.mc_msr[4].reg = MSR_IA32_MCG_ESI;
-    rdmsrl(MSR_IA32_MCG_ESI, mc_ext.mc_msr[4].value);
-    mc_ext.mc_msr[5].reg = MSR_IA32_MCG_EDI;
-    rdmsrl(MSR_IA32_MCG_EDI, mc_ext.mc_msr[5].value);
-
-    mc_ext.mc_msr[6].reg = MSR_IA32_MCG_EBP;
-    rdmsrl(MSR_IA32_MCG_EBP, mc_ext.mc_msr[6].value);
-    mc_ext.mc_msr[7].reg = MSR_IA32_MCG_ESP;
-    rdmsrl(MSR_IA32_MCG_ESP, mc_ext.mc_msr[7].value);
-    mc_ext.mc_msr[8].reg = MSR_IA32_MCG_EFLAGS;
-    rdmsrl(MSR_IA32_MCG_EFLAGS, mc_ext.mc_msr[8].value);
-    mc_ext.mc_msr[9].reg = MSR_IA32_MCG_EIP;
-    rdmsrl(MSR_IA32_MCG_EIP, mc_ext.mc_msr[9].value);
+#ifdef __x86_64__
+    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_R8);
+    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_R9);
+    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_R10);
+    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_R11);
+    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_R12);
+    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_R13);
+    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_R14);
+    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_R15);
+#endif
 
     x86_mcinfo_add(mci, &mc_ext);
 
