@@ -1410,6 +1410,21 @@ class XendConfig(dict):
                 if dev_uuid not in target['console_refs']:
                     target['console_refs'].append(dev_uuid)
 
+		# Cope with old-format save files which say under vfb
+		# (type vfb) rather than (vfb 1)
+		try:
+		    vfb_type = dev_info['type']
+		except KeyError:
+		    vfb_type = None
+		log.debug("iwj dev_type=%s vfb type %s" %
+			(dev_type, `vfb_type`))
+
+		if vfb_type == 'vnc' or vfb_type == 'sdl':
+		    dev_info[vfb_type] = 1
+		    del dev_info['type']
+		    log.debug("iwj dev_type=%s vfb setting dev_info['%s']" %
+				(dev_type, vfb_type))
+                
             elif dev_type == 'console':
                 if 'console_refs' not in target:
                     target['console_refs'] = []
