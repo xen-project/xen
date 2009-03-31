@@ -911,6 +911,8 @@ static int iommu_alloc(struct acpi_drhd_unit *drhd)
         return -ENOMEM;
     memset(iommu, 0, sizeof(struct iommu));
 
+    iommu->vector = -1; /* No vector assigned yet. */
+
     iommu->intel = alloc_intel_iommu();
     if ( iommu->intel == NULL )
     {
@@ -1666,15 +1668,18 @@ static int init_vtd_hw(void)
             return -EIO;
         }
 
-        vector = iommu_set_interrupt(iommu);
-        if ( vector < 0 )
+        if ( iommu->vector < 0 )
         {
-            gdprintk(XENLOG_ERR VTDPREFIX, "IOMMU: interrupt setup failed\n");
-            return vector;
+            vector = iommu_set_interrupt(iommu);
+            if ( vector < 0 )
+            {
+                gdprintk(XENLOG_ERR VTDPREFIX, "IOMMU: interrupt setup failed\n");
+                return vector;
+            }
+            iommu->vector = vector;
         }
-        dma_msi_data_init(iommu, vector);
+        dma_msi_data_init(iommu, iommu->vector);
         dma_msi_addr_init(iommu, cpu_physical_id(first_cpu(cpu_online_map)));
-        iommu->vector = vector;
         clear_fault_bits(iommu);
         dmar_writel(iommu->reg, DMAR_FECTL_REG, 0);
 

@@ -55,7 +55,7 @@ struct iommu {
     spinlock_t lock; /* protect context, domain ids */
     spinlock_t register_lock; /* protect iommu register handling */
     u64 root_maddr; /* root entry machine address */
-    unsigned int vector;
+    int vector;
     struct intel_iommu *intel;
 };
 
