@@ -723,6 +723,13 @@ class XendDomainInfo:
         dev_config_dict = self.info['devices'][dev_uuid][1]
         log.debug("XendDomainInfo.device_create: %s" % scrub_password(dev_config_dict))
 
+        if dev_type == 'vif':
+            for x in dev_config:
+                if x != 'vif' and x[0] == 'mac':
+                    if not re.match('^([0-9a-f]{2}:){5}[0-9a-f]{2}$', x[1], re.I):
+                        log.error("Virtual network interface creation error - invalid MAC Address entered: %s", x[1])
+                        raise VmError("Cannot create a new virtual network interface - MAC address is not valid!");
+
         if self.domid is not None:
             try:
                 dev_config_dict['devid'] = devid = \
