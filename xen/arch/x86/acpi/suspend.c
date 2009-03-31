@@ -16,6 +16,7 @@
 
 #if defined(CONFIG_X86_64)
 static unsigned long saved_lstar, saved_cstar;
+static unsigned long saved_sysenter_esp, saved_sysenter_eip;
 #endif
 
 void save_rest_processor_state(void)
@@ -26,6 +27,11 @@ void save_rest_processor_state(void)
 #if defined(CONFIG_X86_64)
     rdmsrl(MSR_CSTAR, saved_cstar);
     rdmsrl(MSR_LSTAR, saved_lstar);
+    if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
+    {
+        rdmsrl(MSR_IA32_SYSENTER_ESP, saved_sysenter_esp);
+        rdmsrl(MSR_IA32_SYSENTER_EIP, saved_sysenter_eip);
+    }
 #endif
 }
 
@@ -41,6 +47,14 @@ void restore_rest_processor_state(void)
     wrmsrl(MSR_CSTAR, saved_cstar);
     wrmsr(MSR_STAR, 0, (FLAT_RING3_CS32<<16) | __HYPERVISOR_CS);
     wrmsr(MSR_SYSCALL_MASK, EF_VM|EF_RF|EF_NT|EF_DF|EF_IE|EF_TF, 0U);    
+
+    if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
+    {
+        /* Recover sysenter MSRs */
+        wrmsrl(MSR_IA32_SYSENTER_ESP, saved_sysenter_esp);
+        wrmsrl(MSR_IA32_SYSENTER_EIP, saved_sysenter_eip);
+        wrmsr(MSR_IA32_SYSENTER_CS, __HYPERVISOR_CS, 0);
+    }
 #else /* !defined(CONFIG_X86_64) */
     if ( supervisor_mode_kernel && cpu_has_sep )
         wrmsr(MSR_IA32_SYSENTER_ESP, &init_tss[smp_processor_id()].esp1, 0);
