@@ -1953,16 +1953,34 @@ void iommu_resume(void)
 {
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
+    struct iommu_flush *flush;
     u32 i;
 
     if ( !vtd_enabled )
         return;
 
+    /* Re-initialize the register-based flush functions.
+     * In iommu_flush_all(), we invoke iommu_flush_{context,iotlb}_global(),
+     * but at this point, on hosts that support QI(Queued Invalidation), QI
+     * hasn't been re-enabed yet, so for now let's use the register-based
+     * invalidation method before invoking init_vtd_hw().
+     */
+    if ( iommu_qinval )
+    {
+        for_each_drhd_unit ( drhd )
+        {
+            iommu = drhd->iommu;
+            flush = iommu_get_flush(iommu);
+            flush->context = flush_context_reg;
+            flush->iotlb = flush_iotlb_reg;
+        }
+    }
+
     /* Not sure whether the flush operation is required to meet iommu
      * specification. Note that BIOS also executes in S3 resume and iommu may
      * be touched again, so let us do the flush operation for safety.
      */
-    flush_all_cache();
+    iommu_flush_all();
 
     if ( init_vtd_hw() != 0  && force_iommu )
          panic("IOMMU setup failed, crash Xen for security purpose!\n");
