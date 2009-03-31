@@ -154,6 +154,7 @@ struct csched_private {
     spinlock_t lock;
     struct list_head active_sdom;
     uint32_t ncpus;
+    struct timer  master_ticker;
     unsigned int master;
     cpumask_t idlers;
     uint32_t weight;
@@ -757,7 +758,7 @@ csched_runq_sort(unsigned int cpu)
 }
 
 static void
-csched_acct(void)
+csched_acct(void* dummy)
 {
     unsigned long flags;
     struct list_head *iter_vcpu, *next_vcpu;
@@ -792,7 +793,7 @@ csched_acct(void)
         csched_priv.credit_balance = 0;
         spin_unlock_irqrestore(&csched_priv.lock, flags);
         CSCHED_STAT_CRANK(acct_no_work);
-        return;
+        goto out;
     }
 
     CSCHED_STAT_CRANK(acct_run);
@@ -950,6 +951,10 @@ csched_acct(void)
 
     /* Inform each CPU that its runq needs to be sorted */
     csched_priv.runq_sort++;
+
+out:
+    set_timer( &csched_priv.master_ticker, NOW() +
+            MILLISECS(CSCHED_MSECS_PER_TICK) * CSCHED_TICKS_PER_ACCT );
 }
 
 static void
@@ -965,18 +970,6 @@ csched_tick(void *_cpu)
      */
     if ( !is_idle_vcpu(current) )
         csched_vcpu_acct(cpu);
-
-    /*
-     * Host-wide accounting duty
-     *
-     * Note: Currently, this is always done by the master boot CPU. Eventually,
-     * we could distribute or at the very least cycle the duty.
-     */
-    if ( (csched_priv.master == cpu) &&
-         (spc->tick % CSCHED_TICKS_PER_ACCT) == 0 )
-    {
-        csched_acct();
-    }
 
     /*
      * Check if runq needs to be sorted
@@ -1310,10 +1303,35 @@ static __init int csched_start_tickers(void)
         set_timer(&spc->ticker, NOW() + MILLISECS(CSCHED_MSECS_PER_TICK));
     }
 
+    init_timer( &csched_priv.master_ticker, csched_acct, NULL,
+                    csched_priv.master);
+
+    set_timer( &csched_priv.master_ticker, NOW() +
+            MILLISECS(CSCHED_MSECS_PER_TICK) * CSCHED_TICKS_PER_ACCT );
+
     return 0;
 }
 __initcall(csched_start_tickers);
 
+static void csched_tick_suspend(void)
+{
+    struct csched_pcpu *spc;
+
+    spc = CSCHED_PCPU(smp_processor_id());
+
+    stop_timer(&spc->ticker);
+}
+
+static void csched_tick_resume(void)
+{
+    struct csched_pcpu *spc;
+    uint64_t now = NOW();
+
+    spc = CSCHED_PCPU(smp_processor_id());
+
+    set_timer(&spc->ticker, now + MILLISECS(CSCHED_MSECS_PER_TICK)
+            - now % MILLISECS(CSCHED_MSECS_PER_TICK) );
+}
 
 struct scheduler sched_credit_def = {
     .name           = "SMP Credit Scheduler",
@@ -1337,4 +1355,7 @@ struct scheduler sched_credit_def = {
     .dump_cpu_state = csched_dump_pcpu,
     .dump_settings  = csched_dump,
     .init           = csched_init,
+
+    .tick_suspend   = csched_tick_suspend,
+    .tick_resume    = csched_tick_resume,
 };

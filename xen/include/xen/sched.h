@@ -428,6 +428,8 @@ int  sched_init_domain(struct domain *d);
 void sched_destroy_domain(struct domain *d);
 long sched_adjust(struct domain *, struct xen_domctl_scheduler_op *);
 int  sched_id(void);
+void sched_tick_suspend(void);
+void sched_tick_resume(void);
 void vcpu_wake(struct vcpu *d);
 void vcpu_sleep_nosync(struct vcpu *d);
 void vcpu_sleep_sync(struct vcpu *d);

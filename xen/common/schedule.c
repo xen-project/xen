@@ -964,6 +964,16 @@ void dump_runq(unsigned char key)
     local_irq_restore(flags);
 }
 
+void sched_tick_suspend(void)
+{
+    SCHED_OP(tick_suspend);
+}
+
+void sched_tick_resume(void)
+{
+    SCHED_OP(tick_resume);
+}
+
 #ifdef CONFIG_COMPAT
 #include "compat/schedule.c"
 #endif

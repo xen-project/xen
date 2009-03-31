@@ -195,6 +195,15 @@ static void acpi_processor_idle(void)
     int sleep_ticks = 0;
     u32 t1, t2 = 0;
 
+    sched_tick_suspend();
+    /*
+     * sched_tick_suspend may raise TIMER_SOFTIRQ by __stop_timer,
+     * which will break the later assumption of no sofirq pending,
+     * so add do_softirq
+     */
+    if ( softirq_pending(smp_processor_id()) )
+        do_softirq();
+
     /*
      * Interrupts must be disabled during bus mastering calculations and
      * for C2/C3 transitions.
@@ -204,6 +213,7 @@ static void acpi_processor_idle(void)
     if ( softirq_pending(smp_processor_id()) )
     {
         local_irq_enable();
+        sched_tick_resume();
         return;
     }
 
@@ -223,6 +233,7 @@ static void acpi_processor_idle(void)
             pm_idle_save();
         else
             acpi_safe_halt();
+        sched_tick_resume();
         return;
     }
 
@@ -329,6 +340,7 @@ static void acpi_processor_idle(void)
 
     default:
         local_irq_enable();
+        sched_tick_resume();
         return;
     }
 
@@ -338,6 +350,8 @@ static void acpi_processor_idle(void)
         power->last_residency = acpi_pm_tick_to_ns(sleep_ticks) / 1000UL;
         cx->time += sleep_ticks;
     }
+
+    sched_tick_resume();
 
     if ( cpuidle_current_governor->reflect )
         cpuidle_current_governor->reflect(power);
