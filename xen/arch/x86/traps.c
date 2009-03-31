@@ -3048,8 +3048,8 @@ void load_TR(void)
 
     /* Switch to non-compat GDT (which has B bit clear) to execute LTR. */
     asm volatile (
-        "sgdt %1; lgdt %2; ltr %%ax; lgdt %1"
-        : : "a" (TSS_ENTRY << 3), "m" (old_gdt), "m" (tss_gdt) : "memory" );
+        "sgdt %0; lgdt %2; ltr %w1; lgdt %0"
+        : "=m" (old_gdt) : "rm" (TSS_ENTRY << 3), "m" (tss_gdt) : "memory" );
 }
 
 void __devinit percpu_traps_init(void)
