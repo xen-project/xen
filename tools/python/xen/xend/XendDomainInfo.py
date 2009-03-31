@@ -2313,6 +2313,21 @@ class XendDomainInfo:
         # Set maximum number of vcpus in domain
         xc.domain_max_vcpus(self.domid, int(self.info['VCPUs_max']))
 
+        # Check for cpu_{cap|weight} validity for credit scheduler
+        if XendNode.instance().xenschedinfo() == 'credit':
+            cap = self.getCap()
+            weight = self.getWeight()
+
+            assert type(weight) == int
+            assert type(cap) == int
+
+            if weight < 1 or weight > 65535:
+                raise VmError("Cpu weight out of range, valid values are within range from 1 to 65535")
+
+            if cap < 0 or cap > dominfo.getVCpuCount() * 100:
+                raise VmError("Cpu cap out of range, valid range is from 0 to %s for specified number of vcpus" %
+                              (dominfo.getVCpuCount() * 100))
+
         # Test whether the devices can be assigned with VT-d
         pci = self.info["platform"].get("pci")
         pci_str = ''
