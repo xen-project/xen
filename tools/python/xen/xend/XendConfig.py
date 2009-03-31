@@ -1912,6 +1912,7 @@ class XendConfig(dict):
             for key, val in cfg_xenapi.items():
                 dev_info[key] = val
             self['devices'][dev_uuid] = (dev_type, dev_info)
+            return True
 
         return False
 
