@@ -36,6 +36,11 @@ SYSFS_SCSI_DEV_TYPEID_PATH = '/type'
 SYSFS_SCSI_DEV_REVISION_PATH = '/rev'
 SYSFS_SCSI_DEV_SCSILEVEL_PATH = '/scsi_level'
 
+SCSI_ID_COMMANDS = [
+    "/lib/udev/scsi_id -gu --sg-version 3 -d /dev/%s 2>/dev/null",
+    "/sbin/scsi_id -gu -s /class/scsi_generic/%s 2>/dev/null"
+]
+
 def _vscsi_get_devname_by(name, scsi_devices):
     """A device name is gotten by the HCTL.
     (e.g., '0:0:0:0' to '/dev/sda')
@@ -79,9 +84,10 @@ def _vscsi_get_hctl_by(phyname, scsi_devices):
 
 
 def _vscsi_get_scsiid(sg):
-    scsi_id = os.popen('/sbin/scsi_id -gu -s /class/scsi_generic/' + sg).read().split()
-    if len(scsi_id):
-        return scsi_id[0]
+    for scsi_id_command in SCSI_ID_COMMANDS:
+        scsi_id = os.popen(scsi_id_command % sg).read().split()
+        if len(scsi_id):
+            return scsi_id[0]
     return None
 
 
