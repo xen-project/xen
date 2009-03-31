@@ -488,7 +488,10 @@ class ImageHandler:
 
     def _dmfailed(self, message):
         log.warning("domain %s: %s", self.vm.getName(), message)
-        xc.domain_shutdown(self.vm.getDomid(), DOMAIN_CRASH)
+        try:
+            xc.domain_shutdown(self.vm.getDomid(), DOMAIN_CRASH)
+        except:
+            pass
 
     def recreate(self):
         if self.device_model is None:
