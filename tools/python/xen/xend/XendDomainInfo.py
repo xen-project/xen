@@ -2324,9 +2324,9 @@ class XendDomainInfo:
             if weight < 1 or weight > 65535:
                 raise VmError("Cpu weight out of range, valid values are within range from 1 to 65535")
 
-            if cap < 0 or cap > dominfo.getVCpuCount() * 100:
+            if cap < 0 or cap > self.getVCpuCount() * 100:
                 raise VmError("Cpu cap out of range, valid range is from 0 to %s for specified number of vcpus" %
-                              (dominfo.getVCpuCount() * 100))
+                              (self.getVCpuCount() * 100))
 
         # Test whether the devices can be assigned with VT-d
         pci = self.info["platform"].get("pci")
