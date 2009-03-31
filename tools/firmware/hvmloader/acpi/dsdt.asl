@@ -123,7 +123,7 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
            Name (_BBN, 0x00)
 
            /*
-            * Reserve the IO port ranges [0x10c0, 0x10c2] and [0xb044, 0xb047].
+            * Reserve the IO port ranges [0x10c0, 0x10e1] and [0xb044, 0xb047].
             * Or else, for a hotplugged-in device, the port IO BAR assigned
             * by guest OS may conflict with the ranges here.
             */
@@ -131,7 +131,7 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
            {
                Name(_HID, EISAID("PNP0C02"))
                Name(_CRS, ResourceTemplate() {
-                   IO (Decode16, 0x10c0, 0x10c0, 0x00, 0x03)
+                   IO (Decode16, 0x10c0, 0x10c0, 0x00, 0x22)
                    IO (Decode16, 0xb044, 0xb044, 0x00, 0x04)
                })
            }
@@ -2067,104 +2067,133 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
             Store (SLT, DPT1)
             Store (EVT, DPT2)
 
-            Switch (SLT)
+            If ( LEqual(SLT, 0x00) )
             {
-                Case (0x00) {
-                    Notify (\_SB.PCI0.S00, EVT)
-                }
-                Case (0x01) {
-                    Notify (\_SB.PCI0.S01, EVT)
-                }
-                Case (0x02) {
-                    Notify (\_SB.PCI0.S02, EVT)
-                }
-                Case (0x03) {
-                    Notify (\_SB.PCI0.S03, EVT)
-                }
-                Case (0x04) {
-                    Notify (\_SB.PCI0.S04, EVT)
-                }
-                Case (0x05) {
-                    Notify (\_SB.PCI0.S05, EVT)
-                }
-                Case (0x06) {
-                    Notify (\_SB.PCI0.S06, EVT)
-                }
-                Case (0x07) {
-                    Notify (\_SB.PCI0.S07, EVT)
-                }
-                Case (0x08) {
-                    Notify (\_SB.PCI0.S08, EVT)
-                }
-                Case (0x09) {
-                    Notify (\_SB.PCI0.S09, EVT)
-                }
-                Case (0x0a) {
-                    Notify (\_SB.PCI0.S0A, EVT)
-                }
-                Case (0x0b) {
-                    Notify (\_SB.PCI0.S0B, EVT)
-                }
-                Case (0x0c) {
-                    Notify (\_SB.PCI0.S0C, EVT)
-                }
-                Case (0x0d) {
-                    Notify (\_SB.PCI0.S0D, EVT)
-                }
-                Case (0x0e) {
-                    Notify (\_SB.PCI0.S0E, EVT)
-                }
-                Case (0x0f) {
-                    Notify (\_SB.PCI0.S0F, EVT)
-                }
-                Case (0x10) {
-                    Notify (\_SB.PCI0.S10, EVT)
-                }
-                Case (0x11) {
-                    Notify (\_SB.PCI0.S11, EVT)
-                }
-                Case (0x12) {
-                    Notify (\_SB.PCI0.S12, EVT)
-                }
-                Case (0x13) {
-                    Notify (\_SB.PCI0.S13, EVT)
-                }
-                Case (0x14) {
-                    Notify (\_SB.PCI0.S14, EVT)
-                }
-                Case (0x15) {
-                    Notify (\_SB.PCI0.S15, EVT)
-                }
-                Case (0x16) {
-                    Notify (\_SB.PCI0.S16, EVT)
-                }
-                Case (0x17) {
-                    Notify (\_SB.PCI0.S17, EVT)
-                }
-                Case (0x18) {
-                    Notify (\_SB.PCI0.S18, EVT)
-                }
-                Case (0x19) {
-                    Notify (\_SB.PCI0.S19, EVT)
-                }
-                Case (0x1a) {
-                    Notify (\_SB.PCI0.S1A, EVT)
-                }
-                Case (0x1b) {
-                    Notify (\_SB.PCI0.S1B, EVT)
-                }
-                Case (0x1c) {
-                    Notify (\_SB.PCI0.S1C, EVT)
-                }
-                Case (0x1d) {
-                    Notify (\_SB.PCI0.S1D, EVT)
-                }
-                Case (0x1e) {
-                    Notify (\_SB.PCI0.S1E, EVT)
-                }
-                Case (0x1f) {
-                    Notify (\_SB.PCI0.S1F, EVT)
-                }
+                Notify (\_SB.PCI0.S00, EVT)
+            }
+            ElseIf ( LEqual(SLT, 0x01) )
+            {
+                Notify (\_SB.PCI0.S01, EVT)
+            }
+            ElseIf ( LEqual(SLT, 0x02) )
+            {
+                Notify (\_SB.PCI0.S02, EVT)
+            }
+            ElseIf ( LEqual(SLT, 0x03) )
+            {
+                Notify (\_SB.PCI0.S03, EVT)
+            }
+            ElseIf ( LEqual(SLT, 0x04) )
+            {
+                Notify (\_SB.PCI0.S04, EVT)
+            }
+            ElseIf ( LEqual(SLT, 0x05) )
+            {
+                Notify (\_SB.PCI0.S05, EVT)
+            }
+            ElseIf ( LEqual(SLT, 0x06) )
+            {
+                Notify (\_SB.PCI0.S06, EVT)
+            }
+            ElseIf ( LEqual(SLT, 0x07) )
+            {
+                Notify (\_SB.PCI0.S07, EVT)
+            }
+            ElseIf ( LEqual(SLT, 0x08) )
+            {
+                Notify (\_SB.PCI0.S08, EVT)
+            }
+            ElseIf ( LEqual(SLT, 0x09) )
+            {
+                Notify (\_SB.PCI0.S09, EVT)
+            }
+            ElseIf ( LEqual(SLT, 0x0a) )
+            {
+                Notify (\_SB.PCI0.S0A, EVT)
+            }
+            ElseIf ( LEqual(SLT, 0x0b) )
+            {
+                Notify (\_SB.PCI0.S0B, EVT)
+            }
+            ElseIf ( LEqual(SLT, 0x0c) )
+            {
+                Notify (\_SB.PCI0.S0C, EVT)
+            }
+            ElseIf ( LEqual(SLT, 0x0d) )
+            {
+                Notify (\_SB.PCI0.S0D, EVT)
+            }
+            ElseIf ( LEqual(SLT, 0x0e) )
+            {
+                Notify (\_SB.PCI0.S0E, EVT)
+            }
+            ElseIf ( LEqual(SLT, 0x0f) )
+            {
+                Notify (\_SB.PCI0.S0F, EVT)
+            }
+            ElseIf ( LEqual(SLT, 0x10) )
+            {
+                Notify (\_SB.PCI0.S10, EVT)
+            }
+            ElseIf ( LEqual(SLT, 0x11) )
+            {
+                Notify (\_SB.PCI0.S11, EVT)
+            }
+            ElseIf ( LEqual(SLT, 0x12) )
+            {
+                Notify (\_SB.PCI0.S12, EVT)
+            }
+            ElseIf ( LEqual(SLT, 0x13) )
+            {
+                Notify (\_SB.PCI0.S13, EVT)
+            }
+            ElseIf ( LEqual(SLT, 0x14) )
+            {
+                Notify (\_SB.PCI0.S14, EVT)
+            }
+            ElseIf ( LEqual(SLT, 0x15) )
+            {
+                Notify (\_SB.PCI0.S15, EVT)
+            }
+            ElseIf ( LEqual(SLT, 0x16) )
+            {
+                Notify (\_SB.PCI0.S16, EVT)
+            }
+            ElseIf ( LEqual(SLT, 0x17) )
+            {
+                Notify (\_SB.PCI0.S17, EVT)
+            }
+            ElseIf ( LEqual(SLT, 0x18) )
+            {
+                Notify (\_SB.PCI0.S18, EVT)
+            }
+            ElseIf ( LEqual(SLT, 0x19) )
+            {
+                Notify (\_SB.PCI0.S19, EVT)
+            }
+            ElseIf ( LEqual(SLT, 0x1a) )
+            {
+                Notify (\_SB.PCI0.S1A, EVT)
+            }
+            ElseIf ( LEqual(SLT, 0x1b) )
+            {
+                Notify (\_SB.PCI0.S1B, EVT)
+            }
+            ElseIf ( LEqual(SLT, 0x1c) )
+            {
+                Notify (\_SB.PCI0.S1C, EVT)
+            }
+            ElseIf ( LEqual(SLT, 0x1d) )
+            {
+                Notify (\_SB.PCI0.S1D, EVT)
+            }
+            ElseIf ( LEqual(SLT, 0x1e) )
+            {
+                Notify (\_SB.PCI0.S1E, EVT)
+            }
+            ElseIf ( LEqual(SLT, 0x1f) )
+            {
+                Notify (\_SB.PCI0.S1F, EVT)
             }
         }
     }
