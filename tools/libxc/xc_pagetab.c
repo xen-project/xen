@@ -32,7 +32,7 @@ unsigned long xc_translate_foreign_address(int xc_handle, uint32_t dom,
                                              &ctx, sizeof ctx) != 0)
             return 0;
         if (!(ctx.cr0 & CR0_PG))
-            return virt;
+            return virt >> PAGE_SHIFT;
         pt_levels = (ctx.msr_efer&EFER_LMA) ? 4 : (ctx.cr4&CR4_PAE) ? 3 : 2;
         paddr = ctx.cr3 & ((pt_levels == 3) ? ~0x1full : ~0xfffull);
     } else {
