@@ -426,7 +426,7 @@ static void severity_scan(void)
      * recovered, we need to RESET for avoiding DOM0 LOG missing
      */
     for ( i = 0; i < nr_mce_banks; i++) {
-        rdmsrl(MSR_IA32_MC0_STATUS + 4 * i , status);
+        mca_rdmsrl(MSR_IA32_MC0_STATUS + 4 * i , status);
         if ( !(status & MCi_STATUS_VAL) )
             continue;
         /* MCE handler only handles UC error */
@@ -434,7 +434,12 @@ static void severity_scan(void)
             continue;
         if ( !(status & MCi_STATUS_EN) )
             continue;
-        if (status & MCi_STATUS_PCC)
+        /*
+         * If this was an injected error, keep going, since the
+         * interposed value will be lost at reboot.
+         */
+        if (status & MCi_STATUS_PCC && intpose_lookup(smp_processor_id(),
+          MSR_IA32_MC0_STATUS + 4 * i, NULL) == NULL)
             mc_panic("pcc = 1, cpu unable to continue\n");
     }
 
@@ -519,8 +524,8 @@ static void intel_machine_check(struct cpu_user_regs * regs, long error_code)
 
     /* Pick one CPU to clear MCIP */
     if (!test_and_set_bool(mce_process_lock)) {
-        rdmsrl(MSR_IA32_MCG_STATUS, gstatus);
-        wrmsrl(MSR_IA32_MCG_STATUS, gstatus & ~MCG_STATUS_MCIP);
+        mca_rdmsrl(MSR_IA32_MCG_STATUS, gstatus);
+        mca_wrmsrl(MSR_IA32_MCG_STATUS, gstatus & ~MCG_STATUS_MCIP);
 
         if (worst >= 3) {
             printk(KERN_WARNING "worst=3 should have caused RESET\n");
