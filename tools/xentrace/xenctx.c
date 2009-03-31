@@ -683,12 +683,30 @@ static void print_stack_word(guest_word_t word, int width)
         printf(FMT_64B_WORD, word);
 }
 
+static void print_code(vcpu_guest_context_any_t *ctx, int vcpu)
+{
+    guest_word_t instr;
+    int i;
+
+    printf("Code:\n");
+    instr = instr_pointer(ctx) - 21;
+    for(i=0; i<32; i++) {
+        unsigned char *c = map_page(ctx, vcpu, instr+i);
+        if (instr+i == instr_pointer(ctx))
+            printf("<%02x> ", *c);
+        else
+            printf("%02x ", *c);
+    }
+    printf("\n");
+
+    printf("\n");
+}
+
 static void print_stack(vcpu_guest_context_any_t *ctx, int vcpu, int width)
 {
     guest_word_t stack = stack_pointer(ctx);
     guest_word_t stack_limit;
     guest_word_t frame;
-    guest_word_t instr;
     guest_word_t word;
     guest_word_t *p;
     int i;
@@ -707,19 +725,6 @@ static void print_stack(vcpu_guest_context_any_t *ctx, int vcpu, int width)
         }
         printf("\n");
     }
-    printf("\n");
-
-    printf("Code:\n");
-    instr = instr_pointer(ctx) - 21;
-    for(i=0; i<32; i++) {
-        unsigned char *c = map_page(ctx, vcpu, instr+i);
-        if (instr+i == instr_pointer(ctx))
-            printf("<%02x> ", *c);
-        else
-            printf("%02x ", *c);
-    }
-    printf("\n");
-
     printf("\n");
 
     if(stack_trace)
@@ -848,6 +853,7 @@ static void dump_ctx(int vcpu)
 #endif
 
     print_ctx(&ctx);
+    print_code(&ctx, vcpu);
 #ifndef NO_TRANSLATION
     if (is_kernel_text(instr_pointer(&ctx)))
         print_stack(&ctx, vcpu, guest_word_size);
