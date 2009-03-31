@@ -363,6 +363,8 @@ class XendNode:
         ppci_uuid = saved_ppci_table.get(pci_dev.name, uuid.createString())
         XendPPCI(ppci_uuid, ppci_record)
 
+        self.save_PPCIs()
+
 
     def remove_PPCI(self, pci_name):
         # Update lspci info
@@ -372,6 +374,8 @@ class XendNode:
         (domain, bus, slot, func) = PciUtil.parse_pci_name(pci_name)
         ppci_ref = XendPPCI.get_by_sbdf(domain, bus, slot, func)
         XendAPIStore.get(ppci_ref, "PPCI").destroy()
+
+        self.save_PPCIs()
 
 
     def add_PSCSI(self):
