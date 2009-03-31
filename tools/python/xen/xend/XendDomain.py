@@ -1378,6 +1378,7 @@ class XendDomain:
                 XendCheckpoint.save(sock.fileno(), dominfo, True, live,
                                     dst, node=node)
             finally:
+                sock.shutdown(socket.SHUT_RDWR)
                 sock.close()
 
     def domain_save(self, domid, dst, checkpoint=False):
