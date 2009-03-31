@@ -328,7 +328,7 @@ check_field ()
 				struct|union)
 					;;
 				[a-zA-Z_]*)
-					echo -n "    CHECK_$n"
+					echo -n "    CHECK_${n#xen_}"
 					break
 					;;
 				*)

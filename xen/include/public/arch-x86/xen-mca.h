@@ -62,7 +62,7 @@
  * choose a different version number range that is numerically less
  * than that used in xen-unstable.
  */
-#define XEN_MCA_INTERFACE_VERSION 0x01ecc002
+#define XEN_MCA_INTERFACE_VERSION 0x01ecc003
 
 /* IN: Dom0 calls hypercall to retrieve nonurgent telemetry */
 #define XEN_MC_NONURGENT  0x0001
@@ -125,13 +125,13 @@ struct mcinfo_global {
 
     /* running domain at the time in error (most likely the impacted one) */
     uint16_t mc_domid;
+    uint16_t mc_vcpuid; /* virtual cpu scheduled for mc_domid */
     uint32_t mc_socketid; /* physical socket of the physical core */
     uint16_t mc_coreid; /* physical impacted core */
-    uint32_t mc_apicid;
     uint16_t mc_core_threadid; /* core thread of physical core */
-    uint16_t mc_vcpuid; /* virtual cpu scheduled for mc_domid */
-    uint64_t mc_gstatus; /* global status */
+    uint32_t mc_apicid;
     uint32_t mc_flags;
+    uint64_t mc_gstatus; /* global status */
 };
 
 /* contains bank local x86 mc information */
@@ -216,8 +216,9 @@ struct cpu_offline_action
 };
 
 #define MAX_UNION_SIZE 16
-struct mc_recovery
+struct mcinfo_recovery
 {
+    struct mcinfo_common common;
     uint16_t mc_bank; /* bank nr */
     uint8_t action_flags;
     uint8_t action_types;
@@ -228,12 +229,6 @@ struct mc_recovery
     } action_info;
 };
 
-struct mcinfo_recovery
-{
-    struct mcinfo_common common;
-    struct mc_recovery mc_action;
-};
-
 
 #define MCINFO_HYPERCALLSIZE	1024
 #define MCINFO_MAXSIZE		768
@@ -241,8 +236,8 @@ struct mcinfo_recovery
 struct mc_info {
     /* Number of mcinfo_* entries in mi_data */
     uint32_t mi_nentries;
-
-    uint8_t mi_data[MCINFO_MAXSIZE - sizeof(uint32_t)];
+    uint32_t _pad0;
+    uint64_t mi_data[(MCINFO_MAXSIZE - 1) / 8];
 };
 typedef struct mc_info mc_info_t;
 DEFINE_XEN_GUEST_HANDLE(mc_info_t);
@@ -258,7 +253,7 @@ DEFINE_XEN_GUEST_HANDLE(mc_info_t);
 #define MC_CAPS_VIA	5	/* cpuid level 0xc0000001 */
 #define MC_CAPS_AMD_ECX	6	/* cpuid level 0x80000001 (%ecx) */
 
-typedef struct mcinfo_logical_cpu {
+struct mcinfo_logical_cpu {
     uint32_t mc_cpunr;          
     uint32_t mc_chipid; 
     uint16_t mc_coreid;
@@ -280,7 +275,8 @@ typedef struct mcinfo_logical_cpu {
     uint32_t mc_cache_alignment;
     int32_t mc_nmsrvals;
     struct mcinfo_msr mc_msrvalues[__MC_MSR_ARRAYSIZE];
-} xen_mc_logical_cpu_t;
+};
+typedef struct mcinfo_logical_cpu xen_mc_logical_cpu_t;
 DEFINE_XEN_GUEST_HANDLE(xen_mc_logical_cpu_t);
 
 
@@ -299,12 +295,12 @@ DEFINE_XEN_GUEST_HANDLE(xen_mc_logical_cpu_t);
  *    struct mcinfo_common *x86_mcinfo_first(struct mc_info *mi);
  */
 #define x86_mcinfo_first(_mi)       \
-    (struct mcinfo_common *)((_mi)->mi_data)
+    ((struct mcinfo_common *)(_mi)->mi_data)
 /* Prototype:
  *    struct mcinfo_common *x86_mcinfo_next(struct mcinfo_common *mic);
  */
 #define x86_mcinfo_next(_mic)       \
-    (struct mcinfo_common *)((uint8_t *)(_mic) + (_mic)->size)
+    ((struct mcinfo_common *)((uint8_t *)(_mic) + (_mic)->size))
 
 /* Prototype:
  *    void x86_mcinfo_lookup(void *ret, struct mc_info *mi, uint16_t type);
@@ -350,6 +346,7 @@ struct xen_mc_fetch {
                            XEN_MC_ACK if ack'ing an earlier fetch */
 			/* OUT: XEN_MC_OK, XEN_MC_FETCHFAILED,
 			   XEN_MC_NODATA, XEN_MC_NOMATCH */
+    uint32_t _pad0;
     uint64_t fetch_id;	/* OUT: id for ack, IN: id we are ack'ing */
 
     /* OUT variables. */
@@ -382,7 +379,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_mc_notifydomain_t);
 struct xen_mc_physcpuinfo {
 	/* IN/OUT */
 	uint32_t ncpus;
-	uint32_t pad0;
+	uint32_t _pad0;
 	/* OUT */
 	XEN_GUEST_HANDLE(xen_mc_logical_cpu_t) info;
 };
@@ -391,10 +388,10 @@ struct xen_mc_physcpuinfo {
 #define MC_MSRINJ_MAXMSRS       8
 struct xen_mc_msrinject {
        /* IN */
-	unsigned int mcinj_cpunr;       /* target processor id */
+	uint32_t mcinj_cpunr;           /* target processor id */
 	uint32_t mcinj_flags;           /* see MC_MSRINJ_F_* below */
 	uint32_t mcinj_count;           /* 0 .. count-1 in array are valid */
-	uint32_t mcinj_pad0;
+	uint32_t _pad0;
 	struct mcinfo_msr mcinj_msr[MC_MSRINJ_MAXMSRS];
 };
 
@@ -406,18 +403,16 @@ struct xen_mc_mceinject {
 	unsigned int mceinj_cpunr;      /* target processor id */
 };
 
-typedef union {
-    struct xen_mc_fetch        mc_fetch;
-    struct xen_mc_notifydomain mc_notifydomain;
-    struct xen_mc_physcpuinfo  mc_physcpuinfo;
-    struct xen_mc_msrinject    mc_msrinject;
-    struct xen_mc_mceinject    mc_mceinject;
-} xen_mc_arg_t;
-
 struct xen_mc {
     uint32_t cmd;
     uint32_t interface_version; /* XEN_MCA_INTERFACE_VERSION */
-    xen_mc_arg_t u;
+    union {
+        struct xen_mc_fetch        mc_fetch;
+        struct xen_mc_notifydomain mc_notifydomain;
+        struct xen_mc_physcpuinfo  mc_physcpuinfo;
+        struct xen_mc_msrinject    mc_msrinject;
+        struct xen_mc_mceinject    mc_mceinject;
+    } u;
 };
 typedef struct xen_mc xen_mc_t;
 DEFINE_XEN_GUEST_HANDLE(xen_mc_t);
