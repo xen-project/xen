@@ -417,7 +417,10 @@ class PciDevice:
 
     def find_the_uppermost_pci_bridge(self):
         # Find the uppermost PCI/PCI-X bridge
-        (dom, b, d, f) = self.find_parent()
+        dev = self.find_parent()
+        if dev is None:
+            return None
+        (dom, b, d, f) = dev
         dev = dev_parent = PciDevice(dom, b, d, f)
         while dev_parent.dev_type != DEV_TYPE_PCIe_BRIDGE:
             parent = dev_parent.find_parent()
@@ -463,6 +466,11 @@ class PciDevice:
                 element,  the caller itself can remove it explicitly.
         '''
         dev = self.find_the_uppermost_pci_bridge()
+
+        # The 'self' device is on bus0.
+        if dev is None:
+            return [self.name]
+
         dev_list = dev.find_all_devices_behind_the_bridge(ignore_bridge)
         dev_list = re.findall(PCI_DEV_REG_EXPRESS_STR, '%s' % dev_list)
         return dev_list
@@ -559,7 +567,8 @@ class PciDevice:
             return self.find_all_the_multi_functions()
         elif self.dev_type == DEV_TYPE_PCI and not self.pci_af_flr:
             coassigned_pci_list = self.find_coassigned_pci_devices(True)
-            del coassigned_pci_list[0]
+            if len(coassigned_pci_list) > 1:
+                del coassigned_pci_list[0]
             return coassigned_pci_list
         else:
             return [self.name]
