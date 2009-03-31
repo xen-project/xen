@@ -231,40 +231,50 @@ def get_scsi_scsilevel(pHCTL):
     except:
         return None
 
+def _make_scsi_record(scsi_info):
+    scsi_rec = {
+        'physical_HCTL': scsi_info[0],
+        'dev_name': None,
+        'sg_name': scsi_info[2],
+        'scsi_id': None
+    }
+    if scsi_info[1] is not None:
+        scsi_rec['dev_name'] = scsi_info[1] 
+    if scsi_info[3] is not None:
+        scsi_rec['scsi_id'] = scsi_info[3] 
+
+    scsi_rec['vendor_name'] = \
+        get_scsi_vendor(scsi_rec['physical_HCTL'])
+    scsi_rec['model'] = \
+        get_scsi_model(scsi_rec['physical_HCTL'])
+    scsi_rec['type_id'] = \
+        get_scsi_typeid(scsi_rec['physical_HCTL'])
+    scsi_rec['revision'] = \
+        get_scsi_revision(scsi_rec['physical_HCTL'])
+    scsi_rec['scsi_level'] = \
+        get_scsi_scsilevel(scsi_rec['physical_HCTL'])
+
+    try:
+        lsscsi_info = os.popen('lsscsi %s 2>/dev/null' % scsi_rec['physical_HCTL']).read().split()
+        scsi_rec['type'] = lsscsi_info[1]
+    except:
+        scsi_rec['type'] = None
+
+    return scsi_rec
+
+def get_scsi_device(pHCTL):
+    scsis_info = _vscsi_get_scsidevices_by_lsscsi(pHCTL)
+    if not scsis_info:
+        scsis_info = _vscsi_get_scsidevices_by_sysfs()
+    for scsi_info in scsis_info:
+        if scsi_info[0] == pHCTL:
+            return _make_scsi_record(scsi_info)
+    return None
+
 def get_all_scsi_devices():
-
-    scsi_devs = []
-
+    scsi_records = []
     for scsi_info in vscsi_get_scsidevices():
-        scsi_dev = {
-            'physical_HCTL': scsi_info[0],
-            'dev_name': None,
-            'sg_name': scsi_info[2],
-            'scsi_id': None
-        }
-        if scsi_info[1] is not None:
-            scsi_dev['dev_name'] = scsi_info[1] 
-        if scsi_info[3] is not None:
-            scsi_dev['scsi_id'] = scsi_info[3] 
-
-        scsi_dev['vendor_name'] = \
-            get_scsi_vendor(scsi_dev['physical_HCTL'])
-        scsi_dev['model'] = \
-            get_scsi_model(scsi_dev['physical_HCTL'])
-        scsi_dev['type_id'] = \
-            get_scsi_typeid(scsi_dev['physical_HCTL'])
-        scsi_dev['revision'] = \
-            get_scsi_revision(scsi_dev['physical_HCTL'])
-        scsi_dev['scsi_level'] = \
-            get_scsi_scsilevel(scsi_dev['physical_HCTL'])
-
-        try:
-            lsscsi_info = os.popen('lsscsi %s 2>/dev/null' % scsi_dev['physical_HCTL']).read().split()
-            scsi_dev['type'] = lsscsi_info[1]
-        except:
-            scsi_dev['type'] = None
-
-        scsi_devs.append(scsi_dev)
-
-    return scsi_devs
+        scsi_record = _make_scsi_record(scsi_info)
+        scsi_records.append(scsi_record)
+    return scsi_records
 

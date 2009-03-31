@@ -378,14 +378,38 @@ class XendNode:
         self.save_PPCIs()
 
 
-    def add_PSCSI(self):
-        # TODO
-        log.debug("add_network(): Not implemented.")
+    def add_PSCSI(self, add_HCTL):
+        saved_pscsis = self.state_store.load_state('pscsi')
+        saved_pscsi_table = {}
+        if saved_pscsis:
+            for saved_uuid, saved_record in saved_pscsis.items():
+                try:
+                    saved_pscsi_table[saved_record['scsi_id']] = saved_uuid
+                except KeyError:
+                    pass
+
+        # Initialise the PSCSI
+        pscsi_record = vscsi_util.get_scsi_device(add_HCTL)
+        if pscsi_record and pscsi_record['scsi_id']:
+            pscsi_uuid = saved_pscsi_table.get(pscsi_record['scsi_id'], None)
+            if pscsi_uuid is None:
+                pscsi_uuid = uuid.createString()
+                XendPSCSI(pscsi_uuid, pscsi_record)
+                self.save_PSCSIs()
 
 
-    def remove_PSCSI(self):
-        # TODO
-        log.debug("add_network(): Not implemented.")
+    def remove_PSCSI(self, rem_HCTL):
+        saved_pscsis = self.state_store.load_state('pscsi')
+        if not saved_pscsis:
+            return
+
+        # Remove the PSCSI
+        for pscsi_record in saved_pscsis.values():
+            if rem_HCTL == pscsi_record['physical_HCTL']:
+                pscsi_ref = XendPSCSI.get_by_HCTL(rem_HCTL)
+                XendAPIStore.get(pscsi_ref, "PSCSI").destroy()
+                self.save_PSCSIs()
+                return
 
 
 ##    def network_destroy(self, net_uuid):
