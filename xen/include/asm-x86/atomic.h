@@ -23,8 +23,7 @@ typedef struct { int counter; } atomic_t;
  * atomic_read - read atomic variable
  * @v: pointer of type atomic_t
  * 
- * Atomically reads the value of @v.  Note that the guaranteed
- * useful range of an atomic_t is only 24 bits.
+ * Atomically reads the value of @v.
  */
 #define _atomic_read(v)		((v).counter)
 #define atomic_read(v)		(*(volatile int *)&((v)->counter))
@@ -34,8 +33,7 @@ typedef struct { int counter; } atomic_t;
  * @v: pointer of type atomic_t
  * @i: required value
  * 
- * Atomically sets the value of @v to @i.  Note that the guaranteed
- * useful range of an atomic_t is only 24 bits.
+ * Atomically sets the value of @v to @i.
  */ 
 #define _atomic_set(v,i)	(((v).counter) = (i))
 #define atomic_set(v,i)		(*(volatile int *)&((v)->counter) = (i))
@@ -45,12 +43,11 @@ typedef struct { int counter; } atomic_t;
  * @i: integer value to add
  * @v: pointer of type atomic_t
  * 
- * Atomically adds @i to @v.  Note that the guaranteed useful range
- * of an atomic_t is only 24 bits.
+ * Atomically adds @i to @v.
  */
 static __inline__ void atomic_add(int i, atomic_t *v)
 {
-	__asm__ __volatile__(
+	asm volatile(
 		LOCK "addl %1,%0"
 		:"=m" (*(volatile int *)&v->counter)
 		:"ir" (i), "m" (*(volatile int *)&v->counter));
@@ -61,12 +58,11 @@ static __inline__ void atomic_add(int i, atomic_t *v)
  * @i: integer value to subtract
  * @v: pointer of type atomic_t
  * 
- * Atomically subtracts @i from @v.  Note that the guaranteed
- * useful range of an atomic_t is only 24 bits.
+ * Atomically subtracts @i from @v.
  */
 static __inline__ void atomic_sub(int i, atomic_t *v)
 {
-	__asm__ __volatile__(
+	asm volatile(
 		LOCK "subl %1,%0"
 		:"=m" (*(volatile int *)&v->counter)
 		:"ir" (i), "m" (*(volatile int *)&v->counter));
@@ -79,14 +75,13 @@ static __inline__ void atomic_sub(int i, atomic_t *v)
  * 
  * Atomically subtracts @i from @v and returns
  * true if the result is zero, or false for all
- * other cases.  Note that the guaranteed
- * useful range of an atomic_t is only 24 bits.
+ * other cases.
  */
 static __inline__ int atomic_sub_and_test(int i, atomic_t *v)
 {
 	unsigned char c;
 
-	__asm__ __volatile__(
+	asm volatile(
 		LOCK "subl %2,%0; sete %1"
 		:"=m" (*(volatile int *)&v->counter), "=qm" (c)
 		:"ir" (i), "m" (*(volatile int *)&v->counter) : "memory");
@@ -97,12 +92,11 @@ static __inline__ int atomic_sub_and_test(int i, atomic_t *v)
  * atomic_inc - increment atomic variable
  * @v: pointer of type atomic_t
  * 
- * Atomically increments @v by 1.  Note that the guaranteed
- * useful range of an atomic_t is only 24 bits.
+ * Atomically increments @v by 1.
  */ 
 static __inline__ void atomic_inc(atomic_t *v)
 {
-	__asm__ __volatile__(
+	asm volatile(
 		LOCK "incl %0"
 		:"=m" (*(volatile int *)&v->counter)
 		:"m" (*(volatile int *)&v->counter));
@@ -112,12 +106,11 @@ static __inline__ void atomic_inc(atomic_t *v)
  * atomic_dec - decrement atomic variable
  * @v: pointer of type atomic_t
  * 
- * Atomically decrements @v by 1.  Note that the guaranteed
- * useful range of an atomic_t is only 24 bits.
+ * Atomically decrements @v by 1.
  */ 
 static __inline__ void atomic_dec(atomic_t *v)
 {
-	__asm__ __volatile__(
+	asm volatile(
 		LOCK "decl %0"
 		:"=m" (*(volatile int *)&v->counter)
 		:"m" (*(volatile int *)&v->counter));
@@ -129,14 +122,13 @@ static __inline__ void atomic_dec(atomic_t *v)
  * 
  * Atomically decrements @v by 1 and
  * returns true if the result is 0, or false for all other
- * cases.  Note that the guaranteed
- * useful range of an atomic_t is only 24 bits.
+ * cases.
  */ 
 static __inline__ int atomic_dec_and_test(atomic_t *v)
 {
 	unsigned char c;
 
-	__asm__ __volatile__(
+	asm volatile(
 		LOCK "decl %0; sete %1"
 		:"=m" (*(volatile int *)&v->counter), "=qm" (c)
 		:"m" (*(volatile int *)&v->counter) : "memory");
@@ -149,14 +141,13 @@ static __inline__ int atomic_dec_and_test(atomic_t *v)
  * 
  * Atomically increments @v by 1
  * and returns true if the result is zero, or false for all
- * other cases.  Note that the guaranteed
- * useful range of an atomic_t is only 24 bits.
+ * other cases.
  */ 
 static __inline__ int atomic_inc_and_test(atomic_t *v)
 {
 	unsigned char c;
 
-	__asm__ __volatile__(
+	asm volatile(
 		LOCK "incl %0; sete %1"
 		:"=m" (*(volatile int *)&v->counter), "=qm" (c)
 		:"m" (*(volatile int *)&v->counter) : "memory");
@@ -170,14 +161,13 @@ static __inline__ int atomic_inc_and_test(atomic_t *v)
  * 
  * Atomically adds @i to @v and returns true
  * if the result is negative, or false when
- * result is greater than or equal to zero.  Note that the guaranteed
- * useful range of an atomic_t is only 24 bits.
+ * result is greater than or equal to zero.
  */ 
 static __inline__ int atomic_add_negative(int i, atomic_t *v)
 {
 	unsigned char c;
 
-	__asm__ __volatile__(
+	asm volatile(
 		LOCK "addl %2,%0; sets %1"
 		:"=m" (*(volatile int *)&v->counter), "=qm" (c)
 		:"ir" (i), "m" (*(volatile int *)&v->counter) : "memory");
