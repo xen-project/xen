@@ -806,6 +806,43 @@ class XendNode:
 
         return [[k, info[k]] for k in ITEM_ORDER]
 
+
+    def pciinfo(self):
+        # Each element of dev_list is a PciDevice
+        dev_list = PciUtil.find_all_devices_owned_by_pciback()
+ 
+        # Each element of devs_list is a list of PciDevice
+        devs_list = PciUtil.check_FLR_capability(dev_list)
+ 
+        devs_list = PciUtil.check_mmio_bar(devs_list)
+ 
+        # Check if the devices have been assigned to guests.
+        final_devs_list = []
+        for dev_list in devs_list:
+            available = True
+            for d in dev_list:
+                pci_str = '0x%x,0x%x,0x%x,0x%x' %(d.domain, d.bus, d.slot, d.func)
+                # Xen doesn't care what the domid is, so we pass 0 here...
+                domid = 0
+                bdf = self.xc.test_assign_device(domid, pci_str)
+                if bdf != 0:
+                    available = False
+                    break
+            if available:
+                final_devs_list = final_devs_list + [dev_list]
+
+        pci_sxp_list = []
+        for dev_list in final_devs_list:
+            for d in dev_list:
+                pci_sxp = ['dev', ['domain', '0x%04x' % d.domain],
+                                  ['bus', '0x%02x' % d.bus],
+                                  ['slot', '0x%02x' % d.slot],
+                                  ['func', '0x%x' % d.func]]
+                pci_sxp_list.append(pci_sxp)
+
+        return pci_sxp_list
+ 
+
     def xenschedinfo(self):
         sched_id = self.xc.sched_id_get()
         if sched_id == xen.lowlevel.xc.XEN_SCHEDULER_SEDF:

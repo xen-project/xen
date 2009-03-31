@@ -58,13 +58,6 @@ from xen.util.acmpolicy import ACM_LABEL_UNLABELED_DISPLAY
 
 import XenAPI
 
-import xen.lowlevel.xc
-try:
-    xc = xen.lowlevel.xc.xc()
-except Exception, ex:
-    print >>sys.stderr, ("Is xen kernel running?")
-    sys.exit(1)
-
 import inspect
 from xen.xend import XendOptions
 xoptions = XendOptions.instance()
@@ -2188,34 +2181,28 @@ def xm_pci_list(args):
             hdr = 1
         print ( fmt_str % x )
 
+
+def parse_pci_info(info):
+    def get_info(n, t, d):
+        return t(sxp.child_value(info, n, d))
+    return {
+        'domain' : get_info('domain', parse_hex, 0),
+        'bus'    : get_info('bus', parse_hex, -1),
+        'slot'   : get_info('slot', parse_hex, -1),
+        'func'   : get_info('func', parse_hex, -1)
+        }
+
 def xm_pci_list_assignable_devices(args):
-    # Each element of dev_list is a PciDevice
-    dev_list = find_all_devices_owned_by_pciback()
+    xenapi_unsupported()
+    arg_check(args, "pci-list-assignable-devices", 0)
 
-    # Each element of devs_list is a list of PciDevice
-    devs_list = check_FLR_capability(dev_list)
+    devs =  server.xend.node.pciinfo()
+ 
+    fmt_str = "%(domain)04x:%(bus)02x:%(slot)02x:%(func)01x"
+    for x in devs:
+        pci = parse_pci_info(x)
+        print fmt_str % pci
 
-    devs_list = check_mmio_bar(devs_list)
-
-    # Check if the devices have been assigned to guests.
-    final_devs_list = []
-    for dev_list in devs_list:
-        available = True
-        for d in dev_list:
-            pci_str = '0x%x,0x%x,0x%x,0x%x' %(d.domain, d.bus, d.slot, d.func)
-            # Xen doesn't care what the domid is, so we pass 0 here...
-            domid = 0
-            bdf = xc.test_assign_device(domid, pci_str)
-            if bdf != 0:
-                available = False
-                break
-        if available:
-            final_devs_list = final_devs_list + [dev_list]
-
-    for dev_list in final_devs_list:
-        for d in dev_list:
-            print d.name,
-        print
 
 def vscsi_sort(devs):
     def sort_hctl(ds, l):
