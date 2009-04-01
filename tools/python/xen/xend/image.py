@@ -534,8 +534,8 @@ class ImageHandler:
         try: self.sentinel_fifo.read(1)
         except OSError, e: pass
         self.sentinel_lock.acquire()
-        try:
-            if self.pid:
+        if self.pid:
+            try:
                 (p,st) = os.waitpid(self.pid, os.WNOHANG)
                 if p == self.pid:
                     message = oshelp.waitstatus_description(st)
@@ -547,15 +547,15 @@ class ImageHandler:
                     except:
                         message = "malfunctioning or died ?"
                 message = "pid %d: %s" % (self.pid, message)
-            else:
-                message = "no longer running"
-        except Exception, e:
-            message = "waitpid failed: %s" % utils.exception_string(e)
-        message = "device model failure: %s" % message
-        try: message += "; see %s " % self.logfile
-        except: pass
-        self._dmfailed(message)
-        self.pid = None
+            except Exception, e:
+                message = "waitpid failed: %s" % utils.exception_string(e)
+            message = "device model failure: %s" % message
+            try: message += "; see %s " % self.logfile
+            except: pass
+            self._dmfailed(message)
+            self.pid = None
+        else:
+            log.info("%s device model terminated", self.vm.getName())
         self.sentinel_lock.release()
 
     def destroyDeviceModel(self):
