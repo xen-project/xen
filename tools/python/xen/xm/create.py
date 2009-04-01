@@ -204,7 +204,7 @@ gopts.var('cpus', val='CPUS',
           use="CPUS to run the domain on.")
 
 gopts.var('rtc_timeoffset', val='RTC_TIMEOFFSET',
-          fn=set_value, default="0",
+          fn=set_int, default=0,
           use="Set RTC offset.")
 
 gopts.var('pae', val='PAE',

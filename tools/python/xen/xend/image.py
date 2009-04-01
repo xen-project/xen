@@ -119,9 +119,14 @@ class ImageHandler:
         self.vncconsole = int(vmConfig['platform'].get('vncconsole', 0))
         self.dmargs = self.parseDeviceModelArgs(vmConfig)
         self.pid = None
-        rtc_timeoffset = vmConfig['platform'].get('rtc_timeoffset')
-        if rtc_timeoffset is not None:
-            xc.domain_set_time_offset(self.vm.getDomid(), int(rtc_timeoffset))
+        rtc_timeoffset = int(vmConfig['platform'].get('rtc_timeoffset', 0))
+        if vmConfig['platform'].get('localtime', 0):
+            if time.localtime(time.time())[8]:
+                rtc_timeoffset -= time.altzone
+            else:
+                rtc_timeoffset -= time.timezone
+        if rtc_timeoffset != 0:
+            xc.domain_set_time_offset(self.vm.getDomid(), rtc_timeoffset)
 
         self.cpuid = None
         self.cpuid_check = None

@@ -1605,9 +1605,6 @@ class XendDomainInfo:
         # convert two lists into a python dictionary
         vm_details = dict(zip(cfg_vm, vm_details))
 
-        if vm_details['rtc/timeoffset'] == None:
-            vm_details['rtc/timeoffset'] = "0"
-
         for arg, val in vm_details.items():
             if arg in XendConfig.LEGACY_CFG_TO_XENAPI_CFG:
                 xapiarg = XendConfig.LEGACY_CFG_TO_XENAPI_CFG[arg]
@@ -1629,10 +1626,10 @@ class XendDomainInfo:
             self.info.update_with_image_sxp(sxp.from_string(image_sxp))
             changed = True
 
-        # Check if the rtc offset has changes
-        if vm_details.get("rtc/timeoffset", "0") != self.info["platform"].get("rtc_timeoffset", "0"):
-            self.info["platform"]["rtc_timeoffset"] = vm_details.get("rtc/timeoffset", 0)
-            changed = True
+        # Update the rtc_timeoffset to be preserved across reboot.
+        # NB. No need to update xenstore domain section.
+        val = int(vm_details.get("rtc/timeoffset", 0))
+        self.info["platform"]["rtc_timeoffset"] = val
  
         if changed:
             # Update the domain section of the store, as this contains some
@@ -2440,12 +2437,6 @@ class XendDomainInfo:
         self._configureBootloader()
 
         try:
-            if self.info['platform'].get('localtime', 0):
-                if time.localtime(time.time())[8]:
-                    self.info['platform']['rtc_timeoffset'] = -time.altzone
-                else:
-                    self.info['platform']['rtc_timeoffset'] = -time.timezone
-
             self.image = image.create(self, self.info)
 
             # repin domain vcpus if a restricted cpus list is provided
