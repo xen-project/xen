@@ -45,7 +45,7 @@ static unsigned int num_hpets_used; /* msi hpet channels used for broadcast */
 
 DEFINE_PER_CPU(struct hpet_event_channel *, cpu_bc_channel);
 
-static int vector_channel[NR_IRQS] = {[0 ... NR_IRQS-1] = -1};
+static int vector_channel[NR_VECTORS] = {[0 ... NR_VECTORS-1] = -1};
 
 #define vector_to_channel(vector)   vector_channel[vector]
 
@@ -344,6 +344,9 @@ static int hpet_setup_msi_irq(unsigned int vector)
 static int hpet_assign_irq(struct hpet_event_channel *ch)
 {
     int vector;
+
+    if ( ch->vector )
+        return 0;
 
     if ( (vector = assign_irq_vector(AUTO_ASSIGN_IRQ)) < 0 )
         return vector;
