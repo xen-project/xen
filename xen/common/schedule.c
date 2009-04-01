@@ -818,8 +818,9 @@ static void schedule(void)
     next = next_slice.task;
 
     sd->curr = next;
-    
-    set_timer(&sd->s_timer, now + r_time);
+
+    if ( !is_idle_vcpu(next) )
+        set_timer(&sd->s_timer, now + r_time);
 
     if ( unlikely(prev == next) )
     {
