@@ -1,6 +1,5 @@
-diff -Naur newlib-1.16.0/newlib/libc/stdio/fprintf_chk.c newlib-1.16.0/newlib/libc/stdio/fprintf_chk.c
---- newlib-1.16.0/newlib/libc/stdio/fprintf_chk.c	1969-12-31 19:00:00.000000000 -0500
-+++ newlib-1.16.0/newlib/libc/stdio/fprintf_chk.c	2009-02-26 19:02:53.000000000 -0500
+--- newlib/libc/stdio/fprintf_chk.c	1969-12-31 19:00:00.000000000 -0500
++++ newlib/libc/stdio/fprintf_chk.c	2009-02-26 19:02:53.000000000 -0500
 @@ -0,0 +1,21 @@
 +#include <stdarg.h>
 +#include <stdio.h>
@@ -23,9 +22,8 @@ diff -Naur newlib-1.16.0/newlib/libc/stdio/fprintf_chk.c newlib-1.16.0/newlib/li
 +  return done;
 +}
 +
-diff -Naur newlib-1.16.0/newlib/libc/stdio/Makefile.am newlib-1.16.0/newlib/libc/stdio/Makefile.am
---- ./newlib-1.16.0/newlib/libc/stdio/Makefile.am	2007-08-02 16:23:06.000000000 -0400
-+++ ./newlib-1.16.0/newlib/libc/stdio/Makefile.am	2009-02-26 18:14:53.000000000 -0500
+--- newlib/libc/stdio/Makefile.am	2007-08-02 16:23:06.000000000 -0400
++++ newlib/libc/stdio/Makefile.am	2009-02-26 18:14:53.000000000 -0500
 @@ -20,6 +20,7 @@
  	flags.c			\
  	fopen.c			\
@@ -42,9 +40,8 @@ diff -Naur newlib-1.16.0/newlib/libc/stdio/Makefile.am newlib-1.16.0/newlib/libc
  	sscanf.c			\
  	stdio.c			\
  	tmpfile.c			\
-diff -Naur newlib-1.16.0/newlib/libc/stdio/Makefile.in newlib-1.16.0/newlib/libc/stdio/Makefile.in
---- newlib-1.16.0/newlib/libc/stdio/Makefile.in	2007-12-19 17:36:38.000000000 -0500
-+++ newlib-1.16.0/newlib/libc/stdio/Makefile.in	2009-02-26 18:43:52.000000000 -0500
+--- newlib/libc/stdio/Makefile.in	2007-12-19 17:36:38.000000000 -0500
++++ newlib/libc/stdio/Makefile.in	2009-02-26 18:43:52.000000000 -0500
 @@ -63,7 +63,8 @@
  	lib_a-fgets.$(OBJEXT) lib_a-fileno.$(OBJEXT) \
  	lib_a-findfp.$(OBJEXT) lib_a-fiprintf.$(OBJEXT) \
@@ -132,9 +129,8 @@ diff -Naur newlib-1.16.0/newlib/libc/stdio/Makefile.in newlib-1.16.0/newlib/libc
  lib_a-sscanf.o: sscanf.c
  	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(lib_a_CFLAGS) $(CFLAGS) -c -o lib_a-sscanf.o `test -f 'sscanf.c' || echo '$(srcdir)/'`sscanf.c
  
-diff -Naur ./newlib-1.16.0/newlib/libc/stdio/sprintf_chk.c ../newlib-1.16.0/newlib/libc/stdio/sprintf_chk.c
---- newlib-1.16.0/newlib/libc/stdio/sprintf_chk.c	1969-12-31 19:00:00.000000000 -0500
-+++ newlib-1.16.0/newlib/libc/stdio/sprintf_chk.c	2009-02-26 19:02:26.000000000 -0500
+--- newlib/libc/stdio/sprintf_chk.c	1969-12-31 19:00:00.000000000 -0500
++++ newlib/libc/stdio/sprintf_chk.c	2009-02-26 19:02:26.000000000 -0500
 @@ -0,0 +1,21 @@
 +#include <stdarg.h>
 +#include <stdio.h>
