@@ -343,20 +343,16 @@ static int hpet_setup_msi_irq(unsigned int vector)
 
 static int hpet_assign_irq(struct hpet_event_channel *ch)
 {
-    unsigned int vector;
+    int vector;
 
-    vector = assign_irq_vector(AUTO_ASSIGN_IRQ);
-    if ( !vector )
-        return -EINVAL;
+    if ( (vector = assign_irq_vector(AUTO_ASSIGN_IRQ)) < 0 )
+        return vector;
 
-    irq_vector[vector] = vector;
-    vector_irq[vector] = vector;
     vector_channel[vector] = ch - &hpet_events[0];
 
     if ( hpet_setup_msi_irq(vector) )
     {
-        irq_vector[vector] = 0;
-        vector_irq[vector] = FREE_TO_ASSIGN_IRQ;
+        free_irq_vector(vector);
         vector_channel[vector] = -1;
         return -EINVAL;
     }
