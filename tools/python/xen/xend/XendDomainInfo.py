@@ -2253,8 +2253,9 @@ class XendDomainInfo:
         # There is an implicit memory overhead for any domain creation. This
         # overhead is greater for some types of domain than others. For
         # example, an x86 HVM domain will have a default shadow-pagetable
-        # allocation of 1MB. We free up 2MB here to be on the safe side.
-        balloon.free(2*1024, self) # 2MB should be plenty
+        # allocation of 1MB. We free up 4MB here to be on the safe side.
+        # 2MB memory allocation was not enough in some cases, so it's 4MB now
+        balloon.free(4*1024, self) # 4MB should be plenty
 
         ssidref = 0
         if security.on() == xsconstants.XS_POLICY_USE:
