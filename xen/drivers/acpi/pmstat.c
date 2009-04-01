@@ -530,13 +530,13 @@ int do_pm_op(struct xen_sysctl_pm_op *op)
 
     case XEN_SYSCTL_pm_op_get_max_cstate:
     {
-        op->get_max_cstate = max_cstate;
+        op->get_max_cstate = acpi_get_cstate_limit();
         break;
     }
 
     case XEN_SYSCTL_pm_op_set_max_cstate:
     {
-        max_cstate = op->set_max_cstate;
+        acpi_set_cstate_limit(op->set_max_cstate);
         break;
     }
 

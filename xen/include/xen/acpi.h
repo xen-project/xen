@@ -402,9 +402,7 @@ static inline int acpi_blacklisted(void)
 
 #endif /*!CONFIG_ACPI_INTERPRETER*/
 
-#define	ACPI_CSTATE_LIMIT_DEFINED	/* for driver builds */
-#ifdef	CONFIG_ACPI
-
+#ifdef	CONFIG_ACPI_CSTATE
 /*
  * Set highest legal C-state
  * 0: C0 okay, but not C1
