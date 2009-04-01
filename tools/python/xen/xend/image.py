@@ -781,6 +781,14 @@ class HVMImageHandler(ImageHandler):
                     if v: ret.append("-%s" % a)
                 except (ValueError, TypeError):
                     pass # if we can't convert it to a sane type, ignore it
+            elif a == 'serial':
+                if v:
+                    if type(v) == str:
+                        v = [v]
+                    for s in v:
+                        if s:
+                            ret.append("-serial")
+                            ret.append("%s" % s)
             else:
                 if v:
                     ret.append("-%s" % a)
