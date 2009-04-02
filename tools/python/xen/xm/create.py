@@ -1081,7 +1081,7 @@ def preprocess_vscsi(vals):
     if not vals.vscsi: return
     scsi = []
     for scsi_str in vals.vscsi:
-        d = scsi_str.split(',')
+        d = [tmp.strip() for tmp in scsi_str.split(',')]
         n = len(d)
         if n == 2:
             tmp = d[1].split(':')
