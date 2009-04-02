@@ -430,7 +430,8 @@ int paging_log_dirty_op(struct domain *d, struct xen_domctl_shadow_op *sc)
         if ( l3 )
             unmap_domain_page(l3);
     }
-    unmap_domain_page(l4);
+    if ( l4 )
+        unmap_domain_page(l4);
 
     if ( pages < sc->pages )
         sc->pages = pages;
