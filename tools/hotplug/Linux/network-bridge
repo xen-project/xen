@@ -106,7 +106,7 @@ get_ip_info() {
 }
     
 do_ifup() {
-    if ! ifup $1 ; then
+    if [ $1 != "${netdev}" ] || ! ifup $1 ; then
         if [ -n "$addr_pfx" ] ; then
             # use the info from get_ip_info()
             ip addr flush $1
@@ -223,9 +223,9 @@ op_start () {
 
     preiftransfer ${netdev}
     transfer_addrs ${netdev} ${tdev}
+    # Remember the IP details for do_ifup.
+    get_ip_info ${netdev}
     if ! ifdown ${netdev}; then
-	# If ifdown fails, remember the IP details.
-	get_ip_info ${netdev}
 	ip link set ${netdev} down
 	ip addr flush ${netdev}
     fi
