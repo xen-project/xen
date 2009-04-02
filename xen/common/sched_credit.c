@@ -1146,7 +1146,8 @@ csched_schedule(s_time_t now)
     /*
      * Return task to run next...
      */
-    ret.time = MILLISECS(CSCHED_MSECS_PER_TSLICE);
+    ret.time = (is_idle_vcpu(snext->vcpu) ?
+                -1 : MILLISECS(CSCHED_MSECS_PER_TSLICE));
     ret.task = snext->vcpu;
 
     CSCHED_VCPU_CHECK(ret.task);
