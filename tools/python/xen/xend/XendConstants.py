@@ -105,13 +105,15 @@ LAST_SHUTDOWN_REASON = 'xend/last_shutdown_reason'
 TRIGGER_NMI   = 0
 TRIGGER_RESET = 1
 TRIGGER_INIT  = 2
-TRIGGER_S3RESUME = 3
+TRIGGER_POWER = 3
+TRIGGER_S3RESUME = 4
 
 TRIGGER_TYPE = {
     "nmi"   : TRIGGER_NMI,
     "reset" : TRIGGER_RESET,
     "init"  : TRIGGER_INIT,
-    "s3resume": TRIGGER_S3RESUME
+    "s3resume": TRIGGER_S3RESUME,
+    "power": TRIGGER_POWER
 }
 
 #
