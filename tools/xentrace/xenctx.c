@@ -875,8 +875,8 @@ static void dump_ctx(int vcpu)
 #endif
 
     print_ctx(&ctx);
-    print_code(&ctx, vcpu);
 #ifndef NO_TRANSLATION
+    print_code(&ctx, vcpu);
     if (is_kernel_text(instr_pointer(&ctx)))
         print_stack(&ctx, vcpu, guest_word_size);
 #endif
