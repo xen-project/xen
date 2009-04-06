@@ -1161,9 +1161,9 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
             c.nat->ctrlreg[3] = xen_pfn_to_cr3(
                 pagetable_get_pfn(v->arch.guest_table));
 #ifdef __x86_64__
-            if ( !pagetable_is_null(v->arch.guest_table_user) )
-                c.nat->ctrlreg[1] = xen_pfn_to_cr3(
-                    pagetable_get_pfn(v->arch.guest_table_user));
+            c.nat->ctrlreg[1] =
+                pagetable_is_null(v->arch.guest_table_user) ? 0
+                : xen_pfn_to_cr3(pagetable_get_pfn(v->arch.guest_table_user));
 #endif
 
             /* Merge shadow DR7 bits into real DR7. */
