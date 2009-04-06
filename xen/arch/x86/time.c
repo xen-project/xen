@@ -35,6 +35,13 @@
 static char opt_clocksource[10];
 string_param("clocksource", opt_clocksource);
 
+/*
+ * opt_consistent_tscs: All TSCs tick at the exact same rate, allowing
+ * simplified system time handling.
+ */
+static int opt_consistent_tscs;
+boolean_param("consistent_tscs", opt_consistent_tscs);
+
 unsigned long cpu_khz;  /* CPU clock frequency in kHz. */
 DEFINE_SPINLOCK(rtc_lock);
 unsigned long pit0_ticks;
@@ -959,7 +966,7 @@ static void local_time_calibration(void)
     /* The overall calibration scale multiplier. */
     u32 calibration_mul_frac;
 
-    if ( boot_cpu_has(X86_FEATURE_CONSTANT_TSC) )
+    if ( opt_consistent_tscs )
     {
         /* Atomically read cpu_calibration struct and write cpu_time struct. */
         local_irq_disable();
@@ -1087,66 +1094,84 @@ static void local_time_calibration(void)
  */
 struct calibration_rendezvous {
     cpumask_t cpu_calibration_map;
-    atomic_t count_start;
-    atomic_t count_end;
+    atomic_t semaphore;
     s_time_t master_stime;
     u64 master_tsc_stamp;
 };
 
-#define NR_LOOPS 5
-
-static void time_calibration_rendezvous(void *_r)
+static void time_calibration_tsc_rendezvous(void *_r)
 {
     int i;
     struct cpu_calibration *c = &this_cpu(cpu_calibration);
     struct calibration_rendezvous *r = _r;
     unsigned int total_cpus = cpus_weight(r->cpu_calibration_map);
 
-    /* 
-     * Loop is used here to get rid of the cache's side effect to enlarge
-     * the TSC difference among CPUs.
-     */
-    for ( i = 0; i < NR_LOOPS; i++ )
+    /* Loop to get rid of cache effects on TSC skew. */
+    for ( i = 4; i >= 0; i-- )
     {
         if ( smp_processor_id() == 0 )
         {
-            while ( atomic_read(&r->count_start) != (total_cpus - 1) )
+            while ( atomic_read(&r->semaphore) != (total_cpus - 1) )
                 mb();
-   
+
             if ( r->master_stime == 0 )
             {
                 r->master_stime = read_platform_stime();
-                if ( boot_cpu_has(X86_FEATURE_CONSTANT_TSC) )
-                    rdtscll(r->master_tsc_stamp);
+                rdtscll(r->master_tsc_stamp);
             }
-            atomic_set(&r->count_end, 0);
-            wmb();
-            atomic_inc(&r->count_start);
-    
-            if ( boot_cpu_has(X86_FEATURE_CONSTANT_TSC) && 
-                 i == NR_LOOPS - 1 )
-                write_tsc((u32)r->master_tsc_stamp, (u32)(r->master_tsc_stamp >> 32));
-    
-            while (atomic_read(&r->count_end) != total_cpus - 1)
+            atomic_inc(&r->semaphore);
+
+            if ( i == 0 )
+                write_tsc((u32)r->master_tsc_stamp,
+                          (u32)(r->master_tsc_stamp >> 32));
+
+            while ( atomic_read(&r->semaphore) != (2*total_cpus - 1) )
                 mb();
-            atomic_set(&r->count_start, 0);
-            wmb();
-            atomic_inc(&r->count_end);
+            atomic_set(&r->semaphore, 0);
         }
         else
         {
-            atomic_inc(&r->count_start);
-            while ( atomic_read(&r->count_start) != total_cpus )
+            atomic_inc(&r->semaphore);
+            while ( atomic_read(&r->semaphore) < total_cpus )
                 mb();
-    
-            if ( boot_cpu_has(X86_FEATURE_CONSTANT_TSC) && 
-                 i == NR_LOOPS - 1 )
-                write_tsc((u32)r->master_tsc_stamp, (u32)(r->master_tsc_stamp >> 32));
-    
-            atomic_inc(&r->count_end);
-            while (atomic_read(&r->count_end) != total_cpus)
+
+            if ( i == 0 )
+                write_tsc((u32)r->master_tsc_stamp,
+                          (u32)(r->master_tsc_stamp >> 32));
+
+            atomic_inc(&r->semaphore);
+            while ( atomic_read(&r->semaphore) > total_cpus )
                 mb();
         }
+    }
+
+    rdtscll(c->local_tsc_stamp);
+    c->stime_local_stamp = get_s_time();
+    c->stime_master_stamp = r->master_stime;
+
+    raise_softirq(TIME_CALIBRATE_SOFTIRQ);
+}
+
+static void time_calibration_std_rendezvous(void *_r)
+{
+    struct cpu_calibration *c = &this_cpu(cpu_calibration);
+    struct calibration_rendezvous *r = _r;
+    unsigned int total_cpus = cpus_weight(r->cpu_calibration_map);
+
+    if ( smp_processor_id() == 0 )
+    {
+        while ( atomic_read(&r->semaphore) != (total_cpus - 1) )
+            cpu_relax();
+        r->master_stime = read_platform_stime();
+        mb(); /* write r->master_stime /then/ signal */
+        atomic_inc(&r->semaphore);
+    }
+    else
+    {
+        atomic_inc(&r->semaphore);
+        while ( atomic_read(&r->semaphore) != total_cpus )
+            cpu_relax();
+        mb(); /* receive signal /then/ read r->master_stime */
     }
 
     rdtscll(c->local_tsc_stamp);
@@ -1160,14 +1185,15 @@ static void time_calibration(void *unused)
 {
     struct calibration_rendezvous r = {
         .cpu_calibration_map = cpu_online_map,
-        .count_start = ATOMIC_INIT(0),
-        .count_end = ATOMIC_INIT(0),
-        .master_stime = 0
+        .semaphore = ATOMIC_INIT(0)
     };
 
     /* @wait=1 because we must wait for all cpus before freeing @r. */
     on_selected_cpus(r.cpu_calibration_map,
-                     time_calibration_rendezvous, &r, 0, 1);
+                     opt_consistent_tscs
+                     ? time_calibration_tsc_rendezvous
+                     : time_calibration_std_rendezvous,
+                     &r, 0, 1);
 }
 
 void init_percpu_time(void)
@@ -1194,8 +1220,11 @@ void init_percpu_time(void)
 /* Late init function (after all CPUs are booted). */
 int __init init_xen_time(void)
 {
+    if ( !boot_cpu_has(X86_FEATURE_CONSTANT_TSC) )
+        opt_consistent_tscs = 0;
+
     /* If we have constant TSCs then scale factor can be shared. */
-    if ( boot_cpu_has(X86_FEATURE_CONSTANT_TSC) )
+    if ( opt_consistent_tscs )
     {
         int cpu;
         for_each_cpu ( cpu )
