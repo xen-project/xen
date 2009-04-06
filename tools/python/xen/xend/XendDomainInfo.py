@@ -620,7 +620,7 @@ class XendDomainInfo:
             pci_devs = pci_conf['devs']
             for x in pci_devs:
                 if (int(x['vslt'], 16) == int(new_dev['vslt'], 16) and
-                   int(x['vslt'], 16) != 0 ):
+                   int(x['vslt'], 16) != AUTO_PHP_SLOT):
                     raise VmError("vslot %s already have a device." % (new_dev['vslt']))
 
                 if (int(x['domain'], 16) == int(new_dev['domain'], 16) and
@@ -1053,7 +1053,7 @@ class XendDomainInfo:
         if devnum >= pci_len:
             raise VmError("Device @ vslot 0x%x doesn't exist." % (vslot))
 
-        if vslot == 0:
+        if vslot == AUTO_PHP_SLOT:
             raise VmError("Device @ vslot 0x%x do not support hotplug." % (vslot))
 
         # Check the co-assignment.
