@@ -577,6 +577,7 @@ void mcheck_init(struct cpuinfo_x86 *c)
 		break;
 	}
 
+    set_poll_bankmask(c);
 	if (!inited)
 		printk(XENLOG_INFO "CPU%i: No machine check initialization\n",
 		    smp_processor_id());
@@ -1230,7 +1231,19 @@ long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)
 
 	return ret;
 }
+void set_poll_bankmask(struct cpuinfo_x86 *c)
+{
 
+    if (cmci_support && !mce_disabled) {
+        memcpy(&(__get_cpu_var(poll_bankmask)),
+                &(__get_cpu_var(no_cmci_banks)), sizeof(cpu_banks_t));
+    }
+    else {
+        memcpy(&(get_cpu_var(poll_bankmask)), &mca_allbanks, sizeof(cpu_banks_t));
+        if (mce_firstbank(c))
+            clear_bit(0, get_cpu_var(poll_bankmask));
+    }
+}
 void mc_panic(char *s)
 {
     console_start_sync();

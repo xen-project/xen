@@ -12,9 +12,10 @@
 #include "x86_mca.h"
 
 DEFINE_PER_CPU(cpu_banks_t, mce_banks_owned);
+DEFINE_PER_CPU(cpu_banks_t, no_cmci_banks);
+int cmci_support = 0;
 
 static int nr_intel_ext_msrs = 0;
-static int cmci_support = 0;
 static int firstbank;
 
 #ifdef CONFIG_X86_MCE_THERMAL
@@ -548,7 +549,6 @@ static void intel_machine_check(struct cpu_user_regs * regs, long error_code)
 }
 
 static DEFINE_SPINLOCK(cmci_discover_lock);
-static DEFINE_PER_CPU(cpu_banks_t, no_cmci_banks);
 
 /*
  * Discover bank sharing using the algorithm recommended in the SDM.

@@ -88,6 +88,10 @@ struct mca_summary {
 };
 
 extern cpu_banks_t mca_allbanks;
+void set_poll_bankmask(struct cpuinfo_x86 *c);
+DECLARE_PER_CPU(cpu_banks_t, poll_bankmask);
+DECLARE_PER_CPU(cpu_banks_t, no_cmci_banks);
+extern int cmci_support;
 
 extern mctelem_cookie_t mcheck_mca_logout(enum mca_source, cpu_banks_t,
     struct mca_summary *);

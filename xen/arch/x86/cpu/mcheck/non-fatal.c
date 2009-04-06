@@ -22,7 +22,7 @@
 
 #include "mce.h"
 
-static cpu_banks_t bankmask;
+DEFINE_PER_CPU(cpu_banks_t, poll_bankmask);
 static struct timer mce_timer;
 
 #define MCE_PERIOD MILLISECS(8000)
@@ -39,7 +39,7 @@ static void mce_checkregs (void *info)
 	struct mca_summary bs;
 	static uint64_t dumpcount = 0;
 
-	mctc = mcheck_mca_logout(MCA_POLLER, bankmask, &bs);
+	mctc = mcheck_mca_logout(MCA_POLLER, __get_cpu_var(poll_bankmask), &bs);
 
 	if (bs.errcnt && mctc != NULL) {
 		adjust++;
@@ -93,10 +93,6 @@ static int __init init_nonfatal_mce_checker(void)
 	/* Check for MCE support */
 	if (!mce_available(c))
 		return -ENODEV;
-
-	memcpy(&bankmask, &mca_allbanks, sizeof (cpu_banks_t));
-	if (mce_firstbank(c) == 1)
-		clear_bit(0, bankmask);
 
 	/*
 	 * Check for non-fatal errors every MCE_RATE s
