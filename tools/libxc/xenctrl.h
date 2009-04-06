@@ -1261,6 +1261,8 @@ struct xc_get_cputopo {
 int xc_get_cputopo(int xc_handle, struct xc_get_cputopo *info);
 
 int xc_set_sched_opt_smt(int xc_handle, uint32_t value);
+int xc_set_vcpu_migration_delay(int xc_handle, uint32_t value);
+int xc_get_vcpu_migration_delay(int xc_handle, uint32_t *value);
 
 int xc_get_cpuidle_max_cstate(int xc_handle, uint32_t *value);
 int xc_set_cpuidle_max_cstate(int xc_handle, uint32_t value);

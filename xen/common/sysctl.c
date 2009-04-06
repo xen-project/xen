@@ -206,6 +206,10 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
 
     case XEN_SYSCTL_get_pmstat:
     {
+        ret = xsm_get_pmstat();
+        if ( ret )
+            break;
+
         ret = do_get_pm_info(&op->u.get_pmstat);
         if ( ret )
             break;
@@ -220,6 +224,10 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
 
     case XEN_SYSCTL_pm_op:
     {
+        ret = xsm_pm_op();
+        if ( ret )
+            break;
+
         ret = do_pm_op(&op->u.pm_op);
         if ( ret && (ret != -EAGAIN) )
             break;

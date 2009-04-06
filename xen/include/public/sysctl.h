@@ -386,6 +386,10 @@ struct xen_sysctl_pm_op {
     #define XEN_SYSCTL_pm_op_get_max_cstate       0x22
     #define XEN_SYSCTL_pm_op_set_max_cstate       0x23
 
+    /* set scheduler migration cost value */
+    #define XEN_SYSCTL_pm_op_set_vcpu_migration_delay   0x24
+    #define XEN_SYSCTL_pm_op_get_vcpu_migration_delay   0x25
+
     uint32_t cmd;
     uint32_t cpuid;
     union {
@@ -397,6 +401,8 @@ struct xen_sysctl_pm_op {
         uint32_t                    set_sched_opt_smt;
         uint32_t                    get_max_cstate;
         uint32_t                    set_max_cstate;
+        uint32_t                    get_vcpu_migration_delay;
+        uint32_t                    set_vcpu_migration_delay;
     };
 };
 

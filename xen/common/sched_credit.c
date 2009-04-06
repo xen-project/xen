@@ -326,6 +326,16 @@ __csched_vcpu_check(struct vcpu *vc)
 static unsigned int vcpu_migration_delay;
 integer_param("vcpu_migration_delay", vcpu_migration_delay);
 
+void set_vcpu_migration_delay(unsigned int delay)
+{
+    vcpu_migration_delay = delay;
+}
+
+unsigned int get_vcpu_migration_delay(void)
+{
+    return vcpu_migration_delay;
+}
+
 static inline int
 __csched_vcpu_is_cache_hot(struct vcpu *v)
 {

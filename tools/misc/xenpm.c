@@ -57,6 +57,8 @@ void show_help(void)
             "                                     it is used in ondemand governor.\n"
             " get-cpu-topology                    get thread/core/socket topology info\n"
             " set-sched-smt           enable|disable enable/disable scheduler smt power saving\n"
+            " set-vcpu-migration-delay      <num> set scheduler vcpu migration delay in us\n"
+            " get-vcpu-migration-delay            get scheduler vcpu migration delay\n"
             " set-max-cstate        <num>         set the C-State limitation (<num> >= 0)\n"
             " start [seconds]                     start collect Cx/Px statistics,\n"
             "                                     output after CTRL-C or SIGINT or several seconds.\n"
@@ -884,6 +886,54 @@ void set_sched_smt_func(int argc, char *argv[])
     return;
 }
 
+void set_vcpu_migration_delay_func(int argc, char *argv[])
+{
+    int value;
+    int rc;
+
+    if (argc != 1){
+        show_help();
+        exit(-1);
+    }
+
+    value = atoi(argv[0]);
+
+    if (value < 0)
+    {
+        printf("Please try non-negative vcpu migration delay\n");
+        exit(-1);
+    }
+
+    rc = xc_set_vcpu_migration_delay(xc_fd, value);
+    printf("%s to set vcpu migration delay to %d us\n",
+                    rc? "Fail":"Succeed", value );
+
+    return;
+}
+
+void get_vcpu_migration_delay_func(int argc, char *argv[])
+{
+    uint32_t value;
+    int rc;
+
+    if (argc != 0){
+        show_help();
+        exit(-1);
+    }
+
+    rc = xc_get_vcpu_migration_delay(xc_fd, &value);
+    if (!rc)
+    {
+        printf("Schduler vcpu migration delay is %d us\n", value);
+    }
+    else
+    {
+        printf("Failed to get scheduler vcpu migration delay, errno=%d\n", errno);
+    }
+
+    return;
+}
+
 void set_max_cstate_func(int argc, char *argv[])
 {
     int value, rc;
@@ -918,6 +968,8 @@ struct {
     { "set-up-threshold", scaling_up_threshold_func },
     { "get-cpu-topology", cpu_topology_func},
     { "set-sched-smt", set_sched_smt_func},
+    { "get-vcpu-migration-delay", get_vcpu_migration_delay_func},
+    { "set-vcpu-migration-delay", set_vcpu_migration_delay_func},
     { "set-max-cstate", set_max_cstate_func},
 };
 

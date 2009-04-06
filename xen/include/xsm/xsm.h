@@ -75,6 +75,8 @@ struct xsm_operations {
     int (*debug_keys) (void);
     int (*getcpuinfo) (void);
     int (*availheap) (void);
+    int (*get_pmstat) (void);
+    int (*pm_op) (void);
 
     int (*evtchn_unbound) (struct domain *d, struct evtchn *chn, domid_t id2);
     int (*evtchn_interdomain) (struct domain *d1, struct evtchn *chn1,
@@ -280,6 +282,16 @@ static inline int xsm_availheap (void)
 static inline int xsm_getcpuinfo (void)
 {
     return xsm_call(getcpuinfo());
+}
+
+static inline int xsm_get_pmstat(void)
+{
+    return xsm_call(get_pmstat());
+}
+
+static inline int xsm_pm_op(void)
+{
+    return xsm_call(pm_op());
 }
 
 static inline int xsm_evtchn_unbound (struct domain *d1, struct evtchn *chn,

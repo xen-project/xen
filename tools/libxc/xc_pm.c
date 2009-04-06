@@ -362,6 +362,36 @@ int xc_set_sched_opt_smt(int xc_handle, uint32_t value)
    return rc;
 }
 
+int xc_set_vcpu_migration_delay(int xc_handle, uint32_t value)
+{
+   int rc;
+   DECLARE_SYSCTL;
+
+   sysctl.cmd = XEN_SYSCTL_pm_op;
+   sysctl.u.pm_op.cmd = XEN_SYSCTL_pm_op_set_vcpu_migration_delay;
+   sysctl.u.pm_op.cpuid = 0;
+   sysctl.u.pm_op.set_vcpu_migration_delay = value;
+   rc = do_sysctl(xc_handle, &sysctl);
+
+   return rc;
+}
+
+int xc_get_vcpu_migration_delay(int xc_handle, uint32_t *value)
+{
+   int rc;
+   DECLARE_SYSCTL;
+
+   sysctl.cmd = XEN_SYSCTL_pm_op;
+   sysctl.u.pm_op.cmd = XEN_SYSCTL_pm_op_get_vcpu_migration_delay;
+   sysctl.u.pm_op.cpuid = 0;
+   rc = do_sysctl(xc_handle, &sysctl);
+
+   if (!rc && value)
+       *value = sysctl.u.pm_op.get_vcpu_migration_delay;
+
+   return rc;
+}
+
 int xc_get_cpuidle_max_cstate(int xc_handle, uint32_t *value)
 {
     int rc;
