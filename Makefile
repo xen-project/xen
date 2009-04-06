@@ -224,7 +224,7 @@ uninstall:
 	rm -rf $(D)$(LIBDIR)/xen/
 	rm -rf $(D)/usr/lib/xen/
 	rm -rf $(D)/usr/local/sbin/setmask $(D)/usr/local/sbin/xen*
-	rm -rf $(D)/usr/sbin/xen* $(D)/usr/sbin/netfix $(D)/usr/sbin/xm
+	rm -rf $(D)/usr/sbin/xen* $(D)/usr/sbin/netfix $(D)/usr/sbin/xm $(D)/usr/sbin/device-path
 	rm -rf $(D)/usr/share/doc/xen
 	rm -rf $(D)/usr/share/xen
 	rm -rf $(D)/usr/share/man/man1/xen*
