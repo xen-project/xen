@@ -841,7 +841,7 @@ asmlinkage void do_invalid_op(struct cpu_user_regs *regs)
 {
     struct bug_frame bug;
     struct bug_frame_str bug_str;
-    char *filename, *predicate, *eip = (char *)regs->eip;
+    const char *filename, *predicate, *eip = (char *)regs->eip;
     unsigned long fixup;
     int id, lineno;
 
@@ -873,11 +873,13 @@ asmlinkage void do_invalid_op(struct cpu_user_regs *regs)
     /* WARN, BUG or ASSERT: decode the filename pointer and line number. */
     if ( !is_kernel(eip) ||
          __copy_from_user(&bug_str, eip, sizeof(bug_str)) ||
-         memcmp(bug_str.mov, BUG_MOV_STR, sizeof(bug_str.mov)) )
+         (bug_str.mov != 0xbc) )
         goto die;
+    filename = bug_str(bug_str, eip);
     eip += sizeof(bug_str);
 
-    filename = is_kernel(bug_str.str) ? (char *)bug_str.str : "<unknown>";
+    if ( !is_kernel(filename) )
+        filename = "<unknown>";
     lineno   = bug.id >> 2;
 
     if ( id == BUGFRAME_warn )
@@ -900,11 +902,13 @@ asmlinkage void do_invalid_op(struct cpu_user_regs *regs)
     ASSERT(id == BUGFRAME_assert);
     if ( !is_kernel(eip) ||
          __copy_from_user(&bug_str, eip, sizeof(bug_str)) ||
-         memcmp(bug_str.mov, BUG_MOV_STR, sizeof(bug_str.mov)) )
+         (bug_str.mov != 0xbc) )
         goto die;
+    predicate = bug_str(bug_str, eip);
     eip += sizeof(bug_str);
 
-    predicate = is_kernel(bug_str.str) ? (char *)bug_str.str : "<unknown>";
+    if ( !is_kernel(predicate) )
+        predicate = "<unknown>";
     printk("Assertion '%s' failed at %.50s:%d\n",
            predicate, filename, lineno);
     DEBUGGER_trap_fatal(TRAP_invalid_op, regs);
@@ -1637,10 +1641,6 @@ static int is_cpufreq_controller(struct domain *d)
             (d->domain_id == 0));
 }
 
-/*Intel vMCE MSRs virtualization*/
-extern int intel_mce_wrmsr(u32 msr, u32 lo,  u32 hi);
-extern int intel_mce_rdmsr(u32 msr, u32 *lo,  u32 *hi);
-
 static int emulate_privileged_op(struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
@@ -2210,10 +2210,10 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                 break;
             if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
             {
-                int rc = intel_mce_wrmsr(regs->ecx, eax, edx);
-                if ( rc == -1 )
+                int rc = intel_mce_wrmsr(regs->ecx, res);
+                if ( rc < 0 )
                     goto fail;
-                if ( rc == 0 )
+                if ( rc )
                     break;
             }
 
@@ -2291,25 +2291,27 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         default:
             if ( rdmsr_hypervisor_regs(regs->ecx, &l, &h) )
             {
+ rdmsr_writeback:
                 regs->eax = l;
                 regs->edx = h;
                 break;
             }
+
+            if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
+            {
+                int rc = intel_mce_rdmsr(regs->ecx, &l, &h);
+
+                if ( rc < 0 )
+                    goto fail;
+                if ( rc )
+                    goto rdmsr_writeback;
+            }
+
             /* Everyone can read the MSR space. */
             /* gdprintk(XENLOG_WARNING,"Domain attempted RDMSR %p.\n",
                         _p(regs->ecx));*/
             if ( rdmsr_safe(regs->ecx, regs->eax, regs->edx) )
                 goto fail;
-
-            if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
-            {
-                int rc = intel_mce_rdmsr(regs->ecx, &eax, &edx);
-                if ( rc == -1 )
-                    goto fail;
-                if ( rc == 0 )
-                    break;
-            }
-
             break;
         }
         break;
@@ -3048,8 +3050,8 @@ void load_TR(void)
 
     /* Switch to non-compat GDT (which has B bit clear) to execute LTR. */
     asm volatile (
-        "sgdt %1; lgdt %2; ltr %%ax; lgdt %1"
-        : : "a" (TSS_ENTRY << 3), "m" (old_gdt), "m" (tss_gdt) : "memory" );
+        "sgdt %0; lgdt %2; ltr %w1; lgdt %0"
+        : "=m" (old_gdt) : "rm" (TSS_ENTRY << 3), "m" (tss_gdt) : "memory" );
 }
 
 void __devinit percpu_traps_init(void)

@@ -75,7 +75,7 @@ def _parse_uname(uname):
     fn = taptype = None
     if uname.find(":") != -1:
         (typ, fn) = uname.split(":", 1)
-        if typ == "phy" and not fn.startswith("/"):
+        if typ in ("phy", "drbd") and not fn.startswith("/"):
             fn = "/dev/%s" %(fn,)
         if typ == "tap":
             (taptype, fn) = fn.split(":", 1)

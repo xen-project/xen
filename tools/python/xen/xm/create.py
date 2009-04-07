@@ -204,7 +204,7 @@ gopts.var('cpus', val='CPUS',
           use="CPUS to run the domain on.")
 
 gopts.var('rtc_timeoffset', val='RTC_TIMEOFFSET',
-          fn=set_value, default="0",
+          fn=set_int, default=0,
           use="Set RTC offset.")
 
 gopts.var('pae', val='PAE',
@@ -1057,7 +1057,7 @@ def preprocess_pci(vals):
                 r"(?P<bus>[0-9a-fA-F]{1,2})[:,]" + \
                 r"(?P<slot>[0-9a-fA-F]{1,2})[.,]" + \
                 r"(?P<func>[0-7])" + \
-                r"(@(?P<vslot>[0-9a-fA-F]))?" + \
+                r"(@(?P<vslot>[01]?[0-9a-fA-F]))?" + \
                 r"(,(?P<opts>.*))?$", \
                 pci_dev_str)
         if pci_match!=None:
@@ -1081,7 +1081,7 @@ def preprocess_vscsi(vals):
     if not vals.vscsi: return
     scsi = []
     for scsi_str in vals.vscsi:
-        d = scsi_str.split(',')
+        d = [tmp.strip() for tmp in scsi_str.split(',')]
         n = len(d)
         if n == 2:
             tmp = d[1].split(':')

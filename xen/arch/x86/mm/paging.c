@@ -385,13 +385,14 @@ int paging_log_dirty_op(struct domain *d, struct xen_domctl_shadow_op *sc)
     }
 
     pages = 0;
-    l4 = map_domain_page(mfn_x(d->arch.paging.log_dirty.top));
+    l4 = (mfn_valid(d->arch.paging.log_dirty.top) ?
+          map_domain_page(mfn_x(d->arch.paging.log_dirty.top)) : NULL);
 
     for ( i4 = 0;
           (pages < sc->pages) && (i4 < LOGDIRTY_NODE_ENTRIES);
           i4++ )
     {
-        l3 = mfn_valid(l4[i4]) ? map_domain_page(mfn_x(l4[i4])) : NULL;
+        l3 = (l4 && mfn_valid(l4[i4])) ? map_domain_page(mfn_x(l4[i4])) : NULL;
         for ( i3 = 0;
               (pages < sc->pages) && (i3 < LOGDIRTY_NODE_ENTRIES);
               i3++ )
@@ -429,7 +430,8 @@ int paging_log_dirty_op(struct domain *d, struct xen_domctl_shadow_op *sc)
         if ( l3 )
             unmap_domain_page(l3);
     }
-    unmap_domain_page(l4);
+    if ( l4 )
+        unmap_domain_page(l4);
 
     if ( pages < sc->pages )
         sc->pages = pages;

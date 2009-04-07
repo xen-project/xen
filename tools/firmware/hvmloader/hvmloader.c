@@ -88,8 +88,8 @@ asm (
     "    .align 8                    \n"
     "gdt:                            \n"
     "    .quad 0x0000000000000000    \n"
-    "    .quad 0x00009a000000ffff    \n" /* Ring 0 code, base 0 limit 0xffff */
-    "    .quad 0x000092000000ffff    \n" /* Ring 0 data, base 0 limit 0xffff */
+    "    .quad 0x008f9a000000ffff    \n" /* Ring 0 16b code, base 0 limit 4G */
+    "    .quad 0x008f92000000ffff    \n" /* Ring 0 16b data, base 0 limit 4G */
     "gdt_end:                        \n"
     "                                \n"
     "    .bss                        \n"

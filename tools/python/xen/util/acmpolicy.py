@@ -216,7 +216,7 @@ ACM_SCHEMA="""<?xml version="1.0" encoding="UTF-8"?>
 		<xsd:complexType>
 			<xsd:sequence>
 				<xsd:element name="Name" type="NameWithFrom"></xsd:element>
-				<xsd:element ref="SimpleTypeEnforcementTypes" minOccurs="0" maxOccurs="unbounded" />
+				<xsd:element ref="SimpleTypeEnforcementTypes" minOccurs="0" maxOccurs="1" />
 				<xsd:element ref="ChineseWallTypes" minOccurs="0" maxOccurs="unbounded" />
 			</xsd:sequence>
 		</xsd:complexType>

@@ -46,6 +46,7 @@
 #include <asm/hvm/support.h>
 #include <asm/debugreg.h>
 #include <asm/msr.h>
+#include <asm/traps.h>
 #include <asm/nmi.h>
 #include <xen/numa.h>
 #include <xen/iommu.h>
@@ -373,7 +374,6 @@ void vcpu_destroy(struct vcpu *v)
         hvm_vcpu_destroy(v);
 }
 
-extern uint64_t g_mcg_cap;
 int arch_domain_create(struct domain *d, unsigned int domcr_flags)
 {
 #ifdef __x86_64__
@@ -458,14 +458,8 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
             goto fail;
 
         /* For Guest vMCE MSRs virtualization */
-        d->arch.vmca_msrs.mcg_status = 0x0;
-        d->arch.vmca_msrs.mcg_cap = g_mcg_cap;
-        d->arch.vmca_msrs.mcg_ctl = (uint64_t)~0x0;
-        d->arch.vmca_msrs.nr_injection = 0;
-        memset(d->arch.vmca_msrs.mci_ctl, 0x1,
-            sizeof(d->arch.vmca_msrs.mci_ctl));
-        INIT_LIST_HEAD(&d->arch.vmca_msrs.impact_header);
-
+        if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
+            intel_mce_init_msr(d);
     }
 
     if ( is_hvm_domain(d) )

@@ -2,6 +2,7 @@
 #include <xen/irq.h>
 #include <xen/smp.h>
 #include <xen/spinlock.h>
+#include <asm/processor.h>
 
 #ifndef NDEBUG
 
@@ -43,7 +44,9 @@ void spin_debug_disable(void)
 void _spin_lock(spinlock_t *lock)
 {
     check_lock(&lock->debug);
-    _raw_spin_lock(&lock->raw);
+    while ( unlikely(!_raw_spin_trylock(&lock->raw)) )
+        while ( likely(_raw_spin_is_locked(&lock->raw)) )
+            cpu_relax();
 }
 
 void _spin_lock_irq(spinlock_t *lock)
@@ -51,7 +54,13 @@ void _spin_lock_irq(spinlock_t *lock)
     ASSERT(local_irq_is_enabled());
     local_irq_disable();
     check_lock(&lock->debug);
-    _raw_spin_lock(&lock->raw);
+    while ( unlikely(!_raw_spin_trylock(&lock->raw)) )
+    {
+        local_irq_enable();
+        while ( likely(_raw_spin_is_locked(&lock->raw)) )
+            cpu_relax();
+        local_irq_disable();
+    }
 }
 
 unsigned long _spin_lock_irqsave(spinlock_t *lock)
@@ -59,7 +68,13 @@ unsigned long _spin_lock_irqsave(spinlock_t *lock)
     unsigned long flags;
     local_irq_save(flags);
     check_lock(&lock->debug);
-    _raw_spin_lock(&lock->raw);
+    while ( unlikely(!_raw_spin_trylock(&lock->raw)) )
+    {
+        local_irq_restore(flags);
+        while ( likely(_raw_spin_is_locked(&lock->raw)) )
+            cpu_relax();
+        local_irq_save(flags);
+    }
     return flags;
 }
 

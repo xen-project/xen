@@ -798,7 +798,6 @@ static void schedule(void)
     s_time_t              now = NOW();
     struct schedule_data *sd;
     struct task_slice     next_slice;
-    s32                   r_time;     /* time for new dom to run */
 
     ASSERT(!in_irq());
     ASSERT(this_cpu(mc_state).flags == 0);
@@ -814,12 +813,12 @@ static void schedule(void)
     /* get policy-specific decision on scheduling... */
     next_slice = ops.do_schedule(now);
 
-    r_time = next_slice.time;
     next = next_slice.task;
 
     sd->curr = next;
-    
-    set_timer(&sd->s_timer, now + r_time);
+
+    if ( next_slice.time >= 0 ) /* -ve means no limit */
+        set_timer(&sd->s_timer, now + next_slice.time);
 
     if ( unlikely(prev == next) )
     {
@@ -835,7 +834,7 @@ static void schedule(void)
              next->domain->domain_id,
              (next->runstate.state == RUNSTATE_runnable) ?
              (now - next->runstate.state_entry_time) : 0,
-             r_time);
+             next_slice.time);
 
     ASSERT(prev->runstate.state == RUNSTATE_running);
     vcpu_runstate_change(
@@ -962,6 +961,16 @@ void dump_runq(unsigned char key)
     }
 
     local_irq_restore(flags);
+}
+
+void sched_tick_suspend(void)
+{
+    SCHED_OP(tick_suspend);
+}
+
+void sched_tick_resume(void)
+{
+    SCHED_OP(tick_resume);
 }
 
 #ifdef CONFIG_COMPAT

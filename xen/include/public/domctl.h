@@ -433,6 +433,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_real_mode_area_t);
 #define XEN_DOMCTL_SENDTRIGGER_NMI    0
 #define XEN_DOMCTL_SENDTRIGGER_RESET  1
 #define XEN_DOMCTL_SENDTRIGGER_INIT   2
+#define XEN_DOMCTL_SENDTRIGGER_POWER  3
 struct xen_domctl_sendtrigger {
     uint32_t  trigger;  /* IN */
     uint32_t  vcpu;     /* IN */

@@ -134,6 +134,16 @@ static int dummy_getcpuinfo (void)
     return 0;
 }
 
+static int dummy_get_pmstat (void)
+{
+    return 0;
+}
+
+static int dummy_pm_op (void)
+{
+    return 0;
+}
+
 static int dummy_availheap (void)
 {
     return 0;

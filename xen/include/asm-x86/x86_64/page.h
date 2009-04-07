@@ -46,8 +46,14 @@ static inline unsigned long __virt_to_maddr(unsigned long va)
 }
 #define virt_to_maddr(va)       \
     (__virt_to_maddr((unsigned long)(va)))
+
+static inline void *__maddr_to_virt(unsigned long ma)
+{
+    ASSERT(ma < DIRECTMAP_VIRT_END - DIRECTMAP_VIRT_START);
+    return (void *)(ma + DIRECTMAP_VIRT_START);
+}
 #define maddr_to_virt(ma)       \
-    ((void *)((unsigned long)(ma)+DIRECTMAP_VIRT_START))
+    (__maddr_to_virt((unsigned long)(ma)))
 
 /* read access (should only be used for debug printk's) */
 typedef u64 intpte_t;

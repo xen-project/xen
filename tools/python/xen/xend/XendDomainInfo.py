@@ -144,6 +144,7 @@ def recreate(info, priv):
     xeninfo = XendConfig.XendConfig(dominfo = info)
     xeninfo['is_control_domain'] = priv
     xeninfo['is_a_template'] = False
+    xeninfo['auto_power_on'] = False
     domid = xeninfo['domid']
     uuid1 = uuid.fromString(xeninfo['uuid'])
     needs_reinitialising = False
@@ -619,7 +620,7 @@ class XendDomainInfo:
             pci_devs = pci_conf['devs']
             for x in pci_devs:
                 if (int(x['vslt'], 16) == int(new_dev['vslt'], 16) and
-                   int(x['vslt'], 16) != 0 ):
+                   int(x['vslt'], 16) != AUTO_PHP_SLOT):
                     raise VmError("vslot %s already have a device." % (new_dev['vslt']))
 
                 if (int(x['domain'], 16) == int(new_dev['domain'], 16) and
@@ -722,6 +723,13 @@ class XendDomainInfo:
         dev_uuid = self.info.device_add(dev_type, cfg_sxp = dev_config)
         dev_config_dict = self.info['devices'][dev_uuid][1]
         log.debug("XendDomainInfo.device_create: %s" % scrub_password(dev_config_dict))
+
+        if dev_type == 'vif':
+            for x in dev_config:
+                if x != 'vif' and x[0] == 'mac':
+                    if not re.match('^([0-9a-f]{2}:){5}[0-9a-f]{2}$', x[1], re.I):
+                        log.error("Virtual network interface creation error - invalid MAC Address entered: %s", x[1])
+                        raise VmError("Cannot create a new virtual network interface - MAC address is not valid!");
 
         if self.domid is not None:
             try:
@@ -1045,7 +1053,7 @@ class XendDomainInfo:
         if devnum >= pci_len:
             raise VmError("Device @ vslot 0x%x doesn't exist." % (vslot))
 
-        if vslot == 0:
+        if vslot == AUTO_PHP_SLOT:
             raise VmError("Device @ vslot 0x%x do not support hotplug." % (vslot))
 
         # Check the co-assignment.
@@ -1597,9 +1605,6 @@ class XendDomainInfo:
         # convert two lists into a python dictionary
         vm_details = dict(zip(cfg_vm, vm_details))
 
-        if vm_details['rtc/timeoffset'] == None:
-            vm_details['rtc/timeoffset'] = "0"
-
         for arg, val in vm_details.items():
             if arg in XendConfig.LEGACY_CFG_TO_XENAPI_CFG:
                 xapiarg = XendConfig.LEGACY_CFG_TO_XENAPI_CFG[arg]
@@ -1621,10 +1626,10 @@ class XendDomainInfo:
             self.info.update_with_image_sxp(sxp.from_string(image_sxp))
             changed = True
 
-        # Check if the rtc offset has changes
-        if vm_details.get("rtc/timeoffset", "0") != self.info["platform"].get("rtc_timeoffset", "0"):
-            self.info["platform"]["rtc_timeoffset"] = vm_details.get("rtc/timeoffset", 0)
-            changed = True
+        # Update the rtc_timeoffset to be preserved across reboot.
+        # NB. No need to update xenstore domain section.
+        val = int(vm_details.get("rtc/timeoffset", 0))
+        self.info["platform"]["rtc_timeoffset"] = val
  
         if changed:
             # Update the domain section of the store, as this contains some
@@ -2245,8 +2250,9 @@ class XendDomainInfo:
         # There is an implicit memory overhead for any domain creation. This
         # overhead is greater for some types of domain than others. For
         # example, an x86 HVM domain will have a default shadow-pagetable
-        # allocation of 1MB. We free up 2MB here to be on the safe side.
-        balloon.free(2*1024, self) # 2MB should be plenty
+        # allocation of 1MB. We free up 4MB here to be on the safe side.
+        # 2MB memory allocation was not enough in some cases, so it's 4MB now
+        balloon.free(4*1024, self) # 4MB should be plenty
 
         ssidref = 0
         if security.on() == xsconstants.XS_POLICY_USE:
@@ -2304,6 +2310,21 @@ class XendDomainInfo:
 
         # Set maximum number of vcpus in domain
         xc.domain_max_vcpus(self.domid, int(self.info['VCPUs_max']))
+
+        # Check for cpu_{cap|weight} validity for credit scheduler
+        if XendNode.instance().xenschedinfo() == 'credit':
+            cap = self.getCap()
+            weight = self.getWeight()
+
+            assert type(weight) == int
+            assert type(cap) == int
+
+            if weight < 1 or weight > 65535:
+                raise VmError("Cpu weight out of range, valid values are within range from 1 to 65535")
+
+            if cap < 0 or cap > self.getVCpuCount() * 100:
+                raise VmError("Cpu cap out of range, valid range is from 0 to %s for specified number of vcpus" %
+                              (self.getVCpuCount() * 100))
 
         # Test whether the devices can be assigned with VT-d
         pci = self.info["platform"].get("pci")
@@ -2416,12 +2437,6 @@ class XendDomainInfo:
         self._configureBootloader()
 
         try:
-            if self.info['platform'].get('localtime', 0):
-                if time.localtime(time.time())[8]:
-                    self.info['platform']['rtc_timeoffset'] = -time.altzone
-                else:
-                    self.info['platform']['rtc_timeoffset'] = -time.timezone
-
             self.image = image.create(self, self.info)
 
             # repin domain vcpus if a restricted cpus list is provided

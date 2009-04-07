@@ -363,6 +363,8 @@ class XendNode:
         ppci_uuid = saved_ppci_table.get(pci_dev.name, uuid.createString())
         XendPPCI(ppci_uuid, ppci_record)
 
+        self.save_PPCIs()
+
 
     def remove_PPCI(self, pci_name):
         # Update lspci info
@@ -373,15 +375,41 @@ class XendNode:
         ppci_ref = XendPPCI.get_by_sbdf(domain, bus, slot, func)
         XendAPIStore.get(ppci_ref, "PPCI").destroy()
 
-
-    def add_PSCSI(self):
-        # TODO
-        log.debug("add_network(): Not implemented.")
+        self.save_PPCIs()
 
 
-    def remove_PSCSI(self):
-        # TODO
-        log.debug("add_network(): Not implemented.")
+    def add_PSCSI(self, add_HCTL):
+        saved_pscsis = self.state_store.load_state('pscsi')
+        saved_pscsi_table = {}
+        if saved_pscsis:
+            for saved_uuid, saved_record in saved_pscsis.items():
+                try:
+                    saved_pscsi_table[saved_record['scsi_id']] = saved_uuid
+                except KeyError:
+                    pass
+
+        # Initialise the PSCSI
+        pscsi_record = vscsi_util.get_scsi_device(add_HCTL)
+        if pscsi_record and pscsi_record['scsi_id']:
+            pscsi_uuid = saved_pscsi_table.get(pscsi_record['scsi_id'], None)
+            if pscsi_uuid is None:
+                pscsi_uuid = uuid.createString()
+                XendPSCSI(pscsi_uuid, pscsi_record)
+                self.save_PSCSIs()
+
+
+    def remove_PSCSI(self, rem_HCTL):
+        saved_pscsis = self.state_store.load_state('pscsi')
+        if not saved_pscsis:
+            return
+
+        # Remove the PSCSI
+        for pscsi_record in saved_pscsis.values():
+            if rem_HCTL == pscsi_record['physical_HCTL']:
+                pscsi_ref = XendPSCSI.get_by_HCTL(rem_HCTL)
+                XendAPIStore.get(pscsi_ref, "PSCSI").destroy()
+                self.save_PSCSIs()
+                return
 
 
 ##    def network_destroy(self, net_uuid):
@@ -801,6 +829,43 @@ class XendNode:
                       ]
 
         return [[k, info[k]] for k in ITEM_ORDER]
+
+
+    def pciinfo(self):
+        # Each element of dev_list is a PciDevice
+        dev_list = PciUtil.find_all_devices_owned_by_pciback()
+ 
+        # Each element of devs_list is a list of PciDevice
+        devs_list = PciUtil.check_FLR_capability(dev_list)
+ 
+        devs_list = PciUtil.check_mmio_bar(devs_list)
+ 
+        # Check if the devices have been assigned to guests.
+        final_devs_list = []
+        for dev_list in devs_list:
+            available = True
+            for d in dev_list:
+                pci_str = '0x%x,0x%x,0x%x,0x%x' %(d.domain, d.bus, d.slot, d.func)
+                # Xen doesn't care what the domid is, so we pass 0 here...
+                domid = 0
+                bdf = self.xc.test_assign_device(domid, pci_str)
+                if bdf != 0:
+                    available = False
+                    break
+            if available:
+                final_devs_list = final_devs_list + [dev_list]
+
+        pci_sxp_list = []
+        for dev_list in final_devs_list:
+            for d in dev_list:
+                pci_sxp = ['dev', ['domain', '0x%04x' % d.domain],
+                                  ['bus', '0x%02x' % d.bus],
+                                  ['slot', '0x%02x' % d.slot],
+                                  ['func', '0x%x' % d.func]]
+                pci_sxp_list.append(pci_sxp)
+
+        return pci_sxp_list
+ 
 
     def xenschedinfo(self):
         sched_id = self.xc.sched_id_get()

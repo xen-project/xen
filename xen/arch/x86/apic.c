@@ -1303,8 +1303,10 @@ int __init APIC_init_uniprocessor (void)
     if (enable_local_apic < 0)
         clear_bit(X86_FEATURE_APIC, boot_cpu_data.x86_capability);
 
-    if (!smp_found_config && !cpu_has_apic)
+    if (!smp_found_config && !cpu_has_apic) {
+        skip_ioapic_setup = 1;
         return -1;
+    }
 
     /*
      * Complain if the BIOS pretends there is one.
@@ -1313,6 +1315,7 @@ int __init APIC_init_uniprocessor (void)
         printk(KERN_ERR "BIOS bug, local APIC #%d not detected!...\n",
                boot_cpu_physical_apicid);
         clear_bit(X86_FEATURE_APIC, boot_cpu_data.x86_capability);
+        skip_ioapic_setup = 1;
         return -1;
     }
 

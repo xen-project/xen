@@ -29,18 +29,15 @@
 
 /* The interesting bits of the PM1a_STS register */
 #define TMR_STS    (1 << 0)
-#define PWRBTN_STS (1 << 5)
-#define GBL_STS    (1 << 8)
+#define GBL_STS    (1 << 5)
+#define PWRBTN_STS (1 << 8)
 
 /* The same in PM1a_EN */
 #define TMR_EN     (1 << 0)
-#define PWRBTN_EN  (1 << 5)
-#define GBL_EN     (1 << 8)
+#define GBL_EN     (1 << 5)
+#define PWRBTN_EN  (1 << 8)
 
-/* Mask of bits in PM1a_STS that can generate an SCI.  Although the ACPI
- * spec lists other bits, the PIIX4, which we are emulating, only
- * supports these three.  For now, we only use TMR_STS; in future we
- * will let qemu set the other bits */
+/* Mask of bits in PM1a_STS that can generate an SCI. */
 #define SCI_MASK (TMR_STS|PWRBTN_STS|GBL_STS) 
 
 /* SCI IRQ number (must match SCI_INT number in ACPI FADT in hvmloader) */
@@ -59,6 +56,15 @@ static void pmt_update_sci(PMTState *s)
         hvm_isa_irq_assert(s->vcpu->domain, SCI_IRQ);
     else
         hvm_isa_irq_deassert(s->vcpu->domain, SCI_IRQ);
+}
+
+void hvm_acpi_power_button(struct domain *d)
+{
+    PMTState *s = &d->arch.hvm_domain.pl_time.vpmt;
+    spin_lock(&s->lock);
+    s->pm.pm1a_sts |= PWRBTN_STS;
+    pmt_update_sci(s);
+    spin_unlock(&s->lock);
 }
 
 /* Set the correct value in the timer, accounting for time elapsed

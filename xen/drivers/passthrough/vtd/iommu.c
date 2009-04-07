@@ -911,6 +911,8 @@ static int iommu_alloc(struct acpi_drhd_unit *drhd)
         return -ENOMEM;
     memset(iommu, 0, sizeof(struct iommu));
 
+    iommu->vector = -1; /* No vector assigned yet. */
+
     iommu->intel = alloc_intel_iommu();
     if ( iommu->intel == NULL )
     {
@@ -1666,15 +1668,18 @@ static int init_vtd_hw(void)
             return -EIO;
         }
 
-        vector = iommu_set_interrupt(iommu);
-        if ( vector < 0 )
+        if ( iommu->vector < 0 )
         {
-            gdprintk(XENLOG_ERR VTDPREFIX, "IOMMU: interrupt setup failed\n");
-            return vector;
+            vector = iommu_set_interrupt(iommu);
+            if ( vector < 0 )
+            {
+                gdprintk(XENLOG_ERR VTDPREFIX, "IOMMU: interrupt setup failed\n");
+                return vector;
+            }
+            iommu->vector = vector;
         }
-        dma_msi_data_init(iommu, vector);
+        dma_msi_data_init(iommu, iommu->vector);
         dma_msi_addr_init(iommu, cpu_physical_id(first_cpu(cpu_online_map)));
-        iommu->vector = vector;
         clear_fault_bits(iommu);
         dmar_writel(iommu->reg, DMAR_FECTL_REG, 0);
 
@@ -1948,16 +1953,34 @@ void iommu_resume(void)
 {
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
+    struct iommu_flush *flush;
     u32 i;
 
     if ( !vtd_enabled )
         return;
 
+    /* Re-initialize the register-based flush functions.
+     * In iommu_flush_all(), we invoke iommu_flush_{context,iotlb}_global(),
+     * but at this point, on hosts that support QI(Queued Invalidation), QI
+     * hasn't been re-enabed yet, so for now let's use the register-based
+     * invalidation method before invoking init_vtd_hw().
+     */
+    if ( iommu_qinval )
+    {
+        for_each_drhd_unit ( drhd )
+        {
+            iommu = drhd->iommu;
+            flush = iommu_get_flush(iommu);
+            flush->context = flush_context_reg;
+            flush->iotlb = flush_iotlb_reg;
+        }
+    }
+
     /* Not sure whether the flush operation is required to meet iommu
      * specification. Note that BIOS also executes in S3 resume and iommu may
      * be touched again, so let us do the flush operation for safety.
      */
-    flush_all_cache();
+    iommu_flush_all();
 
     if ( init_vtd_hw() != 0  && force_iommu )
          panic("IOMMU setup failed, crash Xen for security purpose!\n");

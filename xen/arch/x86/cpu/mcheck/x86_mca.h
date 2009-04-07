@@ -18,9 +18,9 @@
  */
 
 #ifndef X86_MCA_H
-
 #define X86_MCA_H
 
+#include <public/arch-x86/xen-mca.h>
 
 /* The MCA/MCE MSRs should not be used anywhere else.
  * They are cpu family/model specific and are only for use

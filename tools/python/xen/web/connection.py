@@ -317,6 +317,8 @@ class SocketDgramListener:
 
     def main(self):
         try:
+            fcntl.fcntl(self.sock.fileno(), fcntl.F_SETFD, fcntl.FD_CLOEXEC)
+
             while True:
                 try:
                     data = self.sock.recv(BUFFER_SIZE)

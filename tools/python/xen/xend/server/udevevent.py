@@ -40,13 +40,25 @@ class UdevEventProtocol(protocol.Protocol):
                     log.info("Removing pci device %s", pci_name)
                     XendNode.instance().remove_PPCI(pci_name)
 
-            elif (udev_event.get('SUBSYSTEMS', None) == 'scsi'):
+            elif (udev_event.get('SUBSYSTEM', None) == 'scsi'):
+                hctl = None
+                devpath = udev_event.get('DEVPATH', None)
+                if devpath:
+                    hctl = devpath.split('/')[-1]
+                    if len(hctl.split(':')) != 4:
+                        hctl = None
+                if hctl is None:
+                    # By any possibility, if an HCTL isn't gotten from
+                    # the udev event, the udev event is ignored.
+                    log.warn("Invalid udev event about scsi received")
+                    return
+
                 if (udev_event['ACTION'] == 'add'):
-                    log.info("Adding scsi device")
-                    XendNode.instance().add_PSCSI()
+                    log.info("Adding scsi device %s", hctl)
+                    XendNode.instance().add_PSCSI(hctl)
                 elif (udev_event['ACTION'] == 'remove'):
-                    log.info("Removing scci device")
-                    XendNode.instance().remove_PSCSI()
+                    log.info("Removing scsi device %s", hctl)
+                    XendNode.instance().remove_PSCSI(hctl)
 
             elif (udev_event.get('SUBSYSTEM', None) == 'net'):
                 interface = udev_event.get('INTERFACE', None)

@@ -8,6 +8,8 @@ struct blkfront_aiocb
     uint8_t *aio_buf;
     size_t aio_nbytes;
     off_t aio_offset;
+    size_t total_bytes;
+    uint8_t is_write;
     void *data;
 
     grant_ref_t gref[BLKIF_MAX_SEGMENTS_PER_REQUEST];

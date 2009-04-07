@@ -42,6 +42,7 @@ typedef unsigned long long guest_word_t;
 int guest_word_size = sizeof (unsigned long);
 /* Word-length of the context record we get from xen */
 int ctxt_word_size = sizeof (unsigned long);
+int guest_protected_mode = 1;
 #elif defined (__ia64__)
 /* On ia64, we can't translate virtual address to physical address.  */
 #define NO_TRANSLATION
@@ -206,6 +207,7 @@ static void read_symbol_table(const char *symtab)
 }
 
 #if defined(__i386__) || defined(__x86_64__)
+#define CR0_PE  0x1
 char *flag_values[22][2] =
 {/*  clear,     set,       bit# */
     { NULL,     "c"    }, // 0        Carry
@@ -371,20 +373,38 @@ static void print_ctx(vcpu_guest_context_any_t *ctx)
         print_ctx_64(&ctx->x64);
 }
 
+#define NONPROT_MODE_SEGMENT_SHIFT 4
+
 static guest_word_t instr_pointer(vcpu_guest_context_any_t *ctx)
 {
-    if (ctxt_word_size == 4) 
-        return ctx->x32.user_regs.eip;
+    guest_word_t r;
+    if (ctxt_word_size == 4)
+    {
+        r = ctx->x32.user_regs.eip;
+
+        if ( !guest_protected_mode )
+            r += ctx->x32.user_regs.cs << NONPROT_MODE_SEGMENT_SHIFT;
+    }
     else 
-        return ctx->x64.user_regs.rip;
+        r = ctx->x64.user_regs.rip;
+
+    return r;
 }
 
 static guest_word_t stack_pointer(vcpu_guest_context_any_t *ctx)
 {
-    if (ctxt_word_size == 4) 
-        return ctx->x32.user_regs.esp;
+    guest_word_t r;
+    if (ctxt_word_size == 4)
+    {
+        r = ctx->x32.user_regs.esp;
+
+        if ( !guest_protected_mode )
+            r += ctx->x32.user_regs.ss << NONPROT_MODE_SEGMENT_SHIFT;
+    }
     else 
-        return ctx->x64.user_regs.rsp;
+        r = ctx->x64.user_regs.rsp;
+    
+    return r;
 }
 
 static guest_word_t frame_pointer(vcpu_guest_context_any_t *ctx)
@@ -683,12 +703,31 @@ static void print_stack_word(guest_word_t word, int width)
         printf(FMT_64B_WORD, word);
 }
 
+static void print_code(vcpu_guest_context_any_t *ctx, int vcpu)
+{
+    guest_word_t instr;
+    int i;
+
+    instr = instr_pointer(ctx);
+    printf("Code (instr addr %08llx)\n", instr);
+    instr -= 21;
+    for(i=0; i<32; i++) {
+        unsigned char *c = map_page(ctx, vcpu, instr+i);
+        if (instr+i == instr_pointer(ctx))
+            printf("<%02x> ", *c);
+        else
+            printf("%02x ", *c);
+    }
+    printf("\n");
+
+    printf("\n");
+}
+
 static void print_stack(vcpu_guest_context_any_t *ctx, int vcpu, int width)
 {
     guest_word_t stack = stack_pointer(ctx);
     guest_word_t stack_limit;
     guest_word_t frame;
-    guest_word_t instr;
     guest_word_t word;
     guest_word_t *p;
     int i;
@@ -707,19 +746,6 @@ static void print_stack(vcpu_guest_context_any_t *ctx, int vcpu, int width)
         }
         printf("\n");
     }
-    printf("\n");
-
-    printf("Code:\n");
-    instr = instr_pointer(ctx) - 21;
-    for(i=0; i<32; i++) {
-        unsigned char *c = map_page(ctx, vcpu, instr+i);
-        if (instr+i == instr_pointer(ctx))
-            printf("<%02x> ", *c);
-        else
-            printf("%02x ", *c);
-    }
-    printf("\n");
-
     printf("\n");
 
     if(stack_trace)
@@ -830,6 +856,7 @@ static void dump_ctx(int vcpu)
                 exit(-1);
             }
             guest_word_size = (cpuctx.msr_efer & 0x400) ? 8 : 4;
+            guest_protected_mode = (cpuctx.cr0 & CR0_PE);
             /* HVM guest context records are always host-sized */
             if (xc_version(xc_handle, XENVER_capabilities, &xen_caps) != 0) {
                 perror("xc_version");
@@ -849,6 +876,7 @@ static void dump_ctx(int vcpu)
 
     print_ctx(&ctx);
 #ifndef NO_TRANSLATION
+    print_code(&ctx, vcpu);
     if (is_kernel_text(instr_pointer(&ctx)))
         print_stack(&ctx, vcpu, guest_word_size);
 #endif

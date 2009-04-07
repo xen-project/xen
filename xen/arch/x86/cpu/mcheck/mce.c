@@ -577,6 +577,7 @@ void mcheck_init(struct cpuinfo_x86 *c)
 		break;
 	}
 
+    set_poll_bankmask(c);
 	if (!inited)
 		printk(XENLOG_INFO "CPU%i: No machine check initialization\n",
 		    smp_processor_id());
@@ -984,14 +985,76 @@ static void x86_mc_mceinject(void *data)
 #error BITS_PER_LONG definition absent
 #endif
 
+#ifdef CONFIG_COMPAT
+# include <compat/arch-x86/xen-mca.h>
+
+# define xen_mcinfo_msr              mcinfo_msr
+CHECK_mcinfo_msr;
+# undef xen_mcinfo_msr
+# undef CHECK_mcinfo_msr
+# define CHECK_mcinfo_msr            struct mcinfo_msr
+
+# define xen_mcinfo_common           mcinfo_common
+CHECK_mcinfo_common;
+# undef xen_mcinfo_common
+# undef CHECK_mcinfo_common
+# define CHECK_mcinfo_common         struct mcinfo_common
+
+CHECK_FIELD_(struct, mc_fetch, flags);
+CHECK_FIELD_(struct, mc_fetch, fetch_id);
+# define CHECK_compat_mc_fetch       struct mc_fetch
+
+CHECK_FIELD_(struct, mc_physcpuinfo, ncpus);
+# define CHECK_compat_mc_physcpuinfo struct mc_physcpuinfo
+
+CHECK_mc;
+# undef CHECK_compat_mc_fetch
+# undef CHECK_compat_mc_physcpuinfo
+
+# define xen_mc_info                 mc_info
+CHECK_mc_info;
+# undef xen_mc_info
+
+# define xen_mcinfo_global           mcinfo_global
+CHECK_mcinfo_global;
+# undef xen_mcinfo_global
+
+# define xen_mcinfo_bank             mcinfo_bank
+CHECK_mcinfo_bank;
+# undef xen_mcinfo_bank
+
+# define xen_mcinfo_extended         mcinfo_extended
+CHECK_mcinfo_extended;
+# undef xen_mcinfo_extended
+
+# define xen_mcinfo_recovery         mcinfo_recovery
+# define xen_cpu_offline_action      cpu_offline_action
+# define xen_page_offline_action     page_offline_action
+CHECK_mcinfo_recovery;
+# undef xen_cpu_offline_action
+# undef xen_page_offline_action
+# undef xen_mcinfo_recovery
+#else
+# define compat_mc_fetch xen_mc_fetch
+# define compat_mc_physcpuinfo xen_mc_physcpuinfo
+# define compat_handle_is_null guest_handle_is_null
+# define copy_to_compat copy_to_guest
+#endif
+
 /* Machine Check Architecture Hypercall */
 long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)
 {
 	long ret = 0;
 	struct xen_mc curop, *op = &curop;
 	struct vcpu *v = current;
-	struct xen_mc_fetch *mc_fetch;
-	struct xen_mc_physcpuinfo *mc_physcpuinfo;
+	union {
+		struct xen_mc_fetch *nat;
+		struct compat_mc_fetch *cmp;
+	} mc_fetch;
+	union {
+		struct xen_mc_physcpuinfo *nat;
+		struct compat_mc_physcpuinfo *cmp;
+	} mc_physcpuinfo;
 	uint32_t flags, cmdflags;
 	int nlcpu;
 	xen_mc_logical_cpu_t *log_cpus = NULL;
@@ -1009,8 +1072,8 @@ long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)
 
 	switch (op->cmd) {
 	case XEN_MC_fetch:
-		mc_fetch = &op->u.mc_fetch;
-		cmdflags = mc_fetch->flags;
+		mc_fetch.nat = &op->u.mc_fetch;
+		cmdflags = mc_fetch.nat->flags;
 
 		/* This hypercall is for Dom0 only */
 		if (!IS_PRIV(v->domain) )
@@ -1032,30 +1095,35 @@ long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)
 		flags = XEN_MC_OK;
 
 		if (cmdflags & XEN_MC_ACK) {
-			mctelem_cookie_t cookie = ID2COOKIE(mc_fetch->fetch_id);
+			mctelem_cookie_t cookie = ID2COOKIE(mc_fetch.nat->fetch_id);
 			mctelem_ack(which, cookie);
 		} else {
-			if (guest_handle_is_null(mc_fetch->data))
+			if (!is_pv_32on64_vcpu(v)
+			    ? guest_handle_is_null(mc_fetch.nat->data)
+			    : compat_handle_is_null(mc_fetch.cmp->data))
 				return x86_mcerr("do_mca fetch: guest buffer "
 				    "invalid", -EINVAL);
 
 			if ((mctc = mctelem_consume_oldest_begin(which))) {
 				struct mc_info *mcip = mctelem_dataptr(mctc);
-				if (copy_to_guest(mc_fetch->data, mcip, 1)) {
+				if (!is_pv_32on64_vcpu(v)
+				    ? copy_to_guest(mc_fetch.nat->data, mcip, 1)
+				    : copy_to_compat(mc_fetch.cmp->data,
+						     mcip, 1)) {
 					ret = -EFAULT;
 					flags |= XEN_MC_FETCHFAILED;
-					mc_fetch->fetch_id = 0;
+					mc_fetch.nat->fetch_id = 0;
 				} else {
-					mc_fetch->fetch_id = COOKIE2ID(mctc);
+					mc_fetch.nat->fetch_id = COOKIE2ID(mctc);
 				}
 				mctelem_consume_oldest_end(mctc);
 			} else {
 				/* There is no data */
 				flags |= XEN_MC_NODATA;
-				mc_fetch->fetch_id = 0;
+				mc_fetch.nat->fetch_id = 0;
 			}
 
-			mc_fetch->flags = flags;
+			mc_fetch.nat->flags = flags;
 			if (copy_to_guest(u_xen_mc, op, 1) != 0)
 				ret = -EFAULT;
 		}
@@ -1069,14 +1137,16 @@ long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)
 		if ( !IS_PRIV(v->domain) )
 			return x86_mcerr("do_mca cpuinfo", -EPERM);
 
-		mc_physcpuinfo = &op->u.mc_physcpuinfo;
+		mc_physcpuinfo.nat = &op->u.mc_physcpuinfo;
 		nlcpu = num_online_cpus();
 
-		if (!guest_handle_is_null(mc_physcpuinfo->info)) {
-			if (mc_physcpuinfo->ncpus <= 0)
+		if (!is_pv_32on64_vcpu(v)
+		    ? !guest_handle_is_null(mc_physcpuinfo.nat->info)
+		    : !compat_handle_is_null(mc_physcpuinfo.cmp->info)) {
+			if (mc_physcpuinfo.nat->ncpus <= 0)
 				return x86_mcerr("do_mca cpuinfo: ncpus <= 0",
 				    -EINVAL);
-			nlcpu = min(nlcpu, (int)mc_physcpuinfo->ncpus);
+			nlcpu = min(nlcpu, (int)mc_physcpuinfo.nat->ncpus);
 			log_cpus = xmalloc_array(xen_mc_logical_cpu_t, nlcpu);
 			if (log_cpus == NULL)
 				return x86_mcerr("do_mca cpuinfo", -ENOMEM);
@@ -1086,22 +1156,20 @@ long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)
 				xfree(log_cpus);
 				return x86_mcerr("do_mca cpuinfo", -EIO);
 			}
-		}
-
-		mc_physcpuinfo->ncpus = nlcpu;
-
-		if (copy_to_guest(u_xen_mc, op, 1)) {
-			if (log_cpus != NULL)
-				xfree(log_cpus);
-			return x86_mcerr("do_mca cpuinfo", -EFAULT);
-		}
-
-		if (!guest_handle_is_null(mc_physcpuinfo->info)) {
-			if (copy_to_guest(mc_physcpuinfo->info,
-			    log_cpus, nlcpu))
+			if (!is_pv_32on64_vcpu(v)
+			    ? copy_to_guest(mc_physcpuinfo.nat->info,
+					    log_cpus, nlcpu)
+			    : copy_to_compat(mc_physcpuinfo.cmp->info,
+					    log_cpus, nlcpu))
 				ret = -EFAULT;
 			xfree(log_cpus);
 		}
+
+		mc_physcpuinfo.nat->ncpus = nlcpu;
+
+		if (copy_to_guest(u_xen_mc, op, 1))
+			return x86_mcerr("do_mca cpuinfo", -EFAULT);
+
 		break;
 
 	case XEN_MC_msrinject:
@@ -1163,7 +1231,19 @@ long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)
 
 	return ret;
 }
+void set_poll_bankmask(struct cpuinfo_x86 *c)
+{
 
+    if (cmci_support && !mce_disabled) {
+        memcpy(&(__get_cpu_var(poll_bankmask)),
+                &(__get_cpu_var(no_cmci_banks)), sizeof(cpu_banks_t));
+    }
+    else {
+        memcpy(&(get_cpu_var(poll_bankmask)), &mca_allbanks, sizeof(cpu_banks_t));
+        if (mce_firstbank(c))
+            clear_bit(0, get_cpu_var(poll_bankmask));
+    }
+}
 void mc_panic(char *s)
 {
     console_start_sync();

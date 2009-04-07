@@ -77,6 +77,9 @@ struct scheduler {
                                     struct xen_domctl_scheduler_op *);
     void         (*dump_settings)  (void);
     void         (*dump_cpu_state) (int);
+
+    void         (*tick_suspend)    (void);
+    void         (*tick_resume)     (void);
 };
 
 #endif /* __XEN_SCHED_IF_H__ */

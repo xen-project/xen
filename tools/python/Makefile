@@ -12,7 +12,7 @@ PODIR := xen/xm/messages
 POTFILE := $(PODIR)/xen-xm.pot
 I18NSRCFILES = $(shell find xen/xm/ -name '*.py')
 CATALOGS = $(patsubst %,xen/xm/messages/%.mo,$(LINGUAS))
-NLSDIR = /usr/share/locale
+NLSDIR = $(SHAREDIR)/locale
 
 .PHONY: build buildpy
 buildpy: 
@@ -57,19 +57,19 @@ refresh-po: $(POTFILE)
 ifndef XEN_PYTHON_NATIVE_INSTALL
 install: LIBPATH=$(shell PYTHONPATH=xen/util python -c "import auxbin; print auxbin.libpath()")
 install: install-messages install-dtd
-	CC="$(CC)" CFLAGS="$(CFLAGS)" python setup.py install --home="$(DESTDIR)/usr" --prefix="" --force --install-lib="$(DESTDIR)$(LIBPATH)/python"
+	CC="$(CC)" CFLAGS="$(CFLAGS)" python setup.py install --home="$(DESTDIR)$(PREFIX)" --prefix="" --force --install-lib="$(DESTDIR)$(LIBDIR)/python"
 else
 install: install-messages install-dtd
 	CC="$(CC)" CFLAGS="$(CFLAGS)" python setup.py install --root="$(DESTDIR)" --force
 endif
 
 install-dtd: all
-	$(INSTALL_DIR) $(DESTDIR)/usr/share/xen
-	$(INSTALL_DATA) xen/xm/create.dtd $(DESTDIR)/usr/share/xen
+	$(INSTALL_DIR) $(DESTDIR)$(DOCDIR)
+	$(INSTALL_DATA) xen/xm/create.dtd $(DESTDIR)$(DOCDIR)
 
 install-messages: all
 	set -e; if which $(MSGFMT) >/dev/null ; then \
-		mkdir -p $(DESTDIR)$(NLSDIR); \
+		$(INSTALL_DIR) $(DESTDIR)$(NLSDIR); \
 		for l in $(LINGUAS); do \
 			$(INSTALL_DIR) $(DESTDIR)$(NLSDIR)/$$l; \
 			$(INSTALL_DIR) $(DESTDIR)$(NLSDIR)/$$l/LC_MESSAGES; \

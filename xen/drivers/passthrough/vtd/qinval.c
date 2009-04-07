@@ -432,9 +432,10 @@ int enable_qinval(struct iommu *iommu)
                     "Cannot allocate memory for qi_ctrl->qinval_maddr\n");
             return -ENOMEM;
         }
-        flush->context = flush_context_qi;
-        flush->iotlb = flush_iotlb_qi;
     }
+
+    flush->context = flush_context_qi;
+    flush->iotlb = flush_iotlb_qi;
 
     /* Setup Invalidation Queue Address(IQA) register with the
      * address of the page we just allocated.  QS field at

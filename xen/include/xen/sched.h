@@ -428,6 +428,8 @@ int  sched_init_domain(struct domain *d);
 void sched_destroy_domain(struct domain *d);
 long sched_adjust(struct domain *, struct xen_domctl_scheduler_op *);
 int  sched_id(void);
+void sched_tick_suspend(void);
+void sched_tick_resume(void);
 void vcpu_wake(struct vcpu *d);
 void vcpu_sleep_nosync(struct vcpu *d);
 void vcpu_sleep_sync(struct vcpu *d);
@@ -549,6 +551,9 @@ uint64_t get_cpu_idle_time(unsigned int cpu);
 #define is_hvm_domain(d) ((d)->is_hvm)
 #define is_hvm_vcpu(v)   (is_hvm_domain(v->domain))
 #define need_iommu(d)    ((d)->need_iommu && !(d)->is_hvm)
+
+void set_vcpu_migration_delay(unsigned int delay);
+unsigned int get_vcpu_migration_delay(void);
 
 extern int sched_smt_power_savings;
 

@@ -100,8 +100,11 @@ static int hvm_mmio_access(struct vcpu *v,
         }
     }
 
-    if ( (p->count = i) != 0 )
+    if ( i != 0 )
+    {
+        p->count = i;
         rc = X86EMUL_OKAY;
+    }
 
     return rc;
 }
@@ -165,8 +168,11 @@ static int process_portio_intercept(portio_action_t action, ioreq_t *p)
         }
     }
 
-    if ( (p->count = i) != 0 )
+    if ( i != 0 )
+    {
+        p->count = i;
         rc = X86EMUL_OKAY;
+    }
 
     return rc;
 }

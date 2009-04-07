@@ -119,9 +119,14 @@ class ImageHandler:
         self.vncconsole = int(vmConfig['platform'].get('vncconsole', 0))
         self.dmargs = self.parseDeviceModelArgs(vmConfig)
         self.pid = None
-        rtc_timeoffset = vmConfig['platform'].get('rtc_timeoffset')
-        if rtc_timeoffset is not None:
-            xc.domain_set_time_offset(self.vm.getDomid(), int(rtc_timeoffset))
+        rtc_timeoffset = int(vmConfig['platform'].get('rtc_timeoffset', 0))
+        if vmConfig['platform'].get('localtime', 0):
+            if time.localtime(time.time())[8]:
+                rtc_timeoffset -= time.altzone
+            else:
+                rtc_timeoffset -= time.timezone
+        if rtc_timeoffset != 0:
+            xc.domain_set_time_offset(self.vm.getDomid(), rtc_timeoffset)
 
         self.cpuid = None
         self.cpuid_check = None
@@ -488,7 +493,10 @@ class ImageHandler:
 
     def _dmfailed(self, message):
         log.warning("domain %s: %s", self.vm.getName(), message)
-        xc.domain_shutdown(self.vm.getDomid(), DOMAIN_CRASH)
+        try:
+            xc.domain_shutdown(self.vm.getDomid(), DOMAIN_CRASH)
+        except:
+            pass
 
     def recreate(self):
         if self.device_model is None:
@@ -526,8 +534,8 @@ class ImageHandler:
         try: self.sentinel_fifo.read(1)
         except OSError, e: pass
         self.sentinel_lock.acquire()
-        try:
-            if self.pid:
+        if self.pid:
+            try:
                 (p,st) = os.waitpid(self.pid, os.WNOHANG)
                 if p == self.pid:
                     message = oshelp.waitstatus_description(st)
@@ -539,15 +547,15 @@ class ImageHandler:
                     except:
                         message = "malfunctioning or died ?"
                 message = "pid %d: %s" % (self.pid, message)
-            else:
-                message = "no longer running"
-        except Exception, e:
-            message = "waitpid failed: %s" % utils.exception_string(e)
-        message = "device model failure: %s" % message
-        try: message += "; see %s " % self.logfile
-        except: pass
-        self._dmfailed(message)
-        self.pid = None
+            except Exception, e:
+                message = "waitpid failed: %s" % utils.exception_string(e)
+            message = "device model failure: %s" % message
+            try: message += "; see %s " % self.logfile
+            except: pass
+            self._dmfailed(message)
+            self.pid = None
+        else:
+            log.info("%s device model terminated", self.vm.getName())
         self.sentinel_lock.release()
 
     def destroyDeviceModel(self):
@@ -778,6 +786,14 @@ class HVMImageHandler(ImageHandler):
                     if v: ret.append("-%s" % a)
                 except (ValueError, TypeError):
                     pass # if we can't convert it to a sane type, ignore it
+            elif a == 'serial':
+                if v:
+                    if type(v) == str:
+                        v = [v]
+                    for s in v:
+                        if s:
+                            ret.append("-serial")
+                            ret.append("%s" % s)
             else:
                 if v:
                     ret.append("-%s" % a)

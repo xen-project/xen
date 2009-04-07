@@ -1069,7 +1069,7 @@ extern void dump_ioapic_irq_info(void);
 
 static void dump_irqs(unsigned char key)
 {
-    int i, irq, vector;
+    int i, glob_irq, irq, vector;
     irq_desc_t *desc;
     irq_guest_action_t *action;
     struct domain *d;
@@ -1077,41 +1077,47 @@ static void dump_irqs(unsigned char key)
 
     printk("Guest interrupt information:\n");
 
-    for ( irq = 0; irq < NR_IRQS; irq++ )
+    for ( vector = 0; vector < NR_VECTORS; vector++ )
     {
-        vector = irq_to_vector(irq);
-        if ( vector == 0 )
-            continue;
+
+        glob_irq = vector_to_irq(vector);
 
         desc = &irq_desc[vector];
+        if ( desc == NULL || desc->handler == &no_irq_type )
+            continue;
 
         spin_lock_irqsave(&desc->lock, flags);
 
-        if ( desc->status & IRQ_GUEST )
+        if ( !(desc->status & IRQ_GUEST) )
+            printk("   Vec%3d IRQ%3d: type=%-15s status=%08x "
+                   "mapped, unbound\n",
+                   vector, glob_irq, desc->handler->typename, desc->status);
+        else
         {
             action = (irq_guest_action_t *)desc->action;
 
-            printk("    IRQ%3d Vec%3d: type=%-15s status=%08x "
+            printk("   Vec%3d IRQ%3d: type=%-15s status=%08x "
                    "in-flight=%d domain-list=",
-                   irq, vector, desc->handler->typename,
+                   vector, glob_irq, desc->handler->typename,
                    desc->status, action->in_flight);
 
             for ( i = 0; i < action->nr_guests; i++ )
             {
                 d = action->guest[i];
-                printk("%u(%c%c%c%c)",
-                       d->domain_id,
-                       (test_bit(d->pirq_to_evtchn[irq],
+                irq = domain_vector_to_irq(d, vector);
+                printk("%u:%3d(%c%c%c%c)",
+                       d->domain_id, irq,
+                       (test_bit(d->pirq_to_evtchn[glob_irq],
                                  &shared_info(d, evtchn_pending)) ?
                         'P' : '-'),
-                       (test_bit(d->pirq_to_evtchn[irq] /
+                       (test_bit(d->pirq_to_evtchn[glob_irq] /
                                  BITS_PER_EVTCHN_WORD(d),
                                  &vcpu_info(d->vcpu[0], evtchn_pending_sel)) ?
                         'S' : '-'),
-                       (test_bit(d->pirq_to_evtchn[irq],
+                       (test_bit(d->pirq_to_evtchn[glob_irq],
                                  &shared_info(d, evtchn_mask)) ?
                         'M' : '-'),
-                       (test_bit(irq, d->pirq_mask) ?
+                       (test_bit(glob_irq, d->pirq_mask) ?
                         'M' : '-'));
                 if ( i != action->nr_guests )
                     printk(",");

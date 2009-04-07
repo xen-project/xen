@@ -302,7 +302,8 @@ static unsigned long init_node_heap(int node, unsigned long mfn,
               (mfn + needed) <= (virt_to_mfn(DIRECTMAP_VIRT_END - 1) + 1) )
     {
         _heap[node] = mfn_to_virt(mfn);
-        avail[node] = mfn_to_virt(mfn + needed) - sizeof(**avail) * NR_ZONES;
+        avail[node] = mfn_to_virt(mfn + needed - 1) +
+                      PAGE_SIZE - sizeof(**avail) * NR_ZONES;
     }
 #endif
     else if ( get_order_from_bytes(sizeof(**_heap)) ==

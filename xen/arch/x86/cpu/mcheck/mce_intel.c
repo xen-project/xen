@@ -12,9 +12,10 @@
 #include "x86_mca.h"
 
 DEFINE_PER_CPU(cpu_banks_t, mce_banks_owned);
+DEFINE_PER_CPU(cpu_banks_t, no_cmci_banks);
+int cmci_support = 0;
 
 static int nr_intel_ext_msrs = 0;
-static int cmci_support = 0;
 static int firstbank;
 
 #ifdef CONFIG_X86_MCE_THERMAL
@@ -117,6 +118,16 @@ static void intel_init_thermal(struct cpuinfo_x86 *c)
 }
 #endif /* CONFIG_X86_MCE_THERMAL */
 
+static inline void intel_get_extended_msr(struct mcinfo_extended *ext, u32 msr)
+{
+    if ( ext->mc_msrs < ARRAY_SIZE(ext->mc_msr)
+         && msr < MSR_IA32_MCG_EAX + nr_intel_ext_msrs ) {
+        ext->mc_msr[ext->mc_msrs].reg = msr;
+        rdmsrl(msr, ext->mc_msr[ext->mc_msrs].value);
+        ++ext->mc_msrs;
+    }
+}
+
 static enum mca_extinfo
 intel_get_extended_msrs(struct mc_info *mci, uint16_t bank, uint64_t status)
 {
@@ -129,30 +140,29 @@ intel_get_extended_msrs(struct mc_info *mci, uint16_t bank, uint64_t status)
     memset(&mc_ext, 0, sizeof(struct mcinfo_extended));
     mc_ext.common.type = MC_TYPE_EXTENDED;
     mc_ext.common.size = sizeof(mc_ext);
-    mc_ext.mc_msrs = 10;
 
-    mc_ext.mc_msr[0].reg = MSR_IA32_MCG_EAX;
-    rdmsrl(MSR_IA32_MCG_EAX, mc_ext.mc_msr[0].value);
-    mc_ext.mc_msr[1].reg = MSR_IA32_MCG_EBX;
-    rdmsrl(MSR_IA32_MCG_EBX, mc_ext.mc_msr[1].value);
-    mc_ext.mc_msr[2].reg = MSR_IA32_MCG_ECX;
-    rdmsrl(MSR_IA32_MCG_ECX, mc_ext.mc_msr[2].value);
+    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_EAX);
+    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_EBX);
+    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_ECX);
+    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_EDX);
+    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_ESI);
+    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_EDI);
+    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_EBP);
+    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_ESP);
+    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_EFLAGS);
+    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_EIP);
+    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_MISC);
 
-    mc_ext.mc_msr[3].reg = MSR_IA32_MCG_EDX;
-    rdmsrl(MSR_IA32_MCG_EDX, mc_ext.mc_msr[3].value);
-    mc_ext.mc_msr[4].reg = MSR_IA32_MCG_ESI;
-    rdmsrl(MSR_IA32_MCG_ESI, mc_ext.mc_msr[4].value);
-    mc_ext.mc_msr[5].reg = MSR_IA32_MCG_EDI;
-    rdmsrl(MSR_IA32_MCG_EDI, mc_ext.mc_msr[5].value);
-
-    mc_ext.mc_msr[6].reg = MSR_IA32_MCG_EBP;
-    rdmsrl(MSR_IA32_MCG_EBP, mc_ext.mc_msr[6].value);
-    mc_ext.mc_msr[7].reg = MSR_IA32_MCG_ESP;
-    rdmsrl(MSR_IA32_MCG_ESP, mc_ext.mc_msr[7].value);
-    mc_ext.mc_msr[8].reg = MSR_IA32_MCG_EFLAGS;
-    rdmsrl(MSR_IA32_MCG_EFLAGS, mc_ext.mc_msr[8].value);
-    mc_ext.mc_msr[9].reg = MSR_IA32_MCG_EIP;
-    rdmsrl(MSR_IA32_MCG_EIP, mc_ext.mc_msr[9].value);
+#ifdef __x86_64__
+    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_R8);
+    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_R9);
+    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_R10);
+    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_R11);
+    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_R12);
+    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_R13);
+    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_R14);
+    intel_get_extended_msr(&mc_ext, MSR_IA32_MCG_R15);
+#endif
 
     x86_mcinfo_add(mci, &mc_ext);
 
@@ -426,7 +436,7 @@ static void severity_scan(void)
      * recovered, we need to RESET for avoiding DOM0 LOG missing
      */
     for ( i = 0; i < nr_mce_banks; i++) {
-        rdmsrl(MSR_IA32_MC0_STATUS + 4 * i , status);
+        mca_rdmsrl(MSR_IA32_MC0_STATUS + 4 * i , status);
         if ( !(status & MCi_STATUS_VAL) )
             continue;
         /* MCE handler only handles UC error */
@@ -434,7 +444,12 @@ static void severity_scan(void)
             continue;
         if ( !(status & MCi_STATUS_EN) )
             continue;
-        if (status & MCi_STATUS_PCC)
+        /*
+         * If this was an injected error, keep going, since the
+         * interposed value will be lost at reboot.
+         */
+        if (status & MCi_STATUS_PCC && intpose_lookup(smp_processor_id(),
+          MSR_IA32_MC0_STATUS + 4 * i, NULL) == NULL)
             mc_panic("pcc = 1, cpu unable to continue\n");
     }
 
@@ -519,8 +534,8 @@ static void intel_machine_check(struct cpu_user_regs * regs, long error_code)
 
     /* Pick one CPU to clear MCIP */
     if (!test_and_set_bool(mce_process_lock)) {
-        rdmsrl(MSR_IA32_MCG_STATUS, gstatus);
-        wrmsrl(MSR_IA32_MCG_STATUS, gstatus & ~MCG_STATUS_MCIP);
+        mca_rdmsrl(MSR_IA32_MCG_STATUS, gstatus);
+        mca_wrmsrl(MSR_IA32_MCG_STATUS, gstatus & ~MCG_STATUS_MCIP);
 
         if (worst >= 3) {
             printk(KERN_WARNING "worst=3 should have caused RESET\n");
@@ -534,7 +549,6 @@ static void intel_machine_check(struct cpu_user_regs * regs, long error_code)
 }
 
 static DEFINE_SPINLOCK(cmci_discover_lock);
-static DEFINE_PER_CPU(cpu_banks_t, no_cmci_banks);
 
 /*
  * Discover bank sharing using the algorithm recommended in the SDM.
@@ -728,7 +742,7 @@ void mce_intel_feature_init(struct cpuinfo_x86 *c)
     intel_init_cmci(c);
 }
 
-uint64_t g_mcg_cap;
+static uint64_t g_mcg_cap;
 static void mce_cap_init(struct cpuinfo_x86 *c)
 {
     u32 l, h;
@@ -740,9 +754,12 @@ static void mce_cap_init(struct cpuinfo_x86 *c)
     if ((l & MCG_CMCI_P) && cpu_has_apic)
         cmci_support = 1;
 
-    nr_mce_banks = l & 0xff;
+    nr_mce_banks = l & MCG_CAP_COUNT;
     if (nr_mce_banks > MAX_NR_BANKS)
+    {
         printk(KERN_WARNING "MCE: exceed max mce banks\n");
+        g_mcg_cap = (g_mcg_cap & ~MCG_CAP_COUNT) | MAX_NR_BANKS;
+    }
     if (l & MCG_EXT_P)
     {
         nr_intel_ext_msrs = (l >> MCG_EXT_CNT) & 0xff;
@@ -814,11 +831,22 @@ int intel_mcheck_init(struct cpuinfo_x86 *c)
 }
 
 /* Guest vMCE# MSRs virtualization ops (rdmsr/wrmsr) */
-int intel_mce_wrmsr(u32 msr, u32 lo, u32 hi)
+void intel_mce_init_msr(struct domain *d)
+{
+    d->arch.vmca_msrs.mcg_status = 0x0;
+    d->arch.vmca_msrs.mcg_cap = g_mcg_cap;
+    d->arch.vmca_msrs.mcg_ctl = (uint64_t)~0x0;
+    d->arch.vmca_msrs.nr_injection = 0;
+    memset(d->arch.vmca_msrs.mci_ctl, ~0,
+           sizeof(d->arch.vmca_msrs.mci_ctl));
+    INIT_LIST_HEAD(&d->arch.vmca_msrs.impact_header);
+}
+
+int intel_mce_wrmsr(u32 msr, u64 value)
 {
     struct domain *d = current->domain;
     struct bank_entry *entry = NULL;
-    uint64_t value = (u64)hi << 32 | lo;
+    unsigned int bank;
     int ret = 1;
 
     spin_lock(&mce_locks);
@@ -826,86 +854,71 @@ int intel_mce_wrmsr(u32 msr, u32 lo, u32 hi)
     {
     case MSR_IA32_MCG_CTL:
         if (value != (u64)~0x0 && value != 0x0) {
-            gdprintk(XENLOG_WARNING, "MCE: value writen to MCG_CTL"
+            gdprintk(XENLOG_WARNING, "MCE: value written to MCG_CTL"
                      "should be all 0s or 1s\n");
             ret = -1;
-            break;
-        }
-        if (!d || is_idle_domain(d)) {
-            gdprintk(XENLOG_WARNING, "MCE: wrmsr not in DOM context, skip\n");
             break;
         }
         d->arch.vmca_msrs.mcg_ctl = value;
         break;
     case MSR_IA32_MCG_STATUS:
-        if (!d || is_idle_domain(d)) {
-            gdprintk(XENLOG_WARNING, "MCE: wrmsr not in DOM context, skip\n");
-            break;
-        }
         d->arch.vmca_msrs.mcg_status = value;
         gdprintk(XENLOG_DEBUG, "MCE: wrmsr MCG_CTL %"PRIx64"\n", value);
         break;
-    case MSR_IA32_MC0_CTL2:
-    case MSR_IA32_MC1_CTL2:
-    case MSR_IA32_MC2_CTL2:
-    case MSR_IA32_MC3_CTL2:
-    case MSR_IA32_MC4_CTL2:
-    case MSR_IA32_MC5_CTL2:
-    case MSR_IA32_MC6_CTL2:
-    case MSR_IA32_MC7_CTL2:
-    case MSR_IA32_MC8_CTL2:
+    case MSR_IA32_MCG_CAP:
+        gdprintk(XENLOG_WARNING, "MCE: MCG_CAP is read-only\n");
+        ret = -1;
+        break;
+    case MSR_IA32_MC0_CTL2 ... MSR_IA32_MC0_CTL2 + MAX_NR_BANKS - 1:
         gdprintk(XENLOG_WARNING, "We have disabled CMCI capability, "
                  "Guest should not write this MSR!\n");
         break;
-    case MSR_IA32_MC0_CTL:
-    case MSR_IA32_MC1_CTL:
-    case MSR_IA32_MC2_CTL:
-    case MSR_IA32_MC3_CTL:
-    case MSR_IA32_MC4_CTL:
-    case MSR_IA32_MC5_CTL:
-    case MSR_IA32_MC6_CTL:
-    case MSR_IA32_MC7_CTL:
-    case MSR_IA32_MC8_CTL:
-        if (value != (u64)~0x0 && value != 0x0) {
-            gdprintk(XENLOG_WARNING, "MCE: value writen to MCi_CTL"
-                     "should be all 0s or 1s\n");
+    case MSR_IA32_MC0_CTL ... MSR_IA32_MC0_CTL + 4 * MAX_NR_BANKS - 1:
+        bank = (msr - MSR_IA32_MC0_CTL) / 4;
+        if (bank >= (d->arch.vmca_msrs.mcg_cap & MCG_CAP_COUNT)) {
+            gdprintk(XENLOG_WARNING, "MCE: bank %u does not exist\n", bank);
             ret = -1;
             break;
         }
-        if (!d || is_idle_domain(d)) {
-            gdprintk(XENLOG_WARNING, "MCE: wrmsr not in DOM context, skip\n");
-            break;
-        }
-        d->arch.vmca_msrs.mci_ctl[(msr - MSR_IA32_MC0_CTL)/4] = value;
-        break;
-    case MSR_IA32_MC0_STATUS:
-    case MSR_IA32_MC1_STATUS:
-    case MSR_IA32_MC2_STATUS:
-    case MSR_IA32_MC3_STATUS:
-    case MSR_IA32_MC4_STATUS:
-    case MSR_IA32_MC5_STATUS:
-    case MSR_IA32_MC6_STATUS:
-    case MSR_IA32_MC7_STATUS:
-    case MSR_IA32_MC8_STATUS:
-        if (!d || is_idle_domain(d)) {
-            /* Just skip */
-            gdprintk(XENLOG_WARNING, "mce wrmsr: not in domain context!\n");
-            break;
-        }
-        /* Give the first entry of the list, it corresponds to current
-         * vMCE# injection. When vMCE# is finished processing by the
-         * the guest, this node will be deleted.
-         * Only error bank is written. Non-error bank simply return.
-         */
-        if ( !list_empty(&d->arch.vmca_msrs.impact_header) ) {
-            entry = list_entry(d->arch.vmca_msrs.impact_header.next,
-                               struct bank_entry, list);
-            if ( entry->bank == (msr - MSR_IA32_MC0_STATUS)/4 ) {
-                entry->mci_status = value;
+        switch (msr & (MSR_IA32_MC0_CTL | 3))
+        {
+        case MSR_IA32_MC0_CTL:
+            if (value != (u64)~0x0 && value != 0x0) {
+                gdprintk(XENLOG_WARNING, "MCE: value written to MC%u_CTL"
+                         "should be all 0s or 1s (is %"PRIx64")\n",
+                         bank, value);
+                ret = -1;
+                break;
             }
-            gdprintk(XENLOG_DEBUG, "MCE: wmrsr mci_status in vMCE# context\n");
+            d->arch.vmca_msrs.mci_ctl[(msr - MSR_IA32_MC0_CTL)/4] = value;
+            break;
+        case MSR_IA32_MC0_STATUS:
+            /* Give the first entry of the list, it corresponds to current
+             * vMCE# injection. When vMCE# is finished processing by the
+             * the guest, this node will be deleted.
+             * Only error bank is written. Non-error banks simply return.
+             */
+            if (!list_empty(&d->arch.vmca_msrs.impact_header)) {
+                entry = list_entry(d->arch.vmca_msrs.impact_header.next,
+                                   struct bank_entry, list);
+                if ( entry->bank == bank )
+                    entry->mci_status = value;
+                gdprintk(XENLOG_DEBUG,
+                         "MCE: wr MC%u_STATUS %"PRIx64" in vMCE#\n",
+                         bank, value);
+            } else
+                gdprintk(XENLOG_DEBUG,
+                         "MCE: wr MC%u_STATUS %"PRIx64"\n", bank, value);
+            break;
+        case MSR_IA32_MC0_ADDR:
+            gdprintk(XENLOG_WARNING, "MCE: MC%u_ADDR is read-only\n", bank);
+            ret = -1;
+            break;
+        case MSR_IA32_MC0_MISC:
+            gdprintk(XENLOG_WARNING, "MCE: MC%u_MISC is read-only\n", bank);
+            ret = -1;
+            break;
         }
-        gdprintk(XENLOG_DEBUG, "MCE: wrmsr mci_status val:%"PRIx64"\n", value);
         break;
     default:
         ret = 0;
@@ -919,6 +932,7 @@ int intel_mce_rdmsr(u32 msr, u32 *lo, u32 *hi)
 {
     struct domain *d = current->domain;
     int ret = 1;
+    unsigned int bank;
     struct bank_entry *entry = NULL;
 
     *lo = *hi = 0x0;
@@ -926,142 +940,82 @@ int intel_mce_rdmsr(u32 msr, u32 *lo, u32 *hi)
     switch(msr)
     {
     case MSR_IA32_MCG_STATUS:
-        if (!d || is_idle_domain(d)) {
-            gdprintk(XENLOG_WARNING, "MCE: rdmsr not in domain context!\n");
-            *lo = *hi = 0x0;
-            break;
-        }
         *lo = (u32)d->arch.vmca_msrs.mcg_status;
         *hi = (u32)(d->arch.vmca_msrs.mcg_status >> 32);
         gdprintk(XENLOG_DEBUG, "MCE: rd MCG_STATUS lo %x hi %x\n", *lo, *hi);
         break;
     case MSR_IA32_MCG_CAP:
-        if (!d || is_idle_domain(d)) {
-            gdprintk(XENLOG_WARNING, "MCE: rdmsr not in domain context!\n");
-            *lo = *hi = 0x0;
-            break;
-        }
         *lo = (u32)d->arch.vmca_msrs.mcg_cap;
         *hi = (u32)(d->arch.vmca_msrs.mcg_cap >> 32);
         gdprintk(XENLOG_DEBUG, "MCE: rdmsr MCG_CAP lo %x hi %x\n", *lo, *hi);
         break;
     case MSR_IA32_MCG_CTL:
-        if (!d || is_idle_domain(d)) {
-            gdprintk(XENLOG_WARNING, "MCE: rdmsr not in domain context!\n");
-            *lo = *hi = 0x0;
-            break;
-        }
         *lo = (u32)d->arch.vmca_msrs.mcg_ctl;
         *hi = (u32)(d->arch.vmca_msrs.mcg_ctl >> 32);
         gdprintk(XENLOG_DEBUG, "MCE: rdmsr MCG_CTL lo %x hi %x\n", *lo, *hi);
         break;
-    case MSR_IA32_MC0_CTL2:
-    case MSR_IA32_MC1_CTL2:
-    case MSR_IA32_MC2_CTL2:
-    case MSR_IA32_MC3_CTL2:
-    case MSR_IA32_MC4_CTL2:
-    case MSR_IA32_MC5_CTL2:
-    case MSR_IA32_MC6_CTL2:
-    case MSR_IA32_MC7_CTL2:
-    case MSR_IA32_MC8_CTL2:
+    case MSR_IA32_MC0_CTL2 ... MSR_IA32_MC0_CTL2 + MAX_NR_BANKS - 1:
         gdprintk(XENLOG_WARNING, "We have disabled CMCI capability, "
                  "Guest should not read this MSR!\n");
         break;
-    case MSR_IA32_MC0_CTL:
-    case MSR_IA32_MC1_CTL:
-    case MSR_IA32_MC2_CTL:
-    case MSR_IA32_MC3_CTL:
-    case MSR_IA32_MC4_CTL:
-    case MSR_IA32_MC5_CTL:
-    case MSR_IA32_MC6_CTL:
-    case MSR_IA32_MC7_CTL:
-    case MSR_IA32_MC8_CTL:
-        if (!d || is_idle_domain(d)) {
-            gdprintk(XENLOG_WARNING, "MCE: rdmsr not in domain context!\n");
-            *lo = *hi = 0x0;
+    case MSR_IA32_MC0_CTL ... MSR_IA32_MC0_CTL + 4 * MAX_NR_BANKS - 1:
+        bank = (msr - MSR_IA32_MC0_CTL) / 4;
+        if (bank >= (d->arch.vmca_msrs.mcg_cap & MCG_CAP_COUNT)) {
+            gdprintk(XENLOG_WARNING, "MCE: bank %u does not exist\n", bank);
+            ret = -1;
             break;
         }
-        *lo = (u32)d->arch.vmca_msrs.mci_ctl[(msr - MSR_IA32_MC0_CTL)/4];
-        *hi =
-            (u32)(d->arch.vmca_msrs.mci_ctl[(msr - MSR_IA32_MC0_CTL)/4]
-                  >> 32);
-        gdprintk(XENLOG_DEBUG, "MCE: rdmsr MCi_CTL lo %x hi %x\n", *lo, *hi);
-        break;
-    case MSR_IA32_MC0_STATUS:
-    case MSR_IA32_MC1_STATUS:
-    case MSR_IA32_MC2_STATUS:
-    case MSR_IA32_MC3_STATUS:
-    case MSR_IA32_MC4_STATUS:
-    case MSR_IA32_MC5_STATUS:
-    case MSR_IA32_MC6_STATUS:
-    case MSR_IA32_MC7_STATUS:
-    case MSR_IA32_MC8_STATUS:
-        /* Only error bank is read. Non-error bank simply return */
-        *lo = *hi = 0x0;
-        gdprintk(XENLOG_DEBUG, "MCE: rdmsr mci_status\n");
-        if (!d || is_idle_domain(d)) {
-            gdprintk(XENLOG_WARNING, "mce_rdmsr: not in domain context!\n");
+        switch (msr & (MSR_IA32_MC0_CTL | 3))
+        {
+        case MSR_IA32_MC0_CTL:
+            *lo = (u32)d->arch.vmca_msrs.mci_ctl[bank];
+            *hi = (u32)(d->arch.vmca_msrs.mci_ctl[bank] >> 32);
+            gdprintk(XENLOG_DEBUG, "MCE: rd MC%u_CTL lo %x hi %x\n",
+                     bank, *lo, *hi);
             break;
-        }
-        if (!list_empty(&d->arch.vmca_msrs.impact_header)) {
-            entry = list_entry(d->arch.vmca_msrs.impact_header.next,
-                               struct bank_entry, list);
-            if ( entry->bank == (msr - MSR_IA32_MC0_STATUS)/4 ) {
-                *lo = entry->mci_status;
-                *hi = entry->mci_status >> 32;
-                gdprintk(XENLOG_DEBUG, "MCE: rdmsr MCi_STATUS in vmCE# context "
-                         "lo %x hi %x\n", *lo, *hi);
+        case MSR_IA32_MC0_STATUS:
+            /* Only error bank is read. Non-error banks simply return. */
+            if (!list_empty(&d->arch.vmca_msrs.impact_header)) {
+                entry = list_entry(d->arch.vmca_msrs.impact_header.next,
+                                   struct bank_entry, list);
+                if (entry->bank == bank) {
+                    *lo = entry->mci_status;
+                    *hi = entry->mci_status >> 32;
+                    gdprintk(XENLOG_DEBUG,
+                             "MCE: rd MC%u_STATUS in vmCE# context "
+                             "lo %x hi %x\n", bank, *lo, *hi);
+                } else
+                    entry = NULL;
             }
-        }
-        break;
-    case MSR_IA32_MC0_ADDR:
-    case MSR_IA32_MC1_ADDR:
-    case MSR_IA32_MC2_ADDR:
-    case MSR_IA32_MC3_ADDR:
-    case MSR_IA32_MC4_ADDR:
-    case MSR_IA32_MC5_ADDR:
-    case MSR_IA32_MC6_ADDR:
-    case MSR_IA32_MC7_ADDR:
-    case MSR_IA32_MC8_ADDR:
-        *lo = *hi = 0x0;
-        if (!d || is_idle_domain(d)) {
-            gdprintk(XENLOG_WARNING, "mce_rdmsr: not in domain context!\n");
+            if (!entry)
+                gdprintk(XENLOG_DEBUG, "MCE: rd MC%u_STATUS\n", bank);
             break;
-        }
-        if (!list_empty(&d->arch.vmca_msrs.impact_header)) {
-            entry = list_entry(d->arch.vmca_msrs.impact_header.next,
-                               struct bank_entry, list);
-            if ( entry->bank == (msr - MSR_IA32_MC0_ADDR)/4 ) {
-                *lo = entry->mci_addr;
-                *hi = entry->mci_addr >> 32;
-                gdprintk(XENLOG_DEBUG, "MCE: rdmsr MCi_ADDR in vMCE# context "
-                         "lo %x hi %x\n", *lo, *hi);
+        case MSR_IA32_MC0_ADDR:
+            if (!list_empty(&d->arch.vmca_msrs.impact_header)) {
+                entry = list_entry(d->arch.vmca_msrs.impact_header.next,
+                                   struct bank_entry, list);
+                if (entry->bank == bank) {
+                    *lo = entry->mci_addr;
+                    *hi = entry->mci_addr >> 32;
+                    gdprintk(XENLOG_DEBUG,
+                             "MCE: rd MC%u_ADDR in vMCE# context lo %x hi %x\n",
+                             bank, *lo, *hi);
+                }
             }
-        }
-        break;
-    case MSR_IA32_MC0_MISC:
-    case MSR_IA32_MC1_MISC:
-    case MSR_IA32_MC2_MISC:
-    case MSR_IA32_MC3_MISC:
-    case MSR_IA32_MC4_MISC:
-    case MSR_IA32_MC5_MISC:
-    case MSR_IA32_MC6_MISC:
-    case MSR_IA32_MC7_MISC:
-    case MSR_IA32_MC8_MISC:
-        *lo = *hi = 0x0;
-        if (!d || is_idle_domain(d)) {
-            gdprintk(XENLOG_WARNING, "MCE: rdmsr not in domain context!\n");
             break;
-        }
-        if (!list_empty(&d->arch.vmca_msrs.impact_header)) {
-            entry = list_entry(d->arch.vmca_msrs.impact_header.next,
-                               struct bank_entry, list);
-            if ( entry->bank == (msr - MSR_IA32_MC0_MISC)/4 ) {
-                *lo = entry->mci_misc;
-                *hi = entry->mci_misc >> 32;
-                gdprintk(XENLOG_DEBUG, "MCE: rdmsr MCi_MISC in vMCE# context "
-                         " lo %x hi %x\n", *lo, *hi);
+        case MSR_IA32_MC0_MISC:
+            if (!list_empty(&d->arch.vmca_msrs.impact_header)) {
+                entry = list_entry(d->arch.vmca_msrs.impact_header.next,
+                                   struct bank_entry, list);
+                if (entry->bank == bank) {
+                    *lo = entry->mci_misc;
+                    *hi = entry->mci_misc >> 32;
+                    gdprintk(XENLOG_DEBUG,
+                             "MCE: rd MC%u_MISC in vMCE# context lo %x hi %x\n",
+                             bank, *lo, *hi);
+                }
             }
+            break;
         }
         break;
     default:

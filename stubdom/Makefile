@@ -91,6 +91,7 @@ newlib-$(NEWLIB_VERSION).tar.gz:
 newlib-$(NEWLIB_VERSION): newlib-$(NEWLIB_VERSION).tar.gz
 	tar xzf $<
 	patch -d $@ -p0 < newlib.patch
+	patch -d $@ -p0 < newlib-chk.patch
 	touch $@
 
 NEWLIB_STAMPFILE=$(CROSS_ROOT)/$(GNU_TARGET_ARCH)-xen-elf/lib/libc.a

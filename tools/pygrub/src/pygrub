@@ -316,7 +316,11 @@ class Grub:
                 curline = len(img.lines) - 1
 
         if self.isdone:
-            origimg.reset(img.lines)
+           # Fix to allow pygrub command-line editing in Lilo bootloader (used by IA64)
+           if platform.machine() == 'ia64':
+              origimg.reset(img.lines, img.path)
+           else:
+              origimg.reset(img.lines)
 
     def edit_line(self, line):
         self.screen.erase()
@@ -532,7 +536,7 @@ def run_grub(file, entry, fs, arg):
 
     try:
         img = g.cf.images[sel]
-    except:
+    except IndexError:
         log.debug("PyGrub: Default selection is not valid, using first boot configuration...")
         img = g.cf.images[0]
 
