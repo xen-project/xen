@@ -178,7 +178,8 @@ static void do_dbs_timer(void *dbs)
 
     dbs_check_cpu(dbs_info);
 
-    set_timer(&dbs_timer[dbs_info->cpu], NOW()+dbs_tuners_ins.sampling_rate);
+    set_timer(&dbs_timer[dbs_info->cpu],
+            align_timer(NOW() , dbs_tuners_ins.sampling_rate));
 }
 
 static void dbs_timer_init(struct cpu_dbs_info_s *dbs_info)
