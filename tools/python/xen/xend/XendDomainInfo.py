@@ -1634,7 +1634,13 @@ class XendDomainInfo:
         if changed:
             # Update the domain section of the store, as this contains some
             # parameters derived from the VM configuration.
-            self._storeDomDetails()
+            self.refresh_shutdown_lock.acquire()
+            try:
+                state = self._stateGet()
+                if state not in (DOM_STATE_SHUTDOWN, DOM_STATE_HALTED,):
+                    self._storeDomDetails()
+            finally:
+                self.refresh_shutdown_lock.release()
 
         return 1
 
