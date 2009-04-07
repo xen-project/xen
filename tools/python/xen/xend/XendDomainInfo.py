@@ -596,7 +596,7 @@ class XendDomainInfo:
         #update the vslot info
         count = 0;
         for x in pci_devs:
-            x['vslt'] = slot_list[count]
+            x['vslot'] = slot_list[count]
             count += 1
 
 
@@ -619,9 +619,9 @@ class XendDomainInfo:
             pci_conf = self.info['devices'][dev_uuid][1]
             pci_devs = pci_conf['devs']
             for x in pci_devs:
-                if (int(x['vslt'], 16) == int(new_dev['vslt'], 16) and
-                   int(x['vslt'], 16) != AUTO_PHP_SLOT):
-                    raise VmError("vslot %s already have a device." % (new_dev['vslt']))
+                if (int(x['vslot'], 16) == int(new_dev['vslot'], 16) and
+                   int(x['vslot'], 16) != AUTO_PHP_SLOT):
+                    raise VmError("vslot %s already have a device." % (new_dev['vslot']))
 
                 if (int(x['domain'], 16) == int(new_dev['domain'], 16) and
                    int(x['bus'], 16)    == int(new_dev['bus'], 16) and
@@ -708,7 +708,7 @@ class XendDomainInfo:
                 new_dev['slot'],
                 new_dev['func'],
                 opts,
-                new_dev['vslt'])
+                new_dev['vslot'])
         self.image.signalDeviceModel('pci-ins', 'pci-inserted', bdf_str)
 
 
@@ -789,36 +789,36 @@ class XendDomainInfo:
             if pci_state == 'Initialising':
                 # HVM PCI device attachment
                 self.hvm_pci_device_create(dev_config)
-                # Update vslt
-                vslt = xstransact.Read("/local/domain/0/device-model/%i/parameter"
-                                       % self.getDomid())
-                dev['vslt'] = vslt
+                # Update vslot
+                vslot = xstransact.Read("/local/domain/0/device-model/%i/parameter"
+                                        % self.getDomid())
+                dev['vslot'] = vslot
                 for n in sxp.children(pci_dev):
-                    if(n[0] == 'vslt'):
-                        n[1] = vslt
+                    if(n[0] == 'vslot'):
+                        n[1] = vslot
             else:
                 # HVM PCI device detachment
                 existing_dev_uuid = sxp.child_value(existing_dev_info, 'uuid')
                 existing_pci_conf = self.info['devices'][existing_dev_uuid][1]
                 existing_pci_devs = existing_pci_conf['devs']
-                vslt = AUTO_PHP_SLOT_STR
+                vslot = AUTO_PHP_SLOT_STR
                 for x in existing_pci_devs:
                     if ( int(x['domain'], 16) == int(dev['domain'], 16) and
                          int(x['bus'], 16) == int(dev['bus'], 16) and
                          int(x['slot'], 16) == int(dev['slot'], 16) and
                          int(x['func'], 16) == int(dev['func'], 16) ):
-                        vslt = x['vslt']
+                        vslot = x['vslot']
                         break
-                if vslt == AUTO_PHP_SLOT_STR:
+                if vslot == AUTO_PHP_SLOT_STR:
                     raise VmError("Device %04x:%02x:%02x.%01x is not connected"
                                   % (int(dev['domain'],16), int(dev['bus'],16),
                                      int(dev['slot'],16), int(dev['func'],16)))
-                self.hvm_destroyPCIDevice(int(vslt, 16))
-                # Update vslt
-                dev['vslt'] = vslt
+                self.hvm_destroyPCIDevice(int(vslot, 16))
+                # Update vslot
+                dev['vslot'] = vslot
                 for n in sxp.children(pci_dev):
-                    if(n[0] == 'vslt'):
-                        n[1] = vslt
+                    if(n[0] == 'vslot'):
+                        n[1] = vslot
 
         # If pci platform does not exist, create and exit.
         if existing_dev_info is None:
@@ -1046,7 +1046,7 @@ class XendDomainInfo:
         #find the pass-through device with the virtual slot
         devnum = 0
         for x in pci_conf['devs']:
-            if int(x['vslt'], 16) == vslot:
+            if int(x['vslot'], 16) == vslot:
                 break
             devnum += 1
 
@@ -3666,7 +3666,7 @@ class XendDomainInfo:
                     ['bus', '0x%02x' % ppci.get_bus()],
                     ['slot', '0x%02x' % ppci.get_slot()],
                     ['func', '0x%1x' % ppci.get_func()],
-                    ['vslt', '0x%02x' % xenapi_pci.get('hotplug_slot')],
+                    ['vslot', '0x%02x' % xenapi_pci.get('hotplug_slot')],
                     ['opts', dpci_opts],
                     ['uuid', dpci_uuid]
                 ],

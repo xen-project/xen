@@ -83,9 +83,9 @@ class PciController(DevController):
                 opts = reduce(lambda x, y: x+','+y, opts)
                 back['opts-%i' % pcidevid] = opts
 
-            vslt = pci_config.get('vslt')
-            if vslt is not None:
-                vslots = vslots + vslt + ";"
+            vslot = pci_config.get('vslot')
+            if vslot is not None:
+                vslots = vslots + vslot + ";"
 
             back['dev-%i' % pcidevid] = "%04x:%02x:%02x.%01x" % \
                                         (domain, bus, slot, func)
@@ -170,9 +170,9 @@ class PciController(DevController):
                 # Update vslots
                 if back.get('vslots') is not None:
                     vslots = old_vslots
-                    for vslt in back['vslots'].split(';'):
-                        if vslt != '':
-                            vslots = vslots.replace(vslt + ';', '', 1)
+                    for vslot in back['vslots'].split(';'):
+                        if vslot != '':
+                            vslots = vslots.replace(vslot + ';', '', 1)
                     if vslots == '':
                         self.removeBackend(devid, 'vslots')
                     else:
@@ -219,9 +219,9 @@ class PciController(DevController):
                 #append vslot info
                 if vslots is not None:
                     try:
-                        dev_dict['vslt'] = slot_list[i]
+                        dev_dict['vslot'] = slot_list[i]
                     except IndexError:
-                        dev_dict['vslt'] = AUTO_PHP_SLOT_STR
+                        dev_dict['vslot'] = AUTO_PHP_SLOT_STR
 
                 pci_devs.append(dev_dict)
 

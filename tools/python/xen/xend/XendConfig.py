@@ -1617,10 +1617,10 @@ class XendConfig(dict):
         # extendend like this:
         #
         # [device, [pci, [dev, [domain, 0], [bus, 0], [slot, 1], [func, 2],
-        #                      [vslt, 0]],
+        #                      [vslot, 0]],
         #                [state, 'Initialising']]]
         #
-        # 'vslt' shows the virtual hotplug slot number which the PCI device
+        # 'vslot' shows the virtual hotplug slot number which the PCI device
         # is inserted in. This is only effective for HVM domains.
         #
         # state 'Initialising' indicates that the device is being attached,
@@ -1628,7 +1628,7 @@ class XendConfig(dict):
         #
         # The Dict looks like this:
         #
-        # { devs: [{domain: 0, bus: 0, slot: 1, func: 2, vslt: 0}],
+        # { devs: [{domain: 0, bus: 0, slot: 1, func: 2, vslot: 0}],
         #   states: ['Initialising'] }
 
         dev_config = {}
