@@ -18,6 +18,7 @@
 #include <asm/event.h>
 #include <asm/hvm/emulate.h>
 #include <asm/hvm/hvm.h>
+#include <asm/hvm/trace.h>
 #include <asm/hvm/support.h>
 
 #define HVMTRACE_IO_ASSIST_WRITE 0x200
@@ -749,6 +750,7 @@ static int hvmemul_read_cr(
     case 3:
     case 4:
         *val = current->arch.hvm_vcpu.guest_cr[reg];
+        HVMTRACE_LONG_2D(CR_READ, reg, TRC_PAR_LONG(*val));
         return X86EMUL_OKAY;
     default:
         break;
@@ -762,6 +764,7 @@ static int hvmemul_write_cr(
     unsigned long val,
     struct x86_emulate_ctxt *ctxt)
 {
+    HVMTRACE_LONG_2D(CR_WRITE, reg, TRC_PAR_LONG(val));
     switch ( reg )
     {
     case 0:
