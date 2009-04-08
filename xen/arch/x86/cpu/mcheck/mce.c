@@ -33,18 +33,15 @@ static void mcinfo_clear(struct mc_info *);
 #define	SEG_PL(segsel)			((segsel) & 0x3)
 #define _MC_MSRINJ_F_REQ_HWCR_WREN	(1 << 16)
 
-#if 1	/* XXFM switch to 0 for putback */
-
-#define	x86_mcerr(str, err) _x86_mcerr(str, err)
-
-static int _x86_mcerr(const char *msg, int err)
+#if 0
+static int x86_mcerr(const char *msg, int err)
 {
-	printk("x86_mcerr: %s, returning %d\n",
-	    msg != NULL ? msg : "", err);
-	return err;
+    gdprintk(XENLOG_WARNING, "x86_mcerr: %s, returning %d\n",
+             msg != NULL ? msg : "", err);
+    return err;
 }
 #else
-#define x86_mcerr(str,err)
+#define x86_mcerr(msg, err) (err)
 #endif
 
 cpu_banks_t mca_allbanks;
@@ -1064,6 +1061,9 @@ long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)
 	struct xen_mc_msrinject *mc_msrinject;
 	struct xen_mc_mceinject *mc_mceinject;
 
+	if (!IS_PRIV(v->domain) )
+		return x86_mcerr(NULL, -EPERM);
+
 	if ( copy_from_guest(op, u_xen_mc, 1) )
 		return x86_mcerr("do_mca: failed copyin of xen_mc_t", -EFAULT);
 
@@ -1074,10 +1074,6 @@ long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)
 	case XEN_MC_fetch:
 		mc_fetch.nat = &op->u.mc_fetch;
 		cmdflags = mc_fetch.nat->flags;
-
-		/* This hypercall is for Dom0 only */
-		if (!IS_PRIV(v->domain) )
-			return x86_mcerr(NULL, -EPERM);
 
 		switch (cmdflags & (XEN_MC_NONURGENT | XEN_MC_URGENT)) {
 		case XEN_MC_NONURGENT:
@@ -1134,9 +1130,6 @@ long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)
 		return x86_mcerr("do_mca notify unsupported", -EINVAL);
 
 	case XEN_MC_physcpuinfo:
-		if ( !IS_PRIV(v->domain) )
-			return x86_mcerr("do_mca cpuinfo", -EPERM);
-
 		mc_physcpuinfo.nat = &op->u.mc_physcpuinfo;
 		nlcpu = num_online_cpus();
 
@@ -1173,9 +1166,6 @@ long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)
 		break;
 
 	case XEN_MC_msrinject:
-		if ( !IS_PRIV(v->domain) )
-			return x86_mcerr("do_mca inject", -EPERM);
-
 		if (nr_mce_banks == 0)
 			return x86_mcerr("do_mca inject", -ENODEV);
 
@@ -1203,9 +1193,6 @@ long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)
 		break;
 
 	case XEN_MC_mceinject:
-		if ( !IS_PRIV(v->domain) )
-			return x86_mcerr("do_mca #MC", -EPERM);
-
 		if (nr_mce_banks == 0)
 			return x86_mcerr("do_mca #MC", -ENODEV);
 
