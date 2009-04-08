@@ -48,12 +48,16 @@ then
   fi
 fi
 
+domain_name=`cat /etc/resolv.conf | grep -v "#" | grep -E 'search|domain' -i | tail -n 1 | awk '{ print $2 }'`
+nameserver=`cat /etc/resolv.conf | grep -v "#" | grep "nameserver" -i -m 1 | awk '{ print $2 }'`
 
 function dhcp_start()
 {
   if ! grep -q "subnet 10.0.0.0" "$dhcpd_conf_file"
   then
-    echo >>"$dhcpd_conf_file" "subnet 10.0.0.0 netmask 255.255.0.0 {}"
+    echo >>"$dhcpd_conf_file" "subnet 10.0.0.0 netmask 255.255.0.0 {\
+ option domain-name \"$domain_name\";\
+ option domain-name-servers $nameserver; }"
   fi
 
   "$dhcpd_init_file" restart
