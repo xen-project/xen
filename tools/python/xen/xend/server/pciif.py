@@ -71,6 +71,10 @@ class PciController(DevController):
         pcidevid = 0
         vslots = ""
         for pci_config in config.get('devs', []):
+            vslot = pci_config.get('vslot')
+            if vslot is not None:
+                vslots = vslots + vslot + ";"
+
             domain = parse_hex(pci_config.get('domain', 0))
             bus = parse_hex(pci_config.get('bus', 0))
             slot = parse_hex(pci_config.get('slot', 0))
@@ -82,10 +86,6 @@ class PciController(DevController):
                 opts = map(lambda (x, y): x+'='+y, opts)
                 opts = reduce(lambda x, y: x+','+y, opts)
                 back['opts-%i' % pcidevid] = opts
-
-            vslot = pci_config.get('vslot')
-            if vslot is not None:
-                vslots = vslots + vslot + ";"
 
             back['dev-%i' % pcidevid] = "%04x:%02x:%02x.%01x" % \
                                         (domain, bus, slot, func)
