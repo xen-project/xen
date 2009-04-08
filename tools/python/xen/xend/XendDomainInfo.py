@@ -634,7 +634,7 @@ class XendDomainInfo:
                 new_dev['bus'],
                 new_dev['slot'],
                 new_dev['func'])
-        bdf = xc.test_assign_device(self.domid, pci_str)
+        bdf = xc.test_assign_device(0, pci_str)
         if bdf != 0:
             if bdf == -1:
                 raise VmError("failed to assign device: maybe the platform"
@@ -689,7 +689,7 @@ class XendDomainInfo:
         for pci_str in coassignment_list:
             (domain, bus, dev, func) = parse_pci_name(pci_str) 
             dev_str =  '0x%x,0x%x,0x%x,0x%x' % (domain, bus, dev, func)
-            if xc.test_assign_device(self.domid, dev_str) == 0:
+            if xc.test_assign_device(0, dev_str) == 0:
                 continue
             if not pci_str in assigned_pci_device_str_list:
                 raise VmError(('pci: failed to pci-attach %s to dom%d" + \
@@ -2339,7 +2339,7 @@ class XendDomainInfo:
             pci = map(lambda x: x[0:4], pci)  # strip options 
             pci_str = str(pci)
         if hvm and pci_str:
-            bdf = xc.test_assign_device(self.domid, pci_str)
+            bdf = xc.test_assign_device(0, pci_str)
             if bdf != 0:
                 if bdf == -1:
                     raise VmError("failed to assign device: maybe the platform"
