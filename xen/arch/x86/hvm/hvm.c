@@ -2439,10 +2439,6 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         if ( rc != 0 )
             return rc;
 
-        rc = -EPERM;
-        if ( (curr_d != d) && !IS_PRIV_FOR(curr_d, d) )
-            goto param_fail;
-
         rc = -EINVAL;
         if ( !is_hvm_domain(d) )
             goto param_fail;
@@ -2621,10 +2617,6 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         if ( rc != 0 )
             return rc;
 
-        rc = -EPERM;
-        if ( !IS_PRIV_FOR(curr_d, d) )
-            goto param_fail2;
-
         rc = -EINVAL;
         if ( !is_hvm_domain(d) )
             goto param_fail2;
@@ -2662,10 +2654,6 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         rc = rcu_lock_target_domain_by_id(a.domid, &d);
         if ( rc != 0 )
             return rc;
-
-        rc = -EPERM;
-        if ( !IS_PRIV_FOR(curr_d, d) )
-            goto param_fail3;
 
         rc = -EINVAL;
         if ( !is_hvm_domain(d) )
@@ -2722,10 +2710,6 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         rc = rcu_lock_target_domain_by_id(a.domid, &d);
         if ( rc != 0 )
             return rc;
-
-        rc = -EPERM;
-        if ( !IS_PRIV_FOR(curr_d, d) )
-            goto param_fail4;
 
         rc = -EINVAL;
         if ( !is_hvm_domain(d) )
