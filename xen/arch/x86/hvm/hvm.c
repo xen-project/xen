@@ -2377,6 +2377,9 @@ static int hvmop_flush_tlb_all(void)
     struct domain *d = current->domain;
     struct vcpu *v;
 
+    if ( !is_hvm_domain(d) )
+        return -EINVAL;
+
     /* Avoid deadlock if more than one vcpu tries this at the same time. */
     if ( !spin_trylock(&d->hypercall_deadlock_mutex) )
         return -EAGAIN;
@@ -2413,6 +2416,7 @@ static int hvmop_flush_tlb_all(void)
 long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
 
 {
+    struct domain *curr_d = current->domain;
     long rc = 0;
 
     switch ( op )
@@ -2434,6 +2438,10 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         rc = rcu_lock_target_domain_by_id(a.domid, &d);
         if ( rc != 0 )
             return rc;
+
+        rc = -EPERM;
+        if ( (curr_d != d) && !IS_PRIV_FOR(curr_d, d) )
+            goto param_fail;
 
         rc = -EINVAL;
         if ( !is_hvm_domain(d) )
@@ -2477,8 +2485,9 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
                     rc = -EINVAL;
                 break;
             case HVM_PARAM_IDENT_PT:
+                /* Not reflexive, as we must domain_pause(). */
                 rc = -EPERM;
-                if ( !IS_PRIV(current->domain) )
+                if ( curr_d == d )
                     break;
 
                 rc = -EINVAL;
@@ -2508,13 +2517,13 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
                 domctl_lock_release();
                 break;
             case HVM_PARAM_DM_DOMAIN:
-                /* Privileged domains only, as we must domain_pause(d). */
+                /* Not reflexive, as we must domain_pause(). */
                 rc = -EPERM;
-                if ( !IS_PRIV_FOR(current->domain, d) )
+                if ( curr_d == d )
                     break;
 
                 if ( a.value == DOMID_SELF )
-                    a.value = current->domain->domain_id;
+                    a.value = curr_d->domain_id;
 
                 rc = 0;
                 domain_pause(d); /* safe to change per-vcpu xen_port */
@@ -2539,9 +2548,9 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
                 domain_unpause(d);
                 break;
             case HVM_PARAM_ACPI_S_STATE:
-                /* Privileged domains only, as we must domain_pause(d). */
+                /* Not reflexive, as we must domain_pause(). */
                 rc = -EPERM;
-                if ( !IS_PRIV_FOR(current->domain, d) )
+                if ( curr_d == d )
                     break;
 
                 rc = 0;
@@ -2612,6 +2621,10 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         if ( rc != 0 )
             return rc;
 
+        rc = -EPERM;
+        if ( !IS_PRIV_FOR(curr_d, d) )
+            goto param_fail2;
+
         rc = -EINVAL;
         if ( !is_hvm_domain(d) )
             goto param_fail2;
@@ -2649,6 +2662,10 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         rc = rcu_lock_target_domain_by_id(a.domid, &d);
         if ( rc != 0 )
             return rc;
+
+        rc = -EPERM;
+        if ( !IS_PRIV_FOR(curr_d, d) )
+            goto param_fail3;
 
         rc = -EINVAL;
         if ( !is_hvm_domain(d) )
@@ -2705,6 +2722,10 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         rc = rcu_lock_target_domain_by_id(a.domid, &d);
         if ( rc != 0 )
             return rc;
+
+        rc = -EPERM;
+        if ( !IS_PRIV_FOR(curr_d, d) )
+            goto param_fail4;
 
         rc = -EINVAL;
         if ( !is_hvm_domain(d) )
