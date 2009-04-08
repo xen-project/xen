@@ -17,10 +17,6 @@
 
 import sys
 
-# Add fallback path for non-native python path installs if needed
-sys.path.append( '/usr/lib/python' )
-sys.path.append( '/usr/lib64/python' )
-
 from xen.xensec_gen import main
 
 main.main( )

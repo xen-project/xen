@@ -20,7 +20,6 @@ import sys
 import time
 import re
 import os
-sys.path.append('/usr/lib/python')
 
 from xen.util.xmlrpclib2 import ServerProxy
 from optparse import *

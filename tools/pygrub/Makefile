@@ -9,15 +9,10 @@ build:
 	CC="$(CC)" CFLAGS="$(CFLAGS)" python setup.py build
 
 .PHONY: install
-ifndef XEN_PYTHON_NATIVE_INSTALL
 install: all
-	CC="$(CC)" CFLAGS="$(CFLAGS)" python setup.py install --root="$(DESTDIR)" --home="$(PREFIX)" --prefix="" --force
+	CC="$(CC)" CFLAGS="$(CFLAGS)" python setup.py install \
+		--prefix="$(PREFIX)" --root="$(DESTDIR)" --force
 	$(INSTALL_DIR) $(DESTDIR)/var/run/xend/boot
-else
-install: all
-	CC="$(CC)" CFLAGS="$(CFLAGS)" python setup.py install --root="$(DESTDIR)"
-	$(INSTALL_DIR) $(DESTDIR)/var/run/xend/boot
-endif
 
 .PHONY: clean
 clean:

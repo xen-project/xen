@@ -74,7 +74,6 @@ console_cfg = {
 
 import sys
 import time
-sys.path.append('/usr/lib/python')
 
 from xapi import connect, execute
 

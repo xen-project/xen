@@ -40,9 +40,6 @@ ifeq ($(ACM_SECURITY),y)
 all: build
 
 .PHONY: install
-ifndef XEN_PYTHON_NATIVE_INSTALL
-install: LIBPATH=$(shell PYTHONPATH=../python/xen/util python -c "import auxbin; print auxbin.libpath()")
-endif
 install: all $(ACM_CONFIG_FILE)
 	$(INSTALL_DIR) $(DESTDIR)$(SBINDIR)
 	$(INSTALL_PROG) $(ACM_INST_TOOLS) $(DESTDIR)$(SBINDIR)
@@ -63,11 +60,8 @@ install: all $(ACM_CONFIG_FILE)
 	$(INSTALL_DATA) $(ACM_INST_HTML) $(DESTDIR)$(ACM_SECGEN_HTMLDIR)
 	$(INSTALL_DIR) $(DESTDIR)$(ACM_SECGEN_CGIDIR)
 	$(INSTALL_PROG) $(ACM_INST_CGI) $(DESTDIR)$(ACM_SECGEN_CGIDIR)
-ifndef XEN_PYTHON_NATIVE_INSTALL
-	python python/setup.py install --install-lib="$(DESTDIR)$(LIBPATH)/python"
-else
-	python python/setup.py install --root="$(DESTDIR)"
-endif
+	python python/setup.py install \
+		--prefix="$(PREFIX)" --root="$(DESTDIR)" --force
 else
 .PHONY: all
 all:

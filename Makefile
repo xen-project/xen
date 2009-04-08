@@ -188,11 +188,7 @@ help:
 	@echo '  clean-tboot      - clean the tboot module if it exists'
 	@echo
 	@echo 'Environment:'
-	@echo '  XEN_PYTHON_NATIVE_INSTALL=y'
-	@echo '                   - native python install or dist'
-	@echo '                     install into prefix/lib/python<VERSION>'
-	@echo '                     instead of <PREFIX>/lib/python'
-	@echo '                     true if set to non-empty value, false otherwise'
+	@echo '  [ this documentation is sadly not complete ]'
 
 # Use this target with extreme care!
 .PHONY: uninstall

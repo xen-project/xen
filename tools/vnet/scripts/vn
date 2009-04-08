@@ -27,9 +27,6 @@ import socket
 import sys
 from getopt import getopt, GetoptError
 
-sys.path.append('/usr/lib/python')
-sys.path.append('/usr/lib64/python')
-
 from xen.xend import sxp
 from xen.xend.PrettyPrint import prettyprint
 

@@ -54,13 +54,9 @@ refresh-po: $(POTFILE)
 	$(MSGFMT) -c -o $@ $<
 
 .PHONY: install
-ifndef XEN_PYTHON_NATIVE_INSTALL
 install: install-messages install-dtd
-	CC="$(CC)" CFLAGS="$(CFLAGS)" python setup.py install --root="$(DESTDIR)" --home="$(PREFIX)" --prefix="" --force
-else
-install: install-messages install-dtd
-	CC="$(CC)" CFLAGS="$(CFLAGS)" python setup.py install --root="$(DESTDIR)" --force
-endif
+	CC="$(CC)" CFLAGS="$(CFLAGS)" python setup.py install \
+		--prefix="$(PREFIX)" --root="$(DESTDIR)" --force
 
 install-dtd: all
 	$(INSTALL_DIR) $(DESTDIR)$(DOCDIR)

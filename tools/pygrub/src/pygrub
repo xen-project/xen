@@ -21,8 +21,6 @@ import platform
 import curses, _curses, curses.wrapper, curses.textpad, curses.ascii
 import getopt
 
-sys.path = [ '/usr/lib/python', '/usr/lib64/python' ] + sys.path
-
 import fsimage
 import grub.GrubConf
 import grub.LiloConf
