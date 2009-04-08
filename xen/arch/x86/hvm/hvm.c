@@ -2489,20 +2489,23 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
                 if ( !paging_mode_hap(d) )
                     break;
 
-                domain_pause(d);
-
                 /*
                  * Update GUEST_CR3 in each VMCS to point at identity map.
                  * All foreign updates to guest state must synchronise on
                  * the domctl_lock.
                  */
-                spin_lock(&domctl_lock);
+                rc = -EAGAIN;
+                if ( !domctl_lock_acquire() )
+                    break;
+
+                rc = 0;
+                domain_pause(d);
                 d->arch.hvm_domain.params[a.index] = a.value;
                 for_each_vcpu ( d, v )
                     paging_update_cr3(v);
-                spin_unlock(&domctl_lock);
-
                 domain_unpause(d);
+
+                domctl_lock_release();
                 break;
             case HVM_PARAM_DM_DOMAIN:
                 /* Privileged domains only, as we must domain_pause(d). */
