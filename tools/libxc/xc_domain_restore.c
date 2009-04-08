@@ -1197,7 +1197,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
      * we need to adjust the live_p2m assignment appropriately */
     if ( guest_width > sizeof (xen_pfn_t) )
         for ( i = p2m_size - 1; i >= 0; i-- )
-            ((uint64_t *)live_p2m)[i] = p2m[i];
+            ((int64_t *)live_p2m)[i] = (long)p2m[i];
     else if ( guest_width < sizeof (xen_pfn_t) )
         for ( i = 0; i < p2m_size; i++ )   
             ((uint32_t *)live_p2m)[i] = p2m[i];
