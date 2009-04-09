@@ -48,7 +48,7 @@
 #include <public/platform.h>
 #include <public/sysctl.h>
 
-#define DEBUG_PM_CX
+/*#define DEBUG_PM_CX*/
 
 static void (*lapic_timer_off)(void);
 static void (*lapic_timer_on)(void);
