@@ -454,7 +454,7 @@ class PciController(DevController):
         for (domain, bus, slot, func) in pci_dev_list:
             self.setupOneDevice(domain, bus, slot, func)
         wPath = '/local/domain/0/backend/pci/%u/0/aerState' % (self.getDomid())
-        self.aerStatePath = xswatch(wPath, self._handleAerStateWatch)
+        self.aerStateWatch = xswatch(wPath, self._handleAerStateWatch)
         log.debug('pci: register aer watch %s', wPath)
         return
 
@@ -590,7 +590,7 @@ class PciController(DevController):
     def destroyDevice(self, devid, force):
         DevController.destroyDevice(self, devid, True)
         log.debug('pci: unregister aer watch')
-        self.unwatchAerState
+        self.unwatchAerState()
 
     def unwatchAerState(self):
         """Remove the watch on the domain's aerState node, if any."""
