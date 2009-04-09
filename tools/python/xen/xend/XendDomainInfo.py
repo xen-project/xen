@@ -685,31 +685,39 @@ class XendDomainInfo:
         # co-assignment devices hasn't been assigned, or has been assigned to
         # domN.
         coassignment_list = pci_device.find_coassigned_devices()
-        assigned_pci_device_str_list = get_assigned_pci_devices(self.domid)
+        assigned_pci_device_str_list = self._get_assigned_pci_devices()
         for pci_str in coassignment_list:
             (domain, bus, dev, func) = parse_pci_name(pci_str) 
             dev_str =  '0x%x,0x%x,0x%x,0x%x' % (domain, bus, dev, func)
             if xc.test_assign_device(0, dev_str) == 0:
                 continue
             if not pci_str in assigned_pci_device_str_list:
-                raise VmError(('pci: failed to pci-attach %s to dom%d" + \
+                raise VmError(("pci: failed to pci-attach %s to domain %s" + \
                     " because one of its co-assignment device %s has been" + \
-                    " assigned to other domain.' \
-                    )% (pci_device.name, self.domid, pci_str))
+                    " assigned to other domain." \
+                    )% (pci_device.name, self.info['name_label'], pci_str))
 
-        opts = ''
-        if 'opts' in new_dev and len(new_dev['opts']) > 0:
-            config_opts = new_dev['opts']
-            config_opts = map(lambda (x, y): x+'='+y, config_opts)
-            opts = ',' + reduce(lambda x, y: x+','+y, config_opts)
+        if self.domid is not None:
+            opts = ''
+            if 'opts' in new_dev and len(new_dev['opts']) > 0:
+                config_opts = new_dev['opts']
+                config_opts = map(lambda (x, y): x+'='+y, config_opts)
+                opts = ',' + reduce(lambda x, y: x+','+y, config_opts)
 
-        bdf_str = "%s:%s:%s.%s%s@%s" % (new_dev['domain'],
+            bdf_str = "%s:%s:%s.%s%s@%s" % (new_dev['domain'],
                 new_dev['bus'],
                 new_dev['slot'],
                 new_dev['func'],
                 opts,
                 new_dev['vslot'])
-        self.image.signalDeviceModel('pci-ins', 'pci-inserted', bdf_str)
+            self.image.signalDeviceModel('pci-ins', 'pci-inserted', bdf_str)
+
+            vslot = xstransact.Read("/local/domain/0/device-model/%i/parameter"
+                                    % self.getDomid())
+        else:
+            vslot = new_dev['vslot']
+
+        return vslot
 
 
     def device_create(self, dev_config):
@@ -788,10 +796,8 @@ class XendDomainInfo:
         if self.info.is_hvm():
             if pci_state == 'Initialising':
                 # HVM PCI device attachment
-                self.hvm_pci_device_create(dev_config)
+                vslot = self.hvm_pci_device_create(dev_config)
                 # Update vslot
-                vslot = xstransact.Read("/local/domain/0/device-model/%i/parameter"
-                                        % self.getDomid())
                 dev['vslot'] = vslot
                 for n in sxp.children(pci_dev):
                     if(n[0] == 'vslot'):
@@ -825,35 +831,66 @@ class XendDomainInfo:
             self.device_create(dev_sxp)
             return True
 
-        # use DevController.reconfigureDevice to change device config
-        dev_control = self.getDeviceController(dev_class)
-        dev_uuid = dev_control.reconfigureDevice(devid, dev_config)
-        if not self.info.is_hvm():
-            # in PV case, wait until backend state becomes connected.
-            dev_control.waitForDevice_reconfigure(devid)
-        num_devs = dev_control.cleanupDevice(devid)
+        if self.domid is not None:
+            # use DevController.reconfigureDevice to change device config
+            dev_control = self.getDeviceController(dev_class)
+            dev_uuid = dev_control.reconfigureDevice(devid, dev_config)
+            if not self.info.is_hvm():
+                # in PV case, wait until backend state becomes connected.
+                dev_control.waitForDevice_reconfigure(devid)
+            num_devs = dev_control.cleanupDevice(devid)
 
-        # update XendConfig with new device info
-        if dev_uuid:
-            new_dev_sxp = dev_control.configuration(devid)
+            # update XendConfig with new device info
+            if dev_uuid:
+                new_dev_sxp = dev_control.configuration(devid)
+                self.info.device_update(dev_uuid, new_dev_sxp)
+
+            # If there is no device left, destroy pci and remove config.
+            if num_devs == 0:
+                if self.info.is_hvm():
+                    self.destroyDevice('pci', devid, True)
+                    del self.info['devices'][dev_uuid]
+                    platform = self.info['platform']
+                    orig_dev_num = len(platform['pci'])
+                    # TODO: can use this to keep some info to ask high level
+                    # management tools to hot insert a new passthrough dev
+                    # after migration
+                    if orig_dev_num != 0:
+                        #platform['pci'] = ["%dDEVs" % orig_dev_num]
+                        platform['pci'] = []
+                else:
+                    self.destroyDevice('pci', devid)
+                    del self.info['devices'][dev_uuid]
+        else:
+            new_dev_sxp = ['pci']
+            for cur_dev in sxp.children(existing_dev_info, 'dev'):
+                if pci_state == 'Closing':
+                    if int(dev['domain'], 16) == int(sxp.child_value(cur_dev, 'domain'), 16) and \
+                       int(dev['bus'], 16) == int(sxp.child_value(cur_dev, 'bus'), 16) and \
+                       int(dev['slot'], 16) == int(sxp.child_value(cur_dev, 'slot'), 16) and \
+                       int(dev['func'], 16) == int(sxp.child_value(cur_dev, 'func'), 16):
+                        continue
+                new_dev_sxp.append(cur_dev)
+
+            if pci_state == 'Initialising':
+                for new_dev in sxp.children(dev_sxp, 'dev'):
+                    new_dev_sxp.append(new_dev)
+
+            dev_uuid = sxp.child_value(existing_dev_info, 'uuid')
             self.info.device_update(dev_uuid, new_dev_sxp)
 
-        # If there is no device left, destroy pci and remove config.
-        if num_devs == 0:
-            if self.info.is_hvm():
-                self.destroyDevice('pci', devid, True)
+            # If there is only 'vscsi' in new_dev_sxp, remove the config.
+            if len(sxp.children(new_dev_sxp, 'dev')) == 0:
                 del self.info['devices'][dev_uuid]
-                platform = self.info['platform']
-                orig_dev_num = len(platform['pci'])
-                # TODO: can use this to keep some info to ask high level
-                # management tools to hot insert a new passthrough dev
-                # after migration
-                if orig_dev_num != 0:
-                    #platform['pci'] = ["%dDEVs" % orig_dev_num]
-                    platform['pci'] = []
-            else:
-                self.destroyDevice('pci', devid)
-                del self.info['devices'][dev_uuid]
+                if self.info.is_hvm():
+                    platform = self.info['platform']
+                    orig_dev_num = len(platform['pci'])
+                    # TODO: can use this to keep some info to ask high level
+                    # management tools to hot insert a new passthrough dev
+                    # after migration
+                    if orig_dev_num != 0:
+                        #platform['pci'] = ["%dDEVs" % orig_dev_num]
+                        platform['pci'] = []
 
         xen.xend.XendDomain.instance().managed_config_save(self)
 
@@ -1054,7 +1091,7 @@ class XendDomainInfo:
             raise VmError("Device @ vslot 0x%x doesn't exist." % (vslot))
 
         if vslot == AUTO_PHP_SLOT:
-            raise VmError("Device @ vslot 0x%x do not support hotplug." % (vslot))
+            raise VmError("Device @ vslot 0x%x doesn't support hotplug." % (vslot))
 
         # Check the co-assignment.
         # To pci-detach a device D from domN, we should ensure: for each DD in the
@@ -1072,19 +1109,20 @@ class XendDomainInfo:
                     "parse it's resources - "+str(e))
         coassignment_list = pci_device.find_coassigned_devices()
         coassignment_list.remove(pci_device.name)
-        assigned_pci_device_str_list = get_assigned_pci_devices(self.domid)
+        assigned_pci_device_str_list = self._get_assigned_pci_devices()
         for pci_str in coassignment_list:
             if pci_str in assigned_pci_device_str_list:
-                raise VmError(('pci: failed to pci-detach %s from dom%d" + \
+                raise VmError(("pci: failed to pci-detach %s from domain %s" + \
                     " because one of its co-assignment device %s is still " + \
-                    " assigned to the domain.' \
-                    )% (pci_device.name, self.domid, pci_str))
+                    " assigned to the domain." \
+                    )% (pci_device.name, self.info['name_label'], pci_str))
 
 
         bdf_str = "%s:%s:%s.%s" % (x['domain'], x['bus'], x['slot'], x['func'])
         log.info("hvm_destroyPCIDevice:%s:%s!", x, bdf_str)
 
-        self.image.signalDeviceModel('pci-rem', 'pci-removed', bdf_str)
+        if self.domid is not None:
+            self.image.signalDeviceModel('pci-rem', 'pci-removed', bdf_str)
 
         return 0
 
@@ -1233,6 +1271,26 @@ class XendDomainInfo:
             if devid == int(sxp.child_value(devs[0], 'devid')):
                 return dev_info
         return None
+
+    def _get_assigned_pci_devices(self, devid = 0):
+        if self.domid is not None:
+            return get_assigned_pci_devices(self.domid)
+
+        dev_str_list = []
+        dev_info = self._getDeviceInfo_pci(devid)
+        if dev_info is None:
+            return dev_str_list
+        dev_uuid = sxp.child_value(dev_info, 'uuid')
+        pci_conf = self.info['devices'][dev_uuid][1]
+        pci_devs = pci_conf['devs']
+        for pci_dev in pci_devs:
+            domain = int(pci_dev['domain'], 16)
+            bus = int(pci_dev['bus'], 16)
+            slot = int(pci_dev['slot'], 16)
+            func = int(pci_dev['func'], 16)
+            dev_str = "%04x:%02x:%02x.%01x" % (domain, bus, slot, func)
+            dev_str_list = dev_str_list + [dev_str]
+        return dev_str_list 
 
     def setMemoryTarget(self, target):
         """Set the memory target of this domain.
