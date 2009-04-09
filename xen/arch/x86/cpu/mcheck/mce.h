@@ -70,7 +70,8 @@ enum mca_source {
 	MCA_MCE_HANDLER,
 	MCA_POLLER,
 	MCA_CMCI_HANDLER,
-	MCA_RESET
+	MCA_RESET,
+	MCA_MCE_SCAN
 };
 
 enum mca_extinfo {
@@ -92,6 +93,8 @@ void set_poll_bankmask(struct cpuinfo_x86 *c);
 DECLARE_PER_CPU(cpu_banks_t, poll_bankmask);
 DECLARE_PER_CPU(cpu_banks_t, no_cmci_banks);
 extern int cmci_support;
+extern int is_mc_panic;
+extern void mcheck_mca_clearbanks(cpu_banks_t);
 
 extern mctelem_cookie_t mcheck_mca_logout(enum mca_source, cpu_banks_t,
     struct mca_summary *);

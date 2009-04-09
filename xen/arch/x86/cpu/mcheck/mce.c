@@ -23,6 +23,7 @@
 #include "mce.h"
 
 int mce_disabled = 0;
+int is_mc_panic = 0;
 unsigned int nr_mce_banks;
 
 EXPORT_SYMBOL_GPL(nr_mce_banks);	/* non-fatal.o */
@@ -124,6 +125,7 @@ mctelem_cookie_t mcheck_mca_logout(enum mca_source who, cpu_banks_t bankmask,
 
 	switch (who) {
 	case MCA_MCE_HANDLER:
+	case MCA_MCE_SCAN:
 		mcg.mc_flags = MC_FLAG_MCE;
 		which = MC_URGENT;
 		break;
@@ -219,8 +221,9 @@ mctelem_cookie_t mcheck_mca_logout(enum mca_source who, cpu_banks_t bankmask,
 			cbret = mc_callback_bank_extended(mci, i, status);
 		}
 
-		/* Clear status */
-		mca_wrmsrl(MSR_IA32_MC0_STATUS + 4 * i, 0x0ULL);
+		if (who != MCA_MCE_SCAN)
+			/* Clear status */
+			mca_wrmsrl(MSR_IA32_MC0_STATUS + 4 * i, 0x0ULL);
 		wmb();
 	}
 
@@ -466,6 +469,21 @@ cmn_handler_done:
 		}
 	} else if (mctc != NULL) {
 		mctelem_dismiss(mctc);
+	}
+}
+
+void mcheck_mca_clearbanks(cpu_banks_t bankmask)
+{
+	int i;
+	uint64_t status;
+
+	for (i = 0; i < 32 && i < nr_mce_banks; i++) {
+		if (!test_bit(i, bankmask))
+			continue;
+		mca_rdmsrl(MSR_IA32_MC0_STATUS + i * 4, status);
+		if (!(status & MCi_STATUS_VAL))
+			continue;
+		mca_wrmsrl(MSR_IA32_MC0_STATUS + 4 * i, 0x0ULL);
 	}
 }
 
@@ -1207,9 +1225,8 @@ long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)
 
 		add_taint(TAINT_ERROR_INJECT);
 
-		on_selected_cpus(cpumask_of_cpu(target),
-		    x86_mc_mceinject, mc_mceinject, 1, 1);
-
+		on_selected_cpus(cpumask_of_cpu(target), x86_mc_mceinject,
+		    mc_mceinject, 1, 1);
 		break;
 
 	default:
@@ -1233,6 +1250,7 @@ void set_poll_bankmask(struct cpuinfo_x86 *c)
 }
 void mc_panic(char *s)
 {
+    is_mc_panic = 1;
     console_start_sync();
     printk("Fatal machine check: %s\n", s);
     printk("\n"

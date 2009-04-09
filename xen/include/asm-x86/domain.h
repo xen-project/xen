@@ -226,6 +226,7 @@ struct domain_mca_msrs
     uint64_t mci_ctl[MAX_NR_BANKS];
     uint16_t nr_injection;
     struct list_head impact_header;
+    spinlock_t lock;
 };
 
 struct arch_domain
