@@ -19,4 +19,7 @@ install: all
 clean:
 	$(RM) -f $(BIN) $(DEPS)
 
+%: %.c Makefile
+	$(CC) $(CFLAGS) $< $(LDFLAGS) -o $@
+
 -include $(DEPS)
