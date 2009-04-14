@@ -58,10 +58,16 @@ boolean_param("console_to_ring", opt_console_to_ring);
 static int opt_console_timestamps;
 boolean_param("console_timestamps", opt_console_timestamps);
 
-#define CONRING_SIZE 16384
-#define CONRING_IDX_MASK(i) ((i)&(CONRING_SIZE-1))
-static char conring[CONRING_SIZE];
-static uint32_t conringc, conringp;
+/* conring_size: allows a large console ring than default (16kB). */
+static uint32_t opt_conring_size;
+static void parse_conring_size(char *s)
+{ opt_conring_size = parse_size_and_unit(s, NULL); }
+custom_param("conring_size", parse_conring_size);
+
+#define _CONRING_SIZE 16384
+#define CONRING_IDX_MASK(i) ((i)&(conring_size-1))
+static char _conring[_CONRING_SIZE], *conring = _conring;
+static uint32_t conring_size = _CONRING_SIZE, conringc, conringp;
 
 static int sercon_handle = -1;
 
@@ -178,8 +184,8 @@ static void putchar_console_ring(int c)
 {
     ASSERT(spin_is_locked(&console_lock));
     conring[CONRING_IDX_MASK(conringp++)] = c;
-    if ( (uint32_t)(conringp - conringc) > CONRING_SIZE )
-        conringc = conringp - CONRING_SIZE;
+    if ( (uint32_t)(conringp - conringc) > conring_size )
+        conringc = conringp - conring_size;
 }
 
 long read_console_ring(struct xen_sysctl_readconsole *op)
@@ -199,8 +205,8 @@ long read_console_ring(struct xen_sysctl_readconsole *op)
     {
         idx = CONRING_IDX_MASK(c);
         len = conringp - c;
-        if ( (idx + len) > CONRING_SIZE )
-            len = CONRING_SIZE - idx;
+        if ( (idx + len) > conring_size )
+            len = conring_size - idx;
         if ( (sofar + len) > max )
             len = max - sofar;
         if ( copy_to_guest_offset(str, sofar, &conring[idx], len) )
@@ -212,8 +218,8 @@ long read_console_ring(struct xen_sysctl_readconsole *op)
     if ( op->clear )
     {
         spin_lock_irq(&console_lock);
-        if ( (uint32_t)(conringp - c) > CONRING_SIZE )
-            conringc = conringp - CONRING_SIZE;
+        if ( (uint32_t)(conringp - c) > conring_size )
+            conringc = conringp - conring_size;
         else
             conringc = c;
         spin_unlock_irq(&console_lock);
@@ -544,9 +550,11 @@ void printk(const char *fmt, ...)
     local_irq_restore(flags);
 }
 
-void __init init_console(void)
+void __init console_init_preirq(void)
 {
     char *p;
+
+    serial_init_preirq();
 
     /* Where should console output go? */
     for ( p = opt_console; p != NULL; p = strchr(p, ',') )
@@ -585,6 +593,37 @@ void __init init_console(void)
         add_taint(TAINT_SYNC_CONSOLE);
         printk("Console output is synchronous.\n");
     }
+}
+
+void __init console_init_postirq(void)
+{
+    char *ring;
+    unsigned int i;
+
+    serial_init_postirq();
+
+    /* Round size down to a power of two. */
+    while ( opt_conring_size & (opt_conring_size - 1) )
+        opt_conring_size &= opt_conring_size - 1;
+    if ( opt_conring_size < conring_size )
+        return;
+    
+    ring = xmalloc_bytes(opt_conring_size);
+    if ( ring == NULL )
+    {
+        printk("Unable to allocate console ring of %u bytes.\n",
+               opt_conring_size);
+        return;
+    }
+
+    spin_lock_irq(&console_lock);
+    for ( i = conringc ; i != conringp; i++ )
+        ring[i & (opt_conring_size - 1)] = conring[i & (conring_size - 1)];
+    conring_size = opt_conring_size;
+    conring = ring;
+    spin_unlock_irq(&console_lock);
+
+    printk("Allocated console ring of %u bytes.\n", opt_conring_size);
 }
 
 void __init console_endboot(void)

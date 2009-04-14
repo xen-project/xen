@@ -374,7 +374,6 @@ void __init start_kernel(void)
         ns16550_init(0, &ns16550_com1);
         ns16550_init(1, &ns16550_com2);
     }
-    serial_init_preirq();
 
 #ifdef CONFIG_VGA
     /* Plug in a default VGA mode */
@@ -390,7 +389,7 @@ void __init start_kernel(void)
                                         ia64_boot_param->console_info.num_cols;
 #endif
 
-    init_console();
+    console_init_preirq();
 
     if (running_on_sim || ia64_boot_param->domain_start == 0 ||
                           ia64_boot_param->domain_size == 0) {
@@ -648,7 +647,7 @@ printk("num_online_cpus=%d, max_cpus=%d\n",num_online_cpus(),max_cpus);
                 ns16550_init(0, &ns16550_com1);
             }
         }
-        serial_init_postirq();
+        console_init_postirq();
     }
 
     expose_p2m_init();

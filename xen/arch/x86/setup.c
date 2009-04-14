@@ -463,9 +463,7 @@ void __init __start_xen(unsigned long mbi_p)
     ns16550.io_base = 0x2f8;
     ns16550.irq     = 3;
     ns16550_init(1, &ns16550);
-    serial_init_preirq();
-
-    init_console();
+    console_init_preirq();
 
     printk("Command line: %s\n", cmdline);
 
@@ -958,7 +956,7 @@ void __init __start_xen(unsigned long mbi_p)
 
     initialize_keytable();
 
-    serial_init_postirq();
+    console_init_postirq();
 
     for_each_present_cpu ( i )
     {
