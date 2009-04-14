@@ -68,17 +68,20 @@ frob_iptable()
 {
   if [ "$command" == "online" ]
   then
-    local c="-A"
+    local c="-I"
   else
     local c="-D"
   fi
 
   iptables "$c" FORWARD -m physdev --physdev-in "$vif" "$@" -j ACCEPT \
-    2>/dev/null ||
-    [ "$c" == "-D" ] ||
-    log err \
-     "iptables $c FORWARD -m physdev --physdev-in $vif $@ -j ACCEPT failed.
-If you are using iptables, this may affect networking for guest domains."
+    2>/dev/null &&
+  iptables "$c" FORWARD -m state --state RELATED,ESTABLISHED -m physdev \
+    --physdev-out "$vif" -j ACCEPT 2>/dev/null
+
+  if [ "$command" == "online" ] && [ $? ]
+  then
+    log err "iptables setup failed. This may affect guest networking."
+  fi
 }
 
 
