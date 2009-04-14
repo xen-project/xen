@@ -4,10 +4,6 @@ import sys
 import traceback
 import getopt
 
-# add fallback path for non-native python path installs if needed
-sys.path.insert(-1, '/usr/lib/python')
-sys.path.insert(-1, '/usr/lib64/python')
-
 from xen.util.security import ACMError, err, get_ssid
 
 # getopt.gnu_getopt is better, but only exists in Python 2.3+.  Use

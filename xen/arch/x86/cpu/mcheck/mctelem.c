@@ -109,6 +109,14 @@ static struct mc_telem_ctl {
 	 * Telemetry array
 	 */
 	struct mctelem_ent *mctc_elems;
+	/*
+	 * Per-CPU processing lists, used for deferred (softirq)
+	 * processing of telemetry. mctc_cpu is indexed by the
+	 * CPU that the telemetry belongs to. mctc_cpu_processing
+	 * is indexed by the CPU that is processing the telemetry.
+	 */
+	struct mctelem_ent *mctc_cpu[NR_CPUS];
+	struct mctelem_ent *mctc_cpu_processing[NR_CPUS];
 } mctctl;
 
 /* Lock protecting all processing lists */
@@ -123,6 +131,82 @@ static void *cmpxchgptr(void *ptr, void *old, void *new)
 	return (void *)cmpxchg(ulp, a, b);
 }
 
+static void mctelem_xchg_head(struct mctelem_ent **headp,
+				struct mctelem_ent **old,
+				struct mctelem_ent *new)
+{
+	for (;;) {
+		*old = *headp;
+		wmb();
+		if (cmpxchgptr(headp, *old, new) == *old)
+			break;
+	}
+}
+
+
+void mctelem_defer(mctelem_cookie_t cookie)
+{
+	struct mctelem_ent *tep = COOKIE2MCTE(cookie);
+
+	mctelem_xchg_head(&mctctl.mctc_cpu[smp_processor_id()],
+	    &tep->mcte_next, tep);
+}
+
+void mctelem_process_deferred(unsigned int cpu,
+			      int (*fn)(unsigned int, mctelem_cookie_t))
+{
+	struct mctelem_ent *tep;
+	struct mctelem_ent *head, *prev;
+	int ret;
+
+	/*
+	 * First, unhook the list of telemetry structures, and	
+	 * hook it up to the processing list head for this CPU.
+	 */
+	mctelem_xchg_head(&mctctl.mctc_cpu[cpu],
+	    &mctctl.mctc_cpu_processing[smp_processor_id()], NULL);
+
+	head = mctctl.mctc_cpu_processing[smp_processor_id()];
+
+	/*
+	 * Then, fix up the list to include prev pointers, to make
+	 * things a little easier, as the list must be traversed in
+	 * chronological order, which is backward from the order they
+	 * are in.
+	 */
+	for (tep = head, prev = NULL; tep != NULL; tep = tep->mcte_next) {
+		tep->mcte_prev = prev;
+		prev = tep;
+	}
+
+	/*
+	 * Now walk the list of telemetry structures, handling each
+	 * one of them. Unhooking the structure here does not need to
+	 * be atomic, as this list is only accessed from a softirq
+	 * context; the MCE handler does not touch it.
+	 */
+	for (tep = prev; tep != NULL; tep = prev) {
+		prev = tep->mcte_prev;
+		tep->mcte_next = tep->mcte_prev = NULL;
+
+		ret = fn(cpu, MCTE2COOKIE(tep));
+		if (prev != NULL)
+			prev->mcte_next = NULL;
+		tep->mcte_prev = tep->mcte_next = NULL;
+		if (ret != 0)
+			mctelem_commit(MCTE2COOKIE(tep));
+		else
+			mctelem_dismiss(MCTE2COOKIE(tep));
+	}
+}
+
+int mctelem_has_deferred(unsigned int cpu)
+{
+	if (mctctl.mctc_cpu[cpu] != NULL)
+		return 1;
+	return 0;
+}
+
 /* Free an entry to its native free list; the entry must not be linked on
  * any list.
  */
@@ -130,21 +214,12 @@ static void mctelem_free(struct mctelem_ent *tep)
 {
 	mctelem_class_t target = MCTE_HOME(tep) == MCTE_F_HOME_URGENT ?
 	    MC_URGENT : MC_NONURGENT;
-	struct mctelem_ent **freelp;
-	struct mctelem_ent *oldhead;
 
 	BUG_ON(tep->mcte_refcnt != 0);
 	BUG_ON(MCTE_STATE(tep) != MCTE_F_STATE_FREE);
 
 	tep->mcte_prev = NULL;
-	freelp = &mctctl.mctc_free[target];
-	for (;;) {
-		oldhead = *freelp;
-		tep->mcte_next = oldhead;
-		wmb();
-		if (cmpxchgptr(freelp, oldhead, tep) == oldhead)
-			break;
-	}
+	mctelem_xchg_head(&mctctl.mctc_free[target], &tep->mcte_next, tep);
 }
 
 /* Increment the reference count of an entry that is not linked on to
@@ -308,22 +383,13 @@ void mctelem_dismiss(mctelem_cookie_t cookie)
 void mctelem_commit(mctelem_cookie_t cookie)
 {
 	struct mctelem_ent *tep = COOKIE2MCTE(cookie);
-	struct mctelem_ent **commlp;
-	struct mctelem_ent *oldhead;
 	mctelem_class_t target = MCTE_CLASS(tep) == MCTE_F_CLASS_URGENT ?
 	    MC_URGENT : MC_NONURGENT;
 
 	BUG_ON(tep->mcte_next != NULL || tep->mcte_prev != NULL);
 	MCTE_TRANSITION_STATE(tep, UNCOMMITTED, COMMITTED);
 
-	commlp = &mctctl.mctc_committed[target];
-	for (;;) {
-		oldhead = *commlp;
-		tep->mcte_prev = oldhead;
-		wmb();
-		if (cmpxchgptr(commlp, oldhead, tep) == oldhead)
-			break;
-	}
+	mctelem_xchg_head(&mctctl.mctc_committed[target], &tep->mcte_prev, tep);
 }
 
 /* Move telemetry from committed list to processing list, reversing the
@@ -358,13 +424,7 @@ static void mctelem_append_processing(mctelem_class_t which)
 	 * the list we unlink in a well-known location so it can be
 	 * picked up in panic code should we panic between this unlink
 	 * and the append to the processing list. */
-	for (;;) {
-		dangling[target] = *commlp;
-		wmb();
-		if (cmpxchgptr(commlp, dangling[target], NULL) ==
-		    dangling[target])
-			break;
-	}
+	mctelem_xchg_head(commlp, &dangling[target], NULL);
 
 	if (dangling[target] == NULL)
 		return;

@@ -2155,7 +2155,7 @@ def xm_pci_list(args):
                 "bus":      "0x%02x" % int(ppci_record["bus"]),
                 "slot":     "0x%02x" % int(ppci_record["slot"]),
                 "func":     "0x%01x" % int(ppci_record["func"]),
-                "vslt":     "0x%02x" % \
+                "vslot":    "0x%02x" % \
                             int(server.xenapi.DPCI.get_hotplug_slot(dpci_ref))
             }
             devs.append(dev)
@@ -2166,10 +2166,10 @@ def xm_pci_list(args):
     if len(devs) == 0:
         return
 
-    has_vslt = devs[0].has_key('vslt')
-    if has_vslt:
+    has_vslot = devs[0].has_key('vslot')
+    if has_vslot:
         hdr_str = 'VSlt domain   bus   slot   func'
-        fmt_str =  "%(vslt)-3s    %(domain)-3s  %(bus)-3s   %(slot)-3s    %(func)-3s    "
+        fmt_str =  "%(vslot)-3s    %(domain)-3s  %(bus)-3s   %(slot)-3s    %(func)-3s    "
     else:
         hdr_str = 'domain   bus   slot   func'
         fmt_str =  "%(domain)-3s  %(bus)-3s   %(slot)-3s    %(func)-3s    "
@@ -2441,16 +2441,16 @@ def parse_pci_configuration(args, state, opts = ''):
     dom = args[0]
     pci_dev_str = args[1]
     if len(args) == 3:
-        vslt = args[2]
+        vslot = args[2]
     else:
-        vslt = AUTO_PHP_SLOT_STR
+        vslot = AUTO_PHP_SLOT_STR
     pci=['pci']
     pci_match = re.match(r"((?P<domain>[0-9a-fA-F]{1,4})[:,])?" + \
             r"(?P<bus>[0-9a-fA-F]{1,2})[:,]" + \
             r"(?P<slot>[0-9a-fA-F]{1,2})[.,]" + \
             r"(?P<func>[0-7])$", pci_dev_str)
     if pci_match == None:
-        raise OptionError("Invalid argument: %s %s" % (pci_dev_str,vslt))
+        raise OptionError("Invalid argument: %s %s" % (pci_dev_str, vslot))
     pci_dev_info = pci_match.groupdict('0')
 
     try:
@@ -2458,13 +2458,13 @@ def parse_pci_configuration(args, state, opts = ''):
                 ['bus', '0x'+ pci_dev_info['bus']],
                 ['slot', '0x'+ pci_dev_info['slot']],
                 ['func', '0x'+ pci_dev_info['func']],
-                ['vslt', '0x%x' % int(vslt, 16)]]
+                ['vslot', '0x%x' % int(vslot, 16)]]
         if len(opts) > 0:
             pci_bdf.append(['opts', opts])
         pci.append(pci_bdf)
 
     except:
-        raise OptionError("Invalid argument: %s %s" % (pci_dev_str,vslt))
+        raise OptionError("Invalid argument: %s %s" % (pci_dev_str, vslot))
     pci.append(['state', state])
 
     return (dom, pci)
@@ -2494,7 +2494,7 @@ def xm_pci_attach(args):
         bus = int(sxp.child_value(pci_dev, 'bus'), 16)
         slot = int(sxp.child_value(pci_dev, 'slot'), 16)
         func = int(sxp.child_value(pci_dev, 'func'), 16)
-        vslt = int(sxp.child_value(pci_dev, 'vslt'), 16)
+        vslot = int(sxp.child_value(pci_dev, 'vslot'), 16)
         name = "%04x:%02x:%02x.%01x" % (domain, bus, slot, func)
 
         target_ref = None
@@ -2508,7 +2508,7 @@ def xm_pci_attach(args):
         dpci_record = {
             "VM":           get_single_vm(dom),
             "PPCI":         target_ref,
-            "hotplug_slot": vslt,
+            "hotplug_slot": vslot,
             "options":      dict(config_pci_opts)
         }
         server.xenapi.DPCI.create(dpci_record)
@@ -2667,7 +2667,7 @@ def xm_pci_detach(args):
         bus = int(sxp.child_value(pci_dev, 'bus'), 16)
         slot = int(sxp.child_value(pci_dev, 'slot'), 16)
         func = int(sxp.child_value(pci_dev, 'func'), 16)
-        vslt = int(sxp.child_value(pci_dev, 'vslt'), 16)
+        vslot = int(sxp.child_value(pci_dev, 'vslot'), 16)
         name = "%04x:%02x:%02x.%01x" % (domain, bus, slot, func)
 
         target_ref = None

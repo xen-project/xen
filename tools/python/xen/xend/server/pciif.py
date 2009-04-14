@@ -71,6 +71,10 @@ class PciController(DevController):
         pcidevid = 0
         vslots = ""
         for pci_config in config.get('devs', []):
+            vslot = pci_config.get('vslot')
+            if vslot is not None:
+                vslots = vslots + vslot + ";"
+
             domain = parse_hex(pci_config.get('domain', 0))
             bus = parse_hex(pci_config.get('bus', 0))
             slot = parse_hex(pci_config.get('slot', 0))
@@ -82,10 +86,6 @@ class PciController(DevController):
                 opts = map(lambda (x, y): x+'='+y, opts)
                 opts = reduce(lambda x, y: x+','+y, opts)
                 back['opts-%i' % pcidevid] = opts
-
-            vslt = pci_config.get('vslt')
-            if vslt is not None:
-                vslots = vslots + vslt + ";"
 
             back['dev-%i' % pcidevid] = "%04x:%02x:%02x.%01x" % \
                                         (domain, bus, slot, func)
@@ -170,9 +170,9 @@ class PciController(DevController):
                 # Update vslots
                 if back.get('vslots') is not None:
                     vslots = old_vslots
-                    for vslt in back['vslots'].split(';'):
-                        if vslt != '':
-                            vslots = vslots.replace(vslt + ';', '', 1)
+                    for vslot in back['vslots'].split(';'):
+                        if vslot != '':
+                            vslots = vslots.replace(vslot + ';', '', 1)
                     if vslots == '':
                         self.removeBackend(devid, 'vslots')
                     else:
@@ -219,9 +219,9 @@ class PciController(DevController):
                 #append vslot info
                 if vslots is not None:
                     try:
-                        dev_dict['vslt'] = slot_list[i]
+                        dev_dict['vslot'] = slot_list[i]
                     except IndexError:
-                        dev_dict['vslt'] = AUTO_PHP_SLOT_STR
+                        dev_dict['vslot'] = AUTO_PHP_SLOT_STR
 
                 pci_devs.append(dev_dict)
 
@@ -454,7 +454,7 @@ class PciController(DevController):
         for (domain, bus, slot, func) in pci_dev_list:
             self.setupOneDevice(domain, bus, slot, func)
         wPath = '/local/domain/0/backend/pci/%u/0/aerState' % (self.getDomid())
-        self.aerStatePath = xswatch(wPath, self._handleAerStateWatch)
+        self.aerStateWatch = xswatch(wPath, self._handleAerStateWatch)
         log.debug('pci: register aer watch %s', wPath)
         return
 
@@ -590,7 +590,7 @@ class PciController(DevController):
     def destroyDevice(self, devid, force):
         DevController.destroyDevice(self, devid, True)
         log.debug('pci: unregister aer watch')
-        self.unwatchAerState
+        self.unwatchAerState()
 
     def unwatchAerState(self):
         """Remove the watch on the domain's aerState node, if any."""

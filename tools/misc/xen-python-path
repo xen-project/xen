@@ -17,31 +17,8 @@
 # Copyright (C) 2007 XenSource Inc.
 #============================================================================
 
+# Nowadays we install xen in the standard python site-packages
+# directories.  This script is still provided for the benefit of old
+# out-of-xen-tree callers.  It is deprecated and will be removed.
 
-# Use the auxbin module in Xend to determine the correct Python path.  We
-# take the first installed instance of auxbin that we find, and then run it
-# to determine the correct path, appending that to sys.path.
-
-AUXBIN = 'xen/util/auxbin.py'
-
-import os
-import os.path
-import sys
-
-usr   = os.path.dirname(os.path.dirname(sys.argv[0]))
-list  = [ os.path.join(usr,'lib64') ]
-list += [ os.path.join(usr,'lib') ]
-list += ['/usr/lib64', '/usr/lib']
-
-for l in list:
-    for p in ['python%s' % sys.version[:3], 'python']:
-        for k in ['', 'site-packages/']:
-            d = os.path.join(l, p, k)
-            if os.path.exists(os.path.join(d, AUXBIN)):
-                sys.path.append(d)
-                import xen.util.auxbin
-                print os.path.join(xen.util.auxbin.libpath(), p)
-                sys.exit(0)
-
-print >>sys.stderr, "Cannot find Xen Python modules."
-sys.exit(1)
+print '/dev/enoent/xen/python-path'

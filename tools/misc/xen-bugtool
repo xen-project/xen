@@ -6,9 +6,6 @@
 
 import sys
 
-sys.path.append('/usr/lib/python')
-sys.path.append('/usr/lib64/python')
-
 from xen.util import bugtool
 
 

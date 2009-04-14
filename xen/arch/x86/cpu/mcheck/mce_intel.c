@@ -18,6 +18,29 @@ int cmci_support = 0;
 static int nr_intel_ext_msrs = 0;
 static int firstbank;
 
+/* Below are for MCE handling */
+struct mce_softirq_barrier {
+	atomic_t val;
+	atomic_t ingen;
+	atomic_t outgen;
+};
+
+static struct mce_softirq_barrier mce_inside_bar, mce_severity_bar;
+static struct mce_softirq_barrier mce_trap_bar;
+
+/*
+ * mce_logout_lock should only be used in the trap handler,
+ * while MCIP has not been cleared yet in the global status
+ * register. Other use is not safe, since an MCE trap can
+ * happen at any moment, which would cause lock recursion.
+ */
+static DEFINE_SPINLOCK(mce_logout_lock);
+
+static atomic_t severity_cpu = ATOMIC_INIT(-1);
+
+static void mce_barrier_enter(struct mce_softirq_barrier *);
+static void mce_barrier_exit(struct mce_softirq_barrier *);
+
 #ifdef CONFIG_X86_MCE_THERMAL
 static void unexpected_thermal_interrupt(struct cpu_user_regs *regs)
 {
@@ -123,7 +146,7 @@ static inline void intel_get_extended_msr(struct mcinfo_extended *ext, u32 msr)
     if ( ext->mc_msrs < ARRAY_SIZE(ext->mc_msr)
          && msr < MSR_IA32_MCG_EAX + nr_intel_ext_msrs ) {
         ext->mc_msr[ext->mc_msrs].reg = msr;
-        rdmsrl(msr, ext->mc_msr[ext->mc_msrs].value);
+        mca_rdmsrl(msr, ext->mc_msr[ext->mc_msrs].value);
         ++ext->mc_msrs;
     }
 }
@@ -169,45 +192,6 @@ intel_get_extended_msrs(struct mc_info *mci, uint16_t bank, uint64_t status)
     return MCA_EXTINFO_GLOBAL;
 }
 
-/* Below are for MCE handling */
-
-/* Log worst error severity and offending CPU.,
- * Pick this CPU for further processing in softirq */
-static int severity_cpu = -1;
-static int worst = 0;
-
-/* Lock of entry@second round scanning in MCE# handler */
-static cpumask_t scanned_cpus;
-/* Lock for entry@Critical Section in MCE# handler */
-static bool_t mce_enter_lock = 0;
-/* Record how many CPUs impacted in this MCE# */
-static cpumask_t impact_map;
-
-/* Lock of softirq rendezvous entering point */
-static cpumask_t mced_cpus;
-/*Lock of softirq rendezvous leaving point */
-static cpumask_t finished_cpus;
-/* Lock for picking one processing CPU */
-static bool_t mce_process_lock = 0;
-
-/* Spinlock for vMCE# MSR virtualization data */
-static DEFINE_SPINLOCK(mce_locks);
-
-/* Local buffer for holding MCE# data temporarily, sharing between mce
- * handler and softirq handler. Those data will be finally committed
- * for DOM0 Log and coped to per_dom related data for guest vMCE#
- * MSR virtualization.
- * Note: When local buffer is still in processing in softirq, another
- * MCA comes, simply panic.
- */
-
-struct mc_local_t
-{
-    bool_t in_use;
-    mctelem_cookie_t mctc[NR_CPUS];
-};
-static struct mc_local_t mc_local;
-
 /* This node list records errors impacting a domain. when one
  * MCE# happens, one error bank impacts a domain. This error node
  * will be inserted to the tail of the per_dom data for vMCE# MSR
@@ -252,18 +236,22 @@ static int fill_vmsr_data(int cpu, struct mcinfo_bank *mc_bank,
         }
 
         entry = alloc_bank_entry();
+        if (entry == NULL)
+	    return -1;
         entry->mci_status = mc_bank->mc_status;
         entry->mci_addr = mc_bank->mc_addr;
         entry->mci_misc = mc_bank->mc_misc;
         entry->cpu = cpu;
         entry->bank = mc_bank->mc_bank;
 
+	spin_lock(&d->arch.vmca_msrs.lock);
         /* New error Node, insert to the tail of the per_dom data */
         list_add_tail(&entry->list, &d->arch.vmca_msrs.impact_header);
         /* Fill MSR global status */
         d->arch.vmca_msrs.mcg_status = gstatus;
         /* New node impact the domain, need another vMCE# injection*/
         d->arch.vmca_msrs.nr_injection++;
+	spin_unlock(&d->arch.vmca_msrs.lock);
 
         printk(KERN_DEBUG "MCE: Found error @[CPU%d BANK%d "
                 "status %"PRIx64" addr %"PRIx64" domid %d]\n ",
@@ -273,100 +261,83 @@ static int fill_vmsr_data(int cpu, struct mcinfo_bank *mc_bank,
     return 0;
 }
 
-static int mce_actions(void) {
-    int32_t cpu, ret;
+/*
+ * Called from mctelem_process_deferred. Return 1 if the telemetry
+ * should be committed for dom0 consumption, 0 if it should be
+ * dismissed.
+ */
+static int mce_action(unsigned int cpu, mctelem_cookie_t mctc)
+{
     struct mc_info *local_mi;
     struct mcinfo_common *mic = NULL;
     struct mcinfo_global *mc_global;
     struct mcinfo_bank *mc_bank;
 
-    /* Spinlock is used for exclusive read/write of vMSR virtualization
-     * (per_dom vMCE# data)
-     */
-    spin_lock(&mce_locks);
-
-    /*
-     * If softirq is filling this buffer while another MCE# comes,
-     * simply panic
-     */
-    test_and_set_bool(mc_local.in_use);
-
-    for_each_cpu_mask(cpu, impact_map) {
-        if (mc_local.mctc[cpu] == NULL) {
-            printk(KERN_ERR "MCE: get reserved entry failed\n ");
-            ret = -1;
-            goto end;
-        }
-        local_mi = (struct mc_info*)mctelem_dataptr(mc_local.mctc[cpu]);
-        x86_mcinfo_lookup(mic, local_mi, MC_TYPE_GLOBAL);
-        if (mic == NULL) {
-            printk(KERN_ERR "MCE: get local buffer entry failed\n ");
-            ret = -1;
-            goto end;
-        }
-
-        mc_global = (struct mcinfo_global *)mic;
-
-        /* Processing bank information */
-        x86_mcinfo_lookup(mic, local_mi, MC_TYPE_BANK);
-
-        for ( ; mic && mic->size; mic = x86_mcinfo_next(mic) ) {
-            if (mic->type != MC_TYPE_BANK) {
-                continue;
-            }
-            mc_bank = (struct mcinfo_bank*)mic;
-            /* Fill vMCE# injection and vMCE# MSR virtualization related data */
-            if (fill_vmsr_data(cpu, mc_bank, mc_global->mc_gstatus) == -1) {
-                ret = -1;
-                goto end;
-            }
-
-            /* TODO: Add recovery actions here, such as page-offline, etc */
-        }
-    } /* end of impact_map loop */
-
-    ret = 0;
-
-end:
-
-    for_each_cpu_mask(cpu, impact_map) {
-        /* This reserved entry is processed, commit it */
-        if (mc_local.mctc[cpu] != NULL) {
-            mctelem_commit(mc_local.mctc[cpu]);
-            printk(KERN_DEBUG "MCE: Commit one URGENT ENTRY\n");
-        }
+    local_mi = (struct mc_info*)mctelem_dataptr(mctc);
+    x86_mcinfo_lookup(mic, local_mi, MC_TYPE_GLOBAL);
+    if (mic == NULL) {
+        printk(KERN_ERR "MCE: get local buffer entry failed\n ");
+        return 0;
     }
 
-    test_and_clear_bool(mc_local.in_use);
-    spin_unlock(&mce_locks);
-    return ret;
+    mc_global = (struct mcinfo_global *)mic;
+
+    /* Processing bank information */
+    x86_mcinfo_lookup(mic, local_mi, MC_TYPE_BANK);
+
+    for ( ; mic && mic->size; mic = x86_mcinfo_next(mic) ) {
+        if (mic->type != MC_TYPE_BANK) {
+            continue;
+        }
+        mc_bank = (struct mcinfo_bank*)mic;
+        /* Fill vMCE# injection and vMCE# MSR virtualization related data */
+        if (fill_vmsr_data(cpu, mc_bank, mc_global->mc_gstatus) == -1)
+             break;
+
+       /* TODO: Add recovery actions here, such as page-offline, etc */
+    }
+
+    return 1;
 }
 
 /* Softirq Handler for this MCE# processing */
 static void mce_softirq(void)
 {
     int cpu = smp_processor_id();
+    unsigned int workcpu;
     cpumask_t affinity;
 
-    /* Wait until all cpus entered softirq */
-    while ( cpus_weight(mced_cpus) != num_online_cpus() ) {
-        cpu_relax();
-    }
-    /* Not Found worst error on severity_cpu, it's weird */
-    if (severity_cpu == -1) {
-        printk(KERN_WARNING "MCE: not found severity_cpu!\n");
-        mc_panic("MCE: not found severity_cpu!");
-        return;
-    }
+    printk(KERN_DEBUG "CPU%d enter softirq\n", cpu);
+
+    mce_barrier_enter(&mce_inside_bar);
+
+    /*
+     * Everybody is here. Now let's see who gets to do the
+     * recovery work. Right now we just see if there's a CPU
+     * that did not have any problems, and pick that one.
+     *
+     * First, just set a default value: the last CPU who reaches this
+     * will overwrite the value and become the default.
+     */
+
+    atomic_set(&severity_cpu, cpu);
+
+    mce_barrier_enter(&mce_severity_bar);
+    if (!mctelem_has_deferred(cpu))
+        atomic_set(&severity_cpu, cpu);
+    mce_barrier_exit(&mce_severity_bar);
+
     /* We choose severity_cpu for further processing */
-    if (severity_cpu == cpu) {
+    if (atomic_read(&severity_cpu) == cpu) {
+
+        printk(KERN_DEBUG "CPU%d handling errors\n", cpu);
 
         /* Step1: Fill DOM0 LOG buffer, vMCE injection buffer and
          * vMCE MSRs virtualization buffer
          */
-        if (mce_actions())
-            mc_panic("MCE recovery actions or Filling vMCE MSRS "
-                     "virtualization data failed!\n");
+        for_each_online_cpu(workcpu) {
+	    mctelem_process_deferred(workcpu, mce_action);
+        }
 
         /* Step2: Send Log to DOM0 through vIRQ */
         if (dom0 && guest_enabled_event(dom0->vcpu[0], VIRQ_MCA)) {
@@ -387,26 +358,9 @@ static void mce_softirq(void)
             vcpu_set_affinity(dom0->vcpu[0], &affinity);
             vcpu_kick(dom0->vcpu[0]);
         }
-
-        /* Clean Data */
-        test_and_clear_bool(mce_process_lock);
-        cpus_clear(impact_map);
-        cpus_clear(scanned_cpus);
-        worst = 0;
-        cpus_clear(mced_cpus);
-        memset(&mc_local, 0x0, sizeof(mc_local));
     }
 
-    cpu_set(cpu, finished_cpus);
-    wmb();
-   /* Leave until all cpus finished recovery actions in softirq */
-    while ( cpus_weight(finished_cpus) != num_online_cpus() ) {
-        cpu_relax();
-    }
-
-    cpus_clear(finished_cpus);
-    severity_cpu = -1;
-    printk(KERN_DEBUG "CPU%d exit softirq \n", cpu);
+    mce_barrier_exit(&mce_inside_bar);
 }
 
 /* Machine Check owner judge algorithm:
@@ -424,127 +378,157 @@ static void mce_softirq(void)
  * Round2: Do all MCE processing logic as normal.
  */
 
-/* Simple Scan. Panic when found non-recovery errors. Doing this for
- * avoiding LOG missing
- */
-static void severity_scan(void)
+static void mce_panic_check(void)
 {
-    uint64_t status;
-    int32_t i;
-
-    /* TODO: For PCC = 0, we need to have further judge. If it is can't be
-     * recovered, we need to RESET for avoiding DOM0 LOG missing
-     */
-    for ( i = 0; i < nr_mce_banks; i++) {
-        mca_rdmsrl(MSR_IA32_MC0_STATUS + 4 * i , status);
-        if ( !(status & MCi_STATUS_VAL) )
-            continue;
-        /* MCE handler only handles UC error */
-        if ( !(status & MCi_STATUS_UC) )
-            continue;
-        if ( !(status & MCi_STATUS_EN) )
-            continue;
-        /*
-         * If this was an injected error, keep going, since the
-         * interposed value will be lost at reboot.
-         */
-        if (status & MCi_STATUS_PCC && intpose_lookup(smp_processor_id(),
-          MSR_IA32_MC0_STATUS + 4 * i, NULL) == NULL)
-            mc_panic("pcc = 1, cpu unable to continue\n");
-    }
-
-    /* TODO: Further judgement for later CPUs here, maybe need MCACOD assistence */
-    /* EIPV and RIPV is not a reliable way to judge the error severity */
-
+      if (is_mc_panic) {
+              local_irq_enable();
+              for ( ; ; )
+                      halt();
+      }
 }
 
+/*
+ * Initialize a barrier. Just set it to 0.
+ */
+static void mce_barrier_init(struct mce_softirq_barrier *bar)
+{
+      atomic_set(&bar->val, 0);
+      atomic_set(&bar->ingen, 0);
+      atomic_set(&bar->outgen, 0);
+}
+
+#if 0
+/*
+ * This function will need to be used when offlining a CPU in the
+ * recovery actions.
+ *
+ * Decrement a barrier only. Needed for cases where the CPU
+ * in question can't do it itself (e.g. it is being offlined).
+ */
+static void mce_barrier_dec(struct mce_softirq_barrier *bar)
+{
+      atomic_inc(&bar->outgen);
+      wmb();
+      atomic_dec(&bar->val);
+}
+#endif
+
+static void mce_spin_lock(spinlock_t *lk)
+{
+      while (!spin_trylock(lk)) {
+              cpu_relax();
+              mce_panic_check();
+      }
+}
+
+static void mce_spin_unlock(spinlock_t *lk)
+{
+      spin_unlock(lk);
+}
+
+/*
+ * Increment the generation number and the value. The generation number
+ * is incremented when entering a barrier. This way, it can be checked
+ * on exit if a CPU is trying to re-enter the barrier. This can happen
+ * if the first CPU to make it out immediately exits or re-enters, while
+ * another CPU that is still in the loop becomes otherwise occupied
+ * (e.g. it needs to service an interrupt, etc), missing the value
+ * it's waiting for.
+ *
+ * These barrier functions should always be paired, so that the
+ * counter value will reach 0 again after all CPUs have exited.
+ */
+static void mce_barrier_enter(struct mce_softirq_barrier *bar)
+{
+      int gen;
+
+      atomic_inc(&bar->ingen);
+      gen = atomic_read(&bar->outgen);
+      mb();
+      atomic_inc(&bar->val);
+      while ( atomic_read(&bar->val) != num_online_cpus() &&
+          atomic_read(&bar->outgen) == gen) {
+              mb();
+              mce_panic_check();
+      }
+}
+
+static void mce_barrier_exit(struct mce_softirq_barrier *bar)
+{
+      int gen;
+
+      atomic_inc(&bar->outgen);
+      gen = atomic_read(&bar->ingen);
+      mb();
+      atomic_dec(&bar->val);
+      while ( atomic_read(&bar->val) != 0 &&
+          atomic_read(&bar->ingen) == gen ) {
+              mb();
+              mce_panic_check();
+      }
+}
+
+static void mce_barrier(struct mce_softirq_barrier *bar)
+{
+      mce_barrier_enter(bar);
+      mce_barrier_exit(bar);
+}
 
 static void intel_machine_check(struct cpu_user_regs * regs, long error_code)
 {
-    unsigned int cpu = smp_processor_id();
-    int32_t severity = 0;
     uint64_t gstatus;
     mctelem_cookie_t mctc = NULL;
     struct mca_summary bs;
 
-    /* First round scanning */
-    severity_scan();
-    cpu_set(cpu, scanned_cpus);
-    while (cpus_weight(scanned_cpus) < num_online_cpus())
-        cpu_relax();
+    mce_spin_lock(&mce_logout_lock);
 
-    wmb();
-    /* All CPUs Finished first round scanning */
-    if (mc_local.in_use != 0) {
-        mc_panic("MCE: Local buffer is being processed, can't handle new MCE!\n");
-        return;
-    }
+    mctc = mcheck_mca_logout(MCA_MCE_SCAN, mca_allbanks, &bs);
 
-    /* Enter Critical Section */
-    while (test_and_set_bool(mce_enter_lock)) {
-        udelay (1);
-    }
-
-    mctc = mcheck_mca_logout(MCA_MCE_HANDLER, mca_allbanks, &bs);
-     /* local data point to the reserved entry, let softirq to
-      * process the local data */
-    if (!bs.errcnt) {
+    if (bs.errcnt) {
+        /*
+         * Uncorrected errors must be dealth with in softirq context.
+         */
+        if (bs.uc || bs.pcc) {
+            add_taint(TAINT_MACHINE_CHECK);
+            if (mctc != NULL)
+                mctelem_defer(mctc);
+            /*
+             * For PCC=1, context is lost, so reboot now without clearing
+             * the banks, and deal with the telemetry after reboot
+             * (the MSRs are sticky)
+             */
+            if (bs.pcc)
+                mc_panic("State lost due to machine check exception.\n");
+        } else {
+            if (mctc != NULL)
+                mctelem_commit(mctc);
+        }
+        mcheck_mca_clearbanks(mca_allbanks);
+    } else {
         if (mctc != NULL)
             mctelem_dismiss(mctc);
-        mc_local.mctc[cpu] = NULL;
-        cpu_set(cpu, mced_cpus);
-        test_and_clear_bool(mce_enter_lock);
-        raise_softirq(MACHINE_CHECK_SOFTIRQ);
-        return;
-    }
-    else if ( mctc != NULL) {
-        mc_local.mctc[cpu] = mctc;
     }
 
-    if (bs.uc || bs.pcc)
-        add_taint(TAINT_MACHINE_CHECK);
+    mce_spin_unlock(&mce_logout_lock);
 
-    if (bs.pcc) {
-        printk(KERN_WARNING "PCC=1 should have caused reset\n");
-        severity = 3;
-    }
-    else if (bs.uc) {
-        severity = 2;
-    }
-    else {
-        printk(KERN_WARNING "We should skip Correctable Error\n");
-        severity = 1;
-    }
-    /* This is the offending cpu! */
-    cpu_set(cpu, impact_map);
+    /*
+     * Wait until everybody has processed the trap.
+     */
+    mce_barrier(&mce_trap_bar);
 
-    if ( severity > worst) {
-        worst = severity;
-        severity_cpu = cpu;
-    }
-    cpu_set(cpu, mced_cpus);
-    test_and_clear_bool(mce_enter_lock);
-    wmb();
-
-    /* Wait for all cpus Leave Critical */
-    while (cpus_weight(mced_cpus) < num_online_cpus())
-        cpu_relax();
-    /* Print MCE error */
-    x86_mcinfo_dump(mctelem_dataptr(mctc));
-
-    /* Pick one CPU to clear MCIP */
-    if (!test_and_set_bool(mce_process_lock)) {
+    /*
+     * Clear MCIP if it wasn't already. There is a small
+     * chance that more than 1 CPU will end up doing this,
+     * but that's OK.
+     */
+    if (bs.errcnt) {
         mca_rdmsrl(MSR_IA32_MCG_STATUS, gstatus);
-        mca_wrmsrl(MSR_IA32_MCG_STATUS, gstatus & ~MCG_STATUS_MCIP);
-
-        if (worst >= 3) {
-            printk(KERN_WARNING "worst=3 should have caused RESET\n");
-            mc_panic("worst=3 should have caused RESET");
-        }
-        else {
-            printk(KERN_DEBUG "MCE: trying to recover\n");
-        }
+        if ((gstatus & MCG_STATUS_MCIP) != 0)
+            mca_wrmsrl(MSR_IA32_MCG_STATUS, gstatus & ~MCG_STATUS_MCIP);
+        /* Print MCE error */
+        x86_mcinfo_dump(mctelem_dataptr(mctc));
     }
+
     raise_softirq(MACHINE_CHECK_SOFTIRQ);
 }
 
@@ -778,6 +762,11 @@ static void mce_init(void)
 
     clear_in_cr4(X86_CR4_MCE);
 
+    mce_barrier_init(&mce_inside_bar);
+    mce_barrier_init(&mce_severity_bar);
+    mce_barrier_init(&mce_trap_bar);
+    spin_lock_init(&mce_logout_lock);
+
     /* log the machine checks left over from the previous reset.
      * This also clears all registers*/
 
@@ -840,6 +829,7 @@ void intel_mce_init_msr(struct domain *d)
     memset(d->arch.vmca_msrs.mci_ctl, ~0,
            sizeof(d->arch.vmca_msrs.mci_ctl));
     INIT_LIST_HEAD(&d->arch.vmca_msrs.impact_header);
+    spin_lock_init(&d->arch.vmca_msrs.lock);
 }
 
 int intel_mce_wrmsr(u32 msr, u64 value)
@@ -849,7 +839,7 @@ int intel_mce_wrmsr(u32 msr, u64 value)
     unsigned int bank;
     int ret = 1;
 
-    spin_lock(&mce_locks);
+    spin_lock(&d->arch.vmca_msrs.lock);
     switch(msr)
     {
     case MSR_IA32_MCG_CTL:
@@ -924,7 +914,7 @@ int intel_mce_wrmsr(u32 msr, u64 value)
         ret = 0;
         break;
     }
-    spin_unlock(&mce_locks);
+    spin_unlock(&d->arch.vmca_msrs.lock);
     return ret;
 }
 
@@ -936,7 +926,7 @@ int intel_mce_rdmsr(u32 msr, u32 *lo, u32 *hi)
     struct bank_entry *entry = NULL;
 
     *lo = *hi = 0x0;
-    spin_lock(&mce_locks);
+    spin_lock(&d->arch.vmca_msrs.lock);
     switch(msr)
     {
     case MSR_IA32_MCG_STATUS:
@@ -1022,7 +1012,7 @@ int intel_mce_rdmsr(u32 msr, u32 *lo, u32 *hi)
         ret = 0;
         break;
     }
-    spin_unlock(&mce_locks);
+    spin_unlock(&d->arch.vmca_msrs.lock);
     return ret;
 }
 

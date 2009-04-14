@@ -35,7 +35,11 @@ def execute(exe, args = None):
     a = [ exepath ]
     if args:
         a.extend(args)
-    os.execv(exepath, a)
+    try:
+        os.execv(exepath, a)
+    except OSError, exn:
+        print exepath, ": ", exn
+        sys.exit(1)
 
 
 def pathTo(exe):

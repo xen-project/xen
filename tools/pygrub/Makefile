@@ -9,16 +9,10 @@ build:
 	CC="$(CC)" CFLAGS="$(CFLAGS)" python setup.py build
 
 .PHONY: install
-ifndef XEN_PYTHON_NATIVE_INSTALL
-install: LIBPATH=$(shell PYTHONPATH=../python/xen/util python -c "import auxbin; print auxbin.libpath()")
 install: all
-	CC="$(CC)" CFLAGS="$(CFLAGS)" python setup.py install --home="$(DESTDIR)$(PREFIX)" --prefix="" --install-lib="$(DESTDIR)$(LIBDIR)/python"
+	CC="$(CC)" CFLAGS="$(CFLAGS)" python setup.py install \
+		--prefix="$(PREFIX)" --root="$(DESTDIR)" --force
 	$(INSTALL_DIR) $(DESTDIR)/var/run/xend/boot
-else
-install: all
-	CC="$(CC)" CFLAGS="$(CFLAGS)" python setup.py install --root="$(DESTDIR)"
-	$(INSTALL_DIR) $(DESTDIR)/var/run/xend/boot
-endif
 
 .PHONY: clean
 clean:

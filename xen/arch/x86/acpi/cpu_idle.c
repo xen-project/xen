@@ -48,7 +48,7 @@
 #include <public/platform.h>
 #include <public/sysctl.h>
 
-#define DEBUG_PM_CX
+/*#define DEBUG_PM_CX*/
 
 static void (*lapic_timer_off)(void);
 static void (*lapic_timer_on)(void);
@@ -780,7 +780,7 @@ long set_cx_pminfo(uint32_t cpu, struct xen_processor_power *power)
 
     /* FIXME: C-state dependency is not supported by far */
 
-    print_acpi_power(cpu_id, acpi_power);
+    /*print_acpi_power(cpu_id, acpi_power);*/
 
     if ( cpu_id == 0 && pm_idle_save == NULL )
     {

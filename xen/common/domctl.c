@@ -25,7 +25,7 @@
 #include <public/domctl.h>
 #include <xsm/xsm.h>
 
-DEFINE_SPINLOCK(domctl_lock);
+static DEFINE_SPINLOCK(domctl_lock);
 
 extern long arch_do_domctl(
     struct xen_domctl *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl);
@@ -188,6 +188,33 @@ static unsigned int default_vcpu0_location(void)
     return cpu;
 }
 
+bool_t domctl_lock_acquire(void)
+{
+    /*
+     * Caller may try to pause its own VCPUs. We must prevent deadlock
+     * against other non-domctl routines which try to do the same.
+     */
+    if ( !spin_trylock(&current->domain->hypercall_deadlock_mutex) )
+        return 0;
+
+    /*
+     * Trylock here is paranoia if we have multiple privileged domains. Then
+     * we could have one domain trying to pause another which is spinning
+     * on domctl_lock -- results in deadlock.
+     */
+    if ( spin_trylock(&domctl_lock) )
+        return 1;
+
+    spin_unlock(&current->domain->hypercall_deadlock_mutex);
+    return 0;
+}
+
+void domctl_lock_release(void)
+{
+    spin_unlock(&domctl_lock);
+    spin_unlock(&current->domain->hypercall_deadlock_mutex);
+}
+
 long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 {
     long ret = 0;
@@ -202,7 +229,9 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     if ( op->interface_version != XEN_DOMCTL_INTERFACE_VERSION )
         return -EACCES;
 
-    spin_lock(&domctl_lock);
+    if ( !domctl_lock_acquire() )
+        return hypercall_create_continuation(
+            __HYPERVISOR_domctl, "h", u_domctl);
 
     switch ( op->cmd )
     {
@@ -866,7 +895,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         break;
     }
 
-    spin_unlock(&domctl_lock);
+    domctl_lock_release();
 
     return ret;
 }

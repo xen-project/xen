@@ -54,14 +54,9 @@ refresh-po: $(POTFILE)
 	$(MSGFMT) -c -o $@ $<
 
 .PHONY: install
-ifndef XEN_PYTHON_NATIVE_INSTALL
-install: LIBPATH=$(shell PYTHONPATH=xen/util python -c "import auxbin; print auxbin.libpath()")
 install: install-messages install-dtd
-	CC="$(CC)" CFLAGS="$(CFLAGS)" python setup.py install --home="$(DESTDIR)$(PREFIX)" --prefix="" --force --install-lib="$(DESTDIR)$(LIBDIR)/python"
-else
-install: install-messages install-dtd
-	CC="$(CC)" CFLAGS="$(CFLAGS)" python setup.py install --root="$(DESTDIR)" --force
-endif
+	CC="$(CC)" CFLAGS="$(CFLAGS)" python setup.py install \
+		--prefix="$(PREFIX)" --root="$(DESTDIR)" --force
 
 install-dtd: all
 	$(INSTALL_DIR) $(DESTDIR)$(DOCDIR)

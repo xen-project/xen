@@ -937,8 +937,8 @@ class sxp2xml:
                     = get_child_by_name(dev_sxp, "slot", "0")
                 pci.attributes["func"] \
                     = get_child_by_name(dev_sxp, "func", "0")
-                pci.attributes["vslt"] \
-                    = get_child_by_name(dev_sxp, "vslt", "0")
+                pci.attributes["vslot"] \
+                    = get_child_by_name(dev_sxp, "vslot", "0")
                 for opt in get_child_by_name(dev_sxp, "opts", ""):
                     if len(opt) > 0:
                         pci_opt = document.createElement("pci_opt")

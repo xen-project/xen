@@ -1,0 +1,82 @@
+#!/usr/bin/env python
+#  -*- mode: python; -*-
+#============================================================================
+# This library is free software; you can redistribute it and/or
+# modify it under the terms of version 2.1 of the GNU Lesser General Public
+# License as published by the Free Software Foundation.
+#
+# This library is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public
+# License along with this library; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#============================================================================
+# Copyright (c) 2009, NEC Corporation.
+#============================================================================
+# This script converts SBDF into device path.
+#   'SBDF' format is "[SEG#:]BUS#:DEV#.FUNC#"
+#       ex) 0000:0a:1f.3
+#   Device path format is "HID[:UID]-DEV#.FUNC#[-DEV#.FUNC#[...]]"
+#       ex) PNP0A08:0-2.0-0.0
+#=============================================================================
+
+import sys
+import os
+
+# add fallback path for non-native python path installs if needed
+sys.path.append('/usr/lib/python')
+sys.path.append('/usr/lib64/python')
+from xen.util.pci import *
+
+SYSFS_ACPI_DEVS_PATH = '/firmware/acpi/namespace/ACPI/_SB'
+
+def find_hid_uid(dom, b, d, f):
+    obj_list = os.listdir(sb_path)
+    for obj in obj_list:
+        obj_path = sb_path + '/' + obj.strip() + '/'
+        if os.path.exists(obj_path + 'seg') and \
+            os.path.exists(obj_path + 'bbn'):
+            seg = open(obj_path + 'seg').read()
+            bbn = open(obj_path + 'bbn').read()
+            if int(seg) == dom and int(bbn) == b:
+                hid = open(obj_path + 'hid').read()
+                if os.path.exists(obj_path + 'uid') is False:
+                    path_str = hid.strip()
+                else:
+                    uid = open(obj_path + 'uid').read()
+                    path_str = hid.strip() + ':' + uid.strip()
+                return path_str
+    return None
+
+def make_device_path(dom, b, d, f):
+    dev = PciDevice(dom, b, d, f)
+    parent = dev.find_parent()
+    if parent is None:
+        path_str = find_hid_uid(dom, b, d, f)
+        path_str = path_str + '-' + hex(d).replace('0x', '') + '.' + \
+            hex(f).replace('0x', '')
+        return path_str
+    (pdom, pb, pd, pf) = parent
+    path_str = make_device_path(pdom, pb, pd, pf)
+    path_str = path_str + '-' + hex(d).replace('0x', '') + '.' + \
+        hex(f).replace('0x', '')
+    return path_str
+
+# main
+if len(sys.argv) <> 2:
+    print 'Usage: sbdf2devicepath SBDF\n'
+else:
+    sb_path = find_sysfs_mnt() + SYSFS_ACPI_DEVS_PATH
+    if os.path.exists(sb_path):
+        path = os.environ['PATH']
+        os.environ['PATH'] = path + ':/sbin' + ':/user/sbin'
+        sbdf = sys.argv[1]
+        (dom, b, d, f) = parse_pci_name(sbdf)
+        path_str = make_device_path(dom, b, d, f)
+        print path_str
+    else:
+        print sb_path + ' not found.\n'
+        print 'This command is only for linux 2.6.18.8 xen kernel.\n'
