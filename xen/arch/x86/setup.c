@@ -419,7 +419,7 @@ void __init __start_xen(unsigned long mbi_p)
     multiboot_info_t *mbi = __va(mbi_p);
     module_t *mod = (module_t *)__va(mbi->mods_addr);
     unsigned long nr_pages, modules_length, modules_headroom;
-    int i, e820_warn = 0, bytes = 0;
+    int i, j, e820_warn = 0, bytes = 0;
     struct ns16550_defaults ns16550 = {
         .data_bits = 8,
         .parity    = 'n',
@@ -614,7 +614,9 @@ void __init __start_xen(unsigned long mbi_p)
      * we can relocate the dom0 kernel and other multiboot modules. Also, on
      * x86/64, we relocate Xen to higher memory.
      */
-    modules_length = mod[mbi->mods_count-1].mod_end - mod[0].mod_start;
+    modules_length = 0;
+    for ( i = 0; i < mbi->mods_count; i++ )
+        modules_length += mod[i].mod_end - mod[i].mod_start;
 
     /* ensure mod[0] is mapped before parsing */
     bootstrap_map(mod[0].mod_start, mod[0].mod_end);
@@ -735,8 +737,14 @@ void __init __start_xen(unsigned long mbi_p)
             initial_images_start = e;
             e -= modules_headroom;
             initial_images_base = e;
-            move_memory(initial_images_start,
-                        mod[0].mod_start, mod[mbi->mods_count-1].mod_end);
+            e += modules_length + modules_headroom;
+            for ( j = mbi->mods_count-1; j >= 0; j-- )
+            {
+                e -= mod[j].mod_end - mod[j].mod_start;
+                move_memory(e, mod[j].mod_start, mod[j].mod_end);
+                mod[j].mod_end += e - mod[j].mod_start;
+                mod[j].mod_start = e;
+            }
         }
 
         if ( !kexec_crash_area.start && (s < e) &&
@@ -1030,8 +1038,7 @@ void __init __start_xen(unsigned long mbi_p)
 
     if ( (initrdidx > 0) && (initrdidx < mbi->mods_count) )
     {
-        _initrd_start = initial_images_start +
-            (mod[initrdidx].mod_start - mod[0].mod_start);
+        _initrd_start = mod[initrdidx].mod_start;
         _initrd_len   = mod[initrdidx].mod_end - mod[initrdidx].mod_start;
     }
 
