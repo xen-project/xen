@@ -502,6 +502,8 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, perfcontrol);
     set_to_dummy_if_null(ops, debug_keys);
     set_to_dummy_if_null(ops, getcpuinfo);
+    set_to_dummy_if_null(ops, pm_op);
+    set_to_dummy_if_null(ops, get_pmstat);
     set_to_dummy_if_null(ops, availheap);
 
     set_to_dummy_if_null(ops, evtchn_unbound);
