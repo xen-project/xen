@@ -317,19 +317,21 @@ void blkfront_aio(struct blkfront_aiocb *aiocbp, int write)
     req->sector_number = aiocbp->aio_offset / dev->info.sector_size;
 
     for (j = 0; j < n; j++) {
+        req->seg[j].first_sect = 0;
+        req->seg[j].last_sect = PAGE_SIZE / dev->info.sector_size - 1;
+    }
+    req->seg[0].first_sect = ((uintptr_t)aiocbp->aio_buf & ~PAGE_MASK) / dev->info.sector_size;
+    req->seg[n-1].last_sect = (((uintptr_t)aiocbp->aio_buf + aiocbp->aio_nbytes - 1) & ~PAGE_MASK) / dev->info.sector_size;
+    for (j = 0; j < n; j++) {
 	uintptr_t data = start + j * PAGE_SIZE;
         if (!write) {
             /* Trigger CoW if needed */
-            *(char*)data = 0;
+            *(char*)(data + (req->seg[j].first_sect << 9)) = 0;
             barrier();
         }
 	aiocbp->gref[j] = req->seg[j].gref =
             gnttab_grant_access(dev->dom, virtual_to_mfn(data), write);
-	req->seg[j].first_sect = 0;
-	req->seg[j].last_sect = PAGE_SIZE / dev->info.sector_size - 1;
     }
-    req->seg[0].first_sect = ((uintptr_t)aiocbp->aio_buf & ~PAGE_MASK) / dev->info.sector_size;
-    req->seg[n-1].last_sect = (((uintptr_t)aiocbp->aio_buf + aiocbp->aio_nbytes - 1) & ~PAGE_MASK) / dev->info.sector_size;
 
     dev->ring.req_prod_pvt = i + 1;
 
