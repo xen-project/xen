@@ -190,6 +190,12 @@ static void dbs_timer_init(struct cpu_dbs_info_s *dbs_info)
         (void *)dbs_info, dbs_info->cpu);
 
     set_timer(&dbs_timer[dbs_info->cpu], NOW()+dbs_tuners_ins.sampling_rate);
+
+    if ( processor_pminfo[dbs_info->cpu]->perf.shared_type
+            == CPUFREQ_SHARED_TYPE_HW )
+    {
+        dbs_info->stoppable = 1;
+    }
 }
 
 static void dbs_timer_exit(struct cpu_dbs_info_s *dbs_info)
@@ -337,3 +343,38 @@ static void __exit cpufreq_gov_dbs_exit(void)
     cpufreq_unregister_governor(&cpufreq_gov_dbs);
 }
 __exitcall(cpufreq_gov_dbs_exit);
+
+void cpufreq_dbs_timer_suspend(void)
+{
+    int cpu;
+
+    cpu = smp_processor_id();
+
+    if ( per_cpu(cpu_dbs_info,cpu).stoppable )
+    {
+        stop_timer( &dbs_timer[cpu] );
+    }
+}
+
+void cpufreq_dbs_timer_resume(void)
+{
+    int cpu;
+    struct timer* t;
+    s_time_t now;
+
+    cpu = smp_processor_id();
+
+    if ( per_cpu(cpu_dbs_info,cpu).stoppable )
+    {
+        now = NOW();
+        t = &dbs_timer[cpu];
+        if (t->expires <= now)
+        {
+            t->function(t->data);
+        }
+        else
+        {
+            set_timer(t, align_timer(now , dbs_tuners_ins.sampling_rate));
+        }
+    }
+}

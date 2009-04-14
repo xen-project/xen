@@ -221,6 +221,7 @@ struct cpu_dbs_info_s {
     struct cpufreq_frequency_table *freq_table;
     int cpu;
     unsigned int enable:1;
+    unsigned int stoppable:1;
 };
 
 int cpufreq_governor_dbs(struct cpufreq_policy *policy, unsigned int event);
@@ -232,4 +233,7 @@ int write_ondemand_sampling_rate(unsigned int sampling_rate);
 int write_ondemand_up_threshold(unsigned int up_threshold);
 
 int write_userspace_scaling_setspeed(unsigned int cpu, unsigned int freq);
+
+void cpufreq_dbs_timer_suspend(void);
+void cpufreq_dbs_timer_resume(void);
 #endif /* __XEN_CPUFREQ_PM_H__ */

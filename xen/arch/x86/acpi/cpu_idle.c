@@ -47,6 +47,7 @@
 #include <asm/processor.h>
 #include <public/platform.h>
 #include <public/sysctl.h>
+#include <acpi/cpufreq/cpufreq.h>
 
 /*#define DEBUG_PM_CX*/
 
@@ -195,6 +196,8 @@ static void acpi_processor_idle(void)
     int sleep_ticks = 0;
     u32 t1, t2 = 0;
 
+    cpufreq_dbs_timer_suspend();
+
     sched_tick_suspend();
     /*
      * sched_tick_suspend may raise TIMER_SOFTIRQ by __stop_timer,
@@ -214,6 +217,7 @@ static void acpi_processor_idle(void)
     {
         local_irq_enable();
         sched_tick_resume();
+        cpufreq_dbs_timer_resume();
         return;
     }
 
@@ -234,6 +238,7 @@ static void acpi_processor_idle(void)
         else
             acpi_safe_halt();
         sched_tick_resume();
+        cpufreq_dbs_timer_resume();
         return;
     }
 
@@ -341,6 +346,7 @@ static void acpi_processor_idle(void)
     default:
         local_irq_enable();
         sched_tick_resume();
+        cpufreq_dbs_timer_resume();
         return;
     }
 
@@ -352,6 +358,7 @@ static void acpi_processor_idle(void)
     }
 
     sched_tick_resume();
+    cpufreq_dbs_timer_resume();
 
     if ( cpuidle_current_governor->reflect )
         cpuidle_current_governor->reflect(power);

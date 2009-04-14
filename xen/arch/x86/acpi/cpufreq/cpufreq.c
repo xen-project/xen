@@ -191,7 +191,11 @@ static void drv_read(struct drv_cmd *cmd)
 
 static void drv_write(struct drv_cmd *cmd)
 {
-    on_selected_cpus( cmd->mask, do_drv_write, (void *)cmd, 0, 0);
+    if ((cpus_weight(cmd->mask) ==  1) &&
+        cpu_isset(smp_processor_id(), cmd->mask))
+        do_drv_write((void *)cmd);
+    else
+        on_selected_cpus( cmd->mask, do_drv_write, (void *)cmd, 0, 0);
 }
 
 static u32 get_cur_val(cpumask_t mask)
