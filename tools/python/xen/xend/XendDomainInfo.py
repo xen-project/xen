@@ -350,6 +350,8 @@ class XendDomainInfo:
     @type shutdownWatch: xen.xend.xenstore.xswatch
     @ivar shutdownStartTime: UNIX Time when domain started shutting down.
     @type shutdownStartTime: float or None
+    @ivar restart_in_progress: Is a domain restart thread running?
+    @type restart_in_progress: bool
 #    @ivar state: Domain state
 #    @type state: enum(DOM_STATE_HALTED, DOM_STATE_RUNNING, ...)
     @ivar state_updated: lock for self.state
@@ -418,6 +420,7 @@ class XendDomainInfo:
         self.shutdownWatch = None
         self.shutdownStartTime = None
         self._resume = resume
+        self.restart_in_progress = False
 
         self.state_updated = threading.Condition()
         self.refresh_shutdown_lock = threading.Condition()
@@ -1929,7 +1932,8 @@ class XendDomainInfo:
         finally:
             self.refresh_shutdown_lock.release()
 
-        if restart_reason:
+        if restart_reason and not self.restart_in_progress:
+            self.restart_in_progress = True
             threading.Thread(target = self._maybeRestart,
                              args = (restart_reason,)).start()
 
