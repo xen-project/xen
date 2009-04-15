@@ -1279,8 +1279,17 @@ static int disable_pit_irq(void)
         hpet_broadcast_init();
         if ( !hpet_broadcast_is_available() )
         {
-            printk("HPET broadcast init failed, turn to PIT broadcast.\n");
-            return 0;
+            if ( xen_cpuidle == -1 )
+            {
+                xen_cpuidle = 0;
+                printk("CPUIDLE: disabled due to no HPET. "
+                       "Force enable with 'cpuidle'.\n");
+            }
+            else
+            {
+                printk("HPET broadcast init failed, turn to PIT broadcast.\n");
+                return 0;
+            }
         }
     }
 
