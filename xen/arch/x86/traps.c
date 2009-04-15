@@ -1551,6 +1551,8 @@ static uint32_t guest_io_read(
     return data;
 }
 
+extern void (*pv_rtc_handler)(unsigned int port, uint8_t value);
+
 static void guest_io_write(
     unsigned int port, unsigned int bytes, uint32_t data,
     struct vcpu *v, struct cpu_user_regs *regs)
@@ -1565,6 +1567,8 @@ static void guest_io_write(
             outb((uint8_t)data, port);
             if ( pv_post_outb_hook )
                 pv_post_outb_hook(port, (uint8_t)data);
+            if ( ((port == 0x71) || (port == 0x70)) && pv_rtc_handler )
+                pv_rtc_handler(port, (uint8_t)data);
             break;
         case 2:
             outw((uint16_t)data, port);
@@ -1936,6 +1940,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             io_emul(regs);            
             if ( (op_bytes == 1) && pv_post_outb_hook )
                 pv_post_outb_hook(port, regs->eax);
+            if ( ((port == 0x71) || (port == 0x70)) && pv_rtc_handler )
+                pv_rtc_handler(port, regs->eax);
         }
         else
         {

@@ -78,5 +78,6 @@ void hpet_broadcast_init(void);
 void hpet_broadcast_enter(void);
 void hpet_broadcast_exit(void);
 int hpet_broadcast_is_available(void);
+void hpet_disable_legacy_broadcast(void);
 
 #endif /* __X86_HPET_H__ */

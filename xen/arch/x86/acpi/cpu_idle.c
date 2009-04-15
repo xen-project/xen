@@ -221,8 +221,8 @@ static void acpi_processor_idle(void)
         return;
     }
 
-    next_state = power ? cpuidle_current_governor->select(power) : -1;
-    if ( next_state > 0 )
+    if ( max_cstate > 0 && power && 
+         (next_state = cpuidle_current_governor->select(power)) > 0 )
     {
         cx = &power->states[next_state];
         if ( power->flags.bm_check && acpi_idle_bm_check()
@@ -851,5 +851,20 @@ int pmstat_get_cx_stat(uint32_t cpuid, struct pm_cx_stat *stat)
 int pmstat_reset_cx_stat(uint32_t cpuid)
 {
     return 0;
+}
+
+void cpuidle_disable_deep_cstate(void)
+{
+    if ( max_cstate > 1 )
+    {
+        if ( local_apic_timer_c2_ok )
+            max_cstate = 2;
+        else
+            max_cstate = 1;
+    }
+
+    mb();
+
+    hpet_disable_legacy_broadcast();
 }
 

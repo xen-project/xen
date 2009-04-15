@@ -22,8 +22,10 @@
 
 #define MAX_HPET_NUM 32
 
-#define HPET_EVT_USED_BIT   2
+#define HPET_EVT_USED_BIT    0
 #define HPET_EVT_USED       (1 << HPET_EVT_USED_BIT)
+#define HPET_EVT_DISABLE_BIT 1
+#define HPET_EVT_DISALBE    (1 << HPET_EVT_DISABLE_BIT)
 
 struct hpet_event_channel
 {
@@ -53,8 +55,11 @@ unsigned long hpet_address;
 
 void msi_compose_msg(struct pci_dev *pdev, int vector, struct msi_msg *msg);
 
-/* force_hpet_broadcast: if true, force using hpet_broadcast to fix lapic stop
-   issue for deep C state with pit disabled */
+/*
+ * force_hpet_broadcast: by default legacy hpet broadcast will be stopped
+ * if RTC interrupts are enabled. Enable this option if want to always enable
+ * legacy hpet broadcast for deep C state
+ */
 int force_hpet_broadcast;
 boolean_param("hpetbroadcast", force_hpet_broadcast);
 
@@ -113,6 +118,9 @@ static int reprogram_hpet_evt_channel(
 {
     int64_t delta;
     int ret;
+
+    if ( ch->flags & HPET_EVT_DISALBE )
+        return 0;
 
     if ( unlikely(expire < 0) )
     {
@@ -483,6 +491,32 @@ static void hpet_detach_channel_share(int cpu)
 static void (*hpet_attach_channel)(int cpu, struct hpet_event_channel *ch);
 static void (*hpet_detach_channel)(int cpu);
 
+#include <asm/mc146818rtc.h>
+void cpuidle_disable_deep_cstate(void);
+
+void (*pv_rtc_handler)(unsigned int port, uint8_t value);
+
+static void handle_rtc_once(unsigned int port, uint8_t value)
+{
+    static int index;
+
+    if ( port == 0x70 )
+    {
+        index = value;
+        return;
+    }
+
+    if ( index != RTC_REG_B )
+        return;
+    
+    /* RTC Reg B, contain PIE/AIE/UIE */
+    if ( value & (RTC_PIE | RTC_AIE | RTC_UIE ) )
+    {
+        cpuidle_disable_deep_cstate();
+        pv_rtc_handler = NULL;
+    }
+}
+
 void hpet_broadcast_init(void)
 {
     u64 hpet_rate;
@@ -526,8 +560,11 @@ void hpet_broadcast_init(void)
         return;
     }
 
+    if ( legacy_hpet_event.flags & HPET_EVT_DISALBE )
+        return;
+
     hpet_id = hpet_read32(HPET_ID);
-    if ( !(hpet_id & HPET_ID_LEGSUP) || !force_hpet_broadcast )
+    if ( !(hpet_id & HPET_ID_LEGSUP) )
         return;
 
     /* Start HPET legacy interrupts */
@@ -555,6 +592,32 @@ void hpet_broadcast_init(void)
 
     for_each_cpu(i)
         per_cpu(cpu_bc_channel, i) = &legacy_hpet_event;
+
+    if ( !force_hpet_broadcast )
+        pv_rtc_handler = handle_rtc_once;
+}
+
+void hpet_disable_legacy_broadcast(void)
+{
+    u32 cfg;
+
+    spin_lock_irq(&legacy_hpet_event.lock);
+
+    legacy_hpet_event.flags |= HPET_EVT_DISALBE;
+
+    /* disable HPET T0 */
+    cfg = hpet_read32(HPET_T0_CFG);
+    cfg &= ~HPET_TN_ENABLE;
+    hpet_write32(cfg, HPET_T0_CFG);
+
+    /* Stop HPET legacy interrupts */
+    cfg = hpet_read32(HPET_CFG);
+    cfg &= ~HPET_CFG_LEGACY;
+    hpet_write32(cfg, HPET_CFG);
+
+    spin_unlock_irq(&legacy_hpet_event.lock);
+
+    smp_send_event_check_mask(cpu_online_map);
 }
 
 void hpet_broadcast_enter(void)
