@@ -514,7 +514,6 @@ class XendDomainInfo:
         
         if reason not in DOMAIN_SHUTDOWN_REASONS.values():
             raise XendError('Invalid reason: %s' % reason)
-        self._removeVm('xend/previous_restart_time')
         self.storeDom("control/shutdown", reason)
 
         # HVM domain shuts itself down only if it has PV drivers
@@ -2001,20 +2000,13 @@ class XendDomainInfo:
         old_domid = self.domid
         self._writeVm(RESTART_IN_PROGRESS, 'True')
 
-        now = time.time()
-        rst = self._readVm('xend/previous_restart_time')
-        if rst:
-            rst = float(rst)
-            timeout = now - rst
-            if timeout < MINIMUM_RESTART_TIME:
-                log.error(
-                    'VM %s restarting too fast (%f seconds since the last '
-                    'restart).  Refusing to restart to avoid loops.',
-                    self.info['name_label'], timeout)
-                self.destroy()
-                return
-
-        self._writeVm('xend/previous_restart_time', str(now))
+        elapse = time.time() - self.info['start_time']
+        if elapse < MINIMUM_RESTART_TIME:
+            log.error('VM %s restarting too fast (Elapsed time: %f seconds). '
+                      'Refusing to restart to avoid loops.',
+                      self.info['name_label'], elapse)
+            self.destroy()
+            return
 
         prev_vm_xend = self._listRecursiveVm('xend')
         new_dom_info = self.info
