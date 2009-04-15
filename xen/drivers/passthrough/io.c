@@ -148,12 +148,23 @@ int pt_irq_create_bind_vtd(
                 return rc;
             }
         }
-        else if (hvm_irq_dpci->mirq[pirq].gmsi.gvec != pt_irq_bind->u.msi.gvec
-                ||hvm_irq_dpci->msi_gvec_pirq[pt_irq_bind->u.msi.gvec] != pirq)
-
+        else
         {
-            spin_unlock(&d->event_lock);
-            return -EBUSY;
+            uint32_t mask = HVM_IRQ_DPCI_MACH_MSI | HVM_IRQ_DPCI_GUEST_MSI;
+            uint32_t old_gvec;
+
+            if ( (hvm_irq_dpci->mirq[pirq].flags & mask) != mask)
+            {
+	            spin_unlock(&d->event_lock);
+        	    return -EBUSY;
+            }
+ 
+            /* if pirq is already mapped as vmsi, update the guest data/addr */
+            old_gvec = hvm_irq_dpci->mirq[pirq].gmsi.gvec;
+            hvm_irq_dpci->msi_gvec_pirq[old_gvec] = 0;
+            hvm_irq_dpci->mirq[pirq].gmsi.gvec = pt_irq_bind->u.msi.gvec;
+            hvm_irq_dpci->mirq[pirq].gmsi.gflags = pt_irq_bind->u.msi.gflags;
+            hvm_irq_dpci->msi_gvec_pirq[pt_irq_bind->u.msi.gvec] = pirq;
         }
     }
     else
