@@ -1564,11 +1564,11 @@ static void guest_io_write(
     {
         switch ( bytes ) {
         case 1:
+            if ( ((port == 0x70) || (port == 0x71)) && pv_rtc_handler )
+                pv_rtc_handler(port, (uint8_t)data);
             outb((uint8_t)data, port);
             if ( pv_post_outb_hook )
                 pv_post_outb_hook(port, (uint8_t)data);
-            if ( ((port == 0x71) || (port == 0x70)) && pv_rtc_handler )
-                pv_rtc_handler(port, (uint8_t)data);
             break;
         case 2:
             outw((uint16_t)data, port);
@@ -1937,11 +1937,13 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             goto fail;
         if ( admin_io_okay(port, op_bytes, v, regs) )
         {
+            if ( (op_bytes == 1) &&
+                 ((port == 0x71) || (port == 0x70)) &&
+                 pv_rtc_handler )
+                pv_rtc_handler(port, regs->eax);
             io_emul(regs);            
             if ( (op_bytes == 1) && pv_post_outb_hook )
                 pv_post_outb_hook(port, regs->eax);
-            if ( ((port == 0x71) || (port == 0x70)) && pv_rtc_handler )
-                pv_rtc_handler(port, regs->eax);
         }
         else
         {
