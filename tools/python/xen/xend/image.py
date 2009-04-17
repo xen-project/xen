@@ -561,9 +561,9 @@ class ImageHandler:
     def destroyDeviceModel(self):
         if self.device_model is None:
             return
-        if self.pid:
-            self.sentinel_lock.acquire()
-            try:
+        self.sentinel_lock.acquire()
+        try:
+            if self.pid:
                 try:
                     os.kill(self.pid, signal.SIGHUP)
                 except OSError, exn:
@@ -592,22 +592,22 @@ class ImageHandler:
                     except OSError:
                         # This happens if the process doesn't exist.
                         pass
-                state = xstransact.Remove("/local/domain/0/device-model/%i"
-                                          % self.vm.getDomid())
-            finally:
-                self.pid = None
-                self.sentinel_lock.release()
+        finally:
+            self.pid = None
+            self.sentinel_lock.release()
             
-            try:
-                os.unlink('/var/run/tap/qemu-read-%d' % self.vm.getDomid())
-                os.unlink('/var/run/tap/qemu-write-%d' % self.vm.getDomid())
-            except:
-                pass
-            try:
-                del sentinel_fifos_inuse[self.sentinel_path_fifo]
-                os.unlink(self.sentinel_path_fifo)
-            except:
-                pass
+        state = xstransact.Remove("/local/domain/0/device-model/%i"
+                                  % self.vm.getDomid())
+        try:
+            os.unlink('/var/run/tap/qemu-read-%d' % self.vm.getDomid())
+            os.unlink('/var/run/tap/qemu-write-%d' % self.vm.getDomid())
+        except:
+            pass
+        try:
+            del sentinel_fifos_inuse[self.sentinel_path_fifo]
+            os.unlink(self.sentinel_path_fifo)
+        except:
+            pass
 
     def setCpuid(self):
         xc.domain_set_policy_cpuid(self.vm.getDomid())
