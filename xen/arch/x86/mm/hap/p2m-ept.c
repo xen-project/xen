@@ -210,17 +210,18 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
         ept_entry_t *split_ept_entry = NULL;
         unsigned long split_mfn = ept_entry->mfn;
         p2m_type_t split_p2mt = ept_entry->avail1;
+        ept_entry_t new_ept_entry;
 
         /* alloc new page for new ept middle level entry which is
          * before a leaf super entry
          */
 
-        if ( !ept_set_middle_entry(d, ept_entry) )
+        if ( !ept_set_middle_entry(d, &new_ept_entry) )
             goto out;
 
         /* split the super page before to 4k pages */
 
-        split_table = map_domain_page(ept_entry->mfn);
+        split_table = map_domain_page(new_ept_entry.mfn);
         offset = gfn & ((1 << EPT_TABLE_ORDER) - 1);
 
         for ( i = 0; i < 512; i++ )
@@ -257,6 +258,7 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
         ept_p2m_type_to_flags(split_ept_entry, p2mt);
 
         unmap_domain_page(split_table);
+        *ept_entry = new_ept_entry;
     }
 
     /* Track the highest gfn for which we have ever had a valid mapping */
