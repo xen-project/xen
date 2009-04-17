@@ -108,8 +108,17 @@ static void update_intremap_entry_from_ioapic(
     return;
 }
 
+extern int nr_ioapic_registers[MAX_IO_APICS];
+extern int nr_ioapics;
+
 int __init amd_iommu_setup_intremap_table(void)
 {
+    struct IO_APIC_route_entry rte = {0};
+    unsigned long flags;
+    u32* entry;
+    int apic, pin;
+    u8 delivery_mode, dest, vector, dest_mode;
+
     if ( int_remap_table == NULL )
     {
         int_remap_table = __alloc_amd_iommu_tables(INTREMAP_TABLE_ORDER);
@@ -118,6 +127,31 @@ int __init amd_iommu_setup_intremap_table(void)
         memset(int_remap_table, 0, PAGE_SIZE * (1UL << INTREMAP_TABLE_ORDER));
     }
 
+    /* Read ioapic entries and update interrupt remapping table accordingly */
+    for ( apic = 0; apic < nr_ioapics; apic++ )
+    {
+        for ( pin = 0; pin < nr_ioapic_registers[apic]; pin++ )
+        {
+            *(((int *)&rte) + 1) = io_apic_read(apic, 0x11 + 2 * pin);
+            *(((int *)&rte) + 0) = io_apic_read(apic, 0x10 + 2 * pin);
+
+            if ( rte.mask == 1 )
+                continue;
+
+            delivery_mode = rte.delivery_mode;
+            vector = rte.vector;
+            dest_mode = rte.dest_mode;
+            if ( dest_mode == 0 )
+                dest = rte.dest.physical.physical_dest & 0xf;
+            else
+                dest = rte.dest.logical.logical_dest & 0xff;
+
+            spin_lock_irqsave(&int_remap_table_lock, flags);
+            entry = (u32*)get_intremap_entry(vector, delivery_mode);
+            update_intremap_entry(entry, vector, delivery_mode, dest_mode, dest);
+            spin_unlock_irqrestore(&int_remap_table_lock, flags);
+        }
+    }
     return 0;
 }
 
