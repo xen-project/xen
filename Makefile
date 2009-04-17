@@ -237,7 +237,7 @@ linux26:
 # tboot targets
 #
 
-TBOOT_TARFILE = tboot-20080613.tar.gz
+TBOOT_TARFILE = tboot-20090330.tar.gz
 #TBOOT_BASE_URL = http://downloads.sourceforge.net/tboot
 TBOOT_BASE_URL = $(XEN_EXTFILES_URL)
 
