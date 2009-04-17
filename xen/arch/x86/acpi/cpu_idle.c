@@ -51,6 +51,7 @@
 
 /*#define DEBUG_PM_CX*/
 
+static void lapic_timer_nop(void) { }
 static void (*lapic_timer_off)(void);
 static void (*lapic_timer_on)(void);
 
@@ -538,8 +539,12 @@ static int check_cx(struct acpi_processor_power *power, xen_processor_cx_t *cx)
         if ( local_apic_timer_c2_ok )
             break;
     case ACPI_STATE_C3:
-        /* We must be able to use HPET in place of LAPIC timers. */
-        if ( hpet_broadcast_is_available() )
+        if ( boot_cpu_has(X86_FEATURE_ARAT) )
+        {
+            lapic_timer_off = lapic_timer_nop;
+            lapic_timer_on = lapic_timer_nop;
+        }
+        else if ( hpet_broadcast_is_available() )
         {
             lapic_timer_off = hpet_broadcast_enter;
             lapic_timer_on = hpet_broadcast_exit;

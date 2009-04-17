@@ -1274,7 +1274,7 @@ static int disable_pit_irq(void)
      * XXX dom0 may rely on RTC interrupt delivery, so only enable
      * hpet_broadcast if FSB mode available or if force_hpet_broadcast.
      */
-    if ( xen_cpuidle )
+    if ( xen_cpuidle && !boot_cpu_has(X86_FEATURE_ARAT) )
     {
         hpet_broadcast_init();
         if ( !hpet_broadcast_is_available() )

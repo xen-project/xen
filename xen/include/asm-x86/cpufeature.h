@@ -75,6 +75,7 @@
 #define X86_FEATURE_P4		(3*32+ 7) /* P4 */
 #define X86_FEATURE_CONSTANT_TSC (3*32+ 8) /* TSC ticks at a constant rate */
 #define X86_FEATURE_NOSTOP_TSC	(3*32+ 9) /* TSC does not stop in C states */
+#define X86_FEATURE_ARAT	(3*32+ 10) /* Always running APIC timer */
 
 /* Intel-defined CPU features, CPUID level 0x00000001 (ecx), word 4 */
 #define X86_FEATURE_XMM3	(4*32+ 0) /* Streaming SIMD Extensions-3 */
