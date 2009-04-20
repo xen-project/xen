@@ -288,6 +288,7 @@ static int create_domain_log(struct domain *dom)
 	namepath = s;
 	strcat(namepath, "/name");
 	data = xs_read(xs, XBT_NULL, namepath, &len);
+	free(namepath);
 	if (!data)
 		return -1;
 	if (!len) {
@@ -548,9 +549,6 @@ static int domain_create_ring(struct domain *dom)
 	}
 	free(type);
 
-	if ((ring_ref == dom->ring_ref) && (remote_port == dom->remote_port))
-		goto out;
-
 	if (ring_ref != dom->ring_ref) {
 		if (dom->interface != NULL)
 			munmap(dom->interface, getpagesize());
@@ -563,6 +561,16 @@ static int domain_create_ring(struct domain *dom)
 			goto out;
 		}
 		dom->ring_ref = ring_ref;
+	}
+
+	/* Go no further if port has not changed and we are still bound. */
+	if (remote_port == dom->remote_port) {
+		xc_evtchn_status_t status = {
+			.dom = DOMID_SELF,
+			.port = dom->local_port };
+		if ((xc_evtchn_status(xc, &status) == 0) &&
+		    (status.status == EVTCHNSTAT_interdomain))
+			goto out;
 	}
 
 	dom->local_port = -1;
@@ -601,7 +609,7 @@ static int domain_create_ring(struct domain *dom)
 		}
 	}
 
-	if (log_guest)
+	if (log_guest && (dom->log_fd == -1))
 		dom->log_fd = create_domain_log(dom);
 
  out:
