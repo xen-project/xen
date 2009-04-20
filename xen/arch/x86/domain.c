@@ -1308,8 +1308,7 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
     if ( unlikely(!cpu_isset(cpu, dirty_mask) && !cpus_empty(dirty_mask)) )
     {
         /* Other cpus call __sync_lazy_execstate from flush ipi handler. */
-        if ( !cpus_empty(next->vcpu_dirty_cpumask) )
-            flush_tlb_mask(next->vcpu_dirty_cpumask);
+        flush_tlb_mask(dirty_mask);
     }
 
     if ( is_hvm_vcpu(prev) && !list_empty(&prev->arch.hvm_vcpu.tm_list) )
