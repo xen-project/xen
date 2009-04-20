@@ -125,7 +125,11 @@ def event_register(session, reg_classes):
             }
     if not reg_classes:
         reg_classes = classes
-    event_registrations[session]['classes'].union_update(reg_classes)
+    if hasattr(set, 'union_update'):
+        event_registrations[session]['classes'].union_update(reg_classes)
+    else:
+        event_registrations[session]['classes'].update(reg_classes)
+
 
 
 def event_unregister(session, unreg_classes):
