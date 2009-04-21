@@ -183,7 +183,7 @@ void *percpu_area __initdata = NULL;
 void* __init
 per_cpu_allocate(void *xen_heap_start, unsigned long end_in_pa)
 {
-	int order = get_order(NR_CPUS * PERCPU_PAGE_SIZE);
+	int order = get_order((NR_CPUS - 1) * PERCPU_PAGE_SIZE);
 	unsigned long size = 1UL << (order + PAGE_SHIFT);
 	unsigned long start = ALIGN_UP((unsigned long)xen_heap_start,
 				       PERCPU_PAGE_SIZE);
@@ -226,19 +226,31 @@ per_cpu_init (void)
 	 */
 	if (smp_processor_id() == 0) {
 #ifdef XEN
+		void *cpu0_data = __cpu0_per_cpu;
+
+		__per_cpu_offset[0] = (char *)cpu0_data - __per_cpu_start;
+		per_cpu(local_per_cpu_offset, 0) = __per_cpu_offset[0];
+
 		cpu_data = get_per_cpu_area();
 		if (cpu_data == NULL) 
 			panic("can't allocate per cpu area.\n");
+
+		for (cpu = 1; cpu < NR_CPUS; cpu++) {
+			memcpy(cpu_data, __phys_per_cpu_start, __per_cpu_end - __per_cpu_start);
+			__per_cpu_offset[cpu] = (char *) cpu_data - __per_cpu_start;
+			cpu_data += PERCPU_PAGE_SIZE;
+			per_cpu(local_per_cpu_offset, cpu) = __per_cpu_offset[cpu];
+		}
 #else
 		cpu_data = __alloc_bootmem(PERCPU_PAGE_SIZE * NR_CPUS,
 					   PERCPU_PAGE_SIZE, __pa(MAX_DMA_ADDRESS));
-#endif
 		for (cpu = 0; cpu < NR_CPUS; cpu++) {
 			memcpy(cpu_data, __phys_per_cpu_start, __per_cpu_end - __per_cpu_start);
 			__per_cpu_offset[cpu] = (char *) cpu_data - __per_cpu_start;
 			cpu_data += PERCPU_PAGE_SIZE;
 			per_cpu(local_per_cpu_offset, cpu) = __per_cpu_offset[cpu];
 		}
+#endif
 	}
 	return __per_cpu_start + __per_cpu_offset[smp_processor_id()];
 }

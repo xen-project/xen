@@ -382,6 +382,35 @@ start_ap:
 	mov ar.rsc=0		// place RSE in enforced lazy mode
 	;;
 	loadrs			// clear the dirty partition
+#ifdef XEN
+(isAP)	br.few 2f
+	movl r19=__phys_per_cpu_start
+	mov r18=PERCPU_PAGE_SIZE
+#ifndef CONFIG_SMP
+	add r19=r19,r18
+	;;
+#else
+	movl r20=__cpu0_per_cpu
+	;;
+	shr.u r18=r18,3
+1:
+	ld8 r21=[r19],8 ;;
+	st8[r20]=r21,8
+	adds r18=-1,r18
+	;;
+	cmp4.lt p7,p6=0,r18
+(p7)	br.cond.dptk.few 1b
+	;;
+#endif
+	movl r18=__per_cpu_offset
+	movl r19=__cpu0_per_cpu
+	movl r20=__per_cpu_start
+	;;
+	sub r20=r19,r20
+	;;
+	st8 [r18]=r20
+2:
+#endif
 	;;
 	mov ar.bspstore=r2	// establish the new RSE stack
 	;;

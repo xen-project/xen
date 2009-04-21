@@ -449,8 +449,8 @@ start_secondary (void *unused)
 {
 	/* Early console may use I/O ports */
 	ia64_set_kr(IA64_KR_IO_BASE, __pa(ia64_iobase));
-	Dprintk("start_secondary: starting CPU 0x%x\n", hard_smp_processor_id());
 #ifndef XEN
+	Dprintk("start_secondary: starting CPU 0x%x\n", hard_smp_processor_id());
 	efi_map_pal_code();
 #endif
 	cpu_init();

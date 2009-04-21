@@ -22,6 +22,7 @@ pgtable.h		-> linux/include/asm-ia64/pgtable.h
 processor.h		-> linux/include/asm-ia64/processor.h
 ptrace.h		-> linux/include/asm-ia64/ptrace.h
 sal.h			-> linux/include/asm-ia64/sal.h
+sections.h		-> linux/include/asm-ia64/sections.h
 smp.h			-> linux/include/asm-ia64/smp.h
 spinlock.h		-> linux/include/asm-ia64/spinlock.h
 system.h		-> linux/include/asm-ia64/system.h

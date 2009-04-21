@@ -9,6 +9,11 @@
 #include <asm-generic/sections.h>
 
 extern char __per_cpu_start[], __per_cpu_end[], __phys_per_cpu_start[];
+#ifdef XEN
+#ifdef CONFIG_SMP
+extern char __cpu0_per_cpu[];
+#endif
+#endif
 extern char __start___vtop_patchlist[], __end___vtop_patchlist[];
 extern char __start___mckinley_e9_bundles[], __end___mckinley_e9_bundles[];
 extern char __start_gate_section[];

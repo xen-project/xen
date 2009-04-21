@@ -195,7 +195,17 @@ SECTIONS
 
   data : { } :data
   .data : AT(ADDR(.data) - LOAD_OFFSET)
-	{ *(.data) *(.data1) *(.gnu.linkonce.d*) CONSTRUCTORS }
+	{
+#ifdef CONFIG_SMP
+  . = ALIGN(PERCPU_PAGE_SIZE);
+		__cpu0_per_cpu = .;
+  . = . + PERCPU_PAGE_SIZE;    /* cpu0 per-cpu space */
+#endif
+		*(.data)
+		*(.data1)
+		*(.gnu.linkonce.d*)
+		CONSTRUCTORS
+	}
 
   . = ALIGN(16);	/* gp must be 16-byte aligned for exc. table */
   .got : AT(ADDR(.got) - LOAD_OFFSET)
