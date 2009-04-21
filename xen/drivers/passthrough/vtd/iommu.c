@@ -1196,7 +1196,20 @@ static int domain_context_mapping(struct domain *domain, u8 bus, u8 devfn)
     u8 secbus, secdevfn;
     struct pci_dev *pdev = pci_get_pdev(bus, devfn);
 
-    BUG_ON(!pdev);
+    if ( pdev == NULL )
+    {
+        /* We can reach here by setup_dom0_rmrr() -> iommu_prepare_rmrr_dev()
+         * -> domain_context_mapping().
+         * In the case a user enables VT-d and disables USB (that usually needs
+         * RMRR) in BIOS, we can't discover the BDF of the USB controller in
+         * setup_dom0_devices(), but the ACPI RMRR structures may still contain
+         * the BDF and at last pci_get_pdev() returns NULL here.
+         */
+        gdprintk(XENLOG_WARNING VTDPREFIX,
+                "domain_context_mapping: can't find bdf = %x:%x.%x\n",
+                 bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+        return 0;
+    }
 
     drhd = acpi_find_matched_drhd_unit(pdev);
     if ( !drhd )
