@@ -242,7 +242,7 @@ main(int argc, char **argv)
         port = xs_suspend_evtchn_port(si.domid);
 
         if (port < 0)
-            warnx("faield to get the suspend evtchn port\n");
+            warnx("failed to get the suspend evtchn port\n");
         else
         {
             si.suspend_evtchn =
