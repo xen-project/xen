@@ -223,6 +223,10 @@ op_start () {
 
     preiftransfer ${netdev}
     transfer_addrs ${netdev} ${tdev}
+    # Remember slaves for bonding interface.
+    if [ -e /sys/class/net/${netdev}/bonding/slaves ]; then
+	slaves=`cat /sys/class/net/${netdev}/bonding/slaves`
+    fi
     # Remember the IP details for do_ifup.
     get_ip_info ${netdev}
     if ! ifdown ${netdev}; then
@@ -234,6 +238,11 @@ op_start () {
 
     setup_bridge_port ${pdev}
 
+    # Restore slaves
+    if [ -n "${slaves}" ]; then
+	ip link set ${pdev} up
+	ifenslave ${pdev} ${slaves}
+    fi
     add_to_bridge2 ${bridge} ${pdev}
     do_ifup ${bridge}
 
