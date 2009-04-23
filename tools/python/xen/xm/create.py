@@ -710,7 +710,8 @@ def configure_pci(config_devs, vals):
             config_pci_opts.append([k, d[k]])
 
         config_pci_bdf = ['dev', ['domain', domain], ['bus', bus], \
-                          ['slot', slot], ['func', func], ['vslot', vslot]]
+                          ['slot', slot], ['func', func],
+                          ['requested_vslot', vslot]]
         map(f, d.keys())
         if len(config_pci_opts)>0:
             config_pci_bdf.append(['opts', config_pci_opts])
