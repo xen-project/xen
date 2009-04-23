@@ -74,7 +74,7 @@ populate_memnodemap(const struct node *nodes, int numnodes, int shift)
 			if (memnodemap[addr >> shift] != 0xff)
 				return -1;
 			memnodemap[addr >> shift] = i;
-			addr += (1UL << shift);
+			addr += (1ULL << shift);
 		} while (addr < end);
 		res = 1;
 	} 
@@ -290,7 +290,7 @@ static void dump_numa(unsigned char key)
 		  (u32)(now>>32), (u32)now);
 
 	for_each_online_node(i) {
-		paddr_t pa = (NODE_DATA(i)->node_start_pfn + 1)<< PAGE_SHIFT;
+		paddr_t pa = (paddr_t)(NODE_DATA(i)->node_start_pfn + 1)<< PAGE_SHIFT;
 		printk("idx%d -> NODE%d start->%lu size->%lu\n",
 			  i, NODE_DATA(i)->node_id,
 			  NODE_DATA(i)->node_start_pfn,
@@ -314,7 +314,7 @@ static void dump_numa(unsigned char key)
 
 		page_list_for_each(page, &d->page_list)
 		{
-			i = phys_to_nid(page_to_mfn(page) << PAGE_SHIFT);
+			i = phys_to_nid((paddr_t)page_to_mfn(page) << PAGE_SHIFT);
 			page_num_node[i]++;
 		}
 
