@@ -291,8 +291,8 @@ class ImageHandler:
                 if int(dev_info.get('sdl', 0)) != 0 :
                     has_sdl = True
                 if has_sdl:
-                    self.display = dev_info.get('display', {})
-                    self.xauthority = dev_info.get('xauthority', {})
+                    self.display = dev_info.get('display', self.display)
+                    self.xauthority = dev_info.get('xauthority', self.xauthority)
                     opengl = int(dev_info.get('opengl', opengl))
                 if has_vnc:
                     vnc_config = dev_info.get('other_config', {})
