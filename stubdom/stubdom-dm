@@ -112,6 +112,8 @@ do
     vbd_disk=`xenstore-read $i/params`
     vbd_type=`xenstore-read $i/type`
     vbd_dev=`xenstore-read $i/dev`
+    vbd_front=`xenstore-read $i/frontend`
+    vbd_devtype=`xenstore-read $vbd_front/device-type`
     if [ $vbd_type = "file" ]
     then
         vbd_type="tap:aio"
@@ -120,7 +122,7 @@ do
     then
         echo -n "," >> /etc/xen/stubdoms/$domname-dm
     fi
-    echo -n "'$vbd_type:$vbd_disk,$vbd_dev,$vbd_mode'" >> /etc/xen/stubdoms/$domname-dm
+    echo -n "'$vbd_type:$vbd_disk,$vbd_dev:$vbd_devtype,$vbd_mode'" >> /etc/xen/stubdoms/$domname-dm
     j=$(( $j + 1 ))
 done
 echo " ] " >> /etc/xen/stubdoms/$domname-dm
