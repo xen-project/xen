@@ -729,7 +729,12 @@ class HVMImageHandler(ImageHandler):
 
         if not self.display :
             self.display = ''
-        self.vm.storeVm(("image/dmargs", " ".join(self.dmargs)),
+        # Do not store sdl, opengl and serial related qemu cli options
+        self.vm.storeVm(("image/dmargs", " ".join([ x for x in self.dmargs
+                        if x != "-sdl"
+                        and x != "-disable-opengl"
+                        and x != "-serial"
+                        and x != "pty" ])),
                         ("image/device-model", self.device_model),
                         ("image/display", self.display))
         self.vm.permissionsVm("image/dmargs", { 'dom': self.vm.getDomid(), 'read': True } )

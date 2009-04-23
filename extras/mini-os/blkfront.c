@@ -244,10 +244,6 @@ void shutdown_blkfront(struct blkfront_dev *dev)
     xenbus_wait_for_value(path, "5", &dev->events);
 
     err = xenbus_printf(XBT_NIL, nodename, "state", "%u", 6);
-    xenbus_wait_for_value(path, "6", &dev->events);
-
-    err = xenbus_printf(XBT_NIL, nodename, "state", "%u", 1);
-    xenbus_wait_for_value(path, "2", &dev->events);
 
     xenbus_unwatch_path(XBT_NIL, path);
 
