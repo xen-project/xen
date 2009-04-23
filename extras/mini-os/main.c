@@ -62,7 +62,7 @@ static void call_main(void *p)
 
 #ifndef CONFIG_GRUB
     sparse((unsigned long) &__app_bss_start, &__app_bss_end - &__app_bss_start);
-#ifdef HAVE_LWIP
+#if defined(HAVE_LWIP) && !defined(CONFIG_QEMU)
     start_networking();
 #endif
     init_fs_frontend();

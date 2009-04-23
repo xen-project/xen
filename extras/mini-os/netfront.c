@@ -306,11 +306,16 @@ struct netfront_dev *init_netfront(char *_nodename, void (*thenetif_rx)(unsigned
     int retry=0;
     int i;
     char* msg;
-    char* nodename = _nodename ? _nodename : "device/vif/0";
-
+    char nodename[256];
+    char path[256];
     struct netfront_dev *dev;
+    static int netfrontends = 0;
 
-    char path[strlen(nodename) + 1 + 10 + 1];
+    if (!_nodename)
+        snprintf(nodename, sizeof(nodename), "device/vif/%d", netfrontends);
+    else
+        strncpy(nodename, _nodename, strlen(nodename));
+    netfrontends++;
 
     if (!thenetif_rx)
 	thenetif_rx = netif_rx;

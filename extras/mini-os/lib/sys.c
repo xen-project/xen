@@ -677,7 +677,7 @@ static int select_poll(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exce
 {
     int i, n = 0;
 #ifdef HAVE_LWIP
-    int sock_n, sock_nfds = 0;
+    int sock_n = 0, sock_nfds = 0;
     fd_set sock_readfds, sock_writefds, sock_exceptfds;
     struct timeval timeout = { .tv_sec = 0, .tv_usec = 0};
 #endif
@@ -711,12 +711,14 @@ static int select_poll(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exce
 	    }
 	}
     }
-    DEBUG("lwip_select(");
-    dump_set(nfds, &sock_readfds, &sock_writefds, &sock_exceptfds, &timeout);
-    DEBUG("); -> ");
-    sock_n = lwip_select(sock_nfds, &sock_readfds, &sock_writefds, &sock_exceptfds, &timeout);
-    dump_set(nfds, &sock_readfds, &sock_writefds, &sock_exceptfds, &timeout);
-    DEBUG("\n");
+    if (sock_nfds > 0) {
+        DEBUG("lwip_select(");
+        dump_set(nfds, &sock_readfds, &sock_writefds, &sock_exceptfds, &timeout);
+        DEBUG("); -> ");
+        sock_n = lwip_select(sock_nfds, &sock_readfds, &sock_writefds, &sock_exceptfds, &timeout);
+        dump_set(nfds, &sock_readfds, &sock_writefds, &sock_exceptfds, &timeout);
+        DEBUG("\n");
+    }
 #endif
 
     /* Then see others as well. */

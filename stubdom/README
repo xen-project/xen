@@ -31,11 +31,10 @@ Create /etc/xen/hvmconfig-dm (where "hvmconfig" is the name of your HVM
 guest) with
 
 kernel = "/usr/lib/xen/boot/ioemu-stubdom.gz"
-vif = [ '', 'ip=10.0.1.1,mac=aa:00:00:12:23:34']
+vif = ['ip=10.0.1.1,mac=aa:00:00:12:23:34']
 disk = [  'file:/tmp/install.iso,hdc:cdrom,r', 'phy:/dev/sda6,hda,w', 'file:/tmp/test,hdb,r' ]
 
 where
-- the first vif ('') is reserved for VNC (see below)
 - 'ip=10.0.1.1,mac= etc...' is the same net configuration as in the hvmconfig
 script,
 - and disk = is the same block configuration as in the hvmconfig script.
@@ -43,7 +42,7 @@ script,
 Display Configuration
 =====================
 
-There are three posibilities
+There are two possibilities
 
 * Using SDL
 
@@ -61,18 +60,6 @@ vfb = [ 'type=sdl' ]
 
 vfb = [ 'type=sdl, opengl=0' ]
 
-* Using a VNC server in the stub domain
-
-  - In hvmconfig, set vnclisten to "172.30.206.1" for instance.  Do not use a
-host name as Mini-OS does not have a name resolver.  Do not use 127.0.0.1 since
-then you will not be able to connect to it.
-
-vnc = 1
-vnclisten = "172.30.206.1"
-
-  - In hvmconfig-dm, fill the reserved vif with the same IP, for instance:
-
-vif = [ 'ip=172.30.206.1', 'ip=10.0.1.1,mac=aa:00:00:12:23:34']
 
 * Using a VNC server in dom0
 
