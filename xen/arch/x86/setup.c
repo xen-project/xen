@@ -1119,7 +1119,7 @@ int xen_in_range(paddr_t start, paddr_t end)
     int i;
     static struct {
         paddr_t s, e;
-    } xen_regions[5];
+    } xen_regions[4];
 
     /* initialize first time */
     if ( !xen_regions[0].s )
@@ -1140,10 +1140,6 @@ int xen_in_range(paddr_t start, paddr_t end)
         /* bss + boot allocator bitmap */
         xen_regions[3].s = __pa(&__bss_start);
         xen_regions[3].e = allocator_bitmap_end;
-        /* frametable */
-        xen_regions[4].s = (unsigned long)frame_table;
-        xen_regions[4].e = (unsigned long)frame_table +
-                           PFN_UP(max_page * sizeof(*frame_table));
     }
 
     for ( i = 0; i < ARRAY_SIZE(xen_regions); i++ )
