@@ -6,6 +6,9 @@
 #include <xen/dmi.h>
 #include <asm/e820.h>
 #include <asm/page.h>
+#include <asm/processor.h>
+#include <asm/mtrr.h>
+#include <asm/msr.h>
 
 /* opt_mem: Limit of physical RAM. Any RAM beyond this point is ignored. */
 unsigned long long opt_mem;
@@ -345,6 +348,55 @@ static void __init clip_to_limit(uint64_t limit, char *warnmsg)
     }
 }
 
+/* Conservative estimate of top-of-RAM by looking for MTRR WB regions. */
+#define MSR_MTRRphysBase(reg) (0x200 + 2 * (reg))
+#define MSR_MTRRphysMask(reg) (0x200 + 2 * (reg) + 1)
+static uint64_t mtrr_top_of_ram(void)
+{
+    uint32_t eax, ebx, ecx, edx;
+    uint64_t mtrr_cap, mtrr_def, addr_mask, base, mask, top;
+    unsigned int i, phys_bits = 36;
+
+    /* Does the CPU support architectural MTRRs? */
+    cpuid(0x00000001, &eax, &ebx, &ecx, &edx);
+    if ( !test_bit(X86_FEATURE_MTRR & 31, &edx) )
+         return 0;
+
+    /* Find the physical address size for this CPU. */
+    cpuid(0x80000000, &eax, &ebx, &ecx, &edx);
+    if ( eax >= 0x80000008 )
+    {
+        cpuid(0x80000008, &eax, &ebx, &ecx, &edx);
+        phys_bits = (uint8_t)eax;
+    }
+    addr_mask = ((1ull << phys_bits) - 1) & ~((1ull << 12) - 1);
+
+    rdmsrl(MSR_MTRRcap, mtrr_cap);
+    rdmsrl(MSR_MTRRdefType, mtrr_def);
+
+    /* MTRRs enabled, and default memory type is not writeback? */
+    if ( !test_bit(11, &mtrr_def) || ((uint8_t)mtrr_def == MTRR_TYPE_WRBACK) )
+        return 0;
+
+    /*
+     * Find end of highest WB-type range. This is a conservative estimate
+     * of the highest WB address since overlapping UC/WT ranges dominate.
+     */
+    top = 0;
+    for ( i = 0; i < (uint8_t)mtrr_cap; i++ )
+    {
+        rdmsrl(MSR_MTRRphysBase(i), base);
+        rdmsrl(MSR_MTRRphysMask(i), mask);
+        if ( !test_bit(11, &mask) || ((uint8_t)base != MTRR_TYPE_WRBACK) )
+            continue;
+        base &= addr_mask;
+        mask &= addr_mask;
+        top = max_t(uint64_t, top, ((base | ~mask) & addr_mask) + PAGE_SIZE);
+    }
+
+    return top;
+}
+
 static void __init reserve_dmi_region(void)
 {
     u32 base, len;
@@ -357,6 +409,8 @@ static void __init reserve_dmi_region(void)
 static void __init machine_specific_memory_setup(
     struct e820entry *raw, int *raw_nr)
 {
+    uint64_t top_of_ram;
+
     char nr = (char)*raw_nr;
     sanitize_e820_map(raw, &nr);
     *raw_nr = nr;
@@ -389,6 +443,10 @@ static void __init machine_specific_memory_setup(
 #endif
 
     reserve_dmi_region();
+
+    top_of_ram = mtrr_top_of_ram();
+    if ( top_of_ram )
+        clip_to_limit(top_of_ram, "MTRRs do not cover all of memory.");
 }
 
 int __init e820_change_range_type(
