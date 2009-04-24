@@ -21,7 +21,6 @@
 #include <asm/hvm/trace.h>
 #include <asm/hvm/support.h>
 
-#define HVMTRACE_IO_ASSIST_WRITE 0x200
 static void hvmtrace_io_assist(int is_mmio, ioreq_t *p)
 {
     unsigned int size, event;
@@ -30,9 +29,10 @@ static void hvmtrace_io_assist(int is_mmio, ioreq_t *p)
     if ( likely(!tb_init_done) )
         return;
 
-    event = is_mmio ? TRC_HVM_MMIO_ASSIST : TRC_HVM_IO_ASSIST;
-    if ( !p->dir )
-        event |= HVMTRACE_IO_ASSIST_WRITE;
+    if ( is_mmio )
+        event = p->dir ? TRC_HVM_IOMEM_READ : TRC_HVM_IOMEM_WRITE;
+    else
+        event = p->dir ? TRC_HVM_IOPORT_READ : TRC_HVM_IOPORT_WRITE;
 
     *(uint64_t *)buffer = p->addr;
     size = (p->addr != (u32)p->addr) ? 8 : 4;
