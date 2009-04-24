@@ -489,13 +489,16 @@ class PciController(DevController):
                     "bind your slot/device to the PCI backend using sysfs" \
                     )%(dev.name))
 
-        if not self.vm.info.is_hvm():
-            pci_str = "0x%x, 0x%x, 0x%x, 0x%x" % (domain, bus, slot, func)
-            bdf = xc.deassign_device(fe_domid, pci_str)
-            if bdf > 0:
-                raise VmError("Failed to deassign device from IOMMU (%x:%x.%x)"
-                              % (bus, slot, func))
-            log.debug("pci: deassign device %x:%x.%x" % (bus, slot, func))
+        # Need to do FLR here before deassign device in order to terminate
+        # DMA transaction, etc
+        dev.do_FLR()
+
+        pci_str = "0x%x, 0x%x, 0x%x, 0x%x" % (domain, bus, slot, func)
+        bdf = xc.deassign_device(fe_domid, pci_str)
+        if bdf > 0:
+            raise VmError("Failed to deassign device from IOMMU (%x:%x.%x)"
+                          % (bus, slot, func))
+        log.debug("pci: Deassign device %x:%x.%x" % (bus, slot, func))
 
         for (start, size) in dev.ioports:
             log.debug('pci: disabling ioport 0x%x/0x%x'%(start,size))
@@ -528,7 +531,6 @@ class PciController(DevController):
             if rc<0:
                 raise VmError(('pci: failed to configure irq on device '+
                             '%s - errno=%d')%(dev.name,rc))
-        dev.do_FLR()
 
     def cleanupDevice(self, devid):
         """ Detach I/O resources for device and cleanup xenstore nodes
