@@ -46,7 +46,7 @@ static uint64_t sinit_base, sinit_size;
 #define TXTCR_HEAP_BASE             0x0300
 #define TXTCR_HEAP_SIZE             0x0308
 
-extern char __init_begin[], __per_cpu_start[], __per_cpu_end[], __bss_start[];
+extern char __init_begin[], __per_cpu_start[], __bss_start[];
 extern unsigned long allocator_bitmap_end;
 
 #define SHA1_SIZE      20
@@ -310,8 +310,9 @@ void tboot_shutdown(uint32_t shutdown_type)
                                               __pa(&_stext);
         /* per-cpu data */
         g_tboot_shared->mac_regions[2].start = (uint64_t)__pa(&__per_cpu_start);
-        g_tboot_shared->mac_regions[2].size = __pa(&__per_cpu_end) -
-                                              __pa(&__per_cpu_start);
+        g_tboot_shared->mac_regions[2].size =
+            g_tboot_shared->mac_regions[2].start +
+            (((uint64_t)last_cpu(cpu_possible_map) + 1) << PERCPU_SHIFT);
         /* bss */
         g_tboot_shared->mac_regions[3].start = (uint64_t)__pa(&__bss_start);
         g_tboot_shared->mac_regions[3].size = __pa(&_end) - __pa(&__bss_start);

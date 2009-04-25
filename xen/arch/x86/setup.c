@@ -1124,8 +1124,7 @@ int xen_in_range(paddr_t start, paddr_t end)
     /* initialize first time */
     if ( !xen_regions[0].s )
     {
-        extern char __init_begin[], __per_cpu_start[], __per_cpu_end[],
-                    __bss_start[];
+        extern char __init_begin[], __bss_start[];
         extern unsigned long allocator_bitmap_end;
 
         /* S3 resume code (and other real mode trampoline code) */
@@ -1136,7 +1135,8 @@ int xen_in_range(paddr_t start, paddr_t end)
         xen_regions[1].e = __pa(&__init_begin);
         /* per-cpu data */
         xen_regions[2].s = __pa(&__per_cpu_start);
-        xen_regions[2].e = __pa(&__per_cpu_end);
+        xen_regions[2].e = xen_regions[2].s +
+            (((paddr_t)last_cpu(cpu_possible_map) + 1) << PERCPU_SHIFT);
         /* bss + boot allocator bitmap */
         xen_regions[3].s = __pa(&__bss_start);
         xen_regions[3].e = allocator_bitmap_end;
