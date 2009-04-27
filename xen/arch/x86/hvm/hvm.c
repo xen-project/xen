@@ -1440,13 +1440,13 @@ void hvm_task_switch(
     }
 
     exn_raised = 0;
-    if ( hvm_load_segment_selector(v, x86_seg_es, tss.es) ||
+    if ( hvm_load_segment_selector(v, x86_seg_ldtr, tss.ldt) ||
+         hvm_load_segment_selector(v, x86_seg_es, tss.es) ||
          hvm_load_segment_selector(v, x86_seg_cs, tss.cs) ||
          hvm_load_segment_selector(v, x86_seg_ss, tss.ss) ||
          hvm_load_segment_selector(v, x86_seg_ds, tss.ds) ||
          hvm_load_segment_selector(v, x86_seg_fs, tss.fs) ||
-         hvm_load_segment_selector(v, x86_seg_gs, tss.gs) ||
-         hvm_load_segment_selector(v, x86_seg_ldtr, tss.ldt) )
+         hvm_load_segment_selector(v, x86_seg_gs, tss.gs) )
         exn_raised = 1;
 
     rc = hvm_copy_to_guest_virt(
