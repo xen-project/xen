@@ -1442,6 +1442,7 @@ class XendDomain:
         # set the same cpumask for all vcpus
         rc = 0
         cpus = dominfo.getCpus()
+        cpumap = map(int, cpumap.split(","))
         for v in vcpus:
             try:
                 if dominfo._stateGet() in (DOM_STATE_RUNNING, DOM_STATE_PAUSED):

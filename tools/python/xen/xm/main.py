@@ -1379,7 +1379,7 @@ def xm_vcpu_pin(args):
                 else:
                     cpus.append(int(c))
         cpus.sort()
-        return cpus
+        return ",".join(map(str, cpus))
 
     dom  = args[0]
     vcpu = args[1]
@@ -1389,9 +1389,8 @@ def xm_vcpu_pin(args):
         cpumap = cpu_make_map(args[2])
 
     if serverType == SERVER_XEN_API:
-        cpumap = map(str, cpumap)        
         server.xenapi.VM.add_to_VCPUs_params_live(
-            get_single_vm(dom), "cpumap%i" % int(vcpu), ",".join(cpumap))
+            get_single_vm(dom), "cpumap%i" % int(vcpu), cpumap)
     else:
         server.xend.domain.pincpu(dom, vcpu, cpumap)
 

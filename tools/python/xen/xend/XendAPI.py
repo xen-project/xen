@@ -1509,8 +1509,7 @@ class XendAPI(object):
             if key.startswith("cpumap"):
                 vcpu = int(key[6:])
                 try:
-                    cpus = map(int, value.split(","))
-                    xendom.domain_pincpu(xeninfo.getDomid(), vcpu, cpus)
+                    xendom.domain_pincpu(xeninfo.getDomid(), vcpu, value)
                 except Exception, ex:
                     log.exception(ex)
 
