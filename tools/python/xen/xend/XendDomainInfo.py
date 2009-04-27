@@ -2295,6 +2295,7 @@ class XendDomainInfo:
         log.debug('XendDomainInfo.constructDomain')
 
         self.shutdownStartTime = None
+        self.restart_in_progress = False
 
         hap = 0
         hvm = self.info.is_hvm()
