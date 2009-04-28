@@ -2347,7 +2347,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
          * (NB. If we emulate this IRET for any reason, we should re-clear!)
          */
         if ( unlikely(intr_info & INTR_INFO_NMI_UNBLOCKED_BY_IRET) &&
-             !(__vmread(IDT_VECTORING_INFO) & INTR_INFO_VALID_MASK) &&
+             !(idtv_info & INTR_INFO_VALID_MASK) &&
              (vector != TRAP_double_fault) )
             __vmwrite(GUEST_INTERRUPTIBILITY_INFO,
                       __vmread(GUEST_INTERRUPTIBILITY_INFO)
