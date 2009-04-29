@@ -4987,6 +4987,9 @@ int sh_audit_fl1_table(struct vcpu *v, mfn_t sl1mfn, mfn_t x)
         f &= ~(_PAGE_AVAIL0|_PAGE_AVAIL1|_PAGE_AVAIL2);
         if ( !(f == 0 
                || f == (_PAGE_PRESENT|_PAGE_USER|_PAGE_RW|
+                        _PAGE_ACCESSED) 
+               || f == (_PAGE_PRESENT|_PAGE_USER|_PAGE_ACCESSED)
+               || f == (_PAGE_PRESENT|_PAGE_USER|_PAGE_RW|
                         _PAGE_ACCESSED|_PAGE_DIRTY) 
                || f == (_PAGE_PRESENT|_PAGE_USER|_PAGE_ACCESSED|_PAGE_DIRTY)
                || sh_l1e_is_magic(*sl1e)) )
