@@ -409,7 +409,7 @@ static uint64_t mtrr_top_of_ram(void)
     rdmsrl(MSR_MTRRdefType, mtrr_def);
 
     if ( e820_verbose )
-        printk(" MTRR cap: %lx type: %lx\n", mtrr_cap, mtrr_def);
+        printk(" MTRR cap: %"PRIx64" type: %"PRIx64"\n", mtrr_cap, mtrr_def);
 
     /* MTRRs enabled, and default memory type is not writeback? */
     if ( !test_bit(11, &mtrr_def) || ((uint8_t)mtrr_def == MTRR_TYPE_WRBACK) )
@@ -426,7 +426,8 @@ static uint64_t mtrr_top_of_ram(void)
         rdmsrl(MSR_MTRRphysMask(i), mask);
 
         if ( e820_verbose )
-            printk(" MTRR[%d]: base %lx mask %lx\n", i, base, mask);
+            printk(" MTRR[%d]: base %"PRIx64" mask %"PRIx64"\n",
+                   i, base, mask);
 
         if ( !test_bit(11, &mask) || ((uint8_t)base != MTRR_TYPE_WRBACK) )
             continue;
