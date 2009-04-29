@@ -15,6 +15,14 @@ unsigned long long opt_mem;
 static void parse_mem(char *s) { opt_mem = parse_size_and_unit(s, NULL); }
 custom_param("mem", parse_mem);
 
+/* opt_nomtrr_check: Don't clip ram to highest cacheable MTRR. */
+static int __initdata e820_mtrr_clip = -1;
+boolean_param("e820-mtrr-clip", e820_mtrr_clip);
+
+/* opt_e820_verbose: Be verbose about clipping, the original e820, &c */
+static int __initdata e820_verbose;
+boolean_param("e820-verbose", e820_verbose);
+
 struct e820map e820;
 
 static void __init add_memory_region(unsigned long long start,
@@ -324,27 +332,35 @@ static void __init clip_to_limit(uint64_t limit, char *warnmsg)
 {
     int i;
     char _warnmsg[160];
+    uint64_t old_limit = 0;
 
     for ( i = 0; i < e820.nr_map; i++ )
     {
-        if ( (e820.map[i].addr + e820.map[i].size) <= limit )
+        if ( (e820.map[i].type != E820_RAM) ||
+             ((e820.map[i].addr + e820.map[i].size) <= limit) )
             continue;
+        old_limit = e820.map[i].addr + e820.map[i].size;
+        if ( e820.map[i].addr < limit )
+        {
+            e820.map[i].size = limit - e820.map[i].addr;
+        }
+        else
+        {
+            memmove(&e820.map[i], &e820.map[i+1],
+                    (e820.nr_map - i - 1) * sizeof(struct e820entry));
+            e820.nr_map--;
+        }
+    }
+
+    if ( old_limit )
+    {
         if ( warnmsg )
         {
             snprintf(_warnmsg, sizeof(_warnmsg), warnmsg, (long)(limit>>30));
             printk("WARNING: %s\n", _warnmsg);
         }
-        printk("Truncating memory map to %lukB\n",
-               (unsigned long)(limit >> 10));
-        if ( e820.map[i].addr >= limit )
-        {
-            e820.nr_map = i;
-        }
-        else
-        {
-            e820.map[i].size = limit - e820.map[i].addr;
-            e820.nr_map = i + 1;                
-        }            
+        printk("Truncating RAM from %lukB to %lukB\n",
+               (unsigned long)(old_limit >> 10), (unsigned long)(limit >> 10));
     }
 }
 
@@ -356,6 +372,24 @@ static uint64_t mtrr_top_of_ram(void)
     uint32_t eax, ebx, ecx, edx;
     uint64_t mtrr_cap, mtrr_def, addr_mask, base, mask, top;
     unsigned int i, phys_bits = 36;
+
+    /* By default we check only Intel systems. */
+    if ( e820_mtrr_clip == -1 )
+    {
+        char vendor[13];
+        cpuid(0x00000000, &eax,
+              (uint32_t *)&vendor[0],
+              (uint32_t *)&vendor[8],
+              (uint32_t *)&vendor[4]);
+        vendor[12] = '\0';
+        e820_mtrr_clip = !strcmp(vendor, "GenuineIntel");
+    }
+
+    if ( !e820_mtrr_clip )
+        return 0;
+
+    if ( e820_verbose )
+        printk("Checking MTRR ranges...\n");
 
     /* Does the CPU support architectural MTRRs? */
     cpuid(0x00000001, &eax, &ebx, &ecx, &edx);
@@ -374,6 +408,9 @@ static uint64_t mtrr_top_of_ram(void)
     rdmsrl(MSR_MTRRcap, mtrr_cap);
     rdmsrl(MSR_MTRRdefType, mtrr_def);
 
+    if ( e820_verbose )
+        printk(" MTRR cap: %lx type: %lx\n", mtrr_cap, mtrr_def);
+
     /* MTRRs enabled, and default memory type is not writeback? */
     if ( !test_bit(11, &mtrr_def) || ((uint8_t)mtrr_def == MTRR_TYPE_WRBACK) )
         return 0;
@@ -387,6 +424,10 @@ static uint64_t mtrr_top_of_ram(void)
     {
         rdmsrl(MSR_MTRRphysBase(i), base);
         rdmsrl(MSR_MTRRphysMask(i), mask);
+
+        if ( e820_verbose )
+            printk(" MTRR[%d]: base %lx mask %lx\n", i, base, mask);
+
         if ( !test_bit(11, &mask) || ((uint8_t)base != MTRR_TYPE_WRBACK) )
             continue;
         base &= addr_mask;
@@ -543,8 +584,16 @@ int __init reserve_e820_ram(struct e820map *e820, uint64_t s, uint64_t e)
 unsigned long __init init_e820(
     const char *str, struct e820entry *raw, int *raw_nr)
 {
+    if ( e820_verbose )
+    {
+        printk("Initial %s RAM map:\n", str);
+        print_e820_memory_map(raw, *raw_nr);
+    }
+
     machine_specific_memory_setup(raw, raw_nr);
+
     printk("%s RAM map:\n", str);
     print_e820_memory_map(e820.map, e820.nr_map);
+
     return find_max_pfn();
 }
