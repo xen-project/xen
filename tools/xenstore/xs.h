@@ -27,6 +27,11 @@
 struct xs_handle;
 typedef uint32_t xs_transaction_t;
 
+/* IMPORTANT: For details on xenstore protocol limits, see
+ * docs/misc/xenstore.txt in the Xen public source repository, and use the
+ * XENSTORE_*_MAX limit macros defined in xen/io/xs_wire.h.
+ */
+
 /* On failure, these routines set errno. */
 
 /* Connect to the xs daemon.
