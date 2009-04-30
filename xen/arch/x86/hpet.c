@@ -25,7 +25,7 @@
 #define HPET_EVT_USED_BIT    0
 #define HPET_EVT_USED       (1 << HPET_EVT_USED_BIT)
 #define HPET_EVT_DISABLE_BIT 1
-#define HPET_EVT_DISALBE    (1 << HPET_EVT_DISABLE_BIT)
+#define HPET_EVT_DISABLE    (1 << HPET_EVT_DISABLE_BIT)
 
 struct hpet_event_channel
 {
@@ -119,12 +119,12 @@ static int reprogram_hpet_evt_channel(
     int64_t delta;
     int ret;
 
-    if ( ch->flags & HPET_EVT_DISALBE )
+    if ( (ch->flags & HPET_EVT_DISABLE) || (expire == 0) )
         return 0;
 
     if ( unlikely(expire < 0) )
     {
-        printk(KERN_DEBUG "reprogram: expire < 0\n");
+        printk(KERN_DEBUG "reprogram: expire <= 0\n");
         return -ETIME;
     }
 
@@ -560,7 +560,7 @@ void hpet_broadcast_init(void)
         return;
     }
 
-    if ( legacy_hpet_event.flags & HPET_EVT_DISALBE )
+    if ( legacy_hpet_event.flags & HPET_EVT_DISABLE )
         return;
 
     hpet_id = hpet_read32(HPET_ID);
@@ -603,7 +603,7 @@ void hpet_disable_legacy_broadcast(void)
 
     spin_lock_irq(&legacy_hpet_event.lock);
 
-    legacy_hpet_event.flags |= HPET_EVT_DISALBE;
+    legacy_hpet_event.flags |= HPET_EVT_DISABLE;
 
     /* disable HPET T0 */
     cfg = hpet_read32(HPET_T0_CFG);
@@ -624,6 +624,9 @@ void hpet_broadcast_enter(void)
 {
     int cpu = smp_processor_id();
     struct hpet_event_channel *ch = per_cpu(cpu_bc_channel, cpu);
+
+    if ( this_cpu(timer_deadline) == 0 )
+        return;
 
     if ( !ch )
         ch = hpet_get_channel(cpu);
