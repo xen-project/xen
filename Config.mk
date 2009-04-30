@@ -112,6 +112,7 @@ XEN_EXTFILES_URL=http://xenbits.xensource.com/xen-extfiles
 # the internet.  The original download URL is preserved as a comment
 # near the place in the Xen Makefiles where the file is used.
 
+QEMU_TAG=xen-3.4.0-rc3
 QEMU_REMOTE=http://xenbits.xensource.com/git-http/qemu-xen-unstable.git
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
