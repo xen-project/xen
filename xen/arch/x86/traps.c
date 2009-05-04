@@ -1364,11 +1364,11 @@ static int read_descriptor(unsigned int sel,
 
             asm volatile (
                 "larl %2,%0 ; setz %1"
-                : "=r" (a), "=rm" (valid) : "rm" (sel));
+                : "=r" (a), "=qm" (valid) : "rm" (sel));
             BUG_ON(valid && ((a & 0x00f0ff00) != *ar));
             asm volatile (
                 "lsll %2,%0 ; setz %1"
-                : "=r" (l), "=rm" (valid) : "rm" (sel));
+                : "=r" (l), "=qm" (valid) : "rm" (sel));
             BUG_ON(valid && (l != *limit));
         }
 #endif
