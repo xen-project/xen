@@ -4,7 +4,7 @@
 
 PERFCOUNTER_ARRAY(exceptions,           "exceptions", 32)
 
-#define VMX_PERF_EXIT_REASON_SIZE 44
+#define VMX_PERF_EXIT_REASON_SIZE 56
 #define VMX_PERF_VECTOR_SIZE 0x20
 PERFCOUNTER_ARRAY(vmexits,              "vmexits", VMX_PERF_EXIT_REASON_SIZE)
 PERFCOUNTER_ARRAY(cause_vector,         "cause vector", VMX_PERF_VECTOR_SIZE)
