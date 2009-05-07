@@ -16,7 +16,7 @@ NLSDIR = $(SHAREDIR)/locale
 
 .PHONY: build buildpy
 buildpy: 
-	CC="$(CC)" CFLAGS="$(CFLAGS)" python setup.py build
+	CC="$(CC)" CFLAGS="$(CFLAGS)" $(PYTHON) setup.py build
 
 build: buildpy refresh-pot refresh-po $(CATALOGS)
 
@@ -55,8 +55,8 @@ refresh-po: $(POTFILE)
 
 .PHONY: install
 install: install-messages install-dtd
-	CC="$(CC)" CFLAGS="$(CFLAGS)" python setup.py install \
-		--prefix="$(PREFIX)" --root="$(DESTDIR)" --force
+	CC="$(CC)" CFLAGS="$(CFLAGS)" $(PYTHON) setup.py install \
+		$(PYTHON_PREFIX_ARG) --root="$(DESTDIR)" --force
 
 install-dtd: all
 	$(INSTALL_DIR) $(DESTDIR)$(DOCDIR)

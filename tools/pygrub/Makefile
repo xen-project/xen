@@ -6,12 +6,12 @@ include $(XEN_ROOT)/tools/Rules.mk
 all: build
 .PHONY: build
 build:
-	CC="$(CC)" CFLAGS="$(CFLAGS)" python setup.py build
+	CC="$(CC)" CFLAGS="$(CFLAGS)" $(PYTHON) setup.py build
 
 .PHONY: install
 install: all
-	CC="$(CC)" CFLAGS="$(CFLAGS)" python setup.py install \
-		--prefix="$(PREFIX)" --root="$(DESTDIR)" --force
+	CC="$(CC)" CFLAGS="$(CFLAGS)" $(PYTHON) setup.py install \
+		$(PYTHON_PREFIX_ARG) --root="$(DESTDIR)" --force
 	$(INSTALL_DIR) $(DESTDIR)/var/run/xend/boot
 
 .PHONY: clean

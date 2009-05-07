@@ -35,6 +35,12 @@ EXTRA_INCLUDES += $(EXTRA_PREFIX)/include
 EXTRA_LIB += $(EXTRA_PREFIX)/$(LIBLEAFDIR)
 endif
 
+PYTHON      ?= python
+PYTHON_PREFIX_ARG ?= --prefix="$(PREFIX)"
+# The above requires that PREFIX contains *no spaces*. This variable is here
+# to permit the user to set PYTHON_PREFIX_ARG to '' to workaround this bug:
+#  https://bugs.launchpad.net/ubuntu/+bug/362570
+
 # cc-option: Check if compiler supports first option, else fall back to second.
 # Usage: cflags-y += $(call cc-option,$(CC),-march=winchip-c6,-march=i586)
 cc-option = $(shell if test -z "`$(1) $(2) -S -o /dev/null -xc \

@@ -60,8 +60,8 @@ install: all $(ACM_CONFIG_FILE)
 	$(INSTALL_DATA) $(ACM_INST_HTML) $(DESTDIR)$(ACM_SECGEN_HTMLDIR)
 	$(INSTALL_DIR) $(DESTDIR)$(ACM_SECGEN_CGIDIR)
 	$(INSTALL_PROG) $(ACM_INST_CGI) $(DESTDIR)$(ACM_SECGEN_CGIDIR)
-	python python/setup.py install \
-		--prefix="$(PREFIX)" --root="$(DESTDIR)" --force
+	$(PYTHON) python/setup.py install $(PYTHON_PREFIX_ARG) \
+		--root="$(DESTDIR)" --force
 else
 .PHONY: all
 all:
@@ -72,7 +72,7 @@ endif
 
 .PHONY: build
 build: $(ACM_INST_TOOLS) $(ACM_NOINST_TOOLS)
-	python python/setup.py build
+	$(PYTHON) python/setup.py build
 	chmod 700 $(ACM_SCRIPTS)
 
 xensec_tool: $(OBJS_TOOL)
