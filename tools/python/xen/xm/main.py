@@ -2197,7 +2197,7 @@ def xm_pci_list_assignable_devices(args):
 
     devs =  server.xend.node.pciinfo()
  
-    fmt_str = "%(domain)04x:%(bus)02x:%(slot)02x:%(func)01x"
+    fmt_str = "%(domain)04x:%(bus)02x:%(slot)02x.%(func)01x"
     for x in devs:
         pci = parse_pci_info(x)
         print fmt_str % pci
