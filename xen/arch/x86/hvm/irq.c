@@ -185,8 +185,16 @@ void hvm_maybe_deassert_evtchn_irq(void)
 
 void hvm_assert_evtchn_irq(struct vcpu *v)
 {
-    if ( v->vcpu_id == 0 )
-        hvm_set_callback_irq_level(v);
+    if ( v->vcpu_id != 0 )
+        return;
+
+    if ( unlikely(in_irq() || !local_irq_is_enabled()) )
+    {
+        tasklet_schedule(&v->arch.hvm_vcpu.assert_evtchn_irq_tasklet);
+        return;
+    }
+
+    hvm_set_callback_irq_level(v);
 }
 
 void hvm_set_pci_link_route(struct domain *d, u8 link, u8 isa_irq)

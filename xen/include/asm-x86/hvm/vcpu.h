@@ -66,6 +66,8 @@ struct hvm_vcpu {
         struct arch_svm_struct svm;
     } u;
 
+    struct tasklet      assert_evtchn_irq_tasklet;
+
     struct mtrr_state   mtrr;
     u64                 pat_cr;
 

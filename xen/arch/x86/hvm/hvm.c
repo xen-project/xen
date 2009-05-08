@@ -697,6 +697,10 @@ int hvm_vcpu_initialise(struct vcpu *v)
     if ( rc != 0 )
         goto fail3;
 
+    tasklet_init(&v->arch.hvm_vcpu.assert_evtchn_irq_tasklet,
+                 (void(*)(unsigned long))hvm_assert_evtchn_irq,
+                 (unsigned long)v);
+
     v->arch.guest_context.user_regs.eflags = 2;
 
     if ( v->vcpu_id == 0 )
@@ -726,6 +730,7 @@ int hvm_vcpu_initialise(struct vcpu *v)
 
 void hvm_vcpu_destroy(struct vcpu *v)
 {
+    tasklet_kill(&v->arch.hvm_vcpu.assert_evtchn_irq_tasklet);
     hvm_vcpu_cacheattr_destroy(v);
     vlapic_destroy(v);
     hvm_funcs.vcpu_destroy(v);
