@@ -11,68 +11,12 @@ of video memory for the HVM domain, you need to avoid the need for ballooning,
 by using the hypervisor dom0_mem= option for instance.
 
 
-There is a sample configuration set in xmexample.hvm-stubdom and
-xmexample.hvm-dm
+There is a sample configuration set in xmexample.hvm-stubdom
 
-In your HVM config "hvmconfig",
-
-- use /usr/lib/xen/bin/stubdom-dm as dm script:
+In your HVM config "hvmconfig" use /usr/lib/xen/bin/stubdom-dm as dm script:
 
 device_model = '/usr/lib/xen/bin/stubdom-dm'
 
-- comment the disk statement:
-
-#disk = [  'file:/tmp/install.iso,hdc:cdrom,r', 'phy:/dev/sda6,hda,w', 'file:/tmp/test,hdb,r' ]
-
-- disable anything related to dom0, like pty serial assignments
-
-
-Create /etc/xen/hvmconfig-dm (where "hvmconfig" is the name of your HVM
-guest) with
-
-kernel = "/usr/lib/xen/boot/ioemu-stubdom.gz"
-vif = ['ip=10.0.1.1,mac=aa:00:00:12:23:34']
-disk = [  'file:/tmp/install.iso,hdc:cdrom,r', 'phy:/dev/sda6,hda,w', 'file:/tmp/test,hdb,r' ]
-
-where
-- 'ip=10.0.1.1,mac= etc...' is the same net configuration as in the hvmconfig
-script,
-- and disk = is the same block configuration as in the hvmconfig script.
-
-Display Configuration
-=====================
-
-There are two possibilities
-
-* Using SDL
-
-  - In hvmconfig, disable vnc and sdl:
-
-vnc = 0
-sdl = 0
-
-  - In hvmconfig-dm, set an sdl vfb:
-
-vfb = [ 'type=sdl' ]
-
-    by default qemu will use sdl together with opengl for rendering, if
-    you do not want qemu to use opengl then also pass opengl=0:
-
-vfb = [ 'type=sdl, opengl=0' ]
-
-
-* Using a VNC server in dom0
-
-  - In hvmconfig, disable vnc and sdl:
-
-vnc = 0
-sdl = 0
-
-  - In hvmconfig-dm, set a vnc vfb:
-
-vfb = [ 'type=vnc' ]
-
-and any other parameter as wished.
 
 To run
 ======

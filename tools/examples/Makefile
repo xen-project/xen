@@ -17,7 +17,6 @@ XEN_CONFIGS += xmexample2
 XEN_CONFIGS += xmexample3
 XEN_CONFIGS += xmexample.hvm
 XEN_CONFIGS += xmexample.hvm-stubdom
-XEN_CONFIGS += xmexample.hvm-dm
 XEN_CONFIGS += xmexample.pv-grub
 XEN_CONFIGS += xmexample.nbd
 XEN_CONFIGS += xmexample.vti

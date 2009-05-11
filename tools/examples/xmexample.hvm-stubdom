@@ -6,8 +6,7 @@
 # you can set the parameters for the domain on the xm command line.
 #============================================================================
 #
-# This is a version using a stubdomain for device model, see
-# xmexample.hvm-dm and README.stubdom for more details
+# This is a version using a stubdomain for device model
 # The differences with xmexample.hvm are marked with "STUBDOM"
 
 #----------------------------------------------------------------------------
@@ -68,11 +67,8 @@ vif = [ 'type=ioemu, bridge=xenbr0' ]
 # Each disk entry is of the form phy:UNAME,DEV,MODE
 # where UNAME is the device, DEV is the device name the domain will see,
 # and MODE is r for read-only, w for read-write.
-#
-# STUBDOM: do not put it here but in stubdom-ExampleHVMDomain
 
-#disk = [ 'phy:hda1,hda1,r' ]
-#disk = [ 'file:/var/images/min-el3-i386.img,hda,w', ',hdc:cdrom,r' ]
+disk = [ 'file:/var/images/min-el3-i386.img,hda,w', 'phy:/dev/cdrom,hdc:cdrom,r' ]
 
 #----------------------------------------------------------------------------
 # Configure the behaviour when a domain exits.  There are three 'reasons'
@@ -127,7 +123,7 @@ device_model = '/usr/lib/xen/bin/stubdom-dm'
 #-----------------------------------------------------------------------------
 # boot on floppy (a), hard disk (c), Network (n) or CD-ROM (d) 
 # default: hard disk, cd-rom, floppy
-#boot="cda"
+boot="cda"
 
 #-----------------------------------------------------------------------------
 #  write to temporary files instead of disk image files
@@ -136,19 +132,17 @@ device_model = '/usr/lib/xen/bin/stubdom-dm'
 #----------------------------------------------------------------------------
 # enable SDL library for graphics, default = 0
 # 
-# STUBDOM: always disable since the stub domain doesn't have direct X access
 sdl=0
 
 #----------------------------------------------------------------------------
 # enable OpenGL for texture rendering inside the SDL window, default = 1
 # valid only if sdl is enabled.
 # 
-# STUBDOM: always disable for the same reason
-opengl=0
+opengl=1
 
 #----------------------------------------------------------------------------
 # enable VNC library for graphics, default = 1
-vnc=0
+vnc=1
 
 #----------------------------------------------------------------------------
 # address that should be listened on for the VNC server if vnc is set.
