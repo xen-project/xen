@@ -706,12 +706,12 @@ class XendDomainInfo:
                 config_opts = map(lambda (x, y): x+'='+y, config_opts)
                 opts = ',' + reduce(lambda x, y: x+','+y, config_opts)
 
-            bdf_str = "%s:%s:%s.%s%s@%s" % (new_dev['domain'],
+            bdf_str = "%s:%s:%s.%s@%s%s" % (new_dev['domain'],
                 new_dev['bus'],
                 new_dev['slot'],
                 new_dev['func'],
-                opts,
-                new_dev['vslot'])
+                new_dev['vslot'],
+                opts)
             self.image.signalDeviceModel('pci-ins', 'pci-inserted', bdf_str)
 
             vslot = xstransact.Read("/local/domain/0/device-model/%i/parameter"
