@@ -912,18 +912,8 @@ void vmx_do_resume(struct vcpu *v)
     debug_state = v->domain->debugger_attached;
     if ( unlikely(v->arch.hvm_vcpu.debug_state_latch != debug_state) )
     {
-        unsigned long intercepts = __vmread(EXCEPTION_BITMAP);
-        unsigned long mask = 1u << TRAP_int3;
-
-        if ( !cpu_has_monitor_trap_flag )
-            mask |= 1u << TRAP_debug;
-
         v->arch.hvm_vcpu.debug_state_latch = debug_state;
-        if ( debug_state )
-            intercepts |= mask;
-        else
-            intercepts &= ~mask;
-        __vmwrite(EXCEPTION_BITMAP, intercepts);
+        vmx_update_debug_state(v);
     }
 
     hvm_do_resume(v);

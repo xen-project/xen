@@ -1035,6 +1035,24 @@ static void vmx_update_host_cr3(struct vcpu *v)
     vmx_vmcs_exit(v);
 }
 
+void vmx_update_debug_state(struct vcpu *v)
+{
+    unsigned long intercepts, mask;
+
+    ASSERT(v == current);
+
+    mask = 1u << TRAP_int3;
+    if ( !cpu_has_monitor_trap_flag )
+        mask |= 1u << TRAP_debug;
+
+    intercepts = __vmread(EXCEPTION_BITMAP);
+    if ( v->arch.hvm_vcpu.debug_state_latch )
+        intercepts |= mask;
+    else
+        intercepts &= ~mask;
+    __vmwrite(EXCEPTION_BITMAP, intercepts);
+}
+
 static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
 {
     vmx_vmcs_enter(v);
@@ -1107,6 +1125,7 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
                           | (paging_mode_hap(v->domain) ?
                              0 : (1U << TRAP_page_fault))
                           | (1U << TRAP_no_device));
+                vmx_update_debug_state(v);
             }
         }
 
