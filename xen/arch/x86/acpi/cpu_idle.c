@@ -624,6 +624,7 @@ static int check_cx(struct acpi_processor_power *power, xen_processor_cx_t *cx)
 }
 
 static unsigned int latency_factor = 2;
+integer_param("idle_latency_factor", latency_factor);
 
 static void set_cx(
     struct acpi_processor_power *acpi_power,

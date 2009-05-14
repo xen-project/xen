@@ -45,9 +45,15 @@ struct menu_device
 
 static DEFINE_PER_CPU(struct menu_device, menu_devices);
 
-static s_time_t get_sleep_length_ns(void)
+static unsigned int get_sleep_length_us(void)
 {
-    return per_cpu(timer_deadline, smp_processor_id()) - NOW();
+    s_time_t us = (per_cpu(timer_deadline, smp_processor_id()) - NOW()) / 1000;
+    /*
+     * while us < 0 or us > (u32)-1, return a large u32,
+     * choose (unsigned int)-2000 to avoid wrapping while added with exit
+     * latency because the latency should not larger than 2ms
+     */
+    return (us >> 32) ? (unsigned int)-2000 : (unsigned int)us;
 }
 
 static int menu_select(struct acpi_processor_power *power)
@@ -56,7 +62,7 @@ static int menu_select(struct acpi_processor_power *power)
     int i;
 
     /* determine the expected residency time */
-    data->expected_us = (u32) get_sleep_length_ns() / 1000;
+    data->expected_us = get_sleep_length_us();
 
     /* find the deepest idle state that satisfies our constraints */
     for ( i = 2; i < power->count; i++ )
