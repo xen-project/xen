@@ -272,9 +272,9 @@ struct mmuext_op {
         unsigned int nr_ents;
         /* TLB_FLUSH_MULTI, INVLPG_MULTI */
 #if __XEN_INTERFACE_VERSION__ >= 0x00030205
-        XEN_GUEST_HANDLE(void) vcpumask;
+        XEN_GUEST_HANDLE(const_void) vcpumask;
 #else
-        void *vcpumask;
+        const void *vcpumask;
 #endif
         /* COPY_PAGE */
         xen_pfn_t src_mfn;
