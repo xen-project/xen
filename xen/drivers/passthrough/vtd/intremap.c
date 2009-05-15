@@ -23,6 +23,7 @@
 #include <xen/iommu.h>
 #include <asm/hvm/iommu.h>
 #include <xen/time.h>
+#include <xen/list.h>
 #include <xen/pci.h>
 #include <xen/pci_regs.h>
 #include "iommu.h"
@@ -40,8 +41,64 @@
  */
 #define MAX_IOAPIC_PIN_NUM  256
 
-static int ioapic_pin_to_intremap_index[MAX_IOAPIC_PIN_NUM] =
-    { [0 ... MAX_IOAPIC_PIN_NUM-1] = -1 };
+struct ioapicid_pin_intremap_index {
+	struct list_head list;
+	unsigned int ioapic_id;
+	unsigned int pin;
+	int intremap_index;
+};
+
+static struct list_head ioapic_pin_to_intremap_index[MAX_IOAPIC_PIN_NUM];
+
+static int init_ioapic_pin_intremap_index(void)
+{
+    static int initialized = 0;
+    int i;
+
+    if ( initialized == 1 )
+        return 0;
+
+    for ( i = 0; i < MAX_IOAPIC_PIN_NUM; i++ )
+        INIT_LIST_HEAD(&ioapic_pin_to_intremap_index[i]);
+
+    initialized = 1;
+    return 0;
+}
+
+static int get_ioapic_pin_intremap_index(unsigned int ioapic_id,
+                                         unsigned int pin)
+{
+    struct ioapicid_pin_intremap_index *entry;
+    struct list_head *pos, *tmp;
+
+    list_for_each_safe ( pos, tmp, &ioapic_pin_to_intremap_index[pin] )
+    {
+        entry = list_entry(pos, struct ioapicid_pin_intremap_index, list);
+        if ( entry->ioapic_id == ioapic_id )
+            return entry->intremap_index;
+    }
+
+    return -1;
+}
+
+static int set_ioapic_pin_intremap_index(unsigned int ioapic_id,
+                                         unsigned int pin,
+                                         int index)
+{
+    struct ioapicid_pin_intremap_index *entry;
+
+    entry = xmalloc(struct ioapicid_pin_intremap_index);
+    if ( !entry )
+        return -ENOMEM;
+
+    entry->ioapic_id = ioapic_id;
+    entry->pin = pin;
+    entry->intremap_index = index;
+
+    list_add_tail(&entry->list, &ioapic_pin_to_intremap_index[pin]);
+
+    return 0;
+}
 
 u16 apicid_to_bdf(int apic_id)
 {
@@ -117,14 +174,13 @@ static int ioapic_rte_to_remap_entry(struct iommu *iommu,
     remap_rte = (struct IO_APIC_route_remap_entry *) old_rte;
     spin_lock_irqsave(&ir_ctrl->iremap_lock, flags);
 
-    if ( ioapic_pin_to_intremap_index[ioapic_pin] < 0 )
+    index = get_ioapic_pin_intremap_index(apic_id, ioapic_pin);
+    if ( index < 0 )
     {
         ir_ctrl->iremap_index++;
         index = ir_ctrl->iremap_index;
-        ioapic_pin_to_intremap_index[ioapic_pin] = index;
+        set_ioapic_pin_intremap_index(apic_id, ioapic_pin, index);
     }
-    else
-        index = ioapic_pin_to_intremap_index[ioapic_pin];
 
     if ( index > IREMAP_ENTRY_NR - 1 )
     {
@@ -571,6 +627,8 @@ int enable_intremap(struct iommu *iommu)
 
     /* After set SIRTP, we should do globally invalidate the IEC */
     iommu_flush_iec_global(iommu);
+
+    init_ioapic_pin_intremap_index();
 
     return 0;
 }
