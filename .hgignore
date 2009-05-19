@@ -183,6 +183,7 @@
 ^tools/misc/xenpm$
 ^tools/pygrub/build/.*$
 ^tools/python/build/.*$
+^tools/python/xen/util/path\.py$
 ^tools/security/secpol_tool$
 ^tools/security/xen/.*$
 ^tools/security/xensec_tool$

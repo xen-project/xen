@@ -13,9 +13,18 @@ POTFILE := $(PODIR)/xen-xm.pot
 I18NSRCFILES = $(shell find xen/xm/ -name '*.py')
 CATALOGS = $(patsubst %,xen/xm/messages/%.mo,$(LINGUAS))
 NLSDIR = $(SHAREDIR)/locale
+xenpath = "xen/util/path.py"
+  
+.PHONY: build buildpy genpath
+genpath:
+	rm -f ${xenpath}
+	echo "SBINDIR=\"$(SBINDIR)\"" >> ${xenpath}
+	echo "BINDIR=\"$(BINDIR)\"" >> ${xenpath}
+	echo "LIBEXEC=\"$(LIBEXEC)\"" >> ${xenpath}
+	echo "LIBDIR=\"$(LIBDIR)\"" >> ${xenpath}
+	echo "PRIVATE_BINDIR=\"$(PRIVATE_BINDIR)\"" >> ${xenpath}
 
-.PHONY: build buildpy
-buildpy: 
+buildpy: genpath 
 	CC="$(CC)" CFLAGS="$(CFLAGS)" $(PYTHON) setup.py build
 
 build: buildpy refresh-pot refresh-po $(CATALOGS)
