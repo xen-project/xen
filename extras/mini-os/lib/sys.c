@@ -1185,6 +1185,32 @@ int clock_gettime(clockid_t clk_id, struct timespec *tp)
     return 0;
 }
 
+uid_t getuid(void)
+{
+	return 0;
+}
+
+uid_t geteuid(void)
+{
+	return 0;
+}
+
+gid_t getgid(void)
+{
+	return 0;
+}
+
+gid_t getegid(void)
+{
+	return 0;
+}
+
+int gethostname(char *name, size_t namelen)
+{
+	strncpy(name, "mini-os", namelen);
+	return 0;
+}
+
 size_t getpagesize(void)
 {
     return PAGE_SIZE;
@@ -1253,6 +1279,12 @@ void sparse(unsigned long data, size_t size)
     munmap((void *) data, size);
     free_physical_pages(mfns, n);
     do_map_zero(data, n);
+}
+
+int nice(int inc)
+{
+    printk("nice() stub called with inc=%d\n", inc);
+    return 0;
 }
 
 
