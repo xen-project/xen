@@ -766,7 +766,7 @@ get_page_from_l1e(
         goto could_not_pin;
 
     if ( pte_flags_to_cacheattr(l1f) !=
-         ((page->count_info >> PGC_cacheattr_base) & 7) )
+         ((page->count_info & PGC_cacheattr_mask) >> PGC_cacheattr_base) )
     {
         unsigned long x, nx, y = page->count_info;
         unsigned long cacheattr = pte_flags_to_cacheattr(l1f);
@@ -782,7 +782,7 @@ get_page_from_l1e(
             return 0;
         }
 
-        while ( ((y >> PGC_cacheattr_base) & 7) != cacheattr )
+        while ( ((y & PGC_cacheattr_mask) >> PGC_cacheattr_base) != cacheattr )
         {
             x  = y;
             nx = (x & ~PGC_cacheattr_mask) | (cacheattr << PGC_cacheattr_base);
@@ -2389,7 +2389,8 @@ int get_page_type_preemptible(struct page_info *page, unsigned long type)
 
 void cleanup_page_cacheattr(struct page_info *page)
 {
-    uint32_t cacheattr = (page->count_info >> PGC_cacheattr_base) & 7;
+    uint32_t cacheattr =
+        (page->count_info & PGC_cacheattr_mask) >> PGC_cacheattr_base;
 
     if ( likely(cacheattr == 0) )
         return;
