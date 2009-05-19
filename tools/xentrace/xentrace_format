@@ -110,6 +110,10 @@ D7REC  = "IIIIIII"
 
 last_tsc = [0]
 
+TRC_TRACE_IRQ = 0x1f004
+NR_VECTORS = 256
+irq_measure = [{'count':0, 'tot_cycles':0, 'max_cycles':0}] * NR_VECTORS
+
 i=0
 
 while not interrupted:
@@ -179,6 +183,19 @@ while not interrupted:
         if event == 0x1f003:
             cpu = d1
 
+        if event == TRC_TRACE_IRQ:
+            # IN - d1:vector, d2:tsc_in, d3:tsc_out
+            # OUT - d1:vector, d2:count, d3:tot_cycles, d4:max_cycles
+            tsc_diff = d3 - d2
+            if tsc_diff < 0:
+                break
+            irq_measure[d1]['count'] += 1
+            irq_measure[d1]['tot_cycles'] += tsc_diff
+            if irq_measure[d1]['max_cycles'] < tsc_diff:
+                irq_measure[d1]['max_cycles'] = tsc_diff
+            d2 = irq_measure[d1]['count']
+            d3 = irq_measure[d1]['tot_cycles']
+            d4 = irq_measure[d1]['max_cycles']
 
         #tsc = (tscH<<32) | tscL
 

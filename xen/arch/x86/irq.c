@@ -16,6 +16,7 @@
 #include <xen/compat.h>
 #include <xen/iocap.h>
 #include <xen/iommu.h>
+#include <xen/trace.h>
 #include <asm/msi.h>
 #include <asm/current.h>
 #include <asm/flushtlb.h>
@@ -114,6 +115,7 @@ asmlinkage void do_IRQ(struct cpu_user_regs *regs)
     unsigned int      vector = regs->entry_vector;
     irq_desc_t       *desc = &irq_desc[vector];
     struct irqaction *action;
+    uint32_t          tsc_in;
 
     perfc_incr(irqs);
 
@@ -123,7 +125,9 @@ asmlinkage void do_IRQ(struct cpu_user_regs *regs)
     if ( likely(desc->status & IRQ_GUEST) )
     {
         irq_enter();
+        tsc_in = tb_init_done ? get_cycles() : 0;
         __do_IRQ_guest(vector);
+        TRACE_3D(TRC_TRACE_IRQ, vector, tsc_in, get_cycles());
         irq_exit();
         spin_unlock(&desc->lock);
         return;
@@ -147,7 +151,9 @@ asmlinkage void do_IRQ(struct cpu_user_regs *regs)
         desc->status &= ~IRQ_PENDING;
         irq_enter();
         spin_unlock_irq(&desc->lock);
+        tsc_in = tb_init_done ? get_cycles() : 0;
         action->handler(vector_to_irq(vector), action->dev_id, regs);
+        TRACE_3D(TRC_TRACE_IRQ, vector, tsc_in, get_cycles());
         spin_lock_irq(&desc->lock);
         irq_exit();
     }

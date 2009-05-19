@@ -3,6 +3,7 @@
 0x0001f001  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  lost_records      0x%(1)08x
 0x0001f002  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  wrap_buffer       0x%(1)08x
 0x0001f003  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  cpu_change        0x%(1)08x
+0x0001f004  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  trace_irq    [ vector = %(1)d, count = %(2)d, tot_cycles = 0x%(3)08x, max_cycles = 0x%(4)08x ]
 
 0x00021011  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  running_to_runnable [ dom:vcpu = 0x%(1)08x ]
 0x00021021  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  running_to_blocked  [ dom:vcpu = 0x%(1)08x ]
