@@ -172,7 +172,7 @@ static uint8_t opcode_table[256] = {
 
 static uint8_t twobyte_table[256] = {
     /* 0x00 - 0x07 */
-    0, ImplicitOps|ModRM, 0, 0, 0, 0, ImplicitOps, 0,
+    SrcMem16|ModRM, ImplicitOps|ModRM, 0, 0, 0, 0, ImplicitOps, 0,
     /* 0x08 - 0x0F */
     ImplicitOps, ImplicitOps, 0, 0, 0, ImplicitOps|ModRM, 0, 0,
     /* 0x10 - 0x17 */
@@ -971,8 +971,8 @@ protmode_load_seg(
     struct { uint32_t a, b; } desc;
     unsigned long val;
     uint8_t dpl, rpl, cpl;
-    uint32_t new_desc_b;
-    int rc, fault_type = EXC_TS;
+    uint32_t new_desc_b, a_flag = 0x100;
+    int rc, fault_type = EXC_GP;
 
     /* NULL selector? */
     if ( (sel & 0xfffc) == 0 )
@@ -983,8 +983,8 @@ protmode_load_seg(
         return ops->write_segment(seg, &segr, ctxt);
     }
 
-    /* LDT descriptor must be in the GDT. */
-    if ( (seg == x86_seg_ldtr) && (sel & 4) )
+    /* System segment descriptors must reside in the GDT. */
+    if ( !is_x86_user_segment(seg) && (sel & 4) )
         goto raise_exn;
 
     if ( (rc = ops->read_segment(x86_seg_ss, &ss, ctxt)) ||
@@ -1013,8 +1013,8 @@ protmode_load_seg(
             goto raise_exn;
         }
 
-        /* LDT descriptor is a system segment. All others are code/data. */
-        if ( (desc.b & (1u<<12)) == ((seg == x86_seg_ldtr) << 12) )
+        /* System segments must have the system flag (S) set. */
+        if ( (desc.b & (1u<<12)) == (!is_x86_user_segment(seg) << 12) )
             goto raise_exn;
 
         dpl = (desc.b >> 13) & 3;
@@ -1043,6 +1043,12 @@ protmode_load_seg(
             if ( (desc.b & (15u<<8)) != (2u<<8) )
                 goto raise_exn;
             goto skip_accessed_flag;
+        case x86_seg_tr:
+            /* Available TSS system segment? */
+            if ( (desc.b & (15u<<8)) != (9u<<8) )
+                goto raise_exn;
+            a_flag = 0x200; /* busy flag */
+            break;
         default:
             /* Readable code or data segment? */
             if ( (desc.b & (5u<<9)) == (4u<<9) )
@@ -1055,8 +1061,8 @@ protmode_load_seg(
         }
 
         /* Ensure Accessed flag is set. */
-        new_desc_b = desc.b | 0x100;
-        rc = ((desc.b & 0x100) ? X86EMUL_OKAY :
+        new_desc_b = desc.b | a_flag;
+        rc = ((desc.b & a_flag) ? X86EMUL_OKAY :
               ops->cmpxchg(
                   x86_seg_none, desctab.base + (sel & 0xfff8) + 4,
                   &desc.b, &new_desc_b, 4, ctxt));
@@ -1066,7 +1072,7 @@ protmode_load_seg(
         return rc;
 
     /* Force the Accessed flag in our local copy. */
-    desc.b |= 0x100;
+    desc.b |= a_flag;
 
  skip_accessed_flag:
     segr.base = (((desc.b <<  0) & 0xff000000u) |
@@ -3440,6 +3446,15 @@ x86_emulate(
  twobyte_insn:
     switch ( b )
     {
+    case 0x00: /* Grp6 */
+        fail_if((modrm_reg & 6) != 2);
+        generate_exception_if(!in_protmode(ctxt, ops), EXC_UD, -1);
+        generate_exception_if(!mode_ring0(), EXC_GP, 0);
+        if ( (rc = load_seg((modrm_reg & 1) ? x86_seg_tr : x86_seg_ldtr,
+                            src.val, ctxt, ops)) != 0 )
+            goto done;
+        break;
+
     case 0x01: /* Grp7 */ {
         struct segment_register reg;
         unsigned long base, limit, cr0, cr0w;
