@@ -34,7 +34,7 @@ build: buildpy refresh-pot refresh-po $(CATALOGS)
 # string, hence the sed black magic. This avoids the expensive
 # re-generation of .po files on every single build
 refresh-pot: $(I18NSRCFILES)
-	xgettext --default-domain=$(POPACAKGE) \
+	xgettext --default-domain=$(POPACKAGE) \
 		--keyword=N_ \
 		--keyword=_ \
 		-o $(POTFILE)-tmp \
