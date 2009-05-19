@@ -199,6 +199,7 @@ __gnttab_map_grant_ref(
     unsigned long  frame = 0, nr_gets = 0;
     int            rc = GNTST_okay;
     u32            old_pin;
+    u32            act_pin;
     unsigned int   cache_flags;
     struct active_grant_entry *act;
     struct grant_mapping *mt;
@@ -329,6 +330,7 @@ __gnttab_map_grant_ref(
             GNTPIN_hstr_inc : GNTPIN_hstw_inc;
 
     frame = act->frame;
+    act_pin = act->pin;
 
     cache_flags = (sha->flags & (GTF_PAT | GTF_PWT | GTF_PCD) );
 
@@ -391,7 +393,7 @@ __gnttab_map_grant_ref(
 
     if ( need_iommu(ld) &&
          !(old_pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask)) &&
-         (act->pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask)) )
+         (act_pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask)) )
     {
         if ( iommu_map_page(ld, mfn_to_gmfn(ld, frame), frame) )
         {
