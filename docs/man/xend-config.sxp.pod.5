@@ -115,6 +115,16 @@ The name of an application or script that can handle external device
 migration, such as for example virtual TPM migration. An example
 script is I</etc/xen/scripts/external-device-migrate>.
 
+=item I<device-create-timeout>
+
+Integer value that tells xend how long it should wait for a new device
+to be created. Defaults to I<100>.
+
+=item I<device-destroy-timeout>
+
+Integer value that tells xend how long it should wait for a device to
+be destroyed. Defaults to I<100>.
+
 =back
 
 =head1 EXAMPLES

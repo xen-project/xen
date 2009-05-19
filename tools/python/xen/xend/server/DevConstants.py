@@ -16,8 +16,12 @@
 # Copyright (C) 2005 XenSource Ltd
 #============================================================================
 
-DEVICE_CREATE_TIMEOUT  = 100
-DEVICE_DESTROY_TIMEOUT = 100
+from xen.xend import XendOptions
+
+xoptions = XendOptions.instance()
+
+DEVICE_CREATE_TIMEOUT  = xoptions.get_device_create_timeout();
+DEVICE_DESTROY_TIMEOUT = xoptions.get_device_destroy_timeout();
 HOTPLUG_STATUS_NODE = "hotplug-status"
 HOTPLUG_ERROR_NODE  = "hotplug-error"
 HOTPLUG_STATUS_ERROR = "error"

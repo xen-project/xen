@@ -254,3 +254,9 @@
 # Path where persistent domain configuration is stored.
 # Default is /var/lib/xend/domains/
 #(xend-domains-path /var/lib/xend/domains)
+
+# Number of seconds xend will wait for device creation and
+# destruction
+#(device-create-timeout 100)
+#(device-destroy-timeout 100)
+

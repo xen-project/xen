@@ -141,6 +141,12 @@ class XendOptions:
     """Default rotation count of qemu-dm log file."""
     qemu_dm_logrotate_count = 10
 
+    """Default timeout for device creation."""
+    device_create_timeout_default = 100
+
+    """Default timeout for device destruction."""
+    device_destroy_timeout_default = 100
+
     def __init__(self):
         self.configure()
 
@@ -367,6 +373,14 @@ class XendOptions:
     def get_qemu_dm_logrotate_count(self):
         return self.get_config_int("qemu-dm-logrotate-count",
                                    self.qemu_dm_logrotate_count)
+
+    def get_device_create_timeout(self):
+        return self.get_config_int("device-create-timeout",
+                                   self.device_create_timeout_default)
+
+    def get_device_destroy_timeout(self):
+        return self.get_config_int("device-destroy-timeout",
+                                   self.device_destroy_timeout_default)
 
 
 class XendOptionsFile(XendOptions):
