@@ -621,9 +621,13 @@ class XendDomainInfo:
             pci_conf = self.info['devices'][dev_uuid][1]
             pci_devs = pci_conf['devs']
             for x in pci_devs:
-                if (int(x['vslot'], 16) == int(new_dev['vslot'], 16) and
-                   int(x['vslot'], 16) != AUTO_PHP_SLOT):
-                    raise VmError("vslot %s already have a device." % (new_dev['vslot']))
+                if x.has_key('vslot'):
+                    x_vslot = x['vslot']
+                else:
+                    x_vslot = x['requested_vslot']
+                if (int(x_vslot, 16) == int(new_dev['requested_vslot'], 16) and
+                   int(x_vslot, 16) != AUTO_PHP_SLOT):
+                    raise VmError("vslot %s already have a device." % (new_dev['requested_vslot']))
 
                 if (int(x['domain'], 16) == int(new_dev['domain'], 16) and
                    int(x['bus'], 16)    == int(new_dev['bus'], 16) and
@@ -710,14 +714,14 @@ class XendDomainInfo:
                 new_dev['bus'],
                 new_dev['slot'],
                 new_dev['func'],
-                new_dev['vslot'],
+                new_dev['requested_vslot'],
                 opts)
             self.image.signalDeviceModel('pci-ins', 'pci-inserted', bdf_str)
 
             vslot = xstransact.Read("/local/domain/0/device-model/%i/parameter"
                                     % self.getDomid())
         else:
-            vslot = new_dev['vslot']
+            vslot = new_dev['requested_vslot']
 
         return vslot
 
@@ -815,7 +819,10 @@ class XendDomainInfo:
                          int(x['bus'], 16) == int(dev['bus'], 16) and
                          int(x['slot'], 16) == int(dev['slot'], 16) and
                          int(x['func'], 16) == int(dev['func'], 16) ):
-                        vslot = x['vslot']
+                        if x.has_key('vslot'):
+                            vslot = x['vslot']
+                        else:
+                            vslot = x['requested_vslot']
                         break
                 if vslot == AUTO_PHP_SLOT_STR:
                     raise VmError("Device %04x:%02x:%02x.%01x is not connected"
@@ -1112,7 +1119,11 @@ class XendDomainInfo:
         #find the pass-through device with the virtual slot
         devnum = 0
         for x in pci_conf['devs']:
-            if int(x['vslot'], 16) == vslot:
+            if x.has_key('vslot'):
+                x_vslot = x['vslot']
+            else:
+                x_vslot = x['requested_vslot']
+            if int(x_vslot, 16) == vslot:
                 break
             devnum += 1
 

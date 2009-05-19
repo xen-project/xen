@@ -2165,13 +2165,27 @@ def xm_pci_list(args):
     if len(devs) == 0:
         return
 
-    has_vslot = devs[0].has_key('vslot')
+    has_vslot = False
+    for x in devs:
+        if x.has_key('vslot'):
+            if x['vslot'] == "0x%s" % AUTO_PHP_SLOT_STR:
+                x['vslot'] = '-'
+            else:
+                has_vslot = True
+        elif not x.has_key('requested_vslot'):
+            x['vslot'] = '-'
+        elif x['requested_vslot'] == "0x%s" % AUTO_PHP_SLOT_STR:
+            x['vslot'] = '-'
+        else:
+            has_vslot = True
+            x['vslot'] = x['requested_vslot']
+
     if has_vslot:
         hdr_str = 'VSlt domain   bus   slot   func'
-        fmt_str =  "%(vslot)-3s    %(domain)-3s  %(bus)-3s   %(slot)-3s    %(func)-3s    "
+        fmt_str =  "%(vslot)-4s %(domain)-6s   %(bus)-4s  %(slot)-4s   %(func)-3s    "
     else:
         hdr_str = 'domain   bus   slot   func'
-        fmt_str =  "%(domain)-3s  %(bus)-3s   %(slot)-3s    %(func)-3s    "
+        fmt_str =  "%(domain)-6s   %(bus)-4s  %(slot)-4s   %(func)-3s    "
     hdr = 0
 
     for x in devs:
@@ -2457,7 +2471,7 @@ def parse_pci_configuration(args, state, opts = ''):
                 ['bus', '0x'+ pci_dev_info['bus']],
                 ['slot', '0x'+ pci_dev_info['slot']],
                 ['func', '0x'+ pci_dev_info['func']],
-                ['vslot', '0x%x' % int(vslot, 16)]]
+                ['requested_vslot', '0x%x' % int(vslot, 16)]]
         if len(opts) > 0:
             pci_bdf.append(['opts', opts])
         pci.append(pci_bdf)
