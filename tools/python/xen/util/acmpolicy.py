@@ -17,12 +17,19 @@
 #============================================================================
 
 import os
-import sha
 import stat
 import array
 import struct
 import shutil
 import commands
+
+# sha is deprecated as of python 2.6
+try:
+    from hashlib import sha1
+except ImportError:
+    # but hashlib was only added in python 2.5
+    from sha import new as sha1
+
 from xml.dom import minidom, Node
 from xen.xend.XendLogging import log
 from xen.util import xsconstants, bootloader, mkdir
@@ -1102,8 +1109,8 @@ class ACMPolicy(XSPolicy):
         return None
 
     def hash(self):
-        """ Calculate a SAH1 hash of the XML policy """
-        return sha.sha(self.toxml())
+        """ Calculate a SHA1 hash of the XML policy """
+        return sha1(self.toxml())
 
     def save(self):
         ### Save the XML policy into a file ###

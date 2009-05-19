@@ -18,13 +18,18 @@
 import inspect
 import os
 import Queue
-import sets
 import string
 import sys
 import traceback
 import threading
 import time
 import xmlrpclib
+
+# sets is deprecated as of python 2.6, but set is unavailable in 2.3
+try:
+    set
+except NameError:
+    from sets import Set as set
 
 import XendDomain, XendDomainInfo, XendNode, XendDmesg
 import XendLogging, XendTaskManager, XendAPIStore
@@ -119,16 +124,17 @@ event_registrations = {}
 def event_register(session, reg_classes):
     if session not in event_registrations:
         event_registrations[session] = {
-            'classes' : sets.Set(),
+            'classes' : set(),
             'queue'   : Queue.Queue(EVENT_QUEUE_LENGTH),
             'next-id' : 1
             }
     if not reg_classes:
         reg_classes = classes
-    if hasattr(set, 'union_update'):
-        event_registrations[session]['classes'].union_update(reg_classes)
+    sessionclasses = event_registrations[session]['classes']
+    if hasattr(sessionclasses, 'union_update'):
+        sessionclasses.union_update(reg_classes)
     else:
-        event_registrations[session]['classes'].update(reg_classes)
+        sessionclasses.update(reg_classes)
 
 
 
