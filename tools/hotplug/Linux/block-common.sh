@@ -110,7 +110,8 @@ same_vm()
   # allowed.
   local othervm=$(xenstore_read_default "/local/domain/$otherdom/vm"         \
                   "$FRONTEND_UUID")
-
-  [ "$FRONTEND_UUID" = "$othervm" ]
+  local target=$(xenstore_read_default  "/local/domain/$FRONTEND_ID/target"   \
+                 "-1")
+  [ "$FRONTEND_UUID" = "$othervm" -o "$target" = "$otherdom" ]
 }
 
