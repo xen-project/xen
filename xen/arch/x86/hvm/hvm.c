@@ -1193,12 +1193,24 @@ static void hvm_unmap_entry(void *p)
 }
 
 static int hvm_load_segment_selector(
-    struct vcpu *v, enum x86_segment seg, uint16_t sel)
+    enum x86_segment seg, uint16_t sel)
 {
     struct segment_register desctab, cs, segr;
     struct desc_struct *pdesc, desc;
     u8 dpl, rpl, cpl;
     int fault_type = TRAP_invalid_tss;
+    struct cpu_user_regs *regs = guest_cpu_user_regs();
+    struct vcpu *v = current;
+
+    if ( regs->eflags & EF_VM )
+    {
+        segr.sel = sel;
+        segr.base = (uint32_t)sel << 4;
+        segr.limit = 0xffffu;
+        segr.attr.bytes = 0xf3;
+        hvm_set_segment_register(v, seg, &segr);
+        return 0;
+    }
 
     /* NULL selector? */
     if ( (sel & 0xfffc) == 0 )
@@ -1445,13 +1457,13 @@ void hvm_task_switch(
     }
 
     exn_raised = 0;
-    if ( hvm_load_segment_selector(v, x86_seg_ldtr, tss.ldt) ||
-         hvm_load_segment_selector(v, x86_seg_es, tss.es) ||
-         hvm_load_segment_selector(v, x86_seg_cs, tss.cs) ||
-         hvm_load_segment_selector(v, x86_seg_ss, tss.ss) ||
-         hvm_load_segment_selector(v, x86_seg_ds, tss.ds) ||
-         hvm_load_segment_selector(v, x86_seg_fs, tss.fs) ||
-         hvm_load_segment_selector(v, x86_seg_gs, tss.gs) )
+    if ( hvm_load_segment_selector(x86_seg_ldtr, tss.ldt) ||
+         hvm_load_segment_selector(x86_seg_es, tss.es) ||
+         hvm_load_segment_selector(x86_seg_cs, tss.cs) ||
+         hvm_load_segment_selector(x86_seg_ss, tss.ss) ||
+         hvm_load_segment_selector(x86_seg_ds, tss.ds) ||
+         hvm_load_segment_selector(x86_seg_fs, tss.fs) ||
+         hvm_load_segment_selector(x86_seg_gs, tss.gs) )
         exn_raised = 1;
 
     rc = hvm_copy_to_guest_virt(
