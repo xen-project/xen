@@ -1623,7 +1623,6 @@ void p2m_final_teardown(struct domain *d)
 #if P2M_AUDIT
 static void audit_p2m(struct domain *d)
 {
-    struct list_head *entry;
     struct page_info *page;
     struct domain *od;
     unsigned long mfn, gfn, m2pfn, lp2mfn = 0;
@@ -1647,11 +1646,8 @@ static void audit_p2m(struct domain *d)
 
     /* Audit part one: walk the domain's page allocation list, checking
      * the m2p entries. */
-    for ( entry = d->page_list.next;
-          entry != &d->page_list;
-          entry = entry->next )
+    page_list_for_each ( page, &d->page_list )
     {
-        page = list_entry(entry, struct page_info, list);
         mfn = mfn_x(page_to_mfn(page));
 
         // P2M_PRINTK("auditing guest page, mfn=%#lx\n", mfn);
@@ -1777,7 +1773,7 @@ static void audit_p2m(struct domain *d)
                             {
                                 pmbad++;
                                 P2M_PRINTK("mismatch: gfn %#lx -> mfn %#lx"
-                                           " -> gfn %#lx\n", gfn+i, mfn+i,
+                                           " -> gfn %#lx\n", gfn+i1, mfn+i1,
                                            m2pfn);
                                 BUG();
                             }
@@ -1800,7 +1796,8 @@ static void audit_p2m(struct domain *d)
                         mfn = l1e_get_pfn(l1e[i1]);
                         ASSERT(mfn_valid(_mfn(mfn)));
                         m2pfn = get_gpfn_from_mfn(mfn);
-                        if ( m2pfn != gfn )
+                        if ( m2pfn != gfn &&
+                             p2m_flags_to_type(l1e_get_flags(l1e[i1])) != p2m_mmio_direct )
                         {
                             pmbad++;
                             printk("mismatch: gfn %#lx -> mfn %#lx"
@@ -1924,7 +1921,7 @@ guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn,
     p2m_lock(p2md);
     audit_p2m(d);
 
-    P2M_DEBUG("adding gfn=%#lx mfn=%#lx\n", gfn, mfn);
+    P2M_DEBUG("mark pod gfn=%#lx\n", gfn);
 
     /* Make sure all gpfns are unused */
     for ( i = 0; i < (1UL << order); i++ )
@@ -2212,6 +2209,7 @@ set_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
         set_gpfn_from_mfn(mfn_x(omfn), INVALID_M2P_ENTRY);
     }
 
+    P2M_DEBUG("set mmio %lx %lx\n", gfn, mfn_x(mfn));
     rc = set_p2m_entry(d, gfn, mfn, 0, p2m_mmio_direct);
     if ( 0 == rc )
         gdprintk(XENLOG_ERR,
