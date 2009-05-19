@@ -91,6 +91,8 @@ ioemu-dir-find:
 	fi
 	set -e; \
 		$(absolutify_xen_root); \
+		PREFIX=$(PREFIX); \
+		export PREFIX; \
 		cd ioemu-dir; \
 		./xen-setup $(IOEMU_CONFIGURE_CROSS)
 

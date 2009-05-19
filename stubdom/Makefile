@@ -235,6 +235,8 @@ libxc-$(XEN_TARGET_ARCH)/libxenctrl.a libxc-$(XEN_TARGET_ARCH)/libxenguest.a:: c
 ioemu: cross-zlib cross-libpci libxc
 	[ -f ioemu/config-host.mak ] || \
 	  ( $(absolutify_xen_root); \
+	    PREFIX=$(PREFIX); \
+	    export PREFIX; \
 	    cd ioemu ; \
 	    LWIPDIR=$(CURDIR)/lwip-$(XEN_TARGET_ARCH) \
 	    TARGET_CPPFLAGS="$(TARGET_CPPFLAGS)" \
