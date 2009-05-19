@@ -119,7 +119,6 @@ __get_maptrack_handle(
     if ( unlikely((h = t->maptrack_head) == (t->maptrack_limit - 1)) )
         return -1;
     t->maptrack_head = maptrack_entry(t, h).ref;
-    t->map_count++;
     return h;
 }
 
@@ -129,7 +128,6 @@ put_maptrack_handle(
 {
     maptrack_entry(t, handle).ref = t->maptrack_head;
     t->maptrack_head = handle;
-    t->map_count--;
 }
 
 static inline int
