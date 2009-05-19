@@ -1685,13 +1685,19 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
 
     domain_cpuid(v->domain, input, *ecx, eax, ebx, ecx, edx);
 
-    if ( input == 0x00000001 )
+    switch ( input )
     {
+    case 0x1:
         /* Fix up VLAPIC details. */
         *ebx &= 0x00FFFFFFu;
         *ebx |= (v->vcpu_id * 2) << 24;
         if ( vlapic_hw_disabled(vcpu_vlapic(v)) )
             __clear_bit(X86_FEATURE_APIC & 31, edx);
+        break;
+    case 0xb:
+        /* Fix the x2APIC identifier. */
+        *edx = v->vcpu_id * 2;
+        break;
     }
 }
 
