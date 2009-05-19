@@ -37,7 +37,7 @@ specifying what kind of socket they are. There are subclasses
 for TCP and unix-domain sockets (see tcp.py and unix.py).
 """
 
-BUFFER_SIZE = 1024
+BUFFER_SIZE = 16384
 BACKLOG = 5
 
 
