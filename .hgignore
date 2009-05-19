@@ -99,6 +99,7 @@
 ^stubdom/pciutils-.*$
 ^stubdom/zlib-.*$
 ^stubdom/grub-.*$
+^stubdom/ocaml-.*$
 ^stubdom/lwip/
 ^stubdom/ioemu/
 ^tools/.*/build/lib.*/.*\.py$

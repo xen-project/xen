@@ -27,6 +27,10 @@ LWIP_VERSION=1.3.0
 GRUB_URL?=$(XEN_EXTFILES_URL)
 GRUB_VERSION=0.97
 
+#OCAML_URL?=$(XEN_EXTFILES_URL)
+OCAML_URL?=http://caml.inria.fr/pub/distrib/ocaml-3.11
+OCAML_VERSION=3.11.0
+
 WGET=wget -c
 
 GNU_TARGET_ARCH:=$(XEN_TARGET_ARCH)
@@ -164,6 +168,37 @@ lwip-$(XEN_TARGET_ARCH): lwip-$(LWIP_VERSION).tar.gz
 	patch -d $@ -p0 < lwip.patch-cvs
 	touch $@
 
+#############
+# Cross-ocaml
+#############
+
+CAMLLIB = $(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/lib/ocaml
+OCAML_STAMPFILE=$(CAMLLIB)/.dirstamp
+
+ocaml-$(OCAML_VERSION).tar.gz:
+	$(WGET) $(OCAML_URL)/$@
+
+ocaml-$(XEN_TARGET_ARCH)/.dirstamp: ocaml-$(OCAML_VERSION).tar.gz ocaml.patch
+	tar xzf $<
+	cd ocaml-$(OCAML_VERSION) && patch -p0 < ../ocaml.patch
+	rm -rf ocaml-$(XEN_TARGET_ARCH)
+	mv ocaml-$(OCAML_VERSION) ocaml-$(XEN_TARGET_ARCH)
+	touch $@
+
+MINIOS_HASNOT=IPV6 INET_ATON
+
+.PHONY: cross-ocaml
+cross-ocaml: $(OCAML_STAMPFILE)
+$(OCAML_STAMPFILE): ocaml-$(XEN_TARGET_ARCH)/.dirstamp
+	cd ocaml-$(XEN_TARGET_ARCH) &&  ./configure -prefix $(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf \
+		-no-pthread -no-shared-libs -no-tk -no-curses \
+		-cc "$(CC) -U_FORTIFY_SOURCE -fno-stack-protector"
+	$(foreach i,$(MINIOS_HASNOT),sed -i 's,^\(#define HAS_$(i)\),//\1,' ocaml-$(XEN_TARGET_ARCH)/config/s.h ; )
+	$(MAKE) -C ocaml-$(XEN_TARGET_ARCH) world
+	$(MAKE) -C ocaml-$(XEN_TARGET_ARCH) opt
+	$(MAKE) -C ocaml-$(XEN_TARGET_ARCH) install
+	touch $@
+
 #######
 # Links
 #######
@@ -251,7 +286,7 @@ ioemu: cross-zlib cross-libpci libxc
 
 .PHONY: caml
 caml: $(CROSS_ROOT)
-	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) -C $@ LWIPDIR=$(CURDIR)/lwip-$(XEN_TARGET_ARCH) 
+	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) -C $@ LWIPDIR=$(CURDIR)/lwip-$(XEN_TARGET_ARCH) OCAMLC_CROSS_PREFIX=$(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/bin/
 
 ###
 # C
@@ -289,7 +324,6 @@ ioemu-stubdom: APP_OBJS=$(CURDIR)/ioemu/i386-stubdom/qemu.a $(CURDIR)/ioemu/i386
 ioemu-stubdom: mini-os-$(XEN_TARGET_ARCH)-ioemu lwip-$(XEN_TARGET_ARCH) libxc ioemu
 	DEF_CPPFLAGS="$(TARGET_CPPFLAGS)" DEF_CFLAGS="-DCONFIG_QEMU $(TARGET_CFLAGS)" DEF_LDFLAGS="$(TARGET_LDFLAGS)" $(MAKE) -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< LWIPDIR=$(CURDIR)/lwip-$(XEN_TARGET_ARCH) APP_OBJS="$(APP_OBJS)"
 
-CAMLLIB = $(shell ocamlc -where)
 .PHONY: caml-stubdom
 caml-stubdom: mini-os-$(XEN_TARGET_ARCH)-caml lwip-$(XEN_TARGET_ARCH) libxc caml
 	DEF_CPPFLAGS="$(TARGET_CPPFLAGS)" DEF_CFLAGS="-DCONFIG_CAML $(TARGET_CFLAGS)" DEF_LDFLAGS="$(TARGET_LDFLAGS)" $(MAKE) -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< LWIPDIR=$(CURDIR)/lwip-$(XEN_TARGET_ARCH) APP_OBJS="$(CURDIR)/caml/main-caml.o $(CURDIR)/caml/caml.o $(CAMLLIB)/libasmrun.a"
@@ -351,6 +385,7 @@ crossclean: clean
 	rm -fr zlib-$(XEN_TARGET_ARCH) pciutils-$(XEN_TARGET_ARCH)
 	rm -fr libxc-$(XEN_TARGET_ARCH) ioemu
 	rm -f mk-headers-$(XEN_TARGET_ARCH)
+	rm -fr ocaml-$(XEN_TARGET_ARCH)
 
 # clean patched sources
 .PHONY: patchclean
@@ -367,6 +402,7 @@ downloadclean: patchclean
 	rm -f pciutils-$(LIBPCI_VERSION).tar.bz2
 	rm -f grub-$(GRUB_VERSION).tar.gz
 	rm -f lwip-$(LWIP_VERSION).tar.gz
+	rm -f ocaml-$(OCAML_VERSION).tar.gz
 
 .PHONY: distclean
 distclean: downloadclean

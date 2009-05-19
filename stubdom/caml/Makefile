@@ -2,11 +2,10 @@ XEN_ROOT = ../..
 
 include $(XEN_ROOT)/Config.mk
 
-CAMLLIB = $(shell ocamlc -where)
+CAMLLIB = $(shell $(OCAMLC_CROSS_PREFIX)ocamlc -where)
 DEF_CPPFLAGS += -I$(CAMLLIB)
 
-OCAMLFIND=ocamlfind
-OCAMLOPT=ocamlopt
+OCAMLOPT=$(OCAMLC_CROSS_PREFIX)ocamlopt
 
 OBJS := hello.cmx
 LIBS := 
@@ -14,10 +13,10 @@ LIBS :=
 all: main-caml.o caml.o
 
 %.cmx: %.ml
-	$(OCAMLFIND) $(OCAMLOPT) -c $< -o $@
+	$(OCAMLOPT) -c $< -o $@
 
 caml.o: $(OBJS)
-	$(OCAMLFIND) $(OCAMLOPT) $(LIBS) $^ -output-obj -o $@
+	$(OCAMLOPT) $(LIBS) $^ -output-obj -o $@
 
 clean:
 	rm -f *.a *.o *.cmx *.cmi
