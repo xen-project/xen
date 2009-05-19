@@ -1048,14 +1048,41 @@ class XendDomainInfo:
             except IndexError:
                 pass
 
-        # use DevController.reconfigureDevice to change device config
         dev_control = self.getDeviceController(dev_class)
-        dev_uuid = dev_control.reconfigureDevice(devid, dev_config)
+        if devid is None:
+            dev = dev_config.get('dev', '')
+            if not dev:
+                raise VmError('Block device must have virtual details specified')
+            if 'ioemu:' in dev:
+                (_, dev) = dev.split(':', 1)
+            try:
+                (dev, _) = dev.split(':', 1)  # Remove ":disk" or ":cdrom"
+            except ValueError:
+                pass
+            devid = dev_control.convertToDeviceNumber(dev)
+        dev_info = self._getDeviceInfo_vbd(devid)
+        if dev_info is None:
+            raise VmError("Device %s not connected" % devid)
+        dev_uuid = sxp.child_value(dev_info, 'uuid')
+
+        if self.domid is not None:
+            # use DevController.reconfigureDevice to change device config
+            dev_control.reconfigureDevice(devid, dev_config)
+        else:
+            (_, new_b, new_f) = dev_control.getDeviceDetails(dev_config)
+            if (new_f['device-type'] == 'cdrom' and
+                sxp.child_value(dev_info, 'dev').endswith(':cdrom') and
+                new_b['mode'] == 'r' and
+                sxp.child_value(dev_info, 'mode') == 'r'):
+                pass
+            else:
+                raise VmError('Refusing to reconfigure device %s:%d to %s' %
+                              (dev_class, devid, dev_config))
 
         # update XendConfig with new device info
-        if dev_uuid:
-            self.info.device_update(dev_uuid, dev_sxp)
-            
+        self.info.device_update(dev_uuid, dev_sxp)
+        xen.xend.XendDomain.instance().managed_config_save(self)
+
         return True
 
     def waitForDevices(self):
