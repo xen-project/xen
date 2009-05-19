@@ -7,7 +7,6 @@ XENDOMAINS_INITD = init.d/xendomains
 XENDOMAINS_SYSCONFIG = init.d/sysconfig.xendomains
 
 # Xen configuration dir and configs to go there.
-XEN_CONFIG_DIR = /etc/xen
 XEN_READMES = README
 XEN_READMES += README.incompatibilities
 XEN_CONFIGS = xend-config.sxp

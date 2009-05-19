@@ -3,11 +3,7 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 # OS-independent hotplug scripts go in this directory
 
-# Xen configuration dir and configs to go there.
-XEN_CONFIG_DIR = /etc/xen
-
 # Xen script dir and scripts to go there.
-XEN_SCRIPT_DIR = /etc/xen/scripts
 XEN_SCRIPTS =
 XEN_SCRIPT_DATA =
 

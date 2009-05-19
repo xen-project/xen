@@ -86,7 +86,7 @@ TUNABLES := $(POLDIR)/tunables.conf
 BOOLEANS := $(POLDIR)/booleans.conf
 
 # install paths
-TOPDIR = $(DESTDIR)/etc/xen/
+TOPDIR = $(DESTDIR)$(XEN_CONFIG_DIR)
 INSTALLDIR = $(TOPDIR)/$(NAME)
 SRCPATH = $(INSTALLDIR)/src
 USERPATH = $(INSTALLDIR)/users

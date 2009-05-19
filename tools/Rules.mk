@@ -8,6 +8,10 @@ include $(XEN_ROOT)/Config.mk
 export _INSTALL := $(INSTALL)
 INSTALL = $(XEN_ROOT)/tools/cross-install
 
+CONFIG_DIR = /etc
+XEN_CONFIG_DIR = $(CONFIG_DIR)/xen
+XEN_SCRIPT_DIR = $(XEN_CONFIG_DIR)/scripts
+
 XEN_INCLUDE        = $(XEN_ROOT)/tools/include
 XEN_XC             = $(XEN_ROOT)/tools/python/xen/lowlevel/xc
 XEN_LIBXC          = $(XEN_ROOT)/tools/libxc

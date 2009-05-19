@@ -1,5 +1,5 @@
 XEN_ROOT=../../..
-include $(XEN_ROOT)/Config.mk
+include $(XEN_ROOT)/tools/Rules.mk
 
 ROOT = $(XEN_ROOT)/xen/include/public
 

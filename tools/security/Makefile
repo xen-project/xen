@@ -21,7 +21,7 @@ ACM_EZPOLICY      = xensec_ezpolicy
 ACM_OBJS          = $(OBJS_TOOL) $(OBJS_GETD)
 ACM_SCRIPTS       = python/xensec_tools/acm_getlabel
 
-ACM_CONFIG_DIR    = /etc/xen/acm-security
+ACM_CONFIG_DIR    = $(XEN_CONFIG_DIR)/acm-security
 ACM_POLICY_DIR    = $(ACM_CONFIG_DIR)/policies
 ACM_SCRIPT_DIR    = $(ACM_CONFIG_DIR)/scripts
 

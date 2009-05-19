@@ -1,11 +1,7 @@
 XEN_ROOT = ../../../
 include $(XEN_ROOT)/tools/Rules.mk
 
-# Xen configuration dir and configs to go there.
-XEN_CONFIG_DIR = /etc/xen
-
 # Xen script dir and scripts to go there.
-XEN_SCRIPT_DIR = $(XEN_CONFIG_DIR)/scripts
 XEN_SCRIPTS =
 XEN_SCRIPTS += block-nbsd
 XEN_SCRIPTS += qemu-ifup-nbsd

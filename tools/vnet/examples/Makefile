@@ -3,8 +3,6 @@
 XEN_ROOT        = ../../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-XEN_SCRIPT_DIR  = $(DESTDIR)/etc/xen/scripts
-
 .PHONY: all
 all:
 
