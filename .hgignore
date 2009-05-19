@@ -90,6 +90,7 @@
 ^stubdom/gcc-.*$
 ^stubdom/include$
 ^stubdom/ioemu$
+^stubdom/xenstore$
 ^stubdom/libxc-.*$
 ^stubdom/lwip-.*$
 ^stubdom/mini-os-.*$
@@ -251,6 +252,7 @@
 ^tools/xm-test/tests/.*\.test$
 ^tools/ioemu-remote
 ^tools/ioemu-dir$
+^tools/ocaml-xenstored.*$
 ^xen/\.banner.*$
 ^xen/BLOG$
 ^xen/System.map$

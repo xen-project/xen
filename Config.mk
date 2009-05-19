@@ -125,6 +125,12 @@ QEMU_REMOTE=http://xenbits.xensource.com/git-http/qemu-xen-unstable.git
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
+OCAML_XENSTORED_REPO=http://xenbits.xensource.com/ext/xen-ocaml-tools.hg
+
+# Build OCAML version of xenstored instead of the in-tree C version?
+# This will cause $(OCAML_XENSTORED_REPO) to be cloned.
+CONFIG_OCAML_XENSTORED ?= n
+
 # Optional components
 XENSTAT_XENTOP     ?= y
 VTPM_TOOLS         ?= n
