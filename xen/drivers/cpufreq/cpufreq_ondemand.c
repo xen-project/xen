@@ -97,9 +97,8 @@ int get_cpufreq_ondemand_para(uint32_t *sampling_rate_max,
 
 static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
 {
-    unsigned int load = 0;
-    uint64_t cur_ns, idle_ns, total_ns;
-
+    uint64_t cur_ns, total_ns;
+    uint64_t max_load_freq = 0;
     struct cpufreq_policy *policy;
     unsigned int j;
 
@@ -121,30 +120,34 @@ static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
         return;
 
     /* Get Idle Time */
-    idle_ns = UINT_MAX;
     for_each_cpu_mask(j, policy->cpus) {
-        uint64_t total_idle_ns;
-        unsigned int tmp_idle_ns;
+        uint64_t idle_ns, total_idle_ns;
+        uint64_t load, load_freq, freq_avg;
         struct cpu_dbs_info_s *j_dbs_info;
 
         j_dbs_info = &per_cpu(cpu_dbs_info, j);
         total_idle_ns = get_cpu_idle_time(j);
-        tmp_idle_ns = total_idle_ns - j_dbs_info->prev_cpu_idle;
+        idle_ns = total_idle_ns - j_dbs_info->prev_cpu_idle;
         j_dbs_info->prev_cpu_idle = total_idle_ns;
 
-        if (tmp_idle_ns < idle_ns)
-            idle_ns = tmp_idle_ns;
+        if (unlikely(total_ns < idle_ns))
+            continue;
+
+        load = 100 * (total_ns - idle_ns) / total_ns;
+
+        freq_avg = cpufreq_driver_getavg(j, GOV_GETAVG);
+
+        load_freq = load * freq_avg;
+        if (load_freq > max_load_freq)
+            max_load_freq = load_freq;
     }
 
-    if (likely(total_ns > idle_ns))
-        load = (100 * (total_ns - idle_ns)) / total_ns;
-
     /* Check for frequency increase */
-    if (load > dbs_tuners_ins.up_threshold) {
+    if (max_load_freq > dbs_tuners_ins.up_threshold * policy->cur) {
         /* if we are already at full speed then break out early */
         if (policy->cur == policy->max)
             return;
-        __cpufreq_driver_target(policy, policy->max,CPUFREQ_RELATION_H);
+        __cpufreq_driver_target(policy, policy->max, CPUFREQ_RELATION_H);
         return;
     }
 
@@ -158,12 +161,10 @@ static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
      * can support the current CPU usage without triggering the up
      * policy. To be safe, we focus 10 points under the threshold.
      */
-    if (load < (dbs_tuners_ins.up_threshold - 10)) {
-        unsigned int freq_next, freq_cur;
+    if (max_load_freq < (dbs_tuners_ins.up_threshold - 10) * policy->cur) {
+        uint64_t freq_next;
 
-        freq_cur = cpufreq_driver_getavg(policy->cpu, GOV_GETAVG);
-
-        freq_next = (freq_cur * load) / (dbs_tuners_ins.up_threshold - 10);
+        freq_next = max_load_freq / (dbs_tuners_ins.up_threshold - 10);
 
         __cpufreq_driver_target(policy, freq_next, CPUFREQ_RELATION_L);
     }
