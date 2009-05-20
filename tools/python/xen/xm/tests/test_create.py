@@ -8,6 +8,7 @@ import xen.xend.XendOptions
 xen.xend.XendOptions.XendOptions.config_default = '/dev/null'
 
 import xen.xm.create
+from xen.util import auxbin
 
 
 class test_create(unittest.TestCase):
@@ -48,7 +49,7 @@ class test_create(unittest.TestCase):
                  'boot'      : 'c',
                  'dhcp'      : 'off',
                  'interface' : 'eth0',
-                 'path'      : '.:/etc/xen',
+                 'path'      : '.:' + auxbin.xen_configdir(),
                  'builder'   : 'linux',
                  'nics'      : -1,
                  'vncunused' : 1,
@@ -99,7 +100,7 @@ on_crash    = 'destroy'
                  'boot'        : 'c',
                  'dhcp'        : 'off',
                  'interface'   : 'eth0',
-                 'path'        : '.:/etc/xen',
+                 'path'        : '.:' + auxbin.xen_configdir(),
                  'builder'     : 'linux',
 
                  'vncunused'   : 1,
@@ -138,7 +139,7 @@ cpu_weight = 0.75
                  'boot'       : 'c',
                  'dhcp'       : 'off',
                  'interface'  : 'eth0',
-                 'path'       : '.:/etc/xen',
+                 'path'        : '.:' + auxbin.xen_configdir(),
                  'builder'    : 'linux',
                  'nics'       : -1,
 
@@ -195,7 +196,7 @@ ne2000=0
                  'boot'        : 'c',
                  'dhcp'        : 'off',
                  'interface'   : 'eth0',
-                 'path'        : '.:/etc/xen',
+                 'path'        : '.:' + auxbin.xen_configdir(),
 
                  'xauthority'  : xen.xm.create.get_xauthority(),
                })

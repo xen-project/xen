@@ -40,6 +40,14 @@ SBINDIR = $(PREFIX)/sbin
 PRIVATE_PREFIX = $(LIBDIR)/xen
 PRIVATE_BINDIR = $(PRIVATE_PREFIX)/bin
 
+ifeq ($(PREFIX),/usr)
+CONFIG_DIR = /etc
+else
+CONFIG_DIR = $(PREFIX)/etc
+endif
+XEN_CONFIG_DIR = $(CONFIG_DIR)/xen
+XEN_SCRIPT_DIR = $(XEN_CONFIG_DIR)/scripts
+
 SOCKET_LIBS =
 CURSES_LIBS = -lncurses
 PTHREAD_LIBS = -lpthread

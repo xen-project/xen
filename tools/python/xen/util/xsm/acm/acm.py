@@ -31,11 +31,11 @@ from xen.xend import XendConstants
 from xen.xend import XendOptions
 from xen.xend.XendLogging import log
 from xen.xend.XendError import VmError
-from xen.util import dictio, xsconstants
+from xen.util import dictio, xsconstants, auxbin
 from xen.xend.XendConstants import *
 
 #global directories and tools for security management
-install_policy_dir_prefix = "/etc/xen/acm-security/policies"
+install_policy_dir_prefix = auxbin.xen_configdir() + "/acm-security/policies"
 security_dir_prefix = XendOptions.instance().get_xend_security_path()
 policy_dir_prefix = security_dir_prefix + "/policies"
 res_label_filename = policy_dir_prefix + "/resource_labels"

@@ -29,7 +29,6 @@ import xmlrpclib
 
 from xen.xend import sxp
 from xen.xend import PrettyPrint as SXPPrettyPrint
-from xen.xend import osdep
 import xen.xend.XendClient
 from xen.xend.XendBootloader import bootloader
 from xen.xend.XendConstants import *
@@ -38,7 +37,7 @@ from xen.util import blkif
 from xen.util import vscsi_util
 import xen.util.xsm.xsm as security
 from xen.xm.main import serverType, SERVER_XEN_API, get_single_vm
-from xen.util import utils
+from xen.util import utils, auxbin
 
 from xen.xm.opts import *
 
@@ -72,7 +71,7 @@ gopts.opt('quiet', short='q',
           use="Quiet.")
 
 gopts.opt('path', val='PATH',
-          fn=set_value, default='.:/etc/xen',
+          fn=set_value, default='.:' + auxbin.xen_configdir(),
           use="Search path for configuration scripts. "
           "The value of PATH is a colon-separated directory list.")
 
@@ -981,7 +980,7 @@ def make_config(vals):
     config_image = configure_image(vals)
     if vals.bootloader:
         if vals.bootloader == "pygrub":
-            vals.bootloader = osdep.pygrub_path
+            vals.bootloader = auxbin.pathTo(vals.bootloader)
 
         config.append(['bootloader', vals.bootloader])
         if vals.bootargs:

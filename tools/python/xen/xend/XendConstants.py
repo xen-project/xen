@@ -16,6 +16,7 @@
 #============================================================================
 
 from xen.xend.XendAPIConstants import *
+from xen.util import auxbin
 
 #
 # Shutdown codes and reasons.
@@ -129,7 +130,7 @@ DEV_MIGRATE_STEP3 = 3
 # VTPM-related constants
 #
 
-VTPM_DELETE_SCRIPT = '/etc/xen/scripts/vtpm-delete'
+VTPM_DELETE_SCRIPT = auxbin.scripts_dir() + '/vtpm-delete'
 
 #
 # Xenstore Constants

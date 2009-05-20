@@ -25,6 +25,7 @@ from xen.xend.XendBase import XendBase
 from xen.xend.XendPIFMetrics import XendPIFMetrics
 from xen.xend.XendError import *
 from xen.xend import Vifctl
+from xen.util import auxbin
 
 log = logging.getLogger("xend.XendPIF")
 log.setLevel(logging.TRACE)

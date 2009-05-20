@@ -22,7 +22,7 @@ import os
 import re
 import sys
 import xen.util.xsm.xsm as security
-from xen.util import xsconstants
+from xen.util import xsconstants, auxbin
 from xen.util.acmpolicy import ACM_LABEL_UNLABELED
 from xen.xm.opts import OptionError
 from xen.xm import main as xm_main
@@ -81,7 +81,7 @@ def rm_domain_label(configfile):
         fil = configfile
         fd = open(fil, "rb")
     else:
-        for prefix in [".", "/etc/xen"]:
+        for prefix in [".", auxbin.xen_configdir() ]:
             fil = prefix + "/" + configfile
             if os.path.isfile(fil):
                 fd = open(fil, "rb")

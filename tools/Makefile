@@ -94,7 +94,9 @@ ioemu-dir-find:
 	set -e; \
 		$(absolutify_xen_root); \
 		PREFIX=$(PREFIX); \
+		XEN_SCRIPT_DIR=$(XEN_SCRIPT_DIR); \
 		export PREFIX; \
+		export XEN_SCRIPT_DIR; \
 		cd ioemu-dir; \
 		./xen-setup $(IOEMU_CONFIGURE_CROSS)
 

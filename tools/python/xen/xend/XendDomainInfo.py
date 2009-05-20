@@ -34,12 +34,12 @@ import traceback
 from types import StringTypes
 
 import xen.lowlevel.xc
-from xen.util import asserts
+from xen.util import asserts, auxbin
 from xen.util.blkif import blkdev_uname_to_file, blkdev_uname_to_taptype
 import xen.util.xsm.xsm as security
 from xen.util import xsconstants
 
-from xen.xend import balloon, sxp, uuid, image, arch, osdep
+from xen.xend import balloon, sxp, uuid, image, arch
 from xen.xend import XendOptions, XendNode, XendConfig
 
 from xen.xend.XendConfig import scrub_password
@@ -2914,7 +2914,7 @@ class XendDomainInfo:
         else:
             # Boot using bootloader
             if not blexec or blexec == 'pygrub':
-                blexec = osdep.pygrub_path
+                blexec = auxbin.pathTo('pygrub')
 
             blcfg = None
             disks = [x for x in self.info['vbd_refs']

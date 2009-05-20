@@ -20,6 +20,7 @@ import os
 import os.path
 import sys
 from xen.util.path import SBINDIR,BINDIR,LIBEXEC,LIBDIR,PRIVATE_BINDIR
+from xen.util.path import XEN_CONFIG_DIR, XEN_SCRIPT_DIR
 
 def execute(exe, args = None):
     exepath = pathTo(exe)
@@ -45,3 +46,9 @@ def path():
 
 def libpath():
     return LIBDIR
+
+def xen_configdir():
+    return XEN_CONFIG_DIR
+
+def scripts_dir():
+    return XEN_SCRIPT_DIR

@@ -32,6 +32,7 @@ import sys
 
 from xen.xend import sxp, osdep, XendLogging
 from xen.xend.XendError import XendError
+from xen.util import auxbin
 
 if os.uname()[0] == 'SunOS':
     from xen.lowlevel import scf
@@ -40,10 +41,10 @@ class XendOptions:
     """Configuration options."""
 
     """Where network control scripts live."""
-    network_script_dir = osdep.scripts_dir
+    network_script_dir = auxbin.scripts_dir()
 
     """Where block control scripts live."""
-    block_script_dir = osdep.scripts_dir
+    block_script_dir = auxbin.scripts_dir()
 
     """Default path to the log file. """
     logfile_default = "/var/log/xen/xend.log"
@@ -115,7 +116,7 @@ class XendOptions:
     xend_vnc_tls = 0
 
     """x509 certificate directory for QEMU VNC server"""
-    xend_vnc_x509_cert_dir = "/etc/xen/vnc"
+    xend_vnc_x509_cert_dir = auxbin.xen_configdir() + "/vnc"
 
     """Verify incoming client x509 certs"""
     xend_vnc_x509_verify = 0
@@ -355,7 +356,7 @@ class XendOptions:
         s = self.get_config_string('resource-label-change-script')
         if s:
             result = s.split(" ")
-            result[0] = os.path.join(osdep.scripts_dir, result[0])
+            result[0] = os.path.join(auxbin.scripts_dir(), result[0])
             return result
         else:
             return None
@@ -386,7 +387,7 @@ class XendOptions:
 class XendOptionsFile(XendOptions):
 
     """Default path to the config file."""
-    config_default = "/etc/xen/xend-config.sxp"
+    config_default = auxbin.xen_configdir() + "/xend-config.sxp"
 
     """Environment variable used to override config_default."""
     config_var     = "XEND_CONFIG"

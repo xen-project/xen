@@ -23,6 +23,8 @@ genpath:
 	echo "LIBEXEC=\"$(LIBEXEC)\"" >> ${xenpath}
 	echo "LIBDIR=\"$(LIBDIR)\"" >> ${xenpath}
 	echo "PRIVATE_BINDIR=\"$(PRIVATE_BINDIR)\"" >> ${xenpath}
+	echo "XEN_CONFIG_DIR=\"$(XEN_CONFIG_DIR)\"" >> ${xenpath}
+	echo "XEN_SCRIPT_DIR=\"$(XEN_SCRIPT_DIR)\"" >> ${xenpath}
 
 buildpy: genpath 
 	CC="$(CC)" CFLAGS="$(CFLAGS)" $(PYTHON) setup.py build

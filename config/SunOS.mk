@@ -34,6 +34,14 @@ SBINDIR = $(PREFIX)/sbin
 PRIVATE_PREFIX = $(LIBDIR)/xen
 PRIVATE_BINDIR = $(PRIVATE_PREFIX)/bin
 
+ifeq ($(PREFIX),/usr)
+CONFIG_DIR = /etc
+else
+CONFIG_DIR = $(PREFIX)/etc
+endif
+XEN_CONFIG_DIR = $(CONFIG_DIR)/xen
+XEN_SCRIPT_DIR = $(PRIVATE_PREFIX)/scripts
+
 SunOS_LIBDIR = /usr/sfw/lib
 SunOS_LIBDIR_x86_64 = /usr/sfw/lib/amd64
 

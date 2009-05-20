@@ -24,7 +24,7 @@ from xen.util import blkif
 import xen.util.xsm.xsm as security
 from xen.xend.XendError import VmError
 from xen.xend.server.DevController import DevController
-from xen.util import xsconstants
+from xen.util import xsconstants, auxbin
 
 class BlkifController(DevController):
     """Block device interface controller. Handles all block devices
@@ -40,7 +40,7 @@ class BlkifController(DevController):
         if protocol in ('phy', 'file', 'tap'):
             return True
 
-        return os.access('/etc/xen/scripts/block-%s' % protocol, os.X_OK)
+        return os.access(auxbin.scripts_dir() + '/block-%s' % protocol, os.X_OK)
 
 
     def getDeviceDetails(self, config):

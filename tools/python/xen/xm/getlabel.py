@@ -20,7 +20,7 @@
 """
 import sys, os, re
 import xen.util.xsm.xsm as security
-from xen.util import xsconstants
+from xen.util import xsconstants, auxbin
 from xen.xm.opts import OptionError
 from xen.xm import main as xm_main
 from xen.xm.main import server
@@ -59,7 +59,7 @@ def get_domain_label(configfile):
     if configfile[0] == '/':
         fd = open(configfile, "rb")
     else:
-        for prefix in [".", "/etc/xen"]:
+        for prefix in [".", auxbin.xen_configdir() ]:
             abs_file = prefix + "/" + configfile
             if os.path.isfile(abs_file):
                 fd = open(abs_file, "rb")

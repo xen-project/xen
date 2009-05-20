@@ -24,7 +24,7 @@ import sys
 
 import xen.util.xsm.xsm as security
 from xen.xm.opts import OptionError
-from xen.util import xsconstants
+from xen.util import xsconstants, auxbin
 from xen.xm import main as xm_main
 from xen.xm.main import server
 
@@ -221,7 +221,7 @@ def main(argv):
     if argv[2].lower() == "dom":
         configfile = argv[3]
         if configfile[0] != '/':
-            for prefix in [os.path.realpath(os.path.curdir), "/etc/xen"]:
+            for prefix in [os.path.realpath(os.path.curdir), auxbin.xen_configdir()]:
                 configfile = prefix + "/" + configfile
                 if os.path.isfile(configfile):
                     break

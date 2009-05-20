@@ -20,19 +20,10 @@
 import os
 import commands
 
-_scripts_dir = {
-    "Linux": "/etc/xen/scripts",
-    "SunOS": "/usr/lib/xen/scripts",
-}
-
 _xend_autorestart = {
     "NetBSD": True,
     "Linux": True,
     "SunOS": False,
-}
-
-_pygrub_path = {
-    "SunOS": "/usr/lib/xen/bin/pygrub"
 }
 
 _vif_script = {
@@ -221,9 +212,7 @@ _get_postfork = {
 def _get(var, default=None):
     return var.get(os.uname()[0], default)
 
-scripts_dir = _get(_scripts_dir, "/etc/xen/scripts")
 xend_autorestart = _get(_xend_autorestart)
-pygrub_path = _get(_pygrub_path, "/usr/bin/pygrub")
 vif_script = _get(_vif_script, "vif-bridge")
 lookup_balloon_stat = _get(_balloon_stat, _linux_balloon_stat)
 get_cpuinfo = _get(_get_cpuinfo, _linux_get_cpuinfo)

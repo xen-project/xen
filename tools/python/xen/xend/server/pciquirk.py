@@ -3,10 +3,11 @@ from xen.xend.XendError import XendError, VmError
 import sys
 import os.path
 from xen.xend.sxp import *
+from xen.util import auxbin
 
 QUIRK_SYSFS_NODE = "/sys/bus/pci/drivers/pciback/quirks"
-QUIRK_CONFIG_FILE = "/etc/xen/xend-pci-quirks.sxp"
-PERMISSIVE_CONFIG_FILE = "/etc/xen/xend-pci-permissive.sxp"
+QUIRK_CONFIG_FILE = auxbin.xen_configdir() + "/xend-pci-quirks.sxp"
+PERMISSIVE_CONFIG_FILE = auxbin.xen_configdir() + "/xend-pci-permissive.sxp"
 PERMISSIVE_SYSFS_NODE = "/sys/bus/pci/drivers/pciback/permissive"
 
 class PCIQuirk:
