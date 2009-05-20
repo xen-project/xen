@@ -1235,7 +1235,6 @@ class XendDomainInfo:
                 return []
             dev_uuid = sxp.child_value(dev_info, 'uuid')
             pci_devs = self.info['devices'][dev_uuid][1]['devs']
-            pci_len = len(pci_devs)
             return pci_devs
         if self._stateGet() in (DOM_STATE_RUNNING, DOM_STATE_PAUSED, DOM_STATE_CRASHED):
             return self.getDeviceController(deviceClass).sxprs()
