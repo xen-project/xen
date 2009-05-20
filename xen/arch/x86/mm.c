@@ -709,6 +709,23 @@ int is_iomem_page(unsigned long mfn)
     return (page_get_owner(page) == dom_io);
 }
 
+static void update_xen_mappings(unsigned long mfn, unsigned long cacheattr)
+{
+#ifdef __x86_64__
+    bool_t alias = mfn >= PFN_DOWN(xen_phys_start) &&
+         mfn < PFN_UP(xen_phys_start + (unsigned long)_end - XEN_VIRT_START);
+    unsigned long xen_va =
+        XEN_VIRT_START + ((mfn - PFN_DOWN(xen_phys_start)) << PAGE_SHIFT);
+
+    if ( unlikely(alias) && cacheattr )
+        map_pages_to_xen(xen_va, mfn, 1, 0);
+    map_pages_to_xen((unsigned long)mfn_to_virt(mfn), mfn, 1,
+                     PAGE_HYPERVISOR | cacheattr_to_pte_flags(cacheattr));
+    if ( unlikely(alias) && !cacheattr )
+        map_pages_to_xen(xen_va, mfn, 1, PAGE_HYPERVISOR);
+#endif
+}
+
 
 int
 get_page_from_l1e(
@@ -796,10 +813,7 @@ get_page_from_l1e(
             y  = cmpxchg(&page->count_info, x, nx);
         }
 
-#ifdef __x86_64__
-        map_pages_to_xen((unsigned long)mfn_to_virt(mfn), mfn, 1,
-                         PAGE_HYPERVISOR | cacheattr_to_pte_flags(cacheattr));
-#endif
+        update_xen_mappings(mfn, cacheattr);
     }
 
     return 1;
@@ -857,12 +871,6 @@ get_page_from_l2e(
                 return -EINVAL;
             }
         } while ( m++ < (mfn + (L1_PAGETABLE_ENTRIES-1)) );
-
-#ifdef __x86_64__
-        map_pages_to_xen(
-            (unsigned long)mfn_to_virt(mfn), mfn, L1_PAGETABLE_ENTRIES,
-            PAGE_HYPERVISOR | l2e_get_flags(l2e));
-#endif
     }
 
     return rc;
@@ -2406,10 +2414,7 @@ void cleanup_page_cacheattr(struct page_info *page)
 
     BUG_ON(is_xen_heap_page(page));
 
-#ifdef __x86_64__
-    map_pages_to_xen((unsigned long)page_to_virt(page), page_to_mfn(page),
-                     1, PAGE_HYPERVISOR);
-#endif
+    update_xen_mappings(page_to_mfn(page), 0);
 }
 
 
