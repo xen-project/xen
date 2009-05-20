@@ -154,7 +154,7 @@ static DEFINE_PER_CPU(struct percpu_mm_info, percpu_mm_info);
 struct domain *dom_xen, *dom_io;
 
 /* Frame table and its size in pages. */
-struct page_info *frame_table;
+struct page_info *__read_mostly frame_table;
 unsigned long max_page;
 unsigned long total_pages;
 
@@ -186,11 +186,18 @@ void __init init_frametable(void)
     frame_table = (struct page_info *)FRAMETABLE_VIRT_START;
 
     nr_pages  = PFN_UP(max_page * sizeof(*frame_table));
-    page_step = (1 << L2_PAGETABLE_SHIFT) >> PAGE_SHIFT;
+    page_step = 1 << (cpu_has_page1gb ? L3_PAGETABLE_SHIFT - PAGE_SHIFT
+                                      : L2_PAGETABLE_SHIFT - PAGE_SHIFT);
 
     for ( i = 0; i < nr_pages; i += page_step )
     {
-        mfn = alloc_boot_pages(min(nr_pages - i, page_step), page_step);
+        /*
+         * The hardcoded 4 below is arbitrary - just pick whatever you think
+         * is reasonable to waste as a trade-off for using a large page.
+         */
+        while (nr_pages + 4 - i < page_step)
+            page_step >>= PAGETABLE_ORDER;
+        mfn = alloc_boot_pages(page_step, page_step);
         if ( mfn == 0 )
             panic("Not enough memory for frame table\n");
         map_pages_to_xen(
