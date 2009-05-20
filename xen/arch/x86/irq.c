@@ -844,7 +844,7 @@ void pirq_guest_unbind(struct domain *d, int irq)
         xfree(oldaction);
 }
 
-int pirq_guest_force_unbind(struct domain *d, int irq)
+static int pirq_guest_force_unbind(struct domain *d, int irq)
 {
     irq_desc_t *desc;
     irq_guest_action_t *action, *oldaction = NULL;

@@ -1,11 +1,6 @@
 /* two abstractions specific to kernel/smpboot.c, mainly to cater to visws
  * which needs to alter them. */
 
-static inline void smpboot_clear_io_apic_irqs(void)
-{
-	io_apic_irqs = 0;
-}
-
 static inline void smpboot_setup_warm_reset_vector(unsigned long start_eip)
 {
 	CMOS_WRITE(0xa, 0xf);

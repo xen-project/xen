@@ -108,9 +108,6 @@ static void update_intremap_entry_from_ioapic(
     return;
 }
 
-extern int nr_ioapic_registers[MAX_IO_APICS];
-extern int nr_ioapics;
-
 int __init amd_iommu_setup_intremap_table(void)
 {
     struct IO_APIC_route_entry rte = {0};

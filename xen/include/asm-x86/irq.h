@@ -64,6 +64,4 @@ void free_domain_pirqs(struct domain *d);
                                        (vec) > LAST_LEGACY_VECTOR) ? \
                                       0 : LEGACY_IRQ_FROM_VECTOR(vec))
 
-int pirq_guest_force_unbind(struct domain *d, int irq);
-
 #endif /* _ASM_HW_IRQ_H */

@@ -1781,7 +1781,7 @@ static inline void check_timer(void)
 
 static struct IO_APIC_route_entry *ioapic_pm_state;
 
-void ioapic_pm_state_alloc(void)
+static void __init ioapic_pm_state_alloc(void)
 {
     int i, nr_entry = 0;
 
