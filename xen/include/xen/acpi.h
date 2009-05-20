@@ -176,35 +176,6 @@ enum acpi_srat_entry_id {
 	ACPI_SRAT_ENTRY_COUNT
 };
 
-struct acpi_table_processor_affinity {
-	struct acpi_subtable_header	header;
-	u8			proximity_domain;
-	u8			apic_id;
-	struct {
-		u32			enabled:1;
-		u32			reserved:31;
-	}			flags;
-	u8			lsapic_eid;
-	u8			reserved[7];
-} __attribute__ ((packed));
-
-struct acpi_table_memory_affinity {
-	struct acpi_subtable_header	header;
-	u8			proximity_domain;
-	u8			reserved1[5];
-	u32			base_addr_lo;
-	u32			base_addr_hi;
-	u32			length_lo;
-	u32			length_hi;
-	u32			memory_type;	/* See acpi_address_range_id */
-	struct {
-		u32			enabled:1;
-		u32			hot_pluggable:1;
-		u32			reserved:30;
-	}			flags;
-	u64			reserved2;
-} __attribute__ ((packed));
-
 enum acpi_address_range_id {
 	ACPI_ADDRESS_RANGE_MEMORY = 1,
 	ACPI_ADDRESS_RANGE_RESERVED = 2,
@@ -297,8 +268,8 @@ void acpi_table_print_srat_entry (struct acpi_subtable_header *srat);
 
 /* the following four functions are architecture-dependent */
 void acpi_numa_slit_init (struct acpi_table_slit *slit);
-void acpi_numa_processor_affinity_init (struct acpi_table_processor_affinity *pa);
-void acpi_numa_memory_affinity_init (struct acpi_table_memory_affinity *ma);
+void acpi_numa_processor_affinity_init (struct acpi_srat_cpu_affinity *pa);
+void acpi_numa_memory_affinity_init (struct acpi_srat_mem_affinity *ma);
 void acpi_numa_arch_fixup(void);
 
 #ifdef CONFIG_ACPI_HOTPLUG_CPU

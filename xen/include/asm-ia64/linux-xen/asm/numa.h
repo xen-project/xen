@@ -25,6 +25,8 @@
 
 #include <asm/mmzone.h>
 
+extern int srat_rev;
+
 extern u8 cpu_to_node_map[NR_CPUS] __cacheline_aligned;
 #ifndef XEN
 extern cpumask_t node_to_cpu_mask[MAX_NUMNODES] __cacheline_aligned;

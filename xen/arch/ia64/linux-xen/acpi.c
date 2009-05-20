@@ -55,6 +55,7 @@
 #include <asm/xen/hypervisor.h>
 #ifdef XEN
 #include <asm/hw_irq.h>
+#include <asm/numa.h>
 extern u8 numa_slit[MAX_NUMNODES * MAX_NUMNODES];
 #endif
 
@@ -484,22 +485,28 @@ static u32 __devinitdata pxm_flag[PXM_FLAG_LEN];
 static struct acpi_table_slit __initdata *slit_table;
 cpumask_t early_cpu_possible_map = CPU_MASK_NONE;
 
-static int get_processor_proximity_domain(struct acpi_srat_cpu_affinity *pa)
+static int __init
+get_processor_proximity_domain(struct acpi_srat_cpu_affinity *pa)
 {
 	int pxm;
 
 	pxm = pa->proximity_domain_lo;
-	if (ia64_platform_is("sn2"))
+	if (srat_rev >= 2) {
+		pxm += pa->proximity_domain_hi[0] << 8;
+		pxm += pa->proximity_domain_hi[1] << 16;
+		pxm += pa->proximity_domain_hi[2] << 24;
+	} else if (ia64_platform_is("sn2"))
 		pxm += pa->proximity_domain_hi[0] << 8;
 	return pxm;
 }
 
-static int get_memory_proximity_domain(struct acpi_srat_mem_affinity *ma)
+static int __init
+get_memory_proximity_domain(struct acpi_srat_mem_affinity *ma)
 {
 	int pxm;
 
 	pxm = ma->proximity_domain;
-	if (!ia64_platform_is("sn2"))
+	if (!ia64_platform_is("sn2") && srat_rev < 2)
 		pxm &= 0xff;
 
 	return pxm;
@@ -525,17 +532,9 @@ void __init acpi_numa_slit_init(struct acpi_table_slit *slit)
 	slit_table = slit;
 }
 
-#ifndef XEN
 void __init
 acpi_numa_processor_affinity_init(struct acpi_srat_cpu_affinity *pa)
-#else
-void __init
-acpi_numa_processor_affinity_init (struct acpi_table_processor_affinity *pa__)
-#endif
 {
-#ifdef XEN
-	struct acpi_srat_cpu_affinity *pa = (struct acpi_srat_cpu_affinity *)pa__;
-#endif
 	int pxm;
 
 	if (!(pa->flags & ACPI_SRAT_CPU_ENABLED))
@@ -554,18 +553,9 @@ acpi_numa_processor_affinity_init (struct acpi_table_processor_affinity *pa__)
 	srat_num_cpus++;
 }
 
-#ifndef XEN
 void __init
 acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
-#else
-void __init
-acpi_numa_memory_affinity_init (struct acpi_table_memory_affinity *ma__)
-#endif
 {
-#ifdef XEN
-	struct acpi_srat_mem_affinity *ma =
-		(struct acpi_srat_mem_affinity *)ma__;
-#endif
 	unsigned long paddr, size;
 	int pxm;
 	struct node_memblk_s *p, *q, *pend;

@@ -35,6 +35,8 @@
 #define _COMPONENT	ACPI_NUMA
 ACPI_MODULE_NAME("numa")
 
+int __initdata srat_rev;
+
 void __init acpi_table_print_srat_entry(struct acpi_subtable_header * header)
 {
 
@@ -48,14 +50,21 @@ void __init acpi_table_print_srat_entry(struct acpi_subtable_header * header)
 	case ACPI_SRAT_PROCESSOR_AFFINITY:
 #ifdef ACPI_DEBUG_OUTPUT
 		{
-			struct acpi_table_processor_affinity *p =
-			    (struct acpi_table_processor_affinity *)header;
+			struct acpi_srat_cpu_affinity *p =
+			    container_of(header, struct acpi_srat_cpu_affinity, header);
+			u32 proximity_domain = p->proximity_domain_lo;
+
+			if (srat_rev >= 2) {
+				proximity_domain |= p->proximity_domain_hi[0] << 8;
+				proximity_domain |= p->proximity_domain_hi[1] << 16;
+				proximity_domain |= p->proximity_domain_hi[2] << 24;
+			}
 			ACPI_DEBUG_PRINT((ACPI_DB_INFO,
 					  "SRAT Processor (id[0x%02x] eid[0x%02x]) in proximity domain %d %s\n",
-					  p->apic_id, p->lsapic_eid,
-					  p->proximity_domain,
-					  p->flags.
-					  enabled ? "enabled" : "disabled"));
+					  p->apic_id, p->local_sapic_eid,
+					  proximity_domain,
+					  p->flags & ACPI_SRAT_CPU_ENABLED
+					  ? "enabled" : "disabled"));
 		}
 #endif				/* ACPI_DEBUG_OUTPUT */
 		break;
@@ -63,18 +72,20 @@ void __init acpi_table_print_srat_entry(struct acpi_subtable_header * header)
 	case ACPI_SRAT_MEMORY_AFFINITY:
 #ifdef ACPI_DEBUG_OUTPUT
 		{
-			struct acpi_table_memory_affinity *p =
-			    (struct acpi_table_memory_affinity *)header;
+			struct acpi_srat_mem_affinity *p =
+			    container_of(header, struct acpi_srat_mem_affinity, header);
+			u32 proximity_domain = p->proximity_domain;
+
+			if (srat_rev < 2)
+				proximity_domain &= 0xff;
 			ACPI_DEBUG_PRINT((ACPI_DB_INFO,
-					  "SRAT Memory (0x%08x%08x length 0x%08x%08x type 0x%x) in proximity domain %d %s%s\n",
-					  p->base_addr_hi, p->base_addr_lo,
-					  p->length_hi, p->length_lo,
-					  p->memory_type, p->proximity_domain,
-					  p->flags.
-					  enabled ? "enabled" : "disabled",
-					  p->flags.
-					  hot_pluggable ? " hot-pluggable" :
-					  ""));
+					  "SRAT Memory (0x%016"PRIx64" length 0x%016"PRIx64" type 0x%x) in proximity domain %d %s%s\n",
+					  p->base_address, p->length,
+					  p->memory_type, proximity_domain,
+					  p->flags & ACPI_SRAT_MEM_ENABLED
+					  ? "enabled" : "disabled",
+					  p->flags & ACPI_SRAT_MEM_HOT_PLUGGABLE
+					  ? " hot-pluggable" : ""));
 		}
 #endif				/* ACPI_DEBUG_OUTPUT */
 		break;
@@ -98,9 +109,9 @@ static int __init
 acpi_parse_processor_affinity(struct acpi_subtable_header * header,
 			      const unsigned long end)
 {
-	struct acpi_table_processor_affinity *processor_affinity;
+	struct acpi_srat_cpu_affinity *processor_affinity
+		= container_of(header, struct acpi_srat_cpu_affinity, header);
 
-	processor_affinity = (struct acpi_table_processor_affinity *)header;
 	if (!processor_affinity)
 		return -EINVAL;
 
@@ -116,9 +127,9 @@ static int __init
 acpi_parse_memory_affinity(struct acpi_subtable_header * header,
 			   const unsigned long end)
 {
-	struct acpi_table_memory_affinity *memory_affinity;
+	struct acpi_srat_mem_affinity *memory_affinity
+		= container_of(header, struct acpi_srat_mem_affinity, header);
 
-	memory_affinity = (struct acpi_table_memory_affinity *)header;
 	if (!memory_affinity)
 		return -EINVAL;
 
@@ -132,6 +143,11 @@ acpi_parse_memory_affinity(struct acpi_subtable_header * header,
 
 static int __init acpi_parse_srat(struct acpi_table_header *table)
 {
+	if (!table)
+		return -EINVAL;
+
+	srat_rev = table->revision;
+
 	return 0;
 }
 

@@ -132,17 +132,23 @@ void __init acpi_numa_slit_init(struct acpi_table_slit *slit)
 
 /* Callback for Proximity Domain -> LAPIC mapping */
 void __init
-acpi_numa_processor_affinity_init(struct acpi_table_processor_affinity *pa)
+acpi_numa_processor_affinity_init(struct acpi_srat_cpu_affinity *pa)
 {
 	int pxm, node;
 	if (srat_disabled())
 		return;
-	if (pa->header.length != sizeof(struct acpi_table_processor_affinity)) {		bad_srat();
+	if (pa->header.length != sizeof(struct acpi_srat_cpu_affinity)) {
+		bad_srat();
 		return;
 	}
-	if (pa->flags.enabled == 0)
+	if (!(pa->flags & ACPI_SRAT_CPU_ENABLED))
 		return;
-	pxm = pa->proximity_domain;
+	pxm = pa->proximity_domain_lo;
+	if (srat_rev >= 2) {
+		pxm |= pa->proximity_domain_hi[0] << 8;
+		pxm |= pa->proximity_domain_hi[1] << 16;
+		pxm |= pa->proximity_domain_hi[2] << 24;
+	}
 	node = setup_node(pxm);
 	if (node < 0) {
 		printk(KERN_ERR "SRAT: Too many proximity domains %x\n", pxm);
@@ -157,7 +163,7 @@ acpi_numa_processor_affinity_init(struct acpi_table_processor_affinity *pa)
 
 /* Callback for parsing of the Proximity Domain <-> Memory Area mappings */
 void __init
-acpi_numa_memory_affinity_init(struct acpi_table_memory_affinity *ma)
+acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
 {
 	struct node *nd;
 	u64 start, end;
@@ -166,15 +172,17 @@ acpi_numa_memory_affinity_init(struct acpi_table_memory_affinity *ma)
 
 	if (srat_disabled())
 		return;
-	if (ma->header.length != sizeof(struct acpi_table_memory_affinity)) {
+	if (ma->header.length != sizeof(struct acpi_srat_mem_affinity)) {
 		bad_srat();
 		return;
 	}
-	if (ma->flags.enabled == 0)
+	if (!(ma->flags & ACPI_SRAT_MEM_ENABLED))
 		return;
-	start = ma->base_addr_lo | ((u64)ma->base_addr_hi << 32);
-	end = start + (ma->length_lo | ((u64)ma->length_hi << 32));
+	start = ma->base_address;
+	end = start + ma->length;
 	pxm = ma->proximity_domain;
+	if (srat_rev < 2)
+		pxm &= 0xff;
 	node = setup_node(pxm);
 	if (node < 0) {
 		printk(KERN_ERR "SRAT: Too many proximity domains.\n");
@@ -182,7 +190,7 @@ acpi_numa_memory_affinity_init(struct acpi_table_memory_affinity *ma)
 		return;
 	}
 	/* It is fine to add this area to the nodes data it will be used later*/
-	if (ma->flags.hot_pluggable == 1)
+	if (ma->flags & ACPI_SRAT_MEM_HOT_PLUGGABLE)
 		printk(KERN_INFO "SRAT: hot plug zone found %"PRIx64" - %"PRIx64" \n",
 				start, end);
 	i = conflicting_nodes(start, end);

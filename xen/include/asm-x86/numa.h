@@ -5,6 +5,8 @@
 
 #define NODES_SHIFT 6
 
+extern int srat_rev;
+
 extern unsigned char cpu_to_node[];
 extern cpumask_t     node_to_cpumask[];
 
