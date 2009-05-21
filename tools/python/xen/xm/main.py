@@ -73,7 +73,7 @@ if not hasattr(getopt, 'gnu_getopt'):
     getopt.gnu_getopt = getopt.getopt
 
 XM_CONFIG_FILE_ENVVAR = 'XM_CONFIG_FILE'
-XM_CONFIG_FILE_DEFAULT = auxbin.xen_configdir + '/xm-config.xml'
+XM_CONFIG_FILE_DEFAULT = auxbin.xen_configdir() + '/xm-config.xml'
 
 # Supported types of server
 SERVER_LEGACY_XMLRPC = 'LegacyXMLRPC'
