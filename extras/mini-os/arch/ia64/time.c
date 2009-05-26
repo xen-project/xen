@@ -1,24 +1,7 @@
 /* 
  * Done by Dietmar Hahn <dietmar.hahn@fujitsu-siemens.com>
  * Description: simple ia64 specific time handling
- * mktime() is taken from Linux (see copyright below)
  * Parts are taken from FreeBSD.
- *
- ****************************************************************************
- * For the copy of the mktime() from linux.
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  ****************************************************************************
  *
@@ -57,6 +40,49 @@ static uint64_t itc_frequency;
 static uint64_t processor_frequency;
 static uint64_t itm_val;
 
+static int is_leap_year(int year)
+{
+	if( year % 4 == 0 )
+	{
+		if( year % 100 == 0 )
+		{
+			if( year % 400 == 0 ) return 1;
+			else return 0;
+		}
+		return 1;
+	}
+	return 0;
+}
+
+static int count_leap_years(int epoch, int year)
+{
+	int i, result = 0;
+	for( i = epoch ; i < year ; i++ ) if( is_leap_year(i) ) result++;
+	return result;
+}
+
+static int get_day(int year, int mon, int day) {
+	int result;
+	switch(mon)
+	{
+		case 0: result = 0; break;
+		case 1: result = 31; break; /* 1: 31 */
+		case 2: result = 59; break; /* 2: 31+28 */
+		case 3: result = 90; break; /* 3: 59+31 */
+		case 4: result = 120;break; /* 4: 90+30 */
+		case 5: result = 151;break; /* 5: 120+31 */
+		case 6: result = 181;break; /* 6: 151+30 */
+		case 7: result = 212;break; /* 7: 181+31 */
+		case 8: result = 243;break; /* 8: 212+31 */
+		case 9: result = 273;break; /* 9: 243+30 */
+		case 10:result = 304;break; /* 10:273+31 */
+		case 11:result = 334;break; /* 11:304+30 */
+		default: break;
+	}
+	if( is_leap_year(year) && mon > 2 ) result++;
+	result += day - 1;
+	return result;
+}
 
 /*
  * mktime() is take from Linux. See copyright above.
@@ -64,38 +90,24 @@ static uint64_t itm_val;
  * Assumes input in normal date format, i.e. 1980-12-31 23:59:59
  * => year=1980, mon=12, day=31, hour=23, min=59, sec=59.
  *
- * [For the Julian calendar (which was used in Russia before 1917,
- * Britain & colonies before 1752, anywhere else before 1582,
- * and is still in use by some communities) leave out the
- * -year/100+year/400 terms, and add 10.]
- *
- * This algorithm was first published by Gauss (I think).
- *
  * WARNING: this function will overflow on 2106-02-07 06:28:16 on
  * machines were long is 32-bit! (However, as time_t is signed, we
  * will already get problems at other places on 2038-01-19 03:14:08)
  */
-static unsigned long
-_mktime(const unsigned int year0, const unsigned int mon0,
-       const unsigned int day, const unsigned int hour,
-       const unsigned int min, const unsigned int sec)
+static unsigned long _mktime(const unsigned int year, const unsigned int mon,
+			    const unsigned int day, const unsigned int hour,
+		            const unsigned int min, const unsigned int sec)
 {
-	unsigned int mon = mon0, year = year0;
+	unsigned long result = 0;
 
-	/* 1..12 -> 11,12,1..10 */
-	if (0 >= (int) (mon -= 2)) {
-		mon += 12;	/* Puts Feb last since it has leap day */
-		year -= 1;
-	}
+	result = sec;
+	result += min * 60;
+	result += hour * 3600;
+	result += get_day(year, mon - 1, day) * 86400;
+	result += (year - 1970) * 31536000;
+	result += count_leap_years(1970, year) * 86400;
 
-	return (
-		(
-		 ((unsigned long)
-		  (year/4 - year/100 + year/400 + 367*mon/12 + day) +
-		   year*365 - 719499
-		 ) * 24 + hour /* now have hours */
-		) * 60 + min /* now have minutes */
-	       ) * 60 + sec; /* finally seconds */
+	return result;
 }
 
 static inline uint64_t
