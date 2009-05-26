@@ -74,3 +74,6 @@
 ?	processor_px			platform.h
 !	psd_package			platform.h
 !	processor_performance		platform.h
+# ?	tmem_op_t			tmem.h
+# ?	tmem_cli_mfn_t			tmem.h
+# ?	tmem_cli_va_t			tmem.h

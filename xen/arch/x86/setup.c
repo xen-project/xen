@@ -110,6 +110,7 @@ extern void early_time_init(void);
 extern void early_cpu_init(void);
 extern void vesa_init(void);
 extern void vesa_mtrr_init(void);
+extern void init_tmem(void);
 
 DEFINE_PER_CPU(struct desc_struct *, gdt_table) = boot_cpu_gdt_table;
 #ifdef CONFIG_COMPAT
@@ -1062,6 +1063,8 @@ void __init __start_xen(unsigned long mbi_p)
     scrub_heap_pages();
 
     init_trace_bufs();
+
+    init_tmem();
 
     console_endboot();
 

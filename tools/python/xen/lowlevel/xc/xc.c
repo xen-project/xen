@@ -19,6 +19,7 @@
 
 #include "xenctrl.h"
 #include <xen/elfnote.h>
+#include <xen/tmem.h>
 #include "xc_dom.h"
 #include <xen/hvm/hvm_info_table.h>
 #include <xen/hvm/params.h>
@@ -1506,6 +1507,50 @@ static PyObject *dom_op(XcObject *self, PyObject *args,
     return zero;
 }
 
+static PyObject *pyxc_tmem_control(XcObject *self,
+                                   PyObject *args,
+                                   PyObject *kwds)
+{
+    int32_t pool_id;
+    uint32_t subop;
+    uint32_t cli_id;
+    uint32_t arg1;
+    uint32_t arg2;
+    char *buf;
+    char _buffer[32768], *buffer = _buffer;
+    int rc;
+
+    static char *kwd_list[] = { "pool_id", "subop", "cli_id", "arg1", "arg2", "buf", NULL };
+
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiiiis", kwd_list,
+                                      &pool_id, &subop, &cli_id, &arg1, &arg2, &buf) )
+        return NULL;
+
+    if ( (subop == TMEMC_LIST) && (arg1 > 32768) )
+        arg1 = 32768;
+
+    if ( (rc = xc_tmem_control(self->xc_handle, pool_id, subop, cli_id, arg1, arg2, buffer)) < 0 )
+        return Py_BuildValue("i", rc);
+
+    switch (subop) {
+        case TMEMC_LIST:
+            return Py_BuildValue("s", buffer);
+        case TMEMC_FLUSH:
+            return Py_BuildValue("i", rc);
+        case TMEMC_THAW:
+        case TMEMC_FREEZE:
+        case TMEMC_DESTROY:
+        case TMEMC_SET_WEIGHT:
+        case TMEMC_SET_CAP:
+        case TMEMC_SET_COMPRESS:
+        default:
+            break;
+    }
+
+    Py_INCREF(zero);
+    return zero;
+}
+
 static PyMethodDef pyxc_methods[] = {
     { "handle",
       (PyCFunction)pyxc_handle,
@@ -1964,6 +2009,18 @@ static PyMethodDef pyxc_methods[] = {
       "Do not propagate spurious page faults to this guest.\n"
       " dom [int]: Identifier of domain.\n" },
 #endif
+
+    { "tmem_control",
+      (PyCFunction)pyxc_tmem_control,
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "Do various control on a tmem pool.\n"
+      " pool_id [int]: Identifier of the tmem pool (-1 == all).\n"
+      " subop [int]: Supplementary Operation.\n"
+      " cli_id [int]: Client identifier (-1 == all).\n"
+      " arg1 [int]: Argument.\n"
+      " arg2 [int]: Argument.\n"
+      " buf [str]: Buffer.\n\n"
+      "Returns: [int] 0 or [str] tmem info on success; exception on error.\n" },
 
     { NULL, NULL, 0, NULL }
 };

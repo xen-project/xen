@@ -31,6 +31,7 @@
 #include <public/vcpu.h>
 #include <xsm/xsm.h>
 #include <xen/trace.h>
+#include <xen/tmem.h>
 
 /* Linux config option: propageted to domain0 */
 /* xen_processor_pmbits: xen control Cx, Px, ... */
@@ -557,6 +558,9 @@ static void complete_domain_destroy(struct rcu_head *head)
     }
 
     grant_table_destroy(d);
+
+    if ( d->tmem != NULL )
+        tmem_destroy(d->tmem);
 
     arch_domain_destroy(d);
 

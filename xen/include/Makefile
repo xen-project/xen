@@ -14,6 +14,7 @@ headers-y := \
     compat/physdev.h \
     compat/platform.h \
     compat/sched.h \
+    compat/tmem.h \
     compat/trace.h \
     compat/vcpu.h \
     compat/version.h \

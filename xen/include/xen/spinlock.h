@@ -67,12 +67,14 @@ void _read_unlock_irqrestore(rwlock_t *lock, unsigned long flags);
 void _write_lock(rwlock_t *lock);
 void _write_lock_irq(rwlock_t *lock);
 unsigned long _write_lock_irqsave(rwlock_t *lock);
+int _write_trylock(rwlock_t *lock);
 
 void _write_unlock(rwlock_t *lock);
 void _write_unlock_irq(rwlock_t *lock);
 void _write_unlock_irqrestore(rwlock_t *lock, unsigned long flags);
 
 int _rw_is_locked(rwlock_t *lock);
+int _rw_is_write_locked(rwlock_t *lock);
 
 #define spin_lock(l)                  _spin_lock(l)
 #define spin_lock_irq(l)              _spin_lock_irq(l)
@@ -110,11 +112,13 @@ int _rw_is_locked(rwlock_t *lock);
 #define write_lock(l)                 _write_lock(l)
 #define write_lock_irq(l)             _write_lock_irq(l)
 #define write_lock_irqsave(l, f)      ((f) = _write_lock_irqsave(l))
+#define write_trylock(l)              _write_trylock(l)
 
 #define write_unlock(l)               _write_unlock(l)
 #define write_unlock_irq(l)           _write_unlock_irq(l)
 #define write_unlock_irqrestore(l, f) _write_unlock_irqrestore(l, f)
 
 #define rw_is_locked(l)               _rw_is_locked(l)
+#define rw_is_write_locked(l)         _rw_is_write_locked(l)
 
 #endif /* __SPINLOCK_H__ */

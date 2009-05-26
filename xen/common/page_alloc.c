@@ -35,6 +35,7 @@
 #include <xen/perfc.h>
 #include <xen/numa.h>
 #include <xen/nodemask.h>
+#include <xen/tmem.h>
 #include <public/sysctl.h>
 #include <asm/page.h>
 #include <asm/numa.h>
@@ -335,9 +336,9 @@ static unsigned long init_node_heap(int node, unsigned long mfn,
 /* Allocate 2^@order contiguous pages. */
 static struct page_info *alloc_heap_pages(
     unsigned int zone_lo, unsigned int zone_hi,
-    unsigned int node, unsigned int order)
+    unsigned int node, unsigned int order, unsigned int memflags)
 {
-    unsigned int i, j, zone;
+    unsigned int i, j, zone = 0;
     unsigned int num_nodes = num_online_nodes();
     unsigned long request = 1UL << order;
     cpumask_t extra_cpus_mask, mask;
@@ -378,6 +379,14 @@ static struct page_info *alloc_heap_pages(
         /* Pick next node, wrapping around if needed. */
         if ( ++node == num_nodes )
             node = 0;
+    }
+
+    /* Try to free memory from tmem */
+    if ( (pg = tmem_relinquish_pages(order,memflags)) != NULL )
+    {
+        /* reassigning an already allocated anonymous heap page */
+        spin_unlock(&heap_lock);
+        return pg;
     }
 
     /* No suitable memory blocks. Fail the request. */
@@ -1018,8 +1027,8 @@ void *alloc_xenheap_pages(unsigned int order, unsigned int memflags)
 
     ASSERT(!in_irq());
 
-    pg = alloc_heap_pages(
-        MEMZONE_XEN, MEMZONE_XEN, cpu_to_node(smp_processor_id()), order);
+    pg = alloc_heap_pages(MEMZONE_XEN, MEMZONE_XEN,
+        cpu_to_node(smp_processor_id()), order, memflags);
     if ( unlikely(pg == NULL) )
         return NULL;
 
@@ -1172,11 +1181,11 @@ struct page_info *alloc_domheap_pages(
         return NULL;
 
     if ( dma_bitsize && ((dma_zone = bits_to_zone(dma_bitsize)) < zone_hi) )
-        pg = alloc_heap_pages(dma_zone + 1, zone_hi, node, order);
+        pg = alloc_heap_pages(dma_zone + 1, zone_hi, node, order, memflags);
 
     if ( (pg == NULL) &&
          ((pg = alloc_heap_pages(MEMZONE_XEN + 1, zone_hi,
-                                 node, order)) == NULL) )
+                                 node, order, memflags)) == NULL) )
          return NULL;
 
     if ( (d != NULL) && assign_pages(d, pg, order, memflags) )
@@ -1371,6 +1380,28 @@ static void page_scrub_softirq(void)
 
  out:
     spin_unlock(&serialise_lock);
+}
+
+void scrub_list_splice(struct page_list_head *list)
+{
+    spin_lock(&page_scrub_lock);
+    page_list_splice(list, &page_scrub_list);
+    spin_unlock(&page_scrub_lock);
+}
+
+void scrub_list_add(struct page_info *pg)
+{
+    spin_lock(&page_scrub_lock);
+    page_list_add(pg, &page_scrub_list);
+    spin_unlock(&page_scrub_lock);
+}
+
+void scrub_one_page(struct page_info *pg)
+{
+    void *p = map_domain_page(page_to_mfn(pg));
+
+    scrub_page(p);
+    unmap_domain_page(p);
 }
 
 static void page_scrub_timer_fn(void *unused)

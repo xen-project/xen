@@ -13,6 +13,7 @@
 #include <public/sysctl.h>
 #include <public/platform.h>
 #include <public/event_channel.h>
+#include <public/tmem.h>
 #include <asm/hypercall.h>
 #include <xsm/xsm.h>
 
@@ -115,6 +116,10 @@ do_kexec_op(
 extern long
 do_xsm_op(
     XEN_GUEST_HANDLE(xsm_op_t) u_xsm_op);
+
+extern long
+do_tmem_op(
+    XEN_GUEST_HANDLE(tmem_op_t) uops);
 
 #ifdef CONFIG_COMPAT
 

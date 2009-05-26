@@ -45,6 +45,8 @@ do {                                                            \
 
 #define DIV_ROUND(x, y) (((x) + (y) / 2) / (y))
 
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]) + __must_be_array(x))
+
 #define reserve_bootmem(_p,_l) ((void)0)
 
 struct domain;

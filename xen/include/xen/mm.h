@@ -77,6 +77,8 @@ int assign_pages(
 #define  MEMF_no_refcount (1U<<_MEMF_no_refcount)
 #define _MEMF_populate_on_demand 1
 #define  MEMF_populate_on_demand (1U<<_MEMF_populate_on_demand)
+#define _MEMF_tmem        2
+#define  MEMF_tmem        (1U<<_MEMF_tmem)
 #define _MEMF_node        8
 #define  MEMF_node(n)     ((((n)+1)&0xff)<<_MEMF_node)
 #define _MEMF_bits        24
@@ -222,6 +224,32 @@ page_list_remove_head(struct page_list_head *head)
     return page;
 }
 
+static inline void
+page_list_splice(struct page_list_head *list, struct page_list_head *head)
+{
+    struct page_info *first, *last, *at;
+
+    if ( page_list_empty(list) )
+        return;
+
+    if ( page_list_empty(head) )
+    {
+        head->next = list->next;
+        head->tail = list->tail;
+        return;
+    }
+
+    first = list->next;
+    last = list->tail;
+    at = head->next;
+
+    first->list.prev = page_to_mfn(head->next);
+    head->next = first;
+
+    last->list.next = page_to_mfn(at);
+    at->list.prev = page_to_mfn(last);
+}
+
 #define page_list_for_each(pos, head) \
     for ( pos = (head)->next; pos; pos = page_list_next(pos, head) )
 #define page_list_for_each_safe(pos, tmp, head) \
@@ -258,6 +286,7 @@ page_list_remove_head(struct page_list_head *head)
     list_for_each_entry_safe(pos, tmp, head, list)
 # define page_list_for_each_safe_reverse(pos, tmp, head) \
     list_for_each_entry_safe_reverse(pos, tmp, head, list)
+# define page_list_splice(list, hd)        list_splice(list, hd)
 #endif
 
 /* Automatic page scrubbing for dead domains. */
@@ -272,6 +301,9 @@ extern struct page_list_head page_scrub_list;
         if ( !page_list_empty(&page_scrub_list) )                       \
             cpumask_raise_softirq(cpu_online_map, PAGE_SCRUB_SOFTIRQ);  \
     } while ( 0 )
+void scrub_list_splice(struct page_list_head *);
+void scrub_list_add(struct page_info *);
+void scrub_one_page(struct page_info *);
 unsigned long avail_scrub_pages(void);
 
 int guest_remove_page(struct domain *d, unsigned long gmfn);

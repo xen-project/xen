@@ -590,6 +590,8 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg);
 
 int steal_page(
     struct domain *d, struct page_info *page, unsigned int memflags);
+int donate_page(
+    struct domain *d, struct page_info *page, unsigned int memflags);
 
 #define domain_clamp_alloc_bitsize(d, b) (b)
 

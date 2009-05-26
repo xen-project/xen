@@ -269,6 +269,9 @@ struct domain
 
     /* VRAM dirty support. */
     struct sh_dirty_vram *dirty_vram;
+
+    /* transcendent memory, auto-allocated on first tmem op by each domain */
+    void *tmem;
 };
 
 struct domain_setup_info

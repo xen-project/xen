@@ -32,10 +32,10 @@ static always_inline int _raw_spin_trylock(raw_spinlock_t *lock)
 }
 
 typedef struct {
-    volatile unsigned int lock;
+    volatile int lock;
 } raw_rwlock_t;
 
-#define RW_LOCK_BIAS		 0x01000000
+#define RW_LOCK_BIAS 0x01000000
 #define _RAW_RW_LOCK_UNLOCKED /*(raw_rwlock_t)*/ { RW_LOCK_BIAS }
 
 static always_inline void _raw_read_lock(raw_rwlock_t *rw)
@@ -66,6 +66,22 @@ static always_inline void _raw_write_lock(raw_rwlock_t *rw)
         : "=m" (rw->lock) : "i" (RW_LOCK_BIAS) : "memory" );
 }
 
+static always_inline int _raw_write_trylock(raw_rwlock_t *rw)
+{
+    int rc;
+
+    asm volatile (
+        "    lock; subl %2,%0      \n"
+        "    jz 1f                 \n"
+        "    lock; addl %2,%0      \n"
+        "    dec %1                \n"
+        "1:"
+        : "=m" (rw->lock), "=r" (rc) : "i" (RW_LOCK_BIAS), "1" (1)
+        : "memory" );
+
+    return rc;
+}
+
 static always_inline void _raw_read_unlock(raw_rwlock_t *rw)
 {
     asm volatile (
@@ -81,5 +97,6 @@ static always_inline void _raw_write_unlock(raw_rwlock_t *rw)
 }
 
 #define _raw_rw_is_locked(x) ((x)->lock < RW_LOCK_BIAS)
+#define _raw_rw_is_write_locked(x) ((x)->lock <= 0)
 
 #endif /* __ASM_SPINLOCK_H */

@@ -487,6 +487,8 @@ int compat_subarch_memory_op(int op, XEN_GUEST_HANDLE(void));
 
 int steal_page(
     struct domain *d, struct page_info *page, unsigned int memflags);
+int donate_page(
+    struct domain *d, struct page_info *page, unsigned int memflags);
 
 int map_ldt_shadow_page(unsigned int);
 

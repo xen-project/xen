@@ -1267,4 +1267,15 @@ int xc_get_vcpu_migration_delay(int xc_handle, uint32_t *value);
 int xc_get_cpuidle_max_cstate(int xc_handle, uint32_t *value);
 int xc_set_cpuidle_max_cstate(int xc_handle, uint32_t value);
 
+/**
+ * tmem operations
+ */
+int xc_tmem_control(int xc,
+                    int32_t pool_id,
+                    uint32_t subop,
+                    uint32_t cli_id,
+                    uint32_t arg1,
+                    uint32_t arg2,
+                    void *buf);
+
 #endif /* XENCTRL_H */

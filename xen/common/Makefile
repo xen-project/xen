@@ -28,6 +28,11 @@ obj-y += version.o
 obj-y += vsprintf.o
 obj-y += xmalloc_tlsf.o
 obj-y += rcupdate.o
+obj-y += tmem.o
+obj-y += tmem_xen.o
+obj-y += radix-tree.o
+obj-y += rbtree.o
+obj-y += lzo.o
 
 obj-$(perfc)       += perfc.o
 obj-$(crash_debug) += gdbstub.o

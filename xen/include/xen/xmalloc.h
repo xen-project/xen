@@ -76,7 +76,13 @@ void xmem_pool_destroy(struct xmem_pool *pool);
 void *xmem_pool_alloc(unsigned long size, struct xmem_pool *pool);
 
 /**
- * xmem_pool_free - free memory from given pool
+ * xmem_pool_maxalloc - xmem_pool_alloc's greater than this size will fail
+ * @mem_pool: pool
+ */
+int xmem_pool_maxalloc(struct xmem_pool *pool);
+
+/**
+ * xmem_pool_maxsize - 
  * @ptr: address of memory to be freed
  * @mem_pool: pool to free from
  */

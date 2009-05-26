@@ -214,6 +214,12 @@ unsigned long _write_lock_irqsave(rwlock_t *lock)
     return flags;
 }
 
+int _write_trylock(rwlock_t *lock)
+{
+    check_lock(&lock->debug);
+    return _raw_write_trylock(&lock->raw);
+}
+
 void _write_unlock(rwlock_t *lock)
 {
     _raw_write_unlock(&lock->raw);
@@ -235,4 +241,10 @@ int _rw_is_locked(rwlock_t *lock)
 {
     check_lock(&lock->debug);
     return _raw_rw_is_locked(&lock->raw);
+}
+
+int _rw_is_write_locked(rwlock_t *lock)
+{
+    check_lock(&lock->debug);
+    return _raw_rw_is_write_locked(&lock->raw);
 }

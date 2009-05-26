@@ -925,7 +925,15 @@ class XendAPI(object):
                     ('dmesg', 'String'),
                     ('dmesg_clear', 'String'),
                     ('get_log', 'String'),
-                    ('send_debug_keys', None)]
+                    ('send_debug_keys', None),
+                    ('tmem_thaw', None),
+                    ('tmem_freeze', None),
+                    ('tmem_flush', None),
+                    ('tmem_destroy', None),
+                    ('tmem_list', None),
+                    ('tmem_set_weight', None),
+                    ('tmem_set_cap', None),
+                    ('tmem_set_compress', None)]
     
     host_funcs = [('get_by_name_label', None),
                   ('list_methods', None)]
@@ -1060,6 +1068,70 @@ class XendAPI(object):
                   'PPCIs': XendPPCI.get_all(),
                   'PSCSIs': XendPSCSI.get_all()}
         return xen_api_success(record)
+
+    def host_tmem_thaw(self, _, host_ref, cli_id):
+        node = XendNode.instance()
+        try:
+            node.tmem_thaw(cli_id)
+        except Exception, e:
+            return xen_api_error(e)
+        return xen_api_success_void()
+
+    def host_tmem_freeze(self, _, host_ref, cli_id):
+        node = XendNode.instance()
+        try:
+            node.tmem_freeze(cli_id)
+        except Exception, e:
+            return xen_api_error(e)
+        return xen_api_success_void()
+
+    def host_tmem_flush(self, _, host_ref, cli_id, pages):
+        node = XendNode.instance()
+        try:
+            node.tmem_flush(cli_id, pages)
+        except Exception, e:
+            return xen_api_error(e)
+        return xen_api_success_void()
+
+    def host_tmem_destroy(self, _, host_ref, cli_id):
+        node = XendNode.instance()
+        try:
+            node.tmem_destroy(cli_id)
+        except Exception, e:
+            return xen_api_error(e)
+        return xen_api_success_void()
+
+    def host_tmem_list(self, _, host_ref, cli_id, use_long):
+        node = XendNode.instance()
+        try:
+            info = node.tmem_list(cli_id, use_long)
+        except Exception, e:
+            return xen_api_error(e)
+        return xen_api_success(info)
+
+    def host_tmem_set_weight(self, _, host_ref, cli_id, value):
+        node = XendNode.instance()
+        try:
+            node.tmem_set_weight(cli_id, value)
+        except Exception, e:
+            return xen_api_error(e)
+        return xen_api_success_void()
+
+    def host_tmem_set_cap(self, _, host_ref, cli_id, value):
+        node = XendNode.instance()
+        try:
+            node.tmem_set_cap(cli_id, value)
+        except Exception, e:
+            return xen_api_error(e)
+        return xen_api_success_void()
+
+    def host_tmem_set_compress(self, _, host_ref, cli_id, value):
+        node = XendNode.instance()
+        try:
+            node.tmem_set_compress(cli_id, value)
+        except Exception, e:
+            return xen_api_error(e)
+        return xen_api_success_void()
 
     # class methods
     def host_get_all(self, session):

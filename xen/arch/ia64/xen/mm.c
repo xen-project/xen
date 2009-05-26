@@ -2870,6 +2870,13 @@ steal_page(struct domain *d, struct page_info *page, unsigned int memflags)
     return -1;
 }
 
+int
+donate_page(struct domain *d, struct page_info *page, unsigned int memflags)
+{
+    /* needs to be implemented for transcendent memory (tmem) */
+    ASSERT(0);
+}
+
 static void
 __guest_physmap_add_page(struct domain *d, unsigned long gpfn,
                          unsigned long mfn)

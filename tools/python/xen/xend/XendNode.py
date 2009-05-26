@@ -26,6 +26,7 @@ from xen.util import pci as PciUtil
 from xen.util import vscsi_util
 from xen.xend import XendAPIStore
 from xen.xend import osdep
+from xen.xend.XendConstants import *
 
 import uuid, arch
 from XendPBD import XendPBD
@@ -939,6 +940,69 @@ class XendNode:
         return dict(self.physinfo())
     def info_dict(self):
         return dict(self.info())
+
+    # tmem
+    def tmem_list(self, cli_id, use_long):
+        pool_id = -1
+        subop = TMEMC_LIST
+        arg1 = 32768
+        arg2 = use_long
+        buf = ''
+        return self.xc.tmem_control(pool_id, subop, cli_id, arg1, arg2, buf)
+
+    def tmem_thaw(self, cli_id):
+        pool_id = -1
+        subop = TMEMC_THAW
+        arg1 = 0
+        arg2 = 0
+        buf = ''
+        return self.xc.tmem_control(pool_id, subop, cli_id, arg1, arg2, buf)
+
+    def tmem_freeze(self, cli_id):
+        pool_id = -1
+        subop = TMEMC_FREEZE
+        arg1 = 0
+        arg2 = 0
+        buf = ''
+        return self.xc.tmem_control(pool_id, subop, cli_id, arg1, arg2, buf)
+
+    def tmem_flush(self, cli_id, pages):
+        pool_id = -1
+        subop = TMEMC_FLUSH
+        arg1 = pages
+        arg2 = 0
+        buf = ''
+        return self.xc.tmem_control(pool_id, subop, cli_id, arg1, arg2, buf)
+
+    def tmem_destroy(self, cli_id):
+        pool_id = -1
+        subop = TMEMC_DESTROY
+        arg1 = 0
+        arg2 = 0
+        buf = ''
+        return self.xc.tmem_control(pool_id, subop, cli_id, arg1, arg2, buf)
+
+    def tmem_set_weight(self, cli_id, arg1):
+        pool_id = -1
+        subop = TMEMC_SET_WEIGHT
+        arg2 = 0
+        buf = ''
+        return self.xc.tmem_control(pool_id, subop, cli_id, arg1, arg2, buf)
+
+    def tmem_set_cap(self, cli_id, arg1):
+        pool_id = -1
+        subop = TMEMC_SET_CAP
+        arg2 = 0
+        buf = ''
+        return self.xc.tmem_control(pool_id, subop, cli_id, arg1, arg2, buf)
+
+    def tmem_set_compress(self, cli_id, arg1):
+        pool_id = -1
+        subop = TMEMC_SET_COMPRESS
+        arg2 = 0
+        buf = ''
+        return self.xc.tmem_control(pool_id, subop, cli_id, arg1, arg2, buf)
+
 
 def instance():
     global inst

@@ -11,7 +11,6 @@
 
 #define EXPORT_SYMBOL(var)
 #define EXPORT_SYMBOL_GPL(var)
-#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]) + __must_be_array(x))
 
 /*
  * The following log levels are as follows:

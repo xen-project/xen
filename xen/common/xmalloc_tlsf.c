@@ -292,7 +292,6 @@ struct xmem_pool *xmem_pool_create(
     unsigned long grow_size)
 {
     struct xmem_pool *pool;
-    void *region;
     int pool_bytes, pool_order;
 
     BUG_ON(max_size && (max_size < init_size));
@@ -319,11 +318,9 @@ struct xmem_pool *xmem_pool_create(
     pool->get_mem = get_mem;
     pool->put_mem = put_mem;
     strlcpy(pool->name, name, sizeof(pool->name));
-    region = get_mem(init_size);
-    if ( region == NULL )
-        goto out_region;
-    ADD_REGION(region, init_size, pool);
-    pool->init_region = region;
+
+    /* always obtain init_region lazily now to ensure it is get_mem'd
+     * in the same "context" as all other regions */
 
     spin_lock_init(&pool->lock);
 
@@ -332,10 +329,6 @@ struct xmem_pool *xmem_pool_create(
     spin_unlock(&pool_list_lock);
 
     return pool;
-
- out_region:
-    free_xenheap_pages(pool, pool_order);
-    return NULL;
 }
 
 unsigned long xmem_pool_get_used_size(struct xmem_pool *pool)
@@ -354,13 +347,15 @@ unsigned long xmem_pool_get_total_size(struct xmem_pool *pool)
 
 void xmem_pool_destroy(struct xmem_pool *pool) 
 {
+    int pool_bytes, pool_order;
+
     if ( pool == NULL )
         return;
 
     /* User is destroying without ever allocating from this pool */
     if ( xmem_pool_get_used_size(pool) == BHDR_OVERHEAD )
     {
-        pool->put_mem(pool->init_region);
+        ASSERT(!pool->init_region);
         pool->used_size -= BHDR_OVERHEAD;
     }
 
@@ -373,7 +368,10 @@ void xmem_pool_destroy(struct xmem_pool *pool)
     spin_lock(&pool_list_lock);
     list_del_init(&pool->list);
     spin_unlock(&pool_list_lock);
-    pool->put_mem(pool);
+
+    pool_bytes = ROUNDUP_SIZE(sizeof(*pool));
+    pool_order = get_order_from_bytes(pool_bytes);
+    free_xenheap_pages(pool,pool_order);
 }
 
 void *xmem_pool_alloc(unsigned long size, struct xmem_pool *pool)
@@ -381,6 +379,14 @@ void *xmem_pool_alloc(unsigned long size, struct xmem_pool *pool)
     struct bhdr *b, *b2, *next_b, *region;
     int fl, sl;
     unsigned long tmp_size;
+
+    if ( pool->init_region == NULL )
+    {
+        if ( (region = pool->get_mem(pool->init_size)) == NULL )
+            goto out;
+        ADD_REGION(region, pool->init_size, pool);
+        pool->init_region = region;
+    }
 
     size = (size < MIN_BLOCK_SIZE) ? MIN_BLOCK_SIZE : ROUNDUP_SIZE(size);
     /* Rounding up the requested size and calculating fl and sl */
@@ -494,6 +500,11 @@ void xmem_pool_free(void *ptr, struct xmem_pool *pool)
     tmp_b->prev_hdr = b;
  out:
     spin_unlock(&pool->lock);
+}
+
+int xmem_pool_maxalloc(struct xmem_pool *pool)
+{
+    return pool->grow_size - (2 * BHDR_OVERHEAD);
 }
 
 /*

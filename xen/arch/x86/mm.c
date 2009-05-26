@@ -3539,6 +3539,42 @@ int replace_grant_host_mapping(
     return rc;
 }
 
+int donate_page(
+    struct domain *d, struct page_info *page, unsigned int memflags)
+{
+    spin_lock(&d->page_alloc_lock);
+
+    if ( is_xen_heap_page(page) || (page_get_owner(page) != NULL) )
+        goto fail;
+
+    if ( d->is_dying )
+        goto fail;
+
+    if ( page->count_info & ~(PGC_allocated | 1) )
+        goto fail;
+
+    if ( !(memflags & MEMF_no_refcount) )
+    {
+        if ( d->tot_pages >= d->max_pages )
+            goto fail;
+        d->tot_pages++;
+    }
+
+    page->count_info = PGC_allocated | 1;
+    page_set_owner(page, d);
+    page_list_add_tail(page,&d->page_list);
+
+    spin_unlock(&d->page_alloc_lock);
+    return 0;
+
+ fail:
+    spin_unlock(&d->page_alloc_lock);
+    MEM_LOG("Bad donate %p: ed=%p(%u), sd=%p, caf=%08lx, taf=%" PRtype_info,
+            (void *)page_to_mfn(page), d, d->domain_id,
+            page_get_owner(page), page->count_info, page->u.inuse.type_info);
+    return -1;
+}
+
 int steal_page(
     struct domain *d, struct page_info *page, unsigned int memflags)
 {

@@ -199,6 +199,15 @@ SUBCOMMAND_HELP = {
     'scsi-list'    :  ('<Domain> [--long]',
                         'List all SCSI devices currently attached.'),
 
+    # tmem
+    'tmem-list'     :  ('[-l|--long] [<Domain>|-a|--all]', 'List tmem pools.'),
+    'tmem-thaw'     :  ('[<Domain>|-a|--all]', 'Thaw tmem pools.'),
+    'tmem-freeze'   :  ('[<Domain>|-a|--all]', 'Freeze tmem pools.'),
+    'tmem-destroy'  :  ('[<Domain>|-a|--all]', 'Destroy tmem pools.'),
+    'tmem-set'      :  ('[<Domain>|-a|--all] [weight=<weight>] [cap=<cap>] '
+                        '[compress=<compress>]',
+                        'Change tmem settings.'),
+
     # security
 
     'addlabel'      :  ('<label> {dom <ConfigFile>|res <resource>|mgt <managed domain>}\n'
@@ -282,6 +291,21 @@ SUBCOMMAND_OPTIONS = {
     ),
     'info': (
        ('-c', '--config', 'List Xend configuration parameters'),
+    ),
+    'tmem-list': (
+       ('-l', '--long', 'List tmem stats.'),
+    ),
+    'tmem-thaw': (
+       ('-a', '--all', 'Thaw all tmem.'),
+    ),
+    'tmem-freeze':  (
+       ('-a', '--all', 'Freeze all tmem.'),
+    ),
+    'tmem-destroy':  (
+       ('-a', '--all', 'Destroy all tmem.'),
+    ),
+    'tmem-set':  (
+       ('-a', '--all', 'Operate on all tmem.'),
     ),
 }
 
@@ -397,9 +421,17 @@ acm_commands = [
     "getpolicy",
     ]
 
+tmem_commands = [
+    "tmem-list",
+    "tmem-thaw",
+    "tmem-freeze",
+    "tmem-destroy",
+    "tmem-set",
+    ]
+
 all_commands = (domain_commands + host_commands + scheduler_commands +
                 device_commands + vnet_commands + acm_commands +
-                ['shell', 'event-monitor'])
+                tmem_commands + ['shell', 'event-monitor'])
 
 
 ##
@@ -2837,7 +2869,188 @@ def xm_network_show(args):
 
             print format2 % r
 
-            
+def xm_tmem_list(args):
+    try:
+        (options, params) = getopt.gnu_getopt(args, 'la', ['long','all'])
+    except getopt.GetoptError, opterr:
+        err(opterr)
+        usage('tmem-list')
+
+    use_long = False
+    for (k, v) in options:
+        if k in ['-l', '--long']:
+            use_long = True
+
+    all = False
+    for (k, v) in options:
+        if k in ['-a', '--all']:
+            all = True
+
+    if not all and len(params) == 0:
+        err('You must specify -a or --all or a domain id.')
+        usage('tmem-list')
+
+    if all:
+        domid = -1
+    else:
+        try: 
+            domid = int(params[0])
+            params = params[1:]
+        except:
+            err('Unrecognized domain id: %s' % params[0])
+            usage('tmem-list')
+
+    if serverType == SERVER_XEN_API:
+        print server.xenapi.host.tmem_list(domid,use_long)
+    else:
+        print  server.xend.node.tmem_list(domid,use_long)
+
+def parse_tmem_args(args, name):
+    try:
+        (options, params) = getopt.gnu_getopt(args, 'a', ['all'])
+    except getopt.GetoptError, opterr:
+        err(opterr)
+        usage(name)
+
+    all = False
+    for (k, v) in options:
+        if k in ['-a', '--all']:
+            all = True
+
+    if not all and len(params) == 0:
+        err('You must specify -a or --all or a domain id.')
+        usage(name)
+
+    if all:
+        domid = -1
+    else:
+        try: 
+            domid = int(params[0])
+            params = params[1:]
+        except:
+            err('Unrecognized domain id: %s' % params[0])
+            usage(name)
+
+    return domid, params
+
+def xm_tmem_destroy(args):
+    (domid, _) = parse_tmem_args(args, 'tmem-destroy')
+    if serverType == SERVER_XEN_API:
+        server.xenapi.host.tmem_destroy(domid)
+    else:
+        server.xend.node.tmem_destroy(domid)
+
+def xm_tmem_thaw(args):
+    (domid, _) = parse_tmem_args(args, 'tmem-thaw')
+    if serverType == SERVER_XEN_API:
+        server.xenapi.host.tmem_thaw(domid)
+    else:
+        server.xend.node.tmem_thaw(domid)
+
+def xm_tmem_freeze(args):
+    (domid, _) = parse_tmem_args(args, 'tmem-freeze')
+    if serverType == SERVER_XEN_API:
+        server.xenapi.host.tmem_freeze(domid)
+    else:
+        server.xend.node.tmem_freeze(domid)
+
+def xm_tmem_flush(args):
+    try:
+        (options, params) = getopt.gnu_getopt(args, 'a', ['all'])
+    except getopt.GetoptError, opterr:
+        err(opterr)
+        usage(name)
+
+    all = False
+    for (k, v) in options:
+        if k in ['-a', '--all']:
+            all = True
+
+    if not all and len(params) == 0:
+        err('You must specify -a or --all or a domain id.')
+        usage('tmem-flush')
+
+    if all:
+        domid = -1
+    else:
+        try: 
+            domid = int(params[0])
+            params = params[1:]
+        except:
+            err('Unrecognized domain id: %s' % params[0])
+            usage('tmem-flush')
+
+    pages = -1
+    for (k, v) in options:
+        if k in ['-p', '--pages']:
+            pages = v
+
+    if serverType == SERVER_XEN_API:
+        server.xenapi.host.tmem_flush(domid,pages)
+    else:
+        server.xend.node.tmem_flush(domid,pages)
+
+def xm_tmem_set(args):
+    try:
+        (options, params) = getopt.gnu_getopt(args, 'a', ['all'])
+    except getopt.GetoptError, opterr:
+        err(opterr)
+        usage(name)
+
+    all = False
+    for (k, v) in options:
+        if k in ['-a', '--all']:
+            all = True
+
+    if not all and len(params) == 0:
+        err('You must specify -a or --all or a domain id.')
+        usage('tmem-set')
+
+    if all:
+        domid = -1
+    else:
+        try: 
+            domid = int(params[0])
+            params = params[1:]
+        except:
+            err('Unrecognized domain id: %s' % params[0])
+            usage('tmem-set')
+
+    weight = None
+    cap = None
+    compress = None
+    for item in params:
+        if item.startswith('weight='):
+            try:
+                weight = int(item[7:])
+            except:
+                err('weight should be a integer')
+                usage('tmem-set')
+        if item.startswith('cap='):
+            cap = int(item[4:])
+        if item.startswith('compress='):
+            compress = int(item[9:])
+
+    if weight is None and cap is None and compress is None:
+        err('Unrecognized tmem configuration option: %s' % item)
+        usage('tmem-set')
+        
+    if serverType == SERVER_XEN_API:
+        if weight is not None:
+            server.xenapi.host.tmem_set_weight(domid, weight)
+        if cap is not None:
+            server.xenapi.host.tmem_set_cap(domid, cap)
+        if compress is not None:
+            server.xenapi.host.tmem_set_compress(domid, compress)
+    else:
+        if weight is not None:
+            server.xend.node.tmem_set_weight(domid, weight)
+        if cap is not None:
+            server.xend.node.tmem_set_cap(domid, cap)
+        if compress is not None:
+            server.xend.node.tmem_set_compress(domid, compress)
+
+
 commands = {
     "shell": xm_shell,
     "event-monitor": xm_event_monitor,
@@ -2912,6 +3125,13 @@ commands = {
     "scsi-attach": xm_scsi_attach,
     "scsi-detach": xm_scsi_detach,
     "scsi-list": xm_scsi_list,
+    # tmem
+    "tmem-thaw": xm_tmem_thaw,
+    "tmem-freeze": xm_tmem_freeze,
+    "tmem-flush": xm_tmem_flush,
+    "tmem-destroy": xm_tmem_destroy,
+    "tmem-list": xm_tmem_list,
+    "tmem-set": xm_tmem_set,
     }
 
 ## The commands supported by a separate argument parser in xend.xm.
