@@ -194,37 +194,37 @@ help:
 .PHONY: uninstall
 uninstall: D=$(DESTDIR)
 uninstall:
-	[ -d $(D)/etc/xen ] && mv -f $(D)/etc/xen $(D)/etc/xen.old-`date +%s` || true
-	rm -rf $(D)/etc/init.d/xend*
-	rm -rf $(D)/etc/hotplug/xen-backend.agent
-	rm -f  $(D)/etc/udev/rules.d/xen-backend.rules
-	rm -f  $(D)/etc/udev/xen-backend.rules
-	rm -f  $(D)/etc/udev/rules.d/xend.rules
-	rm -f  $(D)/etc/udev/xend.rules
-	rm -f  $(D)/etc/sysconfig/xendomains
+	[ -d $(D)$(XEN_CONFIG_DIR) ] && mv -f $(D)$(XEN_CONFIG_DIR) $(D)$(XEN_CONFIG_DIR).old-`date +%s` || true
+	rm -rf $(D)$(CONFIG_DIR)/init.d/xend*
+	rm -rf $(D)$(CONFIG_DIR)/hotplug/xen-backend.agent
+	rm -f  $(D)$(CONFIG_DIR)/udev/rules.d/xen-backend.rules
+	rm -f  $(D)$(CONFIG_DIR)/udev/xen-backend.rules
+	rm -f  $(D)$(CONFIG_DIR)/udev/rules.d/xend.rules
+	rm -f  $(D)$(CONFIG_DIR)/udev/xend.rules
+	rm -f  $(D)$(CONFIG_DIR)/sysconfig/xendomains
 	rm -rf $(D)/var/run/xen* $(D)/var/lib/xen*
 	rm -rf $(D)/boot/*xen*
 	rm -rf $(D)/lib/modules/*xen*
-	rm -rf $(D)/usr/bin/xen* $(D)/usr/bin/lomount
-	rm -rf $(D)/usr/bin/cpuperf-perfcntr $(D)/usr/bin/cpuperf-xen
-	rm -rf $(D)/usr/bin/xc_shadow
-	rm -rf $(D)/usr/bin/pygrub
-	rm -rf $(D)/usr/bin/setsize $(D)/usr/bin/tbctl
-	rm -rf $(D)/usr/bin/xsls
-	rm -rf $(D)/usr/include/xenctrl.h $(D)/usr/include/xenguest.h
-	rm -rf $(D)/usr/include/xs_lib.h $(D)/usr/include/xs.h
-	rm -rf $(D)/usr/include/xen
+	rm -rf $(D)$(LIBDIR)/xen* $(D)$(BINDIR)/lomount
+	rm -rf $(D)$(BINDIR)/cpuperf-perfcntr $(D)$(BINDIR)/cpuperf-xen
+	rm -rf $(D)$(BINDIR)/xc_shadow
+	rm -rf $(D)$(BINDIR)/pygrub
+	rm -rf $(D)$(BINDIR)/setsize $(D)$(BINDIR)/tbctl
+	rm -rf $(D)$(BINDIR)/xsls
+	rm -rf $(D)$(INCLUDEDIR)/xenctrl.h $(D)$(INCLUDEDIR)/xenguest.h
+	rm -rf $(D)$(INCLUDEDIR)/xs_lib.h $(D)$(INCLUDEDIR)/xs.h
+	rm -rf $(D)$(INCLUDEDIR)/xen
 	rm -rf $(D)$(LIBDIR)/libxenctrl* $(D)$(LIBDIR)/libxenguest*
 	rm -rf $(D)$(LIBDIR)/libxenstore*
 	rm -rf $(D)$(LIBDIR)/python/xen $(D)$(LIBDIR)/python/grub
 	rm -rf $(D)$(LIBDIR)/xen/
-	rm -rf $(D)/usr/lib/xen/
-	rm -rf $(D)/usr/local/sbin/setmask $(D)/usr/local/sbin/xen*
-	rm -rf $(D)/usr/sbin/xen* $(D)/usr/sbin/netfix $(D)/usr/sbin/xm
-	rm -rf $(D)/usr/share/doc/xen
-	rm -rf $(D)/usr/share/xen
-	rm -rf $(D)/usr/share/man/man1/xen*
-	rm -rf $(D)/usr/share/man/man8/xen*
+	rm -rf $(D)$(LIBEXEC)/xen*
+	rm -rf $(D)$(SBINDIR)/setmask
+	rm -rf $(D)$(SBINDIR)/xen* $(D)$(SBINDIR)/netfix $(D)$(SBINDIR)/xm
+	rm -rf $(D)$(SHAREDIR)/doc/xen
+	rm -rf $(D)$(SHAREDIR)/xen
+	rm -rf $(D)$(MAN1DIR)/xen*
+	rm -rf $(D)$(MAN8DIR)/xen*
 	rm -rf $(D)/boot/tboot*
 
 # Legacy targets for compatibility
