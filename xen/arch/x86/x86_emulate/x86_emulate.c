@@ -172,7 +172,7 @@ static uint8_t opcode_table[256] = {
 
 static uint8_t twobyte_table[256] = {
     /* 0x00 - 0x07 */
-    SrcMem16|ModRM, ImplicitOps|ModRM, 0, 0, 0, 0, ImplicitOps, 0,
+    SrcMem16|ModRM, ImplicitOps|ModRM, 0, 0, 0, ImplicitOps, ImplicitOps, 0,
     /* 0x08 - 0x0F */
     ImplicitOps, ImplicitOps, 0, 0, 0, ImplicitOps|ModRM, 0, 0,
     /* 0x10 - 0x17 */
@@ -186,7 +186,8 @@ static uint8_t twobyte_table[256] = {
     /* 0x28 - 0x2F */
     0, 0, 0, 0, 0, 0, 0, 0,
     /* 0x30 - 0x37 */
-    ImplicitOps, ImplicitOps, ImplicitOps, 0, 0, 0, 0, 0,
+    ImplicitOps, ImplicitOps, ImplicitOps, 0,
+    ImplicitOps, ImplicitOps, 0, 0,
     /* 0x38 - 0x3F */
     0, 0, 0, 0, 0, 0, 0, 0,
     /* 0x40 - 0x47 */
@@ -280,7 +281,17 @@ struct operand {
 };
 
 /* MSRs. */
-#define MSR_TSC   0x10
+#define MSR_TSC          0x00000010
+#define MSR_SYSENTER_CS  0x00000174
+#define MSR_SYSENTER_ESP 0x00000175
+#define MSR_SYSENTER_EIP 0x00000176
+#define MSR_EFER         0xc0000080
+#define EFER_SCE         (1u<<0)
+#define EFER_LMA         (1u<<10)
+#define MSR_STAR         0xc0000081
+#define MSR_LSTAR        0xc0000082
+#define MSR_CSTAR        0xc0000083
+#define MSR_FMASK        0xc0000084
 
 /* Control register flags. */
 #define CR0_PE    (1<<0)
@@ -939,6 +950,20 @@ in_protmode(
     struct x86_emulate_ops  *ops)
 {
     return !(in_realmode(ctxt, ops) || (ctxt->regs->eflags & EFLG_VM));
+}
+
+static int
+in_longmode(
+    struct x86_emulate_ctxt *ctxt,
+    struct x86_emulate_ops *ops)
+{
+    uint64_t efer;
+
+    if (ops->read_msr == NULL)
+        return -1;
+
+    ops->read_msr(MSR_EFER, &efer, ctxt);
+    return !!(efer & EFER_LMA);
 }
 
 static int
@@ -3544,6 +3569,71 @@ x86_emulate(
         break;
     }
 
+    case 0x05: /* syscall */ {
+        uint64_t msr_content;
+        struct segment_register cs = { 0 }, ss = { 0 };
+        int rc;
+
+        fail_if(ops->read_msr == NULL);
+        fail_if(ops->read_segment == NULL);
+        fail_if(ops->write_segment == NULL);
+
+        generate_exception_if(in_realmode(ctxt, ops), EXC_UD, 0);
+        generate_exception_if(!in_protmode(ctxt, ops), EXC_UD, 0);
+        generate_exception_if(lock_prefix, EXC_UD, 0);
+
+        /* Inject #UD if syscall/sysret are disabled. */
+        rc = ops->read_msr(MSR_EFER, &msr_content, ctxt);
+        fail_if(rc != 0);
+        generate_exception_if((msr_content & EFER_SCE) == 0, EXC_UD, 0);
+
+        rc = ops->read_msr(MSR_STAR, &msr_content, ctxt);
+        fail_if(rc != 0);
+
+        msr_content >>= 32;
+        cs.sel = (uint16_t)(msr_content & 0xfffc);
+        ss.sel = (uint16_t)(msr_content + 8);
+
+        cs.base = ss.base = 0; /* flat segment */
+        cs.limit = ss.limit = ~0u;  /* 4GB limit */
+        cs.attr.bytes = 0xc9b; /* G+DB+P+S+Code */
+        ss.attr.bytes = 0xc93; /* G+DB+P+S+Data */
+
+        if ( in_longmode(ctxt, ops) )
+        {
+            cs.attr.fields.db = 0;
+            cs.attr.fields.l = 1;
+
+            _regs.rcx = _regs.rip;
+            _regs.r11 = _regs.eflags & ~EFLG_RF;
+
+            rc = ops->read_msr(mode_64bit() ? MSR_LSTAR : MSR_CSTAR,
+                               &msr_content, ctxt);
+            fail_if(rc != 0);
+
+            _regs.rip = msr_content;
+
+            rc = ops->read_msr(MSR_FMASK, &msr_content, ctxt);
+            fail_if(rc != 0);
+            _regs.eflags &= ~(msr_content | EFLG_RF);
+        }
+        else
+        {
+            rc = ops->read_msr(MSR_STAR, &msr_content, ctxt);
+            fail_if(rc != 0);
+
+            _regs.rcx = _regs.rip;
+            _regs.eip = (uint32_t)msr_content;
+            _regs.eflags &= ~(EFLG_VM | EFLG_IF | EFLG_RF);
+        }
+
+        if ( (rc = ops->write_segment(x86_seg_cs, &cs, ctxt)) ||
+             (rc = ops->write_segment(x86_seg_ss, &ss, ctxt)) )
+            goto done;
+
+        break;
+    }
+
     case 0x06: /* clts */
         generate_exception_if(!mode_ring0(), EXC_GP, 0);
         fail_if((ops->read_cr == NULL) || (ops->write_cr == NULL));
@@ -3644,6 +3734,122 @@ x86_emulate(
         if ( !test_cc(b, _regs.eflags) )
             dst.type = OP_NONE;
         break;
+
+    case 0x34: /* sysenter */ {
+        uint64_t msr_content;
+        struct segment_register cs, ss;
+        int rc;
+
+        fail_if(ops->read_msr == NULL);
+        fail_if(ops->read_segment == NULL);
+        fail_if(ops->write_segment == NULL);
+
+        generate_exception_if(mode_ring0(), EXC_GP, 0);
+        generate_exception_if(in_realmode(ctxt, ops), EXC_GP, 0);
+        generate_exception_if(!in_protmode(ctxt, ops), EXC_GP, 0);
+        generate_exception_if(lock_prefix, EXC_UD, 0);
+
+        rc = ops->read_msr(MSR_SYSENTER_CS, &msr_content, ctxt);
+        fail_if(rc != 0);
+
+        if ( mode_64bit() )
+            generate_exception_if(msr_content == 0, EXC_GP, 0);
+        else
+            generate_exception_if((msr_content & 0xfffc) == 0, EXC_GP, 0);
+
+        _regs.eflags &= ~(EFLG_VM | EFLG_IF | EFLG_RF);
+
+        ops->read_segment(x86_seg_cs, &cs, ctxt);
+        cs.sel = (uint16_t)msr_content & ~3; /* SELECTOR_RPL_MASK */
+        cs.base = 0;   /* flat segment */
+        cs.limit = ~0u;  /* 4GB limit */
+        cs.attr.bytes = 0xc9b; /* G+DB+P+S+Code */
+
+        ss.sel = cs.sel + 8;
+        ss.base = 0;   /* flat segment */
+        ss.limit = ~0u;  /* 4GB limit */
+        ss.attr.bytes = 0xc93; /* G+DB+P+S+Data */
+
+        if ( in_longmode(ctxt, ops) )
+        {
+            cs.attr.fields.db = 0;
+            cs.attr.fields.l = 1;
+        }
+
+        rc = ops->write_segment(x86_seg_cs, &cs, ctxt);
+        fail_if(rc != 0);
+        rc = ops->write_segment(x86_seg_ss, &ss, ctxt);
+        fail_if(rc != 0);
+
+        rc = ops->read_msr(MSR_SYSENTER_EIP, &msr_content, ctxt);
+        fail_if(rc != 0);
+        _regs.rip = msr_content;
+
+        rc = ops->read_msr(MSR_SYSENTER_ESP, &msr_content, ctxt);
+        fail_if(rc != 0);
+        _regs.rsp = msr_content;
+
+        break;
+    }
+
+    case 0x35: /* sysexit */ {
+        uint64_t msr_content;
+        struct segment_register cs, ss;
+        int user64 = !!(rex_prefix & 8); /* REX.W */
+        int rc;
+
+        fail_if(ops->read_msr == NULL);
+        fail_if(ops->read_segment == NULL);
+        fail_if(ops->write_segment == NULL);
+
+        generate_exception_if(!mode_ring0(), EXC_GP, 0);
+        generate_exception_if(in_realmode(ctxt, ops), EXC_GP, 0);
+        generate_exception_if(!in_protmode(ctxt, ops), EXC_GP, 0);
+        generate_exception_if(lock_prefix, EXC_UD, 0);
+
+        rc = ops->read_msr(MSR_SYSENTER_CS, &msr_content, ctxt);
+        fail_if(rc != 0);
+        rc = ops->read_segment(x86_seg_cs, &cs, ctxt);
+        fail_if(rc != 0);
+
+        if ( user64 )
+        {
+            cs.sel = (uint16_t)(msr_content + 32);
+            ss.sel = (cs.sel + 8);
+            generate_exception_if(msr_content == 0, EXC_GP, 0);
+        }
+        else
+        {
+            cs.sel = (uint16_t)(msr_content + 16);
+            ss.sel = (uint16_t)(msr_content + 24);
+            generate_exception_if((msr_content & 0xfffc) == 0, EXC_GP, 0);
+        }
+
+        cs.sel |= 0x3;   /* SELECTOR_RPL_MASK */
+        cs.base = 0;   /* flat segment */
+        cs.limit = ~0u;  /* 4GB limit */
+        cs.attr.bytes = 0xcfb; /* G+DB+P+DPL3+S+Code */
+
+        ss.sel |= 0x3;   /* SELECTOR_RPL_MASK */
+        ss.base = 0;   /* flat segment */
+        ss.limit = ~0u;  /* 4GB limit */
+        ss.attr.bytes = 0xcf3; /* G+DB+P+DPL3+S+Data */
+
+        if ( user64 )
+        {
+            cs.attr.fields.db = 0;
+            cs.attr.fields.l = 1;
+        }
+
+        rc = ops->write_segment(x86_seg_cs, &cs, ctxt);
+        fail_if(rc != 0);
+        rc = ops->write_segment(x86_seg_ss, &ss, ctxt);
+        fail_if(rc != 0);
+
+        _regs.rip = _regs.rdx;
+        _regs.rsp = _regs.rcx;
+        break;
+    }
 
     case 0x6f: /* movq mm/m64,mm */ {
         uint8_t stub[] = { 0x0f, 0x6f, modrm, 0xc3 };

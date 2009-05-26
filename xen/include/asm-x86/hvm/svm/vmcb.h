@@ -459,6 +459,15 @@ struct arch_svm_struct {
     unsigned long *msrpm;
     int    launch_core;
     bool_t vmcb_in_sync;    /* VMCB sync'ed with VMSAVE? */
+
+    /* Upper four bytes are undefined in the VMCB, therefore we can't
+     * use the fields in the VMCB. Write a 64bit value and then read a 64bit
+     * value is fine unless there's a VMRUN/VMEXIT in between which clears
+     * the upper four bytes.
+     */
+    uint64_t guest_sysenter_cs;
+    uint64_t guest_sysenter_esp;
+    uint64_t guest_sysenter_eip;
 };
 
 struct vmcb_struct *alloc_vmcb(void);

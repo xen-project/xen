@@ -123,9 +123,7 @@ struct hvm_hw_cpu {
     uint32_t tr_arbytes;
     uint32_t ldtr_arbytes;
 
-    uint32_t sysenter_cs;
-    uint32_t padding0;
-
+    uint64_t sysenter_cs;
     uint64_t sysenter_esp;
     uint64_t sysenter_eip;
 

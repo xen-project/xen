@@ -37,6 +37,7 @@
 #include <asm/debugreg.h>
 #include <asm/msr.h>
 #include <asm/spinlock.h>
+#include <asm/hvm/emulate.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
 #include <asm/hvm/io.h>
@@ -199,9 +200,9 @@ static int svm_vmcb_save(struct vcpu *v, struct hvm_hw_cpu *c)
     c->cr3 = v->arch.hvm_vcpu.guest_cr[3];
     c->cr4 = v->arch.hvm_vcpu.guest_cr[4];
 
-    c->sysenter_cs = vmcb->sysenter_cs;
-    c->sysenter_esp = vmcb->sysenter_esp;
-    c->sysenter_eip = vmcb->sysenter_eip;
+    c->sysenter_cs = v->arch.hvm_svm.guest_sysenter_cs;
+    c->sysenter_esp = v->arch.hvm_svm.guest_sysenter_esp;
+    c->sysenter_eip = v->arch.hvm_svm.guest_sysenter_eip;
 
     c->pending_event = 0;
     c->error_code = 0;
@@ -258,9 +259,9 @@ static int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     svm_update_guest_cr(v, 2);
     svm_update_guest_cr(v, 4);
 
-    vmcb->sysenter_cs =  c->sysenter_cs;
-    vmcb->sysenter_esp = c->sysenter_esp;
-    vmcb->sysenter_eip = c->sysenter_eip;
+    v->arch.hvm_svm.guest_sysenter_cs = c->sysenter_cs;
+    v->arch.hvm_svm.guest_sysenter_esp = c->sysenter_esp;
+    v->arch.hvm_svm.guest_sysenter_eip = c->sysenter_eip;
 
     if ( paging_mode_hap(v->domain) )
     {
@@ -286,7 +287,7 @@ static int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     return 0;
 }
 
-        
+
 static void svm_save_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
@@ -985,6 +986,16 @@ static int svm_msr_read_intercept(struct cpu_user_regs *regs)
         msr_content = v->arch.hvm_vcpu.guest_efer;
         break;
 
+    case MSR_IA32_SYSENTER_CS:
+        msr_content = v->arch.hvm_svm.guest_sysenter_cs;
+        break;
+    case MSR_IA32_SYSENTER_ESP:
+        msr_content = v->arch.hvm_svm.guest_sysenter_esp;
+        break;
+    case MSR_IA32_SYSENTER_EIP:
+        msr_content = v->arch.hvm_svm.guest_sysenter_eip;
+        break;
+
     case MSR_IA32_MC4_MISC: /* Threshold register */
     case MSR_F10_MC4_MISC1 ... MSR_F10_MC4_MISC3:
         /*
@@ -1066,6 +1077,16 @@ static int svm_msr_write_intercept(struct cpu_user_regs *regs)
     {
     case MSR_K8_VM_HSAVE_PA:
         goto gpf;
+
+    case MSR_IA32_SYSENTER_CS:
+        v->arch.hvm_svm.guest_sysenter_cs = msr_content;
+        break;
+    case MSR_IA32_SYSENTER_ESP:
+        v->arch.hvm_svm.guest_sysenter_esp = msr_content;
+        break;
+    case MSR_IA32_SYSENTER_EIP:
+        v->arch.hvm_svm.guest_sysenter_eip = msr_content;
+        break;
 
     case MSR_IA32_DEBUGCTLMSR:
         vmcb->debugctlmsr = msr_content;
@@ -1165,6 +1186,66 @@ static void svm_vmexit_do_rdtsc(struct cpu_user_regs *regs)
     hvm_rdtsc_intercept(regs);
 }
 
+static void svm_dump_regs(const char *from, struct cpu_user_regs *regs)
+{
+    printk("Dumping guest's current registers at %s...\n", from);
+    printk("Size of regs = 0x%lx, address = %p\n",
+           sizeof(struct cpu_user_regs), regs);
+
+    printk("r15 = 0x%016"PRIx64", r14 = 0x%016"PRIx64"\n",
+           regs->r15, regs->r14);
+    printk("r13 = 0x%016"PRIx64", r12 = 0x%016"PRIx64"\n",
+           regs->r13, regs->r12);
+    printk("rbp = 0x%016"PRIx64", rbx = 0x%016"PRIx64"\n",
+           regs->rbp, regs->rbx);
+    printk("r11 = 0x%016"PRIx64", r10 = 0x%016"PRIx64"\n",
+           regs->r11, regs->r10);
+    printk("r9  = 0x%016"PRIx64", r8  = 0x%016"PRIx64"\n",
+           regs->r9, regs->r8);
+    printk("rax = 0x%016"PRIx64", rcx = 0x%016"PRIx64"\n",
+           regs->rax, regs->rcx);
+    printk("rdx = 0x%016"PRIx64", rsi = 0x%016"PRIx64"\n",
+           regs->rdx, regs->rsi);
+    printk("rdi = 0x%016"PRIx64", rsp = 0x%016"PRIx64"\n",
+           regs->rdi, regs->rsp);
+    printk("error code = 0x%08"PRIx32", entry_vector = 0x%08"PRIx32"\n",
+           regs->error_code, regs->entry_vector);
+    printk("rip = 0x%016"PRIx64", rflags = 0x%016"PRIx64"\n",
+           regs->rip, regs->rflags);
+}
+
+static void svm_vmexit_ud_intercept(struct cpu_user_regs *regs)
+{
+    struct hvm_emulate_ctxt ctxt;
+    int rc;
+
+    hvm_emulate_prepare(&ctxt, regs);
+
+    rc = hvm_emulate_one(&ctxt);
+
+    switch ( rc )
+    {
+    case X86EMUL_UNHANDLEABLE:
+        gdprintk(XENLOG_WARNING,
+                 "instruction emulation failed @ %04x:%lx: "
+                 "%02x %02x %02x %02x %02x %02x\n",
+                 hvmemul_get_seg_reg(x86_seg_cs, &ctxt)->sel,
+                 ctxt.insn_buf_eip,
+                 ctxt.insn_buf[0], ctxt.insn_buf[1],
+                 ctxt.insn_buf[2], ctxt.insn_buf[3],
+                 ctxt.insn_buf[4], ctxt.insn_buf[5]);
+         return;
+    case X86EMUL_EXCEPTION:
+        if ( ctxt.exn_pending )
+            hvm_inject_exception(ctxt.exn_vector, ctxt.exn_error_code, 0);
+        break;
+    default:
+        break;
+    }
+
+    hvm_emulate_writeback(&ctxt);
+}
+
 static void wbinvd_ipi(void *info)
 {
     wbinvd();
@@ -1229,6 +1310,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
     if ( unlikely(exit_reason == VMEXIT_INVALID) )
     {
         svm_dump_vmcb(__func__, vmcb);
+        svm_dump_regs(__func__, regs);
         goto exit_and_crash;
     }
 
@@ -1304,6 +1386,10 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         svm_inject_exception(TRAP_page_fault, regs->error_code, va);
         break;
     }
+
+    case VMEXIT_EXCEPTION_UD:
+        svm_vmexit_ud_intercept(regs);
+        break;
 
     /* Asynchronous event, handled when we STGI'd after the VMEXIT. */
     case VMEXIT_EXCEPTION_MC:

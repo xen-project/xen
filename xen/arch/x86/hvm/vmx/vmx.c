@@ -37,6 +37,7 @@
 #include <asm/spinlock.h>
 #include <asm/paging.h>
 #include <asm/p2m.h>
+#include <asm/hvm/emulate.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
 #include <asm/hvm/vmx/vmx.h>
@@ -2248,6 +2249,38 @@ asmlinkage void vmx_enter_realmode(struct cpu_user_regs *regs)
     regs->eflags |= (X86_EFLAGS_VM | X86_EFLAGS_IOPL);
 }
 
+static void vmx_vmexit_ud_intercept(struct cpu_user_regs *regs)
+{
+     struct hvm_emulate_ctxt ctxt;
+     int rc;
+ 
+     hvm_emulate_prepare(&ctxt, regs);
+ 
+     rc = hvm_emulate_one(&ctxt);
+ 
+     switch ( rc )
+     {
+     case X86EMUL_UNHANDLEABLE:
+         gdprintk(XENLOG_WARNING,
+                  "instruction emulation failed @ %04x:%lx: "
+                  "%02x %02x %02x %02x %02x %02x\n",
+                  hvmemul_get_seg_reg(x86_seg_cs, &ctxt)->sel,
+                  ctxt.insn_buf_eip,
+                  ctxt.insn_buf[0], ctxt.insn_buf[1],
+                  ctxt.insn_buf[2], ctxt.insn_buf[3],
+                  ctxt.insn_buf[4], ctxt.insn_buf[5]);
+          return;
+     case X86EMUL_EXCEPTION:
+         if ( ctxt.exn_pending )
+             hvm_inject_exception(ctxt.exn_vector, ctxt.exn_error_code, 0);
+         break;
+     default:
+         break;
+     }
+ 
+     hvm_emulate_writeback(&ctxt);
+}
+
 asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
 {
     unsigned int exit_reason, idtv_info;
@@ -2433,6 +2466,9 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         case TRAP_machine_check:
             HVMTRACE_0D(MCE);
             do_machine_check(regs);
+            break;
+        case TRAP_invalid_op:
+            vmx_vmexit_ud_intercept(regs);
             break;
         default:
             goto exit_and_crash;

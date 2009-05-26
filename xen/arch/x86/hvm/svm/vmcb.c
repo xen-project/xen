@@ -150,9 +150,6 @@ static int construct_vmcb(struct vcpu *v)
     svm_disable_intercept_for_msr(v, MSR_LSTAR);
     svm_disable_intercept_for_msr(v, MSR_STAR);
     svm_disable_intercept_for_msr(v, MSR_SYSCALL_MASK);
-    svm_disable_intercept_for_msr(v, MSR_IA32_SYSENTER_CS);
-    svm_disable_intercept_for_msr(v, MSR_IA32_SYSENTER_ESP);
-    svm_disable_intercept_for_msr(v, MSR_IA32_SYSENTER_EIP);
 
     vmcb->msrpm_base_pa = (u64)virt_to_maddr(arch_svm->msrpm);
     vmcb->iopm_base_pa  = (u64)virt_to_maddr(hvm_io_bitmap);
@@ -222,7 +219,10 @@ static int construct_vmcb(struct vcpu *v)
 
     paging_update_paging_modes(v);
 
-    vmcb->exception_intercepts = HVM_TRAP_MASK | (1U << TRAP_no_device);
+    vmcb->exception_intercepts =
+        HVM_TRAP_MASK
+        | (1U << TRAP_no_device)
+        | (1U << TRAP_invalid_op);
 
     if ( paging_mode_hap(v->domain) )
     {
