@@ -1130,9 +1130,6 @@ class XendDomainInfo:
         if devnum >= pci_len:
             raise VmError("Device @ vslot 0x%x doesn't exist." % (vslot))
 
-        if vslot == AUTO_PHP_SLOT:
-            raise VmError("Device @ vslot 0x%x doesn't support hotplug." % (vslot))
-
         # Check the co-assignment.
         # To pci-detach a device D from domN, we should ensure: for each DD in the
         # list of D's co-assignment devices, DD is not assigned (to domN).
