@@ -21,11 +21,12 @@ main(int argc, char **argv)
     unsigned int domid, store_evtchn, console_evtchn;
     unsigned int hvm, pae, apic;
     int xc_fd, io_fd, ret;
+    int superpages;
     unsigned long store_mfn, console_mfn;
 
-    if ( argc != 8 )
+    if ( (argc != 8) && (argc != 9) )
         errx(1, "usage: %s iofd domid store_evtchn "
-             "console_evtchn hvm pae apic", argv[0]);
+             "console_evtchn hvm pae apic [superpages]", argv[0]);
 
     xc_fd = xc_interface_open();
     if ( xc_fd < 0 )
@@ -38,9 +39,13 @@ main(int argc, char **argv)
     hvm  = atoi(argv[5]);
     pae  = atoi(argv[6]);
     apic = atoi(argv[7]);
+    if ( argc == 9 )
+	    superpages = atoi(argv[8]);
+    else
+	    superpages = 0;
 
     ret = xc_domain_restore(xc_fd, io_fd, domid, store_evtchn, &store_mfn,
-                            console_evtchn, &console_mfn, hvm, pae);
+                            console_evtchn, &console_mfn, hvm, pae, superpages);
 
     if ( ret == 0 )
     {

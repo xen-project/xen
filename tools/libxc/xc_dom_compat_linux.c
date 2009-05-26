@@ -28,7 +28,8 @@ static int xc_linux_build_internal(struct xc_dom_image *dom,
                                    unsigned int store_evtchn,
                                    unsigned long *store_mfn,
                                    unsigned int console_evtchn,
-                                   unsigned long *console_mfn)
+                                   unsigned long *console_mfn,
+    							   int superpages)
 {
     int rc;
 
@@ -42,7 +43,7 @@ static int xc_linux_build_internal(struct xc_dom_image *dom,
         goto out;
     if ( (rc = xc_dom_mem_init(dom, mem_mb)) != 0 )
         goto out;
-    if ( (rc = xc_dom_boot_mem_init(dom)) != 0 )
+    if ( (rc = xc_dom_boot_mem_init(dom, superpages)) != 0 )
         goto out;
     if ( (rc = xc_dom_build_image(dom)) != 0 )
         goto out;
@@ -67,7 +68,8 @@ int xc_linux_build_mem(int xc_handle, uint32_t domid,
                        unsigned long flags,
                        unsigned int store_evtchn,
                        unsigned long *store_mfn,
-                       unsigned int console_evtchn, unsigned long *console_mfn)
+                       unsigned int console_evtchn, unsigned long *console_mfn,
+                       int superpages)
 {
     struct xc_dom_image *dom;
     int rc;
@@ -82,7 +84,7 @@ int xc_linux_build_mem(int xc_handle, uint32_t domid,
     rc = xc_linux_build_internal(dom, xc_handle, domid,
                                  mem_mb, flags,
                                  store_evtchn, store_mfn,
-                                 console_evtchn, console_mfn);
+                                 console_evtchn, console_mfn, superpages);
 
  out:
     xc_dom_release(dom);
@@ -98,7 +100,8 @@ int xc_linux_build(int xc_handle, uint32_t domid,
                    unsigned long flags,
                    unsigned int store_evtchn,
                    unsigned long *store_mfn,
-                   unsigned int console_evtchn, unsigned long *console_mfn)
+                   unsigned int console_evtchn, unsigned long *console_mfn,
+                   int superpages)
 {
     struct xc_dom_image *dom;
     int rc;
@@ -114,7 +117,7 @@ int xc_linux_build(int xc_handle, uint32_t domid,
     rc = xc_linux_build_internal(dom, xc_handle, domid,
                                  mem_mb, flags,
                                  store_evtchn, store_mfn,
-                                 console_evtchn, console_mfn);
+                                 console_evtchn, console_mfn, superpages);
 
  out:
     xc_dom_release(dom);
@@ -130,7 +133,8 @@ int xc_dom_linux_build(int xc_handle,
                        unsigned long flags,
                        unsigned int store_evtchn,
                        unsigned long *store_mfn,
-                       unsigned int console_evtchn, unsigned long *console_mfn)
+                       unsigned int console_evtchn, unsigned long *console_mfn,
+                       int superpages)
 {
     int rc;
 
@@ -143,7 +147,7 @@ int xc_dom_linux_build(int xc_handle,
     return xc_linux_build_internal(dom, xc_handle, domid,
                                    mem_mb, flags,
                                    store_evtchn, store_mfn,
-                                   console_evtchn, console_mfn);
+                                   console_evtchn, console_mfn, superpages);
 }
 
 /*

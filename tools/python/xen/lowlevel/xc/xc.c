@@ -405,6 +405,7 @@ static PyObject *pyxc_linux_build(XcObject *self,
     int flags = 0;
     int store_evtchn, console_evtchn;
     int vhpt = 0;
+    int superpages = 0;
     unsigned int mem_mb;
     unsigned long store_mfn = 0;
     unsigned long console_mfn = 0;
@@ -417,14 +418,14 @@ static PyObject *pyxc_linux_build(XcObject *self,
                                 "console_evtchn", "image",
                                 /* optional */
                                 "ramdisk", "cmdline", "flags",
-                                "features", "vhpt", NULL };
+                                "features", "vhpt", "superpages", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiiis|ssisi", kwd_list,
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiiis|ssisii", kwd_list,
                                       &domid, &store_evtchn, &mem_mb,
                                       &console_evtchn, &image,
                                       /* optional */
                                       &ramdisk, &cmdline, &flags,
-                                      &features, &vhpt) )
+                                      &features, &vhpt, &superpages) )
         return NULL;
 
     xc_dom_loginit();
@@ -436,7 +437,7 @@ static PyObject *pyxc_linux_build(XcObject *self,
 
     if ( xc_dom_linux_build(self->xc_handle, dom, domid, mem_mb, image,
                             ramdisk, flags, store_evtchn, &store_mfn,
-                            console_evtchn, &console_mfn) != 0 ) {
+                            console_evtchn, &console_mfn, superpages) != 0 ) {
         goto out;
     }
 

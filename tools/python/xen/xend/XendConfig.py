@@ -220,6 +220,7 @@ XENAPI_CFG_TYPES = {
     'machine_address_size': int,
     'suppress_spurious_page_faults': bool0,
     's3_integrity' : int,
+    'superpages' : int,
 }
 
 # List of legacy configuration keys that have no equivalent in the
@@ -392,6 +393,7 @@ class XendConfig(dict):
             'other_config': {},
             'platform': {},
             'target': 0,
+            'superpages': 0,
         }
         
         return defaults
@@ -2014,6 +2016,8 @@ class XendConfig(dict):
             image.append(['ramdisk', self['PV_ramdisk']])
         if self.has_key('PV_args') and self['PV_args']:
             image.append(['args', self['PV_args']])
+        if self.has_key('superpages'):
+            image.append(['superpages', self['superpages']])
 
         for key in XENAPI_PLATFORM_CFG_TYPES.keys():
             if key in self['platform']:
@@ -2050,6 +2054,8 @@ class XendConfig(dict):
             self['PV_kernel'] = sxp.child_value(image_sxp, 'kernel','')
             self['PV_ramdisk'] = sxp.child_value(image_sxp, 'ramdisk','')
             self['PV_args'] = kernel_args
+
+        self['superpages'] = sxp.child_value(image_sxp, 'superpages',0)
 
         for key in XENAPI_PLATFORM_CFG_TYPES.keys():
             val = sxp.child_value(image_sxp, key, None)

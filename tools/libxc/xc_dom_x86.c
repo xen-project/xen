@@ -26,6 +26,9 @@
 
 /* ------------------------------------------------------------------------ */
 
+#define SUPERPAGE_PFN_SHIFT  9
+#define SUPERPAGE_NR_PFNS    (1UL << SUPERPAGE_PFN_SHIFT)
+
 #define bits_to_mask(bits)       (((xen_vaddr_t)1 << (bits))-1)
 #define round_down(addr, mask)   ((addr) & ~(mask))
 #define round_up(addr, mask)     ((addr) | (mask))
@@ -691,7 +694,7 @@ static int x86_shadow(int xc, domid_t domid)
     return rc;
 }
 
-int arch_setup_meminit(struct xc_dom_image *dom)
+int arch_setup_meminit(struct xc_dom_image *dom, int superpages)
 {
     int rc;
     xen_pfn_t pfn, allocsz, i;
@@ -707,19 +710,49 @@ int arch_setup_meminit(struct xc_dom_image *dom)
             return rc;
     }
 
-    /* setup initial p2m */
     dom->p2m_host = xc_dom_malloc(dom, sizeof(xen_pfn_t) * dom->total_pages);
-    for ( pfn = 0; pfn < dom->total_pages; pfn++ )
-        dom->p2m_host[pfn] = pfn;
-
-    /* allocate guest memory */
-    for ( i = rc = allocsz = 0; (i < dom->total_pages) && !rc; i += allocsz )
+    if (superpages)
     {
-        allocsz = dom->total_pages - i;
-        if ( allocsz > 1024*1024 )
-            allocsz = 1024*1024;
-        rc = xc_domain_memory_populate_physmap(
-            dom->guest_xc, dom->guest_domid, allocsz, 0, 0, &dom->p2m_host[i]);
+        int count = dom->total_pages >> SUPERPAGE_PFN_SHIFT;
+        xen_pfn_t extents[count];
+
+        xc_dom_printf("Populating memory with %d superpages\n", count);
+        for (pfn = 0; pfn < count; pfn++)
+            extents[pfn] = pfn << SUPERPAGE_PFN_SHIFT;
+        rc = xc_domain_memory_populate_physmap(dom->guest_xc, dom->guest_domid,
+                                               count, SUPERPAGE_PFN_SHIFT, 0,
+                                               extents);
+        if (!rc)
+        {
+            int i, j;
+            xen_pfn_t mfn;
+
+            /* Expand the returned mfn into the p2m array */
+            pfn = 0;
+            for (i = 0; i < count; i++)
+            {
+                mfn = extents[i];
+                for (j = 0; j < SUPERPAGE_NR_PFNS; j++, pfn++)
+                {
+                    dom->p2m_host[pfn] = mfn + j;
+                }
+            }
+        }
+    } else
+    {
+        /* setup initial p2m */
+        for ( pfn = 0; pfn < dom->total_pages; pfn++ )
+            dom->p2m_host[pfn] = pfn;
+        
+        /* allocate guest memory */
+        for ( i = rc = allocsz = 0; (i < dom->total_pages) && !rc; i += allocsz )
+        {
+            allocsz = dom->total_pages - i;
+            if ( allocsz > 1024*1024 )
+                allocsz = 1024*1024;
+            rc = xc_domain_memory_populate_physmap(
+                dom->guest_xc, dom->guest_domid, allocsz, 0, 0, &dom->p2m_host[i]);
+        }
     }
 
     return rc;

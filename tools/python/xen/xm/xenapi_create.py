@@ -271,6 +271,8 @@ class xenapi_create:
                 vm.attributes["auto_power_on"].value == 'true',
             "s3_integrity":
                 vm.attributes["s3_integrity"].value,
+            "superpages":
+                vm.attributes["superpages"].value,
             "memory_static_max":
                 get_child_node_attribute(vm, "memory", "static_max"),
             "memory_static_min":
@@ -654,6 +656,8 @@ class sxp2xml:
             = str(get_child_by_name(config, "vcpus", 1))
         vm.attributes["s3_integrity"] \
             = str(get_child_by_name(config, "s3_integrity", 0))
+        vm.attributes["superpages"] \
+            = str(get_child_by_name(config, "superpages", 0))
 
         sec_data = get_child_by_name(config, "security")
         if sec_data:

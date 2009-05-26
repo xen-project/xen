@@ -149,7 +149,7 @@ static void __init register_arch_hooks(void)
 
 #include "xc_efi.h"
 
-int arch_setup_meminit(struct xc_dom_image *dom)
+int arch_setup_meminit(struct xc_dom_image *dom, int superpages)
 {
     xen_pfn_t pfn;
     int rc;

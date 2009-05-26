@@ -272,9 +272,11 @@ def restore(xd, fd, dominfo = None, paused = False, relocating = False):
         shadow_cur = xc.shadow_mem_control(dominfo.getDomid(), shadow / 1024)
         dominfo.info['shadow_memory'] = shadow_cur
 
+        superpages = restore_image.superpages
+
         cmd = map(str, [xen.util.auxbin.pathTo(XC_RESTORE),
                         fd, dominfo.getDomid(),
-                        store_port, console_port, int(is_hvm), pae, apic])
+                        store_port, console_port, int(is_hvm), pae, apic, superpages])
         log.debug("[xc_restore]: %s", string.join(cmd))
 
         handler = RestoreInputHandler()

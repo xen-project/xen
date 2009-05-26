@@ -651,6 +651,7 @@ class LinuxImageHandler(ImageHandler):
         ImageHandler.configure(self, vmConfig)
         self.vramsize = int(vmConfig['platform'].get('videoram',4)) * 1024
         self.is_stubdom = (self.kernel.find('stubdom') >= 0)
+        self.superpages = vmConfig['superpages']
 
     def buildDomain(self):
         store_evtchn = self.vm.getStorePort()
@@ -668,6 +669,7 @@ class LinuxImageHandler(ImageHandler):
         log.debug("vcpus          = %d", self.vm.getVCpuCount())
         log.debug("features       = %s", self.vm.getFeatures())
         log.debug("flags          = %d", self.flags)
+        log.debug("superpages     = %d", self.superpages)
         if arch.type == "ia64":
             log.debug("vhpt          = %d", self.vhpt)
 
@@ -680,7 +682,8 @@ class LinuxImageHandler(ImageHandler):
                               ramdisk        = self.ramdisk,
                               features       = self.vm.getFeatures(),
                               flags          = self.flags,
-                              vhpt           = self.vhpt)
+                              vhpt           = self.vhpt,
+                              superpages     = self.superpages)
 
     def getRequiredAvailableMemory(self, mem_kb):
         if self.is_stubdom :

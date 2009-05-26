@@ -54,6 +54,7 @@
                  actions_after_reboot   %NORMAL_EXIT; #REQUIRED
                  actions_after_crash    %CRASH_BEHAVIOUR; #REQUIRED
                  PCI_bus                CDATA #REQUIRED
+                 superpages             CDATA #REQUIRED
                  security_label         CDATA #IMPLIED>
 
 <!ELEMENT memory EMPTY> 

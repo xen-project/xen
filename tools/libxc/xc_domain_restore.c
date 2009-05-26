@@ -53,11 +53,92 @@ static xen_pfn_t *live_p2m = NULL;
 /* A table mapping each PFN to its new MFN. */
 static xen_pfn_t *p2m = NULL;
 
-/* A table of P2M mappings in the current region */
-static xen_pfn_t *p2m_batch = NULL;
-
 /* Address size of the guest, in bytes */
 unsigned int guest_width;
+
+/*
+**
+**
+*/
+#define SUPERPAGE_PFN_SHIFT  9
+#define SUPERPAGE_NR_PFNS    (1UL << SUPERPAGE_PFN_SHIFT)
+
+static int allocate_mfn(int xc_handle, uint32_t dom, unsigned long pfn, int superpages)
+{
+    unsigned long mfn;
+
+    if (superpages)
+    {
+        unsigned long base_pfn;
+
+        base_pfn = pfn & ~(SUPERPAGE_NR_PFNS-1);
+        mfn = base_pfn;
+
+        if (xc_domain_memory_populate_physmap(xc_handle, dom, 1,
+                                              SUPERPAGE_PFN_SHIFT, 0, &mfn) != 0)
+        {
+            ERROR("Failed to allocate physical memory at pfn 0x%x, base 0x%x.\n", pfn, base_pfn); 
+            errno = ENOMEM;
+            return 1;
+        }
+        for (pfn = base_pfn; pfn < base_pfn + SUPERPAGE_NR_PFNS; pfn++, mfn++)
+        {
+            p2m[pfn] = mfn;
+        }
+    }
+    else
+    {
+        mfn = pfn;
+        if (xc_domain_memory_populate_physmap(xc_handle, dom, 1, 0,
+                                              0, &mfn) != 0)
+        {
+            ERROR("Failed to allocate physical memory.!\n"); 
+            errno = ENOMEM;
+            return 1;
+        }
+        p2m[pfn] = mfn;
+    }
+    return 0;
+}
+
+static int allocate_physmem(int xc_handle, uint32_t dom,
+                            unsigned long *region_pfn_type, int region_size,
+                            unsigned int hvm, xen_pfn_t *region_mfn, int superpages)
+{
+	int i;
+    unsigned long pfn;
+    unsigned long pagetype;
+
+    for (i = 0; i < region_size; i++)
+    {
+        pfn      = region_pfn_type[i] & ~XEN_DOMCTL_PFINFO_LTAB_MASK;
+        pagetype = region_pfn_type[i] &  XEN_DOMCTL_PFINFO_LTAB_MASK;
+
+        if ( pfn > p2m_size )
+        {
+            ERROR("pfn out of range");
+            return 1;
+        }
+        if (pagetype == XEN_DOMCTL_PFINFO_XTAB)
+        {
+            region_mfn[i] = ~0UL;
+        }
+        else 
+        {
+            if (p2m[pfn] == INVALID_P2M_ENTRY)
+            {
+                if (allocate_mfn(xc_handle, dom, pfn, superpages) != 0)
+                    return 1;
+            }
+
+            /* setup region_mfn[] for batch map.
+             * For HVM guests, this interface takes PFNs, not MFNs */
+            region_mfn[i] = hvm ? pfn : p2m[pfn]; 
+        }
+    }
+    return 0;
+}
+
 
 /*
 ** In the state file (or during transfer), all page-table pages are
@@ -67,74 +148,33 @@ unsigned int guest_width;
 ** the (now known) appropriate mfn values.
 */
 static int uncanonicalize_pagetable(int xc_handle, uint32_t dom, 
-                                    unsigned long type, void *page)
+                                    unsigned long type, void *page, int superpages)
 {
     int i, pte_last;
     unsigned long pfn;
     uint64_t pte;
-    int nr_mfns = 0; 
 
     pte_last = PAGE_SIZE / ((pt_levels == 2)? 4 : 8);
 
-    /* First pass: work out how many (if any) MFNs we need to alloc */
     for ( i = 0; i < pte_last; i++ )
     {
         if ( pt_levels == 2 )
             pte = ((uint32_t *)page)[i];
         else
             pte = ((uint64_t *)page)[i];
-
+        
         /* XXX SMH: below needs fixing for PROT_NONE etc */
         if ( !(pte & _PAGE_PRESENT) )
             continue;
         
         pfn = (pte >> PAGE_SHIFT) & MFN_MASK_X86;
-        
-        if ( pfn >= p2m_size )
-        {
-            /* This "page table page" is probably not one; bail. */
-            ERROR("Frame number in type %lu page table is out of range: "
-                  "i=%d pfn=0x%lx p2m_size=%lu",
-                  type >> 28, i, pfn, p2m_size);
-            return 0;
-        }
-        
+
+        /* Allocate mfn if necessary */
         if ( p2m[pfn] == INVALID_P2M_ENTRY )
         {
-            /* Have a 'valid' PFN without a matching MFN - need to alloc */
-            p2m_batch[nr_mfns++] = pfn; 
-            p2m[pfn]--;
+            if (allocate_mfn(xc_handle, dom, pfn, superpages) != 0)
+                return 0;
         }
-    }
-
-    /* Allocate the requisite number of mfns. */
-    if ( nr_mfns &&
-         (xc_domain_memory_populate_physmap(xc_handle, dom, nr_mfns, 0, 0,
-                                            p2m_batch) != 0) )
-    { 
-        ERROR("Failed to allocate memory for batch.!\n"); 
-        errno = ENOMEM;
-        return 0; 
-    }
-    
-    /* Second pass: uncanonicalize each present PTE */
-    nr_mfns = 0;
-    for ( i = 0; i < pte_last; i++ )
-    {
-        if ( pt_levels == 2 )
-            pte = ((uint32_t *)page)[i];
-        else
-            pte = ((uint64_t *)page)[i];
-        
-        /* XXX SMH: below needs fixing for PROT_NONE etc */
-        if ( !(pte & _PAGE_PRESENT) )
-            continue;
-        
-        pfn = (pte >> PAGE_SHIFT) & MFN_MASK_X86;
-
-        if ( p2m[pfn] == (INVALID_P2M_ENTRY-1) )
-            p2m[pfn] = p2m_batch[nr_mfns++];
-
         pte &= ~MADDR_MASK_X86;
         pte |= (uint64_t)p2m[pfn] << PAGE_SHIFT;
 
@@ -272,7 +312,7 @@ static xen_pfn_t *load_p2m_frame_list(
 int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
                       unsigned int store_evtchn, unsigned long *store_mfn,
                       unsigned int console_evtchn, unsigned long *console_mfn,
-                      unsigned int hvm, unsigned int pae)
+                      unsigned int hvm, unsigned int pae, int superpages)
 {
     DECLARE_DOMCTL;
     int rc = 1, frc, i, j, n, m, pae_extended_cr3 = 0, ext_vcpucontext = 0;
@@ -377,11 +417,9 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
 
     region_mfn = xg_memalign(PAGE_SIZE, ROUNDUP(
                               MAX_BATCH_SIZE * sizeof(xen_pfn_t), PAGE_SHIFT));
-    p2m_batch  = xg_memalign(PAGE_SIZE, ROUNDUP(
-                              MAX_BATCH_SIZE * sizeof(xen_pfn_t), PAGE_SHIFT));
 
     if ( (p2m == NULL) || (pfn_type == NULL) ||
-         (region_mfn == NULL) || (p2m_batch == NULL) )
+         (region_mfn == NULL) )
     {
         ERROR("memory alloc failed");
         errno = ENOMEM;
@@ -390,18 +428,10 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
 
     memset(region_mfn, 0,
            ROUNDUP(MAX_BATCH_SIZE * sizeof(xen_pfn_t), PAGE_SHIFT)); 
-    memset(p2m_batch, 0,
-           ROUNDUP(MAX_BATCH_SIZE * sizeof(xen_pfn_t), PAGE_SHIFT)); 
 
     if ( lock_pages(region_mfn, sizeof(xen_pfn_t) * MAX_BATCH_SIZE) )
     {
         ERROR("Could not lock region_mfn");
-        goto out;
-    }
-
-    if ( lock_pages(p2m_batch, sizeof(xen_pfn_t) * MAX_BATCH_SIZE) )
-    {
-        ERROR("Could not lock p2m_batch");
         goto out;
     }
 
@@ -437,7 +467,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     n = m = 0;
     for ( ; ; )
     {
-        int j, nr_mfns = 0; 
+        int j; 
 
         this_pc = (n * 100) / p2m_size;
         if ( (this_pc - prev_pc) >= 5 )
@@ -521,57 +551,9 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
             goto out;
         }
 
-        /* First pass for this batch: work out how much memory to alloc */
-        nr_mfns = 0; 
-        for ( i = 0; i < j; i++ )
-        {
-            unsigned long pfn, pagetype;
-            pfn      = region_pfn_type[i] & ~XEN_DOMCTL_PFINFO_LTAB_MASK;
-            pagetype = region_pfn_type[i] &  XEN_DOMCTL_PFINFO_LTAB_MASK;
-
-            if ( (pagetype != XEN_DOMCTL_PFINFO_XTAB) && 
-                 (p2m[pfn] == INVALID_P2M_ENTRY) )
-            {
-                /* Have a live PFN which hasn't had an MFN allocated */
-                p2m_batch[nr_mfns++] = pfn; 
-                p2m[pfn]--;
-            }
-        } 
-
-        /* Now allocate a bunch of mfns for this batch */
-        if ( nr_mfns &&
-             (xc_domain_memory_populate_physmap(xc_handle, dom, nr_mfns, 0,
-                                                0, p2m_batch) != 0) )
-        { 
-            ERROR("Failed to allocate memory for batch.!\n"); 
-            errno = ENOMEM;
+        if (allocate_physmem(xc_handle, dom, region_pfn_type,
+                             j, hvm, region_mfn, superpages) != 0)
             goto out;
-        }
-
-        /* Second pass for this batch: update p2m[] and region_mfn[] */
-        nr_mfns = 0; 
-        for ( i = 0; i < j; i++ )
-        {
-            unsigned long pfn, pagetype;
-            pfn      = region_pfn_type[i] & ~XEN_DOMCTL_PFINFO_LTAB_MASK;
-            pagetype = region_pfn_type[i] &  XEN_DOMCTL_PFINFO_LTAB_MASK;
-
-            if ( pagetype == XEN_DOMCTL_PFINFO_XTAB )
-                region_mfn[i] = ~0UL; /* map will fail but we don't care */
-            else 
-            {
-                if ( p2m[pfn] == (INVALID_P2M_ENTRY-1) )
-                {
-                    /* We just allocated a new mfn above; update p2m */
-                    p2m[pfn] = p2m_batch[nr_mfns++]; 
-                    nr_pfns++; 
-                }
-
-                /* setup region_mfn[] for batch map.
-                 * For HVM guests, this interface takes PFNs, not MFNs */
-                region_mfn[i] = hvm ? pfn : p2m[pfn]; 
-            }
-        } 
 
         /* Map relevant mfns */
         region_base = xc_map_foreign_batch(
@@ -633,7 +615,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
                     (pagetype != XEN_DOMCTL_PFINFO_L1TAB)) {
 
                     if (!uncanonicalize_pagetable(xc_handle, dom, 
-                                                  pagetype, page)) {
+                                                  pagetype, page, superpages)) {
                         /*
                         ** Failing to uncanonicalize a page table can be ok
                         ** under live migration since the pages type may have
@@ -875,7 +857,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
                 {
                     if ( !uncanonicalize_pagetable(
                         xc_handle, dom, XEN_DOMCTL_PFINFO_L1TAB,
-                        region_base + k*PAGE_SIZE) )
+                        region_base + k*PAGE_SIZE, superpages) )
                     {
                         ERROR("failed uncanonicalize pt!");
                         goto out;
@@ -1223,3 +1205,12 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     
     return rc;
 }
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

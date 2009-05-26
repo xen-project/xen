@@ -660,6 +660,8 @@ def configure_image(vals):
         config_image.append(['videoram', vals.videoram])
     if vals.extra:
         config_image.append(['args', vals.extra])
+    if vals.superpages:
+        config_image.append(['superpages', vals.superpages])
 
     if vals.builder == 'hvm':
         configure_hvm(config_image, vals) 
