@@ -71,15 +71,15 @@ class PciController(DevController):
         pcidevid = 0
         vslots = ""
         for pci_config in config.get('devs', []):
-            vslot = pci_config.get('vslot')
-            if vslot is not None:
-                vslots = vslots + vslot + ";"
+            attached_vslot = pci_config.get('vslot')
+            if attached_vslot is not None:
+                vslots = vslots + attached_vslot + ";"
 
             domain = parse_hex(pci_config.get('domain', 0))
             bus = parse_hex(pci_config.get('bus', 0))
             slot = parse_hex(pci_config.get('slot', 0))
             func = parse_hex(pci_config.get('func', 0))            
-            requested_vslot = parse_hex(pci_config.get('requested_vslot', 0))
+            vslot = parse_hex(assigned_or_requested_vslot(pci_config))
 
             opts = pci_config.get('opts', '')
             if len(opts) > 0:
@@ -90,7 +90,7 @@ class PciController(DevController):
             back['dev-%i' % pcidevid] = "%04x:%02x:%02x.%01x" % \
                                         (domain, bus, slot, func)
             back['uuid-%i' % pcidevid] = pci_config.get('uuid', '')
-            back['vslot-%i' % pcidevid] = "%02x" % requested_vslot
+            back['vslot-%i' % pcidevid] = "%02x" % vslot
             pcidevid += 1
 
         if vslots != "":

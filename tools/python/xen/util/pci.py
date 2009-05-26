@@ -138,7 +138,13 @@ def parse_pci_name(pci_name_string):
     func = parse_hex(pci_dev_info['func'])
 
     return (domain, bus, slot, func)
- 
+
+def assigned_or_requested_vslot(dev):
+    if dev.has_key("vslot"):
+        return dev["vslot"]
+    if dev.has_key("requested_vslot"):
+        return dev["requested_vslot"]
+    raise PciDeviceVslotMissing("%s" % dev)
 
 def find_sysfs_mnt():
     try:
@@ -354,6 +360,12 @@ class PciDeviceAssignmentError(Exception):
     def __str__(self):
         return 'pci: impproper device assignment spcified: ' + \
             self.message
+
+class PciDeviceVslotMissing(Exception):
+    def __init__(self,msg):
+        self.message = msg
+    def __str__(self):
+        return 'pci: no vslot or requested_vslot: ' + self.message
 
 class PciDevice:
     def __init__(self, domain, bus, slot, func):

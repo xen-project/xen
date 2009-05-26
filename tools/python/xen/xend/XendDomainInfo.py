@@ -38,6 +38,7 @@ from xen.util import asserts, auxbin
 from xen.util.blkif import blkdev_uname_to_file, blkdev_uname_to_taptype
 import xen.util.xsm.xsm as security
 from xen.util import xsconstants
+from xen.util.pci import assigned_or_requested_vslot
 
 from xen.xend import balloon, sxp, uuid, image, arch
 from xen.xend import XendOptions, XendNode, XendConfig
@@ -621,10 +622,7 @@ class XendDomainInfo:
             pci_conf = self.info['devices'][dev_uuid][1]
             pci_devs = pci_conf['devs']
             for x in pci_devs:
-                if x.has_key('vslot'):
-                    x_vslot = x['vslot']
-                else:
-                    x_vslot = x['requested_vslot']
+                x_vslot = assigned_or_requested_vslot(x)
                 if (int(x_vslot, 16) == int(new_dev['requested_vslot'], 16) and
                    int(x_vslot, 16) != AUTO_PHP_SLOT):
                     raise VmError("vslot %s already have a device." % (new_dev['requested_vslot']))
@@ -819,10 +817,7 @@ class XendDomainInfo:
                          int(x['bus'], 16) == int(dev['bus'], 16) and
                          int(x['slot'], 16) == int(dev['slot'], 16) and
                          int(x['func'], 16) == int(dev['func'], 16) ):
-                        if x.has_key('vslot'):
-                            vslot = x['vslot']
-                        else:
-                            vslot = x['requested_vslot']
+                        vslot = assigned_or_requested_vslot(x)
                         break
                 if vslot == AUTO_PHP_SLOT_STR:
                     raise VmError("Device %04x:%02x:%02x.%01x is not connected"
@@ -1119,10 +1114,7 @@ class XendDomainInfo:
         #find the pass-through device with the virtual slot
         devnum = 0
         for x in pci_conf['devs']:
-            if x.has_key('vslot'):
-                x_vslot = x['vslot']
-            else:
-                x_vslot = x['requested_vslot']
+            x_vslot = assigned_or_requested_vslot(x)
             if int(x_vslot, 16) == vslot:
                 break
             devnum += 1

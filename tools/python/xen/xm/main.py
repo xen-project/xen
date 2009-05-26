@@ -2168,18 +2168,12 @@ def xm_pci_list(args):
 
     has_vslot = False
     for x in devs:
-        if x.has_key('vslot'):
-            if x['vslot'] == "0x%s" % AUTO_PHP_SLOT_STR:
-                x['vslot'] = '-'
-            else:
-                has_vslot = True
-        elif not x.has_key('requested_vslot'):
-            x['vslot'] = '-'
-        elif x['requested_vslot'] == "0x%s" % AUTO_PHP_SLOT_STR:
+        vslot = assigned_or_requested_vslot(x)
+        if int(vslot, 16) == AUTO_PHP_SLOT:
             x['vslot'] = '-'
         else:
+            x['vslot'] = vslot
             has_vslot = True
-            x['vslot'] = x['requested_vslot']
 
     if has_vslot:
         hdr_str = 'VSlt domain   bus   slot   func'
