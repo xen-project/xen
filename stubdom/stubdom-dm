@@ -114,10 +114,6 @@ do
     vbd_dev=`xenstore-read $i/dev`
     vbd_front=`xenstore-read $i/frontend`
     vbd_devtype=`xenstore-read $vbd_front/device-type`
-    if [ $vbd_type = "file" ]
-    then
-        vbd_type="tap:aio"
-    fi
     if [ $j -ne 0 ]
     then
         echo -n "," >> /etc/xen/stubdoms/$domname-dm

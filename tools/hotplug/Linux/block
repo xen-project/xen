@@ -202,13 +202,13 @@ case "$command" in
       p=$(xenstore_read "$XENBUS_PATH/params")
       mode=$(xenstore_read "$XENBUS_PATH/mode")
     fi
+    FRONTEND_ID=$(xenstore_read "$XENBUS_PATH/frontend-id")
+    FRONTEND_UUID=$(xenstore_read_default \
+            "/local/domain/$FRONTEND_ID/vm" 'unknown')
 
     case $t in 
       phy)
         dev=$(expand_dev $p)
-        FRONTEND_ID=$(xenstore_read "$XENBUS_PATH/frontend-id")
-        FRONTEND_UUID=$(xenstore_read_default \
-            "/local/domain/$FRONTEND_ID/vm" 'unknown')
 
         if [ -L "$dev" ]
         then
