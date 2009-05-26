@@ -310,14 +310,14 @@ void blkfront_aio(struct blkfront_aiocb *aiocbp, int write)
     req->nr_segments = n;
     req->handle = dev->handle;
     req->id = (uintptr_t) aiocbp;
-    req->sector_number = aiocbp->aio_offset / dev->info.sector_size;
+    req->sector_number = aiocbp->aio_offset / 512;
 
     for (j = 0; j < n; j++) {
         req->seg[j].first_sect = 0;
-        req->seg[j].last_sect = PAGE_SIZE / dev->info.sector_size - 1;
+        req->seg[j].last_sect = PAGE_SIZE / 512 - 1;
     }
-    req->seg[0].first_sect = ((uintptr_t)aiocbp->aio_buf & ~PAGE_MASK) / dev->info.sector_size;
-    req->seg[n-1].last_sect = (((uintptr_t)aiocbp->aio_buf + aiocbp->aio_nbytes - 1) & ~PAGE_MASK) / dev->info.sector_size;
+    req->seg[0].first_sect = ((uintptr_t)aiocbp->aio_buf & ~PAGE_MASK) / 512;
+    req->seg[n-1].last_sect = (((uintptr_t)aiocbp->aio_buf + aiocbp->aio_nbytes - 1) & ~PAGE_MASK) / 512;
     for (j = 0; j < n; j++) {
 	uintptr_t data = start + j * PAGE_SIZE;
         if (!write) {
