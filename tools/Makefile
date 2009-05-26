@@ -22,6 +22,7 @@ SUBDIRS-$(VTPM_TOOLS) += vtpm
 SUBDIRS-y += xenstat
 SUBDIRS-$(CONFIG_Linux) += libaio
 SUBDIRS-$(CONFIG_Linux) += blktap
+SUBDIRS-$(CONFIG_Linux) += blktap2
 SUBDIRS-y += libfsimage
 SUBDIRS-$(LIBXENAPI_BINDINGS) += libxen
 SUBDIRS-$(CONFIG_Linux) += fs-back

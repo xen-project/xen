@@ -27,6 +27,7 @@ Author: Mike Wray <mike.wray@hp.com>
 import logging
 import time
 import threading
+import thread
 import re
 import copy
 import os
@@ -535,6 +536,25 @@ class XendDomainInfo:
         @raise XendError: Failed pausing a domain
         """
         try:
+            bepath="/local/domain/0/backend/"
+            if(self.domid):
+                
+                dev =  xstransact.List(bepath + 'vbd' + "/%d" % (self.domid,))
+                for x in dev:
+                    path = self.getDeviceController('vbd').readBackend(x, 'params')
+                    if path and path.startswith('/dev/xen/blktap-2'):
+                        #Figure out the sysfs path.
+                        pattern = re.compile('/dev/xen/blktap-2/tapdev(\d+)$')
+                        ctrlid = pattern.search(path)
+                        ctrl = '/sys/class/blktap2/blktap' + ctrlid.group(1)            
+                        #pause the disk
+                        f = open(ctrl + '/pause', 'w')
+                        f.write('pause');
+                        f.close()
+        except Exception, ex:
+            log.warn('Could not pause blktap disk.');
+
+        try:
             xc.domain_pause(self.domid)
             self._stateSet(DOM_STATE_PAUSED)
         except Exception, ex:
@@ -546,6 +566,26 @@ class XendDomainInfo:
         
         @raise XendError: Failed unpausing a domain
         """
+        try:
+            bepath="/local/domain/0/backend/"
+            if(self.domid):
+                dev =  xstransact.List(bepath + "vbd" + "/%d" % (self.domid,))
+                for x in dev:
+                    path = self.getDeviceController('vbd').readBackend(x, 'params')
+                    if path and path.startswith('/dev/xen/blktap-2'):
+                        #Figure out the sysfs path.
+                        pattern = re.compile('/dev/xen/blktap-2/tapdev(\d+)$')
+                        ctrlid = pattern.search(path)
+                        ctrl = '/sys/class/blktap2/blktap' + ctrlid.group(1)
+                        #unpause the disk
+                        if(os.path.exists(ctrl + '/resume')):                  
+                            f = open(ctrl + '/resume', 'w');
+                            f.write('resume');
+                            f.close();
+
+        except Exception, ex:
+            log.warn('Could not unpause blktap disk: %s' % str(ex));
+
         try:
             xc.domain_unpause(self.domid)
             self._stateSet(DOM_STATE_RUNNING)
@@ -1171,6 +1211,15 @@ class XendDomainInfo:
 
         rc = None
         if self.domid is not None:
+            
+            #new blktap implementation may need a sysfs write after everything is torn down.
+            dev = self.getDeviceController(deviceClass).convertToDeviceNumber(devid)
+            path = self.getDeviceController(deviceClass).readBackend(dev, 'params')                
+            if path and path.startswith('/dev/xen/blktap-2'):
+                frontpath = self.getDeviceController(deviceClass).frontendPath(dev)
+                backpath = xstransact.Read(frontpath, "backend")
+                thread.start_new_thread(self.getDeviceController(deviceClass).finishDeviceCleanup, (backpath, path))
+
             rc = self.getDeviceController(deviceClass).destroyDevice(devid, force)
             if not force and rm_cfg:
                 # The backend path, other than the device itself,

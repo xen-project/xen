@@ -1,11 +1,17 @@
 # Copyright (c) 2005, XenSource Ltd.
-
+import string, re
+import subprocess
 
 from xen.xend.server.blkif import BlkifController
 from xen.xend.XendLogging import log
 
 phantomDev = 0;
 phantomId = 0;
+
+TAPDISK_SYSFS   = '/sys/class/blktap2'
+TAPDISK_BINARY  = '/usr/sbin/tapdisk2'
+TAPDISK_DEVICE  = '/dev/xen/blktap-2/tapdev'
+TAPDISK_CONTROL = TAPDISK_SYSFS + '/blktap'
 
 blktap_disk_types = [
     'aio',
@@ -14,10 +20,33 @@ blktap_disk_types = [
     'ram',
     'qcow',
     'qcow2',
-
+    'vhd',
     'ioemu',
     'tapdisk',
     ]
+ 
+def doexec(args, inputtext=None):
+    """Execute a subprocess, then return its return code, stdout and stderr"""
+    proc = subprocess.Popen(args,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,close_fds=True)
+    (stdout,stderr) = proc.communicate(inputtext)
+    rc = proc.returncode
+    return (rc,stdout,stderr)
+
+def parseDeviceString(device):
+    if device.find('/dev') == -1:
+        raise Exception, 'invalid tap device: ' + device
+
+    pattern = re.compile(TAPDISK_DEVICE + '(\d+)$')
+    groups  = pattern.search(device)
+    if not groups:
+        raise Exception, 'malformed tap device: ' + device
+
+    minor   = groups.group(1)
+    control = TAPDISK_CONTROL + minor
+
+    return minor, device, control
+
+
 
 class BlktapController(BlkifController):
     def __init__(self, vm):
@@ -86,3 +115,24 @@ class BlktapController(BlkifController):
 
         return (devid, back, front)
 
+    def createDevice(self, config):
+
+        uname = config.get('uname', '')        
+        (typ, subtyp, params, file) = string.split(uname, ':', 3)
+        if typ in ('tap'):
+            if subtyp in ('tapdisk'):                                          
+                if params in ('ioemu', 'qcow2', 'vmdk', 'sync'):
+                    log.warn('WARNING: using deprecated blktap module');
+                    return BlkifController.createDevice(self, config);
+
+        cmd = [ TAPDISK_BINARY, '-n', '%s:%s' % (params, file) ]
+        (rc,stdout,stderr) = doexec(cmd)
+
+        minor, device, control = parseDeviceString(stdout)
+
+        #modify the configuration to attach as a vbd, now that the
+        #device is configured.  Then continue to create the device
+        config.update({'uname' : 'phy:' + device.rstrip()})
+        self.deviceClass='vbd'
+
+        return BlkifController.createDevice(self, config);

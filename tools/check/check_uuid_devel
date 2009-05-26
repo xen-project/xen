@@ -1,0 +1,6 @@
+#!/bin/sh
+# CHECK-BUILD
+
+. ./funcs.sh
+
+has_header uuid/uuid.h || fail "missing uuid headers (package uuid-dev)"

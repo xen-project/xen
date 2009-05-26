@@ -27,8 +27,8 @@ from xen.xend.server.DevConstants import *
 
 from xen.xend.xenstore.xstransact import xstransact, complete
 from xen.xend.xenstore.xswatch import xswatch
-
-import os
+import xen.xend.server.DevConstants
+import os, re
 
 xoptions = XendOptions.instance()
 
@@ -237,6 +237,34 @@ class DevController:
 
             # xstransact.Remove(self.devicePath()) ?? Below is the same ?
             self.vm._removeVm("device/%s/%d" % (self.deviceClass, dev))
+
+    # The new blocktap implementation requires a sysfs signal to close
+    # out disks.  This function is called from a thread when the
+    # domain is detached from the disk.
+    def finishDeviceCleanup(self, backpath, path):
+        """Perform any device specific cleanup
+
+        @backpath backend xenstore path.
+        @path frontend device path
+
+        """
+        
+        if path and path.startswith('/dev/xen/blktap-2'):
+            
+            #Figure out what we're going to wait on.
+            self.waitForBackend_destroy(backpath)            
+
+            #Figure out the sysfs path.
+            pattern = re.compile('/dev/xen/blktap-2/tapdev(\d+)$')
+            ctrlid = pattern.search(path)
+            ctrl = '/sys/class/blktap2/blktap' + ctrlid.group(1)
+            
+            #Close out the disk
+            f = open(ctrl + '/remove', 'w')
+            f.write('remove');
+            f.close()
+
+        return
 
     def configurations(self, transaction = None):
         return map(lambda x: self.configuration(x, transaction), self.deviceIDs(transaction))
