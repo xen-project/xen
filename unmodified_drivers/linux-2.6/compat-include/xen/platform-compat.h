@@ -157,4 +157,8 @@ typedef irqreturn_t (*irq_handler_t)(int, void *, struct pt_regs *);
 #define setup_xen_features xen_setup_features
 #endif
 
+#ifndef atomic_cmpxchg
+#define atomic_cmpxchg(v, old, new) (cmpxchg(&((v)->counter), (old), (new)))
+#endif
+
 #endif
