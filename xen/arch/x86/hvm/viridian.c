@@ -22,6 +22,7 @@
 #define VIRIDIAN_MSR_EOI         0x40000070
 #define VIRIDIAN_MSR_ICR         0x40000071
 #define VIRIDIAN_MSR_TPR         0x40000072
+#define VIRIDIAN_MSR_APIC_ASSIST 0x40000073
 
 /* Viridian Hypercall Status Codes. */
 #define HV_STATUS_SUCCESS                       0x0000
@@ -49,14 +50,14 @@ int cpuid_viridian_leaves(unsigned int leaf, unsigned int *eax,
         return 0;
 
     leaf -= 0x40000000;
-    if ( leaf > 5 )
+    if ( leaf > 6 )
         return 0;
 
     *eax = *ebx = *ecx = *edx = 0;
     switch ( leaf )
     {
     case 0:
-        *eax = 0x40000005; /* Maximum leaf */
+        *eax = 0x40000006; /* Maximum leaf */
         *ebx = 0x7263694d; /* Magic numbers  */
         *ecx = 0x666F736F;
         *edx = 0x76482074;
@@ -190,6 +191,30 @@ int wrmsr_viridian_regs(uint32_t idx, uint32_t eax, uint32_t edx)
     case VIRIDIAN_MSR_TPR:
         perfc_incr(mshv_wrmsr_tpr);
         vlapic_set_reg(vcpu_vlapic(current), APIC_TASKPRI, eax & 0xff);
+        break;
+
+    case VIRIDIAN_MSR_APIC_ASSIST:
+        /*
+         * We don't support the APIC assist page, and that fact is reflected in
+         * our CPUID flags. However, Windows 7 build 7000 has a bug which means
+         * that it doesn't recognise that, and tries to use the page anyway. We
+         * therefore have to fake up just enough to keep win7 happy.
+         * Fortunately, that's really easy: just setting the first four bytes
+         * in the page to zero effectively disables the page again, so that's
+         * what we do. Semantically, the first four bytes are supposed to be a
+         * flag saying whether the guest really needs to issue an EOI. Setting
+         * that flag to zero means that it must always issue one, which is what
+         * we want. Once a page has been repurposed as an APIC assist page the
+         * guest isn't allowed to set anything in it, so the flag remains zero
+         * and all is fine. The guest is allowed to clear flags in the page,
+         * but that doesn't cause us any problems.
+         */
+        if ( val & 1 ) /* APIC assist page enabled? */
+        {
+            uint32_t word = 0;
+            paddr_t page_start = val & ~1ul;
+            hvm_copy_to_guest_phys(page_start, &word, sizeof(word));
+        }
         break;
 
     default:
