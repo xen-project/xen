@@ -247,6 +247,12 @@ static int construct_vmcb(struct vcpu *v)
         vmcb->exception_intercepts |= (1U << TRAP_page_fault);
     }
 
+    if ( cpu_has_pause_filter )
+    {
+        vmcb->pause_filter_count = 3000;
+        vmcb->general1_intercepts |= GENERAL1_INTERCEPT_PAUSE;
+    }
+
     return 0;
 }
 

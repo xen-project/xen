@@ -375,7 +375,9 @@ struct vmcb_struct {
     u64 res03;                  /* offset 0x20 */
     u64 res04;                  /* offset 0x28 */
     u64 res05;                  /* offset 0x30 */
-    u64 res06;                  /* offset 0x38 */
+    u32 res06;                  /* offset 0x38 */
+    u16 res06a;                 /* offset 0x3C */
+    u16 pause_filter_count;     /* offset 0x3E */
     u64 iopm_base_pa;           /* offset 0x40 */
     u64 msrpm_base_pa;          /* offset 0x48 */
     u64 tsc_offset;             /* offset 0x50 */

@@ -1508,6 +1508,14 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         vmcb->interrupt_shadow = 1;
         break;
 
+    case VMEXIT_PAUSE:
+        /*
+         * The guest is running a contended spinlock and we've detected it.
+         * Do something useful, like reschedule the guest
+         */
+       do_sched_op_compat(SCHEDOP_yield, 0);
+       break;
+
     default:
     exit_and_crash:
         gdprintk(XENLOG_ERR, "unexpected VMEXIT: exit reason = 0x%x, "
