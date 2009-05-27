@@ -302,7 +302,7 @@ static long evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
     int            port, pirq = bind->pirq;
     long           rc;
 
-    if ( (pirq < 0) || (pirq >= ARRAY_SIZE(d->pirq_to_evtchn)) )
+    if ( (pirq < 0) || (pirq >= d->nr_pirqs) )
         return -EINVAL;
 
     if ( !irq_access_permitted(d, pirq) )

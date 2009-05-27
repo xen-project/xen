@@ -18,7 +18,7 @@
 #define vector_to_irq(vec)  (vector_irq[vec])
 
 extern int vector_irq[NR_VECTORS];
-extern u8 irq_vector[NR_IRQS];
+extern u8 *irq_vector;
 
 #define platform_legacy_irq(irq)	((irq) < 16)
 

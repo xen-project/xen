@@ -8,6 +8,7 @@
 #include <xen/compat.h>
 #include <xen/init.h>
 #include <xen/lib.h>
+#include <xen/ctype.h>
 #include <xen/errno.h>
 #include <xen/sched.h>
 #include <xen/domain.h>
@@ -198,6 +199,16 @@ struct vcpu *alloc_idle_vcpu(unsigned int cpu_id)
     return v;
 }
 
+static unsigned int extra_dom0_irqs, extra_domU_irqs = 8;
+static void __init parse_extra_guest_irqs(const char *s)
+{
+    if ( isdigit(*s) )
+        extra_domU_irqs = simple_strtoul(s, &s, 0);
+    if ( *s == ',' && isdigit(*++s) )
+        extra_dom0_irqs = simple_strtoul(s, &s, 0);
+}
+custom_param("extra_guest_irqs", parse_extra_guest_irqs);
+
 struct domain *domain_create(
     domid_t domid, unsigned int domcr_flags, ssidref_t ssidref)
 {
@@ -244,9 +255,19 @@ struct domain *domain_create(
         d->is_paused_by_controller = 1;
         atomic_inc(&d->pause_count);
 
+        d->nr_pirqs = nr_irqs +
+                      (domid ? extra_domU_irqs :
+                               extra_dom0_irqs ?: nr_irqs);
         if ( evtchn_init(d) != 0 )
             goto fail;
         init_status |= INIT_evtchn;
+        d->pirq_to_evtchn = xmalloc_array(u16, d->nr_pirqs);
+        d->pirq_mask = xmalloc_array(unsigned long,
+                                     BITS_TO_LONGS(d->nr_pirqs));
+        if ( !d->pirq_to_evtchn || !d->pirq_mask )
+            goto fail;
+        memset(d->pirq_to_evtchn, 0, d->nr_pirqs * sizeof(*d->pirq_to_evtchn));
+        bitmap_zero(d->pirq_mask, d->nr_pirqs);
 
         if ( grant_table_create(d) != 0 )
             goto fail;
@@ -289,7 +310,11 @@ struct domain *domain_create(
     if ( init_status & INIT_gnttab )
         grant_table_destroy(d);
     if ( init_status & INIT_evtchn )
+    {
+        xfree(d->pirq_mask);
+        xfree(d->pirq_to_evtchn);
         evtchn_destroy(d);
+    }
     if ( init_status & INIT_rangeset )
         rangeset_domain_destroy(d);
     if ( init_status & INIT_xsm )

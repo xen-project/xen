@@ -200,8 +200,9 @@ struct domain
      * domain's event-channel spinlock. Read accesses can also synchronise on 
      * the lock, but races don't usually matter.
      */
-    u16              pirq_to_evtchn[NR_IRQS];
-    DECLARE_BITMAP(pirq_mask, NR_IRQS);
+    unsigned int     nr_pirqs;
+    u16             *pirq_to_evtchn;
+    unsigned long   *pirq_mask;
 
     /* I/O capabilities (access to IRQs and memory-mapped I/O). */
     struct rangeset *iomem_caps;

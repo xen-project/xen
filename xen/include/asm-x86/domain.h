@@ -263,7 +263,7 @@ struct arch_domain
 
     /* NB. protected by d->event_lock and by irq_desc[vector].lock */
     int vector_pirq[NR_VECTORS];
-    s16 pirq_vector[NR_IRQS];
+    s16 *pirq_vector;
 
     /* Shared page for notifying that explicit PIRQ EOI is required. */
     unsigned long *pirq_eoi_map;

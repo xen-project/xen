@@ -55,7 +55,7 @@ static int physdev_map_pirq(struct physdev_map_pirq *map)
     switch ( map->type )
     {
         case MAP_PIRQ_TYPE_GSI:
-            if ( map->index < 0 || map->index >= NR_IRQS )
+            if ( map->index < 0 || map->index >= nr_irqs )
             {
                 dprintk(XENLOG_G_ERR, "dom%d: map invalid irq %d\n",
                         d->domain_id, map->index);
@@ -196,7 +196,7 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         if ( copy_from_guest(&eoi, arg, 1) != 0 )
             break;
         ret = -EINVAL;
-        if ( eoi.irq < 0 || eoi.irq >= NR_IRQS )
+        if ( eoi.irq < 0 || eoi.irq >= v->domain->nr_pirqs )
             break;
         if ( v->domain->arch.pirq_eoi_map )
             evtchn_unmask(v->domain->pirq_to_evtchn[eoi.irq]);
@@ -207,8 +207,6 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
     case PHYSDEVOP_pirq_eoi_gmfn: {
         struct physdev_pirq_eoi_gmfn info;
         unsigned long mfn;
-
-        BUILD_BUG_ON(NR_IRQS > (PAGE_SIZE * 8));
 
         ret = -EFAULT;
         if ( copy_from_guest(&info, arg, 1) != 0 )
@@ -254,7 +252,7 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
             break;
         irq = irq_status_query.irq;
         ret = -EINVAL;
-        if ( (irq < 0) || (irq >= NR_IRQS) )
+        if ( (irq < 0) || (irq >= v->domain->nr_pirqs) )
             break;
         irq_status_query.flags = 0;
         /*
@@ -346,7 +344,7 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
 
         irq = irq_op.irq;
         ret = -EINVAL;
-        if ( (irq < 0) || (irq >= NR_IRQS) )
+        if ( (irq < 0) || (irq >= nr_irqs) )
             break;
 
         irq_op.vector = assign_irq_vector(irq);

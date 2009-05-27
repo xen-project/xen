@@ -68,21 +68,26 @@ struct hvm_girq_dpci_mapping {
 
 #define NR_ISAIRQS  16
 #define NR_LINK     4
+#if defined(__i386__) || defined(__x86_64__)
+# define NR_HVM_IRQS VIOAPIC_NUM_PINS
+#elif defined(__ia64__)
+# define NR_HVM_IRQS VIOSAPIC_NUM_PINS
+#endif
 
 /* Protected by domain's event_lock */
 struct hvm_irq_dpci {
     /* Machine IRQ to guest device/intx mapping. */
-    DECLARE_BITMAP(mapping, NR_IRQS);
-    struct hvm_mirq_dpci_mapping mirq[NR_IRQS];
+    unsigned long *mapping;
+    struct hvm_mirq_dpci_mapping *mirq;
+    unsigned long *dirq_mask;
     /* Guest IRQ to guest device/intx mapping. */
-    struct list_head girq[NR_IRQS];
-    uint8_t msi_gvec_pirq[NR_VECTORS];
-    DECLARE_BITMAP(dirq_mask, NR_IRQS);
+    struct list_head girq[NR_HVM_IRQS];
+    uint8_t msi_gvec_pirq[0x100];
     /* Record of mapped ISA IRQs */
     DECLARE_BITMAP(isairq_map, NR_ISAIRQS);
     /* Record of mapped Links */
     uint8_t link_cnt[NR_LINK];
-    struct timer hvm_timer[NR_IRQS];
+    struct timer hvm_timer[NR_VECTORS];
 };
 
 /* Modify state of a PCI INTx wire. */

@@ -1000,7 +1000,7 @@ int __init construct_dom0(
     /* DOM0 is permitted full I/O capabilities. */
     rc |= ioports_permit_access(dom0, 0, 0xFFFF);
     rc |= iomem_permit_access(dom0, 0UL, ~0UL);
-    rc |= irqs_permit_access(dom0, 0, NR_IRQS-1);
+    rc |= irqs_permit_access(dom0, 0, d->nr_pirqs - 1);
 
     /*
      * Modify I/O port access permissions.

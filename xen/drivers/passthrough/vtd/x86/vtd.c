@@ -130,9 +130,9 @@ void hvm_dpci_isairq_eoi(struct domain *d, unsigned int isairq)
         return;
     }
     /* Multiple mirq may be mapped to one isa irq */
-    for ( i = find_first_bit(dpci->mapping, NR_IRQS);
-          i < NR_IRQS;
-          i = find_next_bit(dpci->mapping, NR_IRQS, i + 1) )
+    for ( i = find_first_bit(dpci->mapping, d->nr_pirqs);
+          i < d->nr_pirqs;
+          i = find_next_bit(dpci->mapping, d->nr_pirqs, i + 1) )
     {
         list_for_each_entry_safe ( digl, tmp,
             &dpci->mirq[i].digl_list, list )

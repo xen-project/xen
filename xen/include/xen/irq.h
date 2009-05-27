@@ -49,6 +49,12 @@ typedef struct hw_interrupt_type hw_irq_controller;
 
 #include <asm/irq.h>
 
+#ifdef NR_IRQS
+# define nr_irqs NR_IRQS
+#else
+extern unsigned int nr_irqs;
+#endif
+
 struct msi_desc;
 /*
  * This is the "IRQ descriptor", which contains various information

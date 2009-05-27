@@ -71,8 +71,8 @@ int disable_timer_pin_1 __initdata;
  * Rough estimation of how many shared IRQs there are, can
  * be changed anytime.
  */
-#define MAX_PLUS_SHARED_IRQS NR_IRQS
-#define PIN_MAP_SIZE (MAX_PLUS_SHARED_IRQS + NR_IRQS)
+#define MAX_PLUS_SHARED_IRQS nr_irqs
+#define PIN_MAP_SIZE (MAX_PLUS_SHARED_IRQS + nr_irqs)
 
 /*
  * This is performance-critical, we want to do it O(1)
@@ -82,11 +82,10 @@ int disable_timer_pin_1 __initdata;
  */
 
 static struct irq_pin_list {
-    int apic, pin, next;
-} irq_2_pin[PIN_MAP_SIZE] = {
-    [0 ... PIN_MAP_SIZE-1].pin = -1
-};
-static int irq_2_pin_free_entry = NR_IRQS;
+    int apic, pin;
+    unsigned int next;
+} *irq_2_pin;
+static unsigned int irq_2_pin_free_entry;
 
 /*
  * The common case is 1:1 IRQ<->pin mappings. Sometimes there are
@@ -663,7 +662,7 @@ static inline int IO_APIC_irq_trigger(int irq)
 }
 
 /* irq_vectors is indexed by the sum of all RTEs in all I/O APICs. */
-u8 irq_vector[NR_IRQS] __read_mostly;
+u8 *irq_vector __read_mostly = (u8 *)(1UL << (BITS_PER_LONG - 1));
 
 static struct hw_interrupt_type ioapic_level_type;
 static struct hw_interrupt_type ioapic_edge_type;
@@ -929,7 +928,7 @@ void /*__init*/ __print_IO_APIC(void)
     }
     printk(KERN_INFO "Using vector-based indexing\n");
     printk(KERN_DEBUG "IRQ to pin mappings:\n");
-    for (i = 0; i < NR_IRQS; i++) {
+    for (i = 0; i < nr_irqs; i++) {
         struct irq_pin_list *entry = irq_2_pin + i;
         if (entry->pin < 0)
             continue;
@@ -961,24 +960,16 @@ void print_IO_APIC_keyhandler(unsigned char key)
 
 static void __init enable_IO_APIC(void)
 {
-    union IO_APIC_reg_01 reg_01;
     int i8259_apic, i8259_pin;
     int i, apic;
     unsigned long flags;
 
     /* Initialise dynamic irq_2_pin free list. */
-    for (i = NR_IRQS; i < PIN_MAP_SIZE; i++)
+    irq_2_pin = xmalloc_array(struct irq_pin_list, PIN_MAP_SIZE);
+    memset(irq_2_pin, 0, nr_irqs * sizeof(*irq_2_pin));
+    for (i = irq_2_pin_free_entry = nr_irqs; i < PIN_MAP_SIZE; i++)
         irq_2_pin[i].next = i + 1;
 
-    /*
-     * The number of IO-APIC IRQ registers (== #pins):
-     */
-    for (apic = 0; apic < nr_ioapics; apic++) {
-        spin_lock_irqsave(&ioapic_lock, flags);
-        reg_01.raw = io_apic_read(apic, 1);
-        spin_unlock_irqrestore(&ioapic_lock, flags);
-        nr_ioapic_registers[apic] = reg_01.bits.entries+1;
-    }
     for(apic = 0; apic < nr_ioapics; apic++) {
         int pin;
         /* See if any of the pins is in ExtINT mode */
@@ -2174,7 +2165,7 @@ void dump_ioapic_irq_info(void)
     unsigned int irq, pin, printed = 0;
     unsigned long flags;
 
-    for ( irq = 0; irq < NR_IRQS; irq++ )
+    for ( irq = 0; irq < nr_irqs; irq++ )
     {
         entry = &irq_2_pin[irq];
         if ( entry->pin == -1 )
@@ -2208,5 +2199,57 @@ void dump_ioapic_irq_info(void)
                 break;
             entry = &irq_2_pin[entry->next];
         }
+    }
+}
+
+void __init init_ioapic_mappings(void)
+{
+    unsigned long ioapic_phys;
+    unsigned int i, idx = FIX_IO_APIC_BASE_0;
+    union IO_APIC_reg_01 reg_01;
+
+    if ( smp_found_config )
+        nr_irqs = 0;
+    for ( i = 0; i < nr_ioapics; i++ )
+    {
+        if ( smp_found_config )
+        {
+            ioapic_phys = mp_ioapics[i].mpc_apicaddr;
+            if ( !ioapic_phys )
+            {
+                printk(KERN_ERR "WARNING: bogus zero IO-APIC address "
+                       "found in MPTABLE, disabling IO/APIC support!\n");
+                smp_found_config = 0;
+                skip_ioapic_setup = 1;
+                goto fake_ioapic_page;
+            }
+        }
+        else
+        {
+ fake_ioapic_page:
+            ioapic_phys = __pa(alloc_xenheap_page());
+            clear_page(__va(ioapic_phys));
+        }
+        set_fixmap_nocache(idx, ioapic_phys);
+        apic_printk(APIC_VERBOSE, "mapped IOAPIC to %08lx (%08lx)\n",
+                    __fix_to_virt(idx), ioapic_phys);
+        idx++;
+
+        if ( smp_found_config )
+        {
+            /* The number of IO-APIC IRQ registers (== #pins): */
+            reg_01.raw = io_apic_read(i, 1);
+            nr_ioapic_registers[i] = reg_01.bits.entries + 1;
+            nr_irqs += nr_ioapic_registers[i];
+        }
+    }
+    if ( !smp_found_config || skip_ioapic_setup || nr_irqs < 16 )
+        nr_irqs = 16;
+    else if ( nr_irqs > PAGE_SIZE * 8 )
+    {
+        /* for PHYSDEVOP_pirq_eoi_gmfn guest assumptions */
+        printk(KERN_WARNING "Limiting number of IRQs found (%u) to %lu\n",
+               nr_irqs, PAGE_SIZE * 8);
+        nr_irqs = PAGE_SIZE * 8;
     }
 }

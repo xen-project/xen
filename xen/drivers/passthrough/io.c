@@ -38,9 +38,10 @@ static void pt_irq_time_out(void *data)
     struct dev_intx_gsi_link *digl;
     struct hvm_girq_dpci_mapping *girq;
     uint32_t device, intx;
-    DECLARE_BITMAP(machine_gsi_map, NR_IRQS);
+    unsigned int nr_pirqs = irq_map->dom->nr_pirqs;
+    DECLARE_BITMAP(machine_gsi_map, nr_pirqs);
 
-    bitmap_zero(machine_gsi_map, NR_IRQS);
+    bitmap_zero(machine_gsi_map, nr_pirqs);
 
     spin_lock(&irq_map->dom->event_lock);
 
@@ -59,9 +60,9 @@ static void pt_irq_time_out(void *data)
         hvm_pci_intx_deassert(irq_map->dom, device, intx);
     }
 
-    for ( machine_gsi = find_first_bit(machine_gsi_map, NR_IRQS);
-          machine_gsi < NR_IRQS;
-          machine_gsi = find_next_bit(machine_gsi_map, NR_IRQS,
+    for ( machine_gsi = find_first_bit(machine_gsi_map, nr_pirqs);
+          machine_gsi < nr_pirqs;
+          machine_gsi = find_next_bit(machine_gsi_map, nr_pirqs,
                                       machine_gsi + 1) )
     {
         clear_bit(machine_gsi, dpci->dirq_mask);
@@ -71,13 +72,21 @@ static void pt_irq_time_out(void *data)
 
     spin_unlock(&irq_map->dom->event_lock);
 
-    for ( machine_gsi = find_first_bit(machine_gsi_map, NR_IRQS);
-          machine_gsi < NR_IRQS;
-          machine_gsi = find_next_bit(machine_gsi_map, NR_IRQS,
+    for ( machine_gsi = find_first_bit(machine_gsi_map, nr_pirqs);
+          machine_gsi < nr_pirqs;
+          machine_gsi = find_next_bit(machine_gsi_map, nr_pirqs,
                                       machine_gsi + 1) )
     {
         pirq_guest_eoi(irq_map->dom, machine_gsi);
     }
+}
+
+void free_hvm_irq_dpci(struct hvm_irq_dpci *dpci)
+{
+    xfree(dpci->mirq);
+    xfree(dpci->dirq_mask);
+    xfree(dpci->mapping);
+    xfree(dpci);
 }
 
 int pt_irq_create_bind_vtd(
@@ -90,7 +99,7 @@ int pt_irq_create_bind_vtd(
     struct hvm_girq_dpci_mapping *girq;
     int rc, pirq = pt_irq_bind->machine_irq;
 
-    if ( pirq < 0 || pirq >= NR_IRQS )
+    if ( pirq < 0 || pirq >= d->nr_pirqs )
         return -EINVAL;
 
     spin_lock(&d->event_lock);
@@ -105,16 +114,33 @@ int pt_irq_create_bind_vtd(
             return -ENOMEM;
         }
         memset(hvm_irq_dpci, 0, sizeof(*hvm_irq_dpci));
-        for ( int i = 0; i < NR_IRQS; i++ )
+        hvm_irq_dpci->mirq = xmalloc_array(struct hvm_mirq_dpci_mapping,
+                                           d->nr_pirqs);
+        hvm_irq_dpci->dirq_mask = xmalloc_array(unsigned long,
+                                                BITS_TO_LONGS(d->nr_pirqs));
+        hvm_irq_dpci->mapping = xmalloc_array(unsigned long,
+                                              BITS_TO_LONGS(d->nr_pirqs));
+        if ( !hvm_irq_dpci->mirq ||
+             !hvm_irq_dpci->dirq_mask ||
+             !hvm_irq_dpci->mapping )
         {
-            INIT_LIST_HEAD(&hvm_irq_dpci->mirq[i].digl_list);
-            INIT_LIST_HEAD(&hvm_irq_dpci->girq[i]);
+            spin_unlock(&d->event_lock);
+            free_hvm_irq_dpci(hvm_irq_dpci);
+            return -ENOMEM;
         }
+        memset(hvm_irq_dpci->mirq, 0,
+               d->nr_pirqs * sizeof(*hvm_irq_dpci->mirq));
+        bitmap_zero(hvm_irq_dpci->dirq_mask, d->nr_pirqs);
+        bitmap_zero(hvm_irq_dpci->mapping, d->nr_pirqs);
+        for ( int i = 0; i < d->nr_pirqs; i++ )
+            INIT_LIST_HEAD(&hvm_irq_dpci->mirq[i].digl_list);
+        for ( int i = 0; i < NR_HVM_IRQS; i++ )
+            INIT_LIST_HEAD(&hvm_irq_dpci->girq[i]);
 
         if ( domain_set_irq_dpci(d, hvm_irq_dpci) == 0 )
         {
             spin_unlock(&d->event_lock);
-            xfree(hvm_irq_dpci);
+            free_hvm_irq_dpci(hvm_irq_dpci);
             return -EINVAL;
         }
     }
@@ -364,7 +390,7 @@ static void __msi_pirq_eoi(struct domain *d, int pirq)
     struct hvm_irq_dpci *hvm_irq_dpci = d->arch.hvm_domain.irq.dpci;
     irq_desc_t *desc;
 
-    if ( ( pirq >= 0 ) && ( pirq < NR_IRQS ) &&
+    if ( ( pirq >= 0 ) && ( pirq < d->nr_pirqs ) &&
          test_bit(pirq, hvm_irq_dpci->mapping) &&
          ( hvm_irq_dpci->mirq[pirq].flags & HVM_IRQ_DPCI_MACH_MSI) )
     {
@@ -414,9 +440,9 @@ void hvm_dirq_assist(struct vcpu *v)
     if ( !iommu_enabled || (v->vcpu_id != 0) || (hvm_irq_dpci == NULL) )
         return;
 
-    for ( irq = find_first_bit(hvm_irq_dpci->dirq_mask, NR_IRQS);
-          irq < NR_IRQS;
-          irq = find_next_bit(hvm_irq_dpci->dirq_mask, NR_IRQS, irq + 1) )
+    for ( irq = find_first_bit(hvm_irq_dpci->dirq_mask, d->nr_pirqs);
+          irq < d->nr_pirqs;
+          irq = find_next_bit(hvm_irq_dpci->dirq_mask, d->nr_pirqs, irq + 1) )
     {
         if ( !test_and_clear_bit(irq, &hvm_irq_dpci->dirq_mask) )
             continue;

@@ -774,16 +774,14 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         struct domain *d;
         unsigned int pirq = op->u.irq_permission.pirq;
 
-        ret = -EINVAL;
-        if ( pirq >= NR_IRQS )
-            break;
-
         ret = -ESRCH;
         d = rcu_lock_domain_by_id(op->domain);
         if ( d == NULL )
             break;
 
-        if ( op->u.irq_permission.allow_access )
+        if ( pirq >= d->nr_pirqs )
+            ret = -EINVAL;
+        else if ( op->u.irq_permission.allow_access )
             ret = irq_permit_access(d, pirq);
         else
             ret = irq_deny_access(d, pirq);

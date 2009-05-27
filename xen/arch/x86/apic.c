@@ -890,35 +890,7 @@ __next:
     if (boot_cpu_physical_apicid == -1U)
         boot_cpu_physical_apicid = get_apic_id();
 
-#ifdef CONFIG_X86_IO_APIC
-    {
-        unsigned long ioapic_phys, idx = FIX_IO_APIC_BASE_0;
-        int i;
-
-        for (i = 0; i < nr_ioapics; i++) {
-            if (smp_found_config) {
-                ioapic_phys = mp_ioapics[i].mpc_apicaddr;
-                if (!ioapic_phys) {
-                    printk(KERN_ERR
-                           "WARNING: bogus zero IO-APIC "
-                           "address found in MPTABLE, "
-                           "disabling IO/APIC support!\n");
-                    smp_found_config = 0;
-                    skip_ioapic_setup = 1;
-                    goto fake_ioapic_page;
-                }
-            } else {
-fake_ioapic_page:
-                ioapic_phys = __pa(alloc_xenheap_page());
-                clear_page(__va(ioapic_phys));
-            }
-            set_fixmap_nocache(idx, ioapic_phys);
-            apic_printk(APIC_VERBOSE, "mapped IOAPIC to %08lx (%08lx)\n",
-                        __fix_to_virt(idx), ioapic_phys);
-            idx++;
-        }
-    }
-#endif
+    init_ioapic_mappings();
 }
 
 /*****************************************************************************

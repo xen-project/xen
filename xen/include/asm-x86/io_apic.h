@@ -175,11 +175,14 @@ extern int io_apic_set_pci_routing (int ioapic, int pin, int irq, int edge_level
 extern int timer_uses_ioapic_pin_0;
 #endif /*CONFIG_ACPI_BOOT*/
 
+extern void init_ioapic_mappings(void);
+
 extern int (*ioapic_renumber_irq)(int ioapic, int irq);
 extern void ioapic_suspend(void);
 extern void ioapic_resume(void);
 
 #else  /* !CONFIG_X86_IO_APIC */
+static inline void init_ioapic_mappings(void) {}
 static inline void ioapic_suspend(void) {}
 static inline void ioapic_resume(void) {}
 #endif
