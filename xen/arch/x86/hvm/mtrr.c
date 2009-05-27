@@ -676,7 +676,7 @@ static int hvm_load_mtrr_msr(struct domain *d, hvm_domain_context_t *h)
     struct hvm_hw_mtrr hw_mtrr;
 
     vcpuid = hvm_load_instance(h);
-    if ( vcpuid > MAX_VIRT_CPUS || (v = d->vcpu[vcpuid]) == NULL )
+    if ( vcpuid >= MAX_VIRT_CPUS || (v = d->vcpu[vcpuid]) == NULL )
     {
         gdprintk(XENLOG_ERR, "HVM restore: domain has no vcpu %u\n", vcpuid);
         return -EINVAL;

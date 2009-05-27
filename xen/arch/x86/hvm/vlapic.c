@@ -913,7 +913,7 @@ static int lapic_load_hidden(struct domain *d, hvm_domain_context_t *h)
     
     /* Which vlapic to load? */
     vcpuid = hvm_load_instance(h); 
-    if ( vcpuid > MAX_VIRT_CPUS || (v = d->vcpu[vcpuid]) == NULL ) 
+    if ( vcpuid >= MAX_VIRT_CPUS || (v = d->vcpu[vcpuid]) == NULL )
     {
         gdprintk(XENLOG_ERR, "HVM restore: domain has no vlapic %u\n", vcpuid);
         return -EINVAL;
@@ -936,7 +936,7 @@ static int lapic_load_regs(struct domain *d, hvm_domain_context_t *h)
     
     /* Which vlapic to load? */
     vcpuid = hvm_load_instance(h); 
-    if ( vcpuid > MAX_VIRT_CPUS || (v = d->vcpu[vcpuid]) == NULL ) 
+    if ( vcpuid >= MAX_VIRT_CPUS || (v = d->vcpu[vcpuid]) == NULL )
     {
         gdprintk(XENLOG_ERR, "HVM restore: domain has no vlapic %u\n", vcpuid);
         return -EINVAL;
