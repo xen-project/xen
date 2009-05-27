@@ -1564,9 +1564,9 @@ static int tmemc_list_client(client_t *c, tmem_cli_va_t buf, int off,
         c->frozen, use_long ? ',' : '\n');
     if (use_long)
         n += scnprintf(info+n,BSIZE-n,
-             "Ec:%ld,Em:%ld,cp:%ld,cb:%lld,cn:%ld,cm:%ld\n",
+             "Ec:%ld,Em:%ld,cp:%ld,cb:%"PRId64",cn:%ld,cm:%ld\n",
              c->eph_count, c->eph_count_max,
-             c->compressed_pages, (long long)c->compressed_sum_size,
+             c->compressed_pages, c->compressed_sum_size,
              c->compress_poor, c->compress_nomem);
     tmh_copy_to_client_buf_offset(buf,off+sum,info,n+1);
     sum += n;
@@ -1575,11 +1575,13 @@ static int tmemc_list_client(client_t *c, tmem_cli_va_t buf, int off,
         if ( (p = c->pools[i]) == NULL )
             continue;
         s = is_shared(p);
-        n = scnprintf(info,BSIZE,"P=CI:%d,PI:%d,PT:%c%c,U0:%llx,U1:%llx%c",
-             c->cli_id, p->pool_id,
-             is_persistent(p) ? 'P' : 'E', s ? 'S' : 'P',
-             s ? p->uuid[0] : 0LL, s ? p->uuid[1] : 0LL,
-             use_long ? ',' : '\n');
+        n = scnprintf(info,BSIZE,"P=CI:%d,PI:%d,"
+                      "PT:%c%c,U0:%"PRIx64",U1:%"PRIx64"%c",
+                      c->cli_id, p->pool_id,
+                      is_persistent(p) ? 'P' : 'E', s ? 'S' : 'P',
+                      (uint64_t)(s ? p->uuid[0] : 0),
+                      (uint64_t)(s ? p->uuid[1] : 0LL),
+                      use_long ? ',' : '\n');
         if (use_long)
             n += scnprintf(info+n,BSIZE-n,
              "Pc:%d,Pm:%d,Oc:%ld,Om:%ld,Nc:%lu,Nm:%lu,"
@@ -1612,9 +1614,10 @@ static int tmemc_list_shared(tmem_cli_va_t buf, int off, uint32_t len,
     {
         if ( (p = global_shared_pools[i]) == NULL )
             continue;
-        n = scnprintf(info+n,BSIZE-n,"S=SI:%d,PT:%c%c,U0:%llx,U1:%llx",
-            i, is_persistent(p) ? 'P' : 'E', is_shared(p) ? 'S' : 'P',
-             (unsigned long long)p->uuid[0], (unsigned long long)p->uuid[1]);
+        n = scnprintf(info+n,BSIZE-n,"S=SI:%d,PT:%c%c,U0:%"PRIx64",U1:%"PRIx64,
+                      i, is_persistent(p) ? 'P' : 'E',
+                      is_shared(p) ? 'S' : 'P',
+                      p->uuid[0], p->uuid[1]);
         list_for_each_entry(sl,&p->share_list, share_list)
             n += scnprintf(info+n,BSIZE-n,",SC:%d",sl->client->cli_id);
         n += scnprintf(info+n,BSIZE-n,"%c", use_long ? ',' : '\n');
