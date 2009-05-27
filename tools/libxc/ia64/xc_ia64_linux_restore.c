@@ -540,9 +540,9 @@ xc_ia64_hvm_domain_setup(int xc_handle, uint32_t dom)
 
 int
 xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
-                 unsigned int store_evtchn, unsigned long *store_mfn,
-                 unsigned int console_evtchn, unsigned long *console_mfn,
-                 unsigned int hvm, unsigned int pae)
+                  unsigned int store_evtchn, unsigned long *store_mfn,
+                  unsigned int console_evtchn, unsigned long *console_mfn,
+                  unsigned int hvm, unsigned int pae, int superpages)
 {
     DECLARE_DOMCTL;
     int rc = 1;
