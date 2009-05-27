@@ -112,5 +112,6 @@ do {										\
 })
 
 #define _raw_rw_is_locked(x) (*(int *)(x) != 0)
+#define _raw_rw_is_write_locked(x) (test_bit(31, (x)))
 
 #endif /*  _ASM_IA64_SPINLOCK_H */
