@@ -19,6 +19,7 @@ import logging
 import re
 import time
 import types
+import XendDomain
 
 from xen.xend import sxp
 from xen.xend import uuid
@@ -1162,65 +1163,142 @@ class XendConfig(dict):
                     return None
         return devid
     
+    def device_tuple_value_from_dev_info(self, dev_info, key):
+         for x in dev_info:
+             if (type(x) != str):
+                 for xx in x:
+                     if (xx[0] == key):
+                         return xx[1]
+         return None
+
+    # This function translates all block device modes (incl. aliases) to
+    # one common label per each device mode. Those modes can be:
+    #  read-only (ro), write-exclusive (wx) and write-shared (ws)
+    def block_device_mode_translate(self, mode):
+         # Device modes can be read-only (ro), write-exclusive (wx) or
+         # write-shared (ws), otherwise an error is raised
+         if mode == "w" or mode == "wr":
+             return "wx"
+         elif mode == "r" or mode == "ro":
+             return "ro"
+         elif mode == "!" or mode == "w!":
+             return "ws"
+
+         # If no mode defined we consider this as write-exclusive
+         return "wx"
+
+    # Detect device duplicates for vbd, tap and vif devices for domain and
+    # duplicate unames in global context not to destroy virtual block devices
     def device_duplicate_check(self, dev_type, dev_info, defined_config, config):
-        defined_devices_sxpr = self.all_devices_sxpr(target = defined_config)
-        
-        if dev_type == 'vbd' or dev_type == 'tap':
-            dev_uname = dev_info.get('uname')
-            blkdev_name = dev_info.get('dev')
-            devid = self._blkdev_name_to_number(blkdev_name)
-            if devid == None or dev_uname == None:
-                return
-            
-            for o_dev_type, o_dev_info in defined_devices_sxpr:
-                if o_dev_type == 'vbd' or o_dev_type == 'tap':
-                    blkdev_file = blkdev_uname_to_file(dev_uname)
-                    o_dev_uname = sxp.child_value(o_dev_info, 'uname')
-                    if o_dev_uname != None:
-                        o_blkdev_file = blkdev_uname_to_file(o_dev_uname)
-                        if blkdev_file == o_blkdev_file:
-                            raise XendConfigError('The file "%s" is already used' %
-                                                  blkdev_file)
-                    if dev_uname == o_dev_uname:
-                        raise XendConfigError('The uname "%s" is already defined' %
-                                             dev_uname)
-                    o_blkdev_name = sxp.child_value(o_dev_info, 'dev')
-                    o_devid = self._blkdev_name_to_number(o_blkdev_name)
-                    if o_devid != None and devid == o_devid:
-                        name_array = blkdev_name.split(':', 2)
-                        if len(name_array) == 2 and name_array[1] == 'cdrom':
-                            #
-                            # Since the device is a cdrom, we are most likely
-                            # inserting, changing, or removing a cd.  We can
-                            # update the old device instead of creating a new
-                            # one.
-                            #
-                            if o_dev_uname != None and dev_uname == None:
-                                #
-                                # We are removing a cd.  We can simply update
-                                # the uname on the existing device.
-                                #
-                                merge_sxp = sxp.from_string("('vbd' ('uname' ''))")
-                            else:
-                                merge_sxp = config
+         # Enumerate all devices for all domains
+         allSxprs = []
+         val = XendDomain.instance().domains.values()
+         for v in val:
+             sxpr = v.getDeviceSxprs(dev_type)
+             for key in sxpr:
+                try:
+                    index = allSxprs.index(key)
+                except:
+                    allSxprs.append(key)
 
-                            dev_uuid = sxp.child_value(o_dev_info, 'uuid')
-                            if dev_uuid != None and \
-                               self.device_update(dev_uuid, cfg_sxp = merge_sxp):
-                                return dev_uuid
+         # Enumerate devices for current domain
+         sxpr = self.all_devices_sxpr(target = defined_config)
 
-                        raise XendConfigError('The device "%s" is already defined' %
-                                              blkdev_name)
-                    
-        elif dev_type == 'vif':
-            dev_mac = dev_info.get('mac')
-            
-            for o_dev_type, o_dev_info in defined_devices_sxpr:
-                if dev_type == o_dev_type:
-                    if dev_mac.lower() == sxp.child_value(o_dev_info, 'mac').lower():
-                        raise XendConfigError('The mac "%s" is already defined' %
-                                              dev_mac)
-        return None
+         # For vif interface we won't check cross-domain
+         if sxpr == None and dev_type == 'vif':
+            return
+
+         # Preset None values to all variables we'll be checking
+         new_uname = None
+         uname = None
+         dev = None
+         mac = None
+         mode = None
+
+         # Disk device
+         if dev_type in ['vbd', 'tap']:
+             for x in config:
+                 if type(x) != str and (x[0] in ['uname', 'dev', 'mode']):
+                     if x[0] == 'uname':
+                         new_uname = x[1]
+                     if x[0] == 'dev':
+                         dev = x[1]
+                     if x[0] == 'mode':
+                         mode = x[1]
+
+             # If we don't have uname entry (happens in virt-manager) return
+             if new_uname == None:
+                 return
+
+             new_uname = new_uname.split(":")[len(new_uname.split(":"))-1]
+             # We need to allow when uname is zero length, eg. hdc:cdrom device
+             if len(new_uname) == 0:
+                 log.debug("Null uname when attaching disk device, allowing %s..."
+                           % dev)
+                 return
+
+             log.debug("Checking for duplicate for uname: %s, dev: %s, mode: %s"
+                       % (new_uname, dev, mode))
+             # No device in dev found
+             if dev == None:
+                 return
+
+             devid = self._blkdev_name_to_number(dev)
+             if devid == None:
+                 return
+
+             for o_dev_info in sxpr:
+                 # Get information only for tap/vbd block devices
+                 if o_dev_info[0] in ['tap', 'vbd']:
+                     uname = self.device_tuple_value_from_dev_info(o_dev_info, "uname")
+                     dev = self.device_tuple_value_from_dev_info(o_dev_info, "dev")
+                     dev_uname = None
+                     if uname != None:
+                         dev_uname = uname.split(":")[len(uname.split(":"))-1]
+                     if new_uname == dev_uname:
+                         raise XendConfigError('The uname "%s" is already defined' %
+                                               dev_uname)
+
+                     blkdev = dev.split(":")[0]
+                     blkdevid = self._blkdev_name_to_number(blkdev)
+                     if blkdevid != None and devid == blkdevid:
+                         raise XendConfigError('The device "%s" is already defined' %
+                                               blkdev)
+
+             tMode = self.block_device_mode_translate(mode)
+
+             # Device/uname not found in the context of current domain but we
+             # need to have a look to global context. We deny addition of device
+             # in those cases:
+             #   1. We're adding read-only disk that's already used as write-exclusive
+             #   2. We're adding write-shared disk that's already used as write-exclusive
+             #   3. We're adding write-exclusive disk that's already used
+             #   4. We're adding read-only disk that's already used as write-shared
+             for o_dev_info in allSxprs:
+                 backend = self.device_tuple_value_from_dev_info(o_dev_info, "backend")
+                 params = xstransact.Read(backend, "params")
+                 aMode = self.block_device_mode_translate(
+                                     xstransact.Read(backend, "mode") )
+                 dev_uname = params.split(":")[len(params.split(":"))-1]
+                 if new_uname == dev_uname:
+                     if ((tMode == "ro" and aMode == "wx")
+                       or (tMode == "ws" and aMode == "wx")
+                       or (tMode == "ro" and aMode == "ws")
+                       or (tMode == "wx")):
+                         raise XendConfigError('The uname "%s" is already used by another domain' %
+                                                   dev_uname)
+
+         # Virtual network adapter
+         elif dev_type == 'vif':
+             dev_mac = dev_info.get('mac')
+
+             for o_dev_type, o_dev_info in sxpr: 
+                 if dev_type == o_dev_type:
+                     if dev_mac.lower() == sxp.child_value(o_dev_info, 'mac').lower():
+                         raise XendConfigError('The mac "%s" is already defined' %
+                                               dev_mac)
+
+         return None
     
     def device_add(self, dev_type, cfg_sxp = None, cfg_xenapi = None,
                    target = None):
