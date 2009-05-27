@@ -119,7 +119,7 @@ static void dump_registers(unsigned char key, struct cpu_user_regs *regs)
         if ( cpu == smp_processor_id() )
             continue;
         printk("\n*** Dumping CPU%d host state: ***\n", cpu);
-        on_selected_cpus(cpumask_of(cpu), __dump_execstate, NULL, 1, 1);
+        on_selected_cpus(cpumask_of(cpu), __dump_execstate, NULL, 1);
     }
 
     printk("\n");
@@ -263,7 +263,7 @@ static void read_clocks(unsigned char key)
 
     spin_lock(&lock);
 
-    smp_call_function(read_clocks_slave, NULL, 0, 0);
+    smp_call_function(read_clocks_slave, NULL, 0);
 
     local_irq_disable();
     read_clocks_cpumask = cpu_online_map;

@@ -971,7 +971,7 @@ int hvm_set_cr0(unsigned long value)
             if ( !v->domain->arch.hvm_domain.is_in_uc_mode )
             {
                 /* Flush physical caches. */
-                on_each_cpu(local_flush_cache, NULL, 1, 1);
+                on_each_cpu(local_flush_cache, NULL, 1);
                 hvm_set_uc_mode(v, 1);
             }
             spin_unlock(&v->domain->arch.hvm_domain.uc_lock);

@@ -229,7 +229,7 @@ static void set_mtrr(unsigned int reg, unsigned long base,
 	atomic_set(&data.gate,0);
 
 	/*  Start the ball rolling on other CPUs  */
-	if (smp_call_function(ipi_handler, &data, 1, 0) != 0)
+	if (smp_call_function(ipi_handler, &data, 0) != 0)
 		panic("mtrr: timed out waiting for other CPUs\n");
 
 	local_irq_save(flags);
@@ -688,7 +688,7 @@ void mtrr_save_state(void)
 	if (cpu == 0)
 		mtrr_save_fixed_ranges(NULL);
 	else
-		on_selected_cpus(cpumask_of(0), mtrr_save_fixed_ranges, NULL, 1, 1);
+		on_selected_cpus(cpumask_of(0), mtrr_save_fixed_ranges, NULL, 1);
 	put_cpu();
 }
 

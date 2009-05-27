@@ -186,7 +186,7 @@ static void drv_read(struct drv_cmd *cmd)
     if (likely(cpu_isset(smp_processor_id(), cmd->mask)))
         do_drv_read((void *)cmd);
     else
-        on_selected_cpus(&cmd->mask, do_drv_read, (void *)cmd, 0, 1);
+        on_selected_cpus(&cmd->mask, do_drv_read, cmd, 1);
 }
 
 static void drv_write(struct drv_cmd *cmd)
@@ -195,7 +195,7 @@ static void drv_write(struct drv_cmd *cmd)
         cpu_isset(smp_processor_id(), cmd->mask))
         do_drv_write((void *)cmd);
     else
-        on_selected_cpus(&cmd->mask, do_drv_write, (void *)cmd, 0, 0);
+        on_selected_cpus(&cmd->mask, do_drv_write, cmd, 0);
 }
 
 static u32 get_cur_val(cpumask_t mask)
@@ -303,7 +303,7 @@ static unsigned int get_measured_perf(unsigned int cpu, unsigned int flag)
         read_measured_perf_ctrs((void *)&readin);
     } else {
         on_selected_cpus(cpumask_of(cpu), read_measured_perf_ctrs,
-                        (void *)&readin, 0, 1);
+                        &readin, 1);
     }
 
     cur.aperf.whole = readin.aperf.whole - saved->aperf.whole;

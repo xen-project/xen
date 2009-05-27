@@ -70,7 +70,7 @@ void
 new_tlbflush_clock_period(void)
 {
     /* flush all vhpt of physical cpu and mTLB */
-    on_each_cpu(tlbflush_clock_local_flush, NULL, 1, 1);
+    on_each_cpu(tlbflush_clock_local_flush, NULL, 1);
 
     /*
      * if global TLB shootdown is finished, increment tlbflush_time

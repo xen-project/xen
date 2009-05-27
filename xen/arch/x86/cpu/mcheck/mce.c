@@ -1162,8 +1162,7 @@ long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)
 			if (log_cpus == NULL)
 				return x86_mcerr("do_mca cpuinfo", -ENOMEM);
 
-			if (on_each_cpu(do_mc_get_cpu_info, log_cpus,
-			    1, 1) != 0) {
+			if (on_each_cpu(do_mc_get_cpu_info, log_cpus, 1)) {
 				xfree(log_cpus);
 				return x86_mcerr("do_mca cpuinfo", -EIO);
 			}
@@ -1206,7 +1205,7 @@ long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)
 		add_taint(TAINT_ERROR_INJECT);
 
 		on_selected_cpus(cpumask_of(target), x86_mc_msrinject,
-				 mc_msrinject, 1, 1);
+				 mc_msrinject, 1);
 
 		break;
 
@@ -1226,7 +1225,7 @@ long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)
 		add_taint(TAINT_ERROR_INJECT);
 
 		on_selected_cpus(cpumask_of(target), x86_mc_mceinject,
-		                 mc_mceinject, 1, 1);
+		                 mc_mceinject, 1);
 		break;
 
 	default:

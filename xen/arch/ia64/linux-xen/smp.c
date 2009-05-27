@@ -274,7 +274,7 @@ smp_send_reschedule (int cpu)
 void
 smp_flush_tlb_all (void)
 {
-	on_each_cpu((void (*)(void *))local_flush_tlb_all, NULL, 1, 1);
+	on_each_cpu((void (*)(void *))local_flush_tlb_all, NULL, 1);
 }
 
 void
@@ -297,7 +297,7 @@ smp_flush_tlb_mm (struct mm_struct *mm)
 	 * anyhow, and once a CPU is interrupted, the cost of local_flush_tlb_all() is
 	 * rather trivial.
 	 */
-	on_each_cpu((void (*)(void *))local_finish_flush_tlb_mm, mm, 1, 1);
+	on_each_cpu((void (*)(void *))local_finish_flush_tlb_mm, mm, 1);
 }
 #endif
 
@@ -314,7 +314,7 @@ smp_flush_tlb_mm (struct mm_struct *mm)
  */
 
 int
-smp_call_function_single (int cpuid, void (*func) (void *info), void *info, int nonatomic,
+smp_call_function_single (int cpuid, void (*func) (void *info), void *info,
 			  int wait)
 {
 	struct call_data_struct data;
@@ -372,7 +372,6 @@ EXPORT_SYMBOL(smp_call_function_single);
  *  [SUMMARY]	Run a function on all other CPUs.
  *  <func>	The function to run. This must be fast and non-blocking.
  *  <info>	An arbitrary pointer to pass to the function.
- *  <nonatomic>	currently unused.
  *  <wait>	If true, wait (atomically) until function has completed on other CPUs.
  *  [RETURNS]   0 on success, else a negative status code.
  *
@@ -383,7 +382,7 @@ EXPORT_SYMBOL(smp_call_function_single);
  * hardware interrupt handler or from a bottom half handler.
  */
 int
-smp_call_function (void (*func) (void *info), void *info, int nonatomic, int wait)
+smp_call_function (void (*func) (void *info), void *info, int wait)
 {
 	struct call_data_struct data;
 	int cpus = num_online_cpus()-1;
@@ -438,7 +437,7 @@ EXPORT_SYMBOL(smp_call_function);
 #ifdef XEN
 int
 on_selected_cpus(const cpumask_t *selected, void (*func) (void *info),
-                 void *info, int retry, int wait)
+                 void *info, int wait)
 {
 	struct call_data_struct data;
 	unsigned int cpu, nr_cpus = cpus_weight(*selected);

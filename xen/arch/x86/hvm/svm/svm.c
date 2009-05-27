@@ -1254,7 +1254,7 @@ static void wbinvd_ipi(void *info)
 static void svm_wbinvd_intercept(void)
 {
     if ( has_arch_pdevs(current->domain) )
-        on_each_cpu(wbinvd_ipi, NULL, 1, 1);
+        on_each_cpu(wbinvd_ipi, NULL, 1);
 }
 
 static void svm_vmexit_do_invalidate_cache(struct cpu_user_regs *regs)

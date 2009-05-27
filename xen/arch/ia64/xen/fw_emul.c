@@ -281,7 +281,7 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 				IA64_SAL_DEBUG("SAL_GET_STATE_INFO: remote\n");
 				ret = smp_call_function_single(e->cpuid,
 				                               get_state_info_on,
-				                               &arg, 0, 1);
+				                               &arg, 1);
 				if (ret < 0) {
 					printk("SAL_GET_STATE_INFO "
 					       "smp_call_function_single error:"
@@ -344,7 +344,7 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 				int ret;
 				IA64_SAL_DEBUG("SAL_CLEAR_STATE_INFO: remote\n");
 				ret = smp_call_function_single(e->cpuid,
-					clear_state_info_on, &arg, 0, 1);
+					clear_state_info_on, &arg, 1);
 				if (ret < 0) {
 					printk("sal_emulator: "
 					       "SAL_CLEAR_STATE_INFO "
@@ -845,8 +845,7 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 				.progress = 0,
 				.status = 0
 			};
-			smp_call_function(remote_pal_cache_flush,
-					  (void *)&args, 1, 1);
+			smp_call_function(remote_pal_cache_flush, &args, 1);
 			if (args.status != 0)
 				panic_domain(NULL, "PAL_CACHE_FLUSH ERROR, "
 					     "remote status %lx", args.status);
@@ -945,7 +944,7 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 			/* must be performed on all remote processors 
 			   in the coherence domain. */
 			smp_call_function(remote_pal_prefetch_visibility,
-					  (void *)in1, 1, 1);
+					  (void *)in1, 1);
 			status = 1; /* no more necessary on remote processor */
 		}
 		break;
@@ -953,7 +952,7 @@ xen_pal_emulator(unsigned long index, u64 in1, u64 in2, u64 in3)
 		status = ia64_pal_mc_drain();
 		/* FIXME: All vcpus likely call PAL_MC_DRAIN.
 		   That causes the congestion. */
-		smp_call_function(remote_pal_mc_drain, NULL, 1, 1);
+		smp_call_function(remote_pal_mc_drain, NULL, 1);
 		break;
 	    case PAL_BRAND_INFO:
 		if (in1 == 0) {

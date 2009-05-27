@@ -632,7 +632,7 @@ static void __cpu_mcheck_distribute_cmci(void *unused)
 void cpu_mcheck_distribute_cmci(void)
 {
     if (cmci_support && !mce_disabled)
-        on_each_cpu(__cpu_mcheck_distribute_cmci, NULL, 0, 0);
+        on_each_cpu(__cpu_mcheck_distribute_cmci, NULL, 0);
 }
 
 static void clear_cmci(void)

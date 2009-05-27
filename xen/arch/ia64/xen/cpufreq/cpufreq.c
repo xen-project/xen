@@ -95,8 +95,7 @@ acpi_cpufreq_get (unsigned int cpu)
 	if (cpu == smp_processor_id())
 		processor_get_freq((void*)&freq);
 	else
-		smp_call_function_single(cpu, processor_get_freq,
-					 (void *)&freq, 0, 1);
+		smp_call_function_single(cpu, processor_get_freq, &freq, 1);
 
 	return freq;
 }
@@ -143,8 +142,7 @@ processor_set_freq (struct acpi_cpufreq_data *data,
 	if (cpu == smp_processor_id())
 		processor_set_pstate((void *)&value);
 	else
-		smp_call_function_single(cpu, processor_set_pstate,
-				(void *)&value, 0, 1);
+		smp_call_function_single(cpu, processor_set_pstate, &value, 1);
 
 	if (value) {
 		printk(KERN_WARNING "Transition failed\n");

@@ -186,7 +186,7 @@ static void nmi_cpu_setup(void * dummy)
 
 int nmi_setup_events(void)
 {
-	on_each_cpu(nmi_cpu_setup, NULL, 0, 1);
+	on_each_cpu(nmi_cpu_setup, NULL, 1);
 	return 0;
 }
 
@@ -207,7 +207,7 @@ int nmi_reserve_counters(void)
 	/* We need to serialize save and setup for HT because the subset
 	 * of msrs are distinct for save and setup operations
 	 */
-	on_each_cpu(nmi_save_registers, NULL, 0, 1);
+	on_each_cpu(nmi_save_registers, NULL, 1);
  	return 0;
 }
 
@@ -256,7 +256,7 @@ static void nmi_cpu_shutdown(void * dummy)
  
 void nmi_release_counters(void)
 {
-	on_each_cpu(nmi_cpu_shutdown, NULL, 0, 1);
+	on_each_cpu(nmi_cpu_shutdown, NULL, 1);
 	release_lapic_nmi();
 	free_msrs();
 }
@@ -274,7 +274,7 @@ static void nmi_cpu_start(void * dummy)
 
 int nmi_start(void)
 {
-	on_each_cpu(nmi_cpu_start, NULL, 0, 1);
+	on_each_cpu(nmi_cpu_start, NULL, 1);
 	return 0;
 }
  
@@ -306,7 +306,7 @@ static void nmi_cpu_stop(void * dummy)
  
 void nmi_stop(void)
 {
-	on_each_cpu(nmi_cpu_stop, NULL, 0, 1);
+	on_each_cpu(nmi_cpu_stop, NULL, 1);
 }
 
 

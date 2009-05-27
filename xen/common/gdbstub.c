@@ -672,7 +672,7 @@ static void gdb_smp_pause(void)
 
     atomic_set(&gdb_smp_paused_count, 0);
 
-    smp_call_function(gdb_pause_this_cpu, NULL, /* dont wait! */0, 0);
+    smp_call_function(gdb_pause_this_cpu, NULL, /* dont wait! */0);
 
     /* Wait 100ms for all other CPUs to enter pause loop */
     while ( (atomic_read(&gdb_smp_paused_count) < (num_online_cpus() - 1)) 

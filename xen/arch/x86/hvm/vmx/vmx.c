@@ -1220,7 +1220,7 @@ void ept_sync_domain(struct domain *d)
     if ( d->arch.hvm_domain.hap_enabled && d->vcpu[0] )
     {
         ASSERT(local_irq_is_enabled());
-        on_each_cpu(__ept_sync_domain, d, 1, 1);
+        on_each_cpu(__ept_sync_domain, d, 1);
     }
 }
 
@@ -2131,7 +2131,7 @@ static void vmx_wbinvd_intercept(void)
         return;
 
     if ( cpu_has_wbinvd_exiting )
-        on_each_cpu(wbinvd_ipi, NULL, 1, 1);
+        on_each_cpu(wbinvd_ipi, NULL, 1);
     else
         wbinvd();
 }

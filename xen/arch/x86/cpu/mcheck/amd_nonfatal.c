@@ -133,7 +133,7 @@ void mce_amd_checkregs(void *info)
  */
 static void mce_amd_work_fn(void *data)
 {
-	on_each_cpu(mce_amd_checkregs, data, 1, 1);
+	on_each_cpu(mce_amd_checkregs, data, 1);
 
 	if (adjust > 0) {
 		if (!guest_enabled_event(dom0->vcpu[0], VIRQ_MCA) ) {

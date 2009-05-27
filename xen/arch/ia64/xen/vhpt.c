@@ -307,7 +307,7 @@ void domain_flush_vtlb_all(struct domain* d)
 			// takes care of mTLB flush.
 			smp_call_function_single(v->processor,
 						 __vcpu_flush_vtlb_all,
-						 v, 1, 1);
+						 v, 1);
 	}
 	perfc_incr(domain_flush_vtlb_all);
 }
@@ -513,9 +513,9 @@ void domain_flush_tlb_vhpt(struct domain *d)
 {
 	/* Very heavy...  */
 	if (HAS_PERVCPU_VHPT(d) || is_hvm_domain(d))
-		on_each_cpu((void (*)(void *))local_flush_tlb_all, NULL, 1, 1);
+		on_each_cpu((void (*)(void *))local_flush_tlb_all, NULL, 1);
 	else
-		on_each_cpu((void (*)(void *))flush_tlb_vhpt_all, d, 1, 1);
+		on_each_cpu((void (*)(void *))flush_tlb_vhpt_all, d, 1);
 	cpus_clear (d->domain_dirty_cpumask);
 }
 
@@ -532,7 +532,7 @@ void flush_tlb_for_log_dirty(struct domain *d)
 			thash_purge_all(v);
 		}
 		smp_call_function((void (*)(void *))local_flush_tlb_all, 
-					NULL, 1, 1);
+					NULL, 1);
 	} else if (HAS_PERVCPU_VHPT(d)) {
 		for_each_vcpu (d, v) {
 			if (!v->is_initialised)
@@ -541,9 +541,9 @@ void flush_tlb_for_log_dirty(struct domain *d)
 			vcpu_purge_tr_entry(&PSCBX(v,itlb));
 			vcpu_vhpt_flush(v);
 		}
-		on_each_cpu((void (*)(void *))local_flush_tlb_all, NULL, 1, 1);
+		on_each_cpu((void (*)(void *))local_flush_tlb_all, NULL, 1);
 	} else {
-		on_each_cpu((void (*)(void *))flush_tlb_vhpt_all, d, 1, 1);
+		on_each_cpu((void (*)(void *))flush_tlb_vhpt_all, d, 1);
 	}
 	cpus_clear (d->domain_dirty_cpumask);
 }
@@ -562,7 +562,7 @@ void flush_tlb_mask(const cpumask_t *mask)
     for_each_cpu_mask (cpu, *mask)
         if (cpu != smp_processor_id())
             smp_call_function_single
-                (cpu, (void (*)(void *))flush_tlb_vhpt_all, NULL, 1, 1);
+                (cpu, (void (*)(void *))flush_tlb_vhpt_all, NULL, 1);
 }
 
 #ifdef PERF_COUNTERS

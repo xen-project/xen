@@ -239,19 +239,17 @@ static void __smp_call_function_interrupt(void);
 int smp_call_function(
     void (*func) (void *info),
     void *info,
-    int retry,
     int wait)
 {
     cpumask_t allbutself = cpu_online_map;
     cpu_clear(smp_processor_id(), allbutself);
-    return on_selected_cpus(&allbutself, func, info, retry, wait);
+    return on_selected_cpus(&allbutself, func, info, wait);
 }
 
 int on_selected_cpus(
     const cpumask_t *selected,
     void (*func) (void *info),
     void *info,
-    int retry,
     int wait)
 {
     struct call_data_struct data;
@@ -322,7 +320,7 @@ void smp_send_stop(void)
 {
     int timeout = 10;
 
-    smp_call_function(stop_this_cpu, NULL, 1, 0);
+    smp_call_function(stop_this_cpu, NULL, 0);
 
     /* Wait 10ms for all other CPUs to go offline. */
     while ( (num_online_cpus() > 1) && (timeout-- > 0) )

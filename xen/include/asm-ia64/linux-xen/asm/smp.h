@@ -127,8 +127,8 @@ extern void __init smp_build_cpu_map(void);
 extern void __init init_smp_config (void);
 extern void smp_do_timer (struct pt_regs *regs);
 
-extern int smp_call_function_single (int cpuid, void (*func) (void *info), void *info,
-				     int retry, int wait);
+extern int smp_call_function_single (int cpuid, void (*func) (void *info),
+				     void *info, int wait);
 extern void smp_send_reschedule (int cpu);
 #ifdef XEN
 extern void lock_ipi_calllock(unsigned long *flags);

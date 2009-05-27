@@ -643,7 +643,7 @@ void vmx_vcpu_flush_vtlb_all(VCPU *v)
     if (v->processor == smp_processor_id())
         __thash_purge_all(v);
     else
-        smp_call_function_single(v->processor, __thash_purge_all, v, 1, 1);
+        smp_call_function_single(v->processor, __thash_purge_all, v, 1);
     vcpu_unpause(v);
 }
 

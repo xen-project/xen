@@ -91,7 +91,7 @@ void machine_halt(void)
     watchdog_disable();
     console_start_sync();
     local_irq_enable();
-    smp_call_function(__machine_halt, NULL, 1, 0);
+    smp_call_function(__machine_halt, NULL, 0);
     __machine_halt(NULL);
 }
 
@@ -311,7 +311,7 @@ void machine_restart(unsigned int delay_millisecs)
     {
         /* Send IPI to the boot CPU (logical cpu 0). */
         on_selected_cpus(cpumask_of(0), __machine_restart,
-                         &delay_millisecs, 1, 0);
+                         &delay_millisecs, 0);
         for ( ; ; )
             halt();
     }

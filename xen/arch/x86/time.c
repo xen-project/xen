@@ -1193,7 +1193,7 @@ static void time_calibration(void *unused)
                      opt_consistent_tscs
                      ? time_calibration_tsc_rendezvous
                      : time_calibration_std_rendezvous,
-                     &r, 0, 1);
+                     &r, 1);
 }
 
 void init_percpu_time(void)

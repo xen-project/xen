@@ -956,7 +956,7 @@ ia64_mca_cmc_vector_enable (void *dummy)
 static void
 ia64_mca_cmc_vector_disable_keventd(void *unused)
 {
-	on_each_cpu(ia64_mca_cmc_vector_disable, NULL, 1, 0);
+	on_each_cpu(ia64_mca_cmc_vector_disable, NULL, 0);
 }
 
 /*
@@ -968,7 +968,7 @@ ia64_mca_cmc_vector_disable_keventd(void *unused)
 static void
 ia64_mca_cmc_vector_enable_keventd(void *unused)
 {
-	on_each_cpu(ia64_mca_cmc_vector_enable, NULL, 1, 0);
+	on_each_cpu(ia64_mca_cmc_vector_enable, NULL, 0);
 }
 #endif /* !XEN	*/
 

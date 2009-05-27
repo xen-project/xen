@@ -246,7 +246,7 @@ static void check_disable_c1e(unsigned int port, u8 value)
 {
 	/* C1E is sometimes enabled during entry to ACPI mode. */
 	if ((port == acpi_smi_cmd) && (value == acpi_enable_value))
-		on_each_cpu(disable_c1e, NULL, 1, 1);
+		on_each_cpu(disable_c1e, NULL, 1);
 }
 
 static void __devinit init_amd(struct cpuinfo_x86 *c)

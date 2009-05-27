@@ -240,7 +240,7 @@ sn2_global_tlb_purge(unsigned long start,
 		flush_data.end = end;
 		flush_data.nbits = nbits;
 		on_selected_cpus(&selected_cpus, sn_flush_ptcga_cpu,
-				 &flush_data, 1, 1);
+				 &flush_data, 1);
 	}
 	spin_unlock(&sn2_ptcg_lock2);
 }

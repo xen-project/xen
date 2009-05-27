@@ -100,7 +100,7 @@ void machine_reboot_kexec(xen_kexec_image_t *image)
     if ( reboot_cpu_id != smp_processor_id() )
     {
         on_selected_cpus(cpumask_of(reboot_cpu_id), __machine_reboot_kexec,
-                         image, 1, 0);
+                         image, 0);
         for (;;)
                 ; /* nothing */
     }
