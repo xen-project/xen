@@ -617,7 +617,7 @@ void hpet_disable_legacy_broadcast(void)
 
     spin_unlock_irq(&legacy_hpet_event.lock);
 
-    smp_send_event_check_mask(cpu_online_map);
+    smp_send_event_check_mask(&cpu_online_map);
 }
 
 void hpet_broadcast_enter(void)

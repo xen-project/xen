@@ -3189,7 +3189,7 @@ int get_page_type(struct page_info *page, unsigned long type)
                 if ( unlikely(!cpus_empty(mask)) )
                 {
                     perfc_incr(need_flush_tlb_flush);
-                    flush_tlb_mask(mask);
+                    flush_tlb_mask(&mask);
                 }
 
                 /* We lose existing type, back pointer, and validity. */

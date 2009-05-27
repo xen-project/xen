@@ -64,7 +64,7 @@ int hap_enable_log_dirty(struct domain *d)
 
     /* set l1e entries of P2M table to be read-only. */
     p2m_change_entry_type_global(d, p2m_ram_rw, p2m_ram_logdirty);
-    flush_tlb_mask(d->domain_dirty_cpumask);
+    flush_tlb_mask(&d->domain_dirty_cpumask);
     return 0;
 }
 
@@ -83,7 +83,7 @@ void hap_clean_dirty_bitmap(struct domain *d)
 {
     /* set l1e entries of P2M table to be read-only. */
     p2m_change_entry_type_global(d, p2m_ram_rw, p2m_ram_logdirty);
-    flush_tlb_mask(d->domain_dirty_cpumask);
+    flush_tlb_mask(&d->domain_dirty_cpumask);
 }
 
 /************************************************/
@@ -643,7 +643,7 @@ hap_write_p2m_entry(struct vcpu *v, unsigned long gfn, l1_pgentry_t *p,
     safe_write_pte(p, new);
     if ( (old_flags & _PAGE_PRESENT)
          && (level == 1 || (level == 2 && (old_flags & _PAGE_PSE))) )
-             flush_tlb_mask(v->domain->domain_dirty_cpumask);
+             flush_tlb_mask(&v->domain->domain_dirty_cpumask);
 
 #if CONFIG_PAGING_LEVELS == 3
     /* install P2M in monitor table for PAE Xen */

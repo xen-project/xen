@@ -121,7 +121,7 @@ static int powernow_cpufreq_target(struct cpufreq_policy *policy,
 
     cmd.val = next_perf_state;
 
-    on_selected_cpus( cmd.mask, transition_pstate, (void *) &cmd, 0, 0);
+    on_selected_cpus(&cmd.mask, transition_pstate, (void *) &cmd, 0, 0);
 
     perf->state = next_perf_state;
     policy->cur = freqs.new;

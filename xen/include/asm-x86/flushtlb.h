@@ -90,12 +90,12 @@ void flush_area_local(const void *va, unsigned int flags);
 #define flush_local(flags) flush_area_local(NULL, flags)
 
 /* Flush specified CPUs' TLBs/caches */
-void flush_area_mask(cpumask_t, const void *va, unsigned int flags);
+void flush_area_mask(const cpumask_t *, const void *va, unsigned int flags);
 #define flush_mask(mask, flags) flush_area_mask(mask, NULL, flags)
 
 /* Flush all CPUs' TLBs/caches */
-#define flush_area_all(va, flags) flush_area_mask(cpu_online_map, va, flags)
-#define flush_all(flags) flush_mask(cpu_online_map, flags)
+#define flush_area_all(va, flags) flush_area_mask(&cpu_online_map, va, flags)
+#define flush_all(flags) flush_mask(&cpu_online_map, flags)
 
 /* Flush local TLBs */
 #define flush_tlb_local()                       \
@@ -111,8 +111,8 @@ void flush_area_mask(cpumask_t, const void *va, unsigned int flags);
 
 /* Flush all CPUs' TLBs */
 #define flush_tlb_all()                         \
-    flush_tlb_mask(cpu_online_map)
+    flush_tlb_mask(&cpu_online_map)
 #define flush_tlb_one_all(v)                    \
-    flush_tlb_one_mask(cpu_online_map, v)
+    flush_tlb_one_mask(&cpu_online_map, v)
 
 #endif /* __FLUSHTLB_H__ */

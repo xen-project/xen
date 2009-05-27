@@ -264,7 +264,7 @@ static void vmx_clear_vmcs(struct vcpu *v)
     int cpu = v->arch.hvm_vmx.active_cpu;
 
     if ( cpu != -1 )
-        on_selected_cpus(cpumask_of_cpu(cpu), __vmx_clear_vmcs, v, 1, 1);
+        on_selected_cpus(cpumask_of(cpu), __vmx_clear_vmcs, v, 1, 1);
 }
 
 static void vmx_load_vmcs(struct vcpu *v)
@@ -900,7 +900,7 @@ void vmx_do_resume(struct vcpu *v)
         {
             int cpu = v->arch.hvm_vmx.active_cpu;
             if ( cpu != -1 )
-                on_selected_cpus(cpumask_of_cpu(cpu), wbinvd_ipi, NULL, 1, 1);
+                on_selected_cpus(cpumask_of(cpu), wbinvd_ipi, NULL, 1, 1);
         }
 
         vmx_clear_vmcs(v);

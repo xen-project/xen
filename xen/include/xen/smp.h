@@ -9,9 +9,9 @@
  */
 extern void smp_send_stop(void);
 
-extern void smp_send_event_check_mask(cpumask_t mask);
+extern void smp_send_event_check_mask(const cpumask_t *mask);
 #define smp_send_event_check_cpu(cpu) \
-    smp_send_event_check_mask(cpumask_of_cpu(cpu))
+    smp_send_event_check_mask(cpumask_of(cpu))
 
 /*
  * Prepare machine for booting other CPUs.
@@ -41,7 +41,7 @@ extern int smp_call_function(
  * Call a function on a selection of processors
  */
 extern int on_selected_cpus(
-    cpumask_t selected,
+    const cpumask_t *selected,
     void (*func) (void *info),
     void *info,
     int retry,
@@ -62,7 +62,7 @@ static inline int on_each_cpu(
     int retry,
     int wait)
 {
-    return on_selected_cpus(cpu_online_map, func, info, retry, wait);
+    return on_selected_cpus(&cpu_online_map, func, info, retry, wait);
 }
 
 #define smp_processor_id() raw_smp_processor_id()

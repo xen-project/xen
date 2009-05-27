@@ -2164,7 +2164,7 @@ static void ept_handle_violation(unsigned long qualification, paddr_t gpa)
         {
             paging_mark_dirty(d, mfn_x(mfn));
             p2m_change_type(d, gfn, p2m_ram_logdirty, p2m_ram_rw);
-            flush_tlb_mask(d->domain_dirty_cpumask);
+            flush_tlb_mask(&d->domain_dirty_cpumask);
         }
         return;
     }

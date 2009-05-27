@@ -688,7 +688,7 @@ void mtrr_save_state(void)
 	if (cpu == 0)
 		mtrr_save_fixed_ranges(NULL);
 	else
-		on_selected_cpus(cpumask_of_cpu(0), mtrr_save_fixed_ranges, NULL, 1, 1);
+		on_selected_cpus(cpumask_of(0), mtrr_save_fixed_ranges, NULL, 1, 1);
 	put_cpu();
 }
 

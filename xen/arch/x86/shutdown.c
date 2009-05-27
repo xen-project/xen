@@ -310,7 +310,7 @@ void machine_restart(unsigned int delay_millisecs)
     if ( get_apic_id() != boot_cpu_physical_apicid )
     {
         /* Send IPI to the boot CPU (logical cpu 0). */
-        on_selected_cpus(cpumask_of_cpu(0), __machine_restart,
+        on_selected_cpus(cpumask_of(0), __machine_restart,
                          &delay_millisecs, 1, 0);
         for ( ; ; )
             halt();

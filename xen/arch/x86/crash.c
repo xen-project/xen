@@ -13,7 +13,6 @@
 #include <asm/percpu.h>
 #include <xen/types.h>
 #include <xen/irq.h>
-#include <asm/ipi.h>
 #include <asm/nmi.h>
 #include <xen/string.h>
 #include <xen/elf.h>
@@ -49,19 +48,6 @@ static int crash_nmi_callback(struct cpu_user_regs *regs, int cpu)
         halt();
 
     return 1;
-}
-
-/*
- * By using the NMI code instead of a vector we just sneak thru the
- * word generator coming out with just what we want.  AND it does
- * not matter if clustered_apic_mode is set or not.
- */
-static void smp_send_nmi_allbutself(void)
-{
-    cpumask_t allbutself = cpu_online_map;
-    cpu_clear(smp_processor_id(), allbutself);
-    if ( !cpus_empty(allbutself) )
-        send_IPI_mask(allbutself, APIC_DM_NMI);
 }
 
 static void nmi_shootdown_cpus(void)

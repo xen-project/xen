@@ -56,7 +56,7 @@ unsigned int cpu_mask_to_apicid_x2apic(cpumask_t cpumask)
     return cpu_physical_id(first_cpu(cpumask));
 }
 
-void send_IPI_mask_x2apic(cpumask_t cpumask, int vector)
+void send_IPI_mask_x2apic(const cpumask_t *cpumask, int vector)
 {
     unsigned int cpu, cfg;
     unsigned long flags;
@@ -76,8 +76,9 @@ void send_IPI_mask_x2apic(cpumask_t cpumask, int vector)
     local_irq_save(flags);
 
     cfg = APIC_DM_FIXED | 0 /* no shorthand */ | APIC_DEST_PHYSICAL | vector;
-    for_each_cpu_mask ( cpu, cpumask )
-        apic_wrmsr(APIC_ICR, cfg, cpu_physical_id(cpu));
+    for_each_cpu_mask ( cpu, *cpumask )
+        if ( cpu != smp_processor_id() )
+            apic_wrmsr(APIC_ICR, cfg, cpu_physical_id(cpu));
 
     local_irq_restore(flags);
 }

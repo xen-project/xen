@@ -80,7 +80,6 @@
 #include <xen/kernel.h>
 
 typedef struct { DECLARE_BITMAP(bits, NR_CPUS); } cpumask_t;
-extern cpumask_t _unused_cpumask_arg_;
 
 #define cpu_set(cpu, dst) __cpu_set((cpu), &(dst))
 static inline void __cpu_set(int cpu, volatile cpumask_t *dstp)
@@ -244,17 +243,23 @@ static inline int __cycle_cpu(int n, const cpumask_t *srcp, int nbits)
     return nxt;
 }
 
-#define cpumask_of_cpu(cpu)						\
-({									\
-	typeof(_unused_cpumask_arg_) m;					\
-	if (sizeof(m) == sizeof(unsigned long)) {			\
-		m.bits[0] = 1UL<<(cpu);					\
-	} else {							\
-		cpus_clear(m);						\
-		cpu_set((cpu), m);					\
-	}								\
-	m;								\
-})
+/*
+ * Special-case data structure for "single bit set only" constant CPU masks.
+ *
+ * We pre-generate all the 64 (or 32) possible bit positions, with enough
+ * padding to the left and the right, and return the constant pointer
+ * appropriately offset.
+ */
+extern const unsigned long
+	cpu_bit_bitmap[BITS_PER_LONG+1][BITS_TO_LONGS(NR_CPUS)];
+
+static inline const cpumask_t *cpumask_of(unsigned int cpu)
+{
+	const unsigned long *p = cpu_bit_bitmap[1 + cpu % BITS_PER_LONG];
+	return (const cpumask_t *)(p - cpu / BITS_PER_LONG);
+}
+
+#define cpumask_of_cpu(cpu) (*cpumask_of(cpu))
 
 #define CPU_MASK_LAST_WORD BITMAP_LAST_WORD_MASK(NR_CPUS)
 

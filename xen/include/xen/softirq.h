@@ -39,7 +39,7 @@ static inline void cpumask_raise_softirq(cpumask_t mask, unsigned int nr)
             cpu_clear(cpu, mask);
     }
 
-    smp_send_event_check_mask(mask);
+    smp_send_event_check_mask(&mask);
 }
 
 static inline void cpu_raise_softirq(unsigned int cpu, unsigned int nr)

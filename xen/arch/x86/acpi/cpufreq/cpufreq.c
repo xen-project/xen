@@ -186,7 +186,7 @@ static void drv_read(struct drv_cmd *cmd)
     if (likely(cpu_isset(smp_processor_id(), cmd->mask)))
         do_drv_read((void *)cmd);
     else
-        on_selected_cpus( cmd->mask, do_drv_read, (void *)cmd, 0, 1);
+        on_selected_cpus(&cmd->mask, do_drv_read, (void *)cmd, 0, 1);
 }
 
 static void drv_write(struct drv_cmd *cmd)
@@ -195,7 +195,7 @@ static void drv_write(struct drv_cmd *cmd)
         cpu_isset(smp_processor_id(), cmd->mask))
         do_drv_write((void *)cmd);
     else
-        on_selected_cpus( cmd->mask, do_drv_write, (void *)cmd, 0, 0);
+        on_selected_cpus(&cmd->mask, do_drv_write, (void *)cmd, 0, 0);
 }
 
 static u32 get_cur_val(cpumask_t mask)
@@ -274,7 +274,6 @@ static unsigned int get_measured_perf(unsigned int cpu, unsigned int flag)
     struct cpufreq_policy *policy;    
     struct perf_pair readin, cur, *saved;
     unsigned int perf_percent;
-    cpumask_t cpumask;
     unsigned int retval;
 
     if (!cpu_online(cpu))
@@ -303,8 +302,7 @@ static unsigned int get_measured_perf(unsigned int cpu, unsigned int flag)
     if (cpu == smp_processor_id()) {
         read_measured_perf_ctrs((void *)&readin);
     } else {
-        cpumask = cpumask_of_cpu(cpu);
-        on_selected_cpus(cpumask, read_measured_perf_ctrs, 
+        on_selected_cpus(cpumask_of(cpu), read_measured_perf_ctrs,
                         (void *)&readin, 0, 1);
     }
 

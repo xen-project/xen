@@ -1205,8 +1205,8 @@ long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)
 
 		add_taint(TAINT_ERROR_INJECT);
 
-		on_selected_cpus(cpumask_of_cpu(target),
-		    x86_mc_msrinject, mc_msrinject, 1, 1);
+		on_selected_cpus(cpumask_of(target), x86_mc_msrinject,
+				 mc_msrinject, 1, 1);
 
 		break;
 
@@ -1225,8 +1225,8 @@ long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)
 
 		add_taint(TAINT_ERROR_INJECT);
 
-		on_selected_cpus(cpumask_of_cpu(target), x86_mc_mceinject,
-		    mc_mceinject, 1, 1);
+		on_selected_cpus(cpumask_of(target), x86_mc_mceinject,
+		                 mc_mceinject, 1, 1);
 		break;
 
 	default:

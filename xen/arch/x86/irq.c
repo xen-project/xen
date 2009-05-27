@@ -522,7 +522,7 @@ static void __pirq_guest_eoi(struct domain *d, int irq)
     }
 
     if ( !cpus_empty(cpu_eoi_map) )
-        on_selected_cpus(cpu_eoi_map, set_eoi_ready, desc, 1, 0);
+        on_selected_cpus(&cpu_eoi_map, set_eoi_ready, desc, 1, 0);
 }
 
 int pirq_guest_eoi(struct domain *d, int irq)
@@ -761,7 +761,7 @@ static irq_guest_action_t *__pirq_guest_unbind(
         {
             cpu_eoi_map = action->cpu_eoi_map;
             spin_unlock_irq(&desc->lock);
-            on_selected_cpus(cpu_eoi_map, set_eoi_ready, desc, 1, 0);
+            on_selected_cpus(&cpu_eoi_map, set_eoi_ready, desc, 1, 0);
             spin_lock_irq(&desc->lock);
         }
         break;
@@ -799,7 +799,7 @@ static irq_guest_action_t *__pirq_guest_unbind(
     {
         BUG_ON(action->ack_type != ACKTYPE_EOI);
         spin_unlock_irq(&desc->lock);
-        on_selected_cpus(cpu_eoi_map, set_eoi_ready, desc, 1, 1);
+        on_selected_cpus(&cpu_eoi_map, set_eoi_ready, desc, 1, 1);
         spin_lock_irq(&desc->lock);
     }
 

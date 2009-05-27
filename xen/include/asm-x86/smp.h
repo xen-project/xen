@@ -35,6 +35,8 @@ extern int pic_mode;
 extern cpumask_t cpu_sibling_map[];
 extern cpumask_t cpu_core_map[];
 
+void smp_send_nmi_allbutself(void);
+
 extern void (*mtrr_hook) (void);
 
 #ifdef CONFIG_X86_64

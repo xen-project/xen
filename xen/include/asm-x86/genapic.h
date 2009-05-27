@@ -35,7 +35,7 @@ struct genapic {
 	void (*clustered_apic_check)(void);
 	cpumask_t (*target_cpus)(void);
 	unsigned int (*cpu_mask_to_apicid)(cpumask_t cpumask);
-	void (*send_IPI_mask)(cpumask_t mask, int vector);
+	void (*send_IPI_mask)(const cpumask_t *mask, int vector);
 };
 
 #define APICFUNC(x) .x = x
@@ -52,7 +52,7 @@ void init_apic_ldr_flat(void);
 void clustered_apic_check_flat(void);
 cpumask_t target_cpus_flat(void);
 unsigned int cpu_mask_to_apicid_flat(cpumask_t cpumask);
-void send_IPI_mask_flat(cpumask_t mask, int vector);
+void send_IPI_mask_flat(const cpumask_t *mask, int vector);
 #define GENAPIC_FLAT \
 	.int_delivery_mode = dest_LowestPrio, \
 	.int_dest_mode = 1 /* logical delivery */, \
@@ -66,7 +66,7 @@ void init_apic_ldr_x2apic(void);
 void clustered_apic_check_x2apic(void);
 cpumask_t target_cpus_x2apic(void);
 unsigned int cpu_mask_to_apicid_x2apic(cpumask_t cpumask);
-void send_IPI_mask_x2apic(cpumask_t mask, int vector);
+void send_IPI_mask_x2apic(const cpumask_t *mask, int vector);
 #define GENAPIC_X2APIC \
 	.int_delivery_mode = dest_Fixed, \
 	.int_dest_mode = 0 /* physical delivery */, \
@@ -80,7 +80,7 @@ void init_apic_ldr_phys(void);
 void clustered_apic_check_phys(void);
 cpumask_t target_cpus_phys(void);
 unsigned int cpu_mask_to_apicid_phys(cpumask_t cpumask);
-void send_IPI_mask_phys(cpumask_t mask, int vector);
+void send_IPI_mask_phys(const cpumask_t *mask, int vector);
 #define GENAPIC_PHYS \
 	.int_delivery_mode = dest_Fixed, \
 	.int_dest_mode = 0 /* physical delivery */, \

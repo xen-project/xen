@@ -548,22 +548,21 @@ void flush_tlb_for_log_dirty(struct domain *d)
 	cpus_clear (d->domain_dirty_cpumask);
 }
 
-void flush_tlb_mask(cpumask_t mask)
+void flush_tlb_mask(const cpumask_t *mask)
 {
     int cpu;
 
     cpu = smp_processor_id();
-    if (cpu_isset (cpu, mask)) {
-        cpu_clear(cpu, mask);
+    if (cpu_isset(cpu, *mask))
         flush_tlb_vhpt_all (NULL);
-    }
 
-    if (cpus_empty(mask))
+    if (cpus_subset(*mask, *cpumask_of(cpu)))
         return;
 
-    for_each_cpu_mask (cpu, mask)
-        smp_call_function_single
-            (cpu, (void (*)(void *))flush_tlb_vhpt_all, NULL, 1, 1);
+    for_each_cpu_mask (cpu, *mask)
+        if (cpu != smp_processor_id())
+            smp_call_function_single
+                (cpu, (void (*)(void *))flush_tlb_vhpt_all, NULL, 1, 1);
 }
 
 #ifdef PERF_COUNTERS

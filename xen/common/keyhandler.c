@@ -119,7 +119,7 @@ static void dump_registers(unsigned char key, struct cpu_user_regs *regs)
         if ( cpu == smp_processor_id() )
             continue;
         printk("\n*** Dumping CPU%d host state: ***\n", cpu);
-        on_selected_cpus(cpumask_of_cpu(cpu), __dump_execstate, NULL, 1, 1);
+        on_selected_cpus(cpumask_of(cpu), __dump_execstate, NULL, 1, 1);
     }
 
     printk("\n");

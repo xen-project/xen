@@ -1,4 +1,5 @@
 obj-y += bitmap.o
+obj-y += cpu.o
 obj-y += domctl.o
 obj-y += domain.o
 obj-y += event_channel.o

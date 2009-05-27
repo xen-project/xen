@@ -57,19 +57,18 @@
 //#if CONFIG_SMP || IA64
 #if CONFIG_SMP
 //Huh? This seems to be used on ia64 even if !CONFIG_SMP
-void smp_send_event_check_mask(cpumask_t mask)
+void smp_send_event_check_mask(const cpumask_t *mask)
 {
     int cpu;
 
     /*  Not for me.  */
-    cpu_clear(smp_processor_id(), mask);
-    if (cpus_empty(mask))
+    if (cpus_subset(*mask, *cpumask_of(smp_processor_id())))
         return;
 
     //printf("smp_send_event_check_mask called\n");
 
     for (cpu = 0; cpu < NR_CPUS; ++cpu)
-        if (cpu_isset(cpu, mask))
+        if (cpu_isset(cpu, *mask) && cpu != smp_processor_id())
 	    platform_send_ipi(cpu, IA64_IPI_RESCHEDULE, IA64_IPI_DM_INT, 0);
 }
 #endif
@@ -438,11 +437,11 @@ EXPORT_SYMBOL(smp_call_function);
 
 #ifdef XEN
 int
-on_selected_cpus(cpumask_t selected, void (*func) (void *info), void *info,
-                 int retry, int wait)
+on_selected_cpus(const cpumask_t *selected, void (*func) (void *info),
+                 void *info, int retry, int wait)
 {
 	struct call_data_struct data;
-	unsigned int cpu, nr_cpus = cpus_weight(selected);
+	unsigned int cpu, nr_cpus = cpus_weight(*selected);
 
 	ASSERT(local_irq_is_enabled());
 
@@ -460,7 +459,7 @@ on_selected_cpus(cpumask_t selected, void (*func) (void *info), void *info,
 	call_data = &data;
 	wmb();
 
-	for_each_cpu_mask(cpu, selected)
+	for_each_cpu_mask(cpu, *selected)
 		send_IPI_single(cpu, IPI_CALL_FUNC);
 
 	while (atomic_read(wait ? &data.finished : &data.started) != nr_cpus)

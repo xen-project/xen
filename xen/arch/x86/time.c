@@ -1189,7 +1189,7 @@ static void time_calibration(void *unused)
     };
 
     /* @wait=1 because we must wait for all cpus before freeing @r. */
-    on_selected_cpus(r.cpu_calibration_map,
+    on_selected_cpus(&r.cpu_calibration_map,
                      opt_consistent_tscs
                      ? time_calibration_tsc_rendezvous
                      : time_calibration_std_rendezvous,

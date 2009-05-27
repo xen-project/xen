@@ -517,7 +517,7 @@ static void invalidate_shadow_ldt(struct vcpu *v, int flush)
 
     /* Rid TLBs of stale mappings (guest mappings and shadow mappings). */
     if ( flush )
-        flush_tlb_mask(v->vcpu_dirty_cpumask);
+        flush_tlb_mask(&v->vcpu_dirty_cpumask);
 
  out:
     spin_unlock(&v->arch.shadow_ldt_lock);
@@ -1250,7 +1250,7 @@ static void pae_flush_pgd(
                 paging_update_cr3(v);
                 cpus_or(m, m, v->vcpu_dirty_cpumask);
             }
-        flush_tlb_mask(m);
+        flush_tlb_mask(&m);
     }
 
     /* If below 4GB then the pgdir is not shadowed in low memory. */
@@ -1275,7 +1275,7 @@ static void pae_flush_pgd(
         spin_unlock(&cache->lock);
     }
 
-    flush_tlb_mask(d->domain_dirty_cpumask);
+    flush_tlb_mask(&d->domain_dirty_cpumask);
 }
 #else
 # define pae_flush_pgd(mfn, idx, nl3e) ((void)0)
@@ -2290,7 +2290,7 @@ static int __get_page_type(struct page_info *page, unsigned long type,
                       ((nx & PGT_type_mask) == PGT_writable_page)) )
                 {
                     perfc_incr(need_flush_tlb_flush);
-                    flush_tlb_mask(mask);
+                    flush_tlb_mask(&mask);
                 }
 
                 /* We lose existing type and validity. */
@@ -2489,7 +2489,7 @@ static void process_deferred_ops(void)
     if ( deferred_ops & (DOP_FLUSH_ALL_TLBS|DOP_FLUSH_TLB) )
     {
         if ( deferred_ops & DOP_FLUSH_ALL_TLBS )
-            flush_tlb_mask(d->domain_dirty_cpumask);
+            flush_tlb_mask(&d->domain_dirty_cpumask);
         else
             flush_tlb_local();
     }
@@ -2824,9 +2824,9 @@ int do_mmuext_op(
             }
             pmask = vcpumask_to_pcpumask(d, vmask);
             if ( op.cmd == MMUEXT_TLB_FLUSH_MULTI )
-                flush_tlb_mask(pmask);
+                flush_tlb_mask(&pmask);
             else
-                flush_tlb_one_mask(pmask, op.arg1.linear_addr);
+                flush_tlb_one_mask(&pmask, op.arg1.linear_addr);
             break;
         }
 
@@ -2835,7 +2835,7 @@ int do_mmuext_op(
             break;
     
         case MMUEXT_INVLPG_ALL:
-            flush_tlb_one_mask(d->domain_dirty_cpumask, op.arg1.linear_addr);
+            flush_tlb_one_mask(&d->domain_dirty_cpumask, op.arg1.linear_addr);
             break;
 
         case MMUEXT_FLUSH_CACHE:
@@ -3688,7 +3688,7 @@ int do_update_va_mapping(unsigned long va, u64 val64,
             pmask = vcpumask_to_pcpumask(d, vmask);
             if ( cpu_isset(smp_processor_id(), pmask) )
                 this_cpu(percpu_mm_info).deferred_ops &= ~DOP_FLUSH_TLB;
-            flush_tlb_mask(pmask);
+            flush_tlb_mask(&pmask);
             break;
         }
         break;
@@ -3706,7 +3706,7 @@ int do_update_va_mapping(unsigned long va, u64 val64,
                 flush_tlb_one_local(va);
             break;
         case UVMF_ALL:
-            flush_tlb_one_mask(d->domain_dirty_cpumask, va);
+            flush_tlb_one_mask(&d->domain_dirty_cpumask, va);
             break;
         default:
             if ( unlikely(!is_pv_32on64_domain(d) ?
@@ -3716,7 +3716,7 @@ int do_update_va_mapping(unsigned long va, u64 val64,
             pmask = vcpumask_to_pcpumask(d, vmask);
             if ( this_cpu(percpu_mm_info).deferred_ops & DOP_FLUSH_TLB )
                 cpu_clear(smp_processor_id(), pmask);
-            flush_tlb_one_mask(pmask, va);
+            flush_tlb_one_mask(&pmask, va);
             break;
         }
         break;

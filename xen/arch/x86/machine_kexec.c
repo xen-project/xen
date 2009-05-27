@@ -91,7 +91,6 @@ static void __machine_reboot_kexec(void *data)
 void machine_reboot_kexec(xen_kexec_image_t *image)
 {
     int reboot_cpu_id;
-    cpumask_t reboot_cpu;
 
     reboot_cpu_id = 0;
 
@@ -100,9 +99,8 @@ void machine_reboot_kexec(xen_kexec_image_t *image)
 
     if ( reboot_cpu_id != smp_processor_id() )
     {
-        cpus_clear(reboot_cpu);
-        cpu_set(reboot_cpu_id, reboot_cpu);
-        on_selected_cpus(reboot_cpu, __machine_reboot_kexec, image, 1, 0);
+        on_selected_cpus(cpumask_of(reboot_cpu_id), __machine_reboot_kexec,
+                         image, 1, 0);
         for (;;)
                 ; /* nothing */
     }
