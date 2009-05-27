@@ -91,6 +91,8 @@ struct grant_table {
     struct grant_mapping **maptrack;
     unsigned int          maptrack_head;
     unsigned int          maptrack_limit;
+    /* Lock protecting maptrack-related fields. */
+    spinlock_t            maptrack_lock;
     /* Lock protecting updates to active and shared grant tables. */
     spinlock_t            lock;
 };

@@ -111,6 +111,26 @@ static unsigned inline int max_nr_maptrack_frames(void)
 #define active_entry(t, e) \
     ((t)->active[(e)/ACGNT_PER_PAGE][(e)%ACGNT_PER_PAGE])
 
+/* Technically, we only really need to acquire the lock for SMP
+   guests, because you only ever touch the maptrack tables from the
+   context of the guest which owns them, so if it's uniproc then the
+   lock can't be contended, and is therefore pointless.  Don't bother
+   with that optimisation for now, though, because it's scary and
+   confusing. */
+/* The maptrack lock is top-level: you're not allowed to be holding
+   any other locks when you acquire it. */
+static void
+maptrack_lock(struct grant_table *lgt)
+{
+    spin_lock(&lgt->maptrack_lock);
+}
+
+static void
+maptrack_unlock(struct grant_table *lgt)
+{
+    spin_unlock(&lgt->maptrack_lock);
+}
+
 static inline int
 __get_maptrack_handle(
     struct grant_table *t)
@@ -141,43 +161,30 @@ get_maptrack_handle(
 
     if ( unlikely((handle = __get_maptrack_handle(lgt)) == -1) )
     {
-        spin_lock(&lgt->lock);
+        nr_frames = nr_maptrack_frames(lgt);
+        if ( nr_frames >= max_nr_maptrack_frames() )
+            return -1;
 
-        if ( unlikely((handle = __get_maptrack_handle(lgt)) == -1) )
+        new_mt = alloc_xenheap_page();
+        if ( new_mt == NULL )
+            return -1;
+
+        clear_page(new_mt);
+
+        new_mt_limit = lgt->maptrack_limit + MAPTRACK_PER_PAGE;
+
+        for ( i = lgt->maptrack_limit; i < new_mt_limit; i++ )
         {
-            nr_frames = nr_maptrack_frames(lgt);
-            if ( nr_frames >= max_nr_maptrack_frames() )
-            {
-                spin_unlock(&lgt->lock);
-                return -1;
-            }
-
-            new_mt = alloc_xenheap_page();
-            if ( new_mt == NULL )
-            {
-                spin_unlock(&lgt->lock);
-                return -1;
-            }
-
-            clear_page(new_mt);
-
-            new_mt_limit = lgt->maptrack_limit + MAPTRACK_PER_PAGE;
-
-            for ( i = lgt->maptrack_limit; i < new_mt_limit; i++ )
-            {
-                new_mt[i % MAPTRACK_PER_PAGE].ref = i+1;
-                new_mt[i % MAPTRACK_PER_PAGE].flags = 0;
-            }
-
-            lgt->maptrack[nr_frames] = new_mt;
-            lgt->maptrack_limit      = new_mt_limit;
-
-            gdprintk(XENLOG_INFO,
-                    "Increased maptrack size to %u frames.\n", nr_frames + 1);
-            handle = __get_maptrack_handle(lgt);
+            new_mt[i % MAPTRACK_PER_PAGE].ref = i+1;
+            new_mt[i % MAPTRACK_PER_PAGE].flags = 0;
         }
 
-        spin_unlock(&lgt->lock);
+        lgt->maptrack[nr_frames] = new_mt;
+        lgt->maptrack_limit      = new_mt_limit;
+
+        gdprintk(XENLOG_INFO,
+                 "Increased maptrack size to %u frames.\n", nr_frames + 1);
+        handle = __get_maptrack_handle(lgt);
     }
     return handle;
 }
@@ -1508,7 +1515,9 @@ do_grant_table_op(
             guest_handle_cast(uop, gnttab_map_grant_ref_t);
         if ( unlikely(!guest_handle_okay(map, count)) )
             goto out;
+        maptrack_lock(current->domain->grant_table);
         rc = gnttab_map_grant_ref(map, count);
+        maptrack_unlock(current->domain->grant_table);
         break;
     }
     case GNTTABOP_unmap_grant_ref:
@@ -1517,7 +1526,9 @@ do_grant_table_op(
             guest_handle_cast(uop, gnttab_unmap_grant_ref_t);
         if ( unlikely(!guest_handle_okay(unmap, count)) )
             goto out;
+        maptrack_lock(current->domain->grant_table);
         rc = gnttab_unmap_grant_ref(unmap, count);
+        maptrack_unlock(current->domain->grant_table);
         break;
     }
     case GNTTABOP_unmap_and_replace:
@@ -1529,7 +1540,9 @@ do_grant_table_op(
         rc = -ENOSYS;
         if ( unlikely(!replace_grant_supported()) )
             goto out;
+        maptrack_lock(current->domain->grant_table);
         rc = gnttab_unmap_and_replace(unmap, count);
+        maptrack_unlock(current->domain->grant_table);
         break;
     }
     case GNTTABOP_setup_table:
@@ -1600,6 +1613,7 @@ grant_table_create(
     /* Simple stuff. */
     memset(t, 0, sizeof(*t));
     spin_lock_init(&t->lock);
+    spin_lock_init(&t->maptrack_lock);
     t->nr_grant_frames = INITIAL_NR_GRANT_FRAMES;
 
     /* Active grant table. */
@@ -1680,6 +1694,7 @@ gnttab_release_mappings(
 
     for ( handle = 0; handle < gt->maptrack_limit; handle++ )
     {
+        /* Domain is dying, so don't need maptrack lock */
         map = &maptrack_entry(gt, handle);
         if ( !(map->flags & (GNTMAP_device_map|GNTMAP_host_map)) )
             continue;
