@@ -617,6 +617,10 @@ gopts.var('xen_platform_pci', val='0|1',
            fn=set_int, default=1,
            use="Is xen_platform_pci used?")
 
+gopts.var('superpages', val='0|1',
+           fn=set_int, default=0,
+           use="Create domain with superpages")
+
 def err(msg):
     """Print an error to stderr and exit.
     """
