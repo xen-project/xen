@@ -1013,10 +1013,27 @@ void notify_via_xen_event_channel(int lport)
 int evtchn_init(struct domain *d)
 {
     spin_lock_init(&d->event_lock);
+
+    d->pirq_to_evtchn = xmalloc_array(u16, d->nr_pirqs);
+    d->pirq_mask = xmalloc_array(
+        unsigned long, BITS_TO_LONGS(d->nr_pirqs));
+    if ( (d->pirq_to_evtchn == NULL) || (d->pirq_mask == NULL) )
+        goto fail;
+    memset(d->pirq_to_evtchn, 0, d->nr_pirqs * sizeof(*d->pirq_to_evtchn));
+    bitmap_zero(d->pirq_mask, d->nr_pirqs);
+
     if ( get_free_port(d) != 0 )
-        return -EINVAL;
+        goto fail;
     evtchn_from_port(d, 0)->state = ECS_RESERVED;
+
     return 0;
+
+ fail:
+    xfree(d->pirq_to_evtchn);
+    d->pirq_to_evtchn = NULL;
+    xfree(d->pirq_mask);
+    d->pirq_mask = NULL;
+    return -ENOMEM;
 }
 
 
@@ -1044,6 +1061,11 @@ void evtchn_destroy(struct domain *d)
         d->evtchn[i] = NULL;
     }
     spin_unlock(&d->event_lock);
+
+    xfree(d->pirq_to_evtchn);
+    d->pirq_to_evtchn = NULL;
+    xfree(d->pirq_mask);
+    d->pirq_mask = NULL;
 }
 
 static void domain_dump_evtchn_info(struct domain *d)
