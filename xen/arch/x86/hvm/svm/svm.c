@@ -1186,34 +1186,6 @@ static void svm_vmexit_do_rdtsc(struct cpu_user_regs *regs)
     hvm_rdtsc_intercept(regs);
 }
 
-static void svm_dump_regs(const char *from, struct cpu_user_regs *regs)
-{
-    printk("Dumping guest's current registers at %s...\n", from);
-    printk("Size of regs = 0x%lx, address = %p\n",
-           sizeof(struct cpu_user_regs), regs);
-
-    printk("r15 = 0x%016"PRIx64", r14 = 0x%016"PRIx64"\n",
-           regs->r15, regs->r14);
-    printk("r13 = 0x%016"PRIx64", r12 = 0x%016"PRIx64"\n",
-           regs->r13, regs->r12);
-    printk("rbp = 0x%016"PRIx64", rbx = 0x%016"PRIx64"\n",
-           regs->rbp, regs->rbx);
-    printk("r11 = 0x%016"PRIx64", r10 = 0x%016"PRIx64"\n",
-           regs->r11, regs->r10);
-    printk("r9  = 0x%016"PRIx64", r8  = 0x%016"PRIx64"\n",
-           regs->r9, regs->r8);
-    printk("rax = 0x%016"PRIx64", rcx = 0x%016"PRIx64"\n",
-           regs->rax, regs->rcx);
-    printk("rdx = 0x%016"PRIx64", rsi = 0x%016"PRIx64"\n",
-           regs->rdx, regs->rsi);
-    printk("rdi = 0x%016"PRIx64", rsp = 0x%016"PRIx64"\n",
-           regs->rdi, regs->rsp);
-    printk("error code = 0x%08"PRIx32", entry_vector = 0x%08"PRIx32"\n",
-           regs->error_code, regs->entry_vector);
-    printk("rip = 0x%016"PRIx64", rflags = 0x%016"PRIx64"\n",
-           regs->rip, regs->rflags);
-}
-
 static void svm_vmexit_ud_intercept(struct cpu_user_regs *regs)
 {
     struct hvm_emulate_ctxt ctxt;
@@ -1310,7 +1282,6 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
     if ( unlikely(exit_reason == VMEXIT_INVALID) )
     {
         svm_dump_vmcb(__func__, vmcb);
-        svm_dump_regs(__func__, regs);
         goto exit_and_crash;
     }
 

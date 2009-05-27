@@ -3599,6 +3599,7 @@ x86_emulate(
         cs.attr.bytes = 0xc9b; /* G+DB+P+S+Code */
         ss.attr.bytes = 0xc93; /* G+DB+P+S+Data */
 
+#ifdef __x86_64__
         if ( in_longmode(ctxt, ops) )
         {
             cs.attr.fields.db = 0;
@@ -3618,11 +3619,12 @@ x86_emulate(
             _regs.eflags &= ~(msr_content | EFLG_RF);
         }
         else
+#endif
         {
             rc = ops->read_msr(MSR_STAR, &msr_content, ctxt);
             fail_if(rc != 0);
 
-            _regs.rcx = _regs.rip;
+            _regs.ecx = _regs.eip;
             _regs.eip = (uint32_t)msr_content;
             _regs.eflags &= ~(EFLG_VM | EFLG_IF | EFLG_RF);
         }
@@ -3783,11 +3785,11 @@ x86_emulate(
 
         rc = ops->read_msr(MSR_SYSENTER_EIP, &msr_content, ctxt);
         fail_if(rc != 0);
-        _regs.rip = msr_content;
+        _regs.eip = msr_content;
 
         rc = ops->read_msr(MSR_SYSENTER_ESP, &msr_content, ctxt);
         fail_if(rc != 0);
-        _regs.rsp = msr_content;
+        _regs.esp = msr_content;
 
         break;
     }
@@ -3846,8 +3848,8 @@ x86_emulate(
         rc = ops->write_segment(x86_seg_ss, &ss, ctxt);
         fail_if(rc != 0);
 
-        _regs.rip = _regs.rdx;
-        _regs.rsp = _regs.rcx;
+        _regs.eip = _regs.edx;
+        _regs.esp = _regs.ecx;
         break;
     }
 
