@@ -192,7 +192,7 @@ void flush_area_mask(const cpumask_t *mask, const void *va, unsigned int flags)
         cpus_andnot(flush_cpumask, *mask, *cpumask_of(smp_processor_id()));
         flush_va      = va;
         flush_flags   = flags;
-        send_IPI_mask(mask, INVALIDATE_TLB_VECTOR);
+        send_IPI_mask(&flush_cpumask, INVALIDATE_TLB_VECTOR);
         while ( !cpus_empty(flush_cpumask) )
             cpu_relax();
         spin_unlock(&flush_lock);
@@ -223,18 +223,16 @@ void smp_send_event_check_mask(const cpumask_t *mask)
  * Structure and data for smp_call_function()/on_selected_cpus().
  */
 
-struct call_data_struct {
+static void __smp_call_function_interrupt(void);
+static DEFINE_SPINLOCK(call_lock);
+static struct call_data_struct {
     void (*func) (void *info);
     void *info;
     int wait;
     atomic_t started;
     atomic_t finished;
-    const cpumask_t *selected;
-};
-
-static DEFINE_SPINLOCK(call_lock);
-static struct call_data_struct *call_data;
-static void __smp_call_function_interrupt(void);
+    cpumask_t selected;
+} call_data;
 
 int smp_call_function(
     void (*func) (void *info),
@@ -252,39 +250,39 @@ int on_selected_cpus(
     void *info,
     int wait)
 {
-    struct call_data_struct data;
-    unsigned int nr_cpus = cpus_weight(*selected);
+    unsigned int nr_cpus;
 
     ASSERT(local_irq_is_enabled());
 
-    if ( nr_cpus == 0 )
-        return 0;
-
-    data.func = func;
-    data.info = info;
-    data.wait = wait;
-    atomic_set(&data.started, 0);
-    atomic_set(&data.finished, 0);
-    data.selected = selected;
-
     spin_lock(&call_lock);
 
-    call_data = &data;
+    call_data.selected = *selected;
 
-    send_IPI_mask(selected, CALL_FUNCTION_VECTOR);
+    nr_cpus = cpus_weight(call_data.selected);
+    if ( nr_cpus == 0 )
+        goto out;
 
-    if ( cpu_isset(smp_processor_id(), *call_data->selected) )
+    call_data.func = func;
+    call_data.info = info;
+    call_data.wait = wait;
+    atomic_set(&call_data.started, 0);
+    atomic_set(&call_data.finished, 0);
+
+    send_IPI_mask(&call_data.selected, CALL_FUNCTION_VECTOR);
+
+    if ( cpu_isset(smp_processor_id(), call_data.selected) )
     {
         local_irq_disable();
         __smp_call_function_interrupt();
         local_irq_enable();
     }
 
-    while ( atomic_read(wait ? &data.finished : &data.started) != nr_cpus )
+    while ( atomic_read(wait ? &call_data.finished : &call_data.started)
+            != nr_cpus )
         cpu_relax();
 
+ out:
     spin_unlock(&call_lock);
-
     return 0;
 }
 
@@ -345,24 +343,24 @@ fastcall void smp_event_check_interrupt(struct cpu_user_regs *regs)
 
 static void __smp_call_function_interrupt(void)
 {
-    void (*func)(void *info) = call_data->func;
-    void *info = call_data->info;
+    void (*func)(void *info) = call_data.func;
+    void *info = call_data.info;
 
-    if ( !cpu_isset(smp_processor_id(), *call_data->selected) )
+    if ( !cpu_isset(smp_processor_id(), call_data.selected) )
         return;
 
     irq_enter();
 
-    if ( call_data->wait )
+    if ( call_data.wait )
     {
         (*func)(info);
         mb();
-        atomic_inc(&call_data->finished);
+        atomic_inc(&call_data.finished);
     }
     else
     {
         mb();
-        atomic_inc(&call_data->started);
+        atomic_inc(&call_data.started);
         (*func)(info);
     }
 
