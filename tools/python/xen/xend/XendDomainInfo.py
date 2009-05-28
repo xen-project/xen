@@ -893,18 +893,9 @@ class XendDomainInfo:
             if num_devs == 0:
                 if self.info.is_hvm():
                     self.destroyDevice('pci', devid, True)
-                    del self.info['devices'][dev_uuid]
-                    platform = self.info['platform']
-                    orig_dev_num = len(platform['pci'])
-                    # TODO: can use this to keep some info to ask high level
-                    # management tools to hot insert a new passthrough dev
-                    # after migration
-                    if orig_dev_num != 0:
-                        #platform['pci'] = ["%dDEVs" % orig_dev_num]
-                        platform['pci'] = []
                 else:
                     self.destroyDevice('pci', devid)
-                    del self.info['devices'][dev_uuid]
+                del self.info['devices'][dev_uuid]
         else:
             new_dev_sxp = ['pci']
             for cur_dev in sxp.children(existing_dev_info, 'dev'):
@@ -923,18 +914,9 @@ class XendDomainInfo:
             dev_uuid = sxp.child_value(existing_dev_info, 'uuid')
             self.info.device_update(dev_uuid, new_dev_sxp)
 
-            # If there is only 'vscsi' in new_dev_sxp, remove the config.
+            # If there is no device left, remove config.
             if len(sxp.children(new_dev_sxp, 'dev')) == 0:
                 del self.info['devices'][dev_uuid]
-                if self.info.is_hvm():
-                    platform = self.info['platform']
-                    orig_dev_num = len(platform['pci'])
-                    # TODO: can use this to keep some info to ask high level
-                    # management tools to hot insert a new passthrough dev
-                    # after migration
-                    if orig_dev_num != 0:
-                        #platform['pci'] = ["%dDEVs" % orig_dev_num]
-                        platform['pci'] = []
 
         xen.xend.XendDomain.instance().managed_config_save(self)
 
@@ -2463,6 +2445,7 @@ class XendDomainInfo:
                               (self.getVCpuCount() * 100))
 
         # Test whether the devices can be assigned with VT-d
+        self.info.update_platform_pci()
         pci = self.info["platform"].get("pci")
         pci_str = ''
         if pci and len(pci) > 0:

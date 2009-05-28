@@ -37,6 +37,7 @@ from xen.xend.xenstore.xstransact import xstransact
 from xen.xend.server.BlktapController import blktap_disk_types
 from xen.xend.server.netif import randomMAC
 from xen.util.blkif import blkdev_name_to_number, blkdev_uname_to_file
+from xen.util.pci import assigned_or_requested_vslot
 from xen.util import xsconstants
 import xen.util.auxbin
 
@@ -2186,3 +2187,26 @@ class XendConfig(dict):
 
     def is_hap(self):
         return self['platform'].get('hap', 0)
+
+    def update_platform_pci(self):
+        if not self.is_hvm():
+            return
+
+        pci = []
+        for dev_type, dev_info in self.all_devices_sxpr():
+            if dev_type != 'pci':
+                continue
+            for dev in sxp.children(dev_info, 'dev'):
+                domain = sxp.child_value(dev, 'domain')
+                bus = sxp.child_value(dev, 'bus')
+                slot = sxp.child_value(dev, 'slot')
+                func = sxp.child_value(dev, 'func')
+                vslot = assigned_or_requested_vslot(dev) 
+                opts = ''
+                for opt in sxp.child_value(dev, 'opts', []):
+                    if opts:
+                        opts += ','
+                    opts += '%s=%s' % (opt[0], str(opt[1]))
+                pci.append([domain, bus, slot, func, vslot, opts])
+        self['platform']['pci'] = pci
+

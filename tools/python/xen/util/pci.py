@@ -14,6 +14,7 @@ import struct
 import time
 import threading
 from xen.util import utils
+from xen.xend import sxp
 
 PROC_PCI_PATH = '/proc/bus/pci/devices'
 PROC_PCI_NUM_RESOURCES = 7
@@ -140,10 +141,17 @@ def parse_pci_name(pci_name_string):
     return (domain, bus, slot, func)
 
 def assigned_or_requested_vslot(dev):
-    if dev.has_key("vslot"):
-        return dev["vslot"]
-    if dev.has_key("requested_vslot"):
-        return dev["requested_vslot"]
+    if isinstance(dev, types.DictType):
+        if dev.has_key("vslot"):
+            return dev["vslot"]
+        if dev.has_key("requested_vslot"):
+            return dev["requested_vslot"]
+    elif isinstance(dev, (types.ListType, types.TupleType)):
+        vslot = sxp.child_value(dev, 'vslot', None)
+        if not vslot:
+            vslot = sxp.child_value(dev, 'requested_vslot', None)
+        if vslot:
+            return vslot
     raise PciDeviceVslotMissing("%s" % dev)
 
 def find_sysfs_mnt():

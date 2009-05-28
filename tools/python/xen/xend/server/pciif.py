@@ -223,6 +223,11 @@ class PciController(DevController):
                     except IndexError:
                         dev_dict['vslot'] = AUTO_PHP_SLOT_STR
 
+                #append opts info
+                opts = self.readBackend(devid, 'opts-%d' % i)
+                if opts is not None:
+                    dev_dict['opts'] = opts
+
                 pci_devs.append(dev_dict)
 
         result['devs'] = pci_devs
@@ -243,8 +248,14 @@ class PciController(DevController):
         
         for dev in devs:
             dev_sxpr = ['dev']
-            for dev_item in dev.items():
-                dev_sxpr.append(list(dev_item))
+            for dev_key, dev_val in dev.items():
+                if dev_key == 'opts':
+                    opts = []
+                    for opt in dev_val.split(','):
+                        opts.append(opt.split('='))
+                    dev_sxpr.append(['opts', opts])
+                else:
+                    dev_sxpr.append([dev_key, dev_val])
             sxpr.append(dev_sxpr)
         
         for key, val in configDict.items():
