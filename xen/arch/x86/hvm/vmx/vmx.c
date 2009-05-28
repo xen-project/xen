@@ -1062,8 +1062,10 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
     {
     case 0: {
         int realmode;
-        unsigned long hw_cr0_mask =
-            X86_CR0_NE | X86_CR0_PG | X86_CR0_PE;
+        unsigned long hw_cr0_mask = X86_CR0_NE;
+
+        if ( !vmx_unrestricted_guest(v) )
+            hw_cr0_mask |= X86_CR0_PG | X86_CR0_PE;
 
         if ( paging_mode_shadow(v->domain) )
            hw_cr0_mask |= X86_CR0_WP;
@@ -1091,7 +1093,9 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
         }
 
         realmode = !(v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PE); 
-        if ( realmode != v->arch.hvm_vmx.vmx_realmode )
+
+        if ( (!vmx_unrestricted_guest(v)) &&
+             (realmode != v->arch.hvm_vmx.vmx_realmode) )
         {
             enum x86_segment s; 
             struct segment_register reg[x86_seg_tr + 1];
@@ -1431,15 +1435,10 @@ void start_vmx(void)
     }
 
     if ( cpu_has_vmx_ept )
-    {
-        printk("VMX: EPT is available.\n");
         vmx_function_table.hap_supported = 1;
-    }
 
     if ( cpu_has_vmx_vpid )
     {
-        printk("VMX: VPID is available.\n");
-
         vpid_bitmap = xmalloc_array(
             unsigned long, BITS_TO_LONGS(VPID_BITMAP_SIZE));
         BUG_ON(vpid_bitmap == NULL);

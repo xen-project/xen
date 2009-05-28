@@ -170,6 +170,7 @@ extern u32 vmx_vmentry_control;
 #define SECONDARY_EXEC_ENABLE_EPT               0x00000002
 #define SECONDARY_EXEC_ENABLE_VPID              0x00000020
 #define SECONDARY_EXEC_WBINVD_EXITING           0x00000040
+#define SECONDARY_EXEC_UNRESTRICTED_GUEST       0x00000080
 extern u32 vmx_secondary_exec_control;
 
 extern bool_t cpu_has_vmx_ins_outs_instr_info;
@@ -194,6 +195,11 @@ extern bool_t cpu_has_vmx_ins_outs_instr_info;
     (vmx_cpu_based_exec_control & CPU_BASED_MONITOR_TRAP_FLAG)
 #define cpu_has_vmx_pat \
     (vmx_vmentry_control & VM_ENTRY_LOAD_GUEST_PAT)
+#define cpu_has_vmx_unrestricted_guest \
+    (vmx_secondary_exec_control & SECONDARY_EXEC_UNRESTRICTED_GUEST)
+#define vmx_unrestricted_guest(v)               \
+    ((v)->arch.hvm_vmx.secondary_exec_control & \
+     SECONDARY_EXEC_UNRESTRICTED_GUEST)
 
 /* GUEST_INTERRUPTIBILITY_INFO flags. */
 #define VMX_INTR_SHADOW_STI             0x00000001

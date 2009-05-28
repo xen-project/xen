@@ -41,6 +41,9 @@
 static int opt_vpid_enabled = 1;
 boolean_param("vpid", opt_vpid_enabled);
 
+static int opt_unrestricted_guest_enabled = 1;
+boolean_param("unrestricted_guest", opt_unrestricted_guest_enabled);
+
 /* Dynamic (run-time adjusted) execution control flags. */
 u32 vmx_pin_based_exec_control __read_mostly;
 u32 vmx_cpu_based_exec_control __read_mostly;
@@ -68,6 +71,7 @@ static void __init vmx_display_features(void)
     P(cpu_has_vmx_vpid, "Virtual-Processor Identifiers (VPID)");
     P(cpu_has_vmx_vnmi, "Virtual NMI");
     P(cpu_has_vmx_msr_bitmap, "MSR direct-access bitmap");
+    P(cpu_has_vmx_unrestricted_guest, "Unrestricted Guest");
 #undef P
 
     if ( !printed )
@@ -139,6 +143,9 @@ static void vmx_init_vmcs_config(void)
                SECONDARY_EXEC_ENABLE_EPT);
         if ( opt_vpid_enabled )
             opt |= SECONDARY_EXEC_ENABLE_VPID;
+        if ( opt_unrestricted_guest_enabled )
+            opt |= SECONDARY_EXEC_UNRESTRICTED_GUEST;
+
         _vmx_secondary_exec_control = adjust_vmx_controls(
             min, opt, MSR_IA32_VMX_PROCBASED_CTLS2);
     }
@@ -156,7 +163,9 @@ static void vmx_init_vmcs_config(void)
         if ( must_be_one & (CPU_BASED_INVLPG_EXITING |
                             CPU_BASED_CR3_LOAD_EXITING |
                             CPU_BASED_CR3_STORE_EXITING) )
-            _vmx_secondary_exec_control &= ~SECONDARY_EXEC_ENABLE_EPT;
+            _vmx_secondary_exec_control &=
+                ~(SECONDARY_EXEC_ENABLE_EPT |
+                  SECONDARY_EXEC_UNRESTRICTED_GUEST);
     }
 
 #if defined(__i386__)
@@ -532,7 +541,9 @@ static int construct_vmcs(struct vcpu *v)
     }
     else
     {
-        v->arch.hvm_vmx.secondary_exec_control &= ~SECONDARY_EXEC_ENABLE_EPT;
+        v->arch.hvm_vmx.secondary_exec_control &= 
+            ~(SECONDARY_EXEC_ENABLE_EPT | 
+              SECONDARY_EXEC_UNRESTRICTED_GUEST);
         vmx_vmexit_control &= ~(VM_EXIT_SAVE_GUEST_PAT |
                                 VM_EXIT_LOAD_HOST_PAT);
         vmx_vmentry_control &= ~VM_ENTRY_LOAD_GUEST_PAT;
