@@ -2,10 +2,11 @@ XEN_ROOT=../../../
 BLKTAP_ROOT := ..
 include $(XEN_ROOT)/tools/Rules.mk
 
+SUBDIRS-y    :=
+SUBDIRS-y    += lib
+
 IBIN          = blktapctrl
 INST_DIR      = $(SBINDIR)
-
-LIBDIR        = lib
 
 LIBS         := -lxenstore
 LIBS         += -Llib
@@ -31,25 +32,20 @@ CFLAGS       += -g
 CFLAGS       += -Wp,-MD,.$(@F).d
 DEPS          = .*.d
 
-all: libblktap $(IBIN)
+all: $(IBIN)
 
-blktapctrl: tapdisk-daemon.c $(OBJS)
-	$(CC) $(CFLAGS) -o blktapctrl tapdisk-daemon.c $(LIBS) $(OBJS)
-
-libblktap:
-	@set -e
-	$(MAKE) -C $(LIBDIR) all
+blktapctrl: tapdisk-daemon.c $(OBJS) subdir-all-lib
+	$(CC) $(CFLAGS) -o blktapctrl tapdisk-daemon.c $(LDFLAGS) $(LIBS) $(OBJS)
 
 install: all
-	$(MAKE) -C $(LIBDIR) install
 	$(INSTALL_DIR) -p $(DESTDIR)$(INST_DIR)
 	$(INSTALL_PROG) $(IBIN) $(DESTDIR)$(INST_DIR)
 
 clean:
-	$(MAKE) -C $(LIBDIR) clean
 	rm -rf *.o *~ $(IBIN) $(DEPS) xen TAGS
 
-.PHONY: all clean install blktapctrl libblktap
+.PHONY: all clean install blktapctrl
+all clean install: %: subdirs-%
 
 -include $(DEPS)
 

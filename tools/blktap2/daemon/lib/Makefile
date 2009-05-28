@@ -55,7 +55,7 @@ clean:
 
 libblktap.a: $(OBJS) 
 	$(CC) $(CFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,$(SONAME) $(SHLIB_CFLAGS) \
-	      -o libblktap.so.$(MAJOR).$(MINOR) $^ $(LIBS)
+	      $(LDFLAGS) -o libblktap.so.$(MAJOR).$(MINOR) $^ $(LIBS)
 	ln -sf libblktap.so.$(MAJOR).$(MINOR) libblktap.so.$(MAJOR)
 	ln -sf libblktap.so.$(MAJOR) libblktap.so
 	$(AR) rc $@ libblktap.so

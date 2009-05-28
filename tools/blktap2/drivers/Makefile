@@ -72,28 +72,28 @@ BLK-OBJS-y  += aes.o
 all: $(IBIN) lock-util qcow-util
 
 tapdisk: $(TAP-OBJS-y) $(BLK-OBJS-y) $(MISC-OBJS-y) tapdisk.c
-	$(CC) $(CFLAGS) -o $@ $^ $(LIBS) $(AIOLIBS)  $(LDFLAGS_img)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS) $(AIOLIBS)  $(LDFLAGS_img)
 
 tapdisk2: $(TAP-OBJS-y) $(BLK-OBJS-y) $(MISC-OBJS-y) tapdisk2.c
-	$(CC) $(CFLAGS) -o $@ $^ $(LIBS) $(AIOLIBS) $(LDFLAGS_img)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS) $(AIOLIBS) $(LDFLAGS_img)
 
 tapdisk-client: tapdisk-client.o
-	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)  $(LDFLAGS_img)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS)  $(LDFLAGS_img)
 
 tapdisk-stream tapdisk-diff: %: %.o $(TAP-OBJS-y) $(BLK-OBJS-y)
-	$(CC) $(CFLAGS) -o $@ $^ $(LIBS) $(AIOLIBS)  $(LDFLAGS_img)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS) $(AIOLIBS)  $(LDFLAGS_img)
 
 td-util: td.o tapdisk-utils.o tapdisk-log.o
-	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)  $(LDFLAGS_img)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS)  $(LDFLAGS_img)
 
 lock-util: lock.c
-	$(CC) $(CFLAGS) -DUTIL -o lock-util lock.c $(LIBS)
+	$(CC) $(CFLAGS) -DUTIL -o lock-util lock.c $(LDFLAGS) $(LIBS)
 
 .PHONY: qcow-util
 qcow-util: img2qcow qcow2raw qcow-create
 
 img2qcow qcow2raw qcow-create: %: %.o $(TAP-OBJS-y) $(BLK-OBJS-y)
-	$(CC) $(CFLAGS) -o $@ $^ $(LIBS) $(AIOLIBS) $(LDFLAGS_img)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS) $(AIOLIBS) $(LDFLAGS_img)
 
 install: all
 	$(INSTALL_DIR) -p $(DESTDIR)$(INST_DIR)
