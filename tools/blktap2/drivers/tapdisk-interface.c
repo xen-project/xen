@@ -213,7 +213,7 @@ td_forward_request(td_request_t treq)
 void
 td_complete_request(td_request_t treq, int res)
 {
-	treq.cb(treq, res);
+	((td_callback_t)treq.cb)(treq, res);
 }
 
 void

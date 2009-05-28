@@ -104,11 +104,6 @@ typedef struct td_request            td_request_t;
 typedef struct td_driver_handle      td_driver_t;
 typedef struct td_image_handle       td_image_t;
 
-/* 
- * Prototype of the callback to activate as requests complete.
- */
-typedef void (*td_callback_t)(td_request_t, int);
-
 struct td_disk_id {
 	char                        *name;
 	int                          drivertype;
@@ -130,13 +125,18 @@ struct td_request {
 
 	td_image_t                  *image;
 
-	td_callback_t                cb;
+	void * /*td_callback_t*/     cb;
 	void                        *cb_data;
 
 	uint64_t                     id;
 	int                          sidx;
 	void                        *private;
 };
+
+/* 
+ * Prototype of the callback to activate as requests complete.
+ */
+typedef void (*td_callback_t)(td_request_t, int);
 
 /* 
  * Structure describing the interface to a virtual disk implementation.
