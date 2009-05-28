@@ -6,3 +6,4 @@ SUBSYSTEM=="xen-backend", KERNEL=="vscsi*", RUN+="/etc/xen/scripts/vscsi $env{AC
 SUBSYSTEM=="xen-backend", ACTION=="remove", RUN+="/etc/xen/scripts/xen-hotplug-cleanup"
 KERNEL=="evtchn", NAME="xen/%k"
 KERNEL=="blktap[0-9]*", NAME="xen/%k"
+KERNEL=="pci_iomul", NAME="xen/%k"
