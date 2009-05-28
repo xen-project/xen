@@ -31,6 +31,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include <sys/resource.h>
 
 #include <xs.h>
 #include "disktypes.h"
@@ -556,7 +557,6 @@ main(int argc, char *argv[])
 
 #define CORE_DUMP
 #if defined(CORE_DUMP)
-#include <sys/resource.h>
 	{
 		/* set up core-dumps*/
 		struct rlimit rlim;
