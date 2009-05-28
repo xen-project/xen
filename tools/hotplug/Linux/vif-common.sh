@@ -103,6 +103,8 @@ handle_iptable()
     return
   fi
 
+  claim_lock "iptables"
+
   if [ "$ip" != "" ]
   then
       local addr
@@ -117,6 +119,8 @@ handle_iptable()
       # No IP addresses have been specified, so allow anything.
       frob_iptable
   fi
+
+  release_lock "iptables"
 }
 
 
