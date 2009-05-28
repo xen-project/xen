@@ -18,6 +18,43 @@
  ****************************************************************************
  */
 
+#include <strings.h>
+
+/* newlib defines ffs but not ffsll or ffsl */
+int __ffsti2 (long long int lli)
+{
+    int i, num, t, tmpint, len;
+
+    num = sizeof(long long int) / sizeof(int);
+    if (num == 1) return (ffs((int) lli));
+    len = sizeof(int) * 8;
+
+    for (i = 0; i < num; i++) {
+        tmpint = (int) (((lli >> len) << len) ^ lli);
+
+        t = ffs(tmpint);
+        if (t)
+            return (t + i * len);
+        lli = lli >> len;
+    }
+    return 0;
+}
+
+int __ffsdi2 (long int li)
+{
+    return __ffsti2 ((long long int) li);
+}
+
+int ffsl (long int li)
+{
+    return __ffsti2 ((long long int) li);
+}
+
+int ffsll (long long int lli)
+{
+    return __ffsti2 (lli);
+}
+
 #if !defined HAVE_LIBC
 
 #include <os.h>
@@ -173,6 +210,19 @@ char *strdup(const char *x)
 	if (!res) return NULL;
     memcpy(res, x, l + 1);
     return res;
+}
+
+int ffs(int i)
+{
+   int c = 1;
+
+   do {
+      if (i & 1)
+         return (c);
+      i = i >> 1;
+      c++;
+   } while (i);
+   return 0;
 }
 
 #endif
