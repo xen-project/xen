@@ -1,6 +1,6 @@
 # Copyright (c) 2005, XenSource Ltd.
 import string, re
-import subprocess
+import popen2
 
 from xen.xend.server.blkif import BlkifController
 from xen.xend.XendLogging import log
@@ -27,9 +27,12 @@ blktap_disk_types = [
  
 def doexec(args, inputtext=None):
     """Execute a subprocess, then return its return code, stdout and stderr"""
-    proc = subprocess.Popen(args,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,close_fds=True)
-    (stdout,stderr) = proc.communicate(inputtext)
-    rc = proc.returncode
+    proc = popen2.Popen3(args, True)
+    if inputtext != None:
+        proc.tochild.write(inputtext)
+    stdout = proc.fromchild
+    stderr = proc.childerr
+    rc = proc.poll()
     return (rc,stdout,stderr)
 
 def parseDeviceString(device):
