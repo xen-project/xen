@@ -255,19 +255,20 @@ struct domain *domain_create(
         d->is_paused_by_controller = 1;
         atomic_inc(&d->pause_count);
 
-        d->nr_pirqs = nr_irqs +
-                      (domid ? extra_domU_irqs :
-                               extra_dom0_irqs ?: nr_irqs);
-        if ( evtchn_init(d) != 0 )
-            goto fail;
-        init_status |= INIT_evtchn;
+        d->nr_pirqs = (nr_irqs +
+                       (domid ? extra_domU_irqs :
+                        extra_dom0_irqs ?: nr_irqs));
         d->pirq_to_evtchn = xmalloc_array(u16, d->nr_pirqs);
-        d->pirq_mask = xmalloc_array(unsigned long,
-                                     BITS_TO_LONGS(d->nr_pirqs));
-        if ( !d->pirq_to_evtchn || !d->pirq_mask )
+        d->pirq_mask = xmalloc_array(
+            unsigned long, BITS_TO_LONGS(d->nr_pirqs));
+        if ( (d->pirq_to_evtchn == NULL) || (d->pirq_mask == NULL) )
             goto fail;
         memset(d->pirq_to_evtchn, 0, d->nr_pirqs * sizeof(*d->pirq_to_evtchn));
         bitmap_zero(d->pirq_mask, d->nr_pirqs);
+
+        if ( evtchn_init(d) != 0 )
+            goto fail;
+        init_status |= INIT_evtchn;
 
         if ( grant_table_create(d) != 0 )
             goto fail;
@@ -310,15 +311,13 @@ struct domain *domain_create(
     if ( init_status & INIT_gnttab )
         grant_table_destroy(d);
     if ( init_status & INIT_evtchn )
-    {
-        xfree(d->pirq_mask);
-        xfree(d->pirq_to_evtchn);
         evtchn_destroy(d);
-    }
     if ( init_status & INIT_rangeset )
         rangeset_domain_destroy(d);
     if ( init_status & INIT_xsm )
         xsm_free_security_domain(d);
+    xfree(d->pirq_mask);
+    xfree(d->pirq_to_evtchn);
     free_domain_struct(d);
     return NULL;
 }
@@ -602,6 +601,9 @@ static void complete_domain_destroy(struct rcu_head *head)
 
     if ( d->target != NULL )
         put_domain(d->target);
+
+    xfree(d->pirq_mask);
+    xfree(d->pirq_to_evtchn);
 
     xsm_free_security_domain(d);
     free_domain_struct(d);
