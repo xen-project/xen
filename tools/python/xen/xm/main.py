@@ -2183,43 +2183,45 @@ def xm_pci_list(args):
             ppci_ref = server.xenapi.DPCI.get_PPCI(dpci_ref)
             ppci_record = server.xenapi.PPCI.get_record(ppci_ref)
             dev = {
-                "domain":   "0x%04x" % int(ppci_record["domain"]),
-                "bus":      "0x%02x" % int(ppci_record["bus"]),
-                "slot":     "0x%02x" % int(ppci_record["slot"]),
-                "func":     "0x%01x" % int(ppci_record["func"]),
-                "vslot":    "0x%02x" % \
-                            int(server.xenapi.DPCI.get_hotplug_slot(dpci_ref))
+                "domain":   int(ppci_record["domain"]),
+                "bus":      int(ppci_record["bus"]),
+                "slot":     int(ppci_record["slot"]),
+                "func":     int(ppci_record["func"]),
+                "vslot":    int(server.xenapi.DPCI.get_hotplug_slot(dpci_ref))
             }
             devs.append(dev)
 
     else:
-        devs = server.xend.domain.getDeviceSxprs(dom, 'pci')
+        for x in server.xend.domain.getDeviceSxprs(dom, 'pci'):
+            dev = {
+                "domain":   int(x["domain"], 16),
+                "bus":      int(x["bus"], 16),
+                "slot":     int(x["slot"], 16),
+                "func":     int(x["func"], 16),
+                "vslot":    int(assigned_or_requested_vslot(x), 16)
+            }
+            devs.append(dev)
 
     if len(devs) == 0:
         return
 
     has_vslot = False
     for x in devs:
-        vslot = assigned_or_requested_vslot(x)
-        if int(vslot, 16) == AUTO_PHP_SLOT:
-            x['vslot'] = '-'
+        if x['vslot'] == AUTO_PHP_SLOT:
+            x['show_vslot'] = '-'
         else:
-            x['vslot'] = vslot
+            x['show_vslot'] = "0x%02x" % x['vslot']
             has_vslot = True
 
+    hdr_str = 'domain bus  slot func'
+    fmt_str = '0x%(domain)04x 0x%(bus)02x 0x%(slot)02x 0x%(func)x'
     if has_vslot:
-        hdr_str = 'VSlt domain   bus   slot   func'
-        fmt_str =  "%(vslot)-4s %(domain)-6s   %(bus)-4s  %(slot)-4s   %(func)-3s    "
-    else:
-        hdr_str = 'domain   bus   slot   func'
-        fmt_str =  "%(domain)-6s   %(bus)-4s  %(slot)-4s   %(func)-3s    "
-    hdr = 0
+        hdr_str = 'VSlt ' + hdr_str
+        fmt_str = '%(show_vslot)-4s ' + fmt_str
 
+    print hdr_str
     for x in devs:
-        if hdr == 0:
-            print (hdr_str)
-            hdr = 1
-        print ( fmt_str % x )
+        print fmt_str % x
 
 
 def parse_pci_info(info):
