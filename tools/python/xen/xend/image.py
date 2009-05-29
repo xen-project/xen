@@ -454,8 +454,22 @@ class ImageHandler:
         if cmd is '' or ret is '':
             raise VmError('need valid command and result when signal device model')
 
-        orig_state = xstransact.Read("/local/domain/0/device-model/%i/state"
+        count = 0
+        while True:
+            orig_state = xstransact.Read("/local/domain/0/device-model/%i/state"
                                 % self.vm.getDomid())
+            # This can occur right after start-up
+            if orig_state != None:
+                break
+
+            log.debug('signalDeviceModel: orig_state is None, retrying')
+
+            time.sleep(0.1)
+            count += 1
+            if count < 100:
+                continue
+
+            VmError('Device model isn\'t ready for commands')
 
         if par is not None:
             xstransact.Store("/local/domain/0/device-model/%i"

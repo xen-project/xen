@@ -601,7 +601,7 @@ class XendDomainInfo:
         asserts.isCharConvertible(key)
         self.storeDom("control/sysrq", '%c' % key)
 
-    def sync_pcidev_info(self):
+    def pci_device_configure_boot(self):
 
         if not self.info.is_hvm():
             return
@@ -615,33 +615,12 @@ class XendDomainInfo:
         dev_uuid = sxp.child_value(dev_info, 'uuid')
         pci_conf = self.info['devices'][dev_uuid][1]
         pci_devs = pci_conf['devs']
+        request = map(lambda x:
+                      self.info.pci_convert_dict_to_sxp(x, 'Initialising',
+                                                        'Booting'), pci_devs)
 
-        count = 0
-        vslots = None
-        while vslots is None and count < 20:
-            vslots = xstransact.Read("/local/domain/0/backend/pci/%u/%s/vslots"
-                              % (self.getDomid(), devid))
-            time.sleep(0.1)
-            count += 1
-        if vslots is None:
-            log.error("Device model didn't tell the vslots for PCI device")
-            return
-
-        #delete last delim
-        if vslots[-1] == ";":
-            vslots = vslots[:-1]
-
-        slot_list = vslots.split(';')
-        if len(slot_list) != len(pci_devs):
-            log.error("Device model's pci dev num dismatch")
-            return
-
-        #update the vslot info
-        count = 0;
-        for x in pci_devs:
-            x['vslot'] = slot_list[count]
-            count += 1
-
+        for i in request:
+                self.pci_device_configure(i)
 
     def hvm_pci_device_create(self, dev_config):
         log.debug("XendDomainInfo.hvm_pci_device_create: %s"
@@ -741,6 +720,23 @@ class XendDomainInfo:
                     " assigned to other domain." \
                     )% (pci_device.name, self.info['name_label'], pci_str))
 
+        return self.hvm_pci_device_insert_dev(new_dev)
+
+    def hvm_pci_device_insert(self, dev_config):
+        log.debug("XendDomainInfo.hvm_pci_device_insert: %s"
+                  % scrub_password(dev_config))
+
+        if not self.info.is_hvm():
+            raise VmError("hvm_pci_device_create called on non-HVM guest")
+
+        new_dev = dev_config['devs'][0]
+
+        return self.hvm_pci_device_insert_dev(new_dev)
+
+    def hvm_pci_device_insert_dev(self, new_dev):
+        log.debug("XendDomainInfo.hvm_pci_device_insert_dev: %s"
+                  % scrub_password(new_dev))
+
         if self.domid is not None:
             opts = ''
             if 'opts' in new_dev and len(new_dev['opts']) > 0:
@@ -752,7 +748,10 @@ class XendDomainInfo:
                 new_dev['bus'],
                 new_dev['slot'],
                 new_dev['func'],
-                new_dev['requested_vslot'],
+                # vslot will be used when activating a
+                # previously activated domain.
+                # Otherwise requested_vslot will be used.
+                assigned_or_requested_vslot(new_dev),
                 opts)
             self.image.signalDeviceModel('pci-ins', 'pci-inserted', bdf_str)
 
@@ -827,6 +826,7 @@ class XendDomainInfo:
             return False
 
         pci_state = sxp.child_value(dev_sxp, 'state')
+        pci_sub_state = sxp.child_value(dev_sxp, 'sub_state')
         existing_dev_info = self._getDeviceInfo_pci(devid)
 
         if existing_dev_info is None and pci_state != 'Initialising':
@@ -840,7 +840,10 @@ class XendDomainInfo:
         if self.info.is_hvm():
             if pci_state == 'Initialising':
                 # HVM PCI device attachment
-                vslot = self.hvm_pci_device_create(dev_config)
+                if pci_sub_state == 'Booting':
+                    vslot = self.hvm_pci_device_insert(dev_config)
+                else:
+                    vslot = self.hvm_pci_device_create(dev_config)
                 # Update vslot
                 dev['vslot'] = vslot
                 for n in sxp.children(pci_dev):
@@ -907,7 +910,7 @@ class XendDomainInfo:
                         continue
                 new_dev_sxp.append(cur_dev)
 
-            if pci_state == 'Initialising':
+            if pci_state == 'Initialising' and pci_sub_state != 'Booting':
                 for new_dev in sxp.children(dev_sxp, 'dev'):
                     new_dev_sxp.append(new_dev)
 
@@ -2246,7 +2249,7 @@ class XendDomainInfo:
             self.image.createDeviceModel()
 
         #if have pass-through devs, need the virtual pci slots info from qemu
-        self.sync_pcidev_info()
+        self.pci_device_configure_boot()
 
     def _releaseDevices(self, suspend = False):
         """Release all domain's devices.  Nothrow guarantee."""

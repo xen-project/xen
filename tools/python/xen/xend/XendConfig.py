@@ -1669,6 +1669,13 @@ class XendConfig(dict):
 
         return ''
 
+    def pci_convert_dict_to_sxp(self, dev, state, sub_state = None):
+        sxp =  ['pci', ['dev'] + map(lambda (x, y): [x, y], dev.items()),
+                ['state', state]]
+        if sub_state != None:
+            sxp.append(['sub_state', sub_state])
+        return sxp
+
     def pci_convert_sxp_to_dict(self, dev_sxp):
         """Convert pci device sxp to dict
         @param dev_sxp: device configuration
@@ -1723,9 +1730,10 @@ class XendConfig(dict):
                     pci_dev_info[opt] = val
                 except (TypeError, ValueError):
                     pass
-            # append uuid for each pci device.
-            dpci_uuid = pci_dev_info.get('uuid', uuid.createString())
-            pci_dev_info['uuid'] = dpci_uuid
+            # append uuid to each pci device that does't already have one.
+            if not pci_dev_info.has_key('uuid'):
+                dpci_uuid = pci_dev_info.get('uuid', uuid.createString())
+                pci_dev_info['uuid'] = dpci_uuid
             pci_devs.append(pci_dev_info)
         dev_config['devs'] = pci_devs 
 

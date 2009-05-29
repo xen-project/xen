@@ -69,12 +69,7 @@ class PciController(DevController):
         """@see DevController.getDeviceDetails"""
         back = {}
         pcidevid = 0
-        vslots = ""
         for pci_config in config.get('devs', []):
-            attached_vslot = pci_config.get('vslot')
-            if attached_vslot is not None:
-                vslots = vslots + attached_vslot + ";"
-
             domain = parse_hex(pci_config.get('domain', 0))
             bus = parse_hex(pci_config.get('bus', 0))
             slot = parse_hex(pci_config.get('slot', 0))
@@ -93,9 +88,6 @@ class PciController(DevController):
             back['vslot-%i' % pcidevid] = "%02x" % vslot
             pcidevid += 1
 
-        if vslots != "":
-            back['vslots'] = vslots
-
         back['num_devs']=str(pcidevid)
         back['uuid'] = config.get('uuid','')
         if 'pci_msitranslate' in self.vm.info['platform']:
@@ -105,16 +97,17 @@ class PciController(DevController):
 
         return (0, back, {})
 
+    def reconfigureDevice_find(self, devid, nsearch_dev, match_dev):
+        for j in range(nsearch_dev):
+            if match_dev == self.readBackend(devid, 'dev-%i' % j):
+                return j
+        return None
 
     def reconfigureDevice(self, _, config):
         """@see DevController.reconfigureDevice"""
         (devid, back, front) = self.getDeviceDetails(config)
         num_devs = int(back['num_devs'])
         states = config.get('states', [])
-
-        old_vslots = self.readBackend(devid, 'vslots')
-        if old_vslots is None:
-            old_vslots = ''
         num_olddevs = int(self.readBackend(devid, 'num_devs'))
 
         for i in range(num_devs):
@@ -129,11 +122,15 @@ class PciController(DevController):
                 raise XendError('Error reading config')
 
             if state == 'Initialising':
-                # PCI device attachment
-                for j in range(num_olddevs):
-                    if dev == self.readBackend(devid, 'dev-%i' % j):
-                        raise XendError('Device %s is already connected.' % dev)
-                log.debug('Attaching PCI device %s.' % dev)
+                devno = self.reconfigureDevice_find(devid, num_olddevs, dev)
+                if devno == None:
+                    devno = num_olddevs + i
+                    log.debug('Attaching PCI device %s.' % dev)
+                    attaching = True
+                else:
+                    log.debug('Reconfiguring PCI device %s.' % dev)
+                    attaching = False
+
                 (domain, bus, slotfunc) = dev.split(':')
                 (slot, func) = slotfunc.split('.')
                 domain = parse_hex(domain)
@@ -142,41 +139,28 @@ class PciController(DevController):
                 func = parse_hex(func)
                 self.setupOneDevice(domain, bus, slot, func)
 
-                self.writeBackend(devid, 'dev-%i' % (num_olddevs + i), dev)
-                self.writeBackend(devid, 'state-%i' % (num_olddevs + i),
+                self.writeBackend(devid, 'dev-%i' % devno, dev)
+                self.writeBackend(devid, 'state-%i' % devno,
                                   str(xenbusState['Initialising']))
-                self.writeBackend(devid, 'uuid-%i' % (num_olddevs + i), uuid)
+                self.writeBackend(devid, 'uuid-%i' % devno, uuid)
                 if len(opts) > 0:
-                    self.writeBackend(devid, 'opts-%i' % (num_olddevs + i), opts)
-                self.writeBackend(devid, 'num_devs', str(num_olddevs + i + 1))
+                    self.writeBackend(devid, 'opts-%i' % devno, opts)
+                if back.has_key('vslot-%i' % i):
+                    self.writeBackend(devid, 'vslot-%i' % devno,
+                                      back['vslot-%i' % i])
 
-                # Update vslots
-                if back['vslots'] is not None:
-                    vslots = old_vslots + back['vslots']
-                    self.writeBackend(devid, 'vslots', vslots)
+                # If a device is being attached then num_devs will grow
+                if attaching:
+                    self.writeBackend(devid, 'num_devs', str(devno + 1))
 
             elif state == 'Closing':
                 # PCI device detachment
-                found = False
-                for j in range(num_olddevs):
-                    if dev == self.readBackend(devid, 'dev-%i' % j):
-                        found = True
-                        log.debug('Detaching device %s' % dev)
-                        self.writeBackend(devid, 'state-%i' % j,
-                                          str(xenbusState['Closing']))
-                if not found:
+                devno = self.reconfigureDevice_find(devid, num_olddevs, dev)
+                if devno == None:
                     raise XendError('Device %s is not connected' % dev)
-
-                # Update vslots
-                if back.get('vslots') is not None:
-                    vslots = old_vslots
-                    for vslot in back['vslots'].split(';'):
-                        if vslot != '':
-                            vslots = vslots.replace(vslot + ';', '', 1)
-                    if vslots == '':
-                        self.removeBackend(devid, 'vslots')
-                    else:
-                        self.writeBackend(devid, 'vslots', vslots)
+                log.debug('Detaching device %s' % dev)
+                self.writeBackend(devid, 'state-%i' % devno,
+                                  str(xenbusState['Closing']))
 
             else:
                 raise XendError('Error configuring device %s: invalid state %s'
@@ -191,12 +175,6 @@ class PciController(DevController):
         result = DevController.getDeviceConfiguration(self, devid, transaction)
         num_devs = self.readBackend(devid, 'num_devs')
         pci_devs = []
-        
-        vslots = self.readBackend(devid, 'vslots')
-        if vslots is not None:
-            if vslots[-1] == ";":
-                vslots = vslots[:-1]
-            slot_list = vslots.split(';')
 
         for i in range(int(num_devs)):
             dev_config = self.readBackend(devid, 'dev-%d' % i)
@@ -215,13 +193,11 @@ class PciController(DevController):
 
                 # Per device uuid info
                 dev_dict['uuid'] = self.readBackend(devid, 'uuid-%d' % i)
-
-                #append vslot info
-                if vslots is not None:
-                    try:
-                        dev_dict['vslot'] = slot_list[i]
-                    except IndexError:
-                        dev_dict['vslot'] = AUTO_PHP_SLOT_STR
+                vslot = self.readBackend(devid, 'vslot-%d' % i)
+                if vslot != None:
+                    dev_dict['vslot'] = self.readBackend(devid, 'vslot-%d' % i)
+                else:
+                    dev_dict['vslot'] = AUTO_PHP_SLOT_STR
 
                 #append opts info
                 opts = self.readBackend(devid, 'opts-%d' % i)
