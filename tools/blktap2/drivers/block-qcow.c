@@ -35,6 +35,7 @@
 #include <inttypes.h>
 #include <libaio.h>
 #include <openssl/md5.h>
+#include <limits.h>
 #include "bswap.h"
 #include "aes.h"
 
