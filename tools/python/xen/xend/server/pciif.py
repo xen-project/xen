@@ -76,10 +76,8 @@ class PciController(DevController):
             func = parse_hex(pci_config.get('func', 0))            
             vslot = parse_hex(assigned_or_requested_vslot(pci_config))
 
-            opts = pci_config.get('opts', '')
-            if len(opts) > 0:
-                opts = map(lambda (x, y): x+'='+y, opts)
-                opts = reduce(lambda x, y: x+','+y, opts)
+            if pci_config.has_key('opts'):
+                opts = serialise_pci_opts(pci_config['opts'])
                 back['opts-%i' % pcidevid] = opts
 
             back['dev-%i' % pcidevid] = "%04x:%02x:%02x.%01x" % \
@@ -226,10 +224,7 @@ class PciController(DevController):
             dev_sxpr = ['dev']
             for dev_key, dev_val in dev.items():
                 if dev_key == 'opts':
-                    opts = []
-                    for opt in dev_val.split(','):
-                        opts.append(opt.split('='))
-                    dev_sxpr.append(['opts', opts])
+                    dev_sxpr.append(['opts', split_pci_opts(dev_val)])
                 else:
                     dev_sxpr.append([dev_key, dev_val])
             sxpr.append(dev_sxpr)

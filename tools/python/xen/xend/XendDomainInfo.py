@@ -39,7 +39,7 @@ from xen.util import asserts, auxbin
 from xen.util.blkif import blkdev_uname_to_file, blkdev_uname_to_taptype
 import xen.util.xsm.xsm as security
 from xen.util import xsconstants
-from xen.util.pci import assigned_or_requested_vslot
+from xen.util.pci import assigned_or_requested_vslot, serialise_pci_opts
 
 from xen.xend import balloon, sxp, uuid, image, arch
 from xen.xend import XendOptions, XendNode, XendConfig
@@ -739,10 +739,8 @@ class XendDomainInfo:
 
         if self.domid is not None:
             opts = ''
-            if 'opts' in new_dev and len(new_dev['opts']) > 0:
-                config_opts = new_dev['opts']
-                config_opts = map(lambda (x, y): x+'='+y, config_opts)
-                opts = ',' + reduce(lambda x, y: x+','+y, config_opts)
+            if new_dev.has_key('opts'):
+                opts = ',' + serialise_pci_opts(new_dev['opts'])
 
             bdf_str = "%s:%s:%s.%s@%s%s" % (new_dev['domain'],
                 new_dev['bus'],

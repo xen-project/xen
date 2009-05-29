@@ -114,6 +114,12 @@ PAGE_MASK=~(PAGE_SIZE - 1)
 def PCI_DEVFN(slot, func):
     return ((((slot) & 0x1f) << 3) | ((func) & 0x07))
 
+def serialise_pci_opts(opts):
+    return reduce(lambda x, y: x+','+y, map(lambda (x, y): x+'='+y, opts))
+
+def split_pci_opts(opts):
+    return map(lambda x: x.split('='), opts.split(','))
+
 def parse_hex(val):
     try:
         if isinstance(val, types.StringTypes):
