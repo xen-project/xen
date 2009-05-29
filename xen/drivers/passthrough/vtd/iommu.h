@@ -455,7 +455,7 @@ struct iommu_flush {
     int (*context)(void *iommu, u16 did, u16 source_id,
                    u8 function_mask, u64 type, int non_present_entry_flush);
     int (*iotlb)(void *iommu, u16 did, u64 addr, unsigned int size_order,
-                 u64 type, int non_present_entry_flush);
+                 u64 type, int flush_non_present_entry, int flush_dev_iotlb);
 };
 
 struct intel_iommu {

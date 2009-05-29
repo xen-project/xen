@@ -156,7 +156,7 @@ struct acpi_drhd_unit * acpi_find_matched_drhd_unit(struct pci_dev *pdev)
 {
     u8 bus, devfn;
     struct acpi_drhd_unit *drhd;
-    struct acpi_drhd_unit *found = NULL, *include_all = NULL;
+    struct acpi_drhd_unit *include_all = NULL;
     int i;
 
     if (pdev->info.is_extfn) {
@@ -177,35 +177,28 @@ struct acpi_drhd_unit * acpi_find_matched_drhd_unit(struct pci_dev *pdev)
                 return drhd;
 
         if ( test_bit(bus, drhd->scope.buses) )
-            found = drhd;
+            return drhd;
 
         if ( drhd->include_all )
             include_all = drhd;
     }
-
-    return found ? found : include_all;
+    return include_all;
 }
 
 struct acpi_atsr_unit * acpi_find_matched_atsr_unit(u8 bus, u8 devfn)
 {
     struct acpi_atsr_unit *atsr;
-    struct acpi_atsr_unit *found = NULL, *include_all = NULL;
-    int i;
+    struct acpi_atsr_unit *all_ports = NULL;
 
     list_for_each_entry ( atsr, &acpi_atsr_units, list )
     {
-        for (i = 0; i < atsr->scope.devices_cnt; i++)
-            if ( atsr->scope.devices[i] == PCI_BDF2(bus, devfn) )
-                return atsr;
-
         if ( test_bit(bus, atsr->scope.buses) )
-            found = atsr;
+            return atsr;
 
         if ( atsr->all_ports )
-            include_all = atsr;
+            all_ports = atsr;
     }
-
-    return found ? found : include_all;
+    return all_ports;
 }
 
 /*
@@ -227,7 +220,8 @@ static int scope_device_count(void *start, void *end)
             return -EINVAL;
         }
 
-        if ( scope->dev_type == ACPI_DEV_ENDPOINT ||
+        if ( scope->dev_type == ACPI_DEV_P2PBRIDGE ||
+             scope->dev_type == ACPI_DEV_ENDPOINT ||
              scope->dev_type == ACPI_DEV_IOAPIC ||
              scope->dev_type == ACPI_DEV_MSI_HPET )
             count++;
@@ -286,19 +280,18 @@ static int __init acpi_parse_dev_scope(void *start, void *end,
                     "found bridge: bdf = %x:%x.%x  sec = %x  sub = %x\n",
                     bus, path->dev, path->fn, sec_bus, sub_bus);
 
+            dmar_scope_add_buses(scope, acpi_scope->start_bus, acpi_scope->start_bus);
             dmar_scope_add_buses(scope, sec_bus, sub_bus);
             break;
 
         case ACPI_DEV_MSI_HPET:
             dprintk(XENLOG_INFO VTDPREFIX, "found MSI HPET: bdf = %x:%x.%x\n",
                     bus, path->dev, path->fn);
-            scope->devices[didx++] = PCI_BDF(bus, path->dev, path->fn);
             break;
 
         case ACPI_DEV_ENDPOINT:
             dprintk(XENLOG_INFO VTDPREFIX, "found endpoint: bdf = %x:%x.%x\n",
                     bus, path->dev, path->fn);
-            scope->devices[didx++] = PCI_BDF(bus, path->dev, path->fn);
             break;
 
         case ACPI_DEV_IOAPIC:
@@ -318,10 +311,9 @@ static int __init acpi_parse_dev_scope(void *start, void *end,
                 list_add(&acpi_ioapic_unit->list, &drhd->ioapic_list);
             }
 
-            scope->devices[didx++] = PCI_BDF(bus, path->dev, path->fn);
             break;
         }
-
+        scope->devices[didx++] = PCI_BDF(bus, path->dev, path->fn);
         start += acpi_scope->length;
    }
 

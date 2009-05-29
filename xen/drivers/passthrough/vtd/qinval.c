@@ -29,6 +29,8 @@
 #include "vtd.h"
 #include "extern.h"
 
+int qinval_enabled;
+
 static void print_qi_regs(struct iommu *iommu)
 {
     u64 val;
@@ -343,7 +345,7 @@ int iommu_flush_iec_index(struct iommu *iommu, u8 im, u16 iidx)
 
 static int flush_context_qi(
     void *_iommu, u16 did, u16 sid, u8 fm, u64 type,
-    int non_present_entry_flush)
+    int flush_non_present_entry)
 {
     int ret = 0;
     struct iommu *iommu = (struct iommu *)_iommu;
@@ -355,7 +357,7 @@ static int flush_context_qi(
      * entry, we flush entries of domain 0 (the domain id is used to cache
      * any non-present entries)
      */
-    if ( non_present_entry_flush )
+    if ( flush_non_present_entry )
     {
         if ( !cap_caching_mode(iommu->cap) )
             return 1;
@@ -375,7 +377,7 @@ static int flush_context_qi(
 static int flush_iotlb_qi(
     void *_iommu, u16 did,
     u64 addr, unsigned int size_order, u64 type,
-    int non_present_entry_flush)
+    int flush_non_present_entry, int flush_dev_iotlb)
 {
     u8 dr = 0, dw = 0;
     int ret = 0;
@@ -388,7 +390,7 @@ static int flush_iotlb_qi(
      * entry, we flush entries of domain 0 (the domain id is used to cache
      * any non-present entries)
      */
-    if ( non_present_entry_flush )
+    if ( flush_non_present_entry )
     {
         if ( !cap_caching_mode(iommu->cap) )
             return 1;
@@ -407,6 +409,10 @@ static int flush_iotlb_qi(
         ret = queue_invalidate_iotlb(iommu,
                   (type >> DMA_TLB_FLUSH_GRANU_OFFSET), dr,
                   dw, did, (u8)size_order, 0, addr);
+#if defined(NOT_YET)
+        if ( flush_dev_iotlb )
+            ret |= dev_invalidate_iotlb(iommu, did, addr, size_order, type);
+#endif
         ret |= invalidate_sync(iommu);
     }
     return ret;
@@ -462,6 +468,7 @@ int enable_qinval(struct iommu *iommu)
         cpu_relax();
     }
 
+    qinval_enabled = 1;
     return 0;
 }
 

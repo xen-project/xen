@@ -419,6 +419,9 @@
 #define PCI_EXT_CAP_ID_VC	2
 #define PCI_EXT_CAP_ID_DSN	3
 #define PCI_EXT_CAP_ID_PWR	4
+#define PCI_EXT_CAP_ID_ARI	0xE
+#define PCI_EXT_CAP_ID_ATS	0xF
+#define PCI_EXT_CAP_ID_IOV	0x10
 
 /* Advanced Error Reporting */
 #define PCI_ERR_UNCOR_STATUS	4	/* Uncorrectable Error Status */

@@ -23,6 +23,8 @@
 
 #include "dmar.h"
 
+extern int qinval_enabled;
+extern int ats_enabled;
 extern struct qi_ctrl *qi_ctrl;
 extern struct ir_ctrl *ir_ctrl;
 
@@ -46,5 +48,8 @@ int iommu_flush_iec_index(struct iommu *iommu, u8 im, u16 iidx);
 struct iommu * ioapic_to_iommu(unsigned int apic_id);
 struct acpi_drhd_unit * ioapic_to_drhd(unsigned int apic_id);
 void clear_fault_bits(struct iommu *iommu);
+int qinval_device_iotlb(struct iommu *iommu,
+                        u32 max_invs_pend, u16 sid, u16 size, u64 addr);
+struct acpi_drhd_unit * find_ats_dev_drhd(struct iommu *iommu);
 
 #endif // _VTD_EXTERN_H_
