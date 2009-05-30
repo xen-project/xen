@@ -444,7 +444,7 @@ void hvm_dirq_assist(struct vcpu *v)
           irq < d->nr_pirqs;
           irq = find_next_bit(hvm_irq_dpci->dirq_mask, d->nr_pirqs, irq + 1) )
     {
-        if ( !test_and_clear_bit(irq, &hvm_irq_dpci->dirq_mask) )
+        if ( !test_and_clear_bit(irq, hvm_irq_dpci->dirq_mask) )
             continue;
 
         spin_lock(&d->event_lock);
