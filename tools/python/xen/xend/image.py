@@ -83,7 +83,7 @@ class ImageHandler:
     """
 
     ostype = None
-
+    superpages = 0
 
     def __init__(self, vm, vmConfig):
         self.vm = vm
