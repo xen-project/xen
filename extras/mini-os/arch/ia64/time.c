@@ -85,7 +85,6 @@ static int get_day(int year, int mon, int day) {
 }
 
 /*
- * mktime() is take from Linux. See copyright above.
  * Converts Gregorian date to seconds since 1970-01-01 00:00:00.
  * Assumes input in normal date format, i.e. 1980-12-31 23:59:59
  * => year=1980, mon=12, day=31, hour=23, min=59, sec=59.
