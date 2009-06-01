@@ -581,21 +581,6 @@ static NOINLINE void obj_free(obj_t *obj, int no_rebalance)
     tmem_free(obj,sizeof(obj_t),pool);
 }
 
-static NOINLINE void obj_rb_destroy_node(struct rb_node *node)
-{
-    obj_t * obj;
-
-    if ( node == NULL )
-        return;
-    obj_rb_destroy_node(node->rb_left);
-    obj_rb_destroy_node(node->rb_right);
-    obj = container_of(node, obj_t, rb_tree_node);
-    tmem_spin_lock(&obj->obj_spinlock);
-    ASSERT(obj->no_evict == 0);
-    radix_tree_destroy(&obj->tree_root, pgp_destroy, rtn_free);
-    obj_free(obj,1);
-}
-
 static NOINLINE int obj_rb_insert(struct rb_root *root, obj_t *obj)
 {
     struct rb_node **new, *parent = NULL;
@@ -650,26 +635,15 @@ static NOINLINE obj_t * obj_new(pool_t *pool, uint64_t oid)
 }
 
 /* free an object after destroying any pgps in it */
-static NOINLINE void obj_destroy(obj_t *obj)
+static NOINLINE void obj_destroy(obj_t *obj, int no_rebalance)
 {
     ASSERT_WRITELOCK(&obj->pool->pool_rwlock);
     radix_tree_destroy(&obj->tree_root, pgp_destroy, rtn_free);
-    obj_free(obj,0);
+    obj_free(obj,no_rebalance);
 }
 
-/* destroy all objects in a pool */
-static NOINLINE void obj_rb_destroy_all(pool_t *pool)
-{
-    int i;
-
-    tmem_write_lock(&pool->pool_rwlock);
-    for (i = 0; i < OBJ_HASH_BUCKETS; i++)
-        obj_rb_destroy_node(pool->obj_rb_root[i].rb_node);
-    tmem_write_unlock(&pool->pool_rwlock);
-}
-
-/* destroys all objects in a pool that have last_client set to cli_id */
-static void obj_free_selective(pool_t *pool, cli_id_t cli_id)
+/* destroys all objs in a pool, or only if obj->last_client matches cli_id */
+static void pool_destroy_objs(pool_t *pool, bool_t selective, cli_id_t cli_id)
 {
     struct rb_node *node;
     obj_t *obj;
@@ -684,8 +658,11 @@ static void obj_free_selective(pool_t *pool, cli_id_t cli_id)
             obj = container_of(node, obj_t, rb_tree_node);
             tmem_spin_lock(&obj->obj_spinlock);
             node = rb_next(node);
-            if ( obj->last_client == cli_id )
-                obj_destroy(obj);
+            ASSERT(obj->no_evict == 0);
+            if ( !selective )
+                obj_destroy(obj,1);
+            else if ( obj->last_client == cli_id )
+                obj_destroy(obj,0);
             else
                 tmem_spin_unlock(&obj->obj_spinlock);
         }
@@ -740,8 +717,9 @@ static int shared_pool_join(pool_t *pool, client_t *new_client)
         return -1;
     sl->client = new_client;
     list_add_tail(&sl->share_list, &pool->share_list);
-    printk("adding new %s %d to shared pool owned by %s %d\n",
-        client_str, new_client->cli_id, client_str, pool->client->cli_id);
+    if ( new_client->cli_id != pool->client->cli_id )
+        printk("adding new %s %d to shared pool owned by %s %d\n",
+            client_str, new_client->cli_id, client_str, pool->client->cli_id);
     return ++pool->shared_count;
 }
 
@@ -766,6 +744,10 @@ static NOINLINE void shared_pool_reassign(pool_t *pool)
         if (new_client->pools[poolid] == pool)
             break;
     ASSERT(poolid != MAX_POOLS_PER_DOMAIN);
+    new_client->eph_count += _atomic_read(pool->pgp_count);
+    old_client->eph_count -= _atomic_read(pool->pgp_count);
+    list_splice_init(&old_client->ephemeral_page_list,
+                     &new_client->ephemeral_page_list);
     printk("reassigned shared pool from %s=%d to %s=%d pool_id=%d\n",
         cli_id_str, old_client->cli_id, cli_id_str, new_client->cli_id, poolid);
     pool->pool_id = poolid;
@@ -781,7 +763,8 @@ static NOINLINE int shared_pool_quit(pool_t *pool, cli_id_t cli_id)
     ASSERT(is_shared(pool));
     ASSERT(pool->client != NULL);
     
-    obj_free_selective(pool,cli_id);
+    ASSERT_WRITELOCK(&tmem_rwlock);
+    pool_destroy_objs(pool,1,cli_id);
     list_for_each_entry(sl,&pool->share_list, share_list)
     {
         if (sl->client->cli_id != cli_id)
@@ -812,15 +795,15 @@ static void pool_flush(pool_t *pool, cli_id_t cli_id, bool_t destroy)
     ASSERT(pool != NULL);
     if ( (is_shared(pool)) && (shared_pool_quit(pool,cli_id) > 0) )
     {
-        printk("tmem: unshared shared pool %d from %s=%d\n",
-           pool->pool_id, cli_id_str,pool->client->cli_id);
+        printk("tmem: %s=%d no longer using shared pool %d owned by %s=%d\n",
+           cli_id_str, cli_id, pool->pool_id, cli_id_str,pool->client->cli_id);
         return;
     }
     printk("%s %s-%s tmem pool ",destroy?"destroying":"flushing",
         is_persistent(pool) ? "persistent" : "ephemeral" ,
         is_shared(pool) ? "shared" : "private");
     printk("%s=%d pool_id=%d\n", cli_id_str,pool->client->cli_id,pool->pool_id);
-    obj_rb_destroy_all(pool);
+    pool_destroy_objs(pool,0,CLI_ID_NULL);
     if ( destroy )
     {
         pool->client->pools[pool->pool_id] = NULL;
@@ -1378,7 +1361,7 @@ static NOINLINE int do_tmem_flush_object(pool_t *pool, uint64_t oid)
     if ( obj == NULL )
         goto out;
     tmem_write_lock(&pool->pool_rwlock);
-    obj_destroy(obj);
+    obj_destroy(obj,0);
     pool->flush_objs_found++;
     tmem_write_unlock(&pool->pool_rwlock);
 
@@ -1455,7 +1438,7 @@ static NOINLINE int do_tmem_new_pool(uint32_t flags, uint64_t uuid_lo, uint64_t 
             {
                 if ( shpool->uuid[0] == uuid_lo && shpool->uuid[1] == uuid_hi )
                 {
-                    printk("(matches shared pool uuid=%"PRIx64".%"PRIu64") ",
+                    printk("(matches shared pool uuid=%"PRIx64".%"PRIx64") ",
                         uuid_hi, uuid_lo);
                     printk("pool_id=%d\n",d_poolid);
                     client->pools[d_poolid] = global_shared_pools[s_poolid];
@@ -1507,10 +1490,8 @@ static int tmemc_freeze_pools(int cli_id, int arg)
     if ( cli_id == CLI_ID_NULL )
     {
         list_for_each_entry(client,&global_client_list,client_list)
-        {
             client->frozen = freeze;
-            printk("tmem: all pools %s for all %ss\n",s,client_str);
-        }
+        printk("tmem: all pools %s for all %ss\n",s,client_str);
     }
     else
     {
@@ -1878,7 +1859,7 @@ EXPORT long do_tmem_op(tmem_cli_op_t uops)
         }
     }
 
-    if ( op.cmd == TMEM_NEW_POOL )
+    if ( op.cmd == TMEM_NEW_POOL || op.cmd == TMEM_DESTROY_POOL )
     {
         if ( !tmem_write_lock_set )
         {

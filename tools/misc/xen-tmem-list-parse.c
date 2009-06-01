@@ -29,6 +29,20 @@ unsigned long long parse(char *s,char *match)
     return ret;
 }
 
+unsigned long long parse_hex(char *s,char *match)
+{
+    char *s1 = strstr(s,match);
+    unsigned long long ret;
+
+    if ( s1 == NULL )
+        return 0LL;
+    s1 += 2;
+    if ( *s1++ != ':' )
+        return 0LL;
+    sscanf(s1,"%llx",&ret);
+    return ret;
+}
+
 unsigned long long parse2(char *s,char *match1, char *match2)
 {
     char match[3];
@@ -64,7 +78,7 @@ void parse_sharers(char *s, char *match, char *buf, int len)
         s1 += 2;
         if (*s1++ != ':')
             return;
-        while (*s1 <= '0' && *s1 <= '9')
+        while (*s1 >= '0' && *s1 <= '9')
             *b++ = *s1++;
         *b++ = ',';
         s1 = strstr(s1,match);
@@ -196,6 +210,8 @@ void parse_pool(char *s)
     unsigned long long flush_objs = parse(s,"ot");
 
     parse_string(s,"PT",pool_type,2);
+    if (pool_type[1] == 'S')
+        return; /* no need to repeat print data for shared pools */
     printf("domid%lu,id%lu[%s]:pgp=%llu(max=%llu) obj=%llu(%llu) "
            "objnode=%llu(%llu) puts=%llu/%llu/%llu(dup=%llu/%llu) "
            "gets=%llu/%llu(%llu%%) "
@@ -216,8 +232,8 @@ void parse_shared_pool(char *s)
     char pool_type[3];
     char buf[BUFSIZE];
     unsigned long pool_id = parse(s,"PI");
-    unsigned long long uid0 = parse(s,"U0");
-    unsigned long long uid1 = parse(s,"U1");
+    unsigned long long uid0 = parse_hex(s,"U0");
+    unsigned long long uid1 = parse_hex(s,"U1");
     unsigned long long pgp_count = parse(s,"Pc");
     unsigned long long max_pgp_count = parse(s,"Pm");
     unsigned long long obj_count = parse(s,"Oc");
@@ -238,7 +254,7 @@ void parse_shared_pool(char *s)
 
     parse_string(s,"PT",pool_type,2);
     parse_sharers(s,"SC",buf,BUFSIZE);
-    printf("poolid=%lu[%s] uuid=%llu.%llu, shared-by:%s: "
+    printf("poolid=%lu[%s] uuid=%llx.%llx, shared-by:%s: "
            "pgp=%llu(max=%llu) obj=%llu(%llu) "
            "objnode=%llu(%llu) puts=%llu/%llu/%llu(dup=%llu/%llu) "
            "gets=%llu/%llu(%llu%%) "
