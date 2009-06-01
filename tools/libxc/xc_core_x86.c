@@ -75,10 +75,10 @@ xc_core_arch_memory_map_get(int xc_handle, struct xc_core_arch_context *unused,
     return 0;
 }
 
-int
-xc_core_arch_map_p2m(int xc_handle, unsigned int guest_width, xc_dominfo_t *info,
-                     shared_info_any_t *live_shinfo, xen_pfn_t **live_p2m,
-                     unsigned long *pfnp)
+static int
+xc_core_arch_map_p2m_rw(int xc_handle, unsigned int guest_width, xc_dominfo_t *info,
+                        shared_info_any_t *live_shinfo, xen_pfn_t **live_p2m,
+                        unsigned long *pfnp, int rw)
 {
     /* Double and single indirect references to the live P2M table */
     xen_pfn_t *live_p2m_frame_list_list = NULL;
@@ -156,7 +156,8 @@ xc_core_arch_map_p2m(int xc_handle, unsigned int guest_width, xc_dominfo_t *info
         for ( i = P2M_FL_ENTRIES - 1; i >= 0; i-- )
             p2m_frame_list[i] = ((uint32_t *)p2m_frame_list)[i];
 
-    *live_p2m = xc_map_foreign_pages(xc_handle, dom, PROT_READ,
+    *live_p2m = xc_map_foreign_pages(xc_handle, dom,
+                                    rw ? (PROT_READ | PROT_WRITE) : PROT_READ,
                                     p2m_frame_list,
                                     P2M_FL_ENTRIES);
 
@@ -189,6 +190,23 @@ out:
     return ret;
 }
 
+int
+xc_core_arch_map_p2m(int xc_handle, unsigned int guest_width, xc_dominfo_t *info,
+                        shared_info_any_t *live_shinfo, xen_pfn_t **live_p2m,
+                        unsigned long *pfnp)
+{
+    return xc_core_arch_map_p2m_rw(xc_handle, guest_width, info,
+                                   live_shinfo, live_p2m, pfnp, 0);
+}
+
+int
+xc_core_arch_map_p2m_writable(int xc_handle, unsigned int guest_width, xc_dominfo_t *info,
+                              shared_info_any_t *live_shinfo, xen_pfn_t **live_p2m,
+                              unsigned long *pfnp)
+{
+    return xc_core_arch_map_p2m_rw(xc_handle, guest_width, info,
+                                   live_shinfo, live_p2m, pfnp, 1);
+}
 /*
  * Local variables:
  * mode: C
