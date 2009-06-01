@@ -163,6 +163,8 @@ int xc_mark_page_offline(int xc, unsigned long start,
 int xc_query_page_offline_status(int xc, unsigned long start,
                                  unsigned long end, uint32_t *status);
 
+int xc_exchange_page(int xc_handle, int domid, xen_pfn_t mfn);
+
 
 /**
  * This function map m2p table

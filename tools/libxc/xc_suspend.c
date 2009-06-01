@@ -110,7 +110,7 @@ int xc_suspend_evtchn_init(int xc, int xce, int domid, int port)
     return suspend_evtchn;
 
 cleanup:
-    if (suspend_evtchn > 0)
+    if (suspend_evtchn != -1)
         xc_suspend_evtchn_release(xce, suspend_evtchn);
 
     return -1;
