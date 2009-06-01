@@ -414,6 +414,11 @@ int xc_gnttab_set_max_grants(int xcg_handle,
     return ret;
 }
 
+struct grant_entry *xc_gnttab_map_table(int xc_handle, int domid, int *gnt_num)
+{
+    return NULL;
+}
+
 /*
  * Local variables:
  * mode: C

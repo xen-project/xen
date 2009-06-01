@@ -263,6 +263,11 @@ void discard_file_cache(int fd, int flush)
     }
 }
 
+struct grant_entry *xc_gnttab_map_table(int xc_handle, int domid, int *gnt_num)
+{
+    return NULL;
+}
+
 /*
  * Local variables:
  * mode: C
