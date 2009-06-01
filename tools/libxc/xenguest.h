@@ -154,4 +154,13 @@ int xc_suspend_evtchn_init(int xc, int xce, int domid, int port);
 
 int xc_await_suspend(int xce, int suspend_evtchn);
 
+int xc_mark_page_online(int xc, unsigned long start,
+                        unsigned long end, uint32_t *status);
+
+int xc_mark_page_offline(int xc, unsigned long start,
+                          unsigned long end, uint32_t *status);
+
+int xc_query_page_offline_status(int xc, unsigned long start,
+                                 unsigned long end, uint32_t *status);
+
 #endif /* XENGUEST_H */
