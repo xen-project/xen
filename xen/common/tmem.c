@@ -867,7 +867,6 @@ static void client_free(client_t *client)
 {
     list_del(&client->client_list);
     tmh_client_destroy(client->tmh);
-    tmh_set_current_client(NULL);
     tmem_free(client,sizeof(client_t),NULL);
 }
 
@@ -1992,20 +1991,17 @@ EXPORT void tmem_destroy(void *v)
 {
     client_t *client = (client_t *)v;
 
+    if ( client == NULL )
+        return;
+
     if ( tmh_lock_all )
         spin_lock(&tmem_spinlock);
     else
         write_lock(&tmem_rwlock);
 
-    if ( client == NULL )
-        printk("tmem: can't destroy tmem pools for %s=%d\n",
-               cli_id_str,client->cli_id);
-    else
-    {
-        printk("tmem: flushing tmem pools for %s=%d\n",
-               cli_id_str,client->cli_id);
-        client_flush(client,1);
-    }
+    printk("tmem: flushing tmem pools for %s=%d\n",
+           cli_id_str, client->cli_id);
+    client_flush(client, 1);
 
     if ( tmh_lock_all )
         spin_unlock(&tmem_spinlock);
