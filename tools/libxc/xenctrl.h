@@ -27,6 +27,7 @@
 #include <xen/event_channel.h>
 #include <xen/sched.h>
 #include <xen/memory.h>
+#include <xen/grant_table.h>
 #include <xen/hvm/params.h>
 #include <xen/xsm/acm.h>
 #include <xen/xsm/acm_ops.h>
@@ -936,6 +937,11 @@ int xc_gnttab_munmap(int xcg_handle,
  */
 int xc_gnttab_set_max_grants(int xcg_handle,
 			     uint32_t count);
+
+int xc_gnttab_op(int xc_handle, int cmd,
+                 void * op, int op_size, int count);
+
+struct grant_entry *xc_gnttab_map_table(int xc_handle, int domid, int *gnt_num);
 
 int xc_physdev_map_pirq(int xc_handle,
                         int domid,

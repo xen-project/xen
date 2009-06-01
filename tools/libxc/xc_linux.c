@@ -562,6 +562,111 @@ int xc_gnttab_set_max_grants(int xcg_handle,
     return 0;
 }
 
+int xc_gnttab_op(int xc_handle, int cmd,
+                 void * op, int op_size, int count)
+{
+    int ret = 0;
+    DECLARE_HYPERCALL;
+
+    hypercall.op     = __HYPERVISOR_grant_table_op;
+    hypercall.arg[0] = cmd;
+    hypercall.arg[1] = (unsigned long)op;
+    hypercall.arg[2] = count;
+
+    if ( lock_pages(op, count* op_size) != 0 )
+    {
+        PERROR("Could not lock memory for Xen hypercall");
+        goto out1;
+    }
+
+    ret = do_xen_hypercall(xc_handle, &hypercall);
+
+    unlock_pages(op, count * op_size);
+
+ out1:
+    return ret;
+}
+
+struct grant_entry *xc_gnttab_map_table(int xc_handle, int domid, int *gnt_num)
+{
+    int rc, i;
+    struct gnttab_query_size query;
+    struct gnttab_setup_table setup;
+    unsigned long *frame_list = NULL;
+    xen_pfn_t *pfn_list = NULL;
+    struct grant_entry *gnt = NULL;
+
+    if (!gnt_num)
+        return NULL;
+
+    query.dom = domid;
+    rc = xc_gnttab_op(xc_handle, GNTTABOP_query_size,
+                     &query, sizeof(query), 1);
+
+    if (rc || (query.status != GNTST_okay) )
+    {
+        ERROR("Could not query dom's grant size\n", domid);
+        return NULL;
+    }
+
+    *gnt_num = query.nr_frames *
+            (PAGE_SIZE / sizeof(struct grant_entry) );
+
+    frame_list = malloc(query.nr_frames * sizeof(unsigned long));
+    if (!frame_list || lock_pages(frame_list, query.nr_frames *
+                                              sizeof(unsigned long)))
+    {
+        ERROR("Alloc/lock frame_list in xc_gnttab_map_table\n");
+        if (frame_list)
+            free(frame_list);
+        return NULL;
+    }
+
+    pfn_list = malloc(query.nr_frames * sizeof(xen_pfn_t));
+
+    if (!pfn_list)
+    {
+        ERROR("Could not lock pfn_list in xc_gnttab_map_table\n");
+        goto err;
+    }
+
+    setup.dom = domid;
+    setup.nr_frames = query.nr_frames;
+    set_xen_guest_handle(setup.frame_list, frame_list);
+
+    /* XXX Any race with other setup_table hypercall? */
+    rc = xc_gnttab_op(xc_handle, GNTTABOP_setup_table,
+                      &setup, sizeof(setup), 1);
+
+    if (rc ||( setup.status != GNTST_okay) )
+    {
+        ERROR("Could not get grant table frame list\n");
+        goto err;
+    }
+
+    for (i = 0; i < setup.nr_frames; i++)
+        pfn_list[i] = frame_list[i];
+
+    gnt = xc_map_foreign_pages(xc_handle, domid, PROT_READ,
+                               pfn_list, setup.nr_frames);
+    if (!gnt)
+    {
+        ERROR("Could not map grant table\n");
+        goto err;
+    }
+
+err:
+    if (frame_list)
+    {
+        unlock_pages(frame_list, query.nr_frames *  sizeof(unsigned long));
+        free(frame_list);
+    }
+    if (pfn_list)
+        free(pfn_list);
+
+    return gnt;
+}
+
 /*
  * Local variables:
  * mode: C
