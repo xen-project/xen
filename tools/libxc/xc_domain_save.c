@@ -510,9 +510,10 @@ static int canonicalize_pagetable(unsigned long type, unsigned long pfn,
     return race;
 }
 
-static xen_pfn_t *xc_map_m2p(int xc_handle,
+xen_pfn_t *xc_map_m2p(int xc_handle,
                                  unsigned long max_mfn,
-                                 int prot)
+                                 int prot,
+                                 unsigned long *mfn0)
 {
     struct xen_machphys_mfn_list xmml;
     privcmd_mmap_entry_t *entries;
@@ -561,7 +562,8 @@ static xen_pfn_t *xc_map_m2p(int xc_handle,
         goto err2;
     }
 
-    m2p_mfn0 = entries[0].mfn;
+    if (mfn0)
+        *mfn0 = entries[0].mfn;
 
 err2:
     free(entries);
@@ -949,7 +951,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     }
 
     /* Setup the mfn_to_pfn table mapping */
-    if ( !(live_m2p = xc_map_m2p(xc_handle, max_mfn, PROT_READ)) )
+    if ( !(live_m2p = xc_map_m2p(xc_handle, max_mfn, PROT_READ, &m2p_mfn0)) )
     {
         ERROR("Failed to map live M2P table");
         goto out;

@@ -163,4 +163,17 @@ int xc_mark_page_offline(int xc, unsigned long start,
 int xc_query_page_offline_status(int xc, unsigned long start,
                                  unsigned long end, uint32_t *status);
 
+
+/**
+ * This function map m2p table
+ * @parm xc_handle a handle to an open hypervisor interface
+ * @parm max_mfn the max pfn
+ * @parm prot the flags to map, such as read/write etc
+ * @parm mfn0 return the first mfn, can be NULL
+ * @return mapped m2p table on success, NULL on failure
+ */
+xen_pfn_t *xc_map_m2p(int xc_handle,
+                      unsigned long max_mfn,
+                      int prot,
+                      unsigned long *mfn0);
 #endif /* XENGUEST_H */
