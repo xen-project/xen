@@ -379,6 +379,9 @@ class PciController(DevController):
             pci_str_list = pci_str_list + [pci_str]
             pci_dev_list = pci_dev_list + [(domain, bus, slot, func)]
 
+        if len(pci_str_list) != len(set(pci_str_list)):
+            raise VmError('pci: duplicate devices specified in guest config?')
+
         for (domain, bus, slot, func) in pci_dev_list:
             try:
                 dev = PciDevice(domain, bus, slot, func)
@@ -395,6 +398,7 @@ class PciController(DevController):
                     log.warn(err_msg % dev.name)
                 else:
                     funcs = dev.find_all_the_multi_functions()
+                    dev.devs_check_driver(funcs)
                     for f in funcs:
                         if not f in pci_str_list:
                             (f_dom, f_bus, f_slot, f_func) = parse_pci_name(f)
@@ -422,6 +426,7 @@ class PciController(DevController):
                     # Remove the element 0 which is a bridge
                     del devs_str[0]
 
+                    dev.devs_check_driver(devs_str)
                     for s in devs_str:
                         if not s in pci_str_list:
                             (s_dom, s_bus, s_slot, s_func) = parse_pci_name(s)

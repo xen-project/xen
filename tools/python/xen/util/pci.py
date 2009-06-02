@@ -372,7 +372,7 @@ class PciDeviceAssignmentError(Exception):
     def __init__(self,msg):
         self.message = msg
     def __str__(self):
-        return 'pci: impproper device assignment spcified: ' + \
+        return 'pci: improper device assignment specified: ' + \
             self.message
 
 class PciDeviceVslotMissing(Exception):
@@ -582,10 +582,10 @@ class PciDevice:
 
     def find_all_the_multi_functions(self):
         sysfs_mnt = find_sysfs_mnt()
-        pci_names = os.popen('ls ' + sysfs_mnt + SYSFS_PCI_DEVS_PATH).read()
-        p = self.name
-        p = p[0 : p.rfind('.')] + '.[0-7]'
-        funcs = re.findall(p, pci_names)
+        parent = PCI_DEV_FORMAT_STR % self.find_parent()
+        pci_names = os.popen('ls ' + sysfs_mnt + SYSFS_PCI_DEVS_PATH + '/' + \
+            parent + '/').read()
+        funcs = re.findall(PCI_DEV_REG_EXPRESS_STR, pci_names)
         return funcs
 
     def find_coassigned_devices(self):

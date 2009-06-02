@@ -708,6 +708,7 @@ class XendDomainInfo:
         # co-assignment devices hasn't been assigned, or has been assigned to
         # domN.
         coassignment_list = pci_device.find_coassigned_devices()
+        pci_device.devs_check_driver(coassignment_list)
         assigned_pci_device_str_list = self._get_assigned_pci_devices()
         for pci_str in coassignment_list:
             (domain, bus, dev, func) = parse_pci_name(pci_str) 
