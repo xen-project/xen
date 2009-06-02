@@ -35,14 +35,6 @@ struct acpi_drhd_unit * find_ats_dev_drhd(struct iommu *iommu)
     return NULL;
 }
 
-/*
- * BUGBUG: return 0 until pcimmcfg is checked in.
- */
-int pci_find_ext_capability(int seg, int bus, int devfn, int cap)
-{
-    return 0;
-}
-
 int ats_device(int seg, int bus, int devfn)
 {
     return 0;

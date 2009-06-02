@@ -2186,7 +2186,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                 break;
             if ( (rdmsr_safe(MSR_FAM10H_MMIO_CONF_BASE, l, h) != 0) ||
                  (((((u64)h << 32) | l) ^ res) &
-                  ~((1 << FAM10H_MMIO_CONF_ENABLE_BIT) |
+                  ~( FAM10H_MMIO_CONF_ENABLE |
                     (FAM10H_MMIO_CONF_BUSRANGE_MASK <<
                      FAM10H_MMIO_CONF_BUSRANGE_SHIFT) |
                     ((u64)FAM10H_MMIO_CONF_BASE_MASK <<

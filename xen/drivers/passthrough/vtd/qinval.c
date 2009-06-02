@@ -409,10 +409,8 @@ static int flush_iotlb_qi(
         ret = queue_invalidate_iotlb(iommu,
                   (type >> DMA_TLB_FLUSH_GRANU_OFFSET), dr,
                   dw, did, (u8)size_order, 0, addr);
-#if defined(NOT_YET)
         if ( flush_dev_iotlb )
             ret |= dev_invalidate_iotlb(iommu, did, addr, size_order, type);
-#endif
         ret |= invalidate_sync(iommu);
     }
     return ret;

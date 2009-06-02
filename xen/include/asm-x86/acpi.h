@@ -164,7 +164,8 @@ struct acpi_sleep_info {
 extern u8 x86_acpiid_to_apicid[];
 #define MAX_LOCAL_APIC 256
 
-extern int acpi_dmar_init(void);
+int acpi_dmar_init(void);
+void acpi_mmcfg_init(void);
 
 /* Incremented whenever we transition through S3. Value is 1 during boot. */
 extern uint32_t system_reset_counter;

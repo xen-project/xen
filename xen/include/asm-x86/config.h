@@ -135,7 +135,7 @@ extern unsigned int video_mode, video_flags;
  *  0xffff804000000000 - 0xffff807fffffffff [256GB, 2^38 bytes, PML4:256]
  *    Reserved for future shared info with the guest OS (GUEST ACCESSIBLE).
  *  0xffff808000000000 - 0xffff80ffffffffff [512GB, 2^39 bytes, PML4:257]
- *    Reserved for future use.
+ *    ioremap for PCI mmconfig space
  *  0xffff810000000000 - 0xffff817fffffffff [512GB, 2^39 bytes, PML4:258]
  *    Guest linear page table.
  *  0xffff818000000000 - 0xffff81ffffffffff [512GB, 2^39 bytes, PML4:259]
@@ -188,6 +188,12 @@ extern unsigned int video_mode, video_flags;
 /* Slot 256: read-only guest-accessible machine-to-phys translation table. */
 #define RO_MPT_VIRT_START       (PML4_ADDR(256))
 #define RO_MPT_VIRT_END         (RO_MPT_VIRT_START + PML4_ENTRY_BYTES/2)
+/* Slot 257: ioremap for PCI mmconfig space for 2048 segments (512GB)
+ *     - full 16-bit segment support needs 44 bits
+ *     - since PML4 slot has 39 bits, we limit segments to 2048 (11-bits)
+ */
+#define PCI_MCFG_VIRT_START     (PML4_ADDR(257))
+#define PCI_MCFG_VIRT_END       (RDWR_MPT_VIRT_START + PML4_ENTRY_BYTES)
 /* Slot 258: linear page table (guest table). */
 #define LINEAR_PT_VIRT_START    (PML4_ADDR(258))
 #define LINEAR_PT_VIRT_END      (LINEAR_PT_VIRT_START + PML4_ENTRY_BYTES)

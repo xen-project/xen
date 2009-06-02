@@ -48,8 +48,14 @@ int iommu_flush_iec_index(struct iommu *iommu, u8 im, u16 iidx);
 struct iommu * ioapic_to_iommu(unsigned int apic_id);
 struct acpi_drhd_unit * ioapic_to_drhd(unsigned int apic_id);
 void clear_fault_bits(struct iommu *iommu);
+int ats_device(int seg, int bus, int devfn);
+int enable_ats_device(int seg, int bus, int devfn);
+int disable_ats_device(int seg, int bus, int devfn);
+int invalidate_ats_tcs(struct iommu *iommu);
 int qinval_device_iotlb(struct iommu *iommu,
                         u32 max_invs_pend, u16 sid, u16 size, u64 addr);
+int dev_invalidate_iotlb(struct iommu *iommu, u16 did,
+                         u64 addr, unsigned int size_order, u64 type);
 struct acpi_drhd_unit * find_ats_dev_drhd(struct iommu *iommu);
 
 #endif // _VTD_EXTERN_H_
