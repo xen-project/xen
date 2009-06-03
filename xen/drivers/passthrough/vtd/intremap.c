@@ -31,71 +31,40 @@
 #include "vtd.h"
 #include "extern.h"
 
-#ifndef dest_SMI
+#ifdef __ia64__
 #define dest_SMI -1
 #endif
 
-/* The max number of IOAPIC (or IOSAPIC) pin. The typical values can be 24 or
- * 48 on x86 and Itanium platforms. Here we use a biger number 256. This
- * should be big enough. Actually now IREMAP_ENTRY_NR is also 256.
- */
-#define MAX_IOAPIC_PIN_NUM  256
+/* apic_pin_2_ir_idx[apicid][pin] = interrupt remapping table index */
+static unsigned int **apic_pin_2_ir_idx;
 
-struct ioapicid_pin_intremap_index {
-	struct list_head list;
-	unsigned int ioapic_id;
-	unsigned int pin;
-	int intremap_index;
-};
-
-static struct list_head ioapic_pin_to_intremap_index[MAX_IOAPIC_PIN_NUM];
-
-static int init_ioapic_pin_intremap_index(void)
+static int init_apic_pin_2_ir_idx(void)
 {
-    static int initialized = 0;
-    int i;
+    unsigned int *_apic_pin_2_ir_idx;
+    unsigned int nr_pins, i;
 
-    if ( initialized == 1 )
-        return 0;
+    nr_pins = 0;
+    for ( i = 0; i < nr_ioapics; i++ )
+        nr_pins += nr_ioapic_registers[i];
 
-    for ( i = 0; i < MAX_IOAPIC_PIN_NUM; i++ )
-        INIT_LIST_HEAD(&ioapic_pin_to_intremap_index[i]);
-
-    initialized = 1;
-    return 0;
-}
-
-static int get_ioapic_pin_intremap_index(unsigned int ioapic_id,
-                                         unsigned int pin)
-{
-    struct ioapicid_pin_intremap_index *entry;
-    struct list_head *pos, *tmp;
-
-    list_for_each_safe ( pos, tmp, &ioapic_pin_to_intremap_index[pin] )
+    _apic_pin_2_ir_idx = xmalloc_array(unsigned int, nr_pins);
+    apic_pin_2_ir_idx = xmalloc_array(unsigned int *, nr_ioapics);
+    if ( (_apic_pin_2_ir_idx == NULL) || (apic_pin_2_ir_idx == NULL) )
     {
-        entry = list_entry(pos, struct ioapicid_pin_intremap_index, list);
-        if ( entry->ioapic_id == ioapic_id )
-            return entry->intremap_index;
+        xfree(_apic_pin_2_ir_idx);
+        xfree(apic_pin_2_ir_idx);
+        return -ENOMEM;
     }
 
-    return -1;
-}
+    for ( i = 0; i < nr_pins; i++ )
+        _apic_pin_2_ir_idx[i] = -1;
 
-static int set_ioapic_pin_intremap_index(unsigned int ioapic_id,
-                                         unsigned int pin,
-                                         int index)
-{
-    struct ioapicid_pin_intremap_index *entry;
-
-    entry = xmalloc(struct ioapicid_pin_intremap_index);
-    if ( !entry )
-        return -ENOMEM;
-
-    entry->ioapic_id = ioapic_id;
-    entry->pin = pin;
-    entry->intremap_index = index;
-
-    list_add_tail(&entry->list, &ioapic_pin_to_intremap_index[pin]);
+    nr_pins = 0;
+    for ( i = 0; i < nr_ioapics; i++ )
+    {
+        apic_pin_2_ir_idx[i] = &_apic_pin_2_ir_idx[nr_pins];
+        nr_pins += nr_ioapic_registers[i];
+    }
 
     return 0;
 }
@@ -160,7 +129,7 @@ static int remap_entry_to_ioapic_rte(
 }
 
 static int ioapic_rte_to_remap_entry(struct iommu *iommu,
-    int apic_id, unsigned int ioapic_pin, struct IO_xAPIC_route_entry *old_rte,
+    int apic, unsigned int ioapic_pin, struct IO_xAPIC_route_entry *old_rte,
     unsigned int rte_upper, unsigned int value)
 {
     struct iremap_entry *iremap_entry = NULL, *iremap_entries;
@@ -174,12 +143,12 @@ static int ioapic_rte_to_remap_entry(struct iommu *iommu,
     remap_rte = (struct IO_APIC_route_remap_entry *) old_rte;
     spin_lock_irqsave(&ir_ctrl->iremap_lock, flags);
 
-    index = get_ioapic_pin_intremap_index(apic_id, ioapic_pin);
+    index = apic_pin_2_ir_idx[apic][ioapic_pin];
     if ( index < 0 )
     {
         ir_ctrl->iremap_index++;
         index = ir_ctrl->iremap_index;
-        set_ioapic_pin_intremap_index(apic_id, ioapic_pin, index);
+        apic_pin_2_ir_idx[apic][ioapic_pin] = index;
     }
 
     if ( index > IREMAP_ENTRY_NR - 1 )
@@ -218,7 +187,7 @@ static int ioapic_rte_to_remap_entry(struct iommu *iommu,
         new_ire.lo.res_1 = 0;
         new_ire.lo.vector = new_rte.vector;
         new_ire.lo.res_2 = 0;
-        new_ire.hi.sid = apicid_to_bdf(apic_id);
+        new_ire.hi.sid = apicid_to_bdf(IO_APIC_ID(apic));
 
         new_ire.hi.sq = 0;    /* comparing all 16-bit of SID */
         new_ire.hi.svt = 1;   /* requestor ID verification SID/SQ */
@@ -356,8 +325,7 @@ void io_apic_write_remap_rte(
     *(IO_APIC_BASE(apic)+4) = *(((int *)&old_rte)+0);
     remap_rte->mask = saved_mask;
 
-    ASSERT(ioapic_pin < MAX_IOAPIC_PIN_NUM);
-    if ( ioapic_rte_to_remap_entry(iommu, IO_APIC_ID(apic), ioapic_pin,
+    if ( ioapic_rte_to_remap_entry(iommu, apic, ioapic_pin,
                                    &old_rte, rte_upper, value) )
     {
         *IO_APIC_BASE(apic) = rte_upper ? (reg + 1) : reg;
@@ -628,9 +596,7 @@ int enable_intremap(struct iommu *iommu)
     /* After set SIRTP, we should do globally invalidate the IEC */
     iommu_flush_iec_global(iommu);
 
-    init_ioapic_pin_intremap_index();
-
-    return 0;
+    return init_apic_pin_2_ir_idx();
 }
 
 void disable_intremap(struct iommu *iommu)
