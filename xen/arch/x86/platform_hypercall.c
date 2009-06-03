@@ -313,7 +313,6 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
     {
         uint32_t cpu;
         uint64_t idletime, now = NOW();
-        struct vcpu *v;
         struct xenctl_cpumap ctlmap;
         cpumask_t cpumap;
         XEN_GUEST_HANDLE(uint8) cpumap_bitmap;
@@ -336,7 +335,7 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
 
         for_each_cpu_mask ( cpu, cpumap )
         {
-            if ( (v = idle_vcpu[cpu]) != NULL )
+            if ( idle_vcpu[cpu] == NULL )
                 cpu_clear(cpu, cpumap);
             idletime = get_cpu_idle_time(cpu);
 
