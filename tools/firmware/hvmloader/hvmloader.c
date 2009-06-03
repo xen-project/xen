@@ -451,8 +451,9 @@ static int scan_etherboot_nic(uint32_t copy_rom_dest)
 {
     uint8_t devfn;
     uint16_t class, vendor_id, device_id;
+    int rom_size = 0;
 
-    for ( devfn = 0; devfn < 128; devfn++ )
+    for ( devfn = 0; (devfn < 128) && !rom_size; devfn++ )
     {
         class     = pci_readw(devfn, PCI_CLASS_DEVICE);
         vendor_id = pci_readw(devfn, PCI_VENDOR_ID);
@@ -462,11 +463,11 @@ static int scan_etherboot_nic(uint32_t copy_rom_dest)
         if ( (vendor_id != 0xffff) &&
              (device_id != 0xffff) &&
              (class == 0x0200) )
-            return scan_option_rom(
+            rom_size = scan_option_rom(
                 devfn, vendor_id, device_id, etherboot, copy_rom_dest);
     }
 
-    return 0;
+    return rom_size;
 }
 
 /*
