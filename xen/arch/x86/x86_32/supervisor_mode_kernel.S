@@ -98,7 +98,7 @@ ENTRY(fixup_ring0_guest_stack)
         addl $((6+4)*4),%esi
 
         # %gs:%esi now points to the guest stack before the
-        # interrupt/exception occured.
+        # interrupt/exception occurred.
 
         movl  $PER_CPU_GDT_ENTRY*8,%ecx
         lsll  %ecx,%ecx

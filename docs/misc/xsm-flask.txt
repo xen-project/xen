@@ -1,4 +1,4 @@
-These notes are compiled from xen-devel questions and postings that have occured
+These notes are compiled from xen-devel questions and postings that have occurred
 since the inclusion of XSM.  These notes are not intended to be definitive
 documentation but should address many common problems that arrise when
 experimenting with XSM:FLASK.

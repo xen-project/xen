@@ -354,7 +354,7 @@ void mcheck_cmn_handler(struct cpu_user_regs *regs, long error_code,
 		vcpu_schedule_unlock_irq(v);
 		irqlocked = 0;
 
-		printk("Terminal machine check exception occured in "
+		printk("Terminal machine check exception occurred in "
 		    "hypervisor context.\n");
 
 		/* If MCG_STATUS_EIPV indicates, the IP on the stack is related
@@ -666,7 +666,7 @@ void x86_mcinfo_dump(struct mc_info *mi)
 			mc_global->mc_coreid, mc_global->mc_gstatus);
 	} else {
 		printk(XENLOG_WARNING "MCE: The hardware reports a non "
-			"fatal, correctable incident occured on "
+			"fatal, correctable incident occurred on "
 			"CPU %d.\n",
 			mc_global->mc_coreid);
 	}

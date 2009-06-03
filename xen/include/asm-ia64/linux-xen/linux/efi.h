@@ -469,7 +469,7 @@ struct efi_generic_dev_path {
 
 /* rr7 (and rr6) may already be set to XEN_EFI_RR7 (and XEN_EFI_RR6), which
  * would indicate a nested EFI, SAL or PAL call, such
- * as from an MCA. This may have occured during a call
+ * as from an MCA. This may have occurred during a call
  * to set_one_rr_efi(). To be safe, repin everything anyway.
  */
 
