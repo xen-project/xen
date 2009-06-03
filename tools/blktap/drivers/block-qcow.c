@@ -824,7 +824,7 @@ static int tdqcow_open (struct disk_driver *dd, const char *name, td_flag_t flag
 	l1_table_block = ROUNDUP(l1_table_block, 512);
 	ret = posix_memalign((void **)&buf2, 4096, l1_table_block);
 	if (ret != 0) goto fail;
-	if (read(fd, buf2, l1_table_block) != l1_table_block)
+	if (read(fd, buf2, l1_table_block) < l1_table_size + s->l1_table_offset)
 		goto fail;
 	memcpy(s->l1_table, buf2 + s->l1_table_offset, l1_table_size);
 
@@ -878,7 +878,8 @@ static int tdqcow_open (struct disk_driver *dd, const char *name, td_flag_t flag
 
 			memcpy(buf2 + s->l1_table_offset, s->l1_table, l1_table_size);
 			lseek(fd, 0, SEEK_SET);
-			if (write(fd, buf2, l1_table_block) != l1_table_block) {
+			if (write(fd, buf2, l1_table_block) < 
+				l1_table_size + s->l1_table_offset) {
 				DPRINTF("qcow: Failed to write new L1 table\n");
 				goto fail;
 			}
