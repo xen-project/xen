@@ -726,66 +726,69 @@ static void update_xen_mappings(unsigned long mfn, unsigned long cacheattr)
 #endif
 }
 
-
 int
 get_page_from_l1e(
-    l1_pgentry_t l1e, struct domain *d)
+    l1_pgentry_t l1e, struct domain *l1e_owner, struct domain *pg_owner)
 {
     unsigned long mfn = l1e_get_pfn(l1e);
     struct page_info *page = mfn_to_page(mfn);
     uint32_t l1f = l1e_get_flags(l1e);
     struct vcpu *curr = current;
-    struct domain *owner;
+    struct domain *real_pg_owner;
 
     if ( !(l1f & _PAGE_PRESENT) )
         return 1;
 
-    if ( unlikely(l1f & l1_disallow_mask(d)) )
+    if ( unlikely(l1f & l1_disallow_mask(l1e_owner)) )
     {
-        MEM_LOG("Bad L1 flags %x", l1f & l1_disallow_mask(d));
+        MEM_LOG("Bad L1 flags %x", l1f & l1_disallow_mask(l1e_owner));
         return 0;
     }
 
     if ( !mfn_valid(mfn) ||
-         (owner = page_get_owner_and_reference(page)) == dom_io )
+         (real_pg_owner = page_get_owner_and_reference(page)) == dom_io )
     {
         /* Only needed the reference to confirm dom_io ownership. */
         if ( mfn_valid(mfn) )
             put_page(page);
 
         /* DOMID_IO reverts to caller for privilege checks. */
-        if ( d == dom_io )
-            d = curr->domain;
+        if ( pg_owner == dom_io )
+            pg_owner = curr->domain;
 
-        if ( !iomem_access_permitted(d, mfn, mfn) )
+        if ( !iomem_access_permitted(pg_owner, mfn, mfn) )
         {
             if ( mfn != (PADDR_MASK >> PAGE_SHIFT) ) /* INVALID_MFN? */
                 MEM_LOG("Non-privileged (%u) attempt to map I/O space %08lx", 
-                        d->domain_id, mfn);
+                        pg_owner->domain_id, mfn);
             return 0;
         }
 
         return 1;
     }
 
-    if ( owner == NULL )
+    if ( real_pg_owner == NULL )
         goto could_not_pin;
 
-    /*
-     * Let privileged domains transfer the right to map their target
-     * domain's pages. This is used to allow stub-domain pvfb export to dom0,
-     * until pvfb supports granted mappings. At that time this minor hack
-     * can go away.
-     */
-    if ( unlikely(d != owner) && (d != curr->domain) && IS_PRIV_FOR(d, owner) )
-        d = owner;
+    if ( unlikely(real_pg_owner != pg_owner) )
+    {
+        /*
+         * Let privileged domains transfer the right to map their target
+         * domain's pages. This is used to allow stub-domain pvfb export to
+         * dom0, until pvfb supports granted mappings. At that time this
+         * minor hack can go away.
+         */
+        if ( (pg_owner == l1e_owner) || !IS_PRIV_FOR(pg_owner, real_pg_owner) )
+            goto could_not_pin;
+        pg_owner = real_pg_owner;
+    }
 
     /* Foreign mappings into guests in shadow external mode don't
      * contribute to writeable mapping refcounts.  (This allows the
      * qemu-dm helper process in dom0 to map the domain's memory without
      * messing up the count of "real" writable mappings.) */
     if ( (l1f & _PAGE_RW) &&
-         !(paging_mode_external(d) && (d != curr->domain)) &&
+         ((l1e_owner == pg_owner) || !paging_mode_external(pg_owner)) &&
          !get_page_type(page, PGT_writable_page) )
         goto could_not_pin;
 
@@ -798,8 +801,7 @@ get_page_from_l1e(
         if ( is_xen_heap_page(page) )
         {
             if ( (l1f & _PAGE_RW) &&
-                 !(unlikely(paging_mode_external(d) &&
-                            (d != curr->domain))) )
+                 ((l1e_owner == pg_owner) || !paging_mode_external(pg_owner)) )
                 put_page_type(page);
             put_page(page);
             MEM_LOG("Attempt to change cache attributes of Xen heap page");
@@ -820,10 +822,10 @@ get_page_from_l1e(
 
  could_not_pin:
     MEM_LOG("Error getting mfn %lx (pfn %lx) from L1 entry %" PRIpte
-            " for dom%d",
+            " for l1e_owner=%d, pg_owner=%d",
             mfn, get_gpfn_from_mfn(mfn),
-            l1e_get_intpte(l1e), d->domain_id);
-    if ( owner != NULL )
+            l1e_get_intpte(l1e), l1e_owner->domain_id, pg_owner->domain_id);
+    if ( real_pg_owner != NULL )
         put_page(page);
     return 0;
 }
@@ -996,19 +998,18 @@ get_page_from_l4e(
 #define unadjust_guest_l3e(_p, _d) ((void)(_d))
 #endif
 
-void put_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
+void put_page_from_l1e(l1_pgentry_t l1e, struct domain *l1e_owner)
 {
     unsigned long     pfn = l1e_get_pfn(l1e);
     struct page_info *page;
-    struct domain    *e;
+    struct domain    *pg_owner;
     struct vcpu      *v;
 
     if ( !(l1e_get_flags(l1e) & _PAGE_PRESENT) || is_iomem_page(pfn) )
         return;
 
     page = mfn_to_page(pfn);
-
-    e = page_get_owner(page);
+    pg_owner = page_get_owner(page);
 
     /*
      * Check if this is a mapping that was established via a grant reference.
@@ -1024,17 +1025,17 @@ void put_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
      * Xen. All active grants can safely be cleaned up when the domain dies.)
      */
     if ( (l1e_get_flags(l1e) & _PAGE_GNTTAB) &&
-         !d->is_shutting_down && !d->is_dying )
+         !l1e_owner->is_shutting_down && !l1e_owner->is_dying )
     {
         MEM_LOG("Attempt to implicitly unmap a granted PTE %" PRIpte,
                 l1e_get_intpte(l1e));
-        domain_crash(d);
+        domain_crash(l1e_owner);
     }
 
     /* Remember we didn't take a type-count of foreign writable mappings
      * to paging-external domains */
     if ( (l1e_get_flags(l1e) & _PAGE_RW) && 
-         !(unlikely((e != d) && paging_mode_external(e))) )
+         ((l1e_owner == pg_owner) || !paging_mode_external(pg_owner)) )
     {
         put_page_and_type(page);
     }
@@ -1044,9 +1045,9 @@ void put_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
         if ( unlikely(((page->u.inuse.type_info & PGT_type_mask) == 
                        PGT_seg_desc_page)) &&
              unlikely(((page->u.inuse.type_info & PGT_count_mask) != 0)) &&
-             (d == e) )
+             (l1e_owner == pg_owner) )
         {
-            for_each_vcpu ( d, v )
+            for_each_vcpu ( pg_owner, v )
                 invalidate_shadow_ldt(v, 1);
         }
         put_page(page);
@@ -1137,7 +1138,7 @@ static int alloc_l1_table(struct page_info *page)
     for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
     {
         if ( is_guest_l1_slot(i) &&
-             unlikely(!get_page_from_l1e(pl1e[i], d)) )
+             unlikely(!get_page_from_l1e(pl1e[i], d, d)) )
             goto fail;
 
         adjust_guest_l1e(pl1e[i], d);
@@ -1716,7 +1717,7 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
             return rc;
         }
 
-        if ( unlikely(!get_page_from_l1e(nl1e, FOREIGNDOM)) )
+        if ( unlikely(!get_page_from_l1e(nl1e, d, FOREIGNDOM)) )
             return 0;
         
         adjust_guest_l1e(nl1e, d);
@@ -4224,7 +4225,7 @@ static int ptwr_emulated_update(
 
     /* Check the new PTE. */
     nl1e = l1e_from_intpte(val);
-    if ( unlikely(!get_page_from_l1e(nl1e, d)) )
+    if ( unlikely(!get_page_from_l1e(nl1e, d, d)) )
     {
         if ( is_pv_32bit_domain(d) && (bytes == 4) && (unaligned_addr & 4) &&
              !do_cmpxchg && (l1e_get_flags(nl1e) & _PAGE_PRESENT) )

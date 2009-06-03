@@ -816,7 +816,7 @@ shadow_get_page_from_l1e(shadow_l1e_t sl1e, struct domain *d)
     if ( !shadow_mode_refcounts(d) )
         return 1;
 
-    res = get_page_from_l1e(sl1e, d);
+    res = get_page_from_l1e(sl1e, d, d);
 
     // If a privileged domain is attempting to install a map of a page it does
     // not own, we let it succeed anyway.
@@ -828,7 +828,7 @@ shadow_get_page_from_l1e(shadow_l1e_t sl1e, struct domain *d)
          (d != owner) &&
          IS_PRIV_FOR(d, owner))
     {
-        res = get_page_from_l1e(sl1e, owner);
+        res = get_page_from_l1e(sl1e, d, owner);
         SHADOW_PRINTK("privileged domain %d installs map of mfn %05lx "
                        "which is owned by domain %d: %s\n",
                        d->domain_id, mfn_x(mfn), owner->domain_id,
