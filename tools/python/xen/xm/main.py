@@ -2198,7 +2198,7 @@ def xm_pci_list(args):
                 "bus":      int(x["bus"], 16),
                 "slot":     int(x["slot"], 16),
                 "func":     int(x["func"], 16),
-                "vslot":    int(assigned_or_requested_vslot(x), 16)
+                "vslot":    int(x["vslot"], 16)
             }
             devs.append(dev)
 
@@ -2500,7 +2500,7 @@ def parse_pci_configuration(args, state, opts = ''):
                 ['bus', '0x'+ pci_dev_info['bus']],
                 ['slot', '0x'+ pci_dev_info['slot']],
                 ['func', '0x'+ pci_dev_info['func']],
-                ['requested_vslot', '0x%x' % int(vslot, 16)]]
+                ['vslot', '0x%x' % int(vslot, 16)]]
         if len(opts) > 0:
             pci_bdf.append(['opts', opts])
         pci.append(pci_bdf)

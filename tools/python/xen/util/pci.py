@@ -146,20 +146,6 @@ def parse_pci_name(pci_name_string):
 
     return (domain, bus, slot, func)
 
-def assigned_or_requested_vslot(dev):
-    if isinstance(dev, types.DictType):
-        if dev.has_key("vslot"):
-            return dev["vslot"]
-        if dev.has_key("requested_vslot"):
-            return dev["requested_vslot"]
-    elif isinstance(dev, (types.ListType, types.TupleType)):
-        vslot = sxp.child_value(dev, 'vslot', None)
-        if not vslot:
-            vslot = sxp.child_value(dev, 'requested_vslot', None)
-        if vslot:
-            return vslot
-    raise PciDeviceVslotMissing("%s" % dev)
-
 def find_sysfs_mnt():
     try:
         return utils.find_sysfs_mount()
@@ -379,7 +365,7 @@ class PciDeviceVslotMissing(Exception):
     def __init__(self,msg):
         self.message = msg
     def __str__(self):
-        return 'pci: no vslot or requested_vslot: ' + self.message
+        return 'pci: no vslot: ' + self.message
 
 class PciDevice:
     def __init__(self, domain, bus, slot, func):

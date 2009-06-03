@@ -39,7 +39,7 @@ from xen.util import asserts, auxbin
 from xen.util.blkif import blkdev_uname_to_file, blkdev_uname_to_taptype
 import xen.util.xsm.xsm as security
 from xen.util import xsconstants
-from xen.util.pci import assigned_or_requested_vslot, serialise_pci_opts
+from xen.util.pci import serialise_pci_opts
 
 from xen.xend import balloon, sxp, uuid, image, arch
 from xen.xend import XendOptions, XendNode, XendConfig
@@ -641,10 +641,9 @@ class XendDomainInfo:
             pci_conf = self.info['devices'][dev_uuid][1]
             pci_devs = pci_conf['devs']
             for x in pci_devs:
-                x_vslot = assigned_or_requested_vslot(x)
-                if (int(x_vslot, 16) == int(new_dev['requested_vslot'], 16) and
-                   int(x_vslot, 16) != AUTO_PHP_SLOT):
-                    raise VmError("vslot %s already have a device." % (new_dev['requested_vslot']))
+                if (int(x['vslot'], 16) == int(new_dev['vslot'], 16) and
+                   int(x['vslot'], 16) != AUTO_PHP_SLOT):
+                    raise VmError("vslot %s already have a device." % (new_dev['vslot']))
 
                 if (int(x['domain'], 16) == int(new_dev['domain'], 16) and
                    int(x['bus'], 16)    == int(new_dev['bus'], 16) and
@@ -747,17 +746,14 @@ class XendDomainInfo:
                 new_dev['bus'],
                 new_dev['slot'],
                 new_dev['func'],
-                # vslot will be used when activating a
-                # previously activated domain.
-                # Otherwise requested_vslot will be used.
-                assigned_or_requested_vslot(new_dev),
+                new_dev['vslot'],
                 opts)
             self.image.signalDeviceModel('pci-ins', 'pci-inserted', bdf_str)
 
             vslot = xstransact.Read("/local/domain/0/device-model/%i/parameter"
                                     % self.getDomid())
         else:
-            vslot = new_dev['requested_vslot']
+            vslot = new_dev['vslot']
 
         return vslot
 
@@ -859,7 +855,7 @@ class XendDomainInfo:
                          int(x['bus'], 16) == int(dev['bus'], 16) and
                          int(x['slot'], 16) == int(dev['slot'], 16) and
                          int(x['func'], 16) == int(dev['func'], 16) ):
-                        vslot = assigned_or_requested_vslot(x)
+                        vslot = x['vslot']
                         break
                 if vslot == "":
                     raise VmError("Device %04x:%02x:%02x.%01x is not connected"
@@ -1138,8 +1134,7 @@ class XendDomainInfo:
         #find the pass-through device with the virtual slot
         devnum = 0
         for x in pci_conf['devs']:
-            x_vslot = assigned_or_requested_vslot(x)
-            if int(x_vslot, 16) == vslot:
+            if int(x['vslot'], 16) == vslot:
                 break
             devnum += 1
 

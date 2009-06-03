@@ -36,7 +36,6 @@ from xen.xend.xenstore.xstransact import xstransact
 from xen.xend.server.BlktapController import blktap_disk_types
 from xen.xend.server.netif import randomMAC
 from xen.util.blkif import blkdev_name_to_number, blkdev_uname_to_file
-from xen.util.pci import assigned_or_requested_vslot
 from xen.util import xsconstants
 import xen.util.auxbin
 
@@ -1288,7 +1287,7 @@ class XendConfig(dict):
                     dpci_record = {
                         'VM': self['uuid'],
                         'PPCI': ppci_uuid,
-                        'hotplug_slot': pci_dev.get('requested_vslot', 0)
+                        'hotplug_slot': pci_dev.get('vslot', 0)
                     }
 
                     dpci_opts = pci_dev.get('opts')
@@ -1858,7 +1857,7 @@ class XendConfig(dict):
                     dpci_record = {
                         'VM': self['uuid'],
                         'PPCI': ppci_uuid,
-                        'hotplug_slot': pci_dev.get('requested_vslot', 0)
+                        'hotplug_slot': pci_dev.get('vslot', 0)
                     }
 
                     dpci_opts = pci_dev.get('opts')
@@ -2131,7 +2130,7 @@ class XendConfig(dict):
                 bus = sxp.child_value(dev, 'bus')
                 slot = sxp.child_value(dev, 'slot')
                 func = sxp.child_value(dev, 'func')
-                vslot = assigned_or_requested_vslot(dev) 
+                vslot = sxp.child_value(dev, 'vslot')
                 opts = ''
                 for opt in sxp.child_value(dev, 'opts', []):
                     if opts:
