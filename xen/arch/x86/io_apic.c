@@ -967,6 +967,8 @@ static void __init enable_IO_APIC(void)
     /* Initialise dynamic irq_2_pin free list. */
     irq_2_pin = xmalloc_array(struct irq_pin_list, PIN_MAP_SIZE);
     memset(irq_2_pin, 0, nr_irqs * sizeof(*irq_2_pin));
+    for (i = 0; i < PIN_MAP_SIZE; i++)
+        irq_2_pin[i].pin = -1;
     for (i = irq_2_pin_free_entry = nr_irqs; i < PIN_MAP_SIZE; i++)
         irq_2_pin[i].next = i + 1;
 
