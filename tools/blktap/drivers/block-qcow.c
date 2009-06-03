@@ -55,7 +55,7 @@
 #define ROUNDUP(l, s) \
 ({ \
     (uint64_t)( \
-        (l + (s - 1)) - ((l + (s - 1)) % s)); \
+        ((l) + ((s) - 1)) - (((l) + ((s) - 1)) % (s))); \
 })
 
 #undef IOCB_IDX
@@ -800,14 +800,14 @@ static int tdqcow_open (struct disk_driver *dd, const char *name, td_flag_t flag
 
 	/* read the level 1 table */
 	shift = s->cluster_bits + s->l2_bits;
-	s->l1_size = (header->size + (1LL << shift) - 1) >> shift;
+	s->l1_size = ROUNDUP(header->size, 1LL << shift);
 	
 	s->l1_table_offset = header->l1_table_offset;
 
 	/*allocate a 4Kbyte multiple of memory*/
 	l1_table_size = s->l1_size * sizeof(uint64_t);
 	if (l1_table_size % 4096 > 0) {
-		l1_table_size = ((l1_table_size >> 12) + 1) << 12;
+		l1_table_size = ROUNDUP(l1_table_size, 4096);
 	}
 	ret = posix_memalign((void **)&s->l1_table, 4096, l1_table_size);
 	if (ret != 0) goto fail;
@@ -821,7 +821,7 @@ static int tdqcow_open (struct disk_driver *dd, const char *name, td_flag_t flag
 
 	lseek(fd, 0, SEEK_SET);
 	l1_table_block = l1_table_size + s->l1_table_offset;
-	l1_table_block = l1_table_block + 512 - (l1_table_block % 512); 
+	l1_table_block = ROUNDUP(l1_table_block, 512);
 	ret = posix_memalign((void **)&buf2, 4096, l1_table_block);
 	if (ret != 0) goto fail;
 	if (read(fd, buf2, l1_table_block) != l1_table_block)
@@ -1226,11 +1226,11 @@ int qcow_create(const char *filename, uint64_t total_size,
 	
 	header_size = (header_size + 7) & ~7;
 	if (header_size % 4096 > 0) {
-		header_size = ((header_size >> 12) + 1) << 12;
+		header_size = ROUNDUP(header_size, 4096);
 	}
 
 	shift = header.cluster_bits + header.l2_bits;
-	l1_size = ((size * 512) + (1LL << shift) - 1) >> shift;
+	l1_size = ROUNDUP(size * 512, 1LL << shift);
 
 	header.l1_table_offset = cpu_to_be64(header_size);
 	DPRINTF("L1 Table offset: %d, size %d\n",
