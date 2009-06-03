@@ -120,6 +120,70 @@ char* xenbus_wait_for_value(const char* path, const char* value, xenbus_event_qu
     return NULL;
 }
 
+char *xenbus_switch_state(xenbus_transaction_t xbt, const char* path, XenbusState state)
+{
+    char *current_state;
+    char *msg = NULL;
+    char *msg2 = NULL;
+    char value[2];
+    XenbusState rs;
+    int xbt_flag = 0;
+    int retry = 0;
+
+    do {
+        if (xbt == XBT_NIL) {
+            xenbus_transaction_start(&xbt);
+            xbt_flag = 1;
+        }
+
+        msg = xenbus_read(xbt, path, &current_state);
+        if (msg) goto exit;
+
+        rs = (XenbusState) (current_state[0] - '0');
+        free(current_state);
+        if (rs == state) {
+            msg = NULL;
+            goto exit;
+        }
+
+        snprintf(value, 2, "%d", state);
+        msg = xenbus_write(xbt, path, value);
+
+exit:
+        if (xbt_flag)
+            msg2 = xenbus_transaction_end(xbt, 0, &retry);
+        if (msg == NULL && msg2 != NULL)
+            msg = msg2;
+    } while (retry);
+
+    return msg;
+}
+
+char *xenbus_wait_for_state_change(const char* path, XenbusState *state, xenbus_event_queue *queue)
+{
+    if (!queue)
+        queue = &xenbus_events;
+    for(;;)
+    {
+        char *res, *msg;
+        XenbusState rs;
+
+        msg = xenbus_read(XBT_NIL, path, &res);
+        if(msg) return msg;
+
+        rs = (XenbusState) (res[0] - 48);
+        free(res);
+
+        if (rs == *state)
+            xenbus_wait_for_watch(queue);
+        else {
+            *state = rs;
+            break;
+        }
+    }
+    return NULL;
+}
+
 
 static void xenbus_thread_func(void *ign)
 {

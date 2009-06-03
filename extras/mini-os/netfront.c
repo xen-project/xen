@@ -405,9 +405,12 @@ again:
         goto abort_transaction;
     }
 
-    err = xenbus_printf(xbt, nodename, "state", "%u",
-            4); /* connected */
-
+    snprintf(path, sizeof(path), "%s/state", nodename);
+    err = xenbus_switch_state(xbt, path, XenbusStateConnected);
+    if (err) {
+        message = "switching state";
+        goto abort_transaction;
+    }
 
     err = xenbus_transaction_end(xbt, 0, &retry);
     if (retry) {
@@ -437,12 +440,21 @@ done:
     printk("mac is %s\n",dev->mac);
 
     {
+        XenbusState state;
         char path[strlen(dev->backend) + 1 + 5 + 1];
         snprintf(path, sizeof(path), "%s/state", dev->backend);
 
         xenbus_watch_path_token(XBT_NIL, path, path, &dev->events);
 
-        xenbus_wait_for_value(path, "4", &dev->events);
+        err = NULL;
+        state = xenbus_read_integer(path);
+        while (err == NULL && state < XenbusStateConnected)
+            err = xenbus_wait_for_state_change(path, &state, &dev->events);
+        if (state != XenbusStateConnected) {
+            printk("backend not avalable, state=%d\n", state);
+            xenbus_unwatch_path(XBT_NIL, path);
+            goto error;
+        }
 
         if (ip) {
             snprintf(path, sizeof(path), "%s/ip", dev->backend);
@@ -490,24 +502,46 @@ int netfront_tap_open(char *nodename) {
 
 void shutdown_netfront(struct netfront_dev *dev)
 {
-    char* err;
-    char *nodename = dev->nodename;
+    char* err = NULL;
+    XenbusState state;
 
     char path[strlen(dev->backend) + 1 + 5 + 1];
+    char nodename[strlen(dev->nodename) + 1 + 5 + 1];
 
     printk("close network: backend at %s\n",dev->backend);
 
     snprintf(path, sizeof(path), "%s/state", dev->backend);
+    snprintf(nodename, sizeof(nodename), "%s/state", dev->nodename);
 
-    err = xenbus_printf(XBT_NIL, nodename, "state", "%u", 5); /* closing */
-    xenbus_wait_for_value(path, "5", &dev->events);
+    if ((err = xenbus_switch_state(XBT_NIL, nodename, XenbusStateClosing)) != NULL) {
+        printk("shutdown_netfront: error changing state to %d: %s\n",
+                XenbusStateClosing, err);
+        goto close;
+    }
+    state = xenbus_read_integer(path);
+    while (err == NULL && state < XenbusStateClosing)
+        err = xenbus_wait_for_state_change(path, &state, &dev->events);
 
-    err = xenbus_printf(XBT_NIL, nodename, "state", "%u", 6);
-    xenbus_wait_for_value(path, "6", &dev->events);
+    if ((err = xenbus_switch_state(XBT_NIL, nodename, XenbusStateClosed)) != NULL) {
+        printk("shutdown_netfront: error changing state to %d: %s\n",
+                XenbusStateClosed, err);
+        goto close;
+    }
+    state = xenbus_read_integer(path);
+    if (state < XenbusStateClosed)
+        xenbus_wait_for_state_change(path, &state, &dev->events);
 
-    err = xenbus_printf(XBT_NIL, nodename, "state", "%u", 1);
-    xenbus_wait_for_value(path, "2", &dev->events);
+    if ((err = xenbus_switch_state(XBT_NIL, nodename, XenbusStateInitialising)) != NULL) {
+        printk("shutdown_netfront: error changing state to %d: %s\n",
+                XenbusStateInitialising, err);
+        goto close;
+    }
+    err = NULL;
+    state = xenbus_read_integer(path);
+    while (err == NULL && (state < XenbusStateInitWait || state >= XenbusStateClosed))
+        err = xenbus_wait_for_state_change(path, &state, &dev->events);
 
+close:
     xenbus_unwatch_path(XBT_NIL, path);
 
     snprintf(path, sizeof(path), "%s/tx-ring-ref", nodename);

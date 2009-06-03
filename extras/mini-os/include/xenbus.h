@@ -1,6 +1,8 @@
 #ifndef XENBUS_H__
 #define XENBUS_H__
 
+#include <xen/io/xenbus.h>
+
 typedef unsigned long xenbus_transaction_t;
 #define XBT_NIL ((xenbus_transaction_t)0)
 
@@ -27,6 +29,8 @@ extern struct wait_queue_head xenbus_watch_queue;
 void xenbus_wait_for_watch(xenbus_event_queue *queue);
 char **xenbus_wait_for_watch_return(xenbus_event_queue *queue);
 char* xenbus_wait_for_value(const char *path, const char *value, xenbus_event_queue *queue);
+char *xenbus_wait_for_state_change(const char* path, XenbusState *state, xenbus_event_queue *queue);
+char *xenbus_switch_state(xenbus_transaction_t xbt, const char* path, XenbusState state);
 
 /* When no token is provided, use a global queue. */
 #define XENBUS_WATCH_PATH_TOKEN "xenbus_watch_path"
