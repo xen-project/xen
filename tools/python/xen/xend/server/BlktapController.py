@@ -32,7 +32,7 @@ def doexec(args, inputtext=None):
         proc.tochild.write(inputtext)
     stdout = proc.fromchild
     stderr = proc.childerr
-    rc = proc.poll()
+    rc = proc.wait()
     return (rc,stdout,stderr)
 
 def parseDeviceString(device):
@@ -131,7 +131,16 @@ class BlktapController(BlkifController):
         cmd = [ TAPDISK_BINARY, '-n', '%s:%s' % (params, file) ]
         (rc,stdout,stderr) = doexec(cmd)
 
-        minor, device, control = parseDeviceString(stdout)
+        if rc != 0:
+            err = stderr.read();
+            out = stdout.read();
+            stdout.close();
+            stderr.close();
+            raise Exception, 'Failed to create device.\n    stdout: %s\n    stderr: %s\nCheck that target \"%s\" exists and that blktap2 driver installed in dom0.' % (out.rstrip(), err.rstrip(), file);
+
+        minor, device, control = parseDeviceString(stdout.readline())
+        stdout.close();
+        stderr.close();
 
         #modify the configuration to attach as a vbd, now that the
         #device is configured.  Then continue to create the device
