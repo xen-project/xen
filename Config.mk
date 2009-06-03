@@ -125,9 +125,9 @@ QEMU_REMOTE=http://xenbits.xensource.com/git-http/qemu-xen-unstable.git
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 5beedb58147cbb04e206a71429198b6316217cfc
-# Mon Jun 1 10:45:42 2009 +0100
-# passthrough: hot-plug PCI devices at boot-time
+QEMU_TAG ?= c9c1a645fcfdba8c4a15a56e29d5ea7b7bcd7aa6
+# Wed Jun 3 15:47:52 2009 +0100
+# add a few missing statics and consts
 
 OCAML_XENSTORED_REPO=http://xenbits.xensource.com/ext/xen-ocaml-tools.hg
 
