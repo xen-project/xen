@@ -22,6 +22,7 @@ genpath:
 	echo "BINDIR=\"$(BINDIR)\"" >> ${xenpath}
 	echo "LIBEXEC=\"$(LIBEXEC)\"" >> ${xenpath}
 	echo "LIBDIR=\"$(LIBDIR)\"" >> ${xenpath}
+	echo "SHAREDIR=\"$(SHAREDIR)\"" >> ${xenpath}
 	echo "PRIVATE_BINDIR=\"$(PRIVATE_BINDIR)\"" >> ${xenpath}
 	echo "XEN_CONFIG_DIR=\"$(XEN_CONFIG_DIR)\"" >> ${xenpath}
 	echo "XEN_SCRIPT_DIR=\"$(XEN_SCRIPT_DIR)\"" >> ${xenpath}
@@ -70,8 +71,8 @@ install: install-messages install-dtd
 		$(PYTHON_PREFIX_ARG) --root="$(DESTDIR)" --force
 
 install-dtd: all
-	$(INSTALL_DIR) $(DESTDIR)$(DOCDIR)
-	$(INSTALL_DATA) xen/xm/create.dtd $(DESTDIR)$(DOCDIR)
+	$(INSTALL_DIR) $(DESTDIR)$(SHAREDIR)
+	$(INSTALL_DATA) xen/xm/create.dtd $(DESTDIR)$(SHAREDIR)
 
 install-messages: all
 	set -e; if which $(MSGFMT) >/dev/null ; then \

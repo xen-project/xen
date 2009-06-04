@@ -26,10 +26,12 @@ from xen.xend.XendAPIConstants import XEN_API_ON_NORMAL_EXIT, \
      XEN_API_ON_CRASH_BEHAVIOUR
 from xen.xm.opts import OptionError
 from xen.util import xsconstants
+from xen.util.path import SHAREDIR
 import xen.util.xsm.xsm as security
 
 import sys
 import os
+from os.path import join
 import traceback
 import re
 
@@ -75,7 +77,7 @@ class xenapi_create:
     def __init__(self):
         self.DEFAULT_STORAGE_REPOSITORY = get_default_SR()
 
-        self.dtd = "/usr/share/xen/create.dtd"
+        self.dtd = join(SHAREDIR, "create.dtd")
 
     def create(self, filename=None, document=None, skipdtd=False):
         """
