@@ -39,7 +39,7 @@ from xen.util import asserts, auxbin
 from xen.util.blkif import blkdev_uname_to_file, blkdev_uname_to_taptype
 import xen.util.xsm.xsm as security
 from xen.util import xsconstants
-from xen.util.pci import serialise_pci_opts
+from xen.util.pci import serialise_pci_opts, pci_opts_list_to_spx
 
 from xen.xend import balloon, sxp, uuid, image, arch
 from xen.xend import XendOptions, XendNode, XendConfig
@@ -3771,23 +3771,21 @@ class XendDomainInfo:
         opts_dict = xenapi_pci.get('options')
         for k in opts_dict.keys():
             dpci_opts.append([k, opts_dict[k]])
+        opts_sxp = pci_opts_list_to_spx(dpci_opts)
 
         # Convert xenapi to sxp
         ppci = XendAPIStore.get(xenapi_pci.get('PPCI'), 'PPCI')
 
-        target_pci_sxp = \
-            ['pci', 
-                ['dev',
-                    ['domain', '0x%02x' % ppci.get_domain()],
-                    ['bus', '0x%02x' % ppci.get_bus()],
-                    ['slot', '0x%02x' % ppci.get_slot()],
-                    ['func', '0x%1x' % ppci.get_func()],
-                    ['vslot', '0x%02x' % xenapi_pci.get('hotplug_slot')],
-                    ['opts', dpci_opts],
-                    ['uuid', dpci_uuid]
-                ],
-                ['state', 'Initialising']
-            ]
+        dev_sxp = ['dev',
+                   ['domain', '0x%02x' % ppci.get_domain()],
+                   ['bus', '0x%02x' % ppci.get_bus()],
+                   ['slot', '0x%02x' % ppci.get_slot()],
+                   ['func', '0x%1x' % ppci.get_func()],
+                   ['vslot', '0x%02x' % xenapi_pci.get('hotplug_slot')],
+                   ['uuid', dpci_uuid]]
+        dev_sxp = sxp.merge(dev_sxp, opts_sxp)
+
+        target_pci_sxp = ['pci', dev_sxp, ['state', 'Initialising'] ]
 
         if self._stateGet() != XEN_API_VM_POWER_STATE_RUNNING:
 
