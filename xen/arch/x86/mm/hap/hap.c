@@ -52,8 +52,140 @@
 #define page_to_mfn(_pg) _mfn(__page_to_mfn(_pg))
 
 /************************************************/
+/*          HAP VRAM TRACKING SUPPORT           */
+/************************************************/
+
+int hap_enable_vram_tracking(struct domain *d)
+{
+    int i;
+
+    if ( !d->dirty_vram )
+        return -EINVAL;
+
+    /* turn on PG_log_dirty bit in paging mode */
+    hap_lock(d);
+    d->arch.paging.mode |= PG_log_dirty;
+    hap_unlock(d);
+
+    /* set l1e entries of P2M table to be read-only. */
+    for (i = d->dirty_vram->begin_pfn; i < d->dirty_vram->end_pfn; i++)
+        p2m_change_type(d, i, p2m_ram_rw, p2m_ram_logdirty);
+
+    flush_tlb_mask(&d->domain_dirty_cpumask);
+    return 0;
+}
+
+int hap_disable_vram_tracking(struct domain *d)
+{
+    int i;
+
+    if ( !d->dirty_vram )
+        return -EINVAL;
+
+    hap_lock(d);
+    d->arch.paging.mode &= ~PG_log_dirty;
+    hap_unlock(d);
+
+    /* set l1e entries of P2M table with normal mode */
+    for (i = d->dirty_vram->begin_pfn; i < d->dirty_vram->end_pfn; i++)
+        p2m_change_type(d, i, p2m_ram_rw, p2m_ram_logdirty);
+
+    flush_tlb_mask(&d->domain_dirty_cpumask);
+    return 0;
+}
+
+void hap_clean_vram_tracking(struct domain *d)
+{
+    int i;
+
+    if ( !d->dirty_vram )
+        return;
+
+    /* set l1e entries of P2M table to be read-only. */
+    for (i = d->dirty_vram->begin_pfn; i < d->dirty_vram->end_pfn; i++)
+        p2m_change_type(d, i, p2m_ram_rw, p2m_ram_logdirty);
+
+    flush_tlb_mask(&d->domain_dirty_cpumask);
+}
+
+void hap_vram_tracking_init(struct domain *d)
+{
+    paging_log_dirty_init(d, hap_enable_vram_tracking,
+                          hap_disable_vram_tracking,
+                          hap_clean_vram_tracking);
+}
+
+int hap_track_dirty_vram(struct domain *d,
+                         unsigned long begin_pfn,
+                         unsigned long nr,
+                         XEN_GUEST_HANDLE_64(uint8) dirty_bitmap)
+{
+    long rc = 0;
+
+    if ( nr )
+    {
+        if ( paging_mode_log_dirty(d) && d->dirty_vram )
+        {
+            if ( begin_pfn != d->dirty_vram->begin_pfn ||
+                 begin_pfn + nr != d->dirty_vram->end_pfn )
+            {
+                paging_log_dirty_disable(d);
+                d->dirty_vram->begin_pfn = begin_pfn;
+                d->dirty_vram->end_pfn = begin_pfn + nr;
+                rc = paging_log_dirty_enable(d);
+                if (rc != 0)
+                    goto param_fail;
+            }
+        }
+        else if ( !paging_mode_log_dirty(d) && !d->dirty_vram )
+        {
+            rc -ENOMEM;
+            if ( (d->dirty_vram = xmalloc(struct sh_dirty_vram)) == NULL )
+                goto param_fail;
+
+            d->dirty_vram->begin_pfn = begin_pfn;
+            d->dirty_vram->end_pfn = begin_pfn + nr;
+            hap_vram_tracking_init(d);
+            rc = paging_log_dirty_enable(d);
+            if (rc != 0)
+                goto param_fail;
+        }
+        else
+        {
+            if ( !paging_mode_log_dirty(d) && d->dirty_vram )
+                rc = -EINVAL;
+            else
+                rc = -ENODATA;
+            goto param_fail;
+        }
+        /* get the bitmap */
+        rc = paging_log_dirty_range(d, begin_pfn, nr, dirty_bitmap);
+    }
+    else
+    {
+        if ( paging_mode_log_dirty(d) && d->dirty_vram ) {
+            rc = paging_log_dirty_disable(d);
+            xfree(d->dirty_vram);
+            d->dirty_vram = NULL;
+        } else
+            rc = 0;
+    }
+
+    return rc;
+
+param_fail:
+    if ( d->dirty_vram )
+    {
+        xfree(d->dirty_vram);
+        d->dirty_vram = NULL;
+    }
+    return rc;
+}
+
+/************************************************/
 /*            HAP LOG DIRTY SUPPORT             */
 /************************************************/
+
 /* hap code to call when log_dirty is enable. return 0 if no problem found. */
 int hap_enable_log_dirty(struct domain *d)
 {
@@ -84,6 +216,21 @@ void hap_clean_dirty_bitmap(struct domain *d)
     /* set l1e entries of P2M table to be read-only. */
     p2m_change_entry_type_global(d, p2m_ram_rw, p2m_ram_logdirty);
     flush_tlb_mask(&d->domain_dirty_cpumask);
+}
+
+void hap_logdirty_init(struct domain *d)
+{
+    if ( paging_mode_log_dirty(d) && d->dirty_vram )
+    {
+        paging_log_dirty_disable(d);
+        xfree(d->dirty_vram);
+        d->dirty_vram = NULL;
+    }
+
+    /* Reinitialize logdirty mechanism */
+    paging_log_dirty_init(d, hap_enable_log_dirty,
+                          hap_disable_log_dirty,
+                          hap_clean_dirty_bitmap);
 }
 
 /************************************************/
@@ -390,10 +537,6 @@ void hap_domain_init(struct domain *d)
 {
     hap_lock_init(d);
     INIT_PAGE_LIST_HEAD(&d->arch.paging.hap.freelist);
-
-    /* This domain will use HAP for log-dirty mode */
-    paging_log_dirty_init(d, hap_enable_log_dirty, hap_disable_log_dirty,
-                          hap_clean_dirty_bitmap);
 }
 
 /* return 0 for success, -errno for failure */

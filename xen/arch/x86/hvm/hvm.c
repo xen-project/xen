@@ -34,6 +34,7 @@
 #include <xen/event.h>
 #include <xen/paging.h>
 #include <asm/shadow.h>
+#include <asm/hap.h>
 #include <asm/current.h>
 #include <asm/e820.h>
 #include <asm/io.h>
@@ -2653,12 +2654,13 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
             goto param_fail2;
 
         rc = -EINVAL;
-        if ( !shadow_mode_enabled(d))
-            goto param_fail2;
         if ( d->vcpu[0] == NULL )
             goto param_fail2;
 
-        rc = shadow_track_dirty_vram(d, a.first_pfn, a.nr, a.dirty_bitmap);
+        if ( shadow_mode_enabled(d) )
+            rc = shadow_track_dirty_vram(d, a.first_pfn, a.nr, a.dirty_bitmap);
+        else
+            rc = hap_track_dirty_vram(d, a.first_pfn, a.nr, a.dirty_bitmap);
 
     param_fail2:
         rcu_unlock_domain(d);

@@ -139,6 +139,12 @@ int paging_alloc_log_dirty_bitmap(struct domain *d);
 /* free log dirty bitmap resource */
 void paging_free_log_dirty_bitmap(struct domain *d);
 
+/* get the dirty bitmap for a specific range of pfns */
+int paging_log_dirty_range(struct domain *d,
+                           unsigned long begin_pfn,
+                           unsigned long nr,
+                           XEN_GUEST_HANDLE_64(uint8) dirty_bitmap);
+
 /* enable log dirty */
 int paging_log_dirty_enable(struct domain *d);
 
@@ -175,6 +181,15 @@ void paging_mark_dirty(struct domain *d, unsigned long guest_mfn);
 #else
 #define L4_LOGDIRTY_IDX(pfn) 0
 #endif
+
+/* VRAM dirty tracking support */
+struct sh_dirty_vram {
+    unsigned long begin_pfn;
+    unsigned long end_pfn;
+    paddr_t *sl1ma;
+    uint8_t *dirty_bitmap;
+    s_time_t last_dirty;
+};
 
 /*****************************************************************************
  * Entry points into the paging-assistance code */

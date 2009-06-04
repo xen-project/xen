@@ -590,17 +590,6 @@ sh_mfn_is_dirty(struct domain *d, mfn_t gmfn)
 }
 
 /**************************************************************************/
-/* VRAM dirty tracking support */
-
-struct sh_dirty_vram {
-    unsigned long begin_pfn;
-    unsigned long end_pfn;
-    paddr_t *sl1ma;
-    uint8_t *dirty_bitmap;
-    s_time_t last_dirty;
-};
-
-/**************************************************************************/
 /* Shadow-page refcounting. */
 
 void sh_destroy_shadow(struct vcpu *v, mfn_t smfn);
