@@ -539,7 +539,7 @@ class xenapi_create:
             "PPCI":
                 target_ref,
             "hotplug_slot":
-                int(pci.attributes["func"].value, 16),
+                int(pci.attributes["vslot"].value, 16),
             "options":
                 get_child_nodes_as_dict(pci,
                   "pci_opt", "key", "value")
