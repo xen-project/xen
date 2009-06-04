@@ -191,11 +191,8 @@ class PciController(DevController):
 
                 # Per device uuid info
                 dev_dict['uuid'] = self.readBackend(devid, 'uuid-%d' % i)
-                vslot = self.readBackend(devid, 'vslot-%d' % i)
-                if vslot != None:
-                    dev_dict['vslot'] = self.readBackend(devid, 'vslot-%d' % i)
-                else:
-                    dev_dict['vslot'] = AUTO_PHP_SLOT_STR
+                dev_dict['vslot'] = '0x%s' % \
+                                    self.readBackend(devid, 'vslot-%d' % i)
 
                 #append opts info
                 opts = self.readBackend(devid, 'opts-%d' % i)
