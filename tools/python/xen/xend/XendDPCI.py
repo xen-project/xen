@@ -119,7 +119,7 @@ class XendDPCI(XendBase):
 
         self.VM = record['VM']
         self.PPCI = record['PPCI']
-        self.hotplug_slot = record['hotplug_slot']
+        self.hotplug_slot = int(record['hotplug_slot'], 16)
         if 'options' in record.keys():
             self.options = record['options']
 
@@ -153,7 +153,7 @@ class XendDPCI(XendBase):
         return self.PPCI
 
     def get_hotplug_slot(self):
-        return self.hotplug_slot
+        return "%d" % self.hotplug_slot
 
     def get_options(self):
         return self.options
