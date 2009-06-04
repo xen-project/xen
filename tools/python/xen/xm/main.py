@@ -2205,6 +2205,9 @@ def xm_pci_list(args):
     if len(devs) == 0:
         return
 
+    devs.sort(None, lambda x: x['vslot'] << 32 | PCI_BDF(x['domain'], x['bus'],
+                                                         x['slot'], x['func']))
+
     has_vslot = False
     for x in devs:
         if x['vslot'] == AUTO_PHP_SLOT:

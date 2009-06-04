@@ -114,6 +114,10 @@ PAGE_MASK=~(PAGE_SIZE - 1)
 def PCI_DEVFN(slot, func):
     return ((((slot) & 0x1f) << 3) | ((func) & 0x07))
 
+def PCI_BDF(domain, bus, slot, func):
+    return (((domain & 0xffff) << 16) | ((bus & 0xff) << 8) |
+            PCI_DEVFN(slot, func))
+
 def serialise_pci_opts(opts):
     return reduce(lambda x, y: x+','+y, map(lambda (x, y): x+'='+y, opts))
 
