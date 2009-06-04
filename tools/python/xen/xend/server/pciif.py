@@ -74,7 +74,8 @@ class PciController(DevController):
             bus = parse_hex(pci_config.get('bus', 0))
             slot = parse_hex(pci_config.get('slot', 0))
             func = parse_hex(pci_config.get('func', 0))            
-            vslot = parse_hex(pci_config.get('vslot', 0))
+            vslot = parse_hex(pci_config.get('vslot',
+                                             '0x' + AUTO_PHP_SLOT_STR))
 
             if pci_config.has_key('opts'):
                 opts = serialise_pci_opts(pci_config['opts'])
