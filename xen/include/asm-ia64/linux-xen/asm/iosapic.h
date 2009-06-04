@@ -186,6 +186,9 @@ struct rte_entry {
 #define IOSAPIC_RTEINDEX(reg)	(((reg) - 0x10) >> 1)
 extern unsigned long ia64_vector_mask[];
 extern unsigned long ia64_xen_vector[];
+
+int iosapic_get_nr_iosapics(void);
+int iosapic_get_nr_pins(int index);
 #endif /* XEN */
 
 #define IO_APIC_BASE(idx) ((unsigned int *)iosapic_lists[idx].addr)

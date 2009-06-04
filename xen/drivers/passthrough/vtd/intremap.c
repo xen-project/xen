@@ -33,6 +33,10 @@
 
 #ifdef __ia64__
 #define dest_SMI -1
+#define nr_ioapics              iosapic_get_nr_iosapics()
+#define nr_ioapic_registers(i)  iosapic_get_nr_pins(i)
+#else
+#define nr_ioapic_registers(i)  nr_ioapic_registers[i]
 #endif
 
 /* apic_pin_2_ir_idx[apicid][pin] = interrupt remapping table index */
@@ -45,7 +49,7 @@ static int init_apic_pin_2_ir_idx(void)
 
     nr_pins = 0;
     for ( i = 0; i < nr_ioapics; i++ )
-        nr_pins += nr_ioapic_registers[i];
+        nr_pins += nr_ioapic_registers(i);
 
     _apic_pin_2_ir_idx = xmalloc_array(unsigned int, nr_pins);
     apic_pin_2_ir_idx = xmalloc_array(unsigned int *, nr_ioapics);
@@ -63,7 +67,7 @@ static int init_apic_pin_2_ir_idx(void)
     for ( i = 0; i < nr_ioapics; i++ )
     {
         apic_pin_2_ir_idx[i] = &_apic_pin_2_ir_idx[nr_pins];
-        nr_pins += nr_ioapic_registers[i];
+        nr_pins += nr_ioapic_registers(i);
     }
 
     return 0;

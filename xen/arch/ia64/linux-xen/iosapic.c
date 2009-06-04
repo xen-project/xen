@@ -1275,4 +1275,22 @@ int iosapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
 	spin_unlock_irqrestore(&irq_descp(vec)->lock, flags);
 	return 0;
 }
+
+/* for vtd interrupt remapping. xen/drivers/vtd/intremap.c */
+int iosapic_get_nr_iosapics(void)
+{
+	int index;
+
+	for (index = NR_IOSAPICS - 1; index >= 0; index--) {
+		if (iosapic_lists[index].addr)
+			break;
+	}
+
+	return index + 1;
+}
+
+int iosapic_get_nr_pins(int index)
+{
+	return iosapic_lists[index].num_rte;
+}
 #endif /* XEN */
