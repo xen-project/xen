@@ -1407,7 +1407,6 @@ def do_console(domain_name):
                 # the child process used to do this has detached
                 print("Domain has already finished");
                 break
-            (p, rv) = os.waitpid(cpid, os.WNOHANG)
             if os.WIFEXITED(rv):
                 if os.WEXITSTATUS(rv) != 0:
                     sys.exit(os.WEXITSTATUS(rv))
