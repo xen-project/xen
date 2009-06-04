@@ -153,6 +153,18 @@ def parse_pci_name(pci_name_string):
 
     return (domain, bus, slot, func)
 
+def extract_the_exact_pci_names(pci_names):
+    result = []
+    pci_names = pci_names.split()
+    for pci in pci_names:
+        # The length of DDDD:bb:dd.f is 12.
+        if len(pci) !=  12:
+            continue
+        if re.match(PCI_DEV_REG_EXPRESS_STR, pci) is None:
+            continue
+        result = result + [pci]
+    return result
+
 def find_sysfs_mnt():
     try:
         return utils.find_sysfs_mount()
@@ -253,7 +265,7 @@ def find_all_devices_owned_by_pciback():
     sysfs_mnt = find_sysfs_mnt()
     pciback_path = sysfs_mnt + SYSFS_PCIBACK_PATH
     pci_names = os.popen('ls ' + pciback_path).read()
-    pci_list = re.findall(PCI_DEV_REG_EXPRESS_STR, pci_names)
+    pci_list = extract_the_exact_pci_names(pci_names)
     dev_list = []
     for pci in pci_list:
         (dom, b, d, f) = parse_pci_name(pci)
@@ -454,7 +466,7 @@ class PciDevice:
         sysfs_mnt = find_sysfs_mnt()
         self_path = sysfs_mnt + SYSFS_PCI_DEVS_PATH + '/' + self.name
         pci_names = os.popen('ls ' + self_path).read()
-        dev_list = re.findall(PCI_DEV_REG_EXPRESS_STR, pci_names)
+        dev_list = extract_the_exact_pci_names(pci_names)
 
         list = [self.name]
         for pci_str in dev_list:
@@ -491,7 +503,7 @@ class PciDevice:
             return [self.name]
 
         dev_list = dev.find_all_devices_behind_the_bridge(ignore_bridge)
-        dev_list = re.findall(PCI_DEV_REG_EXPRESS_STR, '%s' % dev_list)
+        dev_list = extract_the_exact_pci_names('%s' % dev_list)
         return dev_list
 
     def do_secondary_bus_reset(self, target_bus, devs):
@@ -578,7 +590,7 @@ class PciDevice:
         parent = PCI_DEV_FORMAT_STR % self.find_parent()
         pci_names = os.popen('ls ' + sysfs_mnt + SYSFS_PCI_DEVS_PATH + '/' + \
             parent + '/').read()
-        funcs = re.findall(PCI_DEV_REG_EXPRESS_STR, pci_names)
+        funcs = extract_the_exact_pci_names(pci_names)
         return funcs
 
     def find_coassigned_devices(self):
