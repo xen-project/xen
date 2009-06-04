@@ -10439,22 +10439,44 @@ no_serial:
   ret
 
 rom_checksum:
-  push ax
-  push bx
-  push cx
+  pusha
+  push ds
+
   xor  ax, ax
   xor  bx, bx
   xor  cx, cx
+  xor  dx, dx
+
   mov  ch, [2]
   shl  cx, #1
+
+  jnc checksum_loop
+  jz  checksum_loop
+  xchg dx, cx
+  dec  cx
+
 checksum_loop:
   add  al, [bx]
   inc  bx
   loop checksum_loop
+
+  test dx, dx
+  je checksum_out
+
+  add  al, [bx]
+  mov  cx, dx
+  mov  dx, ds
+  add  dh, #0x10
+  mov  ds, dx
+  xor  dx, dx
+  xor  bx, bx
+
+  jmp  checksum_loop
+
+checksum_out:
   and  al, #0xff
-  pop  cx
-  pop  bx
-  pop  ax
+  pop  ds
+  popa
   ret
 
 
