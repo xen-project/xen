@@ -1400,6 +1400,13 @@ def do_console(domain_name):
         for i in range(10):
             # Catch failure of the create process 
             time.sleep(1)
+            try:
+                (p, rv) = os.waitpid(cpid, os.WNOHANG)
+            except OSError:
+                # Domain has started cleanly and then exiting,
+                # the child process used to do this has detached
+                print("Domain has already finished");
+                break
             (p, rv) = os.waitpid(cpid, os.WNOHANG)
             if os.WIFEXITED(rv):
                 if os.WEXITSTATUS(rv) != 0:
