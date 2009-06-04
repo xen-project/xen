@@ -752,6 +752,12 @@ class XendDomainInfo:
 
             vslot = xstransact.Read("/local/domain/0/device-model/%i/parameter"
                                     % self.getDomid())
+            try:
+                vslot_int = int(vslot, 16)
+            except ValueError:
+                raise VmError(("Cannot pass-through PCI function '%s'. " +
+                               "Device model reported an error: %s") %
+                              (bdf_str, vslot))
         else:
             vslot = new_dev['vslot']
 
