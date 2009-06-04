@@ -32,10 +32,13 @@ all: build
 
 build: $(IBIN)
 
-vhd-util: vhd-util.o subdir-all-lib
+LIBS_DEPENDS	  := lib/libvhd.so lib/vhd.a
+$(LIBS_DEPENDS):subdirs-all
+
+vhd-util: vhd-util.o $(LIBS_DEPENDS)
 	$(CC) $(CFLAGS) -o vhd-util vhd-util.o $(LDFLAGS) $(LIBS)
 
-vhd-update: vhd-update.o subdir-all-lib
+vhd-update: vhd-update.o $(LIBS_DEPENDS)
 	$(CC) $(CFLAGS) -o vhd-update vhd-update.o $(LDFLAGS) $(LIBS)
 
 install: all

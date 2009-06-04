@@ -34,7 +34,10 @@ DEPS          = .*.d
 
 all: $(IBIN)
 
-blktapctrl: tapdisk-daemon.c $(OBJS) subdir-all-lib
+LIBS_DEPENDS := lib/libblktap.a lib/libblktap.so
+$(LIBS_DEPENDS):subdirs-all
+
+blktapctrl: tapdisk-daemon.c $(OBJS) $(LIBS_DEPENDS)
 	$(CC) $(CFLAGS) -o blktapctrl tapdisk-daemon.c $(LDFLAGS) $(LIBS) $(OBJS)
 
 install: all
