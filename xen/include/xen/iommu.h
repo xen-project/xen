@@ -26,7 +26,6 @@
 #include <public/hvm/ioreq.h>
 #include <public/domctl.h>
 
-extern int vtd_enabled;
 extern int iommu_enabled;
 extern int iommu_pv_enabled;
 extern int force_iommu;

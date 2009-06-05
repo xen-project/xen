@@ -1790,7 +1790,7 @@ int intel_vtd_setup(void)
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
 
-    if ( !vtd_enabled )
+    if ( !iommu_enabled )
         return -ENODEV;
 
     platform_quirks();
@@ -1859,7 +1859,7 @@ int intel_vtd_setup(void)
  error:
     for_each_drhd_unit ( drhd )
         iommu_free(drhd);
-    vtd_enabled = 0;
+    iommu_enabled = 0;
     iommu_snoop = 0;
     iommu_passthrough = 0;
     iommu_qinval = 0;
@@ -1955,7 +1955,7 @@ void iommu_suspend(void)
     struct iommu *iommu;
     u32    i;
 
-    if ( !vtd_enabled )
+    if ( !iommu_enabled )
         return;
 
     iommu_flush_all();
@@ -1991,7 +1991,7 @@ void iommu_resume(void)
     struct iommu_flush *flush;
     u32 i;
 
-    if ( !vtd_enabled )
+    if ( !iommu_enabled )
         return;
 
     /* Re-initialize the register-based flush functions.

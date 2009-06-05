@@ -117,7 +117,7 @@ void hvm_dpci_isairq_eoi(struct domain *d, unsigned int isairq)
     int i;
 
     ASSERT(isairq < NR_ISAIRQS);
-    if ( !vtd_enabled)
+    if ( !iommu_enabled)
         return;
 
     spin_lock(&d->event_lock);

@@ -32,8 +32,6 @@
 #include "dmar.h"
 #include "iommu.h"
 
-int vtd_enabled = 1;
-
 #undef PREFIX
 #define PREFIX VTDPREFIX "ACPI DMAR:"
 #define DEBUG
@@ -561,6 +559,6 @@ int acpi_dmar_init(void)
         panic("acpi_dmar_init: acpi_dmar_init failed,"
               " crash Xen for security purpose!\n");
 
-    vtd_enabled = 0;
+    iommu_enabled = 0;
     return -ENODEV;
 }

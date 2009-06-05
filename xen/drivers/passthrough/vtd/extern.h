@@ -25,8 +25,6 @@
 
 extern int qinval_enabled;
 extern int ats_enabled;
-extern struct qi_ctrl *qi_ctrl;
-extern struct ir_ctrl *ir_ctrl;
 
 void print_iommu_regs(struct acpi_drhd_unit *drhd);
 void print_vtd_entries(struct iommu *iommu, int bus, int devfn, u64 gmfn);

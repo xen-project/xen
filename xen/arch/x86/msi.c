@@ -191,7 +191,7 @@ static void read_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
         BUG();
     }
 
-    if ( vtd_enabled )
+    if ( iommu_enabled )
         msi_msg_read_remap_rte(entry, msg);
 }
 

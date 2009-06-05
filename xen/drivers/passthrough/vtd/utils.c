@@ -260,7 +260,7 @@ void dump_iommu_info(unsigned char key)
     }
 
     /* Dump the I/O xAPIC redirection table(s). */
-    if ( vtd_enabled )
+    if ( iommu_enabled )
     {
         int apic, reg;
         union IO_APIC_reg_01 reg_01;
