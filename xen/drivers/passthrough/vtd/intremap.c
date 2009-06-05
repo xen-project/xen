@@ -534,7 +534,7 @@ void msi_msg_write_remap_rte(
 int enable_intremap(struct iommu *iommu)
 {
     struct ir_ctrl *ir_ctrl;
-    s_time_t start_time;
+    u32 sts;
 
     ASSERT(ecap_intr_remap(iommu->ecap) && iommu_intremap);
 
@@ -564,38 +564,22 @@ int enable_intremap(struct iommu *iommu)
     iommu->gcmd |= DMA_GCMD_SIRTP;
     dmar_writel(iommu->reg, DMAR_GCMD_REG, iommu->gcmd);
 
-    /* Make sure hardware complete it */
-    start_time = NOW();
-    while ( !(dmar_readl(iommu->reg, DMAR_GSTS_REG) & DMA_GSTS_SIRTPS) )
-    {
-        if ( NOW() > (start_time + DMAR_OPERATION_TIMEOUT) )
-            panic("Cannot set SIRTP field for interrupt remapping\n");
-        cpu_relax();
-    }
-
+    IOMMU_WAIT_OP(iommu, DMAR_GSTS_REG, dmar_readl,
+                  (sts & DMA_GSTS_SIRTPS), sts);
+ 
     /* enable comaptiblity format interrupt pass through */
     iommu->gcmd |= DMA_GCMD_CFI;
     dmar_writel(iommu->reg, DMAR_GCMD_REG, iommu->gcmd);
 
-    start_time = NOW();
-    while ( !(dmar_readl(iommu->reg, DMAR_GSTS_REG) & DMA_GSTS_CFIS) )
-    {
-        if ( NOW() > (start_time + DMAR_OPERATION_TIMEOUT) )
-            panic("Cannot set CFI field for interrupt remapping\n");
-        cpu_relax();
-    }
+    IOMMU_WAIT_OP(iommu, DMAR_GSTS_REG, dmar_readl,
+                  (sts & DMA_GSTS_CFIS), sts);
 
     /* enable interrupt remapping hardware */
     iommu->gcmd |= DMA_GCMD_IRE;
     dmar_writel(iommu->reg, DMAR_GCMD_REG, iommu->gcmd);
 
-    start_time = NOW();
-    while ( !(dmar_readl(iommu->reg, DMAR_GSTS_REG) & DMA_GSTS_IRES) )
-    {
-        if ( NOW() > (start_time + DMAR_OPERATION_TIMEOUT) )
-            panic("Cannot set IRE field for interrupt remapping\n");
-        cpu_relax();
-    }
+    IOMMU_WAIT_OP(iommu, DMAR_GSTS_REG, dmar_readl,
+                  (sts & DMA_GSTS_IRES), sts);
 
     /* After set SIRTP, we should do globally invalidate the IEC */
     iommu_flush_iec_global(iommu);
@@ -605,18 +589,13 @@ int enable_intremap(struct iommu *iommu)
 
 void disable_intremap(struct iommu *iommu)
 {
-    s_time_t start_time;
+    u32 sts;
 
     ASSERT(ecap_intr_remap(iommu->ecap) && iommu_intremap);
 
     iommu->gcmd &= ~(DMA_GCMD_SIRTP | DMA_GCMD_CFI | DMA_GCMD_IRE);
     dmar_writel(iommu->reg, DMAR_GCMD_REG, iommu->gcmd);
 
-    start_time = NOW();
-    while ( dmar_readl(iommu->reg, DMAR_GSTS_REG) & DMA_GSTS_IRES )
-    {
-        if ( NOW() > (start_time + DMAR_OPERATION_TIMEOUT) )
-            panic("Cannot clear IRE field for interrupt remapping\n");
-        cpu_relax();
-    }
+    IOMMU_WAIT_OP(iommu, DMAR_GSTS_REG, dmar_readl,
+                  !(sts & DMA_GSTS_IRES), sts);
 }

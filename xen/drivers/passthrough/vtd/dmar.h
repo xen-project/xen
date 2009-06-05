@@ -90,6 +90,20 @@ void dmar_scope_remove_buses(struct dmar_scope *scope, u16 sec, u16 sub);
 
 #define DMAR_OPERATION_TIMEOUT MILLISECS(1000)
 
+#define IOMMU_WAIT_OP(iommu, offset, op, cond, sts) \
+do {                                                \
+    s_time_t start_time = NOW();                    \
+    while (1) {                                     \
+        sts = op(iommu->reg, offset);               \
+        if ( cond )                                 \
+            break;                                  \
+        if ( NOW() > start_time + DMAR_OPERATION_TIMEOUT )      \
+            panic("%s:%d:%s: DMAR hardware is malfunctional\n", \
+                  __FILE__, __LINE__, __func__);                \
+        cpu_relax();                                            \
+    }                                                           \
+} while (0)
+
 int vtd_hw_check(void);
 void disable_pmr(struct iommu *iommu);
 int is_usb_device(u8 bus, u8 devfn);

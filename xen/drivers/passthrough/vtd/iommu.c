@@ -230,7 +230,6 @@ static void iommu_flush_write_buffer(struct iommu *iommu)
 {
     u32 val;
     unsigned long flag;
-    s_time_t start_time;
 
     if ( !rwbf_quirk && !cap_rwbf(iommu->cap) )
         return;
@@ -240,17 +239,9 @@ static void iommu_flush_write_buffer(struct iommu *iommu)
     dmar_writel(iommu->reg, DMAR_GCMD_REG, val);
 
     /* Make sure hardware complete it */
-    start_time = NOW();
-    for ( ; ; )
-    {
-        val = dmar_readl(iommu->reg, DMAR_GSTS_REG);
-        if ( !(val & DMA_GSTS_WBFS) )
-            break;
-        if ( NOW() > start_time + DMAR_OPERATION_TIMEOUT )
-            panic("%s: DMAR hardware is malfunctional,"
-                  " please disable IOMMU\n", __func__);
-        cpu_relax();
-    }
+    IOMMU_WAIT_OP(iommu, DMAR_GSTS_REG, dmar_readl,
+                  !(val & DMA_GSTS_WBFS), val);
+
     spin_unlock_irqrestore(&iommu->register_lock, flag);
 }
 
@@ -263,7 +254,6 @@ static int flush_context_reg(
     struct iommu *iommu = (struct iommu *) _iommu;
     u64 val = 0;
     unsigned long flag;
-    s_time_t start_time;
 
     /*
      * In the non-present entry flush case, if hardware doesn't cache
@@ -301,17 +291,9 @@ static int flush_context_reg(
     dmar_writeq(iommu->reg, DMAR_CCMD_REG, val);
 
     /* Make sure hardware complete it */
-    start_time = NOW();
-    for ( ; ; )
-    {
-        val = dmar_readq(iommu->reg, DMAR_CCMD_REG);
-        if ( !(val & DMA_CCMD_ICC) )
-            break;
-        if ( NOW() > start_time + DMAR_OPERATION_TIMEOUT )
-            panic("%s: DMAR hardware is malfunctional,"
-                  " please disable IOMMU\n", __func__);
-        cpu_relax();
-    }
+    IOMMU_WAIT_OP(iommu, DMAR_CCMD_REG, dmar_readq,
+                  !(val & DMA_CCMD_ICC), val);
+
     spin_unlock_irqrestore(&iommu->register_lock, flag);
     /* flush context entry will implicitly flush write buffer */
     return 0;
@@ -352,7 +334,6 @@ static int flush_iotlb_reg(void *_iommu, u16 did,
     int tlb_offset = ecap_iotlb_offset(iommu->ecap);
     u64 val = 0, val_iva = 0;
     unsigned long flag;
-    s_time_t start_time;
 
     /*
      * In the non-present entry flush case, if hardware doesn't cache
@@ -399,17 +380,8 @@ static int flush_iotlb_reg(void *_iommu, u16 did,
     dmar_writeq(iommu->reg, tlb_offset + 8, val);
 
     /* Make sure hardware complete it */
-    start_time = NOW();
-    for ( ; ; )
-    {
-        val = dmar_readq(iommu->reg, tlb_offset + 8);
-        if ( !(val & DMA_TLB_IVT) )
-            break;
-        if ( NOW() > start_time + DMAR_OPERATION_TIMEOUT )
-            panic("%s: DMAR hardware is malfunctional,"
-                  " please disable IOMMU\n", __func__);
-        cpu_relax();
-    }
+    IOMMU_WAIT_OP(iommu, (tlb_offset + 8), dmar_readq,
+                  !(val & DMA_TLB_IVT), val);
     spin_unlock_irqrestore(&iommu->register_lock, flag);
 
     /* check IOTLB invalidation granularity */
@@ -578,7 +550,6 @@ static int iommu_set_root_entry(struct iommu *iommu)
 {
     u32 cmd, sts;
     unsigned long flags;
-    s_time_t start_time;
 
     spin_lock(&iommu->lock);
 
@@ -597,18 +568,8 @@ static int iommu_set_root_entry(struct iommu *iommu)
     dmar_writel(iommu->reg, DMAR_GCMD_REG, cmd);
 
     /* Make sure hardware complete it */
-    start_time = NOW();
-    for ( ; ; )
-    {
-        sts = dmar_readl(iommu->reg, DMAR_GSTS_REG);
-        if ( sts & DMA_GSTS_RTPS )
-            break;
-        if ( NOW() > start_time + DMAR_OPERATION_TIMEOUT )
-            panic("%s: DMAR hardware is malfunctional,"
-                  " please disable IOMMU\n", __func__);
-        cpu_relax();
-    }
-
+    IOMMU_WAIT_OP(iommu, DMAR_GSTS_REG, dmar_readl,
+                  (sts & DMA_GSTS_RTPS), sts);
     spin_unlock_irqrestore(&iommu->register_lock, flags);
 
     return 0;
@@ -618,25 +579,16 @@ static void iommu_enable_translation(struct iommu *iommu)
 {
     u32 sts;
     unsigned long flags;
-    s_time_t start_time;
 
     dprintk(XENLOG_INFO VTDPREFIX,
             "iommu_enable_translation: iommu->reg = %p\n", iommu->reg);
     spin_lock_irqsave(&iommu->register_lock, flags);
     iommu->gcmd |= DMA_GCMD_TE;
     dmar_writel(iommu->reg, DMAR_GCMD_REG, iommu->gcmd);
+
     /* Make sure hardware complete it */
-    start_time = NOW();
-    for ( ; ; )
-    {
-        sts = dmar_readl(iommu->reg, DMAR_GSTS_REG);
-        if ( sts & DMA_GSTS_TES )
-            break;
-        if ( NOW() > start_time + DMAR_OPERATION_TIMEOUT )
-            panic("%s: DMAR hardware is malfunctional,"
-                  " please disable IOMMU\n", __func__);
-        cpu_relax();
-    }
+    IOMMU_WAIT_OP(iommu, DMAR_GSTS_REG, dmar_readl,
+                  (sts & DMA_GSTS_TES), sts);
 
     /* Disable PMRs when VT-d engine takes effect per spec definition */
     disable_pmr(iommu);
@@ -647,24 +599,14 @@ static void iommu_disable_translation(struct iommu *iommu)
 {
     u32 sts;
     unsigned long flags;
-    s_time_t start_time;
 
     spin_lock_irqsave(&iommu->register_lock, flags);
     iommu->gcmd &= ~ DMA_GCMD_TE;
     dmar_writel(iommu->reg, DMAR_GCMD_REG, iommu->gcmd);
 
     /* Make sure hardware complete it */
-    start_time = NOW();
-    for ( ; ; )
-    {
-        sts = dmar_readl(iommu->reg, DMAR_GSTS_REG);
-        if ( !(sts & DMA_GSTS_TES) )
-            break;
-        if ( NOW() > start_time + DMAR_OPERATION_TIMEOUT )
-            panic("%s: DMAR hardware is malfunctional,"
-                  " please disable IOMMU\n", __func__);
-        cpu_relax();
-    }
+    IOMMU_WAIT_OP(iommu, DMAR_GSTS_REG, dmar_readl,
+                  !(sts & DMA_GSTS_TES), sts);
     spin_unlock_irqrestore(&iommu->register_lock, flags);
 }
 

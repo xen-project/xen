@@ -38,27 +38,16 @@ int is_usb_device(u8 bus, u8 devfn)
 /* Disable vt-d protected memory registers. */
 void disable_pmr(struct iommu *iommu)
 {
-    s_time_t start_time;
-    unsigned int val;
+    u32 val;
 
     val = dmar_readl(iommu->reg, DMAR_PMEN_REG);
     if ( !(val & DMA_PMEN_PRS) )
         return;
 
     dmar_writel(iommu->reg, DMAR_PMEN_REG, val & ~DMA_PMEN_EPM);
-    start_time = NOW();
 
-    for ( ; ; )
-    {
-        val = dmar_readl(iommu->reg, DMAR_PMEN_REG);
-        if ( (val & DMA_PMEN_PRS) == 0 )
-            break;
-
-        if ( NOW() > start_time + DMAR_OPERATION_TIMEOUT )
-            panic("Disable PMRs timeout\n");
-
-        cpu_relax();
-    }
+    IOMMU_WAIT_OP(iommu, DMAR_PMEN_REG, dmar_readl,
+                  !(val & DMA_PMEN_PRS), val);
 
     dprintk(XENLOG_INFO VTDPREFIX,
             "Disabled protected memory registers\n");

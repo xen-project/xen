@@ -418,9 +418,9 @@ static int flush_iotlb_qi(
 
 int enable_qinval(struct iommu *iommu)
 {
-    s_time_t start_time;
     struct qi_ctrl *qi_ctrl;
     struct iommu_flush *flush;
+    u32 sts;
 
     qi_ctrl = iommu_qi_ctrl(iommu);
     flush = iommu_get_flush(iommu);
@@ -458,13 +458,8 @@ int enable_qinval(struct iommu *iommu)
     dmar_writel(iommu->reg, DMAR_GCMD_REG, iommu->gcmd);
 
     /* Make sure hardware complete it */
-    start_time = NOW();
-    while ( !(dmar_readl(iommu->reg, DMAR_GSTS_REG) & DMA_GSTS_QIES) )
-    {
-        if ( NOW() > (start_time + DMAR_OPERATION_TIMEOUT) )
-            panic("Cannot set QIE field for queue invalidation\n");
-        cpu_relax();
-    }
+    IOMMU_WAIT_OP(iommu, DMAR_GSTS_REG, dmar_readl,
+                  (sts & DMA_GSTS_QIES), sts);
 
     qinval_enabled = 1;
     return 0;
@@ -472,7 +467,7 @@ int enable_qinval(struct iommu *iommu)
 
 void disable_qinval(struct iommu *iommu)
 {
-    s_time_t start_time;
+    u32 sts;
 
     ASSERT(ecap_queued_inval(iommu->ecap) && iommu_qinval);
 
@@ -480,11 +475,6 @@ void disable_qinval(struct iommu *iommu)
     dmar_writel(iommu->reg, DMAR_GCMD_REG, iommu->gcmd);
 
     /* Make sure hardware complete it */
-    start_time = NOW();
-    while ( dmar_readl(iommu->reg, DMAR_GSTS_REG) & DMA_GSTS_QIES )
-    {
-        if ( NOW() > (start_time + DMAR_OPERATION_TIMEOUT) )
-            panic("Cannot clear QIE field for queue invalidation\n");
-        cpu_relax();
-    }
+    IOMMU_WAIT_OP(iommu, DMAR_GSTS_REG, dmar_readl,
+                  !(sts & DMA_GSTS_QIES), sts);
 }
