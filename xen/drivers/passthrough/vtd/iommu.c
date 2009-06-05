@@ -233,10 +233,10 @@ static void iommu_flush_write_buffer(struct iommu *iommu)
 
     if ( !rwbf_quirk && !cap_rwbf(iommu->cap) )
         return;
-    val = iommu->gcmd | DMA_GCMD_WBF;
 
     spin_lock_irqsave(&iommu->register_lock, flag);
-    dmar_writel(iommu->reg, DMAR_GCMD_REG, val);
+    val = dmar_readl(iommu->reg, DMAR_GSTS_REG);
+    dmar_writel(iommu->reg, DMAR_GCMD_REG, val | DMA_GCMD_WBF);
 
     /* Make sure hardware complete it */
     IOMMU_WAIT_OP(iommu, DMAR_GSTS_REG, dmar_readl,
@@ -548,7 +548,7 @@ static void iommu_free_pagetable(u64 pt_maddr, int level)
 
 static int iommu_set_root_entry(struct iommu *iommu)
 {
-    u32 cmd, sts;
+    u32 sts;
     unsigned long flags;
 
     spin_lock(&iommu->lock);
@@ -564,8 +564,9 @@ static int iommu_set_root_entry(struct iommu *iommu)
     spin_unlock(&iommu->lock);
     spin_lock_irqsave(&iommu->register_lock, flags);
     dmar_writeq(iommu->reg, DMAR_RTADDR_REG, iommu->root_maddr);
-    cmd = iommu->gcmd | DMA_GCMD_SRTP;
-    dmar_writel(iommu->reg, DMAR_GCMD_REG, cmd);
+
+    sts = dmar_readl(iommu->reg, DMAR_GSTS_REG);
+    dmar_writel(iommu->reg, DMAR_GCMD_REG, sts | DMA_GCMD_SRTP);
 
     /* Make sure hardware complete it */
     IOMMU_WAIT_OP(iommu, DMAR_GSTS_REG, dmar_readl,
@@ -583,8 +584,8 @@ static void iommu_enable_translation(struct iommu *iommu)
     dprintk(XENLOG_INFO VTDPREFIX,
             "iommu_enable_translation: iommu->reg = %p\n", iommu->reg);
     spin_lock_irqsave(&iommu->register_lock, flags);
-    iommu->gcmd |= DMA_GCMD_TE;
-    dmar_writel(iommu->reg, DMAR_GCMD_REG, iommu->gcmd);
+    sts = dmar_readl(iommu->reg, DMAR_GSTS_REG);
+    dmar_writel(iommu->reg, DMAR_GCMD_REG, sts | DMA_GCMD_TE);
 
     /* Make sure hardware complete it */
     IOMMU_WAIT_OP(iommu, DMAR_GSTS_REG, dmar_readl,
@@ -601,8 +602,8 @@ static void iommu_disable_translation(struct iommu *iommu)
     unsigned long flags;
 
     spin_lock_irqsave(&iommu->register_lock, flags);
-    iommu->gcmd &= ~ DMA_GCMD_TE;
-    dmar_writel(iommu->reg, DMAR_GCMD_REG, iommu->gcmd);
+    sts = dmar_readl(iommu->reg, DMAR_GSTS_REG);
+    dmar_writel(iommu->reg, DMAR_GCMD_REG, sts & (~DMA_GCMD_TE));
 
     /* Make sure hardware complete it */
     IOMMU_WAIT_OP(iommu, DMAR_GSTS_REG, dmar_readl,

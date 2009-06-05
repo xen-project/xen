@@ -534,7 +534,7 @@ void msi_msg_write_remap_rte(
 int enable_intremap(struct iommu *iommu)
 {
     struct ir_ctrl *ir_ctrl;
-    u32 sts;
+    u32 sts, gcmd;
 
     ASSERT(ecap_intr_remap(iommu->ecap) && iommu_intremap);
 
@@ -561,22 +561,23 @@ int enable_intremap(struct iommu *iommu)
     dmar_writeq(iommu->reg, DMAR_IRTA_REG, ir_ctrl->iremap_maddr);
 
     /* set SIRTP */
-    iommu->gcmd |= DMA_GCMD_SIRTP;
-    dmar_writel(iommu->reg, DMAR_GCMD_REG, iommu->gcmd);
+    gcmd = dmar_readl(iommu->reg, DMAR_GSTS_REG);
+    gcmd |= DMA_GCMD_SIRTP;
+    dmar_writel(iommu->reg, DMAR_GCMD_REG, gcmd);
 
     IOMMU_WAIT_OP(iommu, DMAR_GSTS_REG, dmar_readl,
                   (sts & DMA_GSTS_SIRTPS), sts);
  
     /* enable comaptiblity format interrupt pass through */
-    iommu->gcmd |= DMA_GCMD_CFI;
-    dmar_writel(iommu->reg, DMAR_GCMD_REG, iommu->gcmd);
+    gcmd |= DMA_GCMD_CFI;
+    dmar_writel(iommu->reg, DMAR_GCMD_REG, gcmd);
 
     IOMMU_WAIT_OP(iommu, DMAR_GSTS_REG, dmar_readl,
                   (sts & DMA_GSTS_CFIS), sts);
 
     /* enable interrupt remapping hardware */
-    iommu->gcmd |= DMA_GCMD_IRE;
-    dmar_writel(iommu->reg, DMAR_GCMD_REG, iommu->gcmd);
+    gcmd |= DMA_GCMD_IRE;
+    dmar_writel(iommu->reg, DMAR_GCMD_REG, gcmd);
 
     IOMMU_WAIT_OP(iommu, DMAR_GSTS_REG, dmar_readl,
                   (sts & DMA_GSTS_IRES), sts);
@@ -593,8 +594,8 @@ void disable_intremap(struct iommu *iommu)
 
     ASSERT(ecap_intr_remap(iommu->ecap) && iommu_intremap);
 
-    iommu->gcmd &= ~(DMA_GCMD_SIRTP | DMA_GCMD_CFI | DMA_GCMD_IRE);
-    dmar_writel(iommu->reg, DMAR_GCMD_REG, iommu->gcmd);
+    sts = dmar_readl(iommu->reg, DMAR_GSTS_REG);
+    dmar_writel(iommu->reg, DMAR_GCMD_REG, sts & (~DMA_GCMD_IRE));
 
     IOMMU_WAIT_OP(iommu, DMAR_GSTS_REG, dmar_readl,
                   !(sts & DMA_GSTS_IRES), sts);

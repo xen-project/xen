@@ -47,7 +47,6 @@ struct iommu {
     struct list_head list;
     void __iomem *reg; /* Pointer to hardware regs, virtual addr */
     u32	index;         /* Sequence number of iommu */
-    u32	gcmd;          /* Holds TE, EAFL. Don't need SRTP, SFL, WBF */
     u32 nr_pt_levels;
     u64	cap;
     u64	ecap;

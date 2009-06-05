@@ -454,8 +454,8 @@ int enable_qinval(struct iommu *iommu)
     dmar_writeq(iommu->reg, DMAR_IQT_REG, 0);
 
     /* enable queued invalidation hardware */
-    iommu->gcmd |= DMA_GCMD_QIE;
-    dmar_writel(iommu->reg, DMAR_GCMD_REG, iommu->gcmd);
+    sts = dmar_readl(iommu->reg, DMAR_GSTS_REG);
+    dmar_writel(iommu->reg, DMAR_GCMD_REG, sts | DMA_GCMD_QIE);
 
     /* Make sure hardware complete it */
     IOMMU_WAIT_OP(iommu, DMAR_GSTS_REG, dmar_readl,
@@ -471,8 +471,8 @@ void disable_qinval(struct iommu *iommu)
 
     ASSERT(ecap_queued_inval(iommu->ecap) && iommu_qinval);
 
-    iommu->gcmd &= ~DMA_GCMD_QIE;
-    dmar_writel(iommu->reg, DMAR_GCMD_REG, iommu->gcmd);
+    sts = dmar_readl(iommu->reg, DMAR_GSTS_REG);
+    dmar_writel(iommu->reg, DMAR_GCMD_REG, sts & (~DMA_GCMD_QIE));
 
     /* Make sure hardware complete it */
     IOMMU_WAIT_OP(iommu, DMAR_GSTS_REG, dmar_readl,
