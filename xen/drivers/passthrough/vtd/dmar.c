@@ -277,25 +277,25 @@ static int __init acpi_parse_dev_scope(void *start, void *end,
             sub_bus = pci_conf_read8(
                 bus, path->dev, path->fn, PCI_SUBORDINATE_BUS);
             dprintk(XENLOG_INFO VTDPREFIX,
-                    "found bridge: bdf = %x:%x.%x  sec = %x  sub = %x\n",
-                    bus, path->dev, path->fn, sec_bus, sub_bus);
+                    "bridge: %x:%x.%x  start = %x sec = %x  sub = %x\n",
+                    bus, path->dev, path->fn,
+                    acpi_scope->start_bus, sec_bus, sub_bus);
 
-            dmar_scope_add_buses(scope, acpi_scope->start_bus, acpi_scope->start_bus);
             dmar_scope_add_buses(scope, sec_bus, sub_bus);
             break;
 
         case ACPI_DEV_MSI_HPET:
-            dprintk(XENLOG_INFO VTDPREFIX, "found MSI HPET: bdf = %x:%x.%x\n",
+            dprintk(XENLOG_INFO VTDPREFIX, "MSI HPET: %x:%x.%x\n",
                     bus, path->dev, path->fn);
             break;
 
         case ACPI_DEV_ENDPOINT:
-            dprintk(XENLOG_INFO VTDPREFIX, "found endpoint: bdf = %x:%x.%x\n",
+            dprintk(XENLOG_INFO VTDPREFIX, "endpoint: %x:%x.%x\n",
                     bus, path->dev, path->fn);
             break;
 
         case ACPI_DEV_IOAPIC:
-            dprintk(XENLOG_INFO VTDPREFIX, "found IOAPIC: bdf = %x:%x.%x\n",
+            dprintk(XENLOG_INFO VTDPREFIX, "IOAPIC: %x:%x.%x\n",
                     bus, path->dev, path->fn);
 
             if ( type == DMAR_TYPE )
