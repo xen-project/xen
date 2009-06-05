@@ -2220,7 +2220,7 @@ static void vmx_failed_vmentry(unsigned int exit_reason,
     case EXIT_REASON_MSR_LOADING:
         printk("caused by MSR entry %ld loading.\n", exit_qualification);
         break;
-    case EXIT_REASON_MACHINE_CHECK:
+    case EXIT_REASON_MCE_DURING_VMENTRY:
         printk("caused by machine check.\n");
         HVMTRACE_0D(MCE);
         do_machine_check(regs);
@@ -2340,7 +2340,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         case EXIT_REASON_SIPI:
         case EXIT_REASON_PENDING_VIRT_INTR:
         case EXIT_REASON_PENDING_VIRT_NMI:
-        case EXIT_REASON_MACHINE_CHECK:
+        case EXIT_REASON_MCE_DURING_VMENTRY:
             break;
         default:
             v->arch.hvm_vmx.vmx_emulate = 1;
