@@ -475,6 +475,7 @@ _sh_propagate(struct vcpu *v,
     guest_l1e_t guest_entry = { guest_intpte };
     shadow_l1e_t *sp = shadow_entry_ptr;
     struct domain *d = v->domain;
+    struct sh_dirty_vram *dirty_vram = d->arch.hvm_domain.dirty_vram;
     gfn_t target_gfn = guest_l1e_get_gfn(guest_entry);
     u32 pass_thru_flags;
     u32 gflags, sflags;
@@ -615,13 +616,13 @@ _sh_propagate(struct vcpu *v,
         }
     }
 
-    if ( unlikely((level == 1) && d->dirty_vram
-            && d->dirty_vram->last_dirty == -1
-            && gfn_x(target_gfn) >= d->dirty_vram->begin_pfn
-            && gfn_x(target_gfn) < d->dirty_vram->end_pfn) )
+    if ( unlikely((level == 1) && dirty_vram
+            && dirty_vram->last_dirty == -1
+            && gfn_x(target_gfn) >= dirty_vram->begin_pfn
+            && gfn_x(target_gfn) < dirty_vram->end_pfn) )
     {
         if ( ft & FETCH_TYPE_WRITE )
-            d->dirty_vram->last_dirty = NOW();
+            dirty_vram->last_dirty = NOW();
         else
             sflags &= ~_PAGE_RW;
     }
@@ -1042,22 +1043,23 @@ static inline void shadow_vram_get_l1e(shadow_l1e_t new_sl1e,
     mfn_t mfn = shadow_l1e_get_mfn(new_sl1e);
     int flags = shadow_l1e_get_flags(new_sl1e);
     unsigned long gfn;
+    struct sh_dirty_vram *dirty_vram = d->arch.hvm_domain.dirty_vram;
 
-    if ( !d->dirty_vram         /* tracking disabled? */
+    if ( !dirty_vram         /* tracking disabled? */
          || !(flags & _PAGE_RW) /* read-only mapping? */
          || !mfn_valid(mfn) )   /* mfn can be invalid in mmio_direct */
         return;
 
     gfn = mfn_to_gfn(d, mfn);
 
-    if ( (gfn >= d->dirty_vram->begin_pfn) && (gfn < d->dirty_vram->end_pfn) )
+    if ( (gfn >= dirty_vram->begin_pfn) && (gfn < dirty_vram->end_pfn) )
     {
-        unsigned long i = gfn - d->dirty_vram->begin_pfn;
+        unsigned long i = gfn - dirty_vram->begin_pfn;
         struct page_info *page = mfn_to_page(mfn);
         
         if ( (page->u.inuse.type_info & PGT_count_mask) == 1 )
             /* Initial guest reference, record it */
-            d->dirty_vram->sl1ma[i] = pfn_to_paddr(mfn_x(sl1mfn))
+            dirty_vram->sl1ma[i] = pfn_to_paddr(mfn_x(sl1mfn))
                 | ((unsigned long)sl1e & ~PAGE_MASK);
     }
 }
@@ -1070,17 +1072,18 @@ static inline void shadow_vram_put_l1e(shadow_l1e_t old_sl1e,
     mfn_t mfn = shadow_l1e_get_mfn(old_sl1e);
     int flags = shadow_l1e_get_flags(old_sl1e);
     unsigned long gfn;
+    struct sh_dirty_vram *dirty_vram = d->arch.hvm_domain.dirty_vram;
 
-    if ( !d->dirty_vram         /* tracking disabled? */
+    if ( !dirty_vram         /* tracking disabled? */
          || !(flags & _PAGE_RW) /* read-only mapping? */
          || !mfn_valid(mfn) )   /* mfn can be invalid in mmio_direct */
         return;
 
     gfn = mfn_to_gfn(d, mfn);
 
-    if ( (gfn >= d->dirty_vram->begin_pfn) && (gfn < d->dirty_vram->end_pfn) )
+    if ( (gfn >= dirty_vram->begin_pfn) && (gfn < dirty_vram->end_pfn) )
     {
-        unsigned long i = gfn - d->dirty_vram->begin_pfn;
+        unsigned long i = gfn - dirty_vram->begin_pfn;
         struct page_info *page = mfn_to_page(mfn);
         int dirty = 0;
         paddr_t sl1ma = pfn_to_paddr(mfn_x(sl1mfn))
@@ -1089,14 +1092,14 @@ static inline void shadow_vram_put_l1e(shadow_l1e_t old_sl1e,
         if ( (page->u.inuse.type_info & PGT_count_mask) == 1 )
         {
             /* Last reference */
-            if ( d->dirty_vram->sl1ma[i] == INVALID_PADDR ) {
+            if ( dirty_vram->sl1ma[i] == INVALID_PADDR ) {
                 /* We didn't know it was that one, let's say it is dirty */
                 dirty = 1;
             }
             else
             {
-                ASSERT(d->dirty_vram->sl1ma[i] == sl1ma);
-                d->dirty_vram->sl1ma[i] = INVALID_PADDR;
+                ASSERT(dirty_vram->sl1ma[i] == sl1ma);
+                dirty_vram->sl1ma[i] = INVALID_PADDR;
                 if ( flags & _PAGE_DIRTY )
                     dirty = 1;
             }
@@ -1106,10 +1109,10 @@ static inline void shadow_vram_put_l1e(shadow_l1e_t old_sl1e,
             /* We had more than one reference, just consider the page dirty. */
             dirty = 1;
             /* Check that it's not the one we recorded. */
-            if ( d->dirty_vram->sl1ma[i] == sl1ma )
+            if ( dirty_vram->sl1ma[i] == sl1ma )
             {
                 /* Too bad, we remembered the wrong one... */
-                d->dirty_vram->sl1ma[i] = INVALID_PADDR;
+                dirty_vram->sl1ma[i] = INVALID_PADDR;
             }
             else
             {
@@ -1119,8 +1122,8 @@ static inline void shadow_vram_put_l1e(shadow_l1e_t old_sl1e,
         }
         if ( dirty )
         {
-            d->dirty_vram->dirty_bitmap[i / 8] |= 1 << (i % 8);
-            d->dirty_vram->last_dirty = NOW();
+            dirty_vram->dirty_bitmap[i / 8] |= 1 << (i % 8);
+            dirty_vram->last_dirty = NOW();
         }
     }
 }

@@ -3259,11 +3259,11 @@ void shadow_teardown(struct domain *d)
      * calls now that we've torn down the bitmap */
     d->arch.paging.mode &= ~PG_log_dirty;
 
-    if (d->dirty_vram) {
-        xfree(d->dirty_vram->sl1ma);
-        xfree(d->dirty_vram->dirty_bitmap);
-        xfree(d->dirty_vram);
-        d->dirty_vram = NULL;
+    if (d->arch.hvm_domain.dirty_vram) {
+        xfree(d->arch.hvm_domain.dirty_vram->sl1ma);
+        xfree(d->arch.hvm_domain.dirty_vram->dirty_bitmap);
+        xfree(d->arch.hvm_domain.dirty_vram);
+        d->arch.hvm_domain.dirty_vram = NULL;
     }
 
     shadow_unlock(d);
@@ -3583,6 +3583,7 @@ int shadow_track_dirty_vram(struct domain *d,
     int flush_tlb = 0;
     unsigned long i;
     p2m_type_t t;
+    struct sh_dirty_vram *dirty_vram = d->arch.hvm_domain.dirty_vram;
 
     if (end_pfn < begin_pfn
             || begin_pfn > d->arch.p2m->max_mapped_pfn
@@ -3591,16 +3592,16 @@ int shadow_track_dirty_vram(struct domain *d,
 
     shadow_lock(d);
 
-    if ( d->dirty_vram && (!nr ||
-             ( begin_pfn != d->dirty_vram->begin_pfn
-            || end_pfn   != d->dirty_vram->end_pfn )) )
+    if ( dirty_vram && (!nr ||
+             ( begin_pfn != dirty_vram->begin_pfn
+            || end_pfn   != dirty_vram->end_pfn )) )
     {
         /* Different tracking, tear the previous down. */
-        gdprintk(XENLOG_INFO, "stopping tracking VRAM %lx - %lx\n", d->dirty_vram->begin_pfn, d->dirty_vram->end_pfn);
-        xfree(d->dirty_vram->sl1ma);
-        xfree(d->dirty_vram->dirty_bitmap);
-        xfree(d->dirty_vram);
-        d->dirty_vram = NULL;
+        gdprintk(XENLOG_INFO, "stopping tracking VRAM %lx - %lx\n", dirty_vram->begin_pfn, dirty_vram->end_pfn);
+        xfree(dirty_vram->sl1ma);
+        xfree(dirty_vram->dirty_bitmap);
+        xfree(dirty_vram);
+        dirty_vram = d->arch.hvm_domain.dirty_vram = NULL;
     }
 
     if ( !nr )
@@ -3611,7 +3612,7 @@ int shadow_track_dirty_vram(struct domain *d,
 
     /* This should happen seldomly (Video mode change),
      * no need to be careful. */
-    if ( !d->dirty_vram )
+    if ( !dirty_vram )
     {
         /* Just recount from start. */
         for ( i = begin_pfn; i < end_pfn; i++ ) {
@@ -3623,29 +3624,30 @@ int shadow_track_dirty_vram(struct domain *d,
         gdprintk(XENLOG_INFO, "tracking VRAM %lx - %lx\n", begin_pfn, end_pfn);
 
         rc = -ENOMEM;
-        if ( (d->dirty_vram = xmalloc(struct sh_dirty_vram)) == NULL )
+        if ( (dirty_vram = xmalloc(struct sh_dirty_vram)) == NULL )
             goto out;
-        d->dirty_vram->begin_pfn = begin_pfn;
-        d->dirty_vram->end_pfn = end_pfn;
+        dirty_vram->begin_pfn = begin_pfn;
+        dirty_vram->end_pfn = end_pfn;
+        d->arch.hvm_domain.dirty_vram = dirty_vram;
 
-        if ( (d->dirty_vram->sl1ma = xmalloc_array(paddr_t, nr)) == NULL )
+        if ( (dirty_vram->sl1ma = xmalloc_array(paddr_t, nr)) == NULL )
             goto out_dirty_vram;
-        memset(d->dirty_vram->sl1ma, ~0, sizeof(paddr_t) * nr);
+        memset(dirty_vram->sl1ma, ~0, sizeof(paddr_t) * nr);
 
-        if ( (d->dirty_vram->dirty_bitmap = xmalloc_array(uint8_t, dirty_size)) == NULL )
+        if ( (dirty_vram->dirty_bitmap = xmalloc_array(uint8_t, dirty_size)) == NULL )
             goto out_sl1ma;
-        memset(d->dirty_vram->dirty_bitmap, 0, dirty_size);
+        memset(dirty_vram->dirty_bitmap, 0, dirty_size);
 
-        d->dirty_vram->last_dirty = NOW();
+        dirty_vram->last_dirty = NOW();
 
         /* Tell the caller that this time we could not track dirty bits. */
         rc = -ENODATA;
     }
-    else if (d->dirty_vram->last_dirty == -1)
+    else if (dirty_vram->last_dirty == -1)
     {
         /* still completely clean, just copy our empty bitmap */
         rc = -EFAULT;
-        if ( copy_to_guest(dirty_bitmap, d->dirty_vram->dirty_bitmap, dirty_size) == 0 )
+        if ( copy_to_guest(dirty_bitmap, dirty_vram->dirty_bitmap, dirty_size) == 0 )
             rc = 0;
     }
     else
@@ -3660,7 +3662,7 @@ int shadow_track_dirty_vram(struct domain *d,
             mfn_t mfn = gfn_to_mfn(d, begin_pfn + i, &t);
             struct page_info *page;
             int dirty = 0;
-            paddr_t sl1ma = d->dirty_vram->sl1ma[i];
+            paddr_t sl1ma = dirty_vram->sl1ma[i];
 
             if (mfn_x(mfn) == INVALID_MFN)
             {
@@ -3724,8 +3726,8 @@ int shadow_track_dirty_vram(struct domain *d,
 
             if ( dirty )
             {
-                d->dirty_vram->dirty_bitmap[i / 8] |= 1 << (i % 8);
-                d->dirty_vram->last_dirty = NOW();
+                dirty_vram->dirty_bitmap[i / 8] |= 1 << (i % 8);
+                dirty_vram->last_dirty = NOW();
             }
         }
 
@@ -3735,9 +3737,9 @@ int shadow_track_dirty_vram(struct domain *d,
 #endif
 
         rc = -EFAULT;
-        if ( copy_to_guest(dirty_bitmap, d->dirty_vram->dirty_bitmap, dirty_size) == 0 ) {
-            memset(d->dirty_vram->dirty_bitmap, 0, dirty_size);
-            if (d->dirty_vram->last_dirty + SECONDS(2) < NOW())
+        if ( copy_to_guest(dirty_bitmap, dirty_vram->dirty_bitmap, dirty_size) == 0 ) {
+            memset(dirty_vram->dirty_bitmap, 0, dirty_size);
+            if (dirty_vram->last_dirty + SECONDS(2) < NOW())
             {
                 /* was clean for more than two seconds, try to disable guest
                  * write access */
@@ -3746,7 +3748,7 @@ int shadow_track_dirty_vram(struct domain *d,
                     if (mfn_x(mfn) != INVALID_MFN)
                         flush_tlb |= sh_remove_write_access(d->vcpu[0], mfn, 1, 0);
                 }
-                d->dirty_vram->last_dirty = -1;
+                dirty_vram->last_dirty = -1;
             }
             rc = 0;
         }
@@ -3756,10 +3758,10 @@ int shadow_track_dirty_vram(struct domain *d,
     goto out;
 
 out_sl1ma:
-    xfree(d->dirty_vram->sl1ma);
+    xfree(dirty_vram->sl1ma);
 out_dirty_vram:
-    xfree(d->dirty_vram);
-    d->dirty_vram = NULL;
+    xfree(dirty_vram);
+    dirty_vram = d->arch.hvm_domain.dirty_vram = NULL;
 
 out:
     shadow_unlock(d);

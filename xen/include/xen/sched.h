@@ -268,9 +268,6 @@ struct domain
      */
     spinlock_t hypercall_deadlock_mutex;
 
-    /* VRAM dirty support. */
-    struct sh_dirty_vram *dirty_vram;
-
     /* transcendent memory, auto-allocated on first tmem op by each domain */
     void *tmem;
 };
