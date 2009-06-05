@@ -665,7 +665,7 @@ class LinuxImageHandler(ImageHandler):
         ImageHandler.configure(self, vmConfig)
         self.vramsize = int(vmConfig['platform'].get('videoram',4)) * 1024
         self.is_stubdom = (self.kernel.find('stubdom') >= 0)
-        self.superpages = vmConfig['superpages']
+        self.superpages = int(vmConfig['superpages'])
 
     def buildDomain(self):
         store_evtchn = self.vm.getStorePort()
