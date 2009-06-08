@@ -155,7 +155,14 @@ def parse_pci_name(pci_name_string):
 
 def extract_the_exact_pci_names(pci_names):
     result = []
-    pci_names = pci_names.split()
+
+    if isinstance(pci_names, types.StringTypes):
+        pci_names = pci_names.split()
+    elif isinstance(pci_names, types.ListType):
+        pci_names = re.findall(PCI_DEV_REG_EXPRESS_STR, '%s' % pci_names)
+    else:
+         raise PciDeviceParseError('Invalid argument: %s' % pci_names)
+
     for pci in pci_names:
         # The length of DDDD:bb:dd.f is 12.
         if len(pci) !=  12:
@@ -503,7 +510,7 @@ class PciDevice:
             return [self.name]
 
         dev_list = dev.find_all_devices_behind_the_bridge(ignore_bridge)
-        dev_list = extract_the_exact_pci_names('%s' % dev_list)
+        dev_list = extract_the_exact_pci_names(dev_list)
         return dev_list
 
     def do_secondary_bus_reset(self, target_bus, devs):
