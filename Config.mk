@@ -125,9 +125,9 @@ QEMU_REMOTE=http://xenbits.xensource.com/git-http/qemu-xen-unstable.git
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= c9c1a645fcfdba8c4a15a56e29d5ea7b7bcd7aa6
-# Wed Jun 3 15:47:52 2009 +0100
-# add a few missing statics and consts
+QEMU_TAG ?= e0bb6b8df60863bca0163a1688baf4854e931e55
+# Mon Jun 8 17:45:42 2009 +0100
+# stdvga + videoram config option
 
 OCAML_XENSTORED_REPO=http://xenbits.xensource.com/ext/xen-ocaml-tools.hg
 
