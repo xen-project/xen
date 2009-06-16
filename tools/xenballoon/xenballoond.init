@@ -2,7 +2,7 @@
 #
 # xenballoond	Script to start and stop Xen ballooning daemon.
 #
-# Copyright (C) 2008 Oracle Corporation and/or its affiliates.
+# Copyright (C) 2009 Oracle Corporation and/or its affiliates.
 # All rights reserved.
 # Written by: Dan Magenheimer <dan.magenheimer@oracle.com>
 #

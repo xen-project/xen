@@ -5,9 +5,10 @@
 # Written by: Dan Magenheimer <dan.magenheimer@oracle.com>
 #
 # xenballoond - In-guest engine for Xen memory ballooning
-# Version: 080630
+# Original version: 080630
+# Updated 0906XX: add tmem preswap auto-shrinking
 #
-# Two "policies" are implemented:
+# Two self-ballooning "policies" are implemented:
 # - Selfballooning: Adjust memory periodically, with no (or little) input
 #     from domain0.  Target memory is determined solely by the
 #     Committed_AS line in /proc/meminfo, but parameters may adjust
@@ -149,6 +150,75 @@ send_memory_stats() {
 	fi
 }
 
+
+curpreswappages() {
+	pages=$(cat $XENBALLOON_PRESWAP_SYSFILE)
+	RETVAL=$pages
+	return  # value returned in RETVAL in pages
+}
+
+preswaphysteresis() {
+	RETVAL=$XENBALLOON_PRESWAP_HYSTERESIS
+	if [ $xenstore_enabled = "true" ]; then
+		if xenstore-exists memory/preswaphysteresis ; then
+			RETVAL=`xenstore-read memory/preswaphysteresis`
+		fi
+	fi
+	return
+}
+
+preswapinertia() {
+	RETVAL=$XENBALLOON_PRESWAP_INERTIA
+	if [ $xenstore_enabled = "true" ]; then
+		if xenstore-exists memory/preswapinertia ; then
+			RETVAL=`xenstore-read memory/preswapinertia`
+		fi
+	fi
+	return
+}
+
+send_preswap_stats() {
+	if [ ! $xenstore_enabled = "true" ]; then
+		return
+	fi
+	curpreswappages
+	preswap_pgs=$RETVAL
+	if [ $XENBALLOON_SEND_PRESWAP ]; then
+		xenstore-write memory/preswap "$preswap_pgs"
+	fi
+}
+
+shrink_preswap() {
+	if [ "$XENBALLOON_PRESWAP_SHRINK" = "false" ]; then
+		return
+	fi
+	if [ ! -f "$XENBALLOON_PRESWAP_SYSFILE" ]; then
+		return
+	fi
+	curpreswappages
+	preswaplast=$preswapnow
+	preswapnow=$RETVAL
+	if [ $preswapnow -eq 0 -o $preswapnow -ne $preswaplast ]; then
+		preswapinertia
+		preswapinertiacounter=$RETVAL
+		return
+	fi
+	let "preswapinertiacounter=$preswapinertiacounter-1"
+	if [ $preswapinertiacounter -ne 0 ]; then
+		return
+	fi
+	preswaphysteresis
+	preswaphys=$RETVAL
+	if [ $preswaphys -eq 0 ]; then
+		return
+	fi
+	let "tgtpreswappages=$(( $preswapnow - \
+				( $preswapnow / $preswaphys ) ))"
+	preswapinertia
+	preswapinertiacounter=$RETVAL
+	echo $tgtpreswappages > "$XENBALLOON_PRESWAP_SYSFILE"
+}
+
 if [ ! -f /proc/xen/balloon ]; then
 	echo "$0: no balloon driver installed"
 	exit 0
@@ -165,6 +235,7 @@ else
 	echo "$0: missing /usr/bin/xenstore-* tools, disabling directed ballooning"
 	xenstore_enabled=false
 fi
+preswapnow=0
 
 . /etc/sysconfig/xenballoon.conf
 
@@ -194,7 +265,9 @@ do
 		fi
 		interval=$XENBALLOON_INTERVAL
 	fi
+	shrink_preswap
 	send_memory_stats
+	send_preswap_stats
 	if [ $xenstore_enabled = "true" ]; then
 		if xenstore-exists memory/interval ; then
 			interval=`xenstore-read memory/interval`
