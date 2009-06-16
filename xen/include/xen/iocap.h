@@ -28,8 +28,4 @@
 #define irq_access_permitted(d, i)                      \
     rangeset_contains_singleton((d)->irq_caps, i)
 
-#define multipage_allocation_permitted(d)               \
-    (!rangeset_is_empty((d)->iomem_caps) ||             \
-     !rangeset_is_empty((d)->arch.ioport_caps))
-
 #endif /* __XEN_IOCAP_H__ */

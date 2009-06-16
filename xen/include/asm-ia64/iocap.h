@@ -15,4 +15,9 @@ extern int ioports_deny_access(struct domain *d,
 #define ioports_access_permitted(d, s, e)               \
     rangeset_contains_range((d)->arch.ioport_caps, s, e)
 
+#define multipage_allocation_permitted(d, order)        \
+    (((order) == 0) ||                                  \
+     !rangeset_is_empty((d)->iomem_caps) ||             \
+     !rangeset_is_empty((d)->arch.ioport_caps))
+
 #endif /* __IA64_IOCAP_H__ */

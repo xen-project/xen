@@ -50,8 +50,7 @@ static void increase_reservation(struct memop_args *a)
                                      a->nr_extents-1) )
         return;
 
-    if ( (a->extent_order != 0) &&
-         !multipage_allocation_permitted(current->domain) )
+    if ( !multipage_allocation_permitted(current->domain, a->extent_order) )
         return;
 
     for ( i = a->nr_done; i < a->nr_extents; i++ )
@@ -96,8 +95,7 @@ static void populate_physmap(struct memop_args *a)
                                      a->nr_extents-1) )
         return;
 
-    if ( (a->extent_order != 0) &&
-         !multipage_allocation_permitted(current->domain) )
+    if ( !multipage_allocation_permitted(current->domain, a->extent_order) )
         return;
 
     for ( i = a->nr_done; i < a->nr_extents; i++ )
@@ -247,8 +245,10 @@ static long memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
     }
 
     /* Only privileged guests can allocate multi-page contiguous extents. */
-    if ( ((exch.in.extent_order != 0) || (exch.out.extent_order != 0)) &&
-         !multipage_allocation_permitted(current->domain) )
+    if ( !multipage_allocation_permitted(current->domain,
+                                         exch.in.extent_order) ||
+         !multipage_allocation_permitted(current->domain,
+                                         exch.out.extent_order) )
     {
         rc = -EPERM;
         goto fail_early;
