@@ -38,6 +38,8 @@ from xen.util import vscsi_util
 import xen.util.xsm.xsm as security
 from xen.xm.main import serverType, SERVER_XEN_API, get_single_vm
 from xen.util import utils, auxbin
+from xen.util.pci import split_pci_opts, check_pci_opts, \
+                         pci_opts_list_to_sxp
 
 from xen.xm.opts import *
 
@@ -706,23 +708,18 @@ def configure_pci(config_devs, vals):
     """
     config_pci = []
     for (domain, bus, slot, func, vslot, opts) in vals.pci:
-        config_pci_opts = []
-        d = comma_sep_kv_to_dict(opts)
-
-        def f(k):
-            if k not in ['msitranslate', 'power_mgmt']:
-                err('Invalid pci option: ' + k)
-
-            config_pci_opts.append([k, d[k]])
-
         config_pci_bdf = ['dev', ['domain', domain], ['bus', bus], \
                           ['slot', slot], ['func', func],
                           ['vslot', vslot]]
-        map(f, d.keys())
-        if len(config_pci_opts)>0:
-            config_pci_bdf.append(['opts', config_pci_opts])
 
-        config_pci.append(config_pci_bdf)
+        opts_list = split_pci_opts(opts)
+        try:
+            check_pci_opts(opts_list)
+        except PciDeviceParseError, ex:
+            err(str(ex))
+
+        config_opts = pci_opts_list_to_sxp(split_pci_opts(opts))
+        config_pci.append(sxp.merge(config_pci_bdf, config_opts))
 
     if len(config_pci)>0:
         config_pci.insert(0, 'pci')

@@ -118,14 +118,26 @@ def PCI_BDF(domain, bus, slot, func):
     return (((domain & 0xffff) << 16) | ((bus & 0xff) << 8) |
             PCI_DEVFN(slot, func))
 
+def check_pci_opts(opts):
+    def f((k, v)):
+        if k not in ['msitranslate', 'power_mgmt'] or \
+           not v.lower() in ['0', '1', 'yes', 'no']:
+            raise PciDeviceParseError('Invalid pci option %s=%s: ' % (k, v))
+
+    map(f, opts)
+
 def serialise_pci_opts(opts):
-    return reduce(lambda x, y: x+','+y, map(lambda (x, y): x+'='+y, opts))
+    return ','.join(map(lambda x: '='.join(x), opts))
 
 def split_pci_opts(opts):
-    return map(lambda x: x.split('='), opts.split(','))
+    return map(lambda x: x.split('='),
+               filter(lambda x: x != '', opts.split(',')))
 
 def pci_opts_list_to_sxp(list):
-    ['dev'] + map(lambda x: ['opts', x], list)
+    return ['dev'] + map(lambda x: ['opts', x], list)
+
+def pci_opts_list_from_sxp(dev):
+    return map(lambda x: sxp.children(x)[0], sxp.children(dev, 'opts'))
 
 def parse_hex(val):
     try:

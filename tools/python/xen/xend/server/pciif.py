@@ -222,7 +222,8 @@ class PciController(DevController):
             dev_sxpr = ['dev']
             for dev_key, dev_val in dev.items():
                 if dev_key == 'opts':
-                    dev_sxpr.append(['opts', split_pci_opts(dev_val)])
+                    opts_sxpr = pci_opts_list_to_sxp(split_pci_opts(dev_val))
+                    dev_sxpr = sxp.merge(dev_sxpr, opts_sxpr)
                 else:
                     dev_sxpr.append([dev_key, dev_val])
             sxpr.append(dev_sxpr)

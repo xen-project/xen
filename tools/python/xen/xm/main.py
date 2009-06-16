@@ -2507,12 +2507,15 @@ def parse_pci_configuration(args, state, opts = ''):
                 ['slot', '0x'+ pci_dev_info['slot']],
                 ['func', '0x'+ pci_dev_info['func']],
                 ['vslot', '0x%x' % int(vslot, 16)]]
-        if len(opts) > 0:
-            pci_bdf.append(['opts', opts])
-        pci.append(pci_bdf)
-
     except:
         raise OptionError("Invalid argument: %s %s" % (pci_dev_str, vslot))
+
+    try:
+        check_pci_opts(opts)
+    except PciDeviceParseError, ex:
+        raise OptionError(str(ex))
+
+    pci.append(sxp.merge(pci_bdf, pci_opts_list_to_sxp(opts)))
     pci.append(['state', state])
 
     return (dom, pci)

@@ -36,6 +36,7 @@ from xen.xend.xenstore.xstransact import xstransact
 from xen.xend.server.BlktapController import blktap_disk_types
 from xen.xend.server.netif import randomMAC
 from xen.util.blkif import blkdev_name_to_number, blkdev_uname_to_file
+from xen.util.pci import pci_opts_list_from_sxp
 from xen.util import xsconstants
 import xen.util.auxbin
 
@@ -1605,11 +1606,10 @@ class XendConfig(dict):
         return ''
 
     def pci_convert_dict_to_sxp(self, dev, state, sub_state = None):
-        sxp =  ['pci', ['dev'] + map(lambda (x, y): [x, y], dev.items()),
-                ['state', state]]
+        pci_sxp = ['pci', self.dev_dict_to_sxp(dev), ['state', state]]
         if sub_state != None:
-            sxp.append(['sub_state', sub_state])
-        return sxp
+            pci_sxp.append(['sub_state', sub_state])
+        return pci_sxp
 
     def pci_convert_sxp_to_dict(self, dev_sxp):
         """Convert pci device sxp to dict
@@ -1658,13 +1658,9 @@ class XendConfig(dict):
 
         pci_devs = []
         for pci_dev in sxp.children(dev_sxp, 'dev'):
-            pci_dev_info = {}
-            for opt_val in pci_dev[1:]:
-                try:
-                    opt, val = opt_val
-                    pci_dev_info[opt] = val
-                except (TypeError, ValueError):
-                    pass
+            pci_dev_info = dict(pci_dev[1:])
+            if 'opts' in pci_dev_info:
+                pci_dev_info['opts'] = pci_opts_list_from_sxp(pci_dev)
             # append uuid to each pci device that does't already have one.
             if not pci_dev_info.has_key('uuid'):
                 dpci_uuid = pci_dev_info.get('uuid', uuid.createString())
@@ -1975,6 +1971,15 @@ class XendConfig(dict):
         result.extend([u for u in target['devices'].keys() if u not in result])
         return result
 
+    # This includes a generic equivalent of pci_opts_list_to_sxp()
+    def dev_dict_to_sxp(self, dev):
+        def f((key, val)):
+            if isinstance(val, types.ListType):
+                return map(lambda x: [key, x], val)
+            return [[key, val]]
+        dev_sxp = ['dev'] + reduce(lambda x, y: x + y, map(f, dev.items()))
+        return dev_sxp
+
     def all_devices_sxpr(self, target = None):
         """Returns the SXPR for all devices in the current configuration."""
         sxprs = []
@@ -1997,10 +2002,7 @@ class XendConfig(dict):
                     if dev_info.has_key('backend'):
                         sxpr.append(['backend', dev_info['backend']])
                 for pci_dev_info in dev_info['devs']:
-                    pci_dev_sxpr = ['dev']
-                    for opt, val in pci_dev_info.items():
-                        pci_dev_sxpr.append([opt, val])
-                    sxpr.append(pci_dev_sxpr)
+                    sxpr.append(self.dev_dict_to_sxp(pci_dev_info))
                 sxprs.append((dev_type, sxpr))
             else:
                 sxpr = self.device_sxpr(dev_type = dev_type,
@@ -2127,11 +2129,7 @@ class XendConfig(dict):
                 slot = sxp.child_value(dev, 'slot')
                 func = sxp.child_value(dev, 'func')
                 vslot = sxp.child_value(dev, 'vslot')
-                opts = ''
-                for opt in sxp.child_value(dev, 'opts', []):
-                    if opts:
-                        opts += ','
-                    opts += '%s=%s' % (opt[0], str(opt[1]))
+                opts = pci_opts_list_from_sxp(dev)
                 pci.append([domain, bus, slot, func, vslot, opts])
         self['platform']['pci'] = pci
 

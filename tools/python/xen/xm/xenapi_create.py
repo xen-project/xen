@@ -26,6 +26,7 @@ from xen.xend.XendAPIConstants import XEN_API_ON_NORMAL_EXIT, \
      XEN_API_ON_CRASH_BEHAVIOUR
 from xen.xm.opts import OptionError
 from xen.util import xsconstants
+from xen.util.pci import pci_opts_list_from_sxp
 from xen.util.path import SHAREDIR
 import xen.util.xsm.xsm as security
 
@@ -945,12 +946,11 @@ class sxp2xml:
                     = get_child_by_name(dev_sxp, "func", "0")
                 pci.attributes["vslot"] \
                     = get_child_by_name(dev_sxp, "vslot", "0")
-                for opt in get_child_by_name(dev_sxp, "opts", ""):
-                    if len(opt) > 0:
-                        pci_opt = document.createElement("pci_opt")
-                        pci_opt.attributes["key"] = opt[0]
-                        pci_opt.attributes["value"] = opt[1]
-                        pci.appendChild(pci_opt)
+                for opt in pci_opts_list_from_sxp(dev_sxp):
+                    pci_opt = document.createElement("pci_opt")
+                    pci_opt.attributes["key"] = opt[0]
+                    pci_opt.attributes["value"] = opt[1]
+                    pci.appendChild(pci_opt)
 
                 pcis.append(pci)
 
