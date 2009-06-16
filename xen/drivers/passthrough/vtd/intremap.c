@@ -568,6 +568,9 @@ int enable_intremap(struct iommu *iommu)
     IOMMU_WAIT_OP(iommu, DMAR_GSTS_REG, dmar_readl,
                   (sts & DMA_GSTS_SIRTPS), sts);
  
+    /* After set SIRTP, must globally invalidate the interrupt entry cache */
+    iommu_flush_iec_global(iommu);
+
     /* enable comaptiblity format interrupt pass through */
     gcmd |= DMA_GCMD_CFI;
     dmar_writel(iommu->reg, DMAR_GCMD_REG, gcmd);
@@ -581,9 +584,6 @@ int enable_intremap(struct iommu *iommu)
 
     IOMMU_WAIT_OP(iommu, DMAR_GSTS_REG, dmar_readl,
                   (sts & DMA_GSTS_IRES), sts);
-
-    /* After set SIRTP, we should do globally invalidate the IEC */
-    iommu_flush_iec_global(iommu);
 
     return init_apic_pin_2_ir_idx();
 }
