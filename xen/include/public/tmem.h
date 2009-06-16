@@ -66,7 +66,7 @@
 
 
 #ifndef __ASSEMBLY__
-typedef XEN_GUEST_HANDLE(void) tmem_cli_mfn_t;
+typedef xen_pfn_t tmem_cli_mfn_t;
 typedef XEN_GUEST_HANDLE(char) tmem_cli_va_t;
 struct tmem_op {
     uint32_t cmd;
@@ -95,7 +95,6 @@ struct tmem_op {
 };
 typedef struct tmem_op tmem_op_t;
 DEFINE_XEN_GUEST_HANDLE(tmem_op_t);
-typedef XEN_GUEST_HANDLE_64(tmem_op_t) tmem_cli_op_t;
 
 #endif
 

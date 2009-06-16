@@ -281,12 +281,12 @@ static inline bool_t tmh_current_is_privileged(void)
 /* these typedefs are in the public/tmem.h interface
 typedef XEN_GUEST_HANDLE(void) cli_mfn_t;
 typedef XEN_GUEST_HANDLE(char) cli_va_t;
-typedef XEN_GUEST_HANDLE(tmem_op_t) cli_tmemop_t;
 */
+typedef XEN_GUEST_HANDLE(tmem_op_t) tmem_cli_op_t;
 
 static inline int tmh_get_tmemop_from_client(tmem_op_t *op, tmem_cli_op_t uops)
 {
-    return __copy_from_guest(op, uops, 1);
+    return copy_from_guest(op, uops, 1);
 }
 
 static inline void tmh_copy_to_client_buf_offset(tmem_cli_va_t clibuf, int off,

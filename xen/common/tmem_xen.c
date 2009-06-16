@@ -87,10 +87,7 @@ static inline void *cli_mfn_to_va(tmem_cli_mfn_t cmfn, unsigned long *pcli_mfn)
     unsigned long cli_mfn;
     p2m_type_t t;
 
-
-    if (is_pv_32on64_vcpu(current))
-        cmfn.p = (void *)((unsigned long)cmfn.p & 0xffffffffUL);
-    cli_mfn = mfn_x(gfn_to_mfn(current->domain,(unsigned long)cmfn.p,&t));
+    cli_mfn = mfn_x(gfn_to_mfn(current->domain, cmfn, &t));
     if (t != p2m_ram_rw)
         return NULL;
     if (pcli_mfn != NULL)
