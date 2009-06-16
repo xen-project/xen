@@ -87,15 +87,13 @@ int ats_device(int seg, int bus, int devfn)
     struct pci_dev *pdev;
     int pos = 0;
 
-    if ( !ats_enabled )
-        return 0;
-
-    if ( !qinval_enabled )
+    if ( !ats_enabled || !iommu_qinval )
         return 0;
 
     pdev = pci_get_pdev(bus, devfn);
     drhd = acpi_find_matched_drhd_unit(pdev);
-    if ( !ecap_dev_iotlb(drhd->iommu->ecap) )
+    if ( !ecap_queued_inval(drhd->iommu->ecap) ||
+         !ecap_dev_iotlb(drhd->iommu->ecap) )
         return 0;
 
     if ( !acpi_find_matched_atsr_unit(bus, devfn) )

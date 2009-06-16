@@ -29,8 +29,6 @@
 #include "vtd.h"
 #include "extern.h"
 
-int qinval_enabled;
-
 static void print_qi_regs(struct iommu *iommu)
 {
     u64 val;
@@ -465,7 +463,6 @@ int enable_qinval(struct iommu *iommu)
                   (sts & DMA_GSTS_QIES), sts);
     spin_unlock_irqrestore(&iommu->register_lock, flags);
 
-    qinval_enabled = 1;
     return 0;
 }
 
