@@ -124,7 +124,7 @@ def serialise_pci_opts(opts):
 def split_pci_opts(opts):
     return map(lambda x: x.split('='), opts.split(','))
 
-def pci_opts_list_to_spx(list):
+def pci_opts_list_to_sxp(list):
     ['dev'] + map(lambda x: ['opts', x], list)
 
 def parse_hex(val):
