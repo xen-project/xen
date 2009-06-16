@@ -540,33 +540,24 @@ class PciController(DevController):
                 # In HVM case, I/O resources are disabled in ioemu.
                 self.cleanupOneDevice(domain, bus, slot, func)
                 # Remove xenstore nodes.
-                self.removeBackend(devid, 'dev-%i' % i)
-                self.removeBackend(devid, 'vdev-%i' % i)
-                self.removeBackend(devid, 'state-%i' % i)
-                self.removeBackend(devid, 'uuid-%i' % i)
-                tmpopts = self.readBackend(devid, 'opts-%i' % i)
-                if tmpopts is not None:
-                    self.removeBackend(devid, 'opts-%i' % i)
+                list = ['dev', 'vdev', 'state', 'uuid']
+                if self.readBackend(devid, 'opts-%i' % i) is not None:
+                    list.append('opts')
+                for key in list:
+                    self.removeBackend(devid, '%s-%i' % (key, i))
             else:
-                if new_num_devs != i:
-                    tmpdev = self.readBackend(devid, 'dev-%i' % i)
-                    self.writeBackend(devid, 'dev-%i' % new_num_devs, tmpdev)
-                    self.removeBackend(devid, 'dev-%i' % i)
-                    tmpvdev = self.readBackend(devid, 'vdev-%i' % i)
-                    if tmpvdev is not None:
-                        self.writeBackend(devid, 'vdev-%i' % new_num_devs,
-                                          tmpvdev)
-                    self.removeBackend(devid, 'vdev-%i' % i)
-                    tmpstate = self.readBackend(devid, 'state-%i' % i)
-                    self.writeBackend(devid, 'state-%i' % new_num_devs, tmpstate)
-                    self.removeBackend(devid, 'state-%i' % i)
-                    tmpuuid = self.readBackend(devid, 'uuid-%i' % i)
-                    self.writeBackend(devid, 'uuid-%i' % new_num_devs, tmpuuid)
-                    self.removeBackend(devid, 'uuid-%i' % i)
-                    tmpopts = self.readBackend(devid, 'opts-%i' % i)
-                    if tmpopts is not None:
-                        self.removeBackend(devid, 'opts-%i' % i)
                 new_num_devs = new_num_devs + 1
+                if new_num_devs == i + 1:
+                    continue
+
+                list = ['dev', 'vdev', 'state', 'uuid', 'opts']
+                for key in list:
+                    tmp = self.readBackend(devid, '%s-%i' % (key, i))
+                    if tmp is None:
+                        continue
+                    self.removeBackend(devid, '%s-%i' % (key, i))
+                    self.writeBackend(devid,
+                                      '%s-%i' % (key, new_num_devs - 1), tmp)
 
         self.writeBackend(devid, 'num_devs', str(new_num_devs))
 
