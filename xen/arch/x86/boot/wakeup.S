@@ -110,6 +110,7 @@ video_flags:    .long 0
         # Add offset for any reference to xen specific symbols
 
 wakeup_32:
+        /* Set up segment registers and initial stack for protected mode */
         mov     $BOOT_DS, %eax
         mov     %eax, %ds
         mov     %eax, %ss
@@ -152,6 +153,7 @@ wakeup_32:
 
         wbinvd
 
+        /* Enable paging and flush prefetch queue */
         mov     $0x80050033,%eax /* hi-to-lo: PG,AM,WP,NE,ET,MP,PE */
         mov     %eax,%cr0
         jmp     1f
@@ -163,31 +165,22 @@ wakeup_32:
         ljmp    $BOOT_CS64, $bootsym_phys(wakeup_64)
 
         .code64
-        .align  8
-        .word   0,0,0
-lgdt_descr:
-        .word   LAST_RESERVED_GDT_BYTE
-        .quad   boot_cpu_gdt_table - FIRST_RESERVED_GDT_BYTE
-        
 wakeup_64:
-        lgdt    lgdt_descr(%rip)
-        mov     $(__HYPERVISOR_DS64), %eax
-        mov     %eax, %ds
+        /* Jump to high mappings and the higher-level wakeup code. */
+        movq    ret_point(%rip), %rbx
+        jmp     *%rbx
 
-        # long jump to return point, with cs reload
-        rex64 ljmp    *ret_point(%rip)
-
-        .align 8
 ret_point:
         .quad   __ret_point
-        .word   __HYPERVISOR_CS64
 
 #else /* !defined(__x86_64__) */
+
         lgdt    gdt_descr
         mov     $(__HYPERVISOR_DS), %eax
         mov     %eax, %ds
 
         ljmp    $(__HYPERVISOR_CS), $__ret_point
+
 #endif
 
 bogus_saved_magic:

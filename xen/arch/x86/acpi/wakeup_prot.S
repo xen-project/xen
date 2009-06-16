@@ -142,6 +142,12 @@ __ret_point:
         LOAD_GREG(sp)
 
 #if defined(__x86_64__)
+        /* Reload code selector */
+        pushq   $(__HYPERVISOR_CS64)
+        leaq    1f(%rip),%rax
+        pushq   %rax
+        lretq
+1:
 
         mov     REF(saved_cr8), %rax
         mov     %rax, %cr8
