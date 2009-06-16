@@ -38,8 +38,8 @@ from xen.util import vscsi_util
 import xen.util.xsm.xsm as security
 from xen.xm.main import serverType, SERVER_XEN_API, get_single_vm
 from xen.util import utils, auxbin
-from xen.util.pci import split_pci_opts, check_pci_opts, \
-                         pci_opts_list_to_sxp
+from xen.util.pci import pci_opts_list_to_sxp, \
+                         parse_pci_name_extended, PciDeviceParseError
 
 from xen.xm.opts import *
 
@@ -711,14 +711,7 @@ def configure_pci(config_devs, vals):
         config_pci_bdf = ['dev', ['domain', domain], ['bus', bus], \
                           ['slot', slot], ['func', func],
                           ['vslot', vslot]]
-
-        opts_list = split_pci_opts(opts)
-        try:
-            check_pci_opts(opts_list)
-        except PciDeviceParseError, ex:
-            err(str(ex))
-
-        config_opts = pci_opts_list_to_sxp(split_pci_opts(opts))
+        config_opts = pci_opts_list_to_sxp(opts)
         config_pci.append(sxp.merge(config_pci_bdf, config_opts))
 
     if len(config_pci)>0:
@@ -1053,33 +1046,18 @@ def preprocess_cpuid(vals, attr_name):
                 cpuid[input][res['reg']] = res['val'] # new register
             setattr(vals, attr_name, cpuid)
 
+def pci_dict_to_tuple(dev):
+    return (dev['domain'], dev['bus'], dev['slot'], dev['func'],
+            dev['vslot'], dev.get('opts', []))
+
 def preprocess_pci(vals):
-    if not vals.pci: return
-    pci = []
-    for pci_dev_str in vals.pci:
-        pci_match = re.match(r"((?P<domain>[0-9a-fA-F]{1,4})[:,])?" + \
-                r"(?P<bus>[0-9a-fA-F]{1,2})[:,]" + \
-                r"(?P<slot>[0-9a-fA-F]{1,2})[.,]" + \
-                r"(?P<func>[0-7])" + \
-                r"(@(?P<vslot>[01]?[0-9a-fA-F]))?" + \
-                r"(,(?P<opts>.*))?$", \
-                pci_dev_str)
-        if pci_match!=None:
-            pci_dev_info = pci_match.groupdict('')
-            if pci_dev_info['domain']=='':
-                pci_dev_info['domain']='0'
-            if pci_dev_info['vslot']=='':
-                pci_dev_info['vslot']="%02x" % AUTO_PHP_SLOT
-            try:
-                pci.append( ('0x'+pci_dev_info['domain'], \
-                        '0x'+pci_dev_info['bus'], \
-                        '0x'+pci_dev_info['slot'], \
-                        '0x'+pci_dev_info['func'], \
-                        '0x'+pci_dev_info['vslot'], \
-                        pci_dev_info['opts']))
-            except IndexError:
-                err('Error in PCI slot syntax "%s"'%(pci_dev_str))
-    vals.pci = pci
+    if not vals.pci:
+        return
+    try:
+        vals.pci = map(pci_dict_to_tuple,
+                       map(parse_pci_name_extended, vals.pci))
+    except PciDeviceParseError, ex:
+        err(str(ex))
 
 def preprocess_vscsi(vals):
     if not vals.vscsi: return
