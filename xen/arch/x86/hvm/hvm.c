@@ -512,11 +512,13 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     vc = &v->arch.guest_context;
 
     /* Need to init this vcpu before loading its contents */
+    rc = 0;
     domain_lock(d);
     if ( !v->is_initialised )
-        if ( (rc = boot_vcpu(d, vcpuid, vc)) != 0 )
-            return rc;
+        rc = boot_vcpu(d, vcpuid, vc);
     domain_unlock(d);
+    if ( rc != 0 )
+        return rc;
 
     if ( hvm_load_entry(CPU, h, &ctxt) != 0 ) 
         return -EINVAL;
@@ -2296,7 +2298,7 @@ static void hvm_s3_suspend(struct domain *d)
     vpic_reset(d);
     vioapic_reset(d);
     pit_reset(d);
-    rtc_reset(d);	
+    rtc_reset(d);
     pmtimer_reset(d);
     hpet_reset(d);
 
