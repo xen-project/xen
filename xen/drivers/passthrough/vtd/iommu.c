@@ -229,12 +229,12 @@ static u64 addr_to_dma_page_maddr(struct domain *domain, u64 addr, int alloc)
 static void iommu_flush_write_buffer(struct iommu *iommu)
 {
     u32 val;
-    unsigned long flag;
+    unsigned long flags;
 
     if ( !rwbf_quirk && !cap_rwbf(iommu->cap) )
         return;
 
-    spin_lock_irqsave(&iommu->register_lock, flag);
+    spin_lock_irqsave(&iommu->register_lock, flags);
     val = dmar_readl(iommu->reg, DMAR_GSTS_REG);
     dmar_writel(iommu->reg, DMAR_GCMD_REG, val | DMA_GCMD_WBF);
 
@@ -242,7 +242,7 @@ static void iommu_flush_write_buffer(struct iommu *iommu)
     IOMMU_WAIT_OP(iommu, DMAR_GSTS_REG, dmar_readl,
                   !(val & DMA_GSTS_WBFS), val);
 
-    spin_unlock_irqrestore(&iommu->register_lock, flag);
+    spin_unlock_irqrestore(&iommu->register_lock, flags);
 }
 
 /* return value determine if we need a write buffer flush */
@@ -253,7 +253,7 @@ static int flush_context_reg(
 {
     struct iommu *iommu = (struct iommu *) _iommu;
     u64 val = 0;
-    unsigned long flag;
+    unsigned long flags;
 
     /*
      * In the non-present entry flush case, if hardware doesn't cache
@@ -287,14 +287,14 @@ static int flush_context_reg(
     }
     val |= DMA_CCMD_ICC;
 
-    spin_lock_irqsave(&iommu->register_lock, flag);
+    spin_lock_irqsave(&iommu->register_lock, flags);
     dmar_writeq(iommu->reg, DMAR_CCMD_REG, val);
 
     /* Make sure hardware complete it */
     IOMMU_WAIT_OP(iommu, DMAR_CCMD_REG, dmar_readq,
                   !(val & DMA_CCMD_ICC), val);
 
-    spin_unlock_irqrestore(&iommu->register_lock, flag);
+    spin_unlock_irqrestore(&iommu->register_lock, flags);
     /* flush context entry will implicitly flush write buffer */
     return 0;
 }
@@ -333,7 +333,7 @@ static int flush_iotlb_reg(void *_iommu, u16 did,
     struct iommu *iommu = (struct iommu *) _iommu;
     int tlb_offset = ecap_iotlb_offset(iommu->ecap);
     u64 val = 0, val_iva = 0;
-    unsigned long flag;
+    unsigned long flags;
 
     /*
      * In the non-present entry flush case, if hardware doesn't cache
@@ -373,7 +373,7 @@ static int flush_iotlb_reg(void *_iommu, u16 did,
     if ( cap_write_drain(iommu->cap) )
         val |= DMA_TLB_WRITE_DRAIN;
 
-    spin_lock_irqsave(&iommu->register_lock, flag);
+    spin_lock_irqsave(&iommu->register_lock, flags);
     /* Note: Only uses first TLB reg currently */
     if ( val_iva )
         dmar_writeq(iommu->reg, tlb_offset, val_iva);
@@ -382,7 +382,7 @@ static int flush_iotlb_reg(void *_iommu, u16 did,
     /* Make sure hardware complete it */
     IOMMU_WAIT_OP(iommu, (tlb_offset + 8), dmar_readq,
                   !(val & DMA_TLB_IVT), val);
-    spin_unlock_irqrestore(&iommu->register_lock, flag);
+    spin_unlock_irqrestore(&iommu->register_lock, flags);
 
     /* check IOTLB invalidation granularity */
     if ( DMA_TLB_IAIG(val) == 0 )
@@ -590,10 +590,10 @@ static void iommu_enable_translation(struct iommu *iommu)
     /* Make sure hardware complete it */
     IOMMU_WAIT_OP(iommu, DMAR_GSTS_REG, dmar_readl,
                   (sts & DMA_GSTS_TES), sts);
+    spin_unlock_irqrestore(&iommu->register_lock, flags);
 
     /* Disable PMRs when VT-d engine takes effect per spec definition */
     disable_pmr(iommu);
-    spin_unlock_irqrestore(&iommu->register_lock, flags);
 }
 
 static void iommu_disable_translation(struct iommu *iommu)
@@ -1617,7 +1617,9 @@ static void setup_dom0_devices(struct domain *d)
 void clear_fault_bits(struct iommu *iommu)
 {
     u64 val;
+    unsigned long flags;
 
+    spin_lock_irqsave(&iommu->register_lock, flags);
     val = dmar_readq(
         iommu->reg,
         cap_fault_reg_offset(dmar_readq(iommu->reg,DMAR_CAP_REG))+0x8);
@@ -1626,6 +1628,7 @@ void clear_fault_bits(struct iommu *iommu)
         cap_fault_reg_offset(dmar_readq(iommu->reg,DMAR_CAP_REG))+8,
         val);
     dmar_writel(iommu->reg, DMAR_FSTS_REG, DMA_FSTS_FAULTS);
+    spin_unlock_irqrestore(&iommu->register_lock, flags);
 }
 
 static int init_vtd_hw(void)
@@ -1635,6 +1638,7 @@ static int init_vtd_hw(void)
     struct iommu_flush *flush = NULL;
     int vector;
     int ret;
+    unsigned long flags;
 
     for_each_drhd_unit ( drhd )
     {
@@ -1652,7 +1656,10 @@ static int init_vtd_hw(void)
         dma_msi_data_init(iommu, iommu->vector);
         dma_msi_addr_init(iommu, cpu_physical_id(first_cpu(cpu_online_map)));
         clear_fault_bits(iommu);
+
+        spin_lock_irqsave(&iommu->register_lock, flags);
         dmar_writel(iommu->reg, DMAR_FECTL_REG, 0);
+        spin_unlock_irqrestore(&iommu->register_lock, flags);
 
         /* initialize flush functions */
         flush = iommu_get_flush(iommu);
@@ -1942,6 +1949,7 @@ void iommu_resume(void)
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
     u32 i;
+    unsigned long flags;
 
     if ( !iommu_enabled )
         return;
@@ -1954,6 +1962,7 @@ void iommu_resume(void)
         iommu = drhd->iommu;
         i = iommu->index;
 
+        spin_lock_irqsave(&iommu->register_lock, flags);
         dmar_writel(iommu->reg, DMAR_FECTL_REG,
                     (u32) iommu_state[i][DMAR_FECTL_REG]);
         dmar_writel(iommu->reg, DMAR_FEDATA_REG,
@@ -1962,6 +1971,7 @@ void iommu_resume(void)
                     (u32) iommu_state[i][DMAR_FEADDR_REG]);
         dmar_writel(iommu->reg, DMAR_FEUADDR_REG,
                     (u32) iommu_state[i][DMAR_FEUADDR_REG]);
+        spin_unlock_irqrestore(&iommu->register_lock, flags);
 
         iommu_enable_translation(iommu);
     }

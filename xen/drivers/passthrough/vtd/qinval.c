@@ -421,6 +421,7 @@ int enable_qinval(struct iommu *iommu)
     struct qi_ctrl *qi_ctrl;
     struct iommu_flush *flush;
     u32 sts;
+    unsigned long flags;
 
     qi_ctrl = iommu_qi_ctrl(iommu);
     flush = iommu_get_flush(iommu);
@@ -449,6 +450,8 @@ int enable_qinval(struct iommu *iommu)
      * to IQA register.
      */
     qi_ctrl->qinval_maddr |= IQA_REG_QS;
+
+    spin_lock_irqsave(&iommu->register_lock, flags);
     dmar_writeq(iommu->reg, DMAR_IQA_REG, qi_ctrl->qinval_maddr);
 
     dmar_writeq(iommu->reg, DMAR_IQT_REG, 0);
@@ -460,6 +463,7 @@ int enable_qinval(struct iommu *iommu)
     /* Make sure hardware complete it */
     IOMMU_WAIT_OP(iommu, DMAR_GSTS_REG, dmar_readl,
                   (sts & DMA_GSTS_QIES), sts);
+    spin_unlock_irqrestore(&iommu->register_lock, flags);
 
     qinval_enabled = 1;
     return 0;
@@ -468,13 +472,16 @@ int enable_qinval(struct iommu *iommu)
 void disable_qinval(struct iommu *iommu)
 {
     u32 sts;
+    unsigned long flags;
 
     ASSERT(ecap_queued_inval(iommu->ecap) && iommu_qinval);
 
+    spin_lock_irqsave(&iommu->register_lock, flags);
     sts = dmar_readl(iommu->reg, DMAR_GSTS_REG);
     dmar_writel(iommu->reg, DMAR_GCMD_REG, sts & (~DMA_GCMD_QIE));
 
     /* Make sure hardware complete it */
     IOMMU_WAIT_OP(iommu, DMAR_GSTS_REG, dmar_readl,
                   !(sts & DMA_GSTS_QIES), sts);
+    spin_unlock_irqrestore(&iommu->register_lock, flags);
 }

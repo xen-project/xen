@@ -535,6 +535,7 @@ int enable_intremap(struct iommu *iommu)
 {
     struct ir_ctrl *ir_ctrl;
     u32 sts, gcmd;
+    unsigned long flags;
 
     ASSERT(ecap_intr_remap(iommu->ecap) && iommu_intremap);
 
@@ -556,6 +557,8 @@ int enable_intremap(struct iommu *iommu)
     ir_ctrl->iremap_maddr |=
             ecap_ext_intr(iommu->ecap) ? (1 << IRTA_REG_EIME_SHIFT) : 0;
 #endif
+    spin_lock_irqsave(&iommu->register_lock, flags);
+
     /* set size of the interrupt remapping table */
     ir_ctrl->iremap_maddr |= IRTA_REG_TABLE_SIZE;
     dmar_writeq(iommu->reg, DMAR_IRTA_REG, ir_ctrl->iremap_maddr);
@@ -567,10 +570,12 @@ int enable_intremap(struct iommu *iommu)
 
     IOMMU_WAIT_OP(iommu, DMAR_GSTS_REG, dmar_readl,
                   (sts & DMA_GSTS_SIRTPS), sts);
- 
+    spin_unlock_irqrestore(&iommu->register_lock, flags);
+
     /* After set SIRTP, must globally invalidate the interrupt entry cache */
     iommu_flush_iec_global(iommu);
 
+    spin_lock_irqsave(&iommu->register_lock, flags);
     /* enable comaptiblity format interrupt pass through */
     gcmd |= DMA_GCMD_CFI;
     dmar_writel(iommu->reg, DMAR_GCMD_REG, gcmd);
@@ -584,6 +589,7 @@ int enable_intremap(struct iommu *iommu)
 
     IOMMU_WAIT_OP(iommu, DMAR_GSTS_REG, dmar_readl,
                   (sts & DMA_GSTS_IRES), sts);
+    spin_unlock_irqrestore(&iommu->register_lock, flags);
 
     return init_apic_pin_2_ir_idx();
 }
@@ -591,12 +597,15 @@ int enable_intremap(struct iommu *iommu)
 void disable_intremap(struct iommu *iommu)
 {
     u32 sts;
+    unsigned long flags;
 
     ASSERT(ecap_intr_remap(iommu->ecap) && iommu_intremap);
 
+    spin_lock_irqsave(&iommu->register_lock, flags);
     sts = dmar_readl(iommu->reg, DMAR_GSTS_REG);
     dmar_writel(iommu->reg, DMAR_GCMD_REG, sts & (~DMA_GCMD_IRE));
 
     IOMMU_WAIT_OP(iommu, DMAR_GSTS_REG, dmar_readl,
                   !(sts & DMA_GSTS_IRES), sts);
+    spin_unlock_irqrestore(&iommu->register_lock, flags);
 }

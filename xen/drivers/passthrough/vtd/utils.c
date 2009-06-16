@@ -39,15 +39,18 @@ int is_usb_device(u8 bus, u8 devfn)
 void disable_pmr(struct iommu *iommu)
 {
     u32 val;
+    unsigned long flags;
 
     val = dmar_readl(iommu->reg, DMAR_PMEN_REG);
     if ( !(val & DMA_PMEN_PRS) )
         return;
 
+    spin_lock_irqsave(&iommu->register_lock, flags);
     dmar_writel(iommu->reg, DMAR_PMEN_REG, val & ~DMA_PMEN_EPM);
 
     IOMMU_WAIT_OP(iommu, DMAR_PMEN_REG, dmar_readl,
                   !(val & DMA_PMEN_PRS), val);
+    spin_unlock_irqrestore(&iommu->register_lock, flags);
 
     dprintk(XENLOG_INFO VTDPREFIX,
             "Disabled protected memory registers\n");
