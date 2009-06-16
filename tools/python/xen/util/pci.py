@@ -233,11 +233,16 @@ def _create_lspci_info():
     for paragraph in os.popen(LSPCI_CMD + ' -vmm').read().split('\n\n'):
         device_name = None
         device_info = {}
+        # FIXME: workaround for pciutils without the -mm option.
+        # see: git://git.kernel.org/pub/scm/utils/pciutils/pciutils.git
+        # commit: 3fd6b4d2e2fda814047664ffc67448ac782a8089
+        first_device = True
         for line in paragraph.split('\n'):
             try:
                 (opt, value) = line.split(':\t')
-                if opt == 'Slot':
+                if opt == 'Slot' or (opt == 'Device' and first_device):
                     device_name = PCI_DEV_FORMAT_STR % parse_pci_name(value)
+                    first_device = False
                 else:
                     device_info[opt] = value
             except:
@@ -980,18 +985,18 @@ class PciDevice:
             if lspci_info is None:
                 _create_lspci_info()
 
-            try:
-                device_info = lspci_info[self.name]
-                self.revision = int(device_info['Rev'], 16)
-                self.vendorname = device_info['Vendor']
-                self.devicename = device_info['Device']
-                self.classname = device_info['Class']
-                self.subvendorname = device_info['SVendor']
-                self.subdevicename = device_info['SDevice']
-            except KeyError:
-                pass
-
-            return True
+            device_info = lspci_info.get(self.name)
+            if device_info:
+                try:
+                    self.revision = int(device_info.get('Rev', '0'), 16)
+                except ValueError:
+                    pass
+                self.vendorname = device_info.get('Vendor', '')
+                self.devicename = device_info.get('Device', '')
+                self.classname = device_info.get('Class', '')
+                self.subvendorname = device_info.get('SVendor', '')
+                self.subdevicename = device_info.get('SDevice', '')
+                return True
         finally:
             lspci_info_lock.release()
 
