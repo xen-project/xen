@@ -301,8 +301,7 @@ class PciController(DevController):
         # if arch.type != "ia64":
         #    dev.do_FLR()
 
-        PCIQuirk(dev.vendor, dev.device, dev.subvendor, dev.subdevice, domain, 
-                bus, slot, func)
+        PCIQuirk(dev)
 
         if not self.vm.info.is_hvm():
             # Setup IOMMU device assignment

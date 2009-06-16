@@ -11,18 +11,19 @@ PERMISSIVE_CONFIG_FILE = auxbin.xen_configdir() + "/xend-pci-permissive.sxp"
 PERMISSIVE_SYSFS_NODE = "/sys/bus/pci/drivers/pciback/permissive"
 
 class PCIQuirk:
-    def __init__( self, vendor, device, subvendor, subdevice, domain, bus, slot, func):
-        self.vendor = vendor
-        self.device = device
-        self.subvendor = subvendor
-        self.subdevice = subdevice
-        self.domain = domain
-        self.bus = bus
-        self.slot = slot
-        self.func = func
+    def __init__(self, dev):
+        self.vendor = dev.vendor
+        self.device = dev.device
+        self.subvendor = dev.subvendor
+        self.subdevice = dev.subdevice
+        self.domain = dev.domain
+        self.bus = dev.bus
+        self.slot = dev.slot
+        self.func = dev.func
 
-        self.devid = "%04x:%04x:%04x:%04x" % (vendor, device, subvendor, subdevice)
-        self.pciid = "%04x:%02x:%02x.%01x" % (domain, bus, slot, func)
+        self.devid = "%04x:%04x:%04x:%04x" % (self.vendor, self.device,
+                                              self.subvendor, self.subdevice)
+        self.pciid = dev.name
         self.quirks = self.__getQuirksByID()
 
         self.__sendQuirks()
