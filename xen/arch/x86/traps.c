@@ -129,18 +129,18 @@ boolean_param("ler", opt_ler);
 #define ESP_BEFORE_EXCEPTION(regs) ((unsigned long *)regs->rsp)
 #endif
 
-static void show_guest_stack(struct cpu_user_regs *regs)
+static void show_guest_stack(struct vcpu *v, struct cpu_user_regs *regs)
 {
     int i;
-    struct vcpu *curr = current;
     unsigned long *stack, addr;
+    unsigned long mask = STACK_SIZE;
 
-    if ( is_hvm_vcpu(curr) )
+    if ( is_hvm_vcpu(v) )
         return;
 
-    if ( is_pv_32on64_vcpu(curr) )
+    if ( is_pv_32on64_vcpu(v) )
     {
-        compat_show_guest_stack(regs, debug_stack_lines);
+        compat_show_guest_stack(v, regs, debug_stack_lines);
         return;
     }
 
@@ -156,11 +156,42 @@ static void show_guest_stack(struct cpu_user_regs *regs)
         printk("Guest stack trace from "__OP"sp=%p:\n  ", stack);
     }
 
+    if ( !access_ok(stack, sizeof(*stack)) )
+    {
+        printk("Guest-inaccessible memory.\n");
+        return;
+    }
+
+    if ( v != current )
+    {
+        struct vcpu *vcpu;
+
+        ASSERT(guest_kernel_mode(v, regs));
+#ifndef __x86_64__
+        addr = read_cr3();
+        for_each_vcpu( v->domain, vcpu )
+            if ( vcpu->arch.cr3 == addr )
+                break;
+#else
+        vcpu = maddr_get_owner(read_cr3()) == v->domain ? v : NULL;
+#endif
+        if ( !vcpu )
+        {
+            stack = do_page_walk(v, (unsigned long)stack);
+            if ( (unsigned long)stack < PAGE_SIZE )
+            {
+                printk("Inaccessible guest memory.\n");
+                return;
+            }
+            mask = PAGE_SIZE;
+        }
+    }
+
     for ( i = 0; i < (debug_stack_lines*stack_words_per_line); i++ )
     {
-        if ( ((long)stack & (STACK_SIZE-BYTES_PER_LONG)) == 0 )
+        if ( (((long)stack - 1) ^ ((long)(stack + 1) - 1)) & mask )
             break;
-        if ( get_user(addr, stack) )
+        if ( __get_user(addr, stack) )
         {
             if ( i != 0 )
                 printk("\n    ");
@@ -264,7 +295,7 @@ void show_stack(struct cpu_user_regs *regs)
     int i;
 
     if ( guest_mode(regs) )
-        return show_guest_stack(regs);
+        return show_guest_stack(current, regs);
 
     printk("Xen stack trace from "__OP"sp=%p:\n  ", stack);
 
@@ -346,10 +377,8 @@ void vcpu_show_execution_state(struct vcpu *v)
     vcpu_pause(v); /* acceptably dangerous */
 
     vcpu_show_registers(v);
-    /* Todo: map arbitrary vcpu's top guest stack page here. */
-    if ( (v->domain == current->domain) &&
-         guest_kernel_mode(v, &v->arch.guest_context.user_regs) )
-        show_guest_stack(&v->arch.guest_context.user_regs);
+    if ( guest_kernel_mode(v, &v->arch.guest_context.user_regs) )
+        show_guest_stack(v, &v->arch.guest_context.user_regs);
 
     vcpu_unpause(v);
 }

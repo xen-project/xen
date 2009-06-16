@@ -103,6 +103,47 @@ l2_pgentry_t *virt_to_xen_l2e(unsigned long v)
     return l3e_to_l2e(*pl3e) + l2_table_offset(v);
 }
 
+void *do_page_walk(struct vcpu *v, unsigned long addr)
+{
+    unsigned long mfn = pagetable_get_pfn(v->arch.guest_table);
+    l4_pgentry_t l4e, *l4t;
+    l3_pgentry_t l3e, *l3t;
+    l2_pgentry_t l2e, *l2t;
+    l1_pgentry_t l1e, *l1t;
+
+    if ( is_hvm_vcpu(v) )
+        return NULL;
+
+    l4t = mfn_to_virt(mfn);
+    l4e = l4t[l4_table_offset(addr)];
+    mfn = l4e_get_pfn(l4e);
+    if ( !(l4e_get_flags(l4e) & _PAGE_PRESENT) )
+        return NULL;
+
+    l3t = mfn_to_virt(mfn);
+    l3e = l3t[l3_table_offset(addr)];
+    mfn = l3e_get_pfn(l3e);
+    if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) || !mfn_valid(mfn) )
+    if ( (l3e_get_flags(l3e) & _PAGE_PSE) )
+        return mfn_to_virt(mfn) + (addr & ((1UL << L3_PAGETABLE_SHIFT) - 1));
+
+    l2t = mfn_to_virt(mfn);
+    l2e = l2t[l2_table_offset(addr)];
+    mfn = l2e_get_pfn(l2e);
+    if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) || !mfn_valid(mfn) )
+        return NULL;
+    if ( (l2e_get_flags(l2e) & _PAGE_PSE) )
+        return mfn_to_virt(mfn) + (addr & ((1UL << L2_PAGETABLE_SHIFT) - 1));
+
+    l1t = mfn_to_virt(mfn);
+    l1e = l1t[l1_table_offset(addr)];
+    mfn = l1e_get_pfn(l1e);
+    if ( !(l1e_get_flags(l1e) & _PAGE_PRESENT) || !mfn_valid(mfn) )
+        return NULL;
+
+    return mfn_to_virt(mfn) + (addr & ~PAGE_MASK);
+}
+
 void __init paging_init(void)
 {
     unsigned long i, mpt_size, va;

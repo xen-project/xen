@@ -536,9 +536,9 @@ void show_page_walk(unsigned long addr);
 asmlinkage void fatal_trap(int trapnr, struct cpu_user_regs *regs);
 
 #ifdef CONFIG_COMPAT
-void compat_show_guest_stack(struct cpu_user_regs *, int lines);
+void compat_show_guest_stack(struct vcpu *, struct cpu_user_regs *, int lines);
 #else
-#define compat_show_guest_stack(regs, lines) ((void)0)
+#define compat_show_guest_stack(vcpu, regs, lines) ((void)0)
 #endif
 
 extern void mtrr_ap_init(void);

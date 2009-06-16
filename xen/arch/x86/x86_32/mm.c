@@ -63,6 +63,11 @@ l2_pgentry_t *virt_to_xen_l2e(unsigned long v)
     return &idle_pg_table_l2[l2_linear_offset(v)];
 }
 
+void *do_page_walk(struct vcpu *v, unsigned long addr)
+{
+    return NULL;
+}
+
 void __init paging_init(void)
 {
     unsigned long v;

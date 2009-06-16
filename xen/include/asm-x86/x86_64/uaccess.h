@@ -27,11 +27,14 @@ DECLARE_PER_CPU(char, compat_arg_xlat[COMPAT_ARG_XLAT_SIZE]);
 #define array_access_ok(addr, count, size) \
     (access_ok(addr, (count)*(size)))
 
-#define __compat_addr_ok(addr) \
-    ((unsigned long)(addr) < HYPERVISOR_COMPAT_VIRT_START(current->domain))
+#define __compat_addr_ok(d, addr) \
+    ((unsigned long)(addr) < HYPERVISOR_COMPAT_VIRT_START(d))
+
+#define __compat_access_ok(d, addr, size) \
+    __compat_addr_ok(d, (unsigned long)(addr) + ((size) ? (size) - 1 : 0))
 
 #define compat_access_ok(addr, size) \
-    __compat_addr_ok((unsigned long)(addr) + ((size) ? (size) - 1 : 0))
+    __compat_access_ok(current->domain, addr, size)
 
 #define compat_array_access_ok(addr,count,size) \
     (likely((count) < (~0U / (size))) && \

@@ -5,18 +5,46 @@
 #include <compat/callback.h>
 #include <compat/arch-x86_32.h>
 
-void compat_show_guest_stack(struct cpu_user_regs *regs, int debug_stack_lines)
+void compat_show_guest_stack(struct vcpu *v, struct cpu_user_regs *regs,
+                             int debug_stack_lines)
 {
-    unsigned int i, *stack, addr;
+    unsigned int i, *stack, addr, mask = STACK_SIZE;
 
     stack = (unsigned int *)(unsigned long)regs->_esp;
     printk("Guest stack trace from esp=%08lx:\n ", (unsigned long)stack);
 
+    if ( !__compat_access_ok(v->domain, stack, sizeof(*stack)) )
+    {
+        printk("Guest-inaccessible memory.\n");
+        return;
+    }
+
+    if ( v != current )
+    {
+        struct vcpu *vcpu;
+
+        ASSERT(guest_kernel_mode(v, regs));
+        addr = read_cr3() >> PAGE_SHIFT;
+        for_each_vcpu( v->domain, vcpu )
+            if ( pagetable_get_pfn(vcpu->arch.guest_table) == addr )
+                break;
+        if ( !vcpu )
+        {
+            stack = do_page_walk(v, (unsigned long)stack);
+            if ( (unsigned long)stack < PAGE_SIZE )
+            {
+                printk("Inaccessible guest memory.\n");
+                return;
+            }
+            mask = PAGE_SIZE;
+        }
+    }
+
     for ( i = 0; i < debug_stack_lines * 8; i++ )
     {
-        if ( (((long)stack + 3) & (STACK_SIZE - 4)) == 0 )
+        if ( (((long)stack - 1) ^ ((long)(stack + 1) - 1)) & mask )
             break;
-        if ( get_user(addr, stack) )
+        if ( __get_user(addr, stack) )
         {
             if ( i != 0 )
                 printk("\n    ");
