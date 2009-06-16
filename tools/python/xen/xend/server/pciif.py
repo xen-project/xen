@@ -540,7 +540,7 @@ class PciController(DevController):
                 # In HVM case, I/O resources are disabled in ioemu.
                 self.cleanupOneDevice(domain, bus, slot, func)
                 # Remove xenstore nodes.
-                list = ['dev', 'vdev', 'state', 'uuid']
+                list = ['dev', 'vdev', 'state', 'uuid', 'vslot']
                 if self.readBackend(devid, 'opts-%i' % i) is not None:
                     list.append('opts')
                 for key in list:
@@ -550,7 +550,7 @@ class PciController(DevController):
                 if new_num_devs == i + 1:
                     continue
 
-                list = ['dev', 'vdev', 'state', 'uuid', 'opts']
+                list = ['dev', 'vdev', 'state', 'uuid', 'opts', 'vslot']
                 for key in list:
                     tmp = self.readBackend(devid, '%s-%i' % (key, i))
                     if tmp is None:
