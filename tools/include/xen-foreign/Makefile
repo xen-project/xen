@@ -22,14 +22,14 @@ check-headers: checker
 	diff -u reference.size tmp.size
 	rm tmp.size
 
-x86_32.h: mkheader.py $(ROOT)/arch-x86/xen-x86_32.h $(ROOT)/arch-x86/xen.h $(ROOT)/xen.h
+x86_32.h: mkheader.py structs.py $(ROOT)/arch-x86/xen-x86_32.h $(ROOT)/arch-x86/xen.h $(ROOT)/xen.h
 	python $< $* $@ $(filter %.h,$^)
 
-x86_64.h: mkheader.py $(ROOT)/arch-x86/xen-x86_64.h $(ROOT)/arch-x86/xen.h $(ROOT)/xen.h
+x86_64.h: mkheader.py structs.py $(ROOT)/arch-x86/xen-x86_64.h $(ROOT)/arch-x86/xen.h $(ROOT)/xen.h
 	python $< $* $@ $(filter %.h,$^)
 
-ia64.h: mkheader.py $(ROOT)/arch-ia64.h $(ROOT)/xen.h
+ia64.h: mkheader.py structs.py $(ROOT)/arch-ia64.h $(ROOT)/xen.h
 	python $< $* $@ $(filter %.h,$^)
 
-checker.c: mkchecker.py
+checker.c: mkchecker.py structs.py
 	python $< $@ $(architectures)
