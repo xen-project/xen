@@ -286,6 +286,9 @@ class ImageHandler:
             if dev_type == 'vfb':
                 if 'keymap' in dev_info:
                     keymap = dev_info.get('keymap',{})
+                if 'serial' in dev_info:
+                    ret.append("-serial")
+                    ret.append(dev_info.get('serial',{}))
                 if int(dev_info.get('vnc', 0)) != 0 :
                     has_vnc = True
                 if int(dev_info.get('sdl', 0)) != 0 :
@@ -746,12 +749,10 @@ class HVMImageHandler(ImageHandler):
 
         if not self.display :
             self.display = ''
-        # Do not store sdl, opengl and serial related qemu cli options
+        # Do not store sdl and opengl qemu cli options
         self.vm.storeVm(("image/dmargs", " ".join([ x for x in self.dmargs
                         if x != "-sdl"
-                        and x != "-disable-opengl"
-                        and x != "-serial"
-                        and x != "pty" ])),
+                        and x != "-disable-opengl" ])),
                         ("image/device-model", self.device_model),
                         ("image/display", self.display))
         self.vm.permissionsVm("image/dmargs", { 'dom': self.vm.getDomid(), 'read': True } )
