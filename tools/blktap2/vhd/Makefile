@@ -28,7 +28,7 @@ LIBS              += -luuid
 CFLAGS            += -Wp,-MD,.$(@F).d
 DEPS               = .*.d
 
-all: build
+all: subdirs-all build
 
 build: $(IBIN)
 
@@ -42,13 +42,13 @@ vhd-update: vhd-update.o $(LIBS_DEPENDS)
 	$(CC) $(CFLAGS) -o vhd-update vhd-update.o $(LDFLAGS) $(LIBS)
 
 install: all
+	$(MAKE) subdirs-install
 	$(INSTALL_DIR) -p $(DESTDIR)$(INST_DIR)
 	$(INSTALL_PROG) $(IBIN) $(DESTDIR)$(INST_DIR)
 
-clean:
+clean: subdirs-clean
 	rm -rf *.o *~ $(DEPS) $(IBIN)
 
 .PHONY: all build clean install vhd-util vhd-update
-all clean install: %: subdirs-%
 
 -include $(DEPS)

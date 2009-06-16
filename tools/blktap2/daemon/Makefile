@@ -32,7 +32,7 @@ CFLAGS       += -g
 CFLAGS       += -Wp,-MD,.$(@F).d
 DEPS          = .*.d
 
-all: $(IBIN)
+all: subdirs-all $(IBIN)
 
 LIBS_DEPENDS := lib/libblktap.a lib/libblktap.so
 $(LIBS_DEPENDS):subdirs-all
@@ -41,14 +41,14 @@ blktapctrl: tapdisk-daemon.c $(OBJS) $(LIBS_DEPENDS)
 	$(CC) $(CFLAGS) -o blktapctrl tapdisk-daemon.c $(LDFLAGS) $(LIBS) $(OBJS)
 
 install: all
+	$(MAKE) subdirs-install
 	$(INSTALL_DIR) -p $(DESTDIR)$(INST_DIR)
 	$(INSTALL_PROG) $(IBIN) $(DESTDIR)$(INST_DIR)
 
-clean:
+clean: subdirs-clean
 	rm -rf *.o *~ $(IBIN) $(DEPS) xen TAGS
 
 .PHONY: all clean install blktapctrl
-all clean install: %: subdirs-%
 
 -include $(DEPS)
 
