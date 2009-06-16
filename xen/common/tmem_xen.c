@@ -202,6 +202,7 @@ EXPORT void tmh_release_avail_pages_to_host(void)
     {
         scrub_list_splice(&tmh_page_list);
         INIT_PAGE_LIST_HEAD(&tmh_page_list);
+        tmh_page_list_pages = 0;
     }
     spin_unlock(&tmh_page_list_lock);
 }
