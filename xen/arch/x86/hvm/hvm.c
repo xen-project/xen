@@ -662,8 +662,9 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     v->fpu_initialised = 1;
 
     /* Auxiliary processors should be woken immediately. */
-    if ( test_and_clear_bit(_VPF_down, &v->pause_flags) )
-        vcpu_wake(v);
+    v->is_initialised = 1;
+    clear_bit(_VPF_down, &v->pause_flags);
+    vcpu_wake(v);
 
     return 0;
 }
