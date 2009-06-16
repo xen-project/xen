@@ -375,17 +375,6 @@ def check_mmio_bar(devs_list):
 
     return result
 
-class PciDeviceNotFoundError(Exception):
-    def __init__(self,domain,bus,slot,func):
-        self.domain = domain
-        self.bus = bus
-        self.slot = slot
-        self.func = func
-        self.name = PCI_DEV_FORMAT_STR %(domain, bus, slot, func)
-    
-    def __str__(self):
-        return ('PCI Device %s Not Found' % (self.name))
-
 class PciDeviceParseError(Exception):
     def __init__(self,msg):
         self.message = msg
