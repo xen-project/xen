@@ -71,6 +71,8 @@ unsigned long __attribute__ ((__section__ (".bss.page_aligned")))
 
 void hvm_enable(struct hvm_function_table *fns)
 {
+    extern int hvm_port80_allowed;
+
     BUG_ON(hvm_enabled);
     printk("HVM: %s enabled\n", fns->name);
 
@@ -79,7 +81,8 @@ void hvm_enable(struct hvm_function_table *fns)
      * often used for I/O delays, but the vmexits simply slow things down).
      */
     memset(hvm_io_bitmap, ~0, sizeof(hvm_io_bitmap));
-    __clear_bit(0x80, hvm_io_bitmap);
+    if ( hvm_port80_allowed )
+        __clear_bit(0x80, hvm_io_bitmap);
     __clear_bit(0xed, hvm_io_bitmap);
 
     hvm_funcs   = *fns;
