@@ -120,8 +120,12 @@ class BlktapController(BlkifController):
 
     def createDevice(self, config):
 
-        uname = config.get('uname', '')        
-        (typ, subtyp, params, file) = string.split(uname, ':', 3)
+        uname = config.get('uname', '')
+        try:
+            (typ, subtyp, params, file) = string.split(uname, ':', 3)
+        except:
+            (typ, params, file) = string.split(uname, ':', 2)
+            subtyp = 'tapdisk'
         if typ in ('tap'):
             if subtyp in ('tapdisk'):                                          
                 if params in ('ioemu', 'qcow2', 'vmdk', 'sync'):
