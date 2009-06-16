@@ -71,6 +71,7 @@ static void usage(const char *program) {
 	       "Attaches to a virtual domain console\n"
 	       "\n"
 	       "  -h, --help       display this help and exit\n"
+	       "  -n, --num N      use console number N\n"
 	       , program);
 }
 
@@ -255,15 +256,17 @@ int main(int argc, char **argv)
 {
 	struct termios attr;
 	int domid;
-	char *sopt = "h";
+	char *sopt = "hn:";
 	int ch;
+	unsigned int num = 0;
 	int opt_ind=0;
 	struct option lopt[] = {
+		{ "num",     1, 0, 'n' },
 		{ "help",    0, 0, 'h' },
 		{ 0 },
 
 	};
-	char *path;
+	char *dom_path = NULL, *path = NULL;
 	int spty, xsfd;
 	struct xs_handle *xs;
 	char *end;
@@ -274,14 +277,15 @@ int main(int argc, char **argv)
 			usage(argv[0]);
 			exit(0);
 			break;
+		case 'n':
+			num = atoi(optarg);
+			break;
+		default:
+			fprintf(stderr, "Invalid argument\n");
+			fprintf(stderr, "Try `%s --help' for more information.\n", 
+					argv[0]);
+			exit(EINVAL);
 		}
-	}
-	
-	if ((argc - optind) != 1) {
-		fprintf(stderr, "Invalid number of arguments\n");
-		fprintf(stderr, "Try `%s --help' for more information.\n", 
-			argv[0]);
-		exit(EINVAL);
 	}
 	
 	domid = strtol(argv[optind], &end, 10);
@@ -299,13 +303,13 @@ int main(int argc, char **argv)
 
 	signal(SIGTERM, sighandler);
 
-	path = xs_get_domain_path(xs, domid);
-	if (path == NULL)
+	dom_path = xs_get_domain_path(xs, domid);
+	if (dom_path == NULL)
 		err(errno, "xs_get_domain_path()");
-	path = realloc(path, strlen(path) + strlen("/console/tty") + 1);
+	path = malloc(strlen(dom_path) + strlen("/serial/0/tty") + 3);
 	if (path == NULL)
-		err(ENOMEM, "realloc");
-	strcat(path, "/console/tty");
+		err(ENOMEM, "malloc");
+	snprintf(path, strlen(dom_path) + strlen("/serial/0/tty") + 2, "%s/serial/%d/tty", dom_path, num);
 
 	/* FIXME consoled currently does not assume domain-0 doesn't have a
 	   console which is good when we break domain-0 up.  To keep us
@@ -336,5 +340,6 @@ int main(int argc, char **argv)
 	restore_term(STDIN_FILENO, &attr);
 
 	free(path);
+	free(dom_path);
 	return 0;
  }

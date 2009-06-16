@@ -1779,12 +1779,13 @@ def xm_info(args):
                 print "%-23s:" % x[0], x[1]
 
 def xm_console(args):
-    arg_check(args, "console", 1, 2)
+    arg_check(args, "console", 1, 3)
 
+    num = 0
     quiet = False;
 
     try:
-        (options, params) = getopt.gnu_getopt(args, 'q', ['quiet'])
+        (options, params) = getopt.gnu_getopt(args, 'qn:', ['quiet', 'num'])
     except getopt.GetoptError, opterr:
         err(opterr)
         usage('console')
@@ -1792,6 +1793,8 @@ def xm_console(args):
     for (k, v) in options:
         if k in ['-q', '--quiet']:
             quiet = True
+	elif k in ['-n', '--num']:
+	    num = int(v[0])
         else:
             assert False
 
@@ -1819,7 +1822,7 @@ def xm_console(args):
         else:
             raise xmlrpclib.Fault(0, "Domain '%s' is not started" % dom)
 
-    console.execConsole(domid)
+    console.execConsole(domid, num)
 
 
 def domain_name_to_domid(domain_name):

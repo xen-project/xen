@@ -24,8 +24,8 @@ from xen.util import utils
 
 XENCONSOLE = "xenconsole"
 
-def execConsole(domid):
-    xen.util.auxbin.execute(XENCONSOLE, [str(domid)])
+def execConsole(domid, num = 0):
+    xen.util.auxbin.execute(XENCONSOLE, [str(domid), "--num", str(num)])
 
 
 class OurXenstoreConnection:
