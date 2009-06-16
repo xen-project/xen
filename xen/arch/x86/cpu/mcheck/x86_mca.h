@@ -30,6 +30,7 @@
 
 
 /* Bitfield of the MSR_IA32_MCG_CAP register */
+#define MCG_SER_P               (1UL<<24)
 #define MCG_CAP_COUNT           0x00000000000000ffULL
 #define MCG_CTL_P               0x0000000000000100ULL
 #define MCG_EXT_P		(1UL<<9)
@@ -50,6 +51,10 @@
 #define MCi_STATUS_MSEC         0x00000000ffff0000ULL
 /* Other information */
 #define MCi_STATUS_OTHER        0x01ffffff00000000ULL
+/* Action Required flag */
+#define MCi_STATUS_AR           0x0080000000000000ULL
+/* Signaling flag */
+#define MCi_STATUS_S            0x0100000000000000ULL
 /* processor context corrupt */
 #define MCi_STATUS_PCC          0x0200000000000000ULL
 /* MSR_K8_MCi_ADDR register valid */
@@ -105,8 +110,8 @@ DECLARE_PER_CPU(cpu_banks_t, mce_banks_owned);
 #define MCA_OWNER (0x1 < 1)
 /* MCA error can't be recovered and need reset */
 #define MCA_NEED_RESET (0x1 < 2)
-/* MCA error need further actions in softIRQ context for recovery */
-#define MCA_MORE_ACTION (0x1 < 3)
+/* MCA error did not have any action yet */
+#define MCA_NO_ACTION (0x1 < 3)
 
 struct mca_handle_result
 {

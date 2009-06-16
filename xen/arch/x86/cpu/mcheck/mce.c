@@ -82,14 +82,41 @@ void x86_mce_callback_register(x86_mce_callback_t cbfunc)
 	mc_callback_bank_extended = cbfunc;
 }
 
+/* Machine check recoverable judgement callback handler 
+ * It is used to judge whether an UC error is recoverable by software
+ */
+static mce_recoverable_t mc_recoverable_scan = NULL;
+
+void mce_recoverable_register(mce_recoverable_t cbfunc)
+{
+    mc_recoverable_scan = cbfunc;
+}
+
+/* Judging whether to Clear Machine Check error bank callback handler
+ * According to Intel latest MCA OS Recovery Writer's Guide, 
+ * whether the error MCA bank needs to be cleared is decided by the mca_source
+ * and MCi_status bit value. 
+ */
+static mce_need_clearbank_t mc_need_clearbank_scan = NULL;
+
+void mce_need_clearbank_register(mce_need_clearbank_t cbfunc)
+{
+    mc_need_clearbank_scan = cbfunc;
+}
+
 /* Utility function to perform MCA bank telemetry readout and to push that
  * telemetry towards an interested dom0 for logging and diagnosis.
  * The caller - #MC handler or MCA poll function - must arrange that we
  * do not migrate cpus. */
 
 /* XXFM Could add overflow counting? */
+
+/* Add out_param clear_bank for Machine Check Handler Caller.
+ * For Intel latest CPU, whether to clear the error bank status needs to
+ * be judged by the callback function defined above.
+ */
 mctelem_cookie_t mcheck_mca_logout(enum mca_source who, cpu_banks_t bankmask,
-    struct mca_summary *sp)
+    struct mca_summary *sp, cpu_banks_t* clear_bank)
 {
 	struct vcpu *v = current;
 	struct domain *d;
@@ -98,7 +125,7 @@ mctelem_cookie_t mcheck_mca_logout(enum mca_source who, cpu_banks_t bankmask,
 	struct mcinfo_common *mic;
 	struct mcinfo_global *mig;	/* on stack */
 	mctelem_cookie_t mctc = NULL;
-	uint32_t uc = 0, pcc = 0;
+	uint32_t uc = 0, pcc = 0, recover, need_clear = 1 ;
 	struct mc_info *mci = NULL;
 	mctelem_class_t which = MC_URGENT;	/* XXXgcc */
 	unsigned int cpu_nr;
@@ -150,6 +177,11 @@ mctelem_cookie_t mcheck_mca_logout(enum mca_source who, cpu_banks_t bankmask,
 	    &mcg.mc_coreid, &mcg.mc_core_threadid,
 	    &mcg.mc_apicid, NULL, NULL, NULL);
 
+	/* If no mc_recovery_scan callback handler registered,
+	 * this error is not recoverable
+	 */
+	recover = (mc_recoverable_scan)? 1: 0;
+
 	for (i = 0; i < 32 && i < nr_mce_banks; i++) {
 		struct mcinfo_bank mcb;		/* on stack */
 
@@ -160,6 +192,13 @@ mctelem_cookie_t mcheck_mca_logout(enum mca_source who, cpu_banks_t bankmask,
 		mca_rdmsrl(MSR_IA32_MC0_STATUS + i * 4, status);
 		if (!(status & MCi_STATUS_VAL))
 			continue;	/* this bank has no valid telemetry */
+
+		/* For Intel Latest CPU CMCI/MCE Handler caller, we need to
+		 * decide whether to clear bank by MCi_STATUS bit value such as
+		 * OVER/UC/EN/PCC/S/AR
+		 */
+		if ( mc_need_clearbank_scan )
+			need_clear = mc_need_clearbank_scan(who, status);
 
 		/* If this is the first bank with valid MCA DATA, then
 		 * try to reserve an entry from the urgent/nonurgent queue
@@ -186,6 +225,11 @@ mctelem_cookie_t mcheck_mca_logout(enum mca_source who, cpu_banks_t bankmask,
 		/* likewise for those with processor context corrupt */
 		if ((status & MCi_STATUS_PCC) != 0)
 			pcc |= (1 << i);
+
+		if (recover && uc)
+		 /* uc = 1, recover = 1, we need not panic.
+		  */
+			recover = mc_recoverable_scan(status);
 
 		addr = misc = 0;
 
@@ -221,9 +265,13 @@ mctelem_cookie_t mcheck_mca_logout(enum mca_source who, cpu_banks_t bankmask,
 			cbret = mc_callback_bank_extended(mci, i, status);
 		}
 
-		if (who != MCA_MCE_SCAN)
+		/* By default, need_clear = 1 */
+		if (who != MCA_MCE_SCAN && need_clear)
 			/* Clear status */
 			mca_wrmsrl(MSR_IA32_MC0_STATUS + 4 * i, 0x0ULL);
+		else if ( who == MCA_MCE_SCAN && need_clear)
+			set_bit(i, clear_bank);
+
 		wmb();
 	}
 
@@ -245,6 +293,7 @@ mctelem_cookie_t mcheck_mca_logout(enum mca_source who, cpu_banks_t bankmask,
 		sp->eipv = (gstatus & MCG_STATUS_EIPV) != 0;
 		sp->uc = uc;
 		sp->pcc = pcc;
+		sp->recoverable = recover;
 	}
 
 	return mci != NULL ? mctc : NULL;	/* may be NULL */
@@ -296,7 +345,7 @@ void mcheck_cmn_handler(struct cpu_user_regs *regs, long error_code,
 	 * for logging or dismiss the cookie that is returned, and must not
 	 * reference the cookie after that action.
 	 */
-	mctc = mcheck_mca_logout(MCA_MCE_HANDLER, bankmask, &bs);
+	mctc = mcheck_mca_logout(MCA_MCE_HANDLER, bankmask, &bs, NULL);
 	if (mctc != NULL)
 		mci = (struct mc_info *)mctelem_dataptr(mctc);
 
@@ -606,7 +655,7 @@ static void __init mcheck_disable(char *str)
 
 static void __init mcheck_enable(char *str)
 {
-	mce_disabled = -1;
+	mce_disabled = 0;
 }
 
 custom_param("nomce", mcheck_disable);

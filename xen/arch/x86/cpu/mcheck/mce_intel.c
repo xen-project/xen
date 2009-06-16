@@ -5,7 +5,9 @@
 #include <xen/kernel.h>
 #include <xen/delay.h>
 #include <xen/smp.h>
+#include <xen/mm.h>
 #include <asm/processor.h> 
+#include <public/sysctl.h>
 #include <asm/system.h>
 #include <asm/msr.h>
 #include "mce.h"
@@ -14,6 +16,7 @@
 DEFINE_PER_CPU(cpu_banks_t, mce_banks_owned);
 DEFINE_PER_CPU(cpu_banks_t, no_cmci_banks);
 int cmci_support = 0;
+int ser_support = 0;
 
 static int nr_intel_ext_msrs = 0;
 static int firstbank;
@@ -37,9 +40,11 @@ static struct mce_softirq_barrier mce_trap_bar;
 static DEFINE_SPINLOCK(mce_logout_lock);
 
 static atomic_t severity_cpu = ATOMIC_INIT(-1);
+static atomic_t found_error = ATOMIC_INIT(0);
 
 static void mce_barrier_enter(struct mce_softirq_barrier *);
 static void mce_barrier_exit(struct mce_softirq_barrier *);
+static int mce_barrier_last(struct mce_softirq_barrier *);
 
 #ifdef CONFIG_X86_MCE_THERMAL
 static void unexpected_thermal_interrupt(struct cpu_user_regs *regs)
@@ -261,6 +266,44 @@ static int fill_vmsr_data(int cpu, struct mcinfo_bank *mc_bank,
     return 0;
 }
 
+void intel_UCR_handler(struct mcinfo_bank *bank,
+             struct mcinfo_global *global,
+             struct mcinfo_extended *extension,
+             struct mca_handle_result *result)
+{
+    struct domain *d;
+    unsigned long mfn;
+    uint32_t status;
+
+    printk(KERN_DEBUG "MCE: Enter EWB UCR recovery action\n");
+    result->result = MCA_NEED_RESET;
+    if (bank->mc_addr != 0) {
+         mfn = bank->mc_addr >> PAGE_SHIFT;
+         if (!offline_page(mfn, 1, &status)) {
+              if (status & PG_OFFLINE_OFFLINED)
+                  result->result = MCA_RECOVERED;
+              else if (status & PG_OFFLINE_PENDING) {
+                 /* This page has owner */
+                  if (status & PG_OFFLINE_OWNED) {
+                      result->result |= MCA_OWNER;
+                      result->owner = status >> PG_OFFLINE_OWNER_SHIFT;
+                      printk(KERN_DEBUG "MCE: This error page is ownded"
+                                  " by DOM %d\n", result->owner);
+                      if (result->owner != 0 && result->owner != DOMID_XEN) {
+                          d = get_domain_by_id(result->owner);
+                          domain_crash(d);
+                          result->result = MCA_RECOVERED;
+                      }
+                  }
+              }
+         }
+    }
+}
+
+#define INTEL_MAX_RECOVERY 2
+struct mca_error_handler intel_recovery_handler[INTEL_MAX_RECOVERY] =
+            {{0x017A, intel_UCR_handler}, {0x00C0, intel_UCR_handler}};
+
 /*
  * Called from mctelem_process_deferred. Return 1 if the telemetry
  * should be committed for dom0 consumption, 0 if it should be
@@ -269,9 +312,11 @@ static int fill_vmsr_data(int cpu, struct mcinfo_bank *mc_bank,
 static int mce_action(unsigned int cpu, mctelem_cookie_t mctc)
 {
     struct mc_info *local_mi;
+    uint32_t i;
     struct mcinfo_common *mic = NULL;
     struct mcinfo_global *mc_global;
     struct mcinfo_bank *mc_bank;
+    struct mca_handle_result mca_res;
 
     local_mi = (struct mc_info*)mctelem_dataptr(mctc);
     x86_mcinfo_lookup(mic, local_mi, MC_TYPE_GLOBAL);
@@ -294,9 +339,45 @@ static int mce_action(unsigned int cpu, mctelem_cookie_t mctc)
         if (fill_vmsr_data(cpu, mc_bank, mc_global->mc_gstatus) == -1)
              break;
 
-       /* TODO: Add recovery actions here, such as page-offline, etc */
+        /* TODO: Add recovery actions here, such as page-offline, etc */
+        memset(&mca_res, 0x0f, sizeof(mca_res));
+        for ( i = 0; i < INTEL_MAX_RECOVERY; i++ ) {
+            if ( (mc_bank->mc_status & 0xffff) == 
+                        intel_recovery_handler[i].mca_code ) {
+                /* For SRAR, OVER = 1 should have caused reset
+                 * For SRAO, OVER = 1 skip recovery action, continue execution
+                 */
+                if (!(mc_bank->mc_status & MCi_STATUS_OVER))
+                    intel_recovery_handler[i].recovery_handler
+                                (mc_bank, mc_global, NULL, &mca_res);
+                else {
+                   if (!mc_global->mc_gstatus & MCG_STATUS_RIPV)
+                       mca_res.result = MCA_NEED_RESET;
+                   else
+                       mca_res.result = MCA_NO_ACTION; 
+                }
+                if (mca_res.result & MCA_OWNER)
+                    mc_bank->mc_domid = mca_res.owner;
+                if (mca_res.result == MCA_NEED_RESET)
+                    /* DOMID_XEN*/
+                    mc_panic("MCE: Software recovery failed for the UCR "
+                                "error\n");
+                else if (mca_res.result == MCA_RECOVERED)
+                    printk(KERN_DEBUG "MCE: The UCR error is succesfully "
+                                "recovered by software!\n");
+                else if (mca_res.result == MCA_NO_ACTION)
+                    printk(KERN_DEBUG "MCE: Overwrite SRAO error can't execute "
+                                "recover action, RIPV=1, let it be.\n");
+                break;
+            }
+            /* For SRAR, no defined recovery action should have caused reset
+             * in MCA Handler
+             */
+            if ( i >= INTEL_MAX_RECOVERY )
+                printk(KERN_DEBUG "MCE: No software recovery action found for "
+                                "this SRAO error\n");
+        }
     }
-
     return 1;
 }
 
@@ -468,21 +549,35 @@ static void mce_barrier_exit(struct mce_softirq_barrier *bar)
       }
 }
 
+static int mce_barrier_last(struct mce_softirq_barrier *bar)
+{
+    int gen = atomic_read(&bar->ingen);
+    if ( atomic_read(&bar->ingen) == gen &&
+        atomic_read(&bar->val) == 1 ) {
+        return 1;
+    }
+    return 0;
+}
+
+#if 0
 static void mce_barrier(struct mce_softirq_barrier *bar)
 {
       mce_barrier_enter(bar);
       mce_barrier_exit(bar);
 }
+#endif
 
 static void intel_machine_check(struct cpu_user_regs * regs, long error_code)
 {
     uint64_t gstatus;
     mctelem_cookie_t mctc = NULL;
     struct mca_summary bs;
+    cpu_banks_t clear_bank; 
 
     mce_spin_lock(&mce_logout_lock);
 
-    mctc = mcheck_mca_logout(MCA_MCE_SCAN, mca_allbanks, &bs);
+    memset( &clear_bank, 0x0, sizeof(cpu_banks_t));
+    mctc = mcheck_mca_logout(MCA_MCE_SCAN, mca_allbanks, &bs, &clear_bank);
 
     if (bs.errcnt) {
         /*
@@ -493,28 +588,47 @@ static void intel_machine_check(struct cpu_user_regs * regs, long error_code)
             if (mctc != NULL)
                 mctelem_defer(mctc);
             /*
-             * For PCC=1, context is lost, so reboot now without clearing
-             * the banks, and deal with the telemetry after reboot
+             * For PCC=1 and can't be recovered, context is lost, so reboot now without
+             * clearing  the banks, and deal with the telemetry after reboot
              * (the MSRs are sticky)
              */
             if (bs.pcc)
                 mc_panic("State lost due to machine check exception.\n");
+            if (!bs.ripv)
+                mc_panic("RIPV =0 can't resume execution!\n");
+            if (!bs.recoverable)
+                mc_panic("Machine check exception software recovery fail.\n");
         } else {
             if (mctc != NULL)
                 mctelem_commit(mctc);
         }
-        mcheck_mca_clearbanks(mca_allbanks);
+        atomic_set(&found_error, 1);
+
+        printk(KERN_DEBUG "MCE: clear_bank map %lx\n", 
+                *((unsigned long*)clear_bank));
+        mcheck_mca_clearbanks(clear_bank);
+
     } else {
         if (mctc != NULL)
             mctelem_dismiss(mctc);
     }
-
     mce_spin_unlock(&mce_logout_lock);
 
     /*
      * Wait until everybody has processed the trap.
      */
-    mce_barrier(&mce_trap_bar);
+    mce_barrier_enter(&mce_trap_bar);
+    /* According to latest MCA OS writer guide, if no error bank found
+     * on all cpus, something unexpected happening, we can't do any 
+     * recovery job but to reset the system.
+     */
+    if (atomic_read(&found_error) == 0)
+        mc_panic("Unexpected condition for the MCE handler, need reset\n");
+    if (mce_barrier_last(&mce_trap_bar)) {
+        printk(KERN_DEBUG "Choose one CPU to clear error finding flag\n ");
+        atomic_set(&found_error, 0);
+    }
+    mce_barrier_exit(&mce_trap_bar);
 
     /*
      * Clear MCIP if it wasn't already. There is a small
@@ -530,6 +644,90 @@ static void intel_machine_check(struct cpu_user_regs * regs, long error_code)
     }
 
     raise_softirq(MACHINE_CHECK_SOFTIRQ);
+}
+
+/* According to MCA OS writer guide, CMCI handler need to clear bank when
+ * 1) CE (UC = 0)
+ * 2) ser_support = 1, Superious error, OVER = 0, EN = 0, [UC = 1]
+ * 3) ser_support = 1, UCNA, OVER = 0, S = 1, AR = 0, PCC = 0, [UC = 1, EN = 1]
+ * MCA handler need to clear bank when
+ * 1) ser_support = 1, Superious error, OVER = 0, EN = 0, UC = 1
+ * 2) ser_support = 1, SRAR, UC = 1, OVER = 0, S = 1, AR = 1, [EN = 1]
+ * 3) ser_support = 1, SRAO, UC = 1, S = 1, AR = 0, [EN = 1]
+*/
+
+static int intel_need_clearbank_scan(enum mca_source who, u64 status)
+{
+    if ( who == MCA_CMCI_HANDLER) {
+        /* CMCI need clear bank */
+        if ( !(status & MCi_STATUS_UC) )
+            return 1;
+        /* Spurious need clear bank */
+        else if ( ser_support && !(status & MCi_STATUS_OVER)
+                    && !(status & MCi_STATUS_EN) )
+            return 1;
+        /* UCNA OVER = 0 need clear bank */
+        else if ( ser_support && !(status & MCi_STATUS_OVER) 
+                    && !(status & MCi_STATUS_PCC) && !(status & MCi_STATUS_S) 
+                    && !(status & MCi_STATUS_AR))
+            return 1;
+        /* Only Log, no clear */
+        else return 0;
+    }
+    else if ( who == MCA_MCE_SCAN) {
+        /* Spurious need clear bank */
+        if ( ser_support && !(status & MCi_STATUS_OVER)
+                    && (status & MCi_STATUS_UC) && !(status & MCi_STATUS_EN))
+            return 1;
+        /* SRAR OVER=0 clear bank. OVER = 1 have caused reset */
+        else if ( ser_support && (status & MCi_STATUS_UC)
+                    && (status & MCi_STATUS_S) && (status & MCi_STATUS_AR )
+                    && (status & MCi_STATUS_OVER) )
+            return 1;
+        /* SRAO need clear bank */
+        else if ( ser_support && !(status & MCi_STATUS_AR) 
+                    && (status & MCi_STATUS_S) && (status & MCi_STATUS_UC))
+            return 1; 
+        else
+            return 0;
+    }
+
+    return 1;
+}
+
+/* MCE continues/is recoverable when 
+ * 1) CE UC = 0
+ * 2) Supious ser_support = 1, OVER = 0, En = 0 [UC = 1]
+ * 3) SRAR ser_support = 1, OVER = 0, PCC = 0, S = 1, AR = 1 [UC =1, EN = 1]
+ * 4) SRAO ser_support = 1, PCC = 0, S = 1, AR = 0, EN = 1 [UC = 1]
+ * 5) UCNA ser_support = 1, OVER = 0, EN = 1, PCC = 0, S = 0, AR = 0, [UC = 1]
+ */
+static int intel_recoverable_scan(u64 status)
+{
+
+    if ( !(status & MCi_STATUS_UC ) )
+        return 1;
+    else if ( ser_support && !(status & MCi_STATUS_EN) 
+                && !(status & MCi_STATUS_OVER) )
+        return 1;
+    /* SRAR error */
+    else if ( ser_support && !(status & MCi_STATUS_OVER) 
+                && !(status & MCi_STATUS_PCC) && (status & MCi_STATUS_S)
+                && (status & MCi_STATUS_AR) ) {
+        printk(KERN_DEBUG "MCE: No SRAR error defined currently.\n");
+        return 0;
+    }
+    /* SRAO error */
+    else if (ser_support && !(status & MCi_STATUS_PCC)
+                && (status & MCi_STATUS_S) && !(status & MCi_STATUS_AR)
+                && (status & MCi_STATUS_EN))
+        return 1;
+    /* UCNA error */
+    else if (ser_support && !(status & MCi_STATUS_OVER)
+                && (status & MCi_STATUS_EN) && !(status & MCi_STATUS_PCC)
+                && !(status & MCi_STATUS_S) && !(status & MCi_STATUS_AR))
+        return 1;
+    return 0;
 }
 
 static DEFINE_SPINLOCK(cmci_discover_lock);
@@ -586,7 +784,7 @@ static void cmci_discover(void)
      */
 
     mctc = mcheck_mca_logout(
-        MCA_CMCI_HANDLER, __get_cpu_var(mce_banks_owned), &bs);
+        MCA_CMCI_HANDLER, __get_cpu_var(mce_banks_owned), &bs, NULL);
 
     if (bs.errcnt && mctc != NULL) {
         if (guest_enabled_event(dom0->vcpu[0], VIRQ_MCA)) {
@@ -700,7 +898,7 @@ fastcall void smp_cmci_interrupt(struct cpu_user_regs *regs)
     irq_enter();
 
     mctc = mcheck_mca_logout(
-        MCA_CMCI_HANDLER, __get_cpu_var(mce_banks_owned), &bs);
+        MCA_CMCI_HANDLER, __get_cpu_var(mce_banks_owned), &bs, NULL);
 
     if (bs.errcnt && mctc != NULL) {
         if (guest_enabled_event(dom0->vcpu[0], VIRQ_MCA)) {
@@ -738,6 +936,10 @@ static void mce_cap_init(struct cpuinfo_x86 *c)
     if ((l & MCG_CMCI_P) && cpu_has_apic)
         cmci_support = 1;
 
+    /* Support Software Error Recovery */
+    if (l & MCG_SER_P)
+        ser_support = 1;
+
     nr_mce_banks = l & MCG_CAP_COUNT;
     if (nr_mce_banks > MAX_NR_BANKS)
     {
@@ -770,7 +972,7 @@ static void mce_init(void)
     /* log the machine checks left over from the previous reset.
      * This also clears all registers*/
 
-    mctc = mcheck_mca_logout(MCA_RESET, mca_allbanks, &bs);
+    mctc = mcheck_mca_logout(MCA_RESET, mca_allbanks, &bs, NULL);
 
     /* in the boot up stage, don't inject to DOM0, but print out */
     if (bs.errcnt && mctc != NULL) {
@@ -810,6 +1012,8 @@ int intel_mcheck_init(struct cpuinfo_x86 *c)
     /* machine check is available */
     x86_mce_vector_register(intel_machine_check);
     x86_mce_callback_register(intel_get_extended_msrs);
+    mce_recoverable_register(intel_recoverable_scan);
+    mce_need_clearbank_register(intel_need_clearbank_scan);
 
     mce_init();
     mce_intel_feature_init(c);

@@ -86,7 +86,7 @@ void mce_amd_checkregs(void *info)
 	struct mca_summary bs;
 	unsigned int event_enabled;
 
-	mctc = mcheck_mca_logout(MCA_POLLER, mca_allbanks, &bs);
+	mctc = mcheck_mca_logout(MCA_POLLER, mca_allbanks, &bs, NULL);
 
 	event_enabled = guest_enabled_event(dom0->vcpu[0], VIRQ_MCA);
 

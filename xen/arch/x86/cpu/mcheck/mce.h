@@ -42,6 +42,10 @@ extern void x86_mce_vector_register(x86_mce_vector_t);
  * via x86_mce_vector_register. */
 extern void mcheck_cmn_handler(struct cpu_user_regs *, long, cpu_banks_t);
 
+/* Register a handler for judging whether mce is recoverable. */
+typedef int (*mce_recoverable_t)(u64 status);
+extern void mce_recoverable_register(mce_recoverable_t);
+
 /* Read an MSR, checking for an interposed value first */
 extern struct intpose_ent *intpose_lookup(unsigned int, uint64_t,
     uint64_t *);
@@ -86,6 +90,8 @@ struct mca_summary {
 	int		eipv;	/* meaningful on #MC */
 	uint32_t	uc;	/* bitmask of banks with UC */
 	uint32_t	pcc;	/* bitmask of banks with PCC */
+	/* bitmask of banks with software error recovery ability*/
+	uint32_t	recoverable; 
 };
 
 extern cpu_banks_t mca_allbanks;
@@ -93,11 +99,12 @@ void set_poll_bankmask(struct cpuinfo_x86 *c);
 DECLARE_PER_CPU(cpu_banks_t, poll_bankmask);
 DECLARE_PER_CPU(cpu_banks_t, no_cmci_banks);
 extern int cmci_support;
+extern int ser_support;
 extern int is_mc_panic;
 extern void mcheck_mca_clearbanks(cpu_banks_t);
 
 extern mctelem_cookie_t mcheck_mca_logout(enum mca_source, cpu_banks_t,
-    struct mca_summary *);
+    struct mca_summary *, cpu_banks_t*);
 
 /* Register a callback to be made during bank telemetry logout.
  * This callback is only available to those machine check handlers
@@ -112,6 +119,11 @@ extern mctelem_cookie_t mcheck_mca_logout(enum mca_source, cpu_banks_t,
  * the current MCA bank number we are reading telemetry from, and the
  * MCi_STATUS value for that bank.
  */
+
+/* Register a handler for judging whether the bank need to be cleared */
+typedef int (*mce_need_clearbank_t)(enum mca_source who, u64 status);
+extern void mce_need_clearbank_register(mce_need_clearbank_t);
+
 typedef enum mca_extinfo (*x86_mce_callback_t)
     (struct mc_info *, uint16_t, uint64_t);
 extern void x86_mce_callback_register(x86_mce_callback_t);

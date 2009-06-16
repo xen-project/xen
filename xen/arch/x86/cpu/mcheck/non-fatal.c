@@ -39,7 +39,7 @@ static void mce_checkregs (void *info)
 	struct mca_summary bs;
 	static uint64_t dumpcount = 0;
 
-	mctc = mcheck_mca_logout(MCA_POLLER, __get_cpu_var(poll_bankmask), &bs);
+	mctc = mcheck_mca_logout(MCA_POLLER, __get_cpu_var(poll_bankmask), &bs, NULL);
 
 	if (bs.errcnt && mctc != NULL) {
 		adjust++;
