@@ -436,8 +436,6 @@ class PciController(DevController):
                                     ' same guest with %s'
                                 raise VmError(err_msg % (s, dev.name))
 
-        for (domain, bus, slot, func) in pci_dev_list:
-            self.setupOneDevice(domain, bus, slot, func)
         wPath = '/local/domain/0/backend/pci/%u/0/aerState' % (self.getDomid())
         self.aerStateWatch = xswatch(wPath, self._handleAerStateWatch)
         log.debug('pci: register aer watch %s', wPath)
