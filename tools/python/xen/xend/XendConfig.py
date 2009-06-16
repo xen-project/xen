@@ -1100,12 +1100,11 @@ class XendConfig(dict):
                             configs = controller.configurations(txn)
                             for config in configs:
                                 if sxp.name(config) in ('vbd', 'tap'):
-                                    # The bootable flag is never written to the
-                                    # store as part of the device config.
                                     dev_uuid = sxp.child_value(config, 'uuid')
                                     dev_type, dev_cfg = self['devices'][dev_uuid]
-                                    is_bootable = dev_cfg.get('bootable', 0)
-                                    config.append(['bootable', int(is_bootable)])
+                                    if sxp.child_value(config, 'bootable', None) is None:
+                                        is_bootable = dev_cfg.get('bootable', 0)
+                                        config.append(['bootable', int(is_bootable)])
                                     config.append(['VDI', dev_cfg.get('VDI', '')])
 
                                 sxpr.append(['device', config])
