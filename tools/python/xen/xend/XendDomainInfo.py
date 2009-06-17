@@ -844,7 +844,7 @@ class XendDomainInfo:
                     raise VmError("Device %s is not connected" %
                                   pci_dict_to_bdf_str(dev))
                 new_dev = new_devs[0]
-                self.hvm_destroyPCIDevice(int(new_dev['vslot'], 16))
+                self.hvm_destroyPCIDevice(new_dev)
                 # Update vslot
                 dev['vslot'] = new_dev['vslot']
                 for n in sxp.children(pci_dev):
@@ -1098,31 +1098,11 @@ class XendDomainInfo:
         for devclass in XendDevices.valid_devices():
             self.getDeviceController(devclass).waitForDevices()
 
-    def hvm_destroyPCIDevice(self, vslot):
-        log.debug("hvm_destroyPCIDevice called %s", vslot)
+    def hvm_destroyPCIDevice(self, pci_dev):
+        log.debug("hvm_destroyPCIDevice: %s", pci_dev)
 
         if not self.info.is_hvm():
             raise VmError("hvm_destroyPCIDevice called on non-HVM guest")
-
-        #all the PCI devs share one conf node
-        devid = '0'
-        vslot = int(vslot)
-        dev_info = self._getDeviceInfo_pci('0')#from self.info['devices']
-        dev_uuid = sxp.child_value(dev_info, 'uuid')
-
-        #delete the pci bdf config under the pci device
-        pci_conf = self.info['devices'][dev_uuid][1]
-        pci_len = len(pci_conf['devs'])
-
-        #find the pass-through device with the virtual slot
-        devnum = 0
-        for x in pci_conf['devs']:
-            if int(x['vslot'], 16) == vslot:
-                break
-            devnum += 1
-
-        if devnum >= pci_len:
-            raise VmError("Device @ vslot 0x%x doesn't exist." % (vslot))
 
         # Check the co-assignment.
         # To pci-detach a device D from domN, we should ensure: for each DD in the
@@ -1130,7 +1110,7 @@ class XendDomainInfo:
         # 
         from xen.xend.server.pciif import PciDevice
         try:
-            pci_device = PciDevice(x)
+            pci_device = PciDevice(pci_dev)
         except Exception, e:
             raise VmError("pci: failed to locate device and "+
                     "parse it's resources - "+str(e))
@@ -1145,8 +1125,8 @@ class XendDomainInfo:
                     )% (pci_device.name, self.info['name_label'], pci_str))
 
 
-        bdf_str = pci_dict_to_bdf_str(x)
-        log.info("hvm_destroyPCIDevice:%s:%s!", x, bdf_str)
+        bdf_str = pci_dict_to_bdf_str(pci_dev)
+        log.info("hvm_destroyPCIDevice:%s:%s!", pci_dev, bdf_str)
         if self.domid is not None:
             self.image.signalDeviceModel('pci-rem', 'pci-removed', bdf_str)
 
