@@ -101,6 +101,7 @@ char * strcat(char * dest, const char * src);
 char  *strdup(const char *s);
 #endif
 #include <mini-os/console.h>
+int openpty(void);
 
 #define RAND_MIX 2654435769U
 
@@ -183,6 +184,9 @@ extern struct file {
 	struct {
 	    struct fbfront_dev *dev;
 	} fb;
+	struct {
+	    struct consfront_dev *dev;
+	} cons;
         struct {
             /* To each xenbus FD is associated a queue of watch events for this
              * FD.  */

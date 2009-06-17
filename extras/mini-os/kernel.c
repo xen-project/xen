@@ -562,7 +562,7 @@ void stop_kernel(void)
     fini_gnttab();
 
     /* Reset the console driver. */
-    fini_console();
+    fini_console(NULL);
     /* TODO: record new ring mfn & event in start_info */
 
     /* Reset XenBus */

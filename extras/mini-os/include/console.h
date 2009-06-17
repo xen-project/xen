@@ -36,9 +36,32 @@
 #ifndef _LIB_CONSOLE_H_
 #define _LIB_CONSOLE_H_
 
-#include<mini-os/os.h>
-#include<mini-os/traps.h>
-#include<stdarg.h>
+#include <mini-os/os.h>
+#include <mini-os/traps.h>
+#include <mini-os/types.h>
+#include <xen/grant_table.h>
+#include <xenbus.h>
+#include <xen/io/console.h>
+#include <stdarg.h>
+
+struct consfront_dev {
+    domid_t dom;
+
+    struct xencons_interface *ring;
+    grant_ref_t ring_ref;
+    evtchn_port_t evtchn;
+
+    char *nodename;
+    char *backend;
+
+    xenbus_event_queue events;
+
+#ifdef HAVE_LIBC
+    int fd;
+#endif
+};
+
+
 
 void print(int direct, const char *fmt, va_list args);
 void printk(const char *fmt, ...);
@@ -50,16 +73,17 @@ void xencons_rx(char *buf, unsigned len, struct pt_regs *regs);
 void xencons_tx(void);
 
 void init_console(void);
-void console_print(char *data, int length);
-void fini_console(void);
+void console_print(struct consfront_dev *dev, char *data, int length);
+void fini_console(struct consfront_dev *dev);
 
 /* Low level functions defined in xencons_ring.c */
 extern struct wait_queue_head console_queue;
-int xencons_ring_init(void);
-int xencons_ring_send(const char *data, unsigned len);
-int xencons_ring_send_no_notify(const char *data, unsigned len);
-int xencons_ring_avail(void);
-int xencons_ring_recv(char *data, unsigned len);
-
+struct consfront_dev *xencons_ring_init(void);
+struct consfront_dev *init_consfront(char *_nodename);
+int xencons_ring_send(struct consfront_dev *dev, const char *data, unsigned len);
+int xencons_ring_send_no_notify(struct consfront_dev *dev, const char *data, unsigned len);
+int xencons_ring_avail(struct consfront_dev *dev);
+int xencons_ring_recv(struct consfront_dev *dev, char *data, unsigned len);
+void free_consfront(struct consfront_dev *dev);
 
 #endif /* _LIB_CONSOLE_H_ */

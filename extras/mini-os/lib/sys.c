@@ -167,6 +167,18 @@ int mkdir(const char *pathname, mode_t mode)
     return 0;
 }
 
+int openpty(void)
+{
+    struct consfront_dev *dev;
+
+    dev = init_consfront(NULL);
+    dev->fd = alloc_fd(FTYPE_CONSOLE);
+    files[dev->fd].cons.dev = dev;
+
+    printk("fd(%d) = openpty\n", dev->fd);
+    return(dev->fd);
+}
+
 int open(const char *pathname, int flags, ...)
 {
     int fs_fd, fd;
@@ -219,7 +231,7 @@ int read(int fd, void *buf, size_t nbytes)
             DEFINE_WAIT(w);
             while(1) {
                 add_waiter(w, console_queue);
-                ret = xencons_ring_recv(buf, nbytes);
+                ret = xencons_ring_recv(files[fd].cons.dev, buf, nbytes);
                 if (ret)
                     break;
                 schedule();
@@ -286,7 +298,7 @@ int write(int fd, const void *buf, size_t nbytes)
 {
     switch (files[fd].type) {
 	case FTYPE_CONSOLE:
-	    console_print((char *)buf, nbytes);
+	    console_print(files[fd].cons.dev, (char *)buf, nbytes);
 	    return nbytes;
 	case FTYPE_FILE: {
 	    ssize_t ret;
@@ -414,6 +426,10 @@ int close(int fd)
             return 0;
 	case FTYPE_FB:
             shutdown_fbfront(files[fd].fb.dev);
+            files[fd].type = FTYPE_NONE;
+            return 0;
+        case FTYPE_CONSOLE:
+            fini_console(files[fd].cons.dev);
             files[fd].type = FTYPE_NONE;
             return 0;
 	case FTYPE_NONE:
@@ -735,7 +751,7 @@ static int select_poll(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exce
 	    break;
 	case FTYPE_CONSOLE:
 	    if (FD_ISSET(i, readfds)) {
-                if (xencons_ring_avail())
+                if (xencons_ring_avail(files[i].cons.dev))
 		    n++;
 		else
 		    FD_CLR(i, readfds);

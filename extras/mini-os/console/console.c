@@ -76,11 +76,11 @@ void xencons_tx(void)
 #endif
 
 
-void console_print(char *data, int length)
+void console_print(struct consfront_dev *dev, char *data, int length)
 {
     char *curr_char, saved_char;
     int part_len;
-    int (*ring_send_fn)(const char *data, unsigned length);
+    int (*ring_send_fn)(struct consfront_dev *dev, const char *data, unsigned length);
 
     if(!console_initialised)
         ring_send_fn = xencons_ring_send_no_notify;
@@ -94,17 +94,17 @@ void console_print(char *data, int length)
             saved_char = *(curr_char+1);
             *(curr_char+1) = '\r';
             part_len = curr_char - data + 2;
-            ring_send_fn(data, part_len);
+            ring_send_fn(dev, data, part_len);
             *(curr_char+1) = saved_char;
             data = curr_char+1;
             length -= part_len - 1;
         }
     }
     
-    ring_send_fn(data, length);
+    ring_send_fn(dev, data, length);
     
     if(data[length-1] == '\n')
-        ring_send_fn("\r", 1);
+        ring_send_fn(dev, "\r", 1);
 }
 
 void print(int direct, const char *fmt, va_list args)
@@ -123,7 +123,7 @@ void print(int direct, const char *fmt, va_list args)
 #endif    
             (void)HYPERVISOR_console_io(CONSOLEIO_write, strlen(buf), buf);
         
-        console_print(buf, strlen(buf));
+        console_print(NULL, buf, strlen(buf));
     }
 }
 
@@ -151,7 +151,7 @@ void init_console(void)
     printk("done.\n");
 }
 
-void fini_console(void)
+void fini_console(struct consfront_dev *dev)
 {
-    /* Destruct the console and get the parameters of the restarted one */
+    if (dev) free_consfront(dev);
 }

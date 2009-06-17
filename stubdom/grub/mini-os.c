@@ -329,7 +329,7 @@ void
 serial_hw_put (int _c)
 {
   char c = _c;
-  console_print(&c, 1);
+  console_print(NULL, &c, 1);
 }
 
 int
@@ -337,7 +337,7 @@ serial_hw_fetch (void)
 {
     char key;
 
-    if (!xencons_ring_avail())
+    if (!xencons_ring_avail(NULL))
         return -1;
 
     read(STDIN_FILENO, &key, 1);
