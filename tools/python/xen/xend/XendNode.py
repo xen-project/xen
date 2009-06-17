@@ -340,8 +340,7 @@ class XendNode:
                 except KeyError:
                     pass
 
-        (domain, bus, slot, func) = PciUtil.parse_pci_name(pci_name)
-        pci_dev = PciUtil.PciDevice(domain, bus, slot, func)
+        pci_dev = PciUtil.PciDevice(PciUtil.parse_pci_name(pci_name))
         ppci_record = {
             'domain':                   pci_dev.domain,
             'bus':                      pci_dev.bus,

@@ -130,13 +130,7 @@ class PciController(DevController):
                     log.debug('Reconfiguring PCI device %s.' % dev)
                     attaching = False
 
-                (domain, bus, slotfunc) = dev.split(':')
-                (slot, func) = slotfunc.split('.')
-                domain = parse_hex(domain)
-                bus = parse_hex(bus)
-                slot = parse_hex(slot)
-                func = parse_hex(func)
-                self.setupOneDevice(domain, bus, slot, func)
+                self.setupOneDevice(parse_pci_name(dev))
 
                 self.writeBackend(devid, 'dev-%i' % devno, dev)
                 self.writeBackend(devid, 'state-%i' % devno,
@@ -248,15 +242,13 @@ class PciController(DevController):
             return
 
         #group string format xx:xx.x,xx:xx.x,
-        devstr_len = group_str.find(',')
-        for i in range(0, len(group_str), devstr_len + 1):
-            (bus, slotfunc) = group_str[i:i + devstr_len].split(':')
-            (slot, func) = slotfunc.split('.')
-            b = parse_hex(bus)
-            d = parse_hex(slot)
-            f = parse_hex(func)
+        for i in group_str.split(','):
+            if i == '':
+                continue
+            pci_dev = parse_pci_name(i)
+            pci_dev['domain'] = '%04x' % dev.domain
             try:
-                sdev = PciDevice(dev.domain, b, d, f)
+                sdev = PciDevice(pci_dev)
             except Exception, e:
                 #no dom0 drivers bound to sdev
                 continue
@@ -270,13 +262,13 @@ class PciController(DevController):
                     )%(sdev.name, dev.name))
         return
 
-    def setupOneDevice(self, domain, bus, slot, func):
+    def setupOneDevice(self, pci_dev):
         """ Attach I/O resources for device to frontend domain
         """
         fe_domid = self.getDomid()
 
         try:
-            dev = PciDevice(domain, bus, slot, func)
+            dev = PciDevice(pci_dev)
         except Exception, e:
             raise VmError("pci: failed to locate device and "+
                     "parse it's resources - "+str(e))
@@ -305,12 +297,11 @@ class PciController(DevController):
 
         if not self.vm.info.is_hvm():
             # Setup IOMMU device assignment
-            pci_str = "0x%x, 0x%x, 0x%x, 0x%x" % (domain, bus, slot, func)
-            bdf = xc.assign_device(fe_domid, pci_str)
+            bdf = xc.assign_device(fe_domid, pci_dict_to_xc_str(pci_dev))
+            pci_str = pci_dict_to_bdf_str(pci_dev)
             if bdf > 0:
-                raise VmError("Failed to assign device to IOMMU (%x:%x.%x)"
-                              % (bus, slot, func))
-            log.debug("pci: assign device %x:%x.%x" % (bus, slot, func))
+                raise VmError("Failed to assign device to IOMMU (%s)" % pci_str)
+            log.debug("pci: assign device %s" % pci_str)
 
         for (start, size) in dev.ioports:
             log.debug('pci: enabling ioport 0x%x/0x%x'%(start,size))
@@ -366,23 +357,15 @@ class PciController(DevController):
     def setupDevice(self, config):
         """Setup devices from config
         """
-        pci_str_list = []
-        pci_dev_list = []
-        for pci_config in config.get('devs', []):
-            domain = parse_hex(pci_config.get('domain', 0))
-            bus = parse_hex(pci_config.get('bus', 0))
-            slot = parse_hex(pci_config.get('slot', 0))
-            func = parse_hex(pci_config.get('func', 0))            
-            pci_str = '%04x:%02x:%02x.%01x' % (domain, bus, slot, func)
-            pci_str_list = pci_str_list + [pci_str]
-            pci_dev_list = pci_dev_list + [(domain, bus, slot, func)]
+        pci_dev_list = config.get('devs', [])
+        pci_str_list = map(pci_dict_to_bdf_str, pci_dev_list)
 
         if len(pci_str_list) != len(set(pci_str_list)):
             raise VmError('pci: duplicate devices specified in guest config?')
 
-        for (domain, bus, slot, func) in pci_dev_list:
+        for pci_dev in pci_dev_list:
             try:
-                dev = PciDevice(domain, bus, slot, func)
+                dev = PciDevice(pci_dev)
             except Exception, e:
                 raise VmError("pci: failed to locate device and "+
                         "parse it's resources - "+str(e))
@@ -427,9 +410,7 @@ class PciController(DevController):
                     dev.devs_check_driver(devs_str)
                     for s in devs_str:
                         if not s in pci_str_list:
-                            (s_dom, s_bus, s_slot, s_func) = parse_pci_name(s)
-                            s_pci_str = '0x%x,0x%x,0x%x,0x%x' % \
-                                (s_dom, s_bus, s_slot, s_func)
+                            s_pci_str = pci_dict_to_bdf_str(parse_pci_name(s))
                             # s has been assigned to other guest?
                             if xc.test_assign_device(0, s_pci_str) != 0:
                                 err_msg = 'pci: %s must be co-assigned to the'+\
@@ -453,13 +434,13 @@ class PciController(DevController):
         return True
 
 
-    def cleanupOneDevice(self, domain, bus, slot, func):
+    def cleanupOneDevice(self, pci_dev):
         """ Detach I/O resources for device from frontend domain
         """
         fe_domid = self.getDomid()
 
         try:
-            dev = PciDevice(domain, bus, slot, func)
+            dev = PciDevice(pci_dev)
         except Exception, e:
             raise VmError("pci: failed to locate device and "+
                     "parse it's resources - "+str(e))
@@ -476,12 +457,11 @@ class PciController(DevController):
         # DMA transaction, etc
         dev.do_FLR()
 
-        pci_str = "0x%x, 0x%x, 0x%x, 0x%x" % (domain, bus, slot, func)
-        bdf = xc.deassign_device(fe_domid, pci_str)
+        bdf = xc.deassign_device(fe_domid, pci_dict_to_xc_str(pci_dev))
+        pci_str = pci_dict_to_bdf_str(pci_dev)
         if bdf > 0:
-            raise VmError("Failed to deassign device from IOMMU (%x:%x.%x)"
-                          % (bus, slot, func))
-        log.debug("pci: Deassign device %x:%x.%x" % (bus, slot, func))
+            raise VmError("Failed to deassign device from IOMMU (%s)" % pci_str)
+        log.debug("pci: Deassign device %s" % pci_str)
 
         for (start, size) in dev.ioports:
             log.debug('pci: disabling ioport 0x%x/0x%x'%(start,size))
@@ -530,15 +510,9 @@ class PciController(DevController):
             state = int(self.readBackend(devid, 'state-%i' % i))
             if state == xenbusState['Closing']:
                 # Detach I/O resources.
-                dev = self.readBackend(devid, 'dev-%i' % i)
-                (domain, bus, slotfunc) = dev.split(':')
-                (slot, func) = slotfunc.split('.')
-                domain = parse_hex(domain)
-                bus = parse_hex(bus)
-                slot = parse_hex(slot)
-                func = parse_hex(func)            
+                pci_dev = parse_pci_name(self.readBackend(devid, 'dev-%i' % i))
                 # In HVM case, I/O resources are disabled in ioemu.
-                self.cleanupOneDevice(domain, bus, slot, func)
+                self.cleanupOneDevice(pci_dev)
                 # Remove xenstore nodes.
                 list = ['dev', 'vdev', 'state', 'uuid', 'vslot']
                 if self.readBackend(devid, 'opts-%i' % i) is not None:

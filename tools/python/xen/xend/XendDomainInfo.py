@@ -39,7 +39,8 @@ from xen.util import asserts, auxbin
 from xen.util.blkif import blkdev_uname_to_file, blkdev_uname_to_taptype
 import xen.util.xsm.xsm as security
 from xen.util import xsconstants
-from xen.util.pci import serialise_pci_opts, pci_opts_list_to_sxp
+from xen.util.pci import serialise_pci_opts, pci_opts_list_to_sxp, \
+                         pci_dict_to_bdf_str, pci_dict_to_xc_str
 
 from xen.xend import balloon, sxp, uuid, image, arch
 from xen.xend import XendOptions, XendNode, XendConfig
@@ -310,9 +311,8 @@ def do_FLR(domid):
     dev_str_list = get_assigned_pci_devices(domid)
 
     for dev_str in dev_str_list:
-        (dom, b, d, f) = parse_pci_name(dev_str)
         try:
-            dev = PciDevice(dom, b, d, f)
+            dev = PciDevice(parse_pci_name(dev_str))
         except Exception, e:
             raise VmError("pci: failed to locate device and "+
                     "parse it's resources - "+str(e))
@@ -652,23 +652,15 @@ class XendDomainInfo:
                     raise VmError("device is already inserted")
 
         # Test whether the devices can be assigned with VT-d
-        pci_str = "%s, %s, %s, %s" % (new_dev['domain'],
-                new_dev['bus'],
-                new_dev['slot'],
-                new_dev['func'])
-        bdf = xc.test_assign_device(0, pci_str)
+        bdf = xc.test_assign_device(0, pci_dict_to_xc_str(new_dev))
         if bdf != 0:
             if bdf == -1:
                 raise VmError("failed to assign device: maybe the platform"
                               " doesn't support VT-d, or VT-d isn't enabled"
                               " properly?")
-            bus = (bdf >> 16) & 0xff
-            devfn = (bdf >> 8) & 0xff
-            dev = (devfn >> 3) & 0x1f
-            func = devfn & 0x7
-            raise VmError("fail to assign device(%x:%x.%x): maybe it has"
+            raise VmError("fail to assign device(%s): maybe it has"
                           " already been assigned to other domain, or maybe"
-                          " it doesn't exist." % (bus, dev, func))
+                          " it doesn't exist." % pci_dict_to_bdf_str(new_dev))
 
         # Here, we duplicate some checkings (in some cases, we mustn't allow
         # a device to be hot-plugged into an HVM guest) that are also done in
@@ -680,12 +672,8 @@ class XendDomainInfo:
         # Test whether the device is owned by pciback. For instance, we can't
         # hotplug a device being used by Dom0 itself to an HVM guest.
         from xen.xend.server.pciif import PciDevice, parse_pci_name
-        domain = int(new_dev['domain'],16)
-        bus    = int(new_dev['bus'],16)
-        dev    = int(new_dev['slot'],16)
-        func   = int(new_dev['func'],16)
         try:
-            pci_device = PciDevice(domain, bus, dev, func)
+            pci_device = PciDevice(new_dev)
         except Exception, e:
             raise VmError("pci: failed to locate device and "+
                     "parse it's resources - "+str(e))
@@ -710,9 +698,8 @@ class XendDomainInfo:
         pci_device.devs_check_driver(coassignment_list)
         assigned_pci_device_str_list = self._get_assigned_pci_devices()
         for pci_str in coassignment_list:
-            (domain, bus, dev, func) = parse_pci_name(pci_str) 
-            dev_str =  '0x%x,0x%x,0x%x,0x%x' % (domain, bus, dev, func)
-            if xc.test_assign_device(0, dev_str) == 0:
+            pci_dev = parse_pci_name(pci_str)
+            if xc.test_assign_device(0, pci_dict_to_xc_str(pci_dev)) == 0:
                 continue
             if not pci_str in assigned_pci_device_str_list:
                 raise VmError(("pci: failed to pci-attach %s to domain %s" + \
@@ -742,12 +729,9 @@ class XendDomainInfo:
             if new_dev.has_key('opts'):
                 opts = ',' + serialise_pci_opts(new_dev['opts'])
 
-            bdf_str = "%s:%s:%s.%s@%s%s" % (new_dev['domain'],
-                new_dev['bus'],
-                new_dev['slot'],
-                new_dev['func'],
-                new_dev['vslot'],
-                opts)
+            bdf_str = "%s@%02x%s" % (pci_dict_to_bdf_str(new_dev),
+                                     int(new_dev['vslot'], 16), opts)
+            log.debug("XendDomainInfo.hvm_pci_device_insert_dev: %s" % bdf_str)
             self.image.signalDeviceModel('pci-ins', 'pci-inserted', bdf_str)
 
             vslot = xstransact.Read("/local/domain/0/device-model/%i/parameter"
@@ -864,9 +848,8 @@ class XendDomainInfo:
                         vslot = x['vslot']
                         break
                 if vslot == "":
-                    raise VmError("Device %04x:%02x:%02x.%01x is not connected"
-                                  % (int(dev['domain'],16), int(dev['bus'],16),
-                                     int(dev['slot'],16), int(dev['func'],16)))
+                    raise VmError("Device %s is not connected" %
+                                  pci_dict_to_bdf_str(dev))
                 self.hvm_destroyPCIDevice(int(vslot, 16))
                 # Update vslot
                 dev['vslot'] = vslot
@@ -1152,12 +1135,8 @@ class XendDomainInfo:
         # list of D's co-assignment devices, DD is not assigned (to domN).
         # 
         from xen.xend.server.pciif import PciDevice
-        domain = int(x['domain'],16)
-        bus    = int(x['bus'],16)
-        dev    = int(x['slot'],16)
-        func   = int(x['func'],16)
         try:
-            pci_device = PciDevice(domain, bus, dev, func)
+            pci_device = PciDevice(x)
         except Exception, e:
             raise VmError("pci: failed to locate device and "+
                     "parse it's resources - "+str(e))
@@ -1172,9 +1151,8 @@ class XendDomainInfo:
                     )% (pci_device.name, self.info['name_label'], pci_str))
 
 
-        bdf_str = "%s:%s:%s.%s" % (x['domain'], x['bus'], x['slot'], x['func'])
+        bdf_str = pci_dict_to_bdf_str(x)
         log.info("hvm_destroyPCIDevice:%s:%s!", x, bdf_str)
-
         if self.domid is not None:
             self.image.signalDeviceModel('pci-rem', 'pci-removed', bdf_str)
 
@@ -1338,21 +1316,12 @@ class XendDomainInfo:
         if self.domid is not None:
             return get_assigned_pci_devices(self.domid)
 
-        dev_str_list = []
         dev_info = self._getDeviceInfo_pci(devid)
         if dev_info is None:
-            return dev_str_list
+            return []
         dev_uuid = sxp.child_value(dev_info, 'uuid')
         pci_conf = self.info['devices'][dev_uuid][1]
-        pci_devs = pci_conf['devs']
-        for pci_dev in pci_devs:
-            domain = int(pci_dev['domain'], 16)
-            bus = int(pci_dev['bus'], 16)
-            slot = int(pci_dev['slot'], 16)
-            func = int(pci_dev['func'], 16)
-            dev_str = "%04x:%02x:%02x.%01x" % (domain, bus, slot, func)
-            dev_str_list = dev_str_list + [dev_str]
-        return dev_str_list 
+        return map(pci_dict_to_bdf_str, pci_conf['devs'])
 
     def setMemoryTarget(self, target):
         """Set the memory target of this domain.
@@ -3909,12 +3878,12 @@ class XendDomainInfo:
         target_dev = None
         new_pci_sxp = ['pci']
         for dev in sxp.children(old_pci_sxp, 'dev'):
-            domain = int(sxp.child_value(dev, 'domain'), 16)
-            bus = int(sxp.child_value(dev, 'bus'), 16)
-            slot = int(sxp.child_value(dev, 'slot'), 16)
-            func = int(sxp.child_value(dev, 'func'), 16)
-            name = "%04x:%02x:%02x.%01x" % (domain, bus, slot, func)
-            if ppci.get_name() == name:
+            pci_dev = {}
+            pci_dev['domain'] = sxp.child_value(dev, 'domain')
+            pci_dev['bus'] = sxp.child_value(dev, 'bus')
+            pci_dev['slot'] = sxp.child_value(dev, 'slot')
+            pci_dev['func'] = sxp.child_value(dev, 'func')
+            if ppci.get_name() == pci_dict_to_bdf_str(pci_dev):
                 target_dev = dev
             else:
                 new_pci_sxp.append(dev)

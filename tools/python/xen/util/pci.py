@@ -15,6 +15,7 @@ import time
 import threading
 from xen.util import utils
 from xen.xend import sxp
+from xen.xend.XendConstants import AUTO_PHP_SLOT
 
 PROC_PCI_PATH = '/proc/bus/pci/devices'
 PROC_PCI_NUM_RESOURCES = 7
@@ -35,7 +36,6 @@ LSPCI_CMD = 'lspci'
 
 PCI_DEV_REG_EXPRESS_STR = r"[0-9a-fA-F]{4}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}."+ \
             r"[0-9a-fA-F]{1}"
-PCI_DEV_FORMAT_STR = '%04x:%02x:%02x.%01x'
 
 DEV_TYPE_PCIe_ENDPOINT  = 0
 DEV_TYPE_PCIe_BRIDGE    = 1
@@ -148,22 +148,62 @@ def parse_hex(val):
     except ValueError:
         return None
 
+def parse_pci_name_extended(pci_dev_str):
+    pci_match = re.match(r"((?P<domain>[0-9a-fA-F]{1,4})[:,])?" +
+                         r"(?P<bus>[0-9a-fA-F]{1,2})[:,]" +
+                         r"(?P<slot>[0-9a-fA-F]{1,2})[.,]" +
+                         r"(?P<func>(\*|[0-7]))" +
+                         r"(@(?P<vslot>[01]?[0-9a-fA-F]))?" +
+                         r"(,(?P<opts>.*))?$", pci_dev_str)
+
+    if pci_match == None:
+        raise PciDeviceParseError("Failed to parse pci device: %s" %
+                                  pci_dev_str)
+
+    out = {}
+    pci_dev_info = pci_match.groupdict('')
+    if pci_dev_info['domain'] == '':
+        domain = 0
+    else:
+        domain = int(pci_dev_info['domain'], 16)
+    out['domain'] = "0x%04x" % domain
+    out['bus']    = "0x%02x" % int(pci_dev_info['bus'], 16)
+    out['slot']   = "0x%02x" % int(pci_dev_info['slot'], 16)
+    out['func']   = "0x%x"   % int(pci_dev_info['func'], 16)
+    if pci_dev_info['vslot'] == '':
+        vslot = AUTO_PHP_SLOT
+    else:
+        vslot = int(pci_dev_info['vslot'], 16)
+    out['vslot'] = "0x%02x" % vslot
+    if pci_dev_info['opts'] != '':
+        out['opts'] = split_pci_opts(pci_dev_info['opts'])
+        check_pci_opts(out['opts'])
+
+    return out
+
 def parse_pci_name(pci_name_string):
-    pci_match = re.match(r"((?P<domain>[0-9a-fA-F]{1,4})[:,])?" + \
-            r"(?P<bus>[0-9a-fA-F]{1,2})[:,]" + \
-            r"(?P<slot>[0-9a-fA-F]{1,2})[.,]" + \
-            r"(?P<func>[0-7])$", pci_name_string)
-    if pci_match is None:
-        raise PciDeviceParseError(('Failed to parse pci device name: %s' %
-            pci_name_string))
-    pci_dev_info = pci_match.groupdict('0')
+    pci = parse_pci_name_extended(pci_name_string)
 
-    domain = parse_hex(pci_dev_info['domain'])
-    bus = parse_hex(pci_dev_info['bus'])
-    slot = parse_hex(pci_dev_info['slot'])
-    func = parse_hex(pci_dev_info['func'])
+    if int(pci['vslot'], 16) != AUTO_PHP_SLOT:
+        raise PciDeviceParseError(("Failed to parse pci device: %s: " +
+                                   "vslot provided where prohibited: %s") %
+                                  (pci_name_string, pci['vslot']))
+    if 'opts' in pci:
+        raise PciDeviceParseError(("Failed to parse pci device: %s: " +
+                                   "options provided where prohibited: %s") %
+                                  (pci_name_string, pci['opts']))
 
-    return (domain, bus, slot, func)
+    return pci
+
+def __pci_dict_to_fmt_str(fmt, dev):
+    return fmt % (int(dev['domain'], 16), int(dev['bus'], 16),
+                  int(dev['slot'], 16), int(dev['func'], 16))
+
+def pci_dict_to_bdf_str(dev):
+    return __pci_dict_to_fmt_str('%04x:%02x:%02x.%01x', dev)
+
+def pci_dict_to_xc_str(dev):
+    return __pci_dict_to_fmt_str('0x%x, 0x%x, 0x%x, 0x%x', dev)
 
 def extract_the_exact_pci_names(pci_names):
     result = []
@@ -198,27 +238,7 @@ def get_all_pci_names():
     return pci_names
 
 def get_all_pci_devices():
-    pci_devs = []
-    for pci_name in get_all_pci_names():
-        pci_match = re.match(r"((?P<domain>[0-9a-fA-F]{1,4})[:,])?" + \
-                r"(?P<bus>[0-9a-fA-F]{1,2})[:,]" + \
-                r"(?P<slot>[0-9a-fA-F]{1,2})[.,]" + \
-                r"(?P<func>[0-7])$", pci_name)
-        if pci_match is None:
-            raise PciDeviceParseError(('Failed to parse pci device name: %s' %
-                pci_name))
-        pci_dev_info = pci_match.groupdict('0')
-        domain = parse_hex(pci_dev_info['domain'])
-        bus = parse_hex(pci_dev_info['bus'])
-        slot = parse_hex(pci_dev_info['slot'])
-        func = parse_hex(pci_dev_info['func'])
-        try:
-            pci_dev = PciDevice(domain, bus, slot, func)
-        except:
-            continue
-        pci_devs.append(pci_dev)
-
-    return pci_devs
+    return map(PciDevice, map(parse_pci_name, get_all_pci_names()))
 
 def _create_lspci_info():
     """Execute 'lspci' command and parse the result.
@@ -241,7 +261,7 @@ def _create_lspci_info():
             try:
                 (opt, value) = line.split(':\t')
                 if opt == 'Slot' or (opt == 'Device' and first_device):
-                    device_name = PCI_DEV_FORMAT_STR % parse_pci_name(value)
+                    device_name = pci_dict_to_bdf_str(parse_pci_name(value))
                     first_device = False
                 else:
                     device_info[opt] = value
@@ -292,8 +312,7 @@ def find_all_devices_owned_by_pciback():
     pci_list = extract_the_exact_pci_names(pci_names)
     dev_list = []
     for pci in pci_list:
-        (dom, b, d, f) = parse_pci_name(pci)
-        dev = PciDevice(dom, b, d, f)
+        dev = PciDevice(parse_pci_name(pci))
         dev_list = dev_list + [dev]
     return dev_list
 
@@ -400,12 +419,12 @@ class PciDeviceVslotMissing(Exception):
         return 'pci: no vslot: ' + self.message
 
 class PciDevice:
-    def __init__(self, domain, bus, slot, func):
-        self.domain = domain
-        self.bus = bus
-        self.slot = slot
-        self.func = func
-        self.name = PCI_DEV_FORMAT_STR % (domain, bus, slot, func)
+    def __init__(self, dev):
+        self.domain = int(dev['domain'], 16)
+        self.bus = int(dev['bus'], 16)
+        self.slot = int(dev['slot'], 16)
+        self.func = int(dev['func'], 16)
+        self.name = pci_dict_to_bdf_str(dev)
         self.cfg_space_path = find_sysfs_mnt()+SYSFS_PCI_DEVS_PATH+'/'+ \
             self.name + SYSFS_PCI_DEV_CONFIG_PATH 
         self.irq = 0
@@ -447,14 +466,15 @@ class PciDevice:
                 # We have reached the upmost one.
                 return None
             else:
+                dev = {}
                 lst = parent.split(':')
-                dom = int(lst[0], 16)
-                bus = int(lst[1], 16)
+                dev['domain'] = int(lst[0], 16)
+                dev['bus'] = int(lst[1], 16)
                 lst = lst[2]
                 lst = lst.split('.')
-                dev =  int(lst[0], 16)
-                func =  int(lst[1], 16)
-            return (dom, bus, dev, func)
+                dev['slot'] = int(lst[0], 16)
+                dev['func'] = int(lst[1], 16)
+            return dev
         except OSError, (errno, strerr):
             raise PciDeviceParseError('Can not locate the parent of %s',
                 self.name)
@@ -464,15 +484,13 @@ class PciDevice:
         dev = self.find_parent()
         if dev is None:
             return None
-        (dom, b, d, f) = dev
-        dev = dev_parent = PciDevice(dom, b, d, f)
+        dev = dev_parent = PciDevice(dev)
         while dev_parent.dev_type != DEV_TYPE_PCIe_BRIDGE:
             parent = dev_parent.find_parent()
             if parent is None:
                 break
-            (dom, b, d, f) = parent
             dev = dev_parent
-            dev_parent = PciDevice(dom, b, d, f)
+            dev_parent = PciDevice(parent)
         return dev
 
     def find_all_devices_behind_the_bridge(self, ignore_bridge):
@@ -483,8 +501,7 @@ class PciDevice:
 
         list = [self.name]
         for pci_str in dev_list:
-            (dom, b, d, f) = parse_pci_name(pci_str)
-            dev = PciDevice(dom, b, d, f)
+            dev = PciDevice(parse_pci_name(pci_str))
             if dev.dev_type == DEV_TYPE_PCI_BRIDGE or \
                 dev.dev_type == DEV_TYPE_PCIe_BRIDGE:
                 sub_list_including_self = \
@@ -600,7 +617,7 @@ class PciDevice:
 
     def find_all_the_multi_functions(self):
         sysfs_mnt = find_sysfs_mnt()
-        parent = PCI_DEV_FORMAT_STR % self.find_parent()
+        parent = pci_dict_to_bdf_str(self.find_parent())
         pci_names = os.popen('ls ' + sysfs_mnt + SYSFS_PCI_DEVS_PATH + '/' + \
             parent + '/').read()
         funcs = extract_the_exact_pci_names(pci_names)
@@ -758,8 +775,7 @@ class PciDevice:
         if len(devs) == 0:
             return
         for pci_dev in devs:
-            (dom, b, d, f) = parse_pci_name(pci_dev)
-            dev = PciDevice(dom, b, d, f)
+            dev = PciDevice(parse_pci_name(pci_dev))
             if dev.driver == 'pciback':
                 continue
             err_msg = 'pci: %s must be co-assigned to the same guest with %s' + \
@@ -785,7 +801,7 @@ class PciDevice:
                     funcs = self.find_all_the_multi_functions()
                     self.devs_check_driver(funcs)
 
-                    parent = '%04x:%02x:%02x.%01x' % self.find_parent()
+                    parent = pci_dict_to_bdf_str(self.find_parent())
 
                     # Do Secondary Bus Reset.
                     self.do_secondary_bus_reset(parent, funcs)
