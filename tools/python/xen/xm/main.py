@@ -2489,36 +2489,16 @@ def parse_pci_configuration(args, state, opts = ''):
     dom = args[0]
     pci_dev_str = args[1]
     if len(args) == 3:
-        vslot = args[2]
-    else:
-        vslot = AUTO_PHP_SLOT_STR
-    pci=['pci']
-    pci_match = re.match(r"((?P<domain>[0-9a-fA-F]{1,4})[:,])?" + \
-            r"(?P<bus>[0-9a-fA-F]{1,2})[:,]" + \
-            r"(?P<slot>[0-9a-fA-F]{1,2})[.,]" + \
-            r"(?P<func>[0-7])$", pci_dev_str)
-    if pci_match == None:
-        raise OptionError("Invalid argument: %s %s" % (pci_dev_str, vslot))
-    pci_dev_info = pci_match.groupdict('0')
+        pci_dev_str += '@' + args[2]
+    if len(opts) > 0:
+        pci_dev_str += ',' + serialise_pci_opts(opts)
 
     try:
-        pci_bdf =['dev', ['domain', '0x'+ pci_dev_info['domain']], \
-                ['bus', '0x'+ pci_dev_info['bus']],
-                ['slot', '0x'+ pci_dev_info['slot']],
-                ['func', '0x'+ pci_dev_info['func']],
-                ['vslot', '0x%x' % int(vslot, 16)]]
-    except:
-        raise OptionError("Invalid argument: %s %s" % (pci_dev_str, vslot))
-
-    try:
-        check_pci_opts(opts)
+        pci_dev = parse_pci_name_extended(pci_dev_str)
     except PciDeviceParseError, ex:
         raise OptionError(str(ex))
 
-    pci.append(sxp.merge(pci_bdf, pci_opts_list_to_sxp(opts)))
-    pci.append(['state', state])
-
-    return (dom, pci)
+    return (dom, pci_convert_dict_to_sxp(pci_dev, state))
 
 def xm_pci_attach(args):
     config_pci_opts = []
