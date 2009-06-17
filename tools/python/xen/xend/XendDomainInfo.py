@@ -40,7 +40,9 @@ from xen.util.blkif import blkdev_uname_to_file, blkdev_uname_to_taptype
 import xen.util.xsm.xsm as security
 from xen.util import xsconstants
 from xen.util.pci import serialise_pci_opts, pci_opts_list_to_sxp, \
-                         pci_dict_to_bdf_str, pci_dict_to_xc_str, pci_dict_cmp
+                         pci_dict_to_bdf_str, pci_dict_to_xc_str, \
+                         pci_convert_sxp_to_dict, pci_convert_dict_to_sxp, \
+                         pci_dict_cmp
 
 from xen.xend import balloon, sxp, uuid, image, arch
 from xen.xend import XendOptions, XendNode, XendConfig
@@ -616,8 +618,8 @@ class XendDomainInfo:
         pci_conf = self.info['devices'][dev_uuid][1]
         pci_devs = pci_conf['devs']
         request = map(lambda x:
-                      self.info.pci_convert_dict_to_sxp(x, 'Initialising',
-                                                        'Booting'), pci_devs)
+                      pci_convert_dict_to_sxp(x, 'Initialising', 'Booting'),
+                      pci_devs)
 
         for i in request:
                 self.pci_device_configure(i)
@@ -815,7 +817,7 @@ class XendDomainInfo:
             raise XendError("Cannot detach when pci platform does not exist")
 
         pci_dev = sxp.children(dev_sxp, 'dev')[0]
-        dev_config = self.info.pci_convert_sxp_to_dict(dev_sxp)
+        dev_config = pci_convert_sxp_to_dict(dev_sxp)
         dev = dev_config['devs'][0]
                 
         # Do HVM specific processing

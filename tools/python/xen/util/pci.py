@@ -14,8 +14,10 @@ import struct
 import time
 import threading
 from xen.util import utils
+from xen.xend import uuid
 from xen.xend import sxp
 from xen.xend.XendConstants import AUTO_PHP_SLOT
+from xen.xend.XendSXPDev import dev_dict_to_sxp
 
 PROC_PCI_PATH = '/proc/bus/pci/devices'
 PROC_PCI_NUM_RESOURCES = 7
@@ -138,6 +140,79 @@ def pci_opts_list_to_sxp(list):
 
 def pci_opts_list_from_sxp(dev):
     return map(lambda x: sxp.children(x)[0], sxp.children(dev, 'opts'))
+
+def pci_convert_dict_to_sxp(dev, state, sub_state = None):
+    pci_sxp = ['pci', dev_dict_to_sxp(dev), ['state', state]]
+    if sub_state != None:
+        pci_sxp.append(['sub_state', sub_state])
+    return pci_sxp
+
+def pci_convert_sxp_to_dict(dev_sxp):
+    """Convert pci device sxp to dict
+    @param dev_sxp: device configuration
+    @type  dev_sxp: SXP object (parsed config)
+    @return: dev_config
+    @rtype: dictionary
+    """
+    # Parsing the device SXP's. In most cases, the SXP looks
+    # like this:
+    #
+    # [device, [vif, [mac, xx:xx:xx:xx:xx:xx], [ip 1.3.4.5]]]
+    #
+    # However, for PCI devices it looks like this:
+    #
+    # [device, [pci, [dev, [domain, 0], [bus, 0], [slot, 1], [func, 2]]]
+    #
+    # It seems the reasoning for this difference is because
+    # pciif.py needs all the PCI device configurations at
+    # the same time when creating the devices.
+    #
+    # To further complicate matters, Xen 2.0 configuration format
+    # uses the following for pci device configuration:
+    #
+    # [device, [pci, [domain, 0], [bus, 0], [dev, 1], [func, 2]]]
+
+    # For PCI device hotplug support, the SXP of PCI devices is
+    # extendend like this:
+    #
+    # [device, [pci, [dev, [domain, 0], [bus, 0], [slot, 1], [func, 2],
+    #                      [vslot, 0]],
+    #                [state, 'Initialising']]]
+    #
+    # 'vslot' shows the virtual hotplug slot number which the PCI device
+    # is inserted in. This is only effective for HVM domains.
+    #
+    # state 'Initialising' indicates that the device is being attached,
+    # while state 'Closing' indicates that the device is being detached.
+    #
+    # The Dict looks like this:
+    #
+    # { devs: [{domain: 0, bus: 0, slot: 1, func: 2, vslot: 0}],
+    #   states: ['Initialising'] }
+
+    dev_config = {}
+
+    pci_devs = []
+    for pci_dev in sxp.children(dev_sxp, 'dev'):
+        pci_dev_info = dict(pci_dev[1:])
+        if 'opts' in pci_dev_info:
+            pci_dev_info['opts'] = pci_opts_list_from_sxp(pci_dev)
+        # append uuid to each pci device that does't already have one.
+        if not pci_dev_info.has_key('uuid'):
+            dpci_uuid = pci_dev_info.get('uuid', uuid.createString())
+            pci_dev_info['uuid'] = dpci_uuid
+        pci_devs.append(pci_dev_info)
+    dev_config['devs'] = pci_devs
+
+    pci_states = []
+    for pci_state in sxp.children(dev_sxp, 'state'):
+        try:
+            pci_states.append(pci_state[1])
+        except IndexError:
+            raise XendError("Error reading state while parsing pci sxp")
+    dev_config['states'] = pci_states
+
+    return dev_config
 
 def parse_hex(val):
     try:
