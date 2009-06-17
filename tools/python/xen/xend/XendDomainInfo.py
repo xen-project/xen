@@ -40,7 +40,7 @@ from xen.util.blkif import blkdev_uname_to_file, blkdev_uname_to_taptype
 import xen.util.xsm.xsm as security
 from xen.util import xsconstants
 from xen.util.pci import serialise_pci_opts, pci_opts_list_to_sxp, \
-                         pci_dict_to_bdf_str, pci_dict_to_xc_str
+                         pci_dict_to_bdf_str, pci_dict_to_xc_str, pci_dict_cmp
 
 from xen.xend import balloon, sxp, uuid, image, arch
 from xen.xend import XendOptions, XendNode, XendConfig
@@ -645,10 +645,7 @@ class XendDomainInfo:
                    int(x['vslot'], 16) != AUTO_PHP_SLOT):
                     raise VmError("vslot %s already have a device." % (new_dev['vslot']))
 
-                if (int(x['domain'], 16) == int(new_dev['domain'], 16) and
-                   int(x['bus'], 16)    == int(new_dev['bus'], 16) and
-                   int(x['slot'], 16)   == int(new_dev['slot'], 16) and
-                   int(x['func'], 16)   == int(new_dev['func'], 16) ):
+                if (pci_dict_cmp(x, new_dev)):
                     raise VmError("device is already inserted")
 
         # Test whether the devices can be assigned with VT-d
@@ -839,23 +836,18 @@ class XendDomainInfo:
                 existing_dev_uuid = sxp.child_value(existing_dev_info, 'uuid')
                 existing_pci_conf = self.info['devices'][existing_dev_uuid][1]
                 existing_pci_devs = existing_pci_conf['devs']
-                vslot = ""
-                for x in existing_pci_devs:
-                    if ( int(x['domain'], 16) == int(dev['domain'], 16) and
-                         int(x['bus'], 16) == int(dev['bus'], 16) and
-                         int(x['slot'], 16) == int(dev['slot'], 16) and
-                         int(x['func'], 16) == int(dev['func'], 16) ):
-                        vslot = x['vslot']
-                        break
-                if vslot == "":
+                new_devs = filter(lambda x: pci_dict_cmp(x, dev),
+                                  existing_pci_devs)
+                if len(new_devs) < 0:
                     raise VmError("Device %s is not connected" %
                                   pci_dict_to_bdf_str(dev))
-                self.hvm_destroyPCIDevice(int(vslot, 16))
+                new_dev = new_devs[0]
+                self.hvm_destroyPCIDevice(int(new_dev['vslot'], 16))
                 # Update vslot
-                dev['vslot'] = vslot
+                dev['vslot'] = new_dev['vslot']
                 for n in sxp.children(pci_dev):
                     if(n[0] == 'vslot'):
-                        n[1] = vslot
+                        n[1] = new_dev['vslot']
 
         # If pci platform does not exist, create and exit.
         if existing_dev_info is None:

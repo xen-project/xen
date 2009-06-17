@@ -205,6 +205,10 @@ def pci_dict_to_bdf_str(dev):
 def pci_dict_to_xc_str(dev):
     return __pci_dict_to_fmt_str('0x%x, 0x%x, 0x%x, 0x%x', dev)
 
+def pci_dict_cmp(a, b, keys=['domain', 'bus', 'slot', 'func']):
+    return reduce(lambda x, y: x and y,
+                  map(lambda k: int(a[k], 16) == int(b[k], 16), keys))
+
 def extract_the_exact_pci_names(pci_names):
     result = []
 
