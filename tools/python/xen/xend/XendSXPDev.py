@@ -4,7 +4,6 @@
 
 import types
 
-# This includes a generic equivalent of pci_opts_list_to_sxp()
 def dev_dict_to_sxp(dev):
     def f((key, val)):
         if isinstance(val, types.ListType):

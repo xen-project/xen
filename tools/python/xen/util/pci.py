@@ -136,7 +136,7 @@ def split_pci_opts(opts):
                filter(lambda x: x != '', opts.split(',')))
 
 def pci_opts_list_to_sxp(list):
-    return ['dev'] + map(lambda x: ['opts', x], list)
+    return dev_dict_to_sxp({'opts': list})
 
 def pci_opts_list_from_sxp(dev):
     return map(lambda x: sxp.children(x)[0], sxp.children(dev, 'opts'))
