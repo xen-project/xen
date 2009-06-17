@@ -75,14 +75,14 @@ struct tmem_op {
         struct {  /* for cmd == TMEM_NEW_POOL */
             uint64_t uuid[2];
             uint32_t flags;
-        };
+        } new;
         struct {  /* for cmd == TMEM_CONTROL */
             uint32_t subop;
             uint32_t cli_id;
             uint32_t arg1;
             uint32_t arg2;
             tmem_cli_va_t buf;
-        };
+        } ctrl;
         struct {
             uint64_t object;
             uint32_t index;
@@ -90,8 +90,8 @@ struct tmem_op {
             uint32_t pfn_offset;
             uint32_t len;
             tmem_cli_mfn_t cmfn; /* client machine page frame */
-        };
-    };
+        } gen;
+    } u;
 };
 typedef struct tmem_op tmem_op_t;
 DEFINE_XEN_GUEST_HANDLE(tmem_op_t);

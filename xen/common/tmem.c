@@ -1842,7 +1842,8 @@ EXPORT long do_tmem_op(tmem_cli_op_t uops)
     {
         tmem_write_lock(&tmem_rwlock);
         tmem_write_lock_set = 1;
-        rc = do_tmem_control(op.subop, op.cli_id, op.arg1, op.arg2, op.buf);
+        rc = do_tmem_control(op.u.ctrl.subop, op.u.ctrl.cli_id,
+                             op.u.ctrl.arg1, op.u.ctrl.arg2, op.u.ctrl.buf);
         goto out;
     }
 
@@ -1887,27 +1888,31 @@ EXPORT long do_tmem_op(tmem_cli_op_t uops)
     switch ( op.cmd )
     {
     case TMEM_NEW_POOL:
-        rc = do_tmem_new_pool(op.flags,op.uuid[0],op.uuid[1]);
+        rc = do_tmem_new_pool(op.u.new.flags,
+                              op.u.new.uuid[0], op.u.new.uuid[1]);
         break;
     case TMEM_NEW_PAGE:
-        rc = do_tmem_put(pool, op.object, op.index, op.cmfn, 0, 0, 0);
+        rc = do_tmem_put(pool, op.u.gen.object, op.u.gen.index, op.u.gen.cmfn,
+                         0, 0, 0);
         break;
     case TMEM_PUT_PAGE:
-        rc = do_tmem_put(pool, op.object, op.index, op.cmfn, 0, 0, PAGE_SIZE);
+        rc = do_tmem_put(pool, op.u.gen.object, op.u.gen.index, op.u.gen.cmfn,
+                         0, 0, PAGE_SIZE);
         if (rc == 1) succ_put = 1;
         else non_succ_put = 1;
         break;
     case TMEM_GET_PAGE:
-        rc = do_tmem_get(pool, op.object, op.index, op.cmfn, 0, 0, PAGE_SIZE);
+        rc = do_tmem_get(pool, op.u.gen.object, op.u.gen.index, op.u.gen.cmfn,
+                         0, 0, PAGE_SIZE);
         if (rc == 1) succ_get = 1;
         else non_succ_get = 1;
         break;
     case TMEM_FLUSH_PAGE:
         flush = 1;
-        rc = do_tmem_flush_page(pool, op.object, op.index);
+        rc = do_tmem_flush_page(pool, op.u.gen.object, op.u.gen.index);
         break;
     case TMEM_FLUSH_OBJECT:
-        rc = do_tmem_flush_object(pool, op.object);
+        rc = do_tmem_flush_object(pool, op.u.gen.object);
         flush_obj = 1;
         break;
     case TMEM_DESTROY_POOL:
@@ -1915,12 +1920,14 @@ EXPORT long do_tmem_op(tmem_cli_op_t uops)
         rc = do_tmem_destroy_pool(op.pool_id);
         break;
     case TMEM_READ:
-        rc = do_tmem_get(pool, op.object, op.index, op.cmfn,
-                         op.tmem_offset, op.pfn_offset, op.len);
+        rc = do_tmem_get(pool, op.u.gen.object, op.u.gen.index, op.u.gen.cmfn,
+                         op.u.gen.tmem_offset, op.u.gen.pfn_offset,
+                         op.u.gen.len);
         break;
     case TMEM_WRITE:
-        rc = do_tmem_put(pool, op.object, op.index, op.cmfn,
-                         op.tmem_offset, op.pfn_offset, op.len);
+        rc = do_tmem_put(pool, op.u.gen.object, op.u.gen.index, op.u.gen.cmfn,
+                         op.u.gen.tmem_offset, op.u.gen.pfn_offset,
+                         op.u.gen.len);
         break;
     case TMEM_XCHG:
         /* need to hold global lock to ensure xchg is atomic */

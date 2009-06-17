@@ -43,11 +43,11 @@ int xc_tmem_control(int xc,
 
     op.cmd = TMEM_CONTROL;
     op.pool_id = pool_id;
-    op.subop = subop;
-    op.cli_id = cli_id;
-    op.arg1 = arg1;
-    op.arg2 = arg2;
-    op.buf.p = buf;
+    op.u.ctrl.subop = subop;
+    op.u.ctrl.cli_id = cli_id;
+    op.u.ctrl.arg1 = arg1;
+    op.u.ctrl.arg2 = arg2;
+    op.u.ctrl.buf.p = buf;
 
     if (subop == TMEMC_LIST) {
         if ((arg1 != 0) && (lock_pages(buf, arg1) != 0))

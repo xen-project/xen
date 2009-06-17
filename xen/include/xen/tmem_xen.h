@@ -16,6 +16,9 @@
 #include <xen/guest_access.h> /* copy_from_guest */
 #include <xen/hash.h> /* hash_long */
 #include <public/tmem.h>
+#ifdef CONFIG_COMPAT
+#include <compat/tmem.h>
+#endif
 
 struct tmem_host_dependent_client {
     struct domain *domain;
@@ -286,6 +289,29 @@ typedef XEN_GUEST_HANDLE(tmem_op_t) tmem_cli_op_t;
 
 static inline int tmh_get_tmemop_from_client(tmem_op_t *op, tmem_cli_op_t uops)
 {
+#ifdef CONFIG_COMPAT
+    if ( is_pv_32on64_vcpu(current) )
+    {
+        int rc;
+        enum XLAT_tmem_op_u u;
+        tmem_op_compat_t cop;
+
+        rc = copy_from_guest(&cop, guest_handle_cast(uops, void), 1);
+        if ( rc )
+            return rc;
+        switch ( cop.cmd )
+        {
+        case TMEM_NEW_POOL: u = XLAT_tmem_op_u_new;  break;
+        case TMEM_CONTROL:  u = XLAT_tmem_op_u_ctrl; break;
+        default:            u = XLAT_tmem_op_u_gen;  break;
+        }
+#define XLAT_tmem_op_HNDL_u_ctrl_buf(_d_, _s_) \
+        guest_from_compat_handle((_d_)->u.ctrl.buf, (_s_)->u.ctrl.buf)
+        XLAT_tmem_op(op, &cop);
+#undef XLAT_tmem_op_HNDL_u_ctrl_buf
+        return 0;
+    }
+#endif
     return copy_from_guest(op, uops, 1);
 }
 

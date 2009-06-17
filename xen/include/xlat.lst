@@ -57,6 +57,7 @@
 !	sched_poll			sched.h
 ?	sched_remote_shutdown		sched.h
 ?	sched_shutdown			sched.h
+!	tmem_op				tmem.h
 ?	t_buf				trace.h
 ?	vcpu_get_physid			vcpu.h
 ?	vcpu_register_vcpu_info		vcpu.h
@@ -74,6 +75,3 @@
 ?	processor_px			platform.h
 !	psd_package			platform.h
 !	processor_performance		platform.h
-# ?	tmem_op_t			tmem.h
-# ?	tmem_cli_mfn_t			tmem.h
-# ?	tmem_cli_va_t			tmem.h

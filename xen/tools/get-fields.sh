@@ -34,6 +34,34 @@ get_fields ()
 	done
 }
 
+get_typedefs ()
+{
+	local level=1 state=
+	for token in $1
+	do
+		case "$token" in
+		typedef)
+			test $level != 1 || state=1
+			;;
+		COMPAT_HANDLE\(*\))
+			test $level != 1 -o "$state" != 1 || state=2
+			;;
+		[\{\[])
+			level=$(expr $level + 1)
+			;;
+		[\}\]])
+			level=$(expr $level - 1)
+			;;
+		";")
+			test $level != 1 || state=
+			;;
+		[a-zA-Z_]*)
+			test $level != 1 -o "$state" != 2 || echo "$token"
+			;;
+		esac
+	done
+}
+
 build_enums ()
 {
 	local level=1 kind= fields= members= named= id= token
@@ -166,7 +194,21 @@ for line in sys.stdin.readlines():
 				fi
 				;;
 			[a-zA-Z]*)
-				id=$token
+				if [ -z "$id" -a -z "$type" -a -z "$array_type" ]
+				then
+					for id in $typedefs
+					do
+						test $id != "$token" || type=$id
+					done
+					if [ -z "$type" ]
+					then
+						id=$token
+					else
+						id=
+					fi
+				else
+					id=$token
+				fi
 				;;
 			[\,\;])
 				if [ $level = 2 -a -n "$(echo $id | $SED 's,^_pad[[:digit:]]*,,')" ]
@@ -281,6 +323,18 @@ build_body ()
 			if [ -n "$array" ]
 			then
 				array="$array $token"
+			elif [ -z "$id" -a -z "$type" -a -z "$array_type" ]
+			then
+				for id in $typedefs
+				do
+					test $id != "$token" || type=$id
+				done
+				if [ -z "$type" ]
+				then
+					id=$token
+				else
+					id=
+				fi
 			else
 				id=$token
 			fi
@@ -419,7 +473,8 @@ build_check ()
 	echo ""
 }
 
-fields="$(get_fields $(echo $2 | $SED 's,^compat_xen,compat_,') "$($SED -e 's,^[[:space:]]#.*,,' -e 's!\([]\[,;:{}]\)! \1 !g' $3)")"
+list="$($SED -e 's,^[[:space:]]#.*,,' -e 's!\([]\[,;:{}]\)! \1 !g' $3)"
+fields="$(get_fields $(echo $2 | $SED 's,^compat_xen,compat_,') "$list")"
 if [ -z "$fields" ]
 then
 	echo "Fields of '$2' not found in '$3'" >&2
@@ -429,6 +484,7 @@ name=${2#compat_}
 name=${name#xen}
 case "$1" in
 "!")
+	typedefs="$(get_typedefs "$list")"
 	build_enums $name "$fields"
 	build_body $name "$fields"
 	;;
