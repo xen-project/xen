@@ -60,6 +60,7 @@ struct xsd_errors
     int errnum;
     const char *errstring;
 };
+#ifdef EINVAL
 #define XSD_ERROR(x) { x, #x }
 /* LINTED: static unused */
 static struct xsd_errors xsd_errors[]
@@ -82,6 +83,7 @@ __attribute__((unused))
     XSD_ERROR(EAGAIN),
     XSD_ERROR(EISCONN)
 };
+#endif
 
 struct xsd_sockmsg
 {

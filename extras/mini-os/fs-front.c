@@ -218,7 +218,7 @@ int fs_open(struct fs_import *import, char *file)
     schedule();
     
     /* Read the response */
-    fd = (int)fsr->shadow_rsp.ret_val;
+    fd = (int)fsr->shadow_rsp.u.ret_val;
     DEBUG("The following FD returned: %d\n", fd);
     free_buffer_page(fsr);
     add_id_to_freelist(priv_req_id, import->freelist);
@@ -256,7 +256,7 @@ int fs_close(struct fs_import *import, int fd)
     schedule();
     
     /* Read the response */
-    ret = (int)fsr->shadow_rsp.ret_val;
+    ret = (int)fsr->shadow_rsp.u.ret_val;
     DEBUG("Close returned: %d\n", ret);
     add_id_to_freelist(priv_req_id, import->freelist);
 
@@ -313,7 +313,7 @@ ssize_t fs_read(struct fs_import *import, int fd, void *buf,
     schedule();
     
     /* Read the response */
-    ret = (ssize_t)fsr->shadow_rsp.ret_val;
+    ret = (ssize_t)fsr->shadow_rsp.u.ret_val;
     DEBUG("The following ret value returned %d\n", ret);
     if(ret > 0)
     {
@@ -391,7 +391,7 @@ ssize_t fs_write(struct fs_import *import, int fd, void *buf,
     schedule();
     
     /* Read the response */
-    ret = (ssize_t)fsr->shadow_rsp.ret_val;
+    ret = (ssize_t)fsr->shadow_rsp.u.ret_val;
     DEBUG("The following ret value returned %d\n", ret);
     for(i=0; i<gnts.count; i++)
     {
@@ -435,10 +435,10 @@ int fs_stat(struct fs_import *import,
     schedule();
     
     /* Read the response */
-    ret = (int)fsr->shadow_rsp.ret_val;
+    ret = (int)fsr->shadow_rsp.u.ret_val;
     DEBUG("Following ret from fstat: %d\n", ret);
     memcpy(stat, 
-           &fsr->shadow_rsp.fstat, 
+           &fsr->shadow_rsp.u.fstat, 
            sizeof(struct fsif_stat_response));
     add_id_to_freelist(priv_req_id, import->freelist);
 
@@ -478,7 +478,7 @@ int fs_truncate(struct fs_import *import,
     schedule();
     
     /* Read the response */
-    ret = (int)fsr->shadow_rsp.ret_val;
+    ret = (int)fsr->shadow_rsp.u.ret_val;
     DEBUG("Following ret from ftruncate: %d\n", ret);
     add_id_to_freelist(priv_req_id, import->freelist);
 
@@ -520,7 +520,7 @@ int fs_remove(struct fs_import *import, char *file)
     schedule();
     
     /* Read the response */
-    ret = (int)fsr->shadow_rsp.ret_val;
+    ret = (int)fsr->shadow_rsp.u.ret_val;
     DEBUG("The following ret: %d\n", ret);
     free_buffer_page(fsr);
     add_id_to_freelist(priv_req_id, import->freelist);
@@ -575,7 +575,7 @@ int fs_rename(struct fs_import *import,
     schedule();
     
     /* Read the response */
-    ret = (int)fsr->shadow_rsp.ret_val;
+    ret = (int)fsr->shadow_rsp.u.ret_val;
     DEBUG("The following ret: %d\n", ret);
     free_buffer_page(fsr);
     add_id_to_freelist(priv_req_id, import->freelist);
@@ -621,7 +621,7 @@ int fs_create(struct fs_import *import, char *name,
     schedule();
     
     /* Read the response */
-    ret = (int)fsr->shadow_rsp.ret_val;
+    ret = (int)fsr->shadow_rsp.u.ret_val;
     DEBUG("The following ret: %d\n", ret);
     free_buffer_page(fsr);
     add_id_to_freelist(priv_req_id, import->freelist);
@@ -670,7 +670,7 @@ char** fs_list(struct fs_import *import, char *name,
     schedule();
     
     /* Read the response */
-    *nr_files = (fsr->shadow_rsp.ret_val & NR_FILES_MASK) >> NR_FILES_SHIFT;
+    *nr_files = (fsr->shadow_rsp.u.ret_val & NR_FILES_MASK) >> NR_FILES_SHIFT;
     files = NULL;
     if(*nr_files <= 0) goto exit;
     files = malloc(sizeof(char*) * (*nr_files));
@@ -681,7 +681,7 @@ char** fs_list(struct fs_import *import, char *name,
         current_file += strlen(current_file) + 1;
     }
     if(has_more != NULL)
-        *has_more = fsr->shadow_rsp.ret_val & HAS_MORE_FLAG;
+        *has_more = fsr->shadow_rsp.u.ret_val & HAS_MORE_FLAG;
     free_buffer_page(fsr);
     add_id_to_freelist(priv_req_id, import->freelist);
 exit:
@@ -719,7 +719,7 @@ int fs_chmod(struct fs_import *import, int fd, int32_t mode)
     schedule();
     
     /* Read the response */
-    ret = (int)fsr->shadow_rsp.ret_val;
+    ret = (int)fsr->shadow_rsp.u.ret_val;
     DEBUG("The following returned: %d\n", ret);
     add_id_to_freelist(priv_req_id, import->freelist);
 
@@ -761,7 +761,7 @@ int64_t fs_space(struct fs_import *import, char *location)
     schedule();
     
     /* Read the response */
-    ret = (int64_t)fsr->shadow_rsp.ret_val;
+    ret = (int64_t)fsr->shadow_rsp.u.ret_val;
     DEBUG("The following returned: %lld\n", ret);
     free_buffer_page(fsr);
     add_id_to_freelist(priv_req_id, import->freelist);
@@ -799,7 +799,7 @@ int fs_sync(struct fs_import *import, int fd)
     schedule();
     
     /* Read the response */
-    ret = (int)fsr->shadow_rsp.ret_val;
+    ret = (int)fsr->shadow_rsp.u.ret_val;
     DEBUG("Close returned: %d\n", ret);
     add_id_to_freelist(priv_req_id, import->freelist);
 
@@ -852,7 +852,7 @@ moretodo:
 
         rsp = RING_GET_RESPONSE(&import->ring, cons); 
         DEBUG("Response at idx=%d to request id=%d, ret_val=%lx\n", 
-            cons, rsp->id, rsp->ret_val);
+            cons, rsp->id, rsp->u.ret_val);
         req = &import->requests[rsp->id];
         memcpy(&req->shadow_rsp, rsp, sizeof(struct fsif_response));
         DEBUG("Waking up: %s\n", req->thread->name);

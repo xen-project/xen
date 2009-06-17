@@ -27,6 +27,8 @@
 #ifndef __XEN_PUBLIC_VCPU_H__
 #define __XEN_PUBLIC_VCPU_H__
 
+#include "xen.h"
+
 /*
  * Prototype for this hypercall is:
  *  int vcpu_op(int cmd, int vcpuid, void *extra_args)

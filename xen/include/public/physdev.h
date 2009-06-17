@@ -21,6 +21,8 @@
 #ifndef __XEN_PUBLIC_PHYSDEV_H__
 #define __XEN_PUBLIC_PHYSDEV_H__
 
+#include "xen.h"
+
 /*
  * Prototype for this hypercall is:
  *  int physdev_op(int cmd, void *args)

@@ -27,6 +27,8 @@
 #ifndef __XEN_PUBLIC_EVENT_CHANNEL_H__
 #define __XEN_PUBLIC_EVENT_CHANNEL_H__
 
+#include "xen.h"
+
 /*
  * Prototype for this hypercall is:
  *  int event_channel_op(int cmd, void *args)

@@ -169,7 +169,7 @@ struct fsif_response {
     union {
         uint64_t ret_val;
         struct fsif_stat_response fstat;
-    };
+    } u;
 };
 
 typedef struct fsif_response fsif_response_t;

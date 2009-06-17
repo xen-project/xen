@@ -359,7 +359,7 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
                 ret = -ENOSYS;
                 break;
             }
-            ret = set_px_pminfo(op->u.set_pminfo.id, &op->u.set_pminfo.perf);
+            ret = set_px_pminfo(op->u.set_pminfo.id, &op->u.set_pminfo.u.perf);
             break;
  
         case XEN_PM_CX:
@@ -368,7 +368,7 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
                 ret = -ENOSYS;
                 break;
             }
-            ret = set_cx_pminfo(op->u.set_pminfo.id, &op->u.set_pminfo.power);
+            ret = set_cx_pminfo(op->u.set_pminfo.id, &op->u.set_pminfo.u.power);
             break;
 
         case XEN_PM_TX:

@@ -1,3 +1,6 @@
+XEN_ROOT:=$(BASEDIR)/..
+include $(XEN_ROOT)/Config.mk
+
 ifneq ($(CONFIG_COMPAT),)
 
 compat-arch-$(CONFIG_X86) := x86_32
@@ -35,6 +38,9 @@ suffix-$(CONFIG_X86)      := \#pragma pack()
 
 endif
 
+public-$(CONFIG_X86) := $(wildcard public/arch-x86/*.h public/arch-x86/*/*.h)
+public-$(CONFIG_IA64) := $(wildcard public/arch-ia64/*.h public/arch-ia64/*/*.h)
+
 .PHONY: all
 all: $(headers-y)
 
@@ -66,6 +72,19 @@ compat/xlat.h: xlat.lst $(filter-out compat/xlat.h,$(headers-y)) $(BASEDIR)/tool
 		$(SHELL) $(BASEDIR)/tools/get-fields.sh "$$what" compat_$$name $$(echo compat/$$hdr | sed 's,@arch@,$(compat-arch-y),g') || exit $$?; \
 	done >$@.new
 	mv -f $@.new $@
+
+ifeq ($(XEN_TARGET_ARCH),$(XEN_COMPILE_ARCH))
+# public/arch-ia64.h explicitly bails on __STRICT_ANSI__
+ifeq ($(CONFIG_IA64),)
+
+all: headers.chk
+
+headers.chk: $(filter-out public/arch-% public/%ctl.h public/xsm/% public/%hvm/save.h, $(wildcard public/*.h public/*/*.h) $(public-y)) Makefile
+	for i in $(filter %.h,$^); do $(CC) -ansi -include stdint.h -Wall -W -Werror -S -o /dev/null -xc $$i || exit 1; echo $$i; done >$@.new
+	mv $@.new $@
+
+endif
+endif
 
 clean::
 	rm -rf compat

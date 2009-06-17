@@ -21,6 +21,8 @@
 #ifndef __XEN_PUBLIC_HVM_HVM_OP_H__
 #define __XEN_PUBLIC_HVM_HVM_OP_H__
 
+#include "../xen.h"
+
 /* Get/set subcommands: extra argument == pointer to xen_hvm_param struct. */
 #define HVMOP_set_param           0
 #define HVMOP_get_param           1

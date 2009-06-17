@@ -27,6 +27,8 @@
 #ifndef __XEN_PUBLIC_MEMORY_H__
 #define __XEN_PUBLIC_MEMORY_H__
 
+#include "xen.h"
+
 /*
  * Increase or decrease the specified domain's memory reservation. Returns the
  * number of extents successfully allocated or freed.

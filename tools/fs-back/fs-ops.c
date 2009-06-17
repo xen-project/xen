@@ -89,7 +89,7 @@ static void dispatch_file_open(struct fs_mount *mount, struct fsif_request *req)
     FS_DEBUG("Writing response at: idx=%d, id=%d\n", rsp_idx, req_id);
     rsp = RING_GET_RESPONSE(&mount->ring, rsp_idx);
     rsp->id = req_id; 
-    rsp->ret_val = (uint64_t)fd;
+    rsp->u.ret_val = (uint64_t)fd;
 }
 
 static void dispatch_file_close(struct fs_mount *mount, struct fsif_request *req)
@@ -119,7 +119,7 @@ static void dispatch_file_close(struct fs_mount *mount, struct fsif_request *req
     FS_DEBUG("Writing response at: idx=%d, id=%d\n", rsp_idx, req_id);
     rsp = RING_GET_RESPONSE(&mount->ring, rsp_idx);
     rsp->id = req_id; 
-    rsp->ret_val = (uint64_t)ret;
+    rsp->u.ret_val = (uint64_t)ret;
 }
 
 #define MAX_GNTS 16
@@ -190,7 +190,7 @@ static void end_file_read(struct fs_mount *mount, struct fs_request *priv_req)
     FS_DEBUG("Writing response at: idx=%d, id=%d\n", rsp_idx, req_id);
     rsp = RING_GET_RESPONSE(&mount->ring, rsp_idx);
     rsp->id = req_id; 
-    rsp->ret_val = (uint64_t)aio_return(&priv_req->aiocb);
+    rsp->u.ret_val = (uint64_t)aio_return(&priv_req->aiocb);
 }
 
 static void dispatch_file_write(struct fs_mount *mount, struct fsif_request *req)
@@ -261,7 +261,7 @@ static void end_file_write(struct fs_mount *mount, struct fs_request *priv_req)
     FS_DEBUG("Writing response at: idx=%d, id=%d\n", rsp_idx, req_id);
     rsp = RING_GET_RESPONSE(&mount->ring, rsp_idx);
     rsp->id = req_id; 
-    rsp->ret_val = (uint64_t)aio_return(&priv_req->aiocb);
+    rsp->u.ret_val = (uint64_t)aio_return(&priv_req->aiocb);
 }
 
 static void dispatch_stat(struct fs_mount *mount, struct fsif_request *req)
@@ -294,24 +294,24 @@ static void dispatch_stat(struct fs_mount *mount, struct fsif_request *req)
     FS_DEBUG("Writing response at: idx=%d, id=%d\n", rsp_idx, req_id);
     rsp = RING_GET_RESPONSE(&mount->ring, rsp_idx);
     rsp->id = req_id; 
-    rsp->fstat.stat_ret = (uint32_t)ret;
-    rsp->fstat.stat_mode  = stat.st_mode;
-    rsp->fstat.stat_uid   = stat.st_uid;
-    rsp->fstat.stat_gid   = stat.st_gid;
+    rsp->u.fstat.stat_ret = (uint32_t)ret;
+    rsp->u.fstat.stat_mode  = stat.st_mode;
+    rsp->u.fstat.stat_uid   = stat.st_uid;
+    rsp->u.fstat.stat_gid   = stat.st_gid;
 #ifdef BLKGETSIZE
     if (S_ISBLK(stat.st_mode)) {
 	unsigned long sectors;
 	if (ioctl(fd, BLKGETSIZE, &sectors)) {
 	    perror("getting device size\n");
-	    rsp->fstat.stat_size = 0;
+	    rsp->u.fstat.stat_size = 0;
 	} else
-	    rsp->fstat.stat_size = sectors << 9;
+	    rsp->u.fstat.stat_size = sectors << 9;
     } else
 #endif
-	rsp->fstat.stat_size  = stat.st_size;
-    rsp->fstat.stat_atime = stat.st_atime;
-    rsp->fstat.stat_mtime = stat.st_mtime;
-    rsp->fstat.stat_ctime = stat.st_ctime;
+	rsp->u.fstat.stat_size  = stat.st_size;
+    rsp->u.fstat.stat_atime = stat.st_atime;
+    rsp->u.fstat.stat_mtime = stat.st_mtime;
+    rsp->u.fstat.stat_ctime = stat.st_ctime;
 }
 
 
@@ -344,7 +344,7 @@ static void dispatch_truncate(struct fs_mount *mount, struct fsif_request *req)
     FS_DEBUG("Writing response at: idx=%d, id=%d\n", rsp_idx, req_id);
     rsp = RING_GET_RESPONSE(&mount->ring, rsp_idx);
     rsp->id = req_id; 
-    rsp->ret_val = (uint64_t)ret;
+    rsp->u.ret_val = (uint64_t)ret;
 }
 
 static void dispatch_remove(struct fs_mount *mount, struct fsif_request *req)
@@ -382,7 +382,7 @@ static void dispatch_remove(struct fs_mount *mount, struct fsif_request *req)
     FS_DEBUG("Writing response at: idx=%d, id=%d\n", rsp_idx, req_id);
     rsp = RING_GET_RESPONSE(&mount->ring, rsp_idx);
     rsp->id = req_id; 
-    rsp->ret_val = (uint64_t)ret;
+    rsp->u.ret_val = (uint64_t)ret;
 }
 
 
@@ -429,7 +429,7 @@ static void dispatch_rename(struct fs_mount *mount, struct fsif_request *req)
     FS_DEBUG("Writing response at: idx=%d, id=%d\n", rsp_idx, req_id);
     rsp = RING_GET_RESPONSE(&mount->ring, rsp_idx);
     rsp->id = req_id; 
-    rsp->ret_val = (uint64_t)ret;
+    rsp->u.ret_val = (uint64_t)ret;
 }
 
 
@@ -490,7 +490,7 @@ static void dispatch_create(struct fs_mount *mount, struct fsif_request *req)
     FS_DEBUG("Writing response at: idx=%d, id=%d\n", rsp_idx, req_id);
     rsp = RING_GET_RESPONSE(&mount->ring, rsp_idx);
     rsp->id = req_id; 
-    rsp->ret_val = (uint64_t)ret;
+    rsp->u.ret_val = (uint64_t)ret;
 }
 
 static void dispatch_list(struct fs_mount *mount, struct fsif_request *req)
@@ -560,7 +560,7 @@ error_out:
     FS_DEBUG("Writing response at: idx=%d, id=%d\n", rsp_idx, req_id);
     rsp = RING_GET_RESPONSE(&mount->ring, rsp_idx);
     rsp->id = req_id; 
-    rsp->ret_val = ret_val;
+    rsp->u.ret_val = ret_val;
 }
 
 static void dispatch_chmod(struct fs_mount *mount, struct fsif_request *req)
@@ -591,7 +591,7 @@ static void dispatch_chmod(struct fs_mount *mount, struct fsif_request *req)
     FS_DEBUG("Writing response at: idx=%d, id=%d\n", rsp_idx, req_id);
     rsp = RING_GET_RESPONSE(&mount->ring, rsp_idx);
     rsp->id = req_id; 
-    rsp->ret_val = (uint64_t)ret;
+    rsp->u.ret_val = (uint64_t)ret;
 }
 
 static void dispatch_fs_space(struct fs_mount *mount, struct fsif_request *req)
@@ -632,7 +632,7 @@ static void dispatch_fs_space(struct fs_mount *mount, struct fsif_request *req)
     FS_DEBUG("Writing response at: idx=%d, id=%d\n", rsp_idx, req_id);
     rsp = RING_GET_RESPONSE(&mount->ring, rsp_idx);
     rsp->id = req_id; 
-    rsp->ret_val = (uint64_t)ret;
+    rsp->u.ret_val = (uint64_t)ret;
 }
 
 static void dispatch_file_sync(struct fs_mount *mount, struct fsif_request *req)
@@ -681,7 +681,7 @@ static void end_file_sync(struct fs_mount *mount, struct fs_request *priv_req)
     FS_DEBUG("Writing response at: idx=%d, id=%d\n", rsp_idx, req_id);
     rsp = RING_GET_RESPONSE(&mount->ring, rsp_idx);
     rsp->id = req_id; 
-    rsp->ret_val = (uint64_t)aio_return(&priv_req->aiocb);
+    rsp->u.ret_val = (uint64_t)aio_return(&priv_req->aiocb);
 }
 
 struct fs_op fopen_op     = {.type             = REQ_FILE_OPEN,
