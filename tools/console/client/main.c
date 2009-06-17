@@ -306,10 +306,10 @@ int main(int argc, char **argv)
 	dom_path = xs_get_domain_path(xs, domid);
 	if (dom_path == NULL)
 		err(errno, "xs_get_domain_path()");
-	path = malloc(strlen(dom_path) + strlen("/serial/0/tty") + 3);
+	path = malloc(strlen(dom_path) + strlen("/serial/0/tty") + 5);
 	if (path == NULL)
 		err(ENOMEM, "malloc");
-	snprintf(path, strlen(dom_path) + strlen("/serial/0/tty") + 2, "%s/serial/%d/tty", dom_path, num);
+	snprintf(path, strlen(dom_path) + strlen("/serial/0/tty") + 5, "%s/serial/%d/tty", dom_path, num);
 
 	/* FIXME consoled currently does not assume domain-0 doesn't have a
 	   console which is good when we break domain-0 up.  To keep us
