@@ -170,31 +170,18 @@ class PciController(DevController):
         pci_devs = []
 
         for i in range(int(num_devs)):
-            dev_config = self.readBackend(devid, 'dev-%d' % i)
+            pci_dev = parse_pci_name(self.readBackend(devid, 'dev-%d' % i))
 
-            pci_match = re.match(r"((?P<domain>[0-9a-fA-F]{1,4})[:,])?" +
-                                 r"(?P<bus>[0-9a-fA-F]{1,2})[:,]" + 
-                                 r"(?P<slot>[0-9a-fA-F]{1,2})[.,]" + 
-                                 r"(?P<func>[0-7]{1,2})$", dev_config)
-            
-            if pci_match!=None:
-                pci_dev_info = pci_match.groupdict()
-                dev_dict = {'domain': '0x%(domain)s' % pci_dev_info,
-                                 'bus': '0x%(bus)s' % pci_dev_info,
-                                 'slot': '0x%(slot)s' % pci_dev_info,
-                                 'func': '0x%(func)s' % pci_dev_info}
+            # Per device uuid info
+            pci_dev['uuid'] = self.readBackend(devid, 'uuid-%d' % i)
+            pci_dev['vslot'] = '0x%s' % self.readBackend(devid, 'vslot-%d' % i)
 
-                # Per device uuid info
-                dev_dict['uuid'] = self.readBackend(devid, 'uuid-%d' % i)
-                dev_dict['vslot'] = '0x%s' % \
-                                    self.readBackend(devid, 'vslot-%d' % i)
+            #append opts info
+            opts = self.readBackend(devid, 'opts-%d' % i)
+            if opts is not None:
+                pci_dev['opts'] = opts
 
-                #append opts info
-                opts = self.readBackend(devid, 'opts-%d' % i)
-                if opts is not None:
-                    dev_dict['opts'] = opts
-
-                pci_devs.append(dev_dict)
+            pci_devs.append(pci_dev)
 
         result['devs'] = pci_devs
         result['uuid'] = self.readBackend(devid, 'uuid')
