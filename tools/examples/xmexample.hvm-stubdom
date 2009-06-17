@@ -178,9 +178,11 @@ stdvga=0
 #-----------------------------------------------------------------------------
 #   serial port re-direct to pty deivce, /dev/pts/n 
 #   then xm console or minicom can connect
-# 
-# STUBDOM: always disable as the stub domain doesn't have access to dom0's
-# ptys
+#
+#   In the stubdoms case this option adds a secondary console to the
+#   stubdom because there is always one for logging.
+#   To connect to the guest serial you can use "xm console -n 1"
+#   followed by the domain name of the stubdom.
 #serial='pty'
 
 
