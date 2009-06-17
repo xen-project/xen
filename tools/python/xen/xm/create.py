@@ -38,7 +38,7 @@ from xen.util import vscsi_util
 import xen.util.xsm.xsm as security
 from xen.xm.main import serverType, SERVER_XEN_API, get_single_vm
 from xen.util import utils, auxbin
-from xen.util.pci import pci_opts_list_to_sxp, \
+from xen.util.pci import dev_dict_to_sxp, \
                          parse_pci_name_extended, PciDeviceParseError
 
 from xen.xm.opts import *
@@ -707,12 +707,9 @@ def configure_pci(config_devs, vals):
     """Create the config for pci devices.
     """
     config_pci = []
-    for (domain, bus, slot, func, vslot, opts) in vals.pci:
-        config_pci_bdf = ['dev', ['domain', domain], ['bus', bus], \
-                          ['slot', slot], ['func', func],
-                          ['vslot', vslot]]
-        config_opts = pci_opts_list_to_sxp(opts)
-        config_pci.append(sxp.merge(config_pci_bdf, config_opts))
+    for pci_tuple in vals.pci:
+        pci_dev = pci_tuple_to_dict(pci_tuple)
+        config_pci.append(dev_dict_to_sxp(pci_dev))
 
     if len(config_pci)>0:
         config_pci.insert(0, 'pci')
@@ -1049,6 +1046,16 @@ def preprocess_cpuid(vals, attr_name):
 def pci_dict_to_tuple(dev):
     return (dev['domain'], dev['bus'], dev['slot'], dev['func'],
             dev['vslot'], dev.get('opts', []))
+
+def pci_tuple_to_dict((domain, bus, slot, func, vslot, opts)):
+    pci_dev = { 'domain': domain,
+                'bus':    bus,
+                'slot':   slot,
+                'func':   func,
+                'vslot':  vslot}
+    if len(opts) > 0:
+        pci_dev['opts'] = opts
+    return pci_dev
 
 def preprocess_pci(vals):
     if not vals.pci:
