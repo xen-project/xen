@@ -480,8 +480,7 @@ int __init construct_dom0(
 
     for ( i = 0; i < PDPT_L2_ENTRIES; i++ )
         l2tab[l2_linear_offset(PERDOMAIN_VIRT_START) + i] =
-            l2e_from_page(virt_to_page(d->arch.mm_perdomain_pt) + i,
-                          __PAGE_HYPERVISOR);
+            l2e_from_page(perdomain_pt_page(d, i), __PAGE_HYPERVISOR);
 
     l2tab += l2_linear_offset(v_start);
     mfn = alloc_spfn;

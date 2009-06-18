@@ -437,7 +437,7 @@ static void hap_install_xen_entries_in_l2h(struct vcpu *v, mfn_t l2hmfn)
     for ( i = 0; i < PDPT_L2_ENTRIES; i++ )
         l2e[l2_table_offset(PERDOMAIN_VIRT_START) + i] =
             l2e_from_pfn(
-                mfn_x(page_to_mfn(virt_to_page(d->arch.mm_perdomain_pt) + i)),
+                mfn_x(page_to_mfn(perdomain_pt_page(d, i))),
                 __PAGE_HYPERVISOR);
 
     /* No linear mapping; will be set up by monitor-table contructor. */

@@ -1470,7 +1470,7 @@ static void sh_install_xen_entries_in_l2h(struct vcpu *v, mfn_t sl2hmfn)
     for ( i = 0; i < PDPT_L2_ENTRIES; i++ )
         sl2e[shadow_l2_table_offset(PERDOMAIN_VIRT_START) + i] =
             shadow_l2e_from_mfn(
-                page_to_mfn(virt_to_page(d->arch.mm_perdomain_pt) + i),
+                page_to_mfn(perdomain_pt_page(d, i)),
                 __PAGE_HYPERVISOR);
     
     /* We don't set up a linear mapping here because we can't until this

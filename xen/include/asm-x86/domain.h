@@ -231,10 +231,12 @@ struct domain_mca_msrs
 
 struct arch_domain
 {
-    l1_pgentry_t *mm_perdomain_pt;
 #ifdef CONFIG_X86_64
+    struct page_info **mm_perdomain_pt_pages;
     l2_pgentry_t *mm_perdomain_l2;
     l3_pgentry_t *mm_perdomain_l3;
+#else
+    l1_pgentry_t *mm_perdomain_pt;
 #endif
 
 #ifdef CONFIG_X86_32
@@ -301,6 +303,21 @@ struct arch_domain
 } __cacheline_aligned;
 
 #define has_arch_pdevs(d)    (!list_empty(&(d)->arch.pdev_list))
+
+#ifdef CONFIG_X86_64
+#define perdomain_pt_pgidx(v) \
+      ((v)->vcpu_id >> (PAGETABLE_ORDER - GDT_LDT_VCPU_SHIFT))
+#define perdomain_ptes(d, v) \
+    ((l1_pgentry_t *)page_to_virt((d)->arch.mm_perdomain_pt_pages \
+      [perdomain_pt_pgidx(v)]) + (((v)->vcpu_id << GDT_LDT_VCPU_SHIFT) & \
+                                  (L1_PAGETABLE_ENTRIES - 1)))
+#define perdomain_pt_page(d, n) ((d)->arch.mm_perdomain_pt_pages[n])
+#else
+#define perdomain_ptes(d, v) \
+    ((d)->arch.mm_perdomain_pt + ((v)->vcpu_id << GDT_LDT_VCPU_SHIFT))
+#define perdomain_pt_page(d, n) \
+    (virt_to_page((d)->arch.mm_perdomain_pt) + (n))
+#endif
 
 
 #ifdef __i386__

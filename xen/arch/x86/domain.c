@@ -322,6 +322,22 @@ int vcpu_initialise(struct vcpu *v)
 
 #if defined(__i386__)
     mapcache_vcpu_init(v);
+#else
+    {
+        unsigned int idx = perdomain_pt_pgidx(v);
+        struct page_info *pg;
+
+        if ( !perdomain_pt_page(d, idx) )
+        {
+            pg = alloc_domheap_page(NULL, MEMF_node(vcpu_to_node(v)));
+            if ( !pg )
+                return -ENOMEM;
+            clear_page(page_to_virt(pg));
+            perdomain_pt_page(d, idx) = pg;
+            d->arch.mm_perdomain_l2[l2_table_offset(PERDOMAIN_VIRT_START)+idx]
+                = l2e_from_page(pg, __PAGE_HYPERVISOR);
+        }
+    }
 #endif
 
     pae_l3_cache_init(&v->arch.pae_l3_cache);
@@ -357,8 +373,7 @@ int vcpu_initialise(struct vcpu *v)
             real_cr4_to_pv_guest_cr4(mmu_cr4_features);
     }
 
-    v->arch.perdomain_ptes =
-        d->arch.mm_perdomain_pt + (v->vcpu_id << GDT_LDT_VCPU_SHIFT);
+    v->arch.perdomain_ptes = perdomain_ptes(d, v);
 
     spin_lock_init(&v->arch.shadow_ldt_lock);
 
@@ -378,8 +393,10 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
 {
 #ifdef __x86_64__
     struct page_info *pg;
+#else
+    int pdpt_order;
 #endif
-    int i, pdpt_order, paging_initialised = 0;
+    int i, paging_initialised = 0;
     int rc = -ENOMEM;
 
     d->arch.hvm_domain.hap_enabled =
@@ -394,27 +411,30 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
     d->arch.relmem = RELMEM_not_started;
     INIT_PAGE_LIST_HEAD(&d->arch.relmem_list);
 
+#if defined(__i386__)
+
     pdpt_order = get_order_from_bytes(PDPT_L1_ENTRIES * sizeof(l1_pgentry_t));
     d->arch.mm_perdomain_pt = alloc_xenheap_pages(pdpt_order, 0);
     if ( d->arch.mm_perdomain_pt == NULL )
         goto fail;
     memset(d->arch.mm_perdomain_pt, 0, PAGE_SIZE << pdpt_order);
 
-#if defined(__i386__)
-
     mapcache_domain_init(d);
 
 #else /* __x86_64__ */
+
+    d->arch.mm_perdomain_pt_pages = xmalloc_array(struct page_info *,
+                                                  PDPT_L2_ENTRIES);
+    if ( !d->arch.mm_perdomain_pt_pages )
+        goto fail;
+    memset(d->arch.mm_perdomain_pt_pages, 0,
+           PDPT_L2_ENTRIES * sizeof(*d->arch.mm_perdomain_pt_pages));
 
     pg = alloc_domheap_page(NULL, MEMF_node(domain_to_node(d)));
     if ( pg == NULL )
         goto fail;
     d->arch.mm_perdomain_l2 = page_to_virt(pg);
     clear_page(d->arch.mm_perdomain_l2);
-    for ( i = 0; i < (1 << pdpt_order); i++ )
-        d->arch.mm_perdomain_l2[l2_table_offset(PERDOMAIN_VIRT_START)+i] =
-            l2e_from_page(virt_to_page(d->arch.mm_perdomain_pt)+i,
-                          __PAGE_HYPERVISOR);
 
     pg = alloc_domheap_page(NULL, MEMF_node(domain_to_node(d)));
     if ( pg == NULL )
@@ -503,13 +523,19 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
         free_domheap_page(virt_to_page(d->arch.mm_perdomain_l2));
     if ( d->arch.mm_perdomain_l3 )
         free_domheap_page(virt_to_page(d->arch.mm_perdomain_l3));
-#endif
+    xfree(d->arch.mm_perdomain_pt_pages);
+#else
     free_xenheap_pages(d->arch.mm_perdomain_pt, pdpt_order);
+#endif
     return rc;
 }
 
 void arch_domain_destroy(struct domain *d)
 {
+#ifdef __x86_64__
+    unsigned int i;
+#endif
+
     if ( is_hvm_domain(d) )
         hvm_domain_destroy(d);
 
@@ -520,11 +546,17 @@ void arch_domain_destroy(struct domain *d)
 
     paging_final_teardown(d);
 
+#ifdef __i386__
     free_xenheap_pages(
         d->arch.mm_perdomain_pt,
         get_order_from_bytes(PDPT_L1_ENTRIES * sizeof(l1_pgentry_t)));
-
-#ifdef __x86_64__
+#else
+    for ( i = 0; i < PDPT_L2_ENTRIES; ++i )
+    {
+        if ( perdomain_pt_page(d, i) )
+            free_domheap_page(perdomain_pt_page(d, i));
+    }
+    xfree(d->arch.mm_perdomain_pt_pages);
     free_domheap_page(virt_to_page(d->arch.mm_perdomain_l2));
     free_domheap_page(virt_to_page(d->arch.mm_perdomain_l3));
 #endif
@@ -1272,8 +1304,7 @@ static void __context_switch(void)
         struct page_info *page = virt_to_page(gdt);
         unsigned int i;
         for ( i = 0; i < NR_RESERVED_GDT_PAGES; i++ )
-            l1e_write(n->domain->arch.mm_perdomain_pt +
-                      (n->vcpu_id << GDT_LDT_VCPU_SHIFT) +
+            l1e_write(n->arch.perdomain_ptes +
                       FIRST_RESERVED_GDT_PAGE + i,
                       l1e_from_page(page + i, __PAGE_HYPERVISOR));
     }

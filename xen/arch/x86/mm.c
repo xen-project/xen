@@ -1207,9 +1207,7 @@ static int create_pae_xen_mappings(struct domain *d, l3_pgentry_t *pl3e)
            L2_PAGETABLE_XEN_SLOTS * sizeof(l2_pgentry_t));
     for ( i = 0; i < PDPT_L2_ENTRIES; i++ )
     {
-        l2e = l2e_from_page(
-            virt_to_page(d->arch.mm_perdomain_pt) + i,
-            __PAGE_HYPERVISOR);
+        l2e = l2e_from_page(perdomain_pt_page(d, i), __PAGE_HYPERVISOR);
         l2e_write(&pl2e[l2_table_offset(PERDOMAIN_VIRT_START) + i], l2e);
     }
     for ( i = 0; i < (LINEARPT_MBYTES >> (L2_PAGETABLE_SHIFT - 20)); i++ )
