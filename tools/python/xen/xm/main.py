@@ -1757,6 +1757,7 @@ def xm_info(args):
             "xen_scheduler":     getVal(["sched_policy"]),
             "xen_pagesize":      getVal(["other_config", "xen_pagesize"]),
             "platform_params":   getVal(["other_config", "platform_params"]),
+            "xen_commandline":   getVal(["other_config", "xen_commandline"]),
             "xen_changeset":     getVal(["software_version", "xen_changeset"]),
             "cc_compiler":       getVal(["software_version", "cc_compiler"]),
             "cc_compile_by":     getVal(["software_version", "cc_compile_by"]),

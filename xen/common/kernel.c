@@ -24,12 +24,16 @@
 
 int tainted;
 
+xen_commandline_t saved_cmdline;
+
 void cmdline_parse(char *cmdline)
 {
     char opt[100], *optval, *optkey, *q;
     const char *p = cmdline;
     struct kernel_param *param;
     int bool_assert;
+
+    safe_strcpy(saved_cmdline, cmdline);
 
     if ( p == NULL )
         return;
@@ -246,7 +250,14 @@ DO(xen_version)(int cmd, XEN_GUEST_HANDLE(void) arg)
                            ARRAY_SIZE(current->domain->handle)) )
             return -EFAULT;
         return 0;
-    }    
+    }
+
+    case XENVER_commandline:
+    {
+        if ( copy_to_guest(arg, saved_cmdline, ARRAY_SIZE(saved_cmdline)) )
+            return -EFAULT;
+        return 0;
+    }
     }
 
     return -ENOSYS;

@@ -15,6 +15,8 @@
 #include <compat/nmi.h>
 #include <compat/version.h>
 
+extern xen_commandline_t saved_cmdline;
+
 #define xen_extraversion compat_extraversion
 #define xen_extraversion_t compat_extraversion_t
 

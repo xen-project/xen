@@ -91,6 +91,7 @@ class XendNode:
         # is directly exposed via XenAPI
         self.other_config["xen_pagesize"] = self.xeninfo_dict()["xen_pagesize"]
         self.other_config["platform_params"] = self.xeninfo_dict()["platform_params"]
+        self.other_config["xen_commandline"] = self.xeninfo_dict()["xen_commandline"]
             
         # load CPU UUIDs
         saved_cpus = self.state_store.load_state('cpu')
@@ -612,7 +613,8 @@ class XendNode:
             "cc_compile_by":     xeninfo_dict["cc_compile_by"],
             "cc_compile_domain": xeninfo_dict["cc_compile_domain"],
             "cc_compile_date":   xeninfo_dict["cc_compile_date"],
-            "xen_changeset":     xeninfo_dict["xen_changeset"]
+            "xen_changeset":     xeninfo_dict["xen_changeset"],
+            "xen_commandline":   xeninfo_dict["xen_commandline"]
             })
         
         return info
@@ -888,6 +890,7 @@ class XendNode:
                       'xen_pagesize',
                       'platform_params',
                       'xen_changeset',
+                      'xen_commandline',
                       'cc_compiler',
                       'cc_compile_by',
                       'cc_compile_domain',
