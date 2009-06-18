@@ -126,9 +126,19 @@ class BlktapController(BlkifController):
         except:
             (typ, params, file) = string.split(uname, ':', 2)
             subtyp = 'tapdisk'
+
+        #check for blktap2 installation.
+        blktap2_installed=0;
+        (rc,stdout, stderr) = doexec("cat /proc/devices");
+        out = stdout.read();
+        stdout.close();
+        stderr.close();
+        if( out.find("blktap2") >= 0 ):
+            blktap2_installed=1;
+           
         if typ in ('tap'):
             if subtyp in ('tapdisk'):                                          
-                if params in ('ioemu', 'qcow2', 'vmdk', 'sync'):
+                if params in ('ioemu', 'qcow2', 'vmdk', 'sync') or not blktap2_installed:
                     log.warn('WARNING: using deprecated blktap module');
                     return BlkifController.createDevice(self, config);
 

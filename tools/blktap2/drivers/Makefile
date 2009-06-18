@@ -4,7 +4,7 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 LIBVHDDIR  = $(BLKTAP_ROOT)/vhd/lib
 
-IBIN       = tapdisk tapdisk2 td-util tapdisk-client tapdisk-stream tapdisk-diff
+IBIN       = tapdisk2 td-util tapdisk-client tapdisk-stream tapdisk-diff
 QCOW_UTIL  = img2qcow qcow-create qcow2raw
 LOCK_UTIL  = lock-util
 INST_DIR   = $(SBINDIR)
@@ -34,11 +34,11 @@ endif
 
 LDFLAGS_img := $(CRYPT_LIB) -lpthread -lz
 
-tapdisk tapdisk2 td-util tapdisk-stream tapdisk-diff $(QCOW_UTIL): LIBS += -L$(LIBVHDDIR) -lvhd -luuid
+tapdisk2 td-util tapdisk-stream tapdisk-diff $(QCOW_UTIL): LIBS += -L$(LIBVHDDIR) -lvhd -luuid
 
 LIBAIO_DIR = $(XEN_ROOT)/tools/libaio/src
-tapdisk tapdisk2 tapdisk-stream tapdisk-diff $(QCOW_UTIL): AIOLIBS := $(LIBAIO_DIR)/libaio.a
-tapdisk tapdisk-client tapdisk-stream tapdisk-diff $(QCOW_UTIL): CFLAGS  += -I$(LIBAIO_DIR) -I$(XEN_LIBXC)
+tapdisk2 tapdisk-stream tapdisk-diff $(QCOW_UTIL): AIOLIBS := $(LIBAIO_DIR)/libaio.a
+tapdisk-client tapdisk-stream tapdisk-diff $(QCOW_UTIL): CFLAGS  += -I$(LIBAIO_DIR) -I$(XEN_LIBXC)
 
 ifeq ($(VHD_STATIC),y)
 td-util: CFLAGS += -static
@@ -71,8 +71,6 @@ BLK-OBJS-y  += aes.o
 
 all: $(IBIN) lock-util qcow-util
 
-tapdisk: $(TAP-OBJS-y) $(BLK-OBJS-y) $(MISC-OBJS-y) tapdisk.c
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS) $(AIOLIBS)  $(LDFLAGS_img)
 
 tapdisk2: $(TAP-OBJS-y) $(BLK-OBJS-y) $(MISC-OBJS-y) tapdisk2.c
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS) $(AIOLIBS) $(LDFLAGS_img)
