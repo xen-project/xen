@@ -2565,29 +2565,41 @@ static int set_foreigndom(domid_t domid)
     return okay;
 }
 
-static inline cpumask_t vcpumask_to_pcpumask(
-    struct domain *d, unsigned long vmask)
+static inline int vcpumask_to_pcpumask(
+    struct domain *d, XEN_GUEST_HANDLE(const_void) bmap, cpumask_t *pmask)
 {
-    unsigned int vcpu_id;
-    cpumask_t    pmask = CPU_MASK_NONE;
+    unsigned int vcpu_id, vcpu_bias, offs;
+    unsigned long vmask;
     struct vcpu *v;
+    bool_t is_native = !is_pv_32on64_domain(d);
 
-    /*
-     * Callers copy only a single guest-sized longword from the guest.
-     * This must be wide enough to reference all VCPUs. Worst case is 32 bits.
-     */
-    BUILD_BUG_ON(MAX_VIRT_CPUS > 32);
-
-    while ( vmask != 0 )
+    cpus_clear(*pmask);
+    for ( vmask = 0, offs = 0; ; ++offs)
     {
-        vcpu_id = find_first_set_bit(vmask);
-        vmask &= ~(1UL << vcpu_id);
-        if ( (vcpu_id < MAX_VIRT_CPUS) &&
-             ((v = d->vcpu[vcpu_id]) != NULL) )
-            cpus_or(pmask, pmask, v->vcpu_dirty_cpumask);
-    }
+        vcpu_bias = offs * (is_native ? BITS_PER_LONG : 32);
+        if ( vcpu_bias >= MAX_VIRT_CPUS )
+            return 0;
 
-    return pmask;
+        if ( unlikely(is_native ?
+                      copy_from_guest_offset(&vmask, bmap, offs, 1) :
+                      copy_from_guest_offset((unsigned int *)&vmask, bmap,
+                                             offs, 1)) )
+        {
+            cpus_clear(*pmask);
+            return -EFAULT;
+        }
+
+        while ( vmask )
+        {
+            vcpu_id = find_first_set_bit(vmask);
+            vmask &= ~(1UL << vcpu_id);
+            vcpu_id += vcpu_bias;
+            if ( (vcpu_id >= MAX_VIRT_CPUS) )
+                return 0;
+            if ( ((v = d->vcpu[vcpu_id]) != NULL) )
+                cpus_or(*pmask, *pmask, v->vcpu_dirty_cpumask);
+        }
+    }
 }
 
 #ifdef __i386__
@@ -2816,14 +2828,13 @@ int do_mmuext_op(
         case MMUEXT_TLB_FLUSH_MULTI:
         case MMUEXT_INVLPG_MULTI:
         {
-            unsigned long vmask;
             cpumask_t     pmask;
-            if ( unlikely(copy_from_guest(&vmask, op.arg2.vcpumask, 1)) )
+
+            if ( unlikely(vcpumask_to_pcpumask(d, op.arg2.vcpumask, &pmask)) )
             {
                 okay = 0;
                 break;
             }
-            pmask = vcpumask_to_pcpumask(d, vmask);
             if ( op.cmd == MMUEXT_TLB_FLUSH_MULTI )
                 flush_tlb_mask(&pmask);
             else
@@ -3630,7 +3641,7 @@ int do_update_va_mapping(unsigned long va, u64 val64,
     struct domain *d   = v->domain;
     struct page_info *gl1pg;
     l1_pgentry_t  *pl1e;
-    unsigned long  vmask, bmap_ptr, gl1mfn;
+    unsigned long  bmap_ptr, gl1mfn;
     cpumask_t      pmask;
     int            rc;
 
@@ -3682,11 +3693,9 @@ int do_update_va_mapping(unsigned long va, u64 val64,
         default:
             if ( this_cpu(percpu_mm_info).deferred_ops & DOP_FLUSH_ALL_TLBS )
                 break;
-            if ( unlikely(!is_pv_32on64_domain(d) ?
-                          get_user(vmask, (unsigned long *)bmap_ptr) :
-                          get_user(vmask, (unsigned int *)bmap_ptr)) )
-                rc = -EFAULT, vmask = 0;
-            pmask = vcpumask_to_pcpumask(d, vmask);
+            rc = vcpumask_to_pcpumask(d, const_guest_handle_from_ptr(bmap_ptr,
+                                                                     void),
+                                      &pmask);
             if ( cpu_isset(smp_processor_id(), pmask) )
                 this_cpu(percpu_mm_info).deferred_ops &= ~DOP_FLUSH_TLB;
             flush_tlb_mask(&pmask);
@@ -3710,11 +3719,9 @@ int do_update_va_mapping(unsigned long va, u64 val64,
             flush_tlb_one_mask(&d->domain_dirty_cpumask, va);
             break;
         default:
-            if ( unlikely(!is_pv_32on64_domain(d) ?
-                          get_user(vmask, (unsigned long *)bmap_ptr) :
-                          get_user(vmask, (unsigned int *)bmap_ptr)) )
-                rc = -EFAULT, vmask = 0;
-            pmask = vcpumask_to_pcpumask(d, vmask);
+            rc = vcpumask_to_pcpumask(d, const_guest_handle_from_ptr(bmap_ptr,
+                                                                     void),
+                                      &pmask);
             if ( this_cpu(percpu_mm_info).deferred_ops & DOP_FLUSH_TLB )
                 cpu_clear(smp_processor_id(), pmask);
             flush_tlb_one_mask(&pmask, va);

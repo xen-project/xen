@@ -278,18 +278,7 @@ int compat_mmuext_op(XEN_GUEST_HANDLE(mmuext_op_compat_t) cmp_uops,
             }
 
 #define XLAT_mmuext_op_HNDL_arg2_vcpumask(_d_, _s_) \
-            do \
-            { \
-                unsigned int vcpumask; \
-                if ( i < --limit ) \
-                { \
-                    (_d_)->arg2.vcpumask.p = (void *)(nat_ops.p + limit); \
-                    if ( copy_from_compat(&vcpumask, (_s_)->arg2.vcpumask, 1) == 0 ) \
-                        *(unsigned long *)(_d_)->arg2.vcpumask.p = vcpumask; \
-                    else \
-                        rc = -EFAULT; \
-                } \
-            } while(0)
+        guest_from_compat_handle((_d_)->arg2.vcpumask, (_s_)->arg2.vcpumask)
             XLAT_mmuext_op(nat_op, &cmp_op);
 #undef XLAT_mmuext_op_HNDL_arg2_vcpumask
 

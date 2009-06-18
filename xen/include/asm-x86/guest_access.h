@@ -45,6 +45,8 @@
 
 #define guest_handle_from_ptr(ptr, type)        \
     ((XEN_GUEST_HANDLE(type)) { (type *)ptr })
+#define const_guest_handle_from_ptr(ptr, type)  \
+    ((XEN_GUEST_HANDLE(const_##type)) { (const type *)ptr })
 
 /*
  * Copy an array of objects to guest context via a guest handle,
