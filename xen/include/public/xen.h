@@ -458,7 +458,7 @@ typedef struct vcpu_info vcpu_info_t;
  * of this structure remaining constant.
  */
 struct shared_info {
-    struct vcpu_info vcpu_info[MAX_VIRT_CPUS];
+    struct vcpu_info vcpu_info[XEN_LEGACY_MAX_VCPUS];
 
     /*
      * A domain can create "event channels" on which it can send and receive

@@ -498,7 +498,7 @@ static int shared_info_x86_32(struct xc_dom_image *dom, void *ptr)
     xc_dom_printf("%s: called\n", __FUNCTION__);
 
     memset(shared_info, 0, sizeof(*shared_info));
-    for ( i = 0; i < MAX_VIRT_CPUS; i++ )
+    for ( i = 0; i < XEN_LEGACY_MAX_VCPUS; i++ )
         shared_info->vcpu_info[i].evtchn_upcall_mask = 1;
     return 0;
 }
@@ -511,7 +511,7 @@ static int shared_info_x86_64(struct xc_dom_image *dom, void *ptr)
     xc_dom_printf("%s: called\n", __FUNCTION__);
 
     memset(shared_info, 0, sizeof(*shared_info));
-    for ( i = 0; i < MAX_VIRT_CPUS; i++ )
+    for ( i = 0; i < XEN_LEGACY_MAX_VCPUS; i++ )
         shared_info->vcpu_info[i].evtchn_upcall_mask = 1;
     return 0;
 }

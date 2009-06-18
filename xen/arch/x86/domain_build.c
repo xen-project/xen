@@ -82,8 +82,24 @@ static void __init parse_dom0_mem(const char *s)
 }
 custom_param("dom0_mem", parse_dom0_mem);
 
-static unsigned int opt_dom0_max_vcpus;
+static unsigned int __initdata opt_dom0_max_vcpus;
 integer_param("dom0_max_vcpus", opt_dom0_max_vcpus);
+
+struct vcpu *__init alloc_dom0_vcpu0(void)
+{
+    if ( opt_dom0_max_vcpus == 0 )
+        opt_dom0_max_vcpus = num_online_cpus();
+    if ( opt_dom0_max_vcpus > MAX_VIRT_CPUS )
+        opt_dom0_max_vcpus = MAX_VIRT_CPUS;
+
+    dom0->vcpu = xmalloc_array(struct vcpu *, opt_dom0_max_vcpus);
+    if ( !dom0->vcpu )
+        return NULL;
+    memset(dom0->vcpu, 0, opt_dom0_max_vcpus * sizeof(*dom0->vcpu));
+    dom0->max_vcpus = opt_dom0_max_vcpus;
+
+    return alloc_vcpu(dom0, 0, 0);
+}
 
 static unsigned int opt_dom0_shadow;
 boolean_param("dom0_shadow", opt_dom0_shadow);
@@ -701,13 +717,9 @@ int __init construct_dom0(
 #endif /* __x86_64__ */
 
     /* Mask all upcalls... */
-    for ( i = 0; i < MAX_VIRT_CPUS; i++ )
+    for ( i = 0; i < XEN_LEGACY_MAX_VCPUS; i++ )
         shared_info(d, vcpu_info[i].evtchn_upcall_mask) = 1;
 
-    if ( opt_dom0_max_vcpus == 0 )
-        opt_dom0_max_vcpus = num_online_cpus();
-    if ( opt_dom0_max_vcpus > MAX_VIRT_CPUS )
-        opt_dom0_max_vcpus = MAX_VIRT_CPUS;
     printk("Dom0 has maximum %u VCPUs\n", opt_dom0_max_vcpus);
 
     for ( i = 1; i < opt_dom0_max_vcpus; i++ )

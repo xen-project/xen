@@ -263,7 +263,7 @@ int switch_native(struct domain *d)
 
     d->arch.is_32bit_pv = d->arch.has_32bit_shinfo = 0;
 
-    for ( vcpuid = 0; vcpuid < MAX_VIRT_CPUS; vcpuid++ )
+    for ( vcpuid = 0; vcpuid < d->max_vcpus; vcpuid++ )
     {
         if (d->vcpu[vcpuid])
             release_compat_l4(d->vcpu[vcpuid]);
@@ -285,7 +285,7 @@ int switch_compat(struct domain *d)
 
     d->arch.is_32bit_pv = d->arch.has_32bit_shinfo = 1;
 
-    for ( vcpuid = 0; vcpuid < MAX_VIRT_CPUS; vcpuid++ )
+    for ( vcpuid = 0; vcpuid < d->max_vcpus; vcpuid++ )
     {
         if ( (d->vcpu[vcpuid] != NULL) &&
              (setup_compat_l4(d->vcpu[vcpuid]) != 0) )
@@ -423,12 +423,13 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
 
 #else /* __x86_64__ */
 
-    d->arch.mm_perdomain_pt_pages = xmalloc_array(struct page_info *,
-                                                  PDPT_L2_ENTRIES);
-    if ( !d->arch.mm_perdomain_pt_pages )
+    BUILD_BUG_ON(PDPT_L2_ENTRIES * sizeof(*d->arch.mm_perdomain_pt_pages)
+                 != PAGE_SIZE);
+    pg = alloc_domheap_page(NULL, MEMF_node(domain_to_node(d)));
+    if ( !pg )
         goto fail;
-    memset(d->arch.mm_perdomain_pt_pages, 0,
-           PDPT_L2_ENTRIES * sizeof(*d->arch.mm_perdomain_pt_pages));
+    d->arch.mm_perdomain_pt_pages = page_to_virt(pg);
+    clear_page(d->arch.mm_perdomain_pt_pages);
 
     pg = alloc_domheap_page(NULL, MEMF_node(domain_to_node(d)));
     if ( pg == NULL )
@@ -523,7 +524,8 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
         free_domheap_page(virt_to_page(d->arch.mm_perdomain_l2));
     if ( d->arch.mm_perdomain_l3 )
         free_domheap_page(virt_to_page(d->arch.mm_perdomain_l3));
-    xfree(d->arch.mm_perdomain_pt_pages);
+    if ( d->arch.mm_perdomain_pt_pages )
+        free_domheap_page(virt_to_page(d->arch.mm_perdomain_pt_pages));
 #else
     free_xenheap_pages(d->arch.mm_perdomain_pt, pdpt_order);
 #endif
@@ -556,7 +558,7 @@ void arch_domain_destroy(struct domain *d)
         if ( perdomain_pt_page(d, i) )
             free_domheap_page(perdomain_pt_page(d, i));
     }
-    xfree(d->arch.mm_perdomain_pt_pages);
+    free_domheap_page(virt_to_page(d->arch.mm_perdomain_pt_pages));
     free_domheap_page(virt_to_page(d->arch.mm_perdomain_l2));
     free_domheap_page(virt_to_page(d->arch.mm_perdomain_l3));
 #endif
@@ -872,7 +874,13 @@ map_vcpu_info(struct vcpu *v, unsigned long mfn, unsigned offset)
 
     new_info = (vcpu_info_t *)(mapping + offset);
 
-    memcpy(new_info, v->vcpu_info, sizeof(*new_info));
+    if ( v->vcpu_info )
+        memcpy(new_info, v->vcpu_info, sizeof(*new_info));
+    else
+    {
+        memset(new_info, 0, sizeof(*new_info));
+        __vcpu_info(v, new_info, evtchn_upcall_mask) = 1;
+    }
 
     v->vcpu_info = new_info;
     v->arch.vcpu_info_mfn = mfn;

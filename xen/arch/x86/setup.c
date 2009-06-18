@@ -234,11 +234,15 @@ static void __init init_idle_domain(void)
     scheduler_init();
 
     idle_domain = domain_create(IDLE_DOMAIN_ID, 0, 0);
-    if ( (idle_domain == NULL) || (alloc_vcpu(idle_domain, 0, 0) == NULL) )
+    if ( idle_domain == NULL )
+        BUG();
+    idle_domain->vcpu = idle_vcpu;
+    idle_domain->max_vcpus = NR_CPUS;
+    if ( alloc_vcpu(idle_domain, 0, 0) == NULL )
         BUG();
 
-    set_current(idle_domain->vcpu[0]);
-    idle_vcpu[0] = this_cpu(curr_vcpu) = current;
+    set_current(idle_vcpu[0]);
+    this_cpu(curr_vcpu) = current;
 
     setup_idle_pagetable();
 }
@@ -998,7 +1002,7 @@ void __init __start_xen(unsigned long mbi_p)
 
     /* Create initial domain 0. */
     dom0 = domain_create(0, DOMCRF_s3_integrity, DOM0_SSIDREF);
-    if ( (dom0 == NULL) || (alloc_vcpu(dom0, 0, 0) == NULL) )
+    if ( (dom0 == NULL) || (alloc_dom0_vcpu0() == NULL) )
         panic("Error creating domain 0\n");
 
     dom0->is_privileged = 1;

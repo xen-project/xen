@@ -955,7 +955,7 @@ char *parse_arg (char **buf)
     return res;
 }
 
-vcpu_guest_context_any_t vcpu_ctx_any[MAX_VIRT_CPUS];
+vcpu_guest_context_any_t *vcpu_ctx_any;
 
 int vcpu_setcontext (int vcpu)
 {
@@ -1584,10 +1584,22 @@ void xenitp (int vcpu)
 {
     int ret;
     struct sigaction sa;
-
-    cur_ctx = &vcpu_ctx_any[vcpu].c;
+    xc_dominfo_t dominfo;
 
     xc_handle = xc_interface_open (); /* for accessing control interface */
+
+    ret = xc_domain_getinfo (xc_handle, domid, 1, &dominfo);
+    if (ret < 0) {
+        perror ("xc_domain_getinfo");
+        exit (-1);
+    }
+
+    vcpu_ctx_any = calloc (sizeof(vcpu_ctx_any), dominfo.max_vcpu_id + 1);
+    if (!vcpu_ctx_any) {
+        perror ("vcpu context array alloc");
+        exit (-1);
+    }
+    cur_ctx = &vcpu_ctx_any[vcpu].c;
 
     if (xc_domain_setdebugging (xc_handle, domid, 1) != 0)
         perror ("setdebugging");

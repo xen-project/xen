@@ -574,7 +574,8 @@ long arch_do_domctl(
             goto sendtrigger_out;
 
         ret = -ESRCH;
-        if ( (v = d->vcpu[domctl->u.sendtrigger.vcpu]) == NULL )
+        if ( domctl->u.sendtrigger.vcpu >= d->max_vcpus ||
+             (v = d->vcpu[domctl->u.sendtrigger.vcpu]) == NULL )
             goto sendtrigger_out;
 
         switch ( domctl->u.sendtrigger.trigger )
@@ -963,7 +964,7 @@ long arch_do_domctl(
             goto ext_vcpucontext_out;
 
         ret = -ESRCH;
-        if ( (evc->vcpu >= MAX_VIRT_CPUS) ||
+        if ( (evc->vcpu >= d->max_vcpus) ||
              ((v = d->vcpu[evc->vcpu]) == NULL) )
             goto ext_vcpucontext_out;
 
@@ -1085,7 +1086,7 @@ long arch_do_domctl(
             break;
 
         ret = -EINVAL;
-        if ( (domctl->u.debug_op.vcpu >= MAX_VIRT_CPUS) ||
+        if ( (domctl->u.debug_op.vcpu >= d->max_vcpus) ||
              ((v = d->vcpu[domctl->u.debug_op.vcpu]) == NULL) )
             goto debug_op_out;
 

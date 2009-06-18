@@ -12,6 +12,44 @@
 #include <time.h>
 #include <inttypes.h>
 
+static unsigned int    max_nr_vcpus;
+static unsigned long  *cr3;
+static unsigned long  *cr3_phys;
+static unsigned long **cr3_virt;
+static unsigned long  *pde_phys;
+static unsigned long **pde_virt;
+static unsigned long  *page_phys;
+static unsigned long **page_virt;
+
+static vcpu_guest_context_t *
+ptrace_core_get_vcpu_ctxt(unsigned int nr_vcpus)
+{
+    if (nr_vcpus > max_nr_vcpus) {
+        void *new;
+
+#define REALLOC(what) \
+        new = realloc(what, nr_vcpus * sizeof(*what)); \
+        if (!new) \
+            return NULL; \
+        memset(what + max_nr_vcpus, 0, \
+              (nr_vcpus - max_nr_vcpus) * sizeof(*what)); \
+        what = new
+
+        REALLOC(cr3);
+        REALLOC(cr3_phys);
+        REALLOC(cr3_virt);
+        REALLOC(pde_phys);
+        REALLOC(pde_virt);
+        REALLOC(page_phys);
+        REALLOC(page_virt);
+
+#undef REALLOC
+        max_nr_vcpus = nr_vcpus;
+    }
+
+    return &xc_ptrace_get_vcpu_ctxt(nr_vcpus)->c;
+}
+
 /* Leave the code for the old format as is. */
 /* --- compatible layer for old format ------------------------------------- */
 /* XXX application state */
@@ -21,7 +59,6 @@ static long   nr_pages_compat = 0;
 static unsigned long  *p2m_array_compat = NULL;
 static unsigned long  *m2p_array_compat = NULL;
 static unsigned long   pages_offset_compat;
-static unsigned long   cr3_compat[MAX_VIRT_CPUS];
 
 /* --------------------- */
 
@@ -34,23 +71,15 @@ map_mtop_offset_compat(unsigned long ma)
 
 
 static void *
-map_domain_va_core_compat(unsigned long domfd, int cpu, void *guest_va,
-                          vcpu_guest_context_t *ctxt)
+map_domain_va_core_compat(unsigned long domfd, int cpu, void *guest_va)
 {
     unsigned long pde, page;
     unsigned long va = (unsigned long)guest_va;
     void *v;
 
-    static unsigned long  cr3_phys[MAX_VIRT_CPUS];
-    static unsigned long *cr3_virt[MAX_VIRT_CPUS];
-    static unsigned long  pde_phys[MAX_VIRT_CPUS];
-    static unsigned long *pde_virt[MAX_VIRT_CPUS];
-    static unsigned long  page_phys[MAX_VIRT_CPUS];
-    static unsigned long *page_virt[MAX_VIRT_CPUS];
-
-    if (cr3_compat[cpu] != cr3_phys[cpu])
+    if (cr3[cpu] != cr3_phys[cpu])
     {
-        cr3_phys[cpu] = cr3_compat[cpu];
+        cr3_phys[cpu] = cr3[cpu];
         if (cr3_virt[cpu])
             munmap(cr3_virt[cpu], PAGE_SIZE);
         v = mmap(
@@ -93,7 +122,7 @@ map_domain_va_core_compat(unsigned long domfd, int cpu, void *guest_va,
             map_mtop_offset_compat(page_phys[cpu]));
         if (v == MAP_FAILED)
         {
-            IPRINTF("cr3 %lx pde %lx page %lx pti %lx\n", cr3_compat[cpu], pde, page, l1_table_offset_i386(va));
+            IPRINTF("cr3 %lx pde %lx page %lx pti %lx\n", cr3[cpu], pde, page, l1_table_offset_i386(va));
             page_phys[cpu] = 0;
             return NULL;
         }
@@ -107,11 +136,11 @@ xc_waitdomain_core_compat(
     int xc_handle,
     int domfd,
     int *status,
-    int options,
-    vcpu_guest_context_t *ctxt)
+    int options)
 {
     int nr_vcpus;
     int i;
+    vcpu_guest_context_t *ctxt;
     xc_core_header_t header;
 
     if ( nr_pages_compat == 0 )
@@ -132,12 +161,18 @@ xc_waitdomain_core_compat(
         nr_vcpus = header.xch_nr_vcpus;
         pages_offset_compat = header.xch_pages_offset;
 
+        if ((ctxt = ptrace_core_get_vcpu_ctxt(nr_vcpus)) == NULL)
+        {
+            IPRINTF("Could not allocate vcpu context array\n");
+            return -1;
+        }
+
         if (read(domfd, ctxt, sizeof(vcpu_guest_context_t)*nr_vcpus) !=
             sizeof(vcpu_guest_context_t)*nr_vcpus)
             return -1;
 
         for (i = 0; i < nr_vcpus; i++)
-            cr3_compat[i] = ctxt[i].ctrlreg[3];
+            cr3[i] = ctxt[i].ctrlreg[3];
 
         if ((p2m_array_compat = malloc(nr_pages_compat * sizeof(unsigned long))) == NULL)
         {
@@ -375,7 +410,6 @@ static uint64_t* pfn_array = NULL; /* for auto translated physmap mode */
 static uint64_t pfn_array_size = 0;
 static long nr_pages = 0;
 static uint64_t pages_offset;
-static unsigned long cr3[MAX_VIRT_CPUS];
 
 static const struct xen_dumpcore_elfnote_format_version_desc
 known_format_version[] =
@@ -413,20 +447,12 @@ map_gmfn_to_offset_elf(unsigned long gmfn)
 }
 
 static void *
-map_domain_va_core_elf(unsigned long domfd, int cpu, void *guest_va,
-                       vcpu_guest_context_t *ctxt)
+map_domain_va_core_elf(unsigned long domfd, int cpu, void *guest_va)
 {
     unsigned long pde, page;
     unsigned long va = (unsigned long)guest_va;
     unsigned long offset;
     void *v;
-
-    static unsigned long  cr3_phys[MAX_VIRT_CPUS];
-    static unsigned long *cr3_virt[MAX_VIRT_CPUS];
-    static unsigned long  pde_phys[MAX_VIRT_CPUS];
-    static unsigned long *pde_virt[MAX_VIRT_CPUS];
-    static unsigned long  page_phys[MAX_VIRT_CPUS];
-    static unsigned long *page_virt[MAX_VIRT_CPUS];
 
     if (cr3[cpu] != cr3_phys[cpu])
     {
@@ -498,10 +524,10 @@ xc_waitdomain_core_elf(
     int xc_handle,
     int domfd,
     int *status,
-    int options,
-    vcpu_guest_context_t *ctxt)
+    int options)
 {
     int i;
+    vcpu_guest_context_t *ctxt;
     struct elf_core ecore;
 
     struct xen_dumpcore_elfnote_none *none;
@@ -527,14 +553,13 @@ xc_waitdomain_core_elf(
     if ((header->header.xch_magic != XC_CORE_MAGIC &&
          header->header.xch_magic != XC_CORE_MAGIC_HVM) ||
         header->header.xch_nr_vcpus == 0 ||
-        header->header.xch_nr_vcpus >= MAX_VIRT_CPUS ||
         header->header.xch_nr_pages == 0 ||
         header->header.xch_page_size != PAGE_SIZE)
         goto out;
     current_is_auto_translated_physmap =
         (header->header.xch_magic == XC_CORE_MAGIC_HVM);
     nr_pages = header->header.xch_nr_pages;
-    
+
     /* .note.Xen: xen_version */
     if (elf_core_search_note(&ecore, XEN_DUMPCORE_ELFNOTE_NAME,
                              XEN_ELFNOTE_DUMPCORE_XEN_VERSION,
@@ -560,6 +585,9 @@ xc_waitdomain_core_elf(
         IPRINTF("warning:unknown format version. %"PRIx64"\n",
                 format_version->format_version.version);
     }
+
+    if ((ctxt = ptrace_core_get_vcpu_ctxt(header->header.xch_nr_vcpus)) == NULL)
+        goto out;
 
     /* .xen_prstatus: read vcpu_guest_context_t*/
     if (elf_core_read_sec_by_name(&ecore, XEN_DUMPCORE_SEC_PRSTATUS,
@@ -621,12 +649,10 @@ out:
 typedef int (*xc_waitdomain_core_t)(int xc_handle,
                                     int domfd,
                                     int *status,
-                                    int options,
-                                    vcpu_guest_context_t *ctxt);
+                                    int options);
 typedef void *(*map_domain_va_core_t)(unsigned long domfd,
                                       int cpu,
-                                      void *guest_va,
-                                      vcpu_guest_context_t *ctxt);
+                                      void *guest_va);
 struct xc_core_format_type {
     xc_waitdomain_core_t waitdomain_core;
     map_domain_va_core_t map_domain_va_core;
@@ -642,25 +668,22 @@ static const struct xc_core_format_type format_type[] = {
 static const struct xc_core_format_type* current_format_type = NULL;
 
 void *
-map_domain_va_core(unsigned long domfd, int cpu, void *guest_va,
-                   vcpu_guest_context_any_t *ctxt)
+map_domain_va_core(unsigned long domfd, int cpu, void *guest_va)
 {
     if (current_format_type == NULL)
         return NULL;
-    return (current_format_type->map_domain_va_core)(domfd, cpu, guest_va,
-                                                     &ctxt->c);
+    return (current_format_type->map_domain_va_core)(domfd, cpu, guest_va);
 }
 
 int
-xc_waitdomain_core(int xc_handle, int domfd, int *status, int options,
-                   vcpu_guest_context_any_t *ctxt)
+xc_waitdomain_core(int xc_handle, int domfd, int *status, int options)
 {
     int ret;
     int i;
 
     for (i = 0; i < NR_FORMAT_TYPE; i++) {
         ret = (format_type[i].waitdomain_core)(xc_handle, domfd, status,
-                                               options, &ctxt->c);
+                                               options);
         if (ret == 0) {
             current_format_type = &format_type[i];
             break;

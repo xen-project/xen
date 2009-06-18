@@ -332,7 +332,7 @@ static inline void paging_write_p2m_entry(struct domain *d, unsigned long gfn,
 {
     struct vcpu *v = current;
     if ( v->domain != d )
-        v = d->vcpu[0];
+        v = d->vcpu ? d->vcpu[0] : NULL;
     if ( likely(v && paging_mode_enabled(d) && v->arch.paging.mode != NULL) )
     {
         return v->arch.paging.mode->write_p2m_entry(v, gfn, p, table_mfn,

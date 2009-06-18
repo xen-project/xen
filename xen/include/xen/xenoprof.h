@@ -50,7 +50,7 @@ struct xenoprof {
 #ifdef CONFIG_COMPAT
     int is_compat;
 #endif
-    struct xenoprof_vcpu vcpu [MAX_VIRT_CPUS];
+    struct xenoprof_vcpu *vcpu;
 };
 
 #ifndef CONFIG_COMPAT

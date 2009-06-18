@@ -31,6 +31,7 @@
 #else
 #define NR_CPUS 64
 #endif
+#define MAX_VIRT_CPUS XEN_LEGACY_MAX_VCPUS
 #define CONFIG_NUMA
 #define CONFIG_ACPI_NUMA
 #define NODES_SHIFT 8				/* linux/asm/numnodes.h */

@@ -1376,6 +1376,9 @@ static int sedf_adjust(struct domain *p, struct xen_domctl_scheduler_op *op)
           p->domain_id, op->u.sedf.period, op->u.sedf.slice,
           op->u.sedf.latency, (op->u.sedf.extratime)?"yes":"no");
 
+    if ( !p->vcpu )
+        return -EINVAL;
+
     if ( op->cmd == XEN_DOMCTL_SCHEDOP_putinfo )
     {
         /* Check for sane parameters. */

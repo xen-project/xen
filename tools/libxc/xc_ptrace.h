@@ -157,4 +157,9 @@ struct gdb_regs {
 }
 #endif
 
+void *map_domain_va_core(unsigned long domfd, int cpu, void *guest_va);
+int xc_waitdomain_core(int xc_handle, int domain, int *status, int options);
+vcpu_guest_context_any_t *xc_ptrace_get_vcpu_ctxt(unsigned int nr_cpus);
+
+
 #endif /* XC_PTRACE */

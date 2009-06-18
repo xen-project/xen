@@ -174,7 +174,7 @@ xc_ia64_recv_shared_info(int xc_handle, int io_fd, uint32_t dom,
     /* clear any pending events and the selector */
     memset(&(shared_info->evtchn_pending[0]), 0,
            sizeof (shared_info->evtchn_pending));
-    for (i = 0; i < MAX_VIRT_CPUS; i++)
+    for (i = 0; i < XEN_LEGACY_MAX_VCPUS; i++)
         shared_info->vcpu_info[i].evtchn_pending_sel = 0;
 
     if (start_info_pfn != NULL)

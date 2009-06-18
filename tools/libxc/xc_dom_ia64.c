@@ -87,7 +87,7 @@ int shared_info_ia64(struct xc_dom_image *dom, void *ptr)
     xc_dom_printf("%s: called\n", __FUNCTION__);
 
     memset(shared_info, 0, sizeof(*shared_info));
-    for (i = 0; i < MAX_VIRT_CPUS; i++)
+    for (i = 0; i < XEN_LEGACY_MAX_VCPUS; i++)
         shared_info->vcpu_info[i].evtchn_upcall_mask = 1;
     shared_info->arch.start_info_pfn = dom->start_info_pfn;
     shared_info->arch.memmap_info_num_pages = 1; //XXX

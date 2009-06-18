@@ -2225,13 +2225,6 @@ int __init construct_dom0(struct domain *d,
 	for ( i = 1; i < MAX_VIRT_CPUS; i++ )
 	    d->shared_info->vcpu_info[i].evtchn_upcall_mask = 1;
 
-	if (dom0_max_vcpus == 0)
-	    dom0_max_vcpus = MAX_VIRT_CPUS;
-	if (dom0_max_vcpus > num_online_cpus())
-	    dom0_max_vcpus = num_online_cpus();
-	if (dom0_max_vcpus > MAX_VIRT_CPUS)
-	    dom0_max_vcpus = MAX_VIRT_CPUS;
-	
 	printk ("Dom0 max_vcpus=%d\n", dom0_max_vcpus);
 	for ( i = 1; i < dom0_max_vcpus; i++ )
 	    if (alloc_vcpu(d, i, i) == NULL)
@@ -2304,6 +2297,24 @@ int __init construct_dom0(struct domain *d,
 	physdev_init_dom0(d);
 
 	return 0;
+}
+
+struct vcpu *__init alloc_dom0_vcpu0(void)
+{
+       if (dom0_max_vcpus == 0)
+           dom0_max_vcpus = MAX_VIRT_CPUS;
+       if (dom0_max_vcpus > num_online_cpus())
+           dom0_max_vcpus = num_online_cpus();
+       if (dom0_max_vcpus > MAX_VIRT_CPUS)
+           dom0_max_vcpus = MAX_VIRT_CPUS;
+
+       dom0->vcpu = xmalloc_array(struct vcpu *, dom0_max_vcpus);
+       if ( !dom0->vcpu )
+               return NULL;
+       memset(dom0->vcpu, 0, dom0_max_vcpus * sizeof(*dom0->vcpu));
+       dom0->max_vcpus = dom0_max_vcpus;
+
+       return alloc_vcpu(dom0, 0, 0);
 }
 
 void machine_restart(unsigned int delay_millisecs)

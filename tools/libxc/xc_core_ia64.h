@@ -29,7 +29,7 @@
 struct xc_core_arch_context {
     size_t mapped_regs_size;
     int nr_vcpus;
-    mapped_regs_t* mapped_regs[MAX_VIRT_CPUS];
+    mapped_regs_t** mapped_regs;
 
     struct xen_ia64_p2m_table p2m_table;
 };

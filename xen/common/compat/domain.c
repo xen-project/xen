@@ -24,7 +24,7 @@ int compat_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
     if ( (vcpuid < 0) || (vcpuid >= MAX_VIRT_CPUS) )
         return -EINVAL;
 
-    if ( (v = d->vcpu[vcpuid]) == NULL )
+    if ( vcpuid >= d->max_vcpus || (v = d->vcpu[vcpuid]) == NULL )
         return -ENOENT;
 
     switch ( cmd )

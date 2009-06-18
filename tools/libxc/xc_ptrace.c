@@ -42,7 +42,8 @@ static int current_is_hvm;
 
 static uint64_t                         online_cpumap;
 static uint64_t                         regs_valid;
-static vcpu_guest_context_any_t      ctxt[MAX_VIRT_CPUS];
+static unsigned int                     nr_vcpu_ids;
+static vcpu_guest_context_any_t        *ctxt;
 
 #define FOREACH_CPU(cpumap, i)  for ( cpumap = online_cpumap; (i = xc_ffs64(cpumap)); cpumap &= ~(1 << (index - 1)) )
 
@@ -101,6 +102,21 @@ paging_enabled(vcpu_guest_context_any_t *v)
     return (cr0 & X86_CR0_PE) && (cr0 & X86_CR0_PG);
 }
 
+vcpu_guest_context_any_t *xc_ptrace_get_vcpu_ctxt(unsigned int nr_cpus)
+{
+    if (nr_cpus > nr_vcpu_ids) {
+        vcpu_guest_context_any_t *new;
+
+        new = realloc(ctxt, nr_cpus * sizeof(*ctxt));
+        if (!new)
+            return NULL;
+        ctxt = new;
+        nr_vcpu_ids = nr_cpus;
+    }
+
+    return ctxt;
+}
+
 /*
  * Fetch registers for all online cpus and set the cpumap
  * to indicate which cpus are online
@@ -112,6 +128,9 @@ get_online_cpumap(int xc_handle, struct xen_domctl_getdomaininfo *d,
                   uint64_t *cpumap)
 {
     int i, online;
+
+    if (!xc_ptrace_get_vcpu_ctxt(d->max_vcpu_id + 1))
+        return -ENOMEM;
 
     *cpumap = 0;
     for (i = 0; i <= d->max_vcpu_id; i++) {
@@ -261,7 +280,7 @@ xc_ptrace(
     case PTRACE_PEEKDATA:
         if (current_isfile)
             guest_va = (unsigned long *)map_domain_va_core(
-                current_domid, cpu, addr, ctxt);
+                current_domid, cpu, addr);
         else
             guest_va = (unsigned long *)map_domain_va(
                 xc_handle, cpu, addr, PROT_READ);
@@ -277,7 +296,7 @@ xc_ptrace(
         /* XXX assume that all CPUs have the same address space */
         if (current_isfile)
             guest_va = (unsigned long *)map_domain_va_core(
-                current_domid, cpu, addr, ctxt);
+                current_domid, cpu, addr);
         else
             guest_va = (unsigned long *)map_domain_va(
                 xc_handle, cpu, addr, PROT_READ|PROT_WRITE);
@@ -433,7 +452,7 @@ xc_waitdomain(
     int options)
 {
     if (current_isfile)
-        return xc_waitdomain_core(xc_handle, domain, status, options, ctxt);
+        return xc_waitdomain_core(xc_handle, domain, status, options);
     return __xc_waitdomain(xc_handle, domain, status, options);
 }
 

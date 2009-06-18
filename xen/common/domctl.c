@@ -253,7 +253,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 
         ret = -EINVAL;
         if ( (d == current->domain) || /* no domain_pause() */
-             (vcpu >= MAX_VIRT_CPUS) || ((v = d->vcpu[vcpu]) == NULL) )
+             (vcpu >= d->max_vcpus) || ((v = d->vcpu[vcpu]) == NULL) )
             goto svc_out;
 
         if ( guest_handle_is_null(op->u.vcpucontext.ctxt) )
@@ -433,7 +433,8 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 
         ret = -EINVAL;
         if ( (d == current->domain) || /* no domain_pause() */
-             (max > MAX_VIRT_CPUS) )
+             (max > MAX_VIRT_CPUS) ||
+             (is_hvm_domain(d) && max > XEN_LEGACY_MAX_VCPUS) )
         {
             rcu_unlock_domain(d);
             break;
@@ -446,15 +447,40 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
             break;
         }
 
+        /* Until Xenoprof can dynamically grow its vcpu-s array... */
+        if ( d->xenoprof )
+        {
+            rcu_unlock_domain(d);
+            ret = -EAGAIN;
+            break;
+        }
+
         /* Needed, for example, to ensure writable p.t. state is synced. */
         domain_pause(d);
 
         /* We cannot reduce maximum VCPUs. */
         ret = -EINVAL;
-        if ( (max != MAX_VIRT_CPUS) && (d->vcpu[max] != NULL) )
+        if ( (max < d->max_vcpus) && (d->vcpu[max] != NULL) )
             goto maxvcpu_out;
 
         ret = -ENOMEM;
+        if ( max > d->max_vcpus )
+        {
+            struct vcpu **vcpus = xmalloc_array(struct vcpu *, max);
+            void *ptr;
+
+            if ( !vcpus )
+                goto maxvcpu_out;
+            memcpy(vcpus, d->vcpu, d->max_vcpus * sizeof(*vcpus));
+            memset(vcpus + d->max_vcpus, 0,
+                   (max - d->max_vcpus) * sizeof(*vcpus));
+
+            ptr = d->vcpu;
+            d->vcpu = vcpus;
+            wmb();
+            d->max_vcpus = max;
+            xfree(ptr);
+        }
         for ( i = 0; i < max; i++ )
         {
             if ( d->vcpu[i] != NULL )
@@ -505,7 +531,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
             goto vcpuaffinity_out;
 
         ret = -EINVAL;
-        if ( op->u.vcpuaffinity.vcpu >= MAX_VIRT_CPUS )
+        if ( op->u.vcpuaffinity.vcpu >= d->max_vcpus )
             goto vcpuaffinity_out;
 
         ret = -ESRCH;
@@ -599,7 +625,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
             goto getvcpucontext_out;
 
         ret = -EINVAL;
-        if ( op->u.vcpucontext.vcpu >= MAX_VIRT_CPUS )
+        if ( op->u.vcpucontext.vcpu >= d->max_vcpus )
             goto getvcpucontext_out;
 
         ret = -ESRCH;
@@ -661,7 +687,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
             goto getvcpuinfo_out;
 
         ret = -EINVAL;
-        if ( op->u.getvcpuinfo.vcpu >= MAX_VIRT_CPUS )
+        if ( op->u.getvcpuinfo.vcpu >= d->max_vcpus )
             goto getvcpuinfo_out;
 
         ret = -ESRCH;

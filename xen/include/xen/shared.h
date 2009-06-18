@@ -21,8 +21,6 @@ typedef union {
     (*(!has_32bit_shinfo(d) ?                           \
        (typeof(&(s)->compat.field))&(s)->native.field : \
        (typeof(&(s)->compat.field))&(s)->compat.field))
-#define shared_info(d, field)                   \
-    __shared_info(d, (d)->shared_info, field)
 
 typedef union {
     struct vcpu_info native;
@@ -30,19 +28,22 @@ typedef union {
 } vcpu_info_t;
 
 /* As above, cast to compat field type. */
-#define vcpu_info(v, field)                                                   \
-    (*(!has_32bit_shinfo((v)->domain) ?                                       \
-       (typeof(&(v)->vcpu_info->compat.field))&(v)->vcpu_info->native.field : \
-       (typeof(&(v)->vcpu_info->compat.field))&(v)->vcpu_info->compat.field))
+#define __vcpu_info(v, i, field)                        \
+    (*(!has_32bit_shinfo((v)->domain) ?                 \
+       (typeof(&(i)->compat.field))&(i)->native.field : \
+       (typeof(&(i)->compat.field))&(i)->compat.field))
 
 #else
 
 typedef struct shared_info shared_info_t;
-#define shared_info(d, field)           ((d)->shared_info->field)
+#define __shared_info(d, s, field) ((s)->field)
 
 typedef struct vcpu_info vcpu_info_t;
-#define vcpu_info(v, field)             ((v)->vcpu_info->field)
+#define __vcpu_info(v, i, field)   ((i)->field)
 
 #endif
+
+#define shared_info(d, field)      __shared_info(d, (d)->shared_info, field)
+#define vcpu_info(v, field)        __vcpu_info(v, (v)->vcpu_info, field)
 
 #endif /* __XEN_SHARED_H__ */

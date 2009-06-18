@@ -1146,7 +1146,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
 
     /* clear any pending events and the selector */
     MEMSET_ARRAY_FIELD(new_shared_info, evtchn_pending, 0);
-    for ( i = 0; i < MAX_VIRT_CPUS; i++ )
+    for ( i = 0; i < XEN_LEGACY_MAX_VCPUS; i++ )
 	    SET_FIELD(new_shared_info, vcpu_info[i].evtchn_pending_sel, 0);
 
     /* mask event channels */

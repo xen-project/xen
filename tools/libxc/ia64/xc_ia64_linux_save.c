@@ -238,7 +238,7 @@ xc_ia64_pv_send_context(int xc_handle, int io_fd, uint32_t dom,
 
     /* vcpu map */
     uint64_t *vcpumap = NULL;
-    if (xc_ia64_send_vcpumap(xc_handle, io_fd, dom, info, MAX_VIRT_CPUS,
+    if (xc_ia64_send_vcpumap(xc_handle, io_fd, dom, info, XEN_LEGACY_MAX_VCPUS,
                              &vcpumap))
         goto out;
 
@@ -308,7 +308,7 @@ xc_ia64_hvm_send_context(int xc_handle, int io_fd, uint32_t dom,
         return -1;
 
     /* vcpu map */
-    if (xc_ia64_send_vcpumap(xc_handle, io_fd, dom, info, MAX_VIRT_CPUS,
+    if (xc_ia64_send_vcpumap(xc_handle, io_fd, dom, info, XEN_LEGACY_MAX_VCPUS,
                              &vcpumap))
         goto out;
 

@@ -2868,7 +2868,7 @@ static void nmi_dom0_report(unsigned int reason_idx)
 {
     struct domain *d = dom0;
 
-    if ( (d == NULL) || (d->vcpu[0] == NULL) )
+    if ( (d == NULL) || (d->vcpu == NULL) || (d->vcpu[0] == NULL) )
         return;
 
     set_bit(reason_idx, nmi_reason(d));
@@ -3205,7 +3205,7 @@ int guest_has_trap_callback(struct domain *d, uint16_t vcpuid, unsigned int trap
     struct trap_info *t;
 
     BUG_ON(d == NULL);
-    BUG_ON(vcpuid >= MAX_VIRT_CPUS);
+    BUG_ON(vcpuid >= d->max_vcpus);
 
     /* Sanity check - XXX should be more fine grained. */
     BUG_ON(trap_nr > TRAP_syscall);
@@ -3223,7 +3223,7 @@ int send_guest_trap(struct domain *d, uint16_t vcpuid, unsigned int trap_nr)
     struct softirq_trap *st;
 
     BUG_ON(d == NULL);
-    BUG_ON(vcpuid >= MAX_VIRT_CPUS);
+    BUG_ON(vcpuid >= d->max_vcpus);
     v = d->vcpu[vcpuid];
 
     switch (trap_nr) {

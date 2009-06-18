@@ -462,7 +462,7 @@ The structure is declared in {\bf xen/include/public/xen.h}:
 \scriptsize
 \begin{verbatim}
 typedef struct shared_info {
-    vcpu_info_t vcpu_info[MAX_VIRT_CPUS];
+    vcpu_info_t vcpu_info[XEN_LEGACY_MAX_VCPUS];
 
     /*
      * A domain can create "event channels" on which it can send and receive

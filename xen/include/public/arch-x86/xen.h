@@ -73,8 +73,8 @@ typedef unsigned long xen_pfn_t;
 #define FIRST_RESERVED_GDT_BYTE  (FIRST_RESERVED_GDT_PAGE * 4096)
 #define FIRST_RESERVED_GDT_ENTRY (FIRST_RESERVED_GDT_BYTE / 8)
 
-/* Maximum number of virtual CPUs in multi-processor guests. */
-#define MAX_VIRT_CPUS 32
+/* Maximum number of virtual CPUs in legacy multi-processor guests. */
+#define XEN_LEGACY_MAX_VCPUS 32
 
 #ifndef __ASSEMBLY__
 

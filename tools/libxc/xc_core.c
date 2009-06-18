@@ -430,7 +430,7 @@ xc_domain_dumpcore_via_callback(int xc_handle,
 
     int nr_vcpus = 0;
     char *dump_mem, *dump_mem_start = NULL;
-    vcpu_guest_context_any_t  ctxt[MAX_VIRT_CPUS];
+    vcpu_guest_context_any_t *ctxt = NULL;
     struct xc_core_arch_context arch_ctxt;
     char dummy[PAGE_SIZE];
     int dummy_len;
@@ -492,6 +492,13 @@ xc_domain_dumpcore_via_callback(int xc_handle,
     if ( domid != info.domid )
     {
         PERROR("Domain %d does not exist", domid);
+        goto out;
+    }
+
+    ctxt = calloc(sizeof(*ctxt), info.max_vcpu_id + 1);
+    if ( !ctxt )
+    {
+        PERROR("Could not allocate vcpu context array", domid);
         goto out;
     }
 
@@ -900,6 +907,8 @@ out:
         xc_core_shdr_free(sheaders);
     if ( strtab != NULL )
         xc_core_strtab_free(strtab);
+    if ( ctxt != NULL )
+        free(ctxt);
     if ( dump_mem_start != NULL )
         free(dump_mem_start);
     if ( live_shinfo != NULL )

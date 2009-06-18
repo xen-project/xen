@@ -240,9 +240,12 @@ static long evtchn_bind_virq(evtchn_bind_virq_t *bind)
     if ( virq_is_global(virq) && (vcpu != 0) )
         return -EINVAL;
 
-    if ( (vcpu < 0) || (vcpu >= ARRAY_SIZE(d->vcpu)) ||
+    if ( (vcpu < 0) || (vcpu >= d->max_vcpus) ||
          ((v = d->vcpu[vcpu]) == NULL) )
         return -ENOENT;
+
+    if ( unlikely(!v->vcpu_info) )
+        return -EAGAIN;
 
     spin_lock(&d->event_lock);
 
@@ -273,9 +276,12 @@ static long evtchn_bind_ipi(evtchn_bind_ipi_t *bind)
     int            port, vcpu = bind->vcpu;
     long           rc = 0;
 
-    if ( (vcpu < 0) || (vcpu >= ARRAY_SIZE(d->vcpu)) ||
+    if ( (vcpu < 0) || (vcpu >= d->max_vcpus) ||
          (d->vcpu[vcpu] == NULL) )
         return -ENOENT;
+
+    if ( unlikely(!d->vcpu[vcpu]->vcpu_info) )
+        return -EAGAIN;
 
     spin_lock(&d->event_lock);
 
@@ -555,13 +561,13 @@ static int evtchn_set_pending(struct vcpu *v, int port)
     }
     
     /* Check if some VCPU might be polling for this event. */
-    if ( likely(bitmap_empty(d->poll_mask, MAX_VIRT_CPUS)) )
+    if ( likely(bitmap_empty(d->poll_mask, d->max_vcpus)) )
         return 0;
 
     /* Wake any interested (or potentially interested) pollers. */
-    for ( vcpuid = find_first_bit(d->poll_mask, MAX_VIRT_CPUS);
-          vcpuid < MAX_VIRT_CPUS;
-          vcpuid = find_next_bit(d->poll_mask, MAX_VIRT_CPUS, vcpuid+1) )
+    for ( vcpuid = find_first_bit(d->poll_mask, d->max_vcpus);
+          vcpuid < d->max_vcpus;
+          vcpuid = find_next_bit(d->poll_mask, d->max_vcpus, vcpuid+1) )
     {
         v = d->vcpu[vcpuid];
         if ( ((v->poll_evtchn <= 0) || (v->poll_evtchn == port)) &&
@@ -608,7 +614,7 @@ void send_guest_global_virq(struct domain *d, int virq)
 
     ASSERT(virq_is_global(virq));
 
-    if ( unlikely(d == NULL) )
+    if ( unlikely(d == NULL) || unlikely(d->vcpu == NULL) )
         return;
 
     v = d->vcpu[0];
@@ -717,8 +723,11 @@ long evtchn_bind_vcpu(unsigned int port, unsigned int vcpu_id)
     struct evtchn *chn;
     long           rc = 0;
 
-    if ( (vcpu_id >= ARRAY_SIZE(d->vcpu)) || (d->vcpu[vcpu_id] == NULL) )
+    if ( (vcpu_id >= d->max_vcpus) || (d->vcpu[vcpu_id] == NULL) )
         return -ENOENT;
+
+    if ( unlikely(!d->vcpu[vcpu_id]->vcpu_info) )
+        return -EAGAIN;
 
     spin_lock(&d->event_lock);
 
@@ -943,6 +952,9 @@ int alloc_unbound_xen_event_channel(
     struct domain *d = local_vcpu->domain;
     int            port;
 
+    if ( unlikely(!local_vcpu->vcpu_info) )
+        return -EAGAIN;
+
     spin_lock(&d->event_lock);
 
     if ( (port = get_free_port(d)) < 0 )
@@ -1016,6 +1028,14 @@ int evtchn_init(struct domain *d)
     if ( get_free_port(d) != 0 )
         return -EINVAL;
     evtchn_from_port(d, 0)->state = ECS_RESERVED;
+
+#if MAX_VIRT_CPUS > BITS_PER_LONG
+    d->poll_mask = xmalloc_array(unsigned long, BITS_TO_LONGS(MAX_VIRT_CPUS));
+    if ( !d->poll_mask )
+        return -ENOMEM;
+    bitmap_zero(d->poll_mask, MAX_VIRT_CPUS);
+#endif
+
     return 0;
 }
 
@@ -1044,6 +1064,11 @@ void evtchn_destroy(struct domain *d)
         d->evtchn[i] = NULL;
     }
     spin_unlock(&d->event_lock);
+
+#if MAX_VIRT_CPUS > BITS_PER_LONG
+    xfree(d->poll_mask);
+    d->poll_mask = NULL;
+#endif
 }
 
 static void domain_dump_evtchn_info(struct domain *d)

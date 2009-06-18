@@ -180,6 +180,8 @@ struct domain
     unsigned int     max_pages;       /* maximum value for tot_pages        */
     unsigned int     xenheap_pages;   /* # pages allocated from Xen heap    */
 
+    unsigned int     max_vcpus;
+
     /* Scheduling. */
     void            *sched_priv;    /* scheduler-specific data */
 
@@ -226,7 +228,11 @@ struct domain
     bool_t           is_pinned;
 
     /* Are any VCPUs polling event channels (SCHEDOP_poll)? */
+#if MAX_VIRT_CPUS <= BITS_PER_LONG
     DECLARE_BITMAP(poll_mask, MAX_VIRT_CPUS);
+#else
+    unsigned long   *poll_mask;
+#endif
 
     /* Guest has shut down (inc. reason code)? */
     spinlock_t       shutdown_lock;
@@ -244,7 +250,7 @@ struct domain
 
     atomic_t         refcnt;
 
-    struct vcpu *vcpu[MAX_VIRT_CPUS];
+    struct vcpu    **vcpu;
 
     /* Bitmask of CPUs which are holding onto this domain's state. */
     cpumask_t        domain_dirty_cpumask;
@@ -497,7 +503,7 @@ extern struct domain *domain_list;
        (_d) = rcu_dereference((_d)->next_in_list )) \
 
 #define for_each_vcpu(_d,_v)                    \
- for ( (_v) = (_d)->vcpu[0];                    \
+ for ( (_v) = (_d)->vcpu ? (_d)->vcpu[0] : NULL; \
        (_v) != NULL;                            \
        (_v) = (_v)->next_in_list )
 

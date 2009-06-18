@@ -684,7 +684,7 @@ int paging_domctl(struct domain *d, xen_domctl_shadow_op_t *sc,
         return 0;
     }
 
-    if ( unlikely(d->vcpu[0] == NULL) )
+    if ( unlikely(d->vcpu == NULL) || unlikely(d->vcpu[0] == NULL) )
     {
         PAGING_ERROR("Paging op on a domain (%u) with no vcpus\n",
                      d->domain_id);

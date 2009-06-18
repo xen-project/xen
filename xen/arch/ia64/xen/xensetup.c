@@ -570,7 +570,11 @@ skip_move:
     scheduler_init();
     idle_vcpu[0] = (struct vcpu*) ia64_r13;
     idle_domain = domain_create(IDLE_DOMAIN_ID, 0, 0);
-    if ( (idle_domain == NULL) || (alloc_vcpu(idle_domain, 0, 0) == NULL) )
+    if ( idle_domain == NULL )
+        BUG();
+    idle_domain->vcpu = idle_vcpu;
+    idle_domain->max_vcpus = NR_CPUS;
+    if ( alloc_vcpu(idle_domain, 0, 0) == NULL )
         BUG();
 
     alloc_dom_xen_and_dom_io();
@@ -657,7 +661,7 @@ printk("num_online_cpus=%d, max_cpus=%d\n",num_online_cpus(),max_cpus);
     if (dom0 == NULL)
         panic("Error creating domain 0\n");
     domain_set_vhpt_size(dom0, dom0_vhpt_size_log2);
-    dom0_vcpu0 = alloc_vcpu(dom0, 0, 0);
+    dom0_vcpu0 = alloc_dom0_vcpu0();
     if (dom0_vcpu0 == NULL || vcpu_late_initialise(dom0_vcpu0) != 0)
         panic("Cannot allocate dom0 vcpu 0\n");
 

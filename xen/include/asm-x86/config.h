@@ -52,8 +52,12 @@
 #define NR_CPUS 32
 #endif
 
-#if defined(__i386__) && (NR_CPUS > 32)
+#ifdef __i386__
+#if NR_CPUS > 32
 #error "Maximum of 32 physical processors supported by Xen on x86_32"
+#endif
+/* Maximum number of virtual CPUs in multi-processor guests. */
+#define MAX_VIRT_CPUS XEN_LEGACY_MAX_VCPUS
 #endif
 
 #ifdef CONFIG_X86_SUPERVISOR_MODE_KERNEL
@@ -203,7 +207,7 @@ extern unsigned int video_mode, video_flags;
 /* Slot 260: per-domain mappings. */
 #define PERDOMAIN_VIRT_START    (PML4_ADDR(260))
 #define PERDOMAIN_VIRT_END      (PERDOMAIN_VIRT_START + (PERDOMAIN_MBYTES<<20))
-#define PERDOMAIN_MBYTES        ((unsigned long)GDT_LDT_MBYTES)
+#define PERDOMAIN_MBYTES        (PML4_ENTRY_BYTES >> (20 + PAGETABLE_ORDER))
 /* Slot 261: machine-to-phys conversion table (16GB). */
 #define RDWR_MPT_VIRT_START     (PML4_ADDR(261))
 #define RDWR_MPT_VIRT_END       (RDWR_MPT_VIRT_START + (16UL<<30))
@@ -241,6 +245,8 @@ extern unsigned int video_mode, video_flags;
 #define COMPAT_L2_PAGETABLE_LAST_XEN_SLOT  l2_table_offset(~0U)
 #define COMPAT_L2_PAGETABLE_XEN_SLOTS(d) \
     (COMPAT_L2_PAGETABLE_LAST_XEN_SLOT - COMPAT_L2_PAGETABLE_FIRST_XEN_SLOT(d) + 1)
+
+#define COMPAT_LEGACY_MAX_VCPUS XEN_LEGACY_MAX_VCPUS
 
 #endif
 
@@ -347,7 +353,12 @@ extern unsigned long xenheap_phys_end;
 /* GDT/LDT shadow mapping area. The first per-domain-mapping sub-area. */
 #define GDT_LDT_VCPU_SHIFT       5
 #define GDT_LDT_VCPU_VA_SHIFT    (GDT_LDT_VCPU_SHIFT + PAGE_SHIFT)
+#ifdef MAX_VIRT_CPUS
 #define GDT_LDT_MBYTES           (MAX_VIRT_CPUS >> (20-GDT_LDT_VCPU_VA_SHIFT))
+#else
+#define GDT_LDT_MBYTES           PERDOMAIN_MBYTES
+#define MAX_VIRT_CPUS            (GDT_LDT_MBYTES << (20-GDT_LDT_VCPU_VA_SHIFT))
+#endif
 #define GDT_LDT_VIRT_START       PERDOMAIN_VIRT_START
 #define GDT_LDT_VIRT_END         (GDT_LDT_VIRT_START + (GDT_LDT_MBYTES << 20))
 

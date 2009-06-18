@@ -1336,7 +1336,7 @@ static int alloc_l3_table(struct page_info *page, int preemptible)
      */
     if ( (pfn >= 0x100000) &&
          unlikely(!VM_ASSIST(d, VMASST_TYPE_pae_extended_cr3)) &&
-         d->vcpu[0] && d->vcpu[0]->is_initialised )
+         d->vcpu && d->vcpu[0] && d->vcpu[0]->is_initialised )
     {
         MEM_LOG("PAE pgd must be below 4GB (0x%lx >= 0x100000)", pfn);
         return -EINVAL;
@@ -2575,7 +2575,7 @@ static inline int vcpumask_to_pcpumask(
     for ( vmask = 0, offs = 0; ; ++offs)
     {
         vcpu_bias = offs * (is_native ? BITS_PER_LONG : 32);
-        if ( vcpu_bias >= MAX_VIRT_CPUS )
+        if ( vcpu_bias >= d->max_vcpus )
             return 0;
 
         if ( unlikely(is_native ?
@@ -2592,7 +2592,7 @@ static inline int vcpumask_to_pcpumask(
             vcpu_id = find_first_set_bit(vmask);
             vmask &= ~(1UL << vcpu_id);
             vcpu_id += vcpu_bias;
-            if ( (vcpu_id >= MAX_VIRT_CPUS) )
+            if ( (vcpu_id >= d->max_vcpus) )
                 return 0;
             if ( ((v = d->vcpu[vcpu_id]) != NULL) )
                 cpus_or(*pmask, *pmask, v->vcpu_dirty_cpumask);

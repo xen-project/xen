@@ -134,7 +134,7 @@ struct vcpu *alloc_vcpu(
 {
     struct vcpu *v;
 
-    BUG_ON(d->vcpu[vcpu_id] != NULL);
+    BUG_ON((!is_idle_domain(d) || vcpu_id) && d->vcpu[vcpu_id]);
 
     if ( (v = alloc_vcpu_struct()) == NULL )
         return NULL;
@@ -153,7 +153,8 @@ struct vcpu *alloc_vcpu(
         v->runstate.state = RUNSTATE_offline;        
         v->runstate.state_entry_time = NOW();
         set_bit(_VPF_down, &v->pause_flags);
-        v->vcpu_info = (void *)&shared_info(d, vcpu_info[vcpu_id]);
+        if ( vcpu_id < XEN_LEGACY_MAX_VCPUS )
+            v->vcpu_info = (void *)&shared_info(d, vcpu_info[vcpu_id]);
     }
 
     if ( sched_init_vcpu(v, cpu_id) != 0 )
@@ -181,22 +182,8 @@ struct vcpu *alloc_vcpu(
 
 struct vcpu *alloc_idle_vcpu(unsigned int cpu_id)
 {
-    struct domain *d;
-    struct vcpu *v;
-    unsigned int vcpu_id = cpu_id % MAX_VIRT_CPUS;
-
-    if ( (v = idle_vcpu[cpu_id]) != NULL )
-        return v;
-
-    d = (vcpu_id == 0) ?
-        domain_create(IDLE_DOMAIN_ID, 0, 0) :
-        idle_vcpu[cpu_id - vcpu_id]->domain;
-    BUG_ON(d == NULL);
-
-    v = alloc_vcpu(d, vcpu_id, cpu_id);
-    idle_vcpu[cpu_id] = v;
-
-    return v;
+    return idle_vcpu[cpu_id] ?: alloc_vcpu(idle_vcpu[0]->domain,
+                                           cpu_id, cpu_id);
 }
 
 static unsigned int extra_dom0_irqs, extra_domU_irqs = 8;
@@ -575,7 +562,7 @@ static void complete_domain_destroy(struct rcu_head *head)
     struct vcpu *v;
     int i;
 
-    for ( i = MAX_VIRT_CPUS-1; i >= 0; i-- )
+    for ( i = d->max_vcpus - 1; i >= 0; i-- )
     {
         if ( (v = d->vcpu[i]) == NULL )
             continue;
@@ -594,7 +581,7 @@ static void complete_domain_destroy(struct rcu_head *head)
     /* Free page used by xen oprofile buffer. */
     free_xenoprof_pages(d);
 
-    for ( i = MAX_VIRT_CPUS-1; i >= 0; i-- )
+    for ( i = d->max_vcpus - 1; i >= 0; i-- )
         if ( (v = d->vcpu[i]) != NULL )
             free_vcpu_struct(v);
 
@@ -742,12 +729,15 @@ long do_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
     if ( (vcpuid < 0) || (vcpuid >= MAX_VIRT_CPUS) )
         return -EINVAL;
 
-    if ( (v = d->vcpu[vcpuid]) == NULL )
+    if ( vcpuid >= d->max_vcpus || (v = d->vcpu[vcpuid]) == NULL )
         return -ENOENT;
 
     switch ( cmd )
     {
     case VCPUOP_initialise:
+        if ( !v->vcpu_info )
+            return -EINVAL;
+
         if ( (ctxt = xmalloc(struct vcpu_guest_context)) == NULL )
             return -ENOMEM;
 

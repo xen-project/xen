@@ -339,7 +339,8 @@ static void vioapic_deliver(struct hvm_hw_vioapic *vioapic, int irq)
         /* Force round-robin to pick VCPU 0 */
         if ( (irq == hvm_isa_irq_to_gsi(0)) && pit_channel0_enabled() )
         {
-            v = vioapic_domain(vioapic)->vcpu[0];
+            v = vioapic_domain(vioapic)->vcpu ?
+                vioapic_domain(vioapic)->vcpu[0] : NULL;
             target = v ? vcpu_vlapic(v) : NULL;
         }
         else
@@ -367,12 +368,14 @@ static void vioapic_deliver(struct hvm_hw_vioapic *vioapic, int irq)
             if ( !(deliver_bitmask & (1 << bit)) )
                 continue;
             deliver_bitmask &= ~(1 << bit);
+            if ( vioapic_domain(vioapic)->vcpu == NULL )
+                v = NULL;
 #ifdef IRQ0_SPECIAL_ROUTING
             /* Do not deliver timer interrupts to VCPU != 0 */
-            if ( (irq == hvm_isa_irq_to_gsi(0)) && pit_channel0_enabled() )
+            else if ( (irq == hvm_isa_irq_to_gsi(0)) && pit_channel0_enabled() )
                 v = vioapic_domain(vioapic)->vcpu[0];
-            else
 #endif
+            else
                 v = vioapic_domain(vioapic)->vcpu[bit];
             if ( v != NULL )
             {
@@ -392,7 +395,8 @@ static void vioapic_deliver(struct hvm_hw_vioapic *vioapic, int irq)
             if ( !(deliver_bitmask & (1 << bit)) )
                 continue;
             deliver_bitmask &= ~(1 << bit);
-            if ( ((v = vioapic_domain(vioapic)->vcpu[bit]) != NULL) &&
+            if ( (vioapic_domain(vioapic)->vcpu != NULL) &&
+                 ((v = vioapic_domain(vioapic)->vcpu[bit]) != NULL) &&
                  !test_and_set_bool(v->nmi_pending) )
                 vcpu_kick(v);
         }

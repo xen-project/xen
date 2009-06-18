@@ -28,6 +28,7 @@
 #include "ia64/xc_dom_ia64_util.h"
 
 #define ia64_fc(addr)   asm volatile ("fc %0" :: "r"(addr) : "memory")
+#define MAX_VIRT_CPUS XEN_LEGACY_MAX_VCPUS /* XXX */
 #endif /* __XEN__ */
 
 #include <xen/acpi.h>

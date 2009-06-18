@@ -367,7 +367,7 @@ void hvm_domain_relinquish_resources(struct domain *d)
 
     /* Stop all asynchronous timer actions. */
     rtc_deinit(d);
-    if ( d->vcpu[0] != NULL )
+    if ( d->vcpu != NULL && d->vcpu[0] != NULL )
     {
         pit_deinit(d);
         pmtimer_deinit(d);
@@ -507,7 +507,7 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
 
     /* Which vcpu is this? */
     vcpuid = hvm_load_instance(h);
-    if ( vcpuid >= MAX_VIRT_CPUS || (v = d->vcpu[vcpuid]) == NULL )
+    if ( vcpuid >= d->max_vcpus || (v = d->vcpu[vcpuid]) == NULL )
     {
         gdprintk(XENLOG_ERR, "HVM restore: domain has no vcpu %u\n", vcpuid);
         return -EINVAL;
@@ -2285,7 +2285,7 @@ static void hvm_s3_suspend(struct domain *d)
     domain_pause(d);
     domain_lock(d);
 
-    if ( d->is_dying || (d->vcpu[0] == NULL) ||
+    if ( d->is_dying || (d->vcpu == NULL) || (d->vcpu[0] == NULL) ||
          test_and_set_bool(d->arch.hvm_domain.is_s3_suspended) )
     {
         domain_unlock(d);
@@ -2660,7 +2660,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
             goto param_fail2;
 
         rc = -EINVAL;
-        if ( d->vcpu[0] == NULL )
+        if ( d->vcpu == NULL || d->vcpu[0] == NULL )
             goto param_fail2;
 
         if ( shadow_mode_enabled(d) )

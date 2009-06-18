@@ -120,7 +120,7 @@ static void xenoprof_reset_buf(struct domain *d)
         return;
     }
 
-    for ( j = 0; j < MAX_VIRT_CPUS; j++ )
+    for ( j = 0; j < d->max_vcpus; j++ )
     {
         buf = d->xenoprof->vcpu[j].buffer;
         if ( buf != NULL )
@@ -200,6 +200,17 @@ static int alloc_xenoprof_struct(
     }
 
     memset(d->xenoprof, 0, sizeof(*d->xenoprof));
+
+    d->xenoprof->vcpu = xmalloc_array(struct xenoprof_vcpu, d->max_vcpus);
+    if ( d->xenoprof->vcpu == NULL )
+    {
+        xfree(d->xenoprof);
+        d->xenoprof = NULL;
+        printk("alloc_xenoprof_struct(): vcpu array allocation failed\n");
+        return -ENOMEM;
+    }
+
+    memset(d->xenoprof->vcpu, 0, d->max_vcpus * sizeof(*d->xenoprof->vcpu));
 
     nvcpu = 0;
     for_each_vcpu ( d, v )

@@ -66,7 +66,7 @@ typedef unsigned long xen_pfn_t;
 
 /* Maximum number of virtual CPUs in multi-processor guests. */
 /* WARNING: before changing this, check that shared_info fits on a page */
-#define MAX_VIRT_CPUS 64
+#define XEN_LEGACY_MAX_VCPUS 64
 
 /* IO ports location for PV.  */
 #define IO_PORTS_PADDR          0x00000ffffc000000UL

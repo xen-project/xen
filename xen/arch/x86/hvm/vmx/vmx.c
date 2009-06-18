@@ -1221,7 +1221,7 @@ static void __ept_sync_domain(void *info)
 void ept_sync_domain(struct domain *d)
 {
     /* Only if using EPT and this domain has some VCPUs to dirty. */
-    if ( d->arch.hvm_domain.hap_enabled && d->vcpu[0] )
+    if ( d->arch.hvm_domain.hap_enabled && d->vcpu && d->vcpu[0] )
     {
         ASSERT(local_irq_is_enabled());
         on_each_cpu(__ept_sync_domain, d, 1);
@@ -1399,7 +1399,7 @@ static struct hvm_function_table vmx_function_table = {
 };
 
 static unsigned long *vpid_bitmap;
-#define VPID_BITMAP_SIZE ((1u << VMCS_VPID_WIDTH) / MAX_VIRT_CPUS)
+#define VPID_BITMAP_SIZE ((1u << VMCS_VPID_WIDTH) / XEN_LEGACY_MAX_VCPUS)
 
 void start_vmx(void)
 {
@@ -1921,7 +1921,7 @@ static int vmx_alloc_vpid(struct domain *d)
     }
     while ( test_and_set_bit(idx, vpid_bitmap) );
 
-    d->arch.hvm_domain.vmx.vpid_base = idx * MAX_VIRT_CPUS;
+    d->arch.hvm_domain.vmx.vpid_base = idx * XEN_LEGACY_MAX_VCPUS;
     return 0;
 }
 
@@ -1930,7 +1930,8 @@ static void vmx_free_vpid(struct domain *d)
     if ( !cpu_has_vmx_vpid )
         return;
 
-    clear_bit(d->arch.hvm_domain.vmx.vpid_base / MAX_VIRT_CPUS, vpid_bitmap);
+    clear_bit(d->arch.hvm_domain.vmx.vpid_base / XEN_LEGACY_MAX_VCPUS,
+              vpid_bitmap);
 }
 
 static void vmx_install_vlapic_mapping(struct vcpu *v)

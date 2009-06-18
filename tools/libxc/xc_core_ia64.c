@@ -251,13 +251,10 @@ xc_core_arch_map_p2m(int xc_handle, unsigned int guest_width, xc_dominfo_t *info
 void
 xc_core_arch_context_init(struct xc_core_arch_context* arch_ctxt)
 {
-    int i;
-
     arch_ctxt->mapped_regs_size =
         (XMAPPEDREGS_SIZE < PAGE_SIZE) ? PAGE_SIZE: XMAPPEDREGS_SIZE;
     arch_ctxt->nr_vcpus = 0;
-    for ( i = 0; i < MAX_VIRT_CPUS; i++ )
-        arch_ctxt->mapped_regs[i] = NULL;
+    arch_ctxt->mapped_regs = NULL;
 
     xc_ia64_p2m_init(&arch_ctxt->p2m_table);
 }
@@ -269,6 +266,7 @@ xc_core_arch_context_free(struct xc_core_arch_context* arch_ctxt)
     for ( i = 0; i < arch_ctxt->nr_vcpus; i++ )
         if ( arch_ctxt->mapped_regs[i] != NULL )
             munmap(arch_ctxt->mapped_regs[i], arch_ctxt->mapped_regs_size);
+    free(arch_ctxt->mapped_regs);
     xc_ia64_p2m_unmap(&arch_ctxt->p2m_table);
 }
 
@@ -289,6 +287,21 @@ xc_core_arch_context_get(struct xc_core_arch_context* arch_ctxt,
         errno = ENOENT;
         return -1;
     }
+    if ( !(arch_ctxt->nr_vcpus & (arch_ctxt->nr_vcpus - 1)) ) {
+        unsigned int nr = arch_ctxt->nr_vcpus ? arch_ctxt->nr_vcpus << 1 : 1;
+        mapped_regs_t** new = realloc(arch_ctxt->mapped_regs,
+                                      nr * sizeof(*new));
+
+        if ( !new )
+        {
+            PERROR("Could not alloc mapped regs pointer array");
+            return -1;
+        }
+        memset(new + arch_ctxt->nr_vcpus, 0,
+               (nr - arch_ctxt->nr_vcpus) * sizeof(*new));
+        arch_ctxt->mapped_regs = new;
+    }
+
     mapped_regs = xc_map_foreign_range(xc_handle, domid,
                                        arch_ctxt->mapped_regs_size,
                                        PROT_READ, ctxt->privregs_pfn);

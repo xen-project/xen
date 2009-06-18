@@ -463,7 +463,8 @@ static void do_nmi_stats(unsigned char key)
     for_each_cpu ( i )
         printk("%3d\t%3d\n", i, nmi_count(i));
 
-    if ( ((d = dom0) == NULL) || ((v = d->vcpu[0]) == NULL) )
+    if ( ((d = dom0) == NULL) || (d->vcpu == NULL) ||
+         ((v = d->vcpu[0]) == NULL) )
         return;
 
     if ( v->nmi_pending || (v->trap_priority >= VCPU_TRAP_NMI) )
