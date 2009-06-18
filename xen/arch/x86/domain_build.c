@@ -146,33 +146,65 @@ static struct page_info * __init alloc_chunk(
     return page;
 }
 
-static unsigned long __init compute_dom0_nr_pages(void)
+static unsigned long __init compute_dom0_nr_pages(
+#ifdef __x86_64__
+    unsigned long vstart, unsigned long vend, size_t sizeof_long)
+#else
+    void)
+#endif
 {
     unsigned long avail = avail_domheap_pages() + initial_images_nrpages();
+    unsigned long nr_pages = dom0_nrpages;
+    unsigned long min_pages = dom0_min_nrpages;
+    unsigned long max_pages = dom0_max_nrpages;
 
     /*
      * If domain 0 allocation isn't specified, reserve 1/16th of available
      * memory for things like DMA buffers. This reservation is clamped to 
      * a maximum of 128MB.
      */
-    if ( dom0_nrpages == 0 )
-    {
-        dom0_nrpages = avail;
-        dom0_nrpages = min(dom0_nrpages / 16, 128L << (20 - PAGE_SHIFT));
-        dom0_nrpages = -dom0_nrpages;
-    }
+    if ( nr_pages == 0 )
+        nr_pages = -min(avail / 16, 128UL << (20 - PAGE_SHIFT));
 
     /* Negative memory specification means "all memory - specified amount". */
-    if ( dom0_nrpages     < 0 ) dom0_nrpages     += avail;
-    if ( dom0_min_nrpages < 0 ) dom0_min_nrpages += avail;
-    if ( dom0_max_nrpages < 0 ) dom0_max_nrpages += avail;
+    if ( (long)nr_pages  < 0 ) nr_pages  += avail;
+    if ( (long)min_pages < 0 ) min_pages += avail;
+    if ( (long)max_pages < 0 ) max_pages += avail;
 
     /* Clamp dom0 memory according to min/max limits and available memory. */
-    dom0_nrpages = max(dom0_nrpages, dom0_min_nrpages);
-    dom0_nrpages = min(dom0_nrpages, dom0_max_nrpages);
-    dom0_nrpages = min(dom0_nrpages, (long)avail);
+    nr_pages = max(nr_pages, min_pages);
+    nr_pages = min(nr_pages, max_pages);
+    nr_pages = min(nr_pages, avail);
 
-    return dom0_nrpages;
+#ifdef __x86_64__
+    if ( vstart && dom0_nrpages <= 0 &&
+         (dom0_min_nrpages <= 0 || nr_pages > min_pages) )
+    {
+        /*
+         * Legacy Linux kernels (i.e. such without a XEN_ELFNOTE_INIT_P2M
+         * note) require that there is enough virtual space beyond the initial
+         * allocation to set up their initial page tables. This space is
+         * roughly the same size as the p2m table, so make sure the initial
+         * allocation doesn't consume more than about half the space that's
+         * available between params.virt_base and the address space end.
+         */
+        unsigned long end = vend + nr_pages * sizeof_long;
+
+        if ( end > vstart )
+            end += end - vstart;
+        if ( end <= vstart ||
+             (sizeof_long < sizeof(end) && end > (1UL << (8 * sizeof_long))) )
+        {
+            end = sizeof_long >= sizeof(end) ? 0 : 1UL << (8 * sizeof_long);
+            nr_pages = (end - vend) / (2 * sizeof_long);
+            if ( dom0_min_nrpages > 0 && nr_pages < min_pages )
+                nr_pages = min_pages;
+            printk("Dom0 memory clipped to %lu pages\n", nr_pages);
+        }
+    }
+#endif
+
+    return nr_pages;
 }
 
 static void __init process_dom0_ioports_disable(void)
@@ -282,8 +314,6 @@ int __init construct_dom0(
 
     d->max_pages = ~0U;
 
-    nr_pages = compute_dom0_nr_pages();
-
     if ( (rc = bzimage_parse(image_base, &image_start, &image_len)) != 0 )
         return rc;
 
@@ -342,9 +372,18 @@ int __init construct_dom0(
         d->arch.is_32bit_pv = d->arch.has_32bit_shinfo = 1;
         v->vcpu_info = (void *)&d->shared_info->compat.vcpu_info[0];
 
-        if ( nr_pages != (unsigned int)nr_pages )
-            nr_pages = UINT_MAX;
+        nr_pages = compute_dom0_nr_pages(parms.virt_base,
+            round_pgup(parms.virt_kend) + round_pgup(initrd_len),
+            sizeof(unsigned int));
     }
+    else if (parms.p2m_base != UNSET_ADDR)
+        nr_pages = compute_dom0_nr_pages(0, 0, 0);
+    else
+        nr_pages = compute_dom0_nr_pages(parms.virt_base,
+            round_pgup(parms.virt_kend) + round_pgup(initrd_len),
+            sizeof(unsigned long));
+#else
+    nr_pages = compute_dom0_nr_pages();
 #endif
 
     if ( parms.pae == PAEKERN_extended_cr3 )
