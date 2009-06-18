@@ -223,7 +223,15 @@ page_list_remove_head(struct page_list_head *head)
 
     return page;
 }
-
+static inline void
+page_list_move(struct page_list_head *dst, struct page_list_head *src)
+{
+    if ( !page_list_empty(src) )
+    {
+        *dst = *src;
+        INIT_PAGE_LIST_HEAD(src);
+    }
+}
 static inline void
 page_list_splice(struct page_list_head *list, struct page_list_head *head)
 {
@@ -281,6 +289,8 @@ page_list_splice(struct page_list_head *list, struct page_list_head *head)
         list_del(&__pg->list); \
         __pg; \
     }) : NULL)
+# define page_list_move(dst, src)        (!list_empty(src) ? \
+    list_replace_init(src, dst) : (void)0)
 # define page_list_for_each(pos, head)   list_for_each_entry(pos, head, list)
 # define page_list_for_each_safe(pos, tmp, head) \
     list_for_each_entry_safe(pos, tmp, head, list)

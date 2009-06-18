@@ -1705,7 +1705,7 @@ static int relinquish_memory(struct domain *d, struct page_list_head *list)
         }
     }
 
-    page_list_splice_init(&d->arch.relmem_list, list);
+    page_list_move(list, &d->arch.relmem_list);
 
  out:
     spin_unlock_recursive(&d->page_alloc_lock);

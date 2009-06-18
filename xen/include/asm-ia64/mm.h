@@ -92,24 +92,6 @@ struct page_info
     u32 tlbflush_timestamp;
 };
 
-#ifndef page_list_entry
-static inline void
-page_list_splice_init(struct page_list_head *list, struct page_list_head *head)
-{
-    if ( !page_list_empty(list) )
-    {
-        if ( head->next )
-            head->tail->list.next = page_to_mfn(list->next);
-        else
-            head->next = list->next;
-        head->tail = list->tail;
-        INIT_PAGE_LIST_HEAD(list);
-    }
-}
-#else
-# define page_list_splice_init	list_splice_init
-#endif
-
 #define set_page_count(p,v) 	atomic_set(&(p)->_count, v - 1)
 
 /*

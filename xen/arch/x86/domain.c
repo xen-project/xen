@@ -1818,11 +1818,7 @@ static int relinquish_memory(
     }
 
     /* list is empty at this point. */
-    if ( !page_list_empty(&d->arch.relmem_list) )
-    {
-        *list = d->arch.relmem_list;
-        INIT_PAGE_LIST_HEAD(&d->arch.relmem_list);
-    }
+    page_list_move(list, &d->arch.relmem_list);
 
  out:
     spin_unlock_recursive(&d->page_alloc_lock);
