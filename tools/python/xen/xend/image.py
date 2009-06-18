@@ -286,6 +286,11 @@ class ImageHandler:
             if dev_type == 'vfb':
                 if 'keymap' in dev_info:
                     keymap = dev_info.get('keymap',{})
+                if 'monitor' in dev_info:
+                    ret.append("-serial")
+                    ret.append(dev_info.get('monitor',{}))
+                    ret.append("-monitor")
+                    ret.append("null")
                 if 'serial' in dev_info:
                     ret.append("-serial")
                     ret.append(dev_info.get('serial',{}))
@@ -717,7 +722,7 @@ class LinuxImageHandler(ImageHandler):
         ret = ImageHandler.parseDeviceModelArgs(self, vmConfig)
         # Equivalent to old xenconsoled behaviour. Should make
         # it configurable in future
-        ret = ret + ["-serial", "pty"]
+        ret = ["-serial", "pty"] + ret
         return ret
 
     def getDeviceModelArgs(self, restore = False):
@@ -749,10 +754,16 @@ class HVMImageHandler(ImageHandler):
 
         if not self.display :
             self.display = ''
-        # Do not store sdl and opengl qemu cli options
-        self.vm.storeVm(("image/dmargs", " ".join([ x for x in self.dmargs
-                        if x != "-sdl"
-                        and x != "-disable-opengl" ])),
+
+        store_dmargs = self.dmargs[:]
+        store_dmargs.remove('-sdl')
+        store_dmargs.remove('-disable-opengl')
+        try :
+            midx = store_dmargs.index('-monitor')
+            store_dmargs[midx + 1] = 'pty'
+        except ValueError :
+            pass
+        self.vm.storeVm(("image/dmargs", " ".join(store_dmargs)),
                         ("image/device-model", self.device_model),
                         ("image/display", self.display))
         self.vm.permissionsVm("image/dmargs", { 'dom': self.vm.getDomid(), 'read': True } )

@@ -354,7 +354,7 @@ gopts.var('irq', val='IRQ',
          For example 'irq=7'.
          This option may be repeated to add more than one IRQ.""")
 
-gopts.var('vfb', val="vnc=1,sdl=1,vncunused=1,vncdisplay=N,vnclisten=ADDR,display=DISPLAY,xauthority=XAUTHORITY,vncpasswd=PASSWORD,opengl=1,keymap=FILE,serial=FILE",
+gopts.var('vfb', val="vnc=1,sdl=1,vncunused=1,vncdisplay=N,vnclisten=ADDR,display=DISPLAY,xauthority=XAUTHORITY,vncpasswd=PASSWORD,opengl=1,keymap=FILE,serial=FILE,monitor=FILE",
           fn=append_value, default=[],
           use="""Make the domain a framebuffer backend.
           Both sdl=1 and vnc=1 can be enabled at the same time.
@@ -367,7 +367,8 @@ gopts.var('vfb', val="vnc=1,sdl=1,vncunused=1,vncdisplay=N,vnclisten=ADDR,displa
           given DISPLAY and XAUTHORITY, which default to the current user's
           ones.  OpenGL will be used by default unless opengl is set to 0.
           keymap overrides the XendD configured default layout file.
-	  Serial adds a second serial support to qemu.""")
+	  Serial adds a second serial support to qemu.
+          Monitor adds a backend for the stubdom monitor.""")
 
 gopts.var('vif', val="type=TYPE,mac=MAC,bridge=BRIDGE,ip=IPADDR,script=SCRIPT," + \
           "backend=DOM,vifname=NAME,rate=RATE,model=MODEL,accel=ACCEL",
@@ -815,7 +816,7 @@ def configure_vfbs(config_devs, vals):
         for (k,v) in d.iteritems():
             if not k in [ 'vnclisten', 'vncunused', 'vncdisplay', 'display',
                           'videoram', 'xauthority', 'sdl', 'vnc', 'vncpasswd',
-                          'opengl', 'keymap', 'serial' ]:
+                          'opengl', 'keymap', 'serial', 'monitor' ]:
                 err("configuration option %s unknown to vfbs" % k)
             config.append([k,v])
         if not d.has_key("keymap"):

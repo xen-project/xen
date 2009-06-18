@@ -56,6 +56,10 @@ do
 		serial="$2"
 		shift
 		;;
+            -monitor)
+		monitor="$2"
+		shift
+		;;
 	esac
     fi
     case "$1" in
@@ -104,6 +108,7 @@ test $vnc != 0 && vfb="$vfb, vnc=$vnc, vncdisplay=$vnc_port, vnclisten=$ip, vncu
 vncpasswd=`xenstore-read /local/domain/0/backend/vfb/$domid/0/vncpasswd 2>/dev/null`
 test "$vncpasswd" && vfb="$vfb, vncpasswd=$vncpasswd"
 test "$keymap" && vfb="$vfb, keymap=$keymap"
+test "$monitor" && vfb="$vfb, monitor=$monitor"
 test "$serial" && vfb="$vfb, serial=$serial"
 echo "vfb = ['$vfb']" >> /etc/xen/stubdoms/$domname-dm
 

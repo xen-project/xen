@@ -1434,17 +1434,21 @@ class XendConfig(dict):
 		    del dev_info['type']
 		    log.debug("iwj dev_type=%s vfb setting dev_info['%s']" %
 				(dev_type, vfb_type))
+                # Create serial backends now, the location value is bogus, but does not matter
+                i=0
+                chardev=0
                 if dev_info.get('serial') is not None :
-                    # Create two serial backends now, the location value is bogus, but does not matter
-                    cfg = self.console_add('vt100', '0')
+                    chardev = chardev + 1
+                if dev_info.get('monitor') is not None :
+                    chardev = chardev + 1
+                if chardev > 0 :
+                    chardev = chardev + 1
+                while i < chardev :
+                    cfg = self.console_add('vt100', str(i))
                     c_uuid = uuid.createString()
                     target['devices'][c_uuid] = ('console', cfg)
                     target['console_refs'].append(c_uuid)
-                    cfg = self.console_add('vt100', '1')
-                    c_uuid = uuid.createString()
-                    target['devices'][c_uuid] = ('console', cfg)
-                    target['console_refs'].append(c_uuid)
-                
+                    i = i + 1
             elif dev_type == 'console':
                 if 'console_refs' not in target:
                     target['console_refs'] = []
