@@ -87,4 +87,4 @@ endif
 endif
 
 clean::
-	rm -rf compat
+	rm -rf compat headers.chk

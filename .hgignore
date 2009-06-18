@@ -275,6 +275,7 @@
 ^xen/arch/x86/xen\.lds$
 ^xen/arch/x86/boot/reloc.S$
 ^xen/ddb/.*$
+^xen/include/headers\.chk$
 ^xen/include/asm$
 ^xen/include/asm-.*/asm-offsets\.h$
 ^xen/include/asm-ia64/asm-xsi-offsets\.h$
