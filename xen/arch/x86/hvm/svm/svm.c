@@ -877,7 +877,7 @@ void start_svm(struct cpuinfo_x86 *c)
 {
     static bool_t bootstrapped;
 
-    if ( !test_and_set_bool(bootstrapped) )
+    if ( test_and_set_bool(bootstrapped) )
     {
         if ( hvm_enabled && !svm_cpu_up(c) )
         {

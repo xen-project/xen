@@ -1407,7 +1407,7 @@ void start_vmx(void)
 
     vmx_save_host_msrs();
 
-    if ( !test_and_set_bool(bootstrapped) )
+    if ( test_and_set_bool(bootstrapped) )
     {
         if ( hvm_enabled && !vmx_cpu_up() )
         {
