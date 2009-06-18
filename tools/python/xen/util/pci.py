@@ -547,12 +547,12 @@ class PciDevice:
             else:
                 dev = {}
                 lst = parent.split(':')
-                dev['domain'] = int(lst[0], 16)
-                dev['bus'] = int(lst[1], 16)
+                dev['domain'] = '%04x' % int(lst[0], 16)
+                dev['bus'] = '%02x' % int(lst[1], 16)
                 lst = lst[2]
                 lst = lst.split('.')
-                dev['slot'] = int(lst[0], 16)
-                dev['func'] = int(lst[1], 16)
+                dev['slot'] = '%02x' % int(lst[0], 16)
+                dev['func'] = '%x' % int(lst[1], 16)
             return dev
         except OSError, (errno, strerr):
             raise PciDeviceParseError('Can not locate the parent of %s',
