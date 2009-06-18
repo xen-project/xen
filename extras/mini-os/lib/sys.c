@@ -167,15 +167,17 @@ int mkdir(const char *pathname, mode_t mode)
     return 0;
 }
 
-int openpty(void)
+int posix_openpt(int flags)
 {
     struct consfront_dev *dev;
+
+    /* Ignore flags */
 
     dev = init_consfront(NULL);
     dev->fd = alloc_fd(FTYPE_CONSOLE);
     files[dev->fd].cons.dev = dev;
 
-    printk("fd(%d) = openpty\n", dev->fd);
+    printk("fd(%d) = posix_openpt\n", dev->fd);
     return(dev->fd);
 }
 
@@ -188,6 +190,8 @@ int open(const char *pathname, int flags, ...)
         printk("open(%s) -> %d\n", pathname, fd);
         return fd;
     }
+    if (!strncmp(pathname, "/dev/ptmx", strlen("/dev/ptmx")))
+        return posix_openpt(flags);
     printk("open(%s, %x)", pathname, flags);
     switch (flags & ~O_ACCMODE) {
         case 0:
@@ -1341,6 +1345,9 @@ unsupported_function_crash(lockf);
 unsupported_function_crash(sysconf);
 unsupported_function(int, tcsetattr, -1);
 unsupported_function(int, tcgetattr, 0);
+unsupported_function(int, grantpt, -1);
+unsupported_function(int, unlockpt, -1);
+unsupported_function(char *, ptsname, NULL);
 unsupported_function(int, poll, -1);
 
 /* net/if.h */

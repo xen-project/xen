@@ -101,7 +101,6 @@ char * strcat(char * dest, const char * src);
 char  *strdup(const char *s);
 #endif
 #include <mini-os/console.h>
-int openpty(void);
 
 #define RAND_MIX 2654435769U
 
