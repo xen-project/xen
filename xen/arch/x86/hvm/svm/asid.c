@@ -61,6 +61,7 @@ struct svm_asid_data {
    u32 next_asid;
    u32 max_asid;
    u32 erratum170:1;
+   u32 initialised:1;
 };
 
 static DEFINE_PER_CPU(struct svm_asid_data, svm_asid_data);
@@ -70,7 +71,7 @@ static DEFINE_PER_CPU(struct svm_asid_data, svm_asid_data);
  */
 static struct svm_asid_data *svm_asid_core_data(void)
 {
-    return &get_cpu_var(svm_asid_data);
+    return &this_cpu(svm_asid_data);
 }
 
 /*
@@ -80,6 +81,15 @@ void svm_asid_init(struct cpuinfo_x86 *c)
 {
     int nasids;
     struct svm_asid_data *data = svm_asid_core_data();
+
+    /*
+     * If already initialised, we just bump the generation to force a TLB
+     * flush. Resetting the generation could be dangerous, if VCPUs still
+     * exist that reference earlier generations on this CPU.
+     */
+    if ( data->initialised )
+        return svm_asid_inc_generation();
+    data->initialised = 1;
 
     /* Find #ASID. */
     nasids = cpuid_ebx(0x8000000A);

@@ -839,45 +839,66 @@ static struct hvm_function_table svm_function_table = {
     .invlpg_intercept     = svm_invlpg_intercept
 };
 
-int start_svm(struct cpuinfo_x86 *c)
+static int svm_cpu_up(struct cpuinfo_x86 *c)
 {
-    u32 eax, ecx, edx;
-    u32 phys_hsa_lo, phys_hsa_hi;   
+    u32 eax, edx, phys_hsa_lo, phys_hsa_hi;   
     u64 phys_hsa;
     int cpu = smp_processor_id();
  
-    /* Xen does not fill x86_capability words except 0. */
-    ecx = cpuid_ecx(0x80000001);
-    boot_cpu_data.x86_capability[5] = ecx;
-    
-    if ( !(test_bit(X86_FEATURE_SVME, &boot_cpu_data.x86_capability)) )
-        return 0;
-
     /* Check whether SVM feature is disabled in BIOS */
     rdmsr(MSR_K8_VM_CR, eax, edx);
     if ( eax & K8_VMCR_SVME_DISABLE )
     {
-        printk("AMD SVM Extension is disabled in BIOS.\n");
+        printk("CPU%d: AMD SVM Extension is disabled in BIOS.\n", cpu);
         return 0;
     }
 
-    if ( ((hsa[cpu] = alloc_host_save_area()) == NULL) ||
-         ((root_vmcb[cpu] = alloc_vmcb()) == NULL) )
+    if ( ((hsa[cpu] == NULL) &&
+          ((hsa[cpu] = alloc_host_save_area()) == NULL)) ||
+         ((root_vmcb[cpu] == NULL) &&
+          ((root_vmcb[cpu] = alloc_vmcb()) == NULL)) )
         return 0;
 
     write_efer(read_efer() | EFER_SVME);
 
     /* Initialize the HSA for this core. */
-    phys_hsa = (u64) virt_to_maddr(hsa[cpu]);
-    phys_hsa_lo = (u32) phys_hsa;
-    phys_hsa_hi = (u32) (phys_hsa >> 32);    
+    phys_hsa = (u64)virt_to_maddr(hsa[cpu]);
+    phys_hsa_lo = (u32)phys_hsa;
+    phys_hsa_hi = (u32)(phys_hsa >> 32);    
     wrmsr(MSR_K8_VM_HSAVE_PA, phys_hsa_lo, phys_hsa_hi);
 
     /* Initialize core's ASID handling. */
     svm_asid_init(c);
 
-    if ( cpu != 0 )
-        return 1;
+    return 1;
+}
+
+void start_svm(struct cpuinfo_x86 *c)
+{
+    static bool_t bootstrapped;
+
+    if ( !test_and_set_bool(bootstrapped) )
+    {
+        if ( hvm_enabled && !svm_cpu_up(c) )
+        {
+            printk("SVM: FATAL: failed to initialise CPU%d!\n",
+                   smp_processor_id());
+            BUG();
+        }
+        return;
+    }
+
+    /* Xen does not fill x86_capability words except 0. */
+    boot_cpu_data.x86_capability[5] = cpuid_ecx(0x80000001);
+
+    if ( !test_bit(X86_FEATURE_SVME, &boot_cpu_data.x86_capability) )
+        return;
+
+    if ( !svm_cpu_up(c) )
+    {
+        printk("SVM: failed to initialise.\n");
+        return;
+    }
 
     setup_vmcb_dump();
 
@@ -887,8 +908,6 @@ int start_svm(struct cpuinfo_x86 *c)
     svm_function_table.hap_supported = cpu_has_svm_npt;
 
     hvm_enable(&svm_function_table);
-
-    return 1;
 }
 
 static void svm_do_nested_pgfault(paddr_t gpa, struct cpu_user_regs *regs)

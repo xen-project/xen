@@ -1403,11 +1403,11 @@ static unsigned long *vpid_bitmap;
 
 void start_vmx(void)
 {
-    static int bootstrapped;
+    static bool_t bootstrapped;
 
     vmx_save_host_msrs();
 
-    if ( bootstrapped )
+    if ( !test_and_set_bool(bootstrapped) )
     {
         if ( hvm_enabled && !vmx_cpu_up() )
         {
@@ -1417,8 +1417,6 @@ void start_vmx(void)
         }
         return;
     }
-
-    bootstrapped = 1;
 
     /* Xen does not fill x86_capability words except 0. */
     boot_cpu_data.x86_capability[4] = cpuid_ecx(1);

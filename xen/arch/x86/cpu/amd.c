@@ -12,7 +12,7 @@
 #include "cpu.h"
 #include "amd.h"
 
-int start_svm(struct cpuinfo_x86 *c);
+void start_svm(struct cpuinfo_x86 *c);
 
 /*
  * Pre-canned values for overriding the CPUID features 
