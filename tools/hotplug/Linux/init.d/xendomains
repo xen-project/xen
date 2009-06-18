@@ -182,11 +182,11 @@ rdnames()
 
 parseln()
 {
-    if [[ "$1" =~ "\(domain" ]]; then
+    if [[ "$1" =~ '(domain' ]]; then
         name=;id=
-    else if [[ "$1" =~ "\(name" ]]; then
+    else if [[ "$1" =~ '(name' ]]; then
         name=$(echo $1 | sed -e 's/^.*(name \(.*\))$/\1/')
-    else if [[ "$1" =~ "\(domid" ]]; then
+    else if [[ "$1" =~ '(domid' ]]; then
         id=$(echo $1 | sed -e 's/^.*(domid \(.*\))$/\1/')
     fi; fi; fi
 
