@@ -1583,14 +1583,17 @@ class XendDomain:
             if weight is None:
                 weight = int(0)
             elif weight < 1 or weight > 65535:
-                raise XendError("weight is out of range")
+                raise XendError("Cpu weight out of range, valid values are "
+                                "within range from 1 to 65535")
             else:
                 set_weight = True
 
             if cap is None:
                 cap = int(~0)
             elif cap < 0 or cap > dominfo.getVCpuCount() * 100:
-                raise XendError("cap is out of range")
+                raise XendError("Cpu cap out of range, valid range is "
+                                "from 0 to %s for specified number of vcpus" %
+                                (dominfo.getVCpuCount() * 100))
             else:
                 set_cap = True
 
