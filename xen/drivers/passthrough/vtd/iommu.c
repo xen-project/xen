@@ -1066,92 +1066,12 @@ static int domain_context_mapping_one(
     return 0;
 }
 
-#define PCI_BASE_CLASS_BRIDGE    0x06
-#define PCI_CLASS_BRIDGE_PCI     0x0604
-
-enum {
-    DEV_TYPE_PCIe_ENDPOINT,
-    DEV_TYPE_PCIe_BRIDGE,    // PCIe root port, switch
-    DEV_TYPE_PCI_BRIDGE,     // PCIe-to-PCI/PCIx bridge, PCI-to-PCI bridge
-    DEV_TYPE_PCI,
-};
-
-int pdev_type(u8 bus, u8 devfn)
-{
-    u16 class_device;
-    u16 status, creg;
-    int pos;
-    u8 d = PCI_SLOT(devfn), f = PCI_FUNC(devfn);
-
-    class_device = pci_conf_read16(bus, d, f, PCI_CLASS_DEVICE);
-    if ( class_device == PCI_CLASS_BRIDGE_PCI )
-    {
-        pos = pci_find_next_cap(bus, devfn,
-                                PCI_CAPABILITY_LIST, PCI_CAP_ID_EXP);
-        if ( !pos )
-            return DEV_TYPE_PCI_BRIDGE;
-        creg = pci_conf_read16(bus, d, f, pos + PCI_EXP_FLAGS);
-        return ((creg & PCI_EXP_FLAGS_TYPE) >> 4) == PCI_EXP_TYPE_PCI_BRIDGE ?
-            DEV_TYPE_PCI_BRIDGE : DEV_TYPE_PCIe_BRIDGE;
-    }
-
-    status = pci_conf_read16(bus, d, f, PCI_STATUS);
-    if ( !(status & PCI_STATUS_CAP_LIST) )
-        return DEV_TYPE_PCI;
-
-    if ( pci_find_next_cap(bus, devfn, PCI_CAPABILITY_LIST, PCI_CAP_ID_EXP) )
-        return DEV_TYPE_PCIe_ENDPOINT;
-
-    return DEV_TYPE_PCI;
-}
-
-#define MAX_BUSES 256
-static DEFINE_SPINLOCK(bus2bridge_lock);
-static struct { u8 map, bus, devfn; } bus2bridge[MAX_BUSES];
-
-static int _find_pcie_endpoint(u8 *bus, u8 *devfn, u8 *secbus)
-{
-    int cnt = 0;
-    *secbus = *bus;
-
-    ASSERT(spin_is_locked(&bus2bridge_lock));
-    if ( !bus2bridge[*bus].map )
-        return 0;
-
-    while ( bus2bridge[*bus].map )
-    {
-        *secbus = *bus;
-        *devfn = bus2bridge[*bus].devfn;
-        *bus = bus2bridge[*bus].bus;
-        if ( cnt++ >= MAX_BUSES )
-            return 0;
-    }
-
-    return 1;
-}
-
-static int find_pcie_endpoint(u8 *bus, u8 *devfn, u8 *secbus)
-{
-    int ret = 0;
-
-    if ( *bus == 0 )
-        /* assume integrated PCI devices in RC have valid requester-id */
-        return 1;
-
-    spin_lock(&bus2bridge_lock);
-    ret = _find_pcie_endpoint(bus, devfn, secbus);
-    spin_unlock(&bus2bridge_lock);
-
-    return ret;
-}
-
 static int domain_context_mapping(struct domain *domain, u8 bus, u8 devfn)
 {
     struct acpi_drhd_unit *drhd;
     int ret = 0;
-    u16 sec_bus, sub_bus;
     u32 type;
-    u8 secbus, secdevfn;
+    u8 secbus;
     struct pci_dev *pdev = pci_get_pdev(bus, devfn);
 
     if ( pdev == NULL )
@@ -1179,22 +1099,8 @@ static int domain_context_mapping(struct domain *domain, u8 bus, u8 devfn)
     switch ( type )
     {
     case DEV_TYPE_PCIe_BRIDGE:
-        break;
-
-    case DEV_TYPE_PCI_BRIDGE:
-        sec_bus = pci_conf_read8(bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
-                                 PCI_SECONDARY_BUS);
-        sub_bus = pci_conf_read8(bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
-                                 PCI_SUBORDINATE_BUS);
-
-        spin_lock(&bus2bridge_lock);
-        for ( sub_bus &= 0xff; sec_bus <= sub_bus; sec_bus++ )
-        {
-            bus2bridge[sec_bus].map = 1;
-            bus2bridge[sec_bus].bus =  bus;
-            bus2bridge[sec_bus].devfn =  devfn;
-        }
-        spin_unlock(&bus2bridge_lock);
+    case DEV_TYPE_PCIe2PCI_BRIDGE:
+    case DEV_TYPE_LEGACY_PCI_BRIDGE:
         break;
 
     case DEV_TYPE_PCIe_ENDPOINT:
@@ -1211,31 +1117,29 @@ static int domain_context_mapping(struct domain *domain, u8 bus, u8 devfn)
 
         ret = domain_context_mapping_one(domain, drhd->iommu, bus, devfn);
         if ( ret )
-           break;
+            break;
 
-        secbus = bus;
-        secdevfn = devfn;
-        /* dependent devices mapping */
-        while ( bus2bridge[bus].map )
+        if ( find_upstream_bridge(&bus, &devfn, &secbus) < 1 )
+            break;
+
+        /* PCIe to PCI/PCIx bridge */
+        if ( pdev_type(bus, devfn) == DEV_TYPE_PCIe2PCI_BRIDGE )
         {
-            secbus = bus;
-            secdevfn = devfn;
-            devfn = bus2bridge[bus].devfn;
-            bus = bus2bridge[bus].bus;
             ret = domain_context_mapping_one(domain, drhd->iommu, bus, devfn);
             if ( ret )
                 return ret;
-        }
 
-        if ( (secbus != bus) && (secdevfn != 0) )
             /*
-             * The source-id for transactions on non-PCIe buses seem
-             * to originate from devfn=0 on the secondary bus behind
-             * the bridge.  Map that id as well.  The id to use in
-             * these scanarios is not particularly well documented
-             * anywhere.
+             * Devices behind PCIe-to-PCI/PCIx bridge may generate
+             * different requester-id. It may originate from devfn=0
+             * on the secondary bus behind the bridge. Map that id
+             * as well.
              */
             ret = domain_context_mapping_one(domain, drhd->iommu, secbus, 0);
+        }
+        else /* Legacy PCI bridge */
+            ret = domain_context_mapping_one(domain, drhd->iommu, bus, devfn);
+
         break;
 
     default:
@@ -1296,7 +1200,7 @@ static int domain_context_unmap(struct domain *domain, u8 bus, u8 devfn)
     struct acpi_drhd_unit *drhd;
     int ret = 0;
     u32 type;
-    u8 secbus, secdevfn;
+    u8 secbus;
     struct pci_dev *pdev = pci_get_pdev(bus, devfn);
 
     BUG_ON(!pdev);
@@ -1309,7 +1213,8 @@ static int domain_context_unmap(struct domain *domain, u8 bus, u8 devfn)
     switch ( type )
     {
     case DEV_TYPE_PCIe_BRIDGE:
-    case DEV_TYPE_PCI_BRIDGE:
+    case DEV_TYPE_PCIe2PCI_BRIDGE:
+    case DEV_TYPE_LEGACY_PCI_BRIDGE:
         break;
 
     case DEV_TYPE_PCIe_ENDPOINT:
@@ -1327,22 +1232,21 @@ static int domain_context_unmap(struct domain *domain, u8 bus, u8 devfn)
         if ( ret )
             break;
 
-        secbus = bus;
-        secdevfn = devfn;
-        /* dependent devices unmapping */
-        while ( bus2bridge[bus].map )
+        if ( find_upstream_bridge(&bus, &devfn, &secbus) < 1 )
+            break;
+
+        /* PCIe to PCI/PCIx bridge */
+        if ( pdev_type(bus, devfn) == DEV_TYPE_PCIe2PCI_BRIDGE )
         {
-            secbus = bus;
-            secdevfn = devfn;
-            devfn = bus2bridge[bus].devfn;
-            bus = bus2bridge[bus].bus;
             ret = domain_context_unmap_one(domain, drhd->iommu, bus, devfn);
             if ( ret )
                 return ret;
-        }
 
-        if ( (secbus != bus) && (secdevfn != 0) )
             ret = domain_context_unmap_one(domain, drhd->iommu, secbus, 0);
+        }
+        else /* Legacy PCI bridge */
+            ret = domain_context_unmap_one(domain, drhd->iommu, bus, devfn);
+
         break;
 
     default:
@@ -1584,31 +1488,24 @@ static void setup_dom0_devices(struct domain *d)
 {
     struct hvm_iommu *hd;
     struct pci_dev *pdev;
-    int bus, dev, func;
-    u32 l;
+    int bus, devfn;
 
     hd = domain_hvm_iommu(d);
 
     spin_lock(&pcidevs_lock);
     for ( bus = 0; bus < 256; bus++ )
     {
-        for ( dev = 0; dev < 32; dev++ )
+        for ( devfn = 0; devfn < 256; devfn++ )
         {
-            for ( func = 0; func < 8; func++ )
-            {
-                l = pci_conf_read32(bus, dev, func, PCI_VENDOR_ID);
-                /* some broken boards return 0 or ~0 if a slot is empty: */
-                if ( (l == 0xffffffff) || (l == 0x00000000) ||
-                     (l == 0x0000ffff) || (l == 0xffff0000) )
-                    continue;
+            pdev = pci_get_pdev(bus, devfn);
+            if ( !pdev )
+                continue;
 
-                pdev = alloc_pdev(bus, PCI_DEVFN(dev, func));
-                pdev->domain = d;
-                list_add(&pdev->domain_list, &d->arch.pdev_list);
-                domain_context_mapping(d, pdev->bus, pdev->devfn);
-                if ( ats_device(0, pdev->bus, pdev->devfn) )
-                    enable_ats_device(0, pdev->bus, pdev->devfn);
-            }
+            pdev->domain = d;
+            list_add(&pdev->domain_list, &d->arch.pdev_list);
+            domain_context_mapping(d, pdev->bus, pdev->devfn);
+            if ( ats_device(0, pdev->bus, pdev->devfn) )
+                enable_ats_device(0, pdev->bus, pdev->devfn);
         }
     }
     spin_unlock(&pcidevs_lock);
@@ -1809,6 +1706,8 @@ int intel_vtd_setup(void)
     memset(domid_bitmap, 0, domid_bitmap_size / 8);
     set_bit(0, domid_bitmap);
 
+    scan_pci_devices();
+
     if ( init_vtd_hw() )
         goto error;
 
@@ -1902,10 +1801,10 @@ done:
 static int intel_iommu_group_id(u8 bus, u8 devfn)
 {
     u8 secbus;
-    if ( !bus2bridge[bus].map || find_pcie_endpoint(&bus, &devfn, &secbus) )
-        return PCI_BDF2(bus, devfn);
-    else
+    if ( find_upstream_bridge(&bus, &devfn, &secbus) < 0 )
         return -1;
+    else
+        return PCI_BDF2(bus, devfn);
 }
 
 static u32 iommu_state[MAX_IOMMUS][MAX_IOMMU_REGS];

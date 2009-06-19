@@ -66,6 +66,17 @@ struct pci_dev {
 
 extern spinlock_t pcidevs_lock;
 
+enum {
+    DEV_TYPE_PCIe_ENDPOINT,
+    DEV_TYPE_PCIe_BRIDGE,       // PCIe root port, switch
+    DEV_TYPE_PCIe2PCI_BRIDGE,   // PCIe-to-PCI/PCIx bridge
+    DEV_TYPE_LEGACY_PCI_BRIDGE, // Legacy PCI bridge
+    DEV_TYPE_PCI,
+};
+
+int scan_pci_devices(void);
+int pdev_type(u8 bus, u8 devfn);
+int find_upstream_bridge(u8 *bus, u8 *devfn, u8 *secbus);
 struct pci_dev *alloc_pdev(u8 bus, u8 devfn);
 void free_pdev(struct pci_dev *pdev);
 struct pci_dev *pci_lock_pdev(int bus, int devfn);

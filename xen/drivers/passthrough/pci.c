@@ -30,6 +30,16 @@
 LIST_HEAD(alldevs_list);
 spinlock_t pcidevs_lock = SPIN_LOCK_UNLOCKED;
 
+#define MAX_BUSES 256
+static struct {
+    u8 map;
+    u8 bus;
+    u8 devfn;
+} bus2bridge[MAX_BUSES];
+
+/* bus2bridge_lock protects bus2bridge array */
+static DEFINE_SPINLOCK(bus2bridge_lock);
+
 struct pci_dev *alloc_pdev(u8 bus, u8 devfn)
 {
     struct pci_dev *pdev;
@@ -238,6 +248,149 @@ void pci_release_devices(struct domain *d)
         deassign_device(d, bus, devfn);
     }
     spin_unlock(&pcidevs_lock);
+}
+
+#define PCI_CLASS_BRIDGE_PCI     0x0604
+
+int pdev_type(u8 bus, u8 devfn)
+{
+    u16 class_device;
+    u16 status, creg;
+    int pos;
+    u8 d = PCI_SLOT(devfn), f = PCI_FUNC(devfn);
+
+    class_device = pci_conf_read16(bus, d, f, PCI_CLASS_DEVICE);
+    if ( class_device == PCI_CLASS_BRIDGE_PCI )
+    {
+        pos = pci_find_next_cap(bus, devfn,
+                                PCI_CAPABILITY_LIST, PCI_CAP_ID_EXP);
+        if ( !pos )
+            return DEV_TYPE_LEGACY_PCI_BRIDGE;
+        creg = pci_conf_read16(bus, d, f, pos + PCI_EXP_FLAGS);
+        return ((creg & PCI_EXP_FLAGS_TYPE) >> 4) == PCI_EXP_TYPE_PCI_BRIDGE ?
+            DEV_TYPE_PCIe2PCI_BRIDGE : DEV_TYPE_PCIe_BRIDGE;
+    }
+
+    status = pci_conf_read16(bus, d, f, PCI_STATUS);
+    if ( !(status & PCI_STATUS_CAP_LIST) )
+        return DEV_TYPE_PCI;
+
+    if ( pci_find_next_cap(bus, devfn, PCI_CAPABILITY_LIST, PCI_CAP_ID_EXP) )
+        return DEV_TYPE_PCIe_ENDPOINT;
+
+    return DEV_TYPE_PCI;
+}
+
+/*
+ * find the upstream PCIe-to-PCI/PCIX bridge or PCI legacy bridge
+ * return 0: the device is integrated PCI device or PCIe
+ * return 1: find PCIe-to-PCI/PCIX bridge or PCI legacy bridge
+ * return -1: fail
+ */
+int find_upstream_bridge(u8 *bus, u8 *devfn, u8 *secbus)
+{
+    int ret = 0;
+    int cnt = 0;
+
+    if ( *bus == 0 )
+        return 0;
+
+    if ( !bus2bridge[*bus].map )
+        return 0;
+
+    ret = 1;
+    spin_lock(&bus2bridge_lock);
+    while ( bus2bridge[*bus].map )
+    {
+        *secbus = *bus;
+        *devfn = bus2bridge[*bus].devfn;
+        *bus = bus2bridge[*bus].bus;
+        if ( cnt++ >= MAX_BUSES )
+        {
+            ret = -1;
+            goto out;
+        }
+    }
+
+out:
+    spin_unlock(&bus2bridge_lock);
+    return ret;
+}
+
+/*
+ * scan pci devices to add all existed PCI devices to alldevs_list,
+ * and setup pci hierarchy in array bus2bridge. This function is only
+ * called in VT-d hardware setup
+ */
+int __init scan_pci_devices(void)
+{
+    struct pci_dev *pdev;
+    int bus, dev, func;
+    u8 sec_bus, sub_bus;
+    int type;
+    u32 l;
+
+    spin_lock(&pcidevs_lock);
+    for ( bus = 0; bus < 256; bus++ )
+    {
+        for ( dev = 0; dev < 32; dev++ )
+        {
+            for ( func = 0; func < 8; func++ )
+            {
+                l = pci_conf_read32(bus, dev, func, PCI_VENDOR_ID);
+                /* some broken boards return 0 or ~0 if a slot is empty: */
+                if ( (l == 0xffffffff) || (l == 0x00000000) ||
+                     (l == 0x0000ffff) || (l == 0xffff0000) )
+                    continue;
+
+                pdev = alloc_pdev(bus, PCI_DEVFN(dev, func));
+                if ( !pdev )
+                {
+                    printk("%s: alloc_pdev failed.\n", __func__);
+                    spin_unlock(&pcidevs_lock);
+                    return -ENOMEM;
+                }
+
+                /* build bus2bridge */
+                type = pdev_type(bus, PCI_DEVFN(dev, func));
+                switch ( type )
+                {
+                    case DEV_TYPE_PCIe_BRIDGE:
+                        break;
+
+                    case DEV_TYPE_PCIe2PCI_BRIDGE:
+                    case DEV_TYPE_LEGACY_PCI_BRIDGE:
+                        sec_bus = pci_conf_read8(bus, dev, func,
+                                                 PCI_SECONDARY_BUS);
+                        sub_bus = pci_conf_read8(bus, dev, func,
+                                                 PCI_SUBORDINATE_BUS);
+
+                        spin_lock(&bus2bridge_lock);
+                        for ( sub_bus &= 0xff; sec_bus <= sub_bus; sec_bus++ )
+                        {
+                            bus2bridge[sec_bus].map = 1;
+                            bus2bridge[sec_bus].bus =  bus;
+                            bus2bridge[sec_bus].devfn =  PCI_DEVFN(dev, func);
+                        }
+                        spin_unlock(&bus2bridge_lock);
+                        break;
+
+                    case DEV_TYPE_PCIe_ENDPOINT:
+                    case DEV_TYPE_PCI:
+                        break;
+
+                    default:
+                        printk("%s: unknown type: bdf = %x:%x.%x\n",
+                               __func__, bus, dev, func);
+                        spin_unlock(&pcidevs_lock);
+                        return -EINVAL;
+                }
+            }
+        }
+    }
+
+    spin_unlock(&pcidevs_lock);
+    return 0;
 }
 
 #ifdef SUPPORT_MSI_REMAPPING
