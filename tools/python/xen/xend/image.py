@@ -755,9 +755,8 @@ class HVMImageHandler(ImageHandler):
         if not self.display :
             self.display = ''
 
-        store_dmargs = self.dmargs[:]
-        store_dmargs.remove('-sdl')
-        store_dmargs.remove('-disable-opengl')
+        store_dmargs = [ x for x in self.dmargs
+                         if x not in ['-sdl', '-disable-opengl'] ]
         try :
             midx = store_dmargs.index('-monitor')
             store_dmargs[midx + 1] = 'pty'
