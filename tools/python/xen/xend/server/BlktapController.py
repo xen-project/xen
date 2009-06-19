@@ -159,6 +159,8 @@ class BlktapController(BlkifController):
         #modify the configuration to attach as a vbd, now that the
         #device is configured.  Then continue to create the device
         config.update({'uname' : 'phy:' + device.rstrip()})
-        self.deviceClass='vbd'
 
-        return BlkifController.createDevice(self, config);
+        self.deviceClass='vbd'
+        devid = BlkifController.createDevice(self, config)
+        self.deviceClass='tap'
+        return devid
