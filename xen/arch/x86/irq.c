@@ -84,6 +84,12 @@ int assign_irq_vector(int irq)
 
     spin_lock(&vector_lock);
 
+    if ((irq != AUTO_ASSIGN_IRQ) && !IO_APIC_IRQ(irq))
+    {
+        spin_unlock(&vector_lock);
+        return LEGACY_VECTOR(irq);
+    }
+
     if ((irq != AUTO_ASSIGN_IRQ) && (IO_APIC_VECTOR(irq) > 0)) {
         spin_unlock(&vector_lock);
         return IO_APIC_VECTOR(irq);
