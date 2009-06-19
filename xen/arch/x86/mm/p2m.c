@@ -1499,7 +1499,11 @@ int set_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
 
     while ( todo )
     {
-        order = (((gfn | mfn_x(mfn) | todo) & ((1ul << 9) - 1)) == 0) ? 9 : 0;
+        if ( is_hvm_domain(d) && d->arch.hvm_domain.hap_enabled )
+            order = (((gfn | mfn_x(mfn) | todo) & ((1ul << 9) - 1)) == 0) ?
+                9 : 0;
+        else
+            order = 0;
         rc = d->arch.p2m->set_entry(d, gfn, mfn, order, p2mt);
         gfn += 1ul << order;
         if ( mfn_x(mfn) != INVALID_MFN )
