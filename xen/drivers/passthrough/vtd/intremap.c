@@ -39,6 +39,27 @@
 #define nr_ioapic_registers(i)  nr_ioapic_registers[i]
 #endif
 
+/*
+ * source validation type (SVT)
+ */
+#define SVT_NO_VERIFY       0x0  /* no verification is required */
+#define SVT_VERIFY_SID_SQ   0x1  /* verify using SID and SQ fiels */
+#define SVT_VERIFY_BUS      0x2  /* verify bus of request-id */
+
+/*
+ * source-id qualifier (SQ)
+ */
+#define SQ_ALL_16           0x0  /* verify all 16 bits of request-id */
+#define SQ_13_IGNORE_1      0x1  /* verify most significant 13 bits, ignore
+                                  * the third least significant bit
+                                  */
+#define SQ_13_IGNORE_2      0x2  /* verify most significant 13 bits, ignore
+                                  * the second and third least significant bits
+                                  */
+#define SQ_13_IGNORE_3      0x3  /* verify most significant 13 bits, ignore
+                                  * the least three significant bits
+                                  */
+
 /* apic_pin_2_ir_idx[apicid][pin] = interrupt remapping table index */
 static unsigned int **apic_pin_2_ir_idx;
 
@@ -84,6 +105,20 @@ u16 apicid_to_bdf(int apic_id)
 
     dprintk(XENLOG_ERR VTDPREFIX, "Didn't find the bdf for the apic_id!\n");
     return 0;
+}
+
+static void set_ire_sid(struct iremap_entry *ire,
+                        unsigned int svt, unsigned int sq, unsigned int sid)
+{
+    ire->hi.svt = svt;
+    ire->hi.sq = sq;
+    ire->hi.sid = sid;
+}
+
+static void set_ioapic_source_id(int apic_id, struct iremap_entry *ire)
+{
+    set_ire_sid(ire, SVT_VERIFY_SID_SQ, SQ_ALL_16,
+                apicid_to_bdf(apic_id));
 }
 
 static int remap_entry_to_ioapic_rte(
@@ -191,10 +226,8 @@ static int ioapic_rte_to_remap_entry(struct iommu *iommu,
         new_ire.lo.res_1 = 0;
         new_ire.lo.vector = new_rte.vector;
         new_ire.lo.res_2 = 0;
-        new_ire.hi.sid = apicid_to_bdf(IO_APIC_ID(apic));
 
-        new_ire.hi.sq = 0;    /* comparing all 16-bit of SID */
-        new_ire.hi.svt = 1;   /* requestor ID verification SID/SQ */
+        set_ioapic_source_id(IO_APIC_ID(apic), &new_ire);
         new_ire.hi.res_1 = 0;
         new_ire.lo.p = 1;     /* finally, set present bit */
 
@@ -345,6 +378,56 @@ void io_apic_write_remap_rte(
 }
 
 #if defined(__i386__) || defined(__x86_64__)
+
+static void set_msi_source_id(struct pci_dev *pdev, struct iremap_entry *ire)
+{
+    int type;
+    u8 bus, devfn, secbus;
+    int ret;
+
+    if ( !pdev || !ire )
+        return;
+
+    bus = pdev->bus;
+    devfn = pdev->devfn;
+    type = pdev_type(bus, devfn);
+    switch ( type )
+    {
+    case DEV_TYPE_PCIe_BRIDGE:
+    case DEV_TYPE_PCIe2PCI_BRIDGE:
+    case DEV_TYPE_LEGACY_PCI_BRIDGE:
+        break;
+
+    case DEV_TYPE_PCIe_ENDPOINT:
+        set_ire_sid(ire, SVT_VERIFY_SID_SQ, SQ_ALL_16, PCI_BDF2(bus, devfn));
+        break;
+
+    case DEV_TYPE_PCI:
+        ret = find_upstream_bridge(&bus, &devfn, &secbus);
+        if ( ret == 0 ) /* integrated PCI device */
+        {
+            set_ire_sid(ire, SVT_VERIFY_SID_SQ, SQ_ALL_16,
+                        PCI_BDF2(bus, devfn));
+        }
+        else if ( ret == 1 ) /* find upstream bridge */
+        {
+            if ( pdev_type(bus, devfn) == DEV_TYPE_PCIe2PCI_BRIDGE )
+                set_ire_sid(ire, SVT_VERIFY_BUS, SQ_ALL_16,
+                            (bus << 8) | pdev->bus);
+            else if ( pdev_type(bus, devfn) == DEV_TYPE_LEGACY_PCI_BRIDGE )
+                set_ire_sid(ire, SVT_VERIFY_BUS, SQ_ALL_16,
+                            PCI_BDF2(bus, devfn));
+        }
+        break;
+
+    default:
+        gdprintk(XENLOG_WARNING VTDPREFIX,
+                 "set_msi_source_id: unknown type : bdf = %x:%x.%x\n",
+                 bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+        break;
+   }
+}
+
 static int remap_entry_to_msi_msg(
     struct iommu *iommu, struct msi_msg *msg)
 {
@@ -456,9 +539,7 @@ static int msi_msg_to_remap_entry(
     new_ire.lo.dst = ((msg->address_lo >> MSI_ADDR_DEST_ID_SHIFT)
                       & 0xff) << 8;
 
-    new_ire.hi.sid = (pdev->bus << 8) | pdev->devfn;
-    new_ire.hi.sq = 0;
-    new_ire.hi.svt = 1;
+    set_msi_source_id(pdev, &new_ire);
     new_ire.hi.res_1 = 0;
     new_ire.lo.p = 1;    /* finally, set present bit */
 
