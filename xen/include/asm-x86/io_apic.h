@@ -131,7 +131,7 @@ extern int mpc_default_type;
 static inline unsigned int io_apic_read(unsigned int apic, unsigned int reg)
 {
 	if (ioapic_reg_remapped(reg))
-		return io_apic_read_remap_rte(apic, reg);
+		return iommu_read_apic_from_ire(apic, reg);
 	*IO_APIC_BASE(apic) = reg;
 	return *(IO_APIC_BASE(apic)+4);
 }

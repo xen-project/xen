@@ -263,14 +263,10 @@ static int iommu_setup(void)
 {
     int rc = -ENODEV;
 
-    if ( !iommu_enabled )
-        goto out;
-
     rc = iommu_hardware_setup();
 
     iommu_enabled = (rc == 0);
 
- out:
     if ( force_iommu && !iommu_enabled )
         panic("IOMMU setup failed, crash Xen for security purpose!\n");
 
@@ -336,6 +332,20 @@ void iommu_update_ire_from_msi(
     struct iommu_ops *ops = iommu_get_ops();
     ops->update_ire_from_msi(msi_desc, msg);
 }
+
+void iommu_read_msi_from_ire(
+    struct msi_desc *msi_desc, struct msi_msg *msg)
+{
+    struct iommu_ops *ops = iommu_get_ops();
+    ops->read_msi_from_ire(msi_desc, msg);
+}
+
+unsigned int iommu_read_apic_from_ire(unsigned int apic, unsigned int reg)
+{
+    struct iommu_ops *ops = iommu_get_ops();
+    return ops->read_apic_from_ire(apic, reg);
+}
+
 /*
  * Local variables:
  * mode: C

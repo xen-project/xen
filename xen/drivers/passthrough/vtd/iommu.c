@@ -1989,6 +1989,8 @@ struct iommu_ops intel_iommu_ops = {
     .get_device_group_id = intel_iommu_group_id,
     .update_ire_from_apic = io_apic_write_remap_rte,
     .update_ire_from_msi = msi_msg_write_remap_rte,
+    .read_apic_from_ire = io_apic_read_remap_rte,
+    .read_msi_from_ire = msi_msg_read_remap_rte,
 };
 
 /*

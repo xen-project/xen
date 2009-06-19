@@ -192,7 +192,7 @@ static void read_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
     }
 
     if ( iommu_enabled )
-        msi_msg_read_remap_rte(entry, msg);
+        iommu_read_msi_from_ire(entry, msg);
 }
 
 static int set_vector_msi(struct msi_desc *entry)

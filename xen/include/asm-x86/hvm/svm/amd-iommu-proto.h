@@ -87,6 +87,10 @@ void amd_iommu_ioapic_update_ire(
     unsigned int apic, unsigned int reg, unsigned int value);
 void amd_iommu_msi_msg_update_ire(
     struct msi_desc *msi_desc, struct msi_msg *msg);
+void amd_iommu_read_msi_from_ire(
+    struct msi_desc *msi_desc, struct msi_msg *msg);
+unsigned int amd_iommu_read_ioapic_from_ire(
+    unsigned int apic, unsigned int reg);
 
 static inline u32 get_field_from_reg_u32(u32 reg_value, u32 mask, u32 shift)
 {
