@@ -152,6 +152,7 @@
 ^tools/firmware/vgabios/vbetables\.h$
 ^tools/flask/loadpolicy/flask-loadpolicy$
 ^tools/fs-back/fs-backend$
+^tools/hotplug/common/hotplugpath\.sh$
 ^tools/include/xen/.*$
 ^tools/include/xen-foreign/.*\.(c|h|size)$
 ^tools/include/xen-foreign/checker$
