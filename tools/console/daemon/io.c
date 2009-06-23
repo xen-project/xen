@@ -127,7 +127,7 @@ static int write_with_timestamp(int fd, const char *data, size_t sz,
 	const char *last_byte = data + sz - 1;
 
 	while (data <= last_byte) {
-		const char *nl = memchr(data, '\n', sz);
+		const char *nl = memchr(data, '\n', last_byte + 1 - data);
 		int found_nl = (nl != NULL);
 		if (!found_nl)
 			nl = last_byte;
