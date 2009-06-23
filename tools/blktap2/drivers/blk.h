@@ -26,5 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include <inttypes.h>
+
 int blk_getimagesize(int fd, uint64_t *size);
 int blk_getsectorsize(int fd, uint64_t *sector_size);
+
+#ifndef O_LARGEFILE
+#define O_LARGEFILE	0
+#endif

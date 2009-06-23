@@ -36,8 +36,6 @@
 #include <fcntl.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <endian.h>
-#include <byteswap.h>
 
 #include "atomicio.h"
 #include "libvhd.h"

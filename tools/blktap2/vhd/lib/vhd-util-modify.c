@@ -56,7 +56,7 @@ vhd_util_modify(int argc, char **argv)
 	char *name;
 	vhd_context_t vhd;
 	int err, c, size, parent, parent_raw;
-	off64_t newsize = 0;
+	off_t newsize = 0;
 	char *newparent = NULL;
 
 	name       = NULL;

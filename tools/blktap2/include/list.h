@@ -2,6 +2,7 @@
  * list.h
  * 
  * This is a subset of linux's list.h intended to be used in user-space.
+ * XXX The namespace conflicts with NetBSD's <sys/queue.h>
  * 
  */
 
@@ -15,6 +16,16 @@ struct list_head {
         struct list_head *next, *prev;
 };
  
+/* XXX workaround for conflicts. The list API should use its own
+ * namespace prefix, i.e. BLK_
+ */
+#ifdef LIST_HEAD_INIT
+#undef LIST_HEAD_INIT
+#endif
+#ifndef LIST_HEAD
+#undef LIST_HEAD
+#endif
+
 #define LIST_HEAD_INIT(name) { &(name), &(name) }
  
 #define LIST_HEAD(name) \

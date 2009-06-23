@@ -24,61 +24,50 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-#include <errno.h>
-#include <fcntl.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
+#ifndef __BLKTAP2_UUID_H__
+#define __BLKTAP2_UUID_H__
 
-#include "libvhd.h"
+#if defined(__linux__) || defined(__Linux__)
 
-int
-vhd_util_repair(int argc, char **argv)
+#include <uuid/uuid.h>
+
+#else
+
+#include <inttypes.h>
+#include <string.h>
+#include <uuid.h>
+
+static inline int uuid_is_null(uuid_t uuid)
 {
-	char *name;
-	int err, c;
-	off_t eof;
-	vhd_context_t vhd;
-
-	name = NULL;
-
-	if (!argc || !argv)
-		goto usage;
-
-	optind = 0;
-	while ((c = getopt(argc, argv, "n:h")) != -1) {
-		switch (c) {
-		case 'n':
-			name = optarg;
-			break;
-		case 'h':
-		default:
-			goto usage;
-		}
-	}
-
-	if (!name || optind != argc)
-		goto usage;
-
-	err = vhd_open(&vhd, name, VHD_OPEN_RDWR);
-	if (err) {
-		printf("error opening %s: %d\n", name, err);
-		return err;
-	}
-
-	err = vhd_end_of_data(&vhd, &eof);
-	if (err) {
-		printf("error finding end of data: %d\n", err);
-		goto done;
-	}
-
-	err = vhd_write_footer_at(&vhd, &vhd.footer, eof);
-
- done:
-	vhd_close(&vhd);
-	return err;
-
-usage:
-	printf("options: <-n name> [-h help]\n");
-	return -EINVAL;
+    uint32_t status;
+    return uuid_is_nil(&uuid, &status);
 }
+
+static inline void uuid_generate(uuid_t uuid)
+{
+    uint32_t status;
+    uuid_create(&uuid, &status);
+}
+
+static inline void uuid_unparse(uuid_t uuid, char *out)
+{
+    uint32_t status;
+    uuid_to_string(&uuid, (char **)&out, &status);
+}
+
+static inline void uuid_copy(uuid_t dst, uuid_t src)
+{
+    memcpy(dst, src, sizeof(dst));
+}
+
+static inline void uuid_clear(uuid_t uu)
+{
+    memset(uu, 0, sizeof(uu));
+}
+
+#define uuid_compare(x,y) \
+    ({ uint32_t status; uuid_compare(&(x),&(y),&status); })
+
+#endif
+
+#endif /* __BLKTAP2_UUID_H__ */

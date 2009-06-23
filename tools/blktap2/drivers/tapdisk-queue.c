@@ -174,7 +174,7 @@ iocb_rw(struct iocb *iocb)
 	ssize_t (*func)(int, void *, size_t) = 
 		(iocb->aio_lio_opcode == IO_CMD_PWRITE ? vwrite : read);
 
-	if (lseek64(fd, off, SEEK_SET) == (off64_t)-1)
+	if (lseek(fd, off, SEEK_SET) == (off_t)-1)
 		return -errno;
 	
 	if (atomicio(func, fd, buf, size) != size)

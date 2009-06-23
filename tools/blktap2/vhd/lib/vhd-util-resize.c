@@ -95,7 +95,7 @@ vhd_fixed_shrink(vhd_journal_t *journal, uint64_t secs)
 }
 
 static int
-vhd_write_zeros(vhd_journal_t *journal, off64_t off, uint64_t size)
+vhd_write_zeros(vhd_journal_t *journal, off_t off, uint64_t size)
 {
 	int err;
 	char *buf;
@@ -109,7 +109,7 @@ vhd_write_zeros(vhd_journal_t *journal, off64_t off, uint64_t size)
 	if (err)
 		return err;
 
-	buf = mmap(0, map, PROT_READ, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	buf = mmap(0, map, PROT_READ, MAP_SHARED | MAP_ANON, -1, 0);
 	if (buf == MAP_FAILED)
 		return -errno;
 
@@ -143,7 +143,7 @@ vhd_fixed_grow(vhd_journal_t *journal, uint64_t secs)
 		goto out;
 
 	eof = vhd_position(vhd);
-	if (eof == (off64_t)-1) {
+	if (eof == (off_t)-1) {
 		err = -errno;
 		goto out;
 	}
@@ -234,13 +234,13 @@ quicksort(vhd_block_t *list, int left, int right)
 }
 
 static int
-vhd_move_block(vhd_journal_t *journal, uint32_t src, off64_t offset)
+vhd_move_block(vhd_journal_t *journal, uint32_t src, off_t offset)
 {
 	int err;
 	char *buf;
 	size_t size;
 	vhd_context_t *vhd;
-	off64_t off, src_off;
+	off_t off, src_off;
 
 	buf     = NULL;
 	vhd     = &journal->vhd;
@@ -300,7 +300,7 @@ static int
 vhd_clobber_block(vhd_journal_t *journal, uint32_t src, uint32_t dest)
 {
 	int err;
-	off64_t off;
+	off_t off;
 	vhd_context_t *vhd;
 
 	vhd = &journal->vhd;
@@ -404,7 +404,7 @@ vhd_clear_bat_entries(vhd_journal_t *journal, uint32_t entries)
 {
 	int i, err;
 	vhd_context_t *vhd;
-	off64_t orig_map_off, new_map_off;
+	off_t orig_map_off, new_map_off;
 	uint32_t orig_entries, new_entries;
 
 	vhd          = &journal->vhd;
@@ -473,7 +473,7 @@ vhd_clear_bat_entries(vhd_journal_t *journal, uint32_t entries)
 static int
 vhd_dynamic_shrink(vhd_journal_t *journal, uint64_t secs)
 {
-	off64_t eof;
+	off_t eof;
 	uint32_t blocks;
 	vhd_context_t *vhd;
 	int i, j, err, free_cnt;
@@ -581,7 +581,7 @@ vhd_next_block_offset(vhd_context_t *vhd)
 }
 
 static inline int
-in_range(off64_t off, off64_t start, off64_t size)
+in_range(off_t off, off_t start, off_t size)
 {
 	return (start < off && start + size > off);
 }
@@ -599,7 +599,7 @@ skip_check(int mode, int type)
 }
 
 static int
-vhd_check_for_clobber(vhd_context_t *vhd, off64_t off, int mode)
+vhd_check_for_clobber(vhd_context_t *vhd, off_t off, int mode)
 {
 	int i, n;
 	char *msg;
@@ -676,7 +676,7 @@ fail:
  * take any metadata after the bat (@eob) and shift it
  */
 static int
-vhd_shift_metadata(vhd_journal_t *journal, off64_t eob,
+vhd_shift_metadata(vhd_journal_t *journal, off_t eob,
 		   size_t bat_needed, size_t map_needed)
 {
 	int i, n, err;
@@ -724,7 +724,7 @@ vhd_shift_metadata(vhd_journal_t *journal, off64_t eob,
 	}
 
 	for (i = 0; i < n; i++) {
-		off64_t off;
+		off_t off;
 		size_t size;
 
 		if (!locators[i])
@@ -775,7 +775,7 @@ static int
 vhd_add_bat_entries(vhd_journal_t *journal, int entries)
 {
 	int i, err;
-	off64_t off;
+	off_t off;
 	vhd_bat_t new_bat;
 	vhd_context_t *vhd;
 	uint32_t new_entries;
@@ -878,7 +878,7 @@ static int
 vhd_dynamic_grow(vhd_journal_t *journal, uint64_t secs)
 {
 	int i, err;
-	off64_t eob, eom;
+	off_t eob, eom;
 	vhd_context_t *vhd;
 	vhd_block_t first_block;
 	uint64_t blocks, size_needed;
@@ -953,7 +953,7 @@ vhd_dynamic_grow(vhd_journal_t *journal, uint64_t secs)
 	 * move vhd data blocks to the end of the file to make room 
 	 */
 	do {
-		off64_t new_off, bm_size, gap_size;
+		off_t new_off, bm_size, gap_size;
 
 		new_off = vhd_sectors_to_bytes(vhd_next_block_offset(vhd));
 

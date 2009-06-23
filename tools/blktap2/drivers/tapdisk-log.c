@@ -126,8 +126,9 @@ __tlog_write(int level, const char *func, const char *fmt, ...)
 
 	buf = tapdisk_log.p;
 	gettimeofday(&t, NULL);
-	len = snprintf(buf, MAX_ENTRY_LEN - 1, "%08"PRIu64":%010ld.%06ld:"
-		       "%s ", tapdisk_log.cnt, t.tv_sec, t.tv_usec, func);
+	len = snprintf(buf, MAX_ENTRY_LEN - 1, "%08"PRIu64":%010ld.%06lld:"
+		       "%s ", tapdisk_log.cnt,
+			t.tv_sec, (unsigned long long)t.tv_usec, func);
 
 	va_start(ap, fmt);
 	ret = vsnprintf(buf + len, MAX_ENTRY_LEN - (len + 1), fmt, ap);
@@ -167,8 +168,8 @@ __tlog_error(int err, const char *func, const char *fmt, ...)
 	gettimeofday(&t, NULL);
 	e = &tapdisk_err.errors[tapdisk_err.cnt];
 
-	len = snprintf(e->msg, MAX_ENTRY_LEN - 1, "%010ld.%06ld:%s ",
-		       t.tv_sec, t.tv_usec, func);
+	len = snprintf(e->msg, MAX_ENTRY_LEN - 1, "%010ld.%06lld:%s ",
+		       t.tv_sec, (unsigned long long)t.tv_usec, func);
 
 	va_start(ap, fmt);
 	ret = vsnprintf(e->msg + len, MAX_ENTRY_LEN - (len + 1), fmt, ap);
@@ -237,7 +238,7 @@ tlog_flush(void)
 		return;
 
 	if (tapdisk_log.append)
-		if (lseek64(fd, 0, SEEK_END) == (loff_t)-1)
+		if (lseek(fd, 0, SEEK_END) == (off_t)-1)
 			goto out;
 
 	tlog_flush_errors();

@@ -24,6 +24,7 @@ endif
 
 LIBS      += -lrt -lz
 
+ifeq ($(CONFIG_Linux),y)
 ifeq ($(shell . ./check_gcrypt $(CC)),yes)
 CFLAGS += -DUSE_GCRYPT
 CRYPT_LIB += -lgcrypt
@@ -31,10 +32,17 @@ else
 CRYPT_LIB += -lcrypto
 $(warning === libgcrypt not installed: falling back to libcrypto ===)
 endif
+else
+CRYPT_LIB += -lcrypto
+endif
 
 LDFLAGS_img := $(CRYPT_LIB) -lpthread -lz
 
-tapdisk2 td-util tapdisk-stream tapdisk-diff $(QCOW_UTIL): LIBS += -L$(LIBVHDDIR) -lvhd -luuid
+LIBS += -L$(LIBVHDDIR) -lvhd
+
+ifeq ($(CONFIG_Linux),y)
+LIBS += -luuid
+endif
 
 LIBAIO_DIR = $(XEN_ROOT)/tools/libaio/src
 tapdisk2 tapdisk-stream tapdisk-diff $(QCOW_UTIL): AIOLIBS := $(LIBAIO_DIR)/libaio.a
@@ -43,6 +51,10 @@ tapdisk-client tapdisk-stream tapdisk-diff $(QCOW_UTIL): CFLAGS  += -I$(LIBAIO_D
 ifeq ($(VHD_STATIC),y)
 td-util: CFLAGS += -static
 endif
+
+PORTABLE-OBJS-y :=
+PORTABLE-OBJS-$(CONFIG_Linux)  += blk_linux.o
+PORTABLE-OBJS-$(CONFIG_NetBSD) += blk_netbsd.o
 
 TAP-OBJS-y  := scheduler.o
 TAP-OBJS-y  += tapdisk-ipc.o
@@ -57,7 +69,7 @@ TAP-OBJS-y  += tapdisk-log.o
 TAP-OBJS-y  += tapdisk-utils.o
 TAP-OBJS-y  += io-optimize.o
 TAP-OBJS-y  += lock.o
-TAP-OBJS-$(CONFIG_Linux)  += blk_linux.o
+TAP-OBJS-y  += $(PORTABLE-OBJS-y)
 
 MISC-OBJS-y := atomicio.o
 
@@ -68,6 +80,7 @@ BLK-OBJS-y  += block-vhd.o
 BLK-OBJS-y  += block-log.o
 BLK-OBJS-y  += block-qcow.o
 BLK-OBJS-y  += aes.o
+BLK-OBJS-y  += $(PORTABLE-OBJS-y)
 
 all: $(IBIN) lock-util qcow-util
 
@@ -81,7 +94,7 @@ tapdisk-client: tapdisk-client.o
 tapdisk-stream tapdisk-diff: %: %.o $(TAP-OBJS-y) $(BLK-OBJS-y)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS) $(AIOLIBS)  $(LDFLAGS_img)
 
-td-util: td.o tapdisk-utils.o tapdisk-log.o
+td-util: td.o tapdisk-utils.o tapdisk-log.o $(PORTABLE-OBJS-y)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS)  $(LDFLAGS_img)
 
 lock-util: lock.c

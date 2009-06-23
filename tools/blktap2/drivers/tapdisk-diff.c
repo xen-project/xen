@@ -31,6 +31,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <libgen.h>	/* for basename(3) */
 #include <unistd.h>
 
 #include "list.h"

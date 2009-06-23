@@ -37,7 +37,7 @@ vhd_util_query(int argc, char **argv)
 {
 	char *name;
 	vhd_context_t vhd;
-	off64_t currsize;
+	off_t currsize;
 	int ret, err, c, size, physize, parent, fields, depth;
 
 	name    = NULL;

@@ -250,8 +250,8 @@ vhd_validate_footer(vhd_footer_t *footer)
 	if (memcmp(footer->cookie, HD_COOKIE, csize) != 0 &&
 	    memcmp(footer->cookie, VHD_POISON_COOKIE, csize) != 0) {
 		char buf[9];
-		memcpy(buf, footer->cookie, 8);
-		buf[8]= '\0';
+		strncpy(buf, footer->cookie, sizeof(buf));
+		buf[sizeof(buf)-1]= '\0';
 		VHDLOG("invalid footer cookie: %s\n", buf);
 		return -EINVAL;
 	}
@@ -311,8 +311,8 @@ vhd_validate_header(vhd_header_t *header)
 
 	if (memcmp(header->cookie, DD_COOKIE, 8) != 0) {
 		char buf[9];
-		memcpy(buf, header->cookie, 8);
-		buf[8] = '\0';
+		strncpy(buf, header->cookie, sizeof(buf));
+		buf[sizeof(buf)-1]= '\0';
 		VHDLOG("invalid header cookie: %s\n", buf);
 		return -EINVAL;
 	}
@@ -403,9 +403,9 @@ vhd_validate_batmap(vhd_batmap_t *batmap)
 }
 
 int
-vhd_batmap_header_offset(vhd_context_t *ctx, off64_t *_off)
+vhd_batmap_header_offset(vhd_context_t *ctx, off_t *_off)
 {
-	off64_t off;
+	off_t off;
 	size_t  bat;
 
 	*_off = 0;
@@ -592,11 +592,11 @@ vhd_bitmap_clear(vhd_context_t *ctx, char *map, uint32_t block)
  * byte of the file which is not vhd metadata
  */
 int
-vhd_end_of_headers(vhd_context_t *ctx, off64_t *end)
+vhd_end_of_headers(vhd_context_t *ctx, off_t *end)
 {
 	int err, i, n;
 	uint32_t bat_bytes;
-	off64_t eom, bat_end;
+	off_t eom, bat_end;
 	vhd_parent_locator_t *loc;
 
 	*end = 0;
@@ -612,7 +612,7 @@ vhd_end_of_headers(vhd_context_t *ctx, off64_t *end)
 	eom       = MAX(eom, bat_end);
 
 	if (vhd_has_batmap(ctx)) {
-		off64_t hdr_end, hdr_secs, map_end, map_secs;
+		off_t hdr_end, hdr_secs, map_end, map_secs;
 
 		err = vhd_get_batmap(ctx);
 		if (err)
@@ -636,7 +636,7 @@ vhd_end_of_headers(vhd_context_t *ctx, off64_t *end)
 	n = sizeof(ctx->header.loc) / sizeof(vhd_parent_locator_t);
 
 	for (i = 0; i < n; i++) {
-		off64_t loc_end;
+		off_t loc_end;
 
 		loc = &ctx->header.loc[i];
 		if (loc->code == PLAT_CODE_NONE)
@@ -651,10 +651,10 @@ vhd_end_of_headers(vhd_context_t *ctx, off64_t *end)
 }
 
 int
-vhd_end_of_data(vhd_context_t *ctx, off64_t *end)
+vhd_end_of_data(vhd_context_t *ctx, off_t *end)
 {
 	int i, err;
-	off64_t max;
+	off_t max;
 	uint64_t blk;
 
 	if (!vhd_type_dynamic(ctx)) {
@@ -663,7 +663,7 @@ vhd_end_of_data(vhd_context_t *ctx, off64_t *end)
 			return err;
 
 		max = vhd_position(ctx);
-		if (max == (off64_t)-1)
+		if (max == (off_t)-1)
 			return -errno;
 
 		*end = max - sizeof(vhd_footer_t);
@@ -871,7 +871,7 @@ vhd_read_short_footer(vhd_context_t *ctx, vhd_footer_t *footer)
 {
 	int err;
 	char *buf;
-	off64_t eof;
+	off_t eof;
 
 	buf = NULL;
 
@@ -880,7 +880,7 @@ vhd_read_short_footer(vhd_context_t *ctx, vhd_footer_t *footer)
 		goto out;
 
 	eof = vhd_position(ctx);
-	if (eof == (off64_t)-1) {
+	if (eof == (off_t)-1) {
 		err = -errno;
 		goto out;
 	}
@@ -918,7 +918,7 @@ out:
 }
 
 int
-vhd_read_footer_at(vhd_context_t *ctx, vhd_footer_t *footer, off64_t off)
+vhd_read_footer_at(vhd_context_t *ctx, vhd_footer_t *footer, off_t off)
 {
 	int err;
 	char *buf;
@@ -958,14 +958,14 @@ int
 vhd_read_footer(vhd_context_t *ctx, vhd_footer_t *footer)
 {
 	int err;
-	off64_t off;
+	off_t off;
 
 	err = vhd_seek(ctx, 0, SEEK_END);
 	if (err)
 		return err;
 
 	off = vhd_position(ctx);
-	if (off == (off64_t)-1)
+	if (off == (off_t)-1)
 		return -errno;
 
 	err = vhd_read_footer_at(ctx, footer, off - 512);
@@ -983,7 +983,7 @@ vhd_read_footer(vhd_context_t *ctx, vhd_footer_t *footer)
 }
 
 int
-vhd_read_header_at(vhd_context_t *ctx, vhd_header_t *header, off64_t off)
+vhd_read_header_at(vhd_context_t *ctx, vhd_header_t *header, off_t off)
 {
 	int err;
 	char *buf;
@@ -1028,7 +1028,7 @@ int
 vhd_read_header(vhd_context_t *ctx, vhd_header_t *header)
 {
 	int err;
-	off64_t off;
+	off_t off;
 
 	if (!vhd_type_dynamic(ctx)) {
 		VHDLOG("%s is not dynamic!\n", ctx->file);
@@ -1044,7 +1044,7 @@ vhd_read_bat(vhd_context_t *ctx, vhd_bat_t *bat)
 {
 	int err;
 	char *buf;
-	off64_t off;
+	off_t off;
 	size_t size;
 
 	buf  = NULL;
@@ -1092,7 +1092,7 @@ vhd_read_batmap_header(vhd_context_t *ctx, vhd_batmap_t *batmap)
 {
 	int err;
 	char *buf;
-	off64_t off;
+	off_t off;
 	size_t size;
 
 	buf = NULL;
@@ -1137,7 +1137,7 @@ vhd_read_batmap_map(vhd_context_t *ctx, vhd_batmap_t *batmap)
 {
 	int err;
 	char *buf;
-	off64_t off;
+	off_t off;
 	size_t map_size;
 
 	map_size = vhd_sectors_to_bytes(batmap->header.batmap_size);
@@ -1331,7 +1331,7 @@ vhd_macx_encode_location(char *name, char **out, int *outlen)
 		goto out;
 	}
 
-	sprintf(uri, "file://%s", name);
+	snprintf(uri, ibl+1, "file://%s", name);
 
 	if (iconv(cd, &urip, &ibl, &uri_utf8p, &obl) == (size_t)-1 ||
 	    ibl || obl) {
@@ -1446,7 +1446,7 @@ vhd_w2u_encode_location(char *name, char **out, int *outlen)
 }
 
 static char *
-vhd_macx_decode_location(char *in, char *out, int len)
+vhd_macx_decode_location(const char *in, char *out, int len)
 {
 	iconv_t cd;
 	char *name;
@@ -1459,7 +1459,7 @@ vhd_macx_decode_location(char *in, char *out, int len)
 	if (cd == (iconv_t)-1) 
 		return NULL;
 
-	if (iconv(cd, &in, &ibl, &out, &obl) == (size_t)-1 || ibl)
+	if (iconv(cd, (char **)&in, &ibl, &out, &obl) == (size_t)-1 || ibl)
 		return NULL;
 
 	iconv_close(cd);
@@ -1474,7 +1474,7 @@ vhd_macx_decode_location(char *in, char *out, int len)
 }
 
 static char *
-vhd_w2u_decode_location(char *in, char *out, int len, char *utf_type)
+vhd_w2u_decode_location(const char *in, char *out, int len, char *utf_type)
 {
 	iconv_t cd;
 	char *name, *tmp;
@@ -1487,7 +1487,7 @@ vhd_w2u_decode_location(char *in, char *out, int len, char *utf_type)
 	if (cd == (iconv_t)-1) 
 		return NULL;
 
-	if (iconv(cd, &in, &ibl, &out, &obl) == (size_t)-1 || ibl)
+	if (iconv(cd, (char **)&in, &ibl, &out, &obl) == (size_t)-1 || ibl)
 		return NULL;
 
 	iconv_close(cd);
@@ -1646,7 +1646,7 @@ vhd_parent_locator_get(vhd_context_t *ctx, char **parent)
 
 int
 vhd_parent_locator_write_at(vhd_context_t *ctx,
-			    const char *parent, off64_t off, uint32_t code,
+			    const char *parent, off_t off, uint32_t code,
 			    size_t max_bytes, vhd_parent_locator_t *loc)
 {
 	struct stat stats;
@@ -1762,7 +1762,7 @@ out:
 }
 
 static int
-vhd_footer_offset_at_eof(vhd_context_t *ctx, off64_t *off)
+vhd_footer_offset_at_eof(vhd_context_t *ctx, off_t *off)
 {
 	int err;
 	if ((err = vhd_seek(ctx, 0, SEEK_END)))
@@ -1777,7 +1777,7 @@ vhd_read_bitmap(vhd_context_t *ctx, uint32_t block, char **bufp)
 	int err;
 	char *buf;
 	size_t size;
-	off64_t off;
+	off_t off;
 	uint64_t blk;
 
 	buf   = NULL;
@@ -1827,7 +1827,7 @@ vhd_read_block(vhd_context_t *ctx, uint32_t block, char **bufp)
 	char *buf;
 	size_t size;
 	uint64_t blk;
-	off64_t end, off;
+	off_t end, off;
 
 	buf   = NULL;
 	*bufp = NULL;
@@ -1881,7 +1881,7 @@ fail:
 }
 
 int
-vhd_write_footer_at(vhd_context_t *ctx, vhd_footer_t *footer, off64_t off)
+vhd_write_footer_at(vhd_context_t *ctx, vhd_footer_t *footer, off_t off)
 {
 	int err;
 	vhd_footer_t *f;
@@ -1923,7 +1923,7 @@ int
 vhd_write_footer(vhd_context_t *ctx, vhd_footer_t *footer)
 {
 	int err;
-	off64_t off;
+	off_t off;
 
 	if (ctx->is_block)
 		err = vhd_footer_offset_at_eof(ctx, &off);
@@ -1943,7 +1943,7 @@ vhd_write_footer(vhd_context_t *ctx, vhd_footer_t *footer)
 }
 
 int
-vhd_write_header_at(vhd_context_t *ctx, vhd_header_t *header, off64_t off)
+vhd_write_header_at(vhd_context_t *ctx, vhd_header_t *header, off_t off)
 {
 	int err;
 	vhd_header_t *h;
@@ -1990,7 +1990,7 @@ int
 vhd_write_header(vhd_context_t *ctx, vhd_header_t *header)
 {
 	int err;
-	off64_t off;
+	off_t off;
 
 	if (!vhd_type_dynamic(ctx))
 		return -EINVAL;
@@ -2003,7 +2003,7 @@ int
 vhd_write_bat(vhd_context_t *ctx, vhd_bat_t *bat)
 {
 	int err;
-	off64_t off;
+	off_t off;
 	vhd_bat_t b;
 	size_t size;
 
@@ -2046,7 +2046,7 @@ int
 vhd_write_batmap(vhd_context_t *ctx, vhd_batmap_t *batmap)
 {
 	int err;
-	off64_t off;
+	off_t off;
 	vhd_batmap_t b;
 	char *buf, *map;
 	size_t size, map_size;
@@ -2122,7 +2122,7 @@ int
 vhd_write_bitmap(vhd_context_t *ctx, uint32_t block, char *bitmap)
 {
 	int err;
-	off64_t off;
+	off_t off;
 	uint64_t blk;
 	size_t secs, size;
 
@@ -2161,7 +2161,7 @@ int
 vhd_write_block(vhd_context_t *ctx, uint32_t block, char *data)
 {
 	int err;
-	off64_t off;
+	off_t off;
 	size_t size;
 	uint64_t blk;
 
@@ -2212,12 +2212,12 @@ namedup(char **dup, const char *name)
 }
 
 int
-vhd_seek(vhd_context_t *ctx, off64_t offset, int whence)
+vhd_seek(vhd_context_t *ctx, off_t offset, int whence)
 {
-	off64_t off;
+	off_t off;
 
-	off = lseek64(ctx->fd, offset, whence);
-	if (off == (off64_t)-1) {
+	off = lseek(ctx->fd, offset, whence);
+	if (off == (off_t)-1) {
 		VHDLOG("%s: seek(0x%08"PRIx64", %d) failed: %d\n",
 		       ctx->file, offset, whence, -errno);
 		return -errno;
@@ -2226,10 +2226,10 @@ vhd_seek(vhd_context_t *ctx, off64_t offset, int whence)
 	return 0;
 }
 
-off64_t
+off_t
 vhd_position(vhd_context_t *ctx)
 {
-	return lseek64(ctx->fd, 0, SEEK_CUR);
+	return lseek(ctx->fd, 0, SEEK_CUR);
 }
 
 int
@@ -2444,7 +2444,8 @@ vhd_initialize_header_parent_name(vhd_context_t *ctx, const char *parent_path)
 	int err;
 	iconv_t cd;
 	size_t ibl, obl;
-	char *pname, *ppath, *dst;
+	char *ppath, *dst;
+	const char *pname;
 
 	err   = 0;
 	pname = NULL;
@@ -2478,7 +2479,7 @@ vhd_initialize_header_parent_name(vhd_context_t *ctx, const char *parent_path)
 
 	memset(dst, 0, obl);
 
-	if (iconv(cd, &pname, &ibl, &dst, &obl) == (size_t)-1 || ibl)
+	if (iconv(cd, (char **)&pname, &ibl, &dst, &obl) == (size_t)-1 || ibl)
 		err = (errno ? -errno : -EINVAL);
 
 out:
@@ -2487,18 +2488,18 @@ out:
 	return err;
 }
 
-static off64_t
+static off_t
 get_file_size(const char *name)
 {
 	int fd;
-	off64_t end;
+	off_t end;
 
 	fd = open(name, O_LARGEFILE | O_RDONLY);
 	if (fd == -1) {
 		VHDLOG("unable to open '%s': %d\n", name, errno);
 		return -errno;
 	}
-	end = lseek64(fd, 0, SEEK_END);
+	end = lseek(fd, 0, SEEK_END);
 	close(fd); 
 	return end;
 }
@@ -2563,7 +2564,7 @@ static int
 vhd_write_parent_locators(vhd_context_t *ctx, const char *parent)
 {
 	int i, err;
-	off64_t off;
+	off_t off;
 	uint32_t code;
 
 	code = PLAT_CODE_NONE;
@@ -2683,7 +2684,7 @@ out:
 static int
 vhd_create_batmap(vhd_context_t *ctx)
 {
-	off64_t off;
+	off_t off;
 	int err, map_bytes;
 	vhd_batmap_header_t *header;
 
@@ -2694,7 +2695,7 @@ vhd_create_batmap(vhd_context_t *ctx)
 	header    = &ctx->batmap.header;
 
 	memset(header, 0, sizeof(vhd_batmap_header_t));
-	memcpy(header->cookie, VHD_BATMAP_COOKIE, sizeof(header->cookie));
+	memcpy(header->cookie, VHD_BATMAP_COOKIE, sizeof(*header->cookie));
 
 	err = vhd_batmap_header_offset(ctx, &off);
 	if (err)
@@ -2763,7 +2764,7 @@ vhd_initialize_fixed_disk(vhd_context_t *ctx)
 		return err;
 
 	buf = mmap(0, VHD_BLOCK_SIZE, PROT_READ,
-		   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+		   MAP_SHARED | MAP_ANON, -1, 0);
 	if (buf == MAP_FAILED)
 		return -errno;
 
@@ -2781,7 +2782,7 @@ out:
 }
 
 int 
-vhd_get_phys_size(vhd_context_t *ctx, off64_t *size)
+vhd_get_phys_size(vhd_context_t *ctx, off_t *size)
 {
 	int err;
 
@@ -2792,9 +2793,9 @@ vhd_get_phys_size(vhd_context_t *ctx, off64_t *size)
 }
 
 int 
-vhd_set_phys_size(vhd_context_t *ctx, off64_t size)
+vhd_set_phys_size(vhd_context_t *ctx, off_t size)
 {
-	off64_t phys_size;
+	off_t phys_size;
 	int err;
 
 	err = vhd_get_phys_size(ctx, &phys_size);
@@ -2815,7 +2816,7 @@ __vhd_create(const char *name, const char *parent, uint64_t bytes, int type,
 		vhd_flag_creat_t flags)
 {
 	int err;
-	off64_t off;
+	off_t off;
 	vhd_context_t ctx;
 	vhd_footer_t *footer;
 	vhd_header_t *header;
@@ -2901,7 +2902,7 @@ __vhd_create(const char *name, const char *parent, uint64_t bytes, int type,
 		goto out;
 
 	off = vhd_position(&ctx);
-	if (off == (off64_t)-1) {
+	if (off == (off_t)-1) {
 		err = -errno;
 		goto out;
 	}
@@ -2976,7 +2977,7 @@ static int
 __vhd_io_dynamic_read_link(vhd_context_t *ctx, char *map,
 			   char *buf, uint64_t sector, uint32_t secs)
 {
-	off64_t off;
+	off_t off;
 	uint32_t blk, sec;
 	int err, cnt, map_off;
 	char *bitmap, *data, *src;
@@ -3032,7 +3033,7 @@ __raw_read_link(char *filename,
 		char *map, char *buf, uint64_t sec, uint32_t secs)
 {
 	int fd, err;
-	off64_t off;
+	off_t off;
 	uint64_t size;
 	char *data;
 
@@ -3044,8 +3045,8 @@ __raw_read_link(char *filename,
 		return -errno;
 	}
 
-	off = lseek64(fd, vhd_sectors_to_bytes(sec), SEEK_SET);
-	if (off == (off64_t)-1) {
+	off = lseek(fd, vhd_sectors_to_bytes(sec), SEEK_SET);
+	if (off == (off_t)-1) {
 		VHDLOG("%s: seek(0x%08"PRIx64") failed: %d\n",
 		       filename, vhd_sectors_to_bytes(sec), -errno);
 		err = -errno;
@@ -3178,7 +3179,7 @@ __vhd_io_allocate_block(vhd_context_t *ctx, uint32_t block)
 {
 	char *buf;
 	size_t size;
-	off64_t off, max;
+	off_t off, max;
 	int i, err, gap, spp;
 
 	spp = getpagesize() >> VHD_SECTOR_SHIFT;
@@ -3202,7 +3203,7 @@ __vhd_io_allocate_block(vhd_context_t *ctx, uint32_t block)
 		return err;
 
 	size = vhd_sectors_to_bytes(ctx->spb + ctx->bm_secs + gap);
-	buf  = mmap(0, size, PROT_READ, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	buf  = mmap(0, size, PROT_READ, MAP_SHARED | MAP_ANON, -1, 0);
 	if (buf == MAP_FAILED)
 		return -errno;
 
@@ -3227,7 +3228,7 @@ __vhd_io_dynamic_write(vhd_context_t *ctx,
 		       char *buf, uint64_t sector, uint32_t secs)
 {
 	char *map;
-	off64_t off;
+	off_t off;
 	uint32_t blk, sec;
 	int i, err, cnt, ret;
 

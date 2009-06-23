@@ -113,10 +113,11 @@ check_hash(struct tfilter *filter, uint64_t sec, char *buf, char *type)
 	if (hash->hash != chksum(buf)) {
 		struct timeval now;
 		gettimeofday(&now, NULL);
-		DBG("%s: hash table: 0x%020" PRIx64 " at %012lu.%06lu, "
-		    "from disk: 0x%020" PRIx64 " at %012lu.%06lu\n",
+		DBG("%s: hash table: 0x%020" PRIx64 " at %012lu.%06llu, "
+		    "from disk: 0x%020" PRIx64 " at %012lu.%06llu\n",
 		    type, hash->hash, hash->time.tv_sec,
-		    hash->time.tv_usec, sum, now.tv_sec, now.tv_usec);
+		    (unsigned long long)hash->time.tv_usec, sum,
+		    now.tv_sec, (unsigned long long)now.tv_usec);
 	}
 }
 

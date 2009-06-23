@@ -29,12 +29,12 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-#include <linux/fs.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <sys/ioctl.h>
 #include <sys/resource.h>
 
+#include "blk.h"
 #include "tapdisk.h"
 #include "disktypes.h"
 #include "blktaplib.h"
@@ -150,7 +150,7 @@ tapdisk_get_image_size(int fd, uint64_t *_sectors, uint32_t *_sector_size)
 	int ret;
 	struct stat stat;
 	uint64_t sectors;
-	uint32_t sector_size;
+	uint64_t sector_size;
 
 	sectors       = 0;
 	sector_size   = 0;
@@ -164,26 +164,12 @@ tapdisk_get_image_size(int fd, uint64_t *_sectors, uint32_t *_sector_size)
 
 	if (S_ISBLK(stat.st_mode)) {
 		/*Accessing block device directly*/
-		if (ioctl(fd, BLKGETSIZE, &sectors)) {
-			DPRINTF("ERR: BLKGETSIZE failed, couldn't stat image");
+		if (blk_getimagesize(fd, &sectors) != 0)
 			return -EINVAL;
-		}
 
 		/*Get the sector size*/
-#if defined(BLKSSZGET)
-		{
-			int arg;
+		if (blk_getsectorsize(fd, &sector_size) != 0)
 			sector_size = DEFAULT_SECTOR_SIZE;
-			ioctl(fd, BLKSSZGET, &sector_size);
-
-			if (sector_size != DEFAULT_SECTOR_SIZE)
-				DPRINTF("Note: sector size is %u (not %d)\n",
-					sector_size, DEFAULT_SECTOR_SIZE);
-		}
-#else
-		sector_size = DEFAULT_SECTOR_SIZE;
-#endif
-
 	} else {
 		/*Local file? try fstat instead*/
 		sectors     = (stat.st_size >> SECTOR_SHIFT);

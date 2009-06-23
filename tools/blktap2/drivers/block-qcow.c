@@ -29,7 +29,6 @@
 #include <sys/statvfs.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
-#include <linux/fs.h>
 #include <string.h>
 #include <zlib.h>
 #include <inttypes.h>
@@ -990,8 +989,8 @@ int tdqcow_open (td_driver_t *driver, const char *name, td_flag_t flags)
 		s->fd_end = s->l1_table_offset +
 			((s->l1_size * sizeof(uint64_t) + 4095) & ~4095);
 	else {
-		s->fd_end = lseek64(fd, 0, SEEK_END);
-		if (s->fd_end == (off64_t)-1)
+		s->fd_end = lseek(fd, 0, SEEK_END);
+		if (s->fd_end == (off_t)-1)
 			goto fail;
 	}
 

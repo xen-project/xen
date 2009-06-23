@@ -52,21 +52,21 @@ typedef struct vhd_journal_entry {
 } vhd_journal_entry_t;
 
 static inline int
-vhd_journal_seek(vhd_journal_t *j, off64_t offset, int whence)
+vhd_journal_seek(vhd_journal_t *j, off_t offset, int whence)
 {
-	off64_t off;
+	off_t off;
 
-	off = lseek64(j->jfd, offset, whence);
-	if (off == (off64_t)-1)
+	off = lseek(j->jfd, offset, whence);
+	if (off == (off_t)-1)
 		return -errno;
 
 	return 0;
 }
 
-static inline off64_t
+static inline off_t
 vhd_journal_position(vhd_journal_t *j)
 {
-	return lseek64(j->jfd, 0, SEEK_CUR);
+	return lseek(j->jfd, 0, SEEK_CUR);
 }
 
 static inline int
@@ -98,7 +98,7 @@ vhd_journal_write(vhd_journal_t *j, void *buf, size_t size)
 }
 
 static inline int
-vhd_journal_truncate(vhd_journal_t *j, off64_t length)
+vhd_journal_truncate(vhd_journal_t *j, off_t length)
 {
 	int err;
 
@@ -145,7 +145,7 @@ static int
 vhd_journal_validate_header(vhd_journal_t *j, vhd_journal_header_t *header)
 {
 	int err;
-	off64_t eof;
+	off_t eof;
 
 	if (memcmp(header->cookie,
 		   VHD_JOURNAL_HEADER_COOKIE, sizeof(header->cookie)))
@@ -156,7 +156,7 @@ vhd_journal_validate_header(vhd_journal_t *j, vhd_journal_header_t *header)
 		return err;
 
 	eof = vhd_journal_position(j);
-	if (eof == (off64_t)-1)
+	if (eof == (off_t)-1)
 		return -errno;
 
 	if (j->header.journal_data_offset > j->header.journal_eof)
@@ -219,7 +219,7 @@ static int
 vhd_journal_add_journal_header(vhd_journal_t *j)
 {
 	int err;
-	off64_t off;
+	off_t off;
 	vhd_context_t *vhd;
 
 	vhd = &j->vhd;
@@ -230,7 +230,7 @@ vhd_journal_add_journal_header(vhd_journal_t *j)
 		return err;
 
 	off = vhd_position(vhd);
-	if (off == (off64_t)-1)
+	if (off == (off_t)-1)
 		return -errno;
 
 	err = vhd_get_footer(vhd);
@@ -353,11 +353,11 @@ vhd_journal_validate_entry_data(vhd_journal_entry_t *entry, char *buf)
 }
 
 static int
-vhd_journal_update(vhd_journal_t *j, off64_t offset,
+vhd_journal_update(vhd_journal_t *j, off_t offset,
 		   char *buf, size_t size, uint32_t type)
 {
 	int err;
-	off64_t eof;
+	off_t eof;
 	uint64_t *off, off_bak;
 	uint32_t *entries;
 	vhd_journal_entry_t entry;
@@ -413,7 +413,7 @@ static int
 vhd_journal_add_footer(vhd_journal_t *j)
 {
 	int err;
-	off64_t off;
+	off_t off;
 	vhd_context_t *vhd;
 	vhd_footer_t footer;
 
@@ -424,7 +424,7 @@ vhd_journal_add_footer(vhd_journal_t *j)
 		return err;
 
 	off = vhd_position(vhd);
-	if (off == (off64_t)-1)
+	if (off == (off_t)-1)
 		return -errno;
 
 	err = vhd_read_footer_at(vhd, &footer, off - sizeof(vhd_footer_t));
@@ -459,7 +459,7 @@ static int
 vhd_journal_add_header(vhd_journal_t *j)
 {
 	int err;
-	off64_t off;
+	off_t off;
 	vhd_context_t *vhd;
 	vhd_header_t header;
 
@@ -495,7 +495,7 @@ vhd_journal_add_locators(vhd_journal_t *j)
 	n = sizeof(vhd->header.loc) / sizeof(vhd_parent_locator_t);
 	for (i = 0; i < n; i++) {
 		char *buf;
-		off64_t off;
+		off_t off;
 		size_t size;
 		vhd_parent_locator_t *loc;
 
@@ -542,7 +542,7 @@ static int
 vhd_journal_add_bat(vhd_journal_t *j)
 {
 	int err;
-	off64_t off;
+	off_t off;
 	size_t size;
 	vhd_bat_t bat;
 	vhd_context_t *vhd;
@@ -572,7 +572,7 @@ static int
 vhd_journal_add_batmap(vhd_journal_t *j)
 {
 	int err;
-	off64_t off;
+	off_t off;
 	size_t size;
 	vhd_context_t *vhd;
 	vhd_batmap_t batmap;
@@ -611,7 +611,7 @@ static int
 vhd_journal_add_metadata(vhd_journal_t *j)
 {
 	int err;
-	off64_t eof;
+	off_t eof;
 	vhd_context_t *vhd;
 
 	vhd = &j->vhd;
@@ -930,7 +930,7 @@ vhd_journal_restore_footer_copy(vhd_journal_t *j, vhd_footer_t *footer)
 static int
 vhd_journal_restore_header(vhd_journal_t *j, vhd_header_t *header)
 {
-	off64_t off;
+	off_t off;
 	vhd_context_t *vhd;
 
 	vhd = &j->vhd;
@@ -985,7 +985,7 @@ vhd_journal_restore_batmap(vhd_journal_t *j, vhd_batmap_t *batmap)
 static int
 vhd_journal_restore_metadata(vhd_journal_t *j)
 {
-	off64_t off;
+	off_t off;
 	char **locators;
 	vhd_footer_t copy;
 	vhd_context_t *vhd;
@@ -1046,7 +1046,7 @@ vhd_journal_restore_metadata(vhd_journal_t *j)
 
 restore:
 	off  = vhd_journal_position(j);
-	if (off == (off64_t)-1)
+	if (off == (off_t)-1)
 		return -errno;
 
 	if (j->header.journal_data_offset != off)
@@ -1259,7 +1259,7 @@ vhd_journal_create(vhd_journal_t *j, const char *file, const char *jfile)
 	char *buf;
 	int i, err;
 	size_t size;
-	off64_t off;
+	off_t off;
 	struct stat stats;
 
 	memset(j, 0, sizeof(vhd_journal_t));
@@ -1345,7 +1345,7 @@ vhd_journal_add_block(vhd_journal_t *j, uint32_t block, char mode)
 {
 	int err;
 	char *buf;
-	off64_t off;
+	off_t off;
 	size_t size;
 	uint64_t blk;
 	vhd_context_t *vhd;

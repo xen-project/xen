@@ -37,7 +37,7 @@ vhd_util_set_field(int argc, char **argv)
 {
 	long value;
 	int err, c;
-	off64_t eof;
+	off_t eof;
 	vhd_context_t vhd;
 	char *name, *field;
 

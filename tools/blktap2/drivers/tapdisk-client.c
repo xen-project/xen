@@ -109,7 +109,7 @@ static int tdctl_open(const char* sockpath)
   saddr.sun_family = AF_UNIX;
   memcpy(saddr.sun_path, sockpath, strlen(sockpath));
 
-  if (connect(fd, &saddr, sizeof(saddr)) < 0) {
+  if (connect(fd, (struct sockaddr *)&saddr, sizeof(saddr)) < 0) {
     BWPRINTF("error connecting to socket %s: %s", sockpath, strerror(errno));
     close(fd);
     return -1;

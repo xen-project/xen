@@ -27,9 +27,8 @@
 #ifndef __VHD_H__
 #define __VHD_H__
 
-#include <asm/types.h>
-#include <uuid/uuid.h>
 #include <inttypes.h>
+#include "uuid.h"
 
 typedef uint32_t u32;
 typedef uint64_t u64;

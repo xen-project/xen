@@ -28,19 +28,37 @@
 #define _VHD_LIB_H_
 
 #include <string.h>
+#if defined(__linux__) || defined(__Linux__)
 #include <endian.h>
 #include <byteswap.h>
-#include <uuid/uuid.h>
+#elif defined(__NetBSD__)
+#include <sys/endian.h>
+#include <sys/bswap.h>
+#endif
 
+#include "uuid.h"
 #include "vhd.h"
 
+#ifndef O_LARGEFILE
+#define O_LARGEFILE	0
+#endif
+
 #if BYTE_ORDER == LITTLE_ENDIAN
+#if defined(__linux__) || defined(__Linux__)
   #define BE16_IN(foo)             (*(foo)) = bswap_16(*(foo))
   #define BE32_IN(foo)             (*(foo)) = bswap_32(*(foo))
   #define BE64_IN(foo)             (*(foo)) = bswap_64(*(foo))
   #define BE16_OUT(foo)            (*(foo)) = bswap_16(*(foo))
   #define BE32_OUT(foo)            (*(foo)) = bswap_32(*(foo))
   #define BE64_OUT(foo)            (*(foo)) = bswap_64(*(foo))
+#elif defined(__NetBSD__)
+  #define BE16_IN(foo)             (*(foo)) = bswap16(*(foo))
+  #define BE32_IN(foo)             (*(foo)) = bswap32(*(foo))
+  #define BE64_IN(foo)             (*(foo)) = bswap64(*(foo))
+  #define BE16_OUT(foo)            (*(foo)) = bswap16(*(foo))
+  #define BE32_OUT(foo)            (*(foo)) = bswap32(*(foo))
+  #define BE64_OUT(foo)            (*(foo)) = bswap64(*(foo))
+#endif
 #else
   #define BE16_IN(foo)
   #define BE32_IN(foo)
@@ -239,16 +257,16 @@ int vhd_snapshot(const char *snapshot, uint64_t bytes, const char *parent,
 int vhd_hidden(vhd_context_t *, int *);
 int vhd_chain_depth(vhd_context_t *, int *);
 
-off64_t vhd_position(vhd_context_t *);
-int vhd_seek(vhd_context_t *, off64_t, int);
+off_t vhd_position(vhd_context_t *);
+int vhd_seek(vhd_context_t *, off_t, int);
 int vhd_read(vhd_context_t *, void *, size_t);
 int vhd_write(vhd_context_t *, void *, size_t);
 
 int vhd_offset(vhd_context_t *, uint32_t, uint32_t *);
 
-int vhd_end_of_headers(vhd_context_t *ctx, off64_t *off);
-int vhd_end_of_data(vhd_context_t *ctx, off64_t *off);
-int vhd_batmap_header_offset(vhd_context_t *ctx, off64_t *off);
+int vhd_end_of_headers(vhd_context_t *ctx, off_t *off);
+int vhd_end_of_data(vhd_context_t *ctx, off_t *off);
+int vhd_batmap_header_offset(vhd_context_t *ctx, off_t *off);
 
 int vhd_get_header(vhd_context_t *);
 int vhd_get_footer(vhd_context_t *);
@@ -265,8 +283,8 @@ int vhd_batmap_test(vhd_context_t *, vhd_batmap_t *, uint32_t);
 void vhd_batmap_set(vhd_context_t *, vhd_batmap_t *, uint32_t);
 void vhd_batmap_clear(vhd_context_t *, vhd_batmap_t *, uint32_t);
 
-int vhd_get_phys_size(vhd_context_t *, off64_t *);
-int vhd_set_phys_size(vhd_context_t *, off64_t);
+int vhd_get_phys_size(vhd_context_t *, off_t *);
+int vhd_set_phys_size(vhd_context_t *, off_t);
 
 int vhd_bitmap_test(vhd_context_t *, char *, uint32_t);
 void vhd_bitmap_set(vhd_context_t *, char *, uint32_t);
@@ -277,26 +295,26 @@ int vhd_parent_locator_get(vhd_context_t *, char **);
 int vhd_parent_locator_read(vhd_context_t *, vhd_parent_locator_t *, char **);
 int vhd_find_parent(vhd_context_t *, const char *, char **);
 int vhd_parent_locator_write_at(vhd_context_t *, const char *,
-				off64_t, uint32_t, size_t,
+				off_t, uint32_t, size_t,
 				vhd_parent_locator_t *);
 
 int vhd_header_decode_parent(vhd_context_t *, vhd_header_t *, char **);
 int vhd_change_parent(vhd_context_t *, char *parent_path, int raw);
 
 int vhd_read_footer(vhd_context_t *, vhd_footer_t *);
-int vhd_read_footer_at(vhd_context_t *, vhd_footer_t *, off64_t);
+int vhd_read_footer_at(vhd_context_t *, vhd_footer_t *, off_t);
 int vhd_read_footer_strict(vhd_context_t *, vhd_footer_t *);
 int vhd_read_header(vhd_context_t *, vhd_header_t *);
-int vhd_read_header_at(vhd_context_t *, vhd_header_t *, off64_t);
+int vhd_read_header_at(vhd_context_t *, vhd_header_t *, off_t);
 int vhd_read_bat(vhd_context_t *, vhd_bat_t *);
 int vhd_read_batmap(vhd_context_t *, vhd_batmap_t *);
 int vhd_read_bitmap(vhd_context_t *, uint32_t block, char **bufp);
 int vhd_read_block(vhd_context_t *, uint32_t block, char **bufp);
 
 int vhd_write_footer(vhd_context_t *, vhd_footer_t *);
-int vhd_write_footer_at(vhd_context_t *, vhd_footer_t *, off64_t);
+int vhd_write_footer_at(vhd_context_t *, vhd_footer_t *, off_t);
 int vhd_write_header(vhd_context_t *, vhd_header_t *);
-int vhd_write_header_at(vhd_context_t *, vhd_header_t *, off64_t);
+int vhd_write_header_at(vhd_context_t *, vhd_header_t *, off_t);
 int vhd_write_bat(vhd_context_t *, vhd_bat_t *);
 int vhd_write_batmap(vhd_context_t *, vhd_batmap_t *);
 int vhd_write_bitmap(vhd_context_t *, uint32_t block, char *bitmap);

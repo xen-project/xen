@@ -35,12 +35,12 @@
 static int
 __raw_io_write(int fd, char* buf, uint64_t sec, uint32_t secs)
 {
-	off64_t off;
+	off_t off;
 	size_t ret;
 
 	errno = 0;
-	off = lseek64(fd, vhd_sectors_to_bytes(sec), SEEK_SET);
-	if (off == (off64_t)-1) {
+	off = lseek(fd, vhd_sectors_to_bytes(sec), SEEK_SET);
+	if (off == (off_t)-1) {
 		printf("raw parent: seek(0x%08"PRIx64") failed: %d\n",
 		       vhd_sectors_to_bytes(sec), -errno);
 		return -errno;

@@ -146,7 +146,7 @@ ok:
 static char *
 vhd_util_check_validate_header(int fd, vhd_header_t *header)
 {
-	off64_t eof;
+	off_t eof;
 	int i, cnt, size;
 	uint32_t checksum;
 
@@ -164,8 +164,8 @@ vhd_util_check_validate_header(int fd, vhd_header_t *header)
 	if (header->data_offset != ~(0ULL))
 		return "invalid data offset";
 
-	eof = lseek64(fd, 0, SEEK_END);
-	if (eof == (off64_t)-1)
+	eof = lseek(fd, 0, SEEK_END);
+	if (eof == (off_t)-1)
 		return "error finding eof";
 
 	if (header->table_offset <= 0  ||
@@ -232,7 +232,7 @@ static char *
 vhd_util_check_validate_batmap(vhd_context_t *vhd, vhd_batmap_t *batmap)
 {
 	int size;
-	off64_t eof;
+	off_t eof;
 	uint32_t checksum;
 
 	size = sizeof(batmap->header.cookie);
@@ -249,8 +249,8 @@ vhd_util_check_validate_batmap(vhd_context_t *vhd, vhd_batmap_t *batmap)
 	if (!batmap->header.batmap_size)
 		return "invalid size zero";
 
-	eof = lseek64(vhd->fd, 0, SEEK_END);
-	if (eof == (off64_t)-1)
+	eof = lseek(vhd->fd, 0, SEEK_END);
+	if (eof == (off_t)-1)
 		return "error finding eof";
 
 	if (!batmap->header.batmap_offset ||
@@ -269,7 +269,7 @@ static char *
 vhd_util_check_validate_parent_locator(vhd_context_t *vhd,
 				       vhd_parent_locator_t *loc)
 {
-	off64_t eof;
+	off_t eof;
 
 	if (vhd_validate_platform_code(loc->code))
 		return "invalid platform code";
@@ -290,8 +290,8 @@ vhd_util_check_validate_parent_locator(vhd_context_t *vhd,
 	if (!loc->data_len)
 		return "invalid data length";
 
-	eof = lseek64(vhd->fd, 0, SEEK_END);
-	if (eof == (off64_t)-1)
+	eof = lseek(vhd->fd, 0, SEEK_END);
+	if (eof == (off_t)-1)
 		return "error finding eof";
 
 	if (loc->data_offset + vhd_parent_locator_size(loc) >
@@ -304,11 +304,12 @@ vhd_util_check_validate_parent_locator(vhd_context_t *vhd,
 	return NULL;
 }
 
-static char *
+static const char *
 vhd_util_check_validate_parent(vhd_context_t *vhd, const char *ppath)
 {
-	char *msg;
+	const char *msg;
 	vhd_context_t parent;
+	uint32_t status;
 
 	msg = NULL;
 
@@ -335,7 +336,7 @@ vhd_util_check_footer(int fd, vhd_footer_t *footer, int ignore)
 	size_t size;
 	int err, opened;
 	char *msg, *buf;
-	off64_t eof, off;
+	off_t eof, off;
 	vhd_footer_t primary, backup;
 
 	memset(&primary, 0, sizeof(primary));
@@ -349,16 +350,16 @@ vhd_util_check_footer(int fd, vhd_footer_t *footer, int ignore)
 
 	memset(buf, 0, sizeof(primary));
 
-	eof = lseek64(fd, 0, SEEK_END);
-	if (eof == (off64_t)-1) {
+	eof = lseek(fd, 0, SEEK_END);
+	if (eof == (off_t)-1) {
 		err = -errno;
 		printf("error calculating end of file: %d\n", err);
 		goto out;
 	}
 
 	size = ((eof % 512) ? 511 : 512);
-	eof  = lseek64(fd, eof - size, SEEK_SET);
-	if (eof == (off64_t)-1) {
+	eof  = lseek(fd, eof - size, SEEK_SET);
+	if (eof == (off_t)-1) {
 		err = -errno;
 		printf("error calculating end of file: %d\n", err);
 		goto out;
@@ -391,8 +392,8 @@ vhd_util_check_footer(int fd, vhd_footer_t *footer, int ignore)
 	}
 
 check_backup:
-	off = lseek64(fd, 0, SEEK_SET);
-	if (off == (off64_t)-1) {
+	off = lseek(fd, 0, SEEK_SET);
+	if (off == (off_t)-1) {
 		err = -errno;
 		printf("error seeking to backup footer: %d\n", err);
 		goto out;
@@ -454,7 +455,7 @@ static int
 vhd_util_check_header(int fd, vhd_footer_t *footer)
 {
 	int err;
-	off64_t off;
+	off_t off;
 	char *msg, *buf;
 	vhd_header_t header;
 
@@ -465,8 +466,8 @@ vhd_util_check_header(int fd, vhd_footer_t *footer)
 	}
 
 	off = footer->data_offset;
-	off = lseek64(fd, off, SEEK_SET);
-	if (off == (off64_t)-1) {
+	off = lseek(fd, off, SEEK_SET);
+	if (off == (off_t)-1) {
 		err = -errno;
 		printf("error seeking to header: %d\n", err);
 		goto out;
@@ -513,7 +514,7 @@ vhd_util_check_differencing_header(vhd_context_t *vhd)
 static int
 vhd_util_check_bat(vhd_context_t *vhd)
 {
-	off64_t eof, eoh;
+	off_t eof, eoh;
 	int i, j, err, block_size;
 
 	err = vhd_seek(vhd, 0, SEEK_END);
@@ -523,7 +524,7 @@ vhd_util_check_bat(vhd_context_t *vhd)
 	}
 
 	eof = vhd_position(vhd);
-	if (eof == (off64_t)-1) {
+	if (eof == (off_t)-1) {
 		printf("error calculating eof: %d\n", -errno);
 		return -errno;
 	}
@@ -645,7 +646,8 @@ vhd_util_check_parent_locators(vhd_context_t *vhd)
 {
 	int i, n, err;
 	vhd_parent_locator_t *loc;
-	char *msg, *file, *ppath, *location, *pname;
+	char *file, *ppath, *location, *pname;
+	const char *msg;
 	int mac, macx, w2ku, w2ru, wi2r, wi2k, found;
 
 	mac      = 0;

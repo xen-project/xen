@@ -59,11 +59,11 @@ vhd_print_header(vhd_context_t *vhd, vhd_header_t *h, int hex)
 {
 	int err;
 	uint32_t  cksm;
-	char      uuid[37], time_str[26], cookie[9], out[512], *name;
+	char      uuid[39], time_str[26], cookie[9], out[512], *name;
 
 	printf("VHD Header Summary:\n-------------------\n");
 
-	snprintf(cookie, 9, "%s", h->cookie);
+	snprintf(cookie, sizeof(cookie), "%s", h->cookie);
 	printf("Cookie              : %s\n", cookie);
 
 	printf("Data offset (unusd) : %s\n", conv(hex, h->data_offset));
@@ -95,11 +95,11 @@ vhd_print_footer(vhd_footer_t *f, int hex)
 {
 	uint64_t  c, h, s;
 	uint32_t  ff_maj, ff_min, cr_maj, cr_min, cksm, cksm_save;
-	char      time_str[26], creator[5], uuid[37], cookie[9];
+	char      time_str[26], creator[5], uuid[39], cookie[9];
 
 	printf("VHD Footer Summary:\n-------------------\n");
 
-	snprintf(cookie, 9, "%s", f->cookie);
+	snprintf(cookie, sizeof(cookie), "%s", f->cookie);
 	printf("Cookie              : %s\n", cookie);
 
 	printf("Features            : (0x%08x) %s%s\n", f->features,

@@ -23,9 +23,12 @@ SUBDIRS-y += xenstat
 SUBDIRS-$(CONFIG_Linux) += libaio
 SUBDIRS-$(CONFIG_Linux) += blktap
 SUBDIRS-$(CONFIG_Linux) += blktap2
+SUBDIRS-$(CONFIG_NetBSD) += libaio
+SUBDIRS-$(CONFIG_NetBSD) += blktap2
 SUBDIRS-y += libfsimage
 SUBDIRS-$(LIBXENAPI_BINDINGS) += libxen
 SUBDIRS-$(CONFIG_Linux) += fs-back
+SUBDIRS-$(CONFIG_NetBSD) += fs-back
 SUBDIRS-$(CONFIG_IOEMU) += ioemu-dir
 SUBDIRS-y += xenpmd
 

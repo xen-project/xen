@@ -826,10 +826,10 @@ tapdisk_vbd_shutdown(td_vbd_t *vbd)
 	DPRINTF("%s: state: 0x%08x, new: 0x%02x, pending: 0x%02x, "
 		"failed: 0x%02x, completed: 0x%02x\n", 
 		vbd->name, vbd->state, new, pending, failed, completed);
-	DPRINTF("last activity: %010ld.%06ld, errors: 0x%04"PRIx64", "
+	DPRINTF("last activity: %010ld.%06lld, errors: 0x%04"PRIx64", "
 		"retries: 0x%04"PRIx64", received: 0x%08"PRIx64", "
 		"returned: 0x%08"PRIx64", kicked: 0x%08"PRIx64"\n",
-		vbd->ts.tv_sec, vbd->ts.tv_usec,
+		vbd->ts.tv_sec, (unsigned long long)vbd->ts.tv_usec,
 		vbd->errors, vbd->retries, vbd->received, vbd->returned,
 		vbd->kicked);
 
@@ -886,11 +886,12 @@ tapdisk_vbd_debug(td_vbd_t *vbd)
 	tapdisk_vbd_queue_count(vbd, &new, &pending, &failed, &completed);
 
 	DBG(TLOG_WARN, "%s: state: 0x%08x, new: 0x%02x, pending: 0x%02x, "
-	    "failed: 0x%02x, completed: 0x%02x, last activity: %010ld.%06ld, "
+	    "failed: 0x%02x, completed: 0x%02x, last activity: %010ld.%06lld, "
 	    "errors: 0x%04"PRIx64", retries: 0x%04"PRIx64", received: 0x%08"PRIx64", "
 	    "returned: 0x%08"PRIx64", kicked: 0x%08"PRIx64"\n",
 	    vbd->name, vbd->state, new, pending, failed, completed,
-	    vbd->ts.tv_sec, vbd->ts.tv_usec, vbd->errors, vbd->retries,
+	    vbd->ts.tv_sec, (unsigned long long)vbd->ts.tv_usec,
+	    vbd->errors, vbd->retries,
 	    vbd->received, vbd->returned, vbd->kicked);
 
 	tapdisk_vbd_for_each_image(vbd, image, tmp)

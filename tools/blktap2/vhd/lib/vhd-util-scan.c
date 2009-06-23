@@ -33,6 +33,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <fnmatch.h>
+#include <libgen.h>	/* for basename() */
 
 #include "list.h"
 #include "libvhd.h"
@@ -82,7 +83,7 @@ struct vhd_image {
 	char                *name;
 	char                *parent;
 	uint64_t             capacity;
-	off64_t              size;
+	off_t                size;
 	uint8_t              hidden;
 	int                  error;
 	char                *message;

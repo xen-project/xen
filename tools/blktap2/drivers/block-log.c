@@ -314,7 +314,7 @@ static int ctl_open(struct tdlog_state* s, const char* name)
     goto err_sock;
   }
     
-  if (bind(s->ctl.fd, &saddr, sizeof(saddr)) < 0) {
+  if (bind(s->ctl.fd, (const struct sockaddr *)&saddr, sizeof(saddr)) < 0) {
     BWPRINTF("error binding control socket to %s: %s", s->ctlpath,
 	     strerror(errno));
     goto err_sock;

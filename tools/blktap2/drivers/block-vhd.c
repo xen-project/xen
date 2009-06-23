@@ -50,8 +50,6 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
-#include <uuid/uuid.h> /* For whatever reason, Linux packages this in */
-                       /* e2fsprogs-devel.                            */
 #include <string.h>    /* for memset.                                 */
 #include <libaio.h>
 #include <sys/mman.h>
@@ -275,7 +273,7 @@ vhd_initialize(struct vhd_state *s)
 		_vhd_zsize += VHD_BLOCK_SIZE;
 
 	_vhd_zeros = mmap(0, _vhd_zsize, PROT_READ,
-			  MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+			  MAP_SHARED | MAP_ANON, -1, 0);
 	if (_vhd_zeros == MAP_FAILED) {
 		EPRINTF("vhd_initialize failed: %d\n", -errno);
 		_vhd_zeros = NULL;
@@ -334,7 +332,7 @@ static int
 vhd_kill_footer(struct vhd_state *s)
 {
 	int err;
-	off64_t end;
+	off_t end;
 	char *zeros;
 
 	if (s->vhd.footer.type == HD_TYPE_FIXED)
@@ -347,10 +345,10 @@ vhd_kill_footer(struct vhd_state *s)
 	err = 1;
 	memset(zeros, 0xc7c7c7c7, 512);
 
-	if ((end = lseek64(s->vhd.fd, 0, SEEK_END)) == -1)
+	if ((end = lseek(s->vhd.fd, 0, SEEK_END)) == -1)
 		goto fail;
 
-	if (lseek64(s->vhd.fd, (end - 512), SEEK_SET) == -1)
+	if (lseek(s->vhd.fd, (end - 512), SEEK_SET) == -1)
 		goto fail;
 
 	if (write(s->vhd.fd, zeros, 512) != 512)
@@ -369,7 +367,7 @@ static inline int
 find_next_free_block(struct vhd_state *s)
 {
 	int err;
-	off64_t eom;
+	off_t eom;
 	uint32_t i, entry;
 
 	err = vhd_end_of_headers(&s->vhd, &eom);
@@ -772,6 +770,7 @@ int
 vhd_validate_parent(td_driver_t *child_driver,
 		    td_driver_t *parent_driver, td_flag_t flags)
 {
+	uint32_t status;
 	struct stat stats;
 	struct vhd_state *child  = (struct vhd_state *)child_driver->data;
 	struct vhd_state *parent;

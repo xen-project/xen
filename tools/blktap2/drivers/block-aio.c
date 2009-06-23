@@ -36,8 +36,8 @@
 #include <sys/statvfs.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
-#include <linux/fs.h>
 
+#include "blk.h"
 #include "tapdisk.h"
 #include "tapdisk-driver.h"
 #include "tapdisk-interface.h"
@@ -79,10 +79,8 @@ static int tdaio_get_image_info(int fd, td_disk_info_t *info)
 	if (S_ISBLK(stat.st_mode)) {
 		/*Accessing block device directly*/
 		info->size = 0;
-		if (ioctl(fd,BLKGETSIZE,&info->size)!=0) {
-			DPRINTF("ERR: BLKGETSIZE failed, couldn't stat image");
+		if (blk_getimagesize(fd, &info->size) != 0)
 			return -EINVAL;
-		}
 
 		DPRINTF("Image size: \n\tpre sector_shift  [%llu]\n\tpost "
 			"sector_shift [%llu]\n",
@@ -90,19 +88,8 @@ static int tdaio_get_image_info(int fd, td_disk_info_t *info)
 			(long long unsigned)info->size);
 
 		/*Get the sector size*/
-#if defined(BLKSSZGET)
-		{
-			int arg;
+		if (blk_getsectorsize(fd, &info->sector_size) != 0)
 			info->sector_size = DEFAULT_SECTOR_SIZE;
-			ioctl(fd, BLKSSZGET, &info->sector_size);
-			
-			if (info->sector_size != DEFAULT_SECTOR_SIZE)
-				DPRINTF("Note: sector size is %ld (not %d)\n",
-					info->sector_size, DEFAULT_SECTOR_SIZE);
-		}
-#else
-		info->sector_size = DEFAULT_SECTOR_SIZE;
-#endif
 
 	} else {
 		/*Local file? try fstat instead*/
