@@ -463,24 +463,34 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         if ( (max < d->max_vcpus) && (d->vcpu[max] != NULL) )
             goto maxvcpu_out;
 
+        /*
+         * For now don't allow increasing the vcpu count from a non-zero
+         * value: This code and all readers of d->vcpu would otherwise need
+         * to be converted to use RCU, but at present there's no tools side
+         * code path that would issue such a request.
+         */
+        ret = -EBUSY;
+        if ( (d->max_vcpus > 0) && (max > d->max_vcpus) )
+            goto maxvcpu_out;
+
         ret = -ENOMEM;
         if ( max > d->max_vcpus )
         {
-            struct vcpu **vcpus = xmalloc_array(struct vcpu *, max);
-            void *ptr;
+            struct vcpu **vcpus;
 
-            if ( !vcpus )
+            BUG_ON(d->vcpu != NULL);
+            BUG_ON(d->max_vcpus != 0);
+
+            if ( (vcpus = xmalloc_array(struct vcpu *, max)) == NULL )
                 goto maxvcpu_out;
-            memcpy(vcpus, d->vcpu, d->max_vcpus * sizeof(*vcpus));
-            memset(vcpus + d->max_vcpus, 0,
-                   (max - d->max_vcpus) * sizeof(*vcpus));
+            memset(vcpus, 0, max * sizeof(*vcpus));
 
-            ptr = d->vcpu;
+            /* Install vcpu array /then/ update max_vcpus. */
             d->vcpu = vcpus;
             wmb();
             d->max_vcpus = max;
-            xfree(ptr);
         }
+
         for ( i = 0; i < max; i++ )
         {
             if ( d->vcpu[i] != NULL )
