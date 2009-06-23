@@ -38,6 +38,7 @@
 
 #define domain_iommu_domid(d) ((d)->arch.hvm_domain.hvm_iommu.iommu_domid)
 
+int nr_iommus;
 static spinlock_t domid_bitmap_lock;    /* protect domain id bitmap */
 static int domid_bitmap_size;           /* domain id bitmap size in bits */
 static unsigned long *domid_bitmap;     /* iommu domain id bitmap */
@@ -136,10 +137,37 @@ void iommu_flush_cache_page(void *addr, unsigned long npages)
     __iommu_flush_cache(addr, PAGE_SIZE_4K * npages);
 }
 
-int nr_iommus;
+/* Allocate page table, return its machine address */
+u64 alloc_pgtable_maddr(struct acpi_drhd_unit *drhd, unsigned long npages)
+{
+    struct acpi_rhsa_unit *rhsa;
+    struct page_info *pg;
+    u64 *vaddr;
+
+    rhsa = drhd_to_rhsa(drhd);
+    if ( !rhsa )
+        dprintk(XENLOG_INFO VTDPREFIX,
+                "IOMMU: RHSA == NULL, IO NUMA memory allocation disabled\n");
+
+    pg = alloc_domheap_pages(NULL, get_order_from_pages(npages),
+                             rhsa ? rhsa->domain : 0);
+    if ( !pg )
+        return 0;
+    vaddr = map_domain_page(page_to_mfn(pg));
+    if ( !vaddr )
+        return 0;
+    memset(vaddr, 0, PAGE_SIZE * npages);
+
+    iommu_flush_cache_page(vaddr, npages);
+    unmap_domain_page(vaddr);
+
+    return page_to_maddr(pg);
+}
+
 /* context entry handling */
 static u64 bus_to_context_maddr(struct iommu *iommu, u8 bus)
 {
+    struct acpi_drhd_unit *drhd;
     struct root_entry *root, *root_entries;
     u64 maddr;
 
@@ -148,7 +176,8 @@ static u64 bus_to_context_maddr(struct iommu *iommu, u8 bus)
     root = &root_entries[bus];
     if ( !root_present(*root) )
     {
-        maddr = alloc_pgtable_maddr(NULL, 1);
+        drhd = iommu_to_drhd(iommu);
+        maddr = alloc_pgtable_maddr(drhd, 1);
         if ( maddr == 0 )
         {
             unmap_vtd_domain_page(root_entries);
@@ -165,6 +194,8 @@ static u64 bus_to_context_maddr(struct iommu *iommu, u8 bus)
 
 static u64 addr_to_dma_page_maddr(struct domain *domain, u64 addr, int alloc)
 {
+    struct acpi_drhd_unit *drhd;
+    struct pci_dev *pdev;
     struct hvm_iommu *hd = domain_hvm_iommu(domain);
     int addr_width = agaw_to_width(hd->agaw);
     struct dma_pte *parent, *pte = NULL;
@@ -176,8 +207,12 @@ static u64 addr_to_dma_page_maddr(struct domain *domain, u64 addr, int alloc)
     addr &= (((u64)1) << addr_width) - 1;
     ASSERT(spin_is_locked(&hd->mapping_lock));
     if ( hd->pgd_maddr == 0 )
-        if ( !alloc || ((hd->pgd_maddr = alloc_pgtable_maddr(domain, 1)) == 0) )
+    {
+        pdev = pci_get_pdev_by_domain(domain, -1, -1);
+        drhd = acpi_find_matched_drhd_unit(pdev);
+        if ( !alloc || ((hd->pgd_maddr = alloc_pgtable_maddr(drhd, 1)) == 0) )
             goto out;
+    }
 
     parent = (struct dma_pte *)map_vtd_domain_page(hd->pgd_maddr);
     while ( level > 1 )
@@ -189,9 +224,13 @@ static u64 addr_to_dma_page_maddr(struct domain *domain, u64 addr, int alloc)
         {
             if ( !alloc )
                 break;
-            maddr = alloc_pgtable_maddr(domain, 1);
+
+            pdev = pci_get_pdev_by_domain(domain, -1, -1);
+            drhd = acpi_find_matched_drhd_unit(pdev);
+            maddr = alloc_pgtable_maddr(drhd, 1);
             if ( !maddr )
                 break;
+
             dma_set_pte_addr(*pte, maddr);
             vaddr = map_vtd_domain_page(maddr);
 
@@ -548,13 +587,18 @@ static void iommu_free_pagetable(u64 pt_maddr, int level)
 
 static int iommu_set_root_entry(struct iommu *iommu)
 {
+    struct acpi_drhd_unit *drhd;
     u32 sts;
     unsigned long flags;
 
     spin_lock(&iommu->lock);
 
     if ( iommu->root_maddr == 0 )
-        iommu->root_maddr = alloc_pgtable_maddr(NULL, 1);
+    {
+        drhd = iommu_to_drhd(iommu);
+        iommu->root_maddr = alloc_pgtable_maddr(drhd, 1);
+    }
+
     if ( iommu->root_maddr == 0 )
     {
         spin_unlock(&iommu->lock);

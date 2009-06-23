@@ -197,6 +197,7 @@ enum acpi_dmar_entry_type {
 	ACPI_DMAR_DRHD = 0,
 	ACPI_DMAR_RMRR,
 	ACPI_DMAR_ATSR,
+	ACPI_DMAR_RHSA,
 	ACPI_DMAR_ENTRY_COUNT
 };
 
@@ -222,6 +223,12 @@ struct acpi_table_atsr {
         u8      flags;
         u8      reserved;
         u16     segment;
+} __attribute__ ((packed));
+
+struct acpi_table_rhsa {
+        struct  acpi_dmar_entry_header header;
+        u32     domain;
+        u64     address; /* register base address for this drhd */
 } __attribute__ ((packed));
 
 enum acpi_dev_scope_type {

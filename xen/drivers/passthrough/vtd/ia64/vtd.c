@@ -46,25 +46,6 @@ void unmap_vtd_domain_page(void *va)
     unmap_domain_page(va);
 }
 
-/* Allocate page table, return its machine address */
-u64 alloc_pgtable_maddr(struct domain *d, unsigned long npages)
-{
-    struct page_info *pg;
-    u64 *vaddr;
-
-    pg = alloc_domheap_pages(NULL, get_order_from_pages(npages),
-                             d ? MEMF_node(domain_to_node(d)) : 0);
-    vaddr = map_domain_page(page_to_mfn(pg));
-    if ( !vaddr )
-        return 0;
-    memset(vaddr, 0, PAGE_SIZE * npages);
-
-    iommu_flush_cache_page(vaddr, npages);
-    unmap_domain_page(vaddr);
-
-    return page_to_maddr(pg);
-}
-
 void free_pgtable_maddr(u64 maddr)
 {
     if ( maddr != 0 )

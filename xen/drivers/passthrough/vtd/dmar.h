@@ -69,6 +69,11 @@ struct acpi_atsr_unit {
     u8     all_ports:1;
 };
 
+struct acpi_rhsa_unit {
+    struct list_head list;
+    u64    address;
+    u32    domain;
+};
 
 #define for_each_drhd_unit(drhd) \
     list_for_each_entry(drhd, &acpi_drhd_units, list)

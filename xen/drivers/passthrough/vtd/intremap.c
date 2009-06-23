@@ -614,6 +614,7 @@ void msi_msg_write_remap_rte(
 
 int enable_intremap(struct iommu *iommu)
 {
+    struct acpi_drhd_unit *drhd;
     struct ir_ctrl *ir_ctrl;
     u32 sts, gcmd;
     unsigned long flags;
@@ -623,7 +624,8 @@ int enable_intremap(struct iommu *iommu)
     ir_ctrl = iommu_ir_ctrl(iommu);
     if ( ir_ctrl->iremap_maddr == 0 )
     {
-        ir_ctrl->iremap_maddr = alloc_pgtable_maddr(NULL, 1);
+        drhd = iommu_to_drhd(iommu);
+        ir_ctrl->iremap_maddr = alloc_pgtable_maddr(drhd, 1);
         if ( ir_ctrl->iremap_maddr == 0 )
         {
             dprintk(XENLOG_WARNING VTDPREFIX,

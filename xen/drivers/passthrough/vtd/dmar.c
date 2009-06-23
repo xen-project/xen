@@ -42,6 +42,7 @@
 LIST_HEAD(acpi_drhd_units);
 LIST_HEAD(acpi_rmrr_units);
 LIST_HEAD(acpi_atsr_units);
+LIST_HEAD(acpi_rhsa_units);
 
 u8 dmar_host_address_width;
 
@@ -127,6 +128,20 @@ struct acpi_drhd_unit * ioapic_to_drhd(unsigned int apic_id)
     return NULL;
 }
 
+struct acpi_drhd_unit * iommu_to_drhd(struct iommu *iommu)
+{
+    struct acpi_drhd_unit *drhd;
+
+    if ( iommu == NULL )
+        return NULL;
+
+    list_for_each_entry( drhd, &acpi_drhd_units, list )
+        if ( drhd->iommu == iommu )
+            return drhd;
+
+    return NULL;
+}
+
 struct iommu * ioapic_to_iommu(unsigned int apic_id)
 {
     struct acpi_drhd_unit *drhd;
@@ -156,6 +171,9 @@ struct acpi_drhd_unit * acpi_find_matched_drhd_unit(struct pci_dev *pdev)
     struct acpi_drhd_unit *drhd;
     struct acpi_drhd_unit *include_all = NULL;
     int i;
+
+    if ( pdev == NULL )
+        return NULL;
 
     if (pdev->info.is_extfn) {
         bus = pdev->bus;
@@ -197,6 +215,21 @@ struct acpi_atsr_unit * acpi_find_matched_atsr_unit(u8 bus, u8 devfn)
             all_ports = atsr;
     }
     return all_ports;
+}
+
+struct acpi_rhsa_unit * drhd_to_rhsa(struct acpi_drhd_unit *drhd)
+{
+    struct acpi_rhsa_unit *rhsa;
+
+    if ( drhd == NULL )
+        return NULL;
+
+    list_for_each_entry ( rhsa, &acpi_rhsa_units, list )
+    {
+        if ( rhsa->address == drhd->address )
+            return rhsa;
+    }
+    return NULL;
 }
 
 /*
@@ -453,6 +486,25 @@ acpi_parse_one_atsr(struct acpi_dmar_entry_header *header)
     return ret;
 }
 
+static int __init
+acpi_parse_one_rhsa(struct acpi_dmar_entry_header *header)
+{
+    struct acpi_table_rhsa *rhsa = (struct acpi_table_rhsa *)header;
+    struct acpi_rhsa_unit *rhsau;
+    int ret = 0;
+
+    rhsau = xmalloc(struct acpi_rhsa_unit);
+    if ( !rhsau )
+        return -ENOMEM;
+    memset(rhsau, 0, sizeof(struct acpi_rhsa_unit));
+
+    rhsau->address = rhsa->address;
+    rhsau->domain = rhsa->domain;
+    list_add_tail(&rhsau->list, &acpi_rhsa_units);
+
+    return ret;
+}
+
 static int __init acpi_parse_dmar(struct acpi_table_header *table)
 {
     struct acpi_table_dmar *dmar;
@@ -491,6 +543,10 @@ static int __init acpi_parse_dmar(struct acpi_table_header *table)
         case ACPI_DMAR_ATSR:
             dprintk(XENLOG_INFO VTDPREFIX, "found ACPI_DMAR_ATSR\n");
             ret = acpi_parse_one_atsr(entry_header);
+            break;
+        case ACPI_DMAR_RHSA:
+            dprintk(XENLOG_INFO VTDPREFIX, "found ACPI_DMAR_RHSA\n");
+            ret = acpi_parse_one_rhsa(entry_header);
             break;
         default:
             dprintk(XENLOG_WARNING VTDPREFIX, "Unknown DMAR structure type\n");
