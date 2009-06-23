@@ -660,7 +660,7 @@ def configure_image(vals):
             # This allows guest migration to a Dom0 having different
             # xen install pathes.
             config_image.append([ 'kernel', vals.kernel ])
-        elif os.path.exists(os.path.abspath(vals.kernel))
+        elif os.path.exists(os.path.abspath(vals.kernel)):
             # Keep old behaviour, if path is valid.
             config_image.append([ 'kernel', os.path.abspath(vals.kernel) ])
         else:
