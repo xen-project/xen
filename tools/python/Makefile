@@ -13,19 +13,20 @@ POTFILE := $(PODIR)/xen-xm.pot
 I18NSRCFILES = $(shell find xen/xm/ -name '*.py')
 CATALOGS = $(patsubst %,xen/xm/messages/%.mo,$(LINGUAS))
 NLSDIR = $(SHAREDIR)/locale
-xenpath = "xen/util/path.py"
+XENPATH = "xen/util/path.py"
   
 .PHONY: build buildpy genpath
 genpath:
-	rm -f ${xenpath}
-	echo "SBINDIR=\"$(SBINDIR)\"" >> ${xenpath}
-	echo "BINDIR=\"$(BINDIR)\"" >> ${xenpath}
-	echo "LIBEXEC=\"$(LIBEXEC)\"" >> ${xenpath}
-	echo "LIBDIR=\"$(LIBDIR)\"" >> ${xenpath}
-	echo "SHAREDIR=\"$(SHAREDIR)\"" >> ${xenpath}
-	echo "PRIVATE_BINDIR=\"$(PRIVATE_BINDIR)\"" >> ${xenpath}
-	echo "XEN_CONFIG_DIR=\"$(XEN_CONFIG_DIR)\"" >> ${xenpath}
-	echo "XEN_SCRIPT_DIR=\"$(XEN_SCRIPT_DIR)\"" >> ${xenpath}
+	rm -f $(XENPATH)
+	echo "SBINDIR=\"$(SBINDIR)\"" >> $(XENPATH)
+	echo "BINDIR=\"$(BINDIR)\"" >> $(XENPATH)
+	echo "LIBEXEC=\"$(LIBEXEC)\"" >> $(XENPATH)
+	echo "LIBDIR=\"$(LIBDIR)\"" >> $(XENPATH)
+	echo "SHAREDIR=\"$(SHAREDIR)\"" >> $(XENPATH)
+	echo "PRIVATE_BINDIR=\"$(PRIVATE_BINDIR)\"" >> $(XENPATH)
+	echo "XENFIRMWAREDIR=\"$(XENFIRMWAREDIR)\"" >> $(XENPATH)
+	echo "XEN_CONFIG_DIR=\"$(XEN_CONFIG_DIR)\"" >> $(XENPATH)
+	echo "XEN_SCRIPT_DIR=\"$(XEN_SCRIPT_DIR)\"" >> $(XENPATH)
 
 buildpy: genpath 
 	CC="$(CC)" CFLAGS="$(CFLAGS)" $(PYTHON) setup.py build
@@ -91,6 +92,7 @@ test:
 
 .PHONY: clean
 clean:
+	rm -f $(XENPATH)
 	rm -rf build *.pyc *.pyo *.o *.a *~ $(CATALOGS) xen/util/auxbin.pyc
 	rm -f $(DEPS)
 

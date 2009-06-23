@@ -653,11 +653,39 @@ def configure_image(vals):
         return None
     config_image = [ vals.builder ]
     if vals.kernel:
-        config_image.append([ 'kernel', os.path.abspath(vals.kernel) ])
+        if os.path.dirname(vals.kernel) != "" and os.path.exists(vals.kernel):
+            config_image.append([ 'kernel', vals.kernel ])
+        elif vals.kernel == 'hvmloader':
+            # Keep hvmloader w/o a path and let xend find it.
+            # This allows guest migration to a Dom0 having different
+            # xen install pathes.
+            config_image.append([ 'kernel', vals.kernel ])
+        elif os.path.exists(os.path.abspath(vals.kernel))
+            # Keep old behaviour, if path is valid.
+            config_image.append([ 'kernel', os.path.abspath(vals.kernel) ])
+        else:
+            raise ValueError('Cannot find kernel "%s"' % vals.kernel)
     if vals.ramdisk:
-        config_image.append([ 'ramdisk', os.path.abspath(vals.ramdisk) ])
+        if os.path.dirname(vals.ramdisk) != "" and os.path.exists(vals.ramdisk):
+            config_image.append([ 'ramdisk', vals.ramdisk ])
+        elif os.path.exists(os.path.abspath(vals.ramdisk)):
+            # Keep old behaviour, if path is valid.
+            config_image.append([ 'ramdisk', os.path.abspath(vals.ramdisk) ])
+        else:
+            raise ValueError('Cannot find ramdisk "%s"' % vals.ramdisk)
     if vals.loader:
-        config_image.append([ 'loader', os.path.abspath(vals.loader) ])
+        if os.path.dirname(vals.loader) != "" and os.path.exists(vals.loader):
+            config_image.append([ 'loader', vals.loader ])
+        elif vals.loader == 'hvmloader':
+            # Keep hvmloader w/o a path and let xend find it.
+            # This allows guest migration to a Dom0 having different
+            # xen install pathes.
+            config_image.append([ 'loader', vals.loader ])
+        elif os.path.exists(os.path.abspath(vals.loader)):
+            # Keep old behaviour, if path is valid.
+            config_image.append([ 'loader', os.path.abspath(vals.loader) ])
+        else:
+            raise ValueError('Cannot find loader "%s"' % vals.loader)
     if vals.cmdline_ip:
         cmdline_ip = strip('ip=', vals.cmdline_ip)
         config_image.append(['ip', cmdline_ip])

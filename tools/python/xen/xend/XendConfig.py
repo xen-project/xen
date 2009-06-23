@@ -16,6 +16,7 @@
 #============================================================================
 
 import logging
+import os
 import re
 import time
 import types
@@ -39,7 +40,7 @@ from xen.util.blkif import blkdev_name_to_number, blkdev_uname_to_file
 from xen.util.pci import pci_opts_list_from_sxp, pci_convert_sxp_to_dict
 from xen.xend.XendSXPDev import dev_dict_to_sxp
 from xen.util import xsconstants
-import xen.util.auxbin
+from xen.util import auxbin
 
 log = logging.getLogger("xend.XendConfig")
 log.setLevel(logging.WARN)
@@ -460,7 +461,11 @@ class XendConfig(dict):
 
         if self.is_hvm() or self.has_rfb():
             if 'device_model' not in self['platform']:
-                self['platform']['device_model'] = xen.util.auxbin.pathTo("qemu-dm")
+                self['platform']['device_model'] = auxbin.pathTo("qemu-dm")
+            # device_model may be set to 'qemu-dm' or 'stubdom-dm' w/o a path
+            if os.path.dirname(self['platform']['device_model']) != "":
+                self['platform']['device_model'] = \
+                    auxbin.pathTo(self['platform']['device_model'])
 
         if self.is_hvm():
             if 'timer_mode' not in self['platform']:
@@ -478,11 +483,17 @@ class XendConfig(dict):
             if 'loader' not in self['platform']:
                 # Old configs may have hvmloader set as PV_kernel param
                 if self.has_key('PV_kernel') and self['PV_kernel'] != '':
+                    if self['PV_kernel'] == 'hvmloader':
+                        self['PV_kernel'] = auxbin.pathTo("hvmloader")
                     self['platform']['loader'] = self['PV_kernel']
                     self['PV_kernel'] = ''
                 else:
-                    self['platform']['loader'] = "/usr/lib/xen/boot/hvmloader"
+                    self['platform']['loader'] = auxbin.pathTo("hvmloader")
                 log.debug("Loader is %s" % str(self['platform']['loader']))
+            elif self['platform']['loader'] == 'hvmloader':
+                self['platform']['loader'] = auxbin.pathTo("hvmloader")
+            if not os.path.exists(self['platform']['loader']):
+                raise VmError("kernel '%s' not found" % str(self['platform']['loader']))
 
             # Compatibility hack, can go away soon.
             if 'soundhw' not in self['platform'] and \
@@ -1550,7 +1561,7 @@ class XendConfig(dict):
                     # is invoked for pvfb services
                     if 'device_model' not in target['platform']:
                         target['platform']['device_model'] = \
-                            xen.util.auxbin.pathTo("qemu-dm")
+                            auxbin.pathTo("qemu-dm")
 
                     # Finally, if we are a pvfb, we need to make a vkbd
                     # as well that is not really exposed to Xen API

@@ -19,8 +19,7 @@
 import os
 import os.path
 import sys
-from xen.util.path import SBINDIR,BINDIR,LIBEXEC,LIBDIR,PRIVATE_BINDIR
-from xen.util.path import XEN_CONFIG_DIR, XEN_SCRIPT_DIR
+from xen.util.path import *
 
 def execute(exe, args = None):
     exepath = pathTo(exe)
@@ -33,7 +32,7 @@ def execute(exe, args = None):
         print exepath, ": ", exn
         sys.exit(1)
 
-SEARCHDIRS = [ BINDIR, SBINDIR, LIBEXEC, PRIVATE_BINDIR ]
+SEARCHDIRS = [ BINDIR, SBINDIR, LIBEXEC, PRIVATE_BINDIR, XENFIRMWAREDIR ]
 def pathTo(exebin):
     for dir in SEARCHDIRS:
         exe = os.path.join(dir, exebin)

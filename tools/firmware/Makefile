@@ -3,7 +3,7 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 # hvmloader is a 32-bit protected mode binary.
 TARGET      := hvmloader/hvmloader
-INST_DIR := $(DESTDIR)$(LIBDIR_x86_32)/xen/boot
+INST_DIR := $(DESTDIR)$(XENFIRMWAREDIR)
 
 SUBDIRS :=
 SUBDIRS += rombios
