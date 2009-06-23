@@ -87,7 +87,7 @@ install-messages: all
 
 .PHONY: test
 test:
-	export LD_LIBRARY_PATH=$$(readlink -f ../libxc):$$(readlink -f ../xenstore); python test.py -b -u
+	export LD_LIBRARY_PATH=$$(readlink -f ../libxc):$$(readlink -f ../xenstore); $(PYTHON) test.py -b -u
 
 .PHONY: clean
 clean:
