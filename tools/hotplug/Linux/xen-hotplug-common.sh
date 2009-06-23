@@ -17,13 +17,14 @@
 
 
 dir=$(dirname "$0")
+. "$dir/hotplugpath.sh"
 . "$dir/logging.sh"
 . "$dir/xen-script-common.sh"
 . "$dir/locking.sh"
 
 exec 2>>/var/log/xen/xen-hotplug.log
 
-export PATH="/sbin:/bin:/usr/bin:/usr/sbin:$PATH"
+export PATH="${BINDIR}:${SBINDIR}:${LIBEXEC}:${PRIVATE_BINDIR}:/sbin:/bin:/usr/bin:/usr/sbin:$PATH"
 export LANG="POSIX"
 unset $(set | grep ^LC_ | cut -d= -f1)
 

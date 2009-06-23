@@ -2,7 +2,7 @@
 #============================================================================
 # Default Xen network start/stop script.
 # Xend calls a network script when it starts.
-# The script name to use is defined in /etc/xen/xend-config.sxp
+# The script name to use is defined in ${XEN_CONFIG_DIR}/xend-config.sxp
 # in the network-script field.
 #
 # This script creates a bridge (default ${netdev}), adds a device

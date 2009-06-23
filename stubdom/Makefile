@@ -77,8 +77,12 @@ TARGET_LDFLAGS += -nostdlib -L$(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/lib
 
 TARGETS=ioemu c caml grub
 
+STUBDOMPATH="stubdompath.sh"
+genpath-target = $(call buildmakevars2file,$(STUBDOMPATH))
+$(eval $(genpath-target))
+
 .PHONY: all
-all: build
+all: genpath build
 ifeq ($(STUBDOM_SUPPORTED),1)
 build: ioemu-stubdom c-stubdom pv-grub
 else
@@ -270,8 +274,7 @@ libxc-$(XEN_TARGET_ARCH)/libxenctrl.a libxc-$(XEN_TARGET_ARCH)/libxenguest.a:: c
 ioemu: cross-zlib cross-libpci libxc
 	[ -f ioemu/config-host.mak ] || \
 	  ( $(absolutify_xen_root); \
-	    PREFIX=$(PREFIX); \
-	    export PREFIX; \
+	    $(buildmakevars2shellvars); \
 	    cd ioemu ; \
 	    LWIPDIR=$(CURDIR)/lwip-$(XEN_TARGET_ARCH) \
 	    TARGET_CPPFLAGS="$(TARGET_CPPFLAGS)" \
@@ -374,6 +377,7 @@ clean:
 	$(MAKE) -C caml clean
 	$(MAKE) -C c clean
 	rm -fr grub-$(XEN_TARGET_ARCH)
+	rm -f $(STUBDOMPATH)
 	[ ! -d libxc-$(XEN_TARGET_ARCH) ] || $(MAKE) -C libxc-$(XEN_TARGET_ARCH) clean
 	-[ ! -d ioemu ] || $(MAKE) -C ioemu clean
 

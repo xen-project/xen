@@ -1,12 +1,12 @@
 #!/bin/bash
 #============================================================================
-# /etc/xen/vif-nat
+# ${XEN_SCRIPT_DIR}/vif-nat
 #
 # Script for configuring a vif in routed-nat mode.
 # The hotplugging system will call this script if it is specified either in
 # the device configuration given to Xend, or the default Xend configuration
-# in /etc/xen/xend-config.sxp.  If the script is specified in neither of those
-# places, then vif-bridge is the default.
+# in ${XEN_CONFIG_DIR}/xend-config.sxp.  If the script is specified in
+# neither of those places, then vif-bridge is the default.
 #
 # Usage:
 # vif-nat (add|remove|online|offline)

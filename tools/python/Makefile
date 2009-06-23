@@ -14,20 +14,11 @@ I18NSRCFILES = $(shell find xen/xm/ -name '*.py')
 CATALOGS = $(patsubst %,xen/xm/messages/%.mo,$(LINGUAS))
 NLSDIR = $(SHAREDIR)/locale
 XENPATH = "xen/util/path.py"
-  
-.PHONY: build buildpy genpath
-genpath:
-	rm -f $(XENPATH)
-	echo "SBINDIR=\"$(SBINDIR)\"" >> $(XENPATH)
-	echo "BINDIR=\"$(BINDIR)\"" >> $(XENPATH)
-	echo "LIBEXEC=\"$(LIBEXEC)\"" >> $(XENPATH)
-	echo "LIBDIR=\"$(LIBDIR)\"" >> $(XENPATH)
-	echo "SHAREDIR=\"$(SHAREDIR)\"" >> $(XENPATH)
-	echo "PRIVATE_BINDIR=\"$(PRIVATE_BINDIR)\"" >> $(XENPATH)
-	echo "XENFIRMWAREDIR=\"$(XENFIRMWAREDIR)\"" >> $(XENPATH)
-	echo "XEN_CONFIG_DIR=\"$(XEN_CONFIG_DIR)\"" >> $(XENPATH)
-	echo "XEN_SCRIPT_DIR=\"$(XEN_SCRIPT_DIR)\"" >> $(XENPATH)
 
+genpath-target = $(call buildmakevars2file,$(XENPATH))
+$(eval $(genpath-target))
+
+.PHONY: build buildpy
 buildpy: genpath 
 	CC="$(CC)" CFLAGS="$(CFLAGS)" $(PYTHON) setup.py build
 

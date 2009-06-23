@@ -87,6 +87,28 @@ define absolutify_xen_root
     export XEN_ROOT
 endef
 
+define buildmakevars2shellvars
+    PREFIX="$(PREFIX)";                                            \
+    XEN_SCRIPT_DIR="$(XEN_SCRIPT_DIR)";                            \
+    export PREFIX;                                                 \
+    export XEN_SCRIPT_DIR
+endef
+
+buildmakevars2file = $(eval $(call buildmakevars2file-closure,$(1)))
+define buildmakevars2file-closure
+    .PHONY: genpath
+    genpath:
+	rm -f $(1);                                                    \
+	echo "SBINDIR=\"$(SBINDIR)\"" >> $(1);                         \
+	echo "BINDIR=\"$(BINDIR)\"" >> $(1);                           \
+	echo "LIBEXEC=\"$(LIBEXEC)\"" >> $(1);                         \
+	echo "LIBDIR=\"$(LIBDIR)\"" >> $(1);                           \
+	echo "PRIVATE_BINDIR=\"$(PRIVATE_BINDIR)\"" >> $(1);           \
+	echo "XENFIRMWAREDIR=\"$(XENFIRMWAREDIR)\"" >> $(1);           \
+	echo "XEN_CONFIG_DIR=\"$(XEN_CONFIG_DIR)\"" >> $(1);           \
+	echo "XEN_SCRIPT_DIR=\"$(XEN_SCRIPT_DIR)\"" >> $(1)
+endef
+
 ifeq ($(debug),y)
 CFLAGS += -g
 endif

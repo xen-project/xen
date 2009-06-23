@@ -1,12 +1,12 @@
 #!/bin/bash
 #============================================================================
-# /etc/xen/vif-bridge
+# ${XEN_SCRIPT_DIR}/vif-bridge
 #
 # Script for configuring a vif in bridged mode.
 # The hotplugging system will call this script if it is specified either in
 # the device configuration given to Xend, or the default Xend configuration
-# in /etc/xen/xend-config.sxp.  If the script is specified in neither of those
-# places, then this script is the default.
+# in ${XEN_CONFIG_DIR}/xend-config.sxp.  If the script is specified in
+# neither of those places, then this script is the default.
 #
 # Usage:
 # vif-bridge (add|remove|online|offline)

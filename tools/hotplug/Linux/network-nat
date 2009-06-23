@@ -2,7 +2,7 @@
 #============================================================================
 # Default Xen network start/stop script when using NAT.
 # Xend calls a network script when it starts.
-# The script name to use is defined in /etc/xen/xend-config.sxp
+# The script name to use is defined in ${XEN_CONFIG_DIR}/xend-config.sxp
 # in the network-script field.
 #
 # Usage:
@@ -18,6 +18,7 @@
 #============================================================================
 
 dir=$(dirname "$0")
+. "$dir/hotplugpath.sh"
 . "$dir/xen-script-common.sh"
 . "$dir/xen-network-common.sh"
 

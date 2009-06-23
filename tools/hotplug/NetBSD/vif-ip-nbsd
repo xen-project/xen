@@ -4,7 +4,10 @@
 # Called by xenbackendd
 # Usage: vif-ip xsdir_backend_path state
 
-PATH=/bin:/usr/bin:/sbin:/usr/sbin
+DIR=$(dirname "$0")
+. "${DIR}/hotplugpath.sh"
+
+PATH=${BINDIR}:${SBINDIR}:${LIBEXEC}:${PRIVATE_BINDIR}:/bin:/usr/bin:/sbin:/usr/sbin
 export PATH
 
 xpath=$1

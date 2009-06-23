@@ -97,10 +97,7 @@ ioemu-dir-find:
 	fi
 	set -e; \
 		$(absolutify_xen_root); \
-		PREFIX=$(PREFIX); \
-		XEN_SCRIPT_DIR=$(XEN_SCRIPT_DIR); \
-		export PREFIX; \
-		export XEN_SCRIPT_DIR; \
+		$(buildmakevars2shellvars); \
 		cd ioemu-dir; \
 		./xen-setup $(IOEMU_CONFIGURE_CROSS)
 
@@ -109,6 +106,7 @@ subdir-all-ioemu-dir subdir-install-ioemu-dir: ioemu-dir-find
 subdir-clean-ioemu-dir:
 	set -e; if test -d ioemu-dir/.; then \
 		$(absolutify_xen_root); \
+		$(buildmakevars2shellvars); \
 		$(MAKE) -C ioemu-dir clean; \
 	fi
 
