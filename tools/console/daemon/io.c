@@ -688,7 +688,7 @@ static struct domain *create_domain(int domid)
 	dom->buffer.capacity = 0;
 	dom->buffer.max_capacity = 0;
 	dom->event_count = 0;
-	dom->next_period = (ts.tv_sec * 1000) + (ts.tv_nsec / 1000000) + RATE_LIMIT_PERIOD;
+	dom->next_period = ((long long)ts.tv_sec * 1000) + (ts.tv_nsec / 1000000) + RATE_LIMIT_PERIOD;
 	dom->next = NULL;
 
 	dom->ring_ref = -1;
@@ -1009,7 +1009,7 @@ void handle_io(void)
 
 		if (clock_gettime(CLOCK_MONOTONIC, &ts) < 0)
 			return;
-		now = (ts.tv_sec * 1000) + (ts.tv_nsec / 1000000);
+		now = ((long long)ts.tv_sec * 1000) + (ts.tv_nsec / 1000000);
 
 		/* Re-calculate any event counter allowances & unblock
 		   domains with new allowance */
