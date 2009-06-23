@@ -40,12 +40,6 @@ def pathTo(exebin):
             return exe
     return None
 
-def path():
-    return LIBEXEC
-
-def libpath():
-    return LIBDIR
-
 def xen_configdir():
     return XEN_CONFIG_DIR
 
