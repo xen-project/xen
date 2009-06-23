@@ -1360,6 +1360,7 @@ class XendConfig(dict):
                 if dev_info['uname'].split(':')[1] not in blktap_disk_types:
                     raise XendConfigError("tap:%s not a valid disk type" %
                                     dev_info['uname'].split(':')[1])
+                dev_info['required_uname'] = dev_info['uname']
 
             if dev_type == 'vif':
                 if not dev_info.get('mac'):

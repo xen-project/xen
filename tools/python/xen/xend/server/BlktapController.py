@@ -120,7 +120,7 @@ class BlktapController(BlkifController):
 
     def createDevice(self, config):
 
-        uname = config.get('uname', '')
+        uname = config.get('required_uname', '')
         try:
             (typ, subtyp, params, file) = string.split(uname, ':', 3)
         except:
