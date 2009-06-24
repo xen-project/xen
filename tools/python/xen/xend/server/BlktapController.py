@@ -60,6 +60,11 @@ class BlktapController(BlkifController):
         
         return "%s/device/vbd" % self.vm.getDomainPath()
 
+    def devicePath(self, devid):
+        """@see DevController#devicePath"""
+        
+        return "%s/device/vbd/%s" % (self.vm.vmpath, devid)
+
     def getDeviceDetails(self, config):
         (devid, back, front) = BlkifController.getDeviceDetails(self, config)
 
