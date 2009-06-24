@@ -649,7 +649,8 @@ __vhd_open(td_driver_t *driver, const char *name, vhd_flag_t flags)
 	driver->info.sector_size = VHD_SECTOR_SIZE;
 	driver->info.info        = 0;
 
-        DBG(TLOG_INFO, "vhd_open: done (sz:%"PRIu64", sct:%lu, inf:%u)\n",
+        DBG(TLOG_INFO, "vhd_open: done (sz:%"PRIu64", sct:%"PRIu64
+            ", inf:%u)\n",
 	    driver->info.size, driver->info.sector_size, driver->info.info);
 
 	if (test_vhd_flag(flags, VHD_FLAG_OPEN_STRICT) && 

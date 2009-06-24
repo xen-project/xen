@@ -101,7 +101,7 @@ static int get_image_info(int fd, td_disk_info_t *info)
 	disksector_size = info->sector_size;
 	disksize        = info->size;
 	diskinfo        = info->info;
-	DPRINTF("Image sector_size: \n\t[%lu]\n",
+	DPRINTF("Image sector_size: \n\t[%"PRIu64"]\n",
 		info->sector_size);
 
 	return 0;
@@ -126,7 +126,7 @@ int tdram_open (td_driver_t *driver, const char *name, td_flag_t flags)
 			"sector_shift [%llu]\n",
 			(long long unsigned)(driver->info.size << SECTOR_SHIFT),
 			(long long unsigned)driver->info.size);
-		DPRINTF("Image sector_size: \n\t[%lu]\n",
+		DPRINTF("Image sector_size: \n\t[%"PRIu64"]\n",
 			driver->info.sector_size);
 
 		prv->fd = -1;
