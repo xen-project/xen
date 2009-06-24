@@ -45,7 +45,7 @@ static inline void blk_uuid_generate(blk_uuid_t *uuid)
 	uuid_generate(uuid->uuid);
 }
 
-static inline void blk_uuid_to_string(blk_uuid_t *uuid, char *out)
+static inline void blk_uuid_to_string(blk_uuid_t *uuid, char *out, size_t size)
 {
 	uuid_unparse(uuid->uuid, out);
 }
@@ -74,6 +74,7 @@ static inline int blk_uuid_compare(blk_uuid_t *uuid1, blk_uuid_t *uuid2)
 
 #include <uuid.h>
 #include <string.h>
+#include <stdlib.h>
 
 typedef uuid_t blk_uuid_t;
 
@@ -89,10 +90,13 @@ static inline void blk_uuid_generate(blk_uuid_t *uuid)
 	uuid_create((uuid_t *)uuid, &status);
 }
 
-static inline void blk_uuid_to_string(blk_uuid_t *uuid, char *out)
+static inline void blk_uuid_to_string(blk_uuid_t *uuid, char *out, size_t size)
 {
 	uint32_t status;
-	uuid_to_string((uuid_t *)uuid, &out, &status);
+	char *_out = NULL;
+	uuid_to_string((uuid_t *)uuid, &_out, &status);
+	strlcpy(out, _out, size);
+	free(_out);
 }
 
 static inline void blk_uuid_from_string(blk_uuid_t *uuid, const char *in)

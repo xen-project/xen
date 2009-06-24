@@ -1335,7 +1335,7 @@ vhd_macx_encode_location(char *name, char **out, int *outlen)
 	snprintf(uri, ibl+1, "file://%s", name);
 
 	if (iconv(cd,
-#if defined(__linux__) || (__Linux__)
+#if defined(__linux__) || defined(__Linux__)
 	    (char **)
 #endif
 	    &urip, &ibl, &uri_utf8p, &obl) == (size_t)-1 ||
@@ -1425,7 +1425,7 @@ vhd_w2u_encode_location(char *name, char **out, int *outlen)
 	}
 
 	if (iconv(cd,
-#if defined(__linux__) || (__Linux__)
+#if defined(__linux__) || defined(__Linux__)
 	    (char **)
 #endif
 	    &urip, &ibl, &uri_utf16p, &obl) == (size_t)-1 ||
