@@ -31,42 +31,95 @@
 
 #include <uuid/uuid.h>
 
+typedef struct {
+    uuid_t uuid;
+} blk_uuid_t;
+
+static inline int blk_uuid_is_nil(blk_uuid_t *uuid)
+{
+	return uuid_is_null(uuid->uuid);
+}
+
+static inline void blk_uuid_generate(blk_uuid_t *uuid)
+{
+	uuid_generate(uuid->uuid);
+}
+
+static inline void blk_uuid_to_string(blk_uuid_t *uuid, char *out)
+{
+	uuid_unparse(uuid->uuid, out);
+}
+
+static inline void blk_uuid_from_string(blk_uuid_t *uuid, const char *in)
+{
+	uuid_parse(in, uuid->uuid);
+}
+
+static inline void blk_uuid_copy(blk_uuid_t *dst, blk_uuid_t *src)
+{
+	uuid_copy(dst->uuid, src->uuid);
+}
+
+static inline void blk_uuid_clear(blk_uuid_t *uuid)
+{
+	uuid_clear(uuid->uuid);
+}
+
+static inline int blk_uuid_compare(blk_uuid_t *uuid1, blk_uuid_t *uuid2)
+{
+	return uuid_compare(uuid1->uuid, uuid2->uuid);
+}
+
+#elif defined(__NetBSD__)
+
+#include <uuid.h>
+#include <string.h>
+
+typedef uuid_t blk_uuid_t;
+
+static inline int blk_uuid_is_nil(blk_uuid_t *uuid)
+{
+	uint32_t status;
+	return uuid_is_nil((uuid_t *)uuid, &status);
+}
+
+static inline void blk_uuid_generate(blk_uuid_t *uuid)
+{
+	uint32_t status;
+	uuid_create((uuid_t *)uuid, &status);
+}
+
+static inline void blk_uuid_to_string(blk_uuid_t *uuid, char *out)
+{
+	uint32_t status;
+	uuid_to_string((uuid_t *)uuid, &out, &status);
+}
+
+static inline void blk_uuid_from_string(blk_uuid_t *uuid, const char *in)
+{
+	uint32_t status;
+	uuid_from_string(in, (uuid_t *)uuid, &status);
+}
+
+static inline void blk_uuid_copy(blk_uuid_t *dst, blk_uuid_t *src)
+{
+	memcpy((uuid_t *)dst, (uuid_t *)src, sizeof(uuid_t));
+}
+
+static inline void blk_uuid_clear(blk_uuid_t *uuid)
+{
+	memset((uuid_t *)uuid, 0, sizeof(uuid_t));
+}
+
+static inline int blk_uuid_compare(blk_uuid_t *uuid1, blk_uuid_t *uuid2)
+{
+	uint32_t status;
+	return uuid_compare((uuid_t *)uuid1, (uuid_t *)uuid2, &status);
+}
+
 #else
 
-#include <inttypes.h>
-#include <string.h>
-#include <uuid.h>
-
-static inline int uuid_is_null(uuid_t uuid)
-{
-    uint32_t status;
-    return uuid_is_nil(&uuid, &status);
-}
-
-static inline void uuid_generate(uuid_t uuid)
-{
-    uint32_t status;
-    uuid_create(&uuid, &status);
-}
-
-static inline void uuid_unparse(uuid_t uuid, char *out)
-{
-    uint32_t status;
-    uuid_to_string(&uuid, (char **)&out, &status);
-}
-
-static inline void uuid_copy(uuid_t dst, uuid_t src)
-{
-    memcpy(dst, src, sizeof(dst));
-}
-
-static inline void uuid_clear(uuid_t uu)
-{
-    memset(uu, 0, sizeof(uu));
-}
-
-#define uuid_compare(x,y) \
-    ({ uint32_t status; uuid_compare(&(x),&(y),&status); })
+#error "Please update blk_uuid.h for your OS"
 
 #endif
 

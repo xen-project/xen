@@ -1308,7 +1308,8 @@ vhd_macx_encode_location(char *name, char **out, int *outlen)
 	iconv_t cd;
 	int len, err;
 	size_t ibl, obl;
-	char *uri, *urip, *uri_utf8, *uri_utf8p, *ret;
+	char *uri, *uri_utf8, *uri_utf8p, *ret;
+	const char *urip;
 
 	err     = 0;
 	ret     = NULL;
@@ -1319,7 +1320,7 @@ vhd_macx_encode_location(char *name, char **out, int *outlen)
 	ibl     = len;
 	obl     = len;
 
-	uri = urip = malloc(ibl + 1);
+	urip = uri = malloc(ibl + 1);
 	uri_utf8 = uri_utf8p = malloc(obl);
 
 	if (!uri || !uri_utf8)
@@ -1333,7 +1334,11 @@ vhd_macx_encode_location(char *name, char **out, int *outlen)
 
 	snprintf(uri, ibl+1, "file://%s", name);
 
-	if (iconv(cd, &urip, &ibl, &uri_utf8p, &obl) == (size_t)-1 ||
+	if (iconv(cd,
+#if defined(__linux__) || (__Linux__)
+	    (char **)
+#endif
+	    &urip, &ibl, &uri_utf8p, &obl) == (size_t)-1 ||
 	    ibl || obl) {
 		err = (errno ? -errno : -EIO);
 		goto out;
@@ -1364,7 +1369,8 @@ vhd_w2u_encode_location(char *name, char **out, int *outlen)
 	iconv_t cd;
 	int len, err;
 	size_t ibl, obl;
-	char *uri, *urip, *uri_utf16, *uri_utf16p, *tmp, *ret;
+	char *uri, *uri_utf16, *uri_utf16p, *tmp, *ret;
+	const char *urip;
 
 	err     = 0;
 	ret     = NULL;
@@ -1418,7 +1424,11 @@ vhd_w2u_encode_location(char *name, char **out, int *outlen)
 		goto out;
 	}
 
-	if (iconv(cd, &urip, &ibl, &uri_utf16p, &obl) == (size_t)-1 ||
+	if (iconv(cd,
+#if defined(__linux__) || (__Linux__)
+	    (char **)
+#endif
+	    &urip, &ibl, &uri_utf16p, &obl) == (size_t)-1 ||
 	    ibl || obl) {
 		err = (errno ? -errno : -EIO);
 		goto out;
@@ -1459,7 +1469,11 @@ vhd_macx_decode_location(const char *in, char *out, int len)
 	if (cd == (iconv_t)-1) 
 		return NULL;
 
-	if (iconv(cd, (char **)&in, &ibl, &out, &obl) == (size_t)-1 || ibl)
+	if (iconv(cd,
+#if defined(__linux__) || defined(__Linux__)
+		(char **)
+#endif
+		&in, &ibl, &out, &obl) == (size_t)-1 || ibl)
 		return NULL;
 
 	iconv_close(cd);
@@ -1487,7 +1501,11 @@ vhd_w2u_decode_location(const char *in, char *out, int len, char *utf_type)
 	if (cd == (iconv_t)-1) 
 		return NULL;
 
-	if (iconv(cd, (char **)&in, &ibl, &out, &obl) == (size_t)-1 || ibl)
+	if (iconv(cd,
+#if defined(__linux__) || defined(__Linux__)
+		(char **)
+#endif
+		&in, &ibl, &out, &obl) == (size_t)-1 || ibl)
 		return NULL;
 
 	iconv_close(cd);
@@ -2435,7 +2453,7 @@ vhd_initialize_footer(vhd_context_t *ctx, int type, uint64_t size)
 	ctx->footer.saved        = 0;
 	ctx->footer.data_offset  = 0xFFFFFFFFFFFFFFFF;
 	strcpy(ctx->footer.crtr_app, "tap");
-	uuid_generate(ctx->footer.uuid);
+	blk_uuid_generate(&ctx->footer.uuid);
 }
 
 static int
@@ -2479,7 +2497,11 @@ vhd_initialize_header_parent_name(vhd_context_t *ctx, const char *parent_path)
 
 	memset(dst, 0, obl);
 
-	if (iconv(cd, (char **)&pname, &ibl, &dst, &obl) == (size_t)-1 || ibl)
+	if (iconv(cd,
+#if defined(__linux__) || defined(__Linux__)
+		(char **)
+#endif
+		&pname, &ibl, &dst, &obl) == (size_t)-1 || ibl)
 		err = (errno ? -errno : -EINVAL);
 
 out:
@@ -2546,7 +2568,7 @@ vhd_initialize_header(vhd_context_t *ctx, const char *parent_path,
 			return err;
 
 		ctx->header.prt_ts = vhd_time(stats.st_mtime);
-		uuid_copy(ctx->header.prt_uuid, parent.footer.uuid);
+		blk_uuid_copy(&ctx->header.prt_uuid, &parent.footer.uuid);
 		if (!size)
 			size = parent.footer.curr_size;
 		vhd_close(&parent);
@@ -2628,7 +2650,7 @@ vhd_change_parent(vhd_context_t *child, char *parent_path, int raw)
 	}
 
 	if (raw) {
-		uuid_clear(child->header.prt_uuid);
+		blk_uuid_clear(&child->header.prt_uuid);
 	} else {
 		err = vhd_open(&parent, ppath, VHD_OPEN_RDONLY);
 		if (err) {
@@ -2636,7 +2658,7 @@ vhd_change_parent(vhd_context_t *child, char *parent_path, int raw)
 			       ppath, child->file, err);
 			goto out;
 		}
-		uuid_copy(child->header.prt_uuid, parent.footer.uuid);
+		blk_uuid_copy(&child->header.prt_uuid, &parent.footer.uuid);
 		vhd_close(&parent);
 	}
 
@@ -2695,7 +2717,7 @@ vhd_create_batmap(vhd_context_t *ctx)
 	header    = &ctx->batmap.header;
 
 	memset(header, 0, sizeof(vhd_batmap_header_t));
-	memcpy(header->cookie, VHD_BATMAP_COOKIE, sizeof(*header->cookie));
+	memcpy(header->cookie, VHD_BATMAP_COOKIE, sizeof(header->cookie));
 
 	err = vhd_batmap_header_offset(ctx, &off);
 	if (err)
