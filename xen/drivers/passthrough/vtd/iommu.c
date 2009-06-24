@@ -1877,6 +1877,10 @@ void iommu_suspend(void)
         iommu_state[i][DMAR_FEUADDR_REG] =
             (u32) dmar_readl(iommu->reg, DMAR_FEUADDR_REG);
 
+        /* don't disable VT-d engine when force_iommu is set. */
+        if ( force_iommu )
+            continue;
+
         iommu_disable_translation(iommu);
 
         if ( iommu_intremap )
