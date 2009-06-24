@@ -32,7 +32,8 @@ void arch_hvm_save(struct domain *d, struct hvm_save_header *hdr)
     cpuid(1, &eax, &ebx, &ecx, &edx);
     hdr->cpuid = eax;
 
-    hdr->pad0 = 0;
+    /* Save guest's preferred TSC. */
+    hdr->gtsc_khz = d->arch.hvm_domain.gtsc_khz;
 }
 
 int arch_hvm_load(struct domain *d, struct hvm_save_header *hdr)
@@ -58,6 +59,9 @@ int arch_hvm_load(struct domain *d, struct hvm_save_header *hdr)
     if ( hdr->cpuid != eax )
         gdprintk(XENLOG_WARNING, "HVM restore: saved CPUID (%#"PRIx32") "
                "does not match host (%#"PRIx32").\n", hdr->cpuid, eax);
+
+    /* Restore guest's preferred TSC frequency. */
+    d->arch.hvm_domain.gtsc_khz = hdr->gtsc_khz;
 
     /* VGA state is not saved/restored, so we nobble the cache. */
     d->arch.hvm_domain.stdvga.cache = 0;

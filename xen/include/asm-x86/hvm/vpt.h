@@ -136,8 +136,6 @@ struct pl_time {    /* platform time */
     spinlock_t pl_time_lock;
 };
 
-#define ticks_per_sec(v) (v->domain->arch.hvm_domain.tsc_frequency)
-
 void pt_save_timer(struct vcpu *v);
 void pt_restore_timer(struct vcpu *v);
 void pt_update_irq(struct vcpu *v);

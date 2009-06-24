@@ -481,8 +481,6 @@ void pit_init(struct vcpu *v, unsigned long cpu_khz)
     register_portio_handler(v->domain, PIT_BASE, 4, handle_pit_io);
     register_portio_handler(v->domain, 0x61, 1, handle_speaker_io);
 
-    ticks_per_sec(v) = cpu_khz * (int64_t)1000;
-
     pit_reset(v->domain);
 }
 
