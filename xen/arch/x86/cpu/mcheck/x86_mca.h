@@ -105,13 +105,13 @@ DECLARE_PER_CPU(cpu_banks_t, mce_banks_owned);
 */
 
 /* MCA error has been recovered successfully by the recovery action*/
-#define MCA_RECOVERED (0x1 < 0)
+#define MCA_RECOVERED (0x1 << 0)
 /* MCA error impact the specified DOMAIN in owner field below */
-#define MCA_OWNER (0x1 < 1)
+#define MCA_OWNER (0x1 << 1)
 /* MCA error can't be recovered and need reset */
-#define MCA_NEED_RESET (0x1 < 2)
+#define MCA_NEED_RESET (0x1 << 2)
 /* MCA error did not have any action yet */
-#define MCA_NO_ACTION (0x1 < 3)
+#define MCA_NO_ACTION (0x1 << 3)
 
 struct mca_handle_result
 {
