@@ -12,7 +12,7 @@ arch = os.uname()[4]
 
 #----------------------------------------------------------------------------
 # Kernel image file.
-kernel = "/usr/lib/xen/boot/guest_firmware.bin"
+kernel = "guest_firmware.bin"
 
 # The domain build function. VTI domain uses 'hvm'.
 builder='hvm'

@@ -11,7 +11,7 @@
 
 #----------------------------------------------------------------------------
 # Kernel image file.
-kernel = "/usr/lib/xen/boot/hvmloader"
+kernel = "hvmloader"
 
 # The domain build function. HVM domain uses 'hvm'.
 builder='hvm'
@@ -118,7 +118,7 @@ disk = [ 'file:/var/images/min-el3-i386.img,hda,w', 'phy:/dev/cdrom,hdc:cdrom,r'
 #
 # STUBDOM: this is a script that creates the stub domain running the device
 # model
-device_model = '/usr/lib/xen/bin/stubdom-dm'
+device_model = 'stubdom-dm'
 
 #-----------------------------------------------------------------------------
 # boot on floppy (a), hard disk (c), Network (n) or CD-ROM (d) 
@@ -146,7 +146,8 @@ vnc=1
 
 #----------------------------------------------------------------------------
 # address that should be listened on for the VNC server if vnc is set.
-# default is to use 'vnc-listen' setting from /etc/xen/xend-config.sxp
+# default is to use 'vnc-listen' setting from
+# auxbin.xen_configdir() + /xend-config.sxp
 #vnclisten="127.0.0.1"
 
 #----------------------------------------------------------------------------

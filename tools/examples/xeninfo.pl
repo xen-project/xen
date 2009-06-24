@@ -210,7 +210,7 @@ sub get_vm_type
 		# which is something like:
 		# 'PV_kernel': '/boot/vmlinuz-2.6.18-xen',
 		# or
-		# 'PV_kernel': '/usr/lib/xen/boot/hvmloader',
+		# 'PV_kernel': 'hvmloader',
 		if ("$vm_pv_kernel_results->{'Value'}" =~ m/hvm/i)
 		{
 			$host_info{$host_name}{'vms'}{$vm_name_label}{'type'} = "HVM";

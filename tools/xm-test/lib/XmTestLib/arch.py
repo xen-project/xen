@@ -77,7 +77,7 @@ ia_HVMDefaults =      {"memory"       : 64,
                        "acpi"         : 0,
                        "disk"         : ["file:%s/disk.img,ioemu:%s,w!" %
                                          (getRdPath(), BLOCK_ROOT_DEV)],
-                       "kernel"       : "/usr/lib/xen/boot/hvmloader",
+                       "kernel"       : "hvmloader",
                        "builder"      : "hvm",
                        "sdl"          : 0,
                        "vnc"          : 0,

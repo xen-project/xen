@@ -8,7 +8,7 @@
 
 #----------------------------------------------------------------------------
 # PV GRUB image file.
-kernel = "/usr/lib/xen/boot/pv-grub.gz"
+kernel = "pv-grub.gz"
 
 # Optional provided menu.lst.
 #ramdisk = "/boot/guests/menu.lst"

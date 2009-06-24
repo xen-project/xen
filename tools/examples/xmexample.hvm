@@ -6,16 +6,9 @@
 # you can set the parameters for the domain on the xm command line.
 #============================================================================
 
-import os, re
-
-arch_libdir = 'lib'
-arch = os.uname()[4]
-if os.uname()[0] == 'Linux' and re.search('64', arch):
-    arch_libdir = 'lib64'
-
 #----------------------------------------------------------------------------
 # Kernel image file.
-kernel = "/usr/lib/xen/boot/hvmloader"
+kernel = "hvmloader"
 
 # The domain build function. HVM domain uses 'hvm'.
 builder='hvm'
@@ -128,7 +121,7 @@ disk = [ 'file:/var/images/min-el3-i386.img,hda,w', ',hdc:cdrom,r' ]
 #============================================================================
 
 # Device Model to be used
-device_model = '/usr/' + arch_libdir + '/xen/bin/qemu-dm'
+device_model = 'qemu-dm'
 
 #-----------------------------------------------------------------------------
 # boot on floppy (a), hard disk (c), Network (n) or CD-ROM (d) 
@@ -154,7 +147,8 @@ vnc=1
 
 #----------------------------------------------------------------------------
 # address that should be listened on for the VNC server if vnc is set.
-# default is to use 'vnc-listen' setting from /etc/xen/xend-config.sxp
+# default is to use 'vnc-listen' setting from
+# auxbin.xen_configdir() + /xend-config.sxp
 #vnclisten="127.0.0.1"
 
 #----------------------------------------------------------------------------
