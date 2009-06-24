@@ -99,6 +99,8 @@ unsigned long long simple_strtoull(
 
 unsigned long long parse_size_and_unit(const char *s, const char **ps);
 
+uint64_t muldiv64(uint64_t a, uint32_t b, uint32_t c);
+
 #define TAINT_UNSAFE_SMP                (1<<0)
 #define TAINT_MACHINE_CHECK             (1<<1)
 #define TAINT_BAD_PAGE                  (1<<2)
