@@ -250,7 +250,7 @@ static int lock_holder(char *fn, char *lockfn, char *lockfn_link,
                         }
                 }
                 dptr = readdir(pd);
-                if (!dptr & errno) {
+                if (!dptr && errno) {
                     *ioerror = EIO;
                 }
         }
