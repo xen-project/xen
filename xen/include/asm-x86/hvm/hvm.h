@@ -129,6 +129,7 @@ struct hvm_function_table {
     void (*invlpg_intercept)(unsigned long vaddr);
     void (*set_uc_mode)(struct vcpu *v);
     void (*set_info_guest)(struct vcpu *v);
+    void (*enable_rdtsc_exiting)(struct vcpu *v);
 };
 
 extern struct hvm_function_table hvm_funcs;
@@ -281,6 +282,9 @@ static inline int hvm_do_pmu_interrupt(struct cpu_user_regs *regs)
 int hvm_event_needs_reinjection(uint8_t type, uint8_t vector);
 
 uint8_t hvm_combine_hw_exceptions(uint8_t vec1, uint8_t vec2);
+
+void hvm_enable_rdtsc_exiting(struct domain *d);
+int hvm_gtsc_need_scale(struct domain *d);
 
 static inline int hvm_cpu_up(void)
 {

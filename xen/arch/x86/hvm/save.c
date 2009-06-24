@@ -63,6 +63,15 @@ int arch_hvm_load(struct domain *d, struct hvm_save_header *hdr)
     /* Restore guest's preferred TSC frequency. */
     d->arch.hvm_domain.gtsc_khz = hdr->gtsc_khz;
 
+    if ( hdr->gtsc_khz && hvm_gtsc_need_scale(d) )
+    {
+        hvm_enable_rdtsc_exiting(d);
+        gdprintk(XENLOG_WARNING, "Loading VM(id:%d) expects freq: %dmHz, "
+                "but host's freq :%"PRIu64"mHz, trap and emulate rdtsc!!!\n",
+                d->domain_id, hdr->gtsc_khz / 1000, opt_softtsc ? 1000 :
+                cpu_khz / 1000);
+    }
+
     /* VGA state is not saved/restored, so we nobble the cache. */
     d->arch.hvm_domain.stdvga.cache = 0;
 

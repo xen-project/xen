@@ -144,26 +144,67 @@ uint8_t hvm_combine_hw_exceptions(uint8_t vec1, uint8_t vec2)
     return TRAP_double_fault;
 }
 
-void hvm_set_guest_tsc(struct vcpu *v, u64 guest_tsc)
+void hvm_enable_rdtsc_exiting(struct domain *d)
 {
-    u64 host_tsc;
+    struct vcpu *v;
 
-    rdtscll(host_tsc);
+    if ( opt_softtsc || !hvm_funcs.enable_rdtsc_exiting )
+        return;
 
-    v->arch.hvm_vcpu.cache_tsc_offset = guest_tsc - host_tsc;
-    hvm_funcs.set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset);
+    for_each_vcpu ( d, v )
+        hvm_funcs.enable_rdtsc_exiting(v);
 }
 
-u64 hvm_get_guest_tsc(struct vcpu *v)
+int hvm_gtsc_need_scale(struct domain *d)
 {
-    u64 host_tsc;
+    uint32_t gtsc_mhz, htsc_mhz;
+
+    gtsc_mhz = d->arch.hvm_domain.gtsc_khz / 1000;
+    htsc_mhz = opt_softtsc ? 1000 : ((uint32_t)cpu_khz / 1000);
+
+    d->arch.hvm_domain.tsc_scaled = (gtsc_mhz && (gtsc_mhz != htsc_mhz));
+    return d->arch.hvm_domain.tsc_scaled;
+}
+
+static u64 hvm_h2g_scale_tsc(struct vcpu *v, u64 host_tsc)
+{
+    uint32_t gtsc_khz, htsc_khz;
+
+    if ( !v->domain->arch.hvm_domain.tsc_scaled )
+        return host_tsc;
+
+    htsc_khz = opt_softtsc ? 1000000 : cpu_khz;
+    gtsc_khz = v->domain->arch.hvm_domain.gtsc_khz;
+    return muldiv64(host_tsc, gtsc_khz, htsc_khz);
+}
+
+void hvm_set_guest_tsc(struct vcpu *v, u64 guest_tsc)
+{
+    uint64_t host_tsc, scaled_htsc;
 
     if ( opt_softtsc )
         host_tsc = hvm_get_guest_time(v);
     else
         rdtscll(host_tsc);
 
-    return host_tsc + v->arch.hvm_vcpu.cache_tsc_offset;
+    scaled_htsc = hvm_h2g_scale_tsc(v, host_tsc);
+
+    v->arch.hvm_vcpu.cache_tsc_offset = guest_tsc - scaled_htsc;
+    hvm_funcs.set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset);
+}
+
+u64 hvm_get_guest_tsc(struct vcpu *v)
+{
+    uint64_t host_tsc, scaled_htsc;
+
+    if ( opt_softtsc )
+        host_tsc = hvm_get_guest_time(v);
+    else
+        rdtscll(host_tsc);
+
+    scaled_htsc = hvm_h2g_scale_tsc(v, host_tsc);
+
+    return scaled_htsc + v->arch.hvm_vcpu.cache_tsc_offset;
 }
 
 void hvm_migrate_timers(struct vcpu *v)
