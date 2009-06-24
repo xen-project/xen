@@ -1768,7 +1768,7 @@ static shadow_l3e_t * shadow_get_and_create_l3e(struct vcpu *v,
         if ( r & SHADOW_SET_ERROR )
             return NULL;
 
-#if (SHADOW_OPTIMIZATIONS && SHOPT_OUT_OF_SYNC )
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC )
         *resync |= 1;
 #endif
 
@@ -1823,7 +1823,7 @@ static shadow_l2e_t * shadow_get_and_create_l2e(struct vcpu *v,
         if ( r & SHADOW_SET_ERROR )
             return NULL;        
 
-#if (SHADOW_OPTIMIZATIONS && SHOPT_OUT_OF_SYNC )
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC )
         *resync |= 1;
 #endif
 
@@ -1920,7 +1920,7 @@ static shadow_l1e_t * shadow_get_and_create_l1e(struct vcpu *v,
         (void) shadow_l1_index(sl1mfn, guest_l1_table_offset(gw->va));
     }
 
-#if (SHADOW_OPTIMIZATIONS && SHOPT_OUT_OF_SYNC )
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC )
     /* All pages walked are now pagetables. Safe to resync pages
        in case level 4 or 3 shadows were set. */
     if ( resync )
@@ -2202,7 +2202,7 @@ static int validate_gl4e(struct vcpu *v, void *new_ge, mfn_t sl4mfn, void *se)
         else if ( p2mt != p2m_populate_on_demand )
             result |= SHADOW_SET_ERROR;
 
-#if (SHADOW_OPTIMIZATIONS && SHOPT_OUT_OF_SYNC )
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC )
         if ( mfn_valid(sl3mfn) )
             shadow_resync_all(v, 0);
 #endif
@@ -2259,7 +2259,7 @@ static int validate_gl3e(struct vcpu *v, void *new_ge, mfn_t sl3mfn, void *se)
         else if ( p2mt != p2m_populate_on_demand )
             result |= SHADOW_SET_ERROR;
 
-#if (SHADOW_OPTIMIZATIONS && SHOPT_OUT_OF_SYNC )
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC )
         if ( mfn_valid(sl2mfn) )
             shadow_resync_all(v, 0);
 #endif
