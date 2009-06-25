@@ -21,7 +21,9 @@
 #define INT_MIN         (-INT_MAX-1)
 #define UINT_MAX        0xffffffff
 
+#define SHRT_MIN	(-0x8000)
 #define SHRT_MAX        0x7fff
+#define USHRT_MAX       0xffff
 
 #if defined(__x86_64__) || defined(__ia64__)
 # define LONG_MAX       0x7fffffffffffffffL
