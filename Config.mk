@@ -103,6 +103,7 @@ define buildmakevars2file-closure
 	echo "BINDIR=\"$(BINDIR)\"" >> $(1);                           \
 	echo "LIBEXEC=\"$(LIBEXEC)\"" >> $(1);                         \
 	echo "LIBDIR=\"$(LIBDIR)\"" >> $(1);                           \
+	echo "SHAREDIR=\"$(SHAREDIR)\"" >> $(1);                       \
 	echo "PRIVATE_BINDIR=\"$(PRIVATE_BINDIR)\"" >> $(1);           \
 	echo "XENFIRMWAREDIR=\"$(XENFIRMWAREDIR)\"" >> $(1);           \
 	echo "XEN_CONFIG_DIR=\"$(XEN_CONFIG_DIR)\"" >> $(1);           \
