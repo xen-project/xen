@@ -463,9 +463,11 @@ class XendConfig(dict):
             if 'device_model' not in self['platform']:
                 self['platform']['device_model'] = auxbin.pathTo("qemu-dm")
             # device_model may be set to 'qemu-dm' or 'stubdom-dm' w/o a path
-            if os.path.dirname(self['platform']['device_model']) != "":
+            if os.path.dirname(self['platform']['device_model']) == "":
                 self['platform']['device_model'] = \
                     auxbin.pathTo(self['platform']['device_model'])
+            if not os.path.exists(self['platform']['device_model']):
+                raise VmError("device model '%s' not found" % str(self['platform']['device_model']))
 
         if self.is_hvm():
             if 'timer_mode' not in self['platform']:
