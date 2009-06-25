@@ -20,6 +20,8 @@
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/dmi.h>
+#include <xen/bitmap.h>
+#include <asm/hvm/support.h>
 
 int hvm_port80_allowed = -1;
 boolean_param("hvm_port80", hvm_port80_allowed);
@@ -87,6 +89,9 @@ static int __init check_port80(void)
     };
 
     dmi_check_system(hvm_no_port80_dmi_table);
+
+    if ( !hvm_port80_allowed )
+        __set_bit(0x80, hvm_io_bitmap);
 
     return 0;
 }
