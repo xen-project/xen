@@ -356,12 +356,12 @@ install-readme:
 install-ioemu: ioemu-stubdom
 	$(INSTALL_DIR) "$(DESTDIR)$(LIBEXEC)"
 	$(INSTALL_PROG) stubdom-dm "$(DESTDIR)$(LIBEXEC)"
-	$(INSTALL_DIR) "$(DESTDIR)$(LIBDIR_x86_32)/xen/boot"
-	$(INSTALL_DATA) mini-os-$(XEN_TARGET_ARCH)-ioemu/mini-os.gz "$(DESTDIR)$(LIBDIR_x86_32)/xen/boot/ioemu-stubdom.gz"
+	$(INSTALL_DIR) "$(DESTDIR)$(XENFIRMWAREDIR)"
+	$(INSTALL_DATA) mini-os-$(XEN_TARGET_ARCH)-ioemu/mini-os.gz "$(DESTDIR)$(XENFIRMWAREDIR)/ioemu-stubdom.gz"
 
 install-grub: pv-grub
-	$(INSTALL_DIR) "$(DESTDIR)$(LIBDIR_x86_32)/xen/boot"
-	$(INSTALL_DATA) mini-os-$(XEN_TARGET_ARCH)-grub/mini-os.gz "$(DESTDIR)$(LIBDIR_x86_32)/xen/boot/pv-grub-$(XEN_TARGET_ARCH).gz"
+	$(INSTALL_DIR) "$(DESTDIR)$(XENFIRMWAREDIR)"
+	$(INSTALL_DATA) mini-os-$(XEN_TARGET_ARCH)-grub/mini-os.gz "$(DESTDIR)$(XENFIRMWAREDIR)/pv-grub-$(XEN_TARGET_ARCH).gz"
 
 #######
 # clean
