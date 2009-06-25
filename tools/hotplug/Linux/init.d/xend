@@ -39,6 +39,7 @@ function await_daemons_up
 
 case "$1" in
   start)
+	mkdir -p /var/lock/subsys
 	touch /var/lock/subsys/xend
 	xend start
 	await_daemons_up
