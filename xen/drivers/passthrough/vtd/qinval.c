@@ -120,8 +120,8 @@ static int gen_iotlb_inv_dsc(struct iommu *iommu, int index,
     qinval_entry = &qinval_entries[index];
     qinval_entry->q.iotlb_inv_dsc.lo.type = TYPE_INVAL_IOTLB;
     qinval_entry->q.iotlb_inv_dsc.lo.granu = granu;
-    qinval_entry->q.iotlb_inv_dsc.lo.dr = 0;
-    qinval_entry->q.iotlb_inv_dsc.lo.dw = 0;
+    qinval_entry->q.iotlb_inv_dsc.lo.dr = dr;
+    qinval_entry->q.iotlb_inv_dsc.lo.dw = dw;
     qinval_entry->q.iotlb_inv_dsc.lo.res_1 = 0;
     qinval_entry->q.iotlb_inv_dsc.lo.did = did;
     qinval_entry->q.iotlb_inv_dsc.lo.res_2 = 0;

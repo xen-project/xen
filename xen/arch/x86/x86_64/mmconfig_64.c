@@ -114,24 +114,14 @@ static void __iomem * __init mcfg_ioremap(struct acpi_mcfg_allocation *cfg)
     unsigned long mfn;
     unsigned long size, nr_mfn;
 
-    printk("amk_mcfg_ioremap: PCI_MCFG_VIRT_START %lx\n", (u64)PCI_MCFG_VIRT_START); 
-    printk("amk_mcfg_ioremap: start_bus %x end_bus %x\n",
-               cfg->start_bus_number, cfg->end_bus_number);
-
     virt = PCI_MCFG_VIRT_START + (cfg->pci_segment * (1 << 22)) +
                (cfg->start_bus_number * (1 << 20));
     mfn = cfg->address >> PAGE_SHIFT;
         size = (cfg->end_bus_number - cfg->start_bus_number) << 20;
         nr_mfn = size >> PAGE_SHIFT;
 
-    printk("amk_mcfg_ioremap: virt %lx mfn = %lx size %lx\n", virt, mfn, size);
-
     map_pages_to_xen(virt, mfn, nr_mfn, PAGE_HYPERVISOR_NOCACHE);
     addr = (void __iomem *) virt;
-
-    printk("amk_mcfg_ioremap: PCI_MCFG_VIRT_START %lx\n",
-        (u64)PCI_MCFG_VIRT_START); 
-    printk("amk_mcfg_ioremap: virt  %lx size %lx\n", virt, size);
 
     return addr;
 }
