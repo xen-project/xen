@@ -66,9 +66,9 @@ int arch_hvm_load(struct domain *d, struct hvm_save_header *hdr)
     if ( hdr->gtsc_khz && hvm_gtsc_need_scale(d) )
     {
         hvm_enable_rdtsc_exiting(d);
-        gdprintk(XENLOG_WARNING, "Loading VM(id:%d) expects freq: %dmHz, "
-                "but host's freq :%"PRIu64"mHz, trap and emulate rdtsc!!!\n",
-                d->domain_id, hdr->gtsc_khz / 1000, opt_softtsc ? 1000 :
+        gdprintk(XENLOG_WARNING, "Domain %d expects freq %uMHz "
+                "but host's freq is %luMHz: trap and emulate rdtsc\n",
+                d->domain_id, hdr->gtsc_khz / 1000, opt_softtsc ? 1000ul :
                 cpu_khz / 1000);
     }
 
