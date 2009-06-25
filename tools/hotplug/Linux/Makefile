@@ -24,6 +24,12 @@ XEN_SCRIPT_DATA += vtpm-migration.sh vtpm-impl
 XEN_HOTPLUG_DIR = $(CONFIG_DIR)/hotplug
 XEN_HOTPLUG_SCRIPTS = xen-backend.agent
 
+ifeq ($(shell [ -x /sbin/udevadm ] && echo 1),1)
+UDEVINFO = /sbin/udevadm
+else
+UDEVINFO = /usr/bin/udevinfo
+endif
+
 UDEV_RULES_DIR = $(CONFIG_DIR)/udev
 UDEV_RULES = xen-backend.rules xend.rules
 
@@ -32,7 +38,7 @@ DE = $(if $(DESTDIR),$(shell readlink -f $(DESTDIR)),)
 ifeq ($(findstring $(DI),$(DE)),$(DI))
 HOTPLUGS=install-hotplug install-udev
 else
-ifeq ($(shell [ -x /usr/bin/udevinfo ] && [ `/usr/bin/udevinfo -V | sed -e 's/^[^0-9]* \([0-9]\{1,\}\)[^0-9]\{0,\}/\1/'` -ge 059 ] && echo 1),1)
+ifeq ($(shell [ -x $(UDEVINFO) -a `$(UDEVINFO) -V | sed -e 's/^[^0-9]* \([0-9]\{1,\}\)[^0-9]\{0,\}/\1/'` -ge 059 ] && echo 1),1)
 HOTPLUGS=install-udev
 else
 HOTPLUGS=install-hotplug

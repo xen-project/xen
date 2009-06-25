@@ -8,8 +8,10 @@ OpenBSD|NetBSD|FreeBSD)
 	has_or_fail vnconfig
 	;;
 Linux)
-	has_or_fail udevinfo
-	[ "`udevinfo -V | awk '{print $NF}'`" -ge 59 ] 2>/dev/null || \
+	has /sbin/udevadm && udevver=`/sbin/udevadm -V`
+	[ -z "$udevver" ] && has_or_fail udevinfo && \
+		udevver=`udevinfo -V | awk '{print $NF}'`
+	[ "$udevver" -ge 59 ] 2>/dev/null || \
 		has hotplug || \
 		fail "udev is too old, upgrade to version 59 or later"
 	;;
