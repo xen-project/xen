@@ -90,7 +90,7 @@ int hap_disable_vram_tracking(struct domain *d)
 
     /* set l1e entries of P2M table with normal mode */
     for (i = dirty_vram->begin_pfn; i < dirty_vram->end_pfn; i++)
-        p2m_change_type(d, i, p2m_ram_rw, p2m_ram_logdirty);
+        p2m_change_type(d, i, p2m_ram_logdirty, p2m_ram_rw);
 
     flush_tlb_mask(&d->domain_dirty_cpumask);
     return 0;
