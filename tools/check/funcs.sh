@@ -78,6 +78,11 @@ check_sys_root() {
 	fi
 }
 
+warning() {
+	echo
+	echo " *** `basename "$0"` FAILED${*+: $*}"
+}
+
 fail() {
 	echo
 	echo " *** `basename "$0"` FAILED${*+: $*}"
