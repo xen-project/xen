@@ -119,6 +119,8 @@ struct client {
     unsigned long compress_poor, compress_nomem;
     unsigned long compressed_pages;
     uint64_t compressed_sum_size;
+    uint64_t total_cycles;
+    unsigned long succ_pers_puts, succ_eph_gets, succ_pers_gets;
 };
 typedef struct client client_t;
 
@@ -842,6 +844,8 @@ static client_t *client_create(void)
     list_add_tail(&client->client_list, &global_client_list);
     INIT_LIST_HEAD(&client->ephemeral_page_list);
     client->eph_count = client->eph_count_max = 0;
+    client->total_cycles = 0; client->succ_pers_puts = 0;
+    client->succ_eph_gets = 0; client->succ_pers_gets = 0;
     printk("ok\n");
     return client;
 }
@@ -1081,6 +1085,8 @@ done:
     tmem_spin_unlock(&obj->obj_spinlock);
     pool->dup_puts_replaced++;
     pool->good_puts++;
+    if ( is_persistent(pool) )
+        client->succ_pers_puts++;
     return 1;
 
 bad_copy:
@@ -1208,6 +1214,8 @@ insert_page:
     obj->no_evict = 0;
     tmem_spin_unlock(&obj->obj_spinlock);
     pool->good_puts++;
+    if ( is_persistent(pool) )
+        client->succ_pers_puts++;
     return 1;
 
 delete_and_free:
@@ -1307,6 +1315,10 @@ static NOINLINE int do_tmem_get(pool_t *pool, uint64_t oid, uint32_t index,
         tmem_spin_unlock(&obj->obj_spinlock);
     }
     pool->found_gets++;
+    if ( is_ephemeral(pool) )
+        client->succ_eph_gets++;
+    else
+        client->succ_pers_gets++;
     return 1;
 
 bad_copy:
@@ -1539,9 +1551,11 @@ static int tmemc_list_client(client_t *c, tmem_cli_va_t buf, int off,
     pool_t *p;
     bool_t s;
 
-    n = scnprintf(info,BSIZE,"C=CI:%d,ww:%d,ca:%d,co:%d,fr:%d%c",
-        c->cli_id, c->weight, c->cap, c->compress,
-        c->frozen, use_long ? ',' : '\n');
+    n = scnprintf(info,BSIZE,"C=CI:%d,ww:%d,ca:%d,co:%d,fr:%d,"
+        "Tc:%"PRIu64",Ge:%ld,Pp:%ld,Gp:%ld%c",
+        c->cli_id, c->weight, c->cap, c->compress, c->frozen,
+        c->total_cycles, c->succ_eph_gets, c->succ_pers_puts, c->succ_pers_gets,
+        use_long ? ',' : '\n');
     if (use_long)
         n += scnprintf(info+n,BSIZE-n,
              "Ec:%ld,Em:%ld,cp:%ld,cb:%"PRId64",cn:%ld,cm:%ld\n",
@@ -1944,17 +1958,17 @@ out:
     if ( rc < 0 )
         errored_tmem_ops++;
     if ( succ_get )
-        END_CYC_COUNTER(succ_get);
+        END_CYC_COUNTER_CLI(succ_get,client);
     else if ( succ_put )
-        END_CYC_COUNTER(succ_put);
+        END_CYC_COUNTER_CLI(succ_put,client);
     else if ( non_succ_get )
-        END_CYC_COUNTER(non_succ_get);
+        END_CYC_COUNTER_CLI(non_succ_get,client);
     else if ( non_succ_put )
-        END_CYC_COUNTER(non_succ_put);
+        END_CYC_COUNTER_CLI(non_succ_put,client);
     else if ( flush )
-        END_CYC_COUNTER(flush);
-    else
-        END_CYC_COUNTER(flush_obj);
+        END_CYC_COUNTER_CLI(flush,client);
+    else if ( flush_obj )
+        END_CYC_COUNTER_CLI(flush_obj,client);
 
     if ( tmh_lock_all )
     {
