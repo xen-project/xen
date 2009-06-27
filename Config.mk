@@ -148,9 +148,9 @@ QEMU_REMOTE=http://xenbits.xensource.com/git-http/qemu-xen-unstable.git
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= f2e0a24d00b2f0c591719bab088fbe3654955066
-# Thu Jun 18 15:23:53 2009 +0100
-# hw/piix4acpi.c: cleanup logging
+QEMU_TAG ?= d67e46f6860bfbd8991b7691efc1f67b7bc413bc
+# Thu Jun 25 18:40:33 2009 +0100
+# Merge branch 'pt.multifn'
 
 OCAML_XENSTORED_REPO=http://xenbits.xensource.com/ext/xen-ocaml-tools.hg
 
