@@ -83,6 +83,7 @@ class PciController(DevController):
             back['dev-%i' % pcidevid] = "%04x:%02x:%02x.%01x" % \
                                         (domain, bus, slot, func)
             back['uuid-%i' % pcidevid] = pci_config.get('uuid', '')
+            back['key-%i' % pcidevid] = pci_config.get('key', '')
             back['vslot-%i' % pcidevid] = "%02x" % vslot
             pcidevid += 1
 
@@ -113,6 +114,7 @@ class PciController(DevController):
                 dev = back['dev-%i' % i]
                 state = states[i]
                 uuid = back['uuid-%i' %i]
+                key = back['key-%i' %i]
                 opts = ''
                 if 'opts-%i' % i in back:
                     opts = back['opts-%i' % i]
@@ -135,6 +137,7 @@ class PciController(DevController):
                 self.writeBackend(devid, 'state-%i' % devno,
                                   str(xenbusState['Initialising']))
                 self.writeBackend(devid, 'uuid-%i' % devno, uuid)
+                self.writeBackend(devid, 'key-%i' % devno, key)
                 if len(opts) > 0:
                     self.writeBackend(devid, 'opts-%i' % devno, opts)
                 if back.has_key('vslot-%i' % i):
@@ -173,6 +176,7 @@ class PciController(DevController):
 
             # Per device uuid info
             pci_dev['uuid'] = self.readBackend(devid, 'uuid-%d' % i)
+            pci_dev['key'] = self.readBackend(devid, 'key-%d' % i)
             pci_dev['vslot'] = '0x%s' % self.readBackend(devid, 'vslot-%d' % i)
 
             #append opts info
@@ -500,7 +504,7 @@ class PciController(DevController):
                 # In HVM case, I/O resources are disabled in ioemu.
                 self.cleanupOneDevice(pci_dev)
                 # Remove xenstore nodes.
-                list = ['dev', 'vdev', 'state', 'uuid', 'vslot']
+                list = ['dev', 'vdev', 'state', 'uuid', 'vslot', 'key']
                 if self.readBackend(devid, 'opts-%i' % i) is not None:
                     list.append('opts')
                 for key in list:
@@ -510,7 +514,7 @@ class PciController(DevController):
                 if new_num_devs == i + 1:
                     continue
 
-                list = ['dev', 'vdev', 'state', 'uuid', 'opts', 'vslot']
+                list = ['dev', 'vdev', 'state', 'uuid', 'opts', 'vslot', 'key']
                 for key in list:
                     tmp = self.readBackend(devid, '%s-%i' % (key, i))
                     if tmp is None:

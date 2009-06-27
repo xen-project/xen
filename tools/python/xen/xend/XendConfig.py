@@ -1249,7 +1249,8 @@ class XendConfig(dict):
             dpci_record = {
                 'VM': self['uuid'],
                 'PPCI': ppci_uuid,
-                'hotplug_slot': pci_dev.get('vslot', '0x%02x' % AUTO_PHP_SLOT)
+                'hotplug_slot': pci_dev.get('vslot', '0x%02x' % AUTO_PHP_SLOT),
+                'key': pci_dev['key']
             }
 
             dpci_opts = pci_dev.get('opts')

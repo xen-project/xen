@@ -2186,7 +2186,8 @@ def attached_pci_dict_bin(dom):
                 'bus':    int(ppci_record['bus']),
                 'slot':   int(ppci_record['slot']),
                 'func':   int(ppci_record['func']),
-                'vslot':  int(server.xenapi.DPCI.get_hotplug_slot(dpci_ref))
+                'vslot':  int(server.xenapi.DPCI.get_hotplug_slot(dpci_ref)),
+                'key':    server.xenapi.DPCI.get_key(dpci_ref)
             }
             devs.append(dev)
 
@@ -2197,7 +2198,8 @@ def attached_pci_dict_bin(dom):
                 'bus':    int(x['bus'], 16),
                 'slot':   int(x['slot'], 16),
                 'func':   int(x['func'], 16),
-                'vslot':  int(x['vslot'], 16)
+                'vslot':  int(x['vslot'], 16),
+                'key':    x['key']
             }
             devs.append(dev)
 
@@ -2543,6 +2545,7 @@ def xm_pci_attach(args):
         slot = int(sxp.child_value(pci_dev, 'slot'), 16)
         func = int(sxp.child_value(pci_dev, 'func'), 16)
         vslot = int(sxp.child_value(pci_dev, 'vslot'), 16)
+        key = sxp.child_value(pci_dev, 'key')
         name = "%04x:%02x:%02x.%01x" % (domain, bus, slot, func)
 
         target_ref = None
@@ -2557,7 +2560,8 @@ def xm_pci_attach(args):
             "VM":           get_single_vm(dom),
             "PPCI":         target_ref,
             "hotplug_slot": vslot,
-            "options":      dict(config_pci_opts)
+            "options":      dict(config_pci_opts),
+            "key":          key
         }
         server.xenapi.DPCI.create(dpci_record)
 

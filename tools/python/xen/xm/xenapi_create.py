@@ -543,7 +543,9 @@ class xenapi_create:
                 int(pci.attributes["vslot"].value, 16),
             "options":
                 get_child_nodes_as_dict(pci,
-                  "pci_opt", "key", "value")
+                  "pci_opt", "key", "value"),
+            "key":
+                pci.attributes["key"].value
         }
 
         return server.xenapi.DPCI.create(dpci_record)
@@ -946,6 +948,8 @@ class sxp2xml:
                     = get_child_by_name(dev_sxp, "func", "0")
                 pci.attributes["vslot"] \
                     = get_child_by_name(dev_sxp, "vslot", "0")
+                pci.attributes["key"] \
+                    = get_child_by_name(dev_sxp, "key", "0")
                 for opt in pci_opts_list_from_sxp(dev_sxp):
                     pci_opt = document.createElement("pci_opt")
                     pci_opt.attributes["key"] = opt[0]

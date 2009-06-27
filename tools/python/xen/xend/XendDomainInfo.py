@@ -3733,6 +3733,7 @@ class XendDomainInfo:
                    ['slot', '0x%02x' % ppci.get_slot()],
                    ['func', '0x%1x' % ppci.get_func()],
                    ['vslot', '0x%02x' % xenapi_pci.get('hotplug_slot')],
+                   ['key', xenapi_pci['key']],
                    ['uuid', dpci_uuid]]
         dev_sxp = sxp.merge(dev_sxp, opts_sxp)
 

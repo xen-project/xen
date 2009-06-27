@@ -277,7 +277,7 @@ def parse_pci_name_extended(pci_dev_str):
     template['domain'] = "0x%04x" % domain
     template['bus']    = "0x%02x" % int(pci_dev_info['bus'], 16)
     template['slot']   = "0x%02x" % int(pci_dev_info['slot'], 16)
-    template['func']   = "0x%x"   % int(pci_dev_info['func'], 16)
+    template['key']    = pci_dev_str
     if pci_dev_info['opts'] != '':
         template['opts'] = split_pci_opts(pci_dev_info['opts'])
         check_pci_opts(template['opts'])
@@ -290,6 +290,7 @@ def parse_pci_name_extended(pci_dev_str):
                                       pci_dev_info['func'])
     for func in func_list:
         pci_dev = template.copy()
+        pci_dev['func'] = "0x%x" % func
 
         if len(func_list) == 1:
             # For single-function devices vfunc must be 0

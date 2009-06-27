@@ -42,6 +42,7 @@ class XendDPCI(XendBase):
                   'VM',
                   'PPCI',
                   'hotplug_slot',
+                  'key',
                   'options']
         return XendBase.getAttrRO() + attrRO
 
@@ -52,7 +53,8 @@ class XendDPCI(XendBase):
     def getAttrInst(self):
         attrInst = ['VM',
                     'PPCI',
-                    'hotplug_slot']
+                    'hotplug_slot',
+                    'key']
         return XendBase.getAttrInst() + attrInst
 
     def getMethods(self):
@@ -120,6 +122,7 @@ class XendDPCI(XendBase):
         self.VM = record['VM']
         self.PPCI = record['PPCI']
         self.hotplug_slot = int(record['hotplug_slot'], 16)
+        self.key = record['key']
         if 'options' in record.keys():
             self.options = record['options']
 
@@ -154,6 +157,9 @@ class XendDPCI(XendBase):
 
     def get_hotplug_slot(self):
         return "%d" % self.hotplug_slot
+
+    def get_key(self):
+        return self.key
 
     def get_options(self):
         return self.options
