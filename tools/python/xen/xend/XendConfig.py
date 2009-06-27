@@ -1249,7 +1249,7 @@ class XendConfig(dict):
             dpci_record = {
                 'VM': self['uuid'],
                 'PPCI': ppci_uuid,
-                'hotplug_slot': pci_dev.get('vslot', '0x%02x' % AUTO_PHP_SLOT),
+                'hotplug_slot': pci_dev.get('vdevfn', '0x%02x' % AUTO_PHP_SLOT),
                 'key': pci_dev['key']
             }
 
@@ -2065,8 +2065,8 @@ class XendConfig(dict):
                 bus = sxp.child_value(dev, 'bus')
                 slot = sxp.child_value(dev, 'slot')
                 func = sxp.child_value(dev, 'func')
-                vslot = sxp.child_value(dev, 'vslot')
+                vdevfn = sxp.child_value(dev, 'vdevfn')
                 opts = pci_opts_list_from_sxp(dev)
-                pci.append([domain, bus, slot, func, vslot, opts])
+                pci.append([domain, bus, slot, func, vdevfn, opts])
         self['platform']['pci'] = pci
 

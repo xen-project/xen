@@ -1074,14 +1074,14 @@ def preprocess_cpuid(vals, attr_name):
 
 def pci_dict_to_tuple(dev):
     return (dev['domain'], dev['bus'], dev['slot'], dev['func'],
-            dev['vslot'], dev.get('opts', []), dev['key'])
+            dev['vdevfn'], dev.get('opts', []), dev['key'])
 
-def pci_tuple_to_dict((domain, bus, slot, func, vslot, opts, key)):
+def pci_tuple_to_dict((domain, bus, slot, func, vdevfn, opts, key)):
     pci_dev = { 'domain': domain,
                 'bus':    bus,
                 'slot':   slot,
                 'func':   func,
-                'vslot':  vslot,
+                'vdevfn': vdevfn,
                 'key':    key}
     if len(opts) > 0:
         pci_dev['opts'] = opts

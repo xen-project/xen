@@ -2186,7 +2186,7 @@ def attached_pci_dict_bin(dom):
                 'bus':    int(ppci_record['bus']),
                 'slot':   int(ppci_record['slot']),
                 'func':   int(ppci_record['func']),
-                'vslot':  int(server.xenapi.DPCI.get_hotplug_slot(dpci_ref)),
+                'vdevfn': int(server.xenapi.DPCI.get_hotplug_slot(dpci_ref)),
                 'key':    server.xenapi.DPCI.get_key(dpci_ref)
             }
             devs.append(dev)
@@ -2198,7 +2198,7 @@ def attached_pci_dict_bin(dom):
                 'bus':    int(x['bus'], 16),
                 'slot':   int(x['slot'], 16),
                 'func':   int(x['func'], 16),
-                'vslot':  int(x['vslot'], 16),
+                'vdevfn': int(x['vdevfn'], 16),
                 'key':    x['key']
             }
             devs.append(dev)
@@ -2212,7 +2212,7 @@ def pci_dict_bin_to_str(pci_dev):
     new_dev['bus']    = '0x%02x' % pci_dev['bus']
     new_dev['slot']   = '0x%02x' % pci_dev['slot']
     new_dev['func']   = '0x%x'   % pci_dev['func']
-    new_dev['vslot']  = '0x%02x' % pci_dev['vslot']
+    new_dev['vdevfn'] = '0x%02x' % pci_dev['vdevfn']
 
     return new_dev
 
@@ -2227,22 +2227,22 @@ def xm_pci_list(args):
         return
 
     devs.sort(None,
-              lambda x: (x['vslot'] - PCI_FUNC(x['vslot'])) << 32 |
+              lambda x: (x['vdevfn'] - PCI_FUNC(x['vdevfn'])) << 32 |
                         PCI_BDF(x['domain'], x['bus'], x['slot'], x['func']))
 
-    has_vslot = False
+    has_vdevfn = False
     for x in devs:
-        if x['vslot'] & AUTO_PHP_SLOT:
+        if x['vdevfn'] & AUTO_PHP_SLOT:
             x['show_vslot'] = '-'
             x['show_vfunc'] = '-'
         else:
-            x['show_vslot'] = "0x%02x" % PCI_SLOT(x['vslot'])
-            x['show_vfunc'] = "0x%x" % PCI_FUNC(x['vslot'])
-            has_vslot = True
+            x['show_vslot'] = "0x%02x" % PCI_SLOT(x['vdevfn'])
+            x['show_vfunc'] = "0x%x" % PCI_FUNC(x['vdevfn'])
+            has_vdevfn = True
 
     hdr_str = 'domain bus  slot func'
     fmt_str = '0x%(domain)04x 0x%(bus)02x 0x%(slot)02x 0x%(func)x'
-    if has_vslot:
+    if has_vdevfn:
         hdr_str = 'VSlt VFn ' + hdr_str
         fmt_str = '%(show_vslot)-4s %(show_vfunc)-3s ' + fmt_str
 
@@ -2572,7 +2572,7 @@ def xm_pci_attach_one(dom, pci_dev):
         dpci_record = {
             "VM":           get_single_vm(dom),
             "PPCI":         target_ref,
-            "hotplug_slot": int(pci_dev['vslot'], 16),
+            "hotplug_slot": int(pci_dev['vdevfn'], 16),
             "options":      dict(pci_dev.get('opts', [])),
             "key":          pci_dev['key']
         }
@@ -2735,7 +2735,7 @@ def find_attached(attached, key):
 
 def find_attached_devfn(attached, key):
     pci_dev = find_attached(attached, key)
-    return pci_dev['vslot']
+    return pci_dev['vdevfn']
 
 def xm_pci_detach(args):
     arg_check(args, 'pci-detach', 2)
@@ -2746,18 +2746,18 @@ def xm_pci_detach(args):
     attached_dev = map(lambda x: find_attached(attached, x), dev)
 
     def f(pci_dev):
-        vdevfn = int(pci_dev['vslot'], 16)
+        vdevfn = int(pci_dev['vdevfn'], 16)
         return PCI_SLOT(vdevfn) | (vdevfn & AUTO_PHP_SLOT)
-    vslots = map(f, attached_dev)
-    if len(set(vslots)) > 1:
+    vdevfns = map(f, attached_dev)
+    if len(set(vdevfns)) > 1:
         err_str = map(lambda x: "\t%s is in slot 0x%02x\n" %
                                 (pci_dict_to_bdf_str(x),
-                                 PCI_SLOT(int(x['vslot'], 16))), dev)
+                                 PCI_SLOT(int(x['vdevfn'], 16))), dev)
         raise OptionError("More than one slot used by specified devices\n"
                           + ''.join(err_str))
 
     attached_to_slot = filter(lambda x:
-                              f(x) == vslots[0] and
+                              f(x) == vdevfns[0] and
                               attached_dev[0]["key"] ==
                                       x["key"], attached_dev)
 
@@ -2769,7 +2769,7 @@ def xm_pci_detach(args):
                        attached_to_slot)
         err_str += "Present:\n" + ''.join(err_str_)
         raise OptionError(("Not all functions in slot 0x%02x have had "
-                           "detachment requested.\n" % vslots[0]) + err_str)
+                           "detachment requested.\n" % vdevfns[0]) + err_str)
 
     for i in dev:
         xm_pci_detach_one(dom, i)

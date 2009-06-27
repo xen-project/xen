@@ -540,7 +540,7 @@ class xenapi_create:
             "PPCI":
                 target_ref,
             "hotplug_slot":
-                int(pci.attributes["vslot"].value, 16),
+                int(pci.attributes["vdevfn"].value, 16),
             "options":
                 get_child_nodes_as_dict(pci,
                   "pci_opt", "key", "value"),
@@ -946,8 +946,8 @@ class sxp2xml:
                     = get_child_by_name(dev_sxp, "slot", "0")
                 pci.attributes["func"] \
                     = get_child_by_name(dev_sxp, "func", "0")
-                pci.attributes["vslot"] \
-                    = get_child_by_name(dev_sxp, "vslot", "0")
+                pci.attributes["vdevfn"] \
+                    = get_child_by_name(dev_sxp, "vdevfn", "0")
                 pci.attributes["key"] \
                     = get_child_by_name(dev_sxp, "key", "0")
                 for opt in pci_opts_list_from_sxp(dev_sxp):

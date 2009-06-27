@@ -180,10 +180,10 @@ def pci_convert_sxp_to_dict(dev_sxp):
     # extendend like this:
     #
     # [device, [pci, [dev, [domain, 0], [bus, 0], [slot, 1], [func, 2],
-    #                      [vslot, 0]],
+    #                      [vdevfn, 0]],
     #                [state, 'Initialising']]]
     #
-    # 'vslot' shows the virtual hotplug slot number which the PCI device
+    # 'vdevfn' shows the virtual hotplug slot number which the PCI device
     # is inserted in. This is only effective for HVM domains.
     #
     # state 'Initialising' indicates that the device is being attached,
@@ -191,7 +191,7 @@ def pci_convert_sxp_to_dict(dev_sxp):
     #
     # The Dict looks like this:
     #
-    # { devs: [{domain: 0, bus: 0, slot: 1, func: 2, vslot: 0}],
+    # { devs: [{domain: 0, bus: 0, slot: 1, func: 2, vdevfn: 0}],
     #   states: ['Initialising'] }
 
     dev_config = {}
@@ -260,7 +260,7 @@ def parse_pci_name_extended(pci_dev_str):
                          r"(?P<bus>[0-9a-fA-F]{1,2})[:,]" +
                          r"(?P<slot>[0-9a-fA-F]{1,2})[.,]" +
                          r"(?P<func>(\*|[0-7]([,-][0-7])*))" +
-                         r"(@(?P<vslot>[01]?[0-9a-fA-F]))?" +
+                         r"(@(?P<vdevfn>[01]?[0-9a-fA-F]))?" +
                          r"(,(?P<opts>.*))?$", pci_dev_str)
 
     if pci_match == None:
@@ -299,11 +299,11 @@ def parse_pci_name_extended(pci_dev_str):
             # For multi-function virtual devices,
             # identity map the func to vfunc
             vfunc = func
-        if pci_dev_info['vslot'] == '':
-            vslot = AUTO_PHP_SLOT | vfunc
+        if pci_dev_info['vdevfn'] == '':
+            vdevfn = AUTO_PHP_SLOT | vfunc
         else:
-            vslot = PCI_DEVFN(int(pci_dev_info['vslot'], 16), vfunc)
-        pci_dev['vslot'] = "0x%02x" % vslot
+            vdevfn = PCI_DEVFN(int(pci_dev_info['vdevfn'], 16), vfunc)
+        pci_dev['vdevfn'] = "0x%02x" % vdevfn
 
         pci.append(pci_dev)
 
@@ -314,7 +314,7 @@ def parse_pci_name_extended(pci_dev_str):
     # By arranging things so that virtual function 0 is first,
     # attachemnt can use the returned list as is. And detachment
     # can just reverse the list.
-    pci.sort(None, lambda x: int(x['vslot'], 16), 1)
+    pci.sort(None, lambda x: int(x['vdevfn'], 16), 1)
     return pci
 
 def parse_pci_name(pci_name_string):
@@ -326,11 +326,11 @@ def parse_pci_name(pci_name_string):
                                     pci_name_string)
 
     pci = dev[0]
-    if not int(pci['vslot'], 16) & AUTO_PHP_SLOT:
+    if not int(pci['vdevfn'], 16) & AUTO_PHP_SLOT:
         raise PciDeviceParseError(("Failed to parse pci device: %s: " +
-                                   "vslot provided where prohibited: 0x%02x") %
+                                   "vdevfn provided where prohibited: 0x%02x") %
                                   (pci_name_string,
-                                   PCI_SLOT(int(pci['vslot'], 16))))
+                                   PCI_SLOT(int(pci['vdevfn'], 16))))
     if 'opts' in pci:
         raise PciDeviceParseError(("Failed to parse pci device: %s: " +
                                    "options provided where prohibited: %s") %
