@@ -2214,7 +2214,7 @@ def xm_pci_list(args):
 
     has_vslot = False
     for x in devs:
-        if x['vslot'] == AUTO_PHP_DEVFN:
+        if x['vslot'] & AUTO_PHP_SLOT:
             x['show_vslot'] = '-'
             x['show_vfunc'] = '-'
         else:
@@ -2497,7 +2497,7 @@ def parse_pci_configuration(args, state, opts = ''):
         pci_dev_str += ',' + serialise_pci_opts(opts)
 
     try:
-        pci_dev = parse_pci_name_extended(pci_dev_str)
+        pci_dev = parse_pci_name_extended(pci_dev_str)[0]
     except PciDeviceParseError, ex:
         raise OptionError(str(ex))
 

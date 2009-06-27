@@ -1090,8 +1090,8 @@ def preprocess_pci(vals):
     if not vals.pci:
         return
     try:
-        vals.pci = map(pci_dict_to_tuple,
-                       map(parse_pci_name_extended, vals.pci))
+        vals.pci = map(pci_dict_to_tuple, reduce(lambda x, y: x + y,
+                       map(parse_pci_name_extended, vals.pci)))
     except PciDeviceParseError, ex:
         err(str(ex))
 

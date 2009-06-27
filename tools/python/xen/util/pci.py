@@ -16,7 +16,7 @@ import threading
 from xen.util import utils
 from xen.xend import uuid
 from xen.xend import sxp
-from xen.xend.XendConstants import AUTO_PHP_DEVFN
+from xen.xend.XendConstants import AUTO_PHP_SLOT
 from xen.xend.XendSXPDev import dev_dict_to_sxp
 
 PROC_PCI_PATH = '/proc/bus/pci/devices'
@@ -227,11 +227,39 @@ def parse_hex(val):
     except ValueError:
         return None
 
+def pci_func_list_map_fn(key, func_str):
+    if func_str == "*":
+        return map(lambda x: int(x['func'], 16),
+                   filter(lambda x:
+                          pci_dict_cmp(x, key, ['domain', 'bus', 'slot']),
+                          get_all_pci_dict()))
+    l = map(int, func_str.split("-"))
+    if len(l) == 1:
+        return l
+    if len(l) == 2:
+        if l[0] < l[1]:
+            return range(l[0], l[1] + 1)
+        else:
+            x = range(l[1], l[0] + 1)
+            x.reverse()
+            return x
+    return []
+
+def pci_func_list_process(pci_dev_str, template, func_str):
+    l = reduce(lambda x, y: x + y,
+               (map(lambda x: pci_func_list_map_fn(template, x),
+                    func_str.split(","))))
+
+    if len(l) != len(set(l)):
+        raise PciDeviceParseError("Duplicate functions: %s" % pci_dev_str)
+
+    return l
+
 def parse_pci_name_extended(pci_dev_str):
     pci_match = re.match(r"((?P<domain>[0-9a-fA-F]{1,4})[:,])?" +
                          r"(?P<bus>[0-9a-fA-F]{1,2})[:,]" +
                          r"(?P<slot>[0-9a-fA-F]{1,2})[.,]" +
-                         r"(?P<func>(\*|[0-7]))" +
+                         r"(?P<func>(\*|[0-7]([,-][0-7])*))" +
                          r"(@(?P<vslot>[01]?[0-9a-fA-F]))?" +
                          r"(,(?P<opts>.*))?$", pci_dev_str)
 
@@ -239,31 +267,65 @@ def parse_pci_name_extended(pci_dev_str):
         raise PciDeviceParseError("Failed to parse pci device: %s" %
                                   pci_dev_str)
 
-    out = {}
     pci_dev_info = pci_match.groupdict('')
-    if pci_dev_info['domain'] == '':
-        domain = 0
-    else:
-        domain = int(pci_dev_info['domain'], 16)
-    out['domain'] = "0x%04x" % domain
-    out['bus']    = "0x%02x" % int(pci_dev_info['bus'], 16)
-    out['slot']   = "0x%02x" % int(pci_dev_info['slot'], 16)
-    out['func']   = "0x%x"   % int(pci_dev_info['func'], 16)
-    if pci_dev_info['vslot'] == '':
-        vslot = AUTO_PHP_DEVFN
-    else:
-        vslot = PCI_DEVFN(int(pci_dev_info['vslot'], 16), 0)
-    out['vslot'] = "0x%02x" % vslot
-    if pci_dev_info['opts'] != '':
-        out['opts'] = split_pci_opts(pci_dev_info['opts'])
-        check_pci_opts(out['opts'])
 
-    return out
+    template = {}
+    if pci_dev_info['domain'] != '':
+        domain = int(pci_dev_info['domain'], 16)
+    else:
+        domain = 0
+    template['domain'] = "0x%04x" % domain
+    template['bus']    = "0x%02x" % int(pci_dev_info['bus'], 16)
+    template['slot']   = "0x%02x" % int(pci_dev_info['slot'], 16)
+    template['func']   = "0x%x"   % int(pci_dev_info['func'], 16)
+    if pci_dev_info['opts'] != '':
+        template['opts'] = split_pci_opts(pci_dev_info['opts'])
+        check_pci_opts(template['opts'])
+
+    # This is where virtual function assignment takes place
+    # Virtual slot assignment takes place here if specified in the bdf,
+    # else it is done inside qemu-xen, as it knows which slots are free
+    pci = []
+    func_list = pci_func_list_process(pci_dev_str, template,
+                                      pci_dev_info['func'])
+    for func in func_list:
+        pci_dev = template.copy()
+
+        if len(func_list) == 1:
+            # For single-function devices vfunc must be 0
+            vfunc = 0
+        else:
+            # For multi-function virtual devices,
+            # identity map the func to vfunc
+            vfunc = func
+        if pci_dev_info['vslot'] == '':
+            vslot = AUTO_PHP_SLOT | vfunc
+        else:
+            vslot = PCI_DEVFN(int(pci_dev_info['vslot'], 16), vfunc)
+        pci_dev['vslot'] = "0x%02x" % vslot
+
+        pci.append(pci_dev)
+
+    # For pci attachment and detachment is it important that virtual
+    # function 0 is done last. This is because is virtual function 0 that
+    # is used to singnal changes to the guest using ACPI
+    #
+    # By arranging things so that virtual function 0 is first,
+    # attachemnt can use the returned list as is. And detachment
+    # can just reverse the list.
+    pci.sort(None, lambda x: int(x['vslot'], 16), 1)
+    return pci
 
 def parse_pci_name(pci_name_string):
-    pci = parse_pci_name_extended(pci_name_string)
+    dev = parse_pci_name_extended(pci_name_string)
 
-    if int(pci['vslot'], 16) != AUTO_PHP_DEVFN:
+    if len(dev) != 1:
+        raise PciDeviceParseError(("Failed to parse pci device: %s: "
+                                   "multiple functions specified prohibited") %
+                                    pci_name_string)
+
+    pci = dev[0]
+    if not int(pci['vslot'], 16) & AUTO_PHP_SLOT:
         raise PciDeviceParseError(("Failed to parse pci device: %s: " +
                                    "vslot provided where prohibited: 0x%02x") %
                                   (pci_name_string,
@@ -321,8 +383,11 @@ def get_all_pci_names():
     pci_names = os.popen('ls ' + sysfs_mnt + SYSFS_PCI_DEVS_PATH).read().split()
     return pci_names
 
+def get_all_pci_dict():
+    return map(parse_pci_name, get_all_pci_names())
+
 def get_all_pci_devices():
-    return map(PciDevice, map(parse_pci_name, get_all_pci_names()))
+    return map(PciDevice, get_all_pci_dict())
 
 def _create_lspci_info():
     """Execute 'lspci' command and parse the result.
