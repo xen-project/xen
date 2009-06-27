@@ -42,7 +42,7 @@ from xen.util import xsconstants
 from xen.util.pci import serialise_pci_opts, pci_opts_list_to_sxp, \
                          pci_dict_to_bdf_str, pci_dict_to_xc_str, \
                          pci_convert_sxp_to_dict, pci_convert_dict_to_sxp, \
-                         pci_dict_cmp, PCI_FUNC
+                         pci_dict_cmp, PCI_DEVFN, PCI_SLOT, PCI_FUNC
 
 from xen.xend import balloon, sxp, uuid, image, arch
 from xen.xend import XendOptions, XendNode, XendConfig
@@ -617,12 +617,52 @@ class XendDomainInfo:
         dev_uuid = sxp.child_value(dev_info, 'uuid')
         pci_conf = self.info['devices'][dev_uuid][1]
         pci_devs = pci_conf['devs']
-        request = map(lambda x:
-                      pci_convert_dict_to_sxp(x, 'Initialising', 'Booting'),
-                      pci_devs)
 
-        for i in request:
-                self.pci_device_configure(i)
+        # Keep a set of keys that are done rather than
+        # just itterating through set(map(..., pci_devs))
+        # to preserve any order information present.
+        done = set()
+        for key in map(lambda x: x['key'], pci_devs):
+            if key in done:
+                continue
+            done |= set([key])
+            dev = filter(lambda x: x['key'] == key, pci_devs)
+
+            head_dev = dev.pop()
+            dev_sxp = pci_convert_dict_to_sxp(head_dev, 'Initialising',
+                                              'Booting')
+            self.pci_device_configure(dev_sxp)
+
+            # That is all for single-function virtual devices
+            if len(dev) == 0:
+                continue
+
+            if int(head_dev['vslot'], 16) & AUTO_PHP_SLOT:
+                new_dev_info = self._getDeviceInfo_pci(devid)
+                if new_dev_info is None:
+                    continue
+                new_dev_uuid = sxp.child_value(new_dev_info, 'uuid')
+                new_pci_conf = self.info['devices'][new_dev_uuid][1]
+                new_pci_devs = new_pci_conf['devs']
+
+                new_head_dev = filter(lambda x: pci_dict_cmp(x, head_dev),
+                                      new_pci_devs)[0]
+
+                if int(new_head_dev['vslot'], 16) & AUTO_PHP_SLOT:
+                    continue
+
+                vslot = PCI_SLOT(int(new_head_dev['vslot'], 16))
+                new_dev = []
+                for i in dev:
+                    i['vslot'] = '0x%02x' % \
+                                 PCI_DEVFN(vslot, PCI_FUNC(int(i['vslot'], 16)))
+                    new_dev.append(i)
+
+                dev = new_dev
+
+            for i in dev:
+                dev_sxp = pci_convert_dict_to_sxp(i, 'Initialising', 'Booting')
+                self.pci_device_configure(dev_sxp)
 
     def hvm_pci_device_create(self, dev_config):
         log.debug("XendDomainInfo.hvm_pci_device_create: %s"
