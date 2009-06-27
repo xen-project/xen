@@ -452,10 +452,19 @@ static void svm_update_guest_cr(struct vcpu *v, unsigned int cr)
 static void svm_update_guest_efer(struct vcpu *v)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+    bool_t lma = v->arch.hvm_vcpu.guest_efer & EFER_LMA;
 
     vmcb->efer = (v->arch.hvm_vcpu.guest_efer | EFER_SVME) & ~EFER_LME;
-    if ( vmcb->efer & EFER_LMA )
+    if ( lma )
         vmcb->efer |= EFER_LME;
+
+    /*
+     * In legacy mode (EFER.LMA=0) we natively support SYSENTER/SYSEXIT with
+     * no need for MSR intercepts. Ehen EFER.LMA=1 we must trap and emulate.
+     */
+    svm_intercept_msr(v, MSR_IA32_SYSENTER_CS, lma);
+    svm_intercept_msr(v, MSR_IA32_SYSENTER_ESP, lma);
+    svm_intercept_msr(v, MSR_IA32_SYSENTER_EIP, lma);
 }
 
 static void svm_flush_guest_tlbs(void)

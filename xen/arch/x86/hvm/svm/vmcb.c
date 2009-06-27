@@ -78,29 +78,34 @@ struct host_save_area *alloc_host_save_area(void)
     return hsa;
 }
 
-void svm_disable_intercept_for_msr(struct vcpu *v, u32 msr)
+void svm_intercept_msr(struct vcpu *v, uint32_t msr, int enable)
 {
     unsigned long *msr_bitmap = v->arch.hvm_svm.msrpm;
+    unsigned long *msr_bit = NULL;
 
     /*
      * See AMD64 Programmers Manual, Vol 2, Section 15.10 (MSR-Bitmap Address).
      */
     if ( msr <= 0x1fff )
-    {
-        __clear_bit(msr*2, msr_bitmap + 0x000/BYTES_PER_LONG); 
-        __clear_bit(msr*2+1, msr_bitmap + 0x000/BYTES_PER_LONG); 
-    }
+        msr_bit = msr_bitmap + 0x0000 / BYTES_PER_LONG;
     else if ( (msr >= 0xc0000000) && (msr <= 0xc0001fff) )
+        msr_bit = msr_bitmap + 0x0800 / BYTES_PER_LONG;
+    else if ( (msr >= 0xc0010000) && (msr <= 0xc0011fff) )
+        msr_bit = msr_bitmap + 0x1000 / BYTES_PER_LONG;
+
+    BUG_ON(msr_bit == NULL);
+
+    msr &= 0x1fff;
+
+    if ( enable )
     {
-        msr &= 0x1fff;
-        __clear_bit(msr*2, msr_bitmap + 0x800/BYTES_PER_LONG);
-        __clear_bit(msr*2+1, msr_bitmap + 0x800/BYTES_PER_LONG);
-    } 
-    else if ( (msr >= 0xc001000) && (msr <= 0xc0011fff) )
+        __set_bit(msr * 2, msr_bit);
+        __set_bit(msr * 2 + 1, msr_bit);
+    }
+    else
     {
-        msr &= 0x1fff;
-        __clear_bit(msr*2, msr_bitmap + 0x1000/BYTES_PER_LONG);
-        __clear_bit(msr*2+1, msr_bitmap + 0x1000/BYTES_PER_LONG);
+        __clear_bit(msr * 2, msr_bit);
+        __clear_bit(msr * 2 + 1, msr_bit);
     }
 }
 
@@ -165,8 +170,9 @@ static int construct_vmcb(struct vcpu *v)
     if ( opt_softtsc )
         vmcb->general1_intercepts |= GENERAL1_INTERCEPT_RDTSC;
 
-    /* Guest EFER: *must* contain SVME or VMRUN will fail. */
-    vmcb->efer = EFER_SVME;
+    /* Guest EFER. */
+    v->arch.hvm_vcpu.guest_efer = 0;
+    hvm_update_guest_efer(v);
 
     /* Guest segment limits. */
     vmcb->cs.limit = ~0u;
