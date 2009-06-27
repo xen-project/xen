@@ -644,7 +644,7 @@ class XendDomainInfo:
             pci_devs = pci_conf['devs']
             for x in pci_devs:
                 if (int(x['vslot'], 16) == int(new_dev['vslot'], 16) and
-                   int(x['vslot'], 16) != AUTO_PHP_SLOT):
+                   int(x['vslot'], 16) != AUTO_PHP_DEVFN):
                     raise VmError("vslot %s already have a device." % (new_dev['vslot']))
 
                 if (pci_dict_cmp(x, new_dev)):

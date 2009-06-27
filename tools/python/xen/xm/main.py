@@ -2214,17 +2214,19 @@ def xm_pci_list(args):
 
     has_vslot = False
     for x in devs:
-        if x['vslot'] == AUTO_PHP_SLOT:
+        if x['vslot'] == AUTO_PHP_DEVFN:
             x['show_vslot'] = '-'
+            x['show_vfunc'] = '-'
         else:
-            x['show_vslot'] = "0x%02x" % x['vslot']
+            x['show_vslot'] = "0x%02x" % PCI_SLOT(x['vslot'])
+            x['show_vfunc'] = "0x%x" % PCI_FUNC(x['vslot'])
             has_vslot = True
 
     hdr_str = 'domain bus  slot func'
     fmt_str = '0x%(domain)04x 0x%(bus)02x 0x%(slot)02x 0x%(func)x'
     if has_vslot:
-        hdr_str = 'VSlt ' + hdr_str
-        fmt_str = '%(show_vslot)-4s ' + fmt_str
+        hdr_str = 'VSlt VFn ' + hdr_str
+        fmt_str = '%(show_vslot)-4s %(show_vfunc)-3s ' + fmt_str
 
     print hdr_str
     for x in devs:
@@ -2520,7 +2522,6 @@ def xm_pci_attach(args):
                      config_pci_opts)
 
     if serverType == SERVER_XEN_API:
-
         pci_dev = sxp.children(pci, 'dev')[0]
         domain = int(sxp.child_value(pci_dev, 'domain'), 16)
         bus = int(sxp.child_value(pci_dev, 'bus'), 16)

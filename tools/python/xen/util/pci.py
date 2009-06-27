@@ -16,7 +16,7 @@ import threading
 from xen.util import utils
 from xen.xend import uuid
 from xen.xend import sxp
-from xen.xend.XendConstants import AUTO_PHP_SLOT
+from xen.xend.XendConstants import AUTO_PHP_DEVFN
 from xen.xend.XendSXPDev import dev_dict_to_sxp
 
 PROC_PCI_PATH = '/proc/bus/pci/devices'
@@ -115,6 +115,10 @@ PAGE_MASK=~(PAGE_SIZE - 1)
 # Definitions from Linux: include/linux/pci.h
 def PCI_DEVFN(slot, func):
     return ((((slot) & 0x1f) << 3) | ((func) & 0x07))
+def PCI_SLOT(devfn):
+    return (devfn >> 3) & 0x1f
+def PCI_FUNC(devfn):
+    return devfn & 0x7
 
 def PCI_BDF(domain, bus, slot, func):
     return (((domain & 0xffff) << 16) | ((bus & 0xff) << 8) |
@@ -246,9 +250,9 @@ def parse_pci_name_extended(pci_dev_str):
     out['slot']   = "0x%02x" % int(pci_dev_info['slot'], 16)
     out['func']   = "0x%x"   % int(pci_dev_info['func'], 16)
     if pci_dev_info['vslot'] == '':
-        vslot = AUTO_PHP_SLOT
+        vslot = AUTO_PHP_DEVFN
     else:
-        vslot = int(pci_dev_info['vslot'], 16)
+        vslot = PCI_DEVFN(int(pci_dev_info['vslot'], 16), 0)
     out['vslot'] = "0x%02x" % vslot
     if pci_dev_info['opts'] != '':
         out['opts'] = split_pci_opts(pci_dev_info['opts'])
@@ -259,10 +263,11 @@ def parse_pci_name_extended(pci_dev_str):
 def parse_pci_name(pci_name_string):
     pci = parse_pci_name_extended(pci_name_string)
 
-    if int(pci['vslot'], 16) != AUTO_PHP_SLOT:
+    if int(pci['vslot'], 16) != AUTO_PHP_DEVFN:
         raise PciDeviceParseError(("Failed to parse pci device: %s: " +
-                                   "vslot provided where prohibited: %s") %
-                                  (pci_name_string, pci['vslot']))
+                                   "vslot provided where prohibited: 0x%02x") %
+                                  (pci_name_string,
+                                   PCI_SLOT(int(pci['vslot'], 16))))
     if 'opts' in pci:
         raise PciDeviceParseError(("Failed to parse pci device: %s: " +
                                    "options provided where prohibited: %s") %
