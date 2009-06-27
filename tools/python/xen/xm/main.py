@@ -2226,9 +2226,17 @@ def xm_pci_list(args):
     if len(devs) == 0:
         return
 
-    devs.sort(None,
-              lambda x: (x['vdevfn'] - PCI_FUNC(x['vdevfn'])) << 32 |
-                        PCI_BDF(x['domain'], x['bus'], x['slot'], x['func']))
+    def f(x):
+	# The vfunc shouldn't be used for ordering if the vslot hasn't been
+	# assigned as the output looks odd beacuse the vfunc isn't reported
+	# but the (physical) function is.
+	if x['vdevfn'] & AUTO_PHP_SLOT:
+	    vdevfn = AUTO_PHP_SLOT
+	else:
+	    vdevfn = x['vdevfn']
+        return (vdevfn << 32) | \
+	       PCI_BDF(x['domain'], x['bus'], x['slot'], x['func'])
+    devs.sort(None, f)
 
     has_vdevfn = False
     for x in devs:
