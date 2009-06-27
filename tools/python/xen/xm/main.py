@@ -2175,37 +2175,52 @@ def xm_vtpm_list(args):
                    "%(be-path)-30s  "
                    % ni)
 
-
-def xm_pci_list(args):
-    (use_long, params) = arg_check_for_resource_list(args, "pci-list")
-
-    dom = params[0]
-
+def attached_pci_dict_bin(dom):
     devs = []
     if serverType == SERVER_XEN_API:
         for dpci_ref in server.xenapi.VM.get_DPCIs(get_single_vm(dom)):
             ppci_ref = server.xenapi.DPCI.get_PPCI(dpci_ref)
             ppci_record = server.xenapi.PPCI.get_record(ppci_ref)
             dev = {
-                "domain":   int(ppci_record["domain"]),
-                "bus":      int(ppci_record["bus"]),
-                "slot":     int(ppci_record["slot"]),
-                "func":     int(ppci_record["func"]),
-                "vslot":    int(server.xenapi.DPCI.get_hotplug_slot(dpci_ref))
+                'domain': int(ppci_record['domain']),
+                'bus':    int(ppci_record['bus']),
+                'slot':   int(ppci_record['slot']),
+                'func':   int(ppci_record['func']),
+                'vslot':  int(server.xenapi.DPCI.get_hotplug_slot(dpci_ref))
             }
             devs.append(dev)
 
     else:
         for x in server.xend.domain.getDeviceSxprs(dom, 'pci'):
             dev = {
-                "domain":   int(x["domain"], 16),
-                "bus":      int(x["bus"], 16),
-                "slot":     int(x["slot"], 16),
-                "func":     int(x["func"], 16),
-                "vslot":    int(x["vslot"], 16)
+                'domain': int(x['domain'], 16),
+                'bus':    int(x['bus'], 16),
+                'slot':   int(x['slot'], 16),
+                'func':   int(x['func'], 16),
+                'vslot':  int(x['vslot'], 16)
             }
             devs.append(dev)
 
+    return devs
+
+def pci_dict_bin_to_str(pci_dev):
+    new_dev = pci_dev.copy()
+
+    new_dev['domain'] = '0x%04x' % pci_dev['domain']
+    new_dev['bus']    = '0x%02x' % pci_dev['bus']
+    new_dev['slot']   = '0x%02x' % pci_dev['slot']
+    new_dev['func']   = '0x%x'   % pci_dev['func']
+    new_dev['vslot']  = '0x%02x' % pci_dev['vslot']
+
+    return new_dev
+
+def attached_pci_dict(dom):
+    return map(pci_dict_bin_to_str, attached_pci_dict_bin(dom))
+
+def xm_pci_list(args):
+    (use_long, params) = arg_check_for_resource_list(args, "pci-list")
+
+    devs = attached_pci_dict_bin(params[0])
     if len(devs) == 0:
         return
 
