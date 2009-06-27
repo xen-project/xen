@@ -404,7 +404,7 @@ int main(void)
     xenbus_create_request_node();
     
     /* Create & register the default export */
-    export = create_export("default", "/exports");
+    export = create_export("default", "/var/lib/xen");
     xenbus_register_export(export);
 
     if (socketpair(PF_UNIX,SOCK_STREAM, 0, pipefds) == -1)

@@ -13,6 +13,7 @@
 #include <sys/statvfs.h>
 #include <sys/mount.h>
 #include <unistd.h>
+#include <ctype.h>
 #include "fs-backend.h"
 #include "fs-debug.h"
 
@@ -22,6 +23,25 @@
 
 
 #define BUFFER_SIZE 1024
+
+static int check_export_path(const char *export_path, const char *path)
+{
+    int i;
+    if (!export_path || !path)
+        return -1;
+    if (strlen(path) < strlen(export_path))
+        return -1;
+    if (strstr(path, "..") != NULL)
+        return -1;
+    for (i = 0; i < strlen(path); i++) {
+        if (!isascii(path[i]))
+            return -1;
+    }
+    if (strncmp(export_path, path, strlen(export_path)))
+        return -1;
+    else
+        return 0;
+}
 
 static unsigned short get_request(struct fs_mount *mount, struct fsif_request *req)
 {
@@ -47,7 +67,7 @@ static int get_fd(struct fs_mount *mount)
 
 static void dispatch_file_open(struct fs_mount *mount, struct fsif_request *req)
 {
-    char *file_name, full_path[BUFFER_SIZE];
+    char *file_name;
     int fd;
     RING_IDX rsp_idx;
     fsif_response_t *rsp;
@@ -62,15 +82,14 @@ static void dispatch_file_open(struct fs_mount *mount, struct fsif_request *req)
    
     req_id = req->id;
     FS_DEBUG("File open issued for %s\n", file_name); 
-    assert(BUFFER_SIZE > 
-           strlen(file_name) + strlen(mount->export->export_path) + 1); 
-    snprintf(full_path, sizeof(full_path), "%s/%s",
-           mount->export->export_path, file_name);
-    assert(xc_gnttab_munmap(mount->gnth, file_name, 1) == 0);
-    FS_DEBUG("Issuing open for %s\n", full_path);
+    if (check_export_path(mount->export->export_path, file_name) < 0) {
+        FS_DEBUG("Filename check failed\n");
+        fd = -1;
+        goto out;
+    }
     fd = get_fd(mount);
     if (fd >= 0) {
-        int real_fd = open(full_path, O_RDWR);
+        int real_fd = open(file_name, O_RDWR);
         if (real_fd < 0)
             fd = -1;
         else
@@ -79,6 +98,8 @@ static void dispatch_file_open(struct fs_mount *mount, struct fsif_request *req)
             FS_DEBUG("Got FD: %d for real %d\n", fd, real_fd);
         }
     }
+out:
+    assert(xc_gnttab_munmap(mount->gnth, file_name, 1) == 0);
     /* We can advance the request consumer index, from here on, the request
      * should not be used (it may be overrinden by a response) */
     mount->ring.req_cons++;
@@ -349,7 +370,7 @@ static void dispatch_truncate(struct fs_mount *mount, struct fsif_request *req)
 
 static void dispatch_remove(struct fs_mount *mount, struct fsif_request *req)
 {
-    char *file_name, full_path[BUFFER_SIZE];
+    char *file_name;
     int ret;
     RING_IDX rsp_idx;
     fsif_response_t *rsp;
@@ -364,14 +385,14 @@ static void dispatch_remove(struct fs_mount *mount, struct fsif_request *req)
    
     req_id = req->id;
     FS_DEBUG("File remove issued for %s\n", file_name); 
-    assert(BUFFER_SIZE > 
-           strlen(file_name) + strlen(mount->export->export_path) + 1); 
-    snprintf(full_path, sizeof(full_path), "%s/%s",
-           mount->export->export_path, file_name);
-    assert(xc_gnttab_munmap(mount->gnth, file_name, 1) == 0);
-    FS_DEBUG("Issuing remove for %s\n", full_path);
-    ret = remove(full_path);
+    if (check_export_path(mount->export->export_path, file_name) < 0) {
+        FS_DEBUG("Filename check failed\n");
+        ret = -1;
+    } else {
+        ret = remove(file_name);
+    }
     FS_DEBUG("Got ret: %d\n", ret);
+    assert(xc_gnttab_munmap(mount->gnth, file_name, 1) == 0);
     /* We can advance the request consumer index, from here on, the request
      * should not be used (it may be overrinden by a response) */
     mount->ring.req_cons++;
@@ -389,7 +410,6 @@ static void dispatch_remove(struct fs_mount *mount, struct fsif_request *req)
 static void dispatch_rename(struct fs_mount *mount, struct fsif_request *req)
 {
     char *buf, *old_file_name, *new_file_name;
-    char old_full_path[BUFFER_SIZE], new_full_path[BUFFER_SIZE];
     int ret;
     RING_IDX rsp_idx;
     fsif_response_t *rsp;
@@ -407,18 +427,15 @@ static void dispatch_rename(struct fs_mount *mount, struct fsif_request *req)
     new_file_name = buf + req->u.frename.new_name_offset;
     FS_DEBUG("File rename issued for %s -> %s (buf=%s)\n", 
             old_file_name, new_file_name, buf); 
-    assert(BUFFER_SIZE > 
-           strlen(old_file_name) + strlen(mount->export->export_path) + 1); 
-    assert(BUFFER_SIZE > 
-           strlen(new_file_name) + strlen(mount->export->export_path) + 1); 
-    snprintf(old_full_path, sizeof(old_full_path), "%s/%s",
-           mount->export->export_path, old_file_name);
-    snprintf(new_full_path, sizeof(new_full_path), "%s/%s",
-           mount->export->export_path, new_file_name);
-    assert(xc_gnttab_munmap(mount->gnth, buf, 1) == 0);
-    FS_DEBUG("Issuing rename for %s -> %s\n", old_full_path, new_full_path);
-    ret = rename(old_full_path, new_full_path);
+    if (check_export_path(mount->export->export_path, old_file_name) < 0 ||
+        check_export_path(mount->export->export_path, new_file_name) < 0) {
+        FS_DEBUG("Filename check failed\n");
+        ret = -1;
+    } else {
+        ret = rename(old_file_name, new_file_name);
+    }
     FS_DEBUG("Got ret: %d\n", ret);
+    assert(xc_gnttab_munmap(mount->gnth, buf, 1) == 0);
     /* We can advance the request consumer index, from here on, the request
      * should not be used (it may be overrinden by a response) */
     mount->ring.req_cons++;
@@ -435,7 +452,7 @@ static void dispatch_rename(struct fs_mount *mount, struct fsif_request *req)
 
 static void dispatch_create(struct fs_mount *mount, struct fsif_request *req)
 {
-    char *file_name, full_path[BUFFER_SIZE];
+    char *file_name;
     int ret;
     int8_t directory;
     int32_t mode;
@@ -453,27 +470,26 @@ static void dispatch_create(struct fs_mount *mount, struct fsif_request *req)
                                         PROT_READ);
    
     req_id = req->id;
-    FS_DEBUG("File create issued for %s\n", file_name); 
-    assert(BUFFER_SIZE > 
-           strlen(file_name) + strlen(mount->export->export_path) + 1); 
-    snprintf(full_path, sizeof(full_path), "%s/%s",
-           mount->export->export_path, file_name);
-    assert(xc_gnttab_munmap(mount->gnth, file_name, 1) == 0);
+    if (check_export_path(mount->export->export_path, file_name) < 0) {
+        FS_DEBUG("Filename check failed\n");
+        ret = -1;
+        goto out;
+    }
     /* We can advance the request consumer index, from here on, the request
      * should not be used (it may be overrinden by a response) */
     mount->ring.req_cons++;
 
     if(directory)
     {
-        FS_DEBUG("Issuing create for directory: %s\n", full_path);
-        ret = mkdir(full_path, mode);
+        FS_DEBUG("Issuing create for directory: %s\n", file_name);
+        ret = mkdir(file_name, mode);
     }
     else
     {
-        FS_DEBUG("Issuing create for file: %s\n", full_path);
+        FS_DEBUG("Issuing create for file: %s\n", file_name);
         ret = get_fd(mount);
         if (ret >= 0) {
-            int real_fd = creat(full_path, mode); 
+            int real_fd = creat(file_name, mode);
             if (real_fd < 0)
                 ret = -1;
             else
@@ -483,6 +499,8 @@ static void dispatch_create(struct fs_mount *mount, struct fsif_request *req)
             }
         }
     }
+out:
+    assert(xc_gnttab_munmap(mount->gnth, file_name, 1) == 0);
     FS_DEBUG("Got ret %d (errno=%d)\n", ret, errno);
 
     /* Get a response from the ring */
@@ -495,8 +513,8 @@ static void dispatch_create(struct fs_mount *mount, struct fsif_request *req)
 
 static void dispatch_list(struct fs_mount *mount, struct fsif_request *req)
 {
-    char *file_name, *buf, full_path[BUFFER_SIZE];
-    uint32_t offset, nr_files, error_code; 
+    char *file_name, *buf;
+    uint32_t offset = 0, nr_files = 0, error_code = 0;
     uint64_t ret_val;
     RING_IDX rsp_idx;
     fsif_response_t *rsp;
@@ -514,17 +532,18 @@ static void dispatch_list(struct fs_mount *mount, struct fsif_request *req)
    
     req_id = req->id;
     FS_DEBUG("Dir list issued for %s\n", file_name); 
-    assert(BUFFER_SIZE > 
-           strlen(file_name) + strlen(mount->export->export_path) + 1); 
-    snprintf(full_path, sizeof(full_path), "%s/%s",
-           mount->export->export_path, file_name);
+    if (check_export_path(mount->export->export_path, file_name) < 0) {
+        FS_DEBUG("Filename check failed\n");
+        error_code = 1;
+        goto error_out;
+    }
     /* We can advance the request consumer index, from here on, the request
      * should not be used (it may be overrinden by a response) */
     mount->ring.req_cons++;
 
     ret_val = 0;
     nr_files = 0;
-    dir = opendir(full_path);
+    dir = opendir(file_name);
     if(dir == NULL)
     {
         error_code = errno;
@@ -596,7 +615,7 @@ static void dispatch_chmod(struct fs_mount *mount, struct fsif_request *req)
 
 static void dispatch_fs_space(struct fs_mount *mount, struct fsif_request *req)
 {
-    char *file_name, full_path[BUFFER_SIZE];
+    char *file_name;
     RING_IDX rsp_idx;
     fsif_response_t *rsp;
     uint16_t req_id;
@@ -612,16 +631,16 @@ static void dispatch_fs_space(struct fs_mount *mount, struct fsif_request *req)
    
     req_id = req->id;
     FS_DEBUG("Fs space issued for %s\n", file_name); 
-    assert(BUFFER_SIZE > 
-           strlen(file_name) + strlen(mount->export->export_path) + 1); 
-    snprintf(full_path, sizeof(full_path), "%s/%s",
-           mount->export->export_path, file_name);
-    assert(xc_gnttab_munmap(mount->gnth, file_name, 1) == 0);
-    FS_DEBUG("Issuing fs space for %s\n", full_path);
-    ret = statvfs(full_path, &stat);
+    if (check_export_path(mount->export->export_path, file_name) < 0) {
+        FS_DEBUG("Filename check failed\n");
+        ret = -1;
+    } else {
+        ret = statvfs(file_name, &stat);
+    }
     if(ret >= 0)
         ret = stat.f_bsize * stat.f_bfree;
 
+    assert(xc_gnttab_munmap(mount->gnth, file_name, 1) == 0);
     /* We can advance the request consumer index, from here on, the request
      * should not be used (it may be overrinden by a response) */
     mount->ring.req_cons++;
