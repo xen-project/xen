@@ -42,7 +42,7 @@ from xen.util import xsconstants
 from xen.util.pci import serialise_pci_opts, pci_opts_list_to_sxp, \
                          pci_dict_to_bdf_str, pci_dict_to_xc_str, \
                          pci_convert_sxp_to_dict, pci_convert_dict_to_sxp, \
-                         pci_dict_cmp
+                         pci_dict_cmp, PCI_FUNC
 
 from xen.xend import balloon, sxp, uuid, image, arch
 from xen.xend import XendOptions, XendNode, XendConfig
@@ -844,7 +844,15 @@ class XendDomainInfo:
                     raise VmError("Device %s is not connected" %
                                   pci_dict_to_bdf_str(dev))
                 new_dev = new_devs[0]
-                self.hvm_destroyPCIDevice(new_dev)
+                # Only tell qemu-dm to unplug function 0.
+                # When unplugging a function, all functions in the
+                # same vslot must be unplugged, and function 0 must
+                # be one of the functions present when a vslot is
+                # hot-plugged. Telling qemu-dm to unplug function 0
+                # also tells it to unplug all other functions in the
+                # same vslot.
+                if (PCI_FUNC(int(new_dev['vslot'], 16)) == 0):
+                    self.hvm_destroyPCIDevice(new_dev)
                 # Update vslot
                 dev['vslot'] = new_dev['vslot']
                 for n in sxp.children(pci_dev):
