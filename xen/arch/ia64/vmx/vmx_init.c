@@ -623,7 +623,7 @@ int vmx_setup_platform(struct domain *d)
 
 	if (d->arch.is_sioemu) {
 		int i;
-		for (i = 1; i < MAX_VIRT_CPUS; i++)
+		for (i = 1; i < XEN_LEGACY_MAX_VCPUS; i++)
 			d->shared_info->vcpu_info[i].evtchn_upcall_mask = 1;
 	}
 

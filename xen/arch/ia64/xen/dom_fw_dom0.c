@@ -60,7 +60,7 @@ acpi_update_lsapic(struct acpi_subtable_header * header, const unsigned long end
 	if (!lsapic)
 		return -EINVAL;
 
-	if (lsapic_nbr < MAX_VIRT_CPUS && dom0->vcpu[lsapic_nbr] != NULL)
+	if (lsapic_nbr < dom0->max_vcpus && dom0->vcpu[lsapic_nbr] != NULL)
 		enable = 1;
 	else
 		enable = 0;

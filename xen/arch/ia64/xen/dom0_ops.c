@@ -233,7 +233,8 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
             goto sendtrigger_out;
 
         ret = -ESRCH;
-        if ( (v = d->vcpu[op->u.sendtrigger.vcpu]) == NULL )
+        if ( op->u.sendtrigger.vcpu >= d->max_vcpus ||
+             (v = d->vcpu[op->u.sendtrigger.vcpu]) == NULL )
             goto sendtrigger_out;
 
         ret = 0;

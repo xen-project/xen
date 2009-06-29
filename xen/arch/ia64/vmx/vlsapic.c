@@ -153,7 +153,7 @@ static void vtm_reset(VCPU *vcpu)
 
     if (vcpu->vcpu_id == 0) {
         vtm_offset = 0UL - ia64_get_itc();
-        for (i = MAX_VIRT_CPUS - 1; i >= 0; i--) {
+        for (i = d->max_vcpus - 1; i >= 0; i--) {
             if ((v = d->vcpu[i]) != NULL) {
                 VMX(v, vtm).vtm_offset = vtm_offset;
                 VMX(v, vtm).last_itc = 0;
@@ -227,7 +227,7 @@ void vtm_set_itc(VCPU *vcpu, uint64_t new_itc)
     vtm = &VMX(vcpu, vtm);
     if (vcpu->vcpu_id == 0) {
         vtm_offset = new_itc - ia64_get_itc();
-        for (i = MAX_VIRT_CPUS - 1; i >= 0; i--) {
+        for (i = d->max_vcpus - 1; i >= 0; i--) {
             if ((v = d->vcpu[i]) != NULL) {
                 VMX(v, vtm).vtm_offset = vtm_offset;
                 VMX(v, vtm).last_itc = 0;
@@ -606,7 +606,7 @@ struct vcpu *lid_to_vcpu(struct domain *d, uint16_t dest)
     int id = dest >> 8;
 
     /* Fast look: assume EID=0 ID=vcpu_id.  */
-    if ((dest & 0xff) == 0 && id < MAX_VIRT_CPUS)
+    if ((dest & 0xff) == 0 && id < d->max_vcpus)
         return d->vcpu[id];
     return NULL;
 }
@@ -875,7 +875,7 @@ static int vlsapic_load(struct domain *d, hvm_domain_context_t *h)
     int i;
 
     vcpuid = hvm_load_instance(h);
-    if (vcpuid > MAX_VIRT_CPUS || (v = d->vcpu[vcpuid]) == NULL) {
+    if (vcpuid >= d->max_vcpus || (v = d->vcpu[vcpuid]) == NULL) {
         gdprintk(XENLOG_ERR,
                  "%s: domain has no vlsapic %u\n", __func__, vcpuid);
         return -EINVAL;
@@ -934,7 +934,7 @@ static int vtime_load(struct domain *d, hvm_domain_context_t *h)
     vtime_t *vtm;
 
     vcpuid = hvm_load_instance(h);
-    if (vcpuid > MAX_VIRT_CPUS || (v = d->vcpu[vcpuid]) == NULL) {
+    if (vcpuid >= d->max_vcpus || (v = d->vcpu[vcpuid]) == NULL) {
         gdprintk(XENLOG_ERR,
                  "%s: domain has no vtime %u\n", __func__, vcpuid);
         return -EINVAL;

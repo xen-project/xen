@@ -231,7 +231,7 @@ domain_purge_swtc_entries_vcpu_dirty_mask(struct domain* d,
 {
 	int vcpu;
 
-	for_each_vcpu_mask(vcpu, vcpu_dirty_mask) {
+	for_each_vcpu_mask(d, vcpu, vcpu_dirty_mask) {
 		struct vcpu* v = d->vcpu[vcpu];
 		if (!v->is_initialised)
 			continue;
@@ -445,7 +445,7 @@ __domain_flush_vtlb_track_entry(struct domain* d,
 	}
     
 	if (HAS_PERVCPU_VHPT(d)) {
-		for_each_vcpu_mask(vcpu, entry->vcpu_dirty_mask) {
+		for_each_vcpu_mask(d, vcpu, entry->vcpu_dirty_mask) {
 			v = d->vcpu[vcpu];
 			if (!v->is_initialised)
 				continue;

@@ -228,7 +228,7 @@ static int vmx_cpu_load(struct domain *d, hvm_domain_context_t *h)
     struct pt_regs *regs;
 
     vcpuid = hvm_load_instance(h);
-    if (vcpuid > MAX_VIRT_CPUS || (v = d->vcpu[vcpuid]) == NULL) {
+    if (vcpuid >= d->max_vcpus || (v = d->vcpu[vcpuid]) == NULL) {
         gdprintk(XENLOG_ERR,
                  "%s: domain has no vcpu %u\n", __func__, vcpuid);
         rc = -EINVAL;
@@ -278,7 +278,7 @@ static int vmx_vpd_load(struct domain *d, hvm_domain_context_t *h)
     int i;
 
     vcpuid = hvm_load_instance(h);
-    if (vcpuid > MAX_VIRT_CPUS || (v = d->vcpu[vcpuid]) == NULL) {
+    if (vcpuid >= d->max_vcpus || (v = d->vcpu[vcpuid]) == NULL) {
         gdprintk(XENLOG_ERR,
                  "%s: domain has no vcpu %u\n", __func__, vcpuid);
         rc = -EINVAL;

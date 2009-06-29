@@ -2118,6 +2118,7 @@ int __init construct_dom0(struct domain *d,
 
 	/* Sanity! */
 	BUG_ON(d != dom0);
+	BUG_ON(d->vcpu == NULL);
 	BUG_ON(d->vcpu[0] == NULL);
 	BUG_ON(v->is_initialised);
 
@@ -2222,7 +2223,7 @@ int __init construct_dom0(struct domain *d,
 	//  (we should be able to deal with this... later)
 
 	/* Mask all upcalls... */
-	for ( i = 1; i < MAX_VIRT_CPUS; i++ )
+	for ( i = 1; i < XEN_LEGACY_MAX_VCPUS; i++ )
 	    d->shared_info->vcpu_info[i].evtchn_upcall_mask = 1;
 
 	printk ("Dom0 max_vcpus=%d\n", dom0_max_vcpus);

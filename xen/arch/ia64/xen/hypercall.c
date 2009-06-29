@@ -84,7 +84,7 @@ fw_hypercall_ipi (struct pt_regs *regs)
 	struct domain *d = current->domain;
 
 	/* Be sure the target exists.  */
-	if (cpu > MAX_VIRT_CPUS)
+	if (cpu >= d->max_vcpus)
 		return;
 	targ = d->vcpu[cpu];
 	if (targ == NULL)

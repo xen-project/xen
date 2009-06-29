@@ -378,7 +378,7 @@ static int viosapic_load(struct domain *d, hvm_domain_context_t *h)
         return -EINVAL;
 
     lowest_vcpu = NULL;
-    if (viosapic_load.lowest_vcpu_id < MAX_VIRT_CPUS)
+    if (viosapic_load.lowest_vcpu_id < d->max_vcpus)
         lowest_vcpu = d->vcpu[viosapic_load.lowest_vcpu_id];
     else if (viosapic_load.lowest_vcpu_id != VIOSAPIC_INVALID_VCPU_ID)
         return -EINVAL;

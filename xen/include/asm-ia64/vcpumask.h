@@ -31,12 +31,12 @@ static inline int __next_vcpu(int n, const vcpumask_t *srcp, int nbits)
 }
 
 #if MAX_VIRT_CPUS > 1
-#define for_each_vcpu_mask(vcpu, mask)          \
+#define for_each_vcpu_mask(d, vcpu, mask)       \
     for ((vcpu) = first_vcpu(mask);             \
-         (vcpu) < MAX_VIRT_CPUS;                \
+         (vcpu) < d->max_vcpus;                 \
          (vcpu) = next_vcpu((vcpu), (mask)))
 #else /* NR_CPUS == 1 */
-#define for_each_vcpu_mask(vcpu, mask) for ((vcpu) = 0; (vcpu) < 1; (vcpu)++)
+#define for_each_vcpu_mask(d, vcpu, mask) for ((vcpu) = 0; (vcpu) < 1; (vcpu)++)
 #endif /* NR_CPUS */
 
 #define vcpumask_scnprintf(buf, len, src) \
