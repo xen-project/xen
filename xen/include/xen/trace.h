@@ -111,4 +111,19 @@ static inline void trace_var(u32 event, int cycles, int extra,
         }                                                       \
     } while ( 0 )
 
+#define TRACE_6D(_e,d1,d2,d3,d4,d5,d6)                             \
+    do {                                                        \
+        if ( unlikely(tb_init_done) )                           \
+        {                                                       \
+            u32 _d[6];                                          \
+            _d[0] = d1;                                         \
+            _d[1] = d2;                                         \
+            _d[2] = d3;                                         \
+            _d[3] = d4;                                         \
+            _d[4] = d5;                                         \
+            _d[5] = d6;                                         \
+            __trace_var(_e, 1, sizeof(*_d)*6, (unsigned char *)_d); \
+        }                                                       \
+    } while ( 0 )
+
 #endif /* __XEN_TRACE_H__ */

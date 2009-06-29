@@ -190,6 +190,28 @@ static struct {
     unsigned int count;
 } c3_cpu_status = { .lock = SPIN_LOCK_UNLOCKED };
 
+static inline void trace_exit_reason(u32 *irq_traced)
+{
+#ifdef DEBUG
+    if ( unlikely(tb_init_done) )
+    {
+        int i, curbit;
+        u32 irr_status[8] = { 0 };
+
+        /* Get local apic IRR register */
+        for ( i = 0; i < 8; i++ )
+            irr_status[i] = apic_read(APIC_IRR + (i << 4));
+        i = 0;
+        curbit = find_first_bit((const unsigned long *)irr_status, 256);
+        while ( i < 4 && curbit < 256 )
+        {
+            irq_traced[i++] = curbit;
+            curbit = find_next_bit((const unsigned long *)irr_status, 256, curbit + 1);
+        }
+    }
+#endif
+}
+
 static void acpi_processor_idle(void)
 {
     struct acpi_processor_power *power = processor_powers[smp_processor_id()];
@@ -198,6 +220,7 @@ static void acpi_processor_idle(void)
     int sleep_ticks = 0;
     u32 t1, t2 = 0;
     u32 exp = 0, pred = 0;
+    u32 irq_traced[4] = { 0 };
 
     cpufreq_dbs_timer_suspend();
 
@@ -267,9 +290,10 @@ static void acpi_processor_idle(void)
             acpi_idle_do_entry(cx);
             /* Get end time (ticks) */
             t2 = inl(pmtmr_ioport);
+            trace_exit_reason(irq_traced);
             /* Trace cpu idle exit */
-            TRACE_2D(TRC_PM_IDLE_EXIT, cx->idx, t2);
-
+            TRACE_6D(TRC_PM_IDLE_EXIT, cx->idx, t2,
+                     irq_traced[0], irq_traced[1], irq_traced[2], irq_traced[3]);
             /* Re-enable interrupts */
             local_irq_enable();
             /* Compute time (ticks) that we were actually asleep */
@@ -326,8 +350,10 @@ static void acpi_processor_idle(void)
 
         /* recovering TSC */
         cstate_restore_tsc();
+        trace_exit_reason(irq_traced);
         /* Trace cpu idle exit */
-        TRACE_2D(TRC_PM_IDLE_EXIT, cx->idx, t2);
+        TRACE_6D(TRC_PM_IDLE_EXIT, cx->idx, t2,
+                 irq_traced[0], irq_traced[1], irq_traced[2], irq_traced[3]);
 
         if ( power->flags.bm_check && power->flags.bm_control )
         {
