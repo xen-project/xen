@@ -311,7 +311,6 @@ void tboot_shutdown(uint32_t shutdown_type)
         /* per-cpu data */
         g_tboot_shared->mac_regions[2].start = (uint64_t)__pa(&__per_cpu_start);
         g_tboot_shared->mac_regions[2].size =
-            g_tboot_shared->mac_regions[2].start +
             (((uint64_t)last_cpu(cpu_possible_map) + 1) << PERCPU_SHIFT);
         /* bss */
         g_tboot_shared->mac_regions[3].start = (uint64_t)__pa(&__bss_start);
