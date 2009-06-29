@@ -452,7 +452,7 @@ static void svm_update_guest_cr(struct vcpu *v, unsigned int cr)
 static void svm_update_guest_efer(struct vcpu *v)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    bool_t lma = v->arch.hvm_vcpu.guest_efer & EFER_LMA;
+    bool_t lma = !!(v->arch.hvm_vcpu.guest_efer & EFER_LMA);
 
     vmcb->efer = (v->arch.hvm_vcpu.guest_efer | EFER_SVME) & ~EFER_LME;
     if ( lma )
