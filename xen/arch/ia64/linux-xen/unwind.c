@@ -36,6 +36,9 @@
 #include <xen/errno.h>
 
 // work around
+// write_trylock() does bug check, but stack unwinder can be called
+// subtle situation, so skip bug check.
+#undef write_trylock(lock)
 #ifdef CONFIG_SMP
 #define write_trylock(lock)	_raw_write_trylock(lock)
 #else
