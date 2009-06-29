@@ -90,7 +90,8 @@
                  slot            CDATA #REQUIRED
                  func            CDATA #REQUIRED
                  opts_str        CDATA #IMPLIED
-                 vslot           CDATA #IMPLIED>
+                 vdevfn          CDATA #IMPLIED
+                 key             CDATA #IMPLIED>
 
 <!ELEMENT vscsi  EMPTY>
 <!ATTLIST vscsi  p-dev           CDATA #REQUIRED

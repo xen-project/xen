@@ -481,7 +481,9 @@ void svm_destroy_vmcb(struct vcpu *v);
 
 void setup_vmcb_dump(void);
 
-void svm_disable_intercept_for_msr(struct vcpu *v, u32 msr);
+void svm_intercept_msr(struct vcpu *v, uint32_t msr, int enable);
+#define svm_disable_intercept_for_msr(v, msr) svm_intercept_msr((v), (msr), 0)
+#define svm_enable_intercept_for_msr(v, msr) svm_intercept_msr((v), (msr), 1)
 
 #endif /* ASM_X86_HVM_SVM_VMCS_H__ */
 

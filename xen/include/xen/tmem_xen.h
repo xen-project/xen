@@ -360,6 +360,16 @@ extern int tmh_copy_to_client(tmem_cli_mfn_t cmfn, pfp_t *pfp,
        if ((uint32_t)x##_start > x##_max_cycles) x##_max_cycles = x##_start; \
       } \
     } while (0)
+#define END_CYC_COUNTER_CLI(x,y) \
+    do { \
+      x##_start = get_cycles() - x##_start; \
+      if (x##_start > 0 && x##_start < 1000000000) { \
+       x##_sum_cycles += x##_start; x##_count++; \
+       if ((uint32_t)x##_start < x##_min_cycles) x##_min_cycles = x##_start; \
+       if ((uint32_t)x##_start > x##_max_cycles) x##_max_cycles = x##_start; \
+       y->total_cycles += x##_start; \
+      } \
+    } while (0)
 #define RESET_CYC_COUNTER(x) { x##_sum_cycles = 0, x##_count = 0; \
   x##_min_cycles = 0x7fffffff, x##_max_cycles = 0; }
 #define SCNPRINTF_CYC_COUNTER(buf,size,x,tag) \

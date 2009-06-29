@@ -138,9 +138,10 @@ VTPM_DELETE_SCRIPT = auxbin.scripts_dir() + '/vtpm-delete'
 
 XS_VMROOT = "/vm/"
 
+NR_PCI_FUNC = 8
 NR_PCI_DEV = 32
-AUTO_PHP_SLOT = NR_PCI_DEV
-AUTO_PHP_SLOT_STR = "%02x" % NR_PCI_DEV
+NR_PCI_DEVFN = NR_PCI_FUNC * NR_PCI_DEV
+AUTO_PHP_SLOT = 0x100
 
 #
 # tmem

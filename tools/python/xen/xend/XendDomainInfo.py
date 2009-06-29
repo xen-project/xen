@@ -42,7 +42,7 @@ from xen.util import xsconstants
 from xen.util.pci import serialise_pci_opts, pci_opts_list_to_sxp, \
                          pci_dict_to_bdf_str, pci_dict_to_xc_str, \
                          pci_convert_sxp_to_dict, pci_convert_dict_to_sxp, \
-                         pci_dict_cmp
+                         pci_dict_cmp, PCI_DEVFN, PCI_SLOT, PCI_FUNC
 
 from xen.xend import balloon, sxp, uuid, image, arch
 from xen.xend import XendOptions, XendNode, XendConfig
@@ -617,12 +617,53 @@ class XendDomainInfo:
         dev_uuid = sxp.child_value(dev_info, 'uuid')
         pci_conf = self.info['devices'][dev_uuid][1]
         pci_devs = pci_conf['devs']
-        request = map(lambda x:
-                      pci_convert_dict_to_sxp(x, 'Initialising', 'Booting'),
-                      pci_devs)
 
-        for i in request:
-                self.pci_device_configure(i)
+        # Keep a set of keys that are done rather than
+        # just itterating through set(map(..., pci_devs))
+        # to preserve any order information present.
+        done = set()
+        for key in map(lambda x: x['key'], pci_devs):
+            if key in done:
+                continue
+            done |= set([key])
+            dev = filter(lambda x: x['key'] == key, pci_devs)
+
+            head_dev = dev.pop()
+            dev_sxp = pci_convert_dict_to_sxp(head_dev, 'Initialising',
+                                              'Booting')
+            self.pci_device_configure(dev_sxp)
+
+            # That is all for single-function virtual devices
+            if len(dev) == 0:
+                continue
+
+            if int(head_dev['vdevfn'], 16) & AUTO_PHP_SLOT:
+                new_dev_info = self._getDeviceInfo_pci(devid)
+                if new_dev_info is None:
+                    continue
+                new_dev_uuid = sxp.child_value(new_dev_info, 'uuid')
+                new_pci_conf = self.info['devices'][new_dev_uuid][1]
+                new_pci_devs = new_pci_conf['devs']
+
+                new_head_dev = filter(lambda x: pci_dict_cmp(x, head_dev),
+                                      new_pci_devs)[0]
+
+                if int(new_head_dev['vdevfn'], 16) & AUTO_PHP_SLOT:
+                    continue
+
+                vdevfn = PCI_SLOT(int(new_head_dev['vdevfn'], 16))
+                new_dev = []
+                for i in dev:
+                    i['vdevfn'] = '0x%02x' % \
+                                 PCI_DEVFN(vdevfn,
+                                           PCI_FUNC(int(i['vdevfn'], 16)))
+                    new_dev.append(i)
+
+                dev = new_dev
+
+            for i in dev:
+                dev_sxp = pci_convert_dict_to_sxp(i, 'Initialising', 'Booting')
+                self.pci_device_configure(dev_sxp)
 
     def hvm_pci_device_create(self, dev_config):
         log.debug("XendDomainInfo.hvm_pci_device_create: %s"
@@ -643,9 +684,10 @@ class XendDomainInfo:
             pci_conf = self.info['devices'][dev_uuid][1]
             pci_devs = pci_conf['devs']
             for x in pci_devs:
-                if (int(x['vslot'], 16) == int(new_dev['vslot'], 16) and
-                   int(x['vslot'], 16) != AUTO_PHP_SLOT):
-                    raise VmError("vslot %s already have a device." % (new_dev['vslot']))
+                if (int(x['vdevfn'], 16) == int(new_dev['vdevfn'], 16) and
+                    not int(x['vdevfn'], 16) & AUTO_PHP_SLOT):
+                    raise VmError("vdevfn %s already have a device." %
+                                  (new_dev['vdevfn']))
 
                 if (pci_dict_cmp(x, new_dev)):
                     raise VmError("device is already inserted")
@@ -729,22 +771,22 @@ class XendDomainInfo:
                 opts = ',' + serialise_pci_opts(new_dev['opts'])
 
             bdf_str = "%s@%02x%s" % (pci_dict_to_bdf_str(new_dev),
-                                     int(new_dev['vslot'], 16), opts)
+                                     int(new_dev['vdevfn'], 16), opts)
             log.debug("XendDomainInfo.hvm_pci_device_insert_dev: %s" % bdf_str)
             self.image.signalDeviceModel('pci-ins', 'pci-inserted', bdf_str)
 
-            vslot = xstransact.Read("/local/domain/0/device-model/%i/parameter"
+            vdevfn = xstransact.Read("/local/domain/0/device-model/%i/parameter"
                                     % self.getDomid())
             try:
-                vslot_int = int(vslot, 16)
+                vdevfn_int = int(vdevfn, 16)
             except ValueError:
                 raise VmError(("Cannot pass-through PCI function '%s'. " +
                                "Device model reported an error: %s") %
-                              (bdf_str, vslot))
+                              (bdf_str, vdevfn))
         else:
-            vslot = new_dev['vslot']
+            vdevfn = new_dev['vdevfn']
 
-        return vslot
+        return vdevfn
 
 
     def device_create(self, dev_config):
@@ -825,14 +867,14 @@ class XendDomainInfo:
             if pci_state == 'Initialising':
                 # HVM PCI device attachment
                 if pci_sub_state == 'Booting':
-                    vslot = self.hvm_pci_device_insert(dev_config)
+                    vdevfn = self.hvm_pci_device_insert(dev_config)
                 else:
-                    vslot = self.hvm_pci_device_create(dev_config)
-                # Update vslot
-                dev['vslot'] = vslot
+                    vdevfn = self.hvm_pci_device_create(dev_config)
+                # Update vdevfn
+                dev['vdevfn'] = vdevfn
                 for n in sxp.children(pci_dev):
-                    if(n[0] == 'vslot'):
-                        n[1] = vslot
+                    if(n[0] == 'vdevfn'):
+                        n[1] = vdevfn
             else:
                 # HVM PCI device detachment
                 existing_dev_uuid = sxp.child_value(existing_dev_info, 'uuid')
@@ -844,12 +886,20 @@ class XendDomainInfo:
                     raise VmError("Device %s is not connected" %
                                   pci_dict_to_bdf_str(dev))
                 new_dev = new_devs[0]
-                self.hvm_destroyPCIDevice(new_dev)
-                # Update vslot
-                dev['vslot'] = new_dev['vslot']
+                # Only tell qemu-dm to unplug function 0.
+                # When unplugging a function, all functions in the
+                # same vslot must be unplugged, and function 0 must
+                # be one of the functions present when a vslot is
+                # hot-plugged. Telling qemu-dm to unplug function 0
+                # also tells it to unplug all other functions in the
+                # same vslot.
+                if (PCI_FUNC(int(new_dev['vdevfn'], 16)) == 0):
+                    self.hvm_destroyPCIDevice(new_dev)
+                # Update vdevfn
+                dev['vdevfn'] = new_dev['vdevfn']
                 for n in sxp.children(pci_dev):
-                    if(n[0] == 'vslot'):
-                        n[1] = new_dev['vslot']
+                    if(n[0] == 'vdevfn'):
+                        n[1] = new_dev['vdevfn']
 
         # If pci platform does not exist, create and exit.
         if existing_dev_info is None:
@@ -3724,7 +3774,8 @@ class XendDomainInfo:
                    ['bus', '0x%02x' % ppci.get_bus()],
                    ['slot', '0x%02x' % ppci.get_slot()],
                    ['func', '0x%1x' % ppci.get_func()],
-                   ['vslot', '0x%02x' % xenapi_pci.get('hotplug_slot')],
+                   ['vdevfn', '0x%02x' % xenapi_pci.get('hotplug_slot')],
+                   ['key', xenapi_pci['key']],
                    ['uuid', dpci_uuid]]
         dev_sxp = sxp.merge(dev_sxp, opts_sxp)
 

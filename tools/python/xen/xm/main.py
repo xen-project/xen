@@ -2175,56 +2175,84 @@ def xm_vtpm_list(args):
                    "%(be-path)-30s  "
                    % ni)
 
-
-def xm_pci_list(args):
-    (use_long, params) = arg_check_for_resource_list(args, "pci-list")
-
-    dom = params[0]
-
+def attached_pci_dict_bin(dom):
     devs = []
     if serverType == SERVER_XEN_API:
         for dpci_ref in server.xenapi.VM.get_DPCIs(get_single_vm(dom)):
             ppci_ref = server.xenapi.DPCI.get_PPCI(dpci_ref)
             ppci_record = server.xenapi.PPCI.get_record(ppci_ref)
             dev = {
-                "domain":   int(ppci_record["domain"]),
-                "bus":      int(ppci_record["bus"]),
-                "slot":     int(ppci_record["slot"]),
-                "func":     int(ppci_record["func"]),
-                "vslot":    int(server.xenapi.DPCI.get_hotplug_slot(dpci_ref))
+                'domain': int(ppci_record['domain']),
+                'bus':    int(ppci_record['bus']),
+                'slot':   int(ppci_record['slot']),
+                'func':   int(ppci_record['func']),
+                'vdevfn': int(server.xenapi.DPCI.get_hotplug_slot(dpci_ref)),
+                'key':    server.xenapi.DPCI.get_key(dpci_ref)
             }
             devs.append(dev)
 
     else:
         for x in server.xend.domain.getDeviceSxprs(dom, 'pci'):
             dev = {
-                "domain":   int(x["domain"], 16),
-                "bus":      int(x["bus"], 16),
-                "slot":     int(x["slot"], 16),
-                "func":     int(x["func"], 16),
-                "vslot":    int(x["vslot"], 16)
+                'domain': int(x['domain'], 16),
+                'bus':    int(x['bus'], 16),
+                'slot':   int(x['slot'], 16),
+                'func':   int(x['func'], 16),
+                'vdevfn': int(x['vdevfn'], 16),
+                'key':    x['key']
             }
             devs.append(dev)
 
+    return devs
+
+def pci_dict_bin_to_str(pci_dev):
+    new_dev = pci_dev.copy()
+
+    new_dev['domain'] = '0x%04x' % pci_dev['domain']
+    new_dev['bus']    = '0x%02x' % pci_dev['bus']
+    new_dev['slot']   = '0x%02x' % pci_dev['slot']
+    new_dev['func']   = '0x%x'   % pci_dev['func']
+    new_dev['vdevfn'] = '0x%02x' % pci_dev['vdevfn']
+
+    return new_dev
+
+def attached_pci_dict(dom):
+    return map(pci_dict_bin_to_str, attached_pci_dict_bin(dom))
+
+def xm_pci_list(args):
+    (use_long, params) = arg_check_for_resource_list(args, "pci-list")
+
+    devs = attached_pci_dict_bin(params[0])
     if len(devs) == 0:
         return
 
-    devs.sort(None, lambda x: x['vslot'] << 32 | PCI_BDF(x['domain'], x['bus'],
-                                                         x['slot'], x['func']))
+    def f(x):
+	# The vfunc shouldn't be used for ordering if the vslot hasn't been
+	# assigned as the output looks odd beacuse the vfunc isn't reported
+	# but the (physical) function is.
+	if x['vdevfn'] & AUTO_PHP_SLOT:
+	    vdevfn = AUTO_PHP_SLOT
+	else:
+	    vdevfn = x['vdevfn']
+        return (vdevfn << 32) | \
+	       PCI_BDF(x['domain'], x['bus'], x['slot'], x['func'])
+    devs.sort(None, f)
 
-    has_vslot = False
+    has_vdevfn = False
     for x in devs:
-        if x['vslot'] == AUTO_PHP_SLOT:
+        if x['vdevfn'] & AUTO_PHP_SLOT:
             x['show_vslot'] = '-'
+            x['show_vfunc'] = '-'
         else:
-            x['show_vslot'] = "0x%02x" % x['vslot']
-            has_vslot = True
+            x['show_vslot'] = "0x%02x" % PCI_SLOT(x['vdevfn'])
+            x['show_vfunc'] = "0x%x" % PCI_FUNC(x['vdevfn'])
+            has_vdevfn = True
 
     hdr_str = 'domain bus  slot func'
     fmt_str = '0x%(domain)04x 0x%(bus)02x 0x%(slot)02x 0x%(func)x'
-    if has_vslot:
-        hdr_str = 'VSlt ' + hdr_str
-        fmt_str = '%(show_vslot)-4s ' + fmt_str
+    if has_vdevfn:
+        hdr_str = 'VSlt VFn ' + hdr_str
+        fmt_str = '%(show_vslot)-4s %(show_vfunc)-3s ' + fmt_str
 
     print hdr_str
     for x in devs:
@@ -2486,7 +2514,7 @@ def xm_network_attach(args):
             vif.append(vif_param)
         server.xend.domain.device_create(dom, vif)
 
-def parse_pci_configuration(args, state, opts = ''):
+def parse_pci_configuration(args, opts = ''):
     dom = args[0]
     pci_dev_str = args[1]
     if len(args) == 3:
@@ -2499,7 +2527,7 @@ def parse_pci_configuration(args, state, opts = ''):
     except PciDeviceParseError, ex:
         raise OptionError(str(ex))
 
-    return (dom, pci_convert_dict_to_sxp(pci_dev, state))
+    return (dom, pci_dev)
 
 def xm_pci_attach(args):
     config_pci_opts = []
@@ -2516,19 +2544,31 @@ def xm_pci_attach(args):
         err("Invalid argument for 'xm pci-attach'")
         usage('pci-attach')
 
-    (dom, pci) = parse_pci_configuration(params, 'Initialising',
-                     config_pci_opts)
+    (dom, dev) = parse_pci_configuration(params, config_pci_opts)
 
+    head_dev = dev.pop(0)
+    xm_pci_attach_one(dom, head_dev)
+
+    # That is all for single-function virtual devices
+    if len(dev) == 0:
+        return
+
+    # If the slot wasn't spefified in the args then use the slot
+    # assigned to the head by qemu-xen for the rest of the functions
+    if int(head_dev['vslot'], 16) & AUTO_PHP_SLOT:
+        vdevfn = int(find_attached_devfn(attached_pci_dict(dom), head_dev), 16)
+        if not vdevfn & AUTO_PHP_SLOT:
+            vslot = PCI_SLOT(vdevfn)
+            for i in dev:
+                i['vslot'] = '0x%02x' % \
+		             PCI_DEVFN(vslot, PCI_FUNC(int(i['vslot'], 16)))
+
+    for i in dev:
+        xm_pci_attach_one(dom, i)
+
+def xm_pci_attach_one(dom, pci_dev):
     if serverType == SERVER_XEN_API:
-
-        pci_dev = sxp.children(pci, 'dev')[0]
-        domain = int(sxp.child_value(pci_dev, 'domain'), 16)
-        bus = int(sxp.child_value(pci_dev, 'bus'), 16)
-        slot = int(sxp.child_value(pci_dev, 'slot'), 16)
-        func = int(sxp.child_value(pci_dev, 'func'), 16)
-        vslot = int(sxp.child_value(pci_dev, 'vslot'), 16)
-        name = "%04x:%02x:%02x.%01x" % (domain, bus, slot, func)
-
+        name = pci_dict_to_bdf_str(pci_dev)
         target_ref = None
         for ppci_ref in server.xenapi.PPCI.get_all():
             if name == server.xenapi.PPCI.get_name(ppci_ref):
@@ -2540,12 +2580,14 @@ def xm_pci_attach(args):
         dpci_record = {
             "VM":           get_single_vm(dom),
             "PPCI":         target_ref,
-            "hotplug_slot": vslot,
-            "options":      dict(config_pci_opts)
+            "hotplug_slot": int(pci_dev['vdevfn'], 16),
+            "options":      dict(pci_dev.get('opts', [])),
+            "key":          pci_dev['key']
         }
         server.xenapi.DPCI.create(dpci_record)
 
     else:
+        pci = pci_convert_dict_to_sxp(pci_dev, 'Initialising')
         server.xend.domain.device_configure(dom, pci)
 
 def parse_scsi_configuration(p_scsi, v_hctl, state):
@@ -2688,20 +2730,61 @@ def xm_network_detach(args):
         arg_check(args, 'network-detach', 2, 3)
         detach(args, 'vif')
 
+def find_attached(attached, key):
+    l = filter(lambda dev: pci_dict_cmp(dev, key), attached)
+
+    if len(l) == 0:
+         raise OptionError("pci: device is not attached: " +
+                           pci_dict_to_bdf_str(key))
+
+    # There shouldn't ever be more than one match,
+    # but perhaps an exception should be thrown if there is
+    return l[0]
+
+def find_attached_devfn(attached, key):
+    pci_dev = find_attached(attached, key)
+    return pci_dev['vdevfn']
+
 def xm_pci_detach(args):
     arg_check(args, 'pci-detach', 2)
-    (dom, pci) = parse_pci_configuration(args, 'Closing')
 
+    (dom, dev) = parse_pci_configuration(args)
+    attached = attached_pci_dict(dom)
+
+    attached_dev = map(lambda x: find_attached(attached, x), dev)
+
+    def f(pci_dev):
+        vdevfn = int(pci_dev['vdevfn'], 16)
+        return PCI_SLOT(vdevfn) | (vdevfn & AUTO_PHP_SLOT)
+    vdevfns = map(f, attached_dev)
+    if len(set(vdevfns)) > 1:
+        err_str = map(lambda x: "\t%s is in slot 0x%02x\n" %
+                                (pci_dict_to_bdf_str(x),
+                                 PCI_SLOT(int(x['vdevfn'], 16))), dev)
+        raise OptionError("More than one slot used by specified devices\n"
+                          + ''.join(err_str))
+
+    attached_to_slot = filter(lambda x:
+                              f(x) == vdevfns[0] and
+                              attached_dev[0]["key"] ==
+                                      x["key"], attached_dev)
+
+    if len(attached_to_slot) != len(dev):
+        err_str_ = map(lambda x: '\t%s\n' % pci_dict_to_bdf_str(x), dev)
+        err_str = "Requested:\n" + ''.join(err_str_)
+        err_str_ = map(lambda x: '\t%s (%s)\n' %
+                       (pci_dict_to_bdf_str(x), x['key']),
+                       attached_to_slot)
+        err_str += "Present:\n" + ''.join(err_str_)
+        raise OptionError(("Not all functions in slot 0x%02x have had "
+                           "detachment requested.\n" % vdevfns[0]) + err_str)
+
+    for i in dev:
+        xm_pci_detach_one(dom, i)
+
+def xm_pci_detach_one(dom, pci_dev):
     if serverType == SERVER_XEN_API:
-
-        pci_dev = sxp.children(pci, 'dev')[0]
-        domain = int(sxp.child_value(pci_dev, 'domain'), 16)
-        bus = int(sxp.child_value(pci_dev, 'bus'), 16)
-        slot = int(sxp.child_value(pci_dev, 'slot'), 16)
-        func = int(sxp.child_value(pci_dev, 'func'), 16)
-        vslot = int(sxp.child_value(pci_dev, 'vslot'), 16)
-        name = "%04x:%02x:%02x.%01x" % (domain, bus, slot, func)
-
+        name = pci_dict_to_bdf_str(pci_dev)
         target_ref = None
         for dpci_ref in server.xenapi.VM.get_DPCIs(get_single_vm(dom)):
             ppci_ref = server.xenapi.DPCI.get_PPCI(dpci_ref)
@@ -2713,6 +2796,7 @@ def xm_pci_detach(args):
             raise OptionError("Device %s not assigned" % name)
 
     else:
+        pci = pci_convert_dict_to_sxp(pci_dev, 'Closing')
         server.xend.domain.device_configure(dom, pci)
 
 def xm_scsi_detach(args):

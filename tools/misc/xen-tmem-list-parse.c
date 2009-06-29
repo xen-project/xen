@@ -174,12 +174,19 @@ void parse_client(char *s)
     unsigned long long compressed_sum_size = parse(s,"cb");
     unsigned long long compress_poor = parse(s,"cn");
     unsigned long long compress_nomem = parse(s,"cm");
+    unsigned long long total_cycles = parse(s,"Tc");
+    unsigned long long succ_eph_gets = parse(s,"Ge");
+    unsigned long long succ_pers_puts = parse(s,"Pp");
+    unsigned long long succ_pers_gets = parse(s,"Gp");
 
     printf("domid%lu: weight=%lu,cap=%lu,compress=%d,frozen=%d,"
+           "total_cycles=%llu,succ_eph_gets=%llu,"
+           "succ_pers_puts=%llu,succ_pers_gets=%llu,"
            "eph_count=%llu,max_eph=%llu,"
            "compression ratio=%lu%% (samples=%llu,poor=%llu,nomem=%llu)\n",
            cli_id, weight, cap, compress?1:0, frozen?1:0,
            eph_count, max_eph_count,
+           total_cycles, succ_eph_gets, succ_pers_puts, succ_pers_gets, 
            compressed_pages ?  (long)((compressed_sum_size*100LL) /
                                       (compressed_pages*PAGE_SIZE)) : 0,
            compressed_pages, compress_poor, compress_nomem);

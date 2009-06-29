@@ -655,8 +655,6 @@ close_fbfront:
     snprintf(path, sizeof(path), "%s/feature-update", nodename);
     xenbus_rm(XBT_NIL, path);
 
-    unbind_evtchn(dev->evtchn);
-
     free_fbfront(dev);
 }
 

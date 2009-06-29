@@ -74,8 +74,8 @@ class PciController(DevController):
             bus = parse_hex(pci_config.get('bus', 0))
             slot = parse_hex(pci_config.get('slot', 0))
             func = parse_hex(pci_config.get('func', 0))            
-            vslot = parse_hex(pci_config.get('vslot',
-                                             '0x' + AUTO_PHP_SLOT_STR))
+            vdevfn = parse_hex(pci_config.get('vdevfn', \
+                                              '0x%02x' % AUTO_PHP_SLOT))
 
             if pci_config.has_key('opts'):
                 opts = serialise_pci_opts(pci_config['opts'])
@@ -84,7 +84,8 @@ class PciController(DevController):
             back['dev-%i' % pcidevid] = "%04x:%02x:%02x.%01x" % \
                                         (domain, bus, slot, func)
             back['uuid-%i' % pcidevid] = pci_config.get('uuid', '')
-            back['vslot-%i' % pcidevid] = "%02x" % vslot
+            back['key-%i' % pcidevid] = pci_config.get('key', '')
+            back['vdevfn-%i' % pcidevid] = "%02x" % vdevfn
             pcidevid += 1
 
         back['num_devs']=str(pcidevid)
@@ -114,6 +115,7 @@ class PciController(DevController):
                 dev = back['dev-%i' % i]
                 state = states[i]
                 uuid = back['uuid-%i' %i]
+                key = back['key-%i' %i]
                 opts = ''
                 if 'opts-%i' % i in back:
                     opts = back['opts-%i' % i]
@@ -136,11 +138,12 @@ class PciController(DevController):
                 self.writeBackend(devid, 'state-%i' % devno,
                                   str(xenbusState['Initialising']))
                 self.writeBackend(devid, 'uuid-%i' % devno, uuid)
+                self.writeBackend(devid, 'key-%i' % devno, key)
                 if len(opts) > 0:
                     self.writeBackend(devid, 'opts-%i' % devno, opts)
-                if back.has_key('vslot-%i' % i):
-                    self.writeBackend(devid, 'vslot-%i' % devno,
-                                      back['vslot-%i' % i])
+                if back.has_key('vdevfn-%i' % i):
+                    self.writeBackend(devid, 'vdevfn-%i' % devno,
+                                      back['vdevfn-%i' % i])
 
                 # If a device is being attached then num_devs will grow
                 if attaching:
@@ -174,7 +177,9 @@ class PciController(DevController):
 
             # Per device uuid info
             pci_dev['uuid'] = self.readBackend(devid, 'uuid-%d' % i)
-            pci_dev['vslot'] = '0x%s' % self.readBackend(devid, 'vslot-%d' % i)
+            pci_dev['key'] = self.readBackend(devid, 'key-%d' % i)
+            pci_dev['vdevfn'] = '0x%s' % self.readBackend(devid,
+                                                          'vdevfn-%d' % i)
 
             #append opts info
             opts = self.readBackend(devid, 'opts-%d' % i)
@@ -501,7 +506,7 @@ class PciController(DevController):
                 # In HVM case, I/O resources are disabled in ioemu.
                 self.cleanupOneDevice(pci_dev)
                 # Remove xenstore nodes.
-                list = ['dev', 'vdev', 'state', 'uuid', 'vslot']
+                list = ['dev', 'vdev', 'state', 'uuid', 'vdevfn', 'key']
                 if self.readBackend(devid, 'opts-%i' % i) is not None:
                     list.append('opts')
                 for key in list:
@@ -511,7 +516,7 @@ class PciController(DevController):
                 if new_num_devs == i + 1:
                     continue
 
-                list = ['dev', 'vdev', 'state', 'uuid', 'opts', 'vslot']
+                list = ['dev', 'vdev', 'state', 'uuid', 'opts', 'vdevfn', 'key']
                 for key in list:
                     tmp = self.readBackend(devid, '%s-%i' % (key, i))
                     if tmp is None:

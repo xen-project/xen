@@ -32,7 +32,7 @@ from xen.xend.XendDSCSI import XendDSCSI
 from xen.xend.XendError import VmError
 from xen.xend.XendDevices import XendDevices
 from xen.xend.PrettyPrint import prettyprintstring
-from xen.xend.XendConstants import DOM_STATE_HALTED, AUTO_PHP_SLOT_STR
+from xen.xend.XendConstants import DOM_STATE_HALTED, AUTO_PHP_SLOT
 from xen.xend.xenstore.xstransact import xstransact
 from xen.xend.server.BlktapController import blktap_disk_types
 from xen.xend.server.netif import randomMAC
@@ -1249,8 +1249,8 @@ class XendConfig(dict):
             dpci_record = {
                 'VM': self['uuid'],
                 'PPCI': ppci_uuid,
-                'hotplug_slot': pci_dev.get('vslot',
-                                            '0x' + AUTO_PHP_SLOT_STR)
+                'hotplug_slot': pci_dev.get('vdevfn', '0x%02x' % AUTO_PHP_SLOT),
+                'key': pci_dev['key']
             }
 
             dpci_opts = pci_dev.get('opts')
@@ -2065,8 +2065,8 @@ class XendConfig(dict):
                 bus = sxp.child_value(dev, 'bus')
                 slot = sxp.child_value(dev, 'slot')
                 func = sxp.child_value(dev, 'func')
-                vslot = sxp.child_value(dev, 'vslot')
+                vdevfn = sxp.child_value(dev, 'vdevfn')
                 opts = pci_opts_list_from_sxp(dev)
-                pci.append([domain, bus, slot, func, vslot, opts])
+                pci.append([domain, bus, slot, func, vdevfn, opts])
         self['platform']['pci'] = pci
 
