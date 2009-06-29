@@ -126,3 +126,9 @@ static struct cpuidle_governor menu_governor =
 };
 
 struct cpuidle_governor *cpuidle_current_governor = &menu_governor;
+void menu_get_trace_data(u32 *expected, u32 *pred)
+{
+    struct menu_device *data = &__get_cpu_var(menu_devices);
+    *expected = data->expected_us;
+    *pred = data->predicted_us;
+}

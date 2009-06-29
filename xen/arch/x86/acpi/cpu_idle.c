@@ -58,6 +58,7 @@ static void (*lapic_timer_on)(void);
 extern u32 pmtmr_ioport;
 extern void (*pm_idle) (void);
 extern void (*dead_idle) (void);
+extern void menu_get_trace_data(u32 *expected, u32 *pred);
 
 static void (*pm_idle_save) (void) __read_mostly;
 unsigned int max_cstate __read_mostly = ACPI_PROCESSOR_MAX_POWER - 1;
@@ -196,6 +197,7 @@ static void acpi_processor_idle(void)
     int next_state;
     int sleep_ticks = 0;
     u32 t1, t2 = 0;
+    u32 exp = 0, pred = 0;
 
     cpufreq_dbs_timer_suspend();
 
@@ -231,6 +233,7 @@ static void acpi_processor_idle(void)
             cx = power->safe_state;
         if ( cx->idx > max_cstate )
             cx = &power->states[max_cstate];
+        menu_get_trace_data(&exp, &pred);
     }
     if ( !cx )
     {
@@ -259,7 +262,7 @@ static void acpi_processor_idle(void)
             /* Get start time (ticks) */
             t1 = inl(pmtmr_ioport);
             /* Trace cpu idle entry */
-            TRACE_2D(TRC_PM_IDLE_ENTRY, cx->idx, t1);
+            TRACE_4D(TRC_PM_IDLE_ENTRY, cx->idx, t1, exp, pred);
             /* Invoke C2 */
             acpi_idle_do_entry(cx);
             /* Get end time (ticks) */
@@ -315,7 +318,7 @@ static void acpi_processor_idle(void)
         /* Get start time (ticks) */
         t1 = inl(pmtmr_ioport);
         /* Trace cpu idle entry */
-        TRACE_2D(TRC_PM_IDLE_ENTRY, cx->idx, t1);
+        TRACE_4D(TRC_PM_IDLE_ENTRY, cx->idx, t1, exp, pred);
         /* Invoke C3 */
         acpi_idle_do_entry(cx);
         /* Get end time (ticks) */
