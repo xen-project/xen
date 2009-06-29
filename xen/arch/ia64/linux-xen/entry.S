@@ -1555,7 +1555,7 @@ ia64_hypercall_table:
 	data8 do_sysctl			/*  */                  /* 35 */
 	data8 do_domctl			/*  */
 	data8 do_kexec_op		/*  */
-	data8 do_ni_hypercall		/*  */
+	data8 do_tmem_op		/*  */
 	data8 do_ni_hypercall		/*  */
 	data8 do_ni_hypercall		/*  */                 /* 40 */
 	data8 do_ni_hypercall		/*  */
