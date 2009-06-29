@@ -197,6 +197,8 @@
 ^tools/misc/xen-tmem-list-parse$
 ^tools/misc/xenperf$
 ^tools/misc/xenpm$
+^tools/misc/gtraceview$
+^tools/misc/gtracestat$
 ^tools/pygrub/build/.*$
 ^tools/python/build/.*$
 ^tools/python/xen/util/path\.py$
