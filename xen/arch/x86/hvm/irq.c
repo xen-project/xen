@@ -326,6 +326,9 @@ struct hvm_intack hvm_vcpu_has_pending_irq(struct vcpu *v)
     if ( unlikely(v->nmi_pending) )
         return hvm_intack_nmi;
 
+    if ( unlikely(v->mce_pending) )
+        return hvm_intack_mce;
+
     if ( vlapic_accept_pic_intr(v) && plat->vpic[0].int_output )
         return hvm_intack_pic(0);
 
@@ -345,6 +348,10 @@ struct hvm_intack hvm_vcpu_ack_pending_irq(
     {
     case hvm_intsrc_nmi:
         if ( !test_and_clear_bool(v->nmi_pending) )
+            intack = hvm_intack_none;
+        break;
+    case hvm_intsrc_mce:
+        if ( !test_and_clear_bool(v->mce_pending) )
             intack = hvm_intack_none;
         break;
     case hvm_intsrc_pic:

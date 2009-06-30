@@ -1771,6 +1771,8 @@ void hvm_rdtsc_intercept(struct cpu_user_regs *regs)
     regs->edx = (uint32_t)(tsc >> 32);
 }
 
+extern int intel_mce_rdmsr(u32 msr, u32 *lo, u32 *hi);
+extern int intel_mce_wrmsr(u32 msr, u64 value);
 int hvm_msr_read_intercept(struct cpu_user_regs *regs)
 {
     uint32_t ecx = regs->ecx;
@@ -1779,6 +1781,8 @@ int hvm_msr_read_intercept(struct cpu_user_regs *regs)
     uint64_t *var_range_base, *fixed_range_base;
     int index, mtrr;
     uint32_t cpuid[4];
+    uint32_t lo, hi;
+    int ret;
 
     var_range_base = (uint64_t *)v->arch.hvm_vcpu.mtrr.var_ranges;
     fixed_range_base = (uint64_t *)v->arch.hvm_vcpu.mtrr.fixed_ranges;
@@ -1794,18 +1798,6 @@ int hvm_msr_read_intercept(struct cpu_user_regs *regs)
 
     case MSR_IA32_APICBASE:
         msr_content = vcpu_vlapic(v)->hw.apic_base_msr;
-        break;
-
-    case MSR_IA32_MCG_CAP:
-    case MSR_IA32_MCG_STATUS:
-    case MSR_IA32_MC0_STATUS:
-    case MSR_IA32_MC1_STATUS:
-    case MSR_IA32_MC2_STATUS:
-    case MSR_IA32_MC3_STATUS:
-    case MSR_IA32_MC4_STATUS:
-    case MSR_IA32_MC5_STATUS:
-        /* No point in letting the guest see real MCEs */
-        msr_content = 0;
         break;
 
     case MSR_IA32_CR_PAT:
@@ -1858,7 +1850,17 @@ int hvm_msr_read_intercept(struct cpu_user_regs *regs)
          break;
 
     default:
-        return hvm_funcs.msr_read_intercept(regs);
+        ret = intel_mce_rdmsr(ecx, &lo, &hi);
+        if ( ret < 0 )
+            goto gp_fault;
+        else if ( ret )
+        {
+            msr_content = ((u64)hi << 32) | lo;
+            break;
+        }
+        /* ret == 0, This is not an MCE MSR, see other MSRs */
+        else if (!ret)
+            return hvm_funcs.msr_read_intercept(regs);
     }
 
     regs->eax = (uint32_t)msr_content;
@@ -1884,6 +1886,7 @@ int hvm_msr_write_intercept(struct cpu_user_regs *regs)
     struct vcpu *v = current;
     int index, mtrr;
     uint32_t cpuid[4];
+    int ret;
 
     hvm_cpuid(1, &cpuid[0], &cpuid[1], &cpuid[2], &cpuid[3]);
     mtrr = !!(cpuid[3] & bitmaskof(X86_FEATURE_MTRR));
@@ -1946,7 +1949,13 @@ int hvm_msr_write_intercept(struct cpu_user_regs *regs)
         break;
 
     default:
-        return hvm_funcs.msr_write_intercept(regs);
+        ret = intel_mce_wrmsr(ecx, msr_content);
+        if ( ret < 0 )
+            goto gp_fault;
+        else if ( ret )
+            break;
+        else if (!ret)
+            return hvm_funcs.msr_write_intercept(regs);
     }
 
     return X86EMUL_OKAY;

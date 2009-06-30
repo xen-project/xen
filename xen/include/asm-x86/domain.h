@@ -210,7 +210,6 @@ struct p2m_domain;
  * put into impact_header list. */
 struct bank_entry {
     struct list_head list;
-    int32_t cpu;
     uint16_t bank;
     uint64_t mci_status;
     uint64_t mci_addr;

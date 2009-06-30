@@ -69,7 +69,7 @@ extern void mctelem_consume_oldest_end(mctelem_cookie_t);
 extern void mctelem_ack(mctelem_class_t, mctelem_cookie_t);
 extern void mctelem_defer(mctelem_cookie_t);
 extern void mctelem_process_deferred(unsigned int,
-    int (*)(unsigned int, mctelem_cookie_t));
+    int (*)(mctelem_cookie_t));
 int mctelem_has_deferred(unsigned int);
 
 #endif

@@ -309,12 +309,13 @@ unsigned long do_iret(void)
        && !cpus_equal(v->cpu_affinity_tmp, v->cpu_affinity))
         vcpu_set_affinity(v, &v->cpu_affinity_tmp);
 
-   /*Currently, only inject vMCE to DOM0.*/
+   /* inject vMCE to PV_Guest including DOM0. */
     if (v->trap_priority >= VCPU_TRAP_NMI) {
-        printk(KERN_DEBUG "MCE: Return from vMCE# trap!");
-        if (d->domain_id == 0 && v->vcpu_id == 0) {
+        printk(KERN_DEBUG "MCE: Return from vMCE# trap!\n");
+        if ( v->vcpu_id == 0 ) {
             if ( !d->arch.vmca_msrs.nr_injection ) {
-                printk(KERN_WARNING "MCE: Ret from vMCE#, nr_injection is 0\n");
+                printk(KERN_WARNING "MCE: Ret from vMCE#, "
+                       "No injection Node\n");
                 goto end;
             }
 

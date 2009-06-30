@@ -10,6 +10,7 @@
 #include <public/sysctl.h>
 #include <asm/system.h>
 #include <asm/msr.h>
+#include <asm/p2m.h>
 #include "mce.h"
 #include "x86_mca.h"
 
@@ -224,7 +225,7 @@ static struct bank_entry* alloc_bank_entry(void) {
       for vMCE# MSRs virtualization
 */
 
-static int fill_vmsr_data(int cpu, struct mcinfo_bank *mc_bank, 
+static int fill_vmsr_data(struct mcinfo_bank *mc_bank, 
         uint64_t gstatus) {
     struct domain *d;
     struct bank_entry *entry;
@@ -240,28 +241,89 @@ static int fill_vmsr_data(int cpu, struct mcinfo_bank *mc_bank,
             return 0;
         }
 
+        /* For HVM guest, Only when first vMCE is consumed by HVM guest successfully,
+         * will we generete another node and inject another vMCE
+         */
+        if ( (d->is_hvm) && (d->arch.vmca_msrs.nr_injection > 0) )
+        {
+            printk(KERN_DEBUG "MCE: HVM guest has not handled previous"
+                        " vMCE yet!\n");
+            return -1;
+        }
         entry = alloc_bank_entry();
         if (entry == NULL)
-	    return -1;
+            return -1;
+
         entry->mci_status = mc_bank->mc_status;
         entry->mci_addr = mc_bank->mc_addr;
         entry->mci_misc = mc_bank->mc_misc;
-        entry->cpu = cpu;
         entry->bank = mc_bank->mc_bank;
 
-	spin_lock(&d->arch.vmca_msrs.lock);
+        spin_lock(&d->arch.vmca_msrs.lock);
         /* New error Node, insert to the tail of the per_dom data */
         list_add_tail(&entry->list, &d->arch.vmca_msrs.impact_header);
         /* Fill MSR global status */
         d->arch.vmca_msrs.mcg_status = gstatus;
         /* New node impact the domain, need another vMCE# injection*/
         d->arch.vmca_msrs.nr_injection++;
-	spin_unlock(&d->arch.vmca_msrs.lock);
+        spin_unlock(&d->arch.vmca_msrs.lock);
 
-        printk(KERN_DEBUG "MCE: Found error @[CPU%d BANK%d "
+        printk(KERN_DEBUG "MCE: Found error @[BANK%d "
                 "status %"PRIx64" addr %"PRIx64" domid %d]\n ",
-                entry->cpu, mc_bank->mc_bank,
-                mc_bank->mc_status, mc_bank->mc_addr, mc_bank->mc_domid);
+                mc_bank->mc_bank, mc_bank->mc_status, mc_bank->mc_addr,
+                mc_bank->mc_domid);
+    }
+    return 0;
+}
+
+static int inject_mce(struct domain *d)
+{
+    int cpu = smp_processor_id();
+    cpumask_t affinity;
+
+    /* PV guest and HVM guest have different vMCE# injection
+     * methods*/
+
+    if ( !test_and_set_bool(d->vcpu[0]->mce_pending) )
+    {
+        if (d->is_hvm)
+        {
+            printk(KERN_DEBUG "MCE: inject vMCE to HVM DOM %d\n", 
+                        d->domain_id);
+            vcpu_kick(d->vcpu[0]);
+        }
+        /* PV guest including DOM0 */
+        else
+        {
+            printk(KERN_DEBUG "MCE: inject vMCE to PV DOM%d\n", 
+                        d->domain_id);
+            if (guest_has_trap_callback
+                   (d, 0, TRAP_machine_check))
+            {
+                d->vcpu[0]->cpu_affinity_tmp =
+                        d->vcpu[0]->cpu_affinity;
+                cpus_clear(affinity);
+                cpu_set(cpu, affinity);
+                printk(KERN_DEBUG "MCE: CPU%d set affinity, old %d\n", cpu,
+                            d->vcpu[0]->processor);
+                vcpu_set_affinity(d->vcpu[0], &affinity);
+                vcpu_kick(d->vcpu[0]);
+            }
+            else
+            {
+                printk(KERN_DEBUG "MCE: Kill PV guest with No MCE handler\n");
+                domain_crash(d);
+            }
+        }
+    }
+    else {
+        /* new vMCE comes while first one has not been injected yet,
+         * in this case, inject fail. [We can't lose this vMCE for
+         * the mce node's consistency].
+        */
+        printk(KERN_DEBUG "There's a pending vMCE waiting to be injected "
+                    " to this DOM%d!\n", d->domain_id);
+        return -1;
     }
     return 0;
 }
@@ -272,7 +334,7 @@ void intel_UCR_handler(struct mcinfo_bank *bank,
              struct mca_handle_result *result)
 {
     struct domain *d;
-    unsigned long mfn;
+    unsigned long mfn, gfn;
     uint32_t status;
 
     printk(KERN_DEBUG "MCE: Enter EWB UCR recovery action\n");
@@ -280,6 +342,7 @@ void intel_UCR_handler(struct mcinfo_bank *bank,
     if (bank->mc_addr != 0) {
          mfn = bank->mc_addr >> PAGE_SHIFT;
          if (!offline_page(mfn, 1, &status)) {
+              /* This is free page */
               if (status & PG_OFFLINE_OFFLINED)
                   result->result = MCA_RECOVERED;
               else if (status & PG_OFFLINE_PENDING) {
@@ -289,9 +352,35 @@ void intel_UCR_handler(struct mcinfo_bank *bank,
                       result->owner = status >> PG_OFFLINE_OWNER_SHIFT;
                       printk(KERN_DEBUG "MCE: This error page is ownded"
                                   " by DOM %d\n", result->owner);
-                      if (result->owner != 0 && result->owner != DOMID_XEN) {
+                      /* Fill vMCE# injection and vMCE# MSR virtualization "
+                       * "related data */
+                      bank->mc_domid = result->owner;
+                      if ( result->owner != DOMID_XEN ) {
                           d = get_domain_by_id(result->owner);
-                          domain_crash(d);
+                          gfn =
+                              mfn_to_gmfn(d, ((bank->mc_addr) >> PAGE_SHIFT));
+                          bank->mc_addr =
+                              gfn << PAGE_SHIFT | (bank->mc_addr & PAGE_MASK);
+                          if (fill_vmsr_data(bank, global->mc_gstatus) == -1)
+                          {
+                              printk(KERN_DEBUG "Fill vMCE# data for DOM%d "
+                                      "failed\n", result->owner);
+                              domain_crash(d);
+                              return;
+                          }
+                          /* We will inject vMCE to DOMU*/
+                          if ( inject_mce(d) < 0 )
+                          {
+                              printk(KERN_DEBUG "inject vMCE to DOM%d"
+                                          " failed\n", d->domain_id);
+                              domain_crash(d);
+                              return;
+                          }
+                          /* Impacted domain go on with domain's recovery job
+                           * if the domain has its own MCA handler.
+                           * For xen, it has contained the error and finished
+                           * its own recovery job.
+                           */
                           result->result = MCA_RECOVERED;
                       }
                   }
@@ -309,7 +398,7 @@ struct mca_error_handler intel_recovery_handler[INTEL_MAX_RECOVERY] =
  * should be committed for dom0 consumption, 0 if it should be
  * dismissed.
  */
-static int mce_action(unsigned int cpu, mctelem_cookie_t mctc)
+static int mce_action(mctelem_cookie_t mctc)
 {
     struct mc_info *local_mi;
     uint32_t i;
@@ -335,9 +424,6 @@ static int mce_action(unsigned int cpu, mctelem_cookie_t mctc)
             continue;
         }
         mc_bank = (struct mcinfo_bank*)mic;
-        /* Fill vMCE# injection and vMCE# MSR virtualization related data */
-        if (fill_vmsr_data(cpu, mc_bank, mc_global->mc_gstatus) == -1)
-             break;
 
         /* TODO: Add recovery actions here, such as page-offline, etc */
         memset(&mca_res, 0x0f, sizeof(mca_res));
@@ -386,7 +472,6 @@ static void mce_softirq(void)
 {
     int cpu = smp_processor_id();
     unsigned int workcpu;
-    cpumask_t affinity;
 
     printk(KERN_DEBUG "CPU%d enter softirq\n", cpu);
 
@@ -417,27 +502,13 @@ static void mce_softirq(void)
          * vMCE MSRs virtualization buffer
          */
         for_each_online_cpu(workcpu) {
-	    mctelem_process_deferred(workcpu, mce_action);
+            mctelem_process_deferred(workcpu, mce_action);
         }
 
         /* Step2: Send Log to DOM0 through vIRQ */
         if (dom0 && guest_enabled_event(dom0->vcpu[0], VIRQ_MCA)) {
             printk(KERN_DEBUG "MCE: send MCE# to DOM0 through virq\n");
             send_guest_global_virq(dom0, VIRQ_MCA);
-        }
-
-        /* Step3: Inject vMCE to impacted DOM. Currently we cares DOM0 only */
-        if (guest_has_trap_callback
-               (dom0, 0, TRAP_machine_check) &&
-                 !test_and_set_bool(dom0->vcpu[0]->mce_pending)) {
-            dom0->vcpu[0]->cpu_affinity_tmp = 
-                    dom0->vcpu[0]->cpu_affinity;
-            cpus_clear(affinity);
-            cpu_set(cpu, affinity);
-            printk(KERN_DEBUG "MCE: CPU%d set affinity, old %d\n", cpu,
-                dom0->vcpu[0]->processor);
-            vcpu_set_affinity(dom0->vcpu[0], &affinity);
-            vcpu_kick(dom0->vcpu[0]);
         }
     }
 
@@ -1057,7 +1128,27 @@ int intel_mce_wrmsr(u32 msr, u64 value)
         break;
     case MSR_IA32_MCG_STATUS:
         d->arch.vmca_msrs.mcg_status = value;
-        gdprintk(XENLOG_DEBUG, "MCE: wrmsr MCG_CTL %"PRIx64"\n", value);
+        gdprintk(XENLOG_DEBUG, "MCE: wrmsr MCG_STATUS %"PRIx64"\n", value);
+        /* For HVM guest, this is the point for deleting vMCE injection node */
+        if ( (d->is_hvm) && (d->arch.vmca_msrs.nr_injection >0) )
+        {
+            d->arch.vmca_msrs.nr_injection--; /* Should be 0 */
+            if (!list_empty(&d->arch.vmca_msrs.impact_header)) {
+                entry = list_entry(d->arch.vmca_msrs.impact_header.next,
+                    struct bank_entry, list);
+                if (entry->mci_status & MCi_STATUS_VAL)
+                    gdprintk(XENLOG_ERR, "MCE: MCi_STATUS MSR should have "
+                                "been cleared before write MCG_STATUS MSR\n");
+
+                gdprintk(XENLOG_DEBUG, "MCE: Delete HVM last injection "
+                                "Node, nr_injection %u\n",
+                                d->arch.vmca_msrs.nr_injection);
+                list_del(&entry->list);
+            }
+            else
+                gdprintk(XENLOG_DEBUG, "MCE: Not found HVM guest"
+                    " last injection Node, something Wrong!\n");
+        }
         break;
     case MSR_IA32_MCG_CAP:
         gdprintk(XENLOG_WARNING, "MCE: MCG_CAP is read-only\n");

@@ -153,7 +153,7 @@ void mctelem_defer(mctelem_cookie_t cookie)
 }
 
 void mctelem_process_deferred(unsigned int cpu,
-			      int (*fn)(unsigned int, mctelem_cookie_t))
+			      int (*fn)(mctelem_cookie_t))
 {
 	struct mctelem_ent *tep;
 	struct mctelem_ent *head, *prev;
@@ -189,7 +189,7 @@ void mctelem_process_deferred(unsigned int cpu,
 		prev = tep->mcte_prev;
 		tep->mcte_next = tep->mcte_prev = NULL;
 
-		ret = fn(cpu, MCTE2COOKIE(tep));
+		ret = fn(MCTE2COOKIE(tep));
 		if (prev != NULL)
 			prev->mcte_next = NULL;
 		tep->mcte_prev = tep->mcte_next = NULL;

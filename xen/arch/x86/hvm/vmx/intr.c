@@ -157,6 +157,10 @@ asmlinkage void vmx_intr_assist(void)
     {
         vmx_inject_nmi();
     }
+    else if ( intack.source == hvm_intsrc_mce )
+    {
+        vmx_inject_hw_exception(TRAP_machine_check, HVM_DELIVER_NO_ERROR_CODE);
+    }
     else
     {
         HVMTRACE_2D(INJ_VIRQ, intack.vector, /*fake=*/ 0);
