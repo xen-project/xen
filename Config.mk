@@ -148,9 +148,9 @@ QEMU_REMOTE=http://xenbits.xensource.com/git-http/qemu-xen-unstable.git
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= d67e46f6860bfbd8991b7691efc1f67b7bc413bc
-# Thu Jun 25 18:40:33 2009 +0100
-# Merge branch 'pt.multifn'
+QEMU_TAG ?= b471f03d51cde3976b6d52179ca2a86d8906a587
+# Tue Jun 30 15:22:14 2009 +0100
+# cpu_unregister_map_client: fix memory leak
 
 OCAML_XENSTORED_REPO=http://xenbits.xensource.com/ext/xen-ocaml-tools.hg
 
