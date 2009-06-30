@@ -145,10 +145,6 @@ u64 alloc_pgtable_maddr(struct acpi_drhd_unit *drhd, unsigned long npages)
     u64 *vaddr;
 
     rhsa = drhd_to_rhsa(drhd);
-    if ( !rhsa )
-        dprintk(XENLOG_INFO VTDPREFIX,
-                "IOMMU: RHSA == NULL, IO NUMA memory allocation disabled\n");
-
     pg = alloc_domheap_pages(NULL, get_order_from_pages(npages),
                              rhsa ? rhsa->domain : 0);
     if ( !pg )
