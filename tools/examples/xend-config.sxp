@@ -51,7 +51,7 @@
 # Optionally, the TCP Xen-API server can use SSL by specifying the private
 # key and certificate location:
 #
-#                    (9367 pam '' /etc/xen/xen-api.key /etc/xen/xen-api.crt)
+#                    (9367 pam '' xen-api.key xen-api.crt)
 #
 # Default:
 #   (xen-api-server ((unix)))
@@ -77,8 +77,8 @@
 # SSL key and certificate to use for the legacy TCP XMLRPC interface.
 # Setting these will mean that this port serves only SSL connections as
 # opposed to plaintext ones.
-#(xend-tcp-xmlrpc-server-ssl-key-file  /etc/xen/xmlrpc.key)
-#(xend-tcp-xmlrpc-server-ssl-cert-file /etc/xen/xmlrpc.crt)
+#(xend-tcp-xmlrpc-server-ssl-key-file  xmlrpc.key)
+#(xend-tcp-xmlrpc-server-ssl-cert-file xmlrpc.crt)
 
 
 # Port xend should use for the HTTP interface, if xend-http-server is set.
@@ -94,8 +94,8 @@
 
 # SSL key and certificate to use for the ssl relocation interface, if
 # xend-relocation-ssl-server is set.
-#(xend-relocation-server-ssl-key-file  /etc/xen/xmlrpc.key)
-#(xend-relocation-server-ssl-cert-file  /etc/xen/xmlrpc.crt)
+#(xend-relocation-server-ssl-key-file   xmlrpc.key)
+#(xend-relocation-server-ssl-cert-file  xmlrpc.crt)
 
 # Whether to use ssl as default when relocating.
 #(xend-relocation-ssl no)
@@ -219,7 +219,7 @@
 # TightVNC/RealVNC/UltraVNC clients do not.
 #
 # To enable this create x509 certificates / keys in the
-# directory /etc/xen/vnc
+# directory ${XEN_CONFIG_DIR} + vnc
 #
 #  ca-cert.pem       - The CA certificate
 #  server-cert.pem   - The Server certificate signed by the CA
@@ -230,7 +230,7 @@
 
 # The certificate dir can be pointed elsewhere..
 #
-# (vnc-x509-cert-dir /etc/xen/vnc)
+# (vnc-x509-cert-dir vnc)
 
 # The server can be told to request & validate an x509
 # certificate from the client. Only clients with a cert

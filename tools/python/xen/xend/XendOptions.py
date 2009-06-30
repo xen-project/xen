@@ -199,10 +199,22 @@ class XendOptions:
                                       self.xend_tcp_xmlrpc_server_address_default)
 
     def get_xend_tcp_xmlrpc_server_ssl_key_file(self):
-        return self.get_config_string("xend-tcp-xmlrpc-server-ssl-key-file")
+        name = 'xend-tcp-xmlrpc-server-ssl-key-file'
+        file = self.get_config_string(name)
+        if os.path.dirname(file) == "":
+            file = auxbin.xen_configdir() + '/' + file;
+        if not os.path.exists(file):
+            raise XendError("invalid xend config %s: directory '%s' does not exist" % (name, file))
+        return file
 
     def get_xend_tcp_xmlrpc_server_ssl_cert_file(self):
-        return self.get_config_string("xend-tcp-xmlrpc-server-ssl-cert-file")
+        name = 'xend-tcp-xmlrpc-server-ssl-cert-file'
+        file = self.get_config_string(name)
+        if os.path.dirname(file) == "":
+            file = auxbin.xen_configdir() + '/' + file;
+        if not os.path.exists(file):
+            raise XendError("invalid xend config %s: directory '%s' does not exist" % (name, file))
+        return file
 
     def get_xend_unix_xmlrpc_server(self):
         return self.get_config_bool("xend-unix-xmlrpc-server",
@@ -221,10 +233,22 @@ class XendOptions:
                                     self.xend_relocation_ssl_server_default)
 
     def get_xend_relocation_server_ssl_key_file(self):
-        return self.get_config_string("xend-relocation-server-ssl-key-file")
+        name = 'xend-relocation-server-ssl-key-file'
+        file = self.get_config_string(name)
+        if os.path.dirname(file) == "":
+            file = auxbin.xen_configdir() + '/' + file;
+        if not os.path.exists(file):
+            raise XendError("invalid xend config %s: directory '%s' does not exist" % (name, file))
+        return file
 
     def get_xend_relocation_server_ssl_cert_file(self):
-        return self.get_config_string("xend-relocation-server-ssl-cert-file")
+        name = 'xend-relocation-server-ssl-cert-file'
+        file = self.get_config_string(name)
+        if os.path.dirname(file) == "":
+            file = auxbin.xen_configdir() + '/' + file;
+        if not os.path.exists(file):
+            raise XendError("invalid xend config %s: directory '%s' does not exist" % (name, file))
+        return file
 
     def get_xend_udev_event_server(self):
         return self.get_config_bool("xend-udev-event-server",
@@ -366,7 +390,13 @@ class XendOptions:
         return self.get_config_string('vnc-tls', self.xend_vnc_tls)
 
     def get_vnc_x509_cert_dir(self):
-        return self.get_config_string('vnc-x509-cert-dir', self.xend_vnc_x509_cert_dir)
+        name = 'vnc-x509-cert-dir'
+        vncdir = self.get_config_string(name, self.xend_vnc_x509_cert_dir)
+        if os.path.dirname(vncdir) == "":
+            vncdir = auxbin.xen_configdir() + '/' + vncdir
+        if not os.path.exists(vncdir):
+            raise XendError("invalid xend config %s: directory '%s' does not exist" % (name, vncdir))
+        return vncdir
 
     def get_vnc_x509_verify(self):
         return self.get_config_string('vnc-x509-verify', self.xend_vnc_x509_verify)
