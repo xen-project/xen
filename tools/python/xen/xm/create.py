@@ -718,7 +718,7 @@ def configure_disks(config_devs, vals):
     """
     for (uname, dev, mode, backend, protocol) in vals.disk:
         if uname.startswith('tap:'):
-            cls = 'tap'
+            cls = 'tap2'
         else:
             cls = 'vbd'
 

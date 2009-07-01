@@ -1114,7 +1114,7 @@ class XendConfig(dict):
                             controller = domain.getDeviceController(cls)
                             configs = controller.configurations(txn)
                             for config in configs:
-                                if sxp.name(config) in ('vbd', 'tap'):
+                                if sxp.name(config) in ('vbd', 'tap', 'tap2'):
                                     dev_uuid = sxp.child_value(config, 'uuid')
                                     dev_type, dev_cfg = self['devices'][dev_uuid]
                                     if sxp.child_value(config, 'bootable', None) is None:
@@ -1179,7 +1179,7 @@ class XendConfig(dict):
     def device_duplicate_check(self, dev_type, dev_info, defined_config, config):
         defined_devices_sxpr = self.all_devices_sxpr(target = defined_config)
         
-        if dev_type == 'vbd' or dev_type == 'tap':
+        if dev_type == 'vbd' or dev_type == 'tap' or dev_type == 'tap2':
             dev_uname = dev_info.get('uname')
             blkdev_name = dev_info.get('dev')
             devid = self._blkdev_name_to_number(blkdev_name)
@@ -1187,7 +1187,7 @@ class XendConfig(dict):
                 return
             
             for o_dev_type, o_dev_info in defined_devices_sxpr:
-                if o_dev_type == 'vbd' or o_dev_type == 'tap':
+                if o_dev_type == 'vbd' or o_dev_type == 'tap' or o_dev_type == 'tap2':
                     blkdev_file = blkdev_uname_to_file(dev_uname)
                     o_dev_uname = sxp.child_value(o_dev_info, 'uname')
                     if o_dev_uname != None:
@@ -1369,7 +1369,7 @@ class XendConfig(dict):
                 else:
                     dev_info['driver'] = 'paravirtualised'
 
-            if dev_type == 'tap':
+            if dev_type == 'tap' or dev_type == 'tap2':
                 if dev_info['uname'].split(':')[1] not in blktap_disk_types:
                     raise XendConfigError("tap:%s not a valid disk type" %
                                     dev_info['uname'].split(':')[1])
@@ -1406,7 +1406,7 @@ class XendConfig(dict):
                         # Compat hack -- mark first disk bootable
                         dev_info['bootable'] = int(not target[param])
                     target[param].append(dev_uuid)
-            elif dev_type == 'tap':
+            elif dev_type == 'tap' or dev_type == 'tap2':
                 if 'vbd_refs' not in target:
                     target['vbd_refs'] = []
                 if dev_uuid not in target['vbd_refs']:
@@ -1504,7 +1504,7 @@ class XendConfig(dict):
                 target['devices'][dev_uuid] = (dev_type, dev_info)
                 target['vif_refs'].append(dev_uuid)
             
-            elif dev_type in ('vbd', 'tap'):
+            elif dev_type in ('vbd', 'tap', 'tap2'):
                 dev_info['type'] = cfg_xenapi.get('type', 'Disk')
                 if dev_info['type'] == 'CD':
                     old_vbd_type = 'cdrom'

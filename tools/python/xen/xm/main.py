@@ -2371,7 +2371,7 @@ def parse_block_configuration(args):
     dom = args[0]
 
     if args[1].startswith('tap:'):
-        cls = 'tap'
+        cls = 'tap2'
     else:
         cls = 'vbd'
 
@@ -2706,7 +2706,9 @@ def xm_block_detach(args):
         dom = args[0]
         dev = args[1]
         dc = server.xend.domain.getBlockDeviceClass(dom, dev)
-        if dc == "tap":
+        if dc == "tap2":
+            detach(args, 'tap2')
+        elif dc == "tap":
             detach(args, 'tap')
         else:
             detach(args, 'vbd')

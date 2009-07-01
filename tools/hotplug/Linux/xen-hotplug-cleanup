@@ -18,6 +18,13 @@ vm=$(xenstore_read_default "/local/domain/${path_array[2]}/vm" "")
 # construct /vm/UUID/device/DEVCLASS/DEVID
 if [ "$vm" != "" ]; then
   vm_dev="$vm/device/${path_array[1]}/${path_array[3]}"
+
+  # if the vm path does not exist and the device class is 'vbd' then we may have
+  # a tap2 device
+  if [ ! $(xenstore-read "vm_dev" 2>/dev/null) ] \
+       && [ "${path_array[1]}" = "vbd" ]; then
+    vm_dev="$vm/device/tap2/${path_array[3]}"
+  fi
 else
   vm_dev=
 fi

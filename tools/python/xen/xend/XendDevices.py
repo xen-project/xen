@@ -20,7 +20,7 @@
 #
 
 from xen.xend.server import blkif, netif, tpmif, pciif, iopif, irqif, vfbif, vscsiif
-from xen.xend.server.BlktapController import BlktapController
+from xen.xend.server.BlktapController import BlktapController, Blktap2Controller
 from xen.xend.server.ConsoleController import ConsoleController
 
 
@@ -42,6 +42,7 @@ class XendDevices:
         'ioports': iopif.IOPortsController,
         'irq': irqif.IRQController,
         'tap': BlktapController,
+        'tap2': Blktap2Controller,
         'vfb': vfbif.VfbifController,
         'vkbd': vfbif.VkbdifController,
         'console': ConsoleController,

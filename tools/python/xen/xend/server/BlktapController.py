@@ -24,7 +24,7 @@ blktap_disk_types = [
     'ioemu',
     'tapdisk',
     ]
- 
+
 def doexec(args, inputtext=None):
     """Execute a subprocess, then return its return code, stdout and stderr"""
     proc = popen2.Popen3(args, True)
@@ -49,8 +49,7 @@ def parseDeviceString(device):
 
     return minor, device, control
 
-
-
+# blktap1 device controller
 class BlktapController(BlkifController):
     def __init__(self, vm):
         BlkifController.__init__(self, vm)
@@ -59,11 +58,6 @@ class BlktapController(BlkifController):
         """@see DevController#frontendRoot"""
         
         return "%s/device/vbd" % self.vm.getDomainPath()
-
-    def devicePath(self, devid):
-        """@see DevController#devicePath"""
-        
-        return "%s/device/vbd/%s" % (self.vm.vmpath, devid)
 
     def getDeviceDetails(self, config):
         (devid, back, front) = BlkifController.getDeviceDetails(self, config)
@@ -123,6 +117,20 @@ class BlktapController(BlkifController):
 
         return (devid, back, front)
 
+class Blktap2Controller(BlktapController):
+    def __init__(self, vm):
+        BlktapController.__init__(self, vm)
+
+    def backendPath(self, backdom, devid):
+        if self.deviceClass == 'tap2':
+            deviceClass = 'vbd'
+        else:
+            deviceClass = 'tap'
+        return "%s/backend/%s/%s/%d" % (backdom.getDomainPath(),
+                                        deviceClass,
+                                        self.vm.getDomid(), devid)
+
+
     def createDevice(self, config):
 
         uname = config.get('required_uname', '')
@@ -140,12 +148,16 @@ class BlktapController(BlkifController):
         stderr.close();
         if( out.find("blktap2") >= 0 ):
             blktap2_installed=1;
-           
+
         if typ in ('tap'):
-            if subtyp in ('tapdisk'):                                          
+            if subtyp in ('tapdisk'):
                 if params in ('ioemu', 'qcow2', 'vmdk', 'sync') or not blktap2_installed:
-                    log.warn('WARNING: using deprecated blktap module');
-                    return BlkifController.createDevice(self, config);
+                    # pass this device off to BlktapController
+                    log.warn('WARNING: using deprecated blktap module')
+                    self.deviceClass = 'tap'
+                    devid = BlktapController.createDevice(self, config)
+                    self.deviceClass = 'tap2'
+                    return devid
 
         cmd = [ TAPDISK_BINARY, '-n', '%s:%s' % (params, file) ]
         (rc,stdout,stderr) = doexec(cmd)
@@ -165,7 +177,32 @@ class BlktapController(BlkifController):
         #device is configured.  Then continue to create the device
         config.update({'uname' : 'phy:' + device.rstrip()})
 
-        self.deviceClass='vbd'
         devid = BlkifController.createDevice(self, config)
-        self.deviceClass='tap'
         return devid
+
+    # The new blocktap implementation requires a sysfs signal to close
+    # out disks.  This function is called from a thread when the
+    # domain is detached from the disk.
+    def finishDeviceCleanup(self, backpath, path):
+        """Perform any device specific cleanup
+
+        @backpath backend xenstore path.
+        @path frontend device path
+
+        """
+
+        #Figure out what we're going to wait on.
+        self.waitForBackend_destroy(backpath)
+
+        #Figure out the sysfs path.
+        pattern = re.compile('/dev/xen/blktap-2/tapdev(\d+)$')
+        ctrlid = pattern.search(path)
+        ctrl = '/sys/class/blktap2/blktap' + ctrlid.group(1)
+
+        #Close out the disk
+        f = open(ctrl + '/remove', 'w')
+        f.write('remove');
+        f.close()
+
+        return
+

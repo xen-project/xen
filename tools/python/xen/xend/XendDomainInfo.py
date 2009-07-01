@@ -538,12 +538,11 @@ class XendDomainInfo:
         @raise XendError: Failed pausing a domain
         """
         try:
-            bepath="/local/domain/0/backend/"
             if(self.domid):
-                
-                dev =  xstransact.List(bepath + 'vbd' + "/%d" % (self.domid,))
+                # get all blktap2 devices
+                dev =  xstransact.List(self.vmpath + 'device/tap2')
                 for x in dev:
-                    path = self.getDeviceController('vbd').readBackend(x, 'params')
+                    path = self.getDeviceController('tap2').readBackend(x, 'params')
                     if path and path.startswith('/dev/xen/blktap-2'):
                         #Figure out the sysfs path.
                         pattern = re.compile('/dev/xen/blktap-2/tapdev(\d+)$')
@@ -569,11 +568,10 @@ class XendDomainInfo:
         @raise XendError: Failed unpausing a domain
         """
         try:
-            bepath="/local/domain/0/backend/"
             if(self.domid):
-                dev =  xstransact.List(bepath + "vbd" + "/%d" % (self.domid,))
+                dev =  xstransact.List(self.vmpath + 'device/tap2')
                 for x in dev:
-                    path = self.getDeviceController('vbd').readBackend(x, 'params')
+                    path = self.getDeviceController('tap2').readBackend(x, 'params')
                     if path and path.startswith('/dev/xen/blktap-2'):
                         #Figure out the sysfs path.
                         pattern = re.compile('/dev/xen/blktap-2/tapdev(\d+)$')
@@ -812,6 +810,11 @@ class XendDomainInfo:
             try:
                 dev_config_dict['devid'] = devid = \
                     self._createDevice(dev_type, dev_config_dict)
+                if dev_type == 'tap2':
+                    # createDevice may create a blktap1 device if blktap2 is not
+                    # installed or if the blktap driver is not supported in
+                    # blktap1
+                    dev_type = self.getBlockDeviceClass(devid)
                 self._waitForDevice(dev_type, devid)
             except VmError, ex:
                 del self.info['devices'][dev_uuid]
@@ -821,7 +824,7 @@ class XendDomainInfo:
                 elif dev_type == 'vscsi':
                     for dev in dev_config_dict['devs']:
                         XendAPIStore.deregister(dev['uuid'], 'DSCSI')
-                elif dev_type == 'tap':
+                elif dev_type == 'tap' or dev_type == 'tap2':
                     self.info['vbd_refs'].remove(dev_uuid)
                 else:
                     self.info['%s_refs' % dev_type].remove(dev_uuid)
@@ -1200,9 +1203,9 @@ class XendDomainInfo:
         if self.domid is not None:
             
             #new blktap implementation may need a sysfs write after everything is torn down.
-            dev = self.getDeviceController(deviceClass).convertToDeviceNumber(devid)
-            path = self.getDeviceController(deviceClass).readBackend(dev, 'params')                
-            if path and path.startswith('/dev/xen/blktap-2'):
+            if deviceClass == 'tap2':
+                dev = self.getDeviceController(deviceClass).convertToDeviceNumber(devid)
+                path = self.getDeviceController(deviceClass).readBackend(dev, 'params')
                 frontpath = self.getDeviceController(deviceClass).frontendPath(dev)
                 backpath = xstransact.Read(frontpath, "backend")
                 thread.start_new_thread(self.getDeviceController(deviceClass).finishDeviceCleanup, (backpath, path))
@@ -1238,7 +1241,7 @@ class XendDomainInfo:
                     dev_info = self._getDeviceInfo_vif(mac)
                 else:
                     _, dev_info = sxprs[dev]
-            else:  # 'vbd' or 'tap'
+            else:  # 'vbd' or 'tap' or 'tap2'
                 dev_info = self._getDeviceInfo_vbd(dev)
                 # To remove the UUID of the device from refs,
                 # deviceClass must be always 'vbd'.
@@ -1267,7 +1270,7 @@ class XendDomainInfo:
             sxprs = []
             dev_num = 0
             for dev_type, dev_info in self.info.all_devices_sxpr():
-                if (deviceClass == 'vbd' and dev_type not in ['vbd', 'tap']) or \
+                if (deviceClass == 'vbd' and dev_type not in ['vbd', 'tap', 'tap2']) or \
                    (deviceClass != 'vbd' and dev_type != deviceClass):
                     continue
 
@@ -1295,12 +1298,27 @@ class XendDomainInfo:
             return sxprs
 
     def getBlockDeviceClass(self, devid):
-        # To get a device number from the devid,
-        # we temporarily use the device controller of VBD.
-        dev = self.getDeviceController('vbd').convertToDeviceNumber(devid)
-        dev_info = self._getDeviceInfo_vbd(dev)
-        if dev_info:
-            return dev_info[0]
+        # if the domain is running we can get the device class from xenstore.
+        # This is more accurate, as blktap1 devices show up as blktap2 devices
+        # in the config.
+        if self._stateGet() in (DOM_STATE_RUNNING, DOM_STATE_PAUSED, DOM_STATE_CRASHED):
+            # All block devices have a vbd frontend, so we know the frontend path
+            dev = self.getDeviceController('vbd').convertToDeviceNumber(devid)
+            frontendPath = "%s/device/vbd/%s" % (self.dompath, dev)
+            for devclass in XendDevices.valid_devices():
+                for dev in xstransact.List("%s/device/%s" % (self.vmpath, devclass)):
+                    devFrontendPath = xstransact.Read("%s/device/%s/%s/frontend" % (self.vmpath, devclass, dev))
+                    if frontendPath == devFrontendPath:
+                        return devclass
+
+        else: # the domain is not active so we must get the device class
+              # from the config
+            # To get a device number from the devid,
+            # we temporarily use the device controller of VBD.
+            dev = self.getDeviceController('vbd').convertToDeviceNumber(devid)
+            dev_info = self._getDeviceInfo_vbd(dev)
+            if dev_info:
+                return dev_info[0]
 
     def _getDeviceInfo_vif(self, mac):
         for dev_type, dev_info in self.info.all_devices_sxpr():
@@ -1311,7 +1329,7 @@ class XendDomainInfo:
 
     def _getDeviceInfo_vbd(self, devid):
         for dev_type, dev_info in self.info.all_devices_sxpr():
-            if dev_type != 'vbd' and dev_type != 'tap':
+            if dev_type != 'vbd' and dev_type != 'tap' and dev_type != 'tap2':
                 continue
             dev = sxp.child_value(dev_info, 'dev')
             dev = dev.split(':')[0]
@@ -2256,26 +2274,19 @@ class XendDomainInfo:
             log.debug("No device model")
 
         log.debug("Releasing devices")
-        t = xstransact("%s/device" % self.dompath)
+        t = xstransact("%s/device" % self.vmpath)
         try:
             for devclass in XendDevices.valid_devices():
                 for dev in t.list(devclass):
                     try:
-                        true_devclass = devclass
-                        if devclass == 'vbd':
-                            # In the case of "vbd", the true device class
-                            # may possibly be "tap". Just in case, verify
-                            # device class.
-                            devid = dev.split('/')[-1]
-                            true_devclass = self.getBlockDeviceClass(devid)
                         log.debug("Removing %s", dev);
-                        self.destroyDevice(true_devclass, dev, False);
+                        self.destroyDevice(devclass, dev, False);
                     except:
                         # Log and swallow any exceptions in removal --
                         # there's nothing more we can do.
                         log.exception("Device release failed: %s; %s; %s",
                                       self.info['name_label'],
-                                      true_devclass, dev)
+                                      devclass, dev)
         finally:
             t.abort()
 
@@ -2948,7 +2959,7 @@ class XendDomainInfo:
 
             fn = blkdev_uname_to_file(disk)
             taptype = blkdev_uname_to_taptype(disk)
-            mounted = devtype == 'tap' and taptype != 'aio' and taptype != 'sync' and not os.stat(fn).st_rdev
+            mounted = devtype in ['tap', 'tap2'] and taptype != 'aio' and taptype != 'sync' and not os.stat(fn).st_rdev
             if mounted:
                 # This is a file, not a device.  pygrub can cope with a
                 # file if it's raw, but if it's QCOW or other such formats
@@ -3052,7 +3063,8 @@ class XendDomainInfo:
             diff = time.time() - start
             vbds = self.getDeviceController('vbd').deviceIDs()
             taps = self.getDeviceController('tap').deviceIDs()
-            for i in vbds + taps:
+            tap2s = self.getDeviceController('tap2').deviceIDs()
+            for i in vbds + taps + tap2s:
                 test = 1
                 log.info("Dev %s still active, looping...", i)
                 time.sleep(0.1)
@@ -3635,7 +3647,7 @@ class XendDomainInfo:
         """
         xenapi_vbd['image'] = vdi_image_path
         if vdi_image_path.startswith('tap'):
-            dev_uuid = self.info.device_add('tap', cfg_xenapi = xenapi_vbd)
+            dev_uuid = self.info.device_add('tap2', cfg_xenapi = xenapi_vbd)
         else:
             dev_uuid = self.info.device_add('vbd', cfg_xenapi = xenapi_vbd)
             
@@ -3647,7 +3659,7 @@ class XendDomainInfo:
             _, config = self.info['devices'][dev_uuid]
             
             if vdi_image_path.startswith('tap'):
-                dev_control = self.getDeviceController('tap')
+                dev_control = self.getDeviceController('tap2')
             else:
                 dev_control = self.getDeviceController('vbd')
 
