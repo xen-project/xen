@@ -227,8 +227,7 @@ static int construct_vmcb(struct vcpu *v)
 
     vmcb->exception_intercepts =
         HVM_TRAP_MASK
-        | (1U << TRAP_no_device)
-        | (1U << TRAP_invalid_op);
+        | (1U << TRAP_no_device);
 
     if ( paging_mode_hap(v->domain) )
     {

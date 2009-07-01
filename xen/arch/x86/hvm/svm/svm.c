@@ -1226,24 +1226,16 @@ static void svm_vmexit_ud_intercept(struct cpu_user_regs *regs)
     switch ( rc )
     {
     case X86EMUL_UNHANDLEABLE:
-        gdprintk(XENLOG_WARNING,
-                 "instruction emulation failed @ %04x:%lx: "
-                 "%02x %02x %02x %02x %02x %02x\n",
-                 hvmemul_get_seg_reg(x86_seg_cs, &ctxt)->sel,
-                 ctxt.insn_buf_eip,
-                 ctxt.insn_buf[0], ctxt.insn_buf[1],
-                 ctxt.insn_buf[2], ctxt.insn_buf[3],
-                 ctxt.insn_buf[4], ctxt.insn_buf[5]);
-         return;
+        svm_inject_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE, 0);
+        break;
     case X86EMUL_EXCEPTION:
         if ( ctxt.exn_pending )
             hvm_inject_exception(ctxt.exn_vector, ctxt.exn_error_code, 0);
-        break;
+        /* fall through */
     default:
+        hvm_emulate_writeback(&ctxt);
         break;
     }
-
-    hvm_emulate_writeback(&ctxt);
 }
 
 static void wbinvd_ipi(void *info)

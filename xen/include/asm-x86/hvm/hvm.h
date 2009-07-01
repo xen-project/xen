@@ -268,7 +268,7 @@ static inline int hvm_do_pmu_interrupt(struct cpu_user_regs *regs)
         X86_CR4_OSFXSR | X86_CR4_OSXMMEXCPT)))
 
 /* These exceptions must always be intercepted. */
-#define HVM_TRAP_MASK (1U << TRAP_machine_check)
+#define HVM_TRAP_MASK ((1U << TRAP_machine_check) | (1U << TRAP_invalid_op))
 
 /*
  * x86 event types. This enumeration is valid for:
