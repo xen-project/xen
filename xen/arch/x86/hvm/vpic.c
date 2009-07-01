@@ -109,11 +109,9 @@ static void vpic_update_int_output(struct hvm_hw_vpic *vpic)
     {
         if ( vpic->is_master )
         {
-            /* Master INT line is connected to VCPU0's VLAPIC LVT0. */
-            struct vcpu *v = vpic_domain(vpic)->vcpu ?
-                vpic_domain(vpic)->vcpu[0] : NULL;
-
-            if ( (v != NULL) && vlapic_accept_pic_intr(v) )
+            /* Master INT line is connected in Virtual Wire Mode. */
+            struct vcpu *v = vpic_domain(vpic)->arch.hvm_domain.i8259_target;
+            if ( v != NULL )
                 vcpu_kick(v);
         }
         else

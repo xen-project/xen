@@ -57,6 +57,9 @@ struct hvm_domain {
     struct hvm_vioapic    *vioapic;
     struct hvm_hw_stdvga   stdvga;
 
+    /* VCPU which is current target for 8259 interrupts. */
+    struct vcpu           *i8259_target;
+
     /* hvm_print_line() logging. */
     char                   pbuf[80];
     int                    pbuf_idx;

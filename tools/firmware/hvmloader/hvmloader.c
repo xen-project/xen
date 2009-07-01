@@ -141,13 +141,17 @@ static void init_hypercalls(void)
 
 static void apic_setup(void)
 {
-    /* Set the IOAPIC ID to tha static value used in the MP/ACPI tables. */
+    /* Set the IOAPIC ID to the static value used in the MP/ACPI tables. */
     ioapic_write(0x00, IOAPIC_ID);
 
-    /* Set up Virtual Wire mode. */
+    /* NMIs are delivered direct to the BSP. */
     lapic_write(APIC_SPIV, APIC_SPIV_APIC_ENABLED | 0xFF);
-    lapic_write(APIC_LVT0, APIC_MODE_EXTINT << 8);
-    lapic_write(APIC_LVT1, APIC_MODE_NMI    << 8);
+    lapic_write(APIC_LVT0, (APIC_MODE_EXTINT << 8) | APIC_LVT_MASKED);
+    lapic_write(APIC_LVT1, APIC_MODE_NMI << 8);
+
+    /* 8259A ExtInts are delivered through IOAPIC pin 0 (Virtual Wire Mode). */
+    ioapic_write(0x10, APIC_DM_EXTINT);
+    ioapic_write(0x11, SET_APIC_ID(LAPIC_ID(0)));
 }
 
 static void pci_setup(void)

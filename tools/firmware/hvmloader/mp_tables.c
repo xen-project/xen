@@ -233,21 +233,6 @@ static void fill_mp_ioapic_entry(struct mp_ioapic_entry *mpie)
 }
 
 
-/* fills in an IO interrupt entry for IOAPIC 'ioapic_id' */
-static void fill_mp_io_intr_entry(
-    struct mp_io_intr_entry *mpiie,
-    int src_bus_id, int src_bus_irq, int ioapic_id, int dst_ioapic_intin)
-{
-    mpiie->type = ENTRY_TYPE_IO_INTR;
-    mpiie->intr_type = INTR_TYPE_INT;
-    mpiie->io_intr_flags = (PCI_ISA_IRQ_MASK & (1U<<src_bus_irq)) ? 0xf : 0x0;
-    mpiie->src_bus_id = src_bus_id;
-    mpiie->src_bus_irq = src_bus_irq;
-    mpiie->dst_ioapic_id = ioapic_id;
-    mpiie->dst_ioapic_intin = dst_ioapic_intin;
-}
-
-
 /* fill in the mp floating processor structure */
 static void fill_mpfps(struct mp_floating_pointer_struct *mpfps, uint32_t mpct)
 {
@@ -316,6 +301,7 @@ void create_mp_tables(void)
     void *mp_table_base;
     char *p;
     int vcpu_nr, i, length;
+    struct mp_io_intr_entry *mpiie;
 
     vcpu_nr = hvm_info->nr_vcpus;
 
@@ -343,12 +329,28 @@ void create_mp_tables(void)
     fill_mp_ioapic_entry((struct mp_ioapic_entry *)p);
     p += sizeof(struct mp_ioapic_entry);
 
+    /* I/O interrupt assignment: IOAPIC pin 0 is connected to 8259 ExtInt. */
+    mpiie = (struct mp_io_intr_entry *)p;
+    memset(mpiie, 0, sizeof(*mpiie));
+    mpiie->type = ENTRY_TYPE_IO_INTR;
+    mpiie->intr_type = INTR_TYPE_EXTINT;
+    mpiie->dst_ioapic_id = IOAPIC_ID;
+    p += sizeof(*mpiie);
+
+    /* I/O interrupt assignment for every legacy 8259 interrupt source. */
     for ( i = 0; i < 16; i++ )
     {
-        if ( i == 2 ) continue; /* skip the slave PIC connection */
-        fill_mp_io_intr_entry((struct mp_io_intr_entry *)p, 
-                              BUS_ID_ISA, i, IOAPIC_ID, (i == 0) ? 2 : i);
-        p += sizeof(struct mp_io_intr_entry);
+        if ( i == 2 )
+            continue; /* skip the slave PIC connection */
+        mpiie = (struct mp_io_intr_entry *)p;
+        mpiie->type = ENTRY_TYPE_IO_INTR;
+        mpiie->intr_type = INTR_TYPE_EXTINT;
+        mpiie->io_intr_flags = (PCI_ISA_IRQ_MASK & (1U << i)) ? 0xf : 0x0;
+        mpiie->src_bus_id = BUS_ID_ISA;
+        mpiie->src_bus_irq = i;
+        mpiie->dst_ioapic_id = IOAPIC_ID;
+        mpiie->dst_ioapic_intin = (i == 0) ? 2 : i;
+        p += sizeof(*mpiie);
     }
 
     length = p - (char *)mp_table_base;

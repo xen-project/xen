@@ -697,6 +697,8 @@ static int vlapic_write(struct vcpu *v, unsigned long address,
             val |= APIC_LVT_MASKED;
         val &= vlapic_lvt_mask[(offset - APIC_LVTT) >> 4];
         vlapic_set_reg(vlapic, offset, val);
+        if ( offset == APIC_LVT0 )
+            vlapic_adjust_i8259_target(v->domain);
         break;
 
     case APIC_TMICT:
@@ -776,18 +778,43 @@ void vlapic_msr_set(struct vlapic *vlapic, uint64_t value)
                 "apic base msr is 0x%016"PRIx64, vlapic->hw.apic_base_msr);
 }
 
-int vlapic_accept_pic_intr(struct vcpu *v)
+static int __vlapic_accept_pic_intr(struct vcpu *v)
 {
+    struct domain *d = v->domain;
     struct vlapic *vlapic = vcpu_vlapic(v);
     uint32_t lvt0 = vlapic_get_reg(vlapic, APIC_LVT0);
+    union vioapic_redir_entry redir0 = domain_vioapic(d)->redirtbl[0];
 
-    /*
-     * Only CPU0 is wired to the 8259A. INTA cycles occur if LINT0 is set up
-     * accept ExtInts, or if the LAPIC is disabled (so LINT0 behaves as INTR).
-     */
-    return ((v->vcpu_id == 0) &&
-            (((lvt0 & (APIC_MODE_MASK|APIC_LVT_MASKED)) == APIC_DM_EXTINT) ||
+    /* We deliver 8259 interrupts to the appropriate CPU as follows. */
+    return ((/* IOAPIC pin0 is unmasked and routing to this LAPIC? */
+             ((redir0.fields.delivery_mode == dest_ExtINT) &&
+              !redir0.fields.mask &&
+              redir0.fields.dest_id == VLAPIC_ID(vlapic) &&
+              !vlapic_disabled(vlapic)) ||
+             /* LAPIC has LVT0 unmasked for ExtInts? */
+             ((lvt0 & (APIC_MODE_MASK|APIC_LVT_MASKED)) == APIC_DM_EXTINT) ||
+             /* LAPIC is fully disabled? */
              vlapic_hw_disabled(vlapic)));
+}
+
+int vlapic_accept_pic_intr(struct vcpu *v)
+{
+    return ((v == v->domain->arch.hvm_domain.i8259_target) &&
+            __vlapic_accept_pic_intr(v));
+}
+
+void vlapic_adjust_i8259_target(struct domain *d)
+{
+    struct vcpu *v;
+
+    for_each_vcpu ( d, v )
+        if ( __vlapic_accept_pic_intr(v) )
+            goto found;
+
+    v = d->vcpu ? d->vcpu[0] : NULL;
+
+ found:
+    d->arch.hvm_domain.i8259_target = v;
 }
 
 int vlapic_has_pending_irq(struct vcpu *v)
@@ -946,6 +973,7 @@ static int lapic_load_regs(struct domain *d, hvm_domain_context_t *h)
     if ( hvm_load_entry(LAPIC_REGS, h, s->regs) != 0 ) 
         return -EINVAL;
 
+    vlapic_adjust_i8259_target(d);
     lapic_rearm(s);
     return 0;
 }

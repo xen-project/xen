@@ -146,10 +146,14 @@ static void vioapic_write_redirent(
 
     *pent = ent;
 
-    if ( (ent.fields.trig_mode == VIOAPIC_LEVEL_TRIG) &&
-         !ent.fields.mask &&
-         !ent.fields.remote_irr &&
-         hvm_irq->gsi_assert_count[idx] )
+    if ( idx == 0 )
+    {
+        vlapic_adjust_i8259_target(d);
+    }
+    else if ( (ent.fields.trig_mode == VIOAPIC_LEVEL_TRIG) &&
+              !ent.fields.mask &&
+              !ent.fields.remote_irr &&
+              hvm_irq->gsi_assert_count[idx] )
     {
         pent->fields.remote_irr = 1;
         vioapic_deliver(vioapic, idx);
@@ -159,8 +163,7 @@ static void vioapic_write_redirent(
 }
 
 static void vioapic_write_indirect(
-    struct hvm_hw_vioapic *vioapic, unsigned long addr,
-    unsigned long length, unsigned long val)
+    struct hvm_hw_vioapic *vioapic, unsigned long length, unsigned long val)
 {
     switch ( vioapic->ioregsel )
     {
@@ -213,7 +216,7 @@ static int vioapic_write(
         break;
 
     case VIOAPIC_REG_WINDOW:
-        vioapic_write_indirect(vioapic, addr, length, val);
+        vioapic_write_indirect(vioapic, length, val);
         break;
 
 #if VIOAPIC_IS_IOSAPIC
