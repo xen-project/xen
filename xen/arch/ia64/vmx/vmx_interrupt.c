@@ -80,7 +80,7 @@ collect_interruption(VCPU *vcpu)
     if ( vdcr & IA64_DCR_PP ) {
         vpsr.val |= IA64_PSR_PP;
     } else {
-        vpsr.val &= ~IA64_PSR_PP;;
+        vpsr.val &= ~IA64_PSR_PP;
     }
 
     vmx_vcpu_set_psr(vcpu, vpsr.val);

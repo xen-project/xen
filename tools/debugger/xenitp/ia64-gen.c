@@ -569,7 +569,7 @@ fetch_insn_class (const char *full_name, int create)
 
       ics[ind]->nsubs = 1;
       ics[ind]->subs = tmalloc(int);
-      ics[ind]->subs[0] = fetch_insn_class (subname, 1);;
+      ics[ind]->subs[0] = fetch_insn_class (subname, 1);
     }
 
   while (xsect)

@@ -1093,7 +1093,7 @@ getreg (unsigned long regnum, unsigned long *val, int *nat, struct pt_regs *regs
 	} else {
 		addr = (unsigned long)regs;
 #if defined(XEN)
-		unat = &regs->eml_unat;;
+		unat = &regs->eml_unat;
 #else
 		unat = &sw->caller_unat;
 #endif

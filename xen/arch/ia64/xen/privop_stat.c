@@ -58,7 +58,7 @@ void privop_count_addr(unsigned long iip, enum privop_inst inst)
 			return;
 		}
 	}
-	v->overflow++;;
+	v->overflow++;
 }
 
 void gather_privop_addrs(void)

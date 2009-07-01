@@ -145,7 +145,7 @@ long do_acm_op(XEN_GUEST_HANDLE(xen_acmctl_t) u_acmctl)
             if (!subj)
             {
                 rc = -ESRCH; /* domain not found */
-                break;;
+                break;
             }
             if (subj->ssid == NULL)
             {

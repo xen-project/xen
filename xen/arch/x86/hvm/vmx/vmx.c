@@ -2334,7 +2334,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         switch ( exit_reason )
         {
         case EXIT_REASON_EXCEPTION_NMI:
-            vector = __vmread(VM_EXIT_INTR_INFO) & INTR_INFO_VECTOR_MASK;;
+            vector = __vmread(VM_EXIT_INTR_INFO) & INTR_INFO_VECTOR_MASK;
             if ( vector != TRAP_page_fault
                  && vector != TRAP_nmi 
                  && vector != TRAP_machine_check ) 

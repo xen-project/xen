@@ -133,7 +133,7 @@ out:
 int pci_remove_device(u8 bus, u8 devfn)
 {
     struct pci_dev *pdev;
-    int ret = -ENODEV;;
+    int ret = -ENODEV;
 
     spin_lock(&pcidevs_lock);
     list_for_each_entry ( pdev, &alldevs_list, alldevs_list )
@@ -164,7 +164,7 @@ int pci_add_device_ext(u8 bus, u8 devfn, struct pci_dev_info *info)
     else if (info->is_virtfn)
         pdev_type = "Virtual Function";
     else
-    	return -EINVAL;;
+        return -EINVAL;
 
 
     ret = -ENOMEM;

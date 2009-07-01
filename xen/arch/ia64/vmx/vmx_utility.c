@@ -619,7 +619,7 @@ IA64FAULT check_target_register(VCPU *vcpu, u64 reg_index)
     sof = regs->cr_ifs & 0x7f;
     if(reg_index >= sof + 32)
         return IA64_FAULT;
-    return IA64_NO_FAULT;;
+    return IA64_NO_FAULT;
 }
 
 

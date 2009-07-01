@@ -1418,7 +1418,7 @@ int tdb_traverse(TDB_CONTEXT *tdb, tdb_traverse_func fn, void *private)
 			/* They want us to terminate traversal */
 			ret = count;
 			if (unlock_record(tdb, tl.off) != 0) {
-				TDB_LOG((tdb, 0, "tdb_traverse: unlock_record failed!\n"));;
+				TDB_LOG((tdb, 0, "tdb_traverse: unlock_record failed!\n"));
 				ret = -1;
 			}
 			tdb->travlocks.next = tl.next;
