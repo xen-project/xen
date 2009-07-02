@@ -583,7 +583,7 @@ int xc_exchange_page(int xc_handle, int domid, xen_pfn_t mfn)
     /* Don't exchange CR3 for PAE guest in PAE host environment */
     if (minfo.guest_width > sizeof(long))
     {
-        if ( (minfo.pfn_type[mfn] & XEN_DOMCTL_PFINFO_LTABTYPE_MASK) ==
+        if ( (minfo.pfn_type[gpfn] & XEN_DOMCTL_PFINFO_LTABTYPE_MASK) ==
                     XEN_DOMCTL_PFINFO_L3TAB )
             goto failed;
     }
@@ -621,7 +621,7 @@ int xc_exchange_page(int xc_handle, int domid, xen_pfn_t mfn)
     old_ptes.cur = 0;
 
     /* Unpin the page if it is pined */
-    if (minfo.pfn_type[mfn] & XEN_DOMCTL_PFINFO_LPINTAB)
+    if (minfo.pfn_type[gpfn] & XEN_DOMCTL_PFINFO_LPINTAB)
     {
         mops.cmd = MMUEXT_UNPIN_TABLE;
         mops.arg1.mfn = mfn;
