@@ -1120,6 +1120,8 @@ class XendConfig(dict):
                                     if sxp.child_value(config, 'bootable', None) is None:
                                         is_bootable = dev_cfg.get('bootable', 0)
                                         config.append(['bootable', int(is_bootable)])
+                                    if dev_cfg.has_key('required_uname'):
+                                        config.append(['required_uname', dev_cfg['required_uname']])
                                     config.append(['VDI', dev_cfg.get('VDI', '')])
 
                                 sxpr.append(['device', config])
@@ -1370,10 +1372,16 @@ class XendConfig(dict):
                     dev_info['driver'] = 'paravirtualised'
 
             if dev_type == 'tap' or dev_type == 'tap2':
+                if dev_info.has_key('required_uname'):
+                    # Restore uname by required_uname because uname might
+                    # be replaced with 'phy:/dev/xen/blktap-2/tapdev*'.
+                    dev_info['uname'] = dev_info['required_uname']
+                else:
+                    # Save uname for next domain start.
+                    dev_info['required_uname'] = dev_info['uname']
                 if dev_info['uname'].split(':')[1] not in blktap_disk_types:
                     raise XendConfigError("tap:%s not a valid disk type" %
                                     dev_info['uname'].split(':')[1])
-                dev_info['required_uname'] = dev_info['uname']
 
             if dev_type == 'vif':
                 if not dev_info.get('mac'):
