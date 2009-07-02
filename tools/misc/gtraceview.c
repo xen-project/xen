@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <inttypes.h>
@@ -29,7 +30,12 @@
 #include <xenctrl.h>
 #include <xen/trace.h>
 
+#ifdef __Linux__
 #include <ncurses.h>
+#endif
+#ifdef __NetBSD__
+#include <curses.h>
+#endif
 
 /********** MACROS **********/
 #define MAX_CPU_NR  32

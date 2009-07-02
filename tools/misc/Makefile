@@ -57,6 +57,6 @@ xenperf xenpm gtracestat: %: %.o Makefile
 	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS) $(LDFLAGS_libxenctrl)
 
 gtraceview: %: %.o Makefile
-	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS) -lncurses
+	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS) $(CURSES_LIBS)
 
 -include $(DEPS)
