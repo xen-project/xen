@@ -89,12 +89,7 @@ DOM_STATES_OLD = [
     'dying'
     ]
 
-STATE_DOM_OK       = 1
-STATE_DOM_SHUTDOWN = 2
-
 SHUTDOWN_TIMEOUT = (60.0 * 5)
-
-ZOMBIE_PREFIX = 'Zombie-'
 
 """Minimum time between domain restarts in seconds."""
 MINIMUM_RESTART_TIME = 60
