@@ -1230,6 +1230,7 @@ class XendDomainInfo:
         if rm_cfg:
             if deviceClass == 'vif':
                 if self.domid is not None:
+                    mac = ''
                     for dev_num, dev_info in sxprs:
                         dev_num = int(dev_num)
                         if dev_num == dev:
