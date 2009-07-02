@@ -355,7 +355,6 @@ struct hvm_intack hvm_vcpu_ack_pending_irq(
             intack = hvm_intack_none;
         break;
     case hvm_intsrc_pic:
-        ASSERT(v->vcpu_id == 0);
         if ( (vector = vpic_ack_pending_irq(v)) == -1 )
             intack = hvm_intack_none;
         else
