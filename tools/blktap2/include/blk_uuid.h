@@ -27,7 +27,7 @@
 #ifndef __BLKTAP2_UUID_H__
 #define __BLKTAP2_UUID_H__
 
-#if defined(__linux__) || defined(__Linux__)
+#if defined(__linux__)
 
 #include <uuid/uuid.h>
 

@@ -30,7 +30,7 @@
 #include <xenctrl.h>
 #include <xen/trace.h>
 
-#ifdef __Linux__
+#ifdef __linux__
 #include <ncurses.h>
 #endif
 #ifdef __NetBSD__

@@ -28,7 +28,7 @@
 #define _VHD_LIB_H_
 
 #include <string.h>
-#if defined(__linux__) || defined(__Linux__)
+#if defined(__linux__)
 #include <endian.h>
 #include <byteswap.h>
 #elif defined(__NetBSD__)
@@ -44,7 +44,7 @@
 #endif
 
 #if BYTE_ORDER == LITTLE_ENDIAN
-#if defined(__linux__) || defined(__Linux__)
+#if defined(__linux__)
   #define BE16_IN(foo)             (*(foo)) = bswap_16(*(foo))
   #define BE32_IN(foo)             (*(foo)) = bswap_32(*(foo))
   #define BE64_IN(foo)             (*(foo)) = bswap_64(*(foo))

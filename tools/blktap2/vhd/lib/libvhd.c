@@ -1335,7 +1335,7 @@ vhd_macx_encode_location(char *name, char **out, int *outlen)
 	snprintf(uri, ibl+1, "file://%s", name);
 
 	if (iconv(cd,
-#if defined(__linux__) || defined(__Linux__)
+#ifdef __linux__
 	    (char **)
 #endif
 	    &urip, &ibl, &uri_utf8p, &obl) == (size_t)-1 ||
@@ -1425,7 +1425,7 @@ vhd_w2u_encode_location(char *name, char **out, int *outlen)
 	}
 
 	if (iconv(cd,
-#if defined(__linux__) || defined(__Linux__)
+#ifdef __linux__
 	    (char **)
 #endif
 	    &urip, &ibl, &uri_utf16p, &obl) == (size_t)-1 ||
@@ -1470,7 +1470,7 @@ vhd_macx_decode_location(const char *in, char *out, int len)
 		return NULL;
 
 	if (iconv(cd,
-#if defined(__linux__) || defined(__Linux__)
+#ifdef __linux__
 		(char **)
 #endif
 		&in, &ibl, &out, &obl) == (size_t)-1 || ibl)
@@ -1502,7 +1502,7 @@ vhd_w2u_decode_location(const char *in, char *out, int len, char *utf_type)
 		return NULL;
 
 	if (iconv(cd,
-#if defined(__linux__) || defined(__Linux__)
+#ifdef __linux__
 		(char **)
 #endif
 		&in, &ibl, &out, &obl) == (size_t)-1 || ibl)
@@ -2498,7 +2498,7 @@ vhd_initialize_header_parent_name(vhd_context_t *ctx, const char *parent_path)
 	memset(dst, 0, obl);
 
 	if (iconv(cd,
-#if defined(__linux__) || defined(__Linux__)
+#ifdef __linux__
 		(char **)
 #endif
 		&pname, &ibl, &dst, &obl) == (size_t)-1 || ibl)

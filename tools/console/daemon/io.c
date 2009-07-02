@@ -39,10 +39,9 @@
 #include <assert.h>
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 #include <util.h>
-#elif defined(__linux__) || defined(__Linux__)
+#elif defined(__linux__)
 #include <pty.h>
-#endif
-#if defined(__sun__)
+#elif defined(__sun__)
 #include <stropts.h>
 #endif
 
