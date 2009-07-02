@@ -113,6 +113,18 @@ void machine_reboot_kexec(xen_kexec_image_t *image)
 
 void machine_kexec(xen_kexec_image_t *image)
 {
+    struct desc_ptr gdt_desc = {
+        .base = (unsigned long)(boot_cpu_gdt_table - FIRST_RESERVED_GDT_ENTRY),
+        .limit = LAST_RESERVED_GDT_BYTE
+    };
+
+    /*
+     * compat_machine_kexec() returns to idle pagetables, which requires us
+     * to be running on a static GDT mapping (idle pagetables have no GDT
+     * mappings in their per-domain mapping area).
+     */
+    asm volatile ( "lgdt %0" : : "m" (gdt_desc) );
+
 #ifdef CONFIG_COMPAT
     if ( is_pv_32on64_domain(dom0) )
     {
