@@ -394,7 +394,6 @@ int domain_kill(struct domain *d)
         /* fallthrough */
     case DOMDYING_dying:
         rc = domain_relinquish_resources(d);
-        page_scrub_kick();
         if ( rc != 0 )
         {
             BUG_ON(rc != -EAGAIN);

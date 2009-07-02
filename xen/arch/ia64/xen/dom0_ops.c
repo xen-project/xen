@@ -718,7 +718,7 @@ long arch_do_sysctl(xen_sysctl_t *op, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
         pi->nr_nodes         = num_online_nodes();
         pi->total_pages      = total_pages; 
         pi->free_pages       = avail_domheap_pages();
-        pi->scrub_pages      = avail_scrub_pages();
+        pi->scrub_pages      = 0;
         pi->cpu_khz          = local_cpu_data->proc_freq / 1000;
 
         pi->max_cpu_id = last_cpu(cpu_online_map);

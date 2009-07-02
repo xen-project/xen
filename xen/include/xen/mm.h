@@ -299,22 +299,7 @@ page_list_splice(struct page_list_head *list, struct page_list_head *head)
 # define page_list_splice(list, hd)        list_splice(list, hd)
 #endif
 
-/* Automatic page scrubbing for dead domains. */
-extern struct page_list_head page_scrub_list;
-#define page_scrub_schedule_work()                 \
-    do {                                           \
-        if ( !page_list_empty(&page_scrub_list) )  \
-            raise_softirq(PAGE_SCRUB_SOFTIRQ);     \
-    } while ( 0 )
-#define page_scrub_kick()                                               \
-    do {                                                                \
-        if ( !page_list_empty(&page_scrub_list) )                       \
-            cpumask_raise_softirq(cpu_online_map, PAGE_SCRUB_SOFTIRQ);  \
-    } while ( 0 )
-void scrub_list_splice(struct page_list_head *);
-void scrub_list_add(struct page_info *);
 void scrub_one_page(struct page_info *);
-unsigned long avail_scrub_pages(void);
 
 int guest_remove_page(struct domain *d, unsigned long gmfn);
 

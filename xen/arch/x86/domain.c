@@ -120,7 +120,6 @@ void idle_loop(void)
     {
         if ( cpu_is_offline(smp_processor_id()) )
             play_dead();
-        page_scrub_schedule_work();
         (*pm_idle)();
         do_softirq();
     }

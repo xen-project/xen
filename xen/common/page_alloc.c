@@ -64,18 +64,6 @@ integer_param("dma_bits", dma_bitsize);
 #define round_pgdown(_p)  ((_p)&PAGE_MASK)
 #define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
 
-#ifndef NDEBUG
-/* Avoid callers relying on allocations returning zeroed pages. */
-#define scrub_page(p) memset((p), 0xc2, PAGE_SIZE)
-#else
-/* For a production build, clear_page() is the fastest way to scrub. */
-#define scrub_page(p) clear_page(p)
-#endif
-
-static DEFINE_SPINLOCK(page_scrub_lock);
-PAGE_LIST_HEAD(page_scrub_list);
-static unsigned long scrub_pages;
-
 /* Offlined page list, protected by heap_lock. */
 PAGE_LIST_HEAD(page_offlined_list);
 /* Broken page list, protected by heap_lock. */
@@ -945,7 +933,6 @@ void __init end_boot_allocator(void)
  */
 void __init scrub_heap_pages(void)
 {
-    void *p;
     unsigned long mfn;
 
     if ( !opt_bootscrub )
@@ -969,21 +956,7 @@ void __init scrub_heap_pages(void)
 
         /* Re-check page status with lock held. */
         if ( !allocated_in_map(mfn) )
-        {
-            if ( is_xen_heap_mfn(mfn) )
-            {
-                p = page_to_virt(mfn_to_page(mfn));
-                memguard_unguard_range(p, PAGE_SIZE);
-                scrub_page(p);
-                memguard_guard_range(p, PAGE_SIZE);
-            }
-            else
-            {
-                p = map_domain_page(mfn);
-                scrub_page(p);
-                unmap_domain_page(p);
-            }
-        }
+            scrub_one_page(mfn_to_page(mfn));
 
         spin_unlock(&heap_lock);
     }
@@ -1247,10 +1220,7 @@ void free_domheap_pages(struct page_info *pg, unsigned int order)
             for ( i = 0; i < (1 << order); i++ )
             {
                 page_set_owner(&pg[i], NULL);
-                spin_lock(&page_scrub_lock);
-                page_list_add(&pg[i], &page_scrub_list);
-                scrub_pages++;
-                spin_unlock(&page_scrub_lock);
+                scrub_one_page(&pg[i]);
             }
         }
     }
@@ -1322,96 +1292,19 @@ static __init int pagealloc_keyhandler_init(void)
 __initcall(pagealloc_keyhandler_init);
 
 
-
-/*************************
- * PAGE SCRUBBING
- */
-
-static DEFINE_PER_CPU(struct timer, page_scrub_timer);
-
-static void page_scrub_softirq(void)
-{
-    PAGE_LIST_HEAD(list);
-    struct page_info  *pg;
-    void             *p;
-    int               i;
-    s_time_t          start = NOW();
-    static spinlock_t serialise_lock = SPIN_LOCK_UNLOCKED;
-
-    /* free_heap_pages() does not parallelise well. Serialise this function. */
-    if ( !spin_trylock(&serialise_lock) )
-    {
-        set_timer(&this_cpu(page_scrub_timer), NOW() + MILLISECS(1));
-        return;
-    }
-
-    /* Aim to do 1ms of work every 10ms. */
-    do {
-        spin_lock(&page_scrub_lock);
-
-        /* Peel up to 16 pages from the list. */
-        for ( i = 0; i < 16; i++ )
-        {
-            if ( !(pg = page_list_remove_head(&page_scrub_list)) )
-                break;
-            page_list_add_tail(pg, &list);
-        }
-        
-        if ( unlikely(i == 0) )
-        {
-            spin_unlock(&page_scrub_lock);
-            goto out;
-        }
-
-        scrub_pages -= i;
-
-        spin_unlock(&page_scrub_lock);
-
-        /* Scrub each page in turn. */
-        while ( (pg = page_list_remove_head(&list)) ) {
-            p = map_domain_page(page_to_mfn(pg));
-            scrub_page(p);
-            unmap_domain_page(p);
-            free_heap_pages(pg, 0);
-        }
-    } while ( (NOW() - start) < MILLISECS(1) );
-
-    set_timer(&this_cpu(page_scrub_timer), NOW() + MILLISECS(10));
-
- out:
-    spin_unlock(&serialise_lock);
-}
-
-void scrub_list_splice(struct page_list_head *list)
-{
-    spin_lock(&page_scrub_lock);
-    page_list_splice(list, &page_scrub_list);
-    spin_unlock(&page_scrub_lock);
-}
-
-void scrub_list_add(struct page_info *pg)
-{
-    spin_lock(&page_scrub_lock);
-    page_list_add(pg, &page_scrub_list);
-    spin_unlock(&page_scrub_lock);
-}
-
 void scrub_one_page(struct page_info *pg)
 {
     void *p = map_domain_page(page_to_mfn(pg));
 
-    scrub_page(p);
+#ifndef NDEBUG
+    /* Avoid callers relying on allocations returning zeroed pages. */
+    memset(p, 0xc2, PAGE_SIZE);
+#else
+    /* For a production build, clear_page() is the fastest way to scrub. */
+    clear_page(p);
+#endif
+
     unmap_domain_page(p);
-}
-
-static void page_scrub_timer_fn(void *unused)
-{
-    page_scrub_schedule_work();
-}
-
-unsigned long avail_scrub_pages(void)
-{
-    return scrub_pages;
 }
 
 static void dump_heap(unsigned char key)
@@ -1438,18 +1331,6 @@ static __init int register_heap_trigger(void)
     return 0;
 }
 __initcall(register_heap_trigger);
-
-
-static __init int page_scrub_init(void)
-{
-    int cpu;
-    for_each_cpu ( cpu )
-        init_timer(&per_cpu(page_scrub_timer, cpu),
-                   page_scrub_timer_fn, NULL, cpu);
-    open_softirq(PAGE_SCRUB_SOFTIRQ, page_scrub_softirq);
-    return 0;
-}
-__initcall(page_scrub_init);
 
 /*
  * Local variables:

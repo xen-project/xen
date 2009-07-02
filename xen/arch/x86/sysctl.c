@@ -67,7 +67,7 @@ long arch_do_sysctl(
         pi->nr_nodes = num_online_nodes();
         pi->total_pages = total_pages;
         pi->free_pages = avail_domheap_pages();
-        pi->scrub_pages = avail_scrub_pages();
+        pi->scrub_pages = 0;
         pi->cpu_khz = cpu_khz;
         memcpy(pi->hw_cap, boot_cpu_data.x86_capability, NCAPINTS*4);
         if ( hvm_enabled )
