@@ -1206,23 +1206,16 @@ void free_domheap_pages(struct page_info *pg, unsigned int order)
 
         spin_unlock_recursive(&d->page_alloc_lock);
 
-        if ( likely(!d->is_dying) )
-        {
-            free_heap_pages(pg, order);
-        }
-        else
-        {
-            /*
-             * Normally we expect a domain to clear pages before freeing them,
-             * if it cares about the secrecy of their contents. However, after
-             * a domain has died we assume responsibility for erasure.
-             */
+        /*
+         * Normally we expect a domain to clear pages before freeing them, if 
+         * it cares about the secrecy of their contents. However, after a 
+         * domain has died we assume responsibility for erasure.
+         */
+        if ( unlikely(d->is_dying) )
             for ( i = 0; i < (1 << order); i++ )
-            {
-                page_set_owner(&pg[i], NULL);
                 scrub_one_page(&pg[i]);
-            }
-        }
+
+        free_heap_pages(pg, order);
     }
     else
     {
