@@ -137,10 +137,39 @@ class Blktap2Controller(BlktapController):
                                         deviceClass,
                                         self.vm.getDomid(), devid)
 
+    def getDeviceDetails(self, config):
+
+        (devid, back, front) = BlktapController.getDeviceDetails(self, config)
+        if self.deviceClass == 'tap2':
+        # since blktap2 uses blkback as a backend the 'params' feild contains
+        # the path to the blktap2 device (/dev/xen/blktap-2/tapdev*). As well,
+        # we need to store the params used to create the blktap2 device
+        # (tap:tapdisk:<driver>:/<image-path>)
+            tapdisk_uname = config.get('tapdisk_uname', '')
+            (_, tapdisk_params) = string.split(tapdisk_uname, ':', 1)
+            back['tapdisk-params'] = tapdisk_params 
+            
+        return (devid, back, front)
+
+    def getDeviceConfiguration(self, devid, transaction = None):
+
+        # this is a blktap2 device, so we need to overwrite the 'params' feild
+        # with the actual blktap2 parameters. (the vbd parameters are of little
+        # use to us)
+        config = BlktapController.getDeviceConfiguration(self, devid, transaction)
+        if transaction is None:
+            tapdisk_params = self.readBackend(devid, 'tapdisk-params')
+        else:
+            tapdisk_params = self.readBackendTxn(transaction, devid, 'tapdisk-params')
+        if tapdisk_params:
+            config['uname'] = 'tap:' + tapdisk_params
+
+        return config
+
 
     def createDevice(self, config):
 
-        uname = config.get('required_uname', '')
+        uname = config.get('uname', '')
         try:
             (typ, subtyp, params, file) = string.split(uname, ':', 3)
         except:
@@ -180,11 +209,15 @@ class Blktap2Controller(BlktapController):
         stdout.close();
         stderr.close();
 
-        #modify the configuration to attach as a vbd, now that the
-        #device is configured.  Then continue to create the device
+        # modify the configutration to create a blkback for the underlying
+        # blktap2 device. Note: we need to preserve the original tapdisk uname
+        # (it is used during save/restore and for managed domains).
+        config.update({'tapdisk_uname' : uname})
         config.update({'uname' : 'phy:' + device.rstrip()})
 
         devid = BlkifController.createDevice(self, config)
+        config.update({'uname' : uname})
+        config.pop('tapdisk_uname')
         return devid
 
     # The new blocktap implementation requires a sysfs signal to close
