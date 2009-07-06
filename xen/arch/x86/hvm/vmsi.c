@@ -290,7 +290,7 @@ static int msixtbl_write(struct vcpu *v, unsigned long address,
         goto out;
 
     entry = msixtbl_find_entry(v, address);
-    nr_entry = (address - entry->gtable) % PCI_MSIX_ENTRY_SIZE;
+    nr_entry = (address - entry->gtable) / PCI_MSIX_ENTRY_SIZE;
 
     offset = address & (PCI_MSIX_ENTRY_SIZE - 1);
     if ( offset != PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET)
