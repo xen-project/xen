@@ -2,7 +2,7 @@
 #define __X86_64_UACCESS_H
 
 #define COMPAT_ARG_XLAT_VIRT_BASE this_cpu(compat_arg_xlat)
-#define COMPAT_ARG_XLAT_SIZE      PAGE_SIZE
+#define COMPAT_ARG_XLAT_SIZE      (2*PAGE_SIZE)
 DECLARE_PER_CPU(void *, compat_arg_xlat);
 int setup_compat_arg_xlat(unsigned int cpu, int node);
 #define is_compat_arg_xlat_range(addr, size) ({                               \
