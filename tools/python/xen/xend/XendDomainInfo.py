@@ -716,7 +716,7 @@ class XendDomainInfo:
         except Exception, e:
             raise VmError("pci: failed to locate device and "+
                     "parse it's resources - "+str(e))
-        if pci_device.driver!='pciback':
+        if pci_device.driver!='pciback' and pci_device.driver!='pci-stub':
             raise VmError(("pci: PCI Backend does not own device "+ \
                     "%s\n"+ \
                     "See the pciback.hide kernel "+ \

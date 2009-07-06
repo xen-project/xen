@@ -224,7 +224,7 @@ class PciController(DevController):
         return sxpr    
 
     def CheckSiblingDevices(self, domid, dev):
-        """ Check if all sibling devices of dev are owned by pciback
+        """ Check if all sibling devices of dev are owned by pciback or pci-stub
         """
         if not self.vm.info.is_hvm():
             return
@@ -245,12 +245,9 @@ class PciController(DevController):
                 #no dom0 drivers bound to sdev
                 continue
 
-            if sdev.driver!='pciback':
-                raise VmError(("pci: PCI Backend does not own\n "+ \
-                    "sibling device %s of device %s\n"+ \
-                    "See the pciback.hide kernel "+ \
-                    "command-line parameter or\n"+ \
-                    "bind your slot/device to the PCI backend using sysfs" \
+            if sdev.driver!='pciback' and sdev.driver!='pci-stub':
+                raise VmError(("pci: PCI Backend and pci-stub don't\n "+ \
+                    "own sibling device %s of device %s\n"\
                     )%(sdev.name, dev.name))
         return
 
@@ -265,13 +262,9 @@ class PciController(DevController):
             raise VmError("pci: failed to locate device and "+
                     "parse it's resources - "+str(e))
 
-        if dev.driver!='pciback':
-            raise VmError(("pci: PCI Backend does not own device "+ \
-                    "%s\n"+ \
-                    "See the pciback.hide kernel "+ \
-                    "command-line parameter or\n"+ \
-                    "bind your slot/device to the PCI backend using sysfs" \
-                    )%(dev.name))
+        if dev.driver!='pciback' and dev.driver!='pci-stub':
+            raise VmError(("pci: PCI Backend and pci-stub don't own "+ \
+                    "device %s\n") %(dev.name))
 
         if dev.has_non_page_aligned_bar and arch.type != "ia64":
             raise VmError("pci: %s: non-page-aligned MMIO BAR found." % dev.name)
@@ -285,7 +278,8 @@ class PciController(DevController):
         # if arch.type != "ia64":
         #    dev.do_FLR()
 
-        PCIQuirk(dev)
+        if dev.driver == 'pciback':
+            PCIQuirk(dev)
 
         if not self.vm.info.is_hvm():
             # Setup IOMMU device assignment
@@ -437,13 +431,9 @@ class PciController(DevController):
             raise VmError("pci: failed to locate device and "+
                     "parse it's resources - "+str(e))
 
-        if dev.driver!='pciback':
-            raise VmError(("pci: PCI Backend does not own device "+ \
-                    "%s\n"+ \
-                    "See the pciback.hide kernel "+ \
-                    "command-line parameter or\n"+ \
-                    "bind your slot/device to the PCI backend using sysfs" \
-                    )%(dev.name))
+        if dev.driver!='pciback' and dev.driver!='pci-stub':
+            raise VmError(("pci: PCI Backend and pci-stub don't own device "+ \
+                    "%s\n") %(dev.name))
 
         # Need to do FLR here before deassign device in order to terminate
         # DMA transaction, etc

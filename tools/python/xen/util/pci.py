@@ -33,6 +33,7 @@ SYSFS_PCI_DEV_SUBVENDOR_PATH = '/subsystem_vendor'
 SYSFS_PCI_DEV_SUBDEVICE_PATH = '/subsystem_device'
 SYSFS_PCI_DEV_CLASS_PATH = '/class'
 SYSFS_PCIBACK_PATH = '/bus/pci/drivers/pciback/'
+SYSFS_PCISTUB_PATH = '/bus/pci/drivers/pci-stub/'
 
 LSPCI_CMD = 'lspci'
 
@@ -450,7 +451,10 @@ def restore_pci_conf_space(pci_cfg_list):
             os.write(fd, dw)
         os.close(fd) 
 
-def find_all_devices_owned_by_pciback():
+def find_all_assignable_devices():
+    '''  devices owned by pcibak or pci-stub can be directly assigned to
+         guest with IOMMU (VT-d or AMD IOMMU), find all these devices.
+    '''
     sysfs_mnt = find_sysfs_mnt()
     pciback_path = sysfs_mnt + SYSFS_PCIBACK_PATH
     pci_names = os.popen('ls ' + pciback_path).read()
@@ -459,6 +463,14 @@ def find_all_devices_owned_by_pciback():
     for pci in pci_list:
         dev = PciDevice(parse_pci_name(pci))
         dev_list = dev_list + [dev]
+
+    pcistub_path = sysfs_mnt + SYSFS_PCISTUB_PATH
+    pci_names = os.popen('ls ' + pcistub_path).read()
+    pci_list = extract_the_exact_pci_names(pci_names)
+    for pci in pci_list:
+        dev = PciDevice(parse_pci_name(pci))
+        dev_list = dev_list + [dev]
+
     return dev_list
 
 def transform_list(target, src):
@@ -921,10 +933,10 @@ class PciDevice:
             return
         for pci_dev in devs:
             dev = PciDevice(parse_pci_name(pci_dev))
-            if dev.driver == 'pciback':
+            if dev.driver == 'pciback' or dev.driver == 'pci-stub':
                 continue
             err_msg = 'pci: %s must be co-assigned to the same guest with %s' + \
-                ', but it is not owned by pciback.'
+                ', but it is not owned by pciback or pci-stub.'
             raise PciDeviceAssignmentError(err_msg % (pci_dev, self.name))
 
     def do_FLR(self):
