@@ -22,6 +22,7 @@
 #include <xen/init.h>
 #include <xen/mm.h>
 #include <xen/sched.h>
+#include <xen/numa.h>
 #include <xen/guest_access.h>
 #include <asm/current.h>
 #include <asm/asm_defns.h>
@@ -30,14 +31,13 @@
 #include <asm/fixmap.h>
 #include <asm/hypercall.h>
 #include <asm/msr.h>
-#include <asm/numa.h>
 #include <public/memory.h>
 
 #ifdef CONFIG_COMPAT
 unsigned int m2p_compat_vstart = __HYPERVISOR_COMPAT_VIRT_START;
 #endif
 
-DEFINE_PER_CPU(char, compat_arg_xlat[COMPAT_ARG_XLAT_SIZE]);
+DEFINE_PER_CPU(void *, compat_arg_xlat);
 
 /* Top-level master (and idle-domain) page directory. */
 l4_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
@@ -293,6 +293,25 @@ void __init zap_low_mappings(void)
                      0x10, __PAGE_HYPERVISOR);
 }
 
+int __cpuinit setup_compat_arg_xlat(unsigned int cpu, int node)
+{
+    unsigned int order = get_order_from_bytes(COMPAT_ARG_XLAT_SIZE);
+    unsigned long sz = PAGE_SIZE << order;
+    unsigned int memflags = node != NUMA_NO_NODE ? MEMF_node(node) : 0;
+    struct page_info *pg;
+
+    pg = alloc_domheap_pages(NULL, order, memflags);
+    if ( !pg )
+        return -ENOMEM;
+
+    for ( ; (sz -= PAGE_SIZE) >= COMPAT_ARG_XLAT_SIZE; ++pg )
+        free_domheap_page(pg);
+
+    per_cpu(compat_arg_xlat, cpu) = page_to_virt(pg);
+
+    return 0;
+}
+
 void __init subarch_init_memory(void)
 {
     unsigned long i, n, v, m2p_start_mfn;
@@ -350,6 +369,10 @@ void __init subarch_init_memory(void)
             share_xen_page_with_privileged_guests(page, XENSHARE_readonly);
         }
     }
+
+    if ( setup_compat_arg_xlat(smp_processor_id(),
+                               apicid_to_node[boot_cpu_physical_apicid]) )
+        panic("Could not setup argument translation area");
 }
 
 long subarch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)

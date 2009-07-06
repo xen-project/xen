@@ -3,7 +3,8 @@
 
 #define COMPAT_ARG_XLAT_VIRT_BASE this_cpu(compat_arg_xlat)
 #define COMPAT_ARG_XLAT_SIZE      PAGE_SIZE
-DECLARE_PER_CPU(char, compat_arg_xlat[COMPAT_ARG_XLAT_SIZE]);
+DECLARE_PER_CPU(void *, compat_arg_xlat);
+int setup_compat_arg_xlat(unsigned int cpu, int node);
 #define is_compat_arg_xlat_range(addr, size) ({                               \
     unsigned long __off;                                                      \
     __off = (unsigned long)(addr) - (unsigned long)COMPAT_ARG_XLAT_VIRT_BASE; \

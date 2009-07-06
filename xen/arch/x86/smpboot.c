@@ -878,6 +878,9 @@ static int __devinit do_boot_cpu(int apicid, int cpu)
 		per_cpu(doublefault_tss, cpu) = alloc_xenheap_page();
 		memset(per_cpu(doublefault_tss, cpu), 0, PAGE_SIZE);
 	}
+#else
+	if (!per_cpu(compat_arg_xlat, cpu))
+		setup_compat_arg_xlat(cpu, apicid_to_node[apicid]);
 #endif
 
 	if (!idt_tables[cpu]) {

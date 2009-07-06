@@ -25,7 +25,7 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE(void) compat)
             struct compat_memory_exchange xchg;
         } cmp;
 
-        set_xen_guest_handle(nat.hnd, (void *)COMPAT_ARG_XLAT_VIRT_BASE);
+        set_xen_guest_handle(nat.hnd, COMPAT_ARG_XLAT_VIRT_BASE);
         split = 0;
         switch ( op )
         {

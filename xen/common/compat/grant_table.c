@@ -97,7 +97,7 @@ int compat_grant_table_op(unsigned int cmd,
             struct compat_gnttab_copy copy;
         } cmp;
 
-        set_xen_guest_handle(nat.uop, (void *)COMPAT_ARG_XLAT_VIRT_BASE);
+        set_xen_guest_handle(nat.uop, COMPAT_ARG_XLAT_VIRT_BASE);
         switch ( cmd )
         {
         case GNTTABOP_setup_table:
