@@ -494,11 +494,13 @@ _sh_propagate(struct vcpu *v,
 
     if ( unlikely(!(gflags & _PAGE_PRESENT)) )
     {
+#if !(SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
         /* If a guest l1 entry is not present, shadow with the magic 
          * guest-not-present entry. */
         if ( level == 1 )
             *sp = sh_l1e_gnp();
         else 
+#endif /* !OOS */
             *sp = shadow_l1e_empty();
         goto done;
     }
