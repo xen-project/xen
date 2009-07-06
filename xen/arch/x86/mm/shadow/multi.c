@@ -2975,6 +2975,30 @@ static int sh_page_fault(struct vcpu *v,
 #if (SHADOW_OPTIMIZATIONS & SHOPT_FAST_FAULT_PATH)
     if ( (regs->error_code & PFEC_reserved_bit) )
     {
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC) 
+        /* First, need to check that this isn't an out-of-sync
+         * shadow l1e.  If it is, we fall back to the slow path, which
+         * will sync it up again. */
+        {
+            shadow_l2e_t sl2e;
+            mfn_t gl1mfn;
+            if ( (__copy_from_user(&sl2e,
+                                   (sh_linear_l2_table(v)
+                                    + shadow_l2_linear_offset(va)),
+                                   sizeof(sl2e)) != 0)
+                 || !(shadow_l2e_get_flags(sl2e) & _PAGE_PRESENT)
+                 || !mfn_valid(gl1mfn = _mfn(mfn_to_page(
+                                  shadow_l2e_get_mfn(sl2e))->v.sh.back))
+                 || unlikely(mfn_is_out_of_sync(gl1mfn)) )
+            {
+                /* Hit the slow path as if there had been no 
+                 * shadow entry at all, and let it tidy up */
+                ASSERT(regs->error_code & PFEC_page_present);
+                regs->error_code ^= (PFEC_reserved_bit|PFEC_page_present);
+                goto page_fault_slow_path;
+            }
+        }
+#endif /* SHOPT_OUT_OF_SYNC */
         /* The only reasons for reserved bits to be set in shadow entries 
          * are the two "magic" shadow_l1e entries. */
         if ( likely((__copy_from_user(&sl1e, 
@@ -2983,30 +3007,6 @@ static int sh_page_fault(struct vcpu *v,
                                       sizeof(sl1e)) == 0)
                     && sh_l1e_is_magic(sl1e)) )
         {
-#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC) 
-             /* First, need to check that this isn't an out-of-sync
-              * shadow l1e.  If it is, we fall back to the slow path, which
-              * will sync it up again. */
-            {
-                shadow_l2e_t sl2e;
-                mfn_t gl1mfn;
-               if ( (__copy_from_user(&sl2e,
-                                       (sh_linear_l2_table(v)
-                                        + shadow_l2_linear_offset(va)),
-                                       sizeof(sl2e)) != 0)
-                     || !(shadow_l2e_get_flags(sl2e) & _PAGE_PRESENT)
-                     || !mfn_valid(gl1mfn = _mfn(mfn_to_page(
-                                      shadow_l2e_get_mfn(sl2e))->v.sh.back))
-                     || unlikely(mfn_is_out_of_sync(gl1mfn)) )
-               {
-                   /* Hit the slow path as if there had been no 
-                    * shadow entry at all, and let it tidy up */
-                   ASSERT(regs->error_code & PFEC_page_present);
-                   regs->error_code ^= (PFEC_reserved_bit|PFEC_page_present);
-                   goto page_fault_slow_path;
-               }
-            }
-#endif /* SHOPT_OUT_OF_SYNC */
 
             if ( sh_l1e_is_gnp(sl1e) )
             {
