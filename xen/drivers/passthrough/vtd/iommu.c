@@ -1848,7 +1848,7 @@ static int intel_iommu_group_id(u8 bus, u8 devfn)
 }
 
 static u32 iommu_state[MAX_IOMMUS][MAX_IOMMU_REGS];
-void iommu_suspend(void)
+void vtd_suspend(void)
 {
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
@@ -1887,7 +1887,7 @@ void iommu_suspend(void)
     }
 }
 
-void iommu_resume(void)
+void vtd_resume(void)
 {
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
@@ -1934,6 +1934,8 @@ struct iommu_ops intel_iommu_ops = {
     .update_ire_from_msi = msi_msg_write_remap_rte,
     .read_apic_from_ire = io_apic_read_remap_rte,
     .read_msi_from_ire = msi_msg_read_remap_rte,
+    .suspend = vtd_suspend,
+    .resume = vtd_resume,
 };
 
 /*

@@ -109,6 +109,8 @@ struct iommu_ops {
     void (*update_ire_from_msi)(struct msi_desc *msi_desc, struct msi_msg *msg);
     void (*read_msi_from_ire)(struct msi_desc *msi_desc, struct msi_msg *msg);
     unsigned int (*read_apic_from_ire)(unsigned int apic, unsigned int reg);
+    void (*suspend)(void);
+    void (*resume)(void);
 };
 
 void iommu_update_ire_from_apic(unsigned int apic, unsigned int reg, unsigned int value);

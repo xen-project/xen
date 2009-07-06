@@ -92,6 +92,10 @@ void amd_iommu_read_msi_from_ire(
 unsigned int amd_iommu_read_ioapic_from_ire(
     unsigned int apic, unsigned int reg);
 
+/* power management support */
+void amd_iommu_resume(void);
+void amd_iommu_suspend(void);
+
 static inline u32 get_field_from_reg_u32(u32 reg_value, u32 mask, u32 shift)
 {
     u32 field;

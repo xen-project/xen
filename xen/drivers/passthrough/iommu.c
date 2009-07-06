@@ -346,6 +346,20 @@ unsigned int iommu_read_apic_from_ire(unsigned int apic, unsigned int reg)
     return ops->read_apic_from_ire(apic, reg);
 }
 
+void iommu_resume()
+{
+    struct iommu_ops *ops = iommu_get_ops();
+    if ( iommu_enabled )
+        ops->resume();
+}
+
+void iommu_suspend()
+{
+    struct iommu_ops *ops = iommu_get_ops();
+    if ( iommu_enabled )
+        ops->suspend();
+}
+
 /*
  * Local variables:
  * mode: C
