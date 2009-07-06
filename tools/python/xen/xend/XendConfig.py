@@ -1379,9 +1379,13 @@ class XendConfig(dict):
                 else:
                     # Save uname for next domain start.
                     dev_info['required_uname'] = dev_info['uname']
-                if dev_info['uname'].split(':')[1] not in blktap_disk_types:
+                tap_disk_type = dev_info['uname'].split(':')[1]
+                # tapdisk uname may be 'tap:<driver>' or 'tap:tapdisk:<driver>'
+                if tap_disk_type == 'tapdisk':
+                    tap_disk_type = dev_info['uname'].split(':')[2]
+                if tap_disk_type not in blktap_disk_types:
                     raise XendConfigError("tap:%s not a valid disk type" %
-                                    dev_info['uname'].split(':')[1])
+                                    tap_disk_type)
 
             if dev_type == 'vif':
                 if not dev_info.get('mac'):

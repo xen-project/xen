@@ -13,17 +13,24 @@ TAPDISK_BINARY  = '/usr/sbin/tapdisk2'
 TAPDISK_DEVICE  = '/dev/xen/blktap-2/tapdev'
 TAPDISK_CONTROL = TAPDISK_SYSFS + '/blktap'
 
-blktap_disk_types = [
+blktap1_disk_types = set([
     'aio',
     'sync',
     'vmdk',
     'ram',
     'qcow',
     'qcow2',
-    'vhd',
     'ioemu',
-    'tapdisk',
-    ]
+    ])
+
+blktap2_disk_types = set([
+    'aio',
+    'ram',
+    'qcow',
+    'vhd',
+    ])
+
+blktap_disk_types = blktap1_disk_types | blktap2_disk_types
 
 def doexec(args, inputtext=None):
     """Execute a subprocess, then return its return code, stdout and stderr"""
@@ -151,7 +158,7 @@ class Blktap2Controller(BlktapController):
 
         if typ in ('tap'):
             if subtyp in ('tapdisk'):
-                if params in ('ioemu', 'qcow2', 'vmdk', 'sync') or not blktap2_installed:
+                if params not in blktap2_disk_types or not blktap2_installed:
                     # pass this device off to BlktapController
                     log.warn('WARNING: using deprecated blktap module')
                     self.deviceClass = 'tap'
