@@ -297,8 +297,7 @@ uberblock_verify(uberblock_phys_t *ub, int offset)
 	if (zio_checksum_verify(&bp, (char *)ub, UBERBLOCK_SIZE) != 0)
 		return (-1);
 
-	if (uber->ub_magic == UBERBLOCK_MAGIC &&
-	    uber->ub_version > 0 && uber->ub_version <= SPA_VERSION)
+	if (uber->ub_magic == UBERBLOCK_MAGIC && uber->ub_version > 0)
 		return (0);
 
 	return (-1);
@@ -761,8 +760,6 @@ dnode_get_path(fsi_file_t *ffi, dnode_phys_t *mdn, char *path,
 
 	if ((errnum = zap_lookup(ffi, dn, ZPL_VERSION_STR, &version, stack)))
 		return (errnum);
-	if (version > ZPL_VERSION)
-		return (-1);
 
 	if ((errnum = zap_lookup(ffi, dn, ZFS_ROOT_OBJ, &objnum, stack)))
 		return (errnum);
