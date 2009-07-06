@@ -716,3 +716,83 @@ error_out:
     }
     return -ENOMEM;
 }
+
+static void disable_iommu(struct amd_iommu *iommu)
+{
+    unsigned long flags;
+
+    spin_lock_irqsave(&iommu->lock, flags);
+
+    if ( !iommu->enabled )
+    {
+        spin_unlock_irqrestore(&iommu->lock, flags); 
+        return;
+    }
+
+    amd_iommu_msi_enable(iommu, IOMMU_CONTROL_DISABLED);
+    set_iommu_command_buffer_control(iommu, IOMMU_CONTROL_DISABLED);
+    set_iommu_event_log_control(iommu, IOMMU_CONTROL_DISABLED);
+    set_iommu_translation_control(iommu, IOMMU_CONTROL_DISABLED);
+
+    iommu->enabled = 0;
+
+    spin_unlock_irqrestore(&iommu->lock, flags);
+
+}
+
+static void invalidate_all_domain_pages(void)
+{
+    struct domain *d;
+    for_each_domain( d )
+        invalidate_all_iommu_pages(d);
+}
+
+static void invalidate_all_devices(void)
+{
+    u16 bus, devfn, bdf, req_id;
+    unsigned long flags;
+    struct amd_iommu *iommu;
+
+    for ( bdf = 0; bdf < ivrs_bdf_entries; bdf++ )
+    {
+        bus = bdf >> 8;
+        devfn = bdf & 0xFF;
+        iommu = find_iommu_for_device(bus, devfn);
+        req_id = ivrs_mappings[bdf].dte_requestor_id;
+        if ( iommu )
+        {
+            spin_lock_irqsave(&iommu->lock, flags);
+            invalidate_dev_table_entry(iommu, req_id);
+            invalidate_interrupt_table(iommu, req_id);
+            flush_command_buffer(iommu);
+            spin_unlock_irqrestore(&iommu->lock, flags);
+        }
+    }
+}
+
+void amd_iommu_suspend(void)
+{
+    struct amd_iommu *iommu;
+
+    for_each_amd_iommu ( iommu )
+        disable_iommu(iommu);
+}
+
+void amd_iommu_resume(void)
+{
+    struct amd_iommu *iommu;
+
+    for_each_amd_iommu ( iommu )
+    {
+       /*
+        * To make sure that iommus have not been touched 
+        * before re-enablement
+        */
+        disable_iommu(iommu);
+        enable_iommu(iommu);
+    }
+
+    /* flush all cache entries after iommu re-enabled */
+    invalidate_all_devices();
+    invalidate_all_domain_pages();
+}
