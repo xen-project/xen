@@ -67,7 +67,7 @@ static void __init unmap_iommu_mmio_region(struct amd_iommu *iommu)
     }
 }
 
-static void __init register_iommu_dev_table_in_mmio_space(struct amd_iommu *iommu)
+static void register_iommu_dev_table_in_mmio_space(struct amd_iommu *iommu)
 {
     u64 addr_64, addr_lo, addr_hi;
     u32 entry;
@@ -90,7 +90,7 @@ static void __init register_iommu_dev_table_in_mmio_space(struct amd_iommu *iomm
     writel(entry, iommu->mmio_base + IOMMU_DEV_TABLE_BASE_HIGH_OFFSET);
 }
 
-static void __init register_iommu_cmd_buffer_in_mmio_space(struct amd_iommu *iommu)
+static void register_iommu_cmd_buffer_in_mmio_space(struct amd_iommu *iommu)
 {
     u64 addr_64, addr_lo, addr_hi;
     u32 power_of2_entries;
@@ -144,7 +144,7 @@ static void __init register_iommu_event_log_in_mmio_space(struct amd_iommu *iomm
     writel(entry, iommu->mmio_base+IOMMU_EVENT_LOG_BASE_HIGH_OFFSET);
 }
 
-static void __init set_iommu_translation_control(struct amd_iommu *iommu,
+static void set_iommu_translation_control(struct amd_iommu *iommu,
                                                  int enable)
 {
     u32 entry;
@@ -181,24 +181,28 @@ static void __init set_iommu_translation_control(struct amd_iommu *iommu,
     writel(entry, iommu->mmio_base+IOMMU_CONTROL_MMIO_OFFSET);
 }
 
-static void __init set_iommu_command_buffer_control(struct amd_iommu *iommu,
+static void set_iommu_command_buffer_control(struct amd_iommu *iommu,
                                                     int enable)
 {
     u32 entry;
 
-    entry = readl(iommu->mmio_base+IOMMU_CONTROL_MMIO_OFFSET);
+    entry = readl(iommu->mmio_base + IOMMU_CONTROL_MMIO_OFFSET);
     set_field_in_reg_u32(enable ? IOMMU_CONTROL_ENABLED :
                          IOMMU_CONTROL_DISABLED, entry,
                          IOMMU_CONTROL_COMMAND_BUFFER_ENABLE_MASK,
                          IOMMU_CONTROL_COMMAND_BUFFER_ENABLE_SHIFT, &entry);
-    writel(entry, iommu->mmio_base+IOMMU_CONTROL_MMIO_OFFSET);
 
-    /*reset head and tail pointer */
-    writel(0x0, iommu->mmio_base + IOMMU_CMD_BUFFER_HEAD_OFFSET);
-    writel(0x0, iommu->mmio_base + IOMMU_CMD_BUFFER_TAIL_OFFSET);
+    /*reset head and tail pointer manually before enablement */
+    if ( enable == IOMMU_CONTROL_ENABLED )
+    {
+        writel(0x0, iommu->mmio_base + IOMMU_CMD_BUFFER_HEAD_OFFSET);
+        writel(0x0, iommu->mmio_base + IOMMU_CMD_BUFFER_TAIL_OFFSET);
+    }
+
+    writel(entry, iommu->mmio_base+IOMMU_CONTROL_MMIO_OFFSET);
 }
 
-static void __init register_iommu_exclusion_range(struct amd_iommu *iommu)
+static void register_iommu_exclusion_range(struct amd_iommu *iommu)
 {
     u64 addr_lo, addr_hi;
     u32 entry;
@@ -238,32 +242,31 @@ static void __init register_iommu_exclusion_range(struct amd_iommu *iommu)
     writel(entry, iommu->mmio_base+IOMMU_EXCLUSION_BASE_LOW_OFFSET);
 }
 
-static void __init set_iommu_event_log_control(struct amd_iommu *iommu,
+static void set_iommu_event_log_control(struct amd_iommu *iommu,
             int enable)
 {
     u32 entry;
 
-    entry = readl(iommu->mmio_base+IOMMU_CONTROL_MMIO_OFFSET);
+    entry = readl(iommu->mmio_base + IOMMU_CONTROL_MMIO_OFFSET);
     set_field_in_reg_u32(enable ? IOMMU_CONTROL_ENABLED :
                          IOMMU_CONTROL_DISABLED, entry,
                          IOMMU_CONTROL_EVENT_LOG_ENABLE_MASK,
                          IOMMU_CONTROL_EVENT_LOG_ENABLE_SHIFT, &entry);
-    writel(entry, iommu->mmio_base+IOMMU_CONTROL_MMIO_OFFSET);
-
     set_field_in_reg_u32(enable ? IOMMU_CONTROL_ENABLED :
                          IOMMU_CONTROL_DISABLED, entry,
                          IOMMU_CONTROL_EVENT_LOG_INT_MASK,
                          IOMMU_CONTROL_EVENT_LOG_INT_SHIFT, &entry);
-    writel(entry, iommu->mmio_base+IOMMU_CONTROL_MMIO_OFFSET);
-
     set_field_in_reg_u32(IOMMU_CONTROL_DISABLED, entry,
                          IOMMU_CONTROL_COMP_WAIT_INT_MASK,
                          IOMMU_CONTROL_COMP_WAIT_INT_SHIFT, &entry);
-    writel(entry, iommu->mmio_base+IOMMU_CONTROL_MMIO_OFFSET);
 
-    /*reset head and tail pointer */
-    writel(0x0, iommu->mmio_base + IOMMU_EVENT_LOG_HEAD_OFFSET);
-    writel(0x0, iommu->mmio_base + IOMMU_EVENT_LOG_TAIL_OFFSET);
+    /*reset head and tail pointer manually before enablement */
+    if ( enable == IOMMU_CONTROL_ENABLED )
+    {
+        writel(0x0, iommu->mmio_base + IOMMU_EVENT_LOG_HEAD_OFFSET);
+        writel(0x0, iommu->mmio_base + IOMMU_EVENT_LOG_TAIL_OFFSET);
+    }
+    writel(entry, iommu->mmio_base + IOMMU_CONTROL_MMIO_OFFSET);
 }
 
 static int amd_iommu_read_event_log(struct amd_iommu *iommu, u32 event[])
@@ -502,7 +505,7 @@ static int set_iommu_interrupt_handler(struct amd_iommu *iommu)
     return vector;
 }
 
-void __init enable_iommu(struct amd_iommu *iommu)
+void enable_iommu(struct amd_iommu *iommu)
 {
     unsigned long flags;
 
@@ -513,10 +516,6 @@ void __init enable_iommu(struct amd_iommu *iommu)
         spin_unlock_irqrestore(&iommu->lock, flags); 
         return;
     }
-
-    iommu->dev_table.alloc_size = device_table.alloc_size;
-    iommu->dev_table.entries = device_table.entries;
-    iommu->dev_table.buffer = device_table.buffer;
 
     register_iommu_dev_table_in_mmio_space(iommu);
     register_iommu_cmd_buffer_in_mmio_space(iommu);
@@ -530,9 +529,6 @@ void __init enable_iommu(struct amd_iommu *iommu)
     set_iommu_command_buffer_control(iommu, IOMMU_CONTROL_ENABLED);
     set_iommu_event_log_control(iommu, IOMMU_CONTROL_ENABLED);
     set_iommu_translation_control(iommu, IOMMU_CONTROL_ENABLED);
-
-    printk("AMD_IOV: IOMMU %d Enabled.\n", nr_amd_iommus );
-    nr_amd_iommus++;
 
     iommu->enabled = 1;
     spin_unlock_irqrestore(&iommu->lock, flags);
@@ -580,20 +576,24 @@ static int __init allocate_iommu_tables(struct amd_iommu *iommu)
 {
     /* allocate 'command buffer' in power of 2 increments of 4K */
     iommu->cmd_buffer_tail = 0;
-    iommu->cmd_buffer.alloc_size = PAGE_SIZE << get_order_from_bytes(
-        PAGE_ALIGN(amd_iommu_cmd_buffer_entries * IOMMU_CMD_BUFFER_ENTRY_SIZE));
-    iommu->cmd_buffer.entries =
-        iommu->cmd_buffer.alloc_size / IOMMU_CMD_BUFFER_ENTRY_SIZE;
+    iommu->cmd_buffer.alloc_size = PAGE_SIZE <<
+                                   get_order_from_bytes(
+                                   PAGE_ALIGN(amd_iommu_cmd_buffer_entries *
+                                   IOMMU_CMD_BUFFER_ENTRY_SIZE));
+    iommu->cmd_buffer.entries = iommu->cmd_buffer.alloc_size /
+                                IOMMU_CMD_BUFFER_ENTRY_SIZE;
 
     if ( allocate_iommu_table_struct(&iommu->cmd_buffer, "Command Buffer") != 0 )
         goto error_out;
 
     /* allocate 'event log' in power of 2 increments of 4K */
     iommu->event_log_head = 0;
-    iommu->event_log.alloc_size = PAGE_SIZE << get_order_from_bytes(
-        PAGE_ALIGN(amd_iommu_event_log_entries * IOMMU_EVENT_LOG_ENTRY_SIZE));
-    iommu->event_log.entries =
-        iommu->event_log.alloc_size / IOMMU_EVENT_LOG_ENTRY_SIZE;
+    iommu->event_log.alloc_size = PAGE_SIZE <<
+                                  get_order_from_bytes(
+                                  PAGE_ALIGN(amd_iommu_event_log_entries *
+                                  IOMMU_EVENT_LOG_ENTRY_SIZE));
+    iommu->event_log.entries = iommu->event_log.alloc_size /
+                               IOMMU_EVENT_LOG_ENTRY_SIZE;
 
     if ( allocate_iommu_table_struct(&iommu->event_log, "Event Log") != 0 )
         goto error_out;
@@ -607,7 +607,6 @@ static int __init allocate_iommu_tables(struct amd_iommu *iommu)
 
 int __init amd_iommu_init_one(struct amd_iommu *iommu)
 {
-
     if ( allocate_iommu_tables(iommu) != 0 )
         goto error_out;
 
@@ -617,7 +616,18 @@ int __init amd_iommu_init_one(struct amd_iommu *iommu)
     if ( set_iommu_interrupt_handler(iommu) == 0 )
         goto error_out;
 
+    /* To make sure that device_table.buffer has been successfully allocated */
+    if ( device_table.buffer == NULL )
+        goto error_out;
+
+    iommu->dev_table.alloc_size = device_table.alloc_size;
+    iommu->dev_table.entries = device_table.entries;
+    iommu->dev_table.buffer = device_table.buffer;
+
     enable_iommu(iommu);
+    printk("AMD-Vi: IOMMU %d Enabled.\n", nr_amd_iommus );
+    nr_amd_iommus++;
+
     return 0;
 
 error_out:
@@ -670,9 +680,12 @@ static int __init init_ivrs_mapping(void)
 static int __init amd_iommu_setup_device_table(void)
 {
     /* allocate 'device table' on a 4K boundary */
-    device_table.alloc_size = PAGE_SIZE << get_order_from_bytes(
-        PAGE_ALIGN(ivrs_bdf_entries * IOMMU_DEV_TABLE_ENTRY_SIZE));
-    device_table.entries = device_table.alloc_size / IOMMU_DEV_TABLE_ENTRY_SIZE;
+    device_table.alloc_size = PAGE_SIZE <<
+                              get_order_from_bytes(
+                              PAGE_ALIGN(ivrs_bdf_entries *
+                              IOMMU_DEV_TABLE_ENTRY_SIZE));
+    device_table.entries = device_table.alloc_size /
+                           IOMMU_DEV_TABLE_ENTRY_SIZE;
 
     return ( allocate_iommu_table_struct(&device_table, "Device Table") );
 }
@@ -681,7 +694,7 @@ int __init amd_iommu_setup_shared_tables(void)
 {
     BUG_ON( !ivrs_bdf_entries );
 
-    if (init_ivrs_mapping() != 0 )
+    if ( init_ivrs_mapping() != 0 )
         goto error_out;
 
     if ( amd_iommu_setup_device_table() != 0 )
