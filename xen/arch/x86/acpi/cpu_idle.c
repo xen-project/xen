@@ -225,13 +225,8 @@ static void acpi_processor_idle(void)
     cpufreq_dbs_timer_suspend();
 
     sched_tick_suspend();
-    /*
-     * sched_tick_suspend may raise TIMER_SOFTIRQ by __stop_timer,
-     * which will break the later assumption of no sofirq pending,
-     * so add do_softirq
-     */
-    if ( softirq_pending(smp_processor_id()) )
-        do_softirq();
+    /* sched_tick_suspend() can raise TIMER_SOFTIRQ. Process it now. */
+    process_pending_timers();
 
     /*
      * Interrupts must be disabled during bus mastering calculations and
