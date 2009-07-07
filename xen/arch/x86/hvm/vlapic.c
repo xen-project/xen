@@ -814,7 +814,10 @@ void vlapic_adjust_i8259_target(struct domain *d)
     v = d->vcpu ? d->vcpu[0] : NULL;
 
  found:
+    if ( d->arch.hvm_domain.i8259_target == v )
+        return;
     d->arch.hvm_domain.i8259_target = v;
+    pt_adjust_global_vcpu_target(v);
 }
 
 int vlapic_has_pending_irq(struct vcpu *v)

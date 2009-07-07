@@ -28,7 +28,7 @@
 #define vcpu_vhpet(vcpu)   (domain_vhpet((vcpu)->domain))
 #define vhpet_domain(hpet) (container_of((hpet), struct domain, \
                                          arch.hvm_domain.pl_time.vhpet))
-#define vhpet_vcpu(hpet)   (vhpet_domain(hpet)->vcpu[0])
+#define vhpet_vcpu(hpet)   (pt_global_vcpu_target(vhpet_domain(hpet)))
 
 #define HPET_BASE_ADDRESS   0xfed00000ULL
 #define HPET_MMAP_SIZE      1024

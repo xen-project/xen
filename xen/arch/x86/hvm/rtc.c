@@ -32,7 +32,7 @@
 #define vcpu_vrtc(vcpu)  (domain_vrtc((vcpu)->domain))
 #define vrtc_domain(rtc) (container_of((rtc), struct domain, \
                                        arch.hvm_domain.pl_time.vrtc))
-#define vrtc_vcpu(rtc)   (vrtc_domain(rtc)->vcpu[0])
+#define vrtc_vcpu(rtc)   (pt_global_vcpu_target(vrtc_domain(rtc)))
 
 static void rtc_periodic_cb(struct vcpu *v, void *opaque)
 {

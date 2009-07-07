@@ -42,7 +42,7 @@
 #define vcpu_vpit(vcpu)  (domain_vpit((vcpu)->domain))
 #define vpit_domain(pit) (container_of((pit), struct domain, \
                                        arch.hvm_domain.pl_time.vpit))
-#define vpit_vcpu(pit)   (vpit_domain(pit)->vcpu[0])
+#define vpit_vcpu(pit)   (pt_global_vcpu_target(vpit_domain(pit)))
 
 #define RW_STATE_LSB 1
 #define RW_STATE_MSB 2

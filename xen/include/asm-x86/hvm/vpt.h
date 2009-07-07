@@ -142,6 +142,10 @@ void pt_intr_post(struct vcpu *v, struct hvm_intack intack);
 void pt_reset(struct vcpu *v);
 void pt_migrate(struct vcpu *v);
 
+void pt_adjust_global_vcpu_target(struct vcpu *v);
+#define pt_global_vcpu_target(d) \
+    ((d)->arch.hvm_domain.i8259_target ? : (d)->vcpu ? (d)->vcpu[0] : NULL)
+
 /* Is given periodic timer active? */
 #define pt_active(pt) ((pt)->on_list)
 

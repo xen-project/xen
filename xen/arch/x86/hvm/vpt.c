@@ -437,3 +437,53 @@ void destroy_periodic_time(struct periodic_time *pt)
      */
     kill_timer(&pt->timer);
 }
+
+static void pt_adjust_vcpu(struct periodic_time *pt, struct vcpu *v)
+{
+    int on_list;
+
+    ASSERT(pt->source == PTSRC_isa);
+
+    if ( pt->vcpu == NULL )
+        return;
+
+    pt_lock(pt);
+    on_list = pt->on_list;
+    if ( pt->on_list )
+        list_del(&pt->list);
+    pt->on_list = 0;
+    pt_unlock(pt);
+
+    spin_lock(&v->arch.hvm_vcpu.tm_lock);
+    pt->vcpu = v;
+    if ( on_list )
+    {
+        pt->on_list = 1;
+        list_add(&pt->list, &v->arch.hvm_vcpu.tm_list);
+
+        migrate_timer(&pt->timer, v->processor);
+    }
+    spin_unlock(&v->arch.hvm_vcpu.tm_lock);
+}
+
+void pt_adjust_global_vcpu_target(struct vcpu *v)
+{
+    struct pl_time *pl_time = &v->domain->arch.hvm_domain.pl_time;
+    int i;
+
+    if ( v == NULL )
+        return;
+
+    spin_lock(&pl_time->vpit.lock);
+    pt_adjust_vcpu(&pl_time->vpit.pt0, v);
+    spin_unlock(&pl_time->vpit.lock);
+
+    spin_lock(&pl_time->vrtc.lock);
+    pt_adjust_vcpu(&pl_time->vrtc.pt, v);
+    spin_unlock(&pl_time->vrtc.lock);
+
+    spin_lock(&pl_time->vhpet.lock);
+    for ( i = 0; i < HPET_TIMER_NUM; i++ )
+        pt_adjust_vcpu(&pl_time->vhpet.pt[i], v);
+    spin_unlock(&pl_time->vhpet.lock);
+}
