@@ -110,6 +110,7 @@
 #include <asm/hypercall.h>
 #include <asm/shared.h>
 #include <public/memory.h>
+#include <public/sched.h>
 #include <xsm/xsm.h>
 #include <xen/trace.h>
 
@@ -2999,8 +3000,9 @@ int do_mmu_update(
     unsigned long gpfn, gmfn, mfn;
     struct page_info *page;
     int rc = 0, okay = 1, i = 0;
-    unsigned int cmd, done = 0;
-    struct domain *d = current->domain;
+    unsigned int cmd, done = 0, pt_dom;
+    struct domain *d = current->domain, *pt_owner = d;
+    struct vcpu *v = current;
     struct domain_mmap_cache mapcache;
 
     if ( unlikely(count & MMU_UPDATE_PREEMPTED) )
@@ -3018,7 +3020,29 @@ int do_mmu_update(
         goto out;
     }
 
-    if ( !set_foreigndom(foreigndom) )
+    if ( (pt_dom = foreigndom >> 16) != 0 )
+    {
+        /* Pagetables belong to a foreign domain (PFD). */
+        if ( (pt_owner = rcu_lock_domain_by_id(pt_dom - 1)) == NULL )
+        {
+            rc = -EINVAL;
+            goto out;
+        }
+        if ( pt_owner == d )
+            rcu_unlock_domain(pt_owner);
+        if ( (v = pt_owner->vcpu ? pt_owner->vcpu[0] : NULL) == NULL )
+        {
+            rc = -EINVAL;
+            goto out;
+        }
+        if ( !IS_PRIV_FOR(d, pt_owner) )
+        {
+            rc = -ESRCH;
+            goto out;
+        }
+    }
+
+    if ( !set_foreigndom((uint16_t)foreigndom) )
     {
         rc = -ESRCH;
         goto out;
@@ -3059,9 +3083,9 @@ int do_mmu_update(
 
             req.ptr -= cmd;
             gmfn = req.ptr >> PAGE_SHIFT;
-            mfn = gmfn_to_mfn(d, gmfn);
+            mfn = gmfn_to_mfn(pt_owner, gmfn);
 
-            if ( unlikely(!get_page_from_pagenr(mfn, d)) )
+            if ( unlikely(!get_page_from_pagenr(mfn, pt_owner)) )
             {
                 MEM_LOG("Could not get page for normal update");
                 break;
@@ -3080,24 +3104,21 @@ int do_mmu_update(
                 {
                     l1_pgentry_t l1e = l1e_from_intpte(req.val);
                     okay = mod_l1_entry(va, l1e, mfn,
-                                        cmd == MMU_PT_UPDATE_PRESERVE_AD,
-                                        current);
+                                        cmd == MMU_PT_UPDATE_PRESERVE_AD, v);
                 }
                 break;
                 case PGT_l2_page_table:
                 {
                     l2_pgentry_t l2e = l2e_from_intpte(req.val);
                     okay = mod_l2_entry(va, l2e, mfn,
-                                        cmd == MMU_PT_UPDATE_PRESERVE_AD,
-                                        current);
+                                        cmd == MMU_PT_UPDATE_PRESERVE_AD, v);
                 }
                 break;
                 case PGT_l3_page_table:
                 {
                     l3_pgentry_t l3e = l3e_from_intpte(req.val);
                     rc = mod_l3_entry(va, l3e, mfn,
-                                      cmd == MMU_PT_UPDATE_PRESERVE_AD, 1,
-                                      current);
+                                      cmd == MMU_PT_UPDATE_PRESERVE_AD, 1, v);
                     okay = !rc;
                 }
                 break;
@@ -3106,8 +3127,7 @@ int do_mmu_update(
                 {
                     l4_pgentry_t l4e = l4e_from_intpte(req.val);
                     rc = mod_l4_entry(va, l4e, mfn,
-                                      cmd == MMU_PT_UPDATE_PRESERVE_AD, 1,
-                                      current);
+                                      cmd == MMU_PT_UPDATE_PRESERVE_AD, 1, v);
                     okay = !rc;
                 }
                 break;
@@ -3115,7 +3135,7 @@ int do_mmu_update(
                 case PGT_writable_page:
                     perfc_incr(writable_mmu_updates);
                     okay = paging_write_guest_entry(
-                        current, va, req.val, _mfn(mfn));
+                        v, va, req.val, _mfn(mfn));
                     break;
                 }
                 page_unlock(page);
@@ -3126,7 +3146,7 @@ int do_mmu_update(
             {
                 perfc_incr(writable_mmu_updates);
                 okay = paging_write_guest_entry(
-                    current, va, req.val, _mfn(mfn));
+                    v, va, req.val, _mfn(mfn));
                 put_page_type(page);
             }
 
@@ -3191,6 +3211,9 @@ int do_mmu_update(
     perfc_add(num_page_updates, i);
 
  out:
+    if ( pt_owner && (pt_owner != d) )
+        rcu_unlock_domain(pt_owner);
+
     /* Add incremental work we have done to the @done output parameter. */
     if ( unlikely(!guest_handle_is_null(pdone)) )
     {

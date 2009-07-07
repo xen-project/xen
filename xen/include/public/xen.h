@@ -158,18 +158,26 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 #define NR_VIRQS       24
 
 /*
- * MMU-UPDATE REQUESTS
+ * HYPERVISOR_mmu_update(reqs, count, pdone, foreigndom)
  * 
- * HYPERVISOR_mmu_update() accepts a list of (ptr, val) pairs.
- * A foreigndom (FD) can be specified (or DOMID_SELF for none).
- * Where the FD has some effect, it is described below.
- * ptr[1:0] specifies the appropriate MMU_* command.
+ * @reqs is an array of mmu_update_t structures ((ptr, val) pairs).
+ * @count is the length of the above array.
+ * @pdone is an output parameter indicating number of completed operations
+ * @foreigndom[15:0]: FD, the expected owner of data pages referenced in this
+ *                    hypercall invocation. Can be DOMID_SELF.
+ * @foreigndom[31:16]: PFD, the expected owner of pagetable pages referenced
+ *                     in this hypercall invocation. The value of this field
+ *                     (x) encodes the PFD as follows:
+ *                     x == 0 => PFD == DOMID_SELF
+ *                     x != 0 => PFD == x - 1
  * 
+ * Sub-commands: ptr[1:0] specifies the appropriate MMU_* command.
+ * -------------
  * ptr[1:0] == MMU_NORMAL_PT_UPDATE:
- * Updates an entry in a page table. If updating an L1 table, and the new
- * table entry is valid/present, the mapped frame must belong to the FD, if
- * an FD has been specified. If attempting to map an I/O page then the
- * caller assumes the privilege of the FD.
+ * Updates an entry in a page table belonging to PFD. If updating an L1 table,
+ * and the new table entry is valid/present, the mapped frame must belong to
+ * FD. If attempting to map an I/O page then the caller assumes the privilege
+ * of the FD.
  * FD == DOMID_IO: Permit /only/ I/O mappings, at the priv level of the caller.
  * FD == DOMID_XEN: Map restricted areas of Xen's heap space.
  * ptr[:2]  -- Machine address of the page-table entry to modify.
