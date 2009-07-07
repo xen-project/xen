@@ -92,7 +92,6 @@ struct hpet_registers {
 
 typedef struct HPETState {
     struct hpet_registers hpet;
-    struct vcpu *vcpu;
     uint64_t stime_freq;
     uint64_t hpet_to_ns_scale; /* hpet ticks to ns (multiplied by 2^10) */
     uint64_t hpet_to_ns_limit; /* max hpet ticks convertable to ns      */

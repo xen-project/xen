@@ -24,6 +24,12 @@
 #include <xen/sched.h>
 #include <xen/event.h>
 
+#define domain_vhpet(d)    (&(d)->arch.hvm_domain.pl_time.vhpet)
+#define vcpu_vhpet(vcpu)   (domain_vhpet((vcpu)->domain))
+#define vhpet_domain(hpet) (container_of((hpet), struct domain, \
+                                         arch.hvm_domain.pl_time.vhpet))
+#define vhpet_vcpu(hpet)   (vhpet_domain(hpet)->vcpu[0])
+
 #define HPET_BASE_ADDRESS   0xfed00000ULL
 #define HPET_MMAP_SIZE      1024
 #define S_TO_NS  1000000000ULL           /* 1s  = 10^9  ns */
@@ -31,7 +37,8 @@
 
 /* Frequency_of_Xen_systeme_time / frequency_of_HPET = 16 */
 #define STIME_PER_HPET_TICK 16
-#define guest_time_hpet(v) (hvm_get_guest_time(v) / STIME_PER_HPET_TICK)
+#define guest_time_hpet(hpet) \
+    (hvm_get_guest_time(vhpet_vcpu(hpet)) / STIME_PER_HPET_TICK)
 
 #define HPET_ID         0x000
 #define HPET_PERIOD     0x004
@@ -94,7 +101,7 @@ static inline uint64_t hpet_read_maincounter(HPETState *h)
     ASSERT(spin_is_locked(&h->lock));
 
     if ( hpet_enabled(h) )
-        return guest_time_hpet(h->vcpu) + h->mc_offset;
+        return guest_time_hpet(h) + h->mc_offset;
     else 
         return h->hpet.mc64;
 }
@@ -176,7 +183,7 @@ static int hpet_read(
     struct vcpu *v, unsigned long addr, unsigned long length,
     unsigned long *pval)
 {
-    HPETState *h = &v->domain->arch.hvm_domain.pl_time.vhpet;
+    HPETState *h = vcpu_vhpet(v);
     unsigned long result;
     uint64_t val;
 
@@ -230,7 +237,7 @@ static void hpet_set_timer(HPETState *h, unsigned int tn)
     {
         /* HPET specification requires PIT shouldn't generate
          * interrupts if LegacyReplacementRoute is set for timer0 */
-        PITState *pit = &h->vcpu->domain->arch.hvm_domain.pl_time.vpit;
+        PITState *pit = &vhpet_domain(h)->arch.hvm_domain.pl_time.vpit;
         pit_stop_channel0_irq(pit);
     }
 
@@ -272,7 +279,7 @@ static void hpet_set_timer(HPETState *h, unsigned int tn)
      * being enabled (now).
      */
     oneshot = !timer_is_periodic(h, tn);
-    create_periodic_time(h->vcpu, &h->pt[tn],
+    create_periodic_time(vhpet_vcpu(h), &h->pt[tn],
                          hpet_tick_to_ns(h, diff),
                          oneshot ? 0 : hpet_tick_to_ns(h, h->hpet.period[tn]),
                          irq, NULL, NULL);
@@ -290,7 +297,7 @@ static int hpet_write(
     struct vcpu *v, unsigned long addr,
     unsigned long length, unsigned long val)
 {
-    HPETState *h = &v->domain->arch.hvm_domain.pl_time.vhpet;
+    HPETState *h = vcpu_vhpet(v);
     uint64_t old_val, new_val;
     int tn, i;
 
@@ -323,7 +330,7 @@ static int hpet_write(
         if ( !(old_val & HPET_CFG_ENABLE) && (new_val & HPET_CFG_ENABLE) )
         {
             /* Enable main counter and interrupt generation. */
-            h->mc_offset = h->hpet.mc64 - guest_time_hpet(h->vcpu);
+            h->mc_offset = h->hpet.mc64 - guest_time_hpet(h);
             for ( i = 0; i < HPET_TIMER_NUM; i++ )
             {
                 h->hpet.comparator64[i] =
@@ -337,7 +344,7 @@ static int hpet_write(
         else if ( (old_val & HPET_CFG_ENABLE) && !(new_val & HPET_CFG_ENABLE) )
         {
             /* Halt main counter and disable interrupt generation. */
-            h->hpet.mc64 = h->mc_offset + guest_time_hpet(h->vcpu);
+            h->hpet.mc64 = h->mc_offset + guest_time_hpet(h);
             for ( i = 0; i < HPET_TIMER_NUM; i++ )
                 if ( timer_enabled(h, i) )
                     set_stop_timer(i);
@@ -487,13 +494,13 @@ struct hvm_mmio_handler hpet_mmio_handler = {
 
 static int hpet_save(struct domain *d, hvm_domain_context_t *h)
 {
-    HPETState *hp = &d->arch.hvm_domain.pl_time.vhpet;
+    HPETState *hp = domain_vhpet(d);
     int rc;
 
     spin_lock(&hp->lock);
 
     /* Write the proper value into the main counter */
-    hp->hpet.mc64 = hp->mc_offset + guest_time_hpet(hp->vcpu);
+    hp->hpet.mc64 = hp->mc_offset + guest_time_hpet(hp);
 
     /* Save the HPET registers */
     rc = _hvm_init_entry(h, HVM_SAVE_CODE(HPET), 0, HVM_SAVE_LENGTH(HPET));
@@ -531,7 +538,7 @@ static int hpet_save(struct domain *d, hvm_domain_context_t *h)
 
 static int hpet_load(struct domain *d, hvm_domain_context_t *h)
 {
-    HPETState *hp = &d->arch.hvm_domain.pl_time.vhpet;
+    HPETState *hp = domain_vhpet(d);
     struct hvm_hw_hpet *rec;
     uint64_t cmp;
     int i;
@@ -572,7 +579,7 @@ static int hpet_load(struct domain *d, hvm_domain_context_t *h)
 #undef C
     
     /* Recalculate the offset between the main counter and guest time */
-    hp->mc_offset = hp->hpet.mc64 - guest_time_hpet(hp->vcpu);
+    hp->mc_offset = hp->hpet.mc64 - guest_time_hpet(hp);
 
     /* restart all timers */
 
@@ -590,14 +597,13 @@ HVM_REGISTER_SAVE_RESTORE(HPET, hpet_save, hpet_load, 1, HVMSR_PER_DOM);
 
 void hpet_init(struct vcpu *v)
 {
-    HPETState *h = &v->domain->arch.hvm_domain.pl_time.vhpet;
+    HPETState *h = vcpu_vhpet(v);
     int i;
 
     memset(h, 0, sizeof(HPETState));
 
     spin_lock_init(&h->lock);
 
-    h->vcpu = v;
     h->stime_freq = S_TO_NS;
 
     h->hpet_to_ns_scale = ((S_TO_NS * STIME_PER_HPET_TICK) << 10) / h->stime_freq;
@@ -622,7 +628,7 @@ void hpet_init(struct vcpu *v)
 void hpet_deinit(struct domain *d)
 {
     int i;
-    HPETState *h = &d->arch.hvm_domain.pl_time.vhpet;
+    HPETState *h = domain_vhpet(d);
 
     spin_lock(&h->lock);
 
