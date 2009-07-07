@@ -3,11 +3,12 @@ Authors : Allen Kay    <allen.m.kay@intel.com>
           Weidong Han  <weidong.han@intel.com>
           Yuji Shimada <shimada-yxb@necst.nec.co.jp>
 Created : October-24-2007
-Updated : September-09-2008
+Updated : July-07-2009
 
 How to turn on VT-d in Xen
 --------------------------
 
+Xen with 2.6.18 dom0:
 1 ) cd xen-unstable.hg
 2 ) make install
 3 ) make linux-2.6-xen-config CONFIGMODE=menuconfig
@@ -41,6 +42,44 @@ title Xen-Fedora Core (2.6.18-xen)
 13) add "pci" line in /etc/xen/hvm.conf for to assigned devices
         pci = [ '01:00.0', '03:00.0' ]
 15) start hvm guest and use "lspci" to see the passthru device and
+    "ifconfig" to see if IP address has been assigned to NIC devices.
+
+
+Xen with pv-ops dom0:
+1 ) cd xen-unstable.hg
+2 ) make install
+3 ) make linux-2.6-pvops-config CONFIGMODE=menuconfig
+4 ) change Bus options (PCI etc.)->"PCI Stub driver" to "*".
+5 ) make linux-2.6-pvops-build
+6 ) make linux-2.6-pvops-install
+7 ) mkinitrd -v -f --with=ahci --with=aacraid --with=sd_mod --with=scsi_mod initrd-2.6.30-rc3-tip.img 2.6.30-rc3-tip
+    (change 2.6.30-rc3-tip to pv-ops dom0 version when it's updated in future)
+8 ) cp initrd-2.6.30-rc3-tip.img /boot
+9 ) edit grub:
+
+title Xen-Fedora Core (pv-ops)
+        root (hd0,0)
+        kernel /boot/xen.gz console=com1,vga console=com1 com1=115200,8n1 iommu=1
+        module /boot/vmlinuz-2.6.30-rc3-tip root=LABEL=/ ro console=hvc0 earlyprintk=xen
+        module /boot/initrd-2.6.30-rc3-tip.img
+
+10) reboot system
+11) hide device using pci-stub (example PCI device 01:00.0):
+
+    - lspci -n
+    - locate the entry for device 01:00.0 and note down the vendor & device ID
+8086:10b9
+        ...
+        01:00.0 0200: 8086:10b9 (rev 06)
+        ...
+    - then use following commands to hide it:
+        echo "8086 10b9" > /sys/bus/pci/drivers/pci-stub/new_id
+        echo "0000:01:00.0" > /sys/bus/pci/devices/0000:01:00.0/driver/unbind
+        echo "0000:01:00.0" > /sys/bus/pci/drivers/pci-stub/bind
+
+12) add "pci" line in /etc/xen/hvm.conf for to assigned devices
+        pci = [ '01:00.0' ]
+13) start hvm guest and use "lspci" to see the passthru device and
     "ifconfig" to see if IP address has been assigned to NIC devices.
 
 
@@ -245,7 +284,7 @@ using it in VT-d environment. You need to hide the Virtual Function,
 use the Virtual Function bus, device and function number in the HVM
 guest configuration file and then boot the HVM guest. You also need the
 Virtual Function driver which is the normal PCI device driver in the
-HMV guest to drive the Virtual Function. The PCIe SR-IOV specification
+HVM guest to drive the Virtual Function. The PCIe SR-IOV specification
 requires that the Virtual Function can only support MSI/MSI-x if it
 uses interrupt. This means you also need to enable Xen/MSI support.
 Since the Virtual Function is dynamically allocated by Physical Function
