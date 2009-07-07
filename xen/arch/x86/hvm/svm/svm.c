@@ -1504,8 +1504,9 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
          * The guest is running a contended spinlock and we've detected it.
          * Do something useful, like reschedule the guest
          */
-       do_sched_op_compat(SCHEDOP_yield, 0);
-       break;
+        perfc_incr(pauseloop_exits);
+        do_sched_op_compat(SCHEDOP_yield, 0);
+        break;
 
     default:
     exit_and_crash:

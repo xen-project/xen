@@ -44,6 +44,20 @@ boolean_param("vpid", opt_vpid_enabled);
 static int opt_unrestricted_guest_enabled = 1;
 boolean_param("unrestricted_guest", opt_unrestricted_guest_enabled);
 
+/*
+ * These two parameters are used to config the controls for Pause-Loop Exiting:
+ * ple_gap:    upper bound on the amount of time between two successive
+ *             executions of PAUSE in a loop.
+ * ple_window: upper bound on the amount of time a guest is allowed to execute
+ *             in a PAUSE loop.
+ * Time is measured based on a counter that runs at the same rate as the TSC,
+ * refer SDM volume 3b section 21.6.13 & 22.1.3.
+ */
+static unsigned int ple_gap = 41;
+integer_param("ple_gap", ple_gap);
+static unsigned int ple_window = 4096;
+integer_param("ple_window", ple_window);
+
 /* Dynamic (run-time adjusted) execution control flags. */
 u32 vmx_pin_based_exec_control __read_mostly;
 u32 vmx_cpu_based_exec_control __read_mostly;
@@ -140,7 +154,8 @@ static void vmx_init_vmcs_config(void)
         min = 0;
         opt = (SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES |
                SECONDARY_EXEC_WBINVD_EXITING |
-               SECONDARY_EXEC_ENABLE_EPT);
+               SECONDARY_EXEC_ENABLE_EPT |
+               SECONDARY_EXEC_PAUSE_LOOP_EXITING);
         if ( opt_vpid_enabled )
             opt |= SECONDARY_EXEC_ENABLE_VPID;
         if ( opt_unrestricted_guest_enabled )
@@ -166,6 +181,13 @@ static void vmx_init_vmcs_config(void)
             _vmx_secondary_exec_control &=
                 ~(SECONDARY_EXEC_ENABLE_EPT |
                   SECONDARY_EXEC_UNRESTRICTED_GUEST);
+    }
+
+    if ( (_vmx_secondary_exec_control & SECONDARY_EXEC_PAUSE_LOOP_EXITING) &&
+          ple_gap == 0 )
+    {
+        printk("Disable Pause-Loop Exiting.\n");
+        _vmx_secondary_exec_control &= ~ SECONDARY_EXEC_PAUSE_LOOP_EXITING;
     }
 
 #if defined(__i386__)
@@ -555,6 +577,12 @@ static int construct_vmcs(struct vcpu *v)
     __vmwrite(CPU_BASED_VM_EXEC_CONTROL, v->arch.hvm_vmx.exec_control);
     __vmwrite(VM_EXIT_CONTROLS, vmx_vmexit_control);
     __vmwrite(VM_ENTRY_CONTROLS, vmx_vmentry_control);
+
+    if ( cpu_has_vmx_ple )
+    {
+        __vmwrite(PLE_GAP, ple_gap);
+        __vmwrite(PLE_WINDOW, ple_window);
+    }
 
     if ( cpu_has_vmx_secondary_exec_control )
         __vmwrite(SECONDARY_VM_EXEC_CONTROL,

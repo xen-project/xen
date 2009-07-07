@@ -2609,13 +2609,16 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
     }
 
     case EXIT_REASON_MONITOR_TRAP_FLAG:
-    {
         v->arch.hvm_vmx.exec_control &= ~CPU_BASED_MONITOR_TRAP_FLAG;
         __vmwrite(CPU_BASED_VM_EXEC_CONTROL, v->arch.hvm_vmx.exec_control);
         if ( v->domain->debugger_attached && v->arch.hvm_vcpu.single_step )
             domain_pause_for_debugger();
         break;
-    }
+
+    case EXIT_REASON_PAUSE_INSTRUCTION:
+        perfc_incr(pauseloop_exits);
+        do_sched_op_compat(SCHEDOP_yield, 0);
+        break;
 
     default:
     exit_and_crash:

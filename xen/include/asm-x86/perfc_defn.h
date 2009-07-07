@@ -130,4 +130,6 @@ PERFCOUNTER(mshv_wrmsr_eoi,             "MS Hv wrmsr eoi")
 PERFCOUNTER(realmode_emulations, "realmode instructions emulated")
 PERFCOUNTER(realmode_exits,      "vmexits from realmode")
 
+PERFCOUNTER(pauseloop_exits, "vmexits from Pause-Loop Detection")
+
 /*#endif*/ /* __XEN_PERFC_DEFN_H__ */

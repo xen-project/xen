@@ -171,6 +171,7 @@ extern u32 vmx_vmentry_control;
 #define SECONDARY_EXEC_ENABLE_VPID              0x00000020
 #define SECONDARY_EXEC_WBINVD_EXITING           0x00000040
 #define SECONDARY_EXEC_UNRESTRICTED_GUEST       0x00000080
+#define SECONDARY_EXEC_PAUSE_LOOP_EXITING       0x00000400
 extern u32 vmx_secondary_exec_control;
 
 extern bool_t cpu_has_vmx_ins_outs_instr_info;
@@ -200,6 +201,8 @@ extern bool_t cpu_has_vmx_ins_outs_instr_info;
 #define vmx_unrestricted_guest(v)               \
     ((v)->arch.hvm_vmx.secondary_exec_control & \
      SECONDARY_EXEC_UNRESTRICTED_GUEST)
+#define cpu_has_vmx_ple \
+    (vmx_secondary_exec_control & SECONDARY_EXEC_PAUSE_LOOP_EXITING)
 
 /* GUEST_INTERRUPTIBILITY_INFO flags. */
 #define VMX_INTR_SHADOW_STI             0x00000001
@@ -279,6 +282,8 @@ enum vmcs_field {
     VM_ENTRY_INSTRUCTION_LEN        = 0x0000401a,
     TPR_THRESHOLD                   = 0x0000401c,
     SECONDARY_VM_EXEC_CONTROL       = 0x0000401e,
+    PLE_GAP                         = 0x00004020,
+    PLE_WINDOW                      = 0x00004022,
     VM_INSTRUCTION_ERROR            = 0x00004400,
     VM_EXIT_REASON                  = 0x00004402,
     VM_EXIT_INTR_INFO               = 0x00004404,
