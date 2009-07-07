@@ -31,7 +31,7 @@
 
 #include "xenstat_priv.h"
 
-#define SYSFS_VBD_PATH "/sys/devices/xen-backend/"
+#define SYSFS_VBD_PATH "/sys/bus/xen-backend/devices"
 
 struct priv_data {
 	FILE *procnetdev;
