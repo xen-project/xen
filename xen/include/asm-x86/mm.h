@@ -199,24 +199,19 @@ struct page_info
 #define PGC_cacheattr_base PG_shift(6)
 #define PGC_cacheattr_mask PG_mask(7, 6)
  /* Page is broken? */
-#define _PGC_broken         PG_shift(7)
-#define PGC_broken          PG_mask(1, 7)
- /* Page is offline pending ? */
-#define _PGC_offlining      PG_shift(8)
-#define PGC_offlining       PG_mask(1, 8)
- /* Page is offlined */
-#define _PGC_offlined       PG_shift(9)
-#define PGC_offlined        PG_mask(1, 9)
-#define PGC_offlined_broken (PGC_offlined | PGC_broken)
+#define _PGC_broken       PG_shift(7)
+#define PGC_broken        PG_mask(1, 7)
+ /* Mutually-exclusive page states: { inuse, offlining, offlined, free }. */
+#define PGC_state         PG_mask(3, 9)
+#define PGC_state_inuse   PG_mask(0, 9)
+#define PGC_state_offlining PG_mask(1, 9)
+#define PGC_state_offlined PG_mask(2, 9)
+#define PGC_state_free    PG_mask(3, 9)
+#define page_state_is(pg, st) (((pg)->count_info&PGC_state) == PGC_state_##st)
 
  /* Count of references to this frame. */
 #define PGC_count_width   PG_shift(9)
 #define PGC_count_mask    ((1UL<<PGC_count_width)-1)
-
-#define is_page_offlining(page)  ((page)->count_info & PGC_offlining)
-#define is_page_offlined(page)   ((page)->count_info & PGC_offlined)
-#define is_page_broken(page)     ((page)->count_info & PGC_broken)
-#define is_page_online(page)     (!is_page_offlined(page))
 
 #if defined(__i386__)
 #define is_xen_heap_page(page) is_xen_heap_mfn(page_to_mfn(page))

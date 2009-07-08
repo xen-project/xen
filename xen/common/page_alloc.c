@@ -389,8 +389,7 @@ static struct page_info *alloc_heap_pages(
         page_list_add_tail(pg, &heap(node, zone, j));
         pg += 1 << j;
     }
-    
-    map_alloc(page_to_mfn(pg), request);
+
     ASSERT(avail[node][zone] >= request);
     avail[node][zone] -= request;
 
@@ -401,7 +400,8 @@ static struct page_info *alloc_heap_pages(
     for ( i = 0; i < (1 << order); i++ )
     {
         /* Reference count must continuously be zero for free pages. */
-        BUG_ON(pg[i].count_info != 0);
+        BUG_ON(pg[i].count_info != PGC_state_free);
+        pg[i].count_info = PGC_state_inuse;
 
         if ( pg[i].u.free.need_tlbflush )
         {
@@ -444,7 +444,7 @@ static int reserve_offlined_page(struct page_info *head)
         struct page_info *pg;
         int next_order;
 
-        if ( test_bit(_PGC_offlined, &cur_head->count_info) )
+        if ( page_state_is(cur_head, offlined) )
         {
             cur_head++;
             continue;
@@ -462,7 +462,7 @@ static int reserve_offlined_page(struct page_info *head)
             for ( i = (1 << cur_order), pg = cur_head + (1 << cur_order );
                   i < (1 << next_order);
                   i++, pg++ )
-                if ( test_bit(_PGC_offlined, &pg->count_info) )
+                if ( page_state_is(pg, offlined) )
                     break;
             if ( i == ( 1 << next_order) )
             {
@@ -483,12 +483,10 @@ static int reserve_offlined_page(struct page_info *head)
 
     for ( cur_head = head; cur_head < head + ( 1UL << head_order); cur_head++ )
     {
-        if ( !test_bit(_PGC_offlined, &cur_head->count_info) )
+        if ( !page_state_is(cur_head, offlined) )
             continue;
 
         avail[node][zone]--;
-
-        map_alloc(page_to_mfn(cur_head), 1);
 
         page_list_add_tail(cur_head,
                            test_bit(_PGC_broken, &cur_head->count_info) ?
@@ -525,14 +523,13 @@ static void free_heap_pages(
          *     in its pseudophysical address space).
          * In all the above cases there can be no guest mappings of this page.
          */
-        ASSERT(!(pg[i].count_info & PGC_offlined));
-        pg[i].count_info &= PGC_offlining | PGC_broken;
-        if ( pg[i].count_info & PGC_offlining )
-        {
-            pg[i].count_info &= ~PGC_offlining;
-            pg[i].count_info |= PGC_offlined;
+        ASSERT(!page_state_is(&pg[i], offlined));
+        pg[i].count_info =
+            ((pg[i].count_info & PGC_broken) |
+             (page_state_is(&pg[i], offlining)
+              ? PGC_state_offlined : PGC_state_free));
+        if ( page_state_is(&pg[i], offlined) )
             tainted = 1;
-        }
 
         /* If a page has no owner it will need no safety TLB flush. */
         pg[i].u.free.need_tlbflush = (page_get_owner(&pg[i]) != NULL);
@@ -542,7 +539,6 @@ static void free_heap_pages(
 
     spin_lock(&heap_lock);
 
-    map_free(page_to_mfn(pg), 1 << order);
     avail[node][zone] += 1 << order;
 
     /* Merge chunks as far as possible. */
@@ -553,7 +549,7 @@ static void free_heap_pages(
         if ( (page_to_mfn(pg) & mask) )
         {
             /* Merge with predecessor block? */
-            if ( allocated_in_map(page_to_mfn(pg)-mask) ||
+            if ( !page_state_is(pg-mask, free) ||
                  (PFN_ORDER(pg-mask) != order) )
                 break;
             pg -= mask;
@@ -562,7 +558,7 @@ static void free_heap_pages(
         else
         {
             /* Merge with successor block? */
-            if ( allocated_in_map(page_to_mfn(pg)+mask) ||
+            if ( !page_state_is(pg+mask, free) ||
                  (PFN_ORDER(pg+mask) != order) )
                 break;
             page_list_del(pg + mask, &heap(node, zone, order));
@@ -593,7 +589,6 @@ static void free_heap_pages(
  * Once a page is broken, it can't be assigned anymore
  * A page will be offlined only if it is free
  * return original count_info
- *
  */
 static unsigned long mark_page_offline(struct page_info *pg, int broken)
 {
@@ -605,26 +600,19 @@ static unsigned long mark_page_offline(struct page_info *pg, int broken)
     do {
         nx = x = y;
 
-        if ( ((x & PGC_offlined_broken) == PGC_offlined_broken) )
-            return y;
-
-        if ( x & PGC_offlined )
+        if ( ((x & PGC_state) != PGC_state_offlined) &&
+             ((x & PGC_state) != PGC_state_offlining) )
         {
-            /* PGC_offlined means it is a free page. */
-            if ( broken && !(nx & PGC_broken) )
-                nx |= PGC_broken;
-            else
-                return y;
-        }
-        else
-        {
-            /* It is not offlined, not reserved page */
-            nx |= (allocated_in_map(page_to_mfn(pg)) ?
-                   PGC_offlining : PGC_offlined);
+            nx &= ~PGC_state;
+            nx |= (((x & PGC_state) == PGC_state_free)
+                   ? PGC_state_offlined : PGC_state_offlining);
         }
 
         if ( broken )
             nx |= PGC_broken;
+
+        if ( x == nx )
+            break;
     } while ( (y = cmpxchg(&pg->count_info, x, nx)) != x );
 
     return y;
@@ -698,13 +686,13 @@ int offline_page(unsigned long mfn, int broken, uint32_t *status)
 
     old_info = mark_page_offline(pg, broken);
 
-    if ( !allocated_in_map(mfn) )
+    if ( page_state_is(pg, free) )
     {
         /* Free pages are reserve directly */
         reserve_heap_page(pg);
         *status = PG_OFFLINE_OFFLINED;
     }
-    else if ( test_bit(_PGC_offlined, &pg->count_info) )
+    else if ( page_state_is(pg, offlined) )
     {
         *status = PG_OFFLINE_OFFLINED;
     }
@@ -749,8 +737,9 @@ int offline_page(unsigned long mfn, int broken, uint32_t *status)
  */
 unsigned int online_page(unsigned long mfn, uint32_t *status)
 {
+    unsigned long x, nx, y;
     struct page_info *pg;
-    int ret = 0, free = 0;
+    int ret;
 
     if ( mfn > max_page )
     {
@@ -760,30 +749,40 @@ unsigned int online_page(unsigned long mfn, uint32_t *status)
 
     pg = mfn_to_page(mfn);
 
-    *status = 0;
-
     spin_lock(&heap_lock);
 
-    if ( unlikely(is_page_broken(pg)) )
-    {
-        ret = -EINVAL;
-        *status = PG_ONLINE_FAILED |PG_ONLINE_BROKEN;
-    }
-    else if ( pg->count_info & PGC_offlined )
-    {
-        clear_bit(_PGC_offlined, &pg->count_info);
-        page_list_del(pg, &page_offlined_list);
-        *status = PG_ONLINE_ONLINED;
-        free = 1;
-    }
-    else if ( pg->count_info & PGC_offlining )
-    {
-        clear_bit(_PGC_offlining, &pg->count_info);
-        *status = PG_ONLINE_ONLINED;
-    }
+    y = pg->count_info;
+    do {
+        ret = *status = 0;
+
+        if ( y & PGC_broken )
+        {
+            ret = -EINVAL;
+            *status = PG_ONLINE_FAILED |PG_ONLINE_BROKEN;
+            break;
+        }
+
+        if ( (y & PGC_state) == PGC_state_offlined )
+        {
+            page_list_del(pg, &page_offlined_list);
+            *status = PG_ONLINE_ONLINED;
+        }
+        else if ( (y & PGC_state) == PGC_state_offlining )
+        {
+            *status = PG_ONLINE_ONLINED;
+        }
+        else
+        {
+            break;
+        }
+
+        x = y;
+        nx = (x & ~PGC_state) | PGC_state_inuse;
+    } while ( (y = cmpxchg(&pg->count_info, x, nx)) != x );
+
     spin_unlock(&heap_lock);
 
-    if ( free )
+    if ( (y & PGC_state) == PGC_state_offlined )
         free_heap_pages(pg, 0);
 
     return ret;
@@ -804,11 +803,11 @@ int query_page_offline(unsigned long mfn, uint32_t *status)
 
     pg = mfn_to_page(mfn);
 
-    if (pg->count_info & PGC_offlining)
+    if ( page_state_is(pg, offlining) )
         *status |= PG_OFFLINE_STATUS_OFFLINE_PENDING;
-    if (pg->count_info & PGC_broken)
+    if ( pg->count_info & PGC_broken )
         *status |= PG_OFFLINE_STATUS_BROKEN;
-    if (pg->count_info & PGC_offlined)
+    if ( page_state_is(pg, offlined) )
         *status |= PG_OFFLINE_STATUS_OFFLINED;
 
     spin_unlock(&heap_lock);
@@ -934,6 +933,7 @@ void __init end_boot_allocator(void)
 void __init scrub_heap_pages(void)
 {
     unsigned long mfn;
+    struct page_info *pg;
 
     if ( !opt_bootscrub )
         return;
@@ -944,8 +944,10 @@ void __init scrub_heap_pages(void)
     {
         process_pending_timers();
 
+        pg = mfn_to_page(mfn);
+
         /* Quick lock-free check. */
-        if ( allocated_in_map(mfn) )
+        if ( !page_state_is(pg, free) )
             continue;
 
         /* Every 100MB, print a progress dot. */
@@ -955,8 +957,8 @@ void __init scrub_heap_pages(void)
         spin_lock(&heap_lock);
 
         /* Re-check page status with lock held. */
-        if ( !allocated_in_map(mfn) )
-            scrub_one_page(mfn_to_page(mfn));
+        if ( page_state_is(pg, free) )
+            scrub_one_page(pg);
 
         spin_unlock(&heap_lock);
     }
