@@ -810,6 +810,7 @@ vhd_util_check_vhd(const char *name, int ignore)
 
 	fd = -1;
 	memset(&vhd, 0, sizeof(vhd));
+        memset(&footer, 0, sizeof(footer));
 
 	err = stat(name, &stats);
 	if (err == -1) {
