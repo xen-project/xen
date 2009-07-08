@@ -99,7 +99,10 @@ static void dispatch_file_open(struct fs_mount *mount, struct fsif_request *req)
         }
     }
 out:
-    assert(xc_gnttab_munmap(mount->gnth, file_name, 1) == 0);
+    if (xc_gnttab_munmap(mount->gnth, file_name, 1) != 0) {
+        FS_DEBUG("ERROR: xc_gnttab_munmap failed errno=%d\n", errno);
+        terminate_mount_request(mount);
+    }
     /* We can advance the request consumer index, from here on, the request
      * should not be used (it may be overrinden by a response) */
     mount->ring.req_cons++;
@@ -187,7 +190,11 @@ static void dispatch_file_read(struct fs_mount *mount, struct fsif_request *req)
     priv_req->aiocb.aio_sigevent.sigev_notify = SIGEV_SIGNAL;
     priv_req->aiocb.aio_sigevent.sigev_signo = SIGUSR2;
     priv_req->aiocb.aio_sigevent.sigev_value.sival_ptr = priv_req;
-    assert(aio_read(&priv_req->aiocb) >= 0);
+    if (aio_read(&priv_req->aiocb) < 0) {
+        FS_DEBUG("ERROR: aio_read failed errno=%d\n", errno);
+        xc_gnttab_munmap(mount->gnth, priv_req->page, priv_req->count);
+        terminate_mount_request(mount);
+    }
 
     /* We can advance the request consumer index, from here on, the request
      * should not be used (it may be overrinden by a response) */
@@ -201,9 +208,10 @@ static void end_file_read(struct fs_mount *mount, struct fs_request *priv_req)
     uint16_t req_id;
 
     /* Release the grant */
-    assert(xc_gnttab_munmap(mount->gnth, 
-                            priv_req->page, 
-                            priv_req->count) == 0);
+    if (xc_gnttab_munmap(mount->gnth, priv_req->page, priv_req->count) != 0) {
+        FS_DEBUG("ERROR: xc_gnttab_munmap failed errno=%d\n", errno);
+        terminate_mount_request(mount);
+    }
 
     /* Get a response from the ring */
     rsp_idx = mount->ring.rsp_prod_pvt++;
@@ -257,7 +265,11 @@ static void dispatch_file_write(struct fs_mount *mount, struct fsif_request *req
     priv_req->aiocb.aio_sigevent.sigev_notify = SIGEV_SIGNAL;
     priv_req->aiocb.aio_sigevent.sigev_signo = SIGUSR2;
     priv_req->aiocb.aio_sigevent.sigev_value.sival_ptr = priv_req;
-    assert(aio_write(&priv_req->aiocb) >= 0);
+    if (aio_write(&priv_req->aiocb) < 0) {
+        FS_DEBUG("ERROR: aio_write failed errno=%d\n", errno);
+        xc_gnttab_munmap(mount->gnth, priv_req->page, priv_req->count);
+        terminate_mount_request(mount);
+    }
 
      
     /* We can advance the request consumer index, from here on, the request
@@ -272,9 +284,10 @@ static void end_file_write(struct fs_mount *mount, struct fs_request *priv_req)
     uint16_t req_id;
 
     /* Release the grant */
-    assert(xc_gnttab_munmap(mount->gnth, 
-                            priv_req->page, 
-                            priv_req->count) == 0);
+    if (xc_gnttab_munmap(mount->gnth, priv_req->page, priv_req->count) != 0) {
+        FS_DEBUG("ERROR: xc_gnttab_munmap failed errno=%d\n", errno);
+        terminate_mount_request(mount);
+    }
     
     /* Get a response from the ring */
     rsp_idx = mount->ring.rsp_prod_pvt++;
@@ -392,7 +405,10 @@ static void dispatch_remove(struct fs_mount *mount, struct fsif_request *req)
         ret = remove(file_name);
     }
     FS_DEBUG("Got ret: %d\n", ret);
-    assert(xc_gnttab_munmap(mount->gnth, file_name, 1) == 0);
+    if (xc_gnttab_munmap(mount->gnth, file_name, 1) != 0) {
+        FS_DEBUG("ERROR: xc_gnttab_munmap failed errno=%d\n", errno);
+        terminate_mount_request(mount);
+    }
     /* We can advance the request consumer index, from here on, the request
      * should not be used (it may be overrinden by a response) */
     mount->ring.req_cons++;
@@ -435,7 +451,10 @@ static void dispatch_rename(struct fs_mount *mount, struct fsif_request *req)
         ret = rename(old_file_name, new_file_name);
     }
     FS_DEBUG("Got ret: %d\n", ret);
-    assert(xc_gnttab_munmap(mount->gnth, buf, 1) == 0);
+    if (xc_gnttab_munmap(mount->gnth, buf, 1) != 0) {
+        FS_DEBUG("ERROR: xc_gnttab_munmap failed errno=%d\n", errno);
+        terminate_mount_request(mount);
+    }
     /* We can advance the request consumer index, from here on, the request
      * should not be used (it may be overrinden by a response) */
     mount->ring.req_cons++;
@@ -500,7 +519,10 @@ static void dispatch_create(struct fs_mount *mount, struct fsif_request *req)
         }
     }
 out:
-    assert(xc_gnttab_munmap(mount->gnth, file_name, 1) == 0);
+    if (xc_gnttab_munmap(mount->gnth, file_name, 1) != 0) {
+        FS_DEBUG("ERROR: xc_gnttab_munmap failed errno=%d\n", errno);
+        terminate_mount_request(mount);
+    }
     FS_DEBUG("Got ret %d (errno=%d)\n", ret, errno);
 
     /* Get a response from the ring */
@@ -556,7 +578,8 @@ static void dispatch_list(struct fs_mount *mount, struct fsif_request *req)
     /* If there was any error with reading the directory, errno will be set */
     error_code = errno;
     /* Copy file names of the remaining non-NULL dirents into buf */
-    assert(NAME_MAX < XC_PAGE_SIZE >> 1);
+    if (NAME_MAX >= XC_PAGE_SIZE >> 1)
+        goto error_out;
     while(dirent != NULL && 
             (XC_PAGE_SIZE - ((unsigned long)buf & XC_PAGE_MASK) > NAME_MAX))
     {
@@ -572,8 +595,11 @@ error_out:
     ret_val = ((nr_files << NR_FILES_SHIFT) & NR_FILES_MASK) | 
               ((error_code << ERROR_SHIFT) & ERROR_MASK) | 
               (dirent != NULL ? HAS_MORE_FLAG : 0);
-    assert(xc_gnttab_munmap(mount->gnth, file_name, 1) == 0);
-    
+    if (xc_gnttab_munmap(mount->gnth, file_name, 1) != 0) {
+        FS_DEBUG("ERROR: xc_gnttab_munmap failed errno=%d\n", errno);
+        terminate_mount_request(mount);
+    }
+
     /* Get a response from the ring */
     rsp_idx = mount->ring.rsp_prod_pvt++;
     FS_DEBUG("Writing response at: idx=%d, id=%d\n", rsp_idx, req_id);
@@ -640,7 +666,10 @@ static void dispatch_fs_space(struct fs_mount *mount, struct fsif_request *req)
     if(ret >= 0)
         ret = stat.f_bsize * stat.f_bfree;
 
-    assert(xc_gnttab_munmap(mount->gnth, file_name, 1) == 0);
+    if (xc_gnttab_munmap(mount->gnth, file_name, 1) != 0) {
+        FS_DEBUG("ERROR: xc_gnttab_munmap failed errno=%d\n", errno);
+        terminate_mount_request(mount);
+    }
     /* We can advance the request consumer index, from here on, the request
      * should not be used (it may be overrinden by a response) */
     mount->ring.req_cons++;
@@ -680,9 +709,11 @@ static void dispatch_file_sync(struct fs_mount *mount, struct fsif_request *req)
     priv_req->aiocb.aio_sigevent.sigev_notify = SIGEV_SIGNAL;
     priv_req->aiocb.aio_sigevent.sigev_signo = SIGUSR2;
     priv_req->aiocb.aio_sigevent.sigev_value.sival_ptr = priv_req;
-    assert(aio_fsync(O_SYNC, &priv_req->aiocb) >= 0);
+    if (aio_fsync(O_SYNC, &priv_req->aiocb) < 0) {
+        FS_DEBUG("ERROR: aio_fsync failed errno=%d\n", errno);
+        terminate_mount_request(mount);
+    }
 
-     
     /* We can advance the request consumer index, from here on, the request
      * should not be used (it may be overrinden by a response) */
     mount->ring.req_cons++;

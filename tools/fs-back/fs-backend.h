@@ -56,6 +56,7 @@ struct fs_mount
     LIST_ENTRY(fs_mount) entries;
 };
 
+void terminate_mount_request(struct fs_mount *mount);
 
 /* Handle to XenStore driver */
 extern struct xs_handle *xsh;
@@ -63,12 +64,12 @@ extern struct xs_handle *xsh;
 bool xenbus_create_request_node(void);
 int xenbus_register_export(struct fs_export *export);
 int xenbus_get_watch_fd(void);
-void xenbus_read_mount_request(struct fs_mount *mount, char *frontend);
-void xenbus_write_backend_node(struct fs_mount *mount);
-void xenbus_write_backend_state(struct fs_mount *mount, const char *state);
+int xenbus_read_mount_request(struct fs_mount *mount, char *frontend);
+bool xenbus_write_backend_node(struct fs_mount *mount);
+bool xenbus_write_backend_state(struct fs_mount *mount, const char *state);
 int xenbus_frontend_state_changed(struct fs_mount *mount, const char *oldstate);
-void xenbus_watch_frontend_state(struct fs_mount *mount);
-void xenbus_unwatch_frontend_state(struct fs_mount *mount);
+bool xenbus_watch_frontend_state(struct fs_mount *mount);
+bool xenbus_unwatch_frontend_state(struct fs_mount *mount);
 char* xenbus_read_frontend_state(struct fs_mount *mount);
 
 /* File operations, implemented in fs-ops.c */

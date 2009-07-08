@@ -144,7 +144,8 @@ moretodo:
         xc_evtchn_notify(mount->evth, mount->local_evtchn);
 }
 
-static void terminate_mount_request(struct fs_mount *mount) {
+void terminate_mount_request(struct fs_mount *mount)
+{
     int count = 0, i;
 
     FS_DEBUG("terminate_mount_request %s\n", mount->frontend);
@@ -158,7 +159,13 @@ static void terminate_mount_request(struct fs_mount *mount) {
         }
     mount->nr_entries = count;
 
-    while (!xenbus_frontend_state_changed(mount, STATE_CLOSING));
+    /* wait for the frontend to shut down but don't wait more than 3
+     * seconds */
+    i = 0;
+    while (!xenbus_frontend_state_changed(mount, STATE_CLOSING) && i < 3) {
+        sleep(1);
+        i++;
+    }
     xenbus_write_backend_state(mount, STATE_CLOSED);
 
     xc_gnttab_munmap(mount->gnth, mount->ring.sring, mount->shared_ring_size);
@@ -183,7 +190,7 @@ static void handle_connection(int frontend_dom_id, int export_id, char *frontend
 {
     struct fs_mount *mount;
     struct fs_export *export;
-    struct fsif_sring *sring;
+    struct fsif_sring *sring = NULL;
     uint32_t dom_ids[MAX_RING_SIZE];
     int i;
 
@@ -204,24 +211,38 @@ static void handle_connection(int frontend_dom_id, int export_id, char *frontend
     }
 
     mount = (struct fs_mount*)malloc(sizeof(struct fs_mount));
+    memset(mount, 0, sizeof(struct fs_mount));
     mount->dom_id = frontend_dom_id;
     mount->export = export;
     mount->mount_id = mount_id++;
-    xenbus_read_mount_request(mount, frontend);
+    if (xenbus_read_mount_request(mount, frontend) < 0)
+        goto error;
     FS_DEBUG("Frontend found at: %s (gref=%d, evtchn=%d)\n", 
             mount->frontend, mount->grefs[0], mount->remote_evtchn);
-    xenbus_write_backend_node(mount);
+    if (!xenbus_write_backend_node(mount)) {
+        FS_DEBUG("ERROR: failed to write backend node on xenbus\n");
+        goto error;
+    }
     mount->evth = -1;
     mount->evth = xc_evtchn_open(); 
-    assert(mount->evth != -1);
+    if (mount->evth < 0) {
+        FS_DEBUG("ERROR: Couldn't open evtchn!\n");
+        goto error;
+    }
     mount->local_evtchn = -1;
     mount->local_evtchn = xc_evtchn_bind_interdomain(mount->evth, 
                                                      mount->dom_id, 
                                                      mount->remote_evtchn);
-    assert(mount->local_evtchn != -1);
+    if (mount->local_evtchn < 0) {
+        FS_DEBUG("ERROR: Couldn't bind evtchn!\n");
+        goto error;
+    }
     mount->gnth = -1;
     mount->gnth = xc_gnttab_open(); 
-    assert(mount->gnth != -1);
+    if (mount->gnth < 0) {
+        FS_DEBUG("ERROR: Couldn't open gnttab!\n");
+        goto error;
+    }
     for(i=0; i<mount->shared_ring_size; i++)
         dom_ids[i] = mount->dom_id;
     sring = xc_gnttab_map_grant_refs(mount->gnth,
@@ -230,16 +251,40 @@ static void handle_connection(int frontend_dom_id, int export_id, char *frontend
                                      mount->grefs,
                                      PROT_READ | PROT_WRITE);
 
+    if (!sring) {
+        FS_DEBUG("ERROR: Couldn't amp grant refs!\n");
+        goto error;
+    }
+
     BACK_RING_INIT(&mount->ring, sring, mount->shared_ring_size * XC_PAGE_SIZE);
     mount->nr_entries = mount->ring.nr_ents; 
     for (i = 0; i < MAX_FDS; i++)
         mount->fds[i] = -1;
 
     LIST_INSERT_HEAD(&mount_requests_head, mount, entries);
-    xenbus_watch_frontend_state(mount);
-    xenbus_write_backend_state(mount, STATE_READY);
-    
+    if (!xenbus_watch_frontend_state(mount)) {
+        FS_DEBUG("ERROR: failed to watch frontend state on xenbus\n");
+        goto error;
+    }
+    if (!xenbus_write_backend_state(mount, STATE_READY)) {
+        FS_DEBUG("ERROR: failed to write backend state to xenbus\n");
+        goto error;
+    }
+
     allocate_request_array(mount);
+
+    return;
+
+error:
+    xenbus_write_backend_state(mount, STATE_CLOSED);
+    if (sring)
+        xc_gnttab_munmap(mount->gnth, mount->ring.sring, mount->shared_ring_size);
+    if (mount->gnth > 0)
+        xc_gnttab_close(mount->gnth);
+    if (mount->local_evtchn > 0)
+        xc_evtchn_unbind(mount->evth, mount->local_evtchn);
+    if (mount->evth > 0)
+        xc_evtchn_close(mount->evth);
 }
 
 static void await_connections(void)

@@ -107,11 +107,15 @@ int xenbus_get_watch_fd(void)
     int res;
     assert(xsh != NULL);
     res = xs_watch(xsh, WATCH_NODE, "conn-watch");
-    assert(res);
+    if (!res) {
+        FS_DEBUG("ERROR: xs_watch %s failed ret=%d errno=%d\n",
+                 WATCH_NODE, res, errno);
+        return -1;
+    }
     return xs_fileno(xsh); 
 }
 
-void xenbus_read_mount_request(struct fs_mount *mount, char *frontend)
+int xenbus_read_mount_request(struct fs_mount *mount, char *frontend)
 {
     char node[1024];
     char *s;
@@ -126,12 +130,18 @@ void xenbus_read_mount_request(struct fs_mount *mount, char *frontend)
     mount->frontend = frontend;
     snprintf(node, sizeof(node), "%s/state", frontend);
     s = xs_read(xsh, XBT_NULL, node, NULL);
-    assert(strcmp(s, STATE_READY) == 0);
+    if (strcmp(s, STATE_READY) != 0) {
+        FS_DEBUG("ERROR: frontend not read\n");
+        goto error;
+    }
     free(s);
     snprintf(node, sizeof(node), "%s/ring-size", frontend);
     s = xs_read(xsh, XBT_NULL, node, NULL);
     mount->shared_ring_size = atoi(s);
-    assert(mount->shared_ring_size <= MAX_RING_SIZE);
+    if (mount->shared_ring_size > MAX_RING_SIZE) {
+        FS_DEBUG("ERROR: shared_ring_size (%d) > MAX_RING_SIZE\n", mount->shared_ring_size);
+        goto error;
+    }
     free(s);
     for(i=0; i<mount->shared_ring_size; i++)
     {
@@ -144,6 +154,11 @@ void xenbus_read_mount_request(struct fs_mount *mount, char *frontend)
     s = xs_read(xsh, XBT_NULL, node, NULL);
     mount->remote_evtchn = atoi(s);
     free(s);
+    return 0;
+
+error:
+    free(s);
+    return -1;
 }
 
 /* Small utility function to figure out our domain id */
@@ -161,7 +176,7 @@ static int get_self_id(void)
 } 
 
 
-void xenbus_write_backend_node(struct fs_mount *mount)
+bool xenbus_write_backend_node(struct fs_mount *mount)
 {
     char node[1024], backend_node[1024];
     int self_id;
@@ -175,10 +190,10 @@ void xenbus_write_backend_node(struct fs_mount *mount)
     xs_write(xsh, XBT_NULL, node, backend_node, strlen(backend_node));
 
     snprintf(node, sizeof(node), ROOT_NODE"/%d/state", mount->mount_id);
-    xs_write(xsh, XBT_NULL, node, STATE_INITIALISED, strlen(STATE_INITIALISED));
+    return xs_write(xsh, XBT_NULL, node, STATE_INITIALISED, strlen(STATE_INITIALISED));
 }
 
-void xenbus_write_backend_state(struct fs_mount *mount, const char *state)
+bool xenbus_write_backend_state(struct fs_mount *mount, const char *state)
 {
     char node[1024];
     int self_id;
@@ -186,29 +201,25 @@ void xenbus_write_backend_state(struct fs_mount *mount, const char *state)
     assert(xsh != NULL);
     self_id = get_self_id();
     snprintf(node, sizeof(node), ROOT_NODE"/%d/state", mount->mount_id);
-    xs_write(xsh, XBT_NULL, node, state, strlen(state));
+    return xs_write(xsh, XBT_NULL, node, state, strlen(state));
 }
 
-void xenbus_watch_frontend_state(struct fs_mount *mount)
+bool xenbus_watch_frontend_state(struct fs_mount *mount)
 {
-    int res;
     char statepath[1024];
 
     assert(xsh != NULL);
     snprintf(statepath, sizeof(statepath), "%s/state", mount->frontend);
-    res = xs_watch(xsh, statepath, "frontend-state");
-    assert(res);
+    return xs_watch(xsh, statepath, "frontend-state");
 }
 
-void xenbus_unwatch_frontend_state(struct fs_mount *mount)
+bool xenbus_unwatch_frontend_state(struct fs_mount *mount)
 {
-    int res;
     char statepath[1024];
 
     assert(xsh != NULL);
     snprintf(statepath, sizeof(statepath), "%s/state", mount->frontend);
-    res = xs_unwatch(xsh, statepath, "frontend-state");
-    assert(res);
+    return xs_unwatch(xsh, statepath, "frontend-state");
 }
 
 int xenbus_frontend_state_changed(struct fs_mount *mount, const char *oldstate)
