@@ -28,10 +28,9 @@
 
 #define MAX_VECTOR      256
 
-#define vcpu_vlapic(vcpu)   (&(vcpu)->arch.hvm_vcpu.vlapic)
-#define vlapic_vcpu(vpic)   (container_of((vpic), struct vcpu, \
-                                          arch.hvm_vcpu.vlapic))
-#define vlapic_domain(vpic) (vlapic_vcpu(vlapic)->domain)
+#define vcpu_vlapic(x)   (&(x)->arch.hvm_vcpu.vlapic)
+#define vlapic_vcpu(x)   (container_of((x), struct vcpu, arch.hvm_vcpu.vlapic))
+#define vlapic_domain(x) (vlapic_vcpu(x)->domain)
 
 #define VLAPIC_ID(vlapic)   \
     (GET_xAPIC_ID(vlapic_get_reg((vlapic), APIC_ID)))

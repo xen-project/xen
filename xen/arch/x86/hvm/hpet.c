@@ -24,11 +24,11 @@
 #include <xen/sched.h>
 #include <xen/event.h>
 
-#define domain_vhpet(d)    (&(d)->arch.hvm_domain.pl_time.vhpet)
-#define vcpu_vhpet(vcpu)   (domain_vhpet((vcpu)->domain))
-#define vhpet_domain(hpet) (container_of((hpet), struct domain, \
-                                         arch.hvm_domain.pl_time.vhpet))
-#define vhpet_vcpu(hpet)   (pt_global_vcpu_target(vhpet_domain(hpet)))
+#define domain_vhpet(x) (&(x)->arch.hvm_domain.pl_time.vhpet)
+#define vcpu_vhpet(x)   (domain_vhpet((x)->domain))
+#define vhpet_domain(x) (container_of((x), struct domain, \
+                                      arch.hvm_domain.pl_time.vhpet))
+#define vhpet_vcpu(x)   (pt_global_vcpu_target(vhpet_domain(x)))
 
 #define HPET_BASE_ADDRESS   0xfed00000ULL
 #define HPET_MMAP_SIZE      1024

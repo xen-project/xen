@@ -460,7 +460,7 @@ int vlapic_ipi(
 
     if ( delivery_mode == APIC_DM_LOWEST )
     {
-        target = apic_lowest_prio(vlapic_domain(v), lpr_map);
+        target = apic_lowest_prio(vlapic_domain(vlapic), lpr_map);
         if ( target != NULL )
             rc = vlapic_accept_irq(vlapic_vcpu(target), delivery_mode,
                                    vector, level, trig_mode);

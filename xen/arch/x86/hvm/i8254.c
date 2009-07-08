@@ -38,11 +38,11 @@
 #include <asm/hvm/vpt.h>
 #include <asm/current.h>
 
-#define domain_vpit(d)   (&(d)->arch.hvm_domain.pl_time.vpit)
-#define vcpu_vpit(vcpu)  (domain_vpit((vcpu)->domain))
-#define vpit_domain(pit) (container_of((pit), struct domain, \
-                                       arch.hvm_domain.pl_time.vpit))
-#define vpit_vcpu(pit)   (pt_global_vcpu_target(vpit_domain(pit)))
+#define domain_vpit(x) (&(x)->arch.hvm_domain.pl_time.vpit)
+#define vcpu_vpit(x)   (domain_vpit((x)->domain))
+#define vpit_domain(x) (container_of((x), struct domain, \
+                                     arch.hvm_domain.pl_time.vpit))
+#define vpit_vcpu(x)   (pt_global_vcpu_target(vpit_domain(x)))
 
 #define RW_STATE_LSB 1
 #define RW_STATE_MSB 2
