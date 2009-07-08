@@ -37,7 +37,6 @@ struct domain;
 struct page_info;
 
 /* Boot-time allocator. Turns into generic allocator after bootstrap. */
-paddr_t init_boot_allocator(paddr_t bitmap_start);
 void init_boot_pages(paddr_t ps, paddr_t pe);
 unsigned long alloc_boot_pages(
     unsigned long nr_pfns, unsigned long pfn_align);
@@ -307,9 +306,7 @@ int guest_remove_page(struct domain *d, unsigned long gmfn);
 #define RAM_TYPE_RESERVED     0x00000002
 #define RAM_TYPE_UNUSABLE     0x00000004
 #define RAM_TYPE_ACPI         0x00000008
-/* Returns TRUE if the whole page at @mfn is of the requested RAM type(s) above. */
+/* TRUE if the whole page at @mfn is of the requested RAM type(s) above. */
 int page_is_ram_type(unsigned long mfn, unsigned long mem_type);
-
-extern unsigned long *alloc_bitmap;	/* for vmcoreinfo */
 
 #endif /* __XEN_MM_H__ */

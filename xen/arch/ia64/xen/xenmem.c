@@ -87,8 +87,6 @@ alloc_dir_page(void)
 {
 	unsigned long mfn = alloc_boot_pages(1, 1);
 	unsigned long dir;
-	if (!mfn)
-		panic("Not enough memory for virtual frame table!\n");
 	++table_size;
 	dir = mfn << PAGE_SHIFT;
 	clear_page(__va(dir));
@@ -101,8 +99,6 @@ alloc_table_page(unsigned long fill)
 	unsigned long mfn = alloc_boot_pages(1, 1);
 	unsigned long *table;
 	unsigned long i;
-	if (!mfn)
-		panic("Not enough memory for virtual frame table!\n");
 	++table_size;
 	table = (unsigned long *)__va((mfn << PAGE_SHIFT));
 	for (i = 0; i < PAGE_SIZE / sizeof(unsigned long); i++)
@@ -245,8 +241,6 @@ void __init init_frametable(void)
 	 * address is identity mapped */
 	pfn = alloc_boot_pages(
             frame_table_size >> PAGE_SHIFT, FT_ALIGN_SIZE >> PAGE_SHIFT);
-	if (pfn == 0)
-		panic("Not enough memory for frame table.\n");
 
 	frame_table = __va(pfn << PAGE_SHIFT);
 	memset(frame_table, 0, frame_table_size);

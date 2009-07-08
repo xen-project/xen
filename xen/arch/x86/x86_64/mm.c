@@ -68,7 +68,6 @@ void *alloc_xen_pagetable(void)
     }
 
     mfn = alloc_boot_pages(1, 1);
-    BUG_ON(mfn == 0);
     return mfn_to_virt(mfn);
 }
 

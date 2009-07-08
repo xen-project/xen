@@ -97,7 +97,6 @@ int early_boot = 1;
 cpumask_t cpu_present_map;
 
 unsigned long xen_phys_start;
-unsigned long allocator_bitmap_end;
 
 #ifdef CONFIG_X86_32
 /* Limits of Xen heap, used to initialise the allocator. */
@@ -764,24 +763,21 @@ void __init __start_xen(unsigned long mbi_p)
         EARLY_FAIL("Not enough memory to relocate the dom0 kernel image.\n");
     reserve_e820_ram(&boot_e820, initial_images_base, initial_images_end);
 
-    /* Initialise boot heap. */
-    allocator_bitmap_end = init_boot_allocator(__pa(&_end));
 #if defined(CONFIG_X86_32)
-    xenheap_initial_phys_start = allocator_bitmap_end;
+    xenheap_initial_phys_start = __pa(&_end);
     xenheap_phys_end = DIRECTMAP_MBYTES << 20;
 #else
     if ( !xen_phys_start )
         EARLY_FAIL("Not enough memory to relocate Xen.\n");
-    reserve_e820_ram(&boot_e820, __pa(&_start), allocator_bitmap_end);
+    reserve_e820_ram(&boot_e820, __pa(&_start), __pa(&_end));
 #endif
 
     /* Late kexec reservation (dynamic start address). */
     kexec_reserve_area(&boot_e820);
 
     /*
-     * With the boot allocator now initialised, we can walk every RAM region
-     * and map it in its entirety (on x86/64, at least) and notify it to the
-     * boot allocator.
+     * Walk every RAM region and map it in its entirety (on x86/64, at least)
+     * and notify it to the boot allocator.
      */
     for ( i = 0; i < boot_e820.nr_map; i++ )
     {
@@ -1132,7 +1128,6 @@ int xen_in_range(paddr_t start, paddr_t end)
     if ( !xen_regions[0].s )
     {
         extern char __init_begin[], __bss_start[];
-        extern unsigned long allocator_bitmap_end;
 
         /* S3 resume code (and other real mode trampoline code) */
         xen_regions[0].s = bootsym_phys(trampoline_start);
@@ -1144,9 +1139,9 @@ int xen_in_range(paddr_t start, paddr_t end)
         xen_regions[2].s = __pa(&__per_cpu_start);
         xen_regions[2].e = xen_regions[2].s +
             (((paddr_t)last_cpu(cpu_possible_map) + 1) << PERCPU_SHIFT);
-        /* bss + boot allocator bitmap */
+        /* bss */
         xen_regions[3].s = __pa(&__bss_start);
-        xen_regions[3].e = allocator_bitmap_end;
+        xen_regions[3].e = __pa(&_end);
     }
 
     for ( i = 0; i < ARRAY_SIZE(xen_regions); i++ )

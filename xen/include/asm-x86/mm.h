@@ -219,14 +219,14 @@ struct page_info
     unsigned long _mfn = (mfn);                         \
     (_mfn < paddr_to_pfn(xenheap_phys_end));            \
 })
+#define is_xen_fixed_mfn(mfn) is_xen_heap_mfn(mfn)
 #else
-extern unsigned long allocator_bitmap_end;
 #define is_xen_heap_page(page) ((page)->count_info & PGC_xen_heap)
 #define is_xen_heap_mfn(mfn) \
     (__mfn_valid(mfn) && is_xen_heap_page(__mfn_to_page(mfn)))
-#define is_xen_fixed_mfn(mfn) \
-    ( (mfn << PAGE_SHIFT) >= __pa(&_start) &&    \
-          (mfn << PAGE_SHIFT) <= allocator_bitmap_end )
+#define is_xen_fixed_mfn(mfn)                     \
+    ((((mfn) << PAGE_SHIFT) >= __pa(&_start)) &&  \
+     (((mfn) << PAGE_SHIFT) <= __pa(&_end)))
 #endif
 
 #if defined(__i386__)

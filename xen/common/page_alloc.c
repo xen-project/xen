@@ -69,117 +69,78 @@ PAGE_LIST_HEAD(page_offlined_list);
 /* Broken page list, protected by heap_lock. */
 PAGE_LIST_HEAD(page_broken_list);
 
-/*********************
- * ALLOCATION BITMAP
- *  One bit per page of memory. Bit set => page is allocated.
- */
-
-unsigned long *alloc_bitmap;
-#define PAGES_PER_MAPWORD (sizeof(unsigned long) * 8)
-
-#define allocated_in_map(_pn)                       \
-({  unsigned long ___pn = (_pn);                    \
-    !!(alloc_bitmap[___pn/PAGES_PER_MAPWORD] &      \
-       (1UL<<(___pn&(PAGES_PER_MAPWORD-1)))); })
-
-/*
- * Hint regarding bitwise arithmetic in map_{alloc,free}:
- *  -(1<<n)  sets all bits >= n. 
- *  (1<<n)-1 sets all bits <  n.
- * Variable names in map_{alloc,free}:
- *  *_idx == Index into `alloc_bitmap' array.
- *  *_off == Bit offset within an element of the `alloc_bitmap' array.
- */
-
-static void map_alloc(unsigned long first_page, unsigned long nr_pages)
-{
-    unsigned long start_off, end_off, curr_idx, end_idx;
-
-#ifndef NDEBUG
-    unsigned long i;
-    /* Check that the block isn't already allocated. */
-    for ( i = 0; i < nr_pages; i++ )
-        ASSERT(!allocated_in_map(first_page + i));
-#endif
-
-    curr_idx  = first_page / PAGES_PER_MAPWORD;
-    start_off = first_page & (PAGES_PER_MAPWORD-1);
-    end_idx   = (first_page + nr_pages) / PAGES_PER_MAPWORD;
-    end_off   = (first_page + nr_pages) & (PAGES_PER_MAPWORD-1);
-
-    if ( curr_idx == end_idx )
-    {
-        alloc_bitmap[curr_idx] |= ((1UL<<end_off)-1) & -(1UL<<start_off);
-    }
-    else 
-    {
-        alloc_bitmap[curr_idx] |= -(1UL<<start_off);
-        while ( ++curr_idx < end_idx ) alloc_bitmap[curr_idx] = ~0UL;
-        alloc_bitmap[curr_idx] |= (1UL<<end_off)-1;
-    }
-}
-
-static void map_free(unsigned long first_page, unsigned long nr_pages)
-{
-    unsigned long start_off, end_off, curr_idx, end_idx;
-
-#ifndef NDEBUG
-    unsigned long i;
-    /* Check that the block isn't already freed. */
-    for ( i = 0; i < nr_pages; i++ )
-        ASSERT(allocated_in_map(first_page + i));
-#endif
-
-    curr_idx  = first_page / PAGES_PER_MAPWORD;
-    start_off = first_page & (PAGES_PER_MAPWORD-1);
-    end_idx   = (first_page + nr_pages) / PAGES_PER_MAPWORD;
-    end_off   = (first_page + nr_pages) & (PAGES_PER_MAPWORD-1);
-
-    if ( curr_idx == end_idx )
-    {
-        alloc_bitmap[curr_idx] &= -(1UL<<end_off) | ((1UL<<start_off)-1);
-    }
-    else 
-    {
-        alloc_bitmap[curr_idx] &= (1UL<<start_off)-1;
-        while ( ++curr_idx != end_idx ) alloc_bitmap[curr_idx] = 0;
-        alloc_bitmap[curr_idx] &= -(1UL<<end_off);
-    }
-}
-
-
-
 /*************************
  * BOOT-TIME ALLOCATOR
  */
 
-static unsigned long first_valid_mfn = ~0UL;
+static unsigned long __initdata first_valid_mfn = ~0UL;
 
-/* Initialise allocator to handle up to @max_page pages. */
-paddr_t __init init_boot_allocator(paddr_t bitmap_start)
+static struct bootmem_region {
+    unsigned long s, e; /* MFNs @s through @e-1 inclusive are free */
+} *__initdata bootmem_region_list;
+static unsigned int __initdata nr_bootmem_regions;
+
+static void __init boot_bug(int line)
 {
-    unsigned long bitmap_size;
+    panic("Boot BUG at %s:%d\n", __FILE__, line);
+}
+#define BOOT_BUG_ON(p) if ( p ) boot_bug(__LINE__);
 
-    bitmap_start = round_pgup(bitmap_start);
+static void __init bootmem_region_add(unsigned long s, unsigned long e)
+{
+    unsigned int i;
 
-    /*
-     * Allocate space for the allocation bitmap. Include an extra longword
-     * of padding for possible overrun in map_alloc and map_free.
-     */
-    bitmap_size  = max_page / 8;
-    bitmap_size += sizeof(unsigned long);
-    bitmap_size  = round_pgup(bitmap_size);
-    alloc_bitmap = (unsigned long *)maddr_to_virt(bitmap_start);
+    if ( (bootmem_region_list == NULL) && (s < e) )
+        bootmem_region_list = mfn_to_virt(s++);
 
-    /* All allocated by default. */
-    memset(alloc_bitmap, ~0, bitmap_size);
+    if ( s >= e )
+        return;
 
-    return bitmap_start + bitmap_size;
+    for ( i = 0; i < nr_bootmem_regions; i++ )
+        if ( s < bootmem_region_list[i].e )
+            break;
+
+    BOOT_BUG_ON((i < nr_bootmem_regions) && (e > bootmem_region_list[i].s));
+    BOOT_BUG_ON(nr_bootmem_regions ==
+                (PAGE_SIZE / sizeof(struct bootmem_region)));
+
+    memmove(&bootmem_region_list[i+1], &bootmem_region_list[i],
+            (nr_bootmem_regions - i) * sizeof(*bootmem_region_list));
+    bootmem_region_list[i] = (struct bootmem_region) { s, e };
+    nr_bootmem_regions++;
+}
+
+static void __init bootmem_region_zap(unsigned long s, unsigned long e)
+{
+    unsigned int i;
+
+    for ( i = 0; i < nr_bootmem_regions; i++ )
+    {
+        struct bootmem_region *r = &bootmem_region_list[i];
+        if ( e <= r->s )
+            break;
+        if ( s >= r->e )
+            continue;
+        if ( s <= r->s )
+        {
+            r->s = min(e, r->e);
+        }
+        else if ( e >= r->e )
+        {
+            r->e = s;
+        }
+        else
+        {
+            unsigned long _e = r->e;
+            r->e = s;
+            bootmem_region_add(e, _e);
+        }
+    }
 }
 
 void __init init_boot_pages(paddr_t ps, paddr_t pe)
 {
-    unsigned long bad_spfn, bad_epfn, i;
+    unsigned long bad_spfn, bad_epfn;
     const char *p;
 
     ps = round_pgup(ps);
@@ -189,7 +150,7 @@ void __init init_boot_pages(paddr_t ps, paddr_t pe)
 
     first_valid_mfn = min_t(unsigned long, ps >> PAGE_SHIFT, first_valid_mfn);
 
-    map_free(ps >> PAGE_SHIFT, (pe - ps) >> PAGE_SHIFT);
+    bootmem_region_add(ps >> PAGE_SHIFT, pe >> PAGE_SHIFT);
 
     /* Check new pages against the bad-page list. */
     p = opt_badpage;
@@ -217,32 +178,29 @@ void __init init_boot_pages(paddr_t ps, paddr_t pe)
             printk("Marking pages %lx through %lx as bad\n",
                    bad_spfn, bad_epfn);
 
-        for ( i = bad_spfn; i <= bad_epfn; i++ )
-            if ( (i < max_page) && !allocated_in_map(i) )
-                map_alloc(i, 1);
+        bootmem_region_zap(bad_spfn, bad_epfn+1);
     }
 }
 
 unsigned long __init alloc_boot_pages(
     unsigned long nr_pfns, unsigned long pfn_align)
 {
-    unsigned long pg, i;
+    unsigned long pg, _e;
+    int i;
 
-    /* Search backwards to obtain highest available range. */
-    for ( pg = (max_page - nr_pfns) & ~(pfn_align - 1);
-          pg >= first_valid_mfn;
-          pg = (pg + i - nr_pfns) & ~(pfn_align - 1) )
+    for ( i = nr_bootmem_regions - 1; i >= 0; i-- )
     {
-        for ( i = 0; i < nr_pfns; i++ )
-            if ( allocated_in_map(pg+i) )
-                break;
-        if ( i == nr_pfns )
-        {
-            map_alloc(pg, nr_pfns);
-            return pg;
-        }
+        struct bootmem_region *r = &bootmem_region_list[i];
+        pg = (r->e - nr_pfns) & ~(pfn_align - 1);
+        if ( pg < r->s )
+            continue;
+        _e = r->e;
+        r->e = pg;
+        bootmem_region_add(pg + nr_pfns, _e);
+        return pg;
     }
 
+    BOOT_BUG_ON(1);
     return 0;
 }
 
@@ -660,12 +618,7 @@ int offline_page(unsigned long mfn, int broken, uint32_t *status)
     *status = 0;
     pg = mfn_to_page(mfn);
 
-#if defined(__x86_64__)
-     /* Xen's txt mfn in x86_64 is reserved in e820 */
     if ( is_xen_fixed_mfn(mfn) )
-#elif defined(__i386__)
-    if ( is_xen_heap_mfn(mfn) )
-#endif
     {
         *status = PG_OFFLINE_XENPAGE | PG_OFFLINE_FAILED |
           (DOMID_XEN << PG_OFFLINE_OWNER_SHIFT);
@@ -673,14 +626,14 @@ int offline_page(unsigned long mfn, int broken, uint32_t *status)
     }
 
     /*
-     * N.B. xen's txt in x86_64 is marked reserved and handled already
-     *  Also kexec range is reserved
+     * N.B. xen's txt in x86_64 is marked reserved and handled already.
+     * Also kexec range is reserved.
      */
-     if ( !page_is_ram_type(mfn, RAM_TYPE_CONVENTIONAL) )
-     {
+    if ( !page_is_ram_type(mfn, RAM_TYPE_CONVENTIONAL) )
+    {
         *status = PG_OFFLINE_FAILED | PG_OFFLINE_NOT_CONV_RAM;
         return -EINVAL;
-     }
+    }
 
     spin_lock(&heap_lock);
 
@@ -703,7 +656,7 @@ int offline_page(unsigned long mfn, int broken, uint32_t *status)
             /* Release the reference since it will not be allocated anymore */
             put_page(pg);
     }
-    else if ( old_info & PGC_xen_heap)
+    else if ( old_info & PGC_xen_heap )
     {
         *status = PG_OFFLINE_XENPAGE | PG_OFFLINE_PENDING |
           (DOMID_XEN << PG_OFFLINE_OWNER_SHIFT);
@@ -880,31 +833,18 @@ static unsigned long avail_heap_pages(
     return free_pages;
 }
 
-#define avail_for_domheap(mfn) !(allocated_in_map(mfn) || is_xen_heap_mfn(mfn))
 void __init end_boot_allocator(void)
 {
-    unsigned long i, nr = 0;
-    int curr_free, next_free;
+    unsigned int i;
 
     /* Pages that are free now go to the domain sub-allocator. */
-    if ( (curr_free = next_free = avail_for_domheap(first_valid_mfn)) )
-        map_alloc(first_valid_mfn, 1);
-    for ( i = first_valid_mfn; i < max_page; i++ )
+    for ( i = 0; i < nr_bootmem_regions; i++ )
     {
-        curr_free = next_free;
-        next_free = avail_for_domheap(i+1);
-        if ( next_free )
-            map_alloc(i+1, 1); /* prevent merging in free_heap_pages() */
-        if ( curr_free )
-            ++nr;
-        else if ( nr )
-        {
-            init_heap_pages(mfn_to_page(i - nr), nr);
-            nr = 0;
-        }
+        struct bootmem_region *r = &bootmem_region_list[i];
+        if ( r->s < r->e )
+            init_heap_pages(mfn_to_page(r->s), r->e - r->s);
     }
-    if ( nr )
-        init_heap_pages(mfn_to_page(i - nr), nr);
+    init_heap_pages(virt_to_page(bootmem_region_list), 1);
 
     if ( !dma_bitsize && (num_online_nodes() > 1) )
     {
@@ -923,7 +863,6 @@ void __init end_boot_allocator(void)
         printk(" DMA width %u bits", dma_bitsize);
     printk("\n");
 }
-#undef avail_for_domheap
 
 /*
  * Scrub all unallocated pages in all heap zones. This function is more

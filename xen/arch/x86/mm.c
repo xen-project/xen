@@ -199,8 +199,6 @@ void __init init_frametable(void)
         while (nr_pages + 4 - i < page_step)
             page_step >>= PAGETABLE_ORDER;
         mfn = alloc_boot_pages(page_step, page_step);
-        if ( mfn == 0 )
-            panic("Not enough memory for frame table\n");
         map_pages_to_xen(
             FRAMETABLE_VIRT_START + (i << PAGE_SHIFT),
             mfn, page_step, PAGE_HYPERVISOR);

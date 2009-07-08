@@ -514,9 +514,7 @@ skip_move:
     efi_print();
     
     xen_heap_start = memguard_init(ia64_imva(&_end));
-    printk("Before xen_heap_start: %p\n", xen_heap_start);
-    xen_heap_start = __va(init_boot_allocator(__pa(xen_heap_start)));
-    printk("After xen_heap_start: %p\n", xen_heap_start);
+    printk("xen_heap_start: %p\n", xen_heap_start);
 
     efi_memmap_walk(filter_rsvd_memory, init_boot_pages);
     efi_memmap_walk(xen_count_pages, &nr_pages);
