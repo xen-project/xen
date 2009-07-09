@@ -4,7 +4,6 @@ include $(XEN_ROOT)/tools/Rules.mk
 # Xen script dir and scripts to go there.
 XEN_SCRIPTS =
 XEN_SCRIPTS += block-nbsd
-XEN_SCRIPTS += qemu-ifup-nbsd
 XEN_SCRIPTS += vif-bridge-nbsd
 XEN_SCRIPTS += vif-ip-nbsd
 
