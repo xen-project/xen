@@ -646,8 +646,7 @@ void __init __start_xen(unsigned long mbi_p)
             s >> PAGE_SHIFT, (e-s) >> PAGE_SHIFT, PAGE_HYPERVISOR);
 
 #if defined(CONFIG_X86_64)
-/* Relocate Xen image, allocation bitmap, and one page of padding. */
-#define reloc_size ((__pa(&_end) + max_page/8 + PAGE_SIZE + mask) & ~mask)
+#define reloc_size ((__pa(&_end) + mask) & ~mask)
         /* Is the region suitable for relocating Xen? */
         if ( !xen_phys_start && ((e-s) >= reloc_size) )
         {
