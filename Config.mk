@@ -148,9 +148,9 @@ QEMU_REMOTE=http://xenbits.xensource.com/git-http/qemu-xen-unstable.git
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= b471f03d51cde3976b6d52179ca2a86d8906a587
-# Tue Jun 30 15:22:14 2009 +0100
-# cpu_unregister_map_client: fix memory leak
+QEMU_TAG ?= 5cc34ea27f1cbd1a0560cfca91fb89ccd6d5726f
+# Thu Jul 9 15:33:48 2009 +0100
+# portability fixes for qemu-ifup
 
 OCAML_XENSTORED_REPO=http://xenbits.xensource.com/ext/xen-ocaml-tools.hg
 
