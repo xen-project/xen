@@ -3,7 +3,12 @@
 
 . ./funcs.sh
 
-python -c '
+if test -z ${PYTHON}; then
+	PYTHON=`/usr/bin/env python 2>/dev/null`
+fi
+has_or_fail ${PYTHON}
+
+${PYTHON} -c '
 import os.path, sys
 for p in sys.path:
 	if os.path.exists(p + "/config/Makefile"):

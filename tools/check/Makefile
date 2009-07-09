@@ -7,12 +7,12 @@ all install: check-build
 # Check this machine is OK for building on.
 .PHONY: check-build
 check-build:
-	LIBXENAPI_BINDINGS=$(LIBXENAPI_BINDINGS) ACM_SECURITY=$(ACM_SECURITY) ./chk build
+	PYTHON=$(PYTHON) LIBXENAPI_BINDINGS=$(LIBXENAPI_BINDINGS) ACM_SECURITY=$(ACM_SECURITY) ./chk build
 
 # Check this machine is OK for installing on.
 .PHONY: check-install
 check-install:
-	LIBXENAPI_BINDINGS=$(LIBXENAPI_BINDINGS) ACM_SECURITY=$(ACM_SECURITY) ./chk install
+	PYTHON=$(PYTHON) LIBXENAPI_BINDINGS=$(LIBXENAPI_BINDINGS) ACM_SECURITY=$(ACM_SECURITY) ./chk install
 
 .PHONY: clean
 clean:
