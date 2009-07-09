@@ -5,6 +5,13 @@ SED=sed
 if test -x /usr/xpg4/bin/sed; then
 	SED=/usr/xpg4/bin/sed
 fi
+if test -z ${PYTHON}; then
+	PYTHON=`/usr/bin/env python`
+fi
+if test -z ${PYTHON}; then
+	echo "Python not found"
+	exit 1
+fi
 
 get_fields ()
 {
@@ -129,7 +136,7 @@ handle_field ()
 		fi
 	elif [ -z "$(echo "$5" | $SED 's,[^{}],,g')" ]
 	then
-		local tag=$(echo "$5" | python -c '
+		local tag=$(echo "$5" | ${PYTHON} -c '
 import re,sys
 for line in sys.stdin.readlines():
     print re.subn(r"\s*(struct|union)\s+(compat_)?(\w+)\s.*", r"\3", line)[0].rstrip()

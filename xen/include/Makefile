@@ -52,7 +52,7 @@ compat/%.h: compat/%.i Makefile
 	$(if $(filter-out compat/arch-%.h,$@),echo "#include <$(patsubst compat/%,public/%,$@)>" >>$@.new;) \
 	$(if $(prefix-y),echo "$(prefix-y)" >>$@.new;) \
 	grep -v '^# [0-9]' $< | \
-	$(BASEDIR)/tools/compat-build-header.py | uniq >>$@.new; \
+	$(PYTHON) $(BASEDIR)/tools/compat-build-header.py | uniq >>$@.new; \
 	$(if $(suffix-y),echo "$(suffix-y)" >>$@.new;) \
 	echo "#endif /* $$id */" >>$@.new
 	mv -f $@.new $@
@@ -63,10 +63,11 @@ compat/%.i: compat/%.c Makefile
 compat/%.c: public/%.h xlat.lst Makefile
 	mkdir -p $(@D)
 	grep -v 'DEFINE_XEN_GUEST_HANDLE(long)' $< | \
-        $(BASEDIR)/tools/compat-build-source.py >$@.new
+	$(PYTHON) $(BASEDIR)/tools/compat-build-source.py >$@.new
 	mv -f $@.new $@
 
 compat/xlat.h: xlat.lst $(filter-out compat/xlat.h,$(headers-y)) $(BASEDIR)/tools/get-fields.sh Makefile
+	export PYTHON=$(PYTHON); \
 	grep -v '^[	 ]*#' xlat.lst | \
 	while read what name hdr; do \
 		$(SHELL) $(BASEDIR)/tools/get-fields.sh "$$what" compat_$$name $$(echo compat/$$hdr | sed 's,@arch@,$(compat-arch-y),g') || exit $$?; \
