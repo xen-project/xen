@@ -763,7 +763,9 @@ void __init __start_xen(unsigned long mbi_p)
     reserve_e820_ram(&boot_e820, initial_images_base, initial_images_end);
 
 #if defined(CONFIG_X86_32)
-    xenheap_initial_phys_start = __pa(&_end);
+    xenheap_initial_phys_start = (PFN_UP(__pa(&_end)) + 1) << PAGE_SHIFT;
+    /* Must pass a single mapped page for populating bootmem_region_list. */
+    init_boot_pages(__pa(&_end), xenheap_initial_phys_start);
     xenheap_phys_end = DIRECTMAP_MBYTES << 20;
 #else
     if ( !xen_phys_start )
