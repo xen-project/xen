@@ -5,9 +5,9 @@
 #define PERCPU_SIZE  (1UL << PERCPU_SHIFT)
 
 /* Separate out the type, so (int[3], foo) works. */
-#define DEFINE_PER_CPU(type, name)                      \
-    __attribute__((__section__(".data.percpu")))        \
-    __typeof__(type) per_cpu__##name
+#define __DEFINE_PER_CPU(type, name, suffix)                    \
+    __attribute__((__section__(".data.percpu" #suffix)))        \
+    __typeof__(type) per_cpu_##name
 
 /* var is in discarded region: offset to particular copy we want */
 #define per_cpu(var, cpu)  \

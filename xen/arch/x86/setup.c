@@ -111,9 +111,9 @@ extern void vesa_init(void);
 extern void vesa_mtrr_init(void);
 extern void init_tmem(void);
 
-DEFINE_PER_CPU(struct desc_struct *, gdt_table) = boot_cpu_gdt_table;
+DEFINE_PER_CPU_READ_MOSTLY(struct desc_struct *, gdt_table) = boot_cpu_gdt_table;
 #ifdef CONFIG_COMPAT
-DEFINE_PER_CPU(struct desc_struct *, compat_gdt_table)
+DEFINE_PER_CPU_READ_MOSTLY(struct desc_struct *, compat_gdt_table)
     = boot_cpu_compat_gdt_table;
 #endif
 

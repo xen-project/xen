@@ -187,6 +187,8 @@ SECTIONS
 	{
 		__per_cpu_start = .;
 		*(.data.percpu)
+		. = ALIGN(SMP_CACHE_BYTES);
+		*(.data.percpu.read_mostly)
 		__per_cpu_end = .;
 	}
   . = __phys_per_cpu_start + PERCPU_PAGE_SIZE;	/* ensure percpu data fits

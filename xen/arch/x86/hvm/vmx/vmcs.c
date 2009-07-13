@@ -66,7 +66,7 @@ u32 vmx_vmexit_control __read_mostly;
 u32 vmx_vmentry_control __read_mostly;
 bool_t cpu_has_vmx_ins_outs_instr_info __read_mostly;
 
-static DEFINE_PER_CPU(struct vmcs_struct *, host_vmcs);
+static DEFINE_PER_CPU_READ_MOSTLY(struct vmcs_struct *, host_vmcs);
 static DEFINE_PER_CPU(struct vmcs_struct *, current_vmcs);
 static DEFINE_PER_CPU(struct list_head, active_vmcs_list);
 

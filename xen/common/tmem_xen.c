@@ -36,8 +36,8 @@ DECL_CYC_COUNTER(pg_copy);
  * allocated iff opt_tmem_compress */
 #define LZO_WORKMEM_BYTES LZO1X_1_MEM_COMPRESS
 #define LZO_DSTMEM_PAGES 2
-static DEFINE_PER_CPU(unsigned char *, workmem);
-static DEFINE_PER_CPU(unsigned char *, dstmem);
+static DEFINE_PER_CPU_READ_MOSTLY(unsigned char *, workmem);
+static DEFINE_PER_CPU_READ_MOSTLY(unsigned char *, dstmem);
 
 #ifdef COMPARE_COPY_PAGE_SSE2
 #include <asm/flushtlb.h>  /* REMOVE ME AFTER TEST */

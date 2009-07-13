@@ -37,7 +37,7 @@
 unsigned int m2p_compat_vstart = __HYPERVISOR_COMPAT_VIRT_START;
 #endif
 
-DEFINE_PER_CPU(void *, compat_arg_xlat);
+DEFINE_PER_CPU_READ_MOSTLY(void *, compat_arg_xlat);
 
 /* Top-level master (and idle-domain) page directory. */
 l4_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))

@@ -78,7 +78,7 @@ char opt_nmi[10] = "fatal";
 #endif
 string_param("nmi", opt_nmi);
 
-DEFINE_PER_CPU(u32, ler_msr);
+DEFINE_PER_CPU_READ_MOSTLY(u32, ler_msr);
 
 /* Master table, used by CPU0. */
 idt_entry_t idt_table[IDT_ENTRIES];

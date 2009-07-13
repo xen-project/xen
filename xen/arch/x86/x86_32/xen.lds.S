@@ -4,6 +4,7 @@
  */
 
 #include <xen/config.h>
+#include <xen/cache.h>
 #include <asm/page.h>
 #include <asm/percpu.h>
 #undef ENTRY
@@ -69,9 +70,13 @@ SECTIONS
   __init_end = .;
 
   __per_cpu_shift = PERCPU_SHIFT; /* kdump assist */
-  __per_cpu_start = .;
-  .data.percpu : { *(.data.percpu) } :text
-  __per_cpu_data_end = .;
+  .data.percpu : {
+	__per_cpu_start = .;
+	*(.data.percpu)
+	. = ALIGN(SMP_CACHE_BYTES);
+	*(.data.percpu.read_mostly)
+	__per_cpu_data_end = .;
+  } :text
   . = __per_cpu_start + (NR_CPUS << PERCPU_SHIFT);
   . = ALIGN(PAGE_SIZE);
   __per_cpu_end = .;

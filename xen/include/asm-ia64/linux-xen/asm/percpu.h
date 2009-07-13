@@ -26,9 +26,9 @@
 	extern __SMALL_ADDR_AREA __typeof__(type) per_cpu__##name
 
 /* Separate out the type, so (int[3], foo) works. */
-#define DEFINE_PER_CPU(type, name)				\
-	__attribute__((__section__(".data.percpu")))		\
-	__SMALL_ADDR_AREA __typeof__(type) per_cpu__##name
+#define __DEFINE_PER_CPU(type, name, suffix)				\
+	__attribute__((__section__(".data.percpu" #suffix)))		\
+	__SMALL_ADDR_AREA __typeof__(type) per_cpu_##name
 
 /*
  * Pretty much a literal copy of asm-generic/percpu.h, except that percpu_modcopy() is an

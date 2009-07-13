@@ -188,7 +188,7 @@ void show_page_walk(unsigned long addr)
     unmap_domain_page(l1t);
 }
 
-DEFINE_PER_CPU(struct tss_struct *, doublefault_tss);
+DEFINE_PER_CPU_READ_MOSTLY(struct tss_struct *, doublefault_tss);
 static unsigned char __attribute__ ((__section__ (".bss.page_aligned")))
     boot_cpu_doublefault_space[PAGE_SIZE];
 

@@ -46,8 +46,8 @@ static unsigned int opt_tbuf_size = 0;
 integer_param("tbuf_size", opt_tbuf_size);
 
 /* Pointers to the meta-data objects for all system trace buffers */
-static DEFINE_PER_CPU(struct t_buf *, t_bufs);
-static DEFINE_PER_CPU(unsigned char *, t_data);
+static DEFINE_PER_CPU_READ_MOSTLY(struct t_buf *, t_bufs);
+static DEFINE_PER_CPU_READ_MOSTLY(unsigned char *, t_data);
 static int data_size;
 
 /* High water mark for trace buffers; */

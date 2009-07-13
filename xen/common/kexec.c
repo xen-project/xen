@@ -27,7 +27,7 @@
 #include <compat/kexec.h>
 #endif
 
-static DEFINE_PER_CPU(void *, crash_notes);
+static DEFINE_PER_CPU_READ_MOSTLY(void *, crash_notes);
 
 static Elf_Note *xen_crash_note;
 

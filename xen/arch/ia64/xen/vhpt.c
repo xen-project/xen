@@ -21,8 +21,8 @@
 #include <asm/vcpumask.h>
 #include <asm/vmmu.h>
 
-DEFINE_PER_CPU (unsigned long, vhpt_paddr);
-DEFINE_PER_CPU (unsigned long, vhpt_pend);
+DEFINE_PER_CPU_READ_MOSTLY(unsigned long, vhpt_paddr);
+DEFINE_PER_CPU_READ_MOSTLY(unsigned long, vhpt_pend);
 #ifdef CONFIG_XEN_IA64_TLBFLUSH_CLOCK
 DEFINE_PER_CPU(volatile u32, vhpt_tlbflush_timestamp);
 #endif
