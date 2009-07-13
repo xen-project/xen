@@ -31,6 +31,7 @@
 #include <asm/hvm/viridian.h>
 #include <asm/hvm/vmx/vmcs.h>
 #include <asm/hvm/svm/vmcb.h>
+#include <public/grant_table.h>
 #include <public/hvm/params.h>
 #include <public/hvm/save.h>
 

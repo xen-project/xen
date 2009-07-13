@@ -39,10 +39,12 @@ static void ept_p2m_type_to_flags(ept_entry_t *entry, p2m_type_t type)
             return;
         case p2m_ram_rw:
         case p2m_mmio_direct:
+        case p2m_grant_map_rw:
              entry->r = entry->w = entry->x = 1;
             return;
         case p2m_ram_logdirty:
         case p2m_ram_ro:
+        case p2m_grant_map_ro:
              entry->r = entry->x = 1;
              entry->w = 0;
             return;

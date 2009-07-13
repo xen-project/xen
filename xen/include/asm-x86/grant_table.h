@@ -44,7 +44,7 @@ static inline void gnttab_clear_flag(unsigned long nr, uint16_t *addr)
      (((ld) == (rd)) || !paging_mode_external(rd)))
 
 /* Done implicitly when page tables are destroyed. */
-#define gnttab_release_host_mappings 0
+#define gnttab_release_host_mappings(domain) ( paging_mode_external(domain) )
 
 static inline int replace_grant_supported(void)
 {

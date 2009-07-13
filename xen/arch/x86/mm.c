@@ -2672,10 +2672,16 @@ int do_mmuext_op(
             break;
         }
 
-        okay = 1;
         gmfn  = op.arg1.mfn;
         mfn = gmfn_to_mfn(FOREIGNDOM, gmfn);
+        if ( mfn == INVALID_MFN )
+        {
+            MEM_LOG("Bad gmfn_to_mfn");
+            rc = -EFAULT;
+            break;
+        }
         page = mfn_to_page(mfn);
+        okay = 1;
 
         switch ( op.cmd )
         {
@@ -3475,11 +3481,37 @@ static int destroy_grant_va_mapping(
     return replace_grant_va_mapping(addr, frame, l1e_empty(), v);
 }
 
+static int create_grant_p2m_mapping(uint64_t addr, unsigned long frame,
+                                    unsigned int flags,
+                                    unsigned int cache_flags)
+{
+    p2m_type_t p2mt;
+    int rc;
+
+    if ( cache_flags  || (flags & ~GNTMAP_readonly) != GNTMAP_host_map )
+        return GNTST_general_error;
+
+    if ( flags & GNTMAP_readonly )
+        p2mt = p2m_grant_map_ro;
+    else
+        p2mt = p2m_grant_map_rw;
+    rc = guest_physmap_add_entry(current->domain, addr >> PAGE_SHIFT,
+                                 frame, 0, p2mt);
+    if ( rc )
+        return GNTST_general_error;
+    else
+        return GNTST_okay;
+}
+
 int create_grant_host_mapping(uint64_t addr, unsigned long frame, 
                               unsigned int flags, unsigned int cache_flags)
 {
-    l1_pgentry_t pte = l1e_from_pfn(frame, GRANT_PTE_FLAGS);
+    l1_pgentry_t pte;
 
+    if ( paging_mode_external(current->domain) )
+        return create_grant_p2m_mapping(addr, frame, flags, cache_flags);
+
+    pte = l1e_from_pfn(frame, GRANT_PTE_FLAGS);
     if ( (flags & GNTMAP_application_map) )
         l1e_add_flags(pte,_PAGE_USER);
     if ( !(flags & GNTMAP_readonly) )
@@ -3496,6 +3528,29 @@ int create_grant_host_mapping(uint64_t addr, unsigned long frame,
     return create_grant_va_mapping(addr, pte, current);
 }
 
+static int replace_grant_p2m_mapping(
+    uint64_t addr, unsigned long frame, uint64_t new_addr, unsigned int flags)
+{
+    unsigned long gfn = (unsigned long)(addr >> PAGE_SHIFT);
+    p2m_type_t type;
+    mfn_t old_mfn;
+
+    if ( new_addr != 0 || (flags & GNTMAP_contains_pte) )
+        return GNTST_general_error;
+
+    old_mfn = gfn_to_mfn_current(gfn, &type);
+    if ( !p2m_is_grant(type) || mfn_x(old_mfn) != frame )
+    {
+        gdprintk(XENLOG_WARNING,
+                 "replace_grant_p2m_mapping: old mapping invalid (type %d, mfn %lx, frame %lx)\n",
+                 type, mfn_x(old_mfn), frame);
+        return GNTST_general_error;
+    }
+    guest_physmap_remove_page(current->domain, gfn, frame, 0);
+
+    return GNTST_okay;
+}
+
 int replace_grant_host_mapping(
     uint64_t addr, unsigned long frame, uint64_t new_addr, unsigned int flags)
 {
@@ -3505,6 +3560,9 @@ int replace_grant_host_mapping(
     struct page_info *l1pg;
     int rc;
     
+    if ( paging_mode_external(current->domain) )
+        return replace_grant_p2m_mapping(addr, frame, new_addr, flags);
+
     if ( flags & GNTMAP_contains_pte )
     {
         if ( !new_addr )

@@ -227,6 +227,15 @@ __gnttab_map_grant_ref(
         return;
     }
 
+    if ( unlikely(paging_mode_external(ld) &&
+                  (op->flags & (GNTMAP_device_map|GNTMAP_application_map|
+                            GNTMAP_contains_pte))) )
+    {
+        gdprintk(XENLOG_INFO, "No device mapping in HVM domain.\n");
+        op->status = GNTST_general_error;
+        return;
+    }
+
     if ( unlikely((rd = rcu_lock_domain_by_id(op->dom)) == NULL) )
     {
         gdprintk(XENLOG_INFO, "Could not find domain %d\n", op->dom);
@@ -344,6 +353,13 @@ __gnttab_map_grant_ref(
         if ( mfn_valid(frame) )
             put_page(mfn_to_page(frame));
 
+        if ( paging_mode_external(ld) )
+        {
+            gdprintk(XENLOG_WARNING, "HVM guests can't grant map iomem\n");
+            rc = GNTST_general_error;
+            goto undo_out;
+        }
+
         if ( !iomem_access_permitted(rd, frame, frame) )
         {
             gdprintk(XENLOG_WARNING,
@@ -396,7 +412,12 @@ __gnttab_map_grant_ref(
          !(old_pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask)) &&
          (act_pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask)) )
     {
-        if ( iommu_map_page(ld, mfn_to_gmfn(ld, frame), frame) )
+        /* Shouldn't happen, because you can't use iommu in a HVM
+         * domain. */
+        BUG_ON(paging_mode_translate(ld));
+        /* We're not translated, so we know that gmfns and mfns are
+           the same things, so the IOMMU entry is always 1-to-1. */
+        if ( iommu_map_page(ld, frame, frame) )
         {
             rc = GNTST_general_error;
             goto undo_out;
@@ -576,7 +597,8 @@ __gnttab_unmap_common(
          (old_pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask)) &&
          !(act->pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask)) )
     {
-        if ( iommu_unmap_page(ld, mfn_to_gmfn(ld, op->frame)) )
+        BUG_ON(paging_mode_translate(ld));
+        if ( iommu_unmap_page(ld, op->frame) )
         {
             rc = GNTST_general_error;
             goto unmap_out;
@@ -1765,7 +1787,7 @@ gnttab_release_mappings(
             {
                 BUG_ON(!(act->pin & GNTPIN_hstr_mask));
                 act->pin -= GNTPIN_hstr_inc;
-                if ( gnttab_release_host_mappings &&
+                if ( gnttab_release_host_mappings(d) &&
                      !is_iomem_page(act->frame) )
                     put_page(mfn_to_page(act->frame));
             }
@@ -1784,7 +1806,7 @@ gnttab_release_mappings(
             {
                 BUG_ON(!(act->pin & GNTPIN_hstw_mask));
                 act->pin -= GNTPIN_hstw_inc;
-                if ( gnttab_release_host_mappings &&
+                if ( gnttab_release_host_mappings(d) &&
                      !is_iomem_page(act->frame) )
                 {
                     if ( gnttab_host_mapping_get_page_type(map, d, rd) )

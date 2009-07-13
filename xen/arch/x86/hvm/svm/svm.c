@@ -938,8 +938,27 @@ static void svm_do_nested_pgfault(paddr_t gpa, struct cpu_user_regs *regs)
     }
 
     /* Log-dirty: mark the page dirty and let the guest write it again */
-    paging_mark_dirty(current->domain, mfn_x(mfn));
-    p2m_change_type(current->domain, gfn, p2m_ram_logdirty, p2m_ram_rw);
+    if ( p2mt == p2m_ram_logdirty )
+    {
+        paging_mark_dirty(current->domain, mfn_x(mfn));
+        p2m_change_type(current->domain, gfn, p2m_ram_logdirty, p2m_ram_rw);
+        return;
+    }
+
+    /* Okay, this shouldn't happen.  Maybe the guest was writing to a
+       read-only grant mapping? */
+    if ( p2mt == p2m_grant_map_ro )
+    {
+        /* Naughty... */
+        gdprintk(XENLOG_WARNING,
+                 "trying to write to read-only grant mapping\n");
+        hvm_inject_exception(TRAP_gp_fault, 0, 0);
+        return;
+    }
+
+    /* Something bad has happened; either Xen or the hardware have
+       screwed up. */
+    gdprintk(XENLOG_WARNING, "unexpected SVM nested page fault\n");
 }
 
 static void svm_fpu_dirty_intercept(void)

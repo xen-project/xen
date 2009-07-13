@@ -408,20 +408,23 @@ static int __hvmemul_read(
     rc = ((access_type == hvm_access_insn_fetch) ?
           hvm_fetch_from_guest_virt(p_data, addr, bytes, pfec) :
           hvm_copy_from_guest_virt(p_data, addr, bytes, pfec));
-    if ( rc == HVMCOPY_bad_gva_to_gfn )
-        return X86EMUL_EXCEPTION;
 
-    if ( rc == HVMCOPY_bad_gfn_to_mfn )
+    switch ( rc )
     {
+    case HVMCOPY_bad_gva_to_gfn:
+        return X86EMUL_EXCEPTION;
+    case HVMCOPY_unhandleable:
+        return X86EMUL_UNHANDLEABLE;
+    case  HVMCOPY_bad_gfn_to_mfn:
         if ( access_type == hvm_access_insn_fetch )
             return X86EMUL_UNHANDLEABLE;
-
         rc = hvmemul_linear_to_phys(
             addr, &gpa, bytes, &reps, pfec, hvmemul_ctxt);
         if ( rc != X86EMUL_OKAY )
             return rc;
-
         return hvmemul_do_mmio(gpa, &reps, bytes, 0, IOREQ_READ, 0, p_data);
+    default:
+        break;
     }
 
     return X86EMUL_OKAY;
@@ -496,18 +499,22 @@ static int hvmemul_write(
         pfec |= PFEC_user_mode;
 
     rc = hvm_copy_to_guest_virt(addr, p_data, bytes, pfec);
-    if ( rc == HVMCOPY_bad_gva_to_gfn )
-        return X86EMUL_EXCEPTION;
 
-    if ( rc == HVMCOPY_bad_gfn_to_mfn )
+    switch ( rc )
     {
+    case HVMCOPY_bad_gva_to_gfn:
+        return X86EMUL_EXCEPTION;
+    case HVMCOPY_unhandleable:
+        return X86EMUL_UNHANDLEABLE;
+    case  HVMCOPY_bad_gfn_to_mfn:
         rc = hvmemul_linear_to_phys(
             addr, &gpa, bytes, &reps, pfec, hvmemul_ctxt);
         if ( rc != X86EMUL_OKAY )
             return rc;
-
         return hvmemul_do_mmio(gpa, &reps, bytes, 0,
                                IOREQ_WRITE, 0, p_data);
+    default:
+        break;
     }
 
     return X86EMUL_OKAY;
@@ -636,12 +643,12 @@ static int hvmemul_rep_movs(
         return rc;
 
     (void)gfn_to_mfn_current(sgpa >> PAGE_SHIFT, &p2mt);
-    if ( !p2m_is_ram(p2mt) )
+    if ( !p2m_is_ram(p2mt) && !p2m_is_grant(p2mt) )
         return hvmemul_do_mmio(
             sgpa, reps, bytes_per_rep, dgpa, IOREQ_READ, df, NULL);
 
     (void)gfn_to_mfn_current(dgpa >> PAGE_SHIFT, &p2mt);
-    if ( !p2m_is_ram(p2mt) )
+    if ( !p2m_is_ram(p2mt) && !p2m_is_grant(p2mt) )
         return hvmemul_do_mmio(
             dgpa, reps, bytes_per_rep, sgpa, IOREQ_WRITE, df, NULL);
 

@@ -213,7 +213,7 @@ int wrmsr_viridian_regs(uint32_t idx, uint32_t eax, uint32_t edx)
         {
             uint32_t word = 0;
             paddr_t page_start = val & ~1ul;
-            hvm_copy_to_guest_phys(page_start, &word, sizeof(word));
+            (void)hvm_copy_to_guest_phys(page_start, &word, sizeof(word));
         }
         break;
 

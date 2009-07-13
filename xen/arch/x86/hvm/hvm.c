@@ -1589,6 +1589,8 @@ static enum hvm_copy_result __hvm_copy(
 
         mfn = mfn_x(gfn_to_mfn_current(gfn, &p2mt));
 
+        if ( p2m_is_grant(p2mt) )
+            return HVMCOPY_unhandleable;
         if ( !p2m_is_ram(p2mt) )
             return HVMCOPY_bad_gfn_to_mfn;
         ASSERT(mfn_valid(mfn));
@@ -1997,7 +1999,8 @@ enum hvm_intblk hvm_interrupt_blocked(struct vcpu *v, struct hvm_intack intack)
 static long hvm_grant_table_op(
     unsigned int cmd, XEN_GUEST_HANDLE(void) uop, unsigned int count)
 {
-    if ( (cmd != GNTTABOP_query_size) && (cmd != GNTTABOP_setup_table) )
+    if ( (cmd != GNTTABOP_query_size) && (cmd != GNTTABOP_setup_table) &&
+         (cmd != GNTTABOP_map_grant_ref) && (cmd != GNTTABOP_unmap_grant_ref) )
         return -ENOSYS; /* all other commands need auditing */
     return do_grant_table_op(cmd, uop, count);
 }
@@ -2804,17 +2807,36 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
             
         if ( a.hvmmem_type >= ARRAY_SIZE(memtype) )
             goto param_fail4;
-            
-        rc = 0;
-        
+
         for ( pfn = a.first_pfn; pfn < a.first_pfn + a.nr; pfn++ )
         {
             p2m_type_t t;
+            p2m_type_t nt;
             mfn_t mfn;
             mfn = gfn_to_mfn(d, pfn, &t);
-            p2m_change_type(d, pfn, t, memtype[a.hvmmem_type]);
+            if ( p2m_is_grant(t) )
+            {
+                gdprintk(XENLOG_WARNING,
+                         "type for pfn 0x%lx changed to grant while "
+                         "we were working?\n", pfn);
+                goto param_fail4;
+            }
+            else
+            {
+                nt = p2m_change_type(d, pfn, t, memtype[a.hvmmem_type]);
+                if ( nt != t )
+                {
+                    gdprintk(XENLOG_WARNING,
+                             "type of pfn 0x%lx changed from %d to %d while "
+                             "we were trying to change it to %d\n",
+                             pfn, t, nt, memtype[a.hvmmem_type]);
+                    goto param_fail4;
+                }
+            }
         }
-         
+
+        rc = 0;
+
     param_fail4:
         rcu_unlock_domain(d);
         break;

@@ -45,6 +45,10 @@
  */
 #define phys_to_machine_mapping ((l1_pgentry_t *)RO_MPT_VIRT_START)
 
+#ifdef __x86_64__
+#define HAVE_GRANT_MAP_P2M
+#endif
+
 /*
  * The upper levels of the p2m pagetable always contain full rights; all 
  * variation in the access control bits is made in the level-1 PTEs.
@@ -65,6 +69,12 @@ typedef enum {
     p2m_mmio_dm = 4,            /* Reads and write go to the device model */
     p2m_mmio_direct = 5,        /* Read/write mapping of genuine MMIO area */
     p2m_populate_on_demand = 6, /* Place-holder for empty memory */
+
+    /* Note that these can only be used if HAVE_GRANT_MAP_P2M is
+       defined.  They get defined anyway so as to avoid lots of
+       #ifdef's everywhere else. */
+    p2m_grant_map_rw = 7,       /* Read/write grant mapping */
+    p2m_grant_map_ro = 8,       /* Read-only grant mapping */
 } p2m_type_t;
 
 typedef enum {
@@ -81,13 +91,19 @@ typedef enum {
                        | p2m_to_mask(p2m_ram_logdirty)  \
                        | p2m_to_mask(p2m_ram_ro))
 
+/* Grant mapping types, which map to a real machine frame in another
+ * VM */
+#define P2M_GRANT_TYPES (p2m_to_mask(p2m_grant_map_rw)  \
+                         | p2m_to_mask(p2m_grant_map_ro) )
+
 /* MMIO types, which don't have to map to anything in the frametable */
 #define P2M_MMIO_TYPES (p2m_to_mask(p2m_mmio_dm)        \
                         | p2m_to_mask(p2m_mmio_direct))
 
 /* Read-only types, which must have the _PAGE_RW bit clear in their PTEs */
 #define P2M_RO_TYPES (p2m_to_mask(p2m_ram_logdirty)     \
-                      | p2m_to_mask(p2m_ram_ro))
+                      | p2m_to_mask(p2m_ram_ro)         \
+                      | p2m_to_mask(p2m_grant_map_ro) )
 
 #define P2M_MAGIC_TYPES (p2m_to_mask(p2m_populate_on_demand))
 
@@ -96,6 +112,10 @@ typedef enum {
 #define p2m_is_mmio(_t) (p2m_to_mask(_t) & P2M_MMIO_TYPES)
 #define p2m_is_readonly(_t) (p2m_to_mask(_t) & P2M_RO_TYPES)
 #define p2m_is_magic(_t) (p2m_to_mask(_t) & P2M_MAGIC_TYPES)
+#define p2m_is_grant(_t) (p2m_to_mask(_t) & P2M_GRANT_TYPES)
+/* Grant types are *not* considered valid, because they can be
+   unmapped at any time and, unless you happen to be the shadow or p2m
+   implementations, there's no way of synchronising against that. */
 #define p2m_is_valid(_t) (p2m_to_mask(_t) & (P2M_RAM_TYPES | P2M_MMIO_TYPES))
 
 /* Populate-on-demand */
@@ -161,8 +181,12 @@ struct p2m_domain {
 /* Extract the type from the PTE flags that store it */
 static inline p2m_type_t p2m_flags_to_type(unsigned long flags)
 {
-    /* Type is stored in the "available" bits, 9, 10 and 11 */
+    /* Type is stored in the "available" bits */
+#ifdef __x86_64__
+    return (flags >> 9) & 0x3fff;
+#else
     return (flags >> 9) & 0x7;
+#endif
 }
 
 /* Read the current domain's p2m table.  Do not populate PoD pages. */
@@ -225,17 +249,6 @@ static inline unsigned long mfn_to_gfn(struct domain *d, mfn_t mfn)
     else
         return mfn_x(mfn);
 }
-
-/* Translate the frame number held in an l1e from guest to machine */
-static inline l1_pgentry_t
-gl1e_to_ml1e(struct domain *d, l1_pgentry_t l1e)
-{
-    if ( unlikely(paging_mode_translate(d)) )
-        l1e = l1e_from_pfn(gmfn_to_mfn(d, l1e_get_pfn(l1e)),
-                           l1e_get_flags(l1e));
-    return l1e;
-}
-
 
 /* Init the datastructures for later use by the p2m code */
 int p2m_init(struct domain *d);

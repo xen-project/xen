@@ -71,7 +71,8 @@ void hvm_enable(struct hvm_function_table *);
 enum hvm_copy_result {
     HVMCOPY_okay = 0,
     HVMCOPY_bad_gva_to_gfn,
-    HVMCOPY_bad_gfn_to_mfn
+    HVMCOPY_bad_gfn_to_mfn,
+    HVMCOPY_unhandleable
 };
 
 /*

@@ -172,10 +172,12 @@ hvm_read(enum x86_segment seg,
         return X86EMUL_OKAY;
     case HVMCOPY_bad_gva_to_gfn:
         return X86EMUL_EXCEPTION;
-    default:
-        break;
+    case HVMCOPY_bad_gfn_to_mfn:
+    case HVMCOPY_unhandleable:
+        return X86EMUL_UNHANDLEABLE;
     }
 
+    BUG();
     return X86EMUL_UNHANDLEABLE;
 }
 
@@ -3431,7 +3433,7 @@ shadow_write_p2m_entry(struct vcpu *v, unsigned long gfn,
     {
         mfn_t mfn = _mfn(l1e_get_pfn(*p));
         p2m_type_t p2mt = p2m_flags_to_type(l1e_get_flags(*p));
-        if ( p2m_is_valid(p2mt) && mfn_valid(mfn) ) 
+        if ( (p2m_is_valid(p2mt) || p2m_is_grant(p2mt)) && mfn_valid(mfn) ) 
         {
             sh_remove_all_shadows_and_parents(v, mfn);
             if ( sh_remove_all_mappings(v, mfn) )

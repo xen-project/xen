@@ -121,11 +121,10 @@ static int fetch(struct vcpu *v, u8 *buf, unsigned long addr, int len)
     switch ( hvm_fetch_from_guest_virt(buf, addr, len, pfec) )
     {
     case HVMCOPY_okay:
-        return 1;
+        break;
     case HVMCOPY_bad_gva_to_gfn:
         /* OK just to give up; we'll have injected #PF already */
         return 0;
-    case HVMCOPY_bad_gfn_to_mfn:
     default:
         /* Not OK: fetches from non-RAM pages are not supportable. */
         gdprintk(XENLOG_WARNING, "Bad instruction fetch at %#lx (%#lx)\n",
@@ -133,6 +132,7 @@ static int fetch(struct vcpu *v, u8 *buf, unsigned long addr, int len)
         hvm_inject_exception(TRAP_gp_fault, 0, 0);
         return 0;
     }
+    return 1;
 }
 
 int __get_instruction_length_from_list(struct vcpu *v,

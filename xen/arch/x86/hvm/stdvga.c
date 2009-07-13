@@ -478,8 +478,8 @@ static int mmio_move(struct hvm_hw_stdvga *s, ioreq_t *p)
             for ( i = 0; i < p->count; i++ ) 
             {
                 tmp = stdvga_mem_read(addr, p->size);
-                if ( hvm_copy_to_guest_phys(data, &tmp, p->size) ==
-                     HVMCOPY_bad_gfn_to_mfn )
+                if ( hvm_copy_to_guest_phys(data, &tmp, p->size) !=
+                     HVMCOPY_okay )
                 {
                     (void)gfn_to_mfn_current(data >> PAGE_SHIFT, &p2mt);
                     /*
@@ -500,8 +500,8 @@ static int mmio_move(struct hvm_hw_stdvga *s, ioreq_t *p)
             uint32_t addr = p->addr, data = p->data, tmp;
             for ( i = 0; i < p->count; i++ )
             {
-                if ( hvm_copy_from_guest_phys(&tmp, data, p->size) ==
-                     HVMCOPY_bad_gfn_to_mfn )
+                if ( hvm_copy_from_guest_phys(&tmp, data, p->size) !=
+                     HVMCOPY_okay )
                 {
                     (void)gfn_to_mfn_current(data >> PAGE_SHIFT, &p2mt);
                     if ( (p2mt != p2m_mmio_dm) || (data < VGA_MEM_BASE) ||

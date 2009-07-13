@@ -272,7 +272,8 @@ void paging_mark_dirty(struct domain *d, unsigned long guest_mfn)
 
     gmfn = _mfn(guest_mfn);
 
-    if ( !paging_mode_log_dirty(d) || !mfn_valid(gmfn) )
+    if ( !paging_mode_log_dirty(d) || !mfn_valid(gmfn) ||
+         page_get_owner(mfn_to_page(gmfn)) != d )
         return;
 
     log_dirty_lock(d);

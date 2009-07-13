@@ -102,17 +102,27 @@
 
 static unsigned long p2m_type_to_flags(p2m_type_t t) 
 {
-    unsigned long flags = (t & 0x7UL) << 9;
+    unsigned long flags;
+#ifdef __x86_64__
+    flags = (unsigned long)(t & 0x3fff) << 9;
+#else
+    flags = (t & 0x7UL) << 9;
+#endif
+#ifndef HAVE_GRANT_MAP_P2M
+    BUG_ON(p2m_is_grant(t));
+#endif
     switch(t)
     {
     case p2m_invalid:
     default:
         return flags;
     case p2m_ram_rw:
+    case p2m_grant_map_rw:
         return flags | P2M_BASE_FLAGS | _PAGE_RW;
     case p2m_ram_logdirty:
         return flags | P2M_BASE_FLAGS;
     case p2m_ram_ro:
+    case p2m_grant_map_ro:
         return flags | P2M_BASE_FLAGS;
     case p2m_mmio_dm:
         return flags;
@@ -1321,7 +1331,7 @@ pod_retry_l1:
     unmap_domain_page(l1e);
 
     ASSERT(mfn_valid(mfn) || !p2m_is_ram(*t));
-    return (p2m_is_valid(*t)) ? mfn : _mfn(INVALID_MFN);
+    return (p2m_is_valid(*t) || p2m_is_grant(*t)) ? mfn : _mfn(INVALID_MFN);
 }
 
 /* Read the current domain's p2m table (through the linear mapping). */
@@ -1438,7 +1448,7 @@ static mfn_t p2m_gfn_to_mfn_current(unsigned long gfn, p2m_type_t *t,
                 }
             }
 
-            if ( p2m_is_valid(p2mt) )
+            if ( p2m_is_valid(p2mt) || p2m_is_grant(p2mt) )
                 mfn = _mfn(l1e_get_pfn(l1e));
             else 
                 /* XXX see above */
@@ -1790,18 +1800,21 @@ static void audit_p2m(struct domain *d)
 
                     for ( i1 = 0; i1 < L1_PAGETABLE_ENTRIES; i1++, gfn++ )
                     {
+                        p2m_type_t type;
+
+                        type = p2m_flags_to_type(l1e_get_flags(l1e[i1]));
                         if ( !(l1e_get_flags(l1e[i1]) & _PAGE_PRESENT) )
                         {
-                            if ( p2m_flags_to_type(l1e_get_flags(l1e[i1]))
-                                 == p2m_populate_on_demand )
-                            entry_count++;
+                            if ( type == p2m_populate_on_demand )
+                                entry_count++;
                             continue;
                         }
                         mfn = l1e_get_pfn(l1e[i1]);
                         ASSERT(mfn_valid(_mfn(mfn)));
                         m2pfn = get_gpfn_from_mfn(mfn);
                         if ( m2pfn != gfn &&
-                             p2m_flags_to_type(l1e_get_flags(l1e[i1])) != p2m_mmio_direct )
+                             type != p2m_mmio_direct &&
+                             !p2m_is_grant(type) )
                         {
                             pmbad++;
                             printk("mismatch: gfn %#lx -> mfn %#lx"
@@ -1854,6 +1867,8 @@ p2m_remove_page(struct domain *d, unsigned long gfn, unsigned long mfn,
                 unsigned int page_order)
 {
     unsigned long i;
+    mfn_t mfn_return;
+    p2m_type_t t;
 
     if ( !paging_mode_translate(d) )
     {
@@ -1865,9 +1880,14 @@ p2m_remove_page(struct domain *d, unsigned long gfn, unsigned long mfn,
 
     P2M_DEBUG("removing gfn=%#lx mfn=%#lx\n", gfn, mfn);
 
-    set_p2m_entry(d, gfn, _mfn(INVALID_MFN), page_order, p2m_invalid);
     for ( i = 0; i < (1UL << page_order); i++ )
-        set_gpfn_from_mfn(mfn+i, INVALID_M2P_ENTRY);
+    {
+        mfn_return = p2m_gfn_to_mfn(d, gfn + i, &t, p2m_query);
+        if ( !p2m_is_grant(t) )
+            set_gpfn_from_mfn(mfn+i, INVALID_M2P_ENTRY);
+        ASSERT( !p2m_is_valid(t) || mfn + i == mfn_x(mfn_return) );
+    }
+    set_p2m_entry(d, gfn, _mfn(INVALID_MFN), page_order, p2m_invalid);
 }
 
 void
@@ -2003,7 +2023,14 @@ guest_physmap_add_entry(struct domain *d, unsigned long gfn,
     for ( i = 0; i < (1UL << page_order); i++ )
     {
         omfn = gfn_to_mfn_query(d, gfn + i, &ot);
-        if ( p2m_is_ram(ot) )
+        if ( p2m_is_grant(ot) )
+        {
+            /* Really shouldn't be unmapping grant maps this way */
+            domain_crash(d);
+            p2m_unlock(d->arch.p2m);
+            return -EINVAL;
+        }
+        else if ( p2m_is_ram(ot) )
         {
             ASSERT(mfn_valid(omfn));
             set_gpfn_from_mfn(mfn_x(omfn), INVALID_M2P_ENTRY);
@@ -2018,6 +2045,8 @@ guest_physmap_add_entry(struct domain *d, unsigned long gfn,
     /* Then, look for m->p mappings for this range and deal with them */
     for ( i = 0; i < (1UL << page_order); i++ )
     {
+        if ( page_get_owner(mfn_to_page(_mfn(mfn + i))) != d )
+            continue;
         ogfn = mfn_to_gfn(d, _mfn(mfn+i));
         if (
 #ifdef __x86_64__
@@ -2033,6 +2062,9 @@ guest_physmap_add_entry(struct domain *d, unsigned long gfn,
             P2M_DEBUG("aliased! mfn=%#lx, old gfn=%#lx, new gfn=%#lx\n",
                       mfn + i, ogfn, gfn + i);
             omfn = gfn_to_mfn_query(d, ogfn, &ot);
+            /* If we get here, we know the local domain owns the page,
+               so it can't have been grant mapped in. */
+            BUG_ON( p2m_is_grant(ot) );
             if ( p2m_is_ram(ot) )
             {
                 ASSERT(mfn_valid(omfn));
@@ -2049,8 +2081,11 @@ guest_physmap_add_entry(struct domain *d, unsigned long gfn,
     {
         if ( !set_p2m_entry(d, gfn, _mfn(mfn), page_order, t) )
             rc = -EINVAL;
-        for ( i = 0; i < (1UL << page_order); i++ )
-            set_gpfn_from_mfn(mfn+i, gfn+i);
+        if ( !p2m_is_grant(t) )
+        {
+            for ( i = 0; i < (1UL << page_order); i++ )
+                set_gpfn_from_mfn(mfn+i, gfn+i);
+        }
     }
     else
     {
@@ -2089,6 +2124,8 @@ void p2m_change_type_global(struct domain *d, p2m_type_t ot, p2m_type_t nt)
     l4_pgentry_t *l4e;
     int i4;
 #endif /* CONFIG_PAGING_LEVELS == 4 */
+
+    BUG_ON(p2m_is_grant(ot) || p2m_is_grant(nt));
 
     if ( !paging_mode_translate(d) )
         return;
@@ -2185,6 +2222,8 @@ p2m_type_t p2m_change_type(struct domain *d, unsigned long gfn,
     p2m_type_t pt;
     mfn_t mfn;
 
+    BUG_ON(p2m_is_grant(ot) || p2m_is_grant(nt));
+
     p2m_lock(d->arch.p2m);
 
     mfn = gfn_to_mfn(d, gfn, &pt);
@@ -2207,7 +2246,12 @@ set_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
         return 0;
 
     omfn = gfn_to_mfn_query(d, gfn, &ot);
-    if ( p2m_is_ram(ot) )
+    if ( p2m_is_grant(ot) )
+    {
+        domain_crash(d);
+        return 0;
+    }
+    else if ( p2m_is_ram(ot) )
     {
         ASSERT(mfn_valid(omfn));
         set_gpfn_from_mfn(mfn_x(omfn), INVALID_M2P_ENTRY);
