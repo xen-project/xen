@@ -102,8 +102,8 @@ ENTRY(fixup_ring0_guest_stack)
 
         movl  $PER_CPU_GDT_ENTRY*8,%ecx
         lsll  %ecx,%ecx
-        shll  $7,%ecx                                   # Each TSS entry is 0x80 bytes
-        addl  $init_tss,%ecx
+        shll  $PERCPU_SHIFT,%ecx
+        addl  $per_cpu__init_tss,%ecx
 
         # Load Xen stack from TSS.
         movw  TSS_ss0(%ecx),%ax

@@ -204,7 +204,7 @@ asmlinkage void do_double_fault(void)
     asm ( "lsll %1, %0" : "=r" (cpu) : "rm" (PER_CPU_GDT_ENTRY << 3) );
 
     /* Find information saved during fault and dump it to the console. */
-    tss = &init_tss[cpu];
+    tss = &per_cpu(init_tss, cpu);
     printk("*** DOUBLE FAULT ***\n");
     print_xen_info();
     printk("CPU:    %d\nEIP:    %04x:[<%08x>]",

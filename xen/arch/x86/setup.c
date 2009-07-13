@@ -117,7 +117,7 @@ DEFINE_PER_CPU(struct desc_struct *, compat_gdt_table)
     = boot_cpu_compat_gdt_table;
 #endif
 
-struct tss_struct init_tss[NR_CPUS];
+DEFINE_PER_CPU(struct tss_struct, init_tss);
 
 char __attribute__ ((__section__(".bss.stack_aligned"))) cpu0_stack[STACK_SIZE];
 

@@ -326,7 +326,7 @@ void show_stack_overflow(unsigned int cpu, unsigned long esp)
 
     printk("Valid stack range: %p-%p, sp=%p, tss.esp0=%p\n",
            (void *)esp_top, (void *)esp_bottom, (void *)esp,
-           (void *)init_tss[cpu].esp0);
+           (void *)per_cpu(init_tss, cpu).esp0);
 
     /* Trigger overflow trace if %esp is within 512 bytes of the guard page. */
     if ( ((unsigned long)(esp - esp_top) > 512) &&
@@ -3066,7 +3066,7 @@ void set_intr_gate(unsigned int n, void *addr)
 
 void load_TR(void)
 {
-    struct tss_struct *tss = &init_tss[smp_processor_id()];
+    struct tss_struct *tss = &this_cpu(init_tss);
     struct desc_ptr old_gdt, tss_gdt = {
         .base = (long)(this_cpu(gdt_table) - FIRST_RESERVED_GDT_ENTRY),
         .limit = LAST_RESERVED_GDT_BYTE

@@ -576,7 +576,7 @@ void __init early_cpu_init(void)
 void __cpuinit cpu_init(void)
 {
 	int cpu = smp_processor_id();
-	struct tss_struct *t = &init_tss[cpu];
+	struct tss_struct *t = &this_cpu(init_tss);
 	struct desc_ptr gdt_desc = {
 		.base = (unsigned long)(this_cpu(gdt_table) - FIRST_RESERVED_GDT_ENTRY),
 		.limit = LAST_RESERVED_GDT_BYTE

@@ -227,8 +227,7 @@ long subarch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
 
 long do_stack_switch(unsigned long ss, unsigned long esp)
 {
-    int nr = smp_processor_id();
-    struct tss_struct *t = &init_tss[nr];
+    struct tss_struct *t = &this_cpu(init_tss);
 
     fixup_guest_stack_selector(current->domain, ss);
 

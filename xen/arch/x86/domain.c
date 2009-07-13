@@ -1223,7 +1223,7 @@ static void save_segments(struct vcpu *v)
 
 static inline void switch_kernel_stack(struct vcpu *v)
 {
-    struct tss_struct *tss = &init_tss[smp_processor_id()];
+    struct tss_struct *tss = &this_cpu(init_tss);
     tss->esp1 = v->arch.guest_context.kernel_sp;
     tss->ss1  = v->arch.guest_context.kernel_ss;
 }

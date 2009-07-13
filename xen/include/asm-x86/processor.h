@@ -456,7 +456,7 @@ struct tss_struct {
 extern idt_entry_t idt_table[];
 extern idt_entry_t *idt_tables[];
 
-extern struct tss_struct init_tss[NR_CPUS];
+DECLARE_PER_CPU(struct tss_struct, init_tss);
 
 extern void init_int80_direct_trap(struct vcpu *v);
 

@@ -57,7 +57,7 @@ void restore_rest_processor_state(void)
     }
 #else /* !defined(CONFIG_X86_64) */
     if ( supervisor_mode_kernel && cpu_has_sep )
-        wrmsr(MSR_IA32_SYSENTER_ESP, &init_tss[smp_processor_id()].esp1, 0);
+        wrmsr(MSR_IA32_SYSENTER_ESP, &this_cpu(init_tss).esp1, 0);
 #endif
 
     /* Maybe load the debug registers. */

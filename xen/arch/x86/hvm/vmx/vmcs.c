@@ -502,7 +502,7 @@ static void vmx_set_host_env(struct vcpu *v)
     __vmwrite(HOST_IDTR_BASE, (unsigned long)idt_tables[cpu]);
 
     __vmwrite(HOST_TR_SELECTOR, TSS_ENTRY << 3);
-    __vmwrite(HOST_TR_BASE, (unsigned long)&init_tss[cpu]);
+    __vmwrite(HOST_TR_BASE, (unsigned long)&per_cpu(init_tss, cpu));
 
     __vmwrite(HOST_SYSENTER_ESP, get_stack_bottom());
 
