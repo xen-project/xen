@@ -3,28 +3,25 @@ subdir-y += vmx
 subdir-y += linux
 subdir-y += linux-xen
 
-$(TARGET)-syms: linux-xen/head.o $(ALL_OBJS) xen.lds.s
+ALL_OBJS := linux-xen/head.o $(ALL_OBJS)
+
+$(TARGET)-syms: $(ALL_OBJS) xen.lds.s
 	$(MAKE) -f $(BASEDIR)/Rules.mk $(BASEDIR)/common/symbols-dummy.o
-	$(LD) $(LDFLAGS) -T xen.lds.s -N \
-		-Map map.out linux-xen/head.o $(ALL_OBJS) \
-		$(BASEDIR)/common/symbols-dummy.o -o $@
-	$(NM) -n $@ | $(BASEDIR)/tools/symbols > $(BASEDIR)/xen-syms.S
-	$(MAKE) -f $(BASEDIR)/Rules.mk $(BASEDIR)/xen-syms.o
-	$(LD) $(LDFLAGS) -T xen.lds.s -N \
-		-Map map.out linux-xen/head.o $(ALL_OBJS) \
-		$(BASEDIR)/xen-syms.o -o $@
-	$(NM) -n $@ | $(BASEDIR)/tools/symbols >$(BASEDIR)/xen-syms.S
-	$(MAKE) -f $(BASEDIR)/Rules.mk $(BASEDIR)/xen-syms.o
-	$(LD) $(LDFLAGS) -T xen.lds.s -N \
-		-Map map.out linux-xen/head.o $(ALL_OBJS) \
-		$(BASEDIR)/xen-syms.o -o $@
-	rm -f $(BASEDIR)/xen-syms.S $(BASEDIR)/xen-syms.o
+	$(LD) $(LDFLAGS) -T xen.lds.s -N -Map $(@D)/.$(@F).0.map $(ALL_OBJS) \
+		$(BASEDIR)/common/symbols-dummy.o -o $(@D)/.$(@F).0 
+	$(NM) -n $(@D)/.$(@F).0 | $(BASEDIR)/tools/symbols >$(@D)/.$(@F).0.S 
+	$(MAKE) -f $(BASEDIR)/Rules.mk $(@D)/.$(@F).0.o 
+	$(LD) $(LDFLAGS) -T xen.lds.s -N -Map $(@D)/.$(@F).1.map $(ALL_OBJS) \
+		$(@D)/.$(@F).0.o -o $(@D)/.$(@F).1 
+	$(NM) -n $(@D)/.$(@F).1 | $(BASEDIR)/tools/symbols >$(@D)/.$(@F).1.S 
+	$(MAKE) -f $(BASEDIR)/Rules.mk $(@D)/.$(@F).1.o 
+	$(LD) $(LDFLAGS) -T xen.lds.s -N -Map $@.map $(ALL_OBJS) \
+		$(@D)/.$(@F).1.o -o $@
+	rm -f $(@D)/.$(@F).[0-9]* 
 
 $(TARGET): $(TARGET)-syms
-	$(OBJCOPY) -R .note -R .comment -S $(TARGET)-syms $@
-	$(NM) -n $(TARGET)-syms | \
-		grep -v '\( [aUw] \)\|\(__crc_\)\|\( \$[adt]\)' \
-		> $(BASEDIR)/System.map
+	$(NM) -n $< | grep -v ' [aUw] ' > $(@D)/System.map 
+	$(OBJCOPY) -R .note -R .comment -S $< $@
 
 # Headers do not depend on auto-generated header, but object files do.
 $(ALL_OBJS): $(BASEDIR)/include/asm-ia64/asm-xsi-offsets.h
