@@ -29,6 +29,7 @@
 #include <xen/lib.h>
 #include <xen/sched.h>
 #include <xen/mm.h>
+#include <xen/event.h>
 #include <xen/trace.h>
 #include <xen/guest_access.h>
 #include <xen/domain_page.h>
@@ -465,6 +466,8 @@ gnttab_map_grant_ref(
 
     for ( i = 0; i < count; i++ )
     {
+        if (i && hypercall_preempt_check())
+            return i;
         if ( unlikely(__copy_from_guest_offset(&op, uop, i, 1)) )
             return -EFAULT;
         __gnttab_map_grant_ref(&op);
@@ -722,6 +725,9 @@ gnttab_unmap_grant_ref(
 
         count -= c;
         done += c;
+
+        if (count && hypercall_preempt_check())
+            return done;
     }
      
     return 0;
@@ -781,6 +787,9 @@ gnttab_unmap_and_replace(
 
         count -= c;
         done += c;
+
+        if (count && hypercall_preempt_check())
+            return done;
     }
 
     return 0;
@@ -1086,6 +1095,9 @@ gnttab_transfer(
 
     for ( i = 0; i < count; i++ )
     {
+        if (i && hypercall_preempt_check())
+            return i;
+
         /* Read from caller address space. */
         if ( unlikely(__copy_from_guest_offset(&gop, uop, i, 1)) )
         {
@@ -1478,6 +1490,8 @@ gnttab_copy(
 
     for ( i = 0; i < count; i++ )
     {
+        if (i && hypercall_preempt_check())
+            return i;
         if ( unlikely(__copy_from_guest_offset(&op, uop, i, 1)) )
             return -EFAULT;
         __gnttab_copy(&op);
@@ -1494,7 +1508,7 @@ do_grant_table_op(
     long rc;
     struct domain *d = current->domain;
     
-    if ( count > 512 )
+    if ( (int)count < 0 )
         return -EINVAL;
     
     domain_lock(d);
@@ -1509,6 +1523,11 @@ do_grant_table_op(
         if ( unlikely(!guest_handle_okay(map, count)) )
             goto out;
         rc = gnttab_map_grant_ref(map, count);
+        if ( rc > 0 )
+        {
+            guest_handle_add_offset(map, rc);
+            uop = guest_handle_cast(map, void);
+        }
         break;
     }
     case GNTTABOP_unmap_grant_ref:
@@ -1518,6 +1537,11 @@ do_grant_table_op(
         if ( unlikely(!guest_handle_okay(unmap, count)) )
             goto out;
         rc = gnttab_unmap_grant_ref(unmap, count);
+        if ( rc > 0 )
+        {
+            guest_handle_add_offset(unmap, rc);
+            uop = guest_handle_cast(unmap, void);
+        }
         break;
     }
     case GNTTABOP_unmap_and_replace:
@@ -1530,12 +1554,18 @@ do_grant_table_op(
         if ( unlikely(!replace_grant_supported()) )
             goto out;
         rc = gnttab_unmap_and_replace(unmap, count);
+        if ( rc > 0 )
+        {
+            guest_handle_add_offset(unmap, rc);
+            uop = guest_handle_cast(unmap, void);
+        }
         break;
     }
     case GNTTABOP_setup_table:
     {
         rc = gnttab_setup_table(
             guest_handle_cast(uop, gnttab_setup_table_t), count);
+        ASSERT(rc <= 0);
         break;
     }
     case GNTTABOP_transfer:
@@ -1545,6 +1575,11 @@ do_grant_table_op(
         if ( unlikely(!guest_handle_okay(transfer, count)) )
             goto out;
         rc = gnttab_transfer(transfer, count);
+        if ( rc > 0 )
+        {
+            guest_handle_add_offset(transfer, rc);
+            uop = guest_handle_cast(transfer, void);
+        }
         break;
     }
     case GNTTABOP_copy:
@@ -1554,12 +1589,18 @@ do_grant_table_op(
         if ( unlikely(!guest_handle_okay(copy, count)) )
             goto out;
         rc = gnttab_copy(copy, count);
+        if ( rc > 0 )
+        {
+            guest_handle_add_offset(copy, rc);
+            uop = guest_handle_cast(copy, void);
+        }
         break;
     }
     case GNTTABOP_query_size:
     {
         rc = gnttab_query_size(
             guest_handle_cast(uop, gnttab_query_size_t), count);
+        ASSERT(rc <= 0);
         break;
     }
     default:
@@ -1569,6 +1610,13 @@ do_grant_table_op(
     
   out:
     domain_unlock(d);
+
+    if ( rc > 0 )
+    {
+        ASSERT(rc < count);
+        rc = hypercall_create_continuation(__HYPERVISOR_grant_table_op,
+                                           "ihi", cmd, uop, count - rc);
+    }
     
     return rc;
 }

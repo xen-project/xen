@@ -35,7 +35,9 @@ int compat_grant_table_op(unsigned int cmd,
 {
     int rc = 0;
     unsigned int i;
+    XEN_GUEST_HANDLE(void) cnt_uop;
 
+    set_xen_guest_handle(cnt_uop, NULL);
     switch ( cmd )
     {
 #define CASE(name) \
@@ -79,7 +81,7 @@ int compat_grant_table_op(unsigned int cmd,
         return do_grant_table_op(cmd, cmp_uop, count);
     }
 
-    if ( count > 512 )
+    if ( (int)count < 0 )
         rc = -EINVAL;
 
     for ( i = 0; i < count && rc == 0; )
@@ -128,6 +130,7 @@ int compat_grant_table_op(unsigned int cmd,
                     rc = gnttab_setup_table(guest_handle_cast(nat.uop, gnttab_setup_table_t), 1);
                 }
             }
+            ASSERT(rc <= 0);
             if ( rc == 0 )
             {
 #define XLAT_gnttab_setup_table_HNDL_frame_list(_d_, _s_) \
@@ -163,12 +166,19 @@ int compat_grant_table_op(unsigned int cmd,
             }
             if ( rc == 0 )
                 rc = gnttab_transfer(guest_handle_cast(nat.uop, gnttab_transfer_t), n);
-            if ( rc == 0 )
+            if ( rc > 0 )
+            {
+                ASSERT(rc < n);
+                i -= n - rc;
+                n = rc;
+            }
+            if ( rc >= 0 )
             {
                 XEN_GUEST_HANDLE(gnttab_transfer_compat_t) xfer;
 
                 xfer = guest_handle_cast(cmp_uop, gnttab_transfer_compat_t);
                 guest_handle_add_offset(xfer, i);
+                cnt_uop = guest_handle_cast(xfer, void);
                 while ( n-- )
                 {
                     guest_handle_add_offset(xfer, -1);
@@ -201,12 +211,19 @@ int compat_grant_table_op(unsigned int cmd,
             }
             if ( rc == 0 )
                 rc = gnttab_copy(guest_handle_cast(nat.uop, gnttab_copy_t), n);
-            if ( rc == 0 )
+            if ( rc > 0 )
+            {
+                ASSERT(rc < n);
+                i -= n - rc;
+                n = rc;
+            }
+            if ( rc >= 0 )
             {
                 XEN_GUEST_HANDLE(gnttab_copy_compat_t) copy;
 
                 copy = guest_handle_cast(cmp_uop, gnttab_copy_compat_t);
                 guest_handle_add_offset(copy, i);
+                cnt_uop = guest_handle_cast(copy, void);
                 while ( n-- )
                 {
                     guest_handle_add_offset(copy, -1);
@@ -220,6 +237,14 @@ int compat_grant_table_op(unsigned int cmd,
             domain_crash(current->domain);
             break;
         }
+    }
+
+    if ( rc > 0 )
+    {
+        ASSERT(i < count);
+        ASSERT(!guest_handle_is_null(cnt_uop));
+        rc = hypercall_create_continuation(__HYPERVISOR_grant_table_op,
+                                           "ihi", cmd, cnt_uop, count - i);
     }
 
     return rc;
