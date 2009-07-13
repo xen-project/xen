@@ -265,16 +265,22 @@ static long memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
         out_chunk_order = exch.in.extent_order - exch.out.extent_order;
     }
 
-    /*
-     * Only support exchange on calling domain right now. Otherwise there are
-     * tricky corner cases to consider (e.g., dying domain).
-     */
-    if ( unlikely(exch.in.domid != DOMID_SELF) )
+    if ( likely(exch.in.domid == DOMID_SELF) )
     {
-        rc = IS_PRIV(current->domain) ? -EINVAL : -EPERM;
-        goto fail_early;
+        d = rcu_lock_current_domain();
     }
-    d = current->domain;
+    else
+    {
+        if ( (d = rcu_lock_domain_by_id(exch.in.domid)) == NULL )
+            goto fail_early;
+
+        if ( !IS_PRIV_FOR(current->domain, d) )
+        {
+            rcu_unlock_domain(d);
+            rc = -EPERM;
+            goto fail_early;
+        }
+    }
 
     memflags |= MEMF_bits(domain_clamp_alloc_bitsize(
         d,
@@ -292,6 +298,7 @@ static long memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
         if ( hypercall_preempt_check() )
         {
             exch.nr_exchanged = i << in_chunk_order;
+            rcu_unlock_domain(d);
             if ( copy_field_to_guest(arg, &exch, nr_exchanged) )
                 return -EFAULT;
             return hypercall_create_continuation(
@@ -362,7 +369,32 @@ static long memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
         {
             if ( assign_pages(d, page, exch.out.extent_order,
                               MEMF_no_refcount) )
-                BUG();
+            {
+                unsigned long dec_count;
+                bool_t drop_dom_ref;
+
+                /*
+                 * Pages in in_chunk_list is stolen without
+                 * decreasing the tot_pages. If the domain is dying when
+                 * assign pages, we need decrease the count. For those pages
+                 * that has been assigned, it should be covered by
+                 * domain_relinquish_resources().
+                 */
+                dec_count = (((1UL << exch.in.extent_order) *
+                              (1UL << in_chunk_order)) -
+                             (j * (1UL << exch.out.extent_order)));
+
+                spin_lock(&d->page_alloc_lock);
+                d->tot_pages -= dec_count;
+                drop_dom_ref = (dec_count && !d->tot_pages);
+                spin_unlock(&d->page_alloc_lock);
+
+                if ( drop_dom_ref )
+                    put_domain(d);
+
+                free_domheap_pages(page, exch.out.extent_order);
+                goto dying;
+            }
 
             /* Note that we ignore errors accessing the output extent list. */
             (void)__copy_from_guest_offset(
@@ -378,15 +410,15 @@ static long memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
                 (void)__copy_to_guest_offset(
                     exch.out.extent_start, (i<<out_chunk_order)+j, &mfn, 1);
             }
-
             j++;
         }
-        BUG_ON(j != (1UL << out_chunk_order));
+        BUG_ON( !(d->is_dying) && (j != (1UL << out_chunk_order)) );
     }
 
     exch.nr_exchanged = exch.in.nr_extents;
     if ( copy_field_to_guest(arg, &exch, nr_exchanged) )
         rc = -EFAULT;
+    rcu_unlock_domain(d);
     return rc;
 
     /*
@@ -398,7 +430,8 @@ static long memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
     while ( (page = page_list_remove_head(&in_chunk_list)) )
         if ( assign_pages(d, page, 0, MEMF_no_refcount) )
             BUG();
-
+ dying:
+    rcu_unlock_domain(d);
     /* Free any output pages we managed to allocate. */
     while ( (page = page_list_remove_head(&out_chunk_list)) )
         free_domheap_pages(page, exch.out.extent_order);
