@@ -122,10 +122,12 @@ extern unsigned int video_mode, video_flags;
 #define PML4_ADDR(_slot)                             \
     ((((_slot ## UL) >> 8) * 0xffff000000000000UL) | \
      (_slot ## UL << PML4_ENTRY_BITS))
+#define GB(_gb) (_gb ## UL << 30)
 #else
 #define PML4_ENTRY_BYTES (1 << PML4_ENTRY_BITS)
 #define PML4_ADDR(_slot)                             \
     (((_slot >> 8) * 0xffff000000000000) | (_slot << PML4_ENTRY_BITS))
+#define GB(_gb) (_gb << 30)
 #endif
 
 /*
@@ -210,22 +212,22 @@ extern unsigned int video_mode, video_flags;
 #define PERDOMAIN_MBYTES        (PML4_ENTRY_BYTES >> (20 + PAGETABLE_ORDER))
 /* Slot 261: machine-to-phys conversion table (16GB). */
 #define RDWR_MPT_VIRT_START     (PML4_ADDR(261))
-#define RDWR_MPT_VIRT_END       (RDWR_MPT_VIRT_START + (16UL<<30))
+#define RDWR_MPT_VIRT_END       (RDWR_MPT_VIRT_START + GB(16))
 /* Slot 261: page-frame information array (16GB). */
 #define FRAMETABLE_VIRT_START   (RDWR_MPT_VIRT_END)
-#define FRAMETABLE_VIRT_END     (FRAMETABLE_VIRT_START + (16UL<<30))
+#define FRAMETABLE_VIRT_END     (FRAMETABLE_VIRT_START + GB(16))
 /* Slot 261: ioremap()/fixmap area (16GB). */
 #define IOREMAP_VIRT_START      (FRAMETABLE_VIRT_END)
-#define IOREMAP_VIRT_END        (IOREMAP_VIRT_START + (16UL<<30))
+#define IOREMAP_VIRT_END        (IOREMAP_VIRT_START + GB(16))
 /* Slot 261: compatibility machine-to-phys conversion table (1GB). */
 #define RDWR_COMPAT_MPT_VIRT_START IOREMAP_VIRT_END
-#define RDWR_COMPAT_MPT_VIRT_END (RDWR_COMPAT_MPT_VIRT_START + (1UL << 30))
+#define RDWR_COMPAT_MPT_VIRT_END (RDWR_COMPAT_MPT_VIRT_START + GB(1))
 /* Slot 261: high read-only compat machine-to-phys conversion table (1GB). */
 #define HIRO_COMPAT_MPT_VIRT_START RDWR_COMPAT_MPT_VIRT_END
-#define HIRO_COMPAT_MPT_VIRT_END (HIRO_COMPAT_MPT_VIRT_START + (1UL << 30))
+#define HIRO_COMPAT_MPT_VIRT_END (HIRO_COMPAT_MPT_VIRT_START + GB(1))
 /* Slot 261: xen text, static data and bss (1GB). */
 #define XEN_VIRT_START          (HIRO_COMPAT_MPT_VIRT_END)
-#define XEN_VIRT_END            (XEN_VIRT_START + (1UL << 30))
+#define XEN_VIRT_END            (XEN_VIRT_START + GB(1))
 /* Slot 262-263: A direct 1:1 mapping of all of physical memory. */
 #define DIRECTMAP_VIRT_START    (PML4_ADDR(262))
 #define DIRECTMAP_VIRT_END      (DIRECTMAP_VIRT_START + PML4_ENTRY_BYTES*2)
@@ -258,6 +260,8 @@ extern unsigned int video_mode, video_flags;
 #define __HYPERVISOR_DS64 0x0000
 #define __HYPERVISOR_DS32 0xe010
 #define __HYPERVISOR_DS   __HYPERVISOR_DS64
+
+#define SYMBOLS_ORIGIN XEN_VIRT_START
 
 /* For generic assembly code: use macros to define operation/operand sizes. */
 #define __OS          "q"  /* Operation Suffix */

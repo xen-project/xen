@@ -6,11 +6,15 @@
 #include <xen/config.h>
 #include <xen/types.h>
 
-unsigned long symbols_addresses[1];
-unsigned long symbols_num_syms;
-u8 symbols_names[1];
+#ifdef SYMBOLS_ORIGIN
+const unsigned int symbols_offsets[1];
+#else
+const unsigned long symbols_addresses[1];
+#endif
+const unsigned int symbols_num_syms;
+const u8 symbols_names[1];
 
-u8 symbols_token_table[1];
-u16 symbols_token_index[1];
+const u8 symbols_token_table[1];
+const u16 symbols_token_index[1];
 
-unsigned long symbols_markers[1];
+const unsigned int symbols_markers[1];

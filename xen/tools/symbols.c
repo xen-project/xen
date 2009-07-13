@@ -108,10 +108,7 @@ static int read_symbol(FILE *in, struct sym_entry *s)
 	else if (toupper((uint8_t)stype) == 'A')
 	{
 		/* Keep these useful absolute symbols */
-		if (strcmp(sym, "__kernel_syscall_via_break") &&
-		    strcmp(sym, "__kernel_syscall_via_epc") &&
-		    strcmp(sym, "__kernel_sigtramp") &&
-		    strcmp(sym, "__gp"))
+		if (strcmp(sym, "__gp"))
 			return -1;
 
 	}
@@ -134,24 +131,6 @@ static int read_symbol(FILE *in, struct sym_entry *s)
 
 static int symbol_valid(struct sym_entry *s)
 {
-	/* Symbols which vary between passes.  Passes 1 and 2 must have
-	 * identical symbol lists.  The symbols_* symbols below are only added
-	 * after pass 1, they would be included in pass 2 when --all-symbols is
-	 * specified so exclude them to get a stable symbol list.
-	 */
-	static char *special_symbols[] = {
-		"symbols_addresses",
-		"symbols_num_syms",
-		"symbols_names",
-		"symbols_markers",
-		"symbols_token_table",
-		"symbols_token_index",
-
-	/* Exclude linker generated symbols which vary between passes */
-		"_SDA_BASE_",		/* ppc */
-		"_SDA2_BASE_",		/* ppc */
-		NULL };
-	int i;
 	int offset = 1;
 
 	/* skip prefix char */
@@ -180,10 +159,6 @@ static int symbol_valid(struct sym_entry *s)
 	/* Exclude symbols which vary between passes. */
 	if (strstr((char *)s->sym + offset, "_compiled."))
 		return 0;
-
-	for (i = 0; special_symbols[i]; i++)
-		if( strcmp((char *)s->sym + offset, special_symbols[i]) == 0 )
-			return 0;
 
 	return 1;
 }
@@ -251,8 +226,9 @@ static void write_src(void)
 	unsigned int *markers;
 	char buf[KSYM_NAME_LEN+1];
 
+	printf("#include <xen/config.h>\n");
 	printf("#include <asm/types.h>\n");
-	printf("#if BITS_PER_LONG == 64\n");
+	printf("#if BITS_PER_LONG == 64 && !defined(SYMBOLS_ORIGIN)\n");
 	printf("#define PTR .quad\n");
 	printf("#define ALGN .align 8\n");
 	printf("#else\n");
@@ -260,16 +236,21 @@ static void write_src(void)
 	printf("#define ALGN .align 4\n");
 	printf("#endif\n");
 
-	printf(".data\n");
+	printf("\t.section .rodata, \"a\"\n");
 
+	printf("#ifndef SYMBOLS_ORIGIN\n");
+	printf("#define SYMBOLS_ORIGIN 0\n");
 	output_label("symbols_addresses");
+	printf("#else\n");
+	output_label("symbols_offsets");
+	printf("#endif\n");
 	for (i = 0; i < table_cnt; i++) {
-		printf("\tPTR\t%#llx\n", table[i].addr);
+		printf("\tPTR\t%#llx - SYMBOLS_ORIGIN\n", table[i].addr);
 	}
 	printf("\n");
 
 	output_label("symbols_num_syms");
-	printf("\tPTR\t%d\n", table_cnt);
+	printf("\t.long\t%d\n", table_cnt);
 	printf("\n");
 
 	/* table of offset markers, that give the offset in the compressed stream
@@ -293,7 +274,7 @@ static void write_src(void)
 
 	output_label("symbols_markers");
 	for (i = 0; i < ((table_cnt + 255) >> 8); i++)
-		printf("\tPTR\t%d\n", markers[i]);
+		printf("\t.long\t%d\n", markers[i]);
 	printf("\n");
 
 	free(markers);

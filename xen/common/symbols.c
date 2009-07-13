@@ -18,21 +18,27 @@
 #include <xen/string.h>
 #include <xen/spinlock.h>
 
-extern unsigned long symbols_addresses[];
-extern unsigned long symbols_num_syms;
-extern u8 symbols_names[];
+#ifdef SYMBOLS_ORIGIN
+extern const unsigned int symbols_offsets[1];
+#define symbols_address(n) (SYMBOLS_ORIGIN + symbols_offsets[n])
+#else
+extern const unsigned long symbols_addresses[];
+#define symbols_address(n) symbols_addresses[n]
+#endif
+extern const unsigned int symbols_num_syms;
+extern const u8 symbols_names[];
 
-extern u8 symbols_token_table[];
-extern u16 symbols_token_index[];
+extern const u8 symbols_token_table[];
+extern const u16 symbols_token_index[];
 
-extern unsigned long symbols_markers[];
+extern const unsigned int symbols_markers[];
 
 /* expand a compressed symbol data into the resulting uncompressed string,
    given the offset to where the symbol is in the compressed stream */
 static unsigned int symbols_expand_symbol(unsigned int off, char *result)
 {
     int len, skipped_first = 0;
-    u8 *tptr, *data;
+    const u8 *tptr, *data;
 
     /* get the compressed symbol length from the first symbol byte */
     data = &symbols_names[off];
@@ -70,7 +76,7 @@ static unsigned int symbols_expand_symbol(unsigned int off, char *result)
  * symbols array */
 static unsigned int get_symbol_offset(unsigned long pos)
 {
-    u8 *name;
+    const u8 *name;
     int i;
 
     /* use the closest marker we have. We have markers every 256 positions,
@@ -107,13 +113,13 @@ const char *symbols_lookup(unsigned long addr,
 
     while (high-low > 1) {
         mid = (low + high) / 2;
-        if (symbols_addresses[mid] <= addr) low = mid;
+        if (symbols_address(mid) <= addr) low = mid;
         else high = mid;
     }
 
     /* search for the first aliased symbol. Aliased symbols are
            symbols with the same address */
-    while (low && symbols_addresses[low - 1] == symbols_addresses[low])
+    while (low && symbols_address(low - 1) == symbols_address(low))
         --low;
 
         /* Grab name */
@@ -121,8 +127,8 @@ const char *symbols_lookup(unsigned long addr,
 
     /* Search for next non-aliased symbol */
     for (i = low + 1; i < symbols_num_syms; i++) {
-        if (symbols_addresses[i] > symbols_addresses[low]) {
-            symbol_end = symbols_addresses[i];
+        if (symbols_address(i) > symbols_address(low)) {
+            symbol_end = symbols_address(i);
             break;
         }
     }
@@ -132,8 +138,8 @@ const char *symbols_lookup(unsigned long addr,
         symbol_end = is_kernel_inittext(addr) ?
             (unsigned long)_einittext : (unsigned long)_etext;
 
-    *symbolsize = symbol_end - symbols_addresses[low];
-    *offset = addr - symbols_addresses[low];
+    *symbolsize = symbol_end - symbols_address(low);
+    *offset = addr - symbols_address(low);
     return namebuf;
 }
 
