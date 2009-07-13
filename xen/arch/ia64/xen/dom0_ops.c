@@ -711,9 +711,9 @@ long arch_do_sysctl(xen_sysctl_t *op, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
 
         memset(pi, 0, sizeof(*pi));
         pi->cpu_to_node = cpu_to_node_arr;
-        pi->threads_per_core = cpus_weight(cpu_sibling_map[0]);
+        pi->threads_per_core = cpus_weight(per_cpu(cpu_sibling_map, 0));
         pi->cores_per_socket =
-            cpus_weight(cpu_core_map[0]) / pi->threads_per_core;
+            cpus_weight(per_cpu(cpu_core_map, 0)) / pi->threads_per_core;
         pi->nr_cpus          = (u32)num_online_cpus();
         pi->nr_nodes         = num_online_nodes();
         pi->total_pages      = total_pages; 

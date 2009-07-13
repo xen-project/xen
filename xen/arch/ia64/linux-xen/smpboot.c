@@ -144,8 +144,8 @@ EXPORT_SYMBOL(cpu_online_map);
 cpumask_t cpu_possible_map;
 EXPORT_SYMBOL(cpu_possible_map);
 
-cpumask_t cpu_core_map[NR_CPUS] __cacheline_aligned;
-cpumask_t cpu_sibling_map[NR_CPUS] __cacheline_aligned;
+DEFINE_PER_CPU_READ_MOSTLY(cpumask_t, cpu_core_map);
+DEFINE_PER_CPU_READ_MOSTLY(cpumask_t, cpu_sibling_map);
 int smp_num_siblings = 1;
 int smp_num_cpucores = 1;
 
@@ -686,13 +686,13 @@ clear_cpu_sibling_map(int cpu)
 {
 	int i;
 
-	for_each_cpu_mask(i, cpu_sibling_map[cpu])
-		cpu_clear(cpu, cpu_sibling_map[i]);
-	for_each_cpu_mask(i, cpu_core_map[cpu])
-		cpu_clear(cpu, cpu_core_map[i]);
+	for_each_cpu_mask(i, per_cpu(cpu_sibling_map, cpu))
+		cpu_clear(cpu, per_cpu(cpu_sibling_map, i));
+	for_each_cpu_mask(i, per_cpu(cpu_core_map, cpu))
+		cpu_clear(cpu, per_cpu(cpu_core_map, i));
 
-	cpus_clear(cpu_sibling_map[cpu]);
-	cpus_clear(cpu_core_map[cpu]);
+	cpus_clear(per_cpu(cpu_sibling_map, cpu));
+	cpus_clear(per_cpu(cpu_core_map, cpu));
 }
 
 static void
@@ -702,12 +702,12 @@ remove_siblinginfo(int cpu)
 
 	if (cpu_data(cpu)->threads_per_core == 1 &&
 	    cpu_data(cpu)->cores_per_socket == 1) {
-		cpu_clear(cpu, cpu_core_map[cpu]);
-		cpu_clear(cpu, cpu_sibling_map[cpu]);
+		cpu_clear(cpu, per_cpu(cpu_core_map, cpu));
+		cpu_clear(cpu, per_cpu(cpu_sibling_map, cpu));
 		return;
 	}
 
-	last = (cpus_weight(cpu_core_map[cpu]) == 1 ? 1 : 0);
+	last = (cpus_weight(per_cpu(cpu_core_map, cpu)) == 1);
 
 	/* remove it from all sibling map's */
 	clear_cpu_sibling_map(cpu);
@@ -800,11 +800,11 @@ set_cpu_sibling_map(int cpu)
 
 	for_each_online_cpu(i) {
 		if ((cpu_data(cpu)->socket_id == cpu_data(i)->socket_id)) {
-			cpu_set(i, cpu_core_map[cpu]);
-			cpu_set(cpu, cpu_core_map[i]);
+			cpu_set(i, per_cpu(cpu_core_map, cpu));
+			cpu_set(cpu, per_cpu(cpu_core_map, i));
 			if (cpu_data(cpu)->core_id == cpu_data(i)->core_id) {
-				cpu_set(i, cpu_sibling_map[cpu]);
-				cpu_set(cpu, cpu_sibling_map[i]);
+				cpu_set(i, per_cpu(cpu_sibling_map, cpu));
+				cpu_set(cpu, per_cpu(cpu_sibling_map, i));
 			}
 		}
 	}
@@ -835,8 +835,8 @@ __cpu_up (unsigned int cpu)
 
 	if (cpu_data(cpu)->threads_per_core == 1 &&
 	    cpu_data(cpu)->cores_per_socket == 1) {
-		cpu_set(cpu, cpu_sibling_map[cpu]);
-		cpu_set(cpu, cpu_core_map[cpu]);
+		cpu_set(cpu, per_cpu(cpu_sibling_map, cpu));
+		cpu_set(cpu, per_cpu(cpu_core_map, cpu));
 		return 0;
 	}
 

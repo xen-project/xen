@@ -167,18 +167,18 @@ static unsigned int default_vcpu0_location(void)
      * If we're on a HT system, we only auto-allocate to a non-primary HT. We 
      * favour high numbered CPUs in the event of a tie.
      */
-    cpu = first_cpu(cpu_sibling_map[0]);
-    if ( cpus_weight(cpu_sibling_map[0]) > 1 )
-        cpu = next_cpu(cpu, cpu_sibling_map[0]);
-    cpu_exclude_map = cpu_sibling_map[0];
+    cpu = first_cpu(per_cpu(cpu_sibling_map, 0));
+    if ( cpus_weight(per_cpu(cpu_sibling_map, 0)) > 1 )
+        cpu = next_cpu(cpu, per_cpu(cpu_sibling_map, 0));
+    cpu_exclude_map = per_cpu(cpu_sibling_map, 0);
     for_each_online_cpu ( i )
     {
         if ( cpu_isset(i, cpu_exclude_map) )
             continue;
-        if ( (i == first_cpu(cpu_sibling_map[i])) &&
-             (cpus_weight(cpu_sibling_map[i]) > 1) )
+        if ( (i == first_cpu(per_cpu(cpu_sibling_map, i))) &&
+             (cpus_weight(per_cpu(cpu_sibling_map, i)) > 1) )
             continue;
-        cpus_or(cpu_exclude_map, cpu_exclude_map, cpu_sibling_map[i]);
+        cpus_or(cpu_exclude_map, cpu_exclude_map, per_cpu(cpu_sibling_map, i));
         if ( !cnt || cnt[i] <= cnt[cpu] )
             cpu = i;
     }

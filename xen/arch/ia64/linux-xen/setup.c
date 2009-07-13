@@ -577,8 +577,8 @@ late_setup_arch (char **cmdline_p)
 
 	cpu_physical_id(0) = hard_smp_processor_id();
 
-	cpu_set(0, cpu_sibling_map[0]);
-	cpu_set(0, cpu_core_map[0]);
+	cpu_set(0, per_cpu(cpu_sibling_map, 0));
+	cpu_set(0, per_cpu(cpu_core_map, 0));
 
 	check_for_logical_procs();
 	if (smp_num_cpucores > 1)

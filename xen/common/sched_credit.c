@@ -402,17 +402,17 @@ csched_cpu_pick(struct vcpu *vc)
 
         nxt = cycle_cpu(cpu, cpus);
 
-        if ( cpu_isset(cpu, cpu_core_map[nxt]) )
+        if ( cpu_isset(cpu, per_cpu(cpu_core_map, nxt)) )
         {
-            ASSERT( cpu_isset(nxt, cpu_core_map[cpu]) );
-            cpus_and(cpu_idlers, idlers, cpu_sibling_map[cpu]);
-            cpus_and(nxt_idlers, idlers, cpu_sibling_map[nxt]);
+            ASSERT( cpu_isset(nxt, per_cpu(cpu_core_map, cpu)) );
+            cpus_and(cpu_idlers, idlers, per_cpu(cpu_sibling_map, cpu));
+            cpus_and(nxt_idlers, idlers, per_cpu(cpu_sibling_map, nxt));
         }
         else
         {
-            ASSERT( !cpu_isset(nxt, cpu_core_map[cpu]) );
-            cpus_and(cpu_idlers, idlers, cpu_core_map[cpu]);
-            cpus_and(nxt_idlers, idlers, cpu_core_map[nxt]);
+            ASSERT( !cpu_isset(nxt, per_cpu(cpu_core_map, cpu)) );
+            cpus_and(cpu_idlers, idlers, per_cpu(cpu_core_map, cpu));
+            cpus_and(nxt_idlers, idlers, per_cpu(cpu_core_map, nxt));
         }
 
         weight_cpu = cpus_weight(cpu_idlers);
@@ -1205,9 +1205,9 @@ csched_dump_pcpu(int cpu)
     spc = CSCHED_PCPU(cpu);
     runq = &spc->runq;
 
-    cpumask_scnprintf(cpustr, sizeof(cpustr), cpu_sibling_map[cpu]);
+    cpumask_scnprintf(cpustr, sizeof(cpustr), per_cpu(cpu_sibling_map, cpu));
     printk(" sort=%d, sibling=%s, ", spc->runq_sort_last, cpustr);
-    cpumask_scnprintf(cpustr, sizeof(cpustr), cpu_core_map[cpu]);
+    cpumask_scnprintf(cpustr, sizeof(cpustr), per_cpu(cpu_core_map, cpu));
     printk("core=%s\n", cpustr);
 
     /* current VCPU */
