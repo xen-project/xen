@@ -82,7 +82,7 @@ $(TARGET)-syms: $(ALL_OBJS) xen.lds
 asm-offsets.s: $(TARGET_SUBARCH)/asm-offsets.c
 	$(CC) $(CFLAGS) -S -o $@ $<
 
-xen.lds: $(TARGET_SUBARCH)/xen.lds.S
+xen.lds: xen.lds.S
 	$(CC) -P -E -Ui386 $(AFLAGS) -o $@ $<
 
 boot/mkelf32: boot/mkelf32.c

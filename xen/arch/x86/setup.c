@@ -191,7 +191,8 @@ void __init discard_initial_images(void)
     init_domheap_pages(initial_images_base, initial_images_end);
 }
 
-extern char __per_cpu_start[], __per_cpu_data_end[], __per_cpu_end[];
+extern char __init_begin[], __bss_start[];
+extern char __per_cpu_start[], __per_cpu_data_end[];
 
 static void __init percpu_init_areas(void)
 {
@@ -213,10 +214,11 @@ static void __init percpu_init_areas(void)
 
 #ifndef MEMORY_GUARD
     init_xenheap_pages(__pa(__per_cpu_start) + (first_unused << PERCPU_SHIFT),
-                       __pa(__per_cpu_end));
+                       __pa(__bss_start));
 #endif
     memguard_guard_range(&__per_cpu_start[first_unused << PERCPU_SHIFT],
-                         (NR_CPUS - first_unused) << PERCPU_SHIFT);
+                         __bss_start - &__per_cpu_start[first_unused <<
+                                                        PERCPU_SHIFT]);
 #if defined(CONFIG_X86_64)
     /* Also zap the mapping in the 1:1 area. */
     memguard_guard_range(__va(__pa(__per_cpu_start)) +
@@ -1128,8 +1130,6 @@ int xen_in_range(paddr_t start, paddr_t end)
     /* initialize first time */
     if ( !xen_regions[0].s )
     {
-        extern char __init_begin[], __bss_start[];
-
         /* S3 resume code (and other real mode trampoline code) */
         xen_regions[0].s = bootsym_phys(trampoline_start);
         xen_regions[0].e = bootsym_phys(trampoline_end);
