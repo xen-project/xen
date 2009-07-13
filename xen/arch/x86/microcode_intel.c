@@ -99,7 +99,7 @@ static int collect_cpu_info(int cpu_num, struct cpu_signature *csig)
 static inline int microcode_update_match(
     int cpu_num, struct microcode_header_intel *mc_header, int sig, int pf)
 {
-    struct ucode_cpu_info *uci = ucode_cpu_info + cpu_num;
+    struct ucode_cpu_info *uci = &per_cpu(ucode_cpu_info, cpu_num);
 
     return (sigmatch(sig, uci->cpu_sig.sig, pf, uci->cpu_sig.pf) &&
             (mc_header->rev > uci->cpu_sig.rev));
@@ -201,7 +201,7 @@ static int microcode_sanity_check(void *mc)
  */
 static int get_matching_microcode(void *mc, int cpu)
 {
-    struct ucode_cpu_info *uci = ucode_cpu_info + cpu;
+    struct ucode_cpu_info *uci = &per_cpu(ucode_cpu_info, cpu);
     struct microcode_header_intel *mc_header = mc;
     struct extended_sigtable *ext_header;
     unsigned long total_size = get_totalsize(mc_header);
@@ -251,7 +251,7 @@ static int apply_microcode(int cpu)
     unsigned long flags;
     unsigned int val[2];
     int cpu_num = raw_smp_processor_id();
-    struct ucode_cpu_info *uci = ucode_cpu_info + cpu_num;
+    struct ucode_cpu_info *uci = &per_cpu(ucode_cpu_info, cpu_num);
 
     /* We should bind the task to the CPU */
     BUG_ON(cpu_num != cpu);
@@ -362,7 +362,7 @@ static int cpu_request_microcode(int cpu, const void *buf, size_t size)
 
 static int microcode_resume_match(int cpu, struct cpu_signature *nsig)
 {
-    struct ucode_cpu_info *uci = ucode_cpu_info + cpu;
+    struct ucode_cpu_info *uci = &per_cpu(ucode_cpu_info, cpu);
 
     return (sigmatch(nsig->sig, uci->cpu_sig.sig, nsig->pf, uci->cpu_sig.pf) &&
             (uci->cpu_sig.rev > nsig->rev));

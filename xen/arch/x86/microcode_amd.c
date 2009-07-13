@@ -68,7 +68,7 @@ static int collect_cpu_info(int cpu, struct cpu_signature *csig)
 
 static int microcode_fits(void *mc, int cpu)
 {
-    struct ucode_cpu_info *uci = ucode_cpu_info + cpu;
+    struct ucode_cpu_info *uci = &per_cpu(ucode_cpu_info, cpu);
     struct microcode_header_amd *mc_header = mc;
     unsigned int current_cpu_id;
     unsigned int equiv_cpu_id = 0x0;
@@ -125,7 +125,7 @@ out:
 static int apply_microcode(int cpu)
 {
     unsigned long flags;
-    struct ucode_cpu_info *uci = ucode_cpu_info + cpu;
+    struct ucode_cpu_info *uci = &per_cpu(ucode_cpu_info, cpu);
     uint32_t rev, dummy;
     struct microcode_amd *mc_amd = uci->mc.mc_amd;
 
@@ -253,7 +253,7 @@ static int cpu_request_microcode(int cpu, const void *buf, size_t size)
     unsigned long offset = 0;
     int error = 0;
     int ret;
-    struct ucode_cpu_info *uci = ucode_cpu_info + cpu;
+    struct ucode_cpu_info *uci = &per_cpu(ucode_cpu_info, cpu);
     void *mc;
 
     /* We should bind the task to the CPU */

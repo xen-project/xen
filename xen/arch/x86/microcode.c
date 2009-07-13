@@ -40,7 +40,7 @@ const struct microcode_ops *microcode_ops;
 
 static DEFINE_SPINLOCK(microcode_mutex);
 
-struct ucode_cpu_info ucode_cpu_info[NR_CPUS];
+DEFINE_PER_CPU(struct ucode_cpu_info, ucode_cpu_info);
 
 struct microcode_info {
     unsigned int cpu;
@@ -51,7 +51,7 @@ struct microcode_info {
 
 static void __microcode_fini_cpu(int cpu)
 {
-    struct ucode_cpu_info *uci = ucode_cpu_info + cpu;
+    struct ucode_cpu_info *uci = &per_cpu(ucode_cpu_info, cpu);
 
     xfree(uci->mc.mc_valid);
     memset(uci, 0, sizeof(*uci));
@@ -67,7 +67,7 @@ static void microcode_fini_cpu(int cpu)
 int microcode_resume_cpu(int cpu)
 {
     int err = 0;
-    struct ucode_cpu_info *uci = ucode_cpu_info + cpu;
+    struct ucode_cpu_info *uci = &per_cpu(ucode_cpu_info, cpu);
     struct cpu_signature nsig;
 
     gdprintk(XENLOG_INFO, "microcode: CPU%d resumed\n", cpu);
@@ -101,7 +101,7 @@ static int microcode_update_cpu(const void *buf, size_t size)
 {
     int err;
     unsigned int cpu = smp_processor_id();
-    struct ucode_cpu_info *uci = ucode_cpu_info + cpu;
+    struct ucode_cpu_info *uci = &per_cpu(ucode_cpu_info, cpu);
 
     spin_lock(&microcode_mutex);
 

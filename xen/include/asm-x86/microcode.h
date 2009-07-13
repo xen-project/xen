@@ -1,6 +1,8 @@
 #ifndef ASM_X86__MICROCODE_H
 #define ASM_X86__MICROCODE_H
 
+#include <xen/percpu.h>
+
 struct cpu_signature;
 struct ucode_cpu_info;
 
@@ -88,7 +90,7 @@ struct ucode_cpu_info {
     } mc;
 };
 
-extern struct ucode_cpu_info ucode_cpu_info[];
+DECLARE_PER_CPU(struct ucode_cpu_info, ucode_cpu_info);
 extern const struct microcode_ops *microcode_ops;
 
 #endif /* ASM_X86__MICROCODE_H */
