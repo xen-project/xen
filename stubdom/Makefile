@@ -82,11 +82,11 @@ genpath-target = $(call buildmakevars2file,$(STUBDOMPATH))
 $(eval $(genpath-target))
 
 .PHONY: all
-all: genpath build
+all: build
 ifeq ($(STUBDOM_SUPPORTED),1)
-build: ioemu-stubdom c-stubdom pv-grub
+build: genpath ioemu-stubdom c-stubdom pv-grub
 else
-build:
+build: genpath
 endif
 
 ##############
@@ -344,9 +344,9 @@ pv-grub: mini-os-$(XEN_TARGET_ARCH)-grub libxc grub
 #########
 
 ifeq ($(STUBDOM_SUPPORTED),1)
-install: install-readme install-ioemu install-grub
+install: genpath install-readme install-ioemu install-grub
 else
-install:
+install: genpath
 endif
 
 install-readme:
@@ -355,7 +355,7 @@ install-readme:
 
 install-ioemu: ioemu-stubdom
 	$(INSTALL_DIR) "$(DESTDIR)$(LIBEXEC)"
-	$(INSTALL_PROG) stubdom-dm "$(DESTDIR)$(LIBEXEC)"
+	$(INSTALL_PROG) stubdompath.sh stubdom-dm "$(DESTDIR)$(LIBEXEC)"
 	$(INSTALL_DIR) "$(DESTDIR)$(XENFIRMWAREDIR)"
 	$(INSTALL_DATA) mini-os-$(XEN_TARGET_ARCH)-ioemu/mini-os.gz "$(DESTDIR)$(XENFIRMWAREDIR)/ioemu-stubdom.gz"
 

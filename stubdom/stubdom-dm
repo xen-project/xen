@@ -5,8 +5,8 @@
 # dm script around stubdomains.
 #
 
-XEN_CONFIG_DIR="/etc/xen"
-XENFIRMWAREDIR="/usr/lib/xen/boot"
+DIR=`dirname $0`
+. "${DIR}/stubdompath.sh"
 stubdom_configdir="${XEN_CONFIG_DIR}/stubdoms"
 
 # To fit xterms nicely
