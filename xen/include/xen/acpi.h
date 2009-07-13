@@ -227,7 +227,7 @@ struct acpi_table_atsr {
 
 struct acpi_table_rhsa {
         struct  acpi_dmar_entry_header header;
-        u32     domain;
+        u32     proximity_domain;
         u64     address; /* register base address for this drhd */
 } __attribute__ ((packed));
 

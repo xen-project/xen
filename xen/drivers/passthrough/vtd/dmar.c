@@ -499,7 +499,7 @@ acpi_parse_one_rhsa(struct acpi_dmar_entry_header *header)
     memset(rhsau, 0, sizeof(struct acpi_rhsa_unit));
 
     rhsau->address = rhsa->address;
-    rhsau->domain = rhsa->domain;
+    rhsau->proximity_domain = rhsa->proximity_domain;
     list_add_tail(&rhsau->list, &acpi_rhsa_units);
 
     return ret;

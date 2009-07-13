@@ -143,10 +143,14 @@ u64 alloc_pgtable_maddr(struct acpi_drhd_unit *drhd, unsigned long npages)
     struct acpi_rhsa_unit *rhsa;
     struct page_info *pg;
     u64 *vaddr;
+    int node = -1;
 
     rhsa = drhd_to_rhsa(drhd);
+    if ( rhsa )
+        node =  pxm_to_node(rhsa->proximity_domain);
+
     pg = alloc_domheap_pages(NULL, get_order_from_pages(npages),
-                             rhsa ? rhsa->domain : 0);
+                             (node == -1 ) ? 0 : MEMF_node(node));
     if ( !pg )
         return 0;
     vaddr = map_domain_page(page_to_mfn(pg));
@@ -204,6 +208,10 @@ static u64 addr_to_dma_page_maddr(struct domain *domain, u64 addr, int alloc)
     ASSERT(spin_is_locked(&hd->mapping_lock));
     if ( hd->pgd_maddr == 0 )
     {
+        /*
+         * just get any passthrough device in the domainr - assume user
+         * assigns only devices from same node to a given guest.
+         */
         pdev = pci_get_pdev_by_domain(domain, -1, -1);
         drhd = acpi_find_matched_drhd_unit(pdev);
         if ( !alloc || ((hd->pgd_maddr = alloc_pgtable_maddr(drhd, 1)) == 0) )

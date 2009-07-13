@@ -72,7 +72,7 @@ struct acpi_atsr_unit {
 struct acpi_rhsa_unit {
     struct list_head list;
     u64    address;
-    u32    domain;
+    u32    proximity_domain;
 };
 
 #define for_each_drhd_unit(drhd) \
