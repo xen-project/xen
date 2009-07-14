@@ -1,5 +1,6 @@
 %
 % Copyright (c) 2006-2007 XenSource, Inc.
+% Copyright (c) 2009 flonatel GmbH & Co. KG
 %
 % Permission is granted to copy, distribute and/or modify this document under
 % the terms of the GNU Free Documentation License, Version 1.2 or any later
@@ -9,6 +10,7 @@
 % "GNU Free Documentation License" or the file fdl.tex.
 %
 % Authors: Ewan Mellor, Richard Sharp, Dave Scott, Jon Harrop.
+% Contributor: Andreas Florath
 %
 
 \section{Wire Protocol for Remote API Calls}
@@ -229,76 +231,153 @@ can then be queried by accessing the fields of the Task object in the usual way.
 Note that, in order to get a consistent snapshot of a task's state, it is advisable to call the ``get\_record'' function.
 
 \section{Example interactive session}
+This section describes how an interactive session might look, using
+the python API.  All python versions starting from 2.4 should work.
 
-This section describes how an interactive session might look, using the python
-XML-RPC client library. 
+The examples in this section use a remote Xen host with the ip address
+of \texttt{192.168.7.20} and the xmlrpc port \texttt{9363}.  No
+authentication is used.
 
-First, initialise python and import the library {\tt xmlrpclib}:
+Note that the remote server must be configured in the way, that it
+accepts remote connections.  Some lines must be added to the
+xend-config.sxp configuration file:
+\begin{verbatim}
+(xen-api-server ((9363 none)
+                 (unix none)))
+(xend-tcp-xmlrpc-server yes)
+\end{verbatim}
+The xend must be restarted after changing the configuration.
+
+Before starting python, the \texttt{PYTHONPATH} must be set that the
+\texttt{XenAPI.py} can be found.  Typically the \texttt{XenAPI.py} is
+installed with one of the Xen helper packages which the last part of
+the path is \texttt{xen/xm/XenAPI.py}.
+
+Example: Under Debian 5.0 the package which contains the
+\texttt{XenAPI.py} is \texttt{xen-utils-3.2-1}. \texttt{XenAPI.py} is
+located in \texttt{/usr/lib/xen-3.2-1/lib/python/xen/xm}. The
+following command will set the \texttt{PYTHONPATH} environment
+variable in a bash:
 
 \begin{verbatim}
-\$ python2.4
+$ export PYTHONPATH=/usr/lib/xen-3.2-1/lib/python
+\end{verbatim}
+
+Then python can be started and the XenAPI must be imported:
+
+\begin{verbatim}
+$ python
 ...
->>> import xmlrpclib
+>>> import xen.xm.XenAPI
 \end{verbatim}
 
-Create a python object referencing the remote server:
-
+To create a session to the remote server, the
+\texttt{xen.xm.XenAPI.Session} constructor is used:
 \begin{verbatim}
->>> xen = xmlrpclib.Server("http://test:4464")
+>>> session = xen.xm.XenAPI.Session("http://192.168.7.20:9363")
 \end{verbatim}
 
-Acquire a session token by logging in with a username and password
-(error-handling omitted for brevity; the session token is pointed to by the
-key {\tt 'Value'} in the returned dictionary)
-
+For authentication with a username and password the
+\texttt{login\_with\_password} is used:
 \begin{verbatim}
->>> session = session.login_with_password("user", "passwd")['Value']
+>>> session.login_with_password("", "")
 \end{verbatim}
 
-When serialised, this call looks like the following:
-
+When serialised, this call looks like:
 \begin{verbatim}
+POST /RPC2 HTTP/1.0
+Host: 192.168.7.20:9363
+User-Agent: xmlrpclib.py/1.0.1 (by www.pythonware.com)
+Content-Type: text/xml
+Content-Length: 221
+
 <?xml version='1.0'?>
 <methodCall>
-  <methodName>session.login_with_password</methodName>
-  <params>
-    <param>
-      <value><string>user</string></value>
-    </param>
-    <param>
-      <value><string>passwd</string></value>
-    </param>
-  </params>
+<methodName>session.login_with_password</methodName>
+<params>
+<param>
+<value><string></string></value>
+</param>
+<param>
+<value><string></string></value>
+</param>
+</params>
 </methodCall>
 \end{verbatim}
 
-Next, the user may acquire a list of all the VMs known to the host: (Note the
-call takes the session token as the only parameter)
-
+And the response:
 \begin{verbatim}
->>> all_vms = host.get_resident_VMs(session)['Value']
->>> all_vms
-['OpaqueRef:1', 'OpaqueRef:2', 'OpaqueRef:3', 'OpaqueRef:4' ]
+HTTP/1.1 200 OK
+Server: BaseHTTP/0.3 Python/2.5.2
+Date: Fri, 10 Jul 2009 09:01:27 GMT
+Content-Type: text/xml
+Content-Length: 313
+
+<?xml version='1.0'?>
+<methodResponse>
+<params>
+<param>
+<value><struct>
+<member>
+<name>Status</name>
+<value><string>Success</string></value>
+</member>
+<member>
+<name>Value</name>
+<value><string>68e3a009-0249-725b-246b-7fc43cf4f154</string></value>
+</member>
+</struct></value>
+</param>
+</params>
+</methodResponse>
 \end{verbatim}
 
-The VM references here have the form {\tt OpaqueRef:X}, though they may not be 
-that simple in the future, and you should treat them as opaque strings.  
-Once a reference to a VM has been acquired a lifecycle operation may be invoked:
+Next, the user may acquire a list of all the VMs known to the host:
 
 \begin{verbatim}
->>> xen.VM.start(session, all_vms[3], False)
-{'Status': 'Failure', 'ErrorDescription': ['VM_BAD_POWER_STATE', 'Halted', 'Running']}
+>>> vms = session.xenapi.VM.get_all()
+>>> vms
+['00000000-0000-0000-0000-000000000000', 'b28e4ee3-216f-fa85-9cae-615e954dbbe7']
+\end{verbatim}
+
+The VM references here have the form of an uuid, though they may
+change in the future, and they should be treated as opaque strings.
+
+Some examples of using accessors for object fields:
+\begin{verbatim}
+>>> session.xenapi.VM.get_name_label(vms[1])
+'guest002'
+>>> session.xenapi.VM.get_actions_after_reboot(vms[1])
+'restart'
+\end{verbatim}
+
+Grab the actual memory and cpu utilisation of one vm:
+\begin{verbatim}
+>>> m = session.xenapi.VM.get_metrics(vms[1])
+>>> session.xenapi.VM_metrics.get_memory_actual(m)
+'268435456'
+>>> session.xenapi.VM_metrics.get_VCPUs_utilisation(m)
+{'0': 0.00041759955632935362}
+\end{verbatim}
+(The virtual machine has about 256 MByte RAM and is idle.)
+
+Pausing and unpausing a vm:
+\begin{verbatim}
+>>> session.xenapi.VM.pause(vms[1])
+''
+>>> session.xenapi.VM.unpause(vms[1])
+''
+\end{verbatim}
+
+Trying to start an vm:
+\begin{verbatim}
+>>> session.xenapi.VM.start(vms[1], False)
+...
+: Xen-API failure: ['VM_BAD_POWER_STATE', \
+    'b28e4ee3-216f-fa85-9cae-615e954dbbe7', 'Halted', 'Running']
 \end{verbatim}
 
 In this case the {\tt start} message has been rejected, because the VM is
 already running, and so an error response has been returned.  These high-level
 errors are returned as structured data (rather than as XML-RPC faults),
-allowing them to be internationalised.  Finally, here are some examples of
-using accessors for object fields:
-
-\begin{verbatim}
->>> xen.VM.get_name_label(session, all_vms[3])['Value']
-'SMP'
->>> xen.VM.get_name_description(session, all_vms[3])['Value']
-'Debian for Xen'
-\end{verbatim}
+allowing them to be internationalised.  
