@@ -74,8 +74,8 @@ do
     shift
 done
 
-[ -z "$domid"   ] && ( echo "couldn't find domain ID" ; exit 1 )
-[ -z "$domname" ] && ( echo "couldn't find domain name" ; exit 1 )
+[ -z "$domid"   ] && { echo "couldn't find domain ID" ; exit 1; }
+[ -z "$domname" ] && { echo "couldn't find domain name" ; exit 1; }
 
 # Termination handler
 
