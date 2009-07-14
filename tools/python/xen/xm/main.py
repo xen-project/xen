@@ -2555,13 +2555,13 @@ def xm_pci_attach(args):
 
     # If the slot wasn't spefified in the args then use the slot
     # assigned to the head by qemu-xen for the rest of the functions
-    if int(head_dev['vslot'], 16) & AUTO_PHP_SLOT:
+    if int(head_dev['vdevfn'], 16) & AUTO_PHP_SLOT:
         vdevfn = int(find_attached_devfn(attached_pci_dict(dom), head_dev), 16)
         if not vdevfn & AUTO_PHP_SLOT:
             vslot = PCI_SLOT(vdevfn)
             for i in dev:
-                i['vslot'] = '0x%02x' % \
-		             PCI_DEVFN(vslot, PCI_FUNC(int(i['vslot'], 16)))
+                i['vdevfn'] = '0x%02x' % \
+		             PCI_DEVFN(vslot, PCI_FUNC(int(i['vdevfn'], 16)))
 
     for i in dev:
         xm_pci_attach_one(dom, i)
