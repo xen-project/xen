@@ -97,7 +97,7 @@ def encode_data(d):
     """Encode some data for HTTP transport.
     The encoding used is stored in 'Content-Type' in the headers.
 
-    d	data - sequence of tuples or dictionary
+    d data - sequence of tuples or dictionary
     returns a 2-tuple of the headers and the encoded data
     """
     val = ({}, None)

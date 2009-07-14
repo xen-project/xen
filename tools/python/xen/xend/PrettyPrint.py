@@ -284,9 +284,9 @@ class SXPPrettyPrinter(PrettyPrinter):
 def prettyprint(sxpr, out=sys.stdout, width=80):
     """Prettyprint an SXP form.
 
-    sxpr	s-expression
-    out		destination
-    width	maximum output width
+    sxpr  s-expression
+    out   destination
+    width maximum output width
     """
     if isinstance(sxpr, types.ListType):
         pp = SXPPrettyPrinter(width=width)
@@ -299,8 +299,8 @@ def prettyprint(sxpr, out=sys.stdout, width=80):
 def prettyprintstring(sxpr, width=80):
     """Prettyprint an SXP form to a string.
 
-    sxpr	s-expression
-    width	maximum output width
+    sxpr  s-expression
+    width maximum output width
     """
     io = StringIO.StringIO()
     prettyprint(sxpr, out=io, width=width)

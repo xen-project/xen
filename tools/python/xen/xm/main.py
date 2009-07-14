@@ -1794,8 +1794,8 @@ def xm_console(args):
     for (k, v) in options:
         if k in ['-q', '--quiet']:
             quiet = True
-	elif k in ['-n', '--num']:
-	    num = int(v[0])
+        elif k in ['-n', '--num']:
+            num = int(v[0])
         else:
             assert False
 
@@ -2227,15 +2227,15 @@ def xm_pci_list(args):
         return
 
     def f(x):
-	# The vfunc shouldn't be used for ordering if the vslot hasn't been
-	# assigned as the output looks odd beacuse the vfunc isn't reported
-	# but the (physical) function is.
-	if x['vdevfn'] & AUTO_PHP_SLOT:
-	    vdevfn = AUTO_PHP_SLOT
-	else:
-	    vdevfn = x['vdevfn']
-        return (vdevfn << 32) | \
-	       PCI_BDF(x['domain'], x['bus'], x['slot'], x['func'])
+        # The vfunc shouldn't be used for ordering if the vslot hasn't been
+        # assigned as the output looks odd beacuse the vfunc isn't reported
+        # but the (physical) function is.
+        if x['vdevfn'] & AUTO_PHP_SLOT:
+            vdevfn = AUTO_PHP_SLOT
+        else:
+            vdevfn = x['vdevfn']
+            return (vdevfn << 32) | \
+                   PCI_BDF(x['domain'], x['bus'], x['slot'], x['func'])
     devs.sort(None, f)
 
     has_vdevfn = False
@@ -2561,7 +2561,7 @@ def xm_pci_attach(args):
             vslot = PCI_SLOT(vdevfn)
             for i in dev:
                 i['vdevfn'] = '0x%02x' % \
-		             PCI_DEVFN(vslot, PCI_FUNC(int(i['vdevfn'], 16)))
+                              PCI_DEVFN(vslot, PCI_FUNC(int(i['vdevfn'], 16)))
 
     for i in dev:
         xm_pci_attach_one(dom, i)

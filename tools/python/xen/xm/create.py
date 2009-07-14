@@ -367,7 +367,7 @@ gopts.var('vfb', val="vnc=1,sdl=1,vncunused=1,vncdisplay=N,vnclisten=ADDR,displa
           given DISPLAY and XAUTHORITY, which default to the current user's
           ones.  OpenGL will be used by default unless opengl is set to 0.
           keymap overrides the XendD configured default layout file.
-	  Serial adds a second serial support to qemu.
+          Serial adds a second serial support to qemu.
           Monitor adds a backend for the stubdom monitor.""")
 
 gopts.var('vif', val="type=TYPE,mac=MAC,bridge=BRIDGE,ip=IPADDR,script=SCRIPT," + \

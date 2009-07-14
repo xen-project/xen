@@ -730,7 +730,7 @@ def all_from_string(s):
 def parse(io):
     """Completely parse all input from 'io'.
 
-    io	input file object
+    io input file object
     returns list of values, None if incomplete
     raises ParseError on parse error
     """

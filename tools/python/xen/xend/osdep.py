@@ -72,12 +72,11 @@ def _linux_balloon_stat_sysfs(label):
     return None
 
 def _linux_balloon_stat(label):
-	if os.access(PROC_XEN_BALLOON, os.F_OK):
-		return _linux_balloon_stat_proc(label)
-	elif os.access(SYSFS_XEN_MEMORY, os.F_OK):
-		return _linux_balloon_stat_sysfs(label)
-
-	return None
+    if os.access(PROC_XEN_BALLOON, os.F_OK):
+        return _linux_balloon_stat_proc(label)
+    elif os.access(SYSFS_XEN_MEMORY, os.F_OK):
+        return _linux_balloon_stat_sysfs(label)
+    return None
 
 def _solaris_balloon_stat(label):
     """Returns the value for the named label, or None if an error occurs."""

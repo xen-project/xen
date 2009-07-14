@@ -37,10 +37,10 @@ class PCIQuirk:
             if id.startswith(self.devid[:9]): # id's vendor and device ID match
                 skey = id.split(':')
                 size = len(skey)
-                if (size == 2):		# subvendor/subdevice not suplied
+                if (size == 2): # subvendor/subdevice not suplied
                     ret = True
                     break
-                elif (size == 4):	# check subvendor/subdevice
+                elif (size == 4): # check subvendor/subdevice
                     # check subvendor
                     subven = '%04x' % self.subvendor
                     if ((skey[2] != 'FFFF') and 

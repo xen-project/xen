@@ -30,7 +30,7 @@ import httpserver
 
 def uri_pathlist(p):
     """Split a path into a list.
-    p		path
+    p path
     return list of path elements
     """
     l = []
@@ -51,7 +51,7 @@ class SrvBase(resource.Resource):
         """Get the method for an operation.
         For operation 'foo' looks for 'op_foo'.
 
-        op	operation name
+        op operation name
         returns method or None
         """
         op_method_name = 'op_' + op
@@ -67,7 +67,7 @@ class SrvBase(resource.Resource):
         and an HTML string otherwise (or list).
         Methods may also return a ThreadRequest (for incomplete processing).
 
-        req	request
+        req request
         """
         op = req.args.get('op')
         if op is None or len(op) != 1:
