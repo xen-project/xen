@@ -1159,10 +1159,9 @@ static int alloc_l1_table(struct page_info *page)
 static int create_pae_xen_mappings(struct domain *d, l3_pgentry_t *pl3e)
 {
     struct page_info *page;
-    l2_pgentry_t    *pl2e;
     l3_pgentry_t     l3e3;
-#ifndef CONFIG_COMPAT
-    l2_pgentry_t     l2e;
+#ifdef __i386__
+    l2_pgentry_t     *pl2e, l2e;
     int              i;
 #endif
 
@@ -1198,17 +1197,9 @@ static int create_pae_xen_mappings(struct domain *d, l3_pgentry_t *pl3e)
         return 0;
     }
 
-    /* Xen private mappings. */
+#ifdef __i386__
+    /* Xen linear pagetable mappings. */
     pl2e = map_domain_page(l3e_get_pfn(l3e3));
-#ifndef CONFIG_COMPAT
-    memcpy(&pl2e[L2_PAGETABLE_FIRST_XEN_SLOT & (L2_PAGETABLE_ENTRIES-1)],
-           &idle_pg_table_l2[L2_PAGETABLE_FIRST_XEN_SLOT],
-           L2_PAGETABLE_XEN_SLOTS * sizeof(l2_pgentry_t));
-    for ( i = 0; i < PDPT_L2_ENTRIES; i++ )
-    {
-        l2e = l2e_from_page(perdomain_pt_page(d, i), __PAGE_HYPERVISOR);
-        l2e_write(&pl2e[l2_table_offset(PERDOMAIN_VIRT_START) + i], l2e);
-    }
     for ( i = 0; i < (LINEARPT_MBYTES >> (L2_PAGETABLE_SHIFT - 20)); i++ )
     {
         l2e = l2e_empty();
@@ -1216,13 +1207,8 @@ static int create_pae_xen_mappings(struct domain *d, l3_pgentry_t *pl3e)
             l2e = l2e_from_pfn(l3e_get_pfn(pl3e[i]), __PAGE_HYPERVISOR);
         l2e_write(&pl2e[l2_table_offset(LINEAR_PT_VIRT_START) + i], l2e);
     }
-#else
-    memcpy(&pl2e[COMPAT_L2_PAGETABLE_FIRST_XEN_SLOT(d)],
-           &compat_idle_pg_table_l2[
-               l2_table_offset(HIRO_COMPAT_MPT_VIRT_START)],
-           COMPAT_L2_PAGETABLE_XEN_SLOTS(d) * sizeof(*pl2e));
-#endif
     unmap_domain_page(pl2e);
+#endif
 
     return 1;
 }
@@ -1313,6 +1299,27 @@ static int alloc_l2_table(struct page_info *page, unsigned long type,
         }
 
         adjust_guest_l2e(pl2e[i], d);
+    }
+
+    if ( rc >= 0 && (type & PGT_pae_xen_l2) )
+    {
+        /* Xen private mappings. */
+#if defined(__i386__)
+        memcpy(&pl2e[L2_PAGETABLE_FIRST_XEN_SLOT & (L2_PAGETABLE_ENTRIES-1)],
+               &idle_pg_table_l2[L2_PAGETABLE_FIRST_XEN_SLOT],
+               L2_PAGETABLE_XEN_SLOTS * sizeof(l2_pgentry_t));
+        for ( i = 0; i < PDPT_L2_ENTRIES; i++ )
+            l2e_write(&pl2e[l2_table_offset(PERDOMAIN_VIRT_START) + i],
+                      l2e_from_page(perdomain_pt_page(d, i),
+                                    __PAGE_HYPERVISOR));
+        pl2e[l2_table_offset(LINEAR_PT_VIRT_START)] =
+            l2e_from_pfn(pfn, __PAGE_HYPERVISOR);
+#elif defined(CONFIG_COMPAT)
+        memcpy(&pl2e[COMPAT_L2_PAGETABLE_FIRST_XEN_SLOT(d)],
+               &compat_idle_pg_table_l2[
+                   l2_table_offset(HIRO_COMPAT_MPT_VIRT_START)],
+               COMPAT_L2_PAGETABLE_XEN_SLOTS(d) * sizeof(*pl2e));
+#endif
     }
 
     unmap_domain_page(pl2e);
