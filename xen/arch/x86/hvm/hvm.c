@@ -43,6 +43,7 @@
 #include <asm/processor.h>
 #include <asm/types.h>
 #include <asm/msr.h>
+#include <asm/traps.h>
 #include <asm/mc146818rtc.h>
 #include <asm/spinlock.h>
 #include <asm/hvm/hvm.h>
@@ -1773,8 +1774,6 @@ void hvm_rdtsc_intercept(struct cpu_user_regs *regs)
     regs->edx = (uint32_t)(tsc >> 32);
 }
 
-extern int intel_mce_rdmsr(u32 msr, u32 *lo, u32 *hi);
-extern int intel_mce_wrmsr(u32 msr, u64 value);
 int hvm_msr_read_intercept(struct cpu_user_regs *regs)
 {
     uint32_t ecx = regs->ecx;
@@ -1852,7 +1851,7 @@ int hvm_msr_read_intercept(struct cpu_user_regs *regs)
          break;
 
     default:
-        ret = intel_mce_rdmsr(ecx, &lo, &hi);
+        ret = mce_rdmsr(ecx, &lo, &hi);
         if ( ret < 0 )
             goto gp_fault;
         else if ( ret )
@@ -1951,7 +1950,7 @@ int hvm_msr_write_intercept(struct cpu_user_regs *regs)
         break;
 
     default:
-        ret = intel_mce_wrmsr(ecx, msr_content);
+        ret = mce_wrmsr(ecx, msr_content);
         if ( ret < 0 )
             goto gp_fault;
         else if ( ret )

@@ -47,9 +47,9 @@ extern int guest_has_trap_callback(struct domain *d, uint16_t vcpuid,
 extern int send_guest_trap(struct domain *d, uint16_t vcpuid,
 				unsigned int trap_nr);
 
-/* Intel vMCE MSRs virtualization */
-extern void intel_mce_init_msr(struct domain *d);
-extern int intel_mce_wrmsr(u32 msr, u64 value);
-extern int intel_mce_rdmsr(u32 msr, u32 *lo, u32 *hi);
+/* Guest vMCE MSRs virtualization */
+extern void mce_init_msr(struct domain *d);
+extern int mce_wrmsr(u32 msr, u64 value);
+extern int mce_rdmsr(u32 msr, u32 *lo, u32 *hi);
 
 #endif /* ASM_TRAP_H */

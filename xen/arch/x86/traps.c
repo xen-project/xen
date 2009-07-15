@@ -1680,7 +1680,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     unsigned long *reg, eip = regs->eip, res;
     u8 opcode, modrm_reg = 0, modrm_rm = 0, rep_prefix = 0, lock = 0, rex = 0;
     enum { lm_seg_none, lm_seg_fs, lm_seg_gs } lm_ovr = lm_seg_none;
-    unsigned int port, i, data_sel, ar, data, rc, bpmatch = 0;
+    int rc;
+    unsigned int port, i, data_sel, ar, data, bpmatch = 0;
     unsigned int op_bytes, op_default, ad_bytes, ad_default;
 #define rd_ad(reg) (ad_bytes >= sizeof(regs->reg) \
                     ? regs->reg \
@@ -2245,14 +2246,12 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         default:
             if ( wrmsr_hypervisor_regs(regs->ecx, eax, edx) )
                 break;
-            if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
-            {
-                int rc = intel_mce_wrmsr(regs->ecx, res);
-                if ( rc < 0 )
-                    goto fail;
-                if ( rc )
-                    break;
-            }
+
+            rc = mce_wrmsr(regs->ecx, res);
+            if ( rc < 0 )
+                goto fail;
+            if ( rc )
+                break;
 
             if ( (rdmsr_safe(regs->ecx, l, h) != 0) ||
                  (eax != l) || (edx != h) )
@@ -2334,15 +2333,11 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                 break;
             }
 
-            if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
-            {
-                int rc = intel_mce_rdmsr(regs->ecx, &l, &h);
-
-                if ( rc < 0 )
-                    goto fail;
-                if ( rc )
-                    goto rdmsr_writeback;
-            }
+            rc = mce_rdmsr(regs->ecx, &l, &h);
+            if ( rc < 0 )
+                goto fail;
+            if ( rc )
+                goto rdmsr_writeback;
 
             /* Everyone can read the MSR space. */
             /* gdprintk(XENLOG_WARNING,"Domain attempted RDMSR %p.\n",

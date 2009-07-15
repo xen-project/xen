@@ -995,14 +995,9 @@ void mce_intel_feature_init(struct cpuinfo_x86 *c)
     intel_init_cmci(c);
 }
 
-static uint64_t g_mcg_cap;
-static void mce_cap_init(struct cpuinfo_x86 *c)
+static void _mce_cap_init(struct cpuinfo_x86 *c)
 {
-    u32 l, h;
-
-    rdmsr (MSR_IA32_MCG_CAP, l, h);
-    /* For Guest vMCE usage */
-    g_mcg_cap = ((u64)h << 32 | l) & (~MCG_CMCI_P);
+    u32 l = mce_cap_init();
 
     if ((l & MCG_CMCI_P) && cpu_has_apic)
         cmci_support = 1;
@@ -1011,12 +1006,6 @@ static void mce_cap_init(struct cpuinfo_x86 *c)
     if (l & MCG_SER_P)
         ser_support = 1;
 
-    nr_mce_banks = l & MCG_CAP_COUNT;
-    if (nr_mce_banks > MAX_NR_BANKS)
-    {
-        printk(KERN_WARNING "MCE: exceed max mce banks\n");
-        g_mcg_cap = (g_mcg_cap & ~MCG_CAP_COUNT) | MAX_NR_BANKS;
-    }
     if (l & MCG_EXT_P)
     {
         nr_intel_ext_msrs = (l >> MCG_EXT_CNT) & 0xff;
@@ -1052,9 +1041,6 @@ static void mce_init(void)
     }
 
     set_in_cr4(X86_CR4_MCE);
-    rdmsr (MSR_IA32_MCG_CAP, l, h);
-    if (l & MCG_CTL_P) /* Control register present ? */
-        wrmsr(MSR_IA32_MCG_CTL, 0xffffffff, 0xffffffff);
 
     for (i = firstbank; i < nr_mce_banks; i++)
     {
@@ -1076,7 +1062,7 @@ static void mce_init(void)
 /* p4/p6 family have similar MCA initialization process */
 int intel_mcheck_init(struct cpuinfo_x86 *c)
 {
-    mce_cap_init(c);
+    _mce_cap_init(c);
     printk (KERN_INFO "Intel machine check reporting enabled on CPU#%d.\n",
             smp_processor_id());
 
@@ -1094,220 +1080,39 @@ int intel_mcheck_init(struct cpuinfo_x86 *c)
     return 1;
 }
 
-/* Guest vMCE# MSRs virtualization ops (rdmsr/wrmsr) */
-void intel_mce_init_msr(struct domain *d)
-{
-    d->arch.vmca_msrs.mcg_status = 0x0;
-    d->arch.vmca_msrs.mcg_cap = g_mcg_cap;
-    d->arch.vmca_msrs.mcg_ctl = (uint64_t)~0x0;
-    d->arch.vmca_msrs.nr_injection = 0;
-    memset(d->arch.vmca_msrs.mci_ctl, ~0,
-           sizeof(d->arch.vmca_msrs.mci_ctl));
-    INIT_LIST_HEAD(&d->arch.vmca_msrs.impact_header);
-    spin_lock_init(&d->arch.vmca_msrs.lock);
-}
-
 int intel_mce_wrmsr(u32 msr, u64 value)
 {
-    struct domain *d = current->domain;
-    struct bank_entry *entry = NULL;
-    unsigned int bank;
     int ret = 1;
 
-    spin_lock(&d->arch.vmca_msrs.lock);
-    switch(msr)
+    switch ( msr )
     {
-    case MSR_IA32_MCG_CTL:
-        if (value != (u64)~0x0 && value != 0x0) {
-            gdprintk(XENLOG_WARNING, "MCE: value written to MCG_CTL"
-                     "should be all 0s or 1s\n");
-            ret = -1;
-            break;
-        }
-        d->arch.vmca_msrs.mcg_ctl = value;
-        break;
-    case MSR_IA32_MCG_STATUS:
-        d->arch.vmca_msrs.mcg_status = value;
-        gdprintk(XENLOG_DEBUG, "MCE: wrmsr MCG_STATUS %"PRIx64"\n", value);
-        /* For HVM guest, this is the point for deleting vMCE injection node */
-        if ( (d->is_hvm) && (d->arch.vmca_msrs.nr_injection >0) )
-        {
-            d->arch.vmca_msrs.nr_injection--; /* Should be 0 */
-            if (!list_empty(&d->arch.vmca_msrs.impact_header)) {
-                entry = list_entry(d->arch.vmca_msrs.impact_header.next,
-                    struct bank_entry, list);
-                if (entry->mci_status & MCi_STATUS_VAL)
-                    gdprintk(XENLOG_ERR, "MCE: MCi_STATUS MSR should have "
-                                "been cleared before write MCG_STATUS MSR\n");
-
-                gdprintk(XENLOG_DEBUG, "MCE: Delete HVM last injection "
-                                "Node, nr_injection %u\n",
-                                d->arch.vmca_msrs.nr_injection);
-                list_del(&entry->list);
-            }
-            else
-                gdprintk(XENLOG_DEBUG, "MCE: Not found HVM guest"
-                    " last injection Node, something Wrong!\n");
-        }
-        break;
-    case MSR_IA32_MCG_CAP:
-        gdprintk(XENLOG_WARNING, "MCE: MCG_CAP is read-only\n");
-        ret = -1;
-        break;
     case MSR_IA32_MC0_CTL2 ... MSR_IA32_MC0_CTL2 + MAX_NR_BANKS - 1:
         gdprintk(XENLOG_WARNING, "We have disabled CMCI capability, "
                  "Guest should not write this MSR!\n");
-        break;
-    case MSR_IA32_MC0_CTL ... MSR_IA32_MC0_CTL + 4 * MAX_NR_BANKS - 1:
-        bank = (msr - MSR_IA32_MC0_CTL) / 4;
-        if (bank >= (d->arch.vmca_msrs.mcg_cap & MCG_CAP_COUNT)) {
-            gdprintk(XENLOG_WARNING, "MCE: bank %u does not exist\n", bank);
-            ret = -1;
-            break;
-        }
-        switch (msr & (MSR_IA32_MC0_CTL | 3))
-        {
-        case MSR_IA32_MC0_CTL:
-            if (value != (u64)~0x0 && value != 0x0) {
-                gdprintk(XENLOG_WARNING, "MCE: value written to MC%u_CTL"
-                         "should be all 0s or 1s (is %"PRIx64")\n",
-                         bank, value);
-                ret = -1;
-                break;
-            }
-            d->arch.vmca_msrs.mci_ctl[(msr - MSR_IA32_MC0_CTL)/4] = value;
-            break;
-        case MSR_IA32_MC0_STATUS:
-            /* Give the first entry of the list, it corresponds to current
-             * vMCE# injection. When vMCE# is finished processing by the
-             * the guest, this node will be deleted.
-             * Only error bank is written. Non-error banks simply return.
-             */
-            if (!list_empty(&d->arch.vmca_msrs.impact_header)) {
-                entry = list_entry(d->arch.vmca_msrs.impact_header.next,
-                                   struct bank_entry, list);
-                if ( entry->bank == bank )
-                    entry->mci_status = value;
-                gdprintk(XENLOG_DEBUG,
-                         "MCE: wr MC%u_STATUS %"PRIx64" in vMCE#\n",
-                         bank, value);
-            } else
-                gdprintk(XENLOG_DEBUG,
-                         "MCE: wr MC%u_STATUS %"PRIx64"\n", bank, value);
-            break;
-        case MSR_IA32_MC0_ADDR:
-            gdprintk(XENLOG_WARNING, "MCE: MC%u_ADDR is read-only\n", bank);
-            ret = -1;
-            break;
-        case MSR_IA32_MC0_MISC:
-            gdprintk(XENLOG_WARNING, "MCE: MC%u_MISC is read-only\n", bank);
-            ret = -1;
-            break;
-        }
         break;
     default:
         ret = 0;
         break;
     }
-    spin_unlock(&d->arch.vmca_msrs.lock);
+
     return ret;
 }
 
 int intel_mce_rdmsr(u32 msr, u32 *lo, u32 *hi)
 {
-    struct domain *d = current->domain;
     int ret = 1;
-    unsigned int bank;
-    struct bank_entry *entry = NULL;
 
-    *lo = *hi = 0x0;
-    spin_lock(&d->arch.vmca_msrs.lock);
-    switch(msr)
+    switch ( msr )
     {
-    case MSR_IA32_MCG_STATUS:
-        *lo = (u32)d->arch.vmca_msrs.mcg_status;
-        *hi = (u32)(d->arch.vmca_msrs.mcg_status >> 32);
-        gdprintk(XENLOG_DEBUG, "MCE: rd MCG_STATUS lo %x hi %x\n", *lo, *hi);
-        break;
-    case MSR_IA32_MCG_CAP:
-        *lo = (u32)d->arch.vmca_msrs.mcg_cap;
-        *hi = (u32)(d->arch.vmca_msrs.mcg_cap >> 32);
-        gdprintk(XENLOG_DEBUG, "MCE: rdmsr MCG_CAP lo %x hi %x\n", *lo, *hi);
-        break;
-    case MSR_IA32_MCG_CTL:
-        *lo = (u32)d->arch.vmca_msrs.mcg_ctl;
-        *hi = (u32)(d->arch.vmca_msrs.mcg_ctl >> 32);
-        gdprintk(XENLOG_DEBUG, "MCE: rdmsr MCG_CTL lo %x hi %x\n", *lo, *hi);
-        break;
     case MSR_IA32_MC0_CTL2 ... MSR_IA32_MC0_CTL2 + MAX_NR_BANKS - 1:
         gdprintk(XENLOG_WARNING, "We have disabled CMCI capability, "
                  "Guest should not read this MSR!\n");
-        break;
-    case MSR_IA32_MC0_CTL ... MSR_IA32_MC0_CTL + 4 * MAX_NR_BANKS - 1:
-        bank = (msr - MSR_IA32_MC0_CTL) / 4;
-        if (bank >= (d->arch.vmca_msrs.mcg_cap & MCG_CAP_COUNT)) {
-            gdprintk(XENLOG_WARNING, "MCE: bank %u does not exist\n", bank);
-            ret = -1;
-            break;
-        }
-        switch (msr & (MSR_IA32_MC0_CTL | 3))
-        {
-        case MSR_IA32_MC0_CTL:
-            *lo = (u32)d->arch.vmca_msrs.mci_ctl[bank];
-            *hi = (u32)(d->arch.vmca_msrs.mci_ctl[bank] >> 32);
-            gdprintk(XENLOG_DEBUG, "MCE: rd MC%u_CTL lo %x hi %x\n",
-                     bank, *lo, *hi);
-            break;
-        case MSR_IA32_MC0_STATUS:
-            /* Only error bank is read. Non-error banks simply return. */
-            if (!list_empty(&d->arch.vmca_msrs.impact_header)) {
-                entry = list_entry(d->arch.vmca_msrs.impact_header.next,
-                                   struct bank_entry, list);
-                if (entry->bank == bank) {
-                    *lo = entry->mci_status;
-                    *hi = entry->mci_status >> 32;
-                    gdprintk(XENLOG_DEBUG,
-                             "MCE: rd MC%u_STATUS in vmCE# context "
-                             "lo %x hi %x\n", bank, *lo, *hi);
-                } else
-                    entry = NULL;
-            }
-            if (!entry)
-                gdprintk(XENLOG_DEBUG, "MCE: rd MC%u_STATUS\n", bank);
-            break;
-        case MSR_IA32_MC0_ADDR:
-            if (!list_empty(&d->arch.vmca_msrs.impact_header)) {
-                entry = list_entry(d->arch.vmca_msrs.impact_header.next,
-                                   struct bank_entry, list);
-                if (entry->bank == bank) {
-                    *lo = entry->mci_addr;
-                    *hi = entry->mci_addr >> 32;
-                    gdprintk(XENLOG_DEBUG,
-                             "MCE: rd MC%u_ADDR in vMCE# context lo %x hi %x\n",
-                             bank, *lo, *hi);
-                }
-            }
-            break;
-        case MSR_IA32_MC0_MISC:
-            if (!list_empty(&d->arch.vmca_msrs.impact_header)) {
-                entry = list_entry(d->arch.vmca_msrs.impact_header.next,
-                                   struct bank_entry, list);
-                if (entry->bank == bank) {
-                    *lo = entry->mci_misc;
-                    *hi = entry->mci_misc >> 32;
-                    gdprintk(XENLOG_DEBUG,
-                             "MCE: rd MC%u_MISC in vMCE# context lo %x hi %x\n",
-                             bank, *lo, *hi);
-                }
-            }
-            break;
-        }
         break;
     default:
         ret = 0;
         break;
     }
-    spin_unlock(&d->arch.vmca_msrs.lock);
+
     return ret;
 }
 

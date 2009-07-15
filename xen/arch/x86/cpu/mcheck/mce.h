@@ -23,6 +23,11 @@ void intel_mcheck_timer(struct cpuinfo_x86 *c);
 void mce_intel_feature_init(struct cpuinfo_x86 *c);
 void amd_nonfatal_mcheck_init(struct cpuinfo_x86 *c);
 
+u64 mce_cap_init(void);
+
+int intel_mce_rdmsr(u32 msr, u32 *lo, u32 *hi);
+int intel_mce_wrmsr(u32 msr, u64 value);
+
 int mce_available(struct cpuinfo_x86 *c);
 int mce_firstbank(struct cpuinfo_x86 *c);
 /* Helper functions used for collecting error telemetry */

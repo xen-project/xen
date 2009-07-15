@@ -484,8 +484,7 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
             goto fail;
 
         /* For Guest vMCE MSRs virtualization */
-        if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
-            intel_mce_init_msr(d);
+        mce_init_msr(d);
     }
 
     if ( is_hvm_domain(d) )
