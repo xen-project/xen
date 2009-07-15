@@ -1163,7 +1163,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	 * construct cpu_sibling_map, so that we can tell sibling CPUs
 	 * efficiently.
 	 */
-	for (cpu = 0; cpu < NR_CPUS; cpu++) {
+	for_each_cpu(cpu) {
 		cpus_clear(per_cpu(cpu_sibling_map, cpu));
 		cpus_clear(per_cpu(cpu_core_map, cpu));
 	}
