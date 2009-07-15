@@ -3,6 +3,9 @@
 
 . ./funcs.sh
 
+if test -z ${PYTHON}; then
+  PYTHON=python
+fi
 has_or_fail ${PYTHON}
 
 ${PYTHON} -c 'import xml.dom.minidom' 2>/dev/null || \

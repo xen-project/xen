@@ -3,6 +3,10 @@
 
 . ./funcs.sh
 
+if test -z ${PYTHON}; then
+  PYTHON=python
+fi
+
 ${PYTHON} -c '
 import sys
 sys.exit(sys.version_info[0] < 2 or sys.version_info[1] < 2)
