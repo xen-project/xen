@@ -390,6 +390,7 @@ crossclean: clean
 	rm -fr libxc-$(XEN_TARGET_ARCH) ioemu
 	rm -f mk-headers-$(XEN_TARGET_ARCH)
 	rm -fr ocaml-$(XEN_TARGET_ARCH)
+	rm -fr include
 
 # clean patched sources
 .PHONY: patchclean
