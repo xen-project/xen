@@ -213,7 +213,7 @@
 
 # The VNC server can be told to negotiate a TLS session
 # to encryption all traffic, and provide x509 cert to
-# clients enalbing them to verify server identity. The
+# clients enabling them to verify server identity. The
 # GTK-VNC widget, virt-viewer, virt-manager and VeNCrypt
 # all support the VNC extension for TLS used in QEMU. The
 # TightVNC/RealVNC/UltraVNC clients do not.
