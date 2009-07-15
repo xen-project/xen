@@ -3,10 +3,6 @@
 
 . ./funcs.sh
 
-if test -z ${PYTHON}; then
-	PYTHON=`/usr/bin/env python 2>/dev/null`
-fi
-
 ${PYTHON} -c '
 import sys
 sys.exit(sys.version_info[0] < 2 or sys.version_info[1] < 2)
