@@ -40,9 +40,9 @@ extern union start_info_union start_info_union;
 /* hypervisor.c */
 void force_evtchn_callback(void);
 void do_hypervisor_callback(struct pt_regs *regs);
-void mask_evtchn(u32 port);
-void unmask_evtchn(u32 port);
-void clear_evtchn(u32 port);
+void mask_evtchn(uint32_t port);
+void unmask_evtchn(uint32_t port);
+void clear_evtchn(uint32_t port);
 
 extern int in_callback;
 

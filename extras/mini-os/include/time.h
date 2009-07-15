@@ -29,7 +29,7 @@
  * The other macros are for convenience to approximate short intervals
  * of real time into system time 
  */
-typedef s64 s_time_t;
+typedef int64_t s_time_t;
 #define NOW()                   ((s_time_t)monotonic_clock())
 #define SECONDS(_s)             (((s_time_t)(_s))  * 1000000000UL )
 #define TENTHS(_ts)             (((s_time_t)(_ts)) * 100000000UL )
@@ -57,7 +57,7 @@ void     init_time(void);
 void     fini_time(void);
 s_time_t get_s_time(void);
 s_time_t get_v_time(void);
-u64      monotonic_clock(void);
+uint64_t monotonic_clock(void);
 void     block_domain(s_time_t until);
 
 #endif /* _MINIOS_TIME_H_ */

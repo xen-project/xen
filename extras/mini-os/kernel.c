@@ -49,7 +49,7 @@
 
 static struct netfront_dev *net_dev;
 
-u8 xen_features[XENFEAT_NR_SUBMAPS * 32];
+uint8_t xen_features[XENFEAT_NR_SUBMAPS * 32];
 
 void setup_xen_features(void)
 {

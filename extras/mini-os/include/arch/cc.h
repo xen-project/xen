@@ -13,17 +13,17 @@
 #include <mini-os/os.h>
 #include <mini-os/types.h>
 #include <time.h>
-typedef  u8  u8_t;
-typedef  s8  s8_t;
-typedef u16 u16_t;
-typedef s16 s16_t;
-typedef u32 u32_t;
-typedef s32 s32_t;
-typedef u64 u64_t;
-typedef s64 s64_t;
+typedef uint8_t  u8_t;
+typedef int8_t   s8_t;
+typedef uint16_t u16_t;
+typedef int16_t  s16_t;
+typedef uint32_t u32_t;
+typedef int32_t  s32_t;
+typedef uint64_t u64_t;
+typedef int64_t  s64_t;
 typedef uintptr_t mem_ptr_t;
 
-typedef u16 u_short;
+typedef uint16_t u_short;
 
 /*   Compiler hints for packing lwip's structures - */
 #define PACK_STRUCT_FIELD(_x)  _x

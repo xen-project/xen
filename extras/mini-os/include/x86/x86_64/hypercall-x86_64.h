@@ -178,7 +178,7 @@ HYPERVISOR_sched_op(
 
 static inline long
 HYPERVISOR_set_timer_op(
-	u64 timeout)
+	uint64_t timeout)
 {
 	return _hypercall1(long, set_timer_op, timeout);
 }

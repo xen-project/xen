@@ -102,7 +102,7 @@ gnttab_grant_transfer(domid_t domid, unsigned long pfn)
 int
 gnttab_end_access(grant_ref_t ref)
 {
-    u16 flags, nflags;
+    uint16_t flags, nflags;
 
     BUG_ON(ref >= NR_GRANT_ENTRIES || ref < NR_RESERVED_ENTRIES);
 
@@ -123,7 +123,7 @@ unsigned long
 gnttab_end_transfer(grant_ref_t ref)
 {
     unsigned long frame;
-    u16 flags;
+    uint16_t flags;
 
     BUG_ON(ref >= NR_GRANT_ENTRIES || ref < NR_RESERVED_ENTRIES);
 

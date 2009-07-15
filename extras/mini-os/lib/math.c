@@ -68,8 +68,8 @@
  * one or more of the following formats.
  */
 union uu {
-        s64            q;              /* as a (signed) quad */
-        s64            uq;             /* as an unsigned quad */
+        int64_t           q;              /* as a (signed) quad */
+        int64_t          uq;             /* as an unsigned quad */
         long           sl[2];          /* as two signed longs */
         unsigned long  ul[2];          /* as two unsigned longs */
 };
@@ -90,7 +90,7 @@ union uu {
 #ifndef HAVE_LIBC
 #define CHAR_BIT        8               /* number of bits in a char */
 #endif
-#define QUAD_BITS       (sizeof(s64) * CHAR_BIT)
+#define QUAD_BITS       (sizeof(int64_t) * CHAR_BIT)
 #define LONG_BITS       (sizeof(long) * CHAR_BIT)
 #define HALF_BITS       (sizeof(long) * CHAR_BIT / 2)
 
@@ -147,8 +147,8 @@ shl(register digit *p, register int len, register int sh)
  * divisor are 4 `digits' in this base (they are shorter if they have
  * leading zeros).
  */
-u64
-__qdivrem(u64 uq, u64 vq, u64 *arq)
+uint64_t
+__qdivrem(uint64_t uq, uint64_t vq, uint64_t *arq)
 {
 	union uu tmp;
 	digit *u, *v, *q;
@@ -348,31 +348,31 @@ __qdivrem(u64 uq, u64 vq, u64 *arq)
  * Divide two signed quads.
  * ??? if -1/2 should produce -1 on this machine, this code is wrong
  */
-s64
-__divdi3(s64 a, s64 b)
+int64_t
+__divdi3(int64_t a, int64_t b)
 {
-	u64 ua, ub, uq;
+	uint64_t ua, ub, uq;
 	int neg;
 
 	if (a < 0)
-		ua = -(u64)a, neg = 1;
+		ua = -(uint64_t)a, neg = 1;
 	else
 		ua = a, neg = 0;
 	if (b < 0)
-		ub = -(u64)b, neg ^= 1;
+		ub = -(uint64_t)b, neg ^= 1;
 	else
 		ub = b;
-	uq = __qdivrem(ua, ub, (u64 *)0);
+	uq = __qdivrem(ua, ub, (uint64_t *)0);
 	return (neg ? -uq : uq);
 }
 
 /*
  * Divide two unsigned quads.
  */
-u64
-__udivdi3(u64 a, u64 b)
+uint64_t
+__udivdi3(uint64_t a, uint64_t b)
 {
-        return (__qdivrem(a, b, (u64 *)0));
+        return (__qdivrem(a, b, (uint64_t *)0));
 }
 
 

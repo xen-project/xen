@@ -20,7 +20,7 @@ struct thread
     thread_regs_t regs;
 #endif /* !defined(__ia64__) */
     struct minios_list_head thread_list;
-    u32 flags;
+    uint32_t flags;
     s_time_t wakeup_time;
 #ifdef HAVE_LIBC
     struct _reent reent;
@@ -54,6 +54,6 @@ void schedule(void);
 
 void wake(struct thread *thread);
 void block(struct thread *thread);
-void msleep(u32 millisecs);
+void msleep(uint32_t millisecs);
 
 #endif /* __SCHED_H__ */

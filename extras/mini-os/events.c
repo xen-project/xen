@@ -28,7 +28,7 @@
 typedef struct _ev_action_t {
 	evtchn_handler_t handler;
 	void *data;
-    u32 count;
+    uint32_t count;
 } ev_action_t;
 
 static ev_action_t ev_actions[NR_EVS];

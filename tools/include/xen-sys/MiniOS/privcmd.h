@@ -5,12 +5,12 @@
 
 typedef struct privcmd_hypercall
 {
-	u64 op;
-	u64 arg[5];
+	uint64_t op;
+	uint64_t arg[5];
 } privcmd_hypercall_t;
 
 typedef struct privcmd_mmap_entry {
-	u64 mfn;
+	uint64_t mfn;
 } privcmd_mmap_entry_t; 
 
 #endif /* __MINIOS_PUBLIC_PRIVCMD_H__ */

@@ -87,13 +87,13 @@ void force_evtchn_callback(void)
     };
 }
 
-inline void mask_evtchn(u32 port)
+inline void mask_evtchn(uint32_t port)
 {
     shared_info_t *s = HYPERVISOR_shared_info;
     synch_set_bit(port, &s->evtchn_mask[0]);
 }
 
-inline void unmask_evtchn(u32 port)
+inline void unmask_evtchn(uint32_t port)
 {
     shared_info_t *s = HYPERVISOR_shared_info;
     vcpu_info_t *vcpu_info = &s->vcpu_info[smp_processor_id()];
@@ -114,7 +114,7 @@ inline void unmask_evtchn(u32 port)
     }
 }
 
-inline void clear_evtchn(u32 port)
+inline void clear_evtchn(uint32_t port)
 {
     shared_info_t *s = HYPERVISOR_shared_info;
     synch_clear_bit(port, &s->evtchn_pending[0]);

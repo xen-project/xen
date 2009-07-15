@@ -207,7 +207,7 @@ netfront_input(struct netif *netif, unsigned char* data, int len)
     etharp_ip_input(netif, p);
 #endif
     /* skip Ethernet header */
-    pbuf_header(p, -(s16)sizeof(struct eth_hdr));
+    pbuf_header(p, -(int16_t)sizeof(struct eth_hdr));
     /* pass to network layer */
     if (tcpip_input(p, netif) == ERR_MEM)
       /* Could not store it, drop */

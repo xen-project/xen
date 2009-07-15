@@ -445,7 +445,7 @@ static __inline__ unsigned long __ffs(unsigned long word)
                            : /* no outputs */ \
                            : "c" (msr), "a" (val1), "d" (val2))
 
-#define wrmsrl(msr,val) wrmsr(msr,(u32)((u64)(val)),((u64)(val))>>32)
+#define wrmsrl(msr,val) wrmsr(msr,(uint32_t)((uint64_t)(val)),((uint64_t)(val))>>32)
 
 
 #else /* ifdef __x86_64__ */

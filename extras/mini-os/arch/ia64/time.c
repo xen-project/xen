@@ -178,7 +178,7 @@ timer_interrupt(evtchn_port_t port, struct pt_regs* regsP, void *data)
 /*
  * monotonic_clock(): returns # of nanoseconds passed since time_init()
  */
-u64
+uint64_t
 monotonic_clock(void)
 {
 	uint64_t delta;

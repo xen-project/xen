@@ -20,7 +20,7 @@ void sys_init(void)
 
 /* Creates and returns a new semaphore. The "count" argument specifies
  * the initial state of the semaphore. */
-sys_sem_t sys_sem_new(u8_t count)
+sys_sem_t sys_sem_new(uint8_t count)
 {
     struct semaphore *sem = xmalloc(struct semaphore);
     sem->count = count;
@@ -50,13 +50,13 @@ void sys_sem_signal(sys_sem_t sem)
  * semaphore wasn't signaled within the specified time, the return value is
  * SYS_ARCH_TIMEOUT. If the thread didn't have to wait for the semaphore
  * (i.e., it was already signaled), the function may return zero. */
-u32_t sys_arch_sem_wait(sys_sem_t sem, u32_t timeout)
+uint32_t sys_arch_sem_wait(sys_sem_t sem, uint32_t timeout)
 {
     /* Slightly more complicated than the normal minios semaphore:
      * need to wake on timeout *or* signal */
     sys_prot_t prot;
-    s64_t then = NOW();
-    s64_t deadline;
+    int64_t then = NOW();
+    int64_t deadline;
 
     if (timeout == 0)
 	deadline = 0;
@@ -174,9 +174,9 @@ static void do_mbox_fetch(sys_mbox_t mbox, void **msg)
  * The return values are the same as for the sys_arch_sem_wait() function:
  * Number of milliseconds spent waiting or SYS_ARCH_TIMEOUT if there was a
  * timeout. */
-u32_t sys_arch_mbox_fetch(sys_mbox_t mbox, void **msg, u32_t timeout)
+uint32_t sys_arch_mbox_fetch(sys_mbox_t mbox, void **msg, uint32_t timeout)
 {
-    u32 rv;
+    uint32_t rv;
     if (mbox == SYS_MBOX_NULL)
         return SYS_ARCH_TIMEOUT;
 
@@ -199,7 +199,7 @@ u32_t sys_arch_mbox_fetch(sys_mbox_t mbox, void **msg, u32_t timeout)
  *     sys_arch_mbox_fetch(mbox,msg,1)
  * although this would introduce unnecessary delays. */
 
-u32_t sys_arch_mbox_tryfetch(sys_mbox_t mbox, void **msg) {
+uint32_t sys_arch_mbox_tryfetch(sys_mbox_t mbox, void **msg) {
     if (mbox == SYS_MBOX_NULL)
         return SYS_ARCH_TIMEOUT;
 

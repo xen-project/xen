@@ -46,15 +46,15 @@
 
 /* These are peridically updated in shared_info, and then copied here. */
 struct shadow_time_info {
-	u64 tsc_timestamp;     /* TSC at last update of time vals.  */
-	u64 system_timestamp;  /* Time, in nanosecs, since boot.    */
-	u32 tsc_to_nsec_mul;
-	u32 tsc_to_usec_mul;
+	uint64_t tsc_timestamp;     /* TSC at last update of time vals.  */
+	uint64_t system_timestamp;  /* Time, in nanosecs, since boot.    */
+	uint32_t tsc_to_nsec_mul;
+	uint32_t tsc_to_usec_mul;
 	int tsc_shift;
-	u32 version;
+	uint32_t version;
 };
 static struct timespec shadow_ts;
-static u32 shadow_ts_version;
+static uint32_t shadow_ts_version;
 
 static struct shadow_time_info shadow;
 
@@ -84,11 +84,11 @@ static inline int time_values_up_to_date(void)
  * Scale a 64-bit delta by scaling and multiplying by a 32-bit fraction,
  * yielding a 64-bit result.
  */
-static inline u64 scale_delta(u64 delta, u32 mul_frac, int shift)
+static inline uint64_t scale_delta(uint64_t delta, uint32_t mul_frac, int shift)
 {
-	u64 product;
+	uint64_t product;
 #ifdef __i386__
-	u32 tmp1, tmp2;
+	uint32_t tmp1, tmp2;
 #endif
 
 	if ( shift < 0 )
@@ -106,11 +106,11 @@ static inline u64 scale_delta(u64 delta, u32 mul_frac, int shift)
 		"xor  %5,%5    ; "
 		"adc  %5,%%edx ; "
 		: "=A" (product), "=r" (tmp1), "=r" (tmp2)
-		: "a" ((u32)delta), "1" ((u32)(delta >> 32)), "2" (mul_frac) );
+		: "a" ((uint32_t)delta), "1" ((uint32_t)(delta >> 32)), "2" (mul_frac) );
 #else
 	__asm__ (
 		"mul %%rdx ; shrd $32,%%rdx,%%rax"
-		: "=a" (product) : "0" (delta), "d" ((u64)mul_frac) );
+		: "=a" (product) : "0" (delta), "d" ((uint64_t)mul_frac) );
 #endif
 
 	return product;
@@ -119,7 +119,7 @@ static inline u64 scale_delta(u64 delta, u32 mul_frac, int shift)
 
 static unsigned long get_nsec_offset(void)
 {
-	u64 now, delta;
+	uint64_t now, delta;
 	rdtscll(now);
 	delta = now - shadow.tsc_timestamp;
 	return scale_delta(delta, shadow.tsc_to_nsec_mul, shadow.tsc_shift);
@@ -151,10 +151,10 @@ static void get_time_values_from_xen(void)
  *		Note: This function is required to return accurate
  *		time even in the absence of multiple timer ticks.
  */
-u64 monotonic_clock(void)
+uint64_t monotonic_clock(void)
 {
-	u64 time;
-	u32 local_time_version;
+	uint64_t time;
+	uint32_t local_time_version;
 
 	do {
 		local_time_version = shadow.version;
@@ -185,7 +185,7 @@ static void update_wallclock(void)
 
 int gettimeofday(struct timeval *tv, void *tz)
 {
-    u64 nsec = monotonic_clock();
+    uint64_t nsec = monotonic_clock();
     nsec += shadow_ts.tv_nsec;
     
     

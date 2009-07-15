@@ -1189,7 +1189,7 @@ int clock_gettime(clockid_t clk_id, struct timespec *tp)
 	}
 	case CLOCK_REALTIME:
 	{
-	    u64 nsec = monotonic_clock();
+	    uint64_t nsec = monotonic_clock();
 
 	    tp->tv_sec = nsec / 1000000000ULL;
 	    tp->tv_nsec = nsec % 1000000000ULL;

@@ -68,7 +68,7 @@ char boot_cmd_line[COMMAND_LINE_SIZE+1];
 
 
 void
-ia64_write_itr_i(ia64_pte_t* pteP, u32 reg, uint64_t vAddr,
+ia64_write_itr_i(ia64_pte_t* pteP, uint32_t reg, uint64_t vAddr,
 		  uint64_t ps, uint64_t pk)
 {
 	/* The virtual address. */
