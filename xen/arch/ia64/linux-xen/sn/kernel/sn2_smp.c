@@ -211,7 +211,7 @@ sn2_global_tlb_purge(unsigned long start,
 	spin_lock(&sn2_ptcg_lock2);
 	node_set(cpu_to_node(smp_processor_id()), nodes_flushed);
 	i = 0;
-	for_each_cpu(cpu) {
+	for_each_possible_cpu(cpu) {
 		cnode = cpu_to_node(cpu);
 		if (!node_isset(cnode, nodes_flushed)) {
 			cpu_set(cpu, selected_cpus);
@@ -269,7 +269,7 @@ sn2_global_tlb_purge(struct mm_struct *mm, unsigned long start,
 		i++;
 	}
 #else
-	for_each_cpu(cpu) {
+	for_each_possible_cpu(cpu) {
 		cnode = cpu_to_node(cpu);
 		node_set(cnode, nodes_flushed);
 		lcpu = cpu;

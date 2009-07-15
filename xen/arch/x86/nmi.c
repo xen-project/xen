@@ -460,7 +460,7 @@ static void do_nmi_stats(unsigned char key)
     struct vcpu *v;
 
     printk("CPU\tNMI\n");
-    for_each_cpu ( i )
+    for_each_possible_cpu ( i )
         printk("%3d\t%3d\n", i, nmi_count(i));
 
     if ( ((d = dom0) == NULL) || (d->vcpu == NULL) ||

@@ -675,7 +675,7 @@ remove_from_mtinfo(int cpu)
 {
 	int i;
 
-	for_each_cpu(i)
+	for_each_possible_cpu(i)
 		if (mt_info[i].valid &&  mt_info[i].socket_id ==
 		    				cpu_data(cpu)->socket_id)
 			mt_info[i].valid = 0;
@@ -874,7 +874,7 @@ check_for_mtinfo_index(void)
 {
 	int i;
 	
-	for_each_cpu(i)
+	for_each_possible_cpu(i)
 		if (!mt_info[i].valid)
 			return i;
 
@@ -892,7 +892,7 @@ check_for_new_socket(__u16 logical_address, struct cpuinfo_ia64 *c)
 	int i;
 	__u32 sid = c->socket_id;
 
-	for_each_cpu(i) {
+	for_each_possible_cpu(i) {
 		if (mt_info[i].valid && mt_info[i].proc_fixed_addr == logical_address
 		    && mt_info[i].socket_id == sid) {
 			c->core_id = mt_info[i].core_id;

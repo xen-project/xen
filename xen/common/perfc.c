@@ -136,13 +136,13 @@ void perfc_reset(unsigned char key)
         switch ( perfc_info[i].type )
         {
         case TYPE_SINGLE:
-            for_each_cpu ( cpu )
+            for_each_possible_cpu ( cpu )
                 per_cpu(perfcounters, cpu)[j] = 0;
         case TYPE_S_SINGLE:
             ++j;
             break;
         case TYPE_ARRAY:
-            for_each_cpu ( cpu )
+            for_each_possible_cpu ( cpu )
                 memset(per_cpu(perfcounters, cpu) + j, 0,
                        perfc_info[i].nr_elements * sizeof(perfc_t));
         case TYPE_S_ARRAY:
@@ -205,14 +205,14 @@ static int perfc_copy_info(XEN_GUEST_HANDLE_64(xen_sysctl_perfc_desc_t) desc,
         {
         case TYPE_SINGLE:
         case TYPE_S_SINGLE:
-            for_each_cpu ( cpu )
+            for_each_possible_cpu ( cpu )
                 perfc_vals[v++] = per_cpu(perfcounters, cpu)[j];
             ++j;
             break;
         case TYPE_ARRAY:
         case TYPE_S_ARRAY:
             memset(perfc_vals + v, 0, perfc_d[i].nr_vals * sizeof(*perfc_vals));
-            for_each_cpu ( cpu )
+            for_each_possible_cpu ( cpu )
             {
                 perfc_t *counters = per_cpu(perfcounters, cpu) + j;
                 unsigned int k;

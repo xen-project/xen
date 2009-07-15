@@ -1227,7 +1227,7 @@ int __init init_xen_time(void)
     if ( opt_consistent_tscs )
     {
         int cpu;
-        for_each_cpu ( cpu )
+        for_each_possible_cpu ( cpu )
             per_cpu(cpu_time, cpu).tsc_scale = per_cpu(cpu_time, 0).tsc_scale;
     }
 

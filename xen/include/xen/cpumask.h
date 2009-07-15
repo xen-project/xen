@@ -61,7 +61,7 @@
  *
  * int any_online_cpu(mask)		First online cpu in mask, or NR_CPUS
  *
- * for_each_cpu(cpu)			for-loop cpu over cpu_possible_map
+ * for_each_possible_cpu(cpu)		for-loop cpu over cpu_possible_map
  * for_each_online_cpu(cpu)		for-loop cpu over cpu_online_map
  * for_each_present_cpu(cpu)		for-loop cpu over cpu_present_map
  *
@@ -402,9 +402,9 @@ extern cpumask_t cpu_present_map;
 	cpu;					\
 })
 
-#define for_each_cpu(cpu)	  for_each_cpu_mask((cpu), cpu_possible_map)
-#define for_each_online_cpu(cpu)  for_each_cpu_mask((cpu), cpu_online_map)
-#define for_each_present_cpu(cpu) for_each_cpu_mask((cpu), cpu_present_map)
+#define for_each_possible_cpu(cpu) for_each_cpu_mask((cpu), cpu_possible_map)
+#define for_each_online_cpu(cpu)   for_each_cpu_mask((cpu), cpu_online_map)
+#define for_each_present_cpu(cpu)  for_each_cpu_mask((cpu), cpu_present_map)
 
 /* Copy to/from cpumap provided by control tools. */
 struct xenctl_cpumap;

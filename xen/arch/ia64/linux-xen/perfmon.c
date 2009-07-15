@@ -7313,7 +7313,7 @@ xenpfm_context_create(XEN_GUEST_HANDLE(pfarg_context_t) req)
 		goto out;
 
 	/* XXX fmt */
-	for_each_cpu(cpu) {
+	for_each_possible_cpu(cpu) {
 		ctx[cpu] = pfm_context_create(&kreq);
 		if (ctx[cpu] == NULL) {
 			error = -ENOMEM;
@@ -7325,20 +7325,20 @@ xenpfm_context_create(XEN_GUEST_HANDLE(pfarg_context_t) req)
 
 	BUG_ON(in_irq());
 	spin_lock(&xenpfm_context_lock);
-	for_each_cpu(cpu) {
+	for_each_possible_cpu(cpu) {
 		if (per_cpu(xenpfm_context, cpu) != NULL) {
 			error = -EBUSY;
 			break;
 		}
 	}
-	for_each_cpu(cpu) {
+	for_each_possible_cpu(cpu) {
 		per_cpu(xenpfm_context, cpu) = ctx[cpu];
 		ctx[cpu] = NULL;
 	}
 	spin_unlock(&xenpfm_context_lock);
 
 out:
-	for_each_cpu(cpu) {
+	for_each_possible_cpu(cpu) {
 		if (ctx[cpu] != NULL)
 			pfm_context_free(ctx[cpu]);
 	}
@@ -7358,7 +7358,7 @@ again:
 	need_unload = 0;
 	BUG_ON(in_irq());
 	spin_lock_irqsave(&xenpfm_context_lock, flags);
-	for_each_cpu(cpu) {
+	for_each_possible_cpu(cpu) {
 		ctx = per_cpu(xenpfm_context, cpu);
 		if (ctx == NULL) {
 			error = -EINVAL;
@@ -7369,7 +7369,7 @@ again:
 			need_unload = 1;
 	}
 	if (error) {
-		for_each_cpu(cpu) {
+		for_each_possible_cpu(cpu) {
 			ctx = per_cpu(xenpfm_context, cpu);
 			if (ctx == NULL)
 				break;
@@ -7378,7 +7378,7 @@ again:
 		goto out;
 	}
 	if (need_unload) {
-		for_each_cpu(cpu)
+		for_each_possible_cpu(cpu)
 			UNPROTECT_CTX_NOIRQ(per_cpu(xenpfm_context, cpu));
 		spin_unlock_irqrestore(&xenpfm_context_lock, flags);
 
@@ -7388,7 +7388,7 @@ again:
 		goto again;
 	}
 
-	for_each_cpu(cpu) {
+	for_each_possible_cpu(cpu) {
 		pfm_context_t* ctx = per_cpu(xenpfm_context, cpu);
 		per_cpu(xenpfm_context, cpu) = NULL;
 
@@ -7740,7 +7740,7 @@ xenpfm_start_stop_locked(int is_start)
 	arg.is_start = is_start;
 	atomic_set(&arg.started, 1); /* 1 for this cpu */
 	atomic_set(&arg.finished, 0);
-	for_each_cpu(cpu)
+	for_each_possible_cpu(cpu)
 		arg.error[cpu] = 0;
 
 	BUG_ON(!spin_is_locked(&xenpfm_context_lock));

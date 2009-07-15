@@ -590,7 +590,7 @@ void hpet_broadcast_init(void)
     legacy_hpet_event.flags = 0;
     spin_lock_init(&legacy_hpet_event.lock);
 
-    for_each_cpu(i)
+    for_each_possible_cpu(i)
         per_cpu(cpu_bc_channel, i) = &legacy_hpet_event;
 
     if ( !force_hpet_broadcast )

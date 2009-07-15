@@ -65,7 +65,7 @@ void gather_privop_addrs(void)
 {
 	unsigned int cpu;
 
-	for_each_cpu ( cpu ) {
+	for_each_possible_cpu ( cpu ) {
 		perfc_t *perfcounters = per_cpu(perfcounters, cpu);
 		struct privop_addr_count *s = per_cpu(privop_addr_counter, cpu);
 		int i, j;
@@ -92,7 +92,7 @@ void reset_privop_addrs(void)
 {
 	unsigned int cpu;
 
-	for_each_cpu ( cpu ) {
+	for_each_possible_cpu ( cpu ) {
 		struct privop_addr_count *v = per_cpu(privop_addr_counter, cpu);
 		int i, j;
 

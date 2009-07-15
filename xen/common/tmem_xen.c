@@ -317,7 +317,7 @@ EXPORT int tmh_init(void)
 
     dstmem_order = get_order_from_pages(LZO_DSTMEM_PAGES);
     workmem_order = get_order_from_bytes(LZO1X_1_MEM_COMPRESS);
-    for_each_cpu ( cpu )
+    for_each_possible_cpu ( cpu )
     {
         pi = alloc_domheap_pages(0,dstmem_order,0);
         per_cpu(dstmem, cpu) = p1 = ((pi == NULL) ? NULL : page_to_virt(pi));
