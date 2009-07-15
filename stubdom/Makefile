@@ -211,7 +211,7 @@ $(OCAML_STAMPFILE): ocaml-$(XEN_TARGET_ARCH)/.dirstamp
 $(CROSS_ROOT): cross-newlib cross-zlib cross-libpci
 
 $(XEN_ROOT)/tools/ioemu-dir:
-	make -C $(XEN_ROOT)/tools ioemu-dir-find
+	$(MAKE) -C $(XEN_ROOT)/tools ioemu-dir-find
 
 ioemu/linkfarm.stamp: $(XEN_ROOT)/tools/ioemu-dir
 	mkdir -p ioemu
