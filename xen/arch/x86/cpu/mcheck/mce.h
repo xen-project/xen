@@ -17,8 +17,6 @@ int amd_k7_mcheck_init(struct cpuinfo_x86 *c);
 int amd_k8_mcheck_init(struct cpuinfo_x86 *c);
 int amd_f10_mcheck_init(struct cpuinfo_x86 *c);
 
-int intel_p5_mcheck_init(struct cpuinfo_x86 *c);
-int winchip_mcheck_init(struct cpuinfo_x86 *c);
 int intel_mcheck_init(struct cpuinfo_x86 *c);
 
 void intel_mcheck_timer(struct cpuinfo_x86 *c);

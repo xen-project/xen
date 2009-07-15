@@ -616,26 +616,12 @@ void mcheck_init(struct cpuinfo_x86 *c)
 
 	case X86_VENDOR_INTEL:
 		switch (c->x86) {
-		case 5:
-#ifndef CONFIG_X86_64
-			inited = intel_p5_mcheck_init(c);
-#endif
-			break;
-
 		case 6:
 		case 15:
 			inited = intel_mcheck_init(c);
 			break;
 		}
 		break;
-
-#ifndef CONFIG_X86_64
-	case X86_VENDOR_CENTAUR:
-		if (c->x86==5) {
-			inited = winchip_mcheck_init(c);
-		}
-		break;
-#endif
 
 	default:
 		break;

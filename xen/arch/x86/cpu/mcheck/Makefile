@@ -6,5 +6,3 @@ obj-y += mctelem.o
 obj-y += mce.o
 obj-y += mce_intel.o
 obj-y += non-fatal.o
-obj-$(x86_32) += p5.o
-obj-$(x86_32) += winchip.o
