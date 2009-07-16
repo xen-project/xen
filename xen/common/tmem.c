@@ -1812,7 +1812,6 @@ EXPORT long do_tmem_op(tmem_cli_op_t uops)
     bool_t non_succ_get = 0, non_succ_put = 0;
     bool_t flush = 0, flush_obj = 0;
     bool_t tmem_write_lock_set = 0, tmem_read_lock_set = 0;
-    static bool_t warned = 0;
     DECL_LOCAL_CYC_COUNTER(succ_get);
     DECL_LOCAL_CYC_COUNTER(succ_put);
     DECL_LOCAL_CYC_COUNTER(non_succ_get);
@@ -1821,12 +1820,7 @@ EXPORT long do_tmem_op(tmem_cli_op_t uops)
     DECL_LOCAL_CYC_COUNTER(flush_obj);
 
     if ( !tmem_initialized )
-    {
-        if ( !warned )
-            printk("tmem: must specify tmem parameter on xen boot line\n");
-        warned = 1;
         return -ENODEV;
-    }
 
     total_tmem_ops++;
 
