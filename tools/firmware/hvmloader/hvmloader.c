@@ -22,8 +22,8 @@
 
 #include "roms.h"
 #include "acpi/acpi2_0.h"
-#include "hypercall.h"
 #include "util.h"
+#include "hypercall.h"
 #include "config.h"
 #include "apic_regs.h"
 #include "pci_regs.h"
@@ -40,7 +40,15 @@ asm (
     /* C runtime kickoff. */
     "    cld                         \n"
     "    cli                         \n"
-    "    movl $stack_top,%esp        \n"
+    "    lgdt gdt_desr               \n"
+    "    mov  $"STR(SEL_DATA32)",%ax \n"
+    "    mov  %ax,%ds                \n"
+    "    mov  %ax,%es                \n"
+    "    mov  %ax,%fs                \n"
+    "    mov  %ax,%gs                \n"
+    "    mov  %ax,%ss                \n"
+    "    ljmp $"STR(SEL_CODE32)",$1f \n"
+    "1:  movl $stack_top,%esp        \n"
     "    movl %esp,%ebp              \n"
     "    call main                   \n"
     /* Relocate real-mode trampoline to 0x0. */
@@ -50,8 +58,7 @@ asm (
     "    sub  %esi,%ecx              \n"
     "    rep  movsb                  \n"
     /* Load real-mode compatible segment state (base 0x0000, limit 0xffff). */
-    "    lgdt gdt_desr               \n"
-    "    mov  $0x0010,%ax            \n"
+    "    mov  $"STR(SEL_DATA16)",%ax \n"
     "    mov  %ax,%ds                \n"
     "    mov  %ax,%es                \n"
     "    mov  %ax,%fs                \n"
@@ -67,7 +74,7 @@ asm (
     "    xor  %esi,%esi              \n"
     "    xor  %edi,%edi              \n"
     /* Enter real mode, reload all segment registers and IDT. */
-    "    ljmp $0x8,$0x0              \n"
+    "    ljmp $"STR(SEL_CODE16)",$0x0\n"
     "trampoline_start: .code16       \n"
     "    mov  %eax,%cr0              \n"
     "    ljmp $0,$1f-trampoline_start\n"
@@ -90,6 +97,9 @@ asm (
     "    .quad 0x0000000000000000    \n"
     "    .quad 0x008f9a000000ffff    \n" /* Ring 0 16b code, base 0 limit 4G */
     "    .quad 0x008f92000000ffff    \n" /* Ring 0 16b data, base 0 limit 4G */
+    "    .quad 0x00cf9a000000ffff    \n" /* Ring 0 32b code, base 0 limit 4G */
+    "    .quad 0x00cf92000000ffff    \n" /* Ring 0 32b data, base 0 limit 4G */
+    "    .quad 0x00af9a000000ffff    \n" /* Ring 0 64b code */
     "gdt_end:                        \n"
     "                                \n"
     "    .bss                        \n"

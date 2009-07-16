@@ -5,6 +5,16 @@
 #include <stdint.h>
 #include <xen/hvm/hvm_info_table.h>
 
+#define __STR(...) #__VA_ARGS__
+#define STR(...) __STR(__VA_ARGS__)
+
+/* GDT selector values. */
+#define SEL_CODE16          0x0008
+#define SEL_DATA16          0x0010
+#define SEL_CODE32          0x0018
+#define SEL_DATA32          0x0020
+#define SEL_CODE64          0x0028
+
 #undef offsetof
 #define offsetof(t, m) ((unsigned long)&((t *)0)->m)
 

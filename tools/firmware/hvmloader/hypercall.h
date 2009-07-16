@@ -35,9 +35,6 @@
 #include <xen/xen.h>
 #include "config.h"
 
-#define __STR(...) #__VA_ARGS__
-#define STR(...) __STR(__VA_ARGS__)
-
 /*
  * NB. Hypercall address needs to be relative to a linkage symbol for
  * some version of ld to relocate the relative calls properly.

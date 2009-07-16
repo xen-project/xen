@@ -22,6 +22,10 @@
 
 #include "util.h"
 
+#define TEST_FAIL 0
+#define TEST_PASS 1
+#define TEST_SKIP 2
+
 /*
  * Memory layout during tests:
  *  4MB to 8MB is cleared.
@@ -73,7 +77,7 @@ static int rep_io_test(void)
 {
     uint32_t *p;
     uint32_t i, p0, p1, p2;
-    int okay = 1;
+    int okay = TEST_PASS;
 
     static const struct {
         unsigned long addr;
@@ -121,44 +125,114 @@ static int rep_io_test(void)
         {
             printf("Bad value at 0x%08lx: saw %08x expected %08x\n",
                    (unsigned long)p, *p, expected);
-            okay = 0;
+            okay = TEST_FAIL;
         }
     }
 
     return okay;
 }
 
+static int shadow_gs_test(void)
+{
+    uint64_t *pd = (uint64_t *)PD_START;
+    uint32_t i, eax, ebx, ecx, edx;
+
+    /* Skip this test if the CPU does not support long mode. */
+    cpuid(0x80000000, &eax, &ebx, &ecx, &edx);
+    if ( eax < 0x80000001 )
+        return TEST_SKIP;
+    cpuid(0x80000001, &eax, &ebx, &ecx, &edx);
+    if ( !(edx & (1u<<29)) )
+        return TEST_SKIP;
+
+    /* Long mode pagetable setup: Identity map 0-16MB with 2MB mappings. */
+    *pd = (unsigned long)pd + 0x1007; /* Level 4 */
+    pd += 512;
+    *pd = (unsigned long)pd + 0x1007; /* Level 3 */
+    pd += 512;
+    for ( i = 0; i < 8; i++ )         /* Level 2 */
+        *pd++ = (i << 21) + 0x1e3;
+
+    asm volatile (
+        /* CR4.PAE=1 */
+        "mov $0x20,%%ebx; "
+        "mov %%ebx,%%cr4; "
+        /* CR3 */
+        "mov %%eax,%%cr3; "
+        /* EFER.LME=1 */
+        "mov $0xc0000080,%%ecx; rdmsr; btsl $8,%%eax; wrmsr; "
+        /* CR0.PG=1 */
+        "mov %%cr0,%%eax; btsl $31,%%eax; mov %%eax,%%cr0; "
+        "jmp 1f; 1: "
+        /* GS_BASE=2; SHADOW_GS_BASE=3 */
+        "mov $0xc0000101,%%ecx; xor %%edx,%%edx; mov $2,%%eax; wrmsr; "
+        "mov $0xc0000102,%%ecx; xor %%edx,%%edx; mov $3,%%eax; wrmsr; "
+        /* Push LRETQ stack frame. */
+        "pushl $0; pushl $"STR(SEL_CODE32)"; pushl $0; pushl $2f; "
+        /* Jump to 64-bit mode. */
+        "ljmp $"STR(SEL_CODE64)",$1f; 1: "
+        /* Swap GS_BASE and SHADOW_GS_BASE */
+        ".byte 0x0f,0x01,0xf8; " /* SWAPGS */
+        /* Jump to 32-bit mode. */
+        ".byte 0x89, 0xe4; "     /* MOV ESP,ESP */
+        ".byte 0x48, 0xcb; 2: "  /* LRETQ */
+        /* Read SHADOW_GS_BASE: should now contain 2 */
+        "mov $0xc0000102,%%ecx; rdmsr; mov %%eax,%%ebx; "
+        /* CR0.PG=0 */
+        "mov %%cr0,%%eax; btcl $31,%%eax; mov %%eax,%%cr0; "
+        "jmp 1f; 1:"
+        /* EFER.LME=0 */
+        "mov $0xc0000080,%%ecx; rdmsr; btcl $8,%%eax; wrmsr; "
+        /* CR4.PAE=0 */
+        "xor %%eax,%%eax; mov %%eax,%%cr4; "
+        : "=b" (ebx) : "a" (PD_START) : "ecx", "edx", "memory" );
+
+    return (ebx == 2) ? TEST_PASS : TEST_FAIL;
+}
+
 void perform_tests(void)
 {
-    int i, passed;
+    int i, passed, skipped;
 
     static struct {
         int (* const test)(void);
         const char *description;
     } tests[] = {
         { rep_io_test, "REP INSB across page boundaries" },
+        { shadow_gs_test, "GS base MSRs and SWAPGS" },
         { NULL, NULL }
     };
 
     printf("Testing HVM environment:\n");
 
-    passed = 0;
+    passed = skipped = 0;
     for ( i = 0; tests[i].test; i++ )
     {
         printf(" - %s ... ", tests[i].description);
         memset((char *)(4ul << 20), 0, 4ul << 20);
         setup_paging();
-        if ( (*tests[i].test)() )
+        switch ( (*tests[i].test)() )
         {
+        case TEST_PASS:
             printf("passed\n");
             passed++;
-        }
-        else
-        {
+            break;
+        case TEST_FAIL:
             printf("failed\n");
+            break;
+        case TEST_SKIP:
+            printf("skipped\n");
+            skipped++;
+            break;
         }
     }
 
-    printf("Passed %d/%d tests\n", passed, i);
-    BUG_ON(passed != i);
+    printf("Passed %d of %d tests\n", passed, i);
+    if ( skipped != 0 )
+        printf("Skipped %d of %d tests\n", skipped, i);
+    if ( (passed + skipped) != i )
+    {
+        printf("FAILED %d of %d tests\n", i - passed - skipped, i);
+        BUG();
+    }
 }
