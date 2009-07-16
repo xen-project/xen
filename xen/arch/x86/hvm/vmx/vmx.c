@@ -177,20 +177,14 @@ static enum handler_return long_mode_do_msr_read(struct cpu_user_regs *regs)
 
     case MSR_FS_BASE:
         msr_content = __vmread(GUEST_FS_BASE);
-        goto check_long_mode;
+        break;
 
     case MSR_GS_BASE:
         msr_content = __vmread(GUEST_GS_BASE);
-        goto check_long_mode;
+        break;
 
     case MSR_SHADOW_GS_BASE:
-        msr_content = v->arch.hvm_vmx.shadow_gs;
-    check_long_mode:
-        if ( !(hvm_long_mode_enabled(v)) )
-        {
-            vmx_inject_hw_exception(TRAP_gp_fault, 0);
-            return HNDL_exception_raised;
-        }
+        rdmsrl(MSR_SHADOW_GS_BASE, msr_content);
         break;
 
     case MSR_STAR:
@@ -241,9 +235,6 @@ static enum handler_return long_mode_do_msr_write(struct cpu_user_regs *regs)
     case MSR_FS_BASE:
     case MSR_GS_BASE:
     case MSR_SHADOW_GS_BASE:
-        if ( !hvm_long_mode_enabled(v) )
-            goto gp_fault;
-
         if ( !is_canonical_address(msr_content) )
             goto uncanonical_address;
 
@@ -252,10 +243,7 @@ static enum handler_return long_mode_do_msr_write(struct cpu_user_regs *regs)
         else if ( ecx == MSR_GS_BASE )
             __vmwrite(GUEST_GS_BASE, msr_content);
         else
-        {
-            v->arch.hvm_vmx.shadow_gs = msr_content;
             wrmsrl(MSR_SHADOW_GS_BASE, msr_content);
-        }
 
         break;
 
@@ -284,7 +272,6 @@ static enum handler_return long_mode_do_msr_write(struct cpu_user_regs *regs)
 
  uncanonical_address:
     HVM_DBG_LOG(DBG_LEVEL_0, "Not cano address of msr write %x", ecx);
- gp_fault:
     vmx_inject_hw_exception(TRAP_gp_fault, 0);
  exception_raised:
     return HNDL_exception_raised;
@@ -311,7 +298,10 @@ static void vmx_restore_host_msrs(void)
 
 static void vmx_save_guest_msrs(struct vcpu *v)
 {
-    /* MSR_SHADOW_GS_BASE may have been changed by swapgs instruction. */
+    /*
+     * We cannot cache SHADOW_GS_BASE while the VCPU runs, as it can
+     * be updated at any time via SWAPGS, which we cannot trap.
+     */
     rdmsrl(MSR_SHADOW_GS_BASE, v->arch.hvm_vmx.shadow_gs);
 }
 
