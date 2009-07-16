@@ -465,17 +465,11 @@ class XendDomainInfo:
                 XendTask.log_progress(91, 100, self.refreshShutdown)
 
                 xendomains = XendDomain.instance()
-                xennode = XendNode.instance()
 
                 # save running configuration if XendDomains believe domain is
                 # persistent
                 if is_managed:
                     xendomains.managed_config_save(self)
-
-                if xennode.xenschedinfo() == 'credit':
-                    xendomains.domain_sched_credit_set(self.getDomid(),
-                                                       self.getWeight(),
-                                                       self.getCap())
             except:
                 log.exception('VM start failed')
                 self.destroy()
@@ -497,6 +491,7 @@ class XendDomainInfo:
                     # we just ignore it so that the domain can still be restored
                     log.warn("Cannot restore CPU affinity")
 
+                self._setSchedParams()
                 self._storeVmDetails()
                 self._createChannels()
                 self._createDevices()
@@ -2555,6 +2550,12 @@ class XendDomainInfo:
                 for v in range(0, self.info['VCPUs_max']):
                     xc.vcpu_setaffinity(self.domid, v, cpumask)
 
+    def _setSchedParams(self):
+        if XendNode.instance().xenschedinfo() == 'credit':
+            from xen.xend import XendDomain
+            XendDomain.instance().domain_sched_credit_set(self.getDomid(),
+                                                          self.getWeight(),
+                                                          self.getCap())
 
     def _initDomain(self):
         log.debug('XendDomainInfo.initDomain: %s %s',
@@ -2570,6 +2571,9 @@ class XendDomainInfo:
             # this is done prior to memory allocation to aide in memory
             # distribution for NUMA systems.
             self._setCPUAffinity()
+
+            # Set scheduling parameters.
+            self._setSchedParams()
 
             # Use architecture- and image-specific calculations to determine
             # the various headrooms necessary, given the raw configured
