@@ -1299,6 +1299,9 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
     eventinj_t eventinj;
     int inst_len, rc;
 
+    if ( paging_mode_hap(v->domain) )
+        v->arch.hvm_vcpu.guest_cr[3] = v->arch.hvm_vcpu.hw_cr[3] = vmcb->cr3;
+
     /*
      * Before doing anything else, we need to sync up the VLAPIC's TPR with
      * SVM's vTPR. It's OK if the guest doesn't touch CR8 (e.g. 32-bit Windows)
