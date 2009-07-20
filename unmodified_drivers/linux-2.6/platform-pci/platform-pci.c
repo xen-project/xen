@@ -257,6 +257,60 @@ int xen_reboot_init(void);
 int xen_panic_handler_init(void);
 int gnttab_init(void);
 
+#define XEN_IOPORT_BASE 0x10
+
+#define XEN_IOPORT_PLATFLAGS	(XEN_IOPORT_BASE + 0) /* 1 byte access (R/W) */
+#define XEN_IOPORT_MAGIC	(XEN_IOPORT_BASE + 0) /* 2 byte access (R) */
+#define XEN_IOPORT_UNPLUG	(XEN_IOPORT_BASE + 0) /* 2 byte access (W) */
+#define XEN_IOPORT_DRVVER	(XEN_IOPORT_BASE + 0) /* 4 byte access (W) */
+
+#define XEN_IOPORT_SYSLOG	(XEN_IOPORT_BASE + 2) /* 1 byte access (W) */
+#define XEN_IOPORT_PROTOVER	(XEN_IOPORT_BASE + 2) /* 1 byte access (R) */
+#define XEN_IOPORT_PRODNUM	(XEN_IOPORT_BASE + 2) /* 2 byte access (W) */
+
+#define XEN_IOPORT_MAGIC_VAL 0x49d2
+#define XEN_IOPORT_LINUX_PRODNUM 0xffff /* NB: register a proper one */
+#define XEN_IOPORT_LINUX_DRVVER  ((LINUX_VERSION_CODE << 8) + 0x0)
+
+static int check_platform_magic(struct device *dev, long ioaddr, long iolen)
+{
+	short magic;
+	char protocol;
+
+	if (iolen < 0x16)
+		return -ENODEV;
+
+	magic = inw(XEN_IOPORT_MAGIC);
+
+	if (magic != XEN_IOPORT_MAGIC_VAL) {
+		dev_err(dev, "invalid magic %#x", magic);
+		return -ENODEV;
+	}
+
+	protocol = inb(XEN_IOPORT_PROTOVER);
+
+	dev_info(dev, "I/O protocol version %d\n", protocol);
+
+	switch (protocol) {
+	case 1:
+		outw(XEN_IOPORT_PRODNUM, 0xbeef);
+		outl(XEN_IOPORT_DRVVER, 0xdead);
+		if (inw(XEN_IOPORT_MAGIC) != XEN_IOPORT_MAGIC_VAL) {
+			dev_err(dev, "blacklisted by host\n");
+			return -ENODEV;
+		}
+		/* Fall through */
+	case 0:
+		outw(XEN_IOPORT_UNPLUG, 0xf);
+		break;
+	default:
+		dev_err(dev, "unknown qemu version\n");
+		return -ENODEV;
+	}
+
+	return 0;
+}
+
 static int __devinit platform_pci_init(struct pci_dev *pdev,
 				       const struct pci_device_id *ent)
 {
@@ -302,6 +356,10 @@ static int __devinit platform_pci_init(struct pci_dev *pdev,
 	platform_mmiolen = mmio_len;
 
 	ret = init_hypercall_stubs();
+	if (ret < 0)
+		goto out;
+
+	ret = check_platform_magic(&pdev->dev, ioaddr, iolen);
 	if (ret < 0)
 		goto out;
 
