@@ -310,7 +310,7 @@ def parse_pci_name_extended(pci_dev_str):
     # By arranging things so that virtual function 0 is first,
     # attachemnt can use the returned list as is. And detachment
     # can just reverse the list.
-    pci.sort(None, lambda x: int(x['vdevfn'], 16), 1)
+    pci.sort(lambda x,y: cmp(int(y['vdevfn'], 16), int(x['vdevfn'], 16)))
     return pci
 
 def parse_pci_name(pci_name_string):
