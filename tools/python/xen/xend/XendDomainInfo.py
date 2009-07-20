@@ -2634,7 +2634,7 @@ class XendDomainInfo:
 
             self._createDevices()
 
-            self.image.cleanupBootloading()
+            self.image.cleanupTmpImages()
 
             self.info['start_time'] = time.time()
 
@@ -2642,12 +2642,12 @@ class XendDomainInfo:
         except VmError, exn:
             log.exception("XendDomainInfo.initDomain: exception occurred")
             if self.image:
-                self.image.cleanupBootloading()
+                self.image.cleanupTmpImages()
             raise exn
         except RuntimeError, exn:
             log.exception("XendDomainInfo.initDomain: exception occurred")
             if self.image:
-                self.image.cleanupBootloading()
+                self.image.cleanupTmpImages()
             raise VmError(str(exn))
 
 

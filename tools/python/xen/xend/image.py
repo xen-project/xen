@@ -89,6 +89,8 @@ class ImageHandler:
         self.vm = vm
 
         self.bootloader = False
+        self.use_tmp_kernel = False
+        self.use_tmp_ramdisk = False
         self.kernel = None
         self.ramdisk = None
         self.cmdline = None
@@ -106,6 +108,10 @@ class ImageHandler:
             self.kernel = vmConfig['PV_kernel']
             self.cmdline = vmConfig['PV_args']
             self.ramdisk = vmConfig['PV_ramdisk']
+        if vmConfig['use_tmp_kernel']:
+            self.use_tmp_ramdisk = True
+        if vmConfig['use_tmp_ramdisk']:
+            self.use_tmp_kernel = True
         self.vm.storeVm(("image/ostype", self.ostype),
                         ("image/kernel", self.kernel),
                         ("image/cmdline", self.cmdline),
@@ -135,9 +141,10 @@ class ImageHandler:
         if 'cpuid_check' in vmConfig:
             self.cpuid_check = vmConfig['cpuid_check']
 
-    def cleanupBootloading(self):
-        if self.bootloader:
+    def cleanupTmpImages(self):
+        if self.use_tmp_kernel:
             self.unlink(self.kernel)
+        if self.use_tmp_ramdisk:
             self.unlink(self.ramdisk)
 
 

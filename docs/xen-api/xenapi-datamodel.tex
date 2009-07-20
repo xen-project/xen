@@ -1,5 +1,6 @@
 %
 % Copyright (c) 2006-2007 XenSource, Inc.
+% Copyright (c) 2009 flonatel GmbH & Co. KG
 %
 % Permission is granted to copy, distribute and/or modify this document under
 % the terms of the GNU Free Documentation License, Version 1.2 or any later
@@ -9,6 +10,7 @@
 % "GNU Free Documentation License" or the file fdl.tex.
 %
 % Authors: Ewan Mellor, Richard Sharp, Dave Scott, Jon Harrop.
+% Contributor: Andreas Florath
 %
 
 \chapter{API Reference}
@@ -1378,10 +1380,10 @@ the batch of events
 \newpage
 \section{Class: VM}
 \subsection{Fields for class: VM}
-\begin{longtable}{|lllp{0.38\textwidth}|}
+\begin{longtable}{|llp{0.21\textwidth}p{0.33\textwidth}|}
 \hline
 \multicolumn{1}{|l}{Name} & \multicolumn{3}{l|}{\bf VM} \\
-\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em A
+\multicolumn{4}{|l|}{\parbox{11cm}{\em Description: A
 virtual machine (or 'guest').}} \\
 \hline
 Quals & Field & Type & Description \\
@@ -1413,8 +1415,8 @@ $\mathit{RO}_\mathit{run}$ &  {\tt VTPMs} & (VTPM ref) Set & virtual TPMs \\
 $\mathit{RO}_\mathit{run}$ &  {\tt DPCIs} & (DPCI ref) Set & pass-through PCI devices \\
 $\mathit{RO}_\mathit{run}$ &  {\tt DSCSIs} & (DSCSI ref) Set & half-virtualized SCSI devices \\
 $\mathit{RW}$ &  {\tt PV/bootloader} & string & name of or path to bootloader \\
-$\mathit{RW}$ &  {\tt PV/kernel} & string & path to the kernel \\
-$\mathit{RW}$ &  {\tt PV/ramdisk} & string & path to the initrd \\
+$\mathit{RW}$ &  {\tt PV/kernel} & string & URI of kernel \\
+$\mathit{RW}$ &  {\tt PV/ramdisk} & string & URI of initrd \\
 $\mathit{RW}$ &  {\tt PV/args} & string & kernel command-line arguments \\
 $\mathit{RW}$ &  {\tt PV/bootloader\_args} & string & miscellaneous arguments for the bootloader \\
 $\mathit{RW}$ &  {\tt HVM/boot\_policy} & string & HVM boot policy \\
@@ -1429,6 +1431,87 @@ $\mathit{RO}_\mathit{run}$ &  {\tt guest\_metrics} & VM\_guest\_metrics ref & me
 $\mathit{RO}_\mathit{run}$ &  {\tt security/label} & string & the VM's security label \\
 \hline
 \end{longtable}
+\subsection{Parameter Details}
+\subsubsection{PV/kernel and PV/ramdisk}
+The \texttt{PV/kernel} and \texttt{PV/ramdisk} parameters should be
+specified as URIs with either a \texttt{file} or \texttt{data} scheme.
+
+The \texttt{file} scheme must be used when a file on the remote dom0
+should be used.  The remote dom0 is the one where the guest system
+should be started on. Only absolute filenames are supported, i.e. the
+string must start with \texttt{file://} appended with the absolute
+path.  This is typically used when the guest system use the same
+operating systems as the dom0 or there is some kind of shared storage
+for the images inside the dom0s.
+
+Note that for compatibility reasons it is possible --- but not
+recommended --- to leave out the scheme specification for
+\texttt{file}, i.e. \texttt{file:///some/path} and \texttt{/some/path}
+is equivalent.
+
+Examples (in python):
+
+Use kernel image which resides in the \texttt{/boot} directory:
+\begin{verbatim}
+xenapi.VM.create({ ...
+   'PV_kernel': 'file:///boot/vmlinuz-2.6.26-2-xen-686',
+   ... })
+\end{verbatim}
+
+Use ramdisk image which resides on a (shared) nfs directory:
+\begin{verbatim}
+xenapi.VM.create({ ...
+   'PV_ramdisk': 'file:///nfs/xen/debian/5.0.1/initrd.img-2.6.26-2-xen-686'
+   ... })
+\end{verbatim}
+
+When an image should be used which resides on the local system,
+i.e. the system where the XenAPI call is send from, it is possible to
+use the \texttt{data} URI scheme as described in \cite{RFC2397}.  The
+media-type must be set to \texttt{application/octet-stream}.
+Currently only base64 encoding is supported.  The URI must therefore
+start with \texttt{data:application/octet-stream;base64,} followed by
+the base64 encoded image.
+
+The \texttt{xen/util/fileuri.py} provides a helper function which
+takes a local filename as parameter and build up the correct URI from
+this.
+
+Examples (in python):
+
+Use kernel image specified inline:
+\begin{verbatim}
+xenapi.VM.create({ ...
+   'PV_kernel': 'data:application/octet-stream;base64,H4Zu....'
+      # most of base64 encoded data is omitted 
+   ... })
+\end{verbatim}
+
+Using the utility function:
+\begin{verbatim}
+from xen.util.fileuri import scheme_data
+xenapi.VM.create({ ...
+   'PV_kernel': scheme_data.create_from_file(
+       "/xen/guests/images/debian/5.0.1/vmlinuz-2.6.26-2-xen-686"),
+   ... })
+\end{verbatim}
+
+Currently when using the \texttt{data} URI scheme, a temporary file is
+created on the remote dom0 in the directory
+\texttt{/var/run/xend/boot} which is then used for booting. When not
+used any longer the file is deleted.  (Therefore reading of the
+\texttt{PV/kernel} or \texttt{PV/ramdisk} parameters when created with
+a \texttt{data} URI scheme returns a filename to a temporary file ---
+which might even not exists when querying.)  This implementation might
+change in the way that the data is directly used --- without the
+indirection using a file.  Therefore do not rely on the data resulting
+from a read of a variables which was set using the \texttt{data}
+scheme.
+
+Note: a mix of different schemes for the parameters is possible; e.g.
+the kernel can be specified with a \texttt{file} and the ramdisk with
+the \texttt{data} URI scheme.
+
 \subsection{RPCs associated with class: VM}
 \subsubsection{RPC name:~clone}
 
