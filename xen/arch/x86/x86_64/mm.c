@@ -123,6 +123,7 @@ void *do_page_walk(struct vcpu *v, unsigned long addr)
     l3e = l3t[l3_table_offset(addr)];
     mfn = l3e_get_pfn(l3e);
     if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) || !mfn_valid(mfn) )
+        return NULL;
     if ( (l3e_get_flags(l3e) & _PAGE_PSE) )
         return mfn_to_virt(mfn) + (addr & ((1UL << L3_PAGETABLE_SHIFT) - 1));
 

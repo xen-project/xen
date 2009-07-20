@@ -164,7 +164,8 @@ void show_page_walk(unsigned long addr)
     printk(" L3[0x%03lx] = %"PRIpte" %08lx\n",
            l3_table_offset(addr), l3e_get_intpte(l3e), pfn);
     unmap_domain_page(l3t);
-    if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) )
+    if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) ||
+         !mfn_valid(mfn) )
         return;
 
     l2t = map_domain_page(mfn);
@@ -176,7 +177,8 @@ void show_page_walk(unsigned long addr)
            (l2e_get_flags(l2e) & _PAGE_PSE) ? "(PSE)" : "");
     unmap_domain_page(l2t);
     if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) ||
-         (l2e_get_flags(l2e) & _PAGE_PSE) )
+         (l2e_get_flags(l2e) & _PAGE_PSE) ||
+         !mfn_valid(mfn) )
         return;
 
     l1t = map_domain_page(mfn);

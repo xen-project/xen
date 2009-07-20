@@ -179,7 +179,8 @@ void show_page_walk(unsigned long addr)
     pfn = mfn_valid(mfn) ? get_gpfn_from_mfn(mfn) : INVALID_M2P_ENTRY;
     printk(" L4[0x%03lx] = %"PRIpte" %016lx\n",
            l4_table_offset(addr), l4e_get_intpte(l4e), pfn);
-    if ( !(l4e_get_flags(l4e) & _PAGE_PRESENT) )
+    if ( !(l4e_get_flags(l4e) & _PAGE_PRESENT) ||
+         !mfn_valid(mfn) )
         return;
 
     l3t = mfn_to_virt(mfn);
@@ -190,7 +191,8 @@ void show_page_walk(unsigned long addr)
            l3_table_offset(addr), l3e_get_intpte(l3e), pfn,
            (l3e_get_flags(l3e) & _PAGE_PSE) ? " (PSE)" : "");
     if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) ||
-         (l3e_get_flags(l3e) & _PAGE_PSE) )
+         (l3e_get_flags(l3e) & _PAGE_PSE) ||
+         !mfn_valid(mfn) )
         return;
 
     l2t = mfn_to_virt(mfn);
@@ -201,7 +203,8 @@ void show_page_walk(unsigned long addr)
            l2_table_offset(addr), l2e_get_intpte(l2e), pfn,
            (l2e_get_flags(l2e) & _PAGE_PSE) ? "(PSE)" : "");
     if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) ||
-         (l2e_get_flags(l2e) & _PAGE_PSE) )
+         (l2e_get_flags(l2e) & _PAGE_PSE) ||
+         !mfn_valid(mfn) )
         return;
 
     l1t = mfn_to_virt(mfn);
