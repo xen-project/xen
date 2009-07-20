@@ -92,67 +92,38 @@ void *xc_map_foreign_range(int xc_handle, uint32_t dom,
                            int size, int prot,
                            unsigned long mfn)
 {
-    privcmd_mmap_t ioctlx;
-    privcmd_mmap_entry_t entry;
-    void *addr;
-    addr = mmap(NULL, size, prot, MAP_SHARED, xc_handle, 0);
-    if ( addr == MAP_FAILED ) {
-        perror("xc_map_foreign_range: mmap failed");
-        return NULL;
-    }
+    xen_pfn_t *arr;
+    int num;
+    int i;
 
-    ioctlx.num=1;
-    ioctlx.dom=dom;
-    ioctlx.entry=&entry;
-    entry.va=(unsigned long) addr;
-    entry.mfn=mfn;
-    entry.npages=(size+PAGE_SIZE-1)>>PAGE_SHIFT;
-    if ( ioctl(xc_handle, IOCTL_PRIVCMD_MMAP, &ioctlx) < 0 )
-    {
-        int saved_errno = errno;
-        perror("xc_map_foreign_range: ioctl failed");
-        (void)munmap(addr, size);
-        errno = saved_errno;
-        return NULL;
-    }
-    return addr;
+    num = (size + PAGE_SIZE - 1) >> PAGE_SHIFT;
+    arr = calloc(num, sizeof(xen_pfn_t));
+
+    for ( i = 0; i < num; i++ )
+        arr[i] = mfn + i;
+
+    return xc_map_foreign_batch(xc_handle, dom, prot, arr, num);
 }
 
 void *xc_map_foreign_ranges(int xc_handle, uint32_t dom,
                             size_t size, int prot, size_t chunksize,
                             privcmd_mmap_entry_t entries[], int nentries)
 {
-    privcmd_mmap_t ioctlx;
-    int i, rc;
-    void *addr;
+    xen_pfn_t *arr;
+    int num_per_entry;
+    int num;
+    int i;
+    int j;
 
-    addr = mmap(NULL, size, prot, MAP_SHARED, xc_handle, 0);
-    if ( addr == MAP_FAILED )
-        goto mmap_failed;
+    num_per_entry = chunksize >> PAGE_SHIFT;
+    num = num_per_entry * nentries;
+    arr = calloc(num, sizeof(xen_pfn_t));
 
     for ( i = 0; i < nentries; i++ )
-    {
-        entries[i].va = (unsigned long)addr + (i * chunksize);
-        entries[i].npages = chunksize >> PAGE_SHIFT;
-    }
+        for ( j = 0; j < num_per_entry; j++ )
+            arr[i * num_per_entry + j] = entries[i].mfn + j;
 
-    ioctlx.num   = nentries;
-    ioctlx.dom   = dom;
-    ioctlx.entry = entries;
-
-    rc = ioctl(xc_handle, IOCTL_PRIVCMD_MMAP, &ioctlx);
-    if ( rc )
-        goto ioctl_failed;
-
-    return addr;
-
-ioctl_failed:
-    rc = munmap(addr, size);
-    if ( rc == -1 )
-        ERROR("%s: error in error path\n", __FUNCTION__);
-
-mmap_failed:
-    return NULL;
+    return xc_map_foreign_batch(xc_handle, dom, prot, arr, num);
 }
 
 static int do_privcmd(int xc_handle, unsigned int cmd, unsigned long data)
