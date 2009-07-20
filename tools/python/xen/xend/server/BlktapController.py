@@ -13,7 +13,7 @@ TAPDISK_BINARY  = '/usr/sbin/tapdisk2'
 TAPDISK_DEVICE  = '/dev/xen/blktap-2/tapdev'
 TAPDISK_CONTROL = TAPDISK_SYSFS + '/blktap'
 
-blktap1_disk_types = set([
+blktap1_disk_types = [
     'aio',
     'sync',
     'vmdk',
@@ -21,16 +21,16 @@ blktap1_disk_types = set([
     'qcow',
     'qcow2',
     'ioemu',
-    ])
+    ]
 
-blktap2_disk_types = set([
+blktap2_disk_types = [
     'aio',
     'ram',
     'qcow',
     'vhd',
-    ])
+    ]
 
-blktap_disk_types = blktap1_disk_types | blktap2_disk_types
+blktap_disk_types = blktap1_disk_types + blktap2_disk_types
 
 def doexec(args, inputtext=None):
     """Execute a subprocess, then return its return code, stdout and stderr"""
