@@ -129,13 +129,13 @@ int xc_dom_boot_xen_init(struct xc_dom_image *dom, int xc, domid_t domid)
     return 0;
 }
 
-int xc_dom_boot_mem_init(struct xc_dom_image *dom, int superpages)
+int xc_dom_boot_mem_init(struct xc_dom_image *dom)
 {
     long rc;
 
     xc_dom_printf("%s: called\n", __FUNCTION__);
 
-    rc = arch_setup_meminit(dom, superpages);
+    rc = arch_setup_meminit(dom);
     if ( rc != 0 )
     {
         xc_dom_panic(XC_OUT_OF_MEMORY,

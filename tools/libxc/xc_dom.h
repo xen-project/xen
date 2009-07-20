@@ -96,6 +96,7 @@ struct xc_dom_image {
     int guest_xc;
     domid_t guest_domid;
     int8_t vhpt_size_log2; /* for IA64 */
+    int8_t superpages;
     int shadow_enabled;
 
     int xen_version;
@@ -174,7 +175,7 @@ int xc_dom_build_image(struct xc_dom_image *dom);
 int xc_dom_update_guest_p2m(struct xc_dom_image *dom);
 
 int xc_dom_boot_xen_init(struct xc_dom_image *dom, int xc, domid_t domid);
-int xc_dom_boot_mem_init(struct xc_dom_image *dom, int superpages);
+int xc_dom_boot_mem_init(struct xc_dom_image *dom);
 void *xc_dom_boot_domU_map(struct xc_dom_image *dom, xen_pfn_t pfn,
                            xen_pfn_t count);
 int xc_dom_boot_image(struct xc_dom_image *dom);
@@ -260,7 +261,7 @@ static inline xen_pfn_t xc_dom_p2m_guest(struct xc_dom_image *dom,
 
 /* --- arch bits --------------------------------------------------- */
 
-int arch_setup_meminit(struct xc_dom_image *dom, int superpages);
+int arch_setup_meminit(struct xc_dom_image *dom);
 int arch_setup_bootearly(struct xc_dom_image *dom);
 int arch_setup_bootlate(struct xc_dom_image *dom);
 

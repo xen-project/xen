@@ -436,9 +436,11 @@ static PyObject *pyxc_linux_build(XcObject *self,
     /* for IA64 */
     dom->vhpt_size_log2 = vhpt;
 
+    dom->superpages = superpages;
+
     if ( xc_dom_linux_build(self->xc_handle, dom, domid, mem_mb, image,
                             ramdisk, flags, store_evtchn, &store_mfn,
-                            console_evtchn, &console_mfn, superpages) != 0 ) {
+                            console_evtchn, &console_mfn) != 0 ) {
         goto out;
     }
 

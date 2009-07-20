@@ -63,7 +63,6 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
  * @parm store_mfn returned with the mfn of the store page
  * @parm console_evtchn the console event channel for this domain to use
  * @parm conole_mfn returned with the mfn of the console page
- * @parm superpages populate memory in guest with superpages
  * @return 0 on success, -1 on failure
  */
 int xc_linux_build(int xc_handle,
@@ -77,8 +76,7 @@ int xc_linux_build(int xc_handle,
                    unsigned int store_evtchn,
                    unsigned long *store_mfn,
                    unsigned int console_evtchn,
-                   unsigned long *console_mfn,
-	           int superpages);
+                   unsigned long *console_mfn);
 
 /** The same interface, but the dom structure is managed by the caller */
 struct xc_dom_image;
@@ -92,8 +90,7 @@ int xc_dom_linux_build(int xc_handle,
 		       unsigned int store_evtchn,
 		       unsigned long *store_mfn,
 		       unsigned int console_evtchn,
-		       unsigned long *console_mfn,
-                       int superpages);
+		       unsigned long *console_mfn);
 
 /**
  * This function will create a domain for a paravirtualized Linux
@@ -112,7 +109,6 @@ int xc_dom_linux_build(int xc_handle,
  * @parm store_mfn returned with the mfn of the store page
  * @parm console_evtchn the console event channel for this domain to use
  * @parm conole_mfn returned with the mfn of the console page
- * @parm superpages populate memory in guest with superpages
  * @return 0 on success, -1 on failure
  */
 int xc_linux_build_mem(int xc_handle,
@@ -128,8 +124,7 @@ int xc_linux_build_mem(int xc_handle,
                        unsigned int store_evtchn,
                        unsigned long *store_mfn,
                        unsigned int console_evtchn,
-                       unsigned long *console_mfn,
-                       int superpages);
+                       unsigned long *console_mfn);
 
 int xc_hvm_build(int xc_handle,
                  uint32_t domid,
