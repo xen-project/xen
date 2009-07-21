@@ -2234,7 +2234,7 @@ def xm_pci_list(args):
             vdevfn = AUTO_PHP_SLOT
         else:
             vdevfn = x['vdevfn']
-            return (vdevfn << 32) | \
+        return (vdevfn << 32) | \
                    PCI_BDF(x['domain'], x['bus'], x['slot'], x['func'])
     devs.sort(None, f)
 
