@@ -130,11 +130,22 @@ extern struct acm_operations *acm_secondary_ops;
 /* #define ACM_TRACE_MODE */
 
 #ifdef ACM_TRACE_MODE
-# define traceprintk(fmt, args...) printk(fmt,## args)
+# define traceprintk(fmt, args...) printk(fmt, ## args)
 #else
 # define traceprintk(fmt, args...)
 #endif
 
+/* if ACM_DEBUG defined, all hooks should
+ * print a short trace message (comment it out
+ * when not in testing mode )
+ */
+/* #define ACM_DEBUG */
+
+#ifdef ACM_DEBUG
+#  define printkd(fmt, args...) printk(fmt, ## args)
+#else
+#  define printkd(fmt, args...)
+#endif
 
 #ifndef ACM_SECURITY
 

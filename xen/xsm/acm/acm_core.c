@@ -38,7 +38,7 @@
  *   define/undefine this constant to receive / suppress any
  *   security hook debug output of sHype
  *
- *   include/public/xsm/acm.h defines a constant ACM_DEBUG
+ *   include/xsm/acm/acm_hooks.h defines a constant ACM_DEBUG
  *   define/undefine this constant to receive non-hook-related
  *   debug output.
  */
