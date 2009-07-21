@@ -35,9 +35,9 @@
 /* #define ACM_DEBUG */
 
 #ifdef ACM_DEBUG
-#  define printkd(fmt, args...) printk(fmt,## args)
+#  define printkd(fmt, ...) printk(fmt, ##__VA_ARGS__)
 #else
-#  define printkd(fmt, args...)
+#  define printkd(fmt, ...)
 #endif
 
 /* default ssid reference value if not supplied */
