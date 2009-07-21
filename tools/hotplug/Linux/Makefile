@@ -12,6 +12,7 @@ XEN_SCRIPTS += network-route vif-route
 XEN_SCRIPTS += network-nat vif-nat
 XEN_SCRIPTS += block
 XEN_SCRIPTS += block-enbd block-nbd
+XEN_SCRIPTS += blktap
 XEN_SCRIPTS += vtpm vtpm-delete
 XEN_SCRIPTS += xen-hotplug-cleanup
 XEN_SCRIPTS += external-device-migrate

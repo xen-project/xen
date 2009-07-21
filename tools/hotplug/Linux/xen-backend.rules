@@ -1,3 +1,4 @@
+SUBSYSTEM=="xen-backend", KERNEL=="tap*", RUN+="/etc/xen/scripts/blktap $env{ACTION}"
 SUBSYSTEM=="xen-backend", KERNEL=="vbd*", RUN+="/etc/xen/scripts/block $env{ACTION}"
 SUBSYSTEM=="xen-backend", KERNEL=="vtpm*", RUN+="/etc/xen/scripts/vtpm $env{ACTION}"
 SUBSYSTEM=="xen-backend", KERNEL=="vif*", ACTION=="online", RUN+="$env{script} online"
