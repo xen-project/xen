@@ -78,6 +78,19 @@ def _linux_balloon_stat(label):
         return _linux_balloon_stat_sysfs(label)
     return None
 
+def _netbsd_balloon_stat(label):
+    """Returns the value for the named label, or None if an error occurs."""
+
+    import commands
+
+    if label != 'current':
+       return None
+    cmd = "/sbin/sysctl hw.physmem64"
+    sysctloutput = commands.getoutput(cmd)
+    (name, value) = sysctloutput.split('=')
+    """Return value in KB."""
+    return int(value) / 1024
+
 def _solaris_balloon_stat(label):
     """Returns the value for the named label, or None if an error occurs."""
 
@@ -106,7 +119,8 @@ def _solaris_balloon_stat(label):
         f.close()
 
 _balloon_stat = {
-    "SunOS": _solaris_balloon_stat
+    "SunOS": _solaris_balloon_stat,
+    "NetBSD": _netbsd_balloon_stat,
 }
 
 def _linux_get_cpuinfo():
@@ -178,8 +192,32 @@ def _solaris_get_cpuinfo():
     # return the hash table
     return cpuinfo
 
+def _netbsd_get_cpuinfo():
+    import commands
+    cpuinfo = {}
+
+    cmd = "/sbin/sysctl hw.ncpu"
+    sysctloutput = commands.getoutput(cmd)
+    (name, ncpu) = sysctloutput.split('=')
+
+    for i in range(int(ncpu)):
+        if not cpuinfo.has_key(i):
+            cpuinfo[i] = {}
+
+    # Translate NetBSD tokens into what xend expects
+    for key in cpuinfo.keys():
+        cpuinfo[key]['flags'] = "" 
+        cpuinfo[key]['vendor_id'] = ""
+        cpuinfo[key]['model name'] = ""
+        cpuinfo[key]['stepping'] = ""
+        cpuinfo[key]['cpu MHz'] = 0
+ 
+    return cpuinfo
+
+
 _get_cpuinfo = {
-    "SunOS": _solaris_get_cpuinfo
+    "SunOS": _solaris_get_cpuinfo,
+    "NetBSD": _netbsd_get_cpuinfo
 }
 
 def _default_prefork(name):
