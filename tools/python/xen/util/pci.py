@@ -287,13 +287,19 @@ def parse_pci_name_extended(pci_dev_str):
     # Virtual slot assignment takes place here if specified in the bdf,
     # else it is done inside qemu-xen, as it knows which slots are free
     pci = []
-    vfunc = 0;
     func_list = pci_func_list_process(pci_dev_str, template,
                                       pci_dev_info['func'])
     for func in func_list:
         pci_dev = template.copy()
         pci_dev['func'] = "0x%x" % func
 
+        if len(func_list) == 1:
+            # For single-function devices vfunc must be 0
+            vfunc = 0
+        else:
+            # For multi-function virtual devices,
+            # identity map the func to vfunc
+            vfunc = func
         if pci_dev_info['vdevfn'] == '':
             vdevfn = AUTO_PHP_SLOT | vfunc
         else:
@@ -301,7 +307,6 @@ def parse_pci_name_extended(pci_dev_str):
         pci_dev['vdevfn'] = "0x%02x" % vdevfn
 
         pci.append(pci_dev)
-        vfunc += 1
 
     # For pci attachment and detachment is it important that virtual
     # function 0 is done last. This is because is virtual function 0 that
