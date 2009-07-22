@@ -507,7 +507,8 @@ static void free_heap_pages(
         if ( (page_to_mfn(pg) & mask) )
         {
             /* Merge with predecessor block? */
-            if ( !page_state_is(pg-mask, free) ||
+            if ( !mfn_valid(page_to_mfn(pg-mask)) ||
+                 !page_state_is(pg-mask, free) ||
                  (PFN_ORDER(pg-mask) != order) )
                 break;
             pg -= mask;
@@ -516,7 +517,8 @@ static void free_heap_pages(
         else
         {
             /* Merge with successor block? */
-            if ( !page_state_is(pg+mask, free) ||
+            if ( !mfn_valid(page_to_mfn(pg+mask)) ||
+                 !page_state_is(pg+mask, free) ||
                  (PFN_ORDER(pg+mask) != order) )
                 break;
             page_list_del(pg + mask, &heap(node, zone, order));
@@ -608,7 +610,7 @@ int offline_page(unsigned long mfn, int broken, uint32_t *status)
     int ret = 0;
     struct page_info *pg;
 
-    if ( mfn > max_page )
+    if ( mfn_valid(mfn) )
     {
         dprintk(XENLOG_WARNING,
                 "try to offline page out of range %lx\n", mfn);
@@ -694,7 +696,7 @@ unsigned int online_page(unsigned long mfn, uint32_t *status)
     struct page_info *pg;
     int ret;
 
-    if ( mfn > max_page )
+    if ( !mfn_valid(mfn) )
     {
         dprintk(XENLOG_WARNING, "call expand_pages() first\n");
         return -EINVAL;
@@ -745,7 +747,7 @@ int query_page_offline(unsigned long mfn, uint32_t *status)
 {
     struct page_info *pg;
 
-    if ( (mfn > max_page) || !page_is_ram_type(mfn, RAM_TYPE_CONVENTIONAL) )
+    if ( !mfn_valid(mfn) || !page_is_ram_type(mfn, RAM_TYPE_CONVENTIONAL) )
     {
         dprintk(XENLOG_WARNING, "call expand_pages() first\n");
         return -EINVAL;
@@ -886,7 +888,7 @@ void __init scrub_heap_pages(void)
         pg = mfn_to_page(mfn);
 
         /* Quick lock-free check. */
-        if ( !page_state_is(pg, free) )
+        if ( !mfn_valid(mfn) || !page_state_is(pg, free) )
             continue;
 
         /* Every 100MB, print a progress dot. */
