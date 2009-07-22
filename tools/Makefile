@@ -25,6 +25,7 @@ SUBDIRS-$(CONFIG_Linux) += blktap
 SUBDIRS-$(CONFIG_Linux) += blktap2
 SUBDIRS-$(CONFIG_NetBSD) += libaio
 SUBDIRS-$(CONFIG_NetBSD) += blktap2
+SUBDIRS-$(CONFIG_NetBSD) += xenbackendd
 SUBDIRS-y += libfsimage
 SUBDIRS-$(LIBXENAPI_BINDINGS) += libxen
 SUBDIRS-$(CONFIG_Linux) += fs-back

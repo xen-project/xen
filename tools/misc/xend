@@ -107,6 +107,14 @@ def start_consoled():
 def start_blktapctrl():
     start_daemon("blktapctrl", "")
 
+def start_xenbackendd():
+    XENBACKENDD_DEBUG = os.getenv("XENBACKENDD_DEBUG")
+    args = ""
+    if XENBACKENDD_DEBUG:
+        args += "-d"
+    if os.uname()[0] == 'NetBSD':
+        start_daemon("xenbackendd", args)
+
 def main():
     try:
         check_logging()
@@ -121,11 +129,13 @@ def main():
         if os.uname()[0] != "SunOS":
             start_xenstored()
             start_consoled()
+            start_xenbackendd()
             start_blktapctrl()
         return daemon.start()
     elif sys.argv[1] == 'trace_start':
         start_xenstored()
         start_consoled()
+        start_xenbackendd()
         start_blktapctrl()
         return daemon.start(trace=1)
     elif sys.argv[1] == 'stop':
@@ -135,6 +145,7 @@ def main():
     elif sys.argv[1] == 'restart':
         start_xenstored()
         start_consoled()
+        start_xenbackendd()
         start_blktapctrl()
         return daemon.stop() or daemon.start()
     elif sys.argv[1] == 'status':
