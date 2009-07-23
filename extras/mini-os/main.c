@@ -69,11 +69,6 @@ static void call_main(void *p)
 #endif
 
 #ifdef CONFIG_QEMU
-    if (!fs_import) {
-        printk("No FS backend found, is it running?\n");
-        do_exit();
-    }
-
     /* Fetch argc, argv from XenStore */
     domid = xenbus_read_integer("target");
     if (domid == -1) {

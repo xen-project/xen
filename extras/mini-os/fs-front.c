@@ -193,6 +193,9 @@ int fs_open(struct fs_import *import, char *file)
     struct fsif_request *req;
     int fd;
 
+    if (!import)
+        return -1;
+
     /* Prepare request for the backend */
     back_req_id = reserve_fsif_request(import);
     DEBUG("Backend request id=%d\n", back_req_id);
@@ -234,6 +237,9 @@ int fs_close(struct fs_import *import, int fd)
     struct fsif_request *req;
     int ret;
 
+    if (!import)
+        return -1;
+
     /* Prepare request for the backend */
     back_req_id = reserve_fsif_request(import);
     DEBUG("Backend request id=%d\n", back_req_id);
@@ -273,6 +279,9 @@ ssize_t fs_read(struct fs_import *import, int fd, void *buf,
     struct fsif_request *req;
     ssize_t ret;
     int i;
+
+    if (!import)
+        return -1;
 
     BUG_ON(len > PAGE_SIZE * FSIF_NR_READ_GNTS);
 
@@ -345,6 +354,9 @@ ssize_t fs_write(struct fs_import *import, int fd, void *buf,
     ssize_t ret, to_copy;
     int i;
 
+    if (!import)
+        return -1;
+
     BUG_ON(len > PAGE_SIZE * FSIF_NR_WRITE_GNTS);
 
     /* Prepare request for the backend */
@@ -413,6 +425,9 @@ int fs_stat(struct fs_import *import,
     struct fsif_request *req;
     int ret;
 
+    if (!import)
+        return -1;
+
     /* Prepare request for the backend */
     back_req_id = reserve_fsif_request(import);
     DEBUG("Backend request id=%d\n", back_req_id);
@@ -455,6 +470,9 @@ int fs_truncate(struct fs_import *import,
     struct fsif_request *req;
     int ret;
 
+    if (!import)
+        return -1;
+
     /* Prepare request for the backend */
     back_req_id = reserve_fsif_request(import);
     DEBUG("Backend request id=%d\n", back_req_id);
@@ -494,6 +512,9 @@ int fs_remove(struct fs_import *import, char *file)
     RING_IDX back_req_id; 
     struct fsif_request *req;
     int ret;
+
+    if (!import)
+        return -1;
 
     /* Prepare request for the backend */
     back_req_id = reserve_fsif_request(import);
@@ -542,6 +563,9 @@ int fs_rename(struct fs_import *import,
     int ret;
     char old_header[] = "old: ";
     char new_header[] = "new: ";
+
+    if (!import)
+        return -1;
 
     /* Prepare request for the backend */
     back_req_id = reserve_fsif_request(import);
@@ -594,6 +618,9 @@ int fs_create(struct fs_import *import, char *name,
     struct fsif_request *req;
     int ret;
 
+    if (!import)
+        return -1;
+
     /* Prepare request for the backend */
     back_req_id = reserve_fsif_request(import);
     DEBUG("Backend request id=%d\n", back_req_id);
@@ -640,6 +667,9 @@ char** fs_list(struct fs_import *import, char *name,
     struct fsif_request *req;
     char **files, *current_file;
     int i;
+
+    if (!import)
+        return NULL;
 
     DEBUG("Different masks: NR_FILES=(%llx, %d), ERROR=(%llx, %d), HAS_MORE(%llx, %d)\n",
             NR_FILES_MASK, NR_FILES_SHIFT, ERROR_MASK, ERROR_SHIFT, HAS_MORE_FLAG, HAS_MORE_SHIFT);
@@ -696,6 +726,9 @@ int fs_chmod(struct fs_import *import, int fd, int32_t mode)
     struct fsif_request *req;
     int ret;
 
+    if (!import)
+        return -1;
+
     /* Prepare request for the backend */
     back_req_id = reserve_fsif_request(import);
     DEBUG("Backend request id=%d\n", back_req_id);
@@ -735,6 +768,9 @@ int64_t fs_space(struct fs_import *import, char *location)
     RING_IDX back_req_id; 
     struct fsif_request *req;
     int64_t ret;
+
+    if (!import)
+        return -1;
 
     /* Prepare request for the backend */
     back_req_id = reserve_fsif_request(import);
@@ -776,6 +812,9 @@ int fs_sync(struct fs_import *import, int fd)
     RING_IDX back_req_id; 
     struct fsif_request *req;
     int ret;
+
+    if (!import)
+        return -1;
 
     /* Prepare request for the backend */
     back_req_id = reserve_fsif_request(import);
@@ -1231,19 +1270,19 @@ void init_fs_frontend(void)
 {
     struct minios_list_head *entry;
     struct fs_import *import = NULL;
-    printk("Initing FS fronend(s).\n");
+    printk("Initing FS frontend(s).\n");
 
-    //exports = probe_exports();
     add_export(&exports, 0);
     minios_list_for_each(entry, &exports)
     {
         import = minios_list_entry(entry, struct fs_import, list);
         printk("FS export [dom=%d, id=%d] found\n", 
                 import->dom_id, import->export_id);
-        init_fs_import(import);
+        if (init_fs_import(import) != 0) {
+            fs_import = import;
+            break;
+        }
     }
-
-    fs_import = import;
 
     if (!fs_import)
 	printk("No FS import\n");
