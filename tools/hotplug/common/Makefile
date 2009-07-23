@@ -22,7 +22,7 @@ build: genpath
 install: all install-scripts
 
 .PHONY: install-scripts
-install-scripts:
+install-scripts: build
 	[ -d $(DESTDIR)$(XEN_SCRIPT_DIR) ] || \
 		$(INSTALL_DIR) $(DESTDIR)$(XEN_SCRIPT_DIR)
 	set -e; for i in $(XEN_SCRIPTS); \
