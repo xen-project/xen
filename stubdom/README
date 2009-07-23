@@ -13,9 +13,9 @@ by using the hypervisor dom0_mem= option for instance.
 
 There is a sample configuration set in xmexample.hvm-stubdom
 
-In your HVM config "hvmconfig" use /usr/lib/xen/bin/stubdom-dm as dm script:
+In your HVM config "hvmconfig" use stubdom-dm as dm script:
 
-device_model = '/usr/lib/xen/bin/stubdom-dm'
+device_model = 'stubdom-dm'
 
 
 To run
@@ -44,9 +44,9 @@ Configuration
 
 In your PV config,
 
-- use /usr/lib/xen/boot/pv-grub.gz as kernel:
+- use pv-grub.gz as kernel:
 
-kernel = "/usr/lib/xen/boot/pv-grub.gz"
+kernel = "pv-grub.gz"
 
 - set the path to menu.lst, as seen from the domU, in extra:
 
