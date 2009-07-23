@@ -317,8 +317,8 @@ def restore(xd, fd, dominfo = None, paused = False, relocating = False):
                 else:
                     break
             os.close(qemu_fd)
-            restore_image.setCpuid()
 
+        restore_image.setCpuid()
 
         os.read(fd, 1)           # Wait for source to close connection
         
