@@ -2087,7 +2087,7 @@ class XendConfig(dict):
     def handle_fileuris(self):
         for arg in [('PV_kernel', 'use_tmp_kernel'), 
                     ('PV_ramdisk', 'use_tmp_ramdisk')]:
-            if self[arg[0]] != None:
+            if self[arg[0]]:
                 self[arg[0]], self[arg[1]] \
                     = xen.util.fileuri.schemes.decode(self[arg[0]])
                 log.debug("fileuri '%s' = '%s'" % (arg[0], self[arg[0]][:100]))
