@@ -148,9 +148,9 @@ QEMU_REMOTE=git://xenbits.xensource.com/qemu-xen-unstable.git
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= a42b67ed27a9744a2492c8ffe5c26935bd19ee27
-# Tue Jul 21 16:08:24 2009 +0100
-# use XC_PAGE_SIZE in xenfbfront (fix stubdom build on NetBSD)
+QEMU_TAG ?= 5cc34ea27f1cbd1a0560cfca91fb89ccd6d5726f
+# Thu Jul 9 15:33:48 2009 +0100
+# portability fixes for qemu-ifup
 
 OCAML_XENSTORED_REPO=http://xenbits.xensource.com/ext/xen-ocaml-tools.hg
 
