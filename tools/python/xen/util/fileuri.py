@@ -50,7 +50,6 @@ class scheme_error(Exception):
 # o Only base64 is currently supported
 class scheme_data:
 
-    @staticmethod
     def encode(data, mediatype = 'application/octet-stream', 
                encoding = 'base64'):
         # XXX Limit this to base64 for current implementation
@@ -58,9 +57,9 @@ class scheme_data:
             raise scheme_error("invalid encoding")
         return 'data:' + mediatype + ";" + encoding \
             + "," + base64.b64encode(data)
+    encode = staticmethod(encode)
 
     # Private method: parse encoded data
-    @staticmethod
     def parse(encoded_data):
         if not isinstance(encoded_data, str):
             raise scheme_error("encoded data has wrong type")
@@ -78,11 +77,11 @@ class scheme_data:
             raise scheme_error("encoding is not base64")
         mediatype = mtenc[:-7]
         return (mediatype, 'base64', comma+1)
+    parse = staticmethod(parse)
 
     # Stores the data in a local file and returns the filename
     # and a flag if this file in temporary only and must be deleted
     # after starting the VM.
-    @staticmethod
     def decode(encoded_data):
         mkdir.parents("/var/run/xend/boot/", stat.S_IRWXU)
         mediatype, encoding, data_start = scheme_data.parse(encoded_data)
@@ -91,10 +90,10 @@ class scheme_data:
         os.write(fd, base64.b64decode(encoded_data[data_start:]))
         os.close(fd)
         return filename, True
+    decode = staticmethod(decode)
 
     # Utility function which reads in the given (local) file and
     # creates a data scheme from this.
-    @staticmethod
     def create_from_file(filename):
         try:
             f = open(filename, "r")
@@ -103,6 +102,7 @@ class scheme_data:
             return scheme_data.encode(d)
         except IOError:
             raise scheme_error("file does not exists")
+    create_from_file = staticmethod(create_from_file)
 
 class scheme_data_unit_tests(unittest.TestCase):
 
@@ -181,15 +181,14 @@ class scheme_data_unit_tests(unittest.TestCase):
 # This class supports absolut paths only.
 class scheme_file:
 
-    @staticmethod
     def encode(filename):
         if len(filename) == 0:
             raise scheme_error("filename is empty")
         if filename[0] != '/':
             raise scheme_error("filename is not absolut")
         return 'file://' + filename
+    encode = staticmethod(encode)
 
-    @staticmethod
     def decode(encoded_data):
         if not encoded_data.startswith("file://"):
             raise scheme_error("no file:// scheme found")
@@ -199,6 +198,7 @@ class scheme_file:
         if path[0]!='/':
             raise scheme_error("path is not absolute")
         return path, False
+    decode = staticmethod(decode)
 
 class scheme_file_unit_tests(unittest.TestCase):
 
