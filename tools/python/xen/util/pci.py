@@ -19,6 +19,12 @@ from xen.xend import sxp
 from xen.xend.XendConstants import AUTO_PHP_SLOT
 from xen.xend.XendSXPDev import dev_dict_to_sxp
 
+# for 2.3 compatibility
+try:
+    set()
+except NameError:
+    from sets import Set as set
+
 PROC_PCI_PATH = '/proc/bus/pci/devices'
 PROC_PCI_NUM_RESOURCES = 7
 
