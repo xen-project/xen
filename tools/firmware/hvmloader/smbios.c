@@ -148,7 +148,8 @@ get_memsize(void)
 
     sz = (uint64_t)hvm_info->low_mem_pgend << PAGE_SHIFT;
     if ( hvm_info->high_mem_pgend )
-        sz += (hvm_info->high_mem_pgend << PAGE_SHIFT) - (1ull << 32);
+        sz += (((uint64_t)hvm_info->high_mem_pgend << PAGE_SHIFT)
+               - (1ull << 32));
 
     /*
      * Round up to the nearest MB.  The user specifies domU pseudo-physical 
