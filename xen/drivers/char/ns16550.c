@@ -299,7 +299,7 @@ static int __init parse_parity_char(int c)
     return 0;
 }
 
-static int check_existence(struct ns16550 *uart)
+static int __init check_existence(struct ns16550 *uart)
 {
     unsigned char status, scratch, scratch2, scratch3;
 
