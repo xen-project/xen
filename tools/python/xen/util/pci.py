@@ -633,16 +633,7 @@ class PciDevice:
             if parent[0:3] == 'pci':
                 # We have reached the upmost one.
                 return None
-            else:
-                dev = {}
-                lst = parent.split(':')
-                dev['domain'] = '%04x' % int(lst[0], 16)
-                dev['bus'] = '%02x' % int(lst[1], 16)
-                lst = lst[2]
-                lst = lst.split('.')
-                dev['slot'] = '%02x' % int(lst[0], 16)
-                dev['func'] = '%x' % int(lst[1], 16)
-            return dev
+            return parse_pci_name(parent)
         except OSError, (errno, strerr):
             raise PciDeviceParseError('Can not locate the parent of %s',
                 self.name)
