@@ -51,7 +51,6 @@ struct periodic_time {
     struct vcpu *vcpu;          /* vcpu timer interrupt delivers to */
     u32 pending_intr_nr;        /* pending timer interrupts */
     u64 period;                 /* frequency in ns */
-    u64 period_cycles;          /* frequency in cpu cycles */
     s_time_t scheduled;         /* scheduled timer interrupt */
     u64 last_plt_gtime;         /* platform time when last IRQ is injected */
     struct timer timer;         /* ac_timer */

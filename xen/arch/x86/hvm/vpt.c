@@ -230,9 +230,9 @@ void pt_update_irq(struct vcpu *v)
     list_for_each_entry ( pt, head, list )
     {
         if ( !pt_irq_masked(pt) && pt->pending_intr_nr &&
-             ((pt->last_plt_gtime + pt->period_cycles) < max_lag) )
+             ((pt->last_plt_gtime + pt->period) < max_lag) )
         {
-            max_lag = pt->last_plt_gtime + pt->period_cycles;
+            max_lag = pt->last_plt_gtime + pt->period;
             earliest_pt = pt;
         }
     }
@@ -309,7 +309,7 @@ void pt_intr_post(struct vcpu *v, struct hvm_intack intack)
         }
         else
         {
-            pt->last_plt_gtime += pt->period_cycles;
+            pt->last_plt_gtime += pt->period;
             pt->pending_intr_nr--;
         }
     }
@@ -385,7 +385,6 @@ void create_periodic_time(
     pt->vcpu = v;
     pt->last_plt_gtime = hvm_get_guest_time(pt->vcpu);
     pt->irq = irq;
-    pt->period_cycles = (u64)period;
     pt->one_shot = !period;
     pt->scheduled = NOW() + delta;
 
