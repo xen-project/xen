@@ -403,6 +403,17 @@ class PciController(DevController):
                                     ' same guest with %s'
                                 raise VmError(err_msg % (s, dev.name))
 
+        # Assigning device staticaly (namely, the pci string in guest config
+        # file) to PV guest needs this setupOneDevice().
+        # Assigning device dynamically (namely, 'xm pci-attach') to PV guest
+        #  would go through reconfigureDevice().
+        #
+        # For hvm guest, (from c/s 19679 on) assigning device statically and
+        # dynamically both go through reconfigureDevice(), so HERE the
+        # setupOneDevice() is not necessary.
+        if not self.vm.info.is_hvm():
+            for d in pci_dev_list:
+                self.setupOneDevice(d)
         wPath = '/local/domain/0/backend/pci/%u/0/aerState' % (self.getDomid())
         self.aerStateWatch = xswatch(wPath, self._handleAerStateWatch)
         log.debug('pci: register aer watch %s', wPath)
