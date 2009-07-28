@@ -42,7 +42,7 @@
 #define O  OPCODE_BYTE
 #define M  HAS_MODRM
 
-static const unsigned char insn_decode[256] = {
+static const u8 insn_decode[256] = {
     /* 0x00 - 0x0F */
     O|M, O|M, O|M, O|M, X, X, X, X,
     O|M, O|M, O|M, O|M, X, X, X, X,
@@ -93,7 +93,18 @@ static const unsigned char insn_decode[256] = {
     X, X, X, X, X, X, O|M, O|M
 };
 
-static const unsigned char twobyte_decode[256] = {
+static const u8 float_decode[64] = {
+    O|M, O|M, O|M, O|M, O|M, O|M, O|M, O|M, /* 0xD8 */
+    O|M, X, O|M, O|M, O|M, O|M, O|M, O|M, /* 0xD9 */
+    O|M, O|M, O|M, O|M, O|M, O|M, O|M, O|M, /* 0xDA */
+    O|M, X, O|M, O|M, X, O|M, X, O|M, /* 0xDB */
+    O|M, O|M, O|M, O|M, O|M, O|M, O|M, O|M, /* 0xDC */
+    O|M, O|M, O|M, O|M, O|M, X, O|M, O|M, /* 0xDD */
+    O|M, O|M, O|M, O|M, O|M, O|M, O|M, O|M, /* 0xDE */
+    O|M, X, O|M, O|M, O|M, O|M, O|M, O|M, /* 0xDF */
+};
+
+static const u8 twobyte_decode[256] = {
     /* 0x00 - 0x0F */
     X, X, X, X, X, X, X, X,
     X, X, X, X, X, X, X, X,
@@ -321,7 +332,8 @@ int gpf_emulate_4gb(struct cpu_user_regs *regs)
     s32            disp32 = 0;
     u8            *eip;         /* ptr to instruction start */
     u8            *pb, b;       /* ptr into instr. / current instr. byte */
-    int            gs_override = 0, scale = 0, twobyte = 0;
+    int            gs_override = 0, scale = 0, opcode = -1;
+    const u8      *table = insn_decode;
 
     /* WARNING: We only work for ring-3 segments. */
     if ( unlikely(vm86_mode(regs)) || unlikely(!ring_3(regs)) )
@@ -352,8 +364,11 @@ int gpf_emulate_4gb(struct cpu_user_regs *regs)
             goto fail;
         }
 
-        if ( twobyte )
+        if ( opcode != -1 )
+        {
+            opcode = (opcode << 8) | b;
             break;
+        }
 
         switch ( b )
         {
@@ -374,8 +389,29 @@ int gpf_emulate_4gb(struct cpu_user_regs *regs)
             gs_override = 1;
             break;
         case 0x0f: /* Not really a prefix byte */
-            twobyte = 1;
+            table = twobyte_decode;
+            opcode = b;
             break;
+        case 0xd8: /* Math coprocessor instructions.  */
+        case 0xd9:
+        case 0xda:
+        case 0xdb:
+        case 0xdc:
+        case 0xdd:
+        case 0xde:
+        case 0xdf:
+            /* Float opcodes have a secondary opcode in the modrm byte.  */
+            table = float_decode;
+            if ( get_user(modrm, pb + 1) )
+            {
+                dprintk(XENLOG_DEBUG, "Fault while extracting modrm byte\n");
+                goto page_fault;
+            }
+
+            opcode = (b << 8) | modrm;
+            b = ((b & 7) << 3) + ((modrm >> 3) & 7);
+            goto done_prefix;
+
         default: /* Not a prefix byte */
             goto done_prefix;
         }
@@ -388,13 +424,16 @@ int gpf_emulate_4gb(struct cpu_user_regs *regs)
         goto fail;
     }
 
-    decode = (!twobyte ? insn_decode : twobyte_decode)[b];
+    decode = table[b];
     pb++;
 
     if ( !(decode & OPCODE_BYTE) )
     {
-        dprintk(XENLOG_DEBUG, "Unsupported %sopcode %02x\n",
-                twobyte ? "two byte " : "", b);
+        if (opcode == -1)
+            dprintk(XENLOG_DEBUG, "Unsupported opcode %02x\n", b);
+        else
+            dprintk(XENLOG_DEBUG, "Unsupported opcode %02x %02x\n",
+                    opcode >> 8, opcode & 255);
         goto fail;
     }
 
