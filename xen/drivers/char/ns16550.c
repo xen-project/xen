@@ -214,7 +214,8 @@ static void __devinit ns16550_init_preirq(struct serial_port *port)
     ns_write_reg(uart, FCR, FCR_ENABLE | FCR_CLRX | FCR_CLTX | FCR_TRG14);
 
     /* Check this really is a 16550+. Otherwise we have no FIFOs. */
-    if ( (ns_read_reg(uart, IIR) & 0xc0) == 0xc0 )
+    if ( ((ns_read_reg(uart, IIR) & 0xc0) == 0xc0) &&
+         ((ns_read_reg(uart, FCR) & FCR_TRG14) == FCR_TRG14) )
         port->tx_fifo_size = 16;
 }
 
