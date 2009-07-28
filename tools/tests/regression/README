@@ -1,0 +1,39 @@
+
+Regression Test Environment for Xen
+-------------------------------------
+
+This is an initial regression tool environment for Xen.
+
+With the help of the Makefile, it is possible to compile a couple of
+different python versions and check all .py files against all verions
+for syntax errors.  Note that due to the dynmic of python not all
+syntax errors might be detected.
+
+Currently the following versions of python are supported:
+2.3.7 2.4.6 2.5.4 2.6.2 3.1
+
+
+Usage
+-----
+
+To download all supported versions of python, compile them, install
+them and run a basic syntax check, run
+
+$ make
+
+(The download and compilation of python is only done if not already
+available.)
+
+To delete all automatically build files:
+
+$ make dist-clean
+
+
+
+Runing unittests with a specific version
+----------------------------------------
+
+This does not work at the moment, because a lot of additional python
+packages are needed for this (which are currently not automatically
+build).
+

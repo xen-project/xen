@@ -209,6 +209,9 @@
 ^tools/tests/blowfish\.h$
 ^tools/tests/test_x86_emulator$
 ^tools/tests/x86_emulate$
+^tools/tests/regression/installed/.*$
+^tools/tests/regression/build/.*$
+^tools/tests/regression/downloads/.*$
 ^tools/vnet/Make.local$
 ^tools/vnet/build/.*$
 ^tools/vnet/gc$
