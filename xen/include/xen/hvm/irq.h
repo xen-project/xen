@@ -24,6 +24,7 @@
 
 #include <xen/types.h>
 #include <xen/spinlock.h>
+#include <xen/softirq.h>
 #include <asm/irq.h>
 #include <public/hvm/save.h>
 
@@ -88,6 +89,7 @@ struct hvm_irq_dpci {
     /* Record of mapped Links */
     uint8_t link_cnt[NR_LINK];
     struct timer hvm_timer[NR_VECTORS];
+    struct tasklet dirq_tasklet;
 };
 
 /* Modify state of a PCI INTx wire. */
@@ -107,7 +109,5 @@ void hvm_set_pci_link_route(struct domain *d, u8 link, u8 isa_irq);
 void hvm_maybe_deassert_evtchn_irq(void);
 void hvm_assert_evtchn_irq(struct vcpu *v);
 void hvm_set_callback_via(struct domain *d, uint64_t via);
-
-void hvm_dirq_assist(struct vcpu *v);
 
 #endif /* __XEN_HVM_IRQ_H__ */

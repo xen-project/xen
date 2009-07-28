@@ -24,6 +24,8 @@
 #include <asm/hvm/iommu.h>
 #include <xen/hvm/irq.h>
 
+static void hvm_dirq_assist(unsigned long _d);
+
 static int pt_irq_need_timer(uint32_t flags)
 {
     return !(flags & (HVM_IRQ_DPCI_GUEST_MSI | HVM_IRQ_DPCI_TRANSLATE));
@@ -114,6 +116,8 @@ int pt_irq_create_bind_vtd(
             return -ENOMEM;
         }
         memset(hvm_irq_dpci, 0, sizeof(*hvm_irq_dpci));
+        tasklet_init(&hvm_irq_dpci->dirq_tasklet, 
+                     hvm_dirq_assist, (unsigned long)d);
         hvm_irq_dpci->mirq = xmalloc_array(struct hvm_mirq_dpci_mapping,
                                            d->nr_pirqs);
         hvm_irq_dpci->dirq_mask = xmalloc_array(unsigned long,
@@ -368,18 +372,8 @@ int hvm_do_IRQ_dpci(struct domain *d, unsigned int mirq)
          !test_bit(mirq, dpci->mapping))
         return 0;
 
-    /*
-     * Set a timer here to avoid situations where the IRQ line is shared, and
-     * the device belonging to the pass-through guest is not yet active. In
-     * this case the guest may not pick up the interrupt (e.g., masked at the
-     * PIC) and we need to detect that.
-     */
     set_bit(mirq, dpci->dirq_mask);
-    if ( pt_irq_need_timer(dpci->mirq[mirq].flags) )
-        set_timer(&dpci->hvm_timer[domain_irq_to_vector(d, mirq)],
-                  NOW() + PT_IRQ_TIME_OUT);
-    vcpu_kick(d->vcpu[0]);
-
+    tasklet_schedule(&dpci->dirq_tasklet);
     return 1;
 }
 
@@ -429,16 +423,15 @@ static int hvm_pci_msi_assert(struct domain *d, int pirq)
 }
 #endif
 
-void hvm_dirq_assist(struct vcpu *v)
+static void hvm_dirq_assist(unsigned long _d)
 {
     unsigned int irq;
     uint32_t device, intx;
-    struct domain *d = v->domain;
+    struct domain *d = (struct domain *)_d;
     struct hvm_irq_dpci *hvm_irq_dpci = d->arch.hvm_domain.irq.dpci;
     struct dev_intx_gsi_link *digl;
 
-    if ( !iommu_enabled || (v->vcpu_id != 0) || (hvm_irq_dpci == NULL) )
-        return;
+    ASSERT(hvm_irq_dpci);
 
     for ( irq = find_first_bit(hvm_irq_dpci->dirq_mask, d->nr_pirqs);
           irq < d->nr_pirqs;
@@ -456,9 +449,6 @@ void hvm_dirq_assist(struct vcpu *v)
             continue;
         }
 #endif
-        if ( pt_irq_need_timer(hvm_irq_dpci->mirq[irq].flags) )
-            stop_timer(&hvm_irq_dpci->hvm_timer[domain_irq_to_vector(d, irq)]);
-
         list_for_each_entry ( digl, &hvm_irq_dpci->mirq[irq].digl_list, list )
         {
             device = digl->device;

@@ -109,7 +109,6 @@ asmlinkage void svm_intr_assist(void)
 
     /* Crank the handle on interrupt state. */
     pt_update_irq(v);
-    hvm_dirq_assist(v);
 
     do {
         intack = hvm_vcpu_has_pending_irq(v);

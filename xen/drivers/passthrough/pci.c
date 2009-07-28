@@ -209,6 +209,8 @@ static void pci_clean_dpci_irqs(struct domain *d)
     hvm_irq_dpci = domain_get_irq_dpci(d);
     if ( hvm_irq_dpci != NULL )
     {
+        tasklet_kill(&hvm_irq_dpci->dirq_tasklet);
+
         for ( i = find_first_bit(hvm_irq_dpci->mapping, d->nr_pirqs);
               i < d->nr_pirqs;
               i = find_next_bit(hvm_irq_dpci->mapping, d->nr_pirqs, i + 1) )

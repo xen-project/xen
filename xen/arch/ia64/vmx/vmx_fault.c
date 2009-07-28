@@ -305,7 +305,6 @@ void leave_hypervisor_tail(void)
                 viosapic_set_irq(d, callback_irq, 0);
             }
         }
-        hvm_dirq_assist(v);
     }
 
     rmb();

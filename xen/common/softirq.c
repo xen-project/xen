@@ -53,6 +53,28 @@ void open_softirq(int nr, softirq_handler handler)
     softirq_handlers[nr] = handler;
 }
 
+void cpumask_raise_softirq(cpumask_t mask, unsigned int nr)
+{
+    int cpu;
+
+    for_each_cpu_mask(cpu, mask)
+        if ( test_and_set_bit(nr, &softirq_pending(cpu)) )
+            cpu_clear(cpu, mask);
+
+    smp_send_event_check_mask(&mask);
+}
+
+void cpu_raise_softirq(unsigned int cpu, unsigned int nr)
+{
+    if ( !test_and_set_bit(nr, &softirq_pending(cpu)) )
+        smp_send_event_check_cpu(cpu);
+}
+
+void raise_softirq(unsigned int nr)
+{
+    set_bit(nr, &softirq_pending(smp_processor_id()));
+}
+
 static LIST_HEAD(tasklet_list);
 static DEFINE_SPINLOCK(tasklet_lock);
 

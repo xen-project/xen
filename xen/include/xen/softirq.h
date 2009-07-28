@@ -29,29 +29,9 @@ asmlinkage void do_softirq(void);
 void open_softirq(int nr, softirq_handler handler);
 void softirq_init(void);
 
-static inline void cpumask_raise_softirq(cpumask_t mask, unsigned int nr)
-{
-    int cpu;
-
-    for_each_cpu_mask(cpu, mask)
-    {
-        if ( test_and_set_bit(nr, &softirq_pending(cpu)) )
-            cpu_clear(cpu, mask);
-    }
-
-    smp_send_event_check_mask(&mask);
-}
-
-static inline void cpu_raise_softirq(unsigned int cpu, unsigned int nr)
-{
-    if ( !test_and_set_bit(nr, &softirq_pending(cpu)) )
-        smp_send_event_check_cpu(cpu);
-}
-
-static inline void raise_softirq(unsigned int nr)
-{
-    set_bit(nr, &softirq_pending(smp_processor_id()));
-}
+void cpumask_raise_softirq(cpumask_t mask, unsigned int nr);
+void cpu_raise_softirq(unsigned int cpu, unsigned int nr);
+void raise_softirq(unsigned int nr);
 
 /*
  * TASKLETS -- dynamically-allocatable tasks run in softirq context
