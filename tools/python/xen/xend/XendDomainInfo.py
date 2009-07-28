@@ -31,6 +31,7 @@ import thread
 import re
 import copy
 import os
+import stat
 import traceback
 from types import StringTypes
 
@@ -39,6 +40,7 @@ from xen.util import asserts, auxbin
 from xen.util.blkif import blkdev_uname_to_file, blkdev_uname_to_taptype
 import xen.util.xsm.xsm as security
 from xen.util import xsconstants
+from xen.util import mkdir
 from xen.util.pci import serialise_pci_opts, pci_opts_list_to_sxp, \
                          pci_dict_to_bdf_str, pci_dict_to_xc_str, \
                          pci_convert_sxp_to_dict, pci_convert_dict_to_sxp, \
@@ -2151,9 +2153,23 @@ class XendDomainInfo:
         """
         
         if not corefile:
+            # To prohibit directory traversal
+            based_name = os.path.basename(self.info['name_label'])
+            
+            coredir = "/var/xen/dump/%s" % (based_name)
+            if not os.path.exists(coredir):
+                try:
+                    mkdir.parents(coredir, stat.S_IRWXU)
+                except Exception, ex:
+                    log.error("Cannot create directory: %s" % str(ex))
+
+            if not os.path.isdir(coredir):
+                # Use former directory to dump core
+                coredir = '/var/xen/dump'
+
             this_time = time.strftime("%Y-%m%d-%H%M.%S", time.localtime())
-            corefile = "/var/xen/dump/%s-%s.%s.core" % (this_time,
-                              self.info['name_label'], self.domid)
+            corefile = "%s/%s-%s.%s.core" % (coredir, this_time,
+                                             self.info['name_label'], self.domid)
                 
         if os.path.isdir(corefile):
             raise XendError("Cannot dump core in a directory: %s" %
