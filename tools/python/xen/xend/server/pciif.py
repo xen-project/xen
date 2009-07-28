@@ -58,6 +58,25 @@ def parse_hex(val):
     except ValueError:
         return None
 
+def get_assigned_pci_devices(domid):
+    dev_str_list = []
+    path = '/local/domain/0/backend/pci/%u/0/' % domid
+    num_devs = xstransact.Read(path + 'num_devs');
+    if num_devs is None or num_devs == "":
+        return dev_str_list
+    num_devs = int(num_devs)
+    for i in range(num_devs):
+        dev_str = xstransact.Read(path + 'dev-%i' % i)
+        dev_str_list = dev_str_list + [dev_str]
+    return dev_str_list
+
+def get_all_assigned_pci_devices():
+    dom_list = xstransact.List('/local/domain')
+    pci_str_list = []
+    for d in dom_list:
+        pci_str_list = pci_str_list + get_assigned_pci_devices(int(d))
+    return pci_str_list
+
 class PciController(DevController):
 
     def __init__(self, vm):
@@ -368,11 +387,8 @@ class PciController(DevController):
                     dev.devs_check_driver(funcs)
                     for f in funcs:
                         if not f in pci_str_list:
-                            (f_dom, f_bus, f_slot, f_func) = parse_pci_name(f)
-                            f_pci_str = '0x%x,0x%x,0x%x,0x%x' % \
-                                (f_dom, f_bus, f_slot, f_func)
                             # f has been assigned to other guest?
-                            if xc.test_assign_device(0, f_pci_str) != 0:
+                            if f in get_all_assigned_pci_devices():
                                 err_msg = 'pci: %s must be co-assigned to' + \
                                     ' the same guest with %s'
                                 raise VmError(err_msg % (f, dev.name))
@@ -396,9 +412,8 @@ class PciController(DevController):
                     dev.devs_check_driver(devs_str)
                     for s in devs_str:
                         if not s in pci_str_list:
-                            s_pci_str = pci_dict_to_bdf_str(parse_pci_name(s))
                             # s has been assigned to other guest?
-                            if xc.test_assign_device(0, s_pci_str) != 0:
+                            if s in get_all_assigned_pci_devices():
                                 err_msg = 'pci: %s must be co-assigned to the'+\
                                     ' same guest with %s'
                                 raise VmError(err_msg % (s, dev.name))

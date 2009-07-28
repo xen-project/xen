@@ -42,7 +42,7 @@ from xen.util import xsconstants
 from xen.util.pci import serialise_pci_opts, pci_opts_list_to_sxp, \
                          pci_dict_to_bdf_str, pci_dict_to_xc_str, \
                          pci_convert_sxp_to_dict, pci_convert_dict_to_sxp, \
-                         pci_dict_cmp, PCI_DEVFN, PCI_SLOT, PCI_FUNC
+                         pci_dict_cmp, PCI_DEVFN, PCI_SLOT, PCI_FUNC, parse_hex
 
 from xen.xend import balloon, sxp, uuid, image, arch
 from xen.xend import XendOptions, XendNode, XendConfig
@@ -296,20 +296,11 @@ def dom_get(dom):
         log.trace("domain_getinfo(%d) failed, ignoring: %s", dom, str(err))
     return None
 
-def get_assigned_pci_devices(domid):
-    dev_str_list = []
-    path = '/local/domain/0/backend/pci/%u/0/' % domid
-    num_devs = xstransact.Read(path + 'num_devs');
-    if num_devs is None or num_devs == "":
-        return dev_str_list
-    num_devs = int(num_devs);
-    for i in range(num_devs):
-        dev_str = xstransact.Read(path + 'dev-%i' % i)
-        dev_str_list = dev_str_list + [dev_str]
-    return dev_str_list 
+from xen.xend.server.pciif import parse_pci_name, PciDevice,\
+    get_assigned_pci_devices, get_all_assigned_pci_devices
+
 
 def do_FLR(domid):
-    from xen.xend.server.pciif import parse_pci_name, PciDevice
     dev_str_list = get_assigned_pci_devices(domid)
 
     for dev_str in dev_str_list:
@@ -686,15 +677,14 @@ class XendDomainInfo:
                     raise VmError("device is already inserted")
 
         # Test whether the devices can be assigned with VT-d
-        bdf = xc.test_assign_device(0, pci_dict_to_xc_str(new_dev))
-        if bdf != 0:
-            if bdf == -1:
-                raise VmError("failed to assign device: maybe the platform"
-                              " doesn't support VT-d, or VT-d isn't enabled"
-                              " properly?")
-            raise VmError("fail to assign device(%s): maybe it has"
-                          " already been assigned to other domain, or maybe"
-                          " it doesn't exist." % pci_dict_to_bdf_str(new_dev))
+        pci_name = '%04x:%02x:%02x.%x' % \
+          (parse_hex(new_dev['domain']),\
+           parse_hex(new_dev['bus']),\
+           parse_hex(new_dev['slot']),\
+           parse_hex(new_dev['func']))
+        if pci_name in get_all_assigned_pci_devices():
+            raise VmError("failed to assign device %s that has"
+                          " already been assigned to other domain." % pci_str)
 
         # Here, we duplicate some checkings (in some cases, we mustn't allow
         # a device to be hot-plugged into an HVM guest) that are also done in
@@ -732,8 +722,7 @@ class XendDomainInfo:
         pci_device.devs_check_driver(coassignment_list)
         assigned_pci_device_str_list = self._get_assigned_pci_devices()
         for pci_str in coassignment_list:
-            pci_dev = parse_pci_name(pci_str)
-            if xc.test_assign_device(0, pci_dict_to_xc_str(pci_dev)) == 0:
+            if not (pci_str in get_all_assigned_pci_devices()):
                 continue
             if not pci_str in assigned_pci_device_str_list:
                 raise VmError(("pci: failed to pci-attach %s to domain %s" + \
@@ -859,7 +848,7 @@ class XendDomainInfo:
         pci_dev = sxp.children(dev_sxp, 'dev')[0]
         dev_config = pci_convert_sxp_to_dict(dev_sxp)
         dev = dev_config['devs'][0]
-                
+
         # Do HVM specific processing
         if self.info.is_hvm():
             if pci_state == 'Initialising':
@@ -2454,7 +2443,8 @@ class XendDomainInfo:
         if pci and len(pci) > 0:
             pci = map(lambda x: x[0:4], pci)  # strip options 
             pci_str = str(pci)
-        if hvm and pci_str:
+
+        if hvm and pci_str != '':
             bdf = xc.test_assign_device(0, pci_str)
             if bdf != 0:
                 if bdf == -1:
@@ -2465,9 +2455,17 @@ class XendDomainInfo:
                 devfn = (bdf >> 8) & 0xff
                 dev = (devfn >> 3) & 0x1f
                 func = devfn & 0x7
-                raise VmError("fail to assign device(%x:%x.%x): maybe it has"
+                raise VmError("failed to assign device(%x:%x.%x): maybe it has"
                               " already been assigned to other domain, or maybe"
                               " it doesn't exist." % (bus, dev, func))
+
+        # This test is done for both pv and hvm guest.
+        for p in pci:
+            pci_name = '%04x:%02x:%02x.%x' % \
+                (parse_hex(p[0]), parse_hex(p[1]), parse_hex(p[2]), parse_hex(p[3]))
+            if pci_name in get_all_assigned_pci_devices():
+                raise VmError("failed to assign device %s that has"
+                              " already been assigned to other domain." % pci_name)
 
         # register the domain in the list 
         from xen.xend import XendDomain

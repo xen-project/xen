@@ -834,6 +834,9 @@ class XendNode:
 
 
     def pciinfo(self):
+        from xen.xend.server.pciif import get_all_assigned_pci_devices
+        assigned_devs = get_all_assigned_pci_devices()
+
         # Each element of dev_list is a PciDevice
         dev_list = PciUtil.find_all_assignable_devices()
  
@@ -847,11 +850,7 @@ class XendNode:
         for dev_list in devs_list:
             available = True
             for d in dev_list:
-                pci_str = '0x%x,0x%x,0x%x,0x%x' %(d.domain, d.bus, d.slot, d.func)
-                # Xen doesn't care what the domid is, so we pass 0 here...
-                domid = 0
-                bdf = self.xc.test_assign_device(domid, pci_str)
-                if bdf != 0:
+                if d.name in assigned_devs:
                     available = False
                     break
             if available:
