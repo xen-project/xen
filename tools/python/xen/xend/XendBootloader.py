@@ -17,7 +17,7 @@ import random
 import shlex
 from xen.xend import sxp
 
-from xen.util import mkdir
+from xen.util import mkdir, oshelp
 from XendLogging import log
 from XendError import VmError
 
@@ -113,6 +113,7 @@ def bootloader(blexec, disk, dom, quiet = False, blargs = '', kernel = '',
             log.debug("Launching bootloader as %s." % str(args))
             env = os.environ.copy()
             env['TERM'] = 'vt100'
+            oshelp.close_fds()
             os.execvpe(args[0], args, env)
         except OSError, e:
             print e

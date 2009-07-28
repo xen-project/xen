@@ -1,6 +1,19 @@
 import fcntl
 import os
 
+def close_fds(pass_fds=()):
+    try:
+        MAXFD = os.sysconf('SC_OPEN_MAX')
+    except:
+        MAXFD = 256
+    for i in range(3, MAXFD):
+        if i in pass_fds:
+            continue
+        try:
+            os.close(i)
+        except OSError:
+            pass
+
 def fcntl_setfd_cloexec(file, bool):
         f = fcntl.fcntl(file, fcntl.F_GETFD)
         if bool: f |= fcntl.FD_CLOEXEC

@@ -31,7 +31,7 @@ from xen.xend import XendConstants
 from xen.xend import XendOptions
 from xen.xend.XendLogging import log
 from xen.xend.XendError import VmError
-from xen.util import dictio, xsconstants, auxbin
+from xen.util import dictio, xsconstants, auxbin, xpopen
 from xen.xend.XendConstants import *
 
 #global directories and tools for security management
@@ -1710,7 +1710,7 @@ def run_resource_label_change_script(resource, label, command):
                 log.info("Running resource label change script %s: %s" %
                          (script, parms))
                 parms.update(os.environ)
-                os.spawnve(os.P_WAIT, script[0], script, parms)
+                xpopen.call(" ".join(script, params))
         else:
             log.info("No script given for relabeling of resources.")
     if not __script_runner:

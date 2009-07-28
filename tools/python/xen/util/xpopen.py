@@ -85,7 +85,7 @@ class xPopen3:
 
     sts = -1                    # Child not completed yet
 
-    def __init__(self, cmd, capturestderr=False, bufsize=-1, passfd=()):
+    def __init__(self, cmd, capturestderr=False, bufsize=-1, passfd=(), env=None):
         """The parameter 'cmd' is the shell command to execute in a
         sub-process.  The 'capturestderr' flag, if true, specifies that
         the object should capture standard error output of the child process.
@@ -128,6 +128,10 @@ class xPopen3:
                 pass
         try:
             os.execvp(cmd[0], cmd)
+            if env is None:
+                os.execvp(cmd[0], cmd)
+            else:
+                os.execvpe(cmd[0], cmd, env)
         finally:
             os._exit(127)
 
@@ -154,16 +158,26 @@ class xPopen3:
         return self.sts
 
 
-def xpopen2(cmd, bufsize=-1, mode='t', passfd=[]):
+def xpopen2(cmd, bufsize=-1, mode='t', passfd=[], env=None):
     """Execute the shell command 'cmd' in a sub-process.  If 'bufsize' is
     specified, it sets the buffer size for the I/O pipes.  The file objects
     (child_stdout, child_stdin) are returned."""
-    inst = xPopen3(cmd, False, bufsize, passfd)
+    inst = xPopen3(cmd, False, bufsize, passfd, env)
     return inst.fromchild, inst.tochild
 
-def xpopen3(cmd, bufsize=-1, mode='t', passfd=[]):
+def xpopen3(cmd, bufsize=-1, mode='t', passfd=[], env=None):
     """Execute the shell command 'cmd' in a sub-process.  If 'bufsize' is
     specified, it sets the buffer size for the I/O pipes.  The file objects
     (child_stdout, child_stdin, child_stderr) are returned."""
-    inst = xPopen3(cmd, True, bufsize, passfd)
+    inst = xPopen3(cmd, True, bufsize, passfd, env)
     return inst.fromchild, inst.tochild, inst.childerr
+
+def call(*popenargs, **kwargs):
+    """Run command with arguments.  Wait for command to complete, then
+    return the status.
+
+    The arguments are the same as for the xPopen3 constructor.  Example:
+
+    status = call("ls -l")
+    """
+    return xPopen3(*popenargs, **kwargs).wait()

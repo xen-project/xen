@@ -1,9 +1,9 @@
 # Copyright (c) 2005, XenSource Ltd.
 import string, re
-import popen2
 
 from xen.xend.server.blkif import BlkifController
 from xen.xend.XendLogging import log
+from xen.util.xpopen import xPopen3
 
 phantomDev = 0;
 phantomId = 0;
@@ -34,7 +34,7 @@ blktap_disk_types = blktap1_disk_types + blktap2_disk_types
 
 def doexec(args, inputtext=None):
     """Execute a subprocess, then return its return code, stdout and stderr"""
-    proc = popen2.Popen3(args, True)
+    proc = xPopen3(args, True)
     if inputtext != None:
         proc.tochild.write(inputtext)
     stdout = proc.fromchild

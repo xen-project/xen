@@ -431,9 +431,7 @@ class ImageHandler:
                 os.dup2(null, 0)
                 os.dup2(logfd, 1)
                 os.dup2(logfd, 2)
-                os.close(null)
-                os.close(logfd)
-                self.sentinel_fifo.close()
+                oshelp.close_fds((sentinel_write.fileno(),))
                 try:
                     os.execve(self.device_model, args, env)
                 except Exception, e:

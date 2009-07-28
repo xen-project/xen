@@ -18,10 +18,9 @@
 
 """Xend interface to networking control scripts.
 """
-import os
 
 import XendOptions
-
+from xen.util import xpopen
 
 def network(op):
     """Call a network control script.
@@ -33,4 +32,4 @@ def network(op):
     script = XendOptions.instance().get_network_script()
     if script:
         script.insert(1, op)
-        os.spawnv(os.P_WAIT, script[0], script)
+        xpopen.call(script)
