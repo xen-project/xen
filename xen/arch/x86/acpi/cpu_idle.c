@@ -442,6 +442,7 @@ static int init_cx_pminfo(struct acpi_processor_power *acpi_power)
     acpi_power->states[ACPI_STATE_C1].valid = 1;
 
     acpi_power->count = 2;
+    acpi_power->safe_state = &acpi_power->states[ACPI_STATE_C1];
 
     return 0;
 }
