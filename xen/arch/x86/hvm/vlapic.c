@@ -599,13 +599,13 @@ static int vlapic_write(struct vcpu *v, unsigned long address,
     val = (uint32_t)val;
     if ( len != 4 )
     {
-        unsigned long tmp;
+        unsigned int tmp;
         unsigned char alignment;
 
         gdprintk(XENLOG_INFO, "Notice: Local APIC write with len = %lx\n",len);
 
         alignment = offset & 0x3;
-        (void)vlapic_read(v, offset & ~0x3, 4, &tmp);
+        (void)vlapic_read_aligned(vlapic, offset & ~0x3, &tmp);
 
         switch ( len )
         {
