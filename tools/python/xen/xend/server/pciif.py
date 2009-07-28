@@ -489,7 +489,11 @@ class PciController(DevController):
         num_devs = int(self.readBackend(devid, 'num_devs'))
         new_num_devs = 0
         for i in range(num_devs):
-            state = int(self.readBackend(devid, 'state-%i' % i))
+            try:
+                state = int(self.readBackend(devid, 'state-%i' % i))
+            except:
+                state = xenbusState['Unknown']
+
             if state == xenbusState['Closing']:
                 # Detach I/O resources.
                 pci_dev = parse_pci_name(self.readBackend(devid, 'dev-%i' % i))
