@@ -679,14 +679,10 @@ class XendDomainInfo:
                     raise VmError("device is already inserted")
 
         # Test whether the devices can be assigned with VT-d
-        pci_name = '%04x:%02x:%02x.%x' % \
-          (parse_hex(new_dev['domain']),\
-           parse_hex(new_dev['bus']),\
-           parse_hex(new_dev['slot']),\
-           parse_hex(new_dev['func']))
+        pci_name = pci_dict_to_bdf_str(new_dev)
         if pci_name in get_all_assigned_pci_devices():
             raise VmError("failed to assign device %s that has"
-                          " already been assigned to other domain." % pci_str)
+                          " already been assigned to other domain." % pci_name)
 
         # Here, we duplicate some checkings (in some cases, we mustn't allow
         # a device to be hot-plugged into an HVM guest) that are also done in
