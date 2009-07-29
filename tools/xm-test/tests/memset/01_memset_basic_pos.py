@@ -40,17 +40,10 @@ try:
     console.runCmd("ls")
 except ConsoleError, e:
     FAIL(str(e))
-    
-try:
-    run = console.runCmd("cat /proc/xen/balloon | grep Current");
-except ConsoleError, e:
-    FAIL(str(e))
 
-match = re.match("[^0-9]+([0-9]+)", run["output"])
-if not match:
-    FAIL("Invalid domU meminfo line")
-        
-origmem = int(match.group(1)) / 1024
+xen_mem = XenMemory(console)
+    
+origmem = xen_mem.get_mem_from_domU()
 newmem = origmem - 1
 
 # set mem-set for less than default
@@ -76,17 +69,7 @@ elif mem != newmem:
     FAIL("Dom0 failed to verify %i MB; got %i MB" % newmem,mem)
 
 # verify memory set internally
-try:
-    run = console.runCmd("cat /proc/xen/balloon | grep Current")
-except ConsoleError, e:
-    FAIL(str(e))
-
-# Check the output of 'cat /proc/xen/balloon'
-m = re.match("^Current allocation:\s+(\d+)\skB", run["output"])
-if not m: 
-    FAIL("The DomU command 'cat /proc/xen/balloon' failed.")
-
-domUmem = int(m.group(1)) / 1024
+domUmem = xen_mem.get_mem_from_domU()
 
 if domUmem != newmem:
     FAIL("DomU reported incorrect memory amount: %i MB" % (domUmem))

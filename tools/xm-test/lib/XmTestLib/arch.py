@@ -70,7 +70,6 @@ ia_ParavirtDefaults = {"memory"       : 64,
                        "kernel"       : ia_getDefaultKernel(),
                        "root"         : "/dev/ram0",
                        "ramdisk"      : getRdPath() + "/initrd.img",
-                       "extra"        : "console=xvc0",
 }
 ia_HVMDefaults =      {"memory"       : 64,
                        "vcpus"        : 1,

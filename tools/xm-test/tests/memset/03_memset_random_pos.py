@@ -23,16 +23,9 @@ except DomainError, e:
 
 times = random.randint(10,50)
 
-try:
-    run = console.runCmd("cat /proc/xen/balloon | grep Current");
-except ConsoleError, e:
-    FAIL(str(e))
+xen_mem = XenMemory(console)
 
-match = re.match("[^0-9]+([0-9]+)", run["output"])
-if not match:
-    FAIL("Invalid domU meminfo line")
-        
-origmem = int(match.group(1)) / 1024
+origmem = xen_mem.get_mem_from_domU()
 currmem = origmem
 
 for i in range(0,times):
@@ -57,17 +50,8 @@ for i in range(0,times):
             print "mem-set failed:"
             print output
         FAIL("mem-set from %i to %i failed" % (currmem, target))
-
-    try:
-        run = console.runCmd("cat /proc/xen/balloon | grep Current");
-    except ConsoleError, e:
-        FAIL(str(e))
-
-    match = re.match("[^0-9]+([0-9]+)", run["output"])
-    if not match:
-        FAIL("Invalid domU meminfo line")
-        
-    domUmem = int(match.group(1)) / 1024
+    
+    domUmem = xen_mem.get_mem_from_domU()
 
     currmem = target
     actual = int(getDomInfo(domain.getName(), "Mem"))

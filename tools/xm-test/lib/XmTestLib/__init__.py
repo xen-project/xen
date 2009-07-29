@@ -10,6 +10,7 @@ from XenDomain import *
 from config import *
 from XenDevice import *
 from NetConfig import *
+from XenMemory import *
 
 # Give this test a clean slate
 destroyAllDomUs()
