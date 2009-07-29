@@ -730,7 +730,7 @@ class PciDevice:
         # devices transitioning from D3hot to D0 because of
         # PowerState commands do not perform an internal reset.
         pm_ctl = self.pci_conf_read32(pos + PCI_PM_CTRL)
-        if (pm_ctl & PCI_PM_CTRL_NO_SOFT_RESET) == 1:
+        if (pm_ctl & PCI_PM_CTRL_NO_SOFT_RESET) == PCI_PM_CTRL_NO_SOFT_RESET:
             return False
 
         (pci_list, cfg_list) = save_pci_conf_space([self.name])
