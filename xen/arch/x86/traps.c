@@ -1677,7 +1677,7 @@ static int is_cpufreq_controller(struct domain *d)
 static int emulate_privileged_op(struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
-    unsigned long *reg, eip = regs->eip, res;
+    unsigned long *reg, eip = regs->eip;
     u8 opcode, modrm_reg = 0, modrm_rm = 0, rep_prefix = 0, lock = 0, rex = 0;
     enum { lm_seg_none, lm_seg_fs, lm_seg_gs } lm_ovr = lm_seg_none;
     int rc;
@@ -1696,7 +1696,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     unsigned long code_base, code_limit;
     char io_emul_stub[32];
     void (*io_emul)(struct cpu_user_regs *) __attribute__((__regparm__(1)));
-    u32 l, h, eax, edx;
+    u32 l, h;
 
     if ( !read_descriptor(regs->cs, v, regs,
                           &code_base, &code_limit, &ar,
@@ -2075,7 +2075,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         }
         break;
 
-    case 0x21: /* MOV DR?,<reg> */
+    case 0x21: /* MOV DR?,<reg> */ {
+        unsigned long res;
         opcode = insn_fetch(u8, code_base, eip, code_limit);
         if ( opcode < 0xc0 )
             goto fail;
@@ -2086,6 +2087,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             goto fail;
         *reg = res;
         break;
+    }
 
     case 0x22: /* MOV <reg>,CR? */
         opcode = insn_fetch(u8, code_base, eip, code_limit);
@@ -2146,10 +2148,10 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             goto fail;
         break;
 
-    case 0x30: /* WRMSR */
-        eax = regs->eax;
-        edx = regs->edx;
-        res = ((u64)edx << 32) | eax;
+    case 0x30: /* WRMSR */ {
+        u32 eax = regs->eax;
+        u32 edx = regs->edx;
+        u64 val = ((u64)edx << 32) | eax;
         switch ( (u32)regs->ecx )
         {
 #ifdef CONFIG_X86_64
@@ -2158,21 +2160,21 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                 goto fail;
             if ( wrmsr_safe(MSR_FS_BASE, eax, edx) )
                 goto fail;
-            v->arch.guest_context.fs_base = res;
+            v->arch.guest_context.fs_base = val;
             break;
         case MSR_GS_BASE:
             if ( is_pv_32on64_vcpu(v) )
                 goto fail;
             if ( wrmsr_safe(MSR_GS_BASE, eax, edx) )
                 goto fail;
-            v->arch.guest_context.gs_base_kernel = res;
+            v->arch.guest_context.gs_base_kernel = val;
             break;
         case MSR_SHADOW_GS_BASE:
             if ( is_pv_32on64_vcpu(v) )
                 goto fail;
             if ( wrmsr_safe(MSR_SHADOW_GS_BASE, eax, edx) )
                 goto fail;
-            v->arch.guest_context.gs_base_user = res;
+            v->arch.guest_context.gs_base_user = val;
             break;
 #endif
         case MSR_K7_FID_VID_STATUS:
@@ -2215,7 +2217,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             if ( !IS_PRIV(v->domain) )
                 break;
             if ( (rdmsr_safe(MSR_FAM10H_MMIO_CONF_BASE, l, h) != 0) ||
-                 (((((u64)h << 32) | l) ^ res) &
+                 (((((u64)h << 32) | l) ^ val) &
                   ~( FAM10H_MMIO_CONF_ENABLE |
                     (FAM10H_MMIO_CONF_BUSRANGE_MASK <<
                      FAM10H_MMIO_CONF_BUSRANGE_SHIFT) |
@@ -2247,7 +2249,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             if ( wrmsr_hypervisor_regs(regs->ecx, eax, edx) )
                 break;
 
-            rc = mce_wrmsr(regs->ecx, res);
+            rc = mce_wrmsr(regs->ecx, val);
             if ( rc < 0 )
                 goto fail;
             if ( rc )
@@ -2262,6 +2264,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             break;
         }
         break;
+    }
 
     case 0x31: /* RDTSC */
         rdtsc(regs->eax, regs->edx);
