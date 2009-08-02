@@ -106,6 +106,15 @@ existing:
 		echo Error, $(XMTEST_VER_IMG) not found;  \
 		false; \
 	fi
+# The newer linux kernels have ext2 disabled by default - but the
+# initrd is ext2.
+# The whole xm-test environment assumes, that the guest system uses
+# the same kernel as the dom0.  Therefore the current (dom0's) kernel
+# is checked if ext2 is supported.  If not (and ext3 is supported) the
+# initrd will be converted to ext3.
+	@cat /proc/filesystems | grep -q ext2 && \
+	  cat /proc/filesystems | grep -q ext3 || \
+	  /sbin/tune2fs -j $(XMTEST_DL_IMG) >/dev/null || true
 
 clean-local: am_config_clean-local
 
