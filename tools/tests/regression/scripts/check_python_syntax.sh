@@ -4,16 +4,19 @@
 # (compiles them into .pyc files)
 #
 
-XEN_ROOT=$1
-p=$2
+REG_TEST_DIR=$1
+# Python version, e.g. python-2.3
+PYTHON=$2
+PATH_TO_CHECK=$3
 
-echo "Syntax check for $p"
-PYTHON_EXECUTABLE=`echo $p | tr -d "-"`
-export LD_LIBRARY_PATH=${XEN_ROOT}/tests/installed/$p/lib
-export PATH=${XEN_ROOT}/tests/installed/$p/bin:$PATH
+echo "Syntax check for $PYTHON"
+PYTHON_EXECUTABLE=`echo $PYTHON | tr -d "-"`
+export LD_LIBRARY_PATH=${REG_TEST_DIR}/installed/$PYTHON/lib
+export PATH=${REG_TEST_DIR}/installed/$PYTHON/bin:$PATH
+
 # -m is available starting with python 2.4
 # When support for 2.3 (and earlier) is dropped,
 # the following line will do.
-# ${PYTHON_EXECUTABLE} -m compileall -f -q -x ".*\.hg.*|^\.\./tests/installed.*" ..
-${PYTHON_EXECUTABLE} ${XEN_ROOT}/tests/installed/$p/lib/${PYTHON_EXECUTABLE}/compileall.py -f -q -x ".*\.hg.*|.*/tests/installed.*" ..
+# ${PYTHON_EXECUTABLE} -m compileall -f -q -x ".*\.hg.*|.*/tools/tests/regression/installed.*" ${PATH_TO_CHECK}
+${PYTHON_EXECUTABLE} ${REG_TEST_DIR}/installed/$PYTHON/lib/${PYTHON_EXECUTABLE}/compileall.py -f -q -x ".*\.hg.*|.*/installed/python-.*" ${PATH_TO_CHECK}
 exit $?

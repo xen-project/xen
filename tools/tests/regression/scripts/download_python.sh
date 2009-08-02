@@ -5,8 +5,8 @@
 
 set -e
 
-XEN_ROOT=$1
+REG_TEST_DIR=$1
 VERSION=$2
 
-mkdir -p ${XEN_ROOT}/tests/downloads
-wget -q -O ${XEN_ROOT}/tests/downloads/Python-${VERSION}.tgz http://www.python.org/ftp/python/${VERSION}/Python-${VERSION}.tgz
+mkdir -p ${REG_TEST_DIR}/downloads
+wget -q -O ${REG_TEST_DIR}/downloads/Python-${VERSION}.tgz http://www.python.org/ftp/python/${VERSION}/Python-${VERSION}.tgz
