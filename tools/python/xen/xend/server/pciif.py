@@ -279,7 +279,7 @@ class PciController(DevController):
             dev = PciDevice(pci_dev)
         except Exception, e:
             raise VmError("pci: failed to locate device and "+
-                    "parse it's resources - "+str(e))
+                    "parse its resources - "+str(e))
 
         if dev.driver!='pciback' and dev.driver!='pci-stub':
             raise VmError(("pci: PCI Backend and pci-stub don't own "+ \
@@ -373,7 +373,7 @@ class PciController(DevController):
                 dev = PciDevice(pci_dev)
             except Exception, e:
                 raise VmError("pci: failed to locate device and "+
-                        "parse it's resources - "+str(e))
+                        "parse its resources - "+str(e))
             if (dev.dev_type == DEV_TYPE_PCIe_ENDPOINT) and not dev.pcie_flr:
                 if dev.bus == 0:
                     # We cope with this case by using the Dstate transition
@@ -383,6 +383,9 @@ class PciController(DevController):
                         ' method or some vendor specific methods if available.'
                     log.warn(err_msg % dev.name)
                 else:
+                    if not self.vm.info.is_hvm():
+                        continue
+
                     funcs = dev.find_all_the_multi_functions()
                     dev.devs_check_driver(funcs)
                     for f in funcs:
@@ -403,6 +406,9 @@ class PciController(DevController):
                             ' specific methods if available.'
                         log.warn(err_msg % dev.name)
                 else:
+                    if not self.vm.info.is_hvm():
+                        continue
+
                     # All devices behind the uppermost PCI/PCI-X bridge must be\
                     # co-assigned to the same guest.
                     devs_str = dev.find_coassigned_pci_devices(True)
@@ -455,7 +461,7 @@ class PciController(DevController):
             dev = PciDevice(pci_dev)
         except Exception, e:
             raise VmError("pci: failed to locate device and "+
-                    "parse it's resources - "+str(e))
+                    "parse its resources - "+str(e))
 
         if dev.driver!='pciback' and dev.driver!='pci-stub':
             raise VmError(("pci: PCI Backend and pci-stub don't own device "+ \
@@ -463,7 +469,7 @@ class PciController(DevController):
 
         # Need to do FLR here before deassign device in order to terminate
         # DMA transaction, etc
-        dev.do_FLR()
+        dev.do_FLR(self.vm.info.is_hvm())
 
         bdf = xc.deassign_device(fe_domid, pci_dict_to_xc_str(pci_dev))
         pci_str = pci_dict_to_bdf_str(pci_dev)

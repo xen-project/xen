@@ -423,7 +423,7 @@ class XendDomain:
                     log.exception("Unable to recreate domain")
                     try:
                         xc.domain_pause(domid)
-                        XendDomainInfo.do_FLR(domid)
+                        XendDomainInfo.do_FLR(domid, dom['hvm'])
                         xc.domain_destroy(domid)
                     except:
                         log.exception("Hard destruction of domain failed: %d" %
@@ -1276,7 +1276,8 @@ class XendDomain:
         else:
             try:
                 xc.domain_pause(int(domid))
-                XendDomainInfo.do_FLR(int(domid))
+                dom = self.domains[int(domid)]
+                XendDomainInfo.do_FLR(int(domid), dom.info.is_hvm())
                 val = xc.domain_destroy(int(domid))
             except ValueError:
                 raise XendInvalidDomain(domid)

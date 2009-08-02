@@ -302,7 +302,7 @@ from xen.xend.server.pciif import parse_pci_name, PciDevice,\
     get_assigned_pci_devices, get_all_assigned_pci_devices
 
 
-def do_FLR(domid):
+def do_FLR(domid, is_hvm):
     dev_str_list = get_assigned_pci_devices(domid)
 
     for dev_str in dev_str_list:
@@ -311,7 +311,7 @@ def do_FLR(domid):
         except Exception, e:
             raise VmError("pci: failed to locate device and "+
                     "parse it's resources - "+str(e))
-        dev.do_FLR()
+        dev.do_FLR(is_hvm)
 
 class XendDomainInfo:
     """An object represents a domain.
@@ -693,19 +693,14 @@ class XendDomainInfo:
 
         # Test whether the device is owned by pciback. For instance, we can't
         # hotplug a device being used by Dom0 itself to an HVM guest.
-        from xen.xend.server.pciif import PciDevice, parse_pci_name
         try:
             pci_device = PciDevice(new_dev)
         except Exception, e:
             raise VmError("pci: failed to locate device and "+
-                    "parse it's resources - "+str(e))
+                    "parse its resources - "+str(e))
         if pci_device.driver!='pciback' and pci_device.driver!='pci-stub':
-            raise VmError(("pci: PCI Backend does not own device "+ \
-                    "%s\n"+ \
-                    "See the pciback.hide kernel "+ \
-                    "command-line parameter or\n"+ \
-                    "bind your slot/device to the PCI backend using sysfs" \
-                    )%(pci_device.name))
+            raise VmError(("pci: PCI Backend and pci-stub don't own device %s")\
+                            %pci_device.name)
 
         # Check non-page-aligned MMIO BAR.
         if pci_device.has_non_page_aligned_bar and arch.type != "ia64":
@@ -1148,7 +1143,7 @@ class XendDomainInfo:
             pci_device = PciDevice(pci_dev)
         except Exception, e:
             raise VmError("pci: failed to locate device and "+
-                    "parse it's resources - "+str(e))
+                    "parse its resources - "+str(e))
         coassignment_list = pci_device.find_coassigned_devices()
         coassignment_list.remove(pci_device.name)
         assigned_pci_device_str_list = self._get_assigned_pci_devices()
@@ -2458,6 +2453,22 @@ class XendDomainInfo:
             pci = map(lambda x: x[0:4], pci)  # strip options 
             pci_str = str(pci)
 
+        # This test is done for both pv and hvm guest.
+        for p in pci:
+            pci_name = '%04x:%02x:%02x.%x' % \
+                (parse_hex(p[0]), parse_hex(p[1]), parse_hex(p[2]), parse_hex(p[3]))
+            try:
+                pci_device = PciDevice(parse_pci_name(pci_name))
+            except Exception, e:
+                raise VmError("pci: failed to locate device and "+
+                    "parse its resources - "+str(e))
+            if pci_device.driver!='pciback' and pci_device.driver!='pci-stub':
+                raise VmError(("pci: PCI Backend and pci-stub don't own device %s")\
+                                %pci_device.name)
+            if pci_name in get_all_assigned_pci_devices():
+                raise VmError("failed to assign device %s that has"
+                              " already been assigned to other domain." % pci_name)
+
         if hvm and pci_str != '':
             bdf = xc.test_assign_device(0, pci_str)
             if bdf != 0:
@@ -2469,17 +2480,9 @@ class XendDomainInfo:
                 devfn = (bdf >> 8) & 0xff
                 dev = (devfn >> 3) & 0x1f
                 func = devfn & 0x7
-                raise VmError("failed to assign device(%x:%x.%x): maybe it has"
+                raise VmError("failed to assign device %02x:%02x.%x: maybe it has"
                               " already been assigned to other domain, or maybe"
                               " it doesn't exist." % (bus, dev, func))
-
-        # This test is done for both pv and hvm guest.
-        for p in pci:
-            pci_name = '%04x:%02x:%02x.%x' % \
-                (parse_hex(p[0]), parse_hex(p[1]), parse_hex(p[2]), parse_hex(p[3]))
-            if pci_name in get_all_assigned_pci_devices():
-                raise VmError("failed to assign device %s that has"
-                              " already been assigned to other domain." % pci_name)
 
         # register the domain in the list 
         from xen.xend import XendDomain
@@ -2810,7 +2813,7 @@ class XendDomainInfo:
             try:
                 xc.domain_destroy_hook(self.domid)
                 xc.domain_pause(self.domid)
-                do_FLR(self.domid)
+                do_FLR(self.domid, self.info.is_hvm())
                 xc.domain_destroy(self.domid)
                 for state in DOM_STATES_OLD:
                     self.info[state] = 0

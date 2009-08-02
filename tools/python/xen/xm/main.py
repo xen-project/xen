@@ -2538,6 +2538,10 @@ def xm_pci_attach(args):
 
     (dom, dev) = parse_pci_configuration(params, config_pci_opts)
 
+    attached = attached_pci_dict(dom)
+
+    attached_dev = map(lambda x: find_attached(attached, x, False), dev)
+
     head_dev = dev.pop(0)
     xm_pci_attach_one(dom, head_dev)
 
@@ -2724,19 +2728,24 @@ def xm_network_detach(args):
         arg_check(args, 'network-detach', 2, 3)
         detach(args, 'vif')
 
-def find_attached(attached, key):
+def find_attached(attached, key, detaching):
     l = filter(lambda dev: pci_dict_cmp(dev, key), attached)
 
-    if len(l) == 0:
-         raise OptionError("pci: device is not attached: " +
-                           pci_dict_to_bdf_str(key))
-
-    # There shouldn't ever be more than one match,
-    # but perhaps an exception should be thrown if there is
-    return l[0]
+    if detaching:
+        if  len(l) == 0:
+             raise OptionError("pci: device %s is not attached!" %\
+                               pci_dict_to_bdf_str(key))
+        # There shouldn't ever be more than one match,
+        # but perhaps an exception should be thrown if there is
+        return l[0]
+    else:
+        if len(l) == 1:
+            raise  OptionError("pci: device %s has been attached! " %\
+                               pci_dict_to_bdf_str(key))
+        return None
 
 def find_attached_devfn(attached, key):
-    pci_dev = find_attached(attached, key)
+    pci_dev = find_attached(attached, key, True)
     return pci_dev['vdevfn']
 
 def xm_pci_detach(args):
@@ -2745,7 +2754,7 @@ def xm_pci_detach(args):
     (dom, dev) = parse_pci_configuration(args)
     attached = attached_pci_dict(dom)
 
-    attached_dev = map(lambda x: find_attached(attached, x), dev)
+    attached_dev = map(lambda x: find_attached(attached, x, True), dev)
 
     def f(pci_dev):
         vdevfn = int(pci_dev['vdevfn'], 16)

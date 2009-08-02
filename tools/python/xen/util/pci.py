@@ -7,6 +7,7 @@
 
 import sys
 import os, os.path
+import errno
 import resource
 import re
 import types
@@ -571,7 +572,7 @@ class PciDeviceParseError(Exception):
     def __init__(self,msg):
         self.message = msg
     def __str__(self):
-        return 'Error Parsing PCI Device Info: '+self.message
+        return self.message
 
 class PciDeviceAssignmentError(Exception):
     def __init__(self,msg):
@@ -880,7 +881,13 @@ class PciDevice:
         os.close(fd)
 
     def detect_dev_info(self):
-        class_dev = self.pci_conf_read16(PCI_CLASS_DEVICE)
+        try:
+            class_dev = self.pci_conf_read16(PCI_CLASS_DEVICE)
+        except OSError, (err, strerr):
+            if err == errno.ENOENT:
+                strerr = "the device doesn't exist?"
+            raise PciDeviceParseError('%s: %s' %\
+                (self.name, strerr))
         pos = self.find_cap_offset(PCI_CAP_ID_EXP)
         if class_dev == PCI_CLASS_BRIDGE_PCI:
             if pos == 0:
@@ -941,7 +948,7 @@ class PciDevice:
                 ', but it is not owned by pciback or pci-stub.'
             raise PciDeviceAssignmentError(err_msg % (pci_dev, self.name))
 
-    def do_FLR(self):
+    def do_FLR(self, is_hvm):
         """ Perform FLR (Functional Level Reset) for the device.
         """
         if self.dev_type == DEV_TYPE_PCIe_ENDPOINT:
@@ -958,6 +965,10 @@ class PciDevice:
                     self.do_FLR_for_integrated_device()
                 else:
                     funcs = self.find_all_the_multi_functions()
+
+                    if not is_hvm and (len(funcs) > 1):
+                        return
+
                     self.devs_check_driver(funcs)
 
                     parent = pci_dict_to_bdf_str(self.find_parent())
@@ -982,6 +993,10 @@ class PciDevice:
                     # Remove the element 0 which is a bridge
                     target_bus = devs[0]
                     del devs[0]
+
+                    if not is_hvm and (len(devs) > 1):
+                        return
+
                     self.devs_check_driver(devs)
 
                     # Do Secondary Bus Reset.
