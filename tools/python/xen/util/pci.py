@@ -88,6 +88,11 @@ PCI_CAP_ID_VENDOR_SPECIFIC_CAP = 0x09
 PCI_CLASS_ID_USB = 0x0c03
 PCI_USB_FLRCTRL = 0x4
 
+# The VF of Intel 82599 10GbE Controller
+# See http://download.intel.com/design/network/datashts/82599_datasheet.pdf
+# For 'VF PCIe Configuration Space', see its Table 9.7.
+DEVICE_ID_82599 = 0x10ed
+
 PCI_CAP_ID_AF = 0x13
 PCI_AF_CAPs   = 0x3
 PCI_AF_CAPs_TP_FLR = 0x3
@@ -918,6 +923,17 @@ class PciDevice:
             dev_cap = self.pci_conf_read32(pos + PCI_EXP_DEVCAP)
             if dev_cap & PCI_EXP_DEVCAP_FLR:
                 self.pcie_flr = True
+            else:
+                # Quirk for the VF of Intel 82599 10GbE Controller.
+                # We know it does have PCIe FLR capability even if it doesn't
+                # report that (dev_cap.PCI_EXP_DEVCAP_FLR is 0).
+                # See the 82599 datasheet.
+                dev_path = find_sysfs_mnt()+SYSFS_PCI_DEVS_PATH+'/'+self.name
+                vendor_id = parse_hex(os.popen('cat %s/vendor' % dev_path).read())
+                device_id = parse_hex(os.popen('cat %s/device' % dev_path).read())
+                if  (vendor_id == VENDOR_INTEL) and \
+                    (device_id == DEVICE_ID_82599):
+                    self.pcie_flr = True
         elif self.dev_type == DEV_TYPE_PCI:
             # Try to find the "PCI Advanced Capabilities"
             pos = self.find_cap_offset(PCI_CAP_ID_AF)
