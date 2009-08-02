@@ -2448,6 +2448,8 @@ class XendDomainInfo:
                 raise VmError("Cpu cap out of range, valid range is from 0 to %s for specified number of vcpus" %
                               (self.getVCpuCount() * 100))
 
+            xc.sched_credit_domain_set(self.domid, weight, cap)
+
         # Test whether the devices can be assigned with VT-d
         self.info.update_platform_pci()
         pci = self.info["platform"].get("pci")

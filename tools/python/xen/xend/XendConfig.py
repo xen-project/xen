@@ -1088,6 +1088,10 @@ class XendConfig(dict):
             if self.has_key(legacy) and self[legacy] not in (None, []):
                 sxpr.append([legacy, self[legacy]])
 
+        if self.has_key('vcpus_params'):
+            sxpr.append(['cpu_weight', int(self['vcpus_params'].get('weight', 256))])
+            sxpr.append(['cpu_cap', int(self['vcpus_params'].get('cap', 0))])
+
         if self.has_key('security_label'):
             sxpr.append(['security_label', self['security_label']])
 
