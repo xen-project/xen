@@ -60,6 +60,8 @@ setopt CONFIG_LGUEST n
 
 setopt CONFIG_LOCALVERSION_AUTO n
 
+setopt CONFIG_BRIDGE y
+
 # Should all be set one way or another in defconfig but aren't
 setopt CONFIG_NUMA n
 setopt CONFIG_X86_VSMP n
