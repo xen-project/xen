@@ -102,6 +102,7 @@ static void dump_cx(unsigned char key)
 {
     unsigned int cpu;
 
+    printk("'%c' pressed -> printing ACPI Cx structures\n", key);
     for_each_online_cpu ( cpu )
         if (processor_powers[cpu])
             print_acpi_power(cpu, processor_powers[cpu]);
@@ -110,7 +111,7 @@ static void dump_cx(unsigned char key)
 static int __init cpu_idle_key_init(void)
 {
     register_keyhandler(
-        'c', dump_cx,        "dump cx structures");
+        'c', dump_cx,        "dump ACPI Cx structures");
     return 0;
 }
 __initcall(cpu_idle_key_init);
