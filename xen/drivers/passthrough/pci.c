@@ -415,9 +415,15 @@ static void dump_pci_devices(unsigned char ch)
     spin_unlock(&pcidevs_lock);
 }
 
+struct keyhandler dump_pci_devices_keyhandler = {
+    .diagnostic = 1,
+    .u.fn = dump_pci_devices,
+    .desc = "dump PCI devices"
+};
+
 static int __init setup_dump_pcidevs(void)
 {
-    register_keyhandler('Q', dump_pci_devices, "dump PCI devices");
+    register_keyhandler('Q', &dump_pci_devices_keyhandler);
     return 0;
 }
 __initcall(setup_dump_pcidevs);

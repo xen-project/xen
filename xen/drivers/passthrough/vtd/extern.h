@@ -22,13 +22,14 @@
 #define _VTD_EXTERN_H_
 
 #include "dmar.h"
+#include <xen/keyhandler.h>
 
 extern int qinval_enabled;
 extern int ats_enabled;
 
 void print_iommu_regs(struct acpi_drhd_unit *drhd);
 void print_vtd_entries(struct iommu *iommu, int bus, int devfn, u64 gmfn);
-void dump_iommu_info(unsigned char key);
+extern struct keyhandler dump_iommu_info_keyhandler;
 
 int enable_qinval(struct iommu *iommu);
 void disable_qinval(struct iommu *iommu);

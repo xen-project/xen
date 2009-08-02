@@ -921,6 +921,11 @@ static void debugtrace_key(unsigned char key)
     debugtrace_toggle();
 }
 
+static struct keyhandler debugtrace_keyhandler = {
+    .u.fn = debugtrace_key,
+    .desc = "toggle debugtrace to console/buffer"
+};
+
 static int __init debugtrace_init(void)
 {
     int order;
@@ -942,8 +947,7 @@ static int __init debugtrace_init(void)
 
     debugtrace_bytes = bytes;
 
-    register_keyhandler(
-        'T', debugtrace_key, "toggle debugtrace to console/buffer");
+    register_keyhandler('T', &debugtrace_keyhandler);
 
     return 0;
 }

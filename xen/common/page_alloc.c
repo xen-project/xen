@@ -1192,7 +1192,7 @@ unsigned long avail_domheap_pages(void)
                             -1);
 }
 
-static void pagealloc_keyhandler(unsigned char key)
+static void pagealloc_info(unsigned char key)
 {
     unsigned int zone = MEMZONE_XEN;
     unsigned long n, total = 0;
@@ -1219,10 +1219,15 @@ static void pagealloc_keyhandler(unsigned char key)
     printk("    Dom heap: %lukB free\n", total << (PAGE_SHIFT-10));
 }
 
+static struct keyhandler pagealloc_info_keyhandler = {
+    .diagnostic = 1,
+    .u.fn = pagealloc_info,
+    .desc = "memory info"
+};
 
 static __init int pagealloc_keyhandler_init(void)
 {
-    register_keyhandler('m', pagealloc_keyhandler, "memory info");
+    register_keyhandler('m', &pagealloc_info_keyhandler);
     return 0;
 }
 __initcall(pagealloc_keyhandler_init);
@@ -1261,9 +1266,15 @@ static void dump_heap(unsigned char key)
     }
 }
 
+static struct keyhandler dump_heap_keyhandler = {
+    .diagnostic = 1,
+    .u.fn = dump_heap,
+    .desc = "dump heap info"
+};
+
 static __init int register_heap_trigger(void)
 {
-    register_keyhandler('H', dump_heap, "dump heap info");
+    register_keyhandler('H', &dump_heap_keyhandler);
     return 0;
 }
 __initcall(register_heap_trigger);

@@ -453,6 +453,11 @@ static void do_nmi_trigger(unsigned char key)
     local_irq_enable();
 }
 
+static struct keyhandler nmi_trigger_keyhandler = {
+    .u.fn = do_nmi_trigger,
+    .desc = "trigger an NMI"
+};
+
 static void do_nmi_stats(unsigned char key)
 {
     int i;
@@ -475,10 +480,16 @@ static void do_nmi_stats(unsigned char key)
         printk("dom0 vcpu0: NMI neither pending nor masked\n");
 }
 
+static struct keyhandler nmi_stats_keyhandler = {
+    .diagnostic = 1,
+    .u.fn = do_nmi_stats,
+    .desc = "NMI statistics"
+};
+
 static __init int register_nmi_trigger(void)
 {
-    register_keyhandler('n', do_nmi_trigger, "trigger an NMI");
-    register_keyhandler('N', do_nmi_stats,   "NMI statistics");
+    register_keyhandler('N', &nmi_trigger_keyhandler);
+    register_keyhandler('n', &nmi_stats_keyhandler);
     return 0;
 }
 __initcall(register_nmi_trigger);

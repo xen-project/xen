@@ -395,9 +395,15 @@ static void vmcb_dump(unsigned char ch)
     printk("**************************************\n");
 }
 
+static struct keyhandler vmcb_dump_keyhandler = {
+    .diagnostic = 1,
+    .u.fn = vmcb_dump,
+    .desc = "dump AMD-V VMCBs"
+};
+
 void setup_vmcb_dump(void)
 {
-    register_keyhandler('v', vmcb_dump, "dump AMD-V VMCBs");
+    register_keyhandler('v', &vmcb_dump_keyhandler);
 }
 
 /*

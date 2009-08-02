@@ -133,9 +133,14 @@ static void do_crashdump_trigger(unsigned char key)
     printk(" * no crash kernel loaded!\n");
 }
 
+static struct keyhandler crashdump_trigger_keyhandler = {
+    .u.fn = do_crashdump_trigger,
+    .desc = "trigger a crashdump"
+};
+
 static __init int register_crashdump_trigger(void)
 {
-    register_keyhandler('C', do_crashdump_trigger, "trigger a crashdump");
+    register_keyhandler('C', &crashdump_trigger_keyhandler);
     return 0;
 }
 __initcall(register_crashdump_trigger);

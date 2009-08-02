@@ -94,10 +94,14 @@ static void shadow_audit_key(unsigned char key)
            __func__, shadow_audit_enable);
 }
 
+static struct keyhandler shadow_audit_keyhandler = {
+    .u.fn = shadow_audit_key,
+    .desc = "toggle shadow audits"
+};
+
 static int __init shadow_audit_key_init(void)
 {
-    register_keyhandler(
-        'O', shadow_audit_key,  "toggle shadow audits");
+    register_keyhandler('O', &shadow_audit_keyhandler);
     return 0;
 }
 __initcall(shadow_audit_key_init);
@@ -1482,10 +1486,15 @@ static void shadow_blow_all_tables(unsigned char c)
     rcu_read_unlock(&domlist_read_lock);
 }
 
+static struct keyhandler shadow_blow_all_tables_keyhandler = {
+    .u.fn = shadow_blow_all_tables,
+    .desc = "reset shadow pagetables"
+};
+
 /* Register this function in the Xen console keypress table */
 static __init int shadow_blow_tables_keyhandler_init(void)
 {
-    register_keyhandler('S', shadow_blow_all_tables,"reset shadow pagetables");
+    register_keyhandler('S', &shadow_blow_all_tables_keyhandler);
     return 0;
 }
 __initcall(shadow_blow_tables_keyhandler_init);

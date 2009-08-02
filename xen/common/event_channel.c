@@ -1135,9 +1135,15 @@ static void dump_evtchn_info(unsigned char key)
     rcu_read_unlock(&domlist_read_lock);
 }
 
+static struct keyhandler dump_evtchn_info_keyhandler = {
+    .diagnostic = 1,
+    .u.fn = dump_evtchn_info,
+    .desc = "dump evtchn info"
+};
+
 static int __init dump_evtchn_info_key_init(void)
 {
-    register_keyhandler('e', dump_evtchn_info, "dump evtchn info");
+    register_keyhandler('e', &dump_evtchn_info_keyhandler);
     return 0;
 }
 __initcall(dump_evtchn_info_key_init);

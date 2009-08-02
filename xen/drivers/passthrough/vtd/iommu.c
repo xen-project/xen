@@ -1759,7 +1759,7 @@ int intel_vtd_setup(void)
     if ( init_vtd_hw() )
         goto error;
 
-    register_keyhandler('V', dump_iommu_info, "dump iommu info");
+    register_keyhandler('V', &dump_iommu_info_keyhandler);
 
     return 0;
 

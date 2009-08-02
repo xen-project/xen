@@ -514,6 +514,11 @@ static void dump_timerq(unsigned char key)
     }
 }
 
+static struct keyhandler dump_timerq_keyhandler = {
+    .diagnostic = 1,
+    .u.fn = dump_timerq,
+    .desc = "dump timer queues"
+};
 
 void __init timer_init(void)
 {
@@ -535,7 +540,7 @@ void __init timer_init(void)
         per_cpu(timers, i).heap = &dummy_heap;
     }
 
-    register_keyhandler('a', dump_timerq, "dump timer queues");
+    register_keyhandler('a', &dump_timerq_keyhandler);
 }
 
 /*

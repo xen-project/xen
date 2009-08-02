@@ -194,7 +194,7 @@ void print_vtd_entries(struct iommu *iommu, int bus, int devfn, u64 gmfn)
     } while ( --level );
 }
 
-void dump_iommu_info(unsigned char key)
+static void dump_iommu_info(unsigned char key)
 {
 #if defined(__i386__) || defined(__x86_64__)
     struct acpi_drhd_unit *drhd;
@@ -303,6 +303,12 @@ void dump_iommu_info(unsigned char key)
     /* ia64: TODO */
 #endif
 }
+
+struct keyhandler dump_iommu_info_keyhandler = {
+    .diagnostic = 1,
+    .u.fn = dump_iommu_info,
+    .desc = "dump iommu info"
+};
 
 /*
  * Local variables:

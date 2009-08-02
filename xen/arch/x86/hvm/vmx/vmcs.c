@@ -1143,9 +1143,15 @@ static void vmcs_dump(unsigned char ch)
     printk("**************************************\n");
 }
 
+static struct keyhandler vmcs_dump_keyhandler = {
+    .diagnostic = 1,
+    .u.fn = vmcs_dump,
+    .desc = "dump Intel's VMCS"
+};
+
 void setup_vmcs_dump(void)
 {
-    register_keyhandler('v', vmcs_dump, "dump Intel's VMCS");
+    register_keyhandler('v', &vmcs_dump_keyhandler);
 }
 
 

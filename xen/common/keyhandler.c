@@ -13,32 +13,19 @@
 #include <xen/domain.h>
 #include <xen/rangeset.h>
 #include <xen/compat.h>
+#include <xen/ctype.h>
 #include <asm/debugger.h>
 #include <asm/div64.h>
 
-#define KEY_MAX 256
-#define STR_MAX  64
-
-static struct {
-    union {
-        keyhandler_t     *handler;
-        irq_keyhandler_t *irq_handler;
-    } u;
-    unsigned int flags;
-    char         desc[STR_MAX];
-} key_table[KEY_MAX];
-
-#define KEYHANDLER_IRQ_CALLBACK 0x1
-
+static struct keyhandler *key_table[256];
 static unsigned char keypress_key;
 
 static void keypress_action(unsigned long unused)
 {
-    keyhandler_t *h;
     unsigned char key = keypress_key;
     console_start_log_everything();
-    if ( (h = key_table[key].u.handler) != NULL )
-        (*h)(key);
+    if ( key_table[key] != NULL )
+        (*key_table[key]->u.fn)(key);
     console_end_log_everything();
 }
 
@@ -46,13 +33,15 @@ static DECLARE_TASKLET(keypress_tasklet, keypress_action, 0);
 
 void handle_keypress(unsigned char key, struct cpu_user_regs *regs)
 {
-    irq_keyhandler_t *h;
+    struct keyhandler *h;
 
-    if ( !in_irq() || (key_table[key].flags & KEYHANDLER_IRQ_CALLBACK) )
+    if ( (h = key_table[key]) == NULL )
+        return;
+
+    if ( !in_irq() || h->irq_callback )
     {
         console_start_log_everything();
-        if ( (h = key_table[key].u.irq_handler) != NULL )
-            (*h)(key, regs);
+        (*h->u.irq_fn)(key, regs);
         console_end_log_everything();
     }
     else
@@ -62,34 +51,26 @@ void handle_keypress(unsigned char key, struct cpu_user_regs *regs)
     }
 }
 
-void register_keyhandler(
-    unsigned char key, keyhandler_t *handler, char *desc)
+void register_keyhandler(unsigned char key, struct keyhandler *handler)
 {
-    ASSERT(key_table[key].u.handler == NULL);
-    key_table[key].u.handler = handler;
-    key_table[key].flags     = 0;
-    safe_strcpy(key_table[key].desc, desc);
-}
-
-void register_irq_keyhandler(
-    unsigned char key, irq_keyhandler_t *handler, char *desc)
-{
-    ASSERT(key_table[key].u.irq_handler == NULL);
-    key_table[key].u.irq_handler = handler;
-    key_table[key].flags         = KEYHANDLER_IRQ_CALLBACK;
-    safe_strcpy(key_table[key].desc, desc);
+    ASSERT(key_table[key] == NULL);
+    key_table[key] = handler;
 }
 
 static void show_handlers(unsigned char key)
 {
     int i;
     printk("'%c' pressed -> showing installed handlers\n", key);
-    for ( i = 0; i < KEY_MAX; i++ ) 
-        if ( key_table[i].u.handler != NULL ) 
+    for ( i = 0; i < ARRAY_SIZE(key_table); i++ ) 
+        if ( key_table[i] != NULL ) 
             printk(" key '%c' (ascii '%02x') => %s\n", 
-                   (i<33 || i>126)?(' '):(i),i,
-                   key_table[i].desc);
+                   isprint(i) ? i : ' ', i, key_table[i]->desc);
 }
+
+static struct keyhandler show_handlers_keyhandler = {
+    .u.fn = show_handlers,
+    .desc = "show this message"
+};
 
 static void __dump_execstate(void *unused)
 {
@@ -127,6 +108,13 @@ static void dump_registers(unsigned char key, struct cpu_user_regs *regs)
     console_end_sync();
 }
 
+static struct keyhandler dump_registers_keyhandler = {
+    .irq_callback = 1,
+    .diagnostic = 1,
+    .u.irq_fn = dump_registers,
+    .desc = "dump registers"
+};
+
 static void dump_dom0_registers(unsigned char key)
 {
     struct vcpu *v;
@@ -140,11 +128,23 @@ static void dump_dom0_registers(unsigned char key)
         vcpu_show_execution_state(v);
 }
 
-static void halt_machine(unsigned char key, struct cpu_user_regs *regs)
+static struct keyhandler dump_dom0_registers_keyhandler = {
+    .diagnostic = 1,
+    .u.fn = dump_dom0_registers,
+    .desc = "dump Dom0 registers"
+};
+
+static void reboot_machine(unsigned char key, struct cpu_user_regs *regs)
 {
     printk("'%c' pressed -> rebooting machine\n", key);
     machine_restart(0);
 }
+
+static struct keyhandler reboot_machine_keyhandler = {
+    .irq_callback = 1,
+    .u.irq_fn = reboot_machine,
+    .desc = "reboot machine"
+};
 
 static void cpuset_print(char *set, int size, cpumask_t mask)
 {
@@ -236,6 +236,12 @@ static void dump_domains(unsigned char key)
     rcu_read_unlock(&domlist_read_lock);
 }
 
+static struct keyhandler dump_domains_keyhandler = {
+    .diagnostic = 1,
+    .u.fn = dump_domains,
+    .desc = "dump domain (and guest debug) info"
+};
+
 static cpumask_t read_clocks_cpumask = CPU_MASK_NONE;
 static s_time_t read_clocks_time[NR_CPUS];
 static u64 read_cycles_time[NR_CPUS];
@@ -314,12 +320,82 @@ static void read_clocks(unsigned char key)
            maxdif_cycles, sumdif_cycles/count, count, dif_cycles);
 }
 
+static struct keyhandler read_clocks_keyhandler = {
+    .diagnostic = 1,
+    .u.fn = read_clocks,
+    .desc = "display multi-cpu clock info"
+};
+
 extern void dump_runq(unsigned char key);
+static struct keyhandler dump_runq_keyhandler = {
+    .diagnostic = 1,
+    .u.fn = dump_runq,
+    .desc = "dump run queues"
+};
 
 #ifdef PERF_COUNTERS
 extern void perfc_printall(unsigned char key);
+static struct keyhandler perfc_printall_keyhandler = {
+    .diagnostic = 1,
+    .u.fn = perfc_printall,
+    .desc = "print performance counters"
+};
 extern void perfc_reset(unsigned char key);
+static struct keyhandler perfc_reset_keyhandler = {
+    .u.fn = perfc_reset,
+    .desc = "reset performance counters"
+};
 #endif
+
+static void run_all_nonirq_keyhandlers(unsigned long unused)
+{
+    /* Fire all the non-IRQ-context diagnostic keyhandlers */
+    struct keyhandler *h;
+    int k;
+
+    console_start_log_everything();
+    for ( k = 0; k < ARRAY_SIZE(key_table); k++ )
+    {
+        h = key_table[k];
+        if ( (h == NULL) || !h->diagnostic || h->irq_callback )
+            continue;
+        printk("[%c: %s]\n", k, h->desc);
+        (*h->u.fn)(k);
+    }
+    console_end_log_everything();
+}
+
+static DECLARE_TASKLET(run_all_keyhandlers_tasklet,
+                       run_all_nonirq_keyhandlers, 0);
+
+static void run_all_keyhandlers(unsigned char key, struct cpu_user_regs *regs)
+{
+    struct keyhandler *h;
+    int k;
+
+    printk("'%c' pressed -> firing all diagnostic keyhandlers\n", key);
+
+    /* Fire all the IRQ-context diangostic keyhandlers now */
+    console_start_log_everything();
+    for ( k = 0; k < ARRAY_SIZE(key_table); k++ )
+    {
+        h = key_table[k];
+        if ( (h == NULL) || !h->diagnostic || !h->irq_callback )
+            continue;
+        printk("[%c: %s]\n", k, h->desc);
+        (*h->u.irq_fn)(k, regs);
+    }
+    console_end_log_everything();
+
+    /* Trigger the others from a tasklet in non-IRQ context */
+    tasklet_schedule(&run_all_keyhandlers_tasklet);
+}
+
+static struct keyhandler run_all_keyhandlers_keyhandler = {
+    .irq_callback = 1,
+    .u.irq_fn = run_all_keyhandlers,
+    .desc = "print all diagnostics"
+};
 
 static void do_debug_key(unsigned char key, struct cpu_user_regs *regs)
 {
@@ -330,33 +406,28 @@ static void do_debug_key(unsigned char key, struct cpu_user_regs *regs)
                              bit. */
 }
 
+static struct keyhandler do_debug_key_keyhandler = {
+    .irq_callback = 1,
+    .u.irq_fn = do_debug_key,
+    .desc = "trap to xendbg"
+};
+
 void __init initialize_keytable(void)
 {
-    register_irq_keyhandler(
-        'd', dump_registers, "dump registers");
-    register_keyhandler(
-        'h', show_handlers, "show this message");
-    register_keyhandler(
-        'q', dump_domains, "dump domain (and guest debug) info");
-    register_keyhandler(
-        'r', dump_runq,      "dump run queues");
-    register_irq_keyhandler(
-        'R', halt_machine,   "reboot machine");
-
-    register_keyhandler(
-        't', read_clocks, "display multi-cpu clock info");
+    register_keyhandler('d', &dump_registers_keyhandler);
+    register_keyhandler('h', &show_handlers_keyhandler);
+    register_keyhandler('q', &dump_domains_keyhandler);
+    register_keyhandler('r', &dump_runq_keyhandler);
+    register_keyhandler('R', &reboot_machine_keyhandler);
+    register_keyhandler('t', &read_clocks_keyhandler);
+    register_keyhandler('0', &dump_dom0_registers_keyhandler);
+    register_keyhandler('%', &do_debug_key_keyhandler);
+    register_keyhandler('*', &run_all_keyhandlers_keyhandler);
 
 #ifdef PERF_COUNTERS
-    register_keyhandler(
-        'p', perfc_printall, "print performance counters");
-    register_keyhandler(
-        'P', perfc_reset,    "reset performance counters");
+    register_keyhandler('p', &perfc_printall_keyhandler);
+    register_keyhandler('P', &perfc_reset_keyhandler);
 #endif
-
-    register_keyhandler(
-        '0', dump_dom0_registers, "dump Dom0 registers");
-
-    register_irq_keyhandler('%', do_debug_key,   "Trap to xendbg");
 }
 
 /*
