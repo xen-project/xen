@@ -147,6 +147,7 @@ class XendStateStore:
                     cls_dict[val_name] = bool(int(val_text))
             state[uuid] = cls_dict
 
+        dom.unlink()
         return state
 
     def save_state(self, cls, state):
@@ -226,5 +227,5 @@ class XendStateStore:
                     node.appendChild(val_node)
 
         open(xml_path, 'w').write(doc.toprettyxml())
-        
+        doc.unlink()
     
