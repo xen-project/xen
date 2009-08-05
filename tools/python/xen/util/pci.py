@@ -240,22 +240,52 @@ def parse_hex(val):
     except ValueError:
         return None
 
+AUTO_PHP_FUNC = 1
+MANUAL_PHP_FUNC = 2
+
+def parse_pci_pfunc_vfunc(func_str):
+    list = func_str.split('=')
+    l = len(list)
+    if l == 0 or l > 2:
+         raise PciDeviceParseError('Invalid function: ' + func_str)
+    p = int(list[0], 16)
+    if p < 0 or p > 7:
+        raise PciDeviceParseError('Invalid physical function in: ' + func_str)
+    if l == 1:
+	# This defaults to linear mapping of physical to virtual functions
+        return (p, p, AUTO_PHP_FUNC)
+    else:
+	v = int(list[1], 16)
+        if v < 0 or v > 7:
+            raise PciDeviceParseError('Invalid virtual function in: ' +
+	                              func_str)
+        return (p, v, MANUAL_PHP_FUNC)
+
+def pci_func_range(start, end):
+    if end < start:
+        x = pci_func_range(end, start)
+	x.reverse()
+	return x
+    return range(start, end + 1)
+
+def pci_pfunc_vfunc_range(orig, a, b):
+    phys = pci_func_range(a[0], b[0])
+    virt = pci_func_range(a[1], b[1])
+    if len(phys) != len(virt):
+        raise PciDeviceParseError('Invalid range in: ' + orig)
+    return map(lambda x: x + (MANUAL_PHP_FUNC,), zip(phys, virt))
+
 def pci_func_list_map_fn(key, func_str):
     if func_str == "*":
-        return map(lambda x: int(x['func'], 16),
+        return map(lambda x: parse_pci_pfunc_vfunc(x['func']),
                    filter(lambda x:
                           pci_dict_cmp(x, key, ['domain', 'bus', 'slot']),
                           get_all_pci_dict()))
-    l = map(int, func_str.split("-"))
+    l = map(parse_pci_pfunc_vfunc, func_str.split("-"))
     if len(l) == 1:
         return l
     if len(l) == 2:
-        if l[0] < l[1]:
-            return range(l[0], l[1] + 1)
-        else:
-            x = range(l[1], l[0] + 1)
-            x.reverse()
-            return x
+        return pci_pfunc_vfunc_range(func_str, l[0], l[1])
     return []
 
 def pci_func_list_process(pci_dev_str, template, func_str):
@@ -263,7 +293,9 @@ def pci_func_list_process(pci_dev_str, template, func_str):
                (map(lambda x: pci_func_list_map_fn(template, x),
                     func_str.split(","))))
 
-    if len(l) != len(set(l)):
+    phys = map(lambda x: x[0], l)
+    virt = map(lambda x: x[1], l)
+    if len(phys) != len(set(phys)) or len(virt) != len(set(virt)):
         raise PciDeviceParseError("Duplicate functions: %s" % pci_dev_str)
 
     return l
@@ -272,7 +304,7 @@ def parse_pci_name_extended(pci_dev_str):
     pci_match = re.match(r"((?P<domain>[0-9a-fA-F]{1,4})[:,])?" +
                          r"(?P<bus>[0-9a-fA-F]{1,2})[:,]" +
                          r"(?P<slot>[0-9a-fA-F]{1,2})[.,]" +
-                         r"(?P<func>(\*|[0-7]([,-][0-7])*))" +
+                         r"(?P<func>(\*|[0-7]([,-=][0-7])*))" +
                          r"(@(?P<vdevfn>[01]?[0-9a-fA-F]))?" +
                          r"(,(?P<opts>.*))?$", pci_dev_str)
 
@@ -296,22 +328,35 @@ def parse_pci_name_extended(pci_dev_str):
         check_pci_opts(template['opts'])
 
     # This is where virtual function assignment takes place
+    func_list = pci_func_list_process(pci_dev_str, template,
+                                      pci_dev_info['func'])
+    if len(func_list) == 0:
+        return []
+
+    # Set the virtual function of the numerically lowest physical function
+    # to zero if it has not been manually set
+    if not filter(lambda x: x[1] == 0, func_list):
+        auto   = filter(lambda x: x[2] == AUTO_PHP_FUNC, func_list)
+        manual = filter(lambda x: x[2] == MANUAL_PHP_FUNC, func_list)
+	if not auto:
+            raise PciDeviceParseError('Virtual device does not include '
+				      'virtual function 0: ' + pci_dev_str)
+	auto.sort(lambda x,y: cmp(x[1], y[1]))
+	auto[0] = (auto[0][0], 0, AUTO_PHP_FUNC)
+	func_list = auto + manual
+
+    # For pci attachment and detachment is it important that virtual
+    # function 0 is done last. This is because is virtual function 0 that
+    # is used to singnal changes to the guest using ACPI
+    func_list.sort(lambda x,y: cmp(PCI_FUNC(y[1]), PCI_FUNC(x[1])))
+
     # Virtual slot assignment takes place here if specified in the bdf,
     # else it is done inside qemu-xen, as it knows which slots are free
     pci = []
-    func_list = pci_func_list_process(pci_dev_str, template,
-                                      pci_dev_info['func'])
-    for func in func_list:
+    for (pfunc, vfunc, auto) in func_list:
         pci_dev = template.copy()
-        pci_dev['func'] = "0x%x" % func
+        pci_dev['func'] = "0x%x" % pfunc
 
-        if len(func_list) == 1:
-            # For single-function devices vfunc must be 0
-            vfunc = 0
-        else:
-            # For multi-function virtual devices,
-            # identity map the func to vfunc
-            vfunc = func
         if pci_dev_info['vdevfn'] == '':
             vdevfn = AUTO_PHP_SLOT | vfunc
         else:
@@ -320,14 +365,6 @@ def parse_pci_name_extended(pci_dev_str):
 
         pci.append(pci_dev)
 
-    # For pci attachment and detachment is it important that virtual
-    # function 0 is done last. This is because is virtual function 0 that
-    # is used to singnal changes to the guest using ACPI
-    #
-    # By arranging things so that virtual function 0 is first,
-    # attachemnt can use the returned list as is. And detachment
-    # can just reverse the list.
-    pci.sort(lambda x,y: cmp(int(y['vdevfn'], 16), int(x['vdevfn'], 16)))
     return pci
 
 def parse_pci_name(pci_name_string):
