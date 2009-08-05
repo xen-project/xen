@@ -2270,6 +2270,26 @@ static void vmx_vmexit_ud_intercept(struct cpu_user_regs *regs)
     }
 }
 
+static int vmx_handle_eoi_write(void)
+{
+    unsigned long exit_qualification = __vmread(EXIT_QUALIFICATION);
+
+    /*
+     * 1. Must be a linear access data write.
+     * 2. Data write must be to the EOI register.
+     */
+    if ( (((exit_qualification >> 12) & 0xf) == 1) &&
+         ((exit_qualification & 0xfff) == APIC_EOI) )
+    {
+        int inst_len = __get_instruction_length(); /* Safe: APIC data write */
+        __update_guest_eip(inst_len);
+        vlapic_EOI_set(vcpu_vlapic(current));
+        return 1;
+    }
+
+    return 0;
+}
+
 asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
 {
     unsigned int exit_reason, idtv_info;
@@ -2572,8 +2592,12 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
     case EXIT_REASON_TPR_BELOW_THRESHOLD:
         break;
 
-    case EXIT_REASON_IO_INSTRUCTION:
     case EXIT_REASON_APIC_ACCESS:
+        if ( !vmx_handle_eoi_write() && !handle_mmio() )
+            vmx_inject_hw_exception(TRAP_gp_fault, 0);
+        break;
+
+    case EXIT_REASON_IO_INSTRUCTION:
         if ( !handle_mmio() )
             vmx_inject_hw_exception(TRAP_gp_fault, 0);
         break;
