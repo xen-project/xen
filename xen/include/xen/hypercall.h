@@ -129,6 +129,12 @@ compat_memory_op(
     XEN_GUEST_HANDLE(void) arg);
 
 extern int
+compat_grant_table_op(
+    unsigned int cmd,
+    XEN_GUEST_HANDLE(void) uop,
+    unsigned int count);
+
+extern int
 compat_vcpu_op(
     int cmd,
     int vcpuid,

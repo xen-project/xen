@@ -1999,7 +1999,8 @@ static long hvm_grant_table_op(
     unsigned int cmd, XEN_GUEST_HANDLE(void) uop, unsigned int count)
 {
     if ( (cmd != GNTTABOP_query_size) && (cmd != GNTTABOP_setup_table) &&
-         (cmd != GNTTABOP_map_grant_ref) && (cmd != GNTTABOP_unmap_grant_ref) )
+         (cmd != GNTTABOP_map_grant_ref) && (cmd != GNTTABOP_unmap_grant_ref) &&
+         (cmd != GNTTABOP_copy))
         return -ENOSYS; /* all other commands need auditing */
     return do_grant_table_op(cmd, uop, count);
 }
@@ -2051,6 +2052,16 @@ static hvm_hypercall_t *hvm_hypercall32_table[NR_hypercalls] = {
 
 #else /* defined(__x86_64__) */
 
+static long hvm_grant_table_op_compat32(
+    unsigned int cmd, XEN_GUEST_HANDLE(void) uop, unsigned int count)
+{
+    if ( (cmd != GNTTABOP_query_size) && (cmd != GNTTABOP_setup_table) &&
+         (cmd != GNTTABOP_map_grant_ref) && (cmd != GNTTABOP_unmap_grant_ref) &&
+         (cmd != GNTTABOP_copy))
+        return -ENOSYS; /* all other commands need auditing */
+    return compat_grant_table_op(cmd, uop, count);
+}
+
 static long hvm_memory_op_compat32(int cmd, XEN_GUEST_HANDLE(void) arg)
 {
     long rc = compat_memory_op(cmd, arg);
@@ -2090,7 +2101,7 @@ static hvm_hypercall_t *hvm_hypercall64_table[NR_hypercalls] = {
 
 static hvm_hypercall_t *hvm_hypercall32_table[NR_hypercalls] = {
     [ __HYPERVISOR_memory_op ] = (hvm_hypercall_t *)hvm_memory_op_compat32,
-    [ __HYPERVISOR_grant_table_op ] = (hvm_hypercall_t *)hvm_grant_table_op,
+    [ __HYPERVISOR_grant_table_op ] = (hvm_hypercall_t *)hvm_grant_table_op_compat32,
     [ __HYPERVISOR_vcpu_op ] = (hvm_hypercall_t *)hvm_vcpu_op_compat32,
     HYPERCALL(xen_version),
     HYPERCALL(event_channel_op),
