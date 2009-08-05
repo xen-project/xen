@@ -71,5 +71,9 @@ extern uint8_t epte_get_entry_emt(
 extern void ept_change_entry_emt_with_range(
     struct domain *d, unsigned long start_gfn, unsigned long end_gfn);
 extern unsigned char pat_type_2_pte_flags(unsigned char pat_type);
+extern int hold_mtrr_updates_on_aps;
+extern void mtrr_aps_sync_begin(void);
+extern void mtrr_aps_sync_end(void);
+extern void mtrr_bp_restore(void);
 
 #endif /* __ASM_X86_MTRR_H__ */

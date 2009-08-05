@@ -519,6 +519,7 @@ void __devinit start_secondary(void *unused)
 
 	/* We can take interrupts now: we're officially "up". */
 	local_irq_enable();
+	mtrr_ap_init();
 
 	microcode_resume_cpu(cpu);
 
@@ -1194,6 +1195,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 	cpu_callin_map = cpumask_of_cpu(0);
 	mb();
 	smp_boot_cpus(max_cpus);
+	mtrr_aps_sync_begin();
 }
 
 void __devinit smp_prepare_boot_cpu(void)
@@ -1386,6 +1388,7 @@ void enable_nonboot_cpus(void)
 	int cpu, error;
 
 	printk("Thawing cpus ...\n");
+	mtrr_aps_sync_begin();
 	for_each_cpu_mask(cpu, frozen_cpus) {
 		error = cpu_up(cpu);
 		if (!error) {
@@ -1395,6 +1398,7 @@ void enable_nonboot_cpus(void)
 		printk("Error taking cpu %d up: %d\n", cpu, error);
 		panic("Not enough cpus");
 	}
+	mtrr_aps_sync_end();
 	cpus_clear(frozen_cpus);
 
 	/*
@@ -1461,6 +1465,8 @@ void __init smp_cpus_done(unsigned int max_cpus)
 #ifdef CONFIG_X86_IO_APIC
 	setup_ioapic_dest();
 #endif
+	mtrr_save_state();
+	mtrr_aps_sync_end();
 #ifndef CONFIG_HOTPLUG_CPU
 	/*
 	 * Disable executability of the SMP trampoline:

@@ -134,6 +134,17 @@ struct set_mtrr_data {
 	mtrr_type	smp_type;
 };
 
+/* As per the IA32 SDM vol-3: 10.11.8 MTRR Considerations in MP Systems section
+ * MTRRs updates must to be synchronized across all the processors.
+ * This flags avoids multiple cpu synchronization while booting each cpu.
+ * At the boot & resume time, this flag is turned on in mtrr_aps_sync_begin().
+ * Using this flag the mtrr initialization (and the all cpus sync up) in the 
+ * mtrr_ap_init() is avoided while booting each cpu. 
+ * After all the cpus have came up, then mtrr_aps_sync_end() synchronizes all 
+ * the cpus and updates mtrrs on all of them. Then this flag is turned off.
+ */
+int hold_mtrr_updates_on_aps;
+
 #ifdef CONFIG_SMP
 
 static void ipi_handler(void *info)
@@ -151,11 +162,13 @@ static void ipi_handler(void *info)
 		cpu_relax();
 
 	/*  The master has cleared me to execute  */
-	if (data->smp_reg != ~0U) 
+	if (data->smp_reg == ~0U) /* update all mtrr registers */
+		/* At the cpu hot-add time this will reinitialize mtrr 
+ 		 * registres on the existing cpus. It is ok.  */
+		mtrr_if->set_all();
+	else /* single mtrr register update */
 		mtrr_if->set(data->smp_reg, data->smp_base, 
 			     data->smp_size, data->smp_type);
-	else
-		mtrr_if->set_all();
 
 	atomic_dec(&data->count);
 	while(atomic_read(&data->gate))
@@ -250,7 +263,11 @@ static void set_mtrr(unsigned int reg, unsigned long base,
 	 * to replicate across all the APs. 
 	 * If we're doing that @reg is set to something special...
 	 */
-	if (reg != ~0U) 
+	if (reg == ~0U)  /* update all mtrr registers */
+		/* at boot or resume time, this will reinitialize the mtrrs on 
+		 * the bp. It is ok. */
+		mtrr_if->set_all();
+	else /* update the single mtrr register */
 		mtrr_if->set(reg,base,size,type);
 
 	/* wait for the others */
@@ -659,9 +676,7 @@ void __init mtrr_bp_init(void)
 
 void mtrr_ap_init(void)
 {
-	unsigned long flags;
-
-	if (!mtrr_if || !use_intel())
+	if (!mtrr_if || !use_intel() || hold_mtrr_updates_on_aps)
 		return;
 	/*
 	 * Ideally we should hold mtrr_mutex here to avoid mtrr entries changed,
@@ -671,11 +686,7 @@ void mtrr_ap_init(void)
 	 * 2.cpu hotadd time. We let mtrr_add/del_page hold cpuhotplug lock to
 	 * prevent mtrr entry changes
 	 */
-	local_irq_save(flags);
-
-	mtrr_if->set_all();
-
-	local_irq_restore(flags);
+	set_mtrr(~0U, 0, 0, 0);
 }
 
 /**
@@ -690,6 +701,28 @@ void mtrr_save_state(void)
 	else
 		on_selected_cpus(cpumask_of(0), mtrr_save_fixed_ranges, NULL, 1);
 	put_cpu();
+}
+
+void mtrr_aps_sync_begin(void)
+{
+	if (!use_intel())
+		return;
+	hold_mtrr_updates_on_aps = 1;
+}
+
+void mtrr_aps_sync_end(void)
+{
+	if (!use_intel())
+		return;
+	set_mtrr(~0U, 0, 0, 0);
+	hold_mtrr_updates_on_aps = 0;
+}
+
+void mtrr_bp_restore(void)
+{
+	if (!use_intel())
+		return;
+	mtrr_if->set_all();
 }
 
 static int __init mtrr_init_finialize(void)
