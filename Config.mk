@@ -141,7 +141,9 @@ XEN_EXTFILES_URL=http://xenbits.xensource.com/xen-extfiles
 # the internet.  The original download URL is preserved as a comment
 # near the place in the Xen Makefiles where the file is used.
 
-QEMU_REMOTE=git://xenbits.xensource.com/qemu-xen-unstable.git
+# GIT protocol can be faster than HTTP, if your firewall lets it through.
+# QEMU_REMOTE=git://xenbits.xensource.com/qemu-xen-unstable.git
+QEMU_REMOTE=http://xenbits.xensource.com/git-http/qemu-xen-unstable.git
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.
