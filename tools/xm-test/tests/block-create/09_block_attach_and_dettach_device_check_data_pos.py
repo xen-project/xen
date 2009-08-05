@@ -1,7 +1,9 @@
 #!/usr/bin/python
 
 # Copyright (C) International Business Machines Corp., 2005
-# Author: Murillo F. Bernardes <mfb@br.ibm.com>
+# Copyright (C) flonatel GmbH & Co. KG, 2009
+# Authors: Murillo F. Bernardes <mfb@br.ibm.com>
+#          Andreas Florath <xen@flonatel.org>
 
 import re
 
@@ -30,7 +32,7 @@ except ConsoleError, e:
     saveLog(console.getHistory())
     FAIL(str(e))
     
-s, o = traceCommand("mke2fs -q -F /dev/ram1")
+s, o = traceCommand("mke2fs -j -q -F /dev/ram1")
 if s != 0:
     FAIL("mke2fs returned %i != 0" % s)
 
