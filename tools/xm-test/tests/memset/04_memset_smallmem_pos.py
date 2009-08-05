@@ -25,7 +25,7 @@ except ConsoleError, e:
     FAIL(str(e))
 
 status, output = traceCommand("xm mem-set %s %i" %
-                              (domain.getName(), 15))
+                              (domain.getName(), 18))
 
 if status != 0:
     FAIL("xm mem-set %s %i returned invalid %i != 0" %
