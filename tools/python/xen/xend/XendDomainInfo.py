@@ -678,21 +678,21 @@ class XendDomainInfo:
                 if (pci_dict_cmp(x, new_dev)):
                     raise VmError("device is already inserted")
 
-        # Test whether the devices can be assigned with VT-d
+        # Test whether the devices can be assigned.
+        self.pci_device_check_attachability(new_dev)
+
+        return self.hvm_pci_device_insert_dev(new_dev)
+
+    def pci_device_check_attachability(self, new_dev):
+        # Test whether the devices can be assigned
+
         pci_name = pci_dict_to_bdf_str(new_dev)
-        if pci_name in get_all_assigned_pci_devices():
+        _all_assigned_pci_devices =  get_all_assigned_pci_devices()
+        if pci_name in _all_assigned_pci_devices:
             raise VmError("failed to assign device %s that has"
                           " already been assigned to other domain." % pci_name)
 
-        # Here, we duplicate some checkings (in some cases, we mustn't allow
-        # a device to be hot-plugged into an HVM guest) that are also done in
-        # pci_device_configure()'s self.device_create(dev_sxp) or
-        # dev_control.reconfigureDevice(devid, dev_config).
-        # We must make the checkings before sending the command 'pci-ins' to
-        # ioemu.
-
-        # Test whether the device is owned by pciback. For instance, we can't
-        # hotplug a device being used by Dom0 itself to an HVM guest.
+        # Test whether the device is owned by pciback or pci-stub.
         try:
             pci_device = PciDevice(new_dev)
         except Exception, e:
@@ -707,6 +707,10 @@ class XendDomainInfo:
             raise VmError("pci: %s: non-page-aligned MMIO BAR found." % \
                 pci_device.name)
 
+        # PV guest has less checkings.
+        if not self.info.is_hvm():
+            return
+
         # Check the co-assignment.
         # To pci-attach a device D to domN, we should ensure each of D's
         # co-assignment devices hasn't been assigned, or has been assigned to
@@ -715,15 +719,13 @@ class XendDomainInfo:
         pci_device.devs_check_driver(coassignment_list)
         assigned_pci_device_str_list = self._get_assigned_pci_devices()
         for pci_str in coassignment_list:
-            if not (pci_str in get_all_assigned_pci_devices()):
+            if not (pci_str in _all_assigned_pci_devices):
                 continue
             if not pci_str in assigned_pci_device_str_list:
                 raise VmError(("pci: failed to pci-attach %s to domain %s" + \
                     " because one of its co-assignment device %s has been" + \
                     " assigned to other domain." \
                     )% (pci_device.name, self.info['name_label'], pci_str))
-
-        return self.hvm_pci_device_insert_dev(new_dev)
 
     def hvm_pci_device_insert(self, dev_config):
         log.debug("XendDomainInfo.hvm_pci_device_insert: %s"
@@ -880,6 +882,11 @@ class XendDomainInfo:
                 for n in sxp.children(pci_dev):
                     if(n[0] == 'vdevfn'):
                         n[1] = new_dev['vdevfn']
+        else:
+        # Do PV specific checking
+            if pci_state == 'Initialising':
+                # PV PCI device attachment
+                self.pci_device_check_attachability(dev)
 
         # If pci platform does not exist, create and exit.
         if existing_dev_info is None:
