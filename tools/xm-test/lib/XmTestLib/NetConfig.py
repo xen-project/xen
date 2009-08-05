@@ -143,7 +143,7 @@ class NetConfig:
         for line in lines:
             ip = re.search('(\d+\.\d+\.\d+\.\d+)', line)
             if ip and self.isIPInRange(ip.group(1)) == True:
-                dcmd = 'ip addr del %s dev %s' % (ip.group(1), DOM0_INTF)
+                dcmd = 'ip addr del %s/32 dev %s' % (ip.group(1), DOM0_INTF)
                 dstatus, doutput = traceCommand(dcmd)
                 if dstatus:
                     raise NetworkError("Failed to remove %s aliases: %d" %

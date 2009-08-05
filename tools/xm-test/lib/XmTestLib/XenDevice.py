@@ -217,7 +217,7 @@ class XenNetDevice(XenDevice):
     def addDom0AliasCmd(self, dev=DOM0_INTF):
         # Method to add start and remove dom0 alias cmds
         acmd = 'ip addr add %s dev %s' % (self.dom0_alias_ip, dev)
-        rcmd = 'ip addr del %s dev %s' % (self.dom0_alias_ip, dev) 
+        rcmd = 'ip addr del %s/32 dev %s' % (self.dom0_alias_ip, dev) 
         aliascmd = XenNetDevCmd(self, addCmd=acmd, removeCmd=rcmd)
 
         self.dom0_cmds.append(aliascmd)
