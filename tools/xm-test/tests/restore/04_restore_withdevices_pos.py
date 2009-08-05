@@ -10,15 +10,15 @@ import re
 if ENABLE_HVM_SUPPORT:
     SKIP("Restore currently not supported for HVM domains")
 
-config = {"disk": ["phy:/dev/ram0,hda1,w", "phy:/dev/ram1,hdb2,w"],
+config = {"disk": ["phy:/dev/ram0,xvda1,w", "phy:/dev/ram1,xvdb2,w"],
           "vif":  ['', '']}
 domain = XmTestDomain(extraConfig=config)
 
-s, o = traceCommand("mke2fs -q /dev/ram0")
+s, o = traceCommand("mke2fs -j -q /dev/ram0")
 if s != 0:
     FAIL("Unable to mke2fs /dev/ram0 in dom0")
 
-s, o = traceCommand("mke2fs -q /dev/ram1")
+s, o = traceCommand("mke2fs -j -q /dev/ram1")
 if s != 0:
     FAIL("Unable to mke2fs /dev/ram1 in dom0")
 
@@ -32,21 +32,21 @@ try:
     if run["return"] != 0:
         FAIL("Unable to mkdir /mnt/a /mnt/b")
 
-    run = console.runCmd("mount /dev/hda1 /mnt/a")
+    run = console.runCmd("mount /dev/xvda1 /mnt/a")
     if run["return"] != 0:
-        FAIL("Unable to mount /dev/hda1")
+        FAIL("Unable to mount /dev/xvda1")
 
-    run = console.runCmd("mount /dev/hdb2 /mnt/b")
+    run = console.runCmd("mount /dev/xvdb2 /mnt/b")
     if run["return"] != 0:
-        FAIL("Unable to mount /dev/hdb2")
+        FAIL("Unable to mount /dev/xvdb2")
 
-    run = console.runCmd("echo hda1 > /mnt/a/foo")
+    run = console.runCmd("echo xvda1 > /mnt/a/foo")
     if run["return"] != 0:
-        FAIL("Unable to write to block device hda1!")
+        FAIL("Unable to write to block device xvda1!")
 
-    run = console.runCmd("echo hdb2 > /mnt/b/foo")
+    run = console.runCmd("echo xvdb2 > /mnt/b/foo")
     if run["return"] != 0:
-        FAIL("Unable to write to block device hdb2!")
+        FAIL("Unable to write to block device xvdb2!")
 
     run = console.runCmd("ifconfig eth0 172.30.206.1 netmask 255.255.255.240")
     if run["return"] != 0:
@@ -101,15 +101,15 @@ try:
     
     run = console.runCmd("cat /mnt/a/foo")
     if run["return"] != 0:
-        FAIL("Unable to read from block device hda1")
-    if not re.search("hda1", run["output"]):
-        FAIL("Failed to read correct data from hda1")
+        FAIL("Unable to read from block device xvda1")
+    if not re.search("xvda1", run["output"]):
+        FAIL("Failed to read correct data from xvda1")
 
     run = console.runCmd("cat /mnt/b/foo")
     if run["return"] != 0:
-        FAIL("Unable to read from block device hdb2")
-    if not re.search("hdb2", run["output"]):
-        FAIL("Failed to read correct data from hdb2")
+        FAIL("Unable to read from block device xvdb2")
+    if not re.search("xvdb2", run["output"]):
+        FAIL("Failed to read correct data from xvdb2")
 
     run = console.runCmd("ifconfig")
     if not re.search("eth0", run["output"]):
