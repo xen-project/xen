@@ -402,11 +402,11 @@ static mfn_t ept_get_entry_current(unsigned long gfn, p2m_type_t *t,
  * return 1 to not to reset ept entry.
  */
 static int need_modify_ept_entry(struct domain *d, unsigned long gfn,
-                                    unsigned long mfn, uint8_t o_igmt,
+                                    mfn_t mfn, uint8_t o_igmt,
                                     uint8_t o_emt, p2m_type_t p2mt)
 {
     uint8_t igmt, emt;
-    emt = epte_get_entry_emt(d, gfn, mfn, &igmt, 
+    emt = epte_get_entry_emt(d, gfn, mfn_x(mfn), &igmt, 
                                 (p2mt == p2m_mmio_direct));
     if ( (emt == o_emt) && (igmt == o_igmt) )
         return 0;
@@ -420,7 +420,7 @@ void ept_change_entry_emt_with_range(struct domain *d, unsigned long start_gfn,
     p2m_type_t p2mt;
     uint64_t epte;
     int order = 0;
-    unsigned long mfn;
+    mfn_t mfn;
     uint8_t o_igmt, o_emt;
 
     for ( gfn = start_gfn; gfn <= end_gfn; gfn++ )
@@ -428,8 +428,8 @@ void ept_change_entry_emt_with_range(struct domain *d, unsigned long start_gfn,
         epte = ept_get_entry_content(d, gfn);
         if ( epte == 0 )
             continue;
-        mfn = (epte & EPTE_MFN_MASK) >> PAGE_SHIFT;
-        if ( !mfn_valid(mfn) )
+        mfn = _mfn((epte & EPTE_MFN_MASK) >> PAGE_SHIFT);
+        if ( !mfn_valid(mfn_x(mfn)) )
             continue;
         p2mt = (epte & EPTE_AVAIL1_MASK) >> EPTE_AVAIL1_SHIFT;
         o_igmt = (epte & EPTE_IGMT_MASK) >> EPTE_IGMT_SHIFT;
@@ -447,7 +447,7 @@ void ept_change_entry_emt_with_range(struct domain *d, unsigned long start_gfn,
                 order = EPT_TABLE_ORDER;
                 if ( need_modify_ept_entry(d, gfn, mfn, 
                                             o_igmt, o_emt, p2mt) )
-                    ept_set_entry(d, gfn, _mfn(mfn), order, p2mt);
+                    ept_set_entry(d, gfn, mfn, order, p2mt);
                 gfn += 0x1FF;
             }
             else
@@ -455,7 +455,7 @@ void ept_change_entry_emt_with_range(struct domain *d, unsigned long start_gfn,
                 /* change emt for partial entries of the 2m area. */
                 if ( need_modify_ept_entry(d, gfn, mfn, 
                                             o_igmt, o_emt, p2mt) )
-                    ept_set_entry(d, gfn, _mfn(mfn), order, p2mt);
+                    ept_set_entry(d, gfn, mfn, order, p2mt);
                 gfn = ((gfn >> EPT_TABLE_ORDER) << EPT_TABLE_ORDER) + 0x1FF;
             }
         }
@@ -463,7 +463,7 @@ void ept_change_entry_emt_with_range(struct domain *d, unsigned long start_gfn,
         {
             if ( need_modify_ept_entry(d, gfn, mfn, 
                                             o_igmt, o_emt, p2mt) )
-                ept_set_entry(d, gfn, _mfn(mfn), order, p2mt);
+                ept_set_entry(d, gfn, mfn, order, p2mt);
         }
     }
 }
