@@ -27,6 +27,8 @@
 #define EXPORT /* indicates code other modules are dependent upon */
 #define FORWARD
 
+#define TMEM_SPEC_VERSION 0
+
 /************  INTERFACE TO TMEM HOST-DEPENDENT (tmh) CODE ************/
 
 #define CLI_ID_NULL TMH_CLI_ID_NULL
@@ -105,6 +107,7 @@ DECL_CYC_COUNTER(decompress);
 #define MAX_GLOBAL_SHARED_POOLS  16
 
 struct tm_pool;
+struct tmem_page_descriptor;
 struct client {
     struct list_head client_list;
     struct tm_pool *pools[MAX_POOLS_PER_DOMAIN];
@@ -116,11 +119,20 @@ struct client {
     uint32_t cap;
     bool_t compress;
     bool_t frozen;
+    bool_t shared_auth_required;
+    /* for save/restore/migration */
+    bool_t live_migrating;
+    bool_t was_frozen;
+    struct list_head persistent_invalidated_list;
+    struct tmem_page_descriptor *cur_pgp;
+    /* statistics collection */
     unsigned long compress_poor, compress_nomem;
     unsigned long compressed_pages;
     uint64_t compressed_sum_size;
     uint64_t total_cycles;
     unsigned long succ_pers_puts, succ_eph_gets, succ_pers_gets;
+    /* shared pool authentication */
+    uint64_t shared_auth_uuid[MAX_GLOBAL_SHARED_POOLS][2];
 };
 typedef struct client client_t;
 
@@ -137,6 +149,7 @@ typedef struct share_list sharelist_t;
 struct tm_pool {
     bool_t shared;
     bool_t persistent;
+    int pageshift; /* 0 == 2**12 */
     struct list_head pool_list; /* FIXME do we need this anymore? */
     client_t *client;
     uint64_t uuid[2]; /* 0 for private, non-zero for shared */
@@ -144,8 +157,11 @@ struct tm_pool {
     rwlock_t pool_rwlock;
     struct rb_root obj_rb_root[OBJ_HASH_BUCKETS]; /* protected by pool_rwlock */
     struct list_head share_list; /* valid if shared */
-    DECL_SENTINEL
     int shared_count; /* valid if shared */
+    /* for save/restore/migration */
+    struct list_head persistent_page_list;
+    struct tmem_page_descriptor *cur_pgp;
+    /* statistics collection */
     atomic_t pgp_count;
     int pgp_count_max;
     long obj_count;  /* atomicity depends on pool_rwlock held for write */
@@ -158,6 +174,7 @@ struct tm_pool {
     unsigned long gets, found_gets;
     unsigned long flushs, flushs_found;
     unsigned long flush_objs, flush_objs_found;
+    DECL_SENTINEL
 };
 typedef struct tm_pool pool_t;
 
@@ -189,16 +206,29 @@ struct tmem_object_node {
 typedef struct tmem_object_node objnode_t;
 
 struct tmem_page_descriptor {
-    struct list_head global_eph_pages;
-    struct list_head client_eph_pages;
-    obj_t *obj;
+    union {
+        struct list_head global_eph_pages;
+        struct list_head client_inv_pages;
+    };
+    union {
+        struct list_head client_eph_pages;
+        struct list_head pool_pers_pages;
+    };
+    union {
+        obj_t *obj;
+        uint64_t inv_oid;  /* used for invalid list only */
+    };
     uint32_t index;
-    size_t size; /* 0 == PAGE_SIZE (pfp), else compressed data (cdata) */
+    size_t size; /* 0 == PAGE_SIZE (pfp), -1 == data invalid,
+                    else compressed data (cdata) */
     union {
         pfp_t *pfp;  /* page frame pointer */
         char *cdata; /* compressed data */
     };
-    uint64_t timestamp;
+    union {
+        uint64_t timestamp;
+        uint32_t pool_id;  /* used for invalid list only */
+    };
     DECL_SENTINEL
 };
 typedef struct tmem_page_descriptor pgp_t;
@@ -209,6 +239,7 @@ static LIST_HEAD(global_client_list);
 static LIST_HEAD(global_pool_list);
 
 static pool_t *global_shared_pools[MAX_GLOBAL_SHARED_POOLS] = { 0 };
+static bool_t global_shared_auth = 0;
 static atomic_t client_weight_total = ATOMIC_INIT(0);
 static int tmem_initialized = 0;
 
@@ -217,6 +248,7 @@ static int tmem_initialized = 0;
 EXPORT DEFINE_SPINLOCK(tmem_spinlock);  /* used iff tmh_lock_all */
 EXPORT DEFINE_RWLOCK(tmem_rwlock);      /* used iff !tmh_lock_all */
 static DEFINE_SPINLOCK(eph_lists_spinlock); /* protects global AND clients */
+static DEFINE_SPINLOCK(pers_lists_spinlock);
 
 #define tmem_spin_lock(_l)  do {if (!tmh_lock_all) spin_lock(_l);}while(0)
 #define tmem_spin_unlock(_l)  do {if (!tmh_lock_all) spin_unlock(_l);}while(0)
@@ -366,36 +398,61 @@ static NOINLINE void pgp_free(pgp_t *pgp, int from_delete)
     ASSERT(pgp->obj != NULL);
     ASSERT_SENTINEL(pgp->obj,OBJ);
     ASSERT_SENTINEL(pgp->obj->pool,POOL);
-    ASSERT(list_empty(&pgp->global_eph_pages));
-    ASSERT(list_empty(&pgp->client_eph_pages));
+    ASSERT(pgp->obj->pool->client != NULL);
     if ( from_delete )
         ASSERT(pgp_lookup_in_obj(pgp->obj,pgp->index) == NULL);
     ASSERT(pgp->obj->pool != NULL);
     pool = pgp->obj->pool;
+    if ( is_ephemeral(pool) )
+    {
+        ASSERT(list_empty(&pgp->global_eph_pages));
+        ASSERT(list_empty(&pgp->client_eph_pages));
+    }
     pgp_free_data(pgp, pool);
+    atomic_dec_and_assert(global_pgp_count);
+    atomic_dec_and_assert(pool->pgp_count);
+    pgp->size = -1;
+    if ( is_persistent(pool) && pool->client->live_migrating )
+    {
+        pgp->inv_oid = pgp->obj->oid;
+        pgp->pool_id = pool->pool_id;
+        return;
+    }
     INVERT_SENTINEL(pgp,PGD);
     pgp->obj = NULL;
     pgp->index = -1;
-    pgp->size = -1;
-    atomic_dec_and_assert(global_pgp_count);
-    atomic_dec_and_assert(pool->pgp_count);
+    tmem_free(pgp,sizeof(pgp_t),pool);
+}
+
+static NOINLINE void pgp_free_from_inv_list(client_t *client, pgp_t *pgp)
+{
+    pool_t *pool = client->pools[pgp->pool_id];
+
+    ASSERT_SENTINEL(pool,POOL);
+    ASSERT_SENTINEL(pgp,PGD);
+    INVERT_SENTINEL(pgp,PGD);
+    pgp->obj = NULL;
+    pgp->index = -1;
     tmem_free(pgp,sizeof(pgp_t),pool);
 }
 
 /* remove the page from appropriate lists but not from parent object */
 static void pgp_delist(pgp_t *pgp, bool_t no_eph_lock)
 {
+    client_t *client;
+
     ASSERT(pgp != NULL);
     ASSERT(pgp->obj != NULL);
     ASSERT(pgp->obj->pool != NULL);
-    ASSERT(pgp->obj->pool->client != NULL);
+    client = pgp->obj->pool->client;
+    ASSERT(client != NULL);
     if ( is_ephemeral(pgp->obj->pool) )
     {
         if ( !no_eph_lock )
             tmem_spin_lock(&eph_lists_spinlock);
         if ( !list_empty(&pgp->client_eph_pages) )
-            pgp->obj->pool->client->eph_count--;
-        ASSERT(pgp->obj->pool->client->eph_count >= 0);
+            client->eph_count--;
+        ASSERT(client->eph_count >= 0);
         list_del_init(&pgp->client_eph_pages);
         if ( !list_empty(&pgp->global_eph_pages) )
             global_eph_count--;
@@ -403,6 +460,20 @@ static void pgp_delist(pgp_t *pgp, bool_t no_eph_lock)
         list_del_init(&pgp->global_eph_pages);
         if ( !no_eph_lock )
             tmem_spin_unlock(&eph_lists_spinlock);
+    } else {
+        if ( client->live_migrating )
+        {
+            tmem_spin_lock(&pers_lists_spinlock);
+            list_add_tail(&pgp->client_inv_pages,
+                          &client->persistent_invalidated_list);
+            if ( pgp != pgp->obj->pool->cur_pgp )
+                list_del_init(&pgp->pool_pers_pages);
+            tmem_spin_unlock(&pers_lists_spinlock);
+        } else {
+            tmem_spin_lock(&pers_lists_spinlock);
+            list_del_init(&pgp->pool_pers_pages);
+            tmem_spin_unlock(&pers_lists_spinlock);
+        }
     }
 }
 
@@ -564,6 +635,7 @@ static NOINLINE void obj_free(obj_t *obj, int no_rebalance)
     ASSERT(obj->pgp_count == 0);
     pool = obj->pool;
     ASSERT(pool != NULL);
+    ASSERT(pool->client != NULL);
     ASSERT_WRITELOCK(&pool->pool_rwlock);
     if ( obj->tree_root.rnode != NULL ) /* may be a "stump" with no leaves */
         radix_tree_destroy(&obj->tree_root, pgp_destroy, rtn_free);
@@ -685,11 +757,14 @@ static pool_t * pool_alloc(void)
     for (i = 0; i < OBJ_HASH_BUCKETS; i++)
         pool->obj_rb_root[i] = RB_ROOT;
     INIT_LIST_HEAD(&pool->pool_list);
+    INIT_LIST_HEAD(&pool->persistent_page_list);
+    pool->cur_pgp = NULL;
     rwlock_init(&pool->pool_rwlock);
     pool->pgp_count_max = pool->obj_count_max = 0;
     pool->objnode_count = pool->objnode_count_max = 0;
     atomic_set(&pool->pgp_count,0);
-    pool->obj_count = 0;
+    pool->obj_count = 0; pool->shared_count = 0;
+    pool->pageshift = PAGE_SHIFT - 12;
     pool->good_puts = pool->puts = pool->dup_puts_flushed = 0;
     pool->dup_puts_replaced = pool->no_mem_puts = 0;
     pool->found_gets = pool->gets = 0;
@@ -805,6 +880,12 @@ static void pool_flush(pool_t *pool, cli_id_t cli_id, bool_t destroy)
         is_persistent(pool) ? "persistent" : "ephemeral" ,
         is_shared(pool) ? "shared" : "private");
     printk("%s=%d pool_id=%d\n", cli_id_str,pool->client->cli_id,pool->pool_id);
+    if ( pool->client->live_migrating )
+    {
+        printk("can't %s pool while %s is live-migrating\n",
+               destroy?"destroy":"flush", client_str);
+        return;
+    }
     pool_destroy_objs(pool,0,CLI_ID_NULL);
     if ( destroy )
     {
@@ -815,10 +896,10 @@ static void pool_flush(pool_t *pool, cli_id_t cli_id, bool_t destroy)
 
 /************ CLIENT MANIPULATION OPERATIONS **************************/
 
-static client_t *client_create(void)
+static client_t *client_create(cli_id_t cli_id)
 {
     client_t *client = tmem_malloc(client_t,NULL);
-    cli_id_t cli_id = tmh_get_cli_id_from_current();
+    int i;
 
     printk("tmem: initializing tmem capability for %s=%d...",cli_id_str,cli_id);
     if ( client == NULL )
@@ -834,15 +915,23 @@ static client_t *client_create(void)
             tmem_free(client,sizeof(client_t),NULL);
         return NULL;
     }
-    tmh_set_current_client(client);
+    tmh_set_client_from_id(client,cli_id);
     client->cli_id = cli_id;
 #ifdef __i386__
     client->compress = 0;
 #else
     client->compress = tmh_compression_enabled();
 #endif
+    client->shared_auth_required = tmh_shared_auth();
+    for ( i = 0; i < MAX_GLOBAL_SHARED_POOLS; i++)
+        client->shared_auth_uuid[i][0] =
+            client->shared_auth_uuid[i][1] = -1L;
+    client->frozen = 0; client->live_migrating = 0;
+    client->weight = 0; client->cap = 0;
     list_add_tail(&client->client_list, &global_client_list);
     INIT_LIST_HEAD(&client->ephemeral_page_list);
+    INIT_LIST_HEAD(&client->persistent_invalidated_list);
+    client->cur_pgp = NULL;
     client->eph_count = client->eph_count_max = 0;
     client->total_cycles = 0; client->succ_pers_puts = 0;
     client->succ_eph_gets = 0; client->succ_pers_gets = 0;
@@ -885,6 +974,11 @@ static bool_t client_over_quota(client_t *client)
         return 0;
     return ( ((global_eph_count*100L) / client->eph_count ) >
              ((total*100L) / client->weight) );
+}
+
+static void client_freeze(client_t *client, int freeze)
+{
+    client->frozen = freeze;
 }
 
 /************ MEMORY REVOCATION ROUTINES *******************************/
@@ -993,7 +1087,8 @@ static unsigned long tmem_relinquish_npages(unsigned long n)
 
 /************ TMEM CORE OPERATIONS ************************************/
 
-static NOINLINE int do_tmem_put_compress(pgp_t *pgp, tmem_cli_mfn_t cmfn)
+static NOINLINE int do_tmem_put_compress(pgp_t *pgp, tmem_cli_mfn_t cmfn,
+                                         void *cva)
 {
     void *dst, *p;
     size_t size;
@@ -1011,7 +1106,7 @@ static NOINLINE int do_tmem_put_compress(pgp_t *pgp, tmem_cli_mfn_t cmfn)
     if ( pgp->pfp != NULL )
         pgp_free_data(pgp, pgp->obj->pool);  /* FIXME... is this right? */
     START_CYC_COUNTER(compress);
-    ret = tmh_compress_from_client(cmfn, &dst, &size);
+    ret = tmh_compress_from_client(cmfn, &dst, &size, cva);
     if ( (ret == -EFAULT) || (ret == 0) )
         goto out;
     else if ( (size == 0) || (size >= tmem_subpage_maxsize()) )
@@ -1034,7 +1129,7 @@ out:
 }
 
 static NOINLINE int do_tmem_dup_put(pgp_t *pgp, tmem_cli_mfn_t cmfn,
-              uint32_t tmem_offset, uint32_t pfn_offset, uint32_t len)
+       uint32_t tmem_offset, uint32_t pfn_offset, uint32_t len, void *cva)
 {
     pool_t *pool;
     obj_t *obj;
@@ -1042,7 +1137,6 @@ static NOINLINE int do_tmem_dup_put(pgp_t *pgp, tmem_cli_mfn_t cmfn,
     pgp_t *pgpfound = NULL;
     int ret;
 
-    /* if we can successfully manipulate pgp to change out the data, do so */
     ASSERT(pgp != NULL);
     ASSERT(pgp->pfp != NULL);
     ASSERT(pgp->size != -1);
@@ -1052,10 +1146,12 @@ static NOINLINE int do_tmem_dup_put(pgp_t *pgp, tmem_cli_mfn_t cmfn,
     pool = obj->pool;
     ASSERT(pool != NULL);
     client = pool->client;
-    if ( len != 0 && tmh_compression_enabled() &&
-         client->compress && pgp->size != 0 )
+    if ( client->live_migrating )
+        goto failed_dup; /* no dups allowed when migrating */
+    /* can we successfully manipulate pgp to change out the data? */
+    if ( len != 0 && client->compress && pgp->size != 0 )
     {
-        ret = do_tmem_put_compress(pgp,cmfn);
+        ret = do_tmem_put_compress(pgp,cmfn,cva);
         if ( ret == 1 )
             goto done;
         else if ( ret == 0 )
@@ -1072,7 +1168,7 @@ copy_uncompressed:
     if ( ( pgp->pfp = tmem_page_alloc(pool) ) == NULL )
         goto failed_dup;
     /* tmh_copy_from_client properly handles len==0 and offsets != 0 */
-    ret = tmh_copy_from_client(pgp->pfp,cmfn,tmem_offset,pfn_offset,len);
+    ret = tmh_copy_from_client(pgp->pfp,cmfn,tmem_offset,pfn_offset,len,0);
     if ( ret == -EFAULT )
         goto bad_copy;
     pgp->size = 0;
@@ -1115,9 +1211,10 @@ failed_dup:
 }
 
 
-static NOINLINE int do_tmem_put(pool_t *pool, uint64_t oid, uint32_t index,
+static NOINLINE int do_tmem_put(pool_t *pool,
+              uint64_t oid, uint32_t index,
               tmem_cli_mfn_t cmfn, uint32_t tmem_offset,
-              uint32_t pfn_offset, uint32_t len)
+              uint32_t pfn_offset, uint32_t len, void *cva)
 {
     obj_t *obj = NULL, *objfound = NULL, *objnew = NULL;
     pgp_t *pgp = NULL, *pgpdel = NULL;
@@ -1131,7 +1228,7 @@ static NOINLINE int do_tmem_put(pool_t *pool, uint64_t oid, uint32_t index,
     {
         ASSERT_SPINLOCK(&objfound->obj_spinlock);
         if ((pgp = pgp_lookup_in_obj(objfound, index)) != NULL)
-            return do_tmem_dup_put(pgp,cmfn,tmem_offset,pfn_offset,len);
+            return do_tmem_dup_put(pgp,cmfn,tmem_offset,pfn_offset,len,cva);
     }
 
     /* no puts allowed into a frozen pool (except dup puts) */
@@ -1162,10 +1259,10 @@ static NOINLINE int do_tmem_put(pool_t *pool, uint64_t oid, uint32_t index,
     ASSERT(ret != -EEXIST);
     pgp->index = index;
 
-    if ( len != 0 && tmh_compression_enabled() && client->compress )
+    if ( len != 0 && client->compress )
     {
         ASSERT(pgp->pfp == NULL);
-        ret = do_tmem_put_compress(pgp,cmfn);
+        ret = do_tmem_put_compress(pgp,cmfn,cva);
         if ( ret == 1 )
             goto insert_page;
         if ( ret == -ENOMEM )
@@ -1189,7 +1286,7 @@ copy_uncompressed:
         goto delete_and_free;
     }
     /* tmh_copy_from_client properly handles len==0 (TMEM_NEW_PAGE) */
-    ret = tmh_copy_from_client(pgp->pfp,cmfn,tmem_offset,pfn_offset,len);
+    ret = tmh_copy_from_client(pgp->pfp,cmfn,tmem_offset,pfn_offset,len,cva);
     if ( ret == -EFAULT )
         goto bad_copy;
     pgp->size = 0;
@@ -1207,6 +1304,11 @@ insert_page:
         if (++client->eph_count > client->eph_count_max)
             client->eph_count_max = client->eph_count;
         tmem_spin_unlock(&eph_lists_spinlock);
+    } else { /* is_persistent */
+        tmem_spin_lock(&pers_lists_spinlock);
+        list_add_tail(&pgp->pool_pers_pages,
+            &pool->persistent_page_list);
+        tmem_spin_unlock(&pers_lists_spinlock);
     }
     ASSERT( ((objnew==obj)||(objfound==obj)) && (objnew!=objfound));
     if ( is_shared(pool) )
@@ -1249,7 +1351,7 @@ ASSERT(0);
 
 static NOINLINE int do_tmem_get(pool_t *pool, uint64_t oid, uint32_t index,
               tmem_cli_mfn_t cmfn, uint32_t tmem_offset,
-              uint32_t pfn_offset, uint32_t len)
+              uint32_t pfn_offset, uint32_t len, void *cva)
 {
     obj_t *obj;
     pgp_t *pgp;
@@ -1279,12 +1381,13 @@ static NOINLINE int do_tmem_get(pool_t *pool, uint64_t oid, uint32_t index,
     if ( pgp->size != 0 )
     {
         START_CYC_COUNTER(decompress);
-        if ( tmh_decompress_to_client(cmfn, pgp->cdata, pgp->size) == -EFAULT )
+        if ( tmh_decompress_to_client(cmfn, pgp->cdata,
+                                      pgp->size, cva) == -EFAULT )
             goto bad_copy;
         END_CYC_COUNTER(decompress);
     }
     else if ( tmh_copy_to_client(cmfn, pgp->pfp, tmem_offset,
-                                 pfn_offset, len) == -EFAULT)
+                                 pfn_offset, len, cva) == -EFAULT)
         goto bad_copy;
     if ( is_ephemeral(pool) )
     {
@@ -1398,10 +1501,12 @@ static NOINLINE int do_tmem_destroy_pool(uint32_t pool_id)
     return 1;
 }
 
-static NOINLINE int do_tmem_new_pool(uint32_t flags, uint64_t uuid_lo, uint64_t uuid_hi)
+static NOINLINE int do_tmem_new_pool(cli_id_t this_cli_id,
+                                     uint32_t this_pool_id, uint32_t flags,
+                                     uint64_t uuid_lo, uint64_t uuid_hi)
 {
-    client_t *client = tmh_client_from_current();
-    cli_id_t cli_id = tmh_get_cli_id_from_current();
+    client_t *client;
+    cli_id_t cli_id;
     int persistent = flags & TMEM_POOL_PERSIST;
     int shared = flags & TMEM_POOL_SHARED;
     int pagebits = (flags >> TMEM_POOL_PAGESIZE_SHIFT)
@@ -1410,12 +1515,22 @@ static NOINLINE int do_tmem_new_pool(uint32_t flags, uint64_t uuid_lo, uint64_t 
          & TMEM_POOL_VERSION_MASK;
     pool_t *pool, *shpool;
     int s_poolid, d_poolid, first_unused_s_poolid;
+    int i;
 
+    if ( this_cli_id == CLI_ID_NULL )
+    {
+        client = tmh_client_from_current();
+        cli_id = tmh_get_cli_id_from_current();
+    } else {
+        if ( (client = tmh_client_from_cli_id(this_cli_id)) == NULL)
+            return -EPERM;
+        cli_id = this_cli_id;
+    }
     ASSERT(client != NULL);
     printk("tmem: allocating %s-%s tmem pool for %s=%d...",
         persistent ? "persistent" : "ephemeral" ,
         shared ? "shared" : "private", cli_id_str, cli_id);
-    if ( specversion != 0 )
+    if ( specversion != TMEM_SPEC_VERSION )
     {
         printk("failed... unsupported spec version\n");
         return -EPERM;
@@ -1430,14 +1545,35 @@ static NOINLINE int do_tmem_new_pool(uint32_t flags, uint64_t uuid_lo, uint64_t 
         printk("failed... out of memory\n");
         return -ENOMEM;
     }
-    for ( d_poolid = 0; d_poolid < MAX_POOLS_PER_DOMAIN; d_poolid++ )
+    if ( this_cli_id != CLI_ID_NULL )
+    {
+        d_poolid = this_pool_id;
+        if ( client->pools[d_poolid] != NULL )
+            return -EPERM;
+        d_poolid = this_pool_id;
+    }
+    else for ( d_poolid = 0; d_poolid < MAX_POOLS_PER_DOMAIN; d_poolid++ )
         if ( client->pools[d_poolid] == NULL )
             break;
-    if ( d_poolid == MAX_POOLS_PER_DOMAIN )
+    if ( d_poolid >= MAX_POOLS_PER_DOMAIN )
     {
         printk("failed... no more pool slots available for this %s\n",
             client_str);
         goto fail;
+    }
+    if ( shared )
+    {
+        if ( uuid_lo == -1L && uuid_hi == -1L )
+            shared = 0;
+        if ( client->shared_auth_required && !global_shared_auth )
+        {
+            for ( i = 0; i < MAX_GLOBAL_SHARED_POOLS; i++)
+                if ( (client->shared_auth_uuid[i][0] == uuid_lo) &&
+                     (client->shared_auth_uuid[i][1] == uuid_hi) )
+                    break;
+            if ( i == MAX_GLOBAL_SHARED_POOLS )
+                shared = 0;
+        }
     }
     pool->shared = shared;
     pool->client = client;
@@ -1491,7 +1627,7 @@ fail:
 /************ TMEM CONTROL OPERATIONS ************************************/
 
 /* freeze/thaw all pools belonging to client cli_id (all domains if -1) */
-static int tmemc_freeze_pools(int cli_id, int arg)
+static int tmemc_freeze_pools(cli_id_t cli_id, int arg)
 {
     client_t *client;
     bool_t freeze = (arg == TMEMC_FREEZE) ? 1 : 0;
@@ -1502,20 +1638,20 @@ static int tmemc_freeze_pools(int cli_id, int arg)
     if ( cli_id == CLI_ID_NULL )
     {
         list_for_each_entry(client,&global_client_list,client_list)
-            client->frozen = freeze;
+            client_freeze(client,freeze);
         printk("tmem: all pools %s for all %ss\n",s,client_str);
     }
     else
     {
         if ( (client = tmh_client_from_cli_id(cli_id)) == NULL)
             return -1;
-        client->frozen = freeze;
+        client_freeze(client,freeze);
         printk("tmem: all pools %s for %s=%d\n",s,cli_id_str,cli_id);
     }
     return 0;
 }
 
-static int tmemc_flush_mem(int cli_id, uint32_t kb)
+static int tmemc_flush_mem(cli_id_t cli_id, uint32_t kb)
 {
     uint32_t npages, flushed_pages, flushed_kb;
 
@@ -1699,7 +1835,7 @@ static int tmemc_list_global(tmem_cli_va_t buf, int off, uint32_t len,
     return sum;
 }
 
-static int tmemc_list(int cli_id, tmem_cli_va_t buf, uint32_t len,
+static int tmemc_list(cli_id_t cli_id, tmem_cli_va_t buf, uint32_t len,
                                bool_t use_long)
 {
     client_t *client;
@@ -1716,7 +1852,6 @@ static int tmemc_list(int cli_id, tmem_cli_va_t buf, uint32_t len,
         return -1;
     else
         off = tmemc_list_client(client, buf, 0, len, use_long);
-
 
     return 0;
 }
@@ -1740,6 +1875,9 @@ static int tmemc_set_var_one(client_t *client, uint32_t subop, uint32_t arg1)
         printk("tmem: cap set to %d for %s=%d\n",arg1,cli_id_str,cli_id);
         break;
     case TMEMC_SET_COMPRESS:
+#ifdef __i386__
+        return -1;
+#endif
         client->compress = arg1 ? 1 : 0;
         printk("tmem: compression %s for %s=%d\n",
             arg1 ? "enabled" : "disabled",cli_id_str,cli_id);
@@ -1751,7 +1889,7 @@ static int tmemc_set_var_one(client_t *client, uint32_t subop, uint32_t arg1)
     return 0;
 }
 
-static int tmemc_set_var(int cli_id, uint32_t subop, uint32_t arg1)
+static int tmemc_set_var(cli_id_t cli_id, uint32_t subop, uint32_t arg1)
 {
     client_t *client;
 
@@ -1765,11 +1903,229 @@ static int tmemc_set_var(int cli_id, uint32_t subop, uint32_t arg1)
     return 0;
 }
 
-static int do_tmem_control(uint32_t subop, uint32_t cli_id32,
-   uint32_t arg1, uint32_t arg2, tmem_cli_va_t buf)
+static NOINLINE int tmemc_shared_pool_auth(cli_id_t cli_id, uint64_t uuid_lo,
+                                  uint64_t uuid_hi, bool_t auth)
+{
+    client_t *client;
+    int i, free = -1;
+
+    if ( cli_id == CLI_ID_NULL )
+    {
+        global_shared_auth = auth;
+        return 1;
+    }
+    client = tmh_client_from_cli_id(cli_id);
+    for ( i = 0; i < MAX_GLOBAL_SHARED_POOLS; i++)
+    {
+        if ( (client->shared_auth_uuid[i][0] == uuid_lo) &&
+             (client->shared_auth_uuid[i][1] == uuid_hi) )
+        {
+            if ( auth == 0 )
+                client->shared_auth_uuid[i][0] =
+                    client->shared_auth_uuid[i][1] = -1L;
+            return 1;
+        }
+        if ( (auth == 1) && (client->shared_auth_uuid[i][0] == -1L) &&
+                 (client->shared_auth_uuid[i][1] == -1L) && (free == -1) )
+            free = i;
+    }
+    if ( auth == 0 )
+        return 0;
+    if ( auth == 1 && free == -1 )
+        return -ENOMEM;
+    client->shared_auth_uuid[free][0] = uuid_lo;
+    client->shared_auth_uuid[free][1] = uuid_hi;
+    return 1;
+}
+
+static NOINLINE int tmemc_save_subop(int cli_id, uint32_t pool_id,
+                        uint32_t subop, tmem_cli_va_t buf, uint32_t arg1)
+{
+    client_t *client = tmh_client_from_cli_id(cli_id);
+    pool_t *pool =  (client == NULL) ? NULL : client->pools[pool_id];
+    uint32_t p;
+    uint64_t *uuid;
+    pgp_t *pgp, *pgp2;
+
+    switch(subop)
+    {
+    case TMEMC_SAVE_BEGIN:
+        if ( client == NULL )
+            return 0;
+        for (p = 0; p < MAX_POOLS_PER_DOMAIN; p++)
+            if ( client->pools[p] != NULL )
+                break;
+        if ( p == MAX_POOLS_PER_DOMAIN )
+            return 0;
+        client->was_frozen = client->frozen;
+        client->frozen = 1;
+        if ( arg1 != 0 )
+            client->live_migrating = 1;
+        return 1;
+    case TMEMC_RESTORE_BEGIN:
+        ASSERT(client == NULL);
+        if ( (client = client_create(cli_id)) == NULL )
+            return -1;
+        return 1;
+    case TMEMC_SAVE_GET_VERSION:
+        return TMEM_SPEC_VERSION;
+    case TMEMC_SAVE_GET_MAXPOOLS:
+        return MAX_POOLS_PER_DOMAIN;
+    case TMEMC_SAVE_GET_CLIENT_WEIGHT:
+        return client->weight == -1 ? -2 : client->weight;
+    case TMEMC_SAVE_GET_CLIENT_CAP:
+        return client->cap == -1 ? -2 : client->cap;
+    case TMEMC_SAVE_GET_CLIENT_FLAGS:
+        return (client->compress ? TMEM_CLIENT_COMPRESS : 0 ) |
+               (client->was_frozen ? TMEM_CLIENT_FROZEN : 0 );
+    case TMEMC_SAVE_GET_POOL_FLAGS:
+         if ( pool == NULL )
+             return -1;
+         return (pool->persistent ? TMEM_POOL_PERSIST : 0) |
+                (pool->shared ? TMEM_POOL_SHARED : 0) |
+                (pool->pageshift << TMEM_POOL_PAGESIZE_SHIFT);
+    case TMEMC_SAVE_GET_POOL_NPAGES:
+         if ( pool == NULL )
+             return -1;
+        return _atomic_read(pool->pgp_count);
+    case TMEMC_SAVE_GET_POOL_UUID:
+         if ( pool == NULL )
+             return -1;
+        uuid = (uint64_t *)buf.p;
+        *uuid++ = pool->uuid[0];
+        *uuid = pool->uuid[1];
+        return 0;
+    case TMEMC_SAVE_END:
+        client->live_migrating = 0;
+        if ( !list_empty(&client->persistent_invalidated_list) )
+            list_for_each_entry_safe(pgp,pgp2,
+              &client->persistent_invalidated_list, client_inv_pages)
+                pgp_free_from_inv_list(client,pgp);
+        client->frozen = client->was_frozen;
+        return 0;
+    }
+    return -1;
+}
+
+static NOINLINE int tmemc_save_get_next_page(int cli_id, int pool_id,
+                        tmem_cli_va_t buf, uint32_t bufsize)
+{
+    client_t *client = tmh_client_from_cli_id(cli_id);
+    pool_t *pool =  (client == NULL) ? NULL : client->pools[pool_id];
+    pgp_t *pgp;
+    int ret = 0;
+    struct tmem_handle *h;
+    unsigned int pagesize = 1 << (pool->pageshift+12);
+
+    if ( pool == NULL )
+        return -1;
+    if ( is_ephemeral(pool) )
+        return -1;
+    if ( bufsize < pagesize + sizeof(struct tmem_handle) )
+        return -ENOMEM;
+
+    tmem_spin_lock(&pers_lists_spinlock);
+    if ( list_empty(&pool->persistent_page_list) )
+    {
+        ret = -1;
+        goto out;
+    }
+    /* note: pool->cur_pgp is the pgp last returned by get_next_page */
+    if ( pool->cur_pgp == NULL )
+    {
+        /* process the first one */
+        pool->cur_pgp = pgp = list_entry((&pool->persistent_page_list)->next,
+                         pgp_t,pool_pers_pages);
+    } else if ( list_is_last(&pool->cur_pgp->pool_pers_pages, 
+                             &pool->persistent_page_list) )
+    {
+        /* already processed the last one in the list */
+        ret = -1;
+        goto out;
+    }
+    pgp = list_entry((&pool->cur_pgp->pool_pers_pages)->next,
+                         pgp_t,pool_pers_pages);
+    pool->cur_pgp = pgp;
+    h = (struct tmem_handle *)buf.p;
+    h->oid = pgp->obj->oid;
+    h->index = pgp->index;
+    buf.p = (void *)(h+1);
+    ret = do_tmem_get(pool, h->oid, h->index,0,0,0,pagesize,buf.p);
+
+out:
+    tmem_spin_unlock(&pers_lists_spinlock);
+    return ret;
+}
+
+static NOINLINE int tmemc_save_get_next_inv(int cli_id, tmem_cli_va_t buf,
+                        uint32_t bufsize)
+{
+    client_t *client = tmh_client_from_cli_id(cli_id);
+    pgp_t *pgp;
+    struct tmem_handle *h;
+    int ret = 0;
+
+    if ( client == NULL )
+        return 0;
+    if ( bufsize < sizeof(struct tmem_handle) )
+        return 0;
+    tmem_spin_lock(&pers_lists_spinlock);
+    if ( list_empty(&client->persistent_invalidated_list) )
+        goto out;
+    if ( client->cur_pgp == NULL )
+    {
+        pgp = list_entry((&client->persistent_invalidated_list)->next,
+                         pgp_t,client_inv_pages);
+        client->cur_pgp = pgp;
+    } else if ( list_is_last(&client->cur_pgp->client_inv_pages, 
+                             &client->persistent_invalidated_list) )
+    {
+        client->cur_pgp = NULL;
+        ret = 0;
+        goto out;
+    } else {
+        pgp = list_entry((&client->cur_pgp->client_inv_pages)->next,
+                         pgp_t,client_inv_pages);
+        client->cur_pgp = pgp;
+    }
+    h = (struct tmem_handle *)buf.p;
+    h->pool_id = pgp->pool_id;
+    h->oid = pgp->inv_oid;
+    h->index = pgp->index;
+    ret = 1;
+out:
+    tmem_spin_unlock(&pers_lists_spinlock);
+    return ret;
+}
+
+static int tmemc_restore_put_page(int cli_id, int pool_id, uint64_t oid,
+                      uint32_t index, tmem_cli_va_t buf, uint32_t bufsize)
+{
+    client_t *client = tmh_client_from_cli_id(cli_id);
+    pool_t *pool =  (client == NULL) ? NULL : client->pools[pool_id];
+int ret = 0;
+
+    if ( pool == NULL )
+        return -1;
+    return do_tmem_put(pool,oid,index,0,0,0,bufsize,buf.p);
+}
+
+static int tmemc_restore_flush_page(int cli_id, int pool_id, uint64_t oid,
+                        uint32_t index)
+{
+    client_t *client = tmh_client_from_cli_id(cli_id);
+    pool_t *pool =  (client == NULL) ? NULL : client->pools[pool_id];
+
+    if ( pool == NULL )
+        return -1;
+    return do_tmem_flush_page(pool, oid, index);
+}
+
+static NOINLINE int do_tmem_control(struct tmem_op *op)
 {
     int ret;
-    cli_id_t cli_id = (cli_id_t)cli_id32;
+    uint32_t pool_id = op->pool_id;
+    uint32_t subop = op->u.ctrl.subop;
 
     if (!tmh_current_is_privileged())
     {
@@ -1781,18 +2137,50 @@ static int do_tmem_control(uint32_t subop, uint32_t cli_id32,
     case TMEMC_THAW:
     case TMEMC_FREEZE:
     case TMEMC_DESTROY:
-        ret = tmemc_freeze_pools(cli_id,subop);
+        ret = tmemc_freeze_pools(op->u.ctrl.cli_id,subop);
         break;
     case TMEMC_FLUSH:
-        ret = tmemc_flush_mem(cli_id,arg1);
+        ret = tmemc_flush_mem(op->u.ctrl.cli_id,op->u.ctrl.arg1);
         break;
     case TMEMC_LIST:
-        ret = tmemc_list(cli_id,buf,arg1,arg2);
+        ret = tmemc_list(op->u.ctrl.cli_id,op->u.ctrl.buf,
+                         op->u.ctrl.arg1,op->u.ctrl.arg2);
         break;
     case TMEMC_SET_WEIGHT:
     case TMEMC_SET_CAP:
     case TMEMC_SET_COMPRESS:
-        ret = tmemc_set_var(cli_id,subop,arg1);
+        ret = tmemc_set_var(op->u.ctrl.cli_id,subop,op->u.ctrl.arg1);
+        break;
+    case TMEMC_SAVE_BEGIN:
+    case TMEMC_RESTORE_BEGIN:
+    case TMEMC_SAVE_GET_VERSION:
+    case TMEMC_SAVE_GET_MAXPOOLS:
+    case TMEMC_SAVE_GET_CLIENT_WEIGHT:
+    case TMEMC_SAVE_GET_CLIENT_CAP:
+    case TMEMC_SAVE_GET_CLIENT_FLAGS:
+    case TMEMC_SAVE_GET_POOL_FLAGS:
+    case TMEMC_SAVE_GET_POOL_NPAGES:
+    case TMEMC_SAVE_GET_POOL_UUID:
+    case TMEMC_SAVE_END:
+        ret = tmemc_save_subop(op->u.ctrl.cli_id,pool_id,subop,
+                        op->u.ctrl.buf,op->u.ctrl.arg1);
+        break;
+    case TMEMC_SAVE_GET_NEXT_PAGE:
+        ret = tmemc_save_get_next_page(op->u.ctrl.cli_id, pool_id,
+                                       op->u.ctrl.buf, op->u.ctrl.arg1);
+        break;
+    case TMEMC_SAVE_GET_NEXT_INV:
+        ret = tmemc_save_get_next_inv(op->u.ctrl.cli_id, op->u.ctrl.buf,
+                                      op->u.ctrl.arg1);
+        break;
+    case TMEMC_RESTORE_PUT_PAGE:
+        ret = tmemc_restore_put_page(op->u.ctrl.cli_id,pool_id,
+                                     op->u.ctrl.arg3, op->u.ctrl.arg2,
+                                     op->u.ctrl.buf, op->u.ctrl.arg1);
+        break;
+    case TMEMC_RESTORE_FLUSH_PAGE:
+        ret = tmemc_restore_flush_page(op->u.ctrl.cli_id,pool_id,
+                                       op->u.ctrl.arg3, op->u.ctrl.arg2);
         break;
     default:
         ret = -1;
@@ -1850,8 +2238,19 @@ EXPORT long do_tmem_op(tmem_cli_op_t uops)
     {
         tmem_write_lock(&tmem_rwlock);
         tmem_write_lock_set = 1;
-        rc = do_tmem_control(op.u.ctrl.subop, op.u.ctrl.cli_id,
-                             op.u.ctrl.arg1, op.u.ctrl.arg2, op.u.ctrl.buf);
+        rc = do_tmem_control(&op);
+        goto out;
+    } else if ( op.cmd == TMEM_AUTH ) {
+        tmem_write_lock(&tmem_rwlock);
+        tmem_write_lock_set = 1;
+        rc = tmemc_shared_pool_auth(op.u.new.arg1,op.u.new.uuid[0],
+                         op.u.new.uuid[1],op.u.new.flags);
+        goto out;
+    } else if ( op.cmd == TMEM_RESTORE_NEW ) {
+        tmem_write_lock(&tmem_rwlock);
+        tmem_write_lock_set = 1;
+        rc = do_tmem_new_pool(op.u.new.arg1, op.pool_id, op.u.new.flags,
+                         op.u.new.uuid[0], op.u.new.uuid[1]);
         goto out;
     }
 
@@ -1860,7 +2259,7 @@ EXPORT long do_tmem_op(tmem_cli_op_t uops)
     {
         tmem_write_lock(&tmem_rwlock);
         tmem_write_lock_set = 1;
-        if ( (client = client_create()) == NULL )
+        if ( (client = client_create(tmh_get_cli_id_from_current())) == NULL )
         {
             printk("tmem: can't create tmem structure for %s\n",client_str);
             rc = -ENOMEM;
@@ -1896,22 +2295,22 @@ EXPORT long do_tmem_op(tmem_cli_op_t uops)
     switch ( op.cmd )
     {
     case TMEM_NEW_POOL:
-        rc = do_tmem_new_pool(op.u.new.flags,
+        rc = do_tmem_new_pool(CLI_ID_NULL, 0, op.u.new.flags,
                               op.u.new.uuid[0], op.u.new.uuid[1]);
         break;
     case TMEM_NEW_PAGE:
-        rc = do_tmem_put(pool, op.u.gen.object, op.u.gen.index, op.u.gen.cmfn,
-                         0, 0, 0);
+        rc = do_tmem_put(pool, op.u.gen.object,
+                         op.u.gen.index, op.u.gen.cmfn, 0, 0, 0, NULL);
         break;
     case TMEM_PUT_PAGE:
-        rc = do_tmem_put(pool, op.u.gen.object, op.u.gen.index, op.u.gen.cmfn,
-                         0, 0, PAGE_SIZE);
+        rc = do_tmem_put(pool, op.u.gen.object,
+                    op.u.gen.index, op.u.gen.cmfn, 0, 0, PAGE_SIZE, NULL);
         if (rc == 1) succ_put = 1;
         else non_succ_put = 1;
         break;
     case TMEM_GET_PAGE:
         rc = do_tmem_get(pool, op.u.gen.object, op.u.gen.index, op.u.gen.cmfn,
-                         0, 0, PAGE_SIZE);
+                         0, 0, PAGE_SIZE, 0);
         if (rc == 1) succ_get = 1;
         else non_succ_get = 1;
         break;
@@ -1930,12 +2329,13 @@ EXPORT long do_tmem_op(tmem_cli_op_t uops)
     case TMEM_READ:
         rc = do_tmem_get(pool, op.u.gen.object, op.u.gen.index, op.u.gen.cmfn,
                          op.u.gen.tmem_offset, op.u.gen.pfn_offset,
-                         op.u.gen.len);
+                         op.u.gen.len,0);
         break;
     case TMEM_WRITE:
-        rc = do_tmem_put(pool, op.u.gen.object, op.u.gen.index, op.u.gen.cmfn,
+        rc = do_tmem_put(pool, op.u.gen.object,
+                         op.u.gen.index, op.u.gen.cmfn,
                          op.u.gen.tmem_offset, op.u.gen.pfn_offset,
-                         op.u.gen.len);
+                         op.u.gen.len, NULL);
         break;
     case TMEM_XCHG:
         /* need to hold global lock to ensure xchg is atomic */

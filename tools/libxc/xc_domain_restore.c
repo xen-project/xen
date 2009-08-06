@@ -536,6 +536,27 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
             continue;
         }
 
+        if ( j == -5 )
+        {
+            DPRINTF("xc_domain_restore start tmem\n");
+            if ( xc_tmem_restore(xc_handle, dom, io_fd) )
+            {
+                ERROR("error reading/restoring tmem");
+                goto out;
+            }
+            continue;
+        }
+
+        if ( j == -6 )
+        {
+            if ( xc_tmem_restore_extra(xc_handle, dom, io_fd) )
+            {
+                ERROR("error reading/restoring tmem extra");
+                goto out;
+            }
+            continue;
+        }
+
         if ( j == 0 )
             break;  /* our work here is done */
 

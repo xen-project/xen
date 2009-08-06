@@ -207,6 +207,7 @@ SUBCOMMAND_HELP = {
     'tmem-set'      :  ('[<Domain>|-a|--all] [weight=<weight>] [cap=<cap>] '
                         '[compress=<compress>]',
                         'Change tmem settings.'),
+    'tmem-shared-auth' :  ('[<Domain>|-a|--all] [--uuid=<uuid>] [--auth=<0|1>]', 'De/authenticate shared tmem pool.'),
 
     # security
 
@@ -306,6 +307,11 @@ SUBCOMMAND_OPTIONS = {
     ),
     'tmem-set':  (
        ('-a', '--all', 'Operate on all tmem.'),
+    ),
+    'tmem-shared-auth':  (
+       ('-a', '--all', 'Authenticate for all tmem pools.'),
+       ('-u', '--uuid', 'Specify uuid (abcdef01-2345-6789-01234567890abcdef).'),
+       ('-A', '--auth', '0=auth,1=deauth'),
     ),
 }
 
@@ -427,6 +433,7 @@ tmem_commands = [
     "tmem-freeze",
     "tmem-destroy",
     "tmem-set",
+    "tmem-shared-auth",
     ]
 
 all_commands = (domain_commands + host_commands + scheduler_commands +
@@ -3129,6 +3136,46 @@ def xm_tmem_set(args):
         if compress is not None:
             server.xend.node.tmem_set_compress(domid, compress)
 
+def xm_tmem_shared_auth(args):
+    try:
+        (options, params) = getopt.gnu_getopt(args, 'au:A:', ['all','uuid=','auth='])
+    except getopt.GetoptError, opterr:
+        err(opterr)
+	usage('tmem-shared-auth')
+
+    all = False
+    for (k, v) in options:
+        if k in ['-a', '--all']:
+            all = True
+
+    if not all and len(params) == 0:
+        err('You must specify -a or --all or a domain id.')
+        usage('tmem-shared-auth')
+
+    if all:
+        domid = -1
+    else:
+        try: 
+            domid = int(params[0])
+            params = params[1:]
+        except:
+            err('Unrecognized domain id: %s' % params[0])
+            usage('tmem-shared-auth')
+
+    for (k, v) in options:
+        if k in ['-u', '--uuid']:
+             uuid_str = v
+
+    auth = 0
+    for (k, v) in options:
+        if k in ['-A', '--auth']:
+            auth = v
+
+    if serverType == SERVER_XEN_API:
+        return server.xenapi.host.tmem_shared_auth(domid,uuid_str,auth)
+    else:
+        return server.xend.node.tmem_shared_auth(domid,uuid_str,auth)
+
 
 commands = {
     "shell": xm_shell,
@@ -3211,6 +3258,7 @@ commands = {
     "tmem-destroy": xm_tmem_destroy,
     "tmem-list": xm_tmem_list,
     "tmem-set": xm_tmem_set,
+    "tmem-shared-auth": xm_tmem_shared_auth,
     }
 
 ## The commands supported by a separate argument parser in xend.xm.

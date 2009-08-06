@@ -1523,20 +1523,21 @@ static PyObject *pyxc_tmem_control(XcObject *self,
     uint32_t cli_id;
     uint32_t arg1;
     uint32_t arg2;
+    uint64_t arg3;
     char *buf;
     char _buffer[32768], *buffer = _buffer;
     int rc;
 
-    static char *kwd_list[] = { "pool_id", "subop", "cli_id", "arg1", "arg2", "buf", NULL };
+    static char *kwd_list[] = { "pool_id", "subop", "cli_id", "arg1", "arg2", "arg3", "buf", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiiiis", kwd_list,
-                                      &pool_id, &subop, &cli_id, &arg1, &arg2, &buf) )
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiiiiis", kwd_list,
+                        &pool_id, &subop, &cli_id, &arg1, &arg2, &arg3, &buf) )
         return NULL;
 
     if ( (subop == TMEMC_LIST) && (arg1 > 32768) )
         arg1 = 32768;
 
-    if ( (rc = xc_tmem_control(self->xc_handle, pool_id, subop, cli_id, arg1, arg2, buffer)) < 0 )
+    if ( (rc = xc_tmem_control(self->xc_handle, pool_id, subop, cli_id, arg1, arg2, arg3, buffer)) < 0 )
         return Py_BuildValue("i", rc);
 
     switch (subop) {
@@ -1553,6 +1554,28 @@ static PyObject *pyxc_tmem_control(XcObject *self,
         default:
             break;
     }
+
+    Py_INCREF(zero);
+    return zero;
+}
+
+static PyObject *pyxc_tmem_shared_auth(XcObject *self,
+                                   PyObject *args,
+                                   PyObject *kwds)
+{
+    uint32_t cli_id;
+    uint32_t arg1;
+    char *uuid_str;
+    int rc;
+
+    static char *kwd_list[] = { "cli_id", "uuid_str", "arg1" };
+
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "isi", kwd_list,
+                                   &cli_id, &uuid_str, &arg1) )
+        return NULL;
+
+    if ( (rc = xc_tmem_auth(self->xc_handle, cli_id, uuid_str, arg1)) < 0 )
+        return Py_BuildValue("i", rc);
 
     Py_INCREF(zero);
     return zero;
@@ -2028,6 +2051,15 @@ static PyMethodDef pyxc_methods[] = {
       " arg2 [int]: Argument.\n"
       " buf [str]: Buffer.\n\n"
       "Returns: [int] 0 or [str] tmem info on success; exception on error.\n" },
+
+    { "tmem_shared_auth",
+      (PyCFunction)pyxc_tmem_shared_auth,
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "De/authenticate a shared tmem pool.\n"
+      " cli_id [int]: Client identifier (-1 == all).\n"
+      " uuid_str [str]: uuid.\n"
+      " auth [int]: 0|1 .\n"
+      "Returns: [int] 0 on success; exception on error.\n" },
 
     { NULL, NULL, 0, NULL }
 };

@@ -55,6 +55,12 @@ static inline int tmh_compression_enabled(void)
     return opt_tmem_compress;
 }
 
+extern int opt_tmem_shared_auth;
+static inline int tmh_shared_auth(void)
+{
+    return opt_tmem_shared_auth;
+}
+
 extern int opt_tmem;
 static inline int tmh_enabled(void)
 {
@@ -271,9 +277,10 @@ static inline tmh_cli_ptr_t *tmh_get_cli_ptr_from_current(void)
     return current->domain;
 }
 
-static inline void tmh_set_current_client(struct client *client)
+static inline void tmh_set_client_from_id(struct client *client,cli_id_t cli_id)
 {
-    current->domain->tmem = client;
+    struct domain *d = get_domain_by_id(cli_id);
+    d->tmem = client;
 }
 
 static inline bool_t tmh_current_is_privileged(void)
@@ -301,9 +308,11 @@ static inline int tmh_get_tmemop_from_client(tmem_op_t *op, tmem_cli_op_t uops)
             return rc;
         switch ( cop.cmd )
         {
-        case TMEM_NEW_POOL: u = XLAT_tmem_op_u_new;  break;
-        case TMEM_CONTROL:  u = XLAT_tmem_op_u_ctrl; break;
-        default:            u = XLAT_tmem_op_u_gen;  break;
+        case TMEM_NEW_POOL:   u = XLAT_tmem_op_u_new;   break;
+        case TMEM_CONTROL:    u = XLAT_tmem_op_u_ctrl;  break;
+        case TMEM_AUTH:       u = XLAT_tmem_op_u_new;   break;
+        case TMEM_RESTORE_NEW:u = XLAT_tmem_op_u_new;   break;
+        default:              u = XLAT_tmem_op_u_gen ;  break;
         }
 #define XLAT_tmem_op_HNDL_u_ctrl_buf(_d_, _s_) \
         guest_from_compat_handle((_d_)->u.ctrl.buf, (_s_)->u.ctrl.buf)
@@ -326,16 +335,16 @@ static inline void tmh_copy_to_client_buf_offset(tmem_cli_va_t clibuf, int off,
 #define tmh_cli_id_str "domid"
 #define tmh_client_str "domain"
 
-extern int tmh_decompress_to_client(tmem_cli_mfn_t,void*,size_t);
+extern int tmh_decompress_to_client(tmem_cli_mfn_t,void*,size_t,void*);
 
-extern int tmh_compress_from_client(tmem_cli_mfn_t,void**,size_t *);
+extern int tmh_compress_from_client(tmem_cli_mfn_t,void**,size_t *,void*);
 
 extern int tmh_copy_from_client(pfp_t *pfp,
     tmem_cli_mfn_t cmfn, uint32_t tmem_offset,
-    uint32_t pfn_offset, uint32_t len);
+    uint32_t pfn_offset, uint32_t len, void *cva);
 
 extern int tmh_copy_to_client(tmem_cli_mfn_t cmfn, pfp_t *pfp,
-    uint32_t tmem_offset, uint32_t pfn_offset, uint32_t len);
+    uint32_t tmem_offset, uint32_t pfn_offset, uint32_t len, void *cva);
 
 
 #define TMEM_PERF

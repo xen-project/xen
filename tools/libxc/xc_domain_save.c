@@ -758,6 +758,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     int live  = (flags & XCFLAGS_LIVE);
     int debug = (flags & XCFLAGS_DEBUG);
     int race = 0, sent_last_iter, skip_this_iter;
+    int tmem_saved = 0;
 
     /* The new domain's shared-info frame number. */
     unsigned long shared_info_frame;
@@ -995,6 +996,13 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     }
 
     print_stats(xc_handle, dom, 0, &stats, 0);
+
+    tmem_saved = xc_tmem_save(xc_handle, dom, io_fd, live, -5);
+    if ( tmem_saved == -1 )
+    {
+        ERROR("Error when writing to state file (tmem)");
+        goto out;
+    }
 
     /* Now write out each data page, canonicalising page tables as we go... */
     for ( ; ; )
@@ -1316,6 +1324,13 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                 }
 
                 DPRINTF("SUSPEND shinfo %08lx\n", info.shared_info_frame);
+                if ( (tmem_saved > 0) &&
+                     (xc_tmem_save_extra(xc_handle,dom,io_fd,-6) == -1) )
+                {
+                        ERROR("Error when writing to state file (tmem)");
+                        goto out;
+                }
+
             }
 
             if ( xc_shadow_control(xc_handle, dom, 
@@ -1604,6 +1619,9 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     rc = 0;
 
  out:
+
+    if ( tmem_saved != 0 && live )
+        xc_tmem_save_done(xc_handle, dom);
 
     if ( live )
     {

@@ -933,7 +933,8 @@ class XendAPI(object):
                     ('tmem_list', None),
                     ('tmem_set_weight', None),
                     ('tmem_set_cap', None),
-                    ('tmem_set_compress', None)]
+                    ('tmem_set_compress', None),
+                    ('tmem_shared_auth', None)]
     
     host_funcs = [('get_by_name_label', None),
                   ('list_methods', None)]
@@ -1129,6 +1130,14 @@ class XendAPI(object):
         node = XendNode.instance()
         try:
             node.tmem_set_compress(cli_id, value)
+        except Exception, e:
+            return xen_api_error(e)
+        return xen_api_success_void()
+
+    def host_tmem_shared_auth(self, _, host_ref, cli_id, uuid_str, auth):
+        node = XendNode.instance()
+        try:
+            node.tmem_shared_auth(cli_id, uuid_str, auth)
         except Exception, e:
             return xen_api_error(e)
         return xen_api_success_void()

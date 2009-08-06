@@ -202,7 +202,8 @@ class XMLRPCServer:
                               ['info', 'pciinfo', 'send_debug_keys',
                                'tmem_list', 'tmem_freeze', 'tmem_thaw',
                                'tmem_flush', 'tmem_destroy', 'tmem_set_weight',
-                               'tmem_set_cap', 'tmem_set_compress'],
+                               'tmem_set_cap', 'tmem_set_compress',
+                               'tmem_shared_auth'],
                              'node'),
                              (XendDmesg, ['info', 'clear'], 'node.dmesg')]:
             inst = type.instance()

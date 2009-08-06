@@ -1276,12 +1276,13 @@ int xc_set_cpuidle_max_cstate(int xc_handle, uint32_t value);
 /**
  * tmem operations
  */
-int xc_tmem_control(int xc,
-                    int32_t pool_id,
-                    uint32_t subop,
-                    uint32_t cli_id,
-                    uint32_t arg1,
-                    uint32_t arg2,
-                    void *buf);
+int xc_tmem_control(int xc, int32_t pool_id, uint32_t subop, uint32_t cli_id,
+                    uint32_t arg1, uint32_t arg2, uint64_t arg3, void *buf);
+int xc_tmem_auth(int xc_handle, int cli_id, char *uuid_str, int arg1);
+int xc_tmem_save(int xc_handle, int dom, int live, int fd, int field_marker);
+int xc_tmem_save_extra(int xc_handle, int dom, int fd, int field_marker);
+void xc_tmem_save_done(int xc_handle, int dom);
+int xc_tmem_restore(int xc_handle, int dom, int fd);
+int xc_tmem_restore_extra(int xc_handle, int dom, int fd);
 
 #endif /* XENCTRL_H */

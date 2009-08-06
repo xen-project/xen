@@ -111,7 +111,7 @@ def free(need_mem, dominfo):
         rlimit = RETRY_LIMIT
 
         # stop tmem from absorbing any more memory (must THAW when done!)
-        xc.tmem_control(0,TMEMC_FREEZE,-1, 0, 0, "")
+        xc.tmem_control(0,TMEMC_FREEZE,-1, 0, 0, 0, "")
 
         # If unreasonable memory size is required, we give up waiting
         # for ballooning or scrubbing, as if had retried.
@@ -130,7 +130,7 @@ def free(need_mem, dominfo):
         if freeable_mem < need_mem and need_mem < max_free_mem:
             # flush memory from tmem to scrub_mem and reobtain physinfo
             need_tmem_kb = need_mem - freeable_mem
-            tmem_kb = xc.tmem_control(0,TMEMC_FLUSH,-1, need_tmem_kb, 0, "")
+            tmem_kb = xc.tmem_control(0,TMEMC_FLUSH,-1, need_tmem_kb, 0, 0, "")
             log.debug("Balloon: tmem relinquished %d KiB of %d KiB requested.",
                       tmem_kb, need_tmem_kb)
             physinfo = xc.physinfo()
@@ -232,5 +232,5 @@ def free(need_mem, dominfo):
 
     finally:
         # allow tmem to accept pages again
-        xc.tmem_control(0,TMEMC_THAW,-1, 0, 0, "")
+        xc.tmem_control(0,TMEMC_THAW,-1, 0, 0, 0, "")
         del xc

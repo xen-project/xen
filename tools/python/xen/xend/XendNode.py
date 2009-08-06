@@ -948,62 +948,72 @@ class XendNode:
         subop = TMEMC_LIST
         arg1 = 32768
         arg2 = use_long
+        arg3 = 0
         buf = ''
-        return self.xc.tmem_control(pool_id, subop, cli_id, arg1, arg2, buf)
+        return self.xc.tmem_control(pool_id, subop, cli_id, arg1, arg2, arg3, buf)
 
     def tmem_thaw(self, cli_id):
         pool_id = -1
         subop = TMEMC_THAW
         arg1 = 0
         arg2 = 0
+        arg3 = 0
         buf = ''
-        return self.xc.tmem_control(pool_id, subop, cli_id, arg1, arg2, buf)
+        return self.xc.tmem_control(pool_id, subop, cli_id, arg1, arg2, arg3, buf)
 
     def tmem_freeze(self, cli_id):
         pool_id = -1
         subop = TMEMC_FREEZE
         arg1 = 0
         arg2 = 0
+        arg3 = 0
         buf = ''
-        return self.xc.tmem_control(pool_id, subop, cli_id, arg1, arg2, buf)
+        return self.xc.tmem_control(pool_id, subop, cli_id, arg1, arg2, arg3, buf)
 
     def tmem_flush(self, cli_id, pages):
         pool_id = -1
         subop = TMEMC_FLUSH
         arg1 = pages
         arg2 = 0
+        arg3 = 0
         buf = ''
-        return self.xc.tmem_control(pool_id, subop, cli_id, arg1, arg2, buf)
+        return self.xc.tmem_control(pool_id, subop, cli_id, arg1, arg2, arg3, buf)
 
     def tmem_destroy(self, cli_id):
         pool_id = -1
         subop = TMEMC_DESTROY
         arg1 = 0
         arg2 = 0
+        arg3 = 0
         buf = ''
-        return self.xc.tmem_control(pool_id, subop, cli_id, arg1, arg2, buf)
+        return self.xc.tmem_control(pool_id, subop, cli_id, arg1, arg2, arg3, buf)
 
     def tmem_set_weight(self, cli_id, arg1):
         pool_id = -1
         subop = TMEMC_SET_WEIGHT
         arg2 = 0
+        arg3 = 0
         buf = ''
-        return self.xc.tmem_control(pool_id, subop, cli_id, arg1, arg2, buf)
+        return self.xc.tmem_control(pool_id, subop, cli_id, arg1, arg2, arg3, buf)
 
     def tmem_set_cap(self, cli_id, arg1):
         pool_id = -1
         subop = TMEMC_SET_CAP
         arg2 = 0
+        arg3 = 0
         buf = ''
-        return self.xc.tmem_control(pool_id, subop, cli_id, arg1, arg2, buf)
+        return self.xc.tmem_control(pool_id, subop, cli_id, arg1, arg2, arg3, buf)
 
     def tmem_set_compress(self, cli_id, arg1):
         pool_id = -1
         subop = TMEMC_SET_COMPRESS
         arg2 = 0
+        arg3 = 0
         buf = ''
-        return self.xc.tmem_control(pool_id, subop, cli_id, arg1, arg2, buf)
+        return self.xc.tmem_control(pool_id, subop, cli_id, arg1, arg2, arg3, buf)
 
+    def tmem_shared_auth(self, cli_id, uuid_str, auth):
+        return self.xc.tmem_auth(cli_id, uuid_str, auth)
 
 def instance():
     global inst
