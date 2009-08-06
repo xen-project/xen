@@ -1021,79 +1021,75 @@ protmode_load_seg(
     if ( ((sel & 0xfff8) + 7) > desctab.limit )
         goto raise_exn;
 
-    do {
-        if ( (rc = read_ulong(x86_seg_none, desctab.base + (sel & 0xfff8),
-                              &val, 4, ctxt, ops)) )
-            return rc;
-        desc.a = val;
-        if ( (rc = read_ulong(x86_seg_none, desctab.base + (sel & 0xfff8) + 4,
-                              &val, 4, ctxt, ops)) )
-            return rc;
-        desc.b = val;
+    if ( (rc = read_ulong(x86_seg_none, desctab.base + (sel & 0xfff8),
+                          &val, 4, ctxt, ops)) )
+        return rc;
+    desc.a = val;
+    if ( (rc = read_ulong(x86_seg_none, desctab.base + (sel & 0xfff8) + 4,
+                          &val, 4, ctxt, ops)) )
+        return rc;
+    desc.b = val;
 
-        /* Segment present in memory? */
-        if ( !(desc.b & (1u<<15)) )
-        {
-            fault_type = EXC_NP;
+    /* Segment present in memory? */
+    if ( !(desc.b & (1u<<15)) )
+    {
+        fault_type = EXC_NP;
+        goto raise_exn;
+    }
+
+    /* System segments must have the system flag (S) set. */
+    if ( (desc.b & (1u<<12)) == (!is_x86_user_segment(seg) << 12) )
+        goto raise_exn;
+
+    dpl = (desc.b >> 13) & 3;
+    rpl = sel & 3;
+    cpl = ss.attr.fields.dpl;
+
+    switch ( seg )
+    {
+    case x86_seg_cs:
+        /* Code segment? */
+        if ( !(desc.b & (1u<<11)) )
             goto raise_exn;
-        }
-
-        /* System segments must have the system flag (S) set. */
-        if ( (desc.b & (1u<<12)) == (!is_x86_user_segment(seg) << 12) )
+        /* Non-conforming segment: check DPL against RPL. */
+        if ( ((desc.b & (6u<<9)) != (6u<<9)) && (dpl != rpl) )
             goto raise_exn;
+        break;
+    case x86_seg_ss:
+        /* Writable data segment? */
+        if ( (desc.b & (5u<<9)) != (1u<<9) )
+            goto raise_exn;
+        if ( (dpl != cpl) || (dpl != rpl) )
+            goto raise_exn;
+        break;
+    case x86_seg_ldtr:
+        /* LDT system segment? */
+        if ( (desc.b & (15u<<8)) != (2u<<8) )
+            goto raise_exn;
+        goto skip_accessed_flag;
+    case x86_seg_tr:
+        /* Available TSS system segment? */
+        if ( (desc.b & (15u<<8)) != (9u<<8) )
+            goto raise_exn;
+        a_flag = 0x200; /* busy flag */
+        break;
+    default:
+        /* Readable code or data segment? */
+        if ( (desc.b & (5u<<9)) == (4u<<9) )
+            goto raise_exn;
+        /* Non-conforming segment: check DPL against RPL and CPL. */
+        if ( ((desc.b & (6u<<9)) != (6u<<9)) &&
+             ((dpl < cpl) || (dpl < rpl)) )
+            goto raise_exn;
+        break;
+    }
 
-        dpl = (desc.b >> 13) & 3;
-        rpl = sel & 3;
-        cpl = ss.attr.fields.dpl;
-
-        switch ( seg )
-        {
-        case x86_seg_cs:
-            /* Code segment? */
-            if ( !(desc.b & (1u<<11)) )
-                goto raise_exn;
-            /* Non-conforming segment: check DPL against RPL. */
-            if ( ((desc.b & (6u<<9)) != (6u<<9)) && (dpl != rpl) )
-                goto raise_exn;
-            break;
-        case x86_seg_ss:
-            /* Writable data segment? */
-            if ( (desc.b & (5u<<9)) != (1u<<9) )
-                goto raise_exn;
-            if ( (dpl != cpl) || (dpl != rpl) )
-                goto raise_exn;
-            break;
-        case x86_seg_ldtr:
-            /* LDT system segment? */
-            if ( (desc.b & (15u<<8)) != (2u<<8) )
-                goto raise_exn;
-            goto skip_accessed_flag;
-        case x86_seg_tr:
-            /* Available TSS system segment? */
-            if ( (desc.b & (15u<<8)) != (9u<<8) )
-                goto raise_exn;
-            a_flag = 0x200; /* busy flag */
-            break;
-        default:
-            /* Readable code or data segment? */
-            if ( (desc.b & (5u<<9)) == (4u<<9) )
-                goto raise_exn;
-            /* Non-conforming segment: check DPL against RPL and CPL. */
-            if ( ((desc.b & (6u<<9)) != (6u<<9)) &&
-                 ((dpl < cpl) || (dpl < rpl)) )
-                goto raise_exn;
-            break;
-        }
-
-        /* Ensure Accessed flag is set. */
-        new_desc_b = desc.b | a_flag;
-        rc = ((desc.b & a_flag) ? X86EMUL_OKAY :
-              ops->cmpxchg(
-                  x86_seg_none, desctab.base + (sel & 0xfff8) + 4,
-                  &desc.b, &new_desc_b, 4, ctxt));
-    } while ( rc == X86EMUL_CMPXCHG_FAILED );
-
-    if ( rc )
+    /* Ensure Accessed flag is set. */
+    new_desc_b = desc.b | a_flag;
+    if ( !(desc.b & a_flag) &&
+         ((rc = ops->cmpxchg(
+             x86_seg_none, desctab.base + (sel & 0xfff8) + 4,
+             &desc.b, &new_desc_b, 4, ctxt)) != 0) )
         return rc;
 
     /* Force the Accessed flag in our local copy. */
