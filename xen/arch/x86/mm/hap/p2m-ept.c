@@ -36,17 +36,18 @@ static void ept_p2m_type_to_flags(ept_entry_t *entry, p2m_type_t type)
         case p2m_invalid:
         case p2m_mmio_dm:
         default:
+            entry->r = entry->w = entry->x = 0;
             return;
         case p2m_ram_rw:
         case p2m_mmio_direct:
         case p2m_grant_map_rw:
-             entry->r = entry->w = entry->x = 1;
+            entry->r = entry->w = entry->x = 1;
             return;
         case p2m_ram_logdirty:
         case p2m_ram_ro:
         case p2m_grant_map_ro:
-             entry->r = entry->x = 1;
-             entry->w = 0;
+            entry->r = entry->x = 1;
+            entry->w = 0;
             return;
     }
 }
@@ -196,7 +197,6 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
             ept_entry->rsvd = 0;
             ept_entry->avail2 = 0;
             /* last step */
-            ept_entry->r = ept_entry->w = ept_entry->x = 1;
             ept_p2m_type_to_flags(ept_entry, p2mt);
         }
         else
@@ -242,7 +242,6 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
             split_ept_entry->rsvd = 0;
             split_ept_entry->avail2 = 0;
             /* last step */
-            split_ept_entry->r = split_ept_entry->w = split_ept_entry->x = 1;
             ept_p2m_type_to_flags(split_ept_entry, split_p2mt);
         }
 
