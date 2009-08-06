@@ -205,6 +205,12 @@ void perform_tests(void)
 
     printf("Testing HVM environment:\n");
 
+    if ( hvm_info->low_mem_pgend < 0x1000 )
+    {
+        printf("Skipping tests due to insufficient memory (<16MB)\n");
+        return;
+    }
+
     passed = skipped = 0;
     for ( i = 0; tests[i].test; i++ )
     {
