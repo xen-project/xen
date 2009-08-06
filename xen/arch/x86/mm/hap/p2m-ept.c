@@ -75,7 +75,7 @@ static int ept_set_middle_entry(struct domain *d, ept_entry_t *ept_entry)
     ept_entry->mfn = page_to_mfn(pg);
     ept_entry->rsvd = 0;
     ept_entry->avail2 = 0;
-    /* last step */
+
     ept_entry->r = ept_entry->w = ept_entry->x = 1;
 
     return 1;
@@ -85,7 +85,8 @@ static int ept_next_level(struct domain *d, bool_t read_only,
                           ept_entry_t **table, unsigned long *gfn_remainder,
                           u32 shift, int order)
 {
-    ept_entry_t *ept_entry, *next;
+    ept_entry_t *ept_entry;
+    ept_entry_t *next;
     u32 index;
 
     index = *gfn_remainder >> shift;
@@ -127,17 +128,19 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
               unsigned int order, p2m_type_t p2mt)
 {
     ept_entry_t *table = NULL;
-    unsigned long gfn_remainder = gfn, offset = 0;
+    unsigned long gfn_remainder = gfn;
+    unsigned long offset = 0;
     ept_entry_t *ept_entry = NULL;
     u32 index;
-    int i, rv = 0, ret = 0;
+    int i;
+    int rv = 0;
+    int ret = 0;
     int walk_level = order / EPT_TABLE_ORDER;
     int direct_mmio = (p2mt == p2m_mmio_direct);
     uint8_t igmt = 0;
     int need_modify_vtd_table = 1;
 
-    /* we only support 4k and 2m pages now */
-
+    /* We only support 4k and 2m pages now */
     BUG_ON(order && order != EPT_TABLE_ORDER);
 
     if (  order != 0 )
@@ -166,10 +169,10 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
 
     if ( ret != GUEST_TABLE_SPLIT_PAGE )
     {
-        if ( mfn_valid(mfn_x(mfn)) || (p2mt == p2m_mmio_direct) )
+        if ( mfn_valid(mfn_x(mfn)) || direct_mmio )
         {
-            ept_entry->emt = epte_get_entry_emt(d, gfn, mfn,
-                                &igmt, direct_mmio);
+            ept_entry->emt = epte_get_entry_emt(d, gfn, mfn, &igmt,
+                                                direct_mmio);
             ept_entry->igmt = igmt;
             ept_entry->sp_avail = walk_level ? 1 : 0;
 
@@ -180,10 +183,10 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
                 else                  
                     ept_entry->mfn = mfn_x(mfn) - offset;
 
-                if ( ept_entry->avail1 == p2m_ram_logdirty &&
-                  p2mt == p2m_ram_rw )
+                if ( (ept_entry->avail1 == p2m_ram_logdirty) &&
+                     (p2mt == p2m_ram_rw) )
                     for ( i = 0; i < 512; i++ )
-                        paging_mark_dirty(d, mfn_x(mfn)-offset+i);
+                        paging_mark_dirty(d, mfn_x(mfn) - offset + i);
             }
             else
             {
@@ -196,7 +199,7 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
             ept_entry->avail1 = p2mt;
             ept_entry->rsvd = 0;
             ept_entry->avail2 = 0;
-            /* last step */
+
             ept_p2m_type_to_flags(ept_entry, p2mt);
         }
         else
@@ -204,57 +207,54 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
     }
     else
     {
-        /* It's super page before, now set one of the 4k pages, so
+        /* 
+         * It's super page before, now set one of the 4k pages, so
          * we should split the 2m page to 4k pages now.
          */
-
         ept_entry_t *split_table = NULL;
         ept_entry_t *split_ept_entry = NULL;
         unsigned long split_mfn = ept_entry->mfn;
         p2m_type_t split_p2mt = ept_entry->avail1;
         ept_entry_t new_ept_entry;
 
-        /* alloc new page for new ept middle level entry which is
+        /* 
+         * Allocate new page for new ept middle level entry which is
          * before a leaf super entry
          */
-
         if ( !ept_set_middle_entry(d, &new_ept_entry) )
             goto out;
 
-        /* split the super page before to 4k pages */
-
+        /* Split the super page before to 4k pages */
         split_table = map_domain_page(new_ept_entry.mfn);
         offset = gfn & ((1 << EPT_TABLE_ORDER) - 1);
 
         for ( i = 0; i < 512; i++ )
         {
             split_ept_entry = split_table + i;
-            split_ept_entry->emt = epte_get_entry_emt(d,
-                                        gfn-offset+i, _mfn(split_mfn+i), 
-                                        &igmt, direct_mmio);
+            split_ept_entry->emt = epte_get_entry_emt(d, gfn - offset + i,
+                                                      _mfn(split_mfn + i),
+                                                      &igmt, direct_mmio);
             split_ept_entry->igmt = igmt;
-
             split_ept_entry->sp_avail =  0;
-
-            split_ept_entry->mfn = split_mfn+i;
-
+            split_ept_entry->mfn = split_mfn + i;
             split_ept_entry->avail1 = split_p2mt;
             split_ept_entry->rsvd = 0;
             split_ept_entry->avail2 = 0;
-            /* last step */
+
             ept_p2m_type_to_flags(split_ept_entry, split_p2mt);
         }
 
         /* Set the destinated 4k page as normal */
         split_ept_entry = split_table + offset;
-        split_ept_entry->emt = epte_get_entry_emt(d, gfn, mfn,
-                                                &igmt, direct_mmio);
+        split_ept_entry->emt = epte_get_entry_emt(d, gfn, mfn, &igmt,
+                                                  direct_mmio);
         split_ept_entry->igmt = igmt;
 
         if ( split_ept_entry->mfn == mfn_x(mfn) )
             need_modify_vtd_table = 0;
         else
             split_ept_entry->mfn = mfn_x(mfn);
+
         split_ept_entry->avail1 = p2mt;
         ept_p2m_type_to_flags(split_ept_entry, p2mt);
 
@@ -276,16 +276,14 @@ out:
     ept_sync_domain(d);
 
     /* Now the p2m table is not shared with vt-d page table */
-
-    if ( iommu_enabled && is_hvm_domain(d)  
-             && need_modify_vtd_table )
+    if ( iommu_enabled && is_hvm_domain(d) && need_modify_vtd_table )
     {
         if ( p2mt == p2m_ram_rw )
         {
             if ( order == EPT_TABLE_ORDER )
             {
-                for ( i = 0; i < ( 1 << order ); i++ )
-                    iommu_map_page(d, gfn-offset+i, mfn_x(mfn)-offset+i);
+                for ( i = 0; i < (1 << order); i++ )
+                    iommu_map_page(d, gfn - offset + i, mfn_x(mfn) - offset + i);
             }
             else if ( !order )
                 iommu_map_page(d, gfn, mfn_x(mfn));
@@ -294,8 +292,8 @@ out:
         {
             if ( order == EPT_TABLE_ORDER )
             {
-                for ( i = 0; i < ( 1 << order ); i++ )
-                    iommu_unmap_page(d, gfn-offset+i);
+                for ( i = 0; i < (1 << order); i++ )
+                    iommu_unmap_page(d, gfn - offset + i);
             }
             else if ( !order )
                 iommu_unmap_page(d, gfn);
@@ -307,14 +305,15 @@ out:
 
 /* Read ept p2m entries */
 static mfn_t ept_get_entry(struct domain *d, unsigned long gfn, p2m_type_t *t,
-    p2m_query_t q)
+                           p2m_query_t q)
 {
     ept_entry_t *table =
         map_domain_page(mfn_x(pagetable_get_mfn(d->arch.phys_table)));
     unsigned long gfn_remainder = gfn;
     ept_entry_t *ept_entry;
     u32 index;
-    int i, ret=0;
+    int i;
+    int ret = 0;
     mfn_t mfn = _mfn(INVALID_MFN);
 
     *t = p2m_mmio_dm;
@@ -335,7 +334,7 @@ static mfn_t ept_get_entry(struct domain *d, unsigned long gfn, p2m_type_t *t,
             break;
     }
 
-    index = gfn_remainder >> ( i * EPT_TABLE_ORDER);
+    index = gfn_remainder >> (i * EPT_TABLE_ORDER);
     ept_entry = table + index;
 
     if ( ept_entry->avail1 != p2m_invalid )
@@ -344,11 +343,13 @@ static mfn_t ept_get_entry(struct domain *d, unsigned long gfn, p2m_type_t *t,
         mfn = _mfn(ept_entry->mfn);
         if ( i )
         {
-            /* we may meet super pages, and to split into 4k pages
+            /* 
+             * We may meet super pages, and to split into 4k pages
              * to emulate p2m table
              */
-            unsigned long split_mfn = 
-              mfn_x(mfn) + (gfn_remainder & ( ((1 << (i*EPT_TABLE_ORDER)) - 1 )));
+            unsigned long split_mfn = mfn_x(mfn) +
+                                      (gfn_remainder &
+                                       ((1 << (i * EPT_TABLE_ORDER)) - 1));
             mfn = _mfn(split_mfn);
         }
     }
@@ -365,9 +366,9 @@ static uint64_t ept_get_entry_content(struct domain *d, unsigned long gfn)
     unsigned long gfn_remainder = gfn;
     ept_entry_t *ept_entry;
     uint64_t content = 0;
-
     u32 index;
-    int i, ret=0;
+    int i;
+    int ret=0;
 
     /* This pfn is higher than the highest the p2m map currently holds */
     if ( gfn > d->arch.p2m->max_mapped_pfn )
@@ -383,7 +384,7 @@ static uint64_t ept_get_entry_content(struct domain *d, unsigned long gfn)
             break;
     }
 
-    index = gfn_remainder >> ( i * EPT_TABLE_ORDER);
+    index = gfn_remainder >> (i * EPT_TABLE_ORDER);
     ept_entry = table + index;
     content = ept_entry->epte;
 
@@ -398,39 +399,47 @@ static mfn_t ept_get_entry_current(unsigned long gfn, p2m_type_t *t,
     return ept_get_entry(current->domain, gfn, t, q);
 }
 
-/* To test if the new emt type is the same with old,
+/* 
+ * To test if the new emt type is the same with old,
  * return 1 to not to reset ept entry.
  */
 static int need_modify_ept_entry(struct domain *d, unsigned long gfn,
-                                    mfn_t mfn, uint8_t o_igmt,
-                                    uint8_t o_emt, p2m_type_t p2mt)
+                                 mfn_t mfn, uint8_t o_igmt, uint8_t o_emt,
+                                 p2m_type_t p2mt)
 {
-    uint8_t igmt, emt;
-    emt = epte_get_entry_emt(d, gfn, mfn, &igmt, 
-                                (p2mt == p2m_mmio_direct));
+    uint8_t igmt;
+    uint8_t emt;
+    int direct_mmio = (p2mt == p2m_mmio_direct);
+
+    emt = epte_get_entry_emt(d, gfn, mfn, &igmt, direct_mmio);
+
     if ( (emt == o_emt) && (igmt == o_igmt) )
         return 0;
+
     return 1; 
 }
 
 void ept_change_entry_emt_with_range(struct domain *d, unsigned long start_gfn,
-                 unsigned long end_gfn)
+                                     unsigned long end_gfn)
 {
     unsigned long gfn;
-    p2m_type_t p2mt;
     uint64_t epte;
+    p2m_type_t p2mt;
     int order = 0;
     mfn_t mfn;
-    uint8_t o_igmt, o_emt;
+    uint8_t o_igmt;
+    uint8_t o_emt;
 
     for ( gfn = start_gfn; gfn <= end_gfn; gfn++ )
     {
         epte = ept_get_entry_content(d, gfn);
         if ( epte == 0 )
             continue;
+
         mfn = _mfn((epte & EPTE_MFN_MASK) >> PAGE_SHIFT);
         if ( !mfn_valid(mfn_x(mfn)) )
             continue;
+
         p2mt = (epte & EPTE_AVAIL1_MASK) >> EPTE_AVAIL1_SHIFT;
         o_igmt = (epte & EPTE_IGMT_MASK) >> EPTE_IGMT_SHIFT;
         o_emt = (epte & EPTE_EMT_MASK) >> EPTE_EMT_SHIFT;
@@ -438,45 +447,50 @@ void ept_change_entry_emt_with_range(struct domain *d, unsigned long start_gfn,
 
         if ( epte & EPTE_SUPER_PAGE_MASK )
         {
-            if ( !(gfn & ( (1 << EPT_TABLE_ORDER) - 1)) &&
-              ((gfn + 0x1FF) <= end_gfn) )
+            if ( !(gfn & ((1 << EPT_TABLE_ORDER) - 1)) &&
+                 ((gfn + 0x1FF) <= end_gfn) )
             {
-                /* gfn assigned with 2M, and the end covers more than 2m areas.
+                /* 
+                 * gfn assigned with 2M, and the end covers more than 2m areas.
                  * Set emt for super page.
                  */
                 order = EPT_TABLE_ORDER;
-                if ( need_modify_ept_entry(d, gfn, mfn, 
-                                            o_igmt, o_emt, p2mt) )
+                if ( need_modify_ept_entry(d, gfn, mfn, o_igmt, o_emt, p2mt) )
                     ept_set_entry(d, gfn, mfn, order, p2mt);
                 gfn += 0x1FF;
             }
             else
             {
-                /* change emt for partial entries of the 2m area. */
-                if ( need_modify_ept_entry(d, gfn, mfn, 
-                                            o_igmt, o_emt, p2mt) )
+                /* Change emt for partial entries of the 2m area. */
+                if ( need_modify_ept_entry(d, gfn, mfn, o_igmt, o_emt, p2mt) )
                     ept_set_entry(d, gfn, mfn, order, p2mt);
                 gfn = ((gfn >> EPT_TABLE_ORDER) << EPT_TABLE_ORDER) + 0x1FF;
             }
         }
         else /* gfn assigned with 4k */
         {
-            if ( need_modify_ept_entry(d, gfn, mfn, 
-                                            o_igmt, o_emt, p2mt) )
+            if ( need_modify_ept_entry(d, gfn, mfn, o_igmt, o_emt, p2mt) )
                 ept_set_entry(d, gfn, mfn, order, p2mt);
         }
     }
 }
 
-/* Walk the whole p2m table, changing any entries of the old type
+/* 
+ * Walk the whole p2m table, changing any entries of the old type
  * to the new type.  This is used in hardware-assisted paging to
- * quickly enable or diable log-dirty tracking */
-
-static void ept_change_entry_type_global(struct domain *d,
-                                            p2m_type_t ot, p2m_type_t nt)
+ * quickly enable or diable log-dirty tracking
+ */
+static void ept_change_entry_type_global(struct domain *d, p2m_type_t ot,
+                                         p2m_type_t nt)
 {
-    ept_entry_t *l4e, *l3e, *l2e, *l1e;
-    int i4, i3, i2, i1;
+    ept_entry_t *l4e;
+    ept_entry_t *l3e;
+    ept_entry_t *l2e;
+    ept_entry_t *l1e;
+    int i4;
+    int i3;
+    int i2;
+    int i1;
 
     if ( pagetable_get_pfn(d->arch.phys_table) == 0 )
         return;
@@ -488,6 +502,7 @@ static void ept_change_entry_type_global(struct domain *d,
     {
         if ( !l4e[i4].epte )
             continue;
+
         if ( !l4e[i4].sp_avail )
         {
             l3e = map_domain_page(l4e[i4].mfn);
@@ -495,6 +510,7 @@ static void ept_change_entry_type_global(struct domain *d,
             {
                 if ( !l3e[i3].epte )
                     continue;
+
                 if ( !l3e[i3].sp_avail )
                 {
                     l2e = map_domain_page(l3e[i3].mfn);
@@ -502,18 +518,22 @@ static void ept_change_entry_type_global(struct domain *d,
                     {
                         if ( !l2e[i2].epte )
                             continue;
+
                         if ( !l2e[i2].sp_avail )
                         {
                             l1e = map_domain_page(l2e[i2].mfn);
+
                             for ( i1  = 0; i1 < EPT_PAGETABLE_ENTRIES; i1++ )
                             {
                                 if ( !l1e[i1].epte )
                                     continue;
+
                                 if ( l1e[i1].avail1 != ot )
                                     continue;
                                 l1e[i1].avail1 = nt;
                                 ept_p2m_type_to_flags(l1e+i1, nt);
                             }
+
                             unmap_domain_page(l1e);
                         }
                         else
@@ -524,6 +544,7 @@ static void ept_change_entry_type_global(struct domain *d,
                             ept_p2m_type_to_flags(l2e+i2, nt);
                         }
                     }
+
                     unmap_domain_page(l2e);
                 }
                 else
@@ -534,6 +555,7 @@ static void ept_change_entry_type_global(struct domain *d,
                     ept_p2m_type_to_flags(l3e+i3, nt);
                 }
             }
+
             unmap_domain_page(l3e);
         }
         else
@@ -544,6 +566,7 @@ static void ept_change_entry_type_global(struct domain *d,
             ept_p2m_type_to_flags(l4e+i4, nt);
         }
     }
+
     unmap_domain_page(l4e);
 
     ept_sync_domain(d);
