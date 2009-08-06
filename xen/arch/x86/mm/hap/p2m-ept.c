@@ -168,7 +168,7 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
     {
         if ( mfn_valid(mfn_x(mfn)) || (p2mt == p2m_mmio_direct) )
         {
-            ept_entry->emt = epte_get_entry_emt(d, gfn, mfn_x(mfn),
+            ept_entry->emt = epte_get_entry_emt(d, gfn, mfn,
                                 &igmt, direct_mmio);
             ept_entry->igmt = igmt;
             ept_entry->sp_avail = walk_level ? 1 : 0;
@@ -230,7 +230,7 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
         {
             split_ept_entry = split_table + i;
             split_ept_entry->emt = epte_get_entry_emt(d,
-                                        gfn-offset+i, split_mfn+i, 
+                                        gfn-offset+i, _mfn(split_mfn+i), 
                                         &igmt, direct_mmio);
             split_ept_entry->igmt = igmt;
 
@@ -247,7 +247,7 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
 
         /* Set the destinated 4k page as normal */
         split_ept_entry = split_table + offset;
-        split_ept_entry->emt = epte_get_entry_emt(d, gfn, mfn_x(mfn), 
+        split_ept_entry->emt = epte_get_entry_emt(d, gfn, mfn,
                                                 &igmt, direct_mmio);
         split_ept_entry->igmt = igmt;
 
@@ -406,7 +406,7 @@ static int need_modify_ept_entry(struct domain *d, unsigned long gfn,
                                     uint8_t o_emt, p2m_type_t p2mt)
 {
     uint8_t igmt, emt;
-    emt = epte_get_entry_emt(d, gfn, mfn_x(mfn), &igmt, 
+    emt = epte_get_entry_emt(d, gfn, mfn, &igmt, 
                                 (p2mt == p2m_mmio_direct));
     if ( (emt == o_emt) && (igmt == o_igmt) )
         return 0;

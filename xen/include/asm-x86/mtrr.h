@@ -2,6 +2,7 @@
 #define __ASM_X86_MTRR_H__
 
 #include <xen/config.h>
+#include <asm/mm.h>
 
 /* These are the region types. They match the architectural specification. */
 #define MTRR_TYPE_UNCACHABLE 0
@@ -66,7 +67,7 @@ extern void mtrr_centaur_report_mcr(int mcr, u32 lo, u32 hi);
 extern u32 get_pat_flags(struct vcpu *v, u32 gl1e_flags, paddr_t gpaddr,
                   paddr_t spaddr, uint8_t gmtrr_mtype);
 extern uint8_t epte_get_entry_emt(
-    struct domain *d, unsigned long gfn, unsigned long mfn,
+    struct domain *d, unsigned long gfn, mfn_t mfn,
     uint8_t *igmt, int direct_mmio);
 extern void ept_change_entry_emt_with_range(
     struct domain *d, unsigned long start_gfn, unsigned long end_gfn);
