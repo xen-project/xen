@@ -2103,7 +2103,6 @@ static int tmemc_restore_put_page(int cli_id, int pool_id, uint64_t oid,
 {
     client_t *client = tmh_client_from_cli_id(cli_id);
     pool_t *pool =  (client == NULL) ? NULL : client->pools[pool_id];
-int ret = 0;
 
     if ( pool == NULL )
         return -1;
