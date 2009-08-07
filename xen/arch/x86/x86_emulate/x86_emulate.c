@@ -1037,8 +1037,17 @@ protmode_load_seg(
         goto raise_exn;
     }
 
-    /* System segments must have the system flag (S) set. */
-    if ( (desc.b & (1u<<12)) == (!is_x86_user_segment(seg) << 12) )
+    if ( !is_x86_user_segment(seg) )
+    {
+        /* System segments must have S flag == 0. */
+        if ( desc.b & (1u << 12) )
+            goto raise_exn;
+        /* We do not support 64-bit descriptor types. */
+        if ( in_longmode(ctxt, ops) )
+            return X86EMUL_UNHANDLEABLE;
+    }
+    /* User segments must have S flag == 1. */
+    else if ( !(desc.b & (1u << 12)) )
         goto raise_exn;
 
     dpl = (desc.b >> 13) & 3;
