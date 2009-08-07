@@ -113,7 +113,7 @@ static uint8_t opcode_table[256] = {
     ByteOp|DstMem|SrcReg|ModRM|Mov, DstMem|SrcReg|ModRM|Mov,
     ByteOp|DstReg|SrcMem|ModRM|Mov, DstReg|SrcMem|ModRM|Mov,
     DstMem|SrcReg|ModRM|Mov, DstReg|SrcNone|ModRM,
-    DstReg|SrcMem|ModRM|Mov, DstMem|SrcNone|ModRM|Mov,
+    DstReg|SrcMem16|ModRM|Mov, DstMem|SrcNone|ModRM|Mov,
     /* 0x90 - 0x97 */
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
     ImplicitOps, ImplicitOps, ImplicitOps, ImplicitOps,
@@ -2042,6 +2042,7 @@ x86_emulate(
     case 0x8e: /* mov r/m,Sreg */ {
         enum x86_segment seg = decode_segment(modrm_reg);
         generate_exception_if(seg == decode_segment_failed, EXC_UD, -1);
+        generate_exception_if(seg == x86_seg_cs, EXC_UD, -1);
         if ( (rc = load_seg(seg, (uint16_t)src.val, ctxt, ops)) != 0 )
             goto done;
         if ( seg == x86_seg_ss )
