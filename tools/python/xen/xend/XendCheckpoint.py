@@ -66,6 +66,8 @@ def insert_after(list, pred, value):
 
 
 def save(fd, dominfo, network, live, dst, checkpoint=False, node=-1):
+    from xen.xend import XendDomain
+
     try:
         if not os.path.isdir("/var/lib/xen"):
             os.makedirs("/var/lib/xen")
@@ -80,6 +82,18 @@ def save(fd, dominfo, network, live, dst, checkpoint=False, node=-1):
     if node > -1:
         insert_after(sxprep,'vcpus',['node', str(node)])
 
+    for device_sxp in sxp.children(sxprep, 'device'):
+        backend = sxp.child(device_sxp[1], 'backend')
+        if backend == None:
+            continue
+        bkdominfo = XendDomain.instance().domain_lookup_nr(backend[1])
+        if bkdominfo == None:
+            raise XendError("Could not find backend: %s" % backend[1])
+        if bkdominfo.getDomid() == XendDomain.DOM0_ID:
+            # Skip for compatibility of checkpoint data format
+            continue
+        backend[1] = bkdominfo.getName()
+        
     config = sxp.to_string(sxprep)
 
     domain_name = dominfo.getName()
