@@ -78,7 +78,7 @@ frob_iptable()
   iptables "$c" FORWARD -m state --state RELATED,ESTABLISHED -m physdev \
     --physdev-out "$vif" -j ACCEPT 2>/dev/null
 
-  if [ "$command" == "online" ] && [ $? ]
+  if [ "$command" == "online" -a $? -ne 0 ]
   then
     log err "iptables setup failed. This may affect guest networking."
   fi
