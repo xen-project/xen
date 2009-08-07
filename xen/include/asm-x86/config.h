@@ -49,13 +49,10 @@
 #ifdef MAX_PHYS_CPUS
 #define NR_CPUS MAX_PHYS_CPUS
 #else
-#define NR_CPUS 32
+#define NR_CPUS 64
 #endif
 
 #ifdef __i386__
-#if NR_CPUS > 32
-#error "Maximum of 32 physical processors supported by Xen on x86_32"
-#endif
 /* Maximum number of virtual CPUs in multi-processor guests. */
 #define MAX_VIRT_CPUS XEN_LEGACY_MAX_VCPUS
 #endif
