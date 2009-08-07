@@ -743,7 +743,7 @@ static int construct_vmcs(struct vcpu *v)
         u64 host_pat, guest_pat;
 
         rdmsrl(MSR_IA32_CR_PAT, host_pat);
-        guest_pat = 0x7040600070406ULL;
+        guest_pat = MSR_IA32_CR_PAT_RESET;
 
         __vmwrite(HOST_PAT, host_pat);
         __vmwrite(GUEST_PAT, guest_pat);

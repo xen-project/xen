@@ -266,7 +266,7 @@ static int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     if ( paging_mode_hap(v->domain) )
     {
         vmcb->np_enable = 1;
-        vmcb->g_pat = 0x0007040600070406ULL; /* guest PAT */
+        vmcb->g_pat = MSR_IA32_CR_PAT_RESET; /* guest PAT */
         vmcb->h_cr3 = pagetable_get_paddr(v->domain->arch.phys_table);
     }
 
