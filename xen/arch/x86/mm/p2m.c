@@ -1882,7 +1882,7 @@ p2m_remove_page(struct domain *d, unsigned long gfn, unsigned long mfn,
 
     for ( i = 0; i < (1UL << page_order); i++ )
     {
-        mfn_return = p2m_gfn_to_mfn(d, gfn + i, &t, p2m_query);
+        mfn_return = d->arch.p2m->get_entry(d, gfn + i, &t, p2m_query);
         if ( !p2m_is_grant(t) )
             set_gpfn_from_mfn(mfn+i, INVALID_M2P_ENTRY);
         ASSERT( !p2m_is_valid(t) || mfn + i == mfn_x(mfn_return) );
