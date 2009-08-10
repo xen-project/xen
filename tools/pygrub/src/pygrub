@@ -535,7 +535,6 @@ def run_grub(file, entry, fs, arg):
     try:
         img = g.cf.images[sel]
     except IndexError:
-        log.debug("PyGrub: Default selection is not valid, using first boot configuration...")
         img = g.cf.images[0]
 
     grubcfg = { "kernel": None, "ramdisk": None, "args": None }
