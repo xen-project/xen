@@ -934,6 +934,7 @@ class XendAPI(object):
                     ('tmem_set_weight', None),
                     ('tmem_set_cap', None),
                     ('tmem_set_compress', None),
+                    ('tmem_query_freeable_mb', None),
                     ('tmem_shared_auth', None)]
     
     host_funcs = [('get_by_name_label', None),
@@ -1133,6 +1134,14 @@ class XendAPI(object):
         except Exception, e:
             return xen_api_error(e)
         return xen_api_success_void()
+
+    def host_tmem_query_freeable_mb(self, _, host_ref):
+        node = XendNode.instance()
+        try:
+            pages = node.tmem_query_freeable_mb()
+        except Exception, e:
+            return xen_api_error(e)
+        return xen_api_success(pages is None and -1 or pages)
 
     def host_tmem_shared_auth(self, _, host_ref, cli_id, uuid_str, auth):
         node = XendNode.instance()

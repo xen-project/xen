@@ -35,6 +35,7 @@ extern unsigned int tmh_mempool_maxalloc;
 extern struct page_list_head tmh_page_list;
 extern spinlock_t tmh_page_list_lock;
 extern unsigned long tmh_page_list_pages;
+extern atomic_t freeable_page_count;
 
 extern spinlock_t tmem_lock;
 extern spinlock_t tmem_spinlock;
@@ -102,7 +103,7 @@ static inline unsigned long tmh_avail_pages(void)
 }
 
 /*
- * Ephemeral memory allocation for persistent data 
+ * Memory allocation for persistent data 
  */
 
 static inline bool_t domain_fully_allocated(struct domain *d)
@@ -228,6 +229,8 @@ static inline struct page_info *tmh_alloc_page(void *pool, int no_heap)
     if ( pi == NULL && !no_heap )
         pi = alloc_domheap_pages(0,0,MEMF_tmem);
     ASSERT((pi == NULL) || IS_VALID_PAGE(pi));
+    if ( pi != NULL )
+        atomic_inc(&freeable_page_count);
     return pi;
 }
 
@@ -235,11 +238,32 @@ static inline void tmh_free_page(struct page_info *pi)
 {
     ASSERT(IS_VALID_PAGE(pi));
     tmh_page_list_put(pi);
+    atomic_dec(&freeable_page_count);
 }
 
 static inline unsigned int tmem_subpage_maxsize(void)
 {
     return tmh_mempool_maxalloc;
+}
+
+static inline unsigned long tmh_freeable_mb(void)
+{
+    return (tmh_avail_pages() + _atomic_read(freeable_page_count)) >>
+            (20 - PAGE_SHIFT);
+}
+
+/*
+ * Memory allocation for "infrastructure" data
+ */
+
+static inline void *tmh_alloc_infra(size_t size, size_t align)
+{
+    return _xmalloc(size,align);
+}
+
+static inline void tmh_free_infra(void *p)
+{
+    return xfree(p);
 }
 
 #define tmh_lock_all  opt_tmem_lock

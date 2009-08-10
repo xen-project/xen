@@ -752,7 +752,7 @@ static pool_t * pool_alloc(void)
     pool_t *pool;
     int i;
 
-    if ( (pool = tmem_malloc(pool_t,NULL)) == NULL )
+    if ( (pool = tmh_alloc_infra(sizeof(pool_t),__alignof__(pool_t))) == NULL )
         return NULL;
     for (i = 0; i < OBJ_HASH_BUCKETS; i++)
         pool->obj_rb_root[i] = RB_ROOT;
@@ -780,7 +780,7 @@ static NOINLINE void pool_free(pool_t *pool)
     INVERT_SENTINEL(pool,POOL);
     pool->client = NULL;
     list_del(&pool->pool_list);
-    tmem_free(pool,sizeof(pool_t),NULL);
+    tmh_free_infra(pool);
 }
 
 /* register new_client as a user of this shared pool and return new
@@ -898,7 +898,7 @@ static void pool_flush(pool_t *pool, cli_id_t cli_id, bool_t destroy)
 
 static client_t *client_create(cli_id_t cli_id)
 {
-    client_t *client = tmem_malloc(client_t,NULL);
+    client_t *client = tmh_alloc_infra(sizeof(client_t),__alignof__(client_t));
     int i;
 
     printk("tmem: initializing tmem capability for %s=%d...",cli_id_str,cli_id);
@@ -912,7 +912,7 @@ static client_t *client_create(cli_id_t cli_id)
     {
         printk("failed... can't allocate host-dependent part of client\n");
         if ( client )
-            tmem_free(client,sizeof(client_t),NULL);
+            tmh_free_infra(client);
         return NULL;
     }
     tmh_set_client_from_id(client,cli_id);
@@ -2149,6 +2149,9 @@ static NOINLINE int do_tmem_control(struct tmem_op *op)
     case TMEMC_SET_CAP:
     case TMEMC_SET_COMPRESS:
         ret = tmemc_set_var(op->u.ctrl.cli_id,subop,op->u.ctrl.arg1);
+        break;
+    case TMEMC_QUERY_FREEABLE_MB:
+        ret = tmh_freeable_mb();
         break;
     case TMEMC_SAVE_BEGIN:
     case TMEMC_RESTORE_BEGIN:

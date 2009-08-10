@@ -26,6 +26,8 @@ boolean_param("tmem_shared_auth", opt_tmem_shared_auth);
 EXPORT int opt_tmem_lock = 0;
 integer_param("tmem_lock", opt_tmem_lock);
 
+EXPORT atomic_t freeable_page_count = ATOMIC_INIT(0);
+
 #ifdef COMPARE_COPY_PAGE_SSE2
 DECL_CYC_COUNTER(pg_copy1);
 DECL_CYC_COUNTER(pg_copy2);

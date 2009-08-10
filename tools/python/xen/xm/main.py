@@ -207,6 +207,7 @@ SUBCOMMAND_HELP = {
     'tmem-set'      :  ('[<Domain>|-a|--all] [weight=<weight>] [cap=<cap>] '
                         '[compress=<compress>]',
                         'Change tmem settings.'),
+    'tmem-freeable'  :  ('', 'Print number of freeable tmem pages.'),
     'tmem-shared-auth' :  ('[<Domain>|-a|--all] [--uuid=<uuid>] [--auth=<0|1>]', 'De/authenticate shared tmem pool.'),
 
     # security
@@ -3136,6 +3137,12 @@ def xm_tmem_set(args):
         if compress is not None:
             server.xend.node.tmem_set_compress(domid, compress)
 
+def xm_tmem_freeable_mb(args):
+    if serverType == SERVER_XEN_API:
+        print server.xenapi.host.tmem_query_freeable_mb()
+    else:
+        print server.xend.node.tmem_query_freeable_mb()
+
 def xm_tmem_shared_auth(args):
     try:
         (options, params) = getopt.gnu_getopt(args, 'au:A:', ['all','uuid=','auth='])
@@ -3258,6 +3265,7 @@ commands = {
     "tmem-destroy": xm_tmem_destroy,
     "tmem-list": xm_tmem_list,
     "tmem-set": xm_tmem_set,
+    "tmem-freeable": xm_tmem_freeable_mb,
     "tmem-shared-auth": xm_tmem_shared_auth,
     }
 

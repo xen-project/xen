@@ -55,8 +55,7 @@
 #define TMEMC_SET_WEIGHT             5
 #define TMEMC_SET_CAP                6
 #define TMEMC_SET_COMPRESS           7
-#define TMEMC_SHARED_POOL_AUTH       8
-#define TMEMC_SHARED_POOL_DEAUTH     9
+#define TMEMC_QUERY_FREEABLE_MB      8
 #define TMEMC_SAVE_BEGIN             10
 #define TMEMC_SAVE_GET_VERSION       11
 #define TMEMC_SAVE_GET_MAXPOOLS      12

@@ -1012,6 +1012,16 @@ class XendNode:
         buf = ''
         return self.xc.tmem_control(pool_id, subop, cli_id, arg1, arg2, arg3, buf)
 
+    def tmem_query_freeable_mb(self):
+        pool_id = -1
+        cli_id = -1
+        subop = TMEMC_QUERY_FREEABLE_MB
+        arg1 = 0
+        arg2 = 0
+        arg3 = 0
+        buf = ''
+        return self.xc.tmem_control(pool_id, subop, cli_id, arg1, arg2, arg3, buf)
+
     def tmem_shared_auth(self, cli_id, uuid_str, auth):
         return self.xc.tmem_auth(cli_id, uuid_str, auth)
 

@@ -1545,6 +1545,8 @@ static PyObject *pyxc_tmem_control(XcObject *self,
             return Py_BuildValue("s", buffer);
         case TMEMC_FLUSH:
             return Py_BuildValue("i", rc);
+        case TMEMC_QUERY_FREEABLE_MB:
+            return Py_BuildValue("i", rc);
         case TMEMC_THAW:
         case TMEMC_FREEZE:
         case TMEMC_DESTROY:
