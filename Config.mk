@@ -150,9 +150,9 @@ QEMU_REMOTE=http://xenbits.xensource.com/git-http/qemu-xen-unstable.git
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 5cc34ea27f1cbd1a0560cfca91fb89ccd6d5726f
-# Thu Jul 9 15:33:48 2009 +0100
-# portability fixes for qemu-ifup
+QEMU_TAG ?= a83d119cfcc20bc7edb427992d6e31b3e99430be
+# Mon Aug 10 18:02:56 2009 +0100
+# Disable xenstore_dom_chmod in stubdom build.
 
 OCAML_XENSTORED_REPO=http://xenbits.xensource.com/ext/xen-ocaml-tools.hg
 
