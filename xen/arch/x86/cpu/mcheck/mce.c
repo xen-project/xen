@@ -798,8 +798,8 @@ int mce_wrmsr(u32 msr, u64 value)
     case MSR_IA32_MCG_CTL:
         if ( value && (value + 1) )
         {
-            gdprintk(XENLOG_WARNING, "MCE: value written to MCG_CTL "
-                     "should be all 0s or 1s\n");
+            gdprintk(XENLOG_WARNING, "MCE: value \"%"PRIx64"\" written "
+                     "to MCG_CTL should be all 0s or 1s\n", value);
             ret = -1;
             break;
         }
