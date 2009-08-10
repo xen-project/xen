@@ -182,8 +182,19 @@ struct vcpu *alloc_vcpu(
 
 struct vcpu *alloc_idle_vcpu(unsigned int cpu_id)
 {
-    return idle_vcpu[cpu_id] ?: alloc_vcpu(idle_vcpu[0]->domain,
-                                           cpu_id, cpu_id);
+    struct domain *d;
+    struct vcpu *v;
+    unsigned int vcpu_id = cpu_id % MAX_VIRT_CPUS;
+
+    if ( (v = idle_vcpu[cpu_id]) != NULL )
+        return v;
+
+    d = (vcpu_id == 0) ?
+        domain_create(IDLE_DOMAIN_ID, 0, 0) :
+        idle_vcpu[cpu_id - vcpu_id]->domain;
+    BUG_ON(d == NULL);
+
+    return alloc_vcpu(d, vcpu_id, cpu_id);
 }
 
 static unsigned int extra_dom0_irqs, extra_domU_irqs = 8;
