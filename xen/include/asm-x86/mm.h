@@ -3,7 +3,6 @@
 #define __ASM_X86_MM_H__
 
 #include <xen/config.h>
-#include <xen/cpumask.h>
 #include <xen/list.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
