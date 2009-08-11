@@ -72,6 +72,7 @@ TARGET_CPPFLAGS += -isystem $(GCC_INSTALL)include
 TARGET_CPPFLAGS += -isystem $(CURDIR)/lwip-$(XEN_TARGET_ARCH)/src/include
 TARGET_CPPFLAGS += -isystem $(CURDIR)/lwip-$(XEN_TARGET_ARCH)/src/include/ipv4
 TARGET_CPPFLAGS += -I$(CURDIR)/include
+TARGET_CPPFLAGS += -I$(XEN_ROOT)/xen/include
 
 TARGET_LDFLAGS += -nostdlib -L$(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/lib
 
