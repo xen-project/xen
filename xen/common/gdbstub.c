@@ -116,6 +116,28 @@ str2ulong(const char *str, unsigned long bytes)
     return x;
 }
 
+unsigned long
+str_to_native_ulong(const char *str)
+{
+    unsigned long x = 0, i = 0;
+
+    while ( *str && (i < BYTES_PER_LONG) )
+    {
+#ifdef __BIG_ENDIAN
+        x <<= 8;
+        x += str2hex(*str);
+#elif defined(__LITTLE_ENDIAN)
+        x += (unsigned long)str2hex(*str) << (i*8);
+#else
+# error unknown endian
+#endif
+        str += 2;
+        i++;
+    }
+
+    return x;
+}
+
 /* gdb io wrappers */
 static signed long
 gdb_io_write(const char *buf, unsigned long len, struct gdb_context *ctx)
@@ -488,7 +510,7 @@ process_command(struct cpu_user_regs *regs, struct gdb_context *ctx)
             return 0;
         }
         ptr++;
-        val = str2ulong(ptr, sizeof(unsigned long));
+        val = str_to_native_ulong(ptr);
         gdb_arch_write_reg(addr, val, regs, ctx);
         break;
     case 'D':

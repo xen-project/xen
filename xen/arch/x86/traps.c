@@ -3007,9 +3007,12 @@ asmlinkage void do_debug(struct cpu_user_regs *regs)
             if ( (regs->rip >= (unsigned long)sysenter_entry) &&
                  (regs->rip < (unsigned long)sysenter_eflags_saved) )
                 goto out;
-            WARN_ON(regs->rip != (unsigned long)sysenter_eflags_saved);
+            if ( (regs->rip != (unsigned long)sysenter_eflags_saved) &&
+                 !debugger_trap_fatal(TRAP_debug, regs) )
+                WARN_ON(1);
 #else
-            WARN_ON(1);
+            if ( !debugger_trap_fatal(TRAP_debug, regs) )
+                WARN_ON(1);
 #endif
             regs->eflags &= ~EF_TF;
         }
