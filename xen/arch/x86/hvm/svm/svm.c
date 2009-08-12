@@ -1311,7 +1311,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
      */
     vlapic_set_reg(vcpu_vlapic(v), APIC_TASKPRI,
                    ((vmcb->vintr.fields.tpr & 0x0F) << 4) |
-                   (vlapic_get_reg(APIC_TASKPRI) & 0x0F));
+                   (vlapic_get_reg(vcpu_vlapic(v), APIC_TASKPRI) & 0x0F));
 
     exit_reason = vmcb->exitcode;
 
