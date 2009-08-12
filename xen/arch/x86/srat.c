@@ -189,10 +189,21 @@ acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
 		bad_srat();
 		return;
 	}
-	/* It is fine to add this area to the nodes data it will be used later*/
-	if (ma->flags & ACPI_SRAT_MEM_HOT_PLUGGABLE)
-		printk(KERN_INFO "SRAT: hot plug zone found %"PRIx64" - %"PRIx64" \n",
+	if (ma->flags & ACPI_SRAT_MEM_HOT_PLUGGABLE) {
+		if (page_is_ram_type(paddr_to_pfn(start), RAM_TYPE_CONVENTIONAL))
+			printk(KERN_INFO "SRAT: hot-pluggable zone found %"PRIx64" - %"PRIx64" \n",
 				start, end);
+		else {
+			/* TODO: This range contains no existing memory yet,
+			 * and shouldn't be included in nodes' [start, end]. It
+			 * will be covered with physical memory hotplug support
+			 * in future.
+			 */
+			printk(KERN_INFO "SRAT: future hotplug zone found %"PRIx64" - %"PRIx64" \n",
+				start, end);
+			return;
+		}
+	}
 	i = conflicting_nodes(start, end);
 	if (i == node) {
 		printk(KERN_WARNING
