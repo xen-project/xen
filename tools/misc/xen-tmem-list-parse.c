@@ -185,8 +185,8 @@ void parse_client(char *s)
            "eph_count=%llu,max_eph=%llu,"
            "compression ratio=%lu%% (samples=%llu,poor=%llu,nomem=%llu)\n",
            cli_id, weight, cap, compress?1:0, frozen?1:0,
-           eph_count, max_eph_count,
            total_cycles, succ_eph_gets, succ_pers_puts, succ_pers_gets, 
+           eph_count, max_eph_count,
            compressed_pages ?  (long)((compressed_sum_size*100LL) /
                                       (compressed_pages*PAGE_SIZE)) : 0,
            compressed_pages, compress_poor, compress_nomem);
