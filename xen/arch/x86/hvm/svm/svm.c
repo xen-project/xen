@@ -1306,9 +1306,12 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
      * Before doing anything else, we need to sync up the VLAPIC's TPR with
      * SVM's vTPR. It's OK if the guest doesn't touch CR8 (e.g. 32-bit Windows)
      * because we update the vTPR on MMIO writes to the TPR.
+     * NB. We need to preserve the low bits of the TPR to make checked builds
+     * of Windows work, even though they don't actually do anything.
      */
     vlapic_set_reg(vcpu_vlapic(v), APIC_TASKPRI,
-                   (vmcb->vintr.fields.tpr & 0x0F) << 4);
+                   ((vmcb->vintr.fields.tpr & 0x0F) << 4) |
+                   (vlapic_get_reg(APIC_TASKPRI) & 0x0F));
 
     exit_reason = vmcb->exitcode;
 
