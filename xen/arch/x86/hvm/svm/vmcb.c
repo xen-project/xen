@@ -243,6 +243,9 @@ static int construct_vmcb(struct vcpu *v)
          * that need to be fixed up.
          */
         vmcb->general1_intercepts &= ~GENERAL1_INTERCEPT_INVLPG;
+
+        /* PAT is under complete control of SVM when using nested paging. */
+        svm_disable_intercept_for_msr(v, MSR_IA32_CR_PAT);
     }
     else
     {
