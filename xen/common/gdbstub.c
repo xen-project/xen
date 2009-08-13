@@ -71,15 +71,14 @@ string_param("gdb", opt_gdb);
 static void gdbstub_console_puts(const char *str);
 
 /* value <-> char (de)serialzers */
-char
+static char
 hex2char(unsigned long x)
 {
     const char array[] = "0123456789abcdef";
-
     return array[x & 15];
 }
 
-int
+static unsigned int
 char2hex(unsigned char c)
 {
     if ( (c >= '0') && (c <= '9') )
@@ -93,13 +92,13 @@ char2hex(unsigned char c)
     return -1;
 }
 
-char
+static unsigned char
 str2hex(const char *str)
 {
     return (char2hex(str[0]) << 4) | char2hex(str[1]);
 }
 
-unsigned long
+static unsigned long
 str2ulong(const char *str, unsigned long bytes)
 {
     unsigned long x = 0;
@@ -116,7 +115,7 @@ str2ulong(const char *str, unsigned long bytes)
     return x;
 }
 
-unsigned long
+static unsigned long
 str_to_native_ulong(const char *str)
 {
     unsigned long x = 0, i = 0;
@@ -125,9 +124,9 @@ str_to_native_ulong(const char *str)
     {
 #ifdef __BIG_ENDIAN
         x <<= 8;
-        x += str2hex(*str);
+        x += str2hex(str);
 #elif defined(__LITTLE_ENDIAN)
-        x += (unsigned long)str2hex(*str) << (i*8);
+        x += (unsigned long)str2hex(str) << (i*8);
 #else
 # error unknown endian
 #endif

@@ -26,12 +26,6 @@
 
 #ifdef CRASH_DEBUG
 
-/* value <-> char (de)serialzers for arch specific gdb backends */
-char hex2char(unsigned long x);
-int char2hex(unsigned char c);
-char str2hex(const char *str);
-unsigned long str2ulong(const char *str, unsigned long bytes);
-
 struct gdb_context {
     int                 serhnd;           /* handle on our serial line */
     int                 console_steal_id; /* handle on stolen console */
