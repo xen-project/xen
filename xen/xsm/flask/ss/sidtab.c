@@ -17,8 +17,8 @@
 #define SIDTAB_HASH(sid) (sid & SIDTAB_HASH_MASK)
 
 #define INIT_SIDTAB_LOCK(s) spin_lock_init(&s->lock)
-#define SIDTAB_LOCK(s, x) spin_lock_irqsave(&s->lock, x)
-#define SIDTAB_UNLOCK(s, x) spin_unlock_irqrestore(&s->lock, x)
+#define SIDTAB_LOCK(s) spin_lock(&s->lock)
+#define SIDTAB_UNLOCK(s) spin_unlock(&s->lock)
 
 int sidtab_init(struct sidtab *s)
 {
@@ -216,14 +216,13 @@ int sidtab_context_to_sid(struct sidtab *s, struct context *context,
 {
     u32 sid;
     int ret = 0;
-    unsigned long flags;
 
     *out_sid = SECSID_NULL;
 
     sid = sidtab_search_context(s, context);
     if ( !sid )
     {
-        SIDTAB_LOCK(s, flags);
+        SIDTAB_LOCK(s);
         /* Rescan now that we hold the lock. */
         sid = sidtab_search_context(s, context);
         if ( sid )
@@ -239,7 +238,7 @@ int sidtab_context_to_sid(struct sidtab *s, struct context *context,
         if ( ret )
             s->next_sid--;
 unlock_out:
-        SIDTAB_UNLOCK(s, flags);
+        SIDTAB_UNLOCK(s);
     }
 
     if ( ret )
@@ -307,21 +306,17 @@ void sidtab_destroy(struct sidtab *s)
 
 void sidtab_set(struct sidtab *dst, struct sidtab *src)
 {
-    unsigned long flags;
-
-    SIDTAB_LOCK(src, flags);
+    SIDTAB_LOCK(src);
     dst->htable = src->htable;
     dst->nel = src->nel;
     dst->next_sid = src->next_sid;
     dst->shutdown = 0;
-    SIDTAB_UNLOCK(src, flags);
+    SIDTAB_UNLOCK(src);
 }
 
 void sidtab_shutdown(struct sidtab *s)
 {
-    unsigned long flags;
-
-    SIDTAB_LOCK(s, flags);
+    SIDTAB_LOCK(s);
     s->shutdown = 1;
-    SIDTAB_UNLOCK(s, flags);
+    SIDTAB_UNLOCK(s);
 }
