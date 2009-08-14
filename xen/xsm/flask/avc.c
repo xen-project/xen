@@ -226,8 +226,8 @@ static void avc_dump_query(u32 ssid, u32 tsid, u16 tclass)
         printk(" tcontext=%s", scontext);
         xfree(scontext);
     }
-    printk("\n");
-    printk("tclass=%s", class_to_string[tclass]);
+
+    printk(" tclass=%s", class_to_string[tclass]);
 }
 
 /**
@@ -560,12 +560,10 @@ void avc_audit(u32 ssid, u32 tsid, u16 tclass, u32 requested,
     if ( a && a->d )
         d = a->d;
     if ( d )
-        printk("domid=%d", d->domain_id);
+        printk("domid=%d ", d->domain_id);
 
-    printk("\n");
     avc_dump_query(ssid, tsid, tclass);
     printk("\n");
-
 }
 
 /**
