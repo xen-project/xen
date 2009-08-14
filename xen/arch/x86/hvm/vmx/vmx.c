@@ -945,8 +945,6 @@ static void vmx_enable_rdtsc_exiting(struct vcpu *v)
     vmx_vmcs_exit(v);
  }
 
-void do_nmi(struct cpu_user_regs *);
-
 static void vmx_init_hypercall_page(struct domain *d, void *hypercall_page)
 {
     char *p;
@@ -2470,7 +2468,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
                  (X86_EVENTTYPE_NMI << 8) )
                 goto exit_and_crash;
             HVMTRACE_0D(NMI);
-            do_nmi(regs); /* Real NMI, vector 2: normal processing. */
+            self_nmi(); /* Real NMI, vector 2: normal processing. */
             break;
         case TRAP_machine_check:
             HVMTRACE_0D(MCE);

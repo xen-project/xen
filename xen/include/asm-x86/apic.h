@@ -196,6 +196,7 @@ extern void setup_secondary_APIC_clock (void);
 extern void setup_apic_nmi_watchdog (void);
 extern int reserve_lapic_nmi(void);
 extern void release_lapic_nmi(void);
+extern void self_nmi(void);
 extern void disable_timer_nmi_watchdog(void);
 extern void enable_timer_nmi_watchdog(void);
 extern void nmi_watchdog_tick (struct cpu_user_regs *regs);

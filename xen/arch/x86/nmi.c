@@ -441,16 +441,19 @@ void nmi_watchdog_tick(struct cpu_user_regs * regs)
  * 8-3 and 8-4 in IA32 Reference Manual Volume 3. We send the IPI to
  * our own APIC ID explicitly which is valid.
  */
-static void do_nmi_trigger(unsigned char key)
+void self_nmi(void) 
 {
     u32 id = get_apic_id();
-
-    printk("Triggering NMI on APIC ID %x\n", id);
-
     local_irq_disable();
     apic_wait_icr_idle();
     apic_icr_write(APIC_DM_NMI | APIC_DEST_PHYSICAL, id);
     local_irq_enable();
+}
+
+static void do_nmi_trigger(unsigned char key)
+{
+    printk("Triggering NMI on APIC ID %x\n", get_apic_id());
+    self_nmi();
 }
 
 static struct keyhandler nmi_trigger_keyhandler = {
