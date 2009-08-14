@@ -67,7 +67,7 @@
 #include <asm/msr.h>
 
 #include "mce.h"
-
+#include "mce_quirks.h"
 
 /* Machine Check Handler for AMD K8 family series */
 static void k8_machine_check(struct cpu_user_regs *regs, long error_code)
@@ -79,31 +79,21 @@ static void k8_machine_check(struct cpu_user_regs *regs, long error_code)
 int amd_k8_mcheck_init(struct cpuinfo_x86 *c)
 {
 	uint32_t i;
+	enum mcequirk_amd_flags quirkflag;
 
 	/* Check for PPro style MCA; our caller has confirmed MCE support. */
 	if (!cpu_has(c, X86_FEATURE_MCA))
 		return 0;
 
+	quirkflag = mcequirk_lookup_amd_quirkdata(c);
+
 	mce_cap_init();
 	x86_mce_vector_register(k8_machine_check);
 
 	for (i = 0; i < nr_mce_banks; i++) {
-		switch (i) {
-		case 4: /* Northbridge */
-			if (c->x86 == 0xf) {
-				/*
-				 * Enable error reporting of all errors except
-				 * for GART TBL walk error reporting, which
-				 * trips off incorrectly with IOMMU & 3ware &
-				 * Cerberus.
-				 */
-				wrmsrl(MSR_IA32_MC4_CTL, ~(1ULL << 10));
-				wrmsrl(MSR_IA32_MC4_STATUS, 0x0ULL);
-				break;
-			}
-			/* fall through */
-
-		default:
+		if (quirkflag == MCEQUIRK_K8_GART && i == 4) {
+			mcequirk_amd_apply(quirkflag);
+		} else {
 			/* Enable error reporting of all errors */
 			wrmsrl(MSR_IA32_MC0_CTL + 4 * i, 0xffffffffffffffffULL);
 			wrmsrl(MSR_IA32_MC0_STATUS + 4 * i, 0x0ULL);
