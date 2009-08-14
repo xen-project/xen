@@ -685,7 +685,9 @@ int mce_rdmsr(u32 msr, u32 *lo, u32 *hi)
     case MSR_IA32_MCG_STATUS:
         *lo = (u32)d->arch.vmca_msrs.mcg_status;
         *hi = (u32)(d->arch.vmca_msrs.mcg_status >> 32);
-        gdprintk(XENLOG_DEBUG, "MCE: rd MCG_STATUS lo %x hi %x\n", *lo, *hi);
+        if (*lo || *hi)
+            gdprintk(XENLOG_DEBUG,
+                "MCE: rdmsr MCG_STATUS lo %x hi %x\n", *lo, *hi);
         break;
     case MSR_IA32_MCG_CAP:
         *lo = (u32)d->arch.vmca_msrs.mcg_cap;
@@ -710,7 +712,7 @@ int mce_rdmsr(u32 msr, u32 *lo, u32 *hi)
         case MSR_IA32_MC0_CTL:
             *lo = (u32)d->arch.vmca_msrs.mci_ctl[bank];
             *hi = (u32)(d->arch.vmca_msrs.mci_ctl[bank] >> 32);
-            gdprintk(XENLOG_DEBUG, "MCE: rd MC%u_CTL lo %x hi %x\n",
+            gdprintk(XENLOG_DEBUG, "MCE: rdmsr MC%u_CTL lo %x hi %x\n",
                      bank, *lo, *hi);
             break;
         case MSR_IA32_MC0_STATUS:
@@ -729,8 +731,6 @@ int mce_rdmsr(u32 msr, u32 *lo, u32 *hi)
                 else
                     entry = NULL;
             }
-            if ( !entry )
-                gdprintk(XENLOG_DEBUG, "MCE: rd MC%u_STATUS\n", bank);
             break;
         case MSR_IA32_MC0_ADDR:
             if ( !list_empty(&d->arch.vmca_msrs.impact_header) )
@@ -826,7 +826,7 @@ int mce_wrmsr(u32 msr, u64 value)
                 list_del(&entry->list);
             }
             else
-                gdprintk(XENLOG_DEBUG, "MCE: Not found HVM guest"
+                gdprintk(XENLOG_WARNING, "MCE: Not found HVM guest"
                     " last injection Node, something Wrong!\n");
         }
         break;
