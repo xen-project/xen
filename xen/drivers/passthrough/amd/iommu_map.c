@@ -426,7 +426,10 @@ static u64 iommu_l2e_from_pfn(struct page_info *table, int level,
             {
                 table = alloc_amd_iommu_pgtable();
                 if ( table == NULL )
+                {
+                    printk("AMD-Vi: Cannot allocate I/O page table\n");
                     return 0;
+                }
                 next_table_maddr = page_to_maddr(table);
                 amd_iommu_set_page_directory_entry(
                     (u32 *)pde, next_table_maddr, level - 1);
@@ -462,6 +465,7 @@ int amd_iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn)
     {
         spin_unlock(&hd->mapping_lock);
         amd_iov_error("Invalid IO pagetable entry gfn = %lx\n", gfn);
+        domain_crash(d);
         return -EFAULT;
     }
     set_iommu_l1e_present(iommu_l2e, gfn, (u64)mfn << PAGE_SHIFT, iw, ir);
@@ -494,6 +498,7 @@ int amd_iommu_unmap_page(struct domain *d, unsigned long gfn)
     {
         spin_unlock(&hd->mapping_lock);
         amd_iov_error("Invalid IO pagetable entry gfn = %lx\n", gfn);
+        domain_crash(d);
         return -EFAULT;
     }
 
@@ -535,6 +540,7 @@ int amd_iommu_reserve_domain_unity_map(
             spin_unlock(&hd->mapping_lock);
             amd_iov_error("Invalid IO pagetable entry phys_addr = %lx\n",
                           phys_addr);
+            domain_crash(domain);
             return -EFAULT;
         }
 
@@ -583,6 +589,7 @@ int amd_iommu_sync_p2m(struct domain *d)
             spin_unlock(&d->page_alloc_lock);
             spin_unlock(&hd->mapping_lock);
             amd_iov_error("Invalid IO pagetable entry gfn = %lx\n", gfn);
+            domain_crash(d);
             return -EFAULT;
         }
 
