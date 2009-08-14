@@ -1842,8 +1842,9 @@ int hvm_msr_read_intercept(struct cpu_user_regs *regs)
         break;
 
     case MSR_K8_ENABLE_C1E:
-         /* There's no point in letting the guest see C-States.
-          * Further, this AMD-only register may be accessed if this HVM guest
+    case MSR_AMD64_NB_CFG:
+         /*
+          * These AMD-only registers may be accessed if this HVM guest
           * has been migrated to an Intel host. This fixes a guest crash
           * in this case.
           */
@@ -1947,6 +1948,10 @@ int hvm_msr_write_intercept(struct cpu_user_regs *regs)
         if ( !mtrr_var_range_msr_set(&v->arch.hvm_vcpu.mtrr,
                                      regs->ecx, msr_content) )
             goto gp_fault;
+        break;
+
+    case MSR_AMD64_NB_CFG:
+        /* ignore the write */
         break;
 
     default:
