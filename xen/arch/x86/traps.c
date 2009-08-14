@@ -3005,16 +3005,18 @@ asmlinkage void do_debug(struct cpu_user_regs *regs)
             void sysenter_eflags_saved(void);
             /* In SYSENTER entry path we can't zap TF until EFLAGS is saved. */
             if ( (regs->rip >= (unsigned long)sysenter_entry) &&
-                 (regs->rip < (unsigned long)sysenter_eflags_saved) )
+                 (regs->rip <= (unsigned long)sysenter_eflags_saved) )
+            {
+                if ( regs->rip == (unsigned long)sysenter_eflags_saved )
+                    regs->eflags &= ~EF_TF;
                 goto out;
-            if ( (regs->rip != (unsigned long)sysenter_eflags_saved) &&
-                 !debugger_trap_fatal(TRAP_debug, regs) )
-                WARN_ON(1);
-#else
-            if ( !debugger_trap_fatal(TRAP_debug, regs) )
-                WARN_ON(1);
+            }
 #endif
-            regs->eflags &= ~EF_TF;
+            if ( !debugger_trap_fatal(TRAP_debug, regs) )
+            {
+                WARN_ON(1);
+                regs->eflags &= ~EF_TF;
+            }
         }
         else
         {
