@@ -1849,13 +1849,14 @@ static int vmx_msr_read_intercept(struct cpu_user_regs *regs)
             break;
         }
 
-        if ( rdmsr_viridian_regs(ecx, &eax, &edx) ||
-             rdmsr_hypervisor_regs(ecx, &eax, &edx) ||
-             rdmsr_safe(ecx, eax, edx) == 0 )
+        if ( rdmsr_viridian_regs(ecx, &msr_content) ||
+             rdmsr_hypervisor_regs(ecx, &msr_content) )
+            break;
+
+        if ( rdmsr_safe(ecx, eax, edx) == 0 )
         {
-            regs->eax = eax;
-            regs->edx = edx;
-            goto done;
+            msr_content = ((uint64_t)edx << 32) | eax;
+            break;
         }
 
         goto gp_fault;
@@ -2029,7 +2030,7 @@ static int vmx_msr_write_intercept(struct cpu_user_regs *regs)
         if ( passive_domain_do_wrmsr(regs) )
             return X86EMUL_OKAY;
 
-        if ( wrmsr_viridian_regs(ecx, regs->eax, regs->edx) ) 
+        if ( wrmsr_viridian_regs(ecx, msr_content) ) 
             break;
 
         switch ( long_mode_do_msr_write(regs) )
@@ -2037,7 +2038,7 @@ static int vmx_msr_write_intercept(struct cpu_user_regs *regs)
             case HNDL_unhandled:
                 if ( (vmx_write_guest_msr(ecx, msr_content) != 0) &&
                      !is_last_branch_msr(ecx) )
-                    wrmsr_hypervisor_regs(ecx, regs->eax, regs->edx);
+                    wrmsr_hypervisor_regs(ecx, msr_content);
                 break;
             case HNDL_exception_raised:
                 return X86EMUL_EXCEPTION;

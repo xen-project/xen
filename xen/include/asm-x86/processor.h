@@ -551,10 +551,8 @@ void cpu_mcheck_disable(void);
 
 int cpuid_hypervisor_leaves(
     uint32_t idx, uint32_t *eax, uint32_t *ebx, uint32_t *ecx, uint32_t *edx);
-int rdmsr_hypervisor_regs(
-    uint32_t idx, uint32_t *eax, uint32_t *edx);
-int wrmsr_hypervisor_regs(
-    uint32_t idx, uint32_t eax, uint32_t edx);
+int rdmsr_hypervisor_regs(uint32_t idx, uint64_t *val);
+int wrmsr_hypervisor_regs(uint32_t idx, uint64_t val);
 
 int microcode_update(XEN_GUEST_HANDLE(const_void), unsigned long len);
 int microcode_resume_cpu(int cpu);

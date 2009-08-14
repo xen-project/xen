@@ -670,34 +670,33 @@ void mce_init_msr(struct domain *d)
     spin_lock_init(&d->arch.vmca_msrs.lock);
 }
 
-int mce_rdmsr(u32 msr, u32 *lo, u32 *hi)
+int mce_rdmsr(uint32_t msr, uint64_t *val)
 {
     struct domain *d = current->domain;
     int ret = 1;
     unsigned int bank;
     struct bank_entry *entry = NULL;
 
-    *lo = *hi = 0x0;
+    *val = 0;
     spin_lock(&d->arch.vmca_msrs.lock);
 
     switch ( msr )
     {
     case MSR_IA32_MCG_STATUS:
-        *lo = (u32)d->arch.vmca_msrs.mcg_status;
-        *hi = (u32)(d->arch.vmca_msrs.mcg_status >> 32);
-        if (*lo || *hi)
+        *val = d->arch.vmca_msrs.mcg_status;
+        if (*val)
             gdprintk(XENLOG_DEBUG,
-                "MCE: rdmsr MCG_STATUS lo %x hi %x\n", *lo, *hi);
+                "MCE: rdmsr MCG_STATUS 0x%"PRIx64"\n", *val);
         break;
     case MSR_IA32_MCG_CAP:
-        *lo = (u32)d->arch.vmca_msrs.mcg_cap;
-        *hi = (u32)(d->arch.vmca_msrs.mcg_cap >> 32);
-        gdprintk(XENLOG_DEBUG, "MCE: rdmsr MCG_CAP lo %x hi %x\n", *lo, *hi);
+        *val = d->arch.vmca_msrs.mcg_cap;
+        gdprintk(XENLOG_DEBUG, "MCE: rdmsr MCG_CAP 0x%"PRIx64"\n",
+            *val);
         break;
     case MSR_IA32_MCG_CTL:
-        *lo = (u32)d->arch.vmca_msrs.mcg_ctl;
-        *hi = (u32)(d->arch.vmca_msrs.mcg_ctl >> 32);
-        gdprintk(XENLOG_DEBUG, "MCE: rdmsr MCG_CTL lo %x hi %x\n", *lo, *hi);
+        *val = d->arch.vmca_msrs.mcg_ctl;
+        gdprintk(XENLOG_DEBUG, "MCE: rdmsr MCG_CTL 0x%"PRIx64"\n",
+            *val);
         break;
     case MSR_IA32_MC0_CTL ... MSR_IA32_MC0_CTL + 4 * MAX_NR_BANKS - 1:
         bank = (msr - MSR_IA32_MC0_CTL) / 4;
@@ -710,10 +709,9 @@ int mce_rdmsr(u32 msr, u32 *lo, u32 *hi)
         switch (msr & (MSR_IA32_MC0_CTL | 3))
         {
         case MSR_IA32_MC0_CTL:
-            *lo = (u32)d->arch.vmca_msrs.mci_ctl[bank];
-            *hi = (u32)(d->arch.vmca_msrs.mci_ctl[bank] >> 32);
-            gdprintk(XENLOG_DEBUG, "MCE: rdmsr MC%u_CTL lo %x hi %x\n",
-                     bank, *lo, *hi);
+            *val = d->arch.vmca_msrs.mci_ctl[bank];
+            gdprintk(XENLOG_DEBUG, "MCE: rdmsr MC%u_CTL 0x%"PRIx64"\n",
+                     bank, *val);
             break;
         case MSR_IA32_MC0_STATUS:
             /* Only error bank is read. Non-error banks simply return. */
@@ -722,11 +720,10 @@ int mce_rdmsr(u32 msr, u32 *lo, u32 *hi)
                 entry = list_entry(d->arch.vmca_msrs.impact_header.next,
                                    struct bank_entry, list);
                 if (entry->bank == bank) {
-                    *lo = entry->mci_status;
-                    *hi = entry->mci_status >> 32;
+                    *val = entry->mci_status;
                     gdprintk(XENLOG_DEBUG,
                              "MCE: rd MC%u_STATUS in vMCE# context "
-                             "lo %x hi %x\n", bank, *lo, *hi);
+                             "value 0x%"PRIx64"\n", bank, *val);
                 }
                 else
                     entry = NULL;
@@ -739,11 +736,10 @@ int mce_rdmsr(u32 msr, u32 *lo, u32 *hi)
                                    struct bank_entry, list);
                 if ( entry->bank == bank )
                 {
-                    *lo = entry->mci_addr;
-                    *hi = entry->mci_addr >> 32;
+                    *val = entry->mci_addr;
                     gdprintk(XENLOG_DEBUG,
-                             "MCE: rd MC%u_ADDR in vMCE# context lo %x hi %x\n",
-                             bank, *lo, *hi);
+                             "MCE: rdmsr MC%u_ADDR in vMCE# context "
+                             "0x%"PRIx64"\n", bank, *val);
                 }
             }
             break;
@@ -754,11 +750,10 @@ int mce_rdmsr(u32 msr, u32 *lo, u32 *hi)
                                    struct bank_entry, list);
                 if ( entry->bank == bank )
                 {
-                    *lo = entry->mci_misc;
-                    *hi = entry->mci_misc >> 32;
+                    *val = entry->mci_misc;
                     gdprintk(XENLOG_DEBUG,
-                             "MCE: rd MC%u_MISC in vMCE# context lo %x hi %x\n",
-                             bank, *lo, *hi);
+                             "MCE: rd MC%u_MISC in vMCE# context "
+                             "0x%"PRIx64"\n", bank, *val);
                 }
             }
             break;
@@ -768,7 +763,7 @@ int mce_rdmsr(u32 msr, u32 *lo, u32 *hi)
         switch ( boot_cpu_data.x86_vendor )
         {
         case X86_VENDOR_INTEL:
-            ret = intel_mce_rdmsr(msr, lo, hi);
+            ret = intel_mce_rdmsr(msr, val);
             break;
         default:
             ret = 0;
@@ -781,7 +776,7 @@ int mce_rdmsr(u32 msr, u32 *lo, u32 *hi)
     return ret;
 }
 
-int mce_wrmsr(u32 msr, u64 value)
+int mce_wrmsr(u32 msr, u64 val)
 {
     struct domain *d = current->domain;
     struct bank_entry *entry = NULL;
@@ -796,18 +791,18 @@ int mce_wrmsr(u32 msr, u64 value)
     switch ( msr )
     {
     case MSR_IA32_MCG_CTL:
-        if ( value && (value + 1) )
+        if ( val && (val + 1) )
         {
-            gdprintk(XENLOG_WARNING, "MCE: value \"%"PRIx64"\" written "
-                     "to MCG_CTL should be all 0s or 1s\n", value);
+            gdprintk(XENLOG_WARNING, "MCE: val \"%"PRIx64"\" written "
+                     "to MCG_CTL should be all 0s or 1s\n", val);
             ret = -1;
             break;
         }
-        d->arch.vmca_msrs.mcg_ctl = value;
+        d->arch.vmca_msrs.mcg_ctl = val;
         break;
     case MSR_IA32_MCG_STATUS:
-        d->arch.vmca_msrs.mcg_status = value;
-        gdprintk(XENLOG_DEBUG, "MCE: wrmsr MCG_STATUS %"PRIx64"\n", value);
+        d->arch.vmca_msrs.mcg_status = val;
+        gdprintk(XENLOG_DEBUG, "MCE: wrmsr MCG_STATUS %"PRIx64"\n", val);
         /* For HVM guest, this is the point for deleting vMCE injection node */
         if ( d->is_hvm && (d->arch.vmca_msrs.nr_injection > 0) )
         {
@@ -845,15 +840,15 @@ int mce_wrmsr(u32 msr, u64 value)
         switch ( msr & (MSR_IA32_MC0_CTL | 3) )
         {
         case MSR_IA32_MC0_CTL:
-            if ( value && (value + 1) )
+            if ( val && (val + 1) )
             {
-                gdprintk(XENLOG_WARNING, "MCE: value written to MC%u_CTL "
+                gdprintk(XENLOG_WARNING, "MCE: val written to MC%u_CTL "
                          "should be all 0s or 1s (is %"PRIx64")\n",
-                         bank, value);
+                         bank, val);
                 ret = -1;
                 break;
             }
-            d->arch.vmca_msrs.mci_ctl[bank] = value;
+            d->arch.vmca_msrs.mci_ctl[bank] = val;
             break;
         case MSR_IA32_MC0_STATUS:
             /* Give the first entry of the list, it corresponds to current
@@ -866,14 +861,14 @@ int mce_wrmsr(u32 msr, u64 value)
                 entry = list_entry(d->arch.vmca_msrs.impact_header.next,
                                    struct bank_entry, list);
                 if ( entry->bank == bank )
-                    entry->mci_status = value;
+                    entry->mci_status = val;
                 gdprintk(XENLOG_DEBUG,
                          "MCE: wr MC%u_STATUS %"PRIx64" in vMCE#\n",
-                         bank, value);
+                         bank, val);
             }
             else
                 gdprintk(XENLOG_DEBUG,
-                         "MCE: wr MC%u_STATUS %"PRIx64"\n", bank, value);
+                         "MCE: wr MC%u_STATUS %"PRIx64"\n", bank, val);
             break;
         case MSR_IA32_MC0_ADDR:
             gdprintk(XENLOG_WARNING, "MCE: MC%u_ADDR is read-only\n", bank);
@@ -889,7 +884,7 @@ int mce_wrmsr(u32 msr, u64 value)
         switch ( boot_cpu_data.x86_vendor )
         {
         case X86_VENDOR_INTEL:
-            ret = intel_mce_wrmsr(msr, value);
+            ret = intel_mce_wrmsr(msr, val);
             break;
         default:
             ret = 0;

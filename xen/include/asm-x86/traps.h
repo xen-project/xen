@@ -49,7 +49,7 @@ extern int send_guest_trap(struct domain *d, uint16_t vcpuid,
 
 /* Guest vMCE MSRs virtualization */
 extern void mce_init_msr(struct domain *d);
-extern int mce_wrmsr(u32 msr, u64 value);
-extern int mce_rdmsr(u32 msr, u32 *lo, u32 *hi);
+extern int mce_wrmsr(uint32_t msr, uint64_t val);
+extern int mce_rdmsr(uint32_t msr, uint64_t *val);
 
 #endif /* ASM_TRAP_H */

@@ -129,10 +129,9 @@ static void enable_hypercall_page(void)
     put_page_and_type(mfn_to_page(mfn));
 }
 
-int wrmsr_viridian_regs(uint32_t idx, uint32_t eax, uint32_t edx)
+int wrmsr_viridian_regs(uint32_t idx, uint64_t val)
 {
     struct domain *d = current->domain;
-    uint64_t val = ((uint64_t)edx << 32) | eax;
 
     if ( !is_viridian_domain(d) )
         return 0;
@@ -178,6 +177,7 @@ int wrmsr_viridian_regs(uint32_t idx, uint32_t eax, uint32_t edx)
         break;
 
     case VIRIDIAN_MSR_ICR: {
+        u32 eax = (u32)val, edx = (u32)(val >> 32);
         struct vlapic *vlapic = vcpu_vlapic(current);
         perfc_incr(mshv_wrmsr_icr);
         eax &= ~(1 << 12);
@@ -190,7 +190,7 @@ int wrmsr_viridian_regs(uint32_t idx, uint32_t eax, uint32_t edx)
 
     case VIRIDIAN_MSR_TPR:
         perfc_incr(mshv_wrmsr_tpr);
-        vlapic_set_reg(vcpu_vlapic(current), APIC_TASKPRI, eax & 0xff);
+        vlapic_set_reg(vcpu_vlapic(current), APIC_TASKPRI, (uint8_t)val);
         break;
 
     case VIRIDIAN_MSR_APIC_ASSIST:
@@ -224,9 +224,8 @@ int wrmsr_viridian_regs(uint32_t idx, uint32_t eax, uint32_t edx)
     return 1;
 }
 
-int rdmsr_viridian_regs(uint32_t idx, uint32_t *eax, uint32_t *edx)
+int rdmsr_viridian_regs(uint32_t idx, uint64_t *val)
 {
-    uint64_t val;
     struct vcpu *v = current;
     
     if ( !is_viridian_domain(v->domain) )
@@ -236,36 +235,34 @@ int rdmsr_viridian_regs(uint32_t idx, uint32_t *eax, uint32_t *edx)
     {
     case VIRIDIAN_MSR_GUEST_OS_ID:
         perfc_incr(mshv_rdmsr_osid);
-        val = v->domain->arch.hvm_domain.viridian.guest_os_id.raw;
+        *val = v->domain->arch.hvm_domain.viridian.guest_os_id.raw;
         break;
 
     case VIRIDIAN_MSR_HYPERCALL:
         perfc_incr(mshv_rdmsr_hc_page);
-        val = v->domain->arch.hvm_domain.viridian.hypercall_gpa.raw;
+        *val = v->domain->arch.hvm_domain.viridian.hypercall_gpa.raw;
         break;
 
     case VIRIDIAN_MSR_VP_INDEX:
         perfc_incr(mshv_rdmsr_vp_index);
-        val = v->vcpu_id;
+        *val = v->vcpu_id;
         break;
 
     case VIRIDIAN_MSR_ICR:
         perfc_incr(mshv_rdmsr_icr);
-        val = (((uint64_t)vlapic_get_reg(vcpu_vlapic(v), APIC_ICR2) << 32) |
-               vlapic_get_reg(vcpu_vlapic(v), APIC_ICR));
+        *val = (((uint64_t)vlapic_get_reg(vcpu_vlapic(v), APIC_ICR2) << 32) |
+                vlapic_get_reg(vcpu_vlapic(v), APIC_ICR));
         break;
 
     case VIRIDIAN_MSR_TPR:
         perfc_incr(mshv_rdmsr_tpr);
-        val = vlapic_get_reg(vcpu_vlapic(v), APIC_TASKPRI);
+        *val = vlapic_get_reg(vcpu_vlapic(v), APIC_TASKPRI);
         break;
 
     default:
         return 0;
     }
 
-    *eax = val;
-    *edx = val >> 32;
     return 1;
 }
 

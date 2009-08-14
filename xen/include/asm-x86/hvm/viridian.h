@@ -50,14 +50,12 @@ cpuid_viridian_leaves(
 int
 wrmsr_viridian_regs(
     uint32_t idx,
-    uint32_t eax,
-    uint32_t edx);
+    uint64_t val);
 
 int
 rdmsr_viridian_regs(
     uint32_t idx,
-    uint32_t *eax,
-    uint32_t *edx);
+    uint64_t *val);
 
 int
 viridian_hypercall(struct cpu_user_regs *regs);

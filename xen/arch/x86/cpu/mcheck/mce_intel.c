@@ -1080,7 +1080,7 @@ int intel_mcheck_init(struct cpuinfo_x86 *c)
     return 1;
 }
 
-int intel_mce_wrmsr(u32 msr, u64 value)
+int intel_mce_wrmsr(uint32_t msr, uint64_t val)
 {
     int ret = 1;
 
@@ -1098,7 +1098,7 @@ int intel_mce_wrmsr(u32 msr, u64 value)
     return ret;
 }
 
-int intel_mce_rdmsr(u32 msr, u32 *lo, u32 *hi)
+int intel_mce_rdmsr(uint32_t msr, uint64_t *val)
 {
     int ret = 1;
 

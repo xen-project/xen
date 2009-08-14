@@ -603,8 +603,7 @@ DO_ERROR_NOCODE(TRAP_copro_error,     coprocessor_error)
 DO_ERROR(       TRAP_alignment_check, alignment_check)
 DO_ERROR_NOCODE(TRAP_simd_error,      simd_coprocessor_error)
 
-int rdmsr_hypervisor_regs(
-    uint32_t idx, uint32_t *eax, uint32_t *edx)
+int rdmsr_hypervisor_regs(uint32_t idx, uint64_t *val)
 {
     struct domain *d = current->domain;
     /* Optionally shift out of the way of Viridian architectural MSRs. */
@@ -618,7 +617,7 @@ int rdmsr_hypervisor_regs(
     {
     case 0:
     {
-        *eax = *edx = 0;
+        *val = 0;
         break;
     }
     default:
@@ -628,8 +627,7 @@ int rdmsr_hypervisor_regs(
     return 1;
 }
 
-int wrmsr_hypervisor_regs(
-    uint32_t idx, uint32_t eax, uint32_t edx)
+int wrmsr_hypervisor_regs(uint32_t idx, uint64_t val)
 {
     struct domain *d = current->domain;
     /* Optionally shift out of the way of Viridian architectural MSRs. */
@@ -643,10 +641,10 @@ int wrmsr_hypervisor_regs(
     {
     case 0:
     {
-        void         *hypercall_page;
+        void *hypercall_page;
         unsigned long mfn;
-        unsigned long gmfn = ((unsigned long)edx << 20) | (eax >> 12);
-        unsigned int  idx  = eax & 0xfff;
+        unsigned long gmfn = val >> 12;
+        unsigned int idx  = val & 0xfff;
 
         if ( idx > 0 )
         {
@@ -1696,7 +1694,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     unsigned long code_base, code_limit;
     char io_emul_stub[32];
     void (*io_emul)(struct cpu_user_regs *) __attribute__((__regparm__(1)));
-    u32 l, h;
+    uint32_t l, h;
+    uint64_t val;
 
     if ( !read_descriptor(regs->cs, v, regs,
                           &code_base, &code_limit, &ar,
@@ -2246,7 +2245,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                 goto fail;
             break;
         default:
-            if ( wrmsr_hypervisor_regs(regs->ecx, eax, edx) )
+            if ( wrmsr_hypervisor_regs(regs->ecx, val) )
                 break;
 
             rc = mce_wrmsr(regs->ecx, val);
@@ -2328,15 +2327,15 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         case MSR_EFER:
         case MSR_AMD_PATCHLEVEL:
         default:
-            if ( rdmsr_hypervisor_regs(regs->ecx, &l, &h) )
+            if ( rdmsr_hypervisor_regs(regs->ecx, &val) )
             {
  rdmsr_writeback:
-                regs->eax = l;
-                regs->edx = h;
+                regs->eax = (uint32_t)val;
+                regs->edx = (uint32_t)(val >> 32);
                 break;
             }
 
-            rc = mce_rdmsr(regs->ecx, &l, &h);
+            rc = mce_rdmsr(regs->ecx, &val);
             if ( rc < 0 )
                 goto fail;
             if ( rc )

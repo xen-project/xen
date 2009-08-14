@@ -1782,7 +1782,6 @@ int hvm_msr_read_intercept(struct cpu_user_regs *regs)
     uint64_t *var_range_base, *fixed_range_base;
     int index, mtrr;
     uint32_t cpuid[4];
-    uint32_t lo, hi;
     int ret;
 
     var_range_base = (uint64_t *)v->arch.hvm_vcpu.mtrr.var_ranges;
@@ -1852,14 +1851,11 @@ int hvm_msr_read_intercept(struct cpu_user_regs *regs)
          break;
 
     default:
-        ret = mce_rdmsr(ecx, &lo, &hi);
+        ret = mce_rdmsr(ecx, &msr_content);
         if ( ret < 0 )
             goto gp_fault;
         else if ( ret )
-        {
-            msr_content = ((u64)hi << 32) | lo;
             break;
-        }
         /* ret == 0, This is not an MCE MSR, see other MSRs */
         else if (!ret)
             return hvm_funcs.msr_read_intercept(regs);

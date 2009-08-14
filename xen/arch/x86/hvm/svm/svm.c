@@ -1085,20 +1085,23 @@ static int svm_msr_read_intercept(struct cpu_user_regs *regs)
         break;
 
     default:
-        if ( rdmsr_viridian_regs(ecx, &eax, &edx) ||
-             rdmsr_hypervisor_regs(ecx, &eax, &edx) ||
-             rdmsr_safe(ecx, eax, edx) == 0 )
+
+        if ( rdmsr_viridian_regs(ecx, &msr_content) ||
+             rdmsr_hypervisor_regs(ecx, &msr_content) )
+            break;
+
+        if ( rdmsr_safe(ecx, eax, edx) == 0 )
         {
-            regs->eax = eax;
-            regs->edx = edx;
-            goto done;
+            msr_content = ((uint64_t)edx << 32) | eax;
+            break;
         }
+
         goto gpf;
     }
-    regs->eax = msr_content & 0xFFFFFFFF;
-    regs->edx = msr_content >> 32;
 
- done:
+    regs->eax = (uint32_t)msr_content;
+    regs->edx = (uint32_t)(msr_content >> 32);
+
     HVMTRACE_3D (MSR_READ, ecx, regs->eax, regs->edx);
     HVM_DBG_LOG(DBG_LEVEL_1, "returns: ecx=%x, eax=%lx, edx=%lx",
                 ecx, (unsigned long)regs->eax, (unsigned long)regs->edx);
@@ -1164,13 +1167,13 @@ static int svm_msr_write_intercept(struct cpu_user_regs *regs)
         break;
 
     default:
-        if ( wrmsr_viridian_regs(ecx, regs->eax, regs->edx) )
+        if ( wrmsr_viridian_regs(ecx, msr_content) )
             break;
 
         switch ( long_mode_do_msr_write(regs) )
         {
         case HNDL_unhandled:
-            wrmsr_hypervisor_regs(ecx, regs->eax, regs->edx);
+            wrmsr_hypervisor_regs(ecx, msr_content);
             break;
         case HNDL_exception_raised:
             return X86EMUL_EXCEPTION;
