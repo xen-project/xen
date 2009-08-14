@@ -1154,7 +1154,7 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
     else
     {
         /* IOPL privileges are virtualised: merge back into returned eflags. */
-        BUG_ON((c(user_regs.eflags) & EF_IOPL) != 0);
+        BUG_ON((c(user_regs.eflags) & X86_EFLAGS_IOPL) != 0);
         c(user_regs.eflags |= v->arch.iopl << 12);
 
         if ( !is_pv_32on64_domain(v->domain) )

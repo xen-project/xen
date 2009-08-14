@@ -1251,7 +1251,7 @@ static int hvm_load_segment_selector(
     struct cpu_user_regs *regs = guest_cpu_user_regs();
     struct vcpu *v = current;
 
-    if ( regs->eflags & EF_VM )
+    if ( regs->eflags & X86_EFLAGS_VM )
     {
         segr.sel = sel;
         segr.base = (uint32_t)sel << 4;

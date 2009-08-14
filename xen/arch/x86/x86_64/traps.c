@@ -296,7 +296,8 @@ unsigned long do_iret(void)
 
     regs->rip    = iret_saved.rip;
     regs->cs     = iret_saved.cs | 3; /* force guest privilege */
-    regs->rflags = (iret_saved.rflags & ~(EF_IOPL|EF_VM)) | EF_IE;
+    regs->rflags = ((iret_saved.rflags & ~(X86_EFLAGS_IOPL|X86_EFLAGS_VM))
+                    | X86_EFLAGS_IF);
     regs->rsp    = iret_saved.rsp;
     regs->ss     = iret_saved.ss | 3; /* force guest privilege */
 
@@ -359,7 +360,7 @@ end:
     v->trap_priority = v->old_trap_priority;
 
     /* Restore upcall mask from supplied EFLAGS.IF. */
-    vcpu_info(v, evtchn_upcall_mask) = !(iret_saved.rflags & EF_IE);
+    vcpu_info(v, evtchn_upcall_mask) = !(iret_saved.rflags & X86_EFLAGS_IF);
 
     /* Saved %rax gets written back to regs->rax in entry.S. */
     return iret_saved.rax;
@@ -464,7 +465,10 @@ void __devinit subarch_percpu_traps_init(void)
 
     /* Common SYSCALL parameters. */
     wrmsr(MSR_STAR, 0, (FLAT_RING3_CS32<<16) | __HYPERVISOR_CS);
-    wrmsr(MSR_SYSCALL_MASK, EF_VM|EF_RF|EF_NT|EF_DF|EF_IE|EF_TF, 0U);
+    wrmsr(MSR_SYSCALL_MASK,
+          X86_EFLAGS_VM|X86_EFLAGS_RF|X86_EFLAGS_NT|
+          X86_EFLAGS_DF|X86_EFLAGS_IF|X86_EFLAGS_TF,
+          0U);
 }
 
 void init_int80_direct_trap(struct vcpu *v)

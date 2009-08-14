@@ -1852,7 +1852,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                                      PFEC_write_access);
                 return EXCRET_fault_fixed;
             }
-            wr_ad(edi, regs->edi + (int)((regs->eflags & EF_DF)
+            wr_ad(edi, regs->edi + (int)((regs->eflags & X86_EFLAGS_DF)
                                          ? -op_bytes : op_bytes));
             break;
 
@@ -1871,7 +1871,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                 return EXCRET_fault_fixed;
             }
             guest_io_write(port, op_bytes, data, v, regs);
-            wr_ad(esi, regs->esi + (int)((regs->eflags & EF_DF)
+            wr_ad(esi, regs->esi + (int)((regs->eflags & X86_EFLAGS_DF)
                                          ? -op_bytes : op_bytes));
             break;
         }
@@ -2998,7 +2998,7 @@ asmlinkage void do_debug(struct cpu_user_regs *regs)
 
     if ( !guest_mode(regs) )
     {
-        if ( regs->eflags & EF_TF )
+        if ( regs->eflags & X86_EFLAGS_TF )
         {
 #ifdef __x86_64__
             void sysenter_entry(void);
@@ -3008,14 +3008,14 @@ asmlinkage void do_debug(struct cpu_user_regs *regs)
                  (regs->rip <= (unsigned long)sysenter_eflags_saved) )
             {
                 if ( regs->rip == (unsigned long)sysenter_eflags_saved )
-                    regs->eflags &= ~EF_TF;
+                    regs->eflags &= ~X86_EFLAGS_TF;
                 goto out;
             }
 #endif
             if ( !debugger_trap_fatal(TRAP_debug, regs) )
             {
                 WARN_ON(1);
-                regs->eflags &= ~EF_TF;
+                regs->eflags &= ~X86_EFLAGS_TF;
             }
         }
         else

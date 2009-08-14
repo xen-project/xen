@@ -676,10 +676,10 @@ int arch_set_info_guest(
 
     /* IOPL privileges are virtualised. */
     v->arch.iopl = (v->arch.guest_context.user_regs.eflags >> 12) & 3;
-    v->arch.guest_context.user_regs.eflags &= ~EF_IOPL;
+    v->arch.guest_context.user_regs.eflags &= ~X86_EFLAGS_IOPL;
 
     /* Ensure real hardware interrupts are enabled. */
-    v->arch.guest_context.user_regs.eflags |= EF_IE;
+    v->arch.guest_context.user_regs.eflags |= X86_EFLAGS_IF;
 
     cr4 = v->arch.guest_context.ctrlreg[4];
     v->arch.guest_context.ctrlreg[4] = cr4 ? pv_guest_cr4_fixup(cr4) :
