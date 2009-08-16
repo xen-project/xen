@@ -143,11 +143,18 @@ do
     i=${i%\"}
     i=${i#\"}
     vif_mac=`xenstore-read $i/mac`
+    vif_bridge=`xenstore-read $i/bridge`
     if [ $j -ne 0 ]
     then
         echo -n "," >> ${stubdom_configdir}/$domname-dm
     fi
-    echo -n "'mac=$vif_mac'" >> ${stubdom_configdir}/$domname-dm
+    echo -n "'mac=$vif_mac" >> ${stubdom_configdir}/$domname-dm
+    if [ "$vif_bridge" ]
+    then
+        echo -n ",bridge=$vif_bridge'" >> ${stubdom_configdir}/$domname-dm
+    else
+        echo -n "'" >> ${stubdom_configdir}/$domname-dm
+    fi
     j=$(( $j + 1 ))
 done
 echo " ] " >> ${stubdom_configdir}/$domname-dm
