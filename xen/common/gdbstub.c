@@ -608,10 +608,6 @@ __trap_to_gdb(struct cpu_user_regs *regs, unsigned long cookie)
     watchdog_disable();
     console_start_sync();
 
-    /* Shouldn't really do this, but otherwise we stop for no
-       obvious reason, which is Bad */
-    printk("Waiting for GDB to attach...\n");
-
     gdb_arch_enter(regs);
     gdb_ctx->signum = gdb_arch_signal_num(regs, cookie);
 
