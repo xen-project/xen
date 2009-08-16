@@ -42,37 +42,6 @@ class BlkifController(DevController):
 
         return os.access(auxbin.scripts_dir() + '/block-%s' % protocol, os.X_OK)
 
-    def _calculateRateLimit(self, credstr):
-        """Calculate the rate limit, given a string like: 5000/s@50ms.
-        If this fails, the limit is unlimited.
-        """
-        credit_per_interval = 0xffffffffL
-        interval_usecs = 0L
-
-        credit_re = re.compile("^([0-9]+)/s(@([0-9]+)([mu]?)s)?$")
-
-        m = credit_re.match(credstr)
-        if m:
-            credit_per_sec = m.group(1)
-
-            if m.group(2) is None:
-                interval_usecs = 50000L      # 50ms default
-            else:
-                interval_usecs = long(m.group(5))
-                if m.group(3) == '':
-                    interval_usecs *= 1000 * 1000
-                elif m.group(3) == 'm':
-                    interval_usecs *= 1000
-
-            credit_per_interval = (credit_per_sec * interval_usecs) / 1000000L
-
-            # overflow / underflow checking: default to unlimited rate
-            if credit_per_interval == 0 or credit_per_interval > 0xffffffffL or \
-               interval_usecs == 0 or interval_usecs > 0xffffffffL:
-                credit_per_interval = 0xffffffffL
-                interval_usecs     = 0L
-
-        return "%lu,%lu" % (credit_per_interval, interval_usecs)
 
     def getDeviceDetails(self, config):
         """@see DevController.getDeviceDetails"""
@@ -121,10 +90,6 @@ class BlkifController(DevController):
 
         if security.on() == xsconstants.XS_POLICY_USE:
             self.do_access_control(config, uname)
-
-        cred = config.get('credit', '')
-        if cred:
-            back['credit'] = self._calculateRateLimit(cred)
 
         (device_path, devid) = blkif.blkdev_name_to_number(dev)
         if devid is None:
@@ -188,12 +153,12 @@ class BlkifController(DevController):
         config = DevController.getDeviceConfiguration(self, devid, transaction)
         if transaction is None:
             devinfo = self.readBackend(devid, 'dev', 'type', 'params', 'mode',
-                                       'uuid', 'bootable', 'credit')
+                                       'uuid', 'bootable')
         else:
             devinfo = self.readBackendTxn(transaction, devid,
                                           'dev', 'type', 'params', 'mode', 'uuid',
-                                          'bootable', 'credit')
-        dev, typ, params, mode, uuid, bootable, credit = devinfo
+                                          'bootable')
+        dev, typ, params, mode, uuid, bootable = devinfo
         
         if dev:
             if transaction is None:
@@ -213,8 +178,6 @@ class BlkifController(DevController):
             config['uuid'] = uuid
         if bootable != None:
             config['bootable'] = int(bootable)
-        if credit:
-            config['credit'] = credit
 
         proto = self.readFrontend(devid, 'protocol')
         if proto:

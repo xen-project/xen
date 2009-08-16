@@ -82,7 +82,6 @@ vbd
   - uname
   - dev (ioemu:, .. etc)
   - mode (r, w. w!)
-  - credit
 
 vif
   - type
