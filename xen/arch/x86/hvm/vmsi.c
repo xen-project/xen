@@ -40,46 +40,6 @@
 #include <asm/current.h>
 #include <asm/event.h>
 
-static uint32_t vmsi_get_delivery_bitmask(
-    struct domain *d, uint16_t dest, uint8_t dest_mode)
-{
-    uint32_t mask = 0;
-    struct vcpu *v;
-
-    HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "ioapic_get_delivery_bitmask "
-                "dest %d dest_mode %d\n", dest, dest_mode);
-
-    if ( dest_mode == 0 ) /* Physical mode. */
-    {
-        if ( dest == 0xFF ) /* Broadcast. */
-        {
-            for_each_vcpu ( d, v )
-                mask |= 1 << v->vcpu_id;
-            goto out;
-        }
-
-        for_each_vcpu ( d, v )
-        {
-            if ( VLAPIC_ID(vcpu_vlapic(v)) == dest )
-            {
-                mask = 1 << v->vcpu_id;
-                break;
-            }
-        }
-    }
-    else if ( dest != 0 ) /* Logical mode, MDA non-zero. */
-    {
-        for_each_vcpu ( d, v )
-            if ( vlapic_match_logical_addr(vcpu_vlapic(v), dest) )
-                mask |= 1 << v->vcpu_id;
-    }
-
- out:
-    HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "ioapic_get_delivery_bitmask mask %x\n",
-                mask);
-    return mask;
-}
-
 static void vmsi_inj_irq(
     struct domain *d,
     struct vlapic *target,
@@ -87,7 +47,7 @@ static void vmsi_inj_irq(
     uint8_t trig_mode,
     uint8_t delivery_mode)
 {
-    HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "ioapic_inj_irq "
+    HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "vmsi_inj_irq "
                 "irq %d trig %d delive mode %d\n",
                 vector, trig_mode, delivery_mode);
 
@@ -125,7 +85,6 @@ int vmsi_deliver(struct domain *d, int pirq)
     uint8_t dest_mode = (flags & VMSI_DM_MASK) >> GFLAGS_SHIFT_DM;
     uint8_t delivery_mode = (flags & VMSI_DELIV_MASK) >> GLFAGS_SHIFT_DELIV_MODE;
     uint8_t trig_mode = (flags & VMSI_TRIG_MODE) >> GLFAGS_SHIFT_TRG_MODE;
-    uint32_t deliver_bitmask;
     struct vlapic *target;
     struct vcpu *v;
 
@@ -140,44 +99,28 @@ int vmsi_deliver(struct domain *d, int pirq)
         return 0;
     }
 
-    deliver_bitmask = vmsi_get_delivery_bitmask(d, dest, dest_mode);
-    if ( !deliver_bitmask )
-    {
-        HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "ioapic deliver "
-                    "no target on destination\n");
-        return 0;
-    }
-
     switch ( delivery_mode )
     {
     case dest_LowestPrio:
     {
-        target = apic_lowest_prio(d, deliver_bitmask);
+        target = vlapic_lowest_prio(d, NULL, 0, dest, dest_mode);
         if ( target != NULL )
             vmsi_inj_irq(d, target, vector, trig_mode, delivery_mode);
         else
             HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "null round robin: "
-                        "mask=%x vector=%x delivery_mode=%x\n",
-                        deliver_bitmask, vector, dest_LowestPrio);
+                        "vector=%x delivery_mode=%x\n",
+                        vector, dest_LowestPrio);
         break;
     }
 
     case dest_Fixed:
     case dest_ExtINT:
     {
-        uint8_t bit;
-        for ( bit = 0; deliver_bitmask != 0; bit++ )
-        {
-            if ( !(deliver_bitmask & (1 << bit)) )
-                continue;
-            deliver_bitmask &= ~(1 << bit);
-            v = d->vcpu[bit];
-            if ( v != NULL )
-            {
-                target = vcpu_vlapic(v);
-                vmsi_inj_irq(d, target, vector, trig_mode, delivery_mode);
-            }
-        }
+        for_each_vcpu ( d, v )
+            if ( vlapic_match_dest(vcpu_vlapic(v), NULL,
+                                   0, dest, dest_mode) )
+                vmsi_inj_irq(d, vcpu_vlapic(v),
+                             vector, trig_mode, delivery_mode);
         break;
     }
 

@@ -263,46 +263,6 @@ static void ioapic_inj_irq(
         vcpu_kick(vlapic_vcpu(target));
 }
 
-static uint32_t ioapic_get_delivery_bitmask(
-    struct hvm_hw_vioapic *vioapic, uint16_t dest, uint8_t dest_mode)
-{
-    uint32_t mask = 0;
-    struct vcpu *v;
-
-    HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "dest %d dest_mode %d",
-                dest, dest_mode);
-
-    if ( dest_mode == 0 ) /* Physical mode. */
-    {
-        if ( dest == 0xFF ) /* Broadcast. */
-        {
-            for_each_vcpu ( vioapic_domain(vioapic), v )
-                mask |= 1 << v->vcpu_id;
-            goto out;
-        }
-
-        for_each_vcpu ( vioapic_domain(vioapic), v )
-        {
-            if ( VLAPIC_ID(vcpu_vlapic(v)) == dest )
-            {
-                mask = 1 << v->vcpu_id;
-                break;
-            }
-        }
-    }
-    else if ( dest != 0 ) /* Logical mode, MDA non-zero. */
-    {
-        for_each_vcpu ( vioapic_domain(vioapic), v )
-            if ( vlapic_match_logical_addr(vcpu_vlapic(v), dest) )
-                mask |= 1 << v->vcpu_id;
-    }
-
- out:
-    HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "mask %x",
-                mask);
-    return mask;
-}
-
 static inline int pit_channel0_enabled(void)
 {
     PITState *pit = &current->domain->arch.hvm_domain.pl_time.vpit;
@@ -316,23 +276,16 @@ static void vioapic_deliver(struct hvm_hw_vioapic *vioapic, int irq)
     uint8_t delivery_mode = vioapic->redirtbl[irq].fields.delivery_mode;
     uint8_t vector = vioapic->redirtbl[irq].fields.vector;
     uint8_t trig_mode = vioapic->redirtbl[irq].fields.trig_mode;
-    uint32_t deliver_bitmask;
+    struct domain *d = vioapic_domain(vioapic);
     struct vlapic *target;
     struct vcpu *v;
 
-    ASSERT(spin_is_locked(&vioapic_domain(vioapic)->arch.hvm_domain.irq_lock));
+    ASSERT(spin_is_locked(&d->arch.hvm_domain.irq_lock));
 
     HVM_DBG_LOG(DBG_LEVEL_IOAPIC,
                 "dest=%x dest_mode=%x delivery_mode=%x "
                 "vector=%x trig_mode=%x",
                 dest, dest_mode, delivery_mode, vector, trig_mode);
-
-    deliver_bitmask = ioapic_get_delivery_bitmask(vioapic, dest, dest_mode);
-    if ( !deliver_bitmask )
-    {
-        HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "no target on destination");
-        return;
-    }
 
     switch ( delivery_mode )
     {
@@ -342,14 +295,12 @@ static void vioapic_deliver(struct hvm_hw_vioapic *vioapic, int irq)
         /* Force round-robin to pick VCPU 0 */
         if ( (irq == hvm_isa_irq_to_gsi(0)) && pit_channel0_enabled() )
         {
-            v = vioapic_domain(vioapic)->vcpu ?
-                vioapic_domain(vioapic)->vcpu[0] : NULL;
+            v = d->vcpu ? d->vcpu[0] : NULL;
             target = v ? vcpu_vlapic(v) : NULL;
         }
         else
 #endif
-            target = apic_lowest_prio(vioapic_domain(vioapic),
-                                      deliver_bitmask);
+            target = vlapic_lowest_prio(d, NULL, 0, dest, dest_mode);
         if ( target != NULL )
         {
             ioapic_inj_irq(vioapic, target, vector, trig_mode, delivery_mode);
@@ -357,52 +308,41 @@ static void vioapic_deliver(struct hvm_hw_vioapic *vioapic, int irq)
         else
         {
             HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "null round robin: "
-                        "mask=%x vector=%x delivery_mode=%x",
-                        deliver_bitmask, vector, dest_LowestPrio);
+                        "vector=%x delivery_mode=%x",
+                        vector, dest_LowestPrio);
         }
         break;
     }
 
     case dest_Fixed:
     {
-        uint8_t bit;
-        for ( bit = 0; deliver_bitmask != 0; bit++ )
-        {
-            if ( !(deliver_bitmask & (1 << bit)) )
-                continue;
-            deliver_bitmask &= ~(1 << bit);
-            if ( vioapic_domain(vioapic)->vcpu == NULL )
-                v = NULL;
 #ifdef IRQ0_SPECIAL_ROUTING
-            /* Do not deliver timer interrupts to VCPU != 0 */
-            else if ( (irq == hvm_isa_irq_to_gsi(0)) && pit_channel0_enabled() )
-                v = vioapic_domain(vioapic)->vcpu[0];
-#endif
-            else
-                v = vioapic_domain(vioapic)->vcpu[bit];
-            if ( v != NULL )
-            {
-                target = vcpu_vlapic(v);
-                ioapic_inj_irq(vioapic, target, vector,
+        /* Do not deliver timer interrupts to VCPU != 0 */
+        if ( (irq == hvm_isa_irq_to_gsi(0)) && pit_channel0_enabled() )
+        {
+            if ( (v = d->vcpu ? d->vcpu[0] : NULL) != NULL )
+                ioapic_inj_irq(vioapic, vcpu_vlapic(v), vector,
                                trig_mode, delivery_mode);
-            }
+        }
+        else
+#endif
+        {
+            for_each_vcpu ( d, v )
+                if ( vlapic_match_dest(vcpu_vlapic(v), NULL,
+                                       0, dest, dest_mode) )
+                    ioapic_inj_irq(vioapic, vcpu_vlapic(v), vector,
+                                   trig_mode, delivery_mode);
         }
         break;
     }
 
     case dest_NMI:
     {
-        uint8_t bit;
-        for ( bit = 0; deliver_bitmask != 0; bit++ )
-        {
-            if ( !(deliver_bitmask & (1 << bit)) )
-                continue;
-            deliver_bitmask &= ~(1 << bit);
-            if ( (vioapic_domain(vioapic)->vcpu != NULL) &&
-                 ((v = vioapic_domain(vioapic)->vcpu[bit]) != NULL) &&
+        for_each_vcpu ( d, v )
+            if ( vlapic_match_dest(vcpu_vlapic(v), NULL,
+                                   0, dest, dest_mode) &&
                  !test_and_set_bool(v->nmi_pending) )
                 vcpu_kick(v);
-        }
         break;
     }
 

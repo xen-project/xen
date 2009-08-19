@@ -94,12 +94,16 @@ int vlapic_accept_pic_intr(struct vcpu *v);
 
 void vlapic_adjust_i8259_target(struct domain *d);
 
-struct vlapic *apic_lowest_prio(struct domain *d, uint32_t bitmap);
-
-int vlapic_match_logical_addr(struct vlapic *vlapic, uint8_t mda);
-
 void vlapic_EOI_set(struct vlapic *vlapic);
 
 int vlapic_ipi(struct vlapic *vlapic, uint32_t icr_low, uint32_t icr_high);
+
+struct vlapic *vlapic_lowest_prio(
+    struct domain *d, struct vlapic *source,
+    int short_hand, uint8_t dest, uint8_t dest_mode);
+
+bool_t vlapic_match_dest(
+    struct vlapic *target, struct vlapic *source,
+    int short_hand, uint8_t dest, uint8_t dest_mode);
 
 #endif /* __ASM_X86_HVM_VLAPIC_H__ */

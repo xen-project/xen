@@ -167,7 +167,7 @@ uint32_t vlapic_get_ppr(struct vlapic *vlapic)
     return ppr;
 }
 
-int vlapic_match_logical_addr(struct vlapic *vlapic, uint8_t mda)
+static int vlapic_match_logical_addr(struct vlapic *vlapic, uint8_t mda)
 {
     int result = 0;
     uint8_t logical_id;
@@ -194,12 +194,10 @@ int vlapic_match_logical_addr(struct vlapic *vlapic, uint8_t mda)
     return result;
 }
 
-static int vlapic_match_dest(struct vcpu *v, struct vlapic *source,
-                             int short_hand, int dest, int dest_mode)
+bool_t vlapic_match_dest(
+    struct vlapic *target, struct vlapic *source,
+    int short_hand, uint8_t dest, uint8_t dest_mode)
 {
-    int result = 0;
-    struct vlapic *target = vcpu_vlapic(v);
-
     HVM_DBG_LOG(DBG_LEVEL_VLAPIC, "target %p, source %p, dest 0x%x, "
                 "dest_mode 0x%x, short_hand 0x%x",
                 target, source, dest, dest_mode, short_hand);
@@ -207,39 +205,25 @@ static int vlapic_match_dest(struct vcpu *v, struct vlapic *source,
     switch ( short_hand )
     {
     case APIC_DEST_NOSHORT:
-        if ( dest_mode == 0 )
-        {
-            /* Physical mode. */
-            if ( (dest == 0xFF) || (dest == VLAPIC_ID(target)) )
-                result = 1;
-        }
-        else
-        {
-            /* Logical mode. */
-            result = vlapic_match_logical_addr(target, dest);
-        }
-        break;
+        if ( dest_mode )
+            return vlapic_match_logical_addr(target, dest);
+        return ((dest == 0xFF) || (dest == VLAPIC_ID(target)));
 
     case APIC_DEST_SELF:
-        if ( target == source )
-            result = 1;
-        break;
+        return (target == source);
 
     case APIC_DEST_ALLINC:
-        result = 1;
-        break;
+        return 1;
 
     case APIC_DEST_ALLBUT:
-        if ( target != source )
-            result = 1;
-        break;
+        return (target != source);
 
     default:
         gdprintk(XENLOG_WARNING, "Bad dest shorthand value %x\n", short_hand);
         break;
     }
 
-    return result;
+    return 0;
 }
 
 static int vlapic_vcpu_pause_async(struct vcpu *v)
@@ -376,8 +360,9 @@ static int vlapic_accept_irq(struct vcpu *v, int delivery_mode,
     return rc;
 }
 
-/* This function is used by both ioapic and lapic.The bitmap is for vcpu_id. */
-struct vlapic *apic_lowest_prio(struct domain *d, uint32_t bitmap)
+struct vlapic *vlapic_lowest_prio(
+    struct domain *d, struct vlapic *source,
+    int short_hand, uint8_t dest, uint8_t dest_mode)
 {
     int old = d->arch.hvm_domain.irq.round_robin_prev_vcpu;
     uint32_t ppr, target_ppr = UINT_MAX;
@@ -390,7 +375,8 @@ struct vlapic *apic_lowest_prio(struct domain *d, uint32_t bitmap)
     do {
         v = v->next_in_list ? : d->vcpu[0];
         vlapic = vcpu_vlapic(v);
-        if ( test_bit(v->vcpu_id, &bitmap) && vlapic_enabled(vlapic) &&
+        if ( vlapic_match_dest(vlapic, source, short_hand, dest, dest_mode) &&
+             vlapic_enabled(vlapic) &&
              ((ppr = vlapic_get_ppr(vlapic)) < target_ppr) )
         {
             target = vlapic;
@@ -434,36 +420,33 @@ int vlapic_ipi(
 
     struct vlapic *target;
     struct vcpu *v;
-    uint32_t lpr_map = 0;
     int rc = X86EMUL_OKAY;
 
     HVM_DBG_LOG(DBG_LEVEL_VLAPIC, "icr_high 0x%x, icr_low 0x%x, "
                 "short_hand 0x%x, dest 0x%x, trig_mode 0x%x, level 0x%x, "
                 "dest_mode 0x%x, delivery_mode 0x%x, vector 0x%x",
                 icr_high, icr_low, short_hand, dest,
-                trig_mode, level, dest_mode, delivery_mode, vector);
-
-    for_each_vcpu ( vlapic_domain(vlapic), v )
-    {
-        if ( vlapic_match_dest(v, vlapic, short_hand, dest, dest_mode) )
-        {
-            if ( delivery_mode == APIC_DM_LOWEST )
-                __set_bit(v->vcpu_id, &lpr_map);
-            else
-                rc = vlapic_accept_irq(v, delivery_mode,
-                                       vector, level, trig_mode);
-        }
-
-        if ( rc != X86EMUL_OKAY )
-            break;
-    }
+                trig_mode, level, dest_mode, delivery_mode, vector);    
 
     if ( delivery_mode == APIC_DM_LOWEST )
     {
-        target = apic_lowest_prio(vlapic_domain(vlapic), lpr_map);
+        target = vlapic_lowest_prio(vlapic_domain(vlapic), vlapic,
+                                    short_hand, dest, dest_mode);
         if ( target != NULL )
             rc = vlapic_accept_irq(vlapic_vcpu(target), delivery_mode,
                                    vector, level, trig_mode);
+        return rc;
+    }
+
+    for_each_vcpu ( vlapic_domain(vlapic), v )
+    {
+        if ( vlapic_match_dest(vcpu_vlapic(v), vlapic,
+                               short_hand, dest, dest_mode) )
+                rc = vlapic_accept_irq(v, delivery_mode,
+                                       vector, level, trig_mode);
+
+        if ( rc != X86EMUL_OKAY )
+            break;
     }
 
     return rc;
