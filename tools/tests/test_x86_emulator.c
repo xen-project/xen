@@ -76,7 +76,7 @@ int main(int argc, char **argv)
     ctxt.addr_size = 32;
     ctxt.sp_size   = 32;
 
-    res = mmap((void *)0x100000, MMAP_SZ, PROT_READ|PROT_WRITE,
+    res = mmap((void *)0x100000, MMAP_SZ, PROT_READ|PROT_WRITE|PROT_EXEC,
                MAP_FIXED|MAP_PRIVATE|MAP_ANONYMOUS, 0, 0);
     if ( res == MAP_FAILED )
     {

@@ -3583,21 +3583,17 @@ x86_emulate(
         struct segment_register cs = { 0 }, ss = { 0 };
         int rc;
 
-        fail_if(ops->read_msr == NULL);
-        fail_if(ops->read_segment == NULL);
-        fail_if(ops->write_segment == NULL);
-
         generate_exception_if(in_realmode(ctxt, ops), EXC_UD, 0);
         generate_exception_if(!in_protmode(ctxt, ops), EXC_UD, 0);
-        generate_exception_if(lock_prefix, EXC_UD, 0);
 
         /* Inject #UD if syscall/sysret are disabled. */
-        rc = ops->read_msr(MSR_EFER, &msr_content, ctxt);
-        fail_if(rc != 0);
+        fail_if(ops->read_msr == NULL);
+        if ( (rc = ops->read_msr(MSR_EFER, &msr_content, ctxt)) != 0 )
+            goto done;
         generate_exception_if((msr_content & EFER_SCE) == 0, EXC_UD, 0);
 
-        rc = ops->read_msr(MSR_STAR, &msr_content, ctxt);
-        fail_if(rc != 0);
+        if ( (rc = ops->read_msr(MSR_STAR, &msr_content, ctxt)) != 0 )
+            goto done;
 
         msr_content >>= 32;
         cs.sel = (uint16_t)(msr_content & 0xfffc);
@@ -3617,27 +3613,27 @@ x86_emulate(
             _regs.rcx = _regs.rip;
             _regs.r11 = _regs.eflags & ~EFLG_RF;
 
-            rc = ops->read_msr(mode_64bit() ? MSR_LSTAR : MSR_CSTAR,
-                               &msr_content, ctxt);
-            fail_if(rc != 0);
-
+            if ( (rc = ops->read_msr(mode_64bit() ? MSR_LSTAR : MSR_CSTAR,
+                                     &msr_content, ctxt)) != 0 )
+                goto done;
             _regs.rip = msr_content;
 
-            rc = ops->read_msr(MSR_FMASK, &msr_content, ctxt);
-            fail_if(rc != 0);
+            if ( (rc = ops->read_msr(MSR_FMASK, &msr_content, ctxt)) != 0 )
+                goto done;
             _regs.eflags &= ~(msr_content | EFLG_RF);
         }
         else
 #endif
         {
-            rc = ops->read_msr(MSR_STAR, &msr_content, ctxt);
-            fail_if(rc != 0);
+            if ( (rc = ops->read_msr(MSR_STAR, &msr_content, ctxt)) != 0 )
+                goto done;
 
             _regs.ecx = _regs.eip;
             _regs.eip = (uint32_t)msr_content;
             _regs.eflags &= ~(EFLG_VM | EFLG_IF | EFLG_RF);
         }
 
+        fail_if(ops->write_segment == NULL);
         if ( (rc = ops->write_segment(x86_seg_cs, &cs, ctxt)) ||
              (rc = ops->write_segment(x86_seg_ss, &ss, ctxt)) )
             goto done;
@@ -3717,10 +3713,13 @@ x86_emulate(
     case 0x31: /* rdtsc */ {
         unsigned long cr4;
         uint64_t val;
-        fail_if(ops->read_cr == NULL);
-        if ( (rc = ops->read_cr(4, &cr4, ctxt)) )
-            goto done;
-        generate_exception_if((cr4 & CR4_TSD) && !mode_ring0(), EXC_GP, 0);
+        if ( !mode_ring0() )
+        {
+            fail_if(ops->read_cr == NULL);
+            if ( (rc = ops->read_cr(4, &cr4, ctxt)) )
+                goto done;
+            generate_exception_if(cr4 & CR4_TSD, EXC_GP, 0);
+        }
         fail_if(ops->read_msr == NULL);
         if ( (rc = ops->read_msr(MSR_TSC, &val, ctxt)) != 0 )
             goto done;
@@ -3751,17 +3750,13 @@ x86_emulate(
         struct segment_register cs, ss;
         int rc;
 
-        fail_if(ops->read_msr == NULL);
-        fail_if(ops->read_segment == NULL);
-        fail_if(ops->write_segment == NULL);
-
         generate_exception_if(mode_ring0(), EXC_GP, 0);
         generate_exception_if(in_realmode(ctxt, ops), EXC_GP, 0);
         generate_exception_if(!in_protmode(ctxt, ops), EXC_GP, 0);
-        generate_exception_if(lock_prefix, EXC_UD, 0);
 
-        rc = ops->read_msr(MSR_SYSENTER_CS, &msr_content, ctxt);
-        fail_if(rc != 0);
+        fail_if(ops->read_msr == NULL);
+        if ( (rc = ops->read_msr(MSR_SYSENTER_CS, &msr_content, ctxt)) != 0 )
+            goto done;
 
         if ( mode_64bit() )
             generate_exception_if(msr_content == 0, EXC_GP, 0);
@@ -3770,6 +3765,7 @@ x86_emulate(
 
         _regs.eflags &= ~(EFLG_VM | EFLG_IF | EFLG_RF);
 
+        fail_if(ops->read_segment == NULL);
         ops->read_segment(x86_seg_cs, &cs, ctxt);
         cs.sel = (uint16_t)msr_content & ~3; /* SELECTOR_RPL_MASK */
         cs.base = 0;   /* flat segment */
@@ -3787,17 +3783,17 @@ x86_emulate(
             cs.attr.fields.l = 1;
         }
 
-        rc = ops->write_segment(x86_seg_cs, &cs, ctxt);
-        fail_if(rc != 0);
-        rc = ops->write_segment(x86_seg_ss, &ss, ctxt);
-        fail_if(rc != 0);
+        fail_if(ops->write_segment == NULL);
+        if ( (rc = ops->write_segment(x86_seg_cs, &cs, ctxt)) != 0 ||
+             (rc = ops->write_segment(x86_seg_ss, &ss, ctxt)) != 0 )
+            goto done;
 
-        rc = ops->read_msr(MSR_SYSENTER_EIP, &msr_content, ctxt);
-        fail_if(rc != 0);
+        if ( (rc = ops->read_msr(MSR_SYSENTER_EIP, &msr_content, ctxt)) != 0 )
+            goto done;
         _regs.eip = msr_content;
 
-        rc = ops->read_msr(MSR_SYSENTER_ESP, &msr_content, ctxt);
-        fail_if(rc != 0);
+        if ( (rc = ops->read_msr(MSR_SYSENTER_ESP, &msr_content, ctxt)) != 0 )
+            goto done;
         _regs.esp = msr_content;
 
         break;
@@ -3809,19 +3805,13 @@ x86_emulate(
         int user64 = !!(rex_prefix & 8); /* REX.W */
         int rc;
 
-        fail_if(ops->read_msr == NULL);
-        fail_if(ops->read_segment == NULL);
-        fail_if(ops->write_segment == NULL);
-
         generate_exception_if(!mode_ring0(), EXC_GP, 0);
         generate_exception_if(in_realmode(ctxt, ops), EXC_GP, 0);
         generate_exception_if(!in_protmode(ctxt, ops), EXC_GP, 0);
-        generate_exception_if(lock_prefix, EXC_UD, 0);
 
-        rc = ops->read_msr(MSR_SYSENTER_CS, &msr_content, ctxt);
-        fail_if(rc != 0);
-        rc = ops->read_segment(x86_seg_cs, &cs, ctxt);
-        fail_if(rc != 0);
+        fail_if(ops->read_msr == NULL);
+        if ( (rc = ops->read_msr(MSR_SYSENTER_CS, &msr_content, ctxt)) != 0 )
+            goto done;
 
         if ( user64 )
         {
@@ -3852,10 +3842,10 @@ x86_emulate(
             cs.attr.fields.l = 1;
         }
 
-        rc = ops->write_segment(x86_seg_cs, &cs, ctxt);
-        fail_if(rc != 0);
-        rc = ops->write_segment(x86_seg_ss, &ss, ctxt);
-        fail_if(rc != 0);
+        fail_if(ops->write_segment == NULL);
+        if ( (rc = ops->write_segment(x86_seg_cs, &cs, ctxt)) != 0 ||
+             (rc = ops->write_segment(x86_seg_ss, &ss, ctxt)) != 0 )
+            goto done;
 
         _regs.eip = _regs.edx;
         _regs.esp = _regs.ecx;
