@@ -55,7 +55,7 @@ static int physdev_map_pirq(struct physdev_map_pirq *map)
     switch ( map->type )
     {
         case MAP_PIRQ_TYPE_GSI:
-            if ( map->index < 0 || map->index >= nr_irqs )
+            if ( map->index < 0 || map->index >= nr_irqs_gsi )
             {
                 dprintk(XENLOG_G_ERR, "dom%d: map invalid irq %d\n",
                         d->domain_id, map->index);
@@ -344,7 +344,7 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
 
         irq = irq_op.irq;
         ret = -EINVAL;
-        if ( (irq < 0) || (irq >= nr_irqs) )
+        if ( (irq < 0) || (irq >= nr_irqs_gsi) )
             break;
 
         irq_op.vector = assign_irq_vector(irq);

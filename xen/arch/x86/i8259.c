@@ -403,8 +403,8 @@ void __init init_IRQ(void)
             set_intr_gate(i, interrupt[i]);
     }
 
-    irq_vector = xmalloc_array(u8, nr_irqs);
-    memset(irq_vector, 0, nr_irqs * sizeof(*irq_vector));
+    irq_vector = xmalloc_array(u8, nr_irqs_gsi);
+    memset(irq_vector, 0, nr_irqs_gsi * sizeof(*irq_vector));
 
     for ( i = 0; i < 16; i++ )
     {

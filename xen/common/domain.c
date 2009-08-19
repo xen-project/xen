@@ -253,9 +253,9 @@ struct domain *domain_create(
         d->is_paused_by_controller = 1;
         atomic_inc(&d->pause_count);
 
-        d->nr_pirqs = (nr_irqs +
+        d->nr_pirqs = (nr_irqs_gsi +
                        (domid ? extra_domU_irqs :
-                        extra_dom0_irqs ?: nr_irqs));
+                        extra_dom0_irqs ?: nr_irqs_gsi));
         d->pirq_to_evtchn = xmalloc_array(u16, d->nr_pirqs);
         d->pirq_mask = xmalloc_array(
             unsigned long, BITS_TO_LONGS(d->nr_pirqs));

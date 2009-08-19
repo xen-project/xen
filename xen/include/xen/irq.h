@@ -50,9 +50,9 @@ typedef struct hw_interrupt_type hw_irq_controller;
 #include <asm/irq.h>
 
 #ifdef NR_IRQS
-# define nr_irqs NR_IRQS
+# define nr_irqs_gsi NR_IRQS
 #else
-extern unsigned int nr_irqs;
+extern unsigned int nr_irqs_gsi;
 #endif
 
 struct msi_desc;

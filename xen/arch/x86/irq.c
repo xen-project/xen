@@ -26,7 +26,7 @@
 int opt_noirqbalance = 0;
 boolean_param("noirqbalance", opt_noirqbalance);
 
-unsigned int __read_mostly nr_irqs = 16;
+unsigned int __read_mostly nr_irqs_gsi = 16;
 irq_desc_t irq_desc[NR_VECTORS];
 
 static DEFINE_SPINLOCK(vector_lock);
@@ -80,7 +80,7 @@ int assign_irq_vector(int irq)
     static unsigned current_vector = FIRST_DYNAMIC_VECTOR;
     unsigned vector;
 
-    BUG_ON(irq >= nr_irqs && irq != AUTO_ASSIGN_IRQ);
+    BUG_ON(irq >= nr_irqs_gsi && irq != AUTO_ASSIGN_IRQ);
 
     spin_lock(&vector_lock);
 
@@ -886,10 +886,10 @@ int get_free_pirq(struct domain *d, int type, int index)
 
     if ( type == MAP_PIRQ_TYPE_GSI )
     {
-        for ( i = 16; i < nr_irqs; i++ )
+        for ( i = 16; i < nr_irqs_gsi; i++ )
             if ( !d->arch.pirq_vector[i] )
                 break;
-        if ( i == nr_irqs )
+        if ( i == nr_irqs_gsi )
             return -ENOSPC;
     }
     else
