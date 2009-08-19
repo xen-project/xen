@@ -70,11 +70,17 @@ PCI_BRIDGE_CTL_BUS_RESET= 0x40
 PCI_CAP_ID_EXP = 0x10
 PCI_EXP_FLAGS  = 0x2
 PCI_EXP_FLAGS_TYPE = 0x00f0
+PCI_EXP_TYPE_DOWNSTREAM = 0x6
 PCI_EXP_TYPE_PCI_BRIDGE = 0x7
 PCI_EXP_DEVCAP = 0x4
 PCI_EXP_DEVCAP_FLR = (0x1 << 28)
 PCI_EXP_DEVCTL = 0x8
 PCI_EXP_DEVCTL_FLR = (0x1 << 15)
+
+PCI_EXT_CAP_ID_ACS = 0x000d
+PCI_EXT_CAP_ACS_ENABLED = 0x1d  # The bits V, R, C, U.
+PCI_EXT_ACS_CTRL = 0x06
+
 
 PCI_CAP_ID_PM = 0x01
 PCI_PM_CTRL = 4
@@ -656,10 +662,15 @@ class PciDevice:
         self.subvendorname = ""
         self.subdevicename = ""
         self.dev_type = None
+        self.is_downstream_port = False
+        self.acs_enabled = False
         self.has_non_page_aligned_bar = False
         self.pcie_flr = False
         self.pci_af_flr = False
         self.detect_dev_info()
+        if (self.dev_type == DEV_TYPE_PCI_BRIDGE) or \
+            (self.dev_type == DEV_TYPE_PCIe_BRIDGE):
+            return
         self.get_info_from_sysfs()
         self.get_info_from_lspci()
 
@@ -877,6 +888,51 @@ class PciDevice:
                 (strerr, errno)))
         return pos
 
+    def find_ext_cap(self, cap):
+        path = find_sysfs_mnt()+SYSFS_PCI_DEVS_PATH+'/'+ \
+               self.name+SYSFS_PCI_DEV_CONFIG_PATH
+
+        ttl = 480; # 3840 bytes, minimum 8 bytes per capability
+        pos = 0x100
+
+        try:
+            fd = os.open(path, os.O_RDONLY)
+            os.lseek(fd, pos, 0)
+            h = os.read(fd, 4)
+            if len(h) == 0: # MMCONF is not enabled?
+                return 0
+            header = struct.unpack('I', h)[0]
+            if header == 0 or header == -1:
+                return 0
+
+            while ttl > 0:
+                if (header & 0x0000ffff) == cap:
+                    return pos
+                pos = (header >> 20) & 0xffc
+                if pos < 0x100:
+                    break
+                os.lseek(fd, pos, 0)
+                header = struct.unpack('I', os.read(fd, 4))[0]
+                ttl = ttl - 1
+            os.close(fd)
+        except OSError, (errno, strerr):
+            raise PciDeviceParseError(('Error when accessing sysfs: %s (%d)' %
+                (strerr, errno)))
+        return 0
+
+    def is_behind_switch_lacking_acs(self):
+        # If there is intermediate PCIe switch, which doesn't support ACS or
+        # doesn't enable ACS, between Root Complex and the function, we return
+        # True,  meaning the function is not allowed to be assigned to guest due
+        # to potential security issue.
+        parent = self.find_parent()
+        while parent is not None:
+            dev_parent = PciDevice(parent)
+            if dev_parent.is_downstream_port and not dev_parent.acs_enabled:
+                return True
+            parent = dev_parent.find_parent()
+        return False
+
     def pci_conf_read8(self, pos):
         fd = os.open(self.cfg_space_path, os.O_RDONLY)
         os.lseek(fd, pos, 0)
@@ -936,11 +992,19 @@ class PciDevice:
                 self.dev_type = DEV_TYPE_PCI_BRIDGE
             else:
                 creg = self.pci_conf_read16(pos + PCI_EXP_FLAGS)
-                if ((creg & PCI_EXP_FLAGS_TYPE) >> 4) == \
-                    PCI_EXP_TYPE_PCI_BRIDGE:
+                type = (creg & PCI_EXP_FLAGS_TYPE) >> 4
+                if type == PCI_EXP_TYPE_PCI_BRIDGE:
                     self.dev_type = DEV_TYPE_PCI_BRIDGE
                 else:
                     self.dev_type = DEV_TYPE_PCIe_BRIDGE
+                    if type == PCI_EXP_TYPE_DOWNSTREAM:
+                        self.is_downstream_port = True
+                        pos = self.find_ext_cap(PCI_EXT_CAP_ID_ACS)
+                        if pos != 0:
+                            ctrl = self.pci_conf_read16(pos + PCI_EXT_ACS_CTRL)
+                            if (ctrl & PCI_EXT_CAP_ACS_ENABLED) == \
+                                PCI_EXT_CAP_ACS_ENABLED
+                                self.acs_enabled = True
         else:
             if  pos != 0:
                 self.dev_type = DEV_TYPE_PCIe_ENDPOINT

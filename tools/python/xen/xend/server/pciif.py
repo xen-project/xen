@@ -374,6 +374,15 @@ class PciController(DevController):
             except Exception, e:
                 raise VmError("pci: failed to locate device and "+
                         "parse its resources - "+str(e))
+
+            # Check if there is intermediate PCIe switch bewteen the device and
+            # Root Complex.
+            if self.vm.info.is_hvm() and dev.is_behind_switch_lacking_acs():
+                err_msg = 'pci: to avoid potential security issue, %s is not'+\
+                        ' allowed to be assigned to guest since it is behind'+\
+                        ' PCIe switch that does not support or enable ACS.'
+                raise VmError(err_msg % dev.name)
+
             if (dev.dev_type == DEV_TYPE_PCIe_ENDPOINT) and not dev.pcie_flr:
                 if dev.bus == 0:
                     # We cope with this case by using the Dstate transition

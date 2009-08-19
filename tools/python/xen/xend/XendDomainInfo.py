@@ -711,6 +711,14 @@ class XendDomainInfo:
         if not self.info.is_hvm():
             return
 
+        # Check if there is intermediate PCIe switch bewteen the device and
+        # Root Complex.
+        if pci_device.is_behind_switch_lacking_acs():
+            err_msg = 'pci: to avoid potential security issue, %s is not'+\
+                    ' allowed to be assigned to guest since it is behind'+\
+                    ' PCIe switch that does not support or enable ACS.'
+            raise VmError(err_msg % pci_device.name)
+
         # Check the co-assignment.
         # To pci-attach a device D to domN, we should ensure each of D's
         # co-assignment devices hasn't been assigned, or has been assigned to
