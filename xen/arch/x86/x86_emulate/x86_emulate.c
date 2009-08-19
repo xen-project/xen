@@ -572,9 +572,10 @@ do {                                                                    \
 do {                                                                    \
     int _rel = (int)(rel);                                              \
     _regs.eip += _rel;                                                  \
-    if ( !mode_64bit() )                                                \
-        _regs.eip = ((op_bytes == 2)                                    \
-                     ? (uint16_t)_regs.eip : (uint32_t)_regs.eip);      \
+    if ( op_bytes == 2 )                                                \
+        _regs.eip = (uint16_t)_regs.eip;                                \
+    else if ( !mode_64bit() )                                           \
+        _regs.eip = (uint32_t)_regs.eip;                                \
 } while (0)
 
 struct fpu_insn_ctxt {
@@ -1648,6 +1649,7 @@ x86_emulate(
         struct segment_register reg;
         src.val = x86_seg_es;
     push_seg:
+        generate_exception_if(mode_64bit() && !twobyte, EXC_UD, -1);
         fail_if(ops->read_segment == NULL);
         if ( (rc = ops->read_segment(src.val, &reg, ctxt)) != 0 )
             return rc;
@@ -1663,6 +1665,7 @@ x86_emulate(
     case 0x07: /* pop %%es */
         src.val = x86_seg_es;
     pop_seg:
+        generate_exception_if(mode_64bit() && !twobyte, EXC_UD, -1);
         fail_if(ops->write_segment == NULL);
         /* 64-bit mode: POP defaults to a 64-bit operand. */
         if ( mode_64bit() && (op_bytes == 4) )
@@ -2108,8 +2111,8 @@ x86_emulate(
         uint16_t sel;
         uint32_t eip;
 
-        fail_if(ops->read_segment == NULL);
         generate_exception_if(mode_64bit(), EXC_UD, -1);
+        fail_if(ops->read_segment == NULL);
 
         eip = insn_fetch_bytes(op_bytes);
         sel = insn_fetch_type(uint16_t);
@@ -2327,7 +2330,7 @@ x86_emulate(
     case 0xc2: /* ret imm16 (near) */
     case 0xc3: /* ret (near) */ {
         int offset = (b == 0xc2) ? insn_fetch_type(uint16_t) : 0;
-        op_bytes = mode_64bit() ? 8 : op_bytes;
+        op_bytes = ((op_bytes == 4) && mode_64bit()) ? 8 : op_bytes;
         if ( (rc = read_ulong(x86_seg_ss, sp_post_inc(op_bytes + offset),
                               &dst.val, op_bytes, ctxt, ops)) != 0 )
             goto done;
@@ -2339,6 +2342,7 @@ x86_emulate(
         unsigned long sel;
         dst.val = x86_seg_es;
     les: /* dst.val identifies the segment */
+        generate_exception_if(mode_64bit() && !twobyte, EXC_UD, -1);
         generate_exception_if(src.type != OP_MEM, EXC_UD, -1);
         if ( (rc = read_ulong(src.mem.seg, src.mem.off + src.bytes,
                               &sel, 2, ctxt, ops)) != 0 )
@@ -2413,7 +2417,6 @@ x86_emulate(
     case 0xca: /* ret imm16 (far) */
     case 0xcb: /* ret (far) */ {
         int offset = (b == 0xca) ? insn_fetch_type(uint16_t) : 0;
-        op_bytes = mode_64bit() ? 8 : op_bytes;
         if ( (rc = read_ulong(x86_seg_ss, sp_post_inc(op_bytes),
                               &dst.val, op_bytes, ctxt, ops)) ||
              (rc = read_ulong(x86_seg_ss, sp_post_inc(op_bytes + offset),
@@ -3066,17 +3069,17 @@ x86_emulate(
     }
 
     case 0xe8: /* call (near) */ {
-        int rel = (((op_bytes == 2) && !mode_64bit())
+        int rel = ((op_bytes == 2)
                    ? (int32_t)insn_fetch_type(int16_t)
                    : insn_fetch_type(int32_t));
-        op_bytes = mode_64bit() ? 8 : op_bytes;
+        op_bytes = ((op_bytes == 4) && mode_64bit()) ? 8 : op_bytes;
         src.val = _regs.eip;
         jmp_rel(rel);
         goto push;
     }
 
     case 0xe9: /* jmp (near) */ {
-        int rel = (((op_bytes == 2) && !mode_64bit())
+        int rel = ((op_bytes == 2)
                    ? (int32_t)insn_fetch_type(int16_t)
                    : insn_fetch_type(int32_t));
         jmp_rel(rel);
@@ -3364,7 +3367,7 @@ x86_emulate(
             break;
         case 2: /* call (near) */
         case 4: /* jmp (near) */
-            if ( (dst.bytes != 8) && mode_64bit() )
+            if ( (dst.bytes == 4) && mode_64bit() )
             {
                 dst.bytes = op_bytes = 8;
                 if ( dst.type == OP_REG )
@@ -3900,7 +3903,7 @@ x86_emulate(
     }
 
     case 0x80 ... 0x8f: /* jcc (near) */ {
-        int rel = (((op_bytes == 2) && !mode_64bit())
+        int rel = ((op_bytes == 2)
                    ? (int32_t)insn_fetch_type(int16_t)
                    : insn_fetch_type(int32_t));
         if ( test_cc(b, _regs.eflags) )
