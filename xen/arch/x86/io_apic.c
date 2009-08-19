@@ -2349,6 +2349,8 @@ void dump_ioapic_irq_info(void)
     }
 }
 
+unsigned highest_gsi(void);
+
 void __init init_ioapic_mappings(void)
 {
     unsigned long ioapic_phys;
@@ -2390,6 +2392,9 @@ void __init init_ioapic_mappings(void)
             nr_irqs_gsi += nr_ioapic_registers[i];
         }
     }
+
+    nr_irqs_gsi = max(nr_irqs, highest_gsi());
+
     if ( !smp_found_config || skip_ioapic_setup || nr_irqs_gsi < 16 )
         nr_irqs_gsi = 16;
     else if ( nr_irqs_gsi > MAX_GSI_IRQS)

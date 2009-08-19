@@ -945,6 +945,19 @@ void __init mp_register_ioapic (
 	return;
 }
 
+unsigned highest_gsi(void)
+{
+    unsigned x;
+    unsigned res;
+
+    res = 0;
+    for (x = 0; x < nr_ioapics; x++) {
+        if (res < mp_ioapic_routing[x].gsi_end)
+            res = mp_ioapic_routing[x].gsi_end;
+    }
+    return res;
+}
+
 
 void __init mp_override_legacy_irq (
 	u8			bus_irq,
