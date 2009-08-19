@@ -20,7 +20,7 @@
 # By default, checkpolicy will create the highest
 # version policy it supports.  Setting this will
 # override the version.
-OUTPUT_POLICY = 20
+#OUTPUT_POLICY = 20
 
 # Policy Type
 # strict, targeted,

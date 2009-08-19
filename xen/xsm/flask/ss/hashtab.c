@@ -11,8 +11,10 @@
 #include <xen/errno.h>
 #include "hashtab.h"
 
-struct hashtab *hashtab_create(u32 (*hash_value)(struct hashtab *h, void *key),
-            int (*keycmp)(struct hashtab *h, void *key1, void *key2), u32 size)
+struct hashtab *hashtab_create(u32 (*hash_value)(struct hashtab *h,
+						 const void *key),
+            int (*keycmp)(struct hashtab *h, const void *key1,
+			  const void *key2), u32 size)
 {
     struct hashtab *p;
     u32 i;
@@ -26,7 +28,7 @@ struct hashtab *hashtab_create(u32 (*hash_value)(struct hashtab *h, void *key),
     p->nel = 0;
     p->hash_value = hash_value;
     p->keycmp = keycmp;
-    p->htable = (void *)xmalloc_array(struct hashtab_node, size);
+    p->htable = xmalloc_array(struct hashtab_node *, size);
     if ( p->htable == NULL )
     {
         xfree(p);
@@ -80,7 +82,7 @@ int hashtab_insert(struct hashtab *h, void *key, void *datum)
     return 0;
 }
 
-void *hashtab_search(struct hashtab *h, void *key)
+void *hashtab_search(struct hashtab *h, const void *key)
 {
     u32 hvalue;
     struct hashtab_node *cur;

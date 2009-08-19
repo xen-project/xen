@@ -12,8 +12,22 @@
  *
  *     Added conditional policy language extensions
  *
- * Copyright (C) 2004-2005 Trusted Computer Solutions, Inc.
- * Copyright (C) 2003 - 2004 Tresys Technology, LLC
+ * Updated: Hewlett-Packard <paul.moore@hp.com>
+ *
+ *      Added support for the policy capability bitmap
+ *
+ * Updated: Chad Sellers <csellers@tresys.com>
+ *
+ *  Added validation of kernel classes and permissions
+ *
+ * Updated: KaiGai Kohei <kaigai@ak.jp.nec.com>
+ *
+ *  Added support for bounds domain and audit messaged on masked permissions
+ *
+ * Copyright (C) 2008, 2009 NEC Corporation
+ * Copyright (C) 2006, 2007 Hewlett-Packard Development Company, L.P.
+ * Copyright (C) 2004-2006 Trusted Computer Solutions, Inc.
+ * Copyright (C) 2003 - 2004, 2006 Tresys Technology, LLC
  * Copyright (C) 2003 Red Hat, Inc., James Morris <jmorris@redhat.com>
  *    This program is free software; you can redistribute it and/or modify
  *      it under the terms of the GNU General Public License as published by
@@ -42,9 +56,9 @@ unsigned int policydb_loaded_version;
 
 static DEFINE_RWLOCK(policy_rwlock);
 #define POLICY_RDLOCK read_lock(&policy_rwlock)
-#define POLICY_WRLOCK write_lock_irq(&policy_rwlock)
+#define POLICY_WRLOCK write_lock(&policy_rwlock)
 #define POLICY_RDUNLOCK read_unlock(&policy_rwlock)
-#define POLICY_WRUNLOCK write_unlock_irq(&policy_rwlock)
+#define POLICY_WRUNLOCK write_unlock(&policy_rwlock)
 
 static DEFINE_SPINLOCK(load_sem);
 #define LOAD_LOCK spin_lock(&load_sem)
@@ -65,6 +79,12 @@ static u32 latest_granting = 0;
 /* Forward declaration. */
 static int context_struct_to_string(struct context *context, char **scontext,
                                                             u32 *scontext_len);
+
+static int context_struct_compute_av(struct context *scontext,
+				     struct context *tcontext,
+				     u16 tclass,
+				     u32 requested,
+				     struct av_decision *avd);
 
 /*
  * Return the boolean value of a constraint expression
@@ -259,12 +279,180 @@ mls_ops:
 }
 
 /*
+ * security_dump_masked_av - dumps masked permissions during
+ * security_compute_av due to RBAC, MLS/Constraint and Type bounds.
+ */
+static int dump_masked_av_helper(void *k, void *d, void *args)
+{
+    struct perm_datum *pdatum = d;
+    char **permission_names = args;
+
+    BUG_ON(pdatum->value < 1 || pdatum->value > 32);
+
+    permission_names[pdatum->value - 1] = (char *)k;
+
+    return 0;
+}
+
+static void security_dump_masked_av(struct context *scontext,
+				    struct context *tcontext,
+				    u16 tclass,
+				    u32 permissions,
+				    const char *reason)
+{
+    struct common_datum *common_dat;
+    struct class_datum *tclass_dat;
+    char *tclass_name;
+    char *scontext_name = NULL;
+    char *tcontext_name = NULL;
+    char *permission_names[32];
+    int index;
+    u32 length;
+    unsigned char need_comma = 0;
+
+    if ( !permissions )
+        return;
+
+    tclass_name = policydb.p_class_val_to_name[tclass - 1];
+    tclass_dat = policydb.class_val_to_struct[tclass - 1];
+    common_dat = tclass_dat->comdatum;
+
+    /* init permission_names */
+    if ( common_dat &&
+         hashtab_map(common_dat->permissions.table,
+                     dump_masked_av_helper, permission_names) < 0 )
+        goto out;
+
+    if ( hashtab_map(tclass_dat->permissions.table,
+                    dump_masked_av_helper, permission_names) < 0 )
+        goto out;
+
+	/* get scontext/tcontext in text form */
+    if ( context_struct_to_string(scontext,
+                                 &scontext_name, &length) < 0 )
+        goto out;
+
+    if ( context_struct_to_string(tcontext,
+                                 &tcontext_name, &length) < 0 )
+        goto out;
+
+    printk("Flask: op=security_compute_av reason=%s "
+           "scontext=%s tcontext=%s tclass=%s perms=",
+           reason, scontext_name, tcontext_name, tclass_name);
+
+    for ( index = 0; index < 32; index++ )
+    {
+        u32 mask = (1 << index);
+
+        if ( (mask & permissions) == 0 )
+            continue;
+
+        printk("%s%s",
+               need_comma ? "," : "",
+               permission_names[index]
+               ? permission_names[index] : "????");
+        need_comma = 1;
+    }
+    printk("\n");
+out:
+    /* release scontext/tcontext */
+    xfree(tcontext_name);
+    xfree(scontext_name);
+
+    return;
+}
+
+/*
+ * security_boundary_permission - drops violated permissions
+ * on boundary constraint.
+ */
+static void type_attribute_bounds_av(struct context *scontext,
+                                     struct context *tcontext,
+                                     u16 tclass,
+                                     u32 requested,
+                                     struct av_decision *avd)
+{
+    struct context lo_scontext;
+    struct context lo_tcontext;
+    struct av_decision lo_avd;
+    struct type_datum *source
+        = policydb.type_val_to_struct[scontext->type - 1];
+    struct type_datum *target
+        = policydb.type_val_to_struct[tcontext->type - 1];
+    u32 masked = 0;
+
+    if ( source->bounds )
+    {
+        memset(&lo_avd, 0, sizeof(lo_avd));
+
+        memcpy(&lo_scontext, scontext, sizeof(lo_scontext));
+        lo_scontext.type = source->bounds;
+
+        context_struct_compute_av(&lo_scontext,
+                                  tcontext,
+                                  tclass,
+                                  requested,
+                                  &lo_avd);
+        if ( (lo_avd.allowed & avd->allowed) == avd->allowed )
+            return;		/* no masked permission */
+        masked = ~lo_avd.allowed & avd->allowed;
+    }
+
+    if ( target->bounds )
+    {
+        memset(&lo_avd, 0, sizeof(lo_avd));
+
+        memcpy(&lo_tcontext, tcontext, sizeof(lo_tcontext));
+        lo_tcontext.type = target->bounds;
+
+        context_struct_compute_av(scontext,
+                                  &lo_tcontext,
+                                  tclass,
+                                  requested,
+                                  &lo_avd);
+        if ( (lo_avd.allowed & avd->allowed) == avd->allowed )
+            return;		/* no masked permission */
+        masked = ~lo_avd.allowed & avd->allowed;
+    }
+
+    if ( source->bounds && target->bounds )
+    {
+        memset(&lo_avd, 0, sizeof(lo_avd));
+        /*
+         * lo_scontext and lo_tcontext are already
+         * set up.
+         */
+
+        context_struct_compute_av(&lo_scontext,
+                                  &lo_tcontext,
+                                  tclass,
+                                  requested,
+                                  &lo_avd);
+        if ( (lo_avd.allowed & avd->allowed) == avd->allowed )
+            return;		/* no masked permission */
+        masked = ~lo_avd.allowed & avd->allowed;
+    }
+
+    if ( masked )
+    {
+        /* mask violated permissions */
+        avd->allowed &= ~masked;
+
+        /* audit masked permissions */
+        security_dump_masked_av(scontext, tcontext,
+                                tclass, masked, "bounds");
+    }
+}
+
+/*
  * Compute access vectors based on a context structure pair for
  * the permissions in a particular class.
  */
 static int context_struct_compute_av(struct context *scontext,
-                            struct context *tcontext, u16 tclass, u32 requested, 
-                                                        struct av_decision *avd)
+				     struct context *tcontext,
+				     u16 tclass,
+				     u32 requested,
+				     struct av_decision *avd)
 {
     struct constraint_node *constraint;
     struct role_allow *ra;
@@ -275,22 +463,22 @@ static int context_struct_compute_av(struct context *scontext,
     struct ebitmap_node *snode, *tnode;
     unsigned int i, j;
 
-    if ( !tclass || tclass > policydb.p_classes.nprim )
-    {
-        printk(KERN_ERR "security_compute_av:  unrecognized class %d\n",
-               tclass);
-        return -EINVAL;
-    }
-    tclass_datum = policydb.class_val_to_struct[tclass - 1];
-
     /*
      * Initialize the access vectors to the default values.
      */
     avd->allowed = 0;
-    avd->decided = 0xffffffff;
     avd->auditallow = 0;
     avd->auditdeny = 0xffffffff;
     avd->seqno = latest_granting;
+    avd->flags = 0;
+
+    /*
+     * We do not presently support policydb.handle_unknown == allow in Xen.
+     */
+    if ( !tclass || tclass > policydb.p_classes.nprim )
+        return -EINVAL;
+
+    tclass_datum = policydb.class_val_to_struct[tclass - 1];
 
     /*
      * If a specific type enforcement rule was defined for
@@ -300,14 +488,10 @@ static int context_struct_compute_av(struct context *scontext,
     avkey.specified = AVTAB_AV;
     sattr = &policydb.type_attr_map[scontext->type - 1];
     tattr = &policydb.type_attr_map[tcontext->type - 1];
-    ebitmap_for_each_bit(sattr, snode, i)
+    ebitmap_for_each_positive_bit(sattr, snode, i)
     {
-        if ( !ebitmap_node_get_bit(snode, i) )
-            continue;
-        ebitmap_for_each_bit(tattr, tnode, j)
+        ebitmap_for_each_positive_bit(tattr, tnode, j)
         {
-            if ( !ebitmap_node_get_bit(tnode, j) )
-                continue;
             avkey.source_type = i + 1;
             avkey.target_type = j + 1;
             for ( node = avtab_search_node(&policydb.te_avtab, &avkey);
@@ -338,7 +522,7 @@ static int context_struct_compute_av(struct context *scontext,
         if ( (constraint->permissions & (avd->allowed) ) &&
             !constraint_expr_eval(scontext, tcontext, NULL, constraint->expr))
         {
-            avd->allowed = (avd->allowed) & ~(constraint->permissions);
+	    avd->allowed &= ~(constraint->permissions);
         }
         constraint = constraint->next;
     }
@@ -349,23 +533,25 @@ static int context_struct_compute_av(struct context *scontext,
      * pair.
      */
     if ( tclass == SECCLASS_DOMAIN &&
-/* removed until future dynamic domain capability
-        (avd->allowed & (DOMAIN__TRANSITION | DOMAIN__DYNTRANSITION)) &&
-*/
-                                            scontext->role != tcontext->role )
-        {
+         (avd->allowed & DOMAIN__TRANSITION) &&
+         scontext->role != tcontext->role )
+    {
         for ( ra = policydb.role_allow; ra; ra = ra->next )
         {
             if ( scontext->role == ra->role && tcontext->role == ra->new_role )
                 break;
         }
-/* removed until future dynamic domain capability    
         if (!ra)
-            avd->allowed = (avd->allowed) & ~(DOMAIN__TRANSITION |
-                                            DOMAIN__DYNTRANSITION);
-*/
+            avd->allowed &= ~DOMAIN__TRANSITION;
     }
 
+    /*
+     * If the given source and target types have boundary
+     * constraint, lazy checks have to mask any violated
+     * permission and notice it to userspace via audit.
+     */
+    type_attribute_bounds_av(scontext, tcontext,
+			     tclass, requested, avd);
     return 0;
 }
 
@@ -477,7 +663,7 @@ out:
  * if the access vector decisions were computed successfully.
  */
 int security_compute_av(u32 ssid, u32 tsid, u16 tclass, u32 requested,
-                                                    struct av_decision *avd)
+                        struct av_decision *avd)
 {
     struct context *scontext = NULL, *tcontext = NULL;
     int rc = 0;
@@ -485,7 +671,6 @@ int security_compute_av(u32 ssid, u32 tsid, u16 tclass, u32 requested,
     if ( !ss_initialized )
     {
         avd->allowed = 0xffffffff;
-        avd->decided = 0xffffffff;
         avd->auditallow = 0;
         avd->auditdeny = 0xffffffff;
         avd->seqno = latest_granting;
@@ -510,6 +695,10 @@ int security_compute_av(u32 ssid, u32 tsid, u16 tclass, u32 requested,
     }
 
     rc = context_struct_compute_av(scontext, tcontext, tclass, requested, avd);
+
+    /* permissive domain? */
+    if ( ebitmap_get_bit(&policydb.permissive_map, scontext->type) )
+        avd->flags |= AVD_FLAGS_PERMISSIVE;
 out:
     POLICY_RDUNLOCK;
     return rc;
@@ -611,7 +800,18 @@ out:
 
 }
 
-static int security_context_to_sid_core(char *scontext, u32 scontext_len, u32 *sid, u32 def_sid)
+/**
+ * security_context_to_sid - Obtain a SID for a given security context.
+ * @scontext: security context
+ * @scontext_len: length in bytes
+ * @sid: security identifier, SID
+ *
+ * Obtains a SID associated with the security context that
+ * has the string representation specified by @scontext.
+ * Returns -%EINVAL if the context is invalid, -%ENOMEM if insufficient
+ * memory is available, or 0 on success.
+ */
+int security_context_to_sid(char *scontext, u32 scontext_len, u32 *sid)
 {
     char *scontext2;
     struct context context;
@@ -701,12 +901,12 @@ static int security_context_to_sid_core(char *scontext, u32 scontext_len, u32 *s
     *p++ = 0;
 
     typdatum = hashtab_search(policydb.p_types.table, scontextp);
-    if ( !typdatum )
+    if ( !typdatum || typdatum->attribute )
         goto out_unlock;
 
     context.type = typdatum->value;
 
-    rc = mls_context_to_sid(oldc, &p, &context, &sidtab, def_sid);
+    rc = mls_context_to_sid(oldc, &p, &context, &sidtab);
     if ( rc )
         goto out_unlock;
 
@@ -730,45 +930,6 @@ out_unlock:
     xfree(scontext2);
 out:
     return rc;
-}
-
-/**
- * security_context_to_sid - Obtain a SID for a given security context.
- * @scontext: security context
- * @scontext_len: length in bytes
- * @sid: security identifier, SID
- *
- * Obtains a SID associated with the security context that
- * has the string representation specified by @scontext.
- * Returns -%EINVAL if the context is invalid, -%ENOMEM if insufficient
- * memory is available, or 0 on success.
- */
-int security_context_to_sid(char *scontext, u32 scontext_len, u32 *sid)
-{
-    return security_context_to_sid_core(scontext, scontext_len,
-                                                            sid, SECSID_NULL);
-}
-
-/**
- * security_context_to_sid_default - Obtain a SID for a given security context,
- * falling back to specified default if needed.
- *
- * @scontext: security context
- * @scontext_len: length in bytes
- * @sid: security identifier, SID
- * @def_sid: default SID to assign on errror
- *
- * Obtains a SID associated with the security context that
- * has the string representation specified by @scontext.
- * The default SID is passed to the MLS layer to be used to allow
- * kernel labeling of the MLS field if the MLS field is not present
- * (for upgrading to MLS without full relabel).
- * Returns -%EINVAL if the context is invalid, -%ENOMEM if insufficient
- * memory is available, or 0 on success.
- */
-int security_context_to_sid_default(char *scontext, u32 scontext_len, u32 *sid, u32 def_sid)
-{
-    return security_context_to_sid_core(scontext, scontext_len, sid, def_sid);
 }
 
 static int compute_sid_handle_invalid_context(
@@ -1001,88 +1162,128 @@ int security_change_sid(u32 ssid, u32 tsid, u16 tclass, u32 *out_sid)
 }
 
 /*
- * Verify that each permission that is defined under the
- * existing policy is still defined with the same value
- * in the new policy.
+ * Verify that each kernel class that is defined in the
+ * policy is correct
  */
-static int validate_perm(void *key, void *datum, void *p)
+static int validate_classes(struct policydb *p)
 {
-    struct hashtab *h;
-    struct perm_datum *perdatum, *perdatum2;
-    int rc = 0;
+    int i, j;
+    struct class_datum *cladatum;
+    struct perm_datum *perdatum;
+    u32 nprim, tmp, common_pts_len, perm_val, pol_val;
+    u16 class_val;
+    const struct selinux_class_perm *kdefs = &selinux_class_perm;
+    const char *def_class, *def_perm, *pol_class;
+    struct symtab *perms;
 
-    h = p;
-    perdatum = datum;
-
-    perdatum2 = hashtab_search(h, key);
-    if ( !perdatum2 )
+    for ( i = 1; i < kdefs->cts_len; i++ )
     {
-        printk(KERN_ERR "security:  permission %s disappeared", (char *)key);
-        rc = -ENOENT;
-        goto out;
-    }
-    if ( perdatum->value != perdatum2->value )
-    {
-        printk(KERN_ERR "security:  the value of permission %s changed",
-                                                                (char *)key);
-        rc = -EINVAL;
-    }
-out:
-    return rc;
-}
-
-/*
- * Verify that each class that is defined under the
- * existing policy is still defined with the same
- * attributes in the new policy.
- */
-static int validate_class(void *key, void *datum, void *p)
-{
-    struct policydb *newp;
-    struct class_datum *cladatum, *cladatum2;
-    int rc;
-
-    newp = p;
-    cladatum = datum;
-
-    cladatum2 = hashtab_search(newp->p_classes.table, key);
-    if ( !cladatum2 )
-    {
-        printk(KERN_ERR "security:  class %s disappeared\n", (char *)key);
-        rc = -ENOENT;
-        goto out;
-    }
-    if (cladatum->value != cladatum2->value) {
-        printk(KERN_ERR "security:  the value of class %s changed\n",
-                                                                (char *)key);
-        rc = -EINVAL;
-        goto out;
-    }
-    if ( (cladatum->comdatum && !cladatum2->comdatum) ||
-                                (!cladatum->comdatum && cladatum2->comdatum) )
-    {
-        printk(KERN_ERR "security:  the inherits clause for the access "
-               "vector definition for class %s changed\n", (char *)key);
-        rc = -EINVAL;
-        goto out;
-    }
-    if ( cladatum->comdatum )
-    {
-        rc = hashtab_map(cladatum->comdatum->permissions.table, validate_perm,
-                                     cladatum2->comdatum->permissions.table);
-        if ( rc )
+        def_class = kdefs->class_to_string[i];
+        if ( !def_class )
+            continue;
+        if ( i > p->p_classes.nprim )
         {
-            printk(" in the access vector definition for class %s\n", 
-                                                                (char *)key);
-            goto out;
+            printk(KERN_INFO
+                   "Flask:  class %s not defined in policy\n",
+                   def_class);
+            return -EINVAL;
+        }
+        pol_class = p->p_class_val_to_name[i-1];
+        if ( strcmp(pol_class, def_class) )
+        {
+            printk(KERN_ERR
+                   "Flask:  class %d is incorrect, found %s but should be %s\n",
+                   i, pol_class, def_class);
+            return -EINVAL;
         }
     }
-    rc = hashtab_map(cladatum->permissions.table, validate_perm,
-                                                cladatum2->permissions.table);
-    if ( rc )
-        printk(" in access vector definition for class %s\n", (char *)key);
-out:
-    return rc;
+    for ( i = 0; i < kdefs->av_pts_len; i++ )
+    {
+        class_val = kdefs->av_perm_to_string[i].tclass;
+        perm_val = kdefs->av_perm_to_string[i].value;
+        def_perm = kdefs->av_perm_to_string[i].name;
+        if ( class_val > p->p_classes.nprim )
+            continue;
+        pol_class = p->p_class_val_to_name[class_val-1];
+        cladatum = hashtab_search(p->p_classes.table, pol_class);
+        BUG_ON( !cladatum );
+        perms = &cladatum->permissions;
+        nprim = 1 << (perms->nprim - 1);
+        if ( perm_val > nprim )
+        {
+            printk(KERN_INFO
+                   "Flask:  permission %s in class %s not defined in policy\n",
+                   def_perm, pol_class);
+            return -EINVAL;
+        }
+        perdatum = hashtab_search(perms->table, def_perm);
+        if ( perdatum == NULL )
+        {
+            printk(KERN_ERR
+                   "Flask:  permission %s in class %s not found in policy\n",
+                   def_perm, pol_class);
+            return -EINVAL;
+        }
+        pol_val = 1 << (perdatum->value - 1);
+        if ( pol_val != perm_val )
+        {
+            printk(KERN_ERR
+                   "Flask:  permission %s in class %s has incorrect value\n",
+                   def_perm, pol_class);
+            return -EINVAL;
+        }
+    }
+    for ( i = 0; i < kdefs->av_inherit_len; i++ )
+    {
+        class_val = kdefs->av_inherit[i].tclass;
+        if ( class_val > p->p_classes.nprim )
+            continue;
+        pol_class = p->p_class_val_to_name[class_val-1];
+        cladatum = hashtab_search(p->p_classes.table, pol_class);
+        BUG_ON( !cladatum );
+        if ( !cladatum->comdatum )
+        {
+            printk(KERN_ERR
+            "Flask:  class %s should have an inherits clause but does not\n",
+                   pol_class);
+            return -EINVAL;
+        }
+        tmp = kdefs->av_inherit[i].common_base;
+        common_pts_len = 0;
+        while ( !(tmp & 0x01) )
+        {
+            common_pts_len++;
+            tmp >>= 1;
+        }
+        perms = &cladatum->comdatum->permissions;
+        for ( j = 0; j < common_pts_len; j++ )
+        {
+            def_perm = kdefs->av_inherit[i].common_pts[j];
+            if ( j >= perms->nprim )
+            {
+                printk(KERN_INFO
+                "Flask:  permission %s in class %s not defined in policy\n",
+                       def_perm, pol_class);
+                return -EINVAL;
+            }
+            perdatum = hashtab_search(perms->table, def_perm);
+            if ( perdatum == NULL )
+            {
+                printk(KERN_ERR
+                       "Flask:  permission %s in class %s not found in policy\n",
+                       def_perm, pol_class);
+                return -EINVAL;
+            }
+            if ( perdatum->value != j + 1 )
+            {
+                printk(KERN_ERR
+                      "Flask:  permission %s in class %s has incorrect value\n",
+                       def_perm, pol_class);
+                return -EINVAL;
+            }
+        }
+    }
+    return 0;
 }
 
 /* Clone the SID into the new SID table. */
@@ -1105,7 +1306,7 @@ static inline int convert_context_handle_invalid_context(struct context *context
         u32 len;
 
         context_struct_to_string(context, &s, &len);
-        printk(KERN_ERR "security:  context %s is invalid\n", s);
+        printk(KERN_ERR "Flask:  context %s is invalid\n", s);
         xfree(s);
     }
     return rc;
@@ -1184,12 +1385,12 @@ out:
 bad:
     context_struct_to_string(&oldc, &s, &len);
     context_destroy(&oldc);
-    printk(KERN_ERR "security:  invalidating context %s\n", s);
+    printk(KERN_ERR "Flask:  invalidating context %s\n", s);
     xfree(s);
     goto out;
 }
 
-extern void flask_complete_init(void);
+static int security_preserve_bools(struct policydb *p);
 
 /**
  * security_load_policy - Load a security policy configuration.
@@ -1225,6 +1426,14 @@ int security_load_policy(void *data, size_t len)
             policydb_destroy(&policydb);
             return -EINVAL;
         }
+        if ( validate_classes(&policydb) )
+        {
+            printk(KERN_ERR
+                   "Flask:  the definition of a class is incorrect\n");
+            sidtab_destroy(&sidtab);
+            policydb_destroy(&policydb);
+            return -EINVAL;
+        }
         policydb_loaded_version = policydb.policyvers;
         ss_initialized = 1;
         seqno = ++latest_granting;
@@ -1245,12 +1454,19 @@ int security_load_policy(void *data, size_t len)
 
     sidtab_init(&newsidtab);
 
-    /* Verify that the existing classes did not change. */
-    if ( hashtab_map(policydb.p_classes.table, validate_class, &newpolicydb) )
+    /* Verify that the kernel defined classes are correct. */
+    if ( validate_classes(&newpolicydb) )
     {
-        printk(KERN_ERR "security:  the definition of an existing "
-                                                            "class changed\n");
+        printk(KERN_ERR
+               "Flask:  the definition of a class is incorrect\n");
         rc = -EINVAL;
+        goto err;
+    }
+
+    rc = security_preserve_bools(&newpolicydb);
+    if ( rc )
+    {
+        printk(KERN_ERR "Flask:  unable to preserve booleans\n");
         goto err;
     }
 
@@ -1517,15 +1733,11 @@ int security_get_user_sids(u32 fromsid, char *username, u32 **sids, u32 *nel)
     }
     memset(mysids, 0, maxnel*sizeof(*mysids));
 
-    ebitmap_for_each_bit(&user->roles, rnode, i)
+    ebitmap_for_each_positive_bit(&user->roles, rnode, i)
     {
-        if ( !ebitmap_node_get_bit(rnode, i) )
-            continue;
         role = policydb.role_val_to_struct[i];
         usercon.role = i+1;
-        ebitmap_for_each_bit(&role->types, tnode, j) {
-            if ( !ebitmap_node_get_bit(tnode, j) )
-                continue;
+        ebitmap_for_each_positive_bit(&role->types, tnode, j) {
             usercon.type = j+1;
 
             if ( mls_setup_user_range(fromcon, user, &usercon) )
@@ -1640,7 +1852,7 @@ int security_set_bools(int len, int *values)
         goto out;
     }
 
-    printk(KERN_INFO "security: committed booleans { ");
+    printk(KERN_INFO "Flask: committed booleans { ");
     for ( i = 0; i < len; i++ )
     {
         if ( values[i] )
@@ -1693,5 +1905,39 @@ int security_get_bool_value(int bool)
     rc = policydb.bool_val_to_struct[bool]->state;
 out:
     POLICY_RDUNLOCK;
+    return rc;
+}
+
+static int security_preserve_bools(struct policydb *p)
+{
+    int rc, nbools = 0, *bvalues = NULL, i;
+    char **bnames = NULL;
+    struct cond_bool_datum *booldatum;
+    struct cond_node *cur;
+
+    rc = security_get_bools(&nbools, &bnames, &bvalues);
+    if ( rc )
+        goto out;
+    for ( i = 0; i < nbools; i++ )
+    {
+        booldatum = hashtab_search(p->p_bools.table, bnames[i]);
+        if ( booldatum )
+            booldatum->state = bvalues[i];
+    }
+    for ( cur = p->cond_list; cur; cur = cur->next )
+    {
+        rc = evaluate_cond_node(p, cur);
+        if ( rc )
+            goto out;
+    }
+
+out:
+    if ( bnames )
+    {
+        for ( i = 0; i < nbools; i++ )
+            xfree(bnames[i]);
+    }
+    xfree(bnames);
+    xfree(bvalues);
     return rc;
 }

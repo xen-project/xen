@@ -24,7 +24,7 @@ int sidtab_init(struct sidtab *s)
 {
     int i;
 
-    s->htable = (void *)xmalloc_array(struct sidtab_node, SIDTAB_SIZE);
+    s->htable = xmalloc_array(struct sidtab_node *, SIDTAB_SIZE);
     if ( !s->htable )
         return -ENOMEM;
     for ( i = 0; i < SIDTAB_SIZE; i++ )

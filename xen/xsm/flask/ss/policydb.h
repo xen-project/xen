@@ -63,6 +63,7 @@ struct class_datum {
 /* Role attributes */
 struct role_datum {
     u32 value;            /* internal role value */
+    u32 bounds;			/* boundary of role */
     struct ebitmap dominates;    /* set of roles dominated by this role */
     struct ebitmap types;        /* set of authorized types for role */
 };
@@ -83,12 +84,25 @@ struct role_allow {
 /* Type attributes */
 struct type_datum {
     u32 value;        /* internal type value */
+    u32 bounds;		/* boundary of type */
     unsigned char primary;    /* primary name? */
+    unsigned char attribute;/* attribute ?*/
 };
+
+/*
+ * type_datum properties
+ * available at the kernel policy version >= POLICYDB_VERSION_BOUNDARY
+ */
+#define TYPEDATUM_PROPERTY_PRIMARY	0x0001
+#define TYPEDATUM_PROPERTY_ATTRIBUTE	0x0002
+
+/* limitation of boundary depth  */
+#define POLICYDB_BOUNDS_MAXDEPTH	4
 
 /* User attributes */
 struct user_datum {
     u32 value;            /* internal user value */
+    u32 bounds;			/* bounds of user */
     struct ebitmap roles;        /* set of authorized roles for user */
     struct mls_range range;        /* MLS range (min - max) for user */
     struct mls_level dfltlevel;    /* default login MLS level for user */
@@ -108,9 +122,10 @@ struct cat_datum {
 };
 
 struct range_trans {
-    u32 dom;            /* current process domain */
-    u32 type;            /* program executable type */
-    struct mls_range range;        /* new range */
+    u32 source_type;
+    u32 target_type;
+    u32 target_class;
+    struct mls_range target_range;
     struct range_trans *next;
 };
 
@@ -191,6 +206,7 @@ struct policydb {
     struct class_datum **class_val_to_struct;
     struct role_datum **role_val_to_struct;
     struct user_datum **user_val_to_struct;
+    struct type_datum **type_val_to_struct;
 
     /* type enforcement access vectors and transitions */
     struct avtab te_avtab;
@@ -218,12 +234,19 @@ struct policydb {
     /* type -> attribute reverse mapping */
     struct ebitmap *type_attr_map;
 
+    struct ebitmap policycaps;
+
+    struct ebitmap permissive_map;
+
     unsigned int policyvers;
 };
 
 extern void policydb_destroy(struct policydb *p);
 extern int policydb_load_isids(struct policydb *p, struct sidtab *s);
 extern int policydb_context_isvalid(struct policydb *p, struct context *c);
+extern int policydb_class_isvalid(struct policydb *p, unsigned int class);
+extern int policydb_type_isvalid(struct policydb *p, unsigned int type);
+extern int policydb_role_isvalid(struct policydb *p, unsigned int role);
 extern int policydb_read(struct policydb *p, void *fp);
 
 #define PERM_SYMTAB_SIZE 32

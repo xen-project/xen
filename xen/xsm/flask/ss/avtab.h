@@ -16,6 +16,9 @@
  *    This program is free software; you can redistribute it and/or modify
  *      it under the terms of the GNU General Public License as published by
  *    the Free Software Foundation, version 2.
+ *
+ * Updated: Yuichi Nakamura <ynakam@hitachisoft.jp>
+ * 	Tuned number of hash slots for avtab to reduce memory usage
  */
 
 /* Ported to Xen 3.0, George Coker, <gscoker@alpha.ncsc.mil> */
@@ -53,19 +56,23 @@ struct avtab_node {
 struct avtab {
     struct avtab_node **htable;
     u32 nel;    /* number of elements */
+    u32 nslot;      /* number of hash slots */
+    u16 mask;       /* mask to compute hash func */
 };
 
 int avtab_init(struct avtab *);
+int avtab_alloc(struct avtab *, u32);
 struct avtab_datum *avtab_search(struct avtab *h, struct avtab_key *k);
 void avtab_destroy(struct avtab *h);
 void avtab_hash_eval(struct avtab *h, char *tag);
 
-int avtab_read_item(void *fp, uint32_t vers, struct avtab *a,
+struct policydb;
+int avtab_read_item(struct avtab *a, void *fp, struct policydb *pol,
             int (*insert)(struct avtab *a, struct avtab_key *k,
                   struct avtab_datum *d, void *p),
             void *p);
 
-int avtab_read(struct avtab *a, void *fp, u32 vers);
+int avtab_read(struct avtab *a, void *fp, struct policydb *pol);
 
 struct avtab_node *avtab_insert_nonunique(struct avtab *h, 
                             struct avtab_key *key, struct avtab_datum *datum);
@@ -75,11 +82,10 @@ struct avtab_node *avtab_search_node(struct avtab *h, struct avtab_key *key);
 struct avtab_node *avtab_search_node_next(struct avtab_node *node, 
                                                                 int specified);
 
-#define AVTAB_HASH_BITS 15
-#define AVTAB_HASH_BUCKETS (1 << AVTAB_HASH_BITS)
-#define AVTAB_HASH_MASK (AVTAB_HASH_BUCKETS-1)
-
-#define AVTAB_SIZE AVTAB_HASH_BUCKETS
+#define MAX_AVTAB_HASH_BITS 13
+#define MAX_AVTAB_HASH_BUCKETS (1 << MAX_AVTAB_HASH_BITS)
+#define MAX_AVTAB_HASH_MASK (MAX_AVTAB_HASH_BUCKETS-1)
+#define MAX_AVTAB_SIZE MAX_AVTAB_HASH_BUCKETS
 
 #endif    /* _SS_AVTAB_H_ */
 

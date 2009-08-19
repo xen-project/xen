@@ -101,7 +101,7 @@ int evaluate_cond_node(struct policydb *p, struct cond_node *node)
     {
         node->cur_state = new_state;
         if ( new_state == -1 )
-            printk(KERN_ERR "security: expression result was undefined - disabling all rules.\n");
+            printk(KERN_ERR "Flask: expression result was undefined - disabling all rules.\n");
         /* turn the rules on or off */
         for ( cur = node->true_list; cur != NULL; cur = cur->next )
         {
@@ -287,7 +287,7 @@ static int cond_insertf(struct avtab *a, struct avtab_key *k,
     {
         if ( avtab_search(&p->te_avtab, k) )
         {
-            printk("security: type rule already exists outside of a "
+            printk("Flask: type rule already exists outside of a "
                                                                 "conditional.");
             goto err;
         }
@@ -306,7 +306,7 @@ static int cond_insertf(struct avtab *a, struct avtab_key *k,
             {
                 if ( avtab_search_node_next(node_ptr, k->specified) )
                 {
-                    printk("security: too many conflicting type rules.");
+                    printk("Flask: too many conflicting type rules.");
                     goto err;
                 }
                 found = 0;
@@ -320,7 +320,7 @@ static int cond_insertf(struct avtab *a, struct avtab_key *k,
                 }
                 if ( !found )
                 {
-                    printk("security: conflicting type rules.\n");
+                    printk("Flask: conflicting type rules.\n");
                     goto err;
                 }
             }
@@ -329,7 +329,7 @@ static int cond_insertf(struct avtab *a, struct avtab_key *k,
         {
             if ( avtab_search(&p->te_cond_avtab, k) )
             {
-                printk("security: conflicting type rules when adding type rule "
+                printk("Flask: conflicting type rules when adding type rule "
                                                                 "for true.\n");
                 goto err;
             }
@@ -339,7 +339,7 @@ static int cond_insertf(struct avtab *a, struct avtab_key *k,
     node_ptr = avtab_insert_nonunique(&p->te_cond_avtab, k, d);
     if ( !node_ptr )
     {
-        printk("security: could not insert rule.");
+        printk("Flask: could not insert rule.");
         goto err;
     }
 
@@ -389,8 +389,7 @@ static int cond_read_av_list(struct policydb *p, void *fp,
     data.tail = NULL;
     for ( i = 0; i < len; i++ )
     {
-        rc = avtab_read_item(fp, p->policyvers, &p->te_cond_avtab, cond_insertf,
-                                                                        &data);
+        rc = avtab_read_item(&p->te_cond_avtab, fp, p, cond_insertf, &data);
         if ( rc )
             return rc;
     }
@@ -403,13 +402,13 @@ static int expr_isvalid(struct policydb *p, struct cond_expr *expr)
 {
     if ( expr->expr_type <= 0 || expr->expr_type > COND_LAST )
     {
-        printk("security: conditional expressions uses unknown operator.\n");
+        printk("Flask: conditional expressions uses unknown operator.\n");
         return 0;
     }
 
     if ( expr->bool > p->p_bools.nprim )
     {
-        printk("security: conditional expressions uses unknown bool.\n");
+        printk("Flask: conditional expressions uses unknown bool.\n");
         return 0;
     }
     return 1;
@@ -488,6 +487,10 @@ int cond_read_list(struct policydb *p, void *fp)
         return -1;
 
     len = le32_to_cpu(buf[0]);
+
+    rc = avtab_alloc(&(p->te_cond_avtab), p->te_avtab.nel);
+    if ( rc )
+      goto err;
 
     for ( i = 0; i < len; i++ )
     {

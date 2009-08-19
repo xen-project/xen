@@ -346,7 +346,7 @@ static int flask_security_access(char *buf, uint32_t size)
 
     memset(buf, 0, size);
     length = snprintf(buf, size, "%x %x %x %x %u", 
-                                        avd.allowed, avd.decided,
+                                        avd.allowed, 0xffffffff,
                                         avd.auditallow, avd.auditdeny, 
                                         avd.seqno);
                 
