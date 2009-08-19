@@ -71,13 +71,6 @@ static void amd_xc_cpuid_policy(
 {
     switch ( input[0] )
     {
-    case 0x00000001:
-        /* Mask Intel-only features. */
-        regs[2] &= ~(bitmaskof(X86_FEATURE_SSSE3) |
-                     bitmaskof(X86_FEATURE_SSE4_1) |
-                     bitmaskof(X86_FEATURE_SSE4_2));
-        break;
-
     case 0x00000002:
     case 0x00000004:
         regs[0] = regs[1] = regs[2] = 0;
@@ -126,11 +119,6 @@ static void intel_xc_cpuid_policy(
 {
     switch ( input[0] )
     {
-    case 0x00000001:
-        /* Mask AMD-only features. */
-        regs[2] &= ~(bitmaskof(X86_FEATURE_POPCNT));
-        break;
-
     case 0x00000004:
         /*
          * EAX[31:26] is Maximum Cores Per Package (minus one).
