@@ -56,7 +56,7 @@ arch_compat_vcpu_op(
             struct vcpu_runstate_info runstate;
 
             vcpu_runstate_get(v, &runstate);
-            XLAT_vcpu_runstate_info(&info, &v->runstate);
+            XLAT_vcpu_runstate_info(&info, &runstate);
         }
         __copy_to_guest(v->runstate_guest.compat, &info, 1);
 

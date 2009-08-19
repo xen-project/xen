@@ -1273,6 +1273,26 @@ static void paravirt_ctxt_switch_to(struct vcpu *v)
     }
 }
 
+/* Update per-VCPU guest runstate shared memory area (if registered). */
+static void update_runstate_area(struct vcpu *v)
+{
+    if ( guest_handle_is_null(runstate_guest(v)) )
+        return;
+
+#ifdef CONFIG_COMPAT
+    if ( is_pv_32on64_domain(v->domain) )
+    {
+        struct compat_vcpu_runstate_info info;
+
+        XLAT_vcpu_runstate_info(&info, &v->runstate);
+        __copy_to_guest(v->runstate_guest.compat, &info, 1);
+        return;
+    }
+#endif
+
+    __copy_to_guest(runstate_guest(v), &v->runstate, 1);
+}
+
 static inline int need_full_gdt(struct vcpu *v)
 {
     return (!is_hvm_vcpu(v) && !is_idle_vcpu(v));
@@ -1364,6 +1384,9 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
         flush_tlb_mask(&dirty_mask);
     }
 
+    if (prev != next)
+        update_runstate_area(prev);
+
     if ( is_hvm_vcpu(prev) && !list_empty(&prev->arch.hvm_vcpu.tm_list) )
         pt_save_timer(prev);
 
@@ -1403,21 +1426,8 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 
     context_saved(prev);
 
-    /* Update per-VCPU guest runstate shared memory area (if registered). */
-    if ( !guest_handle_is_null(runstate_guest(next)) )
-    {
-        if ( !is_pv_32on64_domain(next->domain) )
-            __copy_to_guest(runstate_guest(next), &next->runstate, 1);
-#ifdef CONFIG_COMPAT
-        else
-        {
-            struct compat_vcpu_runstate_info info;
-
-            XLAT_vcpu_runstate_info(&info, &next->runstate);
-            __copy_to_guest(next->runstate_guest.compat, &info, 1);
-        }
-#endif
-    }
+    if (prev != next)
+        update_runstate_area(next);
 
     schedule_tail(next);
     BUG();
