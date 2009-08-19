@@ -198,7 +198,6 @@ static struct {
 
 static inline void trace_exit_reason(u32 *irq_traced)
 {
-#ifdef DEBUG
     if ( unlikely(tb_init_done) )
     {
         int i, curbit;
@@ -215,7 +214,6 @@ static inline void trace_exit_reason(u32 *irq_traced)
             curbit = find_next_bit((const unsigned long *)irr_status, 256, curbit + 1);
         }
     }
-#endif
 }
 
 static void acpi_processor_idle(void)

@@ -442,7 +442,7 @@ void show_help(void)
 {
     show_version();
     printf("tracestat <trace.data> [-vhdselbcmau]\n");
-    printf("  trace.data       raw data from xentrace\n");
+    printf("  trace.data       raw data got by 'xentrace -e 0x80f000 trace.dat'\n");
     printf("  -v / --version   show version message\n");
     printf("  -h / --help      show this message\n");
     printf("  -d / --digest    digest mode, more variables to specify.\n");

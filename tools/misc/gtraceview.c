@@ -542,7 +542,8 @@ void show_help(void)
 {
     show_version();
     printf("gtraceview <trace.data> [--version] [--help]\n");
-    printf("  trace.data   raw data from xentrace\n");
+    printf("  trace.data   raw data got by "
+           "'xentrace -e 0x80f000 trace.dat'\n");
     printf("  --version    show version information\n");
     printf("  --help       show this message\n");
     printf("For more help messages, please press 'h' in the window\n");
