@@ -69,7 +69,7 @@ static void amd_iommu_setup_domain_device(
     void *dte;
     unsigned long flags;
     int req_id;
-    u8 sys_mgt, dev_ex;
+    u8 sys_mgt, dev_ex, valid = 1, int_valid = 1;
     struct hvm_iommu *hd = domain_hvm_iommu(domain);
 
     BUG_ON( !hd->root_table || !hd->paging_mode || !int_remap_table );
@@ -86,11 +86,16 @@ static void amd_iommu_setup_domain_device(
         sys_mgt = ivrs_mappings[req_id].dte_sys_mgt_enable;
         dev_ex = ivrs_mappings[req_id].dte_allow_exclusion;
 
+        if ( iommu_passthrough && (domain->domain_id == 0) )
+            valid = 0;
+        if ( !iommu_intremap )
+            int_valid = 0;
+
         amd_iommu_set_dev_table_entry((u32 *)dte,
                                       page_to_maddr(hd->root_table),
                                       virt_to_maddr(int_remap_table),
                                       hd->domain_id, sys_mgt, dev_ex,
-                                      hd->paging_mode);
+                                      hd->paging_mode, valid, int_valid);
 
         invalidate_dev_table_entry(iommu, req_id);
         invalidate_interrupt_table(iommu, req_id);
@@ -223,9 +228,13 @@ static int amd_iommu_domain_init(struct domain *domain)
     if ( domain->domain_id == 0 )
     {
         unsigned long i; 
-       /* setup 1:1 page table for dom0 */
-        for ( i = 0; i < max_page; i++ )
-            amd_iommu_map_page(domain, i, i);
+
+        if ( !iommu_passthrough )
+        {
+            /* setup 1:1 page table for dom0 */
+            for ( i = 0; i < max_page; i++ )
+                amd_iommu_map_page(domain, i, i);
+        }
 
         amd_iommu_setup_dom0_devices(domain);
     }

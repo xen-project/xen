@@ -256,7 +256,7 @@ static void amd_iommu_set_page_directory_entry(u32 *pde,
 
 void amd_iommu_set_dev_table_entry(u32 *dte, u64 root_ptr, u64 intremap_ptr,
                                    u16 domain_id, u8 sys_mgt, u8 dev_ex,
-                                   u8 paging_mode)
+                                   u8 paging_mode, u8 valid, u8 int_valid)
 {
     u64 addr_hi, addr_lo;
     u32 entry;
@@ -297,7 +297,8 @@ void amd_iommu_set_dev_table_entry(u32 *dte, u64 root_ptr, u64 intremap_ptr,
     set_field_in_reg_u32(0xB, entry,
                          IOMMU_DEV_TABLE_INT_TABLE_LENGTH_MASK,
                          IOMMU_DEV_TABLE_INT_TABLE_LENGTH_SHIFT, &entry);
-    set_field_in_reg_u32(IOMMU_CONTROL_ENABLED, entry,
+    set_field_in_reg_u32(int_valid ? IOMMU_CONTROL_ENABLED :
+                         IOMMU_CONTROL_DISABLED, entry,
                          IOMMU_DEV_TABLE_INT_VALID_MASK,
                          IOMMU_DEV_TABLE_INT_VALID_SHIFT, &entry);
     set_field_in_reg_u32(IOMMU_CONTROL_ENABLED, entry,
@@ -340,7 +341,8 @@ void amd_iommu_set_dev_table_entry(u32 *dte, u64 root_ptr, u64 intremap_ptr,
     set_field_in_reg_u32(IOMMU_CONTROL_ENABLED, entry,
                          IOMMU_DEV_TABLE_TRANSLATION_VALID_MASK,
                          IOMMU_DEV_TABLE_TRANSLATION_VALID_SHIFT, &entry);
-    set_field_in_reg_u32(IOMMU_CONTROL_ENABLED, entry,
+    set_field_in_reg_u32(valid ? IOMMU_CONTROL_ENABLED :
+                         IOMMU_CONTROL_DISABLED, entry,
                          IOMMU_DEV_TABLE_VALID_MASK,
                          IOMMU_DEV_TABLE_VALID_SHIFT, &entry);
     dte[0] = entry;

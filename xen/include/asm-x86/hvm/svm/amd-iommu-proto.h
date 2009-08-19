@@ -68,7 +68,8 @@ void invalidate_all_iommu_pages(struct domain *d);
 
 /* device table functions */
 void amd_iommu_set_dev_table_entry(u32 *dte, u64 root_ptr, u64 intremap_ptr,
-        u16 domain_id, u8 sys_mgt, u8 dev_ex, u8 paging_mode);
+        u16 domain_id, u8 sys_mgt, u8 dev_ex, u8 paging_mode,
+        u8 valid, u8 int_valid);
 int amd_iommu_is_dte_page_translation_valid(u32 *entry);
 void invalidate_dev_table_entry(struct amd_iommu *iommu, u16 devic_id);
 
