@@ -84,6 +84,8 @@ asm-offsets.s: $(TARGET_SUBARCH)/asm-offsets.c
 
 xen.lds: xen.lds.S
 	$(CC) -P -E -Ui386 $(AFLAGS) -o $@ $<
+	sed -e 's/xen\.lds\.o:/xen\.lds:/g' <.xen.lds.d >.xen.lds.d.new
+	mv -f .xen.lds.d.new .xen.lds.d
 
 boot/mkelf32: boot/mkelf32.c
 	$(HOSTCC) $(HOSTCFLAGS) -o $@ $<
