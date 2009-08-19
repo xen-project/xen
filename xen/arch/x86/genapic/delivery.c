@@ -29,13 +29,17 @@ void clustered_apic_check_flat(void)
 cpumask_t target_cpus_flat(void)
 {
 	return cpu_online_map;
+}
+
+cpumask_t vector_allocation_domain_flat(int cpu)
+{
+	return cpu_online_map;
 } 
 
 unsigned int cpu_mask_to_apicid_flat(cpumask_t cpumask)
 {
-	return cpus_addr(cpumask)[0];
+	return cpus_addr(cpumask)[0]&0xFF;
 }
-
 
 /*
  * PHYSICAL DELIVERY MODE (unicast to physical APIC IDs).
@@ -57,8 +61,12 @@ void clustered_apic_check_phys(void)
 
 cpumask_t target_cpus_phys(void)
 {
-	/* IRQs will get bound more accurately later. */
-	return cpumask_of_cpu(0);
+	return cpu_online_map;
+}
+
+cpumask_t vector_allocation_domain_phys(int cpu)
+{
+	return cpumask_of_cpu(cpu);
 }
 
 unsigned int cpu_mask_to_apicid_phys(cpumask_t cpumask)

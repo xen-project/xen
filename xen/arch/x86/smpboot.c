@@ -512,7 +512,12 @@ void __devinit start_secondary(void *unused)
 	set_cpu_sibling_map(raw_smp_processor_id());
 	wmb();
 
+    /* Initlize vector_irq for BSPs */
+    lock_vector_lock();
+    __setup_vector_irq(smp_processor_id());
 	cpu_set(smp_processor_id(), cpu_online_map);
+    unlock_vector_lock();
+
 	per_cpu(cpu_state, smp_processor_id()) = CPU_ONLINE;
 
 	init_percpu_time();
@@ -1232,10 +1237,9 @@ remove_siblinginfo(int cpu)
 	cpu_clear(cpu, cpu_sibling_setup_map);
 }
 
-extern void fixup_irqs(cpumask_t map);
+extern void fixup_irqs(void);
 int __cpu_disable(void)
 {
-	cpumask_t map = cpu_online_map;
 	int cpu = smp_processor_id();
 
 	/*
@@ -1262,8 +1266,8 @@ int __cpu_disable(void)
 
 	remove_siblinginfo(cpu);
 
-	cpu_clear(cpu, map);
-	fixup_irqs(map);
+	cpu_clear(cpu, cpu_online_map);
+	fixup_irqs();
 	/* It's now safe to remove this processor from the online map */
 	cpu_clear(cpu, cpu_online_map);
 
@@ -1477,14 +1481,13 @@ void __init smp_cpus_done(unsigned int max_cpus)
 
 void __init smp_intr_init(void)
 {
-	int irq, seridx;
+	int irq, seridx, cpu = smp_processor_id();
 
 	/*
 	 * IRQ0 must be given a fixed assignment and initialized,
 	 * because it's used before the IO-APIC is set up.
 	 */
 	irq_vector[0] = FIRST_HIPRIORITY_VECTOR;
-	vector_irq[FIRST_HIPRIORITY_VECTOR] = 0;
 
 	/*
 	 * Also ensure serial interrupts are high priority. We do not
@@ -1493,9 +1496,14 @@ void __init smp_intr_init(void)
 	for (seridx = 0; seridx < 2; seridx++) {
 		if ((irq = serial_irq(seridx)) < 0)
 			continue;
-		irq_vector[irq] = FIRST_HIPRIORITY_VECTOR + seridx + 1;
-		vector_irq[FIRST_HIPRIORITY_VECTOR + seridx + 1] = irq;
+        irq_vector[irq] = FIRST_HIPRIORITY_VECTOR + seridx + 1;
+        per_cpu(vector_irq, cpu)[FIRST_HIPRIORITY_VECTOR + seridx + 1] = irq;
+        irq_cfg[irq].vector = FIRST_HIPRIORITY_VECTOR + seridx + 1;
+        irq_cfg[irq].domain = (cpumask_t)CPU_MASK_ALL;
 	}
+
+    /* IPI for cleanuping vectors after irq move */
+    set_intr_gate(IRQ_MOVE_CLEANUP_VECTOR, irq_move_cleanup_interrupt);
 
 	/* IPI for event checking. */
 	set_intr_gate(EVENT_CHECK_VECTOR, event_check_interrupt);

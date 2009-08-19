@@ -921,9 +921,9 @@ void __init __start_xen(unsigned long mbi_p)
 
     init_apic_mappings();
 
-    init_IRQ();
-    
     percpu_init_areas();
+
+    init_IRQ();
 
     xsm_init(&initrdidx, mbi, initial_images_start);
 

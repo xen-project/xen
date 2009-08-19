@@ -37,6 +37,8 @@ DECLARE_PER_CPU(cpumask_t, cpu_core_map);
 
 void smp_send_nmi_allbutself(void);
 
+void  send_IPI_mask(const cpumask_t *mask, int vector);
+
 extern void (*mtrr_hook) (void);
 
 #ifdef CONFIG_X86_64

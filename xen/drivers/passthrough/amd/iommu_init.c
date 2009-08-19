@@ -26,6 +26,7 @@
 #include <asm/msi.h>
 #include <asm/hvm/svm/amd-iommu-proto.h>
 #include <asm-x86/fixmap.h>
+#include <mach_apic.h>
 
 static struct amd_iommu **irq_to_iommu;
 static int nr_amd_iommus;
@@ -303,40 +304,46 @@ static int amd_iommu_read_event_log(struct amd_iommu *iommu, u32 event[])
     return -EFAULT;
 }
 
-static void amd_iommu_msi_data_init(struct amd_iommu *iommu)
+static void iommu_msi_set_affinity(unsigned int irq, cpumask_t mask)
 {
-    u32 msi_data;
+    struct msi_msg msg;
+    unsigned int dest;
+    struct amd_iommu *iommu = irq_to_iommu[irq];
+    struct irq_desc *desc = irq_to_desc(irq);
+    struct irq_cfg *cfg = desc->chip_data;
     u8 bus = (iommu->bdf >> 8) & 0xff;
     u8 dev = PCI_SLOT(iommu->bdf & 0xff);
     u8 func = PCI_FUNC(iommu->bdf & 0xff);
-    int vector = irq_to_vector(iommu->irq);
 
-    msi_data = MSI_DATA_TRIGGER_EDGE |
-        MSI_DATA_LEVEL_ASSERT |
-        MSI_DATA_DELIVERY_FIXED |
-        MSI_DATA_VECTOR(vector);
+    dest = set_desc_affinity(desc, mask);
+    if (dest == BAD_APICID){
+        gdprintk(XENLOG_ERR, "Set iommu interrupt affinity error!\n");
+        return;
+    }
+
+    memset(&msg, 0, sizeof(msg)); 
+    msg.data = MSI_DATA_VECTOR(cfg->vector) & 0xff;
+    msg.data |= 1 << 14;
+    msg.data |= (INT_DELIVERY_MODE != dest_LowestPrio) ?
+        MSI_DATA_DELIVERY_FIXED:
+        MSI_DATA_DELIVERY_LOWPRI;
+
+    msg.address_hi =0;
+    msg.address_lo = (MSI_ADDRESS_HEADER << (MSI_ADDRESS_HEADER_SHIFT + 8)); 
+    msg.address_lo |= INT_DEST_MODE ? MSI_ADDR_DESTMODE_LOGIC:
+                    MSI_ADDR_DESTMODE_PHYS;
+    msg.address_lo |= (INT_DELIVERY_MODE != dest_LowestPrio) ?
+                    MSI_ADDR_REDIRECTION_CPU:
+                    MSI_ADDR_REDIRECTION_LOWPRI;
+    msg.address_lo |= MSI_ADDR_DEST_ID(dest & 0xff);
 
     pci_conf_write32(bus, dev, func,
-        iommu->msi_cap + PCI_MSI_DATA_64, msi_data);
-}
-
-static void amd_iommu_msi_addr_init(struct amd_iommu *iommu, int phy_cpu)
-{
-
-    int bus = (iommu->bdf >> 8) & 0xff;
-    int dev = PCI_SLOT(iommu->bdf & 0xff);
-    int func = PCI_FUNC(iommu->bdf & 0xff);
-
-    u32 address_hi = 0;
-    u32 address_lo = MSI_ADDR_HEADER |
-            MSI_ADDR_DESTMODE_PHYS |
-            MSI_ADDR_REDIRECTION_CPU |
-            MSI_ADDR_DEST_ID(phy_cpu);
-
+        iommu->msi_cap + PCI_MSI_DATA_64, msg.data);
     pci_conf_write32(bus, dev, func,
-        iommu->msi_cap + PCI_MSI_ADDRESS_LO, address_lo);
+        iommu->msi_cap + PCI_MSI_ADDRESS_LO, msg.address_lo);
     pci_conf_write32(bus, dev, func,
-        iommu->msi_cap + PCI_MSI_ADDRESS_HI, address_hi);
+        iommu->msi_cap + PCI_MSI_ADDRESS_HI, msg.address_hi);
+    
 }
 
 static void amd_iommu_msi_enable(struct amd_iommu *iommu, int flag)
@@ -373,6 +380,9 @@ static void iommu_msi_mask(unsigned int irq)
 {
     unsigned long flags;
     struct amd_iommu *iommu = irq_to_iommu[irq];
+    struct irq_desc *desc = irq_to_desc(irq);
+
+    irq_complete_move(&desc);
 
     /* FIXME: do not support mask bits at the moment */
     if ( iommu->maskbit )
@@ -395,11 +405,6 @@ static void iommu_msi_end(unsigned int irq)
     ack_APIC_irq();
 }
 
-static void iommu_msi_set_affinity(unsigned int irq, cpumask_t dest)
-{
-    struct amd_iommu *iommu = irq_to_iommu[irq];
-    amd_iommu_msi_addr_init(iommu, cpu_physical_id(first_cpu(dest)));
-}
 
 static struct hw_interrupt_type iommu_msi_type = {
     .typename = "AMD_IOV_MSI",
@@ -485,7 +490,7 @@ static int set_iommu_interrupt_handler(struct amd_iommu *iommu)
         gdprintk(XENLOG_ERR VTDPREFIX, "IOMMU: no irqs\n");
         return 0;
     }
-
+    
     irq_desc[irq].handler = &iommu_msi_type;
     irq_to_iommu[irq] = iommu;
     ret = request_irq(irq, amd_iommu_page_fault, 0,
@@ -524,8 +529,7 @@ void enable_iommu(struct amd_iommu *iommu)
     register_iommu_event_log_in_mmio_space(iommu);
     register_iommu_exclusion_range(iommu);
 
-    amd_iommu_msi_data_init (iommu);
-    amd_iommu_msi_addr_init(iommu, cpu_physical_id(first_cpu(cpu_online_map)));
+    iommu_msi_set_affinity(iommu->irq, cpu_online_map);
     amd_iommu_msi_enable(iommu, IOMMU_CONTROL_ENABLED);
 
     set_iommu_command_buffer_control(iommu, IOMMU_CONTROL_ENABLED);

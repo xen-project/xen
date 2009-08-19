@@ -287,6 +287,9 @@ static void hpet_msi_shutdown(unsigned int irq)
 
 static void hpet_msi_ack(unsigned int irq)
 {
+    struct irq_desc *desc = irq_to_desc(irq);
+
+    irq_complete_move(&desc);
     ack_APIC_irq();
 }
 
@@ -298,24 +301,19 @@ static void hpet_msi_set_affinity(unsigned int irq, cpumask_t mask)
 {
     struct msi_msg msg;
     unsigned int dest;
-    cpumask_t tmp;
-    int vector = irq_to_vector(irq);
+    struct irq_desc * desc = irq_to_desc(irq);
+    struct irq_cfg *cfg= desc->chip_data;
 
-    cpus_and(tmp, mask, cpu_online_map);
-    if ( cpus_empty(tmp) )
-        mask = TARGET_CPUS;
+    dest = set_desc_affinity(desc, mask);
+    if (dest == BAD_APICID)
+        return;
 
-    dest = cpu_mask_to_apicid(mask);
-
-    hpet_msi_read(vector, &msg);
-
+    hpet_msi_read(irq, &msg);
     msg.data &= ~MSI_DATA_VECTOR_MASK;
-    msg.data |= MSI_DATA_VECTOR(vector);
+    msg.data |= MSI_DATA_VECTOR(cfg->vector);
     msg.address_lo &= ~MSI_ADDR_DEST_ID_MASK;
     msg.address_lo |= MSI_ADDR_DEST_ID(dest);
-
-    hpet_msi_write(vector, &msg);
-    irq_desc[irq].affinity = mask;
+    hpet_msi_write(irq, &msg);
 }
 
 /*

@@ -28,6 +28,9 @@
 /* Dynamically-allocated vectors available to any driver. */
 #define FIRST_DYNAMIC_VECTOR	0x20
 #define LAST_DYNAMIC_VECTOR	0xdf
+#define NR_DYNAMIC_VECTORS	(LAST_DYNAMIC_VECTOR - FIRST_DYNAMIC_VECTOR + 1)
+
+#define IRQ_MOVE_CLEANUP_VECTOR FIRST_DYNAMIC_VECTOR
 
 #define NR_VECTORS 256
 

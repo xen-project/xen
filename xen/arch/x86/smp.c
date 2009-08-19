@@ -26,7 +26,11 @@
  * send_IPI_mask(cpumask, vector): sends @vector IPI to CPUs in @cpumask,
  * excluding the local CPU. @cpumask may be empty.
  */
-#define send_IPI_mask (genapic->send_IPI_mask)
+
+void send_IPI_mask(const cpumask_t *mask, int vector)
+{
+    genapic->send_IPI_mask(mask, vector);
+}
 
 /*
  *	Some notes on x86 processor bugs affecting SMP operation:
@@ -87,6 +91,41 @@ void apic_wait_icr_idle(void)
 
     while ( apic_read( APIC_ICR ) & APIC_ICR_BUSY )
         cpu_relax();
+}
+
+static void __default_send_IPI_shortcut(unsigned int shortcut, int vector,
+                                    unsigned int dest)
+{
+    unsigned int cfg;
+
+    /*
+     * Wait for idle.
+     */
+    apic_wait_icr_idle();
+
+    /*
+     * prepare target chip field
+     */
+    cfg = __prepare_ICR(shortcut, vector) | dest;
+    /*
+     * Send the IPI. The write to APIC_ICR fires this off.
+     */
+    apic_write_around(APIC_ICR, cfg);
+}
+
+void send_IPI_self_flat(int vector)
+{
+    __default_send_IPI_shortcut(APIC_DEST_SELF, vector, APIC_DEST_PHYSICAL);
+}
+
+void send_IPI_self_phys(int vector)
+{
+    __default_send_IPI_shortcut(APIC_DEST_SELF, vector, APIC_DEST_PHYSICAL);
+}
+
+void send_IPI_self_x2apic(int vector)
+{
+    apic_write(APIC_SELF_IPI, vector);    
 }
 
 void send_IPI_mask_flat(const cpumask_t *cpumask, int vector)
@@ -337,8 +376,10 @@ void smp_send_nmi_allbutself(void)
 
 fastcall void smp_event_check_interrupt(struct cpu_user_regs *regs)
 {
+    struct cpu_user_regs *old_regs = set_irq_regs(regs);
     ack_APIC_irq();
     perfc_incr(ipis);
+    set_irq_regs(old_regs);
 }
 
 static void __smp_call_function_interrupt(void)
@@ -369,7 +410,10 @@ static void __smp_call_function_interrupt(void)
 
 fastcall void smp_call_function_interrupt(struct cpu_user_regs *regs)
 {
+    struct cpu_user_regs *old_regs = set_irq_regs(regs);
+
     ack_APIC_irq();
     perfc_incr(ipis);
     __smp_call_function_interrupt();
+    set_irq_regs(old_regs);
 }

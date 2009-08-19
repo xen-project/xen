@@ -70,12 +70,15 @@ typedef struct irq_desc{
     struct msi_desc   *msi_desc;
     struct irqaction *action;	/* IRQ action list */
     unsigned int depth;		/* nested irq disables */
+#if defined(__i386__) || defined(__x86_64__)
+    struct irq_cfg *chip_data;
+#endif
     int irq;
     spinlock_t lock;
     cpumask_t affinity;
 } __cacheline_aligned irq_desc_t;
 
-#ifndef CONFIG_X86
+#if defined(__ia64__)
 extern irq_desc_t irq_desc[NR_VECTORS];
 
 #define setup_irq(irq, action) \
@@ -116,11 +119,13 @@ static inline void set_native_irq_info(unsigned int irq, cpumask_t mask)
 
 static inline void set_irq_info(int irq, cpumask_t mask)
 {
-#ifdef CONFIG_X86
+#if defined(__i386__) || defined(__x86_64__)
     set_native_irq_info(irq, mask);
 #else
     set_native_irq_info(irq_to_vector(irq), mask);
 #endif
 }
+
+unsigned int set_desc_affinity(struct irq_desc *desc, cpumask_t mask);
 
 #endif /* __XEN_IRQ_H__ */

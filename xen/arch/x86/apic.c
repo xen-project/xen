@@ -70,7 +70,7 @@ int modern_apic(void)
  */
 void ack_bad_irq(unsigned int irq)
 {
-    printk("unexpected IRQ trap at vector %02x\n", irq);
+    printk("unexpected IRQ trap at irq %02x\n", irq);
     /*
      * Currently unexpected vectors happen only on SMP and APIC.
      * We _must_ ack these because every local APIC has only N
@@ -1197,9 +1197,11 @@ int reprogram_timer(s_time_t timeout)
 
 fastcall void smp_apic_timer_interrupt(struct cpu_user_regs * regs)
 {
+    struct cpu_user_regs *old_regs = set_irq_regs(regs);
     ack_APIC_irq();
     perfc_incr(apic_timer);
     raise_softirq(TIMER_SOFTIRQ);
+    set_irq_regs(old_regs);
 }
 
 /*
@@ -1208,6 +1210,7 @@ fastcall void smp_apic_timer_interrupt(struct cpu_user_regs * regs)
 fastcall void smp_spurious_interrupt(struct cpu_user_regs *regs)
 {
     unsigned long v;
+    struct cpu_user_regs *old_regs = set_irq_regs(regs);
 
     irq_enter();
     /*
@@ -1223,6 +1226,7 @@ fastcall void smp_spurious_interrupt(struct cpu_user_regs *regs)
     printk(KERN_INFO "spurious APIC interrupt on CPU#%d, should never happen.\n",
            smp_processor_id());
     irq_exit();
+    set_irq_regs(old_regs);
 }
 
 /*
@@ -1232,6 +1236,7 @@ fastcall void smp_spurious_interrupt(struct cpu_user_regs *regs)
 fastcall void smp_error_interrupt(struct cpu_user_regs *regs)
 {
     unsigned long v, v1;
+    struct cpu_user_regs *old_regs = set_irq_regs(regs);
 
     irq_enter();
     /* First tickle the hardware, only then report what went on. -- REW */
@@ -1254,6 +1259,7 @@ fastcall void smp_error_interrupt(struct cpu_user_regs *regs)
     printk (KERN_DEBUG "APIC error on CPU%d: %02lx(%02lx)\n",
             smp_processor_id(), v , v1);
     irq_exit();
+    set_irq_regs(old_regs);
 }
 
 /*
@@ -1262,8 +1268,10 @@ fastcall void smp_error_interrupt(struct cpu_user_regs *regs)
 
 fastcall void smp_pmu_apic_interrupt(struct cpu_user_regs *regs)
 {
+    struct cpu_user_regs *old_regs = set_irq_regs(regs);
     ack_APIC_irq();
     hvm_do_pmu_interrupt(regs);
+    set_irq_regs(old_regs);
 }
 
 /*

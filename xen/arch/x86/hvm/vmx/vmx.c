@@ -2061,13 +2061,14 @@ static void vmx_do_extint(struct cpu_user_regs *regs)
 
     asmlinkage void do_IRQ(struct cpu_user_regs *);
     fastcall void smp_apic_timer_interrupt(struct cpu_user_regs *);
-    fastcall void smp_event_check_interrupt(void);
+    fastcall void smp_event_check_interrupt(struct cpu_user_regs *regs);
     fastcall void smp_invalidate_interrupt(void);
-    fastcall void smp_call_function_interrupt(void);
+    fastcall void smp_call_function_interrupt(struct cpu_user_regs *regs);
     fastcall void smp_spurious_interrupt(struct cpu_user_regs *regs);
     fastcall void smp_error_interrupt(struct cpu_user_regs *regs);
     fastcall void smp_pmu_apic_interrupt(struct cpu_user_regs *regs);
     fastcall void smp_cmci_interrupt(struct cpu_user_regs *regs);
+    fastcall void smp_irq_move_cleanup_interrupt(struct cpu_user_regs *regs);
 #ifdef CONFIG_X86_MCE_THERMAL
     fastcall void smp_thermal_interrupt(struct cpu_user_regs *regs);
 #endif
@@ -2080,17 +2081,20 @@ static void vmx_do_extint(struct cpu_user_regs *regs)
 
     switch ( vector )
     {
+    case IRQ_MOVE_CLEANUP_VECTOR:
+        smp_irq_move_cleanup_interrupt(regs);
+        break;
     case LOCAL_TIMER_VECTOR:
         smp_apic_timer_interrupt(regs);
         break;
     case EVENT_CHECK_VECTOR:
-        smp_event_check_interrupt();
+        smp_event_check_interrupt(regs);
         break;
     case INVALIDATE_TLB_VECTOR:
         smp_invalidate_interrupt();
         break;
     case CALL_FUNCTION_VECTOR:
-        smp_call_function_interrupt();
+        smp_call_function_interrupt(regs);
         break;
     case SPURIOUS_APIC_VECTOR:
         smp_spurious_interrupt(regs);

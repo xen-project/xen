@@ -79,7 +79,7 @@
 #include <xen/bitmap.h>
 #include <xen/kernel.h>
 
-typedef struct { DECLARE_BITMAP(bits, NR_CPUS); } cpumask_t;
+typedef struct cpumask{ DECLARE_BITMAP(bits, NR_CPUS); } cpumask_t;
 
 #define cpu_set(cpu, dst) __cpu_set((cpu), &(dst))
 static inline void __cpu_set(int cpu, volatile cpumask_t *dstp)
@@ -112,6 +112,16 @@ static inline void __cpus_clear(cpumask_t *dstp, int nbits)
 static inline int __cpu_test_and_set(int cpu, cpumask_t *addr)
 {
 	return test_and_set_bit(cpu, addr->bits);
+}
+
+/**
+ * cpumask_test_cpu - test for a cpu in a cpumask
+ */
+#define cpumask_test_cpu(cpu, cpumask) __cpu_test((cpu), &(cpumask))
+
+static inline int __cpu_test(int cpu, cpumask_t *addr)
+{
+	return test_bit(cpu, addr->bits);
 }
 
 #define cpu_test_and_clear(cpu, cpumask) __cpu_test_and_clear((cpu), &(cpumask))
@@ -193,6 +203,12 @@ static inline int __cpus_full(const cpumask_t *srcp, int nbits)
 static inline int __cpus_weight(const cpumask_t *srcp, int nbits)
 {
 	return bitmap_weight(srcp->bits, nbits);
+}
+
+#define cpus_copy(dest, src) __cpus_copy(&(dest), &(src))
+static inline void __cpus_copy(cpumask_t *dstp, cpumask_t *srcp)
+{
+	bitmap_copy(dstp->bits, srcp->bits, NR_CPUS);
 }
 
 #define cpus_shift_right(dst, src, n) \

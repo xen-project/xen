@@ -794,6 +794,9 @@ static void dma_msi_mask(unsigned int irq)
 {
     unsigned long flags;
     struct iommu *iommu = irq_to_iommu[irq];
+    struct irq_desc *desc = irq_to_desc(irq);
+
+    irq_complete_move(&desc);
 
     /* mask it */
     spin_lock_irqsave(&iommu->register_lock, flags);
@@ -813,42 +816,45 @@ static void dma_msi_end(unsigned int irq)
     ack_APIC_irq();
 }
 
-static void dma_msi_data_init(struct iommu *iommu, int irq)
+static void dma_msi_set_affinity(unsigned int irq, cpumask_t mask)
 {
-    u32 msi_data = 0;
-    unsigned long flags;
-    int vector = irq_to_vector(irq);
-
-    /* Fixed, edge, assert mode. Follow MSI setting */
-    msi_data |= vector & 0xff;
-    msi_data |= 1 << 14;
-
-    spin_lock_irqsave(&iommu->register_lock, flags);
-    dmar_writel(iommu->reg, DMAR_FEDATA_REG, msi_data);
-    spin_unlock_irqrestore(&iommu->register_lock, flags);
-}
-
-static void dma_msi_addr_init(struct iommu *iommu, int phy_cpu)
-{
-    u64 msi_address;
+    struct msi_msg msg;
+    unsigned int dest;
     unsigned long flags;
 
-    /* Physical, dedicated cpu. Follow MSI setting */
-    msi_address = (MSI_ADDRESS_HEADER << (MSI_ADDRESS_HEADER_SHIFT + 8));
-    msi_address |= MSI_PHYSICAL_MODE << 2;
-    msi_address |= MSI_REDIRECTION_HINT_MODE << 3;
-    msi_address |= phy_cpu << MSI_TARGET_CPU_SHIFT;
-
-    spin_lock_irqsave(&iommu->register_lock, flags);
-    dmar_writel(iommu->reg, DMAR_FEADDR_REG, (u32)msi_address);
-    dmar_writel(iommu->reg, DMAR_FEUADDR_REG, (u32)(msi_address >> 32));
-    spin_unlock_irqrestore(&iommu->register_lock, flags);
-}
-
-static void dma_msi_set_affinity(unsigned int irq, cpumask_t dest)
-{
     struct iommu *iommu = irq_to_iommu[irq];
-    dma_msi_addr_init(iommu, cpu_physical_id(first_cpu(dest)));
+    struct irq_desc *desc = irq_to_desc(irq);
+    struct irq_cfg *cfg = desc->chip_data;
+
+    spin_lock_irqsave(&iommu->register_lock, flags);
+    dest = set_desc_affinity(desc, mask);
+    if (dest == BAD_APICID){
+        gdprintk(XENLOG_ERR VTDPREFIX, "Set iommu interrupt affinity error!\n");
+        return;
+    }
+    
+    memset(&msg, 0, sizeof(msg)); 
+    msg.data = MSI_DATA_VECTOR(cfg->vector) & 0xff;
+    msg.data |= 1 << 14;
+    msg.data |= (INT_DELIVERY_MODE != dest_LowestPrio) ?
+        MSI_DATA_DELIVERY_FIXED:
+        MSI_DATA_DELIVERY_LOWPRI;
+
+    /* Follow MSI setting */
+    if (x2apic_enabled)
+        msg.address_hi = dest & 0xFFFFFF00;
+    msg.address_lo = (MSI_ADDRESS_HEADER << (MSI_ADDRESS_HEADER_SHIFT + 8)); 
+    msg.address_lo |= INT_DEST_MODE ? MSI_ADDR_DESTMODE_LOGIC:
+                    MSI_ADDR_DESTMODE_PHYS;
+    msg.address_lo |= (INT_DELIVERY_MODE != dest_LowestPrio) ?
+                    MSI_ADDR_REDIRECTION_CPU:
+                    MSI_ADDR_REDIRECTION_LOWPRI;
+    msg.address_lo |= MSI_ADDR_DEST_ID(dest & 0xff);
+
+    dmar_writel(iommu->reg, DMAR_FEDATA_REG, msg.data);
+    dmar_writel(iommu->reg, DMAR_FEADDR_REG, msg.address_lo);
+    dmar_writel(iommu->reg, DMAR_FEUADDR_REG, msg.address_hi);
+    spin_unlock_irqrestore(&iommu->register_lock, flags);
 }
 
 static struct hw_interrupt_type dma_msi_type = {
@@ -1584,6 +1590,7 @@ static int init_vtd_hw(void)
     int irq = -1;
     int ret;
     unsigned long flags;
+    struct irq_cfg *cfg;
 
     for_each_drhd_unit ( drhd )
     {
@@ -1598,8 +1605,10 @@ static int init_vtd_hw(void)
             }
             iommu->irq = irq;
         }
-        dma_msi_data_init(iommu, iommu->irq);
-        dma_msi_addr_init(iommu, cpu_physical_id(first_cpu(cpu_online_map)));
+
+        cfg = irq_cfg(irq);
+        dma_msi_set_affinity(irq, cfg->domain);
+
         clear_fault_bits(iommu);
 
         spin_lock_irqsave(&iommu->register_lock, flags);

@@ -107,7 +107,7 @@
 #define		APIC_TDCR	0x3E0
 
 /* Only available in x2APIC mode */
-#define		APIC_SELF_IPI	0x400
+#define		APIC_SELF_IPI	0x3F0
 
 #define			APIC_TDR_DIV_TMBASE	(1<<2)
 #define			APIC_TDR_DIV_1		0xB

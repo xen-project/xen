@@ -47,8 +47,12 @@ void clustered_apic_check_x2apic(void)
 
 cpumask_t target_cpus_x2apic(void)
 {
-    /* Deliver interrupts only to CPU0 for now */
-    return cpumask_of_cpu(0);
+    return cpu_online_map;
+}
+
+cpumask_t vector_allocation_domain_x2apic(int cpu)
+{
+	return cpumask_of_cpu(cpu);
 }
 
 unsigned int cpu_mask_to_apicid_x2apic(cpumask_t cpumask)

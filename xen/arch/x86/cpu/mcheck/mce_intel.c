@@ -84,9 +84,11 @@ static void (*vendor_thermal_interrupt)(struct cpu_user_regs *regs)
 
 fastcall void smp_thermal_interrupt(struct cpu_user_regs *regs)
 {
+    struct cpu_user_regs *old_regs = set_irq_regs(regs);
     irq_enter();
     vendor_thermal_interrupt(regs);
     irq_exit();
+    set_irq_regs(old_regs);
 }
 
 /* P4/Xeon Thermal regulation detect and init */
@@ -964,6 +966,7 @@ fastcall void smp_cmci_interrupt(struct cpu_user_regs *regs)
 {
     mctelem_cookie_t mctc;
     struct mca_summary bs;
+    struct cpu_user_regs *old_regs = set_irq_regs(regs);
 
     ack_APIC_irq();
     irq_enter();
@@ -984,6 +987,7 @@ fastcall void smp_cmci_interrupt(struct cpu_user_regs *regs)
         mctelem_dismiss(mctc);
 
     irq_exit();
+    set_irq_regs(old_regs);
 }
 
 void mce_intel_feature_init(struct cpuinfo_x86 *c)

@@ -120,13 +120,19 @@ void msi_compose_msg(struct pci_dev *pdev, int irq,
                             struct msi_msg *msg)
 {
     unsigned dest;
-    cpumask_t tmp;
-    int vector = irq_to_vector(irq);
+    cpumask_t domain;
+    struct irq_cfg *cfg = irq_cfg(irq);
+    int vector = cfg->vector;
+    domain = cfg->domain;
 
-    tmp = TARGET_CPUS;
-    if ( vector )
-    {
-        dest = cpu_mask_to_apicid(tmp);
+    if ( cpus_empty( domain ) ) {
+        dprintk(XENLOG_ERR,"%s, compose msi message error!!\n", __func__);
+	    return;
+    }
+
+    if ( vector ) {
+
+        dest = cpu_mask_to_apicid(domain);
 
         msg->address_hi = MSI_ADDR_BASE_HI;
         msg->address_lo =
@@ -274,11 +280,23 @@ static void write_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
 
 void set_msi_affinity(unsigned int irq, cpumask_t mask)
 {
-    struct msi_desc *desc = irq_desc[irq].msi_desc;
     struct msi_msg msg;
     unsigned int dest;
+    struct irq_desc *desc = irq_to_desc(irq);
+    struct msi_desc *msi_desc = desc->msi_desc;
+    struct irq_cfg *cfg = desc->chip_data;
+
+    dest = set_desc_affinity(desc, mask);
+    if (dest == BAD_APICID || !msi_desc)
+        return;
+
+    ASSERT(spin_is_locked(&desc->lock));
 
     memset(&msg, 0, sizeof(msg));
+    read_msi_msg(msi_desc, &msg);
+
+    msg.data &= ~MSI_DATA_VECTOR_MASK;
+    msg.data |= MSI_DATA_VECTOR(cfg->vector);
     cpus_and(mask, mask, cpu_online_map);
     if ( cpus_empty(mask) )
         mask = TARGET_CPUS;
@@ -287,13 +305,16 @@ void set_msi_affinity(unsigned int irq, cpumask_t mask)
     if ( !desc )
         return;
 
-    ASSERT(spin_is_locked(&irq_desc[irq].lock));
-    read_msi_msg(desc, &msg);
+    ASSERT(spin_is_locked(&desc->lock));
+    read_msi_msg(msi_desc, &msg);
+
+    msg.data &= ~MSI_DATA_VECTOR_MASK;
+    msg.data |= MSI_DATA_VECTOR(cfg->vector);
 
     msg.address_lo &= ~MSI_ADDR_DEST_ID_MASK;
     msg.address_lo |= MSI_ADDR_DEST_ID(dest);
 
-    write_msi_msg(desc, &msg);
+    write_msi_msg(msi_desc, &msg);
 }
 
 static void msi_set_enable(struct pci_dev *dev, int enable)

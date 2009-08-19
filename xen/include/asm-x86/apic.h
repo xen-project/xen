@@ -15,6 +15,12 @@
 #define APIC_VERBOSE 1
 #define APIC_DEBUG   2
 
+#define	SET_APIC_LOGICAL_ID(x)	(((x)<<24))
+
+#define IO_APIC_REDIR_VECTOR_MASK	0x000FF
+#define IO_APIC_REDIR_DEST_LOGICAL	0x00800
+#define IO_APIC_REDIR_DEST_PHYSICAL	0x00000
+
 extern int apic_verbosity;
 extern int x2apic_enabled;
 

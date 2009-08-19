@@ -14,6 +14,7 @@
 #define init_apic_ldr (genapic->init_apic_ldr)
 #define clustered_apic_check (genapic->clustered_apic_check) 
 #define cpu_mask_to_apicid (genapic->cpu_mask_to_apicid)
+#define vector_allocation_domain(cpu) (genapic->vector_allocation_domain(cpu))
 
 static inline void enable_apic_mode(void)
 {

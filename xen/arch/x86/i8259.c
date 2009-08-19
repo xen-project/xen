@@ -58,6 +58,7 @@ BUILD_16_IRQS(0xc) BUILD_16_IRQS(0xd) BUILD_16_IRQS(0xe) BUILD_16_IRQS(0xf)
  * is no hardware IRQ pin equivalent for them, they are triggered
  * through the ICC by us (IPIs)
  */
+BUILD_SMP_INTERRUPT(irq_move_cleanup_interrupt,IRQ_MOVE_CLEANUP_VECTOR)
 BUILD_SMP_INTERRUPT(event_check_interrupt,EVENT_CHECK_VECTOR)
 BUILD_SMP_INTERRUPT(invalidate_interrupt,INVALIDATE_TLB_VECTOR)
 BUILD_SMP_INTERRUPT(call_function_interrupt,CALL_FUNCTION_VECTOR)
@@ -374,7 +375,7 @@ static struct irqaction cascade = { no_action, "cascade", NULL};
 
 void __init init_IRQ(void)
 {
-    int i, vector;
+    int vector, irq, cpu = smp_processor_id();
 
     init_bsp_APIC();
 
@@ -389,15 +390,17 @@ void __init init_IRQ(void)
         set_intr_gate(vector, interrupt[vector]);
     }
 
-    for ( i = 0; i < 16; i++ )
-    {
-        vector_irq[LEGACY_VECTOR(i)] = i;
-        irq_desc[i].handler = &i8259A_irq_type;
+    for (irq = 0; irq < 16; irq++) {
+        struct irq_desc *desc = irq_to_desc(irq);
+        struct irq_cfg *cfg = desc->chip_data;
+        
+        desc->handler = &i8259A_irq_type;
+        per_cpu(vector_irq, cpu)[FIRST_LEGACY_VECTOR + irq] = irq;
+        cfg->domain = cpumask_of_cpu(cpu);
+        cfg->vector = FIRST_LEGACY_VECTOR + irq;
     }
-
-    /* Never allocate the hypercall vector or Linux/BSD fast-trap vector. */
-    vector_irq[HYPERCALL_VECTOR] = NEVER_ASSIGN_IRQ;
-    vector_irq[0x80] = NEVER_ASSIGN_IRQ;
+    
+    per_cpu(vector_irq, cpu)[FIRST_HIPRIORITY_VECTOR] = 0;
 
     apic_intr_init();
 
