@@ -58,7 +58,6 @@ struct vmx_msr_state {
 
 struct vmx_domain {
     unsigned long apic_access_mfn;
-    unsigned long vpid_base;
     union {
         struct {
             u64 etmt :3,

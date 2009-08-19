@@ -732,11 +732,7 @@ static int construct_vmcs(struct vcpu *v)
     }
 
     if ( cpu_has_vmx_vpid )
-    {
-        v->arch.hvm_vmx.vpid =
-            v->domain->arch.hvm_domain.vmx.vpid_base + v->vcpu_id;
         __vmwrite(VIRTUAL_PROCESSOR_ID, v->arch.hvm_vmx.vpid);
-    }
 
     if ( cpu_has_vmx_pat && paging_mode_hap(d) )
     {

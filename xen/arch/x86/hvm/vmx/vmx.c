@@ -59,8 +59,8 @@ static void vmx_ctxt_switch_to(struct vcpu *v);
 
 static int  vmx_alloc_vlapic_mapping(struct domain *d);
 static void vmx_free_vlapic_mapping(struct domain *d);
-static int  vmx_alloc_vpid(struct domain *d);
-static void vmx_free_vpid(struct domain *d);
+static int  vmx_alloc_vpid(struct vcpu *v);
+static void vmx_free_vpid(struct vcpu *v);
 static void vmx_install_vlapic_mapping(struct vcpu *v);
 static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr);
 static void vmx_update_guest_efer(struct vcpu *v);
@@ -82,14 +82,9 @@ static int vmx_domain_initialise(struct domain *d)
     d->arch.hvm_domain.vmx.ept_control.asr  =
         pagetable_get_pfn(d->arch.phys_table);
 
-    if ( (rc = vmx_alloc_vpid(d)) != 0 )
-        return rc;
 
     if ( (rc = vmx_alloc_vlapic_mapping(d)) != 0 )
-    {
-        vmx_free_vpid(d);
         return rc;
-    }
 
     return 0;
 }
@@ -98,7 +93,6 @@ static void vmx_domain_destroy(struct domain *d)
 {
     ept_sync_domain(d);
     vmx_free_vlapic_mapping(d);
-    vmx_free_vpid(d);
 }
 
 static int vmx_vcpu_initialise(struct vcpu *v)
@@ -106,6 +100,9 @@ static int vmx_vcpu_initialise(struct vcpu *v)
     int rc;
 
     spin_lock_init(&v->arch.hvm_vmx.vmcs_lock);
+
+    if ( (rc = vmx_alloc_vpid(v)) != 0 )
+        return rc;
 
     v->arch.schedule_tail    = vmx_do_resume;
     v->arch.ctxt_switch_from = vmx_ctxt_switch_from;
@@ -116,6 +113,7 @@ static int vmx_vcpu_initialise(struct vcpu *v)
         dprintk(XENLOG_WARNING,
                 "Failed to create VMCS for vcpu %d: err=%d.\n",
                 v->vcpu_id, rc);
+        vmx_free_vpid(v);
         return rc;
     }
 
@@ -135,6 +133,7 @@ static void vmx_vcpu_destroy(struct vcpu *v)
     vmx_destroy_vmcs(v);
     vpmu_destroy(v);
     passive_domain_destroy(v);
+    vmx_free_vpid(v);
 }
 
 #ifdef __x86_64__
@@ -1396,7 +1395,7 @@ static struct hvm_function_table vmx_function_table = {
 };
 
 static unsigned long *vpid_bitmap;
-#define VPID_BITMAP_SIZE ((1u << VMCS_VPID_WIDTH) / XEN_LEGACY_MAX_VCPUS)
+#define VPID_BITMAP_SIZE (1u << VMCS_VPID_WIDTH)
 
 void start_vmx(void)
 {
@@ -1902,7 +1901,7 @@ static void vmx_free_vlapic_mapping(struct domain *d)
         free_xenheap_page(mfn_to_virt(mfn));
 }
 
-static int vmx_alloc_vpid(struct domain *d)
+static int vmx_alloc_vpid(struct vcpu *v)
 {
     int idx;
 
@@ -1919,17 +1918,17 @@ static int vmx_alloc_vpid(struct domain *d)
     }
     while ( test_and_set_bit(idx, vpid_bitmap) );
 
-    d->arch.hvm_domain.vmx.vpid_base = idx * XEN_LEGACY_MAX_VCPUS;
+    v->arch.hvm_vmx.vpid = idx;
     return 0;
 }
 
-static void vmx_free_vpid(struct domain *d)
+static void vmx_free_vpid(struct vcpu *v)
 {
     if ( !cpu_has_vmx_vpid )
         return;
 
-    clear_bit(d->arch.hvm_domain.vmx.vpid_base / XEN_LEGACY_MAX_VCPUS,
-              vpid_bitmap);
+    if ( v->arch.hvm_vmx.vpid )
+        clear_bit(v->arch.hvm_vmx.vpid, vpid_bitmap);
 }
 
 static void vmx_install_vlapic_mapping(struct vcpu *v)
