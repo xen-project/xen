@@ -3148,7 +3148,7 @@ def xm_tmem_shared_auth(args):
         (options, params) = getopt.gnu_getopt(args, 'au:A:', ['all','uuid=','auth='])
     except getopt.GetoptError, opterr:
         err(opterr)
-	usage('tmem-shared-auth')
+        usage('tmem-shared-auth')
 
     all = False
     for (k, v) in options:

@@ -252,20 +252,20 @@ def parse_pci_pfunc_vfunc(func_str):
     if p < 0 or p > 7:
         raise PciDeviceParseError('Invalid physical function in: ' + func_str)
     if l == 1:
-	# This defaults to linear mapping of physical to virtual functions
+        # This defaults to linear mapping of physical to virtual functions
         return (p, p, AUTO_PHP_FUNC)
     else:
-	v = int(list[1], 16)
+        v = int(list[1], 16)
         if v < 0 or v > 7:
             raise PciDeviceParseError('Invalid virtual function in: ' +
-	                              func_str)
+                                      func_str)
         return (p, v, MANUAL_PHP_FUNC)
 
 def pci_func_range(start, end):
     if end < start:
         x = pci_func_range(end, start)
-	x.reverse()
-	return x
+        x.reverse()
+        return x
     return range(start, end + 1)
 
 def pci_pfunc_vfunc_range(orig, a, b):
@@ -338,12 +338,12 @@ def parse_pci_name_extended(pci_dev_str):
     if not filter(lambda x: x[1] == 0, func_list):
         auto   = filter(lambda x: x[2] == AUTO_PHP_FUNC, func_list)
         manual = filter(lambda x: x[2] == MANUAL_PHP_FUNC, func_list)
-	if not auto:
+        if not auto:
             raise PciDeviceParseError('Virtual device does not include '
-				      'virtual function 0: ' + pci_dev_str)
-	auto.sort(lambda x,y: cmp(x[1], y[1]))
-	auto[0] = (auto[0][0], 0, AUTO_PHP_FUNC)
-	func_list = auto + manual
+                                      'virtual function 0: ' + pci_dev_str)
+        auto.sort(lambda x,y: cmp(x[1], y[1]))
+        auto[0] = (auto[0][0], 0, AUTO_PHP_FUNC)
+        func_list = auto + manual
 
     # For pci attachment and detachment is it important that virtual
     # function 0 is done last. This is because is virtual function 0 that
