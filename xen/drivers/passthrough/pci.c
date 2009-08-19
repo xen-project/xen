@@ -216,7 +216,7 @@ static void pci_clean_dpci_irqs(struct domain *d)
               i = find_next_bit(hvm_irq_dpci->mapping, d->nr_pirqs, i + 1) )
         {
             pirq_guest_unbind(d, i);
-            kill_timer(&hvm_irq_dpci->hvm_timer[domain_irq_to_vector(d, i)]);
+            kill_timer(&hvm_irq_dpci->hvm_timer[domain_pirq_to_irq(d, i)]);
 
             list_for_each_safe ( digl_list, tmp,
                                  &hvm_irq_dpci->mirq[i].digl_list )
@@ -408,7 +408,7 @@ static void dump_pci_devices(unsigned char ch)
                pdev->bus, PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn),
                pdev->domain ? pdev->domain->domain_id : -1);
         list_for_each_entry ( msi, &pdev->msi_list, list )
-               printk("%d ", msi->vector);
+               printk("%d ", msi->irq);
         printk(">\n");
     }
 

@@ -262,9 +262,9 @@ struct arch_domain
     /* Shadow translated domain: P2M mapping */
     pagetable_t phys_table;
 
-    /* NB. protected by d->event_lock and by irq_desc[vector].lock */
-    int vector_pirq[NR_VECTORS];
-    s16 *pirq_vector;
+    /* NB. protected by d->event_lock and by irq_desc[irq].lock */
+    int *irq_pirq;
+    int *pirq_irq;
 
     /* Shared page for notifying that explicit PIRQ EOI is required. */
     unsigned long *pirq_eoi_map;

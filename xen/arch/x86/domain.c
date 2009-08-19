@@ -474,11 +474,17 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
         share_xen_page_with_guest(
             virt_to_page(d->shared_info), d, XENSHARE_writable);
 
-        d->arch.pirq_vector = xmalloc_array(s16, d->nr_pirqs);
-        if ( !d->arch.pirq_vector )
+        d->arch.pirq_irq = xmalloc_array(int, d->nr_pirqs);
+        if ( !d->arch.pirq_irq )
             goto fail;
-        memset(d->arch.pirq_vector, 0,
-               d->nr_pirqs * sizeof(*d->arch.pirq_vector));
+        memset(d->arch.pirq_irq, 0,
+               d->nr_pirqs * sizeof(*d->arch.pirq_irq));
+
+        d->arch.irq_pirq = xmalloc_array(int, nr_irqs);
+        if ( !d->arch.irq_pirq )
+            goto fail;
+        memset(d->arch.irq_pirq, 0,
+               nr_irqs * sizeof(*d->arch.irq_pirq));
 
         if ( (rc = iommu_domain_init(d)) != 0 )
             goto fail;
@@ -513,7 +519,8 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
 
  fail:
     d->is_dying = DOMDYING_dead;
-    xfree(d->arch.pirq_vector);
+    xfree(d->arch.pirq_irq);
+    xfree(d->arch.irq_pirq);
     free_xenheap_page(d->shared_info);
     if ( paging_initialised )
         paging_final_teardown(d);
@@ -562,7 +569,8 @@ void arch_domain_destroy(struct domain *d)
 #endif
 
     free_xenheap_page(d->shared_info);
-    xfree(d->arch.pirq_vector);
+    xfree(d->arch.pirq_irq);
+    xfree(d->arch.irq_pirq);
 }
 
 unsigned long pv_guest_cr4_fixup(unsigned long guest_cr4)

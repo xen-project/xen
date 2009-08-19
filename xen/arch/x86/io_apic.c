@@ -661,9 +661,6 @@ static inline int IO_APIC_irq_trigger(int irq)
     return 0;
 }
 
-/* irq_vectors is indexed by the sum of all RTEs in all I/O APICs. */
-u8 *irq_vector __read_mostly = (u8 *)(1UL << (BITS_PER_LONG - 1));
-
 static struct hw_interrupt_type ioapic_level_type;
 static struct hw_interrupt_type ioapic_edge_type;
 
@@ -671,13 +668,13 @@ static struct hw_interrupt_type ioapic_edge_type;
 #define IOAPIC_EDGE	0
 #define IOAPIC_LEVEL	1
 
-static inline void ioapic_register_intr(int irq, int vector, unsigned long trigger)
+static inline void ioapic_register_intr(int irq, unsigned long trigger)
 {
     if ((trigger == IOAPIC_AUTO && IO_APIC_irq_trigger(irq)) ||
         trigger == IOAPIC_LEVEL)
-        irq_desc[vector].handler = &ioapic_level_type;
+        irq_desc[irq].handler = &ioapic_level_type;
     else
-        irq_desc[vector].handler = &ioapic_edge_type;
+        irq_desc[irq].handler = &ioapic_edge_type;
 }
 
 static void __init setup_IO_APIC_irqs(void)
@@ -740,7 +737,7 @@ static void __init setup_IO_APIC_irqs(void)
             if (IO_APIC_IRQ(irq)) {
                 vector = assign_irq_vector(irq);
                 entry.vector = vector;
-                ioapic_register_intr(irq, vector, IOAPIC_AUTO);
+                ioapic_register_intr(irq, IOAPIC_AUTO);
 
                 if (!apic && (irq < 16))
                     disable_8259A_irq(irq);
@@ -748,7 +745,7 @@ static void __init setup_IO_APIC_irqs(void)
             spin_lock_irqsave(&ioapic_lock, flags);
             io_apic_write(apic, 0x11+2*pin, *(((int *)&entry)+1));
             io_apic_write(apic, 0x10+2*pin, *(((int *)&entry)+0));
-            set_native_irq_info(entry.vector, TARGET_CPUS);
+            set_native_irq_info(irq, TARGET_CPUS);
             spin_unlock_irqrestore(&ioapic_lock, flags);
 	}
     }
@@ -788,7 +785,7 @@ static void __init setup_ExtINT_IRQ0_pin(unsigned int apic, unsigned int pin, in
      * The timer IRQ doesn't have to know that behind the
      * scene we have a 8259A-master in AEOI mode ...
      */
-    irq_desc[IO_APIC_VECTOR(0)].handler = &ioapic_edge_type;
+    irq_desc[0].handler = &ioapic_edge_type;
 
     /*
      * Add it to the IO-APIC irq-routing table:
@@ -1269,7 +1266,7 @@ static unsigned int startup_edge_ioapic_irq(unsigned int irq)
  */
 static void ack_edge_ioapic_irq(unsigned int irq)
 {
-    if ((irq_desc[IO_APIC_VECTOR(irq)].status & (IRQ_PENDING | IRQ_DISABLED))
+    if ((irq_desc[irq].status & (IRQ_PENDING | IRQ_DISABLED))
         == (IRQ_PENDING | IRQ_DISABLED))
         mask_IO_APIC_irq(irq);
     ack_APIC_irq();
@@ -1359,7 +1356,7 @@ static void end_level_ioapic_irq (unsigned int irq)
 
     if ( !ioapic_ack_new )
     {
-        if ( !(irq_desc[IO_APIC_VECTOR(irq)].status & IRQ_DISABLED) )
+        if ( !(irq_desc[irq].status & IRQ_DISABLED) )
             unmask_IO_APIC_irq(irq);
         return;
     }
@@ -1395,70 +1392,19 @@ static void end_level_ioapic_irq (unsigned int irq)
         __mask_IO_APIC_irq(irq);
         __edge_IO_APIC_irq(irq);
         __level_IO_APIC_irq(irq);
-        if ( !(irq_desc[IO_APIC_VECTOR(irq)].status & IRQ_DISABLED) )
+        if ( !(irq_desc[irq].status & IRQ_DISABLED) )
             __unmask_IO_APIC_irq(irq);
         spin_unlock(&ioapic_lock);
     }
 }
 
-static unsigned int startup_edge_ioapic_vector(unsigned int vector)
-{
-    int irq = vector_to_irq(vector);
-    return startup_edge_ioapic_irq(irq);
-}
-
-static void ack_edge_ioapic_vector(unsigned int vector)
-{
-    int irq = vector_to_irq(vector);
-    ack_edge_ioapic_irq(irq);
-}
-
-static unsigned int startup_level_ioapic_vector(unsigned int vector)
-{
-    int irq = vector_to_irq(vector);
-    return startup_level_ioapic_irq (irq);
-}
-
-static void mask_and_ack_level_ioapic_vector(unsigned int vector)
-{
-    int irq = vector_to_irq(vector);
-    mask_and_ack_level_ioapic_irq(irq);
-}
-
-static void end_level_ioapic_vector(unsigned int vector)
-{
-    int irq = vector_to_irq(vector);
-    end_level_ioapic_irq(irq);
-}
-
-static void mask_IO_APIC_vector(unsigned int vector)
-{
-    int irq = vector_to_irq(vector);
-    mask_IO_APIC_irq(irq);
-}
-
-static void unmask_IO_APIC_vector(unsigned int vector)
-{
-    int irq = vector_to_irq(vector);
-    unmask_IO_APIC_irq(irq);
-}
-
-static void set_ioapic_affinity_vector(
-    unsigned int vector, cpumask_t cpu_mask)
-{
-    int irq = vector_to_irq(vector);
-
-    set_native_irq_info(vector, cpu_mask);
-    set_ioapic_affinity_irq(irq, cpu_mask);
-}
-
-static void disable_edge_ioapic_vector(unsigned int vector)
+static void disable_edge_ioapic_irq(unsigned int irq)
 {
 }
 
-static void end_edge_ioapic_vector(unsigned int vector)
-{
-}
+static void end_edge_ioapic_irq(unsigned int irq)
+ {
+ }
 
 /*
  * Level and edge triggered IO-APIC interrupts need different handling,
@@ -1470,53 +1416,54 @@ static void end_edge_ioapic_vector(unsigned int vector)
  */
 static struct hw_interrupt_type ioapic_edge_type = {
     .typename 	= "IO-APIC-edge",
-    .startup 	= startup_edge_ioapic_vector,
-    .shutdown 	= disable_edge_ioapic_vector,
-    .enable 	= unmask_IO_APIC_vector,
-    .disable 	= disable_edge_ioapic_vector,
-    .ack 		= ack_edge_ioapic_vector,
-    .end 		= end_edge_ioapic_vector,
-    .set_affinity 	= set_ioapic_affinity_vector,
+    .startup 	= startup_edge_ioapic_irq,
+    .shutdown 	= disable_edge_ioapic_irq,
+    .enable 	= unmask_IO_APIC_irq,
+    .disable 	= disable_edge_ioapic_irq,
+    .ack 		= ack_edge_ioapic_irq,
+    .end 		= end_edge_ioapic_irq,
+    .set_affinity 	= set_ioapic_affinity_irq,
 };
 
 static struct hw_interrupt_type ioapic_level_type = {
     .typename 	= "IO-APIC-level",
-    .startup 	= startup_level_ioapic_vector,
-    .shutdown 	= mask_IO_APIC_vector,
-    .enable 	= unmask_IO_APIC_vector,
-    .disable 	= mask_IO_APIC_vector,
-    .ack 		= mask_and_ack_level_ioapic_vector,
-    .end 		= end_level_ioapic_vector,
-    .set_affinity 	= set_ioapic_affinity_vector,
+    .startup 	= startup_level_ioapic_irq,
+    .shutdown 	= mask_IO_APIC_irq,
+    .enable 	= unmask_IO_APIC_irq,
+    .disable 	= mask_IO_APIC_irq,
+    .ack 		= mask_and_ack_level_ioapic_irq,
+    .end 		= end_level_ioapic_irq,
+    .set_affinity 	= set_ioapic_affinity_irq,
 };
 
-static unsigned int startup_msi_vector(unsigned int vector)
+static unsigned int startup_msi_irq(unsigned int irq)
 {
-    unmask_msi_vector(vector);
+    unmask_msi_irq(irq);
     return 0;
 }
 
-static void ack_msi_vector(unsigned int vector)
+static void ack_msi_irq(unsigned int irq)
 {
-    if ( msi_maskable_irq(irq_desc[vector].msi_desc) )
+    struct irq_desc *desc = irq_to_desc(irq);
+
+    if ( msi_maskable_irq(desc->msi_desc) )
         ack_APIC_irq(); /* ACKTYPE_NONE */
 }
 
-static void end_msi_vector(unsigned int vector)
+static void end_msi_irq(unsigned int irq)
 {
-    if ( !msi_maskable_irq(irq_desc[vector].msi_desc) )
+    if ( !msi_maskable_irq(irq_desc[irq].msi_desc) )
         ack_APIC_irq(); /* ACKTYPE_EOI */
 }
 
-static void shutdown_msi_vector(unsigned int vector)
+static void shutdown_msi_irq(unsigned int irq)
 {
-    mask_msi_vector(vector);
+    mask_msi_irq(irq);
 }
 
-static void set_msi_affinity_vector(unsigned int vector, cpumask_t cpu_mask)
+static void set_msi_affinity_irq(unsigned int irq, cpumask_t cpu_mask)
 {
-    set_native_irq_info(vector, cpu_mask);
-    set_msi_affinity(vector, cpu_mask);
+    set_msi_affinity(irq, cpu_mask);
 }
 
 /*
@@ -1525,13 +1472,13 @@ static void set_msi_affinity_vector(unsigned int vector, cpumask_t cpu_mask)
  */
 struct hw_interrupt_type pci_msi_type = {
     .typename   = "PCI-MSI",
-    .startup    = startup_msi_vector,
-    .shutdown   = shutdown_msi_vector,
-    .enable	    = unmask_msi_vector,
-    .disable    = mask_msi_vector,
-    .ack        = ack_msi_vector,
-    .end        = end_msi_vector,
-    .set_affinity   = set_msi_affinity_vector,
+    .startup    = startup_msi_irq,
+    .shutdown   = shutdown_msi_irq,
+    .enable	    = unmask_msi_irq,
+    .disable    = mask_msi_irq,
+    .ack        = ack_msi_irq,
+    .end        = end_msi_irq,
+    .set_affinity   = set_msi_affinity_irq,
 };
 
 static inline void init_IO_APIC_traps(void)
@@ -1543,7 +1490,7 @@ static inline void init_IO_APIC_traps(void)
             make_8259A_irq(irq);
 }
 
-static void enable_lapic_vector(unsigned int vector)
+static void enable_lapic_irq(unsigned int irq)
 {
     unsigned long v;
 
@@ -1551,7 +1498,7 @@ static void enable_lapic_vector(unsigned int vector)
     apic_write_around(APIC_LVT0, v & ~APIC_LVT_MASKED);
 }
 
-static void disable_lapic_vector(unsigned int vector)
+static void disable_lapic_irq(unsigned int irq)
 {
     unsigned long v;
 
@@ -1559,21 +1506,21 @@ static void disable_lapic_vector(unsigned int vector)
     apic_write_around(APIC_LVT0, v | APIC_LVT_MASKED);
 }
 
-static void ack_lapic_vector(unsigned int vector)
+static void ack_lapic_irq(unsigned int irq)
 {
     ack_APIC_irq();
 }
 
-static void end_lapic_vector(unsigned int vector) { /* nothing */ }
+static void end_lapic_irq(unsigned int irq) { /* nothing */ }
 
 static struct hw_interrupt_type lapic_irq_type = {
     .typename 	= "local-APIC-edge",
     .startup 	= NULL, /* startup_irq() not used for IRQ0 */
     .shutdown 	= NULL, /* shutdown_irq() not used for IRQ0 */
-    .enable 	= enable_lapic_vector,
-    .disable 	= disable_lapic_vector,
-    .ack 		= ack_lapic_vector,
-    .end 		= end_lapic_vector
+    .enable 	= enable_lapic_irq,
+    .disable 	= disable_lapic_irq,
+    .ack 		= ack_lapic_irq,
+    .end 		= end_lapic_irq,
 };
 
 /*
@@ -1661,9 +1608,9 @@ static inline void check_timer(void)
     disable_8259A_irq(0);
     vector = assign_irq_vector(0);
 
-    irq_desc[IO_APIC_VECTOR(0)].action = irq_desc[LEGACY_VECTOR(0)].action;
-    irq_desc[IO_APIC_VECTOR(0)].depth  = 0;
-    irq_desc[IO_APIC_VECTOR(0)].status &= ~IRQ_DISABLED;
+    irq_desc[0].depth  = 0;
+    irq_desc[0].status &= ~IRQ_DISABLED;
+    irq_desc[0].handler = &ioapic_edge_type;
 
     /*
      * Subtle, code in do_timer_interrupt() expects an AEOI
@@ -1736,7 +1683,7 @@ static inline void check_timer(void)
     printk(KERN_INFO "...trying to set up timer as Virtual Wire IRQ...");
 
     disable_8259A_irq(0);
-    irq_desc[vector].handler = &lapic_irq_type;
+    irq_desc[0].handler = &lapic_irq_type;
     apic_write_around(APIC_LVT0, APIC_DM_FIXED | vector);	/* Fixed mode */
     enable_8259A_irq(0);
 
@@ -2002,7 +1949,7 @@ int io_apic_set_pci_routing (int ioapic, int pin, int irq, int edge_level, int a
 		mp_ioapics[ioapic].mpc_apicid, pin, entry.vector, irq,
 		edge_level, active_high_low);
 
-    ioapic_register_intr(irq, entry.vector, edge_level);
+    ioapic_register_intr(irq, edge_level);
 
     if (!ioapic && (irq < 16))
         disable_8259A_irq(irq);
@@ -2010,7 +1957,7 @@ int io_apic_set_pci_routing (int ioapic, int pin, int irq, int edge_level, int a
     spin_lock_irqsave(&ioapic_lock, flags);
     io_apic_write(ioapic, 0x11+2*pin, *(((int *)&entry)+1));
     io_apic_write(ioapic, 0x10+2*pin, *(((int *)&entry)+0));
-    set_native_irq_info(entry.vector, TARGET_CPUS);
+    set_native_irq_info(irq, TARGET_CPUS);
     spin_unlock_irqrestore(&ioapic_lock, flags);
 
     return 0;
@@ -2114,12 +2061,13 @@ int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
 
     if ( old_rte.vector >= FIRST_DYNAMIC_VECTOR )
         old_irq = vector_irq[old_rte.vector];
+
     if ( new_rte.vector >= FIRST_DYNAMIC_VECTOR )
         new_irq = vector_irq[new_rte.vector];
 
     if ( (old_irq != new_irq) && (old_irq >= 0) && IO_APIC_IRQ(old_irq) )
     {
-        if ( irq_desc[IO_APIC_VECTOR(old_irq)].action )
+        if ( irq_desc[old_irq].action )
         {
             WARN_BOGUS_WRITE("Attempt to remove IO-APIC pin of in-use IRQ!\n");
             spin_unlock_irqrestore(&ioapic_lock, flags);
@@ -2131,7 +2079,7 @@ int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
 
     if ( (new_irq >= 0) && IO_APIC_IRQ(new_irq) )
     {
-        if ( irq_desc[IO_APIC_VECTOR(new_irq)].action )
+        if ( irq_desc[new_irq].action )
         {
             WARN_BOGUS_WRITE("Attempt to %s IO-APIC pin for in-use IRQ!\n",
                              (old_irq != new_irq) ? "add" : "modify");
@@ -2140,7 +2088,7 @@ int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
         }
         
         /* Set the correct irq-handling type. */
-        irq_desc[IO_APIC_VECTOR(new_irq)].handler = new_rte.trigger ? 
+        irq_desc[new_irq].handler = new_rte.trigger ? 
             &ioapic_level_type: &ioapic_edge_type;
         
         if ( old_irq != new_irq )
@@ -2252,11 +2200,17 @@ void __init init_ioapic_mappings(void)
     }
     if ( !smp_found_config || skip_ioapic_setup || nr_irqs_gsi < 16 )
         nr_irqs_gsi = 16;
-    else if ( nr_irqs_gsi > PAGE_SIZE * 8 )
+    else if ( nr_irqs_gsi > MAX_GSI_IRQS)
     {
         /* for PHYSDEVOP_pirq_eoi_gmfn guest assumptions */
-        printk(KERN_WARNING "Limiting number of IRQs found (%u) to %lu\n",
-               nr_irqs_gsi, PAGE_SIZE * 8);
-        nr_irqs_gsi = PAGE_SIZE * 8;
+        printk(KERN_WARNING "Limiting number of GSI IRQs found (%u) to %lu\n",
+               nr_irqs_gsi, MAX_GSI_IRQS);
+        nr_irqs_gsi = MAX_GSI_IRQS;
     }
+
+    if (nr_irqs < 2 * nr_irqs_gsi)
+        nr_irqs = 2 * nr_irqs_gsi;
+
+    if (nr_irqs > MAX_NR_IRQS)
+        nr_irqs = MAX_NR_IRQS;
 }

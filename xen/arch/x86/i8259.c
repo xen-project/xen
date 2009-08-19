@@ -106,38 +106,28 @@ BUILD_SMP_INTERRUPT(cmci_interrupt, CMCI_APIC_VECTOR)
 
 static DEFINE_SPINLOCK(i8259A_lock);
 
-static void disable_8259A_vector(unsigned int vector)
+static void mask_and_ack_8259A_irq(unsigned int irq);
+
+static unsigned int startup_8259A_irq(unsigned int irq)
 {
-    disable_8259A_irq(LEGACY_IRQ_FROM_VECTOR(vector));
-}
-
-static void enable_8259A_vector(unsigned int vector)
-{
-    enable_8259A_irq(LEGACY_IRQ_FROM_VECTOR(vector));
-}
-
-static void mask_and_ack_8259A_vector(unsigned int);
-
-static void end_8259A_vector(unsigned int vector)
-{
-    if (!(irq_desc[vector].status & (IRQ_DISABLED|IRQ_INPROGRESS)))
-        enable_8259A_vector(vector);
-}
-
-static unsigned int startup_8259A_vector(unsigned int vector)
-{ 
-    enable_8259A_vector(vector);
+    enable_8259A_irq(irq);
     return 0; /* never anything pending */
+}
+
+static void end_8259A_irq(unsigned int irq)
+{
+    if (!(irq_desc[irq].status & (IRQ_DISABLED|IRQ_INPROGRESS)))
+        enable_8259A_irq(irq);
 }
 
 static struct hw_interrupt_type i8259A_irq_type = {
     .typename = "XT-PIC",
-    .startup  = startup_8259A_vector,
-    .shutdown = disable_8259A_vector,
-    .enable   = enable_8259A_vector,
-    .disable  = disable_8259A_vector,
-    .ack      = mask_and_ack_8259A_vector,
-    .end      = end_8259A_vector
+    .startup  = startup_8259A_irq,
+    .shutdown = disable_8259A_irq,
+    .enable   = enable_8259A_irq,
+    .disable  = disable_8259A_irq,
+    .ack      = mask_and_ack_8259A_irq,
+    .end      = end_8259A_irq
 };
 
 /*
@@ -237,9 +227,8 @@ static inline int i8259A_irq_real(unsigned int irq)
  * first, _then_ send the EOI, and the order of EOI
  * to the two 8259s is important!
  */
-static void mask_and_ack_8259A_vector(unsigned int vector)
+static void mask_and_ack_8259A_irq(unsigned int irq)
 {
-    unsigned int irq = LEGACY_IRQ_FROM_VECTOR(vector);
     unsigned int irqmask = 1 << irq;
     unsigned long flags;
 
@@ -369,9 +358,9 @@ void __devinit init_8259A(int auto_eoi)
          * in AEOI mode we just have to mask the interrupt
          * when acking.
          */
-        i8259A_irq_type.ack = disable_8259A_vector;
+        i8259A_irq_type.ack = disable_8259A_irq;
     else
-        i8259A_irq_type.ack = mask_and_ack_8259A_vector;
+        i8259A_irq_type.ack = mask_and_ack_8259A_irq;
 
     udelay(100);            /* wait for 8259A to initialize */
 
@@ -385,31 +374,25 @@ static struct irqaction cascade = { no_action, "cascade", NULL};
 
 void __init init_IRQ(void)
 {
-    int i;
+    int i, vector;
 
     init_bsp_APIC();
 
     init_8259A(0);
 
-    for ( i = 0; i < NR_VECTORS; i++ )
-    {
-        irq_desc[i].status  = IRQ_DISABLED;
-        irq_desc[i].handler = &no_irq_type;
-        irq_desc[i].action  = NULL;
-        irq_desc[i].depth   = 1;
-        spin_lock_init(&irq_desc[i].lock);
-        cpus_setall(irq_desc[i].affinity);
-        if ( i >= 0x20 )
-            set_intr_gate(i, interrupt[i]);
-    }
+    BUG_ON(init_irq_data() < 0);
 
-    irq_vector = xmalloc_array(u8, nr_irqs_gsi);
-    memset(irq_vector, 0, nr_irqs_gsi * sizeof(*irq_vector));
+    for ( vector = FIRST_DYNAMIC_VECTOR; vector < NR_VECTORS; vector++ )
+    {
+        if (vector == HYPERCALL_VECTOR || vector == LEGACY_SYSCALL_VECTOR)
+            continue;
+        set_intr_gate(vector, interrupt[vector]);
+    }
 
     for ( i = 0; i < 16; i++ )
     {
         vector_irq[LEGACY_VECTOR(i)] = i;
-        irq_desc[LEGACY_VECTOR(i)].handler = &i8259A_irq_type;
+        irq_desc[i].handler = &i8259A_irq_type;
     }
 
     /* Never allocate the hypercall vector or Linux/BSD fast-trap vector. */

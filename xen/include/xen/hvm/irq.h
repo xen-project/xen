@@ -88,7 +88,7 @@ struct hvm_irq_dpci {
     DECLARE_BITMAP(isairq_map, NR_ISAIRQS);
     /* Record of mapped Links */
     uint8_t link_cnt[NR_LINK];
-    struct timer hvm_timer[NR_VECTORS];
+    struct timer *hvm_timer;
     struct tasklet dirq_tasklet;
 };
 

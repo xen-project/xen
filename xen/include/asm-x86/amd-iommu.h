@@ -79,7 +79,7 @@ struct amd_iommu {
     int maskbit;
 
     int enabled;
-    int vector;
+    int irq;
 };
 
 struct ivrs_mappings {

@@ -374,7 +374,7 @@ static void del_msixtbl_entry(struct msixtbl_entry *entry)
 
 int msixtbl_pt_register(struct domain *d, int pirq, uint64_t gtable)
 {
-    irq_desc_t *irq_desc;
+    struct irq_desc *irq_desc;
     struct msi_desc *msi_desc;
     struct pci_dev *pdev;
     struct msixtbl_entry *entry, *new_entry;
@@ -429,7 +429,7 @@ out:
 
 void msixtbl_pt_unregister(struct domain *d, int pirq)
 {
-    irq_desc_t *irq_desc;
+    struct irq_desc *irq_desc;
     struct msi_desc *msi_desc;
     struct pci_dev *pdev;
     struct msixtbl_entry *entry;

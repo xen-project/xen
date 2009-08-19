@@ -2,7 +2,6 @@
 #define __ASM_MSI_H
 
 #include <xen/cpumask.h>
-#include <asm/irq.h>
 /*
  * Constants for Intel APIC based MSI messages.
  */
@@ -57,7 +56,7 @@
 struct msi_info {
     int bus;
     int devfn;
-    int vector;
+    int irq;
     int entry_nr;
     uint64_t table_base;
 };
@@ -70,14 +69,14 @@ struct msi_msg {
 
 struct msi_desc;
 /* Helper functions */
-extern void mask_msi_vector(unsigned int vector);
-extern void unmask_msi_vector(unsigned int vector);
+extern void mask_msi_irq(unsigned int irq);
+extern void unmask_msi_irq(unsigned int irq);
 extern void set_msi_affinity(unsigned int vector, cpumask_t mask);
 extern int pci_enable_msi(struct msi_info *msi, struct msi_desc **desc);
 extern void pci_disable_msi(struct msi_desc *desc);
 extern void pci_cleanup_msi(struct pci_dev *pdev);
-extern int setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc);
-extern void teardown_msi_vector(int vector);
+extern int setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc, int irq);
+extern void teardown_msi_irq(int irq);
 extern int msi_free_vector(struct msi_desc *entry);
 extern int pci_restore_msi_state(struct pci_dev *pdev);
 
@@ -97,7 +96,7 @@ struct msi_desc {
 
 	void __iomem *mask_base;        /* va for the entry in mask table */
 	struct pci_dev *dev;
-	int vector;
+	int irq;
 
 	struct msi_msg msg;		/* Last set MSI message */
 
@@ -105,6 +104,7 @@ struct msi_desc {
 };
 
 int msi_maskable_irq(const struct msi_desc *);
+int msi_free_irq(struct msi_desc *entry);
 
 /*
  * Assume the maximum number of hot plug slots supported by the system is about

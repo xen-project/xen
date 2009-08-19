@@ -23,6 +23,7 @@
 #define LAST_LEGACY_VECTOR      0xef
 
 #define HYPERCALL_VECTOR	0x82
+#define LEGACY_SYSCALL_VECTOR   0x80
 
 /* Dynamically-allocated vectors available to any driver. */
 #define FIRST_DYNAMIC_VECTOR	0x20

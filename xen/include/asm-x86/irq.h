@@ -7,19 +7,25 @@
 #include <asm/atomic.h>
 #include <irq_vectors.h>
 
-#define IO_APIC_IRQ(irq)    (((irq) >= 16) || ((1<<(irq)) & io_apic_irqs))
+#define IO_APIC_IRQ(irq)    (((irq) >= 16 && (irq) < nr_irqs_gsi) \
+        || (((irq) < 16) && (1<<(irq)) & io_apic_irqs))
 #define IO_APIC_VECTOR(irq) (irq_vector[irq])
+
+#define MSI_IRQ(irq)       ((irq) >= nr_irqs_gsi && (irq) < nr_irqs)
 
 #define LEGACY_VECTOR(irq)          ((irq) + FIRST_LEGACY_VECTOR)
 #define LEGACY_IRQ_FROM_VECTOR(vec) ((vec) - FIRST_LEGACY_VECTOR)
 
-#define irq_to_vector(irq)  \
-    (IO_APIC_IRQ(irq) ? IO_APIC_VECTOR(irq) : LEGACY_VECTOR(irq))
 #define vector_to_irq(vec)  (vector_irq[vec])
+#define irq_to_desc(irq)    &irq_desc[(irq)]
+
+#define MAX_GSI_IRQS PAGE_SIZE * 8
+#define MAX_NR_IRQS (2 * MAX_GSI_IRQS)
 
 extern int vector_irq[NR_VECTORS];
 extern u8 *irq_vector;
 
+extern int irq_to_vector(int irq);
 #define platform_legacy_irq(irq)	((irq) < 16)
 
 fastcall void event_check_interrupt(void);
@@ -51,17 +57,21 @@ extern atomic_t irq_mis_count;
 
 int pirq_shared(struct domain *d , int irq);
 
-int map_domain_pirq(struct domain *d, int pirq, int vector, int type,
+int map_domain_pirq(struct domain *d, int pirq, int irq, int type,
                            void *data);
 int unmap_domain_pirq(struct domain *d, int pirq);
 int get_free_pirq(struct domain *d, int type, int index);
 void free_domain_pirqs(struct domain *d);
 
-#define domain_irq_to_vector(d, irq) ((d)->arch.pirq_vector[irq] ?: \
-                                      IO_APIC_IRQ(irq) ? 0 : LEGACY_VECTOR(irq))
-#define domain_vector_to_irq(d, vec) ((d)->arch.vector_pirq[vec] ?: \
-                                      ((vec) < FIRST_LEGACY_VECTOR || \
-                                       (vec) > LAST_LEGACY_VECTOR) ? \
-                                      0 : LEGACY_IRQ_FROM_VECTOR(vec))
+int  init_irq_data(void);
+
+void clear_irq_vector(int irq);
+int __assign_irq_vector(int irq);
+
+int create_irq(void);
+void destroy_irq(unsigned int irq);
+
+#define domain_pirq_to_irq(d, pirq) ((d)->arch.pirq_irq[pirq])
+#define domain_irq_to_pirq(d, irq) ((d)->arch.irq_pirq[irq])
 
 #endif /* _ASM_HW_IRQ_H */

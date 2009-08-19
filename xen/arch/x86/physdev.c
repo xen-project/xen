@@ -30,7 +30,7 @@ ioapic_guest_write(
 static int physdev_map_pirq(struct physdev_map_pirq *map)
 {
     struct domain *d;
-    int vector, pirq, ret = 0;
+    int pirq, irq, ret = 0;
     struct msi_info _msi;
     void *map_data = NULL;
 
@@ -51,7 +51,7 @@ static int physdev_map_pirq(struct physdev_map_pirq *map)
         goto free_domain;
     }
 
-    /* Verify or get vector. */
+    /* Verify or get irq. */
     switch ( map->type )
     {
         case MAP_PIRQ_TYPE_GSI:
@@ -62,25 +62,25 @@ static int physdev_map_pirq(struct physdev_map_pirq *map)
                 ret = -EINVAL;
                 goto free_domain;
             }
-            vector = domain_irq_to_vector(current->domain, map->index);
-            if ( !vector )
+            irq = domain_pirq_to_irq(current->domain, map->index);
+            if ( !irq )
             {
-                dprintk(XENLOG_G_ERR, "dom%d: map irq with no vector %d\n",
-                        d->domain_id, vector);
+                dprintk(XENLOG_G_ERR, "dom%d: map pirq with incorrect irq!\n",
+                        d->domain_id);
                 ret = -EINVAL;
                 goto free_domain;
             }
             break;
 
         case MAP_PIRQ_TYPE_MSI:
-            vector = map->index;
-            if ( vector == -1 )
-                vector = assign_irq_vector(AUTO_ASSIGN_IRQ);
+            irq = map->index;
+            if ( irq == -1 )
+                irq = create_irq();
 
-            if ( vector < 0 || vector >= NR_VECTORS )
+            if ( irq < 0 || irq >= nr_irqs )
             {
-                dprintk(XENLOG_G_ERR, "dom%d: map irq with wrong vector %d\n",
-                        d->domain_id, vector);
+                dprintk(XENLOG_G_ERR, "dom%d: can't create irq for msi!\n",
+                        d->domain_id);
                 ret = -EINVAL;
                 goto free_domain;
             }
@@ -89,7 +89,7 @@ static int physdev_map_pirq(struct physdev_map_pirq *map)
             _msi.devfn = map->devfn;
             _msi.entry_nr = map->entry_nr;
             _msi.table_base = map->table_base;
-            _msi.vector = vector;
+            _msi.irq = irq;
             map_data = &_msi;
             break;
 
@@ -103,7 +103,7 @@ static int physdev_map_pirq(struct physdev_map_pirq *map)
     spin_lock(&pcidevs_lock);
     /* Verify or get pirq. */
     spin_lock(&d->event_lock);
-    pirq = domain_vector_to_irq(d, vector);
+    pirq = domain_irq_to_pirq(d, irq);
     if ( map->pirq < 0 )
     {
         if ( pirq )
@@ -132,7 +132,7 @@ static int physdev_map_pirq(struct physdev_map_pirq *map)
     {
         if ( pirq && pirq != map->pirq )
         {
-            dprintk(XENLOG_G_ERR, "dom%d: vector %d conflicts with irq %d\n",
+            dprintk(XENLOG_G_ERR, "dom%d: pirq %d conflicts with irq %d\n",
                     d->domain_id, map->index, map->pirq);
             ret = -EEXIST;
             goto done;
@@ -141,7 +141,7 @@ static int physdev_map_pirq(struct physdev_map_pirq *map)
             pirq = map->pirq;
     }
 
-    ret = map_domain_pirq(d, pirq, vector, map->type, map_data);
+    ret = map_domain_pirq(d, pirq, irq, map->type, map_data);
     if ( ret == 0 )
         map->pirq = pirq;
 
@@ -149,7 +149,7 @@ done:
     spin_unlock(&d->event_lock);
     spin_unlock(&pcidevs_lock);
     if ( (ret != 0) && (map->type == MAP_PIRQ_TYPE_MSI) && (map->index == -1) )
-        free_irq_vector(vector);
+        destroy_irq(irq);
 free_domain:
     rcu_unlock_domain(d);
     return ret;
@@ -344,14 +344,12 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
 
         irq = irq_op.irq;
         ret = -EINVAL;
-        if ( (irq < 0) || (irq >= nr_irqs_gsi) )
-            break;
 
         irq_op.vector = assign_irq_vector(irq);
 
         spin_lock(&pcidevs_lock);
         spin_lock(&dom0->event_lock);
-        ret = map_domain_pirq(dom0, irq_op.irq, irq_op.vector,
+        ret = map_domain_pirq(dom0, irq_op.irq, irq,
                               MAP_PIRQ_TYPE_GSI, NULL);
         spin_unlock(&dom0->event_lock);
         spin_unlock(&pcidevs_lock);

@@ -31,6 +31,8 @@
 #include <xen/pci_regs.h>
 #include <xen/keyhandler.h>
 #include <asm/msi.h>
+#include <asm/irq.h>
+#include <mach_apic.h>
 #include "iommu.h"
 #include "dmar.h"
 #include "extern.h"
@@ -659,7 +661,7 @@ static void iommu_disable_translation(struct iommu *iommu)
     spin_unlock_irqrestore(&iommu->register_lock, flags);
 }
 
-static struct iommu *vector_to_iommu[NR_VECTORS];
+static struct iommu **irq_to_iommu;
 static int iommu_page_fault_do_one(struct iommu *iommu, int type,
                                    u8 fault_reason, u16 source_id, u64 addr)
 {
@@ -705,7 +707,7 @@ static void iommu_fault_status(u32 fault_status)
 }
 
 #define PRIMARY_FAULT_REG_LEN (16)
-static void iommu_page_fault(int vector, void *dev_id,
+static void iommu_page_fault(int irq, void *dev_id,
                              struct cpu_user_regs *regs)
 {
     struct iommu *iommu = dev_id;
@@ -777,9 +779,9 @@ clear_overflow:
     }
 }
 
-static void dma_msi_unmask(unsigned int vector)
+static void dma_msi_unmask(unsigned int irq)
 {
-    struct iommu *iommu = vector_to_iommu[vector];
+    struct iommu *iommu = irq_to_iommu[irq];
     unsigned long flags;
 
     /* unmask it */
@@ -788,10 +790,10 @@ static void dma_msi_unmask(unsigned int vector)
     spin_unlock_irqrestore(&iommu->register_lock, flags);
 }
 
-static void dma_msi_mask(unsigned int vector)
+static void dma_msi_mask(unsigned int irq)
 {
     unsigned long flags;
-    struct iommu *iommu = vector_to_iommu[vector];
+    struct iommu *iommu = irq_to_iommu[irq];
 
     /* mask it */
     spin_lock_irqsave(&iommu->register_lock, flags);
@@ -799,22 +801,23 @@ static void dma_msi_mask(unsigned int vector)
     spin_unlock_irqrestore(&iommu->register_lock, flags);
 }
 
-static unsigned int dma_msi_startup(unsigned int vector)
+static unsigned int dma_msi_startup(unsigned int irq)
 {
-    dma_msi_unmask(vector);
+    dma_msi_unmask(irq);
     return 0;
 }
 
-static void dma_msi_end(unsigned int vector)
+static void dma_msi_end(unsigned int irq)
 {
-    dma_msi_unmask(vector);
+    dma_msi_unmask(irq);
     ack_APIC_irq();
 }
 
-static void dma_msi_data_init(struct iommu *iommu, int vector)
+static void dma_msi_data_init(struct iommu *iommu, int irq)
 {
     u32 msi_data = 0;
     unsigned long flags;
+    int vector = irq_to_vector(irq);
 
     /* Fixed, edge, assert mode. Follow MSI setting */
     msi_data |= vector & 0xff;
@@ -842,9 +845,9 @@ static void dma_msi_addr_init(struct iommu *iommu, int phy_cpu)
     spin_unlock_irqrestore(&iommu->register_lock, flags);
 }
 
-static void dma_msi_set_affinity(unsigned int vector, cpumask_t dest)
+static void dma_msi_set_affinity(unsigned int irq, cpumask_t dest)
 {
-    struct iommu *iommu = vector_to_iommu[vector];
+    struct iommu *iommu = irq_to_iommu[irq];
     dma_msi_addr_init(iommu, cpu_physical_id(first_cpu(dest)));
 }
 
@@ -861,31 +864,28 @@ static struct hw_interrupt_type dma_msi_type = {
 
 static int iommu_set_interrupt(struct iommu *iommu)
 {
-    int vector, ret;
+    int irq, ret;
 
-    vector = assign_irq_vector(AUTO_ASSIGN_IRQ);
-    if ( vector <= 0 )
+    irq = create_irq();
+    if ( irq <= 0 )
     {
-        gdprintk(XENLOG_ERR VTDPREFIX, "IOMMU: no vectors\n");
+        gdprintk(XENLOG_ERR VTDPREFIX, "IOMMU: no irq available!\n");
         return -EINVAL;
     }
 
-    irq_desc[vector].handler = &dma_msi_type;
-    vector_to_iommu[vector] = iommu;
-    ret = request_irq_vector(vector, iommu_page_fault, 0, "dmar", iommu);
+    irq_desc[irq].handler = &dma_msi_type;
+    irq_to_iommu[irq] = iommu;
+    ret = request_irq(irq, iommu_page_fault, 0, "dmar", iommu);
     if ( ret )
     {
-        irq_desc[vector].handler = &no_irq_type;
-        vector_to_iommu[vector] = NULL;
-        free_irq_vector(vector);
+        irq_desc[irq].handler = &no_irq_type;
+        irq_to_iommu[irq] = NULL;
+        destroy_irq(irq);
         gdprintk(XENLOG_ERR VTDPREFIX, "IOMMU: can't request irq\n");
         return ret;
     }
 
-    /* Make sure that vector is never re-used. */
-    vector_irq[vector] = NEVER_ASSIGN_IRQ;
-
-    return vector;
+    return irq;
 }
 
 static int iommu_alloc(struct acpi_drhd_unit *drhd)
@@ -906,7 +906,7 @@ static int iommu_alloc(struct acpi_drhd_unit *drhd)
         return -ENOMEM;
     memset(iommu, 0, sizeof(struct iommu));
 
-    iommu->vector = -1; /* No vector assigned yet. */
+    iommu->irq = -1; /* No irq assigned yet. */
 
     iommu->intel = alloc_intel_iommu();
     if ( iommu->intel == NULL )
@@ -966,7 +966,7 @@ static void iommu_free(struct acpi_drhd_unit *drhd)
         iounmap(iommu->reg);
 
     free_intel_iommu(iommu->intel);
-    release_irq_vector(iommu->vector);
+    destroy_irq(iommu->irq);
     xfree(iommu);
 
     drhd->iommu = NULL;
@@ -1581,24 +1581,24 @@ static int init_vtd_hw(void)
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
     struct iommu_flush *flush = NULL;
-    int vector;
+    int irq = -1;
     int ret;
     unsigned long flags;
 
     for_each_drhd_unit ( drhd )
     {
         iommu = drhd->iommu;
-        if ( iommu->vector < 0 )
+        if ( iommu->irq < 0 )
         {
-            vector = iommu_set_interrupt(iommu);
-            if ( vector < 0 )
+            irq = iommu_set_interrupt(iommu);
+            if ( irq < 0 )
             {
                 gdprintk(XENLOG_ERR VTDPREFIX, "IOMMU: interrupt setup failed\n");
-                return vector;
+                return irq;
             }
-            iommu->vector = vector;
+            iommu->irq = irq;
         }
-        dma_msi_data_init(iommu, iommu->vector);
+        dma_msi_data_init(iommu, iommu->irq);
         dma_msi_addr_init(iommu, cpu_physical_id(first_cpu(cpu_online_map)));
         clear_fault_bits(iommu);
 
@@ -1702,6 +1702,13 @@ int intel_vtd_setup(void)
 
     spin_lock_init(&domid_bitmap_lock);
     clflush_size = get_cache_line_size();
+
+    irq_to_iommu = xmalloc_array(struct iommu*, nr_irqs);
+    BUG_ON(!irq_to_iommu);
+    memset(irq_to_iommu, 0, nr_irqs * sizeof(struct iommu*));
+
+    if(!irq_to_iommu)
+        return -ENOMEM;
 
     /* We enable the following features only if they are supported by all VT-d
      * engines: Snoop Control, DMA passthrough, Queued Invalidation and

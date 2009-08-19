@@ -27,7 +27,7 @@
 #include <asm/hvm/svm/amd-iommu-proto.h>
 #include <asm-x86/fixmap.h>
 
-static struct amd_iommu *vector_to_iommu[NR_VECTORS];
+static struct amd_iommu **irq_to_iommu;
 static int nr_amd_iommus;
 static long amd_iommu_cmd_buffer_entries = IOMMU_CMD_BUFFER_DEFAULT_ENTRIES;
 static long amd_iommu_event_log_entries = IOMMU_EVENT_LOG_DEFAULT_ENTRIES;
@@ -309,7 +309,7 @@ static void amd_iommu_msi_data_init(struct amd_iommu *iommu)
     u8 bus = (iommu->bdf >> 8) & 0xff;
     u8 dev = PCI_SLOT(iommu->bdf & 0xff);
     u8 func = PCI_FUNC(iommu->bdf & 0xff);
-    int vector = iommu->vector;
+    int vector = irq_to_vector(iommu->irq);
 
     msi_data = MSI_DATA_TRIGGER_EDGE |
         MSI_DATA_LEVEL_ASSERT |
@@ -355,10 +355,10 @@ static void amd_iommu_msi_enable(struct amd_iommu *iommu, int flag)
         iommu->msi_cap + PCI_MSI_FLAGS, control);
 }
 
-static void iommu_msi_unmask(unsigned int vector)
+static void iommu_msi_unmask(unsigned int irq)
 {
     unsigned long flags;
-    struct amd_iommu *iommu = vector_to_iommu[vector];
+    struct amd_iommu *iommu = irq_to_iommu[irq];
 
     /* FIXME: do not support mask bits at the moment */
     if ( iommu->maskbit )
@@ -369,10 +369,10 @@ static void iommu_msi_unmask(unsigned int vector)
     spin_unlock_irqrestore(&iommu->lock, flags);
 }
 
-static void iommu_msi_mask(unsigned int vector)
+static void iommu_msi_mask(unsigned int irq)
 {
     unsigned long flags;
-    struct amd_iommu *iommu = vector_to_iommu[vector];
+    struct amd_iommu *iommu = irq_to_iommu[irq];
 
     /* FIXME: do not support mask bits at the moment */
     if ( iommu->maskbit )
@@ -383,21 +383,21 @@ static void iommu_msi_mask(unsigned int vector)
     spin_unlock_irqrestore(&iommu->lock, flags);
 }
 
-static unsigned int iommu_msi_startup(unsigned int vector)
+static unsigned int iommu_msi_startup(unsigned int irq)
 {
-    iommu_msi_unmask(vector);
+    iommu_msi_unmask(irq);
     return 0;
 }
 
-static void iommu_msi_end(unsigned int vector)
+static void iommu_msi_end(unsigned int irq)
 {
-    iommu_msi_unmask(vector);
+    iommu_msi_unmask(irq);
     ack_APIC_irq();
 }
 
-static void iommu_msi_set_affinity(unsigned int vector, cpumask_t dest)
+static void iommu_msi_set_affinity(unsigned int irq, cpumask_t dest)
 {
-    struct amd_iommu *iommu = vector_to_iommu[vector];
+    struct amd_iommu *iommu = irq_to_iommu[irq];
     amd_iommu_msi_addr_init(iommu, cpu_physical_id(first_cpu(dest)));
 }
 
@@ -451,7 +451,7 @@ static void parse_event_log_entry(u32 entry[])
     }
 }
 
-static void amd_iommu_page_fault(int vector, void *dev_id,
+static void amd_iommu_page_fault(int irq, void *dev_id,
                              struct cpu_user_regs *regs)
 {
     u32 event[4];
@@ -477,32 +477,30 @@ static void amd_iommu_page_fault(int vector, void *dev_id,
 
 static int set_iommu_interrupt_handler(struct amd_iommu *iommu)
 {
-    int vector, ret;
+    int irq, ret;
 
-    vector = assign_irq_vector(AUTO_ASSIGN_IRQ);
-    if ( vector <= 0 )
+    irq = create_irq();
+    if ( irq <= 0 )
     {
-        gdprintk(XENLOG_ERR VTDPREFIX, "IOMMU: no vectors\n");
+        gdprintk(XENLOG_ERR VTDPREFIX, "IOMMU: no irqs\n");
         return 0;
     }
 
-    irq_desc[vector].handler = &iommu_msi_type;
-    vector_to_iommu[vector] = iommu;
-    ret = request_irq_vector(vector, amd_iommu_page_fault, 0,
+    irq_desc[irq].handler = &iommu_msi_type;
+    irq_to_iommu[irq] = iommu;
+    ret = request_irq(irq, amd_iommu_page_fault, 0,
                              "amd_iommu", iommu);
     if ( ret )
     {
-        irq_desc[vector].handler = &no_irq_type;
-        vector_to_iommu[vector] = NULL;
-        free_irq_vector(vector);
+        irq_desc[irq].handler = &no_irq_type;
+        irq_to_iommu[irq] = NULL;
+        destroy_irq(irq);
         amd_iov_error("can't request irq\n");
         return 0;
     }
 
-    /* Make sure that vector is never re-used. */
-    vector_irq[vector] = NEVER_ASSIGN_IRQ;
-    iommu->vector = vector;
-    return vector;
+    iommu->irq = irq;
+    return irq;
 }
 
 void enable_iommu(struct amd_iommu *iommu)
@@ -510,6 +508,10 @@ void enable_iommu(struct amd_iommu *iommu)
     unsigned long flags;
 
     spin_lock_irqsave(&iommu->lock, flags);
+
+    irq_to_iommu = xmalloc_array(struct amd_iommu *, nr_irqs);
+    BUG_ON(!irq_to_iommu);
+    memset(irq_to_iommu, 0, nr_irqs * sizeof(struct iommu*));
 
     if ( iommu->enabled )
     {

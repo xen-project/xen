@@ -35,7 +35,6 @@ static void pt_irq_time_out(void *data)
 {
     struct hvm_mirq_dpci_mapping *irq_map = data;
     unsigned int guest_gsi, machine_gsi = 0;
-    int vector;
     struct hvm_irq_dpci *dpci = NULL;
     struct dev_intx_gsi_link *digl;
     struct hvm_girq_dpci_mapping *girq;
@@ -68,7 +67,6 @@ static void pt_irq_time_out(void *data)
                                       machine_gsi + 1) )
     {
         clear_bit(machine_gsi, dpci->dirq_mask);
-        vector = domain_irq_to_vector(irq_map->dom, machine_gsi);
         dpci->mirq[machine_gsi].pending = 0;
     }
 
@@ -88,6 +86,7 @@ void free_hvm_irq_dpci(struct hvm_irq_dpci *dpci)
     xfree(dpci->mirq);
     xfree(dpci->dirq_mask);
     xfree(dpci->mapping);
+    xfree(dpci->hvm_timer);
     xfree(dpci);
 }
 
@@ -124,9 +123,11 @@ int pt_irq_create_bind_vtd(
                                                 BITS_TO_LONGS(d->nr_pirqs));
         hvm_irq_dpci->mapping = xmalloc_array(unsigned long,
                                               BITS_TO_LONGS(d->nr_pirqs));
+        hvm_irq_dpci->hvm_timer = xmalloc_array(struct timer, nr_irqs);
         if ( !hvm_irq_dpci->mirq ||
              !hvm_irq_dpci->dirq_mask ||
-             !hvm_irq_dpci->mapping )
+             !hvm_irq_dpci->mapping ||
+             !hvm_irq_dpci->hvm_timer)
         {
             spin_unlock(&d->event_lock);
             free_hvm_irq_dpci(hvm_irq_dpci);
@@ -136,6 +137,8 @@ int pt_irq_create_bind_vtd(
                d->nr_pirqs * sizeof(*hvm_irq_dpci->mirq));
         bitmap_zero(hvm_irq_dpci->dirq_mask, d->nr_pirqs);
         bitmap_zero(hvm_irq_dpci->mapping, d->nr_pirqs);
+        memset(hvm_irq_dpci->hvm_timer, 0, 
+                nr_irqs * sizeof(*hvm_irq_dpci->hvm_timer));
         for ( int i = 0; i < d->nr_pirqs; i++ )
             INIT_LIST_HEAD(&hvm_irq_dpci->mirq[i].digl_list);
         for ( int i = 0; i < NR_HVM_IRQS; i++ )
@@ -236,7 +239,7 @@ int pt_irq_create_bind_vtd(
         /* Bind the same mirq once in the same domain */
         if ( !test_and_set_bit(machine_gsi, hvm_irq_dpci->mapping))
         {
-            unsigned int vector = domain_irq_to_vector(d, machine_gsi);
+            unsigned int irq = domain_pirq_to_irq(d, machine_gsi);
             unsigned int share;
 
             hvm_irq_dpci->mirq[machine_gsi].dom = d;
@@ -256,14 +259,14 @@ int pt_irq_create_bind_vtd(
 
             /* Init timer before binding */
             if ( pt_irq_need_timer(hvm_irq_dpci->mirq[machine_gsi].flags) )
-                init_timer(&hvm_irq_dpci->hvm_timer[vector],
+                init_timer(&hvm_irq_dpci->hvm_timer[irq],
                            pt_irq_time_out, &hvm_irq_dpci->mirq[machine_gsi], 0);
             /* Deal with gsi for legacy devices */
             rc = pirq_guest_bind(d->vcpu[0], machine_gsi, share);
             if ( unlikely(rc) )
             {
                 if ( pt_irq_need_timer(hvm_irq_dpci->mirq[machine_gsi].flags) )
-                    kill_timer(&hvm_irq_dpci->hvm_timer[vector]);
+                    kill_timer(&hvm_irq_dpci->hvm_timer[irq]);
                 hvm_irq_dpci->mirq[machine_gsi].dom = NULL;
                 clear_bit(machine_gsi, hvm_irq_dpci->mapping);
                 list_del(&girq->list);
@@ -349,7 +352,7 @@ int pt_irq_destroy_bind_vtd(
             pirq_guest_unbind(d, machine_gsi);
             msixtbl_pt_unregister(d, machine_gsi);
             if ( pt_irq_need_timer(hvm_irq_dpci->mirq[machine_gsi].flags) )
-                kill_timer(&hvm_irq_dpci->hvm_timer[domain_irq_to_vector(d, machine_gsi)]);
+                kill_timer(&hvm_irq_dpci->hvm_timer[domain_pirq_to_irq(d, machine_gsi)]);
             hvm_irq_dpci->mirq[machine_gsi].dom   = NULL;
             hvm_irq_dpci->mirq[machine_gsi].flags = 0;
             clear_bit(machine_gsi, hvm_irq_dpci->mapping);
@@ -357,7 +360,7 @@ int pt_irq_destroy_bind_vtd(
     }
     spin_unlock(&d->event_lock);
     gdprintk(XENLOG_INFO,
-             "XEN_DOMCTL_irq_unmapping: m_irq = %x device = %x intx = %x\n",
+             "XEN_DOMCTL_irq_unmapping: m_irq = 0x%x device = 0x%x intx = 0x%x\n",
              machine_gsi, device, intx);
 
     return 0;
@@ -367,7 +370,7 @@ int hvm_do_IRQ_dpci(struct domain *d, unsigned int mirq)
 {
     struct hvm_irq_dpci *dpci = domain_get_irq_dpci(d);
 
-    ASSERT(spin_is_locked(&irq_desc[domain_irq_to_vector(d, mirq)].lock));
+    ASSERT(spin_is_locked(&irq_desc[domain_pirq_to_irq(d, mirq)].lock));
     if ( !iommu_enabled || (d == dom0) || !dpci ||
          !test_bit(mirq, dpci->mapping))
         return 0;
@@ -425,7 +428,7 @@ static int hvm_pci_msi_assert(struct domain *d, int pirq)
 
 static void hvm_dirq_assist(unsigned long _d)
 {
-    unsigned int irq;
+    unsigned int pirq;
     uint32_t device, intx;
     struct domain *d = (struct domain *)_d;
     struct hvm_irq_dpci *hvm_irq_dpci = d->arch.hvm_domain.irq.dpci;
@@ -433,34 +436,34 @@ static void hvm_dirq_assist(unsigned long _d)
 
     ASSERT(hvm_irq_dpci);
 
-    for ( irq = find_first_bit(hvm_irq_dpci->dirq_mask, d->nr_pirqs);
-          irq < d->nr_pirqs;
-          irq = find_next_bit(hvm_irq_dpci->dirq_mask, d->nr_pirqs, irq + 1) )
+    for ( pirq = find_first_bit(hvm_irq_dpci->dirq_mask, d->nr_pirqs);
+          pirq < d->nr_pirqs;
+          pirq = find_next_bit(hvm_irq_dpci->dirq_mask, d->nr_pirqs, pirq + 1) )
     {
-        if ( !test_and_clear_bit(irq, hvm_irq_dpci->dirq_mask) )
+        if ( !test_and_clear_bit(pirq, hvm_irq_dpci->dirq_mask) )
             continue;
 
         spin_lock(&d->event_lock);
 #ifdef SUPPORT_MSI_REMAPPING
-        if ( hvm_irq_dpci->mirq[irq].flags & HVM_IRQ_DPCI_GUEST_MSI )
+        if ( hvm_irq_dpci->mirq[pirq].flags & HVM_IRQ_DPCI_GUEST_MSI )
         {
-            hvm_pci_msi_assert(d, irq);
+            hvm_pci_msi_assert(d, pirq);
             spin_unlock(&d->event_lock);
             continue;
         }
 #endif
-        list_for_each_entry ( digl, &hvm_irq_dpci->mirq[irq].digl_list, list )
+        list_for_each_entry ( digl, &hvm_irq_dpci->mirq[pirq].digl_list, list )
         {
             device = digl->device;
             intx = digl->intx;
             hvm_pci_intx_assert(d, device, intx);
-            hvm_irq_dpci->mirq[irq].pending++;
+            hvm_irq_dpci->mirq[pirq].pending++;
 
 #ifdef SUPPORT_MSI_REMAPPING
-            if ( hvm_irq_dpci->mirq[irq].flags & HVM_IRQ_DPCI_TRANSLATE )
+            if ( hvm_irq_dpci->mirq[pirq].flags & HVM_IRQ_DPCI_TRANSLATE )
             {
                 /* for translated MSI to INTx interrupt, eoi as early as possible */
-                __msi_pirq_eoi(d, irq);
+                __msi_pirq_eoi(d, pirq);
             }
 #endif
         }
@@ -472,8 +475,8 @@ static void hvm_dirq_assist(unsigned long _d)
          * guest will never deal with the irq, then the physical interrupt line
          * will never be deasserted.
          */
-        if ( pt_irq_need_timer(hvm_irq_dpci->mirq[irq].flags) )
-            set_timer(&hvm_irq_dpci->hvm_timer[domain_irq_to_vector(d, irq)],
+        if ( pt_irq_need_timer(hvm_irq_dpci->mirq[pirq].flags) )
+            set_timer(&hvm_irq_dpci->hvm_timer[domain_pirq_to_irq(d, pirq)],
                       NOW() + PT_IRQ_TIME_OUT);
         spin_unlock(&d->event_lock);
     }
@@ -501,7 +504,7 @@ static void __hvm_dpci_eoi(struct domain *d,
          ! pt_irq_need_timer(hvm_irq_dpci->mirq[machine_gsi].flags) )
         return;
 
-    stop_timer(&hvm_irq_dpci->hvm_timer[domain_irq_to_vector(d, machine_gsi)]);
+    stop_timer(&hvm_irq_dpci->hvm_timer[domain_pirq_to_irq(d, machine_gsi)]);
     pirq_guest_eoi(d, machine_gsi);
 }
 
