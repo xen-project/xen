@@ -448,7 +448,8 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
 #endif /* __x86_64__ */
 
 #ifdef CONFIG_COMPAT
-    HYPERVISOR_COMPAT_VIRT_START(d) = __HYPERVISOR_COMPAT_VIRT_START;
+    HYPERVISOR_COMPAT_VIRT_START(d) =
+        is_hvm_domain(d) ? ~0u : __HYPERVISOR_COMPAT_VIRT_START;
 #endif
 
     if ( (rc = paging_domain_init(d)) != 0 )
