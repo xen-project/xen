@@ -10,9 +10,9 @@ if ENABLE_HVM_SUPPORT:
 
 # Mount /dev/ram0
 
-s, o = traceCommand("mkfs /dev/ram0")
+s, o = traceCommand("mkfs -j /dev/ram0")
 if s != 0:
-    FAIL("Unable to mkfs /dev/ram0")
+    FAIL("Unable to mkfs -j /dev/ram0")
 
 s, o = traceCommand("mkdir -p mnt");
 if s != 0:
