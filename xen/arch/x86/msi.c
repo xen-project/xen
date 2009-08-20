@@ -215,22 +215,6 @@ static int set_irq_msi(struct msi_desc *entry)
     return 0;
 }
 
-static int unset_irq_msi(int irq)
-{
-    ASSERT(spin_is_locked(&irq_desc[irq].lock));
-
-    if ( irq >= nr_irqs )
-    {
-        dprintk(XENLOG_ERR, "Trying to uninstall msi data for irq %d\n",
-                irq);
-        return -EINVAL;
-    }
-
-    irq_desc[irq].msi_desc = NULL;
-
-    return 0;
-}
-
 static void write_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
 {
     if ( iommu_enabled )
@@ -455,11 +439,6 @@ int setup_msi_irq(struct pci_dev *dev, struct msi_desc *msidesc, int irq)
     write_msi_msg(irq_desc[irq].msi_desc, &msg);
 
     return 0;
-}
-
-void teardown_msi_irq(int irq)
-{
-    unset_irq_msi(irq);
 }
 
 int msi_free_irq(struct msi_desc *entry)
@@ -780,27 +759,10 @@ void pci_disable_msi(struct msi_desc *msi_desc)
 static void msi_free_irqs(struct pci_dev* dev)
 {
     struct msi_desc *entry, *tmp;
-    struct irq_desc *desc;
-    unsigned long flags, irq;
 
     list_for_each_entry_safe( entry, tmp, &dev->msi_list, list )
     {
-        irq = entry->irq;
-        desc = &irq_desc[irq];
         pci_disable_msi(entry);
-
-        spin_lock_irqsave(&desc->lock, flags);
-
-        teardown_msi_irq(irq);
-
-        if ( desc->handler == &pci_msi_type )
-        {
-            /* MSI is not shared, so should be released already */
-            BUG_ON(desc->status & IRQ_GUEST);
-            desc->handler = &no_irq_type;
-        }
-
-        spin_unlock_irqrestore(&desc->lock, flags);
         msi_free_irq(entry);
     }
 }

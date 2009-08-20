@@ -1383,9 +1383,6 @@ int unmap_domain_pirq(struct domain *d, int pirq)
 
     BUG_ON(irq != domain_pirq_to_irq(d, pirq));
 
-    if ( msi_desc )
-        teardown_msi_irq(irq);
-
     if ( !forced_unbind )
     {
         d->arch.pirq_irq[pirq] = 0;
