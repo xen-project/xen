@@ -1,4 +1,29 @@
 
+----------------------------------------------------------------------
+
+Status of xm-test
+
+The xm-test environment was written in 2006.  It was mostly not
+updated or adapted to new / changed functionality since then.
+("it's slowly rotting", Keir Fraser, xen-devel mailing list,
+June 2009)
+During the last weeks there was the attempt to fix most of the
+problems - but there are still some major issues:
+o The reporting infrastructure is 'long gone' (Dan Smith, Mail from
+  Aug 2009).  Therefore there is no way to send out reports. When
+  running the runtests.sh you should therefore specify the '-d'
+  option.
+o The initrd.img (which is downloaded) is quite old and needs an
+  update. Especially functionality for migration it is missing.
+  [It should be discussed using an existing distribution instead of
+  compiling a micro distribution and put this into the initrd.)
+
+Andreas Florath <xen@flonatel.org>
+August 2009
+
+----------------------------------------------------------------------
+
+
 xm-test README
 
 Copyright (C) International Business Machines Corp., 2005
