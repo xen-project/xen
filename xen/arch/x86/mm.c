@@ -134,23 +134,6 @@ l1_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
 #define PTE_UPDATE_WITH_CMPXCHG
 #endif
 
-/* Used to defer flushing of memory structures. */
-struct percpu_mm_info {
-#define DOP_FLUSH_TLB      (1<<0) /* Flush the local TLB.                    */
-#define DOP_FLUSH_ALL_TLBS (1<<1) /* Flush TLBs of all VCPUs of current dom. */
-#define DOP_RELOAD_LDT     (1<<2) /* Reload the LDT shadow mapping.          */
-    unsigned int   deferred_ops;
-    /* If non-NULL, specifies a foreign subject domain for some operations. */
-    struct domain *foreign;
-};
-static DEFINE_PER_CPU(struct percpu_mm_info, percpu_mm_info);
-
-/*
- * Returns the current foreign domain; defaults to the currently-executing
- * domain if a foreign override hasn't been specified.
- */
-#define FOREIGNDOM (this_cpu(percpu_mm_info).foreign ?: current->domain)
-
 /* Private domain structs for DOMID_XEN and DOMID_IO. */
 struct domain *dom_xen, *dom_io;
 
@@ -1679,10 +1662,10 @@ static inline int update_intpte(intpte_t *p,
 /* Update the L1 entry at pl1e to new value nl1e. */
 static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
                         unsigned long gl1mfn, int preserve_ad,
-                        struct vcpu *vcpu)
+                        struct vcpu *pt_vcpu, struct domain *pg_dom)
 {
     l1_pgentry_t ol1e;
-    struct domain *d = vcpu->domain;
+    struct domain *pt_dom = pt_vcpu->domain;
     unsigned long mfn;
     p2m_type_t p2mt;
     int rc = 1;
@@ -1690,55 +1673,55 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
     if ( unlikely(__copy_from_user(&ol1e, pl1e, sizeof(ol1e)) != 0) )
         return 0;
 
-    if ( unlikely(paging_mode_refcounts(d)) )
+    if ( unlikely(paging_mode_refcounts(pt_dom)) )
     {
-        rc = UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, vcpu, preserve_ad);
+        rc = UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, pt_vcpu, preserve_ad);
         return rc;
     }
 
     if ( l1e_get_flags(nl1e) & _PAGE_PRESENT )
     {
         /* Translate foreign guest addresses. */
-        mfn = mfn_x(gfn_to_mfn(FOREIGNDOM, l1e_get_pfn(nl1e), &p2mt));
+        mfn = mfn_x(gfn_to_mfn(pg_dom, l1e_get_pfn(nl1e), &p2mt));
         if ( !p2m_is_ram(p2mt) || unlikely(mfn == INVALID_MFN) )
             return 0;
         ASSERT((mfn & ~(PADDR_MASK >> PAGE_SHIFT)) == 0);
         nl1e = l1e_from_pfn(mfn, l1e_get_flags(nl1e));
 
-        if ( unlikely(l1e_get_flags(nl1e) & l1_disallow_mask(d)) )
+        if ( unlikely(l1e_get_flags(nl1e) & l1_disallow_mask(pt_dom)) )
         {
             MEM_LOG("Bad L1 flags %x",
-                    l1e_get_flags(nl1e) & l1_disallow_mask(d));
+                    l1e_get_flags(nl1e) & l1_disallow_mask(pt_dom));
             return 0;
         }
 
         /* Fast path for identical mapping, r/w and presence. */
         if ( !l1e_has_changed(ol1e, nl1e, _PAGE_RW | _PAGE_PRESENT) )
         {
-            adjust_guest_l1e(nl1e, d);
-            rc = UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, vcpu,
+            adjust_guest_l1e(nl1e, pt_dom);
+            rc = UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, pt_vcpu,
                               preserve_ad);
             return rc;
         }
 
-        if ( unlikely(!get_page_from_l1e(nl1e, d, FOREIGNDOM)) )
+        if ( unlikely(!get_page_from_l1e(nl1e, pt_dom, pg_dom)) )
             return 0;
         
-        adjust_guest_l1e(nl1e, d);
-        if ( unlikely(!UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, vcpu,
+        adjust_guest_l1e(nl1e, pt_dom);
+        if ( unlikely(!UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, pt_vcpu,
                                     preserve_ad)) )
         {
             ol1e = nl1e;
             rc = 0;
         }
     }
-    else if ( unlikely(!UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, vcpu,
+    else if ( unlikely(!UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, pt_vcpu,
                                      preserve_ad)) )
     {
         return 0;
     }
 
-    put_page_from_l1e(ol1e, d);
+    put_page_from_l1e(ol1e, pt_dom);
     return rc;
 }
 
@@ -2482,91 +2465,63 @@ int new_guest_cr3(unsigned long mfn)
     return 1;
 }
 
-static void process_deferred_ops(void)
+static struct domain *get_pg_owner(domid_t domid)
 {
-    unsigned int deferred_ops;
-    struct domain *d = current->domain;
-    struct percpu_mm_info *info = &this_cpu(percpu_mm_info);
-
-    deferred_ops = info->deferred_ops;
-    info->deferred_ops = 0;
-
-    if ( deferred_ops & (DOP_FLUSH_ALL_TLBS|DOP_FLUSH_TLB) )
-    {
-        if ( deferred_ops & DOP_FLUSH_ALL_TLBS )
-            flush_tlb_mask(&d->domain_dirty_cpumask);
-        else
-            flush_tlb_local();
-    }
-
-    /*
-     * Do this after flushing TLBs, to ensure we see fresh LDT mappings
-     * via the linear pagetable mapping.
-     */
-    if ( deferred_ops & DOP_RELOAD_LDT )
-        (void)map_ldt_shadow_page(0);
-
-    if ( unlikely(info->foreign != NULL) )
-    {
-        rcu_unlock_domain(info->foreign);
-        info->foreign = NULL;
-    }
-}
-
-static int set_foreigndom(domid_t domid)
-{
-    struct domain *e, *d = current->domain;
-    struct percpu_mm_info *info = &this_cpu(percpu_mm_info);
-    int okay = 1;
-
-    ASSERT(info->foreign == NULL);
+    struct domain *pg_owner = NULL, *curr = current->domain;
 
     if ( likely(domid == DOMID_SELF) )
+    {
+        pg_owner = rcu_lock_domain(curr);
         goto out;
+    }
 
-    if ( unlikely(domid == d->domain_id) )
+    if ( unlikely(domid == curr->domain_id) )
     {
         MEM_LOG("Cannot specify itself as foreign domain");
-        okay = 0;
+        goto out;
     }
-    else if ( unlikely(paging_mode_translate(d)) )
+
+    if ( unlikely(paging_mode_translate(curr)) )
     {
         MEM_LOG("Cannot mix foreign mappings with translated domains");
-        okay = 0;
+        goto out;
     }
-    else switch ( domid )
+
+    switch ( domid )
     {
     case DOMID_IO:
-        info->foreign = rcu_lock_domain(dom_io);
+        pg_owner = rcu_lock_domain(dom_io);
         break;
     case DOMID_XEN:
-        if (!IS_PRIV(d)) {
+        if ( !IS_PRIV(curr) )
+        {
             MEM_LOG("Cannot set foreign dom");
-            okay = 0;
             break;
         }
-        info->foreign = rcu_lock_domain(dom_xen);
+        pg_owner = rcu_lock_domain(dom_xen);
         break;
     default:
-        if ( (e = rcu_lock_domain_by_id(domid)) == NULL )
+        if ( (pg_owner = rcu_lock_domain_by_id(domid)) == NULL )
         {
             MEM_LOG("Unknown domain '%u'", domid);
-            okay = 0;
             break;
         }
-        if ( !IS_PRIV_FOR(d, e) )
+        if ( !IS_PRIV_FOR(curr, pg_owner) )
         {
             MEM_LOG("Cannot set foreign dom");
-            okay = 0;
-            rcu_unlock_domain(e);
-            break;
+            rcu_unlock_domain(pg_owner);
+            pg_owner = NULL;
         }
-        info->foreign = e;
         break;
     }
 
  out:
-    return okay;
+    return pg_owner;
+}
+
+static void put_pg_owner(struct domain *pg_owner)
+{
+    rcu_unlock_domain(pg_owner);
 }
 
 static inline int vcpumask_to_pcpumask(
@@ -2642,6 +2597,7 @@ int do_mmuext_op(
     struct page_info *page;
     struct vcpu *curr = current;
     struct domain *d = curr->domain;
+    struct domain *pg_owner;
 
     if ( unlikely(count & MMU_UPDATE_PREEMPTED) )
     {
@@ -2658,7 +2614,7 @@ int do_mmuext_op(
         goto out;
     }
 
-    if ( !set_foreigndom(foreigndom) )
+    if ( (pg_owner = get_pg_owner(foreigndom)) == NULL )
     {
         rc = -ESRCH;
         goto out;
@@ -2680,7 +2636,7 @@ int do_mmuext_op(
         }
 
         gmfn  = op.arg1.mfn;
-        mfn = gmfn_to_mfn(FOREIGNDOM, gmfn);
+        mfn = gmfn_to_mfn(pg_owner, gmfn);
         if ( mfn == INVALID_MFN )
         {
             MEM_LOG("Bad gmfn_to_mfn");
@@ -2705,7 +2661,7 @@ int do_mmuext_op(
             goto pin_page;
 
         case MMUEXT_PIN_L4_TABLE:
-            if ( is_pv_32bit_domain(FOREIGNDOM) )
+            if ( is_pv_32bit_domain(pg_owner) )
                 break;
             type = PGT_l4_page_table;
 
@@ -2718,10 +2674,10 @@ int do_mmuext_op(
             if ( (op.cmd - MMUEXT_PIN_L1_TABLE) > (CONFIG_PAGING_LEVELS - 1) )
                 break;
 
-            if ( paging_mode_refcounts(FOREIGNDOM) )
+            if ( paging_mode_refcounts(pg_owner) )
                 break;
 
-            rc = get_page_and_type_from_pagenr(mfn, type, FOREIGNDOM, 0, 1);
+            rc = get_page_and_type_from_pagenr(mfn, type, pg_owner, 0, 1);
             okay = !rc;
             if ( unlikely(!okay) )
             {
@@ -2745,14 +2701,14 @@ int do_mmuext_op(
             paging_mark_dirty(d, mfn);
            
             /* We can race domain destruction (domain_relinquish_resources). */
-            if ( unlikely(this_cpu(percpu_mm_info).foreign != NULL) )
+            if ( unlikely(pg_owner != d) )
             {
                 int drop_ref;
-                spin_lock(&FOREIGNDOM->page_alloc_lock);
-                drop_ref = (FOREIGNDOM->is_dying &&
+                spin_lock(&pg_owner->page_alloc_lock);
+                drop_ref = (pg_owner->is_dying &&
                             test_and_clear_bit(_PGT_pinned,
                                                &page->u.inuse.type_info));
-                spin_unlock(&FOREIGNDOM->page_alloc_lock);
+                spin_unlock(&pg_owner->page_alloc_lock);
                 if ( drop_ref )
                     put_page_and_type(page);
             }
@@ -2789,7 +2745,6 @@ int do_mmuext_op(
 
         case MMUEXT_NEW_BASEPTR:
             okay = new_guest_cr3(mfn);
-            this_cpu(percpu_mm_info).deferred_ops &= ~DOP_FLUSH_TLB;
             break;
         
 #ifdef __x86_64__
@@ -2826,7 +2781,7 @@ int do_mmuext_op(
 #endif
         
         case MMUEXT_TLB_FLUSH_LOCAL:
-            this_cpu(percpu_mm_info).deferred_ops |= DOP_FLUSH_TLB;
+            flush_tlb_local();
             break;
     
         case MMUEXT_INVLPG_LOCAL:
@@ -2838,7 +2793,7 @@ int do_mmuext_op(
         case MMUEXT_TLB_FLUSH_MULTI:
         case MMUEXT_INVLPG_MULTI:
         {
-            cpumask_t     pmask;
+            cpumask_t pmask;
 
             if ( unlikely(vcpumask_to_pcpumask(d, op.arg2.vcpumask, &pmask)) )
             {
@@ -2853,7 +2808,7 @@ int do_mmuext_op(
         }
 
         case MMUEXT_TLB_FLUSH_ALL:
-            this_cpu(percpu_mm_info).deferred_ops |= DOP_FLUSH_ALL_TLBS;
+            flush_tlb_mask(&d->domain_dirty_cpumask);
             break;
     
         case MMUEXT_INVLPG_ALL:
@@ -2893,13 +2848,12 @@ int do_mmuext_op(
                       (curr->arch.guest_context.ldt_base != ptr) )
             {
                 invalidate_shadow_ldt(curr, 0);
-                this_cpu(percpu_mm_info).deferred_ops |= DOP_FLUSH_TLB;
+                flush_tlb_local();
                 curr->arch.guest_context.ldt_base = ptr;
                 curr->arch.guest_context.ldt_ents = ents;
                 load_LDT(curr);
-                this_cpu(percpu_mm_info).deferred_ops &= ~DOP_RELOAD_LDT;
                 if ( ents != 0 )
-                    this_cpu(percpu_mm_info).deferred_ops |= DOP_RELOAD_LDT;
+                    (void)map_ldt_shadow_page(0);
             }
             break;
         }
@@ -2909,7 +2863,7 @@ int do_mmuext_op(
             unsigned char *ptr;
 
             okay = !get_page_and_type_from_pagenr(mfn, PGT_writable_page,
-                                                  FOREIGNDOM, 0, 0);
+                                                  pg_owner, 0, 0);
             if ( unlikely(!okay) )
             {
                 MEM_LOG("Error while clearing mfn %lx", mfn);
@@ -2933,8 +2887,8 @@ int do_mmuext_op(
             unsigned char *dst;
             unsigned long src_mfn;
 
-            src_mfn = gmfn_to_mfn(FOREIGNDOM, op.arg2.src_mfn);
-            okay = get_page_from_pagenr(src_mfn, FOREIGNDOM);
+            src_mfn = gmfn_to_mfn(pg_owner, op.arg2.src_mfn);
+            okay = get_page_from_pagenr(src_mfn, pg_owner);
             if ( unlikely(!okay) )
             {
                 MEM_LOG("Error while copying from mfn %lx", src_mfn);
@@ -2942,7 +2896,7 @@ int do_mmuext_op(
             }
 
             okay = !get_page_and_type_from_pagenr(mfn, PGT_writable_page,
-                                                  FOREIGNDOM, 0, 0);
+                                                  pg_owner, 0, 0);
             if ( unlikely(!okay) )
             {
                 put_page(mfn_to_page(src_mfn));
@@ -2985,7 +2939,7 @@ int do_mmuext_op(
             __HYPERVISOR_mmuext_op, "hihi",
             uops, (count - i) | MMU_UPDATE_PREEMPTED, pdone, foreigndom);
 
-    process_deferred_ops();
+    put_pg_owner(pg_owner);
 
     perfc_add(num_mmuext_ops, i);
 
@@ -3012,7 +2966,7 @@ int do_mmu_update(
     struct page_info *page;
     int rc = 0, okay = 1, i = 0;
     unsigned int cmd, done = 0, pt_dom;
-    struct domain *d = current->domain, *pt_owner = d;
+    struct domain *d = current->domain, *pt_owner = d, *pg_owner;
     struct vcpu *v = current;
     struct domain_mmap_cache mapcache;
 
@@ -3053,7 +3007,7 @@ int do_mmu_update(
         }
     }
 
-    if ( !set_foreigndom((uint16_t)foreigndom) )
+    if ( (pg_owner = get_pg_owner((uint16_t)foreigndom)) == NULL )
     {
         rc = -ESRCH;
         goto out;
@@ -3088,7 +3042,7 @@ int do_mmu_update(
              */
         case MMU_NORMAL_PT_UPDATE:
         case MMU_PT_UPDATE_PRESERVE_AD:
-            rc = xsm_mmu_normal_update(d, FOREIGNDOM, req.val);
+            rc = xsm_mmu_normal_update(d, pg_owner, req.val);
             if ( rc )
                 break;
 
@@ -3115,7 +3069,8 @@ int do_mmu_update(
                 {
                     l1_pgentry_t l1e = l1e_from_intpte(req.val);
                     okay = mod_l1_entry(va, l1e, mfn,
-                                        cmd == MMU_PT_UPDATE_PRESERVE_AD, v);
+                                        cmd == MMU_PT_UPDATE_PRESERVE_AD, v,
+                                        pg_owner);
                 }
                 break;
                 case PGT_l2_page_table:
@@ -3174,13 +3129,13 @@ int do_mmu_update(
             if ( rc )
                 break;
 
-            if ( unlikely(!get_page_from_pagenr(mfn, FOREIGNDOM)) )
+            if ( unlikely(!get_page_from_pagenr(mfn, pg_owner)) )
             {
                 MEM_LOG("Could not get page for mach->phys update");
                 break;
             }
 
-            if ( unlikely(paging_mode_translate(FOREIGNDOM)) )
+            if ( unlikely(paging_mode_translate(pg_owner)) )
             {
                 MEM_LOG("Mach-phys update on auto-translate guest");
                 break;
@@ -3189,7 +3144,7 @@ int do_mmu_update(
             set_gpfn_from_mfn(mfn, gpfn);
             okay = 1;
 
-            paging_mark_dirty(FOREIGNDOM, mfn);
+            paging_mark_dirty(pg_owner, mfn);
 
             put_page(mfn_to_page(mfn));
             break;
@@ -3215,7 +3170,7 @@ int do_mmu_update(
             __HYPERVISOR_mmu_update, "hihi",
             ureqs, (count - i) | MMU_UPDATE_PREEMPTED, pdone, foreigndom);
 
-    process_deferred_ops();
+    put_pg_owner(pg_owner);
 
     domain_mmap_cache_destroy(&mapcache);
 
@@ -3717,8 +3672,8 @@ int steal_page(
     return -1;
 }
 
-int do_update_va_mapping(unsigned long va, u64 val64,
-                         unsigned long flags)
+static int __do_update_va_mapping(
+    unsigned long va, u64 val64, unsigned long flags, struct domain *pg_owner)
 {
     l1_pgentry_t   val = l1e_from_intpte(val64);
     struct vcpu   *v   = current;
@@ -3731,7 +3686,7 @@ int do_update_va_mapping(unsigned long va, u64 val64,
 
     perfc_incr(calls_to_update_va);
 
-    rc = xsm_update_va_mapping(d, FOREIGNDOM, val);
+    rc = xsm_update_va_mapping(d, pg_owner, val);
     if ( rc )
         return rc;
 
@@ -3754,7 +3709,7 @@ int do_update_va_mapping(unsigned long va, u64 val64,
         goto out;
     }
 
-    rc = mod_l1_entry(pl1e, val, gl1mfn, 0, v) ? 0 : -EINVAL;
+    rc = mod_l1_entry(pl1e, val, gl1mfn, 0, v, pg_owner) ? 0 : -EINVAL;
 
     page_unlock(gl1pg);
     put_page(gl1pg);
@@ -3769,32 +3724,24 @@ int do_update_va_mapping(unsigned long va, u64 val64,
         switch ( (bmap_ptr = flags & ~UVMF_FLUSHTYPE_MASK) )
         {
         case UVMF_LOCAL:
-            this_cpu(percpu_mm_info).deferred_ops |= DOP_FLUSH_TLB;
+            flush_tlb_local();
             break;
         case UVMF_ALL:
-            this_cpu(percpu_mm_info).deferred_ops |= DOP_FLUSH_ALL_TLBS;
+            flush_tlb_mask(&d->domain_dirty_cpumask);
             break;
         default:
-            if ( this_cpu(percpu_mm_info).deferred_ops & DOP_FLUSH_ALL_TLBS )
-                break;
             rc = vcpumask_to_pcpumask(d, const_guest_handle_from_ptr(bmap_ptr,
                                                                      void),
                                       &pmask);
-            if ( cpu_isset(smp_processor_id(), pmask) )
-                this_cpu(percpu_mm_info).deferred_ops &= ~DOP_FLUSH_TLB;
             flush_tlb_mask(&pmask);
             break;
         }
         break;
 
     case UVMF_INVLPG:
-        if ( this_cpu(percpu_mm_info).deferred_ops & DOP_FLUSH_ALL_TLBS )
-            break;
         switch ( (bmap_ptr = flags & ~UVMF_FLUSHTYPE_MASK) )
         {
         case UVMF_LOCAL:
-            if ( this_cpu(percpu_mm_info).deferred_ops & DOP_FLUSH_TLB )
-                break;
             if ( !paging_mode_enabled(d) ||
                  (paging_invlpg(v, va) != 0) ) 
                 flush_tlb_one_local(va);
@@ -3806,32 +3753,34 @@ int do_update_va_mapping(unsigned long va, u64 val64,
             rc = vcpumask_to_pcpumask(d, const_guest_handle_from_ptr(bmap_ptr,
                                                                      void),
                                       &pmask);
-            if ( this_cpu(percpu_mm_info).deferred_ops & DOP_FLUSH_TLB )
-                cpu_clear(smp_processor_id(), pmask);
             flush_tlb_one_mask(&pmask, va);
             break;
         }
         break;
     }
 
-    process_deferred_ops();
-
     return rc;
+}
+
+int do_update_va_mapping(unsigned long va, u64 val64,
+                         unsigned long flags)
+{
+    return __do_update_va_mapping(va, val64, flags, current->domain);
 }
 
 int do_update_va_mapping_otherdomain(unsigned long va, u64 val64,
                                      unsigned long flags,
                                      domid_t domid)
 {
+    struct domain *pg_owner;
     int rc;
 
-    if ( !set_foreigndom(domid) )
+    if ( (pg_owner = get_pg_owner(domid)) == NULL )
         return -ESRCH;
 
-    rc = do_update_va_mapping(va, val64, flags);
+    rc = __do_update_va_mapping(va, val64, flags, pg_owner);
 
-    BUG_ON(this_cpu(percpu_mm_info).deferred_ops);
-    process_deferred_ops(); /* only to clear foreigndom */
+    put_pg_owner(pg_owner);
 
     return rc;
 }
