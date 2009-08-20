@@ -244,6 +244,9 @@ class XenNetDevice(XenDevice):
     def getNetwork(self):
         return self.network
 
+    def get_netmask(self):
+        return self.netmask
+
     def setNetDevIP(self, ip=None):
         # Function to set a new IP for NetDevice.
         if NETWORK_IP_RANGE == "dhcp":

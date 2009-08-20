@@ -29,3 +29,4 @@ unpause
 vcpu-disable
 vcpu-pin
 vtpm
+xapi

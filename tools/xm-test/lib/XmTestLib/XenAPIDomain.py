@@ -94,9 +94,8 @@ class XenAPIDomain(XenDomain):
         self.netEnv = "bridge"
 
         self.session = xapi.connect()
-        session = self.session
         try:
-            self.vm_uuid = session.xenapi.VM.create(self.config.getOpts())
+            self.vm_uuid = self.session.xenapi.VM.create(self.config.getOpts())
             addXAPIDomain(self.vm_uuid)
         except:
             raise DomainError("Could not create VM config file for "

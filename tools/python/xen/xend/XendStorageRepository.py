@@ -103,3 +103,16 @@ class XendStorageRepository:
 
     def destroy_vdi(self, vdi_struct):
         raise NotImplementedError()
+
+    def list_images(self):
+        """ List all the available images by UUID.
+
+        @rtype: list of strings.
+        @return: list of UUIDs
+        """
+        self.lock.acquire()
+        try:
+            return self.images.keys()
+        finally:
+            self.lock.release()
+

@@ -11,7 +11,9 @@ usage() {
     echo "  Where opts are:"
     echo "  -d          : do not submit a report for this run"
     echo "  -b          : do not ask any questions (batch mode)"
-    echo "  -g          : run a group test set"
+    echo "  -g <group>  : run a group test set"
+    echo "                available goups are:"
+    echo "                "`ls grouptest`
     echo "  -e <email>  : set email address for report"
     echo "  -r <url>    : url of test results repository to use"
     echo "  -s <report> : just submit report <report>"

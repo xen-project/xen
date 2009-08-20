@@ -1,7 +1,9 @@
 #!/usr/bin/python
 
 # Copyright (C) International Business Machines Corp., 2007
-# Author: Stefan Berger <stefanb@us.ibm.com>
+# Copyright (C) flonatel GmbH & Co. KG
+# Authors: Stefan Berger <stefanb@us.ibm.com>
+#          Andreas Florath <xen@flonatel.org>
 
 # Tests related to SR, VDI, VBD
 #
@@ -10,7 +12,7 @@
 #
 # VDI: create, get_name_label, destroy
 #
-# VBD: create, get_driver, get_mode, get_VM, get_VDI, get_device
+# VBD: create, get_mode, get_VM, get_VDI, get_device
 #
 # VM: get_VBDs
 
@@ -43,7 +45,8 @@ vdi_rec = { 'name_label'  : "My disk",
             'sector_size' : 512,
             'type'        : 0,
             'shareable'   : 0,
-            'read-only'   : 0
+            'read-only'   : 0,
+            'other_config': { 'location': "phy:/dev/xg/storage_root" },
 }
 
 vdi_ref = session.xenapi.VDI.create(vdi_rec)
@@ -61,8 +64,6 @@ if res != vdi_rec['name_label']:
 #MORE method calls to VDI to add here...
 
 
-
-
 vbd_rec = { 'VM'    : vm_uuid,
             'VDI'   : vdi_ref,
             'device': "xvda1",
@@ -71,12 +72,6 @@ vbd_rec = { 'VM'    : vm_uuid,
 }
 
 vbd_ref = session.xenapi.VBD.create(vbd_rec)
-
-res = session.xenapi.VBD.get_driver(vbd_ref)
-print "VBD driver: %s" % res
-if res != XendAPIConstants.XEN_API_DRIVER_TYPE[int(vbd_rec['driver'])]:
-    session.xenapi.VDI.destroy(vdi_ref)
-    FAIL("VBD_get_driver returned wrong information")
 
 res = session.xenapi.VBD.get_mode(vbd_ref)
 print "VBD mode: %s" % res
@@ -97,7 +92,7 @@ if res != vdi_ref:
 
 res = session.xenapi.VBD.get_device(vbd_ref)
 print "VBD device: %s" % res
-if res != vbd_rec['device']+":disk":
+if res != vbd_rec['device']:
     session.xenapi.VDI.destroy(vdi_ref)
     FAIL("VBD_get_device returned wrong result")
 
@@ -105,7 +100,6 @@ res = session.xenapi.VM.get_VBDs(vm_uuid)
 if vbd_ref not in res:
     session.xenapi.VDI.destroy(vdi_ref)
     FAIL("VM_get_VBDS does not show created VBD")
-
 
 rc = domain.start()
 
@@ -117,7 +111,6 @@ except ConsoleError, e:
     saveLog(console.getHistory())
     session.xenapi.VDI.destroy(vdi_ref)
     FAIL("Could not access proc-filesystem")
-
 
 domain.stop()
 domain.destroy()

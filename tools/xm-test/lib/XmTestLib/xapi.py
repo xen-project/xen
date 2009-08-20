@@ -15,6 +15,7 @@
 #============================================================================
 # Copyright (C) 2006 XenSource Ltd.
 # Copyright (C) 2006 IBM Corporation
+# Copyright (C) 2009 flonatel GmbH & Co. KG
 #============================================================================
 
 import atexit
@@ -27,33 +28,21 @@ from xen.xm.opts import OptionError
 from types import DictType
 import xml.dom.minidom
 
-def get_login_pwd():
-    if xmmain.serverType == xmmain.SERVER_XEN_API:
-        try:
-            login, password = xmmain.parseAuthentication()
-            return (login, password)
-        except:
-            raise OptionError("Configuration for login/pwd not found. "
-                              "Need to run xapi-setup.py?")
-    raise OptionError("Xm configuration file not using Xen-API for "
-                      "communication with xend.")
-
 sessions=[]
 
 def connect(*args):
+    creds = ("", "")
+    uri = "http://localhost:9363"
+
     try:
-        creds = get_login_pwd()
-    except Exception, e:
-        FAIL("%s" % str(e))
-    try:
-        session = XenAPI.Session(xmmain.serverURI)
+        session = XenAPI.Session(uri)
     except:
         raise OptionError("Could not create XenAPI session with Xend." \
-                          "URI=%s" % xmmain.serverURI)
+                          "URI=%s" % uri)
     try:
         session.login_with_password(*creds)
     except:
-        raise OptionError("Could not login to Xend. URI=%s" % xmmain.serverURI)
+        raise OptionError("Could not login to Xend. URI=%s" % uri)
     def logout():
         try:
             for s in sessions:

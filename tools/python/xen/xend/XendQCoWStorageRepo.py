@@ -260,18 +260,6 @@ class XendQCoWStorageRepo(XendStorageRepository):
         
         return False
 
-    def list_images(self):
-        """ List all the available images by UUID.
-
-        @rtype: list of strings.
-        @return: list of UUIDs
-        """
-        self.lock.acquire()
-        try:
-            return self.images.keys()
-        finally:
-            self.lock.release()
-
     def free_space_bytes(self):
         """Returns the amount of available space in KB.
         @rtype: int
