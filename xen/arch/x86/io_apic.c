@@ -2393,7 +2393,7 @@ void __init init_ioapic_mappings(void)
         }
     }
 
-    nr_irqs_gsi = max(nr_irqs, highest_gsi());
+    nr_irqs_gsi = max(nr_irqs_gsi, highest_gsi());
 
     if ( !smp_found_config || skip_ioapic_setup || nr_irqs_gsi < 16 )
         nr_irqs_gsi = 16;
