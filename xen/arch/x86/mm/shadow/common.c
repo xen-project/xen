@@ -1423,7 +1423,6 @@ static void _shadow_prealloc(
  * to avoid freeing shadows that the caller is currently working on. */
 void shadow_prealloc(struct domain *d, u32 type, unsigned int count)
 {
-    ASSERT(type != SH_type_p2m_table);
     return _shadow_prealloc(d, shadow_order(type), count);
 }
 
@@ -1676,6 +1675,7 @@ sh_alloc_p2m_pages(struct domain *d)
          < (shadow_min_acceptable_pages(d) + (1 << order)) )
         return 0; /* Not enough shadow memory: need to increase it first */
     
+    shadow_prealloc(d, SH_type_p2m_table, 1);
     pg = mfn_to_page(shadow_alloc(d, SH_type_p2m_table, 0));
     d->arch.paging.shadow.p2m_pages += (1 << order);
     d->arch.paging.shadow.total_pages -= (1 << order);
