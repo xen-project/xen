@@ -157,6 +157,7 @@ class GrubConfigFile(object):
         self.images = []
         self.timeout = -1
         self._default = 0
+        self.passwordAccess = True
 
         if fn is not None:
             self.parse()
@@ -196,6 +197,7 @@ class GrubConfigFile(object):
             if self.commands.has_key(com):
                 if self.commands[com] is not None:
                     setattr(self, self.commands[com], arg.strip())
+                    #print "%s = %s => %s" % (com, self.commands[com], arg.strip() )
                 else:
                     logging.info("Ignored directive %s" %(com,))
             else:
@@ -203,6 +205,37 @@ class GrubConfigFile(object):
                 
         if len(img) > 0:
             self.add_image(GrubImage(img))
+
+        if self.hasPassword():
+            self.setPasswordAccess(False)
+
+    def hasPasswordAccess(self):
+        return self.passwordAccess
+
+    def setPasswordAccess(self, val):
+        self.passwordAccess = val
+
+    def hasPassword(self):
+        try:
+            getattr(self, self.commands['password'])
+            return True
+        except KeyError, e:
+            return False
+
+    def checkPassword(self, password):
+        try:
+            pwd = getattr(self, self.commands['password']).split()
+            if pwd[0] == '--md5':
+                import crypt
+                if crypt.crypt(password, pwd[1]) == pwd[1]:
+                    return True
+
+            if pwd[0] == password:
+                return True
+
+            return False
+        except:
+            return True
 
     def set(self, line):
         (com, arg) = grub_exact_split(line, 2)
