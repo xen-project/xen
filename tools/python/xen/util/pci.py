@@ -1003,7 +1003,7 @@ class PciDevice:
                         if pos != 0:
                             ctrl = self.pci_conf_read16(pos + PCI_EXT_ACS_CTRL)
                             if (ctrl & PCI_EXT_CAP_ACS_ENABLED) == \
-                                PCI_EXT_CAP_ACS_ENABLED
+                                (PCI_EXT_CAP_ACS_ENABLED):
                                 self.acs_enabled = True
         else:
             if  pos != 0:
