@@ -114,7 +114,7 @@ TAGS:
 
 .PHONY: clean
 clean:
-	rm -rf *.rpm $(LIB) *~ $(DEPS) \
+	rm -rf *.rpm $(LIB) *~ $(DEPS) .*.deps \
             $(CTRL_LIB_OBJS) $(CTRL_PIC_OBJS) \
             $(GUEST_LIB_OBJS) $(GUEST_PIC_OBJS)
 
@@ -151,6 +151,26 @@ libxenguest.so: libxenguest.so.$(MAJOR)
 libxenguest.so.$(MAJOR): libxenguest.so.$(MAJOR).$(MINOR)
 	ln -sf $< $@
 
+.zlib.deps:
+	@(set -e;					\
+          . ../check/funcs.sh;				\
+	  rm -f $@.new;					\
+	  if has_header bzlib.h; then			\
+            echo "-DHAVE_BZLIB" >>$@.new;		\
+	    echo "-lbz2" >>$@.new;			\
+	    echo " - BZIP2 decompression supported";	\
+	  fi;						\
+	  if has_header lzma.h; then			\
+	    echo "-DHAVE_LZMA" >>$@.new;		\
+	    echo "-llzma" >>$@.new;			\
+	    echo " - LZMA decompression supported";	\
+	  fi;						\
+	  mv $@.new $@)
+
+xc_dom_bzimageloader.o: .zlib.deps
+xc_dom_bzimageloader.o: CFLAGS += $(shell grep D .zlib.deps)
+
+libxenguest.so.$(MAJOR).$(MINOR): LDFLAGS += $(shell grep l .zlib.deps)
 libxenguest.so.$(MAJOR).$(MINOR): $(GUEST_PIC_OBJS) libxenctrl.so
 	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenguest.so.$(MAJOR) $(SHLIB_CFLAGS) -o $@ $(GUEST_PIC_OBJS) -lz -lxenctrl $(PTHREAD_LIBS)
 
