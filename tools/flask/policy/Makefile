@@ -3,7 +3,7 @@
 #
 # Targets:
 # 
-# install       - compile and install the policy configuration, and context files.
+# install       - compile and install the policy configuration.
 # load          - compile, install, and load the policy configuration.
 # reload        - compile, install, and load/reload the policy configuration.
 # policy        - compile the policy configuration locally for testing/development.
@@ -20,35 +20,31 @@
 # By default, checkpolicy will create the highest
 # version policy it supports.  Setting this will
 # override the version.
-#OUTPUT_POLICY = 20
+# OUTPUT_POLICY = 24
 
 # Policy Type
-# strict, targeted,
-# strict-mls, targeted-mls,
-# strict-mcs, targeted-mcs
-TYPE = strict
+# xen
+# xen-mls
+TYPE = xen 
 
 # Policy Name
 # If set, this will be used as the policy
-# name.  Otherwise the policy type will be
+# name.  Otherwise xenpolicy will be
 # used for the name.
-NAME = xenrefpolicy
+# NAME = xenpolicy
 
-# Distribution
-# Some distributions have portions of policy
-# for programs or configurations specific to the
-# distribution.  Setting this will enable options
-# for the distribution.
-# redhat, gentoo, debian, and suse are current options.
-# Fedora users should enable redhat.
-#DISTRO = 
+# Number of MLS Sensitivities
+# The sensitivities will be s0 to s(MLS_SENS-1).
+# Dominance will be in increasing numerical order
+# with s0 being lowest.
+# MLS_SENS = 16
 
-# Build monolithic policy.  Putting n here
-# will build a loadable module policy.
-MONOLITHIC=y
+# Number of MLS Categories
+# The categories will be c0 to c(MLS_CATS-1).
+# MLS_CATS = 256
 
 # Uncomment this to disable command echoing
-#QUIET:=@
+# QUIET:=@
 
 ########################################
 #
@@ -60,11 +56,7 @@ PREFIX := /usr
 BINDIR := $(PREFIX)/bin
 SBINDIR := $(PREFIX)/sbin
 CHECKPOLICY := $(BINDIR)/checkpolicy
-CHECKMODULE := $(BINDIR)/checkmodule
-SEMOD_PKG := $(BINDIR)/semodule_package
 LOADPOLICY := $(SBINDIR)/flask-loadpolicy
-
-CFLAGS := -Wall
 
 # policy source layout
 POLDIR := policy
@@ -74,10 +66,6 @@ SECCLASS := $(FLASKDIR)/security_classes
 ISIDS := $(FLASKDIR)/initial_sids
 AVS := $(FLASKDIR)/access_vectors
 
-#policy building support tools
-SUPPORT := support
-FCSORT := tmp/fc_sort
-
 # config file paths
 GLOBALTUN := $(POLDIR)/global_tunables
 GLOBALBOOL := $(POLDIR)/global_booleans
@@ -86,149 +74,158 @@ TUNABLES := $(POLDIR)/tunables.conf
 BOOLEANS := $(POLDIR)/booleans.conf
 
 # install paths
-TOPDIR = $(DESTDIR)$(XEN_CONFIG_DIR)
-INSTALLDIR = $(TOPDIR)/$(NAME)
-SRCPATH = $(INSTALLDIR)/src
-USERPATH = $(INSTALLDIR)/users
-CONTEXTPATH = $(INSTALLDIR)/contexts
+
+DESTDIR = /boot
+INSTALLDIR = $(DESTDIR)
+LOADPATH = $(INSTALLDIR)/$(POLVER)
+
+# default MLS sensitivity and category settings.
+MLS_SENS ?= 16
+MLS_CATS ?= 256
 
 # enable MLS if requested.
 ifneq ($(findstring -mls,$(TYPE)),)
-	override M4PARAM += -D enable_mls
+	M4PARAM += -D enable_mls
 	CHECKPOLICY += -M
-	CHECKMODULE += -M
-endif
-
-# enable MLS if MCS requested.
-ifneq ($(findstring -mcs,$(TYPE)),)
-	override M4PARAM += -D enable_mcs
-	CHECKPOLICY += -M
-	CHECKMODULE += -M
-endif
-
-# compile targeted policy if requested.
-ifneq ($(findstring targeted,$(TYPE)),)
-	override M4PARAM += -D targeted_policy
-endif
-
-# enable distribution-specific policy
-ifneq ($(DISTRO),)
-	override M4PARAM += -D distro_$(DISTRO)
-endif
-
-ifneq ($(OUTPUT_POLICY),)
-	CHECKPOLICY += -c $(OUTPUT_POLICY)
 endif
 
 ifeq ($(NAME),)
-	NAME := $(TYPE)
+	NAME := xenpolicy
 endif
+
+PV := $(shell $(CHECKPOLICY) -V |cut -f 1 -d ' ')
+
+ifneq ($(OUTPUT_POLICY),)
+	CHECKPOLICY += -c $(OUTPUT_POLICY)
+	POLVER = $(NAME).$(OUTPUT_POLICY)
+else
+	POLVER +=$(NAME).$(PV)
+endif
+
 
 # determine the policy version and current kernel version if possible
-PV := $(shell $(CHECKPOLICY) -V |cut -f 1 -d ' ')
-KV := $(shell cat /selinux/policyvers)
-
-# dont print version warnings if we are unable to determine
-# the currently running kernel's policy version
-ifeq ($(KV),)
-	KV := $(PV)
-endif
-
-FC := file_contexts
-POLVER := policy.$(PV)
+M4PARAM += -D mls_num_sens=$(MLS_SENS) -D mls_num_cats=$(MLS_CATS) -D hide_broken_symptoms
 
 M4SUPPORT = $(wildcard $(POLDIR)/support/*.spt)
 
-APPCONF := config/appconfig-$(TYPE)
-APPDIR := $(CONTEXTPATH)
-APPFILES := $(INSTALLDIR)/booleans
-CONTEXTFILES += $(wildcard $(APPCONF)/*_context*) $(APPCONF)/media
-USER_FILES := $(POLDIR)/systemuser $(POLDIR)/users
-
 ALL_LAYERS := $(filter-out $(MODDIR)/CVS,$(shell find $(wildcard $(MODDIR)/*) -maxdepth 0 -type d))
-
-GENERATED_TE := $(basename $(foreach dir,$(ALL_LAYERS),$(wildcard $(dir)/*.te.in)))
-GENERATED_IF := $(basename $(foreach dir,$(ALL_LAYERS),$(wildcard $(dir)/*.if.in)))
-GENERATED_FC := $(basename $(foreach dir,$(ALL_LAYERS),$(wildcard $(dir)/*.fc.in)))
 
 # sort here since it removes duplicates, which can happen
 # when a generated file is already generated
-DETECTED_MODS := $(sort $(foreach dir,$(ALL_LAYERS),$(wildcard $(dir)/*.te)) $(GENERATED_TE))
+DETECTED_MODS := $(sort $(foreach dir,$(ALL_LAYERS),$(wildcard $(dir)/*.te))) 
 
-# modules.conf setting for base module
-MODBASE := base
-
-# modules.conf setting for module
-MODMOD := module
+# modules.conf setting for policy configuration
+MODENABLED := on
 
 # extract settings from modules.conf
-BASE_MODS := $(foreach mod,$(shell awk '/^[[:blank:]]*[[:alpha:]]/{ if ($$3 == "$(MODBASE)") print $$1 }' $(MOD_CONF) 2> /dev/null),$(subst ./,,$(shell find -iname $(mod).te)))
-MOD_MODS := $(foreach mod,$(shell awk '/^[[:blank:]]*[[:alpha:]]/{ if ($$3 == "$(MODMOD)") print $$1 }' $(MOD_CONF) 2> /dev/null),$(subst ./,,$(shell find -iname $(mod).te)))
+ENABLED_MODS := $(foreach mod,$(shell awk '/^[[:blank:]]*[[:alpha:]]/{ if ($$3 == "$(MODENABLED)") print $$1 }' $(MOD_CONF) 2> /dev/null),$(subst ./,,$(shell find -iname $(mod).te)))
 
-HOMEDIR_TEMPLATE = tmp/homedir_template
+ALL_MODULES := $(filter $(ENABLED_MODS),$(DETECTED_MODS))
+
+ALL_INTERFACES := $(ALL_MODULES:.te=.if)
+ALL_TE_FILES := $(ALL_MODULES)
+
+PRE_TE_FILES := $(SECCLASS) $(ISIDS) $(AVS) $(M4SUPPORT) $(POLDIR)/mls 
+POST_TE_FILES := $(POLDIR)/users $(POLDIR)/constraints
+
+POLICY_SECTIONS := tmp/pre_te_files.conf tmp/all_interfaces.conf tmp/all_attrs_types.conf $(GLOBALBOOL) $(GLOBALTUN) tmp/only_te_rules.conf tmp/all_post.conf
 
 ########################################
 #
-# Load appropriate rules
+# default action: build policy locally
 #
+default: policy
 
-ifeq ($(MONOLITHIC),y)
-	include Rules.monolithic
-else
-	include Rules.modular
+policy: $(POLVER)
+
+install: $(LOADPATH)
+
+load: tmp/load
+
+########################################
+#
+# Build a binary policy locally
+#
+$(POLVER): policy.conf
+	@echo "Compiling $(NAME) $(POLVER)"
+	$(QUIET) $(CHECKPOLICY) $^ -o $@
+
+########################################
+#
+# Install a binary policy
+#
+$(LOADPATH): policy.conf
+	@echo "Compiling and installing $(NAME) $(LOADPATH)"
+	$(QUIET) $(CHECKPOLICY) $^ -o $@
+
+########################################
+#
+# Load the binary policy
+#
+reload tmp/load: $(LOADPATH) $(FCPATH)
+	@echo "Loading $(NAME) $(LOADPATH)"
+	$(QUIET) $(LOADPOLICY) $(LOADPATH)
+	@touch tmp/load
+
+########################################
+#
+# Construct a monolithic policy.conf
+#
+policy.conf: $(POLICY_SECTIONS)
+	@echo "Creating $(NAME) policy.conf"
+# checkpolicy can use the #line directives provided by -s for error reporting:
+	$(QUIET) m4 -D self_contained_policy $(M4PARAM) -s $^ > $@
+
+tmp/pre_te_files.conf: $(PRE_TE_FILES)
+	@test -d tmp || mkdir -p tmp
+	$(QUIET) cat $^ > $@
+
+tmp/all_interfaces.conf: $(M4SUPPORT) $(ALL_INTERFACES)
+ifeq ($(ALL_INTERFACES),)
+	$(error No enabled modules! $(notdir $(MOD_CONF)) please create a modules.conf file)
 endif
+	@test -d tmp || mkdir -p tmp
+	$(QUIET) cat $^ | sed -e s/dollarsstar/\$$\*/g > $@
 
-########################################
-#
-# Create config files
-#
-conf: $(MOD_CONF) $(BOOLEANS) $(GENERATED_TE) $(GENERATED_IF) $(GENERATED_FC)
-
-$(MOD_CONF) $(BOOLEANS): $(POLXML)
-	@echo "Updating $(MOD_CONF) and $(BOOLEANS)"
-	$(QUIET) cd $(DOCS) && ../$(GENDOC) -t ../$(BOOLEANS) -m ../$(MOD_CONF) -x ../$(POLXML)
-
-########################################
-#
-# Appconfig files
-#
-install-appconfig: $(APPFILES)
-
-$(INSTALLDIR)/booleans: $(BOOLEANS)
-	@mkdir -p $(INSTALLDIR)
-	$(QUIET) egrep '^[[:blank:]]*[[:alpha:]]' $(BOOLEANS) \
-		| sed -e 's/false/0/g' -e 's/true/1/g' > tmp/booleans
-	$(QUIET) install -m 644 tmp/booleans $@
-
-########################################
-#
-# Install policy sources
-#
-install-src:
-	rm -rf $(SRCPATH)/policy.old
-	-mv $(SRCPATH)/policy $(SRCPATH)/policy.old
-	mkdir -p $(SRCPATH)/policy
-	cp -R . $(SRCPATH)/policy
-
-########################################
-#
-# Clean everything
-#
-bare: clean
-	rm -f $(POLXML)
-	rm -f $(SUPPORT)/*.pyc
-	rm -f $(FCSORT)
-	rm -f $(MOD_CONF)
-	rm -f $(BOOLEANS)
-	rm -fR $(HTMLDIR)
-ifneq ($(GENERATED_TE),)
-	rm -f $(GENERATED_TE)
+tmp/all_te_files.conf: $(ALL_TE_FILES)
+ifeq ($(ALL_TE_FILES),)
+	$(error No enabled modules! $(notdir $(MOD_CONF)) please create a modules.conf file)
 endif
-ifneq ($(GENERATED_IF),)
-	rm -f $(GENERATED_IF)
-endif
-ifneq ($(GENERATED_FC),)
-	rm -f $(GENERATED_FC)
-endif
+	@test -d tmp || mkdir -p tmp
+	$(QUIET) cat $^ > $@
 
-.PHONY: install-src install-appconfig conf html bare
+tmp/post_te_files.conf: $(POST_TE_FILES)
+	@test -d tmp || mkdir -p tmp
+	$(QUIET) cat $^ > $@
+
+# extract attributes and put them first. extract post te stuff
+# like genfscon and put last.  portcon, nodecon, and netifcon
+# is delayed since they are generated by m4
+tmp/all_attrs_types.conf tmp/only_te_rules.conf tmp/all_post.conf: tmp/all_te_files.conf tmp/post_te_files.conf
+	$(QUIET) grep ^attribute tmp/all_te_files.conf > tmp/all_attrs_types.conf || true
+	$(QUIET) grep '^type ' tmp/all_te_files.conf >> tmp/all_attrs_types.conf
+	$(QUIET) cat tmp/post_te_files.conf > tmp/all_post.conf
+	$(QUIET) grep '^sid ' tmp/all_te_files.conf >> tmp/all_post.conf || true
+	$(QUIET) sed -r -e /^attribute/d -e '/^type /d' -e '/^sid /d' \
+			< tmp/all_te_files.conf > tmp/only_te_rules.conf
+
+########################################
+#
+# Remove the dontaudit rules from the policy.conf
+#
+enableaudit: policy.conf
+	@test -d tmp || mkdir -p tmp
+	@echo "Removing dontaudit rules from policy.conf"
+	$(QUIET) grep -v dontaudit policy.conf > tmp/policy.audit
+	$(QUIET) mv tmp/policy.audit policy.conf
+
+########################################
+#
+# Clean the built policies. 
+#
+clean:
+	rm -fR tmp
+	rm -f policy.conf
+	rm -f $(POLVER)
+
+.PHONY: default policy install load reload enableaudit clean
