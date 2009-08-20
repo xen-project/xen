@@ -443,11 +443,7 @@ class Grub:
                 # Timed out waiting for a keypress
                 if mytime != -1:
                     mytime += 1
-                    # curses.timeout() does not work properly on Solaris
-                    # So we may come here even after a key has been pressed.
-                    # Check both timeout and mytime to avoid exiting
-                    # when we shouldn't.
-                    if timeout != -1 and mytime >= int(timeout):
+                    if mytime >= int(timeout):
                         self.isdone = True
                         break
             else:
