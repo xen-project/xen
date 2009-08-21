@@ -170,6 +170,7 @@
 ^tools/ioemu/qemu\.1$
 ^tools/ioemu/qemu\.pod$
 ^tools/ioemu/tapdisk-ioemu$
+^tools/libxc/\.zlib\.deps$
 ^tools/libxc/ia64/asm/.*\.h$
 ^tools/libxc/ia64/acpi/.*\.h$
 ^tools/libxc/ia64/acpi/platform/.*\.h$
