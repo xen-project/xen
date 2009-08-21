@@ -138,6 +138,12 @@ class LiloConfigFile(object):
         if len(img) > 0:
             self.add_image(LiloImage(img, path))
 
+    def hasPassword(self):
+        return False
+
+    def hasPasswordAccess(self):
+        return True
+
     def add_image(self, image):
         self.images.append(image)
 

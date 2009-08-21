@@ -219,7 +219,7 @@ class GrubConfigFile(object):
         try:
             getattr(self, self.commands['password'])
             return True
-        except KeyError, e:
+        except:
             return False
 
     def checkPassword(self, password):
