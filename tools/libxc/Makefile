@@ -151,9 +151,13 @@ libxenguest.so: libxenguest.so.$(MAJOR)
 libxenguest.so.$(MAJOR): libxenguest.so.$(MAJOR).$(MINOR)
 	ln -sf $< $@
 
+ifeq ($(CONFIG_MiniOS),y)
+.zlib.deps:
+	echo >$@
+else
 .zlib.deps:
 	@(set -e;					\
-          . $(XEN_ROOT)/tools/check/funcs.sh;		\
+          . ../check/funcs.sh;				\
 	  echo >$@.new;					\
 	  if has_header bzlib.h; then			\
             echo "-DHAVE_BZLIB" >>$@.new;		\
@@ -166,6 +170,7 @@ libxenguest.so.$(MAJOR): libxenguest.so.$(MAJOR).$(MINOR)
 	    echo " - LZMA decompression supported";	\
 	  fi;						\
 	  mv $@.new $@)
+endif
 
 xc_dom_bzimageloader.o: .zlib.deps
 xc_dom_bzimageloader.o: CFLAGS += $(shell grep D .zlib.deps)
