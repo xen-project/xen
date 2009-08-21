@@ -50,6 +50,7 @@ typedef struct hw_interrupt_type hw_irq_controller;
 #include <asm/irq.h>
 
 #ifdef NR_IRQS
+# define nr_irqs NR_IRQS
 # define nr_irqs_gsi NR_IRQS
 #else
 extern unsigned int nr_irqs_gsi;
@@ -57,6 +58,7 @@ extern unsigned int nr_irqs;
 #endif
 
 struct msi_desc;
+struct irq_cfg;
 /*
  * This is the "IRQ descriptor", which contains various information
  * about the irq, including what kind of hardware handling it has,
@@ -70,9 +72,7 @@ typedef struct irq_desc{
     struct msi_desc   *msi_desc;
     struct irqaction *action;	/* IRQ action list */
     unsigned int depth;		/* nested irq disables */
-#if defined(__i386__) || defined(__x86_64__)
     struct irq_cfg *chip_data;
-#endif
     int irq;
     spinlock_t lock;
     cpumask_t affinity;
@@ -82,13 +82,35 @@ typedef struct irq_desc{
 extern irq_desc_t irq_desc[NR_VECTORS];
 
 #define setup_irq(irq, action) \
-    setup_irq_vector(irq_to_vector(irq), action)
+    setup_irq_vector(irq, action)
 
 #define release_irq(irq) \
-    release_irq_vector(irq_to_vector(irq))
+    release_irq_vector(irq)
 
 #define request_irq(irq, handler, irqflags, devname, devid) \
-    request_irq_vector(irq_to_vector(irq), handler, irqflags, devname, devid)
+    request_irq_vector(irq, handler, irqflags, devname, devid)
+
+extern int request_irq_vector(unsigned int vector,
+               void (*handler)(int, void *, struct cpu_user_regs *),
+               unsigned long irqflags, const char * devname, void *dev_id);
+
+#define create_irq(x) assign_irq_vector(AUTO_ASSIGN_IRQ)
+#define destroy_irq(x) free_irq_vector(x)
+
+#define irq_cfg(x)        &irq_cfg[(x)]
+#define irq_to_desc(x)    &irq_desc[(x)]
+
+#define irq_complete_move(x) do {} \
+    while(!x)
+
+#define domain_pirq_to_irq(d, irq) domain_irq_to_vector(d, irq)
+
+struct irq_cfg {
+        int  vector;
+        cpumask_t domain;
+};
+
+extern struct irq_cfg irq_cfg[];
 
 #else
 extern struct irq_desc *irq_desc;
@@ -119,11 +141,7 @@ static inline void set_native_irq_info(unsigned int irq, cpumask_t mask)
 
 static inline void set_irq_info(int irq, cpumask_t mask)
 {
-#if defined(__i386__) || defined(__x86_64__)
     set_native_irq_info(irq, mask);
-#else
-    set_native_irq_info(irq_to_vector(irq), mask);
-#endif
 }
 
 unsigned int set_desc_affinity(struct irq_desc *desc, cpumask_t mask);

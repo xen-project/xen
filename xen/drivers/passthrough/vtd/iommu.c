@@ -827,12 +827,13 @@ static void dma_msi_set_affinity(unsigned int irq, cpumask_t mask)
     struct irq_cfg *cfg = desc->chip_data;
 
     spin_lock_irqsave(&iommu->register_lock, flags);
+#ifdef CONFIG_X86
     dest = set_desc_affinity(desc, mask);
     if (dest == BAD_APICID){
         gdprintk(XENLOG_ERR VTDPREFIX, "Set iommu interrupt affinity error!\n");
         return;
     }
-    
+
     memset(&msg, 0, sizeof(msg)); 
     msg.data = MSI_DATA_VECTOR(cfg->vector) & 0xff;
     msg.data |= 1 << 14;
@@ -850,6 +851,16 @@ static void dma_msi_set_affinity(unsigned int irq, cpumask_t mask)
                     MSI_ADDR_REDIRECTION_CPU:
                     MSI_ADDR_REDIRECTION_LOWPRI;
     msg.address_lo |= MSI_ADDR_DEST_ID(dest & 0xff);
+#else
+    memset(&msg, 0, sizeof(msg));
+    msg.data = cfg->vector & 0xff;
+    msg.data |= 1 << 14;
+    msg.address_lo = (MSI_ADDRESS_HEADER << (MSI_ADDRESS_HEADER_SHIFT + 8));
+    msg.address_lo |= MSI_PHYSICAL_MODE << 2;
+    msg.address_lo |= MSI_REDIRECTION_HINT_MODE << 3;
+    dest = cpu_physical_id(first_cpu(mask));
+    msg.address_lo |= dest << MSI_TARGET_CPU_SHIFT;
+#endif
 
     dmar_writel(iommu->reg, DMAR_FEDATA_REG, msg.data);
     dmar_writel(iommu->reg, DMAR_FEADDR_REG, msg.address_lo);

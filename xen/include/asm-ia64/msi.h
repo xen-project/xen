@@ -17,4 +17,14 @@
 #define MSI_LOGICAL_MODE		1
 #define MSI_REDIRECTION_HINT_MODE	0
 
+#define MSI_DATA_VECTOR_SHIFT		0
+#define  MSI_DATA_VECTOR_MASK		0x000000ff
+#define	 MSI_DATA_VECTOR(v)		(((v) << MSI_DATA_VECTOR_SHIFT) & MSI_DATA_VECTOR_MASK)
+
+struct msi_msg {
+	u32	address_lo;	/* low 32 bits of msi message address */
+	u32	address_hi;	/* high 32 bits of msi message address */
+	u32	data;		/* 16 bits of msi message data */
+};
+
 #endif /* __ASM_MSI_H */
