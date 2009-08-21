@@ -1,6 +1,6 @@
 These notes are compiled from xen-devel questions and postings that have occurred
 since the inclusion of XSM.  These notes are not intended to be definitive
-documentation but should address many common problems that arrise when
+documentation but should address many common problems that arise when
 experimenting with XSM:FLASK.
 
 Xen XSM:FLASK configuration
@@ -28,7 +28,7 @@ Xen XSM:FLASK policy
 
 These instructions will enable the configuration and build of the sample policy.
 The sample policy provides the MINIMUM policy necessary to boot a
-paravirtualized dom0 and create a paravirtualized domU.  Many of the 
+paravirtualized dom0 and create a pv or hvm domU.  Many of the 
 default capabilities and usages supported by dom0/domU are disallowed by the
 sample policy.  Further, the policy is comprised of a limited number of types and 
 must be adjusted to meet the specific security goals of the installation. 
@@ -40,20 +40,36 @@ the same syntax and structure as SELinux and compiling the policy relies on
 the SELinux policy toolchain.  This toolchain is available under many 
 distributions as well as the following URL,
 
-	http://userspace.selinuxproject.org/releases/20080909/stable/checkpolicy-1.34.7.tar.gz
+	http://userspace.selinuxproject.org/trac/wiki/Releases
+
+You will need at least libsepol and checkpolicy in order to compile a policy.
 
 1) cd xen-unstable.hg/tools/flask/policy
 2) make policy
-3) cp policy.20 /boot/xenpolicy.20
+3) make install
 4) edit /etc/grub.conf, add a module line to the xen entry,
 
-	module /xenpolicy.20
+	module /xenpolicy.24
+
+NB: The .24 suffix reflects the policy format version and may differ for your
+system depending on the version of checkpolicy you used to build the policy.
+At the time of this writing, policy version 24 is the highest version 
+supported by the latest checkpolicy release and by the Xen Flask module.
+You can force the policy build to a specific policy version by uncommenting 
+the OUTPUT_POLICY= line in the policy Makefile and setting the value as
+desired (to any version supported by the Xen Flask module, presently in the
+range 15-24).  Make sure that your module line above matches the actual
+/xenpolicy.NN file that was created in /boot by the make install.
 
 5) reboot, and select the updated xen entry
 
 NB: The module entry can be inserted on any line after the xen kernel line.  Typical
 configurations use the last module entry or the module entry that immediately 
 follows the xen kernel entry.
+
+If you want to use the MLS policy, then set TYPE=xen-mls in the policy Makefile
+before building the policy.  Note that the MLS constraints in policy/mls
+are incomplete and are only a sample.
 
 Xen configuration of xend
 -------------------------
@@ -73,34 +89,43 @@ Xen configuration of xend
 Creating policy controlled domains
 ----------------------------------
 
-2) Edit the domain config file and add the following entry,
+2) Edit the domain config file and add the following entry for a pv guest,
 
-	access_control = ["policy=,label=system_u:object_r:domU_t"]
+	access_control = ["policy=,label=system_u:system_r:domU_t"]
+
+or add the following entry for a hvm guest:
+
+	access_control = ["policy=,label=system_u:system_r:domHU_t"]
 
 NB: The 'policy' field is not used by XSM:FLASK.  The 'label' must exist in the 
-loaded policy. 'system_u:object_r:domU_t' is one of the existing labels from 
+loaded policy. 'system_u:system_r:domU_t' is one of the existing labels from 
 the sample policy and shown for example purposes.
 
+If you enabled the MLS policy, then append a MLS level (e.g. s0:c0) to the
+labels, e.g.:
+
+	access_control = ["policy=,label=system_u:system_r:domU_t:s0:c0"]
+
 2) Create the domain using the 'xm create' command.
-3) Use the 'xm list -l' command to list the running domains and their labels.
+3) Use the 'xm list --label' command to list the running 
+domains and their labels.
 
 Updating the XSM:FLASK policy
 -----------------------------
 
 It is recommended that the XSM:FLASK policy be tailored to meet the specific
-security goals of the platform.  The policy is tailored by editing the xen.te 
-file in the 'policy' subdirectory.
+security goals of the platform.  The policy is tailored by editing the xen.if and xen.te files in the 'policy' subdirectory.
 
 1) cd xen-unstable.hg/tools/flask/policy
-2) edit policy/modules/xen/xen.te - make changes to support platform security goals.
+2) edit policy/modules/xen/xen.* - make changes to support platform security goals.
 3) make policy
-4) cp policy.20 /boot/xenpolicy.20
+4) make install
 5) reboot
 
 Alternatively, one may reload the policy using the 'flask_loadpolicy' tool
 installed by the xen tools.
 
-1) flask_loadpolicy policy.20
+1) flask_loadpolicy policy.24
 
 NB: The sample policy permits policy reloads as well as general manipulation of
 the Flask security server only from dom0.  The policy can be tailored further to
@@ -117,6 +142,31 @@ configuration will allow an XSM:FLASK system to start in enforcing mode.
 2) append the parameter 'flask_enforcing=1' to the xen kernel line.
 3) reboot, and select the updated xen entry
 
+AVC denials
+-----------
+
+XSM:Flask will emit avc: denied messages when a permission is denied
+by the policy, just like SELinux.  For example, if you were to use
+system_u:system_r:domU_t label for a hvm guest (rather than
+system_u:system_r:domHU_t), you would get a set of denials upon xm
+create:
+
+# xm dmesg | grep avc
+(XEN) avc:  denied  { setparam } for domid=0 scontext=system_u:system_r:dom0_t tcontext=system_u:system_r:domU_t tclass=hvm
+(XEN) avc:  denied  { getparam } for domid=0 scontext=system_u:system_r:dom0_t tcontext=system_u:system_r:domU_t tclass=hvm
+(XEN) avc:  denied  { irqlevel } for domid=0 scontext=system_u:system_r:dom0_t tcontext=system_u:system_r:domU_t tclass=hvm
+(XEN) avc:  denied  { pciroute } for domid=0 scontext=system_u:system_r:dom0_t tcontext=system_u:system_r:domU_t tclass=hvm
+(XEN) avc:  denied  { setparam } for domid=4 scontext=system_u:system_r:domU_t tcontext=system_u:system_r:domU_t tclass=hvm
+(XEN) avc:  denied  { cacheattr } for domid=0 scontext=system_u:system_r:dom0_t tcontext=system_u:system_r:domU_t tclass=hvm
+(XEN) avc:  denied  { pcilevel } for domid=0 scontext=system_u:system_r:dom0_t tcontext=system_u:system_r:domU_t tclass=hvm
+
+Existing SELinux tools such as audit2allow can be applied to these denials, e.g.
+xm dmesg | audit2allow 
+
+The generated allow rules can then be fed back into the policy by
+adding them to xen.te, although manual review is advised and will
+often lead to adding parameterized rules to the interfaces in xen.if 
+to address the general case.
 
 Additional notes on XSM:FLASK
 -----------------------------
