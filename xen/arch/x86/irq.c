@@ -55,6 +55,7 @@ DEFINE_PER_CPU(vector_irq_t, vector_irq) = {
 
 DEFINE_PER_CPU(struct cpu_user_regs *, __irq_regs);
 
+/* Must be called when irq disabled */
 void lock_vector_lock(void)
 {
     /* Used to the online set of cpus does not change

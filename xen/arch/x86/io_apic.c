@@ -379,6 +379,7 @@ unsigned int set_desc_affinity(struct irq_desc *desc, cpumask_t mask)
     struct irq_cfg *cfg;
     unsigned int irq;
     int ret;
+    unsigned long flags;
     cpumask_t dest_mask;
 
     if (!cpus_intersects(mask, cpu_online_map))
@@ -386,11 +387,13 @@ unsigned int set_desc_affinity(struct irq_desc *desc, cpumask_t mask)
 
     irq = desc->irq;
     cfg = desc->chip_data;
-    
-    lock_vector_lock();   
+
+    local_irq_save(flags);
+    lock_vector_lock();
     ret = __assign_irq_vector(irq, cfg, mask);
     unlock_vector_lock();
-    
+    local_irq_restore(flags);
+
     if (ret < 0)
         return BAD_APICID;
 
