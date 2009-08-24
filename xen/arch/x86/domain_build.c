@@ -927,6 +927,8 @@ int __init construct_dom0(
         else
             ((unsigned int *)vphysmap_start)[pfn] = mfn;
         set_gpfn_from_mfn(mfn, pfn);
+        if (!(pfn & 0xfffff))
+            process_pending_timers();
     }
     si->first_p2m_pfn = pfn;
     si->nr_p2m_frames = d->tot_pages - count;
@@ -945,6 +947,8 @@ int __init construct_dom0(
 #ifndef NDEBUG
             ++alloc_epfn;
 #endif
+            if (!(pfn & 0xfffff))
+                process_pending_timers();
         }
     }
     BUG_ON(pfn != d->tot_pages);
@@ -965,6 +969,8 @@ int __init construct_dom0(
             set_gpfn_from_mfn(mfn, pfn);
 #undef pfn
             page++; pfn++;
+            if (!(pfn & 0xfffff))
+                process_pending_timers();
         }
     }
 
