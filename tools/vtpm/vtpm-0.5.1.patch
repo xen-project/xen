@@ -1,0 +1,766 @@
+diff -Naurp tpm_emulator-0.5.1/Makefile tpm5-test/Makefile
+--- tpm_emulator-0.5.1/Makefile	2008-02-14 03:22:48.000000000 -0500
++++ tpm5-test/Makefile	2009-07-15 09:45:28.000000000 -0400
+@@ -10,7 +10,7 @@ VERSION_MINOR  := 5
+ VERSION_BUILD  := $(shell date +"%s")
+ VERSION_SUFFIX := .1
+ 
+-SUBDIRS := tpmd tpmd_dev tddl
++SUBDIRS := tpmd 
+ 
+ all: version all-recursive
+ 
+@@ -48,12 +48,12 @@ user_install: user
+ modules_install: modules
+ 	@$(MAKE) -C tpmd_dev install || exit -1
+ 
+-DIRS    := . tpm crypto tpmd tpmd_dev tddl tpmd_dev_openbsd
++DIRS    := . tpm crypto tpmd 
+ DISTSRC := $(foreach dir, $(DIRS), $(wildcard $(dir)/*.c))
+ DISTSRC += $(foreach dir, $(DIRS), $(wildcard $(dir)/*.h))
+-DIRS    := . tpmd tpmd_dev tddl tpmd_dev_openbsd
++DIRS    := . tpmd 
+ DISTSRC += $(foreach dir, $(DIRS), $(dir)/Makefile)
+-DISTSRC += ./README ./AUTHORS ./ChangeLog tpmd_dev/tpmd_dev.rules.in
++DISTSRC += ./README ./AUTHORS ./ChangeLog 
+ DISTDIR := tpm_emulator-$(VERSION_MAJOR).$(VERSION_MINOR)$(VERSION_SUFFIX)
+ 
+ dist: $(DISTSRC)
+diff -Naurp tpm_emulator-0.5.1/tpm/tpm_capability.c tpm5-test/tpm/tpm_capability.c
+--- tpm_emulator-0.5.1/tpm/tpm_capability.c	2008-02-14 03:22:48.000000000 -0500
++++ tpm5-test/tpm/tpm_capability.c	2009-07-16 12:04:20.000000000 -0400
+@@ -136,8 +136,19 @@ static TPM_RESULT cap_property(UINT32 su
+ 
+     case TPM_CAP_PROP_TIS_TIMEOUT:
+       debug("[TPM_CAP_PROP_TIS_TIMEOUT]");
+-      /* TODO: TPM_CAP_PROP_TIS_TIMEOUT */
+-      return TPM_FAIL;
++      /* TODO: TPM_CAP_PROP_TIS_TIMEOUT: Measure these values and determine correct ones */
++      UINT32 len = *respSize = 16;
++      BYTE *ptr = *resp = tpm_malloc(*respSize);
++      if (ptr == NULL || 
++          tpm_marshal_UINT32(&ptr, &len, 200000) ||
++          tpm_marshal_UINT32(&ptr, &len, 200000) ||
++          tpm_marshal_UINT32(&ptr, &len, 200000) ||
++          tpm_marshal_UINT32(&ptr, &len, 200000)) {
++        tpm_free(*resp);
++        return TPM_FAIL;
++      }
++      return TPM_SUCCESS;
++
+ 
+     case TPM_CAP_PROP_STARTUP_EFFECT:
+       debug("[TPM_CAP_PROP_STARTUP_EFFECT]");
+@@ -189,8 +200,12 @@ static TPM_RESULT cap_property(UINT32 su
+ 
+     case TPM_CAP_PROP_DURATION:
+       debug("[TPM_CAP_PROP_DURATION]");
+-      /* TODO: TPM_CAP_PROP_DURATION */
+-      return TPM_FAIL;
++      /* TODO: TPM_CAP_PROP_DURATION: Measure these values and return accurate ones */
++      BYTE dur[]= {0x0,0x0,0x0,0xc,0x0,0x7,0xa1,0x20,0x0,0x1e,0x84,0x80,0x11,0xe1,0xa3,0x0}; 
++      *respSize = 16;
++      *resp = tpm_malloc(*respSize);
++      memcpy(*resp,dur,16); 
++
+ 
+     case TPM_CAP_PROP_ACTIVE_COUNTER:
+       debug("[TPM_CAP_PROP_ACTIVE_COUNTER]");
+diff -Naurp tpm_emulator-0.5.1/tpmd/Makefile tpm5-test/tpmd/Makefile
+--- tpm_emulator-0.5.1/tpmd/Makefile	2008-02-14 03:22:48.000000000 -0500
++++ tpm5-test/tpmd/Makefile	2009-07-16 12:08:26.000000000 -0400
+@@ -8,9 +8,10 @@ WFLAGS  := -Wall -Wno-unused -Wpointer-a
+            -Wwrite-strings -Wsign-compare -Wno-multichar
+            #WFLAGS  += -Wextra -Wcast-qual -Wmissing-prototypes -Wmissing-declarations -Wstrict-aliasing
+ CFLAGS  += $(WFLAGS) -g -I.. -I. -O2 -fno-strict-aliasing
++CFLAGS  += -I../../../../tools/vtpm_manager/manager
+ LDFLAGS += -lgmp
+ 
+-BINDIR  := /usr/sbin/
++BINDIR  := /usr/bin/
+ 
+ TPMD    := tpmd
+ DIRS    := ../tpm ../crypto
+@@ -18,6 +19,8 @@ SRCS    := $(foreach dir, $(DIRS), $(wil
+ OBJS    := $(patsubst %.c, %.o, $(SRCS))
+ OBJS    := $(foreach dir, $(DIRS), $(patsubst $(dir)/%.o, %.o, $(filter $(dir)/%.o, $(OBJS))))
+ 
++VTPM_BIN := vtpmd
++
+ vpath %.c $(strip $(DIRS))
+ 
+ all: $(TPMD)
+@@ -32,10 +35,8 @@ TPMD_GROUP ?= tss
+ INSTALL    ?= install
+ 
+ install: $(TPMD)
+-	$(INSTALL) -m 755 -o $(TPMD_USER) -g $(TPMD_GROUP) -d $(DESTDIR)/var/lib/tpm
+-	$(INSTALL) -m 755 -o $(TPMD_USER) -g $(TPMD_GROUP) -d $(DESTDIR)/var/run/tpm
+ 	$(INSTALL) -D -d $(DESTDIR)/$(BINDIR)
+-	$(INSTALL) -m 755 $(TPMD) $(DESTDIR)/$(BINDIR)
++	$(INSTALL) -m 755 $(TPMD) $(DESTDIR)/$(BINDIR)/$(VTPM_BIN)
+ 
+ .PHONY: all clean install
+ 
+diff -Naurp tpm_emulator-0.5.1/tpmd/tpmd.c tpm5-test/tpmd/tpmd.c
+--- tpm_emulator-0.5.1/tpmd/tpmd.c	2008-02-14 03:22:48.000000000 -0500
++++ tpm5-test/tpmd/tpmd.c	2009-07-16 11:19:05.000000000 -0400
+@@ -32,6 +32,9 @@
+ #include <grp.h>
+ #include "tpm_emulator_config.h"
+ #include "tpm/tpm_emulator.h"
++#include "tpm/tpm_structures.h"
++#include "tpm/tpm_marshalling.h"
++#include "vtpm_manager.h"
+ 
+ #define TPM_DAEMON_NAME     "tpmd"
+ #define TPM_CMD_BUF_SIZE    4096
+@@ -39,6 +42,24 @@
+ #define TPM_RANDOM_DEVICE   "/dev/urandom"
+ #undef  TPM_MKDIRS
+ 
++#ifdef VTPM_MULTI_VM
++ #define DEV_BE "/dev/vtpm"
++ #define DEV_FE "/dev/tpm"
++#else
++ #define PVM_RX_FIFO_D "/var/vtpm/fifos/tpm_cmd_to_%d.fifo"
++ #define PVM_TX_FIFO "/var/vtpm/fifos/tpm_rsp_from_all.fifo"
++ #define HVM_RX_FIFO_D "/var/vtpm/socks/%d.socket"
++
++ #define VTPM_RX_FIFO_D "/var/vtpm/fifos/vtpm_rsp_to_%d.fifo"
++ #define VTPM_TX_FIFO "/var/vtpm/fifos/vtpm_cmd_from_all.fifo"
++
++ static char *vtpm_rx_name=NULL;
++#endif
++
++ static int vtpm_tx_fh=-1, vtpm_rx_fh=-1;
++
++#define BUFFER_SIZE 2048
++
+ static volatile int stopflag = 0;
+ static int is_daemon = 0;
+ static int opt_debug = 0;
+@@ -49,6 +70,8 @@ static const char *opt_storage_file = "/
+ static uid_t opt_uid = 0;
+ static gid_t opt_gid = 0;
+ static int tpm_startup = 2;
++static int vtpm_type = VTPM_TYPE_PVM;
++int dmi_id = 0;
+ static int rand_fh;
+ 
+ void tpm_log(int priority, const char *fmt, ...)
+@@ -90,56 +113,241 @@ uint64_t tpm_get_ticks(void)
+ 
+ int tpm_write_to_file(uint8_t *data, size_t data_length)
+ {
+-    int fh;
+-    ssize_t res;
+-    fh = open(opt_storage_file, O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR | S_IWUSR);
+-    if (fh < 0) return -1;
+-    while (data_length > 0) {
+-        res = write(fh, data, data_length);
+-	if (res < 0) {
+-	    close(fh);
+-	    return -1;
+-	}
+-	data_length -= res; 
+-	data += res;
++  int res, out_data_size, in_header_size;
++  BYTE *ptr, *out_data, *in_header;
++  UINT32 result, len, in_rsp_size;
++  UINT16 tag = VTPM_TAG_REQ;
++	
++  printf("Saving NVM\n");
++  if (vtpm_tx_fh < 0) {
++#ifdef VTPM_MUTLI_VM
++    vtpm_tx_fh = open(DEV_FE, O_RDWR);
++#else
++	vtpm_tx_fh = open(VTPM_TX_FIFO, O_WRONLY);
++#endif
++  }
++
++  if (vtpm_tx_fh < 0) {
++		return -1;
++  }
++ 
++  // Send request to VTPM Manager to encrypt data
++#ifdef VTPM_MUTLI_VM
++  out_data_size = len = VTPM_COMMAND_HEADER_SIZE_CLT + data_length;
++#else
++  out_data_size = len = VTPM_COMMAND_HEADER_SIZE_SRV + data_length;
++#endif
++  
++  out_data = ptr = (BYTE *) malloc(len);
++
++  if (ptr == NULL
++#ifndef VTPM_MUTLI_VM
++      || tpm_marshal_UINT32(&ptr, &len, dmi_id)
++#endif
++	  || tpm_marshal_UINT16(&ptr, &len, tag)
++#ifdef VTPM_MUTLI_VM
++	  || tpm_marshal_UINT32(&ptr, &len, out_data_size)
++#else
++	  || tpm_marshal_UINT32(&ptr, &len, out_data_size - sizeof(uint32_t))
++#endif  
++	  || tpm_marshal_UINT32(&ptr, &len, VTPM_ORD_SAVENVM)
++	  || tpm_marshal_BYTE_ARRAY(&ptr, &len, data, data_length)) {
++	free(out_data);
++	return -1;
++  }
++  
++  printf("\tSending SaveNVM Command.\n");
++  res = write(vtpm_tx_fh, out_data, out_data_size);
++  free(out_data);
++  if (res != out_data_size) return -1;
++
++  if (vtpm_rx_fh < 0) {
++#ifdef VTPM_MUTLI_VM
++    vtpm_rx_fh = vtpm_tx_fh
++#else
++    if (vtpm_rx_name == NULL) {
++      vtpm_rx_name = malloc(10 + strlen(VTPM_RX_FIFO_D));
++      sprintf(vtpm_rx_name, VTPM_RX_FIFO_D, (uint32_t) dmi_id);
+     }
+-    close(fh);
+-    return 0;
++	vtpm_rx_fh = open(vtpm_rx_name, O_RDONLY);
++#endif
++  }
++
++  if (vtpm_rx_fh < 0) {
++		return -1;
++  }
++  
++  // Read Header of response so we can get the size & status
++#ifdef VTPM_MUTLI_VM
++  in_header_size = len = VTPM_COMMAND_HEADER_SIZE_CLT;
++#else
++  in_header_size = len = VTPM_COMMAND_HEADER_SIZE_SRV;
++#endif
++  in_header = ptr = malloc(in_header_size);
++  
++  printf("\tReading SaveNVM header.\n");
++  res = read(vtpm_rx_fh, in_header, in_header_size);
++
++  if ( (res != in_header_size)
++#ifndef VTPM_MUTLI_VM
++       || tpm_unmarshal_UINT32(&ptr, &len, (UINT32*)&dmi_id)
++#endif
++	   || tpm_unmarshal_UINT16(&ptr, &len, &tag)
++	   || tpm_unmarshal_UINT32(&ptr, &len, &in_rsp_size)
++	   || tpm_unmarshal_UINT32(&ptr, &len, &result) ) {
++	  free(in_header);
++	  return -1;
++  }
++  free(in_header);
++  
++  if (result != VTPM_SUCCESS) {
++      return -1;  
++  }
++
++#ifdef VTPM_MUTLI_VM
++  close(vtpm_tx_fh); close(vtpm_rx_fh);
++#endif
++	  
++  printf("\tFinishing up SaveNVM\n");
++  return (0);
+ }
+ 
+ int tpm_read_from_file(uint8_t **data, size_t *data_length)
+ {
+-    int fh;
+-    ssize_t res;
+-    size_t total_length;
+-    fh = open(opt_storage_file, O_RDONLY);
+-    if (fh < 0) return -1;
+-    total_length = lseek(fh, 0, SEEK_END);
+-    lseek(fh, 0, SEEK_SET);
+-    *data = tpm_malloc(total_length);
+-    if (*data == NULL) {
+-        close(fh);
+-        return -1;
+-    }
+-    *data_length = 0;
+-    while (total_length > 0) {
+-        res = read(fh, &(*data)[*data_length], total_length);
+-	if (res < 0) {
+-	    close(fh);
+-	    tpm_free(*data);
+-	    return -1;
+-	}
+-        *data_length += res;
+-	total_length -= res;
++  int res, out_data_size, in_header_size;
++  uint8_t *ptr, *out_data, *in_header;
++  UINT16 tag = VTPM_TAG_REQ;
++  UINT32 len, in_rsp_size, result;
++#ifdef VTPM_MUTLI_VM
++	int vtpm_rx_fh, vtpm_tx_fh;
++#endif
++	
++  printf("Loading NVM.\n");
++  if (vtpm_tx_fh < 0) {
++#ifdef VTPM_MUTLI_VM
++    vtpm_tx_fh = open(DEV_FE, O_RDWR);
++#else
++	vtpm_tx_fh = open(VTPM_TX_FIFO, O_WRONLY);
++#endif
++  }
++
++  if (vtpm_tx_fh < 0) {
++	printf("Error in read_from_file:301\n");
++		return -1;
++  }
++ 
++  // Send request to VTPM Manager to encrypt data
++#ifdef VTPM_MUTLI_VM
++  out_data_size = len = VTPM_COMMAND_HEADER_SIZE_CLT;
++#else
++  out_data_size = len = VTPM_COMMAND_HEADER_SIZE_SRV;
++#endif
++  out_data = ptr = (BYTE *) malloc(len);
++
++  if (ptr == NULL
++#ifndef VTPM_MUTLI_VM
++      || tpm_marshal_UINT32(&ptr, &len, dmi_id)
++#endif  
++      || tpm_marshal_UINT16(&ptr, &len, tag)
++#ifdef VTPM_MUTLI_VM
++      || tpm_marshal_UINT32(&ptr, &len, out_data_size)
++#else
++      || tpm_marshal_UINT32(&ptr, &len, out_data_size - sizeof(uint32_t))
++#endif
++      || tpm_marshal_UINT32(&ptr, &len, VTPM_ORD_LOADNVM)) {
++    free(out_data);
++    printf("Error in read_from_file:325\n");
++
++    return -1;
++  }
++
++  printf("\tSending LoadNVM command\n");
++  res = write(vtpm_tx_fh, out_data, out_data_size);
++  free(out_data);
++  if (res != out_data_size) 
++    {
++	printf("Error in read_from_file:335\n");
++	return -1;
++    }
++
++    if (vtpm_rx_fh < 0) {
++#ifdef VTPM_MUTLI_VM
++    vtpm_rx_fh = vtpm_tx_fh;
++#else
++    if (vtpm_rx_name == NULL) {
++      vtpm_rx_name = malloc(10 + strlen(VTPM_RX_FIFO_D));
++      sprintf(vtpm_rx_name, VTPM_RX_FIFO_D, (uint32_t) dmi_id);
+     }
+-    close(fh);
+-    return 0;
++	vtpm_rx_fh = open(vtpm_rx_name, O_RDONLY);
++#endif
++  }
++
++  if (vtpm_rx_fh < 0) {
++	printf("Error in read_from_file:352\n");	
++	return -1;
++  }
++  
++  // Read Header of response so we can get the size & status
++#ifdef VTPM_MUTLI_VM
++  in_header_size = len = VTPM_COMMAND_HEADER_SIZE_CLT;
++#else
++  in_header_size = len = VTPM_COMMAND_HEADER_SIZE_SRV;
++#endif
++  in_header = ptr = malloc(in_header_size);
++  
++  printf("\tReading LoadNVM header\n");
++  res = read(vtpm_rx_fh, in_header, in_header_size);
++
++  if ( (res != in_header_size)
++#ifndef VTPM_MUTLI_VM
++       || tpm_unmarshal_UINT32(&ptr, &len, (UINT32*)&dmi_id)
++#endif
++       || tpm_unmarshal_UINT16(&ptr, &len, &tag)
++       || tpm_unmarshal_UINT32(&ptr, &len, &in_rsp_size)
++       || tpm_unmarshal_UINT32(&ptr, &len, &result) ) {
++      free(in_header);
++      printf("Error in read_from_file:375\n");     
++      return -1;
++  }
++  free(in_header);
++  
++  if (result != VTPM_SUCCESS) {
++    printf("Error in read_from_file:381\n");
++    return -1;  
++  }
++
++  // Read Encrypted data from VTPM Manager
++  *data_length = in_rsp_size - VTPM_COMMAND_HEADER_SIZE_CLT;
++  *data = (uint8_t *) malloc(*data_length);
++
++  printf("\tReading clear data from LoadNVM.\n");
++  res = read(vtpm_rx_fh, *data, *data_length);
++#ifdef VTPM_MUTLI_VM
++  close(vtpm_rx_fh);close(vtpm_tx_fh);
++#endif 
++	
++  printf("\tReturing from loading NVM\n");
++  if (res != (int)*data_length) {
++      free(*data);
++      printf("Error in read_from_file:398\n");
++      return -1;
++  } else {
++      return 0;
++  }
++
++
++    
+ }
+ 
+ static void print_usage(char *name)
+ {
+     printf("usage: %s [-d] [-f] [-s storage file] [-u unix socket name] "
+-           "[-o user name] [-g group name] [-h] [startup mode]\n", name);
++           "[-o user name] [-g group name] [-h]"
++#ifdef VTPM_MULTI_VM
++	   "clear|save|deactivated\n", name);
++#else
++	   "clear|save|deactivated pvm|hvm vtpmid\n", name);
++#endif
+     printf("  d : enable debug mode\n");
+     printf("  f : forces the application to run in the foreground\n");
+     printf("  s : storage file to use (default: %s)\n", opt_storage_file);
+@@ -205,7 +413,13 @@ static void parse_options(int argc, char
+                 exit(EXIT_SUCCESS);
+         }
+     }
+-    if (optind < argc) {
++    /*Make sure we have all required options*/
++#ifdef VTPM_MULTI_VM
++#define EXTRA_OPTS 0
++#else
++#define EXTRA_OPTS 2
++#endif
++    if (optind < argc - EXTRA_OPTS ) {
+         debug("startup mode = '%s'", argv[optind]);
+         if (!strcmp(argv[optind], "clear")) {
+             tpm_startup = 1;
+@@ -219,6 +433,25 @@ static void parse_options(int argc, char
+             print_usage(argv[0]);
+             exit(EXIT_SUCCESS);
+         }
++#ifndef VTPM_MULTI_VM
++        ++optind;
++	if(!strcmp(argv[optind], "pvm")) {
++		vtpm_type = VTPM_TYPE_PVM;	// Get commands from vTPM Manager through fifo
++	} else if (!strcmp(argv[optind], "hvm")) {
++		vtpm_type = VTPM_TYPE_HVM;	// Get commands from qemu via socket
++        } else {
++		error("Invalid vm mode '%s'; must be 'pvm', "
++			"or 'hvm' ", argv[optind]);
++		print_usage(argv[0]);
++		exit(EXIT_SUCCESS);
++	}
++        ++optind;
++	dmi_id = atoi(argv[optind]);
++#endif
++    } else {
++	error("Invalid number of arguments");
++	print_usage(argv[0]);
++	exit(EXIT_SUCCESS);
+     }
+ }
+ 
+@@ -348,93 +581,180 @@ static int init_socket(const char *name)
+ 
+ static void main_loop(void)
+ {
+-    int sock, fh, res;
+-    int32_t in_len;
++    int32_t in_len, written;
+     uint32_t out_len;
+-    uint8_t in[TPM_CMD_BUF_SIZE], *out;
++    uint8_t in[TPM_CMD_BUF_SIZE], *out, *addressed_out;
++    int guest_id=-1;
++    int i;
++    char *vtpm_rx_file=NULL;
++    int res;
++
++#ifndef VTPM_MULTI_VM
++    int sockfd = -1;
+     struct sockaddr_un addr;
+-    socklen_t addr_len;
+-    fd_set rfds;
+-    struct timeval tv;
++    struct sockaddr_un client_addr;
++    unsigned int client_length;
++#endif
++
++    int vtpm_tx_fh=-1, vtpm_rx_fh=-1;
++
++#ifndef VTPM_MULTI_VM
++  if (vtpm_type == VTPM_TYPE_PVM) {
++    vtpm_rx_file = malloc(10 + strlen(PVM_RX_FIFO_D));
++    sprintf(vtpm_rx_file, PVM_RX_FIFO_D, (uint32_t) dmi_id);
++  } else {
++    vtpm_rx_file = malloc(10 + strlen(HVM_RX_FIFO_D));
++    sprintf(vtpm_rx_file, HVM_RX_FIFO_D, (uint32_t) dmi_id);
++
++    if ( (sockfd = socket(PF_UNIX,SOCK_STREAM,0)) < 0) {
++          error("Unable to create socket. errno = %d\n", errno);
++      exit (-1);
++    }
++
++    memset(&addr, 0, sizeof(addr));
++    addr.sun_family = AF_UNIX;
++    strcpy(addr.sun_path,vtpm_rx_file );
++    unlink(addr.sun_path);
++  }
++#endif
+ 
+     info("staring main loop");
+-    /* open UNIX socket */
+-    sock = init_socket(opt_socket_name);
+-    if (sock < 0) exit(EXIT_FAILURE);
+     /* init tpm emulator */
+-    debug("initializing TPM emulator: %d", tpm_startup);
++#ifdef VTPM_MULTI_VM
++    debug("initializing TPM emulator: state=%d", tpm_startup);
++#else
++    debug("initializing TPM emulator: state=%d, type=%d, id=%d", tpm_startup, vtpm_type, dmi_id);
++#endif
+     tpm_emulator_init(tpm_startup);
+     /* start command processing */
+     while (!stopflag) {
+         /* wait for incomming connections */
+         debug("waiting for connections...");
+-        FD_ZERO(&rfds);
+-        FD_SET(sock, &rfds);
+-        tv.tv_sec = 10;
+-        tv.tv_usec = 0;
+-        res = select(sock + 1, &rfds, NULL, NULL, &tv);
+-        if (res < 0) {
+-            error("select(sock) failed: %s", strerror(errno));
+-            break;
+-        } else if (res == 0) {
+-            continue;
+-        }
+-        addr_len = sizeof(addr);
+-        fh = accept(sock, (struct sockaddr*)&addr, &addr_len);
+-        if (fh < 0) {
+-            error("accept() failed: %s", strerror(errno));
+-            continue;
+-        }
++	if (vtpm_rx_fh < 0) {
++#ifdef VTPM_MUTLI_VM
++	    vtpm_rx_fh = open(DEV_BE, O_RDWR);
++#else
++	    if (vtpm_type == VTPM_TYPE_PVM)
++	    {
++		vtpm_rx_fh = open(vtpm_rx_file, O_RDONLY);
++	    } else {
++		if (bind(sockfd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
++		    error("Unable to bind(). errno = %d\n", errno);
++		    exit (-1);
++		}
++
++		if (listen(sockfd, 10) <0) {
++		    error("Unable to listen(). errno = %d\n", errno);
++		    exit (-1);
++		} 
++
++		 memset(&client_addr, 0, sizeof(client_addr));
++		 client_length = sizeof(client_addr);
++
++		 vtpm_rx_fh = vtpm_tx_fh = accept(sockfd, (struct sockaddr *)&client_addr, &client_length);
++	    }
++#endif
++	}
++	
++	/*Error Checking*/
++	if (vtpm_rx_fh < 0) {
++	  error("Failed to open devices to listen to guest.\n");
++	  exit(-1);
++	}
++
+         /* receive and handle commands */
+         in_len = 0;
+         do {
+             debug("waiting for commands...");
+-            FD_ZERO(&rfds);
+-            FD_SET(fh, &rfds);
+-            tv.tv_sec = TPM_COMMAND_TIMEOUT;
+-            tv.tv_usec = 0;
+-            res = select(fh + 1, &rfds, NULL, NULL, &tv);
+-            if (res < 0) {
+-                error("select(fh) failed: %s", strerror(errno));
+-                close(fh);
+-                break;
+-            } else if (res == 0) {
+-#ifdef TPMD_DISCONNECT_IDLE_CLIENTS	    
+-                info("connection closed due to inactivity");
+-                close(fh);
+-                break;
+-#else		
+-                continue;
+-#endif		
+-            }
+-            in_len = read(fh, in, sizeof(in));
+-            if (in_len > 0) {
++
++            in_len = read(vtpm_rx_fh, in, sizeof(in));
++	    /*Magic size of minimum TPM command is 6*/
++		//FIXME Magic size check may not be required anymore
++            if (in_len < 6) {
++		info("Recv incomplete command of %d bytes.", in_len);
++		if (in_len <= 0) {
++		    close(vtpm_rx_fh);
++		    vtpm_rx_fh = -1;
++		    continue;
++                 }
++	    } else {
++		/*Debug Printouts*/
+                 debug("received %d bytes", in_len);
++		debug_nostop("Recv[%d]: 0x", in_len);
++		for (i=0; i< in_len; i++) 
++		    debug_more("%x ", in[i]);
++		debug_more("\n");
++		/*Multiple Guest check*/
++		if (guest_id == -1) {
++		    guest_id = *((int32_t *) in);
++		} else {
++		    if (guest_id != *((int32_t *) in) ) {
++			error("WARNING: More than one guest attached\n");
++		    }
++		}
++
++		/*Open tx handle now*/
++		if (vtpm_tx_fh < 0) {
++#ifdef VTPM_MUTLI_VM
++		    vtpm_tx_fh = open(DEV_BE, O_RDWR);
++		    vtpm_rx_fh = vtpm_tx_fh;
++#else
++		    if (vtpm_type == VTPM_TYPE_PVM) {
++			vtpm_tx_fh = open(PVM_TX_FIFO, O_WRONLY);
++     		    } // No need to open the other direction for HVM
++#endif
++		}
++		if (vtpm_tx_fh < 0) {
++		  error("Failed to open devices to respond to guest.\n");
++		  exit(-1);
++		}
++
++		/*Handle the TPM command now*/
+                 out = NULL;
+-                res = tpm_handle_command(in, in_len, &out, &out_len);
++                res = tpm_handle_command(in + sizeof(uint32_t), in_len - sizeof(uint32_t), &out, &out_len);
+                 if (res < 0) {
+                     error("tpm_handle_command() failed");
+                 } else {
+                     debug("sending %d bytes", out_len);
++		    //FIXME this prepending may or may not be needed
++		    /*Prepend the first 4 bytes of the in buffer.. why?*/
++		    addressed_out = (uint8_t *) tpm_malloc(sizeof(uint32_t) + out_len);
++		    *(uint32_t *) addressed_out = *(uint32_t *) in;
++		    memcpy(addressed_out + sizeof(uint32_t), out, out_len);
++		    out_len += sizeof(uint32_t);
++		    /*End Prepend*/
++
++		    /*Perform write operation now*/
+                     while (out_len > 0) {
+-                        res = write(fh, out, out_len);
++                        res = write(vtpm_tx_fh, addressed_out, out_len);
++
+                         if (res < 0) {
+                             error("write(%d) failed: %s", out_len, strerror(errno));
+                             break;
+-                        }
++                        } else {
++			  debug_nostop("Sent[%Zu]: ", out_len);
++			  for (i=0; (unsigned int)i< out_len; i++)
++			    debug_more("%x ", addressed_out[i]);
++			  debug_more("\n");
++			}
+                         out_len	-= res;
+                     }
+                     tpm_free(out);
++		    tpm_free(addressed_out);
+                 }
+             }
+         } while (in_len > 0);
+-        close(fh);
++        //close(fh);
+     }
++    
+     /* shutdown tpm emulator */
+     tpm_emulator_shutdown();
+-    /* close socket */
+-    close(sock);
+-    unlink(opt_socket_name);
++    /* Close handles */
++    close(vtpm_tx_fh);
++#ifndef VTPM_MULTI_VM
++    close(vtpm_rx_fh);
++    free(vtpm_rx_file);
++#endif
+     info("main loop stopped");
+ }
+ 
+@@ -450,12 +770,13 @@ int main(int argc, char **argv)
+     /* open random device */
+     init_random();
+     /* init signal handlers */
+-    init_signal_handler();
++    //init_signal_handler();
+     /* unless requested otherwiese, fork and daemonize process */
+-    if (!opt_foreground) daemonize();
++    //if (!opt_foreground) daemonize();
+     /* start main processing loop */
+     main_loop();
+     info("stopping TPM Emulator daemon");
+     closelog();
+     return 0;
+ }
++
+diff -Naurp tpm_emulator-0.5.1/tpmd/tpm_emulator_config.h tpm5-test/tpmd/tpm_emulator_config.h
+--- tpm_emulator-0.5.1/tpmd/tpm_emulator_config.h	2008-02-14 03:22:48.000000000 -0500
++++ tpm5-test/tpmd/tpm_emulator_config.h	2009-07-16 11:25:26.000000000 -0400
+@@ -29,23 +29,28 @@
+ 
+ /* TPM emulator configuration */
+ 
+-#undef  TPM_STRONG_PERSISTENCE
+-#undef  TPM_GENERATE_EK
++#define  TPM_STRONG_PERSISTENCE
++#define  TPM_GENERATE_EK
+ #undef  TPM_GENERATE_SEED_DAA
+ #undef  TPM_MEMORY_ALIGNMENT_MANDATORY
+ 
++extern int dmi_id;
++
+ /* log macros */
+ 
+ void tpm_log(int priority, const char *fmt, ...);
+ 
+-#define debug(fmt, ...) tpm_log(LOG_DEBUG, "%s:%d: Debug: " fmt "\n", \
+-                                __FILE__, __LINE__, ## __VA_ARGS__)
+-#define info(fmt, ...)  tpm_log(LOG_INFO, "%s:%d: Info: " fmt "\n", \
+-                                __FILE__, __LINE__, ## __VA_ARGS__)
+-#define error(fmt, ...) tpm_log(LOG_ERR, "%s:%d: Error: " fmt "\n", \
+-                                __FILE__, __LINE__, ## __VA_ARGS__)
+-#define alert(fmt, ...) tpm_log(LOG_ALERT, "%s:%d: Alert: " fmt "\n", \
+-                                __FILE__, __LINE__, ## __VA_ARGS__)
++#define debug(fmt, ...) tpm_log(LOG_DEBUG, "VTPMD[%d]: %s:%d: Debug: " fmt "\n", \
++                                dmi_id, __FILE__, __LINE__, ## __VA_ARGS__)
++#define info(fmt, ...)  tpm_log(LOG_INFO, "VTPMD[%d]: %s:%d: Info: " fmt "\n", \
++                                dmi_id, __FILE__, __LINE__, ## __VA_ARGS__)
++#define error(fmt, ...) tpm_log(LOG_ERR, "VTPMD[%d]: %s:%d: Error: " fmt "\n", \
++                                dmi_id, __FILE__, __LINE__, ## __VA_ARGS__)
++#define alert(fmt, ...) tpm_log(LOG_ALERT, "VTPMD[%d]: %s:%d: Alert: " fmt "\n", \
++                                dmi_id, __FILE__, __LINE__, ## __VA_ARGS__)
++#define debug_nostop(fmt, ...) tpm_log(LOG_DEBUG, "VTPMD[%d]: %s:%d: Debug: " fmt, \
++                                dmi_id, __FILE__, __LINE__, ## __VA_ARGS__)
++#define debug_more(fmt, ...) tpm_log(LOG_DEBUG, fmt, ## __VA_ARGS__)
+ 
+ /*  min/max macros that also do strict type-checking */
+ 
