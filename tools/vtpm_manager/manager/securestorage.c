@@ -199,7 +199,7 @@ TPM_RESULT VTPM_Handle_Save_NVM(VTPM_DMI_RESOURCE *myDMI,
   // TODO: How to properly return from these. Do we care if we return failure
   //       after writing the file? We can't get the old one back.
   // TODO: Backup old file and try and recover that way.
-  fh = open(myDMI->NVMLocation, O_WRONLY | O_CREAT, S_IREAD | S_IWRITE);
+  fh = open(myDMI->NVMLocation, O_WRONLY | O_CREAT | O_TRUNC, S_IREAD | S_IWRITE);
   if ( (bytes_written = write(fh, sealed_NVM.bytes, buffer_len(&sealed_NVM) ) != (long) buffer_len(&sealed_NVM))) {
     vtpmlogerror(VTPM_LOG_VTPM, "We just overwrote a DMI_NVM and failed to finish. %ld/%ld bytes.\n", bytes_written, (long)buffer_len(&sealed_NVM));
     status = TPM_IOERROR;
