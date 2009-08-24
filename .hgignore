@@ -102,6 +102,7 @@
 ^stubdom/ocaml-.*$
 ^stubdom/lwip/
 ^stubdom/ioemu/
+^stubdom/stubdompath\.sh$
 ^tools/.*/build/lib.*/.*\.py$
 ^tools/blktap2/daemon/blktapctrl$
 ^tools/blktap2/drivers/img2qcow$
@@ -170,7 +171,6 @@
 ^tools/ioemu/qemu\.1$
 ^tools/ioemu/qemu\.pod$
 ^tools/ioemu/tapdisk-ioemu$
-^tools/libxc/\.zlib\.deps$
 ^tools/libxc/ia64/asm/.*\.h$
 ^tools/libxc/ia64/acpi/.*\.h$
 ^tools/libxc/ia64/acpi/platform/.*\.h$

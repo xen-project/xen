@@ -114,7 +114,7 @@ TAGS:
 
 .PHONY: clean
 clean:
-	rm -rf *.rpm $(LIB) *~ $(DEPS) .*.deps \
+	rm -rf *.rpm $(LIB) *~ $(DEPS) \
             $(CTRL_LIB_OBJS) $(CTRL_PIC_OBJS) \
             $(GUEST_LIB_OBJS) $(GUEST_PIC_OBJS)
 
@@ -152,30 +152,24 @@ libxenguest.so.$(MAJOR): libxenguest.so.$(MAJOR).$(MINOR)
 	ln -sf $< $@
 
 ifeq ($(CONFIG_MiniOS),y)
-.zlib.deps:
-	echo >$@
+zlib-options =
 else
-.zlib.deps:
-	@(set -e;					\
-          . ../check/funcs.sh;				\
-	  echo >$@.new;					\
-	  if has_header bzlib.h; then			\
-            echo "-DHAVE_BZLIB" >>$@.new;		\
-	    echo "-lbz2" >>$@.new;			\
-	    echo " - BZIP2 decompression supported";	\
-	  fi;						\
-	  if has_header lzma.h; then			\
-	    echo "-DHAVE_LZMA" >>$@.new;		\
-	    echo "-llzma" >>$@.new;			\
-	    echo " - LZMA decompression supported";	\
-	  fi;						\
-	  mv $@.new $@)
+zlib-options = $(shell					\
+	(. ../check/funcs.sh;				\
+	 if has_header bzlib.h; then			\
+           echo "-DHAVE_BZLIB";				\
+	   echo "-lbz2";				\
+	 fi;						\
+	 if has_header lzma.h; then			\
+	   echo "-DHAVE_LZMA";				\
+	   echo "-llzma";				\
+	 fi) | grep $(1))
 endif
 
-xc_dom_bzimageloader.o: .zlib.deps
-xc_dom_bzimageloader.o: CFLAGS += $(shell grep D .zlib.deps)
+xc_dom_bzimageloader.o: CFLAGS += $(call zlib-options,D)
+xc_dom_bzimageloader.opic: CFLAGS += $(call zlib-options,D)
 
-libxenguest.so.$(MAJOR).$(MINOR): LDFLAGS += $(shell grep l .zlib.deps)
+libxenguest.so.$(MAJOR).$(MINOR): LDFLAGS += $(call zlib-options,l)
 libxenguest.so.$(MAJOR).$(MINOR): $(GUEST_PIC_OBJS) libxenctrl.so
 	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenguest.so.$(MAJOR) $(SHLIB_CFLAGS) -o $@ $(GUEST_PIC_OBJS) -lz -lxenctrl $(PTHREAD_LIBS)
 

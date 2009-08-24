@@ -112,7 +112,7 @@ static int xc_try_bzip2_decode(
 static int xc_try_bzip2_decode(
     struct xc_dom_image *dom, void **blob, size_t *size)
 {
-    xc_dom_printf("%s: LZMA decompress support unavailable\n",
+    xc_dom_printf("%s: BZIP2 decompress support unavailable\n",
                   __FUNCTION__);
     return -1;
 }
