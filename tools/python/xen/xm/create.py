@@ -890,6 +890,7 @@ def configure_vtpm(config_devs, vals):
     if len(vtpm) > 0:
         d = vtpm[0]
         instance = d.get('instance')
+        uuid = d.get('uuid')
         if instance == "VTPMD":
             instance = "0"
         else:
@@ -908,6 +909,8 @@ def configure_vtpm(config_devs, vals):
             config_vtpm.append(['backend', backend])
         if typ:
             config_vtpm.append(['type', type])
+        if uuid:
+            config_vtpm.append(['uuid', type])
         config_devs.append(['device', config_vtpm])
 
 
@@ -1147,7 +1150,7 @@ def preprocess_vtpm(vals):
             (k, v) = b.strip().split('=', 1)
             k = k.strip()
             v = v.strip()
-            if k not in ['backend', 'instance']:
+            if k not in ['backend', 'instance', 'uuid']:
                 err('Invalid vtpm specifier: ' + vtpm)
             d[k] = v
         vtpms.append(d)
