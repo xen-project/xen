@@ -105,7 +105,7 @@ void mls_sid_to_context(struct context *context, char **scontext)
     {
         memcpy(scontextp,
                 policydb.p_sens_val_to_name[context->range.level[l].sens - 1],
-                strlen(policydb.p_sens_val_to_name[context->range.level[l].sens - 1]));
+                strlen(policydb.p_sens_val_to_name[context->range.level[l].sens - 1])+1);
         scontextp += strlen(scontextp);
 
         /* categories */
@@ -124,7 +124,7 @@ void mls_sid_to_context(struct context *context, char **scontext)
                     else
                         *scontextp++ = ',';
                     nm = policydb.p_cat_val_to_name[prev];
-                    memcpy(scontextp, nm, strlen(nm));
+                    memcpy(scontextp, nm, strlen(nm)+1);
                     scontextp += strlen(nm);
                 }
                 if ( prev < 0 )
@@ -132,7 +132,7 @@ void mls_sid_to_context(struct context *context, char **scontext)
                 else
                     *scontextp++ = ',';
                 nm = policydb.p_cat_val_to_name[i];
-                memcpy(scontextp, nm, strlen(nm));
+                memcpy(scontextp, nm, strlen(nm)+1);
                 scontextp += strlen(nm);
                 head = i;
             }
@@ -146,7 +146,7 @@ void mls_sid_to_context(struct context *context, char **scontext)
             else
                 *scontextp++ = ',';
             nm = policydb.p_cat_val_to_name[prev];
-            memcpy(scontextp, nm, strlen(nm));
+            memcpy(scontextp, nm, strlen(nm)+1);
             scontextp += strlen(nm);
         }
 
