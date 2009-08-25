@@ -44,11 +44,12 @@
 #define CSCHED_MSECS_PER_TICK       10
 #define CSCHED_MSECS_PER_TSLICE     \
     (CSCHED_MSECS_PER_TICK * CSCHED_TICKS_PER_TSLICE)
-#define CSCHED_CREDITS_PER_TICK     100
+#define CSCHED_CREDITS_PER_MSEC    100000
 #define CSCHED_CREDITS_PER_TSLICE   \
-    (CSCHED_CREDITS_PER_TICK * CSCHED_TICKS_PER_TSLICE)
+    (CSCHED_MSECS_PER_TSLICE * CSCHED_CREDITS_PER_MSEC)
 #define CSCHED_CREDITS_PER_ACCT     \
-    (CSCHED_CREDITS_PER_TICK * CSCHED_TICKS_PER_ACCT)
+    (CSCHED_CREDITS_PER_MSEC * CSCHED_MSECS_PER_TSLICE)
+#define CSCHED_STIME_TO_CREDIT(_t)  ((_t)*CSCHED_CREDITS_PER_MSEC/MILLISECS(1))
 
 
 /*
@@ -121,6 +122,7 @@ struct csched_vcpu {
     struct csched_dom *sdom;
     struct vcpu *vcpu;
     atomic_t credit;
+    s_time_t start_time;   /* When we were scheduled (used for credit) */
     uint16_t flags;
     int16_t pri;
 #ifdef CSCHED_STATS
@@ -207,6 +209,24 @@ __runq_remove(struct csched_vcpu *svc)
 {
     BUG_ON( !__vcpu_on_runq(svc) );
     list_del_init(&svc->runq_elem);
+}
+
+void burn_credits(struct csched_vcpu *svc, s_time_t now)
+{
+    s_time_t delta;
+
+    /* Assert svc is current */
+    ASSERT(svc==CSCHED_VCPU(per_cpu(schedule_data, svc->vcpu->processor).curr));
+
+    if ( is_idle_vcpu(svc->vcpu) )
+        return;
+
+    delta = (now - svc->start_time);
+
+    if ( delta > 0 ) {
+        atomic_sub(CSCHED_STIME_TO_CREDIT(delta)+1, &svc->credit);
+        svc->start_time = now;
+    } 
 }
 
 static inline void
@@ -496,7 +516,7 @@ csched_vcpu_acct(unsigned int cpu)
     /*
      * Update credits
      */
-    atomic_sub(CSCHED_CREDITS_PER_TICK, &svc->credit);
+    burn_credits(svc, NOW());
 
     /*
      * Put this VCPU and domain back on the active list if it was
@@ -1116,6 +1136,9 @@ csched_schedule(s_time_t now)
     CSCHED_STAT_CRANK(schedule);
     CSCHED_VCPU_CHECK(current);
 
+    /* Update credits */
+    burn_credits(scurr, now);
+
     /*
      * Select next runnable local VCPU (ie top of local runq)
      */
@@ -1152,6 +1175,9 @@ csched_schedule(s_time_t now)
     {
         cpu_clear(cpu, csched_priv.idlers);
     }
+
+    if ( !is_idle_vcpu(snext->vcpu) )
+        snext->start_time = now;
 
     /*
      * Return task to run next...
@@ -1246,7 +1272,7 @@ csched_dump(void)
            "\trunq_sort          = %u\n"
            "\tdefault-weight     = %d\n"
            "\tmsecs per tick     = %dms\n"
-           "\tcredits per tick   = %d\n"
+           "\tcredits per msec   = %d\n"
            "\tticks per tslice   = %d\n"
            "\tticks per acct     = %d\n"
            "\tmigration delay    = %uus\n",
@@ -1258,7 +1284,7 @@ csched_dump(void)
            csched_priv.runq_sort,
            CSCHED_DEFAULT_WEIGHT,
            CSCHED_MSECS_PER_TICK,
-           CSCHED_CREDITS_PER_TICK,
+           CSCHED_CREDITS_PER_MSEC,
            CSCHED_TICKS_PER_TSLICE,
            CSCHED_TICKS_PER_ACCT,
            vcpu_migration_delay);
