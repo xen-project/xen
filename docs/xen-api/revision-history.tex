@@ -1,69 +1,49 @@
 { \bf Revision History}
 
+% Please do not use minipages in a tabular environment; this results
+% in bad vertical alignment. 
+
+\begin{flushleft}
 \begin{center}
- \begin{tabular}{|l|l|l|l|}
+ \begin{tabular}{|l|l|l|>{\raggedright}p{7cm}|}
   \hline
   1.0.0 & 27th April 07 & Xensource et al. &
-   \begin{minipage}[t][.7cm]{7cm}
-     Initial Revision
-   \end{minipage}\\
+     Initial Revision\tabularnewline
   \hline
   1.0.1 & 10th Dec. 07 & S. Berger &
-   \begin{minipage}[t]{7cm}
-    \begin{flushleft}
      Added XSPolicy.reset\_xspolicy, VTPM.get\_other\_config,
-     VTPM.set\_otherconfig. ACMPolicy.get\_enforced\_binary methods.
-    \end{flushleft}
-   \end{minipage}\\
+     VTPM.set\_otherconfig. ACMPolicy.get\_enforced\_binary methods.\tabularnewline
   \hline
   1.0.2 & 25th Jan. 08 & J. Fehlig &
-   \begin{minipage}[t]{7cm}
-    \begin{flushleft}
-     Added Crashed VM power state.
-    \end{flushleft}
-   \end{minipage}\\
+     Added Crashed VM power state.\tabularnewline
   \hline
   1.0.3 & 11th Feb. 08 & S. Berger &
-   \begin{minipage}[t]{7cm}
-    \begin{flushleft}
-     Added table of contents and hyperlink cross reference.
-    \end{flushleft}
-   \end{minipage}\\
+     Added table of contents and hyperlink cross reference.\tabularnewline
   \hline
   1.0.4 & 23rd March 08 & S. Berger &
-   \begin{minipage}[t]{7cm}
-    \begin{flushleft}
-     Added XSPolicy.can\_run
-    \end{flushleft}
-   \end{minipage}\\
+     Added XSPolicy.can\_run\tabularnewline
   \hline
   1.0.5 & 17th Apr. 08 & S. Berger &
-   \begin{minipage}[t]{7cm}
-    \begin{flushleft}
      Added undocumented fields and methods for default\_netmask and
      default\_gateway to the Network class. Removed an unimplemented
      method from the XSPolicy class and removed the 'optional' from
-     'oldlabel' parameters.
-    \end{flushleft}
-   \end{minipage}\\
+     'oldlabel' parameters.\tabularnewline
   \hline
   1.0.6 & 24th Jul. 08 & Y. Iwamatsu &
-   \begin{minipage}[t]{7cm}
-    \begin{flushleft}
      Added definitions of new classes DPCI and PPCI. Updated the table
      and the diagram representing relationships between classes.
-     Added host.PPCIs and VM.DPCIs fields.
-    \end{flushleft}
-   \end{minipage}\\
+     Added host.PPCIs and VM.DPCIs fields.\tabularnewline
   \hline
   1.0.7 & 20th Oct. 08 & M. Kanno &
-   \begin{minipage}[t]{7cm}
-    \begin{flushleft}
      Added definitions of new classes DSCSI and PSCSI. Updated the table
      and the diagram representing relationships between classes.
-     Added host.PSCSIs and VM.DSCSIs fields.
-    \end{flushleft}
-   \end{minipage}\\
+     Added host.PSCSIs and VM.DSCSIs fields.\tabularnewline
+  \hline
+  1.0.8 & 17th Jun. 09 & A. Florath &
+     Updated interactive session example.
+     Added description for \texttt{PV/kernel} and \texttt{PV/ramdisk}
+     parameters using URIs.\tabularnewline
   \hline
  \end{tabular}
 \end{center}
+\end{flushleft}

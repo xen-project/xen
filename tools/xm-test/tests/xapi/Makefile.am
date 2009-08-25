@@ -2,7 +2,8 @@ SUBDIRS =
 
 TESTS = 01_xapi-vm_basic.test \
 	02_xapi-vbd_basic.test \
-	03_xapi-network_pos.test
+	03_xapi-network_pos.test \
+	04_xapi-data_uri_handling.test
 
 XFAIL_TESTS =
 

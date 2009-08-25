@@ -41,6 +41,7 @@ from xen.util.pci import pci_opts_list_from_sxp, pci_convert_sxp_to_dict
 from xen.xend.XendSXPDev import dev_dict_to_sxp
 from xen.util import xsconstants
 from xen.util import auxbin
+import xen.util.fileuri
 
 log = logging.getLogger("xend.XendConfig")
 log.setLevel(logging.WARN)
@@ -337,6 +338,8 @@ class XendConfig(dict):
         elif dominfo:
             # output from xc.domain_getinfo
             self._dominfo_to_xapi(dominfo, update_mem = True)
+
+        self.handle_fileuris()
 
         log.debug('XendConfig.init: %s' % scrub_password(self))
 
@@ -1999,10 +2002,14 @@ class XendConfig(dict):
             self['_temp_kernel'] = sxp.child_value(image_sxp, 'kernel','')
             self['_temp_ramdisk'] = sxp.child_value(image_sxp, 'ramdisk','')
             self['_temp_args'] = kernel_args
+            self['use_tmp_kernel'] = True
+            self['use_tmp_ramdisk'] = True
         else:
             self['PV_kernel'] = sxp.child_value(image_sxp, 'kernel','')
             self['PV_ramdisk'] = sxp.child_value(image_sxp, 'ramdisk','')
             self['PV_args'] = kernel_args
+            self['use_tmp_kernel'] = False
+            self['use_tmp_ramdisk'] = False
 
         self['superpages'] = sxp.child_value(image_sxp, 'superpages',0)
 
@@ -2072,4 +2079,12 @@ class XendConfig(dict):
                 opts = pci_opts_list_from_sxp(dev)
                 pci.append([domain, bus, slot, func, vdevfn, opts])
         self['platform']['pci'] = pci
+ 
+    def handle_fileuris(self):
+        for arg in [('PV_kernel', 'use_tmp_kernel'), 
+                    ('PV_ramdisk', 'use_tmp_ramdisk')]:
+            if arg[0] in self and self[arg[0]]!='':
+                self[arg[0]], self[arg[1]] \
+                    = xen.util.fileuri.schemes.decode(self[arg[0]])
+                log.debug("fileuri '%s' = '%s'" % (arg[0], self[arg[0]][:100]))
 
