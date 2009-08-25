@@ -26,11 +26,6 @@ INSTALL_SBIN-y := xm xen-bugtool xen-python-path xend xenperf xsview xenpm xen-t
 INSTALL_SBIN-$(CONFIG_X86) += xen-hvmctx
 INSTALL_SBIN := $(INSTALL_SBIN-y)
 
-DEFAULT_PYTHON_PATH := $(shell $(XEN_ROOT)/tools/python/get-path)
-PYTHON_PATH ?= $(DEFAULT_PYTHON_PATH)
-INSTALL_PYTHON_PROG = $(XEN_ROOT)/tools/python/install-wrap \
-"$(PYTHON_PATH)" $(INSTALL_PROG)
-
 .PHONY: all
 all: build
 

@@ -12,6 +12,7 @@ build:
 install: all
 	CC="$(CC)" CFLAGS="$(CFLAGS)" $(PYTHON) setup.py install \
 		$(PYTHON_PREFIX_ARG) --root="$(DESTDIR)" --force
+	$(INSTALL_PYTHON_PROG) src/pygrub $(DESTDIR)/$(BINDIR)/pygrub
 	$(INSTALL_DIR) $(DESTDIR)/var/run/xend/boot
 
 .PHONY: clean

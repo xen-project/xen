@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#! /usr/bin/env python
 #
 # pygrub - simple python-based bootloader for Xen
 #
