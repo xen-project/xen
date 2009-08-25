@@ -101,6 +101,7 @@ newlib-$(NEWLIB_VERSION): newlib-$(NEWLIB_VERSION).tar.gz
 	tar xzf $<
 	patch -d $@ -p0 < newlib.patch
 	patch -d $@ -p0 < newlib-chk.patch
+	patch -d $@ -p1 < newlib-stdint-size_max-fix-from-1.17.0.patch
 	touch $@
 
 NEWLIB_STAMPFILE=$(CROSS_ROOT)/$(GNU_TARGET_ARCH)-xen-elf/lib/libc.a
