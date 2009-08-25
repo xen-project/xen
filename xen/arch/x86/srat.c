@@ -17,6 +17,7 @@
 #include <xen/nodemask.h>
 #include <xen/acpi.h>
 #include <xen/numa.h>
+#include <asm/e820.h>
 #include <asm/page.h>
 
 static struct acpi_table_slit *acpi_slit;
@@ -236,23 +237,31 @@ acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
 static int nodes_cover_memory(void)
 {
 	int i;
-	u64 pxmram, e820ram;
 
-	pxmram = 0;
-	for_each_node_mask(i, nodes_parsed) {
-		u64 s = nodes[i].start >> PAGE_SHIFT;
-		u64 e = nodes[i].end >> PAGE_SHIFT;
-		pxmram += e - s;
-	}
+	for (i = 0; i < e820.nr_map; i++) {
+		int j, found;
+		unsigned long long start, end;
 
-	e820ram = max_page;
-	/* We seem to lose 3 pages somewhere. Allow a bit of slack. */
-	if ((long)(e820ram - pxmram) >= 1*1024*1024) {
-		printk(KERN_ERR "SRAT: PXMs only cover %"PRIu64"MB of your %"
-			PRIu64"MB e820 RAM. Not used.\n",
-			(pxmram << PAGE_SHIFT) >> 20,
-			(e820ram << PAGE_SHIFT) >> 20);
-		return 0;
+		if (e820.map[i].type != E820_RAM) {
+			continue;
+		}
+
+		start = e820.map[i].addr;
+		end = e820.map[i].addr + e820.map[i].size - 1;
+
+		found = 0;
+		for_each_node_mask(j, nodes_parsed) {
+			if (start >= nodes[j].start && end <= nodes[j].end) {
+				found = 1;
+				break;
+			}
+		}
+
+		if (!found) {
+			printk(KERN_ERR "SRAT: No PXM for e820 range: "
+				"%016Lx - %016Lx\n", start, end);
+			return 0;
+		}
 	}
 	return 1;
 }
