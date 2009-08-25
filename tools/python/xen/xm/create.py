@@ -908,9 +908,9 @@ def configure_vtpm(config_devs, vals):
         if backend:
             config_vtpm.append(['backend', backend])
         if typ:
-            config_vtpm.append(['type', type])
+            config_vtpm.append(['type', typ])
         if uuid:
-            config_vtpm.append(['uuid', type])
+            config_vtpm.append(['uuid', uuid])
         config_devs.append(['device', config_vtpm])
 
 
