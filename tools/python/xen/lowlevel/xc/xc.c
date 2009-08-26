@@ -654,10 +654,9 @@ static PyObject *pyxc_deassign_device(XcObject *self,
 static PyObject *pyxc_get_device_group(XcObject *self,
                                          PyObject *args)
 {
-    domid_t domid;
     uint32_t bdf = 0;
     uint32_t max_sdevs, num_sdevs;
-    int seg, bus, dev, func, rc, i;
+    int domid, seg, bus, dev, func, rc, i;
     PyObject *Pystr;
     char *group_str;
     char dev_str[9];
@@ -812,7 +811,7 @@ static PyObject *pyxc_dom_check_cpuid(XcObject *self,
 static PyObject *pyxc_dom_set_policy_cpuid(XcObject *self,
                                            PyObject *args)
 {
-    domid_t domid;
+    int domid;
 
     if ( !PyArg_ParseTuple(args, "i", &domid) )
         return NULL;
@@ -828,9 +827,8 @@ static PyObject *pyxc_dom_set_policy_cpuid(XcObject *self,
 static PyObject *pyxc_dom_set_cpuid(XcObject *self,
                                     PyObject *args)
 {
-    domid_t domid;
     PyObject *sub_input, *config;
-    unsigned int input[2];
+    unsigned int domid, input[2];
     char *regs[4], *regs_transform[4];
 
     if ( !PyArg_ParseTuple(args, "IIOO", &domid,
