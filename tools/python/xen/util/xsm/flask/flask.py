@@ -25,7 +25,7 @@ def label2ssidref(label, policy, type):
     try:
         return flask.flask_context_to_sid(label)
     except:
-        return ""
+       raise XSMError('Invalid context %s' % label)
 
 def parse_security_label(security_label):
     return security_label

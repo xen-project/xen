@@ -802,11 +802,6 @@ class XendConfig(dict):
                 if not sxp.child_value(sxp_cfg, 'security_label'):
                     del cfg['security']
 
-            sec_lab = cfg['security_label'].split(":")
-            if len(sec_lab) != 3:
-                raise XendConfigError("Badly formatted security label: %s"
-                                      % cfg['security_label'])
-
         old_state = sxp.child_value(sxp_cfg, 'state')
         if old_state:
             for i in range(len(CONFIG_OLD_DOM_STATES)):

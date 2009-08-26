@@ -1163,17 +1163,11 @@ def preprocess_access_control(vals):
     num = len(vals.access_control)
     if num == 1:
         access_control = (vals.access_control)[0]
-        d = {}
-        a = access_control.split(',')
-        if len(a) > 2:
-            err('Too many elements in access_control specifier: ' + access_control)
-        for b in a:
-            (k, v) = b.strip().split('=', 1)
-            k = k.strip()
-            v = v.strip()
-            if k not in ['policy','label']:
-                err('Invalid access_control specifier: ' + access_control)
-            d[k] = v
+        acc_re = 'policy=(?P<policy>.*),label=(?P<label>.*)'
+        acc_match = re.match(acc_re,access_control)
+        if acc_match == None:
+            err('Invalid access_control specifier: ' + access_control)
+        d = acc_match.groupdict();
         access_controls.append(d)
         vals.access_control = access_controls
     elif num > 1:
