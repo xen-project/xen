@@ -443,17 +443,14 @@ int setup_msi_irq(struct pci_dev *dev, struct msi_desc *msidesc, int irq)
 
 int msi_free_irq(struct msi_desc *entry)
 {
+    destroy_irq(entry->irq);
     if ( entry->msi_attrib.type == PCI_CAP_ID_MSIX )
     {
         unsigned long start;
-
-        writel(1, entry->mask_base + PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET);
-
         start = (unsigned long)entry->mask_base & ~(PAGE_SIZE - 1);
         msix_put_fixmap(entry->dev, virt_to_fix(start));
     }
     list_del(&entry->list);
-    destroy_irq(entry->irq);
     xfree(entry);
     return 0;
 }
