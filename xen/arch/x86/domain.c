@@ -516,6 +516,10 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
         d->arch.cpuids[i].input[1] = XEN_CPUID_INPUT_UNUSED;
     }
 
+    /* For now, per-domain SoftTSC status is taken from global boot param. */
+    d->arch.vtsc = opt_softtsc;
+    spin_lock_init(&d->arch.vtsc_lock);
+
     return 0;
 
  fail:
@@ -1259,7 +1263,7 @@ static void paravirt_ctxt_switch_to(struct vcpu *v)
     set_int80_direct_trap(v);
     switch_kernel_stack(v);
 
-    cr4 = pv_guest_cr4_to_real_cr4(v->arch.guest_context.ctrlreg[4]);
+    cr4 = pv_guest_cr4_to_real_cr4(v);
     if ( unlikely(cr4 != read_cr4()) )
         write_cr4(cr4);
 

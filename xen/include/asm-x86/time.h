@@ -41,4 +41,7 @@ int pit_broadcast_is_available(void);
 uint64_t acpi_pm_tick_to_ns(uint64_t ticks);
 uint64_t ns_to_acpi_pm_tick(uint64_t ns);
 
+extern int opt_softtsc;
+void pv_soft_rdtsc(struct vcpu *v, struct cpu_user_regs *regs);
+
 #endif /* __X86_TIME_H__ */

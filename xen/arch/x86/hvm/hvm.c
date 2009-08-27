@@ -61,9 +61,6 @@ int hvm_enabled __read_mostly;
 unsigned int opt_hvm_debug_level __read_mostly;
 integer_param("hvm_debug", opt_hvm_debug_level);
 
-int opt_softtsc;
-boolean_param("softtsc", opt_softtsc);
-
 struct hvm_function_table hvm_funcs __read_mostly;
 
 /* I/O permission bitmap is globally shared by all HVM guests. */

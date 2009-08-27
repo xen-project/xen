@@ -21,6 +21,7 @@
 #include <xen/smp.h>
 #include <xen/irq.h>
 #include <xen/softirq.h>
+#include <xen/keyhandler.h>
 #include <asm/io.h>
 #include <asm/msr.h>
 #include <asm/mpspec.h>
@@ -34,6 +35,9 @@
 /* opt_clocksource: Force clocksource to one of: pit, hpet, cyclone, acpi. */
 static char opt_clocksource[10];
 string_param("clocksource", opt_clocksource);
+
+int opt_softtsc;
+boolean_param("softtsc", opt_softtsc);
 
 /*
  * opt_consistent_tscs: All TSCs tick at the exact same rate, allowing
@@ -1428,6 +1432,57 @@ struct tm wallclock_time(void)
     do_div(seconds, 1000000000);
     return gmtime(seconds);
 }
+
+
+/*
+ * PV SoftTSC Emulation.
+ */
+
+static unsigned long rdtsc_kerncount, rdtsc_usercount;
+
+void pv_soft_rdtsc(struct vcpu *v, struct cpu_user_regs *regs)
+{
+    s_time_t now;
+
+    if ( guest_kernel_mode(v, regs) )
+    {
+        rdtsc_kerncount++;
+        rdtsc(regs->eax, regs->edx);
+    }
+    else
+    { 
+        rdtsc_usercount++;
+        spin_lock(&v->domain->arch.vtsc_lock);
+        now = get_s_time() + v->domain->arch.vtsc_stime_offset;
+        if ( (int64_t)(now - v->domain->arch.vtsc_last) >= 0 )
+            v->domain->arch.vtsc_last = now;
+        else
+            now = v->domain->arch.vtsc_last;
+        spin_unlock(&v->domain->arch.vtsc_lock);
+        regs->eax = (uint32_t)now;
+        regs->edx = (uint32_t)(now >> 32);
+    }
+}
+
+static void dump_softtsc(unsigned char key)
+{
+    printk("softtsc count: %lu kernel, %lu user\n",
+           rdtsc_kerncount, rdtsc_usercount);
+}
+
+static struct keyhandler dump_softtsc_keyhandler = {
+    .diagnostic = 1,
+    .u.fn = dump_softtsc,
+    .desc = "dump softtsc stats"
+};
+
+static int __init setup_dump_softtsc(void)
+{
+    if ( opt_softtsc )
+        register_keyhandler('s', &dump_softtsc_keyhandler);
+    return 0;
+}
+__initcall(setup_dump_softtsc);
 
 /*
  * Local variables:

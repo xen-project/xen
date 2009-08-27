@@ -126,7 +126,6 @@ int hvm_do_hypercall(struct cpu_user_regs *pregs);
 void hvm_hlt(unsigned long rflags);
 void hvm_triple_fault(void);
 
-extern int opt_softtsc;
 void hvm_rdtsc_intercept(struct cpu_user_regs *regs);
 
 /* These functions all return X86EMUL return codes. */

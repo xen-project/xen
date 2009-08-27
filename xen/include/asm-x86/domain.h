@@ -299,6 +299,12 @@ struct arch_domain
 
     /* For Guest vMCA handling */
     struct domain_mca_msrs vmca_msrs;
+
+    /* SoftTSC emulation */
+    bool_t vtsc;
+    s_time_t vtsc_last;
+    spinlock_t vtsc_lock;
+    int64_t vtsc_stime_offset;
 } __cacheline_aligned;
 
 #define has_arch_pdevs(d)    (!list_empty(&(d)->arch.pdev_list))
@@ -426,10 +432,13 @@ void vcpu_show_registers(const struct vcpu *);
 unsigned long pv_guest_cr4_fixup(unsigned long guest_cr4);
 
 /* Convert between guest-visible and real CR4 values. */
-#define pv_guest_cr4_to_real_cr4(c) \
-    (((c) | (mmu_cr4_features & (X86_CR4_PGE | X86_CR4_PSE))) & ~X86_CR4_DE)
+#define pv_guest_cr4_to_real_cr4(v)                         \
+    (((v)->arch.guest_context.ctrlreg[4]                    \
+      | (mmu_cr4_features & (X86_CR4_PGE | X86_CR4_PSE))    \
+      | ((v)->domain->arch.vtsc ? X86_CR4_TSD : 0))         \
+      & ~X86_CR4_DE)
 #define real_cr4_to_pv_guest_cr4(c) \
-    ((c) & ~(X86_CR4_PGE | X86_CR4_PSE))
+    ((c) & ~(X86_CR4_PGE | X86_CR4_PSE | X86_CR4_TSD))
 
 void domain_cpuid(struct domain *d,
                   unsigned int  input,

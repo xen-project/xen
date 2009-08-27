@@ -2005,12 +2005,15 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     goto fail;
 
  twobyte_opcode:
-    /* Two-byte opcodes only emulated from guest kernel. */
-    if ( !guest_kernel_mode(v, regs) )
+    /*
+     * All two-byte opcodes, except RDTSC (0x31) are executable only from
+     * guest kernel mode (virtual ring 0).
+     */
+    opcode = insn_fetch(u8, code_base, eip, code_limit);
+    if ( !guest_kernel_mode(v, regs) &&
+         !((opcode == 0x31) && v->domain->arch.vtsc) )
         goto fail;
 
-    /* Privileged (ring 0) instructions. */
-    opcode = insn_fetch(u8, code_base, eip, code_limit);
     if ( lock && (opcode & ~3) != 0x20 )
         goto fail;
     switch ( opcode )
@@ -2127,8 +2130,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 
         case 4: /* Write CR4 */
             v->arch.guest_context.ctrlreg[4] = pv_guest_cr4_fixup(*reg);
-            write_cr4(pv_guest_cr4_to_real_cr4(
-                v->arch.guest_context.ctrlreg[4]));
+            write_cr4(pv_guest_cr4_to_real_cr4(v));
             break;
 
         default:
@@ -2266,7 +2268,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     }
 
     case 0x31: /* RDTSC */
-        rdtsc(regs->eax, regs->edx);
+        pv_soft_rdtsc(v, regs);
         break;
 
     case 0x32: /* RDMSR */
