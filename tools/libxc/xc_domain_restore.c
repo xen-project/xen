@@ -56,6 +56,9 @@ static xen_pfn_t *p2m = NULL;
 /* Address size of the guest, in bytes */
 unsigned int guest_width;
 
+/* If have enough continuous memory for super page allocation */
+static unsigned no_superpage_mem = 0;
+
 /*
 **
 **
@@ -63,41 +66,245 @@ unsigned int guest_width;
 #define SUPERPAGE_PFN_SHIFT  9
 #define SUPERPAGE_NR_PFNS    (1UL << SUPERPAGE_PFN_SHIFT)
 
-static int allocate_mfn(int xc_handle, uint32_t dom, unsigned long pfn, int superpages)
+/*
+ * Setting bit 31 force to allocate super page even not all pfns come out,
+ * bit 30 indicate that not is in a super page tracking.
+ */
+#define FORCE_SP_SHIFT           31
+#define FORCE_SP_MASK            (1UL << FORCE_SP_SHIFT)
+
+#define INVALID_SUPER_PAGE       ((1UL << 30) + 1)
+#define SUPER_PAGE_START(pfn)    (((pfn) & (SUPERPAGE_NR_PFNS-1)) == 0 )
+#define SUPER_PAGE_TRACKING(pfn) ( (pfn) != INVALID_SUPER_PAGE )
+#define SUPER_PAGE_DONE(pfn)     ( SUPER_PAGE_START(pfn) )
+
+static int super_page_populated(unsigned long pfn)
 {
-    unsigned long mfn;
-
-    if (superpages)
+    int i;
+    pfn &= ~(SUPERPAGE_NR_PFNS - 1);
+    for ( i = pfn; i < pfn + SUPERPAGE_NR_PFNS; i++ )
     {
-        unsigned long base_pfn;
+        if ( p2m[i] != INVALID_P2M_ENTRY )
+            return 1;
+    }
+    return 0;
+}
 
-        base_pfn = pfn & ~(SUPERPAGE_NR_PFNS-1);
-        mfn = base_pfn;
+/*
+ * Break a 2M page and move contents of [extent start, next_pfn-1] to
+ * some new allocated 4K pages
+ */
+static int break_super_page(int xc_handle,
+                            uint32_t dom,
+                            xen_pfn_t next_pfn)
+{
+    xen_pfn_t *page_array, start_pfn, mfn;
+    uint8_t *ram_base, *save_buf;
+    unsigned long i;
+    int tot_pfns, rc = 0;
 
-        if (xc_domain_memory_populate_physmap(xc_handle, dom, 1,
-                                              SUPERPAGE_PFN_SHIFT, 0, &mfn) != 0)
-        {
-            ERROR("Failed to allocate physical memory at pfn 0x%x, base 0x%x.\n", pfn, base_pfn); 
-            errno = ENOMEM;
+    tot_pfns = (next_pfn & (SUPERPAGE_NR_PFNS - 1));
+
+    start_pfn = next_pfn & ~(SUPERPAGE_NR_PFNS - 1);
+    for ( i = start_pfn; i < start_pfn + SUPERPAGE_NR_PFNS; i++ )
+    {
+        /* check the 2M page are populated */
+        if ( p2m[i] == INVALID_P2M_ENTRY ) {
+            DPRINTF("Previous super page was populated wrongly!\n");
             return 1;
         }
-        for (pfn = base_pfn; pfn < base_pfn + SUPERPAGE_NR_PFNS; pfn++, mfn++)
-        {
-            p2m[pfn] = mfn;
-        }
     }
-    else
+
+    page_array = (xen_pfn_t*)malloc(tot_pfns * sizeof(xen_pfn_t));
+    save_buf = (uint8_t*)malloc(tot_pfns * PAGE_SIZE);
+
+    if ( !page_array || !save_buf )
     {
-        mfn = pfn;
+        ERROR("alloc page_array failed\n");
+        errno = ENOMEM;
+        rc = 1;
+        goto out;
+    }
+
+    /* save previous super page contents */
+    for ( i = 0; i < tot_pfns; i++ )
+    {
+        /* only support HVM, as the mfn of the 2M page is missing */
+        page_array[i] = start_pfn + i;
+    }
+
+    ram_base = xc_map_foreign_batch(xc_handle, dom, PROT_READ,
+                                    page_array, tot_pfns);
+
+    if ( ram_base == NULL )
+    {
+        ERROR("map batch failed\n");
+        rc = 1;
+        goto out;
+    }
+
+    memcpy(save_buf, ram_base, tot_pfns * PAGE_SIZE);
+    munmap(ram_base, tot_pfns * PAGE_SIZE);
+
+    /* free the super page */
+    if ( xc_domain_memory_decrease_reservation(xc_handle, dom, 1,
+                                   SUPERPAGE_PFN_SHIFT, &start_pfn) != 0 )
+    {
+        ERROR("free 2M page failure @ 0x%ld.\n", next_pfn);
+        rc = 1;
+        goto out;
+    }
+
+    start_pfn = next_pfn & ~(SUPERPAGE_NR_PFNS - 1);
+    for ( i = start_pfn; i < start_pfn + SUPERPAGE_NR_PFNS; i++ )
+    {
+        p2m[i] = INVALID_P2M_ENTRY;
+    }
+
+    for ( i = start_pfn; i < start_pfn + tot_pfns; i++ )
+    {
+        mfn = i;
         if (xc_domain_memory_populate_physmap(xc_handle, dom, 1, 0,
                                               0, &mfn) != 0)
         {
-            ERROR("Failed to allocate physical memory.!\n"); 
+            ERROR("Failed to allocate physical memory.!\n");
             errno = ENOMEM;
-            return 1;
+            rc = 1;
+            goto out;
         }
-        p2m[pfn] = mfn;
+        p2m[i] = mfn;
     }
+
+    /* restore contents */
+    for ( i = 0; i < tot_pfns; i++ )
+    {
+        page_array[i] = start_pfn + i;
+    }
+
+    ram_base = xc_map_foreign_batch(xc_handle, dom, PROT_WRITE,
+                                    page_array, tot_pfns);
+    if ( ram_base == NULL )
+    {
+        ERROR("map batch failed\n");
+        rc = 1;
+        goto out;
+    }
+
+    memcpy(ram_base, save_buf, tot_pfns * PAGE_SIZE);
+    munmap(ram_base, tot_pfns * PAGE_SIZE);
+
+out:
+    free(page_array);
+    free(save_buf);
+    return rc;
+}
+
+
+/*
+ * According to pfn list allocate pages: one 2M page or series of 4K pages.
+ * Also optimistically allocate a 2M page even when not all pages in the 2M
+ * extent come out, and fix it up in next batch:
+ * If new pages fit the missing one in the 2M extent, do nothing; Else take
+ * place of the original 2M page by some 4K pages.
+ */
+static int allocate_mfn_list(int xc_handle,
+                              uint32_t dom,
+                              unsigned long nr_extents,
+                              xen_pfn_t *batch_buf,
+                              xen_pfn_t *next_pfn,
+                              int superpages)
+{
+    unsigned int i;
+    unsigned long mfn, pfn, sp_pfn;
+
+    /*Check if force super page, then clear it */
+    unsigned force_super_page = !!(*next_pfn & FORCE_SP_MASK);
+    *next_pfn &= ~FORCE_SP_MASK;
+
+    sp_pfn = *next_pfn;
+
+    if ( !superpages ||
+         no_superpage_mem ||
+         !SUPER_PAGE_TRACKING(sp_pfn) )
+        goto normal_page;
+
+    if ( !batch_buf )
+    {
+        /* Break previous 2M page, if 512 pages split across a batch boundary */
+        if ( SUPER_PAGE_TRACKING(sp_pfn) &&
+             !SUPER_PAGE_DONE(sp_pfn))
+        {
+            /* break previously allocated super page*/
+            if ( break_super_page(xc_handle, dom, sp_pfn) != 0 )
+            {
+                ERROR("Break previous super page fail!\n");
+                return 1;
+            }
+        }
+
+        /* follwing pages fit the order in 2M extent */
+        return 0;
+    }
+
+    /*
+     * We try to allocate a 2M page only when:
+     * user require this(superpages),
+     * AND have enough memory,
+     * AND is in the tracking,
+     * AND tracked all pages in 2M extent, OR partial 2M extent for speculation
+     * AND any page in 2M extent are not populated
+     */
+    if ( !SUPER_PAGE_DONE(sp_pfn) && !force_super_page )
+        goto normal_page;
+
+    pfn = batch_buf[0] & ~XEN_DOMCTL_PFINFO_LTAB_MASK;
+    if  ( super_page_populated(pfn) )
+        goto normal_page;
+
+    pfn &= ~(SUPERPAGE_NR_PFNS - 1);
+    mfn =  pfn;
+
+    if ( xc_domain_memory_populate_physmap(xc_handle, dom, 1,
+                SUPERPAGE_PFN_SHIFT, 0, &mfn) == 0)
+    {
+        for ( i = pfn; i < pfn + SUPERPAGE_NR_PFNS; i++, mfn++ )
+        {
+            p2m[i] = mfn;
+        }
+        return 0;
+    }
+    DPRINTF("No 2M page available for pfn 0x%lx, fall back to 4K page.\n",
+            pfn);
+    no_superpage_mem = 1;
+
+normal_page:
+    if ( !batch_buf )
+        return 0;
+
+    /* End the tracking, if want a 2M page but end by 4K pages, */
+    *next_pfn = INVALID_SUPER_PAGE;
+
+    for ( i = 0; i < nr_extents; i++ )
+    {
+        unsigned long pagetype = batch_buf[i] &  XEN_DOMCTL_PFINFO_LTAB_MASK;
+        if ( pagetype == XEN_DOMCTL_PFINFO_XTAB )
+            continue;
+
+        pfn = mfn = batch_buf[i] & ~XEN_DOMCTL_PFINFO_LTAB_MASK;
+        if ( p2m[pfn] == INVALID_P2M_ENTRY )
+        {
+            if (xc_domain_memory_populate_physmap(xc_handle, dom, 1, 0,
+                        0, &mfn) != 0)
+            {
+                ERROR("Failed to allocate physical memory.! pfn=0x%lx, mfn=0x%lx.\n",
+                        pfn, mfn);
+                errno = ENOMEM;
+                return 1;
+            }
+            p2m[pfn] = mfn;
+        }
+    }
+
     return 0;
 }
 
@@ -105,9 +312,115 @@ static int allocate_physmem(int xc_handle, uint32_t dom,
                             unsigned long *region_pfn_type, int region_size,
                             unsigned int hvm, xen_pfn_t *region_mfn, int superpages)
 {
-	int i;
+    int i;
     unsigned long pfn;
     unsigned long pagetype;
+
+    /* Next expected pfn in order to track a possible 2M page */
+    static unsigned long required_pfn = INVALID_SUPER_PAGE;
+
+    /* Buffer of pfn list for 2M page, or series of 4K pages */
+    xen_pfn_t   *batch_buf;
+    unsigned int batch_buf_len;
+
+    if ( !superpages )
+    {
+        batch_buf     = &region_pfn_type[0];
+        batch_buf_len = region_size;
+        goto alloc_page;
+    }
+
+    batch_buf = NULL;
+    batch_buf_len = 0;
+    /* This loop tracks the possible 2M page */
+    for (i = 0; i < region_size; i++)
+    {
+        pfn      = region_pfn_type[i] & ~XEN_DOMCTL_PFINFO_LTAB_MASK;
+        pagetype = region_pfn_type[i] &  XEN_DOMCTL_PFINFO_LTAB_MASK;
+
+        if (pagetype == XEN_DOMCTL_PFINFO_XTAB)
+        {
+            /* Do not start collecting pfns until get a valid pfn */
+            if ( batch_buf_len != 0 )
+                batch_buf_len++;
+            continue;
+        }
+
+        if ( SUPER_PAGE_START(pfn) )
+        {
+            /* Start of a 2M extent, populate previsous buf */
+            if ( allocate_mfn_list(xc_handle, dom,
+                                   batch_buf_len, batch_buf,
+                                   &required_pfn, superpages) != 0 )
+            {
+                errno = ENOMEM;
+                return 1;
+            }
+
+            /* start new tracking for 2M page */
+            batch_buf     = &region_pfn_type[i];
+            batch_buf_len = 1;
+            required_pfn  = pfn + 1;
+        }
+        else if ( pfn == required_pfn )
+        {
+            /* this page fit the 2M extent in order */
+            batch_buf_len++;
+            required_pfn++;
+        }
+        else if ( SUPER_PAGE_TRACKING(required_pfn) )
+        {
+            /* break of a 2M extent, populate previous buf */
+            if ( allocate_mfn_list(xc_handle, dom,
+                                   batch_buf_len, batch_buf,
+                                   &required_pfn, superpages) != 0 )
+            {
+                errno = ENOMEM;
+                return 1;
+            }
+            /* start new tracking for a series of 4K pages */
+            batch_buf     = &region_pfn_type[i];
+            batch_buf_len = 1;
+            required_pfn  = INVALID_SUPER_PAGE;
+        }
+        else
+        {
+            /* this page is 4K */
+            if ( !batch_buf )
+                batch_buf = &region_pfn_type[i];
+            batch_buf_len++;
+        }
+    }
+
+    /*
+     * populate rest batch_buf in the end.
+     * In a speculative way, we allocate a 2M page even when not see all the
+     * pages in order(set bit 31). If not require super page support,
+     * we can skip the tracking loop and come here directly.
+     * Speculative allocation can't be used for PV guest, as we have no mfn to
+     * map previous 2M mem range if need break it.
+     */
+    if ( SUPER_PAGE_TRACKING(required_pfn) &&
+         !SUPER_PAGE_DONE(required_pfn) )
+    {
+        if (hvm)
+            required_pfn |= FORCE_SP_MASK;
+        else
+            required_pfn = INVALID_SUPER_PAGE;
+    }
+
+alloc_page:
+    if ( batch_buf )
+    {
+        if ( allocate_mfn_list(xc_handle, dom,
+                    batch_buf_len, batch_buf,
+                    &required_pfn,
+                    superpages) != 0 )
+        {
+            errno = ENOMEM;
+            return 1;
+        }
+    }
 
     for (i = 0; i < region_size; i++)
     {
@@ -127,8 +440,8 @@ static int allocate_physmem(int xc_handle, uint32_t dom,
         {
             if (p2m[pfn] == INVALID_P2M_ENTRY)
             {
-                if (allocate_mfn(xc_handle, dom, pfn, superpages) != 0)
-                    return 1;
+                DPRINTF("Warning: pfn 0x%lx are not allocated!\n", pfn);
+                /*XXX:allocate this page?*/
             }
 
             /* setup region_mfn[] for batch map.
@@ -172,7 +485,9 @@ static int uncanonicalize_pagetable(int xc_handle, uint32_t dom,
         /* Allocate mfn if necessary */
         if ( p2m[pfn] == INVALID_P2M_ENTRY )
         {
-            if (allocate_mfn(xc_handle, dom, pfn, superpages) != 0)
+            unsigned long force_pfn = superpages ? FORCE_SP_MASK : pfn;
+            if (allocate_mfn_list(xc_handle, dom,
+                        1, &pfn, &force_pfn, superpages) != 0)
                 return 0;
         }
         pte &= ~MADDR_MASK_X86;
@@ -369,6 +684,10 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
 
     /* For info only */
     nr_pfns = 0;
+
+    /* Always try to allocate 2M pages for HVM */
+    if ( hvm )
+        superpages = 1;
 
     if ( read_exact(io_fd, &p2m_size, sizeof(unsigned long)) )
     {
