@@ -2408,10 +2408,13 @@ class XendDomainInfo:
             # may get here if due to ACM the operation is not permitted
             if security.on() == xsconstants.XS_POLICY_ACM:
                 raise VmError('Domain in conflict set with running domain?')
+            log.exception(e)
 
-        if self.domid < 0:
-            raise VmError('Creating domain failed: name=%s' %
-                          self.info['name_label'])
+        if not self.domid or self.domid < 0:
+            str = 'Creating domain failed: name=%s' % self.info['name_label']
+            if self.domid:
+                str += ', error=%i' % int(self.domid)
+            raise VmError(str)
 
         self.dompath = GetDomainPath(self.domid)
 
