@@ -2411,10 +2411,10 @@ class XendDomainInfo:
             log.exception(e)
 
         if not self.domid or self.domid < 0:
-            str = 'Creating domain failed: name=%s' % self.info['name_label']
+            failmsg = 'Creating domain failed: name=%s' % self.info['name_label']
             if self.domid:
-                str += ', error=%i' % int(self.domid)
-            raise VmError(str)
+                failmsg += ', error=%i' % int(self.domid)
+            raise VmError(failmsg)
 
         self.dompath = GetDomainPath(self.domid)
 
