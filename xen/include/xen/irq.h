@@ -82,14 +82,17 @@ typedef struct irq_desc{
 extern irq_desc_t irq_desc[NR_VECTORS];
 
 #define setup_irq(irq, action) \
-    setup_irq_vector(irq, action)
+    setup_irq_vector(irq_to_vector(irq), action)
 
 #define release_irq(irq) \
-    release_irq_vector(irq)
+    release_irq_vector(irq_to_vector(irq))
 
 #define request_irq(irq, handler, irqflags, devname, devid) \
-    request_irq_vector(irq, handler, irqflags, devname, devid)
+    request_irq_vector(irq_to_vector(irq), handler, irqflags, devname, devid)
 
+static inline unsigned int irq_to_vector(int);
+extern int setup_irq_vector(unsigned int, struct irqaction *);
+extern void release_irq_vector(unsigned int);
 extern int request_irq_vector(unsigned int vector,
                void (*handler)(int, void *, struct cpu_user_regs *),
                unsigned long irqflags, const char * devname, void *dev_id);
