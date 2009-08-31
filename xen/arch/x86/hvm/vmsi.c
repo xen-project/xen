@@ -64,15 +64,12 @@ static void vmsi_inj_irq(
     }
 }
 
-#define VMSI_DEST_ID_MASK 0xff
 #define VMSI_RH_MASK      0x100
 #define VMSI_DM_MASK      0x200
 #define VMSI_DELIV_MASK   0x7000
 #define VMSI_TRIG_MODE    0x8000
 
-#define GFLAGS_SHIFT_DEST_ID        0
 #define GFLAGS_SHIFT_RH             8
-#define GFLAGS_SHIFT_DM             9
 #define GLFAGS_SHIFT_DELIV_MODE     12
 #define GLFAGS_SHIFT_TRG_MODE       15
 
@@ -81,8 +78,8 @@ int vmsi_deliver(struct domain *d, int pirq)
     struct hvm_irq_dpci *hvm_irq_dpci = d->arch.hvm_domain.irq.dpci;
     uint32_t flags = hvm_irq_dpci->mirq[pirq].gmsi.gflags;
     int vector = hvm_irq_dpci->mirq[pirq].gmsi.gvec;
-    uint16_t dest = (flags & VMSI_DEST_ID_MASK) >> GFLAGS_SHIFT_DEST_ID;
-    uint8_t dest_mode = (flags & VMSI_DM_MASK) >> GFLAGS_SHIFT_DM;
+    uint8_t dest = (uint8_t)flags;
+    uint8_t dest_mode = !!(flags & VMSI_DM_MASK);
     uint8_t delivery_mode = (flags & VMSI_DELIV_MASK) >> GLFAGS_SHIFT_DELIV_MODE;
     uint8_t trig_mode = (flags & VMSI_TRIG_MODE) >> GLFAGS_SHIFT_TRG_MODE;
     struct vlapic *target;

@@ -296,35 +296,19 @@ static int vlapic_accept_sipi(struct vcpu *v, int trampoline_vector)
 }
 
 /* Add a pending IRQ into lapic. */
-static int vlapic_accept_irq(struct vcpu *v, int delivery_mode,
-                             int vector, int level, int trig_mode)
+static int vlapic_accept_irq(struct vcpu *v, uint32_t icr_low)
 {
     struct vlapic *vlapic = vcpu_vlapic(v);
+    uint8_t vector = (uint8_t)icr_low;
     int rc = X86EMUL_OKAY;
 
-    switch ( delivery_mode )
+    switch ( icr_low & APIC_MODE_MASK )
     {
     case APIC_DM_FIXED:
     case APIC_DM_LOWEST:
-        /* FIXME add logic for vcpu on reset */
-        if ( unlikely(!vlapic_enabled(vlapic)) )
-            break;
-
-        if ( vlapic_test_and_set_irr(vector, vlapic) && trig_mode )
-        {
-            HVM_DBG_LOG(DBG_LEVEL_VLAPIC,
-                        "level trig mode repeatedly for vector %d", vector);
-            break;
-        }
-
-        if ( trig_mode )
-        {
-            HVM_DBG_LOG(DBG_LEVEL_VLAPIC,
-                        "level trig mode for vector %d", vector);
-            vlapic_set_vector(vector, &vlapic->regs->data[APIC_TMR]);
-        }
-
-        vcpu_kick(v);
+        if ( vlapic_enabled(vlapic) &&
+             !vlapic_test_and_set_irr(vector, vlapic) )
+            vcpu_kick(v);
         break;
 
     case APIC_DM_REMRD:
@@ -342,7 +326,8 @@ static int vlapic_accept_irq(struct vcpu *v, int delivery_mode,
 
     case APIC_DM_INIT:
         /* No work on INIT de-assert for P4-type APIC. */
-        if ( trig_mode && !(level & APIC_INT_ASSERT) )
+        if ( (icr_low & (APIC_INT_LEVELTRIG | APIC_INT_ASSERT)) ==
+             APIC_INT_LEVELTRIG )
             break;
         rc = vlapic_accept_init(v);
         break;
@@ -352,8 +337,8 @@ static int vlapic_accept_irq(struct vcpu *v, int delivery_mode,
         break;
 
     default:
-        gdprintk(XENLOG_ERR, "TODO: unsupported delivery mode %x\n",
-                 delivery_mode);
+        gdprintk(XENLOG_ERR, "TODO: unsupported delivery mode in ICR %x\n",
+                 icr_low);
         domain_crash(v->domain);
     }
 
@@ -410,31 +395,21 @@ void vlapic_EOI_set(struct vlapic *vlapic)
 int vlapic_ipi(
     struct vlapic *vlapic, uint32_t icr_low, uint32_t icr_high)
 {
-    unsigned int dest =         GET_xAPIC_DEST_FIELD(icr_high);
-    unsigned int short_hand =   icr_low & APIC_SHORT_MASK;
-    unsigned int trig_mode =    icr_low & APIC_INT_LEVELTRIG;
-    unsigned int level =        icr_low & APIC_INT_ASSERT;
-    unsigned int dest_mode =    icr_low & APIC_DEST_MASK;
-    unsigned int delivery_mode =icr_low & APIC_MODE_MASK;
-    unsigned int vector =       icr_low & APIC_VECTOR_MASK;
-
+    unsigned int dest       = GET_xAPIC_DEST_FIELD(icr_high);
+    unsigned int short_hand = icr_low & APIC_SHORT_MASK;
+    unsigned int dest_mode  = !!(icr_low & APIC_DEST_MASK);
     struct vlapic *target;
     struct vcpu *v;
     int rc = X86EMUL_OKAY;
 
-    HVM_DBG_LOG(DBG_LEVEL_VLAPIC, "icr_high 0x%x, icr_low 0x%x, "
-                "short_hand 0x%x, dest 0x%x, trig_mode 0x%x, level 0x%x, "
-                "dest_mode 0x%x, delivery_mode 0x%x, vector 0x%x",
-                icr_high, icr_low, short_hand, dest,
-                trig_mode, level, dest_mode, delivery_mode, vector);    
+    HVM_DBG_LOG(DBG_LEVEL_VLAPIC, "icr = 0x%08x:%08x", icr_high, icr_low);
 
-    if ( delivery_mode == APIC_DM_LOWEST )
+    if ( (icr_low & APIC_MODE_MASK) == APIC_DM_LOWEST )
     {
         target = vlapic_lowest_prio(vlapic_domain(vlapic), vlapic,
                                     short_hand, dest, dest_mode);
         if ( target != NULL )
-            rc = vlapic_accept_irq(vlapic_vcpu(target), delivery_mode,
-                                   vector, level, trig_mode);
+            rc = vlapic_accept_irq(vlapic_vcpu(target), icr_low);
         return rc;
     }
 
@@ -442,9 +417,7 @@ int vlapic_ipi(
     {
         if ( vlapic_match_dest(vcpu_vlapic(v), vlapic,
                                short_hand, dest, dest_mode) )
-                rc = vlapic_accept_irq(v, delivery_mode,
-                                       vector, level, trig_mode);
-
+                rc = vlapic_accept_irq(v, icr_low);
         if ( rc != X86EMUL_OKAY )
             break;
     }
