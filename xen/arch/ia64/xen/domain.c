@@ -2387,11 +2387,7 @@ arch_do_vcpu_op(int cmd, struct vcpu *v, XEN_GUEST_HANDLE(void) arg)
 	return rc;
 }
 
-static void __init parse_dom0_mem(char *s)
-{
-	dom0_size = parse_size_and_unit(s, NULL);
-}
-custom_param("dom0_mem", parse_dom0_mem);
+size_param("dom0_mem", dom0_size);
 
 /*
  * Helper function for the optimization stuff handling the identity mapping

@@ -11,9 +11,8 @@
 #include <asm/msr.h>
 
 /* opt_mem: Limit of physical RAM. Any RAM beyond this point is ignored. */
-unsigned long long opt_mem;
-static void parse_mem(char *s) { opt_mem = parse_size_and_unit(s, NULL); }
-custom_param("mem", parse_mem);
+static unsigned long long __initdata opt_mem;
+size_param("mem", opt_mem);
 
 /* opt_nomtrr_check: Don't clip ram to highest cacheable MTRR. */
 static int __initdata e820_mtrr_clip = -1;

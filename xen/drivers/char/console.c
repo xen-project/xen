@@ -59,10 +59,8 @@ static int opt_console_timestamps;
 boolean_param("console_timestamps", opt_console_timestamps);
 
 /* conring_size: allows a large console ring than default (16kB). */
-static uint32_t opt_conring_size;
-static void parse_conring_size(char *s)
-{ opt_conring_size = parse_size_and_unit(s, NULL); }
-custom_param("conring_size", parse_conring_size);
+static uint32_t __initdata opt_conring_size;
+size_param("conring_size", opt_conring_size);
 
 #define _CONRING_SIZE 16384
 #define CONRING_IDX_MASK(i) ((i)&(conring_size-1))

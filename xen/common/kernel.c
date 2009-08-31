@@ -92,6 +92,21 @@ void cmdline_parse(char *cmdline)
                     bool_assert = !bool_assert;
                 *(int *)param->var = bool_assert;
                 break;
+            case OPT_SIZE: {
+                uint64_t sz = parse_size_and_unit(optval, NULL);
+                switch ( param->len )
+                {
+                case sizeof(uint32_t):
+                    *(uint32_t *)param->var = sz;
+                    break;
+                case sizeof(uint64_t):
+                    *(uint64_t *)param->var = sz;
+                    break;
+                default:
+                    BUG();
+                }
+                break;
+            }
             case OPT_CUSTOM:
                 ((void (*)(const char *))param->var)(optval);
                 break;

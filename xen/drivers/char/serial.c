@@ -19,11 +19,7 @@
 /* #define SERIAL_NEVER_DROP_CHARS 1 */
 
 unsigned int serial_txbufsz = 16384;
-static void __init parse_serial_tx_buffer(const char *s)
-{
-    serial_txbufsz = max((unsigned int)parse_size_and_unit(s, NULL), 512u);
-}
-custom_param("serial_tx_buffer", parse_serial_tx_buffer);
+size_param("serial_tx_buffer", serial_txbufsz);
 
 #define mask_serial_rxbuf_idx(_i) ((_i)&(serial_rxbufsz-1))
 #define mask_serial_txbuf_idx(_i) ((_i)&(serial_txbufsz-1))
@@ -493,9 +489,14 @@ void serial_register_uart(int idx, struct uart_driver *driver, void *uart)
 void serial_async_transmit(struct serial_port *port)
 {
     BUG_ON(!port->driver->tx_empty);
-    if ( port->txbuf == NULL )
-        port->txbuf = alloc_xenheap_pages(
-            get_order_from_bytes(serial_txbufsz), 0);
+    if ( port->txbuf != NULL )
+        return;
+    if ( serial_txbufsz < 512 )
+        serial_txbufsz = 512;
+    while ( serial_txbufsz & (serial_txbufsz - 1) )
+        serial_txbufsz &= serial_txbufsz - 1;
+    port->txbuf = alloc_xenheap_pages(
+        get_order_from_bytes(serial_txbufsz), 0);
 }
 
 /*
