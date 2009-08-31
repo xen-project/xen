@@ -33,7 +33,7 @@
 #include <io_ports.h>
 
 /* opt_clocksource: Force clocksource to one of: pit, hpet, cyclone, acpi. */
-static char opt_clocksource[10];
+static char __initdata opt_clocksource[10];
 string_param("clocksource", opt_clocksource);
 
 int opt_softtsc;
@@ -391,13 +391,13 @@ static u64 read_pit_count(void)
     return count32;
 }
 
-static int init_pit(struct platform_timesource *pts)
+static int __init init_pit(struct platform_timesource *pts)
 {
     using_pit = 1;
     return 1;
 }
 
-static struct platform_timesource plt_pit =
+static struct platform_timesource __initdata plt_pit =
 {
     .id = "pit",
     .name = "PIT",
@@ -416,7 +416,7 @@ static u64 read_hpet_count(void)
     return hpet_read32(HPET_COUNTER);
 }
 
-static int init_hpet(struct platform_timesource *pts)
+static int __init init_hpet(struct platform_timesource *pts)
 {
     u64 hpet_rate = hpet_setup();
 
@@ -435,7 +435,7 @@ static void resume_hpet(struct platform_timesource *pts)
     pts->frequency = hpet_rate;
 }
 
-static struct platform_timesource plt_hpet =
+static struct platform_timesource __initdata plt_hpet =
 {
     .id = "hpet",
     .name = "HPET",
@@ -470,7 +470,7 @@ static u64 read_cyclone_count(void)
     return *cyclone_timer;
 }
 
-static volatile u32 *map_cyclone_reg(unsigned long regaddr)
+static volatile u32 *__init map_cyclone_reg(unsigned long regaddr)
 {
     unsigned long pageaddr = regaddr &  PAGE_MASK;
     unsigned long offset   = regaddr & ~PAGE_MASK;
@@ -478,7 +478,7 @@ static volatile u32 *map_cyclone_reg(unsigned long regaddr)
     return (volatile u32 *)(fix_to_virt(FIX_CYCLONE_TIMER) + offset);
 }
 
-static int init_cyclone(struct platform_timesource *pts)
+static int __init init_cyclone(struct platform_timesource *pts)
 {
     u32 base;
     
@@ -500,7 +500,7 @@ static int init_cyclone(struct platform_timesource *pts)
     return 1;
 }
 
-static struct platform_timesource plt_cyclone =
+static struct platform_timesource __initdata plt_cyclone =
 {
     .id = "cyclone",
     .name = "IBM Cyclone",
@@ -524,7 +524,7 @@ static u64 read_pmtimer_count(void)
     return inl(pmtmr_ioport);
 }
 
-static int init_pmtimer(struct platform_timesource *pts)
+static int __init init_pmtimer(struct platform_timesource *pts)
 {
     if ( pmtmr_ioport == 0 )
         return 0;
@@ -532,7 +532,7 @@ static int init_pmtimer(struct platform_timesource *pts)
     return 1;
 }
 
-static struct platform_timesource plt_pmtimer =
+static struct platform_timesource __initdata plt_pmtimer =
 {
     .id = "acpi",
     .name = "ACPI PM Timer",
@@ -638,9 +638,9 @@ static void resume_platform_timer(void)
     plt_stamp = plt_src.read_counter();
 }
 
-static void init_platform_timer(void)
+static void __init init_platform_timer(void)
 {
-    static struct platform_timesource * const plt_timers[] = {
+    static struct platform_timesource * __initdata plt_timers[] = {
         &plt_cyclone, &plt_hpet, &plt_pmtimer, &plt_pit
     };
 
