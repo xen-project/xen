@@ -608,7 +608,7 @@ void __init console_init_postirq(void)
     if ( opt_conring_size < conring_size )
         return;
     
-    ring = xmalloc_bytes(opt_conring_size);
+    ring = alloc_xenheap_pages(get_order_from_bytes(opt_conring_size), 0);
     if ( ring == NULL )
     {
         printk("Unable to allocate console ring of %u bytes.\n",
@@ -619,11 +619,12 @@ void __init console_init_postirq(void)
     spin_lock_irq(&console_lock);
     for ( i = conringc ; i != conringp; i++ )
         ring[i & (opt_conring_size - 1)] = conring[i & (conring_size - 1)];
-    conring_size = opt_conring_size;
     conring = ring;
+    wmb(); /* Allow users of console_force_unlock() to see larger buffer. */
+    conring_size = opt_conring_size;
     spin_unlock_irq(&console_lock);
 
-    printk("Allocated console ring of %u bytes.\n", opt_conring_size);
+    printk("Allocated console ring of %u KiB.\n", opt_conring_size >> 10);
 }
 
 void __init console_endboot(void)
