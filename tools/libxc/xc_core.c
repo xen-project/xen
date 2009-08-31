@@ -321,7 +321,8 @@ elfnote_dump_none(void *args, dumpcore_rtn_t dump_rtn)
     struct xen_dumpcore_elfnote_none_desc none;
 
     elfnote_init(&elfnote);
-    memset(&none, 0, sizeof(none));
+    /* Avoid compile warning about constant-zero-sized memset(). */
+    /*memset(&none, 0, sizeof(none));*/
 
     elfnote.descsz = sizeof(none);
     elfnote.type = XEN_ELFNOTE_DUMPCORE_NONE;
