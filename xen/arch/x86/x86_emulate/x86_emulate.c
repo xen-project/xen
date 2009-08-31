@@ -3605,7 +3605,10 @@ x86_emulate(
         ss.attr.bytes = 0xc93; /* G+DB+P+S+Data */
 
 #ifdef __x86_64__
-        if ( in_longmode(ctxt, ops) )
+        rc = in_longmode(ctxt, ops);
+        if ( rc < 0 )
+            goto cannot_emulate;
+        if ( rc )
         {
             cs.attr.fields.db = 0;
             cs.attr.fields.l = 1;
@@ -3777,7 +3780,10 @@ x86_emulate(
         ss.limit = ~0u;  /* 4GB limit */
         ss.attr.bytes = 0xc93; /* G+DB+P+S+Data */
 
-        if ( in_longmode(ctxt, ops) )
+        rc = in_longmode(ctxt, ops);
+        if ( rc < 0 )
+            goto cannot_emulate;
+        if ( rc )
         {
             cs.attr.fields.db = 0;
             cs.attr.fields.l = 1;
