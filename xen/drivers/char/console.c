@@ -36,7 +36,7 @@
 #include <public/sysctl.h>
 
 /* console: comma-separated list of console outputs. */
-static char opt_console[30] = OPT_CONSOLE_STR;
+static char __initdata opt_console[30] = OPT_CONSOLE_STR;
 string_param("console", opt_console);
 
 /* conswitch: a character pair controlling console switching. */
@@ -676,7 +676,7 @@ void __init console_endboot(void)
     switch_serial_input();
 }
 
-int console_has(const char *device)
+int __init console_has(const char *device)
 {
     char *p;
 

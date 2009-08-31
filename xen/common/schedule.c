@@ -35,7 +35,7 @@
 #include <xsm/xsm.h>
 
 /* opt_sched: scheduler - default to credit */
-static char opt_sched[10] = "credit";
+static char __initdata opt_sched[10] = "credit";
 string_param("sched", opt_sched);
 
 /* if sched_smt_power_savings is set,

@@ -101,10 +101,10 @@ struct vcpu *__init alloc_dom0_vcpu0(void)
     return alloc_vcpu(dom0, 0, 0);
 }
 
-static unsigned int opt_dom0_shadow;
+static unsigned int __initdata opt_dom0_shadow;
 boolean_param("dom0_shadow", opt_dom0_shadow);
 
-static char opt_dom0_ioports_disable[200] = "";
+static char __initdata opt_dom0_ioports_disable[200] = "";
 string_param("dom0_ioports_disable", opt_dom0_ioports_disable);
 
 #if defined(__i386__)

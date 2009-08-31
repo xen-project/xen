@@ -65,7 +65,7 @@ static atomic_t gdb_smp_paused_count;
 static void gdb_smp_pause(void);
 static void gdb_smp_resume(void);
 
-static char opt_gdb[30];
+static char __initdata opt_gdb[30];
 string_param("gdb", opt_gdb);
 
 static void gdbstub_console_puts(const char *str);

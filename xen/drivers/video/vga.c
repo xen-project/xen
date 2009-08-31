@@ -48,7 +48,7 @@ void (*vga_puts)(const char *) = vga_noop_puts;
  * after domain 0 starts to boot. The default behaviour is to relinquish
  * control of the console to domain 0.
  */
-static char opt_vga[30] = "";
+static char __initdata opt_vga[30] = "";
 string_param("vga", opt_vga);
 
 /* VGA text-mode definitions. */

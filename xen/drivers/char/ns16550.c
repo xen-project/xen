@@ -25,7 +25,8 @@
  * can be specified in place of a numeric baud rate. Polled mode is specified
  * by requesting irq 0.
  */
-static char opt_com1[30] = "", opt_com2[30] = "";
+static char __initdata opt_com1[30] = "";
+static char __initdata opt_com2[30] = "";
 string_param("com1", opt_com1);
 string_param("com2", opt_com2);
 

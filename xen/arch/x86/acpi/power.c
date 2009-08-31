@@ -32,7 +32,7 @@
 
 uint32_t system_reset_counter = 1;
 
-static char opt_acpi_sleep[20];
+static char __initdata opt_acpi_sleep[20];
 string_param("acpi_sleep", opt_acpi_sleep);
 
 static u8 sleep_states[ACPI_S_STATE_COUNT];
