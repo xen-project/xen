@@ -1254,10 +1254,10 @@ int get_free_pirq(struct domain *d, int type, int index)
     }
     else
     {
-        for ( i = d->nr_pirqs - 1; i >= 16; i-- )
+        for ( i = d->nr_pirqs - 1; i >= nr_irqs_gsi; i-- )
             if ( !d->arch.pirq_irq[i] )
                 break;
-        if ( i == 16 )
+        if ( i < nr_irqs_gsi )
             return -ENOSPC;
     }
 
