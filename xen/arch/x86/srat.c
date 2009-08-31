@@ -249,15 +249,23 @@ static int nodes_cover_memory(void)
 		start = e820.map[i].addr;
 		end = e820.map[i].addr + e820.map[i].size - 1;
 
-		found = 0;
-		for_each_node_mask(j, nodes_parsed) {
-			if (start >= nodes[j].start && end <= nodes[j].end) {
-				found = 1;
-				break;
-			}
-		}
+		do {
+			found = 0;
+			for_each_node_mask(j, nodes_parsed)
+				if (start < nodes[j].end
+				    && end > nodes[j].start) {
+					if (start >= nodes[j].start) {
+						start = nodes[j].end;
+						found = 1;
+					}
+					if (end <= nodes[j].end) {
+						end = nodes[j].start;
+						found = 1;
+					}
+				}
+		} while (found && start < end);
 
-		if (!found) {
+		if (start < end) {
 			printk(KERN_ERR "SRAT: No PXM for e820 range: "
 				"%016Lx - %016Lx\n", start, end);
 			return 0;
