@@ -547,6 +547,10 @@ gopts.var('sdl', val='',
           fn=set_value, default=None,
           use="""Should the device model use SDL?""")
 
+gopts.var('gfx_passthru', val='',
+          fn=set_value, default=None,
+          use="""Passthrough graphics card?""")
+
 gopts.var('opengl', val='',
           fn=set_value, default=None,
           use="""Enable\Disable OpenGL""")
@@ -957,7 +961,8 @@ def configure_hvm(config_image, vals):
              'acpi', 'apic', 'usb', 'usbdevice', 'keymap', 'pci', 'hpet',
              'guest_os_type', 'hap', 'opengl', 'cpuid', 'cpuid_check',
              'viridian', 'xen_extended_power_mgmt', 'pci_msitranslate',
-             'vpt_align', 'pci_power_mgmt', 'xen_platform_pci' ]
+             'vpt_align', 'pci_power_mgmt', 'xen_platform_pci',
+             'gfx_passthru' ]
 
     for a in args:
         if a in vals.__dict__ and vals.__dict__[a] is not None:

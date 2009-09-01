@@ -113,7 +113,7 @@ asm (
 unsigned long pci_mem_start = PCI_MEM_START;
 unsigned long pci_mem_end = PCI_MEM_END;
 
-static enum { VGA_none, VGA_std, VGA_cirrus } virtual_vga = VGA_none;
+static enum { VGA_none, VGA_std, VGA_cirrus, VGA_pt } virtual_vga = VGA_none;
 
 static void init_hypercalls(void)
 {
@@ -212,8 +212,10 @@ static void pci_setup(void)
         case 0x0300:
             if ( (vendor_id == 0x1234) && (device_id == 0x1111) )
                 virtual_vga = VGA_std;
-            if ( (vendor_id == 0x1013) && (device_id == 0xb8) )
+            else if ( (vendor_id == 0x1013) && (device_id == 0xb8) )
                 virtual_vga = VGA_cirrus;
+            else
+                virtual_vga = VGA_pt;
             break;
         case 0x0680:
             /* PIIX4 ACPI PM. Special device with special PCI config space. */
@@ -684,6 +686,11 @@ int main(void)
         memcpy((void *)VGABIOS_PHYSICAL_ADDRESS,
                vgabios_stdvga, sizeof(vgabios_stdvga));
         vgabios_sz = round_option_rom(sizeof(vgabios_stdvga));
+        break;
+    case VGA_pt:
+        printf("Loading VGABIOS of passthroughed gfx ...\n");
+        vgabios_sz =
+            round_option_rom((*(uint8_t *)(VGABIOS_PHYSICAL_ADDRESS+2)) * 512);
         break;
     default:
         printf("No emulated VGA adaptor ...\n");
