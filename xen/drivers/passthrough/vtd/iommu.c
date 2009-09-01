@@ -892,7 +892,11 @@ static int iommu_set_interrupt(struct iommu *iommu)
 
     irq_desc[irq].handler = &dma_msi_type;
     irq_to_iommu[irq] = iommu;
+#ifdef CONFIG_X86 
     ret = request_irq(irq, iommu_page_fault, 0, "dmar", iommu);
+#else
+    ret = request_irq_vector(irq, iommu_page_fault, 0, "dmar", iommu);
+#endif
     if ( ret )
     {
         irq_desc[irq].handler = &no_irq_type;
