@@ -197,7 +197,7 @@ struct vcpu *alloc_idle_vcpu(unsigned int cpu_id)
     return alloc_vcpu(d, vcpu_id, cpu_id);
 }
 
-static unsigned int extra_dom0_irqs, extra_domU_irqs = 8;
+static unsigned int extra_dom0_irqs = 256, extra_domU_irqs = 32;
 static void __init parse_extra_guest_irqs(const char *s)
 {
     if ( isdigit(*s) )
@@ -253,9 +253,11 @@ struct domain *domain_create(
         d->is_paused_by_controller = 1;
         atomic_inc(&d->pause_count);
 
-        d->nr_pirqs = (nr_irqs_gsi +
-                       (domid ? extra_domU_irqs :
-                        extra_dom0_irqs ?: nr_irqs_gsi));
+        if ( domid )
+            d->nr_pirqs = nr_irqs_gsi + extra_domU_irqs;
+        else
+            d->nr_pirqs = nr_irqs_gsi + extra_dom0_irqs;
+
         d->pirq_to_evtchn = xmalloc_array(u16, d->nr_pirqs);
         d->pirq_mask = xmalloc_array(
             unsigned long, BITS_TO_LONGS(d->nr_pirqs));

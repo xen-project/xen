@@ -85,35 +85,7 @@ static struct irq_pin_list {
     unsigned int next;
 } *irq_2_pin;
 
-static int *pin_irq_map;
-
 static unsigned int irq_2_pin_free_entry;
-
-/* Use an arry to record pin_2_irq_mapping */
-static int get_irq_from_apic_pin(int apic, int pin)
-{
-    int i, pin_base = 0;
-
-    ASSERT(apic < nr_ioapics);
-    
-    for (i = 0; i < apic; i++)
-        pin_base += nr_ioapic_registers[i];
-
-    return pin_irq_map[pin_base + pin];
-}
-
-static void set_irq_to_apic_pin(int apic, int pin, int irq)
-{
-    
-    int i, pin_base = 0;
-
-    ASSERT(apic < nr_ioapics);
-    
-    for (i = 0; i < apic; i++)
-        pin_base += nr_ioapic_registers[i];
-
-    pin_irq_map[pin_base + pin] = irq;
-}
 
 /*
  * The common case is 1:1 IRQ<->pin mappings. Sometimes there are
@@ -141,42 +113,6 @@ static void add_pin_to_irq(unsigned int irq, int apic, int pin)
     }
     entry->apic = apic;
     entry->pin = pin;
-
-    set_irq_to_apic_pin(apic, pin, irq);
-}
-
-static void remove_pin_at_irq(unsigned int irq, int apic, int pin)
-{
-    struct irq_pin_list *entry, *prev;
-
-    for (entry = &irq_2_pin[irq]; ; entry = &irq_2_pin[entry->next]) {
-        if ((entry->apic == apic) && (entry->pin == pin))
-            break;
-        if (!entry->next)
-            BUG();
-    }
-
-    entry->pin = entry->apic = -1;
-    
-    if (entry != &irq_2_pin[irq]) {
-        /* Removed entry is not at head of list. */
-        prev = &irq_2_pin[irq];
-        while (&irq_2_pin[prev->next] != entry)
-            prev = &irq_2_pin[prev->next];
-        prev->next = entry->next;
-        entry->next = irq_2_pin_free_entry;
-        irq_2_pin_free_entry = entry - irq_2_pin;
-    } else if (entry->next != 0) {
-        /* Removed entry is at head of multi-item list. */
-        prev  = entry;
-        entry = &irq_2_pin[entry->next];
-        *prev = *entry;
-        entry->pin = entry->apic = -1;
-        entry->next = irq_2_pin_free_entry;
-        irq_2_pin_free_entry = entry - irq_2_pin;
-    }
-
-    set_irq_to_apic_pin(apic, pin, -1);
 }
 
 /*
@@ -1138,15 +1074,11 @@ static void __init enable_IO_APIC(void)
     /* Initialise dynamic irq_2_pin free list. */
     irq_2_pin = xmalloc_array(struct irq_pin_list, PIN_MAP_SIZE);
     memset(irq_2_pin, 0, PIN_MAP_SIZE * sizeof(*irq_2_pin));
-    pin_irq_map = xmalloc_array(int, nr_irqs_gsi);
-    memset(pin_irq_map, 0, nr_irqs_gsi * sizeof(int));
         
     for (i = 0; i < PIN_MAP_SIZE; i++)
         irq_2_pin[i].pin = -1;
     for (i = irq_2_pin_free_entry = nr_irqs_gsi; i < PIN_MAP_SIZE; i++)
         irq_2_pin[i].next = i + 1;
-    for (i = 0; i < nr_irqs_gsi; i++)
-        pin_irq_map[i] = -1;
 
     for(apic = 0; apic < nr_ioapics; apic++) {
         int pin;
@@ -2165,6 +2097,24 @@ static int ioapic_physbase_to_id(unsigned long physbase)
     return -EINVAL;
 }
 
+unsigned apic_gsi_base(int apic);
+
+int apic_pin_2_gsi_irq(int apic, int pin)
+{
+    int idx, irq;
+
+    if (apic < 0)
+       return -EINVAL;
+
+    irq = apic_gsi_base(apic) + pin;
+    if (apic == 0) {
+        idx = find_irq_entry(apic, pin, mp_INT);
+        if (idx >= 0)
+            irq = pin_2_irq(idx, apic, pin);
+    }
+    return irq;
+}
+
 int ioapic_guest_read(unsigned long physbase, unsigned int reg, u32 *pval)
 {
     int apic;
@@ -2182,17 +2132,19 @@ int ioapic_guest_read(unsigned long physbase, unsigned int reg, u32 *pval)
 
 #define WARN_BOGUS_WRITE(f, a...)                                       \
     dprintk(XENLOG_INFO, "\n%s: "                                        \
-            "apic=%d, pin=%d, old_irq=%d, new_irq=%d\n"                 \
-            "%s: old_entry=%08x, new_entry=%08x\n"                      \
-            "%s: " f, __FUNCTION__, apic, pin, old_irq, new_irq,        \
-            __FUNCTION__, *(u32 *)&old_rte, *(u32 *)&new_rte,           \
+            "apic=%d, pin=%d, irq=%d\n"                 \
+            "%s: new_entry=%08x\n"                      \
+            "%s: " f, __FUNCTION__, apic, pin, irq,        \
+            __FUNCTION__, *(u32 *)&rte,           \
             __FUNCTION__ , ##a )
 
 int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
 {
-    int apic, pin, old_irq = -1, new_irq = -1;
-    struct IO_APIC_route_entry old_rte = { 0 }, new_rte = { 0 };
+    int apic, pin, irq, ret, vector, pirq;
+    struct IO_APIC_route_entry rte = { 0 };
     unsigned long flags;
+    struct irq_cfg *cfg;
+    struct irq_desc *desc;
 
     if ( (apic = ioapic_physbase_to_id(physbase)) < 0 )
         return apic;
@@ -2204,7 +2156,7 @@ int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
     pin = (reg - 0x10) >> 1;
 
     /* Write first half from guest; second half is target info. */
-    *(u32 *)&new_rte = val;
+    *(u32 *)&rte = val;
 
     /*
      * What about weird destination types?
@@ -2214,7 +2166,7 @@ int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
      *  ExtINT: Ignore? Linux only asserts this at start of day.
      * For now, print a message and return an error. We can fix up on demand.
      */
-    if ( new_rte.delivery_mode > dest_LowestPrio )
+    if ( rte.delivery_mode > dest_LowestPrio )
     {
         printk("ERROR: Attempt to write weird IOAPIC destination mode!\n");
         printk("       APIC=%d/%d, lo-reg=%x\n", apic, pin, val);
@@ -2225,83 +2177,65 @@ int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
      * The guest does not know physical APIC arrangement (flat vs. cluster).
      * Apply genapic conventions for this platform.
      */
-    new_rte.delivery_mode = INT_DELIVERY_MODE;
-    new_rte.dest_mode     = INT_DEST_MODE;
+    rte.delivery_mode = INT_DELIVERY_MODE;
+    rte.dest_mode     = INT_DEST_MODE;
 
-    spin_lock_irqsave(&ioapic_lock, flags);
+    irq = apic_pin_2_gsi_irq(apic, pin);
+    if ( irq < 0 )
+        return irq;
 
-    /* Read first (interesting) half of current routing entry. */
-    *(u32 *)&old_rte = io_apic_read(apic, 0x10 + 2 * pin);
+    desc = irq_to_desc(irq);
+    cfg = desc->chip_data;
 
-    /* No change to the first half of the routing entry? Bail quietly. */
-    if ( *(u32 *)&old_rte == *(u32 *)&new_rte )
+    /* Since PHYSDEVOP_alloc_irq_vector is dummy, rte.vector is the pirq
+       which corresponds to this ioapic pin, retrieve it for building
+       pirq and irq mapping. 
+     */
+    pirq = rte.vector;
+    if(pirq < 0 || pirq >= dom0->nr_pirqs)
+        return -EINVAL;
+    
+    if ( desc->action )
     {
-        spin_unlock_irqrestore(&ioapic_lock, flags);
+        WARN_BOGUS_WRITE("Attempt to modify IO-APIC pin for in-use IRQ!\n");
         return 0;
     }
 
-    /* Special delivery modes (SMI,NMI,INIT,ExtInt) should have no vector.  */
-    if ( (old_rte.delivery_mode > dest_LowestPrio) && (old_rte.vector != 0) )
-    {
-        WARN_BOGUS_WRITE("Special delivery mode %d with non-zero vector "
-                         "%02x\n", old_rte.delivery_mode, old_rte.vector);
-        /* Nobble the vector here as it does not relate to a valid irq. */
-        old_rte.vector = 0;
-    }
+    if ( cfg->vector <= 0 || cfg->vector > LAST_DYNAMIC_VECTOR ) {
 
-    if ( old_rte.vector >= FIRST_DYNAMIC_VECTOR )
-        old_irq = get_irq_from_apic_pin(apic, pin);
-
-    /* FIXME: dirty hack to support per-cpu vector. */
-    new_irq = new_rte.vector;
-
-    if ( (old_irq != new_irq) && (old_irq >= 0) && IO_APIC_IRQ(old_irq) )
-    {
-        if ( irq_desc[old_irq].action )
-        {
-            WARN_BOGUS_WRITE("Attempt to remove IO-APIC pin of in-use IRQ!\n");
-            spin_unlock_irqrestore(&ioapic_lock, flags);
-            return 0;
-        }
-
-        remove_pin_at_irq(old_irq, apic, pin);
-    }
-
-    if ( (new_irq >= 0) && IO_APIC_IRQ(new_irq) )
-    {
-        if ( irq_desc[new_irq].action )
-        {
-            WARN_BOGUS_WRITE("Attempt to %s IO-APIC pin for in-use IRQ!\n",
-                             (old_irq != new_irq) ? "add" : "modify");
-            spin_unlock_irqrestore(&ioapic_lock, flags);
-            return 0;
-        }
+        printk("allocated vector for irq:%d\n", irq);
         
-        /* Set the correct irq-handling type. */
-        irq_desc[new_irq].handler = new_rte.trigger ? 
-            &ioapic_level_type: &ioapic_edge_type;
-        
-        if ( old_irq != new_irq )
-            add_pin_to_irq(new_irq, apic, pin);
+        vector = assign_irq_vector(irq);
+        if ( vector < 0 )
+            return vector;
 
-        /* Mask iff level triggered. */
-        new_rte.mask = new_rte.trigger;
-        /* Set the vector field to the real vector! */
-        new_rte.vector = irq_cfg[new_irq].vector;
+        add_pin_to_irq(irq, apic, pin);
     }
-    else if ( !new_rte.mask )
-    {
-        /* This pin leads nowhere but the guest has not masked it. */
-        WARN_BOGUS_WRITE("Installing bogus unmasked IO-APIC entry!\n");
-        new_rte.mask = 1;
-    }
+    spin_lock(&pcidevs_lock);
+    spin_lock(&dom0->event_lock);
+    ret = map_domain_pirq(dom0, pirq, irq,
+            MAP_PIRQ_TYPE_GSI, NULL);
+    spin_unlock(&dom0->event_lock);
+    spin_unlock(&pcidevs_lock);
+    if ( ret < 0 )
+        return ret;
 
-    new_rte.dest.logical.logical_dest = 
-    cpu_mask_to_apicid(irq_cfg[new_irq].domain);
+    spin_lock_irqsave(&ioapic_lock, flags);
+    /* Set the correct irq-handling type. */
+    desc->handler = rte.trigger ? 
+        &ioapic_level_type: &ioapic_edge_type;
 
-    io_apic_write(apic, 0x10 + 2 * pin, *(((int *)&new_rte) + 0));
-    io_apic_write(apic, 0x11 + 2 * pin, *(((int *)&new_rte) + 1));
+    /* Mask iff level triggered. */
+    rte.mask = rte.trigger;
+    /* Set the vector field to the real vector! */
+    rte.vector = cfg->vector;
 
+    rte.dest.logical.logical_dest = 
+    cpu_mask_to_apicid(cfg->domain);
+
+    io_apic_write(apic, 0x10 + 2 * pin, *(((int *)&rte) + 0));
+    io_apic_write(apic, 0x11 + 2 * pin, *(((int *)&rte) + 1));
+    
     spin_unlock_irqrestore(&ioapic_lock, flags);
 
     return 0;

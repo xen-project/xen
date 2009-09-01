@@ -329,7 +329,6 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
 
     case PHYSDEVOP_alloc_irq_vector: {
         struct physdev_irq irq_op;
-        int vector;
 
         ret = -EFAULT;
         if ( copy_from_guest(&irq_op, arg, 1) != 0 )
@@ -343,26 +342,13 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         if ( ret )
             break;
 
-        irq = irq_op.irq;
-        ret = -EINVAL;
+        /* Vector is only used by hypervisor, and dom0 shouldn't
+         touch it in its world, return irq_op.irq as the vecotr,
+         and make this hypercall dummy, and also defer the vector 
+         allocation when dom0 tries to programe ioapic entry. */
+        irq_op.vector = irq_op.irq;
+        ret = 0;
         
-        /* FIXME: Once dom0 breaks GSI IRQ limit, it is
-            a must to eliminate the limit here */
-        BUG_ON(irq >= 256);
-        
-        vector = assign_irq_vector(irq);
-        if (vector >= FIRST_DYNAMIC_VECTOR)
-            irq_op.vector = irq;
-        else
-            irq_op.vector = -ENOSPC;
-
-        spin_lock(&pcidevs_lock);
-        spin_lock(&dom0->event_lock);
-        ret = map_domain_pirq(dom0, irq_op.irq, irq,
-                              MAP_PIRQ_TYPE_GSI, NULL);
-        spin_unlock(&dom0->event_lock);
-        spin_unlock(&pcidevs_lock);
-
         if ( copy_to_guest(arg, &irq_op, 1) != 0 )
             ret = -EFAULT;
         break;

@@ -1293,9 +1293,9 @@ int map_domain_pirq(
     if ( (old_irq && (old_irq != irq) ) ||
          (old_pirq && (old_pirq != pirq)) )
     {
-        dprintk(XENLOG_G_ERR, "dom%d: pirq %d or irq %d already mapped\n",
+        dprintk(XENLOG_G_WARNING, "dom%d: pirq %d or irq %d already mapped\n",
                 d->domain_id, pirq, irq);
-        return -EINVAL;
+        return 0;
     }
 
     ret = irq_permit_access(d, pirq);

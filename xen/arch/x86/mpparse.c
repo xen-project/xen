@@ -958,6 +958,10 @@ unsigned highest_gsi(void)
     return res;
 }
 
+unsigned apic_gsi_base(int apic)
+{
+    return mp_ioapic_routing[apic].gsi_base;
+}
 
 void __init mp_override_legacy_irq (
 	u8			bus_irq,
