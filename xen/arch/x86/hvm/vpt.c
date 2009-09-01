@@ -327,24 +327,6 @@ void pt_intr_post(struct vcpu *v, struct hvm_intack intack)
         cb(v, cb_priv);
 }
 
-void pt_reset(struct vcpu *v)
-{
-    struct list_head *head = &v->arch.hvm_vcpu.tm_list;
-    struct periodic_time *pt;
-
-    spin_lock(&v->arch.hvm_vcpu.tm_lock);
-
-    list_for_each_entry ( pt, head, list )
-    {
-        pt->pending_intr_nr = 0;
-        pt->last_plt_gtime = hvm_get_guest_time(pt->vcpu);
-        pt->scheduled = NOW() + pt->period;
-        set_timer(&pt->timer, pt->scheduled);
-    }
-
-    spin_unlock(&v->arch.hvm_vcpu.tm_lock);
-}
-
 void pt_migrate(struct vcpu *v)
 {
     struct list_head *head = &v->arch.hvm_vcpu.tm_list;

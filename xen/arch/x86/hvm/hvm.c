@@ -1890,7 +1890,6 @@ int hvm_msr_write_intercept(struct cpu_user_regs *regs)
     {
      case MSR_IA32_TSC:
         hvm_set_guest_tsc(v, msr_content);
-        pt_reset(v);
         break;
 
     case MSR_IA32_APICBASE:
