@@ -281,20 +281,6 @@ void set_msi_affinity(unsigned int irq, cpumask_t mask)
 
     msg.data &= ~MSI_DATA_VECTOR_MASK;
     msg.data |= MSI_DATA_VECTOR(cfg->vector);
-    cpus_and(mask, mask, cpu_online_map);
-    if ( cpus_empty(mask) )
-        mask = TARGET_CPUS;
-    dest = cpu_mask_to_apicid(mask);
-
-    if ( !desc )
-        return;
-
-    ASSERT(spin_is_locked(&desc->lock));
-    read_msi_msg(msi_desc, &msg);
-
-    msg.data &= ~MSI_DATA_VECTOR_MASK;
-    msg.data |= MSI_DATA_VECTOR(cfg->vector);
-
     msg.address_lo &= ~MSI_ADDR_DEST_ID_MASK;
     msg.address_lo |= MSI_ADDR_DEST_ID(dest);
 
