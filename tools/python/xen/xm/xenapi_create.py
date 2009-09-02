@@ -778,6 +778,12 @@ class sxp2xml:
 
         map(vm.appendChild, platform)
 
+        # And now the vcpu_params
+
+        vcpu_params = self.extract_vcpu_params(config, document)
+
+        map(vm.appendChild, vcpu_params)
+
         # transient?
 
         if transient:
@@ -1072,6 +1078,23 @@ class sxp2xml:
                 platform_configs.append(platform)
  
         return platform_configs
+
+    def extract_vcpu_params(self, config, document):
+        vcpu_params = []
+
+        vcpu_param = document.createElement("vcpu_param")
+        vcpu_param.attributes["key"] = "weight"
+        vcpu_param.attributes["value"] \
+            = str(get_child_by_name(config, "cpu_weight", 256))
+        vcpu_params.append(vcpu_param)
+
+        vcpu_param = document.createElement("vcpu_param")
+        vcpu_param.attributes["key"] = "cap"
+        vcpu_param.attributes["value"] \
+            = str(get_child_by_name(config, "cpu_cap", 0))
+        vcpu_params.append(vcpu_param)
+
+        return vcpu_params
     
     _eths = -1
 
