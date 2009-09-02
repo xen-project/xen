@@ -47,10 +47,10 @@ u64 hvm_get_guest_time(struct vcpu *v)
 
     spin_lock(&pl->pl_time_lock);
     now = get_s_time() + pl->stime_offset;
-    if ( (int64_t)(now - pl->last_guest_time) >= 0 )
+    if ( (int64_t)(now - pl->last_guest_time) > 0 )
         pl->last_guest_time = now;
     else
-        now = pl->last_guest_time;
+        now = ++pl->last_guest_time;
     spin_unlock(&pl->pl_time_lock);
 
     return now + v->arch.hvm_vcpu.stime_offset;

@@ -1454,10 +1454,10 @@ void pv_soft_rdtsc(struct vcpu *v, struct cpu_user_regs *regs)
         rdtsc_usercount++;
         spin_lock(&v->domain->arch.vtsc_lock);
         now = get_s_time() + v->domain->arch.vtsc_stime_offset;
-        if ( (int64_t)(now - v->domain->arch.vtsc_last) >= 0 )
+        if ( (int64_t)(now - v->domain->arch.vtsc_last) > 0 )
             v->domain->arch.vtsc_last = now;
         else
-            now = v->domain->arch.vtsc_last;
+            now = ++v->domain->arch.vtsc_last;
         spin_unlock(&v->domain->arch.vtsc_lock);
         regs->eax = (uint32_t)now;
         regs->edx = (uint32_t)(now >> 32);
