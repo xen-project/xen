@@ -342,12 +342,6 @@ static int xc_hvm_build_internal(int xc_handle,
     return setup_guest(xc_handle, domid, memsize, target, image, image_size);
 }
 
-static inline int is_loadable_phdr(Elf32_Phdr *phdr)
-{
-    return ((phdr->p_type == PT_LOAD) &&
-            ((phdr->p_flags & (PF_W|PF_X)) != 0));
-}
-
 /* xc_hvm_build:
  * Create a domain for a virtualized Linux, using files/filenames.
  */
