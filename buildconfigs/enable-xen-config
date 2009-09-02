@@ -81,6 +81,11 @@ setopt CONFIG_X86_MCE_INTEL n
 setopt CONFIG_X86_MCE_AMD n
 setopt CONFIG_CRYPTO_AES_NI_INTEL n
 
+setopt CONFIG_FUSION y
+setopt CONFIG_FUSION_SPI m
+setopt CONFIG_FUSION_SAS m
+setopt CONFIG_BLK_CPQ_CISS_DA m
+
 case ${XEN_TARGET_ARCH} in
     x86_32) setopt CONFIG_64BIT n ;;
     x86_64)
