@@ -415,16 +415,17 @@ class Grub:
         def draw():
             # set up the screen
             self.draw_main_windows()
-            self.text_win.addstr(0, 0, "Use the U and D keys to select which entry is highlighted.")
-            self.text_win.addstr(1, 0, "Press enter to boot the selected OS. 'e' to edit the")
-            self.text_win.addstr(2, 0, "commands before booting, 'a' to modify the kernel arguments ")
 
-            # if grub has password defined we allow option to enter password
-            if not self.cf.hasPassword():
+            if not self.cf.hasPassword() or self.cf.hasPasswordAccess():
+                self.text_win.addstr(0, 0, "Use the U and D keys to select which entry is highlighted.")
+                self.text_win.addstr(1, 0, "Press enter to boot the selected OS, 'e' to edit the")
+                self.text_win.addstr(2, 0, "commands before booting, 'a' to modify the kernel arguments ")
                 self.text_win.addstr(3, 0, "before booting, or 'c' for a command line.")
+
             else:
-                self.text_win.addstr(3, 0, "before booting, or 'c' for a command line. You can also")
-                self.text_win.addstr(4, 0, "press 'p' to enter password for modifications...")
+                self.text_win.addstr(0, 0, "Use the U and D keys to select which entry is highlighted.")
+                self.text_win.addstr(1, 0, "Press enter to boot the selected OS or `p` to enter a")
+                self.text_win.addstr(2, 0, "password to unlock the next set of features.")
 
             self.text_win.addch(0, 8, curses.ACS_UARROW)
             self.text_win.addch(0, 14, curses.ACS_DARROW)
@@ -459,20 +460,10 @@ class Grub:
                 self.screen.timeout(-1)
 
             # handle keypresses
-            if c == ord('c'):
-                # we disallow access without password specified
-                if not self.cf.hasPasswordAccess():
-                    self.text_win.addstr(6, 8, "You have to enter GRUB password first")
-                    break
-
+            if c == ord('c') and self.cf.hasPasswordAccess():
                 self.command_line_mode()
                 break
-            elif c == ord('a'):
-                # we disallow access without password specified
-                if not self.cf.hasPasswordAccess():
-                    self.text_win.addstr(6, 8, "You have to enter GRUB password first")
-                    break
-
+            elif c == ord('a') and self.cf.hasPasswordAccess():
                 # find the kernel line, edit it and then boot
                 img = self.cf.images[self.selected_image]
                 for line in img.lines:
@@ -483,23 +474,18 @@ class Grub:
                             self.isdone = True
                             break
                 break
-            elif c == ord('e'):
-                # we disallow access without password specified
-                if not self.cf.hasPasswordAccess():
-                    self.text_win.addstr(6, 8, "You have to enter GRUB password first")
-                    break
-
+            elif c == ord('e') and self.cf.hasPasswordAccess():
                 img = self.cf.images[self.selected_image]
                 self.edit_entry(img)
                 break
             elif c == ord('p') and self.cf.hasPassword():
-                self.text_win.addstr(6, 8, "Enter password: ")
+                self.text_win.addstr(6, 1, "Password: ")
                 pwd = self.text_win.getstr(6, 8)
                 if not self.cf.checkPassword(pwd):
-                    self.text_win.addstr(6, 8, "Incorrect password!")
+                    self.text_win.addstr(6, 1, "Password: ")
+                    self.text_win.addstr(7, 0, "Failed!")
                     self.cf.setPasswordAccess( False )
                 else:
-                    self.text_win.addstr(6, 8, "Access granted     ")
                     self.cf.setPasswordAccess( True )
                 break
             elif c in (curses.KEY_ENTER, ord('\n'), ord('\r')):
