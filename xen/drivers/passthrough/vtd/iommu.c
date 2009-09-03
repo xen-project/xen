@@ -1602,7 +1602,7 @@ static int init_vtd_hw(void)
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
     struct iommu_flush *flush = NULL;
-    int irq = -1;
+    int irq;
     int ret;
     unsigned long flags;
     struct irq_cfg *cfg;
@@ -1621,8 +1621,8 @@ static int init_vtd_hw(void)
             iommu->irq = irq;
         }
 
-        cfg = irq_cfg(irq);
-        dma_msi_set_affinity(irq, cfg->domain);
+        cfg = irq_cfg(iommu->irq);
+        dma_msi_set_affinity(iommu->irq, cfg->domain);
 
         clear_fault_bits(iommu);
 
