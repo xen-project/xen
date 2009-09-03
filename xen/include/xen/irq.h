@@ -7,11 +7,11 @@
 #include <asm/regs.h>
 #include <asm/hardirq.h>
 
-struct irqaction
-{
+struct irqaction {
     void (*handler)(int, void *, struct cpu_user_regs *);
     const char *name;
     void *dev_id;
+    bool_t free_on_release;
 };
 
 /*
@@ -63,10 +63,8 @@ struct irq_cfg;
  * This is the "IRQ descriptor", which contains various information
  * about the irq, including what kind of hardware handling it has,
  * whether it is disabled etc etc.
- *
- * Pad this out to 32 bytes for cache and indexing reasons.
  */
-typedef struct irq_desc{
+typedef struct irq_desc {
     unsigned int status;		/* IRQ status */
     hw_irq_controller *handler;
     struct msi_desc   *msi_desc;

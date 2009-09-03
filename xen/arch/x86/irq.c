@@ -537,6 +537,7 @@ int request_irq(unsigned int irq,
     action->handler = handler;
     action->name = devname;
     action->dev_id = dev_id;
+    action->free_on_release = 1;
 
     retval = setup_irq(irq, action);
     if (retval)
@@ -564,7 +565,7 @@ void release_irq(unsigned int irq)
     /* Wait to make sure it's not being used on another CPU */
     do { smp_mb(); } while ( desc->status & IRQ_INPROGRESS );
 
-    if (action)
+    if (action && action->free_on_release)
         xfree(action);
 }
 
