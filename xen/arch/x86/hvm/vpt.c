@@ -229,7 +229,7 @@ void pt_update_irq(struct vcpu *v)
 
     list_for_each_entry ( pt, head, list )
     {
-        if ( !pt_irq_masked(pt) && pt->pending_intr_nr &&
+        if ( pt->pending_intr_nr && !pt_irq_masked(pt) &&
              ((pt->last_plt_gtime + pt->period) < max_lag) )
         {
             max_lag = pt->last_plt_gtime + pt->period;
@@ -298,6 +298,7 @@ void pt_intr_post(struct vcpu *v, struct hvm_intack intack)
         if ( pt->on_list )
             list_del(&pt->list);
         pt->on_list = 0;
+        pt->pending_intr_nr = 0;
     }
     else
     {
