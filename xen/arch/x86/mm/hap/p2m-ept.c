@@ -282,7 +282,7 @@ out:
     ept_sync_domain(d);
 
     /* Now the p2m table is not shared with vt-d page table */
-    if ( iommu_enabled && is_hvm_domain(d) && need_modify_vtd_table )
+    if ( iommu_enabled && need_iommu(d) && need_modify_vtd_table )
     {
         if ( p2mt == p2m_ram_rw )
         {

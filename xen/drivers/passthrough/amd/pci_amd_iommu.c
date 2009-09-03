@@ -311,8 +311,6 @@ static int amd_iommu_assign_device(struct domain *d, u8 bus, u8 devfn)
     int bdf = (bus << 8) | devfn;
     int req_id = ivrs_mappings[bdf].dte_requestor_id;
 
-    amd_iommu_sync_p2m(d);
-
     if ( ivrs_mappings[req_id].unity_map_enable )
     {
         amd_iommu_reserve_domain_unity_map(

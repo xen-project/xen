@@ -137,7 +137,7 @@ int assign_device(struct domain *d, u8 bus, u8 devfn)
     if ( (rc = hd->platform_ops->assign_device(d, bus, devfn)) )
         goto done;
 
-    if ( has_arch_pdevs(d) && !is_hvm_domain(d) && !need_iommu(d) )
+    if ( has_arch_pdevs(d) && !need_iommu(d) )
     {
         d->need_iommu = 1;
         rc = iommu_populate_page_table(d);
@@ -184,7 +184,7 @@ void iommu_domain_destroy(struct domain *d)
     if ( !iommu_enabled || !hd->platform_ops )
         return;
 
-    if ( !is_hvm_domain(d) && !need_iommu(d)  )
+    if ( !need_iommu(d)  )
         return;
 
     if ( need_iommu(d) )

@@ -1199,7 +1199,7 @@ p2m_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
          && (gfn + (1UL << page_order) - 1 > d->arch.p2m->max_mapped_pfn) )
         d->arch.p2m->max_mapped_pfn = gfn + (1UL << page_order) - 1;
 
-    if ( iommu_enabled && (is_hvm_domain(d) || need_iommu(d)) )
+    if ( iommu_enabled && need_iommu(d) )
     {
         if ( p2mt == p2m_ram_rw )
             for ( i = 0; i < (1UL << page_order); i++ )

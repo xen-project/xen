@@ -1479,7 +1479,7 @@ zap_domain_page_one(struct domain *d, unsigned long mpaddr,
     if(!mfn_valid(mfn))
         return;
 
-    if ( iommu_enabled && (is_hvm_domain(d) || need_iommu(d)) ){
+    if ( iommu_enabled && need_iommu(d) ){
         int i, j;
         j = 1 << (PAGE_SHIFT-PAGE_SHIFT_4K);
         for(i = 0 ; i < j; i++)
@@ -2885,7 +2885,7 @@ __guest_physmap_add_page(struct domain *d, unsigned long gpfn,
     smp_mb();
     assign_domain_page_replace(d, gpfn << PAGE_SHIFT, mfn,
                                ASSIGN_writable | ASSIGN_pgc_allocated);
-    if ( iommu_enabled && (is_hvm_domain(d) || need_iommu(d)) ){
+    if ( iommu_enabled && need_iommu(d) ){
         int i, j;
         j = 1 << (PAGE_SHIFT-PAGE_SHIFT_4K);
         for(i = 0 ; i < j; i++)

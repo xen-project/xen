@@ -669,7 +669,7 @@ void arch_domain_destroy(struct domain *d)
 		free_xenheap_pages(d->shared_info,
 				   get_order_from_shift(XSI_SHIFT));
 
-	if ( iommu_enabled && (is_hvm_domain(d) || need_iommu(d)) )	{
+	if ( iommu_enabled && need_iommu(d) )	{
 		pci_release_devices(d);
 		iommu_domain_destroy(d);
 	}

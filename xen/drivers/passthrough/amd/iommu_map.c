@@ -555,58 +555,6 @@ int amd_iommu_reserve_domain_unity_map(
     return 0;
 }
 
-int amd_iommu_sync_p2m(struct domain *d)
-{
-    unsigned long mfn, gfn;
-    u64 iommu_l2e;
-    struct page_info *page;
-    struct hvm_iommu *hd;
-    int iw = IOMMU_IO_WRITE_ENABLED;
-    int ir = IOMMU_IO_READ_ENABLED;
-
-    if ( !is_hvm_domain(d) )
-        return 0;
-
-    hd = domain_hvm_iommu(d);
-
-    spin_lock(&hd->mapping_lock);
-
-    if ( hd->p2m_synchronized )
-        goto out;
-
-    spin_lock(&d->page_alloc_lock);
-
-    page_list_for_each ( page, &d->page_list )
-    {
-        mfn = page_to_mfn(page);
-        gfn = get_gpfn_from_mfn(mfn);
-
-        if ( gfn == INVALID_M2P_ENTRY )
-            continue;
-
-        iommu_l2e = iommu_l2e_from_pfn(hd->root_table, hd->paging_mode, gfn);
-
-        if ( iommu_l2e == 0 )
-        {
-            spin_unlock(&d->page_alloc_lock);
-            spin_unlock(&hd->mapping_lock);
-            amd_iov_error("Invalid IO pagetable entry gfn = %lx\n", gfn);
-            domain_crash(d);
-            return -EFAULT;
-        }
-
-        set_iommu_l1e_present(iommu_l2e, gfn, (u64)mfn << PAGE_SHIFT, iw, ir);
-    }
-
-    spin_unlock(&d->page_alloc_lock);
-
-    hd->p2m_synchronized = 1;
-
-out:
-    spin_unlock(&hd->mapping_lock);
-    return 0;
-}
-
 void invalidate_all_iommu_pages(struct domain *d)
 {
     u32 cmd[4], entry;

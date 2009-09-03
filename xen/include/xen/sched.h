@@ -557,7 +557,7 @@ uint64_t get_cpu_idle_time(unsigned int cpu);
 
 #define is_hvm_domain(d) ((d)->is_hvm)
 #define is_hvm_vcpu(v)   (is_hvm_domain(v->domain))
-#define need_iommu(d)    ((d)->need_iommu && !(d)->is_hvm)
+#define need_iommu(d)    ((d)->need_iommu)
 
 void set_vcpu_migration_delay(unsigned int delay);
 unsigned int get_vcpu_migration_delay(void);
