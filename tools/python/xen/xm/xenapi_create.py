@@ -594,7 +594,7 @@ class sxp2xml:
                    if len(child) > 0 and child[0] == "device"]
                    
         vbds_sxp = map(lambda x: x[1], [device for device in devices
-                                        if device[1][0] in ("vbd", "tap")])
+                                        if device[1][0] in ("vbd", "tap", "tap2")])
 
         vifs_sxp = map(lambda x: x[1], [device for device in devices
                                         if device[1][0] == "vif"])
