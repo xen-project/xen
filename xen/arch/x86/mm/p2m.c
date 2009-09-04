@@ -634,7 +634,7 @@ p2m_pod_decrease_reservation(struct domain *d,
         p2md->pod.entry_count-=(1<<order); /* Lock: p2m */
         BUG_ON(p2md->pod.entry_count < 0);
         ret = 1;
-        goto out_unlock;
+        goto out_entry_check;
     }
 
     /* FIXME: Steal contig 2-meg regions for cache */
@@ -678,17 +678,18 @@ p2m_pod_decrease_reservation(struct domain *d,
         }
     }    
 
+    /* If there are no more non-PoD entries, tell decrease_reservation() that
+     * there's nothing left to do. */
+    if ( nonpod == 0 )
+        ret = 1;
+
+out_entry_check:
     /* If we've reduced our "liabilities" beyond our "assets", free some */
     if ( p2md->pod.entry_count < p2md->pod.count )
     {
         printk("b %d\n", p2md->pod.entry_count);
         p2m_pod_set_cache_target(d, p2md->pod.entry_count);
     }
-
-    /* If there are no more non-PoD entries, tell decrease_reservation() that
-     * there's nothing left to do. */
-    if ( nonpod == 0 )
-        ret = 1;
 
 out_unlock:
     audit_p2m(d);
