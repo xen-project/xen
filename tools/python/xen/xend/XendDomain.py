@@ -1353,7 +1353,7 @@ class XendDomain:
                 XendCheckpoint.save(p2cwrite, dominfo, True, live, dst,
                                     node=node)
             finally:
-                sock.shutdown()
+                sock.shutdown(2)
                 sock.close()
 
             os.close(p2cread)
@@ -1379,6 +1379,7 @@ class XendDomain:
                 XendCheckpoint.save(sock.fileno(), dominfo, True, live,
                                     dst, node=node)
             finally:
+                sock.shutdown(2)
                 sock.close()
 
     def domain_save(self, domid, dst, checkpoint=False):
