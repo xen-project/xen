@@ -260,3 +260,10 @@
 #(device-create-timeout 100)
 #(device-destroy-timeout 100)
 
+# When assigning device to HVM guest, we use the strict check for HVM guest by
+# default. (For PV guest, we use loose check automatically if necessary.)
+# When we assign device to HVM guest, if we meet with the co-assignment
+# issues or the ACS issue, we could try changing the option to 'no' -- however,
+# we have to realize this may incur security issue and we can't make sure the
+# device assignment could really work properly even after we do this.
+#(pci-passthrough-strict-check yes)

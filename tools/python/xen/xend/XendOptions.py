@@ -148,6 +148,10 @@ class XendOptions:
     """Default timeout for device destruction."""
     device_destroy_timeout_default = 100
 
+    """By default, we use the strict check for HVM guest. (For PV guest, we
+    use loose check automatically if necessary."""
+    pci_dev_assign_strict_check_default = True
+
     def __init__(self):
         self.configure()
 
@@ -413,6 +417,9 @@ class XendOptions:
         return self.get_config_int("device-destroy-timeout",
                                    self.device_destroy_timeout_default)
 
+    def get_pci_dev_assign_strict_check(self):
+        return self.get_config_bool("pci-passthrough-strict-check",
+                                    self.pci_dev_assign_strict_check_default)
 
 class XendOptionsFile(XendOptions):
 

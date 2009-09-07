@@ -311,7 +311,7 @@ def do_FLR(domid, is_hvm):
         except Exception, e:
             raise VmError("pci: failed to locate device and "+
                     "parse it's resources - "+str(e))
-        dev.do_FLR(is_hvm)
+        dev.do_FLR(is_hvm, xoptions.get_pci_dev_assign_strict_check())
 
 class XendDomainInfo:
     """An object represents a domain.
@@ -709,6 +709,9 @@ class XendDomainInfo:
 
         # PV guest has less checkings.
         if not self.info.is_hvm():
+            return
+
+        if not xoptions.get_pci_dev_assign_strict_check():
             return
 
         # Check if there is intermediate PCIe switch bewteen the device and

@@ -1065,7 +1065,7 @@ class PciDevice:
                 ', but it is not owned by pciback or pci-stub.'
             raise PciDeviceAssignmentError(err_msg % (pci_dev, self.name))
 
-    def do_FLR(self, is_hvm):
+    def do_FLR(self, is_hvm, strict_check):
         """ Perform FLR (Functional Level Reset) for the device.
         """
         if self.dev_type == DEV_TYPE_PCIe_ENDPOINT:
@@ -1084,6 +1084,8 @@ class PciDevice:
                     funcs = self.find_all_the_multi_functions()
 
                     if not is_hvm and (len(funcs) > 1):
+                        return
+                    if is_hvm and not strict_check:
                         return
 
                     self.devs_check_driver(funcs)
@@ -1112,6 +1114,8 @@ class PciDevice:
                     del devs[0]
 
                     if not is_hvm and (len(devs) > 1):
+                        return
+                    if is_hvm and not strict_check:
                         return
 
                     self.devs_check_driver(devs)

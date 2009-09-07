@@ -21,6 +21,9 @@ import types
 import time
 
 from xen.xend import sxp
+from xen.xend import XendOptions
+xoptions = XendOptions.instance()
+
 from xen.xend import arch
 from xen.xend.XendError import VmError
 from xen.xend.XendLogging import log
@@ -356,6 +359,7 @@ class PciController(DevController):
         if len(pci_str_list) != len(set(pci_str_list)):
             raise VmError('pci: duplicate devices specified in guest config?')
 
+        strict_check = xoptions.get_pci_dev_assign_strict_check()
         for pci_dev in pci_dev_list:
             try:
                 dev = PciDevice(pci_dev)
@@ -365,7 +369,8 @@ class PciController(DevController):
 
             # Check if there is intermediate PCIe switch bewteen the device and
             # Root Complex.
-            if self.vm.info.is_hvm() and dev.is_behind_switch_lacking_acs():
+            if self.vm.info.is_hvm() and dev.is_behind_switch_lacking_acs() \
+                and strict_check:
                 err_msg = 'pci: to avoid potential security issue, %s is not'+\
                         ' allowed to be assigned to guest since it is behind'+\
                         ' PCIe switch that does not support or enable ACS.'
@@ -381,6 +386,8 @@ class PciController(DevController):
                     log.warn(err_msg % dev.name)
                 else:
                     if not self.vm.info.is_hvm():
+                        continue
+                    if not strict_check:
                         continue
 
                     funcs = dev.find_all_the_multi_functions()
@@ -404,6 +411,8 @@ class PciController(DevController):
                         log.warn(err_msg % dev.name)
                 else:
                     if not self.vm.info.is_hvm():
+                        continue
+                    if not strict_check:
                         continue
 
                     # All devices behind the uppermost PCI/PCI-X bridge must be\
@@ -466,7 +475,8 @@ class PciController(DevController):
 
         # Need to do FLR here before deassign device in order to terminate
         # DMA transaction, etc
-        dev.do_FLR(self.vm.info.is_hvm())
+        dev.do_FLR(self.vm.info.is_hvm(),
+            xoptions.get_pci_dev_assign_strict_check())
 
         bdf = xc.deassign_device(fe_domid, pci_dict_to_xc_str(pci_dev))
         pci_str = pci_dict_to_bdf_str(pci_dev)
