@@ -225,7 +225,10 @@ static int ioapic_rte_to_remap_entry(struct iommu *iommu,
     if ( rte_upper )
     {
 #if defined(__i386__) || defined(__x86_64__)
-        new_ire.lo.dst = (value >> 24) << 8;
+        if ( x2apic_enabled )
+            new_ire.lo.dst = value;
+        else
+            new_ire.lo.dst = (value >> 24) << 8;
 #else /* __ia64__ */
         new_ire.lo.dst = value >> 16;
 #endif
@@ -552,8 +555,11 @@ static int msi_msg_to_remap_entry(
     new_ire.lo.vector = (msg->data >> MSI_DATA_VECTOR_SHIFT) &
                         MSI_DATA_VECTOR_MASK;
     new_ire.lo.res_2 = 0;
-    new_ire.lo.dst = ((msg->address_lo >> MSI_ADDR_DEST_ID_SHIFT)
-                      & 0xff) << 8;
+    if ( x2apic_enabled )
+        new_ire.lo.dst = msg->dest32;
+    else
+        new_ire.lo.dst = ((msg->address_lo >> MSI_ADDR_DEST_ID_SHIFT)
+                          & 0xff) << 8;
 
     set_msi_source_id(pdev, &new_ire);
     new_ire.hi.res_1 = 0;

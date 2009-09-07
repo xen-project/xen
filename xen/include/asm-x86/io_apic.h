@@ -105,6 +105,9 @@ struct IO_APIC_route_entry {
 					__reserved_1	: 24,
 					logical_dest	:  8;
 			} logical;
+
+			/* used when Interrupt Remapping with EIM is enabled */
+			__u32 dest32;
 	} dest;
 
 } __attribute__ ((packed));

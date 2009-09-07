@@ -144,6 +144,7 @@ void msi_compose_msg(struct pci_dev *pdev, int irq,
              MSI_ADDR_REDIRECTION_CPU:
              MSI_ADDR_REDIRECTION_LOWPRI) |
             MSI_ADDR_DEST_ID(dest);
+        msg->dest32 = dest;
 
         msg->data =
             MSI_DATA_TRIGGER_EDGE |
@@ -283,6 +284,7 @@ void set_msi_affinity(unsigned int irq, cpumask_t mask)
     msg.data |= MSI_DATA_VECTOR(cfg->vector);
     msg.address_lo &= ~MSI_ADDR_DEST_ID_MASK;
     msg.address_lo |= MSI_ADDR_DEST_ID(dest);
+    msg.dest32 = dest;
 
     write_msi_msg(msi_desc, &msg);
 }

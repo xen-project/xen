@@ -355,8 +355,8 @@ set_ioapic_affinity_irq_desc(struct irq_desc *desc,
     spin_lock_irqsave(&ioapic_lock, flags);
     dest = set_desc_affinity(desc, mask);
     if (dest != BAD_APICID) {
-        /* Only the high 8 bits are valid. */
-        dest = SET_APIC_LOGICAL_ID(dest);
+        if ( !x2apic_enabled )
+            dest = SET_APIC_LOGICAL_ID(dest);
         entry = irq_2_pin + irq;
         for (;;) {
             unsigned int data;
@@ -770,6 +770,9 @@ static struct hw_interrupt_type ioapic_edge_type;
 #define IOAPIC_EDGE	0
 #define IOAPIC_LEVEL	1
 
+#define SET_DEST(x, y, value) \
+    do { if ( x2apic_enabled ) x = value; else y = value; } while(0)
+
 static inline void ioapic_register_intr(int irq, unsigned long trigger)
 {
     if ((trigger == IOAPIC_AUTO && IO_APIC_irq_trigger(irq)) ||
@@ -845,8 +848,8 @@ static void __init setup_IO_APIC_irqs(void)
                     disable_8259A_irq(irq);
             }
             cfg = irq_cfg(irq);
-            entry.dest.logical.logical_dest = 
-                cpu_mask_to_apicid(cfg->domain);
+            SET_DEST(entry.dest.dest32, entry.dest.logical.logical_dest,
+                cpu_mask_to_apicid(cfg->domain));
             spin_lock_irqsave(&ioapic_lock, flags);
             io_apic_write(apic, 0x11+2*pin, *(((int *)&entry)+1));
             io_apic_write(apic, 0x10+2*pin, *(((int *)&entry)+0));
@@ -880,7 +883,8 @@ static void __init setup_ExtINT_IRQ0_pin(unsigned int apic, unsigned int pin, in
      */
     entry.dest_mode = INT_DEST_MODE;
     entry.mask = 0;					/* unmask IRQ now */
-    entry.dest.logical.logical_dest = cpu_mask_to_apicid(TARGET_CPUS);
+    SET_DEST(entry.dest.dest32, entry.dest.logical.logical_dest,
+        cpu_mask_to_apicid(TARGET_CPUS));
     entry.delivery_mode = INT_DELIVERY_MODE;
     entry.polarity = 0;
     entry.trigger = 0;
@@ -1156,8 +1160,8 @@ void disable_IO_APIC(void)
         entry.dest_mode       = 0; /* Physical */
         entry.delivery_mode   = dest_ExtINT; /* ExtInt */
         entry.vector          = 0;
-        entry.dest.physical.physical_dest =
-            get_apic_id();
+        SET_DEST(entry.dest.dest32, entry.dest.physical.physical_dest,
+            get_apic_id());
 
         /*
          * Add it to the IO-APIC irq-routing table:
@@ -1667,7 +1671,8 @@ static inline void unlock_ExtINT_logic(void)
 
     entry1.dest_mode = 0;			/* physical delivery */
     entry1.mask = 0;			/* unmask IRQ now */
-    entry1.dest.physical.physical_dest = hard_smp_processor_id();
+    SET_DEST(entry1.dest.dest32, entry1.dest.physical.physical_dest,
+        hard_smp_processor_id());
     entry1.delivery_mode = dest_ExtINT;
     entry1.polarity = entry0.polarity;
     entry1.trigger = 0;
@@ -2051,7 +2056,8 @@ int io_apic_set_pci_routing (int ioapic, int pin, int irq, int edge_level, int a
 
     entry.delivery_mode = INT_DELIVERY_MODE;
     entry.dest_mode = INT_DEST_MODE;
-    entry.dest.logical.logical_dest = cpu_mask_to_apicid(TARGET_CPUS);
+    SET_DEST(entry.dest.dest32, entry.dest.logical.logical_dest,
+        cpu_mask_to_apicid(TARGET_CPUS));
     entry.trigger = edge_level;
     entry.polarity = active_high_low;
     entry.mask  = 1;
@@ -2230,8 +2236,8 @@ int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
     /* Set the vector field to the real vector! */
     rte.vector = cfg->vector;
 
-    rte.dest.logical.logical_dest = 
-    cpu_mask_to_apicid(cfg->domain);
+    SET_DEST(rte.dest.dest32, rte.dest.logical.logical_dest,
+        cpu_mask_to_apicid(cfg->domain));
 
     io_apic_write(apic, 0x10 + 2 * pin, *(((int *)&rte) + 0));
     io_apic_write(apic, 0x11 + 2 * pin, *(((int *)&rte) + 1));
