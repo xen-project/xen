@@ -829,7 +829,7 @@ static void dma_msi_set_affinity(unsigned int irq, cpumask_t mask)
 #ifdef CONFIG_X86
     dest = set_desc_affinity(desc, mask);
     if (dest == BAD_APICID){
-        gdprintk(XENLOG_ERR VTDPREFIX, "Set iommu interrupt affinity error!\n");
+        dprintk(XENLOG_ERR VTDPREFIX, "Set iommu interrupt affinity error!\n");
         return;
     }
 
@@ -886,7 +886,7 @@ static int iommu_set_interrupt(struct iommu *iommu)
     irq = create_irq();
     if ( irq <= 0 )
     {
-        gdprintk(XENLOG_ERR VTDPREFIX, "IOMMU: no irq available!\n");
+        dprintk(XENLOG_ERR VTDPREFIX, "IOMMU: no irq available!\n");
         return -EINVAL;
     }
 
@@ -902,7 +902,7 @@ static int iommu_set_interrupt(struct iommu *iommu)
         irq_desc[irq].handler = &no_irq_type;
         irq_to_iommu[irq] = NULL;
         destroy_irq(irq);
-        gdprintk(XENLOG_ERR VTDPREFIX, "IOMMU: can't request irq\n");
+        dprintk(XENLOG_ERR VTDPREFIX, "IOMMU: can't request irq\n");
         return ret;
     }
 
@@ -917,7 +917,7 @@ static int iommu_alloc(struct acpi_drhd_unit *drhd)
 
     if ( nr_iommus > MAX_IOMMUS )
     {
-        gdprintk(XENLOG_ERR VTDPREFIX,
+        dprintk(XENLOG_ERR VTDPREFIX,
                  "IOMMU: nr_iommus %d > MAX_IOMMUS\n", nr_iommus);
         return -ENOMEM;
     }
@@ -942,9 +942,9 @@ static int iommu_alloc(struct acpi_drhd_unit *drhd)
     iommu->cap = dmar_readq(iommu->reg, DMAR_CAP_REG);
     iommu->ecap = dmar_readq(iommu->reg, DMAR_ECAP_REG);
 
-    gdprintk(XENLOG_INFO VTDPREFIX,
+    dprintk(XENLOG_INFO VTDPREFIX,
              "drhd->address = %"PRIx64"\n", drhd->address);
-    gdprintk(XENLOG_INFO VTDPREFIX, "iommu->reg = %p\n", iommu->reg);
+    dprintk(XENLOG_INFO VTDPREFIX, "iommu->reg = %p\n", iommu->reg);
 
     /* Calculate number of pagetable levels: between 2 and 4. */
     sagaw = cap_sagaw(iommu->cap);
@@ -953,7 +953,7 @@ static int iommu_alloc(struct acpi_drhd_unit *drhd)
             break;
     if ( agaw < 0 )
     {
-        gdprintk(XENLOG_ERR VTDPREFIX,
+        dprintk(XENLOG_ERR VTDPREFIX,
                  "IOMMU: unsupported sagaw %lx\n", sagaw);
         xfree(iommu);
         return -ENODEV;
@@ -1615,7 +1615,7 @@ static int init_vtd_hw(void)
             irq = iommu_set_interrupt(iommu);
             if ( irq < 0 )
             {
-                gdprintk(XENLOG_ERR VTDPREFIX, "IOMMU: interrupt setup failed\n");
+                dprintk(XENLOG_ERR VTDPREFIX, "IOMMU: interrupt setup failed\n");
                 return irq;
             }
             iommu->irq = irq;
@@ -1670,7 +1670,7 @@ static int init_vtd_hw(void)
         ret = iommu_set_root_entry(iommu);
         if ( ret )
         {
-            gdprintk(XENLOG_ERR VTDPREFIX, "IOMMU: set root entry failed\n");
+            dprintk(XENLOG_ERR VTDPREFIX, "IOMMU: set root entry failed\n");
             return -EIO;
         }
     }
@@ -1695,7 +1695,7 @@ static void setup_dom0_rmrr(struct domain *d)
     {
         ret = iommu_prepare_rmrr_dev(d, rmrr, PCI_BUS(bdf), PCI_DEVFN2(bdf));
         if ( ret )
-            gdprintk(XENLOG_ERR VTDPREFIX,
+            dprintk(XENLOG_ERR VTDPREFIX,
                      "IOMMU: mapping reserved region failed\n");
     }
     spin_unlock(&pcidevs_lock);
@@ -1761,7 +1761,7 @@ int intel_vtd_setup(void)
     if ( !iommu_qinval && iommu_intremap )
     {
         iommu_intremap = 0;
-        gdprintk(XENLOG_WARNING VTDPREFIX, "Interrupt Remapping disabled "
+        dprintk(XENLOG_WARNING VTDPREFIX, "Interrupt Remapping disabled "
             "since Queued Invalidation isn't supported or enabled.\n");
     }
 
