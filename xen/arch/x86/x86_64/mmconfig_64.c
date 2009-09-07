@@ -21,6 +21,7 @@ struct mmcfg_virt {
     char __iomem *virt;
 };
 static struct mmcfg_virt *pci_mmcfg_virt;
+static int __initdata mmcfg_pci_segment_shift;
 
 static char __iomem *get_virt(unsigned int seg, unsigned bus)
 {
@@ -109,27 +110,26 @@ int pci_mmcfg_write(unsigned int seg, unsigned int bus,
 
 static void __iomem * __init mcfg_ioremap(struct acpi_mcfg_allocation *cfg)
 {
-    void __iomem *addr;
-    unsigned long virt;
-    unsigned long mfn;
-    unsigned long size, nr_mfn;
+    unsigned long virt, size;
 
-    virt = PCI_MCFG_VIRT_START + (cfg->pci_segment * (1 << 22)) +
-               (cfg->start_bus_number * (1 << 20));
-    mfn = cfg->address >> PAGE_SHIFT;
-        size = (cfg->end_bus_number - cfg->start_bus_number) << 20;
-        nr_mfn = size >> PAGE_SHIFT;
+    virt = PCI_MCFG_VIRT_START +
+           ((unsigned long)cfg->pci_segment << mmcfg_pci_segment_shift) +
+           (cfg->start_bus_number << 20);
+    size = (cfg->end_bus_number - cfg->start_bus_number + 1) << 20;
+    if (virt + size < virt || virt + size > PCI_MCFG_VIRT_END)
+        return NULL;
 
-    map_pages_to_xen(virt, mfn, nr_mfn, PAGE_HYPERVISOR_NOCACHE);
-    addr = (void __iomem *) virt;
+    map_pages_to_xen(virt, cfg->address >> PAGE_SHIFT,
+                     size >> PAGE_SHIFT, PAGE_HYPERVISOR_NOCACHE);
 
-    return addr;
+    return (void __iomem *) virt;
 }
 
 int __init pci_mmcfg_arch_init(void)
 {
     int i;
-    pci_mmcfg_virt = xmalloc_bytes(sizeof(*pci_mmcfg_virt) * pci_mmcfg_config_num);
+
+    pci_mmcfg_virt = xmalloc_array(struct mmcfg_virt, pci_mmcfg_config_num);
     if (pci_mmcfg_virt == NULL) {
         printk(KERN_ERR "PCI: Can not allocate memory for mmconfig structures\n");
         return 0;
@@ -138,6 +138,11 @@ int __init pci_mmcfg_arch_init(void)
 
     for (i = 0; i < pci_mmcfg_config_num; ++i) {
         pci_mmcfg_virt[i].cfg = &pci_mmcfg_config[i];
+        while (pci_mmcfg_config[i].end_bus_number >> mmcfg_pci_segment_shift)
+            ++mmcfg_pci_segment_shift;
+    }
+    mmcfg_pci_segment_shift += 20;
+    for (i = 0; i < pci_mmcfg_config_num; ++i) {
         pci_mmcfg_virt[i].virt = mcfg_ioremap(&pci_mmcfg_config[i]);
         if (!pci_mmcfg_virt[i].virt) {
             printk(KERN_ERR "PCI: Cannot map mmconfig aperture for "

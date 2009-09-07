@@ -48,13 +48,10 @@
 struct acpi_mcfg_allocation *pci_mmcfg_config;
 int pci_mmcfg_config_num;
 
-static int acpi_mcfg_64bit_base_addr __initdata = FALSE;
-
-int acpi_parse_mcfg(struct acpi_table_header *header)
+int __init acpi_parse_mcfg(struct acpi_table_header *header)
 {
     struct acpi_table_mcfg *mcfg;
     unsigned long i;
-    int config_size;
 
     if (!header)
         return -EINVAL;
@@ -73,19 +70,19 @@ int acpi_parse_mcfg(struct acpi_table_header *header)
         return -ENODEV;
     }
 
-    config_size = pci_mmcfg_config_num * sizeof(*pci_mmcfg_config);
-    pci_mmcfg_config = xmalloc_bytes(config_size);
+    pci_mmcfg_config = xmalloc_array(struct acpi_mcfg_allocation,
+                                     pci_mmcfg_config_num);
     if (!pci_mmcfg_config) {
         printk(KERN_WARNING PREFIX
                "No memory for MCFG config tables\n");
         return -ENOMEM;
     }
 
-    memcpy(pci_mmcfg_config, &mcfg[1], config_size);
+    memcpy(pci_mmcfg_config, &mcfg[1],
+           pci_mmcfg_config_num * sizeof(*pci_mmcfg_config));
 
     for (i = 0; i < pci_mmcfg_config_num; ++i) {
-        if ((pci_mmcfg_config[i].address > 0xFFFFFFFF) &&
-            !acpi_mcfg_64bit_base_addr) {
+        if (pci_mmcfg_config[i].address > 0xFFFFFFFF) {
             printk(KERN_ERR PREFIX
                    "MMCONFIG not in low 4GB of memory\n");
             xfree(pci_mmcfg_config);

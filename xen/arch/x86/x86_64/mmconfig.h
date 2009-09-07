@@ -81,7 +81,7 @@ static inline void mmio_config_writel(void __iomem *pos, u32 val)
 extern int pci_mmcfg_config_num;
 extern struct acpi_mcfg_allocation *pci_mmcfg_config;
 
-/* fucntion prototypes */
-int __init acpi_parse_mcfg(struct acpi_table_header *header);
-int __init pci_mmcfg_arch_init(void);
-void __init pci_mmcfg_arch_free(void);
+/* function prototypes */
+int acpi_parse_mcfg(struct acpi_table_header *header);
+int pci_mmcfg_arch_init(void);
+void pci_mmcfg_arch_free(void);

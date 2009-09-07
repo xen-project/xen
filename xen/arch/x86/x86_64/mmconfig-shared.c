@@ -24,7 +24,27 @@
 #include "mmconfig.h"
 
 static int __initdata known_bridge;
-unsigned int pci_probe = PCI_PROBE_CONF1 | PCI_PROBE_MMCONF;
+static unsigned int pci_probe = PCI_PROBE_CONF1 | PCI_PROBE_MMCONF;
+
+static void __init parse_mmcfg(char *s)
+{
+    char *ss;
+
+    do {
+        ss = strchr(s, ',');
+        if ( ss )
+            *ss = '\0';
+
+        if ( !strcmp(s, "off") || !strcmp(s, "no") || !strcmp(s, "false") ||
+             !strcmp(s, "0") || !strcmp(s, "disable") )
+            pci_probe &= ~PCI_PROBE_MMCONF;
+        else if ( !strcmp(s, "amd_fam10") || !strcmp(s, "amd-fam10") )
+            pci_probe |= PCI_CHECK_ENABLE_AMD_MMCONF;
+
+        s = ss + 1;
+    } while ( ss );
+}
+custom_param("mmcfg", parse_mmcfg);
 
 static const char __init *pci_mmcfg_e7520(void)
 {
@@ -36,7 +56,7 @@ static const char __init *pci_mmcfg_e7520(void)
         pci_mmcfg_config_num = 0;
     else {
         pci_mmcfg_config_num = 1;
-        pci_mmcfg_config = xmalloc_bytes(sizeof(pci_mmcfg_config[0]));
+        pci_mmcfg_config = xmalloc(struct acpi_mcfg_allocation);
         if (!pci_mmcfg_config)
             return NULL;
         memset(pci_mmcfg_config, 0, sizeof(pci_mmcfg_config[0]));
@@ -90,7 +110,7 @@ static const char __init *pci_mmcfg_intel_945(void)
         pci_mmcfg_config_num = 0;
 
     if (pci_mmcfg_config_num) {
-        pci_mmcfg_config = xmalloc_bytes(sizeof(pci_mmcfg_config[0]));
+        pci_mmcfg_config = xmalloc(struct acpi_mcfg_allocation);
         if (!pci_mmcfg_config)
             return NULL;
         memset(pci_mmcfg_config, 0, sizeof(pci_mmcfg_config[0]));
@@ -143,13 +163,13 @@ static const char __init *pci_mmcfg_amd_fam10h(void)
     }
 
     pci_mmcfg_config_num = (1 << segnbits);
-    pci_mmcfg_config = xmalloc_bytes(sizeof(pci_mmcfg_config[0]) *
+    pci_mmcfg_config = xmalloc_array(struct acpi_mcfg_allocation,
                                      pci_mmcfg_config_num);
     if (!pci_mmcfg_config)
         return NULL;
 
     for (i = 0; i < (1 << segnbits); i++) {
-        pci_mmcfg_config[i].address = base + (1<<28) * i;
+        pci_mmcfg_config[i].address = base + ((unsigned long)i << 28);
         pci_mmcfg_config[i].pci_segment = i;
         pci_mmcfg_config[i].start_bus_number = 0;
         pci_mmcfg_config[i].end_bus_number = (1 << busnbits) - 1;
@@ -334,7 +354,7 @@ static int __init is_mmconf_reserved(
     return valid;
 }
 
-static void __init pci_mmcfg_reject_broken(int early)
+static void __init pci_mmcfg_reject_broken(void)
 {
     typeof(pci_mmcfg_config[0]) *cfg;
     int i;
@@ -347,7 +367,6 @@ static void __init pci_mmcfg_reject_broken(int early)
     cfg = &pci_mmcfg_config[0];
 
     for (i = 0; i < pci_mmcfg_config_num; i++) {
-        int valid = 0;
         u64 addr, size;
 
         cfg = &pci_mmcfg_config[i];
@@ -362,17 +381,7 @@ static void __init pci_mmcfg_reject_broken(int early)
                (unsigned int)cfg->start_bus_number,
                (unsigned int)cfg->end_bus_number);
 
-        if (valid)
-            continue;
-
-        if (!early)
-            printk(KERN_ERR "PCI: BIOS Bug: MCFG area at %lx is not"
-                   " reserved in ACPI motherboard resources\n",
-                   cfg->address);
-
-        valid = is_mmconf_reserved(e820_all_mapped, addr, size, i, cfg, 1);
-
-        if (!valid)
+        if (!is_mmconf_reserved(e820_all_mapped, addr, size, i, cfg, 1))
             goto reject;
     }
 
@@ -386,28 +395,26 @@ reject:
     pci_mmcfg_config_num = 0;
 }
 
-void __init __pci_mmcfg_init(int early)
+void __init acpi_mmcfg_init(void)
 {
     /* MMCONFIG disabled */
     if ((pci_probe & PCI_PROBE_MMCONF) == 0)
         return;
 
     /* MMCONFIG already enabled */
-    if (!early && !(pci_probe & PCI_PROBE_MASK & ~PCI_PROBE_MMCONF))
+    if (!(pci_probe & PCI_PROBE_MASK & ~PCI_PROBE_MMCONF))
         return;
 
     /* for late to exit */
     if (known_bridge)
         return;
 
-    if (early) {
-        if (pci_mmcfg_check_hostbridge())
-            known_bridge = 1;
-    }
+    if (pci_mmcfg_check_hostbridge())
+        known_bridge = 1;
 
     if (!known_bridge) {
         acpi_table_parse(ACPI_SIG_MCFG, acpi_parse_mcfg);
-        pci_mmcfg_reject_broken(early);
+        pci_mmcfg_reject_broken();
     }
 
     if ((pci_mmcfg_config_num == 0) ||
@@ -418,11 +425,6 @@ void __init __pci_mmcfg_init(int early)
     if (pci_mmcfg_arch_init()) {
         pci_probe = (pci_probe & ~PCI_PROBE_MASK) | PCI_PROBE_MMCONF;
     }
-}
-
-void acpi_mmcfg_init(void)
-{
-    __pci_mmcfg_init(1);
 }
 
 /**

@@ -196,7 +196,7 @@ extern unsigned int video_mode, video_flags;
  *     - since PML4 slot has 39 bits, we limit segments to 2048 (11-bits)
  */
 #define PCI_MCFG_VIRT_START     (PML4_ADDR(257))
-#define PCI_MCFG_VIRT_END       (RDWR_MPT_VIRT_START + PML4_ENTRY_BYTES)
+#define PCI_MCFG_VIRT_END       (PCI_MCFG_VIRT_START + PML4_ENTRY_BYTES)
 /* Slot 258: linear page table (guest table). */
 #define LINEAR_PT_VIRT_START    (PML4_ADDR(258))
 #define LINEAR_PT_VIRT_END      (LINEAR_PT_VIRT_START + PML4_ENTRY_BYTES)
