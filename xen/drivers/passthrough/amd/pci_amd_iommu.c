@@ -28,34 +28,6 @@ extern unsigned short ivrs_bdf_entries;
 extern struct ivrs_mappings *ivrs_mappings;
 extern void *int_remap_table;
 
-int __init amd_iommu_init(void)
-{
-    struct amd_iommu *iommu;
-
-    BUG_ON( !iommu_found() );
-
-    ivrs_bdf_entries = amd_iommu_get_ivrs_dev_entries();
-
-    if ( !ivrs_bdf_entries )
-        goto error_out;
-
-    if ( amd_iommu_setup_shared_tables() != 0 )
-        goto error_out;
-
-    if ( amd_iommu_update_ivrs_mapping_acpi() != 0 )
-        goto error_out;
-
-    for_each_amd_iommu ( iommu )
-        if ( amd_iommu_init_one(iommu) != 0 )
-            goto error_out;
-
-    return 0;
-
-error_out:
-    amd_iommu_init_cleanup();
-    return -ENODEV;
-}
-
 struct amd_iommu *find_iommu_for_device(int bus, int devfn)
 {
     u16 bdf = (bus << 8) | devfn;

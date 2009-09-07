@@ -52,10 +52,7 @@ int __init amd_iommu_detect_acpi(void);
 
 /* amd-iommu-init functions */
 int __init amd_iommu_init(void);
-int __init amd_iommu_init_one(struct amd_iommu *iommu);
 int __init amd_iommu_update_ivrs_mapping_acpi(void);
-void __init amd_iommu_init_cleanup(void);
-int __init amd_iommu_setup_shared_tables(void);
 
 /* mapping functions */
 int amd_iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn);
