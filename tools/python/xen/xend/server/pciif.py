@@ -332,19 +332,6 @@ class PciController(DevController):
                 raise VmError(('pci: failed to configure I/O memory on device '+
                             '%s - errno=%d')%(dev.name,rc))
 
-        if dev.msix:
-            for (start, size) in dev.msix_iomem:
-                start_pfn = start>>PAGE_SHIFT
-                nr_pfns = (size+(PAGE_SIZE-1))>>PAGE_SHIFT
-                log.debug('pci-msix: remove permission for 0x%x/0x%x 0x%x/0x%x' % \
-                         (start,size, start_pfn, nr_pfns))
-                rc = xc.domain_iomem_permission(domid = fe_domid,
-                                                first_pfn = start_pfn,
-                                                nr_pfns = nr_pfns,
-                                                allow_access = False)
-                if rc<0:
-                    raise VmError(('pci: failed to remove msi-x iomem'))
-
         if not self.vm.info.is_hvm() and dev.irq:
             rc = xc.physdev_map_pirq(domid = fe_domid,
                                    index = dev.irq,

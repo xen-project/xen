@@ -1173,20 +1173,6 @@ class PciDevice:
             raise PciDeviceParseError(('Failed to locate sysfs mount: %s: %s (%d)' %
                 (PROC_PCI_PATH, strerr, errno)))
 
-    def remove_msix_iomem(self, index, start, size):
-        if (index == self.table_index):
-            table_start = start+self.table_offset
-            table_end = table_start + self.msix_entries * 16
-            table_start = table_start & PAGE_MASK
-            table_end = (table_end + PAGE_SIZE) & PAGE_MASK
-            self.msix_iomem.append((table_start, table_end-table_start))
-        if (index==self.pba_index):
-            pba_start = start + self.pba_offset
-            pba_end = pba_start + self.msix_entries/8
-            pba_start = pba_start & PAGE_MASK
-            pba_end = (pba_end + PAGE_SIZE) & PAGE_MASK
-            self.msix_iomem.append((pba_start, pba_end-pba_start))
-
     def get_info_from_sysfs(self):
         self.find_capability(0x11)
         sysfs_mnt = find_sysfs_mnt()
@@ -1214,10 +1200,6 @@ class PciDevice:
                         self.ioports.append( (start,size) )
                     else:
                         self.iomem.append( (start,size) )
-                    if (self.msix):
-                        self.remove_msix_iomem(i, start, size)
-
-
 
         except IOError, (errno, strerr):
             raise PciDeviceParseError(('Failed to open & read %s: %s (%d)' %
