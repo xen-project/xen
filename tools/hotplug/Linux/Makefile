@@ -3,6 +3,7 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 # Init scripts.
 XEND_INITD = init.d/xend
+XEND_SYSCONFIG = init.d/sysconfig.xend
 XENDOMAINS_INITD = init.d/xendomains
 XENDOMAINS_SYSCONFIG = init.d/sysconfig.xendomains
 
@@ -62,6 +63,7 @@ install-initd:
 	[ -d $(DESTDIR)$(CONFIG_DIR)/init.d ] || $(INSTALL_DIR) $(DESTDIR)$(CONFIG_DIR)/init.d
 	[ -d $(DESTDIR)$(CONFIG_DIR)/sysconfig ] || $(INSTALL_DIR) $(DESTDIR)$(CONFIG_DIR)/sysconfig
 	$(INSTALL_PROG) $(XEND_INITD) $(DESTDIR)$(CONFIG_DIR)/init.d
+	$(INSTALL_PROG) $(XEND_SYSCONFIG) $(DESTDIR)$(CONFIG_DIR)/sysconfig/xend
 	$(INSTALL_PROG) $(XENDOMAINS_INITD) $(DESTDIR)$(CONFIG_DIR)/init.d
 	$(INSTALL_PROG) $(XENDOMAINS_SYSCONFIG) $(DESTDIR)$(CONFIG_DIR)/sysconfig/xendomains
 

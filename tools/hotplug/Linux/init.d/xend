@@ -19,6 +19,9 @@
 # Description:       Starts and stops the Xen control daemon.
 ### END INIT INFO
 
+shopt -s extglob
+test -f /etc/sysconfig/xend && . /etc/sysconfig/xend
+
 if ! grep -q "control_d" /proc/xen/capabilities ; then
 	exit 0
 fi
@@ -41,6 +44,10 @@ case "$1" in
   start)
 	mkdir -p /var/lock/subsys
 	touch /var/lock/subsys/xend
+	test -z "$XENSTORED_ROOTDIR" || export XENSTORED_ROOTDIR
+	test -z "$XENCONSOLED_TRACE" || export XENCONSOLED_TRACE
+	[[ "$XENSTORED_TRACE" == @(yes|on|1) ]] && export XENSTORED_TRACE
+	[[ "$XENBACKENDD_DEBUG" == @(yes|on|1) ]] && export XENBACKENDD_DEBUG
 	xend start
 	await_daemons_up
 	;;
