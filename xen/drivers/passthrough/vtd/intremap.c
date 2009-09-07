@@ -32,7 +32,6 @@
 #include "extern.h"
 
 #ifdef __ia64__
-#define dest_SMI -1
 #define nr_ioapics              iosapic_get_nr_iosapics()
 #define nr_ioapic_registers(i)  iosapic_get_nr_pins(i)
 #else
@@ -142,11 +141,9 @@ int iommu_supports_eim(void)
 }
 
 static int remap_entry_to_ioapic_rte(
-    struct iommu *iommu, struct IO_xAPIC_route_entry *old_rte)
+    struct iommu *iommu, int index, struct IO_xAPIC_route_entry *old_rte)
 {
     struct iremap_entry *iremap_entry = NULL, *iremap_entries;
-    struct IO_APIC_route_remap_entry *remap_rte;
-    int index = 0;
     unsigned long flags;
     struct ir_ctrl *ir_ctrl = iommu_ir_ctrl(iommu);
 
@@ -156,9 +153,6 @@ static int remap_entry_to_ioapic_rte(
                 "remap_entry_to_ioapic_rte: ir_ctl is not ready\n");
         return -EFAULT;
     }
-
-    remap_rte = (struct IO_APIC_route_remap_entry *) old_rte;
-    index = (remap_rte->index_15 << 15) | remap_rte->index_0_14;
 
     if ( index > ir_ctrl->iremap_index )
     {
@@ -282,6 +276,8 @@ static int ioapic_rte_to_remap_entry(struct iommu *iommu,
 unsigned int io_apic_read_remap_rte(
     unsigned int apic, unsigned int reg)
 {
+    unsigned int ioapic_pin = (reg - 0x10) / 2;
+    int index;
     struct IO_xAPIC_route_entry old_rte = { 0 };
     struct IO_APIC_route_remap_entry *remap_rte;
     int rte_upper = (reg & 1) ? 1 : 0;
@@ -289,7 +285,8 @@ unsigned int io_apic_read_remap_rte(
     struct ir_ctrl *ir_ctrl = iommu_ir_ctrl(iommu);
 
     if ( !iommu || !ir_ctrl || ir_ctrl->iremap_maddr == 0 ||
-         ir_ctrl->iremap_index == -1 )
+        (ir_ctrl->iremap_index == -1) ||
+        ( (index = apic_pin_2_ir_idx[apic][ioapic_pin]) < 0 ) )
     {
         *IO_APIC_BASE(apic) = reg;
         return *(IO_APIC_BASE(apic)+4);
@@ -306,13 +303,7 @@ unsigned int io_apic_read_remap_rte(
 
     remap_rte = (struct IO_APIC_route_remap_entry *) &old_rte;
 
-    if ( (remap_rte->format == 0) || (old_rte.delivery_mode == dest_SMI) )
-    {
-        *IO_APIC_BASE(apic) = rte_upper ? (reg + 1) : reg;
-        return *(IO_APIC_BASE(apic)+4);
-    }
-
-    if ( remap_entry_to_ioapic_rte(iommu, &old_rte) )
+    if ( remap_entry_to_ioapic_rte(iommu, index, &old_rte) )
     {
         *IO_APIC_BASE(apic) = rte_upper ? (reg + 1) : reg;
         return *(IO_APIC_BASE(apic)+4);
@@ -352,31 +343,6 @@ void io_apic_write_remap_rte(
     *(((u32 *)&old_rte) + 1) = *(IO_APIC_BASE(apic)+4);
 
     remap_rte = (struct IO_APIC_route_remap_entry *) &old_rte;
-
-    if ( old_rte.delivery_mode == dest_SMI )
-    {
-        /* Some BIOS does not zero out reserve fields in IOAPIC
-         * RTE's.  clear_IO_APIC() zeroes out all RTE's except for RTE
-         * with MSI delivery type.  This is a problem when the host
-         * OS converts SMI delivery type to some other type but leaving
-         * the reserved field uninitialized.  This can cause interrupt
-         * remapping table out of bound error if "format" field is 1
-         * and the "index" field has a value that that is larger than 
-         * the maximum index of interrupt remapping table.
-         */
-        if ( remap_rte->format == 1 )
-        {
-            remap_rte->format = 0;
-            *IO_APIC_BASE(apic) = reg;
-            *(IO_APIC_BASE(apic)+4) = *(((u32 *)&old_rte)+0);
-            *IO_APIC_BASE(apic) = reg + 1;
-            *(IO_APIC_BASE(apic)+4) = *(((u32 *)&old_rte)+1);
-        }
-
-        *IO_APIC_BASE(apic) = rte_upper ? (reg + 1) : reg;
-        *(IO_APIC_BASE(apic)+4) = value;
-        return;
-    }
 
     /* mask the interrupt while we change the intremap table */
     saved_mask = remap_rte->mask;
