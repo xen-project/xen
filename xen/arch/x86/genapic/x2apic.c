@@ -23,25 +23,46 @@
 #include <xen/smp.h>
 #include <asm/mach-default/mach_mpparse.h>
 
-__init int probe_x2apic(void)
+static int x2apic = 1;
+boolean_param("x2apic", x2apic);
+
+static int x2apic_phys = 0; /* By default we use logical cluster mode. */
+boolean_param("x2apic_phys", x2apic_phys);
+
+__init int probe_x2apic_phys(void)
 {
-    return x2apic_is_available();
+    return x2apic && x2apic_phys && x2apic_is_available() &&
+        iommu_supports_eim();
 }
 
-struct genapic apic_x2apic= {
-    APIC_INIT("x2apic", probe_x2apic),
-    GENAPIC_X2APIC
+__init int probe_x2apic_cluster(void)
+{
+    return x2apic && !x2apic_phys && x2apic_is_available() &&
+        iommu_supports_eim();
+}
+
+struct genapic apic_x2apic_phys= {
+    APIC_INIT("x2apic_phys", probe_x2apic_phys),
+    GENAPIC_X2APIC_PHYS
 };
 
-void init_apic_ldr_x2apic(void)
+struct genapic apic_x2apic_cluster= {
+    APIC_INIT("x2apic_cluster", probe_x2apic_cluster),
+    GENAPIC_X2APIC_CLUSTER
+};
+
+void init_apic_ldr_x2apic_phys(void)
 {
-    /* We only use physical delivery mode. */
     return;
 }
 
+void init_apic_ldr_x2apic_cluster(void)
+{
+    int cpu = smp_processor_id();
+    cpu_2_logical_apicid[cpu] = apic_read(APIC_LDR);
+}
 void clustered_apic_check_x2apic(void)
 {
-    /* We only use physical delivery mode. */
     return;
 }
 
@@ -55,12 +76,17 @@ cpumask_t vector_allocation_domain_x2apic(int cpu)
 	return cpumask_of_cpu(cpu);
 }
 
-unsigned int cpu_mask_to_apicid_x2apic(cpumask_t cpumask)
+unsigned int cpu_mask_to_apicid_x2apic_phys(cpumask_t cpumask)
 {
     return cpu_physical_id(first_cpu(cpumask));
 }
 
-void send_IPI_mask_x2apic(const cpumask_t *cpumask, int vector)
+unsigned int cpu_mask_to_apicid_x2apic_cluster(cpumask_t cpumask)
+{
+    return cpu_2_logical_apicid[first_cpu(cpumask)];
+}
+
+void send_IPI_mask_x2apic_phys(const cpumask_t *cpumask, int vector)
 {
     unsigned int cpu, cfg;
     unsigned long flags;
@@ -87,3 +113,19 @@ void send_IPI_mask_x2apic(const cpumask_t *cpumask, int vector)
     local_irq_restore(flags);
 }
 
+void send_IPI_mask_x2apic_cluster(const cpumask_t *cpumask, int vector)
+{
+    unsigned int cpu, cfg;
+    unsigned long flags;
+
+    mb(); /* see the comment in send_IPI_mask_x2apic_phys() */
+
+    local_irq_save(flags);
+
+    cfg = APIC_DM_FIXED | 0 /* no shorthand */ | APIC_DEST_LOGICAL | vector;
+    for_each_cpu_mask ( cpu, *cpumask )
+        if ( cpu != smp_processor_id() )
+            apic_wrmsr(APIC_ICR, cfg, cpu_2_logical_apicid[cpu]);
+
+    local_irq_restore(flags);
+}
