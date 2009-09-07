@@ -259,7 +259,7 @@ extern void share_xen_page_with_guest(
 extern void share_xen_page_with_privileged_guests(
     struct page_info *page, int readonly);
 
-extern struct page_info *frame_table;
+#define frame_table ((struct page_info *)FRAMETABLE_VIRT_START)
 extern unsigned long max_page;
 extern unsigned long total_pages;
 void init_frametable(void);

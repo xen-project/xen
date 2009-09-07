@@ -137,8 +137,7 @@ l1_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
 /* Private domain structs for DOMID_XEN and DOMID_IO. */
 struct domain *dom_xen, *dom_io;
 
-/* Frame table and its size in pages. */
-struct page_info *__read_mostly frame_table;
+/* Frame table size in pages. */
 unsigned long max_page;
 unsigned long total_pages;
 
@@ -166,8 +165,6 @@ l2_pgentry_t *compat_idle_pg_table_l2 = NULL;
 void __init init_frametable(void)
 {
     unsigned long nr_pages, page_step, i, mfn;
-
-    frame_table = (struct page_info *)FRAMETABLE_VIRT_START;
 
     nr_pages  = PFN_UP(max_page * sizeof(*frame_table));
     page_step = 1 << (cpu_has_page1gb ? L3_PAGETABLE_SHIFT - PAGE_SHIFT

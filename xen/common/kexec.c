@@ -338,7 +338,14 @@ static void crash_save_vmcoreinfo(void)
     VMCOREINFO_PAGESIZE(PAGE_SIZE);
 
     VMCOREINFO_SYMBOL(domain_list);
+#ifndef frame_table
     VMCOREINFO_SYMBOL(frame_table);
+#else
+    {
+        static const void *const _frame_table = frame_table;
+        VMCOREINFO_SYMBOL_ALIAS(frame_table, _frame_table);
+    }
+#endif
     VMCOREINFO_SYMBOL(max_page);
 
     VMCOREINFO_STRUCT_SIZE(page_info);
