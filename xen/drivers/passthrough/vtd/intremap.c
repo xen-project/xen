@@ -61,19 +61,23 @@
                                   */
 
 /* apic_pin_2_ir_idx[apicid][pin] = interrupt remapping table index */
-static unsigned int **apic_pin_2_ir_idx;
+static int **apic_pin_2_ir_idx;
 
 static int init_apic_pin_2_ir_idx(void)
 {
-    unsigned int *_apic_pin_2_ir_idx;
+    int *_apic_pin_2_ir_idx;
     unsigned int nr_pins, i;
+
+    /* Here we shouldn't need to re-init when resuming from S3. */
+    if ( apic_pin_2_ir_idx != NULL )
+        return 0;
 
     nr_pins = 0;
     for ( i = 0; i < nr_ioapics; i++ )
         nr_pins += nr_ioapic_registers(i);
 
-    _apic_pin_2_ir_idx = xmalloc_array(unsigned int, nr_pins);
-    apic_pin_2_ir_idx = xmalloc_array(unsigned int *, nr_ioapics);
+    _apic_pin_2_ir_idx = xmalloc_array(int, nr_pins);
+    apic_pin_2_ir_idx = xmalloc_array(int *, nr_ioapics);
     if ( (_apic_pin_2_ir_idx == NULL) || (apic_pin_2_ir_idx == NULL) )
     {
         xfree(_apic_pin_2_ir_idx);
@@ -512,7 +516,7 @@ static int msi_msg_to_remap_entry(
     struct iremap_entry *iremap_entry = NULL, *iremap_entries;
     struct iremap_entry new_ire;
     struct msi_msg_remap_entry *remap_rte;
-    unsigned int index;
+    int index;
     unsigned long flags;
     struct ir_ctrl *ir_ctrl = iommu_ir_ctrl(iommu);
 
