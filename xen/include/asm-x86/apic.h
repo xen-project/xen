@@ -77,6 +77,10 @@ static __inline u32 apic_mem_read(unsigned long reg)
 
 static __inline void apic_wrmsr(unsigned long reg, u32 low, u32 high)
 {
+    if (reg == APIC_DFR || reg == APIC_ID || reg == APIC_LDR ||
+        reg == APIC_LVR)
+        return;
+
     __asm__ __volatile__("wrmsr"
             : /* no outputs */
             : "c" (APIC_MSR_BASE + (reg >> 4)), "a" (low), "d" (high));
@@ -84,6 +88,11 @@ static __inline void apic_wrmsr(unsigned long reg, u32 low, u32 high)
 
 static __inline void apic_rdmsr(unsigned long reg, u32 *low, u32 *high)
 {
+    if (reg == APIC_DFR)
+    {
+        *low = *high = -1u;
+        return;
+    }
     __asm__ __volatile__("rdmsr"
             : "=a" (*low), "=d" (*high)
             : "c" (APIC_MSR_BASE + (reg >> 4)));
