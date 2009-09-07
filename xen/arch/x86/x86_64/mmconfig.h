@@ -32,6 +32,8 @@
 #define PCI_VENDOR_ID_AMD             0x1022
 #define PCI_CHECK_ENABLE_AMD_MMCONF     0x20000
 
+#define PCI_VENDOR_ID_NVIDIA       0x10de
+
 /*
  * AMD Fam10h CPUs are buggy, and cannot access MMIO config space
  * on their northbrige except through the * %eax register. As such, you MUST

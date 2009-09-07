@@ -158,6 +158,93 @@ static const char __init *pci_mmcfg_amd_fam10h(void)
     return "AMD Family 10h NB";
 }
 
+static const char __init *pci_mmcfg_nvidia_mcp55(void)
+{
+    static bool_t __initdata mcp55_checked;
+    int bus, i;
+
+    static const u32 extcfg_regnum      = 0x90;
+    static const u32 extcfg_enable_mask = 1<<31;
+    static const u32 extcfg_start_mask  = 0xff<<16;
+    static const int extcfg_start_shift = 16;
+    static const u32 extcfg_size_mask   = 0x3<<28;
+    static const int extcfg_size_shift  = 28;
+    static const int extcfg_sizebus[]   = {0xff, 0x7f, 0x3f, 0x1f};
+    static const u32 extcfg_base_mask[] = {0x7ff8, 0x7ffc, 0x7ffe, 0x7fff};
+    static const int extcfg_base_lshift = 25;
+
+    /* check if amd fam10h already took over */
+    if (!acpi_disabled || pci_mmcfg_config_num || mcp55_checked)
+        return NULL;
+
+    mcp55_checked = 1;
+    for (i = bus = 0; bus < 256; bus++) {
+        u32 l, extcfg;
+        u16 vendor, device;
+
+        l = pci_conf_read32(bus, 0, 0, 0);
+        vendor = l & 0xffff;
+        device = (l >> 16) & 0xffff;
+
+        if (PCI_VENDOR_ID_NVIDIA != vendor || 0x0369 != device)
+            continue;
+
+        extcfg = pci_conf_read32(bus, 0, 0, extcfg_regnum);
+
+        if (extcfg & extcfg_enable_mask)
+            i++;
+    }
+
+    if (!i)
+        return NULL;
+
+    pci_mmcfg_config_num = i;
+    pci_mmcfg_config = xmalloc_array(struct acpi_mcfg_allocation,
+                                     pci_mmcfg_config_num);
+
+    for (i = bus = 0; bus < 256; bus++) {
+        u64 base;
+        u32 l, extcfg;
+        u16 vendor, device;
+        int size_index;
+
+        l = pci_conf_read32(bus, 0, 0, 0);
+        vendor = l & 0xffff;
+        device = (l >> 16) & 0xffff;
+
+        if (PCI_VENDOR_ID_NVIDIA != vendor || 0x0369 != device)
+            continue;
+
+        extcfg = pci_conf_read32(bus, 0, 0, extcfg_regnum);
+
+        if (!(extcfg & extcfg_enable_mask))
+            continue;
+
+        if (i >= pci_mmcfg_config_num)
+            break;
+
+        size_index = (extcfg & extcfg_size_mask) >> extcfg_size_shift;
+        base = extcfg & extcfg_base_mask[size_index];
+        /* base could be > 4G */
+        pci_mmcfg_config[i].address = base << extcfg_base_lshift;
+        pci_mmcfg_config[i].pci_segment = 0;
+        pci_mmcfg_config[i].start_bus_number =
+            (extcfg & extcfg_start_mask) >> extcfg_start_shift;
+        pci_mmcfg_config[i].end_bus_number =
+            pci_mmcfg_config[i].start_bus_number + extcfg_sizebus[size_index];
+        i++;
+    }
+
+    if (bus == 256)
+        return "nVidia MCP55";
+
+    pci_mmcfg_config_num = 0;
+    xfree(pci_mmcfg_config);
+    pci_mmcfg_config = NULL;
+
+    return NULL;
+}
+
 struct pci_mmcfg_hostbridge_probe {
     u32 bus;
     u32 devfn;
@@ -175,6 +262,8 @@ static struct pci_mmcfg_hostbridge_probe pci_mmcfg_probes[] __initdata = {
       0x1200, pci_mmcfg_amd_fam10h },
     { 0xff, PCI_DEVFN(0, 0), PCI_VENDOR_ID_AMD,
       0x1200, pci_mmcfg_amd_fam10h },
+    { 0, PCI_DEVFN(0, 0), PCI_VENDOR_ID_NVIDIA,
+      0x0369, pci_mmcfg_nvidia_mcp55 },
 };
 
 static int __init pci_mmcfg_check_hostbridge(void)
