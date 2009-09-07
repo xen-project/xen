@@ -459,9 +459,6 @@ int amd_iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn)
 
     spin_lock(&hd->mapping_lock);
 
-    if ( is_hvm_domain(d) && !hd->p2m_synchronized )
-        goto out;
-
     iommu_l2e = iommu_l2e_from_pfn(hd->root_table, hd->paging_mode, gfn);
     if ( iommu_l2e == 0 )
     {
@@ -472,7 +469,6 @@ int amd_iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn)
     }
     set_iommu_l1e_present(iommu_l2e, gfn, (u64)mfn << PAGE_SHIFT, iw, ir);
 
-out:
     spin_unlock(&hd->mapping_lock);
     return 0;
 }
@@ -487,12 +483,6 @@ int amd_iommu_unmap_page(struct domain *d, unsigned long gfn)
     BUG_ON( !hd->root_table );
 
     spin_lock(&hd->mapping_lock);
-
-    if ( is_hvm_domain(d) && !hd->p2m_synchronized )
-    {
-        spin_unlock(&hd->mapping_lock);
-        return 0;
-    }
 
     iommu_l2e = iommu_l2e_from_pfn(hd->root_table, hd->paging_mode, gfn);
 

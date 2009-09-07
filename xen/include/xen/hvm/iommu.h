@@ -41,7 +41,6 @@ struct hvm_iommu {
     int domain_id;
     int paging_mode;
     struct page_info *root_table;
-    bool_t p2m_synchronized;
 
     /* iommu_ops */
     struct iommu_ops *platform_ops;

@@ -158,7 +158,8 @@ static int iommu_populate_page_table(struct domain *d)
 
     page_list_for_each ( page, &d->page_list )
     {
-        if ( (page->u.inuse.type_info & PGT_type_mask) == PGT_writable_page )
+        if ( is_hvm_domain(d) ||
+            (page->u.inuse.type_info & PGT_type_mask) == PGT_writable_page )
         {
             rc = hd->platform_ops->map_page(
                 d, mfn_to_gmfn(d, page_to_mfn(page)), page_to_mfn(page));
