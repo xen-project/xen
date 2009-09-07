@@ -122,10 +122,10 @@ define all_sources
 endef
 
 define set_exuberant_flags
-    exuberant_flags=`$1 --version 2>/dev/null | grep -iq exuberant && \
+    exuberant_flags=`$1 --version 2>/dev/null | (grep -iq exuberant && \
 	echo "-I __initdata,__exitdata,__acquires,__releases \
 	    -I EXPORT_SYMBOL,EXPORT_SYMBOL_GPL \
-	    --extra=+f --c-kinds=+px"`
+	    --extra=+f --c-kinds=+px") || true` 
 endef
 
 .PHONY: _TAGS
