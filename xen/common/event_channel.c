@@ -1080,8 +1080,8 @@ static void domain_dump_evtchn_info(struct domain *d)
     if ( !spin_trylock(&d->event_lock) )
         return;
 
-    printk("Event channel information for domain %d:\n",
-           d->domain_id);
+    printk("Event channel information for domain %d:\n"
+           "    port [p/m]\n", d->domain_id);
 
     for ( port = 1; port < MAX_EVTCHNS(d); ++port )
     {
@@ -1093,10 +1093,10 @@ static void domain_dump_evtchn_info(struct domain *d)
         if ( chn->state == ECS_FREE )
             continue;
 
-        printk("    %4u[%d/%d]: s=%d n=%d",
+        printk("    %4u [%d/%d]: s=%d n=%d",
                port,
-               test_bit(port, &shared_info(d, evtchn_pending)),
-               test_bit(port, &shared_info(d, evtchn_mask)),
+               !!test_bit(port, &shared_info(d, evtchn_pending)),
+               !!test_bit(port, &shared_info(d, evtchn_mask)),
                chn->state, chn->notify_vcpu_id);
         switch ( chn->state )
         {
