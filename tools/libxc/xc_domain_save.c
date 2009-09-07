@@ -39,11 +39,6 @@ static unsigned long hvirt_start;
 /* #levels of page tables used by the current guest */
 static unsigned int pt_levels;
 
-/* HVM: shared-memory bitmaps for getting log-dirty bits from qemu-dm */
-static unsigned long *qemu_bitmaps[2];
-static int qemu_active;
-static int qemu_non_active;
-
 /* number of pfns this guest has (i.e. number of entries in the P2M) */
 static unsigned long p2m_size;
 
@@ -748,8 +743,7 @@ static xen_pfn_t *map_and_save_p2m_table(int xc_handle,
 
 int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                    uint32_t max_factor, uint32_t flags, int (*suspend)(void),
-                   int hvm, void *(*init_qemu_maps)(int, unsigned), 
-                   void (*qemu_flip_buffer)(int, int))
+                   int hvm, void (*switch_qemu_logdirty)(int, unsigned))
 {
     xc_dominfo_t info;
     DECLARE_DOMCTL;
@@ -863,15 +857,9 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             }
         }
 
+        /* Enable qemu-dm logging dirty pages to xen */
         if ( hvm )
-        {
-            /* Get qemu-dm logging dirty pages too */
-            void *seg = init_qemu_maps(dom, BITMAP_SIZE);
-            qemu_bitmaps[0] = seg;
-            qemu_bitmaps[1] = seg + BITMAP_SIZE;
-            qemu_active = 0;
-            qemu_non_active = 1;
-        }
+            switch_qemu_logdirty(dom, 1);
     }
     else
     {
@@ -1341,27 +1329,6 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                 goto out;
             }
 
-            if ( hvm ) 
-            {
-                /* Pull in the dirty bits from qemu-dm too */
-                if ( !last_iter )
-                {
-                    qemu_active = qemu_non_active;
-                    qemu_non_active = qemu_active ? 0 : 1;
-                    qemu_flip_buffer(dom, qemu_active);
-                    for ( j = 0; j < BITMAP_SIZE / sizeof(unsigned long); j++ )
-                    {
-                        to_send[j] |= qemu_bitmaps[qemu_non_active][j];
-                        qemu_bitmaps[qemu_non_active][j] = 0;
-                    }
-                }
-                else
-                {
-                    for ( j = 0; j < BITMAP_SIZE / sizeof(unsigned long); j++ )
-                        to_send[j] |= qemu_bitmaps[qemu_active][j];
-                }
-            }
-
             sent_last_iter = sent_this_iter;
 
             print_stats(xc_handle, dom, sent_this_iter, &stats, 1);
@@ -1629,6 +1596,8 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                                XEN_DOMCTL_SHADOW_OP_OFF,
                                NULL, 0, NULL, 0, NULL) < 0 )
             DPRINTF("Warning - couldn't disable shadow mode");
+        if ( hvm )
+            switch_qemu_logdirty(dom, 0);
     }
 
     /* Flush last write and discard cache for file. */

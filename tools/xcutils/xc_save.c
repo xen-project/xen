@@ -101,115 +101,64 @@ static int suspend(void)
  * the new active buffer.  xc_save can then process and clear the old
  * active buffer. */
 
-static char *qemu_active_path;
-static char *qemu_next_active_path;
-static int qemu_shmid = -1;
-static struct xs_handle *xs;
 
-
-/* Mark the shared-memory segment for destruction */
-static void qemu_destroy_buffer(void)
+static void switch_qemu_logdirty(int domid, unsigned int enable)
 {
-    if (qemu_shmid != -1)
-        shmctl(qemu_shmid, IPC_RMID, NULL);
-    qemu_shmid = -1;
-}
-
-/* Get qemu to change buffers. */
-static void qemu_flip_buffer(int domid, int next_active)
-{
-    char digit = '0' + next_active;
+    struct xs_handle *xs;
+    char *path, *p, *ret_str, *cmd_str, **watch;
     unsigned int len;
-    char *active_str, **watch;
     struct timeval tv;
     fd_set fdset;
 
-    /* Tell qemu that we want it to start writing log-dirty bits to the
-     * other buffer */
-    if (!xs_write(xs, XBT_NULL, qemu_next_active_path, &digit, 1))
-        errx(1, "can't write next-active to store path (%s)\n", 
-             qemu_next_active_path);
-
-    /* Wait a while for qemu to signal that it has switched to the new 
-     * active buffer */
- read_again: 
-    tv.tv_sec = 5;
-    tv.tv_usec = 0;
-    FD_ZERO(&fdset);
-    FD_SET(xs_fileno(xs), &fdset);
-    if ((select(xs_fileno(xs) + 1, &fdset, NULL, NULL, &tv)) != 1)
-        errx(1, "timed out waiting for qemu to switch buffers\n");
-    watch = xs_read_watch(xs, &len);
-    free(watch);
-    
-    active_str = xs_read(xs, XBT_NULL, qemu_active_path, &len);
-    if (active_str == NULL || active_str[0] - '0' != next_active) 
-        /* Watch fired but value is not yet right */
-        goto read_again;
-}
-
-static void *init_qemu_maps(int domid, unsigned int bitmap_size)
-{
-    key_t key;
-    char key_ascii[17] = {0,};
-    void *seg; 
-    char *path, *p;
-
-    /* Make a shared-memory segment */
-    do {
-        key = rand(); /* No security, just a sequence of numbers */
-        qemu_shmid = shmget(key, 2 * bitmap_size, 
-                       IPC_CREAT|IPC_EXCL|S_IRUSR|S_IWUSR);
-        if (qemu_shmid == -1 && errno != EEXIST)
-            errx(1, "can't get shmem to talk to qemu-dm");
-    } while (qemu_shmid == -1);
-
-    /* Remember to tidy up after ourselves */
-    atexit(qemu_destroy_buffer);
-
-    /* Map it into our address space */
-    seg = shmat(qemu_shmid, NULL, 0);
-    if (seg == (void *) -1) 
-        errx(1, "can't map shmem to talk to qemu-dm");
-    memset(seg, 0, 2 * bitmap_size);
-
-    /* Write the size of it into the first 32 bits */
-    *(uint32_t *)seg = bitmap_size;
-
-    /* Tell qemu about it */
     if ((xs = xs_daemon_open()) == NULL)
         errx(1, "Couldn't contact xenstore");
     if (!(path = strdup("/local/domain/0/device-model/")))
         errx(1, "can't get domain path in store");
     if (!(path = realloc(path, strlen(path) 
                          + 10 
-                         + strlen("/logdirty/next-active") + 1))) 
+                         + strlen("/logdirty/cmd") + 1)))
         errx(1, "no memory for constructing xenstore path");
     snprintf(path + strlen(path), 11, "%i", domid);
     strcat(path, "/logdirty/");
     p = path + strlen(path);
 
-    strcpy(p, "key");
-    snprintf(key_ascii, 17, "%16.16llx", (unsigned long long) key);
-    if (!xs_write(xs, XBT_NULL, path, key_ascii, 16))
-        errx(1, "can't write key (%s) to store path (%s)\n", key_ascii, path);
 
-    /* Watch for qemu's indication of the active buffer, and request it 
-     * to start writing to buffer 0 */
-    strcpy(p, "active");
-    if (!xs_watch(xs, path, "qemu-active-buffer"))
+    /* Watch for qemu's return value */
+    strcpy(p, "ret");
+    if (!xs_watch(xs, path, "qemu-logdirty-ret"))
         errx(1, "can't set watch in store (%s)\n", path);
-    if (!(qemu_active_path = strdup(path)))
-        errx(1, "no memory for copying xenstore path");
 
-    strcpy(p, "next-active");
-    if (!(qemu_next_active_path = strdup(path)))
-        errx(1, "no memory for copying xenstore path");
+    if (!(cmd_str = strdup( enable == 0 ? "disable" : "enable")))
+        errx(1, "can't get logdirty cmd path in store");
 
-    qemu_flip_buffer(domid, 0);
+    /* Tell qemu that we want it to start logging dirty page to Xen */
+    strcpy(p, "cmd");
+    if (!xs_write(xs, XBT_NULL, path, cmd_str, strlen(cmd_str)))
+        errx(1, "can't write  to store path (%s)\n",
+             path);
+
+    /* Wait a while for qemu to signal that it has service logdirty command */
+ read_again:
+    tv.tv_sec = 5;
+    tv.tv_usec = 0;
+    FD_ZERO(&fdset);
+    FD_SET(xs_fileno(xs), &fdset);
+
+    if ((select(xs_fileno(xs) + 1, &fdset, NULL, NULL, &tv)) != 1)
+        errx(1, "timed out waiting for qemu logdirty response.\n");
+
+    watch = xs_read_watch(xs, &len);
+    free(watch);
+
+    strcpy(p, "ret");
+    ret_str = xs_read(xs, XBT_NULL, path, &len);
+    if (ret_str == NULL || strcmp(ret_str, cmd_str))
+        /* Watch fired but value is not yet right */
+        goto read_again;
 
     free(path);
-    return seg;
+    free(cmd_str);
+    free(ret_str);
 }
 
 int
@@ -255,7 +204,7 @@ main(int argc, char **argv)
     }
     ret = xc_domain_save(si.xc_fd, io_fd, si.domid, maxit, max_f, si.flags, 
                          &suspend, !!(si.flags & XCFLAGS_HVM),
-                         &init_qemu_maps, &qemu_flip_buffer);
+                         &switch_qemu_logdirty);
 
     if (si.suspend_evtchn > 0)
         xc_suspend_evtchn_release(si.xce, si.suspend_evtchn);
