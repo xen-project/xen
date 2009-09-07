@@ -483,7 +483,11 @@ class Grub:
                 pwd = self.text_win.getstr(6, 8)
                 if not self.cf.checkPassword(pwd):
                     self.text_win.addstr(6, 1, "Password: ")
-                    self.text_win.addstr(7, 0, "Failed!")
+                    if self.cf.passExc is not None:
+                        self.text_win.addstr(7, 0, "Exception: %s"
+                                                  % self.cf.passExc)
+                    else:
+                        self.text_win.addstr(7, 0, "Failed!")
                     self.cf.setPasswordAccess( False )
                 else:
                     self.cf.setPasswordAccess( True )

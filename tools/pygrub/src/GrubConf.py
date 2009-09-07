@@ -158,6 +158,7 @@ class GrubConfigFile(object):
         self.timeout = -1
         self._default = 0
         self.passwordAccess = True
+        self.passExc = None
 
         if fn is not None:
             self.parse()
@@ -197,7 +198,6 @@ class GrubConfigFile(object):
             if self.commands.has_key(com):
                 if self.commands[com] is not None:
                     setattr(self, self.commands[com], arg.strip())
-                    #print "%s = %s => %s" % (com, self.commands[com], arg.strip() )
                 else:
                     logging.info("Ignored directive %s" %(com,))
             else:
@@ -216,25 +216,28 @@ class GrubConfigFile(object):
         self.passwordAccess = val
 
     def hasPassword(self):
-        try:
-            getattr(self, self.commands['password'])
-            return True
-        except:
-            return False
+        return hasattr(self, 'password')
 
     def checkPassword(self, password):
-        try:
-            pwd = getattr(self, self.commands['password']).split()
-            if pwd[0] == '--md5':
+        # Always allow if no password defined in grub.conf
+        if not self.hasPassword:
+            return True
+
+        # If we're here, we're having 'password' attribute set
+        pwd = getattr(self, 'password').split()
+
+        # We check whether password is in MD5 hash for comparison
+        if pwd[0] == '--md5':
+            try:
                 import crypt
                 if crypt.crypt(password, pwd[1]) == pwd[1]:
                     return True
+            except Exception, e:
+                self.passExc = "Can't verify password: %s" % str(e)
+                return False
 
-            if pwd[0] == password:
-                return True
-
-            return False
-        except:
+        # ... and if not, we compare it as a plain text
+        if pwd[0] == password:
             return True
 
     def set(self, line):
