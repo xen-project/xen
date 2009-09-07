@@ -826,7 +826,6 @@ static void dma_msi_set_affinity(unsigned int irq, cpumask_t mask)
     struct irq_desc *desc = irq_to_desc(irq);
     struct irq_cfg *cfg = desc->chip_data;
 
-    spin_lock_irqsave(&iommu->register_lock, flags);
 #ifdef CONFIG_X86
     dest = set_desc_affinity(desc, mask);
     if (dest == BAD_APICID){
@@ -862,6 +861,7 @@ static void dma_msi_set_affinity(unsigned int irq, cpumask_t mask)
     msg.address_lo |= dest << MSI_TARGET_CPU_SHIFT;
 #endif
 
+    spin_lock_irqsave(&iommu->register_lock, flags);
     dmar_writel(iommu->reg, DMAR_FEDATA_REG, msg.data);
     dmar_writel(iommu->reg, DMAR_FEADDR_REG, msg.address_lo);
     dmar_writel(iommu->reg, DMAR_FEUADDR_REG, msg.address_hi);
