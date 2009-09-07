@@ -345,12 +345,13 @@ class PciController(DevController):
                 if rc<0:
                     raise VmError(('pci: failed to remove msi-x iomem'))
 
-        rc = xc.physdev_map_pirq(domid = fe_domid,
-                               index = dev.irq,
-                               pirq  = dev.irq)
-        if rc < 0:
-            raise VmError(('pci: failed to map irq on device '+
-                        '%s - errno=%d')%(dev.name,rc))
+        if not self.vm.info.is_hvm() and dev.irq:
+            rc = xc.physdev_map_pirq(domid = fe_domid,
+                                   index = dev.irq,
+                                   pirq  = dev.irq)
+            if rc < 0:
+                raise VmError(('pci: failed to map irq on device '+
+                            '%s - errno=%d')%(dev.name,rc))
         if dev.irq>0:
             log.debug('pci: enabling irq %d'%dev.irq)
             rc = xc.domain_irq_permission(domid =  fe_domid, pirq = dev.irq,
