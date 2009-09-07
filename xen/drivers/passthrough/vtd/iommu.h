@@ -101,7 +101,7 @@
 #define ecap_queued_inval(e)     ((e >> 1) & 0x1)
 #define ecap_dev_iotlb(e)        ((e >> 2) & 0x1)
 #define ecap_intr_remap(e)       ((e >> 3) & 0x1)
-#define ecap_ext_intr(e)         ((e >> 4) & 0x1)
+#define ecap_eim(e)              ((e >> 4) & 0x1)
 #define ecap_cache_hints(e)      ((e >> 5) & 0x1)
 #define ecap_pass_thru(e)        ((e >> 6) & 0x1)
 #define ecap_snp_ctl(e)          ((e >> 7) & 0x1)

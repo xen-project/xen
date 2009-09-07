@@ -848,6 +848,9 @@ void enable_x2apic(void)
 {
     u32 lo, hi;
 
+    if ( !iommu_supports_eim() )
+        return;
+
     rdmsr(MSR_IA32_APICBASE, lo, hi);
     if ( !(lo & MSR_IA32_APICBASE_EXTD) )
     {
@@ -858,7 +861,13 @@ void enable_x2apic(void)
     else
         printk("x2APIC mode enabled by BIOS.\n");
 
-    x2apic_enabled = 1;
+    if ( !x2apic_enabled )
+    {
+        x2apic_enabled = 1;
+        genapic = &apic_x2apic;
+        printk(KERN_INFO "Switched to APIC driver %s.\n",
+                       genapic->name);
+    }
 }
 
 void __init init_apic_mappings(void)
@@ -889,6 +898,8 @@ __next:
      */
     if (boot_cpu_physical_apicid == -1U)
         boot_cpu_physical_apicid = get_apic_id();
+    x86_cpu_to_apicid[0] = get_apic_id();
+    cpu_2_logical_apicid[0] = get_logical_apic_id();
 
     init_ioapic_mappings();
 }

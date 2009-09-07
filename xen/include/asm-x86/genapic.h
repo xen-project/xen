@@ -49,6 +49,7 @@ struct genapic {
 	APICFUNC(acpi_madt_oem_check)
 
 extern struct genapic *genapic;
+extern struct genapic apic_x2apic;
 
 void init_apic_ldr_flat(void);
 void clustered_apic_check_flat(void);

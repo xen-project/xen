@@ -357,6 +357,7 @@ acpi_parse_one_drhd(struct acpi_dmar_entry_header *header)
     struct acpi_table_drhd * drhd = (struct acpi_table_drhd *)header;
     void *dev_scope_start, *dev_scope_end;
     struct acpi_drhd_unit *dmaru;
+    void *addr;
     int ret = 0;
     static int include_all = 0;
 
@@ -370,6 +371,9 @@ acpi_parse_one_drhd(struct acpi_dmar_entry_header *header)
     INIT_LIST_HEAD(&dmaru->ioapic_list);
     dprintk(XENLOG_INFO VTDPREFIX, "dmaru->address = %"PRIx64"\n",
             dmaru->address);
+
+    addr = map_to_nocache_virt(0, drhd->address);
+    dmaru->ecap = dmar_readq(addr, DMAR_ECAP_REG);
 
     dev_scope_start = (void *)(drhd + 1);
     dev_scope_end = ((void *)drhd) + header->length;

@@ -49,6 +49,7 @@ extern void zap_low_mappings(l2_pgentry_t *base);
 
 #define MAX_APICID 256
 extern u32 x86_cpu_to_apicid[];
+extern u32 cpu_2_logical_apicid[];
 
 #define cpu_physical_id(cpu)	x86_cpu_to_apicid[cpu]
 

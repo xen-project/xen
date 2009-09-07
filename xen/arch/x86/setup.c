@@ -904,10 +904,10 @@ void __init __start_xen(unsigned long mbi_p)
 
     generic_apic_probe();
 
+    acpi_boot_init();
+
     if ( x2apic_is_available() )
         enable_x2apic();
-
-    acpi_boot_init();
 
     init_cpu_to_node();
 
@@ -953,6 +953,8 @@ void __init __start_xen(unsigned long mbi_p)
 
     if ( opt_nosmp )
         max_cpus = 0;
+
+    iommu_setup();    /* setup iommu if available */
 
     smp_prepare_cpus(max_cpus);
 

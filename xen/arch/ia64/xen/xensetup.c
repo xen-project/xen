@@ -630,6 +630,8 @@ printk("num_online_cpus=%d, max_cpus=%d\n",num_online_cpus(),max_cpus);
 
     initialise_gdb(); /* could be moved earlier */
 
+    iommu_setup();    /* setup iommu if available */
+
     do_initcalls();
     sort_main_extable();
 

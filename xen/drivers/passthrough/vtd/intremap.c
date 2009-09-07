@@ -121,6 +121,22 @@ static void set_ioapic_source_id(int apic_id, struct iremap_entry *ire)
                 apicid_to_bdf(apic_id));
 }
 
+int iommu_supports_eim(void)
+{
+    struct acpi_drhd_unit *drhd;
+
+    if ( !iommu_enabled || !iommu_qinval || !iommu_intremap )
+        return 0;
+
+    for_each_drhd_unit ( drhd )
+        if ( !ecap_queued_inval(drhd->ecap) ||
+             !ecap_intr_remap(drhd->ecap) ||
+             !ecap_eim(drhd->ecap) )
+            return 0;
+
+    return 1;
+}
+
 static int remap_entry_to_ioapic_rte(
     struct iommu *iommu, struct IO_xAPIC_route_entry *old_rte)
 {
@@ -635,10 +651,10 @@ int enable_intremap(struct iommu *iommu)
         ir_ctrl->iremap_index = -1;
     }
 
-#if defined(ENABLED_EXTENDED_INTERRUPT_SUPPORT)
+#ifdef CONFIG_X86
     /* set extended interrupt mode bit */
     ir_ctrl->iremap_maddr |=
-            ecap_ext_intr(iommu->ecap) ? (1 << IRTA_REG_EIME_SHIFT) : 0;
+            x2apic_enabled ? (1 << IRTA_REG_EIME_SHIFT) : 0;
 #endif
     spin_lock_irqsave(&iommu->register_lock, flags);
 
@@ -659,13 +675,6 @@ int enable_intremap(struct iommu *iommu)
     iommu_flush_iec_global(iommu);
 
     spin_lock_irqsave(&iommu->register_lock, flags);
-    /* enable comaptiblity format interrupt pass through */
-    gcmd |= DMA_GCMD_CFI;
-    dmar_writel(iommu->reg, DMAR_GCMD_REG, gcmd);
-
-    IOMMU_WAIT_OP(iommu, DMAR_GSTS_REG, dmar_readl,
-                  (sts & DMA_GSTS_CFIS), sts);
-
     /* enable interrupt remapping hardware */
     gcmd |= DMA_GCMD_IRE;
     dmar_writel(iommu->reg, DMAR_GCMD_REG, gcmd);

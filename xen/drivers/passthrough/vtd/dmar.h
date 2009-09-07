@@ -50,6 +50,7 @@ struct acpi_drhd_unit {
     struct dmar_scope scope;            /* must be first member of struct */
     struct list_head list;
     u64    address;                     /* register base address of the unit */
+    u64    ecap;
     u8     include_all:1;
     struct iommu *iommu;
     struct list_head ioapic_list;
@@ -108,6 +109,8 @@ do {                                                \
         cpu_relax();                                            \
     }                                                           \
 } while (0)
+
+void *map_to_nocache_virt(int nr_iommus, u64 maddr);
 
 int vtd_hw_check(void);
 void disable_pmr(struct iommu *iommu);

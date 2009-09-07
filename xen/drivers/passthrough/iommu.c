@@ -260,7 +260,7 @@ int deassign_device(struct domain *d, u8 bus, u8 devfn)
     return 0;
 }
 
-static int iommu_setup(void)
+int iommu_setup(void)
 {
     int rc = -ENODEV;
 
@@ -279,7 +279,6 @@ static int iommu_setup(void)
                iommu_pv_enabled ? "en" : "dis");
     return rc;
 }
-__initcall(iommu_setup);
 
 int iommu_get_device_group(struct domain *d, u8 bus, u8 devfn, 
     XEN_GUEST_HANDLE_64(uint32) buf, int max_sdevs)

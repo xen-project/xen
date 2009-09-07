@@ -100,7 +100,6 @@ struct msi_msg_remap_entry {
 unsigned int get_cache_line_size(void);
 void cacheline_flush(char *);
 void flush_all_cache(void);
-void *map_to_nocache_virt(int nr_iommus, u64 maddr);
 u64 alloc_pgtable_maddr(struct acpi_drhd_unit *drhd, unsigned long npages);
 void free_pgtable_maddr(u64 maddr);
 void *map_vtd_domain_page(u64 maddr);
