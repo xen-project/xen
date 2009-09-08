@@ -483,7 +483,7 @@ class ImageHandler:
             if count < 100:
                 continue
 
-            VmError('Device model isn\'t ready for commands')
+            raise VmError('Device model isn\'t ready for commands')
 
         if par is not None:
             xstransact.Store("/local/domain/0/device-model/%i"
