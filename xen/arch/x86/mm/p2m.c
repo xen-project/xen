@@ -100,6 +100,9 @@
 #define P2M_BASE_FLAGS \
         (_PAGE_PRESENT | _PAGE_USER | _PAGE_DIRTY | _PAGE_ACCESSED)
 
+#define SUPERPAGE_PAGES (1UL << 9)
+#define superpage_aligned(_x)  (((_x)&(SUPERPAGE_PAGES-1))==0)
+
 static unsigned long p2m_type_to_flags(p2m_type_t t) 
 {
     unsigned long flags;
@@ -361,7 +364,7 @@ static struct page_info * p2m_pod_cache_get(struct domain *d,
         p = page_list_remove_head(&p2md->pod.super);
         mfn = mfn_x(page_to_mfn(p));
 
-        for ( i=0; i<(1<<9); i++ )
+        for ( i=0; i<SUPERPAGE_PAGES; i++ )
         {
             q = mfn_to_page(_mfn(mfn+i));
             page_list_add_tail(q, &p2md->pod.single);
@@ -407,7 +410,7 @@ p2m_pod_set_cache_target(struct domain *d, unsigned long pod_target)
         struct page_info * page;
         int order;
 
-        if ( (pod_target - p2md->pod.count) >= (1>>9) )
+        if ( (pod_target - p2md->pod.count) >= SUPERPAGE_PAGES )
             order = 9;
         else
             order = 0;
@@ -431,7 +434,7 @@ p2m_pod_set_cache_target(struct domain *d, unsigned long pod_target)
          * entries may disappear before we grab the lock. */
         spin_lock(&d->page_alloc_lock);
 
-        if ( (p2md->pod.count - pod_target) > (1>>9)
+        if ( (p2md->pod.count - pod_target) > SUPERPAGE_PAGES
              && !page_list_empty(&p2md->pod.super) )
             order = 9;
         else
@@ -550,13 +553,13 @@ p2m_pod_empty_cache(struct domain *d)
     {
         int i;
             
-        for ( i = 0 ; i < (1 << 9) ; i++ )
+        for ( i = 0 ; i < SUPERPAGE_PAGES ; i++ )
         {
             BUG_ON(page_get_owner(page + i) != d);
             page_list_add_tail(page + i, &d->page_list);
         }
 
-        p2md->pod.count -= 1<<9;
+        p2md->pod.count -= SUPERPAGE_PAGES;
     }
 
     while ( (page = page_list_remove_head(&p2md->pod.single)) )
@@ -708,7 +711,6 @@ p2m_pod_dump_data(struct domain *d)
            p2md->pod.entry_count, p2md->pod.count);
 }
 
-#define superpage_aligned(_x)  (((_x)&((1<<9)-1))==0)
 
 /* Search for all-zero superpages to be reclaimed as superpages for the
  * PoD cache. Must be called w/ p2m lock held, page_alloc lock not held. */
@@ -731,7 +733,7 @@ p2m_pod_zero_check_superpage(struct domain *d, unsigned long gfn)
 
     /* Look up the mfns, checking to make sure they're the same mfn
      * and aligned, and mapping them. */
-    for ( i=0; i<(1<<9); i++ )
+    for ( i=0; i<SUPERPAGE_PAGES; i++ )
     {
         
         mfn = gfn_to_mfn_query(d, gfn + i, &type);
@@ -764,7 +766,7 @@ p2m_pod_zero_check_superpage(struct domain *d, unsigned long gfn)
     }
 
     /* Now, do a quick check to see if it may be zero before unmapping. */
-    for ( i=0; i<(1<<9); i++ )
+    for ( i=0; i<SUPERPAGE_PAGES; i++ )
     {
         /* Quick zero-check */
         map = map_domain_page(mfn_x(mfn0) + i);
@@ -788,7 +790,7 @@ p2m_pod_zero_check_superpage(struct domain *d, unsigned long gfn)
     /* Make none of the MFNs are used elsewhere... for example, mapped
      * via the grant table interface, or by qemu.  Allow one refcount for
      * being allocated to the domain. */
-    for ( i=0; i < (1<<9); i++ )
+    for ( i=0; i < SUPERPAGE_PAGES; i++ )
     {
         mfn = _mfn(mfn_x(mfn0) + i);
         if ( (mfn_to_page(mfn)->count_info & PGC_count_mask) > 1 )
@@ -799,7 +801,7 @@ p2m_pod_zero_check_superpage(struct domain *d, unsigned long gfn)
     }
 
     /* Finally, do a full zero-check */
-    for ( i=0; i < (1<<9); i++ )
+    for ( i=0; i < SUPERPAGE_PAGES; i++ )
     {
         map = map_domain_page(mfn_x(mfn0) + i);
 
@@ -819,7 +821,7 @@ p2m_pod_zero_check_superpage(struct domain *d, unsigned long gfn)
     /* Finally!  We've passed all the checks, and can add the mfn superpage
      * back on the PoD cache, and account for the new p2m PoD entries */
     p2m_pod_cache_add(d, mfn_to_page(mfn0), 9);
-    d->arch.p2m->pod.entry_count += (1<<9);
+    d->arch.p2m->pod.entry_count += SUPERPAGE_PAGES;
 
 out_reset:
     if ( reset )
@@ -935,13 +937,13 @@ p2m_pod_emergency_sweep_super(struct domain *d)
     if ( p2md->pod.reclaim_super == 0 )
     {
         p2md->pod.reclaim_super = (p2md->pod.max_guest>>9)<<9;
-        p2md->pod.reclaim_super -= (1<<9);
+        p2md->pod.reclaim_super -= SUPERPAGE_PAGES;
     }
     
     start = p2md->pod.reclaim_super;
     limit = (start > POD_SWEEP_LIMIT) ? (start - POD_SWEEP_LIMIT) : 0;
 
-    for ( i=p2md->pod.reclaim_super ; i > 0 ; i-=(1<<9) )
+    for ( i=p2md->pod.reclaim_super ; i > 0 ; i-=SUPERPAGE_PAGES )
     {
         p2m_pod_zero_check_superpage(d, i);
         /* Stop if we're past our limit and we have found *something*.
@@ -953,7 +955,7 @@ p2m_pod_emergency_sweep_super(struct domain *d)
             break;
     }
 
-    p2md->pod.reclaim_super = i ? i - (1<<9) : 0;
+    p2md->pod.reclaim_super = i ? i - SUPERPAGE_PAGES : 0;
 
 }
 
@@ -1511,7 +1513,7 @@ int set_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
     while ( todo )
     {
         if ( is_hvm_domain(d) && d->arch.hvm_domain.hap_enabled )
-            order = (((gfn | mfn_x(mfn) | todo) & ((1ul << 9) - 1)) == 0) ?
+            order = (((gfn | mfn_x(mfn) | todo) & (SUPERPAGE_PAGES - 1)) == 0) ?
                 9 : 0;
         else
             order = 0;
@@ -1771,7 +1773,7 @@ static void audit_p2m(struct domain *d)
                         if ( (l2e_get_flags(l2e[i2]) & _PAGE_PSE)
                              && ( p2m_flags_to_type(l2e_get_flags(l2e[i2]))
                                   == p2m_populate_on_demand ) )
-                            entry_count+=(1<<9);
+                            entry_count+=SUPERPAGE_PAGES;
                         gfn += 1 << (L2_PAGETABLE_SHIFT - PAGE_SHIFT);
                         continue;
                     }
