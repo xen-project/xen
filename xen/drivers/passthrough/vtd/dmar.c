@@ -517,6 +517,12 @@ static int __init acpi_parse_dmar(struct acpi_table_header *table)
 
     dmar = (struct acpi_table_dmar *)table;
 
+    if ( !iommu_enabled )
+    {
+        ret = -EINVAL;
+        goto out;
+    }
+
     if ( !dmar->width )
     {
         dprintk(XENLOG_WARNING VTDPREFIX, "Zero: Invalid DMAR width\n");
@@ -563,9 +569,6 @@ static int __init acpi_parse_dmar(struct acpi_table_header *table)
         entry_header = ((void *)entry_header + entry_header->length);
     }
 
-    /* Zap APCI DMAR signature to prevent dom0 using vt-d HW. */
-    dmar->header.signature[0] = '\0';
-
     if ( ret )
     {
         if ( force_iommu )
@@ -579,6 +582,9 @@ static int __init acpi_parse_dmar(struct acpi_table_header *table)
         }
     }
 
+out:
+    /* Zap ACPI DMAR signature to prevent dom0 using vt-d HW. */
+    dmar->header.signature[0] = '\0';
     return ret;
 }
 
@@ -598,9 +604,6 @@ int acpi_dmar_init(void)
     rc = -ENODEV;
     if ( force_iommu )
         iommu_enabled = 1;
-
-    if ( !iommu_enabled )
-        goto fail;
 
     rc = parse_dmar_table(acpi_parse_dmar);
     if ( rc )
