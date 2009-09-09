@@ -22,6 +22,15 @@
 shopt -s extglob
 test -f /etc/sysconfig/xend && . /etc/sysconfig/xend
 
+if   test "x$1" = xstart && \
+     test -d /proc/xen && \
+   ! test -d /proc/xen/capabilities && \
+     grep '	xenfs$' /proc/filesystems >/dev/null && \
+   ! grep '^xenfs ' /proc/mounts >/dev/null;
+then
+	mount -t xenfs xenfs /proc/xen
+fi
+
 if ! grep -q "control_d" /proc/xen/capabilities ; then
 	exit 0
 fi
