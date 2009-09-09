@@ -547,7 +547,28 @@ class XendConfig(dict):
 
         if 'handle' in dominfo:
             self['uuid'] = uuid.toString(dominfo['handle'])
-            
+
+    def _convert_cpus_to_list(self, s):
+        # Convert the following string to list of ints.
+        # The string supports a list of ranges (0-3),
+        # seperated by commas, and negation (^1).  
+        # Precedence is settled by order of the string:
+        #    "0-3,^1"   -> [0,2,3]
+        #    "0-3,^1,1" -> [0,1,2,3]
+        l = []
+        for c in s.split(','):
+            if c.find('-') != -1:
+                (x, y) = c.split('-')
+                for i in range(int(x), int(y)+1):
+                    l.append(int(i))
+            else:
+                # remove this element from the list 
+                if c[0] == '^':
+                    l = [x for x in l if x != int(c[1:])]
+                else:
+                    l.append(int(c))
+        return l
+
     def parse_cpuid(self, cfg, field):
        def int2bin(n, count=32):
            return "".join([str((n >> y) & 1) for y in range(count-1, -1, -1)])
@@ -692,27 +713,6 @@ class XendConfig(dict):
         # Convert 'cpus' to list of list of ints
         cpus_list = []
         if 'cpus' in cfg:
-            # Convert the following string to list of ints.
-            # The string supports a list of ranges (0-3),
-            # seperated by commas, and negation (^1).  
-            # Precedence is settled by order of the string:
-            #    "0-3,^1"      -> [0,2,3]
-            #    "0-3,^1,1"    -> [0,1,2,3]
-            def cnv(s):
-                l = []
-                for c in s.split(','):
-                    if c.find('-') != -1:
-                        (x, y) = c.split('-')
-                        for i in range(int(x), int(y)+1):
-                            l.append(int(i))
-                    else:
-                        # remove this element from the list 
-                        if c[0] == '^':
-                            l = [x for x in l if x != int(c[1:])]
-                        else:
-                            l.append(int(c))
-                return l
-            
             if type(cfg['cpus']) == list:
                 if len(cfg['cpus']) > 0 and type(cfg['cpus'][0]) == list:
                     # If sxp_cfg was created from config.sxp,
@@ -736,7 +736,7 @@ class XendConfig(dict):
                     #    ["0-3,^1","1-4,^2"] -> [[0,2,3],[1,3,4]]
                     try:
                         for c in cfg['cpus']:
-                            cpus = cnv(c)
+                            cpus = self._convert_cpus_to_list(c)
                             cpus_list.append(cpus)
                     except ValueError, e:
                         raise XendConfigError('cpus = %s: %s' % (cfg['cpus'], e))
@@ -752,7 +752,7 @@ class XendConfig(dict):
                 #    "1"      -> [[1],[1]]
                 #    "0-3,^1" -> [[0,2,3],[0,2,3]]
                 try:
-                    cpus = cnv(cfg['cpus'])
+                    cpus = self._convert_cpus_to_list(cfg['cpus'])
                     for v in range(0, cfg['vcpus']):
                         cpus_list.append(cpus)
                 except ValueError, e:
@@ -1020,7 +1020,13 @@ class XendConfig(dict):
                 
         self['vcpus_params']['weight'] = \
             int(self['vcpus_params'].get('weight', 256))
-        self['vcpus_params']['cap'] = int(self['vcpus_params'].get('cap', 0))
+        self['vcpus_params']['cap'] = \
+            int(self['vcpus_params'].get('cap', 0))
+
+        for key, val in self['vcpus_params'].items():
+            if key.startswith('cpumap'):
+                self['vcpus_params'][key] = \
+                    ','.join(map(str, self._convert_cpus_to_list(val)))
 
     def cpuid_to_sxp(self, sxpr, field):
         regs_list = []

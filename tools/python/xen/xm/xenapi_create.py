@@ -1094,6 +1094,23 @@ class sxp2xml:
             = str(get_child_by_name(config, "cpu_cap", 0))
         vcpu_params.append(vcpu_param)
 
+        cpus = get_child_by_name(config, "cpus", [])
+        if type(cpus) == list:
+            vcpu = 0
+            for cpu in cpus:
+                if cpu:
+                    vcpu_param = document.createElement("vcpu_param")
+                    vcpu_param.attributes["key"] = "cpumap%i" % vcpu
+                    vcpu_param.attributes["value"] = str(cpu)
+                    vcpu_params.append(vcpu_param)
+                vcpu = vcpu + 1
+        else:
+            for vcpu in range(0, int(get_child_by_name(config, "vcpus", 1))):
+                vcpu_param = document.createElement("vcpu_param")
+                vcpu_param.attributes["key"] = "cpumap%i" % vcpu
+                vcpu_param.attributes["value"] = str(cpus)
+                vcpu_params.append(vcpu_param)
+
         return vcpu_params
     
     _eths = -1

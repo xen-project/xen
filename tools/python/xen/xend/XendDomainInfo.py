@@ -2538,7 +2538,19 @@ class XendDomainInfo:
                         return True
             return False
 
-        if has_cpus():
+        def has_cpumap():
+            if self.info.has_key('vcpus_params'):
+                for k, v in self.info['vcpus_params'].items():
+                    if k.startswith('cpumap'):
+                        return True
+            return False
+
+        if has_cpumap():
+            for v in range(0, self.info['VCPUs_max']):
+                if self.info['vcpus_params'].has_key('cpumap%i' % v):
+                    cpumask = map(int, self.info['vcpus_params']['cpumap%i' % v].split(','))
+                    xc.vcpu_setaffinity(self.domid, v, cpumask)
+        elif has_cpus():
             for v in range(0, self.info['VCPUs_max']):
                 if self.info['cpus'][v]:
                     xc.vcpu_setaffinity(self.domid, v, self.info['cpus'][v])
