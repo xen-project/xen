@@ -844,14 +844,16 @@ get_page_from_l2e(
         int writeable = !!(l2e_get_flags(l2e) & _PAGE_RW);
   
         do {
-            rc = get_data_page(mfn_to_page(m), d, writeable);
-            if ( unlikely(!rc) )
+            if ( !mfn_valid(m) ||
+                 !get_data_page(mfn_to_page(m), d, writeable) )
             {
                 while ( m-- > mfn )
                     put_data_page(mfn_to_page(m), writeable);
                 return -EINVAL;
             }
         } while ( m++ < (mfn + (L1_PAGETABLE_ENTRIES-1)) );
+
+        rc = 1;
     }
 
     return rc;
