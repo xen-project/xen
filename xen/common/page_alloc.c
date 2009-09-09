@@ -610,7 +610,7 @@ int offline_page(unsigned long mfn, int broken, uint32_t *status)
     int ret = 0;
     struct page_info *pg;
 
-    if ( mfn_valid(mfn) )
+    if ( !mfn_valid(mfn) )
     {
         dprintk(XENLOG_WARNING,
                 "try to offline page out of range %lx\n", mfn);
