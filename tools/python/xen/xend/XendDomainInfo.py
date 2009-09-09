@@ -3011,7 +3011,7 @@ class XendDomainInfo:
             fn = blkdev_uname_to_file(disk)
 
             # If this is a drbd volume, check if we need to activate it
-            if disktype.find(":") != -1:
+            if disk.find(":") != -1:
                 (disktype, diskname) = disk.split(':', 1)
                 if disktype == 'drbd':
                     (drbdadmstdin, drbdadmstdout) = os.popen2(["/sbin/drbdadm", "state", diskname])
