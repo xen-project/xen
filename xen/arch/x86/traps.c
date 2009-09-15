@@ -752,8 +752,7 @@ static void pv_cpuid(struct cpu_user_regs *regs)
         __clear_bit(X86_FEATURE_VME, &d);
         if ( !cpu_has_apic )
             __clear_bit(X86_FEATURE_APIC, &d);
-        if ( !opt_allow_hugepage )
-            __clear_bit(X86_FEATURE_PSE, &d);
+        __clear_bit(X86_FEATURE_PSE, &d);
         __clear_bit(X86_FEATURE_PGE, &d);
         __clear_bit(X86_FEATURE_PSE36, &d);
     }
@@ -2064,12 +2063,10 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         case 4: /* Read CR4 */
             /*
              * Guests can read CR4 to see what features Xen has enabled. We
-             * therefore lie about PGE as it is unavailable to guests.
-             * Also disallow PSE if hugepages are not enabled.
+             * therefore lie about PGE and PSE as they are unavailable to
+             * guests.
              */
-            *reg = read_cr4() & ~X86_CR4_PGE;
-            if ( !opt_allow_hugepage )
-                *reg &= ~X86_CR4_PSE;
+            *reg = read_cr4() & ~(X86_CR4_PGE|X86_CR4_PSE);
             break;
 
         default:
