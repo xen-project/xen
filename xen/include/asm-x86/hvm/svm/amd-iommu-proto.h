@@ -131,8 +131,6 @@ static inline struct page_info* alloc_amd_iommu_pgtable(void)
     if ( pg == NULL )
         return 0;
     vaddr = map_domain_page(page_to_mfn(pg));
-    if ( vaddr == NULL )
-        return 0;
     memset(vaddr, 0, PAGE_SIZE);
     unmap_domain_page(vaddr);
     return pg;

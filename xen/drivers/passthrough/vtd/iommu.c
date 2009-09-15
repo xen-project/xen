@@ -156,8 +156,6 @@ u64 alloc_pgtable_maddr(struct acpi_drhd_unit *drhd, unsigned long npages)
     if ( !pg )
         return 0;
     vaddr = map_domain_page(page_to_mfn(pg));
-    if ( !vaddr )
-        return 0;
     memset(vaddr, 0, PAGE_SIZE * npages);
 
     iommu_flush_cache_page(vaddr, npages);
