@@ -53,7 +53,7 @@ tapdisk_server_find_driver_interface(int type)
 	int n;
 
 	n = sizeof(dtypes) / sizeof(struct disk_info_t *);
-	if (type > n)
+	if (type >= n)
 		return NULL;
 
 	return dtypes[type]->drv;
