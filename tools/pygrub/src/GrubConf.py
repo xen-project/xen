@@ -220,10 +220,9 @@ class GrubConfigFile(object):
 
     def checkPassword(self, password):
         # Always allow if no password defined in grub.conf
-        if not self.hasPassword:
+        if not self.hasPassword():
             return True
 
-        # If we're here, we're having 'password' attribute set
         pwd = getattr(self, 'password').split()
 
         # We check whether password is in MD5 hash for comparison
@@ -239,6 +238,8 @@ class GrubConfigFile(object):
         # ... and if not, we compare it as a plain text
         if pwd[0] == password:
             return True
+
+        return False
 
     def set(self, line):
         (com, arg) = grub_exact_split(line, 2)
