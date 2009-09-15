@@ -150,9 +150,9 @@ QEMU_REMOTE=http://xenbits.xensource.com/git-http/qemu-xen-unstable.git
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 2836e73adcd994de071f4eec1aa538a5ca849118
-# Fri Sep 4 16:19:54 2009 +0100
-# Fix to eject cdrom on HVM Domain
+QEMU_TAG ?= 3de6cb51b19c46967cbc88ceb202b240c736eeca
+# Fri Sep 11 18:34:25 2009 +0100
+# Merge branch 'latara'
 
 OCAML_XENSTORED_REPO=http://xenbits.xensource.com/ext/xen-ocaml-tools.hg
 
