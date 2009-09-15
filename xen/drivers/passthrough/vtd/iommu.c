@@ -90,7 +90,6 @@ static struct intel_iommu *alloc_intel_iommu(void)
     memset(intel, 0, sizeof(struct intel_iommu));
 
     spin_lock_init(&intel->qi_ctrl.qinval_lock);
-    spin_lock_init(&intel->qi_ctrl.qinval_poll_lock);
     spin_lock_init(&intel->ir_ctrl.iremap_lock);
 
     return intel;

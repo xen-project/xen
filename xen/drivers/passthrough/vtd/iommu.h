@@ -392,14 +392,20 @@ struct qinval_entry {
     }q;
 };
 
-struct poll_info {
-    u64 saddr;
-    u32 udata;
-};
+/* Order of queue invalidation pages */
+#define IQA_REG_QS       0
+#define NUM_QINVAL_PAGES (1 << IQA_REG_QS)
 
-#define NUM_QINVAL_PAGES 1
-#define IQA_REG_QS       0    // derived from NUM_QINVAL_PAGES per VT-d spec.
-#define QINVAL_ENTRY_NR (PAGE_SIZE_4K*NUM_QINVAL_PAGES/sizeof(struct qinval_entry))
+/* Each entry is 16 byte */
+#define QINVAL_ENTRY_NR  (1 << (IQA_REG_QS + 8))
+
+/* Status data flag */
+#define QINVAL_STAT_INIT  0
+#define QINVAL_STAT_DONE  1
+
+/* Queue invalidation head/tail shift */
+#define QINVAL_INDEX_SHIFT 4
+
 #define qinval_present(v) ((v).lo & 1)
 #define qinval_fault_disable(v) (((v).lo >> 1) & 1)
 
@@ -441,8 +447,6 @@ struct qi_ctrl {
     u64 qinval_maddr;  /* queue invalidation page machine address */
     int qinval_index;                    /* queue invalidation index */
     spinlock_t qinval_lock;      /* lock for queue invalidation page */
-    spinlock_t qinval_poll_lock; /* lock for queue invalidation poll addr */
-    volatile u32 qinval_poll_status;     /* used by poll methord to sync */
 };
 
 struct ir_ctrl {

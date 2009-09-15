@@ -45,18 +45,29 @@ static void print_qi_regs(struct iommu *iommu)
 
 static int qinval_next_index(struct iommu *iommu)
 {
-    u64 val;
-    val = dmar_readq(iommu->reg, DMAR_IQT_REG);
-    return (val >> 4);
+    u64 tail, head;
+
+    tail = dmar_readq(iommu->reg, DMAR_IQT_REG);
+    tail >>= QINVAL_INDEX_SHIFT;
+
+    head = dmar_readq(iommu->reg, DMAR_IQH_REG);
+    head >>= QINVAL_INDEX_SHIFT;
+
+    /* round wrap check */
+    if ( ( tail + 1 ) % QINVAL_ENTRY_NR == head  )
+        return -1;
+
+    return tail;
 }
 
 static int qinval_update_qtail(struct iommu *iommu, int index)
 {
     u64 val;
 
-    /* Need an ASSERT to insure that we have got register lock */
-    val = (index < (QINVAL_ENTRY_NR-1)) ? (index + 1) : 0;
-    dmar_writeq(iommu->reg, DMAR_IQT_REG, (val << 4));
+    /* Need hold register lock when update tail */
+    ASSERT( spin_is_locked(&iommu->register_lock) );
+    val = (index + 1) % QINVAL_ENTRY_NR;
+    dmar_writeq(iommu->reg, DMAR_IQT_REG, (val << QINVAL_INDEX_SHIFT));
     return 0;
 }
 
@@ -146,6 +157,8 @@ int queue_invalidate_iotlb(struct iommu *iommu,
     spin_lock_irqsave(&iommu->register_lock, flags);
 
     index = qinval_next_index(iommu);
+    if ( index == -1 )
+        return -EBUSY;
     ret = gen_iotlb_inv_dsc(iommu, index, granu, dr, dw, did,
                             am, ih, addr);
     ret |= qinval_update_qtail(iommu, index);
@@ -180,29 +193,29 @@ static int gen_wait_dsc(struct iommu *iommu, int index,
 }
 
 static int queue_invalidate_wait(struct iommu *iommu,
-    u8 iflag, u8 sw, u8 fn, u32 sdata, volatile u32 *saddr)
+    u8 iflag, u8 sw, u8 fn)
 {
-    unsigned long flags;
     s_time_t start_time;
+    u32 poll_slot = QINVAL_STAT_INIT;
     int index = -1;
     int ret = -1;
-    struct qi_ctrl *qi_ctrl = iommu_qi_ctrl(iommu);
+    unsigned long flags;
 
-    spin_lock_irqsave(&qi_ctrl->qinval_poll_lock, flags);
-    spin_lock(&iommu->register_lock);
+    spin_lock_irqsave(&iommu->register_lock, flags);
     index = qinval_next_index(iommu);
-    if ( *saddr == 1 )
-        *saddr = 0;
-    ret = gen_wait_dsc(iommu, index, iflag, sw, fn, sdata, saddr);
+    if ( index == -1 )
+        return -EBUSY;
+
+    ret = gen_wait_dsc(iommu, index, iflag, sw, fn, QINVAL_STAT_DONE, &poll_slot);
     ret |= qinval_update_qtail(iommu, index);
-    spin_unlock(&iommu->register_lock);
+    spin_unlock_irqrestore(&iommu->register_lock, flags);
 
     /* Now we don't support interrupt method */
     if ( sw )
     {
         /* In case all wait descriptor writes to same addr with same data */
         start_time = NOW();
-        while ( *saddr != 1 )
+        while ( poll_slot != QINVAL_STAT_DONE )
         {
             if ( NOW() > (start_time + DMAR_OPERATION_TIMEOUT) )
             {
@@ -212,7 +225,6 @@ static int queue_invalidate_wait(struct iommu *iommu,
             cpu_relax();
         }
     }
-    spin_unlock_irqrestore(&qi_ctrl->qinval_poll_lock, flags);
     return ret;
 }
 
@@ -223,8 +235,7 @@ int invalidate_sync(struct iommu *iommu)
 
     if ( qi_ctrl->qinval_maddr != 0 )
     {
-        ret = queue_invalidate_wait(iommu,
-            0, 1, 1, 1, &qi_ctrl->qinval_poll_status);
+        ret = queue_invalidate_wait(iommu, 0, 1, 1);
         return ret;
     }
     return 0;
@@ -269,6 +280,8 @@ int qinval_device_iotlb(struct iommu *iommu,
 
     spin_lock_irqsave(&iommu->register_lock, flags);
     index = qinval_next_index(iommu);
+    if ( index == -1 )
+        return -EBUSY;
     ret = gen_dev_iotlb_inv_dsc(iommu, index, max_invs_pend,
                                 sid, size, addr);
     ret |= qinval_update_qtail(iommu, index);
@@ -311,6 +324,8 @@ int queue_invalidate_iec(struct iommu *iommu, u8 granu, u8 im, u16 iidx)
 
     spin_lock_irqsave(&iommu->register_lock, flags);
     index = qinval_next_index(iommu);
+    if ( index == -1 )
+        return -EBUSY;
     ret = gen_iec_inv_dsc(iommu, index, granu, im, iidx);
     ret |= qinval_update_qtail(iommu, index);
     spin_unlock_irqrestore(&iommu->register_lock, flags);
