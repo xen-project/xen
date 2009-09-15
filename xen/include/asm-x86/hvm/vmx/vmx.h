@@ -33,9 +33,9 @@ typedef union {
         u64 r       :   1,
         w           :   1,
         x           :   1,
-        emt         :   3,
-        igmt        :   1,
-        sp_avail    :   1,
+        emt         :   3, /* EPT Memory type */
+        igmt        :   1, /* Ignore MTRR memory type */
+        sp_avail    :   1, /* Is this a superpage? */
         avail1      :   4,
         mfn         :   45,
         rsvd        :   5,
