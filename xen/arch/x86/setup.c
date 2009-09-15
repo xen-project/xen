@@ -191,6 +191,18 @@ void __init discard_initial_images(void)
     init_domheap_pages(initial_images_base, initial_images_end);
 }
 
+static void free_xen_data(char *s, char *e)
+{
+#ifndef MEMORY_GUARD
+    init_xenheap_pages(__pa(s), __pa(e));
+#endif
+    memguard_guard_range(s, e-s);
+#if defined(CONFIG_X86_64)
+    /* Also zap the mapping in the 1:1 area. */
+    memguard_guard_range(__va(__pa(s)), e-s);
+#endif
+}
+
 extern char __init_begin[], __bss_start[];
 extern char __per_cpu_start[], __per_cpu_data_end[];
 
@@ -212,19 +224,13 @@ static void __init percpu_init_areas(void)
     for ( ; i < NR_CPUS; i++ )
         BUG_ON(cpu_possible(i));
 
-#ifndef MEMORY_GUARD
-    init_xenheap_pages(__pa(__per_cpu_start) + (first_unused << PERCPU_SHIFT),
-                       __pa(__bss_start));
-#endif
-    memguard_guard_range(&__per_cpu_start[first_unused << PERCPU_SHIFT],
-                         __bss_start - &__per_cpu_start[first_unused <<
-                                                        PERCPU_SHIFT]);
-#if defined(CONFIG_X86_64)
-    /* Also zap the mapping in the 1:1 area. */
-    memguard_guard_range(__va(__pa(__per_cpu_start)) +
-                         (first_unused << PERCPU_SHIFT),
-                         (NR_CPUS - first_unused) << PERCPU_SHIFT);
-#endif
+    free_xen_data(&__per_cpu_start[first_unused << PERCPU_SHIFT], __bss_start);
+
+    data_size = (data_size + PAGE_SIZE + 1) & PAGE_MASK;
+    if ( data_size != PERCPU_SIZE )
+        for ( i = 0; i < first_unused; i++ )
+            free_xen_data(&__per_cpu_start[(i << PERCPU_SHIFT) + data_size],
+                          &__per_cpu_start[(i+1) << PERCPU_SHIFT]);
 }
 
 static void __init init_idle_domain(void)
@@ -391,14 +397,7 @@ void init_done(void)
 
     /* Free (or page-protect) the init areas. */
     memset(__init_begin, 0xcc, __init_end - __init_begin); /* int3 poison */
-#ifndef MEMORY_GUARD
-    init_xenheap_pages(__pa(__init_begin), __pa(__init_end));
-#endif
-    memguard_guard_range(__init_begin, __init_end - __init_begin);
-#if defined(CONFIG_X86_64)
-    /* Also zap the mapping in the 1:1 area. */
-    memguard_guard_range(__va(__pa(__init_begin)), __init_end - __init_begin);
-#endif
+    free_xen_data(__init_begin, __init_end);
     printk("Freed %ldkB init memory.\n", (long)(__init_end-__init_begin)>>10);
 
     startup_cpu_idle_loop();
