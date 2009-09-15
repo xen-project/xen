@@ -34,46 +34,6 @@
 #define P2M_AUDIT     0
 #define P2M_DEBUGGING 0
 
-/*
- * The P2M lock.  This protects all updates to the p2m table.
- * Updates are expected to be safe against concurrent reads,
- * which do *not* require the lock.
- *
- * Locking discipline: always acquire this lock before the shadow or HAP one
- */
-
-#define p2m_lock_init(_p2m)                     \
-    do {                                        \
-        spin_lock_init(&(_p2m)->lock);          \
-        (_p2m)->locker = -1;                    \
-        (_p2m)->locker_function = "nobody";     \
-    } while (0)
-
-#define p2m_lock(_p2m)                                          \
-    do {                                                        \
-        if ( unlikely((_p2m)->locker == current->processor) )   \
-        {                                                       \
-            printk("Error: p2m lock held by %s\n",              \
-                   (_p2m)->locker_function);                    \
-            BUG();                                              \
-        }                                                       \
-        spin_lock(&(_p2m)->lock);                               \
-        ASSERT((_p2m)->locker == -1);                           \
-        (_p2m)->locker = current->processor;                    \
-        (_p2m)->locker_function = __func__;                     \
-    } while (0)
-
-#define p2m_unlock(_p2m)                                \
-    do {                                                \
-        ASSERT((_p2m)->locker == current->processor);   \
-        (_p2m)->locker = -1;                            \
-        (_p2m)->locker_function = "nobody";             \
-        spin_unlock(&(_p2m)->lock);                     \
-    } while (0)
-
-#define p2m_locked_by_me(_p2m)                            \
-    (current->processor == (_p2m)->locker)
-
 /* Printouts */
 #define P2M_PRINTK(_f, _a...)                                \
     debugtrace_printk("p2m: %s(): " _f, __func__, ##_a)
@@ -1019,32 +979,16 @@ p2m_pod_emergency_sweep(struct domain *d)
 
 }
 
-static int
+int
 p2m_pod_demand_populate(struct domain *d, unsigned long gfn,
-                        mfn_t table_mfn,
-                        l1_pgentry_t *p2m_entry,
                         unsigned int order,
                         p2m_query_t q)
 {
     struct page_info *p = NULL; /* Compiler warnings */
     unsigned long gfn_aligned;
     mfn_t mfn;
-    l1_pgentry_t entry_content = l1e_empty();
     struct p2m_domain *p2md = d->arch.p2m;
     int i;
-
-    /* We need to grab the p2m lock here and re-check the entry to make
-     * sure that someone else hasn't populated it for us, then hold it
-     * until we're done. */
-    p2m_lock(p2md);
-    audit_p2m(d);
-
-    /* Check to make sure this is still PoD */
-    if ( p2m_flags_to_type(l1e_get_flags(*p2m_entry)) != p2m_populate_on_demand )
-    {
-        p2m_unlock(p2md);
-        return 0;
-    }
 
     /* If we're low, start a sweep */
     if ( order == 9 && page_list_empty(&p2md->pod.super) )
@@ -1075,45 +1019,22 @@ p2m_pod_demand_populate(struct domain *d, unsigned long gfn,
 
     spin_unlock(&d->page_alloc_lock);
 
-    /* Fill in the entry in the p2m */
-    switch ( order )
-    {
-    case 9:
-    {
-        l2_pgentry_t l2e_content;
-        
-        l2e_content = l2e_from_pfn(mfn_x(mfn),
-                                   p2m_type_to_flags(p2m_ram_rw) | _PAGE_PSE);
-
-        entry_content.l1 = l2e_content.l2;
-    }
-    break;
-    case 0:
-        entry_content = l1e_from_pfn(mfn_x(mfn),
-                                     p2m_type_to_flags(p2m_ram_rw));
-        break;
-        
-    }
-
     gfn_aligned = (gfn >> order) << order;
 
-    paging_write_p2m_entry(d, gfn_aligned, p2m_entry, table_mfn,
-                           entry_content, (order==9)?2:1);
+    set_p2m_entry(d, gfn_aligned, mfn, order, p2m_ram_rw);
 
     for( i = 0 ; i < (1UL << order) ; i++ )
         set_gpfn_from_mfn(mfn_x(mfn) + i, gfn_aligned + i);
     
     p2md->pod.entry_count -= (1 << order); /* Lock: p2m */
     BUG_ON(p2md->pod.entry_count < 0);
-    audit_p2m(d);
-    p2m_unlock(p2md);
 
     return 0;
 out_of_memory:
     spin_unlock(&d->page_alloc_lock);
-    audit_p2m(d);
-    p2m_unlock(p2md);
-    printk("%s: Out of populate-on-demand memory!\n", __func__);
+
+    printk("%s: Out of populate-on-demand memory! tot_pages %" PRIu32 " pod_entries %" PRIi32 "\n",
+           __func__, d->tot_pages, p2md->pod.entry_count);
     domain_crash(d);
     return -1;
 remap_and_retry:
@@ -1125,9 +1046,32 @@ remap_and_retry:
     for(i=0; i<(1<<order); i++)
         set_p2m_entry(d, gfn_aligned+i, _mfn(POPULATE_ON_DEMAND_MFN), 0,
                       p2m_populate_on_demand);
-    audit_p2m(d);
-    p2m_unlock(p2md);
+
     return 0;
+}
+
+/* Non-ept "lock-and-check" wrapper */
+static int p2m_pod_check_and_populate(struct domain *d, unsigned long gfn,
+                                      l1_pgentry_t *p2m_entry, int order,
+                                      p2m_query_t q)
+{
+    int r;
+    p2m_lock(d->arch.p2m);
+    audit_p2m(d);
+
+    /* Check to make sure this is still PoD */
+    if ( p2m_flags_to_type(l1e_get_flags(*p2m_entry)) != p2m_populate_on_demand )
+    {
+        p2m_unlock(d->arch.p2m);
+        return 0;
+    }
+
+    r = p2m_pod_demand_populate(d, gfn, order, q);
+
+    audit_p2m(d);
+    p2m_unlock(d->arch.p2m);
+
+    return r;
 }
 
 // Returns 0 on error (out of memory)
@@ -1300,8 +1244,8 @@ pod_retry_l2:
         if ( p2m_flags_to_type(l2e_get_flags(*l2e)) == p2m_populate_on_demand )
         {
             if ( q != p2m_query ) {
-                if( !p2m_pod_demand_populate(d, gfn, mfn,
-                                             (l1_pgentry_t *)l2e, 9, q) )
+                if ( !p2m_pod_check_and_populate(d, gfn,
+                                                       (l1_pgentry_t *)l2e, 9, q) )
                     goto pod_retry_l2;
             } else
                 *t = p2m_populate_on_demand;
@@ -1332,8 +1276,8 @@ pod_retry_l1:
         if ( p2m_flags_to_type(l1e_get_flags(*l1e)) == p2m_populate_on_demand )
         {
             if ( q != p2m_query ) {
-                if( !p2m_pod_demand_populate(d, gfn, mfn,
-                                             (l1_pgentry_t *)l1e, 0, q) )
+                if ( !p2m_pod_check_and_populate(d, gfn,
+                                                       (l1_pgentry_t *)l1e, 0, q) )
                     goto pod_retry_l1;
             } else
                 *t = p2m_populate_on_demand;
@@ -1392,8 +1336,8 @@ static mfn_t p2m_gfn_to_mfn_current(unsigned long gfn, p2m_type_t *t,
                  * exits at this point.  */
                 if ( q != p2m_query )
                 {
-                    if( !p2m_pod_demand_populate(current->domain, gfn, mfn,
-                                                 p2m_entry, 9, q) )
+                    if ( !p2m_pod_check_and_populate(current->domain, gfn,
+                                                            p2m_entry, 9, q) )
                         goto pod_retry_l2;
 
                     /* Allocate failed. */
@@ -1448,9 +1392,8 @@ static mfn_t p2m_gfn_to_mfn_current(unsigned long gfn, p2m_type_t *t,
                  * exits at this point.  */
                 if ( q != p2m_query )
                 {
-                    if( !p2m_pod_demand_populate(current->domain, gfn, mfn,
-                                                 (l1_pgentry_t *)p2m_entry, 0,
-                                                 q) )
+                    if ( !p2m_pod_check_and_populate(current->domain, gfn,
+                                                            (l1_pgentry_t *)p2m_entry, 0, q) )
                         goto pod_retry_l1;
 
                     /* Allocate failed. */

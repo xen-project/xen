@@ -178,6 +178,47 @@ struct p2m_domain {
     } pod;
 };
 
+/*
+ * The P2M lock.  This protects all updates to the p2m table.
+ * Updates are expected to be safe against concurrent reads,
+ * which do *not* require the lock.
+ *
+ * Locking discipline: always acquire this lock before the shadow or HAP one
+ */
+
+#define p2m_lock_init(_p2m)                     \
+    do {                                        \
+        spin_lock_init(&(_p2m)->lock);          \
+        (_p2m)->locker = -1;                    \
+        (_p2m)->locker_function = "nobody";     \
+    } while (0)
+
+#define p2m_lock(_p2m)                                          \
+    do {                                                        \
+        if ( unlikely((_p2m)->locker == current->processor) )   \
+        {                                                       \
+            printk("Error: p2m lock held by %s\n",              \
+                   (_p2m)->locker_function);                    \
+            BUG();                                              \
+        }                                                       \
+        spin_lock(&(_p2m)->lock);                               \
+        ASSERT((_p2m)->locker == -1);                           \
+        (_p2m)->locker = current->processor;                    \
+        (_p2m)->locker_function = __func__;                     \
+    } while (0)
+
+#define p2m_unlock(_p2m)                                \
+    do {                                                \
+        ASSERT((_p2m)->locker == current->processor);   \
+        (_p2m)->locker = -1;                            \
+        (_p2m)->locker_function = "nobody";             \
+        spin_unlock(&(_p2m)->lock);                     \
+    } while (0)
+
+#define p2m_locked_by_me(_p2m)                            \
+    (current->processor == (_p2m)->locker)
+
+
 /* Extract the type from the PTE flags that store it */
 static inline p2m_type_t p2m_flags_to_type(unsigned long flags)
 {
@@ -284,6 +325,12 @@ int
 p2m_pod_decrease_reservation(struct domain *d,
                              xen_pfn_t gpfn,
                              unsigned int order);
+
+/* Called by p2m code when demand-populating a PoD page */
+int
+p2m_pod_demand_populate(struct domain *d, unsigned long gfn,
+                        unsigned int order,
+                        p2m_query_t q);
 
 /* Add a page to a domain's p2m table */
 int guest_physmap_add_entry(struct domain *d, unsigned long gfn,
