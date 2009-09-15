@@ -344,10 +344,25 @@ static int __init p4_init(char ** cpu_type)
 }
 
 
+static int force_arch_perfmon;
+static int force_cpu_type(const char *str)
+{
+	if (!strcmp(str, "arch_perfmon")) {
+		force_arch_perfmon = 1;
+		printk(KERN_INFO "oprofile: forcing architectural perfmon\n");
+	}
+
+	return 0;
+}
+custom_param("cpu_type", force_cpu_type);
+
 extern int ppro_has_global_ctrl;
 static int __init ppro_init(char ** cpu_type)
 {
 	__u8 cpu_model = current_cpu_data.x86_model;
+
+	if (force_arch_perfmon && cpu_has_arch_perfmon)
+		return 0;
 
 	switch (cpu_model) {
 	case 0 ... 2:
