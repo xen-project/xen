@@ -357,22 +357,28 @@ static int __init ppro_init(char ** cpu_type)
 		*cpu_type = "i386/pii";
 		break;
 	case 6 ... 8:
+	case 10 ... 11:
 		*cpu_type = "i386/piii";
 		break;
 	case 9:
+	case 13:
 		*cpu_type = "i386/p6_mobile";
-		break;
-	case 10 ... 13:
-		*cpu_type = "i386/p6";
 		break;
 	case 14:
 		*cpu_type = "i386/core";
 		break;
 	case 15:
 	case 23:
-	case 26:
 	case 29:
 		*cpu_type = "i386/core_2";
+		ppro_has_global_ctrl = 1;
+		break;
+	case 26:
+		*cpu_type = "i386/core_i7";
+		ppro_has_global_ctrl = 1;
+		break;
+	case 28:
+		*cpu_type = "i386/atom";
 		ppro_has_global_ctrl = 1;
 		break;
 	default:
