@@ -521,6 +521,7 @@ void ept_change_entry_emt_with_range(struct domain *d, unsigned long start_gfn,
 {
     unsigned long gfn;
     ept_entry_t e;
+    mfn_t mfn;
     int order = 0;
 
     for ( gfn = start_gfn; gfn <= end_gfn; gfn++ )
@@ -530,6 +531,7 @@ void ept_change_entry_emt_with_range(struct domain *d, unsigned long start_gfn,
             continue;
 
         order = 0;
+        mfn = _mfn(e.mfn);
 
         if ( e.sp_avail )
         {
@@ -541,22 +543,22 @@ void ept_change_entry_emt_with_range(struct domain *d, unsigned long start_gfn,
                  * Set emt for super page.
                  */
                 order = EPT_TABLE_ORDER;
-                if ( need_modify_ept_entry(d, gfn, e.mfn, e.igmt, e.emt, e.avail1) )
-                    ept_set_entry(d, gfn, e.mfn, order, e.avail1);
+                if ( need_modify_ept_entry(d, gfn, mfn, e.igmt, e.emt, e.avail1) )
+                    ept_set_entry(d, gfn, mfn, order, e.avail1);
                 gfn += 0x1FF;
             }
             else
             {
                 /* Change emt for partial entries of the 2m area. */
-                if ( need_modify_ept_entry(d, gfn, e.mfn, e.igmt, e.emt, e.avail1) )
-                    ept_set_entry(d, gfn, e.mfn, order, e.avail1);
+                if ( need_modify_ept_entry(d, gfn, mfn, e.igmt, e.emt, e.avail1) )
+                    ept_set_entry(d, gfn, mfn, order, e.avail1);
                 gfn = ((gfn >> EPT_TABLE_ORDER) << EPT_TABLE_ORDER) + 0x1FF;
             }
         }
         else /* gfn assigned with 4k */
         {
-            if ( need_modify_ept_entry(d, gfn, e.mfn, e.igmt, e.emt, e.avail1) )
-                ept_set_entry(d, gfn, e.mfn, order, e.avail1);
+            if ( need_modify_ept_entry(d, gfn, mfn, e.igmt, e.emt, e.avail1) )
+                ept_set_entry(d, gfn, mfn, order, e.avail1);
         }
     }
 }
