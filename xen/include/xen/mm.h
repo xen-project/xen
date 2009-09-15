@@ -101,11 +101,13 @@ struct page_list_head
 /* These must only have instances in struct page_info. */
 # define page_list_entry
 
+#define PAGE_LIST_NULL (~0)
+
 # define PAGE_LIST_HEAD_INIT(name) { NULL, NULL }
 # define PAGE_LIST_HEAD(name) \
     struct page_list_head name = PAGE_LIST_HEAD_INIT(name)
 # define INIT_PAGE_LIST_HEAD(head) ((head)->tail = (head)->next = NULL)
-# define INIT_PAGE_LIST_ENTRY(ent) ((ent)->prev = (ent)->next = ~0)
+# define INIT_PAGE_LIST_ENTRY(ent) ((ent)->prev = (ent)->next = PAGE_LIST_NULL)
 
 static inline int
 page_list_empty(const struct page_list_head *head)
@@ -140,15 +142,15 @@ page_list_add(struct page_info *page, struct page_list_head *head)
     else
     {
         head->tail = page;
-        page->list.next = ~0;
+        page->list.next = PAGE_LIST_NULL;
     }
-    page->list.prev = ~0;
+    page->list.prev = PAGE_LIST_NULL;
     head->next = page;
 }
 static inline void
 page_list_add_tail(struct page_info *page, struct page_list_head *head)
 {
-    page->list.next = ~0;
+    page->list.next = PAGE_LIST_NULL;
     if ( head->next )
     {
         page->list.prev = page_to_mfn(head->tail);
@@ -156,7 +158,7 @@ page_list_add_tail(struct page_info *page, struct page_list_head *head)
     }
     else
     {
-        page->list.prev = ~0;
+        page->list.prev = PAGE_LIST_NULL;
         head->next = page;
     }
     head->tail = page;
@@ -169,7 +171,7 @@ __page_list_del_head(struct page_info *page, struct page_list_head *head,
     {
         if ( head->tail != page )
         {
-            next->list.prev = ~0;
+            next->list.prev = PAGE_LIST_NULL;
             head->next = next;
         }
         else
@@ -179,7 +181,7 @@ __page_list_del_head(struct page_info *page, struct page_list_head *head,
 
     if ( head->tail == page )
     {
-        prev->list.next = ~0;
+        prev->list.next = PAGE_LIST_NULL;
         head->tail = prev;
         return 1;
     }
