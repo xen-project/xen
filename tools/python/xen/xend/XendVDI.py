@@ -60,7 +60,8 @@ class XendVDI(AutoSaveObject):
                  'virtual_size',
                  'physical_utilisation',
                  'sharable',
-                 'read_only']
+                 'read_only',
+                 'type']
 
     SAVED_CFG_INT = ['sector_size', 'virtual_size', 'physical_utilisation']
     
@@ -155,11 +156,12 @@ class XendVDI(AutoSaveObject):
                 'name_description': self.name_description,
                 'virtual_size': self.virtual_size,
                 'physical_utilisation': self.physical_utilisation,
-                'sharable': False,
-                'readonly': False,
+                'sharable': self.sharable,
+                'read_only': self.read_only,
+                'type': self.type,
                 'SR': self.sr_uuid,
                 'other_config': self.other_config,
-                'VBDs': []}
+                'VBDs': self.vbds}
 
     def get_location(self):
         raise NotImplementedError()
