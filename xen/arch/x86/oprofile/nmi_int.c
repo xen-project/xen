@@ -374,18 +374,15 @@ static int __init ppro_init(char ** cpu_type)
 		ppro_has_global_ctrl = 1;
 		break;
 	case 26:
+		arch_perfmon_setup_counters();
 		*cpu_type = "i386/core_i7";
 		ppro_has_global_ctrl = 1;
 		break;
 	case 28:
 		*cpu_type = "i386/atom";
-		ppro_has_global_ctrl = 1;
 		break;
 	default:
 		/* Unknown */
-		printk("xenoprof: Initialization failed. "
-		       "Intel processor model %d for P6 class family is not "
-		       "supported\n", cpu_model);
 		return 0;
 	}
 
@@ -393,10 +390,21 @@ static int __init ppro_init(char ** cpu_type)
 	return 1;
 }
 
+static int __init arch_perfmon_init(char **cpu_type)
+{
+	if (!cpu_has_arch_perfmon)
+		return 0;
+	*cpu_type = "i386/arch_perfmon";
+	model = &op_arch_perfmon_spec;
+	arch_perfmon_setup_counters();
+	return 1;
+}
+
 static int __init nmi_init(void)
 {
 	__u8 vendor = current_cpu_data.x86_vendor;
 	__u8 family = current_cpu_data.x86;
+	__u8 _model = current_cpu_data.x86_model;
  
 	if (!cpu_has_apic) {
 		printk("xenoprof: Initialization failed. No APIC\n");
@@ -438,21 +446,22 @@ static int __init nmi_init(void)
 			switch (family) {
 				/* Pentium IV */
 				case 0xf:
-					if (!p4_init(&cpu_type))
-						return -ENODEV;
+					p4_init(&cpu_type);
 					break;
 
 				/* A P6-class processor */
 				case 6:
-					if (!ppro_init(&cpu_type))
-						return -ENODEV;
+					ppro_init(&cpu_type);
 					break;
 
 				default:
+				break;
+			}
+			if (!cpu_type && !arch_perfmon_init(&cpu_type)) {
 				printk("xenoprof: Initialization failed. "
-				       "Intel processor family %d is not "
-				       "supported\n", family);
-					return -ENODEV;
+				       "Intel processor family %d model %d"
+				       "is not supported\n", family, _model);
+				return -ENODEV;
 			}
 			break;
 

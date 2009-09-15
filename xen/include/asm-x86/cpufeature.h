@@ -76,6 +76,7 @@
 #define X86_FEATURE_CONSTANT_TSC (3*32+ 8) /* TSC ticks at a constant rate */
 #define X86_FEATURE_NOSTOP_TSC	(3*32+ 9) /* TSC does not stop in C states */
 #define X86_FEATURE_ARAT	(3*32+ 10) /* Always running APIC timer */
+#define X86_FEATURE_ARCH_PERFMON (3*32+11) /* Intel Architectural PerfMon */
 
 /* Intel-defined CPU features, CPUID level 0x00000001 (ecx), word 4 */
 #define X86_FEATURE_XMM3	(4*32+ 0) /* Streaming SIMD Extensions-3 */
@@ -188,6 +189,8 @@
                                  && boot_cpu_has(X86_FEATURE_FFXSR))
 
 #define cpu_has_x2apic          boot_cpu_has(X86_FEATURE_X2APIC)
+#define cpu_has_arch_perfmon    boot_cpu_has(X86_FEATURE_ARCH_PERFMON)
+
 #endif /* __ASM_I386_CPUFEATURE_H */
 
 /* 
