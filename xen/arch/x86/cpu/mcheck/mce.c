@@ -237,10 +237,12 @@ mctelem_cookie_t mcheck_mca_logout(enum mca_source who, cpu_banks_t bankmask,
 
 		if (status & MCi_STATUS_ADDRV) {
 			mca_rdmsrl(MSR_IA32_MC0_ADDR + 4 * i, addr);
-			d = maddr_get_owner(addr);
-			if (d != NULL && (who == MCA_POLLER ||
-			    who == MCA_CMCI_HANDLER))
-				mcb.mc_domid = d->domain_id;
+			if (mfn_valid(paddr_to_pfn(addr))) {
+				d = maddr_get_owner(addr);
+				if (d != NULL && (who == MCA_POLLER ||
+				    who == MCA_CMCI_HANDLER))
+					mcb.mc_domid = d->domain_id;
+			}
 		}
 
 		if (status & MCi_STATUS_MISCV)
