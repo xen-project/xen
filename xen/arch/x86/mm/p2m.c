@@ -759,7 +759,7 @@ p2m_pod_zero_check_superpage(struct domain *d, unsigned long gfn)
          * + All gfns are ram types
          * + All gfns have the same type
          * + All of the mfns are allocated to a domain
-         * + None of the mfns are used as pagetables
+         * + None of the mfns are used as pagetables, or allocated via xenheap
          * + The first mfn is 2-meg aligned
          * + All the other mfns are in sequence
          * Adding for good measure:
@@ -769,7 +769,8 @@ p2m_pod_zero_check_superpage(struct domain *d, unsigned long gfn)
         if ( !p2m_is_ram(type)
              || type != type0
              || ( (mfn_to_page(mfn)->count_info & PGC_allocated) == 0 )
-             || ( (mfn_to_page(mfn)->count_info & PGC_page_table) != 0 )
+             || ( (mfn_to_page(mfn)->count_info & (PGC_page_table|PGC_xen_heap)) != 0 )
+             || ( (mfn_to_page(mfn)->count_info & PGC_xen_heap  ) != 0 )
              || ( (mfn_to_page(mfn)->count_info & PGC_count_mask) > max_ref )
              || !( ( i == 0 && superpage_aligned(mfn_x(mfn0)) )
                    || ( i != 0 && mfn_x(mfn) == (mfn_x(mfn0) + i) ) ) )
@@ -860,11 +861,11 @@ p2m_pod_zero_check(struct domain *d, unsigned long *gfns, int count)
     for ( i=0; i<count; i++ )
     {
         mfns[i] = gfn_to_mfn_query(d, gfns[i], types + i);
-        /* If this is ram, and not a pagetable, and probably not mapped
+        /* If this is ram, and not a pagetable or from the xen heap, and probably not mapped
            elsewhere, map it; otherwise, skip. */
         if ( p2m_is_ram(types[i])
              && ( (mfn_to_page(mfns[i])->count_info & PGC_allocated) != 0 ) 
-             && ( (mfn_to_page(mfns[i])->count_info & PGC_page_table) == 0 ) 
+             && ( (mfn_to_page(mfns[i])->count_info & (PGC_page_table|PGC_xen_heap)) == 0 ) 
              && ( (mfn_to_page(mfns[i])->count_info & PGC_count_mask) <= max_ref ) )
             map[i] = map_domain_page(mfn_x(mfns[i]));
         else
