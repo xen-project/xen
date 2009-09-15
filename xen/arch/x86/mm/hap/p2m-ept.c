@@ -29,12 +29,35 @@
 #include <asm/mtrr.h>
 #include <asm/hvm/cacheattr.h>
 
+/* Non-ept "lock-and-check" wrapper */
+static int ept_pod_check_and_populate(struct domain *d, unsigned long gfn,
+                                      ept_entry_t *entry, int order,
+                                      p2m_query_t q)
+{
+    int r;
+    p2m_lock(d->arch.p2m);
+
+    /* Check to make sure this is still PoD */
+    if ( entry->avail1 != p2m_populate_on_demand )
+    {
+        p2m_unlock(d->arch.p2m);
+        return 0;
+    }
+
+    r = p2m_pod_demand_populate(d, gfn, order, q);
+
+    p2m_unlock(d->arch.p2m);
+
+    return r;
+}
+
 static void ept_p2m_type_to_flags(ept_entry_t *entry, p2m_type_t type)
 {
     switch(type)
     {
         case p2m_invalid:
         case p2m_mmio_dm:
+        case p2m_populate_on_demand:
         default:
             entry->r = entry->w = entry->x = 0;
             return;
@@ -61,6 +84,7 @@ static void ept_p2m_type_to_flags(ept_entry_t *entry, p2m_type_t type)
 #define GUEST_TABLE_MAP_FAILED  0
 #define GUEST_TABLE_NORMAL_PAGE 1
 #define GUEST_TABLE_SUPER_PAGE  2
+#define GUEST_TABLE_POD_PAGE    3
 
 /* Fill in middle levels of ept table */
 static int ept_set_middle_entry(struct domain *d, ept_entry_t *ept_entry)
@@ -99,6 +123,8 @@ static int ept_set_middle_entry(struct domain *d, ept_entry_t *ept_entry)
  *   The next entry points to a superpage, and caller indicates
  *   that they are going to the superpage level, or are only doing
  *   a read.
+ *  GUEST_TABLE_POD:
+ *   The next entry is marked populate-on-demand.
  */
 static int ept_next_level(struct domain *d, bool_t read_only,
                           ept_entry_t **table, unsigned long *gfn_remainder,
@@ -114,6 +140,9 @@ static int ept_next_level(struct domain *d, bool_t read_only,
 
     if ( !(ept_entry->epte & 0x7) )
     {
+        if ( ept_entry->avail1 == p2m_populate_on_demand )
+            return GUEST_TABLE_POD_PAGE;
+
         if ( read_only )
             return GUEST_TABLE_MAP_FAILED;
 
@@ -176,9 +205,11 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
     }
 
     /* If order == 9, we should never get SUPERPAGE or PoD.
+     * If order == 0, we should only get POD if we have a POD superpage.
      * If i > walk_level, we need to split the page; otherwise,
      * just behave as normal. */
     ASSERT(order == 0 || ret == GUEST_TABLE_NORMAL_PAGE);
+    ASSERT(ret != GUEST_TABLE_POD_PAGE || i != walk_level);
 
     index = gfn_remainder >> ( i ?  (i * EPT_TABLE_ORDER): order);
     offset = (gfn_remainder & ( ((1 << (i*EPT_TABLE_ORDER)) - 1)));
@@ -258,7 +289,11 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
                                                       &igmt, direct_mmio);
             split_ept_entry->igmt = igmt;
             split_ept_entry->sp_avail =  0;
-            split_ept_entry->mfn = super_mfn + i;
+            /* Don't increment mfn if it's a PoD mfn */
+            if ( super_p2mt != p2m_populate_on_demand )
+                split_ept_entry->mfn = super_mfn + i;
+            else
+                split_ept_entry->mfn = super_mfn; 
             split_ept_entry->avail1 = super_p2mt;
             split_ept_entry->rsvd = 0;
             split_ept_entry->avail2 = 0;
@@ -348,16 +383,53 @@ static mfn_t ept_get_entry(struct domain *d, unsigned long gfn, p2m_type_t *t,
 
     for ( i = EPT_DEFAULT_GAW; i > 0; i-- )
     {
+    retry:
         ret = ept_next_level(d, 1, &table, &gfn_remainder,
                              i * EPT_TABLE_ORDER);
         if ( !ret )
             goto out;
+        else if ( ret == GUEST_TABLE_POD_PAGE )
+        {
+            if ( q == p2m_query )
+            {
+                *t = p2m_populate_on_demand;
+                goto out;
+            }
+
+            /* Populate this superpage */
+            ASSERT(i == 1);
+
+            index = gfn_remainder >> ( i * EPT_TABLE_ORDER);
+            ept_entry = table + index;
+
+            if ( !ept_pod_check_and_populate(d, gfn,
+                                             ept_entry, 9, q) )
+                goto retry;
+            else
+                goto out;
+        }
         else if ( ret == GUEST_TABLE_SUPER_PAGE )
             break;
     }
 
     index = gfn_remainder >> (i * EPT_TABLE_ORDER);
     ept_entry = table + index;
+
+    if ( ept_entry->avail1 == p2m_populate_on_demand )
+    {
+        if ( q == p2m_query )
+        {
+            *t = p2m_populate_on_demand;
+            goto out;
+        }
+
+        ASSERT(i == 0);
+        
+        if ( ept_pod_check_and_populate(d, gfn,
+                                        ept_entry, 0, q) )
+            goto out;
+    }
+
 
     if ( ept_entry->avail1 != p2m_invalid )
     {
@@ -370,17 +442,20 @@ static mfn_t ept_get_entry(struct domain *d, unsigned long gfn, p2m_type_t *t,
              * to emulate p2m table
              */
             unsigned long split_mfn = mfn_x(mfn) +
-                                      (gfn_remainder &
-                                       ((1 << (i * EPT_TABLE_ORDER)) - 1));
+                (gfn_remainder &
+                 ((1 << (i * EPT_TABLE_ORDER)) - 1));
             mfn = _mfn(split_mfn);
         }
     }
 
- out:
+out:
     unmap_domain_page(table);
     return mfn;
 }
 
+/* WARNING: Only caller doesn't care about PoD pages.  So this function will
+ * always return 0 for PoD pages, not populate them.  If that becomes necessary,
+ * pass a p2m_query_t type along to distinguish. */
 static ept_entry_t ept_get_entry_content(struct domain *d, unsigned long gfn)
 {
     ept_entry_t *table =
@@ -400,7 +475,7 @@ static ept_entry_t ept_get_entry_content(struct domain *d, unsigned long gfn)
     {
         ret = ept_next_level(d, 1, &table, &gfn_remainder,
                              i * EPT_TABLE_ORDER);
-        if ( !ret )
+        if ( !ret || ret == GUEST_TABLE_POD_PAGE )
             goto out;
         else if ( ret == GUEST_TABLE_SUPER_PAGE )
             break;
@@ -451,7 +526,7 @@ void ept_change_entry_emt_with_range(struct domain *d, unsigned long start_gfn,
     for ( gfn = start_gfn; gfn <= end_gfn; gfn++ )
     {
         e = ept_get_entry_content(d, gfn);
-        if ( e.epte == 0 || !mfn_valid(mfn_x(e.mfn)) )
+        if ( !p2m_has_emt(e.avail1) )
             continue;
 
         order = 0;
