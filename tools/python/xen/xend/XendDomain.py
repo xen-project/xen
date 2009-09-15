@@ -28,6 +28,7 @@ import shutil
 import socket
 import tempfile
 import threading
+import re
 
 import xen.lowlevel.xc
 
@@ -1350,10 +1351,40 @@ class XendDomain:
                              args=(sock, p2cread)).start()
 
             try:
-                XendCheckpoint.save(p2cwrite, dominfo, True, live, dst,
-                                    node=node)
+                try:
+                    XendCheckpoint.save(p2cwrite, dominfo, True, live, dst,
+                                        node=node)
+                except Exception, ex:
+                    m_dsterr = None
+                    try:
+                        sock.settimeout(3.0)
+                        dsterr = sock.recv(1024)
+                        sock.settimeout(None)
+                        if dsterr:
+                            # See send_error@relocate.py. If an error occurred
+                            # in a destination side, an error message with the
+                            # following form is returned from the destination
+                            # side.
+                            m_dsterr = \
+                                re.match(r"^\(err\s\(type\s(.+)\)\s\(value\s'(.+)'\)\)", dsterr)
+                    except:
+                        # Probably socket.timeout exception occurred.
+                        # Ignore the exception because it has nothing to do with
+                        # an exception of XendCheckpoint.save.
+                        pass
+
+                    if m_dsterr:
+                        raise XendError("%s (from %s)" % (m_dsterr.group(2), dst))
+                    raise
             finally:
-                sock.shutdown(2)
+                try:
+                    sock.shutdown(2)
+                except:
+                    # Probably the socket is already disconnected by sock.close
+                    # in the destination side.
+                    # Ignore the exception because it has nothing to do with
+                    # an exception of XendCheckpoint.save.
+                    pass
                 sock.close()
 
             os.close(p2cread)
@@ -1376,10 +1407,40 @@ class XendDomain:
                 raise XendError("can't connect: %s" % err)
 
             try:
-                XendCheckpoint.save(sock.fileno(), dominfo, True, live,
-                                    dst, node=node)
+                try:
+                    XendCheckpoint.save(sock.fileno(), dominfo, True, live,
+                                        dst, node=node)
+                except Exception, ex:
+                    m_dsterr = None
+                    try:
+                        sock.settimeout(3.0)
+                        dsterr = sock.recv(1024)
+                        sock.settimeout(None)
+                        if dsterr:
+                            # See send_error@relocate.py. If an error occurred
+                            # in a destination side, an error message with the
+                            # following form is returned from the destination
+                            # side.
+                            m_dsterr = \
+                                re.match(r"^\(err\s\(type\s(.+)\)\s\(value\s'(.+)'\)\)", dsterr)
+                    except:
+                        # Probably socket.timeout exception occurred.
+                        # Ignore the exception because it has nothing to do with
+                        # an exception of XendCheckpoint.save.
+                        pass
+
+                    if m_dsterr:
+                        raise XendError("%s (from %s)" % (m_dsterr.group(2), dst))
+                    raise
             finally:
-                sock.shutdown(2)
+                try:
+                    sock.shutdown(2)
+                except:
+                    # Probably the socket is already disconnected by sock.close
+                    # in the destination side.
+                    # Ignore the exception because it has nothing to do with
+                    # an exception of XendCheckpoint.save.
+                    pass
                 sock.close()
 
     def domain_save(self, domid, dst, checkpoint=False):
