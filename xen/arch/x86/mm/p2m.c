@@ -307,13 +307,14 @@ p2m_pod_cache_add(struct domain *d,
     }
 #endif
 
-    /* Pages from domain_alloc and returned by the balloon driver aren't
-     * guaranteed to be zero; but by reclaiming zero pages, we implicitly promise
-     * to provide zero pages.  So we scrub pages before using */
-    for ( i=0; i< 1 << order ; i++)
+    /*
+     * Pages from domain_alloc and returned by the balloon driver aren't
+     * guaranteed to be zero; but by reclaiming zero pages, we implicitly
+     * promise to provide zero pages. So we scrub pages before using.
+     */
+    for ( i = 0; i < (1 << order); i++ )
     {
-        char * b;
-        b = map_domain_page(page_to_mfn(page) + i);
+        char *b = map_domain_page(mfn_x(page_to_mfn(page)) + i);
         clear_page(b);
         unmap_domain_page(b);
     }
