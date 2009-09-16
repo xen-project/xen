@@ -624,7 +624,10 @@ static int vlapic_write(struct vcpu *v, unsigned long address,
             }
         }
         else
+        {
             vlapic->hw.disabled &= ~VLAPIC_SW_DISABLED;
+            pt_may_unmask_irq(vlapic_domain(vlapic), &vlapic->pt);
+        }
         break;
 
     case APIC_ESR:
@@ -654,7 +657,12 @@ static int vlapic_write(struct vcpu *v, unsigned long address,
         val &= vlapic_lvt_mask[(offset - APIC_LVTT) >> 4];
         vlapic_set_reg(vlapic, offset, val);
         if ( offset == APIC_LVT0 )
+        {
             vlapic_adjust_i8259_target(v->domain);
+            pt_may_unmask_irq(v->domain, NULL);
+        }
+        if ( (offset == APIC_LVTT) && !(val & APIC_LVT_MASKED) )
+            pt_may_unmask_irq(NULL, &vlapic->pt);
         break;
 
     case APIC_TMICT:
@@ -719,10 +727,12 @@ void vlapic_msr_set(struct vlapic *vlapic, uint64_t value)
         {
             vlapic_reset(vlapic);
             vlapic->hw.disabled &= ~VLAPIC_HW_DISABLED;
+            pt_may_unmask_irq(vlapic_domain(vlapic), &vlapic->pt);
         }
         else
         {
             vlapic->hw.disabled |= VLAPIC_HW_DISABLED;
+            pt_may_unmask_irq(vlapic_domain(vlapic), NULL);
         }
     }
 

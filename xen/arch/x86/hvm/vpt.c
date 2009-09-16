@@ -216,19 +216,30 @@ static void pt_timer_fn(void *data)
 void pt_update_irq(struct vcpu *v)
 {
     struct list_head *head = &v->arch.hvm_vcpu.tm_list;
-    struct periodic_time *pt, *earliest_pt = NULL;
+    struct periodic_time *pt, *temp, *earliest_pt = NULL;
     uint64_t max_lag = -1ULL;
     int irq, is_lapic;
 
     spin_lock(&v->arch.hvm_vcpu.tm_lock);
 
-    list_for_each_entry ( pt, head, list )
+    list_for_each_entry_safe ( pt, temp, head, list )
     {
-        if ( pt->pending_intr_nr && !pt_irq_masked(pt) &&
-             ((pt->last_plt_gtime + pt->period) < max_lag) )
+        if ( pt->pending_intr_nr )
         {
-            max_lag = pt->last_plt_gtime + pt->period;
-            earliest_pt = pt;
+            if ( pt_irq_masked(pt) )
+            {
+                /* suspend timer emulation */
+                list_del(&pt->list);
+                pt->on_list = 0;
+            }
+            else
+            {
+                if ( (pt->last_plt_gtime + pt->period) < max_lag )
+                {
+                    max_lag = pt->last_plt_gtime + pt->period;
+                    earliest_pt = pt;
+                }
+            }
         }
     }
 
@@ -412,6 +423,7 @@ void destroy_periodic_time(struct periodic_time *pt)
     if ( pt->on_list )
         list_del(&pt->list);
     pt->on_list = 0;
+    pt->pending_intr_nr = 0;
     pt_unlock(pt);
 
     /*
@@ -451,11 +463,13 @@ static void pt_adjust_vcpu(struct periodic_time *pt, struct vcpu *v)
 
 void pt_adjust_global_vcpu_target(struct vcpu *v)
 {
-    struct pl_time *pl_time = &v->domain->arch.hvm_domain.pl_time;
+    struct pl_time *pl_time;
     int i;
 
     if ( v == NULL )
         return;
+
+    pl_time = &v->domain->arch.hvm_domain.pl_time;
 
     spin_lock(&pl_time->vpit.lock);
     pt_adjust_vcpu(&pl_time->vpit.pt0, v);
@@ -469,4 +483,36 @@ void pt_adjust_global_vcpu_target(struct vcpu *v)
     for ( i = 0; i < HPET_TIMER_NUM; i++ )
         pt_adjust_vcpu(&pl_time->vhpet.pt[i], v);
     spin_unlock(&pl_time->vhpet.lock);
+}
+
+
+static void pt_resume(struct periodic_time *pt)
+{
+    if ( pt->vcpu == NULL )
+        return;
+
+    pt_lock(pt);
+    if ( pt->pending_intr_nr && !pt->on_list )
+    {
+        pt->on_list = 1;
+        list_add(&pt->list, &pt->vcpu->arch.hvm_vcpu.tm_list);
+        vcpu_kick(pt->vcpu);
+    }
+    pt_unlock(pt);
+}
+
+void pt_may_unmask_irq(struct domain *d, struct periodic_time *vlapic_pt)
+{
+    int i;
+
+    if ( d )
+    {
+        pt_resume(&d->arch.hvm_domain.pl_time.vpit.pt0);
+        pt_resume(&d->arch.hvm_domain.pl_time.vrtc.pt);
+        for ( i = 0; i < HPET_TIMER_NUM; i++ )
+            pt_resume(&d->arch.hvm_domain.pl_time.vhpet.pt[i]);
+    }
+
+    if ( vlapic_pt )
+        pt_resume(vlapic_pt);
 }

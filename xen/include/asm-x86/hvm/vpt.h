@@ -144,8 +144,10 @@ void pt_adjust_global_vcpu_target(struct vcpu *v);
 #define pt_global_vcpu_target(d) \
     ((d)->arch.hvm_domain.i8259_target ? : (d)->vcpu ? (d)->vcpu[0] : NULL)
 
+void pt_may_unmask_irq(struct domain *d, struct periodic_time *vlapic_pt);
+
 /* Is given periodic timer active? */
-#define pt_active(pt) ((pt)->on_list)
+#define pt_active(pt) ((pt)->on_list || (pt)->pending_intr_nr)
 
 /*
  * Create/destroy a periodic (or one-shot!) timer.

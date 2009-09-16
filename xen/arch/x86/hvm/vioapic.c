@@ -125,6 +125,7 @@ static void vioapic_write_redirent(
     struct domain *d = vioapic_domain(vioapic);
     struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
     union vioapic_redir_entry *pent, ent;
+    int unmasked = 0;
 
     spin_lock(&d->arch.hvm_domain.irq_lock);
 
@@ -138,10 +139,12 @@ static void vioapic_write_redirent(
     }
     else
     {
+        unmasked = ent.fields.mask;
         /* Remote IRR and Delivery Status are read-only. */
         ent.bits = ((ent.bits >> 32) << 32) | val;
         ent.fields.delivery_status = 0;
         ent.fields.remote_irr = pent->fields.remote_irr;
+        unmasked = unmasked && !ent.fields.mask;
     }
 
     *pent = ent;
@@ -160,6 +163,9 @@ static void vioapic_write_redirent(
     }
 
     spin_unlock(&d->arch.hvm_domain.irq_lock);
+
+    if ( idx == 0 || unmasked )
+        pt_may_unmask_irq(d, NULL);
 }
 
 static void vioapic_write_indirect(

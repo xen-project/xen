@@ -178,7 +178,7 @@ static void vpic_ioport_write(
     struct hvm_hw_vpic *vpic, uint32_t addr, uint32_t val)
 {
     int priority, cmd, irq;
-    uint8_t mask;
+    uint8_t mask, unmasked = 0;
 
     vpic_lock(vpic);
 
@@ -190,6 +190,7 @@ static void vpic_ioport_write(
             /* Clear edge-sensing logic. */
             vpic->irr &= vpic->elcr;
 
+            unmasked = vpic->imr;
             /* No interrupts masked or in service. */
             vpic->imr = vpic->isr = 0;
 
@@ -268,6 +269,7 @@ static void vpic_ioport_write(
         {
         case 0:
             /* OCW1 */
+            unmasked = vpic->imr & (~val);
             vpic->imr = val;
             break;
         case 1:
@@ -295,6 +297,9 @@ static void vpic_ioport_write(
     vpic_update_int_output(vpic);
 
     vpic_unlock(vpic);
+
+    if ( unmasked )
+        pt_may_unmask_irq(vpic_domain(vpic), NULL);
 }
 
 static uint32_t vpic_ioport_read(struct hvm_hw_vpic *vpic, uint32_t addr)
