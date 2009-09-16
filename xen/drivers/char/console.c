@@ -332,13 +332,6 @@ static long guest_console_write(XEN_GUEST_HANDLE(char) buffer, int count)
 
     while ( count > 0 )
     {
-        while ( serial_tx_space(sercon_handle) < (serial_txbufsz / 2) )
-        {
-            if ( hypercall_preempt_check() )
-                break;
-            cpu_relax();
-        }
-
         if ( hypercall_preempt_check() )
             return hypercall_create_continuation(
                 __HYPERVISOR_console_io, "iih",
