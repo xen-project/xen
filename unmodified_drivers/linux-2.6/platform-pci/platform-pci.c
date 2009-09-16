@@ -116,7 +116,7 @@ static uint32_t xen_cpuid_base(void)
 	uint32_t base, eax, ebx, ecx, edx;
 	char signature[13];
 
-	for (base = 0x40000000; base < 0x40001000; base += 0x100) {
+	for (base = 0x40000000; base < 0x40010000; base += 0x100) {
 		cpuid(base, &eax, &ebx, &ecx, &edx);
 		*(uint32_t*)(signature + 0) = ebx;
 		*(uint32_t*)(signature + 4) = ecx;

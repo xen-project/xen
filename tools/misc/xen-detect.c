@@ -52,7 +52,7 @@ static int check_for_xen(void)
     char signature[13];
     uint32_t base;
 
-    for ( base = 0x40000000; base < 0x40001000; base += 0x100 )
+    for ( base = 0x40000000; base < 0x40010000; base += 0x100 )
     {
         cpuid(base, &eax, &ebx, &ecx, &edx);
 
