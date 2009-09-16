@@ -26,13 +26,56 @@
 
 extern unsigned short ivrs_bdf_entries;
 extern struct ivrs_mappings *ivrs_mappings;
-extern void *int_remap_table;
 
-struct amd_iommu *find_iommu_for_device(int bus, int devfn)
+struct amd_iommu *find_iommu_for_device(int bdf)
 {
-    u16 bdf = (bus << 8) | devfn;
     BUG_ON ( bdf >= ivrs_bdf_entries );
     return ivrs_mappings[bdf].iommu;
+}
+
+/*
+ * Some devices will use alias id and original device id to index interrupt
+ * table and I/O page table respectively. Such devices will have
+ * both alias entry and select entry in IVRS structure.
+ *
+ * Return original device id, if device has valid interrupt remapping
+ * table setup for both select entry and alias entry.
+ */
+int get_dma_requestor_id(u16 bdf)
+{
+    int req_id;
+
+    BUG_ON ( bdf >= ivrs_bdf_entries );
+    req_id = ivrs_mappings[bdf].dte_requestor_id;
+    if ( (ivrs_mappings[bdf].intremap_table != NULL) &&
+         (ivrs_mappings[req_id].intremap_table != NULL) )
+        req_id = bdf;
+
+    return req_id;
+}
+
+static int is_translation_valid(u32 *entry)
+{
+    return (get_field_from_reg_u32(entry[0],
+                                   IOMMU_DEV_TABLE_VALID_MASK,
+                                   IOMMU_DEV_TABLE_VALID_SHIFT) &&
+            get_field_from_reg_u32(entry[0],
+                                   IOMMU_DEV_TABLE_TRANSLATION_VALID_MASK,
+                                   IOMMU_DEV_TABLE_TRANSLATION_VALID_SHIFT));
+}
+
+static void disable_translation(u32 *dte)
+{
+    u32 entry;
+
+    entry = dte[0];
+    set_field_in_reg_u32(IOMMU_CONTROL_DISABLED, entry,
+                         IOMMU_DEV_TABLE_TRANSLATION_VALID_MASK,
+                         IOMMU_DEV_TABLE_TRANSLATION_VALID_SHIFT, &entry);
+    set_field_in_reg_u32(IOMMU_CONTROL_DISABLED, entry,
+                         IOMMU_DEV_TABLE_VALID_MASK,
+                         IOMMU_DEV_TABLE_VALID_SHIFT, &entry);
+    dte[0] = entry;
 }
 
 static void amd_iommu_setup_domain_device(
@@ -40,48 +83,37 @@ static void amd_iommu_setup_domain_device(
 {
     void *dte;
     unsigned long flags;
-    int req_id;
-    u8 sys_mgt, dev_ex, valid = 1, int_valid = 1;
+    int req_id, valid = 1;
+
     struct hvm_iommu *hd = domain_hvm_iommu(domain);
 
-    BUG_ON( !hd->root_table || !hd->paging_mode || !int_remap_table );
+    BUG_ON( !hd->root_table || !hd->paging_mode || !iommu->dev_table.buffer );
+
+    if ( iommu_passthrough && (domain->domain_id == 0) )
+        valid = 0;
 
     /* get device-table entry */
-    req_id = ivrs_mappings[bdf].dte_requestor_id;
+    req_id = get_dma_requestor_id(bdf);
     dte = iommu->dev_table.buffer + (req_id * IOMMU_DEV_TABLE_ENTRY_SIZE);
 
     spin_lock_irqsave(&iommu->lock, flags);
 
-    if ( !amd_iommu_is_dte_page_translation_valid((u32 *)dte) )
+    if ( !is_translation_valid((u32 *)dte) )
     {
         /* bind DTE to domain page-tables */
-        sys_mgt = ivrs_mappings[req_id].dte_sys_mgt_enable;
-        dev_ex = ivrs_mappings[req_id].dte_allow_exclusion;
-
-        if ( iommu_passthrough && (domain->domain_id == 0) )
-            valid = 0;
-        if ( !iommu_intremap )
-            int_valid = 0;
-
-        amd_iommu_set_dev_table_entry((u32 *)dte,
-                                      page_to_maddr(hd->root_table),
-                                      virt_to_maddr(int_remap_table),
-                                      hd->domain_id, sys_mgt, dev_ex,
-                                      hd->paging_mode, valid, int_valid);
+        amd_iommu_set_root_page_table(
+            (u32 *)dte, page_to_maddr(hd->root_table), hd->domain_id,
+            hd->paging_mode, valid);
 
         invalidate_dev_table_entry(iommu, req_id);
-        invalidate_interrupt_table(iommu, req_id);
         flush_command_buffer(iommu);
-        amd_iov_info("Enable DTE:0x%x, "
-                "root_table:%"PRIx64", interrupt_table:%"PRIx64", "
-                "domain_id:%d, paging_mode:%d\n",
-                req_id, (u64)page_to_maddr(hd->root_table),
-                (u64)virt_to_maddr(int_remap_table), hd->domain_id,
-                hd->paging_mode);
+
+        amd_iov_info("Setup I/O page table at DTE:0x%x, root_table:%"PRIx64","
+        "domain_id:%d, paging_mode:%d\n", req_id,
+        page_to_maddr(hd->root_table), hd->domain_id, hd->paging_mode);
     }
 
     spin_unlock_irqrestore(&iommu->lock, flags);
-
 }
 
 static void amd_iommu_setup_dom0_devices(struct domain *d)
@@ -110,12 +142,15 @@ static void amd_iommu_setup_dom0_devices(struct domain *d)
                 list_add(&pdev->domain_list, &d->arch.pdev_list);
 
                 bdf = (bus << 8) | pdev->devfn;
-                /* supported device? */
-                iommu = (bdf < ivrs_bdf_entries) ?
-                    find_iommu_for_device(bus, pdev->devfn) : NULL;
+                iommu = find_iommu_for_device(bdf);
 
-                if ( iommu )
-                    amd_iommu_setup_domain_device(d, iommu, bdf);
+                if ( !iommu )
+                {
+                    amd_iov_warning("Fail to find iommu for device"
+                        "%02x:%02x.%x\n", bus, dev, func);
+                    continue;
+                }
+                amd_iommu_setup_domain_device(d, iommu, bdf);
             }
         }
     }
@@ -223,13 +258,14 @@ static void amd_iommu_disable_domain_device(
     unsigned long flags;
     int req_id;
 
-    req_id = ivrs_mappings[bdf].dte_requestor_id;
+    BUG_ON ( iommu->dev_table.buffer == NULL );
+    req_id = get_dma_requestor_id(bdf);
     dte = iommu->dev_table.buffer + (req_id * IOMMU_DEV_TABLE_ENTRY_SIZE);
 
-    spin_lock_irqsave(&iommu->lock, flags); 
-    if ( amd_iommu_is_dte_page_translation_valid((u32 *)dte) )
+    spin_lock_irqsave(&iommu->lock, flags);
+    if ( is_translation_valid((u32 *)dte) )
     {
-        memset (dte, 0, IOMMU_DEV_TABLE_ENTRY_SIZE);
+        disable_translation((u32 *)dte);
         invalidate_dev_table_entry(iommu, req_id);
         flush_command_buffer(iommu);
         amd_iov_info("Disable DTE:0x%x,"
@@ -253,10 +289,7 @@ static int reassign_device( struct domain *source, struct domain *target,
         return -ENODEV;
 
     bdf = (bus << 8) | devfn;
-    /* supported device? */
-    iommu = (bdf < ivrs_bdf_entries) ?
-    find_iommu_for_device(bus, pdev->devfn) : NULL;
-
+    iommu = find_iommu_for_device(bdf);
     if ( !iommu )
     {
         amd_iov_error("Fail to find iommu."
@@ -281,7 +314,7 @@ static int reassign_device( struct domain *source, struct domain *target,
 static int amd_iommu_assign_device(struct domain *d, u8 bus, u8 devfn)
 {
     int bdf = (bus << 8) | devfn;
-    int req_id = ivrs_mappings[bdf].dte_requestor_id;
+    int req_id = get_dma_requestor_id(bdf);
 
     if ( ivrs_mappings[req_id].unity_map_enable )
     {
@@ -356,9 +389,7 @@ static int amd_iommu_add_device(struct pci_dev *pdev)
         return -EINVAL;
 
     bdf = (pdev->bus << 8) | pdev->devfn;
-    iommu = (bdf < ivrs_bdf_entries) ?
-    find_iommu_for_device(pdev->bus, pdev->devfn) : NULL;
-
+    iommu = find_iommu_for_device(bdf);
     if ( !iommu )
     {
         amd_iov_error("Fail to find iommu."
@@ -380,9 +411,7 @@ static int amd_iommu_remove_device(struct pci_dev *pdev)
         return -EINVAL;
 
     bdf = (pdev->bus << 8) | pdev->devfn;
-    iommu = (bdf < ivrs_bdf_entries) ?
-    find_iommu_for_device(pdev->bus, pdev->devfn) : NULL;
-
+    iommu = find_iommu_for_device(bdf);
     if ( !iommu )
     {
         amd_iov_error("Fail to find iommu."
@@ -401,7 +430,7 @@ static int amd_iommu_group_id(u8 bus, u8 devfn)
     int rt;
     int bdf = (bus << 8) | devfn;
     rt = ( bdf < ivrs_bdf_entries ) ?
-        ivrs_mappings[bdf].dte_requestor_id :
+        get_dma_requestor_id(bdf) :
         bdf;
     return rt;
 }

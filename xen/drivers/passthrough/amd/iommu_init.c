@@ -631,6 +631,7 @@ error_out:
 static void __init amd_iommu_init_cleanup(void)
 {
     struct amd_iommu *iommu, *next;
+    int bdf;
 
     /* free amd iommu list */
     list_for_each_entry_safe ( iommu, next, &amd_iommu_head, list )
@@ -646,7 +647,11 @@ static void __init amd_iommu_init_cleanup(void)
     }
 
     /* free interrupt remapping table */
-    deallocate_intremap_table();
+    for ( bdf = 0; bdf < ivrs_bdf_entries; bdf++ )
+    {
+        if ( ivrs_mappings[bdf].intremap_table )
+            amd_iommu_free_intremap_table(bdf);
+    }
 
     /* free device table */
     deallocate_iommu_table_struct(&device_table);
@@ -693,12 +698,28 @@ static int __init init_ivrs_mapping(void)
         ivrs_mappings[bdf].dte_allow_exclusion = IOMMU_CONTROL_DISABLED;
         ivrs_mappings[bdf].unity_map_enable = IOMMU_CONTROL_DISABLED;
         ivrs_mappings[bdf].iommu = NULL;
+
+        ivrs_mappings[bdf].intremap_table = NULL;
+        ivrs_mappings[bdf].dte_lint1_pass = IOMMU_CONTROL_DISABLED;
+        ivrs_mappings[bdf].dte_lint0_pass = IOMMU_CONTROL_DISABLED;
+        ivrs_mappings[bdf].dte_nmi_pass = IOMMU_CONTROL_DISABLED;
+        ivrs_mappings[bdf].dte_ext_int_pass = IOMMU_CONTROL_DISABLED;
+        ivrs_mappings[bdf].dte_init_pass = IOMMU_CONTROL_DISABLED;
+
+        spin_lock_init(&ivrs_mappings[bdf].intremap_lock);
     }
     return 0;
 }
 
 static int __init amd_iommu_setup_device_table(void)
 {
+    int bdf;
+    void *intr_tb, *dte;
+    int sys_mgt, dev_ex, lint1_pass, lint0_pass,
+       nmi_pass, ext_int_pass, init_pass;
+
+    BUG_ON( (ivrs_bdf_entries == 0) || (iommu_enabled) );
+
     /* allocate 'device table' on a 4K boundary */
     device_table.alloc_size = PAGE_SIZE <<
                               get_order_from_bytes(
@@ -707,7 +728,42 @@ static int __init amd_iommu_setup_device_table(void)
     device_table.entries = device_table.alloc_size /
                            IOMMU_DEV_TABLE_ENTRY_SIZE;
 
-    return ( allocate_iommu_table_struct(&device_table, "Device Table") );
+    if ( allocate_iommu_table_struct(&device_table, "Device Table") != 0 )
+         return -ENOMEM;
+
+    /* Add device table entries */
+    for ( bdf = 0; bdf < ivrs_bdf_entries; bdf++ )
+    {
+        intr_tb = ivrs_mappings[bdf].intremap_table;
+
+        if ( intr_tb )
+        {
+            sys_mgt = ivrs_mappings[bdf].dte_sys_mgt_enable;
+            dev_ex = ivrs_mappings[bdf].dte_allow_exclusion;
+
+            /* get interrupt remapping settings */
+            lint1_pass = ivrs_mappings[bdf].dte_lint1_pass;
+            lint0_pass = ivrs_mappings[bdf].dte_lint0_pass;
+            nmi_pass = ivrs_mappings[bdf].dte_nmi_pass;
+            ext_int_pass = ivrs_mappings[bdf].dte_ext_int_pass;
+            init_pass = ivrs_mappings[bdf].dte_init_pass;
+
+            /* add device table entry */
+            dte = device_table.buffer + (bdf * IOMMU_DEV_TABLE_ENTRY_SIZE);
+            amd_iommu_add_dev_table_entry(
+                dte, sys_mgt, dev_ex, lint1_pass, lint0_pass,
+                nmi_pass, ext_int_pass, init_pass);
+
+            amd_iommu_set_intremap_table(
+                dte, (u64)virt_to_maddr(intr_tb), iommu_intremap);
+
+            amd_iov_info("Add device table entry at DTE:0x%x, "
+                "intremap_table:%"PRIx64"\n", bdf,
+                (u64)virt_to_maddr(intr_tb));
+        }
+    }
+
+    return 0;
 }
 
 int __init amd_iommu_init(void)
@@ -717,7 +773,8 @@ int __init amd_iommu_init(void)
     BUG_ON( !iommu_found() );
 
     irq_to_iommu = xmalloc_array(struct amd_iommu *, nr_irqs);
-    BUG_ON(!irq_to_iommu);
+    if ( irq_to_iommu == NULL )
+        goto error_out;
     memset(irq_to_iommu, 0, nr_irqs * sizeof(struct iommu*));
 
     ivrs_bdf_entries = amd_iommu_get_ivrs_dev_entries();
@@ -731,12 +788,12 @@ int __init amd_iommu_init(void)
     if ( amd_iommu_update_ivrs_mapping_acpi() != 0 )
         goto error_out;
 
-    /* allocate and initialize a global device table shared by all iommus */
-    if ( amd_iommu_setup_device_table() != 0 )
+    /* initialize io-apic interrupt remapping entries */
+    if ( amd_iommu_setup_ioapic_remapping() != 0 )
         goto error_out;
 
-    /* initialize io-apic interrupt remapping entries */
-    if ( amd_iommu_setup_intremap_table() != 0 )
+    /* allocate and initialize a global device table shared by all iommus */
+    if ( amd_iommu_setup_device_table() != 0 )
         goto error_out;
 
     /* per iommu initialization  */
@@ -783,15 +840,13 @@ static void invalidate_all_domain_pages(void)
 
 static void invalidate_all_devices(void)
 {
-    u16 bus, devfn, bdf, req_id;
+    int bdf, req_id;
     unsigned long flags;
     struct amd_iommu *iommu;
 
     for ( bdf = 0; bdf < ivrs_bdf_entries; bdf++ )
     {
-        bus = bdf >> 8;
-        devfn = bdf & 0xFF;
-        iommu = find_iommu_for_device(bus, devfn);
+        iommu = find_iommu_for_device(bdf);
         req_id = ivrs_mappings[bdf].dte_requestor_id;
         if ( iommu )
         {

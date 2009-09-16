@@ -92,5 +92,16 @@ struct ivrs_mappings {
     unsigned long addr_range_start;
     unsigned long addr_range_length;
     struct amd_iommu *iommu;
+
+    /* per device interrupt remapping table */
+    void *intremap_table;
+    spinlock_t intremap_lock;
+
+    /* interrupt remapping settings */
+    u8 dte_lint1_pass;
+    u8 dte_lint0_pass;
+    u8 dte_nmi_pass;
+    u8 dte_ext_int_pass;
+    u8 dte_init_pass;
 };
 #endif /* _ASM_X86_64_AMD_IOMMU_H */

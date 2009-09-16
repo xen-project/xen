@@ -43,6 +43,7 @@
 #define AMD_IOMMU_ACPI_IVHD_DEV_ALIAS_RANGE    67
 #define AMD_IOMMU_ACPI_IVHD_DEV_EXT_SELECT 70
 #define AMD_IOMMU_ACPI_IVHD_DEV_EXT_RANGE  71
+#define AMD_IOMMU_ACPI_IVHD_DEV_SPECIAL    72
 
 /* IVHD IOMMU Flags */
 #define AMD_IOMMU_ACPI_COHERENT_MASK       0x20
@@ -151,6 +152,13 @@ struct acpi_ivhd_device_extended_range {
    struct acpi_ivhd_device_trailer trailer;
 };
 
+struct acpi_ivhd_device_special {
+   struct acpi_ivhd_device_header header;
+   u8  handle;
+   u16 dev_id;
+   u8  variety;
+};
+
 union acpi_ivhd_device {
    struct acpi_ivhd_device_header header;
    struct acpi_ivhd_device_range range;
@@ -158,6 +166,7 @@ union acpi_ivhd_device {
    struct acpi_ivhd_device_alias_range alias_range;
    struct acpi_ivhd_device_extended extended;
    struct acpi_ivhd_device_extended_range extended_range;
+   struct acpi_ivhd_device_special special;
 };
 
 struct acpi_ivmd_block_header {

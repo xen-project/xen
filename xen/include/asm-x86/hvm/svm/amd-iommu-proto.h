@@ -63,10 +63,14 @@ int amd_iommu_reserve_domain_unity_map(struct domain *domain,
 void invalidate_all_iommu_pages(struct domain *d);
 
 /* device table functions */
-void amd_iommu_set_dev_table_entry(u32 *dte, u64 root_ptr, u64 intremap_ptr,
-        u16 domain_id, u8 sys_mgt, u8 dev_ex, u8 paging_mode,
-        u8 valid, u8 int_valid);
-int amd_iommu_is_dte_page_translation_valid(u32 *entry);
+int get_dma_requestor_id(u16 bdf);
+void amd_iommu_add_dev_table_entry(
+    u32 *dte, u8 sys_mgt, u8 dev_ex, u8 lint1_pass, u8 lint0_pass, 
+    u8 nmi_pass, u8 ext_int_pass, u8 init_pass);
+void amd_iommu_set_intremap_table(
+    u32 *dte, u64 intremap_ptr, u8 int_valid);
+void amd_iommu_set_root_page_table(
+    u32 *dte, u64 root_ptr, u16 domain_id, u8 paging_mode, u8 valid);
 void invalidate_dev_table_entry(struct amd_iommu *iommu, u16 devic_id);
 
 /* send cmd to iommu */
@@ -74,11 +78,12 @@ int send_iommu_command(struct amd_iommu *iommu, u32 cmd[]);
 void flush_command_buffer(struct amd_iommu *iommu);
 
 /* find iommu for bdf */
-struct amd_iommu *find_iommu_for_device(int bus, int devfn);
+struct amd_iommu *find_iommu_for_device(int bdf);
 
 /*interrupt remapping */
-int __init amd_iommu_setup_intremap_table(void);
-int __init deallocate_intremap_table(void);
+int __init amd_iommu_setup_ioapic_remapping(void);
+void*__init amd_iommu_alloc_intremap_table(void);
+void __init amd_iommu_free_intremap_table(int bdf);
 void invalidate_interrupt_table(struct amd_iommu *iommu, u16 device_id);
 void amd_iommu_ioapic_update_ire(
     unsigned int apic, unsigned int reg, unsigned int value);
