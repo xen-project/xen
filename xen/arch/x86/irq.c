@@ -55,6 +55,14 @@ DEFINE_PER_CPU(vector_irq_t, vector_irq) = {
 
 DEFINE_PER_CPU(struct cpu_user_regs *, __irq_regs);
 
+static LIST_HEAD(irq_ratelimit_list);
+static DEFINE_SPINLOCK(irq_ratelimit_lock);
+static struct timer irq_ratelimit_timer;
+
+/* irq_ratelimit: the max irq rate allowed in every 10ms, set 0 to disable */
+unsigned int __read_mostly irq_ratelimit_threshold = 10000;
+integer_param("irq_ratelimit", irq_ratelimit_threshold);
+
 /* Must be called when irq disabled */
 void lock_vector_lock(void)
 {
@@ -241,6 +249,7 @@ static void init_one_irq_desc(struct irq_desc *desc)
     desc->msi_desc = NULL;
     spin_lock_init(&desc->lock);
     cpus_setall(desc->affinity);
+    INIT_LIST_HEAD(&desc->rl_link);
 }
 
 static void init_one_irq_status(int irq)
@@ -469,6 +478,32 @@ asmlinkage void do_IRQ(struct cpu_user_regs *regs)
 
     if ( likely(desc->status & IRQ_GUEST) )
     {
+        if ( irq_ratelimit_timer.function && /* irq rate limiting enabled? */
+             unlikely(desc->rl_cnt++ >= irq_ratelimit_threshold) )
+        {
+            s_time_t now = NOW();
+            if ( now < (desc->rl_quantum_start + MILLISECS(10)) )
+            {
+                desc->handler->disable(irq);
+                /*
+                 * If handler->disable doesn't actually mask the interrupt, a 
+                 * disabled irq still can fire. This check also avoids possible 
+                 * deadlocks if ratelimit_timer_fn runs at the same time.
+                 */
+                if ( likely(list_empty(&desc->rl_link)) )
+                {
+                    spin_lock(&irq_ratelimit_lock);
+                    if ( list_empty(&irq_ratelimit_list) )
+                        set_timer(&irq_ratelimit_timer, now + MILLISECS(10));
+                    list_add(&desc->rl_link, &irq_ratelimit_list);
+                    spin_unlock(&irq_ratelimit_lock);
+                }
+                goto out;
+            }
+            desc->rl_cnt = 0;
+            desc->rl_quantum_start = now;
+        }
+
         irq_enter();
         tsc_in = tb_init_done ? get_cycles() : 0;
         __do_IRQ_guest(irq);
@@ -511,6 +546,33 @@ asmlinkage void do_IRQ(struct cpu_user_regs *regs)
     spin_unlock(&desc->lock);
     set_irq_regs(old_regs);
 }
+
+static void irq_ratelimit_timer_fn(void *data)
+{
+    struct irq_desc *desc, *tmp;
+    unsigned long flags;
+
+    spin_lock_irqsave(&irq_ratelimit_lock, flags);
+
+    list_for_each_entry_safe ( desc, tmp, &irq_ratelimit_list, rl_link )
+    {
+        spin_lock(&desc->lock);
+        desc->handler->enable(desc->irq);
+        list_del(&desc->rl_link);
+        INIT_LIST_HEAD(&desc->rl_link);
+        spin_unlock(&desc->lock);
+    }
+
+    spin_unlock_irqrestore(&irq_ratelimit_lock, flags);
+}
+
+static int __init irq_ratelimit_init(void)
+{
+    if ( irq_ratelimit_threshold )
+        init_timer(&irq_ratelimit_timer, irq_ratelimit_timer_fn, NULL, 0);
+    return 0;
+}
+__initcall(irq_ratelimit_init);
 
 int request_irq(unsigned int irq,
         void (*handler)(int, void *, struct cpu_user_regs *),

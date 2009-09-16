@@ -4,6 +4,7 @@
 #include <xen/config.h>
 #include <xen/cpumask.h>
 #include <xen/spinlock.h>
+#include <xen/time.h>
 #include <asm/regs.h>
 #include <asm/hardirq.h>
 
@@ -74,6 +75,11 @@ typedef struct irq_desc {
     int irq;
     spinlock_t lock;
     cpumask_t affinity;
+
+    /* irq ratelimit */
+    s_time_t rl_quantum_start;
+    unsigned int rl_cnt;
+    struct list_head rl_link;
 } __cacheline_aligned irq_desc_t;
 
 #if defined(__ia64__)
