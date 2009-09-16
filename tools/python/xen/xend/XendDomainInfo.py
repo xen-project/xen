@@ -3636,6 +3636,9 @@ class XendDomainInfo:
             
             config['VDI'] = config.get('VDI', '')
             config['device'] = config.get('dev', '')
+            if config['device'].startswith('ioemu:'):
+                _, vbd_device = config['device'].split(':', 1)
+                config['device'] = vbd_device
             if ':' in config['device']:
                 vbd_name, vbd_type = config['device'].split(':', 1)
                 config['device'] = vbd_name
