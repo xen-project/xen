@@ -21,9 +21,6 @@
 #ifndef _ASM_X86_64_AMD_IOMMU_DEFS_H
 #define _ASM_X86_64_AMD_IOMMU_DEFS_H
 
-/* IOMMU ComWaitInt polling after issuing a COMPLETION_WAIT command */
-#define COMPLETION_WAIT_DEFAULT_POLLING_COUNT	10
-
 /* IOMMU Command Buffer entries: in power of 2 increments, minimum of 256 */
 #define IOMMU_CMD_BUFFER_DEFAULT_ENTRIES	512
 

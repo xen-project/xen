@@ -23,8 +23,6 @@
 #include <asm/amd-iommu.h>
 #include <asm/hvm/svm/amd-iommu-proto.h>
 
-long amd_iommu_poll_comp_wait = COMPLETION_WAIT_DEFAULT_POLLING_COUNT;
-
 static int queue_iommu_command(struct amd_iommu *iommu, u32 cmd[])
 {
     u32 tail, head, *cmd_buffer;
@@ -131,32 +129,24 @@ void flush_command_buffer(struct amd_iommu *iommu)
                          IOMMU_COMP_WAIT_I_FLAG_SHIFT, &cmd[0]);
     send_iommu_command(iommu, cmd);
 
-    /* wait for 'ComWaitInt' to signal comp#endifletion? */
-    if ( amd_iommu_poll_comp_wait )
-    {
-        loop_count = amd_iommu_poll_comp_wait;
-        do {
-            status = readl(iommu->mmio_base +
-                           IOMMU_STATUS_MMIO_OFFSET);
-            comp_wait = get_field_from_reg_u32(
-                status,
-                IOMMU_STATUS_COMP_WAIT_INT_MASK,
-                IOMMU_STATUS_COMP_WAIT_INT_SHIFT);
-            --loop_count;
-        } while ( loop_count && !comp_wait );
+    /* Make loop_count long enough for polling completion wait bit */
+    loop_count = 1000;
+    do {
+        status = readl(iommu->mmio_base + IOMMU_STATUS_MMIO_OFFSET);
+        comp_wait = get_field_from_reg_u32(status,
+            IOMMU_STATUS_COMP_WAIT_INT_MASK,
+            IOMMU_STATUS_COMP_WAIT_INT_SHIFT);
+        --loop_count;
+    } while ( !comp_wait && loop_count );
 
-        if ( comp_wait )
-        {
-            /* clear 'ComWaitInt' in status register (WIC) */
-            status &= IOMMU_STATUS_COMP_WAIT_INT_MASK;
-            writel(status, iommu->mmio_base +
-                   IOMMU_STATUS_MMIO_OFFSET);
-        }
-        else
-        {
-            AMD_IOMMU_DEBUG("Warning: ComWaitInt bit did not assert!\n");
-        }
+    if ( comp_wait )
+    {
+        /* clear 'ComWaitInt' in status register (WIC) */
+        status &= IOMMU_STATUS_COMP_WAIT_INT_MASK;
+        writel(status, iommu->mmio_base + IOMMU_STATUS_MMIO_OFFSET);
+        return;
     }
+    AMD_IOMMU_DEBUG("Warning: ComWaitInt bit did not assert!\n");
 }
 
 static void clear_iommu_l1e_present(u64 l2e, unsigned long gfn)
