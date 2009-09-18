@@ -21,14 +21,6 @@
 #ifndef _ASM_X86_64_AMD_IOMMU_DEFS_H
 #define _ASM_X86_64_AMD_IOMMU_DEFS_H
 
-/* Reserve some non-mapped pages to handle error conditions.
- * 'bad_dma_address' will point to these reserved pages, and
- * the mapping funtions will return 'bad_dma_address' if there
- * are not enough page table entries available.
- */
-#define IOMMU_RESERVED_BASE_ADDR	0
-#define IOMMU_RESERVED_PAGES		32
-
 /* IOMMU ComWaitInt polling after issuing a COMPLETION_WAIT command */
 #define COMPLETION_WAIT_DEFAULT_POLLING_COUNT	10
 
@@ -38,8 +30,6 @@
 /* IOMMU Event Log entries: in power of 2 increments, minimum of 256 */
 #define IOMMU_EVENT_LOG_DEFAULT_ENTRIES     512
 
-#define BITMAP_ENTRIES_PER_BYTE		8
-
 #define PTE_PER_TABLE_SHIFT		9
 #define PTE_PER_TABLE_SIZE		(1 << PTE_PER_TABLE_SHIFT)
 #define PTE_PER_TABLE_MASK		(~(PTE_PER_TABLE_SIZE - 1))
@@ -48,41 +38,6 @@
 #define PTE_PER_TABLE_ALLOC(entries)	\
 	PAGE_SIZE * (PTE_PER_TABLE_ALIGN(entries) >> PTE_PER_TABLE_SHIFT)
 
-/* 0-based aperture order (represents virtual address space for DMA mappings */
-#define APERTURE_ORDER_FOR_32B_APERTURE		0
-#define APERTURE_ORDER_FOR_64MB_APERTURE	1
-#define APERTURE_ORDER_FOR_128MB_APERTURE	2
-#define APERTURE_ORDER_FOR_256MB_APERTURE	3
-#define APERTURE_ORDER_FOR_512MB_APERTURE	4
-#define APERTURE_ORDER_FOR_1GB_APERTURE		5
-#define APERTURE_ORDER_FOR_MAX_APERTURE		APERTURE_ORDER_FOR_1GB_APERTURE
-
-/* The minimum 32MB aperture requires 2**13 level-1 page table entries */
-#define SHIFT_FOR_MIN_APERTURE		13
-#define PAGES_FROM_APERTURE_ORDER(order)	\
-	((1 << (order)) << SHIFT_FOR_MIN_APERTURE)
-#define ORDER_FROM_APERTURE_PAGES(pages)	\
-	get_order(((pages) * PAGE_SIZE) >> SHIFT_FOR_MIN_APERTURE)
-
-/*
- * PCI config-space
- */
-#define VALID_PCI_VENDOR_ID(id)		(((id) != 0) && ((id) != 0xFFFF))
-#define IS_PCI_MULTI_FUNCTION(hdr)	((hdr) & 0x80)
-#define IS_PCI_TYPE0_HEADER(hdr)	(((hdr) & 0x7f) == 0)
-#define IS_PCI_TYPE1_HEADER(hdr)	(((hdr) & 0x7f) == 1)
-
-#define PCI_MAX_BUS_COUNT	256
-#define PCI_MAX_DEV_COUNT	32
-#define PCI_MAX_FUNC_COUNT	8
-#define PCI_MIN_DEVFN		0
-#define PCI_MAX_DEVFN		0xFF
-
-/*
- * Capability blocks are 4-byte aligned, and must start at >= offset 0x40,
- * for a max of 48 possible cap_blocks (256 - 0x40 = 192; 192 / 4 = 48)
- * The lower 2 bits of each pointer are reserved, and must be masked off.
- */
 #define PCI_MIN_CAP_OFFSET	0x40
 #define PCI_MAX_CAP_BLOCKS	48
 #define PCI_CAP_PTR_MASK	0xFC
@@ -105,7 +60,6 @@
 #define PCI_CAP_RESET_MASK	0x80000000
 #define PCI_CAP_RESET_SHIFT	31
 
-#define PCI_CAP_ID_SECURE_DEVICE	0x0F
 #define PCI_CAP_TYPE_IOMMU		0x3
 
 #define PCI_CAP_MMIO_BAR_LOW_OFFSET	0x04

@@ -58,9 +58,6 @@ struct amd_iommu {
     u8 pass_pw;
     u8 ht_tunnel_enable;
 
-    int last_downstream_bus;
-    int downstream_bus_present[PCI_MAX_BUS_COUNT];
-
     void *mmio_base;
     unsigned long mmio_base_phys;
 
