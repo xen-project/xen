@@ -83,7 +83,6 @@ struct hvm_irq_dpci {
     unsigned long *dirq_mask;
     /* Guest IRQ to guest device/intx mapping. */
     struct list_head girq[NR_HVM_IRQS];
-    uint8_t msi_gvec_pirq[0x100];
     /* Record of mapped ISA IRQs */
     DECLARE_BITMAP(isairq_map, NR_ISAIRQS);
     /* Record of mapped Links */

@@ -161,7 +161,6 @@ int pt_irq_create_bind_vtd(
                                              HVM_IRQ_DPCI_GUEST_MSI;
             hvm_irq_dpci->mirq[pirq].gmsi.gvec = pt_irq_bind->u.msi.gvec;
             hvm_irq_dpci->mirq[pirq].gmsi.gflags = pt_irq_bind->u.msi.gflags;
-            hvm_irq_dpci->msi_gvec_pirq[pt_irq_bind->u.msi.gvec] = pirq;
             /* bind after hvm_irq_dpci is setup to avoid race with irq handler*/
             rc = pirq_guest_bind(d->vcpu[0], pirq, 0);
             if ( rc == 0 && pt_irq_bind->u.msi.gtable )
@@ -172,7 +171,6 @@ int pt_irq_create_bind_vtd(
             }
             if ( unlikely(rc) )
             {
-                hvm_irq_dpci->msi_gvec_pirq[pt_irq_bind->u.msi.gvec] = 0;
                 hvm_irq_dpci->mirq[pirq].gmsi.gflags = 0;
                 hvm_irq_dpci->mirq[pirq].gmsi.gvec = 0;
                 hvm_irq_dpci->mirq[pirq].flags = 0;
@@ -194,10 +192,8 @@ int pt_irq_create_bind_vtd(
  
             /* if pirq is already mapped as vmsi, update the guest data/addr */
             old_gvec = hvm_irq_dpci->mirq[pirq].gmsi.gvec;
-            hvm_irq_dpci->msi_gvec_pirq[old_gvec] = 0;
             hvm_irq_dpci->mirq[pirq].gmsi.gvec = pt_irq_bind->u.msi.gvec;
             hvm_irq_dpci->mirq[pirq].gmsi.gflags = pt_irq_bind->u.msi.gflags;
-            hvm_irq_dpci->msi_gvec_pirq[pt_irq_bind->u.msi.gvec] = pirq;
         }
     }
     else
@@ -405,17 +401,28 @@ static void __msi_pirq_eoi(struct domain *d, int pirq)
 
 void hvm_dpci_msi_eoi(struct domain *d, int vector)
 {
+    int pirq, dest, dest_mode;
     struct hvm_irq_dpci *hvm_irq_dpci = d->arch.hvm_domain.irq.dpci;
-    int pirq;
 
     if ( !iommu_enabled || (hvm_irq_dpci == NULL) )
        return;
 
     spin_lock(&d->event_lock);
+    for ( pirq = find_first_bit(hvm_irq_dpci->mapping, d->nr_pirqs);
+          pirq < d->nr_pirqs;
+          pirq = find_next_bit(hvm_irq_dpci->mapping, d->nr_pirqs, pirq + 1) )
+    {
+        if ( (!(hvm_irq_dpci->mirq[pirq].flags & HVM_IRQ_DPCI_MACH_MSI)) ||
+                (hvm_irq_dpci->mirq[pirq].gmsi.gvec != vector) )
+            continue;
 
-    pirq = hvm_irq_dpci->msi_gvec_pirq[vector];
-    __msi_pirq_eoi(d, pirq);
-
+        dest = hvm_irq_dpci->mirq[pirq].gmsi.gflags & VMSI_DEST_ID_MASK;
+        dest_mode = !!(hvm_irq_dpci->mirq[pirq].gmsi.gflags & VMSI_DM_MASK);
+        if ( vlapic_match_dest(vcpu_vlapic(current), NULL, 0, dest, dest_mode) )
+            break;
+    }
+    if ( pirq < d->nr_pirqs )
+        __msi_pirq_eoi(d, pirq);
     spin_unlock(&d->event_lock);
 }
 
