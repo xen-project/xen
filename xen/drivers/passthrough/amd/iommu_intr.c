@@ -192,6 +192,9 @@ void amd_iommu_ioapic_update_ire(
     *IO_APIC_BASE(apic) = reg;
     *(IO_APIC_BASE(apic)+4) = value;
 
+    if ( !iommu_intremap )
+        return;
+
     /* get device id of ioapic devices */
     bdf = ioapic_bdf[IO_APIC_ID(apic)];
     iommu = find_iommu_for_device(bdf);
@@ -280,6 +283,9 @@ void amd_iommu_msi_msg_update_ire(
 {
     struct pci_dev *pdev = msi_desc->dev;
     struct amd_iommu *iommu = NULL;
+
+    if ( !iommu_intremap )
+        return;
 
     iommu = find_iommu_for_device((pdev->bus << 8) | pdev->devfn);
 
