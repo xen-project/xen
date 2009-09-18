@@ -1473,36 +1473,6 @@ int set_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
                 9 : 0;
         else
             order = 0;
-
-#ifndef NDEBUG
-        /* PoD code assumes that a page owned by the domain, not from the xenheap, and in the p2m
-         * is on the domain page list.  Verify this assumption. */
-        if ( mfn_valid(mfn)
-             && p2m_is_ram(p2mt)
-             && page_get_owner(mfn_to_page(mfn))==d
-             && ( (mfn_to_page(mfn)->count_info & PGC_xen_heap) == 0 ) )
-        {
-            struct page_info *p, *q;
-
-            p = mfn_to_page(mfn);
-
-            spin_lock(&d->page_alloc_lock);
-           
-            /* Walk the domain page list and make sure this page is on it... */
-            for ( q = page_list_first(&d->page_list) ; q; q = page_list_next(q, &d->page_list) )
-                if ( q == p )
-                    break;
-            if ( !q )
-            {
-                printk("%s: mfn %lx owned by d%d, not xen_heap, but not on domain page_list!\n",
-                       __func__, mfn_x(mfn), d->domain_id);
-                BUG();
-            }   
-
-            spin_unlock(&d->page_alloc_lock);
-        }
-#endif
-
         rc = d->arch.p2m->set_entry(d, gfn, mfn, order, p2mt);
         gfn += 1ul << order;
         if ( mfn_x(mfn) != INVALID_MFN )
