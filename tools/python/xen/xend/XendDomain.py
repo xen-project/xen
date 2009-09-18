@@ -347,6 +347,7 @@ class XendDomain:
             if self.is_domain_managed(dom):
                 self._managed_config_remove(dom.get_uuid())
                 del self.managed_domains[dom.get_uuid()]
+                dom.unlink_xapi_instances()
                 dom.destroy_xapi_instances()
         except ValueError:
             log.warn("Domain is not registered: %s" % dom.get_uuid())
@@ -485,6 +486,7 @@ class XendDomain:
             if domid in self.domains:
                 del self.domains[domid]
 
+            info.unlink_xapi_instances()
             info.destroy_xapi_instances()
         else:
             log.warning("Attempted to remove non-existent domain.")
