@@ -46,6 +46,7 @@ int iommu_passthrough = 0;
 int iommu_snoop = 0;
 int iommu_qinval = 0;
 int iommu_intremap = 0;
+int amd_iommu_debug = 0;
 
 static void __init parse_iommu_param(char *s)
 {
@@ -54,6 +55,7 @@ static void __init parse_iommu_param(char *s)
     iommu_snoop = 1;
     iommu_qinval = 1;
     iommu_intremap = 1;
+    amd_iommu_debug = 0;
 
     do {
         ss = strchr(s, ',');
@@ -77,6 +79,8 @@ static void __init parse_iommu_param(char *s)
             iommu_qinval = 0;
         else if ( !strcmp(s, "no-intremap") )
             iommu_intremap = 0;
+        else if ( !strcmp(s, "amd-iommu-debug") )
+            amd_iommu_debug = 1;
 
         s = ss + 1;
     } while ( ss );

@@ -154,7 +154,7 @@ void flush_command_buffer(struct amd_iommu *iommu)
         }
         else
         {
-            amd_iov_warning("Warning: ComWaitInt bit did not assert!\n");
+            AMD_IOMMU_DEBUG("Warning: ComWaitInt bit did not assert!\n");
         }
     }
 }
@@ -485,7 +485,7 @@ int amd_iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn)
     if ( iommu_l2e == 0 )
     {
         spin_unlock(&hd->mapping_lock);
-        amd_iov_error("Invalid IO pagetable entry gfn = %lx\n", gfn);
+        AMD_IOMMU_DEBUG("Invalid IO pagetable entry gfn = %lx\n", gfn);
         domain_crash(d);
         return -EFAULT;
     }
@@ -511,7 +511,7 @@ int amd_iommu_unmap_page(struct domain *d, unsigned long gfn)
     if ( iommu_l2e == 0 )
     {
         spin_unlock(&hd->mapping_lock);
-        amd_iov_error("Invalid IO pagetable entry gfn = %lx\n", gfn);
+        AMD_IOMMU_DEBUG("Invalid IO pagetable entry gfn = %lx\n", gfn);
         domain_crash(d);
         return -EFAULT;
     }
@@ -552,7 +552,7 @@ int amd_iommu_reserve_domain_unity_map(
         if ( iommu_l2e == 0 )
         {
             spin_unlock(&hd->mapping_lock);
-            amd_iov_error("Invalid IO pagetable entry phys_addr = %lx\n",
+            AMD_IOMMU_DEBUG("Invalid IO pagetable entry phys_addr = %lx\n",
                           phys_addr);
             domain_crash(domain);
             return -EFAULT;

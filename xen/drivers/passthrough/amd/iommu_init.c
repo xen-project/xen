@@ -44,7 +44,7 @@ static int __init map_iommu_mmio_region(struct amd_iommu *iommu)
 
     if ( nr_amd_iommus > MAX_AMD_IOMMUS )
     {
-        amd_iov_error("nr_amd_iommus %d > MAX_IOMMUS\n", nr_amd_iommus);
+        AMD_IOMMU_DEBUG("nr_amd_iommus %d > MAX_IOMMUS\n", nr_amd_iommus);
         return -ENOMEM;
     }
 
@@ -437,7 +437,7 @@ static void parse_event_log_entry(u32 entry[])
     if ( (code > IOMMU_EVENT_INVALID_DEV_REQUEST) ||
         (code < IOMMU_EVENT_ILLEGAL_DEV_TABLE_ENTRY) )
     {
-        amd_iov_error("Invalid event log entry!\n");
+        AMD_IOMMU_DEBUG("Invalid event log entry!\n");
         return;
     }
 
@@ -500,7 +500,7 @@ static int set_iommu_interrupt_handler(struct amd_iommu *iommu)
         irq_desc[irq].handler = &no_irq_type;
         irq_to_iommu[irq] = NULL;
         destroy_irq(irq);
-        amd_iov_error("can't request irq\n");
+        AMD_IOMMU_DEBUG("can't request irq\n");
         return 0;
     }
 
@@ -560,7 +560,7 @@ static int __init allocate_iommu_table_struct(struct table_struct *table,
 
         if ( table->buffer == NULL )
         {
-            amd_iov_error("Error allocating %s\n", name);
+            AMD_IOMMU_DEBUG("Error allocating %s\n", name);
             return -ENOMEM;
         }
         memset(table->buffer, 0, PAGE_SIZE * (1UL << order));
@@ -684,7 +684,7 @@ static int __init init_ivrs_mapping(void)
     ivrs_mappings = xmalloc_array( struct ivrs_mappings, ivrs_bdf_entries);
     if ( ivrs_mappings == NULL )
     {
-        amd_iov_error("Error allocating IVRS Mappings table\n");
+        AMD_IOMMU_DEBUG("Error allocating IVRS Mappings table\n");
         return -ENOMEM;
     }
     memset(ivrs_mappings, 0, ivrs_bdf_entries * sizeof(struct ivrs_mappings));
@@ -757,7 +757,7 @@ static int __init amd_iommu_setup_device_table(void)
             amd_iommu_set_intremap_table(
                 dte, (u64)virt_to_maddr(intr_tb), iommu_intremap);
 
-            amd_iov_info("Add device table entry at DTE:0x%x, "
+            AMD_IOMMU_DEBUG("Add device table entry at DTE:0x%x, "
                 "intremap_table:%"PRIx64"\n", bdf,
                 (u64)virt_to_maddr(intr_tb));
         }

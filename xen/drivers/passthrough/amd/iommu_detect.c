@@ -62,7 +62,7 @@ static int __init get_iommu_msi_capabilities(u8 bus, u8 dev, u8 func,
     if ( !iommu->msi_cap )
         return -ENODEV;
 
-    amd_iov_info("Found MSI capability block \n");
+    AMD_IOMMU_DEBUG("Found MSI capability block \n");
     control = pci_conf_read16(bus, dev, func,
             iommu->msi_cap + PCI_MSI_FLAGS);
     iommu->maskbit = control & PCI_MSI_FLAGS_MASKBIT;
@@ -103,21 +103,21 @@ int __init amd_iommu_detect_one_acpi(void *ivhd)
 
     if ( ivhd_block->header.length < sizeof(struct acpi_ivhd_block_header) )
     {
-        amd_iov_error("Invalid IVHD Block Length!\n");
+        AMD_IOMMU_DEBUG("Invalid IVHD Block Length!\n");
         return -ENODEV;
     }
 
     if ( !ivhd_block->header.dev_id ||
         !ivhd_block->cap_offset || !ivhd_block->mmio_base)
     {
-        amd_iov_error("Invalid IVHD Block!\n");
+        AMD_IOMMU_DEBUG("Invalid IVHD Block!\n");
         return -ENODEV;
     }
 
     iommu = (struct amd_iommu *) xmalloc(struct amd_iommu);
     if ( !iommu )
     {
-        amd_iov_error("Error allocating amd_iommu\n");
+        AMD_IOMMU_DEBUG("Error allocating amd_iommu\n");
         return -ENOMEM;
     }
     memset(iommu, 0, sizeof(struct amd_iommu));
