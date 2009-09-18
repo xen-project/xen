@@ -2197,6 +2197,9 @@ class XendAPI(object):
     def VIF_get_device(self, session, vif_ref):
         return self._VIF_get(vif_ref, 'device')
  
+    def VIF_get_network(self, session, vif_ref):
+        return self._VIF_get(vif_ref, 'network')
+ 
     def VIF_get_all(self, session):
         xendom = XendDomain.instance()
         vifs = [d.get_vifs() for d in XendDomain.instance().list('all')]
