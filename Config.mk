@@ -150,9 +150,9 @@ QEMU_REMOTE=http://xenbits.xensource.com/git-http/qemu-xen-unstable.git
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 3de6cb51b19c46967cbc88ceb202b240c736eeca
-# Fri Sep 11 18:34:25 2009 +0100
-# Merge branch 'latara'
+QEMU_TAG ?= f09a5ba89434bb3f28172640354258d1d6cd8579
+# Fri Sep 18 16:41:42 2009 +0100
+# passthrough: basic graphics passthrough support
 
 OCAML_XENSTORED_REPO=http://xenbits.xensource.com/ext/xen-ocaml-tools.hg
 
