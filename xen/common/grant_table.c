@@ -198,6 +198,7 @@ __gnttab_map_grant_ref(
     struct vcpu   *led;
     int            handle;
     unsigned long  frame = 0, nr_gets = 0;
+    struct page_info *pg;
     int            rc = GNTST_okay;
     u32            old_pin;
     u32            act_pin;
@@ -346,12 +347,13 @@ __gnttab_map_grant_ref(
 
     spin_unlock(&rd->grant_table->lock);
 
-    if ( !mfn_valid(frame) ||
-         (owner = page_get_owner_and_reference(mfn_to_page(frame))) == dom_io )
+    pg = mfn_valid(frame) ? mfn_to_page(frame) : NULL;
+
+    if ( !pg || (owner = page_get_owner_and_reference(pg)) == dom_io )
     {
         /* Only needed the reference to confirm dom_io ownership. */
-        if ( mfn_valid(frame) )
-            put_page(mfn_to_page(frame));
+        if ( pg )
+            put_page(pg);
 
         if ( paging_mode_external(ld) )
         {
@@ -377,7 +379,7 @@ __gnttab_map_grant_ref(
     else if ( owner == rd )
     {
         if ( gnttab_host_mapping_get_page_type(op, ld, rd) &&
-             !get_page_type(mfn_to_page(frame), PGT_writable_page) )
+             !get_page_type(pg, PGT_writable_page) )
             goto could_not_pin;
 
         nr_gets++;
@@ -390,9 +392,9 @@ __gnttab_map_grant_ref(
             if ( op->flags & GNTMAP_device_map )
             {
                 nr_gets++;
-                (void)get_page(mfn_to_page(frame), rd);
+                (void)get_page(pg, rd);
                 if ( !(op->flags & GNTMAP_readonly) )
-                    get_page_type(mfn_to_page(frame), PGT_writable_page);
+                    get_page_type(pg, PGT_writable_page);
             }
         }
     }
@@ -403,7 +405,7 @@ __gnttab_map_grant_ref(
             gdprintk(XENLOG_WARNING, "Could not pin grant frame %lx\n",
                      frame);
         if ( owner != NULL )
-            put_page(mfn_to_page(frame));
+            put_page(pg);
         rc = GNTST_general_error;
         goto undo_out;
     }
@@ -442,14 +444,14 @@ __gnttab_map_grant_ref(
     if ( nr_gets > 1 )
     {
         if ( !(op->flags & GNTMAP_readonly) )
-            put_page_type(mfn_to_page(frame));
-        put_page(mfn_to_page(frame));
+            put_page_type(pg);
+        put_page(pg);
     }
     if ( nr_gets > 0 )
     {
         if ( gnttab_host_mapping_get_page_type(op, ld, rd) )
-            put_page_type(mfn_to_page(frame));
-        put_page(mfn_to_page(frame));
+            put_page_type(pg);
+        put_page(pg);
     }
 
     spin_lock(&rd->grant_table->lock);
@@ -621,6 +623,7 @@ __gnttab_unmap_common_complete(struct gnttab_unmap_common *op)
     struct domain   *ld, *rd;
     struct active_grant_entry *act;
     grant_entry_t   *sha;
+    struct page_info *pg;
 
     rd = op->rd;
 
@@ -651,14 +654,16 @@ __gnttab_unmap_common_complete(struct gnttab_unmap_common *op)
         goto unmap_out;
     }
 
+    pg = mfn_to_page(op->frame);
+
     if ( op->flags & GNTMAP_device_map ) 
     {
         if ( !is_iomem_page(act->frame) )
         {
             if ( op->flags & GNTMAP_readonly )
-                put_page(mfn_to_page(op->frame));
+                put_page(pg);
             else
-                put_page_and_type(mfn_to_page(op->frame));
+                put_page_and_type(pg);
         }
     }
 
@@ -676,8 +681,8 @@ __gnttab_unmap_common_complete(struct gnttab_unmap_common *op)
         if ( !is_iomem_page(op->frame) ) 
         {
             if ( gnttab_host_mapping_get_page_type(op, ld, rd) )
-                put_page_type(mfn_to_page(op->frame));
-            put_page(mfn_to_page(op->frame));
+                put_page_type(pg);
+            put_page(pg);
         }
     }
 
@@ -1745,6 +1750,7 @@ gnttab_release_mappings(
     struct domain        *rd;
     struct active_grant_entry *act;
     struct grant_entry   *sha;
+    struct page_info     *pg;
 
     BUG_ON(!d->is_dying);
 
@@ -1772,6 +1778,7 @@ gnttab_release_mappings(
 
         act = &active_entry(rd->grant_table, ref);
         sha = &shared_entry(rd->grant_table, ref);
+        pg = mfn_to_page(act->frame);
 
         if ( map->flags & GNTMAP_readonly )
         {
@@ -1780,7 +1787,7 @@ gnttab_release_mappings(
                 BUG_ON(!(act->pin & GNTPIN_devr_mask));
                 act->pin -= GNTPIN_devr_inc;
                 if ( !is_iomem_page(act->frame) )
-                    put_page(mfn_to_page(act->frame));
+                    put_page(pg);
             }
 
             if ( map->flags & GNTMAP_host_map )
@@ -1789,7 +1796,7 @@ gnttab_release_mappings(
                 act->pin -= GNTPIN_hstr_inc;
                 if ( gnttab_release_host_mappings(d) &&
                      !is_iomem_page(act->frame) )
-                    put_page(mfn_to_page(act->frame));
+                    put_page(pg);
             }
         }
         else
@@ -1799,7 +1806,7 @@ gnttab_release_mappings(
                 BUG_ON(!(act->pin & GNTPIN_devw_mask));
                 act->pin -= GNTPIN_devw_inc;
                 if ( !is_iomem_page(act->frame) )
-                    put_page_and_type(mfn_to_page(act->frame));
+                    put_page_and_type(pg);
             }
 
             if ( map->flags & GNTMAP_host_map )
@@ -1810,8 +1817,8 @@ gnttab_release_mappings(
                      !is_iomem_page(act->frame) )
                 {
                     if ( gnttab_host_mapping_get_page_type(map, d, rd) )
-                        put_page_type(mfn_to_page(act->frame));
-                    put_page(mfn_to_page(act->frame));
+                        put_page_type(pg);
+                    put_page(pg);
                 }
             }
 
