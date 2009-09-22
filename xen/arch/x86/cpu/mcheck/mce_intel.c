@@ -45,7 +45,6 @@ static atomic_t found_error = ATOMIC_INIT(0);
 
 static void mce_barrier_enter(struct mce_softirq_barrier *);
 static void mce_barrier_exit(struct mce_softirq_barrier *);
-static int mce_barrier_last(struct mce_softirq_barrier *);
 
 #ifdef CONFIG_X86_MCE_THERMAL
 static void unexpected_thermal_interrupt(struct cpu_user_regs *regs)
@@ -339,7 +338,7 @@ void intel_UCR_handler(struct mcinfo_bank *bank,
     unsigned long mfn, gfn;
     uint32_t status;
 
-    printk(KERN_DEBUG "MCE: Enter EWB UCR recovery action\n");
+    printk(KERN_DEBUG "MCE: Enter UCR recovery action\n");
     result->result = MCA_NEED_RESET;
     if (bank->mc_addr != 0) {
          mfn = bank->mc_addr >> PAGE_SHIFT;
@@ -430,8 +429,10 @@ static int mce_action(mctelem_cookie_t mctc)
         /* TODO: Add recovery actions here, such as page-offline, etc */
         memset(&mca_res, 0x0f, sizeof(mca_res));
         for ( i = 0; i < INTEL_MAX_RECOVERY; i++ ) {
-            if ( (mc_bank->mc_status & 0xffff) == 
-                        intel_recovery_handler[i].mca_code ) {
+            if ( ((mc_bank->mc_status & 0xffff) ==
+                        intel_recovery_handler[i].mca_code) ||
+                  ((mc_bank->mc_status & 0xfff0) ==
+                        intel_recovery_handler[i].mca_code)) {
                 /* For SRAR, OVER = 1 should have caused reset
                  * For SRAO, OVER = 1 skip recovery action, continue execution
                  */
@@ -439,10 +440,10 @@ static int mce_action(mctelem_cookie_t mctc)
                     intel_recovery_handler[i].recovery_handler
                                 (mc_bank, mc_global, NULL, &mca_res);
                 else {
-                   if (!mc_global->mc_gstatus & MCG_STATUS_RIPV)
+                   if (!(mc_global->mc_gstatus & MCG_STATUS_RIPV))
                        mca_res.result = MCA_NEED_RESET;
                    else
-                       mca_res.result = MCA_NO_ACTION; 
+                       mca_res.result = MCA_NO_ACTION;
                 }
                 if (mca_res.result & MCA_OWNER)
                     mc_bank->mc_domid = mca_res.owner;
@@ -458,13 +459,14 @@ static int mce_action(mctelem_cookie_t mctc)
                                 "recover action, RIPV=1, let it be.\n");
                 break;
             }
-            /* For SRAR, no defined recovery action should have caused reset
-             * in MCA Handler
-             */
-            if ( i >= INTEL_MAX_RECOVERY )
-                printk(KERN_DEBUG "MCE: No software recovery action found for "
-                                "this SRAO error\n");
         }
+        /* For SRAR, no defined recovery action should have caused reset
+         * in MCA Handler
+         */
+        if ( i >= INTEL_MAX_RECOVERY )
+            printk(KERN_DEBUG "MCE: No software recovery action found for "
+                            "this SRAO error\n");
+
     }
     return 1;
 }
@@ -622,16 +624,6 @@ static void mce_barrier_exit(struct mce_softirq_barrier *bar)
       }
 }
 
-static int mce_barrier_last(struct mce_softirq_barrier *bar)
-{
-    int gen = atomic_read(&bar->ingen);
-    if ( atomic_read(&bar->ingen) == gen &&
-        atomic_read(&bar->val) == 1 ) {
-        return 1;
-    }
-    return 0;
-}
-
 #if 0
 static void mce_barrier(struct mce_softirq_barrier *bar)
 {
@@ -645,7 +637,7 @@ static void intel_machine_check(struct cpu_user_regs * regs, long error_code)
     uint64_t gstatus;
     mctelem_cookie_t mctc = NULL;
     struct mca_summary bs;
-    cpu_banks_t clear_bank; 
+    cpu_banks_t clear_bank;
 
     mce_spin_lock(&mce_logout_lock);
 
@@ -677,9 +669,11 @@ static void intel_machine_check(struct cpu_user_regs * regs, long error_code)
         }
         atomic_set(&found_error, 1);
 
-        printk(KERN_DEBUG "MCE: clear_bank map %lx\n", 
-                *((unsigned long*)clear_bank));
+        printk(KERN_DEBUG "MCE: clear_bank map %lx on CPU%d\n",
+                *((unsigned long*)clear_bank), smp_processor_id());
         mcheck_mca_clearbanks(clear_bank);
+       /* Print MCE error */
+        x86_mcinfo_dump(mctelem_dataptr(mctc));
 
     } else {
         if (mctc != NULL)
@@ -692,29 +686,26 @@ static void intel_machine_check(struct cpu_user_regs * regs, long error_code)
      */
     mce_barrier_enter(&mce_trap_bar);
     /* According to latest MCA OS writer guide, if no error bank found
-     * on all cpus, something unexpected happening, we can't do any 
+     * on all cpus, something unexpected happening, we can't do any
      * recovery job but to reset the system.
      */
     if (atomic_read(&found_error) == 0)
         mc_panic("Unexpected condition for the MCE handler, need reset\n");
-    if (mce_barrier_last(&mce_trap_bar)) {
-        printk(KERN_DEBUG "Choose one CPU to clear error finding flag\n ");
-        atomic_set(&found_error, 0);
-    }
     mce_barrier_exit(&mce_trap_bar);
 
-    /*
-     * Clear MCIP if it wasn't already. There is a small
-     * chance that more than 1 CPU will end up doing this,
-     * but that's OK.
-     */
-    if (bs.errcnt) {
-        mca_rdmsrl(MSR_IA32_MCG_STATUS, gstatus);
-        if ((gstatus & MCG_STATUS_MCIP) != 0)
-            mca_wrmsrl(MSR_IA32_MCG_STATUS, gstatus & ~MCG_STATUS_MCIP);
-        /* Print MCE error */
-        x86_mcinfo_dump(mctelem_dataptr(mctc));
+    /* Clear error finding flags after all cpus finishes above judgement */
+    mce_barrier_enter(&mce_trap_bar);
+    if (atomic_read(&found_error)) {
+        printk(KERN_DEBUG "MCE: Choose one CPU "
+		        "to clear error finding flag\n ");
+        atomic_set(&found_error, 0);
     }
+    mca_rdmsrl(MSR_IA32_MCG_STATUS, gstatus);
+    if ((gstatus & MCG_STATUS_MCIP) != 0) {
+        printk(KERN_DEBUG "MCE: Clear MCIP@ last step");
+        mca_wrmsrl(MSR_IA32_MCG_STATUS, gstatus & ~MCG_STATUS_MCIP);
+    }
+    mce_barrier_exit(&mce_trap_bar);
 
     raise_softirq(MACHINE_CHECK_SOFTIRQ);
 }
