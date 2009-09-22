@@ -178,7 +178,7 @@ static inline void __core2_vpmu_save(struct vcpu *v)
     for ( i = 0; i < core2_get_pmc_count(); i++ )
         rdmsrl(MSR_IA32_PERFCTR0+i, core2_vpmu_cxt->arch_msr_pair[i].counter);
     core2_vpmu_cxt->hw_lapic_lvtpc = apic_read(APIC_LVTPC);
-    apic_write(APIC_LVTPC, LVTPC_HVM_PMU | APIC_LVT_MASKED);
+    apic_write(APIC_LVTPC, PMU_APIC_VECTOR | APIC_LVT_MASKED);
 }
 
 static void core2_vpmu_save(struct vcpu *v)
@@ -398,9 +398,9 @@ static int core2_vpmu_do_wrmsr(struct cpu_user_regs *regs)
     /* Setup LVTPC in local apic */
     if ( vpmu->flags & VPMU_RUNNING &&
          is_vlapic_lvtpc_enabled(vcpu_vlapic(v)) )
-        apic_write_around(APIC_LVTPC, LVTPC_HVM_PMU);
+        apic_write_around(APIC_LVTPC, PMU_APIC_VECTOR);
     else
-        apic_write_around(APIC_LVTPC, LVTPC_HVM_PMU | APIC_LVT_MASKED);
+        apic_write_around(APIC_LVTPC, PMU_APIC_VECTOR | APIC_LVT_MASKED);
 
     core2_vpmu_save_msr_context(v, type, index, msr_content);
     if ( type != MSR_TYPE_GLOBAL )

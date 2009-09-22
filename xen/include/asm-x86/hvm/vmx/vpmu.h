@@ -34,8 +34,6 @@
 #define MSR_TYPE_ARCH_COUNTER       3
 #define MSR_TYPE_ARCH_CTRL          4
 
-#define LVTPC_HVM_PMU            0xf8
-
 struct pmumsr {
     unsigned int num;
     u32 *msr;
