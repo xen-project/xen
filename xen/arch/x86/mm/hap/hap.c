@@ -255,7 +255,7 @@ static struct page_info *hap_alloc(struct domain *d)
 
     d->arch.paging.hap.free_pages--;
 
-    p = hap_map_domain_page(page_to_mfn(pg));
+    p = __map_domain_page(pg);
     ASSERT(p != NULL);
     clear_page(p);
     hap_unmap_domain_page(p);
@@ -293,7 +293,7 @@ static struct page_info *hap_alloc_p2m_page(struct domain *d)
             NULL, MEMF_bits(32) | MEMF_node(domain_to_node(d)));
         if ( likely(pg != NULL) )
         {
-            void *p = hap_map_domain_page(page_to_mfn(pg));
+            void *p = __map_domain_page(pg);
             clear_page(p);
             hap_unmap_domain_page(p);
         }

@@ -85,14 +85,14 @@ const uint8_t gr_mask[9] = {
 static uint8_t *vram_getb(struct hvm_hw_stdvga *s, unsigned int a)
 {
     struct page_info *pg = s->vram_page[(a >> 12) & 0x3f];
-    uint8_t *p = map_domain_page(page_to_mfn(pg));
+    uint8_t *p = __map_domain_page(pg);
     return &p[a & 0xfff];
 }
 
 static uint32_t *vram_getl(struct hvm_hw_stdvga *s, unsigned int a)
 {
     struct page_info *pg = s->vram_page[(a >> 10) & 0x3f];
-    uint32_t *p = map_domain_page(page_to_mfn(pg));
+    uint32_t *p = __map_domain_page(pg);
     return &p[a & 0x3ff];
 }
 
@@ -601,7 +601,7 @@ void stdvga_init(struct domain *d)
         if ( pg == NULL )
             break;
         s->vram_page[i] = pg;
-        p = map_domain_page(page_to_mfn(pg));
+        p = __map_domain_page(pg);
         clear_page(p);
         unmap_domain_page(p);
     }

@@ -34,6 +34,9 @@ void unmap_domain_page(const void *va);
 void *map_domain_page_global(unsigned long mfn);
 void unmap_domain_page_global(const void *va);
 
+#define __map_domain_page(pg)        map_domain_page(__page_to_mfn(pg))
+#define __map_domain_page_global(pg) map_domain_page_global(__page_to_mfn(pg))
+
 #define DMCACHE_ENTRY_VALID 1U
 #define DMCACHE_ENTRY_HELD  2U
 
@@ -97,9 +100,11 @@ domain_mmap_cache_destroy(struct domain_mmap_cache *cache)
 #else /* !CONFIG_DOMAIN_PAGE */
 
 #define map_domain_page(mfn)                mfn_to_virt(mfn)
+#define __map_domain_page(pg)               page_to_virt(pg)
 #define unmap_domain_page(va)               ((void)(va))
 
 #define map_domain_page_global(mfn)         mfn_to_virt(mfn)
+#define __map_domain_page_global(pg)        page_to_virt(pg)
 #define unmap_domain_page_global(va)        ((void)(va))
 
 struct domain_mmap_cache { 

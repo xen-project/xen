@@ -268,7 +268,7 @@ static void *tmh_persistent_pool_page_get(unsigned long size)
     if ( (pi = _tmh_alloc_page_thispool(d)) == NULL )
         return NULL;
     ASSERT(IS_VALID_PAGE(pi));
-    return map_domain_page(page_to_mfn(pi));
+    return __map_domain_page(pi);
 }
 
 static void tmh_persistent_pool_page_put(void *page_va)

@@ -335,7 +335,7 @@ static void deallocate_next_page_table(struct page_info* pg, int level)
     u64 next_table_maddr;
     int index;
 
-    table_vaddr = map_domain_page(page_to_mfn(pg));
+    table_vaddr = __map_domain_page(pg);
 
     if ( level > 1 )
     {

@@ -543,7 +543,7 @@ static int alloc_segdesc_page(struct page_info *page)
     struct desc_struct *descs;
     int i;
 
-    descs = map_domain_page(page_to_mfn(page));
+    descs = __map_domain_page(page);
 
     for ( i = 0; i < 512; i++ )
         if ( unlikely(!check_descriptor(page_get_owner(page), &descs[i])) )

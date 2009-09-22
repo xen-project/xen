@@ -99,7 +99,6 @@
 
 static mfn_t paging_new_log_dirty_page(struct domain *d, void **mapping_p)
 {
-    mfn_t mfn;
     struct page_info *page;
 
     page = alloc_domheap_page(NULL, MEMF_node(domain_to_node(d)));
@@ -110,10 +109,9 @@ static mfn_t paging_new_log_dirty_page(struct domain *d, void **mapping_p)
     }
 
     d->arch.paging.log_dirty.allocs++;
-    mfn = page_to_mfn(page);
-    *mapping_p = map_domain_page(mfn_x(mfn));
+    *mapping_p = __map_domain_page(page);
 
-    return mfn;
+    return page_to_mfn(page);
 }
 
 static mfn_t paging_new_log_dirty_leaf(

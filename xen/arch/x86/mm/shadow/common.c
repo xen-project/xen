@@ -1578,7 +1578,7 @@ mfn_t shadow_alloc(struct domain *d,
             flush_tlb_mask(&mask);
         }
         /* Now safe to clear the page for reuse */
-        p = sh_map_domain_page(page_to_mfn(sp+i));
+        p = __map_domain_page(sp+i);
         ASSERT(p != NULL);
         clear_page(p);
         sh_unmap_domain_page(p);
@@ -3130,7 +3130,7 @@ int shadow_enable(struct domain *d, u32 mode)
         }
         /* Fill it with 32-bit, non-PAE superpage entries, each mapping 4MB
          * of virtual address space onto the same physical address range */ 
-        e = sh_map_domain_page(page_to_mfn(pg));
+        e = __map_domain_page(pg);
         for ( i = 0; i < PAGE_SIZE / sizeof(*e); i++ )
             e[i] = ((0x400000U * i)
                     | _PAGE_PRESENT | _PAGE_RW | _PAGE_USER 

@@ -430,7 +430,7 @@ static u64 iommu_l2e_from_pfn(struct page_info *table, int level,
                              (level - IOMMU_PAGING_MODE_LEVEL_1)));
         offset &= ~PTE_PER_TABLE_MASK;
 
-        table_vaddr = map_domain_page(page_to_mfn(table));
+        table_vaddr = __map_domain_page(table);
         pde = table_vaddr + (offset * IOMMU_PAGE_TABLE_ENTRY_SIZE);
         next_table_maddr = amd_iommu_get_next_table_from_pte(pde);
 

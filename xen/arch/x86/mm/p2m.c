@@ -200,7 +200,7 @@ p2m_next_level(struct domain *d, mfn_t *table_mfn, void **table,
         else
             flags &= ~_PAGE_PSE; /* Clear _PAGE_PSE (== _PAGE_PAT) */
         
-        l1_entry = map_domain_page(mfn_x(page_to_mfn(pg)));
+        l1_entry = __map_domain_page(pg);
         for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
         {
             new_entry = l1e_from_pfn(pfn + i, flags);

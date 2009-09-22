@@ -131,7 +131,7 @@ static inline struct page_info* alloc_amd_iommu_pgtable(void)
     pg = alloc_domheap_page(NULL, 0);
     if ( pg == NULL )
         return 0;
-    vaddr = map_domain_page(page_to_mfn(pg));
+    vaddr = __map_domain_page(pg);
     memset(vaddr, 0, PAGE_SIZE);
     unmap_domain_page(vaddr);
     return pg;

@@ -978,7 +978,7 @@ int vlapic_init(struct vcpu *v)
     }
     if (vlapic->regs == NULL) 
     {
-        vlapic->regs = map_domain_page_global(page_to_mfn(vlapic->regs_page));
+        vlapic->regs = __map_domain_page_global(vlapic->regs_page);
         if ( vlapic->regs == NULL )
         {
             dprintk(XENLOG_ERR, "map vlapic regs error: %d/%d\n",

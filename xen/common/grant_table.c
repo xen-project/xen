@@ -1195,7 +1195,7 @@ gnttab_transfer(
             }
 
             sp = map_domain_page(mfn);
-            dp = map_domain_page(page_to_mfn(new_page));
+            dp = __map_domain_page(new_page);
             memcpy(dp, sp, PAGE_SIZE);
             unmap_domain_page(dp);
             unmap_domain_page(sp);
