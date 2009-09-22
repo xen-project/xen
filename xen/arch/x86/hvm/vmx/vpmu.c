@@ -88,6 +88,8 @@ void vpmu_initialise(struct vcpu *v)
         {
         case 15:
         case 23:
+        case 26:
+        case 29:
             vpmu->arch_vpmu_ops = &core2_vpmu_ops;
             break;
         }

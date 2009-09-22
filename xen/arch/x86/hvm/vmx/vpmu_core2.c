@@ -70,6 +70,21 @@ static int core2_get_pmc_count(void)
     return arch_pmc_cnt;
 }
 
+static u64 core2_calc_intial_glb_ctrl_msr(void)
+{
+    int arch_pmc_bits = (1 << core2_get_pmc_count()) - 1;
+    u64 fix_pmc_bits  = (1 << 3) - 1;
+    return ((fix_pmc_bits << 32) | arch_pmc_bits);
+}
+
+/* edx bits 5-12: Bit width of fixed-function performance counters  */
+static int core2_get_bitwidth_fix_count(void)
+{
+    u32 eax, ebx, ecx, edx;
+    cpuid(0xa, &eax, &ebx, &ecx, &edx);
+    return ((edx & 0x1f70) >> 5);
+}
+
 static int is_core2_vpmu_msr(u32 msr_index, int *type, int *index)
 {
     int i;
@@ -244,7 +259,8 @@ static int core2_vpmu_alloc_resource(struct vcpu *v)
 
     if ( vmx_add_guest_msr(MSR_CORE_PERF_GLOBAL_CTRL) )
         return 0;
-    vmx_write_guest_msr(MSR_CORE_PERF_GLOBAL_CTRL, -1ULL);
+    vmx_write_guest_msr(MSR_CORE_PERF_GLOBAL_CTRL,
+                 core2_calc_intial_glb_ctrl_msr());
 
     pmu_enable = xmalloc_bytes(sizeof(struct core2_pmu_enable) +
                  (core2_get_pmc_count()-1)*sizeof(char));
@@ -404,7 +420,33 @@ static int core2_vpmu_do_wrmsr(struct cpu_user_regs *regs)
 
     core2_vpmu_save_msr_context(v, type, index, msr_content);
     if ( type != MSR_TYPE_GLOBAL )
-        wrmsrl(ecx, msr_content);
+    {
+        unsigned long mask;
+        int inject_gp = 0;
+        switch ( type )
+        {
+        case MSR_TYPE_ARCH_CTRL:      /* MSR_P6_EVNTSEL[0,...] */
+            mask = ~((1L << 32) - 1);
+            if (msr_content & mask)
+                inject_gp = 1;
+            break;
+        case MSR_TYPE_CTRL:           /* IA32_FIXED_CTR_CTRL */
+            /* 4 bits per counter, currently 3 fixed counters implemented. */
+            mask = ~((1L << (3 * 4)) - 1);
+            if (msr_content & mask)
+                inject_gp = 1;
+            break;
+        case MSR_TYPE_COUNTER:        /* IA32_FIXED_CTR[0-2] */
+            mask = ~((1L << core2_get_bitwidth_fix_count()) - 1);
+            if (msr_content & mask)
+                inject_gp = 1;
+            break;
+        }
+        if (inject_gp)
+            vmx_inject_hw_exception(TRAP_gp_fault, 0);
+        else
+            wrmsrl(ecx, msr_content);
+    }
     else
         vmx_write_guest_msr(MSR_CORE_PERF_GLOBAL_CTRL, msr_content);
 
@@ -456,7 +498,8 @@ static int core2_vpmu_do_interrupt(struct cpu_user_regs *regs)
     if ( !msr_content )
         return 0;
     core2_vpmu_cxt->global_ovf_status |= msr_content;
-    wrmsrl(MSR_CORE_PERF_GLOBAL_OVF_CTRL, 0xC000000700000003);
+    msr_content = 0xC000000700000000 | ((1 << core2_get_pmc_count()) - 1);
+    wrmsrl(MSR_CORE_PERF_GLOBAL_OVF_CTRL, msr_content);
 
     apic_write_around(APIC_LVTPC, apic_read(APIC_LVTPC) & ~APIC_LVT_MASKED);
 
