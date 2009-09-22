@@ -487,6 +487,10 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
         memset(d->arch.irq_pirq, 0,
                nr_irqs * sizeof(*d->arch.irq_pirq));
 
+        for ( i = 1; platform_legacy_irq(i); ++i )
+            if ( !IO_APIC_IRQ(i) )
+                d->arch.irq_pirq[i] = d->arch.pirq_irq[i] = i;
+
         if ( (rc = iommu_domain_init(d)) != 0 )
             goto fail;
 
