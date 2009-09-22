@@ -35,25 +35,63 @@
 /* Physical address where Xen was relocated to. */
 extern unsigned long xen_phys_start;
 
+extern unsigned long max_page, max_pdx;
+extern unsigned long pfn_pdx_bottom_mask, ma_va_bottom_mask;
+extern unsigned int pfn_pdx_hole_shift;
+extern unsigned long pfn_hole_mask;
+extern unsigned long pfn_top_mask, ma_top_mask;
+extern void pfn_pdx_hole_setup(unsigned long);
+
+#define page_to_pdx(pg)  ((pg) - frame_table)
+#define pdx_to_page(pdx) (frame_table + (pdx))
+/*
+ * Note: These are solely for the use by page_{get,set}_owner(), and
+ *       therefore don't need to handle the XEN_VIRT_{START,END} range.
+ */
+#define virt_to_pdx(va)  (((unsigned long)(va) - DIRECTMAP_VIRT_START) >> \
+                          PAGE_SHIFT)
+#define pdx_to_virt(pdx) ((void *)(DIRECTMAP_VIRT_START + \
+                                   ((unsigned long)(pdx) << PAGE_SHIFT)))
+
+static inline int __mfn_valid(unsigned long mfn)
+{
+    return mfn < max_page && !(mfn & pfn_hole_mask);
+}
+
+static inline unsigned long pfn_to_pdx(unsigned long pfn)
+{
+    return (pfn & pfn_pdx_bottom_mask) |
+           ((pfn & pfn_top_mask) >> pfn_pdx_hole_shift);
+}
+
+static inline unsigned long pdx_to_pfn(unsigned long pdx)
+{
+    return (pdx & pfn_pdx_bottom_mask) |
+           ((pdx << pfn_pdx_hole_shift) & pfn_top_mask);
+}
+
 static inline unsigned long __virt_to_maddr(unsigned long va)
 {
     ASSERT(va >= XEN_VIRT_START);
     ASSERT(va < DIRECTMAP_VIRT_END);
-    ASSERT((va < XEN_VIRT_END) || (va >= DIRECTMAP_VIRT_START));
     if ( va >= DIRECTMAP_VIRT_START )
-        return va - DIRECTMAP_VIRT_START;
-    return va - XEN_VIRT_START + xen_phys_start;
+        va -= DIRECTMAP_VIRT_START;
+    else
+    {
+        ASSERT(va < XEN_VIRT_END);
+        va += xen_phys_start - XEN_VIRT_START;
+    }
+    return (va & ma_va_bottom_mask) |
+           ((va << pfn_pdx_hole_shift) & ma_top_mask);
 }
-#define virt_to_maddr(va)       \
-    (__virt_to_maddr((unsigned long)(va)))
 
 static inline void *__maddr_to_virt(unsigned long ma)
 {
     ASSERT(ma < DIRECTMAP_VIRT_END - DIRECTMAP_VIRT_START);
-    return (void *)(ma + DIRECTMAP_VIRT_START);
+    return (void *)(DIRECTMAP_VIRT_START +
+                    ((ma & ma_va_bottom_mask) |
+                     ((ma & ma_top_mask) >> pfn_pdx_hole_shift)));
 }
-#define maddr_to_virt(ma)       \
-    (__maddr_to_virt((unsigned long)(ma)))
 
 /* read access (should only be used for debug printk's) */
 typedef u64 intpte_t;

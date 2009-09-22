@@ -141,7 +141,7 @@ acpi_parse_memory_affinity(struct acpi_subtable_header * header,
 	return 0;
 }
 
-static int __init acpi_parse_srat(struct acpi_table_header *table)
+int __init acpi_parse_srat(struct acpi_table_header *table)
 {
 	if (!table)
 		return -EINVAL;

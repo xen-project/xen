@@ -488,6 +488,19 @@ mfn_t oos_snapshot_lookup(struct vcpu *v, mfn_t gmfn);
 #undef pagetable_from_page
 #define pagetable_from_page(pg) pagetable_from_mfn(page_to_mfn(pg))
 
+#define backpointer(sp) _mfn(pdx_to_pfn((unsigned long)(sp)->v.sh.back))
+static inline unsigned long __backpointer(const struct page_info *sp)
+{
+    switch (sp->u.sh.type)
+    {
+    case SH_type_fl1_32_shadow:
+    case SH_type_fl1_pae_shadow:
+    case SH_type_fl1_64_shadow:
+        return sp->v.sh.back;
+    }
+    return pdx_to_pfn(sp->v.sh.back);
+}
+
 static inline int
 sh_mfn_is_a_page_table(mfn_t gmfn)
 {
@@ -610,8 +623,8 @@ static inline int sh_get_ref(struct vcpu *v, mfn_t smfn, paddr_t entry_pa)
 
     if ( unlikely(nx >= 1U<<26) )
     {
-        SHADOW_PRINTK("shadow ref overflow, gmfn=%" PRpgmfn " smfn=%lx\n",
-                       sp->v.sh.back, mfn_x(smfn));
+        SHADOW_PRINTK("shadow ref overflow, gmfn=%lx smfn=%lx\n",
+                       __backpointer(sp), mfn_x(smfn));
         return 0;
     }
     

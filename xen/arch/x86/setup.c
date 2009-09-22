@@ -297,6 +297,21 @@ static void __init move_memory(
             src_end - src_start);
 }
 
+static void __init setup_max_pdx(void)
+{
+#ifdef __x86_64__
+    max_pdx = pfn_to_pdx(max_page - 1) + 1;
+
+    if ( max_pdx > (DIRECTMAP_SIZE >> PAGE_SHIFT) )
+        max_pdx = DIRECTMAP_SIZE >> PAGE_SHIFT;
+
+    if ( max_pdx > FRAMETABLE_SIZE / sizeof(*frame_table) )
+        max_pdx = FRAMETABLE_SIZE / sizeof(*frame_table);
+
+    max_page = pdx_to_pfn(max_pdx - 1) + 1;
+#endif
+}
+
 /* A temporary copy of the e820 map that we can mess with during bootstrap. */
 static struct e820map __initdata boot_e820;
 
@@ -425,6 +440,7 @@ void __init __start_xen(unsigned long mbi_p)
     module_t *mod = (module_t *)__va(mbi->mods_addr);
     unsigned long nr_pages, modules_length, modules_headroom;
     int i, j, e820_warn = 0, bytes = 0;
+    bool_t acpi_boot_table_init_done = 0;
     struct ns16550_defaults ns16550 = {
         .data_bits = 8,
         .parity    = 'n',
@@ -777,11 +793,13 @@ void __init __start_xen(unsigned long mbi_p)
     /* Late kexec reservation (dynamic start address). */
     kexec_reserve_area(&boot_e820);
 
+    setup_max_pdx();
+
     /*
      * Walk every RAM region and map it in its entirety (on x86/64, at least)
      * and notify it to the boot allocator.
      */
-    for ( i = 0; i < boot_e820.nr_map; i++ )
+    for ( nr_pages = i = 0; i < boot_e820.nr_map; i++ )
     {
         uint64_t s, e, map_s, map_e, mask = PAGE_SIZE - 1;
 
@@ -795,6 +813,45 @@ void __init __start_xen(unsigned long mbi_p)
 #endif
         if ( (boot_e820.map[i].type != E820_RAM) || (s >= e) )
             continue;
+
+#ifdef __x86_64__
+        if ( !acpi_boot_table_init_done &&
+             s >= BOOTSTRAP_DIRECTMAP_END &&
+             !acpi_boot_table_init() )
+        {
+            acpi_boot_table_init_done = 1;
+            srat_parse_regions(s);
+            setup_max_pdx();
+        }
+
+        if ( pfn_to_pdx((e - 1) >> PAGE_SHIFT) >= max_pdx )
+        {
+            if ( pfn_to_pdx(s >> PAGE_SHIFT) >= max_pdx )
+            {
+                for ( j = i - 1; ; --j )
+                {
+                    if ( boot_e820.map[j].type == E820_RAM )
+                        break;
+                    ASSERT(j);
+                }
+                map_e = boot_e820.map[j].addr + boot_e820.map[j].size;
+                if ( (map_e >> PAGE_SHIFT) < max_page )
+                {
+                    max_page = map_e >> PAGE_SHIFT;
+                    max_pdx = pfn_to_pdx(max_page - 1) + 1;
+                }
+                printk(XENLOG_WARNING "Ignoring inaccessible memory range"
+                                      " %013"PRIx64"-%013"PRIx64"\n",
+                       s, e);
+                continue;
+            }
+            map_e = e;
+            e = (pdx_to_pfn(max_pdx - 1) + 1ULL) << PAGE_SHIFT;
+            printk(XENLOG_WARNING "Ignoring inaccessible memory range"
+                                  " %013"PRIx64"-%013"PRIx64"\n",
+                   e, map_e);
+        }
+#endif
 
         /* Need to create mappings above 16MB. */
         map_s = max_t(uint64_t, s, 16<<20);
@@ -815,14 +872,11 @@ void __init __start_xen(unsigned long mbi_p)
 
         /* Pass remainder of this memory chunk to the allocator. */
         init_boot_pages(map_s, e);
+        nr_pages += (e - s) >> PAGE_SHIFT;
     }
 
     memguard_init();
 
-    nr_pages = 0;
-    for ( i = 0; i < e820.nr_map; i++ )
-        if ( e820.map[i].type == E820_RAM )
-            nr_pages += e820.map[i].size >> PAGE_SHIFT;
     printk("System RAM: %luMB (%lukB)\n",
            nr_pages >> (20 - PAGE_SHIFT),
            nr_pages << (PAGE_SHIFT - 10));
@@ -857,7 +911,8 @@ void __init __start_xen(unsigned long mbi_p)
 
     init_frametable();
 
-    acpi_boot_table_init();
+    if ( !acpi_boot_table_init_done )
+        acpi_boot_table_init();
 
     acpi_numa_init();
 

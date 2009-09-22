@@ -22,13 +22,12 @@
  * wants to support more than 16TB.
  * 'unsigned long' should be used for MFNs everywhere else.
  */
-#define __mfn_t unsigned int
-#define PRpgmfn "08x"
+#define __pdx_t unsigned int
 
 #undef page_list_entry
 struct page_list_entry
 {
-    __mfn_t next, prev;
+    __pdx_t next, prev;
 };
 
 struct page_info
@@ -77,14 +76,14 @@ struct page_info
 
         /* Page is in use, but not as a shadow. */
         struct {
-            /* Owner of this page (NULL if page is anonymous). */
-            u32 _domain; /* pickled format */
+            /* Owner of this page (zero if page is anonymous). */
+            __pdx_t _domain;
         } inuse;
 
         /* Page is in use as a shadow. */
         struct {
             /* GMFN of guest page we're a shadow of. */
-            __mfn_t back;
+            __pdx_t back;
         } sh;
 
         /* Page is on a free list (including shadow code free lists). */
@@ -146,11 +145,11 @@ struct page_info
         u32 shadow_flags;
 
         /* When in use as a shadow, next shadow in this hash chain. */
-        __mfn_t next_shadow;
+        __pdx_t next_shadow;
     };
 };
 
-#undef __mfn_t
+#undef __pdx_t
 
 #define PG_shift(idx)   (BITS_PER_LONG - (idx))
 #define PG_mask(x, idx) (x ## UL << PG_shift(idx))
@@ -245,9 +244,9 @@ struct page_info
 
 #define page_get_owner(_p)                                              \
     ((struct domain *)((_p)->v.inuse._domain ?                          \
-                       mfn_to_virt((_p)->v.inuse._domain) : NULL))
+                       pdx_to_virt((_p)->v.inuse._domain) : NULL))
 #define page_set_owner(_p,_d)                                           \
-    ((_p)->v.inuse._domain = (_d) ? virt_to_mfn(_d) : 0)
+    ((_p)->v.inuse._domain = (_d) ? virt_to_pdx(_d) : 0)
 
 #define maddr_get_owner(ma)   (page_get_owner(maddr_to_page((ma))))
 #define vaddr_get_owner(va)   (page_get_owner(virt_to_page((va))))
@@ -263,6 +262,33 @@ extern void share_xen_page_with_privileged_guests(
 extern unsigned long max_page;
 extern unsigned long total_pages;
 void init_frametable(void);
+
+/* Convert between Xen-heap virtual addresses and page-info structures. */
+static inline struct page_info *__virt_to_page(const void *v)
+{
+    unsigned long va = (unsigned long)v;
+
+#ifdef __x86_64__
+    ASSERT(va >= XEN_VIRT_START);
+    ASSERT(va < DIRECTMAP_VIRT_END);
+    if ( va < XEN_VIRT_END )
+        va += DIRECTMAP_VIRT_START - XEN_VIRT_START + xen_phys_start;
+    else
+        ASSERT(va >= DIRECTMAP_VIRT_START);
+#else
+    ASSERT(va - DIRECTMAP_VIRT_START < DIRECTMAP_VIRT_END);
+#endif
+    return frame_table + ((va - DIRECTMAP_VIRT_START) >> PAGE_SHIFT);
+}
+
+static inline void *__page_to_virt(const struct page_info *pg)
+{
+    ASSERT((unsigned long)pg - FRAMETABLE_VIRT_START < FRAMETABLE_VIRT_END);
+    return (void *)(DIRECTMAP_VIRT_START +
+                    ((unsigned long)pg - FRAMETABLE_VIRT_START) /
+                    (sizeof(*pg) / (sizeof(*pg) & -sizeof(*pg))) *
+                    (PAGE_SIZE / (sizeof(*pg) & -sizeof(*pg))));
+}
 
 int free_page_type(struct page_info *page, unsigned long type,
                    int preemptible);

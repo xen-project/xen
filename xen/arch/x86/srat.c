@@ -286,6 +286,70 @@ static void unparse_node(int node)
 
 void __init acpi_numa_arch_fixup(void) {}
 
+#ifdef __x86_64__
+
+static u64 __initdata srat_region_mask;
+
+static u64 __init fill_mask(u64 mask)
+{
+	while (mask & (mask + 1))
+		mask |= mask + 1;
+	return mask;
+}
+
+static int __init srat_parse_region(struct acpi_subtable_header *header,
+				    const unsigned long end)
+{
+	struct acpi_srat_mem_affinity *ma;
+
+	if (!header)
+		return -EINVAL;
+
+	ma = container_of(header, struct acpi_srat_mem_affinity, header);
+
+	if (!ma->length ||
+	    !(ma->flags & ACPI_SRAT_MEM_ENABLED) ||
+	    (ma->flags & ACPI_SRAT_MEM_NON_VOLATILE))
+		return 0;
+
+	if (numa_off)
+		printk(KERN_INFO "SRAT: %013"PRIx64"-%013"PRIx64"\n",
+		       ma->base_address, ma->base_address + ma->length - 1);
+
+	srat_region_mask |= ma->base_address |
+			    fill_mask(ma->base_address ^
+				      (ma->base_address + ma->length - 1));
+
+	return 0;
+}
+
+void __init srat_parse_regions(u64 addr)
+{
+	u64 mask;
+	unsigned int i;
+
+	if (acpi_disabled || acpi_numa < 0 ||
+	    acpi_table_parse(ACPI_SIG_SRAT, acpi_parse_srat))
+		return;
+
+	srat_region_mask = fill_mask(addr - 1);
+	acpi_table_parse_srat(ACPI_SRAT_MEMORY_AFFINITY, srat_parse_region, 0);
+
+	for (mask = srat_region_mask, i = 0; mask && i < e820.nr_map; i++) {
+		if (e820.map[i].type != E820_RAM)
+			continue;
+
+		if (~mask &
+		    fill_mask(e820.map[i].addr ^
+			      (e820.map[i].addr + e820.map[i].size - 1)))
+			mask = 0;
+	}
+
+	pfn_pdx_hole_setup(mask >> PAGE_SHIFT);
+}
+
+#endif /* __x86_64__ */
+
 /* Use the information discovered above to actually set up the nodes. */
 int __init acpi_scan_nodes(u64 start, u64 end)
 {

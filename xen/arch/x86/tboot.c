@@ -175,6 +175,9 @@ static void update_pagetable_mac(vmac_ctx_t *ctx)
     for ( mfn = 0; mfn < max_page; mfn++ )
     {
         struct page_info *page = mfn_to_page(mfn);
+
+        if ( !mfn_valid(mfn) )
+            continue;
         if ( is_page_in_use(page) && !is_xen_heap_page(page) ) {
             if ( page->count_info & PGC_page_table ) {
                 void *pg = map_domain_page(mfn);
@@ -237,6 +240,9 @@ static void tboot_gen_xenheap_integrity(const uint8_t key[TB_KEY_SIZE],
     for ( mfn = 0; mfn < max_page; mfn++ )
     {
         struct page_info *page = __mfn_to_page(mfn);
+
+        if ( !mfn_valid(mfn) )
+            continue;
         if ( is_page_in_use(page) && is_xen_heap_page(page) ) {
             void *pg = mfn_to_virt(mfn);
             vmac_update((uint8_t *)pg, PAGE_SIZE, &ctx);
@@ -258,7 +264,7 @@ static void tboot_gen_frametable_integrity(const uint8_t key[TB_KEY_SIZE],
 
     vmac_set_key((uint8_t *)key, &ctx);
     *mac = vmac((uint8_t *)frame_table,
-                PFN_UP(max_page * sizeof(*frame_table)), nonce, NULL, &ctx);
+                PFN_UP(max_pdx * sizeof(*frame_table)), nonce, NULL, &ctx);
 
     printk("MAC for frametable is: 0x%08"PRIx64"\n", *mac);
 

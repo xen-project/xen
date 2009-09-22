@@ -33,6 +33,15 @@
 #include <asm/msr.h>
 #include <public/memory.h>
 
+/* Parameters for PFN/MADDR compression. */
+unsigned long __read_mostly max_pdx;
+unsigned long __read_mostly pfn_pdx_bottom_mask = ~0UL;
+unsigned long __read_mostly ma_va_bottom_mask = ~0UL;
+unsigned long __read_mostly pfn_top_mask = 0;
+unsigned long __read_mostly ma_top_mask = 0;
+unsigned long __read_mostly pfn_hole_mask = 0;
+unsigned int __read_mostly pfn_pdx_hole_shift = 0;
+
 #ifdef CONFIG_COMPAT
 unsigned int m2p_compat_vstart = __HYPERVISOR_COMPAT_VIRT_START;
 #endif
@@ -142,6 +151,36 @@ void *do_page_walk(struct vcpu *v, unsigned long addr)
         return NULL;
 
     return mfn_to_virt(mfn) + (addr & ~PAGE_MASK);
+}
+
+void __init pfn_pdx_hole_setup(unsigned long mask)
+{
+    unsigned int i, j, bottom_shift, hole_shift;
+
+    for ( hole_shift = bottom_shift = j = 0; ; )
+    {
+        i = find_next_zero_bit(&mask, BITS_PER_LONG, j);
+        j = find_next_bit(&mask, BITS_PER_LONG, i);
+        if ( j >= BITS_PER_LONG )
+            break;
+        if ( j - i > hole_shift )
+        {
+            hole_shift = j - i;
+            bottom_shift = i;
+        }
+    }
+    if ( !hole_shift )
+        return;
+
+    printk(KERN_INFO "PFN compression on bits %u...%u\n",
+           bottom_shift, bottom_shift + hole_shift - 1);
+
+    pfn_pdx_hole_shift  = hole_shift;
+    pfn_pdx_bottom_mask = (1UL << bottom_shift) - 1;
+    ma_va_bottom_mask   = (PAGE_SIZE << bottom_shift) - 1;
+    pfn_hole_mask       = ((1UL << hole_shift) - 1) << bottom_shift;
+    pfn_top_mask        = ~(pfn_pdx_bottom_mask | pfn_hole_mask);
+    ma_top_mask         = pfn_top_mask << PAGE_SHIFT;
 }
 
 void __init paging_init(void)

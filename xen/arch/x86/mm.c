@@ -173,7 +173,7 @@ void __init init_frametable(void)
     BUILD_BUG_ON(FRAMETABLE_VIRT_START & ((1UL << L2_PAGETABLE_SHIFT) - 1));
 #endif
 
-    nr_pages  = PFN_UP(max_page * sizeof(*frame_table));
+    nr_pages  = PFN_UP(max_pdx * sizeof(*frame_table));
     page_step = 1 << (cpu_has_page1gb ? L3_PAGETABLE_SHIFT - PAGE_SHIFT
                                       : L2_PAGETABLE_SHIFT - PAGE_SHIFT);
 
@@ -248,10 +248,11 @@ void __init arch_init_memory(void)
          * the statically-initialised 1-16MB mapping area.
          */
         iostart_pfn = max_t(unsigned long, pfn, 1UL << (20 - PAGE_SHIFT));
-        ioend_pfn = rstart_pfn;
 #if defined(CONFIG_X86_32)
-        ioend_pfn = min_t(unsigned long, ioend_pfn,
+        ioend_pfn = min_t(unsigned long, rstart_pfn,
                           DIRECTMAP_MBYTES << (20 - PAGE_SHIFT));
+#else
+        ioend_pfn = min(rstart_pfn, 16UL << (20 - PAGE_SHIFT));
 #endif
         if ( iostart_pfn < ioend_pfn )            
             destroy_xen_mappings((unsigned long)mfn_to_virt(iostart_pfn),
@@ -260,7 +261,8 @@ void __init arch_init_memory(void)
         /* Mark as I/O up to next RAM region. */
         for ( ; pfn < rstart_pfn; pfn++ )
         {
-            BUG_ON(!mfn_valid(pfn));
+            if ( !mfn_valid(pfn) )
+                continue;
             share_xen_page_with_guest(
                 mfn_to_page(pfn), dom_io, XENSHARE_writable);
         }

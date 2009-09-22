@@ -145,17 +145,17 @@ extern unsigned int video_mode, video_flags;
  *    Shadow linear page table.
  *  0xffff820000000000 - 0xffff827fffffffff [512GB, 2^39 bytes, PML4:260]
  *    Per-domain mappings (e.g., GDT, LDT).
- *  0xffff828000000000 - 0xffff8283ffffffff [16GB,  2^34 bytes, PML4:261]
+ *  0xffff828000000000 - 0xffff82bfffffffff [256GB, 2^38 bytes, PML4:261]
  *    Machine-to-phys translation table.
- *  0xffff828400000000 - 0xffff8287ffffffff [16GB,  2^34 bytes, PML4:261]
+ *  0xffff82c000000000 - 0xffff82c3ffffffff [16GB,  2^34 bytes, PML4:261]
  *    ioremap()/fixmap area.
- *  0xffff828800000000 - 0xffff82883fffffff [1GB,   2^30 bytes, PML4:261]
+ *  0xffff82c400000000 - 0xffff82c43fffffff [1GB,   2^30 bytes, PML4:261]
  *    Compatibility machine-to-phys translation table.
- *  0xffff828840000000 - 0xffff82887fffffff [1GB,   2^30 bytes, PML4:261]
+ *  0xffff82c440000000 - 0xffff82c47fffffff [1GB,   2^30 bytes, PML4:261]
  *    High read-only compatibility machine-to-phys translation table.
- *  0xffff828880000000 - 0xffff8288bfffffff [1GB,   2^30 bytes, PML4:261]
+ *  0xffff82c480000000 - 0xffff82c4bfffffff [1GB,   2^30 bytes, PML4:261]
  *    Xen text, static data, bss.
- *  0xffff8288c0000000 - 0xffff82f5ffffffff [437GB,             PML4:261]
+ *  0xffff82c4c0000000 - 0xffff82f5ffffffff [197GB,             PML4:261]
  *    Reserved for future use.
  *  0xffff82f600000000 - 0xffff82ffffffffff [40GB,  2^38 bytes, PML4:261]
  *    Page-frame information array.
@@ -188,7 +188,8 @@ extern unsigned int video_mode, video_flags;
 #define HYPERVISOR_VIRT_END     (HYPERVISOR_VIRT_START + PML4_ENTRY_BYTES*16)
 /* Slot 256: read-only guest-accessible machine-to-phys translation table. */
 #define RO_MPT_VIRT_START       (PML4_ADDR(256))
-#define RO_MPT_VIRT_END         (RO_MPT_VIRT_START + PML4_ENTRY_BYTES/2)
+#define MPT_VIRT_SIZE           (PML4_ENTRY_BYTES / 2)
+#define RO_MPT_VIRT_END         (RO_MPT_VIRT_START + MPT_VIRT_SIZE)
 /* Slot 257: ioremap for PCI mmconfig space for 2048 segments (512GB)
  *     - full 16-bit segment support needs 44 bits
  *     - since PML4 slot has 39 bits, we limit segments to 2048 (11-bits)
@@ -205,9 +206,9 @@ extern unsigned int video_mode, video_flags;
 #define PERDOMAIN_VIRT_START    (PML4_ADDR(260))
 #define PERDOMAIN_VIRT_END      (PERDOMAIN_VIRT_START + (PERDOMAIN_MBYTES<<20))
 #define PERDOMAIN_MBYTES        (PML4_ENTRY_BYTES >> (20 + PAGETABLE_ORDER))
-/* Slot 261: machine-to-phys conversion table (16GB). */
+/* Slot 261: machine-to-phys conversion table (256GB). */
 #define RDWR_MPT_VIRT_START     (PML4_ADDR(261))
-#define RDWR_MPT_VIRT_END       (RDWR_MPT_VIRT_START + GB(16))
+#define RDWR_MPT_VIRT_END       (RDWR_MPT_VIRT_START + MPT_VIRT_SIZE)
 /* Slot 261: ioremap()/fixmap area (16GB). */
 #define IOREMAP_VIRT_START      RDWR_MPT_VIRT_END
 #define IOREMAP_VIRT_END        (IOREMAP_VIRT_START + GB(16))

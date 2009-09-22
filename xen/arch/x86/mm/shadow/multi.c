@@ -1010,7 +1010,7 @@ static int shadow_set_l2e(struct vcpu *v,
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
         {
             struct page_info *sp = mfn_to_page(sl1mfn);
-            mfn_t gl1mfn = _mfn(sp->v.sh.back);
+            mfn_t gl1mfn = backpointer(sp);
 
             /* If the shadow is a fl1 then the backpointer contains
                the GFN instead of the GMFN, and it's definitely not
@@ -1974,7 +1974,7 @@ void sh_destroy_l4_shadow(struct vcpu *v, mfn_t smfn)
     ASSERT(t == SH_type_l4_shadow);
 
     /* Record that the guest page isn't shadowed any more (in this type) */
-    gmfn = _mfn(mfn_to_page(smfn)->v.sh.back);
+    gmfn = backpointer(mfn_to_page(smfn));
     delete_shadow_status(v, gmfn, t, smfn);
     shadow_demote(v, gmfn, t);
     /* Decrement refcounts of all the old entries */
@@ -2003,7 +2003,7 @@ void sh_destroy_l3_shadow(struct vcpu *v, mfn_t smfn)
     ASSERT(t == SH_type_l3_shadow);
 
     /* Record that the guest page isn't shadowed any more (in this type) */
-    gmfn = _mfn(mfn_to_page(smfn)->v.sh.back);
+    gmfn = backpointer(mfn_to_page(smfn));
     delete_shadow_status(v, gmfn, t, smfn);
     shadow_demote(v, gmfn, t);
 
@@ -2038,7 +2038,7 @@ void sh_destroy_l2_shadow(struct vcpu *v, mfn_t smfn)
 #endif
 
     /* Record that the guest page isn't shadowed any more (in this type) */
-    gmfn = _mfn(mfn_to_page(smfn)->v.sh.back);
+    gmfn = backpointer(mfn_to_page(smfn));
     delete_shadow_status(v, gmfn, t, smfn);
     shadow_demote(v, gmfn, t);
 
@@ -2073,7 +2073,7 @@ void sh_destroy_l1_shadow(struct vcpu *v, mfn_t smfn)
     }
     else 
     {
-        mfn_t gmfn = _mfn(mfn_to_page(smfn)->v.sh.back);
+        mfn_t gmfn = backpointer(mfn_to_page(smfn));
         delete_shadow_status(v, gmfn, t, smfn);
         shadow_demote(v, gmfn, t);
     }
@@ -2397,7 +2397,7 @@ static int validate_gl1e(struct vcpu *v, void *new_ge, mfn_t sl1mfn, void *se)
     result |= shadow_set_l1e(v, sl1p, new_sl1e, p2mt, sl1mfn);
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
-    gl1mfn = _mfn(mfn_to_page(sl1mfn)->v.sh.back);
+    gl1mfn = backpointer(mfn_to_page(sl1mfn));
     if ( mfn_valid(gl1mfn) 
          && mfn_is_out_of_sync(gl1mfn) )
     {
@@ -3006,8 +3006,8 @@ static int sh_page_fault(struct vcpu *v,
                                     + shadow_l2_linear_offset(va)),
                                    sizeof(sl2e)) != 0)
                  || !(shadow_l2e_get_flags(sl2e) & _PAGE_PRESENT)
-                 || !mfn_valid(gl1mfn = _mfn(mfn_to_page(
-                                  shadow_l2e_get_mfn(sl2e))->v.sh.back))
+                 || !mfn_valid(gl1mfn = backpointer(mfn_to_page(
+                                  shadow_l2e_get_mfn(sl2e))))
                  || unlikely(mfn_is_out_of_sync(gl1mfn)) )
             {
                 /* Hit the slow path as if there had been no 
@@ -3582,7 +3582,7 @@ sh_invlpg(struct vcpu *v, unsigned long va)
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC) 
     /* Check to see if the SL1 is out of sync. */
     {
-        mfn_t gl1mfn = _mfn(mfn_to_page(sl1mfn)->v.sh.back);
+        mfn_t gl1mfn = backpointer(mfn_to_page(sl1mfn));
         struct page_info *pg = mfn_to_page(gl1mfn);
         if ( mfn_valid(gl1mfn) 
              && page_is_out_of_sync(pg) )
@@ -3612,7 +3612,7 @@ sh_invlpg(struct vcpu *v, unsigned long va)
             }
 
             sl1mfn = shadow_l2e_get_mfn(sl2e);
-            gl1mfn = _mfn(mfn_to_page(sl1mfn)->v.sh.back);
+            gl1mfn = backpointer(mfn_to_page(sl1mfn));
             pg = mfn_to_page(gl1mfn);
             
             if ( likely(sh_mfn_is_a_page_table(gl1mfn)
@@ -4949,7 +4949,7 @@ int sh_audit_l1_table(struct vcpu *v, mfn_t sl1mfn, mfn_t x)
     int done = 0;
     
     /* Follow the backpointer */
-    gl1mfn = _mfn(mfn_to_page(sl1mfn)->v.sh.back);
+    gl1mfn = backpointer(mfn_to_page(sl1mfn));
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
     /* Out-of-sync l1 shadows can contain anything: just check the OOS hash */
@@ -5042,7 +5042,7 @@ int sh_audit_l2_table(struct vcpu *v, mfn_t sl2mfn, mfn_t x)
     int done = 0;
 
     /* Follow the backpointer */
-    gl2mfn = _mfn(mfn_to_page(sl2mfn)->v.sh.back);
+    gl2mfn = backpointer(mfn_to_page(sl2mfn));
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
     /* Only L1's may be out of sync. */
@@ -5091,7 +5091,7 @@ int sh_audit_l3_table(struct vcpu *v, mfn_t sl3mfn, mfn_t x)
     int done = 0;
 
     /* Follow the backpointer */
-    gl3mfn = _mfn(mfn_to_page(sl3mfn)->v.sh.back);
+    gl3mfn = backpointer(mfn_to_page(sl3mfn));
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC) 
     /* Only L1's may be out of sync. */
@@ -5138,7 +5138,7 @@ int sh_audit_l4_table(struct vcpu *v, mfn_t sl4mfn, mfn_t x)
     int done = 0;
 
     /* Follow the backpointer */
-    gl4mfn = _mfn(mfn_to_page(sl4mfn)->v.sh.back);
+    gl4mfn = backpointer(mfn_to_page(sl4mfn));
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC) 
     /* Only L1's may be out of sync. */

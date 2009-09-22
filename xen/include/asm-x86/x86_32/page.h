@@ -41,21 +41,25 @@
 #include <xen/config.h>
 #include <asm/types.h>
 
+#define __mfn_valid(mfn)        ((mfn) < max_page)
+
+#define max_pdx                 max_page
+#define pfn_to_pdx(pfn)         (pfn)
+#define pdx_to_pfn(pdx)         (pdx)
+#define virt_to_pdx(va)         virt_to_mfn(va)
+#define pdx_to_virt(pdx)        mfn_to_virt(pdx)
+
 static inline unsigned long __virt_to_maddr(unsigned long va)
 {
     ASSERT(va >= DIRECTMAP_VIRT_START && va < DIRECTMAP_VIRT_END);
     return va - DIRECTMAP_VIRT_START;
 }
-#define virt_to_maddr(va)       \
-    (__virt_to_maddr((unsigned long)(va)))
 
 static inline void *__maddr_to_virt(unsigned long ma)
 {
     ASSERT(ma < DIRECTMAP_VIRT_END - DIRECTMAP_VIRT_START);
     return (void *)(ma + DIRECTMAP_VIRT_START);
 }
-#define maddr_to_virt(ma)       \
-    (__maddr_to_virt((unsigned long)(ma)))
 
 /* read access (should only be used for debug printk's) */
 typedef u64 intpte_t;

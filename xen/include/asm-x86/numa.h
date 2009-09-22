@@ -75,5 +75,6 @@ static inline __attribute__((pure)) int phys_to_nid(paddr_t addr)
 #define clear_node_cpumask(cpu) do {} while (0)
 #endif
 
+void srat_parse_regions(u64 addr);
 
 #endif

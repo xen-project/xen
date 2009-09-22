@@ -103,6 +103,16 @@ struct page_list_head
 
 #define PAGE_LIST_NULL (~0)
 
+# if !defined(pdx_to_page) && !defined(page_to_pdx)
+#  if defined(__page_to_mfn) || defined(__mfn_to_page)
+#   define page_to_pdx __page_to_mfn
+#   define pdx_to_page __mfn_to_page
+#  else
+#   define page_to_pdx page_to_mfn
+#   define pdx_to_page mfn_to_page
+#  endif
+# endif
+
 # define PAGE_LIST_HEAD_INIT(name) { NULL, NULL }
 # define PAGE_LIST_HEAD(name) \
     struct page_list_head name = PAGE_LIST_HEAD_INIT(name)
@@ -123,21 +133,21 @@ static inline struct page_info *
 page_list_next(const struct page_info *page,
                const struct page_list_head *head)
 {
-    return page != head->tail ? mfn_to_page(page->list.next) : NULL;
+    return page != head->tail ? pdx_to_page(page->list.next) : NULL;
 }
 static inline struct page_info *
 page_list_prev(const struct page_info *page,
                const struct page_list_head *head)
 {
-    return page != head->next ? mfn_to_page(page->list.prev) : NULL;
+    return page != head->next ? pdx_to_page(page->list.prev) : NULL;
 }
 static inline void
 page_list_add(struct page_info *page, struct page_list_head *head)
 {
     if ( head->next )
     {
-        page->list.next = page_to_mfn(head->next);
-        head->next->list.prev = page_to_mfn(page);
+        page->list.next = page_to_pdx(head->next);
+        head->next->list.prev = page_to_pdx(page);
     }
     else
     {
@@ -153,8 +163,8 @@ page_list_add_tail(struct page_info *page, struct page_list_head *head)
     page->list.next = PAGE_LIST_NULL;
     if ( head->next )
     {
-        page->list.prev = page_to_mfn(head->tail);
-        head->tail->list.next = page_to_mfn(page);
+        page->list.prev = page_to_pdx(head->tail);
+        head->tail->list.next = page_to_pdx(page);
     }
     else
     {
@@ -191,8 +201,8 @@ __page_list_del_head(struct page_info *page, struct page_list_head *head,
 static inline void
 page_list_del(struct page_info *page, struct page_list_head *head)
 {
-    struct page_info *next = mfn_to_page(page->list.next);
-    struct page_info *prev = mfn_to_page(page->list.prev);
+    struct page_info *next = pdx_to_page(page->list.next);
+    struct page_info *prev = pdx_to_page(page->list.prev);
 
     if ( !__page_list_del_head(page, head, next, prev) )
     {
@@ -204,8 +214,8 @@ static inline void
 page_list_del2(struct page_info *page, struct page_list_head *head1,
                struct page_list_head *head2)
 {
-    struct page_info *next = mfn_to_page(page->list.next);
-    struct page_info *prev = mfn_to_page(page->list.prev);
+    struct page_info *next = pdx_to_page(page->list.next);
+    struct page_info *prev = pdx_to_page(page->list.prev);
 
     if ( !__page_list_del_head(page, head1, next, prev) &&
          !__page_list_del_head(page, head2, next, prev) )
@@ -252,11 +262,11 @@ page_list_splice(struct page_list_head *list, struct page_list_head *head)
     last = list->tail;
     at = head->next;
 
-    first->list.prev = page_to_mfn(head->next);
+    first->list.prev = page_to_pdx(head->next);
     head->next = first;
 
-    last->list.next = page_to_mfn(at);
-    at->list.prev = page_to_mfn(last);
+    last->list.next = page_to_pdx(at);
+    at->list.prev = page_to_pdx(last);
 }
 
 #define page_list_for_each(pos, head) \
