@@ -67,6 +67,7 @@ struct vmx_domain {
         };
         u64 eptp;
     } ept_control;
+    cpumask_t ept_synced;
 };
 
 struct arch_vmx_struct {

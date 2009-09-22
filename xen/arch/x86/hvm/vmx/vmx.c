@@ -72,6 +72,7 @@ static void vmx_fpu_dirty_intercept(void);
 static int vmx_msr_read_intercept(struct cpu_user_regs *regs);
 static int vmx_msr_write_intercept(struct cpu_user_regs *regs);
 static void vmx_invlpg_intercept(unsigned long vaddr);
+static void __ept_sync_domain(void *info);
 
 static int vmx_domain_initialise(struct domain *d)
 {
@@ -91,7 +92,8 @@ static int vmx_domain_initialise(struct domain *d)
 
 static void vmx_domain_destroy(struct domain *d)
 {
-    ept_sync_domain(d);
+    if ( d->arch.hvm_domain.hap_enabled )
+        on_each_cpu(__ept_sync_domain, d, 1);
     vmx_free_vlapic_mapping(d);
 }
 
@@ -666,9 +668,20 @@ static void vmx_ctxt_switch_from(struct vcpu *v)
 
 static void vmx_ctxt_switch_to(struct vcpu *v)
 {
+    struct domain *d = v->domain;
+
     /* HOST_CR4 in VMCS is always mmu_cr4_features. Sync CR4 now. */
     if ( unlikely(read_cr4() != mmu_cr4_features) )
         write_cr4(mmu_cr4_features);
+
+    if ( d->arch.hvm_domain.hap_enabled )
+    {
+        unsigned int cpu = smp_processor_id();
+        /* Test-and-test-and-set this CPU in the EPT-is-synced mask. */
+        if ( !cpu_isset(cpu, d->arch.hvm_domain.vmx.ept_synced) &&
+             !cpu_test_and_set(cpu, d->arch.hvm_domain.vmx.ept_synced) )
+            __invept(1, d->arch.hvm_domain.vmx.ept_control.eptp, 0);
+    }
 
     vmx_restore_guest_msrs(v);
     vmx_restore_dr(v);
@@ -1216,11 +1229,20 @@ static void __ept_sync_domain(void *info)
 void ept_sync_domain(struct domain *d)
 {
     /* Only if using EPT and this domain has some VCPUs to dirty. */
-    if ( d->arch.hvm_domain.hap_enabled && d->vcpu && d->vcpu[0] )
-    {
-        ASSERT(local_irq_is_enabled());
-        on_each_cpu(__ept_sync_domain, d, 1);
-    }
+    if ( !d->arch.hvm_domain.hap_enabled || !d->vcpu || !d->vcpu[0] )
+        return;
+
+    ASSERT(local_irq_is_enabled());
+
+    /*
+     * Flush active cpus synchronously. Flush others the next time this domain
+     * is scheduled onto them. We accept the race of other CPUs adding to
+     * the ept_synced mask before on_selected_cpus() reads it, resulting in
+     * unnecessary extra flushes, to avoid allocating a cpumask_t on the stack.
+     */
+    d->arch.hvm_domain.vmx.ept_synced = d->domain_dirty_cpumask;
+    on_selected_cpus(&d->arch.hvm_domain.vmx.ept_synced,
+                     __ept_sync_domain, d, 1);
 }
 
 static void __vmx_inject_exception(int trap, int type, int error_code)

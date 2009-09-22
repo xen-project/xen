@@ -1328,6 +1328,15 @@ static void __context_switch(void)
         p->arch.ctxt_switch_from(p);
     }
 
+    /*
+     * Mark this CPU in next domain's dirty cpumasks before calling
+     * ctxt_switch_to(). This avoids a race on things like EPT flushing,
+     * which is synchronised on that function.
+     */
+    if ( p->domain != n->domain )
+        cpu_set(cpu, n->domain->domain_dirty_cpumask);
+    cpu_set(cpu, n->vcpu_dirty_cpumask);
+
     if ( !is_idle_vcpu(n) )
     {
         memcpy(stack_regs,
@@ -1335,10 +1344,6 @@ static void __context_switch(void)
                CTXT_SWITCH_STACK_BYTES);
         n->arch.ctxt_switch_to(n);
     }
-
-    if ( p->domain != n->domain )
-        cpu_set(cpu, n->domain->domain_dirty_cpumask);
-    cpu_set(cpu, n->vcpu_dirty_cpumask);
 
     gdt = !is_pv_32on64_vcpu(n) ? per_cpu(gdt_table, cpu) :
                                   per_cpu(compat_gdt_table, cpu);
