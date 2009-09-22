@@ -16,8 +16,8 @@
 #define L4_PAGETABLE_ENTRIES    (1<<PAGETABLE_ORDER)
 #define ROOT_PAGETABLE_ENTRIES  L4_PAGETABLE_ENTRIES
 
-#define __PAGE_OFFSET           (0xFFFF830000000000)
-#define __XEN_VIRT_START        (0xFFFF828C80000000)
+#define __PAGE_OFFSET           DIRECTMAP_VIRT_START
+#define __XEN_VIRT_START        XEN_VIRT_START
 
 /* These are architectural limits. Current CPUs support only 40-bit phys. */
 #define PADDR_BITS              52

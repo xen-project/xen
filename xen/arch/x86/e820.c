@@ -500,15 +500,19 @@ static void __init machine_specific_memory_setup(
                   "can be accessed by Xen in 32-bit mode.");
 #else
     {
-        unsigned long limit, mpt_limit, pft_limit;
+        unsigned long limit, mpt_limit, ro_mpt_limit, pft_limit;
 
         limit = DIRECTMAP_VIRT_END - DIRECTMAP_VIRT_START;
         mpt_limit = ((RDWR_MPT_VIRT_END - RDWR_MPT_VIRT_START)
                      / sizeof(unsigned long)) << PAGE_SHIFT;
+        ro_mpt_limit = ((RO_MPT_VIRT_END - RO_MPT_VIRT_START)
+                        / sizeof(unsigned long)) << PAGE_SHIFT;
         pft_limit = ((FRAMETABLE_VIRT_END - FRAMETABLE_VIRT_START)
                      / sizeof(struct page_info)) << PAGE_SHIFT;
         if ( limit > mpt_limit )
             limit = mpt_limit;
+        if ( limit > ro_mpt_limit )
+            limit = ro_mpt_limit;
         if ( limit > pft_limit )
             limit = pft_limit;
         clip_to_limit(limit,

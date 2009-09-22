@@ -148,21 +148,19 @@ extern unsigned int video_mode, video_flags;
  *  0xffff828000000000 - 0xffff8283ffffffff [16GB,  2^34 bytes, PML4:261]
  *    Machine-to-phys translation table.
  *  0xffff828400000000 - 0xffff8287ffffffff [16GB,  2^34 bytes, PML4:261]
- *    Page-frame information array.
- *  0xffff828800000000 - 0xffff828bffffffff [16GB,  2^34 bytes, PML4:261]
  *    ioremap()/fixmap area.
- *  0xffff828c00000000 - 0xffff828c3fffffff [1GB,   2^30 bytes, PML4:261]
+ *  0xffff828800000000 - 0xffff82883fffffff [1GB,   2^30 bytes, PML4:261]
  *    Compatibility machine-to-phys translation table.
- *  0xffff828c40000000 - 0xffff828c7fffffff [1GB,   2^30 bytes, PML4:261]
+ *  0xffff828840000000 - 0xffff82887fffffff [1GB,   2^30 bytes, PML4:261]
  *    High read-only compatibility machine-to-phys translation table.
- *  0xffff828c80000000 - 0xffff828cbfffffff [1GB,   2^30 bytes, PML4:261]
+ *  0xffff828880000000 - 0xffff8288bfffffff [1GB,   2^30 bytes, PML4:261]
  *    Xen text, static data, bss.
- *  0xffff828cc0000000 - 0xffff82ffffffffff [461GB,             PML4:261]
+ *  0xffff8288c0000000 - 0xffff82f5ffffffff [437GB,             PML4:261]
  *    Reserved for future use.
- *  0xffff830000000000 - 0xffff83ffffffffff [1TB,   2^40 bytes, PML4:262-263]
+ *  0xffff82f600000000 - 0xffff82ffffffffff [40GB,  2^38 bytes, PML4:261]
+ *    Page-frame information array.
+ *  0xffff830000000000 - 0xffff87ffffffffff [5TB, 5*2^40 bytes, PML4:262-271]
  *    1:1 direct mapping of all physical memory.
- *  0xffff840000000000 - 0xffff87ffffffffff [4TB,   2^42 bytes, PML4:264-271]
- *    Reserved for future use.
  *  0xffff880000000000 - 0xffffffffffffffff [120TB, PML4:272-511]
  *    Guest-defined use.
  *
@@ -210,11 +208,8 @@ extern unsigned int video_mode, video_flags;
 /* Slot 261: machine-to-phys conversion table (16GB). */
 #define RDWR_MPT_VIRT_START     (PML4_ADDR(261))
 #define RDWR_MPT_VIRT_END       (RDWR_MPT_VIRT_START + GB(16))
-/* Slot 261: page-frame information array (16GB). */
-#define FRAMETABLE_VIRT_START   (RDWR_MPT_VIRT_END)
-#define FRAMETABLE_VIRT_END     (FRAMETABLE_VIRT_START + GB(16))
 /* Slot 261: ioremap()/fixmap area (16GB). */
-#define IOREMAP_VIRT_START      (FRAMETABLE_VIRT_END)
+#define IOREMAP_VIRT_START      RDWR_MPT_VIRT_END
 #define IOREMAP_VIRT_END        (IOREMAP_VIRT_START + GB(16))
 /* Slot 261: compatibility machine-to-phys conversion table (1GB). */
 #define RDWR_COMPAT_MPT_VIRT_START IOREMAP_VIRT_END
@@ -225,9 +220,15 @@ extern unsigned int video_mode, video_flags;
 /* Slot 261: xen text, static data and bss (1GB). */
 #define XEN_VIRT_START          (HIRO_COMPAT_MPT_VIRT_END)
 #define XEN_VIRT_END            (XEN_VIRT_START + GB(1))
-/* Slot 262-263: A direct 1:1 mapping of all of physical memory. */
+/* Slot 261: page-frame information array (40GB). */
+#define FRAMETABLE_VIRT_END     DIRECTMAP_VIRT_START
+#define FRAMETABLE_SIZE         ((DIRECTMAP_SIZE >> PAGE_SHIFT) * \
+                                 sizeof(struct page_info))
+#define FRAMETABLE_VIRT_START   (FRAMETABLE_VIRT_END - FRAMETABLE_SIZE)
+/* Slot 262-271: A direct 1:1 mapping of all of physical memory. */
 #define DIRECTMAP_VIRT_START    (PML4_ADDR(262))
-#define DIRECTMAP_VIRT_END      (DIRECTMAP_VIRT_START + PML4_ENTRY_BYTES*2)
+#define DIRECTMAP_SIZE          (PML4_ENTRY_BYTES*10)
+#define DIRECTMAP_VIRT_END      (DIRECTMAP_VIRT_START + DIRECTMAP_SIZE)
 
 #ifndef __ASSEMBLY__
 

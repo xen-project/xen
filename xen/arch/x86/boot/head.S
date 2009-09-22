@@ -33,7 +33,7 @@ ENTRY(start)
         /* Checksum: must be the negated sum of the first two fields. */
         .long   -(MULTIBOOT_HEADER_MAGIC + MULTIBOOT_HEADER_FLAGS)
 
-        .section .init.text
+        .section .init.text, "ax"
 
 .Lbad_cpu_msg: .asciz "ERR: Not a 64-bit CPU!"
 .Lbad_ldr_msg: .asciz "ERR: Not a Multiboot bootloader!"
@@ -128,13 +128,13 @@ __start:
         loop    1b
         /* Initialise L3 xen-map page directory entry. */
         mov     $(sym_phys(l2_xenmap)+7),%eax
-        mov     %eax,sym_phys(l3_xenmap) + (50*8)
+        mov     %eax,sym_phys(l3_xenmap) + l3_table_offset(XEN_VIRT_START)*8
         /* Hook identity-map and xen-map L3 tables into PML4. */
         mov     $(sym_phys(l3_identmap)+7),%eax
         mov     %eax,sym_phys(idle_pg_table) + (  0*8) /* PML4[  0]: 1:1 map */
-        mov     %eax,sym_phys(idle_pg_table) + (262*8) /* PML4[262]: 1:1 map */
+        mov     %eax,sym_phys(idle_pg_table) + l4_table_offset(DIRECTMAP_VIRT_START)*8
         mov     $(sym_phys(l3_xenmap)+7),%eax
-        mov     %eax,sym_phys(idle_pg_table) + (261*8) /* PML4[261]: xen map */
+        mov     %eax,sym_phys(idle_pg_table) + l4_table_offset(XEN_VIRT_START)*8
 #else
         /* Initialize low and high mappings of memory with 2MB pages */
         mov     $sym_phys(idle_pg_table_l2),%edi

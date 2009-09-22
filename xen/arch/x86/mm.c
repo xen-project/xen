@@ -166,6 +166,13 @@ void __init init_frametable(void)
 {
     unsigned long nr_pages, page_step, i, mfn;
 
+#ifdef __x86_64__
+    BUILD_BUG_ON(FRAMETABLE_VIRT_START & ((1UL << L3_PAGETABLE_SHIFT) - 1));
+    BUILD_BUG_ON(XEN_VIRT_END > FRAMETABLE_VIRT_END);
+#else
+    BUILD_BUG_ON(FRAMETABLE_VIRT_START & ((1UL << L2_PAGETABLE_SHIFT) - 1));
+#endif
+
     nr_pages  = PFN_UP(max_page * sizeof(*frame_table));
     page_step = 1 << (cpu_has_page1gb ? L3_PAGETABLE_SHIFT - PAGE_SHIFT
                                       : L2_PAGETABLE_SHIFT - PAGE_SHIFT);
