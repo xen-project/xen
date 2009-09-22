@@ -821,6 +821,7 @@ int mce_wrmsr(u32 msr, u64 val)
                                 "Node, nr_injection %u\n",
                                 d->arch.vmca_msrs.nr_injection);
                 list_del(&entry->list);
+                xfree(entry);
             }
             else
                 gdprintk(XENLOG_WARNING, "MCE: Not found HVM guest"
