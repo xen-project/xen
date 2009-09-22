@@ -72,19 +72,19 @@ typedef struct __packed {
 static void tboot_copy_memory(unsigned char *va, uint32_t size,
                               unsigned long pa)
 {
-    uint32_t map_base;
-    unsigned long map_addr;
-    int i;
+    unsigned long map_base = 0;
+    unsigned char *map_addr = NULL;
+    unsigned int i;
 
-    map_base = 0;
-    for (i = 0; i < size; i++) {
-        if ( map_base != PFN_DOWN(pa + i) ) {
+    for ( i = 0; i < size; i++ )
+    {
+        if ( map_base != PFN_DOWN(pa + i) )
+        {
             map_base = PFN_DOWN(pa + i);
             set_fixmap(FIX_TBOOT_MAP_ADDRESS, map_base << PAGE_SHIFT);
-            map_addr = (unsigned long)fix_to_virt(FIX_TBOOT_MAP_ADDRESS);
+            map_addr = (unsigned char *)fix_to_virt(FIX_TBOOT_MAP_ADDRESS);
         }
-        *(va + i) = *(unsigned char *)(map_addr + pa + i
-                                       - (map_base << PAGE_SHIFT));
+        va[i] = map_addr[pa + i - (map_base << PAGE_SHIFT)];
     }
 }
 

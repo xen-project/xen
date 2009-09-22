@@ -421,23 +421,23 @@ static int core2_vpmu_do_wrmsr(struct cpu_user_regs *regs)
     core2_vpmu_save_msr_context(v, type, index, msr_content);
     if ( type != MSR_TYPE_GLOBAL )
     {
-        unsigned long mask;
+        u64 mask;
         int inject_gp = 0;
         switch ( type )
         {
         case MSR_TYPE_ARCH_CTRL:      /* MSR_P6_EVNTSEL[0,...] */
-            mask = ~((1L << 32) - 1);
+            mask = ~((1ull << 32) - 1);
             if (msr_content & mask)
                 inject_gp = 1;
             break;
         case MSR_TYPE_CTRL:           /* IA32_FIXED_CTR_CTRL */
             /* 4 bits per counter, currently 3 fixed counters implemented. */
-            mask = ~((1L << (3 * 4)) - 1);
+            mask = ~((1ull << (3 * 4)) - 1);
             if (msr_content & mask)
                 inject_gp = 1;
             break;
         case MSR_TYPE_COUNTER:        /* IA32_FIXED_CTR[0-2] */
-            mask = ~((1L << core2_get_bitwidth_fix_count()) - 1);
+            mask = ~((1ull << core2_get_bitwidth_fix_count()) - 1);
             if (msr_content & mask)
                 inject_gp = 1;
             break;
