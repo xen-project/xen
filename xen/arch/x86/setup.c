@@ -312,6 +312,16 @@ static void __init setup_max_pdx(void)
 #endif
 }
 
+static void __init set_pdx_range(unsigned long smfn, unsigned long emfn)
+{
+    unsigned long idx, eidx;
+
+    idx = pfn_to_pdx(smfn) / PDX_GROUP_COUNT;
+    eidx = (pfn_to_pdx(emfn - 1) + PDX_GROUP_COUNT) / PDX_GROUP_COUNT;
+    for ( ; idx < eidx; ++idx )
+        __set_bit(idx, pdx_group_valid);
+}
+
 /* A temporary copy of the e820 map that we can mess with during bootstrap. */
 static struct e820map __initdata boot_e820;
 
@@ -657,6 +667,8 @@ void __init __start_xen(unsigned long mbi_p)
         if ( (boot_e820.map[i].type != E820_RAM) || (s >= e) )
             continue;
 
+        set_pdx_range(s >> PAGE_SHIFT, e >> PAGE_SHIFT);
+
         /* Map the chunk. No memory will need to be allocated to do this. */
         map_pages_to_xen(
             (unsigned long)maddr_to_bootstrap_virt(s),
@@ -852,6 +864,8 @@ void __init __start_xen(unsigned long mbi_p)
                    e, map_e);
         }
 #endif
+
+        set_pdx_range(s >> PAGE_SHIFT, e >> PAGE_SHIFT);
 
         /* Need to create mappings above 16MB. */
         map_s = max_t(uint64_t, s, 16<<20);

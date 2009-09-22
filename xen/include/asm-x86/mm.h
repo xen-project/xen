@@ -263,6 +263,10 @@ extern unsigned long max_page;
 extern unsigned long total_pages;
 void init_frametable(void);
 
+#define PDX_GROUP_COUNT ((1 << L2_PAGETABLE_SHIFT) / \
+                         (sizeof(*frame_table) & -sizeof(*frame_table)))
+extern unsigned long pdx_group_valid[];
+
 /* Convert between Xen-heap virtual addresses and page-info structures. */
 static inline struct page_info *__virt_to_page(const void *v)
 {

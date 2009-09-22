@@ -64,6 +64,14 @@ l3_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
 l2_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
     l2_xenmap[L2_PAGETABLE_ENTRIES];
 
+int __mfn_valid(unsigned long mfn)
+{
+    return likely(mfn < max_page) &&
+           likely(!(mfn & pfn_hole_mask)) &&
+           likely(test_bit(pfn_to_pdx(mfn) / PDX_GROUP_COUNT,
+                           pdx_group_valid));
+}
+
 void *alloc_xen_pagetable(void)
 {
     extern int early_boot;

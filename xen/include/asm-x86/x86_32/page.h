@@ -41,7 +41,11 @@
 #include <xen/config.h>
 #include <asm/types.h>
 
-#define __mfn_valid(mfn)        ((mfn) < max_page)
+#define __mfn_valid(mfn)        ({                                            \
+    unsigned long __m_f_n = (mfn);                                            \
+    likely(__m_f_n < max_page) &&                                             \
+    likely(test_bit(pfn_to_pdx(__m_f_n) / PDX_GROUP_COUNT, pdx_group_valid)); \
+})
 
 #define max_pdx                 max_page
 #define pfn_to_pdx(pfn)         (pfn)

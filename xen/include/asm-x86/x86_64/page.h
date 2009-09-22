@@ -35,7 +35,7 @@
 /* Physical address where Xen was relocated to. */
 extern unsigned long xen_phys_start;
 
-extern unsigned long max_page, max_pdx;
+extern unsigned long max_pdx;
 extern unsigned long pfn_pdx_bottom_mask, ma_va_bottom_mask;
 extern unsigned int pfn_pdx_hole_shift;
 extern unsigned long pfn_hole_mask;
@@ -53,10 +53,7 @@ extern void pfn_pdx_hole_setup(unsigned long);
 #define pdx_to_virt(pdx) ((void *)(DIRECTMAP_VIRT_START + \
                                    ((unsigned long)(pdx) << PAGE_SHIFT)))
 
-static inline int __mfn_valid(unsigned long mfn)
-{
-    return mfn < max_page && !(mfn & pfn_hole_mask);
-}
+extern int __mfn_valid(unsigned long mfn);
 
 static inline unsigned long pfn_to_pdx(unsigned long pfn)
 {

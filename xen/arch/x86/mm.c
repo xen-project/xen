@@ -141,6 +141,10 @@ struct domain *dom_xen, *dom_io;
 unsigned long max_page;
 unsigned long total_pages;
 
+unsigned long __read_mostly pdx_group_valid[BITS_TO_LONGS(
+    (FRAMETABLE_SIZE / sizeof(*frame_table) + PDX_GROUP_COUNT - 1)
+    / PDX_GROUP_COUNT)] = { [0] = 1 };
+
 #define PAGE_CACHE_ATTRS (_PAGE_PAT|_PAGE_PCD|_PAGE_PWT)
 
 int opt_allow_hugepage;
@@ -162,36 +166,58 @@ l2_pgentry_t *compat_idle_pg_table_l2 = NULL;
 #define l3_disallow_mask(d) L3_DISALLOW_MASK
 #endif
 
-void __init init_frametable(void)
+static void __init init_frametable_chunk(void *start, void *end)
 {
-    unsigned long nr_pages, page_step, i, mfn;
+    unsigned long s = (unsigned long)start;
+    unsigned long e = (unsigned long)end;
+    unsigned long step, mfn;
 
-#ifdef __x86_64__
-    BUILD_BUG_ON(FRAMETABLE_VIRT_START & ((1UL << L3_PAGETABLE_SHIFT) - 1));
-    BUILD_BUG_ON(XEN_VIRT_END > FRAMETABLE_VIRT_END);
-#else
-    BUILD_BUG_ON(FRAMETABLE_VIRT_START & ((1UL << L2_PAGETABLE_SHIFT) - 1));
-#endif
-
-    nr_pages  = PFN_UP(max_pdx * sizeof(*frame_table));
-    page_step = 1 << (cpu_has_page1gb ? L3_PAGETABLE_SHIFT - PAGE_SHIFT
-                                      : L2_PAGETABLE_SHIFT - PAGE_SHIFT);
-
-    for ( i = 0; i < nr_pages; i += page_step )
+    ASSERT(!(s & ((1 << L2_PAGETABLE_SHIFT) - 1)));
+    for ( ; s < e; s += step << PAGE_SHIFT )
     {
+        step = 1UL << (cpu_has_page1gb &&
+                       !(s & ((1UL << L3_PAGETABLE_SHIFT) - 1)) ?
+                       L3_PAGETABLE_SHIFT - PAGE_SHIFT :
+                       L2_PAGETABLE_SHIFT - PAGE_SHIFT);
         /*
          * The hardcoded 4 below is arbitrary - just pick whatever you think
          * is reasonable to waste as a trade-off for using a large page.
          */
-        while (nr_pages + 4 - i < page_step)
-            page_step >>= PAGETABLE_ORDER;
-        mfn = alloc_boot_pages(page_step, page_step);
-        map_pages_to_xen(
-            FRAMETABLE_VIRT_START + (i << PAGE_SHIFT),
-            mfn, page_step, PAGE_HYPERVISOR);
+        while ( step && s + (step << PAGE_SHIFT) > e + (4 << PAGE_SHIFT) )
+            step >>= PAGETABLE_ORDER;
+        do {
+            mfn = alloc_boot_pages(step, step);
+        } while ( !mfn && (step >>= PAGETABLE_ORDER) );
+        if ( !mfn )
+            panic("Not enough memory for frame table");
+        map_pages_to_xen(s, mfn, step, PAGE_HYPERVISOR);
     }
 
-    memset(frame_table, 0, nr_pages << PAGE_SHIFT);
+    memset(start, 0, end - start);
+    memset(end, -1, s - (unsigned long)end);
+}
+
+void __init init_frametable(void)
+{
+    unsigned int sidx, eidx, nidx;
+    unsigned int max_idx = (max_pdx + PDX_GROUP_COUNT - 1) / PDX_GROUP_COUNT;
+
+#ifdef __x86_64__
+    BUILD_BUG_ON(XEN_VIRT_END > FRAMETABLE_VIRT_END);
+#endif
+    BUILD_BUG_ON(FRAMETABLE_VIRT_START & ((1UL << L2_PAGETABLE_SHIFT) - 1));
+
+    for ( sidx = 0; ; sidx = nidx )
+    {
+        eidx = find_next_zero_bit(pdx_group_valid, max_idx, sidx);
+        nidx = find_next_bit(pdx_group_valid, max_idx, eidx);
+        if ( nidx >= max_idx )
+            break;
+        init_frametable_chunk(pdx_to_page(sidx * PDX_GROUP_COUNT),
+                              pdx_to_page(eidx * PDX_GROUP_COUNT));
+    }
+    init_frametable_chunk(pdx_to_page(sidx * PDX_GROUP_COUNT),
+                          pdx_to_page(max_pdx - 1) + 1);
 }
 
 void __init arch_init_memory(void)
