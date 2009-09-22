@@ -309,7 +309,6 @@ void pt_intr_post(struct vcpu *v, struct hvm_intack intack)
     else
     {
         pt->scheduled += pt->period;
-        pt_process_missed_ticks(pt);
 
         if ( mode_is(v->domain, one_missed_tick_pending) ||
              mode_is(v->domain, no_missed_ticks_pending) )
@@ -324,7 +323,11 @@ void pt_intr_post(struct vcpu *v, struct hvm_intack intack)
         }
 
         if ( pt->pending_intr_nr == 0 )
+        {
+            pt_process_missed_ticks(pt);
+            pt->do_not_freeze = 0;
             set_timer(&pt->timer, pt->scheduled);
+        }
     }
 
     if ( mode_is(v->domain, delay_for_missed_ticks) &&
