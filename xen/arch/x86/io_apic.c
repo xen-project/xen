@@ -2193,12 +2193,14 @@ int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
     desc = irq_to_desc(irq);
     cfg = desc->chip_data;
 
-    /* Since PHYSDEVOP_alloc_irq_vector is dummy, rte.vector is the pirq
-       which corresponds to this ioapic pin, retrieve it for building
-       pirq and irq mapping. 
+    /*
+     * Since PHYSDEVOP_alloc_irq_vector is dummy, rte.vector is the pirq
+     * which corresponds to this ioapic pin, retrieve it for building
+     * pirq and irq mapping. Where the GSI is greater than 256, we assume
+     * that dom0 pirq == irq.
      */
-    pirq = rte.vector;
-    if(pirq < 0 || pirq >= dom0->nr_pirqs)
+    pirq = (irq >= 256) ? irq : rte.vector;
+    if ( (pirq < 0) || (pirq >= dom0->nr_pirqs) )
         return -EINVAL;
     
     if ( desc->action )
