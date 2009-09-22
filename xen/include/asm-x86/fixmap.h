@@ -51,6 +51,7 @@ enum fixed_addresses {
     FIX_TBOOT_SHARED_BASE,
     FIX_MSIX_IO_RESERV_BASE,
     FIX_MSIX_IO_RESERV_END = FIX_MSIX_IO_RESERV_BASE + FIX_MSIX_MAX_PAGES -1,
+    FIX_TBOOT_MAP_ADDRESS,
     __end_of_fixed_addresses
 };
 

@@ -69,12 +69,29 @@ typedef struct __packed {
     uint32_t     vtd_dmars_off;
 } sinit_mle_data_t;
 
+static void tboot_copy_memory(unsigned char *va, uint32_t size,
+                              unsigned long pa)
+{
+    uint32_t map_base;
+    unsigned long map_addr;
+    int i;
+
+    map_base = 0;
+    for (i = 0; i < size; i++) {
+        if ( map_base != PFN_DOWN(pa + i) ) {
+            map_base = PFN_DOWN(pa + i);
+            set_fixmap(FIX_TBOOT_MAP_ADDRESS, map_base << PAGE_SHIFT);
+            map_addr = (unsigned long)fix_to_virt(FIX_TBOOT_MAP_ADDRESS);
+        }
+        *(va + i) = *(unsigned char *)(map_addr + pa + i
+                                       - (map_base << PAGE_SHIFT));
+    }
+}
+
 void __init tboot_probe(void)
 {
     tboot_shared_t *tboot_shared;
     unsigned long p_tboot_shared;
-    uint32_t map_base, map_size;
-    unsigned long map_addr;
 
     /* Look for valid page-aligned address for shared page. */
     p_tboot_shared = simple_strtoul(opt_tboot, NULL, 0);
@@ -107,26 +124,17 @@ void __init tboot_probe(void)
     /* these will be needed by tboot_protect_mem_regions() and/or
        tboot_parse_dmar_table(), so get them now */
 
-    map_base = PFN_DOWN(TXT_PUB_CONFIG_REGS_BASE);
-    map_size = PFN_UP(NR_TXT_CONFIG_PAGES * PAGE_SIZE);
-    map_addr = (unsigned long)__va(map_base << PAGE_SHIFT);
-    if ( map_pages_to_xen(map_addr, map_base, map_size, __PAGE_HYPERVISOR) )
-        return;
-
+    txt_heap_base = txt_heap_size = sinit_base = sinit_size = 0;
     /* TXT Heap */
-    txt_heap_base =
-        *(uint64_t *)__va(TXT_PUB_CONFIG_REGS_BASE + TXTCR_HEAP_BASE);
-    txt_heap_size =
-        *(uint64_t *)__va(TXT_PUB_CONFIG_REGS_BASE + TXTCR_HEAP_SIZE);
-
+    tboot_copy_memory((unsigned char *)&txt_heap_base, sizeof(txt_heap_base),
+                      TXT_PUB_CONFIG_REGS_BASE + TXTCR_HEAP_BASE);
+    tboot_copy_memory((unsigned char *)&txt_heap_size, sizeof(txt_heap_size),
+                      TXT_PUB_CONFIG_REGS_BASE + TXTCR_HEAP_SIZE);
     /* SINIT */
-    sinit_base =
-        *(uint64_t *)__va(TXT_PUB_CONFIG_REGS_BASE + TXTCR_SINIT_BASE);
-    sinit_size =
-        *(uint64_t *)__va(TXT_PUB_CONFIG_REGS_BASE + TXTCR_SINIT_SIZE);
-
-    destroy_xen_mappings((unsigned long)__va(map_base << PAGE_SHIFT),
-                         (unsigned long)__va((map_base + map_size) << PAGE_SHIFT));
+    tboot_copy_memory((unsigned char *)&sinit_base, sizeof(sinit_base),
+                      TXT_PUB_CONFIG_REGS_BASE + TXTCR_SINIT_BASE);
+    tboot_copy_memory((unsigned char *)&sinit_size, sizeof(sinit_size),
+                      TXT_PUB_CONFIG_REGS_BASE + TXTCR_SINIT_SIZE);
 }
 
 /* definitions from xen/drivers/passthrough/vtd/iommu.h
@@ -380,11 +388,14 @@ int __init tboot_protect_mem_regions(void)
 
 int __init tboot_parse_dmar_table(acpi_table_handler dmar_handler)
 {
-    uint32_t map_base, map_size;
-    unsigned long map_vaddr;
-    void *heap_ptr;
     struct acpi_table_header *dmar_table;
     int rc;
+    uint64_t size;
+    uint32_t dmar_table_length;
+    unsigned long pa;
+    sinit_mle_data_t sinit_mle_data;
+    unsigned char *dmar_table_raw;
+
 
     if ( !tboot_in_measured_env() )
         return acpi_table_parse(ACPI_SIG_DMAR, dmar_handler);
@@ -396,32 +407,33 @@ int __init tboot_parse_dmar_table(acpi_table_handler dmar_handler)
         return 1;
 
     /* map TXT heap into Xen addr space */
-    map_base = PFN_DOWN(txt_heap_base);
-    map_size = PFN_UP(txt_heap_size);
-    map_vaddr = (unsigned long)__va(map_base << PAGE_SHIFT);
-    if ( map_pages_to_xen(map_vaddr, map_base, map_size, __PAGE_HYPERVISOR) )
-        return 1;
 
     /* walk heap to SinitMleData */
-    heap_ptr = __va(txt_heap_base);
+    pa = txt_heap_base;
     /* skip BiosData */
-    heap_ptr += *(uint64_t *)heap_ptr;
+    tboot_copy_memory((unsigned char *)&size, sizeof(size), pa);
+    pa += size;
     /* skip OsMleData */
-    heap_ptr += *(uint64_t *)heap_ptr;
+    tboot_copy_memory((unsigned char *)&size, sizeof(size), pa);
+    pa += size;
     /* skip OsSinitData */
-    heap_ptr += *(uint64_t *)heap_ptr;
+    tboot_copy_memory((unsigned char *)&size, sizeof(size), pa);
+    pa += size;
     /* now points to SinitMleDataSize; set to SinitMleData */
-    heap_ptr += sizeof(uint64_t);
+    pa += sizeof(uint64_t);
+    tboot_copy_memory((unsigned char *)&sinit_mle_data, sizeof(sinit_mle_data),
+                      pa);
     /* get addr of DMAR table */
-    dmar_table = (struct acpi_table_header *)(heap_ptr +
-            ((sinit_mle_data_t *)heap_ptr)->vtd_dmars_off - sizeof(uint64_t));
-
+    pa += sinit_mle_data.vtd_dmars_off - sizeof(uint64_t);
+    tboot_copy_memory((unsigned char *)&dmar_table_length,
+                      sizeof(dmar_table_length),
+                      pa + sizeof(char) * ACPI_NAME_SIZE);
+    dmar_table_raw = xmalloc_array(unsigned char, dmar_table_length);
+    tboot_copy_memory(dmar_table_raw, dmar_table_length, pa);
+    dmar_table = (struct acpi_table_header *)dmar_table_raw;
     rc = dmar_handler(dmar_table);
+    xfree(dmar_table_raw);
 
-    destroy_xen_mappings(
-        (unsigned long)__va(map_base << PAGE_SHIFT),
-        (unsigned long)__va((map_base + map_size) << PAGE_SHIFT));
-  
     /* acpi_parse_dmar() zaps APCI DMAR signature in TXT heap table */
     /* but dom0 will read real table, so must zap it there too */
     dmar_table = NULL;
