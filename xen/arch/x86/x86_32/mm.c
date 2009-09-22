@@ -72,7 +72,7 @@ void __init paging_init(void)
 {
     unsigned long v;
     struct page_info *pg;
-    int i;
+    unsigned int i, n;
 
     if ( cpu_has_pge )
     {
@@ -96,8 +96,18 @@ void __init paging_init(void)
      */
     mpt_size  = (max_page * BYTES_PER_LONG) + (1UL << L2_PAGETABLE_SHIFT) - 1;
     mpt_size &= ~((1UL << L2_PAGETABLE_SHIFT) - 1UL);
+#define MFN(x) (((x) << L2_PAGETABLE_SHIFT) / sizeof(unsigned long))
+#define CNT ((sizeof(*frame_table) & -sizeof(*frame_table)) / \
+             sizeof(*machine_to_phys_mapping))
+    BUILD_BUG_ON((sizeof(*frame_table) & ~sizeof(*frame_table)) % \
+                 sizeof(*machine_to_phys_mapping));
     for ( i = 0; i < (mpt_size >> L2_PAGETABLE_SHIFT); i++ )
     {
+        for ( n = 0; n < CNT; ++n)
+            if ( mfn_valid(MFN(i) + n * PDX_GROUP_COUNT) )
+                break;
+        if ( n == CNT )
+            continue;
         if ( (pg = alloc_domheap_pages(NULL, PAGETABLE_ORDER, 0)) == NULL )
             panic("Not enough memory to bootstrap Xen.\n");
         l2e_write(&idle_pg_table_l2[l2_linear_offset(RDWR_MPT_VIRT_START) + i],
@@ -106,11 +116,12 @@ void __init paging_init(void)
         l2e_write(&idle_pg_table_l2[l2_linear_offset(RO_MPT_VIRT_START) + i],
                   l2e_from_page(
                       pg, (__PAGE_HYPERVISOR | _PAGE_PSE) & ~_PAGE_RW));
+        /* Fill with an obvious debug pattern. */
+        memset((void *)(RDWR_MPT_VIRT_START + (i << L2_PAGETABLE_SHIFT)), 0x55,
+               1UL << L2_PAGETABLE_SHIFT);
     }
-
-    /* Fill with an obvious debug pattern. */
-    for ( i = 0; i < (mpt_size / BYTES_PER_LONG); i++)
-        set_gpfn_from_mfn(i, 0x55555555);
+#undef CNT
+#undef MFN
 
     /* Create page tables for ioremap()/map_domain_page_global(). */
     for ( i = 0; i < (IOREMAP_MBYTES >> (L2_PAGETABLE_SHIFT - 20)); i++ )
@@ -163,14 +174,17 @@ void __init subarch_init_memory(void)
 {
     unsigned long m2p_start_mfn;
     unsigned int i, j;
+    l2_pgentry_t l2e;
 
     BUILD_BUG_ON(sizeof(struct page_info) != 24);
 
     /* M2P table is mappable read-only by privileged domains. */
     for ( i = 0; i < (mpt_size >> L2_PAGETABLE_SHIFT); i++ )
     {
-        m2p_start_mfn = l2e_get_pfn(
-            idle_pg_table_l2[l2_linear_offset(RDWR_MPT_VIRT_START) + i]);
+        l2e = idle_pg_table_l2[l2_linear_offset(RDWR_MPT_VIRT_START) + i];
+        if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
+            continue;
+        m2p_start_mfn = l2e_get_pfn(l2e);
         for ( j = 0; j < L2_PAGETABLE_ENTRIES; j++ )
         {
             struct page_info *page = mfn_to_page(m2p_start_mfn + j);
@@ -191,8 +205,9 @@ void __init subarch_init_memory(void)
 long subarch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
 {
     struct xen_machphys_mfn_list xmml;
-    unsigned long mfn;
+    unsigned long mfn, last_mfn;
     unsigned int i, max;
+    l2_pgentry_t l2e;
     long rc = 0;
 
     switch ( op )
@@ -203,12 +218,18 @@ long subarch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
 
         max = min_t(unsigned int, xmml.max_extents, mpt_size >> 21);
 
-        for ( i = 0; i < max; i++ )
+        for ( i = 0, last_mfn = 0; i < max; i++ )
         {
-            mfn = l2e_get_pfn(idle_pg_table_l2[l2_linear_offset(
-                RDWR_MPT_VIRT_START + (i << 21))]) + l1_table_offset(i << 21);
+            l2e = idle_pg_table_l2[l2_linear_offset(
+                RDWR_MPT_VIRT_START + (i << 21))];
+            if ( l2e_get_flags(l2e) & _PAGE_PRESENT )
+                mfn = l2e_get_pfn(l2e);
+            else
+                mfn = last_mfn;
+            ASSERT(mfn);
             if ( copy_to_guest_offset(xmml.extent_start, i, &mfn, 1) )
                 return -EFAULT;
+            last_mfn = mfn;
         }
 
         xmml.nr_extents = i;

@@ -153,19 +153,31 @@ int compat_arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
     }
 
     case XENMEM_machphys_mfn_list:
+    {
+        unsigned long limit;
+        compat_pfn_t last_mfn;
+
         if ( copy_from_guest(&xmml, arg, 1) )
             return -EFAULT;
 
-        for ( i = 0, v = RDWR_COMPAT_MPT_VIRT_START;
-              (i != xmml.max_extents) && (v != RDWR_COMPAT_MPT_VIRT_END);
+        limit = (unsigned long)(compat_machine_to_phys_mapping +
+            min_t(unsigned long, max_page,
+                  MACH2PHYS_COMPAT_NR_ENTRIES(current->domain)));
+        if ( limit > RDWR_COMPAT_MPT_VIRT_END )
+            limit = RDWR_COMPAT_MPT_VIRT_END;
+        for ( i = 0, v = RDWR_COMPAT_MPT_VIRT_START, last_mfn = 0;
+              (i != xmml.max_extents) && (v < limit);
               i++, v += 1 << L2_PAGETABLE_SHIFT )
         {
             l2e = compat_idle_pg_table_l2[l2_table_offset(v)];
-            if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
-                break;
-            mfn = l2e_get_pfn(l2e) + l1_table_offset(v);
+            if ( l2e_get_flags(l2e) & _PAGE_PRESENT )
+                mfn = l2e_get_pfn(l2e);
+            else
+                mfn = last_mfn;
+            ASSERT(mfn);
             if ( copy_to_compat_offset(xmml.extent_start, i, &mfn, 1) )
                 return -EFAULT;
+            last_mfn = mfn;
         }
 
         xmml.nr_extents = i;
@@ -173,6 +185,7 @@ int compat_arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
             rc = -EFAULT;
 
         break;
+    }
 
     default:
         rc = -ENOSYS;

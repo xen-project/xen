@@ -194,7 +194,7 @@ void __init pfn_pdx_hole_setup(unsigned long mask)
 void __init paging_init(void)
 {
     unsigned long i, mpt_size, va;
-    unsigned int memflags;
+    unsigned int n, memflags;
     l3_pgentry_t *l3_ro_mpt;
     l2_pgentry_t *l2_ro_mpt = NULL;
     struct page_info *l1_pg, *l2_pg, *l3_pg;
@@ -213,6 +213,11 @@ void __init paging_init(void)
      */
     mpt_size  = (max_page * BYTES_PER_LONG) + (1UL << L2_PAGETABLE_SHIFT) - 1;
     mpt_size &= ~((1UL << L2_PAGETABLE_SHIFT) - 1UL);
+#define MFN(x) (((x) << L2_PAGETABLE_SHIFT) / sizeof(unsigned long))
+#define CNT ((sizeof(*frame_table) & -sizeof(*frame_table)) / \
+             sizeof(*machine_to_phys_mapping))
+    BUILD_BUG_ON((sizeof(*frame_table) & ~sizeof(*frame_table)) % \
+                 sizeof(*machine_to_phys_mapping));
     for ( i = 0; i < (mpt_size >> L2_PAGETABLE_SHIFT); i++ )
     {
         BUILD_BUG_ON(RO_MPT_VIRT_START & ((1UL << L3_PAGETABLE_SHIFT) - 1));
@@ -222,37 +227,63 @@ void __init paging_init(void)
 
         if ( cpu_has_page1gb &&
              !((unsigned long)l2_ro_mpt & ~PAGE_MASK) &&
-             (mpt_size >> L3_PAGETABLE_SHIFT) > (i >> PAGETABLE_ORDER) &&
-             (l1_pg = alloc_domheap_pages(NULL, 2 * PAGETABLE_ORDER,
-                                          memflags)) != NULL )
+             (mpt_size >> L3_PAGETABLE_SHIFT) > (i >> PAGETABLE_ORDER) )
+        {
+            unsigned int k, holes;
+
+            for ( holes = k = 0; k < 1 << PAGETABLE_ORDER; ++k)
+            {
+                for ( n = 0; n < CNT; ++n)
+                    if ( mfn_valid(MFN(i + k) + n * PDX_GROUP_COUNT) )
+                        break;
+                if ( n == CNT )
+                    ++holes;
+            }
+            if ( k == holes )
+            {
+                i += (1UL << PAGETABLE_ORDER) - 1;
+                continue;
+            }
+            if ( holes == 0 &&
+                 (l1_pg = alloc_domheap_pages(NULL, 2 * PAGETABLE_ORDER,
+                                              memflags)) != NULL )
+            {
+                map_pages_to_xen(
+                    RDWR_MPT_VIRT_START + (i << L2_PAGETABLE_SHIFT),
+                    page_to_mfn(l1_pg),
+                    1UL << (2 * PAGETABLE_ORDER),
+                    PAGE_HYPERVISOR);
+                memset((void *)(RDWR_MPT_VIRT_START + (i << L2_PAGETABLE_SHIFT)),
+                       0x77, 1UL << L3_PAGETABLE_SHIFT);
+
+                ASSERT(!l2_table_offset(va));
+                /* NB. Cannot be GLOBAL as shadow_mode_translate reuses this area. */
+                l3e_write(&l3_ro_mpt[l3_table_offset(va)],
+                    l3e_from_page(l1_pg,
+                        /*_PAGE_GLOBAL|*/_PAGE_PSE|_PAGE_USER|_PAGE_PRESENT));
+                i += (1UL << PAGETABLE_ORDER) - 1;
+                continue;
+            }
+        }
+
+        for ( n = 0; n < CNT; ++n)
+            if ( mfn_valid(MFN(i) + n * PDX_GROUP_COUNT) )
+                break;
+        if ( n == CNT )
+            l1_pg = NULL;
+        else if ( (l1_pg = alloc_domheap_pages(NULL, PAGETABLE_ORDER,
+                                               memflags)) == NULL )
+            goto nomem;
+        else
         {
             map_pages_to_xen(
                 RDWR_MPT_VIRT_START + (i << L2_PAGETABLE_SHIFT),
                 page_to_mfn(l1_pg),
-                1UL << (2 * PAGETABLE_ORDER),
+                1UL << PAGETABLE_ORDER,
                 PAGE_HYPERVISOR);
             memset((void *)(RDWR_MPT_VIRT_START + (i << L2_PAGETABLE_SHIFT)),
-                   0x77, 1UL << L3_PAGETABLE_SHIFT);
-
-            ASSERT(!l2_table_offset(va));
-            /* NB. Cannot be GLOBAL as shadow_mode_translate reuses this area. */
-            l3e_write(&l3_ro_mpt[l3_table_offset(va)],
-                l3e_from_page(l1_pg,
-                    /*_PAGE_GLOBAL|*/_PAGE_PSE|_PAGE_USER|_PAGE_PRESENT));
-            i += (1UL << PAGETABLE_ORDER) - 1;
-            continue;
+                   0x55, 1UL << L2_PAGETABLE_SHIFT);
         }
-
-        if ( (l1_pg = alloc_domheap_pages(NULL, PAGETABLE_ORDER,
-                                          memflags)) == NULL )
-            goto nomem;
-        map_pages_to_xen(
-            RDWR_MPT_VIRT_START + (i << L2_PAGETABLE_SHIFT),
-            page_to_mfn(l1_pg), 
-            1UL << PAGETABLE_ORDER,
-            PAGE_HYPERVISOR);
-        memset((void *)(RDWR_MPT_VIRT_START + (i << L2_PAGETABLE_SHIFT)), 0x55,
-               1UL << L2_PAGETABLE_SHIFT);
         if ( !((unsigned long)l2_ro_mpt & ~PAGE_MASK) )
         {
             if ( (l2_pg = alloc_domheap_page(NULL, memflags)) == NULL )
@@ -264,10 +295,13 @@ void __init paging_init(void)
             ASSERT(!l2_table_offset(va));
         }
         /* NB. Cannot be GLOBAL as shadow_mode_translate reuses this area. */
-        l2e_write(l2_ro_mpt, l2e_from_page(
-            l1_pg, /*_PAGE_GLOBAL|*/_PAGE_PSE|_PAGE_USER|_PAGE_PRESENT));
+        if ( l1_pg )
+            l2e_write(l2_ro_mpt, l2e_from_page(
+                l1_pg, /*_PAGE_GLOBAL|*/_PAGE_PSE|_PAGE_USER|_PAGE_PRESENT));
         l2_ro_mpt++;
     }
+#undef CNT
+#undef MFN
 
     /* Create user-accessible L2 directory to map the MPT for compat guests. */
     BUILD_BUG_ON(l4_table_offset(RDWR_MPT_VIRT_START) !=
@@ -288,12 +322,22 @@ void __init paging_init(void)
     mpt_size &= ~((1UL << L2_PAGETABLE_SHIFT) - 1UL);
     if ( (m2p_compat_vstart + mpt_size) < MACH2PHYS_COMPAT_VIRT_END )
         m2p_compat_vstart = MACH2PHYS_COMPAT_VIRT_END - mpt_size;
-    for ( i = 0; i < (mpt_size >> L2_PAGETABLE_SHIFT); i++ )
+#define MFN(x) (((x) << L2_PAGETABLE_SHIFT) / sizeof(unsigned int))
+#define CNT ((sizeof(*frame_table) & -sizeof(*frame_table)) / \
+             sizeof(*compat_machine_to_phys_mapping))
+    BUILD_BUG_ON((sizeof(*frame_table) & ~sizeof(*frame_table)) % \
+                 sizeof(*compat_machine_to_phys_mapping));
+    for ( i = 0; i < (mpt_size >> L2_PAGETABLE_SHIFT); i++, l2_ro_mpt++ )
     {
         memflags = MEMF_node(phys_to_nid(i <<
             (L2_PAGETABLE_SHIFT - 2 + PAGE_SHIFT)));
+        for ( n = 0; n < CNT; ++n)
+            if ( mfn_valid(MFN(i) + n * PDX_GROUP_COUNT) )
+                break;
+        if ( n == CNT )
+            continue;
         if ( (l1_pg = alloc_domheap_pages(NULL, PAGETABLE_ORDER,
-                                          memflags)) == NULL )
+                                               memflags)) == NULL )
             goto nomem;
         map_pages_to_xen(
             RDWR_COMPAT_MPT_VIRT_START + (i << L2_PAGETABLE_SHIFT),
@@ -306,8 +350,9 @@ void __init paging_init(void)
                1UL << L2_PAGETABLE_SHIFT);
         /* NB. Cannot be GLOBAL as the ptes get copied into per-VM space. */
         l2e_write(l2_ro_mpt, l2e_from_page(l1_pg, _PAGE_PSE|_PAGE_PRESENT));
-        l2_ro_mpt++;
     }
+#undef CNT
+#undef MFN
 
     /* Set up linear page table mapping. */
     l4e_write(&idle_pg_table[l4_table_offset(LINEAR_PT_VIRT_START)],
@@ -428,7 +473,7 @@ long subarch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
     l3_pgentry_t l3e;
     l2_pgentry_t l2e;
     unsigned long v;
-    xen_pfn_t mfn;
+    xen_pfn_t mfn, last_mfn;
     unsigned int i;
     long rc = 0;
 
@@ -440,29 +485,32 @@ long subarch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
 
         BUILD_BUG_ON(RDWR_MPT_VIRT_START & ((1UL << L3_PAGETABLE_SHIFT) - 1));
         BUILD_BUG_ON(RDWR_MPT_VIRT_END   & ((1UL << L3_PAGETABLE_SHIFT) - 1));
-        for ( i = 0, v = RDWR_MPT_VIRT_START;
-              (i != xmml.max_extents) && (v != RDWR_MPT_VIRT_END);
+        for ( i = 0, v = RDWR_MPT_VIRT_START, last_mfn = 0;
+              (i != xmml.max_extents) &&
+              (v < (unsigned long)(machine_to_phys_mapping + max_page));
               i++, v += 1UL << L2_PAGETABLE_SHIFT )
         {
             l3e = l4e_to_l3e(idle_pg_table[l4_table_offset(v)])[
                 l3_table_offset(v)];
             if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) )
-                break;
-            if ( !(l3e_get_flags(l3e) & _PAGE_PSE) )
+                mfn = last_mfn;
+            else if ( !(l3e_get_flags(l3e) & _PAGE_PSE) )
             {
                 l2e = l3e_to_l2e(l3e)[l2_table_offset(v)];
-                if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
-                    break;
-                mfn = l2e_get_pfn(l2e);
+                if ( l2e_get_flags(l2e) & _PAGE_PRESENT )
+                    mfn = l2e_get_pfn(l2e);
+                else
+                    mfn = last_mfn;
             }
             else
             {
                 mfn = l3e_get_pfn(l3e)
                     + (l2_table_offset(v) << PAGETABLE_ORDER);
             }
-            ASSERT(!l1_table_offset(v));
+            ASSERT(mfn);
             if ( copy_to_guest_offset(xmml.extent_start, i, &mfn, 1) )
                 return -EFAULT;
+            last_mfn = mfn;
         }
 
         xmml.nr_extents = i;
