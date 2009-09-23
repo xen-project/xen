@@ -150,9 +150,9 @@ QEMU_REMOTE=http://xenbits.xensource.com/git-http/qemu-xen-unstable.git
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= f09a5ba89434bb3f28172640354258d1d6cd8579
-# Fri Sep 18 16:41:42 2009 +0100
-# passthrough: basic graphics passthrough support
+QEMU_TAG ?= 743edef44f1d0da792aeb38a33bf468a4596f730
+# Wed Sep 23 15:07:47 2009 +0100
+# allow logdirty commands while paused (unbreaks 60dbe1+8f09f4)
 
 OCAML_XENSTORED_REPO=http://xenbits.xensource.com/ext/xen-ocaml-tools.hg
 
