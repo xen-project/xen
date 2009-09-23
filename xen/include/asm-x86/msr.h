@@ -82,7 +82,7 @@ static inline void wrmsrl(unsigned int msr, __u64 val)
 } while(0)
 #endif
 
-#define write_tsc(val1,val2) wrmsr(0x10, val1, val2)
+#define write_tsc(val) wrmsrl(MSR_IA32_TSC, val)
 
 #define rdpmc(counter,low,high) \
      __asm__ __volatile__("rdpmc" \

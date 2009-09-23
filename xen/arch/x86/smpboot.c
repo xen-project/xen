@@ -223,7 +223,7 @@ static void __init synchronize_tsc_bp (void)
 		 * We clear the TSC in the last loop:
 		 */
 		if (i == NR_LOOPS-1)
-			write_tsc(0, 0);
+			write_tsc(0L);
 
 		/*
 		 * Wait for all APs to leave the synchronization point:
@@ -293,7 +293,7 @@ static void __init synchronize_tsc_ap (void)
 
 		rdtscll(tsc_values[smp_processor_id()]);
 		if (i == NR_LOOPS-1)
-			write_tsc(0, 0);
+			write_tsc(0L);
 
 		atomic_inc(&tsc_count_stop);
 		while (atomic_read(&tsc_count_stop) != num_booting_cpus()) mb();

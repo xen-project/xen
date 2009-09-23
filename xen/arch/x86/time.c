@@ -699,7 +699,7 @@ void cstate_restore_tsc(void)
     struct cpu_time *t = &this_cpu(cpu_time);
     struct time_scale sys_to_tsc = scale_reciprocal(t->tsc_scale);
     s_time_t stime_delta;
-    u64 tsc_delta;
+    u64 new_tsc;
 
     if ( boot_cpu_has(X86_FEATURE_NOSTOP_TSC) )
         return;
@@ -708,9 +708,9 @@ void cstate_restore_tsc(void)
     if ( stime_delta < 0 )
         stime_delta = 0;
 
-    tsc_delta = scale_delta(stime_delta, &sys_to_tsc);
+    new_tsc = t->local_tsc_stamp + scale_delta(stime_delta, &sys_to_tsc);
 
-    wrmsrl(MSR_IA32_TSC, t->local_tsc_stamp + tsc_delta);
+    write_tsc(new_tsc);
 }
 
 /***************************************************************************
@@ -1126,8 +1126,7 @@ static void time_calibration_tsc_rendezvous(void *_r)
             atomic_inc(&r->semaphore);
 
             if ( i == 0 )
-                write_tsc((u32)r->master_tsc_stamp,
-                          (u32)(r->master_tsc_stamp >> 32));
+                write_tsc(r->master_tsc_stamp);
 
             while ( atomic_read(&r->semaphore) != (2*total_cpus - 1) )
                 mb();
@@ -1140,8 +1139,7 @@ static void time_calibration_tsc_rendezvous(void *_r)
                 mb();
 
             if ( i == 0 )
-                write_tsc((u32)r->master_tsc_stamp,
-                          (u32)(r->master_tsc_stamp >> 32));
+                write_tsc(r->master_tsc_stamp);
 
             atomic_inc(&r->semaphore);
             while ( atomic_read(&r->semaphore) > total_cpus )
