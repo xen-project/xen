@@ -386,10 +386,22 @@ p2m_pod_set_cache_target(struct domain *d, unsigned long pod_target)
             order = 9;
         else
             order = 0;
-
+    retry:
         page = alloc_domheap_pages(d, order, 0);
         if ( unlikely(page == NULL) )
+        {
+            if ( order == 9 )
+            {
+                /* If we can't allocate a superpage, try singleton pages */
+                order = 0;
+                goto retry;
+            }   
+            
+            printk("%s: Unable to allocate domheap page for pod cache.  target %lu cachesize %d\n",
+                   __func__, pod_target, p2md->pod.count);
+            ret = -ENOMEM;
             goto out;
+        }
 
         p2m_pod_cache_add(d, page, order);
     }
