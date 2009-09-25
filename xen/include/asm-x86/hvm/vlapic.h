@@ -52,16 +52,6 @@
 #define vlapic_base_address(vlapic)                             \
     ((vlapic)->hw.apic_base_msr & MSR_IA32_APICBASE_BASE)
 
-#define VMSI_DEST_ID_MASK 0xff
-#define VMSI_RH_MASK      0x100
-#define VMSI_DM_MASK      0x200
-#define VMSI_DELIV_MASK   0x7000
-#define VMSI_TRIG_MODE    0x8000
-
-#define GFLAGS_SHIFT_RH             8
-#define GLFAGS_SHIFT_DELIV_MODE     12
-#define GLFAGS_SHIFT_TRG_MODE       15
-
 struct vlapic {
     struct hvm_hw_lapic      hw;
     struct hvm_hw_lapic_regs *regs;

@@ -22,6 +22,7 @@
 #include <xen/iommu.h>
 #include <asm/hvm/irq.h>
 #include <asm/hvm/iommu.h>
+#include <asm/hvm/support.h>
 #include <xen/hvm/irq.h>
 
 static void hvm_dirq_assist(unsigned long _d);

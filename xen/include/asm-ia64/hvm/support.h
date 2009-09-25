@@ -25,4 +25,15 @@
 
 #include <xen/hvm/save.h>
 
+static int hvm_girq_dest_2_vcpu_id(struct domain *d, uint8_t dest,
+                                uint8_t dest_mode)
+{
+    /* TODO */
+}
+
+static void hvm_migrate_pirqs(struct vcpu *v)
+{
+    /* TODO */
+}
+
 #endif /* __ASM_IA64_HVM_SUPPORT_H__ */

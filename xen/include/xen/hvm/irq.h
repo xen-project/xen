@@ -47,6 +47,16 @@ struct dev_intx_gsi_link {
 #define HVM_IRQ_DPCI_GUEST_MSI       (1 << _HVM_IRQ_DPCI_GUEST_MSI_SHIFT)
 #define HVM_IRQ_DPCI_TRANSLATE       (1 << _HVM_IRQ_DPCI_TRANSLATE_SHIFT)
 
+#define VMSI_DEST_ID_MASK 0xff
+#define VMSI_RH_MASK      0x100
+#define VMSI_DM_MASK      0x200
+#define VMSI_DELIV_MASK   0x7000
+#define VMSI_TRIG_MODE    0x8000
+
+#define GFLAGS_SHIFT_RH             8
+#define GLFAGS_SHIFT_DELIV_MODE     12
+#define GLFAGS_SHIFT_TRG_MODE       15
+
 struct hvm_gmsi_info {
     uint32_t gvec;
     uint32_t gflags;
