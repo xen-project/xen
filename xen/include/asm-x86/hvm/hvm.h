@@ -157,6 +157,8 @@ void hvm_init_guest_time(struct domain *d);
 void hvm_set_guest_time(struct vcpu *v, u64 guest_time);
 u64 hvm_get_guest_time(struct vcpu *v);
 
+int hvm_girq_dest_2_vcpu_id(struct domain *d, uint8_t dest, uint8_t dest_mode);
+
 #define hvm_paging_enabled(v) \
     (!!((v)->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PG))
 #define hvm_wp_enabled(v) \
@@ -230,6 +232,7 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
                                    unsigned int *ecx, unsigned int *edx);
 void hvm_migrate_timers(struct vcpu *v);
 void hvm_do_resume(struct vcpu *v);
+void hvm_migrate_pirqs(struct vcpu *v);
 
 static inline void
 hvm_inject_exception(unsigned int trapnr, int errcode, unsigned long cr2)

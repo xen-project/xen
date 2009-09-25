@@ -1517,7 +1517,7 @@ static void dump_irqs(unsigned char key)
             /* Only show CPU0 - CPU31's affinity info.*/
             printk("   IRQ:%4d, IRQ affinity:0x%08x, Vec:%3d type=%-15s"
                     " status=%08x mapped, unbound\n",
-                   irq, *(int*)cfg->domain.bits, cfg->vector,
+                   irq, *(int*)desc->affinity.bits, cfg->vector,
                     desc->handler->typename, desc->status);
         else
         {
@@ -1525,7 +1525,7 @@ static void dump_irqs(unsigned char key)
 
             printk("   IRQ:%4d, IRQ affinity:0x%08x, Vec:%3d type=%-15s "
                     "status=%08x in-flight=%d domain-list=",
-                   irq, *(int*)cfg->domain.bits, cfg->vector,
+                   irq, *(int*)desc->affinity.bits, cfg->vector,
                    desc->handler->typename, desc->status, action->in_flight);
 
             for ( i = 0; i < action->nr_guests; i++ )

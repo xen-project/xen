@@ -50,6 +50,7 @@ struct dev_intx_gsi_link {
 struct hvm_gmsi_info {
     uint32_t gvec;
     uint32_t gflags;
+    int dest_vcpu_id; /* -1 :multi-dest, non-negative: dest_vcpu_id */
 };
 
 struct hvm_mirq_dpci_mapping {

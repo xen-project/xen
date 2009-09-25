@@ -940,6 +940,7 @@ void vmx_do_resume(struct vcpu *v)
         vmx_clear_vmcs(v);
         vmx_load_vmcs(v);
         hvm_migrate_timers(v);
+        hvm_migrate_pirqs(v);
         vmx_set_host_env(v);
         vpid_sync_vcpu_all(v);
     }

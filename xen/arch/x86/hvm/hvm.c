@@ -211,6 +211,35 @@ void hvm_migrate_timers(struct vcpu *v)
     pt_migrate(v);
 }
 
+void hvm_migrate_pirqs(struct vcpu *v)
+{
+    int pirq, irq;
+    struct irq_desc *desc;
+    struct domain *d = v->domain;
+    struct hvm_irq_dpci *hvm_irq_dpci = d->arch.hvm_domain.irq.dpci;
+    
+    if ( !iommu_enabled || (hvm_irq_dpci == NULL) )
+       return;
+
+    spin_lock(&d->event_lock);
+    for ( pirq = find_first_bit(hvm_irq_dpci->mapping, d->nr_pirqs);
+          pirq < d->nr_pirqs;
+          pirq = find_next_bit(hvm_irq_dpci->mapping, d->nr_pirqs, pirq + 1) )
+    {
+        if ( !(hvm_irq_dpci->mirq[pirq].flags & HVM_IRQ_DPCI_MACH_MSI) ||
+               (hvm_irq_dpci->mirq[pirq].gmsi.dest_vcpu_id != v->vcpu_id) )
+            continue;
+        desc = domain_spin_lock_irq_desc(v->domain, pirq, NULL);
+        if (!desc)
+            continue;
+        irq = desc - irq_desc;
+        ASSERT(MSI_IRQ(irq));
+        desc->handler->set_affinity(irq, *cpumask_of(v->processor));
+        spin_unlock_irq(&desc->lock);
+    }
+    spin_unlock(&d->event_lock);
+}
+
 void hvm_do_resume(struct vcpu *v)
 {
     ioreq_t *p;

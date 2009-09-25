@@ -139,8 +139,10 @@ int pt_irq_create_bind_vtd(
         bitmap_zero(hvm_irq_dpci->mapping, d->nr_pirqs);
         memset(hvm_irq_dpci->hvm_timer, 0, 
                 nr_irqs * sizeof(*hvm_irq_dpci->hvm_timer));
-        for ( int i = 0; i < d->nr_pirqs; i++ )
+        for ( int i = 0; i < d->nr_pirqs; i++ ) {
             INIT_LIST_HEAD(&hvm_irq_dpci->mirq[i].digl_list);
+            hvm_irq_dpci->mirq[i].gmsi.dest_vcpu_id = -1;
+        }
         for ( int i = 0; i < NR_HVM_IRQS; i++ )
             INIT_LIST_HEAD(&hvm_irq_dpci->girq[i]);
 
@@ -154,6 +156,8 @@ int pt_irq_create_bind_vtd(
 
     if ( pt_irq_bind->irq_type == PT_IRQ_TYPE_MSI )
     {
+        uint8_t dest, dest_mode;
+        int dest_vcpu_id;
 
         if ( !test_and_set_bit(pirq, hvm_irq_dpci->mapping))
         {
@@ -195,6 +199,14 @@ int pt_irq_create_bind_vtd(
             hvm_irq_dpci->mirq[pirq].gmsi.gvec = pt_irq_bind->u.msi.gvec;
             hvm_irq_dpci->mirq[pirq].gmsi.gflags = pt_irq_bind->u.msi.gflags;
         }
+        /* Caculate dest_vcpu_id for MSI-type pirq migration */
+        dest = hvm_irq_dpci->mirq[pirq].gmsi.gflags & VMSI_DEST_ID_MASK;
+        dest_mode = !!(hvm_irq_dpci->mirq[pirq].gmsi.gflags & VMSI_DM_MASK);
+        dest_vcpu_id = hvm_girq_dest_2_vcpu_id(d, dest, dest_mode);
+        hvm_irq_dpci->mirq[pirq].gmsi.dest_vcpu_id = dest_vcpu_id;
+        spin_unlock(&d->event_lock);
+        if ( dest_vcpu_id >= 0 )
+            hvm_migrate_pirqs(d->vcpu[dest_vcpu_id]);
     }
     else
     {
@@ -278,8 +290,8 @@ int pt_irq_create_bind_vtd(
         gdprintk(XENLOG_INFO VTDPREFIX,
                  "VT-d irq bind: m_irq = %x device = %x intx = %x\n",
                  machine_gsi, device, intx);
+        spin_unlock(&d->event_lock);
     }
-    spin_unlock(&d->event_lock);
     return 0;
 }
 

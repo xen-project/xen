@@ -112,6 +112,8 @@ void destroy_irq(unsigned int irq);
 struct irq_desc;
 extern void irq_complete_move(struct irq_desc **descp);
 
+extern struct irq_desc *irq_desc;
+
 void lock_vector_lock(void);
 void unlock_vector_lock(void);
 
