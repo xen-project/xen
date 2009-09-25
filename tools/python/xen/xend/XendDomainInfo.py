@@ -4043,6 +4043,20 @@ class XendDomainInfo:
             except Exception, exn:
                 raise XendError('Failed to destroy device')
 
+    def unlink_xapi_instances(self):
+        from xen.xend import XendDomain
+        if XendDomain.instance().is_valid_vm(self.info.get('uuid')):
+            # domain still exists.
+            return
+
+        for vbd_ref in self.info.get('vbd_refs'):
+            dev_info = self.info['devices'].get(vbd_ref)[1]
+            vdi_uuid = dev_info.get('VDI', None)
+            if vdi_uuid and XendNode.instance().is_valid_vdi(vdi_uuid):
+                vdi = XendNode.instance().get_vdi_by_uuid(vdi_uuid)
+                if vdi.getVBDs().count(vbd_ref):
+                    vdi.removeVBD(vbd_ref)
+
     def destroy_xapi_instances(self):
         """Destroy Xen-API instances stored in XendAPIStore.
         """
