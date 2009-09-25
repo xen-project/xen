@@ -206,6 +206,7 @@ static void pt_timer_fn(void *data)
     pt_lock(pt);
 
     pt->pending_intr_nr++;
+    pt->scheduled += pt->period;
     pt->do_not_freeze = 0;
 
     vcpu_kick(pt->vcpu);
@@ -306,27 +307,22 @@ void pt_intr_post(struct vcpu *v, struct hvm_intack intack)
         pt->on_list = 0;
         pt->pending_intr_nr = 0;
     }
+    else if ( mode_is(v->domain, one_missed_tick_pending) ||
+              mode_is(v->domain, no_missed_ticks_pending) )
+    {
+        pt->last_plt_gtime = hvm_get_guest_time(v);
+        pt_process_missed_ticks(pt);
+        pt->pending_intr_nr = 0; /* 'collapse' all missed ticks */
+        set_timer(&pt->timer, pt->scheduled);
+    }
     else
     {
-        pt->scheduled += pt->period;
-
-        if ( mode_is(v->domain, one_missed_tick_pending) ||
-             mode_is(v->domain, no_missed_ticks_pending) )
-        {
-            pt->last_plt_gtime = hvm_get_guest_time(v);
-            pt->pending_intr_nr = 0; /* 'collapse' all missed ticks */
-        }
-        else
-        {
-            pt->last_plt_gtime += pt->period;
-            pt->pending_intr_nr--;
-        }
-
-        if ( pt->pending_intr_nr == 0 )
+        pt->last_plt_gtime += pt->period;
+        if ( --pt->pending_intr_nr == 0 )
         {
             pt_process_missed_ticks(pt);
-            pt->do_not_freeze = 0;
-            set_timer(&pt->timer, pt->scheduled);
+            if ( pt->pending_intr_nr == 0 )
+                set_timer(&pt->timer, pt->scheduled);
         }
     }
 
