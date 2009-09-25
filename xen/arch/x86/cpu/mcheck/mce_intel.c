@@ -238,7 +238,7 @@ static int fill_vmsr_data(struct mcinfo_bank *mc_bank,
 
         /* Not impact a valid domain, skip this error of the bank */
         if (!d) {
-            printk(KERN_DEBUG "MCE: Not found valid impacted DOM\n");
+            mce_printk(MCE_QUIET, "MCE: Not found valid impacted DOM\n");
             return 0;
         }
 
@@ -247,7 +247,7 @@ static int fill_vmsr_data(struct mcinfo_bank *mc_bank,
          */
         if ( (d->is_hvm) && (d->arch.vmca_msrs.nr_injection > 0) )
         {
-            printk(KERN_DEBUG "MCE: HVM guest has not handled previous"
+            mce_printk(MCE_QUIET, "MCE: HVM guest has not handled previous"
                         " vMCE yet!\n");
             return -1;
         }
@@ -269,7 +269,7 @@ static int fill_vmsr_data(struct mcinfo_bank *mc_bank,
         d->arch.vmca_msrs.nr_injection++;
         spin_unlock(&d->arch.vmca_msrs.lock);
 
-        printk(KERN_DEBUG "MCE: Found error @[BANK%d "
+        mce_printk(MCE_VERBOSE,"MCE: Found error @[BANK%d "
                 "status %"PRIx64" addr %"PRIx64" domid %d]\n ",
                 mc_bank->mc_bank, mc_bank->mc_status, mc_bank->mc_addr,
                 mc_bank->mc_domid);
@@ -289,14 +289,14 @@ static int inject_mce(struct domain *d)
     {
         if (d->is_hvm)
         {
-            printk(KERN_DEBUG "MCE: inject vMCE to HVM DOM %d\n", 
+            mce_printk(MCE_VERBOSE, "MCE: inject vMCE to HVM DOM %d\n", 
                         d->domain_id);
             vcpu_kick(d->vcpu[0]);
         }
         /* PV guest including DOM0 */
         else
         {
-            printk(KERN_DEBUG "MCE: inject vMCE to PV DOM%d\n", 
+            mce_printk(MCE_VERBOSE, "MCE: inject vMCE to PV DOM%d\n", 
                         d->domain_id);
             if (guest_has_trap_callback
                    (d, 0, TRAP_machine_check))
@@ -305,14 +305,14 @@ static int inject_mce(struct domain *d)
                         d->vcpu[0]->cpu_affinity;
                 cpus_clear(affinity);
                 cpu_set(cpu, affinity);
-                printk(KERN_DEBUG "MCE: CPU%d set affinity, old %d\n", cpu,
+                mce_printk(MCE_VERBOSE, "MCE: CPU%d set affinity, old %d\n", cpu,
                             d->vcpu[0]->processor);
                 vcpu_set_affinity(d->vcpu[0], &affinity);
                 vcpu_kick(d->vcpu[0]);
             }
             else
             {
-                printk(KERN_DEBUG "MCE: Kill PV guest with No MCE handler\n");
+                mce_printk(MCE_VERBOSE, "MCE: Kill PV guest with No MCE handler\n");
                 domain_crash(d);
             }
         }
@@ -322,7 +322,7 @@ static int inject_mce(struct domain *d)
          * in this case, inject fail. [We can't lose this vMCE for
          * the mce node's consistency].
         */
-        printk(KERN_DEBUG "There's a pending vMCE waiting to be injected "
+        mce_printk(MCE_QUIET, "There's a pending vMCE waiting to be injected "
                     " to this DOM%d!\n", d->domain_id);
         return -1;
     }
@@ -338,7 +338,7 @@ void intel_UCR_handler(struct mcinfo_bank *bank,
     unsigned long mfn, gfn;
     uint32_t status;
 
-    printk(KERN_DEBUG "MCE: Enter UCR recovery action\n");
+    mce_printk(MCE_VERBOSE, "MCE: Enter UCR recovery action\n");
     result->result = MCA_NEED_RESET;
     if (bank->mc_addr != 0) {
          mfn = bank->mc_addr >> PAGE_SHIFT;
@@ -351,7 +351,7 @@ void intel_UCR_handler(struct mcinfo_bank *bank,
                   if (status & PG_OFFLINE_OWNED) {
                       result->result |= MCA_OWNER;
                       result->owner = status >> PG_OFFLINE_OWNER_SHIFT;
-                      printk(KERN_DEBUG "MCE: This error page is ownded"
+                      mce_printk(MCE_QUIET, "MCE: This error page is ownded"
                                   " by DOM %d\n", result->owner);
                       /* Fill vMCE# injection and vMCE# MSR virtualization "
                        * "related data */
@@ -364,7 +364,7 @@ void intel_UCR_handler(struct mcinfo_bank *bank,
                               gfn << PAGE_SHIFT | (bank->mc_addr & PAGE_MASK);
                           if (fill_vmsr_data(bank, global->mc_gstatus) == -1)
                           {
-                              printk(KERN_DEBUG "Fill vMCE# data for DOM%d "
+                              mce_printk(MCE_QUIET, "Fill vMCE# data for DOM%d "
                                       "failed\n", result->owner);
                               domain_crash(d);
                               return;
@@ -372,7 +372,7 @@ void intel_UCR_handler(struct mcinfo_bank *bank,
                           /* We will inject vMCE to DOMU*/
                           if ( inject_mce(d) < 0 )
                           {
-                              printk(KERN_DEBUG "inject vMCE to DOM%d"
+                              mce_printk(MCE_QUIET, "inject vMCE to DOM%d"
                                           " failed\n", d->domain_id);
                               domain_crash(d);
                               return;
@@ -452,11 +452,11 @@ static int mce_action(mctelem_cookie_t mctc)
                     mc_panic("MCE: Software recovery failed for the UCR "
                                 "error\n");
                 else if (mca_res.result == MCA_RECOVERED)
-                    printk(KERN_DEBUG "MCE: The UCR error is succesfully "
-                                "recovered by software!\n");
+                    mce_printk(MCE_VERBOSE, "MCE: The UCR error is"
+                                "successfully recovered by software!\n");
                 else if (mca_res.result == MCA_NO_ACTION)
-                    printk(KERN_DEBUG "MCE: Overwrite SRAO error can't execute "
-                                "recover action, RIPV=1, let it be.\n");
+                    mce_printk(MCE_VERBOSE, "MCE: Overwrite SRAO error can't"
+                                "do recover action, RIPV=1, let it be.\n");
                 break;
             }
         }
@@ -464,8 +464,8 @@ static int mce_action(mctelem_cookie_t mctc)
          * in MCA Handler
          */
         if ( i >= INTEL_MAX_RECOVERY )
-            printk(KERN_DEBUG "MCE: No software recovery action found for "
-                            "this SRAO error\n");
+            mce_printk(MCE_VERBOSE, "MCE: No software recovery action"
+                            " found for this SRAO error\n");
 
     }
     return 1;
@@ -477,7 +477,7 @@ static void mce_softirq(void)
     int cpu = smp_processor_id();
     unsigned int workcpu;
 
-    printk(KERN_DEBUG "CPU%d enter softirq\n", cpu);
+    mce_printk(MCE_VERBOSE, "CPU%d enter softirq\n", cpu);
 
     mce_barrier_enter(&mce_inside_bar);
 
@@ -500,7 +500,7 @@ static void mce_softirq(void)
     /* We choose severity_cpu for further processing */
     if (atomic_read(&severity_cpu) == cpu) {
 
-        printk(KERN_DEBUG "CPU%d handling errors\n", cpu);
+        mce_printk(MCE_VERBOSE, "CPU%d handling errors\n", cpu);
 
         /* Step1: Fill DOM0 LOG buffer, vMCE injection buffer and
          * vMCE MSRs virtualization buffer
@@ -511,7 +511,7 @@ static void mce_softirq(void)
 
         /* Step2: Send Log to DOM0 through vIRQ */
         if (dom0 && guest_enabled_event(dom0->vcpu[0], VIRQ_MCA)) {
-            printk(KERN_DEBUG "MCE: send MCE# to DOM0 through virq\n");
+            mce_printk(MCE_VERBOSE, "MCE: send MCE# to DOM0 through virq\n");
             send_guest_global_virq(dom0, VIRQ_MCA);
         }
     }
@@ -669,7 +669,7 @@ static void intel_machine_check(struct cpu_user_regs * regs, long error_code)
         }
         atomic_set(&found_error, 1);
 
-        printk(KERN_DEBUG "MCE: clear_bank map %lx on CPU%d\n",
+        mce_printk(MCE_VERBOSE, "MCE: clear_bank map %lx on CPU%d\n",
                 *((unsigned long*)clear_bank), smp_processor_id());
         mcheck_mca_clearbanks(clear_bank);
        /* Print MCE error */
@@ -696,13 +696,13 @@ static void intel_machine_check(struct cpu_user_regs * regs, long error_code)
     /* Clear error finding flags after all cpus finishes above judgement */
     mce_barrier_enter(&mce_trap_bar);
     if (atomic_read(&found_error)) {
-        printk(KERN_DEBUG "MCE: Choose one CPU "
+        mce_printk(MCE_VERBOSE, "MCE: Choose one CPU "
 		        "to clear error finding flag\n ");
         atomic_set(&found_error, 0);
     }
     mca_rdmsrl(MSR_IA32_MCG_STATUS, gstatus);
     if ((gstatus & MCG_STATUS_MCIP) != 0) {
-        printk(KERN_DEBUG "MCE: Clear MCIP@ last step");
+        mce_printk(MCE_VERBOSE, "MCE: Clear MCIP@ last step");
         mca_wrmsrl(MSR_IA32_MCG_STATUS, gstatus & ~MCG_STATUS_MCIP);
     }
     mce_barrier_exit(&mce_trap_bar);
@@ -778,7 +778,7 @@ static int intel_recoverable_scan(u64 status)
     else if ( ser_support && !(status & MCi_STATUS_OVER) 
                 && !(status & MCi_STATUS_PCC) && (status & MCi_STATUS_S)
                 && (status & MCi_STATUS_AR) ) {
-        printk(KERN_DEBUG "MCE: No SRAR error defined currently.\n");
+        mce_printk(MCE_VERBOSE, "MCE: No SRAR error defined currently.\n");
         return 0;
     }
     /* SRAO error */
@@ -831,7 +831,7 @@ static void cmci_discover(void)
     mctelem_cookie_t mctc;
     struct mca_summary bs;
 
-    printk(KERN_DEBUG "CMCI: find owner on CPU%d\n", smp_processor_id());
+    mce_printk(MCE_VERBOSE, "CMCI: find owner on CPU%d\n", smp_processor_id());
 
     spin_lock_irqsave(&cmci_discover_lock, flags);
 
@@ -861,9 +861,9 @@ static void cmci_discover(void)
     } else if (mctc != NULL)
         mctelem_dismiss(mctc);
 
-    printk(KERN_DEBUG "CMCI: CPU%d owner_map[%lx], no_cmci_map[%lx]\n", 
-           smp_processor_id(), 
-           *((unsigned long *)__get_cpu_var(mce_banks_owned)), 
+    mce_printk(MCE_VERBOSE, "CMCI: CPU%d owner_map[%lx], no_cmci_map[%lx]\n",
+           smp_processor_id(),
+           *((unsigned long *)__get_cpu_var(mce_banks_owned)),
            *((unsigned long *)__get_cpu_var(no_cmci_banks)));
 }
 
@@ -904,7 +904,7 @@ static void clear_cmci(void)
     if (!cmci_support || mce_disabled == 1)
         return;
 
-    printk(KERN_DEBUG "CMCI: clear_cmci support on CPU%d\n", 
+    mce_printk(MCE_VERBOSE, "CMCI: clear_cmci support on CPU%d\n",
             smp_processor_id());
 
     for (i = 0; i < nr_mce_banks; i++) {
@@ -933,14 +933,14 @@ static void intel_init_cmci(struct cpuinfo_x86 *c)
     int cpu = smp_processor_id();
 
     if (!mce_available(c) || !cmci_support) {
-        printk(KERN_DEBUG "CMCI: CPU%d has no CMCI support\n", cpu);
+        mce_printk(MCE_QUIET, "CMCI: CPU%d has no CMCI support\n", cpu);
         return;
     }
 
     apic = apic_read(APIC_CMCI);
     if ( apic & APIC_VECTOR_MASK )
     {
-        printk(KERN_WARNING "CPU%d CMCI LVT vector (%#x) already installed\n",
+        mce_printk(MCE_QUIET, "CPU%d CMCI LVT vector (%#x) already installed\n",
             cpu, ( apic & APIC_VECTOR_MASK ));
         return;
     }
@@ -968,7 +968,7 @@ fastcall void smp_cmci_interrupt(struct cpu_user_regs *regs)
     if (bs.errcnt && mctc != NULL) {
         if (guest_enabled_event(dom0->vcpu[0], VIRQ_MCA)) {
             mctelem_commit(mctc);
-            printk(KERN_DEBUG "CMCI: send CMCI to DOM0 through virq\n");
+            mce_printk(MCE_VERBOSE, "CMCI: send CMCI to DOM0 through virq\n");
             send_guest_global_virq(dom0, VIRQ_MCA);
         } else {
             x86_mcinfo_dump(mctelem_dataptr(mctc));
@@ -1004,7 +1004,7 @@ static void _mce_cap_init(struct cpuinfo_x86 *c)
     if (l & MCG_EXT_P)
     {
         nr_intel_ext_msrs = (l >> MCG_EXT_CNT) & 0xff;
-        printk (KERN_INFO "CPU%d: Intel Extended MCE MSRs (%d) available\n",
+        mce_printk (MCE_QUIET, "CPU%d: Intel Extended MCE MSRs (%d) available\n",
             smp_processor_id(), nr_intel_ext_msrs);
     }
     firstbank = mce_firstbank(c);
@@ -1045,7 +1045,7 @@ static void mce_init(void)
         if (!(l | h))
         {
             /* if ctl is 0, this bank is never initialized */
-            printk(KERN_DEBUG "mce_init: init bank%d\n", i);
+            mce_printk(MCE_VERBOSE, "mce_init: init bank%d\n", i);
             wrmsr (MSR_IA32_MC0_CTL + 4*i, 0xffffffff, 0xffffffff);
             wrmsr (MSR_IA32_MC0_STATUS + 4*i, 0x0, 0x0);
         }
@@ -1058,7 +1058,7 @@ static void mce_init(void)
 int intel_mcheck_init(struct cpuinfo_x86 *c)
 {
     _mce_cap_init(c);
-    printk (KERN_INFO "Intel machine check reporting enabled on CPU#%d.\n",
+    mce_printk(MCE_QUIET, "Intel machine check reporting enabled on CPU#%d.\n",
             smp_processor_id());
 
     /* machine check is available */
@@ -1082,7 +1082,7 @@ int intel_mce_wrmsr(uint32_t msr, uint64_t val)
     switch ( msr )
     {
     case MSR_IA32_MC0_CTL2 ... MSR_IA32_MC0_CTL2 + MAX_NR_BANKS - 1:
-        gdprintk(XENLOG_WARNING, "We have disabled CMCI capability, "
+        mce_printk(MCE_QUIET, "We have disabled CMCI capability, "
                  "Guest should not write this MSR!\n");
         break;
     default:
@@ -1100,7 +1100,7 @@ int intel_mce_rdmsr(uint32_t msr, uint64_t *val)
     switch ( msr )
     {
     case MSR_IA32_MC0_CTL2 ... MSR_IA32_MC0_CTL2 + MAX_NR_BANKS - 1:
-        gdprintk(XENLOG_WARNING, "We have disabled CMCI capability, "
+        mce_printk(MCE_QUIET, "We have disabled CMCI capability, "
                  "Guest should not read this MSR!\n");
         break;
     default:

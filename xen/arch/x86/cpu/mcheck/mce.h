@@ -12,6 +12,21 @@
 #include "x86_mca.h"
 #include "mctelem.h"
 
+#define MCE_QUIET 0
+#define MCE_VERBOSE 1
+
+extern int mce_verbosity;
+/* Define the default level of machine check related print.
+ * When set mce_verbosity=verbose, all mce debug information
+ * will be printed, otherwise, those information will not be
+ * printed.
+ */
+#define mce_printk(v, s, a...) do {       \
+        if ((v) <= mce_verbosity) \
+            printk(s, ##a);       \
+        } while (0)
+
+
 /* Init functions */
 int amd_k7_mcheck_init(struct cpuinfo_x86 *c);
 int amd_k8_mcheck_init(struct cpuinfo_x86 *c);
