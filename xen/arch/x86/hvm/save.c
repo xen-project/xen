@@ -61,15 +61,14 @@ int arch_hvm_load(struct domain *d, struct hvm_save_header *hdr)
                "does not match host (%#"PRIx32").\n", hdr->cpuid, eax);
 
     /* Restore guest's preferred TSC frequency. */
-    d->arch.hvm_domain.gtsc_khz = hdr->gtsc_khz;
-
-    if ( hdr->gtsc_khz && hvm_gtsc_need_scale(d) )
+    if ( hdr->gtsc_khz )
+        d->arch.hvm_domain.gtsc_khz = hdr->gtsc_khz;
+    if ( hvm_gtsc_need_scale(d) )
     {
-        hvm_enable_rdtsc_exiting(d);
+        hvm_set_rdtsc_exiting(d, 1);
         gdprintk(XENLOG_WARNING, "Domain %d expects freq %uMHz "
                 "but host's freq is %luMHz: trap and emulate rdtsc\n",
-                d->domain_id, hdr->gtsc_khz / 1000, opt_softtsc ? 1000ul :
-                cpu_khz / 1000);
+                d->domain_id, hdr->gtsc_khz / 1000, cpu_khz / 1000);
     }
 
     /* VGA state is not saved/restored, so we nobble the cache. */

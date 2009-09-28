@@ -167,7 +167,7 @@ static int construct_vmcb(struct vcpu *v)
 
     /* TSC. */
     vmcb->tsc_offset = 0;
-    if ( opt_softtsc )
+    if ( v->domain->arch.vtsc )
         vmcb->general1_intercepts |= GENERAL1_INTERCEPT_RDTSC;
 
     /* Guest EFER. */

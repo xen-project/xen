@@ -1066,6 +1066,7 @@ class sxp2xml:
             'pci_msitranslate',
             'pci_power_mgmt',
             'xen_platform_pci',
+            'tsc_native'
         ]
 
         platform_configs = []

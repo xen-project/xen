@@ -162,6 +162,7 @@ XENAPI_PLATFORM_CFG_TYPES = {
     'vncdisplay': int,
     'vnclisten': str,
     'timer_mode': int,
+    'tsc_native': int,
     'vpt_align': int,
     'viridian': int,
     'vncpasswd': str,
@@ -472,6 +473,9 @@ class XendConfig(dict):
                     auxbin.pathTo(self['platform']['device_model'])
             if not os.path.exists(self['platform']['device_model']):
                 raise VmError("device model '%s' not found" % str(self['platform']['device_model']))
+
+        if 'tsc_native' not in self['platform']:
+            self['platform']['tsc_native'] = 0
 
         if self.is_hvm():
             if 'timer_mode' not in self['platform']:

@@ -2423,7 +2423,12 @@ class XendDomainInfo:
 
         self._recreateDom()
 
-        # Set timer configration of domain
+        # Set TSC mode of domain
+        tsc_native = self.info["platform"].get("tsc_native")
+        if arch.type == "x86" and tsc_native is not None:
+            xc.domain_set_tsc_native(self.domid, tsc_native)
+
+        # Set timer configuration of domain
         timer_mode = self.info["platform"].get("timer_mode")
         if hvm and timer_mode is not None:
             xc.hvm_set_param(self.domid, HVM_PARAM_TIMER_MODE,

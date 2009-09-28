@@ -133,13 +133,14 @@ static void vmx_init_vmcs_config(void)
            CPU_BASED_MOV_DR_EXITING |
            CPU_BASED_ACTIVATE_IO_BITMAP |
            CPU_BASED_USE_TSC_OFFSETING |
-           (opt_softtsc ? CPU_BASED_RDTSC_EXITING : 0));
+           CPU_BASED_RDTSC_EXITING);
     opt = (CPU_BASED_ACTIVATE_MSR_BITMAP |
            CPU_BASED_TPR_SHADOW |
            CPU_BASED_MONITOR_TRAP_FLAG |
            CPU_BASED_ACTIVATE_SECONDARY_CONTROLS);
     _vmx_cpu_based_exec_control = adjust_vmx_controls(
         min, opt, MSR_IA32_VMX_PROCBASED_CTLS);
+    _vmx_cpu_based_exec_control &= ~CPU_BASED_RDTSC_EXITING;
 #ifdef __x86_64__
     if ( !(_vmx_cpu_based_exec_control & CPU_BASED_TPR_SHADOW) )
     {
@@ -553,6 +554,9 @@ static int construct_vmcs(struct vcpu *v)
     __vmwrite(PIN_BASED_VM_EXEC_CONTROL, vmx_pin_based_exec_control);
 
     v->arch.hvm_vmx.exec_control = vmx_cpu_based_exec_control;
+    if ( d->arch.vtsc )
+        v->arch.hvm_vmx.exec_control |= CPU_BASED_RDTSC_EXITING;
+
     v->arch.hvm_vmx.secondary_exec_control = vmx_secondary_exec_control;
 
     if ( paging_mode_hap(d) )

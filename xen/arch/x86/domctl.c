@@ -1060,6 +1060,26 @@ long arch_do_domctl(
     }
     break;
 
+    case XEN_DOMCTL_set_tsc_native:
+    {
+        struct domain *d;
+
+        ret = -ESRCH;
+        d = rcu_lock_domain_by_id(domctl->domain);
+        if ( d == NULL )
+            break;
+
+        domain_pause(d);
+        d->arch.vtsc = !domctl->u.set_tsc_native.is_native;
+        if ( is_hvm_domain(d) )
+            hvm_set_rdtsc_exiting(d, d->arch.vtsc || hvm_gtsc_need_scale(d));
+        domain_unpause(d);
+
+        rcu_unlock_domain(d);
+        ret = 0;
+    }
+    break;
+
     case XEN_DOMCTL_suppress_spurious_page_faults:
     {
         struct domain *d;

@@ -304,6 +304,8 @@ struct arch_domain
     bool_t vtsc;
     s_time_t vtsc_last;
     spinlock_t vtsc_lock;
+    uint64_t vtsc_kerncount; /* for hvm, counts all vtsc */
+    uint64_t vtsc_usercount; /* not used for hvm */
     int64_t vtsc_stime_offset;
 } __cacheline_aligned;
 

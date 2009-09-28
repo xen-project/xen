@@ -36,9 +36,6 @@
 static char __initdata opt_clocksource[10];
 string_param("clocksource", opt_clocksource);
 
-int opt_softtsc;
-boolean_param("softtsc", opt_softtsc);
-
 /*
  * opt_consistent_tscs: All TSCs tick at the exact same rate, allowing
  * simplified system time handling.
@@ -1436,20 +1433,18 @@ struct tm wallclock_time(void)
  * PV SoftTSC Emulation.
  */
 
-static unsigned long rdtsc_kerncount, rdtsc_usercount;
-
 void pv_soft_rdtsc(struct vcpu *v, struct cpu_user_regs *regs)
 {
     s_time_t now;
 
     if ( guest_kernel_mode(v, regs) )
     {
-        rdtsc_kerncount++;
+        v->domain->arch.vtsc_kerncount++;
         rdtsc(regs->eax, regs->edx);
     }
     else
     { 
-        rdtsc_usercount++;
+        v->domain->arch.vtsc_kerncount++;
         spin_lock(&v->domain->arch.vtsc_lock);
         now = get_s_time() + v->domain->arch.vtsc_stime_offset;
         if ( (int64_t)(now - v->domain->arch.vtsc_last) > 0 )
@@ -1462,10 +1457,28 @@ void pv_soft_rdtsc(struct vcpu *v, struct cpu_user_regs *regs)
     }
 }
 
+/* vtsc may incur measurable performance degradation, diagnose with this */
 static void dump_softtsc(unsigned char key)
 {
-    printk("softtsc count: %lu kernel, %lu user\n",
-           rdtsc_kerncount, rdtsc_usercount);
+    struct domain *d;
+    int domcnt = 0;
+
+    for_each_domain ( d )
+    {
+        if ( !d->arch.vtsc )
+            continue;
+        if ( is_hvm_domain(d) )
+            printk("dom%u (hvm) vtsc count: %"PRIu64" total\n",
+                   d->domain_id, d->arch.vtsc_kerncount);
+        else
+            printk("dom%u vtsc count: %"PRIu64" kernel, %"PRIu64" user\n",
+                   d->domain_id, d->arch.vtsc_kerncount,
+                   d->arch.vtsc_usercount);
+        domcnt++;
+    }
+
+    if ( !domcnt )
+            printk("All domains have native TSC\n");
 }
 
 static struct keyhandler dump_softtsc_keyhandler = {
@@ -1476,8 +1489,7 @@ static struct keyhandler dump_softtsc_keyhandler = {
 
 static int __init setup_dump_softtsc(void)
 {
-    if ( opt_softtsc )
-        register_keyhandler('s', &dump_softtsc_keyhandler);
+    register_keyhandler('s', &dump_softtsc_keyhandler);
     return 0;
 }
 __initcall(setup_dump_softtsc);

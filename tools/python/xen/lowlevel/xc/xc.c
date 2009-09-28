@@ -1459,6 +1459,20 @@ static PyObject *pyxc_domain_set_time_offset(XcObject *self, PyObject *args)
     return zero;
 }
 
+static PyObject *pyxc_domain_set_tsc_native(XcObject *self, PyObject *args)
+{
+    uint32_t dom, is_native;
+
+    if (!PyArg_ParseTuple(args, "ii", &dom, &is_native))
+        return NULL;
+
+    if (xc_domain_set_tsc_native(self->xc_handle, dom, is_native) != 0)
+        return pyxc_error_to_exception();
+
+    Py_INCREF(zero);
+    return zero;
+}
+
 static PyObject *pyxc_domain_send_trigger(XcObject *self,
                                           PyObject *args,
                                           PyObject *kwds)
@@ -1979,6 +1993,14 @@ static PyMethodDef pyxc_methods[] = {
       "Set a domain's time offset to Dom0's localtime\n"
       " dom        [int]: Domain whose time offset is being set.\n"
       " offset     [int]: Time offset from UTC in seconds.\n"
+      "Returns: [int] 0 on success; -1 on error.\n" },
+
+    { "domain_set_tsc_native",
+      (PyCFunction)pyxc_domain_set_tsc_native,
+      METH_VARARGS, "\n"
+      "Set a domain's TSC mode (emulate vs native)\n"
+      " dom        [int]: Domain whose TSC mode is being set.\n"
+      " is_native  [int]: 1=native, 0=emulate.\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "domain_send_trigger",

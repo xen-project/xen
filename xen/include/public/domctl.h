@@ -401,7 +401,11 @@ struct xen_domctl_settimeoffset {
 typedef struct xen_domctl_settimeoffset xen_domctl_settimeoffset_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_settimeoffset_t);
 
- 
+#define XEN_DOMCTL_set_tsc_native    57
+typedef struct xen_domctl_set_tsc_native {
+    uint32_t is_native; /* IN: 0: TSC is emulated; 1: TSC is host TSC */
+} xen_domctl_set_tsc_native_t;
+
 #define XEN_DOMCTL_gethvmcontext     33
 #define XEN_DOMCTL_sethvmcontext     34
 typedef struct xen_domctl_hvmcontext {
@@ -672,6 +676,7 @@ struct xen_domctl {
         struct xen_domctl_hypercall_init    hypercall_init;
         struct xen_domctl_arch_setup        arch_setup;
         struct xen_domctl_settimeoffset     settimeoffset;
+        struct xen_domctl_set_tsc_native    set_tsc_native;
         struct xen_domctl_real_mode_area    real_mode_area;
         struct xen_domctl_hvmcontext        hvmcontext;
         struct xen_domctl_hvmcontext_partial hvmcontext_partial;

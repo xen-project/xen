@@ -619,6 +619,14 @@ static void svm_set_tsc_offset(struct vcpu *v, u64 offset)
     v->arch.hvm_svm.vmcb->tsc_offset = offset;
 }
 
+static void svm_set_rdtsc_exiting(struct vcpu *v, bool_t enable)
+{
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+    vmcb->general1_intercepts &= ~GENERAL1_INTERCEPT_RDTSC;
+    if ( enable )
+        vmcb->general1_intercepts |= GENERAL1_INTERCEPT_RDTSC;
+}
+
 static void svm_init_hypercall_page(struct domain *d, void *hypercall_page)
 {
     char *p;
@@ -845,7 +853,8 @@ static struct hvm_function_table svm_function_table = {
     .fpu_dirty_intercept  = svm_fpu_dirty_intercept,
     .msr_read_intercept   = svm_msr_read_intercept,
     .msr_write_intercept  = svm_msr_write_intercept,
-    .invlpg_intercept     = svm_invlpg_intercept
+    .invlpg_intercept     = svm_invlpg_intercept,
+    .set_rdtsc_exiting    = svm_set_rdtsc_exiting
 };
 
 static int svm_cpu_up(struct cpuinfo_x86 *c)

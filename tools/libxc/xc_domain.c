@@ -466,6 +466,15 @@ int xc_domain_set_time_offset(int xc_handle,
     return do_domctl(xc_handle, &domctl);
 }
 
+int xc_domain_set_tsc_native(int xc_handle, uint32_t domid, int is_native)
+{
+    DECLARE_DOMCTL;
+    domctl.cmd = XEN_DOMCTL_set_tsc_native;
+    domctl.domain = (domid_t)domid;
+    domctl.u.set_tsc_native.is_native = is_native;
+    return do_domctl(xc_handle, &domctl);
+}
+
 int xc_domain_memory_increase_reservation(int xc_handle,
                                           uint32_t domid,
                                           unsigned long nr_extents,

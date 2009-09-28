@@ -949,13 +949,15 @@ static void vmx_set_tsc_offset(struct vcpu *v, u64 offset)
     vmx_vmcs_exit(v);
 }
 
-static void vmx_enable_rdtsc_exiting(struct vcpu *v)
+static void vmx_set_rdtsc_exiting(struct vcpu *v, bool_t enable)
 {
     vmx_vmcs_enter(v);
-    v->arch.hvm_vmx.exec_control |= CPU_BASED_RDTSC_EXITING;
+    v->arch.hvm_vmx.exec_control &= ~CPU_BASED_RDTSC_EXITING;
+    if ( enable )
+        v->arch.hvm_vmx.exec_control |= CPU_BASED_RDTSC_EXITING;
     __vmwrite(CPU_BASED_VM_EXEC_CONTROL, v->arch.hvm_vmx.exec_control);
     vmx_vmcs_exit(v);
- }
+}
 
 static void vmx_init_hypercall_page(struct domain *d, void *hypercall_page)
 {
@@ -1414,7 +1416,7 @@ static struct hvm_function_table vmx_function_table = {
     .invlpg_intercept     = vmx_invlpg_intercept,
     .set_uc_mode          = vmx_set_uc_mode,
     .set_info_guest       = vmx_set_info_guest,
-    .enable_rdtsc_exiting = vmx_enable_rdtsc_exiting
+    .set_rdtsc_exiting    = vmx_set_rdtsc_exiting
 };
 
 static unsigned long *vpid_bitmap;

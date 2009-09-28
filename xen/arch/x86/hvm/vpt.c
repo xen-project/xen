@@ -33,7 +33,7 @@ void hvm_init_guest_time(struct domain *d)
     pl->stime_offset = -(u64)get_s_time();
     pl->last_guest_time = 0;
 
-    d->arch.hvm_domain.gtsc_khz = opt_softtsc ? 1000000 : cpu_khz;
+    d->arch.hvm_domain.gtsc_khz = cpu_khz;
     d->arch.hvm_domain.tsc_scaled = 0;
 }
 

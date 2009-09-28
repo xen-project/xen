@@ -628,6 +628,8 @@ int xc_domain_set_time_offset(int xc_handle,
                               uint32_t domid,
                               int32_t time_offset_seconds);
 
+int xc_domain_set_tsc_native(int xc_handle, uint32_t domid, int is_native);
+
 int xc_domain_memory_increase_reservation(int xc_handle,
                                           uint32_t domid,
                                           unsigned long nr_extents,
