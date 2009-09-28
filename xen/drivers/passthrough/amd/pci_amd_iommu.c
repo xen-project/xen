@@ -161,21 +161,15 @@ int amd_iov_detect(void)
 {
     INIT_LIST_HEAD(&amd_iommu_head);
 
-    if ( amd_iommu_detect_acpi() != 0 )
+    if ( (amd_iommu_detect_acpi() !=0) || (iommu_found() == 0) )
     {
-        AMD_IOMMU_DEBUG("Error detection\n");
-        return -ENODEV;
-    }
-
-    if ( !iommu_found() )
-    {
-        printk("AMD_IOV: IOMMU not found!\n");
+        printk("AMD-Vi: IOMMU not found!\n");
         return -ENODEV;
     }
 
     if ( amd_iommu_init() != 0 )
     {
-        AMD_IOMMU_DEBUG("Error initialization\n");
+        printk("Error initialization\n");
         return -ENODEV;
     }
     return 0;
