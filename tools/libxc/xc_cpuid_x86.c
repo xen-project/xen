@@ -28,7 +28,7 @@
 #define clear_bit(idx, dst) ((dst) &= ~(1u << ((idx) & 31)))
 #define set_bit(idx, dst)   ((dst) |= (1u << ((idx) & 31)))
 
-#define DEF_MAX_BASE 0x00000004u
+#define DEF_MAX_BASE 0x0000000du
 #define DEF_MAX_EXT  0x80000008u
 
 static int hypervisor_is_64bit(int xc)

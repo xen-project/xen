@@ -440,7 +440,7 @@ unsigned long pv_guest_cr4_fixup(unsigned long guest_cr4);
       | ((v)->domain->arch.vtsc ? X86_CR4_TSD : 0))         \
       & ~X86_CR4_DE)
 #define real_cr4_to_pv_guest_cr4(c) \
-    ((c) & ~(X86_CR4_PGE | X86_CR4_PSE | X86_CR4_TSD))
+    ((c) & ~(X86_CR4_PGE | X86_CR4_PSE | X86_CR4_TSD | X86_CR4_OSXSAVE))
 
 void domain_cpuid(struct domain *d,
                   unsigned int  input,

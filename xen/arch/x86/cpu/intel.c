@@ -9,6 +9,7 @@
 #include <asm/uaccess.h>
 #include <asm/mpspec.h>
 #include <asm/apic.h>
+#include <asm/i387.h>
 #include <mach_apic.h>
 #include <asm/hvm/support.h>
 
@@ -27,6 +28,9 @@ extern int trap_init_f00f_bug(void);
 static unsigned int opt_cpuid_mask_ecx, opt_cpuid_mask_edx;
 integer_param("cpuid_mask_ecx", opt_cpuid_mask_ecx);
 integer_param("cpuid_mask_edx", opt_cpuid_mask_edx);
+
+static int use_xsave = 1;
+boolean_param("xsave", use_xsave);
 
 #ifdef CONFIG_X86_INTEL_USERCOPY
 /*
@@ -233,6 +237,12 @@ static void __devinit init_intel(struct cpuinfo_x86 *c)
 		set_bit(X86_FEATURE_ARAT, c->x86_capability);
 
 	start_vmx();
+
+	if ( !use_xsave )
+		clear_bit(X86_FEATURE_XSAVE, boot_cpu_data.x86_capability);
+
+	if ( cpu_has_xsave )
+		xsave_init();
 }
 
 

@@ -669,10 +669,14 @@ static void vmx_ctxt_switch_from(struct vcpu *v)
 static void vmx_ctxt_switch_to(struct vcpu *v)
 {
     struct domain *d = v->domain;
+    unsigned long old_cr4 = read_cr4(), new_cr4 = mmu_cr4_features;
 
-    /* HOST_CR4 in VMCS is always mmu_cr4_features. Sync CR4 now. */
-    if ( unlikely(read_cr4() != mmu_cr4_features) )
-        write_cr4(mmu_cr4_features);
+    /* HOST_CR4 in VMCS is always mmu_cr4_features and
+     * CR4_OSXSAVE(if supported). Sync CR4 now. */
+    if ( cpu_has_xsave )
+        new_cr4 |= X86_CR4_OSXSAVE;
+    if ( old_cr4 != new_cr4 )
+        write_cr4(new_cr4);
 
     if ( d->arch.hvm_domain.hap_enabled )
     {
@@ -2317,6 +2321,30 @@ static int vmx_handle_eoi_write(void)
     return 0;
 }
 
+static int vmx_handle_xsetbv(u64 new_bv)
+{
+    struct vcpu *v = current;
+    u64 xfeature = (((u64)xfeature_high) << 32) | xfeature_low;
+    struct segment_register sreg;
+
+    hvm_get_segment_register(v, x86_seg_ss, &sreg);
+    if ( sreg.attr.fields.dpl != 0 )
+        goto err;
+
+    if ( ((new_bv ^ xfeature) & ~xfeature) || !(new_bv & 1) )
+        goto err;
+
+    if ( (xfeature & XSTATE_YMM & new_bv) && !(new_bv & XSTATE_SSE) )
+        goto err;
+
+    v->arch.hvm_vcpu.xfeature_mask = new_bv;
+    set_xcr0(new_bv);
+    return 0;
+err:
+    vmx_inject_hw_exception(TRAP_gp_fault, 0);
+    return -1;
+}
+
 asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
 {
     unsigned int exit_reason, idtv_info;
@@ -2667,6 +2695,17 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         perfc_incr(pauseloop_exits);
         do_sched_op_compat(SCHEDOP_yield, 0);
         break;
+
+    case EXIT_REASON_XSETBV:
+    {
+        u64 new_bv  =  (((u64)regs->edx) << 32) | regs->eax;
+        if ( vmx_handle_xsetbv(new_bv) == 0 )
+        {
+            inst_len = __get_instruction_length();
+            __update_guest_eip(inst_len);
+        }
+        break;
+    }
 
     default:
     exit_and_crash:

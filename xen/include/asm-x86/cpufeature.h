@@ -98,6 +98,7 @@
 #define X86_FEATURE_X2APIC	(4*32+21) /* Extended xAPIC */
 #define X86_FEATURE_POPCNT	(4*32+23) /* POPCNT instruction */
 #define X86_FEATURE_XSAVE	(4*32+26) /* XSAVE/XRSTOR/XSETBV/XGETBV */
+#define X86_FEATURE_OSXSAVE	(4*32+27) /* OSXSAVE */
 #define X86_FEATURE_HYPERVISOR	(4*32+31) /* Running under some hypervisor */
 
 /* VIA/Cyrix/Centaur-defined CPU features, CPUID level 0xC0000001, word 5 */
@@ -189,6 +190,9 @@
                                  && boot_cpu_has(X86_FEATURE_FFXSR))
 
 #define cpu_has_x2apic          boot_cpu_has(X86_FEATURE_X2APIC)
+
+#define cpu_has_xsave           boot_cpu_has(X86_FEATURE_XSAVE)
+
 #define cpu_has_arch_perfmon    boot_cpu_has(X86_FEATURE_ARCH_PERFMON)
 
 #endif /* __ASM_I386_CPUFEATURE_H */

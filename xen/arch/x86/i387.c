@@ -33,7 +33,11 @@ void save_init_fpu(struct vcpu *v)
     if ( cr0 & X86_CR0_TS )
         clts();
 
-    if ( cpu_has_fxsr )
+    if ( cpu_has_xsave && is_hvm_vcpu(v) )
+    {
+        xsave(v);
+    }
+    else if ( cpu_has_fxsr )
     {
 #ifdef __i386__
         asm volatile (
@@ -126,6 +130,76 @@ void restore_fpu(struct vcpu *v)
     {
         asm volatile ( "frstor %0" : : "m" (v->arch.guest_context.fpu_ctxt) );
     }
+}
+
+/*
+ * Maximum size (in byte) of the XSAVE/XRSTOR save area required by all
+ * the supported and enabled features on the processor, including the
+ * XSAVE.HEADER. We only enable XCNTXT_MASK that we have known.
+ */
+u32 xsave_cntxt_size;
+
+/* A 64-bit bitmask of the XSAVE/XRSTOR features supported by processor. */
+u32 xfeature_low, xfeature_high;
+
+void xsave_init(void)
+{
+    u32 eax, ebx, ecx, edx;
+    int cpu = smp_processor_id();
+    u32 min_size;
+
+    cpuid_count(0xd, 0, &eax, &ebx, &ecx, &edx);
+
+    printk("%s: cpu%d: cntxt_max_size: 0x%x and states: %08x:%08x\n",
+        __func__, cpu, ecx, edx, eax);
+
+    if ( ((eax & XSTATE_FP_SSE) != XSTATE_FP_SSE) ||
+         ((eax & XSTATE_YMM) && !(eax & XSTATE_SSE)) )
+    {
+        BUG();
+    }
+
+    /* FP/SSE, XSAVE.HEADER, YMM */
+    min_size =  512 + 64 + ((eax & XSTATE_YMM) ? XSTATE_YMM_SIZE : 0);
+    BUG_ON(ecx < min_size);
+
+    /*
+     * We will only enable the features we know for hvm guest. Here we use
+     * set/clear CR4_OSXSAVE and re-run cpuid to get xsave_cntxt_size.
+     */
+    set_in_cr4(X86_CR4_OSXSAVE);
+    set_xcr0(eax & XCNTXT_MASK);
+    cpuid_count(0xd, 0, &eax, &ebx, &ecx, &edx);
+    clear_in_cr4(X86_CR4_OSXSAVE);
+
+    if ( cpu == 0 )
+    {
+        /*
+         * xsave_cntxt_size is the max size required by enabled features.
+         * We know FP/SSE and YMM about eax, and nothing about edx at present.
+         */
+        xsave_cntxt_size = ebx;
+        xfeature_low = eax & XCNTXT_MASK;
+        xfeature_high = 0;
+        printk("%s: using cntxt_size: 0x%x and states: %08x:%08x\n",
+            __func__, xsave_cntxt_size, xfeature_high, xfeature_low);
+    }
+    else
+    {
+        BUG_ON(xsave_cntxt_size != ebx);
+        BUG_ON(xfeature_low != (eax & XCNTXT_MASK));
+    }
+}
+
+void xsave_init_save_area(void *save_area)
+{
+    memset(save_area, 0, xsave_cntxt_size);
+
+    ((u16 *)save_area)[0] = 0x37f;   /* FCW   */
+    ((u16 *)save_area)[2] = 0xffff;  /* FTW   */
+    ((u32 *)save_area)[6] = 0x1f80;  /* MXCSR */
+
+    ((struct xsave_struct *)save_area)->xsave_hdr.xstate_bv = XSTATE_FP_SSE;
 }
 
 /*

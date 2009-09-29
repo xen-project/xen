@@ -43,6 +43,7 @@
 #include <asm/processor.h>
 #include <asm/types.h>
 #include <asm/msr.h>
+#include <asm/i387.h>
 #include <asm/traps.h>
 #include <asm/mc146818rtc.h>
 #include <asm/spinlock.h>
@@ -753,6 +754,18 @@ int hvm_vcpu_initialise(struct vcpu *v)
 {
     int rc;
 
+    if ( cpu_has_xsave )
+    {
+        /* XSAVE/XRSTOR requires the save area be 64-byte-boundary aligned. */
+        void *xsave_area = _xmalloc(xsave_cntxt_size, 64);
+        if ( xsave_area == NULL )
+            return -ENOMEM;
+
+        xsave_init_save_area(xsave_area);
+        v->arch.hvm_vcpu.xsave_area = xsave_area;
+        v->arch.hvm_vcpu.xfeature_mask = XSTATE_FP_SSE;
+    }
+
     if ( (rc = vlapic_init(v)) != 0 )
         goto fail1;
 
@@ -815,6 +828,7 @@ void hvm_vcpu_destroy(struct vcpu *v)
     hvm_vcpu_cacheattr_destroy(v);
     vlapic_destroy(v);
     hvm_funcs.vcpu_destroy(v);
+    xfree(v->arch.hvm_vcpu.xsave_area);
 
     /* Event channel is already freed by evtchn_destroy(). */
     /*free_xen_event_channel(v, v->arch.hvm_vcpu.xen_port);*/
@@ -1771,6 +1785,7 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
                                    unsigned int *ecx, unsigned int *edx)
 {
     struct vcpu *v = current;
+    unsigned int count = *ecx;
 
     if ( cpuid_viridian_leaves(input, eax, ebx, ecx, edx) )
         return;
@@ -1788,10 +1803,52 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
         *ebx |= (v->vcpu_id * 2) << 24;
         if ( vlapic_hw_disabled(vcpu_vlapic(v)) )
             __clear_bit(X86_FEATURE_APIC & 31, edx);
+
+        /* Fix up XSAVE and OSXSAVE. */
+        *ecx &= ~(bitmaskof(X86_FEATURE_XSAVE) |
+                  bitmaskof(X86_FEATURE_OSXSAVE));
+        if ( cpu_has_xsave )
+        {
+            *ecx |= bitmaskof(X86_FEATURE_XSAVE);
+            *ecx |= (v->arch.hvm_vcpu.guest_cr[4] & X86_CR4_OSXSAVE) ?
+                     bitmaskof(X86_FEATURE_OSXSAVE) : 0;
+        }
         break;
     case 0xb:
         /* Fix the x2APIC identifier. */
         *edx = v->vcpu_id * 2;
+        break;
+    case 0xd:
+        if ( cpu_has_xsave )
+        {
+            /*
+             *  Fix up "Processor Extended State Enumeration". We only present
+             *  FPU(bit0) and SSE(bit1) to HVM guest for now.
+             */
+            *eax = *ebx = *ecx = *edx = 0;
+            switch ( count )
+            {
+            case 0:
+                /* No HW defines bit in EDX yet. */
+                *edx = 0;
+                /* We only enable the features we know. */
+                *eax = xfeature_low;
+                /* FP/SSE + XSAVE.HEADER + YMM. */
+                *ecx = 512 + 64 + ((*eax & XSTATE_YMM) ? XSTATE_YMM_SIZE : 0);
+                /* Let ebx equal ecx at present. */
+                *ebx = *ecx;
+                break;
+            case 2:
+                if ( !(xfeature_low & XSTATE_YMM) )
+                    break;
+                *eax = XSTATE_YMM_SIZE;
+                *ebx = XSTATE_YMM_OFFSET;
+                break;
+            case 1:
+            default:
+                break;
+            }
+        }
         break;
     }
 }

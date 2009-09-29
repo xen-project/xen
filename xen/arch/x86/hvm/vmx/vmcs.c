@@ -629,7 +629,7 @@ static int construct_vmcs(struct vcpu *v)
     /* Host control registers. */
     v->arch.hvm_vmx.host_cr0 = read_cr0() | X86_CR0_TS;
     __vmwrite(HOST_CR0, v->arch.hvm_vmx.host_cr0);
-    __vmwrite(HOST_CR4, mmu_cr4_features);
+    __vmwrite(HOST_CR4, mmu_cr4_features | (cpu_has_xsave ? X86_CR4_OSXSAVE : 0));
 
     /* Host CS:RIP. */
     __vmwrite(HOST_CS_SELECTOR, __HYPERVISOR_CS);
