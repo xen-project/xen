@@ -57,22 +57,11 @@ u32 svm_feature_flags;
 #define set_segment_register(name, value)  \
     asm volatile ( "movw %%ax ,%%" STR(name) "" : : "a" (value) )
 
+static struct hvm_function_table svm_function_table;
+
 enum handler_return { HNDL_done, HNDL_unhandled, HNDL_exception_raised };
 
 asmlinkage void do_IRQ(struct cpu_user_regs *);
-
-static void svm_update_guest_cr(struct vcpu *v, unsigned int cr);
-static void svm_update_guest_efer(struct vcpu *v);
-static void svm_inject_exception(
-    unsigned int trapnr, int errcode, unsigned long cr2);
-static void svm_cpuid_intercept(
-    unsigned int *eax, unsigned int *ebx,
-    unsigned int *ecx, unsigned int *edx);
-static void svm_wbinvd_intercept(void);
-static void svm_fpu_dirty_intercept(void);
-static int svm_msr_read_intercept(struct cpu_user_regs *regs);
-static int svm_msr_write_intercept(struct cpu_user_regs *regs);
-static void svm_invlpg_intercept(unsigned long vaddr);
 
 /* va of hardware host save area     */
 static void *hsa[NR_CPUS] __read_mostly;
@@ -103,7 +92,7 @@ static void inline __update_guest_eip(
     curr->arch.hvm_svm.vmcb->interrupt_shadow = 0;
 
     if ( regs->eflags & X86_EFLAGS_TF )
-        svm_inject_exception(TRAP_debug, HVM_DELIVER_NO_ERROR_CODE, 0);
+        hvm_inject_exception(TRAP_debug, HVM_DELIVER_NO_ERROR_CODE, 0);
 }
 
 static void svm_cpu_down(void)
@@ -255,9 +244,9 @@ static int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     v->arch.hvm_vcpu.guest_cr[2] = c->cr2;
     v->arch.hvm_vcpu.guest_cr[3] = c->cr3;
     v->arch.hvm_vcpu.guest_cr[4] = c->cr4;
-    svm_update_guest_cr(v, 0);
-    svm_update_guest_cr(v, 2);
-    svm_update_guest_cr(v, 4);
+    hvm_update_guest_cr(v, 0);
+    hvm_update_guest_cr(v, 2);
+    hvm_update_guest_cr(v, 4);
 
     v->arch.hvm_svm.guest_sysenter_cs = c->sysenter_cs;
     v->arch.hvm_svm.guest_sysenter_esp = c->sysenter_esp;
@@ -314,7 +303,7 @@ static void svm_load_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
     vmcb->cstar      = data->msr_cstar;
     vmcb->sfmask     = data->msr_syscall_mask;
     v->arch.hvm_vcpu.guest_efer = data->msr_efer;
-    svm_update_guest_efer(v);
+    hvm_update_guest_efer(v);
 
     hvm_set_guest_tsc(v, data->tsc);
 }
@@ -825,38 +814,6 @@ static int svm_do_pmu_interrupt(struct cpu_user_regs *regs)
     return 0;
 }
 
-static struct hvm_function_table svm_function_table = {
-    .name                 = "SVM",
-    .cpu_down             = svm_cpu_down,
-    .domain_initialise    = svm_domain_initialise,
-    .domain_destroy       = svm_domain_destroy,
-    .vcpu_initialise      = svm_vcpu_initialise,
-    .vcpu_destroy         = svm_vcpu_destroy,
-    .save_cpu_ctxt        = svm_save_vmcb_ctxt,
-    .load_cpu_ctxt        = svm_load_vmcb_ctxt,
-    .get_interrupt_shadow = svm_get_interrupt_shadow,
-    .set_interrupt_shadow = svm_set_interrupt_shadow,
-    .guest_x86_mode       = svm_guest_x86_mode,
-    .get_segment_register = svm_get_segment_register,
-    .set_segment_register = svm_set_segment_register,
-    .update_host_cr3      = svm_update_host_cr3,
-    .update_guest_cr      = svm_update_guest_cr,
-    .update_guest_efer    = svm_update_guest_efer,
-    .flush_guest_tlbs     = svm_flush_guest_tlbs,
-    .set_tsc_offset       = svm_set_tsc_offset,
-    .inject_exception     = svm_inject_exception,
-    .init_hypercall_page  = svm_init_hypercall_page,
-    .event_pending        = svm_event_pending,
-    .do_pmu_interrupt     = svm_do_pmu_interrupt,
-    .cpuid_intercept      = svm_cpuid_intercept,
-    .wbinvd_intercept     = svm_wbinvd_intercept,
-    .fpu_dirty_intercept  = svm_fpu_dirty_intercept,
-    .msr_read_intercept   = svm_msr_read_intercept,
-    .msr_write_intercept  = svm_msr_write_intercept,
-    .invlpg_intercept     = svm_invlpg_intercept,
-    .set_rdtsc_exiting    = svm_set_rdtsc_exiting
-};
-
 static int svm_cpu_up(struct cpuinfo_x86 *c)
 {
     u32 eax, edx, phys_hsa_lo, phys_hsa_hi;   
@@ -1117,7 +1074,7 @@ static int svm_msr_read_intercept(struct cpu_user_regs *regs)
     return X86EMUL_OKAY;
 
  gpf:
-    svm_inject_exception(TRAP_gp_fault, 0, 0);
+    hvm_inject_exception(TRAP_gp_fault, 0, 0);
     return X86EMUL_EXCEPTION;
 }
 
@@ -1195,7 +1152,7 @@ static int svm_msr_write_intercept(struct cpu_user_regs *regs)
     return X86EMUL_OKAY;
 
  gpf:
-    svm_inject_exception(TRAP_gp_fault, 0, 0);
+    hvm_inject_exception(TRAP_gp_fault, 0, 0);
     return X86EMUL_EXCEPTION;
 }
 
@@ -1257,7 +1214,7 @@ static void svm_vmexit_ud_intercept(struct cpu_user_regs *regs)
     switch ( rc )
     {
     case X86EMUL_UNHANDLEABLE:
-        svm_inject_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE, 0);
+        hvm_inject_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE, 0);
         break;
     case X86EMUL_EXCEPTION:
         if ( ctxt.exn_pending )
@@ -1302,6 +1259,38 @@ static void svm_invlpg_intercept(unsigned long vaddr)
     paging_invlpg(curr, vaddr);
     svm_asid_g_invlpg(curr, vaddr);
 }
+
+static struct hvm_function_table svm_function_table = {
+    .name                 = "SVM",
+    .cpu_down             = svm_cpu_down,
+    .domain_initialise    = svm_domain_initialise,
+    .domain_destroy       = svm_domain_destroy,
+    .vcpu_initialise      = svm_vcpu_initialise,
+    .vcpu_destroy         = svm_vcpu_destroy,
+    .save_cpu_ctxt        = svm_save_vmcb_ctxt,
+    .load_cpu_ctxt        = svm_load_vmcb_ctxt,
+    .get_interrupt_shadow = svm_get_interrupt_shadow,
+    .set_interrupt_shadow = svm_set_interrupt_shadow,
+    .guest_x86_mode       = svm_guest_x86_mode,
+    .get_segment_register = svm_get_segment_register,
+    .set_segment_register = svm_set_segment_register,
+    .update_host_cr3      = svm_update_host_cr3,
+    .update_guest_cr      = svm_update_guest_cr,
+    .update_guest_efer    = svm_update_guest_efer,
+    .flush_guest_tlbs     = svm_flush_guest_tlbs,
+    .set_tsc_offset       = svm_set_tsc_offset,
+    .inject_exception     = svm_inject_exception,
+    .init_hypercall_page  = svm_init_hypercall_page,
+    .event_pending        = svm_event_pending,
+    .do_pmu_interrupt     = svm_do_pmu_interrupt,
+    .cpuid_intercept      = svm_cpuid_intercept,
+    .wbinvd_intercept     = svm_wbinvd_intercept,
+    .fpu_dirty_intercept  = svm_fpu_dirty_intercept,
+    .msr_read_intercept   = svm_msr_read_intercept,
+    .msr_write_intercept  = svm_msr_write_intercept,
+    .invlpg_intercept     = svm_invlpg_intercept,
+    .set_rdtsc_exiting    = svm_set_rdtsc_exiting
+};
 
 asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
 {
@@ -1411,7 +1400,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
             break;
         }
 
-        svm_inject_exception(TRAP_page_fault, regs->error_code, va);
+        hvm_inject_exception(TRAP_page_fault, regs->error_code, va);
         break;
     }
 
@@ -1514,7 +1503,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
     case VMEXIT_STGI:
     case VMEXIT_CLGI:
     case VMEXIT_SKINIT:
-        svm_inject_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE, 0);
+        hvm_inject_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE, 0);
         break;
 
     case VMEXIT_NPF:
