@@ -1029,10 +1029,10 @@ static void mce_init(void)
 
     mctc = mcheck_mca_logout(MCA_RESET, mca_allbanks, &bs, NULL);
 
-    /* in the boot up stage, don't inject to DOM0, but print out */
+    /* in the boot up stage, print out and also log in DOM0 boot process */
     if (bs.errcnt && mctc != NULL) {
         x86_mcinfo_dump(mctelem_dataptr(mctc));
-        mctelem_dismiss(mctc);
+        mctelem_commit(mctc);
     }
 
     set_in_cr4(X86_CR4_MCE);
