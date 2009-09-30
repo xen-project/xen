@@ -1183,9 +1183,8 @@ decode_register(
 }
 
 #define decode_segment_failed x86_seg_tr
-enum x86_segment
-decode_segment(
-    uint8_t modrm_reg)
+static enum x86_segment
+decode_segment(uint8_t modrm_reg)
 {
     switch ( modrm_reg )
     {

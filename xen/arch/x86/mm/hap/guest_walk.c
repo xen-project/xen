@@ -24,6 +24,7 @@
 #include <xen/paging.h>
 #include <xen/config.h>
 #include <xen/sched.h>
+#include "private.h" /* for hap_gva_to_gfn_* */
 
 #define _hap_gva_to_gfn(levels) hap_gva_to_gfn_##levels##level
 #define hap_gva_to_gfn(levels) _hap_gva_to_gfn(levels)

@@ -69,7 +69,7 @@ static int __init get_iommu_msi_capabilities(u8 bus, u8 dev, u8 func,
     return 0;
 }
 
-int __init get_iommu_capabilities(u8 bus, u8 dev, u8 func, u8 cap_ptr,
+static int __init get_iommu_capabilities(u8 bus, u8 dev, u8 func, u8 cap_ptr,
                                   struct amd_iommu *iommu)
 {
     u32 cap_header, cap_range, misc_info;

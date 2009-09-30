@@ -332,7 +332,7 @@ int queue_invalidate_iec(struct iommu *iommu, u8 granu, u8 im, u16 iidx)
     return ret;
 }
 
-int __iommu_flush_iec(struct iommu *iommu, u8 granu, u8 im, u16 iidx)
+static int __iommu_flush_iec(struct iommu *iommu, u8 granu, u8 im, u16 iidx)
 {
     int ret;
     ret = queue_invalidate_iec(iommu, granu, im, iidx);

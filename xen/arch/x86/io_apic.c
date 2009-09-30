@@ -911,7 +911,7 @@ static inline void UNEXPECTED_IO_APIC(void)
 {
 }
 
-void /*__init*/ __print_IO_APIC(void)
+static void /*__init*/ __print_IO_APIC(void)
 {
     int apic, i;
     union IO_APIC_reg_00 reg_00;
@@ -2105,7 +2105,7 @@ static int ioapic_physbase_to_id(unsigned long physbase)
 
 unsigned apic_gsi_base(int apic);
 
-int apic_pin_2_gsi_irq(int apic, int pin)
+static int apic_pin_2_gsi_irq(int apic, int pin)
 {
     int idx, irq;
 

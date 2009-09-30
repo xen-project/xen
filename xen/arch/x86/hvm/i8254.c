@@ -151,7 +151,7 @@ static void pit_set_gate(PITState *pit, int channel, int val)
     s->gate = val;
 }
 
-int pit_get_gate(PITState *pit, int channel)
+static int pit_get_gate(PITState *pit, int channel)
 {
     ASSERT(spin_is_locked(&pit->lock));
     return pit->hw.channels[channel].gate;

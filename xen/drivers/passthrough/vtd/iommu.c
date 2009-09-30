@@ -495,7 +495,7 @@ static int inline iommu_flush_iotlb_psi(
                         flush_non_present_entry, flush_dev_iotlb);
 }
 
-void iommu_flush_all(void)
+static void iommu_flush_all(void)
 {
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
@@ -1385,7 +1385,7 @@ void iommu_domain_teardown(struct domain *d)
     iommu_domid_release(d);
 }
 
-int intel_iommu_map_page(
+static int intel_iommu_map_page(
     struct domain *d, unsigned long gfn, unsigned long mfn)
 {
     struct hvm_iommu *hd = domain_hvm_iommu(d);
@@ -1446,7 +1446,7 @@ int intel_iommu_map_page(
     return 0;
 }
 
-int intel_iommu_unmap_page(struct domain *d, unsigned long gfn)
+static int intel_iommu_unmap_page(struct domain *d, unsigned long gfn)
 {
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
@@ -1822,7 +1822,7 @@ int device_assigned(u8 bus, u8 devfn)
     return 0;
 }
 
-int intel_iommu_assign_device(struct domain *d, u8 bus, u8 devfn)
+static int intel_iommu_assign_device(struct domain *d, u8 bus, u8 devfn)
 {
     struct acpi_rmrr_unit *rmrr;
     int ret = 0, i;
@@ -1884,7 +1884,7 @@ static int intel_iommu_group_id(u8 bus, u8 devfn)
 }
 
 static u32 iommu_state[MAX_IOMMUS][MAX_IOMMU_REGS];
-void vtd_suspend(void)
+static void vtd_suspend(void)
 {
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
@@ -1923,7 +1923,7 @@ void vtd_suspend(void)
     }
 }
 
-void vtd_resume(void)
+static void vtd_resume(void)
 {
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;

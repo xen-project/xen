@@ -29,13 +29,13 @@ boolean_param("x2apic", x2apic);
 static int x2apic_phys = 0; /* By default we use logical cluster mode. */
 boolean_param("x2apic_phys", x2apic_phys);
 
-__init int probe_x2apic_phys(void)
+static int __init probe_x2apic_phys(void)
 {
     return x2apic && x2apic_phys && x2apic_is_available() &&
         iommu_supports_eim();
 }
 
-__init int probe_x2apic_cluster(void)
+static int __init probe_x2apic_cluster(void)
 {
     return x2apic && !x2apic_phys && x2apic_is_available() &&
         iommu_supports_eim();

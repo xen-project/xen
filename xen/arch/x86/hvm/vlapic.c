@@ -146,7 +146,7 @@ static int vlapic_find_highest_isr(struct vlapic *vlapic)
     return vlapic_find_highest_vector(&vlapic->regs->data[APIC_ISR]);
 }
 
-uint32_t vlapic_get_ppr(struct vlapic *vlapic)
+static uint32_t vlapic_get_ppr(struct vlapic *vlapic)
 {
     uint32_t tpr, isrv, ppr;
     int isr;
@@ -531,7 +531,7 @@ static int vlapic_read(
     return X86EMUL_OKAY;
 }
 
-void vlapic_pt_cb(struct vcpu *v, void *data)
+static void vlapic_pt_cb(struct vcpu *v, void *data)
 {
     *(s_time_t *)data = hvm_get_guest_time(v);
 }

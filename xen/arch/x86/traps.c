@@ -63,6 +63,7 @@
 #include <asm/x86_emulate.h>
 #include <asm/traps.h>
 #include <asm/hvm/vpt.h>
+#include <asm/hypercall.h>
 #include <public/arch-x86/cpuid.h>
 
 /*
@@ -383,7 +384,7 @@ void vcpu_show_execution_state(struct vcpu *v)
     vcpu_unpause(v);
 }
 
-char *trapstr(int trapnr)
+static char *trapstr(int trapnr)
 {
     static char *strings[] = { 
         "divide error", "debug", "nmi", "bkpt", "overflow", "bounds", 
@@ -2872,7 +2873,7 @@ static void nmi_dom0_report(unsigned int reason_idx)
     send_guest_trap(d, 0, TRAP_nmi);
 }
 
-asmlinkage void mem_parity_error(struct cpu_user_regs *regs)
+static void mem_parity_error(struct cpu_user_regs *regs)
 {
     switch ( opt_nmi[0] )
     {
@@ -2891,7 +2892,7 @@ asmlinkage void mem_parity_error(struct cpu_user_regs *regs)
     outb((inb(0x61) & 0x0b) | 0x00, 0x61); /* enable parity check */
 }
 
-asmlinkage void io_check_error(struct cpu_user_regs *regs)
+static void io_check_error(struct cpu_user_regs *regs)
 {
     switch ( opt_nmi[0] )
     {

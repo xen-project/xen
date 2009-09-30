@@ -230,7 +230,7 @@ static
 int set_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn, 
                   unsigned int page_order, p2m_type_t p2mt);
 
-int
+static int
 p2m_pod_cache_add(struct domain *d,
                   struct page_info *page,
                   unsigned long order)

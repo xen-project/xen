@@ -55,7 +55,7 @@
 /*          HAP VRAM TRACKING SUPPORT           */
 /************************************************/
 
-int hap_enable_vram_tracking(struct domain *d)
+static int hap_enable_vram_tracking(struct domain *d)
 {
     int i;
     struct sh_dirty_vram *dirty_vram = d->arch.hvm_domain.dirty_vram;
@@ -76,7 +76,7 @@ int hap_enable_vram_tracking(struct domain *d)
     return 0;
 }
 
-int hap_disable_vram_tracking(struct domain *d)
+static int hap_disable_vram_tracking(struct domain *d)
 {
     int i;
     struct sh_dirty_vram *dirty_vram = d->arch.hvm_domain.dirty_vram;
@@ -96,7 +96,7 @@ int hap_disable_vram_tracking(struct domain *d)
     return 0;
 }
 
-void hap_clean_vram_tracking(struct domain *d)
+static void hap_clean_vram_tracking(struct domain *d)
 {
     int i;
     struct sh_dirty_vram *dirty_vram = d->arch.hvm_domain.dirty_vram;
@@ -111,7 +111,7 @@ void hap_clean_vram_tracking(struct domain *d)
     flush_tlb_mask(&d->domain_dirty_cpumask);
 }
 
-void hap_vram_tracking_init(struct domain *d)
+static void hap_vram_tracking_init(struct domain *d)
 {
     paging_log_dirty_init(d, hap_enable_vram_tracking,
                           hap_disable_vram_tracking,
@@ -192,7 +192,7 @@ param_fail:
 /************************************************/
 
 /* hap code to call when log_dirty is enable. return 0 if no problem found. */
-int hap_enable_log_dirty(struct domain *d)
+static int hap_enable_log_dirty(struct domain *d)
 {
     /* turn on PG_log_dirty bit in paging mode */
     hap_lock(d);
@@ -205,7 +205,7 @@ int hap_enable_log_dirty(struct domain *d)
     return 0;
 }
 
-int hap_disable_log_dirty(struct domain *d)
+static int hap_disable_log_dirty(struct domain *d)
 {
     hap_lock(d);
     d->arch.paging.mode &= ~PG_log_dirty;
@@ -216,7 +216,7 @@ int hap_disable_log_dirty(struct domain *d)
     return 0;
 }
 
-void hap_clean_dirty_bitmap(struct domain *d)
+static void hap_clean_dirty_bitmap(struct domain *d)
 {
     /* set l1e entries of P2M table to be read-only. */
     p2m_change_entry_type_global(d, p2m_ram_rw, p2m_ram_logdirty);
@@ -312,7 +312,7 @@ static struct page_info *hap_alloc_p2m_page(struct domain *d)
     return pg;
 }
 
-void hap_free_p2m_page(struct domain *d, struct page_info *pg)
+static void hap_free_p2m_page(struct domain *d, struct page_info *pg)
 {
     hap_lock(d);
     ASSERT(page_get_owner(pg) == d);

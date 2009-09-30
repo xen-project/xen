@@ -404,16 +404,6 @@ void invalidate_dev_table_entry(struct amd_iommu *iommu,
     send_iommu_command(iommu, cmd);
 }
 
-int amd_iommu_is_dte_page_translation_valid(u32 *entry)
-{
-    return (get_field_from_reg_u32(entry[0],
-                                   IOMMU_DEV_TABLE_VALID_MASK,
-                                   IOMMU_DEV_TABLE_VALID_SHIFT) &&
-            get_field_from_reg_u32(entry[0],
-                                   IOMMU_DEV_TABLE_TRANSLATION_VALID_MASK,
-                                   IOMMU_DEV_TABLE_TRANSLATION_VALID_SHIFT));
-}
-
 static u64 iommu_l2e_from_pfn(struct page_info *table, int level,
                               unsigned long io_pfn)
 {

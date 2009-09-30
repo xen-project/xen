@@ -329,7 +329,7 @@ static int inject_mce(struct domain *d)
     return 0;
 }
 
-void intel_UCR_handler(struct mcinfo_bank *bank,
+static void intel_UCR_handler(struct mcinfo_bank *bank,
              struct mcinfo_global *global,
              struct mcinfo_extended *extension,
              struct mca_handle_result *result)

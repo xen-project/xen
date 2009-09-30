@@ -52,7 +52,7 @@ int x2apic_enabled __read_mostly = 0;
 
 static void apic_pm_activate(void);
 
-int modern_apic(void)
+static int modern_apic(void)
 {
     unsigned int lvr, version;
     /* AMD systems use old APIC versions, so check the CPU */
@@ -995,7 +995,7 @@ void (*wait_timer_tick)(void) __initdata = wait_8254_wraparound;
 
 #define APIC_DIVISOR 1
 
-void __setup_APIC_LVTT(unsigned int clocks)
+static void __setup_APIC_LVTT(unsigned int clocks)
 {
     unsigned int lvtt_value, tmp_value, ver;
 
@@ -1033,7 +1033,7 @@ static void __devinit setup_APIC_timer(unsigned int clocks)
  * APIC irq that way.
  */
 
-int __init calibrate_APIC_clock(void)
+static int __init calibrate_APIC_clock(void)
 {
     unsigned long long t1 = 0, t2 = 0;
     long tt1, tt2;
@@ -1105,11 +1105,6 @@ int __init calibrate_APIC_clock(void)
     __setup_APIC_LVTT(0);
 
     return result;
-}
-
-u32 get_apic_bus_cycle(void)
-{
-    return bus_cycle;
 }
 
 static unsigned int calibration_result;

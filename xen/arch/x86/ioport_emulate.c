@@ -42,7 +42,7 @@ static void ioemul_handle_proliant_quirk(
     io_emul_stub[9] = 0xc3;
 }
 
-int __init proliant_quirk(struct dmi_system_id *d)
+static int __init proliant_quirk(struct dmi_system_id *d)
 {
     ioemul_handle_quirk = ioemul_handle_proliant_quirk;
     return 0;
@@ -121,7 +121,7 @@ static struct dmi_system_id __initdata ioport_quirks_tbl[] = {
     { }
 };
 
-int __init ioport_quirks_init(void)
+static int __init ioport_quirks_init(void)
 {
     dmi_check_system(ioport_quirks_tbl);
     return 0;

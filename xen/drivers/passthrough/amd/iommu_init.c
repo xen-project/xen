@@ -508,7 +508,7 @@ static int set_iommu_interrupt_handler(struct amd_iommu *iommu)
     return irq;
 }
 
-void enable_iommu(struct amd_iommu *iommu)
+static void enable_iommu(struct amd_iommu *iommu)
 {
     unsigned long flags;
 
@@ -596,7 +596,7 @@ static int __init allocate_event_log(struct amd_iommu *iommu)
     return (allocate_iommu_table_struct(&iommu->event_log, "Event Log"));
 }
 
-int __init amd_iommu_init_one(struct amd_iommu *iommu)
+static int __init amd_iommu_init_one(struct amd_iommu *iommu)
 {
     if ( allocate_cmd_buffer(iommu) != 0 )
         goto error_out;

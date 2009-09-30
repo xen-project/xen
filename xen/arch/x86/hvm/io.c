@@ -244,7 +244,7 @@ void hvm_io_assist(void)
         vcpu_end_shutdown_deferral(curr);
 }
 
-void dpci_ioport_read(uint32_t mport, ioreq_t *p)
+static void dpci_ioport_read(uint32_t mport, ioreq_t *p)
 {
     int i, sign = p->df ? -1 : 1;
     uint32_t data = 0;
@@ -274,7 +274,7 @@ void dpci_ioport_read(uint32_t mport, ioreq_t *p)
     }
 }
 
-void dpci_ioport_write(uint32_t mport, ioreq_t *p)
+static void dpci_ioport_write(uint32_t mport, ioreq_t *p)
 {
     int i, sign = p->df ? -1 : 1;
     uint32_t data;

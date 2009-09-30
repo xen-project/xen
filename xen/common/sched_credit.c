@@ -211,7 +211,7 @@ __runq_remove(struct csched_vcpu *svc)
     list_del_init(&svc->runq_elem);
 }
 
-void burn_credits(struct csched_vcpu *svc, s_time_t now)
+static void burn_credits(struct csched_vcpu *svc, s_time_t now)
 {
     s_time_t delta;
 

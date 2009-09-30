@@ -721,16 +721,6 @@ void console_end_sync(void)
     atomic_dec(&print_everything);
 }
 
-void console_putc(char c)
-{
-    serial_putc(sercon_handle, c);
-}
-
-int console_getc(void)
-{
-    return serial_getc(sercon_handle);
-}
-
 /*
  * printk rate limiting, lifted from Linux.
  *

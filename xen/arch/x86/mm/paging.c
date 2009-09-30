@@ -626,7 +626,7 @@ void paging_log_dirty_init(struct domain *d,
 }
 
 /* This function fress log dirty bitmap resources. */
-void paging_log_dirty_teardown(struct domain*d)
+static void paging_log_dirty_teardown(struct domain*d)
 {
     log_dirty_lock(d);
     paging_free_log_dirty_bitmap(d);

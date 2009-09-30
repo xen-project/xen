@@ -225,4 +225,6 @@ struct msg_address {
 	__u32 	hi_address;
 } __attribute__ ((packed));
 
+void msi_compose_msg(struct pci_dev *pdev, int irq,
+                            struct msi_msg *msg);
 #endif /* __ASM_MSI_H */

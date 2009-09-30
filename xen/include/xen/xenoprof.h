@@ -64,6 +64,7 @@ struct xenoprof {
 #endif
 
 struct domain;
+int is_passive(struct domain *d);
 void free_xenoprof_pages(struct domain *d);
 
 int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg);

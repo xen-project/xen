@@ -843,62 +843,6 @@ void vhash_update(unsigned char *m,
 
 /* ----------------------------------------------------------------------- */
 
-uint64_t xvhash(unsigned char m[],
-          unsigned int mbytes,
-          uint64_t *tagl,
-          vmac_ctx_t *ctx)
-{
-    uint64_t ch, cl, rh, rl, *mptr;
-    #if (VMAC_TAG_LEN == 128)
-    uint64_t ch2, cl2, rh2, rl2;
-    #endif
-    const uint64_t *kptr = (uint64_t *)ctx->nhkey;
-    int i, remaining;
-
-    remaining = mbytes % VMAC_NHBYTES;
-    i = mbytes-remaining;
-    mptr = (uint64_t *)(m+i);
-    if (i) vhash_update(m,i,ctx);
-
-    ch = ctx->polytmp[0];
-    cl = ctx->polytmp[1];
-    #if (VMAC_TAG_LEN == 128)
-    ch2 = ctx->polytmp[2];
-    cl2 = ctx->polytmp[3];
-    #endif
-
-    if (remaining) {
-        #if (VMAC_TAG_LEN == 128)
-        nh_16_2(mptr,kptr,2*((remaining+15)/16),rh,rl,rh2,rl2);
-        rh2 &= m62;
-        #else
-        nh_16(mptr,kptr,2*((remaining+15)/16),rh,rl);
-        #endif
-        rh &= m62;
-        if (i) {
-            poly_step(ch,cl,ctx->polykey[0],ctx->polykey[1],rh,rl);
-            #if (VMAC_TAG_LEN == 128)
-            poly_step(ch2,cl2,ctx->polykey[2],ctx->polykey[3],rh2,rl2);
-            #endif
-        } else {
-            ADD128(ch,cl,rh,rl);
-            #if (VMAC_TAG_LEN == 128)
-            ADD128(ch2,cl2,rh2,rl2);
-            #endif
-        }
-    }
-
-    #if VMAC_USE_SSE2
-    _mm_empty(); /* SSE2 version of poly_step uses mmx instructions */
-    #endif
-    vhash_abort(ctx);
-    remaining *= 8;
-#if (VMAC_TAG_LEN == 128)
-    *tagl = l3hash(ch2, cl2, ctx->l3key[2], ctx->l3key[3],remaining);
-#endif
-    return l3hash(ch, cl, ctx->l3key[0], ctx->l3key[1],remaining);
-}
-
 uint64_t vhash(unsigned char m[],
           unsigned int mbytes,
           uint64_t *tagl,

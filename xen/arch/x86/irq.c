@@ -147,7 +147,7 @@ out:
     return irq;
 }
 
-void dynamic_irq_cleanup(unsigned int irq)
+static void dynamic_irq_cleanup(unsigned int irq)
 {
     struct irq_desc *desc = irq_to_desc(irq);
     unsigned long flags;

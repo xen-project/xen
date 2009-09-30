@@ -97,7 +97,7 @@ static int init_apic_pin_2_ir_idx(void)
     return 0;
 }
 
-u16 apicid_to_bdf(int apic_id)
+static u16 apicid_to_bdf(int apic_id)
 {
     struct acpi_drhd_unit *drhd = ioapic_to_drhd(apic_id);
     struct acpi_ioapic_unit *acpi_ioapic_unit;
