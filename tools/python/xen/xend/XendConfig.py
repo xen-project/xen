@@ -1202,14 +1202,14 @@ class XendConfig(dict):
                 if o_dev_type == 'vbd' or o_dev_type == 'tap' or o_dev_type == 'tap2':
                     blkdev_file = blkdev_uname_to_file(dev_uname)
                     o_dev_uname = sxp.child_value(o_dev_info, 'uname')
-                    if o_dev_uname != None:
+                    if o_dev_uname and o_dev_uname != None:
                         o_blkdev_file = blkdev_uname_to_file(o_dev_uname)
                         if blkdev_file == o_blkdev_file:
                             raise XendConfigError('The file "%s" is already used' %
                                                   blkdev_file)
-                    if dev_uname == o_dev_uname:
-                        raise XendConfigError('The uname "%s" is already defined' %
-                                             dev_uname)
+                        if dev_uname and dev_uname == o_dev_uname:
+                            raise XendConfigError('The uname "%s" is already defined' %
+                                                  dev_uname)
                     o_blkdev_name = sxp.child_value(o_dev_info, 'dev')
                     o_devid = self._blkdev_name_to_number(o_blkdev_name)
                     if o_devid != None and devid == o_devid:
