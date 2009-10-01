@@ -604,8 +604,9 @@ void hpet_broadcast_init(void)
 void hpet_disable_legacy_broadcast(void)
 {
     u32 cfg;
+    unsigned long flags;
 
-    spin_lock_irq(&legacy_hpet_event.lock);
+    spin_lock_irqsave(&legacy_hpet_event.lock, flags);
 
     legacy_hpet_event.flags |= HPET_EVT_DISABLE;
 
@@ -619,7 +620,7 @@ void hpet_disable_legacy_broadcast(void)
     cfg &= ~HPET_CFG_LEGACY;
     hpet_write32(cfg, HPET_CFG);
 
-    spin_unlock_irq(&legacy_hpet_event.lock);
+    spin_unlock_irqrestore(&legacy_hpet_event.lock, flags);
 
     smp_send_event_check_mask(&cpu_online_map);
 }
