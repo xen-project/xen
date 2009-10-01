@@ -1067,21 +1067,29 @@ static int p2m_pod_check_and_populate(struct domain *d, unsigned long gfn,
                                       l1_pgentry_t *p2m_entry, int order,
                                       p2m_query_t q)
 {
+    /* Only take the lock if we don't already have it.  Otherwise it
+     * wouldn't be safe to do p2m lookups with the p2m lock held */
+    int do_locking = !p2m_locked_by_me(d->arch.p2m);
     int r;
-    p2m_lock(d->arch.p2m);
+
+    if ( do_locking )
+        p2m_lock(d->arch.p2m);
+
     audit_p2m(d);
 
     /* Check to make sure this is still PoD */
     if ( p2m_flags_to_type(l1e_get_flags(*p2m_entry)) != p2m_populate_on_demand )
     {
-        p2m_unlock(d->arch.p2m);
+        if ( do_locking )
+            p2m_unlock(d->arch.p2m);
         return 0;
     }
 
     r = p2m_pod_demand_populate(d, gfn, order, q);
 
     audit_p2m(d);
-    p2m_unlock(d->arch.p2m);
+    if ( do_locking )
+        p2m_unlock(d->arch.p2m);
 
     return r;
 }
