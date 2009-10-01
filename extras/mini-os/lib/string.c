@@ -57,10 +57,10 @@ int ffsll (long long int lli)
 
 #if !defined HAVE_LIBC
 
-#include <os.h>
-#include <types.h>
-#include <lib.h>
-#include <xmalloc.h>
+#include <mini-os/os.h>
+#include <mini-os/types.h>
+#include <mini-os/lib.h>
+#include <mini-os/xmalloc.h>
 
 int memcmp(const void * cs,const void * ct,size_t count)
 {

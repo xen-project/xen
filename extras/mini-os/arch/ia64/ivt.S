@@ -24,11 +24,11 @@
  */
 
 
-#include "asm.h"
-#include "page.h"
-#include "ia64_cpu.h"
-#include "privop.h"
-#include "offsets.h"
+#include <mini-os/asm.h>
+#include <mini-os/page.h>
+#include <mini-os/ia64_cpu.h>
+#include <mini-os/privop.h>
+#include <mini-os/offsets.h>
 
 
 /* General register usage in interrupt handling:

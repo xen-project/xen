@@ -1,5 +1,5 @@
-#include <kernel.h>
-#include <console.h>
+#include <mini-os/kernel.h>
+#include <mini-os/console.h>
 
 void __stack_chk_fail(void)
 {

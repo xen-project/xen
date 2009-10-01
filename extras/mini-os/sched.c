@@ -35,16 +35,16 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#include <os.h>
-#include <hypervisor.h>
-#include <time.h>
-#include <mm.h>
-#include <types.h>
-#include <lib.h>
-#include <xmalloc.h>
-#include <list.h>
-#include <sched.h>
-#include <semaphore.h>
+#include <mini-os/os.h>
+#include <mini-os/hypervisor.h>
+#include <mini-os/time.h>
+#include <mini-os/mm.h>
+#include <mini-os/types.h>
+#include <mini-os/lib.h>
+#include <mini-os/xmalloc.h>
+#include <mini-os/list.h>
+#include <mini-os/sched.h>
+#include <mini-os/semaphore.h>
 
 
 #ifdef SCHED_DEBUG

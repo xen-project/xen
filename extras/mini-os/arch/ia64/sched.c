@@ -25,11 +25,11 @@
  */
 
 
-#include "types.h"
-#include "sched.h"
-#include "lib.h"
-#include "xmalloc.h"
-#include "mm.h"
+#include <mini-os/types.h>
+#include <mini-os/sched.h>
+#include <mini-os/lib.h>
+#include <mini-os/xmalloc.h>
+#include <mini-os/mm.h>
 
 /* The function is implemented in fw.S */
 extern void thread_starter(void);

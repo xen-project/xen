@@ -31,19 +31,19 @@
  */
 
 
-#include "os.h"
-#include "types.h"
-#include "lib.h"
-#include "page.h"
-#include "xen/xen.h"
-#include "privop.h"
-#include "xen/callback.h"
-#include "ia64_cpu.h"
-#include "hypervisor.h"
-#include "events.h"
-#include "console.h"
-#include "time.h"
-#include "xmalloc.h"
+#include <mini-os/os.h>
+#include <mini-os/types.h>
+#include <mini-os/lib.h>
+#include <mini-os/page.h>
+#include <xen/xen.h>
+#include <mini-os/privop.h>
+#include <xen/callback.h>
+#include <mini-os/ia64_cpu.h>
+#include <mini-os/hypervisor.h>
+#include <mini-os/events.h>
+#include <mini-os/console.h>
+#include <mini-os/time.h>
+#include <mini-os/xmalloc.h>
 
 
 /* For more console boot messages. */

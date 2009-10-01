@@ -21,11 +21,11 @@
  */
 
 
-#include <types.h>
-#include <lib.h>
-#include <xmalloc.h>
-#include <mm.h>
-#include <ioremap.h>
+#include <mini-os/types.h>
+#include <mini-os/lib.h>
+#include <mini-os/xmalloc.h>
+#include <mini-os/mm.h>
+#include <mini-os/ioremap.h>
 
 /* Map a physical address range into virtual address space with provided
  * flags. Return a virtual address range it is mapped to. */

@@ -15,10 +15,10 @@
  *
  ****************************************************************************
  */
-#include <os.h>
-#include <mm.h>
-#include <gnttab.h>
-#include <semaphore.h>
+#include <mini-os/os.h>
+#include <mini-os/mm.h>
+#include <mini-os/gnttab.h>
+#include <mini-os/semaphore.h>
 
 #define NR_RESERVED_ENTRIES 8
 

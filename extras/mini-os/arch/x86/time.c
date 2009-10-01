@@ -32,13 +32,13 @@
  */
 
 
-#include <os.h>
-#include <traps.h>
-#include <types.h>
-#include <hypervisor.h>
-#include <events.h>
-#include <time.h>
-#include <lib.h>
+#include <mini-os/os.h>
+#include <mini-os/traps.h>
+#include <mini-os/types.h>
+#include <mini-os/hypervisor.h>
+#include <mini-os/events.h>
+#include <mini-os/time.h>
+#include <mini-os/lib.h>
 
 /************************************************************************
  * Time functions

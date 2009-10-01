@@ -1,10 +1,10 @@
 
-#include <os.h>
-#include <traps.h>
-#include <hypervisor.h>
-#include <mm.h>
-#include <lib.h>
-#include <sched.h>
+#include <mini-os/os.h>
+#include <mini-os/traps.h>
+#include <mini-os/hypervisor.h>
+#include <mini-os/mm.h>
+#include <mini-os/lib.h>
+#include <mini-os/sched.h>
 
 /*
  * These are assembler stubs in entry.S.

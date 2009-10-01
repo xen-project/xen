@@ -3,17 +3,18 @@
  * Based on netfront.c.
  */
 
-#include <os.h>
-#include <xenbus.h>
-#include <events.h>
+#include <stdint.h>
+#include <mini-os/os.h>
+#include <mini-os/xenbus.h>
+#include <mini-os/events.h>
 #include <errno.h>
 #include <xen/io/blkif.h>
 #include <xen/io/protocols.h>
-#include <gnttab.h>
-#include <xmalloc.h>
+#include <mini-os/gnttab.h>
+#include <mini-os/xmalloc.h>
 #include <time.h>
-#include <blkfront.h>
-#include <lib.h>
+#include <mini-os/blkfront.h>
+#include <mini-os/lib.h>
 #include <fcntl.h>
 
 #ifndef HAVE_LIBC

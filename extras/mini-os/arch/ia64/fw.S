@@ -28,12 +28,12 @@
  */
 
 
-#include "asm.h"
-#include "page.h"
-#include "ia64_cpu.h"
-#include "ia64_fpu.h"
-#include "offsets.h"
-#include "xen/xen.h"
+#include <mini-os/asm.h>
+#include <mini-os/page.h>
+#include <mini-os/ia64_cpu.h>
+#include <mini-os/ia64_fpu.h>
+#include <mini-os/offsets.h>
+#include <mini-os/xen/xen.h>
 
 
 /*

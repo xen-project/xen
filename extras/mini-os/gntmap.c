@@ -30,12 +30,13 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#include <os.h>
-#include <xmalloc.h>
+#include <mini-os/os.h>
+#include <mini-os/lib.h>
+#include <mini-os/xmalloc.h>
 #include <errno.h>
 #include <xen/grant_table.h>
 #include <inttypes.h>
-#include "gntmap.h"
+#include <mini-os/gntmap.h>
 
 #define DEFAULT_MAX_GRANTS 128
 

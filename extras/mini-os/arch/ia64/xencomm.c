@@ -23,10 +23,10 @@
  */
 
 
-#include <os.h>
+#include <mini-os/os.h>
 #include <mini-os/errno.h>
 #include <mini-os/lib.h>
-#include <hypervisor.h>
+#include <mini-os/hypervisor.h>
 #include <xen/xencomm.h>
 #include <xen/grant_table.h>
 

@@ -25,10 +25,10 @@
  * SUCH DAMAGE.
  *
  */
-#include "types.h"
-#include "sched.h"
-#include "xen/xen.h"
-#include "xen/arch-ia64.h"
+#include <mini-os/types.h>
+#include <mini-os/sched.h>
+#include <xen/xen.h>
+#include <xen/arch-ia64.h>
 
 #define DEFINE(sym, val)					\
   asm volatile("\n->" sym " %0 /* " #val " */": : "i" (val))

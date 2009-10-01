@@ -28,11 +28,11 @@
  */
 
 
-#include "os.h"
-#include "efi.h"
-#include "page.h"
-#include "lib.h"
-#include "console.h"
+#include <mini-os/os.h>
+#include <mini-os/efi.h>
+#include <mini-os/page.h>
+#include <mini-os/lib.h>
+#include <mini-os/console.h>
 
 
 /* The implementation is in fw.S. */

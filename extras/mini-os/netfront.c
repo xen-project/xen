@@ -5,17 +5,17 @@
  * Does not handle fragments or extras.
  */
 
-#include <os.h>
-#include <xenbus.h>
-#include <events.h>
+#include <mini-os/os.h>
+#include <mini-os/xenbus.h>
+#include <mini-os/events.h>
 #include <errno.h>
 #include <xen/io/netif.h>
-#include <gnttab.h>
-#include <xmalloc.h>
-#include <time.h>
-#include <netfront.h>
-#include <lib.h>
-#include <semaphore.h>
+#include <mini-os/gnttab.h>
+#include <mini-os/xmalloc.h>
+#include <mini-os/time.h>
+#include <mini-os/netfront.h>
+#include <mini-os/lib.h>
+#include <mini-os/semaphore.h>
 
 DECLARE_WAIT_QUEUE_HEAD(netfront_queue);
 

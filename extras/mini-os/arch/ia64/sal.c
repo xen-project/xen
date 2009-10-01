@@ -27,10 +27,10 @@
  *
  */
 
-#include "os.h"
-#include "lib.h"
-#include "console.h"
-#include "page.h"
+#include <mini-os/os.h>
+#include <mini-os/lib.h>
+#include <mini-os/console.h>
+#include <mini-os/page.h>
 
 
 static struct ia64_fdesc sal_fdesc;

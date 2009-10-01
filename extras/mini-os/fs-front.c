@@ -25,15 +25,16 @@
  */
 
 #undef NDEBUG
-#include <os.h>
-#include <list.h>
-#include <xmalloc.h>
-#include <xenbus.h>
-#include <gnttab.h>
-#include <events.h>
+#include <stdint.h>
+#include <mini-os/os.h>
+#include <mini-os/list.h>
+#include <mini-os/xmalloc.h>
+#include <mini-os/xenbus.h>
+#include <mini-os/gnttab.h>
+#include <mini-os/events.h>
 #include <xen/io/fsif.h>
-#include <fs.h>
-#include <sched.h>
+#include <mini-os/fs.h>
+#include <mini-os/sched.h>
 
 #define preempt_disable()
 #define preempt_enable()

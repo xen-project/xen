@@ -15,18 +15,18 @@
  *
  ****************************************************************************
  **/
-#include <os.h>
-#include <mm.h>
-#include <traps.h>
-#include <lib.h>
-#include <xenbus.h>
-#include <events.h>
-#include <errno.h>
-#include <sched.h>
-#include <wait.h>
+#include <mini-os/os.h>
+#include <mini-os/mm.h>
+#include <mini-os/traps.h>
+#include <mini-os/lib.h>
+#include <mini-os/xenbus.h>
+#include <mini-os/events.h>
+#include <mini-os/errno.h>
+#include <mini-os/sched.h>
+#include <mini-os/wait.h>
 #include <xen/io/xs_wire.h>
-#include <spinlock.h>
-#include <xmalloc.h>
+#include <mini-os/spinlock.h>
+#include <mini-os/xmalloc.h>
 
 #define min(x,y) ({                       \
         typeof(x) tmpx = (x);                 \

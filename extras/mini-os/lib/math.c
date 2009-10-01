@@ -55,9 +55,9 @@
  * $FreeBSD: src/sys/libkern/divdi3.c,v 1.6 1999/08/28 00:46:31 peter Exp $
 */
 
-#include <types.h>
-#include <lib.h>
-#include <time.h>
+#include <mini-os/types.h>
+#include <mini-os/lib.h>
+#include <mini-os/time.h>
 
 	/* On ia64 these functions lead to crashes. These are replaced by
 	 * assembler functions. */

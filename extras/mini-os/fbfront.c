@@ -4,16 +4,16 @@
  * Based on blkfront.c.
  */
 
-#include <os.h>
-#include <xenbus.h>
-#include <events.h>
+#include <mini-os/os.h>
+#include <mini-os/xenbus.h>
+#include <mini-os/events.h>
 #include <xen/io/kbdif.h>
 #include <xen/io/fbif.h>
 #include <xen/io/protocols.h>
-#include <gnttab.h>
-#include <xmalloc.h>
-#include <fbfront.h>
-#include <lib.h>
+#include <mini-os/gnttab.h>
+#include <mini-os/xmalloc.h>
+#include <mini-os/fbfront.h>
+#include <mini-os/lib.h>
 
 DECLARE_WAIT_QUEUE_HEAD(kbdfront_queue);
 

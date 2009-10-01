@@ -27,11 +27,11 @@
  * SUCH DAMAGE.
  */
 
-#include "os.h"
-#include "console.h"
-#include "time.h"
-#include "efi.h"
-#include "events.h"
+#include <mini-os/os.h>
+#include <mini-os/console.h>
+#include <mini-os/time.h>
+#include <mini-os/efi.h>
+#include <mini-os/events.h>
 
 struct timespec os_time;
 static uint64_t itc_alt;		/* itc on last update. */

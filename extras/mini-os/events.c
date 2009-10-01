@@ -16,11 +16,11 @@
  ****************************************************************************
  */
 
-#include <os.h>
-#include <mm.h>
-#include <hypervisor.h>
-#include <events.h>
-#include <lib.h>
+#include <mini-os/os.h>
+#include <mini-os/mm.h>
+#include <mini-os/hypervisor.h>
+#include <mini-os/events.h>
+#include <mini-os/lib.h>
 
 #define NR_EVS 1024
 

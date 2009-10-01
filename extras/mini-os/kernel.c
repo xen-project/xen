@@ -27,22 +27,22 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#include <os.h>
-#include <hypervisor.h>
-#include <mm.h>
-#include <events.h>
-#include <time.h>
-#include <types.h>
-#include <lib.h>
-#include <sched.h>
-#include <xenbus.h>
-#include <gnttab.h>
-#include <netfront.h>
-#include <blkfront.h>
-#include <fbfront.h>
-#include <pcifront.h>
-#include <fs.h>
-#include <xmalloc.h>
+#include <mini-os/os.h>
+#include <mini-os/hypervisor.h>
+#include <mini-os/mm.h>
+#include <mini-os/events.h>
+#include <mini-os/time.h>
+#include <mini-os/types.h>
+#include <mini-os/lib.h>
+#include <mini-os/sched.h>
+#include <mini-os/xenbus.h>
+#include <mini-os/gnttab.h>
+#include <mini-os/netfront.h>
+#include <mini-os/blkfront.h>
+#include <mini-os/fbfront.h>
+#include <mini-os/pcifront.h>
+#include <mini-os/fs.h>
+#include <mini-os/xmalloc.h>
 #include <fcntl.h>
 #include <xen/features.h>
 #include <xen/version.h>

@@ -26,8 +26,8 @@
  */
 
 
-#include "os.h"
-#include "mm.h"
+#include <mini-os/os.h>
+#include <mini-os/mm.h>
 
 
 #define MAX_MEM_AREA	5

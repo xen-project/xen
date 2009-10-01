@@ -36,12 +36,12 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <os.h>
-#include <mm.h>
-#include <types.h>
-#include <lib.h>
-#include <list.h>
-#include <xmalloc.h>
+#include <mini-os/os.h>
+#include <mini-os/mm.h>
+#include <mini-os/types.h>
+#include <mini-os/lib.h>
+#include <mini-os/list.h>
+#include <mini-os/xmalloc.h>
 
 #ifndef HAVE_LIBC
 static MINIOS_LIST_HEAD(freelist);

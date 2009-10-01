@@ -56,13 +56,13 @@
 
 #if !defined HAVE_LIBC
 
-#include <os.h>
-#include <types.h>
-#include <hypervisor.h>
-#include <lib.h>
-#include <mm.h>
-#include <ctype.h>
-#include <limits.h>
+#include <mini-os/os.h>
+#include <mini-os/types.h>
+#include <mini-os/hypervisor.h>
+#include <mini-os/lib.h>
+#include <mini-os/mm.h>
+#include <mini-os/ctype.h>
+#include <mini-os/limits.h>
 
 /**
  * simple_strtoul - convert a string to an unsigned long

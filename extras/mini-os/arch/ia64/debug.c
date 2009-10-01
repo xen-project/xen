@@ -27,7 +27,7 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#include "os.h"
+#include <mini-os/os.h>
 
 static const char *ia64_vector_names[] = {
 	"VHPT Translation",			/* 0 */

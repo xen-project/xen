@@ -1,16 +1,16 @@
-#include <types.h>
-#include <wait.h>
-#include <mm.h>
-#include <hypervisor.h>
-#include <events.h>
-#include <os.h>
-#include <lib.h>
-#include <xenbus.h>
+#include <mini-os/types.h>
+#include <mini-os/wait.h>
+#include <mini-os/mm.h>
+#include <mini-os/hypervisor.h>
+#include <mini-os/events.h>
+#include <mini-os/os.h>
+#include <mini-os/lib.h>
+#include <mini-os/xenbus.h>
 #include <xen/io/console.h>
 #include <xen/io/protocols.h>
 #include <xen/io/ring.h>
-#include <xmalloc.h>
-#include <gnttab.h>
+#include <mini-os/xmalloc.h>
+#include <mini-os/gnttab.h>
 
 DECLARE_WAIT_QUEUE_HEAD(console_queue);
 

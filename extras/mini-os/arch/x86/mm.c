@@ -34,12 +34,12 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#include <os.h>
-#include <hypervisor.h>
-#include <mm.h>
-#include <types.h>
-#include <lib.h>
-#include <xmalloc.h>
+#include <mini-os/os.h>
+#include <mini-os/hypervisor.h>
+#include <mini-os/mm.h>
+#include <mini-os/types.h>
+#include <mini-os/lib.h>
+#include <mini-os/xmalloc.h>
 #include <xen/memory.h>
 
 #ifdef MM_DEBUG
