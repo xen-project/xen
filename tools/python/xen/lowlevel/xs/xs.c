@@ -324,6 +324,7 @@ static PyObject *xspy_set_permissions(XsHandle *self, PyObject *args)
 
     xs_transaction_t th;
     char *thstr;
+    PyObject *ret = NULL;
 
     if (!xh)
         goto exit;
@@ -380,14 +381,13 @@ static PyObject *xspy_set_permissions(XsHandle *self, PyObject *args)
         goto exit;
     }
 
-    free(xsperms);
     Py_INCREF(Py_None);
-    return Py_None;
+    ret = Py_None;
 
  exit:
     Py_XDECREF(tuple0);
     free(xsperms);
-    return NULL;
+    return ret;
 }
 
 #define xspy_watch_doc "\n"						\
