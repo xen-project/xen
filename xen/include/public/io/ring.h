@@ -97,7 +97,8 @@ union __name##_sring_entry {                                            \
 struct __name##_sring {                                                 \
     RING_IDX req_prod, req_event;                                       \
     RING_IDX rsp_prod, rsp_event;                                       \
-    uint8_t  pad[48];                                                   \
+    uint8_t  netfront_smartpoll_active;                                 \
+    uint8_t  pad[47];                                                   \
     union __name##_sring_entry ring[1]; /* variable-length */           \
 };                                                                      \
                                                                         \
