@@ -44,12 +44,11 @@
 #define CSCHED_MSECS_PER_TICK       10
 #define CSCHED_MSECS_PER_TSLICE     \
     (CSCHED_MSECS_PER_TICK * CSCHED_TICKS_PER_TSLICE)
-#define CSCHED_CREDITS_PER_MSEC    100000
+#define CSCHED_CREDITS_PER_MSEC     10
 #define CSCHED_CREDITS_PER_TSLICE   \
-    (CSCHED_MSECS_PER_TSLICE * CSCHED_CREDITS_PER_MSEC)
-#define CSCHED_CREDITS_PER_ACCT     \
     (CSCHED_CREDITS_PER_MSEC * CSCHED_MSECS_PER_TSLICE)
-#define CSCHED_STIME_TO_CREDIT(_t)  ((_t)*CSCHED_CREDITS_PER_MSEC/MILLISECS(1))
+#define CSCHED_CREDITS_PER_ACCT     \
+    (CSCHED_CREDITS_PER_MSEC * CSCHED_MSECS_PER_TICK * CSCHED_TICKS_PER_ACCT)
 
 
 /*
@@ -214,19 +213,17 @@ __runq_remove(struct csched_vcpu *svc)
 static void burn_credits(struct csched_vcpu *svc, s_time_t now)
 {
     s_time_t delta;
+    unsigned int credits;
 
     /* Assert svc is current */
     ASSERT(svc==CSCHED_VCPU(per_cpu(schedule_data, svc->vcpu->processor).curr));
 
-    if ( is_idle_vcpu(svc->vcpu) )
+    if ( (delta = now - svc->start_time) <= 0 )
         return;
 
-    delta = (now - svc->start_time);
-
-    if ( delta > 0 ) {
-        atomic_sub(CSCHED_STIME_TO_CREDIT(delta)+1, &svc->credit);
-        svc->start_time = now;
-    } 
+    credits = (delta*CSCHED_CREDITS_PER_MSEC + MILLISECS(1)/2) / MILLISECS(1);
+    atomic_sub(credits, &svc->credit);
+    svc->start_time += (credits * MILLISECS(1)) / CSCHED_CREDITS_PER_MSEC;
 }
 
 static inline void
@@ -287,6 +284,7 @@ csched_pcpu_init(int cpu)
     spc = xmalloc(struct csched_pcpu);
     if ( spc == NULL )
         return -1;
+    memset(spc, 0, sizeof(*spc));
 
     spin_lock_irqsave(&csched_priv.lock, flags);
 
@@ -516,7 +514,8 @@ csched_vcpu_acct(unsigned int cpu)
     /*
      * Update credits
      */
-    burn_credits(svc, NOW());
+    if ( !is_idle_vcpu(svc->vcpu) )
+        burn_credits(svc, NOW());
 
     /*
      * Put this VCPU and domain back on the active list if it was
@@ -552,6 +551,7 @@ csched_vcpu_init(struct vcpu *vc)
     svc = xmalloc(struct csched_vcpu);
     if ( svc == NULL )
         return -1;
+    memset(svc, 0, sizeof(*svc));
 
     INIT_LIST_HEAD(&svc->runq_elem);
     INIT_LIST_HEAD(&svc->active_vcpu_elem);
@@ -717,6 +717,7 @@ csched_dom_init(struct domain *dom)
     sdom = xmalloc(struct csched_dom);
     if ( sdom == NULL )
         return -ENOMEM;
+    memset(sdom, 0, sizeof(*sdom));
 
     /* Initialize credit and weight */
     INIT_LIST_HEAD(&sdom->active_vcpu);
@@ -1137,7 +1138,11 @@ csched_schedule(s_time_t now)
     CSCHED_VCPU_CHECK(current);
 
     /* Update credits */
-    burn_credits(scurr, now);
+    if ( !is_idle_vcpu(scurr->vcpu) )
+    {
+        burn_credits(scurr, now);
+        scurr->start_time -= now;
+    }
 
     /*
      * Select next runnable local VCPU (ie top of local runq)
@@ -1177,7 +1182,7 @@ csched_schedule(s_time_t now)
     }
 
     if ( !is_idle_vcpu(snext->vcpu) )
-        snext->start_time = now;
+        snext->start_time += now;
 
     /*
      * Return task to run next...
