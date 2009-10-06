@@ -118,8 +118,10 @@ int enable_ats_device(int seg, int bus, int devfn)
     u16 queue_depth;
     int pos;
 
-    pos = pci_find_ext_capability(seg, bus, devfn, PCI_EXT_CAP_ID_ATS);
+    if ( acpi_find_matched_atsr_unit(bus, devfn) )
+        return 0;
 
+    pos = pci_find_ext_capability(seg, bus, devfn, PCI_EXT_CAP_ID_ATS);
     if ( !pos )
     {
         dprintk(XENLOG_ERR VTDPREFIX, "ats capability not found %x:%x:%x\n",
@@ -135,21 +137,18 @@ int enable_ats_device(int seg, int bus, int devfn)
                             PCI_FUNC(devfn), pos + ATS_REG_CAP);
     queue_depth = value & ATS_QUEUE_DEPTH_MASK;
 
-    /* BUGBUG: add back seg when multi-seg platform support is enabled */
-    value = pci_conf_read16(bus, PCI_SLOT(devfn), PCI_FUNC(devfn), pos + ATS_REG_CTL);
+    value = pci_conf_read16(bus, PCI_SLOT(devfn),
+                            PCI_FUNC(devfn), pos + ATS_REG_CTL);
     value |= ATS_ENABLE;
+    pci_conf_write16(bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
+                     pos + ATS_REG_CTL, value);
 
-    /* BUGBUG: add back seg when multi-seg platform support is enabled */
-    pci_conf_write16(bus, PCI_SLOT(devfn), PCI_FUNC(devfn), pos + ATS_REG_CTL, value);
+    pdev = xmalloc(struct pci_ats_dev);
+    pdev->bus = bus;
+    pdev->devfn = devfn;
+    pdev->ats_queue_depth = queue_depth;
+    list_add(&(pdev->list), &ats_devices);
 
-    if ( acpi_find_matched_atsr_unit(bus, devfn) )
-    {
-        pdev = xmalloc(struct pci_ats_dev);
-        pdev->bus = bus;
-        pdev->devfn = devfn;
-        pdev->ats_queue_depth = queue_depth;
-        list_add(&(pdev->list), &ats_devices);
-    }
     return pos;
 }        
 
