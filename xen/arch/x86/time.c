@@ -837,17 +837,26 @@ void update_vcpu_system_time(struct vcpu *v)
     t = &this_cpu(cpu_time);
     u = &vcpu_info(v, time);
 
-    if ( u->tsc_timestamp == t->local_tsc_stamp )
-        return;
-
-    version_update_begin(&u->version);
-
-    u->tsc_timestamp     = t->local_tsc_stamp;
-    u->system_time       = t->stime_local_stamp;
-    u->tsc_to_system_mul = t->tsc_scale.mul_frac;
-    u->tsc_shift         = (s8)t->tsc_scale.shift;
-
-    version_update_end(&u->version);
+    if ( v->domain->arch.vtsc )
+    {
+        if ( u->tsc_timestamp == t->stime_local_stamp )
+            return;
+        version_update_begin(&u->version);
+        u->tsc_timestamp     = t->stime_local_stamp;
+        u->system_time       = t->stime_local_stamp;
+        u->tsc_to_system_mul = 0x80000000u;
+        u->tsc_shift         = 1;
+        version_update_end(&u->version);
+    }
+    else if ( u->tsc_timestamp != t->local_tsc_stamp )
+    {
+        version_update_begin(&u->version);
+        u->tsc_timestamp     = t->local_tsc_stamp;
+        u->system_time       = t->stime_local_stamp;
+        u->tsc_to_system_mul = t->tsc_scale.mul_frac;
+        u->tsc_shift         = (s8)t->tsc_scale.shift;
+        version_update_end(&u->version);
+    }
 }
 
 void update_domain_wallclock_time(struct domain *d)
@@ -1435,26 +1444,24 @@ struct tm wallclock_time(void)
 
 void pv_soft_rdtsc(struct vcpu *v, struct cpu_user_regs *regs)
 {
-    s_time_t now;
+    s_time_t now = get_s_time();
+
+    spin_lock(&v->domain->arch.vtsc_lock);
 
     if ( guest_kernel_mode(v, regs) )
-    {
         v->domain->arch.vtsc_kerncount++;
-        rdtsc(regs->eax, regs->edx);
-    }
     else
-    { 
-        v->domain->arch.vtsc_kerncount++;
-        spin_lock(&v->domain->arch.vtsc_lock);
-        now = get_s_time() + v->domain->arch.vtsc_stime_offset;
-        if ( (int64_t)(now - v->domain->arch.vtsc_last) > 0 )
-            v->domain->arch.vtsc_last = now;
-        else
-            now = ++v->domain->arch.vtsc_last;
-        spin_unlock(&v->domain->arch.vtsc_lock);
-        regs->eax = (uint32_t)now;
-        regs->edx = (uint32_t)(now >> 32);
-    }
+        v->domain->arch.vtsc_usercount++;
+
+    if ( (int64_t)(now - v->domain->arch.vtsc_last) > 0 )
+        v->domain->arch.vtsc_last = now;
+    else
+        now = ++v->domain->arch.vtsc_last;
+
+    spin_unlock(&v->domain->arch.vtsc_lock);
+
+    regs->eax = (uint32_t)now;
+    regs->edx = (uint32_t)(now >> 32);
 }
 
 /* vtsc may incur measurable performance degradation, diagnose with this */

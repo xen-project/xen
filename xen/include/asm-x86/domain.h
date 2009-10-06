@@ -306,7 +306,6 @@ struct arch_domain
     spinlock_t vtsc_lock;
     uint64_t vtsc_kerncount; /* for hvm, counts all vtsc */
     uint64_t vtsc_usercount; /* not used for hvm */
-    int64_t vtsc_stime_offset;
 } __cacheline_aligned;
 
 #define has_arch_pdevs(d)    (!list_empty(&(d)->arch.pdev_list))
