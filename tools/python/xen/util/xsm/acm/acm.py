@@ -82,6 +82,7 @@ log = logging.getLogger("xend.util.security")
 
 #Functions exported through XML-RPC
 xmlrpc_exports = [
+  'on',
   'set_resource_label',
   'get_resource_label',
   'list_labels',

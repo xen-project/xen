@@ -106,6 +106,7 @@ def xserr2string(err):
 
 # Policy identifiers used in labels
 ACM_POLICY_ID = 'ACM'
+FLASK_POLICY_ID = 'FLASK'
 
 INVALID_POLICY_PREFIX = 'INV_'
 

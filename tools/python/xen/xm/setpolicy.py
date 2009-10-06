@@ -43,8 +43,9 @@ def help():
 
     Set the policy managed by xend.
 
-    The only policytype that is currently supported is 'ACM'.
+    Only 'ACM' and 'FLASK' are supported as valid policytype parameters.
 
+    ACM:
     The filename of the policy is the policy name plus the suffic
     '-security_policy.xml'. The location of the policy file is either
     the the current directory or '/etc/xen/acm-security/policies'.
@@ -93,60 +94,68 @@ def setpolicy(policytype, policy_name, flags, overwrite):
             if os.path.exists(policy_file):
                 break
 
-        try:
-            f = open(policy_file,"r")
-            xml = f.read()
-            f.close()
-        except:
-            raise OptionError("Could not read policy file from current"
-                              " directory or '%s'." %
-                              install_policy_dir_prefix)
+    elif policytype.upper() == xsconstants.FLASK_POLICY_ID:
+        xs_type = xsconstants.XS_POLICY_FLASK
+        policy_file = policy_name
 
-        if xm_main.serverType == xm_main.SERVER_XEN_API:
-            if xs_type != int(server.xenapi.XSPolicy.get_xstype()):
-                raise security.XSMError("ACM policy type not supported.")
-
-            try:
-                policystate = server.xenapi.XSPolicy.set_xspolicy(xs_type,
-                                                                  xml,
-                                                                  flags,
-                                                                  overwrite)
-            except Exception, e:
-                raise security.XSMError("An error occurred setting the "
-                                        "policy: %s" % str(e))
-            xserr = int(policystate['xserr'])
-            if xserr != xsconstants.XSERR_SUCCESS:
-                txt = "An error occurred trying to set the policy: %s." % \
-                      xsconstants.xserr2string(abs(xserr))
-                errors = policystate['errors']
-                if len(errors) > 0:
-                    txt += " " + build_hv_error_message(base64.b64decode(errors))
-                raise security.XSMError(txt)
-            else:
-                print "Successfully set the new policy."
-                getpolicy(False)
-        else:
-            # Non-Xen-API call.
-            if xs_type != server.xend.security.get_xstype():
-                raise security.XSMError("ACM policy type not supported.")
-
-            rc, errors = server.xend.security.set_policy(xs_type,
-                                                         xml,
-                                                         flags,
-                                                         overwrite)
-            if rc != xsconstants.XSERR_SUCCESS:
-                txt = "An error occurred trying to set the policy: %s." % \
-                      xsconstants.xserr2string(abs(rc))
-                if len(errors) > 0:
-                    txt += " " + build_hv_error_message(
-                                       base64.b64decode(errors))
-                raise security.XSMError(txt)
-            else:
-                print "Successfully set the new policy."
-                getpolicy(False)
     else:
         raise OptionError("Unsupported policytype '%s'." % policytype)
 
+    try:
+        f = open(policy_file,"r")
+        policy = f.read()
+        f.close()
+    except:
+        raise OptionError("Could not read policy file: %s" % policy_file)
+
+    
+    if xs_type == xsconstants.XS_POLICY_FLASK:
+        policy = base64.b64encode(policy)
+
+    if xm_main.serverType == xm_main.SERVER_XEN_API:
+        if xs_type != int(server.xenapi.XSPolicy.get_xstype()):
+            raise security.XSMError("Policy type not supported.")
+
+        try:
+            policystate = server.xenapi.XSPolicy.set_xspolicy(xs_type,
+                                                              policy,
+                                                              flags,
+                                                              overwrite)
+        except Exception, e:
+            raise security.XSMError("An error occurred setting the "
+                                    "policy: %s" % str(e))
+        xserr = int(policystate['xserr'])
+        if xserr != xsconstants.XSERR_SUCCESS:
+            txt = "An error occurred trying to set the policy: %s." % \
+                   xsconstants.xserr2string(abs(xserr))
+            errors = policystate['errors']
+            if len(errors) > 0:
+                txt += " " + build_hv_error_message(base64.b64decode(errors))
+            raise security.XSMError(txt)
+        else:
+            print "Successfully set the new policy."
+            if xs_type == xsconstants.XS_POLICY_ACM:
+                getpolicy(False)
+    else:
+        # Non-Xen-API call.
+        if xs_type != server.xend.security.on():
+            raise security.XSMError("Policy type not supported.")
+
+        rc, errors = server.xend.security.set_policy(xs_type,
+                                                     policy,
+                                                     flags,
+                                                     overwrite)
+        if rc != xsconstants.XSERR_SUCCESS:
+            txt = "An error occurred trying to set the policy: %s." % \
+                   xsconstants.xserr2string(abs(rc))
+            if len(errors) > 0:
+                txt += " " + build_hv_error_message(
+                       base64.b64decode(errors))
+            raise security.XSMError(txt)
+        else:
+            print "Successfully set the new policy."
+            if xs_type == xsconstants.XS_POLICY_ACM:
+                getpolicy(False)
 
 def main(argv):
     if len(argv) < 3:

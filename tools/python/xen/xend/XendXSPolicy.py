@@ -73,7 +73,7 @@ class XendXSPolicy(XendBase):
     def get_xstype(self):
         return XSPolicyAdminInstance().isXSEnabled()
 
-    def set_xspolicy(self, xstype, xml, flags, overwrite):
+    def set_xspolicy(self, xstype, policy, flags, overwrite):
         ref = ""
         xstype = int(xstype)
         flags  = int(flags)
@@ -84,7 +84,7 @@ class XendXSPolicy(XendBase):
             poladmin = XSPolicyAdminInstance()
             try:
                 (xspol, rc, errors) = poladmin.add_acmpolicy_to_system(
-                                                                   xml, flags,
+                                                                   policy, flags,
                                                                    overwrite)
                 if rc != 0:
                     polstate.update( { 'xserr' : rc,
@@ -102,6 +102,14 @@ class XendXSPolicy(XendBase):
                     }
             except Exception, e:
                 raise
+        elif xstype == xsconstants.XS_POLICY_FLASK:
+            rc, errors = security.set_policy(xstype, policy);
+            if rc != 0:
+                polstate.update( { 'xserr' : -xsconstants.XSERR_POLICY_LOAD_FAILED,
+                                   'errors': errors } )
+            else:
+                polstate.update( { 'xserr' : xsconstants.XSERR_SUCCESS,
+                                   'errors': errors } )
         else:
             raise SecurityError(-xsconstants.XSERR_POLICY_TYPE_UNSUPPORTED)
         return polstate

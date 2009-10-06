@@ -106,6 +106,35 @@ static PyObject *pyflask_sid_to_context(PyObject *self, PyObject *args,
     return Py_BuildValue("s", ctx, ctx_len);
 }
 
+static PyObject *pyflask_load(PyObject *self, PyObject *args, PyObject *kwds)
+{
+    int xc_handle;
+    char *policy;
+    uint32_t len;
+    int ret;
+
+    static char *kwd_list[] = { "policy", NULL };
+  
+    if( !PyArg_ParseTupleAndKeywords(args, kwds, "s#", kwd_list, &policy, &len) )
+        return NULL;
+
+    xc_handle = xc_interface_open();
+    if (xc_handle < 0) {
+        errno = xc_handle;
+        return PyErr_SetFromErrno(xc_error_obj);
+    }
+
+    ret = flask_load(xc_handle, policy, len);
+
+    xc_interface_close(xc_handle);
+
+    if ( ret != 0 ) {
+        errno = -ret;
+        return PyErr_SetFromErrno(xc_error_obj);
+    }
+
+    return Py_BuildValue("i", ret);
+}
 
 static PyMethodDef pyflask_methods[] = {
     { "flask_context_to_sid",
@@ -122,6 +151,13 @@ static PyMethodDef pyflask_methods[] = {
       " context [int]: SID to be converted\n"
       "Returns: [str]: Numeric SID on success; -1 on error.\n" },
 
+    { "flask_load",
+      (PyCFunction)pyflask_load,
+      METH_KEYWORDS, "\n"
+      "Loads a policy into the hypervisor.\n"
+      " policy [str]: policy to be load\n"
+      "Returns: [int]: 0 on success; -1 on failure.\n" }, 
+      
     { NULL, NULL, 0, NULL }
 };
 

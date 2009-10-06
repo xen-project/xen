@@ -75,11 +75,12 @@ class XSPolicyAdmin:
 
     def isXSEnabled(self):
         """ Check whether 'security' is enabled on this system.
-            This currently only checks for ACM-enablement.
         """
         rc = 0
         if security.on() == xsconstants.XS_POLICY_ACM:
             rc |= xsconstants.XS_POLICY_ACM
+	else:
+            rc |= xsconstants.XS_POLICY_FLASK
         return rc
 
     def add_acmpolicy_to_system(self, xmltext, flags, overwrite):
