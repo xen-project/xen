@@ -44,7 +44,7 @@ public-$(CONFIG_IA64) := $(wildcard public/arch-ia64/*.h public/arch-ia64/*/*.h)
 .PHONY: all
 all: $(headers-y)
 
-compat/%.h: compat/%.i Makefile
+compat/%.h: compat/%.i Makefile $(BASEDIR)/tools/compat-build-header.py
 	set -e; id=_$$(echo $@ | tr '[:lower:]-/.' '[:upper:]___'); \
 	echo "#ifndef $$id" >$@.new; \
 	echo "#define $$id" >>$@.new; \
@@ -60,7 +60,7 @@ compat/%.h: compat/%.i Makefile
 compat/%.i: compat/%.c Makefile
 	$(CPP) $(filter-out -M% .%.d,$(CFLAGS)) $(cppflags-y) -o $@ $<
 
-compat/%.c: public/%.h xlat.lst Makefile
+compat/%.c: public/%.h xlat.lst Makefile $(BASEDIR)/tools/compat-build-source.py
 	mkdir -p $(@D)
 	grep -v 'DEFINE_XEN_GUEST_HANDLE(long)' $< | \
 	$(PYTHON) $(BASEDIR)/tools/compat-build-source.py >$@.new
