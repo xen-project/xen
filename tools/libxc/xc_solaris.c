@@ -253,7 +253,14 @@ void discard_file_cache(int fd, int flush)
     // TODO: Implement for Solaris!
 }
 
-struct grant_entry *xc_gnttab_map_table(int xc_handle, int domid, int *gnt_num)
+grant_entry_v1_t *xc_gnttab_map_table_v1(
+    int xc_handle, int domid, int *gnt_num)
+{
+    return NULL;
+}
+
+grant_entry_v2_t *xc_gnttab_map_table_v2(
+    int xc_handle, int domid, int *gnt_num)
 {
     return NULL;
 }
