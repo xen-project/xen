@@ -3111,7 +3111,7 @@ static int sh_page_fault(struct vcpu *v,
      * already used for some special purpose (ioreq pages, or granted pages).
      * If that happens we'll have killed the guest already but it's still not 
      * safe to propagate entries out of the guest PT so get out now. */
-    if ( unlikely(d->is_shutting_down) )
+    if ( unlikely(d->is_shutting_down && d->shutdown_code == SHUTDOWN_crash) )
     {
         SHADOW_PRINTK("guest is shutting down\n");
         goto propagate;
@@ -3212,7 +3212,7 @@ static int sh_page_fault(struct vcpu *v,
          && ft == ft_demand_write )
         sh_unsync(v, gmfn);
 
-    if ( unlikely(d->is_shutting_down) )
+    if ( unlikely(d->is_shutting_down && d->shutdown_code == SHUTDOWN_crash) )
     {
         /* We might end up with a crashed domain here if
          * sh_remove_shadows() in a previous sh_resync() call has
