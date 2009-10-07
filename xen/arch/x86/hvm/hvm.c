@@ -202,6 +202,7 @@ u64 hvm_get_guest_tsc(struct vcpu *v)
     if ( v->domain->arch.vtsc )
     {
         tsc = hvm_get_guest_time(v);
+        v->domain->arch.vtsc_kerncount++;
     }
     else
     {
