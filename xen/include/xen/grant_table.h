@@ -53,10 +53,6 @@ struct active_grant_entry {
 #define GNTPIN_devr_inc      (1 << GNTPIN_devr_shift)
 #define GNTPIN_devr_mask     (0xFFU << GNTPIN_devr_shift)
 
-/* Initial size of a grant table. */
-#define INITIAL_NR_GRANT_ENTRIES ((INITIAL_NR_GRANT_FRAMES << PAGE_SHIFT) / \
-                                     sizeof(grant_entry_t))
-
 #ifndef DEFAULT_MAX_NR_GRANT_FRAMES /* to allow arch to override */
 /* Default maximum size of a grant table. [POLICY] */
 #define DEFAULT_MAX_NR_GRANT_FRAMES   32
@@ -128,16 +124,13 @@ static inline unsigned int
 num_act_frames_from_sha_frames(const unsigned int num)
 {
     /* How many frames are needed for the active grant table,
-     * given the size of the shared grant table?
-     *
-     * act_per_page = PAGE_SIZE / sizeof(active_grant_entry_t);
-     * sha_per_page = PAGE_SIZE / sizeof(grant_entry_t);
-     * num_sha_entries = num * sha_per_page;
-     * num_act_frames = (num_sha_entries + (act_per_page-1)) / act_per_page;
-     */
-    return ((num * (PAGE_SIZE / sizeof(grant_entry_t))) +
-            ((PAGE_SIZE / sizeof(struct active_grant_entry))-1))
-           / (PAGE_SIZE / sizeof(struct active_grant_entry));
+     * given the size of the shared grant table? */
+    unsigned act_per_page = PAGE_SIZE / sizeof(struct active_grant_entry);
+    unsigned sha_per_page = PAGE_SIZE / sizeof(grant_entry_t);
+    unsigned num_sha_entries = num * sha_per_page;
+    unsigned num_act_frames =
+        (num_sha_entries + (act_per_page-1)) / act_per_page;
+    return num_act_frames;
 }
 
 static inline unsigned int
