@@ -944,8 +944,8 @@ int xc_gnttab_op(int xc_handle, int cmd,
                  void * op, int op_size, int count);
 
 int xc_gnttab_get_version(int xc_handle, int domid);
-struct grant_entry_v1 *xc_gnttab_map_table_v1(int xc_handle, int domid, int *gnt_num);
-struct grant_entry_v2 *xc_gnttab_map_table_v2(int xc_handle, int domid, int *gnt_num);
+grant_entry_v1_t *xc_gnttab_map_table_v1(int xc_handle, int domid, int *gnt_num);
+grant_entry_v2_t *xc_gnttab_map_table_v2(int xc_handle, int domid, int *gnt_num);
 
 int xc_physdev_map_pirq(int xc_handle,
                         int domid,

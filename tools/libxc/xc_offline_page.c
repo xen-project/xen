@@ -133,7 +133,7 @@ int xc_query_page_offline_status(int xc, unsigned long start,
   * There should no update to the grant when domain paused
   */
 static int xc_is_page_granted_v1(int xc_handle, xen_pfn_t gpfn,
-                                 struct grant_entry_v1 *gnttab, int gnt_num)
+                                 grant_entry_v1_t *gnttab, int gnt_num)
 {
     int i = 0;
 
@@ -149,7 +149,7 @@ static int xc_is_page_granted_v1(int xc_handle, xen_pfn_t gpfn,
 }
 
 static int xc_is_page_granted_v2(int xc_handle, xen_pfn_t gpfn,
-                                 struct grant_entry_v2 *gnttab, int gnt_num)
+                                 grant_entry_v2_t *gnttab, int gnt_num)
 {
     int i = 0;
 
@@ -158,7 +158,7 @@ static int xc_is_page_granted_v2(int xc_handle, xen_pfn_t gpfn,
 
     for (i = 0; i < gnt_num; i++)
         if ( ((gnttab[i].hdr.flags & GTF_type_mask) !=  GTF_invalid) &&
-             (gnttab[i].frame == gpfn) )
+             (gnttab[i].full_page.frame == gpfn) )
              break;
 
    return (i != gnt_num);
@@ -565,8 +565,8 @@ int xc_exchange_page(int xc_handle, int domid, xen_pfn_t mfn)
     struct domain_mem_info minfo;
     struct xc_mmu *mmu = NULL;
     struct pte_backup old_ptes = {NULL, 0, 0};
-    struct grant_entry_v1 *gnttab_v1 = NULL;
-    struct grant_entry_v2 *gnttab_v2 = NULL;
+    grant_entry_v1_t *gnttab_v1 = NULL;
+    grant_entry_v2_t *gnttab_v2 = NULL;
     struct mmuext_op mops;
     int gnt_num, unpined = 0;
     void *old_p, *backup = NULL;
@@ -779,9 +779,9 @@ failed:
         free(backup);
 
     if (gnttab_v1)
-        munmap(gnttab_v1, gnt_num / (PAGE_SIZE/sizeof(struct grant_entry_v1)));
+        munmap(gnttab_v1, gnt_num / (PAGE_SIZE/sizeof(grant_entry_v1_t)));
     if (gnttab_v2)
-        munmap(gnttab_v2, gnt_num / (PAGE_SIZE/sizeof(struct grant_entry_v2)));
+        munmap(gnttab_v2, gnt_num / (PAGE_SIZE/sizeof(grant_entry_v2_t)));
 
     close_mem_info(xc_handle, &minfo);
 

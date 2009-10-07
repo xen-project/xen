@@ -579,7 +579,7 @@ static void *_gnttab_map_table(int xc_handle, int domid, int *gnt_num)
     struct gnttab_setup_table setup;
     unsigned long *frame_list = NULL;
     xen_pfn_t *pfn_list = NULL;
-    struct grant_entry_v1 *gnt = NULL;
+    grant_entry_v1_t *gnt = NULL;
 
     if (!gnt_num)
         return NULL;
@@ -595,7 +595,7 @@ static void *_gnttab_map_table(int xc_handle, int domid, int *gnt_num)
     }
 
     *gnt_num = query.nr_frames *
-            (PAGE_SIZE / sizeof(struct grant_entry_v1) );
+            (PAGE_SIZE / sizeof(grant_entry_v1_t) );
 
     frame_list = malloc(query.nr_frames * sizeof(unsigned long));
     if (!frame_list || lock_pages(frame_list, query.nr_frames *
@@ -652,16 +652,16 @@ err:
     return gnt;
 }
 
-struct grant_entry_v1 *xc_gnttab_map_table_v1(int xc_handle, int domid,
-                                              int *gnt_num)
+grant_entry_v1_t *xc_gnttab_map_table_v1(int xc_handle, int domid,
+                                         int *gnt_num)
 {
     if (xc_gnttab_get_version(xc_handle, domid) == 2)
         return NULL;
     return _gnttab_map_table(xc_handle, domid, gnt_num);
 }
 
-struct grant_entry_v2 *xc_gnttab_map_table_v2(int xc_handle, int domid,
-                                              int *gnt_num)
+grant_entry_v2_t *xc_gnttab_map_table_v2(int xc_handle, int domid,
+                                         int *gnt_num)
 {
     if (xc_gnttab_get_version(xc_handle, domid) != 2)
         return NULL;
