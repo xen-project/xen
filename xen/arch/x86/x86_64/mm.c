@@ -31,6 +31,7 @@
 #include <asm/fixmap.h>
 #include <asm/hypercall.h>
 #include <asm/msr.h>
+#include <asm/setup.h>
 #include <public/memory.h>
 
 /* Parameters for PFN/MADDR compression. */
@@ -74,7 +75,6 @@ int __mfn_valid(unsigned long mfn)
 
 void *alloc_xen_pagetable(void)
 {
-    extern int early_boot;
     unsigned long mfn;
 
     if ( !early_boot )

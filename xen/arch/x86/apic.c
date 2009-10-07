@@ -34,8 +34,28 @@
 #include <asm/hardirq.h>
 #include <asm/apic.h>
 #include <asm/io_apic.h>
+#include <asm/asm_defns.h> /* for BUILD_SMP_INTERRUPT */
 #include <mach_apic.h>
 #include <io_ports.h>
+
+static struct {
+    int active;
+    /* r/w apic fields */
+    unsigned int apic_id;
+    unsigned int apic_taskpri;
+    unsigned int apic_ldr;
+    unsigned int apic_dfr;
+    unsigned int apic_spiv;
+    unsigned int apic_lvtt;
+    unsigned int apic_lvtpc;
+    unsigned int apic_lvtcmci;
+    unsigned int apic_lvt0;
+    unsigned int apic_lvt1;
+    unsigned int apic_lvterr;
+    unsigned int apic_tmict;
+    unsigned int apic_tdcr;
+    unsigned int apic_thmr;
+} apic_pm_state;
 
 /*
  * Knob to control our willingness to enable the local APIC.
@@ -49,8 +69,31 @@ int apic_verbosity;
 
 int x2apic_enabled __read_mostly = 0;
 
+/*
+ * The following vectors are part of the Linux architecture, there
+ * is no hardware IRQ pin equivalent for them, they are triggered
+ * through the ICC by us (IPIs)
+ */
+BUILD_SMP_INTERRUPT(irq_move_cleanup_interrupt,IRQ_MOVE_CLEANUP_VECTOR)
+BUILD_SMP_INTERRUPT(event_check_interrupt,EVENT_CHECK_VECTOR)
+BUILD_SMP_INTERRUPT(invalidate_interrupt,INVALIDATE_TLB_VECTOR)
+BUILD_SMP_INTERRUPT(call_function_interrupt,CALL_FUNCTION_VECTOR)
 
-static void apic_pm_activate(void);
+/*
+ * Every pentium local APIC has two 'local interrupts', with a
+ * soft-definable vector attached to both interrupts, one of
+ * which is a timer interrupt, the other one is error counter
+ * overflow. Linux uses the local APIC timer interrupt to get
+ * a much simpler SMP time architecture:
+ */
+BUILD_SMP_INTERRUPT(apic_timer_interrupt,LOCAL_TIMER_VECTOR)
+BUILD_SMP_INTERRUPT(error_interrupt,ERROR_APIC_VECTOR)
+BUILD_SMP_INTERRUPT(spurious_interrupt,SPURIOUS_APIC_VECTOR)
+BUILD_SMP_INTERRUPT(pmu_apic_interrupt,PMU_APIC_VECTOR)
+BUILD_SMP_INTERRUPT(cmci_interrupt, CMCI_APIC_VECTOR)
+#ifdef CONFIG_X86_MCE_THERMAL
+BUILD_SMP_INTERRUPT(thermal_interrupt,THERMAL_APIC_VECTOR)
+#endif
 
 static int modern_apic(void)
 {
@@ -428,6 +471,11 @@ void __init init_bsp_APIC(void)
     apic_write_around(APIC_LVT1, value);
 }
 
+static void apic_pm_activate(void)
+{
+    apic_pm_state.active = 1;
+}
+
 void __devinit setup_local_APIC(void)
 {
     unsigned long oldvalue, value, ver, maxlvt;
@@ -598,25 +646,6 @@ void __devinit setup_local_APIC(void)
     apic_pm_activate();
 }
 
-static struct {
-    int active;
-    /* r/w apic fields */
-    unsigned int apic_id;
-    unsigned int apic_taskpri;
-    unsigned int apic_ldr;
-    unsigned int apic_dfr;
-    unsigned int apic_spiv;
-    unsigned int apic_lvtt;
-    unsigned int apic_lvtpc;
-    unsigned int apic_lvtcmci;
-    unsigned int apic_lvt0;
-    unsigned int apic_lvt1;
-    unsigned int apic_lvterr;
-    unsigned int apic_tmict;
-    unsigned int apic_tdcr;
-    unsigned int apic_thmr;
-} apic_pm_state;
-
 int lapic_suspend(void)
 {
     unsigned long flags;
@@ -726,11 +755,6 @@ void lapic_shutdown(void)
         disable_local_APIC();
 
     local_irq_restore(flags);
-}
-
-static void apic_pm_activate(void)
-{
-    apic_pm_state.active = 1;
 }
 
 /*

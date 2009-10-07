@@ -53,30 +53,6 @@ BUILD_16_IRQS(0xc) BUILD_16_IRQS(0xd) BUILD_16_IRQS(0xe) BUILD_16_IRQS(0xf)
 #undef BI
 
 
-/*
- * The following vectors are part of the Linux architecture, there
- * is no hardware IRQ pin equivalent for them, they are triggered
- * through the ICC by us (IPIs)
- */
-BUILD_SMP_INTERRUPT(irq_move_cleanup_interrupt,IRQ_MOVE_CLEANUP_VECTOR)
-BUILD_SMP_INTERRUPT(event_check_interrupt,EVENT_CHECK_VECTOR)
-BUILD_SMP_INTERRUPT(invalidate_interrupt,INVALIDATE_TLB_VECTOR)
-BUILD_SMP_INTERRUPT(call_function_interrupt,CALL_FUNCTION_VECTOR)
-
-/*
- * Every pentium local APIC has two 'local interrupts', with a
- * soft-definable vector attached to both interrupts, one of
- * which is a timer interrupt, the other one is error counter
- * overflow. Linux uses the local APIC timer interrupt to get
- * a much simpler SMP time architecture:
- */
-BUILD_SMP_INTERRUPT(apic_timer_interrupt,LOCAL_TIMER_VECTOR)
-BUILD_SMP_INTERRUPT(error_interrupt,ERROR_APIC_VECTOR)
-BUILD_SMP_INTERRUPT(spurious_interrupt,SPURIOUS_APIC_VECTOR)
-BUILD_SMP_INTERRUPT(pmu_apic_interrupt,PMU_APIC_VECTOR)
-BUILD_SMP_INTERRUPT(thermal_interrupt,THERMAL_APIC_VECTOR)
-BUILD_SMP_INTERRUPT(cmci_interrupt, CMCI_APIC_VECTOR)
-
 #define IRQ(x,y) \
     IRQ##x##y##_interrupt
 

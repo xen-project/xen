@@ -243,11 +243,15 @@ extern const char *acpi_gbl_region_types[ACPI_NUM_PREDEFINED_REGIONS];
 
 /* Exception codes */
 
+#ifndef DEFINE_ACPI_GLOBALS
+
 extern char const *acpi_gbl_exception_names_env[];
 extern char const *acpi_gbl_exception_names_pgm[];
 extern char const *acpi_gbl_exception_names_tbl[];
 extern char const *acpi_gbl_exception_names_aml[];
 extern char const *acpi_gbl_exception_names_ctrl[];
+
+#endif
 
 /*****************************************************************************
  *

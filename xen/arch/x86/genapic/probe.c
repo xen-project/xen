@@ -12,7 +12,8 @@
 #include <asm/fixmap.h>
 #include <asm/mpspec.h>
 #include <asm/apicdef.h>
-#include <asm/genapic.h>
+#include <asm/mach-generic/mach_apic.h>
+#include <asm/setup.h>
 
 extern struct genapic apic_summit;
 extern struct genapic apic_bigsmp;

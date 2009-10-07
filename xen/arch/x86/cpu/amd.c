@@ -8,6 +8,7 @@
 #include <asm/msr.h>
 #include <asm/processor.h>
 #include <asm/hvm/support.h>
+#include <asm/setup.h> /* amd_init_cpu */
 
 #include "cpu.h"
 #include "amd.h"

@@ -6,6 +6,8 @@
 #define __ASM_X86_HYPERCALL_H__
 
 #include <public/physdev.h>
+#include <public/arch-x86/xen-mca.h> /* for do_mca */
+#include <public/domctl.h> /* for arch_do_domctl */
 #include <xen/types.h>
 
 /*
@@ -27,10 +29,6 @@ DECLARE_PER_CPU(char, hc_preempted);
 extern long
 do_event_channel_op_compat(
     XEN_GUEST_HANDLE(evtchn_op_t) uop);
-
-extern long
-do_physdev_op_compat(
-    XEN_GUEST_HANDLE(physdev_op_t) uop);
 
 extern long
 do_set_trap_table(
@@ -71,6 +69,9 @@ do_update_descriptor(
     u64 pa,
     u64 desc);
 
+extern long
+do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc);
+
 extern int
 do_update_va_mapping(
     unsigned long va,
@@ -103,6 +104,11 @@ struct vcpu;
 extern long
 arch_do_vcpu_op(
     int cmd, struct vcpu *v, XEN_GUEST_HANDLE(void) arg);
+
+extern long
+arch_do_domctl(
+    struct xen_domctl *domctl,
+    XEN_GUEST_HANDLE(xen_domctl_t) u_domctl);
 
 extern int
 do_kexec(

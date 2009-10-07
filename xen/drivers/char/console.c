@@ -34,6 +34,7 @@
 #include <asm/div64.h>
 #include <xsm/xsm.h>
 #include <public/sysctl.h>
+#include <xen/hypercall.h> /* for do_console_io */
 
 /* console: comma-separated list of console outputs. */
 static char __initdata opt_console[30] = OPT_CONSOLE_STR;

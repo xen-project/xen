@@ -35,9 +35,6 @@ static unsigned long saved_lvtpc[NR_CPUS];
 
 static char *cpu_type;
 
-extern int is_active(struct domain *d);
-extern int is_passive(struct domain *d);
-
 static int passive_domain_msr_op_checks(struct cpu_user_regs *regs ,int *typep, int *indexp)
 {
 	struct vpmu_struct *vpmu = vcpu_vpmu(current);

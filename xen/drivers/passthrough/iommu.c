@@ -21,8 +21,6 @@
 
 static void parse_iommu_param(char *s);
 static int iommu_populate_page_table(struct domain *d);
-int intel_vtd_setup(void);
-int amd_iov_detect(void);
 
 /*
  * The 'iommu' parameter enables the IOMMU.  Optional comma separated

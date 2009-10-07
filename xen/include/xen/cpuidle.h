@@ -84,5 +84,6 @@ struct cpuidle_governor
 };
 
 extern struct cpuidle_governor *cpuidle_current_governor;
+void cpuidle_disable_deep_cstate(void);
 
 #endif /* _XEN_CPUIDLE_H */

@@ -111,8 +111,6 @@ DECLARE_TRAP_HANDLER(machine_check);
 DECLARE_TRAP_HANDLER(alignment_check);
 DECLARE_TRAP_HANDLER(spurious_interrupt_bug);
 
-long do_set_debugreg(int reg, unsigned long value);
-unsigned long do_get_debugreg(int reg);
 void (*ioemul_handle_quirk)(
     u8 opcode, char *io_emul_stub, struct cpu_user_regs *regs);
 

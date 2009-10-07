@@ -76,4 +76,14 @@ extern void mtrr_aps_sync_begin(void);
 extern void mtrr_aps_sync_end(void);
 extern void mtrr_bp_restore(void);
 
+extern bool_t mtrr_var_range_msr_set(struct mtrr_state *v,
+				uint32_t msr, uint64_t msr_content);
+extern bool_t mtrr_fix_range_msr_set(struct mtrr_state *v,
+				uint32_t row, uint64_t msr_content);
+extern bool_t mtrr_def_type_msr_set(struct mtrr_state *v, uint64_t msr_content);
+extern bool_t pat_msr_set(uint64_t *pat, uint64_t msr);
+
+bool_t is_var_mtrr_overlapped(struct mtrr_state *m);
+bool_t mtrr_pat_not_equal(struct vcpu *vd, struct vcpu *vs);
+
 #endif /* __ASM_X86_MTRR_H__ */

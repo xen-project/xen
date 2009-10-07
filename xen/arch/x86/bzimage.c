@@ -4,6 +4,7 @@
 #include <xen/mm.h>
 #include <xen/string.h>
 #include <xen/types.h>
+#include <asm/bzimage.h>
 
 #define HEAPORDER 3
 

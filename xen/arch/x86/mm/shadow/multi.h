@@ -100,10 +100,10 @@ SHADOW_INTERNAL_NAME(sh_audit_l4_table, GUEST_LEVELS)
 #endif
 
 extern void *
-SHADOW_INTERNAL_NAME(sh_guest_map_l1e, CONFIG_PAGING_LEVELS)
+SHADOW_INTERNAL_NAME(sh_guest_map_l1e, GUEST_LEVELS)
     (struct vcpu *v, unsigned long va, unsigned long *gl1mfn);
 extern void
-SHADOW_INTERNAL_NAME(sh_guest_get_eff_l1e, CONFIG_PAGING_LEVELS)
+SHADOW_INTERNAL_NAME(sh_guest_get_eff_l1e, GUEST_LEVELS)
     (struct vcpu *v, unsigned long va, void *eff_l1e);
 
 extern mfn_t

@@ -147,14 +147,9 @@ bool_t is_var_mtrr_overlapped(struct mtrr_state *m)
 
 #define MTRRphysBase_MSR(reg) (0x200 + 2 * (reg))
 #define MTRRphysMask_MSR(reg) (0x200 + 2 * (reg) + 1)
-bool_t mtrr_var_range_msr_set(struct mtrr_state *m, uint32_t msr,
-                              uint64_t msr_content);
-bool_t mtrr_fix_range_msr_set(struct mtrr_state *m, uint32_t row,
-                              uint64_t msr_content);
 
 static int hvm_mtrr_pat_init(void)
 {
-    extern uint64_t host_pat;
     unsigned int i, j, phys_addr;
 
     memset(&mtrr_epat_tbl, INVALID_MEM_TYPE, sizeof(mtrr_epat_tbl));

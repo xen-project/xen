@@ -45,6 +45,7 @@
 #include <asm/io.h>
 #include <asm/hpet.h>
 #include <asm/processor.h>
+#include <xen/pmstat.h>
 #include <public/platform.h>
 #include <public/sysctl.h>
 #include <acpi/cpufreq/cpufreq.h>

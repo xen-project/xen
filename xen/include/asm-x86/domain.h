@@ -456,6 +456,9 @@ int construct_dom0(
     unsigned long initrd_start, unsigned long initrd_len,
     char *cmdline);
 
+extern unsigned long initial_images_nrpages(void);
+extern void discard_initial_images(void);
+
 #endif /* __ASM_DOMAIN_H__ */
 
 /*

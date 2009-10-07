@@ -29,14 +29,9 @@
 #include <asm/paging.h>
 #include <asm/p2m.h>
 #include <asm/e820.h>
+#include <asm/bzimage.h> /* for bzimage_parse */
 
 #include <public/version.h>
-
-int __init bzimage_parse(
-    char *output, char **image_start, unsigned long *image_len);
-
-extern unsigned long initial_images_nrpages(void);
-extern void discard_initial_images(void);
 
 static long __initdata dom0_nrpages;
 static long __initdata dom0_min_nrpages;

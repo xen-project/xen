@@ -76,11 +76,6 @@
 
 #define acpi_thread_id struct vcpu *
 
-static inline acpi_thread_id acpi_os_get_thread_id(void)
-{
-	return current;
-}
-
 #define ACPI_ALLOCATE(a)	xmalloc_bytes(a)
 #define ACPI_ALLOCATE_ZEROED(a)	({              \
     void *p = xmalloc_bytes(a);                 \

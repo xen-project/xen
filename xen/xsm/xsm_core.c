@@ -14,6 +14,7 @@
 #include <xen/errno.h>
 #include <xen/lib.h>
 
+#include <xen/hypercall.h>
 #include <xsm/xsm.h>
 
 #ifdef XSM_ENABLE

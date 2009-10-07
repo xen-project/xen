@@ -64,10 +64,10 @@ struct xenoprof {
 #endif
 
 struct domain;
+int is_active(struct domain *d);
 int is_passive(struct domain *d);
 void free_xenoprof_pages(struct domain *d);
 
-int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg);
 int xenoprof_add_trace(struct domain *d, struct vcpu *v, 
                        unsigned long eip, int mode);
 
@@ -76,5 +76,9 @@ int xenoprof_add_trace(struct domain *d, struct vcpu *v,
 #define PMU_OWNER_HVM           2
 int acquire_pmu_ownship(int pmu_ownership);
 void release_pmu_ownship(int pmu_ownership);
+
+void xenoprof_log_event(struct vcpu *vcpu,
+                        struct cpu_user_regs * regs, unsigned long eip,
+                        int mode, int event);
 
 #endif  /* __XEN__XENOPROF_H__ */

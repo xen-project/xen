@@ -21,6 +21,7 @@
 #include <asm/hvm/vpt.h>
 #include <asm/hvm/io.h>
 #include <asm/hvm/support.h>
+#include <asm/acpi.h> /* for hvm_acpi_power_button prototype */
 
 /* Slightly more readable port I/O addresses for the registers we intercept */
 #define PM1a_STS_ADDR (ACPI_PM1A_EVT_BLK_ADDRESS)

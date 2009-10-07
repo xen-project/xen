@@ -16,6 +16,7 @@
 #include <asm/hpet.h>
 #include <asm/msi.h>
 #include <mach_apic.h>
+#include <xen/cpuidle.h>
 
 #define MAX_DELTA_NS MILLISECS(10*1000)
 #define MIN_DELTA_NS MICROSECS(20)
@@ -52,8 +53,6 @@ static int *irq_channel;
 #define irq_to_channel(irq)   irq_channel[irq]
 
 unsigned long hpet_address;
-
-void msi_compose_msg(struct pci_dev *pdev, int irq, struct msi_msg *msg);
 
 /*
  * force_hpet_broadcast: by default legacy hpet broadcast will be stopped
@@ -491,7 +490,6 @@ static void (*hpet_attach_channel)(int cpu, struct hpet_event_channel *ch);
 static void (*hpet_detach_channel)(int cpu);
 
 #include <asm/mc146818rtc.h>
-void cpuidle_disable_deep_cstate(void);
 
 void (*pv_rtc_handler)(unsigned int port, uint8_t value);
 

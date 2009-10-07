@@ -31,6 +31,7 @@
 #include <asm/div64.h>
 #include <asm/hpet.h>
 #include <io_ports.h>
+#include <asm/setup.h> /* for early_time_init */
 
 /* opt_clocksource: Force clocksource to one of: pit, hpet, cyclone, acpi. */
 static char __initdata opt_clocksource[10];

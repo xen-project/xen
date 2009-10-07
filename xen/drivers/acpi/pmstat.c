@@ -41,12 +41,9 @@
 
 #include <public/sysctl.h>
 #include <acpi/cpufreq/cpufreq.h>
+#include <xen/pmstat.h>
 
 struct pm_px *__read_mostly cpufreq_statistic_data[NR_CPUS];
-
-extern uint32_t pmstat_get_cx_nr(uint32_t cpuid);
-extern int pmstat_get_cx_stat(uint32_t cpuid, struct pm_cx_stat *stat);
-extern int pmstat_reset_cx_stat(uint32_t cpuid);
 
 extern struct list_head cpufreq_governor_list;
 

@@ -19,6 +19,7 @@
  *
  */
 
+#define XSM_ENABLE
 #include <xsm/xsm.h>
 #include <xen/multiboot.h>
 

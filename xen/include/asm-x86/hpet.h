@@ -58,6 +58,8 @@
 #define hpet_write32(y,x) \
     (*(volatile u32 *)(fix_to_virt(FIX_HPET_BASE) + (x)) = (y))
 
+extern unsigned long hpet_address;
+
 /*
  * Detect and initialise HPET hardware: return counter update frequency.
  * Return value is zero if HPET is unavailable.

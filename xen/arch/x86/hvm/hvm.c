@@ -52,6 +52,7 @@
 #include <asm/hvm/support.h>
 #include <asm/hvm/cacheattr.h>
 #include <asm/hvm/trace.h>
+#include <asm/mtrr.h>
 #include <public/sched.h>
 #include <public/hvm/ioreq.h>
 #include <public/version.h>
@@ -950,7 +951,6 @@ int hvm_set_efer(uint64_t value)
 }
 
 extern void shadow_blow_tables_per_domain(struct domain *d);
-extern bool_t mtrr_pat_not_equal(struct vcpu *vd, struct vcpu *vs);
 
 /* Exit UC mode only if all VCPUs agree on MTRR/PAT and are not in no_fill. */
 static bool_t domain_exit_uc_mode(struct vcpu *v)
@@ -1964,13 +1964,6 @@ gp_fault:
 
 int hvm_msr_write_intercept(struct cpu_user_regs *regs)
 {
-    extern bool_t mtrr_var_range_msr_set(
-        struct mtrr_state *v, u32 msr, u64 msr_content);
-    extern bool_t mtrr_fix_range_msr_set(
-        struct mtrr_state *v, int row, u64 msr_content);
-    extern bool_t mtrr_def_type_msr_set(struct mtrr_state *v, u64 msr_content);
-    extern bool_t pat_msr_set(u64 *pat, u64 msr);
-
     uint32_t ecx = regs->ecx;
     uint64_t msr_content = (uint32_t)regs->eax | ((uint64_t)regs->edx << 32);
     struct vcpu *v = current;

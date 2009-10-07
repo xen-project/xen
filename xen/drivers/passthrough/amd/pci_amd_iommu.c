@@ -21,6 +21,7 @@
 #include <xen/sched.h>
 #include <xen/pci.h>
 #include <xen/pci_regs.h>
+#include <asm/hvm/iommu.h>
 #include <asm/amd-iommu.h>
 #include <asm/hvm/svm/amd-iommu-proto.h>
 

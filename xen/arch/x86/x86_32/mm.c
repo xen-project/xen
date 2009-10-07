@@ -28,6 +28,7 @@
 #include <asm/page.h>
 #include <asm/flushtlb.h>
 #include <asm/fixmap.h>
+#include <asm/setup.h>
 #include <public/memory.h>
 
 l2_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
@@ -42,8 +43,6 @@ static unsigned long mpt_size;
 
 void *alloc_xen_pagetable(void)
 {
-    extern int early_boot;
-    extern unsigned long xenheap_initial_phys_start;
     unsigned long mfn;
 
     if ( !early_boot )

@@ -46,11 +46,6 @@
 
 static unsigned long reset_value[NUM_COUNTERS];
 
-extern void xenoprof_log_event(struct vcpu *v, struct cpu_user_regs * regs, 
-			       unsigned long eip, int mode, int event);
-extern int xenoprofile_get_mode(struct vcpu *v,
-				struct cpu_user_regs * const regs);
-
 extern char svm_stgi_label[];
 
 static void athlon_fill_in_addresses(struct op_msrs * const msrs)

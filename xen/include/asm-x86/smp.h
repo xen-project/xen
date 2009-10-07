@@ -31,7 +31,6 @@
  */
  
 extern void smp_alloc_memory(void);
-extern int pic_mode;
 DECLARE_PER_CPU(cpumask_t, cpu_sibling_map);
 DECLARE_PER_CPU(cpumask_t, cpu_core_map);
 
@@ -81,7 +80,7 @@ static inline void enable_nonboot_cpus(void) {}
 
 extern cpumask_t cpu_callout_map;
 extern cpumask_t cpu_callin_map;
-extern cpumask_t cpu_possible_map;
+/* cpu_possible_map declared in <xen/cpumask.h> */
 
 /* We don't mark CPUs online until __cpu_up(), so we need another measure */
 static inline int num_booting_cpus(void)

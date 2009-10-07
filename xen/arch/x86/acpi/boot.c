@@ -37,6 +37,9 @@
 #include <asm/io.h>
 #include <asm/mpspec.h>
 #include <asm/processor.h>
+#ifdef CONFIG_HPET_TIMER
+#include <asm/hpet.h> /* for hpet_address */
+#endif
 #include <mach_apic.h>
 #include <mach_mpparse.h>
 
@@ -317,8 +320,6 @@ static int __init acpi_parse_hpet(struct acpi_table_header *table)
 	       hpet_tbl->id, vxtime.hpet_address);
 #else	/* X86 */
 	{
-		extern unsigned long hpet_address;
-
 		hpet_address = hpet_tbl->address.address;
 		printk(KERN_INFO PREFIX "HPET id: %#x base: %#lx\n",
 		       hpet_tbl->id, hpet_address);
@@ -898,8 +899,6 @@ int __init acpi_boot_table_init(void)
 	 */
 	error = acpi_blacklisted();
 	if (error) {
-		extern int acpi_force;
-
 		if (acpi_force) {
 			printk(KERN_WARNING PREFIX "acpi=force override\n");
 		} else {

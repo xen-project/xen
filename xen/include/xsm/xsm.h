@@ -21,8 +21,6 @@
 typedef void xsm_op_t;
 DEFINE_XEN_GUEST_HANDLE(xsm_op_t);
 
-extern long do_xsm_op (XEN_GUEST_HANDLE(xsm_op_t) op);
-
 #ifdef XSM_ENABLE
     #define xsm_call(fn) xsm_ops->fn
 #else

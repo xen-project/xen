@@ -120,8 +120,6 @@ struct irq_cfg {
 extern struct irq_cfg irq_cfg[];
 
 #else
-extern struct irq_desc *irq_desc;
-
 extern int setup_irq(unsigned int irq, struct irqaction *);
 extern void release_irq(unsigned int irq);
 extern int request_irq(unsigned int irq,

@@ -61,8 +61,6 @@ static struct hvm_function_table svm_function_table;
 
 enum handler_return { HNDL_done, HNDL_unhandled, HNDL_exception_raised };
 
-asmlinkage void do_IRQ(struct cpu_user_regs *);
-
 /* va of hardware host save area     */
 static void *hsa[NR_CPUS] __read_mostly;
 

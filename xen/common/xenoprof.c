@@ -16,6 +16,7 @@
 #include <public/xenoprof.h>
 #include <xen/paging.h>
 #include <xsm/xsm.h>
+#include <xen/hypercall.h>
 
 /* Limit amount of pages used for shared buffer (per domain) */
 #define MAX_OPROF_SHARED_PAGES 32

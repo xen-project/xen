@@ -38,8 +38,9 @@
 #include <asm/edd.h>
 #include <xsm/xsm.h>
 #include <asm/tboot.h>
-
-int __init bzimage_headroom(char *image_start, unsigned long image_length);
+#include <asm/bzimage.h> /* for bzimage_headroom */
+#include <asm/mach-generic/mach_apic.h> /* for generic_apic_probe */
+#include <asm/setup.h>
 
 #if defined(CONFIG_X86_64)
 #define BOOTSTRAP_DIRECTMAP_END (1UL << 32) /* 4GB */
@@ -48,9 +49,6 @@ int __init bzimage_headroom(char *image_start, unsigned long image_length);
 #define BOOTSTRAP_DIRECTMAP_END (1UL << 30) /* 1GB */
 #define maddr_to_bootstrap_virt(m) ((void *)(long)(m))
 #endif
-
-extern void generic_apic_probe(void);
-extern void numa_initmem_init(unsigned long start_pfn, unsigned long end_pfn);
 
 extern u16 boot_edid_caps;
 extern u8 boot_edid_info[128];
@@ -79,12 +77,10 @@ custom_param("acpi", parse_acpi_param);
 
 /* **** Linux config option: propagated to domain0. */
 /* acpi_skip_timer_override: Skip IRQ0 overrides. */
-extern int acpi_skip_timer_override;
 boolean_param("acpi_skip_timer_override", acpi_skip_timer_override);
 
 /* **** Linux config option: propagated to domain0. */
 /* noapic: Disable IOAPIC setup. */
-extern int skip_ioapic_setup;
 boolean_param("noapic", skip_ioapic_setup);
 
 /* **** Linux config option: propagated to domain0. */
@@ -102,14 +98,6 @@ unsigned long xen_phys_start;
 /* Limits of Xen heap, used to initialise the allocator. */
 unsigned long xenheap_initial_phys_start, xenheap_phys_end;
 #endif
-
-extern void arch_init_memory(void);
-extern void init_IRQ(void);
-extern void early_time_init(void);
-extern void early_cpu_init(void);
-extern void vesa_init(void);
-extern void vesa_mtrr_init(void);
-extern void init_tmem(void);
 
 DEFINE_PER_CPU_READ_MOSTLY(struct desc_struct *, gdt_table) = boot_cpu_gdt_table;
 #ifdef CONFIG_COMPAT
@@ -203,7 +191,7 @@ static void free_xen_data(char *s, char *e)
 #endif
 }
 
-extern char __init_begin[], __bss_start[];
+extern char __init_begin[], __init_end[], __bss_start[];
 extern char __per_cpu_start[], __per_cpu_data_end[];
 
 static void __init percpu_init_areas(void)
@@ -390,7 +378,7 @@ static void __init parse_video_info(void)
     }
 }
 
-void __init kexec_reserve_area(struct e820map *e820)
+static void __init kexec_reserve_area(struct e820map *e820)
 {
     unsigned long kdump_start = kexec_crash_area.start;
     unsigned long kdump_size  = kexec_crash_area.size;
@@ -418,8 +406,6 @@ void __init kexec_reserve_area(struct e820map *e820)
 
 void init_done(void)
 {
-    extern char __init_begin[], __init_end[];
-
     /* Free (or page-protect) the init areas. */
     memset(__init_begin, 0xcc, __init_end - __init_begin); /* int3 poison */
     free_xen_data(__init_begin, __init_end);
@@ -457,7 +443,6 @@ void __init __start_xen(unsigned long mbi_p)
         .stop_bits = 1
     };
 
-    extern void early_page_fault(void);
     set_intr_gate(TRAP_page_fault, &early_page_fault);
 
     /* Parse the command-line options. */

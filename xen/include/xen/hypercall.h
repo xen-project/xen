@@ -121,6 +121,9 @@ extern long
 do_tmem_op(
     XEN_GUEST_HANDLE(tmem_op_t) uops);
 
+extern int
+do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg);
+
 #ifdef CONFIG_COMPAT
 
 extern int
@@ -139,6 +142,9 @@ compat_vcpu_op(
     int cmd,
     int vcpuid,
     XEN_GUEST_HANDLE(void) arg);
+
+extern int
+compat_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg);
 
 #endif
 

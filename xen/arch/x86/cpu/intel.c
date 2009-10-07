@@ -12,6 +12,7 @@
 #include <asm/i387.h>
 #include <mach_apic.h>
 #include <asm/hvm/support.h>
+#include <asm/setup.h>
 
 #include "cpu.h"
 
@@ -296,7 +297,7 @@ static struct cpu_dev intel_cpu_dev __devinitdata = {
 	.c_size_cache	= intel_size_cache,
 };
 
-__init int intel_cpu_init(void)
+int __init intel_cpu_init(void)
 {
 	cpu_devs[X86_VENDOR_INTEL] = &intel_cpu_dev;
 	return 0;

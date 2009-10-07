@@ -15,6 +15,7 @@
 #include <xen/cpumask.h>
 #include <xen/event.h>
 #include <xen/guest_access.h>
+#include <xen/hypercall.h> /* for do_mca */
 
 #include <asm/processor.h>
 #include <asm/system.h>

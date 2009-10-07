@@ -102,7 +102,6 @@ void __init mtrr_state_warn(void)
 	printk(KERN_INFO "mtrr: corrected configuration.\n");
 }
 
-extern bool_t is_var_mtrr_overlapped(struct mtrr_state *m);
 /* Doesn't attempt to pass an error out to MTRR users
    because it's quite complicated in some cases and probably not
    worth it because the best error handling is to ignore it. */

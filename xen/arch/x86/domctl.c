@@ -26,6 +26,8 @@
 #include <asm/hvm/support.h>
 #include <asm/hvm/cacheattr.h>
 #include <asm/processor.h>
+#include <asm/acpi.h> /* for hvm_acpi_power_button */
+#include <asm/hypercall.h> /* for arch_do_domctl */
 #include <xsm/xsm.h>
 #include <xen/iommu.h>
 
@@ -590,8 +592,6 @@ long arch_do_domctl(
 
         case XEN_DOMCTL_SENDTRIGGER_POWER:
         {
-            extern void hvm_acpi_power_button(struct domain *d);
-
             ret = -EINVAL;
             if ( is_hvm_domain(d) ) 
             {

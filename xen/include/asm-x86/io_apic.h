@@ -119,15 +119,6 @@ struct IO_APIC_route_entry {
 /* I/O APIC entries */
 extern struct mpc_config_ioapic mp_ioapics[MAX_IO_APICS];
 
-/* # of MP IRQ source entries */
-extern int mp_irq_entries;
-
-/* MP IRQ source entries */
-extern struct mpc_config_intsrc mp_irqs[MAX_IRQ_SOURCES];
-
-/* non-0 if default (table-less) MP configuration */
-extern int mpc_default_type;
-
 /* Only need to remap ioapic RTE (reg: 10~3Fh) */
 #define ioapic_reg_remapped(reg) (iommu_enabled && ((reg) >= 0x10))
 

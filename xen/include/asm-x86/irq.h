@@ -76,6 +76,19 @@ fastcall void thermal_interrupt(void);
 fastcall void cmci_interrupt(void);
 fastcall void irq_move_cleanup_interrupt(void);
 
+fastcall void smp_event_check_interrupt(struct cpu_user_regs *regs);
+fastcall void smp_invalidate_interrupt(void);
+fastcall void smp_call_function_interrupt(struct cpu_user_regs *regs);
+fastcall void smp_apic_timer_interrupt(struct cpu_user_regs *regs);
+fastcall void smp_error_interrupt(struct cpu_user_regs *regs);
+fastcall void smp_pmu_apic_interrupt(struct cpu_user_regs *regs);
+fastcall void smp_spurious_interrupt(struct cpu_user_regs *regs);
+fastcall void smp_thermal_interrupt(struct cpu_user_regs *regs);
+fastcall void smp_cmci_interrupt(struct cpu_user_regs *regs);
+fastcall void smp_irq_move_cleanup_interrupt(struct cpu_user_regs *regs);
+
+asmlinkage void do_IRQ(struct cpu_user_regs *regs);
+
 void disable_8259A_irq(unsigned int irq);
 void enable_8259A_irq(unsigned int irq);
 int i8259A_irq_pending(unsigned int irq);

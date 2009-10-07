@@ -57,7 +57,6 @@ static int counter_width = 32;
 #define IS_ENABLE(val) (val & (1 << 20) )
 static unsigned long reset_value[OP_MAX_COUNTER];
 int ppro_has_global_ctrl = 0;
-extern int is_passive(struct domain *d);
  
 static void ppro_fill_in_addresses(struct op_msrs * const msrs)
 {
@@ -124,11 +123,6 @@ static void ppro_setup_ctrs(struct op_msrs const * const msrs)
 	}
 }
 
-extern void xenoprof_log_event(struct vcpu *v, struct cpu_user_regs * regs, 
-			       unsigned long eip, int mode, int event);
-extern int xenoprofile_get_mode(struct vcpu *v,
-				struct cpu_user_regs * const regs);
- 
 static int ppro_check_ctrs(unsigned int const cpu,
                            struct op_msrs const * const msrs,
                            struct cpu_user_regs * const regs)

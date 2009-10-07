@@ -31,6 +31,7 @@
 #include <asm/string.h>
 #include "dmar.h"
 #include "iommu.h"
+#include "extern.h"
 
 #undef PREFIX
 #define PREFIX VTDPREFIX "ACPI DMAR:"

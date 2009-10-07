@@ -104,6 +104,8 @@ void pci_conf_write16(
 void pci_conf_write32(
     unsigned int bus, unsigned int dev, unsigned int func, unsigned int reg,
     uint32_t data);
+uint32_t pci_conf_read(uint32_t cf8, uint8_t offset, uint8_t bytes);
+void pci_conf_write(uint32_t cf8, uint8_t offset, uint8_t bytes, uint32_t data);
 int pci_mmcfg_read(unsigned int seg, unsigned int bus,
                    unsigned int devfn, int reg, int len, u32 *value);
 int pci_mmcfg_write(unsigned int seg, unsigned int bus,

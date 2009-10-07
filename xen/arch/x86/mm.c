@@ -113,6 +113,7 @@
 #include <public/sched.h>
 #include <xsm/xsm.h>
 #include <xen/trace.h>
+#include <asm/setup.h>
 
 /*
  * Mapping of first 2 or 4 megabytes of memory. This is mapped with 4kB
@@ -222,8 +223,6 @@ void __init init_frametable(void)
 
 void __init arch_init_memory(void)
 {
-    extern void subarch_init_memory(void);
-
     unsigned long i, pfn, rstart_pfn, rend_pfn, iostart_pfn, ioend_pfn;
 
     /*
@@ -4484,8 +4483,6 @@ int ptwr_do_page_fault(struct vcpu *v, unsigned long addr,
 
 void free_xen_pagetable(void *v)
 {
-    extern int early_boot;
-
     if ( early_boot )
         return;
 

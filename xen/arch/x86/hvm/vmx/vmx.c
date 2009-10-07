@@ -2087,20 +2087,6 @@ static void vmx_do_extint(struct cpu_user_regs *regs)
 {
     unsigned int vector;
 
-    asmlinkage void do_IRQ(struct cpu_user_regs *);
-    fastcall void smp_apic_timer_interrupt(struct cpu_user_regs *);
-    fastcall void smp_event_check_interrupt(struct cpu_user_regs *regs);
-    fastcall void smp_invalidate_interrupt(void);
-    fastcall void smp_call_function_interrupt(struct cpu_user_regs *regs);
-    fastcall void smp_spurious_interrupt(struct cpu_user_regs *regs);
-    fastcall void smp_error_interrupt(struct cpu_user_regs *regs);
-    fastcall void smp_pmu_apic_interrupt(struct cpu_user_regs *regs);
-    fastcall void smp_cmci_interrupt(struct cpu_user_regs *regs);
-    fastcall void smp_irq_move_cleanup_interrupt(struct cpu_user_regs *regs);
-#ifdef CONFIG_X86_MCE_THERMAL
-    fastcall void smp_thermal_interrupt(struct cpu_user_regs *regs);
-#endif
-
     vector = __vmread(VM_EXIT_INTR_INFO);
     BUG_ON(!(vector & INTR_INFO_VALID_MASK));
 

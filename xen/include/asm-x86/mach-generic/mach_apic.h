@@ -53,6 +53,7 @@ static inline int multi_timer_check(int apic, int irq)
 	return 0;
 }
 
+extern void generic_apic_probe(void);
 extern void generic_bigsmp_probe(void);
 
 /*

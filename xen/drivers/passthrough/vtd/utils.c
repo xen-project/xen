@@ -100,7 +100,7 @@ void print_iommu_regs(struct acpi_drhd_unit *drhd)
            dmar_readl(iommu->reg,DMAR_FEUADDR_REG));
 }
 
-u32 get_level_index(unsigned long gmfn, int level)
+static u32 get_level_index(unsigned long gmfn, int level)
 {
     while ( --level )
         gmfn = gmfn >> LEVEL_STRIDE;

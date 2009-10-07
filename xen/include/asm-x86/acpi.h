@@ -104,8 +104,6 @@ static inline void disable_acpi(void)
 /* Fixmap pages to reserve for ACPI boot-time tables (see fixmap.h) */
 #define FIX_ACPI_PAGES 4
 
-extern int acpi_gsi_to_irq(u32 gsi, unsigned int *irq);
-
 static inline void acpi_noirq_set(void) { acpi_noirq = 1; }
 static inline void acpi_disable_pci(void)
 {
@@ -116,6 +114,7 @@ static inline int acpi_irq_balance_set(char *str) { return 0; }
 
 /* routines for saving/restoring kernel state */
 extern int acpi_save_state_mem(void);
+extern int acpi_save_state_disk(void);
 extern void acpi_restore_state_mem(void);
 
 extern unsigned long acpi_wakeup_address;
@@ -130,16 +129,6 @@ extern int acpi_scan_nodes(u64 start, u64 end);
 #define NR_NODE_MEMBLKS (MAX_NUMNODES*2)
 
 #ifdef CONFIG_ACPI_SLEEP
-
-/* routines for saving/restoring kernel state */
-extern int acpi_save_state_mem(void);
-extern int acpi_save_state_disk(void);
-extern void acpi_restore_state_mem(void);
-
-extern unsigned long acpi_wakeup_address;
-
-/* early initialization routine */
-extern void acpi_reserve_bootmem(void);
 
 extern struct acpi_sleep_info acpi_sinfo;
 #define acpi_video_flags bootsym(video_flags)
@@ -169,5 +158,11 @@ void acpi_mmcfg_init(void);
 
 /* Incremented whenever we transition through S3. Value is 1 during boot. */
 extern uint32_t system_reset_counter;
+
+void hvm_acpi_power_button(struct domain *d);
+
+/* suspend/resume */
+void save_rest_processor_state(void);
+void restore_rest_processor_state(void);
 
 #endif /*__X86_ASM_ACPI_H*/

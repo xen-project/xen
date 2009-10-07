@@ -5,6 +5,7 @@
  */
 
 #include <xen/spinlock.h>
+#include <xen/pci.h>
 #include <asm/io.h>
 
 static DEFINE_SPINLOCK(pci_config_lock);

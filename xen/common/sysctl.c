@@ -20,13 +20,12 @@
 #include <xen/guest_access.h>
 #include <xen/keyhandler.h>
 #include <asm/current.h>
+#include <xen/hypercall.h>
 #include <public/sysctl.h>
 #include <asm/numa.h>
 #include <xen/nodemask.h>
 #include <xsm/xsm.h>
-
-extern int do_get_pm_info(struct xen_sysctl_get_pmstat *op);
-extern int do_pm_op(struct xen_sysctl_pm_op *op);
+#include <xen/pmstat.h>
 
 extern long arch_do_sysctl(
     struct xen_sysctl *op, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl);

@@ -27,7 +27,6 @@
 #include <asm/hvm/svm/amd-iommu-proto.h>
 #include <asm/hvm/svm/amd-iommu-acpi.h>
 
-extern struct list_head amd_iommu_head;
 unsigned short last_bdf = 0;
 
 static int __init get_iommu_msi_capabilities(u8 bus, u8 dev, u8 func,

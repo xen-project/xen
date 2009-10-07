@@ -89,7 +89,6 @@
 
 #define BUILD_SMP_INTERRUPT(x,v) XBUILD_SMP_INTERRUPT(x,v)
 #define XBUILD_SMP_INTERRUPT(x,v)               \
-asmlinkage void x(void);                        \
 __asm__(                                        \
     "\n"__ALIGN_STR"\n"                         \
     ".globl " STR(x) "\n\t"                     \
