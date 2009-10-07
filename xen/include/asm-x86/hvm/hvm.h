@@ -148,7 +148,7 @@ int hvm_vcpu_cacheattr_init(struct vcpu *v);
 void hvm_vcpu_cacheattr_destroy(struct vcpu *v);
 void hvm_vcpu_reset_state(struct vcpu *v, uint16_t cs, uint16_t ip);
 
-void hvm_send_assist_req(struct vcpu *v);
+bool_t hvm_send_assist_req(struct vcpu *v);
 
 void hvm_set_guest_tsc(struct vcpu *v, u64 guest_tsc);
 u64 hvm_get_guest_tsc(struct vcpu *v);

@@ -858,12 +858,12 @@ void hvm_vcpu_down(struct vcpu *v)
     }
 }
 
-void hvm_send_assist_req(struct vcpu *v)
+bool_t hvm_send_assist_req(struct vcpu *v)
 {
     ioreq_t *p;
 
     if ( unlikely(!vcpu_start_shutdown_deferral(v)) )
-        return; /* implicitly bins the i/o operation */
+        return 0; /* implicitly bins the i/o operation */
 
     p = &get_ioreq(v)->vp_ioreq;
     if ( unlikely(p->state != STATE_IOREQ_NONE) )
@@ -871,7 +871,7 @@ void hvm_send_assist_req(struct vcpu *v)
         /* This indicates a bug in the device model. Crash the domain. */
         gdprintk(XENLOG_ERR, "Device model set bad IO state %d.\n", p->state);
         domain_crash(v->domain);
-        return;
+        return 0;
     }
 
     prepare_wait_on_xen_event_channel(v->arch.hvm_vcpu.xen_port);
@@ -882,6 +882,8 @@ void hvm_send_assist_req(struct vcpu *v)
      */
     p->state = STATE_IOREQ_READY;
     notify_via_xen_event_channel(v->arch.hvm_vcpu.xen_port);
+
+    return 1;
 }
 
 void hvm_hlt(unsigned long rflags)

@@ -168,7 +168,7 @@ void send_invalidate_req(void)
     p->data = ~0UL; /* flush all */
     p->io_count++;
 
-    hvm_send_assist_req(v);
+    (void)hvm_send_assist_req(v);
 }
 
 int handle_mmio(void)
