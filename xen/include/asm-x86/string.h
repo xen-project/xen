@@ -96,13 +96,29 @@ static always_inline void * __constant_memcpy(
 }
 
 #define __HAVE_ARCH_MEMCPY
+/* align source to a 64-bit boundary */
+static always_inline
+void *__var_memcpy(void *t, const void *f, size_t n)
+{
+    int off = (unsigned long)f & 0x7;
+    /* just do alignment if needed and if size is worth */
+    if ( (n > 32) && off ) {
+        size_t n1 = 8 - off;
+        __variable_memcpy(t, f, n1);
+        __variable_memcpy(t + n1, f + n1, n - n1);
+        return t;
+    } else {
+            return (__variable_memcpy(t, f, n));
+    }
+}
+
 #define memcpy(t,f,n) (__memcpy((t),(f),(n)))
 static always_inline
 void *__memcpy(void *t, const void *f, size_t n)
 {
     return (__builtin_constant_p(n) ?
             __constant_memcpy((t),(f),(n)) :
-            __variable_memcpy((t),(f),(n)));
+            __var_memcpy((t),(f),(n)));
 }
 
 /* Some version of gcc don't have this builtin. It's non-critical anyway. */
