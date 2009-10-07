@@ -463,7 +463,7 @@ static void __devinit init_amd(struct cpuinfo_x86 *c)
 		c->x86_power = cpuid_edx(0x80000007);
 		if (c->x86_power & (1<<8)) {
 			set_bit(X86_FEATURE_CONSTANT_TSC, c->x86_capability);
-			set_bit(X86_FEATURE_NOSTOP_TSC, c->x86_capability);
+			set_bit(X86_FEATURE_NONSTOP_TSC, c->x86_capability);
 		}
 	}
 
