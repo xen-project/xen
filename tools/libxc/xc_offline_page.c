@@ -132,8 +132,8 @@ int xc_query_page_offline_status(int xc, unsigned long start,
  /*
   * There should no update to the grant when domain paused
   */
-static int xc_is_page_granted(int xc_handle, xen_pfn_t gpfn,
-                              struct grant_entry_v1 *gnttab, int gnt_num)
+static int xc_is_page_granted_v1(int xc_handle, xen_pfn_t gpfn,
+                                 struct grant_entry_v1 *gnttab, int gnt_num)
 {
     int i = 0;
 
@@ -142,6 +142,22 @@ static int xc_is_page_granted(int xc_handle, xen_pfn_t gpfn,
 
     for (i = 0; i < gnt_num; i++)
         if ( ((gnttab[i].flags & GTF_type_mask) !=  GTF_invalid) &&
+             (gnttab[i].frame == gpfn) )
+             break;
+
+   return (i != gnt_num);
+}
+
+static int xc_is_page_granted_v2(int xc_handle, xen_pfn_t gpfn,
+                                 struct grant_entry_v2 *gnttab, int gnt_num)
+{
+    int i = 0;
+
+    if (!gnttab)
+        return 0;
+
+    for (i = 0; i < gnt_num; i++)
+        if ( ((gnttab[i].hdr.flags & GTF_type_mask) !=  GTF_invalid) &&
              (gnttab[i].frame == gpfn) )
              break;
 
@@ -549,7 +565,8 @@ int xc_exchange_page(int xc_handle, int domid, xen_pfn_t mfn)
     struct domain_mem_info minfo;
     struct xc_mmu *mmu = NULL;
     struct pte_backup old_ptes = {NULL, 0, 0};
-    struct grant_entry_v1 *gnttab = NULL;
+    struct grant_entry_v1 *gnttab_v1 = NULL;
+    struct grant_entry_v2 *gnttab_v2 = NULL;
     struct mmuext_op mops;
     int gnt_num, unpined = 0;
     void *old_p, *backup = NULL;
@@ -588,14 +605,20 @@ int xc_exchange_page(int xc_handle, int domid, xen_pfn_t mfn)
             goto failed;
     }
 
-    gnttab = xc_gnttab_map_table(xc_handle, domid, &gnt_num);
-    if (!gnttab)
+    gnttab_v2 = xc_gnttab_map_table_v2(xc_handle, domid, &gnt_num);
+    if (!gnttab_v2)
     {
-        ERROR("Failed to map grant table\n");
-        goto failed;
+        gnttab_v1 = xc_gnttab_map_table_v1(xc_handle, domid, &gnt_num);
+        if (!gnttab_v1)
+        {
+            ERROR("Failed to map grant table\n");
+            goto failed;
+        }
     }
 
-    if (xc_is_page_granted(xc_handle, mfn, gnttab, gnt_num))
+    if (gnttab_v1
+        ? xc_is_page_granted_v1(xc_handle, mfn, gnttab_v1, gnt_num)
+        : xc_is_page_granted_v2(xc_handle, mfn, gnttab_v2, gnt_num))
     {
         ERROR("Page %lx is granted now\n", mfn);
         goto failed;
@@ -755,8 +778,10 @@ failed:
     if (backup)
         free(backup);
 
-    if (gnttab)
-        munmap(gnttab, gnt_num / (PAGE_SIZE/sizeof(struct grant_entry_v1)));
+    if (gnttab_v1)
+        munmap(gnttab_v1, gnt_num / (PAGE_SIZE/sizeof(struct grant_entry_v1)));
+    if (gnttab_v2)
+        munmap(gnttab_v2, gnt_num / (PAGE_SIZE/sizeof(struct grant_entry_v2)));
 
     close_mem_info(xc_handle, &minfo);
 

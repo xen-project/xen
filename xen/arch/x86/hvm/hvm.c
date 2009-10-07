@@ -2087,12 +2087,26 @@ enum hvm_intblk hvm_interrupt_blocked(struct vcpu *v, struct hvm_intack intack)
     return hvm_intblk_none;
 }
 
+static int grant_table_op_is_allowed(unsigned int cmd)
+{
+    switch (cmd) {
+    case GNTTABOP_query_size:
+    case GNTTABOP_setup_table:
+    case GNTTABOP_set_version:
+    case GNTTABOP_copy:
+    case GNTTABOP_map_grant_ref:
+    case GNTTABOP_unmap_grant_ref:
+        return 1;
+    default:
+        /* all other commands need auditing */
+        return 0;
+    }
+}
+
 static long hvm_grant_table_op(
     unsigned int cmd, XEN_GUEST_HANDLE(void) uop, unsigned int count)
 {
-    if ( (cmd != GNTTABOP_query_size) && (cmd != GNTTABOP_setup_table) &&
-         (cmd != GNTTABOP_map_grant_ref) && (cmd != GNTTABOP_unmap_grant_ref) &&
-         (cmd != GNTTABOP_copy))
+    if ( !grant_table_op_is_allowed(cmd) )
         return -ENOSYS; /* all other commands need auditing */
     return do_grant_table_op(cmd, uop, count);
 }
@@ -2144,13 +2158,12 @@ static hvm_hypercall_t *hvm_hypercall32_table[NR_hypercalls] = {
 
 #else /* defined(__x86_64__) */
 
-static long hvm_grant_table_op_compat32(
-    unsigned int cmd, XEN_GUEST_HANDLE(void) uop, unsigned int count)
+static long hvm_grant_table_op_compat32(unsigned int cmd,
+                                        XEN_GUEST_HANDLE(void) uop,
+                                        unsigned int count)
 {
-    if ( (cmd != GNTTABOP_query_size) && (cmd != GNTTABOP_setup_table) &&
-         (cmd != GNTTABOP_map_grant_ref) && (cmd != GNTTABOP_unmap_grant_ref) &&
-         (cmd != GNTTABOP_copy))
-        return -ENOSYS; /* all other commands need auditing */
+    if ( !grant_table_op_is_allowed(cmd) )
+        return -ENOSYS;
     return compat_grant_table_op(cmd, uop, count);
 }
 

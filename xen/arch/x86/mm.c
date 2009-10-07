@@ -4000,12 +4000,25 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         case XENMAPSPACE_grant_table:
             spin_lock(&d->grant_table->lock);
 
-            if ( (xatp.idx >= nr_grant_frames(d->grant_table)) &&
-                 (xatp.idx < max_nr_grant_frames) )
-                gnttab_grow_table(d, xatp.idx + 1);
+            if ( d->grant_table->gt_version == 0 )
+                d->grant_table->gt_version = 1;
 
-            if ( xatp.idx < nr_grant_frames(d->grant_table) )
-                mfn = virt_to_mfn(d->grant_table->shared[xatp.idx]);
+            if ( d->grant_table->gt_version == 2 &&
+                 (xatp.idx & XENMAPIDX_grant_table_status) )
+            {
+                xatp.idx &= ~XENMAPIDX_grant_table_status;
+                if ( xatp.idx < nr_status_frames(d->grant_table) )
+                    mfn = virt_to_mfn(d->grant_table->status[xatp.idx]);
+            }
+            else
+            {
+                if ( (xatp.idx >= nr_grant_frames(d->grant_table)) &&
+                     (xatp.idx < max_nr_grant_frames) )
+                    gnttab_grow_table(d, xatp.idx + 1);
+
+                if ( xatp.idx < nr_grant_frames(d->grant_table) )
+                    mfn = virt_to_mfn(d->grant_table->shared_raw[xatp.idx]);
+            }
 
             spin_unlock(&d->grant_table->lock);
             break;

@@ -58,7 +58,7 @@ compat/%.h: compat/%.i Makefile $(BASEDIR)/tools/compat-build-header.py
 	mv -f $@.new $@
 
 compat/%.i: compat/%.c Makefile
-	$(CPP) $(filter-out -M% .%.d,$(CFLAGS)) $(cppflags-y) -o $@ $<
+	$(CPP) -include public/xen-compat.h $(filter-out -M% .%.d,$(CFLAGS)) $(cppflags-y) -o $@ $<
 
 compat/%.c: public/%.h xlat.lst Makefile $(BASEDIR)/tools/compat-build-source.py
 	mkdir -p $(@D)

@@ -9,6 +9,14 @@
 CHECK_grant_entry_v1;
 #undef xen_grant_entry_v1
 
+#define xen_grant_entry_header grant_entry_header
+CHECK_grant_entry_header;
+#undef xen_grant_entry_header
+
+#define xen_grant_entry_v2 grant_entry_v2
+CHECK_grant_entry_v2;
+#undef xen_grant_entry_v2
+
 #define xen_gnttab_map_grant_ref gnttab_map_grant_ref
 CHECK_gnttab_map_grant_ref;
 #undef xen_gnttab_map_grant_ref
@@ -28,6 +36,16 @@ DEFINE_XEN_GUEST_HANDLE(gnttab_copy_compat_t);
 #define xen_gnttab_dump_table gnttab_dump_table
 CHECK_gnttab_dump_table;
 #undef xen_gnttab_dump_table
+
+#define xen_gnttab_set_version gnttab_set_version
+CHECK_gnttab_set_version;
+#undef xen_gnttab_set_version
+
+DEFINE_XEN_GUEST_HANDLE(gnttab_get_status_frames_compat_t);
+
+#define xen_gnttab_get_version gnttab_get_version
+CHECK_gnttab_get_version;
+#undef xen_gnttab_get_version
 
 int compat_grant_table_op(unsigned int cmd,
                           XEN_GUEST_HANDLE(void) cmp_uop,
@@ -76,6 +94,10 @@ int compat_grant_table_op(unsigned int cmd,
     CASE(dump_table);
 #endif
 
+#ifndef CHECK_gnttab_get_status_frames
+    CASE(get_status_frames);
+#endif
+
 #undef CASE
     default:
         return do_grant_table_op(cmd, cmp_uop, count);
@@ -92,11 +114,13 @@ int compat_grant_table_op(unsigned int cmd,
             struct gnttab_setup_table *setup;
             struct gnttab_transfer *xfer;
             struct gnttab_copy *copy;
+            struct gnttab_get_status_frames *get_status;
         } nat;
         union {
             struct compat_gnttab_setup_table setup;
             struct compat_gnttab_transfer xfer;
             struct compat_gnttab_copy copy;
+            struct compat_gnttab_get_status_frames get_status;
         } cmp;
 
         set_xen_guest_handle(nat.uop, COMPAT_ARG_XLAT_VIRT_BASE);
@@ -232,6 +256,63 @@ int compat_grant_table_op(unsigned int cmd,
                 }
             }
             break;
+
+        case GNTTABOP_get_status_frames: {
+            unsigned int max_frame_list_size_in_pages =
+                (COMPAT_ARG_XLAT_SIZE - sizeof(*nat.get_status)) /
+                sizeof(*nat.get_status->frame_list.p);
+            if ( count != 1)
+            {
+                rc = -EINVAL;
+                break;
+            }
+            if ( unlikely(__copy_from_guest(&cmp.get_status, cmp_uop, 1) ||
+                          !compat_handle_okay(cmp.get_status.frame_list,
+                                              cmp.get_status.nr_frames)) )
+            {
+                rc = -EFAULT;
+                break;
+            }
+            if ( max_frame_list_size_in_pages <
+                 grant_to_status_frames(max_nr_grant_frames) )
+            {
+                gdprintk(XENLOG_WARNING,
+                         "grant_to_status_frames(max_nr_grant_frames) is too large (%u,%u)\n",
+                         grant_to_status_frames(max_nr_grant_frames),
+                         max_frame_list_size_in_pages);
+                rc = -EINVAL;
+                break;
+            }
+
+#define XLAT_gnttab_get_status_frames_HNDL_frame_list(_d_, _s_) \
+            set_xen_guest_handle((_d_)->frame_list, (uint64_t *)(nat.get_status + 1))
+            XLAT_gnttab_get_status_frames(nat.get_status, &cmp.get_status);
+#undef XLAT_gnttab_get_status_frames_HNDL_frame_list
+
+            rc = gnttab_get_status_frames(
+                guest_handle_cast(nat.uop, gnttab_get_status_frames_t),
+                count);
+            if ( rc >= 0 )
+            {
+#define XLAT_gnttab_get_status_frames_HNDL_frame_list(_d_, _s_) \
+                do \
+                { \
+                    if ( (_s_)->status == GNTST_okay ) \
+                    { \
+                        for ( i = 0; i < (_s_)->nr_frames; ++i ) \
+                        { \
+                            uint64_t frame = (_s_)->frame_list.p[i]; \
+                            (void)__copy_to_compat_offset((_d_)->frame_list, i, &frame, 1); \
+                        } \
+                    } \
+                } while (0)
+                XLAT_gnttab_get_status_frames(&cmp.get_status, nat.get_status);
+#undef XLAT_gnttab_get_status_frames_HNDL_frame_list
+                if ( unlikely(__copy_to_guest(cmp_uop, &cmp.get_status, 1)) )
+                    rc = -EFAULT;
+            }
+            break;
+        }
 
         default:
             domain_crash(current->domain);

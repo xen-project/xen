@@ -211,6 +211,8 @@ struct xen_add_to_physmap {
 #define XENMAPSPACE_gmfn        2 /* GMFN */
     unsigned int space;
 
+#define XENMAPIDX_grant_table_status 0x80000000
+
     /* Index into source mapping space. */
     xen_ulong_t idx;
 

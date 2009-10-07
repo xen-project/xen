@@ -80,7 +80,15 @@ struct grant_table {
     /* Table size. Number of frames shared with guest */
     unsigned int          nr_grant_frames;
     /* Shared grant table (see include/public/grant_table.h). */
-    struct grant_entry_v1 **shared;
+    union {
+        void **shared_raw;
+        struct grant_entry_v1 **shared_v1;
+        union grant_entry_v2 **shared_v2;
+    };
+    /* Number of grant status frames shared with guest (for version 2) */
+    unsigned int          nr_status_frames;
+    /* State grant table (see include/public/grant_table.h). */
+    grant_status_t       **status;
     /* Active grant table. */
     struct active_grant_entry **active;
     /* Mapping tracking table. */
@@ -89,6 +97,9 @@ struct grant_table {
     unsigned int          maptrack_limit;
     /* Lock protecting updates to active and shared grant tables. */
     spinlock_t            lock;
+    /* The defined versions are 1 and 2.  Set to 0 if we don't know
+       what version to use yet. */
+    unsigned              gt_version;
 };
 
 /* Create/destroy per-domain grant table context. */
@@ -114,10 +125,19 @@ static inline unsigned int nr_grant_frames(struct grant_table *gt)
     return gt->nr_grant_frames;
 }
 
-/* Number of grant table entries. Caller must hold d's grant table lock. */
-static inline unsigned int nr_grant_entries(struct grant_table *gt)
+/* Number of status grant table frames. Caller must hold d's gr. table lock.*/
+static inline unsigned int nr_status_frames(struct grant_table *gt)
 {
-    return (nr_grant_frames(gt) << PAGE_SHIFT) / sizeof(grant_entry_v1_t);
+    return gt->nr_status_frames;
+}
+
+#define GRANT_STATUS_PER_PAGE (PAGE_SIZE / sizeof(grant_status_t))
+#define GRANT_PER_PAGE (PAGE_SIZE / sizeof(grant_entry_v2_t))
+/* Number of grant table status entries. Caller must hold d's gr. table lock.*/
+static inline unsigned int grant_to_status_frames(int grant_frames)
+{
+    return (grant_frames * GRANT_PER_PAGE + GRANT_STATUS_PER_PAGE - 1) /
+        GRANT_STATUS_PER_PAGE;
 }
 
 static inline unsigned int

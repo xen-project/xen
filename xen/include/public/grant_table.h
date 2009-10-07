@@ -90,6 +90,11 @@
  * [XEN]: This field is written by Xen and read by the sharing guest.
  * [GST]: This field is written by the guest and read by Xen.
  */
+
+/*
+ * Version 1 of the grant table entry structure is maintained purely
+ * for backwards compatibility.  New guests should use version 2.
+ */
 #if __XEN_INTERFACE_VERSION__ < 0x0003020a
 #define grant_entry_v1 grant_entry
 #define grant_entry_v1_t grant_entry_t
@@ -154,6 +159,55 @@ typedef struct grant_entry_v1 grant_entry_v1_t;
 #define _GTF_transfer_completed (3)
 #define GTF_transfer_completed  (1U<<_GTF_transfer_completed)
 
+/*
+ * Version 2 grant table entries.  These fulfil the same role as
+ * version 1 entries, but can represent more complicated operations.
+ * Any given domain will have either a version 1 or a version 2 table,
+ * and every entry in the table will be the same version.
+ *
+ * The interface by which domains use grant references does not depend
+ * on the grant table version in use by the other domain.
+ */
+#if __XEN_INTERFACE_VERSION__ >= 0x0003020a
+/*
+ * Version 1 and version 2 grant entries share a common prefix.  The
+ * fields of the prefix are documented as part of struct
+ * grant_entry_v1.
+ */
+struct grant_entry_header {
+    uint16_t flags;
+    domid_t  domid;
+};
+typedef struct grant_entry_header grant_entry_header_t;
+
+/*
+ * Version 2 of the grant entry structure.
+ */
+union grant_entry_v2 {
+    grant_entry_header_t hdr;
+
+    /*
+     * This member is used for V1-style full page grants, where either:
+     *
+     * -- hdr.type is GTF_accept_transfer, or
+     * -- hdr.type is GTF_permit_access and GTF_sub_page is not set.
+     *
+     * In that case, the frame field has the same semantics as the
+     * field of the same name in the V1 entry structure.
+     */
+    struct {
+        grant_entry_header_t hdr;
+        uint32_t pad0;
+        uint64_t frame;
+    } full_page;
+
+    uint32_t __spacer[4]; /* Pad to a power of two */
+};
+typedef union grant_entry_v2 grant_entry_v2_t;
+
+typedef uint16_t grant_status_t;
+
+#endif /* __XEN_INTERFACE_VERSION__ */
 
 /***********************************
  * GRANT TABLE QUERIES AND USES
@@ -363,6 +417,63 @@ struct gnttab_unmap_and_replace {
 typedef struct gnttab_unmap_and_replace gnttab_unmap_and_replace_t;
 DEFINE_XEN_GUEST_HANDLE(gnttab_unmap_and_replace_t);
 
+#if __XEN_INTERFACE_VERSION__ >= 0x0003020a
+/*
+ * GNTTABOP_set_version: Request a particular version of the grant
+ * table shared table structure.  This operation can only be performed
+ * once in any given domain.  It must be performed before any grants
+ * are activated; otherwise, the domain will be stuck with version 1.
+ * The only defined versions are 1 and 2.
+ */
+#define GNTTABOP_set_version          8
+struct gnttab_set_version {
+    /* IN parameters */
+    uint32_t version;
+};
+typedef struct gnttab_set_version gnttab_set_version_t;
+DEFINE_XEN_GUEST_HANDLE(gnttab_set_version_t);
+
+
+/*
+ * GNTTABOP_get_status_frames: Get the list of frames used to store grant
+ * status for <dom>. In grant format version 2, the status is separated
+ * from the other shared grant fields to allow more efficient synchronization
+ * using barriers instead of atomic cmpexch operations.
+ * <nr_frames> specify the size of vector <frame_list>.
+ * The frame addresses are returned in the <frame_list>.
+ * Only <nr_frames> addresses are returned, even if the table is larger.
+ * NOTES:
+ *  1. <dom> may be specified as DOMID_SELF.
+ *  2. Only a sufficiently-privileged domain may specify <dom> != DOMID_SELF.
+ */
+#define GNTTABOP_get_status_frames     9
+struct gnttab_get_status_frames {
+    /* IN parameters. */
+    uint32_t nr_frames;
+    domid_t  dom;
+    /* OUT parameters. */
+    int16_t  status;              /* GNTST_* */
+    XEN_GUEST_HANDLE(uint64_t) frame_list;
+};
+typedef struct gnttab_get_status_frames gnttab_get_status_frames_t;
+DEFINE_XEN_GUEST_HANDLE(gnttab_get_status_frames_t);
+
+/*
+ * GNTTABOP_get_version: Get the grant table version which is in
+ * effect for domain <dom>.
+ */
+#define GNTTABOP_get_version          10
+struct gnttab_get_version {
+    /* IN parameters */
+    domid_t dom;
+    uint16_t pad;
+    /* OUT parameters */
+    uint32_t version;
+};
+typedef struct gnttab_get_version gnttab_get_version_t;
+DEFINE_XEN_GUEST_HANDLE(gnttab_get_version_t);
+
+#endif /* __XEN_INTERFACE_VERSION__ */
 
 /*
  * Bitfield values for gnttab_map_grant_ref.flags.

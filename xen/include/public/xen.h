@@ -47,6 +47,7 @@ DEFINE_XEN_GUEST_HANDLE(long);
 __DEFINE_XEN_GUEST_HANDLE(ulong, unsigned long);
 DEFINE_XEN_GUEST_HANDLE(void);
 
+DEFINE_XEN_GUEST_HANDLE(uint64_t);
 DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 #endif
 

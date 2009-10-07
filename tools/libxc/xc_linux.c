@@ -558,7 +558,21 @@ int xc_gnttab_op(int xc_handle, int cmd,
     return ret;
 }
 
-struct grant_entry_v1 *xc_gnttab_map_table(int xc_handle, int domid, int *gnt_num)
+int xc_gnttab_get_version(int xc_handle, int domid)
+{
+    struct gnttab_get_version query;
+    int rc;
+
+    query.dom = domid;
+    rc = xc_gnttab_op(xc_handle, GNTTABOP_get_version,
+                      &query, sizeof(query), 1);
+    if (rc < 0)
+        return rc;
+    else
+        return query.version;
+}
+
+static void *_gnttab_map_table(int xc_handle, int domid, int *gnt_num)
 {
     int rc, i;
     struct gnttab_query_size query;
@@ -636,6 +650,22 @@ err:
         free(pfn_list);
 
     return gnt;
+}
+
+struct grant_entry_v1 *xc_gnttab_map_table_v1(int xc_handle, int domid,
+                                              int *gnt_num)
+{
+    if (xc_gnttab_get_version(xc_handle, domid) == 2)
+        return NULL;
+    return _gnttab_map_table(xc_handle, domid, gnt_num);
+}
+
+struct grant_entry_v2 *xc_gnttab_map_table_v2(int xc_handle, int domid,
+                                              int *gnt_num)
+{
+    if (xc_gnttab_get_version(xc_handle, domid) != 2)
+        return NULL;
+    return _gnttab_map_table(xc_handle, domid, gnt_num);
 }
 
 /*

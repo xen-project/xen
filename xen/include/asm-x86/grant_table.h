@@ -21,15 +21,30 @@ int replace_grant_host_mapping(
 #define gnttab_create_shared_page(d, t, i)                               \
     do {                                                                 \
         share_xen_page_with_guest(                                       \
-            virt_to_page((char *)(t)->shared[i]),                        \
+            virt_to_page((char *)(t)->shared_raw[i]),                    \
             (d), XENSHARE_writable);                                     \
     } while ( 0 )
 
+#define gnttab_create_status_page(d, t, i)                               \
+    do {                                                                 \
+        share_xen_page_with_guest(                                       \
+           virt_to_page((char *)(t)->status[i]),                         \
+            (d), XENSHARE_writable);                                     \
+    } while ( 0 )
+
+
 #define gnttab_shared_mfn(d, t, i)                      \
-    ((virt_to_maddr((t)->shared[i]) >> PAGE_SHIFT))
+    ((virt_to_maddr((t)->shared_raw[i]) >> PAGE_SHIFT))
 
 #define gnttab_shared_gmfn(d, t, i)                     \
     (mfn_to_gmfn(d, gnttab_shared_mfn(d, t, i)))
+
+
+#define gnttab_status_mfn(d, t, i)                      \
+    ((virt_to_maddr((t)->status[i]) >> PAGE_SHIFT))
+
+#define gnttab_status_gmfn(d, t, i)                     \
+    (mfn_to_gmfn(d, gnttab_status_mfn(d, t, i)))
 
 #define gnttab_mark_dirty(d, f) paging_mark_dirty((d), (f))
 
