@@ -85,6 +85,11 @@
  */
 
 /*
+ * Reference to a grant entry in a specified domain's grant table.
+ */
+typedef uint32_t grant_ref_t;
+
+/*
  * A grant table comprises a packed array of grant entries in one or more
  * page frames shared between Xen and a guest.
  * [XEN]: This field is written by Xen and read by the sharing guest.
@@ -118,10 +123,13 @@ typedef struct grant_entry_v1 grant_entry_v1_t;
  *  GTF_permit_access: Allow @domid to map/access @frame.
  *  GTF_accept_transfer: Allow @domid to transfer ownership of one page frame
  *                       to this guest. Xen writes the page number to @frame.
+ *  GTF_transitive: Allow @domid to transitively access a subrange of
+ *                  @trans_grant in @trans_domid.  No mappings are allowed.
  */
 #define GTF_invalid         (0U<<0)
 #define GTF_permit_access   (1U<<0)
 #define GTF_accept_transfer (2U<<0)
+#define GTF_transitive      (3U<<0)
 #define GTF_type_mask       (3U<<0)
 
 /*
@@ -218,6 +226,22 @@ union grant_entry_v2 {
         uint64_t frame;
     } sub_page;
 
+    /*
+     * If the grant is GTF_transitive, @domid is allowed to use the
+     * grant @gref in domain @trans_domid, as if it was the local
+     * domain.  Obviously, the transitive access must be compatible
+     * with the original grant.
+     *
+     * The current version of Xen does not allow transitive grants
+     * to be mapped.
+     */
+    struct {
+        grant_entry_header_t hdr;
+        domid_t trans_domid;
+        uint16_t pad0;
+        grant_ref_t gref;
+    } transitive;
+
     uint32_t __spacer[4]; /* Pad to a power of two */
 };
 typedef union grant_entry_v2 grant_entry_v2_t;
@@ -229,11 +253,6 @@ typedef uint16_t grant_status_t;
 /***********************************
  * GRANT TABLE QUERIES AND USES
  */
-
-/*
- * Reference to a grant entry in a specified domain's grant table.
- */
-typedef uint32_t grant_ref_t;
 
 /*
  * Handle to track a mapping created via a grant reference.

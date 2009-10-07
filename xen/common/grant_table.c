@@ -309,11 +309,12 @@ static int _set_status_v2(domid_t  domid,
 
     /* If not already pinned, check the grant domid and type. */
     if ( !act->pin &&
-         (((flags & mask) != GTF_permit_access) ||
+         ( (((flags & mask) != GTF_permit_access) &&
+            ((flags & mask) != GTF_transitive)) ||
           (id != domid)) )
         PIN_FAIL(done, GNTST_general_error,
-                 "Bad flags (%x) or dom (%d). (expected dom %d)\n",
-                 flags, id, domid);
+                 "Bad flags (%x) or dom (%d). (expected dom %d, flags %x)\n",
+                 flags, id, domid, mask);
 
     if ( readonly )
     {
@@ -338,7 +339,8 @@ static int _set_status_v2(domid_t  domid,
 
     if ( !act->pin )
     {
-        if ( ((flags & mask) != GTF_permit_access) ||
+        if ( (((flags & mask) != GTF_permit_access) &&
+              ((flags & mask) != GTF_transitive)) ||
              (id != domid) ||
              (!readonly && (flags & GTF_readonly)) )
         {
@@ -1533,6 +1535,14 @@ __release_grant_for_copy(
     struct active_grant_entry *act;
     unsigned long r_frame;
     uint16_t *status;
+    domid_t trans_domid;
+    grant_ref_t trans_gref;
+    int released_read;
+    int released_write;
+    struct domain *trans_dom;
+
+    released_read = 0;
+    released_write = 0;
 
     spin_lock(&rd->grant_table->lock);
 
@@ -1541,9 +1551,19 @@ __release_grant_for_copy(
     r_frame = act->frame;
 
     if (rd->grant_table->gt_version == 1)
+    {
         status = &sha->flags;
+        trans_domid = rd->domain_id;
+        /* Shut the compiler up.  This'll never be used, because
+           trans_domid == rd->domain_id, but gcc doesn't know that. */
+        trans_gref = 0x1234567;
+    }
     else
+    {
         status = &status_entry(rd->grant_table, gref);
+        trans_domid = act->trans_dom;
+        trans_gref = act->trans_gref;
+    }
 
     if ( readonly )
     {
@@ -1555,13 +1575,51 @@ __release_grant_for_copy(
 
         act->pin -= GNTPIN_hstw_inc;
         if ( !(act->pin & (GNTPIN_devw_mask|GNTPIN_hstw_mask)) )
+        {
+            released_write = 1;
             gnttab_clear_flag(_GTF_writing, status);
+        }
     }
 
     if ( !act->pin )
+    {
         gnttab_clear_flag(_GTF_reading, status);
+        released_read = 1;
+    }
 
     spin_unlock(&rd->grant_table->lock);
+
+    if ( trans_domid != rd->domain_id )
+    {
+        if ( released_write || released_read )
+        {
+            trans_dom = rcu_lock_domain_by_id(trans_domid);
+            if ( trans_dom != NULL )
+            {
+                /* Recursive calls, but they're tail calls, so it's
+                   okay. */
+                if ( released_write )
+                    __release_grant_for_copy(trans_dom, trans_gref, 0);
+                else if ( released_read )
+                    __release_grant_for_copy(trans_dom, trans_gref, 1);
+            }
+        }
+    }
+}
+
+/* The status for a grant indicates that we're taking more access than
+   the pin requires.  Fix up the status to match the pin.  Called
+   under the domain's grant table lock. */
+/* Only safe on transitive grants.  Even then, note that we don't
+   attempt to drop any pin on the referent grant. */
+static void __fixup_status_for_pin(struct active_grant_entry *act,
+                                   uint16_t *status)
+{
+    if ( !(act->pin & GNTPIN_hstw_mask) )
+        *status &= ~_GTF_writing;
+
+    if ( !(act->pin & GNTPIN_hstr_mask) )
+        *status &= ~_GTF_reading;
 }
 
 /* Grab a frame number from a grant entry and update the flags and pin
@@ -1570,15 +1628,27 @@ __release_grant_for_copy(
    actually valid. */
 static int
 __acquire_grant_for_copy(
-    struct domain *rd, unsigned long gref, int readonly,
-    unsigned long *frame, unsigned *page_off, unsigned *length)
+    struct domain *rd, unsigned long gref, struct domain *ld, int readonly,
+    unsigned long *frame, unsigned *page_off, unsigned *length,
+    unsigned allow_transitive, struct domain **owning_domain)
 {
     grant_entry_v1_t *sha1;
     grant_entry_v2_t *sha2;
     grant_entry_header_t *shah;
     struct active_grant_entry *act;
     grant_status_t *status;
+    uint32_t old_pin;
+    domid_t trans_domid;
+    grant_ref_t trans_gref;
+    struct domain *rrd;
+    unsigned long grant_frame;
+    unsigned trans_page_off;
+    unsigned trans_length;
+    int is_sub_page;
+    struct domain *ignore;
     s16 rc = GNTST_okay;
+
+    *owning_domain = NULL;
 
     spin_lock(&rd->grant_table->lock);
 
@@ -1607,45 +1677,127 @@ __acquire_grant_for_copy(
 
     /* If already pinned, check the active domid and avoid refcnt overflow. */
     if ( act->pin &&
-         ((act->domid != current->domain->domain_id) ||
+         ((act->domid != ld->domain_id) ||
           (act->pin & 0x80808080U) != 0) )
         PIN_FAIL(unlock_out, GNTST_general_error,
                  "Bad domain (%d != %d), or risk of counter overflow %08x\n",
-                 act->domid, current->domain->domain_id, act->pin);
+                 act->domid, ld->domain_id, act->pin);
 
+    old_pin = act->pin;
     if ( !act->pin ||
          (!readonly && !(act->pin & (GNTPIN_devw_mask|GNTPIN_hstw_mask))) )
     {
         if ( (rc = _set_status(rd->grant_table->gt_version,
-                               current->domain->domain_id, 
-                               readonly, 0, shah, act, status) ) != GNTST_okay )
+                               ld->domain_id,
+                               readonly, 0, shah, act,
+                               status) ) != GNTST_okay )
              goto unlock_out;
+
+        trans_domid = ld->domain_id;
+        trans_gref = 0;
+        if ( sha2 && (shah->flags & GTF_type_mask) == GTF_transitive )
+        {
+            if ( !allow_transitive )
+                PIN_FAIL(unlock_out, GNTST_general_error,
+                         "transitive grant when transitivity not allowed\n");
+
+            trans_domid = sha2->transitive.trans_domid;
+            trans_gref = sha2->transitive.gref;
+            barrier(); /* Stop the compiler from re-loading
+                          trans_domid from shared memory */
+            if ( trans_domid == rd->domain_id )
+                PIN_FAIL(unlock_out, GNTST_general_error,
+                         "transitive grants cannot be self-referential\n");
+
+            /* We allow the trans_domid == ld->domain_id case, which
+               corresponds to a grant being issued by one domain, sent
+               to another one, and then transitively granted back to
+               the original domain.  Allowing it is easy, and means
+               that you don't need to go out of your way to avoid it
+               in the guest. */
+
+            rrd = rcu_lock_domain_by_id(trans_domid);
+            if ( rrd == NULL )
+                PIN_FAIL(unlock_out, GNTST_general_error,
+                         "transitive grant referenced bad domain %d\n",
+                         trans_domid);
+            spin_unlock(&rd->grant_table->lock);
+
+            rc = __acquire_grant_for_copy(rrd, trans_gref, rd,
+                                          readonly, &grant_frame,
+                                          &trans_page_off, &trans_length,
+                                          0, &ignore);
+
+            spin_lock(&rd->grant_table->lock);
+            if ( rc != GNTST_okay ) {
+                __fixup_status_for_pin(act, status);
+                spin_unlock(&rd->grant_table->lock);
+                return rc;
+            }
+
+            /* We dropped the lock, so we have to check that nobody
+               else tried to pin (or, for that matter, unpin) the
+               reference in *this* domain.  If they did, just give up
+               and try again. */
+            if ( act->pin != old_pin )
+            {
+                __fixup_status_for_pin(act, status);
+                spin_unlock(&rd->grant_table->lock);
+                return __acquire_grant_for_copy(rd, gref, ld, readonly,
+                                                frame, page_off, length,
+                                                allow_transitive,
+                                                owning_domain);
+            }
+
+            /* The actual remote remote grant may or may not be a
+               sub-page, but we always treat it as one because that
+               blocks mappings of transitive grants. */
+            is_sub_page = 1;
+            *owning_domain = rrd;
+            act->gfn = INVALID_GFN;
+        }
+        else if ( sha1 )
+        {
+            act->gfn = sha1->frame;
+            grant_frame = gmfn_to_mfn(rd, act->gfn);
+            is_sub_page = 0;
+            trans_page_off = 0;
+            trans_length = PAGE_SIZE;
+            *owning_domain = rd;
+        }
+        else if ( !(sha2->hdr.flags & GTF_sub_page) )
+        {
+            act->gfn = sha2->full_page.frame;
+            grant_frame = gmfn_to_mfn(rd, act->gfn);
+            is_sub_page = 0;
+            trans_page_off = 0;
+            trans_length = PAGE_SIZE;
+            *owning_domain = rd;
+        }
+        else
+        {
+            act->gfn = sha2->sub_page.frame;
+            grant_frame = gmfn_to_mfn(rd, act->gfn);
+            is_sub_page = 1;
+            trans_page_off = sha2->sub_page.page_off;
+            trans_length = sha2->sub_page.length;
+            *owning_domain = rd;
+        }
 
         if ( !act->pin )
         {
-            act->domid = current->domain->domain_id;
-            act->is_sub_page = 0;
-            act->start = 0;
-            act->length = PAGE_SIZE;
-
-            if ( sha1 )
-            {
-                act->gfn = sha1->frame;
-            }
-            else if ( shah->flags & GTF_sub_page )
-            {
-                act->start = sha2->sub_page.page_off;
-                act->length = sha2->sub_page.length;
-                act->is_sub_page = 1;
-                act->gfn = sha2->sub_page.frame;
-            }
-            else
-            {
-                act->gfn = sha2->full_page.frame;
-            }
-
-            act->frame = gmfn_to_mfn(rd, act->gfn);
+            act->domid = ld->domain_id;
+            act->is_sub_page = is_sub_page;
+            act->start = trans_page_off;
+            act->length = trans_length;
+            act->trans_dom = trans_domid;
+            act->trans_gref = trans_gref;
+            act->frame = grant_frame;
         }
+    }
+    else
+    {
+        *owning_domain = rd;
     }
 
     act->pin += readonly ? GNTPIN_hstr_inc : GNTPIN_hstw_inc;
@@ -1664,6 +1816,7 @@ __gnttab_copy(
     struct gnttab_copy *op)
 {
     struct domain *sd = NULL, *dd = NULL;
+    struct domain *source_domain = NULL, *dest_domain = NULL;
     unsigned long s_frame, d_frame;
     char *sp, *dp;
     s16 rc = GNTST_okay;
@@ -1704,8 +1857,9 @@ __gnttab_copy(
     if ( src_is_gref )
     {
         unsigned source_off, source_len;
-        rc = __acquire_grant_for_copy(sd, op->source.u.ref, 1, &s_frame,
-                                      &source_off, &source_len);
+        rc = __acquire_grant_for_copy(sd, op->source.u.ref, current->domain, 1,
+                                      &s_frame, &source_off, &source_len, 1,
+                                      &source_domain);
         if ( rc != GNTST_okay )
             goto error_out;
         have_s_grant = 1;
@@ -1719,11 +1873,12 @@ __gnttab_copy(
     else
     {
         s_frame = gmfn_to_mfn(sd, op->source.u.gmfn);
+        source_domain = sd;
     }
     if ( unlikely(!mfn_valid(s_frame)) )
         PIN_FAIL(error_out, GNTST_general_error,
                  "source frame %lx invalid.\n", s_frame);
-    if ( !get_page(mfn_to_page(s_frame), sd) )
+    if ( !get_page(mfn_to_page(s_frame), source_domain) )
     {
         if ( !sd->is_dying )
             gdprintk(XENLOG_WARNING, "Could not get src frame %lx\n", s_frame);
@@ -1735,8 +1890,9 @@ __gnttab_copy(
     if ( dest_is_gref )
     {
         unsigned dest_off, dest_len;
-        rc = __acquire_grant_for_copy(dd, op->dest.u.ref, 0, &d_frame,
-                                      &dest_off, &dest_len);
+        rc = __acquire_grant_for_copy(dd, op->dest.u.ref, current->domain, 0,
+                                      &d_frame, &dest_off, &dest_len, 1,
+                                      &dest_domain);
         if ( rc != GNTST_okay )
             goto error_out;
         have_d_grant = 1;
@@ -1750,11 +1906,13 @@ __gnttab_copy(
     else
     {
         d_frame = gmfn_to_mfn(dd, op->dest.u.gmfn);
+        dest_domain = dd;
     }
     if ( unlikely(!mfn_valid(d_frame)) )
         PIN_FAIL(error_out, GNTST_general_error,
                  "destination frame %lx invalid.\n", d_frame);
-    if ( !get_page_and_type(mfn_to_page(d_frame), dd, PGT_writable_page) )
+    if ( !get_page_and_type(mfn_to_page(d_frame), dest_domain,
+                            PGT_writable_page) )
     {
         if ( !dd->is_dying )
             gdprintk(XENLOG_WARNING, "Could not get dst frame %lx\n", d_frame);
