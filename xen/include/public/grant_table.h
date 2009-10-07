@@ -130,6 +130,9 @@ typedef struct grant_entry_v1 grant_entry_v1_t;
  *  GTF_reading: Grant entry is currently mapped for reading by @domid. [XEN]
  *  GTF_writing: Grant entry is currently mapped for writing by @domid. [XEN]
  *  GTF_PAT, GTF_PWT, GTF_PCD: (x86) cache attribute flags for the grant [GST]
+ *  GTF_sub_page: Grant access to only a subrange of the page.  @domid
+ *                will only be allowed to copy from the grant, and not
+ *                map it. [GST]
  */
 #define _GTF_readonly       (2)
 #define GTF_readonly        (1U<<_GTF_readonly)
@@ -143,6 +146,8 @@ typedef struct grant_entry_v1 grant_entry_v1_t;
 #define GTF_PCD             (1U<<_GTF_PCD)
 #define _GTF_PAT            (7)
 #define GTF_PAT             (1U<<_GTF_PAT)
+#define _GTF_sub_page       (8)
+#define GTF_sub_page        (1U<<_GTF_sub_page)
 
 /*
  * Subflags for GTF_accept_transfer:
@@ -200,6 +205,18 @@ union grant_entry_v2 {
         uint32_t pad0;
         uint64_t frame;
     } full_page;
+
+    /*
+     * If the grant type is GTF_grant_access and GTF_sub_page is set,
+     * @domid is allowed to access bytes [@page_off,@page_off+@length)
+     * in frame @frame.
+     */
+    struct {
+        grant_entry_header_t hdr;
+        uint16_t page_off;
+        uint16_t length;
+        uint64_t frame;
+    } sub_page;
 
     uint32_t __spacer[4]; /* Pad to a power of two */
 };

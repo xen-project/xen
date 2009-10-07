@@ -210,6 +210,7 @@ static unsigned int nr_grant_entries(struct grant_table *gt)
 
 static int _set_status_v1(domid_t  domid,
                           int readonly,
+                          int mapflag,
                           grant_entry_header_t *shah, 
                           struct active_grant_entry *act)
 {
@@ -226,6 +227,11 @@ static int _set_status_v1(domid_t  domid,
      * so we allow a few retries before failing.
      */
     int retries = 0;
+
+    /* if this is a grant mapping operation we should ensure GTF_sub_page
+       is not set */
+    if (mapflag)
+        mask |= GTF_sub_page;
 
     scombo.word = *(u32 *)shah;
 
@@ -276,6 +282,7 @@ done:
 
 static int _set_status_v2(domid_t  domid,
                           int readonly,
+                          int mapflag,
                           grant_entry_header_t *shah, 
                           struct active_grant_entry *act,
                           grant_status_t *status)
@@ -294,6 +301,11 @@ static int _set_status_v2(domid_t  domid,
                   it back into two reads */
     flags = scombo.shorts.flags;
     id = scombo.shorts.domid;
+
+    /* if this is a grant mapping operation we should ensure GTF_sub_page
+       is not set */
+    if (mapflag)
+        mask |= GTF_sub_page;
 
     /* If not already pinned, check the grant domid and type. */
     if ( !act->pin &&
@@ -355,15 +367,16 @@ done:
 static int _set_status(unsigned gt_version,
                        domid_t  domid,
                        int readonly,
+                       int mapflag,
                        grant_entry_header_t *shah,
                        struct active_grant_entry *act,
                        grant_status_t *status)
 {
 
     if (gt_version == 1)
-        return _set_status_v1(domid, readonly, shah, act);
+        return _set_status_v1(domid, readonly, mapflag, shah, act);
     else
-        return _set_status_v2(domid, readonly, shah, act, status);
+        return _set_status_v2(domid, readonly, mapflag, shah, act, status);
 }
 
 /*
@@ -460,10 +473,11 @@ __gnttab_map_grant_ref(
     /* If already pinned, check the active domid and avoid refcnt overflow. */
     if ( act->pin &&
          ((act->domid != ld->domain_id) ||
-          (act->pin & 0x80808080U) != 0) )
+          (act->pin & 0x80808080U) != 0 ||
+          (act->is_sub_page)) )
         PIN_FAIL(unlock_out, GNTST_general_error,
-                 "Bad domain (%d != %d), or risk of counter overflow %08x\n",
-                 act->domid, ld->domain_id, act->pin);
+                 "Bad domain (%d != %d), or risk of counter overflow %08x, or subpage %d\n",
+                 act->domid, ld->domain_id, act->pin, act->is_sub_page);
 
     if ( !act->pin ||
          (!(op->flags & GNTMAP_readonly) &&
@@ -471,7 +485,7 @@ __gnttab_map_grant_ref(
     {
         if ( (rc = _set_status(rd->grant_table->gt_version,
                                ld->domain_id, op->flags & GNTMAP_readonly,
-                               shah, act, status) ) != GNTST_okay )
+                               1, shah, act, status) ) != GNTST_okay )
              goto unlock_out;
 
         if ( !act->pin )
@@ -482,6 +496,9 @@ __gnttab_map_grant_ref(
             else
                 act->gfn = sha2->full_page.frame;
             act->frame = gmfn_to_mfn(rd, act->gfn);
+            act->start = 0;
+            act->length = PAGE_SIZE;
+            act->is_sub_page = 0;
         }
     }
 
@@ -1554,7 +1571,7 @@ __release_grant_for_copy(
 static int
 __acquire_grant_for_copy(
     struct domain *rd, unsigned long gref, int readonly,
-    unsigned long *frame)
+    unsigned long *frame, unsigned *page_off, unsigned *length)
 {
     grant_entry_v1_t *sha1;
     grant_entry_v2_t *sha2;
@@ -1601,21 +1618,40 @@ __acquire_grant_for_copy(
     {
         if ( (rc = _set_status(rd->grant_table->gt_version,
                                current->domain->domain_id, 
-                               readonly, shah, act, status) ) != GNTST_okay )
+                               readonly, 0, shah, act, status) ) != GNTST_okay )
              goto unlock_out;
+
         if ( !act->pin )
         {
             act->domid = current->domain->domain_id;
+            act->is_sub_page = 0;
+            act->start = 0;
+            act->length = PAGE_SIZE;
+
             if ( sha1 )
+            {
                 act->gfn = sha1->frame;
+            }
+            else if ( shah->flags & GTF_sub_page )
+            {
+                act->start = sha2->sub_page.page_off;
+                act->length = sha2->sub_page.length;
+                act->is_sub_page = 1;
+                act->gfn = sha2->sub_page.frame;
+            }
             else
+            {
                 act->gfn = sha2->full_page.frame;
+            }
+
             act->frame = gmfn_to_mfn(rd, act->gfn);
         }
     }
 
     act->pin += readonly ? GNTPIN_hstr_inc : GNTPIN_hstw_inc;
 
+    *page_off = act->start;
+    *length = act->length;
     *frame = act->frame;
 
  unlock_out:
@@ -1667,10 +1703,18 @@ __gnttab_copy(
 
     if ( src_is_gref )
     {
-        rc = __acquire_grant_for_copy(sd, op->source.u.ref, 1, &s_frame);
+        unsigned source_off, source_len;
+        rc = __acquire_grant_for_copy(sd, op->source.u.ref, 1, &s_frame,
+                                      &source_off, &source_len);
         if ( rc != GNTST_okay )
             goto error_out;
         have_s_grant = 1;
+        if ( op->source.offset < source_off ||
+             op->len > source_len )
+            PIN_FAIL(error_out, GNTST_general_error,
+                     "copy source out of bounds: %d < %d || %d > %d\n",
+                     op->source.offset, source_off,
+                     op->len, source_len);
     }
     else
     {
@@ -1690,10 +1734,18 @@ __gnttab_copy(
 
     if ( dest_is_gref )
     {
-        rc = __acquire_grant_for_copy(dd, op->dest.u.ref, 0, &d_frame);
+        unsigned dest_off, dest_len;
+        rc = __acquire_grant_for_copy(dd, op->dest.u.ref, 0, &d_frame,
+                                      &dest_off, &dest_len);
         if ( rc != GNTST_okay )
             goto error_out;
         have_d_grant = 1;
+        if ( op->dest.offset < dest_off ||
+             op->len > dest_len )
+            PIN_FAIL(error_out, GNTST_general_error,
+                     "copy dest out of bounds: %d < %d || %d > %d\n",
+                     op->dest.offset, dest_off,
+                     op->len, dest_len);
     }
     else
     {

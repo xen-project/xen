@@ -30,10 +30,15 @@
 
 /* Active grant entry - used for shadowing GTF_permit_access grants. */
 struct active_grant_entry {
-    u32           pin;    /* Reference count information.  */
-    domid_t       domid;  /* Domain being granted access.  */
+    u32           pin;    /* Reference count information.             */
+    domid_t       domid;  /* Domain being granted access.             */
+    unsigned long frame;  /* Frame being granted.                     */
     unsigned long gfn;    /* Guest's idea of the frame being granted. */
-    unsigned long frame;  /* Frame being granted.          */
+    unsigned      is_sub_page:1; /* True if this is a sub-page grant. */
+    unsigned      start:15; /* For sub-page grants, the start offset
+                               in the page.                           */
+    unsigned      length:16; /* For sub-page grants, the length of the
+                                grant.                                */
 };
 
  /* Count of writable host-CPU mappings. */
