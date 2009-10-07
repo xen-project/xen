@@ -558,14 +558,14 @@ int xc_gnttab_op(int xc_handle, int cmd,
     return ret;
 }
 
-struct grant_entry *xc_gnttab_map_table(int xc_handle, int domid, int *gnt_num)
+struct grant_entry_v1 *xc_gnttab_map_table(int xc_handle, int domid, int *gnt_num)
 {
     int rc, i;
     struct gnttab_query_size query;
     struct gnttab_setup_table setup;
     unsigned long *frame_list = NULL;
     xen_pfn_t *pfn_list = NULL;
-    struct grant_entry *gnt = NULL;
+    struct grant_entry_v1 *gnt = NULL;
 
     if (!gnt_num)
         return NULL;
@@ -581,7 +581,7 @@ struct grant_entry *xc_gnttab_map_table(int xc_handle, int domid, int *gnt_num)
     }
 
     *gnt_num = query.nr_frames *
-            (PAGE_SIZE / sizeof(struct grant_entry) );
+            (PAGE_SIZE / sizeof(struct grant_entry_v1) );
 
     frame_list = malloc(query.nr_frames * sizeof(unsigned long));
     if (!frame_list || lock_pages(frame_list, query.nr_frames *

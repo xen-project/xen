@@ -105,7 +105,7 @@ static unsigned inline int max_nr_maptrack_frames(void)
 }
 
 
-#define SHGNT_PER_PAGE (PAGE_SIZE / sizeof(grant_entry_t))
+#define SHGNT_PER_PAGE (PAGE_SIZE / sizeof(grant_entry_v1_t))
 #define shared_entry(t, e) \
     ((t)->shared[(e)/SHGNT_PER_PAGE][(e)%SHGNT_PER_PAGE])
 #define ACGNT_PER_PAGE (PAGE_SIZE / sizeof(struct active_grant_entry))
@@ -205,7 +205,7 @@ __gnttab_map_grant_ref(
     unsigned int   cache_flags;
     struct active_grant_entry *act;
     struct grant_mapping *mt;
-    grant_entry_t *sha;
+    grant_entry_v1_t *sha;
     union grant_combo scombo, prev_scombo, new_scombo;
 
     /*
@@ -508,7 +508,7 @@ __gnttab_unmap_common(
     domid_t          dom;
     struct domain   *ld, *rd;
     struct active_grant_entry *act;
-    grant_entry_t   *sha;
+    grant_entry_v1_t *sha;
     s16              rc = 0;
     u32              old_pin;
 
@@ -622,7 +622,7 @@ __gnttab_unmap_common_complete(struct gnttab_unmap_common *op)
 {
     struct domain   *ld, *rd;
     struct active_grant_entry *act;
-    grant_entry_t   *sha;
+    grant_entry_v1_t *sha;
     struct page_info *pg;
 
     rd = op->rd;
@@ -1046,7 +1046,7 @@ gnttab_prepare_for_transfer(
     struct domain *rd, struct domain *ld, grant_ref_t ref)
 {
     struct grant_table *rgt;
-    struct grant_entry *sha;
+    struct grant_entry_v1 *sha;
     union grant_combo   scombo, prev_scombo, new_scombo;
     int                 retries = 0;
 
@@ -1115,7 +1115,7 @@ gnttab_transfer(
     struct domain *e;
     struct page_info *page;
     int i;
-    grant_entry_t *sha;
+    grant_entry_v1_t *sha;
     struct gnttab_transfer gop;
     unsigned long mfn;
     unsigned int max_bitsize;
@@ -1278,7 +1278,7 @@ static void
 __release_grant_for_copy(
     struct domain *rd, unsigned long gref, int readonly)
 {
-    grant_entry_t *sha;
+    grant_entry_v1_t *sha;
     struct active_grant_entry *act;
     unsigned long r_frame;
 
@@ -1316,7 +1316,7 @@ __acquire_grant_for_copy(
     struct domain *rd, unsigned long gref, int readonly,
     unsigned long *frame)
 {
-    grant_entry_t *sha;
+    grant_entry_v1_t *sha;
     struct active_grant_entry *act;
     s16 rc = GNTST_okay;
     int retries = 0;
@@ -1654,7 +1654,7 @@ do_grant_table_op(
 
 static unsigned int max_nr_active_grant_frames(void)
 {
-    return (((max_nr_grant_frames * (PAGE_SIZE / sizeof(grant_entry_t))) + 
+    return (((max_nr_grant_frames * (PAGE_SIZE / sizeof(grant_entry_v1_t))) + 
                     ((PAGE_SIZE / sizeof(struct active_grant_entry))-1)) 
                    / (PAGE_SIZE / sizeof(struct active_grant_entry)));
 }
@@ -1667,7 +1667,7 @@ grant_table_create(
     int                 i;
 
     /* If this sizeof assertion fails, fix the function: shared_index */
-    ASSERT(sizeof(grant_entry_t) == 8);
+    ASSERT(sizeof(grant_entry_v1_t) == 8);
 
     if ( (t = xmalloc(struct grant_table)) == NULL )
         goto no_mem_0;
@@ -1703,7 +1703,7 @@ grant_table_create(
         t->maptrack[0][i].ref = i+1;
 
     /* Shared grant table. */
-    if ( (t->shared = xmalloc_array(struct grant_entry *,
+    if ( (t->shared = xmalloc_array(struct grant_entry_v1 *,
                                     max_nr_grant_frames)) == NULL )
         goto no_mem_3;
     memset(t->shared, 0, max_nr_grant_frames * sizeof(t->shared[0]));
@@ -1749,7 +1749,7 @@ gnttab_release_mappings(
     grant_handle_t        handle;
     struct domain        *rd;
     struct active_grant_entry *act;
-    struct grant_entry   *sha;
+    struct grant_entry_v1*sha;
     struct page_info     *pg;
 
     BUG_ON(!d->is_dying);

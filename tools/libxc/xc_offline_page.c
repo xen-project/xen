@@ -133,7 +133,7 @@ int xc_query_page_offline_status(int xc, unsigned long start,
   * There should no update to the grant when domain paused
   */
 static int xc_is_page_granted(int xc_handle, xen_pfn_t gpfn,
-                              struct grant_entry *gnttab, int gnt_num)
+                              struct grant_entry_v1 *gnttab, int gnt_num)
 {
     int i = 0;
 
@@ -549,7 +549,7 @@ int xc_exchange_page(int xc_handle, int domid, xen_pfn_t mfn)
     struct domain_mem_info minfo;
     struct xc_mmu *mmu = NULL;
     struct pte_backup old_ptes = {NULL, 0, 0};
-    struct grant_entry *gnttab = NULL;
+    struct grant_entry_v1 *gnttab = NULL;
     struct mmuext_op mops;
     int gnt_num, unpined = 0;
     void *old_p, *backup = NULL;
@@ -756,7 +756,7 @@ failed:
         free(backup);
 
     if (gnttab)
-        munmap(gnttab, gnt_num / (PAGE_SIZE/sizeof(struct grant_entry)));
+        munmap(gnttab, gnt_num / (PAGE_SIZE/sizeof(struct grant_entry_v1)));
 
     close_mem_info(xc_handle, &minfo);
 

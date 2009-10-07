@@ -943,7 +943,7 @@ int xc_gnttab_set_max_grants(int xcg_handle,
 int xc_gnttab_op(int xc_handle, int cmd,
                  void * op, int op_size, int count);
 
-struct grant_entry *xc_gnttab_map_table(int xc_handle, int domid, int *gnt_num);
+struct grant_entry_v1 *xc_gnttab_map_table(int xc_handle, int domid, int *gnt_num);
 
 int xc_physdev_map_pirq(int xc_handle,
                         int domid,

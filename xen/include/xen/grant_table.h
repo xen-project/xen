@@ -80,7 +80,7 @@ struct grant_table {
     /* Table size. Number of frames shared with guest */
     unsigned int          nr_grant_frames;
     /* Shared grant table (see include/public/grant_table.h). */
-    struct grant_entry  **shared;
+    struct grant_entry_v1 **shared;
     /* Active grant table. */
     struct active_grant_entry **active;
     /* Mapping tracking table. */
@@ -117,7 +117,7 @@ static inline unsigned int nr_grant_frames(struct grant_table *gt)
 /* Number of grant table entries. Caller must hold d's grant table lock. */
 static inline unsigned int nr_grant_entries(struct grant_table *gt)
 {
-    return (nr_grant_frames(gt) << PAGE_SHIFT) / sizeof(grant_entry_t);
+    return (nr_grant_frames(gt) << PAGE_SHIFT) / sizeof(grant_entry_v1_t);
 }
 
 static inline unsigned int
@@ -126,7 +126,7 @@ num_act_frames_from_sha_frames(const unsigned int num)
     /* How many frames are needed for the active grant table,
      * given the size of the shared grant table? */
     unsigned act_per_page = PAGE_SIZE / sizeof(struct active_grant_entry);
-    unsigned sha_per_page = PAGE_SIZE / sizeof(grant_entry_t);
+    unsigned sha_per_page = PAGE_SIZE / sizeof(grant_entry_v1_t);
     unsigned num_sha_entries = num * sha_per_page;
     unsigned num_act_frames =
         (num_sha_entries + (act_per_page-1)) / act_per_page;

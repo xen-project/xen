@@ -44,7 +44,7 @@
 !	gnttab_transfer			grant_table.h
 ?	gnttab_unmap_grant_ref		grant_table.h
 ?	gnttab_unmap_and_replace	grant_table.h
-?	grant_entry			grant_table.h
+?	grant_entry_v1			grant_table.h
 ?	kexec_exec			kexec.h
 !	kexec_image			kexec.h
 !	kexec_range			kexec.h

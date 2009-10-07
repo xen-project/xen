@@ -5,9 +5,9 @@
 
 #include <compat/grant_table.h>
 
-#define xen_grant_entry grant_entry
-CHECK_grant_entry;
-#undef xen_grant_entry
+#define xen_grant_entry_v1 grant_entry_v1
+CHECK_grant_entry_v1;
+#undef xen_grant_entry_v1
 
 #define xen_gnttab_map_grant_ref gnttab_map_grant_ref
 CHECK_gnttab_map_grant_ref;

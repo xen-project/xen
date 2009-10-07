@@ -90,7 +90,11 @@
  * [XEN]: This field is written by Xen and read by the sharing guest.
  * [GST]: This field is written by the guest and read by Xen.
  */
-struct grant_entry {
+#if __XEN_INTERFACE_VERSION__ < 0x0003020a
+#define grant_entry_v1 grant_entry
+#define grant_entry_v1_t grant_entry_t
+#endif
+struct grant_entry_v1 {
     /* GTF_xxx: various type and flag information.  [XEN,GST] */
     uint16_t flags;
     /* The domain being granted foreign privileges. [GST] */
@@ -101,7 +105,7 @@ struct grant_entry {
      */
     uint32_t frame;
 };
-typedef struct grant_entry grant_entry_t;
+typedef struct grant_entry_v1 grant_entry_v1_t;
 
 /*
  * Type of grant entry.
