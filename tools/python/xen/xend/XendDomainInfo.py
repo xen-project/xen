@@ -1222,7 +1222,7 @@ class XendDomainInfo:
                         break
                 self._waitForDevice_destroy(deviceClass, devid, backend)
 
-        if rm_cfg:
+        if rm_cfg and deviceClass != "vif2":
             if deviceClass == 'vif':
                 if self.domid is not None:
                     mac = ''

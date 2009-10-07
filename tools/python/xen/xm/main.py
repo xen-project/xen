@@ -181,6 +181,15 @@ SUBCOMMAND_HELP = {
                         'Destroy a domain\'s virtual network device.'),
     'network-list'  :  ('<Domain> [--long]',
                         'List virtual network interfaces for a domain.'),
+    'network2-attach': ('<Domain> [front_mac=<mac>] [back_mac=<mac>] '
+                        '[backend=<BackDomain>] [trusted=<0|1>] '
+                        '[back_trusted=<0|1>] [bridge=<bridge>] '
+                        '[max_bypasses=n]'
+                        'Create a new version 2 virtual network device.'),
+    'network2-detach': ('<Domain> <DevId> [-f|--force]',
+                         'Destroy a domain\'s version 2 virtual network device.'),
+    'network2-list'  : ('<Domain> [--long]',
+                        'List version 2 virtual network interfaces for a domain.'),
     'vnet-create'   :  ('<ConfigFile>','Create a vnet from ConfigFile.'),
     'vnet-delete'   :  ('<VnetId>', 'Delete a Vnet.'),
     'vnet-list'     :  ('[-l|--long]', 'List Vnets.'),
@@ -399,6 +408,9 @@ device_commands = [
     "network-attach",
     "network-detach",
     "network-list",
+    "network2-attach",
+    "network2-detach",
+    "network2-list",
     "vtpm-list",
     "pci-attach",
     "pci-detach",
@@ -2436,6 +2448,35 @@ def xm_block_configure(args):
     server.xend.domain.device_configure(dom, vbd)
 
 
+def xm_network2_attach(args):
+    xenapi_unsupported()
+    arg_check(args, 'network2-attach', 1, 4)
+    dom = args[0]
+    vif = ['vif2']
+    vif_params = ['front_mac', 'back_mac', 'backend', 'trusted',
+                  'back_trusted', "front_filter_mac", "filter_mac",
+                  'bridge', 'pdev', "max_bypasses" ]
+    for a in args[1:]:
+        vif_param = a.split("=")
+        if len(vif_param) != 2 or vif_param[1] == "" or \
+           vif_param[0] not in vif_params:
+            err("Invalid argument: %s" % a)
+            usage("network2-attach")
+        vif.append(vif_param)
+    server.xend.domain.device_create(dom, vif)
+
+def xm_network2_detach(args):
+    xenapi_unsupported()
+    arg_check(args, "network2-detch", 2, 3)
+    detach(args, "vif2")
+
+def xm_network2_list(args):
+    xenapi_unsupported()
+    (use_long, params) = arg_check_for_resource_list(args, "network2-list")
+    dom = params[0]
+    devs = server.xend.domain.getDeviceSxprs(dom, 'vif2')
+    map(PrettyPrint.prettyprint, devs)
+                
 def xm_network_attach(args):
     arg_check(args, 'network-attach', 1, 11)
 
@@ -3239,6 +3280,9 @@ commands = {
     "network-attach": xm_network_attach,
     "network-detach": xm_network_detach,
     "network-list": xm_network_list,
+    "network2-attach": xm_network2_attach,
+    "network2-detach": xm_network2_detach,
+    "network2-list": xm_network2_list,
     # network (as in XenAPI)
     "network-new": xm_network_new,
     "network-del": xm_network_del,

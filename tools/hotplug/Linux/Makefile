@@ -11,6 +11,7 @@ XENDOMAINS_SYSCONFIG = init.d/sysconfig.xendomains
 XEN_SCRIPTS = network-bridge vif-bridge
 XEN_SCRIPTS += network-route vif-route
 XEN_SCRIPTS += network-nat vif-nat
+XEN_SCRIPTS += vif2
 XEN_SCRIPTS += block
 XEN_SCRIPTS += block-enbd block-nbd
 XEN_SCRIPTS += blktap

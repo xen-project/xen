@@ -393,6 +393,12 @@ gopts.var('vif', val="type=TYPE,mac=MAC,bridge=BRIDGE,ip=IPADDR,script=SCRIPT," 
           This option may be repeated to add more than one vif.
           Specifying vifs will increase the number of interfaces as needed.""")
 
+gopts.var('vif2', val="front_mac=MAC,back_mac=MAC,backend=DOM,pdev=PDEV,max_bypasses=N,bridge=BRIDGE,filter_mac=<0|1>,front_filter_mac=<0|1>",
+          fn=append_value, default=[],
+          use="""Add a netchannel2 network interface using given front
+          and backend MAC addresses.  Randomly generated
+          addresses will be used if either address is missing.""")
+
 gopts.var('vtpm', val="instance=INSTANCE,backend=DOM,type=TYPE",
           fn=append_value, default=[],
           use="""Add a TPM interface. On the backend side use the given
@@ -931,6 +937,8 @@ def configure_vifs(config_devs, vals):
 
     vifs = vals.vif
     vifs_n = len(vifs)
+    vifs2 = vals.vif2
+    vifs2_n = len(vifs2)
 
     if hasattr(vals, 'nics'):
         if vals.nics > 0:
@@ -955,6 +963,18 @@ def configure_vifs(config_devs, vals):
             config_vif.append([k, d[k]])
 
         map(f, d.keys())
+        config_devs.append(['device', config_vif])
+
+    for c in vifs2:
+        d = comma_sep_kv_to_dict(c)
+        config_vif = ['vif2']
+
+        for k in d.keys():
+            if k not in ['front_mac', 'back_mac', 'backend', 'trusted',
+                         'back_trusted', 'front_filter_mac', 'filter_mac',
+                         'bridge', 'pdev', 'max_bypasses' ]:
+                err('Invalid vif2 option: ' + k)
+            config_vif.append([k, d[k]])
         config_devs.append(['device', config_vif])
 
 

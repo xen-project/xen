@@ -1,0 +1,46 @@
+#!/bin/bash
+
+dir=$(dirname "$0")
+. "$dir/xen-hotplug-common.sh"
+. "$dir/xen-network-common.sh"
+
+bridge=$(xenstore_read_default "$XENBUS_PATH/bridge" "$bridge")
+if [ -z "$bridge" ]
+    then
+    nr_bridges=$(($(brctl show | cut -f 1 | grep -v "^$" | wc -l) - 1))
+    if [ "$nr_bridges" != 1 ]
+	then
+	fatal "no bridge specified, and don't know which one to use ($nr_bridges found)"
+    fi
+    bridge=$(brctl show | cut -d "
+" -f 2 | cut -f 1)
+fi
+
+command="$1"
+shift
+
+case "$command" in
+    "online")
+	if [ "$bridge" != "-" ]
+	    then
+	    setup_bridge_port "$vif"
+	    add_to_bridge "$bridge" "$vif"
+	else
+	    # Just let the normal udev rules for interfaces handle it.
+	    true
+	fi
+	success
+	;;
+
+    "add")
+	success
+	;;
+
+    "remove")
+	;;
+
+    *)
+	echo "Unknown command: $command"
+	echo 'Valid commands are: add, remove, online'
+	exit 1
+esac

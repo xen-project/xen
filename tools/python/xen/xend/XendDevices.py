@@ -19,7 +19,7 @@
 # A collection of DevControllers 
 #
 
-from xen.xend.server import blkif, netif, tpmif, pciif, iopif, irqif, vfbif, vscsiif
+from xen.xend.server import blkif, netif, tpmif, pciif, iopif, irqif, vfbif, vscsiif, netif2
 from xen.xend.server.BlktapController import BlktapController, Blktap2Controller
 from xen.xend.server.ConsoleController import ConsoleController
 
@@ -37,6 +37,7 @@ class XendDevices:
     controllers = {
         'vbd': blkif.BlkifController,
         'vif': netif.NetifController,
+        'vif2': netif2.NetifController2,
         'vtpm': tpmif.TPMifController,
         'pci': pciif.PciController,
         'ioports': iopif.IOPortsController,
