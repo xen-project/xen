@@ -163,8 +163,11 @@ static int hvmemul_do_io(
         curr->arch.hvm_vcpu.io_state = HVMIO_none;
         break;
     case X86EMUL_UNHANDLEABLE:
-        rc = (!hvm_send_assist_req(curr) || (p_data != NULL)
-              ? X86EMUL_RETRY : X86EMUL_OKAY);
+        rc = X86EMUL_RETRY;
+        if ( !hvm_send_assist_req(curr) )
+            curr->arch.hvm_vcpu.io_state = HVMIO_none;
+        else if ( p_data == NULL )
+            rc = X86EMUL_OKAY;
         break;
     default:
         BUG();
