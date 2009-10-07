@@ -294,7 +294,6 @@ static struct page_info *alloc_heap_pages(
         node = cpu_to_node(smp_processor_id());
 
     ASSERT(node >= 0);
-    ASSERT(node < num_nodes);
     ASSERT(zone_lo <= zone_hi);
     ASSERT(zone_hi < NR_ZONES);
 
@@ -323,8 +322,9 @@ static struct page_info *alloc_heap_pages(
         } while ( zone-- > zone_lo ); /* careful: unsigned zone may wrap */
 
         /* Pick next node, wrapping around if needed. */
-        if ( ++node == num_nodes )
-            node = 0;
+        node = next_node(node, node_online_map);
+        if (node == MAX_NUMNODES)
+            node = first_node(node_online_map);
     }
 
     /* Try to free memory from tmem */
@@ -466,7 +466,6 @@ static void free_heap_pages(
 
     ASSERT(order <= MAX_ORDER);
     ASSERT(node >= 0);
-    ASSERT(node < num_online_nodes());
 
     for ( i = 0; i < (1 << order); i++ )
     {
@@ -817,13 +816,13 @@ static void init_heap_pages(
 static unsigned long avail_heap_pages(
     unsigned int zone_lo, unsigned int zone_hi, unsigned int node)
 {
-    unsigned int i, zone, num_nodes = num_online_nodes();
+    unsigned int i, zone;
     unsigned long free_pages = 0;
 
     if ( zone_hi >= NR_ZONES )
         zone_hi = NR_ZONES - 1;
 
-    for ( i = 0; i < num_nodes; i++ )
+    for_each_online_node(i)
     {
         if ( !avail[i] )
             continue;
