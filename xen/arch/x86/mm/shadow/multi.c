@@ -36,6 +36,7 @@
 #include <asm/hvm/cacheattr.h>
 #include <asm/mtrr.h>
 #include <asm/guest_pt.h>
+#include <public/sched.h>
 #include "private.h"
 #include "types.h"
 
