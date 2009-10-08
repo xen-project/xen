@@ -5,7 +5,7 @@ IMAGE_TARGET ?= bzImage vmlinux
 
 XEN_LINUX_CONFIG_UPDATE := buildconfigs/enable-xen-config
 
-XEN_LINUX_GIT_URL ?= git://git.kernel.org/pub/scm/linux/kernel/git/x86/linux-2.6-tip.git
+XEN_LINUX_GIT_URL ?= http://www.kernel.org/pub/scm/linux/kernel/git/x86/linux-2.6-tip.git
 XEN_LINUX_GIT_REMOTEBRANCH ?= auto-latest
 
 EXTRAVERSION ?=
