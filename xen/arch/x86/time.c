@@ -1442,6 +1442,10 @@ struct tm wallclock_time(void)
  * TSC Reliability check
  */
 
+/*
+ * The Linux original version of this function is
+ * Copyright (c) 2006, Red Hat, Inc., Ingo Molnar
+ */
 void check_tsc_warp(unsigned long tsc_khz, unsigned long *max_warp)
 {
 #define rdtsc_barrier() mb()
@@ -1494,7 +1498,7 @@ void check_tsc_warp(unsigned long tsc_khz, unsigned long *max_warp)
         if ( unlikely(prev > now) )
         {
             spin_lock(&sync_lock);
-            if ( *max_warp > prev - now )
+            if ( *max_warp < prev - now )
                 *max_warp = prev - now;
             spin_unlock(&sync_lock);
         }
