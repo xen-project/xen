@@ -150,9 +150,9 @@ QEMU_REMOTE=http://xenbits.xensource.com/git-http/qemu-xen-unstable.git
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 743edef44f1d0da792aeb38a33bf468a4596f730
-# Wed Sep 23 15:07:47 2009 +0100
-# allow logdirty commands while paused (unbreaks 60dbe1+8f09f4)
+QEMU_TAG ?= a05958b6e32f1748ea70b1efca13394956c0698b
+# Wed Oct 7 15:57:18 2009 +0100
+# block: Clean up after deleting BHs
 
 OCAML_XENSTORED_REPO=http://xenbits.xensource.com/ext/xen-ocaml-tools.hg
 
