@@ -40,7 +40,7 @@ int replace_grant_host_mapping(
     (mfn_to_gmfn(d, gnttab_shared_mfn(d, t, i)))
 
 
-#define gnttab_status_mfn(d, t, i)                      \
+#define gnttab_status_mfn(t, i)                         \
     ((virt_to_maddr((t)->status[i]) >> PAGE_SHIFT))
 
 #define gnttab_status_gmfn(d, t, i)                     \
