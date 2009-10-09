@@ -203,6 +203,17 @@ class XendDomain:
                             if key not in XendConfig.LEGACY_XENSTORE_VM_PARAMS and \
                                    key in dom:
                                 running_dom.info[key] = dom[key]
+                        # Devices information is restored from xenstore,
+                        # but VDI value in devices information can be not
+                        # restored because there is not VDI value in
+                        # xenstore. So we restore VDI value by using the
+                        # domain config file.
+                        for vbd_ref in running_dom.info['vbd_refs']:
+                            if dom['devices'].has_key(vbd_ref):
+                                r_devtype, r_devinfo = running_dom.info['devices'][vbd_ref]
+                                _, m_devinfo = dom['devices'][vbd_ref]
+                                r_devinfo['VDI'] = m_devinfo.get('VDI', '')
+                                running_dom.info['devices'][vbd_ref] = (r_devtype, r_devinfo)
                 except Exception:
                     log.exception("Failed to create reference to managed "
                                   "domain: %s" % dom_name)
@@ -347,7 +358,6 @@ class XendDomain:
             if self.is_domain_managed(dom):
                 self._managed_config_remove(dom.get_uuid())
                 del self.managed_domains[dom.get_uuid()]
-                dom.unlink_xapi_instances()
                 dom.destroy_xapi_instances()
         except ValueError:
             log.warn("Domain is not registered: %s" % dom.get_uuid())
@@ -486,7 +496,6 @@ class XendDomain:
             if domid in self.domains:
                 del self.domains[domid]
 
-            info.unlink_xapi_instances()
             info.destroy_xapi_instances()
         else:
             log.warning("Attempted to remove non-existent domain.")

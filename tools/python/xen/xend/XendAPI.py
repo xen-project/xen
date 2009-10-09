@@ -1986,8 +1986,6 @@ class XendAPI(object):
             log.exception("Error in VBD_create")
             return xen_api_error(['INTERNAL_ERROR', str(e)]) 
             
-        vdi.addVBD(vbd_ref)
-
         xendom.managed_config_save(dom)
         return xen_api_success(vbd_ref)
 
@@ -2004,8 +2002,6 @@ class XendAPI(object):
 
         XendTask.log_progress(0, 100, vm.destroy_vbd, vbd_ref)
 
-        vdi.removeVBD(vbd_ref)
-        
         return xen_api_success_void()
 
     def _VBD_get(self, vbd_ref, prop):

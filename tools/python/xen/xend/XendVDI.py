@@ -76,16 +76,17 @@ class XendVDI(AutoSaveObject):
         self.read_only = False
         self.type = "system"
         self.other_config = {}
-        self.vbds = []
-
-    def addVBD(self, vbd_ref):
-        self.vbds.append(vbd_ref)
-
-    def removeVBD(self, vbd_ref):
-        self.vbds.remove(vbd_ref)
 
     def getVBDs(self):
-        return self.vbds
+        from xen.xend import XendDomain
+        vbd_refs = [d.get_vbds() for d in XendDomain.instance().list('all')]
+        vbd_refs = reduce(lambda x, y: x + y, vbd_refs)
+        vbds = []
+        for vbd_ref in vbd_refs:
+            vdi = XendDomain.instance().get_dev_property_by_uuid('vbd', vbd_ref, 'VDI')
+            if vdi == self.uuid:
+                vbds.append(vbd_ref)
+        return vbds
 
     def load_config_dict(self, cfg):
         """Loads configuration into the object from a dict.
@@ -161,7 +162,7 @@ class XendVDI(AutoSaveObject):
                 'type': self.type,
                 'SR': self.sr_uuid,
                 'other_config': self.other_config,
-                'VBDs': self.vbds}
+                'VBDs': self.getVBDs()}
 
     def get_location(self):
         raise NotImplementedError()
