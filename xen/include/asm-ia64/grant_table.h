@@ -31,8 +31,12 @@ int guest_physmap_add_page(struct domain *d, unsigned long gpfn, unsigned long m
 /* Guest physical address of the grant table.  */
 #define IA64_GRANT_TABLE_PADDR  IA64_XMAPPEDREGS_PADDR(NR_CPUS)
 
-#define gnttab_shared_maddr(t, i)       (virt_to_maddr((t)->shared[(i)]))
-#define gnttab_shared_page(t, i)        (virt_to_page((t)->shared[(i)]))
+#define gnttab_shared_maddr(t, i)       (virt_to_maddr((t)->shared_raw[(i)]))
+#define gnttab_shared_page(t, i)        (virt_to_page((t)->shared_raw[(i)]))
+
+#define gnttab_status_maddr(t, i)       (virt_to_maddr((t)->status[(i)]))
+#define gnttab_status_mfn(t, i)       (virt_to_maddr((t)->status[(i)]) >> PAGE_SHIFT)
+#define gnttab_status_page(t, i)        (virt_to_page((t)->status[(i)]))
 
 #define ia64_gnttab_create_shared_page(d, t, i)                         \
     do {                                                                \
@@ -55,8 +59,26 @@ int guest_physmap_add_page(struct domain *d, unsigned long gpfn, unsigned long m
             ia64_gnttab_create_shared_page((d), (t), (i));      \
     } while (0)
 
+#define ia64_gnttab_create_status_page(d, t, i)                         \
+    do {                                                                \
+        BUG_ON((d)->arch.mm.pgd == NULL);                               \
+        assign_domain_page((d),                                         \
+                           IA64_GRANT_TABLE_PADDR + ((i) << PAGE_SHIFT), \
+                           gnttab_status_maddr((t), (i)));              \
+    } while (0)
+
+#define gnttab_create_status_page(d, t, i)                      \
+    do {                                                        \
+        share_xen_page_with_guest(gnttab_status_page((t), (i)), \
+                                  (d), XENSHARE_writable);      \
+        if ((d)->arch.mm.pgd)                                   \
+            ia64_gnttab_create_status_page((d), (t), (i));      \
+    } while (0)
+
 #define gnttab_shared_gmfn(d, t, i)                 \
     ((IA64_GRANT_TABLE_PADDR >> PAGE_SHIFT) + (i))
+#define gnttab_status_gmfn(d, t, i)                     \
+    (mfn_to_gmfn(d, gnttab_status_mfn(t, i)))
 
 #define gnttab_mark_dirty(d, f) ((void)f)
 

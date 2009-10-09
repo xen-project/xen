@@ -1754,7 +1754,7 @@ __acquire_grant_for_copy(
                blocks mappings of transitive grants. */
             is_sub_page = 1;
             *owning_domain = rrd;
-            act->gfn = INVALID_GFN;
+            act->gfn = -1ul;
         }
         else if ( sha1 )
         {
