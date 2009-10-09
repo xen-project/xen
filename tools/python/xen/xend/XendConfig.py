@@ -2017,7 +2017,9 @@ class XendConfig(dict):
             self['use_tmp_kernel'] = False
             self['use_tmp_ramdisk'] = False
 
-        self['superpages'] = sxp.child_value(image_sxp, 'superpages',0)
+        val = sxp.child_value(image_sxp, 'superpages')
+        if val is not None:
+            self['superpages'] = val
 
         for key in XENAPI_PLATFORM_CFG_TYPES.keys():
             val = sxp.child_value(image_sxp, key, None)
