@@ -66,6 +66,10 @@ integer_param("maxcpus", max_cpus);
 static int opt_watchdog = 0;
 boolean_param("watchdog", opt_watchdog);
 
+/* opt_tsc_unstable: Override all tests; assume TSC is unreliable. */
+static int opt_tsc_unstable;
+boolean_param("tsc_unstable", opt_tsc_unstable);
+
 /* **** Linux config option: propagated to domain0. */
 /* "acpi=off":    Sisables both ACPI table parsing and interpreter. */
 /* "acpi=force":  Override the disable blacklist.                   */
@@ -460,6 +464,14 @@ void __init __start_xen(unsigned long mbi_p)
         while ( kextra[1] == ' ' ) kextra++;
     }
     cmdline_parse(cmdline);
+
+    /* If TSC is marked as unstable, clear all enhanced TSC features. */
+    if ( opt_tsc_unstable )
+    {
+        setup_clear_cpu_cap(X86_FEATURE_CONSTANT_TSC);
+        setup_clear_cpu_cap(X86_FEATURE_NONSTOP_TSC);
+        setup_clear_cpu_cap(X86_FEATURE_TSC_RELIABLE);
+    }
 
     parse_video_info();
 

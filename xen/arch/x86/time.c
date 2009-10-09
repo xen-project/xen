@@ -37,13 +37,6 @@
 static char __initdata opt_clocksource[10];
 string_param("clocksource", opt_clocksource);
 
-/*
- * opt_consistent_tscs: All TSCs tick at the exact same rate, allowing
- * simplified system time handling.
- */
-static int opt_consistent_tscs;
-boolean_param("consistent_tscs", opt_consistent_tscs);
-
 unsigned long cpu_khz;  /* CPU clock frequency in kHz. */
 DEFINE_SPINLOCK(rtc_lock);
 unsigned long pit0_ticks;
@@ -977,7 +970,7 @@ static void local_time_calibration(void)
     /* The overall calibration scale multiplier. */
     u32 calibration_mul_frac;
 
-    if ( opt_consistent_tscs )
+    if ( boot_cpu_has(X86_FEATURE_CONSTANT_TSC) )
     {
         /* Atomically read cpu_calibration struct and write cpu_time struct. */
         local_irq_disable();
@@ -1110,6 +1103,10 @@ struct calibration_rendezvous {
     u64 master_tsc_stamp;
 };
 
+/*
+ * Keep TSCs in sync when they run at the same rate, but may stop in
+ * deep-sleep C states.
+ */
 static void time_calibration_tsc_rendezvous(void *_r)
 {
     int i;
@@ -1161,6 +1158,7 @@ static void time_calibration_tsc_rendezvous(void *_r)
     raise_softirq(TIME_CALIBRATE_SOFTIRQ);
 }
 
+/* Ordinary rendezvous function which does not modify TSC values. */
 static void time_calibration_std_rendezvous(void *_r)
 {
     struct cpu_calibration *c = &this_cpu(cpu_calibration);
@@ -1190,6 +1188,9 @@ static void time_calibration_std_rendezvous(void *_r)
     raise_softirq(TIME_CALIBRATE_SOFTIRQ);
 }
 
+static void (*time_calibration_rendezvous_fn)(void *) =
+    time_calibration_std_rendezvous;
+
 static void time_calibration(void *unused)
 {
     struct calibration_rendezvous r = {
@@ -1199,9 +1200,7 @@ static void time_calibration(void *unused)
 
     /* @wait=1 because we must wait for all cpus before freeing @r. */
     on_selected_cpus(&r.cpu_calibration_map,
-                     opt_consistent_tscs
-                     ? time_calibration_tsc_rendezvous
-                     : time_calibration_std_rendezvous,
+                     time_calibration_rendezvous_fn,
                      &r, 1);
 }
 
@@ -1229,15 +1228,15 @@ void init_percpu_time(void)
 /* Late init function (after all CPUs are booted). */
 int __init init_xen_time(void)
 {
-    if ( !boot_cpu_has(X86_FEATURE_CONSTANT_TSC) )
-        opt_consistent_tscs = 0;
-
-    /* If we have constant TSCs then scale factor can be shared. */
-    if ( opt_consistent_tscs )
+    /* If we have constant-rate TSCs then scale factor can be shared. */
+    if ( boot_cpu_has(X86_FEATURE_CONSTANT_TSC) )
     {
         int cpu;
         for_each_possible_cpu ( cpu )
             per_cpu(cpu_time, cpu).tsc_scale = per_cpu(cpu_time, 0).tsc_scale;
+        /* If TSCs are not marked as 'reliable', re-sync during rendezvous. */
+        if ( !boot_cpu_has(X86_FEATURE_TSC_RELIABLE) )
+            time_calibration_rendezvous_fn = time_calibration_tsc_rendezvous;
     }
 
     open_softirq(TIME_CALIBRATE_SOFTIRQ, local_time_calibration);

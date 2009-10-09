@@ -187,6 +187,11 @@ static void __init synchronize_tsc_bp (void)
 	unsigned int one_usec;
 	int buggy = 0;
 
+	if (boot_cpu_has(X86_FEATURE_TSC_RELIABLE)) {
+		printk("TSC is reliable, synchronization unnecessary\n");
+		return;
+	}
+       
 	printk("checking TSC synchronization across %u CPUs: ", num_booting_cpus());
 
 	/* convert from kcyc/sec to cyc/usec */
@@ -278,6 +283,9 @@ static void __init synchronize_tsc_bp (void)
 static void __init synchronize_tsc_ap (void)
 {
 	int i;
+
+	if (boot_cpu_has(X86_FEATURE_TSC_RELIABLE))
+		return;
 
 	/*
 	 * Not every cpu is online at the time
