@@ -2,7 +2,12 @@
 
 cat > .gcrypt.c << EOF
 #include <gcrypt.h>
-int main(void) { return 0; }
+int main(void) 
+{
+    char dummy[14];
+    MD5("DUMMY", 5, dummy);
+    return 0; 
+}
 EOF
 
 if $1 -o .gcrypt .gcrypt.c -lgcrypt 2>/dev/null ; then
