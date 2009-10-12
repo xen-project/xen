@@ -208,7 +208,7 @@ void free_vcpu_struct(struct vcpu *v)
     free_xenheap_pages(v, get_order_from_bytes(sizeof(*v)));
 }
 
-#ifdef CONFIG_COMPAT
+#ifdef __x86_64__
 
 static int setup_compat_l4(struct vcpu *v)
 {
@@ -445,12 +445,10 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
         l3e_from_page(virt_to_page(d->arch.mm_perdomain_l2),
                             __PAGE_HYPERVISOR);
 
-#endif /* __x86_64__ */
-
-#ifdef CONFIG_COMPAT
     HYPERVISOR_COMPAT_VIRT_START(d) =
         is_hvm_domain(d) ? ~0u : __HYPERVISOR_COMPAT_VIRT_START;
-#endif
+
+#endif /* __x86_64__ */
 
     if ( (rc = paging_domain_init(d)) != 0 )
         goto fail;
@@ -768,9 +766,7 @@ int arch_set_info_guest(
 
             v->arch.guest_table_user = pagetable_from_pfn(cr3_pfn);
         }
-#endif
     }
-#ifdef CONFIG_COMPAT
     else
     {
         l4_pgentry_t *l4tab;
@@ -790,8 +786,8 @@ int arch_set_info_guest(
         l4tab = __va(pagetable_get_paddr(v->arch.guest_table));
         *l4tab = l4e_from_pfn(
             cr3_pfn, _PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED);
-    }
 #endif
+    }
 
     if ( v->vcpu_id == 0 )
         update_domain_wallclock_time(d);

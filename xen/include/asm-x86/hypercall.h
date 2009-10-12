@@ -127,19 +127,6 @@ do_set_segment_base(
     unsigned int which,
     unsigned long base);
 
-#else
-
-extern long
-do_set_callbacks(
-    unsigned long event_selector,
-    unsigned long event_address,
-    unsigned long failsafe_selector,
-    unsigned long failsafe_address);
-
-#endif
-
-#ifdef CONFIG_COMPAT
-
 extern int
 compat_physdev_op(
     int cmd,
@@ -148,6 +135,15 @@ compat_physdev_op(
 extern int
 arch_compat_vcpu_op(
     int cmd, struct vcpu *v, XEN_GUEST_HANDLE(void) arg);
+
+#else
+
+extern long
+do_set_callbacks(
+    unsigned long event_selector,
+    unsigned long event_address,
+    unsigned long failsafe_selector,
+    unsigned long failsafe_address);
 
 #endif
 

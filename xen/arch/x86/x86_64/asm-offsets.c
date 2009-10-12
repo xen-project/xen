@@ -7,9 +7,7 @@
 #include <xen/config.h>
 #include <xen/perfc.h>
 #include <xen/sched.h>
-#ifdef CONFIG_COMPAT
 #include <compat/xen.h>
-#endif
 #include <asm/fixmap.h>
 #include <asm/hardirq.h>
 
@@ -128,11 +126,9 @@ void __dummy__(void)
     OFFSET(VCPUINFO_upcall_mask, struct vcpu_info, evtchn_upcall_mask);
     BLANK();
 
-#ifdef CONFIG_COMPAT
     OFFSET(COMPAT_VCPUINFO_upcall_pending, struct compat_vcpu_info, evtchn_upcall_pending);
     OFFSET(COMPAT_VCPUINFO_upcall_mask, struct compat_vcpu_info, evtchn_upcall_mask);
     BLANK();
-#endif
 
     OFFSET(CPUINFO_current_vcpu, struct cpu_info, current_vcpu);
     DEFINE(CPUINFO_sizeof, sizeof(struct cpu_info));

@@ -455,10 +455,8 @@ TYPE_SAFE(unsigned long,mfn);
 
 #define INVALID_MFN             (~0UL)
 
-#ifdef CONFIG_COMPAT
 #define compat_pfn_to_cr3(pfn) (((unsigned)(pfn) << 12) | ((unsigned)(pfn) >> 20))
 #define compat_cr3_to_pfn(cr3) (((unsigned)(cr3) >> 12) | ((unsigned)(cr3) << 20))
-#endif
 
 #ifdef MEMORY_GUARD
 void memguard_init(void);
@@ -506,10 +504,8 @@ int __sync_lazy_execstate(void);
 /* Arch-specific portion of memory_op hypercall. */
 long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg);
 long subarch_memory_op(int op, XEN_GUEST_HANDLE(void) arg);
-#ifdef CONFIG_COMPAT
 int compat_arch_memory_op(int op, XEN_GUEST_HANDLE(void));
 int compat_subarch_memory_op(int op, XEN_GUEST_HANDLE(void));
-#endif
 
 int steal_page(
     struct domain *d, struct page_info *page, unsigned int memflags);

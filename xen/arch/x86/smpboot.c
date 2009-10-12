@@ -864,14 +864,12 @@ static int __devinit do_boot_cpu(int apicid, int cpu)
 	if (gdt == boot_cpu_gdt_table) {
 		order = get_order_from_pages(NR_RESERVED_GDT_PAGES);
 #ifdef __x86_64__
-#ifdef CONFIG_COMPAT
 		page = alloc_domheap_pages(NULL, order,
 					   MEMF_node(cpu_to_node(cpu)));
 		per_cpu(compat_gdt_table, cpu) = gdt = page_to_virt(page);
 		memcpy(gdt, boot_cpu_compat_gdt_table,
 		       NR_RESERVED_GDT_PAGES * PAGE_SIZE);
 		gdt[PER_CPU_GDT_ENTRY - FIRST_RESERVED_GDT_ENTRY].a = cpu;
-#endif
 		page = alloc_domheap_pages(NULL, order,
 					   MEMF_node(cpu_to_node(cpu)));
 		per_cpu(gdt_table, cpu) = gdt = page_to_virt(page);

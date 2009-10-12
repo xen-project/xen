@@ -43,9 +43,7 @@ unsigned long __read_mostly ma_top_mask = 0;
 unsigned long __read_mostly pfn_hole_mask = 0;
 unsigned int __read_mostly pfn_pdx_hole_shift = 0;
 
-#ifdef CONFIG_COMPAT
 unsigned int m2p_compat_vstart = __HYPERVISOR_COMPAT_VIRT_START;
-#endif
 
 DEFINE_PER_CPU_READ_MOSTLY(void *, compat_arg_xlat);
 

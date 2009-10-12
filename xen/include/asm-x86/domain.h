@@ -234,17 +234,13 @@ struct arch_domain
     struct page_info **mm_perdomain_pt_pages;
     l2_pgentry_t *mm_perdomain_l2;
     l3_pgentry_t *mm_perdomain_l3;
+
+    unsigned int hv_compat_vstart;
 #else
     l1_pgentry_t *mm_perdomain_pt;
-#endif
 
-#ifdef CONFIG_X86_32
     /* map_domain_page() mapping cache. */
     struct mapcache_domain mapcache;
-#endif
-
-#ifdef CONFIG_COMPAT
-    unsigned int hv_compat_vstart;
 #endif
 
     bool_t s3_integrity;

@@ -1,5 +1,3 @@
-#ifdef CONFIG_COMPAT
-
 #include <xen/event.h>
 #include <asm/regs.h>
 #include <compat/callback.h>
@@ -360,8 +358,6 @@ int compat_set_trap_table(XEN_GUEST_HANDLE(trap_info_compat_t) traps)
 
     return rc;
 }
-
-#endif /* CONFIG_COMPAT */
 
 static void hypercall_page_initialise_ring1_kernel(void *hypercall_page)
 {

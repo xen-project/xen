@@ -158,7 +158,7 @@ boolean_param("allowhugepage", opt_allow_hugepage);
       !has_arch_pdevs(d)) ?                                     \
      L1_DISALLOW_MASK : (L1_DISALLOW_MASK & ~PAGE_CACHE_ATTRS))
 
-#ifdef CONFIG_COMPAT
+#ifdef __x86_64__
 l2_pgentry_t *compat_idle_pg_table_l2 = NULL;
 #define l3_disallow_mask(d) (!is_pv_32on64_domain(d) ?  \
                              L3_DISALLOW_MASK :         \
@@ -1002,7 +1002,7 @@ get_page_from_l4e(
 
 #endif
 
-#ifdef CONFIG_COMPAT
+#ifdef __x86_64__
 #define unadjust_guest_l3e(pl3e, d)                                         \
     do {                                                                    \
         if ( unlikely(is_pv_32on64_domain(d)) &&                            \
@@ -1330,7 +1330,7 @@ static int alloc_l2_table(struct page_info *page, unsigned long type,
                                     __PAGE_HYPERVISOR));
         pl2e[l2_table_offset(LINEAR_PT_VIRT_START)] =
             l2e_from_pfn(pfn, __PAGE_HYPERVISOR);
-#elif defined(CONFIG_COMPAT)
+#else
         memcpy(&pl2e[COMPAT_L2_PAGETABLE_FIRST_XEN_SLOT(d)],
                &compat_idle_pg_table_l2[
                    l2_table_offset(HIRO_COMPAT_MPT_VIRT_START)],
@@ -1511,7 +1511,7 @@ static void free_l1_table(struct page_info *page)
 
 static int free_l2_table(struct page_info *page, int preemptible)
 {
-#ifdef CONFIG_COMPAT
+#ifdef __x86_64__
     struct domain *d = page_get_owner(page);
 #endif
     unsigned long pfn = page_to_mfn(page);
@@ -2446,7 +2446,7 @@ int new_guest_cr3(unsigned long mfn)
     int okay;
     unsigned long old_base_mfn;
 
-#ifdef CONFIG_COMPAT
+#ifdef __x86_64__
     if ( is_pv_32on64_domain(d) )
     {
         okay = paging_mode_refcounts(d)

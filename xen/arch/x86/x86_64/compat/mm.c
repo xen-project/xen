@@ -1,5 +1,3 @@
-#ifdef CONFIG_COMPAT
-
 #include <xen/event.h>
 #include <xen/multicall.h>
 #include <compat/memory.h>
@@ -342,8 +340,6 @@ int compat_mmuext_op(XEN_GUEST_HANDLE(mmuext_op_compat_t) cmp_uops,
 
     return rc;
 }
-
-#endif /* CONFIG_COMPAT */
 
 /*
  * Local variables:
