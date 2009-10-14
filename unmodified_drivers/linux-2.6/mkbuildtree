@@ -33,7 +33,11 @@ for d in $(find ${XL}/drivers/xen/ -mindepth 1 -maxdepth 1 -type d); do
 done
 
 ln -sf ${XL}/drivers/xen/core/gnttab.c platform-pci
-ln -sf ${XL}/drivers/xen/core/features.c platform-pci
+if [ -f ${XL}/drivers/xen/core/features.c ]; then
+    ln -sf ${XL}/drivers/xen/core/features.c platform-pci
+else
+    ln -sf ${XL}/drivers/xen/features.c platform-pci
+fi
 ln -sf ${XL}/drivers/xen/core/xen_proc.c xenbus
 ln -sf ${XL}/drivers/xen/core/reboot.c platform-pci
 
@@ -47,7 +51,14 @@ ln -nsf ${XEN}/include/public include/xen/interface
 # be native and not xenolinux).
 case "$uname" in
 i[34567]86|x86_64)
-    if [ -d ${XL}/include/asm-x86 ]; then
+    if [ -d ${XL}/arch/x86/include/mach-xen ]; then
+        ln -sf ${XL}/arch/x86/include/mach-xen/asm/hypervisor.h include/asm
+        ln -sf ${XL}/arch/x86/include/mach-xen/asm/hypercall*.h include/asm
+        ln -sf ${XL}/arch/x86/include/mach-xen/asm/synch_bitops*.h include/asm
+        ln -sf ${XL}/arch/x86/include/mach-xen/asm/maddr*.h include/asm
+        ln -sf ${XL}/arch/x86/include/mach-xen/asm/gnttab_dma.h include/asm
+        ln -sf ${XL}/arch/x86/lib/scrub.c balloon
+    elif [ -d ${XL}/include/asm-x86 ]; then
         ln -sf ${XL}/include/asm-x86/mach-xen/asm/hypervisor.h include/asm
         ln -sf ${XL}/include/asm-x86/mach-xen/asm/hypercall*.h include/asm
         ln -sf ${XL}/include/asm-x86/mach-xen/asm/synch_bitops*.h include/asm
