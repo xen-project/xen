@@ -34,9 +34,6 @@ static int physdev_map_pirq(struct physdev_map_pirq *map)
     struct msi_info _msi;
     void *map_data = NULL;
 
-    if ( !IS_PRIV(current->domain) )
-        return -EPERM;
-
     if ( !map )
         return -EINVAL;
 
@@ -46,8 +43,11 @@ static int physdev_map_pirq(struct physdev_map_pirq *map)
         d = rcu_lock_domain_by_id(map->domid);
 
     if ( d == NULL )
+        return -ESRCH;
+
+    if ( !STUBDOM_IS_PRIV_FOR(current->domain, d) )
     {
-        ret = -ESRCH;
+        ret = -EPERM;
         goto free_domain;
     }
 
@@ -160,9 +160,6 @@ static int physdev_unmap_pirq(struct physdev_unmap_pirq *unmap)
     struct domain *d;
     int ret;
 
-    if ( !IS_PRIV(current->domain) )
-        return -EPERM;
-
     if ( unmap->domid == DOMID_SELF )
         d = rcu_lock_domain(current->domain);
     else
@@ -171,14 +168,18 @@ static int physdev_unmap_pirq(struct physdev_unmap_pirq *unmap)
     if ( d == NULL )
         return -ESRCH;
 
+    ret = -EPERM;
+    if ( !STUBDOM_IS_PRIV_FOR(current->domain, d) )
+        goto free_domain;
+
     spin_lock(&pcidevs_lock);
     spin_lock(&d->event_lock);
     ret = unmap_domain_pirq(d, unmap->pirq);
     spin_unlock(&d->event_lock);
     spin_unlock(&pcidevs_lock);
 
+free_domain:
     rcu_unlock_domain(d);
-
     return ret;
 }
 

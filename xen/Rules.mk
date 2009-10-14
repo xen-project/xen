@@ -9,6 +9,9 @@ perfc_arrays  ?= n
 crash_debug   ?= n
 frame_pointer ?= n
 
+# Allow some delicate passthrough related hypercalls to be made from a stubdom
+privileged_stubdoms ?= y
+
 XEN_ROOT=$(BASEDIR)/..
 include $(XEN_ROOT)/Config.mk
 
@@ -56,6 +59,10 @@ CFLAGS-y                += -DMAX_PHYS_CPUS=$(max_phys_cpus)
 endif
 ifneq ($(max_phys_irqs),)
 CFLAGS-y                += -DMAX_PHYS_IRQS=$(max_phys_irqs)
+endif
+
+ifeq ($(privileged_stubdoms),y)
+CFLAGS += -DPRIVILEGED_STUBDOMS
 endif
 
 AFLAGS-y                += -D__ASSEMBLY__

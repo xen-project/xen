@@ -1340,7 +1340,7 @@ int map_domain_pirq(
     ASSERT(spin_is_locked(&pcidevs_lock));
     ASSERT(spin_is_locked(&d->event_lock));
 
-    if ( !IS_PRIV(current->domain) )
+    if ( !STUBDOM_IS_PRIV_FOR(current->domain, d) )
         return -EPERM;
 
     if ( pirq < 0 || pirq >= d->nr_pirqs || irq < 0 || irq >= nr_irqs )

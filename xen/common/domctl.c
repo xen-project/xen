@@ -220,14 +220,36 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     long ret = 0;
     struct xen_domctl curop, *op = &curop;
 
-    if ( !IS_PRIV(current->domain) )
-        return -EPERM;
-
     if ( copy_from_guest(op, u_domctl, 1) )
         return -EFAULT;
 
     if ( op->interface_version != XEN_DOMCTL_INTERFACE_VERSION )
         return -EACCES;
+
+    switch ( op->cmd )
+    {
+    case XEN_DOMCTL_ioport_mapping:
+    case XEN_DOMCTL_memory_mapping:
+    case XEN_DOMCTL_bind_pt_irq:
+    case XEN_DOMCTL_unbind_pt_irq:
+    case XEN_DOMCTL_assign_device:
+    case XEN_DOMCTL_deassign_device: {
+        struct domain *d = get_domain_by_id(op->domain);
+        bool_t is_priv = IS_PRIV(current->domain);
+        if ( !is_priv && ((d = rcu_lock_domain_by_id(op->domain)) != NULL) )
+        {
+            is_priv = STUBDOM_IS_PRIV_FOR(current->domain, d);
+            rcu_unlock_domain(d);
+        }
+        if ( !is_priv )
+            return -EPERM;
+        break;
+    }
+    default:
+        if ( !IS_PRIV(current->domain) )
+            return -EPERM;
+        break;
+    }
 
     if ( !domctl_lock_acquire() )
         return hypercall_create_continuation(
