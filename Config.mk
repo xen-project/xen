@@ -150,9 +150,9 @@ QEMU_REMOTE=http://xenbits.xensource.com/git-http/qemu-xen-unstable.git
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= a05958b6e32f1748ea70b1efca13394956c0698b
-# Wed Oct 7 15:57:18 2009 +0100
-# block: Clean up after deleting BHs
+QEMU_TAG ?= 71324566f3b95bb88105659439adaef1d5bd155c
+# Tue Oct 13 18:16:42 2009 +0100
+# passthrough: support passthrough in stubdoms
 
 OCAML_XENSTORED_REPO=http://xenbits.xensource.com/ext/xen-ocaml-tools.hg
 
