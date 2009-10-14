@@ -191,10 +191,10 @@ void pcifront_scan(struct pcifront_dev *dev, void (*func)(unsigned int domain, u
     n = xenbus_read_integer(path);
 
     for (i = 0; i < n; i++) {
-        snprintf(path, sizeof(path), "%s/vdev-%d", dev->backend, i);
+        snprintf(path, sizeof(path), "%s/dev-%d", dev->backend, i);
         msg = xenbus_read(XBT_NIL, path, &s);
         if (msg) {
-            printk("Error %s when reading the PCI root name at %s\n", path);
+            printk("Error %s when reading the PCI root name at %s\n", msg, path);
             continue;
         }
 
@@ -260,6 +260,55 @@ close_pcifront:
     free_pcifront(dev);
 }
 
+int pcifront_physical_to_virtual (struct pcifront_dev *dev,
+                                  unsigned int *dom,
+                                  unsigned int *bus,
+                                  unsigned int *slot,
+                                  unsigned long *fun)
+{
+    char path[strlen(dev->backend) + 1 + 5 + 10 + 1];
+    int i, n;
+    char *s, *msg = NULL;
+    unsigned int dom1, bus1, slot1, fun1;
+
+    snprintf(path, sizeof(path), "%s/num_devs", dev->backend);
+    n = xenbus_read_integer(path);
+
+    for (i = 0; i < n; i++) {
+        snprintf(path, sizeof(path), "%s/dev-%d", dev->backend, i);
+        msg = xenbus_read(XBT_NIL, path, &s);
+        if (msg) {
+            printk("Error %s when reading the PCI root name at %s\n", msg, path);
+            continue;
+        }
+
+        if (sscanf(s, "%x:%x:%x.%x", &dom1, &bus1, &slot1, &fun1) != 4) {
+            printk("\"%s\" does not look like a PCI device address\n", s);
+            free(s);
+            continue;
+        }
+        free(s);
+
+        if (dom1 == *dom && bus1 == *bus && slot1 == *slot && fun1 == *fun) {
+            snprintf(path, sizeof(path), "%s/vdev-%d", dev->backend, i);
+            msg = xenbus_read(XBT_NIL, path, &s);
+            if (msg) {
+                printk("Error %s when reading the PCI root name at %s\n", msg, path);
+                continue;
+            }
+
+            if (sscanf(s, "%x:%x:%x.%x", dom, bus, slot, fun) != 4) {
+                printk("\"%s\" does not look like a PCI device address\n", s);
+                free(s);
+                continue;
+            }
+            free(s);
+
+            return 0;
+        }
+    }
+    return -1;
+}
 
 void pcifront_op(struct pcifront_dev *dev, struct xen_pci_op *op)
 {
@@ -283,6 +332,8 @@ int pcifront_conf_read(struct pcifront_dev *dev,
 {
     struct xen_pci_op op;
 
+    if (pcifront_physical_to_virtual(dev, &dom, &bus, &slot, &fun) < 0)
+        return XEN_PCI_ERR_dev_not_found;
     memset(&op, 0, sizeof(op));
 
     op.cmd = XEN_PCI_OP_conf_read;
@@ -309,6 +360,8 @@ int pcifront_conf_write(struct pcifront_dev *dev,
 {
     struct xen_pci_op op;
 
+    if (pcifront_physical_to_virtual(dev, &dom, &bus, &slot, &fun) < 0)
+        return XEN_PCI_ERR_dev_not_found;
     memset(&op, 0, sizeof(op));
 
     op.cmd = XEN_PCI_OP_conf_write;
@@ -331,6 +384,8 @@ int pcifront_enable_msi(struct pcifront_dev *dev,
 {
     struct xen_pci_op op;
 
+    if (pcifront_physical_to_virtual(dev, &dom, &bus, &slot, &fun) < 0)
+        return XEN_PCI_ERR_dev_not_found;
     memset(&op, 0, sizeof(op));
 
     op.cmd = XEN_PCI_OP_enable_msi;
@@ -352,6 +407,8 @@ int pcifront_disable_msi(struct pcifront_dev *dev,
 {
     struct xen_pci_op op;
 
+    if (pcifront_physical_to_virtual(dev, &dom, &bus, &slot, &fun) < 0)
+        return XEN_PCI_ERR_dev_not_found;
     memset(&op, 0, sizeof(op));
 
     op.cmd = XEN_PCI_OP_disable_msi;
@@ -371,6 +428,8 @@ int pcifront_enable_msix(struct pcifront_dev *dev,
 {
     struct xen_pci_op op;
 
+    if (pcifront_physical_to_virtual(dev, &dom, &bus, &slot, &fun) < 0)
+        return XEN_PCI_ERR_dev_not_found;
     if (n > SH_INFO_MAX_VEC)
         return XEN_PCI_ERR_op_failed;
 
@@ -401,6 +460,8 @@ int pcifront_disable_msix(struct pcifront_dev *dev,
 {
     struct xen_pci_op op;
 
+    if (pcifront_physical_to_virtual(dev, &dom, &bus, &slot, &fun) < 0)
+        return XEN_PCI_ERR_dev_not_found;
     memset(&op, 0, sizeof(op));
 
     op.cmd = XEN_PCI_OP_disable_msix;
