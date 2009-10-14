@@ -347,6 +347,20 @@ static struct keyhandler perfc_reset_keyhandler = {
 };
 #endif
 
+#ifdef LOCK_PROFILE
+extern void spinlock_profile_printall(unsigned char key);
+static struct keyhandler spinlock_printall_keyhandler = {
+    .diagnostic = 1,
+    .u.fn = spinlock_profile_printall,
+    .desc = "print lock profile info"
+};
+extern void spinlock_profile_reset(unsigned char key);
+static struct keyhandler spinlock_reset_keyhandler = {
+    .u.fn = spinlock_profile_reset,
+    .desc = "reset lock profile info"
+};
+#endif
+
 static void run_all_nonirq_keyhandlers(unsigned long unused)
 {
     /* Fire all the non-IRQ-context diagnostic keyhandlers */
@@ -428,6 +442,12 @@ void __init initialize_keytable(void)
     register_keyhandler('p', &perfc_printall_keyhandler);
     register_keyhandler('P', &perfc_reset_keyhandler);
 #endif
+
+#ifdef LOCK_PROFILE
+    register_keyhandler('l', &spinlock_printall_keyhandler);
+    register_keyhandler('L', &spinlock_reset_keyhandler);
+#endif
+
 }
 
 /*

@@ -276,6 +276,8 @@ struct domain
 
     /* transcendent memory, auto-allocated on first tmem op by each domain */
     void *tmem;
+
+    struct lock_profile_qhead profile_head;
 };
 
 struct domain_setup_info

@@ -10,7 +10,7 @@ CFLAGS   += $(INCLUDES)
 
 HDRS     = $(wildcard *.h)
 
-TARGETS-y := xenperf xenpm xen-tmem-list-parse gtraceview gtracestat
+TARGETS-y := xenperf xenpm xen-tmem-list-parse gtraceview gtracestat xenlockprof
 TARGETS-$(CONFIG_X86) += xen-detect xen-hvmctx
 TARGETS := $(TARGETS-y)
 
@@ -22,7 +22,7 @@ INSTALL_BIN-y := xencons
 INSTALL_BIN-$(CONFIG_X86) += xen-detect
 INSTALL_BIN := $(INSTALL_BIN-y)
 
-INSTALL_SBIN-y := xm xen-bugtool xen-python-path xend xenperf xsview xenpm xen-tmem-list-parse gtraceview gtracestat
+INSTALL_SBIN-y := xm xen-bugtool xen-python-path xend xenperf xsview xenpm xen-tmem-list-parse gtraceview gtracestat xenlockprof
 INSTALL_SBIN-$(CONFIG_X86) += xen-hvmctx
 INSTALL_SBIN := $(INSTALL_SBIN-y)
 
@@ -49,7 +49,7 @@ clean:
 %.o: %.c $(HDRS) Makefile
 	$(CC) -c $(CFLAGS) -o $@ $<
 
-xen-hvmctx xenperf xenpm gtracestat: %: %.o Makefile
+xen-hvmctx xenperf xenpm gtracestat xenlockprof: %: %.o Makefile
 	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS) $(LDFLAGS_libxenctrl)
 
 gtraceview: %: %.o Makefile

@@ -19,16 +19,109 @@ struct lock_debug { };
 #define spin_debug_disable() ((void)0)
 #endif
 
+#ifdef LOCK_PROFILE
+/*
+    lock profiling on:
+
+    Global locks which should be subject to profiling must be declared via
+    DEFINE_SPINLOCK.
+
+    For locks in structures further measures are necessary:
+    - the structure definition must include a profile_head with exactly this
+      name:
+
+      struct lock_profile_qhead   profile_head;
+
+    - the single locks which are subject to profiling have to be initialized
+      via
+
+      spin_lock_init_prof(ptr, lock);
+
+      with ptr being the main structure pointer and lock the spinlock field
+
+    - each structure has to be added to profiling with
+
+      lock_profile_register_struct(type, ptr, idx, print);
+
+      with:
+        type:  something like LOCKPROF_TYPE_PERDOM
+        ptr:   pointer to the structure
+        idx:   index of that structure, e.g. domid
+        print: descriptive string like "domain"
+
+    - removing of a structure is done via
+
+      lock_profile_deregister_struct(type, ptr);
+*/
+
+struct lock_profile {
+    struct lock_profile *next;       /* forward link */
+    char                *name;       /* lock name */
+    u64                 lock_cnt;    /* # of complete locking ops */
+    u64                 block_cnt;   /* # of complete wait for lock */
+    s64                 time_hold;   /* cumulated lock time */
+    s64                 time_block;  /* cumulated wait time */
+    s64                 time_locked; /* system time of last locking */
+};
+
+struct lock_profile_qhead {
+    struct lock_profile_qhead *head_q; /* next head of this type */
+    struct lock_profile       *elem_q; /* first element in q */
+    int32_t                   idx;     /* index for printout */
+};
+
+#define _LOCK_PROFILE(name) { 0, name, 0, 0, 0, 0, 0 }
+#define _LOCK_NO_PROFILE _LOCK_PROFILE(NULL)
+#define _LOCK_PROFILE_PTR(name)                                               \
+    static struct lock_profile *__lock_profile_##name __attribute_used__      \
+    __attribute__ ((__section__(".lockprofile.data"))) = &name.profile
+#define _SPIN_LOCK_UNLOCKED(x) { _RAW_SPIN_LOCK_UNLOCKED, 0xfffu, 0,          \
+                                 _LOCK_DEBUG, x }
+#define SPIN_LOCK_UNLOCKED _SPIN_LOCK_UNLOCKED(_LOCK_NO_PROFILE)
+#define DEFINE_SPINLOCK(l)                                                    \
+    spinlock_t l = _SPIN_LOCK_UNLOCKED(_LOCK_PROFILE(#l));                    \
+    _LOCK_PROFILE_PTR(l)
+
+#define spin_lock_init_prof(s, l)                                             \
+    do {                                                                      \
+        (s)->l = (spinlock_t)_SPIN_LOCK_UNLOCKED(_LOCK_PROFILE(#l));          \
+	(s)->l.profile.next = (s)->profile_head.elem_q;                       \
+	(s)->profile_head.elem_q = &((s)->l.profile);                         \
+    } while(0)
+
+void _lock_profile_register_struct(int32_t, struct lock_profile_qhead *,      \
+                                   int32_t, char *);
+void _lock_profile_deregister_struct(int32_t, struct lock_profile_qhead *);
+
+#define lock_profile_register_struct(type, ptr, idx, print)                   \
+    _lock_profile_register_struct(type, &((ptr)->profile_head), idx, print)
+#define lock_profile_deregister_struct(type, ptr)                             \
+    _lock_profile_deregister_struct(type, &((ptr)->profile_head))
+
+#else
+
+struct lock_profile { };
+struct lock_profile_qhead { };
+
+#define SPIN_LOCK_UNLOCKED                                                    \
+    { _RAW_SPIN_LOCK_UNLOCKED, 0xfffu, 0, _LOCK_DEBUG, { } }
+#define DEFINE_SPINLOCK(l) spinlock_t l = SPIN_LOCK_UNLOCKED
+
+#define spin_lock_init_prof(s, l) spin_lock_init(&((s)->l))
+#define lock_profile_register_struct(type, ptr, idx, print)
+#define lock_profile_deregister_struct(type, ptr)
+
+#endif
+
 typedef struct {
     raw_spinlock_t raw;
     u16 recurse_cpu:12;
     u16 recurse_cnt:4;
     struct lock_debug debug;
+    struct lock_profile profile;
 } spinlock_t;
 
 
-#define SPIN_LOCK_UNLOCKED { _RAW_SPIN_LOCK_UNLOCKED, 0xfffu, 0, _LOCK_DEBUG }
-#define DEFINE_SPINLOCK(l) spinlock_t l = SPIN_LOCK_UNLOCKED
 #define spin_lock_init(l) (*(l) = (spinlock_t)SPIN_LOCK_UNLOCKED)
 
 typedef struct {

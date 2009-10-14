@@ -29,6 +29,7 @@
 #include <acpi/cpufreq/cpufreq.h>
 #include <asm/debugger.h>
 #include <public/sched.h>
+#include <public/sysctl.h>
 #include <public/vcpu.h>
 #include <xsm/xsm.h>
 #include <xen/trace.h>
@@ -221,13 +222,15 @@ struct domain *domain_create(
     memset(d, 0, sizeof(*d));
     d->domain_id = domid;
 
+    lock_profile_register_struct(LOCKPROF_TYPE_PERDOM, d, domid, "Domain");
+
     if ( xsm_alloc_security_domain(d) != 0 )
         goto fail;
     init_status |= INIT_xsm;
 
     atomic_set(&d->refcnt, 1);
-    spin_lock_init(&d->domain_lock);
-    spin_lock_init(&d->page_alloc_lock);
+    spin_lock_init_prof(d, domain_lock);
+    spin_lock_init_prof(d, page_alloc_lock);
     spin_lock_init(&d->shutdown_lock);
     spin_lock_init(&d->hypercall_deadlock_mutex);
     INIT_PAGE_LIST_HEAD(&d->page_list);

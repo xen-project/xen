@@ -396,7 +396,7 @@ struct xen_sysctl_pm_op {
         struct xen_get_cpufreq_para get_para;
         struct xen_set_cpufreq_gov  set_gov;
         struct xen_set_cpufreq_para set_para;
-        uint64_t get_avgfreq;
+        uint64_aligned_t get_avgfreq;
         struct xen_get_cputopo      get_topo;
         uint32_t                    set_sched_opt_smt;
         uint32_t                    get_max_cstate;
@@ -454,6 +454,38 @@ struct xen_sysctl_page_offline_op {
 
 #define PG_OFFLINE_OWNER_SHIFT 16
 
+#define XEN_SYSCTL_lockprof_op       11
+/* Sub-operations: */
+#define XEN_SYSCTL_LOCKPROF_reset 1   /* Reset all profile data to zero. */
+#define XEN_SYSCTL_LOCKPROF_query 2   /* Get lock profile information. */
+/* Record-type: */
+#define LOCKPROF_TYPE_GLOBAL      0   /* global lock, idx meaningless */
+#define LOCKPROF_TYPE_PERDOM      1   /* per-domain lock, idx is domid */
+#define LOCKPROF_TYPE_N           2   /* number of types */
+struct xen_sysctl_lockprof_data {
+    char     name[40];     /* lock name (may include up to 2 %d specifiers) */
+    int32_t  type;         /* LOCKPROF_TYPE_??? */
+    int32_t  idx;          /* index (e.g. domain id) */
+    uint64_aligned_t lock_cnt;     /* # of locking succeeded */
+    uint64_aligned_t block_cnt;    /* # of wait for lock */
+    uint64_aligned_t lock_time;    /* nsecs lock held */
+    uint64_aligned_t block_time;   /* nsecs waited for lock */
+};
+typedef struct xen_sysctl_lockprof_data xen_sysctl_lockprof_data_t;
+DEFINE_XEN_GUEST_HANDLE(xen_sysctl_lockprof_data_t);
+struct xen_sysctl_lockprof_op {
+    /* IN variables. */
+    uint32_t       cmd;               /* XEN_SYSCTL_LOCKPROF_??? */
+    uint32_t       max_elem;          /* size of output buffer */
+    /* OUT variables (query only). */
+    uint32_t       nr_elem;           /* number of elements available */
+    uint64_aligned_t time;            /* nsecs of profile measurement */
+    /* profile information (or NULL) */
+    XEN_GUEST_HANDLE_64(xen_sysctl_lockprof_data_t) data;
+};
+typedef struct xen_sysctl_lockprof_op xen_sysctl_lockprof_op_t;
+DEFINE_XEN_GUEST_HANDLE(xen_sysctl_lockprof_op_t);
+
 struct xen_sysctl {
     uint32_t cmd;
     uint32_t interface_version; /* XEN_SYSCTL_INTERFACE_VERSION */
@@ -471,6 +503,7 @@ struct xen_sysctl {
         struct xen_sysctl_cpu_hotplug       cpu_hotplug;
         struct xen_sysctl_pm_op             pm_op;
         struct xen_sysctl_page_offline_op   page_offline;
+        struct xen_sysctl_lockprof_op       lockprof_op;
         uint8_t                             pad[128];
     } u;
 };

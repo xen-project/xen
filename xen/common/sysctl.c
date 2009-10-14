@@ -29,6 +29,9 @@
 
 extern long arch_do_sysctl(
     struct xen_sysctl *op, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl);
+#ifdef LOCK_PROFILE
+extern int spinlock_profile_control(xen_sysctl_lockprof_op_t *pc);
+#endif
 
 long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
 {
@@ -144,6 +147,15 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
     break;
 #endif
 
+#ifdef LOCK_PROFILE
+    case XEN_SYSCTL_lockprof_op:
+    {
+        ret = spinlock_profile_control(&op->u.lockprof_op);
+        if ( copy_to_guest(u_sysctl, op, 1) )
+            ret = -EFAULT;
+    }
+    break;
+#endif
     case XEN_SYSCTL_debug_keys:
     {
         char c;

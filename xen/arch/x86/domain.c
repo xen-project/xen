@@ -32,6 +32,7 @@
 #include <xen/acpi.h>
 #include <xen/pci.h>
 #include <xen/paging.h>
+#include <public/sysctl.h>
 #include <asm/regs.h>
 #include <asm/mc146818rtc.h>
 #include <asm/system.h>
@@ -185,6 +186,7 @@ struct domain *alloc_domain_struct(void)
 
 void free_domain_struct(struct domain *d)
 {
+    lock_profile_deregister_struct(LOCKPROF_TYPE_PERDOM, d);
     free_xenheap_pages(d, get_order_from_bytes(sizeof(*d)));
 }
 

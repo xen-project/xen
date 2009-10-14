@@ -1,7 +1,11 @@
+#include <xen/lib.h>
 #include <xen/config.h>
 #include <xen/irq.h>
 #include <xen/smp.h>
+#include <xen/time.h>
 #include <xen/spinlock.h>
+#include <xen/guest_access.h>
+#include <public/sysctl.h>
 #include <asm/processor.h>
 
 #ifndef NDEBUG
@@ -41,56 +45,97 @@ void spin_debug_disable(void)
 
 #endif
 
+#ifdef LOCK_PROFILE
+
+#define LOCK_PROFILE_REL                                               \
+    lock->profile.time_hold += NOW() - lock->profile.time_locked;      \
+    lock->profile.lock_cnt++;
+#define LOCK_PROFILE_VAR    s_time_t block = 0
+#define LOCK_PROFILE_BLOCK  block = block ? : NOW();
+#define LOCK_PROFILE_GOT                                               \
+    lock->profile.time_locked = NOW();                                 \
+    if (block)                                                         \
+    {                                                                  \
+        lock->profile.time_block += lock->profile.time_locked - block; \
+        lock->profile.block_cnt++;                                     \
+    }
+
+#else
+
+#define LOCK_PROFILE_REL
+#define LOCK_PROFILE_VAR
+#define LOCK_PROFILE_BLOCK
+#define LOCK_PROFILE_GOT
+
+#endif
+
 void _spin_lock(spinlock_t *lock)
 {
+    LOCK_PROFILE_VAR;
+
     check_lock(&lock->debug);
     while ( unlikely(!_raw_spin_trylock(&lock->raw)) )
+    {
+        LOCK_PROFILE_BLOCK;
         while ( likely(_raw_spin_is_locked(&lock->raw)) )
             cpu_relax();
+    }
+    LOCK_PROFILE_GOT;
 }
 
 void _spin_lock_irq(spinlock_t *lock)
 {
+    LOCK_PROFILE_VAR;
+
     ASSERT(local_irq_is_enabled());
     local_irq_disable();
     check_lock(&lock->debug);
     while ( unlikely(!_raw_spin_trylock(&lock->raw)) )
     {
+        LOCK_PROFILE_BLOCK;
         local_irq_enable();
         while ( likely(_raw_spin_is_locked(&lock->raw)) )
             cpu_relax();
         local_irq_disable();
     }
+    LOCK_PROFILE_GOT;
 }
 
 unsigned long _spin_lock_irqsave(spinlock_t *lock)
 {
     unsigned long flags;
+    LOCK_PROFILE_VAR;
+
     local_irq_save(flags);
     check_lock(&lock->debug);
     while ( unlikely(!_raw_spin_trylock(&lock->raw)) )
     {
+        LOCK_PROFILE_BLOCK;
         local_irq_restore(flags);
         while ( likely(_raw_spin_is_locked(&lock->raw)) )
             cpu_relax();
         local_irq_save(flags);
     }
+    LOCK_PROFILE_GOT;
     return flags;
 }
 
 void _spin_unlock(spinlock_t *lock)
 {
+    LOCK_PROFILE_REL;
     _raw_spin_unlock(&lock->raw);
 }
 
 void _spin_unlock_irq(spinlock_t *lock)
 {
+    LOCK_PROFILE_REL;
     _raw_spin_unlock(&lock->raw);
     local_irq_enable();
 }
 
 void _spin_unlock_irqrestore(spinlock_t *lock, unsigned long flags)
 {
+    LOCK_PROFILE_REL;
     _raw_spin_unlock(&lock->raw);
     local_irq_restore(flags);
 }
@@ -104,13 +149,32 @@ int _spin_is_locked(spinlock_t *lock)
 int _spin_trylock(spinlock_t *lock)
 {
     check_lock(&lock->debug);
+#ifndef LOCK_PROFILE
     return _raw_spin_trylock(&lock->raw);
+#else
+    if (!_raw_spin_trylock(&lock->raw)) return 0;
+    lock->profile.time_locked = NOW();
+    return 1;
+#endif
 }
 
 void _spin_barrier(spinlock_t *lock)
 {
+#ifdef LOCK_PROFILE
+    s_time_t block = NOW();
+    u64      loop = 0;
+
+    check_lock(&lock->debug);
+    do { mb(); loop++;} while ( _raw_spin_is_locked(&lock->raw) );
+    if (loop > 1)
+    {
+        lock->profile.time_block += NOW() - block;
+        lock->profile.block_cnt++;
+    }
+#else
     check_lock(&lock->debug);
     do { mb(); } while ( _raw_spin_is_locked(&lock->raw) );
+#endif
     mb();
 }
 
@@ -248,3 +312,197 @@ int _rw_is_write_locked(rwlock_t *lock)
     check_lock(&lock->debug);
     return _raw_rw_is_write_locked(&lock->raw);
 }
+
+#ifdef LOCK_PROFILE
+struct lock_profile_anc {
+    struct lock_profile_qhead *head_q;   /* first head of this type */
+    char                      *name;     /* descriptive string for print */
+};
+
+typedef void lock_profile_subfunc(struct lock_profile *, int32_t, int32_t,
+                                  void *);
+
+extern struct lock_profile *__lock_profile_start;
+extern struct lock_profile *__lock_profile_end;
+
+static s_time_t lock_profile_start = 0;
+static struct lock_profile_anc lock_profile_ancs[LOCKPROF_TYPE_N];
+static struct lock_profile_qhead lock_profile_glb_q;
+static spinlock_t lock_profile_lock = SPIN_LOCK_UNLOCKED;
+
+static void spinlock_profile_iterate(lock_profile_subfunc *sub, void *par)
+{
+    int  i;
+    struct lock_profile_qhead *hq;
+    struct lock_profile *eq;
+
+    spin_lock(&lock_profile_lock);
+    for (i = 0; i < LOCKPROF_TYPE_N; i++)
+    {
+        for (hq = lock_profile_ancs[i].head_q; hq; hq = hq->head_q)
+        {
+            for (eq = hq->elem_q; eq; eq = eq->next)
+            {
+                sub(eq, i, hq->idx, par);
+            }
+        }
+    }
+    spin_unlock(&lock_profile_lock);
+    return;
+}
+
+static void spinlock_profile_print_elem(struct lock_profile *data,
+    int32_t type, int32_t idx, void *par)
+{
+    if (type == LOCKPROF_TYPE_GLOBAL)
+        printk("%s %s:\n", lock_profile_ancs[idx].name, data->name);
+    else
+        printk("%s %d %s:\n", lock_profile_ancs[idx].name, idx, data->name);
+    printk("  lock:%12ld(%08X:%08X), block:%12ld(%08X:%08X)\n",
+        data->lock_cnt, (u32)(data->time_hold >> 32), (u32)data->time_hold,
+        data->block_cnt, (u32)(data->time_block >> 32), (u32)data->time_block);
+    return;
+}
+
+void spinlock_profile_printall(unsigned char key)
+{
+    s_time_t now = NOW();
+    s_time_t diff;
+
+    diff = now - lock_profile_start;
+    printk("Xen lock profile info SHOW  (now = %08X:%08X, "
+        "total = %08X:%08X)\n", (u32)(now>>32), (u32)now,
+        (u32)(diff>>32), (u32)diff);
+    spinlock_profile_iterate(spinlock_profile_print_elem, NULL);
+    return;
+}
+
+static void spinlock_profile_reset_elem(struct lock_profile *data,
+    int32_t type, int32_t idx, void *par)
+{
+    data->lock_cnt = 0;
+    data->block_cnt = 0;
+    data->time_hold = 0;
+    data->time_block = 0;
+    return;
+}
+
+void spinlock_profile_reset(unsigned char key)
+{
+    s_time_t now = NOW();
+
+    if ( key != '\0' )
+        printk("Xen lock profile info RESET (now = %08X:%08X)\n",
+            (u32)(now>>32), (u32)now);
+    lock_profile_start = now;
+    spinlock_profile_iterate(spinlock_profile_reset_elem, NULL);
+    return;
+}
+
+typedef struct {
+    xen_sysctl_lockprof_op_t *pc;
+    int                      rc;
+} spinlock_profile_ucopy_t;
+
+static void spinlock_profile_ucopy_elem(struct lock_profile *data,
+    int32_t type, int32_t idx, void *par)
+{
+    spinlock_profile_ucopy_t *p;
+    xen_sysctl_lockprof_data_t elem;
+
+    p = (spinlock_profile_ucopy_t *)par;
+    if (p->rc)
+        return;
+
+    if (p->pc->nr_elem < p->pc->max_elem)
+    {
+        safe_strcpy(elem.name, data->name);
+        elem.type = type;
+        elem.idx = idx;
+        elem.lock_cnt = data->lock_cnt;
+        elem.block_cnt = data->block_cnt;
+        elem.lock_time = data->time_hold;
+        elem.block_time = data->time_block;
+        if (copy_to_guest_offset(p->pc->data, p->pc->nr_elem, &elem, 1))
+        {
+            p->rc = -EFAULT;
+            return;
+        }
+    }
+    p->pc->nr_elem++;
+    
+    return;
+}
+
+/* Dom0 control of lock profiling */
+int spinlock_profile_control(xen_sysctl_lockprof_op_t *pc)
+{
+    int rc;
+    spinlock_profile_ucopy_t par;
+
+    rc = 0;
+    switch (pc->cmd)
+    {
+    case XEN_SYSCTL_LOCKPROF_reset:
+        spinlock_profile_reset('\0');
+        break;
+    case XEN_SYSCTL_LOCKPROF_query:
+	pc->nr_elem = 0;
+	par.rc = 0;
+	par.pc = pc;
+        spinlock_profile_iterate(spinlock_profile_ucopy_elem, &par);
+        pc->time = NOW() - lock_profile_start;
+	rc = par.rc;
+        break;
+    default:
+        rc = -EINVAL;
+        break;
+    }
+    return rc;
+}
+
+void _lock_profile_register_struct(int32_t type,
+    struct lock_profile_qhead *qhead, int32_t idx, char *name)
+{
+    qhead->idx = idx;
+    spin_lock(&lock_profile_lock);
+    qhead->head_q = lock_profile_ancs[type].head_q;
+    lock_profile_ancs[type].head_q = qhead;
+    lock_profile_ancs[type].name = name;
+    spin_unlock(&lock_profile_lock);
+    return;
+}
+
+void _lock_profile_deregister_struct(int32_t type,
+    struct lock_profile_qhead *qhead)
+{
+    struct lock_profile_qhead **q;
+
+    spin_lock(&lock_profile_lock);
+    for (q = &lock_profile_ancs[type].head_q; *q; q = &((*q)->head_q))
+    {
+        if (*q == qhead)
+        {
+            *q = qhead->head_q;
+            break;
+        }
+    }
+    spin_unlock(&lock_profile_lock);
+    return;
+}
+
+static int __init lock_prof_init(void)
+{
+    struct lock_profile **q;
+
+    for (q = &__lock_profile_start; q < &__lock_profile_end; q++)
+    {
+        (*q)->next = lock_profile_glb_q.elem_q;
+	lock_profile_glb_q.elem_q = *q;
+    }
+    _lock_profile_register_struct(LOCKPROF_TYPE_GLOBAL, &lock_profile_glb_q,
+        0, "Global lock");
+    return 0;
+}
+__initcall(lock_prof_init);
+#endif

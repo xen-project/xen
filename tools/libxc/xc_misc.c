@@ -121,6 +121,30 @@ int xc_perfc_control(int xc_handle,
     return rc;
 }
 
+int xc_lockprof_control(int xc_handle,
+                        uint32_t opcode,
+                        uint32_t *n_elems,
+                        uint64_t *time,
+                        xc_lockprof_data_t *data)
+{
+    int rc;
+    DECLARE_SYSCTL;
+
+    sysctl.cmd = XEN_SYSCTL_lockprof_op;
+    sysctl.u.lockprof_op.cmd = opcode;
+    sysctl.u.lockprof_op.max_elem = n_elems ? *n_elems : 0;
+    set_xen_guest_handle(sysctl.u.lockprof_op.data, data);
+
+    rc = do_sysctl(xc_handle, &sysctl);
+
+    if (n_elems)
+        *n_elems = sysctl.u.lockprof_op.nr_elem;
+    if (time)
+        *time = sysctl.u.lockprof_op.time;
+
+    return rc;
+}
+
 int xc_getcpuinfo(int xc_handle, int max_cpus,
                   xc_cpuinfo_t *info, int *nr_cpus)
 {

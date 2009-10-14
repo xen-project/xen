@@ -6,6 +6,7 @@
 verbose       ?= n
 perfc         ?= n
 perfc_arrays  ?= n
+lock_profile  ?= n
 crash_debug   ?= n
 frame_pointer ?= n
 
@@ -52,17 +53,15 @@ CFLAGS-$(verbose)       += -DVERBOSE
 CFLAGS-$(crash_debug)   += -DCRASH_DEBUG
 CFLAGS-$(perfc)         += -DPERF_COUNTERS
 CFLAGS-$(perfc_arrays)  += -DPERF_ARRAYS
+CFLAGS-$(lock_profile)  += -DLOCK_PROFILE
 CFLAGS-$(frame_pointer) += -fno-omit-frame-pointer -DCONFIG_FRAME_POINTER
+CFLAGS-$(privileged_stubdoms) += -DPRIVILEGED_STUBDOMS
 
 ifneq ($(max_phys_cpus),)
 CFLAGS-y                += -DMAX_PHYS_CPUS=$(max_phys_cpus)
 endif
 ifneq ($(max_phys_irqs),)
 CFLAGS-y                += -DMAX_PHYS_IRQS=$(max_phys_irqs)
-endif
-
-ifeq ($(privileged_stubdoms),y)
-CFLAGS += -DPRIVILEGED_STUBDOMS
 endif
 
 AFLAGS-y                += -D__ASSEMBLY__

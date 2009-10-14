@@ -700,6 +700,14 @@ int xc_perfc_control(int xc_handle,
                      int *nbr_desc,
                      int *nbr_val);
 
+typedef xen_sysctl_lockprof_data_t xc_lockprof_data_t;
+/* IMPORTANT: The caller is responsible for mlock()'ing the @data array. */
+int xc_lockprof_control(int xc_handle,
+                        uint32_t opcode,
+                        uint32_t *n_elems,
+                        uint64_t *time,
+                        xc_lockprof_data_t *data);
+
 /**
  * Memory maps a range within one domain to a local address range.  Mappings
  * should be unmapped with munmap and should follow the same rules as mmap

@@ -62,6 +62,13 @@ SECTIONS
        *(.data.read_mostly)
   } :text
 
+#ifdef LOCK_PROFILE
+  . = ALIGN(32);
+  __lock_profile_start = .;
+  .lockprofile.data : { *(.lockprofile.data) } :text
+  __lock_profile_end = .;
+#endif
+
   . = ALIGN(4096);             /* Init code and data */
   __init_begin = .;
   .init.text : {
