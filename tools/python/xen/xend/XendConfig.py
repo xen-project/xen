@@ -2063,6 +2063,9 @@ class XendConfig(dict):
     def is_hvm(self):
         return self['HVM_boot_policy'] != ''
 
+    def is_stubdom(self):
+        return (self['PV_kernel'].find('ioemu') >= 0)
+
     def target(self):
         return self['target']
 

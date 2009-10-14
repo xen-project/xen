@@ -77,7 +77,8 @@ def get_all_assigned_pci_devices():
     dom_list = xstransact.List('/local/domain')
     pci_str_list = []
     for d in dom_list:
-        pci_str_list = pci_str_list + get_assigned_pci_devices(int(d))
+        if xstransact.Read('/local/domain/' + d + '/target') is None :
+            pci_str_list = pci_str_list + get_assigned_pci_devices(int(d))
     return pci_str_list
 
 class PciController(DevController):
@@ -303,7 +304,7 @@ class PciController(DevController):
         if dev.driver == 'pciback':
             PCIQuirk(dev)
 
-        if not self.vm.info.is_hvm():
+        if not self.vm.info.is_hvm() and not self.vm.info.is_stubdom() :
             # Setup IOMMU device assignment
             bdf = xc.assign_device(fe_domid, pci_dict_to_xc_str(pci_dev))
             pci_str = pci_dict_to_bdf_str(pci_dev)
