@@ -1156,7 +1156,21 @@ class XendDomain:
             self.policy_lock.acquire_reader()
 
             try:
-                return XendCheckpoint.restore(self, fd, paused=paused, relocating=relocating)
+                dominfo = XendCheckpoint.restore(self, fd, paused=paused, relocating=relocating)
+                if relocating and \
+                   dominfo.info.has_key("change_home_server"):
+                    chs = (dominfo.info["change_home_server"] == "True")
+                    dominfo.setChangeHomeServer(None)
+                    if chs:
+                        self.domains_lock.acquire()
+                        try:
+                            log.debug("Migrating new managed domain: %s: %s" %
+                                      (dominfo.getName(), dominfo.get_uuid()))
+                            self._managed_domain_register(dominfo)
+                            self.managed_config_save(dominfo)
+                        finally:
+                            self.domains_lock.release()
+                return dominfo
             except XendError, e:
                 log.exception("Restore failed")
                 raise
@@ -1298,7 +1312,8 @@ class XendDomain:
 
         return val       
 
-    def domain_migrate(self, domid, dst, live=False, port=0, node=-1, ssl=None):
+    def domain_migrate(self, domid, dst, live=False, port=0, node=-1, ssl=None,\
+                       chs=False):
         """Start domain migration.
         
         @param domid: Domain ID or Name
@@ -1313,6 +1328,8 @@ class XendDomain:
         @type node: int
         @keyword ssl: use ssl connection
         @type ssl: bool
+        @keyword chs: change home server for managed domain
+        @type chs: bool
         @rtype: None
         @raise XendError: Failed to migrate
         @raise XendInvalidDomain: Domain is not valid
@@ -1328,6 +1345,8 @@ class XendDomain:
             raise VMBadState("Domain is not running",
                              POWER_STATE_NAMES[DOM_STATE_RUNNING],
                              POWER_STATE_NAMES[dominfo._stateGet()])
+        if chs and not self.is_domain_managed(dominfo):
+            raise XendError("Domain is not a managed domain")
 
         """ The following call may raise a XendError exception """
         dominfo.testMigrateDevices(True, dst)
@@ -1339,120 +1358,131 @@ class XendDomain:
         if ssl is None:
             ssl = xoptions.get_xend_relocation_ssl()
 
-        if ssl:
-            from OpenSSL import SSL
-            from xen.web import connection
-            if port == 0:
-                port = xoptions.get_xend_relocation_ssl_port()
+        try:
+            dominfo.setChangeHomeServer(chs)
+            if ssl:
+                self._domain_migrate_by_ssl(dominfo, dst, live, port, node)
+            else:
+                self._domain_migrate(dominfo, dst, live, port, node)
+        except:
+            dominfo.setChangeHomeServer(None)
+            raise
+
+    def _domain_migrate_by_ssl(self, dominfo, dst, live, port, node):
+        from OpenSSL import SSL
+        from xen.web import connection
+        if port == 0:
+            port = xoptions.get_xend_relocation_ssl_port()
+        try:
+            ctx = SSL.Context(SSL.SSLv23_METHOD)
+            sock = SSL.Connection(ctx,
+                       socket.socket(socket.AF_INET, socket.SOCK_STREAM))
+            sock.set_connect_state()
+            sock.connect((dst, port))
+            sock.send("sslreceive\n")
+            sock.recv(80)
+        except SSL.Error, err:
+            raise XendError("SSL error: %s" % err)
+        except socket.error, err:
+            raise XendError("can't connect: %s" % err)
+
+        p2cread, p2cwrite = os.pipe()
+        threading.Thread(target=connection.SSLSocketServerConnection.fd2send,
+                         args=(sock, p2cread)).start()
+
+        try:
             try:
-                ctx = SSL.Context(SSL.SSLv23_METHOD)
-                sock = SSL.Connection(ctx,
-                           socket.socket(socket.AF_INET, socket.SOCK_STREAM))
-                sock.set_connect_state()
-                sock.connect((dst, port))
-                sock.send("sslreceive\n")
-                sock.recv(80)
-            except SSL.Error, err:
-                raise XendError("SSL error: %s" % err)
-            except socket.error, err:
-                raise XendError("can't connect: %s" % err)
-
-            p2cread, p2cwrite = os.pipe()
-            threading.Thread(target=connection.SSLSocketServerConnection.fd2send,
-                             args=(sock, p2cread)).start()
-
-            try:
+                XendCheckpoint.save(p2cwrite, dominfo, True, live, dst,
+                                    node=node)
+            except Exception, ex:
+                m_dsterr = None
                 try:
-                    XendCheckpoint.save(p2cwrite, dominfo, True, live, dst,
-                                        node=node)
-                except Exception, ex:
-                    m_dsterr = None
-                    try:
-                        sock.settimeout(3.0)
-                        dsterr = sock.recv(1024)
-                        sock.settimeout(None)
-                        if dsterr:
-                            # See send_error@relocate.py. If an error occurred
-                            # in a destination side, an error message with the
-                            # following form is returned from the destination
-                            # side.
-                            m_dsterr = \
-                                re.match(r"^\(err\s\(type\s(.+)\)\s\(value\s'(.+)'\)\)", dsterr)
-                    except:
-                        # Probably socket.timeout exception occurred.
-                        # Ignore the exception because it has nothing to do with
-                        # an exception of XendCheckpoint.save.
-                        pass
-
-                    if m_dsterr:
-                        raise XendError("%s (from %s)" % (m_dsterr.group(2), dst))
-                    raise
-            finally:
-                try:
-                    sock.shutdown(2)
+                    sock.settimeout(3.0)
+                    dsterr = sock.recv(1024)
+                    sock.settimeout(None)
+                    if dsterr:
+                        # See send_error@relocate.py. If an error occurred
+                        # in a destination side, an error message with the
+                        # following form is returned from the destination
+                        # side.
+                        m_dsterr = \
+                            re.match(r"^\(err\s\(type\s(.+)\)\s\(value\s'(.+)'\)\)", dsterr)
                 except:
-                    # Probably the socket is already disconnected by sock.close
-                    # in the destination side.
+                    # Probably socket.timeout exception occurred.
                     # Ignore the exception because it has nothing to do with
                     # an exception of XendCheckpoint.save.
                     pass
-                sock.close()
 
-            os.close(p2cread)
-            os.close(p2cwrite)
-        else:
-            if port == 0:
-                port = xoptions.get_xend_relocation_port()
+                if m_dsterr:
+                    raise XendError("%s (from %s)" % (m_dsterr.group(2), dst))
+                raise
+        finally:
             try:
-                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                # When connecting to our ssl enabled relocation server using a
-                # plain socket, send will success but recv will block. Add a
-                # 30 seconds timeout to raise a socket.timeout exception to
-                # inform the client.
-                sock.settimeout(30.0)
-                sock.connect((dst, port))
-                sock.send("receive\n")
-                sock.recv(80)
-                sock.settimeout(None)
-            except socket.error, err:
-                raise XendError("can't connect: %s" % err)
+                sock.shutdown(2)
+            except:
+                # Probably the socket is already disconnected by sock.close
+                # in the destination side.
+                # Ignore the exception because it has nothing to do with
+                # an exception of XendCheckpoint.save.
+                pass
+            sock.close()
 
+        os.close(p2cread)
+        os.close(p2cwrite)
+
+    def _domain_migrate(self, dominfo, dst, live, port, node):
+        if port == 0:
+            port = xoptions.get_xend_relocation_port()
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            # When connecting to our ssl enabled relocation server using a
+            # plain socket, send will success but recv will block. Add a
+            # 30 seconds timeout to raise a socket.timeout exception to
+            # inform the client.
+            sock.settimeout(30.0)
+            sock.connect((dst, port))
+            sock.send("receive\n")
+            sock.recv(80)
+            sock.settimeout(None)
+        except socket.error, err:
+            raise XendError("can't connect: %s" % err)
+
+        try:
             try:
+                XendCheckpoint.save(sock.fileno(), dominfo, True, live,
+                                    dst, node=node)
+            except Exception, ex:
+                m_dsterr = None
                 try:
-                    XendCheckpoint.save(sock.fileno(), dominfo, True, live,
-                                        dst, node=node)
-                except Exception, ex:
-                    m_dsterr = None
-                    try:
-                        sock.settimeout(3.0)
-                        dsterr = sock.recv(1024)
-                        sock.settimeout(None)
-                        if dsterr:
-                            # See send_error@relocate.py. If an error occurred
-                            # in a destination side, an error message with the
-                            # following form is returned from the destination
-                            # side.
-                            m_dsterr = \
-                                re.match(r"^\(err\s\(type\s(.+)\)\s\(value\s'(.+)'\)\)", dsterr)
-                    except:
-                        # Probably socket.timeout exception occurred.
-                        # Ignore the exception because it has nothing to do with
-                        # an exception of XendCheckpoint.save.
-                        pass
-
-                    if m_dsterr:
-                        raise XendError("%s (from %s)" % (m_dsterr.group(2), dst))
-                    raise
-            finally:
-                try:
-                    sock.shutdown(2)
+                    sock.settimeout(3.0)
+                    dsterr = sock.recv(1024)
+                    sock.settimeout(None)
+                    if dsterr:
+                        # See send_error@relocate.py. If an error occurred
+                        # in a destination side, an error message with the
+                        # following form is returned from the destination
+                        # side.
+                        m_dsterr = \
+                            re.match(r"^\(err\s\(type\s(.+)\)\s\(value\s'(.+)'\)\)", dsterr)
                 except:
-                    # Probably the socket is already disconnected by sock.close
-                    # in the destination side.
+                    # Probably socket.timeout exception occurred.
                     # Ignore the exception because it has nothing to do with
                     # an exception of XendCheckpoint.save.
                     pass
-                sock.close()
+
+                if m_dsterr:
+                    raise XendError("%s (from %s)" % (m_dsterr.group(2), dst))
+                raise
+        finally:
+            try:
+                sock.shutdown(2)
+            except:
+                # Probably the socket is already disconnected by sock.close
+                # in the destination side.
+                # Ignore the exception because it has nothing to do with
+                # an exception of XendCheckpoint.save.
+                pass
+            sock.close()
 
     def domain_save(self, domid, dst, checkpoint=False):
         """Start saving a domain to file.

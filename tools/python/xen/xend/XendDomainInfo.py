@@ -2364,6 +2364,13 @@ class XendDomainInfo:
         return self.getDeviceController(deviceClass).recover_migrate(
                      deviceConfig, network, dst, step, domName)
 
+    def setChangeHomeServer(self, chs):
+        if chs is not None:
+            self.info['change_home_server'] = bool(chs)
+        else:
+            if self.info.has_key('change_home_server'):
+                del self.info['change_home_server']
+
 
     ## private:
 
@@ -2870,8 +2877,10 @@ class XendDomainInfo:
         self._cleanup_phantom_devs(paths)
         self._cleanupVm()
 
-        if "transient" in self.info["other_config"] \
-           and bool(self.info["other_config"]["transient"]):
+        if ("transient" in self.info["other_config"] and \
+            bool(self.info["other_config"]["transient"])) or \
+           ("change_home_server" in self.info and \
+            bool(self.info["change_home_server"])):
             XendDomain.instance().domain_delete_by_dominfo(self)
 
 

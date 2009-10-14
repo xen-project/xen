@@ -957,6 +957,7 @@ class XendConfig(dict):
         _set_cfg_if_exists('on_xend_stop')
         _set_cfg_if_exists('on_xend_start')
         _set_cfg_if_exists('vcpu_avail')
+        _set_cfg_if_exists('change_home_server')
         
         # Parse and store runtime configuration 
         _set_cfg_if_exists('start_time')
@@ -1157,6 +1158,9 @@ class XendConfig(dict):
             self.cpuid_to_sxp(sxpr, 'cpuid')
         if 'cpuid_check' in self:
             self.cpuid_to_sxp(sxpr, 'cpuid_check')
+
+        if self.has_key('change_home_server'):
+            sxpr.append(['change_home_server', self['change_home_server']])
 
         log.debug(sxpr)
 

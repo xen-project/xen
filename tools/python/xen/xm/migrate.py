@@ -51,6 +51,10 @@ gopts.opt('ssl', short='s',
           fn=set_true, default=None,
           use="Use ssl connection for migration.")
 
+gopts.opt('change_home_server', short='c',
+          fn=set_true, default=0,
+          use="Change home server for managed domains.")
+
 def help():
     return str(gopts)
     
@@ -78,4 +82,5 @@ def main(argv):
         server.xend.domain.migrate(dom, dst, opts.vals.live,
                                    opts.vals.port,
                                    opts.vals.node,
-                                   opts.vals.ssl)
+                                   opts.vals.ssl,
+                                   opts.vals.change_home_server)
