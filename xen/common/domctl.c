@@ -234,7 +234,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     case XEN_DOMCTL_unbind_pt_irq:
     case XEN_DOMCTL_assign_device:
     case XEN_DOMCTL_deassign_device: {
-        struct domain *d = get_domain_by_id(op->domain);
+        struct domain *d;
         bool_t is_priv = IS_PRIV(current->domain);
         if ( !is_priv && ((d = rcu_lock_domain_by_id(op->domain)) != NULL) )
         {
