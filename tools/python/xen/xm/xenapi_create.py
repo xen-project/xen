@@ -215,6 +215,16 @@ class xenapi_create:
     def create_vdi(self, vdi):
         log(DEBUG, "create_vdi")
 
+        for ref, record in server.xenapi.VDI.get_all_records().items():
+            location = record["other_config"]["location"]
+            if vdi.attributes["src"].value != location:
+                continue
+
+            # Reuse the VDI because the location is same.
+            key = vdi.attributes["name"].value
+            return (key, ref)
+
+        # Create a new VDI.
         vdi_record = {
             "name_label":       get_name_label(vdi),
             "name_description": get_name_description(vdi),
