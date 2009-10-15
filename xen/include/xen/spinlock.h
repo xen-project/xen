@@ -85,12 +85,12 @@ struct lock_profile_qhead {
 #define spin_lock_init_prof(s, l)                                             \
     do {                                                                      \
         (s)->l = (spinlock_t)_SPIN_LOCK_UNLOCKED(_LOCK_PROFILE(#l));          \
-	(s)->l.profile.next = (s)->profile_head.elem_q;                       \
-	(s)->profile_head.elem_q = &((s)->l.profile);                         \
+        (s)->l.profile.next = (s)->profile_head.elem_q;                       \
+        (s)->profile_head.elem_q = &((s)->l.profile);                         \
     } while(0)
 
-void _lock_profile_register_struct(int32_t, struct lock_profile_qhead *,      \
-                                   int32_t, char *);
+void _lock_profile_register_struct(
+    int32_t, struct lock_profile_qhead *, int32_t, char *);
 void _lock_profile_deregister_struct(int32_t, struct lock_profile_qhead *);
 
 #define lock_profile_register_struct(type, ptr, idx, print)                   \
