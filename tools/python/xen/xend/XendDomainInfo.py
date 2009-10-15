@@ -855,12 +855,10 @@ class XendDomainInfo:
         dev_config = pci_convert_sxp_to_dict(dev_sxp)
         dev = dev_config['devs'][0]
 
-        dom_list = xstransact.List('/local/domain')
-        for d in dom_list:
-            target = xstransact.Read('/local/domain/' + d + '/target')
-            if target is not None and int(target) is self.domid :
-                from xen.xend import XendDomain
-                XendDomain.instance().domain_lookup(int(d)).pci_device_configure(dev_sxp[:])
+        stubdomid = self.getStubdomDomid()
+        if stubdomid is not None :
+            from xen.xend import XendDomain
+            XendDomain.instance().domain_lookup(stubdomid).pci_device_configure(dev_sxp[:])
 
         # Do HVM specific processing
         if self.info.is_hvm():
@@ -1809,6 +1807,14 @@ class XendDomainInfo:
 
     def getDomid(self):
         return self.domid
+
+    def getStubdomDomid(self):
+        dom_list = xstransact.List('/local/domain')
+        for d in dom_list:
+            target = xstransact.Read('/local/domain/' + d + '/target')
+            if target is not None and int(target) is self.domid :
+                return int(d)
+        return None
 
     def setName(self, name, to_store = True):
         self._checkName(name)

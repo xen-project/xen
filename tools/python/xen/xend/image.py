@@ -591,7 +591,11 @@ class ImageHandler:
             return
         self.sentinel_lock.acquire()
         try:
-            if self.pid:
+            stubdomid = self.vm.getStubdomDomid()
+            if stubdomid is not None :
+                from xen.xend import XendDomain
+                XendDomain.instance().domain_destroy(stubdomid)
+            elif self.pid:
                 try:
                     os.kill(self.pid, signal.SIGHUP)
                 except OSError, exn:

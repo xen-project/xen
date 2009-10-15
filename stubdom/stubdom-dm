@@ -81,12 +81,8 @@ done
 
 term() {
     kill %1
-    (
-	[ -n "$vncpid" ] && kill -9 $vncpid
-	rm ${stubdom_configdir}/$domname-dm
-	xm destroy $domname-dm
-    ) &
-    # We need to exit immediately so as to let xend do the commands above
+    [ -n "$vncpid" ] && kill -9 $vncpid
+    rm ${stubdom_configdir}/$domname-dm
     exit 0
 }
 
