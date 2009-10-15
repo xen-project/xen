@@ -56,6 +56,7 @@ obj-y += hpet.o
 obj-y += bzimage.o
 
 obj-$(crash_debug) += gdbstub.o
+obj-$(gdbsx) += debug.o
 
 x86_emulate.o: x86_emulate/x86_emulate.c x86_emulate/x86_emulate.h
 

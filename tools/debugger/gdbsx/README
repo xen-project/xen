@@ -1,0 +1,143 @@
+
+                            gdbsx: gdbserver for xen
+
+
+Welcome to gdbsx. gdbsx is a gdbserver program to debug guest kernels and 
+kernel modules. It runs on dom0 running on xen hypervisor and allows debug 
+of 32 or 64bit PV or HVM elf guest binaries. It can also be run standalone, 
+without remote gdb, to dump context of any/all VCPUs of any guest.
+
+It is divided in two parts, gx and xg. The former interacts with remote gdb,
+while latter interacts with xen and exports public APIs that can be used to 
+create a plug in for any other debugger or binary type.
+
+
+USAGE:
+   - boot with gdbsx enabled hypervisor (eg, on OVM: xen-64bit-debug.gz)
+   - copy gdbsx binary to the dom0 (assume hostname is "dom0"), then:
+
+   USAGE 1:
+   - dom0> gdbsx -c 1 64 : displays VCPU contexts for 64bit guest with domid 1
+
+   USAGE 2:
+   - dom0> gdbsx -a 2 64 9999
+             connects to a 64bit guest with domid 2 and waits for gdb connection
+   - now, connect to the above gdbsx from a remote system or dom0 as: 
+      bash> gdb ./vmlinux             (exact matching vmlinux of guest kernel)
+      (gdb) target remote dom0:9999 
+
+   - Additionally, to debug loadable kernel modules, please do following:
+      (gdb) p init_mm.pgd[3]
+      $1 = {pgd = 0x1b874f027}
+      (gdb) monitor pgd3 0x1b874f027  (Make sure value is in HEX)
+      pgd3val set to: 0x1b874f027
+
+   - use gdb as normal, breakpoints, single step, etc...
+   - when need to break into gdb, instead of ctrl-c, just do "xm pause <domid>"
+     on dom0 to pause the guest. this will break into gdb right away.
+   - detach/quit from gdb (leave gdbsx alone) to gracefully exit.
+   - if ctrl-c or core-dumped, make sure to do xm unpause if guest still paused.
+
+   - multiple vcpus: 
+	 o  gdb>set scheduler-locking on   : for single step of correct vcpu.
+
+         o  since gdb is not kernel debugger, vcpus are emulated via threads
+            Thus, gdb>info threads : will show all vcpus. Then, switch thread 
+	    to get to another vcpu, etc...  Remember, gdb has it's own [thread]
+	    id, off by 1. 
+
+   - See below for some useful gdb macros. Please email me if you've more.
+
+
+NOTES:
+   - For now, it is not possible to run gdbsx on a guest and gdb inside 
+     the same guest at the same time.
+   - To report problems, please run gdbsx with -d and collect output.
+   - VCPU offlining is not supported. Thus [0-NUMVCPUs] are all assumed active.
+
+TIPS:
+   - make sure firewall is disabled on dom0 if running gdb on a different host.
+   - Must be at least gdb version 6.5-16.x to debug el5 kernels.
+
+BUILD: (if you don't have access to binary):
+   - first compile the hypervisor: xen> make gdbsx=y
+         To have both kdb and gdbsx, xen> make kdb=y gdbsx=y
+	 (NOTE: kdb is not required for gdbsx)
+   - install the hypervisor and reboot
+   - now go to, tools/debugger/gdbsx and do make
+     On 32bit system, a 32bit binary will be built with support for both 32
+     and 64bit guests. On 64bit system, a 64bit binary will be built with 
+     support for both.
+
+
+Mukesh Rathor
+Oracle Corporation,
+Redwood Shores,  CA  USA
+mukesh[dot]rathor[at]oracle[dot]com
+
+
+------------------------------------------------------------------------------
+
+USEFUL gdb macros:
+
+# Courtesy Zhigang W (http://10.182.120.78/tech/vt/ovm/debug/gdbinit.macros):
+
+define ps
+	dont-repeat
+	set $tasks = (struct list_head *)init_task->tasks
+	set $offset = (unsigned long)&init_task->tasks - (unsigned long)&init_task
+	set $task = $tasks
+	set $task_entry = (struct task_struct *)((unsigned long)$task - $offset)
+	printf "Pointer       PID      Command\n"
+	printf "%-14p%-9d%s\n", $task_entry, $task_entry->pid, $task_entry->comm
+	set $task = $task->next
+	while $task != $tasks
+		set $task_entry = (struct task_struct *)((unsigned long)$task - $offset)
+		if ($task_entry->pid) != 0
+			printf "%-14p%-9d%s\n", $task_entry, $task_entry->pid, $task_entry->comm
+		end
+		set $task = $task->next
+	end
+end
+
+document ps
+Report a snapshot of the current processes.
+end
+
+
+define lsmod
+	dont-repeat
+	# 4 for 32bit kernels. 8 for 64bit kernels.
+	set $sz = sizeof(long)     
+	set $mod = (struct list_head *)modules
+	printf "modptr      address     name\n"
+	while 1
+		set $mod_entry = (struct module *)((unsigned long)$mod - $sz)
+		if ($sz == 4)
+			printf "%08lx  %08lx  %s\n", $mod_entry,      \
+			       $mod_entry->module_core, $mod_entry->name 
+		else
+			printf "%016lx  %016lx  %s\n", $mod_entry,      \
+			       $mod_entry->module_core, $mod_entry->name 
+		end
+		set $mod = $mod->next
+		if ($mod == &modules)
+			loop_break
+		end
+	end
+end
+
+document lsmod
+Show the list of modules loaded in the Linux kernel.
+end
+
+define log
+	dont-repeat
+	printf "%s", log_buf
+end
+
+document log
+Dump system message buffer.
+end
+
+------------------------------------------------------------------------------

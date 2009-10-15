@@ -650,6 +650,29 @@ typedef struct xen_domctl_hvmcontext_partial {
 } xen_domctl_hvmcontext_partial_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_hvmcontext_partial_t);
 
+#define XEN_DOMCTL_gdbsx_guestmemio     1000 /* guest mem io */
+struct xen_domctl_gdbsx_memio {
+    uint64_aligned_t pgd3val;/* optional: init_mm.pgd[3] value */
+    uint64_aligned_t gva;    /* guest virtual address */
+    uint64_aligned_t uva;    /* user buffer virtual address */
+    int              len;    /* number of bytes to read/write */
+    int              gwr;    /* 0 = read from guest. 1 = write to guest */
+    int              remain; /* bytes remaining to be copied */
+};
+
+#define XEN_DOMCTL_gdbsx_pausevcpu   1001  
+#define XEN_DOMCTL_gdbsx_unpausevcpu 1002  
+struct xen_domctl_gdbsx_pauseunp_vcpu { /* pause/unpause a vcpu */
+    uint32_t         vcpu;         /* which vcpu */
+};
+
+#define XEN_DOMCTL_gdbsx_domstatus   1003  
+struct xen_domctl_gdbsx_domstatus {
+    int              paused;     /* is the domain paused */
+    uint32_t         vcpu_id;    /* any vcpu in an event? */
+    uint32_t         vcpu_ev;    /* if yes, what event? */
+
+};
 
 struct xen_domctl {
     uint32_t cmd;
@@ -696,6 +719,9 @@ struct xen_domctl {
 #if defined(__i386__) || defined(__x86_64__)
         struct xen_domctl_cpuid             cpuid;
 #endif
+        struct xen_domctl_gdbsx_memio       gdbsx_guest_memio;
+        struct xen_domctl_gdbsx_pauseunp_vcpu gdbsx_pauseunp_vcpu;
+        struct xen_domctl_gdbsx_domstatus   gdbsx_domstatus;
         uint8_t                             pad[128];
     } u;
 };

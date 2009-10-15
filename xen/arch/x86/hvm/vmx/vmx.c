@@ -51,6 +51,7 @@
 #include <public/hvm/save.h>
 #include <asm/hvm/trace.h>
 #include <asm/xenoprof.h>
+#include <asm/debugger.h>
 
 enum handler_return { HNDL_done, HNDL_unhandled, HNDL_exception_raised };
 
@@ -2475,6 +2476,9 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
                 goto exit_and_crash;
             inst_len = __get_instruction_length(); /* Safe: INT3 */
             __update_guest_eip(inst_len);
+#ifdef XEN_GDBSX_CONFIG
+            current->arch.gdbsx_vcpu_event = TRAP_int3;
+#endif
             domain_pause_for_debugger();
             break;
         case TRAP_no_device:

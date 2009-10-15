@@ -413,6 +413,10 @@ struct arch_vcpu
     struct mapcache_vcpu mapcache;
 #endif
 
+#if XEN_GDBSX_CONFIG
+    uint32_t gdbsx_vcpu_event;
+#endif 
+
 } __cacheline_aligned;
 
 /* Shorthands to improve code legibility. */

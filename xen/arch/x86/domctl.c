@@ -31,6 +31,26 @@
 #include <xsm/xsm.h>
 #include <xen/iommu.h>
 
+#ifdef XEN_GDBSX_CONFIG                    
+#ifdef XEN_KDB_CONFIG
+#include "../kdb/include/kdbdefs.h"
+#include "../kdb/include/kdbproto.h"
+#else
+typedef unsigned long kdbva_t;
+typedef unsigned char kdbbyt_t;
+extern int dbg_rw_mem(kdbva_t, kdbbyt_t *, int, domid_t, int, uint64_t);
+#endif
+static int 
+gdbsx_guest_mem_io(domid_t domid, struct xen_domctl_gdbsx_memio *iop)
+{   
+    ulong l_uva = (ulong)iop->uva;
+    iop->remain = dbg_rw_mem(
+        (kdbva_t)iop->gva, (kdbbyt_t *)l_uva, iop->len, domid,
+        iop->gwr, iop->pgd3val);
+    return (iop->remain ? -EFAULT : 0);
+}
+#endif  /* XEN_GDBSX_CONFIG */
+
 long arch_do_domctl(
     struct xen_domctl *domctl,
     XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
@@ -1120,6 +1140,117 @@ long arch_do_domctl(
         rcu_unlock_domain(d);
     }
     break;
+
+#ifdef XEN_GDBSX_CONFIG
+    case XEN_DOMCTL_gdbsx_guestmemio:
+    {
+        struct domain *d;
+
+        ret = -ESRCH;
+        if ( (d = rcu_lock_domain_by_id(domctl->domain)) == NULL )
+            break;
+
+        domctl->u.gdbsx_guest_memio.remain =
+            domctl->u.gdbsx_guest_memio.len;
+
+        ret = gdbsx_guest_mem_io(domctl->domain, &domctl->u.gdbsx_guest_memio);
+        if ( !ret && copy_to_guest(u_domctl, domctl, 1) )
+            ret = -EFAULT;
+
+        rcu_unlock_domain(d);
+    }
+    break;
+
+    case XEN_DOMCTL_gdbsx_pausevcpu:
+    {
+        struct domain *d;
+        struct vcpu *v;
+
+        ret = -ESRCH;
+        if ( (d = rcu_lock_domain_by_id(domctl->domain)) == NULL )
+            break;
+
+        ret = -EBUSY;
+        if ( !d->is_paused_by_controller )
+        {
+            rcu_unlock_domain(d);
+            break;
+        }
+        ret = -EINVAL;
+        if ( domctl->u.gdbsx_pauseunp_vcpu.vcpu >= MAX_VIRT_CPUS ||
+             (v = d->vcpu[domctl->u.gdbsx_pauseunp_vcpu.vcpu]) == NULL )
+        {
+            rcu_unlock_domain(d);
+            break;
+        }
+        vcpu_pause(v);
+        ret = 0;
+        rcu_unlock_domain(d);
+    }
+    break;
+
+    case XEN_DOMCTL_gdbsx_unpausevcpu:
+    {
+        struct domain *d;
+        struct vcpu *v;
+
+        ret = -ESRCH;
+        if ( (d = rcu_lock_domain_by_id(domctl->domain)) == NULL )
+            break;
+
+        ret = -EBUSY;
+        if ( !d->is_paused_by_controller )
+        {
+            rcu_unlock_domain(d);
+            break;
+        }
+        ret = -EINVAL;
+        if ( domctl->u.gdbsx_pauseunp_vcpu.vcpu >= MAX_VIRT_CPUS ||
+             (v = d->vcpu[domctl->u.gdbsx_pauseunp_vcpu.vcpu]) == NULL )
+        {
+            rcu_unlock_domain(d);
+            break;
+        }
+        if ( !atomic_read(&v->pause_count) )
+            printk("WARN: Unpausing vcpu:%d which is not paused\n", v->vcpu_id);
+        vcpu_unpause(v);
+        ret = 0;
+        rcu_unlock_domain(d);
+    }
+    break;
+
+    case XEN_DOMCTL_gdbsx_domstatus:
+    {
+        struct domain *d;
+        struct vcpu *v;
+
+        ret = -ESRCH;
+        if ( (d = rcu_lock_domain_by_id(domctl->domain)) == NULL )
+            break;
+
+        domctl->u.gdbsx_domstatus.vcpu_id = -1;
+        domctl->u.gdbsx_domstatus.paused = d->is_paused_by_controller;
+        if ( domctl->u.gdbsx_domstatus.paused )
+        {
+            for_each_vcpu ( d, v )
+            {
+                if ( v->arch.gdbsx_vcpu_event )
+                {
+                    domctl->u.gdbsx_domstatus.vcpu_id = v->vcpu_id;
+                    domctl->u.gdbsx_domstatus.vcpu_ev =
+                        v->arch.gdbsx_vcpu_event;
+                    v->arch.gdbsx_vcpu_event = 0;
+                    break;
+                }
+            }
+        }
+        ret = 0;
+        if ( copy_to_guest(u_domctl, domctl, 1) )
+            ret = -EFAULT;
+        rcu_unlock_domain(d);
+    }
+    break;
+#endif /* XEN_GDBSX_CONFIG */
 
     default:
         ret = -ENOSYS;

@@ -51,6 +51,7 @@
 #include <asm/hvm/vpt.h>
 #include <asm/hvm/trace.h>
 #include <asm/hap.h>
+#include <asm/debugger.h>       
 
 u32 svm_feature_flags;
 
@@ -1370,6 +1371,9 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         if ( (inst_len = __get_instruction_length(v, INSTR_INT3)) == 0 )
             break;
         __update_guest_eip(regs, inst_len);
+#ifdef XEN_GDBSX_CONFIG
+        current->arch.gdbsx_vcpu_event = TRAP_int3;
+#endif
         domain_pause_for_debugger();
         break;
 

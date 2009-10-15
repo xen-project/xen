@@ -128,12 +128,7 @@
 ^tools/debugger/gdb/gdb-6\.2\.1-linux-i386-xen/.*$
 ^tools/debugger/gdb/gdb-6\.2\.1/.*$
 ^tools/debugger/gdb/gdb-6\.2\.1\.tar\.bz2$
-^tools/debugger/pdb/._bcdi/.*$
-^tools/debugger/pdb/linux-[0-9.]*-module/.*\.ko$
-^tools/debugger/pdb/linux-[0-9.]*-module/.*\.mod.c$
-^tools/debugger/pdb/linux-[0-9.]*-module/.tmp_versions/.*$
-^tools/debugger/pdb/linux-[0-9.]*-module/\..*\.cmd$
-^tools/debugger/pdb/pdb$
+^tools/debugger/gdbsx/gdbsx$
 ^tools/debugger/xenitp/xenitp$
 ^tools/firmware/.*/biossums$
 ^tools/firmware/.*\.bin$
