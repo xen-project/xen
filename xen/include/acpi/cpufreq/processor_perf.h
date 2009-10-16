@@ -8,6 +8,7 @@
 
 int get_cpu_id(u8);
 int powernow_cpufreq_init(void);
+unsigned int powernow_register_driver(void);
 
 void cpufreq_residency_update(unsigned int, uint8_t);
 void cpufreq_statistic_update(unsigned int, uint8_t, uint8_t);

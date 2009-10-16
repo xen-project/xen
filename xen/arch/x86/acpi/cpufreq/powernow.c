@@ -85,6 +85,7 @@ static int powernow_cpufreq_target(struct cpufreq_policy *policy,
     unsigned int next_state = 0; /* Index into freq_table */
     unsigned int next_perf_state = 0; /* Index into perf table */
     int result = 0;
+    int j = 0;
 
     if (unlikely(data == NULL ||
         data->acpi_data == NULL || data->freq_table == NULL)) {
@@ -123,6 +124,9 @@ static int powernow_cpufreq_target(struct cpufreq_policy *policy,
 
     on_selected_cpus(&cmd.mask, transition_pstate, &cmd, 0);
 
+    for_each_cpu_mask(j, online_policy_cpus)
+        cpufreq_statistic_update(j, perf->state, next_perf_state);
+
     perf->state = next_perf_state;
     policy->cur = freqs.new;
 
@@ -132,9 +136,16 @@ static int powernow_cpufreq_target(struct cpufreq_policy *policy,
 static int powernow_cpufreq_verify(struct cpufreq_policy *policy)
 {
     struct powernow_cpufreq_data *data;
+    struct processor_performance *perf;
 
-    if (!policy || !(data = drv_data[policy->cpu]))
+    if (!policy || !(data = drv_data[policy->cpu]) ||
+        !processor_pminfo[policy->cpu])
         return -EINVAL;
+
+    perf = &processor_pminfo[policy->cpu]->perf;
+
+    cpufreq_verify_within_limits(policy, 0, 
+        perf->states[perf->platform_limit].core_frequency * 1000);
 
     return cpufreq_frequency_table_verify(policy, data->freq_table);
 }
@@ -202,6 +213,8 @@ static int powernow_cpufreq_cpu_init(struct cpufreq_policy *policy)
                 perf->states[i].transition_latency * 1000;
     }
 
+    policy->governor = cpufreq_opt_governor ? : CPUFREQ_DEFAULT_GOVERNOR;
+
     data->max_freq = perf->states[0].core_frequency * 1000;
     /* table init */
     for (i = 0; i < perf->state_count && i <= max_hw_pstate; i++) {
@@ -259,10 +272,17 @@ static struct cpufreq_driver powernow_cpufreq_driver = {
     .exit   = powernow_cpufreq_cpu_exit
 };
 
+unsigned int powernow_register_driver()
+{
+    unsigned int ret;
+    ret = cpufreq_register_driver(&powernow_cpufreq_driver);
+    return ret;
+}
+
 int powernow_cpufreq_init(void)
 {
     unsigned int i, ret = 0;
-    unsigned int dom, max_dom = 0;
+    unsigned int max_dom = 0;
     cpumask_t *pt;
     unsigned long *dom_mask;
 
@@ -304,46 +324,6 @@ int powernow_cpufreq_init(void)
         processor_pminfo[i]->perf.shared_cpu_map =
             pt[processor_pminfo[i]->perf.domain_info.domain];
 
-    cpufreq_driver = &powernow_cpufreq_driver;
-
-    /* setup cpufreq infrastructure */
-    for_each_online_cpu(i) {
-        struct cpufreq_policy *policy = cpufreq_cpu_policy[i];
-
-        if (!policy) {
-            unsigned int firstcpu;
-
-            firstcpu = first_cpu(processor_pminfo[i]->perf.shared_cpu_map);
-            if (i == firstcpu) {
-                policy = xmalloc(struct cpufreq_policy);
-                if (!policy) {
-                    ret = -ENOMEM;
-                    goto cpufreq_init_out;
-                }
-                memset(policy, 0, sizeof(struct cpufreq_policy));
-                policy->cpu = i;
-            } else
-                policy = cpufreq_cpu_policy[firstcpu];
-            cpu_set(i, policy->cpus);
-            cpufreq_cpu_policy[i] = policy;
-        }
-
-        ret = powernow_cpufreq_cpu_init(policy);
-        if (ret)
-            goto cpufreq_init_out;
-    }
-
-    /* setup ondemand cpufreq */
-    for (dom = 0; dom < max_dom; dom++) {
-        if (!test_bit(dom, dom_mask))
-            continue;
-        i = first_cpu(pt[dom]);
-        ret = cpufreq_governor_dbs(cpufreq_cpu_policy[i], CPUFREQ_GOV_START);
-        if (ret)
-            goto cpufreq_init_out;
-    }
-
-cpufreq_init_out:
     xfree(pt);
     xfree(dom_mask);
    

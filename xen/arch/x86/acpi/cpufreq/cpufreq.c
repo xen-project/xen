@@ -661,6 +661,9 @@ static int __init cpufreq_driver_init(void)
     if ((cpufreq_controller == FREQCTL_xen) &&
         (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL))
         ret = cpufreq_register_driver(&acpi_cpufreq_driver);
+    else if ((cpufreq_controller == FREQCTL_xen) &&
+        (boot_cpu_data.x86_vendor == X86_VENDOR_AMD))
+        ret = powernow_register_driver();
 
     return ret;
 }
@@ -676,9 +679,8 @@ int cpufreq_cpu_init(unsigned int cpuid)
     /* Currently we only handle Intel and AMD processor */
     if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
         ret = cpufreq_add_cpu(cpuid);
-    else if ( (boot_cpu_data.x86_vendor == X86_VENDOR_AMD) &&
-            (cpu_count == num_online_cpus()) )
-        ret = powernow_cpufreq_init();
+    else if ( boot_cpu_data.x86_vendor == X86_VENDOR_AMD )
+        ret = cpufreq_add_cpu(cpuid);
     else
         ret = -EFAULT;
     return ret;
