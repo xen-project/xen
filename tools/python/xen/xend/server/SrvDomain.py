@@ -118,7 +118,8 @@ class SrvDomain(SrvDir):
                      ['live',        'int'],
                      ['port',        'int'],
                      ['node',        'int'],
-                     ['ssl',         'int']])
+                     ['ssl',         'int'],
+                     ['change_home_server', 'bool']])
         return fn(req.args, {'dom': self.dom.domid})
 
     def op_pincpu(self, _, req):

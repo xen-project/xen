@@ -1902,9 +1902,10 @@ class XendAPI(object):
         port = other_config.get("port", 0)
         node = other_config.get("node", -1)
         ssl = other_config.get("ssl", None)
+        chs = other_config.get("change_home_server", False)
         
         xendom.domain_migrate(xeninfo.getDomid(), destination_url,
-                              bool(live), port, node, ssl)
+                              bool(live), port, node, ssl, bool(chs))
         return xen_api_success_void()
 
     def VM_save(self, _, vm_ref, dest, checkpoint):

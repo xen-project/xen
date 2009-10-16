@@ -74,7 +74,8 @@ def main(argv):
         other_config = {
             "port":     opts.vals.port,
             "node":     opts.vals.node,
-            "ssl":      opts.vals.ssl
+            "ssl":      opts.vals.ssl,
+            "change_home_server": opts.vals.change_home_server
             }
         server.xenapi.VM.migrate(vm_ref, dst, bool(opts.vals.live),
                                  other_config)
