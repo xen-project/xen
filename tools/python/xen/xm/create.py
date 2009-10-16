@@ -507,6 +507,10 @@ gopts.var('usbdevice', val='NAME',
           fn=set_value, default='',
           use="Name of USB device to add?")
 
+gopts.var('description', val='NAME',
+          fn=set_value, default='',
+          use="Description of a domain")
+
 gopts.var('guest_os_type', val='NAME',
           fn=set_value, default='default',
           use="Guest OS type running in HVM")
@@ -989,7 +993,7 @@ def configure_hvm(config_image, vals):
              'guest_os_type', 'hap', 'opengl', 'cpuid', 'cpuid_check',
              'viridian', 'xen_extended_power_mgmt', 'pci_msitranslate',
              'vpt_align', 'pci_power_mgmt', 'xen_platform_pci',
-             'gfx_passthru' ]
+             'gfx_passthru', 'description' ]
 
     for a in args:
         if a in vals.__dict__ and vals.__dict__[a] is not None:

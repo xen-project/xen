@@ -177,6 +177,7 @@ XENAPI_PLATFORM_CFG_TYPES = {
     'pci_power_mgmt': int,
     'xen_platform_pci': int,
     "gfx_passthru": int,
+    'description': str,
 }
 
 # Xen API console 'other_config' keys.
@@ -490,6 +491,8 @@ class XendConfig(dict):
                 self['platform']['xen_platform_pci'] = 1
             if 'vpt_align' not in self['platform']:
                 self['platform']['vpt_align'] = 1
+            if 'description' not in self['platform']:
+                self['platform']['description'] = ''
             if 'loader' not in self['platform']:
                 # Old configs may have hvmloader set as PV_kernel param
                 if self.has_key('PV_kernel') and self['PV_kernel'] != '':
