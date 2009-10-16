@@ -3970,6 +3970,37 @@ class XendDomainInfo:
         return dscsi_uuid
 
 
+    def change_vdi_of_vbd(self, xenapi_vbd, vdi_image_path):
+        """Change current VDI with the new VDI.
+
+        @param xenapi_vbd: vbd struct from the Xen API
+        @param vdi_image_path: path of VDI
+        """
+        dev_uuid = xenapi_vbd['uuid']
+        if dev_uuid not in self.info['devices']:
+            raise XendError('Device does not exist')
+
+        # Convert xenapi to sxp
+        if vdi_image_path.startswith('tap'):
+            dev_class = 'tap'
+        else:
+            dev_class = 'vbd'
+        dev_sxp = [
+            dev_class,
+            ['uuid',  dev_uuid],
+            ['uname', vdi_image_path],
+            ['dev',   '%s:cdrom' % xenapi_vbd['device']],
+            ['mode',  'r'],
+            ['VDI',   xenapi_vbd['VDI']]
+        ]
+
+        if self._stateGet() in (XEN_API_VM_POWER_STATE_RUNNING,
+                                XEN_API_VM_POWER_STATE_PAUSED):
+            self.device_configure(dev_sxp)
+        else:
+            self.info.device_update(dev_uuid, dev_sxp)
+
+
     def destroy_device_by_uuid(self, dev_type, dev_uuid):
         if dev_uuid not in self.info['devices']:
             raise XendError('Device does not exist')

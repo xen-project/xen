@@ -1960,8 +1960,44 @@ class XendAPI(object):
 
         return xen_api_success(return_cfg)
 
-    def VBD_media_change(self, session, vbd_ref, vdi_ref):
-        return xen_api_error(XEND_ERROR_UNSUPPORTED)
+    def VBD_media_change(self, session, vbd_ref, new_vdi_ref):
+        xendom = XendDomain.instance()
+        xennode = XendNode.instance()
+
+        vm = xendom.get_vm_with_dev_uuid('vbd', vbd_ref)
+        if not vm:
+            return xen_api_error(['HANDLE_INVALID', 'VBD', vbd_ref])
+        cur_vbd_struct = vm.get_dev_xenapi_config('vbd', vbd_ref)
+        if not cur_vbd_struct:
+            return xen_api_error(['HANDLE_INVALID', 'VBD', vbd_ref])
+        if cur_vbd_struct['type'] != XEN_API_VBD_TYPE[0]:   # Not CD
+            return xen_api_error(['HANDLE_INVALID', 'VBD', vbd_ref])
+        if cur_vbd_struct['mode'] != 'RO':   # Not read only
+            return xen_api_error(['HANDLE_INVALID', 'VBD', vbd_ref])
+
+        new_vdi = xennode.get_vdi_by_uuid(new_vdi_ref)
+        if not new_vdi:
+            return xen_api_error(['HANDLE_INVALID', 'VDI', new_vdi_ref])
+        new_vdi_image = new_vdi.get_location()
+
+        valid_vbd_keys = self.VBD_attr_ro + self.VBD_attr_rw + \
+                         self.Base_attr_ro + self.Base_attr_rw
+
+        new_vbd_struct = {}
+        for k in cur_vbd_struct.keys():
+            if k in valid_vbd_keys:
+                new_vbd_struct[k] = cur_vbd_struct[k]
+        new_vbd_struct['VDI'] = new_vdi_ref
+
+        try:
+            XendTask.log_progress(0, 100,
+                                  vm.change_vdi_of_vbd,
+                                  new_vbd_struct, new_vdi_image)
+        except XendError, e:
+            log.exception("Error in VBD_media_change")
+            return xen_api_error(['INTERNAL_ERROR', str(e)]) 
+
+        return xen_api_success_void()
 
     # class methods
     def VBD_create(self, session, vbd_struct):
