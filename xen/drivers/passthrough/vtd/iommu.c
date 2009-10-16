@@ -1343,7 +1343,8 @@ static int reassign_device_ownership(
     if (!pdev)
         return -ENODEV;
 
-    drhd = acpi_find_matched_drhd_unit(pdev);
+    if ( (drhd = acpi_find_matched_drhd_unit(pdev)) == NULL )
+        return -ENODEV;
     pdev_iommu = drhd->iommu;
     domain_context_unmap(source, bus, devfn);
 
@@ -1357,7 +1358,7 @@ static int reassign_device_ownership(
     for_each_pdev ( source, pdev )
     {
         drhd = acpi_find_matched_drhd_unit(pdev);
-        if ( drhd->iommu == pdev_iommu )
+        if ( drhd && drhd->iommu == pdev_iommu )
         {
             found = 1;
             break;
