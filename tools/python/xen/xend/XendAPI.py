@@ -2370,6 +2370,12 @@ class XendAPI(object):
     # Object Methods
     
     def VDI_destroy(self, session, vdi_ref):
+        # check no VBDs attached
+        image = XendNode.instance().get_vdi_by_uuid(vdi_ref)
+        if image.getVBDs():
+            raise VDIError("Cannot destroy VDI with VBDs attached",
+                           image.name_label)
+
         sr = XendNode.instance().get_sr_containing_vdi(vdi_ref)
         sr.destroy_vdi(vdi_ref)
         return xen_api_success_void()

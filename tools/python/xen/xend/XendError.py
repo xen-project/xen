@@ -186,6 +186,18 @@ class DirectPCIError(XendAPIError):
     def __str__(self):
         return 'DIRECT_PCI_ERROR: %s' % self.error
 
+class VDIError(XendAPIError):
+    def __init__(self, error, vdi):
+        XendAPIError.__init__(self)
+        self.vdi = vdi
+        self.error = error
+
+    def get_api_error(self):
+        return ['VDI_ERROR', self.error, self.vdi]
+
+    def __str__(self):
+        return 'VDI_ERROR: %s %s' % (self.error, self.vdi)
+
 from xen.util.xsconstants import xserr2string
 
 class SecurityError(XendAPIError):
