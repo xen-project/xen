@@ -289,9 +289,6 @@ class PciController(DevController):
             raise VmError(("pci: PCI Backend and pci-stub don't own "+ \
                     "device %s\n") %(dev.name))
 
-        if dev.has_non_page_aligned_bar and arch.type != "ia64":
-            raise VmError("pci: %s: non-page-aligned MMIO BAR found." % dev.name)
-
         self.CheckSiblingDevices(fe_domid, dev)
 
         # We don't do FLR when we create domain and hotplug device into guest,
@@ -367,6 +364,9 @@ class PciController(DevController):
             except Exception, e:
                 raise VmError("pci: failed to locate device and "+
                         "parse its resources - "+str(e))
+
+            if dev.has_non_page_aligned_bar and strict_check:
+                raise VmError("pci: %s: non-page-aligned MMIO BAR found." % dev.name)
 
             # Check if there is intermediate PCIe switch bewteen the device and
             # Root Complex.

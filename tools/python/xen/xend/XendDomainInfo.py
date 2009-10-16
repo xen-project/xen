@@ -702,8 +702,9 @@ class XendDomainInfo:
             raise VmError(("pci: PCI Backend and pci-stub don't own device %s")\
                             %pci_device.name)
 
+        strict_check = xoptions.get_pci_dev_assign_strict_check()
         # Check non-page-aligned MMIO BAR.
-        if pci_device.has_non_page_aligned_bar and arch.type != "ia64":
+        if pci_device.has_non_page_aligned_bar and strict_check:
             raise VmError("pci: %s: non-page-aligned MMIO BAR found." % \
                 pci_device.name)
 
@@ -711,7 +712,7 @@ class XendDomainInfo:
         if not self.info.is_hvm():
             return
 
-        if not xoptions.get_pci_dev_assign_strict_check():
+        if not strict_check:
             return
 
         # Check if there is intermediate PCIe switch bewteen the device and
