@@ -177,6 +177,12 @@ stdvga=0
 #   then xm console or minicom can connect
 serial='pty'
 
+#----------------------------------------------------------------------------
+#   tsc_native : TSC mode (0=emulate TSC, 1=native TSC)
+#   emulate TSC provides synced TSC for all vcpus, but lose perfomrance.
+#   native TSC leverages hardware's TSC(no perf loss), but vcpu's TSC may lose
+#   sync due to hardware's unreliable/unsynced TSC between CPUs.
+tsc_native=1
 
 #-----------------------------------------------------------------------------
 #   Qemu Monitor, default is disable
