@@ -524,6 +524,7 @@ void ept_change_entry_emt_with_range(struct domain *d, unsigned long start_gfn,
     mfn_t mfn;
     int order = 0;
 
+    p2m_lock(d->arch.p2m);
     for ( gfn = start_gfn; gfn <= end_gfn; gfn++ )
     {
         e = ept_get_entry_content(d, gfn);
@@ -561,6 +562,7 @@ void ept_change_entry_emt_with_range(struct domain *d, unsigned long start_gfn,
                 ept_set_entry(d, gfn, mfn, order, e.avail1);
         }
     }
+    p2m_unlock(d->arch.p2m);
 }
 
 /* 

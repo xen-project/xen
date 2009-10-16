@@ -2237,7 +2237,9 @@ set_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
     }
 
     P2M_DEBUG("set mmio %lx %lx\n", gfn, mfn_x(mfn));
+    p2m_lock(d->arch.p2m);
     rc = set_p2m_entry(d, gfn, mfn, 0, p2m_mmio_direct);
+    p2m_unlock(d->arch.p2m);
     if ( 0 == rc )
         gdprintk(XENLOG_ERR,
             "set_mmio_p2m_entry: set_p2m_entry failed! mfn=%08lx\n",
@@ -2261,7 +2263,9 @@ clear_mmio_p2m_entry(struct domain *d, unsigned long gfn)
             "clear_mmio_p2m_entry: gfn_to_mfn failed! gfn=%08lx\n", gfn);
         return 0;
     }
+    p2m_lock(d->arch.p2m);
     rc = set_p2m_entry(d, gfn, _mfn(INVALID_MFN), 0, 0);
+    p2m_unlock(d->arch.p2m);
 
     return rc;
 }
