@@ -178,6 +178,7 @@ XENAPI_PLATFORM_CFG_TYPES = {
     'xen_platform_pci': int,
     "gfx_passthru": int,
     'description': str,
+    'oos' : int,
 }
 
 # Xen API console 'other_config' keys.

@@ -1073,6 +1073,7 @@ class sxp2xml:
             'vhpt',
             'guest_os_type',
             'hap',
+            'oos',
             'pci_msitranslate',
             'pci_power_mgmt',
             'xen_platform_pci',

@@ -636,7 +636,7 @@ static void paging_log_dirty_teardown(struct domain*d)
 /*           CODE FOR PAGING SUPPORT            */
 /************************************************/
 /* Domain paging struct initialization. */
-int paging_domain_init(struct domain *d)
+int paging_domain_init(struct domain *d, unsigned int domcr_flags)
 {
     int rc;
 
@@ -646,7 +646,7 @@ int paging_domain_init(struct domain *d)
     /* The order of the *_init calls below is important, as the later
      * ones may rewrite some common fields.  Shadow pagetables are the
      * default... */
-    shadow_domain_init(d);
+    shadow_domain_init(d, domcr_flags);
 
     /* ... but we will use hardware assistance if it's available. */
     if ( hap_enabled(d) )

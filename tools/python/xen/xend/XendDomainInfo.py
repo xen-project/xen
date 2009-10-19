@@ -2419,7 +2419,11 @@ class XendDomainInfo:
         s3_integrity = 0
         if self.info.has_key('s3_integrity'):
             s3_integrity = self.info['s3_integrity']
-        flags = (int(hvm) << 0) | (int(hap) << 1) | (int(s3_integrity) << 2)
+
+        oos = self.info['platform'].get('oos', 1)
+        oos_off = 1 - oos
+
+        flags = (int(hvm) << 0) | (int(hap) << 1) | (int(s3_integrity) << 2) | (int(oos_off) << 3)
 
         try:
             self.domid = xc.domain_create(

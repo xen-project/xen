@@ -364,6 +364,9 @@ struct domain *domain_create(
  /* DOMCRF_dummy: Create a dummy domain (not scheduled; not on domain list) */
 #define _DOMCRF_dummy         3
 #define DOMCRF_dummy          (1U<<_DOMCRF_dummy)
+ /* DOMCRF_oos_off: dont use out-of-sync optimization for shadow page tables */
+#define _DOMCRF_oos_off         4
+#define DOMCRF_oos_off          (1U<<_DOMCRF_oos_off)
 
 /*
  * rcu_lock_domain_by_id() is more efficient than get_domain_by_id().

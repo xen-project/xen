@@ -60,6 +60,9 @@ struct xen_domctl_createdomain {
 #define _XEN_DOMCTL_CDF_s3_integrity  2
 #define XEN_DOMCTL_CDF_s3_integrity   (1U<<_XEN_DOMCTL_CDF_s3_integrity)
     uint32_t flags;
+ /* Disable out-of-sync shadow page tables? */
+#define _XEN_DOMCTL_CDF_oos_off       3
+#define XEN_DOMCTL_CDF_oos_off        (1U<<_XEN_DOMCTL_CDF_oos_off)
 };
 typedef struct xen_domctl_createdomain xen_domctl_createdomain_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_createdomain_t);

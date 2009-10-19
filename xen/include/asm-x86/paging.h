@@ -200,7 +200,7 @@ void paging_vcpu_init(struct vcpu *v);
 
 /* Set up the paging-assistance-specific parts of a domain struct at
  * start of day.  Called for every domain from arch_domain_create() */
-int paging_domain_init(struct domain *d);
+int paging_domain_init(struct domain *d, unsigned int domcr_flags);
 
 /* Handler for paging-control ops: operations from user-space to enable
  * and disable ephemeral shadow modes (test mode and log-dirty mode) and

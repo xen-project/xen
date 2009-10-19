@@ -53,7 +53,7 @@
 
 /* Set up the shadow-specific parts of a domain struct at start of day.
  * Called from paging_domain_init(). */
-void shadow_domain_init(struct domain *d);
+void shadow_domain_init(struct domain *d, unsigned int domcr_flags);
 
 /* Setup the shadow-specific parts of a vcpu struct. It is called by
  * paging_vcpu_init() in paging.c */

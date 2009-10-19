@@ -452,7 +452,7 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
 
 #endif /* __x86_64__ */
 
-    if ( (rc = paging_domain_init(d)) != 0 )
+    if ( (rc = paging_domain_init(d, domcr_flags)) != 0 )
         goto fail;
     paging_initialised = 1;
 

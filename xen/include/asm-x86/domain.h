@@ -104,6 +104,7 @@ struct shadow_domain {
 
     /* OOS */
     int oos_active;
+    int oos_off;
 };
 
 struct shadow_vcpu {

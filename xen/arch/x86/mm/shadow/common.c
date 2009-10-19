@@ -43,7 +43,7 @@ DEFINE_PER_CPU(uint32_t,trace_shadow_path_flags);
 
 /* Set up the shadow-specific parts of a domain struct at start of day.
  * Called for every domain from arch_domain_create() */
-void shadow_domain_init(struct domain *d)
+void shadow_domain_init(struct domain *d, unsigned int domcr_flags)
 {
     int i;
     shadow_lock_init(d);
@@ -58,6 +58,7 @@ void shadow_domain_init(struct domain *d)
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
     d->arch.paging.shadow.oos_active = 0;
+    d->arch.paging.shadow.oos_off = (domcr_flags & DOMCRF_oos_off) ?  1 : 0;
 #endif
 }
 
@@ -3023,7 +3024,7 @@ static void sh_update_paging_modes(struct vcpu *v)
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
     /* We need to check that all the vcpus have paging enabled to
      * unsync PTs. */
-    if ( is_hvm_domain(d) )
+    if ( is_hvm_domain(d) && !d->arch.paging.shadow.oos_off )
     {
         int pe = 1;
         struct vcpu *vptr;

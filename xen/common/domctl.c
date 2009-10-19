@@ -393,7 +393,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         if ( supervisor_mode_kernel ||
              (op->u.createdomain.flags &
              ~(XEN_DOMCTL_CDF_hvm_guest | XEN_DOMCTL_CDF_hap |
-               XEN_DOMCTL_CDF_s3_integrity)) )
+               XEN_DOMCTL_CDF_s3_integrity | XEN_DOMCTL_CDF_oos_off)) )
             break;
 
         dom = op->domain;
@@ -427,6 +427,8 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
             domcr_flags |= DOMCRF_hap;
         if ( op->u.createdomain.flags & XEN_DOMCTL_CDF_s3_integrity )
             domcr_flags |= DOMCRF_s3_integrity;
+        if ( op->u.createdomain.flags & XEN_DOMCTL_CDF_oos_off )
+            domcr_flags |= DOMCRF_oos_off;
 
         ret = -ENOMEM;
         d = domain_create(dom, domcr_flags, op->u.createdomain.ssidref);

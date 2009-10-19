@@ -610,6 +610,11 @@ gopts.var('s3_integrity', val='TBOOT_MEMORY_PROTECT',
           use="""Should domain memory integrity be verified during S3?
           (0=protection is disabled; 1=protection is enabled.""")
 
+gopts.var('oos', val='OOS',
+          fn=set_int, default=1,
+          use="""Should out-of-sync shadow page tabled be enabled?
+          (0=OOS is disabled; 1=OOS is enabled.""")
+
 gopts.var('cpuid', val="IN[,SIN]:eax=EAX,ebx=EBX,ecx=ECX,edx=EDX",
           fn=append_value, default=[],
           use="""Cpuid description.""")
@@ -990,7 +995,7 @@ def configure_hvm(config_image, vals):
              'vnc', 'vncdisplay', 'vncunused', 'vncconsole', 'vnclisten',
              'sdl', 'display', 'xauthority', 'rtc_timeoffset', 'monitor',
              'acpi', 'apic', 'usb', 'usbdevice', 'keymap', 'pci', 'hpet',
-             'guest_os_type', 'hap', 'opengl', 'cpuid', 'cpuid_check',
+             'guest_os_type', 'hap', 'oos', 'opengl', 'cpuid', 'cpuid_check',
              'viridian', 'xen_extended_power_mgmt', 'pci_msitranslate',
              'vpt_align', 'pci_power_mgmt', 'xen_platform_pci',
              'gfx_passthru', 'description' ]
@@ -1038,6 +1043,8 @@ def make_config(vals):
         config.append(['backend', ['tpmif']])
     if vals.localtime:
         config.append(['localtime', vals.localtime])
+    if vals.oos:
+        config.append(['oos', vals.oos])
 
     config_image = configure_image(vals)
     if vals.bootloader:
