@@ -1707,7 +1707,7 @@ int intel_vtd_setup(void)
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
 
-    if ( !iommu_enabled )
+    if ( list_empty(&acpi_drhd_units) )
         return -ENODEV;
 
     platform_quirks();
@@ -1760,18 +1760,15 @@ int intel_vtd_setup(void)
     P(iommu_intremap, "Interrupt Remapping");
 #undef P
 
+    /* Allocate domain id bitmap, and set bit 0 as reserved. */
     drhd = list_entry(acpi_drhd_units.next, typeof(*drhd), list);
-    if ( drhd != NULL )
-    {
-        /* Allocate domain id bitmap, and set bit 0 as reserved. */
-        domid_bitmap_size = cap_ndoms(drhd->iommu->cap);
-        domid_bitmap = xmalloc_array(unsigned long,
-                                     BITS_TO_LONGS(domid_bitmap_size));
-        if ( domid_bitmap == NULL )
-            goto error;
-        memset(domid_bitmap, 0, domid_bitmap_size / 8);
-        __set_bit(0, domid_bitmap);
-    }
+    domid_bitmap_size = cap_ndoms(drhd->iommu->cap);
+    domid_bitmap = xmalloc_array(unsigned long,
+                                 BITS_TO_LONGS(domid_bitmap_size));
+    if ( domid_bitmap == NULL )
+        goto error;
+    memset(domid_bitmap, 0, domid_bitmap_size / 8);
+    __set_bit(0, domid_bitmap);
 
     scan_pci_devices();
 

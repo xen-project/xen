@@ -266,9 +266,11 @@ int iommu_setup(void)
 {
     int rc = -ENODEV;
 
-    rc = iommu_hardware_setup();
-
-    iommu_enabled = (rc == 0);
+    if ( iommu_enabled )
+    {
+        rc = iommu_hardware_setup();
+        iommu_enabled = (rc == 0);
+    }
 
     if ( force_iommu && !iommu_enabled )
         panic("IOMMU setup failed, crash Xen for security purpose!\n");
