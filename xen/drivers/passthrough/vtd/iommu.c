@@ -135,16 +135,16 @@ void iommu_flush_cache_entry(void *addr)
 
 void iommu_flush_cache_page(void *addr, unsigned long npages)
 {
-    __iommu_flush_cache(addr, PAGE_SIZE_4K * npages);
+    __iommu_flush_cache(addr, PAGE_SIZE * npages);
 }
 
 /* Allocate page table, return its machine address */
 u64 alloc_pgtable_maddr(struct acpi_drhd_unit *drhd, unsigned long npages)
 {
     struct acpi_rhsa_unit *rhsa;
-    struct page_info *pg;
+    struct page_info *pg, *cur_pg;
     u64 *vaddr;
-    int node = -1;
+    int node = -1, i;
 
     rhsa = drhd_to_rhsa(drhd);
     if ( rhsa )
@@ -154,11 +154,17 @@ u64 alloc_pgtable_maddr(struct acpi_drhd_unit *drhd, unsigned long npages)
                              (node == -1 ) ? 0 : MEMF_node(node));
     if ( !pg )
         return 0;
-    vaddr = __map_domain_page(pg);
-    memset(vaddr, 0, PAGE_SIZE * npages);
 
-    iommu_flush_cache_page(vaddr, npages);
-    unmap_domain_page(vaddr);
+    cur_pg = pg;
+    for ( i = 0; i < npages; i++ )
+    {
+        vaddr = __map_domain_page(cur_pg);
+        memset(vaddr, 0, PAGE_SIZE);
+
+        iommu_flush_cache_page(vaddr, 1);
+        unmap_domain_page(vaddr);
+        cur_pg++;
+    }
 
     return page_to_maddr(pg);
 }

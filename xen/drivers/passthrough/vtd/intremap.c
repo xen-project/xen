@@ -146,6 +146,7 @@ static int remap_entry_to_ioapic_rte(
     struct iremap_entry *iremap_entry = NULL, *iremap_entries;
     unsigned long flags;
     struct ir_ctrl *ir_ctrl = iommu_ir_ctrl(iommu);
+    u64 entry_base;
 
     if ( ir_ctrl == NULL )
     {
@@ -164,9 +165,11 @@ static int remap_entry_to_ioapic_rte(
 
     spin_lock_irqsave(&ir_ctrl->iremap_lock, flags);
 
+    entry_base = ir_ctrl->iremap_maddr +
+                 (( index >> IREMAP_ENTRY_ORDER ) << PAGE_SHIFT );
     iremap_entries =
-        (struct iremap_entry *)map_vtd_domain_page(ir_ctrl->iremap_maddr);
-    iremap_entry = &iremap_entries[index];
+        (struct iremap_entry *)map_vtd_domain_page(entry_base);
+    iremap_entry = &iremap_entries[index % (1 << IREMAP_ENTRY_ORDER)];
 
     old_rte->vector = iremap_entry->lo.vector;
     old_rte->delivery_mode = iremap_entry->lo.dlm;
@@ -192,6 +195,7 @@ static int ioapic_rte_to_remap_entry(struct iommu *iommu,
     int index;
     unsigned long flags;
     struct ir_ctrl *ir_ctrl = iommu_ir_ctrl(iommu);
+    u64 entry_base;
 
     remap_rte = (struct IO_APIC_route_remap_entry *) old_rte;
     spin_lock_irqsave(&ir_ctrl->iremap_lock, flags);
@@ -208,15 +212,17 @@ static int ioapic_rte_to_remap_entry(struct iommu *iommu,
     {
         dprintk(XENLOG_ERR VTDPREFIX,
                 "%s: intremap index (%d) is larger than"
-                " the maximum index (%ld)!\n",
+                " the maximum index (%d)!\n",
                 __func__, index, IREMAP_ENTRY_NR - 1);
         spin_unlock_irqrestore(&ir_ctrl->iremap_lock, flags);
         return -EFAULT;
     }
 
+    entry_base = ir_ctrl->iremap_maddr +
+                 (( index >> IREMAP_ENTRY_ORDER ) << PAGE_SHIFT );
     iremap_entries =
-        (struct iremap_entry *)map_vtd_domain_page(ir_ctrl->iremap_maddr);
-    iremap_entry = &iremap_entries[index];
+        (struct iremap_entry *)map_vtd_domain_page(entry_base);
+    iremap_entry = &iremap_entries[index % (1 << IREMAP_ENTRY_ORDER)];
 
     memcpy(&new_ire, iremap_entry, sizeof(struct iremap_entry));
 
@@ -425,6 +431,7 @@ static int remap_entry_to_msi_msg(
     int index;
     unsigned long flags;
     struct ir_ctrl *ir_ctrl = iommu_ir_ctrl(iommu);
+    u64 entry_base;
 
     if ( ir_ctrl == NULL )
     {
@@ -447,9 +454,11 @@ static int remap_entry_to_msi_msg(
 
     spin_lock_irqsave(&ir_ctrl->iremap_lock, flags);
 
+    entry_base = ir_ctrl->iremap_maddr +
+                 (( index >> IREMAP_ENTRY_ORDER ) << PAGE_SHIFT );
     iremap_entries =
-        (struct iremap_entry *)map_vtd_domain_page(ir_ctrl->iremap_maddr);
-    iremap_entry = &iremap_entries[index];
+        (struct iremap_entry *)map_vtd_domain_page(entry_base);
+    iremap_entry = &iremap_entries[index % (1 << IREMAP_ENTRY_ORDER)];
 
     msg->address_hi = MSI_ADDR_BASE_HI;
     msg->address_lo =
@@ -485,6 +494,7 @@ static int msi_msg_to_remap_entry(
     int index;
     unsigned long flags;
     struct ir_ctrl *ir_ctrl = iommu_ir_ctrl(iommu);
+    u64 entry_base;
 
     remap_rte = (struct msi_msg_remap_entry *) msg;
     spin_lock_irqsave(&ir_ctrl->iremap_lock, flags);
@@ -502,16 +512,18 @@ static int msi_msg_to_remap_entry(
     {
         dprintk(XENLOG_ERR VTDPREFIX,
                 "%s: intremap index (%d) is larger than"
-                " the maximum index (%ld)!\n",
+                " the maximum index (%d)!\n",
                 __func__, index, IREMAP_ENTRY_NR - 1);
         msi_desc->remap_index = -1;
         spin_unlock_irqrestore(&ir_ctrl->iremap_lock, flags);
         return -EFAULT;
     }
 
+    entry_base = ir_ctrl->iremap_maddr +
+                 (( index >> IREMAP_ENTRY_ORDER ) << PAGE_SHIFT );
     iremap_entries =
-        (struct iremap_entry *)map_vtd_domain_page(ir_ctrl->iremap_maddr);
-    iremap_entry = &iremap_entries[index];
+        (struct iremap_entry *)map_vtd_domain_page(entry_base);
+    iremap_entry = &iremap_entries[index % (1 << IREMAP_ENTRY_ORDER)];
     memcpy(&new_ire, iremap_entry, sizeof(struct iremap_entry));
 
     /* Set interrupt remapping table entry */
@@ -619,7 +631,7 @@ int enable_intremap(struct iommu *iommu)
     if ( ir_ctrl->iremap_maddr == 0 )
     {
         drhd = iommu_to_drhd(iommu);
-        ir_ctrl->iremap_maddr = alloc_pgtable_maddr(drhd, 1);
+        ir_ctrl->iremap_maddr = alloc_pgtable_maddr(drhd, IREMAP_ARCH_PAGE_NR );
         if ( ir_ctrl->iremap_maddr == 0 )
         {
             dprintk(XENLOG_WARNING VTDPREFIX,

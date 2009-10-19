@@ -302,7 +302,23 @@ struct iremap_entry {
     }hi;
   };
 };
-#define IREMAP_ENTRY_NR (PAGE_SIZE_4K/sizeof(struct iremap_entry))
+
+/* Max intr remapping table page order is 8, as max number of IRTEs is 64K */
+#define IREMAP_PAGE_ORDER  8
+
+/*
+ * VTd engine handles 4K page, while CPU may have different page size on
+ * different arch. E.g. 16K on IPF.
+ */
+#define IREMAP_ARCH_PAGE_ORDER  (IREMAP_PAGE_ORDER + PAGE_SHIFT_4K - PAGE_SHIFT)
+#define IREMAP_ARCH_PAGE_NR     ( IREMAP_ARCH_PAGE_ORDER < 0 ?  \
+                                1 :                             \
+                                1 << IREMAP_ARCH_PAGE_ORDER )
+
+/* Each entry is 16 bytes, so 2^8 entries per 4K page */
+#define IREMAP_ENTRY_ORDER  ( PAGE_SHIFT - 4 )
+#define IREMAP_ENTRY_NR     ( 1 << ( IREMAP_PAGE_ORDER + 8 ) )
+
 #define iremap_present(v) ((v).lo & 1)
 #define iremap_fault_disable(v) (((v).lo >> 1) & 1)
 
@@ -392,12 +408,17 @@ struct qinval_entry {
     }q;
 };
 
-/* Order of queue invalidation pages */
-#define IQA_REG_QS       0
-#define NUM_QINVAL_PAGES (1 << IQA_REG_QS)
+/* Order of queue invalidation pages(max is 8) */
+#define QINVAL_PAGE_ORDER   2
 
-/* Each entry is 16 byte */
-#define QINVAL_ENTRY_NR  (1 << (IQA_REG_QS + 8))
+#define QINVAL_ARCH_PAGE_ORDER  (QINVAL_PAGE_ORDER + PAGE_SHIFT_4K - PAGE_SHIFT)
+#define QINVAL_ARCH_PAGE_NR     ( QINVAL_ARCH_PAGE_ORDER < 0 ?  \
+                                1 :                             \
+                                1 << QINVAL_ARCH_PAGE_ORDER )
+
+/* Each entry is 16 bytes, so 2^8 entries per page */
+#define QINVAL_ENTRY_ORDER  ( PAGE_SHIFT - 4 )
+#define QINVAL_ENTRY_NR     (1 << (QINVAL_PAGE_ORDER + 8))
 
 /* Status data flag */
 #define QINVAL_STAT_INIT  0
@@ -429,9 +450,9 @@ struct qinval_entry {
 #define IEC_GLOBAL_INVL         0
 #define IEC_INDEX_INVL          1
 #define IRTA_REG_EIME_SHIFT     11
-#define IRTA_REG_TABLE_SIZE     7    // 4k page = 256 * 16 byte entries
-                                     // 2^^(IRTA_REG_TABLE_SIZE + 1) = 256
-                                     // IRTA_REG_TABLE_SIZE = 7
+
+/* 2^(IRTA_REG_TABLE_SIZE + 1) = IREMAP_ENTRY_NR */
+#define IRTA_REG_TABLE_SIZE     ( IREMAP_PAGE_ORDER + 7 )
 
 #define VTD_PAGE_TABLE_LEVEL_3  3
 #define VTD_PAGE_TABLE_LEVEL_4  4

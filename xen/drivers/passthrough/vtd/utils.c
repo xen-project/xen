@@ -226,8 +226,7 @@ static void dump_iommu_info(unsigned char key)
             /* Dump interrupt remapping table. */
             u64 iremap_maddr = dmar_readq(iommu->reg, DMAR_IRTA_REG);
             int nr_entry = 1 << ((iremap_maddr & 0xF) + 1);
-            struct iremap_entry *iremap_entries =
-                (struct iremap_entry *)map_vtd_domain_page(iremap_maddr);
+            struct iremap_entry *iremap_entries = NULL;
 
             printk("  Interrupt remapping table (nr_entry=0x%x. "
                 "Only dump P=1 entries here):\n", nr_entry);
@@ -235,7 +234,18 @@ static void dump_iommu_info(unsigned char key)
                    "FPD P\n");
             for ( i = 0; i < nr_entry; i++ )
             {
-                struct iremap_entry *p = iremap_entries + i;
+                struct iremap_entry *p;
+                if ( i % (1 << IREMAP_ENTRY_ORDER) == 0 )
+                {
+                    /* This entry across page boundry */
+                    u64 entry_base = iremap_maddr +
+                        (( i >> IREMAP_ENTRY_ORDER ) << PAGE_SHIFT );
+                    if ( iremap_entries )
+                        unmap_vtd_domain_page(iremap_entries);
+                    iremap_entries =
+                        (struct iremap_entry *)map_vtd_domain_page(entry_base);
+                }
+                p = &iremap_entries[i % (1 << IREMAP_ENTRY_ORDER)];
 
                 if ( !p->lo.p )
                     continue;
@@ -246,8 +256,9 @@ static void dump_iommu_info(unsigned char key)
                     (u32)p->lo.dlm, (u32)p->lo.tm, (u32)p->lo.rh,
                     (u32)p->lo.dm, (u32)p->lo.fpd, (u32)p->lo.p);
             }
+            if ( iremap_entries )
+                unmap_vtd_domain_page(iremap_entries);
 
-            unmap_vtd_domain_page(iremap_entries);
         }
     }
 
