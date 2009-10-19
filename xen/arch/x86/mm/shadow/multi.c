@@ -3201,7 +3201,16 @@ static int sh_page_fault(struct vcpu *v,
          * are OK, this can only have been caused by a failed
          * shadow_set_l*e(), which will have crashed the guest.
          * Get out of the fault handler immediately. */
+        /* Windows 7 apparently relies on the hardware to do something
+         * it explicitly hasn't promised to do: load l3 values after
+         * the cr3 is loaded.
+         * In any case, in the PAE case, the ASSERT is not true; it can
+         * happen because of actions the guest is taking. */
+#if GUEST_PAGING_LEVELS == 3
+        v->arch.paging.mode->update_cr3(v, 0);
+#else
         ASSERT(d->is_shutting_down);
+#endif
         shadow_unlock(d);
         trace_shadow_gen(TRC_SHADOW_DOMF_DYING, va);
         return 0;
