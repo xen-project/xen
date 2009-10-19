@@ -43,4 +43,6 @@ uint64_t ns_to_acpi_pm_tick(uint64_t ns);
 
 void pv_soft_rdtsc(struct vcpu *v, struct cpu_user_regs *regs);
 
+void force_update_vcpu_system_time(struct vcpu *v);
+
 #endif /* __X86_TIME_H__ */

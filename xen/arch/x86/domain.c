@@ -962,6 +962,25 @@ arch_do_vcpu_op(
         break;
     }
 
+    case VCPUOP_register_vcpu_time_memory_area:
+    {
+        struct vcpu_register_time_memory_area area;
+
+        rc = -EFAULT;
+        if ( copy_from_guest(&area, arg, 1) )
+            break;
+
+        if ( !guest_handle_okay(area.addr.h, 1) )
+            break;
+
+        rc = 0;
+        v->arch.time_info_guest = area.addr.h;
+
+        force_update_vcpu_system_time(v);
+
+        break;
+    }
+
     case VCPUOP_get_physid:
     {
         struct vcpu_get_physid cpu_id;

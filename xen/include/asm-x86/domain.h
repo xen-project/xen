@@ -6,6 +6,7 @@
 #include <asm/hvm/vcpu.h>
 #include <asm/hvm/domain.h>
 #include <asm/e820.h>
+#include <public/vcpu.h>
 
 #define has_32bit_shinfo(d)    ((d)->arch.has_32bit_shinfo)
 #define is_pv_32bit_domain(d)  ((d)->arch.is_32bit_pv)
@@ -417,6 +418,9 @@ struct arch_vcpu
 #if XEN_GDBSX_CONFIG
     uint32_t gdbsx_vcpu_event;
 #endif 
+
+    /* A secondary copy of the vcpu time info. */
+    XEN_GUEST_HANDLE(vcpu_time_info_t) time_info_guest;
 
 } __cacheline_aligned;
 

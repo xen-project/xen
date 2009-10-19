@@ -22,6 +22,7 @@
 #include <xen/irq.h>
 #include <xen/softirq.h>
 #include <xen/keyhandler.h>
+#include <xen/guest_access.h>
 #include <asm/io.h>
 #include <asm/msr.h>
 #include <asm/mpspec.h>
@@ -807,23 +808,15 @@ s_time_t get_s_time(void)
     return now;
 }
 
-static inline void version_update_begin(u32 *version)
-{
-    /* Explicitly OR with 1 just in case version number gets out of sync. */
-    *version = (*version + 1) | 1;
-    wmb();
-}
+/* Explicitly OR with 1 just in case version number gets out of sync. */
+#define version_update_begin(v) (((v)+1)|1)
+#define version_update_end(v)   ((v)+1)
 
-static inline void version_update_end(u32 *version)
-{
-    wmb();
-    (*version)++;
-}
-
-void update_vcpu_system_time(struct vcpu *v)
+static void __update_vcpu_system_time(struct vcpu *v, int force)
 {
     struct cpu_time       *t;
-    struct vcpu_time_info *u;
+    struct vcpu_time_info *u, _u;
+    XEN_GUEST_HANDLE(vcpu_time_info_t) user_u;
 
     if ( v->vcpu_info == NULL )
         return;
@@ -831,35 +824,79 @@ void update_vcpu_system_time(struct vcpu *v)
     t = &this_cpu(cpu_time);
     u = &vcpu_info(v, time);
 
+    /* Don't bother unless timestamps have changed or we are forced. */
+    if ( !force && (u->tsc_timestamp == (v->domain->arch.vtsc
+                                         ? t->stime_local_stamp
+                                         : t->local_tsc_stamp)) )
+        return;
+
+    memset(&_u, 0, sizeof(_u));
+
     if ( v->domain->arch.vtsc )
     {
-        if ( u->tsc_timestamp == t->stime_local_stamp )
-            return;
-        version_update_begin(&u->version);
-        u->tsc_timestamp     = t->stime_local_stamp;
-        u->system_time       = t->stime_local_stamp;
-        u->tsc_to_system_mul = 0x80000000u;
-        u->tsc_shift         = 1;
-        version_update_end(&u->version);
+        _u.tsc_timestamp     = t->stime_local_stamp;
+        _u.system_time       = t->stime_local_stamp;
+        _u.tsc_to_system_mul = 0x80000000u;
+        _u.tsc_shift         = 1;
     }
-    else if ( u->tsc_timestamp != t->local_tsc_stamp )
+    else
     {
-        version_update_begin(&u->version);
-        u->tsc_timestamp     = t->local_tsc_stamp;
-        u->system_time       = t->stime_local_stamp;
-        u->tsc_to_system_mul = t->tsc_scale.mul_frac;
-        u->tsc_shift         = (s8)t->tsc_scale.shift;
-        version_update_end(&u->version);
+        _u.tsc_timestamp     = t->local_tsc_stamp;
+        _u.system_time       = t->stime_local_stamp;
+        _u.tsc_to_system_mul = t->tsc_scale.mul_frac;
+        _u.tsc_shift         = (s8)t->tsc_scale.shift;
     }
+
+    /* 1. Update guest kernel version. */
+    _u.version = u->version = version_update_begin(u->version);
+    wmb();
+    /* 2. Update all other guest kernel fields. */
+    *u = _u;
+    wmb();
+    /* 3. Update guest kernel version. */
+    u->version = version_update_end(u->version);
+
+    user_u = v->arch.time_info_guest;
+    if ( !guest_handle_is_null(user_u) )
+    {
+        /* 1. Update userspace version. */
+        __copy_field_to_guest(user_u, &_u, version);
+        wmb();
+        /* 2. Update all other userspavce fields. */
+        __copy_to_guest(user_u, &_u, 1);
+        wmb();
+        /* 3. Update userspace version. */
+        _u.version = version_update_end(_u.version);
+        __copy_field_to_guest(user_u, &_u, version);
+    }
+}
+
+void update_vcpu_system_time(struct vcpu *v)
+{
+    __update_vcpu_system_time(v, 0);
+}
+
+void force_update_vcpu_system_time(struct vcpu *v)
+{
+    __update_vcpu_system_time(v, 1);
 }
 
 void update_domain_wallclock_time(struct domain *d)
 {
+    uint32_t *wc_version;
+
     spin_lock(&wc_lock);
-    version_update_begin(&shared_info(d, wc_version));
+
+    wc_version = &shared_info(d, wc_version);
+    *wc_version = version_update_begin(*wc_version);
+    wmb();
+
     shared_info(d, wc_sec)  = wc_sec + d->time_offset_seconds;
     shared_info(d, wc_nsec) = wc_nsec;
-    version_update_end(&shared_info(d, wc_version));
+
+    wmb();
+    *wc_version = version_update_end(*wc_version);
+
     spin_unlock(&wc_lock);
 }
 
