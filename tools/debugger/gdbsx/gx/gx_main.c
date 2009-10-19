@@ -201,7 +201,7 @@ process_m_request(char *remote_buf)
 
     gx_decode_m_packet(&remote_buf[1], &addr, &len);
 
-    if ((xbuf=malloc(len)) == NULL) {
+    if ((xbuf=malloc(len+1)) == NULL) {
         gx_reply_error(remote_buf);
         return;
     }
@@ -227,7 +227,7 @@ process_M_request(char *remote_buf)
 
     data_strtp = gx_decode_M_packet(&remote_buf[1], &addr, &len);
 
-    if ((xbuf=malloc(len)) == NULL) {
+    if ((xbuf=malloc(len+1)) == NULL) {
         gx_reply_error(remote_buf);
         return;
     }

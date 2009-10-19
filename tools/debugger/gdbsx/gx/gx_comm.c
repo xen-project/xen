@@ -299,6 +299,7 @@ gx_putpkt (char *buf)
 
         if (write(remote_fd, buf2, p - buf2) != p - buf2) {
             perror("putpkt(write)");
+            free(buf2);
             return -1;
         }
         if (gx_remote_dbg)
