@@ -266,13 +266,9 @@ int iommu_setup(void)
 {
     int rc = -ENODEV;
 
-    if ( acpi_disabled )
-        iommu_enabled = 0;
-    else
-    {
-        rc = iommu_hardware_setup();
-        iommu_enabled = (rc == 0);
-    }
+    rc = iommu_hardware_setup();
+
+    iommu_enabled = (rc == 0);
 
     if ( force_iommu && !iommu_enabled )
         panic("IOMMU setup failed, crash Xen for security purpose!\n");
