@@ -1006,11 +1006,8 @@ static void iommu_free(struct acpi_drhd_unit *drhd)
 static int intel_iommu_domain_init(struct domain *d)
 {
     struct hvm_iommu *hd = domain_hvm_iommu(d);
-    struct iommu *iommu = NULL;
+    struct iommu *iommu;
     struct acpi_drhd_unit *drhd;
-
-    drhd = list_entry(acpi_drhd_units.next, typeof(*drhd), list);
-    iommu = drhd->iommu;
 
     hd->agaw = width_to_agaw(DEFAULT_DOMAIN_ADDRESS_WIDTH);
 
@@ -1110,10 +1107,6 @@ static int domain_context_mapping_one(
         spin_unlock(&hd->mapping_lock);
     }
 
-    /*
-     * domain_id 0 is not valid on Intel's IOMMU, force domain_id to
-     * be 1 based as required by intel's iommu hw.
-     */
     context_set_domain_id(context, domain);
     context_set_address_width(*context, agaw);
     context_set_fault_enable(*context);
@@ -1403,9 +1396,6 @@ static int intel_iommu_map_page(
     int pte_present;
     int flush_dev_iotlb;
 
-    drhd = list_entry(acpi_drhd_units.next, typeof(*drhd), list);
-    iommu = drhd->iommu;
-
     /* do nothing if dom0 and iommu supports pass thru */
     if ( iommu_passthrough && (d->domain_id == 0) )
         return 0;
@@ -1455,13 +1445,7 @@ static int intel_iommu_map_page(
 
 static int intel_iommu_unmap_page(struct domain *d, unsigned long gfn)
 {
-    struct acpi_drhd_unit *drhd;
-    struct iommu *iommu;
-
-    drhd = list_entry(acpi_drhd_units.next, typeof(*drhd), list);
-    iommu = drhd->iommu;
-
-    /* do nothing if dom0 and iommu supports pass thru */
+    /* Do nothing if dom0 and iommu supports pass thru. */
     if ( iommu_passthrough && (d->domain_id == 0) )
         return 0;
 
@@ -1776,18 +1760,18 @@ int intel_vtd_setup(void)
     P(iommu_intremap, "Interrupt Remapping");
 #undef P
 
-    /* Allocate IO page directory page for the domain. */
     drhd = list_entry(acpi_drhd_units.next, typeof(*drhd), list);
-    iommu = drhd->iommu;
-
-    /* Allocate domain id bitmap, and set bit 0 as reserved */
-    domid_bitmap_size = cap_ndoms(iommu->cap);
-    domid_bitmap = xmalloc_array(unsigned long,
-                                 BITS_TO_LONGS(domid_bitmap_size));
-    if ( domid_bitmap == NULL )
-        goto error;
-    memset(domid_bitmap, 0, domid_bitmap_size / 8);
-    set_bit(0, domid_bitmap);
+    if ( drhd != NULL )
+    {
+        /* Allocate domain id bitmap, and set bit 0 as reserved. */
+        domid_bitmap_size = cap_ndoms(drhd->iommu->cap);
+        domid_bitmap = xmalloc_array(unsigned long,
+                                     BITS_TO_LONGS(domid_bitmap_size));
+        if ( domid_bitmap == NULL )
+            goto error;
+        memset(domid_bitmap, 0, domid_bitmap_size / 8);
+        __set_bit(0, domid_bitmap);
+    }
 
     scan_pci_devices();
 
