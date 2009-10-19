@@ -184,7 +184,8 @@ SUBCOMMAND_HELP = {
     'network2-attach': ('<Domain> [front_mac=<mac>] [back_mac=<mac>] '
                         '[backend=<BackDomain>] [trusted=<0|1>] '
                         '[back_trusted=<0|1>] [bridge=<bridge>] '
-                        '[max_bypasses=n]'
+                        '[filter_mac=<0|1>] [front_filter_mac=<0|1>] '
+                        '[pdev=<PDEV>] [max_bypasses=n]',
                         'Create a new version 2 virtual network device.'),
     'network2-detach': ('<Domain> <DevId> [-f|--force]',
                          'Destroy a domain\'s version 2 virtual network device.'),
@@ -2450,7 +2451,7 @@ def xm_block_configure(args):
 
 def xm_network2_attach(args):
     xenapi_unsupported()
-    arg_check(args, 'network2-attach', 1, 4)
+    arg_check(args, 'network2-attach', 1, 11)
     dom = args[0]
     vif = ['vif2']
     vif_params = ['front_mac', 'back_mac', 'backend', 'trusted',
@@ -2467,7 +2468,7 @@ def xm_network2_attach(args):
 
 def xm_network2_detach(args):
     xenapi_unsupported()
-    arg_check(args, "network2-detch", 2, 3)
+    arg_check(args, "network2-detach", 2, 3)
     detach(args, "vif2")
 
 def xm_network2_list(args):
