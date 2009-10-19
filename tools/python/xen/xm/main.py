@@ -161,6 +161,9 @@ SUBCOMMAND_HELP = {
     'vcpu-set'    : ('<Domain> <vCPUs>',
                      'Set the number of active VCPUs for allowed for the'
                      ' domain.'),
+    #usb
+    'usb-add'     : ('<domain> <[host:bus.addr] [host:vendor_id:product_id]>','Add the usb device to FV VM.'),
+    'usb-del'     : ('<domain> <[host:bus.addr] [host:vendor_id:product_id]>','Delete the usb device to FV VM.'),
 
     # device commands
 
@@ -351,6 +354,8 @@ common_commands = [
     "top",
     "unpause",
     "uptime",
+    "usb-add",
+    "usb-del",
     "vcpu-set",
     ]
 
@@ -383,6 +388,8 @@ domain_commands = [
     "top",
     "unpause",
     "uptime",
+    "usb-add",
+    "usb-del",
     "vcpu-list",
     "vcpu-pin",
     "vcpu-set",
@@ -1474,6 +1481,14 @@ def xm_mem_set(args):
     else:
         mem_target = int_unit(args[1], 'm')
         server.xend.domain.setMemoryTarget(dom, mem_target)
+
+def xm_usb_add(args):
+    arg_check(args, "usb-add", 2)
+    server.xend.domain.usb_add(args[0],args[1])
+
+def xm_usb_del(args):
+    arg_check(args, "usb-del", 2)
+    server.xend.domain.usb_del(args[0],args[1])
     
 def xm_vcpu_set(args):
     arg_check(args, "vcpu-set", 2)
@@ -3312,6 +3327,9 @@ commands = {
     "tmem-set": xm_tmem_set,
     "tmem-freeable": xm_tmem_freeable_mb,
     "tmem-shared-auth": xm_tmem_shared_auth,
+    #usb
+    "usb-add": xm_usb_add,
+    "usb-del": xm_usb_del,
     }
 
 ## The commands supported by a separate argument parser in xend.xm.

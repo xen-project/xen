@@ -225,6 +225,19 @@ class SrvDomain(SrvDir):
         self.acceptCommand(req)
         return self.xd.domain_reset(self.dom.getName())
 
+    def op_usb_add(self, op, req):
+        self.acceptCommand(req)
+        return req.threadRequest(self.do_usb_add, op, req)
+
+    def do_usb_add(self, _, req):
+        return self.xd.domain_usb_add(self.dom.getName(), req)
+ 
+    def op_usb_del(self, op, req):
+        self.acceptCommand(req)
+        return req.threadRequest(self.do_usb_add, op, req)
+
+    def do_usb_del(self, _, req):
+        return self.xd.domain_usb_add(self.dom.getName(), req)
 
     def render_POST(self, req):
         return self.perform(req)

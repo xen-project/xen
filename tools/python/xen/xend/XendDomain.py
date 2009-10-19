@@ -1522,6 +1522,45 @@ class XendDomain:
             raise XendError("can't write guest state file %s: %s" %
                             (dst, ex[1]))
 
+    def domain_usb_add(self, domid, dev_id):
+        dominfo = self.domain_lookup_nr(domid)
+        if not dominfo:
+            raise XendInvalidDomain(str(domid))
+
+        usb = dominfo.info['platform'].get('usb')
+        if not usb:
+            raise XendError("Can't add usb device to a guest with usb disabled in configure file")
+
+        hvm = dominfo.info.is_hvm()
+        if not hvm:
+            raise XendError("Can't add usb device to a non-hvm guest")
+
+        if dominfo._stateGet() != DOM_STATE_HALTED:
+            dominfo.image.signalDeviceModel("usb-add",
+                "usb-added", dev_id)
+        else:
+            log.debug("error: Domain is not running!")
+
+
+    def domain_usb_del(self, domid, dev_id):
+        dominfo = self.domain_lookup_nr(domid)
+        if not dominfo:
+            raise XendInvalidDomain(str(domid))
+
+        usb = dominfo.info['platform'].get('usb')
+        if not usb:
+            raise XendError("Can't add usb device to a guest with usb disabled in configure file")
+
+        hvm = dominfo.info.is_hvm()
+        if not hvm:
+            raise XendError("Can't del usb to a non-hvm guest")
+
+        if dominfo._stateGet() != DOM_STATE_HALTED:
+            dominfo.image.signalDeviceModel("usb-del",
+                "usb-deleted", dev_id)
+        else:
+            log.debug("error: Domain is not running!")
+
     def domain_pincpu(self, domid, vcpu, cpumap):
         """Set which cpus vcpu can use
 
