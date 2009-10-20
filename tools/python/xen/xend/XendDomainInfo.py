@@ -2421,7 +2421,7 @@ class XendDomainInfo:
             s3_integrity = self.info['s3_integrity']
 
         oos = self.info['platform'].get('oos', 1)
-        oos_off = 1 - oos
+        oos_off = 1 - int(oos)
 
         flags = (int(hvm) << 0) | (int(hap) << 1) | (int(s3_integrity) << 2) | (int(oos_off) << 3)
 
