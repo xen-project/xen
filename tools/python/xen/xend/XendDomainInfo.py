@@ -2464,6 +2464,11 @@ class XendDomainInfo:
         if arch.type == "x86" and hvm and viridian is not None:
             xc.hvm_set_param(self.domid, HVM_PARAM_VIRIDIAN, long(viridian))
 
+        # If nomigrate is set, disable migration
+        nomigrate = self.info["platform"].get("nomigrate")
+        if arch.type == "x86" and nomigrate is not None and long(nomigrate) != 0:
+            xc.domain_disable_migrate(self.domid)
+
         # Optionally enable virtual HPET
         hpet = self.info["platform"].get("hpet")
         if hvm and hpet is not None:

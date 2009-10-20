@@ -225,6 +225,10 @@ gopts.var('tsc_native', val='TSC_NATIVE',
           fn=set_int, default=0,
           use="""TSC mode (0=emulate TSC, 1=native TSC).""")
 
+gopts.var('nomigrate', val='NOMIGRATE',
+          fn=set_int, default=0,
+          use="""migratability (0=migration enabled, 1=migration disabled).""")
+
 gopts.var('vpt_align', val='VPT_ALIGN',
           fn=set_int, default=1,
           use="Enable aligning all periodic vpt to reduce timer interrupts.")
@@ -737,6 +741,9 @@ def configure_image(vals):
     if vals.tsc_native is not None:
         config_image.append(['tsc_native', vals.tsc_native])
 
+    if vals.nomigrate is not None:
+        config_image.append(['nomigrate', vals.nomigrate])
+
     return config_image
     
 def configure_disks(config_devs, vals):
@@ -1020,7 +1027,7 @@ def make_config(vals):
                 config.append([n, v])
 
     map(add_conf, ['name', 'memory', 'maxmem', 'shadow_memory',
-                   'restart', 'on_poweroff', 'tsc_native',
+                   'restart', 'on_poweroff', 'tsc_native', 'nomigrate',
                    'on_reboot', 'on_crash', 'vcpus', 'vcpu_avail', 'features',
                    'on_xend_start', 'on_xend_stop', 'target', 'cpuid',
                    'cpuid_check', 'machine_address_size', 'suppress_spurious_page_faults'])

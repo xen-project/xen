@@ -522,6 +522,9 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
 
     spin_lock_init(&d->arch.vtsc_lock);
 
+    if ( d->domain_id == 0 )
+        d->disable_migrate = 1;
+
     return 0;
 
  fail:

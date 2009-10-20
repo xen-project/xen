@@ -146,6 +146,7 @@ XENAPI_PLATFORM_CFG_TYPES = {
     'localtime': int,
     'monitor': int,
     'nographic': int,
+    'nomigrate': int,
     'pae' : int,
     'rtc_timeoffset': int,
     'serial': str,
@@ -478,6 +479,9 @@ class XendConfig(dict):
 
         if 'tsc_native' not in self['platform']:
             self['platform']['tsc_native'] = 0
+
+        if 'nomigrate' not in self['platform']:
+            self['platform']['nomigrate'] = 0
 
         if self.is_hvm():
             if 'timer_mode' not in self['platform']:

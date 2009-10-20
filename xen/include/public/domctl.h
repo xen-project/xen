@@ -653,6 +653,12 @@ typedef struct xen_domctl_hvmcontext_partial {
 } xen_domctl_hvmcontext_partial_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_hvmcontext_partial_t);
 
+#define XEN_DOMCTL_disable_migrate    58
+typedef struct xen_domctl_disable_migrate {
+    uint32_t disable; /* IN: 1: disable migration and restore */
+} xen_domctl_disable_migrate_t;
+
+
 #define XEN_DOMCTL_gdbsx_guestmemio     1000 /* guest mem io */
 struct xen_domctl_gdbsx_memio {
     uint64_aligned_t pgd3val;/* optional: init_mm.pgd[3] value */
@@ -703,6 +709,7 @@ struct xen_domctl {
         struct xen_domctl_arch_setup        arch_setup;
         struct xen_domctl_settimeoffset     settimeoffset;
         struct xen_domctl_set_tsc_native    set_tsc_native;
+        struct xen_domctl_disable_migrate   disable_migrate;
         struct xen_domctl_real_mode_area    real_mode_area;
         struct xen_domctl_hvmcontext        hvmcontext;
         struct xen_domctl_hvmcontext_partial hvmcontext_partial;

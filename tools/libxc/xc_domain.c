@@ -475,6 +475,15 @@ int xc_domain_set_tsc_native(int xc_handle, uint32_t domid, int is_native)
     return do_domctl(xc_handle, &domctl);
 }
 
+int xc_domain_disable_migrate(int xc_handle, uint32_t domid)
+{
+    DECLARE_DOMCTL;
+    domctl.cmd = XEN_DOMCTL_disable_migrate;
+    domctl.domain = (domid_t)domid;
+    domctl.u.disable_migrate.disable = 1;
+    return do_domctl(xc_handle, &domctl);
+}
+
 int xc_domain_memory_increase_reservation(int xc_handle,
                                           uint32_t domid,
                                           unsigned long nr_extents,

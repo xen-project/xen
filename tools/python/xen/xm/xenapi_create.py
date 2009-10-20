@@ -1079,6 +1079,7 @@ class sxp2xml:
             'xen_platform_pci',
             'tsc_native'
             'description',
+            'nomigrate'
         ]
 
         platform_configs = []

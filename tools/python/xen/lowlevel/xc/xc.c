@@ -1485,6 +1485,20 @@ static PyObject *pyxc_domain_set_tsc_native(XcObject *self, PyObject *args)
     return zero;
 }
 
+static PyObject *pyxc_domain_disable_migrate(XcObject *self, PyObject *args)
+{
+    uint32_t dom;
+
+    if (!PyArg_ParseTuple(args, "i", &dom))
+        return NULL;
+
+    if (xc_domain_disable_migrate(self->xc_handle, dom) != 0)
+        return pyxc_error_to_exception();
+
+    Py_INCREF(zero);
+    return zero;
+}
+
 static PyObject *pyxc_domain_send_trigger(XcObject *self,
                                           PyObject *args,
                                           PyObject *kwds)
@@ -2013,6 +2027,13 @@ static PyMethodDef pyxc_methods[] = {
       "Set a domain's TSC mode (emulate vs native)\n"
       " dom        [int]: Domain whose TSC mode is being set.\n"
       " is_native  [int]: 1=native, 0=emulate.\n"
+      "Returns: [int] 0 on success; -1 on error.\n" },
+
+    { "domain_disable_migrate",
+      (PyCFunction)pyxc_domain_disable_migrate,
+      METH_VARARGS, "\n"
+      "Marks domain as non-migratable AND non-restoreable\n"
+      " dom        [int]: Domain whose TSC mode is being set.\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "domain_send_trigger",

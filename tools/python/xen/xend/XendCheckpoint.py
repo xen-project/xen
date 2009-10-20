@@ -226,6 +226,19 @@ def restore(xd, fd, dominfo = None, paused = False, relocating = False):
     else:
         dominfo = xd.restore_(vmconfig)
 
+    image_cfg = dominfo.info.get('image', {})
+    is_hvm = dominfo.info.is_hvm()
+
+    if is_hvm:
+        nomigrate = dominfo.info['platform'].get('nomigrate', 0)
+    else:
+        nomigrate = dominfo.info['platform'].get('nomigrate')
+        if nomigrate is None:
+            nomigrate = 0
+    if int(nomigrate) != 0:
+        dominfo.destroy()
+        raise XendError("cannot restore non-migratable domain")
+
     # repin domain vcpus if a target node number was specified 
     # this is done prior to memory allocation to aide in memory
     # distribution for NUMA systems.
@@ -248,8 +261,6 @@ def restore(xd, fd, dominfo = None, paused = False, relocating = False):
     assert console_port
 
     # if hvm, pass mem size to calculate the store_mfn
-    image_cfg = dominfo.info.get('image', {})
-    is_hvm = dominfo.info.is_hvm()
     if is_hvm:
         apic = int(dominfo.info['platform'].get('apic', 0))
         pae  = int(dominfo.info['platform'].get('pae',  0))
