@@ -278,6 +278,9 @@ struct domain
     void *tmem;
 
     struct lock_profile_qhead profile_head;
+
+    /* Non-migratable and non-restoreable? */
+    bool_t disable_migrate;
 };
 
 struct domain_setup_info

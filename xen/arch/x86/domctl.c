@@ -1100,24 +1100,6 @@ long arch_do_domctl(
     }
     break;
 
-    case XEN_DOMCTL_disable_migrate:
-    {
-        struct domain *d;
-
-        ret = -ESRCH;
-        d = rcu_lock_domain_by_id(domctl->domain);
-        if ( d == NULL )
-            break;
-
-        domain_pause(d);
-        d->arch.disable_migrate = domctl->u.disable_migrate.disable;
-        domain_unpause(d);
-
-        rcu_unlock_domain(d);
-        ret = 0;
-    }
-    break;
-
     case XEN_DOMCTL_suppress_spurious_page_faults:
     {
         struct domain *d;

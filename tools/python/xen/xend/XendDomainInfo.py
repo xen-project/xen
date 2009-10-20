@@ -2466,7 +2466,7 @@ class XendDomainInfo:
 
         # If nomigrate is set, disable migration
         nomigrate = self.info["platform"].get("nomigrate")
-        if arch.type == "x86" and nomigrate is not None and long(nomigrate) != 0:
+        if nomigrate is not None and long(nomigrate) != 0:
             xc.domain_disable_migrate(self.domid)
 
         # Optionally enable virtual HPET

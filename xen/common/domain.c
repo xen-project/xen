@@ -239,8 +239,11 @@ struct domain *domain_create(
     if ( domcr_flags & DOMCRF_hvm )
         d->is_hvm = 1;
 
-    if ( (domid == 0) && opt_dom0_vcpus_pin )
-        d->is_pinned = 1;
+    if ( domid == 0 )
+    {
+        d->is_pinned = opt_dom0_vcpus_pin;
+        d->disable_migrate = 1;
+    }
 
     if ( domcr_flags & DOMCRF_dummy )
         return d;

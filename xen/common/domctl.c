@@ -948,6 +948,19 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     }
     break;
 
+    case XEN_DOMCTL_disable_migrate:
+    {
+        struct domain *d;
+        ret = -ESRCH;
+        if ( (d = rcu_lock_domain_by_id(op->domain)) != NULL )
+        {
+            d->disable_migrate = op->u.disable_migrate.disable;
+            rcu_unlock_domain(d);
+            ret = 0;
+        }
+    }
+    break;
+
     default:
         ret = arch_do_domctl(op, u_domctl);
         break;

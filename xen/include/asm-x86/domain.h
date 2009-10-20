@@ -304,9 +304,6 @@ struct arch_domain
     spinlock_t vtsc_lock;
     uint64_t vtsc_kerncount; /* for hvm, counts all vtsc */
     uint64_t vtsc_usercount; /* not used for hvm */
-
-    /* mark domain as non-migratable and non-restoreable */
-    bool_t disable_migrate;
 } __cacheline_aligned;
 
 #define has_arch_pdevs(d)    (!list_empty(&(d)->arch.pdev_list))
