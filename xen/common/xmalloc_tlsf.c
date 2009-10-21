@@ -553,7 +553,7 @@ static void tlsf_init(void)
 
 void *_xmalloc(unsigned long size, unsigned long align)
 {
-    void *p;
+    void *p = NULL;
     u32 pad;
 
     ASSERT(!in_irq());
@@ -566,10 +566,10 @@ void *_xmalloc(unsigned long size, unsigned long align)
     if ( !xenpool )
         tlsf_init();
 
-    if ( size >= (PAGE_SIZE - (2*BHDR_OVERHEAD)) )
-        p = xmalloc_whole_pages(size);
-    else
+    if ( size < PAGE_SIZE )
         p = xmem_pool_alloc(size, xenpool);
+    if ( p == NULL )
+        p = xmalloc_whole_pages(size);
 
     /* Add alignment padding. */
     if ( (pad = -(long)p & (align - 1)) != 0 )
@@ -603,7 +603,7 @@ void xfree(void *p)
         ASSERT(!(b->size & 1));
     }
 
-    if ( b->size >= (PAGE_SIZE - (2*BHDR_OVERHEAD)) )
+    if ( b->size >= PAGE_SIZE )
         free_xenheap_pages((void *)b, get_order_from_bytes(b->size));
     else
         xmem_pool_free(p, xenpool);
