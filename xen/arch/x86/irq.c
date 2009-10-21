@@ -419,13 +419,16 @@ int assign_irq_vector(int irq)
     int ret;
     unsigned long flags;
     struct irq_cfg *cfg = &irq_cfg[irq];
+    struct irq_desc *desc = irq_to_desc(irq);
     
     BUG_ON(irq >= nr_irqs || irq <0);
 
     spin_lock_irqsave(&vector_lock, flags);
     ret = __assign_irq_vector(irq, cfg, TARGET_CPUS);
-    if (!ret)
+    if (!ret) {
         ret = cfg->vector;
+        cpus_copy(desc->affinity, cfg->domain);
+    }
     spin_unlock_irqrestore(&vector_lock, flags);
     return ret;
 }
