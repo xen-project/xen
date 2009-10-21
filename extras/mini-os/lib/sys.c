@@ -190,6 +190,11 @@ int open(const char *pathname, int flags, ...)
         printk("open(%s) -> %d\n", pathname, fd);
         return fd;
     }
+    if (!strncmp(pathname, "/dev/mem", strlen("/dev/mem"))) {
+        fd = alloc_fd(FTYPE_MEM);
+        printk("open(/dev/mem) -> %d\n", fd);
+        return fd;
+    }
     if (!strncmp(pathname, "/dev/ptmx", strlen("/dev/ptmx")))
         return posix_openpt(flags);
     printk("open(%s, %x)", pathname, flags);
@@ -1244,13 +1249,18 @@ void *mmap(void *start, size_t length, int prot, int flags, int fd, off_t offset
     ASSERT(prot == (PROT_READ|PROT_WRITE));
     ASSERT((fd == -1 && (flags == (MAP_SHARED|MAP_ANON) || flags == (MAP_PRIVATE|MAP_ANON)))
         || (fd != -1 && flags == MAP_SHARED));
-    ASSERT(offset == 0);
 
     if (fd == -1)
         return map_zero(n, 1);
     else if (files[fd].type == FTYPE_XC) {
         unsigned long zero = 0;
         return map_frames_ex(&zero, n, 0, 0, 1, DOMID_SELF, 0, 0);
+    } else if (files[fd].type == FTYPE_MEM) {
+        int i;
+        unsigned long mfns[n];
+        for (i = 0; i < n; i++)
+            mfns[i] = ((unsigned long) offset + (i * PAGE_SIZE)) >> PAGE_SHIFT;
+        return map_frames_ex(mfns, n, 1, 0, 1, DOMID_IO, 0, _PAGE_PRESENT|_PAGE_RW);
     } else ASSERT(0);
 }
 
