@@ -150,9 +150,9 @@ QEMU_REMOTE=http://xenbits.xensource.com/git-http/qemu-xen-unstable.git
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 71324566f3b95bb88105659439adaef1d5bd155c
-# Tue Oct 13 18:16:42 2009 +0100
-# passthrough: support passthrough in stubdoms
+QEMU_TAG ?= a3285ff385d2568f0226f15fee2b9808ec3b6deb
+# Tue Oct 20 15:16:34 2009 +0100
+# usb hotplug in qemu-dm via xm
 
 OCAML_XENSTORED_REPO=http://xenbits.xensource.com/ext/xen-ocaml-tools.hg
 
