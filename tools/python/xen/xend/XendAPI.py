@@ -2091,7 +2091,7 @@ class XendAPI(object):
         bootable = bool(bootable)
         xd = XendDomain.instance()
         vm = xd.get_vm_with_dev_uuid('vbd', vbd_ref)
-        vm.set_dev_property('vbd', vbd_ref, 'bootable', bootable)
+        vm.set_dev_property('vbd', vbd_ref, 'bootable', int(bootable))
         xd.managed_config_save(vm)
         return xen_api_success_void()
 
