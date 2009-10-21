@@ -231,6 +231,7 @@ static void write_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
         u8 slot = PCI_SLOT(dev->devfn);
         u8 func = PCI_FUNC(dev->devfn);
 
+        mask_msi_irq(entry->irq);
         pci_conf_write32(bus, slot, func, msi_lower_address_reg(pos),
                          msg->address_lo);
         if ( entry->msi_attrib.is_64 )
@@ -243,6 +244,7 @@ static void write_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
         else
             pci_conf_write16(bus, slot, func, msi_data_reg(pos, 0),
                              msg->data);
+        unmask_msi_irq(entry->irq);
         break;
     }
     case PCI_CAP_ID_MSIX:
@@ -250,11 +252,13 @@ static void write_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
         void __iomem *base;
         base = entry->mask_base;
 
+        mask_msi_irq(entry->irq);
         writel(msg->address_lo,
                base + PCI_MSIX_ENTRY_LOWER_ADDR_OFFSET);
         writel(msg->address_hi,
                base + PCI_MSIX_ENTRY_UPPER_ADDR_OFFSET);
         writel(msg->data, base + PCI_MSIX_ENTRY_DATA_OFFSET);
+        unmask_msi_irq(entry->irq);
         break;
     }
     default:
