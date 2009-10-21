@@ -687,7 +687,7 @@ class XendDomainInfo:
         # Test whether the devices can be assigned
 
         pci_name = pci_dict_to_bdf_str(new_dev)
-        _all_assigned_pci_devices =  get_all_assigned_pci_devices()
+        _all_assigned_pci_devices =  get_all_assigned_pci_devices(self.domid)
         if pci_name in _all_assigned_pci_devices:
             raise VmError("failed to assign device %s that has"
                           " already been assigned to other domain." % pci_name)
@@ -906,7 +906,7 @@ class XendDomainInfo:
                 self.pci_device_check_attachability(dev)
 
         # If pci platform does not exist, create and exit.
-        if existing_dev_info is None:
+        if pci_state == 'Initialising' :
             self.device_create(dev_sxp)
             return True
 
@@ -2253,11 +2253,12 @@ class XendDomainInfo:
             if devclass in XendDevices.valid_devices() and devclass != 'vscsi':
                 log.info("createDevice: %s : %s" % (devclass, scrub_password(config)))
                 dev_uuid = config.get('uuid')
-                devid = self._createDevice(devclass, config)
+                if devclass != 'pci' or not self.info.is_hvm() :
+                    devid = self._createDevice(devclass, config)
                 
-                # store devid in XendConfig for caching reasons
-                if dev_uuid in self.info['devices']:
-                    self.info['devices'][dev_uuid][1]['devid'] = devid
+                    # store devid in XendConfig for caching reasons
+                    if dev_uuid in self.info['devices']:
+                        self.info['devices'][dev_uuid][1]['devid'] = devid
 
             elif devclass == 'vscsi':
                 vscsi_config = config.get('devs', [])[0]

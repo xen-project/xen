@@ -73,11 +73,16 @@ def get_assigned_pci_devices(domid):
         dev_str_list = dev_str_list + [dev_str]
     return dev_str_list
 
-def get_all_assigned_pci_devices():
+def get_all_assigned_pci_devices(domid = 0):
     dom_list = xstransact.List('/local/domain')
     pci_str_list = []
+    ti = 0
+    ts = xstransact.Read('/local/domain/' + str(domid) + '/target')
+    if ts is not None :
+        ti = int(ts)
     for d in dom_list:
-        if xstransact.Read('/local/domain/' + d + '/target') is None :
+        target = xstransact.Read('/local/domain/' + d + '/target')
+        if int(d) is not ti and target is None :
             pci_str_list = pci_str_list + get_assigned_pci_devices(int(d))
     return pci_str_list
 

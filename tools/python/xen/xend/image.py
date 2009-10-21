@@ -460,6 +460,27 @@ class ImageHandler:
         # we would very much prefer not to have a thread here and instead
         #  have a callback but sadly we don't have Twisted in xend
         self.sentinel_thread = thread.start_new_thread(self._sentinel_watch,())
+        if self.device_model.find('stubdom-dm') > -1 :
+            from xen.xend import XendDomain
+            domains = XendDomain.instance()
+            domains.domains_lock.release()
+
+            count = 0
+            while True:
+                orig_state = xstransact.Read("/local/domain/0/device-model/%i/state"
+                                    % self.vm.getDomid())
+                # This can occur right after start-up
+                if orig_state != None:
+                    break
+
+                log.debug('createDeviceModel %i: orig_state is None, retrying' % self.vm.getDomid())
+
+                time.sleep(0.1)
+                count += 1
+                if count < 100:
+                    continue
+
+            domains.domains_lock.acquire()
 
     def signalDeviceModel(self, cmd, ret, par = None):
         if self.device_model is None:
