@@ -235,9 +235,7 @@ class Blktap2Controller(BlktapController):
         self.waitForBackend_destroy(backpath)
 
         #Figure out the sysfs path.
-        pattern = re.compile('/dev/xen/blktap-2/tapdev(\d+)$')
-        ctrlid = pattern.search(path)
-        ctrl = '/sys/class/blktap2/blktap' + ctrlid.group(1)
+        minor, dev, ctrl = parseDeviceString(path)
 
         #Close out the disk
         f = open(ctrl + '/remove', 'w')
