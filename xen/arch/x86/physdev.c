@@ -45,7 +45,7 @@ static int physdev_map_pirq(struct physdev_map_pirq *map)
     if ( d == NULL )
         return -ESRCH;
 
-    if ( !STUBDOM_IS_PRIV_FOR(current->domain, d) )
+    if ( !IS_PRIV_FOR(current->domain, d) )
     {
         ret = -EPERM;
         goto free_domain;
@@ -169,7 +169,7 @@ static int physdev_unmap_pirq(struct physdev_unmap_pirq *unmap)
         return -ESRCH;
 
     ret = -EPERM;
-    if ( !STUBDOM_IS_PRIV_FOR(current->domain, d) )
+    if ( !IS_PRIV_FOR(current->domain, d) )
         goto free_domain;
 
     spin_lock(&pcidevs_lock);

@@ -11,9 +11,6 @@ crash_debug   ?= n
 gdbsx         ?= n
 frame_pointer ?= n
 
-# Allow some delicate passthrough related hypercalls to be made from a stubdom
-privileged_stubdoms ?= y
-
 XEN_ROOT=$(BASEDIR)/..
 include $(XEN_ROOT)/Config.mk
 
@@ -56,7 +53,6 @@ CFLAGS-$(perfc)         += -DPERF_COUNTERS
 CFLAGS-$(perfc_arrays)  += -DPERF_ARRAYS
 CFLAGS-$(lock_profile)  += -DLOCK_PROFILE
 CFLAGS-$(frame_pointer) += -fno-omit-frame-pointer -DCONFIG_FRAME_POINTER
-CFLAGS-$(privileged_stubdoms) += -DPRIVILEGED_STUBDOMS
 CFLAGS-$(gdbsx)         += -DXEN_GDBSX_CONFIG
 
 ifneq ($(max_phys_cpus),)

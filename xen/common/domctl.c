@@ -231,14 +231,12 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     case XEN_DOMCTL_ioport_mapping:
     case XEN_DOMCTL_memory_mapping:
     case XEN_DOMCTL_bind_pt_irq:
-    case XEN_DOMCTL_unbind_pt_irq:
-    case XEN_DOMCTL_assign_device:
-    case XEN_DOMCTL_deassign_device: {
+    case XEN_DOMCTL_unbind_pt_irq: {
         struct domain *d;
         bool_t is_priv = IS_PRIV(current->domain);
         if ( !is_priv && ((d = rcu_lock_domain_by_id(op->domain)) != NULL) )
         {
-            is_priv = STUBDOM_IS_PRIV_FOR(current->domain, d);
+            is_priv = IS_PRIV_FOR(current->domain, d);
             rcu_unlock_domain(d);
         }
         if ( !is_priv )

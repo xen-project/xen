@@ -95,10 +95,4 @@ int current_domain_id(void);
 #define __cpuinitdata
 #define __cpuinit
 
-#ifdef PRIVILEGED_STUBDOMS
-#define STUBDOM_IS_PRIV_FOR(x,y) IS_PRIV_FOR(x,y)
-#else
-#define STUBDOM_IS_PRIV_FOR(x,y) IS_PRIV(x)
-#endif
-
 #endif /* __XEN_CONFIG_H__ */

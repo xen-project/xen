@@ -796,6 +796,11 @@ long arch_do_domctl(
         if ( ret )
             goto bind_out;
 
+        ret = -EPERM;
+        if ( !IS_PRIV(current->domain) &&
+             !irq_access_permitted(current->domain, bind->machine_irq) )
+            goto bind_out;
+
         ret = -ESRCH;
         if ( iommu_enabled )
         {
@@ -820,6 +825,12 @@ long arch_do_domctl(
         if ( (d = rcu_lock_domain_by_id(domctl->domain)) == NULL )
             break;
         bind = &(domctl->u.bind_pt_irq);
+
+        ret = -EPERM;
+        if ( !IS_PRIV(current->domain) &&
+             !irq_access_permitted(current->domain, bind->machine_irq) )
+            goto bind_out;
+
         if ( iommu_enabled )
         {
             spin_lock(&pcidevs_lock);
@@ -846,6 +857,11 @@ long arch_do_domctl(
 
         ret = -ESRCH;
         if ( unlikely((d = rcu_lock_domain_by_id(domctl->domain)) == NULL) )
+            break;
+
+        ret = -EPERM;
+        if ( !IS_PRIV(current->domain) &&
+             !iomem_access_permitted(current->domain, mfn, mfn + nr_mfns - 1) )
             break;
 
         ret=0;
@@ -894,6 +910,11 @@ long arch_do_domctl(
                 fgp, fmp, np);
             break;
         }
+
+        ret = -EPERM;
+        if ( !IS_PRIV(current->domain) &&
+             !ioports_access_permitted(current->domain, fmp, fmp + np - 1) )
+            break;
 
         ret = -ESRCH;
         if ( unlikely((d = rcu_lock_domain_by_id(domctl->domain)) == NULL) )

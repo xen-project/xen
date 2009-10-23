@@ -444,7 +444,15 @@ class PciController(DevController):
         # For hvm guest, (from c/s 19679 on) assigning device statically and
         # dynamically both go through reconfigureDevice(), so HERE the
         # setupOneDevice() is not necessary.
-        if not self.vm.info.is_hvm():
+        if self.vm.info.is_hvm():
+            for pci_dev in pci_dev_list:
+                # Setup IOMMU device assignment
+                bdf = xc.assign_device(self.getDomid(), pci_dict_to_xc_str(pci_dev))
+                pci_str = pci_dict_to_bdf_str(pci_dev)
+                if bdf > 0:
+                    raise VmError("Failed to assign device to IOMMU (%s)" % pci_str)
+                log.debug("pci: assign device %s" % pci_str)
+        else :
             for d in pci_dev_list:
                 self.setupOneDevice(d)
         wPath = '/local/domain/0/backend/pci/%u/0/aerState' % (self.getDomid())
