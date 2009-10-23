@@ -1176,7 +1176,7 @@ static int io_has_perm(struct domain *d, char *name, unsigned long s,
             return rc;
 
         if ( s != e )
-            rc = iomem_has_perm(d, s, access);
+            rc = iomem_has_perm(d, e, access);
     }
     else if ( strcmp(name, "Interrupts") == 0 )
     {
