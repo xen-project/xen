@@ -143,6 +143,9 @@ int cpufreq_add_cpu(unsigned int cpu)
         !cpu_online(cpu))
         return -EINVAL;
 
+    if (!cpufreq_driver)
+        return 0;
+
     if (cpufreq_cpu_policy[cpu])
         return 0;
 

@@ -274,58 +274,23 @@ static struct cpufreq_driver powernow_cpufreq_driver = {
 
 unsigned int powernow_register_driver()
 {
-    unsigned int ret;
-    ret = cpufreq_register_driver(&powernow_cpufreq_driver);
-    return ret;
-}
-
-int powernow_cpufreq_init(void)
-{
     unsigned int i, ret = 0;
-    unsigned int max_dom = 0;
-    cpumask_t *pt;
-    unsigned long *dom_mask;
 
     for_each_online_cpu(i) {
         struct cpuinfo_x86 *c = &cpu_data[i];
-	if (c->x86_vendor != X86_VENDOR_AMD)
+        if (c->x86_vendor != X86_VENDOR_AMD)
             ret = -ENODEV;
-        else 
+        else
         {
             u32 eax, ebx, ecx, edx;
             cpuid(CPUID_FREQ_VOLT_CAPABILITIES, &eax, &ebx, &ecx, &edx);
             if ((edx & USE_HW_PSTATE) != USE_HW_PSTATE)
                 ret = -ENODEV;
-	}
+        }
         if (ret)
             return ret;
-        if (max_dom < processor_pminfo[i]->perf.domain_info.domain)
-            max_dom = processor_pminfo[i]->perf.domain_info.domain;
-    }
-    max_dom++;
-
-    dom_mask = xmalloc_array(unsigned long, BITS_TO_LONGS(max_dom));
-    if (!dom_mask)
-        return -ENOMEM;
-    bitmap_zero(dom_mask, max_dom);
-
-    pt = xmalloc_array(cpumask_t, max_dom);
-    if (!pt)
-        return -ENOMEM;
-    memset(pt, 0, max_dom * sizeof(cpumask_t));
-
-    /* get cpumask of each psd domain */
-    for_each_online_cpu(i) {
-        __set_bit(processor_pminfo[i]->perf.domain_info.domain, dom_mask);
-        cpu_set(i, pt[processor_pminfo[i]->perf.domain_info.domain]);
     }
 
-    for_each_online_cpu(i)
-        processor_pminfo[i]->perf.shared_cpu_map =
-            pt[processor_pminfo[i]->perf.domain_info.domain];
-
-    xfree(pt);
-    xfree(dom_mask);
-   
+    ret = cpufreq_register_driver(&powernow_cpufreq_driver);
     return ret;
 }
