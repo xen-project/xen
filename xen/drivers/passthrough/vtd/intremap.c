@@ -468,8 +468,12 @@ static int remap_entry_to_msi_msg(
             MSI_ADDR_DESTMODE_LOGIC) |
         ((iremap_entry->lo.dlm != dest_LowestPrio) ?
             MSI_ADDR_REDIRECTION_CPU:
-            MSI_ADDR_REDIRECTION_LOWPRI) |
-        iremap_entry->lo.dst >> 8;
+            MSI_ADDR_REDIRECTION_LOWPRI);
+    if ( x2apic_enabled )
+        msg->dest32 = iremap_entry->lo.dst;
+    else
+        msg->address_lo |=
+            ((iremap_entry->lo.dst >> 8) & 0xff ) << MSI_ADDR_DEST_ID_SHIFT;
 
     msg->data =
         MSI_DATA_TRIGGER_EDGE |
