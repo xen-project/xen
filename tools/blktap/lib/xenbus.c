@@ -107,6 +107,24 @@ static int get_be_id(const char *str)
 	return atoi(num);
 }
 
+static int get_be_domid(const char *str)
+{
+	int len1, len2;
+	const char *ptr;
+	char *tptr, num[10];
+
+	len2 = strsep_len(str, '/', 3);
+	if ( len2 < 0 ) return -1;
+	len1 = strsep_len(str, '/', 2);
+
+	ptr = str + len1 + 1;
+	strncpy(num, ptr, len2 - len1 - 1);
+	tptr = num + (len2 - len1 - 1);
+	*tptr = '\0';
+
+	return atoi(num);
+}
+
 static struct backend_info *be_lookup_be(const char *bepath)
 {
 	struct backend_info *be;
@@ -150,6 +168,24 @@ static int backend_remove(struct xs_handle *h, struct backend_info *be)
 	return 0;
 }
 
+static const char *get_image_path(const char *path)
+{
+	const char *tmp;
+
+	/* Strip off the image type */
+	if (!strncmp(path, "tapdisk:", strlen("tapdisk:"))) {
+		path += strlen("tapdisk:");
+	} else if (!strncmp(path, "ioemu:", strlen("ioemu:"))) {
+		path += strlen("ioemu:");
+	}
+
+	tmp = strchr(path, ':');
+	if (tmp != NULL)
+		path = tmp + 1;
+
+	return path;
+}
+
 static int check_sharing(struct xs_handle *h, struct backend_info *be)
 {
 	char *dom_uuid;
@@ -161,8 +197,12 @@ static int check_sharing(struct xs_handle *h, struct backend_info *be)
 	char **devices;
 	int i, j;
 	unsigned int num_dom, num_dev;
-	blkif_info_t *info;
+	blkif_info_t *info = be->blkif->info;
 	int ret = 0;
+	const char *image_path[2];
+	int be_domid = get_be_domid(be->backpath);
+
+	image_path[0] = get_image_path(info->params);
 
 	/* If the mode contains '!' or doesn't contain 'w' don't check anything */
 	xs_gather(h, be->backpath, "mode", NULL, &mode, NULL);
@@ -178,7 +218,10 @@ static int check_sharing(struct xs_handle *h, struct backend_info *be)
 	free(path);
 
 	/* Iterate through the devices of all VMs */
-	domains = xs_directory(h, XBT_NULL, "backend/tap", &num_dom);
+	if (asprintf(&path, "/local/domain/%d/backend/tap", be_domid) == -1)
+		goto fail;
+	domains = xs_directory(h, XBT_NULL, path, &num_dom);
+	free(path);
 	if (domains == NULL)
 		num_dom = 0;
 
@@ -198,7 +241,7 @@ static int check_sharing(struct xs_handle *h, struct backend_info *be)
 		}
 
 		/* Check the devices */
-		if (asprintf(&path, "backend/tap/%s", domains[i]) == -1) {
+		if (asprintf(&path, "/local/domain/%d/backend/tap/%s", be_domid, domains[i]) == -1) {
 			ret = -1;
 			free(cur_dom_uuid);
 			break;
@@ -209,15 +252,15 @@ static int check_sharing(struct xs_handle *h, struct backend_info *be)
 		free(path);
 
 		for (j = 0; !ret && (j < num_dev); j++) {
-			if (asprintf(&path, "backend/tap/%s/%s", domains[i], devices[j]) == -1) {
+			if (asprintf(&path, "/local/domain/%d/backend/tap/%s/%s", be_domid, domains[i], devices[j]) == -1) {
 				ret = -1;
 				break;
 			}
 			xs_gather(h, path, "params", NULL, &params, NULL);
 			free(path);
 
-			info =  be->blkif->info;
-			if (strcmp(params, info->params)) {
+			image_path[1] = get_image_path(params);
+			if (!strcmp(image_path[0], image_path[1])) {
 				ret = -1;
 			}
 
@@ -241,24 +284,12 @@ out:
 static int check_image(struct xs_handle *h, struct backend_info *be,
 	const char** errmsg)
 {
-	const char *tmp;
 	const char *path;
 	int mode;
 	blkif_t *blkif = be->blkif;
 	blkif_info_t *info = blkif->info;
 
-	/* Strip off the image type */
-	path = info->params;
-
-	if (!strncmp(path, "tapdisk:", strlen("tapdisk:"))) {
-		path += strlen("tapdisk:");
-	} else if (!strncmp(path, "ioemu:", strlen("ioemu:"))) {
-		path += strlen("ioemu:");
-	}
-
-	tmp = strchr(path, ':');
-	if (tmp != NULL)
-		path = tmp + 1;
+	path = get_image_path(info->params);
 
 	/* Check if the image exists and access is permitted */
 	mode = R_OK;
