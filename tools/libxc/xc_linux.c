@@ -95,6 +95,7 @@ void *xc_map_foreign_range(int xc_handle, uint32_t dom,
     xen_pfn_t *arr;
     int num;
     int i;
+    void *ret;
 
     num = (size + PAGE_SIZE - 1) >> PAGE_SHIFT;
     arr = calloc(num, sizeof(xen_pfn_t));
@@ -102,7 +103,9 @@ void *xc_map_foreign_range(int xc_handle, uint32_t dom,
     for ( i = 0; i < num; i++ )
         arr[i] = mfn + i;
 
-    return xc_map_foreign_batch(xc_handle, dom, prot, arr, num);
+    ret = xc_map_foreign_batch(xc_handle, dom, prot, arr, num);
+    free(arr);
+    return ret;
 }
 
 void *xc_map_foreign_ranges(int xc_handle, uint32_t dom,
@@ -114,6 +117,7 @@ void *xc_map_foreign_ranges(int xc_handle, uint32_t dom,
     int num;
     int i;
     int j;
+    void *ret;
 
     num_per_entry = chunksize >> PAGE_SHIFT;
     num = num_per_entry * nentries;
@@ -123,7 +127,9 @@ void *xc_map_foreign_ranges(int xc_handle, uint32_t dom,
         for ( j = 0; j < num_per_entry; j++ )
             arr[i * num_per_entry + j] = entries[i].mfn + j;
 
-    return xc_map_foreign_batch(xc_handle, dom, prot, arr, num);
+    ret = xc_map_foreign_batch(xc_handle, dom, prot, arr, num);
+    free(arr);
+    return ret;
 }
 
 static int do_privcmd(int xc_handle, unsigned int cmd, unsigned long data)
