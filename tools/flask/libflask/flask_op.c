@@ -70,3 +70,42 @@ int flask_sid_to_context(int xc_handle, int sid, char *buf, uint32_t size)
 
     return 0;
 }
+
+int flask_getenforce(int xc_handle)
+{
+    int err;
+    flask_op_t op;
+    char buf[20];            
+    int size = 20;
+    int mode;
+ 
+    op.cmd = FLASK_GETENFORCE;
+    op.buf = buf;
+    op.size = size;
+    
+    if ( (err = xc_flask_op(xc_handle, &op)) != 0 )
+        return err;
+
+    sscanf(buf, "%i", &mode);
+
+    return mode;
+}
+
+int flask_setenforce(int xc_handle, int mode)
+{
+    int err;
+    flask_op_t op;
+    char buf[20];
+    int size = 20; 
+ 
+    op.cmd = FLASK_SETENFORCE;
+    op.buf = buf;
+    op.size = size;
+   
+    snprintf(buf, size, "%i", mode);
+ 
+    if ( (err = xc_flask_op(xc_handle, &op)) != 0 )
+        return err;
+
+    return 0;
+}

@@ -136,6 +136,60 @@ static PyObject *pyflask_load(PyObject *self, PyObject *args, PyObject *kwds)
     return Py_BuildValue("i", ret);
 }
 
+static PyObject *pyflask_getenforce(PyObject *self)
+{
+    int xc_handle;
+    int ret;
+
+    xc_handle = xc_interface_open();
+    if (xc_handle < 0) {
+        errno = xc_handle;
+        return PyErr_SetFromErrno(xc_error_obj);
+    }
+    
+    ret = flask_getenforce(xc_handle);
+    
+    xc_interface_close(xc_handle);
+    
+    if ( ret < 0 ) {
+        errno = -ret;
+        return PyErr_SetFromErrno(xc_error_obj);
+    }
+
+    return Py_BuildValue("i", ret);
+}
+
+static PyObject *pyflask_setenforce(PyObject *self, PyObject *args,
+                                                            PyObject *kwds)
+{
+    int xc_handle;
+    int mode;
+    int ret;
+
+    static char *kwd_list[] = { "mode", NULL };
+
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i", kwd_list,
+                                      &mode) )
+        return NULL;
+
+    xc_handle = xc_interface_open();
+    if (xc_handle < 0) {
+        errno = xc_handle;
+        return PyErr_SetFromErrno(xc_error_obj);
+    }
+    
+    ret = flask_setenforce(xc_handle, mode);
+    
+    xc_interface_close(xc_handle);
+    
+    if ( ret != 0 ) {
+        errno = -ret;
+        return PyErr_SetFromErrno(xc_error_obj);
+    }
+
+    return Py_BuildValue("i", ret);
+}
+
 static PyMethodDef pyflask_methods[] = {
     { "flask_context_to_sid",
       (PyCFunction)pyflask_context_to_sid,
@@ -158,6 +212,18 @@ static PyMethodDef pyflask_methods[] = {
       " policy [str]: policy to be load\n"
       "Returns: [int]: 0 on success; -1 on failure.\n" }, 
       
+    { "flask_getenforce",
+      (PyCFunction)pyflask_getenforce,
+      METH_NOARGS, "\n"
+      "Returns the current mode of the Flask XSM module.\n"
+      "Returns: [int]: 0 for permissive; 1 for enforcing; -1 on failure.\n" }, 
+
+    { "flask_setenforce",
+      (PyCFunction)pyflask_setenforce,
+      METH_KEYWORDS, "\n"
+      "Modifies the current mode for the Flask XSM module.\n"
+      " mode [int]: mode to change to\n"
+      "Returns: [int]: 0 on success; -1 on failure.\n" }, 
     { NULL, NULL, 0, NULL }
 };
 

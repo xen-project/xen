@@ -49,7 +49,9 @@ class XendXSPolicy(XendBase):
                   'get_resource_label',
                   'set_resource_label',
                   'get_labeled_resources',
-                  'can_run' ]
+                  'can_run',
+                  'getenforce',
+                  'setenforce']
         return XendBase.getFuncs() + funcs
 
     getClass    = classmethod(getClass)
@@ -205,6 +207,12 @@ class XendXSPolicy(XendBase):
             raise SecurityError(irc)
         return security.check_can_run(sec_label)
 
+    def getenforce(self):
+        return security.getenforce()
+
+    def setenforce(self, mode):
+        return security.setenforce(mode)
+
     get_xstype      = classmethod(get_xstype)
     get_xspolicy    = classmethod(get_xspolicy)
     set_xspolicy    = classmethod(set_xspolicy)
@@ -214,6 +222,8 @@ class XendXSPolicy(XendBase):
     get_resource_label = classmethod(get_resource_label)
     get_labeled_resources = classmethod(get_labeled_resources)
     can_run = classmethod(can_run)
+    getenforce      = classmethod(getenforce)
+    setenforce      = classmethod(setenforce)
 
 
 class XendACMPolicy(XendXSPolicy):

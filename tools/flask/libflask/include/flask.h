@@ -18,5 +18,7 @@
 int flask_load(int xc_handle, char *buf, uint32_t size);
 int flask_context_to_sid(int xc_handle, char *buf, uint32_t size, uint32_t *sid);
 int flask_sid_to_context(int xc_handle, int sid, char *buf, uint32_t size);
+int flask_getenforce(int xc_handle);
+int flask_setenforce(int xc_handle, int mode);
 
 #endif /* __FLASK_H__ */

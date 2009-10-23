@@ -225,8 +225,7 @@ SUBCOMMAND_HELP = {
 
     # security
 
-    'addlabel'      :  ('<label> {dom <ConfigFile>|res <resource>|mgt <managed domain>}\n'
-                        '                   [<policy>]',
+    'addlabel'      :  ('<label> {dom <ConfigFile>|res <resource>|mgt <managed domain>} [<policy>]',
                         'Add security label to domain.'),
     'rmlabel'       :  ('{dom <ConfigFile>|res <Resource>|mgt<managed domain>}',
                         'Remove a security label from domain.'),
@@ -244,6 +243,9 @@ SUBCOMMAND_HELP = {
     'labels'        :  ('[policy] [type=dom|res|any]',
                         'List <type> labels for (active) policy.'),
     'serve'         :  ('', 'Proxy Xend XMLRPC over stdio.'),
+    'getenforce'    :  ('', 'Returns the current enforcing mode for the Flask XSM module (Enforcing,Permissive)'),
+    'setenforce'    :  ('[ (Enforcing|1) | (Permissive|0) ]',
+                        'Modifies the current enforcing mode for the Flask XSM module'),
 }
 
 SUBCOMMAND_OPTIONS = {
@@ -435,6 +437,10 @@ vnet_commands = [
     "vnet-delete",
     ]
 
+security_commands = [
+    "setpolicy",
+    ]
+
 acm_commands = [
     "labels",
     "addlabel",
@@ -443,9 +449,13 @@ acm_commands = [
     "dry-run",
     "resources",
     "dumppolicy",
-    "setpolicy",
     "resetpolicy",
     "getpolicy",
+    ]
+
+flask_commands = [
+    "getenforce",
+    "setenforce",
     ]
 
 tmem_commands = [
@@ -458,8 +468,9 @@ tmem_commands = [
     ]
 
 all_commands = (domain_commands + host_commands + scheduler_commands +
-                device_commands + vnet_commands + acm_commands +
-                tmem_commands + ['shell', 'event-monitor'])
+                device_commands + vnet_commands + security_commands +
+                acm_commands + flask_commands + tmem_commands + 
+                ['shell', 'event-monitor'])
 
 
 ##
@@ -3347,6 +3358,8 @@ IMPORTED_COMMANDS = [
     'getpolicy',
     'setpolicy',
     'resetpolicy',
+    'getenforce',
+    'setenforce',
     ]
 
 for c in IMPORTED_COMMANDS:

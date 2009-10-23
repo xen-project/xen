@@ -19,7 +19,7 @@ TESTDIR  = testsuite/tmp
 TESTFLAGS= -DTESTING
 TESTENV  = XENSTORED_ROOTDIR=$(TESTDIR) XENSTORED_RUNDIR=$(TESTDIR)
 
-CLIENTS := flask-loadpolicy
+CLIENTS := flask-loadpolicy flask-setenforce flask-getenforce
 CLIENTS_SRCS := $(patsubst flask-%,%.c,$(CLIENTS))
 CLIENTS_OBJS := $(patsubst flask-%,%.o,$(CLIENTS))
 
@@ -29,9 +29,6 @@ all: $(CLIENTS)
 $(CLIENTS): flask-%: %.o
 	$(CC) $(CFLAGS) $(LDFLAGS) $< $(LOADLIBES) $(LDLIBS) -L. -lflask $(LDFLAGS_libxenctrl) -o $@
 
-$(CLIENTS_OBJS): $(CLIENTS_SRCS)
-	$(COMPILE.c) -o $@ $<
-
 .PHONY: clean
 clean: 
 	rm -f *.o *.opic *.so
@@ -40,7 +37,7 @@ clean:
 
 .PHONY: print-dir
 print-dir:
-	@echo -n tools/flask/loadpolicy: 
+	@echo -n tools/flask/utils: 
 
 .PHONY: print-end
 print-end:

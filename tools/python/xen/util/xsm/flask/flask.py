@@ -7,9 +7,10 @@ from xen.xend import sxp
 #Functions exported through XML-RPC
 xmlrpc_exports = [
   'on',
-  'set_policy'
+  'set_policy',
+  'getenforce',
+  'setenforce'
 ]
-
 
 def err(msg):
     """Raise XSM-Flask exception.
@@ -56,3 +57,9 @@ def get_security_label(self, xspol=None):
 def set_policy(xs_type, policy_b64, flags=None, overwrite=None):
     policy = base64.b64decode(policy_b64);
     return flask.flask_load(policy), ""
+
+def getenforce():
+    return flask.flask_getenforce()
+
+def setenforce(mode):
+    return flask.flask_setenforce(mode)
