@@ -2184,6 +2184,17 @@ static void ept_handle_violation(unsigned long qualification, paddr_t gpa)
         return;
     }
 
+    /* Ignore writes to:
+     *     1. read only memory regions;
+     *     2. memory holes. */
+    if ( (qualification & EPT_WRITE_VIOLATION)
+         && (((gla_validity == EPT_GLA_VALIDITY_MATCH) && (t == p2m_ram_ro))
+             || (mfn_x(mfn) == INVALID_MFN)) ) {
+        int inst_len = __get_instruction_length();
+        __update_guest_eip(inst_len);
+        return;
+    }
+
     /* Everything else is an error. */
     gla = __vmread(GUEST_LINEAR_ADDRESS);
     gdprintk(XENLOG_ERR, "EPT violation %#lx (%c%c%c/%c%c%c), "
