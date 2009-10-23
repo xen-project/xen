@@ -1256,11 +1256,8 @@ void *mmap(void *start, size_t length, int prot, int flags, int fd, off_t offset
         unsigned long zero = 0;
         return map_frames_ex(&zero, n, 0, 0, 1, DOMID_SELF, 0, 0);
     } else if (files[fd].type == FTYPE_MEM) {
-        int i;
-        unsigned long mfns[n];
-        for (i = 0; i < n; i++)
-            mfns[i] = ((unsigned long) offset + (i * PAGE_SIZE)) >> PAGE_SHIFT;
-        return map_frames_ex(mfns, n, 1, 0, 1, DOMID_IO, 0, _PAGE_PRESENT|_PAGE_RW);
+        unsigned long first_mfn = offset >> PAGE_SHIFT;
+        return map_frames_ex(&first_mfn, n, 0, 1, 1, DOMID_IO, 0, _PAGE_PRESENT|_PAGE_RW);
     } else ASSERT(0);
 }
 
