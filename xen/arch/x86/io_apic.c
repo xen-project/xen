@@ -1379,6 +1379,7 @@ static void ack_edge_ioapic_irq(unsigned int irq)
     struct irq_desc *desc = irq_to_desc(irq);
     
     irq_complete_move(&desc);
+    move_native_irq(irq);
 
     if ((desc->status & (IRQ_PENDING | IRQ_DISABLED))
         == (IRQ_PENDING | IRQ_DISABLED))
@@ -1419,6 +1420,38 @@ static void setup_ioapic_ack(char *s)
 }
 custom_param("ioapic_ack", setup_ioapic_ack);
 
+static bool_t io_apic_level_ack_pending(unsigned int irq)
+{
+    struct irq_pin_list *entry;
+    unsigned long flags;
+
+    spin_lock_irqsave(&ioapic_lock, flags);
+    entry = &irq_2_pin[irq];
+    for (;;) {
+        unsigned int reg;
+        int pin;
+
+        if (!entry)
+            break;
+
+        pin = entry->pin;
+        if (pin == -1)
+            continue;
+        reg = io_apic_read(entry->apic, 0x10 + pin*2);
+        /* Is the remote IRR bit set? */
+        if (reg & IO_APIC_REDIR_REMOTE_IRR) {
+            spin_unlock_irqrestore(&ioapic_lock, flags);
+            return 1;
+        }
+        if (!entry->next)
+            break;
+        entry = irq_2_pin + entry->next;
+    }
+    spin_unlock_irqrestore(&ioapic_lock, flags);
+
+    return 0;
+}
+
 static void mask_and_ack_level_ioapic_irq (unsigned int irq)
 {
     unsigned long v;
@@ -1456,6 +1489,10 @@ static void mask_and_ack_level_ioapic_irq (unsigned int irq)
     v = apic_read(APIC_TMR + ((i & ~0x1f) >> 1));
 
     ack_APIC_irq();
+    
+    if ((irq_desc[irq].status & IRQ_MOVE_PENDING) &&
+       !io_apic_level_ack_pending(irq))
+        move_native_irq(irq);
 
     if (!(v & (1 << (i & 0x1f)))) {
         atomic_inc(&irq_mis_count);
@@ -1502,6 +1539,10 @@ static void end_level_ioapic_irq (unsigned int irq)
     v = apic_read(APIC_TMR + ((i & ~0x1f) >> 1));
 
     ack_APIC_irq();
+
+    if ((irq_desc[irq].status & IRQ_MOVE_PENDING) &&
+            !io_apic_level_ack_pending(irq))
+        move_native_irq(irq);
 
     if (!(v & (1 << (i & 0x1f)))) {
         atomic_inc(&irq_mis_count);
@@ -1564,6 +1605,7 @@ static void ack_msi_irq(unsigned int irq)
     struct irq_desc *desc = irq_to_desc(irq);
 
     irq_complete_move(&desc);
+    move_native_irq(irq);
 
     if ( msi_maskable_irq(desc->msi_desc) )
         ack_APIC_irq(); /* ACKTYPE_NONE */

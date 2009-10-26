@@ -289,6 +289,7 @@ static void hpet_msi_ack(unsigned int irq)
     struct irq_desc *desc = irq_to_desc(irq);
 
     irq_complete_move(&desc);
+    move_native_irq(irq);
     ack_APIC_irq();
 }
 

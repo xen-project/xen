@@ -455,6 +455,67 @@ void __setup_vector_irq(int cpu)
     }
 }
 
+void move_masked_irq(int irq)
+{
+	struct irq_desc *desc = irq_to_desc(irq);
+
+	if (likely(!(desc->status & IRQ_MOVE_PENDING)))
+		return;
+    
+    desc->status &= ~IRQ_MOVE_PENDING;
+
+    if (unlikely(cpus_empty(desc->pending_mask)))
+        return;
+
+    if (!desc->handler->set_affinity)
+        return;
+
+	/*
+	 * If there was a valid mask to work with, please
+	 * do the disable, re-program, enable sequence.
+	 * This is *not* particularly important for level triggered
+	 * but in a edge trigger case, we might be setting rte
+	 * when an active trigger is comming in. This could
+	 * cause some ioapics to mal-function.
+	 * Being paranoid i guess!
+	 *
+	 * For correct operation this depends on the caller
+	 * masking the irqs.
+	 */
+    if (likely(cpus_intersects(desc->pending_mask, cpu_online_map)))
+        desc->handler->set_affinity(irq, desc->pending_mask);
+
+	cpus_clear(desc->pending_mask);
+}
+
+void move_native_irq(int irq)
+{
+    struct irq_desc *desc = irq_to_desc(irq);
+
+    if (likely(!(desc->status & IRQ_MOVE_PENDING)))
+        return;
+
+    if (unlikely(desc->status & IRQ_DISABLED))
+        return;
+
+    desc->handler->disable(irq);
+    move_masked_irq(irq);
+    desc->handler->enable(irq);
+}
+
+/* For re-setting irq interrupt affinity for specific irq */
+void irq_set_affinity(int irq, cpumask_t mask)
+{
+    struct irq_desc *desc = irq_to_desc(irq);
+    
+    if (!desc->handler->set_affinity)
+        return;
+    
+    ASSERT(spin_is_locked(&desc->lock));
+    desc->status |= IRQ_MOVE_PENDING;
+    cpus_copy(desc->pending_mask, mask);
+}
+
 asmlinkage void do_IRQ(struct cpu_user_regs *regs)
 {
     struct irqaction *action;
