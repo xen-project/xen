@@ -780,9 +780,6 @@ get_page_from_l1e(
         return 1;
     }
 
-    if ( real_pg_owner == NULL )
-        goto could_not_pin;
-
     if ( unlikely(real_pg_owner != pg_owner) )
     {
         /*
@@ -791,7 +788,8 @@ get_page_from_l1e(
          * dom0, until pvfb supports granted mappings. At that time this
          * minor hack can go away.
          */
-        if ( (pg_owner == l1e_owner) || !IS_PRIV_FOR(pg_owner, real_pg_owner) )
+        if ( (real_pg_owner == NULL) || (pg_owner == l1e_owner) ||
+             !IS_PRIV_FOR(pg_owner, real_pg_owner) )
             goto could_not_pin;
         pg_owner = real_pg_owner;
     }
