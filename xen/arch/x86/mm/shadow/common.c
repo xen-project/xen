@@ -3637,12 +3637,9 @@ int shadow_track_dirty_vram(struct domain *d,
      * no need to be careful. */
     if ( !dirty_vram )
     {
-        /* Just recount from start. */
-        for ( i = begin_pfn; i < end_pfn; i++ ) {
-            mfn_t mfn = gfn_to_mfn(d, i, &t);
-            if (mfn_x(mfn) != INVALID_MFN)
-                flush_tlb |= sh_remove_all_mappings(d->vcpu[0], mfn);
-        }
+        /* Throw away all the shadows rather than walking through them 
+         * up to nr times getting rid of mappings of each pfn */
+        shadow_blow_tables(d);
 
         gdprintk(XENLOG_INFO, "tracking VRAM %lx - %lx\n", begin_pfn, end_pfn);
 
