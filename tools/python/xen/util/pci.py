@@ -830,7 +830,10 @@ class PciDevice:
 
     def find_all_the_multi_functions(self):
         sysfs_mnt = find_sysfs_mnt()
-        parent = pci_dict_to_bdf_str(self.find_parent())
+        parentdict = self.find_parent()
+        if parentdict is None :
+            return [ self.name ]
+        parent = pci_dict_to_bdf_str(parentdict)
         pci_names = os.popen('ls ' + sysfs_mnt + SYSFS_PCI_DEVS_PATH + '/' + \
             parent + '/').read()
         funcs = extract_the_exact_pci_names(pci_names)
