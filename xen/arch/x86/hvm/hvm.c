@@ -916,6 +916,44 @@ void hvm_triple_fault(void)
     domain_shutdown(v->domain, SHUTDOWN_reboot);
 }
 
+bool_t hvm_hap_nested_page_fault(unsigned long gfn)
+{
+    p2m_type_t p2mt;
+    mfn_t mfn;
+
+    mfn = gfn_to_mfn_type_current(gfn, &p2mt, p2m_guest);
+
+    /*
+     * If this GFN is emulated MMIO or marked as read-only, pass the fault
+     * to the mmio handler.
+     */
+    if ( p2m_is_mmio(p2mt) || (p2mt == p2m_ram_ro) )
+    {
+        if ( !handle_mmio() )
+            hvm_inject_exception(TRAP_gp_fault, 0, 0);
+        return 1;
+    }
+
+    /* Log-dirty: mark the page dirty and let the guest write it again */
+    if ( p2mt == p2m_ram_logdirty )
+    {
+        paging_mark_dirty(current->domain, mfn_x(mfn));
+        p2m_change_type(current->domain, gfn, p2m_ram_logdirty, p2m_ram_rw);
+        return 1;
+    }
+
+    /* Shouldn't happen: Maybe the guest was writing to a r/o grant mapping? */
+    if ( p2mt == p2m_grant_map_ro )
+    {
+        gdprintk(XENLOG_WARNING,
+                 "trying to write to read-only grant mapping\n");
+        hvm_inject_exception(TRAP_gp_fault, 0, 0);
+        return 1;
+    }
+
+    return 0;
+}
+
 int hvm_set_efer(uint64_t value)
 {
     struct vcpu *v = current;

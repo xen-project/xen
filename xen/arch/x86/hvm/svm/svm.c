@@ -884,46 +884,20 @@ void start_svm(struct cpuinfo_x86 *c)
     hvm_enable(&svm_function_table);
 }
 
-static void svm_do_nested_pgfault(paddr_t gpa, struct cpu_user_regs *regs)
+static void svm_do_nested_pgfault(paddr_t gpa)
 {
-    p2m_type_t p2mt;
-    mfn_t mfn;
     unsigned long gfn = gpa >> PAGE_SHIFT;
+    mfn_t mfn;
+    p2m_type_t p2mt;
 
-    /*
-     * If this GFN is emulated MMIO or marked as read-only, pass the fault
-     * to the mmio handler.
-     */
+    if ( hvm_hap_nested_page_fault(gfn) )
+        return;
+
+    /* Everything else is an error. */
     mfn = gfn_to_mfn_type_current(gfn, &p2mt, p2m_guest);
-    if ( (p2mt == p2m_mmio_dm) || (p2mt == p2m_ram_ro) )
-    {
-        if ( !handle_mmio() )
-            hvm_inject_exception(TRAP_gp_fault, 0, 0);
-        return;
-    }
-
-    /* Log-dirty: mark the page dirty and let the guest write it again */
-    if ( p2mt == p2m_ram_logdirty )
-    {
-        paging_mark_dirty(current->domain, mfn_x(mfn));
-        p2m_change_type(current->domain, gfn, p2m_ram_logdirty, p2m_ram_rw);
-        return;
-    }
-
-    /* Okay, this shouldn't happen.  Maybe the guest was writing to a
-       read-only grant mapping? */
-    if ( p2mt == p2m_grant_map_ro )
-    {
-        /* Naughty... */
-        gdprintk(XENLOG_WARNING,
-                 "trying to write to read-only grant mapping\n");
-        hvm_inject_exception(TRAP_gp_fault, 0, 0);
-        return;
-    }
-
-    /* Something bad has happened; either Xen or the hardware have
-       screwed up. */
-    gdprintk(XENLOG_WARNING, "unexpected SVM nested page fault\n");
+    gdprintk(XENLOG_ERR, "SVM violation gpa %#"PRIpaddr", mfn %#lx, type %i\n",
+             gpa, mfn_x(mfn), p2mt);
+    domain_crash(current->domain);
 }
 
 static void svm_fpu_dirty_intercept(void)
@@ -1511,7 +1485,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
     case VMEXIT_NPF:
         perfc_incra(svmexits, VMEXIT_NPF_PERFC);
         regs->error_code = vmcb->exitinfo1;
-        svm_do_nested_pgfault(vmcb->exitinfo2, regs);
+        svm_do_nested_pgfault(vmcb->exitinfo2);
         break;
 
     case VMEXIT_IRET:

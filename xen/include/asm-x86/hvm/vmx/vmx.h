@@ -366,45 +366,24 @@ void vmx_inject_nmi(void);
 void ept_p2m_init(struct domain *d);
 
 /* EPT violation qualifications definitions */
-/* bit offset 0 in exit qualification */
 #define _EPT_READ_VIOLATION         0
 #define EPT_READ_VIOLATION          (1UL<<_EPT_READ_VIOLATION)
-/* bit offset 1 in exit qualification */
 #define _EPT_WRITE_VIOLATION        1
 #define EPT_WRITE_VIOLATION         (1UL<<_EPT_WRITE_VIOLATION)
-/* bit offset 2 in exit qualification */
 #define _EPT_EXEC_VIOLATION         2
 #define EPT_EXEC_VIOLATION          (1UL<<_EPT_EXEC_VIOLATION)
-
-/* bit offset 3 in exit qualification */
 #define _EPT_EFFECTIVE_READ         3
 #define EPT_EFFECTIVE_READ          (1UL<<_EPT_EFFECTIVE_READ)
-/* bit offset 4 in exit qualification */
 #define _EPT_EFFECTIVE_WRITE        4
 #define EPT_EFFECTIVE_WRITE         (1UL<<_EPT_EFFECTIVE_WRITE)
-/* bit offset 5 in exit qualification */
 #define _EPT_EFFECTIVE_EXEC         5
 #define EPT_EFFECTIVE_EXEC          (1UL<<_EPT_EFFECTIVE_EXEC)
-
-/* bit offset 6 in exit qualification */
 #define _EPT_GAW_VIOLATION          6
 #define EPT_GAW_VIOLATION           (1UL<<_EPT_GAW_VIOLATION)
-
-/* bits offset 7 & 8 in exit qualification */
-#define _EPT_GLA_VALIDITY           7
-#define EPT_GLA_VALIDITY_MASK       (3UL<<_EPT_GLA_VALIDITY)
-/* gla != gpa, when load PDPTR */
-#define EPT_GLA_VALIDITY_PDPTR_LOAD (0UL<<_EPT_GLA_VALIDITY)
-/* gla != gpa, during guest page table walking */
-#define EPT_GLA_VALIDITY_GPT_WALK   (1UL<<_EPT_GLA_VALIDITY)
-/* reserved */
-#define EPT_GLA_VALIDITY_RSVD       (2UL<<_EPT_GLA_VALIDITY)
-/* gla == gpa, normal case */
-#define EPT_GLA_VALIDITY_MATCH      (3UL<<_EPT_GLA_VALIDITY)
-
-#define EPT_EFFECTIVE_MASK          (EPT_EFFECTIVE_READ  |  \
-                                     EPT_EFFECTIVE_WRITE |  \
-                                     EPT_EFFECTIVE_EXEC)
+#define _EPT_GLA_VALID              7
+#define EPT_GLA_VALID               (1UL<<_EPT_GLA_VALID)
+#define _EPT_GLA_FAULT              8
+#define EPT_GLA_FAULT               (1UL<<_EPT_GLA_FAULT)
 
 #define EPT_PAGETABLE_ENTRIES       512
 

@@ -2153,50 +2153,16 @@ static void vmx_wbinvd_intercept(void)
 
 static void ept_handle_violation(unsigned long qualification, paddr_t gpa)
 {
-    unsigned long gla_validity = qualification & EPT_GLA_VALIDITY_MASK;
-    struct domain *d = current->domain;
     unsigned long gla, gfn = gpa >> PAGE_SHIFT;
     mfn_t mfn;
-    p2m_type_t t;
+    p2m_type_t p2mt;
 
-    mfn = gfn_to_mfn_guest(d, gfn, &t);
-
-    /* There are three legitimate reasons for taking an EPT violation. 
-     * One is a guest access to MMIO space. */
-    if ( gla_validity == EPT_GLA_VALIDITY_MATCH && p2m_is_mmio(t) )
-    {
-        handle_mmio();
+    if ( (qualification & EPT_GLA_VALID) &&
+         hvm_hap_nested_page_fault(gfn) )
         return;
-    }
-
-    /* The second is log-dirty mode, writing to a read-only page;
-     * The third is populating a populate-on-demand page. */
-    if ( (gla_validity == EPT_GLA_VALIDITY_MATCH
-          || gla_validity == EPT_GLA_VALIDITY_GPT_WALK)
-         && p2m_is_ram(t) && (t != p2m_ram_ro) )
-    {
-        if ( paging_mode_log_dirty(d) )
-        {
-            paging_mark_dirty(d, mfn_x(mfn));
-            p2m_change_type(d, gfn, p2m_ram_logdirty, p2m_ram_rw);
-            flush_tlb_mask(&d->domain_dirty_cpumask);
-        }
-        return;
-    }
-
-    /* Ignore writes to:
-     *     1. read only memory regions;
-     *     2. memory holes. */
-    if ( (qualification & EPT_WRITE_VIOLATION)
-         && (((gla_validity == EPT_GLA_VALIDITY_MATCH) && (t == p2m_ram_ro))
-             || (mfn_x(mfn) == INVALID_MFN)) ) {
-        int inst_len = __get_instruction_length();
-        __update_guest_eip(inst_len);
-        return;
-    }
 
     /* Everything else is an error. */
-    gla = __vmread(GUEST_LINEAR_ADDRESS);
+    mfn = gfn_to_mfn_type_current(gfn, &p2mt, p2m_guest);
     gdprintk(XENLOG_ERR, "EPT violation %#lx (%c%c%c/%c%c%c), "
              "gpa %#"PRIpaddr", mfn %#lx, type %i.\n", 
              qualification, 
@@ -2206,29 +2172,20 @@ static void ept_handle_violation(unsigned long qualification, paddr_t gpa)
              (qualification & EPT_EFFECTIVE_READ) ? 'r' : '-',
              (qualification & EPT_EFFECTIVE_WRITE) ? 'w' : '-',
              (qualification & EPT_EFFECTIVE_EXEC) ? 'x' : '-',
-             gpa, mfn_x(mfn), t);
+             gpa, mfn_x(mfn), p2mt);
+
+    if ( qualification & EPT_GLA_VALID )
+    {
+        gla = __vmread(GUEST_LINEAR_ADDRESS);
+        gdprintk(XENLOG_ERR, " --- GLA %#lx\n", gla);
+    }
 
     if ( qualification & EPT_GAW_VIOLATION )
         gdprintk(XENLOG_ERR, " --- GPA too wide (max %u bits)\n", 
-                 9 * (unsigned) d->arch.hvm_domain.vmx.ept_control.gaw + 21);
+                 9 * (unsigned int)current->domain->arch.hvm_domain.
+                 vmx.ept_control.gaw + 21);
 
-    switch ( gla_validity )
-    {
-    case EPT_GLA_VALIDITY_PDPTR_LOAD:
-        gdprintk(XENLOG_ERR, " --- PDPTR load failed\n"); 
-        break;
-    case EPT_GLA_VALIDITY_GPT_WALK:
-        gdprintk(XENLOG_ERR, " --- guest PT walk to %#lx failed\n", gla);
-        break;
-    case EPT_GLA_VALIDITY_RSVD:
-        gdprintk(XENLOG_ERR, " --- GLA_validity 2 (reserved)\n");
-        break;
-    case EPT_GLA_VALIDITY_MATCH:
-        gdprintk(XENLOG_ERR, " --- guest access to %#lx failed\n", gla);
-        break;
-    }
-
-    domain_crash(d);
+    domain_crash(current->domain);
 }
 
 static void vmx_failed_vmentry(unsigned int exit_reason,

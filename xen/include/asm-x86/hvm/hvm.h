@@ -333,4 +333,6 @@ static inline void hvm_set_info_guest(struct vcpu *v)
 
 int hvm_debug_op(struct vcpu *v, int32_t op);
 
+bool_t hvm_hap_nested_page_fault(unsigned long gfn);
+
 #endif /* __ASM_X86_HVM_HVM_H__ */
