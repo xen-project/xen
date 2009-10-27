@@ -38,11 +38,9 @@ struct sk_buff;
 /* Auxiliary data to use in generating the audit record. */
 struct avc_audit_data {
     char    type;
-#define AVC_AUDIT_DATA_FS   1
-#define AVC_AUDIT_DATA_NET  2
-#define AVC_AUDIT_DATA_CAP  3
-#define AVC_AUDIT_DATA_IPC  4
+#define AVC_AUDIT_DATA_DEV  1
     struct domain *d;
+    unsigned long device;
 };
 
 #define v4info fam.v4

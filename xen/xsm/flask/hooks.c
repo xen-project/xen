@@ -649,6 +649,7 @@ static int irq_has_perm(struct domain *d, uint8_t pirq, uint8_t access)
     int rc = -EPERM;
 
     struct domain_security_struct *ssec, *tsec;
+    struct avc_audit_data ad;
 
     rc = domain_has_perm(current->domain, d, SECCLASS_RESOURCE,
                                                     resource_to_perm(access));
@@ -668,13 +669,16 @@ static int irq_has_perm(struct domain *d, uint8_t pirq, uint8_t access)
     if ( rc )
         return rc;
 
-    rc = avc_has_perm(ssec->sid, rsid, SECCLASS_RESOURCE, perm, NULL);
+    AVC_AUDIT_DATA_INIT(&ad, DEV);
+    ad.device = (unsigned long) pirq;
+
+    rc = avc_has_perm(ssec->sid, rsid, SECCLASS_RESOURCE, perm, &ad);
     if ( rc )
         return rc;
 
     if ( access )
         return avc_has_perm(tsec->sid, rsid, SECCLASS_RESOURCE, 
-                                                        RESOURCE__USE, NULL);
+                                                        RESOURCE__USE, &ad);
     else
         return rc;
 }
@@ -686,6 +690,7 @@ static int iomem_has_perm(struct domain *d, unsigned long mfn, uint8_t access)
     int rc = -EPERM;
 
     struct domain_security_struct *ssec, *tsec;
+    struct avc_audit_data ad;
 
     rc = domain_has_perm(current->domain, d, SECCLASS_RESOURCE,
                                                     resource_to_perm(access));
@@ -704,13 +709,16 @@ static int iomem_has_perm(struct domain *d, unsigned long mfn, uint8_t access)
     if ( rc )
         return rc;
 
-    rc = avc_has_perm(ssec->sid, rsid, SECCLASS_RESOURCE, perm, NULL);
+    AVC_AUDIT_DATA_INIT(&ad, DEV);
+    ad.device = mfn;
+
+    rc = avc_has_perm(ssec->sid, rsid, SECCLASS_RESOURCE, perm, &ad);
 
     if ( rc )
         return rc;
 
     return avc_has_perm(tsec->sid, rsid, SECCLASS_RESOURCE, 
-                                                        RESOURCE__USE, NULL);
+                                                        RESOURCE__USE, &ad);
 }
 
 static int flask_perfcontrol(void)
@@ -753,6 +761,7 @@ static int ioport_has_perm(struct domain *d, uint32_t ioport, uint8_t access)
     u32 rsid;
     int rc = -EPERM;
 
+    struct avc_audit_data ad;
     struct domain_security_struct *ssec, *tsec;
 
     rc = domain_has_perm(current->domain, d, SECCLASS_RESOURCE,
@@ -773,13 +782,16 @@ static int ioport_has_perm(struct domain *d, uint32_t ioport, uint8_t access)
     if ( rc )
         return rc;
 
-    rc = avc_has_perm(ssec->sid, rsid, SECCLASS_RESOURCE, perm, NULL);
+    AVC_AUDIT_DATA_INIT(&ad, DEV);
+    ad.device = ioport;
+
+    rc = avc_has_perm(ssec->sid, rsid, SECCLASS_RESOURCE, perm, &ad);
     if ( rc )
         return rc;
 
     if ( access )
         return avc_has_perm(tsec->sid, rsid, SECCLASS_RESOURCE, 
-                                                        RESOURCE__USE, NULL);    
+                                                        RESOURCE__USE, &ad);
     else
         return rc;
 }
@@ -1081,6 +1093,7 @@ static int flask_assign_device(struct domain *d, uint32_t machine_bdf)
     u32 rsid;
     int rc = -EPERM;
     struct domain_security_struct *ssec, *tsec;
+    struct avc_audit_data ad;
 
     rc = domain_has_perm(current->domain, d, SECCLASS_RESOURCE, RESOURCE__ADD);
     if ( rc )
@@ -1090,13 +1103,15 @@ static int flask_assign_device(struct domain *d, uint32_t machine_bdf)
     if ( rc )
         return rc;
 
+    AVC_AUDIT_DATA_INIT(&ad, DEV);
+    ad.device = (unsigned long) machine_bdf;
     ssec = current->domain->ssid;
-    rc = avc_has_perm(ssec->sid, rsid, SECCLASS_RESOURCE, RESOURCE__ADD_DEVICE, NULL);
+    rc = avc_has_perm(ssec->sid, rsid, SECCLASS_RESOURCE, RESOURCE__ADD_DEVICE, &ad);
     if ( rc )
         return rc;
 
     tsec = d->ssid;
-    return avc_has_perm(tsec->sid, rsid, SECCLASS_RESOURCE, RESOURCE__USE, NULL);
+    return avc_has_perm(tsec->sid, rsid, SECCLASS_RESOURCE, RESOURCE__USE, &ad);
 }
 
 static int flask_deassign_device(struct domain *d, uint32_t machine_bdf)

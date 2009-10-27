@@ -60,3 +60,34 @@ define(`create_channel', `
 	allow $1 $3:event {create};
 	allow $3 $2:event {bind};
 ')
+###############################################################################
+#
+# create_passthrough_resource(priv_dom, domain, resource)
+#
+###############################################################################
+define(`create_passthrough_resource', `
+        type $3, resource_type;
+        allow $1 $3:event vector;
+        allow $1 $2:resource {add remove};
+        allow $1 ioport_t:resource {add_ioport use};
+        allow $1 iomem_t:resource {add_iomem use};
+        allow $1 pirq_t:resource  {add_irq use};
+        allow $1 domio_t:mmu {map_read map_write};
+        allow $2 domio_t:mmu {map_write};
+        allow $2 pirq_t:resource {use};
+        allow $1 $3:resource {add_irq add_iomem add_ioport remove_irq remove_iomem remove_ioport use add_device remove_device};
+        allow $2 $3:resource {use add_ioport add_iomem remove_ioport remove_iomem};
+        allow $2 $3:mmu {map_read map_write};
+')
+###############################################################################
+#
+# create_hvm_resource(priv_dom, domain, resource)
+#
+###############################################################################
+define(`create_hvm_resource', `
+        type $3, resource_type;
+        allow $1 $2:resource {add remove};
+        allow $1 $3:hvm {bind_irq};
+        allow $1 $3:resource {stat_device add_device remove_device add_irq remove_irq add_iomem remove_iomem add_ioport remove_ioport};
+        allow $2 $3:resource {use};
+')

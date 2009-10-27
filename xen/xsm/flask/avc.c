@@ -566,6 +566,8 @@ void avc_audit(u32 ssid, u32 tsid, u16 tclass, u32 requested,
         d = a->d;
     if ( d )
         printk("domid=%d ", d->domain_id);
+    if ( a && a->device )
+        printk("device=0x%lx ", a->device);
 
     avc_dump_query(ssid, tsid, tclass);
     printk("\n");

@@ -1569,7 +1569,7 @@ int security_iomem_sid(unsigned long mfn, u32 *out_sid)
     c = policydb.ocontexts[OCON_IOMEM];
     while ( c )
     {
-        if ( c->u.iomem == mfn )
+        if ( c->u.iomem.low_iomem <= mfn  && c->u.iomem.high_iomem >= mfn )
             break;
         c = c->next;
     }
@@ -1609,7 +1609,8 @@ int security_ioport_sid(u32 ioport, u32 *out_sid)
     c = policydb.ocontexts[OCON_IOPORT];
     while ( c )
     {
-        if ( c->u.ioport == ioport )
+        if ( c->u.ioport.low_ioport <= ioport &&
+             c->u.ioport.high_ioport >= ioport )
             break;
         c = c->next;
     }
@@ -1635,8 +1636,8 @@ out:
 }
 
 /**
- * security_ioport_sid - Obtain the SID for an ioport.
- * @ioport: ioport
+ * security_device_sid - Obtain the SID for a PCI device.
+ * @ioport: device
  * @out_sid: security identifier
  */
 int security_device_sid(u32 device, u32 *out_sid)

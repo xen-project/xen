@@ -147,10 +147,16 @@ struct cond_node;
 struct ocontext {
     union {
         char *name;    /* name of initial SID, fs, netif, fstype, path */
-        int pirq;
-        u32 ioport;
-        unsigned long iomem;
+        u16 pirq;
         u32 device;
+        struct {
+                u32 low_ioport;
+                u32 high_ioport;
+        } ioport;
+        struct {
+                u32 low_iomem;
+                u32 high_iomem;
+        } iomem;
     } u;
     struct context context[2];    /* security context(s) */
     u32 sid[2];    /* SID(s) */
@@ -174,9 +180,7 @@ struct ocontext {
 #define OCON_IOPORT  2    /* io ports */
 #define OCON_IOMEM   3    /* io memory */
 #define OCON_DEVICE  4    /* pci devices */
-#define OCON_DUMMY1  5    /* reserved */
-#define OCON_DUMMY2  6    /* reserved */
-#define OCON_NUM     7
+#define OCON_NUM     5
 
 /* The policy database */
 struct policydb {
@@ -239,6 +243,8 @@ struct policydb {
     struct ebitmap permissive_map;
 
     unsigned int policyvers;
+
+    u16 target_type;
 };
 
 extern void policydb_destroy(struct policydb *p);
@@ -257,7 +263,10 @@ extern int policydb_read(struct policydb *p, void *fp);
 #define OBJECT_R_VAL 1
 
 #define POLICYDB_MAGIC FLASK_MAGIC
-#define POLICYDB_STRING "SE Linux"
+#define POLICYDB_STRING "XenFlask"
+#define POLICYDB_STRING_OLD "SE Linux"
+#define TARGET_XEN 1
+#define TARGET_XEN_OLD 0
 
 struct policy_file {
     char *data;

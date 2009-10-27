@@ -168,6 +168,70 @@ adding them to xen.te, although manual review is advised and will
 often lead to adding parameterized rules to the interfaces in xen.if 
 to address the general case.
 
+Device Policy
+-------------
+
+Flask is capable of labeling devices and enforcing policies associated with
+them.  To enable this functionality the latest version of checkpolicy
+(>= 2.0.20) and libsepol (>=2.0.39) will be needed in order to compile it.  To
+enable the building of the new policies the following changes will need to be
+done to tools/flask/policy/Makefile.
+
+########################################
+#
+# Build a binary policy locally
+#
+$(POLVER): policy.conf
+        @echo "Compiling $(NAME) $(POLVER)"
+       $(QUIET) $(CHECKPOLICY) $^ -o $@            (Comment out this line)
+# Uncomment line below to enable policies for devices
+#        $(QUIET) $(CHECKPOLICY) -t Xen $^ -o $@   (Uncomment this line)
+
+########################################
+#
+# Install a binary policy
+#
+$(LOADPATH): policy.conf
+        @echo "Compiling and installing $(NAME) $(LOADPATH)"
+       $(QUIET) $(CHECKPOLICY) $^ -o $@            (Comment out this line)
+# Uncomment line below to enable policies for devices
+#        $(QUIET) $(CHECKPOLICY) -t Xen $^ -o $@   (Uncomment this line)
+
+
+Pirqs, PCI devices, I/O memory and ports can all be labeled.  There are
+commented out lines in xen.te policy for examples on how to label devices.
+
+Device Labeling
+---------------
+
+The "lspci -vvn" command can be used to output all the devices and identifiers
+associated with them.  For example, to label an Intel e1000e ethernet card the
+lspci output is..
+
+00:19.0 0200: 8086:10de (rev 02)
+        Subsystem: 1028:0276
+        Interrupt: pin A routed to IRQ 33
+        Region 0: Memory at febe0000 (32-bit, non-prefetchable) [size=128K]
+        Region 1: Memory at febd9000 (32-bit, non-prefetchable) [size=4K]
+        Region 2: I/O ports at ecc0 [size=32]
+        Kernel modules: e1000e
+
+The labeling can be done with these commands
+
+pirqcon 33 system_u:object_r:nicP_t
+iomemcon 0xfebe0-0xfebff system_u:object_r:nicP_t
+iomemcon 0xfebd9 system_u:object_r:nicP_t
+ioportcon 0xecc0-0xecdf system_u:object_r:nicP_t
+pcidevicecon 0xc800 system_u:object_r:nicP_t
+
+Labeling of the PCI device is tricky since there is no output in lspci that
+makes the information easily available.  The easiest way to obtain the
+information is to look at the avc denial line for the correct hex value.
+
+(XEN) avc:  denied  { add_device } for domid=0 device=0xc800 <---
+scontext=system_u:system_r:dom0_t tcontext=system_u:object_r:device_t
+tclass=resource
+
 Additional notes on XSM:FLASK
 -----------------------------
 

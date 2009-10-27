@@ -1773,10 +1773,13 @@ int policydb_read(struct policydb *p, void *fp)
         goto bad;
     }
     policydb_str[len] = 0;
-    if ( strcmp(policydb_str, POLICYDB_STRING) )
+    if ( strcmp(policydb_str, POLICYDB_STRING) == 0 )
+        p->target_type = TARGET_XEN;
+    else if ( strcmp(policydb_str, POLICYDB_STRING_OLD) == 0 )
+        p->target_type = TARGET_XEN_OLD;
+    else
     {
-        printk(KERN_ERR "Flask:  policydb string %s does not match "
-               "my string %s\n", policydb_str, POLICYDB_STRING);
+        printk(KERN_ERR "Flask: %s not a valid policydb string", policydb_str);
         xfree(policydb_str);
         goto bad;
     }
@@ -1984,6 +1987,68 @@ int policydb_read(struct policydb *p, void *fp)
                 if ( rc < 0 )
                     goto bad;
                 c->sid[0] = le32_to_cpu(buf[0]);
+                rc = context_read_and_validate(&c->context[0], p, fp);
+                if ( rc )
+                    goto bad;
+                break;
+            case OCON_PIRQ:
+                if ( p->target_type != TARGET_XEN )
+                {
+                    printk(KERN_ERR
+                        "Old xen policy does not support pirqcon");
+                    goto bad;
+                }
+                rc = next_entry(buf, fp, sizeof(u32));
+                if ( rc < 0 )
+                    goto bad;
+                c->u.pirq = le32_to_cpu(buf[0]);
+                rc = context_read_and_validate(&c->context[0], p, fp);
+                if ( rc )
+                    goto bad;
+                break;
+            case OCON_IOPORT:
+                if ( p->target_type != TARGET_XEN )
+                {
+                    printk(KERN_ERR
+                        "Old xen policy does not support ioportcon");
+                    goto bad;
+                }
+                rc = next_entry(buf, fp, sizeof(u32) *2);
+                if ( rc < 0 )
+                    goto bad;
+                c->u.ioport.low_ioport = le32_to_cpu(buf[0]);
+                c->u.ioport.high_ioport = le32_to_cpu(buf[1]);
+                rc = context_read_and_validate(&c->context[0], p, fp);
+                if ( rc )
+                    goto bad;
+                break;
+            case OCON_IOMEM:
+                if ( p->target_type != TARGET_XEN )
+                {
+                    printk(KERN_ERR
+                        "Old xen policy does not support iomemcon");
+                    goto bad;
+                }
+                rc = next_entry(buf, fp, sizeof(u32) *2);
+                if ( rc < 0 )
+                    goto bad;
+                c->u.iomem.low_iomem = le32_to_cpu(buf[0]);
+                c->u.iomem.high_iomem = le32_to_cpu(buf[1]);
+                rc = context_read_and_validate(&c->context[0], p, fp);
+                if ( rc )
+                    goto bad;
+                break;
+            case OCON_DEVICE:
+                if ( p->target_type != TARGET_XEN )
+                {
+                    printk(KERN_ERR
+                        "Old xen policy does not support pcidevicecon");
+                    goto bad;
+                }
+                rc = next_entry(buf, fp, sizeof(u32));
+                if ( rc < 0 )
+                    goto bad;
+                c->u.device = le32_to_cpu(buf[0]);
                 rc = context_read_and_validate(&c->context[0], p, fp);
                 if ( rc )
                     goto bad;

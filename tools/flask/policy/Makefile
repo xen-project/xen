@@ -149,6 +149,8 @@ load: tmp/load
 $(POLVER): policy.conf
 	@echo "Compiling $(NAME) $(POLVER)"
 	$(QUIET) $(CHECKPOLICY) $^ -o $@
+# Uncomment line below to enable policies for devices
+#	$(QUIET) $(CHECKPOLICY) -t Xen $^ -o $@
 
 ########################################
 #
@@ -157,6 +159,8 @@ $(POLVER): policy.conf
 $(LOADPATH): policy.conf
 	@echo "Compiling and installing $(NAME) $(LOADPATH)"
 	$(QUIET) $(CHECKPOLICY) $^ -o $@
+# Uncomment line below to enable policies for devices
+#	$(QUIET) $(CHECKPOLICY) -t Xen $^ -o $@
 
 ########################################
 #
@@ -206,8 +210,18 @@ tmp/all_attrs_types.conf tmp/only_te_rules.conf tmp/all_post.conf: tmp/all_te_fi
 	$(QUIET) grep '^type ' tmp/all_te_files.conf >> tmp/all_attrs_types.conf
 	$(QUIET) cat tmp/post_te_files.conf > tmp/all_post.conf
 	$(QUIET) grep '^sid ' tmp/all_te_files.conf >> tmp/all_post.conf || true
+	$(QUIET) grep ^pirqcon tmp/all_te_files.conf >> \
+                      tmp/all_post.conf || true
+	$(QUIET) grep ^ioportcon tmp/all_te_files.conf >> \
+                      tmp/all_post.conf || true
+	$(QUIET) grep ^iomemcon tmp/all_te_files.conf >> \
+                      tmp/all_post.conf || true
+	$(QUIET) grep ^pcidevicecon tmp/all_te_files.conf >> \
+                      tmp/all_post.conf || true
 	$(QUIET) sed -r -e /^attribute/d -e '/^type /d' -e '/^sid /d' \
-			< tmp/all_te_files.conf > tmp/only_te_rules.conf
+                     -e "/^pirqcon/d" -e "/^pcidevicecon/d" -e "/^ioportcon/d" \
+                     -e "/^iomemcon/d" < tmp/all_te_files.conf \
+                     > tmp/only_te_rules.conf
 
 ########################################
 #
