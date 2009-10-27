@@ -901,7 +901,7 @@ class XendConfig(dict):
                 dev_config.append(['vnc', '1'])
                 # copy VNC related params from platform config to vfb dev conf
                 for key in ['vncpasswd', 'vncunused', 'vncdisplay',
-                            'vnclisten']:
+                            'vnclisten', 'keymap']:
                     if key in self['platform']:
                         dev_config.append([key, self['platform'][key]])
 
