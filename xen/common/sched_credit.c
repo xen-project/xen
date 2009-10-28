@@ -110,6 +110,7 @@ struct csched_pcpu {
     uint32_t runq_sort_last;
     struct timer ticker;
     unsigned int tick;
+    unsigned int idle_bias;
 };
 
 /*
@@ -298,6 +299,7 @@ csched_pcpu_init(int cpu)
     init_timer(&spc->ticker, csched_tick, (void *)(unsigned long)cpu, cpu);
     INIT_LIST_HEAD(&spc->runq);
     spc->runq_sort_last = csched_priv.runq_sort;
+    spc->idle_bias = NR_CPUS - 1;
     per_cpu(schedule_data, cpu).sched_priv = spc;
 
     /* Start off idling... */
@@ -379,7 +381,7 @@ __csched_vcpu_is_migrateable(struct vcpu *vc, int dest_cpu)
 }
 
 static int
-csched_cpu_pick(struct vcpu *vc)
+_csched_cpu_pick(struct vcpu *vc, bool_t commit)
 {
     cpumask_t cpus;
     cpumask_t idlers;
@@ -438,8 +440,10 @@ csched_cpu_pick(struct vcpu *vc)
         if ( ( (weight_cpu < weight_nxt) ^ sched_smt_power_savings )
                 && (weight_cpu != weight_nxt) )
         {
-            cpu = nxt;
-            cpu_clear(cpu, cpus);
+            cpu = cycle_cpu(CSCHED_PCPU(nxt)->idle_bias, nxt_idlers);
+            if ( commit )
+               CSCHED_PCPU(nxt)->idle_bias = cpu;
+            cpus_andnot(cpus, cpus, per_cpu(cpu_sibling_map, cpu));
         }
         else
         {
@@ -448,6 +452,12 @@ csched_cpu_pick(struct vcpu *vc)
     }
 
     return cpu;
+}
+
+static int
+csched_cpu_pick(struct vcpu *vc)
+{
+    return _csched_cpu_pick(vc, 1);
 }
 
 static inline void
@@ -529,7 +539,7 @@ csched_vcpu_acct(unsigned int cpu)
     {
         __csched_vcpu_acct_start(svc);
     }
-    else if ( csched_cpu_pick(current) != cpu )
+    else if ( _csched_cpu_pick(current, 0) != cpu )
     {
         CSCHED_VCPU_STAT_CRANK(svc, migrate_r);
         CSCHED_STAT_CRANK(migrate_running);
