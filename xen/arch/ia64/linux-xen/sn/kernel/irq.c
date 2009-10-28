@@ -221,7 +221,7 @@ static void sn_set_affinity_irq(unsigned int irq, cpumask_t mask)
 }
 #endif
 
-struct hw_interrupt_type irq_type_sn = {
+static hw_irq_controller irq_type_sn = {
 #ifndef XEN
 	.name		= "SN hub",
 #else

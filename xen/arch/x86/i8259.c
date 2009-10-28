@@ -97,7 +97,7 @@ static void end_8259A_irq(unsigned int irq)
         enable_8259A_irq(irq);
 }
 
-static struct hw_interrupt_type i8259A_irq_type = {
+static struct hw_interrupt_type __read_mostly i8259A_irq_type = {
     .typename = "XT-PIC",
     .startup  = startup_8259A_irq,
     .shutdown = disable_8259A_irq,
@@ -347,7 +347,7 @@ void __devinit init_8259A(int auto_eoi)
     spin_unlock_irqrestore(&i8259A_lock, flags);
 }
 
-static struct irqaction cascade = { no_action, "cascade", NULL};
+static struct irqaction __read_mostly cascade = { no_action, "cascade", NULL};
 
 void __init init_IRQ(void)
 {
@@ -366,7 +366,7 @@ void __init init_IRQ(void)
         set_intr_gate(vector, interrupt[vector]);
     }
 
-    for (irq = 0; irq < 16; irq++) {
+    for (irq = 0; platform_legacy_irq(irq); irq++) {
         struct irq_desc *desc = irq_to_desc(irq);
         struct irq_cfg *cfg = desc->chip_data;
         

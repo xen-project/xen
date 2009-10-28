@@ -154,7 +154,7 @@ xen_timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 	raise_softirq(TIMER_SOFTIRQ);
 }
 
-static struct irqaction xen_timer_irqaction = {
+static struct irqaction __read_mostly xen_timer_irqaction = {
 	.handler =	(void *) xen_timer_interrupt,
 	.name =		"timer"
 };

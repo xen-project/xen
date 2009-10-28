@@ -1563,7 +1563,7 @@ ia64_mca_disable_cpe_polling(char *str)
 
 __setup("disable_cpe_poll", ia64_mca_disable_cpe_polling);
 
-static struct irqaction cmci_irqaction = {
+static struct irqaction __read_mostly cmci_irqaction = {
 	.handler =	ia64_mca_cmc_int_handler,
 #ifndef XEN
 	.flags =	SA_INTERRUPT,
@@ -1571,7 +1571,7 @@ static struct irqaction cmci_irqaction = {
 	.name =		"cmc_hndlr"
 };
 
-static struct irqaction cmcp_irqaction = {
+static struct irqaction __read_mostly cmcp_irqaction = {
 	.handler =	ia64_mca_cmc_int_caller,
 #ifndef XEN
 	.flags =	SA_INTERRUPT,
@@ -1579,7 +1579,7 @@ static struct irqaction cmcp_irqaction = {
 	.name =		"cmc_poll"
 };
 
-static struct irqaction mca_rdzv_irqaction = {
+static struct irqaction __read_mostly mca_rdzv_irqaction = {
 	.handler =	ia64_mca_rendez_int_handler,
 #ifndef XEN
 	.flags =	SA_INTERRUPT,
@@ -1587,7 +1587,7 @@ static struct irqaction mca_rdzv_irqaction = {
 	.name =		"mca_rdzv"
 };
 
-static struct irqaction mca_wkup_irqaction = {
+static struct irqaction __read_mostly mca_wkup_irqaction = {
 	.handler =	ia64_mca_wakeup_int_handler,
 #ifndef XEN
 	.flags =	SA_INTERRUPT,
@@ -1596,7 +1596,7 @@ static struct irqaction mca_wkup_irqaction = {
 };
 
 #ifdef CONFIG_ACPI
-static struct irqaction mca_cpe_irqaction = {
+static struct irqaction __read_mostly mca_cpe_irqaction = {
 	.handler =	ia64_mca_cpe_int_handler,
 #ifndef XEN
 	.flags =	SA_INTERRUPT,
@@ -1604,7 +1604,7 @@ static struct irqaction mca_cpe_irqaction = {
 	.name =		"cpe_hndlr"
 };
 
-static struct irqaction mca_cpep_irqaction = {
+static struct irqaction __read_mostly mca_cpep_irqaction = {
 	.handler =	ia64_mca_cpe_int_caller,
 #ifndef XEN
 	.flags =	SA_INTERRUPT,

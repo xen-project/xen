@@ -233,7 +233,7 @@ void ia64_process_pending_intr(void)
 #ifdef CONFIG_SMP
 extern irqreturn_t handle_IPI (int irq, void *dev_id, struct pt_regs *regs);
 
-static struct irqaction ipi_irqaction = {
+static struct irqaction __read_mostly ipi_irqaction = {
 	.handler =	handle_IPI,
 #ifndef XEN
 	.flags =	SA_INTERRUPT,

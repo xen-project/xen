@@ -26,7 +26,7 @@ lsapic_noop (unsigned int irq)
 	/* nuthing to do... */
 }
 
-struct hw_interrupt_type irq_type_ia64_lsapic = {
+hw_irq_controller irq_type_ia64_lsapic = {
 	.typename =	"LSAPIC",
 	.startup =	lsapic_noop_startup,
 	.shutdown =	lsapic_noop,

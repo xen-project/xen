@@ -62,7 +62,8 @@ int sis_apic_bug = -1;
 /*
  * # of IRQ routing registers
  */
-int nr_ioapic_registers[MAX_IO_APICS];
+int __read_mostly nr_ioapic_registers[MAX_IO_APICS];
+int __read_mostly nr_ioapics;
 
 int disable_timer_pin_1 __initdata;
 
@@ -497,7 +498,7 @@ void /*__init*/ setup_ioapic_dest(void)
  */
 static int EISA_ELCR(unsigned int irq)
 {
-    if (irq < 16) {
+    if (platform_legacy_irq(irq)) {
         unsigned int port = 0x4d0 + (irq >> 3);
         return (inb(port) >> (irq & 7)) & 1;
     }
@@ -763,8 +764,8 @@ static inline int IO_APIC_irq_trigger(int irq)
     return 0;
 }
 
-static struct hw_interrupt_type ioapic_level_type;
-static struct hw_interrupt_type ioapic_edge_type;
+static hw_irq_controller ioapic_level_type;
+static hw_irq_controller ioapic_edge_type;
 
 #define IOAPIC_AUTO	-1
 #define IOAPIC_EDGE	0
@@ -844,7 +845,7 @@ static void __init setup_IO_APIC_irqs(void)
                 entry.vector = vector;
                 ioapic_register_intr(irq, IOAPIC_AUTO);
 
-                if (!apic && (irq < 16))
+                if (!apic && platform_legacy_irq(irq))
                     disable_8259A_irq(irq);
             }
             cfg = irq_cfg(irq);
@@ -1358,7 +1359,7 @@ static unsigned int startup_edge_ioapic_irq(unsigned int irq)
     unsigned long flags;
 
     spin_lock_irqsave(&ioapic_lock, flags);
-    if (irq < 16) {
+    if (platform_legacy_irq(irq)) {
         disable_8259A_irq(irq);
         if (i8259A_irq_pending(irq))
             was_pending = 1;
@@ -1408,7 +1409,7 @@ static unsigned int startup_level_ioapic_irq (unsigned int irq)
     return 0; /* don't check for pending */
 }
 
-int ioapic_ack_new = 1;
+int __read_mostly ioapic_ack_new = 1;
 static void setup_ioapic_ack(char *s)
 {
     if ( !strcmp(s, "old") )
@@ -1572,7 +1573,7 @@ static void end_edge_ioapic_irq(unsigned int irq)
  * edge-triggered handler, without risking IRQ storms and other ugly
  * races.
  */
-static struct hw_interrupt_type ioapic_edge_type = {
+static hw_irq_controller ioapic_edge_type = {
     .typename 	= "IO-APIC-edge",
     .startup 	= startup_edge_ioapic_irq,
     .shutdown 	= disable_edge_ioapic_irq,
@@ -1583,7 +1584,7 @@ static struct hw_interrupt_type ioapic_edge_type = {
     .set_affinity 	= set_ioapic_affinity_irq,
 };
 
-static struct hw_interrupt_type ioapic_level_type = {
+static hw_irq_controller ioapic_level_type = {
     .typename 	= "IO-APIC-level",
     .startup 	= startup_level_ioapic_irq,
     .shutdown 	= mask_IO_APIC_irq,
@@ -1631,7 +1632,7 @@ static void set_msi_affinity_irq(unsigned int irq, cpumask_t cpu_mask)
  * IRQ Chip for MSI PCI/PCI-X/PCI-Express Devices,
  * which implement the MSI or MSI-X Capability Structure.
  */
-struct hw_interrupt_type pci_msi_type = {
+hw_irq_controller pci_msi_type = {
     .typename   = "PCI-MSI",
     .startup    = startup_msi_irq,
     .shutdown   = shutdown_msi_irq,
@@ -1646,7 +1647,7 @@ static inline void init_IO_APIC_traps(void)
 {
     int irq;
     /* Xen: This is way simpler than the Linux implementation. */
-    for (irq = 0; irq < 16 ; irq++)
+    for (irq = 0; platform_legacy_irq(irq); irq++)
         if (IO_APIC_IRQ(irq) && !IO_APIC_VECTOR(irq))
             make_8259A_irq(irq);
 }
@@ -1674,7 +1675,7 @@ static void ack_lapic_irq(unsigned int irq)
 
 static void end_lapic_irq(unsigned int irq) { /* nothing */ }
 
-static struct hw_interrupt_type lapic_irq_type = {
+static hw_irq_controller lapic_irq_type = {
     .typename 	= "local-APIC-edge",
     .startup 	= NULL, /* startup_irq() not used for IRQ0 */
     .shutdown 	= NULL, /* shutdown_irq() not used for IRQ0 */
@@ -2107,7 +2108,7 @@ int io_apic_set_pci_routing (int ioapic, int pin, int irq, int edge_level, int a
     /*
      * IRQs < 16 are already in the irq_2_pin[] map
      */
-    if (irq >= 16)
+    if (!platform_legacy_irq(irq))
         add_pin_to_irq(irq, ioapic, pin);
 
     vector = assign_irq_vector(irq);
@@ -2122,7 +2123,7 @@ int io_apic_set_pci_routing (int ioapic, int pin, int irq, int edge_level, int a
 
     ioapic_register_intr(irq, edge_level);
 
-    if (!ioapic && (irq < 16))
+    if (!ioapic && platform_legacy_irq(irq))
         disable_8259A_irq(irq);
 
     spin_lock_irqsave(&ioapic_lock, flags);

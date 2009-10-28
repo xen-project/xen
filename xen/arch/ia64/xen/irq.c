@@ -118,7 +118,7 @@ static void ack_none(unsigned int irq)
 #define shutdown_none	disable_none
 #define end_none	enable_none
 
-struct hw_interrupt_type no_irq_type = {
+hw_irq_controller no_irq_type = {
 	"none",
 	startup_none,
 	shutdown_none,

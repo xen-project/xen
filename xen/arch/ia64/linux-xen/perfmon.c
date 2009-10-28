@@ -6811,7 +6811,7 @@ pfm_flush_pmds(struct task_struct *task, pfm_context_t *ctx)
 #endif
 }
 
-static struct irqaction perfmon_irqaction = {
+static struct irqaction __read_mostly perfmon_irqaction = {
 	.handler = pfm_interrupt_handler,
 #ifndef XEN
 	.flags   = SA_INTERRUPT,

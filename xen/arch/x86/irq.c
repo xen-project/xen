@@ -24,7 +24,7 @@
 #include <public/physdev.h>
 
 /* opt_noirqbalance: If true, software IRQ balancing/affinity is disabled. */
-int opt_noirqbalance = 0;
+int __read_mostly opt_noirqbalance = 0;
 boolean_param("noirqbalance", opt_noirqbalance);
 
 unsigned int __read_mostly nr_irqs_gsi = 16;
@@ -45,7 +45,7 @@ DECLARE_BITMAP(used_vectors, NR_VECTORS);
 
 struct irq_cfg __read_mostly *irq_cfg = NULL;
 
-static struct timer *irq_guest_eoi_timer;
+static struct timer *__read_mostly irq_guest_eoi_timer;
 
 static DEFINE_SPINLOCK(vector_lock);
 
@@ -60,7 +60,7 @@ static DEFINE_SPINLOCK(irq_ratelimit_lock);
 static struct timer irq_ratelimit_timer;
 
 /* irq_ratelimit: the max irq rate allowed in every 10ms, set 0 to disable */
-unsigned int __read_mostly irq_ratelimit_threshold = 10000;
+static unsigned int __read_mostly irq_ratelimit_threshold = 10000;
 integer_param("irq_ratelimit", irq_ratelimit_threshold);
 
 /* Must be called when irq disabled */
@@ -321,7 +321,7 @@ static void ack_none(unsigned int irq)
 #define shutdown_none   disable_none
 #define end_none        enable_none
 
-struct hw_interrupt_type no_irq_type = {
+hw_irq_controller no_irq_type = {
     "none",
     startup_none,
     shutdown_none,

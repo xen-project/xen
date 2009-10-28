@@ -319,7 +319,7 @@ static void hpet_msi_set_affinity(unsigned int irq, cpumask_t mask)
 /*
  * IRQ Chip for MSI HPET Devices,
  */
-static struct hw_interrupt_type hpet_msi_type = {
+static hw_irq_controller hpet_msi_type = {
     .typename   = "HPET-MSI",
     .startup    = hpet_msi_startup,
     .shutdown   = hpet_msi_shutdown,

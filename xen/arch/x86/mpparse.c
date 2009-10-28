@@ -58,8 +58,6 @@ struct mpc_config_intsrc mp_irqs[MAX_IRQ_SOURCES];
 /* MP IRQ source entries */
 int mp_irq_entries;
 
-int nr_ioapics;
-
 int pic_mode;
 unsigned long mp_lapic_addr;
 
@@ -525,7 +523,7 @@ static void __init construct_default_ioirq_mptable(int mpc_default_type)
 		}
 	}
 
-	for (i = 0; i < 16; i++) {
+	for (i = 0; platform_legacy_irq(i); i++) {
 		switch (mpc_default_type) {
 		case 2:
 			if (i == 0 || i == 13)
@@ -1037,7 +1035,7 @@ void __init mp_config_acpi_legacy_irqs (void)
 	 * Use the default configuration for the IRQs 0-15.  Unless
 	 * overriden by (MADT) interrupt source override entries.
 	 */
-	for (i = 0; i < 16; i++) {
+	for (i = 0; platform_legacy_irq(i); i++) {
 		int idx;
 
 		for (idx = 0; idx < mp_irq_entries; idx++) {

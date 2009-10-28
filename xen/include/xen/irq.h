@@ -47,7 +47,7 @@ struct hw_interrupt_type {
     void (*set_affinity)(unsigned int irq, cpumask_t mask);
 };
 
-typedef struct hw_interrupt_type hw_irq_controller;
+typedef const struct hw_interrupt_type hw_irq_controller;
 
 #include <asm/irq.h>
 

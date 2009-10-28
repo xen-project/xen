@@ -507,7 +507,7 @@ static int irq_load_isa(struct domain *d, hvm_domain_context_t *h)
 
     /* Adjust the GSI assert counts for the ISA IRQ line state.
      * This relies on the PCI IRQ state being loaded first. */
-    for ( irq = 0; irq < 16; irq++ )
+    for ( irq = 0; platform_legacy_irq(irq); irq++ )
         if ( test_bit(irq, &hvm_irq->isa_irq.i) )
             hvm_irq->gsi_assert_count[hvm_isa_irq_to_gsi(irq)]++;
 

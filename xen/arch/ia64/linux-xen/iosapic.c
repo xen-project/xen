@@ -430,7 +430,7 @@ iosapic_end_level_irq (unsigned int irq)
 #define iosapic_disable_level_irq	mask_irq
 #define iosapic_ack_level_irq		nop
 
-struct hw_interrupt_type irq_type_iosapic_level = {
+static hw_irq_controller irq_type_iosapic_level = {
 	.typename =	"IO-SAPIC-level",
 	.startup =	iosapic_startup_level_irq,
 	.shutdown =	iosapic_shutdown_level_irq,
@@ -476,7 +476,7 @@ iosapic_ack_edge_irq (unsigned int irq)
 #define iosapic_disable_edge_irq	nop
 #define iosapic_end_edge_irq		nop
 
-struct hw_interrupt_type irq_type_iosapic_edge = {
+static hw_irq_controller irq_type_iosapic_edge = {
 	.typename =	"IO-SAPIC-edge",
 	.startup =	iosapic_startup_edge_irq,
 	.shutdown =	iosapic_disable_edge_irq,
@@ -605,7 +605,7 @@ register_intr (unsigned int gsi, int vector, unsigned char delivery,
 	       unsigned long polarity, unsigned long trigger)
 {
 	irq_desc_t *idesc;
-	struct hw_interrupt_type *irq_type;
+	hw_irq_controller *irq_type;
 	int rte_index;
 	int index;
 	unsigned long gsi_base;

@@ -406,7 +406,7 @@ static void iommu_msi_end(unsigned int irq)
 }
 
 
-static struct hw_interrupt_type iommu_msi_type = {
+static hw_irq_controller iommu_msi_type = {
     .typename = "AMD_IOV_MSI",
     .startup = iommu_msi_startup,
     .shutdown = iommu_msi_mask,

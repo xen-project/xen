@@ -232,7 +232,7 @@ static void timer_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
     }
 }
 
-static struct irqaction irq0 = { timer_interrupt, "timer", NULL };
+static struct irqaction __read_mostly irq0 = { timer_interrupt, "timer", NULL };
 
 /* ------ Calibrate the TSC ------- 
  * Return processor ticks per second / CALIBRATE_FRAC.

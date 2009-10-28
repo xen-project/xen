@@ -871,7 +871,7 @@ static void dma_msi_set_affinity(unsigned int irq, cpumask_t mask)
     spin_unlock_irqrestore(&iommu->register_lock, flags);
 }
 
-static struct hw_interrupt_type dma_msi_type = {
+static hw_irq_controller dma_msi_type = {
     .typename = "DMA_MSI",
     .startup = dma_msi_startup,
     .shutdown = dma_msi_mask,

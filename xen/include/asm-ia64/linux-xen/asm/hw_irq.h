@@ -79,7 +79,7 @@ enum {
 extern __u8 isa_irq_to_vector_map[16];
 #define isa_irq_to_vector(x)	isa_irq_to_vector_map[(x)]
 
-extern struct hw_interrupt_type irq_type_ia64_lsapic;	/* CPU-internal interrupt controller */
+extern hw_irq_controller irq_type_ia64_lsapic;	/* CPU-internal interrupt controller */
 
 extern int assign_irq_vector (int irq);	/* allocate a free vector */
 extern void free_irq_vector (int vector);
@@ -91,7 +91,7 @@ extern int setup_vector(unsigned int vec, struct irqaction *action);
 #endif
 
 static inline void
-hw_resend_irq (struct hw_interrupt_type *h, unsigned int vector)
+hw_resend_irq (hw_irq_controller *h, unsigned int vector)
 {
 	platform_send_ipi(smp_processor_id(), vector, IA64_IPI_DM_INT, 0);
 }

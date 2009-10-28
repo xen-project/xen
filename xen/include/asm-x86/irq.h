@@ -10,8 +10,9 @@
 #include <irq_vectors.h>
 #include <asm/percpu.h>
 
-#define IO_APIC_IRQ(irq)    (((irq) >= 16 && (irq) < nr_irqs_gsi) \
-        || (((irq) < 16) && (1<<(irq)) & io_apic_irqs))
+#define IO_APIC_IRQ(irq)    (platform_legacy_irq(irq) ?    \
+			     (1 << (irq)) & io_apic_irqs : \
+			     (irq) < nr_irqs_gsi)
 #define IO_APIC_VECTOR(irq) (irq_vector[irq])
 
 #define MSI_IRQ(irq)       ((irq) >= nr_irqs_gsi && (irq) < nr_irqs)
@@ -19,13 +20,11 @@
 #define LEGACY_VECTOR(irq)          ((irq) + FIRST_LEGACY_VECTOR)
 #define LEGACY_IRQ_FROM_VECTOR(vec) ((vec) - FIRST_LEGACY_VECTOR)
 
-#define vector_to_irq(vec)  (vector_irq[vec])
-#define irq_to_desc(irq)    &irq_desc[(irq)]
+#define irq_to_desc(irq)    (&irq_desc[irq])
+#define irq_cfg(irq)        (&irq_cfg[irq])
 
 #define MAX_GSI_IRQS PAGE_SIZE * 8
 #define MAX_NR_IRQS (2 * MAX_GSI_IRQS)
-
-#define irq_cfg(irq)        &irq_cfg[(irq)]
 
 struct irq_cfg {
         int  vector;
