@@ -384,17 +384,6 @@ void vioapic_irq_positive_edge(struct domain *d, unsigned int irq)
     }
 }
 
-static int get_eoi_gsi(struct hvm_hw_vioapic *vioapic, int vector)
-{
-    int i;
-
-    for ( i = 0; i < VIOAPIC_NUM_PINS; i++ )
-        if ( vioapic->redirtbl[i].fields.vector == vector )
-            return i;
-
-    return -1;
-}
-
 void vioapic_update_EOI(struct domain *d, int vector)
 {
     struct hvm_hw_vioapic *vioapic = domain_vioapic(d);
@@ -404,32 +393,30 @@ void vioapic_update_EOI(struct domain *d, int vector)
 
     spin_lock(&d->arch.hvm_domain.irq_lock);
 
-    if ( (gsi = get_eoi_gsi(vioapic, vector)) == -1 )
+    for ( gsi = 0; gsi < VIOAPIC_NUM_PINS; gsi++ )
     {
-        gdprintk(XENLOG_WARNING, "Can't find redir item for %d EOI\n", vector);
-        goto out;
+        ent = &vioapic->redirtbl[gsi];
+        if ( ent->fields.vector != vector )
+            continue;
+
+        ent->fields.remote_irr = 0;
+
+        if ( iommu_enabled )
+        {
+            spin_unlock(&d->arch.hvm_domain.irq_lock);
+            hvm_dpci_eoi(d, gsi, ent);
+            spin_lock(&d->arch.hvm_domain.irq_lock);
+        }
+
+        if ( (ent->fields.trig_mode == VIOAPIC_LEVEL_TRIG) &&
+             !ent->fields.mask &&
+             hvm_irq->gsi_assert_count[gsi] )
+        {
+            ent->fields.remote_irr = 1;
+            vioapic_deliver(vioapic, gsi);
+        }
     }
 
-    ent = &vioapic->redirtbl[gsi];
-
-    ent->fields.remote_irr = 0;
-
-    if ( iommu_enabled )
-    {
-        spin_unlock(&d->arch.hvm_domain.irq_lock);
-        hvm_dpci_eoi(current->domain, gsi, ent);
-        spin_lock(&d->arch.hvm_domain.irq_lock);
-    }
-
-    if ( (ent->fields.trig_mode == VIOAPIC_LEVEL_TRIG) &&
-         !ent->fields.mask &&
-         hvm_irq->gsi_assert_count[gsi] )
-    {
-        ent->fields.remote_irr = 1;
-        vioapic_deliver(vioapic, gsi);
-    }
-
- out:
     spin_unlock(&d->arch.hvm_domain.irq_lock);
 }
 
