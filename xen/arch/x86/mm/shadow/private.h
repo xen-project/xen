@@ -747,7 +747,7 @@ struct sh_emulate_ctxt {
 #endif
 };
 
-struct x86_emulate_ops *shadow_init_emulation(
+const struct x86_emulate_ops *shadow_init_emulation(
     struct sh_emulate_ctxt *sh_ctxt, struct cpu_user_regs *regs);
 void shadow_continue_emulation(
     struct sh_emulate_ctxt *sh_ctxt, struct cpu_user_regs *regs);

@@ -187,7 +187,7 @@ struct paging_domain {
 
 struct paging_vcpu {
     /* Pointers to mode-specific entry points. */
-    struct paging_mode *mode;
+    const struct paging_mode *mode;
     /* HVM guest: last emulate was to a pagetable */
     unsigned int last_write_was_pt:1;
     /* HVM guest: last write emulation succeeds */

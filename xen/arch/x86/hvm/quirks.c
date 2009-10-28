@@ -23,7 +23,7 @@
 #include <xen/bitmap.h>
 #include <asm/hvm/support.h>
 
-int hvm_port80_allowed = -1;
+int __read_mostly hvm_port80_allowed = -1;
 boolean_param("hvm_port80", hvm_port80_allowed);
 
 static int __init dmi_hvm_deny_port80(/*const*/ struct dmi_system_id *id)

@@ -272,7 +272,7 @@ static int ns16550_irq(struct serial_port *port)
     return ((uart->irq > 0) ? uart->irq : -1);
 }
 
-static struct uart_driver ns16550_driver = {
+static struct uart_driver __read_mostly ns16550_driver = {
     .init_preirq  = ns16550_init_preirq,
     .init_postirq = ns16550_init_postirq,
     .endboot      = ns16550_endboot,

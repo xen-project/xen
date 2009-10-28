@@ -8,7 +8,7 @@
 #include <asm/iosapic.h>
 
 struct iommu_ops;
-extern struct iommu_ops intel_iommu_ops;
+extern const struct iommu_ops intel_iommu_ops;
 extern int intel_vtd_setup(void);
 
 #define iommu_get_ops() (&intel_iommu_ops)

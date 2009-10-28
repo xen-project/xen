@@ -1375,7 +1375,7 @@ static void csched_tick_resume(void)
             - now % MILLISECS(CSCHED_MSECS_PER_TICK) );
 }
 
-struct scheduler sched_credit_def = {
+const struct scheduler sched_credit_def = {
     .name           = "SMP Credit Scheduler",
     .opt_name       = "credit",
     .sched_id       = XEN_SCHEDULER_CREDIT,

@@ -32,7 +32,7 @@
 #endif
 
 #ifdef XEN
-nodemask_t node_online_map = { { [0] = 1UL } };
+nodemask_t __read_mostly node_online_map = { { [0] = 1UL } };
 #endif
 
 u8 cpu_to_node_map[NR_CPUS] __cacheline_aligned;

@@ -2935,7 +2935,7 @@ static int sh_page_fault(struct vcpu *v,
     shadow_l1e_t sl1e, *ptr_sl1e;
     paddr_t gpa;
     struct sh_emulate_ctxt emul_ctxt;
-    struct x86_emulate_ops *emul_ops;
+    const struct x86_emulate_ops *emul_ops;
     int r;
     fetch_type_t ft = 0;
     p2m_type_t p2mt;
@@ -5188,7 +5188,7 @@ int sh_audit_l4_table(struct vcpu *v, mfn_t sl4mfn, mfn_t x)
 /**************************************************************************/
 /* Entry points into this mode of the shadow code.
  * This will all be mangled by the preprocessor to uniquify everything. */
-struct paging_mode sh_paging_mode = {
+const struct paging_mode sh_paging_mode = {
     .page_fault                    = sh_page_fault, 
     .invlpg                        = sh_invlpg,
     .gva_to_gfn                    = sh_gva_to_gfn,

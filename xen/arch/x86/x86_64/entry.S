@@ -629,7 +629,7 @@ ENTRY(machine_check)
         movl  $TRAP_machine_check,4(%rsp)
         jmp   handle_ist_exception
 
-.data
+.section .rodata, "a", @progbits
 
 ENTRY(exception_table)
         .quad do_divide_error

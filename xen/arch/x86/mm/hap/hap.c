@@ -674,6 +674,11 @@ int hap_domctl(struct domain *d, xen_domctl_shadow_op_t *sc,
     }
 }
 
+static const struct paging_mode hap_paging_real_mode;
+static const struct paging_mode hap_paging_protected_mode;
+static const struct paging_mode hap_paging_pae_mode;
+static const struct paging_mode hap_paging_long_mode;
+
 void hap_vcpu_init(struct vcpu *v)
 {
     v->arch.paging.mode = &hap_paging_real_mode;
@@ -812,7 +817,7 @@ static unsigned long hap_gva_to_gfn_real_mode(
 }
 
 /* Entry points into this mode of the hap code. */
-struct paging_mode hap_paging_real_mode = {
+static const struct paging_mode hap_paging_real_mode = {
     .page_fault             = hap_page_fault,
     .invlpg                 = hap_invlpg,
     .gva_to_gfn             = hap_gva_to_gfn_real_mode,
@@ -822,7 +827,7 @@ struct paging_mode hap_paging_real_mode = {
     .guest_levels           = 1
 };
 
-struct paging_mode hap_paging_protected_mode = {
+static const struct paging_mode hap_paging_protected_mode = {
     .page_fault             = hap_page_fault,
     .invlpg                 = hap_invlpg,
     .gva_to_gfn             = hap_gva_to_gfn_2level,
@@ -832,7 +837,7 @@ struct paging_mode hap_paging_protected_mode = {
     .guest_levels           = 2
 };
 
-struct paging_mode hap_paging_pae_mode = {
+static const struct paging_mode hap_paging_pae_mode = {
     .page_fault             = hap_page_fault,
     .invlpg                 = hap_invlpg,
     .gva_to_gfn             = hap_gva_to_gfn_3level,
@@ -842,7 +847,7 @@ struct paging_mode hap_paging_pae_mode = {
     .guest_levels           = 3
 };
 
-struct paging_mode hap_paging_long_mode = {
+static const struct paging_mode hap_paging_long_mode = {
     .page_fault             = hap_page_fault,
     .invlpg                 = hap_invlpg,
     .gva_to_gfn             = hap_gva_to_gfn_4level,

@@ -109,7 +109,7 @@ static int p4_unused_cccr[NUM_UNUSED_CCCRS] = {
 
 /* p4 event codes in libop/op_event.h are indices into this table. */
 
-static struct p4_event_binding p4_events[NUM_EVENTS] = {
+static const struct p4_event_binding p4_events[NUM_EVENTS] = {
 	
 	{ /* BRANCH_RETIRED */
 		0x05, 0x06, 
@@ -485,7 +485,7 @@ static void pmc_setup_one_p4_counter(unsigned int ctr)
 	unsigned int escr = 0;
 	unsigned int high = 0;
 	unsigned int counter_bit;
-	struct p4_event_binding *ev = NULL;
+	const struct p4_event_binding *ev = NULL;
 	unsigned int stag;
 
 	stag = get_stagger();

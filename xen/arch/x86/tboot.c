@@ -13,7 +13,7 @@
 #include <crypto/vmac.h>
 
 /* tboot=<physical address of shared page> */
-static char opt_tboot[20] = "";
+static char __initdata opt_tboot[20] = "";
 string_param("tboot", opt_tboot);
 
 /* Global pointer to shared data; NULL means no measured launch. */
@@ -26,8 +26,8 @@ static vmac_t frametable_mac; /* MAC for frame table during S3 */
 static const uuid_t tboot_shared_uuid = TBOOT_SHARED_UUID;
 
 /* used by tboot_protect_mem_regions() and/or tboot_parse_dmar_table() */
-static uint64_t txt_heap_base, txt_heap_size;
-static uint64_t sinit_base, sinit_size;
+static uint64_t __initdata txt_heap_base, __initdata txt_heap_size;
+static uint64_t __initdata sinit_base, __initdata sinit_size;
 
 /*
  * TXT configuration registers (offsets from TXT_{PUB, PRIV}_CONFIG_REGS_BASE)

@@ -38,10 +38,10 @@
 #include <asm/shadow.h>
 #include <asm/tboot.h>
 
-static int opt_vpid_enabled = 1;
+static int __read_mostly opt_vpid_enabled = 1;
 boolean_param("vpid", opt_vpid_enabled);
 
-static int opt_unrestricted_guest_enabled = 1;
+static int __read_mostly opt_unrestricted_guest_enabled = 1;
 boolean_param("unrestricted_guest", opt_unrestricted_guest_enabled);
 
 /*
@@ -53,9 +53,9 @@ boolean_param("unrestricted_guest", opt_unrestricted_guest_enabled);
  * Time is measured based on a counter that runs at the same rate as the TSC,
  * refer SDM volume 3b section 21.6.13 & 22.1.3.
  */
-static unsigned int ple_gap = 41;
+static unsigned int __read_mostly ple_gap = 41;
 integer_param("ple_gap", ple_gap);
-static unsigned int ple_window = 4096;
+static unsigned int __read_mostly ple_window = 4096;
 integer_param("ple_window", ple_window);
 
 /* Dynamic (run-time adjusted) execution control flags. */

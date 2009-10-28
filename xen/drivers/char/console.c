@@ -44,19 +44,19 @@ string_param("console", opt_console);
 /* Char 1: CTRL+<char1> is used to switch console input between Xen and DOM0 */
 /* Char 2: If this character is 'x', then do not auto-switch to DOM0 when it */
 /*         boots. Any other value, or omitting the char, enables auto-switch */
-static unsigned char opt_conswitch[3] = "a";
+static unsigned char __read_mostly opt_conswitch[3] = "a";
 string_param("conswitch", opt_conswitch);
 
 /* sync_console: force synchronous console output (useful for debugging). */
-static int opt_sync_console;
+static int __read_mostly opt_sync_console;
 boolean_param("sync_console", opt_sync_console);
 
 /* console_to_ring: send guest (incl. dom 0) console data to console ring. */
-static int opt_console_to_ring;
+static int __read_mostly opt_console_to_ring;
 boolean_param("console_to_ring", opt_console_to_ring);
 
 /* console_timestamps: include a timestamp prefix on every Xen console line. */
-static int opt_console_timestamps;
+static int __read_mostly opt_console_timestamps;
 boolean_param("console_timestamps", opt_console_timestamps);
 
 /* conring_size: allows a large console ring than default (16kB). */
@@ -65,10 +65,11 @@ size_param("conring_size", opt_conring_size);
 
 #define _CONRING_SIZE 16384
 #define CONRING_IDX_MASK(i) ((i)&(conring_size-1))
-static char _conring[_CONRING_SIZE], *conring = _conring;
-static uint32_t conring_size = _CONRING_SIZE, conringc, conringp;
+static char _conring[_CONRING_SIZE], *__read_mostly conring = _conring;
+static uint32_t __read_mostly conring_size = _CONRING_SIZE;
+static uint32_t conringc, conringp;
 
-static int sercon_handle = -1;
+static int __read_mostly sercon_handle = -1;
 
 static DEFINE_SPINLOCK(console_lock);
 
@@ -103,10 +104,10 @@ static DEFINE_SPINLOCK(console_lock);
 #define XENLOG_DEFAULT       1 /* XENLOG_WARNING */
 #define XENLOG_GUEST_DEFAULT 1 /* XENLOG_WARNING */
 
-static int xenlog_upper_thresh = XENLOG_UPPER_THRESHOLD;
-static int xenlog_lower_thresh = XENLOG_LOWER_THRESHOLD;
-static int xenlog_guest_upper_thresh = XENLOG_GUEST_UPPER_THRESHOLD;
-static int xenlog_guest_lower_thresh = XENLOG_GUEST_LOWER_THRESHOLD;
+static int __read_mostly xenlog_upper_thresh = XENLOG_UPPER_THRESHOLD;
+static int __read_mostly xenlog_lower_thresh = XENLOG_LOWER_THRESHOLD;
+static int __read_mostly xenlog_guest_upper_thresh = XENLOG_GUEST_UPPER_THRESHOLD;
+static int __read_mostly xenlog_guest_lower_thresh = XENLOG_GUEST_LOWER_THRESHOLD;
 
 static void parse_loglvl(char *s);
 static void parse_guest_loglvl(char *s);
@@ -273,7 +274,7 @@ static void sercon_puts(const char *s)
 
 /* CTRL-<switch_char> switches input direction between Xen and DOM0. */
 #define switch_code (opt_conswitch[0]-'a'+1)
-static int xen_rx = 1; /* FALSE => serial input passed to domain 0. */
+static int __read_mostly xen_rx = 1; /* FALSE => serial input passed to domain 0. */
 
 static void switch_serial_input(void)
 {
@@ -773,10 +774,10 @@ int __printk_ratelimit(int ratelimit_ms, int ratelimit_burst)
 }
 
 /* minimum time in ms between messages */
-int printk_ratelimit_ms = 5 * 1000;
+static int __read_mostly printk_ratelimit_ms = 5 * 1000;
 
 /* number of messages we send before ratelimiting */
-int printk_ratelimit_burst = 10;
+static int __read_mostly printk_ratelimit_burst = 10;
 
 int printk_ratelimit(void)
 {

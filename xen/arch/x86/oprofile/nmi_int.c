@@ -29,7 +29,7 @@
  
 struct op_counter_config counter_config[OP_MAX_COUNTER];
 
-static struct op_x86_model_spec const * model;
+static struct op_x86_model_spec const *__read_mostly model;
 static struct op_msrs cpu_msrs[NR_CPUS];
 static unsigned long saved_lvtpc[NR_CPUS];
 

@@ -39,7 +39,7 @@ unsigned char apicid_to_node[MAX_LOCAL_APIC] __cpuinitdata = {
 };
 cpumask_t node_to_cpumask[MAX_NUMNODES] __read_mostly;
 
-nodemask_t node_online_map = { { [0] = 1UL } };
+nodemask_t __read_mostly node_online_map = { { [0] = 1UL } };
 
 /* Default NUMA to off for now. acpi=on required to enable it. */
 int numa_off __initdata = 1;

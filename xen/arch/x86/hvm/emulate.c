@@ -929,7 +929,7 @@ static int hvmemul_invlpg(
     return rc;
 }
 
-static struct x86_emulate_ops hvm_emulate_ops = {
+static const struct x86_emulate_ops hvm_emulate_ops = {
     .read          = hvmemul_read,
     .insn_fetch    = hvmemul_insn_fetch,
     .write         = hvmemul_write,

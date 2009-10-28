@@ -48,7 +48,7 @@ static __init int probe_bigsmp(void)
 	return dmi_bigsmp;
 } 
 
-struct genapic apic_bigsmp = {
+const struct genapic apic_bigsmp = {
 	APIC_INIT("bigsmp", probe_bigsmp),
 	GENAPIC_PHYS
 };

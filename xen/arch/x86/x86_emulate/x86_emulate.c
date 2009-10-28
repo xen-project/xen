@@ -715,7 +715,7 @@ static int read_ulong(
         unsigned long *val,
         unsigned int bytes,
         struct x86_emulate_ctxt *ctxt,
-        struct x86_emulate_ops *ops)
+        const struct x86_emulate_ops *ops)
 {
     *val = 0;
     return ops->read(seg, offset, val, bytes, ctxt);
@@ -848,7 +848,7 @@ test_cc(
 static int
 get_cpl(
     struct x86_emulate_ctxt *ctxt,
-    struct x86_emulate_ops  *ops)
+    const struct x86_emulate_ops  *ops)
 {
     struct segment_register reg;
 
@@ -865,7 +865,7 @@ get_cpl(
 static int
 _mode_iopl(
     struct x86_emulate_ctxt *ctxt,
-    struct x86_emulate_ops  *ops)
+    const struct x86_emulate_ops  *ops)
 {
     int cpl = get_cpl(ctxt, ops);
     if ( cpl == -1 )
@@ -888,7 +888,7 @@ static int ioport_access_check(
     unsigned int first_port,
     unsigned int bytes,
     struct x86_emulate_ctxt *ctxt,
-    struct x86_emulate_ops *ops)
+    const struct x86_emulate_ops *ops)
 {
     unsigned long iobmp;
     struct segment_register tr;
@@ -933,7 +933,7 @@ static int ioport_access_check(
 static int
 in_realmode(
     struct x86_emulate_ctxt *ctxt,
-    struct x86_emulate_ops  *ops)
+    const struct x86_emulate_ops  *ops)
 {
     unsigned long cr0;
     int rc;
@@ -948,7 +948,7 @@ in_realmode(
 static int
 in_protmode(
     struct x86_emulate_ctxt *ctxt,
-    struct x86_emulate_ops  *ops)
+    const struct x86_emulate_ops  *ops)
 {
     return !(in_realmode(ctxt, ops) || (ctxt->regs->eflags & EFLG_VM));
 }
@@ -956,7 +956,7 @@ in_protmode(
 static int
 in_longmode(
     struct x86_emulate_ctxt *ctxt,
-    struct x86_emulate_ops *ops)
+    const struct x86_emulate_ops *ops)
 {
     uint64_t efer;
 
@@ -972,7 +972,7 @@ realmode_load_seg(
     enum x86_segment seg,
     uint16_t sel,
     struct x86_emulate_ctxt *ctxt,
-    struct x86_emulate_ops *ops)
+    const struct x86_emulate_ops *ops)
 {
     struct segment_register reg;
     int rc;
@@ -991,7 +991,7 @@ protmode_load_seg(
     enum x86_segment seg,
     uint16_t sel,
     struct x86_emulate_ctxt *ctxt,
-    struct x86_emulate_ops *ops)
+    const struct x86_emulate_ops *ops)
 {
     struct segment_register desctab, ss, segr;
     struct { uint32_t a, b; } desc;
@@ -1130,7 +1130,7 @@ load_seg(
     enum x86_segment seg,
     uint16_t sel,
     struct x86_emulate_ctxt *ctxt,
-    struct x86_emulate_ops *ops)
+    const struct x86_emulate_ops *ops)
 {
     if ( (ops->read_segment == NULL) ||
          (ops->write_segment == NULL) )
@@ -1202,7 +1202,7 @@ decode_segment(uint8_t modrm_reg)
 int
 x86_emulate(
     struct x86_emulate_ctxt *ctxt,
-    struct x86_emulate_ops  *ops)
+    const struct x86_emulate_ops  *ops)
 {
     /* Shadow copy of register state. Committed on successful emulation. */
     struct cpu_user_regs _regs = *ctxt->regs;

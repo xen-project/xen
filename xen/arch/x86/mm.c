@@ -4418,7 +4418,7 @@ static int ptwr_emulated_cmpxchg(
         container_of(ctxt, struct ptwr_emulate_ctxt, ctxt));
 }
 
-static struct x86_emulate_ops ptwr_emulate_ops = {
+static const struct x86_emulate_ops ptwr_emulate_ops = {
     .read       = ptwr_emulated_read,
     .insn_fetch = ptwr_emulated_read,
     .write      = ptwr_emulated_write,

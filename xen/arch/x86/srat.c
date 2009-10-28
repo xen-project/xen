@@ -20,12 +20,12 @@
 #include <asm/e820.h>
 #include <asm/page.h>
 
-static struct acpi_table_slit *acpi_slit;
+static struct acpi_table_slit *__read_mostly acpi_slit;
 
 static nodemask_t nodes_parsed __initdata;
 static nodemask_t nodes_found __initdata;
 static struct node nodes[MAX_NUMNODES] __initdata;
-static u8 pxm2node[256] = { [0 ... 255] = 0xff };
+static u8 __read_mostly pxm2node[256] = { [0 ... 255] = 0xff };
 
 /* Too small nodes confuse the VM badly. Usually they result
    from BIOS bugs. */

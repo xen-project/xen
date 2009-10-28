@@ -20,7 +20,7 @@ static __init int probe_default(void)
 	return 1;
 } 
 
-struct genapic apic_default = {
+const struct genapic apic_default = {
 	APIC_INIT("default", probe_default),
 	GENAPIC_FLAT
 };

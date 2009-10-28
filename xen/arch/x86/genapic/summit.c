@@ -20,7 +20,7 @@ static __init int probe_summit(void)
 	return 0;
 } 
 
-struct genapic apic_summit = {
+const struct genapic apic_summit = {
 	APIC_INIT("summit", probe_summit),
 	GENAPIC_PHYS
 };

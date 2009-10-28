@@ -55,15 +55,15 @@ extern u8 boot_edid_info[128];
 extern struct boot_video_info boot_vid_info;
 
 /* opt_nosmp: If true, secondary processors are ignored. */
-static int opt_nosmp = 0;
+static int __initdata opt_nosmp = 0;
 boolean_param("nosmp", opt_nosmp);
 
 /* maxcpus: maximum number of CPUs to activate. */
-static unsigned int max_cpus = NR_CPUS;
+static unsigned int __initdata max_cpus = NR_CPUS;
 integer_param("maxcpus", max_cpus);
 
 /* opt_watchdog: If true, run a watchdog NMI on each processor. */
-static int opt_watchdog = 0;
+static int __initdata opt_watchdog = 0;
 boolean_param("watchdog", opt_watchdog);
 
 /* opt_tsc_unstable: Override all tests; assume TSC is unreliable. */
@@ -94,13 +94,14 @@ boolean_param("cpuidle", xen_cpuidle);
 
 int early_boot = 1;
 
-cpumask_t cpu_present_map;
+cpumask_t __read_mostly cpu_present_map;
 
-unsigned long xen_phys_start;
+unsigned long __read_mostly xen_phys_start;
 
 #ifdef CONFIG_X86_32
 /* Limits of Xen heap, used to initialise the allocator. */
-unsigned long xenheap_initial_phys_start, xenheap_phys_end;
+unsigned long __initdata xenheap_initial_phys_start;
+unsigned long __read_mostly xenheap_phys_end;
 #endif
 
 DEFINE_PER_CPU_READ_MOSTLY(struct desc_struct *, gdt_table) = boot_cpu_gdt_table;
@@ -113,15 +114,14 @@ DEFINE_PER_CPU(struct tss_struct, init_tss);
 
 char __attribute__ ((__section__(".bss.stack_aligned"))) cpu0_stack[STACK_SIZE];
 
-struct cpuinfo_x86 boot_cpu_data = { 0, 0, 0, 0, -1 };
+struct cpuinfo_x86 __read_mostly boot_cpu_data = { 0, 0, 0, 0, -1 };
 
-unsigned long mmu_cr4_features = X86_CR4_PSE | X86_CR4_PGE | X86_CR4_PAE;
-EXPORT_SYMBOL(mmu_cr4_features);
+unsigned long __read_mostly mmu_cr4_features = X86_CR4_PSE | X86_CR4_PGE | X86_CR4_PAE;
 
-int acpi_disabled;
+int __read_mostly acpi_disabled;
 
-int acpi_force;
-char acpi_param[10] = "";
+int __read_mostly acpi_force;
+static char __initdata acpi_param[10] = "";
 static void __init parse_acpi_param(char *s)
 {
     /* Save the parameter so it can be propagated to domain0. */

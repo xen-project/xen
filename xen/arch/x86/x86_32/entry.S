@@ -640,7 +640,7 @@ ENTRY(setup_vm86_frame)
         addl $16,%esp
         ret
 
-.data
+.section .rodata, "a", @progbits
 
 ENTRY(exception_table)
         .long do_divide_error

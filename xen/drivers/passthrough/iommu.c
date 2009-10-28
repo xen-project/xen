@@ -292,7 +292,7 @@ int iommu_get_device_group(struct domain *d, u8 bus, u8 devfn,
     int group_id, sdev_id;
     u32 bdf;
     int i = 0;
-    struct iommu_ops *ops = hd->platform_ops;
+    const struct iommu_ops *ops = hd->platform_ops;
 
     if ( !iommu_enabled || !ops || !ops->get_device_group_id )
         return 0;
@@ -327,39 +327,39 @@ int iommu_get_device_group(struct domain *d, u8 bus, u8 devfn,
 void iommu_update_ire_from_apic(
     unsigned int apic, unsigned int reg, unsigned int value)
 {
-    struct iommu_ops *ops = iommu_get_ops();
+    const struct iommu_ops *ops = iommu_get_ops();
     ops->update_ire_from_apic(apic, reg, value);
 }
 void iommu_update_ire_from_msi(
     struct msi_desc *msi_desc, struct msi_msg *msg)
 {
-    struct iommu_ops *ops = iommu_get_ops();
+    const struct iommu_ops *ops = iommu_get_ops();
     ops->update_ire_from_msi(msi_desc, msg);
 }
 
 void iommu_read_msi_from_ire(
     struct msi_desc *msi_desc, struct msi_msg *msg)
 {
-    struct iommu_ops *ops = iommu_get_ops();
+    const struct iommu_ops *ops = iommu_get_ops();
     ops->read_msi_from_ire(msi_desc, msg);
 }
 
 unsigned int iommu_read_apic_from_ire(unsigned int apic, unsigned int reg)
 {
-    struct iommu_ops *ops = iommu_get_ops();
+    const struct iommu_ops *ops = iommu_get_ops();
     return ops->read_apic_from_ire(apic, reg);
 }
 
 void iommu_resume()
 {
-    struct iommu_ops *ops = iommu_get_ops();
+    const struct iommu_ops *ops = iommu_get_ops();
     if ( iommu_enabled )
         ops->resume();
 }
 
 void iommu_suspend()
 {
-    struct iommu_ops *ops = iommu_get_ops();
+    const struct iommu_ops *ops = iommu_get_ops();
     if ( iommu_enabled )
         ops->suspend();
 }

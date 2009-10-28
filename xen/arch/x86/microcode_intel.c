@@ -368,7 +368,7 @@ static int microcode_resume_match(int cpu, struct cpu_signature *nsig)
             (uci->cpu_sig.rev > nsig->rev));
 }
 
-static struct microcode_ops microcode_intel_ops = {
+static const struct microcode_ops microcode_intel_ops = {
     .microcode_resume_match           = microcode_resume_match,
     .cpu_request_microcode            = cpu_request_microcode,
     .collect_cpu_info                 = collect_cpu_info,

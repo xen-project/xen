@@ -9,19 +9,20 @@
 #include <xen/kernel.h>
 #include <xen/ctype.h>
 #include <xen/init.h>
+#include <asm/cache.h>
 #include <asm/fixmap.h>
 #include <asm/mpspec.h>
 #include <asm/apicdef.h>
 #include <asm/mach-generic/mach_apic.h>
 #include <asm/setup.h>
 
-extern struct genapic apic_summit;
-extern struct genapic apic_bigsmp;
-extern struct genapic apic_default;
+extern const struct genapic apic_summit;
+extern const struct genapic apic_bigsmp;
+extern const struct genapic apic_default;
 
-struct genapic *genapic;
+const struct genapic *__read_mostly genapic;
 
-struct genapic *apic_probe[] __initdata = { 
+const struct genapic *apic_probe[] __initdata = {
 	&apic_summit,
 	&apic_bigsmp, 
 	&apic_default,	/* must be last */

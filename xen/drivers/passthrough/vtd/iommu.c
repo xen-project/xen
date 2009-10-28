@@ -1944,7 +1944,7 @@ static void vtd_resume(void)
     }
 }
 
-struct iommu_ops intel_iommu_ops = {
+const struct iommu_ops intel_iommu_ops = {
     .init = intel_iommu_domain_init,
     .add_device = intel_iommu_add_device,
     .remove_device = intel_iommu_remove_device,

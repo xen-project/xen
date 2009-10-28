@@ -430,7 +430,7 @@ static int amd_iommu_group_id(u8 bus, u8 devfn)
     return rt;
 }
 
-struct iommu_ops amd_iommu_ops = {
+const struct iommu_ops amd_iommu_ops = {
     .init = amd_iommu_domain_init,
     .add_device = amd_iommu_add_device,
     .remove_device = amd_iommu_remove_device,

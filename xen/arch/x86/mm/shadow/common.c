@@ -290,7 +290,7 @@ hvm_emulate_cmpxchg(enum x86_segment seg,
     return X86EMUL_UNHANDLEABLE;
 }
 
-static struct x86_emulate_ops hvm_shadow_emulator_ops = {
+static const struct x86_emulate_ops hvm_shadow_emulator_ops = {
     .read       = hvm_emulate_read,
     .insn_fetch = hvm_emulate_insn_fetch,
     .write      = hvm_emulate_write,
@@ -367,14 +367,14 @@ pv_emulate_cmpxchg(enum x86_segment seg,
     return X86EMUL_UNHANDLEABLE;
 }
 
-static struct x86_emulate_ops pv_shadow_emulator_ops = {
+static const struct x86_emulate_ops pv_shadow_emulator_ops = {
     .read       = pv_emulate_read,
     .insn_fetch = pv_emulate_read,
     .write      = pv_emulate_write,
     .cmpxchg    = pv_emulate_cmpxchg,
 };
 
-struct x86_emulate_ops *shadow_init_emulation(
+const struct x86_emulate_ops *shadow_init_emulation(
     struct sh_emulate_ctxt *sh_ctxt, struct cpu_user_regs *regs)
 {
     struct segment_register *creg, *sreg;
@@ -2154,7 +2154,7 @@ typedef int (*hash_callback_t)(struct vcpu *v, mfn_t smfn, mfn_t other_mfn);
 
 static void hash_foreach(struct vcpu *v, 
                          unsigned int callback_mask, 
-                         hash_callback_t callbacks[], 
+                         const hash_callback_t callbacks[],
                          mfn_t callback_mfn)
 /* Walk the hash table looking at the types of the entries and 
  * calling the appropriate callback function for each entry. 
@@ -2287,7 +2287,7 @@ int sh_remove_write_access(struct vcpu *v, mfn_t gmfn,
                            unsigned long fault_addr)
 {
     /* Dispatch table for getting per-type functions */
-    static hash_callback_t callbacks[SH_type_unused] = {
+    static const hash_callback_t callbacks[SH_type_unused] = {
         NULL, /* none    */
         SHADOW_INTERNAL_NAME(sh_rm_write_access_from_l1, 2), /* l1_32   */
         SHADOW_INTERNAL_NAME(sh_rm_write_access_from_l1, 2), /* fl1_32  */
@@ -2549,7 +2549,7 @@ int sh_remove_all_mappings(struct vcpu *v, mfn_t gmfn)
     int expected_count, do_locking;
 
     /* Dispatch table for getting per-type functions */
-    static hash_callback_t callbacks[SH_type_unused] = {
+    static const hash_callback_t callbacks[SH_type_unused] = {
         NULL, /* none    */
         SHADOW_INTERNAL_NAME(sh_rm_mappings_from_l1, 2), /* l1_32   */
         SHADOW_INTERNAL_NAME(sh_rm_mappings_from_l1, 2), /* fl1_32  */
@@ -2703,7 +2703,7 @@ void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int fast, int all)
     
     /* Dispatch table for getting per-type functions: each level must
      * be called with the function to remove a lower-level shadow. */
-    static hash_callback_t callbacks[SH_type_unused] = {
+    static const hash_callback_t callbacks[SH_type_unused] = {
         NULL, /* none    */
         NULL, /* l1_32   */
         NULL, /* fl1_32  */
@@ -2852,7 +2852,7 @@ sh_remove_all_shadows_and_parents(struct vcpu *v, mfn_t gmfn)
 static void sh_update_paging_modes(struct vcpu *v)
 {
     struct domain *d = v->domain;
-    struct paging_mode *old_mode = v->arch.paging.mode;
+    const struct paging_mode *old_mode = v->arch.paging.mode;
 
     ASSERT(shadow_locked_by_me(d));
 
@@ -3855,7 +3855,7 @@ int shadow_domctl(struct domain *d,
 void shadow_audit_tables(struct vcpu *v) 
 {
     /* Dispatch table for getting per-type functions */
-    static hash_callback_t callbacks[SH_type_unused] = {
+    static const hash_callback_t callbacks[SH_type_unused] = {
         NULL, /* none    */
         SHADOW_INTERNAL_NAME(sh_audit_l1_table, 2),  /* l1_32   */
         SHADOW_INTERNAL_NAME(sh_audit_fl1_table, 2), /* fl1_32  */

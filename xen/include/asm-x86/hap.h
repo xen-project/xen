@@ -97,11 +97,6 @@ int   hap_track_dirty_vram(struct domain *d,
                            unsigned long nr,
                            XEN_GUEST_HANDLE_64(uint8) dirty_bitmap);
 
-extern struct paging_mode hap_paging_real_mode;
-extern struct paging_mode hap_paging_protected_mode;
-extern struct paging_mode hap_paging_pae_mode;
-extern struct paging_mode hap_paging_long_mode;
-
 #endif /* XEN_HAP_H */
 
 /*

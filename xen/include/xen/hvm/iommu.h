@@ -43,7 +43,7 @@ struct hvm_iommu {
     struct page_info *root_table;
 
     /* iommu_ops */
-    struct iommu_ops *platform_ops;
+    const struct iommu_ops *platform_ops;
 };
 
 #endif /* __XEN_HVM_IOMMU_H__ */

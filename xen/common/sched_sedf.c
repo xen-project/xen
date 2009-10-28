@@ -1456,7 +1456,7 @@ static int sedf_adjust(struct domain *p, struct xen_domctl_scheduler_op *op)
     return 0;
 }
 
-struct scheduler sched_sedf_def = {
+const struct scheduler sched_sedf_def = {
     .name     = "Simple EDF Scheduler",
     .opt_name = "sedf",
     .sched_id = XEN_SCHEDULER_SEDF,

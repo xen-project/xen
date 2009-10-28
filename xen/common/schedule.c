@@ -56,15 +56,15 @@ static void poll_timer_fn(void *data);
 /* This is global for now so that private implementations can reach it */
 DEFINE_PER_CPU(struct schedule_data, schedule_data);
 
-extern struct scheduler sched_sedf_def;
-extern struct scheduler sched_credit_def;
-static struct scheduler *schedulers[] = { 
+extern const struct scheduler sched_sedf_def;
+extern const struct scheduler sched_credit_def;
+static const struct scheduler *__initdata schedulers[] = {
     &sched_sedf_def,
     &sched_credit_def,
     NULL
 };
 
-static struct scheduler ops;
+static struct scheduler __read_mostly ops;
 
 #define SCHED_OP(fn, ...)                                 \
          (( ops.fn != NULL ) ? ops.fn( __VA_ARGS__ )      \

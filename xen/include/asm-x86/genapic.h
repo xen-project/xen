@@ -18,7 +18,7 @@ struct mp_config_table;
 struct mpc_config_processor;
 
 struct genapic { 
-	char *name;
+	const char *name;
 	int (*probe)(void);
 
 	/* When one of the next two hooks returns 1 the genapic
@@ -48,9 +48,9 @@ struct genapic {
 	APICFUNC(mps_oem_check), \
 	APICFUNC(acpi_madt_oem_check)
 
-extern struct genapic *genapic;
-extern struct genapic apic_x2apic_phys;
-extern struct genapic apic_x2apic_cluster;
+extern const struct genapic *genapic;
+extern const struct genapic apic_x2apic_phys;
+extern const struct genapic apic_x2apic_cluster;
 
 void init_apic_ldr_flat(void);
 void clustered_apic_check_flat(void);

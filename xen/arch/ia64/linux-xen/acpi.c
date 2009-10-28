@@ -66,9 +66,9 @@ extern u8 numa_slit[MAX_NUMNODES * MAX_NUMNODES];
 
 #define PREFIX			"ACPI: "
 
-void (*pm_idle) (void);
+void (*pm_idle) (void) __read_mostly;
 EXPORT_SYMBOL(pm_idle);
-void (*pm_power_off) (void);
+void (*pm_power_off) (void) __read_mostly;
 EXPORT_SYMBOL(pm_power_off);
 
 unsigned int acpi_cpei_override;

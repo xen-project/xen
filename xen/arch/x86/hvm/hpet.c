@@ -485,7 +485,7 @@ static int hpet_range(struct vcpu *v, unsigned long addr)
             (addr < (HPET_BASE_ADDRESS + HPET_MMAP_SIZE)));
 }
 
-struct hvm_mmio_handler hpet_mmio_handler = {
+const struct hvm_mmio_handler hpet_mmio_handler = {
     .check_handler = hpet_range,
     .read_handler  = hpet_read,
     .write_handler = hpet_write

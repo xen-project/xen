@@ -309,7 +309,7 @@ void arch_perfmon_setup_counters(void)
 	op_ppro_spec.num_controls = num_counters;
 }
 
-struct op_x86_model_spec op_ppro_spec = {
+struct op_x86_model_spec __read_mostly op_ppro_spec = {
 	.num_counters = 2,
 	.num_controls = 2,
 	.fill_in_addresses = &ppro_fill_in_addresses,
@@ -324,7 +324,7 @@ struct op_x86_model_spec op_ppro_spec = {
 	.save_msr = &ppro_save_msr
 };
 
-struct op_x86_model_spec op_arch_perfmon_spec = {
+struct op_x86_model_spec __read_mostly op_arch_perfmon_spec = {
 	/* num_counters/num_controls filled in at runtime */
 	.fill_in_addresses = &ppro_fill_in_addresses,
 	.setup_ctrs = &ppro_setup_ctrs,

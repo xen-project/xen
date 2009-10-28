@@ -61,8 +61,8 @@ DEFINE_PER_CPU(unsigned long, cr4);
 
 static void default_idle(void);
 static void default_dead_idle(void);
-void (*pm_idle) (void) = default_idle;
-void (*dead_idle) (void) = default_dead_idle;
+void (*pm_idle) (void) __read_mostly = default_idle;
+void (*dead_idle) (void) __read_mostly = default_dead_idle;
 
 static void paravirt_ctxt_switch_from(struct vcpu *v);
 static void paravirt_ctxt_switch_to(struct vcpu *v);

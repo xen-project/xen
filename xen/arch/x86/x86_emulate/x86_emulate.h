@@ -395,7 +395,7 @@ struct x86_emulate_ctxt
 int
 x86_emulate(
     struct x86_emulate_ctxt *ctxt,
-    struct x86_emulate_ops  *ops);
+    const struct x86_emulate_ops *ops);
 
 /*
  * Given the 'reg' portion of a ModRM byte, and a register block, return a

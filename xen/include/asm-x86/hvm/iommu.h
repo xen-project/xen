@@ -2,12 +2,12 @@
 #define __ASM_X86_HVM_IOMMU_H__
 
 struct iommu_ops;
-extern struct iommu_ops intel_iommu_ops;
-extern struct iommu_ops amd_iommu_ops;
+extern const struct iommu_ops intel_iommu_ops;
+extern const struct iommu_ops amd_iommu_ops;
 extern int intel_vtd_setup(void);
 extern int amd_iov_detect(void);
 
-static inline struct iommu_ops *iommu_get_ops(void)
+static inline const struct iommu_ops *iommu_get_ops(void)
 {   
     switch ( boot_cpu_data.x86_vendor )
     {

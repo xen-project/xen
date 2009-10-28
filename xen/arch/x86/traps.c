@@ -73,9 +73,9 @@
  *  ignore: The NMI error is cleared and ignored.
  */
 #ifdef NDEBUG
-char opt_nmi[10] = "dom0";
+static char __read_mostly opt_nmi[10] = "dom0";
 #else
-char opt_nmi[10] = "fatal";
+static char __read_mostly opt_nmi[10] = "fatal";
 #endif
 string_param("nmi", opt_nmi);
 

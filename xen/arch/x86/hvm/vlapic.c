@@ -713,7 +713,7 @@ static int vlapic_range(struct vcpu *v, unsigned long addr)
     return (!vlapic_hw_disabled(vlapic) && (offset < PAGE_SIZE));
 }
 
-struct hvm_mmio_handler vlapic_mmio_handler = {
+const struct hvm_mmio_handler vlapic_mmio_handler = {
     .check_handler = vlapic_range,
     .read_handler = vlapic_read,
     .write_handler = vlapic_write

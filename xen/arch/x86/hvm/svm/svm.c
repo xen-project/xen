@@ -1233,7 +1233,7 @@ static void svm_invlpg_intercept(unsigned long vaddr)
     svm_asid_g_invlpg(curr, vaddr);
 }
 
-static struct hvm_function_table svm_function_table = {
+static struct hvm_function_table __read_mostly svm_function_table = {
     .name                 = "SVM",
     .cpu_down             = svm_cpu_down,
     .domain_initialise    = svm_domain_initialise,
