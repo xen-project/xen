@@ -92,30 +92,32 @@ struct kernel_param {
 
 extern struct kernel_param __setup_start, __setup_end;
 
+#define __setup_str static __initdata __attribute__((__aligned__(1))) char
+#define __kparam static __attribute_used__ __initsetup struct kernel_param
+
 #define custom_param(_name, _var) \
-    static char __setup_str_##_var[] __initdata = _name; \
-    static struct kernel_param __setup_##_var __attribute_used__ \
-        __initsetup = { __setup_str_##_var, OPT_CUSTOM, &_var, 0 }
+    __setup_str __setup_str_##_var[] = _name; \
+    __kparam __setup_##_var = { __setup_str_##_var, OPT_CUSTOM, _var, 0 }
 #define boolean_param(_name, _var) \
-    static char __setup_str_##_var[] __initdata = _name; \
-    static struct kernel_param __setup_##_var __attribute_used__ \
-        __initsetup = { __setup_str_##_var, OPT_BOOL, &_var, sizeof(_var) }
+    __setup_str __setup_str_##_var[] = _name; \
+    __kparam __setup_##_var = \
+        { __setup_str_##_var, OPT_BOOL, &_var, sizeof(_var) }
 #define invbool_param(_name, _var) \
-    static char __setup_str_##_var[] __initdata = _name; \
-    static struct kernel_param __setup_##_var __attribute_used__ \
-        __initsetup = { __setup_str_##_var, OPT_INVBOOL, &_var, sizeof(_var) }
+    __setup_str __setup_str_##_var[] = _name; \
+    __kparam __setup_##_var = \
+        { __setup_str_##_var, OPT_INVBOOL, &_var, sizeof(_var) }
 #define integer_param(_name, _var) \
-    static char __setup_str_##_var[] __initdata = _name; \
-    static struct kernel_param __setup_##_var __attribute_used__ \
-        __initsetup = { __setup_str_##_var, OPT_UINT, &_var, sizeof(_var) }
+    __setup_str __setup_str_##_var[] = _name; \
+    __kparam __setup_##_var = \
+        { __setup_str_##_var, OPT_UINT, &_var, sizeof(_var) }
 #define size_param(_name, _var) \
-    static char __setup_str_##_var[] __initdata = _name; \
-    static struct kernel_param __setup_##_var __attribute_used__ \
-        __initsetup = { __setup_str_##_var, OPT_SIZE, &_var, sizeof(_var) }
+    __setup_str __setup_str_##_var[] = _name; \
+    __kparam __setup_##_var = \
+        { __setup_str_##_var, OPT_SIZE, &_var, sizeof(_var) }
 #define string_param(_name, _var) \
-    static char __setup_str_##_var[] __initdata = _name; \
-    static struct kernel_param __setup_##_var __attribute_used__ \
-        __initsetup = { __setup_str_##_var, OPT_STR, &_var, sizeof(_var) }
+    __setup_str __setup_str_##_var[] = _name; \
+    __kparam __setup_##_var = \
+        { __setup_str_##_var, OPT_STR, &_var, sizeof(_var) }
 
 /* Make sure obsolete cmdline params don't break the build. */
 #define __setup(_name, _fn) static void * __attribute_used__ _dummy_##_fn = _fn
