@@ -29,6 +29,7 @@ extern unsigned short ivrs_bdf_entries;
 extern struct ivrs_mappings *ivrs_mappings;
 extern unsigned short last_bdf;
 extern int ioapic_bdf[MAX_IO_APICS];
+extern void *shared_intremap_table;
 
 static void add_ivrs_mapping_entry(
     u16 bdf, u16 alias_id, u8 flags, struct amd_iommu *iommu)
@@ -66,10 +67,19 @@ static void add_ivrs_mapping_entry(
     ivrs_mappings[bdf].dte_ext_int_pass = ext_int_pass;
     ivrs_mappings[bdf].dte_init_pass = init_pass;
 
-    /* allocate per-device interrupt remapping table */
-    if ( ivrs_mappings[alias_id].intremap_table == NULL )
-        ivrs_mappings[alias_id].intremap_table =
-            amd_iommu_alloc_intremap_table();
+    if (ivrs_mappings[alias_id].intremap_table == NULL )
+    {
+         /* allocate per-device interrupt remapping table */
+         if ( amd_iommu_perdev_intremap )
+             ivrs_mappings[alias_id].intremap_table =
+                amd_iommu_alloc_intremap_table();
+         else
+         {
+             if ( shared_intremap_table == NULL  )
+                 shared_intremap_table = amd_iommu_alloc_intremap_table();
+             ivrs_mappings[alias_id].intremap_table = shared_intremap_table;
+         }
+    }
     /* assgin iommu hardware */
     ivrs_mappings[bdf].iommu = iommu;
 }

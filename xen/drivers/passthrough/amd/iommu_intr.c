@@ -26,6 +26,15 @@
 int ioapic_bdf[MAX_IO_APICS];
 extern struct ivrs_mappings *ivrs_mappings;
 extern unsigned short ivrs_bdf_entries;
+void *shared_intremap_table;
+static DEFINE_SPINLOCK(shared_intremap_lock);
+
+static spinlock_t* get_intremap_lock(int req_id)
+{
+    return (amd_iommu_perdev_intremap ?
+           &ivrs_mappings[req_id].intremap_lock:
+           &shared_intremap_lock);
+}
 
 static int get_intremap_requestor_id(int bdf)
 {
@@ -101,9 +110,10 @@ static void update_intremap_entry_from_ioapic(
     u8 delivery_mode, dest, vector, dest_mode;
     struct IO_APIC_route_entry *rte = ioapic_rte;
     int req_id;
+    spinlock_t *lock;
 
     req_id = get_intremap_requestor_id(bdf);
-
+    lock = get_intremap_lock(req_id);
     /* only remap interrupt vector when lower 32 bits in ioapic ire changed */
     if ( likely(!rte_upper) )
     {
@@ -112,10 +122,10 @@ static void update_intremap_entry_from_ioapic(
         dest_mode = rte->dest_mode;
         dest = rte->dest.logical.logical_dest;
 
-        spin_lock_irqsave(&ivrs_mappings[req_id].intremap_lock, flags);
+        spin_lock_irqsave(lock, flags);
         entry = (u32*)get_intremap_entry(req_id, vector, delivery_mode);
         update_intremap_entry(entry, vector, delivery_mode, dest_mode, dest);
-        spin_unlock_irqrestore(&ivrs_mappings[req_id].intremap_lock, flags);
+        spin_unlock_irqrestore(lock, flags);
 
        if ( iommu->enabled )
         {
@@ -136,6 +146,7 @@ int __init amd_iommu_setup_ioapic_remapping(void)
     u8 delivery_mode, dest, vector, dest_mode;
     u16 bdf, req_id;
     struct amd_iommu *iommu;
+    spinlock_t *lock;
 
     /* Read ioapic entries and update interrupt remapping table accordingly */
     for ( apic = 0; apic < nr_ioapics; apic++ )
@@ -159,15 +170,17 @@ int __init amd_iommu_setup_ioapic_remapping(void)
             }
 
             req_id = get_intremap_requestor_id(bdf);
+            lock = get_intremap_lock(req_id);
+
             delivery_mode = rte.delivery_mode;
             vector = rte.vector;
             dest_mode = rte.dest_mode;
             dest = rte.dest.logical.logical_dest;
 
-            spin_lock_irqsave(&ivrs_mappings[req_id].intremap_lock, flags);
+            spin_lock_irqsave(lock, flags);
             entry = (u32*)get_intremap_entry(req_id, vector, delivery_mode);
             update_intremap_entry(entry, vector, delivery_mode, dest_mode, dest);
-            spin_unlock_irqrestore(&ivrs_mappings[req_id].intremap_lock, flags);
+            spin_unlock_irqrestore(lock, flags);
 
             if ( iommu->enabled )
             {
@@ -234,13 +247,14 @@ static void update_intremap_entry_from_msi_msg(
     unsigned long flags;
     u32* entry;
     u16 bdf, req_id, alias_id;
-
     u8 delivery_mode, dest, vector, dest_mode;
+    spinlock_t *lock;
 
     bdf = (pdev->bus << 8) | pdev->devfn;
     req_id = get_dma_requestor_id(bdf);
+    lock = get_intremap_lock(req_id);
 
-    spin_lock_irqsave(&ivrs_mappings[req_id].intremap_lock, flags);
+    spin_lock_irqsave(lock, flags);
     dest_mode = (msg->address_lo >> MSI_ADDR_DESTMODE_SHIFT) & 0x1;
     delivery_mode = (msg->data >> MSI_DATA_DELIVERY_MODE_SHIFT) & 0x1;
     vector = (msg->data >> MSI_DATA_VECTOR_SHIFT) & MSI_DATA_VECTOR_MASK;
@@ -248,7 +262,7 @@ static void update_intremap_entry_from_msi_msg(
 
     entry = (u32*)get_intremap_entry(req_id, vector, delivery_mode);
     update_intremap_entry(entry, vector, delivery_mode, dest_mode, dest);
-    spin_unlock_irqrestore(&ivrs_mappings[req_id].intremap_lock, flags);
+    spin_unlock_irqrestore(lock, flags);
 
     /*
      * In some special cases, a pci-e device(e.g SATA controller in IDE mode)
@@ -257,14 +271,15 @@ static void update_intremap_entry_from_msi_msg(
      * devices.
      */
     alias_id = get_intremap_requestor_id(bdf);
+    lock = get_intremap_lock(alias_id);
     if ( ( bdf != alias_id ) &&
         ivrs_mappings[alias_id].intremap_table != NULL )
     {
-        spin_lock_irqsave(&ivrs_mappings[alias_id].intremap_lock, flags);
+        spin_lock_irqsave(lock, flags);
         entry = (u32*)get_intremap_entry(alias_id, vector, delivery_mode);
         update_intremap_entry(entry, vector, delivery_mode, dest_mode, dest);
         invalidate_interrupt_table(iommu, alias_id);
-        spin_unlock_irqrestore(&ivrs_mappings[alias_id].intremap_lock, flags);
+        spin_unlock_irqrestore(lock, flags);
     }
 
     if ( iommu->enabled )
