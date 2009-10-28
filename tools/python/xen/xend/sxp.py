@@ -142,7 +142,7 @@ class Parser:
         return self.in_class(c, ' \t\n\v\f\r')
 
     def is_separator(self, c):
-        return self.in_class(c, '{}()<>[]!;')
+        return self.in_class(c, '{}()<>[];')
 
     def in_comment_class(self, c):
         return self.in_class(c, '#')
