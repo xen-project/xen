@@ -30,6 +30,7 @@
 #include <asm/fixmap.h>
 #include <asm/mc146818rtc.h>
 #include <asm/div64.h>
+#include <asm/acpi.h>
 #include <asm/hpet.h>
 #include <io_ports.h>
 #include <asm/setup.h> /* for early_time_init */

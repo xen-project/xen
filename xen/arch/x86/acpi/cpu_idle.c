@@ -56,7 +56,6 @@ static void lapic_timer_nop(void) { }
 static void (*lapic_timer_off)(void);
 static void (*lapic_timer_on)(void);
 
-extern u32 pmtmr_ioport;
 extern void (*pm_idle) (void);
 extern void (*dead_idle) (void);
 extern void menu_get_trace_data(u32 *expected, u32 *pred);

@@ -29,6 +29,7 @@
 #include <asm/paging.h>
 #include <asm/p2m.h>
 #include <asm/e820.h>
+#include <asm/acpi.h>
 #include <asm/bzimage.h> /* for bzimage_parse */
 
 #include <public/version.h>
@@ -1064,6 +1065,9 @@ int __init construct_dom0(
     rc |= ioports_deny_access(dom0, 0x40, 0x43);
     /* PIT Channel 2 / PC Speaker Control. */
     rc |= ioports_deny_access(dom0, 0x61, 0x61);
+    /* ACPI PM Timer. */
+    if ( pmtmr_ioport )
+        rc |= ioports_deny_access(dom0, pmtmr_ioport, pmtmr_ioport + 3);
     /* PCI configuration space (NB. 0xcf8 has special treatment). */
     rc |= ioports_deny_access(dom0, 0xcfc, 0xcff);
     /* Command-line I/O ranges. */

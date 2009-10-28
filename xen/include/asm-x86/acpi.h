@@ -153,6 +153,8 @@ struct acpi_sleep_info {
 extern u8 x86_acpiid_to_apicid[];
 #define MAX_LOCAL_APIC 256
 
+extern u32 pmtmr_ioport;
+
 int acpi_dmar_init(void);
 void acpi_mmcfg_init(void);
 

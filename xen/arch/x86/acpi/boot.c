@@ -332,10 +332,6 @@ static int __init acpi_parse_hpet(struct acpi_table_header *table)
 #define	acpi_parse_hpet	NULL
 #endif
 
-#ifdef CONFIG_X86_PM_TIMER
-extern u32 pmtmr_ioport;
-#endif
-
 #ifdef CONFIG_ACPI_SLEEP
 #define acpi_fadt_copy_address(dst, src, len) do {			\
 	if (fadt->header.revision >= FADT2_REVISION_ID)			\
