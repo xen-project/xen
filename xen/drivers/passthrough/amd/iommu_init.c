@@ -719,7 +719,7 @@ static int __init amd_iommu_setup_device_table(void)
     int sys_mgt, dev_ex, lint1_pass, lint0_pass,
        nmi_pass, ext_int_pass, init_pass;
 
-    BUG_ON( (ivrs_bdf_entries == 0) || (iommu_enabled) );
+    BUG_ON( (ivrs_bdf_entries == 0) );
 
     /* allocate 'device table' on a 4K boundary */
     device_table.alloc_size = PAGE_SIZE <<
