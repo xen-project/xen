@@ -456,7 +456,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         ret = -EINVAL;
         if ( (d == current->domain) || /* no domain_pause() */
              (max > MAX_VIRT_CPUS) ||
-             (is_hvm_domain(d) && max > XEN_LEGACY_MAX_VCPUS) )
+             (is_hvm_domain(d) && (max > MAX_HVM_VCPUS)) )
         {
             rcu_unlock_domain(d);
             break;

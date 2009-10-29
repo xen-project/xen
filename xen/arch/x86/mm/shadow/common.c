@@ -3098,7 +3098,7 @@ int shadow_enable(struct domain *d, u32 mode)
     {
         unsigned int r;
         shadow_lock(d);                
-        r = sh_set_allocation(d, 256, NULL); /* Use at least 1MB */
+        r = sh_set_allocation(d, 1024, NULL); /* Use at least 4MB */
         if ( r != 0 )
         {
             sh_set_allocation(d, 0, NULL);

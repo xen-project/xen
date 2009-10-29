@@ -57,6 +57,9 @@
 #define MAX_VIRT_CPUS XEN_LEGACY_MAX_VCPUS
 #endif
 
+/* Maximum we can support with current vLAPIC ID mapping. */
+#define MAX_HVM_VCPUS 128
+
 #ifdef CONFIG_X86_SUPERVISOR_MODE_KERNEL
 # define supervisor_mode_kernel (1)
 #else

@@ -10734,11 +10734,19 @@ post_init_pic:
   out  0xa1, AL ;slave  pic: unmask IRQ 12, 13, 14
   ret
 
+
+  .align 16
+smbios_entry_point:
+  db 0,0,0,0,0,0,0,0 ; 8 bytes
+  db 0,0,0,0,0,0,0,0 ; 16 bytes
+  db 0,0,0,0,0,0,0,0 ; 24 bytes
+  db 0,0,0,0,0,0,0   ; 31 bytes
+
 ;; the following area can be used to write dynamically generated tables
   .align 16
 bios_table_area_start:
-  dd 0xaafb4442
-  dd bios_table_area_end - bios_table_area_start - 8;
+  db 0x5F, 0x5F, 0x5F, 0x48, 0x56, 0x4D, 0x4D, 0x50 ;; ___HVMMP
+  dd bios_table_area_end - bios_table_area_start
 
 ;--------
 ;- POST -
@@ -11843,41 +11851,6 @@ static Bit8u vgafont8[128*8]=
  0x00, 0x10, 0x38, 0x6c, 0xc6, 0xc6, 0xfe, 0x00,
 };
 
-#ifdef HVMASSIST
-ASM_START
-
-//
-// MP Tables
-// just carve out some blank space for HVMLOADER to write the MP tables to
-//
-// NOTE: There should be enough space for a 32 processor entry MP table
-//
-.org 0xcc00
-db 0x5F, 0x5F, 0x5F, 0x48, 0x56, 0x4D, 0x4D, 0x50 ;; ___HVMMP
-dw 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;;  64 bytes
-dw 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;; 128 bytes
-dw 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;; 192 bytes
-dw 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;; 256 bytes
-dw 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;; 320 bytes
-dw 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;; 384 bytes
-dw 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;; 448 bytes
-dw 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;; 512 bytes
-dw 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;; 576 bytes
-dw 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;; 640 bytes
-dw 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;; 704 bytes
-dw 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;; 768 bytes
-dw 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;; 832 bytes
-dw 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 ;; 896 bytes
-
-.align 16
-smbios_entry_point:
-db 0,0,0,0,0,0,0,0 ; 8 bytes
-db 0,0,0,0,0,0,0,0 ; 16 bytes
-db 0,0,0,0,0,0,0,0 ; 24 bytes
-db 0,0,0,0,0,0,0   ; 31 bytes
-ASM_END
-
-#endif // HVMASSIST
 ASM_START
 .org 0xcff0
 bios_table_area_end:
