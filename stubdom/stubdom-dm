@@ -80,8 +80,8 @@ done
 # Termination handler
 
 term() {
-    kill %1
     [ -n "$vncpid" ] && kill -9 $vncpid
+    rm -f /tmp/domname-dm
     rm ${stubdom_configdir}/$domname-dm
     exit 0
 }
@@ -154,11 +154,10 @@ do
     j=$(( $j + 1 ))
 done
 echo " ] " >> ${stubdom_configdir}/$domname-dm
-creation="xm create -c ${stubdom_configdir}/$domname-dm target=$domid memory=32 extra=\"$extra\""
 
-(while true ; do sleep 60 ; done) | /bin/sh -c "$creation" &
-#xterm -geometry +0+0 -e /bin/sh -c "$creation ; echo ; echo press ENTER to shut down ; read" &
-consolepid=$!
+mkfifo /tmp/$domname-dm
+xm create -c ${stubdom_configdir}/$domname-dm target=$domid memory=32 extra="$extra" < /tmp/$domname-dm &
+exec 4>/tmp/$domname-dm
 
 
 ###########
@@ -178,6 +177,6 @@ then
 fi
 
 # wait for SIGHUP or stubdom termination
-wait $consolepid
+wait
 
 term
