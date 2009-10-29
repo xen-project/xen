@@ -832,7 +832,6 @@ void arch_vcpu_reset(struct vcpu *v)
 static void
 unmap_vcpu_info(struct vcpu *v)
 {
-    struct domain *d = v->domain;
     unsigned long mfn;
 
     if ( v->arch.vcpu_info_mfn == INVALID_MFN )
@@ -841,7 +840,7 @@ unmap_vcpu_info(struct vcpu *v)
     mfn = v->arch.vcpu_info_mfn;
     unmap_domain_page_global(v->vcpu_info);
 
-    v->vcpu_info = (void *)&shared_info(d, vcpu_info[v->vcpu_id]);
+    v->vcpu_info = &dummy_vcpu_info;
     v->arch.vcpu_info_mfn = INVALID_MFN;
 
     put_page_and_type(mfn_to_page(mfn));
@@ -885,13 +884,7 @@ map_vcpu_info(struct vcpu *v, unsigned long mfn, unsigned offset)
 
     new_info = (vcpu_info_t *)(mapping + offset);
 
-    if ( v->vcpu_info )
-        memcpy(new_info, v->vcpu_info, sizeof(*new_info));
-    else
-    {
-        memset(new_info, 0, sizeof(*new_info));
-        __vcpu_info(v, new_info, evtchn_upcall_mask) = 1;
-    }
+    memcpy(new_info, v->vcpu_info, sizeof(*new_info));
 
     v->vcpu_info = new_info;
     v->arch.vcpu_info_mfn = mfn;

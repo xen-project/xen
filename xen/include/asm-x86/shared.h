@@ -26,8 +26,6 @@ static inline void arch_set_##field(struct domain *d,           \
 #define GET_SET_VCPU(type, field)                               \
 static inline type arch_get_##field(const struct vcpu *v)       \
 {                                                               \
-    if ( unlikely(!v->vcpu_info) )                              \
-        return 0;                                               \
     return !has_32bit_shinfo(v->domain) ?                       \
            v->vcpu_info->native.arch.field :                    \
            v->vcpu_info->compat.arch.field;                     \
@@ -59,7 +57,7 @@ static inline void arch_set_##field(struct domain *d,           \
 #define GET_SET_VCPU(type, field)                               \
 static inline type arch_get_##field(const struct vcpu *v)       \
 {                                                               \
-    return v->vcpu_info ? v->vcpu_info->arch.field : 0;         \
+    return v->vcpu_info->arch.field;                            \
 }                                                               \
 static inline void arch_set_##field(struct vcpu *v,             \
                                     type val)                   \

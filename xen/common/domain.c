@@ -87,6 +87,8 @@ struct domain *dom0;
 
 struct vcpu *idle_vcpu[NR_CPUS] __read_mostly;
 
+vcpu_info_t dummy_vcpu_info;
+
 int current_domain_id(void)
 {
     return current->domain->domain_id;
@@ -154,8 +156,9 @@ struct vcpu *alloc_vcpu(
         v->runstate.state = RUNSTATE_offline;        
         v->runstate.state_entry_time = NOW();
         set_bit(_VPF_down, &v->pause_flags);
-        if ( vcpu_id < XEN_LEGACY_MAX_VCPUS )
-            v->vcpu_info = (void *)&shared_info(d, vcpu_info[vcpu_id]);
+        v->vcpu_info = ((vcpu_id < XEN_LEGACY_MAX_VCPUS)
+                        ? (vcpu_info_t *)&shared_info(d, vcpu_info[vcpu_id])
+                        : &dummy_vcpu_info);
     }
 
     if ( sched_init_vcpu(v, cpu_id) != 0 )
@@ -754,9 +757,6 @@ long do_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
     switch ( cmd )
     {
     case VCPUOP_initialise:
-        if ( !v->vcpu_info )
-            return -EINVAL;
-
         if ( (ctxt = xmalloc(struct vcpu_guest_context)) == NULL )
             return -ENOMEM;
 

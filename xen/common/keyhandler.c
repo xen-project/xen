@@ -209,8 +209,8 @@ static void dump_domains(unsigned char key)
                    v->vcpu_id, v->processor,
                    v->is_running ? 'T':'F',
                    v->pause_flags, v->poll_evtchn,
-                   v->vcpu_info ? vcpu_info(v, evtchn_upcall_pending) : 0,
-                   v->vcpu_info ? vcpu_info(v, evtchn_upcall_mask) : 1);
+                   vcpu_info(v, evtchn_upcall_pending),
+                   vcpu_info(v, evtchn_upcall_mask));
             cpuset_print(tmpstr, sizeof(tmpstr), v->vcpu_dirty_cpumask);
             printk("dirty_cpus=%s ", tmpstr);
             cpuset_print(tmpstr, sizeof(tmpstr), v->cpu_affinity);
@@ -218,8 +218,6 @@ static void dump_domains(unsigned char key)
             arch_dump_vcpu_info(v);
             periodic_timer_print(tmpstr, sizeof(tmpstr), v->periodic_period);
             printk("    %s\n", tmpstr);
-            if ( !v->vcpu_info )
-                continue;
             printk("    Notifying guest (virq %d, port %d, stat %d/%d/%d)\n",
                    VIRQ_DEBUG, v->virq_to_evtchn[VIRQ_DEBUG],
                    test_bit(v->virq_to_evtchn[VIRQ_DEBUG], 

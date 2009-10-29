@@ -244,9 +244,6 @@ static long evtchn_bind_virq(evtchn_bind_virq_t *bind)
          ((v = d->vcpu[vcpu]) == NULL) )
         return -ENOENT;
 
-    if ( unlikely(!v->vcpu_info) )
-        return -EAGAIN;
-
     spin_lock(&d->event_lock);
 
     if ( v->virq_to_evtchn[virq] != 0 )
@@ -279,9 +276,6 @@ static long evtchn_bind_ipi(evtchn_bind_ipi_t *bind)
     if ( (vcpu < 0) || (vcpu >= d->max_vcpus) ||
          (d->vcpu[vcpu] == NULL) )
         return -ENOENT;
-
-    if ( unlikely(!d->vcpu[vcpu]->vcpu_info) )
-        return -EAGAIN;
 
     spin_lock(&d->event_lock);
 
@@ -726,9 +720,6 @@ long evtchn_bind_vcpu(unsigned int port, unsigned int vcpu_id)
     if ( (vcpu_id >= d->max_vcpus) || (d->vcpu[vcpu_id] == NULL) )
         return -ENOENT;
 
-    if ( unlikely(!d->vcpu[vcpu_id]->vcpu_info) )
-        return -EAGAIN;
-
     spin_lock(&d->event_lock);
 
     if ( !port_is_valid(d, port) )
@@ -951,9 +942,6 @@ int alloc_unbound_xen_event_channel(
     struct evtchn *chn;
     struct domain *d = local_vcpu->domain;
     int            port;
-
-    if ( unlikely(!local_vcpu->vcpu_info) )
-        return -EAGAIN;
 
     spin_lock(&d->event_lock);
 
