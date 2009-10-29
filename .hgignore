@@ -147,6 +147,9 @@
 ^tools/firmware/vgabios/vbetables-gen$
 ^tools/firmware/vgabios/vbetables\.h$
 ^tools/flask/loadpolicy/flask-loadpolicy$
+^tools/flask/utils/flask-getenforce$
+^tools/flask/utils/flask-loadpolicy$
+^tools/flask/utils/flask-setenforce$
 ^tools/fs-back/fs-backend$
 ^tools/hotplug/common/hotplugpath\.sh$
 ^tools/include/xen/.*$
@@ -196,6 +199,7 @@
 ^tools/misc/xen-hvmctx$
 ^tools/misc/gtraceview$
 ^tools/misc/gtracestat$
+^tools/misc/xenlockprof$
 ^tools/pygrub/build/.*$
 ^tools/python/build/.*$
 ^tools/python/xen/util/path\.py$
