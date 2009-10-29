@@ -187,6 +187,8 @@ void *_xmalloc(size_t size, size_t align)
 
         /* Alloc a new page and return from that. */
         hdr = xmalloc_new_page(align_up(hdr_size, align) + size);
+        if ( hdr == NULL )
+            return NULL;
         data_begin = (uintptr_t)hdr + align_up(hdr_size, align);
     }
 
@@ -279,14 +281,18 @@ void *_realloc(void *ptr, size_t size)
     void *new;
     struct xmalloc_hdr *hdr;
     struct xmalloc_pad *pad;
+    size_t old_data_size;
 
     if (ptr == NULL)
         return _xmalloc(size, DEFAULT_ALIGN);
 
     pad = (struct xmalloc_pad *)ptr - 1;
     hdr = (struct xmalloc_hdr *)((char*)ptr - pad->hdr_size);
-    if (hdr->size >= size) {
-        maybe_split(hdr, size, hdr->size);
+
+    old_data_size = hdr->size - pad->hdr_size;
+    if ( old_data_size >= size )
+    {
+	maybe_split(hdr, pad->hdr_size + size, hdr->size);
         return ptr;
     }
     
@@ -294,7 +300,7 @@ void *_realloc(void *ptr, size_t size)
     if (new == NULL) 
         return NULL;
 
-    memcpy(new, ptr, hdr->size);
+    memcpy(new, ptr, old_data_size);
     xfree(ptr);
 
     return new;
