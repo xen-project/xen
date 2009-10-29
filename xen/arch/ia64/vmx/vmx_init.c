@@ -383,10 +383,8 @@ vmx_vcpu_initialise(struct vcpu *v)
 	v->arch.arch_vmx.xen_port = rc;
 
 	spin_lock(&iorp->lock);
-	if (v->domain->arch.vmx_platform.ioreq.va != 0) {
-		vcpu_iodata_t *p = get_vio(v);
-		p->vp_eport = v->arch.arch_vmx.xen_port;
-	}
+	if (v->domain->arch.vmx_platform.ioreq.va != 0)
+		get_vio(v)->vp_eport = v->arch.arch_vmx.xen_port;
 	spin_unlock(&iorp->lock);
 
 	gdprintk(XENLOG_INFO, "Allocated port %ld for hvm %d vcpu %d.\n",
@@ -641,7 +639,7 @@ void vmx_do_resume(struct vcpu *v)
 
 	/* stolen from hvm_do_resume() in arch/x86/hvm/hvm.c */
 	/* NB. Optimised for common case (p->state == STATE_IOREQ_NONE). */
-	p = &get_vio(v)->vp_ioreq;
+	p = get_vio(v);
 	while (p->state != STATE_IOREQ_NONE) {
 		switch (p->state) {
 		case STATE_IORESP_READY: /* IORESP_READY -> NONE */

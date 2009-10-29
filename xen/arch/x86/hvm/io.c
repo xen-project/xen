@@ -87,7 +87,7 @@ int hvm_buffered_io_send(ioreq_t *p)
         qw = 1;
         break;
     default:
-        gdprintk(XENLOG_WARNING, "unexpected ioreq size:%"PRId64"\n", p->size);
+        gdprintk(XENLOG_WARNING, "unexpected ioreq size: %u\n", p->size);
         return 0;
     }
     
@@ -148,12 +148,8 @@ void send_timeoffset_req(unsigned long timeoff)
 void send_invalidate_req(void)
 {
     struct vcpu *v = current;
-    vcpu_iodata_t *vio = get_ioreq(v);
-    ioreq_t *p;
+    ioreq_t *p = get_ioreq(v);
 
-    BUG_ON(vio == NULL);
-
-    p = &vio->vp_ioreq;
     if ( p->state != STATE_IOREQ_NONE )
     {
         gdprintk(XENLOG_ERR, "WARNING: send invalidate req with something "
@@ -166,7 +162,6 @@ void send_invalidate_req(void)
     p->size = 4;
     p->dir = IOREQ_WRITE;
     p->data = ~0UL; /* flush all */
-    p->io_count++;
 
     (void)hvm_send_assist_req(v);
 }
@@ -221,7 +216,7 @@ int handle_mmio_with_translation(unsigned long gva, unsigned long gpfn)
 void hvm_io_assist(void)
 {
     struct vcpu *curr = current;
-    ioreq_t *p = &get_ioreq(curr)->vp_ioreq;
+    ioreq_t *p = get_ioreq(curr);
     enum hvm_io_state io_state;
 
     rmb(); /* see IORESP_READY /then/ read contents of ioreq */

@@ -100,7 +100,7 @@ static int hvm_buffered_io_intercept(ioreq_t *p)
         qw = 1;
         break;
     default:
-        gdprintk(XENLOG_WARNING, "unexpected ioreq size:%"PRId64"\n", p->size);
+        gdprintk(XENLOG_WARNING, "unexpected ioreq size: %u\n", p->size);
         return 0;
     }
     bp.data = p->data;
@@ -139,14 +139,7 @@ static int hvm_buffered_io_intercept(ioreq_t *p)
 static void low_mmio_access(VCPU *vcpu, u64 pa, u64 *val, size_t s, int dir)
 {
     struct vcpu *v = current;
-    vcpu_iodata_t *vio;
-    ioreq_t *p;
-
-    vio = get_vio(v);
-    if (!vio)
-        panic_domain(NULL, "bad shared page");
-
-    p = &vio->vp_ioreq;
+    ioreq_t *p = get_vio(v);
 
     p->addr = pa;
     p->size = s;
@@ -159,8 +152,6 @@ static void low_mmio_access(VCPU *vcpu, u64 pa, u64 *val, size_t s, int dir)
     p->dir = dir;
     p->df = 0;
     p->type = 1;
-
-    p->io_count++;
 
     if (hvm_buffered_io_intercept(p)) {
         p->state = STATE_IORESP_READY;
@@ -310,14 +301,8 @@ HVM_REGISTER_SAVE_RESTORE(OPT_FEATURE_IDENTITY_MAPPINGS,
 static void legacy_io_access(VCPU *vcpu, u64 pa, u64 *val, size_t s, int dir)
 {
     struct vcpu *v = current;
-    vcpu_iodata_t *vio;
-    ioreq_t *p;
+    ioreq_t *p = get_vio(v);
 
-    vio = get_vio(v);
-    if (!vio)
-        panic_domain(NULL, "bad shared page\n");
-
-    p = &vio->vp_ioreq;
     p->addr = TO_LEGACY_IO(pa & 0x3ffffffUL);
     p->size = s;
     p->count = 1;
@@ -330,8 +315,6 @@ static void legacy_io_access(VCPU *vcpu, u64 pa, u64 *val, size_t s, int dir)
     p->type = 0;
     p->df = 0;
 
-    p->io_count++;
-    
     if (vmx_ide_pio_intercept(p, val))
         return;
 

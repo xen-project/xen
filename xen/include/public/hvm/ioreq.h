@@ -43,32 +43,24 @@
  * virq
  */
 struct ioreq {
-    uint64_t addr;          /*  physical address            */
-    uint64_t size;          /*  size in bytes               */
-    uint64_t count;         /*  for rep prefixes            */
-    uint64_t data;          /*  data (or paddr of data)     */
+    uint64_t addr;          /* physical address */
+    uint64_t data;          /* data (or paddr of data) */
+    uint32_t count;         /* for rep prefixes */
+    uint32_t size;          /* size in bytes */
+    uint32_t vp_eport;      /* evtchn for notifications to/from device model */
+    uint16_t _pad0;
     uint8_t state:4;
-    uint8_t data_is_ptr:1;  /*  if 1, data above is the guest paddr 
-                             *   of the real data to use.   */
-    uint8_t dir:1;          /*  1=read, 0=write             */
+    uint8_t data_is_ptr:1;  /* if 1, data above is the guest paddr 
+                             * of the real data to use. */
+    uint8_t dir:1;          /* 1=read, 0=write */
     uint8_t df:1;
-    uint8_t pad:1;
-    uint8_t type;           /* I/O type                     */
-    uint8_t _pad0[6];
-    uint64_t io_count;      /* How many IO done on a vcpu   */
+    uint8_t _pad1:1;
+    uint8_t type;           /* I/O type */
 };
 typedef struct ioreq ioreq_t;
 
-struct vcpu_iodata {
-    struct ioreq vp_ioreq;
-    /* Event channel port, used for notifications to/from the device model. */
-    uint32_t vp_eport;
-    uint32_t _pad0;
-};
-typedef struct vcpu_iodata vcpu_iodata_t;
-
 struct shared_iopage {
-    struct vcpu_iodata   vcpu_iodata[1];
+    struct ioreq vcpu_ioreq[1];
 };
 typedef struct shared_iopage shared_iopage_t;
 

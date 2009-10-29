@@ -49,12 +49,12 @@ extern void deliver_pal_init(struct vcpu *vcpu);
 extern void vmx_pend_pal_init(struct domain *d);
 extern void vmx_lazy_load_fpu(struct vcpu *vcpu);
 
-static inline vcpu_iodata_t *get_vio(struct vcpu *v)
+static inline ioreq_t *get_vio(struct vcpu *v)
 {
     struct domain *d = v->domain;
     shared_iopage_t *p = (shared_iopage_t *)d->arch.vmx_platform.ioreq.va;
     ASSERT((v == current) || spin_is_locked(&d->arch.vmx_platform.ioreq.lock));
     ASSERT(d->arch.vmx_platform.ioreq.va != NULL);
-    return &p->vcpu_iodata[v->vcpu_id];
+    return &p->vcpu_ioreq[v->vcpu_id];
 }
 #endif /* _ASM_IA64_VT_H */

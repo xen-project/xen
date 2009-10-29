@@ -55,8 +55,7 @@ static int hvmemul_do_io(
     paddr_t value = ram_gpa;
     int value_is_ptr = (p_data == NULL);
     struct vcpu *curr = current;
-    vcpu_iodata_t *vio = get_ioreq(curr);
-    ioreq_t *p = &vio->vp_ioreq;
+    ioreq_t *p = get_ioreq(curr);
     int rc;
 
     /*
@@ -138,7 +137,6 @@ static int hvmemul_do_io(
     p->count = *reps;
     p->df = df;
     p->data = value;
-    p->io_count++;
 
     hvmtrace_io_assist(is_mmio, p);
 

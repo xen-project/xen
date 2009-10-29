@@ -256,7 +256,7 @@ void hvm_do_resume(struct vcpu *v)
     pt_restore_timer(v);
 
     /* NB. Optimised for common case (p->state == STATE_IOREQ_NONE). */
-    p = &get_ioreq(v)->vp_ioreq;
+    p = get_ioreq(v);
     while ( p->state != STATE_IOREQ_NONE )
     {
         switch ( p->state )
@@ -867,7 +867,7 @@ bool_t hvm_send_assist_req(struct vcpu *v)
     if ( unlikely(!vcpu_start_shutdown_deferral(v)) )
         return 0; /* implicitly bins the i/o operation */
 
-    p = &get_ioreq(v)->vp_ioreq;
+    p = get_ioreq(v);
     if ( unlikely(p->state != STATE_IOREQ_NONE) )
     {
         /* This indicates a bug in the device model. Crash the domain. */

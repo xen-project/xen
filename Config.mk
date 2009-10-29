@@ -150,9 +150,9 @@ QEMU_REMOTE=http://xenbits.xensource.com/git-http/qemu-xen-unstable.git
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= b4bb8b3f09d1c873f522f6aebe1f125a6d1854d0
-# Wed Oct 21 16:42:15 2009 +0100
-# passthrough: fix security issue with stubdoms
+QEMU_TAG ?= 3140780e451d3919ef2c81f91ae0ebe3f286eb06
+# Thu Oct 29 13:00:31 2009 +0000
+# Extend max vcpu number for HVM guest
 
 OCAML_XENSTORED_REPO=http://xenbits.xensource.com/ext/xen-ocaml-tools.hg
 
