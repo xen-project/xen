@@ -757,6 +757,9 @@ long do_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
     switch ( cmd )
     {
     case VCPUOP_initialise:
+        if ( v->vcpu_info == &dummy_vcpu_info )
+            return -EINVAL;
+
         if ( (ctxt = xmalloc(struct vcpu_guest_context)) == NULL )
             return -ENOMEM;
 

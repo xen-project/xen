@@ -884,7 +884,15 @@ map_vcpu_info(struct vcpu *v, unsigned long mfn, unsigned offset)
 
     new_info = (vcpu_info_t *)(mapping + offset);
 
-    memcpy(new_info, v->vcpu_info, sizeof(*new_info));
+    if ( v->vcpu_info == &dummy_vcpu_info )
+    {
+        memset(new_info, 0, sizeof(*new_info));
+        __vcpu_info(v, new_info, evtchn_upcall_mask) = 1;
+    }
+    else
+    {
+        memcpy(new_info, v->vcpu_info, sizeof(*new_info));
+    }
 
     v->vcpu_info = new_info;
     v->arch.vcpu_info_mfn = mfn;
