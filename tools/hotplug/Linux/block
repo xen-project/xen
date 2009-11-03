@@ -233,6 +233,15 @@ case "$command" in
 
         claim_lock "block"
 
+        # Avoid a race with the remove if the path has been deleted, or
+	# otherwise changed from "InitWait" state e.g. due to a timeout
+        xenbus_state=$(xenstore_read_default "$XENBUS_PATH/state" 'unknown')
+        if [ "$xenbus_state" != '2' ]
+        then
+          release_lock "block"
+          fatal "Path closed or removed during hotplug add: $XENBUS_PATH state: $xenbus_state"
+        fi
+
         if [ "$mode" = 'w' ] && ! stat "$file" -c %A | grep -q w
         then
           release_lock "block"
@@ -363,8 +372,10 @@ mount it read-write in a guest domain."
 	;;
 
       file)
+        claim_lock "block"
         node=$(xenstore_read "$XENBUS_PATH/node")
 	losetup -d "$node"
+        release_lock "block"
 	exit 0
 	;;
 
