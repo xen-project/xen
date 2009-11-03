@@ -250,94 +250,27 @@ case "$command" in
 mount it read-write in a guest domain."
         fi
 
-        loopdev=''
-        for dev in /dev/loop*
-        do
-          if [ ! -b "$dev" ]
+        if [ "x$mode" != 'x!' ]
+        then
+          inode=$(stat -c '%i' $file)
+          dev=$(stat -c '%D' $file)
+          if [ -z "$inode" ] || [ -z "$dev" ]
           then
-            continue
+            fatal "Unable to lookup $file: dev: $dev inode: $inode"
           fi
 
-          f=$(losetup "$dev" 2>/dev/null) || f=''
-
-          if [ "$f" ]
-          then
-            # $dev is in use.  Check sharing.
-            if [ "x$mode" = 'x!' ]
-            then
-              continue
-            fi
-
-            f=$(echo "$f" | sed -e 's/.*(\(.*\)).*/\1/g')
-
-            # $f is the filename, as read from losetup, but the loopback
-            # driver truncates filenames at 64 characters, so we need to go
-            # trawling through the store if it's longer than that.  Truncation
-            # is indicated by an asterisk at the end of the filename.
-            if expr index "$f" '*' >/dev/null
-            then
-              found=""
-              for dom in $(xenstore-list "$XENBUS_BASE_PATH")
-              do
-                for domdev in $(xenstore-list "$XENBUS_BASE_PATH/$dom")
-                do
-                  d=$(xenstore_read_default \
-                        "$XENBUS_BASE_PATH/$dom/$domdev/node" "")
-                  if [ "$d" = "$dev" ]
-                  then
-                    f=$(xenstore_read "$XENBUS_BASE_PATH/$dom/$domdev/params")
-                    found=1
-                    break 2
-                  fi
-                done
-              done
-
-              if [ ! "$found" ]
-              then
-                # This loopback device is in use by someone else, so skip it.
-                log debug "Loopback sharing check skips device $dev."
-                continue
-              fi
-            fi
-
-            # Canonicalise the filename for the comparison.
-
-            # I have seen this readlink fails because the filename given by
-            # losetup is only the basename.  This cannot happen when the loop
-            # device is set up through this script, because file is
-            # canonicalised above, but it may happen when loop devices are set
-            # up some other way.  This readlink may also conceivably fail if
-            # the file backing this loop device has been removed.
-
-            # For maximum safety, in the case that $f does not resolve, we
-            # assume that $file and $f are in the same directory.
-
-            # If you create a loopback filesystem, remove it and continue to
-            # run on it, and then create another file with the same name, then
-            # this check will block that -- don't do that.
-
-            # If you create loop devices through some other mechanism, use
-            # relative filenames, and then use the same filename through this
-            # script, then this check will block that -- don't do that either.
-
-            f=$(readlink -f "$f" || echo $(dirname "$file")/$(basename "$f"))
-
-
-            if [ "$f" = "$file" ]
+          shared_list=$(losetup -a | grep ' \[0*'${dev}'\]:'${inode} |
+                cut -d : -f 1)
+          for dev in "$shared_list"
+          do
+            if [ -n "$dev" ]
             then
               check_file_sharing "$file" "$dev" "$mode"
             fi
-          else
-            # $dev is not in use, so we'll remember it for use later; we want
-            # to finish the sharing check first.
+          done
+        fi
 
-            if [ "$loopdev" = '' ]
-            then
-              loopdev="$dev"
-            fi
-          fi
-        done
-
+        loopdev=$(losetup -f)
         if [ "$loopdev" = '' ]
         then
           release_lock "block"
