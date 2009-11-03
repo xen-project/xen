@@ -31,6 +31,9 @@
 #include <public/hvm/save.h>
 #include <asm/hvm/vmx/vpmu.h>
 
+static int __read_mostly opt_vpmu_enabled;
+boolean_param("vpmu", opt_vpmu_enabled);
+
 int vpmu_do_wrmsr(struct cpu_user_regs *regs)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(current);
@@ -78,6 +81,9 @@ extern struct arch_vpmu_ops core2_vpmu_ops;
 void vpmu_initialise(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
+
+    if ( !opt_vpmu_enabled )
+        return;
 
     if ( vpmu->flags & VPMU_CONTEXT_ALLOCATED )
         vpmu_destroy(v);
