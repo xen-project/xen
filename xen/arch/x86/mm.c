@@ -3962,6 +3962,37 @@ long do_update_descriptor(u64 pa, u64 desc)
 typedef struct e820entry e820entry_t;
 DEFINE_XEN_GUEST_HANDLE(e820entry_t);
 
+struct memory_map_context
+{
+    unsigned int n;
+    unsigned long s;
+    struct xen_memory_map map;
+};
+
+static int handle_iomem_range(unsigned long s, unsigned long e, void *p)
+{
+    struct memory_map_context *ctxt = p;
+
+    if ( s > ctxt->s )
+    {
+        e820entry_t ent;
+        XEN_GUEST_HANDLE(e820entry_t) buffer;
+
+        if ( ctxt->n + 1 >= ctxt->map.nr_entries )
+            return -EINVAL;
+        ent.addr = (uint64_t)ctxt->s << PAGE_SHIFT;
+        ent.size = (uint64_t)(s - ctxt->s) << PAGE_SHIFT;
+        ent.type = E820_RESERVED;
+        buffer = guest_handle_cast(ctxt->map.buffer, e820entry_t);
+        if ( __copy_to_guest_offset(buffer, ctxt->n, &ent, 1) < 0 )
+            return -EFAULT;
+        ctxt->n++;
+    }
+    ctxt->s = e + 1;
+
+    return 0;
+}
+
 long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
 {
     struct page_info *page = NULL;
@@ -4123,9 +4154,9 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
 
     case XENMEM_machine_memory_map:
     {
-        struct xen_memory_map memmap;
+        struct memory_map_context ctxt;
         XEN_GUEST_HANDLE(e820entry_t) buffer;
-        int count;
+        unsigned int i;
         int rc;
 
         if ( !IS_PRIV(current->domain) )
@@ -4135,20 +4166,49 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         if ( rc )
             return rc;
 
-        if ( copy_from_guest(&memmap, arg, 1) )
+        if ( copy_from_guest(&ctxt.map, arg, 1) )
             return -EFAULT;
-        if ( memmap.nr_entries < e820.nr_map + 1 )
+        if ( ctxt.map.nr_entries < e820.nr_map + 1 )
             return -EINVAL;
 
-        buffer = guest_handle_cast(memmap.buffer, e820entry_t);
-
-        count = min((unsigned int)e820.nr_map, memmap.nr_entries);
-        if ( copy_to_guest(buffer, e820.map, count) < 0 )
+        buffer = guest_handle_cast(ctxt.map.buffer, e820entry_t);
+        if ( !guest_handle_okay(buffer, ctxt.map.nr_entries) )
             return -EFAULT;
 
-        memmap.nr_entries = count;
+        for ( i = 0, ctxt.n = 0, ctxt.s = 0; i < e820.nr_map; ++i, ++ctxt.n )
+        {
+            unsigned long s = PFN_DOWN(e820.map[i].addr);
 
-        if ( copy_to_guest(arg, &memmap, 1) )
+            if ( s )
+            {
+                rc = rangeset_report_ranges(current->domain->iomem_caps,
+                                            ctxt.s, s - 1,
+                                            handle_iomem_range, &ctxt);
+                if ( !rc )
+                    rc = handle_iomem_range(s, s, &ctxt);
+                if ( rc )
+                    return rc;
+            }
+            if ( ctxt.map.nr_entries <= ctxt.n + (e820.nr_map - i) )
+                return -EINVAL;
+            if ( __copy_to_guest_offset(buffer, ctxt.n, e820.map + i, 1) < 0 )
+                return -EFAULT;
+            ctxt.s = PFN_UP(e820.map[i].addr + e820.map[i].size);
+        }
+
+        if ( ctxt.s )
+        {
+            rc = rangeset_report_ranges(current->domain->iomem_caps, ctxt.s,
+                                        ~0UL, handle_iomem_range, &ctxt);
+            if ( !rc && ctxt.s )
+                rc = handle_iomem_range(~0UL, ~0UL, &ctxt);
+            if ( rc )
+                return rc;
+        }
+
+        ctxt.map.nr_entries = ctxt.n;
+
+        if ( copy_to_guest(arg, &ctxt.map, 1) )
             return -EFAULT;
 
         return 0;

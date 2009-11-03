@@ -373,7 +373,13 @@ static void __init clip_to_limit(uint64_t limit, char *warnmsg)
              ((e820.map[i].addr + e820.map[i].size) <= limit) )
             continue;
         old_limit = e820.map[i].addr + e820.map[i].size;
-        if ( e820.map[i].addr < limit )
+        if ( e820_change_range_type(&e820, max(e820.map[i].addr, limit),
+                                    old_limit, E820_RAM, E820_UNUSABLE) )
+        {
+            /* Start again now e820 map must have changed. */
+            i = 0;
+        }
+        else if ( e820.map[i].addr < limit )
         {
             e820.map[i].size = limit - e820.map[i].addr;
         }

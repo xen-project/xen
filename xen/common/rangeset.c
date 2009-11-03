@@ -251,6 +251,24 @@ int rangeset_contains_range(
     return contains;
 }
 
+int rangeset_report_ranges(
+    struct rangeset *r, unsigned long s, unsigned long e,
+    int (*cb)(unsigned long s, unsigned long e, void *), void *ctxt)
+{
+    struct range *x;
+    int rc = 0;
+
+    spin_lock(&r->lock);
+
+    for ( x = find_range(r, s); x && (x->s <= e) && !rc; x = next_range(r, x) )
+        if ( x->e >= s )
+            rc = cb(max(x->s, s), min(x->e, e), ctxt);
+
+    spin_unlock(&r->lock);
+
+    return rc;
+}
+
 int rangeset_add_singleton(
     struct rangeset *r, unsigned long s)
 {
