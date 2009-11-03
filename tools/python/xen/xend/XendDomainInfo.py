@@ -597,6 +597,7 @@ class XendDomainInfo:
             return
 
         devid = '0'
+        first = True
         dev_info = self._getDeviceInfo_pci(devid)
         if dev_info is None:
             return
@@ -619,7 +620,8 @@ class XendDomainInfo:
             head_dev = dev.pop()
             dev_sxp = pci_convert_dict_to_sxp(head_dev, 'Initialising',
                                               'Booting')
-            self.pci_device_configure(dev_sxp)
+            self.pci_device_configure(dev_sxp, first_dev = first)
+            first = False
 
             # That is all for single-function virtual devices
             if len(dev) == 0:
@@ -829,7 +831,7 @@ class XendDomainInfo:
         return self.getDeviceController(dev_type).sxpr(devid)
 
 
-    def pci_device_configure(self, dev_sxp, devid = 0):
+    def pci_device_configure(self, dev_sxp, devid = 0, first_dev = False):
         """Configure an existing pci device.
         
         @param dev_sxp: device configuration
@@ -859,13 +861,13 @@ class XendDomainInfo:
         dev = dev_config['devs'][0]
 
         stubdomid = self.getStubdomDomid()
-        if stubdomid is not None :
-            from xen.xend import XendDomain
-            XendDomain.instance().domain_lookup(stubdomid).pci_device_configure(dev_sxp[:])
-
         # Do HVM specific processing
         if self.info.is_hvm():
+            from xen.xend import XendDomain
             if pci_state == 'Initialising':
+                if stubdomid is not None :
+                    XendDomain.instance().domain_lookup(stubdomid).pci_device_configure(dev_sxp[:])
+
                 # HVM PCI device attachment
                 if pci_sub_state == 'Booting':
                     vdevfn = self.hvm_pci_device_insert(dev_config)
@@ -896,6 +898,8 @@ class XendDomainInfo:
                 # same vslot.
                 if (PCI_FUNC(int(new_dev['vdevfn'], 16)) == 0):
                     self.hvm_destroyPCIDevice(new_dev)
+                if stubdomid is not None :
+                    XendDomain.instance().domain_lookup(stubdomid).pci_device_configure(dev_sxp[:])
                 # Update vdevfn
                 dev['vdevfn'] = new_dev['vdevfn']
                 for n in sxp.children(pci_dev):
@@ -908,15 +912,22 @@ class XendDomainInfo:
                 self.pci_device_check_attachability(dev)
 
         # If pci platform does not exist, create and exit.
-        if pci_state == 'Initialising' :
+        if existing_dev_info is None :
             self.device_create(dev_sxp)
+            return True
+
+        if first_dev is True :
+            existing_dev_uuid = sxp.child_value(existing_dev_info, 'uuid')
+            existing_pci_conf = self.info['devices'][existing_dev_uuid][1]
+            devid = self._createDevice('pci', existing_pci_conf)
+            self.info['devices'][existing_dev_uuid][1]['devid'] = devid
             return True
 
         if self.domid is not None:
             # use DevController.reconfigureDevice to change device config
             dev_control = self.getDeviceController(dev_class)
             dev_uuid = dev_control.reconfigureDevice(devid, dev_config)
-            if not self.info.is_hvm():
+            if not self.info.is_hvm() and not self.info.is_stubdom():
                 # in PV case, wait until backend state becomes connected.
                 dev_control.waitForDevice_reconfigure(devid)
             num_devs = dev_control.cleanupDevice(devid)
