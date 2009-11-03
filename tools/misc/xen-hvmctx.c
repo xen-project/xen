@@ -73,6 +73,7 @@ static void dump_header(void)
     printf("             Xen changeset %llx\n", 
            (unsigned long long) h.changeset);
     printf("             CPUID[0][%%eax] 0x%.8lx\n", (unsigned long) h.cpuid);
+    printf("             gtsc_khz %lu\n", (unsigned long) h.gtsc_khz);
 }
 
 struct fpu_mm {
