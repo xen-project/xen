@@ -1178,65 +1178,25 @@ void enable_APIC_timer(void)
 #undef APIC_DIVISOR
 
 /*
- * reprogram the APIC timer. Timeoutvalue is in ns from start of boot
- * returns 1 on success
- * returns 0 if the timeout value is too small or in the past.
+ * reprogram_timer: Reprogram the APIC timer.
+ * Timeout is a Xen system time (nanoseconds since boot); 0 disables the timer.
+ * Returns 1 on success; 0 if the timeout is too soon or is in the past.
  */
 int reprogram_timer(s_time_t timeout)
 {
-    s_time_t    now;
-    s_time_t    expire;
-    u64         apic_tmict;
+    s_time_t expire;
+    u32 apic_tmict = 0;
 
-    /*
-     * If we don't have local APIC then we just poll the timer list off the
-     * PIT interrupt.
-     */
+    /* No local APIC: timer list is polled via the PIT interrupt. */
     if ( !cpu_has_apic )
         return 1;
 
-    /*
-     * We use this value because we don't trust zero (we think it may just
-     * cause an immediate interrupt). At least this is guaranteed to hold it
-     * off for ages (esp. since the clock ticks on bus clock, not cpu clock!).
-     */
-    if ( timeout == 0 )
-    {
-        apic_tmict = 0xffffffff;
-        goto reprogram;
-    }
+    if ( timeout && ((expire = timeout - NOW()) > 0) )
+        apic_tmict = min_t(u64, (bus_scale * expire) >> 18, UINT_MAX);
 
-    now = NOW();
-    expire = timeout - now; /* value from now */
-
-    if ( expire <= 0 )
-    {
-        Dprintk("APICT[%02d] Timeout in the past 0x%08X%08X > 0x%08X%08X\n", 
-                smp_processor_id(), (u32)(now>>32), 
-                (u32)now, (u32)(timeout>>32),(u32)timeout);
-        return 0;
-    }
-
-    /* conversion to bus units */
-    apic_tmict = (((u64)bus_scale) * expire)>>18;
-
-    if ( apic_tmict >= 0xffffffff )
-    {
-        Dprintk("APICT[%02d] Timeout value too large\n", smp_processor_id());
-        apic_tmict = 0xffffffff;
-    }
-
-    if ( apic_tmict == 0 )
-    {
-        Dprintk("APICT[%02d] timeout value too small\n", smp_processor_id());
-        return 0;
-    }
-
- reprogram:
-    /* Program the timer. */
     apic_write(APIC_TMICT, (unsigned long)apic_tmict);
 
-    return 1;
+    return apic_tmict || !timeout;
 }
 
 fastcall void smp_apic_timer_interrupt(struct cpu_user_regs * regs)

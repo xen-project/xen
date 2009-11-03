@@ -642,6 +642,8 @@ void hpet_broadcast_enter(void)
     if ( hpet_attach_channel )
         hpet_attach_channel(cpu, ch);
 
+    /* Cancel any outstanding LAPIC timer event and disable interrupts. */
+    reprogram_timer(0);
     disable_APIC_timer();
 
     cpu_set(cpu, ch->cpumask);
@@ -664,11 +666,8 @@ void hpet_broadcast_exit(void)
 
     if ( cpu_test_and_clear(cpu, ch->cpumask) )
     {
-        /* Cancel any outstanding LAPIC event and re-enable interrupts. */
-        reprogram_timer(0);
-        enable_APIC_timer();
-        
         /* Reprogram the deadline; trigger timer work now if it has passed. */
+        enable_APIC_timer();
         if ( !reprogram_timer(per_cpu(timer_deadline, cpu)) )
             raise_softirq(TIMER_SOFTIRQ);
 

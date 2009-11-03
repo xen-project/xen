@@ -667,10 +667,17 @@ static int vlapic_write(struct vcpu *v, unsigned long address,
 
     case APIC_TMICT:
     {
-        uint64_t period = (uint64_t)APIC_BUS_CYCLE_NS *
-                            (uint32_t)val * vlapic->hw.timer_divisor;
+        uint64_t period;
 
         vlapic_set_reg(vlapic, APIC_TMICT, val);
+        if ( val == 0 )
+        {
+            destroy_periodic_time(&vlapic->pt);
+            break;
+        }
+
+        period = ((uint64_t)APIC_BUS_CYCLE_NS *
+                  (uint32_t)val * vlapic->hw.timer_divisor);
         create_periodic_time(current, &vlapic->pt, period, 
                              vlapic_lvtt_period(vlapic) ? period : 0,
                              vlapic->pt.irq, vlapic_pt_cb,
