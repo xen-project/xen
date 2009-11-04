@@ -150,9 +150,9 @@ QEMU_REMOTE=http://xenbits.xensource.com/git-http/qemu-xen-unstable.git
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 3140780e451d3919ef2c81f91ae0ebe3f286eb06
-# Thu Oct 29 13:00:31 2009 +0000
-# Extend max vcpu number for HVM guest
+QEMU_TAG ?= f72b6e0ffc3bb84d4442c5a7493bffbdce2a4468
+# Wed Nov 4 17:07:57 2009 +0000
+# fix drive name parsing (any_hdN erroneous local declaration)
 
 OCAML_XENSTORED_REPO=http://xenbits.xensource.com/ext/xen-ocaml-tools.hg
 
