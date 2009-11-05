@@ -92,6 +92,8 @@ struct xenstat_vbd {
 	unsigned long long oo_reqs;
 	unsigned long long rd_reqs;
 	unsigned long long wr_reqs;
+	unsigned long long rd_sects;
+	unsigned long long wr_sects;
 };
 
 extern int xenstat_collect_networks(xenstat_node * node);

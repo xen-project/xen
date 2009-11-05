@@ -183,5 +183,7 @@ unsigned int xenstat_vbd_dev(xenstat_vbd * vbd);
 unsigned long long xenstat_vbd_oo_reqs(xenstat_vbd * vbd);
 unsigned long long xenstat_vbd_rd_reqs(xenstat_vbd * vbd);
 unsigned long long xenstat_vbd_wr_reqs(xenstat_vbd * vbd);
+unsigned long long xenstat_vbd_rd_sects(xenstat_vbd * vbd);
+unsigned long long xenstat_vbd_wr_sects(xenstat_vbd * vbd);
 
 #endif /* XENSTAT_H */

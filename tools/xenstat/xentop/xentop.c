@@ -116,6 +116,10 @@ static int compare_vbd_rd(xenstat_domain *domain1, xenstat_domain *domain2);
 static void print_vbd_rd(xenstat_domain *domain);
 static int compare_vbd_wr(xenstat_domain *domain1, xenstat_domain *domain2);
 static void print_vbd_wr(xenstat_domain *domain);
+static int compare_vbd_rsect(xenstat_domain *domain1, xenstat_domain *domain2);
+static void print_vbd_rsect(xenstat_domain *domain);
+static int compare_vbd_wsect(xenstat_domain *domain1, xenstat_domain *domain2);
+static void print_vbd_wsect(xenstat_domain *domain);
 
 
 /* Section printing functions */
@@ -147,6 +151,8 @@ typedef enum field_id {
 	FIELD_VBD_OO,
 	FIELD_VBD_RD,
 	FIELD_VBD_WR,
+	FIELD_VBD_RSECT,
+	FIELD_VBD_WSECT,
 	FIELD_SSID
 } field_id;
 
@@ -159,23 +165,25 @@ typedef struct field {
 } field;
 
 field fields[] = {
-	{ FIELD_NAME,    "NAME",      10, compare_name,    print_name    },
-	{ FIELD_STATE,   "STATE",      6, compare_state,   print_state   },
-	{ FIELD_CPU,     "CPU(sec)",  10, compare_cpu,     print_cpu     },
-	{ FIELD_CPU_PCT, "CPU(%)",     6, compare_cpu_pct, print_cpu_pct },
-	{ FIELD_MEM,     "MEM(k)",    10, compare_mem,     print_mem     },
-	{ FIELD_MEM_PCT, "MEM(%)",     6, compare_mem,     print_mem_pct },
-	{ FIELD_MAXMEM,  "MAXMEM(k)", 10, compare_maxmem,  print_maxmem  },
-	{ FIELD_MAX_PCT, "MAXMEM(%)",  9, compare_maxmem,  print_max_pct },
-	{ FIELD_VCPUS,   "VCPUS",      5, compare_vcpus,   print_vcpus   },
-	{ FIELD_NETS,    "NETS",       4, compare_nets,    print_nets    },
-	{ FIELD_NET_TX,  "NETTX(k)",   8, compare_net_tx,  print_net_tx  },
-	{ FIELD_NET_RX,  "NETRX(k)",   8, compare_net_rx,  print_net_rx  },
-	{ FIELD_VBDS,    "VBDS",       4, compare_vbds,    print_vbds    },
-	{ FIELD_VBD_OO,  "VBD_OO",     8, compare_vbd_oo,  print_vbd_oo  },
-	{ FIELD_VBD_RD,  "VBD_RD",     8, compare_vbd_rd,  print_vbd_rd  },
-	{ FIELD_VBD_WR,  "VBD_WR",     8, compare_vbd_wr,  print_vbd_wr  },
-	{ FIELD_SSID,    "SSID",       4, compare_ssid,    print_ssid    }
+	{ FIELD_NAME,      "NAME",      10, compare_name,      print_name    },
+	{ FIELD_STATE,     "STATE",      6, compare_state,     print_state   },
+	{ FIELD_CPU,       "CPU(sec)",  10, compare_cpu,       print_cpu     },
+	{ FIELD_CPU_PCT,   "CPU(%)",     6, compare_cpu_pct,   print_cpu_pct },
+	{ FIELD_MEM,       "MEM(k)",    10, compare_mem,       print_mem     },
+	{ FIELD_MEM_PCT,   "MEM(%)",     6, compare_mem,       print_mem_pct },
+	{ FIELD_MAXMEM,    "MAXMEM(k)", 10, compare_maxmem,    print_maxmem  },
+	{ FIELD_MAX_PCT,   "MAXMEM(%)",  9, compare_maxmem,    print_max_pct },
+	{ FIELD_VCPUS,     "VCPUS",      5, compare_vcpus,     print_vcpus   },
+	{ FIELD_NETS,      "NETS",       4, compare_nets,      print_nets    },
+	{ FIELD_NET_TX,    "NETTX(k)",   8, compare_net_tx,    print_net_tx  },
+	{ FIELD_NET_RX,    "NETRX(k)",   8, compare_net_rx,    print_net_rx  },
+	{ FIELD_VBDS,      "VBDS",       4, compare_vbds,      print_vbds    },
+	{ FIELD_VBD_OO,    "VBD_OO",     8, compare_vbd_oo,    print_vbd_oo  },
+	{ FIELD_VBD_RD,    "VBD_RD",     8, compare_vbd_rd,    print_vbd_rd  },
+	{ FIELD_VBD_WR,    "VBD_WR",     8, compare_vbd_wr,    print_vbd_wr  },
+	{ FIELD_VBD_RSECT, "VBD_RSECT", 10, compare_vbd_rsect, print_vbd_rsect  },
+	{ FIELD_VBD_WSECT, "VBD_WSECT", 10, compare_vbd_wsect, print_vbd_wsect  },
+	{ FIELD_SSID,      "SSID",       4, compare_ssid,      print_ssid    }
 };
 
 const unsigned int NUM_FIELDS = sizeof(fields)/sizeof(field);
@@ -685,20 +693,51 @@ static void print_vbd_rd(xenstat_domain *domain)
    returning -1,0,1 * for <,=,> */
 static int compare_vbd_wr(xenstat_domain *domain1, xenstat_domain *domain2)
 {
-	return -compare(tot_vbd_reqs(domain1,FIELD_VBD_WR),
-			tot_vbd_reqs(domain2,FIELD_VBD_WR));
+	return -compare(tot_vbd_reqs(domain1, FIELD_VBD_WR),
+			tot_vbd_reqs(domain2, FIELD_VBD_WR));
 }
 
 /* Prints number of total VBD WRITE requests statistic */
 static void print_vbd_wr(xenstat_domain *domain)
 {
-	print("%8llu", tot_vbd_reqs(domain,FIELD_VBD_WR));
+	print("%8llu", tot_vbd_reqs(domain, FIELD_VBD_WR));
 }
+
+/* Compares number of total VBD READ sectors of two domains,
+   returning -1,0,1 * for <,=,> */
+static int compare_vbd_rsect(xenstat_domain *domain1, xenstat_domain *domain2)
+{
+	return -compare(tot_vbd_reqs(domain1, FIELD_VBD_RSECT),
+			tot_vbd_reqs(domain2, FIELD_VBD_RSECT));
+}
+
+/* Prints number of total VBD READ sectors statistic */
+static void print_vbd_rsect(xenstat_domain *domain)
+{
+	print("%10llu", tot_vbd_reqs(domain, FIELD_VBD_RSECT));
+}
+
+/* Compares number of total VBD WRITE sectors of two domains,
+   returning -1,0,1 * for <,=,> */
+static int compare_vbd_wsect(xenstat_domain *domain1, xenstat_domain *domain2)
+{
+	return -compare(tot_vbd_reqs(domain1, FIELD_VBD_WSECT),
+			tot_vbd_reqs(domain2, FIELD_VBD_WSECT));
+}
+
+/* Prints number of total VBD WRITE sectors statistic */
+static void print_vbd_wsect(xenstat_domain *domain)
+{
+	print("%10llu", tot_vbd_reqs(domain, FIELD_VBD_WSECT));
+}
+
 
 /* Gets number of total VBD requests statistic, 
  *   if flag is FIELD_VBD_OO, then OO requests,
- *   if flag is FIELD_VBD_RD, then READ requests and
- *   if flag is FIELD_VBD_WR, then WRITE requests.
+ *   if flag is FIELD_VBD_RD, then READ requests,
+ *   if flag is FIELD_VBD_WR, then WRITE requests,
+ *   if flag is FIELD_VBD_RSECT, then READ sectors,
+ *   if flag is FIELD_VBD_WSECT, then WRITE sectors.
  */
 static unsigned long long tot_vbd_reqs(xenstat_domain *domain, int flag)
 {
@@ -720,6 +759,12 @@ static unsigned long long tot_vbd_reqs(xenstat_domain *domain, int flag)
 			break;
 		case FIELD_VBD_WR:
 			total += xenstat_vbd_wr_reqs(vbd);
+			break;
+		case FIELD_VBD_RSECT:
+			total += xenstat_vbd_rd_sects(vbd);
+			break;
+		case FIELD_VBD_WSECT:
+			total += xenstat_vbd_wr_sects(vbd);
 			break;
 		default:
 			break;
@@ -950,12 +995,14 @@ void do_vbd(xenstat_domain *domain)
 			 MINOR(xenstat_vbd_dev(vbd)));
 #endif
 
-		print("VBD %s %4d %s OO: %8llu   RD: %8llu   WR: %8llu\n",
+		print("VBD %s %4d %s OO: %8llu   RD: %8llu   WR: %8llu   RSECT: %10llu   WSECT: %10llu\n",
 		      vbd_type[xenstat_vbd_type(vbd)],
 		      xenstat_vbd_dev(vbd), details,
 		      xenstat_vbd_oo_reqs(vbd),
 		      xenstat_vbd_rd_reqs(vbd),
-		      xenstat_vbd_wr_reqs(vbd));
+		      xenstat_vbd_wr_reqs(vbd),
+		      xenstat_vbd_rd_sects(vbd),
+		      xenstat_vbd_wr_sects(vbd));
 	}
 }
 

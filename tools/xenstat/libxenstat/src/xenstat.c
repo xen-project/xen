@@ -653,6 +653,18 @@ unsigned long long xenstat_vbd_wr_reqs(xenstat_vbd * vbd)
 	return vbd->wr_reqs;
 }
 
+/* Get the number of READ sectors */
+unsigned long long xenstat_vbd_rd_sects(xenstat_vbd * vbd)
+{
+	return vbd->rd_sects;
+}
+
+/* Get the number of WRITE sectors */
+unsigned long long xenstat_vbd_wr_sects(xenstat_vbd * vbd)
+{
+	return vbd->wr_sects;
+}
+
 static char *xenstat_get_domain_name(xenstat_handle *handle, unsigned int domain_id)
 {
 	char path[80], *vmpath;

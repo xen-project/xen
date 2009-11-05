@@ -243,6 +243,18 @@ int xenstat_collect_vbds(xenstat_node * node)
 			continue;
 		}
 
+		if((read_attributes_vbd(dp->d_name, "statistics/rd_sect", buf, 256)<=0)
+		   || ((ret = sscanf(buf, "%llu", &vbd.rd_sects)) != 1))
+		{
+			continue;
+		}
+
+		if((read_attributes_vbd(dp->d_name, "statistics/wr_sect", buf, 256)<=0)
+		   || ((ret = sscanf(buf, "%llu", &vbd.wr_sects)) != 1))
+		{
+			continue;
+		}
+
 		if (domain->vbds == NULL) {
 			domain->num_vbds = 1;
 			domain->vbds = malloc(sizeof(xenstat_vbd));
