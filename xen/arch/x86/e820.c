@@ -367,19 +367,32 @@ static void __init clip_to_limit(uint64_t limit, char *warnmsg)
     char _warnmsg[160];
     uint64_t old_limit = 0;
 
-    for ( i = 0; i < e820.nr_map; i++ )
+    for ( ; ; )
     {
-        if ( (e820.map[i].type != E820_RAM) ||
-             ((e820.map[i].addr + e820.map[i].size) <= limit) )
-            continue;
-        old_limit = e820.map[i].addr + e820.map[i].size;
+        /* Find a RAM region needing clipping. */
+        for ( i = 0; i < e820.nr_map; i++ )
+            if ( (e820.map[i].type == E820_RAM) &&
+                 ((e820.map[i].addr + e820.map[i].size) > limit) )
+                break;
+
+        /* If none found, we are done. */
+        if ( i == e820.nr_map )
+            break;        
+
+        old_limit = max_t(
+            uint64_t, old_limit, e820.map[i].addr + e820.map[i].size);
+
+        /* We try to convert clipped RAM areas to E820_UNUSABLE. */
         if ( e820_change_range_type(&e820, max(e820.map[i].addr, limit),
-                                    old_limit, E820_RAM, E820_UNUSABLE) )
-        {
-            /* Start again now e820 map must have changed. */
-            i = 0;
-        }
-        else if ( e820.map[i].addr < limit )
+                                    e820.map[i].addr + e820.map[i].size,
+                                    E820_RAM, E820_UNUSABLE) )
+            continue;
+
+        /*
+         * If the type change fails (e.g., not space in table) then we clip or 
+         * delete the region as appropriate.
+         */
+        if ( e820.map[i].addr < limit )
         {
             e820.map[i].size = limit - e820.map[i].addr;
         }
