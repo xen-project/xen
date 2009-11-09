@@ -4,6 +4,7 @@
 #include <xen/mm.h>
 #include <xen/string.h>
 #include <xen/types.h>
+#include <xen/decompress.h>
 #include <asm/bzimage.h>
 
 #define HEAPORDER 3
@@ -93,20 +94,30 @@ static __init void flush_window(void)
     outcnt = 0;
 }
 
-static __init int gzip_length(char *image, unsigned long image_len)
+static __init unsigned long output_length(char *image, unsigned long image_len)
 {
     return *(uint32_t *)&image[image_len - 4];
 }
 
-static  __init int perform_gunzip(char *output, char **_image_start, unsigned long *image_len)
+static __init int gzip_check(char *image, unsigned long image_len)
 {
-    char *image = *_image_start;
-    int rc;
-    unsigned char magic0 = (unsigned char)image[0];
-    unsigned char magic1 = (unsigned char)image[1];
+    unsigned char magic0, magic1;
 
-    if ( magic0 != 0x1f || ( (magic1 != 0x8b) && (magic1 != 0x9e) ) )
+    if ( image_len < 2 )
         return 0;
+
+    magic0 = (unsigned char)image[0];
+    magic1 = (unsigned char)image[1];
+
+    return (magic0 == 0x1f) && ((magic1 == 0x8b) || (magic1 == 0x9e));
+}
+
+static __init int perform_gunzip(char *output, char *image, unsigned long image_len)
+{
+    int rc;
+
+    if ( !gzip_check(image, image_len) )
+        return 1;
 
     window = (unsigned char *)output;
 
@@ -114,7 +125,7 @@ static  __init int perform_gunzip(char *output, char **_image_start, unsigned lo
     free_mem_end_ptr = free_mem_ptr + (PAGE_SIZE << HEAPORDER);
 
     inbuf = (unsigned char *)image;
-    insize = *image_len;
+    insize = image_len;
     inptr = 0;
 
     makecrc();
@@ -125,8 +136,6 @@ static  __init int perform_gunzip(char *output, char **_image_start, unsigned lo
     }
     else
     {
-        *_image_start = (char *)window;
-        *image_len = gzip_length(image, *image_len);
         rc = 0;
     }
 
@@ -203,9 +212,12 @@ int __init bzimage_headroom(char *image_start, unsigned long image_length)
     img = image_start + (hdr->setup_sects+1) * 512;
     img += hdr->payload_offset;
 
-    headroom = gzip_length(img, hdr->payload_length);
-    headroom += headroom >> 12; /* Add 8 bytes for every 32K input block */
-    headroom += (32768 + 18); /* Add 32K + 18 bytes of extra headroom */
+    headroom = output_length(img, hdr->payload_length);
+    if (gzip_check(img, hdr->payload_length)) {
+        headroom += headroom >> 12; /* Add 8 bytes for every 32K input block */
+        headroom += (32768 + 18); /* Add 32K + 18 bytes of extra headroom */
+    } else
+        headroom += hdr->payload_length;
     headroom = (headroom + 4095) & ~4095;
 
     return headroom;
@@ -215,6 +227,7 @@ int __init bzimage_parse(char *image_base, char **image_start, unsigned long *im
 {
     struct setup_header *hdr = (struct setup_header *)(*image_start);
     int err = bzimage_check(hdr, *image_len);
+    unsigned long output_len;
 
     if (err < 1)
         return err;
@@ -224,11 +237,18 @@ int __init bzimage_parse(char *image_base, char **image_start, unsigned long *im
     *image_start += (hdr->setup_sects+1) * 512;
     *image_start += hdr->payload_offset;
     *image_len = hdr->payload_length;
+    output_len = output_length(*image_start, *image_len);
 
-    if ( (err = perform_gunzip(image_base, image_start, image_len)) < 0 )
-        return err;
+    if ( (err = perform_gunzip(image_base, *image_start, *image_len)) > 0 )
+        err = decompress(*image_start, *image_len, image_base);
 
-    return 0;
+    if ( !err )
+    {
+        *image_start = image_base;
+        *image_len = output_len;
+    }
+
+    return err > 0 ? 0 : err;
 }
 
 /*

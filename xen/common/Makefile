@@ -35,6 +35,8 @@ obj-y += radix-tree.o
 obj-y += rbtree.o
 obj-y += lzo.o
 
+obj-$(CONFIG_X86) += decompress.o bunzip2.o unlzma.o
+
 obj-$(perfc)       += perfc.o
 obj-$(crash_debug) += gdbstub.o
 obj-$(xenoprof)    += xenoprof.o
