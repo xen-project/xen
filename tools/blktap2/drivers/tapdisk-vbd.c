@@ -1560,9 +1560,11 @@ tapdisk_vbd_issue_request(td_vbd_t *vbd, td_vbd_request_t *vreq)
 	gettimeofday(&vreq->last_try, NULL);
 	tapdisk_vbd_move_request(vreq, &vbd->pending_requests);
 
+#if 0
 	err = tapdisk_vbd_check_queue(vbd);
 	if (err)
 		goto fail;
+#endif
 
 	err = tapdisk_image_check_ring_request(image, req);
 	if (err)
