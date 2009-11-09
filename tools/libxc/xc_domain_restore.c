@@ -453,6 +453,51 @@ alloc_page:
 }
 
 
+/* set when a consistent image is available */
+static int completed = 0;
+
+#define HEARTBEAT_MS 500
+
+#ifndef __MINIOS__
+static ssize_t read_exact_timed(int fd, void* buf, size_t size)
+{
+    size_t offset = 0;
+    ssize_t len;
+    struct timeval tv;
+    fd_set rfds;
+
+    while ( offset < size )
+    {
+        if ( completed ) {
+            /* expect a heartbeat every HEARBEAT_MS ms maximum */
+            tv.tv_sec = 0;
+            tv.tv_usec = HEARTBEAT_MS * 1000;
+
+            FD_ZERO(&rfds);
+            FD_SET(fd, &rfds);
+            len = select(fd + 1, &rfds, NULL, NULL, &tv);
+            if ( !FD_ISSET(fd, &rfds) ) {
+                fprintf(stderr, "read_exact_timed failed (select returned %zd)\n", len);
+                return -1;
+            }
+        }
+
+        len = read(fd, buf + offset, size - offset);
+        if ( (len == -1) && ((errno == EINTR) || (errno == EAGAIN)) )
+            continue;
+        if ( len <= 0 )
+            return -1;
+        offset += len;
+    }
+
+    return 0;
+}
+
+#define read_exact read_exact_timed
+
+#else
+#define read_exact_timed read_exact
+#endif
 /*
 ** In the state file (or during transfer), all page-table pages are
 ** converted into a 'canonical' form where references to actual mfns
@@ -1079,7 +1124,6 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     /* Buffer for holding HVM context */
     uint8_t *hvm_buf = NULL;
 
-    int completed = 0;
     pagebuf_t pagebuf;
     tailbuf_t tailbuf, tmptail;
     void* vcpup;
@@ -1342,12 +1386,18 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     /* Non-HVM guests only from here on */
 
     if ( !completed ) {
+        int flags = 0;
+
         if ( buffer_tail(&tailbuf, io_fd, max_vcpu_id, vcpumap,
                          ext_vcpucontext) < 0 ) {
             ERROR ("error buffering image tail");
             goto out;
         }
         completed = 1;
+        /* shift into nonblocking mode for the remainder */
+        if ( (flags = fcntl(io_fd, F_GETFL,0)) < 0 )
+            flags = 0;
+        fcntl(io_fd, F_SETFL, flags | O_NONBLOCK);
     }
 
     // DPRINTF("Buffered checkpoint\n");
