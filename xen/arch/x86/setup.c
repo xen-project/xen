@@ -931,8 +931,17 @@ void __init __start_xen(unsigned long mbi_p)
 
 #if defined(CONFIG_X86_32)
     /* Initialise the Xen heap. */
-    init_xenheap_pages(xenheap_initial_phys_start, xenheap_phys_end);
-    nr_pages = (xenheap_phys_end - xenheap_initial_phys_start) >> PAGE_SHIFT;
+    for ( nr_pages = i = 0; i < boot_e820.nr_map; i++ )
+    {
+        uint64_t s = boot_e820.map[i].addr;
+        uint64_t e = s + boot_e820.map[i].size;
+        s = max_t(uint64_t, s, xenheap_initial_phys_start);
+        e = min_t(uint64_t, e, xenheap_phys_end);
+        if ( (boot_e820.map[i].type != E820_RAM) || (s >= e) )
+            continue;
+        init_xenheap_pages(s, e);
+        nr_pages += (e - s) >> PAGE_SHIFT;
+    }
     printk("Xen heap: %luMB (%lukB)\n", 
            nr_pages >> (20 - PAGE_SHIFT),
            nr_pages << (PAGE_SHIFT - 10));
