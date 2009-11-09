@@ -14,6 +14,19 @@
 #define XCFLAGS_HVM       4
 #define XCFLAGS_STDVGA    8
 
+/* callbacks provided by xc_domain_save */
+struct save_callbacks {
+    int (*suspend)(void* data);
+    /* callback to rendezvous with external checkpoint functions */
+    int (*postcopy)(void* data);
+    /* returns:
+     * 0: terminate checkpointing gracefully
+     * 1: take another checkpoint */
+    int (*checkpoint)(void* data);
+
+    /* to be provided as the first argument to each callback function */
+    void* data;
+};
 
 /**
  * This function will save a running domain.
@@ -25,8 +38,8 @@
  */
 int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                    uint32_t max_factor, uint32_t flags /* XCFLAGS_xxx */,
-                   int (*suspend)(void), int hvm,
-                   void (*switch_qemu_logdirty)(int, unsigned)); /* HVM only */
+                   struct save_callbacks* callbacks,
+                   int hvm, void (*switch_qemu_logdirty)(int, unsigned)); /* HVM only */
 
 
 /**

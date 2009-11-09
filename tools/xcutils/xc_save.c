@@ -71,7 +71,7 @@ static int evtchn_suspend(void)
     return 1;
 }
 
-static int suspend(void)
+static int suspend(void* data)
 {
     unsigned long sx_state = 0;
 
@@ -166,6 +166,7 @@ main(int argc, char **argv)
 {
     unsigned int maxit, max_f;
     int io_fd, ret, port;
+    struct save_callbacks callbacks;
 
     if (argc != 6)
         errx(1, "usage: %s iofd domid maxit maxf flags", argv[0]);
@@ -202,8 +203,10 @@ main(int argc, char **argv)
                        "using slow path");
         }
     }
+    memset(&callbacks, 0, sizeof(callbacks));
+    callbacks.suspend = suspend;
     ret = xc_domain_save(si.xc_fd, io_fd, si.domid, maxit, max_f, si.flags, 
-                         &suspend, !!(si.flags & XCFLAGS_HVM),
+                         &callbacks, !!(si.flags & XCFLAGS_HVM),
                          &switch_qemu_logdirty);
 
     if (si.suspend_evtchn > 0)

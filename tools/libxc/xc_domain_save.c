@@ -332,11 +332,11 @@ static int analysis_phase(int xc_handle, uint32_t domid, int p2m_size,
     return -1;
 }
 
-
-static int suspend_and_state(int (*suspend)(void), int xc_handle, int io_fd,
-                             int dom, xc_dominfo_t *info)
+static int suspend_and_state(int (*suspend)(void*), void* data,
+                             int xc_handle, int io_fd, int dom,
+                             xc_dominfo_t *info)
 {
-    if ( !(*suspend)() )
+    if ( !(*suspend)(data) )
     {
         ERROR("Suspend request failed");
         return -1;
@@ -742,13 +742,14 @@ static xen_pfn_t *map_and_save_p2m_table(int xc_handle,
 }
 
 int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
-                   uint32_t max_factor, uint32_t flags, int (*suspend)(void),
+                   uint32_t max_factor, uint32_t flags,
+                   struct save_callbacks* callbacks,
                    int hvm, void (*switch_qemu_logdirty)(int, unsigned))
 {
     xc_dominfo_t info;
     DECLARE_DOMCTL;
 
-    int rc = 1, frc, i, j, last_iter, iter = 0;
+    int rc = 1, frc, i, j, last_iter = 0, iter = 0;
     int live  = (flags & XCFLAGS_LIVE);
     int debug = (flags & XCFLAGS_DEBUG);
     int race = 0, sent_last_iter, skip_this_iter;
@@ -864,7 +865,8 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     else
     {
         /* This is a non-live suspend. Suspend the domain .*/
-        if ( suspend_and_state(suspend, xc_handle, io_fd, dom, &info) )
+        if ( suspend_and_state(callbacks->suspend, callbacks->data, xc_handle,
+                               io_fd, dom, &info) )
         {
             ERROR("Domain appears not to have suspended");
             goto out;
@@ -992,6 +994,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         goto out;
     }
 
+  copypages:
     /* Now write out each data page, canonicalising page tables as we go... */
     for ( ; ; )
     {
@@ -1305,7 +1308,8 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                 DPRINTF("Start last iteration\n");
                 last_iter = 1;
 
-                if ( suspend_and_state(suspend, xc_handle, io_fd, dom, &info) )
+                if ( suspend_and_state(callbacks->suspend, callbacks->data,
+                                       xc_handle, io_fd, dom, &info) )
                 {
                     ERROR("Domain appears not to have suspended");
                     goto out;
@@ -1586,6 +1590,39 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     rc = 0;
 
  out:
+    if ( !rc && callbacks->postcopy )
+        callbacks->postcopy(callbacks->data);
+
+    /* Flush last write and discard cache for file. */
+    discard_file_cache(io_fd, 1 /* flush */);
+
+    /* checkpoint_cb can spend arbitrarily long in between rounds */
+    if (!rc && callbacks->checkpoint &&
+        callbacks->checkpoint(callbacks->data) > 0)
+    {
+        /* reset stats timer */
+        print_stats(xc_handle, dom, 0, &stats, 0);
+
+        rc = 1;
+        /* last_iter = 1; */
+        if ( suspend_and_state(callbacks->suspend, callbacks->data, xc_handle,
+                               io_fd, dom, &info) )
+        {
+            ERROR("Domain appears not to have suspended");
+            goto out;
+        }
+        DPRINTF("SUSPEND shinfo %08lx\n", info.shared_info_frame);
+        print_stats(xc_handle, dom, 0, &stats, 1);
+
+        if ( xc_shadow_control(xc_handle, dom,
+                               XEN_DOMCTL_SHADOW_OP_CLEAN, to_send,
+                               p2m_size, NULL, 0, &stats) != p2m_size )
+        {
+            ERROR("Error flushing shadow PT");
+        }
+
+        goto copypages;
+    }
 
     if ( tmem_saved != 0 && live )
         xc_tmem_save_done(xc_handle, dom);
@@ -1599,9 +1636,6 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         if ( hvm )
             switch_qemu_logdirty(dom, 0);
     }
-
-    /* Flush last write and discard cache for file. */
-    discard_file_cache(io_fd, 1 /* flush */);
 
     if ( live_shinfo )
         munmap(live_shinfo, PAGE_SIZE);
