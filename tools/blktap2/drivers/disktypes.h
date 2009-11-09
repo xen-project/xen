@@ -49,6 +49,7 @@ extern struct tap_disk tapdisk_ram;
  extern struct tap_disk tapdisk_qcow; 
 extern struct tap_disk tapdisk_block_cache;
 extern struct tap_disk tapdisk_log;
+extern struct tap_disk tapdisk_remus;
 
 #define MAX_DISK_TYPES        20
 
@@ -61,6 +62,7 @@ extern struct tap_disk tapdisk_log;
 #define DISK_TYPE_QCOW        6
 #define DISK_TYPE_BLOCK_CACHE 7
 #define DISK_TYPE_LOG         9
+#define DISK_TYPE_REMUS       10
 
 /*Define Individual Disk Parameters here */
 static disk_info_t null_disk = {
@@ -167,6 +169,16 @@ static disk_info_t log_disk = {
 #endif
 };
 
+static disk_info_t remus_disk = {
+       DISK_TYPE_REMUS,
+       "remus disk replicator (remus)",
+       "remus",
+       0,
+#ifdef TAPDISK
+       &tapdisk_remus,
+#endif
+};
+
 /*Main disk info array */
 static disk_info_t *dtypes[] = {
        &aio_disk,
@@ -179,6 +191,7 @@ static disk_info_t *dtypes[] = {
        &block_cache_disk,
        &null_disk,
        &log_disk,
+       &remus_disk,
 };
 
 #endif

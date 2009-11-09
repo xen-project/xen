@@ -28,6 +28,7 @@ blktap2_disk_types = [
     'ram',
     'qcow',
     'vhd',
+    'remus',
     ]
 
 blktap_disk_types = blktap1_disk_types + blktap2_disk_types

@@ -36,13 +36,21 @@ else
 CRYPT_LIB += -lcrypto
 endif
 
-LDFLAGS_img := $(CRYPT_LIB) -lpthread -lz
+LDFLAGS_img := $(CRYPT_LIB) -lpthread -lz -lm
 
 LIBS += -L$(LIBVHDDIR) -lvhd
 
 ifeq ($(CONFIG_Linux),y)
 LIBS += -luuid
 endif
+
+REMUS-OBJS  := block-remus.o
+REMUS-OBJS  += hashtable.o
+REMUS-OBJS  += hashtable_itr.o
+REMUS-OBJS  += hashtable_utility.o
+
+$(REMUS-OBJS): CFLAGS += -fgnu89-inline -I$(XEN_XENSTORE)
+
 
 LIBAIO_DIR = $(XEN_ROOT)/tools/libaio/src
 tapdisk2 tapdisk-stream tapdisk-diff $(QCOW_UTIL): AIOLIBS := $(LIBAIO_DIR)/libaio.a
@@ -81,6 +89,7 @@ BLK-OBJS-y  += block-log.o
 BLK-OBJS-y  += block-qcow.o
 BLK-OBJS-y  += aes.o
 BLK-OBJS-y  += $(PORTABLE-OBJS-y)
+BLK-OBJS-y  += $(REMUS-OBJS)
 
 all: $(IBIN) lock-util qcow-util
 
