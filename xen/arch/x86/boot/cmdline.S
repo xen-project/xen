@@ -191,7 +191,7 @@ cmdline_parse_early:
         decb    bootsym_phys(opt_edd)     /* opt_edd=1: edd=skipmbr */
         cmpw    $0x6b73,(%eax)            /* 0x6b73 == "sk" */
         je      .Lparse_edid
-        decb    bootsym_phys(opt_edid)    /* opt_edd=0: edd=on (default) */
+        decb    bootsym_phys(opt_edd)     /* opt_edd=0: edd=on (default) */
 
 .Lparse_edid:
         /* Check for 'edid=' command-line option. */
