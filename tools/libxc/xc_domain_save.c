@@ -94,6 +94,8 @@ struct outbuf {
 
 #define BITMAP_SHIFT(_nr) ((_nr) % BITS_PER_LONG)
 
+#define ORDER_LONG (sizeof(unsigned long) == 4 ? 5 : 6)
+
 static inline int test_bit (int nr, volatile void * addr)
 {
     return (BITMAP_ENTRY(nr, addr) >> BITMAP_SHIFT(nr)) & 1;
@@ -1164,6 +1166,14 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
                 if ( completed )
                 {
+                    /* for sparse bitmaps, word-by-word may save time */
+                    if ( !to_send[N >> ORDER_LONG] )
+                    {
+                        /* incremented again in for loop! */
+                        N += BITS_PER_LONG - 1;
+                        continue;
+                    }
+
                     if ( !test_bit(n, to_send) )
                         continue;
 
