@@ -224,6 +224,14 @@ static void xc_cpuid_hvm_policy(
             clear_bit(X86_FEATURE_NX, regs[3]);
         break;
 
+    case 0x80000007:
+        /*
+         * Keep only TSCInvariant. This may be cleared by the hypervisor
+         * depending on guest TSC and migration settings.
+         */
+        regs[0] = regs[1] = regs[2] = 0;
+        regs[3] &= 1u<<8;
+        break;
 
     case 0x80000008:
         regs[0] &= 0x0000ffffu;
