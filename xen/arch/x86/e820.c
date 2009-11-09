@@ -574,7 +574,7 @@ int __init e820_change_range_type(
             e820->map[i+1].type = new_type;
         }
     }
-    else if ( e820->nr_map+1 < ARRAY_SIZE(e820->map) )
+    else
     {
         if ( (e820->nr_map + 2) > ARRAY_SIZE(e820->map) )
             goto overflow;
