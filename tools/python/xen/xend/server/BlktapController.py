@@ -172,6 +172,8 @@ class Blktap2Controller(BlktapController):
         uname = config.get('uname', '')
         try:
             (typ, subtyp, params, file) = string.split(uname, ':', 3)
+            if subtyp not in ('tapdisk', 'ioemu'):
+                raise ValueError('invalid subtype')
         except:
             (typ, params, file) = string.split(uname, ':', 2)
             subtyp = 'tapdisk'
