@@ -2045,6 +2045,15 @@ void domain_cpuid(
             *ebx = cpuid->ebx;
             *ecx = cpuid->ecx;
             *edx = cpuid->edx;
+
+            /*
+             * Do not advertise host's invariant TSC unless the TSC is
+             * emulated, or the domain cannot migrate to other hosts.
+             */
+            if ( (input == 0x80000007) && /* Advanced Power Management */
+                 !d->disable_migrate && !d->arch.vtsc )
+                *edx &= ~(1u<<8); /* TSC Invariant */
+
             return;
         }
     }
