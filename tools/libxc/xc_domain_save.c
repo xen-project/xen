@@ -896,6 +896,8 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
     struct outbuf ob;
 
+    int completed = 0;
+
     outbuf_init(&ob, OUTBUF_SIZE);
 
     /* If no explicit control parameters given, use defaults */
@@ -1159,54 +1161,69 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                                 mfn_to_pfn(pfn_to_mfn(n)&0xFFFFF));
                     DPRINTF("\n");
                 }
-                if ( !last_iter &&
-                     test_bit(n, to_send) &&
-                     test_bit(n, to_skip) )
-                    skip_this_iter++; /* stats keeping */
 
-                if ( !((test_bit(n, to_send) && !test_bit(n, to_skip)) ||
-                       (test_bit(n, to_send) && last_iter) ||
-                       (test_bit(n, to_fix)  && last_iter)) )
-                    continue;
+                if ( completed )
+                {
+                    if ( !test_bit(n, to_send) )
+                        continue;
 
-                /*
-                ** we get here if:
-                **  1. page is marked to_send & hasn't already been re-dirtied
-                **  2. (ignore to_skip in last iteration)
-                **  3. add in pages that still need fixup (net bufs)
-                */
-
-                pfn_batch[batch] = n;
-
-                /* Hypercall interfaces operate in PFNs for HVM guests
-                * and MFNs for PV guests */
-                if ( hvm ) 
-                    pfn_type[batch] = n;
+                    pfn_batch[batch] = n;
+                    if ( hvm )
+                        pfn_type[batch] = n;
+                    else
+                        pfn_type[batch] = pfn_to_mfn(n);
+                }
                 else
-                    pfn_type[batch] = pfn_to_mfn(n);
-                    
-                if ( !is_mapped(pfn_type[batch]) )
                 {
-                    /*
-                    ** not currently in psuedo-physical map -- set bit
-                    ** in to_fix since we must send this page in last_iter
-                    ** unless its sent sooner anyhow, or it never enters
-                    ** pseudo-physical map (e.g. for ballooned down doms)
-                    */
-                    set_bit(n, to_fix);
-                    continue;
-                }
+                    if ( !last_iter &&
+                         test_bit(n, to_send) &&
+                         test_bit(n, to_skip) )
+                        skip_this_iter++; /* stats keeping */
 
-                if ( last_iter &&
-                     test_bit(n, to_fix) &&
-                     !test_bit(n, to_send) )
-                {
-                    needed_to_fix++;
-                    DPRINTF("Fix! iter %d, pfn %x. mfn %lx\n",
-                            iter, n, pfn_type[batch]);
+                    if ( !((test_bit(n, to_send) && !test_bit(n, to_skip)) ||
+                           (test_bit(n, to_send) && last_iter) ||
+                           (test_bit(n, to_fix)  && last_iter)) )
+                        continue;
+
+                    /*
+                    ** we get here if:
+                    **  1. page is marked to_send & hasn't already been re-dirtied
+                    **  2. (ignore to_skip in last iteration)
+                    **  3. add in pages that still need fixup (net bufs)
+                    */
+
+                    pfn_batch[batch] = n;
+
+                    /* Hypercall interfaces operate in PFNs for HVM guests
+                     * and MFNs for PV guests */
+                    if ( hvm )
+                        pfn_type[batch] = n;
+                    else
+                        pfn_type[batch] = pfn_to_mfn(n);
+                    
+                    if ( !is_mapped(pfn_type[batch]) )
+                    {
+                        /*
+                        ** not currently in psuedo-physical map -- set bit
+                        ** in to_fix since we must send this page in last_iter
+                        ** unless its sent sooner anyhow, or it never enters
+                        ** pseudo-physical map (e.g. for ballooned down doms)
+                        */
+                        set_bit(n, to_fix);
+                        continue;
+                    }
+
+                    if ( last_iter &&
+                         test_bit(n, to_fix) &&
+                         !test_bit(n, to_send) )
+                    {
+                        needed_to_fix++;
+                        DPRINTF("Fix! iter %d, pfn %x. mfn %lx\n",
+                                iter, n, pfn_type[batch]);
+                    }
+
+                    clear_bit(n, to_fix);
                 }
-                
-                clear_bit(n, to_fix);
                 
                 batch++;
             }
@@ -1698,6 +1715,8 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     rc = 0;
 
  out:
+    completed = 1;
+
     if ( !rc && callbacks->postcopy )
         callbacks->postcopy(callbacks->data);
 
@@ -1706,6 +1725,8 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         ERROR("Error when flushing output buffer\n");
         rc = 1;
     }
+
+    discard_file_cache(io_fd, 1 /* flush */);
 
     /* checkpoint_cb can spend arbitrarily long in between rounds */
     if (!rc && callbacks->checkpoint &&
