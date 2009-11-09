@@ -345,7 +345,7 @@ def restore(xd, fd, dominfo = None, paused = False, relocating = False):
 
         restore_image.setCpuid()
 
-        os.read(fd, 1)           # Wait for source to close connection
+        # xc_restore will wait for source to close connection
         
         dominfo.completeRestore(handler.store_mfn, handler.console_mfn)
 

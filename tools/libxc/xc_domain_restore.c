@@ -624,6 +624,410 @@ static xen_pfn_t *load_p2m_frame_list(
     return p2m_frame_list;
 }
 
+typedef struct {
+    unsigned int pfncount;
+    unsigned long* pfntab;
+    unsigned int vcpucount;
+    unsigned char* vcpubuf;
+    unsigned char shared_info_page[PAGE_SIZE];
+} tailbuf_t;
+
+static int buffer_tail(tailbuf_t* buf, int fd, unsigned int max_vcpu_id,
+                      uint64_t vcpumap, int ext_vcpucontext)
+{
+    unsigned int i;
+    size_t pfnlen, vcpulen;
+
+    /* TODO: handle changing pfntab and vcpu counts */
+    /* PFN tab */
+    if ( read_exact(fd, &buf->pfncount, sizeof(buf->pfncount)) ||
+         (buf->pfncount > (1U << 28)) ) /* up to 1TB of address space */
+    {
+        ERROR("Error when reading pfn count");
+        return -1;
+    }
+    pfnlen = sizeof(unsigned long) * buf->pfncount;
+    if ( !(buf->pfntab) ) {
+        if ( !(buf->pfntab = malloc(pfnlen)) ) {
+            ERROR("Error allocating PFN tail buffer");
+            return -1;
+        }
+    }
+    // DPRINTF("Reading PFN tab: %d bytes\n", pfnlen);
+    if ( read_exact(fd, buf->pfntab, pfnlen) ) {
+        ERROR("Error when reading pfntab");
+        goto free_pfntab;
+    }
+
+    /* VCPU contexts */
+    buf->vcpucount = 0;
+    for (i = 0; i <= max_vcpu_id; i++) {
+        // DPRINTF("vcpumap: %llx, cpu: %d, bit: %llu\n", vcpumap, i, (vcpumap % (1ULL << i)));
+        if ( (!(vcpumap & (1ULL << i))) )
+            continue;
+        buf->vcpucount++;
+    }
+    // DPRINTF("VCPU count: %d\n", buf->vcpucount);
+    vcpulen = ((guest_width == 8) ? sizeof(vcpu_guest_context_x86_64_t)
+               : sizeof(vcpu_guest_context_x86_32_t)) * buf->vcpucount;
+    if ( ext_vcpucontext )
+        vcpulen += 128 * buf->vcpucount;
+
+    if ( !(buf->vcpubuf) ) {
+        if ( !(buf->vcpubuf = malloc(vcpulen)) ) {
+            ERROR("Error allocating VCPU ctxt tail buffer");
+            goto free_pfntab;
+        }
+    }
+    // DPRINTF("Reading VCPUS: %d bytes\n", vcpulen);
+    if ( read_exact(fd, buf->vcpubuf, vcpulen) ) {
+        ERROR("Error when reading ctxt");
+        goto free_vcpus;
+    }
+
+    /* load shared_info_page */
+    // DPRINTF("Reading shared info: %lu bytes\n", PAGE_SIZE);
+    if ( read_exact(fd, buf->shared_info_page, PAGE_SIZE) ) {
+        ERROR("Error when reading shared info page");
+        goto free_vcpus;
+    }
+
+    return 0;
+
+  free_vcpus:
+    if (buf->vcpubuf) {
+        free (buf->vcpubuf);
+        buf->vcpubuf = NULL;
+    }
+  free_pfntab:
+    if (buf->pfntab) {
+        free (buf->pfntab);
+        buf->pfntab = NULL;
+    }
+
+    return -1;
+}
+
+static void tailbuf_free(tailbuf_t* buf)
+{
+    if (buf->vcpubuf) {
+        free(buf->vcpubuf);
+        buf->vcpubuf = NULL;
+    }
+    if (buf->pfntab) {
+        free(buf->pfntab);
+        buf->pfntab = NULL;
+    }
+}
+
+typedef struct {
+    void* pages;
+    /* pages is of length nr_physpages, pfn_types is of length nr_pages */
+    unsigned int nr_physpages, nr_pages;
+
+    /* Types of the pfns in the current region */
+    unsigned long* pfn_types;
+
+    int verify;
+
+    int new_ctxt_format;
+    int max_vcpu_id;
+    uint64_t vcpumap;
+    uint64_t identpt;
+    uint64_t vm86_tss;
+} pagebuf_t;
+
+static int pagebuf_init(pagebuf_t* buf)
+{
+    memset(buf, 0, sizeof(*buf));
+    return 0;
+}
+
+static void pagebuf_free(pagebuf_t* buf)
+{
+    if (buf->pages) {
+        free(buf->pages);
+        buf->pages = NULL;
+    }
+    if(buf->pfn_types) {
+        free(buf->pfn_types);
+        buf->pfn_types = NULL;
+    }
+}
+
+static int pagebuf_get_one(pagebuf_t* buf, int fd, int xch, uint32_t dom)
+{
+    int count, countpages, oldcount, i;
+    void* ptmp;
+
+    if ( read_exact(fd, &count, sizeof(count)) )
+    {
+        ERROR("Error when reading batch size");
+        return -1;
+    }
+
+    // DPRINTF("reading batch of %d pages\n", count);
+
+    if (!count) {
+        // DPRINTF("Last batch read\n");
+        return 0;
+    } else if (count == -1) {
+        DPRINTF("Entering page verify mode\n");
+        buf->verify = 1;
+        return pagebuf_get_one(buf, fd, xch, dom);
+    } else if (count == -2) {
+        buf->new_ctxt_format = 1;
+        if ( read_exact(fd, &buf->max_vcpu_id, sizeof(buf->max_vcpu_id)) ||
+             buf->max_vcpu_id >= 64 || read_exact(fd, &buf->vcpumap,
+                                                  sizeof(uint64_t)) ) {
+            ERROR("Error when reading max_vcpu_id");
+            return -1;
+        }
+        // DPRINTF("Max VCPU ID: %d, vcpumap: %llx\n", buf->max_vcpu_id, buf->vcpumap);
+        return pagebuf_get_one(buf, fd, xch, dom);
+    } else if (count == -3) {
+        /* Skip padding 4 bytes then read the EPT identity PT location. */
+        if ( read_exact(fd, &buf->identpt, sizeof(uint32_t)) ||
+             read_exact(fd, &buf->identpt, sizeof(uint64_t)) )
+        {
+            ERROR("error read the address of the EPT identity map");
+            return -1;
+        }
+        // DPRINTF("EPT identity map address: %llx\n", buf->identpt);
+        return pagebuf_get_one(buf, fd, xch, dom);
+    } else if ( count == -4 )  {
+        /* Skip padding 4 bytes then read the vm86 TSS location. */
+        if ( read_exact(fd, &buf->vm86_tss, sizeof(uint32_t)) ||
+             read_exact(fd, &buf->vm86_tss, sizeof(uint64_t)) )
+        {
+            ERROR("error read the address of the vm86 TSS");
+            return -1;
+        }
+        // DPRINTF("VM86 TSS location: %llx\n", buf->vm86_tss);
+        return pagebuf_get_one(buf, fd, xch, dom);
+    } else if ( count == -5 ) {
+        DPRINTF("xc_domain_restore start tmem\n");
+        if ( xc_tmem_restore(xch, dom, fd) ) {
+            ERROR("error reading/restoring tmem");
+            return -1;
+        }
+        return pagebuf_get_one(buf, fd, xch, dom);
+    }
+    else if ( count == -6 ) {
+        if ( xc_tmem_restore_extra(xch, dom, fd) ) {
+            ERROR("error reading/restoring tmem extra");
+            return -1;
+        }
+        return pagebuf_get_one(buf, fd, xch, dom);
+    } else if ( (count > MAX_BATCH_SIZE) || (count < 0) ) {
+        ERROR("Max batch size exceeded (%d). Giving up.", count);
+        return -1;
+    }
+
+    oldcount = buf->nr_pages;
+    buf->nr_pages += count;
+    if (!buf->pfn_types) {
+        if (!(buf->pfn_types = malloc(buf->nr_pages * sizeof(*(buf->pfn_types))))) {
+            ERROR("Could not allocate PFN type buffer");
+            return -1;
+        }
+    } else {
+        if (!(ptmp = realloc(buf->pfn_types, buf->nr_pages * sizeof(*(buf->pfn_types))))) {
+            ERROR("Could not reallocate PFN type buffer");
+            return -1;
+        }
+        buf->pfn_types = ptmp;
+    }
+    if ( read_exact(fd, buf->pfn_types + oldcount, count * sizeof(*(buf->pfn_types)))) {
+        ERROR("Error when reading region pfn types");
+        return -1;
+    }
+
+    countpages = count;
+    for (i = oldcount; i < buf->nr_pages; ++i)
+        if ((buf->pfn_types[i] & XEN_DOMCTL_PFINFO_LTAB_MASK) == XEN_DOMCTL_PFINFO_XTAB)
+            --countpages;
+
+    if (!countpages)
+        return count;
+
+    oldcount = buf->nr_physpages;
+    buf->nr_physpages += countpages;
+    if (!buf->pages) {
+        if (!(buf->pages = malloc(buf->nr_physpages * PAGE_SIZE))) {
+            ERROR("Could not allocate page buffer");
+            return -1;
+        }
+    } else {
+        if (!(ptmp = realloc(buf->pages, buf->nr_physpages * PAGE_SIZE))) {
+            ERROR("Could not reallocate page buffer");
+            return -1;
+        }
+        buf->pages = ptmp;
+    }
+    if ( read_exact(fd, buf->pages + oldcount * PAGE_SIZE, countpages * PAGE_SIZE) ) {
+        ERROR("Error when reading pages");
+        return -1;
+    }
+
+    return count;
+}
+
+static int pagebuf_get(pagebuf_t* buf, int fd, int xch, uint32_t dom)
+{
+    int rc;
+
+    buf->nr_physpages = buf->nr_pages = 0;
+
+    do {
+        rc = pagebuf_get_one(buf, fd, xch, dom);
+    } while (rc > 0);
+
+    if (rc < 0)
+        pagebuf_free(buf);
+
+    return rc;
+}
+
+static int apply_batch(int xc_handle, uint32_t dom, xen_pfn_t* region_mfn,
+                       unsigned long* pfn_type, int pae_extended_cr3,
+                       unsigned int hvm, struct xc_mmu* mmu,
+                       pagebuf_t* pagebuf, int curbatch, int superpages)
+{
+    int i, j, curpage;
+    /* used by debug verify code */
+    unsigned long buf[PAGE_SIZE/sizeof(unsigned long)];
+    /* Our mapping of the current region (batch) */
+    char *region_base;
+    /* A temporary mapping, and a copy, of one frame of guest memory. */
+    unsigned long *page = NULL;
+    int nraces = 0;
+
+    unsigned long mfn, pfn, pagetype;
+
+    j = pagebuf->nr_pages - curbatch;
+    if (j > MAX_BATCH_SIZE)
+        j = MAX_BATCH_SIZE;
+
+    if (allocate_physmem(xc_handle, dom, &pagebuf->pfn_types[curbatch],
+                         j, hvm, region_mfn, superpages) != 0)
+    {
+        ERROR("allocate_physmem() failed\n");
+        return -1;
+    }
+
+    /* Map relevant mfns */
+    region_base = xc_map_foreign_batch(
+        xc_handle, dom, PROT_WRITE, region_mfn, j);
+
+    if ( region_base == NULL )
+    {
+        ERROR("map batch failed");
+        return -1;
+    }
+
+    for ( i = 0, curpage = -1; i < j; i++ )
+    {
+        pfn      = pagebuf->pfn_types[i + curbatch] & ~XEN_DOMCTL_PFINFO_LTAB_MASK;
+        pagetype = pagebuf->pfn_types[i + curbatch] &  XEN_DOMCTL_PFINFO_LTAB_MASK;
+
+        if ( pagetype == XEN_DOMCTL_PFINFO_XTAB )
+            /* a bogus/unmapped page: skip it */
+            continue;
+
+        ++curpage;
+
+        if ( pfn > p2m_size )
+        {
+            ERROR("pfn out of range");
+            return -1;
+        }
+
+        pfn_type[pfn] = pagetype;
+
+        mfn = p2m[pfn];
+
+        /* In verify mode, we use a copy; otherwise we work in place */
+        page = pagebuf->verify ? (void *)buf : (region_base + i*PAGE_SIZE);
+
+        memcpy(page, pagebuf->pages + (curpage + curbatch) * PAGE_SIZE, PAGE_SIZE);
+
+        pagetype &= XEN_DOMCTL_PFINFO_LTABTYPE_MASK;
+
+        if ( (pagetype >= XEN_DOMCTL_PFINFO_L1TAB) &&
+             (pagetype <= XEN_DOMCTL_PFINFO_L4TAB) )
+        {
+            /*
+            ** A page table page - need to 'uncanonicalize' it, i.e.
+            ** replace all the references to pfns with the corresponding
+            ** mfns for the new domain.
+            **
+            ** On PAE we need to ensure that PGDs are in MFNs < 4G, and
+            ** so we may need to update the p2m after the main loop.
+            ** Hence we defer canonicalization of L1s until then.
+            */
+            if ((pt_levels != 3) ||
+                pae_extended_cr3 ||
+                (pagetype != XEN_DOMCTL_PFINFO_L1TAB)) {
+
+                if (!uncanonicalize_pagetable(xc_handle, dom,
+                                              pagetype, page, superpages)) {
+                    /*
+                    ** Failing to uncanonicalize a page table can be ok
+                    ** under live migration since the pages type may have
+                    ** changed by now (and we'll get an update later).
+                    */
+                    DPRINTF("PT L%ld race on pfn=%08lx mfn=%08lx\n",
+                            pagetype >> 28, pfn, mfn);
+                    nraces++;
+                    continue;
+                }
+            }
+        }
+        else if ( pagetype != XEN_DOMCTL_PFINFO_NOTAB )
+        {
+            ERROR("Bogus page type %lx page table is out of range: "
+                  "i=%d p2m_size=%lu", pagetype, i, p2m_size);
+            return -1;
+        }
+
+        if ( pagebuf->verify )
+        {
+            int res = memcmp(buf, (region_base + i*PAGE_SIZE), PAGE_SIZE);
+            if ( res )
+            {
+                int v;
+
+                DPRINTF("************** pfn=%lx type=%lx gotcs=%08lx "
+                        "actualcs=%08lx\n", pfn, pagebuf->pfn_types[pfn],
+                        csum_page(region_base + (i + curbatch)*PAGE_SIZE),
+                        csum_page(buf));
+
+                for ( v = 0; v < 4; v++ )
+                {
+                    unsigned long *p = (unsigned long *)
+                        (region_base + i*PAGE_SIZE);
+                    if ( buf[v] != p[v] )
+                        DPRINTF("    %d: %08lx %08lx\n", v, buf[v], p[v]);
+                }
+            }
+        }
+
+        if ( !hvm &&
+             xc_add_mmu_update(xc_handle, mmu,
+                               (((unsigned long long)mfn) << PAGE_SHIFT)
+                               | MMU_MACHPHYS_UPDATE, pfn) )
+        {
+            ERROR("failed machpys update mfn=%lx pfn=%lx", mfn, pfn);
+            return -1;
+        }
+    } /* end of 'batch' for loop */
+
+    munmap(region_base, j*PAGE_SIZE);
+
+    return nraces;
+}
+
 int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
                       unsigned int store_evtchn, unsigned long *store_mfn,
                       unsigned int console_evtchn, unsigned long *console_mfn,
@@ -633,7 +1037,6 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     int rc = 1, frc, i, j, n, m, pae_extended_cr3 = 0, ext_vcpucontext = 0;
     unsigned long mfn, pfn;
     unsigned int prev_pc, this_pc;
-    int verify = 0;
     int nraces = 0;
 
     /* The new domain's shared-info frame number. */
@@ -652,9 +1055,6 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     /* A table of MFNs to map in the current region */
     xen_pfn_t *region_mfn = NULL;
 
-    /* Types of the pfns in the current region */
-    unsigned long region_pfn_type[MAX_BATCH_SIZE];
-
     /* A copy of the pfn-to-mfn table frame list. */
     xen_pfn_t *p2m_frame_list = NULL;
     
@@ -665,9 +1065,6 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     char *region_base;
 
     struct xc_mmu *mmu = NULL;
-
-    /* used by debug verify code */
-    unsigned long buf[PAGE_SIZE/sizeof(unsigned long)];
 
     struct mmuext_op pin[MAX_PIN_BATCH];
     unsigned int nr_pins;
@@ -681,6 +1078,14 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
 
     /* Buffer for holding HVM context */
     uint8_t *hvm_buf = NULL;
+
+    int completed = 0;
+    pagebuf_t pagebuf;
+    tailbuf_t tailbuf, tmptail;
+    void* vcpup;
+
+    pagebuf_init(&pagebuf);
+    memset(&tailbuf, 0, sizeof(tailbuf));
 
     /* For info only */
     nr_pfns = 0;
@@ -784,9 +1189,10 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     prev_pc = 0;
 
     n = m = 0;
+ loadpages:
     for ( ; ; )
     {
-        int j; 
+        int j, curbatch;
 
         this_pc = (n * 100) / p2m_size;
         if ( (this_pc - prev_pc) >= 5 )
@@ -795,221 +1201,49 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
             prev_pc = this_pc;
         }
 
-        if ( read_exact(io_fd, &j, sizeof(int)) )
-        {
-            ERROR("Error when reading batch size");
-            goto out;
+        if ( !completed ) {
+            pagebuf.nr_physpages = pagebuf.nr_pages = 0;
+            if ( pagebuf_get_one(&pagebuf, io_fd, xc_handle, dom) < 0 ) {
+                ERROR("Error when reading batch\n");
+                goto out;
+            }
         }
+        j = pagebuf.nr_pages;
 
         PPRINTF("batch %d\n",j);
 
-        if ( j == -1 )
-        {
-            verify = 1;
-            DPRINTF("Entering page verify mode\n");
-            continue;
-        }
-
-        if ( j == -2 )
-        {
-            new_ctxt_format = 1;
-            if ( read_exact(io_fd, &max_vcpu_id, sizeof(int)) ||
-                 (max_vcpu_id >= 64) ||
-                 read_exact(io_fd, &vcpumap, sizeof(uint64_t)) )
-            {
-                ERROR("Error when reading max_vcpu_id");
-                goto out;
+        if ( j == 0 ) {
+            /* catch vcpu updates */
+            if (pagebuf.new_ctxt_format) {
+                vcpumap = pagebuf.vcpumap;
+                max_vcpu_id = pagebuf.max_vcpu_id;
             }
-            continue;
-        }
-
-        if ( j == -3 )
-        {
-            uint64_t ident_pt;
-
-            /* Skip padding 4 bytes then read the EPT identity PT location. */
-            if ( read_exact(io_fd, &ident_pt, sizeof(uint32_t)) ||
-                 read_exact(io_fd, &ident_pt, sizeof(uint64_t)) )
-            {
-                ERROR("error read the address of the EPT identity map");
-                goto out;
-            }
-
-            xc_set_hvm_param(xc_handle, dom, HVM_PARAM_IDENT_PT, ident_pt);
-            continue;
-        }
-
-        if ( j == -4 )
-        {
-            uint64_t vm86_tss;
-
-            /* Skip padding 4 bytes then read the vm86 TSS location. */
-            if ( read_exact(io_fd, &vm86_tss, sizeof(uint32_t)) ||
-                 read_exact(io_fd, &vm86_tss, sizeof(uint64_t)) )
-            {
-                ERROR("error read the address of the vm86 TSS");
-                goto out;
-            }
-
-            xc_set_hvm_param(xc_handle, dom, HVM_PARAM_VM86_TSS, vm86_tss);
-            continue;
-        }
-
-        if ( j == -5 )
-        {
-            DPRINTF("xc_domain_restore start tmem\n");
-            if ( xc_tmem_restore(xc_handle, dom, io_fd) )
-            {
-                ERROR("error reading/restoring tmem");
-                goto out;
-            }
-            continue;
-        }
-
-        if ( j == -6 )
-        {
-            if ( xc_tmem_restore_extra(xc_handle, dom, io_fd) )
-            {
-                ERROR("error reading/restoring tmem extra");
-                goto out;
-            }
-            continue;
-        }
-
-        if ( j == 0 )
+            /* should this be deferred? does it change? */
+            if ( pagebuf.identpt )
+                xc_set_hvm_param(xc_handle, dom, HVM_PARAM_IDENT_PT, pagebuf.identpt);
+            if ( pagebuf.vm86_tss )
+                xc_set_hvm_param(xc_handle, dom, HVM_PARAM_VM86_TSS, pagebuf.vm86_tss);
             break;  /* our work here is done */
-
-        if ( (j > MAX_BATCH_SIZE) || (j < 0) )
-        {
-            ERROR("Max batch size exceeded. Giving up.");
-            goto out;
         }
 
-        if ( read_exact(io_fd, region_pfn_type, j*sizeof(unsigned long)) )
-        {
-            ERROR("Error when reading region pfn types");
-            goto out;
+        /* break pagebuf into batches */
+        curbatch = 0;
+        while ( curbatch < j ) {
+            int brc;
+
+            brc = apply_batch(xc_handle, dom, region_mfn, pfn_type,
+                              pae_extended_cr3, hvm, mmu, &pagebuf, curbatch, superpages);
+            if ( brc < 0 )
+                goto out;
+
+            nraces += brc;
+
+            curbatch += MAX_BATCH_SIZE;
         }
 
-        if (allocate_physmem(xc_handle, dom, region_pfn_type,
-                             j, hvm, region_mfn, superpages) != 0)
-            goto out;
+        pagebuf.nr_physpages = pagebuf.nr_pages = 0;
 
-        /* Map relevant mfns */
-        region_base = xc_map_foreign_batch(
-            xc_handle, dom, PROT_WRITE, region_mfn, j);
-
-        if ( region_base == NULL )
-        {
-            ERROR("map batch failed");
-            goto out;
-        }
-
-        for ( i = 0; i < j; i++ )
-        {
-            void *page;
-            unsigned long pagetype;
-
-            pfn      = region_pfn_type[i] & ~XEN_DOMCTL_PFINFO_LTAB_MASK;
-            pagetype = region_pfn_type[i] &  XEN_DOMCTL_PFINFO_LTAB_MASK;
-
-            if ( pagetype == XEN_DOMCTL_PFINFO_XTAB )
-                /* a bogus/unmapped page: skip it */
-                continue;
-
-            if ( pfn > p2m_size )
-            {
-                ERROR("pfn out of range");
-                goto out;
-            }
-
-            pfn_type[pfn] = pagetype;
-
-            mfn = p2m[pfn];
-
-            /* In verify mode, we use a copy; otherwise we work in place */
-            page = verify ? (void *)buf : (region_base + i*PAGE_SIZE);
-
-            if ( read_exact(io_fd, page, PAGE_SIZE) )
-            {
-                ERROR("Error when reading page (type was %lx)", pagetype);
-                goto out;
-            }
-
-            pagetype &= XEN_DOMCTL_PFINFO_LTABTYPE_MASK;
-
-            if ( (pagetype >= XEN_DOMCTL_PFINFO_L1TAB) && 
-                 (pagetype <= XEN_DOMCTL_PFINFO_L4TAB) )
-            {
-                /*
-                ** A page table page - need to 'uncanonicalize' it, i.e.
-                ** replace all the references to pfns with the corresponding
-                ** mfns for the new domain.
-                **
-                ** On PAE we need to ensure that PGDs are in MFNs < 4G, and
-                ** so we may need to update the p2m after the main loop.
-                ** Hence we defer canonicalization of L1s until then.
-                */
-                if ((pt_levels != 3) ||
-                    pae_extended_cr3 ||
-                    (pagetype != XEN_DOMCTL_PFINFO_L1TAB)) {
-
-                    if (!uncanonicalize_pagetable(xc_handle, dom, 
-                                                  pagetype, page, superpages)) {
-                        /*
-                        ** Failing to uncanonicalize a page table can be ok
-                        ** under live migration since the pages type may have
-                        ** changed by now (and we'll get an update later).
-                        */
-                        DPRINTF("PT L%ld race on pfn=%08lx mfn=%08lx\n",
-                                pagetype >> 28, pfn, mfn);
-                        nraces++;
-                        continue;
-                    } 
-                }
-            }
-            else if ( pagetype != XEN_DOMCTL_PFINFO_NOTAB )
-            {
-                ERROR("Bogus page type %lx page table is out of range: "
-                    "i=%d p2m_size=%lu", pagetype, i, p2m_size);
-                goto out;
-
-            }
-
-            if ( verify )
-            {
-                int res = memcmp(buf, (region_base + i*PAGE_SIZE), PAGE_SIZE);
-                if ( res )
-                {
-                    int v;
-
-                    DPRINTF("************** pfn=%lx type=%lx gotcs=%08lx "
-                            "actualcs=%08lx\n", pfn, pfn_type[pfn],
-                            csum_page(region_base + i*PAGE_SIZE),
-                            csum_page(buf));
-
-                    for ( v = 0; v < 4; v++ )
-                    {
-                        unsigned long *p = (unsigned long *)
-                            (region_base + i*PAGE_SIZE);
-                        if ( buf[v] != p[v] )
-                            DPRINTF("    %d: %08lx %08lx\n", v, buf[v], p[v]);
-                    }
-                }
-            }
-
-            if ( !hvm &&
-                 xc_add_mmu_update(xc_handle, mmu,
-                                   (((unsigned long long)mfn) << PAGE_SHIFT)
-                                   | MMU_MACHPHYS_UPDATE, pfn) )
-            {
-                ERROR("failed machpys update mfn=%lx pfn=%lx", mfn, pfn);
-                goto out;
-            }
-        } /* end of 'batch' for loop */
-
-        munmap(region_base, j*PAGE_SIZE);
-        n+= j; /* crude stats */
+        n += j; /* crude stats */
 
         /* 
          * Discard cache for portion of file read so far up to last
@@ -1033,7 +1267,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         goto out;
     }
 
-    DPRINTF("Received all pages (%d races)\n", nraces);
+    // DPRINTF("Received all pages (%d races)\n", nraces);
 
     if ( hvm ) 
     {
@@ -1106,6 +1340,34 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     }
 
     /* Non-HVM guests only from here on */
+
+    if ( !completed ) {
+        if ( buffer_tail(&tailbuf, io_fd, max_vcpu_id, vcpumap,
+                         ext_vcpucontext) < 0 ) {
+            ERROR ("error buffering image tail");
+            goto out;
+        }
+        completed = 1;
+    }
+
+    // DPRINTF("Buffered checkpoint\n");
+
+    if ( pagebuf_get(&pagebuf, io_fd, xc_handle, dom) ) {
+        ERROR("error when buffering batch, finishing\n");
+        goto finish;
+    }
+    memset(&tmptail, 0, sizeof(tmptail));
+    if ( buffer_tail(&tmptail, io_fd, max_vcpu_id, vcpumap,
+                     ext_vcpucontext) < 0 ) {
+        ERROR ("error buffering image tail, finishing");
+        goto finish;
+    }
+    tailbuf_free(&tailbuf);
+    memcpy(&tailbuf, &tmptail, sizeof(tailbuf));
+
+    goto loadpages;
+
+  finish:
 
     if ( (pt_levels == 3) && !pae_extended_cr3 )
     {
@@ -1275,39 +1537,17 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
 
     /* Get the list of PFNs that are not in the psuedo-phys map */
     {
-        unsigned int count = 0;
-        unsigned long *pfntab;
-        int nr_frees;
+        int nr_frees = 0;
 
-        if ( read_exact(io_fd, &count, sizeof(count)) ||
-             (count > (1U << 28)) ) /* up to 1TB of address space */
+        for ( i = 0; i < tailbuf.pfncount; i++ )
         {
-            ERROR("Error when reading pfn count (= %u)", count);
-            goto out;
-        }
-
-        if ( !(pfntab = malloc(sizeof(unsigned long) * count)) )
-        {
-            ERROR("Out of memory");
-            goto out;
-        }
-
-        if ( read_exact(io_fd, pfntab, sizeof(unsigned long)*count) )
-        {
-            ERROR("Error when reading pfntab");
-            goto out;
-        }
-
-        nr_frees = 0; 
-        for ( i = 0; i < count; i++ )
-        {
-            unsigned long pfn = pfntab[i];
+            unsigned long pfn = tailbuf.pfntab[i];
 
             if ( p2m[pfn] != INVALID_P2M_ENTRY )
             {
-                /* pfn is not in physmap now, but was at some point during 
+                /* pfn is not in physmap now, but was at some point during
                    the save/migration process - need to free it */
-                pfntab[nr_frees++] = p2m[pfn];
+                tailbuf.pfntab[nr_frees++] = p2m[pfn];
                 p2m[pfn]  = INVALID_P2M_ENTRY; /* not in pseudo-physical map */
             }
         }
@@ -1319,7 +1559,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
                 .extent_order = 0,
                 .domid        = dom
             };
-            set_xen_guest_handle(reservation.extent_start, pfntab);
+            set_xen_guest_handle(reservation.extent_start, tailbuf.pfntab);
 
             if ( (frc = xc_memory_op(xc_handle, XENMEM_decrease_reservation,
                                      &reservation)) != nr_frees )
@@ -1328,7 +1568,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
                 goto out;
             }
             else
-                DPRINTF("Decreased reservation by %d pages\n", count);
+                DPRINTF("Decreased reservation by %d pages\n", tailbuf.pfncount);
         }
     }
 
@@ -1338,18 +1578,17 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         return 1;
     }
 
+    vcpup = tailbuf.vcpubuf;
     for ( i = 0; i <= max_vcpu_id; i++ )
     {
         if ( !(vcpumap & (1ULL << i)) )
             continue;
 
-        if ( read_exact(io_fd, &ctxt, ((guest_width == 8)
-                                       ? sizeof(ctxt.x64)
-                                       : sizeof(ctxt.x32))) )
-        {
-            ERROR("Error when reading ctxt %d", i);
-            goto out;
-        }
+        memcpy(&ctxt, vcpup, ((guest_width == 8) ? sizeof(ctxt.x64)
+                              : sizeof(ctxt.x32)));
+        vcpup += (guest_width == 8) ? sizeof(ctxt.x64) : sizeof(ctxt.x32);
+
+        DPRINTF("read VCPU %d\n", i);
 
         if ( !new_ctxt_format )
             SET_FIELD(&ctxt, flags, GET_FIELD(&ctxt, flags) | VGCF_online);
@@ -1454,12 +1693,8 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
 
         if ( !ext_vcpucontext )
             continue;
-        if ( read_exact(io_fd, &domctl.u.ext_vcpucontext, 128) ||
-             (domctl.u.ext_vcpucontext.vcpu != i) )
-        {
-            ERROR("Error when reading extended ctxt %d", i);
-            goto out;
-        }
+        memcpy(&domctl.u.ext_vcpucontext, vcpup, 128);
+        vcpup += 128;
         domctl.cmd = XEN_DOMCTL_set_ext_vcpucontext;
         domctl.domain = dom;
         frc = xc_domctl(xc_handle, &domctl);
@@ -1470,11 +1705,9 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         }
     }
 
-    if ( read_exact(io_fd, shared_info_page, PAGE_SIZE) )
-    {
-        ERROR("Error when reading shared info page");
-        goto out;
-    }
+    memcpy(shared_info_page, tailbuf.shared_info_page, PAGE_SIZE);
+
+    DPRINTF("Completed checkpoint load\n");
 
     /* Restore contents of shared-info page. No checking needed. */
     new_shared_info = xc_map_foreign_range(
