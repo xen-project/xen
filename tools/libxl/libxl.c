@@ -509,7 +509,7 @@ int libxl_create_device_model(struct libxl_ctx *ctx,
         rename(logfile, logfile_new);
     }
     logfile = libxl_sprintf(ctx, "/var/log/xen/qemu-dm-%s.log", info->dom_name);
-    logfile_w = open(logfile, O_WRONLY|O_CREAT);
+    logfile_w = open(logfile, O_WRONLY|O_CREAT, 0644);
     null = open("/dev/null", O_RDONLY);
     pid = libxl_exec(ctx, null, logfile_w, logfile_w, info->device_model, args);
     close(null);
