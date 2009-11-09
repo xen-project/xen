@@ -323,26 +323,6 @@ def restore(xd, fd, dominfo = None, paused = False, relocating = False):
         if not is_hvm and handler.console_mfn is None:
             raise XendError('Could not read console MFN')        
 
-        # get qemu state and create a tmp file for dm restore
-        # Even PV guests may have QEMU stat, but its not currently
-        # used so only bother with HVM currently.
-        if is_hvm:
-            qemu_signature = read_exact(fd, len(QEMU_SIGNATURE),
-                                        "invalid device model signature read")
-            if qemu_signature != QEMU_SIGNATURE:
-                raise XendError("not a valid device model state: found '%s'" %
-                                qemu_signature)
-            qemu_fd = os.open("/var/lib/xen/qemu-save.%d" % dominfo.getDomid(),
-                              os.O_WRONLY | os.O_CREAT | os.O_TRUNC)
-            while True:
-                buf = os.read(fd, dm_batch)
-                if len(buf):
-                    write_exact(qemu_fd, buf,
-                                "could not write dm state to tmp file")
-                else:
-                    break
-            os.close(qemu_fd)
-
         restore_image.setCpuid()
 
         # xc_restore will wait for source to close connection

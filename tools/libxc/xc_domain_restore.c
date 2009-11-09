@@ -670,15 +670,204 @@ static xen_pfn_t *load_p2m_frame_list(
 }
 
 typedef struct {
-    unsigned int pfncount;
-    unsigned long* pfntab;
-    unsigned int vcpucount;
-    unsigned char* vcpubuf;
-    unsigned char shared_info_page[PAGE_SIZE];
+    int ishvm;
+    union {
+        struct tailbuf_pv {
+            unsigned int pfncount;
+            unsigned long* pfntab;
+            unsigned int vcpucount;
+            unsigned char* vcpubuf;
+            unsigned char shared_info_page[PAGE_SIZE];
+        } pv;
+        struct tailbuf_hvm {
+            uint64_t magicpfns[3];
+            uint32_t hvmbufsize, reclen;
+            uint8_t* hvmbuf;
+            struct {
+                uint32_t magic;
+                uint32_t version;
+                uint64_t len;
+            } qemuhdr;
+            uint32_t qemubufsize;
+            uint8_t* qemubuf;
+        } hvm;
+    } u;
 } tailbuf_t;
 
-static int buffer_tail(tailbuf_t* buf, int fd, unsigned int max_vcpu_id,
-                      uint64_t vcpumap, int ext_vcpucontext)
+/* read stream until EOF, growing buffer as necssary */
+static int compat_buffer_qemu(int fd, struct tailbuf_hvm *buf)
+{
+    uint8_t *qbuf, *tmp;
+    int blen = 0, dlen = 0;
+    int rc;
+
+    /* currently save records tend to be about 7K */
+    blen = 8192;
+    if ( !(qbuf = malloc(blen)) ) {
+        ERROR("Error allocating QEMU buffer");
+        return -1;
+    }
+
+    while( (rc = read(fd, qbuf+dlen, blen-dlen)) > 0 ) {
+        DPRINTF("Read %d bytes of QEMU data\n", rc);
+        dlen += rc;
+
+        if (dlen == blen) {
+            DPRINTF("%d-byte QEMU buffer full, reallocating...\n", dlen);
+            blen += 4096;
+            tmp = realloc(qbuf, blen);
+            if ( !tmp ) {
+                ERROR("Error growing QEMU buffer to %d bytes", blen);
+                free(qbuf);
+                return -1;
+            }
+            qbuf = tmp;
+        }
+    }
+
+    if ( rc < 0 ) {
+        ERROR("Error reading QEMU data");
+        free(qbuf);
+        return -1;
+    }
+
+    if ( memcmp(qbuf, "QEVM", 4) ) {
+        ERROR("Invalid QEMU magic: 0x%08x", *(unsigned long*)qbuf);
+        free(qbuf);
+        return -1;
+    }
+
+    buf->qemubuf = qbuf;
+    buf->qemubufsize = dlen;
+
+    return 0;
+}
+
+static int buffer_qemu(int fd, struct tailbuf_hvm *buf)
+{
+    uint32_t qlen;
+    uint8_t *tmp;
+
+    if ( read_exact(fd, &qlen, sizeof(qlen)) ) {
+        ERROR("Error reading QEMU header length");
+        return -1;
+    }
+
+    if ( qlen > buf->qemubufsize ) {
+        if ( buf->qemubuf) {
+            tmp = realloc(buf->qemubuf, qlen);
+            if ( tmp )
+                buf->qemubuf = tmp;
+            else {
+                ERROR("Error reallocating QEMU state buffer");
+                return -1;
+            }
+        } else {
+            buf->qemubuf = malloc(qlen);
+            if ( !buf->qemubuf ) {
+                ERROR("Error allocating QEMU state buffer");
+                return -1;
+            }
+        }
+    }
+    buf->qemubufsize = qlen;
+
+    if ( read_exact(fd, buf->qemubuf, buf->qemubufsize) ) {
+        ERROR("Error reading QEMU state");
+        return -1;
+    }
+
+    return 0;
+}
+
+static int dump_qemu(uint32_t dom, struct tailbuf_hvm *buf)
+{
+    int saved_errno;
+    char path[256];
+    FILE *fp;
+
+    sprintf(path, "/var/lib/xen/qemu-save.%u", dom);
+    fp = fopen(path, "wb");
+    if ( !fp )
+        return -1;
+
+    DPRINTF("Writing %d bytes of QEMU data\n", buf->qemubufsize);
+    if ( fwrite(buf->qemubuf, 1, buf->qemubufsize, fp) != buf->qemubufsize) {
+        saved_errno = errno;
+        fclose(fp);
+        errno = saved_errno;
+        return -1;
+    }
+
+    fclose(fp);
+
+    return 0;
+}
+
+static int buffer_tail_hvm(struct tailbuf_hvm *buf, int fd,
+                           unsigned int max_vcpu_id, uint64_t vcpumap,
+                           int ext_vcpucontext)
+{
+    uint8_t *tmp;
+    unsigned char qemusig[21];
+
+    if ( read_exact(fd, buf->magicpfns, sizeof(buf->magicpfns)) ) {
+        ERROR("Error reading magic PFNs");
+        return -1;
+    }
+
+    if ( read_exact(fd, &buf->reclen, sizeof(buf->reclen)) ) {
+        ERROR("Error reading HVM params size");
+        return -1;
+    }
+
+    if ( buf->reclen > buf->hvmbufsize ) {
+        if ( buf->hvmbuf) {
+            tmp = realloc(buf->hvmbuf, buf->reclen);
+            if ( tmp ) {
+                buf->hvmbuf = tmp;
+                buf->hvmbufsize = buf->reclen;
+            } else {
+                ERROR("Error reallocating HVM param buffer");
+                return -1;
+            }
+        } else {
+            buf->hvmbuf = malloc(buf->reclen);
+            if ( !buf->hvmbuf ) {
+                ERROR("Error allocating HVM param buffer");
+                return -1;
+            }
+            buf->hvmbufsize = buf->reclen;
+        }
+    }
+
+    if ( read_exact(fd, buf->hvmbuf, buf->reclen) ) {
+        ERROR("Error reading HVM params");
+        return -1;
+    }
+
+    if ( read_exact(fd, qemusig, sizeof(qemusig)) ) {
+        ERROR("Error reading QEMU signature");
+        return -1;
+    }
+
+    /* The normal live-migration QEMU record has no length information.
+     * Short of reimplementing the QEMU parser, we're forced to just read
+     * until EOF. Remus gets around this by sending a different signature
+     * which includes a length prefix */
+    if ( !memcmp(qemusig, "QemuDeviceModelRecord", sizeof(qemusig)) )
+        return compat_buffer_qemu(fd, buf);
+    else if ( !memcmp(qemusig, "RemusDeviceModelState", sizeof(qemusig)) )
+        return buffer_qemu(fd, buf);
+
+    qemusig[20] = '\0';
+    ERROR("Invalid QEMU signature: %s", qemusig);
+    return -1;
+}
+
+static int buffer_tail_pv(struct tailbuf_pv *buf, int fd,
+                          unsigned int max_vcpu_id, uint64_t vcpumap,
+                          int ext_vcpucontext)
 {
     unsigned int i;
     size_t pfnlen, vcpulen;
@@ -753,16 +942,47 @@ static int buffer_tail(tailbuf_t* buf, int fd, unsigned int max_vcpu_id,
     return -1;
 }
 
-static void tailbuf_free(tailbuf_t* buf)
+static int buffer_tail(tailbuf_t *buf, int fd, unsigned int max_vcpu_id,
+                       uint64_t vcpumap, int ext_vcpucontext)
 {
-    if (buf->vcpubuf) {
+    if ( buf->ishvm )
+        return buffer_tail_hvm(&buf->u.hvm, fd, max_vcpu_id, vcpumap,
+                               ext_vcpucontext);
+    else
+        return buffer_tail_pv(&buf->u.pv, fd, max_vcpu_id, vcpumap,
+                              ext_vcpucontext);
+}
+
+static void tailbuf_free_hvm(struct tailbuf_hvm *buf)
+{
+    if ( buf->hvmbuf ) {
+        free(buf->hvmbuf);
+        buf->hvmbuf = NULL;
+    }
+    if ( buf->qemubuf ) {
+        free(buf->qemubuf);
+        buf->qemubuf = NULL;
+    }
+}
+
+static void tailbuf_free_pv(struct tailbuf_pv *buf)
+{
+    if ( buf->vcpubuf ) {
         free(buf->vcpubuf);
         buf->vcpubuf = NULL;
     }
-    if (buf->pfntab) {
+    if ( buf->pfntab ) {
         free(buf->pfntab);
         buf->pfntab = NULL;
     }
+}
+
+static void tailbuf_free(tailbuf_t *buf)
+{
+    if ( buf->ishvm )
+        tailbuf_free_hvm(&buf->u.hvm);
+    else
+        tailbuf_free_pv(&buf->u.pv);
 }
 
 typedef struct {
@@ -1118,18 +1338,13 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     unsigned int max_vcpu_id = 0;
     int new_ctxt_format = 0;
 
-    /* Magic frames in HVM guests: ioreqs and xenstore comms. */
-    uint64_t magic_pfns[3]; /* ioreq_pfn, bufioreq_pfn, store_pfn */
-
-    /* Buffer for holding HVM context */
-    uint8_t *hvm_buf = NULL;
-
     pagebuf_t pagebuf;
     tailbuf_t tailbuf, tmptail;
     void* vcpup;
 
     pagebuf_init(&pagebuf);
     memset(&tailbuf, 0, sizeof(tailbuf));
+    tailbuf.ishvm = hvm;
 
     /* For info only */
     nr_pfns = 0;
@@ -1313,78 +1528,6 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
 
     // DPRINTF("Received all pages (%d races)\n", nraces);
 
-    if ( hvm ) 
-    {
-        uint32_t rec_len;
-
-        /* Set HVM-specific parameters */
-        if ( read_exact(io_fd, magic_pfns, sizeof(magic_pfns)) )
-        {
-            ERROR("error reading magic page addresses");
-            goto out;
-        }
-        
-        /* These comms pages need to be zeroed at the start of day */
-        if ( xc_clear_domain_page(xc_handle, dom, magic_pfns[0]) ||
-             xc_clear_domain_page(xc_handle, dom, magic_pfns[1]) ||
-             xc_clear_domain_page(xc_handle, dom, magic_pfns[2]) )
-        {
-            ERROR("error zeroing magic pages");
-            goto out;
-        }
-                
-        if ( (frc = xc_set_hvm_param(xc_handle, dom, 
-                                     HVM_PARAM_IOREQ_PFN, magic_pfns[0]))
-             || (frc = xc_set_hvm_param(xc_handle, dom, 
-                                        HVM_PARAM_BUFIOREQ_PFN, magic_pfns[1]))
-             || (frc = xc_set_hvm_param(xc_handle, dom, 
-                                        HVM_PARAM_STORE_PFN, magic_pfns[2]))
-             || (frc = xc_set_hvm_param(xc_handle, dom, 
-                                        HVM_PARAM_PAE_ENABLED, pae))
-             || (frc = xc_set_hvm_param(xc_handle, dom, 
-                                        HVM_PARAM_STORE_EVTCHN,
-                                        store_evtchn)) )
-        {
-            ERROR("error setting HVM params: %i", frc);
-            goto out;
-        }
-        *store_mfn = magic_pfns[2];
-
-        /* Read HVM context */
-        if ( read_exact(io_fd, &rec_len, sizeof(uint32_t)) )
-        {
-            ERROR("error read hvm context size!\n");
-            goto out;
-        }
-        
-        hvm_buf = malloc(rec_len);
-        if ( hvm_buf == NULL )
-        {
-            ERROR("memory alloc for hvm context buffer failed");
-            errno = ENOMEM;
-            goto out;
-        }
-        
-        if ( read_exact(io_fd, hvm_buf, rec_len) )
-        {
-            ERROR("error loading the HVM context");
-            goto out;
-        }
-        
-        frc = xc_domain_hvm_setcontext(xc_handle, dom, hvm_buf, rec_len);
-        if ( frc )
-        {
-            ERROR("error setting the HVM context");
-            goto out;
-        }
-
-        /* HVM success! */
-        rc = 0;
-        goto out;
-    }
-
-    /* Non-HVM guests only from here on */
-
     if ( !completed ) {
         int flags = 0;
 
@@ -1407,6 +1550,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         goto finish;
     }
     memset(&tmptail, 0, sizeof(tmptail));
+    tmptail.ishvm = hvm;
     if ( buffer_tail(&tmptail, io_fd, max_vcpu_id, vcpumap,
                      ext_vcpucontext) < 0 ) {
         ERROR ("error buffering image tail, finishing");
@@ -1418,6 +1562,8 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     goto loadpages;
 
   finish:
+    if ( hvm )
+        goto finish_hvm;
 
     if ( (pt_levels == 3) && !pae_extended_cr3 )
     {
@@ -1589,15 +1735,15 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     {
         int nr_frees = 0;
 
-        for ( i = 0; i < tailbuf.pfncount; i++ )
+        for ( i = 0; i < tailbuf.u.pv.pfncount; i++ )
         {
-            unsigned long pfn = tailbuf.pfntab[i];
+            unsigned long pfn = tailbuf.u.pv.pfntab[i];
 
             if ( p2m[pfn] != INVALID_P2M_ENTRY )
             {
                 /* pfn is not in physmap now, but was at some point during
                    the save/migration process - need to free it */
-                tailbuf.pfntab[nr_frees++] = p2m[pfn];
+                tailbuf.u.pv.pfntab[nr_frees++] = p2m[pfn];
                 p2m[pfn]  = INVALID_P2M_ENTRY; /* not in pseudo-physical map */
             }
         }
@@ -1609,7 +1755,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
                 .extent_order = 0,
                 .domid        = dom
             };
-            set_xen_guest_handle(reservation.extent_start, tailbuf.pfntab);
+            set_xen_guest_handle(reservation.extent_start, tailbuf.u.pv.pfntab);
 
             if ( (frc = xc_memory_op(xc_handle, XENMEM_decrease_reservation,
                                      &reservation)) != nr_frees )
@@ -1618,7 +1764,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
                 goto out;
             }
             else
-                DPRINTF("Decreased reservation by %d pages\n", tailbuf.pfncount);
+                DPRINTF("Decreased reservation by %d pages\n", tailbuf.u.pv.pfncount);
         }
     }
 
@@ -1628,7 +1774,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         return 1;
     }
 
-    vcpup = tailbuf.vcpubuf;
+    vcpup = tailbuf.u.pv.vcpubuf;
     for ( i = 0; i <= max_vcpu_id; i++ )
     {
         if ( !(vcpumap & (1ULL << i)) )
@@ -1755,7 +1901,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         }
     }
 
-    memcpy(shared_info_page, tailbuf.shared_info_page, PAGE_SIZE);
+    memcpy(shared_info_page, tailbuf.u.pv.shared_info_page, PAGE_SIZE);
 
     DPRINTF("Completed checkpoint load\n");
 
@@ -1812,6 +1958,51 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
 
     DPRINTF("Domain ready to be built.\n");
     rc = 0;
+    goto out;
+
+  finish_hvm:
+    /* Dump the QEMU state to a state file for QEMU to load */
+    if ( dump_qemu(dom, &tailbuf.u.hvm) ) {
+        ERROR("Error dumping QEMU state to file");
+        goto out;
+    }
+
+    /* These comms pages need to be zeroed at the start of day */
+    if ( xc_clear_domain_page(xc_handle, dom, tailbuf.u.hvm.magicpfns[0]) ||
+         xc_clear_domain_page(xc_handle, dom, tailbuf.u.hvm.magicpfns[1]) ||
+         xc_clear_domain_page(xc_handle, dom, tailbuf.u.hvm.magicpfns[2]) )
+    {
+        ERROR("error zeroing magic pages");
+        goto out;
+    }
+
+    if ( (frc = xc_set_hvm_param(xc_handle, dom,
+                                 HVM_PARAM_IOREQ_PFN, tailbuf.u.hvm.magicpfns[0]))
+         || (frc = xc_set_hvm_param(xc_handle, dom,
+                                    HVM_PARAM_BUFIOREQ_PFN, tailbuf.u.hvm.magicpfns[1]))
+         || (frc = xc_set_hvm_param(xc_handle, dom,
+                                    HVM_PARAM_STORE_PFN, tailbuf.u.hvm.magicpfns[2]))
+         || (frc = xc_set_hvm_param(xc_handle, dom,
+                                    HVM_PARAM_PAE_ENABLED, pae))
+         || (frc = xc_set_hvm_param(xc_handle, dom,
+                                    HVM_PARAM_STORE_EVTCHN,
+                                    store_evtchn)) )
+    {
+        ERROR("error setting HVM params: %i", frc);
+        goto out;
+    }
+    *store_mfn = tailbuf.u.hvm.magicpfns[2];
+
+    frc = xc_domain_hvm_setcontext(xc_handle, dom, tailbuf.u.hvm.hvmbuf,
+                                   tailbuf.u.hvm.reclen);
+    if ( frc )
+    {
+        ERROR("error setting the HVM context");
+        goto out;
+    }
+
+    /* HVM success! */
+    rc = 0;
 
  out:
     if ( (rc != 0) && (dom != 0) )
@@ -1819,7 +2010,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     free(mmu);
     free(p2m);
     free(pfn_type);
-    free(hvm_buf);
+    tailbuf_free(&tailbuf);
 
     /* discard cache for save file  */
     discard_file_cache(io_fd, 1 /*flush*/);
