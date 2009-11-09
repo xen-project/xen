@@ -32,6 +32,7 @@ SUBDIRS-$(CONFIG_Linux) += fs-back
 SUBDIRS-$(CONFIG_NetBSD) += fs-back
 SUBDIRS-$(CONFIG_IOEMU) += ioemu-dir
 SUBDIRS-y += xenpmd
+SUBDIRS-y += libxl
 
 # These don't cross-compile
 ifeq ($(XEN_COMPILE_ARCH),$(XEN_TARGET_ARCH))
