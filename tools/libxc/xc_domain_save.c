@@ -52,6 +52,15 @@ static unsigned long m2p_mfn0;
 /* Address size of the guest */
 unsigned int guest_width;
 
+/* buffer for output */
+struct outbuf {
+    void* buf;
+    size_t size;
+    size_t pos;
+};
+
+#define OUTBUF_SIZE (16384 * 1024)
+
 /* grep fodder: machine_to_phys */
 
 #define mfn_to_pfn(_mfn)  (live_m2p[(_mfn)])
@@ -154,6 +163,85 @@ static int noncached_write(int fd, int live, void *buffer, int len)
     return rc;
 }
 
+static int outbuf_init(struct outbuf* ob, size_t size)
+{
+    memset(ob, 0, sizeof(*ob));
+
+    if ( !(ob->buf = malloc(size)) ) {
+        DPRINTF("error allocating output buffer of size %zu\n", size);
+        return -1;
+    }
+
+    ob->size = size;
+
+    return 0;
+}
+
+static inline int outbuf_write(struct outbuf* ob, void* buf, size_t len)
+{
+    if ( len > ob->size - ob->pos ) {
+        DPRINTF("outbuf_write: %zu > %zu@%zu\n", len, ob->size - ob->pos, ob->pos);
+        return -1;
+    }
+
+    memcpy(ob->buf + ob->pos, buf, len);
+    ob->pos += len;
+
+    return 0;
+}
+
+/* prep for nonblocking I/O */
+static int outbuf_flush(struct outbuf* ob, int fd)
+{
+    int rc;
+    int cur = 0;
+
+    if ( !ob->pos )
+        return 0;
+
+    rc = write(fd, ob->buf, ob->pos);
+    while (rc < 0 || cur + rc < ob->pos) {
+        if (rc < 0 && errno != EAGAIN && errno != EINTR) {
+            DPRINTF("error flushing output: %d\n", errno);
+            return -1;
+        }
+        if (rc > 0)
+            cur += rc;
+
+        rc = write(fd, ob->buf + cur, ob->pos - cur);
+    }
+
+    ob->pos = 0;
+
+    return 0;
+}
+
+/* if there's no room in the buffer, flush it and try again. */
+static inline int outbuf_hardwrite(struct outbuf* ob, int fd, void* buf,
+                                   size_t len)
+{
+    if ( !len )
+        return 0;
+
+    if ( !outbuf_write(ob, buf, len) )
+        return 0;
+
+    if ( outbuf_flush(ob, fd) < 0 )
+        return -1;
+
+    return outbuf_write(ob, buf, len);
+}
+
+/* start buffering output once we've reached checkpoint mode. */
+static inline int write_buffer(int dobuf, struct outbuf* ob, int fd, void* buf,
+                               size_t len)
+{
+    if ( dobuf )
+        return outbuf_hardwrite(ob, fd, buf, len);
+    else
+        return write_exact(fd, buf, len);
+}
+
 #ifdef ADAPTIVE_SAVE
 
 /*
@@ -245,6 +333,16 @@ static int ratewrite(int io_fd, int live, void *buf, int n)
 #define initialize_mbit_rate()
 
 #endif
+
+/* like write_buffer for ratewrite, which returns number of bytes written */
+static inline int ratewrite_buffer(int dobuf, struct outbuf* ob, int fd,
+                                   int live, void* buf, size_t len)
+{
+    if ( dobuf )
+        return outbuf_hardwrite(ob, fd, buf, len) ? -1 : len;
+    else
+        return ratewrite(fd, live, buf, len);
+}
 
 static int print_stats(int xc_handle, uint32_t domid, int pages_sent,
                        xc_shadow_op_stats_t *stats, int print)
@@ -796,6 +894,10 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
     unsigned long mfn;
 
+    struct outbuf ob;
+
+    outbuf_init(&ob, OUTBUF_SIZE);
+
     /* If no explicit control parameters given, use defaults */
     max_iters  = max_iters  ? : DEF_MAX_ITERS;
     max_factor = max_factor ? : DEF_MAX_FACTOR;
@@ -995,6 +1097,12 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     }
 
   copypages:
+#define write_exact(fd, buf, len) write_buffer(last_iter, &ob, (fd), (buf), (len))
+#ifdef ratewrite
+#undef ratewrite
+#endif
+#define ratewrite(fd, live, buf, len) ratewrite_buffer(last_iter, &ob, (fd), (live), (buf), (len))
+
     /* Now write out each data page, canonicalising page tables as we go... */
     for ( ; ; )
     {
@@ -1594,7 +1702,10 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         callbacks->postcopy(callbacks->data);
 
     /* Flush last write and discard cache for file. */
-    discard_file_cache(io_fd, 1 /* flush */);
+    if ( outbuf_flush(&ob, io_fd) < 0 ) {
+        ERROR("Error when flushing output buffer\n");
+        rc = 1;
+    }
 
     /* checkpoint_cb can spend arbitrarily long in between rounds */
     if (!rc && callbacks->checkpoint &&
