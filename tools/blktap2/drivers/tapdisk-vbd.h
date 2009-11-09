@@ -53,6 +53,7 @@
 
 typedef struct td_ring              td_ring_t;
 typedef struct td_vbd_request       td_vbd_request_t;
+typedef struct td_vbd_driver_info   td_vbd_driver_info_t;
 typedef struct td_vbd_handle        td_vbd_t;
 typedef void (*td_vbd_cb_t)        (void *, blkif_response_t *);
 
@@ -79,11 +80,19 @@ struct td_vbd_request {
 	struct list_head            next;
 };
 
+struct td_vbd_driver_info {
+	char                       *params;
+	int                         type;
+	struct list_head            next;
+};
+
 struct td_vbd_handle {
 	char                       *name;
 
 	td_uuid_t                   uuid;
 	int                         type;
+
+	struct list_head            driver_stack;
 
 	int                         storage;
 
@@ -164,6 +173,7 @@ tapdisk_vbd_next_image(td_image_t *image)
 
 int tapdisk_vbd_initialize(int, int, td_uuid_t);
 void tapdisk_vbd_set_callback(td_vbd_t *, td_vbd_cb_t, void *);
+int tapdisk_vbd_parse_stack(td_vbd_t *vbd, const char *path);
 int tapdisk_vbd_open(td_vbd_t *, const char *, uint16_t,
 		     uint16_t, const char *, td_flag_t);
 int tapdisk_vbd_close(td_vbd_t *);

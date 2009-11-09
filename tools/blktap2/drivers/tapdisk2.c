@@ -264,6 +264,13 @@ tapdisk2_open_device(int type, const char *path, const char *name)
 		return err;
 	}
 
+	err = tapdisk_vbd_parse_stack(vbd, name);
+	if (err) {
+		CHILD_ERR(err, "vbd_parse_stack failed: %d\n", err);
+		return err;
+	}
+
+	/* TODO: clean this up */
 	err = tapdisk_vbd_open(vbd, path, type,
 			       TAPDISK_STORAGE_TYPE_DEFAULT,
 			       devname, 0);
