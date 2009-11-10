@@ -44,6 +44,7 @@
 #include <xen/softirq.h>
 #include <xen/serial.h>
 #include <xen/numa.h>
+#include <xen/event.h>
 #include <asm/current.h>
 #include <asm/mc146818rtc.h>
 #include <asm/desc.h>
@@ -104,7 +105,7 @@ static void map_cpu_to_logical_apicid(void);
 DEFINE_PER_CPU(int, cpu_state) = { 0 };
 
 static void *stack_base[NR_CPUS];
-static DEFINE_SPINLOCK(cpu_add_remove_lock);
+DEFINE_SPINLOCK(cpu_add_remove_lock);
 
 /*
  * The bootstrap kernel entry code has set these up. Save them for
@@ -1342,6 +1343,8 @@ int cpu_down(unsigned int cpu)
 	cpu_mcheck_distribute_cmci();
 
 out:
+    if (!err)
+        send_guest_global_virq(dom0, VIRQ_PCPU_STATE);
 	spin_unlock(&cpu_add_remove_lock);
 	return err;
 }
@@ -1362,6 +1365,8 @@ int cpu_up(unsigned int cpu)
 		goto out;
 
 out:
+    if (!err)
+        send_guest_global_virq(dom0, VIRQ_PCPU_STATE);
 	spin_unlock(&cpu_add_remove_lock);
 	return err;
 }

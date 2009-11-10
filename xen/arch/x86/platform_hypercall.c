@@ -53,6 +53,12 @@ static long cpu_frequency_change_helper(void *data)
     return cpu_frequency_change(this_cpu(freq));
 }
 
+static long cpu_down_helper(void *data)
+{
+    int cpu = (unsigned long)data;
+    return cpu_down(cpu);
+}
+
 ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
 {
     ret_t ret = 0;
@@ -385,7 +391,97 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
             break;
         }
         break;
- 
+
+    case XENPF_get_cpuinfo:
+    {
+        int i;
+        struct xenpf_pcpu_info *g_info;
+        struct xen_physical_cpuinfo pcpu;
+        XEN_GUEST_HANDLE(xen_physical_cpuinfo_t) g_cpus;
+
+        g_info = &op->u.pcpu_info;
+        if (g_info->info_num <= 0 )
+        {
+            op->u.pcpu_info.max_present = last_cpu(cpu_present_map);
+            op->u.pcpu_info.max_possible = last_cpu(cpu_possible_map);
+            goto done;
+        }
+
+        guest_from_compat_handle(g_cpus, g_info->info);
+
+        spin_lock(&cpu_add_remove_lock);
+
+        ret = -EFAULT;
+        for (i = 0; i < g_info->info_num; i++)
+        {
+            if (copy_from_guest_offset(&pcpu, g_cpus, i, 1) )
+                goto out;
+
+            if ( (pcpu.xen_cpuid >= NR_CPUS) ||
+                 (pcpu.xen_cpuid < 0) ||
+                 !cpu_present(pcpu.xen_cpuid) )
+            {
+                pcpu.flags |= XEN_PCPU_FLAGS_INVALID;
+            }
+            else
+            {
+                pcpu.apic_id = x86_cpu_to_apicid[pcpu.xen_cpuid];
+                pcpu.acpi_id = acpi_get_processor_id(pcpu.xen_cpuid);
+                ASSERT(pcpu.apic_id != BAD_APICID);
+                if (cpu_online(pcpu.xen_cpuid))
+                    pcpu.flags |= XEN_PCPU_FLAGS_ONLINE;
+            }
+
+            if ( copy_to_guest_offset(g_cpus, i, &pcpu, 1) )
+                goto out;
+        }
+        op->u.pcpu_info.max_present = last_cpu(cpu_present_map);
+        op->u.pcpu_info.max_possible = last_cpu(cpu_possible_map);
+        spin_unlock(&cpu_add_remove_lock);
+done:
+        ret = copy_to_guest(u_xenpf_op, op, 1) ? -EFAULT : 0;
+    }
+    break;
+
+    case XENPF_resource_hotplug:
+    {
+        int cpu;
+
+        switch ( op->u.resource.sub_cmd)
+        {
+        case XEN_CPU_online:
+            cpu = op->u.resource.u.cpu_ol.cpuid;
+            if (!cpu_present(cpu))
+            {
+                ret = -EINVAL;
+                break;
+            }
+            else if (cpu_online(cpu))
+            {
+                ret = 0;
+                break;
+            }
+
+            ret = cpu_up(cpu);
+            break;
+        case XEN_CPU_offline:
+            cpu = op->u.resource.u.cpu_ol.cpuid;
+            if (!cpu_present(cpu))
+            {
+                ret = -EINVAL;
+                break;
+            } else if (!cpu_online(cpu))
+            {
+                ret = 0;
+                break;
+            }
+            ret = continue_hypercall_on_cpu(
+                0, cpu_down_helper, (void *)(unsigned long)cpu);
+            break;
+        }
+    }
+    break;
+
     default:
         ret = -ENOSYS;
         break;
