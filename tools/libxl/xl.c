@@ -19,9 +19,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <uuid/uuid.h>
 #include <libconfig.h>
+#include "xen_uuid.h"
 #include <unistd.h>
+#include <sys/time.h> /* for time */
 #include <getopt.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -42,15 +43,14 @@ static void printf_info(libxl_domain_create_info *c_info,
                         libxl_device_model_info *dm_info)
 {
     int i;
+    char uuid_str[18];
     printf("*** domain_create_info ***\n");
     printf("hvm: %d\n", c_info->hvm);
     printf("hap: %d\n", c_info->hap);
     printf("ssidref: %d\n", c_info->ssidref);
     printf("name: %s\n", c_info->name);
-    printf("uuid: " UUID_FMT "\n", c_info->uuid[0], c_info->uuid[1], c_info->uuid[2], c_info->uuid[3],
-           c_info->uuid[4], c_info->uuid[5], c_info->uuid[6], c_info->uuid[7],
-           c_info->uuid[8], c_info->uuid[9], c_info->uuid[10], c_info->uuid[11],
-           c_info->uuid[12], c_info->uuid[13], c_info->uuid[14], c_info->uuid[15]);
+    xen_uuid_to_string(c_info->uuid, uuid_str, sizeof(uuid_str));
+    printf("uuid: %s\n", uuid_str);
     if (c_info->xsdata)
         printf("xsdata: contains data\n");
     else
@@ -289,7 +289,7 @@ static void parse_config_file(const char *filename,
                               libxl_device_model_info *dm_info)
 {
     const char *buf;
-    uint8_t uuid[16];
+    xen_uuid_t uuid[16];
     long l;
     struct config_t config;
     struct config_setting_t *vbds, *nics;
@@ -322,7 +322,7 @@ static void parse_config_file(const char *filename,
         c_info->name = strdup(buf);
     else
         c_info->name = "test";
-    uuid_generate(uuid);
+    xen_uuid_generate(uuid);
     c_info->uuid = uuid;
 
     init_build_info(b_info, c_info);

@@ -17,6 +17,7 @@
 #include <string.h>
 #include "libxl.h"
 #include "libxl_internal.h"
+#include <sys/time.h> /* for struct timeval */
 
 char *string_of_kinds[] = {
     [DEVICE_VIF] = "vif",

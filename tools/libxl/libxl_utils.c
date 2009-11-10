@@ -72,7 +72,7 @@ int libxl_name_to_domid(struct libxl_ctx *ctx, char *name, uint32_t *domid)
     return -1;
 }
 
-int libxl_uuid_to_domid(struct libxl_ctx *ctx, uint8_t *uuid, uint32_t *domid)
+int libxl_uuid_to_domid(struct libxl_ctx *ctx, xen_uuid_t *uuid, uint32_t *domid)
 {
     int nb_domain, i;
     struct libxl_dominfo *info = libxl_domain_list(ctx, &nb_domain);
@@ -85,7 +85,7 @@ int libxl_uuid_to_domid(struct libxl_ctx *ctx, uint8_t *uuid, uint32_t *domid)
     return -1;
 }
 
-int libxl_domid_to_uuid(struct libxl_ctx *ctx, uint8_t **uuid, uint32_t domid)
+int libxl_domid_to_uuid(struct libxl_ctx *ctx, xen_uuid_t **uuid, uint32_t domid)
 {
     int nb_domain, i;
     struct libxl_dominfo *info = libxl_domain_list(ctx, &nb_domain);
@@ -109,49 +109,44 @@ int libxl_is_uuid(char *s)
             if (s[i] != '-')
                 return 0;
         } else {
-            if (!isxdigit(s[i]))
+            if (!isxdigit((uint8_t)s[i]))
                 return 0;
         }
     }
     return 1;
 }
 
-uint8_t *string_to_uuid(struct libxl_ctx *ctx, char *s)
+xen_uuid_t *libxl_string_to_uuid(struct libxl_ctx *ctx, char *s)
 {
-    uint8_t *buf;
+    xen_uuid_t *uuid;
     if (!s || !ctx)
         return NULL;
-
-    buf = libxl_zalloc(ctx, 16);
-    sscanf(s, UUID_FMT, &buf[0], &buf[1], &buf[2], &buf[3], &buf[4], &buf[5],
-           &buf[6], &buf[7], &buf[8], &buf[9], &buf[10], &buf[11], &buf[12],
-           &buf[13], &buf[14], &buf[15]);
-    return buf;
+    uuid = libxl_zalloc(ctx, sizeof(*uuid));
+    xen_uuid_from_string(uuid, s);
+    return uuid;
 }
 
-char *uuid_to_string(struct libxl_ctx *ctx, uint8_t *uuid)
+char *libxl_uuid_to_string(struct libxl_ctx *ctx, xen_uuid_t *uuid)
 {
+    char uuid_str[39];
     if (!uuid)
         return NULL;
-    return libxl_sprintf(ctx, UUID_FMT,
-                         uuid[0], uuid[1], uuid[2], uuid[3],
-                         uuid[4], uuid[5], uuid[6], uuid[7],
-                         uuid[8], uuid[9], uuid[10], uuid[11],
-                         uuid[12], uuid[13], uuid[14], uuid[15]);
+    xen_uuid_to_string(uuid, uuid_str, sizeof(uuid_str));
+    return libxl_sprintf(ctx, "%s", uuid_str);
 }
 
 int libxl_param_to_domid(struct libxl_ctx *ctx, char *p, uint32_t *domid)
 {
-    uint8_t *uuid;
+    xen_uuid_t *uuid;
     uint32_t d;
 
     if (libxl_is_uuid(p)) {
-        uuid = string_to_uuid(ctx, p);
+        uuid = libxl_string_to_uuid(ctx, p);
         return libxl_uuid_to_domid(ctx, uuid, domid);
     }
     errno = 0;
-    d = strtol(p, (char **) NULL, 10);
-    if (!errno && d != 0 && d != LONG_MAX && d != LONG_MIN) {
+    d = strtoul(p, (char **) NULL, 10);
+    if (!errno && d != 0 && d != ULONG_MAX && d != LONG_MIN) {
         *domid = d;
         return 0;
     }

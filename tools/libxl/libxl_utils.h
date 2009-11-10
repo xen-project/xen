@@ -23,11 +23,11 @@
 unsigned long libxl_get_required_shadow_memory(unsigned long maxmem_kb, unsigned int smp_cpus);
 int libxl_name_to_domid(struct libxl_ctx *ctx, char *name, uint32_t *domid);
 char *libxl_domid_to_name(struct libxl_ctx *ctx, uint32_t domid);
-int libxl_uuid_to_domid(struct libxl_ctx *ctx, uint8_t *uuid, uint32_t *domid);
-int libxl_domid_to_uuid(struct libxl_ctx *ctx, uint8_t **uuid, uint32_t domid);
+int libxl_uuid_to_domid(struct libxl_ctx *ctx, xen_uuid_t *uuid, uint32_t *domid);
+int libxl_domid_to_uuid(struct libxl_ctx *ctx, xen_uuid_t **uuid, uint32_t domid);
 int libxl_is_uuid(char *s);
-uint8_t *string_to_uuid(struct libxl_ctx *ctx, char *s);
-char *uuid_to_string(struct libxl_ctx *ctx, uint8_t *uuid);
+xen_uuid_t *libxl_string_to_uuid(struct libxl_ctx *ctx, char *s);
+char *libxl_uuid_to_string(struct libxl_ctx *ctx, xen_uuid_t *uuid);
 int libxl_param_to_domid(struct libxl_ctx *ctx, char *p, uint32_t *domid);
 
 #endif

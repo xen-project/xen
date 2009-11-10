@@ -12,14 +12,20 @@ MINOR = 0
 CFLAGS += -I. -fPIC
 CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenguest) $(CFLAGS_libxenstore)
 
-LDFLAGS = $(LDFLAGS_libxenctrl) $(LDFLAGS_libxenguest) $(LDFLAGS_libxenstore) -luuid
+
+LIBS = $(LDFLAGS_libxenctrl) $(LDFLAGS_libxenguest) $(LDFLAGS_libxenstore)
+
+ifeq ($(CONFIG_Linux),y)
+LIBS += -luuid
+endif
 
 LIBCONFIG_URL ?= http://www.hyperrealm.com/libconfig
 LIBCONFIG_SOURCE = libconfig-1.3.2
 LIBCONFIG_OUTPUT = $(LIBCONFIG_SOURCE)/.libs
-WGET=wget -c
 
-LIBXL_OBJS = flexarray.o libxl.o libxl_dom.o libxl_exec.o libxl_xshelp.o libxl_device.o libxl_internal.o xenguest.o osdeps.o libxl_utils.o
+LIBXL_OBJS-y =
+LIBXL_OBJS-$(CONFIG_Linux) += osdeps.o
+LIBXL_OBJS = flexarray.o libxl.o libxl_dom.o libxl_exec.o libxl_xshelp.o libxl_device.o libxl_internal.o xenguest.o libxl_utils.o $(LIBXL_OBJS-y)
 
 CLIENTS = xl
 
@@ -51,7 +57,7 @@ xl.o: $(LIBCONFIG_SOURCE)
 	$(CC) $(CFLAGS) -I$(LIBCONFIG_SOURCE) -c xl.c
 
 $(CLIENTS): xl.o libxenlight.so $(LIBCONFIG_OUTPUT)/libconfig.so
-	$(CC) $(LDFLAGS) -o $@ $< -L . -lxenlight -L$(LIBCONFIG_OUTPUT) -lconfig
+	$(CC) $(LDFLAGS) -o $@ $< $(LIBS) -L . -lxenlight -L$(LIBCONFIG_OUTPUT) -lconfig
 
 .PHONY: install
 install: all

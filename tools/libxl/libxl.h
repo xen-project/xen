@@ -20,6 +20,7 @@
 #include <stdarg.h>
 #include <netinet/in.h>
 #include <xenctrl.h>
+#include "xen_uuid.h"
 
 typedef int bool;
 
@@ -27,7 +28,7 @@ typedef void (*libxl_log_callback)(void *userdata, int loglevel, const char *fil
                                    int line, const char *func, char *s);
 
 struct libxl_dominfo {
-    uint8_t uuid[16];
+    xen_uuid_t uuid[16];
     uint32_t domid;
 };
 
@@ -48,7 +49,7 @@ typedef struct {
     bool hap;
     int ssidref;
     char *name;
-    uint8_t *uuid;
+    xen_uuid_t *uuid;
     char **xsdata;
     char **platformdata;
 } libxl_domain_create_info;

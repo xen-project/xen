@@ -754,7 +754,9 @@ static int primary_blocking_connect(struct tdremus_state *state)
 	}
 
 	do {
-		if ((rc = connect(fd, &state->sa, sizeof(state->sa))) < 0) {
+		if ((rc = connect(fd, (struct sockaddr *)&state->sa,
+		    sizeof(state->sa))) < 0)
+		{
 			if (errno == ECONNREFUSED) {
 				RPRINTF("connection refused -- retrying in 1 second\n");
 				sleep(1);
@@ -883,7 +885,9 @@ static void remus_retry_connect_event(event_id_t id, char mode, void *private)
 	struct tdremus_state *s = (struct tdremus_state *)private;
 
 	/* do a non-blocking connect */
-	if (connect(s->stream_fd.fd, &s->sa, sizeof(s->sa)) && errno != EINPROGRESS) {
+	if (connect(s->stream_fd.fd, (struct sockaddr *)&s->sa, sizeof(s->sa))
+	    && errno != EINPROGRESS)
+	{
 		if(errno == ECONNREFUSED || errno == ENETUNREACH || errno == EAGAIN || errno == ECONNABORTED)
 		{
 			/* try again in a second */
@@ -1048,7 +1052,7 @@ static int remus_bind(struct tdremus_state* s)
 	if (setsockopt(s->server_fd.fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0)
 		RPRINTF("Error setting REUSEADDR on %d: %d\n", s->server_fd.fd, errno);
 
-	if (bind(s->server_fd.fd, &s->sa, sizeof(s->sa)) < 0) {
+	if (bind(s->server_fd.fd, (struct sockaddr *)&s->sa, sizeof(s->sa)) < 0) {
 		RPRINTF("could not bind server socket %d to %s:%d: %d %s\n", s->server_fd.fd,
 			inet_ntoa(s->sa.sin_addr), ntohs(s->sa.sin_port), errno, strerror(errno));
 		if (errno != EADDRINUSE)

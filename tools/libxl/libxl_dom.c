@@ -18,6 +18,8 @@
 #include <inttypes.h>
 #include <xenguest.h>
 #include <string.h>
+#include <sys/time.h> /* for struct timeval */
+#include <unistd.h> /* for sleep(2) */
 
 int is_hvm(struct libxl_ctx *ctx, uint32_t domid)
 {
@@ -93,11 +95,13 @@ retry_transaction:
 int build_pv(struct libxl_ctx *ctx, uint32_t domid,
              libxl_domain_build_info *info, libxl_domain_build_state *state)
 {
+#if 0 /* unused variables */
     int mem_target_kib = info->max_memkb;
     char *domid_str = libxl_sprintf(ctx, "%d", domid);
     char *memsize_str = libxl_sprintf(ctx, "%d", mem_target_kib / 1024);
     char *store_port_str = libxl_sprintf(ctx, "%d", state->store_port);
     char *console_port_str = libxl_sprintf(ctx, "%d", state->console_port);
+#endif
     return ERROR_NI;
 }
 
@@ -199,19 +203,20 @@ read_again:
     free(ret_str);
 }
 
-static int core_suspend_callback(void)
+static int core_suspend_callback(void *data)
 {
+    struct suspendinfo *si = data;
     unsigned long s_state = 0;
     int ret;
 
-    if (si.hvm)
-        xc_get_hvm_param(si.xch, si.domid, HVM_PARAM_ACPI_S_STATE, &s_state);
-    if ((s_state == 0) && (si.suspend_eventchn >= 0)) {
-        ret = xc_evtchn_notify(si.xch, si.suspend_eventchn);
+    if (si->hvm)
+        xc_get_hvm_param(si->xch, si->domid, HVM_PARAM_ACPI_S_STATE, &s_state);
+    if ((s_state == 0) && (si->suspend_eventchn >= 0)) {
+        ret = xc_evtchn_notify(si->xch, si->suspend_eventchn);
         if (ret < 0) {
             return 0;
         }
-        ret = xc_await_suspend(si.xch, si.suspend_eventchn);
+        ret = xc_await_suspend(si->xch, si->suspend_eventchn);
         if (ret < 0) {
             return 0;
         }
@@ -221,7 +226,10 @@ static int core_suspend_callback(void)
     return 0;
 }
 
-int core_suspend(struct libxl_ctx *ctx, uint32_t domid, int fd, int hvm, int live, int debug)
+static struct save_callbacks callbacks;
+
+int core_suspend(struct libxl_ctx *ctx, uint32_t domid, int fd,
+		int hvm, int live, int debug)
 {
     int flags;
     int port;
@@ -257,8 +265,13 @@ int core_suspend(struct libxl_ctx *ctx, uint32_t domid, int fd, int hvm, int liv
         }
     }
 
+    callbacks.suspend = core_suspend_callback;
+    callbacks.postcopy = NULL;
+    callbacks.checkpoint = NULL;
+    callbacks.data = &si;
+
     xc_domain_save(ctx->xch, fd, domid, 0, 0, flags,
-                   core_suspend_callback, hvm,
+                   &callbacks, hvm,
                    core_suspend_switch_qemu_logdirty);
 
     if (si.suspend_eventchn > 0)

@@ -22,6 +22,7 @@
 #include <fcntl.h>
 #include <sys/select.h>
 #include <signal.h>
+#include <unistd.h> /* for write, unlink and close */
 #include "libxl.h"
 #include "libxl_utils.h"
 #include "libxl_internal.h"
@@ -63,7 +64,7 @@ int libxl_domain_make(struct libxl_ctx *ctx, libxl_domain_create_info *info,
                        uint32_t *domid)
 {
     int flags, ret, i;
-        char *uuid_string;
+    char *uuid_string;
     char *rw_paths[] = { "device" };
     char *ro_paths[] = { "cpu", "memory", "device", "error", "drivers",
                          "control", "attr", "data", "messages" };
@@ -71,8 +72,9 @@ int libxl_domain_make(struct libxl_ctx *ctx, libxl_domain_create_info *info,
     struct xs_permissions roperm[2];
     struct xs_permissions rwperm[1];
     xs_transaction_t t;
+    xen_domain_handle_t handle;
 
-    uuid_string = uuid_to_string(ctx, info->uuid);
+    uuid_string = libxl_uuid_to_string(ctx, info->uuid);
     if (!uuid_string) {
         XL_LOG(ctx, XL_LOG_ERROR, "missing uuid");
         return ERROR_FAIL;
@@ -82,7 +84,25 @@ int libxl_domain_make(struct libxl_ctx *ctx, libxl_domain_create_info *info,
     flags |= info->hap ? XEN_DOMCTL_CDF_hap : 0;
     *domid = 0;
 
-    ret = xc_domain_create(ctx->xch, info->ssidref, info->uuid, flags, domid);
+    /* XXX handle has to be initialised here.
+     * info->uuid != xen_domain_handle_t
+     * See: 
+     *      http://www.opengroup.org/dce/info/draft-leach-uuids-guids-01.txt
+     *      http://www.opengroup.org/onlinepubs/009629399/apdxa.htm
+     *
+     * A DCE 1.1 compatible source representation of UUIDs.
+     *
+     * struct uuid {
+     *     uint32_t        time_low;
+     *     uint16_t        time_mid;
+     *     uint16_t        time_hi_and_version;
+     *     uint8_t         clock_seq_hi_and_reserved;
+     *     uint8_t         clock_seq_low;
+     *     uint8_t         node[_UUID_NODE_LEN];
+     * };
+     */
+
+    ret = xc_domain_create(ctx->xch, info->ssidref, handle, flags, domid);
     if (ret < 0) {
         XL_LOG(ctx, XL_LOG_ERROR, "domain creation fail: %d", ret);
         return ERROR_FAIL;
@@ -337,7 +357,7 @@ static int libxl_destroy_device_model(struct libxl_ctx *ctx, uint32_t domid)
 int libxl_domain_destroy(struct libxl_ctx *ctx, uint32_t domid, int force)
 {
     char *dom_path, vm_path[41];
-    uint8_t *uuid;
+    xen_uuid_t *uuid;
 
     dom_path = libxl_xs_get_dompath(ctx, domid);
     if (!dom_path) {
@@ -366,7 +386,7 @@ int libxl_domain_destroy(struct libxl_ctx *ctx, uint32_t domid, int force)
         XL_LOG(ctx, XL_LOG_ERROR, "libxl_destroy_device_model failed for %d\n", domid);
     if (!xs_rm(ctx->xsh, XBT_NULL, dom_path))
         XL_LOG(ctx, XL_LOG_ERROR, "xs_rm failed for %s\n", dom_path);
-    snprintf(vm_path, sizeof(vm_path), "/vm/%s", uuid_to_string(ctx, uuid));
+    snprintf(vm_path, sizeof(vm_path), "/vm/%s", libxl_uuid_to_string(ctx, uuid));
     if (!xs_rm(ctx->xsh, XBT_NULL, vm_path))
         XL_LOG(ctx, XL_LOG_ERROR, "xs_rm failed for %s\n", vm_path);
     return 0;

@@ -18,7 +18,9 @@
 
 #include <stdarg.h>
 
+#if defined(__linux__)
 int asprintf(char **buffer, char *fmt, ...);
 int vasprintf(char **buffer, const char *fmt, va_list ap);
+#endif
 
 #endif
