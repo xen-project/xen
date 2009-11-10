@@ -25,7 +25,8 @@ extern int pic_mode;
 extern int using_apic_timer;
 
 #ifdef CONFIG_ACPI
-extern void mp_register_lapic (u8 id, u8 enabled);
+extern int mp_register_lapic (u8 id, u8 enabled);
+extern void mp_unregister_lapic(uint32_t apic_id, uint32_t cpu);
 extern void mp_register_lapic_address (u64 address);
 extern void mp_register_ioapic (u8 id, u32 address, u32 gsi_base);
 extern void mp_override_legacy_irq (u8 bus_irq, u8 polarity, u8 trigger, u32 gsi);

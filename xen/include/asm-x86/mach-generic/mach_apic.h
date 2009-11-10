@@ -25,13 +25,6 @@ static inline void enable_apic_mode(void)
 #define apicid_to_node(apicid) ((int)apicid_to_node[(u32)apicid])
 
 extern u32 bios_cpu_apicid[];
-static inline int cpu_present_to_apicid(int mps_cpu)
-{
-	if (mps_cpu < NR_CPUS)
-		return (int)bios_cpu_apicid[mps_cpu];
-	else
-		return BAD_APICID;
-}
 
 static inline int mpc_apic_id(struct mpc_config_processor *m, 
 			struct mpc_config_translation *translation_record)

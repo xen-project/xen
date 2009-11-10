@@ -800,7 +800,10 @@ wakeup_secondary_cpu(int phys_apicid, unsigned long start_eip)
 #endif	/* WAKE_SECONDARY_VIA_INIT */
 
 extern cpumask_t cpu_initialized;
-static inline int alloc_cpu_id(void)
+/*
+ * Caller should hold cpu_add_remove_lock if not called when booting
+ */
+int alloc_cpu_id(void)
 {
 	cpumask_t	tmp_map;
 	int cpu;
@@ -959,9 +962,13 @@ static int __devinit do_boot_cpu(int apicid, int cpu)
 		cpu_clear(cpu, cpu_callout_map); /* was set here (do_boot_cpu()) */
 		cpu_clear(cpu, cpu_initialized); /* was set by cpu_init() */
 		cpucount--;
+
+        /* Mark the CPU as non-present */
+        spin_lock(&cpu_add_remove_lock);
+		x86_cpu_to_apicid[cpu] = BAD_APICID;
+		cpu_clear(cpu, cpu_present_map);
+        spin_unlock(&cpu_add_remove_lock);
 	} else {
-		x86_cpu_to_apicid[cpu] = apicid;
-		cpu_set(cpu, cpu_present_map);
 	}
 
 	/* mark "stuck" area as not stuck */
@@ -1028,7 +1035,7 @@ EXPORT_SYMBOL(xquad_portio);
 
 static void __init smp_boot_cpus(unsigned int max_cpus)
 {
-	int apicid, cpu, bit, kicked;
+	int apicid, cpu, kicked;
 #ifdef BOGOMIPS
 	unsigned long bogosum = 0;
 #endif
@@ -1112,8 +1119,11 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	Dprintk("CPU present map: %lx\n", physids_coerce(phys_cpu_present_map));
 
 	kicked = 1;
-	for (bit = 0; kicked < NR_CPUS && bit < NR_CPUS; bit++) {
-		apicid = cpu_present_to_apicid(bit);
+
+    for_each_present_cpu ( cpu )
+    {
+		apicid = x86_cpu_to_apicid[cpu];
+
 		/*
 		 * Don't even attempt to start the boot CPU!
 		 */
@@ -1121,11 +1131,15 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 			continue;
 
 		if (!check_apicid_present(apicid))
+        {
+            dprintk(XENLOG_WARNING, "Present CPU has valid apicid\n");
 			continue;
+        }
+
 		if (max_cpus <= cpucount+1)
 			continue;
 
-		if (((cpu = alloc_cpu_id()) <= 0) || do_boot_cpu(apicid, cpu))
+		if ( do_boot_cpu(apicid, cpu))
 			printk("CPU #%d not responding - cannot use it.\n",
 								apicid);
 		else

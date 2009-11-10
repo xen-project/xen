@@ -71,8 +71,6 @@ static unsigned int __devinitdata num_processors;
 /* Bitmask of physically existing CPUs */
 physid_mask_t phys_cpu_present_map;
 
-u32 bios_cpu_apicid[NR_CPUS] = { [0 ... NR_CPUS-1] = BAD_APICID };
-
 /*
  * Intel MP BIOS table parsing routines:
  */
@@ -101,13 +99,14 @@ static int __init mpf_checksum(unsigned char *mp, int len)
 static int mpc_record; 
 static struct mpc_config_translation *translation_table[MAX_MPC_ENTRY] __initdata;
 
-static void __devinit MP_processor_info (struct mpc_config_processor *m)
+/* Return xen's logical cpu_id of the new added cpu or <0 if error */
+static int __devinit MP_processor_info (struct mpc_config_processor *m)
 {
- 	int ver, apicid;
+ 	int ver, apicid, cpu = 0;
 	physid_mask_t phys_cpu;
  	
 	if (!(m->mpc_cpuflag & CPU_ENABLED))
-		return;
+		return -EINVAL;
 
 	apicid = mpc_apic_id(m, translation_table[mpc_record]);
 
@@ -183,14 +182,26 @@ static void __devinit MP_processor_info (struct mpc_config_processor *m)
 	if (num_processors >= NR_CPUS) {
 		printk(KERN_WARNING "WARNING: NR_CPUS limit of %i reached."
 			"  Processor ignored.\n", NR_CPUS);
-		return;
+		return -ENOSPC;
 	}
 
 	if (num_processors >= maxcpus) {
 		printk(KERN_WARNING "WARNING: maxcpus limit of %i reached."
 			" Processor ignored.\n", maxcpus);
-		return;
+		return -ENOSPC;
 	}
+
+    /* Boot cpu has been marked present in smp_prepare_boot_cpu */
+    if (!(m->mpc_cpuflag & CPU_BOOTPROCESSOR)) {
+        cpu = alloc_cpu_id();
+        if (cpu < 0) {
+            printk(KERN_WARNING "WARNING: Can't alloc cpu_id."
+              " Processor with apicid %i ignored\n", apicid);
+            return cpu;
+        }
+        x86_cpu_to_apicid[cpu] = apicid;
+        cpu_set(cpu, cpu_present_map);
+    }
 
 	cpu_set(num_processors, cpu_possible_map);
 	num_processors++;
@@ -202,7 +213,8 @@ static void __devinit MP_processor_info (struct mpc_config_processor *m)
 		 */
 		def_to_bigsmp = 1;
 	}
-	bios_cpu_apicid[num_processors - 1] = m->mpc_apicid;
+
+    return cpu;
 }
 
 static void __init MP_bus_info (struct mpc_config_bus *m)
@@ -826,7 +838,7 @@ void __init mp_register_lapic_address (
 }
 
 
-void __devinit mp_register_lapic (
+int __devinit mp_register_lapic (
 	u8			id, 
 	u8			enabled)
 {
@@ -836,7 +848,7 @@ void __devinit mp_register_lapic (
 	if (MAX_APICS - id <= 0) {
 		printk(KERN_WARNING "Processor #%d invalid (max %d)\n",
 			id, MAX_APICS);
-		return;
+		return -EINVAL;
 	}
 
 	if (id == boot_cpu_physical_apicid)
@@ -853,7 +865,7 @@ void __devinit mp_register_lapic (
 	processor.mpc_reserved[0] = 0;
 	processor.mpc_reserved[1] = 0;
 
-	MP_processor_info(&processor);
+    return MP_processor_info(&processor);
 }
 
 #ifdef	CONFIG_X86_IO_APIC
