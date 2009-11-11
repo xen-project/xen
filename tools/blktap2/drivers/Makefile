@@ -49,8 +49,7 @@ REMUS-OBJS  += hashtable.o
 REMUS-OBJS  += hashtable_itr.o
 REMUS-OBJS  += hashtable_utility.o
 
-$(REMUS-OBJS): CFLAGS += -fgnu89-inline -I$(XEN_XENSTORE)
-
+$(REMUS-OBJS): CFLAGS += -I$(XEN_XENSTORE)
 
 LIBAIO_DIR = $(XEN_ROOT)/tools/libaio/src
 tapdisk2 tapdisk-stream tapdisk-diff $(QCOW_UTIL): AIOLIBS := $(LIBAIO_DIR)/libaio.a

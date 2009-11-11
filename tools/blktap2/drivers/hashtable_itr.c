@@ -5,6 +5,13 @@
 #include "hashtable_itr.h"
 #include <stdlib.h> /* defines NULL */
 
+struct hashtable_itr {
+	struct hashtable *h;
+	struct entry *e;
+	struct entry *parent;
+	unsigned int index;
+};
+
 /*****************************************************************************/
 /* hashtable_iterator    - iterator constructor */
 
