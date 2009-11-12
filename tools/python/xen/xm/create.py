@@ -801,9 +801,6 @@ def configure_vscsis(config_devs, vals):
 
         feature_host = 0
         if v_dev == 'host':
-            if serverType == SERVER_XEN_API:
-                # TODO
-                raise ValueError("SCSI devices assignment by HBA is not implemeted")
             feature_host = 1
             scsi_info = []
             devid = get_devid(p_hctl)

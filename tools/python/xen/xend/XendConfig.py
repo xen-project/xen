@@ -28,7 +28,7 @@ from xen.xend import XendAPIStore
 from xen.xend.XendPPCI import XendPPCI
 from xen.xend.XendDPCI import XendDPCI
 from xen.xend.XendPSCSI import XendPSCSI
-from xen.xend.XendDSCSI import XendDSCSI
+from xen.xend.XendDSCSI import XendDSCSI, XendDSCSI_HBA
 from xen.xend.XendError import VmError
 from xen.xend.XendDevices import XendDevices
 from xen.xend.PrettyPrint import prettyprintstring
@@ -1355,6 +1355,14 @@ class XendConfig(dict):
                 vscsi_mode = vscsi_dict['feature-host']
                 vscsi_be = vscsi_dict.get('backend', None)
 
+                # create XenAPI DSCSI_HBA objects.
+                dscsi_HBA_record = {
+                    'VM': self['uuid'],
+                    'virtual_host': int(vscsi_devs[0]['v-dev'].split(':')[0]),
+                    'assignment_mode': vscsi_mode and 'HOST' or 'LUN'
+                }
+                XendDSCSI_HBA(vscsi_devs_uuid, dscsi_HBA_record)
+
                 # create XenAPI DSCSI objects.
                 for vscsi_dev in vscsi_devs:
                     dscsi_uuid = vscsi_dev.get('uuid')
@@ -1364,6 +1372,7 @@ class XendConfig(dict):
                     dscsi_record = {
                         'VM': self['uuid'],
                         'PSCSI': pscsi_uuid,
+                        'HBA': vscsi_devs_uuid,
                         'virtual_HCTL': vscsi_dev.get('v-dev')
                     }
                     XendDSCSI(dscsi_uuid, dscsi_record)
@@ -1858,6 +1867,10 @@ class XendConfig(dict):
                     if vscsi_devid == dscsi_inst.get_virtual_host():
                         XendAPIStore.deregister(dscsi_uuid, "DSCSI")
 
+                # destroy existing XenAPI DSCSI_HBA objects
+                if not vscsi_devs:
+                    XendAPIStore.deregister(dev_uuid, 'DSCSI_HBA')
+
                 # create XenAPI DSCSI objects.
                 for vscsi_dev in vscsi_devs:
                     dscsi_uuid = vscsi_dev.get('uuid')
@@ -1867,6 +1880,7 @@ class XendConfig(dict):
                     dscsi_record = {
                         'VM': self['uuid'],
                         'PSCSI': pscsi_uuid,
+                        'HBA': dev_uuid,
                         'virtual_HCTL': vscsi_dev.get('v-dev')
                     }
                     XendDSCSI(dscsi_uuid, dscsi_record)

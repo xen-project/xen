@@ -94,8 +94,10 @@
                  key             CDATA #IMPLIED>
 
 <!ELEMENT vscsi  EMPTY>
-<!ATTLIST vscsi  p-dev           CDATA #REQUIRED
-                 v-dev           CDATA #REQUIRED>
+<!ATTLIST vscsi  feature-host    CDATA #REQUIRED
+                 p-dev           CDATA #IMPLIED
+                 v-dev           CDATA #IMPLIED
+                 devid           CDATA #IMPLIED>
 
 <!ELEMENT console (other_config*)>
 <!ATTLIST console protocol       (vt100|rfb|rdp) #REQUIRED>

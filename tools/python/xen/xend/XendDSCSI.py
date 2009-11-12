@@ -37,6 +37,7 @@ class XendDSCSI(XendBase):
     def getAttrRO(self):
         attrRO = ['VM',
                   'PSCSI',
+                  'HBA',
                   'virtual_host',
                   'virtual_channel',
                   'virtual_target',
@@ -52,6 +53,7 @@ class XendDSCSI(XendBase):
     def getAttrInst(self):
         attrInst = ['VM',
                     'PSCSI',
+                    'HBA',
                     'virtual_HCTL']
         return XendBase.getAttrInst() + attrInst
 
@@ -120,6 +122,9 @@ class XendDSCSI(XendBase):
     def get_PSCSI(self):
         return self.PSCSI
 
+    def get_HBA(self):
+        return self.HBA
+
     def get_virtual_host(self):
         return self.virtual_host
 
@@ -170,5 +175,125 @@ class XendDSCSI(XendBase):
             raise InvalidHandleError("VM", self.get_VM())
         XendTask.log_progress(0, 100, \
                               dom.destroy_dscsi, \
+                              self.get_uuid())
+
+
+class XendDSCSI_HBA(XendBase):
+    """Representation of a half-virtualized SCSI HBA."""
+
+    def getClass(self):
+        return "DSCSI_HBA"
+
+    def getAttrRO(self):
+        attrRO = ['VM',
+                  'PSCSI_HBAs',
+                  'DSCSIs',
+                  'virtual_host',
+                  'assignment_mode']
+        return XendBase.getAttrRO() + attrRO
+
+    def getAttrRW(self):
+        attrRW = []
+        return XendBase.getAttrRW() + attrRW
+
+    def getAttrInst(self):
+        attrInst = ['VM',
+                    'virtual_host',
+                    'assignment_mode']
+        return XendBase.getAttrInst() + attrInst
+
+    def getMethods(self):
+        methods = ['destroy']
+        return XendBase.getMethods() + methods
+
+    def getFuncs(self):
+        funcs = ['create']
+        return XendBase.getFuncs() + funcs
+
+    getClass    = classmethod(getClass)
+    getAttrRO   = classmethod(getAttrRO)
+    getAttrRW   = classmethod(getAttrRW)
+    getAttrInst = classmethod(getAttrInst)
+    getMethods  = classmethod(getMethods)
+    getFuncs    = classmethod(getFuncs)
+ 
+    def create(self, dscsi_HBA_struct):
+
+        # Check if VM is valid
+        xendom = XendDomain.instance()
+        if not xendom.is_valid_vm(dscsi_HBA_struct['VM']):
+            raise InvalidHandleError('VM', dscsi_HBA_struct['VM'])
+        dom = xendom.get_vm_by_uuid(dscsi_HBA_struct['VM'])
+
+        # Check if PSCSI_HBA is valid
+        xennode = XendNode.instance()
+        pscsi_HBA_uuid = xennode.get_pscsi_HBA_by_uuid(dscsi_HBA_struct['PSCSI_HBA'])
+        if not pscsi_HBA_uuid:
+            raise InvalidHandleError('PSCSI_HBA', dscsi_HBA_struct['PSCSI_HBA'])
+
+        # Assign PSCSI_HBA and PSCSIs to VM
+        try:
+            dscsi_HBA_ref = XendTask.log_progress(0, 100, \
+                                                  dom.create_dscsi_HBA, \
+                                                  dscsi_HBA_struct)
+        except XendError, e:
+            log.exception("Error in create_dscsi_HBA")
+            raise
+
+        return dscsi_HBA_ref
+
+    create = classmethod(create)
+
+    def get_by_VM(cls, VM_ref):
+        result = []
+        for dscsi_HBA in XendAPIStore.get_all("DSCSI_HBA"):
+            if dscsi_HBA.get_VM() == VM_ref:
+                result.append(dscsi_HBA.get_uuid())
+        return result
+
+    get_by_VM = classmethod(get_by_VM)
+
+    def __init__(self, uuid, record):
+        XendBase.__init__(self, uuid, record)
+        self.virtual_host = record['virtual_host']
+        self.assignment_mode = record['assignment_mode']
+
+    def get_VM(self):
+        return self.VM
+
+    def get_PSCSI_HBAs(self):
+        PSCSIs = []
+        uuid = self.get_uuid()
+        for dscsi in XendAPIStore.get_all('DSCSI'):
+            if dscsi.get_VM() == self.VM and dscsi.get_HBA() == uuid:
+                PSCSIs.append(dscsi.get_PSCSI())
+        PSCSI_HBAs = []
+        for pscsi_uuid in PSCSIs:
+            pscsi_HBA_uuid = XendAPIStore.get(pscsi_uuid, 'PSCSI').get_HBA()
+            if not pscsi_HBA_uuid in PSCSI_HBAs:
+                PSCSI_HBAs.append(pscsi_HBA_uuid)
+        return PSCSI_HBAs
+
+    def get_DSCSIs(self):
+        DSCSIs = []
+        uuid = self.get_uuid()
+        for dscsi in XendAPIStore.get_all('DSCSI'):
+            if dscsi.get_VM() == self.VM and dscsi.get_HBA() == uuid:
+                DSCSIs.append(dscsi.get_uuid())
+        return DSCSIs
+
+    def get_virtual_host(self):
+        return self.virtual_host
+
+    def get_assignment_mode(self):
+        return self.assignment_mode
+
+    def destroy(self):
+        xendom = XendDomain.instance()
+        dom = xendom.get_vm_by_uuid(self.get_VM())
+        if not dom:
+            raise InvalidHandleError("VM", self.get_VM())
+        XendTask.log_progress(0, 100, \
+                              dom.destroy_dscsi_HBA, \
                               self.get_uuid())
 

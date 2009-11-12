@@ -41,7 +41,7 @@ from XendNetwork import *
 from XendStateStore import XendStateStore
 from XendMonitor import XendMonitor
 from XendPPCI import XendPPCI
-from XendPSCSI import XendPSCSI
+from XendPSCSI import XendPSCSI, XendPSCSI_HBA
 
 class XendNode:
     """XendNode - Represents a Domain 0 Host."""
@@ -299,7 +299,7 @@ class XendNode:
             XendPPCI(ppci_uuid, ppci_record)
 
     def _init_PSCSIs(self):
-        # Initialise PSCSIs
+        # Initialise PSCSIs and PSCSI_HBAs
         saved_pscsis = self.state_store.load_state('pscsi')
         saved_pscsi_table = {}
         if saved_pscsis:
@@ -309,12 +309,52 @@ class XendNode:
                 except KeyError:
                     pass
 
+        saved_pscsi_HBAs = self.state_store.load_state('pscsi_HBA')
+        saved_pscsi_HBA_table = {}
+        if saved_pscsi_HBAs:
+            for pscsi_HBA_uuid, pscsi_HBA_record in saved_pscsi_HBAs.items():
+                try:
+                    physical_host = int(pscsi_HBA_record['physical_host'])
+                    saved_pscsi_HBA_table[physical_host] = pscsi_HBA_uuid
+                except (KeyError, ValueError):
+                    pass
+
+        pscsi_table = {}
+        pscsi_HBA_table = {}
+
         for pscsi_record in vscsi_util.get_all_scsi_devices():
-            if pscsi_record['scsi_id']:
-                # If saved uuid exists, use it. Otherwise create one.
-                pscsi_uuid = saved_pscsi_table.get(pscsi_record['scsi_id'],
-                                                   uuid.createString())
-                XendPSCSI(pscsi_uuid, pscsi_record)
+            scsi_id = pscsi_record['scsi_id']
+            if scsi_id:
+                saved_HBA_uuid = None
+
+                pscsi_uuid = saved_pscsi_table.get(scsi_id, None)
+                if pscsi_uuid is None:
+                    pscsi_uuid = uuid.createString()
+                    saved_pscsi_table[scsi_id] = pscsi_uuid
+                else:
+                    saved_HBA_uuid = saved_pscsis[pscsi_uuid].get('HBA', None)
+
+                physical_host = int(pscsi_record['physical_HCTL'].split(':')[0])
+                if pscsi_HBA_table.has_key(physical_host):
+                    pscsi_HBA_uuid = pscsi_HBA_table[physical_host]
+                elif saved_pscsi_HBA_table.has_key(physical_host):
+                    pscsi_HBA_uuid = saved_pscsi_HBA_table[physical_host]
+                    pscsi_HBA_table[physical_host] = pscsi_HBA_uuid
+                else:
+                    pscsi_HBA_uuid = uuid.createString()
+                    pscsi_HBA_table[physical_host] = pscsi_HBA_uuid
+
+                if saved_HBA_uuid is not None and \
+                   saved_HBA_uuid != pscsi_HBA_uuid:
+                    log.debug('The PSCSI(%s) host number was changed', scsi_id)
+                pscsi_record['HBA'] = pscsi_HBA_uuid
+                pscsi_table[pscsi_uuid] = pscsi_record
+
+        for pscsi_uuid, pscsi_record in pscsi_table.items():
+            XendPSCSI(pscsi_uuid, pscsi_record)
+
+        for physical_host, pscsi_HBA_uuid in pscsi_HBA_table.items():
+            XendPSCSI_HBA(pscsi_HBA_uuid, {'physical_host': physical_host})
 
 
     def add_network(self, interface):
@@ -389,14 +429,32 @@ class XendNode:
                 except KeyError:
                     pass
 
-        # Initialise the PSCSI
+        saved_pscsi_HBAs = self.state_store.load_state('pscsi_HBA')
+        saved_pscsi_HBA_table = {}
+        if saved_pscsi_HBAs:
+            for saved_HBA_uuid, saved_HBA_record in saved_pscsi_HBAs.items():
+                try:
+                    physical_host = int(saved_HBA_record['physical_host'])
+                    saved_pscsi_HBA_table[physical_host] = saved_HBA_uuid
+                except (KeyError, ValueError):
+                    pass
+
+        # Initialise the PSCSI and the PSCSI_HBA
         pscsi_record = vscsi_util.get_scsi_device(add_HCTL)
         if pscsi_record and pscsi_record['scsi_id']:
             pscsi_uuid = saved_pscsi_table.get(pscsi_record['scsi_id'], None)
             if pscsi_uuid is None:
+                physical_host = int(add_HCTL.split(':')[0])
+                pscsi_HBA_uuid = saved_pscsi_HBA_table.get(physical_host, None)
+                if pscsi_HBA_uuid is None:
+                    pscsi_HBA_uuid = uuid.createString()
+                    XendPSCSI_HBA(pscsi_HBA_uuid, {'physical_host': physical_host})
+                pscsi_record['HBA'] = pscsi_HBA_uuid
+
                 pscsi_uuid = uuid.createString()
                 XendPSCSI(pscsi_uuid, pscsi_record)
                 self.save_PSCSIs()
+                self.save_PSCSI_HBAs()
 
 
     def remove_PSCSI(self, rem_HCTL):
@@ -410,6 +468,14 @@ class XendNode:
                 pscsi_ref = XendPSCSI.get_by_HCTL(rem_HCTL)
                 XendAPIStore.get(pscsi_ref, "PSCSI").destroy()
                 self.save_PSCSIs()
+
+                physical_host = int(rem_HCTL.split(':')[0])
+                pscsi_HBA_ref = XendPSCSI_HBA.get_by_physical_host(physical_host)
+                if pscsi_HBA_ref:
+                    if not XendAPIStore.get(pscsi_HBA_ref, 'PSCSI_HBA').get_PSCSIs():
+                        XendAPIStore.get(pscsi_HBA_ref, 'PSCSI_HBA').destroy()
+                self.save_PSCSI_HBAs()
+
                 return
 
 
@@ -472,6 +538,14 @@ class XendNode:
             return pscsi_uuid
         return None
 
+    def get_PSCSI_HBA_refs(self):
+        return XendPSCSI_HBA.get_all()
+
+    def get_pscsi_HBA_by_uuid(self, pscsi_HBA_uuid):
+        if pscsi_HBA_uuid in self.get_PSCSI_HBA_refs():
+            return pscsi_HBA_uuid
+        return None
+
 
     def save(self):
         # save state
@@ -487,6 +561,7 @@ class XendNode:
         self.save_SRs()
         self.save_PPCIs()
         self.save_PSCSIs()
+        self.save_PSCSI_HBAs()
 
     def save_PIFs(self):
         pif_records = dict([(pif_uuid, XendAPIStore.get(
@@ -522,6 +597,12 @@ class XendNode:
                                   pscsi_uuid, "PSCSI").get_record())
                             for pscsi_uuid in XendPSCSI.get_all()])
         self.state_store.save_state('pscsi', pscsi_records)
+
+    def save_PSCSI_HBAs(self):
+        pscsi_HBA_records = dict([(pscsi_HBA_uuid, XendAPIStore.get(
+                                      pscsi_HBA_uuid, "PSCSI_HBA").get_record())
+                                for pscsi_HBA_uuid in XendPSCSI_HBA.get_all()])
+        self.state_store.save_state('pscsi_HBA', pscsi_HBA_records)
 
     def shutdown(self):
         return 0

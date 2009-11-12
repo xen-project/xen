@@ -68,7 +68,7 @@ from xen.xend import XendAPIStore
 from xen.xend.XendPPCI import XendPPCI
 from xen.xend.XendDPCI import XendDPCI
 from xen.xend.XendPSCSI import XendPSCSI
-from xen.xend.XendDSCSI import XendDSCSI
+from xen.xend.XendDSCSI import XendDSCSI, XendDSCSI_HBA
 
 MIGRATE_TIMEOUT = 30.0
 BOOTLOADER_LOOPBACK_DEVICE = '/dev/xvdp'
@@ -3752,6 +3752,9 @@ class XendDomainInfo:
     def get_dscsis(self):
         return XendDSCSI.get_by_VM(self.info.get('uuid'))
 
+    def get_dscsi_HBAs(self):
+        return XendDSCSI_HBA.get_by_VM(self.info.get('uuid'))
+
     def create_vbd(self, xenapi_vbd, vdi_image_path):
         """Create a VBD using a VDI from XendStorageRepository.
 
@@ -3986,11 +3989,58 @@ class XendDomainInfo:
         else:
             try:
                 self.device_configure(target_vscsi_sxp)
-
             except Exception, exn:
+                log.exception('create_dscsi: %s', exn)
                 raise XendError('Failed to create device')
 
         return dscsi_uuid
+
+    def create_dscsi_HBA(self, xenapi_dscsi):
+        """Create scsi devices from the passed struct in Xen API format.
+
+        @param xenapi_dscsi: DSCSI_HBA struct from Xen API
+        @rtype: string
+        @return: UUID
+        """
+
+        dscsi_HBA_uuid = uuid.createString()
+
+        # Convert xenapi to sxp
+        feature_host = xenapi_dscsi.get('assignment_mode', 'HOST') == 'HOST' and 1 or 0
+        target_vscsi_sxp = \
+            ['vscsi',
+                ['feature-host', feature_host],
+                ['uuid', dscsi_HBA_uuid],
+            ]
+        pscsi_HBA = XendAPIStore.get(xenapi_dscsi.get('PSCSI_HBA'), 'PSCSI_HBA')
+        devid = pscsi_HBA.get_physical_host()
+        for pscsi_uuid in pscsi_HBA.get_PSCSIs():
+            pscsi = XendAPIStore.get(pscsi_uuid, 'PSCSI')
+            pscsi_HCTL = pscsi.get_physical_HCTL()
+            dscsi_uuid = uuid.createString()
+            dev = \
+                ['dev',
+                    ['devid', devid],
+                    ['p-devname', pscsi.get_dev_name()],
+                    ['p-dev', pscsi_HCTL],
+                    ['v-dev', pscsi_HCTL],
+                    ['state', xenbusState['Initialising']],
+                    ['uuid', dscsi_uuid]
+                ]
+            target_vscsi_sxp.append(dev)
+
+        if self._stateGet() != XEN_API_VM_POWER_STATE_RUNNING:
+            if not self.info.device_add('vscsi', cfg_sxp = target_vscsi_sxp):
+                raise XendError('Failed to create device')
+            xen.xend.XendDomain.instance().managed_config_save(self)
+        else:
+            try:
+                self.device_configure(target_vscsi_sxp)
+            except Exception, exn:
+                log.exception('create_dscsi_HBA: %s', exn)
+                raise XendError('Failed to create device')
+
+        return dscsi_HBA_uuid
 
 
     def change_vdi_of_vbd(self, xenapi_vbd, vdi_image_path):
@@ -4121,9 +4171,40 @@ class XendDomainInfo:
         else:
             try:
                 self.device_configure(target_vscsi_sxp)
-
             except Exception, exn:
+                log.exception('destroy_dscsi: %s', exn)
                 raise XendError('Failed to destroy device')
+
+    def destroy_dscsi_HBA(self, dev_uuid):
+        dscsi_HBA = XendAPIStore.get(dev_uuid, 'DSCSI_HBA')
+        devid = dscsi_HBA.get_virtual_host()
+        cur_vscsi_sxp = self._getDeviceInfo_vscsi(devid)
+        feature_host = sxp.child_value(cur_vscsi_sxp, 'feature-host')
+
+        if self._stateGet() != XEN_API_VM_POWER_STATE_RUNNING:
+            new_vscsi_sxp = ['vscsi', ['feature-host', feature_host]]
+            self.info.device_update(dev_uuid, new_vscsi_sxp)
+            del self.info['devices'][dev_uuid]
+            xen.xend.XendDomain.instance().managed_config_save(self)
+        else:
+            # If feature_host is 1, all devices are destroyed by just
+            # one reconfiguration.
+            # If feature_host is 0, we should reconfigure all devices
+            # one-by-one to destroy all devices.
+            # See reconfigureDevice@VSCSIController. 
+            for dev in sxp.children(cur_vscsi_sxp, 'dev'):
+                target_vscsi_sxp = [
+                    'vscsi',
+                    dev + [['state', xenbusState['Closing']]],
+                    ['feature-host', feature_host]
+                ]
+                try:
+                    self.device_configure(target_vscsi_sxp)
+                except Exception, exn:
+                    log.exception('destroy_dscsi_HBA: %s', exn)
+                    raise XendError('Failed to destroy device')
+                if feature_host:
+                    break
 
     def destroy_xapi_instances(self):
         """Destroy Xen-API instances stored in XendAPIStore.
@@ -4152,6 +4233,10 @@ class XendDomainInfo:
         # Destroy DSCSI instances.
         for dscsi_uuid in XendDSCSI.get_by_VM(self.info.get('uuid')):
             XendAPIStore.deregister(dscsi_uuid, "DSCSI")
+            
+        # Destroy DSCSI_HBA instances.
+        for dscsi_HBA_uuid in XendDSCSI_HBA.get_by_VM(self.info.get('uuid')):
+            XendAPIStore.deregister(dscsi_HBA_uuid, "DSCSI_HBA")
             
     def has_device(self, dev_class, dev_uuid):
         return (dev_uuid in self.info['%s_refs' % dev_class.lower()])

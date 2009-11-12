@@ -33,6 +33,7 @@ class XendPSCSI(XendBase):
                   'physical_target',
                   'physical_lun',
                   'physical_HCTL',
+                  'HBA',
                   'vendor_name',
                   'model',
                   'type_id',
@@ -77,6 +78,7 @@ class XendPSCSI(XendBase):
 
     def __init__(self, uuid, record):
         self.physical_HCTL = record['physical_HCTL']
+        self.physical_HBA = record['HBA']
         self.vendor_name = record['vendor_name']
         self.model = record['model']
         self.type_id = record['type_id']
@@ -114,6 +116,9 @@ class XendPSCSI(XendBase):
     def get_physical_HCTL(self):
         return self.physical_HCTL
 
+    def get_HBA(self):
+        return self.physical_HBA
+
     def get_vendor_name(self):
         return self.vendor_name
 
@@ -140,4 +145,67 @@ class XendPSCSI(XendBase):
 
     def get_scsi_level(self):
         return self.scsi_level
+
+
+class XendPSCSI_HBA(XendBase):
+    """Representation of a physical SCSI HBA."""
+
+    def getClass(self):
+        return "PSCSI_HBA"
+
+    def getAttrRO(self):
+        attrRO = ['host',
+                  'physical_host',
+                  'PSCSIs']
+        return XendBase.getAttrRO() + attrRO
+
+    def getAttrRW(self):
+        attrRW = []
+        return XendBase.getAttrRW() + attrRW
+
+    def getAttrInst(self):
+        attrInst = []
+        return XendBase.getAttrInst() + attrInst
+
+    def getMethods(self):
+        methods = []
+        return XendBase.getMethods() + methods
+
+    def getFuncs(self):
+        funcs = []
+        return XendBase.getFuncs() + funcs
+
+    getClass    = classmethod(getClass)
+    getAttrRO   = classmethod(getAttrRO)
+    getAttrRW   = classmethod(getAttrRW)
+    getAttrInst = classmethod(getAttrInst)
+    getMethods  = classmethod(getMethods)
+    getFuncs    = classmethod(getFuncs)
+ 
+    def get_by_physical_host(self, physical_host):
+        for pscsi_HBA in XendAPIStore.get_all('PSCSI_HBA'):
+            if pscsi_HBA.get_physical_host() == physical_host:
+                return pscsi_HBA.get_uuid()
+        return None
+
+    get_by_physical_host = classmethod(get_by_physical_host)
+
+    def __init__(self, uuid, record):
+        self.physical_host = record['physical_host']
+        XendBase.__init__(self, uuid, record)
+
+    def get_host(self):
+        from xen.xend import XendNode
+        return XendNode.instance().get_uuid()
+
+    def get_physical_host(self):
+        return self.physical_host
+
+    def get_PSCSIs(self):
+        PSCSIs = []
+        uuid = self.get_uuid()
+        for pscsi in XendAPIStore.get_all('PSCSI'):
+            if pscsi.get_HBA() == uuid:
+                PSCSIs.append(pscsi.get_uuid())
+        return PSCSIs
 

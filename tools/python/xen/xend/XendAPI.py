@@ -48,8 +48,8 @@ from XendPIF import XendPIF
 from XendPBD import XendPBD
 from XendPPCI import XendPPCI
 from XendDPCI import XendDPCI
-from XendPSCSI import XendPSCSI
-from XendDSCSI import XendDSCSI
+from XendPSCSI import XendPSCSI, XendPSCSI_HBA
+from XendDSCSI import XendDSCSI, XendDSCSI_HBA
 from XendXSPolicy import XendXSPolicy, XendACMPolicy
 
 from XendAPIConstants import *
@@ -495,7 +495,9 @@ classes = {
     'PPCI'         : valid_object("PPCI"),
     'DPCI'         : valid_object("DPCI"),
     'PSCSI'        : valid_object("PSCSI"),
-    'DSCSI'        : valid_object("DSCSI")
+    'PSCSI_HBA'    : valid_object("PSCSI_HBA"),
+    'DSCSI'        : valid_object("DSCSI"),
+    'DSCSI_HBA'    : valid_object("DSCSI_HBA"),
 }
 
 autoplug_classes = {
@@ -507,7 +509,9 @@ autoplug_classes = {
     'PPCI'        : XendPPCI,
     'DPCI'        : XendDPCI,
     'PSCSI'       : XendPSCSI,
+    'PSCSI_HBA'   : XendPSCSI_HBA,
     'DSCSI'       : XendDSCSI,
+    'DSCSI_HBA'   : XendDSCSI_HBA,
     'XSPolicy'    : XendXSPolicy,
     'ACMPolicy'   : XendACMPolicy,
 }
@@ -899,6 +903,7 @@ class XendAPI(object):
                     'PIFs',
                     'PPCIs',
                     'PSCSIs',
+                    'PSCSI_HBAs',
                     'host_CPUs',
                     'cpu_configuration',
                     'metrics',
@@ -991,6 +996,8 @@ class XendAPI(object):
         return xen_api_success(XendNode.instance().get_PPCI_refs())
     def host_get_PSCSIs(self, session, ref):
         return xen_api_success(XendNode.instance().get_PSCSI_refs())
+    def host_get_PSCSI_HBAs(self, session, ref):
+        return xen_api_success(XendNode.instance().get_PSCSI_HBA_refs())
     def host_get_host_CPUs(self, session, host_ref):
         return xen_api_success(XendNode.instance().get_host_cpu_refs())
     def host_get_metrics(self, _, ref):
@@ -1068,7 +1075,8 @@ class XendAPI(object):
                   'PIFs': XendPIF.get_all(),
                   'PBDs': XendPBD.get_all(),
                   'PPCIs': XendPPCI.get_all(),
-                  'PSCSIs': XendPSCSI.get_all()}
+                  'PSCSIs': XendPSCSI.get_all(),
+                  'PSCSI_HBAs': XendPSCSI_HBA.get_all()}
         return xen_api_success(record)
 
     def host_tmem_thaw(self, _, host_ref, cli_id):
@@ -1270,6 +1278,7 @@ class XendAPI(object):
                   'VTPMs',
                   'DPCIs',
                   'DSCSIs',
+                  'DSCSI_HBAs',
                   'tools_version',
                   'domid',
                   'is_control_domain',
@@ -1419,6 +1428,10 @@ class XendAPI(object):
     def VM_get_DSCSIs(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         return xen_api_success(dom.get_dscsis())
+
+    def VM_get_DSCSI_HBAs(self, session, vm_ref):
+        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
+        return xen_api_success(dom.get_dscsi_HBAs())
 
     def VM_get_tools_version(self, session, vm_ref):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
@@ -1806,6 +1819,7 @@ class XendAPI(object):
             'VTPMs': xeninfo.get_vtpms(),
             'DPCIs': xeninfo.get_dpcis(),
             'DSCSIs': xeninfo.get_dscsis(),
+            'DSCSI_HBAs': xeninfo.get_dscsi_HBAs(),
             'PV_bootloader': xeninfo.info.get('PV_bootloader'),
             'PV_kernel': xeninfo.info.get('PV_kernel'),
             'PV_ramdisk': xeninfo.info.get('PV_ramdisk'),

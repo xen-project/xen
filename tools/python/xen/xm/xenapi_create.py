@@ -567,25 +567,48 @@ class xenapi_create:
     def create_scsi(self, vm_ref, scsi):
         log(DEBUG, "create_scsi")
 
-        target_ref = None
-        for pscsi_ref in server.xenapi.PSCSI.get_all():
-            if scsi.attributes["p-dev"].value == server.xenapi.PSCSI.get_physical_HCTL(pscsi_ref):
-                target_ref = pscsi_ref
-                break
-        if target_ref is None:
-            log(DEBUG, "create_scsi: scsi device not found")
-            return None
+        if scsi.attributes["feature-host"].value == "True":
+            target_HBA_ref = None
+            for pscsi_HBA_ref in server.xenapi.PSCSI_HBA.get_all():
+                if int(scsi.attributes["devid"].value) == \
+                   int(server.xenapi.PSCSI_HBA.get_physical_host(pscsi_HBA_ref)):
+                    target_HBA_ref = pscsi_HBA_ref
+                    break
+            if target_HBA_ref is None:
+                log(DEBUG, "create_scsi: scsi device not found")
+                return None
 
-        dscsi_record = {
-            "VM":
-                vm_ref,
-            "PSCSI":
-                target_ref,
-            "virtual_HCTL":
-                scsi.attributes["v-dev"].value
-        }
+            dscsi_record = {
+                "VM":
+                    vm_ref,
+                "PSCSI_HBA":
+                    target_HBA_ref,
+                "assignment_mode":
+                    "HOST"
+            }
 
-        return server.xenapi.DSCSI.create(dscsi_record)
+            return server.xenapi.DSCSI_HBA.create(dscsi_record)
+        else:
+            target_ref = None
+            for pscsi_ref in server.xenapi.PSCSI.get_all():
+                if scsi.attributes["p-dev"].value == \
+                   server.xenapi.PSCSI.get_physical_HCTL(pscsi_ref):
+                    target_ref = pscsi_ref
+                    break
+            if target_ref is None:
+                log(DEBUG, "create_scsi: scsi device not found")
+                return None
+
+            dscsi_record = {
+                "VM":
+                    vm_ref,
+                "PSCSI":
+                    target_ref,
+                "virtual_HCTL":
+                    scsi.attributes["v-dev"].value
+            }
+
+            return server.xenapi.DSCSI.create(dscsi_record)
 
 def get_child_by_name(exp, childname, default = None):
     try:
@@ -981,15 +1004,23 @@ class sxp2xml:
         scsis = []
 
         for scsi_sxp in scsis_sxp:
+            feature_host = sxp.child_value(scsi_sxp, "feature-host")
             for dev_sxp in sxp.children(scsi_sxp, "dev"):
                 scsi = document.createElement("vscsi")
 
-                scsi.attributes["p-dev"] \
-                    = get_child_by_name(dev_sxp, "p-dev")
-                scsi.attributes["v-dev"] \
-                    = get_child_by_name(dev_sxp, "v-dev")
-
-                scsis.append(scsi)
+                scsi.attributes["feature-host"] \
+                    = feature_host and "True" or "False"
+                if feature_host:
+                    scsi.attributes["devid"] \
+                        = str(get_child_by_name(dev_sxp, "devid"))
+                    scsis.append(scsi)
+                    break
+                else:
+                    scsi.attributes["p-dev"] \
+                        = get_child_by_name(dev_sxp, "p-dev")
+                    scsi.attributes["v-dev"] \
+                        = get_child_by_name(dev_sxp, "v-dev")
+                    scsis.append(scsi)
 
         return scsis
 

@@ -2672,9 +2672,6 @@ def parse_scsi_configuration(p_scsi, v_hctl, state):
     if p_scsi is not None:
         # xm scsi-attach
         if v_hctl == "host":
-            if serverType == SERVER_XEN_API:
-                # TODO
-                raise OptionError("SCSI devices assignment by HBA is not implemeted")
             host_mode = 1
             scsi_devices = vscsi_util.vscsi_get_scsidevices()
         elif len(v_hctl.split(':')) != 4:
@@ -2718,21 +2715,39 @@ def xm_scsi_attach(args):
     if serverType == SERVER_XEN_API:
 
         scsi_dev = sxp.children(scsi, 'dev')[0]
-        p_hctl = sxp.child_value(scsi_dev, 'p-dev')
-        target_ref = None
-        for pscsi_ref in server.xenapi.PSCSI.get_all():
-            if p_hctl == server.xenapi.PSCSI.get_physical_HCTL(pscsi_ref):
-                target_ref = pscsi_ref
-                break
-        if target_ref is None:
-            raise OptionError("Cannot find device '%s'" % p_scsi)
 
-        dscsi_record = {
-            "VM":           get_single_vm(dom),
-            "PSCSI":        target_ref,
-            "virtual_HCTL": v_hctl
-        }
-        server.xenapi.DSCSI.create(dscsi_record)
+        if sxp.child_value(scsi, 'feature-host'):
+            p_host = sxp.child_value(scsi_dev, 'devid')
+            target_ref = None
+            for pscsi_ref in server.xenapi.PSCSI_HBA.get_all():
+                if p_host == int(server.xenapi.PSCSI_HBA.get_physical_host(pscsi_ref)):
+                    target_ref = pscsi_ref
+                    break
+            if target_ref is None:
+                raise OptionError("Cannot find device '%s'" % p_scsi)
+
+            dscsi_record = {
+                "VM":              get_single_vm(dom),
+                "PSCSI_HBA":       target_ref,
+                "assignment_mode": "HOST"
+            }
+            server.xenapi.DSCSI_HBA.create(dscsi_record)
+        else:
+            p_hctl = sxp.child_value(scsi_dev, 'p-dev')
+            target_ref = None
+            for pscsi_ref in server.xenapi.PSCSI.get_all():
+                if p_hctl == server.xenapi.PSCSI.get_physical_HCTL(pscsi_ref):
+                    target_ref = pscsi_ref
+                    break
+            if target_ref is None:
+                raise OptionError("Cannot find device '%s'" % p_scsi)
+
+            dscsi_record = {
+                "VM":           get_single_vm(dom),
+                "PSCSI":        target_ref,
+                "virtual_HCTL": v_hctl
+            }
+            server.xenapi.DSCSI.create(dscsi_record)
 
     else:
         if len(args) == 4:
@@ -2894,7 +2909,11 @@ def xm_scsi_detach(args):
         if target_ref is None:
             raise OptionError("Device %s not assigned" % v_hctl)
 
-        server.xenapi.DSCSI.destroy(target_ref)
+        target_HBA_ref = server.xenapi.DSCSI.get_HBA(target_ref)
+        if server.xenapi.DSCSI_HBA.get_assignment_mode(target_HBA_ref) == "HOST":
+            server.xenapi.DSCSI_HBA.destroy(target_HBA_ref)
+        else:
+            server.xenapi.DSCSI.destroy(target_ref)
 
     else:
         server.xend.domain.device_configure(dom, scsi)
