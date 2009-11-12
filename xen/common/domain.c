@@ -176,7 +176,14 @@ struct vcpu *alloc_vcpu(
 
     d->vcpu[vcpu_id] = v;
     if ( vcpu_id != 0 )
-        d->vcpu[v->vcpu_id-1]->next_in_list = v;
+    {
+        int prev_id = v->vcpu_id - 1;
+        while ( (prev_id >= 0) && (d->vcpu[prev_id] == NULL) )
+            prev_id--;
+        BUG_ON(prev_id < 0);
+        v->next_in_list = d->vcpu[prev_id]->next_in_list;
+        d->vcpu[prev_id]->next_in_list = v;
+    }
 
     /* Must be called after making new vcpu visible to for_each_vcpu(). */
     vcpu_check_shutdown(v);
