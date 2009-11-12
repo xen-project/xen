@@ -303,6 +303,8 @@ p2m_pod_cache_add(struct domain *d,
         BUG();
     }
 
+    BUG_ON(d->is_dying);
+
     spin_unlock(&d->page_alloc_lock);
 
     return 0;
@@ -503,6 +505,10 @@ p2m_pod_set_mem_target(struct domain *d, unsigned long target)
     if ( p2md->pod.entry_count == 0 )
         goto out;
 
+    /* Don't do anything if the domain is being torn down */
+    if ( d->is_dying )
+        goto out;
+
     /* T' < B: Don't reduce the cache size; let the balloon driver
      * take care of it. */
     if ( target < d->tot_pages )
@@ -582,7 +588,7 @@ p2m_pod_decrease_reservation(struct domain *d,
 
     /* If we don't have any outstanding PoD entries, let things take their
      * course */
-    if ( p2md->pod.entry_count == 0 )
+    if ( p2md->pod.entry_count == 0 || unlikely(d->is_dying) )
         goto out;
 
     /* Figure out if we need to steal some freed memory for our cache */
@@ -1002,6 +1008,12 @@ p2m_pod_demand_populate(struct domain *d, unsigned long gfn,
     struct p2m_domain *p2md = d->arch.p2m;
     int i;
 
+    /* This check is done with the p2m lock held.  This will make sure that
+     * even if d->is_dying changes under our feet, empty_pod_cache() won't start
+     * until we're done. */
+    if ( unlikely(d->is_dying) )
+        goto out_fail;
+
     /* If we're low, start a sweep */
     if ( order == 9 && page_list_empty(&p2md->pod.super) )
         p2m_pod_emergency_sweep_super(d);
@@ -1048,6 +1060,7 @@ out_of_memory:
     printk("%s: Out of populate-on-demand memory! tot_pages %" PRIu32 " pod_entries %" PRIi32 "\n",
            __func__, d->tot_pages, p2md->pod.entry_count);
     domain_crash(d);
+out_fail:
     return -1;
 remap_and_retry:
     BUG_ON(order != 9);
