@@ -994,15 +994,27 @@ def configure_vifs(config_devs, vals):
 def configure_hvm(config_image, vals):
     """Create the config for HVM devices.
     """
-    args = [ 'device_model', 'pae', 'vcpus', 'boot', 'fda', 'fdb', 'timer_mode',
-             'localtime', 'serial', 'stdvga', 'isa', 'nographic', 'soundhw',
-             'vnc', 'vncdisplay', 'vncunused', 'vncconsole', 'vnclisten',
-             'sdl', 'display', 'xauthority', 'rtc_timeoffset', 'monitor',
-             'acpi', 'apic', 'usb', 'usbdevice', 'keymap', 'pci', 'hpet',
-             'guest_os_type', 'hap', 'oos', 'opengl', 'cpuid', 'cpuid_check',
-             'viridian', 'xen_extended_power_mgmt', 'pci_msitranslate',
-             'vpt_align', 'pci_power_mgmt', 'xen_platform_pci',
-             'gfx_passthru', 'description' ]
+    args = [ 'acpi', 'apic',
+             'boot',
+             'cpuid', 'cpuid_check',
+             'description', 'device_model', 'display',
+             'fda', 'fdb',
+             'gfx_passthru', 'guest_os_type',
+             'hap', 'hpet',
+             'isa',
+             'keymap',
+             'localtime',
+             'monitor',
+             'nographic',
+             'opengl', 'oos',
+             'pae', 'pci', 'pci_msitranslate', 'pci_power_mgmt',
+             'rtc_timeoffset',
+             'sdl', 'serial', 'soundhw', 'stdvga',
+             'timer_mode',
+             'usb', 'usbdevice',
+             'vcpus', 'vnc', 'vncconsole', 'vncdisplay', 'vnclisten',
+             'vncunused', 'viridian', 'vpt_align',
+             'xauthority', 'xen_extended_power_mgmt', 'xen_platform_pci' ]
 
     for a in args:
         if a in vals.__dict__ and vals.__dict__[a] is not None:
