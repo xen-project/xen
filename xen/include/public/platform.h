@@ -313,55 +313,30 @@ typedef struct xenpf_set_processor_pminfo xenpf_set_processor_pminfo_t;
 DEFINE_XEN_GUEST_HANDLE(xenpf_set_processor_pminfo_t);
 
 #define XENPF_get_cpuinfo 55
-struct xen_physical_cpuinfo {
+struct xenpf_pcpuinfo {
     /* IN */
     uint32_t xen_cpuid;
     /* OUT */
-    uint32_t apic_id;
-    uint32_t acpi_id;
+    /* The maxium cpu_id that is present */
+    uint32_t max_present;
 #define XEN_PCPU_FLAGS_ONLINE   1
     /* Correponding xen_cpuid is not present*/
 #define XEN_PCPU_FLAGS_INVALID  2
     uint32_t flags;
-    uint8_t  pad[128];
+    uint32_t apic_id;
+    uint32_t acpi_id;
 };
-typedef struct xen_physical_cpuinfo xen_physical_cpuinfo_t;
-DEFINE_XEN_GUEST_HANDLE(xen_physical_cpuinfo_t);
+typedef struct xenpf_pcpuinfo xenpf_pcpuinfo_t;
+DEFINE_XEN_GUEST_HANDLE(xenpf_pcpuinfo_t);
 
-/*
- * Fetch physical CPUs information
- */
-struct xenpf_pcpu_info
-{
-    /* OUT */
-    /* The maxium cpu_id that is present */
-    uint32_t max_present;
-    /* The maxium possible cpus */
-    uint32_t max_possible;
-
-    /* IN */
-    uint32_t info_num;
-
-    XEN_GUEST_HANDLE(xen_physical_cpuinfo_t) info;
-};
-typedef struct xenpf_pcpu_info xenpf_pcpu_info_t;
-DEFINE_XEN_GUEST_HANDLE(xenpf_pcpu_info_t);
-
+#define XENPF_cpu_online    56
+#define XENPF_cpu_offline   57
 struct xenpf_cpu_ol
 {
     uint32_t cpuid;
 };
-
-#define XENPF_resource_hotplug 56
-struct xenpf_resource_hotplug {
-    uint32_t sub_cmd;
-#define XEN_CPU_online      1
-#define XEN_CPU_offline     2
-    union {
-        struct xenpf_cpu_ol   cpu_ol;
-        uint8_t               pad[64];
-    }u;
-};
+typedef struct xenpf_cpu_ol xenpf_cpu_ol_t;
+DEFINE_XEN_GUEST_HANDLE(xenpf_cpu_ol_t);
 
 struct xen_platform_op {
     uint32_t cmd;
@@ -378,8 +353,8 @@ struct xen_platform_op {
         struct xenpf_change_freq       change_freq;
         struct xenpf_getidletime       getidletime;
         struct xenpf_set_processor_pminfo set_pminfo;
-        struct xenpf_pcpu_info          pcpu_info;
-        struct xenpf_resource_hotplug   resource;
+        struct xenpf_pcpuinfo          pcpu_info;
+        struct xenpf_cpu_ol            cpu_ol;
         uint8_t                        pad[128];
     } u;
 };

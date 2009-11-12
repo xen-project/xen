@@ -23,11 +23,8 @@ DEFINE_XEN_GUEST_HANDLE(compat_platform_op_t);
 #define xen_processor_power_t   compat_processor_power_t
 #define set_cx_pminfo           compat_set_cx_pminfo
 
-DEFINE_XEN_GUEST_HANDLE(compat_physical_cpuinfo_t);
-#define xen_physical_cpuinfo compat_physical_cpuinfo
-#define xen_physical_cpuinfo_t compat_physical_cpuinfo_t
-#define xenpf_pcpu_info compat_pf_pcpu_info
-#define xenpf_pcpu_info_t compat_pf_pcpu_info_t
+#define xenpf_pcpuinfo compat_pf_pcpuinfo
+#define xenpf_pcpuinfo_t compat_pf_pcpuinfo_t
 
 #define xenpf_enter_acpi_sleep compat_pf_enter_acpi_sleep
 
