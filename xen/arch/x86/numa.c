@@ -42,9 +42,9 @@ cpumask_t node_to_cpumask[MAX_NUMNODES] __read_mostly;
 nodemask_t __read_mostly node_online_map = { { [0] = 1UL } };
 
 /* Default NUMA to off for now. acpi=on required to enable it. */
-int numa_off __initdata = 1;
+int numa_off __devinitdata = 1;
 
-int acpi_numa __initdata;
+int acpi_numa __devinitdata;
 
 /*
  * Given a shift value, try to populate memnodemap[]
@@ -53,7 +53,7 @@ int acpi_numa __initdata;
  * 0 if memnodmap[] too small (of shift too small)
  * -1 if node overlap or lost ram (shift too big)
  */
-static int __init
+static int __devinit
 populate_memnodemap(const struct node *nodes, int numnodes, int shift)
 {
 	int i; 
@@ -259,7 +259,7 @@ static __init int numa_setup(char *opt)
  * prior to this call, and this initialization is good enough
  * for the fake NUMA cases.
  */
-void __init init_cpu_to_node(void)
+void __devinit init_cpu_to_node(void)
 {
 	int i;
  	for (i = 0; i < NR_CPUS; i++) {

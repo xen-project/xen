@@ -66,6 +66,8 @@ extern void cpu_exit_clear(void);
 extern void cpu_uninit(void);
 extern void disable_nonboot_cpus(void);
 extern void enable_nonboot_cpus(void);
+int prefill_possible_map(void);
+int cpu_add(uint32_t apic_id, uint32_t acpi_id, uint32_t pxm);
 #else
 static inline int cpu_is_offline(int cpu) {return 0;}
 static inline void disable_nonboot_cpus(void) {}

@@ -35,7 +35,7 @@
 
 /* Have we found an MP table */
 int smp_found_config;
-unsigned int __initdata maxcpus = NR_CPUS;
+unsigned int __devinitdata maxcpus = NR_CPUS;
 
 /*
  * Various Linux-internal data structures created from the
@@ -867,6 +867,20 @@ int __devinit mp_register_lapic (
 
     return MP_processor_info(&processor);
 }
+
+void mp_unregister_lapic(uint32_t apic_id, uint32_t cpu)
+{
+    if (!cpu || (apic_id == boot_cpu_physical_apicid))
+        return;
+
+    if (x86_cpu_to_apicid[cpu] != apic_id)
+        return;
+
+    physid_clear(apic_id, phys_cpu_present_map);
+
+    x86_cpu_to_apicid[cpu] = BAD_APICID;
+    cpu_clear(cpu, cpu_present_map);
+ }
 
 #ifdef	CONFIG_X86_IO_APIC
 

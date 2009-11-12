@@ -1435,6 +1435,78 @@ void enable_nonboot_cpus(void)
 	 */
 	smpboot_restore_warm_reset_vector();
 }
+
+int prefill_possible_map(void)
+{
+   int i;
+
+   for (i = 0; i < NR_CPUS; i++)
+       cpu_set(i, cpu_possible_map);
+   return 0;
+}
+
+int cpu_add(uint32_t apic_id, uint32_t acpi_id, uint32_t pxm)
+{
+    int cpu = -1;
+
+#ifndef CONFIG_ACPI
+    return -ENOSYS;
+#endif
+
+    dprintk(XENLOG_DEBUG, "cpu_add apic_id %x acpi_id %x pxm %x\n",
+             apic_id, acpi_id, pxm);
+
+    if ( acpi_id > MAX_MADT_ENTRIES || apic_id > MAX_APICS || pxm > 256 )
+        return -EINVAL;
+
+    /* Detect if the cpu has been added before */
+    if ( x86_acpiid_to_apicid[acpi_id] != 0xff)
+    {
+        if (x86_acpiid_to_apicid[acpi_id] != apic_id)
+            return -EINVAL;
+        else
+            return -EEXIST;
+    }
+
+    if ( physid_isset(apic_id, phys_cpu_present_map) )
+        return -EEXIST;
+
+	spin_lock(&cpu_add_remove_lock);
+
+    cpu = mp_register_lapic(apic_id, 1);
+
+    if (cpu < 0)
+    {
+        spin_unlock(&cpu_add_remove_lock);
+        return cpu;
+    }
+
+    x86_acpiid_to_apicid[acpi_id] = apic_id;
+
+    if ( !srat_disabled() )
+    {
+        int node;
+
+        node = setup_node(pxm);
+        if (node < 0)
+        {
+            dprintk(XENLOG_WARNING, "Setup node failed for pxm %x\n", pxm);
+            x86_acpiid_to_apicid[acpi_id] = 0xff;
+            mp_unregister_lapic(apic_id, cpu);
+            spin_unlock(&cpu_add_remove_lock);
+            return node;
+        }
+        apicid_to_node[apic_id] = node;
+    }
+
+    srat_detect_node(cpu);
+    numa_add_cpu(cpu);
+    spin_unlock(&cpu_add_remove_lock);
+    dprintk(XENLOG_INFO, "Add CPU %x with index %x\n", apic_id, cpu);
+    return cpu;
+}
+
+
 #else /* ... !CONFIG_HOTPLUG_CPU */
 int __cpu_disable(void)
 {
@@ -1445,6 +1517,11 @@ void __cpu_die(unsigned int cpu)
 {
 	/* We said "no" in __cpu_disable */
 	BUG();
+}
+
+int cpu_add(uint32_t apic_id, uint32_t acpi_id, uint32_t pxm)
+{
+    return -ENOSYS;
 }
 #endif /* CONFIG_HOTPLUG_CPU */
 

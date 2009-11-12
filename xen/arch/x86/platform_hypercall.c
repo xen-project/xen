@@ -463,6 +463,12 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
     }
     break;
 
+    case XENPF_cpu_hotadd:
+        ret = cpu_add(op->u.cpu_add.apic_id,
+                      op->u.cpu_add.acpi_id,
+                      op->u.cpu_add.pxm);
+    break;
+
     default:
         ret = -ENOSYS;
         break;

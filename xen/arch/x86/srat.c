@@ -41,7 +41,7 @@ int pxm_to_node(int pxm)
 	return (signed char)pxm2node[pxm];
 }
 
-static __init int setup_node(int pxm)
+__devinit int setup_node(int pxm)
 {
 	unsigned node = pxm2node[pxm];
 	if (node == 0xff) {
@@ -91,11 +91,6 @@ static __init void bad_srat(void)
 	acpi_numa = -1;
 	for (i = 0; i < MAX_LOCAL_APIC; i++)
 		apicid_to_node[i] = NUMA_NO_NODE;
-}
-
-static __init inline int srat_disabled(void)
-{
-	return numa_off || acpi_numa < 0;
 }
 
 /*

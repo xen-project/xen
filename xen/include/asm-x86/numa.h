@@ -30,7 +30,13 @@ extern void numa_add_cpu(int cpu);
 extern void numa_init_array(void);
 extern int numa_off;
 
+static __devinit inline int srat_disabled(void)
+{
+	return numa_off || acpi_numa < 0;
+}
 extern void numa_set_node(int cpu, int node);
+extern int setup_node(int pxm);
+extern void srat_detect_node(int cpu);
 
 extern void setup_node_bootmem(int nodeid, u64 start, u64 end);
 extern unsigned char apicid_to_node[256];

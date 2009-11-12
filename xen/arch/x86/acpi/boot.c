@@ -81,7 +81,6 @@ u8 acpi_enable_value, acpi_disable_value;
 #warning ACPI uses CMPXCHG, i486 and later hardware
 #endif
 
-#define MAX_MADT_ENTRIES	256
 u8 x86_acpiid_to_apicid[MAX_MADT_ENTRIES] =
     {[0 ... MAX_MADT_ENTRIES - 1] = 0xff };
 EXPORT_SYMBOL(x86_acpiid_to_apicid);

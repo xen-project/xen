@@ -246,7 +246,7 @@ static void __init init_idle_domain(void)
     setup_idle_pagetable();
 }
 
-static void __init srat_detect_node(int cpu)
+void __devinit srat_detect_node(int cpu)
 {
     unsigned node;
     u32 apicid = x86_cpu_to_apicid[cpu];
@@ -483,6 +483,10 @@ void __init __start_xen(unsigned long mbi_p)
     asm volatile ( "mov %%cr4,%0" : "=r" (this_cpu(cr4)) );
 
     smp_prepare_boot_cpu();
+
+#ifdef CONFIG_HOTPLUG_CPU
+    prefill_possible_map();
+#endif
 
     /* We initialise the serial devices very early so we can get debugging. */
     ns16550.io_base = 0x3f8;
