@@ -58,7 +58,6 @@
 #include <xen/stop_machine.h>
 #include <acpi/cpufreq/processor_perf.h>
 
-#define set_kernel_exec(x, y) (0)
 #define setup_trampoline()    (bootsym_phys(trampoline_realmode_entry))
 
 /* Set if we find a B stepping CPU */
@@ -82,7 +81,7 @@ EXPORT_SYMBOL(cpu_online_map);
 cpumask_t cpu_callin_map;
 cpumask_t cpu_callout_map;
 EXPORT_SYMBOL(cpu_callout_map);
-cpumask_t cpu_possible_map;
+cpumask_t cpu_possible_map = CPU_MASK_ALL;
 EXPORT_SYMBOL(cpu_possible_map);
 static cpumask_t smp_commenced_mask;
 
@@ -491,8 +490,8 @@ void __devinit start_secondary(void *unused)
 	set_processor_id(cpu);
 	set_current(idle_vcpu[cpu]);
 	this_cpu(curr_vcpu) = idle_vcpu[cpu];
-        if ( cpu_has_efer )
-            rdmsrl(MSR_EFER, this_cpu(efer));
+	if ( cpu_has_efer )
+		rdmsrl(MSR_EFER, this_cpu(efer));
 	asm volatile ( "mov %%cr4,%0" : "=r" (this_cpu(cr4)) );
 
 	percpu_traps_init();
@@ -521,11 +520,11 @@ void __devinit start_secondary(void *unused)
 	set_cpu_sibling_map(raw_smp_processor_id());
 	wmb();
 
-    /* Initlize vector_irq for BSPs */
-    lock_vector_lock();
-    __setup_vector_irq(smp_processor_id());
+	/* Initlize vector_irq for BSPs */
+	lock_vector_lock();
+	__setup_vector_irq(smp_processor_id());
 	cpu_set(smp_processor_id(), cpu_online_map);
-    unlock_vector_lock();
+	unlock_vector_lock();
 
 	per_cpu(cpu_state, smp_processor_id()) = CPU_ONLINE;
 
@@ -767,10 +766,8 @@ wakeup_secondary_cpu(int phys_apicid, unsigned long start_eip)
 		do {
 			Dprintk("+");
 			udelay(100);
-			if ( !x2apic_enabled )
-				send_status = apic_read(APIC_ICR) & APIC_ICR_BUSY;
-			else
-			    send_status = 0; /* We go out of the loop dirctly. */
+			send_status = (x2apic_enabled ? 0 :
+				       apic_read(APIC_ICR) & APIC_ICR_BUSY);
 		} while (send_status && (timeout++ < 1000));
 
 		/*
@@ -837,7 +834,7 @@ static int __devinit do_boot_cpu(int apicid, int cpu)
 	struct vcpu *v;
 	struct desc_struct *gdt;
 #ifdef __x86_64__
-        struct page_info *page;
+	struct page_info *page;
 #endif
 
 	/*
@@ -963,11 +960,11 @@ static int __devinit do_boot_cpu(int apicid, int cpu)
 		cpu_clear(cpu, cpu_initialized); /* was set by cpu_init() */
 		cpucount--;
 
-        /* Mark the CPU as non-present */
-        spin_lock(&cpu_add_remove_lock);
+		/* Mark the CPU as non-present */
+		spin_lock(&cpu_add_remove_lock);
 		x86_cpu_to_apicid[cpu] = BAD_APICID;
 		cpu_clear(cpu, cpu_present_map);
-        spin_unlock(&cpu_add_remove_lock);
+		spin_unlock(&cpu_add_remove_lock);
 	} else {
 	}
 
@@ -978,7 +975,6 @@ static int __devinit do_boot_cpu(int apicid, int cpu)
 	return boot_error;
 }
 
-#ifdef CONFIG_HOTPLUG_CPU
 static void idle_task_exit(void)
 {
 	/* Give up lazy state borrowed by this idle vcpu */
@@ -1021,7 +1017,6 @@ static int __cpuinit __smp_prepare_cpu(int cpu)
 exit:
 	return ret;
 }
-#endif
 
 /*
  * Cycle through the processors sending APIC IPIs to boot each.
@@ -1120,8 +1115,8 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 
 	kicked = 1;
 
-    for_each_present_cpu ( cpu )
-    {
+	for_each_present_cpu ( cpu )
+	{
 		apicid = x86_cpu_to_apicid[cpu];
 
 		/*
@@ -1130,11 +1125,11 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 		if ((apicid == boot_cpu_apicid) || (apicid == BAD_APICID))
 			continue;
 
-		if (!check_apicid_present(apicid))
-        {
-            dprintk(XENLOG_WARNING, "Present CPU has valid apicid\n");
+		if (!check_apicid_present(apicid)) {
+			dprintk(XENLOG_WARNING,
+				"Present CPU has valid apicid\n");
 			continue;
-        }
+		}
 
 		if (max_cpus <= cpucount+1)
 			continue;
@@ -1233,7 +1228,6 @@ void __devinit smp_prepare_boot_cpu(void)
 	per_cpu(cpu_state, smp_processor_id()) = CPU_ONLINE;
 }
 
-#ifdef CONFIG_HOTPLUG_CPU
 static void
 remove_siblinginfo(int cpu)
 {
@@ -1318,7 +1312,7 @@ void __cpu_die(unsigned int cpu)
 
 static int take_cpu_down(void *unused)
 {
-    return __cpu_disable();
+	return __cpu_disable();
 }
 
 int cpu_down(unsigned int cpu)
@@ -1357,8 +1351,8 @@ int cpu_down(unsigned int cpu)
 	cpu_mcheck_distribute_cmci();
 
 out:
-    if (!err)
-        send_guest_global_virq(dom0, VIRQ_PCPU_STATE);
+	if (!err)
+		send_guest_global_virq(dom0, VIRQ_PCPU_STATE);
 	spin_unlock(&cpu_add_remove_lock);
 	return err;
 }
@@ -1379,8 +1373,8 @@ int cpu_up(unsigned int cpu)
 		goto out;
 
 out:
-    if (!err)
-        send_guest_global_virq(dom0, VIRQ_PCPU_STATE);
+	if (!err)
+		send_guest_global_virq(dom0, VIRQ_PCPU_STATE);
 	spin_unlock(&cpu_add_remove_lock);
 	return err;
 }
@@ -1436,99 +1430,72 @@ void enable_nonboot_cpus(void)
 	smpboot_restore_warm_reset_vector();
 }
 
-int prefill_possible_map(void)
-{
-   int i;
-
-   for (i = 0; i < NR_CPUS; i++)
-       cpu_set(i, cpu_possible_map);
-   return 0;
-}
-
 int cpu_add(uint32_t apic_id, uint32_t acpi_id, uint32_t pxm)
 {
-    int cpu = -1;
+	int cpu = -1;
 
 #ifndef CONFIG_ACPI
-    return -ENOSYS;
+	return -ENOSYS;
 #endif
 
-    dprintk(XENLOG_DEBUG, "cpu_add apic_id %x acpi_id %x pxm %x\n",
-             apic_id, acpi_id, pxm);
+	dprintk(XENLOG_DEBUG, "cpu_add apic_id %x acpi_id %x pxm %x\n",
+		apic_id, acpi_id, pxm);
 
-    if ( acpi_id > MAX_MADT_ENTRIES || apic_id > MAX_APICS || pxm > 256 )
-        return -EINVAL;
+	if ( acpi_id > MAX_MADT_ENTRIES || apic_id > MAX_APICS || pxm > 256 )
+		return -EINVAL;
 
-    /* Detect if the cpu has been added before */
-    if ( x86_acpiid_to_apicid[acpi_id] != 0xff)
-    {
-        if (x86_acpiid_to_apicid[acpi_id] != apic_id)
-            return -EINVAL;
-        else
-            return -EEXIST;
-    }
+	/* Detect if the cpu has been added before */
+	if ( x86_acpiid_to_apicid[acpi_id] != 0xff)
+	{
+		if (x86_acpiid_to_apicid[acpi_id] != apic_id)
+			return -EINVAL;
+		else
+			return -EEXIST;
+	}
 
-    if ( physid_isset(apic_id, phys_cpu_present_map) )
-        return -EEXIST;
+	if ( physid_isset(apic_id, phys_cpu_present_map) )
+		return -EEXIST;
 
 	spin_lock(&cpu_add_remove_lock);
 
-    cpu = mp_register_lapic(apic_id, 1);
+	cpu = mp_register_lapic(apic_id, 1);
 
-    if (cpu < 0)
-    {
-        spin_unlock(&cpu_add_remove_lock);
-        return cpu;
-    }
+	if (cpu < 0)
+	{
+		spin_unlock(&cpu_add_remove_lock);
+		return cpu;
+	}
 
-    x86_acpiid_to_apicid[acpi_id] = apic_id;
+	x86_acpiid_to_apicid[acpi_id] = apic_id;
 
-    if ( !srat_disabled() )
-    {
-        int node;
+	if ( !srat_disabled() )
+	{
+		int node;
 
-        node = setup_node(pxm);
-        if (node < 0)
-        {
-            dprintk(XENLOG_WARNING, "Setup node failed for pxm %x\n", pxm);
-            x86_acpiid_to_apicid[acpi_id] = 0xff;
-            mp_unregister_lapic(apic_id, cpu);
-            spin_unlock(&cpu_add_remove_lock);
-            return node;
-        }
-        apicid_to_node[apic_id] = node;
-    }
+		node = setup_node(pxm);
+		if (node < 0)
+		{
+			dprintk(XENLOG_WARNING,
+				"Setup node failed for pxm %x\n", pxm);
+			x86_acpiid_to_apicid[acpi_id] = 0xff;
+			mp_unregister_lapic(apic_id, cpu);
+			spin_unlock(&cpu_add_remove_lock);
+			return node;
+		}
+		apicid_to_node[apic_id] = node;
+	}
 
-    srat_detect_node(cpu);
-    numa_add_cpu(cpu);
-    spin_unlock(&cpu_add_remove_lock);
-    dprintk(XENLOG_INFO, "Add CPU %x with index %x\n", apic_id, cpu);
-    return cpu;
+	srat_detect_node(cpu);
+	numa_add_cpu(cpu);
+	spin_unlock(&cpu_add_remove_lock);
+	dprintk(XENLOG_INFO, "Add CPU %x with index %x\n", apic_id, cpu);
+	return cpu;
 }
 
-
-#else /* ... !CONFIG_HOTPLUG_CPU */
-int __cpu_disable(void)
-{
-	return -ENOSYS;
-}
-
-void __cpu_die(unsigned int cpu)
-{
-	/* We said "no" in __cpu_disable */
-	BUG();
-}
-
-int cpu_add(uint32_t apic_id, uint32_t acpi_id, uint32_t pxm)
-{
-    return -ENOSYS;
-}
-#endif /* CONFIG_HOTPLUG_CPU */
 
 int __devinit __cpu_up(unsigned int cpu)
 {
-#ifdef CONFIG_HOTPLUG_CPU
-	int ret=0;
+	int ret = 0;
 
 	/*
 	 * We do warm boot only on cpus that had booted earlier
@@ -1543,7 +1510,6 @@ int __devinit __cpu_up(unsigned int cpu)
 
 	if (ret)
 		return -EIO;
-#endif
 
 	/* In case one didn't come up */
 	if (!cpu_isset(cpu, cpu_callin_map)) {
@@ -1573,12 +1539,6 @@ void __init smp_cpus_done(unsigned int max_cpus)
 #endif
 	mtrr_save_state();
 	mtrr_aps_sync_end();
-#ifndef CONFIG_HOTPLUG_CPU
-	/*
-	 * Disable executability of the SMP trampoline:
-	 */
-	set_kernel_exec((unsigned long)trampoline_base, trampoline_exec);
-#endif
 }
 
 void __init smp_intr_init(void)
@@ -1598,14 +1558,14 @@ void __init smp_intr_init(void)
 	for (seridx = 0; seridx < 2; seridx++) {
 		if ((irq = serial_irq(seridx)) < 0)
 			continue;
-        irq_vector[irq] = FIRST_HIPRIORITY_VECTOR + seridx + 1;
-        per_cpu(vector_irq, cpu)[FIRST_HIPRIORITY_VECTOR + seridx + 1] = irq;
-        irq_cfg[irq].vector = FIRST_HIPRIORITY_VECTOR + seridx + 1;
-        irq_cfg[irq].domain = (cpumask_t)CPU_MASK_ALL;
+		irq_vector[irq] = FIRST_HIPRIORITY_VECTOR + seridx + 1;
+		per_cpu(vector_irq, cpu)[FIRST_HIPRIORITY_VECTOR + seridx + 1] = irq;
+		irq_cfg[irq].vector = FIRST_HIPRIORITY_VECTOR + seridx + 1;
+		irq_cfg[irq].domain = (cpumask_t)CPU_MASK_ALL;
 	}
 
-    /* IPI for cleanuping vectors after irq move */
-    set_intr_gate(IRQ_MOVE_CLEANUP_VECTOR, irq_move_cleanup_interrupt);
+	/* IPI for cleanuping vectors after irq move */
+	set_intr_gate(IRQ_MOVE_CLEANUP_VECTOR, irq_move_cleanup_interrupt);
 
 	/* IPI for event checking. */
 	set_intr_gate(EVENT_CHECK_VECTOR, event_check_interrupt);

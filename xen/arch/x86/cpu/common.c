@@ -615,10 +615,8 @@ void __cpuinit cpu_init(void)
 #undef CD
 }
 
-#ifdef CONFIG_HOTPLUG_CPU
 void __cpuinit cpu_uninit(void)
 {
 	int cpu = raw_smp_processor_id();
 	cpu_clear(cpu, cpu_initialized);
 }
-#endif

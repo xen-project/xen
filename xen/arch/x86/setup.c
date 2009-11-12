@@ -484,10 +484,6 @@ void __init __start_xen(unsigned long mbi_p)
 
     smp_prepare_boot_cpu();
 
-#ifdef CONFIG_HOTPLUG_CPU
-    prefill_possible_map();
-#endif
-
     /* We initialise the serial devices very early so we can get debugging. */
     ns16550.io_base = 0x3f8;
     ns16550.irq     = 4;

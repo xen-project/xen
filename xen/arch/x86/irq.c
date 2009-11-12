@@ -7,6 +7,7 @@
 
 #include <xen/config.h>
 #include <xen/init.h>
+#include <xen/delay.h>
 #include <xen/errno.h>
 #include <xen/event.h>
 #include <xen/irq.h>
@@ -1638,10 +1639,6 @@ static int __init setup_dump_irqs(void)
 }
 __initcall(setup_dump_irqs);
 
-#ifdef CONFIG_HOTPLUG_CPU
-#include <asm/mach-generic/mach_apic.h>
-#include <xen/delay.h>
-
 /* A cpu has been removed from cpu_online_mask.  Re-set irq affinities. */
 void fixup_irqs(void)
 {
@@ -1650,19 +1647,23 @@ void fixup_irqs(void)
     struct irq_desc *desc;
     irq_guest_action_t *action;
     struct pending_eoi *peoi;
-    for(irq = 0; irq < nr_irqs; irq++ ) {
+
+    for ( irq = 0; irq < nr_irqs; irq++ )
+    {
         int break_affinity = 0;
         int set_affinity = 1;
         cpumask_t affinity;
-        if (irq == 2)
+
+        if ( irq == 2 )
             continue;
+
         desc = irq_to_desc(irq);
-        /* interrupt's are disabled at this point */
+
         spin_lock(&desc->lock);
 
         affinity = desc->affinity;
-        if (!desc->action ||
-            cpus_equal(affinity, cpu_online_map)) {
+        if ( !desc->action || cpus_equal(affinity, cpu_online_map) )
+        {
             spin_unlock(&desc->lock);
             continue;
         }
@@ -1674,22 +1675,22 @@ void fixup_irqs(void)
             affinity = cpu_online_map;
         }
 
-        if (desc->handler->disable)
+        if ( desc->handler->disable )
             desc->handler->disable(irq);
 
-        if (desc->handler->set_affinity)
+        if ( desc->handler->set_affinity )
             desc->handler->set_affinity(irq, affinity);
-        else if (!(warned++))
+        else if ( !(warned++) )
             set_affinity = 0;
 
-        if (desc->handler->enable)
+        if ( desc->handler->enable )
             desc->handler->enable(irq);
 
         spin_unlock(&desc->lock);
 
-        if (break_affinity && set_affinity)
+        if ( break_affinity && set_affinity )
             printk("Broke affinity for irq %i\n", irq);
-        else if (!set_affinity)
+        else if ( !set_affinity )
             printk("Cannot set affinity for irq %i\n", irq);
     }
 
@@ -1714,4 +1715,3 @@ void fixup_irqs(void)
         peoi[sp].ready = 1;
     flush_ready_eoi();
 }
-#endif
