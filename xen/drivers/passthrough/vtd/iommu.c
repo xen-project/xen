@@ -664,24 +664,94 @@ static void iommu_disable_translation(struct iommu *iommu)
     spin_unlock_irqrestore(&iommu->register_lock, flags);
 }
 
+enum faulttype {
+    DMA_REMAP,
+    INTR_REMAP,
+    UNKNOWN,
+};
+
+static const char *dma_remap_fault_reasons[] =
+{
+    "Software",
+    "Present bit in root entry is clear",
+    "Present bit in context entry is clear",
+    "Invalid context entry",
+    "Access beyond MGAW",
+    "PTE Write access is not set",
+    "PTE Read access is not set",
+    "Next page table ptr is invalid",
+    "Root table address invalid",
+    "Context table ptr is invalid",
+    "non-zero reserved fields in RTP",
+    "non-zero reserved fields in CTP",
+    "non-zero reserved fields in PTE",
+    "Blocked a DMA translation request",
+};
+
+static const char *intr_remap_fault_reasons[] =
+{
+    "Detected reserved fields in the decoded interrupt-remapped request",
+    "Interrupt index exceeded the interrupt-remapping table size",
+    "Present field in the IRTE entry is clear",
+    "Error accessing interrupt-remapping table pointed by IRTA_REG",
+    "Detected reserved fields in the IRTE entry",
+    "Blocked a compatibility format interrupt request",
+    "Blocked an interrupt request due to source-id verification failure",
+};
+
+static const char *iommu_get_fault_reason(u8 fault_reason, int *fault_type)
+{
+    if ( fault_reason >= 0x20 && ( fault_reason < 0x20 +
+                ARRAY_SIZE(intr_remap_fault_reasons)) )
+    {
+        *fault_type = INTR_REMAP;
+        return intr_remap_fault_reasons[fault_reason - 0x20];
+    }
+    else if ( fault_reason < ARRAY_SIZE(dma_remap_fault_reasons) )
+    {
+        *fault_type = DMA_REMAP;
+        return dma_remap_fault_reasons[fault_reason];
+    }
+    else
+    {
+        *fault_type = UNKNOWN;
+        return "Unknown";
+    }
+}
+
 static struct iommu **irq_to_iommu;
 static int iommu_page_fault_do_one(struct iommu *iommu, int type,
                                    u8 fault_reason, u16 source_id, u64 addr)
 {
-    dprintk(XENLOG_WARNING VTDPREFIX,
-            "iommu_fault:%s: %x:%x.%x addr %"PRIx64" REASON %x "
-            "iommu->reg = %p\n",
-            (type ? "DMA Read" : "DMA Write"), (source_id >> 8),
-            PCI_SLOT(source_id & 0xFF), PCI_FUNC(source_id & 0xFF), addr,
-            fault_reason, iommu->reg);
+    const char *reason;
+    int fault_type;
+    reason = iommu_get_fault_reason(fault_reason, &fault_type);
 
+    if ( fault_type == DMA_REMAP )
+    {
+        dprintk(XENLOG_WARNING VTDPREFIX,
+                "DMAR:[%s] Request device [%02x:%02x.%d] "
+                "fault addr %"PRIx64", iommu reg = %p\n"
+                "DMAR:[fault reason %02xh] %s\n",
+                (type ? "DMA Read" : "DMA Write"),
+                (source_id >> 8), PCI_SLOT(source_id & 0xFF),
+                PCI_FUNC(source_id & 0xFF), addr, iommu->reg,
+                fault_reason, reason);
 #ifndef __i386__ /* map_domain_page() cannot be used in this context */
-    if ( fault_reason < 0x20 )
         print_vtd_entries(iommu, (source_id >> 8),
                           (source_id & 0xff), (addr >> PAGE_SHIFT));
 #endif
-
+    }
+    else
+        dprintk(XENLOG_WARNING VTDPREFIX,
+                "INTR-REMAP: Request device [%02x:%02x.%d] "
+                "fault index %"PRIx64", iommu reg = %p\n"
+                "INTR-REMAP:[fault reason %02xh] %s\n",
+                (source_id >> 8), PCI_SLOT(source_id & 0xFF),
+                PCI_FUNC(source_id & 0xFF), addr >> 48, iommu->reg,
+                fault_reason, reason);
     return 0;
+
 }
 
 static void iommu_fault_status(u32 fault_status)
@@ -717,9 +787,6 @@ static void iommu_page_fault(int irq, void *dev_id,
     int reg, fault_index;
     u32 fault_status;
     unsigned long flags;
-
-    dprintk(XENLOG_WARNING VTDPREFIX,
-            "iommu_page_fault: iommu->reg = %p\n", iommu->reg);
 
     fault_status = dmar_readl(iommu->reg, DMAR_FSTS_REG);
 
