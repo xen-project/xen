@@ -1,0 +1,4 @@
+Remus provides fault tolerance for virtual machines by sending continuous
+checkpoints to a backup, which will activate if the target VM fails.
+
+See the website at http://nss.cs.ubc.ca/remus/ for details.
