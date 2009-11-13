@@ -205,6 +205,8 @@
 ^tools/pygrub/build/.*$
 ^tools/python/build/.*$
 ^tools/python/xen/util/path\.py$
+^tools/remus/imqebt/imqebt$
+^tools/remus/kmod/.*(\.cmd|\.mod|\.ko|\.mod\.c|\.symvers|\.xen)$
 ^tools/security/secpol_tool$
 ^tools/security/xen/.*$
 ^tools/security/xensec_tool$
