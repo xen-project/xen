@@ -766,6 +766,10 @@ class XendDomainInfo:
             bdf_str = "%s@%02x%s" % (pci_dict_to_bdf_str(new_dev),
                                      int(new_dev['vdevfn'], 16), opts)
             log.debug("XendDomainInfo.hvm_pci_device_insert_dev: %s" % bdf_str)
+            bdf = xc.assign_device(self.domid, pci_dict_to_xc_str(new_dev))
+            if bdf > 0:
+                raise VmError("Failed to assign device to IOMMU (%s)" % bdf_str)
+            log.debug("pci: assign device %s" % bdf_str)
             self.image.signalDeviceModel('pci-ins', 'pci-inserted', bdf_str)
 
             vdevfn = xstransact.Read("/local/domain/0/device-model/%i/parameter"
@@ -921,7 +925,6 @@ class XendDomainInfo:
             existing_pci_conf = self.info['devices'][existing_dev_uuid][1]
             devid = self._createDevice('pci', existing_pci_conf)
             self.info['devices'][existing_dev_uuid][1]['devid'] = devid
-            return True
 
         if self.domid is not None:
             # use DevController.reconfigureDevice to change device config

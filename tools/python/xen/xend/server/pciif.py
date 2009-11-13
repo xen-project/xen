@@ -444,15 +444,7 @@ class PciController(DevController):
         # For hvm guest, (from c/s 19679 on) assigning device statically and
         # dynamically both go through reconfigureDevice(), so HERE the
         # setupOneDevice() is not necessary.
-        if self.vm.info.is_hvm():
-            for pci_dev in pci_dev_list:
-                # Setup IOMMU device assignment
-                bdf = xc.assign_device(self.getDomid(), pci_dict_to_xc_str(pci_dev))
-                pci_str = pci_dict_to_bdf_str(pci_dev)
-                if bdf > 0:
-                    raise VmError("Failed to assign device to IOMMU (%s)" % pci_str)
-                log.debug("pci: assign device %s" % pci_str)
-        else :
+        if not self.vm.info.is_hvm():
             for d in pci_dev_list:
                 self.setupOneDevice(d)
         wPath = '/local/domain/0/backend/pci/%u/0/aerState' % (self.getDomid())
@@ -492,11 +484,12 @@ class PciController(DevController):
         dev.do_FLR(self.vm.info.is_hvm(),
             xoptions.get_pci_dev_assign_strict_check())
 
-        bdf = xc.deassign_device(fe_domid, pci_dict_to_xc_str(pci_dev))
-        pci_str = pci_dict_to_bdf_str(pci_dev)
-        if bdf > 0:
-            raise VmError("Failed to deassign device from IOMMU (%s)" % pci_str)
-        log.debug("pci: Deassign device %s" % pci_str)
+        if not self.vm.info.is_stubdom() :
+            bdf = xc.deassign_device(fe_domid, pci_dict_to_xc_str(pci_dev))
+            pci_str = pci_dict_to_bdf_str(pci_dev)
+            if bdf > 0:
+                raise VmError("Failed to deassign device from IOMMU (%s)" % pci_str)
+            log.debug("pci: Deassign device %s" % pci_str)
 
         for (start, size) in dev.ioports:
             log.debug('pci: disabling ioport 0x%x/0x%x'%(start,size))
