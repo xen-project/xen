@@ -23,14 +23,6 @@ diff -urN pciutils-2.2.9.orig/lib/access.c pciutils-2.2.9/lib/access.c
    PCI_ACCESS_MAX
  };
  
-@@ -63,6 +64,7 @@
-   int fd_rw;				/* proc: fd opened read-write */
-   struct pci_dev *cached_dev;		/* proc: device the fd is for */
-   int fd_pos;				/* proc: current position */
-+  void *minios;
- };
- 
- /* Initialize PCI access */
 --- pciutils-2.2.9.orig/lib/internal.h	2006-09-09 11:52:47.000000000 +0100
 +++ pciutils-2.2.9/lib/internal.h	2008-07-01 10:46:24.968202000 +0100
 @@ -37,4 +37,4 @@
@@ -95,24 +87,19 @@ diff -urN pciutils-2.2.9.orig/lib/access.c pciutils-2.2.9/lib/access.c
 +static void
 +minios_init(struct pci_access *a)
 +{
-+  a->minios = init_pcifront(NULL);
-+  if (!a->minios)
++  if (!init_pcifront(NULL))
 +    a->warning("minios_init open failed");
 +}
 +
 +static void
 +minios_cleanup(struct pci_access *a)
 +{
-+  if (a->minios)
-+    shutdown_pcifront(a->minios);
++  shutdown_pcifront(NULL);
 +}
 +
 +static void
 +minios_scan(struct pci_access *a)
 +{
-+  if (!a->minios)
-+    return;
-+
 +  void func(unsigned int domain, unsigned int bus, unsigned int slot, unsigned int fun)
 +  {
 +    struct pci_dev *d = pci_alloc_dev(a);
@@ -125,7 +112,7 @@ diff -urN pciutils-2.2.9.orig/lib/access.c pciutils-2.2.9/lib/access.c
 +    pci_link_dev(a, d);
 +  }
 +
-+  pcifront_scan(a->minios, func);
++  pcifront_scan(NULL, func);
 +}
 +
 +static int
@@ -134,17 +121,17 @@ diff -urN pciutils-2.2.9.orig/lib/access.c pciutils-2.2.9/lib/access.c
 +  unsigned int val;
 +  switch (len) {
 +    case 1:
-+      if (pcifront_conf_read(d->access->minios, d->domain, d->bus, d->dev, d->func, pos, len, &val))
++      if (pcifront_conf_read(NULL, d->domain, d->bus, d->dev, d->func, pos, len, &val))
 +        return 0;
 +      * buf = val;
 +      return 1;
 +    case 2:
-+      if (pcifront_conf_read(d->access->minios, d->domain, d->bus, d->dev, d->func, pos, len, &val))
++      if (pcifront_conf_read(NULL, d->domain, d->bus, d->dev, d->func, pos, len, &val))
 +        return 0;
 +      *(u16 *) buf = cpu_to_le16((u16) val);
 +      return 1;
 +    case 4:
-+      if (pcifront_conf_read(d->access->minios, d->domain, d->bus, d->dev, d->func, pos, len, &val))
++      if (pcifront_conf_read(NULL, d->domain, d->bus, d->dev, d->func, pos, len, &val))
 +        return 0;
 +      *(u32 *) buf = cpu_to_le32((u32) val);
 +      return 1;
@@ -170,7 +157,7 @@ diff -urN pciutils-2.2.9.orig/lib/access.c pciutils-2.2.9/lib/access.c
 +    default:
 +      return pci_generic_block_write(d, pos, buf, len);
 +  }
-+  return !pcifront_conf_write(d->access->minios, d->domain, d->bus, d->dev, d->func, pos, len, val);
++  return !pcifront_conf_write(NULL, d->domain, d->bus, d->dev, d->func, pos, len, val);
 +}
 +
 +struct pci_methods pm_minios = {

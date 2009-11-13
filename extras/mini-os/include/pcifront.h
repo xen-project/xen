@@ -1,6 +1,7 @@
 #include <mini-os/types.h>
 #include <xen/io/pciif.h>
 struct pcifront_dev;
+void pcifront_watches(void *opaque);
 struct pcifront_dev *init_pcifront(char *nodename);
 void pcifront_op(struct pcifront_dev *dev, struct xen_pci_op *op);
 void pcifront_scan(struct pcifront_dev *dev, void (*fun)(unsigned int domain, unsigned int bus, unsigned slot, unsigned int fun));

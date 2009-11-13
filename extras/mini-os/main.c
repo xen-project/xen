@@ -9,6 +9,7 @@
 #include <sched.h>
 #include <console.h>
 #include <netfront.h>
+#include <pcifront.h>
 #include <time.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -67,6 +68,7 @@ static void call_main(void *p)
 #endif
     init_fs_frontend();
 #endif
+    create_thread("pcifront", pcifront_watches, NULL);
 
 #ifdef CONFIG_QEMU
     /* Fetch argc, argv from XenStore */

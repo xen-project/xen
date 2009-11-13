@@ -96,7 +96,10 @@ void xenbus_wait_for_watch(xenbus_event_queue *queue)
     if (!queue)
         queue = &xenbus_events;
     ret = xenbus_wait_for_watch_return(queue);
-    free(ret);
+    if (ret)
+        free(ret);
+    else
+        printk("unexpected path returned by watch\n");
 }
 
 char* xenbus_wait_for_value(const char* path, const char* value, xenbus_event_queue *queue)

@@ -13,10 +13,12 @@
 #include <mini-os/xmalloc.h>
 #include <mini-os/wait.h>
 #include <mini-os/pcifront.h>
+#include <mini-os/sched.h>
 
 #define PCI_DEVFN(slot, func) ((((slot) & 0x1f) << 3) | ((func) & 0x07))
 
 DECLARE_WAIT_QUEUE_HEAD(pcifront_queue);
+static struct pcifront_dev *pcidev;
 
 struct pcifront_dev {
     domid_t dom;
@@ -38,17 +40,101 @@ void pcifront_handler(evtchn_port_t port, struct pt_regs *regs, void *data)
 
 static void free_pcifront(struct pcifront_dev *dev)
 {
-    mask_evtchn(dev->evtchn);
+    if (!dev)
+        dev = pcidev;
 
-    free(dev->backend);
+    mask_evtchn(dev->evtchn);
 
     gnttab_end_access(dev->info_ref);
     free_page(dev->info);
 
     unbind_evtchn(dev->evtchn);
 
+    free(dev->backend);
     free(dev->nodename);
     free(dev);
+}
+
+void pcifront_watches(void *opaque)
+{
+    XenbusState state;
+    char *err = NULL, *msg = NULL;
+    char *be_path, *be_state;
+    char* nodename = opaque ? opaque : "device/pci/0";
+    char path[strlen(nodename) + 9];
+    char fe_state[strlen(nodename) + 7];
+    xenbus_event_queue events = NULL;
+
+    snprintf(path, sizeof(path), "%s/backend", nodename);
+    snprintf(fe_state, sizeof(fe_state), "%s/state", nodename);
+
+    while (1) {
+        printk("pcifront_watches: waiting for backend path to happear %s\n", path);
+        xenbus_watch_path_token(XBT_NIL, path, path, &events);
+        while ((err = xenbus_read(XBT_NIL, path, &be_path)) != NULL) {
+            free(err);
+            xenbus_wait_for_watch(&events);
+        }
+        xenbus_unwatch_path_token(XBT_NIL, path, path);
+        printk("pcifront_watches: waiting for backend to get into the right state %s\n", be_path);
+        be_state = (char *) malloc(strlen(be_path) +  7);
+        snprintf(be_state, strlen(be_path) +  7, "%s/state", be_path);
+        xenbus_watch_path_token(XBT_NIL, be_state, be_state, &events);
+        while ((err = xenbus_read(XBT_NIL, be_state, &msg)) != NULL || msg[0] > '4') {
+            free(msg);
+            free(err);
+            xenbus_wait_for_watch(&events);
+        }
+        xenbus_unwatch_path_token(XBT_NIL, be_state, be_state);
+        if (init_pcifront(NULL) == NULL) {
+            free(be_state);
+            free(be_path);
+            continue;
+        }
+        xenbus_watch_path_token(XBT_NIL, be_state, be_state, &events);
+        state = XenbusStateConnected;
+        printk("pcifront_watches: waiting for backend events %s\n", be_state);
+        while ((err = xenbus_wait_for_state_change(be_state, &state, &events)) == NULL &&
+               (err = xenbus_read(XBT_NIL, pcidev->backend, &msg)) == NULL) {
+            free(msg);
+            printk("pcifront_watches: backend state changed: %s %d\n", be_state, state);
+            if (state == XenbusStateReconfiguring) {
+                printk("pcifront_watches: writing %s %d\n", fe_state, XenbusStateReconfiguring);
+                if ((err = xenbus_switch_state(XBT_NIL, fe_state, XenbusStateReconfiguring)) != NULL) {
+                    printk("pcifront_watches: error changing state to %d: %s\n",
+                            XenbusStateReconfiguring, err);
+                    if (!strcmp(err, "ENOENT")) {
+                        xenbus_write(XBT_NIL, fe_state, "7");
+                        free(err);
+                    }
+                }
+            } else if (state == XenbusStateReconfigured) {
+                printk("pcifront_watches: writing %s %d\n", fe_state, XenbusStateConnected);
+                printk("pcifront_watches: changing state to %d\n", XenbusStateConnected);
+                if ((err = xenbus_switch_state(XBT_NIL, fe_state, XenbusStateConnected)) != NULL) {
+                    printk("pcifront_watches: error changing state to %d: %s\n",
+                            XenbusStateConnected, err);
+                    if (!strcmp(err, "ENOENT")) {
+                        xenbus_write(XBT_NIL, fe_state, "4");
+                        free(err);
+                    }
+                }
+            } else if (state == XenbusStateClosing)
+                break;
+        }
+        if (err)
+            printk("pcifront_watches: done waiting err=%s\n", err);
+        else
+            printk("pcifront_watches: done waiting\n");
+        xenbus_unwatch_path_token(XBT_NIL, be_state, be_state);
+        shutdown_pcifront(pcidev);
+        free(be_state);
+        free(be_path);
+        free(err);
+        pcidev = NULL;
+    }
+
+    xenbus_unwatch_path_token(XBT_NIL, path, path);
 }
 
 struct pcifront_dev *init_pcifront(char *_nodename)
@@ -64,6 +150,9 @@ struct pcifront_dev *init_pcifront(char *_nodename)
     struct pcifront_dev *dev;
 
     char path[strlen(nodename) + 1 + 10 + 1];
+
+    if (!_nodename && pcidev)
+        return pcidev;
 
     printk("******************* PCIFRONT for %s **********\n\n\n", nodename);
 
@@ -173,6 +262,9 @@ done:
 
     printk("**************************\n");
 
+    if (!_nodename)
+        pcidev = dev;
+
     return dev;
 
 error:
@@ -182,16 +274,25 @@ error:
 
 void pcifront_scan(struct pcifront_dev *dev, void (*func)(unsigned int domain, unsigned int bus, unsigned slot, unsigned int fun))
 {
-    char path[strlen(dev->backend) + 1 + 5 + 10 + 1];
-    int i, n;
+    char *path;
+    int i, n, len;
     char *s, *msg;
     unsigned int domain, bus, slot, fun;
 
-    snprintf(path, sizeof(path), "%s/num_devs", dev->backend);
+    if (!dev)
+        dev = pcidev;
+    if (!dev)
+        dev = init_pcifront(NULL);
+    if (!dev)
+        return;
+
+    len = strlen(dev->backend) + 1 + 5 + 10 + 1;
+    path = (char *) malloc(len);
+    snprintf(path, len, "%s/num_devs", dev->backend);
     n = xenbus_read_integer(path);
 
     for (i = 0; i < n; i++) {
-        snprintf(path, sizeof(path), "%s/dev-%d", dev->backend, i);
+        snprintf(path, len, "%s/dev-%d", dev->backend, i);
         msg = xenbus_read(XBT_NIL, path, &s);
         if (msg) {
             printk("Error %s when reading the PCI root name at %s\n", msg, path);
@@ -205,8 +306,10 @@ void pcifront_scan(struct pcifront_dev *dev, void (*func)(unsigned int domain, u
         }
         free(s);
 
-        func(domain, bus, slot, fun);
+        if (func)
+            func(domain, bus, slot, fun);
     }
+    free(path);
 }
 
 void shutdown_pcifront(struct pcifront_dev *dev)
@@ -271,6 +374,9 @@ int pcifront_physical_to_virtual (struct pcifront_dev *dev,
     char *s, *msg = NULL;
     unsigned int dom1, bus1, slot1, fun1;
 
+    if (!dev)
+        dev = pcidev;
+
     snprintf(path, sizeof(path), "%s/num_devs", dev->backend);
     n = xenbus_read_integer(path);
 
@@ -312,6 +418,8 @@ int pcifront_physical_to_virtual (struct pcifront_dev *dev,
 
 void pcifront_op(struct pcifront_dev *dev, struct xen_pci_op *op)
 {
+    if (!dev)
+        dev = pcidev;
     dev->info->op = *op;
     /* Make sure info is written before the flag */
     wmb();
@@ -332,6 +440,8 @@ int pcifront_conf_read(struct pcifront_dev *dev,
 {
     struct xen_pci_op op;
 
+    if (!dev)
+        dev = pcidev;
     if (pcifront_physical_to_virtual(dev, &dom, &bus, &slot, &fun) < 0)
         return XEN_PCI_ERR_dev_not_found;
     memset(&op, 0, sizeof(op));
@@ -360,6 +470,8 @@ int pcifront_conf_write(struct pcifront_dev *dev,
 {
     struct xen_pci_op op;
 
+    if (!dev)
+        dev = pcidev;
     if (pcifront_physical_to_virtual(dev, &dom, &bus, &slot, &fun) < 0)
         return XEN_PCI_ERR_dev_not_found;
     memset(&op, 0, sizeof(op));
@@ -384,6 +496,8 @@ int pcifront_enable_msi(struct pcifront_dev *dev,
 {
     struct xen_pci_op op;
 
+    if (!dev)
+        dev = pcidev;
     if (pcifront_physical_to_virtual(dev, &dom, &bus, &slot, &fun) < 0)
         return XEN_PCI_ERR_dev_not_found;
     memset(&op, 0, sizeof(op));
@@ -407,6 +521,8 @@ int pcifront_disable_msi(struct pcifront_dev *dev,
 {
     struct xen_pci_op op;
 
+    if (!dev)
+        dev = pcidev;
     if (pcifront_physical_to_virtual(dev, &dom, &bus, &slot, &fun) < 0)
         return XEN_PCI_ERR_dev_not_found;
     memset(&op, 0, sizeof(op));
@@ -428,6 +544,8 @@ int pcifront_enable_msix(struct pcifront_dev *dev,
 {
     struct xen_pci_op op;
 
+    if (!dev)
+        dev = pcidev;
     if (pcifront_physical_to_virtual(dev, &dom, &bus, &slot, &fun) < 0)
         return XEN_PCI_ERR_dev_not_found;
     if (n > SH_INFO_MAX_VEC)
@@ -460,6 +578,8 @@ int pcifront_disable_msix(struct pcifront_dev *dev,
 {
     struct xen_pci_op op;
 
+    if (!dev)
+        dev = pcidev;
     if (pcifront_physical_to_virtual(dev, &dom, &bus, &slot, &fun) < 0)
         return XEN_PCI_ERR_dev_not_found;
     memset(&op, 0, sizeof(op));
