@@ -494,6 +494,24 @@ void __devinit start_secondary(void *unused)
 		rdmsrl(MSR_EFER, this_cpu(efer));
 	asm volatile ( "mov %%cr4,%0" : "=r" (this_cpu(cr4)) );
 
+	/*
+	 * Just as during early bootstrap, it is convenient here to disable
+	 * spinlock checking while we have IRQs disabled. This allows us to
+	 * acquire IRQ-unsafe locks when it would otherwise be disallowed.
+	 * 
+	 * It is safe because the race we are usually trying to avoid involves
+	 * a group of CPUs rendezvousing in an IPI handler, where one cannot
+	 * join because it is spinning with IRQs disabled waiting to acquire a
+	 * lock held by another in the rendezvous group (the lock must be an
+	 * IRQ-unsafe lock since the CPU took the IPI after acquiring it, and
+	 * hence had IRQs enabled). This is a deadlock scenario.
+	 * 
+	 * However, no CPU can be involved in rendezvous until it is online,
+	 * hence no such group can be waiting for this CPU until it is
+	 * visible in cpu_online_map. Hence such a deadlock is not possible.
+	 */
+	spin_debug_disable();
+
 	percpu_traps_init();
 
 	cpu_init();
@@ -517,10 +535,15 @@ void __devinit start_secondary(void *unused)
 	flush_tlb_local();
 
 	/* This must be done before setting cpu_online_map */
+	spin_debug_enable();
 	set_cpu_sibling_map(raw_smp_processor_id());
 	wmb();
 
-	/* Initlize vector_irq for BSPs */
+	/*
+	 * We need to hold vector_lock so there the set of online cpus
+	 * does not change while we are assigning vectors to cpus.  Holding
+	 * this lock ensures we don't half assign or remove an irq from a cpu.
+	 */
 	lock_vector_lock();
 	__setup_vector_irq(smp_processor_id());
 	cpu_set(smp_processor_id(), cpu_online_map);
