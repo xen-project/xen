@@ -14,11 +14,11 @@ KERNELDIR ?= $(XEN_ROOT)/build-linux-$(LINUX_VER)_$(XEN_TARGET_ARCH)
 
 .PHONY: all
 all:
-       if test -d $(KERNELDIR); then $(MAKE) -C $(KERNELDIR) SUBDIRS=`pwd` modules; fi
+	if test -d $(KERNELDIR); then $(MAKE) -C $(KERNELDIR) SUBDIRS=`pwd` modules; fi
 
 .PHONY: install
 install:
-       if test -d $(KERNELDIR); then $(MAKE) -C $(KERNELDIR) SUBDIRS=`pwd` INSTALL_MOD_PATH=$(DESTDIR) modules_install; fi
+	if test -d $(KERNELDIR); then $(MAKE) -C $(KERNELDIR) SUBDIRS=`pwd` INSTALL_MOD_PATH=$(DESTDIR) modules_install; fi
 
 clean::
-       -rm -rf *.o *.ko *.mod.c *.mod.o Module.symvers .*.cmd .tmp_versions
+	-rm -rf *.o *.ko *.mod.c *.mod.o Module.symvers .*.cmd .tmp_versions
