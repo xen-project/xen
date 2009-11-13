@@ -7,6 +7,7 @@
 #include <time.h>
 #include <signal.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 #include <xenctrl.h>
 #include <xenguest.h>
