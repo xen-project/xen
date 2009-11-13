@@ -67,10 +67,28 @@ ptsname = Extension("ptsname",
                libraries          = libraries,
                sources            = [ "ptsname/ptsname.c" ])
 
+checkpoint = Extension("checkpoint",
+                       extra_compile_args = extra_compile_args,
+                       include_dirs       = include_dirs,
+                       library_dirs       = library_dirs,
+                       libraries          = libraries + [ "rt" ],
+                       sources            = [ "xen/lowlevel/checkpoint/checkpoint.c",
+                                              "xen/lowlevel/checkpoint/libcheckpoint.c"])
+
+netlink = Extension("netlink",
+                    extra_compile_args = extra_compile_args,
+                    include_dirs       = include_dirs,
+                    library_dirs       = library_dirs,
+                    libraries          = libraries,
+                    sources            = [ "xen/lowlevel/netlink/netlink.c",
+                                           "xen/lowlevel/netlink/libnetlink.c"])
+
 modules = [ xc, xs, ptsname, acm, flask ]
-if os.uname()[0] == 'SunOS':
-    modules.append(scf)
-    modules.append(process)
+plat = os.uname()[0]
+if plat == 'SunOS':
+    modules.extend([ scf, process ])
+if plat == 'Linux':
+    modules.extend([ checkpoint, netlink ])
 
 setup(name            = 'xen',
       version         = '3.0',
@@ -89,6 +107,7 @@ setup(name            = 'xen',
                          'xen.web',
                          'xen.sv',
                          'xen.xsview',
+                         'xen.remus',
 
                          'xen.xend.tests',
                          'xen.xend.server.tests',
