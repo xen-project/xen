@@ -148,6 +148,25 @@ typedef struct {
     libxl_nic_type nictype;
 } libxl_device_nic;
 
+typedef struct  {
+    union {
+        unsigned int value;
+        struct {
+            unsigned int reserved1:2;
+            unsigned int reg:6;
+            unsigned int func:3;
+            unsigned int dev:5;
+            unsigned int bus:8;
+            unsigned int reserved2:7;
+            unsigned int enable:1;
+        };
+    };
+    unsigned int domain;
+    unsigned int vdevfn;
+    bool msitranslate;
+    bool power_mgmt;
+} libxl_device_pci;
+
 #define ERROR_FAIL (-2)
 #define ERROR_NI (-101)
 #define ERROR_NOMEM (-1032)
@@ -194,8 +213,14 @@ int libxl_device_vfb_add(struct libxl_ctx *ctx, uint32_t domid);
 int libxl_device_vfb_clean_shutdown(struct libxl_ctx *ctx, uint32_t domid);
 int libxl_device_vfb_hard_shutdown(struct libxl_ctx *ctx, uint32_t domid);
 
-int libxl_device_pci_add(struct libxl_ctx *ctx, uint32_t domid);
-int libxl_device_pci_clean_shutdown(struct libxl_ctx *ctx, uint32_t domid);
-int libxl_device_pci_hard_shutdown(struct libxl_ctx *ctx, uint32_t domid);
+#define PCI_BDF                "%04x:%02x:%02x.%01x"
+#define PCI_BDF_VDEVFN         "%04x:%02x:%02x.%01x@%02x"
+int libxl_device_pci_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev);
+int libxl_device_pci_remove(struct libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev);
+int libxl_device_pci_shutdown(struct libxl_ctx *ctx, uint32_t domid);
+libxl_device_pci *libxl_device_pci_list(struct libxl_ctx *ctx, uint32_t domid, int *num);
+int libxl_device_pci_init(libxl_device_pci *pcidev, unsigned int domain,
+                          unsigned int bus, unsigned int dev,
+                          unsigned int func, unsigned int vdevfn);
 
 #endif

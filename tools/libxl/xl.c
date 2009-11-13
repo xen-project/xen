@@ -40,6 +40,8 @@ static void printf_info(libxl_domain_create_info *c_info,
                         int num_disks,
                         libxl_device_nic *vifs,
                         int num_vifs,
+                        libxl_device_pci *pcidevs,
+                        int num_pcidevs,
                         libxl_device_model_info *dm_info)
 {
     int i;
@@ -104,6 +106,12 @@ static void printf_info(libxl_domain_create_info *c_info,
         printf("model %s\n", vifs[i].model);
         printf("mac %02x:%02x:%02x:%02x:%02x:%02x\n", vifs[i].mac[0], vifs[i].mac[1], vifs[i].mac[2], vifs[i].mac[3], vifs[i].mac[4], vifs[i].mac[5]);
         printf("smac %s\n", vifs[i].mac);
+    }
+
+    for (i = 0; i < num_pcidevs; i++) {
+        printf("\n\n\n*** pcidevs_info: %d ***\n", i);
+        printf("pci dev "PCI_BDF_VDEVFN"\n", pcidevs[i].domain, pcidevs[i].bus, pcidevs[i].dev, pcidevs[i].func, pcidevs[i].vdevfn);
+        printf("opts msitranslate %d power_mgmt %d\n", pcidevs[i].msitranslate, pcidevs[i].power_mgmt);
     }
 
     printf("\n\n\n*** device_model_info ***\n");
@@ -286,13 +294,17 @@ static void parse_config_file(const char *filename,
                               int *num_disks,
                               libxl_device_nic **vifs,
                               int *num_vifs,
+                              libxl_device_pci **pcidevs,
+                              int *num_pcidevs,
                               libxl_device_model_info *dm_info)
 {
     const char *buf;
     xen_uuid_t uuid[16];
     long l;
     struct config_t config;
-    struct config_setting_t *vbds, *nics;
+    struct config_setting_t *vbds, *nics, *pcis;
+    int pci_power_mgmt = 0;
+    int pci_msitranslate = 1;
 
     config_init (&config);
 
@@ -482,6 +494,48 @@ skip:
         }
     }
 
+    if (config_lookup_int (&config, "pci_msitranslate", &l) == CONFIG_TRUE)
+        pci_msitranslate = l;
+
+    if (config_lookup_int (&config, "pci_power_mgmt", &l) == CONFIG_TRUE)
+        pci_power_mgmt = l;
+
+    if ((pcis = config_lookup (&config, "pci")) != NULL) {
+        *num_pcidevs = 0;
+        *pcidevs = NULL;
+        while ((buf = config_setting_get_string_elem (pcis, *num_pcidevs)) != NULL) {
+            unsigned int domain = 0, bus = 0, dev = 0, func = 0, vdevfn = 0;
+            char *buf2 = strdup(buf);
+            char *p;
+            *pcidevs = (libxl_device_pci *) realloc(*pcidevs, sizeof (libxl_device_pci) * ((*num_pcidevs) + 1));
+            memset(*pcidevs + *num_pcidevs, 0x00, sizeof(libxl_device_pci));
+            p = strtok(buf2, ",");
+            if (!p)
+                goto skip_pci;
+            if (!sscanf(p, PCI_BDF_VDEVFN, &domain, &bus, &dev, &func, &vdevfn)) {
+                sscanf(p, "%02x:%02x.%01x@%02x", &bus, &dev, &func, &vdevfn);
+                domain = 0;
+            }
+            libxl_device_pci_init(*pcidevs + *num_pcidevs, domain, bus, dev, func, vdevfn);
+            (*pcidevs)[*num_pcidevs].msitranslate = pci_msitranslate;
+            (*pcidevs)[*num_pcidevs].power_mgmt = pci_power_mgmt;
+            while ((p = strtok(NULL, ",=")) != NULL) {
+                while (*p == ' ')
+                    p++;
+                if (!strcmp(p, "msitranslate")) {
+                    p = strtok(NULL, ",=");
+                    (*pcidevs)[*num_pcidevs].msitranslate = atoi(p);
+                } else if (!strcmp(p, "power_mgmt")) {
+                    p = strtok(NULL, ",=");
+                    (*pcidevs)[*num_pcidevs].power_mgmt = atoi(p);
+                }
+            }
+            *num_pcidevs = (*num_pcidevs) + 1;
+skip_pci:
+            free(buf2);
+        }
+    }
+
     /* init dm from c and b */
     init_dm_info(dm_info, c_info, b_info);
 
@@ -527,13 +581,14 @@ static void create_domain(int debug, const char *filename)
     libxl_device_model_info dm_info;
     libxl_device_disk *disks = NULL;
     libxl_device_nic *vifs = NULL;
-    int num_disks = 0, num_vifs = 0;
+    libxl_device_pci *pcidevs = NULL;
+    int num_disks = 0, num_vifs = 0, num_pcidevs = 0;
     int i;
 
     printf("Parsing config file %s\n", filename);
-    parse_config_file(filename, &info1, &info2, &disks, &num_disks, &vifs, &num_vifs, &dm_info);
+    parse_config_file(filename, &info1, &info2, &disks, &num_disks, &vifs, &num_vifs, &pcidevs, &num_pcidevs, &dm_info);
     if (debug)
-        printf_info(&info1, &info2, disks, num_disks, vifs, num_vifs, &dm_info);
+        printf_info(&info1, &info2, disks, num_disks, vifs, num_vifs, pcidevs, num_pcidevs, &dm_info);
 
     libxl_ctx_init(&ctx);
     libxl_ctx_set_log(&ctx, log_callback, NULL);
@@ -551,6 +606,8 @@ static void create_domain(int debug, const char *filename)
         libxl_device_nic_add(&ctx, domid, &vifs[i]);
     }
     libxl_create_device_model(&ctx, &dm_info, vifs, num_vifs);
+    for (i = 0; i < num_pcidevs; i++)
+        libxl_device_pci_add(&ctx, domid, &pcidevs[i]);
     libxl_domain_unpause(&ctx, domid);
 
 }
@@ -560,9 +617,12 @@ static void help(char *command)
     if (!command || !strcmp(command, "help")) {
         printf("Usage xl <subcommand> [args]\n\n");
         printf("xl full list of subcommands:\n\n");
-        printf(" create                                create a domain from config file <filename>\n\n");
+        printf(" create                        create a domain from config file <filename>\n\n");
         printf(" list                          list information about all domains\n\n");
         printf(" destroy                       terminate a domain immediately\n\n");
+        printf(" pci-attach                    insert a new pass-through pci device\n\n");
+        printf(" pci-detach                    remove a domain's pass-through pci device\n\n");
+        printf(" pci-list                      list pass-through pci devices for a domain\n\n");
     } else if(!strcmp(command, "create")) {
         printf("Usage: xl create <ConfigFile> [options] [vars]\n\n");
         printf("Create a domain based on <ConfigFile>.\n\n");
@@ -572,11 +632,166 @@ static void help(char *command)
     } else if(!strcmp(command, "list")) {
         printf("Usage: xl list [Domain]\n\n");
         printf("List information about all/some domains.\n\n");
+    } else if(!strcmp(command, "pci-attach")) {
+        printf("Usage: xl pci-attach <Domain> <BDF> [Virtual Slot]\n\n");
+        printf("Insert a new pass-through pci device.\n\n");
+    } else if(!strcmp(command, "pci-detach")) {
+        printf("Usage: xl pci-detach <Domain> <BDF>\n\n");
+        printf("Remove a domain's pass-through pci device.\n\n");
+    } else if(!strcmp(command, "pci-list")) {
+        printf("Usage: xl pci-list <Domain>\n\n");
+        printf("List pass-through pci devices for a domain.\n\n");
     } else if(!strcmp(command, "destroy")) {
         printf("Usage: xl destroy <Domain>\n\n");
         printf("Terminate a domain immediately.\n\n");
     }
 }
+
+void pcilist(char *dom)
+{
+    struct libxl_ctx ctx;
+    uint32_t domid;
+    libxl_device_pci *pcidevs;
+    int num, i;
+
+    libxl_ctx_init(&ctx);
+    libxl_ctx_set_log(&ctx, log_callback, NULL);
+
+    if (libxl_param_to_domid(&ctx, dom, &domid) < 0) {
+        fprintf(stderr, "%s is an invalid domain identifier\n", dom);
+        exit(2);
+    }
+    pcidevs = libxl_device_pci_list(&ctx, domid, &num);
+    if (!num)
+        return;
+    printf("VFn  domain bus  slot func\n");
+    for (i = 0; i < num; i++) {
+        printf("0x%02x 0x%04x 0x%02x 0x%02x 0x%01x\n", pcidevs[i].vdevfn, pcidevs[i].domain, pcidevs[i].bus, pcidevs[i].dev, pcidevs[i].func);
+    }
+}
+
+int main_pcilist(int argc, char **argv)
+{
+    int opt;
+    char *domname = NULL;
+
+    while ((opt = getopt(argc, argv, "h")) != -1) {
+        switch (opt) {
+        case 'h':
+            help("pci-list");
+            exit(0);
+        default:
+            fprintf(stderr, "option not supported\n");
+            break;
+        }
+    }
+    if (optind >= argc) {
+        help("pci-list");
+        exit(2);
+    }
+
+    domname = argv[optind];
+
+    pcilist(domname);
+    exit(0);
+}
+
+void pcidetach(char *dom, char *bdf)
+{
+    struct libxl_ctx ctx;
+    uint32_t domid;
+    libxl_device_pci pcidev;
+    unsigned int domain, bus, dev, func;
+
+    libxl_ctx_init(&ctx);
+    libxl_ctx_set_log(&ctx, log_callback, NULL);
+
+    if (libxl_param_to_domid(&ctx, dom, &domid) < 0) {
+        fprintf(stderr, "%s is an invalid domain identifier\n", dom);
+        exit(2);
+    }
+    memset(&pcidev, 0x00, sizeof(pcidev));
+    sscanf(bdf, PCI_BDF, &domain, &bus, &dev, &func);
+    libxl_device_pci_init(&pcidev, domain, bus, dev, func, 0);
+    libxl_device_pci_remove(&ctx, domid, &pcidev);
+}
+
+int main_pcidetach(int argc, char **argv)
+{
+    int opt;
+    char *domname = NULL, *bdf = NULL;
+
+    while ((opt = getopt(argc, argv, "h")) != -1) {
+        switch (opt) {
+        case 'h':
+            help("pci-attach");
+            exit(0);
+        default:
+            fprintf(stderr, "option not supported\n");
+            break;
+        }
+    }
+    if (optind >= argc - 1) {
+        help("pci-detach");
+        exit(2);
+    }
+
+    domname = argv[optind];
+    bdf = argv[optind + 1];
+
+    pcidetach(domname, bdf);
+    exit(0);
+}
+void pciattach(char *dom, char *bdf, char *vs)
+{
+    struct libxl_ctx ctx;
+    uint32_t domid;
+    libxl_device_pci pcidev;
+    unsigned int domain, bus, dev, func;
+
+    libxl_ctx_init(&ctx);
+    libxl_ctx_set_log(&ctx, log_callback, NULL);
+
+    if (libxl_param_to_domid(&ctx, dom, &domid) < 0) {
+        fprintf(stderr, "%s is an invalid domain identifier\n", dom);
+        exit(2);
+    }
+    memset(&pcidev, 0x00, sizeof(pcidev));
+    sscanf(bdf, PCI_BDF, &domain, &bus, &dev, &func);
+    libxl_device_pci_init(&pcidev, domain, bus, dev, func, 0);
+    libxl_device_pci_add(&ctx, domid, &pcidev);
+}
+
+int main_pciattach(int argc, char **argv)
+{
+    int opt;
+    char *domname = NULL, *bdf = NULL, *vs = NULL;
+
+    while ((opt = getopt(argc, argv, "h")) != -1) {
+        switch (opt) {
+        case 'h':
+            help("pci-attach");
+            exit(0);
+        default:
+            fprintf(stderr, "option not supported\n");
+            break;
+        }
+    }
+    if (optind >= argc - 1) {
+        help("pci-attach");
+        exit(2);
+    }
+
+    domname = argv[optind];
+    bdf = argv[optind + 1];
+
+    if (optind + 1 < argc)
+        vs = argv[optind + 2];
+
+    pciattach(domname, bdf, vs);
+    exit(0);
+}
+
 
 void destroy_domain(char *p)
 {
@@ -713,6 +928,12 @@ int main(int argc, char **argv)
         main_list(argc - 1, argv + 1);
     } else if (!strcmp(argv[1], "destroy")) {
         main_destroy(argc - 1, argv + 1);
+    } else if (!strcmp(argv[1], "pci-attach")) {
+        main_pciattach(argc - 1, argv + 1);
+    } else if (!strcmp(argv[1], "pci-detach")) {
+        main_pcidetach(argc - 1, argv + 1);
+    } else if (!strcmp(argv[1], "pci-list")) {
+        main_pcilist(argc - 1, argv + 1);
     } else if (!strcmp(argv[1], "help")) {
         if (argc > 2)
             help(argv[2]);

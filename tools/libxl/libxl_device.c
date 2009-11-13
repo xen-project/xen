@@ -15,6 +15,7 @@
  */
 
 #include <string.h>
+#include <stdio.h>
 #include "libxl.h"
 #include "libxl_internal.h"
 #include <sys/time.h> /* for struct timeval */
@@ -83,9 +84,12 @@ retry_transaction:
     libxl_xs_writev(ctx, t, backend_path, bents);
     libxl_xs_writev(ctx, t, frontend_path, fents);
 
-    if (!xs_transaction_end(ctx->xsh, t, 0))
+    if (!xs_transaction_end(ctx->xsh, t, 0)) {
         if (errno == EAGAIN)
             goto retry_transaction;
+        else
+            XL_LOG(ctx, XL_LOG_ERROR, "xs transaction failed errno=%d\n", errno);
+    }
     return 0;
 }
 
@@ -154,7 +158,7 @@ int libxl_device_destroy(struct libxl_ctx *ctx, char *be_path, int force)
     char *state = libxl_xs_read(ctx, XBT_NULL, state_path);
     if (!state)
         return 0;
-    if (atoi(state) <= 3) {
+    if (atoi(state) != 4) {
         xs_rm(ctx->xsh, XBT_NULL, be_path);
         return 0;
     }
@@ -240,3 +244,72 @@ int libxl_devices_destroy(struct libxl_ctx *ctx, uint32_t domid, int force)
     flexarray_free(toremove);
     return 0;
 }
+
+int libxl_device_pci_flr(struct libxl_ctx *ctx, unsigned int domain, unsigned int bus,
+                         unsigned int dev, unsigned int func)
+{
+    FILE *fd;
+
+    fd = fopen("/sys/bus/pci/drivers/pciback/do_flr", "w");
+    if (fd != NULL) {
+        fprintf(fd, PCI_BDF, domain, bus, dev, func);
+        fclose(fd);
+        return 0;
+    }
+    XL_LOG(ctx, XL_LOG_ERROR, "Pciback doesn't support do_flr, cannot flr the device\n");
+    return -1;
+}
+
+int libxl_wait_for_device_model(struct libxl_ctx *ctx, uint32_t domid, char *state)
+{
+    char path[50];
+    char *p;
+    int watchdog = 100;
+    unsigned int len;
+
+    snprintf(path, sizeof(path), "/local/domain/0/device-model/%d/state", domid);
+    while (watchdog > 0) {
+        p = xs_read(ctx->xsh, XBT_NULL, path, &len);
+        if (p == NULL) {
+            usleep(100000);
+            watchdog--;
+        } else {
+            if (state == NULL || !strcmp(state, p)) {
+                free(p);
+                return 0;
+            } else {
+                free(p);
+                usleep(100000);
+                watchdog--;
+            }
+        }
+    }
+    XL_LOG(ctx, XL_LOG_ERROR, "Device Model not ready\n");
+    return -1;
+}
+
+int libxl_wait_for_backend(struct libxl_ctx *ctx, char *be_path, char *state)
+{
+    int watchdog = 100;
+    unsigned int len;
+    char *p;
+    char *path = libxl_sprintf(ctx, "%s/state", be_path);
+
+    while (watchdog > 0) {
+        p = xs_read(ctx->xsh, XBT_NULL, path, &len);
+        if (p == NULL) {
+            XL_LOG(ctx, XL_LOG_ERROR, "Backend %s does not exist\n", be_path);
+            return -1;
+        } else {
+            if (!strcmp(p, state)) {
+                return 0;
+            } else {
+                usleep(100000);
+                watchdog--;
+            }
+        }
+    }
+    XL_LOG(ctx, XL_LOG_ERROR, "Backend %s not ready\n", be_path);
+    return -1;
+}
+

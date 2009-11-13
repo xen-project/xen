@@ -72,6 +72,12 @@ typedef struct {
     libxl_device_kinds kind;
 } libxl_device;
 
+#define XC_PCI_BDF             "0x%x, 0x%x, 0x%x, 0x%x"
+#define AUTO_PHP_SLOT          0x100
+#define SYSFS_PCI_DEV          /sys/bus/pci/devices
+#define PROC_PCI_NUM_RESOURCES 7
+#define PCI_BAR_IO             0x01
+
 #define PRINTF_ATTRIBUTE(x, y) __attribute__((format(printf, x, y)))
 
 /* memory allocation tracking/helpers */
@@ -92,7 +98,7 @@ char *libxl_xs_get_dompath(struct libxl_ctx *ctx, uint32_t domid);
 char *libxl_xs_read(struct libxl_ctx *ctx, xs_transaction_t t, char *path);
 char **libxl_xs_directory(struct libxl_ctx *ctx, xs_transaction_t t, char *path, unsigned int *nb);
 
-/* from xd_dom */
+/* from xl_dom */
 int is_hvm(struct libxl_ctx *ctx, uint32_t domid);
 int build_pre(struct libxl_ctx *ctx, uint32_t domid,
               libxl_domain_build_info *info, libxl_domain_build_state *state);
@@ -109,7 +115,7 @@ int restore_common(struct libxl_ctx *ctx, uint32_t domid,
                    libxl_domain_build_info *info, libxl_domain_build_state *state, int fd);
 int core_suspend(struct libxl_ctx *ctx, uint32_t domid, int fd, int hvm, int live, int debug);
 
-/* from xd_device */
+/* from xl_device */
 char *device_disk_backend_type_of_phystype(libxl_disk_phystype phystype);
 char *device_disk_string_of_phystype(libxl_disk_phystype phystype);
 
@@ -120,13 +126,17 @@ int libxl_device_generic_add(struct libxl_ctx *ctx, libxl_device *device,
                              char **bents, char **fents);
 int libxl_device_destroy(struct libxl_ctx *ctx, char *be_path, int force);
 int libxl_devices_destroy(struct libxl_ctx *ctx, uint32_t domid, int force);
+int libxl_wait_for_device_model(struct libxl_ctx *ctx, uint32_t domid, char *state);
+int libxl_wait_for_backend(struct libxl_ctx *ctx, char *be_path, char *state);
+int libxl_device_pci_flr(struct libxl_ctx *ctx, unsigned int domain, unsigned int bus,
+                         unsigned int dev, unsigned int func);
 
 /* from xenguest (helper */
 int hvm_build_set_params(int handle, uint32_t domid,
                          int apic, int acpi, int pae, int nx, int viridian,
                          int vcpus, int store_evtchn, unsigned long *store_mfn);
 
-/* xd_exec */
+/* xl_exec */
 int libxl_exec(struct libxl_ctx *ctx, int stdinfd, int stdoutfd, int stderrfd,
                char *arg0, char **args);
 
