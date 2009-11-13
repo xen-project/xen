@@ -53,18 +53,26 @@ int libxl_name_to_domid(struct libxl_ctx *ctx, char *name, uint32_t *domid)
 {
     unsigned int num, len;
     char path[strlen("/local/domain") + 12];
-    int i;
+    int i, j, nb_domains;
     char *domname, **l;
+    struct libxl_dominfo *dominfo;
+
+    dominfo = libxl_domain_list(ctx, &nb_domains);
 
     l = xs_directory(ctx->xsh, XBT_NULL, "/local/domain", &num);
     for (i = 0; i < num; i++) {
         snprintf(path, sizeof(path), "/local/domain/%s/name", l[i]);
         domname = xs_read(ctx->xsh, XBT_NULL, path, &len);
         if (domname != NULL && !strncmp(domname, name, len)) {
-            *domid = atoi(l[i]);
-            free(l);
-            free(domname);
-            return 0;
+            int domid_i = atoi(l[i]);
+            for (j = 0; j < nb_domains; j++) {
+                if (dominfo[j].domid == domid_i) {
+                    *domid = domid_i;
+                    free(l);
+                    free(domname);
+                    return 0;
+                }
+            }
         }
         free(domname);
     }
