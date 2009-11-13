@@ -163,4 +163,6 @@ class security
 	setenforce
 	setbool
 	setsecparam
+        add_ocontext
+        del_ocontext
 }

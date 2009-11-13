@@ -118,4 +118,6 @@
 #define SECURITY__SETENFORCE                      0x00000080UL
 #define SECURITY__SETBOOL                         0x00000100UL
 #define SECURITY__SETSECPARAM                     0x00000200UL
+#define SECURITY__ADD_OCONTEXT                    0x00000400UL
+#define SECURITY__DEL_OCONTEXT                    0x00000800UL
 

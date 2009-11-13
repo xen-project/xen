@@ -82,4 +82,8 @@ int security_device_sid(u32 device, u32 *out_sid);
 int security_validate_transition(u32 oldsid, u32 newsid, u32 tasksid,
                                                                     u16 tclass);
 
+int security_ocontext_add(char *ocontext, unsigned long low,
+                           unsigned long high, u32 sid);
+
+int security_ocontext_del(char *ocontext, unsigned int low, unsigned int high);
 #endif /* _FLASK_SECURITY_H_ */

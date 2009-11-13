@@ -1942,3 +1942,277 @@ out:
     xfree(bvalues);
     return rc;
 }
+
+int determine_ocontext( char *ocontext )
+{
+    if ( strcmp(ocontext, "pirq") == 0 )
+        return OCON_PIRQ;
+    else if ( strcmp(ocontext, "ioport") == 0 )
+        return OCON_IOPORT;
+    else if ( strcmp(ocontext, "iomem") == 0 )
+        return OCON_IOMEM;
+    else if ( strcmp(ocontext, "pcidevice") == 0 )
+        return OCON_DEVICE;
+    else
+        return -1;
+}
+
+int security_ocontext_add( char *ocontext, unsigned long low, unsigned long high
+                            ,u32 sid )
+{
+    int ret = 0;
+    int ocon = 0;
+    struct ocontext *c;
+    struct ocontext *add;
+
+    if ( (ocon = determine_ocontext(ocontext)) < 0 )
+        return -EINVAL;
+    if ( (add = xmalloc(struct ocontext)) == NULL )
+        return -ENOMEM;
+    memset(add, 0, sizeof(struct ocontext));
+    add->sid[0] = sid;
+
+    POLICY_WRLOCK;
+    switch( ocon )
+    {
+    case OCON_PIRQ:
+        add->u.pirq = (u16)low;
+        if ( high != low )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        c = policydb.ocontexts[OCON_PIRQ];
+        while ( c )
+        {
+            if ( c->u.pirq == add->u.pirq )
+            {
+                printk("%s: Duplicate pirq %d\n", __FUNCTION__, add->u.pirq);
+                ret = -EINVAL;
+                break;
+            }
+            c = c->next;
+        }
+
+        if ( ret == 0 )
+        {
+            add->next = policydb.ocontexts[OCON_PIRQ];
+            policydb.ocontexts[OCON_PIRQ] = add;
+        }
+        break;
+
+    case OCON_IOPORT:
+        add->u.ioport.low_ioport = low;
+        add->u.ioport.high_ioport = high;
+
+        c = policydb.ocontexts[OCON_IOPORT];
+        while ( c )
+        {
+            if ( c->u.ioport.low_ioport <= add->u.ioport.high_ioport &&
+                 add->u.ioport.low_ioport <= c->u.ioport.high_ioport )
+            {
+                printk("%s: IO Port overlap with entry 0x%x - 0x%x\n",
+                       __FUNCTION__, c->u.ioport.low_ioport,
+                       c->u.ioport.high_ioport);
+                ret = -EINVAL;
+                break;
+            }
+            c = c->next;
+        }
+
+        if ( ret == 0 )
+        {
+            add->next = policydb.ocontexts[OCON_IOPORT];
+            policydb.ocontexts[OCON_IOPORT] = add;
+        }
+        break;
+
+    case OCON_IOMEM:
+        add->u.iomem.low_iomem = low;
+        add->u.iomem.high_iomem = high;
+
+        c = policydb.ocontexts[OCON_IOMEM];
+        while ( c )
+        {
+            if ( c->u.iomem.low_iomem <= add->u.iomem.high_iomem &&
+                 add->u.iomem.low_iomem <= c->u.iomem.high_iomem )
+            {
+                printk("%s: IO Memory overlap with entry 0x%x - 0x%x\n",
+                       __FUNCTION__, c->u.iomem.low_iomem,
+                       c->u.iomem.high_iomem);
+                ret = -EINVAL;
+                break;
+            }
+            c = c->next;
+        }
+
+        if ( ret == 0 )
+        {
+            add->next = policydb.ocontexts[OCON_IOMEM];
+            policydb.ocontexts[OCON_IOMEM] = add;
+        }
+        break;
+
+     case OCON_DEVICE:
+        add->u.device = low;
+        if ( high != low )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        c = policydb.ocontexts[OCON_DEVICE];
+        while ( c )
+        {
+            if ( c->u.device == add->u.device )
+            {
+                printk("%s: Duplicate PCI Device 0x%x\n", __FUNCTION__,
+                        add->u.device);
+                ret = -EINVAL;
+                break;
+            }
+            c = c->next;
+        }
+
+        if ( ret == 0 )
+        {
+            add->next = policydb.ocontexts[OCON_DEVICE];
+            policydb.ocontexts[OCON_DEVICE] = add;
+        }
+        break;
+
+     default:
+         ret = -EINVAL;
+    }
+    POLICY_WRUNLOCK;
+
+    if ( ret != 0 )
+        xfree(add);
+    return ret;
+}
+
+int security_ocontext_del( char *ocontext, unsigned int low, unsigned int high )
+{
+    int ret = 0;
+    int ocon = 0;
+    struct ocontext *c, *before_c;
+
+    if ( (ocon = determine_ocontext(ocontext)) < 0 )
+        return -EINVAL;
+
+    POLICY_WRLOCK;
+    switch( ocon )
+    {
+    case OCON_PIRQ:
+        for ( before_c = NULL, c = policydb.ocontexts[OCON_PIRQ];
+              c; before_c = c, c = c->next )
+        {
+            if ( c->u.pirq == low )
+            {
+                if ( before_c == NULL )
+                {
+                    policydb.ocontexts[OCON_PIRQ] = c->next;
+                    xfree(c);
+                    goto out;
+                }
+                else
+                {
+                    before_c->next = c->next;
+                    xfree(c);
+                    goto out;
+                }
+            }
+        }
+
+        printk("%s: ocontext not found: pirq %d\n", __FUNCTION__, low);
+        ret = -EINVAL;
+        break;
+
+    case OCON_IOPORT:
+        for ( before_c = NULL, c = policydb.ocontexts[OCON_IOPORT];
+              c; before_c = c, c = c->next )
+        {
+            if ( c->u.ioport.low_ioport == low &&
+                 c->u.ioport.high_ioport == high )
+            {
+                if ( before_c == NULL )
+                {
+                    policydb.ocontexts[OCON_IOPORT] = c->next;
+                    xfree(c);
+                    goto out;
+                }
+                else
+                {
+                    before_c->next = c->next;
+                    xfree(c);
+                    goto out;
+                }
+            }
+        }
+
+        printk("%s: ocontext not found: ioport 0x%x - 0x%x\n", __FUNCTION__,
+                low, high);
+        ret = -EINVAL;
+        break;
+
+    case OCON_IOMEM:
+        for ( before_c = NULL, c = policydb.ocontexts[OCON_IOMEM];
+              c; before_c = c, c = c->next )
+        {
+            if ( c->u.iomem.low_iomem == low &&
+                 c->u.iomem.high_iomem == high )
+            {
+                if ( before_c == NULL )
+                {
+                    policydb.ocontexts[OCON_IOMEM] = c->next;
+                    xfree(c);
+                    goto out;
+                }
+                else
+                {
+                    before_c->next = c->next;
+                    xfree(c);
+                    goto out;
+                }
+            }
+        }
+
+        printk("%s: ocontext not found: iomem 0x%x - 0x%x\n", __FUNCTION__,
+                low, high);
+        ret = -EINVAL;
+        break;
+
+    case OCON_DEVICE:
+        for ( before_c = NULL, c = policydb.ocontexts[OCON_DEVICE];
+              c; before_c = c, c = c->next )
+        {
+            if ( c->u.device == low )
+            {
+                if ( before_c == NULL )
+                {
+                    policydb.ocontexts[OCON_DEVICE] = c->next;
+                    xfree(c);
+                    goto out;
+                }
+                else
+                {
+                    before_c->next = c->next;
+                    xfree(c);
+                    goto out;
+                }
+            }
+        }
+
+        printk("%s: ocontext not found: pcidevice 0x%x\n", __FUNCTION__, low);
+        ret = -EINVAL;
+        break;
+
+    default:
+        ret = -EINVAL;
+    }
+
+  out:
+    POLICY_WRUNLOCK;
+    return ret;
+}

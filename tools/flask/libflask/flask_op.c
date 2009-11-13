@@ -109,3 +109,236 @@ int flask_setenforce(int xc_handle, int mode)
 
     return 0;
 }
+
+int flask_add_pirq(int xc_handle, unsigned int pirq, char *scontext)
+{
+    int err;
+    flask_op_t op;
+    char *buf;
+    char *pirq_s = OCON_PIRQ_STR;
+    int size = INITCONTEXTLEN + strlen(pirq_s) + (sizeof(unsigned int)) +
+                (sizeof(char) * 3);
+
+    if ( (buf = (char *) malloc(size)) == NULL )
+        return -ENOMEM;
+    memset(buf, 0, size);
+
+    op.cmd = FLASK_ADD_OCONTEXT;
+    snprintf(buf, size, "%s %255s %u", pirq_s, scontext, pirq);
+    op.buf = buf;
+    op.size = size;
+
+    if ( (err = xc_flask_op(xc_handle, &op)) != 0 )
+    {
+        free(buf);
+        return err;
+    }
+
+    free(buf);
+    return 0;
+
+}
+
+int flask_add_ioport(int xc_handle, unsigned long low, unsigned long high,
+                      char *scontext)
+{
+    int err;
+    flask_op_t op;
+    char *buf;
+    char *ioport = OCON_IOPORT_STR;
+    int size = INITCONTEXTLEN + strlen(ioport) +
+                (sizeof(unsigned long) * 2) + (sizeof(char) * 4);
+
+    if ( (buf = (char *) malloc(size)) == NULL )
+        return -ENOMEM;
+    memset(buf, 0, size);
+
+    op.cmd = FLASK_ADD_OCONTEXT;
+    snprintf(buf, size, "%s %255s %li %li", ioport, scontext, low, high);
+    op.buf = buf;
+    op.size = size;
+
+    if ( (err = xc_flask_op(xc_handle, &op)) != 0 )
+    {
+        free(buf);
+        return err;
+    }
+
+    free(buf);
+    return 0;
+
+}
+
+int flask_add_iomem(int xc_handle, unsigned long low, unsigned long high,
+                     char *scontext)
+{
+    int err;
+    flask_op_t op;
+    char *buf;
+    char *iomem = OCON_IOMEM_STR;
+    int size = INITCONTEXTLEN + strlen(iomem) +
+                (sizeof(unsigned long) * 2) + (sizeof(char) * 4);
+
+    if ( (buf = (char *) malloc(size)) == NULL )
+        return -ENOMEM;
+    memset(buf, 0, size);
+
+    op.cmd = FLASK_ADD_OCONTEXT;
+    snprintf(buf, size, "%s %255s %li %li", iomem, scontext, low, high);
+    op.buf = buf;
+    op.size = size;
+
+    if ( (err = xc_flask_op(xc_handle, &op)) != 0 )
+    {
+        free(buf);
+        return err;
+    }
+
+    free(buf);
+    return 0;
+
+}
+
+int flask_add_device(int xc_handle, unsigned long device, char *scontext)
+{
+    int err;
+    flask_op_t op;
+    char *buf;
+    char *dev = OCON_DEVICE_STR;
+    int size = INITCONTEXTLEN + strlen(dev) + (sizeof(unsigned long)) +
+                (sizeof(char) * 3);
+
+    if ( (buf = (char *) malloc(size)) == NULL )
+        return -ENOMEM;
+    memset(buf, 0, size);
+
+    op.cmd = FLASK_ADD_OCONTEXT;
+    snprintf(buf, size, "%s %255s %li", dev, scontext, device);
+    op.buf = buf;
+    op.size = size;
+
+    if ( (err = xc_flask_op(xc_handle, &op)) != 0 )
+    {
+        free(buf);
+        return err;
+    }
+
+    free(buf);
+    return 0;
+
+}
+
+int flask_del_pirq(int xc_handle, unsigned int pirq)
+{
+    int err;
+    flask_op_t op;
+    char *buf;
+    char *pirq_s = OCON_PIRQ_STR;
+    int size = strlen(pirq_s) + (sizeof(unsigned int)) +
+                (sizeof(char) * 2);
+
+    if ( (buf = (char *) malloc(size)) == NULL )
+        return -ENOMEM;
+    memset(buf, 0, size);
+
+    op.cmd = FLASK_DEL_OCONTEXT;
+    snprintf(buf, size, "%s %u", pirq_s, pirq);
+    op.buf = buf;
+    op.size = size;
+
+    if ( (err = xc_flask_op(xc_handle, &op)) != 0 )
+    {
+        free(buf);
+        return err;
+    }
+
+    free(buf);
+    return 0;
+
+}
+
+int flask_del_ioport(int xc_handle, unsigned long low, unsigned long high)
+{
+    int err;
+    flask_op_t op;
+    char *buf;
+    char *ioport = OCON_IOPORT_STR;
+    int size = strlen(ioport) + (sizeof(unsigned long) * 2) +
+                (sizeof(char) * 3);
+
+    if ( (buf = (char *) malloc(size)) == NULL )
+        return -ENOMEM;
+    memset(buf, 0, size);
+
+    op.cmd = FLASK_DEL_OCONTEXT;
+    snprintf(buf, size, "%s %li %li", ioport, low, high);
+    op.buf = buf;
+    op.size = size;
+
+    if ( (err = xc_flask_op(xc_handle, &op)) != 0 )
+    {
+        free(buf);
+        return err;
+    }
+
+    free(buf);
+    return 0;
+
+}
+
+int flask_del_iomem(int xc_handle, unsigned long low, unsigned long high)
+{
+    int err;
+    flask_op_t op;
+    char *buf;
+    char *iomem = OCON_IOMEM_STR;
+    int size = strlen(iomem) + (sizeof(unsigned long) * 2) +
+                (sizeof(char) * 3);
+
+    if ( (buf = (char *) malloc(size)) == NULL )
+        return -ENOMEM;
+    memset(buf, 0, size);
+
+    op.cmd = FLASK_DEL_OCONTEXT;
+    snprintf(buf, size, "%s %li %li", iomem, low, high);
+    op.buf = buf;
+    op.size = size;
+
+    if ( (err = xc_flask_op(xc_handle, &op)) != 0 )
+    {
+        free(buf);
+        return err;
+    }
+
+    free(buf);
+    return 0;
+
+}
+
+int flask_del_device(int xc_handle, unsigned long device)
+{
+    int err;
+    flask_op_t op;
+    char *buf;
+    char *dev = OCON_DEVICE_STR;
+    int size = strlen(dev) + (sizeof(unsigned long)) + (sizeof(char) * 2);
+
+    if ( (buf = (char *) malloc(size)) == NULL )
+        return -ENOMEM;
+    memset(buf, 0, size);
+
+    op.cmd = FLASK_DEL_OCONTEXT;
+    snprintf(buf, size, "%s %li", dev, device);
+    op.buf = buf;
+    op.size = size;
+
+    if ( (err = xc_flask_op(xc_handle, &op)) != 0 )
+    {
+        free(buf);
+        return err;
+    }
+
+    free(buf);
+    return 0;
+
+}

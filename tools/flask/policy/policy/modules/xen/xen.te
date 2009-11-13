@@ -51,7 +51,7 @@ allow dom0_t xen_t:xen firmware;
 
 allow dom0_t security_t:security {compute_av compute_create compute_member 
 check_context load_policy compute_relabel compute_user setenforce setbool
-setsecparam};
+setsecparam add_ocontext del_ocontext};
 
 create_channel(dom0_t, dom0_t, evchn0-0_t)
 allow dom0_t evchn0-0_t:event {send};

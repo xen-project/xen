@@ -31,8 +31,10 @@
 #define FLASK_AVC_HASHSTATS     18
 #define FLASK_AVC_CACHESTATS    19
 #define FLASK_MEMBER            20
+#define FLASK_ADD_OCONTEXT      21
+#define FLASK_DEL_OCONTEXT      22
 
-#define FLASK_LAST              FLASK_MEMBER
+#define FLASK_LAST              FLASK_DEL_OCONTEXT
 
 typedef struct flask_op {
     uint32_t  cmd;

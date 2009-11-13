@@ -45,7 +45,9 @@ integer_param("flask_enabled", flask_enabled);
         1UL<<FLASK_COMMITBOOLS | \
         1UL<<FLASK_DISABLE | \
         1UL<<FLASK_SETAVC_THRESHOLD | \
-        1UL<<FLASK_MEMBER \
+        1UL<<FLASK_MEMBER | \
+        1UL<<FLASK_ADD_OCONTEXT | \
+        1UL<<FLASK_DEL_OCONTEXT \
     )
 
 #define FLASK_COPY_OUT \
@@ -752,6 +754,93 @@ out:
     return length;
 }
 
+static int flask_ocontext_del(char *buf, uint32_t size)
+{
+    int len = 0;
+    char *ocontext;
+    unsigned long low  = 0;
+    unsigned long high = 0;
+
+    len = domain_has_security(current->domain, SECURITY__DEL_OCONTEXT);
+    if ( len )
+        return len;
+
+    if ( (ocontext = xmalloc_bytes(size) ) == NULL )
+        return -ENOMEM;
+
+    len = sscanf(buf, "%s %li %li", ocontext, &low, &high);
+    if ( len < 2 )
+    {
+        len = -EINVAL;
+        goto out;
+    }
+    else if ( len == 2 )
+        high = low;
+
+    if ( low > high )
+    {
+        len = -EINVAL;
+        goto out;
+    }
+
+    len = security_ocontext_del(ocontext, low, high);
+  out:
+    xfree(ocontext);
+    return len;
+}
+
+static int flask_ocontext_add(char *buf, uint32_t size)
+{
+    int len = 0;
+    u32 sid = 0;
+    unsigned long low  = 0;
+    unsigned long high = 0;
+    char *scontext;
+    char *ocontext;
+
+    len = domain_has_security(current->domain, SECURITY__ADD_OCONTEXT);
+    if ( len )
+        return len;
+
+    if ( (scontext = xmalloc_bytes(size) ) == NULL )
+        return -ENOMEM;
+
+    if ( (ocontext = xmalloc_bytes(size) ) == NULL )
+    {
+        xfree(scontext);
+        return -ENOMEM;
+    }
+
+    memset(scontext, 0, size);
+    memset(ocontext, 0, size);
+
+    len = sscanf(buf, "%s %s %li %li", ocontext, scontext, &low, &high);
+    if ( len < 3 )
+    {
+        len = -EINVAL;
+        goto out;
+    }
+    else if ( len == 3 )
+        high = low;
+
+    if ( low > high )
+    {
+        len = -EINVAL;
+        goto out;
+    }
+    len = security_context_to_sid(scontext, strlen(scontext)+1, &sid);
+    if ( len < 0 )
+    {
+        len = -EINVAL;
+        goto out;
+    }
+    len = security_ocontext_add(ocontext, low, high, sid);
+out:
+    xfree(ocontext);
+    xfree(scontext);
+    return len;
+}
+
 long do_flask_op(XEN_GUEST_HANDLE(xsm_op_t) u_flask_op)
 {
     flask_op_t curop, *op = &curop;
@@ -909,6 +998,18 @@ long do_flask_op(XEN_GUEST_HANDLE(xsm_op_t) u_flask_op)
         length = flask_security_member(arg, op->size);
     }
     break;    
+
+    case FLASK_ADD_OCONTEXT:
+    {
+        length = flask_ocontext_add(arg, op->size);
+        break;
+    }
+
+    case FLASK_DEL_OCONTEXT:
+    {
+        length = flask_ocontext_del(arg, op->size);
+        break;
+    }
 
     default:
         length = -ENOSYS;
