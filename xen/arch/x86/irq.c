@@ -1501,7 +1501,7 @@ int unmap_domain_pirq(struct domain *d, int pirq)
     if ( (pirq < 0) || (pirq >= d->nr_pirqs) )
         return -EINVAL;
 
-    if ( !IS_PRIV(current->domain) )
+    if ( !IS_PRIV_FOR(current->domain, d) )
         return -EINVAL;
 
     ASSERT(spin_is_locked(&pcidevs_lock));
