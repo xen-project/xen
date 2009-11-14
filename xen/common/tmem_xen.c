@@ -314,6 +314,7 @@ EXPORT void tmh_client_destroy(tmh_client_t *tmh)
 #ifndef __i386__
     xmem_pool_destroy(tmh->persistent_pool);
 #endif
+    put_domain(tmh->domain);
     xfree(tmh);
 }
 

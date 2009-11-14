@@ -280,7 +280,7 @@ typedef struct page_info pfp_t;
 /* this appears to be unreliable when a domain is being shut down */
 static inline struct client *tmh_client_from_cli_id(cli_id_t cli_id)
 {
-    struct domain *d = get_domain_by_id(cli_id);
+    struct domain *d = get_domain_by_id(cli_id); /* incs d->refcnt! */
     if (d == NULL)
         return NULL;
     return (struct client *)(d->tmem);
@@ -290,6 +290,8 @@ static inline struct client *tmh_client_from_current(void)
 {
     return (struct client *)(current->domain->tmem);
 }
+
+#define tmh_client_is_dying(_client) (!!_client->tmh->domain->is_dying)
 
 static inline cli_id_t tmh_get_cli_id_from_current(void)
 {

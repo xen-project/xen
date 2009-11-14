@@ -2229,6 +2229,12 @@ EXPORT long do_tmem_op(tmem_cli_op_t uops)
     DUP_START_CYC_COUNTER(flush,succ_get);
     DUP_START_CYC_COUNTER(flush_obj,succ_get);
 
+    if ( client != NULL && tmh_client_is_dying(client) )
+    {
+        rc = -ENODEV;
+        goto out;
+    }
+
     if ( unlikely(tmh_get_tmemop_from_client(&op, uops) != 0) )
     {
         printk("tmem: can't get tmem struct from %s\n",client_str);
@@ -2391,6 +2397,12 @@ EXPORT void tmem_destroy(void *v)
 
     if ( client == NULL )
         return;
+
+    if ( !tmh_client_is_dying(client) )
+    {
+        printk("tmem: tmem_destroy can only destroy dying client\n");
+        return;
+    }
 
     if ( tmh_lock_all )
         spin_lock(&tmem_spinlock);
