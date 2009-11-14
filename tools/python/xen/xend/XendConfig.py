@@ -2111,6 +2111,13 @@ class XendConfig(dict):
     def is_hap(self):
         return self['platform'].get('hap', 0)
 
+    def is_pv_and_has_pci(self):
+        for dev_type, dev_info in self.all_devices_sxpr():
+            if dev_type != 'pci':
+                continue
+            return not self.is_hvm()
+        return False
+
     def update_platform_pci(self):
         pci = []
         for dev_type, dev_info in self.all_devices_sxpr():

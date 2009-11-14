@@ -872,11 +872,11 @@ class XendNode:
         except:
             str='none\n'
         return str[:-1];
-    def format_node_to_memory(self, pinfo):
+    def format_node_to_memory(self, pinfo, key):
         str=''
         whitespace=''
         try:
-            node_to_memory=pinfo['node_to_memory']
+            node_to_memory=pinfo[key]
             for i in range(0, pinfo['nr_nodes']):
                 str+='%snode%d:%d\n' % (whitespace,
                                         i,
@@ -896,7 +896,10 @@ class XendNode:
         info['total_memory'] = info['total_memory'] / 1024
         info['free_memory']  = info['free_memory'] / 1024
         info['node_to_cpu']  = self.format_node_to_cpu(info)
-        info['node_to_memory'] = self.format_node_to_memory(info)
+        info['node_to_memory'] = self.format_node_to_memory(info,
+					'node_to_memory')
+        info['node_to_dma32_mem'] = self.format_node_to_memory(info,
+					'node_to_dma32_mem')
 
         ITEM_ORDER = ['nr_cpus',
                       'nr_nodes',
@@ -908,7 +911,8 @@ class XendNode:
                       'total_memory',
                       'free_memory',
                       'node_to_cpu',
-                      'node_to_memory'
+                      'node_to_memory',
+                      'node_to_dma32_mem'
                       ]
 
         return [[k, info[k]] for k in ITEM_ORDER]

@@ -1059,6 +1059,7 @@ static PyObject *pyxc_physinfo(XcObject *self)
     int i, j, max_cpu_id;
     uint64_t free_heap;
     PyObject *ret_obj, *node_to_cpu_obj, *node_to_memory_obj;
+    PyObject *node_to_dma32_mem_obj;
     xc_cpu_to_node_t map[MAX_CPU_ID + 1];
     const char *virtcap_names[] = { "hvm", "hvm_directio" };
 
@@ -1128,10 +1129,27 @@ static PyObject *pyxc_physinfo(XcObject *self)
         Py_DECREF(pyint);
     }
 
+    xc_dom_loginit();
+    /* DMA memory. */
+    node_to_dma32_mem_obj = PyList_New(0);
+
+    for ( i = 0; i < info.nr_nodes; i++ )
+    {
+        PyObject *pyint;
+
+        xc_availheap(self->xc_handle, 0, 32, i, &free_heap);
+        xc_dom_printf("Node:%d: DMA32:%ld\n", i, free_heap);
+        pyint = PyInt_FromLong(free_heap / 1024);
+        PyList_Append(node_to_dma32_mem_obj, pyint);
+        Py_DECREF(pyint);
+    }
+
     PyDict_SetItemString(ret_obj, "node_to_cpu", node_to_cpu_obj);
     Py_DECREF(node_to_cpu_obj);
     PyDict_SetItemString(ret_obj, "node_to_memory", node_to_memory_obj);
     Py_DECREF(node_to_memory_obj);
+    PyDict_SetItemString(ret_obj, "node_to_dma32_mem", node_to_dma32_mem_obj);
+    Py_DECREF(node_to_dma32_mem_obj);
  
     return ret_obj;
 #undef MAX_CPU_ID
