@@ -1129,16 +1129,13 @@ static PyObject *pyxc_physinfo(XcObject *self)
         Py_DECREF(pyint);
     }
 
-    xc_dom_loginit();
     /* DMA memory. */
     node_to_dma32_mem_obj = PyList_New(0);
 
     for ( i = 0; i < info.nr_nodes; i++ )
     {
         PyObject *pyint;
-
         xc_availheap(self->xc_handle, 0, 32, i, &free_heap);
-        xc_dom_printf("Node:%d: DMA32:%ld\n", i, free_heap);
         pyint = PyInt_FromLong(free_heap / 1024);
         PyList_Append(node_to_dma32_mem_obj, pyint);
         Py_DECREF(pyint);
