@@ -64,11 +64,6 @@ static struct timer irq_ratelimit_timer;
 static unsigned int __read_mostly irq_ratelimit_threshold = 10000;
 integer_param("irq_ratelimit", irq_ratelimit_threshold);
 
-int check_irq_status(int irq)
-{
-    return irq_status[irq] != IRQ_UNUSED ? 1 : 0;
-}
-
 /* Must be called when irq disabled */
 void lock_vector_lock(void)
 {
@@ -720,9 +715,6 @@ int setup_irq(unsigned int irq, struct irqaction *new)
     desc->depth   = 0;
     desc->status &= ~IRQ_DISABLED;
     desc->handler->startup(irq);
-
-    if ( !check_irq_status(irq) )
-        irq_status[irq] = IRQ_USED;
 
     spin_unlock_irqrestore(&desc->lock,flags);
 
@@ -1412,8 +1404,6 @@ int map_domain_pirq(
 
     ASSERT(spin_is_locked(&pcidevs_lock));
     ASSERT(spin_is_locked(&d->event_lock));
-    
-    desc = irq_to_desc(irq);
 
     if ( !IS_PRIV(current->domain) &&
          !(IS_PRIV_FOR(current->domain, d) &&
@@ -1425,13 +1415,6 @@ int map_domain_pirq(
         dprintk(XENLOG_G_ERR, "dom%d: invalid pirq %d or irq %d\n",
                 d->domain_id, pirq, irq);
         return -EINVAL;
-    }
-
-    if ( desc->action )
-    {
-        dprintk(XENLOG_G_WARNING, "Attempt to map in-use IRQ by Xen,"
-                        " irq:%d!\n", irq);
-        return 0;
     }
 
     old_irq = domain_pirq_to_irq(d, pirq);
@@ -1453,6 +1436,7 @@ int map_domain_pirq(
         return ret;
     }
 
+    desc = irq_to_desc(irq);
 
     if ( type == MAP_PIRQ_TYPE_MSI )
     {

@@ -30,7 +30,7 @@ ioapic_guest_write(
 static int physdev_map_pirq(struct physdev_map_pirq *map)
 {
     struct domain *d;
-    int pirq = 0, irq, ret = 0;
+    int pirq, irq, ret = 0;
     struct msi_info _msi;
     void *map_data = NULL;
 
@@ -55,28 +55,23 @@ static int physdev_map_pirq(struct physdev_map_pirq *map)
     switch ( map->type )
     {
         case MAP_PIRQ_TYPE_GSI:
-        {
-            int gsi, triggering, polarity;
-            
-            gsi = map->index & 0xffff;
-            triggering = !!(map->index & (1 << 16));
-            polarity = !!(map->index & (1 << 24));
-            irq = pirq = map->pirq;
-            
-            if ( gsi < 0 || gsi >= nr_irqs_gsi )
+            if ( map->index < 0 || map->index >= nr_irqs_gsi )
             {
-                dprintk(XENLOG_G_ERR, "dom%d: map invalid gsi %d\n",
-                        d->domain_id, gsi);
+                dprintk(XENLOG_G_ERR, "dom%d: map invalid irq %d\n",
+                        d->domain_id, map->index);
                 ret = -EINVAL;
                 goto free_domain;
             }
-            if ( !check_irq_status(irq) ) {
-                mp_register_gsi(gsi, triggering, polarity);
-                printk("Register gsi:%d for dom:%d, irq:%d\n", gsi,
-                      d->domain_id, irq);
+            irq = domain_pirq_to_irq(current->domain, map->index);
+            if ( !irq )
+            {
+                dprintk(XENLOG_G_ERR, "dom%d: map pirq with incorrect irq!\n",
+                        d->domain_id);
+                ret = -EINVAL;
+                goto free_domain;
             }
             break;
-        }
+
         case MAP_PIRQ_TYPE_MSI:
             irq = map->index;
             if ( irq == -1 )
@@ -108,6 +103,7 @@ static int physdev_map_pirq(struct physdev_map_pirq *map)
     spin_lock(&pcidevs_lock);
     /* Verify or get pirq. */
     spin_lock(&d->event_lock);
+    pirq = domain_irq_to_pirq(d, irq);
     if ( map->pirq < 0 )
     {
         if ( pirq )
