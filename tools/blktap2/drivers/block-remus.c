@@ -1629,7 +1629,6 @@ static int tdremus_open(td_driver_t *driver, const char *name,
 static int tdremus_close(td_driver_t *driver)
 {
 	struct tdremus_state *s = (struct tdremus_state *)driver->data;
-	int rc;
 
 	RPRINTF("closing\n");
 
@@ -1646,7 +1645,7 @@ static int tdremus_close(td_driver_t *driver)
 
 	ctl_close(driver);
 
-	return rc;
+	return 0;
 }
 
 static int tdremus_get_parent_id(td_driver_t *driver, td_disk_id_t *id)
