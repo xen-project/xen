@@ -517,20 +517,17 @@ def find_all_assignable_devices():
     '''
     sysfs_mnt = find_sysfs_mnt()
     pciback_path = sysfs_mnt + SYSFS_PCIBACK_PATH
-    pci_names = os.popen('ls ' + pciback_path).read()
-    pci_list = extract_the_exact_pci_names(pci_names)
+    pcistub_path = sysfs_mnt + SYSFS_PCISTUB_PATH
+    pci_names1 = os.popen('ls %s 2>/dev/null' % pciback_path).read()
+    pci_names2 = os.popen('ls %s 2>/dev/null' % pcistub_path).read()
+    if len(pci_names1) + len(pci_names2) == 0 :
+        return None
+    pci_list = extract_the_exact_pci_names(pci_names1)
+    pci_list = pci_list + extract_the_exact_pci_names(pci_names2)
     dev_list = []
     for pci in pci_list:
         dev = PciDevice(parse_pci_name(pci))
         dev_list = dev_list + [dev]
-
-    pcistub_path = sysfs_mnt + SYSFS_PCISTUB_PATH
-    pci_names = os.popen('ls ' + pcistub_path).read()
-    pci_list = extract_the_exact_pci_names(pci_names)
-    for pci in pci_list:
-        dev = PciDevice(parse_pci_name(pci))
-        dev_list = dev_list + [dev]
-
     return dev_list
 
 def transform_list(target, src):

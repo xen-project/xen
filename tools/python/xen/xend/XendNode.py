@@ -924,6 +924,8 @@ class XendNode:
 
         # Each element of dev_list is a PciDevice
         dev_list = PciUtil.find_all_assignable_devices()
+        if dev_list is None:
+            return None
  
         # Each element of devs_list is a list of PciDevice
         devs_list = PciUtil.check_FLR_capability(dev_list)

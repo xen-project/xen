@@ -2313,6 +2313,9 @@ def xm_pci_list_assignable_devices(args):
     arg_check(args, "pci-list-assignable-devices", 0)
 
     devs =  server.xend.node.pciinfo()
+    if devs is None:
+        print "Error: pciback/pci-stub not loaded?"
+        return
  
     fmt_str = "%(domain)04x:%(bus)02x:%(slot)02x.%(func)01x"
     for x in devs:
