@@ -154,7 +154,7 @@ int flask_add_ioport(int xc_handle, unsigned long low, unsigned long high,
     memset(buf, 0, size);
 
     op.cmd = FLASK_ADD_OCONTEXT;
-    snprintf(buf, size, "%s %255s %li %li", ioport, scontext, low, high);
+    snprintf(buf, size, "%s %255s %lu %lu", ioport, scontext, low, high);
     op.buf = buf;
     op.size = size;
 
@@ -184,7 +184,7 @@ int flask_add_iomem(int xc_handle, unsigned long low, unsigned long high,
     memset(buf, 0, size);
 
     op.cmd = FLASK_ADD_OCONTEXT;
-    snprintf(buf, size, "%s %255s %li %li", iomem, scontext, low, high);
+    snprintf(buf, size, "%s %255s %lu %lu", iomem, scontext, low, high);
     op.buf = buf;
     op.size = size;
 
@@ -213,7 +213,7 @@ int flask_add_device(int xc_handle, unsigned long device, char *scontext)
     memset(buf, 0, size);
 
     op.cmd = FLASK_ADD_OCONTEXT;
-    snprintf(buf, size, "%s %255s %li", dev, scontext, device);
+    snprintf(buf, size, "%s %255s %lu", dev, scontext, device);
     op.buf = buf;
     op.size = size;
 
@@ -271,7 +271,7 @@ int flask_del_ioport(int xc_handle, unsigned long low, unsigned long high)
     memset(buf, 0, size);
 
     op.cmd = FLASK_DEL_OCONTEXT;
-    snprintf(buf, size, "%s %li %li", ioport, low, high);
+    snprintf(buf, size, "%s %lu %lu", ioport, low, high);
     op.buf = buf;
     op.size = size;
 
@@ -300,7 +300,7 @@ int flask_del_iomem(int xc_handle, unsigned long low, unsigned long high)
     memset(buf, 0, size);
 
     op.cmd = FLASK_DEL_OCONTEXT;
-    snprintf(buf, size, "%s %li %li", iomem, low, high);
+    snprintf(buf, size, "%s %lu %lu", iomem, low, high);
     op.buf = buf;
     op.size = size;
 
@@ -328,7 +328,7 @@ int flask_del_device(int xc_handle, unsigned long device)
     memset(buf, 0, size);
 
     op.cmd = FLASK_DEL_OCONTEXT;
-    snprintf(buf, size, "%s %li", dev, device);
+    snprintf(buf, size, "%s %lu", dev, device);
     op.buf = buf;
     op.size = size;
 

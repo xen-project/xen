@@ -768,7 +768,7 @@ static int flask_ocontext_del(char *buf, uint32_t size)
     if ( (ocontext = xmalloc_bytes(size) ) == NULL )
         return -ENOMEM;
 
-    len = sscanf(buf, "%s %li %li", ocontext, &low, &high);
+    len = sscanf(buf, "%s %lu %lu", ocontext, &low, &high);
     if ( len < 2 )
     {
         len = -EINVAL;
@@ -814,7 +814,7 @@ static int flask_ocontext_add(char *buf, uint32_t size)
     memset(scontext, 0, size);
     memset(ocontext, 0, size);
 
-    len = sscanf(buf, "%s %s %li %li", ocontext, scontext, &low, &high);
+    len = sscanf(buf, "%s %s %lu %lu", ocontext, scontext, &low, &high);
     if ( len < 3 )
     {
         len = -EINVAL;
