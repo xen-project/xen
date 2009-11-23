@@ -53,10 +53,11 @@ static inline void set_bit(int nr, volatile void * addr)
 }
 
 static int
-suspend_and_state(int (*suspend)(void), int xc_handle, int io_fd,
+suspend_and_state(int (*suspend)(void*), void* data,
+                  int xc_handle, int io_fd,
                   int dom, xc_dominfo_t *info)
 {
-    if (!(*suspend)()) {
+    if ( !(*suspend)(data) ) {
         ERROR("Suspend request failed");
         return -1;
     }
@@ -381,7 +382,8 @@ out:
 
 int
 xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
-               uint32_t max_factor, uint32_t flags, int (*suspend)(void),
+               uint32_t max_factor, uint32_t flags,
+               struct save_callbacks* callbacks,
                int hvm, void (*switch_qemu_logdirty)(int, unsigned))
 {
     DECLARE_DOMCTL;
@@ -405,7 +407,7 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     unsigned int sent_last_iter;
 
     /* Number of pages sent (live only).  */
-    unsigned int total_sent;
+    unsigned int total_sent = 0;
 
     /* total number of pages used by the current guest */
     unsigned long p2m_size;
@@ -414,7 +416,7 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     unsigned int bitmap_size = 0;
 
     /* True if last iteration.  */
-    int last_iter;
+    int last_iter = 0;
 
     /* Bitmap of pages to be sent.  */
     unsigned long *to_send = NULL;
@@ -549,7 +551,8 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
         last_iter = 1;
 
-        if (suspend_and_state(suspend, xc_handle, io_fd, dom, &info)) {
+        if (suspend_and_state(callbacks->suspend, callbacks->data, xc_handle,
+                              io_fd, dom, &info)) {
             ERROR("Domain appears not to have suspended");
             goto out;
         }
@@ -580,8 +583,8 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     }
 
     sent_last_iter = p2m_size;
-    total_sent = 0;
 
+ copypages:
     for (iter = 1; ; iter++) {
         unsigned int sent_this_iter, skip_this_iter;
         unsigned long N;
@@ -677,7 +680,8 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                 DPRINTF("Start last iteration\n");
                 last_iter = 1;
 
-                if (suspend_and_state(suspend, xc_handle, io_fd, dom, &info)) {
+                if (suspend_and_state(callbacks->suspend, callbacks->data,
+                                      xc_handle, io_fd, dom, &info)) {
                     ERROR("Domain appears not to have suspended");
                     goto out;
                 }
@@ -727,6 +731,39 @@ xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     rc = 0;
 
  out:
+   if ( !rc && callbacks->postcopy )
+       callbacks->postcopy(callbacks->data);
+
+   /* Flush last write and discard cache for file. */
+   discard_file_cache(io_fd, 1 /* flush */);
+
+   /* checkpoint_cb can spend arbitrarily long in between rounds */
+   if (!rc && callbacks->checkpoint &&
+       callbacks->checkpoint(callbacks->data) > 0)
+   {
+       /* reset stats timer */
+       //print_stats(xc_handle, dom, 0, &stats, 0);
+
+       rc = 1;
+       /* last_iter = 1; */
+       if ( suspend_and_state(callbacks->suspend, callbacks->data, xc_handle,
+                              io_fd, dom, &info) )
+       {
+           ERROR("Domain appears not to have suspended");
+           goto out;
+       }
+       DPRINTF("SUSPEND shinfo %08lx\n", info.shared_info_frame);
+       //print_stats(xc_handle, dom, 0, &stats, 1);
+
+       if ( xc_shadow_control(xc_handle, dom,
+                              XEN_DOMCTL_SHADOW_OP_CLEAN, to_send,
+                              p2m_size, NULL, 0, NULL) != p2m_size )
+       {
+           ERROR("Error flushing shadow PT");
+       }
+
+       goto copypages;
+   }
 
     if (live) {
         if (xc_shadow_control(xc_handle, dom,
