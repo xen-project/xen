@@ -54,13 +54,6 @@
 void xl_logv(struct libxl_ctx *ctx, int errnoval, int loglevel, const char *file, int line, const char *func, char *fmt, va_list al);
 void xl_log(struct libxl_ctx *ctx, int errnoval, int loglevel, const char *file, int line, const char *func, char *fmt, ...);
 
-struct libxl_domain_build_state_ {
-    uint32_t store_port;
-    unsigned long store_mfn;
-    uint32_t console_port;
-    unsigned long console_mfn;
-};
-
 typedef enum {
     DEVICE_VIF,
     DEVICE_VBD,

@@ -45,8 +45,8 @@ int libxl_device_generic_add(struct libxl_ctx *ctx, libxl_device *device,
     struct xs_permissions backend_perms[2];
     struct xs_permissions hotplug_perms[1];
 
-    dom_path_backend = xs_get_domain_path(ctx->xsh, device->backend_domid);
-    dom_path = xs_get_domain_path(ctx->xsh, device->domid);
+    dom_path_backend = libxl_xs_get_dompath(ctx, device->backend_domid);
+    dom_path = libxl_xs_get_dompath(ctx, device->domid);
 
     frontend_path = libxl_sprintf(ctx, "%s/device/%s/%d",
                                   dom_path, string_of_kinds[device->kind], device->devid);
@@ -254,6 +254,7 @@ int libxl_devices_destroy(struct libxl_ctx *ctx, uint32_t domid, int force)
                         XL_LOG(ctx, XL_LOG_DEBUG, "Destroyed device backend at %s", l1[1]);
                         n_watches--;
                     }
+                    free(l1);
                 }
             } else
                 break;

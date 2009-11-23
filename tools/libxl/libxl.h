@@ -85,7 +85,12 @@ typedef struct {
     } u;
 } libxl_domain_build_info;
 
-typedef struct libxl_domain_build_state_ libxl_domain_build_state;
+typedef struct {
+    uint32_t store_port;
+    unsigned long store_mfn;
+    uint32_t console_port;
+    unsigned long console_mfn;
+} libxl_domain_build_state;
 
 typedef struct {
     int flags;
@@ -226,7 +231,7 @@ int libxl_ctx_set_log(struct libxl_ctx *ctx, libxl_log_callback log_callback, vo
 
 /* domain related functions */
 int libxl_domain_make(struct libxl_ctx *ctx, libxl_domain_create_info *info, uint32_t *domid);
-libxl_domain_build_state *libxl_domain_build(struct libxl_ctx *ctx, libxl_domain_build_info *info, uint32_t domid);
+int libxl_domain_build(struct libxl_ctx *ctx, libxl_domain_build_info *info, uint32_t domid, /* out */ libxl_domain_build_state *state);
 int libxl_domain_restore(struct libxl_ctx *ctx, libxl_domain_build_info *info,
                           uint32_t domid, int fd);
 int libxl_domain_suspend(struct libxl_ctx *ctx, libxl_domain_suspend_info *info,

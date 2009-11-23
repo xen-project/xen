@@ -70,6 +70,7 @@ int libxl_name_to_domid(struct libxl_ctx *ctx, char *name, uint32_t *domid)
             for (j = 0; j < nb_domains; j++) {
                 if (dominfo[j].domid == domid_i) {
                     *domid = domid_i;
+                    free(dominfo);
                     free(l);
                     free(domname);
                     return 0;
@@ -78,6 +79,7 @@ int libxl_name_to_domid(struct libxl_ctx *ctx, char *name, uint32_t *domid)
         }
         free(domname);
     }
+    free(dominfo);
     free(l);
     return -1;
 }
@@ -89,9 +91,11 @@ int libxl_uuid_to_domid(struct libxl_ctx *ctx, xen_uuid_t *uuid, uint32_t *domid
     for (i = 0; i < nb_domain; i++) {
         if (!memcmp(info[i].uuid, uuid, 16)) {
             *domid = info[i].domid;
+            free(info);
             return 0;
         }
     }
+    free(info);
     return -1;
 }
 
@@ -103,9 +107,11 @@ int libxl_domid_to_uuid(struct libxl_ctx *ctx, xen_uuid_t **uuid, uint32_t domid
         if (domid == info[i].domid) {
             *uuid = libxl_zalloc(ctx, 16);
             memcpy(*uuid, info[i].uuid, 16);
+            free(info);
             return 0;
         }
     }
+    free(info);
     return -1;
 }
 

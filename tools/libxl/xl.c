@@ -714,7 +714,7 @@ static void create_domain(int debug, const char *filename)
     uint32_t domid;
     libxl_domain_create_info info1;
     libxl_domain_build_info info2;
-    libxl_domain_build_state *state;
+    libxl_domain_build_state state;
     libxl_device_model_info dm_info;
     libxl_device_disk *disks = NULL;
     libxl_device_nic *vifs = NULL;
@@ -734,7 +734,7 @@ static void create_domain(int debug, const char *filename)
     libxl_ctx_init(&ctx);
     libxl_ctx_set_log(&ctx, log_callback, NULL);
     libxl_domain_make(&ctx, &info1, &domid);
-    state = libxl_domain_build(&ctx, &info2, domid);
+    libxl_domain_build(&ctx, &info2, domid, &state);
 
     for (i = 0; i < num_disks; i++) {
         disk_info_domid_fixup(disks + i, domid);
@@ -755,7 +755,7 @@ static void create_domain(int debug, const char *filename)
             vkb_info_domid_fixup(vkbs + i, domid);
             libxl_device_vkb_add(&ctx, domid, &vkbs[i]);
         }
-        init_console_info(&console, 0, state);
+        init_console_info(&console, 0, &state);
         console_info_domid_fixup(&console, domid);
         if (num_vfbs)
             console.constype = CONSTYPE_IOEMU;
@@ -771,6 +771,15 @@ static void create_domain(int debug, const char *filename)
 
     libxl_domain_unpause(&ctx, domid);
 
+    for (i = 0; i < num_vifs; i++) {
+        free(vifs[i].smac);
+        free(vifs[i].ifname);
+    }
+    free(disks);
+    free(vifs);
+    free(vfbs);
+    free(vkbs);
+    free(pcidevs);
 }
 
 static void help(char *command)
@@ -829,6 +838,7 @@ void pcilist(char *dom)
     for (i = 0; i < num; i++) {
         printf("0x%02x 0x%04x 0x%02x 0x%02x 0x%01x\n", pcidevs[i].vdevfn, pcidevs[i].domain, pcidevs[i].bus, pcidevs[i].dev, pcidevs[i].func);
     }
+    free(pcidevs);
 }
 
 int main_pcilist(int argc, char **argv)
@@ -999,6 +1009,7 @@ void list_domains(void)
                 info[i].dying ? 'd' : '-',
                 ((float)info[i].cpu_time / 1e9));
     }
+    free(info);
 }
 
 int main_destroy(int argc, char **argv)
