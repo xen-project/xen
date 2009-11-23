@@ -14,6 +14,8 @@
  * GNU Lesser General Public License for more details.
  */
 
+#include "libxl_osdeps.h"
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -25,6 +27,7 @@
 #include <unistd.h> /* for write, unlink and close */
 #include <stdint.h>
 #include <inttypes.h>
+
 #include "libxl.h"
 #include "libxl_utils.h"
 #include "libxl_internal.h"

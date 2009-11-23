@@ -12,12 +12,16 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU Lesser General Public License for more details.
  */
-#include "libxl.h"
-#include "libxl_internal.h"
-#include "libxl_utils.h"
+
+#include "libxl_osdeps.h"
+
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
+
+#include "libxl.h"
+#include "libxl_internal.h"
+#include "libxl_utils.h"
 
 int libxl_error_set(struct libxl_ctx *ctx, int code)
 {

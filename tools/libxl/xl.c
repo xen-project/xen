@@ -14,8 +14,8 @@
  * GNU Lesser General Public License for more details.
  */
 
-#include "libxl.h"
-#include "libxl_utils.h"
+#include "libxl_osdeps.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -28,6 +28,9 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <xenctrl.h>
+
+#include "libxl.h"
+#include "libxl_utils.h"
 
 void log_callback(void *userdata, int loglevel, const char *file, int line, const char *func, char *s)
 {

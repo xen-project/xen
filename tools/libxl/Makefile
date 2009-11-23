@@ -23,8 +23,7 @@ LIBCONFIG_URL ?= http://www.hyperrealm.com/libconfig
 LIBCONFIG_SOURCE = libconfig-1.3.2
 LIBCONFIG_OUTPUT = $(LIBCONFIG_SOURCE)/.libs
 
-LIBXL_OBJS-y =
-LIBXL_OBJS-$(CONFIG_Linux) += osdeps.o
+LIBXL_OBJS-y = osdeps.o
 LIBXL_OBJS = flexarray.o libxl.o libxl_dom.o libxl_exec.o libxl_xshelp.o libxl_device.o libxl_internal.o xenguest.o libxl_utils.o $(LIBXL_OBJS-y)
 
 CLIENTS = xl

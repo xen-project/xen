@@ -19,6 +19,8 @@
 #include <sys/time.h>
 #include <stdlib.h>
 
+#ifdef NEED_OWN_ASPRINTF
+
 int vasprintf(char **buffer, const char *fmt, va_list ap)
 {
     int size = 0;
@@ -60,3 +62,5 @@ int asprintf(char **buffer, char *fmt, ...)
     va_end (ap);
     return status;
 }
+
+#endif

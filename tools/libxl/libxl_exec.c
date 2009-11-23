@@ -15,9 +15,12 @@
  * GNU Lesser General Public License for more details.
  */
 
+#include "libxl_osdeps.h"
+
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
+
 #include "libxl.h"
 #include "libxl_internal.h"
 

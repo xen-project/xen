@@ -13,14 +13,21 @@
  * GNU Lesser General Public License for more details.
  */
 
+/*
+ * This header must be included first, before any system headers,
+ * so that _GNU_SOURCE takes effect properly.
+ */
+
 #ifndef LIBXL_OSDEP
 #define LIBXL_OSDEP
 
+#define _GNU_SOURCE
+
+#ifdef NEED_OWN_ASPRINTF
 #include <stdarg.h>
 
-#if defined(__linux__)
 int asprintf(char **buffer, char *fmt, ...);
 int vasprintf(char **buffer, const char *fmt, va_list ap);
-#endif
+#endif /*NEED_OWN_ASPRINTF*/
 
 #endif

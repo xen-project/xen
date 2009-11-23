@@ -13,12 +13,15 @@
  * GNU Lesser General Public License for more details.
  */
 
+#include "libxl_osdeps.h"
+
 #include <string.h>
 #include <stddef.h>
-#include "libxl.h"
-#include "libxl_internal.h"
 #include <stdio.h>
 #include <stdarg.h>
+
+#include "libxl.h"
+#include "libxl_internal.h"
 
 char **libxl_xs_kvs_of_flexarray(struct libxl_ctx *ctx, flexarray_t *array, int length)
 {

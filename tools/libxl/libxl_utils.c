@@ -13,8 +13,8 @@
  * GNU Lesser General Public License for more details.
  */
 
-#include "libxl_utils.h"
-#include "libxl_internal.h"
+#include "libxl_osdeps.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -24,6 +24,8 @@
 #include <ctype.h>
 #include <errno.h>
 
+#include "libxl_utils.h"
+#include "libxl_internal.h"
 
 
 unsigned long libxl_get_required_shadow_memory(unsigned long maxmem_kb, unsigned int smp_cpus)

@@ -14,14 +14,17 @@
  * GNU Lesser General Public License for more details.
  */
 
+#include "libxl_osdeps.h"
+
 #include <string.h>
 #include <stdio.h>
-#include "libxl.h"
-#include "libxl_internal.h"
 #include <sys/time.h> /* for struct timeval */
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
+#include "libxl.h"
+#include "libxl_internal.h"
 
 char *string_of_kinds[] = {
     [DEVICE_VIF] = "vif",

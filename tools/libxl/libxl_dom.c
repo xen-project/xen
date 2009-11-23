@@ -13,16 +13,20 @@
  * GNU Lesser General Public License for more details.
  */
 
-#include "libxl.h"
-#include "libxl_internal.h"
+#include "libxl_osdeps.h"
+
 #include <stdio.h>
 #include <inttypes.h>
-#include <xenguest.h>
-#include <xenctrl.h>
-#include <xc_dom.h>
 #include <string.h>
 #include <sys/time.h> /* for struct timeval */
 #include <unistd.h> /* for sleep(2) */
+
+#include <xenctrl.h>
+#include <xc_dom.h>
+#include <xenguest.h>
+
+#include "libxl.h"
+#include "libxl_internal.h"
 
 int is_hvm(struct libxl_ctx *ctx, uint32_t domid)
 {
@@ -110,7 +114,7 @@ int build_pv(struct libxl_ctx *ctx, uint32_t domid,
 
     dom = xc_dom_allocate(info->u.pv.cmdline, info->u.pv.features);
     if (!dom) {
-        XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, dom, "xc_dom_allocate failed");
+        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "xc_dom_allocate failed");
         return -1;
     }
     if ((ret = xc_dom_linux_build(ctx->xch, dom, domid, info->max_memkb / 1024,

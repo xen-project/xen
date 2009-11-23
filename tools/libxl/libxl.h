@@ -15,14 +15,13 @@
 #ifndef LIBXL_H
 #define LIBXL_H
 
-#include "osdeps.h"
 #include <stdint.h>
 #include <stdarg.h>
 #include <netinet/in.h>
 #include <xenctrl.h>
-#include "xen_uuid.h"
+#include <xs.h>
 
-typedef int bool;
+#include "xen_uuid.h"
 
 typedef void (*libxl_log_callback)(void *userdata, int loglevel, const char *file,
                                    int line, const char *func, char *s);
