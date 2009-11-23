@@ -19,6 +19,7 @@
 #include <xen/guest_access.h>
 #include <xen/hypercall.h>
 #include <xen/errno.h>
+#include <xen/tmem.h>
 #include <asm/current.h>
 #include <asm/hardirq.h>
 #include <xen/numa.h>
@@ -120,10 +121,11 @@ static void populate_physmap(struct memop_args *a)
             page = alloc_domheap_pages(d, a->extent_order, a->memflags);
             if ( unlikely(page == NULL) ) 
             {
-                gdprintk(XENLOG_INFO, "Could not allocate order=%d extent: "
-                         "id=%d memflags=%x (%ld of %d)\n",
-                         a->extent_order, d->domain_id, a->memflags,
-                         i, a->nr_extents);
+                if ( !opt_tmem || (a->extent_order != 0) )
+                    gdprintk(XENLOG_INFO, "Could not allocate order=%d extent:"
+                             " id=%d memflags=%x (%ld of %d)\n",
+                             a->extent_order, d->domain_id, a->memflags,
+                             i, a->nr_extents);
                 goto out;
             }
 

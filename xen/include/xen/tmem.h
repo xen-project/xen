@@ -12,5 +12,6 @@
 extern void init_tmem(void);
 extern void tmem_destroy(void *);
 extern void *tmem_relinquish_pages(unsigned int, unsigned int);
+extern int  opt_tmem;
 
 #endif /* __XEN_TMEM_H__ */
