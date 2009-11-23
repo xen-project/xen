@@ -213,12 +213,13 @@ EXPORT void tmh_release_avail_pages_to_host(void)
     spin_lock(&tmh_page_list_lock);
     while ( !page_list_empty(&tmh_page_list) )
     {
-        struct page_info *pg = page_list_first(&tmh_page_list);
+        struct page_info *pg = page_list_remove_head(&tmh_page_list);
         scrub_one_page(pg);
+        tmh_page_list_pages--;
         free_domheap_page(pg);
     }
+    ASSERT(tmh_page_list_pages == 0);
     INIT_PAGE_LIST_HEAD(&tmh_page_list);
-    tmh_page_list_pages = 0;
     spin_unlock(&tmh_page_list_lock);
 }
 
