@@ -31,6 +31,7 @@ static int xc_try_bzip2_decode(
     bz_stream stream;
     int ret;
     char *out_buf;
+    char *tmp_buf;
     int retval = -1;
     int outsize;
     uint64_t total;
@@ -42,7 +43,7 @@ static int xc_try_bzip2_decode(
     ret = BZ2_bzDecompressInit(&stream, 0, 0);
     if ( ret != BZ_OK )
     {
-        xc_dom_printf("Error initting bz2 stream\n");
+        xc_dom_printf("BZIP2: Error initting stream\n");
         return -1;
     }
 
@@ -54,7 +55,7 @@ static int xc_try_bzip2_decode(
     out_buf = malloc(outsize);
     if ( out_buf == NULL )
     {
-        xc_dom_printf("Failed to alloc memory\n");
+        xc_dom_printf("BZIP2: Failed to alloc memory\n");
         goto bzip2_cleanup;
     }
 
@@ -69,12 +70,14 @@ static int xc_try_bzip2_decode(
         ret = BZ2_bzDecompress(&stream);
         if ( (stream.avail_out == 0) || (ret != BZ_OK) )
         {
-            out_buf = realloc(out_buf, outsize * 2);
-            if ( out_buf == NULL )
+            tmp_buf = realloc(out_buf, outsize * 2);
+            if ( tmp_buf == NULL )
             {
-                xc_dom_printf("Failed to realloc memory\n");
-                break;
+                xc_dom_printf("BZIP2: Failed to realloc memory\n");
+                free(out_buf);
+                goto bzip2_cleanup;
             }
+            out_buf = tmp_buf;
 
             stream.next_out = out_buf + outsize;
             stream.avail_out = (outsize * 2) - outsize;
@@ -85,15 +88,15 @@ static int xc_try_bzip2_decode(
         {
             if ( ret == BZ_STREAM_END )
             {
-                xc_dom_printf("Saw data stream end\n");
+                xc_dom_printf("BZIP2: Saw data stream end\n");
                 retval = 0;
                 break;
             }
-            xc_dom_printf("BZIP error\n");
+            xc_dom_printf("BZIP2: error\n");
         }
     }
 
-    total = (stream.total_out_hi32 << 31) | stream.total_out_lo32;
+    total = (((uint64_t)stream.total_out_hi32) << 32) | stream.total_out_lo32;
 
     xc_dom_printf("%s: BZIP2 decompress OK, 0x%zx -> 0x%lx\n",
                   __FUNCTION__, *size, (long unsigned int) total);
@@ -151,6 +154,7 @@ static int xc_try_lzma_decode(
     lzma_ret ret;
     lzma_action action = LZMA_RUN;
     unsigned char *out_buf;
+    unsigned char *tmp_buf;
     int retval = -1;
     int outsize;
     const char *msg;
@@ -158,7 +162,7 @@ static int xc_try_lzma_decode(
     ret = lzma_alone_decoder(&stream, physmem() / 3);
     if ( ret != LZMA_OK )
     {
-        xc_dom_printf("Failed to init lzma stream decoder\n");
+        xc_dom_printf("LZMA: Failed to init stream decoder\n");
         return -1;
     }
 
@@ -170,7 +174,7 @@ static int xc_try_lzma_decode(
     out_buf = malloc(outsize);
     if ( out_buf == NULL )
     {
-        xc_dom_printf("Failed to alloc memory\n");
+        xc_dom_printf("LZMA: Failed to alloc memory\n");
         goto lzma_cleanup;
     }
 
@@ -185,12 +189,14 @@ static int xc_try_lzma_decode(
         ret = lzma_code(&stream, action);
         if ( (stream.avail_out == 0) || (ret != LZMA_OK) )
         {
-            out_buf = realloc(out_buf, outsize * 2);
-            if ( out_buf == NULL )
+            tmp_buf = realloc(out_buf, outsize * 2);
+            if ( tmp_buf == NULL )
             {
-                xc_dom_printf("Failed to realloc memory\n");
-                break;
+                xc_dom_printf("LZMA: Failed to realloc memory\n");
+                free(out_buf);
+                goto lzma_cleanup;
             }
+            out_buf = tmp_buf;
 
             stream.next_out = out_buf + outsize;
             stream.avail_out = (outsize * 2) - outsize;
@@ -201,7 +207,7 @@ static int xc_try_lzma_decode(
         {
             if ( ret == LZMA_STREAM_END )
             {
-                xc_dom_printf("Saw data stream end\n");
+                xc_dom_printf("LZMA: Saw data stream end\n");
                 retval = 0;
                 break;
             }
