@@ -11258,7 +11258,7 @@ int16_wait_for_key:
   cmp  bx, 0x001c
   jne  int16_key_found
   sti
-  nop
+  hlt
 #if 0
                            /* no key yet, call int 15h, function AX=9002 */
   0x50,                    /* push AX */
