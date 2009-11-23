@@ -699,6 +699,15 @@ skip_pci:
     config_destroy(&config);
 }
 
+#define MUST( call ) ({                                                 \
+        int must_rc = (call);                                           \
+        if (must_rc) {                                                  \
+            fprintf(stderr,"xl: fatal error: %s:%d, rc=%d: %s\n",       \
+                    __FILE__,__LINE__, must_rc, #call);                 \
+            exit(-must_rc);                                             \
+        }                                                               \
+    })
+
 static void create_domain(int debug, const char *filename)
 {
     struct libxl_ctx ctx;
@@ -715,6 +724,7 @@ static void create_domain(int debug, const char *filename)
     libxl_device_console console;
     int num_disks = 0, num_vifs = 0, num_pcidevs = 0, num_vfbs = 0, num_vkbs = 0;
     int i;
+    libxl_device_model_starting *dm_starting = 0;
 
     printf("Parsing config file %s\n", filename);
     parse_config_file(filename, &info1, &info2, &disks, &num_disks, &vifs, &num_vifs, &pcidevs, &num_pcidevs, &vfbs, &num_vfbs, &vkbs, &num_vkbs, &dm_info);
@@ -736,7 +746,8 @@ static void create_domain(int debug, const char *filename)
     }
     if (info1.hvm) {
         device_model_info_domid_fixup(&dm_info, domid);
-        libxl_create_device_model(&ctx, &dm_info, vifs, num_vifs);
+        MUST( libxl_create_device_model(&ctx, &dm_info, vifs, num_vifs,
+                                        &dm_starting) );
     } else {
         for (i = 0; i < num_vfbs; i++) {
             vfb_info_domid_fixup(vfbs + i, domid);
@@ -750,10 +761,14 @@ static void create_domain(int debug, const char *filename)
             console.constype = CONSTYPE_IOEMU;
         libxl_device_console_add(&ctx, domid, &console);
         if (num_vfbs)
-            libxl_create_xenpv_qemu(&ctx, vfbs, 1, &console);
+            libxl_create_xenpv_qemu(&ctx, vfbs, 1, &console, &dm_starting);
     }
+
     for (i = 0; i < num_pcidevs; i++)
         libxl_device_pci_add(&ctx, domid, &pcidevs[i]);
+    if (dm_starting)
+        MUST( libxl_confirm_device_model_startup(&ctx, dm_starting) );
+
     libxl_domain_unpause(&ctx, domid);
 
 }

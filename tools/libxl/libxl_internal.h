@@ -135,7 +135,11 @@ int libxl_device_generic_add(struct libxl_ctx *ctx, libxl_device *device,
                              char **bents, char **fents);
 int libxl_device_destroy(struct libxl_ctx *ctx, char *be_path, int force);
 int libxl_devices_destroy(struct libxl_ctx *ctx, uint32_t domid, int force);
-int libxl_wait_for_device_model(struct libxl_ctx *ctx, uint32_t domid, char *state);
+int libxl_wait_for_device_model(struct libxl_ctx *ctx,
+                                uint32_t domid, char *state,
+                                int (*check_callback)(struct libxl_ctx *ctx,
+                                                      void *userdata),
+                                void *check_callback_userdata);
 int libxl_wait_for_backend(struct libxl_ctx *ctx, char *be_path, char *state);
 int libxl_device_pci_flr(struct libxl_ctx *ctx, unsigned int domain, unsigned int bus,
                          unsigned int dev, unsigned int func);
@@ -146,8 +150,47 @@ int hvm_build_set_params(int handle, uint32_t domid,
                          int vcpus, int store_evtchn, unsigned long *store_mfn);
 
 /* xl_exec */
-int libxl_exec(struct libxl_ctx *ctx, int stdinfd, int stdoutfd, int stderrfd,
-               char *arg0, char **args);
+
+ /* higher-level double-fork and separate detach eg as for device models */
+
+struct libxl_spawn_starting {
+    /* put this in your own stateu structure as returned to application */
+    /* all fields are private to libxl_spawn_... */
+    pid_t intermediate;
+    char *what; /* malloc'd in spawn_spawn */
+};
+
+int libxl_spawn_spawn(struct libxl_ctx *ctx,
+                      struct libxl_spawn_starting *for_spawn,
+                      const char *what,
+                      void (*intermediate_hook)(struct libxl_ctx *ctx,
+                                                void *for_spawn,
+                                                pid_t innerchild));
+  /* Logs errors.  A copy of "what" is taken.  Return values:
+   *  < 0   error, for_spawn need not be detached
+   *   +1   caller is now the inner child, should probably call libxl_exec
+   *    0   caller is the parent, must call detach on *for_spawn eventually
+   * Caller, may pass 0 for for_spawn, in which case no need to detach.
+   */
+int libxl_spawn_detach(struct libxl_ctx *ctx,
+                       struct libxl_spawn_starting *for_spawn);
+  /* Logs errors.  Idempotent, but only permitted after successful
+   * call to libxl_spawn_spawn, and no point calling it again if it fails. */
+int libxl_spawn_check(struct libxl_ctx *ctx,
+                      void *for_spawn);
+  /* Logs errors but also returns them.
+   * for_spawn must actually be a  struct libxl_spawn_starting*  but
+   * we take void* so you can pass this function directly to
+   * libxl_wait_for_device_model.  Caller must still call detach. */
+
+ /* low-level stuff, for synchronous subprocesses etc. */
+
+pid_t libxl_fork(struct libxl_ctx *ctx); // logs errors
+void libxl_exec(struct libxl_ctx *ctx, int stdinfd, int stdoutfd, int stderrfd,
+                char *arg0, char **args); // logs errors, never returns
+void libxl_log_child_exitstatus(struct libxl_ctx *ctx,
+                                const char *what, pid_t pid, int status);
+pid_t libxl_waitpid_instead_default(pid_t pid, int *status, int flags);
 
 #endif
 

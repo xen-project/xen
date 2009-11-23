@@ -287,12 +287,17 @@ int libxl_device_pci_flr(struct libxl_ctx *ctx, unsigned int domain, unsigned in
     return -1;
 }
 
-int libxl_wait_for_device_model(struct libxl_ctx *ctx, uint32_t domid, char *state)
+int libxl_wait_for_device_model(struct libxl_ctx *ctx,
+                                uint32_t domid, char *state,
+                                int (*check_callback)(struct libxl_ctx *ctx,
+                                                      void *userdata),
+                                void *check_callback_userdata)
 {
     char path[50];
     char *p;
     int watchdog = 100;
     unsigned int len;
+    int rc;
 
     snprintf(path, sizeof(path), "/local/domain/0/device-model/%d/state", domid);
     while (watchdog > 0) {
@@ -309,6 +314,10 @@ int libxl_wait_for_device_model(struct libxl_ctx *ctx, uint32_t domid, char *sta
                 usleep(100000);
                 watchdog--;
             }
+        }
+        if (check_callback) {
+            rc = check_callback(ctx, check_callback_userdata);
+            if (rc) return rc;
         }
     }
     XL_LOG(ctx, XL_LOG_ERROR, "Device Model not ready");

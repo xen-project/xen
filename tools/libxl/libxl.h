@@ -41,6 +41,11 @@ struct libxl_ctx {
     /* mini-GC */
     int alloc_maxsize;
     void **alloc_ptrs;
+
+    /* for callers who reap children willy-nilly; caller must only
+     * set this after libxl_init and before any other call - or
+     * may leave them untouched */
+    int (*waitpid_instead)(pid_t pid, int *status, int flags);
 };
 
 typedef struct {
@@ -235,11 +240,22 @@ int libxl_domain_unpause(struct libxl_ctx *ctx, uint32_t domid);
 struct libxl_dominfo * libxl_domain_list(struct libxl_ctx *ctx, int *nb_domain);
 xc_dominfo_t * libxl_domain_infolist(struct libxl_ctx *ctx, int *nb_domain);
 
+typedef struct libxl_device_model_starting libxl_device_model_starting;
 int libxl_create_device_model(struct libxl_ctx *ctx,
                               libxl_device_model_info *info,
-                              libxl_device_nic *vifs, int num_vifs);
+                              libxl_device_nic *vifs, int num_vifs,
+                              libxl_device_model_starting **starting_r);
 int libxl_create_xenpv_qemu(struct libxl_ctx *ctx, libxl_device_vfb *vfb,
-                            int num_console, libxl_device_console *console);
+                            int num_console, libxl_device_console *console,
+                            libxl_device_model_starting **starting_r);
+  /* Caller must either: pass starting_r==0, or on successful
+   * return pass *starting_r (which will be non-0) to
+   * libxl_confirm_device_model or libxl_detach_device_model. */
+int libxl_confirm_device_model_startup(struct libxl_ctx *ctx,
+                              libxl_device_model_starting *starting);
+int libxl_detach_device_model(struct libxl_ctx *ctx,
+                              libxl_device_model_starting *starting);
+  /* DM is detached even if error is returned */
 
 int libxl_device_disk_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk);
 int libxl_device_disk_clean_shutdown(struct libxl_ctx *ctx, uint32_t domid);
