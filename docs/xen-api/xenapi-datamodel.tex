@@ -49,7 +49,9 @@ Name & Description \\
 {\tt DPCI} & A pass-through PCI device \\
 {\tt PPCI} & A physical PCI device \\
 {\tt DSCSI} & A half-virtualized SCSI device \\
+{\tt DSCSI\_HBA} & A half-virtualized SCSI host bus adapter \\
 {\tt PSCSI} & A physical SCSI device \\
+{\tt PSCSI\_HBA} & A physical SCSI host bus adapter \\
 {\tt user} & A user of the system \\
 {\tt debug} & A basic class for testing \\
 {\tt XSPolicy} & A class for handling Xen Security Policies \\
@@ -79,7 +81,11 @@ console.VM & VM.consoles & one-to-many\\
 DPCI.VM & VM.DPCIs & one-to-many\\
 PPCI.host & host.PPCIs & one-to-many\\
 DSCSI.VM & VM.DSCSIs & one-to-many\\
+DSCSI.HBA & DSCSI\_HBA.DSCSIs & one-to-many\\
+DSCSI\_HBA.VM & VM.DSCSI\_HBAs & one-to-many\\
 PSCSI.host & host.PSCSIs & one-to-many\\
+PSCSI.HBA & PSCSI\_HBA.PSCSIs & one-to-many\\
+PSCSI\_HBA.host & host.PSCSI\_HBAs & one-to-many\\
 host.resident\_VMs & VM.resident\_on & many-to-one\\
 host.host\_CPUs & host\_cpu.host & many-to-one\\
 \hline
@@ -1414,6 +1420,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt crash\_dumps} & (crashdump ref) Set & crash d
 $\mathit{RO}_\mathit{run}$ &  {\tt VTPMs} & (VTPM ref) Set & virtual TPMs \\
 $\mathit{RO}_\mathit{run}$ &  {\tt DPCIs} & (DPCI ref) Set & pass-through PCI devices \\
 $\mathit{RO}_\mathit{run}$ &  {\tt DSCSIs} & (DSCSI ref) Set & half-virtualized SCSI devices \\
+$\mathit{RO}_\mathit{run}$ &  {\tt DSCSI\_HBAs} & (DSCSI\_HBA ref) Set & half-virtualized SCSI host bus adapters \\
 $\mathit{RW}$ &  {\tt PV/bootloader} & string & name of or path to bootloader \\
 $\mathit{RW}$ &  {\tt PV/kernel} & string & URI of kernel \\
 $\mathit{RW}$ &  {\tt PV/ramdisk} & string & URI of initrd \\
@@ -3570,6 +3577,38 @@ value of the field
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
+\subsubsection{RPC name:~get\_DSCSI\_HBAs}
+
+{\bf Overview:} 
+Get the DSCSI\_HBAs field of the given VM.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((DSCSI_HBA ref) Set) get_DSCSI_HBAs (session_id s, VM ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(DSCSI\_HBA ref) Set
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
 \subsubsection{RPC name:~get\_PV\_bootloader}
 
 {\bf Overview:} 
@@ -5639,6 +5678,7 @@ $\mathit{RW}$ &  {\tt crash\_dump\_sr} & SR ref & The SR in which VDIs for crash
 $\mathit{RO}_\mathit{run}$ &  {\tt PBDs} & (PBD ref) Set & physical blockdevices \\
 $\mathit{RO}_\mathit{run}$ &  {\tt PPCIs} & (PPCI ref) Set & physical PCI devices \\
 $\mathit{RO}_\mathit{run}$ &  {\tt PSCSIs} & (PSCSI ref) Set & physical SCSI devices \\
+$\mathit{RO}_\mathit{run}$ &  {\tt PSCSI\_HBAs} & (PSCSI\_HBA ref) Set & physical SCSI host bus adapters \\
 $\mathit{RO}_\mathit{run}$ &  {\tt host\_CPUs} & (host\_cpu ref) Set & The physical CPUs on this host \\
 $\mathit{RO}_\mathit{run}$ &  {\tt metrics} & host\_metrics ref & metrics associated with this host \\
 \hline
@@ -6990,6 +7030,38 @@ Get the PSCSIs field of the given host.
  \noindent {\bf Return Type:} 
 {\tt 
 (PSCSI ref) Set
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_PSCSI\_HBAs}
+
+{\bf Overview:} 
+Get the PSCSI\_HBAs field of the given host.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((PSCSI_HBA ref) Set) get_PSCSI_HBAs (session_id s, host ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt host ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(PSCSI\_HBA ref) Set
 }
 
 
@@ -15889,6 +15961,7 @@ Quals & Field & Type & Description \\
 $\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
 $\mathit{RO}_\mathit{inst}$ &  {\tt VM} & VM ref & the virtual machine \\
 $\mathit{RO}_\mathit{inst}$ &  {\tt PSCSI} & PSCSI ref & the physical SCSI device \\
+$\mathit{RO}_\mathit{run}$ &  {\tt HBA} & DSCSI\_HBA ref & the half-virtualized SCSI host bus adapter \\
 $\mathit{RO}_\mathit{run}$ &  {\tt virtual\_host} & int & the virtual host number \\
 $\mathit{RO}_\mathit{run}$ &  {\tt virtual\_channel} & int & the virtual channel number \\
 $\mathit{RO}_\mathit{run}$ &  {\tt virtual\_target} & int & the virtual target number \\
@@ -16008,6 +16081,38 @@ Get the PSCSI field of the given DSCSI.
  \noindent {\bf Return Type:} 
 {\tt 
 PSCSI ref
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_HBA}
+
+{\bf Overview:} 
+Get the HBA field of the given DSCSI.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (DSCSI_HBA ref) get_HBA (session_id s, DSCSI ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt DSCSI ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+DSCSI\_HBA ref
 }
 
 
@@ -16210,7 +16315,9 @@ value of the field
 \subsubsection{RPC name:~create}
 
 {\bf Overview:} 
-Create a new DSCSI instance, and return its handle.
+Create a new DSCSI instance, and create a new DSCSI\_HBA instance as needed
+that the new DSCSI instance connects to, and return the handle of the new
+DSCSI instance.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} (DSCSI ref) create (session_id s, DSCSI record args)\end{verbatim}
@@ -16242,7 +16349,8 @@ reference to the newly created object
 \subsubsection{RPC name:~destroy}
 
 {\bf Overview:} 
-Destroy the specified DSCSI instance.
+Destroy the specified DSCSI instance, and destroy a DSCSI\_HBA instance as
+needed that the specified DSCSI instance connects to.
 
  \noindent {\bf Signature:} 
 \begin{verbatim} void destroy (session_id s, DSCSI ref self)\end{verbatim}
@@ -16337,6 +16445,372 @@ all fields from the object
 
 \vspace{1cm}
 \newpage
+\section{Class: DSCSI\_HBA}
+\subsection{Fields for class: DSCSI\_HBA}
+\begin{longtable}{|lllp{0.38\textwidth}|}
+\hline
+\multicolumn{1}{|l}{Name} & \multicolumn{3}{l|}{\bf DSCSI\_HBA} \\
+\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em A
+half-virtualized SCSI host bus adapter.}} \\
+\hline
+Quals & Field & Type & Description \\
+\hline
+$\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
+$\mathit{RO}_\mathit{inst}$ &  {\tt VM} & VM ref & the virtual machine \\
+$\mathit{RO}_\mathit{run}$ &  {\tt PSCSI\_HBAs} & (PSCSI\_HBA ref) Set & the physical SCSI HBAs \\
+$\mathit{RO}_\mathit{run}$ &  {\tt DSCSIs} & (DSCSI ref) Set & the half-virtualized SCSI devices which are connected to this DSCSI HBA \\
+$\mathit{RO}_\mathit{inst}$ &  {\tt virtual\_host} & int & the virtual host number \\
+$\mathit{RO}_\mathit{inst}$ &  {\tt assignment\_mode} & string & the assignment mode of the half-virtualized SCSI devices which are connected to this DSCSI HBA \\
+\hline
+\end{longtable}
+\subsection{RPCs associated with class: DSCSI\_HBA}
+\subsubsection{RPC name:~get\_all}
+
+{\bf Overview:} 
+Return a list of all the DSCSI HBAs known to the system.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((DSCSI_HBA ref) Set) get_all (session_id s)\end{verbatim}
+
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(DSCSI\_HBA ref) Set
+}
+
+
+references to all objects
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_uuid}
+
+{\bf Overview:} 
+Get the uuid field of the given DSCSI HBA.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_uuid (session_id s, DSCSI_HBA ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt DSCSI ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_VM}
+
+{\bf Overview:} 
+Get the VM field of the given DSCSI HBA.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (VM ref) get_VM (session_id s, DSCSI_HBA ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt DSCSI\_HBA ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+VM ref
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_PSCSI\_HBAs}
+
+{\bf Overview:} 
+Get the PSCSI\_HBAs field of the given DSCSI HBA.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((PSCSI_HBA ref) Set) get_PSCSI_HBAs (session_id s, DSCSI_HBA ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt DSCSI\_HBA ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(PSCSI\_HBA ref) Set
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_DSCSIs}
+
+{\bf Overview:} 
+Get the DSCSIs field of the given DSCSI HBA.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((DSCSI ref) Set) get_DSCSIs (session_id s, DSCSI_HBA ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt DSCSI\_HBA ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(DSCSI ref) Set
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_virtual\_host}
+
+{\bf Overview:} 
+Get the virtual\_host field of the given DSCSI HBA.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} int get_virtual_host (session_id s, DSCSI_HBA ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt DSCSI\_HBA ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+int
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_assignment\_mode}
+
+{\bf Overview:} 
+Get the assignment\_mode field of the given DSCSI HBA.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_assignment_mode (session_id s, DSCSI_HBA ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt DSCSI\_HBA ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~create}
+
+{\bf Overview:} 
+Create a new DSCSI\_HBA instance, and create new DSCSI instances of
+half-virtualized SCSI devices which are connected to the half-virtualized
+SCSI host bus adapter, and return the handle of the new DSCSI\_HBA instance.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (DSCSI_HBA ref) create (session_id s, DSCSI_HBA record args)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt DSCSI\_HBA record } & args & All constructor arguments \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+DSCSI\_HBA ref
+}
+
+
+reference to the newly created object
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~destroy}
+
+{\bf Overview:} 
+Destroy the specified DSCSI\_HBA instance, and destroy DSCSI instances of
+half-virtualized SCSI devices which are connected to the half-virtualized SCSI
+host bus adapter.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} void destroy (session_id s, DSCSI_HBA ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt DSCSI\_HBA ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+void
+}
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_by\_uuid}
+
+{\bf Overview:} 
+Get a reference to the DSCSI\_HBA instance with the specified UUID.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (DSCSI_HBA ref) get_by_uuid (session_id s, string uuid)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt string } & uuid & UUID of object to return \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+DSCSI\_HBA ref
+}
+
+
+reference to the object
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_record}
+
+{\bf Overview:} 
+Get a record containing the current state of the given DSCSI HBA.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (DSCSI_HBA record) get_record (session_id s, DSCSI_HBA ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt DSCSI\_HBA ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+DSCSI\_HBA record
+}
+
+
+all fields from the object
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+
+\vspace{1cm}
+\newpage
 \section{Class: PSCSI}
 \subsection{Fields for class: PSCSI}
 \begin{longtable}{|lllp{0.38\textwidth}|}
@@ -16349,6 +16823,7 @@ Quals & Field & Type & Description \\
 \hline
 $\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
 $\mathit{RO}_\mathit{run}$ &  {\tt host} & host ref &  the physical machine to which this PSCSI is connected \\
+$\mathit{RO}_\mathit{run}$ &  {\tt HBA} & PSCSI\_HBA ref &  the physical SCSI host bus adapter \\
 $\mathit{RO}_\mathit{run}$ &  {\tt physical\_host} & int & the physical host number \\
 $\mathit{RO}_\mathit{run}$ &  {\tt physical\_channel} & int & the physical channel number \\
 $\mathit{RO}_\mathit{run}$ &  {\tt physical\_target} & int & the physical target number \\
@@ -16444,6 +16919,38 @@ Get the host field of the given PSCSI.
  \noindent {\bf Return Type:} 
 {\tt 
 host ref
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_HBA}
+
+{\bf Overview:} 
+Get the HBA field of the given PSCSI.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (PSCSI_HBA ref) get_HBA (session_id s, PSCSI ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PSCSI ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+PSCSI\_HBA ref
 }
 
 
@@ -16956,6 +17463,239 @@ Get a record containing the current state of the given PSCSI.
  \noindent {\bf Return Type:} 
 {\tt 
 PSCSI record
+}
+
+
+all fields from the object
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+
+\vspace{1cm}
+\newpage
+\section{Class: PSCSI\_HBA}
+\subsection{Fields for class: PSCSI\_HBA}
+\begin{longtable}{|lllp{0.38\textwidth}|}
+\hline
+\multicolumn{1}{|l}{Name} & \multicolumn{3}{l|}{\bf PSCSI\_HBA} \\
+\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em A
+physical SCSI host bus adapter.}} \\
+\hline
+Quals & Field & Type & Description \\
+\hline
+$\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier/object reference \\
+$\mathit{RO}_\mathit{run}$ &  {\tt host} & host ref &  the physical machine to which this PSCSI HBA is connected \\
+$\mathit{RO}_\mathit{run}$ &  {\tt physical\_host} & int & the physical host number \\
+$\mathit{RO}_\mathit{run}$ &  {\tt PSCSIs} & (PSCSI ref) Set & the physical SCSI devices which are connected to this PSCSI HBA \\
+\hline
+\end{longtable}
+\subsection{RPCs associated with class: PSCSI\_HBA}
+\subsubsection{RPC name:~get\_all}
+
+{\bf Overview:} 
+Return a list of all the PSCSI HBAs known to the system.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((PSCSI_HBA ref) Set) get_all (session_id s)\end{verbatim}
+
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(PSCSI\_HBA ref) Set
+}
+
+
+references to all objects
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_uuid}
+
+{\bf Overview:} 
+Get the uuid field of the given PSCSI HBA.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} string get_uuid (session_id s, PSCSI_HBA ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PSCSI\_HBA ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_host}
+
+{\bf Overview:} 
+Get the host field of the given PSCSI HBA.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (host ref) get_host (session_id s, PSCSI_HBA ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PSCSI\_HBA ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+host ref
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_physical\_host}
+
+{\bf Overview:} 
+Get the physical\_host field of the given PSCSI HBA.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} int get_physical_host (session_id s, PSCSI_HBA ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PSCSI\_HBA ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+int
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_PSCSIs}
+
+{\bf Overview:} 
+Get the PSCSIs field of the given PSCSI HBA.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} ((PSCSI ref) Set) get_PSCSIs (session_id s, PSCSI_HBA ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PSCSI\_HBA ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+(PSCSI ref) Set
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_by\_uuid}
+
+{\bf Overview:} 
+Get a reference to the PSCSI HBA instance with the specified UUID.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (PSCSI_HBA ref) get_by_uuid (session_id s, string uuid)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt string } & uuid & UUID of object to return \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+PSCSI\_HBA ref
+}
+
+
+reference to the object
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_record}
+
+{\bf Overview:} 
+Get a record containing the current state of the given PSCSI HBA.
+
+ \noindent {\bf Signature:} 
+\begin{verbatim} (PSCSI_HBA record) get_record (session_id s, PSCSI_HBA ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt PSCSI\_HBA ref } & self & reference to the object \\ \hline 
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:} 
+{\tt 
+PSCSI\_HBA record
 }
 
 

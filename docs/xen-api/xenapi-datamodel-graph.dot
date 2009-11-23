@@ -14,7 +14,7 @@ fontname="Verdana";
 
 node [ shape=box ]; session VM host network VIF PIF SR VDI VBD PBD user;
 node [ shape=box ]; XSPolicy ACMPolicy DPCI PPCI host_cpu console VTPM;
-node [ shape=box ]; DSCSI PSCSI;
+node [ shape=box ]; DSCSI PSCSI DSCSI_HBA PSCSI_HBA;
 node [ shape=ellipse ]; VM_metrics VM_guest_metrics host_metrics;
 node [ shape=ellipse ]; PIF_metrics VIF_metrics VBD_metrics PBD_metrics;
 session -> host [ arrowhead="none" ]
@@ -44,6 +44,11 @@ DPCI -> VM [ arrowhead="none", arrowtail="crow" ]
 DPCI -> PPCI [ arrowhead="none" ]
 PPCI -> host [ arrowhead="none", arrowtail="crow" ]
 DSCSI -> VM [ arrowhead="none", arrowtail="crow" ]
+DSCSI_HBA -> VM [ arrowhead="none", arrowtail="crow" ]
+DSCSI -> DSCSI_HBA [ arrowhead="none", arrowtail="crow" ]
 DSCSI -> PSCSI [ arrowhead="none" ]
+DSCSI_HBA -> PSCSI_HBA [ arrowhead="crow", arrowtail="none" ]
 PSCSI -> host [ arrowhead="none", arrowtail="crow" ]
+PSCSI_HBA -> host [ arrowhead="none", arrowtail="crow" ]
+PSCSI -> PSCSI_HBA [ arrowhead="none", arrowtail="crow" ]
 }
