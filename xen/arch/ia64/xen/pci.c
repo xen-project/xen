@@ -132,3 +132,8 @@ void pci_conf_write32(
     BUG_ON((bus > 255) || (dev > 31) || (func > 7) || (reg > 255));
     pci_sal_write(0, bus, (dev<<3)|func, reg, 4, data);
 }
+
+int pci_find_ext_capability(int seg, int bus, int devfn, int cap)
+{
+    return 0;
+}

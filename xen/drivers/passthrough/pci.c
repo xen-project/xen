@@ -100,6 +100,45 @@ struct pci_dev *pci_get_pdev_by_domain(struct domain *d, int bus, int devfn)
     return NULL;
 }
 
+/**
+ * pci_enable_acs - enable ACS if hardware support it
+ * @dev: the PCI device
+ */
+void pci_enable_acs(struct pci_dev *pdev)
+{
+    int pos;
+    u16 cap;
+    u16 ctrl;
+
+    u8 bus = pdev->bus;
+    u8 dev = PCI_SLOT(pdev->devfn);
+    u8 func = PCI_FUNC(pdev->devfn);
+
+    if ( !iommu_enabled )
+        return;
+
+    pos = pci_find_ext_capability(0, bus, pdev->devfn, PCI_EXT_CAP_ID_ACS);
+    if (!pos)
+        return;
+
+    cap = pci_conf_read16(bus, dev, func, pos + PCI_ACS_CAP);
+    ctrl = pci_conf_read16(bus, dev, func, pos + PCI_ACS_CTRL);
+
+    /* Source Validation */
+    ctrl |= (cap & PCI_ACS_SV);
+
+    /* P2P Request Redirect */
+    ctrl |= (cap & PCI_ACS_RR);
+
+    /* P2P Completion Redirect */
+    ctrl |= (cap & PCI_ACS_CR);
+
+    /* Upstream Forwarding */
+    ctrl |= (cap & PCI_ACS_UF);
+
+    pci_conf_write16(bus, dev, func, pos + PCI_ACS_CTRL, ctrl);
+}
+
 int pci_add_device(u8 bus, u8 devfn)
 {
     struct pci_dev *pdev;
@@ -119,6 +158,7 @@ int pci_add_device(u8 bus, u8 devfn)
             goto out;
 
         list_add(&pdev->domain_list, &dom0->arch.pdev_list);
+        pci_enable_acs(pdev);
     }
 
 out:

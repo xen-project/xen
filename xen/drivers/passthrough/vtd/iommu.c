@@ -1628,6 +1628,7 @@ static void setup_dom0_devices(struct domain *d)
             pdev->domain = d;
             list_add(&pdev->domain_list, &d->arch.pdev_list);
             domain_context_mapping(d, pdev->bus, pdev->devfn);
+            pci_enable_acs(pdev);
             if ( ats_device(0, pdev->bus, pdev->devfn) )
                 enable_ats_device(0, pdev->bus, pdev->devfn);
         }
