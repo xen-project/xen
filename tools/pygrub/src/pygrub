@@ -381,7 +381,9 @@ class Grub:
         else:
             cfg_list = map(lambda x: (x,grub.GrubConf.GrubConfigFile),
                            ["/boot/grub/menu.lst", "/boot/grub/grub.conf",
-                            "/grub/menu.lst", "/grub/grub.conf"])
+                            "/grub/menu.lst", "/grub/grub.conf"]) + \
+                       map(lambda x: (x,grub.GrubConf.Grub2ConfigFile),
+                           ["/boot/grub/grub.cfg"])
 
         if not fs:
             # set the config file and parse it

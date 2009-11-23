@@ -14,6 +14,7 @@
 
 import os, sys
 import logging
+import re
 
 def grub_split(s, maxsplit = -1):
     eq = s.find('=')
@@ -298,9 +299,125 @@ class GrubConfigFile(_GrubConfigFile):
         if self.hasPassword():
             self.setPasswordAccess(False)
     
+class Grub2Image(_GrubImage):
+    def __init__(self, title, lines):
+        _GrubImage.__init__(self, title, lines)
+
+    def set_from_line(self, line, replace = None):
+        (com, arg) = grub_exact_split(line, 2)
+
+        if com == "set":
+            (com,arg) = grub_split(arg,2)
+            com="set:" + com
+                
+        if self.commands.has_key(com):
+            if self.commands[com] is not None:
+                setattr(self, self.commands[com], arg.strip())
+            else:
+                logging.info("Ignored image directive %s" %(com,))
+        else:
+            logging.warning("Unknown image directive %s" %(com,))
+
+        # now put the line in the list of lines
+        if replace is None:
+            self.lines.append(line)
+        else:
+            self.lines.pop(replace)
+            self.lines.insert(replace, line)
+                
+    commands = {'set:root': 'root',
+                'linux': 'kernel',
+                'initrd': 'initrd',
+                'insmod': None,
+                'search': None}
+    
+class Grub2ConfigFile(_GrubConfigFile):
+    def __init__(self, fn = None):
+        _GrubConfigFile.__init__(self, fn)
+        
+    def parse(self, buf = None):
+        if buf is None:
+            if self.filename is None:
+                raise ValueError, "No config file defined to parse!"
+
+            f = open(self.filename, 'r')
+            lines = f.readlines()
+            f.close()
+        else:
+            lines = buf.split("\n")
+
+        img = None
+        title = ""
+        for l in lines:
+            l = l.strip()
+            # skip blank lines
+            if len(l) == 0:
+                continue
+            # skip comments
+            if l.startswith('#'):
+                continue
+            # new image
+            title_match = re.match('^menuentry "(.*)" {', l)
+            if title_match:
+                if img is not None:
+                    raise RuntimeError, "syntax error 1 %d %s" % (len(img),img)
+                img = []
+                title = title_match.group(1)
+                continue
+            
+            if l.startswith("}"):
+                if img is None:
+                    raise RuntimeError, "syntax error 2 %d %s" % (len(img),img)
+
+                self.add_image(Grub2Image(title, img))
+                img = None
+                continue
+
+            if img is not None:
+                img.append(l)
+                continue
+
+            (com, arg) = grub_exact_split(l, 2)
+        
+            if com == "set":
+                (com,arg) = grub_split(arg,2)
+                com="set:" + com
+                
+            if self.commands.has_key(com):
+                if self.commands[com] is not None:
+                    setattr(self, self.commands[com], arg.strip())
+                else:
+                    logging.info("Ignored directive %s" %(com,))
+            else:
+                logging.warning("Unknown directive %s" %(com,))
+            
+        if img is not None:
+            raise RuntimeError, "syntax error 3 %d %s" % (len(img),img)
+
+        if self.hasPassword():
+            self.setPasswordAccess(False)
+
+    commands = {'set:default': 'default',
+                'set:root': 'root',
+                'set:timeout': 'timeout',
+                'set:gfxmode': None,
+                'set:menu_color_normal': None,
+                'set:menu_color_highlight': None,
+                'terminal': None,
+                'insmod': None,
+                'search': None,
+                'if': None,
+                'fi': None,
+                }
+        
 if __name__ == "__main__":
-    if sys.argv < 2:
-        raise RuntimeError, "Need a grub.conf to read"
-    g = GrubConfigFile(sys.argv[1])
+    if sys.argv < 3:
+        raise RuntimeError, "Need a grub version (\"grub\" or \"grub2\") and a grub.conf or grub.cfg to read"
+    if sys.argv[1] == "grub":
+        g = GrubConfigFile(sys.argv[2])
+    elif sys.argv[1] == "grub2":
+        g = Grub2ConfigFile(sys.argv[2])
+    else:
+        raise RuntimeError, "Unknown config type %s" % sys.argv[1]
     for i in g.images:
         print i #, i.title, i.root, i.kernel, i.args, i.initrd
