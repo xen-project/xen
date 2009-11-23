@@ -896,10 +896,10 @@ class XendNode:
         info['total_memory'] = info['total_memory'] / 1024
         info['free_memory']  = info['free_memory'] / 1024
         info['node_to_cpu']  = self.format_node_to_cpu(info)
-        info['node_to_memory'] = self.format_node_to_memory(info,
-					'node_to_memory')
-        info['node_to_dma32_mem'] = self.format_node_to_memory(info,
-					'node_to_dma32_mem')
+        info['node_to_memory'] = \
+            self.format_node_to_memory(info, 'node_to_memory')
+        info['node_to_dma32_mem'] = \
+            self.format_node_to_memory(info, 'node_to_dma32_mem')
 
         ITEM_ORDER = ['nr_cpus',
                       'nr_nodes',

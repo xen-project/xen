@@ -2653,50 +2653,50 @@ class XendDomainInfo:
 
     def _freeDMAmemory(self, node):
 
-	# If we are PV and have PCI devices the guest will
-	# turn on a SWIOTLB. The SWIOTLB _MUST_ be located in the DMA32
-	# zone (under 4GB). To do so, we need to balloon down Dom0 to where
-	# there is enough (64MB) memory under the 4GB mark. This balloon-ing
-	# might take more memory out than just 64MB thought :-(
-	if not self.info.is_pv_and_has_pci():
-		return
+        # If we are PV and have PCI devices the guest will
+        # turn on a SWIOTLB. The SWIOTLB _MUST_ be located in the DMA32
+        # zone (under 4GB). To do so, we need to balloon down Dom0 to where
+        # there is enough (64MB) memory under the 4GB mark. This balloon-ing
+        # might take more memory out than just 64MB thought :-(
+        if not self.info.is_pv_and_has_pci():
+            return
 
-	retries = 2000
-	ask_for_mem = 0;
-	need_mem = 0
-	try:		
-	    while (retries > 0):
-		physinfo = xc.physinfo()
-		free_mem = physinfo['free_memory']
-		nr_nodes = physinfo['nr_nodes']
-		node_to_dma32_mem = physinfo['node_to_dma32_mem']
-		if (node > nr_nodes):
-		     return;
-		# Extra 2MB above 64GB seems to do the trick.
-		need_mem = 64 * 1024 + 2048 - node_to_dma32_mem[node]
-		# our starting point. We ask just for the difference to
-		# be have an extra 64MB under 4GB.
-		ask_for_mem = max(need_mem, ask_for_mem);
-		if (need_mem > 0):
-		     log.debug('_freeDMAmemory (%d) Need %dKiB DMA memory. '
-			       'Asking for %dKiB', retries, need_mem,
-			       ask_for_mem)
+        retries = 2000
+        ask_for_mem = 0
+        need_mem = 0
+        try:
+            while (retries > 0):
+                physinfo = xc.physinfo()
+                free_mem = physinfo['free_memory']
+                nr_nodes = physinfo['nr_nodes']
+                node_to_dma32_mem = physinfo['node_to_dma32_mem']
+                if (node > nr_nodes):
+                    return
+                # Extra 2MB above 64GB seems to do the trick.
+                need_mem = 64 * 1024 + 2048 - node_to_dma32_mem[node]
+                # our starting point. We ask just for the difference to
+                # be have an extra 64MB under 4GB.
+                ask_for_mem = max(need_mem, ask_for_mem);
+                if (need_mem > 0):
+                    log.debug('_freeDMAmemory (%d) Need %dKiB DMA memory. '
+                              'Asking for %dKiB', retries, need_mem,
+                              ask_for_mem)
 
-		     balloon.free(ask_for_mem, self)
-		     ask_for_mem = ask_for_mem + 2048;
-		else:
-		     # OK. We got enough DMA memory.
-		     break
-		retries  = retries - 1
-	except:
-	    # This is best-try after all.
-	    need_mem = max(1, need_mem);
-	    pass
+                    balloon.free(ask_for_mem, self)
+                    ask_for_mem = ask_for_mem + 2048
+                else:
+                    # OK. We got enough DMA memory.
+                    break
+                retries = retries - 1
+        except:
+            # This is best-try after all.
+            need_mem = max(1, need_mem)
+            pass
 
-	if (need_mem > 0):
-	    log.warn('We tried our best to balloon down DMA memory to '
-		     'accomodate your PV guest. We need %dKiB extra memory.',
-		     need_mem)
+        if (need_mem > 0):
+            log.warn('We tried our best to balloon down DMA memory to '
+                     'accomodate your PV guest. We need %dKiB extra memory.',
+                     need_mem)
 
     def _setSchedParams(self):
         if XendNode.instance().xenschedinfo() == 'credit':

@@ -79,7 +79,7 @@ class XSPolicyAdmin:
         rc = 0
         if security.on() == xsconstants.XS_POLICY_ACM:
             rc |= xsconstants.XS_POLICY_ACM
-	else:
+        else:
             rc |= xsconstants.XS_POLICY_FLASK
         return rc
 
