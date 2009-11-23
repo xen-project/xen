@@ -15,7 +15,7 @@
  */
 
 #ifndef LIBXL_INTERNAL_H
-# define LIBXL_INTERNAL_H
+#define LIBXL_INTERNAL_H
 
 #include <stdint.h>
 #include <stdarg.h>
@@ -28,6 +28,8 @@
 #include "libxl_utils.h"
 
 #define LIBXL_DESTROY_TIMEOUT 10
+#define LIBXL_XENCONSOLE_LIMIT 1048576
+#define LIBXL_XENCONSOLE_PROTOCOL "vt100"
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))
 
@@ -47,12 +49,12 @@
 
 void xl_log(struct libxl_ctx *ctx, int loglevel, const char *file, int line, const char *func, char *fmt, ...);
 
-typedef struct {
+struct libxl_domain_build_state_ {
     uint32_t store_port;
     unsigned long store_mfn;
     uint32_t console_port;
     unsigned long console_mfn;
-} libxl_domain_build_state;
+};
 
 typedef enum {
     DEVICE_VIF,
@@ -61,6 +63,7 @@ typedef enum {
     DEVICE_PCI,
     DEVICE_VFB,
     DEVICE_VKBD,
+    DEVICE_CONSOLE,
 } libxl_device_kinds;
 
 typedef struct {
@@ -119,7 +122,8 @@ int core_suspend(struct libxl_ctx *ctx, uint32_t domid, int fd, int hvm, int liv
 char *device_disk_backend_type_of_phystype(libxl_disk_phystype phystype);
 char *device_disk_string_of_phystype(libxl_disk_phystype phystype);
 
-int device_disk_major_minor(char *virtpath, int *major, int *minor);
+int device_physdisk_major_minor(char *physpath, int *major, int *minor);
+int device_virtdisk_major_minor(char *virtpath, int *major, int *minor);
 int device_disk_dev_number(char *virtpath);
 
 int libxl_device_generic_add(struct libxl_ctx *ctx, libxl_device *device,

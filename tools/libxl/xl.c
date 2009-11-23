@@ -42,10 +42,14 @@ static void printf_info(libxl_domain_create_info *c_info,
                         int num_vifs,
                         libxl_device_pci *pcidevs,
                         int num_pcidevs,
+                        libxl_device_vfb *vfbs,
+                        int num_vfbs,
+                        libxl_device_vkb *vkb,
+                        int num_vkbs,
                         libxl_device_model_info *dm_info)
 {
     int i;
-    char uuid_str[18];
+    char uuid_str[37];
     printf("*** domain_create_info ***\n");
     printf("hvm: %d\n", c_info->hvm);
     printf("hap: %d\n", c_info->hap);
@@ -69,12 +73,12 @@ static void printf_info(libxl_domain_create_info *c_info,
     printf("vpt_align: %d\n", b_info->vpt_align);
     printf("max_vcpus: %d\n", b_info->max_vcpus);
     printf("max_memkb: %d\n", b_info->max_memkb);
-    printf("video_memkb: %d\n", b_info->video_memkb);
-    printf("shadow_memkb: %d\n", b_info->shadow_memkb);
     printf("kernel: %s\n", b_info->kernel);
     printf("hvm: %d\n", b_info->hvm);
 
-    if (b_info->hvm) {
+    if (c_info->hvm) {
+        printf("video_memkb: %d\n", b_info->video_memkb);
+        printf("shadow_memkb: %d\n", b_info->shadow_memkb);
         printf("    pae: %d\n", b_info->u.hvm.pae);
         printf("    apic: %d\n", b_info->u.hvm.apic);
         printf("    acpi: %d\n", b_info->u.hvm.acpi);
@@ -114,25 +118,43 @@ static void printf_info(libxl_domain_create_info *c_info,
         printf("opts msitranslate %d power_mgmt %d\n", pcidevs[i].msitranslate, pcidevs[i].power_mgmt);
     }
 
-    printf("\n\n\n*** device_model_info ***\n");
-    printf("domid: %d\n", dm_info->domid);
-    printf("dom_name: %s\n", dm_info->dom_name);
-    printf("device_model: %s\n", dm_info->device_model);
-    printf("videoram: %d\n", dm_info->videoram);
-    printf("stdvga: %d\n", dm_info->stdvga);
-    printf("vnc: %d\n", dm_info->vnc);
-    printf("vnclisten: %s\n", dm_info->vnclisten);
-    printf("vncdisplay: %d\n", dm_info->vncdisplay);
-    printf("vncunused: %d\n", dm_info->vncunused);
-    printf("keymap: %s\n", dm_info->keymap);
-    printf("sdl: %d\n", dm_info->sdl);
-    printf("opengl: %d\n", dm_info->opengl);
-    printf("nographic: %d\n", dm_info->nographic);
-    printf("serial: %s\n", dm_info->serial);
-    printf("boot: %s\n", dm_info->boot);
-    printf("usb: %d\n", dm_info->usb);
-    printf("usbdevice: %s\n", dm_info->usbdevice);
-    printf("apic: %d\n", dm_info->apic);
+    for (i = 0; i < num_vfbs; i++) {
+        printf("\n\n\n*** vfbs_info: %d ***\n", i);
+        printf("backend_domid %d\n", vfbs[i].backend_domid);
+        printf("domid %d\n", vfbs[i].domid);
+        printf("devid %d\n", vfbs[i].devid);
+        printf("vnc: %d\n", vfbs[i].vnc);
+        printf("vnclisten: %s\n", vfbs[i].vnclisten);
+        printf("vncdisplay: %d\n", vfbs[i].vncdisplay);
+        printf("vncunused: %d\n", vfbs[i].vncunused);
+        printf("keymap: %s\n", vfbs[i].keymap);
+        printf("sdl: %d\n", vfbs[i].sdl);
+        printf("opengl: %d\n", vfbs[i].opengl);
+        printf("display: %s\n", vfbs[i].display);
+        printf("xauthority: %s\n", vfbs[i].xauthority);
+    }
+
+    if (c_info->hvm) {
+        printf("\n\n\n*** device_model_info ***\n");
+        printf("domid: %d\n", dm_info->domid);
+        printf("dom_name: %s\n", dm_info->dom_name);
+        printf("device_model: %s\n", dm_info->device_model);
+        printf("videoram: %d\n", dm_info->videoram);
+        printf("stdvga: %d\n", dm_info->stdvga);
+        printf("vnc: %d\n", dm_info->vnc);
+        printf("vnclisten: %s\n", dm_info->vnclisten);
+        printf("vncdisplay: %d\n", dm_info->vncdisplay);
+        printf("vncunused: %d\n", dm_info->vncunused);
+        printf("keymap: %s\n", dm_info->keymap);
+        printf("sdl: %d\n", dm_info->sdl);
+        printf("opengl: %d\n", dm_info->opengl);
+        printf("nographic: %d\n", dm_info->nographic);
+        printf("serial: %s\n", dm_info->serial);
+        printf("boot: %s\n", dm_info->boot);
+        printf("usb: %d\n", dm_info->usb);
+        printf("usbdevice: %s\n", dm_info->usbdevice);
+        printf("apic: %d\n", dm_info->apic);
+    }
 }
 
 static char* compat_config_file(const char *filename)
@@ -208,10 +230,10 @@ void init_build_info(libxl_domain_build_info *b_info, libxl_domain_create_info *
     b_info->vpt_align = -1;
     b_info->max_vcpus = 1;
     b_info->max_memkb = 32 * 1024;
-    b_info->shadow_memkb = libxl_get_required_shadow_memory(b_info->max_memkb, b_info->max_vcpus);
-    b_info->video_memkb = 8 * 1024;
-    b_info->kernel = "/usr/lib/xen/boot/hvmloader";
     if (c_info->hvm) {
+        b_info->shadow_memkb = libxl_get_required_shadow_memory(b_info->max_memkb, b_info->max_vcpus);
+        b_info->video_memkb = 8 * 1024;
+        b_info->kernel = "/usr/lib/xen/boot/hvmloader";
         b_info->hvm = 1;
         b_info->u.hvm.pae = 1;
         b_info->u.hvm.apic = 1;
@@ -282,9 +304,52 @@ void disk_info_domid_fixup(libxl_device_disk *disk_info, int domid)
     disk_info->domid = domid;
 }
 
+void vfb_info_domid_fixup(libxl_device_vfb *vfb, int domid)
+{
+    vfb->domid = domid;
+}
+
+void vkb_info_domid_fixup(libxl_device_vkb *vkb, int domid)
+{
+    vkb->domid = domid;
+}
+
+void console_info_domid_fixup(libxl_device_console *console, int domid)
+{
+    console->domid = domid;
+}
+
 void device_model_info_domid_fixup(libxl_device_model_info *dm_info, int domid)
 {
     dm_info->domid = domid;
+}
+
+void init_vfb_info(libxl_device_vfb *vfb, int dev_num)
+{
+    memset(vfb, 0x00, sizeof(libxl_device_vfb));
+    vfb->devid = dev_num;
+    vfb->vnc = 1;
+    vfb->vnclisten = "127.0.0.1";
+    vfb->vncdisplay = 0;
+    vfb->vncunused = 1;
+    vfb->keymap = NULL;
+    vfb->sdl = 0;
+    vfb->opengl = 0;
+}
+
+void init_vkb_info(libxl_device_vkb *vkb, int dev_num)
+{
+    memset(vkb, 0x00, sizeof(libxl_device_vkb));
+    vkb->devid = dev_num;
+}
+
+void init_console_info(libxl_device_console *console, int dev_num, libxl_domain_build_state *state)
+{
+    memset(console, 0x00, sizeof(libxl_device_console));
+    console->devid = dev_num;
+    console->constype = CONSTYPE_XENCONSOLED;
+    if (state)
+        console->build_state = state;
 }
 
 static void parse_config_file(const char *filename,
@@ -296,13 +361,17 @@ static void parse_config_file(const char *filename,
                               int *num_vifs,
                               libxl_device_pci **pcidevs,
                               int *num_pcidevs,
+                              libxl_device_vfb **vfbs,
+                              int *num_vfbs,
+                              libxl_device_vkb **vkbs,
+                              int *num_vkbs,
                               libxl_device_model_info *dm_info)
 {
     const char *buf;
     xen_uuid_t uuid[16];
     long l;
     struct config_t config;
-    struct config_setting_t *vbds, *nics, *pcis;
+    struct config_setting_t *vbds, *nics, *pcis, *cvfbs;
     int pci_power_mgmt = 0;
     int pci_msitranslate = 1;
 
@@ -367,10 +436,13 @@ static void parse_config_file(const char *filename,
         if (config_lookup_int (&config, "viridian", &l) == CONFIG_TRUE)
             b_info->u.hvm.viridian = l;
     } else {
-        if (config_lookup_string (&config, "cmdline", &buf) == CONFIG_TRUE)
-            b_info->u.pv.cmdline = buf;
+        char *cmdline;
+        if (config_lookup_string (&config, "root", &buf) == CONFIG_TRUE) {
+            asprintf(&cmdline, "root=%s", buf);
+            b_info->u.pv.cmdline = cmdline;
+        }
         if (config_lookup_string (&config, "ramdisk", &buf) == CONFIG_TRUE)
-            b_info->u.pv.ramdisk = buf;
+            b_info->u.pv.ramdisk = strdup(buf);
     }
 
     if ((vbds = config_lookup (&config, "disk")) != NULL) {
@@ -494,6 +566,56 @@ skip:
         }
     }
 
+    if ((cvfbs = config_lookup (&config, "vfb")) != NULL) {
+        *num_vfbs = 0;
+        *num_vkbs = 0;
+        *vfbs = NULL;
+        *vkbs = NULL;
+        while ((buf = config_setting_get_string_elem (cvfbs, *num_vfbs)) != NULL) {
+            char *buf2 = strdup(buf);
+            char *p, *p2;
+            *vfbs = (libxl_device_vfb *) realloc(*vfbs, sizeof(libxl_device_vfb) * ((*num_vfbs) + 1));
+            init_vfb_info((*vfbs) + (*num_vfbs), (*num_vfbs));
+
+            *vkbs = (libxl_device_vkb *) realloc(*vkbs, sizeof(libxl_device_vkb) * ((*num_vkbs) + 1));
+            init_vkb_info((*vkbs) + (*num_vkbs), (*num_vkbs));
+
+            p = strtok(buf2, ",");
+            if (!p)
+                goto skip_vfb;
+            do {
+                while (*p == ' ')
+                    p++;
+                if ((p2 = strchr(p, '=')) == NULL)
+                    break;
+                *p2 = '\0';
+                if (!strcmp(p, "vnc")) {
+                    (*vfbs)[*num_vfbs].vnc = atoi(p2 + 1);
+                } else if (!strcmp(p, "vnclisten")) {
+                    (*vfbs)[*num_vfbs].vnclisten = strdup(p2 + 1);
+                } else if (!strcmp(p, "vncdisplay")) {
+                    (*vfbs)[*num_vfbs].vncdisplay = atoi(p2 + 1);
+                } else if (!strcmp(p, "vncunused")) {
+                    (*vfbs)[*num_vfbs].vncunused = atoi(p2 + 1);
+                } else if (!strcmp(p, "keymap")) {
+                    (*vfbs)[*num_vfbs].keymap = strdup(p2 + 1);
+                } else if (!strcmp(p, "sdl")) {
+                    (*vfbs)[*num_vfbs].sdl = atoi(p2 + 1);
+                } else if (!strcmp(p, "opengl")) {
+                    (*vfbs)[*num_vfbs].opengl = atoi(p2 + 1);
+                } else if (!strcmp(p, "display")) {
+                    (*vfbs)[*num_vfbs].display = strdup(p2 + 1);
+                } else if (!strcmp(p, "xauthority")) {
+                    (*vfbs)[*num_vfbs].xauthority = strdup(p2 + 1);
+                }
+            } while ((p = strtok(NULL, ",")) != NULL);
+skip_vfb:
+            free(buf2);
+            *num_vfbs = (*num_vfbs) + 1;
+            *num_vkbs = (*num_vkbs) + 1;
+        }
+    }
+
     if (config_lookup_int (&config, "pci_msitranslate", &l) == CONFIG_TRUE)
         pci_msitranslate = l;
 
@@ -536,38 +658,40 @@ skip_pci:
         }
     }
 
-    /* init dm from c and b */
-    init_dm_info(dm_info, c_info, b_info);
+    if (c_info->hvm == 1) {
+        /* init dm from c and b */
+        init_dm_info(dm_info, c_info, b_info);
 
-    /* then process config related to dm */
-    if (config_lookup_string (&config, "device_model", &buf) == CONFIG_TRUE)
-        dm_info->device_model = strdup(buf);
-    if (config_lookup_int (&config, "stdvga", &l) == CONFIG_TRUE)
-        dm_info->stdvga = l;
-    if (config_lookup_int (&config, "vnc", &l) == CONFIG_TRUE)
-        dm_info->vnc = l;
-    if (config_lookup_string (&config, "vnclisten", &buf) == CONFIG_TRUE)
-        dm_info->vnclisten = strdup(buf);
-    if (config_lookup_int (&config, "vncdisplay", &l) == CONFIG_TRUE)
-        dm_info->vncdisplay = l;
-    if (config_lookup_int (&config, "vncunused", &l) == CONFIG_TRUE)
-        dm_info->vncunused = l;
-    if (config_lookup_string (&config, "keymap", &buf) == CONFIG_TRUE)
-        dm_info->keymap = strdup(buf);
-    if (config_lookup_int (&config, "sdl", &l) == CONFIG_TRUE)
-        dm_info->sdl = l;
-    if (config_lookup_int (&config, "opengl", &l) == CONFIG_TRUE)
-        dm_info->opengl = l;
-    if (config_lookup_int (&config, "nographic", &l) == CONFIG_TRUE)
-        dm_info->nographic = l;
-    if (config_lookup_string (&config, "serial", &buf) == CONFIG_TRUE)
-        dm_info->serial = strdup(buf);
-    if (config_lookup_string (&config, "boot", &buf) == CONFIG_TRUE)
-        dm_info->boot = strdup(buf);
-    if (config_lookup_int (&config, "usb", &l) == CONFIG_TRUE)
-        dm_info->usb = l;
-    if (config_lookup_string (&config, "usbdevice", &buf) == CONFIG_TRUE)
-        dm_info->usbdevice = strdup(buf);
+        /* then process config related to dm */
+        if (config_lookup_string (&config, "device_model", &buf) == CONFIG_TRUE)
+            dm_info->device_model = strdup(buf);
+        if (config_lookup_int (&config, "stdvga", &l) == CONFIG_TRUE)
+            dm_info->stdvga = l;
+        if (config_lookup_int (&config, "vnc", &l) == CONFIG_TRUE)
+            dm_info->vnc = l;
+        if (config_lookup_string (&config, "vnclisten", &buf) == CONFIG_TRUE)
+            dm_info->vnclisten = strdup(buf);
+        if (config_lookup_int (&config, "vncdisplay", &l) == CONFIG_TRUE)
+            dm_info->vncdisplay = l;
+        if (config_lookup_int (&config, "vncunused", &l) == CONFIG_TRUE)
+            dm_info->vncunused = l;
+        if (config_lookup_string (&config, "keymap", &buf) == CONFIG_TRUE)
+            dm_info->keymap = strdup(buf);
+        if (config_lookup_int (&config, "sdl", &l) == CONFIG_TRUE)
+            dm_info->sdl = l;
+        if (config_lookup_int (&config, "opengl", &l) == CONFIG_TRUE)
+            dm_info->opengl = l;
+        if (config_lookup_int (&config, "nographic", &l) == CONFIG_TRUE)
+            dm_info->nographic = l;
+        if (config_lookup_string (&config, "serial", &buf) == CONFIG_TRUE)
+            dm_info->serial = strdup(buf);
+        if (config_lookup_string (&config, "boot", &buf) == CONFIG_TRUE)
+            dm_info->boot = strdup(buf);
+        if (config_lookup_int (&config, "usb", &l) == CONFIG_TRUE)
+            dm_info->usb = l;
+        if (config_lookup_string (&config, "usbdevice", &buf) == CONFIG_TRUE)
+            dm_info->usbdevice = strdup(buf);
+    }
 
     config_destroy(&config);
 }
@@ -578,24 +702,26 @@ static void create_domain(int debug, const char *filename)
     uint32_t domid;
     libxl_domain_create_info info1;
     libxl_domain_build_info info2;
+    libxl_domain_build_state *state;
     libxl_device_model_info dm_info;
     libxl_device_disk *disks = NULL;
     libxl_device_nic *vifs = NULL;
     libxl_device_pci *pcidevs = NULL;
-    int num_disks = 0, num_vifs = 0, num_pcidevs = 0;
+    libxl_device_vfb *vfbs = NULL;
+    libxl_device_vkb *vkbs = NULL;
+    libxl_device_console console;
+    int num_disks = 0, num_vifs = 0, num_pcidevs = 0, num_vfbs = 0, num_vkbs = 0;
     int i;
 
     printf("Parsing config file %s\n", filename);
-    parse_config_file(filename, &info1, &info2, &disks, &num_disks, &vifs, &num_vifs, &pcidevs, &num_pcidevs, &dm_info);
+    parse_config_file(filename, &info1, &info2, &disks, &num_disks, &vifs, &num_vifs, &pcidevs, &num_pcidevs, &vfbs, &num_vfbs, &vkbs, &num_vkbs, &dm_info);
     if (debug)
-        printf_info(&info1, &info2, disks, num_disks, vifs, num_vifs, pcidevs, num_pcidevs, &dm_info);
+        printf_info(&info1, &info2, disks, num_disks, vifs, num_vifs, pcidevs, num_pcidevs, vfbs, num_vfbs, vkbs, num_vkbs, &dm_info);
 
     libxl_ctx_init(&ctx);
     libxl_ctx_set_log(&ctx, log_callback, NULL);
     libxl_domain_make(&ctx, &info1, &domid);
-    libxl_domain_build(&ctx, &info2, domid);
-
-    device_model_info_domid_fixup(&dm_info, domid);
+    state = libxl_domain_build(&ctx, &info2, domid);
 
     for (i = 0; i < num_disks; i++) {
         disk_info_domid_fixup(disks + i, domid);
@@ -605,7 +731,24 @@ static void create_domain(int debug, const char *filename)
         nic_info_domid_fixup(vifs + i, domid);
         libxl_device_nic_add(&ctx, domid, &vifs[i]);
     }
-    libxl_create_device_model(&ctx, &dm_info, vifs, num_vifs);
+    if (info1.hvm) {
+        device_model_info_domid_fixup(&dm_info, domid);
+        libxl_create_device_model(&ctx, &dm_info, vifs, num_vifs);
+    } else {
+        for (i = 0; i < num_vfbs; i++) {
+            vfb_info_domid_fixup(vfbs + i, domid);
+            libxl_device_vfb_add(&ctx, domid, &vfbs[i]);
+            vkb_info_domid_fixup(vkbs + i, domid);
+            libxl_device_vkb_add(&ctx, domid, &vkbs[i]);
+        }
+        init_console_info(&console, 0, state);
+        console_info_domid_fixup(&console, domid);
+        if (num_vfbs)
+            console.constype = CONSTYPE_IOEMU;
+        libxl_device_console_add(&ctx, domid, &console);
+        if (num_vfbs)
+            libxl_create_xenpv_qemu(&ctx, vfbs, 1, &console);
+    }
     for (i = 0; i < num_pcidevs; i++)
         libxl_device_pci_add(&ctx, domid, &pcidevs[i]);
     libxl_domain_unpause(&ctx, domid);

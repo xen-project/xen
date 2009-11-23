@@ -15,8 +15,11 @@
 
 #include "libxl.h"
 #include "libxl_internal.h"
+#include <stdio.h>
 #include <inttypes.h>
 #include <xenguest.h>
+#include <xenctrl.h>
+#include <xc_dom.h>
 #include <string.h>
 #include <sys/time.h> /* for struct timeval */
 #include <unistd.h> /* for sleep(2) */
@@ -37,7 +40,6 @@ int is_hvm(struct libxl_ctx *ctx, uint32_t domid)
 int build_pre(struct libxl_ctx *ctx, uint32_t domid,
               libxl_domain_build_info *info, libxl_domain_build_state *state)
 {
-    unsigned long shadow;
     if (info->timer_mode != -1)
         xc_set_hvm_param(ctx->xch, domid, HVM_PARAM_TIMER_MODE,
                 (unsigned long) info->timer_mode);
@@ -48,8 +50,12 @@ int build_pre(struct libxl_ctx *ctx, uint32_t domid,
     xc_domain_max_vcpus(ctx->xch, domid, info->max_vcpus);
     xc_domain_setmaxmem(ctx->xch, domid, info->max_memkb + info->video_memkb);
     xc_domain_set_memmap_limit(ctx->xch, domid, info->max_memkb);
-    shadow = (info->shadow_memkb + 1023) / 1024;
-    xc_shadow_control(ctx->xch, domid, XEN_DOMCTL_SHADOW_OP_SET_ALLOCATION, NULL, 0, &shadow, 0, NULL);
+
+    if (info->hvm) {
+        unsigned long shadow;
+        shadow = (info->shadow_memkb + 1023) / 1024;
+        xc_shadow_control(ctx->xch, domid, XEN_DOMCTL_SHADOW_OP_SET_ALLOCATION, NULL, 0, &shadow, 0, NULL);
+    }
 
     state->store_port = xc_evtchn_alloc_unbound(ctx->xch, domid, 0);
     state->console_port = xc_evtchn_alloc_unbound(ctx->xch, domid, 0);
@@ -64,7 +70,7 @@ int build_post(struct libxl_ctx *ctx, uint32_t domid,
     xs_transaction_t t;
     char **ents;
 
-    ents = libxl_calloc(ctx, 6 * 2, sizeof(char *));
+    ents = libxl_calloc(ctx, 10 * 2, sizeof(char *));
     ents[0] = libxl_sprintf(ctx, "memory/static-max");
     ents[1] = libxl_sprintf(ctx, "%d", info->max_memkb);
     ents[2] = libxl_sprintf(ctx, "memory/target");
@@ -95,14 +101,25 @@ retry_transaction:
 int build_pv(struct libxl_ctx *ctx, uint32_t domid,
              libxl_domain_build_info *info, libxl_domain_build_state *state)
 {
-#if 0 /* unused variables */
-    int mem_target_kib = info->max_memkb;
-    char *domid_str = libxl_sprintf(ctx, "%d", domid);
-    char *memsize_str = libxl_sprintf(ctx, "%d", mem_target_kib / 1024);
-    char *store_port_str = libxl_sprintf(ctx, "%d", state->store_port);
-    char *console_port_str = libxl_sprintf(ctx, "%d", state->console_port);
-#endif
-    return ERROR_NI;
+    struct xc_dom_image *dom;
+    int ret;
+    int flags = 0;
+
+    dom = xc_dom_allocate(info->u.pv.cmdline, info->u.pv.features);
+    if (!dom) {
+        XL_LOG(ctx, XL_LOG_ERROR, "xc_dom_allocate failed: %d", dom);
+        return -1;
+    }
+    if ((ret = xc_dom_linux_build(ctx->xch, dom, domid, info->max_memkb / 1024,
+                                  info->kernel, info->u.pv.ramdisk, flags,
+                                  state->store_port, &state->store_mfn,
+                                  state->console_port, &state->console_mfn)) != 0) {
+        xc_dom_release(dom);
+        XL_LOG(ctx, XL_LOG_ERROR, "xc_dom_linux_build failed: %d", ret);
+        return -2;
+    }
+    xc_dom_release(dom);
+    return 0;
 }
 
 int build_hvm(struct libxl_ctx *ctx, uint32_t domid,

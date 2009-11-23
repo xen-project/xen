@@ -23,6 +23,8 @@
 #include <sys/select.h>
 #include <signal.h>
 #include <unistd.h> /* for write, unlink and close */
+#include <stdint.h>
+#include <inttypes.h>
 #include "libxl.h"
 #include "libxl_utils.h"
 #include "libxl_internal.h"
@@ -156,7 +158,6 @@ retry_transaction:
 
     xs_write(ctx->xsh, t, libxl_sprintf(ctx, "%s/uuid", vm_path), uuid_string, strlen(uuid_string));
     xs_write(ctx->xsh, t, libxl_sprintf(ctx, "%s/name", vm_path), info->name, strlen(info->name));
-    xs_write(ctx->xsh, t, libxl_sprintf(ctx, "%s/image/ostype", vm_path), "hvm", strlen("hvm"));
 
     libxl_xs_writev(ctx, t, dom_path, info->xsdata);
     libxl_xs_writev(ctx, t, libxl_sprintf(ctx, "%s/platform", dom_path), info->platformdata);
@@ -169,24 +170,33 @@ retry_transaction:
     return 0;
 }
 
-int libxl_domain_build(struct libxl_ctx *ctx, libxl_domain_build_info *info, uint32_t domid)
+libxl_domain_build_state *libxl_domain_build(struct libxl_ctx *ctx, libxl_domain_build_info *info, uint32_t domid)
 {
-    libxl_domain_build_state state;
+    libxl_domain_build_state *state = (libxl_domain_build_state *) libxl_calloc(ctx, 1, sizeof(libxl_domain_build_state));
     char **vments = NULL, **localents = NULL;
 
-    memset(&state, '\0', sizeof(state));
-
-    build_pre(ctx, domid, info, &state);
+    build_pre(ctx, domid, info, state);
     if (info->hvm) {
-        build_hvm(ctx, domid, info, &state);
-        vments = libxl_calloc(ctx, 4, sizeof(char *));
+        build_hvm(ctx, domid, info, state);
+        vments = libxl_calloc(ctx, 5, sizeof(char *));
         vments[0] = libxl_sprintf(ctx, "rtc/timeoffset");
         vments[1] = libxl_sprintf(ctx, "%s", (info->u.hvm.timeoffset) ? info->u.hvm.timeoffset : "");
+        vments[2] = libxl_sprintf(ctx, "image/ostype");
+        vments[3] = libxl_sprintf(ctx, "hvm");
     } else {
-        build_pv(ctx, domid, info, &state);
+        build_pv(ctx, domid, info, state);
+        vments = libxl_calloc(ctx, 9, sizeof(char *));
+        vments[0] = libxl_sprintf(ctx, "image/ostype");
+        vments[1] = libxl_sprintf(ctx, "linux");
+        vments[2] = libxl_sprintf(ctx, "image/kernel");
+        vments[3] = libxl_sprintf(ctx, info->kernel);
+        vments[4] = libxl_sprintf(ctx, "image/ramdisk");
+        vments[5] = libxl_sprintf(ctx, info->u.pv.ramdisk);
+        vments[6] = libxl_sprintf(ctx, "image/cmdline");
+        vments[7] = libxl_sprintf(ctx, info->u.pv.cmdline);
     }
-    build_post(ctx, domid, info, &state, vments, localents);
-    return 0;
+    build_post(ctx, domid, info, state, vments, localents);
+    return state;
 }
 
 int libxl_domain_restore(struct libxl_ctx *ctx, libxl_domain_build_info *info,
@@ -414,13 +424,6 @@ static char ** libxl_build_device_model_args(struct libxl_ctx *ctx,
         flexarray_set(dm_args, num++, libxl_sprintf(ctx, "-domain-name"));
         flexarray_set(dm_args, num++, libxl_sprintf(ctx, "%s", info->dom_name));
     }
-    if (info->videoram) {
-        flexarray_set(dm_args, num++, libxl_sprintf(ctx, "-videoram"));
-        flexarray_set(dm_args, num++, libxl_sprintf(ctx, "%d", info->videoram));
-    }
-    if (info->stdvga) {
-        flexarray_set(dm_args, num++, libxl_sprintf(ctx, "-std-vga"));
-    }
     if (info->vnc || info->vncdisplay || info->vnclisten || info->vncunused) {
         flexarray_set(dm_args, num++, libxl_sprintf(ctx, "-vnc"));
         if (info->vncdisplay) {
@@ -459,38 +462,47 @@ static char ** libxl_build_device_model_args(struct libxl_ctx *ctx,
         flexarray_set(dm_args, num++, libxl_sprintf(ctx, "-serial"));
         flexarray_set(dm_args, num++, libxl_sprintf(ctx, "%s", info->serial));
     }
-    if (info->boot) {
-        flexarray_set(dm_args, num++, libxl_sprintf(ctx, "-boot"));
-        flexarray_set(dm_args, num++, libxl_sprintf(ctx, "%s", info->boot));
-    }
-    if (info->usb) {
-        flexarray_set(dm_args, num++, libxl_sprintf(ctx, "-usb"));
-        if (info->usbdevice) {
-            flexarray_set(dm_args, num++, libxl_sprintf(ctx, "-usbdevice"));
-            flexarray_set(dm_args, num++, libxl_sprintf(ctx, "%s", info->usbdevice));
+    if (info->type == XENFV) {
+        if (info->videoram) {
+            flexarray_set(dm_args, num++, libxl_sprintf(ctx, "-videoram"));
+            flexarray_set(dm_args, num++, libxl_sprintf(ctx, "%d", info->videoram));
+        }
+        if (info->stdvga) {
+            flexarray_set(dm_args, num++, libxl_sprintf(ctx, "-std-vga"));
+        }
+
+        if (info->boot) {
+            flexarray_set(dm_args, num++, libxl_sprintf(ctx, "-boot"));
+            flexarray_set(dm_args, num++, libxl_sprintf(ctx, "%s", info->boot));
+        }
+        if (info->usb) {
+            flexarray_set(dm_args, num++, libxl_sprintf(ctx, "-usb"));
+            if (info->usbdevice) {
+                flexarray_set(dm_args, num++, libxl_sprintf(ctx, "-usbdevice"));
+                flexarray_set(dm_args, num++, libxl_sprintf(ctx, "%s", info->usbdevice));
+            }
+        }
+        if (info->apic) {
+            flexarray_set(dm_args, num++, libxl_sprintf(ctx, "-acpi"));
+        }
+        for (i = 0; i < num_vifs; i++) {
+            if (vifs[i].nictype == NICTYPE_IOEMU) {
+                flexarray_set(dm_args, num++, libxl_sprintf(ctx, "-net"));
+                flexarray_set(dm_args, num++, libxl_sprintf(ctx, "nic,vlan=%d,macaddr=%s,model=%s",
+                            vifs[i].devid, vifs[i].smac, vifs[i].model));
+                flexarray_set(dm_args, num++, libxl_sprintf(ctx, "-net"));
+                flexarray_set(dm_args, num++, libxl_sprintf(ctx, "tap,vlan=%d,ifname=%s,bridge=%s",
+                            vifs[i].devid, vifs[i].ifname, vifs[i].bridge));
+            }
         }
     }
-    if (info->apic) {
-        flexarray_set(dm_args, num++, libxl_sprintf(ctx, "-acpi"));
-    }
-    if (info->extra) {
-        int i = 0;
-        while (info->extra[i] != NULL) {
-            flexarray_set(dm_args, num++, libxl_sprintf(ctx, "%s", info->extra[i]));
-        }
-    }
-    for (i = 0; i < num_vifs; i++) {
-        if (vifs[i].nictype == NICTYPE_IOEMU) {
-            flexarray_set(dm_args, num++, libxl_sprintf(ctx, "-net"));
-            flexarray_set(dm_args, num++, libxl_sprintf(ctx, "nic,vlan=%d,macaddr=%s,model=%s",
-                                                        vifs[i].devid, vifs[i].smac, vifs[i].model));
-            flexarray_set(dm_args, num++, libxl_sprintf(ctx, "-net"));
-            flexarray_set(dm_args, num++, libxl_sprintf(ctx, "tap,vlan=%d,ifname=%s,bridge=%s",
-                                                        vifs[i].devid, vifs[i].ifname, vifs[i].bridge));
-        }
-    }
+    for (i = 0; info->extra && info->extra[i] != NULL; i++)
+        flexarray_set(dm_args, num++, info->extra[i]);
     flexarray_set(dm_args, num++, libxl_sprintf(ctx, "-M"));
-    flexarray_set(dm_args, num++, libxl_sprintf(ctx, "xenfv"));
+    if (info->type == XENPV)
+        flexarray_set(dm_args, num++, libxl_sprintf(ctx, "xenpv"));
+    else
+        flexarray_set(dm_args, num++, libxl_sprintf(ctx, "xenfv"));
     flexarray_set(dm_args, num++, NULL);
 
     return (char **) flexarray_contents(dm_args);
@@ -579,7 +591,7 @@ int libxl_device_disk_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_di
         case PHYSTYPE_PHY: {
             int major, minor;
 
-            device_disk_major_minor(disk->virtpath, &major, &minor);
+            device_physdisk_major_minor(disk->physpath, &major, &minor);
             flexarray_set(back, boffset++, libxl_sprintf(ctx, "physical-device"));
             flexarray_set(back, boffset++, libxl_sprintf(ctx, "%x:%x", major, minor));
 
@@ -604,6 +616,8 @@ int libxl_device_disk_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_di
     flexarray_set(back, boffset++, libxl_sprintf(ctx, "1"));
     flexarray_set(back, boffset++, libxl_sprintf(ctx, "removable"));
     flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", (disk->unpluggable) ? 1 : 0));
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, "bootable"));
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", 1));
     flexarray_set(back, boffset++, libxl_sprintf(ctx, "state"));
     flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", 1));
     flexarray_set(back, boffset++, libxl_sprintf(ctx, "dev"));
@@ -716,9 +730,125 @@ int libxl_device_nic_hard_shutdown(struct libxl_ctx *ctx, uint32_t domid)
 }
 
 /******************************************************************************/
-int libxl_device_vkb_add(struct libxl_ctx *ctx, uint32_t domid)
+int libxl_device_console_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_console *console)
 {
-    return ERROR_NI;
+    flexarray_t *front;
+    flexarray_t *back;
+    unsigned int boffset = 0;
+    unsigned int foffset = 0;
+    libxl_device device;
+
+    if (console->build_state) {
+        xs_transaction_t t;
+        char **ents = (char **) libxl_calloc(ctx, 9, sizeof(char *));
+        ents[0] = libxl_sprintf(ctx, "console/port");
+        ents[1] = libxl_sprintf(ctx, "%"PRIu32, console->build_state->console_port);
+        ents[2] = libxl_sprintf(ctx, "console/ring-ref");
+        ents[3] = libxl_sprintf(ctx, "%lu", console->build_state->console_mfn);
+        ents[4] = libxl_sprintf(ctx, "console/limit");
+        ents[5] = libxl_sprintf(ctx, "%d", LIBXL_XENCONSOLE_LIMIT);
+        ents[6] = libxl_sprintf(ctx, "console/type");
+        if (console->constype == CONSTYPE_XENCONSOLED)
+            ents[7] = "xenconsoled";
+        else
+            ents[7] = "ioemu";
+retry_transaction:
+        t = xs_transaction_start(ctx->xsh);
+        libxl_xs_writev(ctx, t, xs_get_domain_path(ctx->xsh, console->domid), ents);
+        if (!xs_transaction_end(ctx->xsh, t, 0))
+            if (errno == EAGAIN)
+                goto retry_transaction;
+    }
+
+    front = flexarray_make(16, 1);
+    if (!front)
+        return ERROR_NOMEM;
+    back = flexarray_make(16, 1);
+    if (!back)
+        return ERROR_NOMEM;
+
+    device.backend_devid = console->devid;
+    device.backend_domid = console->backend_domid;
+    device.backend_kind = DEVICE_CONSOLE;
+    device.devid = console->devid;
+    device.domid = console->domid;
+    device.kind = DEVICE_CONSOLE;
+
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, "frontend-id"));
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", console->domid));
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, "online"));
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, "1"));
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, "state"));
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", 1));
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, "domain"));
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%s", libxl_domid_to_name(ctx, domid)));
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, "protocol"));
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, LIBXL_XENCONSOLE_PROTOCOL));
+
+    flexarray_set(front, foffset++, libxl_sprintf(ctx, "backend-id"));
+    flexarray_set(front, foffset++, libxl_sprintf(ctx, "%d", console->backend_domid));
+    flexarray_set(front, foffset++, libxl_sprintf(ctx, "state"));
+    flexarray_set(front, foffset++, libxl_sprintf(ctx, "%d", 1));
+    flexarray_set(front, foffset++, libxl_sprintf(ctx, "limit"));
+    flexarray_set(front, foffset++, libxl_sprintf(ctx, "%d", LIBXL_XENCONSOLE_LIMIT));
+    flexarray_set(front, foffset++, libxl_sprintf(ctx, "protocol"));
+    flexarray_set(front, foffset++, libxl_sprintf(ctx, LIBXL_XENCONSOLE_PROTOCOL));
+    flexarray_set(front, foffset++, libxl_sprintf(ctx, "type"));
+    if (console->constype == CONSTYPE_XENCONSOLED)
+        flexarray_set(front, foffset++, libxl_sprintf(ctx, "xenconsoled"));
+    else
+        flexarray_set(front, foffset++, libxl_sprintf(ctx, "ioemu"));
+
+    libxl_device_generic_add(ctx, &device,
+                             libxl_xs_kvs_of_flexarray(ctx, back, boffset),
+                             libxl_xs_kvs_of_flexarray(ctx, front, foffset));
+
+
+    return 0;
+}
+
+/******************************************************************************/
+int libxl_device_vkb_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_vkb *vkb)
+{
+    flexarray_t *front;
+    flexarray_t *back;
+    unsigned int boffset = 0;
+    unsigned int foffset = 0;
+    libxl_device device;
+
+    front = flexarray_make(16, 1);
+    if (!front)
+        return ERROR_NOMEM;
+    back = flexarray_make(16, 1);
+    if (!back)
+        return ERROR_NOMEM;
+
+    device.backend_devid = vkb->devid;
+    device.backend_domid = vkb->backend_domid;
+    device.backend_kind = DEVICE_VKBD;
+    device.devid = vkb->devid;
+    device.domid = vkb->domid;
+    device.kind = DEVICE_VKBD;
+
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, "frontend-id"));
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", vkb->domid));
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, "online"));
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, "1"));
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, "state"));
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", 1));
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, "domain"));
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%s", libxl_domid_to_name(ctx, domid)));
+
+    flexarray_set(front, foffset++, libxl_sprintf(ctx, "backend-id"));
+    flexarray_set(front, foffset++, libxl_sprintf(ctx, "%d", vkb->backend_domid));
+    flexarray_set(front, foffset++, libxl_sprintf(ctx, "state"));
+    flexarray_set(front, foffset++, libxl_sprintf(ctx, "%d", 1));
+
+    libxl_device_generic_add(ctx, &device,
+                             libxl_xs_kvs_of_flexarray(ctx, back, boffset),
+                             libxl_xs_kvs_of_flexarray(ctx, front, foffset));
+
+    return 0;
 }
 
 int libxl_device_vkb_clean_shutdown(struct libxl_ctx *ctx, uint32_t domid)
@@ -732,9 +862,119 @@ int libxl_device_vkb_hard_shutdown(struct libxl_ctx *ctx, uint32_t domid)
 }
 
 /******************************************************************************/
-int libxl_device_vfb_add(struct libxl_ctx *ctx, uint32_t domid)
+static int libxl_build_xenpv_qemu_args(struct libxl_ctx *ctx,
+                                       libxl_device_vfb *vfb,
+                                       int num_console,
+                                       libxl_device_console *console,
+                                       libxl_device_model_info *info) {
+    int i = 0, j = 0, num = 0;
+    memset(info, 0x00, sizeof(libxl_device_model_info));
+
+    info->vnc = vfb->vnc;
+    if (vfb->vnclisten)
+        info->vnclisten = libxl_sprintf(ctx, "%s", vfb->vnclisten);
+    info->vncdisplay = vfb->vncdisplay;
+    info->vncunused = vfb->vncunused;
+    if (vfb->keymap)
+        info->keymap = libxl_sprintf(ctx, "%s", vfb->keymap);
+    info->sdl = vfb->sdl;
+    info->opengl = vfb->opengl;
+    for (i = 0; i < num_console; i++) {
+        if (console->constype == CONSTYPE_IOEMU)
+            num++;
+    }
+    if (num > 0) {
+        info->serial = "pty";
+        num--;
+    }
+    if (num > 0) {
+        info->extra = (char **) libxl_calloc(ctx, num * 2 + 1, sizeof(char *));
+        for (j = 0; j < num * 2; j = j + 2) {
+            info->extra[j] = "-serial";
+            info->extra[j + 1] = "pty";
+        }
+        info->extra[j] = NULL;
+    }
+    info->domid = vfb->domid;
+    info->dom_name = libxl_domid_to_name(ctx, vfb->domid);
+    info->device_model = "/usr/lib/xen/bin/qemu-dm";
+    info->type = XENPV;
+    return 0;
+}
+
+int libxl_create_xenpv_qemu(struct libxl_ctx *ctx, libxl_device_vfb *vfb,
+                            int num_console, libxl_device_console *console)
 {
-    return ERROR_NI;
+    libxl_device_model_info info;
+
+    libxl_build_xenpv_qemu_args(ctx, vfb, num_console, console, &info);
+    libxl_create_device_model(ctx, &info, NULL, 0);
+    return 0;
+}
+
+int libxl_device_vfb_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb)
+{
+    flexarray_t *front;
+    flexarray_t *back;
+    unsigned int boffset = 0;
+    unsigned int foffset = 0;
+    libxl_device device;
+
+    front = flexarray_make(16, 1);
+    if (!front)
+        return ERROR_NOMEM;
+    back = flexarray_make(16, 1);
+    if (!back)
+        return ERROR_NOMEM;
+
+    device.backend_devid = vfb->devid;
+    device.backend_domid = vfb->backend_domid;
+    device.backend_kind = DEVICE_VFB;
+    device.devid = vfb->devid;
+    device.domid = vfb->domid;
+    device.kind = DEVICE_VFB;
+
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, "frontend-id"));
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", vfb->domid));
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, "online"));
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, "1"));
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, "state"));
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", 1));
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, "domain"));
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%s", libxl_domid_to_name(ctx, domid)));
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, "vnc"));
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", vfb->vnc));
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, "vnclisten"));
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%s", vfb->vnclisten));
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, "vncdisplay"));
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", vfb->vncdisplay));
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, "vncunused"));
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", vfb->vncunused));
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, "sdl"));
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", vfb->sdl));
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, "opengl"));
+    flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", vfb->opengl));
+    if (vfb->xauthority) {
+        flexarray_set(back, boffset++, libxl_sprintf(ctx, "xauthority"));
+        flexarray_set(back, boffset++, libxl_sprintf(ctx, "%s", vfb->xauthority));
+    }
+    if (vfb->display) {
+        flexarray_set(back, boffset++, libxl_sprintf(ctx, "display"));
+        flexarray_set(back, boffset++, libxl_sprintf(ctx, "%s", vfb->display));
+    }
+
+    flexarray_set(front, foffset++, libxl_sprintf(ctx, "backend-id"));
+    flexarray_set(front, foffset++, libxl_sprintf(ctx, "%d", vfb->backend_domid));
+    flexarray_set(front, foffset++, libxl_sprintf(ctx, "state"));
+    flexarray_set(front, foffset++, libxl_sprintf(ctx, "%d", 1));
+
+    libxl_device_generic_add(ctx, &device,
+                             libxl_xs_kvs_of_flexarray(ctx, back, boffset),
+                             libxl_xs_kvs_of_flexarray(ctx, front, foffset));
+    flexarray_free(front);
+    flexarray_free(back);
+
+    return 0;
 }
 
 int libxl_device_vfb_clean_shutdown(struct libxl_ctx *ctx, uint32_t domid)

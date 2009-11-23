@@ -76,19 +76,28 @@ typedef struct {
         struct {
             const char *cmdline;
             const char *ramdisk;
+            const char *features;
         } pv;
     } u;
 } libxl_domain_build_info;
+
+typedef struct libxl_domain_build_state_ libxl_domain_build_state;
 
 typedef struct {
     int flags;
     int (*suspend_callback)(void *, int);
 } libxl_domain_suspend_info;
 
+typedef enum {
+    XENFV,
+    XENPV,
+} libxl_qemu_machine_type;
+
 typedef struct {
     int domid;
     char *dom_name;
     char *device_model;
+    libxl_qemu_machine_type type;
     int videoram; /* size of the videoram in MB */
     bool stdvga; /* stdvga enabled or disabled */
     bool vnc; /* vnc enabled or disabled */
@@ -107,6 +116,40 @@ typedef struct {
     char **extra; /* extra parameters pass directly to qemu, NULL terminated */
     /* Network is missing */
 } libxl_device_model_info;
+
+typedef struct {
+    uint32_t backend_domid;
+    uint32_t domid;
+    int devid;
+    bool vnc; /* vnc enabled or disabled */
+    char *vnclisten; /* address:port that should be listened on for the VNC server if vnc is set */
+    int vncdisplay; /* set VNC display number */
+    bool vncunused; /* try to find an unused port for the VNC server */
+    char *keymap; /* set keyboard layout, default is en-us keyboard */
+    bool sdl; /* sdl enabled or disabled */
+    bool opengl; /* opengl enabled or disabled (if enabled requires sdl enabled) */
+    char *display;
+    char *xauthority;
+} libxl_device_vfb;
+
+typedef struct {
+    uint32_t backend_domid;
+    uint32_t domid;
+    int devid;
+} libxl_device_vkb;
+
+typedef enum {
+    CONSTYPE_XENCONSOLED,
+    CONSTYPE_IOEMU,
+} libxl_console_constype;
+
+typedef struct {
+    uint32_t backend_domid;
+    uint32_t domid;
+    int devid;
+    libxl_console_constype constype;
+    libxl_domain_build_state *build_state;
+} libxl_device_console;
 
 typedef enum {
     PHYSTYPE_QCOW,
@@ -179,7 +222,7 @@ int libxl_ctx_set_log(struct libxl_ctx *ctx, libxl_log_callback log_callback, vo
 
 /* domain related functions */
 int libxl_domain_make(struct libxl_ctx *ctx, libxl_domain_create_info *info, uint32_t *domid);
-int libxl_domain_build(struct libxl_ctx *ctx, libxl_domain_build_info *info, uint32_t domid);
+libxl_domain_build_state *libxl_domain_build(struct libxl_ctx *ctx, libxl_domain_build_info *info, uint32_t domid);
 int libxl_domain_restore(struct libxl_ctx *ctx, libxl_domain_build_info *info,
                           uint32_t domid, int fd);
 int libxl_domain_suspend(struct libxl_ctx *ctx, libxl_domain_suspend_info *info,
@@ -196,6 +239,8 @@ xc_dominfo_t * libxl_domain_infolist(struct libxl_ctx *ctx, int *nb_domain);
 int libxl_create_device_model(struct libxl_ctx *ctx,
                               libxl_device_model_info *info,
                               libxl_device_nic *vifs, int num_vifs);
+int libxl_create_xenpv_qemu(struct libxl_ctx *ctx, libxl_device_vfb *vfb,
+                            int num_console, libxl_device_console *console);
 
 int libxl_device_disk_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk);
 int libxl_device_disk_clean_shutdown(struct libxl_ctx *ctx, uint32_t domid);
@@ -205,11 +250,13 @@ int libxl_device_nic_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_nic
 int libxl_device_nic_clean_shutdown(struct libxl_ctx *ctx, uint32_t domid);
 int libxl_device_nic_hard_shutdown(struct libxl_ctx *ctx, uint32_t domid);
 
-int libxl_device_vkb_add(struct libxl_ctx *ctx, uint32_t domid);
+int libxl_device_console_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_console *console);
+
+int libxl_device_vkb_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_vkb *vkb);
 int libxl_device_vkb_clean_shutdown(struct libxl_ctx *ctx, uint32_t domid);
 int libxl_device_vkb_hard_shutdown(struct libxl_ctx *ctx, uint32_t domid);
 
-int libxl_device_vfb_add(struct libxl_ctx *ctx, uint32_t domid);
+int libxl_device_vfb_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb);
 int libxl_device_vfb_clean_shutdown(struct libxl_ctx *ctx, uint32_t domid);
 int libxl_device_vfb_hard_shutdown(struct libxl_ctx *ctx, uint32_t domid);
 

@@ -19,6 +19,9 @@
 #include "libxl.h"
 #include "libxl_internal.h"
 #include <sys/time.h> /* for struct timeval */
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 char *string_of_kinds[] = {
     [DEVICE_VIF] = "vif",
@@ -27,6 +30,7 @@ char *string_of_kinds[] = {
     [DEVICE_PCI] = "pci",
     [DEVICE_VFB] = "vfb",
     [DEVICE_VKBD] = "vkbd",
+    [DEVICE_CONSOLE] = "console",
 };
 
 int libxl_device_generic_add(struct libxl_ctx *ctx, libxl_device *device,
@@ -118,7 +122,17 @@ char *device_disk_backend_type_of_phystype(libxl_disk_phystype phystype)
     }
 }
 
-int device_disk_major_minor(char *virtpath, int *major, int *minor)
+int device_physdisk_major_minor(char *physpath, int *major, int *minor)
+{
+    struct stat buf;
+    if (stat(physpath, &buf) < 0)
+        return -1;
+    *major = major(buf.st_rdev);
+    *minor = minor(buf.st_rdev);
+    return 0;
+}
+
+int device_virtdisk_major_minor(char *virtpath, int *major, int *minor)
 {
     if (strstr(virtpath, "sd") == virtpath) {
         return -1;
@@ -146,9 +160,14 @@ int device_disk_dev_number(char *virtpath)
     int majors_table[] = { 3, 22, 33, 34, 56, 57, 88, 89, 90, 91 };
     int major, minor;
 
-    if (device_disk_major_minor(virtpath, &major, &minor))
-        return -1;
-    return majors_table[major / 2] * 256 + (64 * (major % 2)) + minor;
+    if (strstr(virtpath, "hd") == virtpath) {
+        if (device_virtdisk_major_minor(virtpath, &major, &minor))
+            return -1;
+        return majors_table[major / 2] * 256 + (64 * (major % 2)) + minor;
+    } else if (strstr(virtpath, "xvd") == virtpath) {
+        return (202 << 8) + ((virtpath[3] - 'a') << 4) + (virtpath[4] ? (virtpath[4] - '0') : 0);
+    }
+    return -1;
 }
 
 int libxl_device_destroy(struct libxl_ctx *ctx, char *be_path, int force)
