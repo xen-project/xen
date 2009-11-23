@@ -78,7 +78,7 @@ class GrubDiskPart(object):
         self._part = int(val)
     part = property(get_part, set_part)
 
-class GrubImage(object):
+class _GrubImage(object):
     def __init__(self, lines):
         self.reset(lines)
 
@@ -89,30 +89,14 @@ class GrubImage(object):
                 "  args: %s\n"
                 "  initrd: %s\n" %(self.title, self.root, self.kernel,
                                    self.args, self.initrd))
+    def _parse(self, lines):
+        map(self.set_from_line, lines)
 
     def reset(self, lines):
         self._root = self._initrd = self._kernel = self._args = None
         self.title = ""
         self.lines = []
-        map(self.set_from_line, lines)
-
-    def set_from_line(self, line, replace = None):
-        (com, arg) = grub_exact_split(line, 2)
-
-        if self.commands.has_key(com):
-            if self.commands[com] is not None:
-                setattr(self, self.commands[com], arg.strip())
-            else:
-                logging.info("Ignored image directive %s" %(com,))
-        else:
-            logging.warning("Unknown image directive %s" %(com,))
-
-        # now put the line in the list of lines
-        if replace is None:
-            self.lines.append(line)
-        else:
-            self.lines.pop(replace)
-            self.lines.insert(replace, line)
+        self._parse(lines)
 
     def set_root(self, val):
         self._root = GrubDiskPart(val)
@@ -141,6 +125,28 @@ class GrubImage(object):
         return self._initrd
     initrd = property(get_initrd, set_initrd)
 
+class GrubImage(_GrubImage):
+    def __init__(self, lines):
+        _GrubImage.__init__(self, lines)
+    
+    def set_from_line(self, line, replace = None):
+        (com, arg) = grub_exact_split(line, 2)
+
+        if self.commands.has_key(com):
+            if self.commands[com] is not None:
+                setattr(self, self.commands[com], arg.strip())
+            else:
+                logging.info("Ignored image directive %s" %(com,))
+        else:
+            logging.warning("Unknown image directive %s" %(com,))
+
+        # now put the line in the list of lines
+        if replace is None:
+            self.lines.append(line)
+        else:
+            self.lines.pop(replace)
+            self.lines.insert(replace, line)
+
     # set up command handlers
     commands = { "title": "title",
                  "root": "root",
@@ -149,9 +155,8 @@ class GrubImage(object):
                  "initrd": "initrd",
                  "chainloader": None,
                  "module": None}
-        
 
-class GrubConfigFile(object):
+class _GrubConfigFile(object):
     def __init__(self, fn = None):
         self.filename = fn
         self.images = []
@@ -164,50 +169,7 @@ class GrubConfigFile(object):
             self.parse()
 
     def parse(self, buf = None):
-        if buf is None:
-            if self.filename is None:
-                raise ValueError, "No config file defined to parse!"
-
-            f = open(self.filename, 'r')
-            lines = f.readlines()
-            f.close()
-        else:
-            lines = buf.split("\n")
-
-        img = []
-        for l in lines:
-            l = l.strip()
-            # skip blank lines
-            if len(l) == 0:
-                continue
-            # skip comments
-            if l.startswith('#'):
-                continue
-            # new image
-            if l.startswith("title"):
-                if len(img) > 0:
-                    self.add_image(GrubImage(img))
-                img = [l]
-                continue
-                
-            if len(img) > 0:
-                img.append(l)
-                continue
-
-            (com, arg) = grub_exact_split(l, 2)
-            if self.commands.has_key(com):
-                if self.commands[com] is not None:
-                    setattr(self, self.commands[com], arg.strip())
-                else:
-                    logging.info("Ignored directive %s" %(com,))
-            else:
-                logging.warning("Unknown directive %s" %(com,))
-                
-        if len(img) > 0:
-            self.add_image(GrubImage(img))
-
-        if self.hasPassword():
-            self.setPasswordAccess(False)
+        raise RuntimeError, "unimplemented parse function"   
 
     def hasPasswordAccess(self):
         return self.passwordAccess
@@ -285,7 +247,56 @@ class GrubConfigFile(object):
         commands[c] = None
     del c
 
+class GrubConfigFile(_GrubConfigFile):
+    def __init__(self, fn = None):
+        _GrubConfigFile.__init__(self,fn)
+        
+    def parse(self, buf = None):
+        if buf is None:
+            if self.filename is None:
+                raise ValueError, "No config file defined to parse!"
 
+            f = open(self.filename, 'r')
+            lines = f.readlines()
+            f.close()
+        else:
+            lines = buf.split("\n")
+
+        img = []
+        for l in lines:
+            l = l.strip()
+            # skip blank lines
+            if len(l) == 0:
+                continue
+            # skip comments
+            if l.startswith('#'):
+                continue
+            # new image
+            if l.startswith("title"):
+                if len(img) > 0:
+                    self.add_image(GrubImage(img))
+                img = [l]
+                continue
+                
+            if len(img) > 0:
+                img.append(l)
+                continue
+
+            (com, arg) = grub_exact_split(l, 2)
+            if self.commands.has_key(com):
+                if self.commands[com] is not None:
+                    setattr(self, self.commands[com], arg.strip())
+                else:
+                    logging.info("Ignored directive %s" %(com,))
+            else:
+                logging.warning("Unknown directive %s" %(com,))
+                
+        if len(img) > 0:
+            self.add_image(GrubImage(img))
+
+        if self.hasPassword():
+            self.setPasswordAccess(False)
+    
 if __name__ == "__main__":
     if sys.argv < 2:
         raise RuntimeError, "Need a grub.conf to read"

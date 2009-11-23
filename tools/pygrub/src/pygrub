@@ -371,17 +371,17 @@ class Grub:
             raise RuntimeError, "Unable to access %s" %(fn,)
 
         if platform.machine() == 'ia64':
-            self.cf = grub.LiloConf.LiloConfigFile()
-            # common distributions
-            file_list = ("/efi/debian/elilo.conf", "/efi/gentoo/elilo.conf", 
-                         "/efi/redflag/elilo.conf", "/efi/redhat/elilo.conf", 
-                         "/efi/SuSE/elilo.conf",)
-            # fallbacks
-            file_list += ("/efi/boot/elilo.conf", "/elilo.conf",)
+            cfg_list = map(lambda x: (x,grub.LiloConf.LiloConfigFile), 
+                           # common distributions
+                           ["/efi/debian/elilo.conf", "/efi/gentoo/elilo.conf", 
+                            "/efi/redflag/elilo.conf", "/efi/redhat/elilo.conf", 
+                            "/efi/SuSE/elilo.conf",] + 
+                           # fallbacks
+                           ["/efi/boot/elilo.conf", "/elilo.conf",])
         else:
-            self.cf = grub.GrubConf.GrubConfigFile()
-            file_list = ("/boot/grub/menu.lst", "/boot/grub/grub.conf",
-                         "/grub/menu.lst", "/grub/grub.conf")
+            cfg_list = map(lambda x: (x,grub.GrubConf.GrubConfigFile),
+                           ["/boot/grub/menu.lst", "/boot/grub/grub.conf",
+                            "/grub/menu.lst", "/grub/grub.conf"])
 
         if not fs:
             # set the config file and parse it
@@ -389,8 +389,10 @@ class Grub:
             self.cf.parse()
             return
 
-        for f in file_list:
+        for f,parser in cfg_list:
             if fs.file_exists(f):
+                print >>sys.stderr, "Using %s to parse %s" % (parser,f)
+                self.cf = parser()
                 self.cf.filename = f
                 break
         if self.cf.filename is None:
