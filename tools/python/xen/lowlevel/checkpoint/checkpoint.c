@@ -72,7 +72,8 @@ static PyObject* pycheckpoint_open(PyObject* obj, PyObject* args)
     return NULL;
   }
 
-  Py_RETURN_NONE;
+  Py_INCREF(Py_None);
+  return Py_None;
 }
 
 static PyObject* pycheckpoint_close(PyObject* obj, PyObject* args)
@@ -88,7 +89,8 @@ static PyObject* pycheckpoint_close(PyObject* obj, PyObject* args)
   Py_XDECREF(self->checkpoint_cb);
   self->checkpoint_cb = NULL;
 
-  Py_RETURN_NONE;
+  Py_INCREF(Py_None);
+  return Py_None;
 }
 
 static PyObject* pycheckpoint_start(PyObject* obj, PyObject* args) {
@@ -163,7 +165,8 @@ static PyObject* pycheckpoint_start(PyObject* obj, PyObject* args) {
     goto err;
   }
 
-  Py_RETURN_NONE;
+  Py_INCREF(Py_None);
+  return Py_None;
 
   err:
   self->suspend_cb = NULL;

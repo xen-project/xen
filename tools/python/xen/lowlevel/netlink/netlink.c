@@ -55,7 +55,8 @@ static PyObject* pyrtnl_talk(PyObject* obj, PyObject* args)
     return NULL;
   }
 
-  Py_RETURN_NONE;
+  Py_INCREF(Py_None);
+  return Py_None;
 }
 
 static PyObject* pyrtnl_wilddump_request(PyObject* obj, PyObject* args)
@@ -71,7 +72,8 @@ static PyObject* pyrtnl_wilddump_request(PyObject* obj, PyObject* args)
     return NULL;
   }
 
-  Py_RETURN_NONE;
+  Py_INCREF(Py_None);
+  return Py_None;
 }
 
 static PyObject* pyrtnl_dump_request(PyObject* obj, PyObject* args)
@@ -89,7 +91,8 @@ static PyObject* pyrtnl_dump_request(PyObject* obj, PyObject* args)
     return NULL;
   }
 
-  Py_RETURN_NONE;
+  Py_INCREF(Py_None);
+  return Py_None;
 }
 
 /* translate args to python and call python callback */
@@ -133,7 +136,8 @@ static PyObject* pyrtnl_dump_filter(PyObject* obj, PyObject* args)
   }
   Py_DECREF(filter);
 
-  Py_RETURN_NONE;
+  Py_INCREF(Py_None);
+  return Py_None;
 }
 
 static PyMethodDef PyRtnl_methods[] = {
