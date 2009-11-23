@@ -208,7 +208,7 @@ done:
             msg = xenbus_wait_for_state_change(path, &state, &dev->events);
         if (msg != NULL || state != XenbusStateConnected) {
             printk("backend not available, state=%d\n", state);
-            xenbus_unwatch_path(XBT_NIL, path);
+            xenbus_unwatch_path_token(XBT_NIL, path, path);
             goto error;
         }
 
@@ -286,7 +286,7 @@ void shutdown_blkfront(struct blkfront_dev *dev)
         err = xenbus_wait_for_state_change(path, &state, &dev->events);
 
 close:
-    xenbus_unwatch_path(XBT_NIL, path);
+    xenbus_unwatch_path_token(XBT_NIL, path, path);
 
     snprintf(path, sizeof(path), "%s/ring-ref", nodename);
     xenbus_rm(XBT_NIL, path);
