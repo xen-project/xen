@@ -148,7 +148,9 @@ int build_hvm(struct libxl_ctx *ctx, uint32_t domid,
         XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, ret, "hvm build set params failed");
         return ERROR_FAIL;
     }
+#if defined(__i386__) || defined(__x86_64__)
     xc_cpuid_apply_policy(ctx->xch, domid);
+#endif
     return 0;
 }
 
