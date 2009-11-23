@@ -258,7 +258,7 @@ class GrubConfigFile(object):
         return self._default
     def _set_default(self, val):
         if val == "saved":
-            self._default = -1
+            self._default = 0
         else:
             self._default = int(val)
 
