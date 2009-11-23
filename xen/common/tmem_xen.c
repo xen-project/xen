@@ -295,7 +295,7 @@ EXPORT tmh_client_t *tmh_client_init(void)
     if ( (tmh = xmalloc(tmh_client_t)) == NULL )
         return NULL;
     for (i = 0, shift = 12; i < 4; shift -=4, i++)
-        name[i] = ((unsigned short)domid >> shift) & 0xf;
+        name[i] = (((unsigned short)domid >> shift) & 0xf) + '0';
     name[4] = '\0';
 #ifndef __i386__
     tmh->persistent_pool = xmem_pool_create(name, tmh_persistent_pool_page_get,
@@ -316,7 +316,6 @@ EXPORT void tmh_client_destroy(tmh_client_t *tmh)
     xmem_pool_destroy(tmh->persistent_pool);
 #endif
     put_domain(tmh->domain);
-    xfree(tmh);
 }
 
 /******************  XEN-SPECIFIC HOST INITIALIZATION ********************/

@@ -943,7 +943,7 @@ static void client_free(client_t *client)
 {
     list_del(&client->client_list);
     tmh_client_destroy(client->tmh);
-    tmem_free(client,sizeof(client_t),NULL);
+    tmh_free_infra(client);
 }
 
 /* flush all data from a client and, optionally, free it */
