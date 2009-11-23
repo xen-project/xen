@@ -37,9 +37,13 @@
 #define XL_LOGGING_ENABLED
 
 #ifdef XL_LOGGING_ENABLED
-#define XL_LOG(ctx, loglevel, _f, _a...)   xl_log(ctx, loglevel, __FILE__, __LINE__, __func__, _f, ##_a)
+#define XL_LOG(ctx, loglevel, _f, _a...)   xl_log(ctx, loglevel, -1, __FILE__, __LINE__, __func__, _f, ##_a)
+#define XL_LOG_ERRNO(ctx, loglevel, _f, _a...)   xl_log(ctx, loglevel, errno, __FILE__, __LINE__, __func__, _f, ##_a)
+#define XL_LOG_ERRNOVAL(ctx, errnoval, loglevel, _f, _a...)   xl_log(ctx, loglevel, errnoval, __FILE__, __LINE__, __func__, _f, ##_a)
 #else
 #define XL_LOG(ctx, loglevel, _f, _a...)
+#define XL_LOG_ERRNO(ctx, loglevel, _f, _a...)
+#define XL_LOG_ERRNOVAL(ctx, loglevel, errnoval, _f, _a...)
 #endif
 
 #define XL_LOG_DEBUG 3
@@ -47,7 +51,8 @@
 #define XL_LOG_WARNING 1
 #define XL_LOG_ERROR 0
 
-void xl_log(struct libxl_ctx *ctx, int loglevel, const char *file, int line, const char *func, char *fmt, ...);
+void xl_logv(struct libxl_ctx *ctx, int errnoval, int loglevel, const char *file, int line, const char *func, char *fmt, va_list al);
+void xl_log(struct libxl_ctx *ctx, int errnoval, int loglevel, const char *file, int line, const char *func, char *fmt, ...);
 
 struct libxl_domain_build_state_ {
     uint32_t store_port;
@@ -97,7 +102,7 @@ int libxl_xs_writev(struct libxl_ctx *ctx, xs_transaction_t t,
                     char *dir, char **kvs);
 int libxl_xs_write(struct libxl_ctx *ctx, xs_transaction_t t,
                    char *path, char *fmt, ...);
-char *libxl_xs_get_dompath(struct libxl_ctx *ctx, uint32_t domid);
+char *libxl_xs_get_dompath(struct libxl_ctx *ctx, uint32_t domid); // logs errs
 char *libxl_xs_read(struct libxl_ctx *ctx, xs_transaction_t t, char *path);
 char **libxl_xs_directory(struct libxl_ctx *ctx, xs_transaction_t t, char *path, unsigned int *nb);
 

@@ -83,6 +83,9 @@ int build_post(struct libxl_ctx *ctx, uint32_t domid,
     ents[9] = libxl_sprintf(ctx, "%lu", state->store_mfn);
 
     dom_path = libxl_xs_get_dompath(ctx, domid);
+    if (!dom_path)
+        return ERROR_FAIL;
+
     vm_path = xs_read(ctx->xsh, XBT_NULL, libxl_sprintf(ctx, "%s/vm", dom_path), NULL);
 retry_transaction:
     t = xs_transaction_start(ctx->xsh);
@@ -107,7 +110,7 @@ int build_pv(struct libxl_ctx *ctx, uint32_t domid,
 
     dom = xc_dom_allocate(info->u.pv.cmdline, info->u.pv.features);
     if (!dom) {
-        XL_LOG(ctx, XL_LOG_ERROR, "xc_dom_allocate failed: %d", dom);
+        XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, dom, "xc_dom_allocate failed");
         return -1;
     }
     if ((ret = xc_dom_linux_build(ctx->xch, dom, domid, info->max_memkb / 1024,
@@ -115,7 +118,7 @@ int build_pv(struct libxl_ctx *ctx, uint32_t domid,
                                   state->store_port, &state->store_mfn,
                                   state->console_port, &state->console_mfn)) != 0) {
         xc_dom_release(dom);
-        XL_LOG(ctx, XL_LOG_ERROR, "xc_dom_linux_build failed: %d", ret);
+        XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, ret, "xc_dom_linux_build failed");
         return -2;
     }
     xc_dom_release(dom);
@@ -129,7 +132,7 @@ int build_hvm(struct libxl_ctx *ctx, uint32_t domid,
 
     ret = xc_hvm_build(ctx->xch, domid, info->max_memkb / 1024, info->kernel);
     if (ret) {
-        XL_LOG(ctx, XL_LOG_ERROR, "hvm building failed: %d", ret);
+        XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, ret, "hvm building failed");
         return ERROR_FAIL;
     }
     ret = hvm_build_set_params(ctx->xch, domid, info->u.hvm.apic, info->u.hvm.acpi,
@@ -137,7 +140,7 @@ int build_hvm(struct libxl_ctx *ctx, uint32_t domid,
                                info->max_vcpus,
                                state->store_port, &state->store_mfn);
     if (ret) {
-        XL_LOG(ctx, XL_LOG_ERROR, "hvm build set params failed: %d", ret);
+        XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, ret, "hvm build set params failed");
         return ERROR_FAIL;
     }
     xc_cpuid_apply_policy(ctx->xch, domid);

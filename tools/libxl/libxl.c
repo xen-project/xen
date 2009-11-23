@@ -106,14 +106,17 @@ int libxl_domain_make(struct libxl_ctx *ctx, libxl_domain_create_info *info,
 
     ret = xc_domain_create(ctx->xch, info->ssidref, handle, flags, domid);
     if (ret < 0) {
-        XL_LOG(ctx, XL_LOG_ERROR, "domain creation fail: %d", ret);
+        XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, ret, "domain creation fail");
         return ERROR_FAIL;
     }
 
     dom_path = libxl_xs_get_dompath(ctx, *domid);
+    if (!dom_path)
+        return ERROR_FAIL;
+
     vm_path = libxl_sprintf(ctx, "/vm/%s", uuid_string);
     vss_path = libxl_sprintf(ctx, "/vss/%s", uuid_string);
-    if (!dom_path || !vm_path || !vss_path) {
+    if (!vm_path || !vss_path) {
         XL_LOG(ctx, XL_LOG_ERROR, "cannot allocate create paths");
         return ERROR_FAIL;
     }
@@ -326,6 +329,9 @@ int libxl_domain_shutdown(struct libxl_ctx *ctx, uint32_t domid, int req)
         return ERROR_INVAL;
 
     dom_path = libxl_xs_get_dompath(ctx, domid);
+    if (!dom_path)
+        return ERROR_FAIL;
+
     shutdown_path = libxl_sprintf(ctx, "%s/control/shutdown", dom_path);
 
     xs_write(ctx->xsh, XBT_NULL, shutdown_path, req_table[req], strlen(req_table[req]));
@@ -347,20 +353,21 @@ static int libxl_destroy_device_model(struct libxl_ctx *ctx, uint32_t domid)
 
     pid = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "/local/domain/%d/image/device-model-pid", domid));
     if (!pid) {
-        XL_LOG(ctx, XL_LOG_ERROR, "Couldn't find device model's pid\n");
+        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "Couldn't find device model's pid");
         return -1;
     }
     xs_rm(ctx->xsh, XBT_NULL, libxl_sprintf(ctx, "/local/domain/0/device-model/%d", domid));
 
     ret = kill(atoi(pid), SIGHUP);
     if (ret < 0 && errno == ESRCH) {
-        XL_LOG(ctx, XL_LOG_DEBUG, "Device Model already exited\n");
+        XL_LOG(ctx, XL_LOG_DEBUG, "Device Model already exited");
         ret = 0;
     } else if (ret == 0) {
-        XL_LOG(ctx, XL_LOG_DEBUG, "Device Model signaled\n");
+        XL_LOG(ctx, XL_LOG_DEBUG, "Device Model signaled");
         ret = 0;
     } else {
-        XL_LOG(ctx, XL_LOG_ERROR, "kill %d returned %d errno=%d\n", atoi(pid), ret, errno);
+        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "failed to kill Device Model [%d]",
+                     atoi(pid));
     }
     return ret;
 }
@@ -369,38 +376,40 @@ int libxl_domain_destroy(struct libxl_ctx *ctx, uint32_t domid, int force)
 {
     char *dom_path, vm_path[41];
     xen_uuid_t *uuid;
+    int rc;
 
     dom_path = libxl_xs_get_dompath(ctx, domid);
-    if (!dom_path) {
-        XL_LOG(ctx, XL_LOG_ERROR, "dompath doesn't exist for %d\n", domid);
+    if (!dom_path)
         return -1;
-    }
+
     if (libxl_domid_to_uuid(ctx, &uuid, domid) < 0) {
-        XL_LOG(ctx, XL_LOG_ERROR, "failed ot get uuid for %d\n", domid);
+        XL_LOG(ctx, XL_LOG_ERROR, "failed ot get uuid for %d", domid);
         return -1;
     }
     if (libxl_device_pci_shutdown(ctx, domid) < 0)
-        XL_LOG(ctx, XL_LOG_ERROR, "pci shutdown failed for domid %d\n", domid);
+        XL_LOG(ctx, XL_LOG_ERROR, "pci shutdown failed for domid %d", domid);
     xs_write(ctx->xsh, XBT_NULL,
              libxl_sprintf(ctx, "/local/domain/0/device-model/%d/command", domid),
              "shutdown", strlen("shutdown"));
-    if (xc_domain_pause(ctx->xch, domid) < 0) {
-        XL_LOG(ctx, XL_LOG_ERROR, "xc_domain_pause failed for %d\n", domid);
+    rc = xc_domain_pause(ctx->xch, domid);
+    if (rc < 0) {
+        XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, rc, "xc_domain_pause failed for %d", domid);
         return -1;
     }
-    if (xc_domain_destroy(ctx->xch, domid) < 0) {
-        XL_LOG(ctx, XL_LOG_ERROR, "xc_domain_destroy failed for %d\n", domid);
+    rc = xc_domain_destroy(ctx->xch, domid);
+    if (rc < 0) {
+        XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, rc, "xc_domain_destroy failed for %d", domid);
         return -1;
     }
     if (libxl_devices_destroy(ctx, domid, force) < 0)
-        XL_LOG(ctx, XL_LOG_ERROR, "libxl_destroy_devices failed for %d\n", domid);
+        XL_LOG(ctx, XL_LOG_ERROR, "libxl_destroy_devices failed for %d", domid);
     if (libxl_destroy_device_model(ctx, domid) < 0)
-        XL_LOG(ctx, XL_LOG_ERROR, "libxl_destroy_device_model failed for %d\n", domid);
+        XL_LOG(ctx, XL_LOG_ERROR, "libxl_destroy_device_model failed for %d", domid);
     if (!xs_rm(ctx->xsh, XBT_NULL, dom_path))
-        XL_LOG(ctx, XL_LOG_ERROR, "xs_rm failed for %s\n", dom_path);
+        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "xs_rm failed for %s", dom_path);
     snprintf(vm_path, sizeof(vm_path), "/vm/%s", libxl_uuid_to_string(ctx, uuid));
     if (!xs_rm(ctx->xsh, XBT_NULL, vm_path))
-        XL_LOG(ctx, XL_LOG_ERROR, "xs_rm failed for %s\n", vm_path);
+        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "xs_rm failed for %s", vm_path);
     return 0;
 }
 
@@ -524,6 +533,8 @@ int libxl_create_device_model(struct libxl_ctx *ctx,
         return ERROR_FAIL;
 
     dom_path = libxl_xs_get_dompath(ctx, info->domid);
+    if (!dom_path)
+        return ERROR_FAIL;
 
     path = libxl_sprintf(ctx, "/local/domain/0/device-model/%d", info->domid);
     xs_mkdir(ctx->xsh, XBT_NULL, path);
@@ -1017,7 +1028,7 @@ static int libxl_create_pci_backend(struct libxl_ctx *ctx, uint32_t domid, libxl
     if (!back)
         return ERROR_NOMEM;
 
-    XL_LOG(ctx, XL_LOG_DEBUG, "Creating pci backend\n");
+    XL_LOG(ctx, XL_LOG_DEBUG, "Creating pci backend");
 
     /* add pci device */
     device.backend_devid = 0;
@@ -1088,7 +1099,7 @@ static int libxl_device_pci_add_xenstore(struct libxl_ctx *ctx, uint32_t domid, 
     if (!back)
         return ERROR_NOMEM;
 
-    XL_LOG(ctx, XL_LOG_DEBUG, "Adding new pci device to xenstore\n");
+    XL_LOG(ctx, XL_LOG_DEBUG, "Adding new pci device to xenstore");
     num = atoi(num_devs);
     flexarray_set(back, boffset++, libxl_sprintf(ctx, "key-%d", num));
     flexarray_set(back, boffset++, libxl_sprintf(ctx, PCI_BDF, pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func));
@@ -1140,7 +1151,7 @@ static int libxl_device_pci_remove_xenstore(struct libxl_ctx *ctx, uint32_t domi
 
     if (!is_hvm(ctx, domid)) {
         if (libxl_wait_for_backend(ctx, be_path, "4") < 0) {
-            XL_LOG(ctx, XL_LOG_DEBUG, "pci backend at %s is not ready\n");
+            XL_LOG(ctx, XL_LOG_DEBUG, "pci backend at %s is not ready");
             return -1;
         }
     }
@@ -1154,7 +1165,7 @@ static int libxl_device_pci_remove_xenstore(struct libxl_ctx *ctx, uint32_t domi
         }
     }
     if (i == num) {
-        XL_LOG(ctx, XL_LOG_ERROR, "Couldn't find the device on xenstore\n");
+        XL_LOG(ctx, XL_LOG_ERROR, "Couldn't find the device on xenstore");
         return -1;
     }
 
@@ -1196,7 +1207,7 @@ int libxl_device_pci_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_pci
         snprintf(path, sizeof(path), "/local/domain/0/device-model/%d/command", domid);
         xs_write(ctx->xsh, XBT_NULL, path, "pci-ins", strlen("pci-ins"));
         if (libxl_wait_for_device_model(ctx, domid, "pci-inserted") < 0)
-            XL_LOG(ctx, XL_LOG_ERROR, "Device Model didn't respond in time\n");
+            XL_LOG(ctx, XL_LOG_ERROR, "Device Model didn't respond in time");
         snprintf(path, sizeof(path), "/local/domain/0/device-model/%d/parameter", domid);
         vdevfn = libxl_xs_read(ctx, XBT_NULL, path);
         sscanf(vdevfn + 2, "%x", &pcidev->vdevfn);
@@ -1211,22 +1222,22 @@ int libxl_device_pci_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_pci
         int i;
 
         if (f == NULL) {
-            XL_LOG(ctx, XL_LOG_ERROR, "Couldn't open %s\n", sysfs_path);
+            XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "Couldn't open %s", sysfs_path);
             return -1;
         }
         for (i = 0; i < PROC_PCI_NUM_RESOURCES; i++) {
-            fscanf(f, "0x%x 0x%x 0x%x\n", &start, &end, &flags);
+            fscanf(f, "0x%x 0x%x 0x%x", &start, &end, &flags);
             size = end - start + 1;
             if (start) {
                 if (flags & PCI_BAR_IO) {
                     rc = xc_domain_ioport_permission(ctx->xch, domid, start, size, 1);
                     if (rc < 0)
-                        XL_LOG(ctx, XL_LOG_ERROR, "Error: xc_domain_ioport_permission error 0x%x/0x%x:  %d\n", start, size, rc);
+                        XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, rc, "Error: xc_domain_ioport_permission error 0x%x/0x%x", start, size);
                 } else {
                     rc = xc_domain_iomem_permission(ctx->xch, domid, start>>XC_PAGE_SHIFT,
                                                     (size+(XC_PAGE_SIZE-1))>>XC_PAGE_SHIFT, 1);
                     if (rc < 0)
-                        XL_LOG(ctx, XL_LOG_ERROR, "Error: xc_domain_iomem_permission error 0x%x/0x%x:  %d\n", start, size, rc);
+                        XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, rc, "Error: xc_domain_iomem_permission error 0x%x/0x%x", start, size);
                 }
             }
         }
@@ -1235,25 +1246,25 @@ int libxl_device_pci_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_pci
                                    pcidev->bus, pcidev->dev, pcidev->func);
         f = fopen(sysfs_path, "r");
         if (f == NULL) {
-            XL_LOG(ctx, XL_LOG_ERROR, "Couldn't open %s\n", sysfs_path);
+            XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "Couldn't open %s", sysfs_path);
             goto out;
         }
         fscanf(f, "%u", &irq);
         if (irq) {
             rc = xc_physdev_map_pirq(ctx->xch, domid, irq, &irq);
             if (rc < 0) {
-                XL_LOG(ctx, XL_LOG_ERROR, "Error: xc_physdev_map_pirq irq=%d: %d\n", irq, rc);
+                XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, rc, "Error: xc_physdev_map_pirq irq=%d", irq);
             }
             rc = xc_domain_irq_permission(ctx->xch, domid, irq, 1);
             if (rc < 0) {
-                XL_LOG(ctx, XL_LOG_ERROR, "Error: xc_domain_irq_permission irq=%d: %d\n", irq, rc);
+                XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, rc, "Error: xc_domain_irq_permission irq=%d", irq);
             }
         }
         fclose(f);
     }
 out:
     if ((rc = xc_assign_device(ctx->xch, domid, pcidev->value)) < 0)
-        XL_LOG(ctx, XL_LOG_ERROR, "Error: xc_assign_device error %d\n", rc);
+        XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, rc, "xc_assign_device failed");
 
     libxl_device_pci_add_xenstore(ctx, domid, pcidev);
     return 0;
@@ -1280,7 +1291,7 @@ int libxl_device_pci_remove(struct libxl_ctx *ctx, uint32_t domid, libxl_device_
         snprintf(path, sizeof(path), "/local/domain/0/device-model/%d/command", domid);
         xs_write(ctx->xsh, XBT_NULL, path, "pci-rem", strlen("pci-rem"));
         if (libxl_wait_for_device_model(ctx, domid, "pci-removed") < 0) {
-            XL_LOG(ctx, XL_LOG_ERROR, "Device Model didn't respond in time\n");
+            XL_LOG(ctx, XL_LOG_ERROR, "Device Model didn't respond in time");
             return -1;
         }
         snprintf(path, sizeof(path), "/local/domain/0/device-model/%d/state", domid);
@@ -1294,7 +1305,7 @@ int libxl_device_pci_remove(struct libxl_ctx *ctx, uint32_t domid, libxl_device_
         int i;
 
         if (f == NULL) {
-            XL_LOG(ctx, XL_LOG_ERROR, "Couldn't open %s\n", sysfs_path);
+            XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "Couldn't open %s", sysfs_path);
             goto skip1;
         }
         for (i = 0; i < PROC_PCI_NUM_RESOURCES; i++) {
@@ -1304,12 +1315,12 @@ int libxl_device_pci_remove(struct libxl_ctx *ctx, uint32_t domid, libxl_device_
                 if (flags & PCI_BAR_IO) {
                     rc = xc_domain_ioport_permission(ctx->xch, domid, start, size, 0);
                     if (rc < 0)
-                        XL_LOG(ctx, XL_LOG_ERROR, "Error: xc_domain_ioport_permission error 0x%x/0x%x:  %d\n", start, size, rc);
+                        XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, rc, "xc_domain_ioport_permission error 0x%x/0x%x", start, size);
                 } else {
                     rc = xc_domain_iomem_permission(ctx->xch, domid, start>>XC_PAGE_SHIFT,
                                                     (size+(XC_PAGE_SIZE-1))>>XC_PAGE_SHIFT, 0);
                     if (rc < 0)
-                        XL_LOG(ctx, XL_LOG_ERROR, "Error: xc_domain_iomem_permission error 0x%x/0x%x:  %d\n", start, size, rc);
+                        XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, rc, "xc_domain_iomem_permission error 0x%x/0x%x", start, size);
                 }
             }
         }
@@ -1319,18 +1330,18 @@ skip1:
                                    pcidev->bus, pcidev->dev, pcidev->func);
         f = fopen(sysfs_path, "r");
         if (f == NULL) {
-            XL_LOG(ctx, XL_LOG_ERROR, "Couldn't open %s\n", sysfs_path);
+            XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "Couldn't open %s", sysfs_path);
             goto out;
         }
         fscanf(f, "%u", &irq);
         if (irq) {
             rc = xc_physdev_unmap_pirq(ctx->xch, domid, irq);
             if (rc < 0) {
-                XL_LOG(ctx, XL_LOG_ERROR, "Error: xc_physdev_map_pirq irq=%d: %d\n", irq, rc);
+                XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, rc, "xc_physdev_map_pirq irq=%d", irq);
             }
             rc = xc_domain_irq_permission(ctx->xch, domid, irq, 0);
             if (rc < 0) {
-                XL_LOG(ctx, XL_LOG_ERROR, "Error: xc_domain_irq_permission irq=%d: %d\n", irq, rc);
+                XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, rc, "xc_domain_irq_permission irq=%d", irq);
             }
         }
         fclose(f);
@@ -1341,7 +1352,7 @@ out:
     libxl_device_pci_flr(ctx, pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func);
 
     if ((rc = xc_deassign_device(ctx->xch, domid, pcidev->value)) < 0)
-        XL_LOG(ctx, XL_LOG_ERROR, "Error: xc_deassign_device error %d\n", rc);
+        XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, rc, "xc_deassign_device failed");
     return 0;
 }
 

@@ -92,7 +92,7 @@ retry_transaction:
         if (errno == EAGAIN)
             goto retry_transaction;
         else
-            XL_LOG(ctx, XL_LOG_ERROR, "xs transaction failed errno=%d\n", errno);
+            XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "xs transaction failed");
     }
     return 0;
 }
@@ -213,7 +213,7 @@ int libxl_devices_destroy(struct libxl_ctx *ctx, uint32_t domid, int force)
     path = libxl_sprintf(ctx, "/local/domain/%d/device", domid);
     l1 = libxl_xs_directory(ctx, XBT_NULL, path, &num1);
     if (!l1) {
-        XL_LOG(ctx, XL_LOG_ERROR, "%s is empty\n", path);
+        XL_LOG(ctx, XL_LOG_ERROR, "%s is empty", path);
         return -1;
     }
     for (i = 0; i < num1; i++) {
@@ -248,7 +248,7 @@ int libxl_devices_destroy(struct libxl_ctx *ctx, uint32_t domid, int force)
                     if (!state || atoi(state) == 6) {
                         xs_unwatch(ctx->xsh, l1[0], l1[1]);
                         xs_rm(ctx->xsh, XBT_NULL, l1[1]);
-                        XL_LOG(ctx, XL_LOG_DEBUG, "Destroyed device backend at %s\n", l1[1]);
+                        XL_LOG(ctx, XL_LOG_DEBUG, "Destroyed device backend at %s", l1[1]);
                         n_watches--;
                     }
                 }
@@ -267,15 +267,20 @@ int libxl_devices_destroy(struct libxl_ctx *ctx, uint32_t domid, int force)
 int libxl_device_pci_flr(struct libxl_ctx *ctx, unsigned int domain, unsigned int bus,
                          unsigned int dev, unsigned int func)
 {
+    char *do_flr= "/sys/bus/pci/drivers/pciback/do_flr";
     FILE *fd;
 
-    fd = fopen("/sys/bus/pci/drivers/pciback/do_flr", "w");
+    fd = fopen(do_flr, "w");
     if (fd != NULL) {
         fprintf(fd, PCI_BDF, domain, bus, dev, func);
         fclose(fd);
         return 0;
     }
-    XL_LOG(ctx, XL_LOG_ERROR, "Pciback doesn't support do_flr, cannot flr the device\n");
+    if (errno == ENOENT) {
+        XL_LOG(ctx, XL_LOG_ERROR, "Pciback doesn't support do_flr, cannot flr the device");
+    } else {
+        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "Failed to access pciback path %s", do_flr);
+    }
     return -1;
 }
 
@@ -303,7 +308,7 @@ int libxl_wait_for_device_model(struct libxl_ctx *ctx, uint32_t domid, char *sta
             }
         }
     }
-    XL_LOG(ctx, XL_LOG_ERROR, "Device Model not ready\n");
+    XL_LOG(ctx, XL_LOG_ERROR, "Device Model not ready");
     return -1;
 }
 
@@ -317,7 +322,13 @@ int libxl_wait_for_backend(struct libxl_ctx *ctx, char *be_path, char *state)
     while (watchdog > 0) {
         p = xs_read(ctx->xsh, XBT_NULL, path, &len);
         if (p == NULL) {
-            XL_LOG(ctx, XL_LOG_ERROR, "Backend %s does not exist\n", be_path);
+            if (errno == ENOENT) {
+                XL_LOG(ctx, XL_LOG_ERROR, "Backend %s does not exist",
+                       be_path);
+            } else {
+                XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "Failed to access backend %s",
+                       be_path);
+            }
             return -1;
         } else {
             if (!strcmp(p, state)) {
@@ -328,7 +339,7 @@ int libxl_wait_for_backend(struct libxl_ctx *ctx, char *be_path, char *state)
             }
         }
     }
-    XL_LOG(ctx, XL_LOG_ERROR, "Backend %s not ready\n", be_path);
+    XL_LOG(ctx, XL_LOG_ERROR, "Backend %s not ready", be_path);
     return -1;
 }
 

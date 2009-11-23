@@ -28,7 +28,7 @@ int libxl_exec(struct libxl_ctx *ctx, int stdinfd, int stdoutfd, int stderrfd,
 
     pid = fork();
     if (pid == -1) {
-        XL_LOG(ctx, XL_LOG_ERROR, "fork failed");
+        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "fork failed");
         return -1;
     }
     if (pid == 0) {

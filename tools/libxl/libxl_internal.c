@@ -146,14 +146,41 @@ char *libxl_dirname(struct libxl_ctx *ctx, const char *s)
     return ptr;
 }
 
-void xl_log(struct libxl_ctx *ctx, int loglevel, const char *file, int line, const char *func, char *fmt, ...)
+void xl_logv(struct libxl_ctx *ctx, int loglevel, int errnoval,
+             const char *file, int line, const char *func,
+             char *fmt, va_list ap)
+{
+    char *enomem = "[out of memory formatting log message]";
+    char *s;
+    int rc;
+
+    rc = vasprintf(&s, fmt, ap);
+    if (rc<0) { s = enomem; goto x; }
+
+    if (errnoval >= 0) {
+        char *errstr, *snew;
+        errstr = strerror(errnoval);
+        if (errstr)
+            rc = asprintf(&snew, "%s: %s", s, errstr);
+        else
+            rc = asprintf(&snew, "%s: unknown error number %d", s, errnoval);
+        free(s);
+        if (rc<0) { s = enomem; goto x; }
+        s = snew;
+    }
+
+ x:
+    ctx->log_callback(ctx->log_userdata, loglevel, file, line, func, s);
+    if (s != enomem)
+        free(s);
+}
+
+void xl_log(struct libxl_ctx *ctx, int loglevel, int errnoval,
+            const char *file, int line,
+            const char *func, char *fmt, ...)
 {
     va_list ap;
-    char *s;
     va_start(ap, fmt);
-    vasprintf(&s, fmt, ap);
+    xl_logv(ctx, loglevel, errnoval, file, line, func, fmt, ap);
     va_end(ap);
-
-    ctx->log_callback(ctx->log_userdata, loglevel, file, line, func, s);
-    free(s);
 }
