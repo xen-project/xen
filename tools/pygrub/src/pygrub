@@ -239,7 +239,7 @@ class Grub:
                 break
             if y == self.selected_image:
                 self.entry_win.attron(curses.A_REVERSE)
-            self.entry_win.addstr(y + 1 - self.start_image, 2, i.title.ljust(70))
+            self.entry_win.addstr(y + 1 - self.start_image, 2, i.title.expandtabs().ljust(70))
             if y == self.selected_image:
                 self.entry_win.attroff(curses.A_REVERSE)
         self.entry_win.noutrefresh()
@@ -271,7 +271,7 @@ class Grub:
                     self.entry_win.attron(curses.A_REVERSE)
 
                 # trim the line
-                l = img.lines[idx].ljust(70)
+                l = img.lines[idx].expandtabs().ljust(70)
                 if len(l) > 70:
                     l = l[:69] + ">"
                     
