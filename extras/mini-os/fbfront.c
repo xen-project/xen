@@ -80,6 +80,7 @@ struct kbdfront_dev *init_kbdfront(char *_nodename, int abs_pointer)
     printk("******************* KBDFRONT for %s **********\n\n\n", nodename);
 
     dev = malloc(sizeof(*dev));
+    memset(dev, 0, sizeof(*dev));
     dev->nodename = strdup(nodename);
 #ifdef HAVE_LIBC
     dev->fd = -1;
@@ -403,6 +404,7 @@ struct fbfront_dev *init_fbfront(char *_nodename, unsigned long *mfns, int width
     printk("******************* FBFRONT for %s **********\n\n\n", nodename);
 
     dev = malloc(sizeof(*dev));
+    memset(dev, 0, sizeof(*dev));
     dev->nodename = strdup(nodename);
 #ifdef HAVE_LIBC
     dev->fd = -1;
