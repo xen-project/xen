@@ -197,6 +197,30 @@ static void unmask_IO_APIC_irq (unsigned int irq)
     spin_unlock_irqrestore(&ioapic_lock, flags);
 }
 
+static void __eoi_IO_APIC_irq(unsigned int irq)
+{
+    struct irq_pin_list *entry = irq_2_pin + irq;
+    unsigned int pin, vector = IO_APIC_VECTOR(irq);
+
+    for (;;) {
+        pin = entry->pin;
+        if (pin == -1)
+            break;
+        io_apic_eoi(entry->apic, vector);
+        if (!entry->next)
+            break;
+        entry = irq_2_pin + entry->next;
+    }
+}
+
+static void eoi_IO_APIC_irq(unsigned int irq)
+{
+    unsigned long flags;
+    spin_lock_irqsave(&ioapic_lock, flags);
+    __eoi_IO_APIC_irq(irq);
+    spin_unlock_irqrestore(&ioapic_lock, flags);
+}
+
 static void clear_IO_APIC_pin(unsigned int apic, unsigned int pin)
 {
     struct IO_APIC_route_entry entry;
@@ -1464,7 +1488,8 @@ static void mask_and_ack_level_ioapic_irq (unsigned int irq)
     if ( ioapic_ack_new )
         return;
 
-    mask_IO_APIC_irq(irq);
+    if ( !directed_eoi_enabled )
+        mask_IO_APIC_irq(irq);
 
 /*
  * It appears there is an erratum which affects at least version 0x11
@@ -1511,8 +1536,14 @@ static void end_level_ioapic_irq (unsigned int irq)
 
     if ( !ioapic_ack_new )
     {
-        if ( !(irq_desc[irq].status & IRQ_DISABLED) )
+        if ( irq_desc[irq].status & IRQ_DISABLED )
+            return;
+
+        if ( directed_eoi_enabled )
+            eoi_IO_APIC_irq(irq);
+        else
             unmask_IO_APIC_irq(irq);
+
         return;
     }
 

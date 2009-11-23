@@ -23,6 +23,7 @@
 
 extern int apic_verbosity;
 extern int x2apic_enabled;
+extern int directed_eoi_enabled;
 
 extern void enable_x2apic(void);
 

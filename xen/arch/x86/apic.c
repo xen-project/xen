@@ -68,6 +68,7 @@ static int enable_local_apic __initdata = 0; /* -1=force-disable, +1=force-enabl
 int apic_verbosity;
 
 int x2apic_enabled __read_mostly = 0;
+int directed_eoi_enabled __read_mostly = 0;
 
 /*
  * The following vectors are part of the Linux architecture, there
@@ -348,6 +349,7 @@ void disable_local_APIC(void)
     }
 }
 
+extern int ioapic_ack_new;
 /*
  * This is to verify that we're looking at a real local APIC.
  * Check these against your board if the CPUs aren't getting
@@ -386,6 +388,18 @@ int __init verify_local_APIC(void)
     reg1 = get_maxlvt();
     if (reg1 < 0x02 || reg1 == 0xff)
         return 0;
+
+    /*
+     * Detecting directed EOI on BSP:
+     * If having directed EOI support in lapic, force to use ioapic_ack_old,
+     * and enable the directed EOI for intr handling.
+     */
+    if ( reg0 & APIC_LVR_DIRECTED_EOI )
+    {
+        ioapic_ack_new = 0;
+        directed_eoi_enabled = 1;
+        printk("Enabled directed EOI with ioapic_ack_old on!\n");
+    }
 
     /*
      * The ID register is read/write in a real APIC.
@@ -575,6 +589,17 @@ void __devinit setup_local_APIC(void)
      * Set spurious IRQ vector
      */
     value |= SPURIOUS_APIC_VECTOR;
+
+    /*
+     * Enable directed EOI
+     */
+    if ( directed_eoi_enabled )
+    {
+        value |= APIC_SPIV_DIRECTED_EOI;
+        apic_printk(APIC_VERBOSE, "Suppress EOI broadcast on CPU#%d\n",
+                    smp_processor_id());
+    }
+
     apic_write_around(APIC_SPIV, value);
 
     /*

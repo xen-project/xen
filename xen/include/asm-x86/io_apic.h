@@ -147,6 +147,11 @@ static inline void io_apic_write(unsigned int apic, unsigned int reg, unsigned i
 	*(IO_APIC_BASE(apic)+4) = value;
 }
 
+static inline void io_apic_eoi(unsigned int apic, unsigned int vector)
+{
+	*(IO_APIC_BASE(apic)+16) = vector;
+}
+
 /*
  * Re-write a value: to be used for read-modify-write
  * cycles where the read already set up the index register.
