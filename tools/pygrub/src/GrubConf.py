@@ -79,8 +79,9 @@ class GrubDiskPart(object):
     part = property(get_part, set_part)
 
 class _GrubImage(object):
-    def __init__(self, lines):
+    def __init__(self, title, lines):
         self.reset(lines)
+        self.title = title.strip()
 
     def __repr__(self):
         return ("title: %s\n" 
@@ -94,7 +95,6 @@ class _GrubImage(object):
 
     def reset(self, lines):
         self._root = self._initrd = self._kernel = self._args = None
-        self.title = ""
         self.lines = []
         self._parse(lines)
 
@@ -126,8 +126,8 @@ class _GrubImage(object):
     initrd = property(get_initrd, set_initrd)
 
 class GrubImage(_GrubImage):
-    def __init__(self, lines):
-        _GrubImage.__init__(self, lines)
+    def __init__(self, title, lines):
+        _GrubImage.__init__(self, title, lines)
     
     def set_from_line(self, line, replace = None):
         (com, arg) = grub_exact_split(line, 2)
@@ -148,8 +148,7 @@ class GrubImage(_GrubImage):
             self.lines.insert(replace, line)
 
     # set up command handlers
-    commands = { "title": "title",
-                 "root": "root",
+    commands = { "root": "root",
                  "rootnoverify": "root",
                  "kernel": "kernel",
                  "initrd": "initrd",
@@ -262,7 +261,8 @@ class GrubConfigFile(_GrubConfigFile):
         else:
             lines = buf.split("\n")
 
-        img = []
+        img = None
+        title = ""
         for l in lines:
             l = l.strip()
             # skip blank lines
@@ -273,12 +273,13 @@ class GrubConfigFile(_GrubConfigFile):
                 continue
             # new image
             if l.startswith("title"):
-                if len(img) > 0:
-                    self.add_image(GrubImage(img))
-                img = [l]
+                if img is not None:
+                    self.add_image(GrubImage(title, img))
+                img = []
+                title = l[6:]
                 continue
                 
-            if len(img) > 0:
+            if img is not None:
                 img.append(l)
                 continue
 
@@ -291,8 +292,8 @@ class GrubConfigFile(_GrubConfigFile):
             else:
                 logging.warning("Unknown directive %s" %(com,))
                 
-        if len(img) > 0:
-            self.add_image(GrubImage(img))
+        if img:
+            self.add_image(GrubImage(title, img))
 
         if self.hasPassword():
             self.setPasswordAccess(False)
