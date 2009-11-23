@@ -1117,8 +1117,7 @@ static inline void shadow_vram_put_l1e(shadow_l1e_t old_sl1e,
             }
             else
             {
-                ASSERT((dirty_vram->sl1ma[i] & PAGE_MASK) 
-                       == (sl1ma & PAGE_MASK));
+                ASSERT(dirty_vram->sl1ma[i] == sl1ma);
                 dirty_vram->sl1ma[i] = INVALID_PADDR;
                 if ( flags & _PAGE_DIRTY )
                     dirty = 1;
