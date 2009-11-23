@@ -349,7 +349,7 @@ int delete_suspend_timer(checkpoint_state* s)
   if (s->timer) {
     if ((rc = timer_delete(s->timer)))
       fprintf(stderr, "Error deleting timer: %s\n", strerror(errno));
-    s->timer = NULL;
+    s->timer = 0;
   }
 
   return rc;
