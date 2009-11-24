@@ -1122,7 +1122,7 @@ int mp_register_gsi (u32 gsi, int triggering, int polarity)
 	ioapic = mp_find_ioapic(gsi);
 	if (ioapic < 0) {
 		printk(KERN_WARNING "No IOAPIC for GSI %u\n", gsi);
-		return gsi;
+		return -EINVAL;
 	}
 
 	ioapic_pin = gsi - mp_ioapic_routing[ioapic].gsi_base;
@@ -1141,12 +1141,12 @@ int mp_register_gsi (u32 gsi, int triggering, int polarity)
 		printk(KERN_ERR "Invalid reference to IOAPIC pin "
 			"%d-%d\n", mp_ioapic_routing[ioapic].apic_id, 
 			ioapic_pin);
-		return gsi;
+		return -EINVAL;
 	}
 	if ((1<<bit) & mp_ioapic_routing[ioapic].pin_programmed[idx]) {
 		Dprintk(KERN_DEBUG "Pin %d-%d already programmed\n",
 			mp_ioapic_routing[ioapic].apic_id, ioapic_pin);
-		return gsi_to_irq[gsi];
+		return -EEXIST;
 	}
 
 	mp_ioapic_routing[ioapic].pin_programmed[idx] |= (1<<bit);
@@ -1180,14 +1180,13 @@ int mp_register_gsi (u32 gsi, int triggering, int polarity)
 			gsi_to_irq[irq] = gsi;
 		} else {
 			printk(KERN_ERR "GSI %u is too high\n", gsi);
-			return gsi;
+			return -E2BIG;
 		}
 	}
 
-	io_apic_set_pci_routing(ioapic, ioapic_pin, gsi,
+	return io_apic_set_pci_routing(ioapic, ioapic_pin, gsi,
 		    triggering == ACPI_EDGE_SENSITIVE ? 0 : 1,
 		    polarity == ACPI_ACTIVE_HIGH ? 0 : 1);
-	return gsi;
 }
 
 #endif /* CONFIG_X86_IO_APIC */

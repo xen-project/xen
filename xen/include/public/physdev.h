@@ -227,6 +227,19 @@ struct physdev_op {
 typedef struct physdev_op physdev_op_t;
 DEFINE_XEN_GUEST_HANDLE(physdev_op_t);
 
+#define PHYSDEVOP_setup_gsi    21
+struct physdev_setup_gsi {
+    int gsi;
+    /* IN */
+    uint8_t triggering;
+    /* IN */
+    uint8_t polarity;
+    /* IN */
+};
+
+typedef struct physdev_setup_gsi physdev_setup_gsi_t;
+DEFINE_XEN_GUEST_HANDLE(physdev_setup_gsi_t);
+
 /*
  * Notify that some PIRQ-bound event channels have been unmasked.
  * ** This command is obsolete since interface version 0x00030202 and is **

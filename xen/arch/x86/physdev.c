@@ -62,13 +62,18 @@ static int physdev_map_pirq(struct physdev_map_pirq *map)
                 ret = -EINVAL;
                 goto free_domain;
             }
+
             irq = domain_pirq_to_irq(current->domain, map->index);
             if ( !irq )
             {
-                dprintk(XENLOG_G_ERR, "dom%d: map pirq with incorrect irq!\n",
-                        d->domain_id);
-                ret = -EINVAL;
-                goto free_domain;
+                if ( IS_PRIV(current->domain) )
+                    irq = map->index;
+                else {
+                    dprintk(XENLOG_G_ERR, "dom%d: map pirq with incorrect irq!\n",
+                            d->domain_id);
+                    ret = -EINVAL;
+                    goto free_domain;
+                }
             }
             break;
 
@@ -456,6 +461,28 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         ret = pdev ? pci_restore_msi_state(pdev) : -ENODEV;
         spin_unlock(&pcidevs_lock);
         break;
+    }
+    case PHYSDEVOP_setup_gsi: {
+        struct physdev_setup_gsi setup_gsi;
+
+        ret = -EPERM;
+        if ( !IS_PRIV(v->domain) )
+            break;
+
+        ret = -EFAULT;
+        if ( copy_from_guest(&setup_gsi, arg, 1) != 0 )
+            break;
+        
+        ret = -EINVAL;
+        if ( setup_gsi.gsi < 0 || setup_gsi.gsi >= nr_irqs_gsi )
+            break;
+        /* GSI < 16 has been setup by hypervisor */
+        if ( setup_gsi.gsi >= 16 )
+            ret = mp_register_gsi(setup_gsi.gsi, setup_gsi.triggering,
+                            setup_gsi.polarity);
+        else 
+            ret = -EEXIST;
+        break; 
     }
     default:
         ret = -ENOSYS;
