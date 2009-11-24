@@ -149,6 +149,7 @@ typedef struct share_list sharelist_t;
 struct tm_pool {
     bool_t shared;
     bool_t persistent;
+    bool_t is_dying;
     int pageshift; /* 0 == 2**12 */
     struct list_head pool_list; /* FIXME do we need this anymore? */
     client_t *client;
@@ -724,6 +725,7 @@ static void pool_destroy_objs(pool_t *pool, bool_t selective, cli_id_t cli_id)
     int i;
 
     tmem_write_lock(&pool->pool_rwlock);
+    pool->is_dying = 1;
     for (i = 0; i < OBJ_HASH_BUCKETS; i++)
     {
         node = rb_first(&pool->obj_rb_root[i]);
@@ -734,7 +736,8 @@ static void pool_destroy_objs(pool_t *pool, bool_t selective, cli_id_t cli_id)
             node = rb_next(node);
             ASSERT(obj->no_evict == 0);
             if ( !selective )
-                obj_destroy(obj,1);
+                /* FIXME: should be obj,1 but walking/erasing rbtree is racy */
+                obj_destroy(obj,0);
             else if ( obj->last_client == cli_id )
                 obj_destroy(obj,0);
             else
@@ -770,6 +773,7 @@ static pool_t * pool_alloc(void)
     pool->found_gets = pool->gets = 0;
     pool->flushs_found = pool->flushs = 0;
     pool->flush_objs_found = pool->flush_objs = 0;
+    pool->is_dying = 0;
     SET_SENTINEL(pool,POOL);
     return pool;
 }
@@ -1001,6 +1005,8 @@ static int tmem_evict(void)
         {
             obj = pgp->obj;
             pool = obj->pool;
+            if ( pool->is_dying )
+                continue;
             if ( tmh_lock_all && !obj->no_evict )
                 goto found;
             if ( tmem_spin_trylock(&obj->obj_spinlock) )
@@ -1022,6 +1028,8 @@ static int tmem_evict(void)
         {
             obj = pgp->obj;
             pool = obj->pool;
+            if ( pool->is_dying )
+                continue;
             if ( tmh_lock_all && !obj->no_evict )
                 goto found;
             if ( tmem_spin_trylock(&obj->obj_spinlock) )
