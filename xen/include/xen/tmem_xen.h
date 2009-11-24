@@ -229,7 +229,7 @@ static inline struct page_info *tmh_alloc_page(void *pool, int no_heap)
     if ( pi == NULL && !no_heap )
         pi = alloc_domheap_pages(0,0,MEMF_tmem);
     ASSERT((pi == NULL) || IS_VALID_PAGE(pi));
-    if ( pi != NULL )
+    if ( pi != NULL && !no_heap )
         atomic_inc(&freeable_page_count);
     return pi;
 }
