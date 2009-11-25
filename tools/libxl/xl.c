@@ -25,7 +25,10 @@
 #include <sys/time.h> /* for time */
 #include <getopt.h>
 #include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include <sys/socket.h>
+#include <sys/select.h>
 #include <arpa/inet.h>
 #include <xenctrl.h>
 
@@ -584,13 +587,17 @@ static void create_domain(int debug, const char *filename)
     libxl_device_vkb *vkbs = NULL;
     libxl_device_console console;
     int num_disks = 0, num_vifs = 0, num_pcidevs = 0, num_vfbs = 0, num_vkbs = 0;
-    int i;
+    int i, fd;
+    int need_daemon = 1;
     libxl_device_model_starting *dm_starting = 0;
 
     printf("Parsing config file %s\n", filename);
     parse_config_file(filename, &info1, &info2, &disks, &num_disks, &vifs, &num_vifs, &pcidevs, &num_pcidevs, &vfbs, &num_vfbs, &vkbs, &num_vkbs, &dm_info);
     if (debug)
         printf_info(&info1, &info2, disks, num_disks, vifs, num_vifs, pcidevs, num_pcidevs, vfbs, num_vfbs, vkbs, num_vkbs, &dm_info);
+
+start:
+    domid = 0;
 
     libxl_ctx_init(&ctx);
     libxl_ctx_set_log(&ctx, log_callback, NULL);
@@ -631,6 +638,36 @@ static void create_domain(int debug, const char *filename)
         libxl_device_pci_add(&ctx, domid, &pcidevs[i]);
 
     libxl_domain_unpause(&ctx, domid);
+
+    if (need_daemon) {
+        daemon(0, 0);
+        need_daemon = 0;
+    }
+    
+    libxl_wait_for_domain_death(&ctx, domid, &fd);
+    while (1) {
+        int ret;
+        fd_set rfds;
+        xc_dominfo_t info;
+        memset(&info, 0x00, sizeof(xc_dominfo_t));
+
+        FD_ZERO(&rfds);
+        FD_SET(fd, &rfds);
+
+        ret = select(fd + 1, &rfds, NULL, NULL, NULL);
+        if (!ret)
+            continue;
+        if (libxl_is_domain_dead(&ctx, domid, &info)) {
+            if (info.crashed || info.dying || (info.shutdown && (info.shutdown_reason != SHUTDOWN_suspend))) {
+                libxl_domain_destroy(&ctx, domid, 0);
+                if (info.shutdown && (info.shutdown_reason == SHUTDOWN_reboot)) {
+                    libxl_ctx_free(&ctx);
+                    goto start;
+                }
+            }
+            exit(0);
+        }
+    }
 
     for (i = 0; i < num_vifs; i++) {
         free(vifs[i].smac);

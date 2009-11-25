@@ -227,6 +227,7 @@ typedef struct  {
 /* context functions */
 int libxl_ctx_init(struct libxl_ctx *ctx);
 int libxl_ctx_free(struct libxl_ctx *ctx);
+int libxl_ctx_close(struct libxl_ctx *ctx);
 int libxl_ctx_set_log(struct libxl_ctx *ctx, libxl_log_callback log_callback, void *log_data);
 
 /* domain related functions */
@@ -238,6 +239,9 @@ int libxl_domain_suspend(struct libxl_ctx *ctx, libxl_domain_suspend_info *info,
                           uint32_t domid, int fd);
 int libxl_domain_shutdown(struct libxl_ctx *ctx, uint32_t domid, int req);
 int libxl_domain_destroy(struct libxl_ctx *ctx, uint32_t domid, int force);
+
+int libxl_wait_for_domain_death(struct libxl_ctx *ctx, uint32_t domid, int *fd);
+int libxl_is_domain_dead(struct libxl_ctx *ctx, uint32_t domid, xc_dominfo_t *info);
 
 int libxl_domain_pause(struct libxl_ctx *ctx, uint32_t domid);
 int libxl_domain_unpause(struct libxl_ctx *ctx, uint32_t domid);

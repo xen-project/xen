@@ -54,9 +54,18 @@ int libxl_ctx_free(struct libxl_ctx *ctx)
 {
     libxl_free_all(ctx);
     free(ctx->alloc_ptrs);
-    ctx->alloc_ptrs = NULL;
+    ctx->alloc_ptrs = calloc(ctx->alloc_maxsize, sizeof(void *));
+    if (!ctx->alloc_ptrs)
+        return ERROR_NOMEM;
+    return 0;
+}
+
+int libxl_ctx_close(struct libxl_ctx *ctx)
+{
+    libxl_ctx_free(ctx);
+    free(ctx->alloc_ptrs);
     xc_interface_close(ctx->xch);
-    xs_daemon_close(ctx->xsh);
+    xs_daemon_close(ctx->xsh); 
     return 0;
 }
 
@@ -352,6 +361,46 @@ int libxl_domain_shutdown(struct libxl_ctx *ctx, uint32_t domid, int req)
     return 0;
 }
 
+int libxl_wait_for_domain_death(struct libxl_ctx *ctx, uint32_t domid, int *fd)
+{
+    if (!xs_watch(ctx->xsh, "@releaseDomain", "domain_death"))
+        return -1;
+    *fd = xs_fileno(ctx->xsh);
+    return 0;
+}
+
+int libxl_is_domain_dead(struct libxl_ctx *ctx, uint32_t domid, xc_dominfo_t *info)
+{
+    unsigned int num;
+    int nb_domain, i, rc = 0;
+    char **vec = NULL;
+    xc_dominfo_t *list = NULL;
+
+    vec = xs_read_watch(ctx->xsh, &num);
+    if (!vec)
+        return 0;
+    if (!strcmp(vec[XS_WATCH_TOKEN], "domain_death")) {
+        list = libxl_domain_infolist(ctx, &nb_domain);
+        for (i = 0; i < nb_domain; i++) {
+            if (domid == list[i].domid) {
+                if (list[i].running || (!list[i].shutdown && !list[i].crashed && !list[i].dying))
+                    goto out;
+                *info = list[i];
+                rc = 1;
+                goto out;
+            }
+        }
+        memset(info, 0x00, sizeof(xc_dominfo_t));
+        rc = 1;
+        goto out;
+    }
+
+out:
+    free(list);
+    free(vec);
+    return rc;
+}
+
 static int libxl_destroy_device_model(struct libxl_ctx *ctx, uint32_t domid)
 {
     char *pid;
@@ -409,11 +458,6 @@ int libxl_domain_destroy(struct libxl_ctx *ctx, uint32_t domid, int force)
     }
     if (libxl_destroy_device_model(ctx, domid) < 0)
         XL_LOG(ctx, XL_LOG_ERROR, "libxl_destroy_device_model failed for %d", domid);
-    rc = xc_domain_destroy(ctx->xch, domid);
-    if (rc < 0) {
-        XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, rc, "xc_domain_destroy failed for %d", domid);
-        return -1;
-    }
     if (libxl_devices_destroy(ctx, domid, force) < 0)
         XL_LOG(ctx, XL_LOG_ERROR, "libxl_destroy_devices failed for %d", domid);
     if (!xs_rm(ctx->xsh, XBT_NULL, dom_path))
@@ -421,6 +465,11 @@ int libxl_domain_destroy(struct libxl_ctx *ctx, uint32_t domid, int force)
     snprintf(vm_path, sizeof(vm_path), "/vm/%s", libxl_uuid_to_string(ctx, uuid));
     if (!xs_rm(ctx->xsh, XBT_NULL, vm_path))
         XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "xs_rm failed for %s", vm_path);
+    rc = xc_domain_destroy(ctx->xch, domid);
+    if (rc < 0) {
+        XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, rc, "xc_domain_destroy failed for %d", domid);
+        return -1;
+    }
     return 0;
 }
 
