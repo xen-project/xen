@@ -46,13 +46,6 @@ unsigned long pit0_ticks;
 static u32 wc_sec, wc_nsec; /* UTC time at last 'time update'. */
 static DEFINE_SPINLOCK(wc_lock);
 
-/* moved to <asm/domain.h>
-struct time_scale {
-    int shift;
-    u32 mul_frac;
-};
-*/
-
 struct cpu_time {
     u64 local_tsc_stamp;
     s_time_t stime_local_stamp;
@@ -1754,11 +1747,9 @@ void tsc_set_info(struct domain *d,
     switch ( d->arch.tsc_mode = tsc_mode )
     {
     case TSC_MODE_NEVER_EMULATE:
-        gdprintk(XENLOG_G_INFO, "%s: never emulating TSC\n",__func__)
         d->arch.vtsc = 0;
         break;
     case TSC_MODE_ALWAYS_EMULATE:
-        gdprintk(XENLOG_G_INFO, "%s: always emulating TSC\n",__func__)
         d->arch.vtsc = 1;
         d->arch.vtsc_offset = get_s_time() - elapsed_nsec;
         set_time_scale_identity(&d->arch.vtsc_to_ns);
@@ -1767,15 +1758,12 @@ void tsc_set_info(struct domain *d,
         d->arch.vtsc_offset = get_s_time() - elapsed_nsec;
         if ( (host_tsc_is_safe() && incarnation == 0) || !d->domain_id )
         {
-            gdprintk(XENLOG_G_INFO, "%s: using safe native TSC\n",__func__)
             /* use native TSC if initial host supports it */
             d->arch.vtsc = 0;
             d->arch.tsc_khz = gtsc_khz ? gtsc_khz : cpu_khz;
             set_time_scale(&d->arch.vtsc_to_ns, d->arch.tsc_khz * 1000 );
             set_time_scale_identity(&d->arch.ns_to_vtsc);
         } else if ( gtsc_khz != 0  && gtsc_khz != 1000000UL ) {
-            gdprintk(XENLOG_G_INFO, "%s: safe native TSC on initial host,"
-                "but now using emulation\n",__func__)
             /* was native on initial host, now emulated at initial tsc hz*/
             d->arch.vtsc = 1;
             d->arch.tsc_khz = gtsc_khz;
@@ -1783,15 +1771,12 @@ void tsc_set_info(struct domain *d,
             d->arch.ns_to_vtsc =
                 scale_reciprocal(d->arch.vtsc_to_ns);
         } else {
-            gdprintk(XENLOG_G_INFO, "%s: unsafe TSC on initial host,"
-                "using emulation\n",__func__)
             d->arch.vtsc = 1;
             set_time_scale_identity(&d->arch.vtsc_to_ns);
             set_time_scale_identity(&d->arch.ns_to_vtsc);
         }
         break;
     case TSC_MODE_PVRDTSCP:
-        gdprintk(XENLOG_G_INFO, "%s: using PVRDTSCP\n",__func__)
         if ( boot_cpu_has(X86_FEATURE_RDTSCP) && gtsc_khz != 0 ) {
             d->arch.vtsc = 0;
             set_time_scale(&d->arch.vtsc_to_ns, gtsc_khz * 1000 );
