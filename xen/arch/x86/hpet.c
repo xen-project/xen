@@ -660,6 +660,9 @@ void hpet_broadcast_exit(void)
     int cpu = smp_processor_id();
     struct hpet_event_channel *ch = per_cpu(cpu_bc_channel, cpu);
 
+    if ( this_cpu(timer_deadline) == 0 )
+        return;
+
     BUG_ON( !ch );
 
     spin_lock_irq(&ch->lock);
