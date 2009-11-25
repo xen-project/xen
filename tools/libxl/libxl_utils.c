@@ -23,6 +23,9 @@
 #include <xenctrl.h>
 #include <ctype.h>
 #include <errno.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #include "libxl_utils.h"
 #include "libxl_internal.h"
@@ -185,5 +188,29 @@ int libxl_is_stubdom(struct libxl_ctx *ctx, int domid)
         return 1;
     else
         return 0;
+}
+
+int libxl_create_logfile(struct libxl_ctx *ctx, char *name, char **full_name)
+{
+    struct stat stat_buf;
+    char *logfile, *logfile_new;
+    int i;
+
+    logfile = libxl_sprintf(ctx, "/var/log/xen/%s.log", name);
+    if (stat(logfile, &stat_buf) == 0) {
+        /* file exists, rotate */
+        logfile = libxl_sprintf(ctx, "/var/log/xen/%s.log.10", name);
+        unlink(logfile);
+        for (i = 9; i > 0; i--) {
+            logfile = libxl_sprintf(ctx, "/var/log/xen/%s.log.%d", name, i);
+            logfile_new = libxl_sprintf(ctx, "/var/log/xen/%s.log.%d", name, i + 1);
+            rename(logfile, logfile_new);
+        }
+        logfile = libxl_sprintf(ctx, "/var/log/xen/%s.log", name);
+        logfile_new = libxl_sprintf(ctx, "/var/log/xen/%s.log.1", name);
+        rename(logfile, logfile_new);
+    }
+    *full_name = strdup(logfile);
+    return 0;
 }
 

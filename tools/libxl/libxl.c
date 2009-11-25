@@ -19,7 +19,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include <sys/stat.h>
 #include <sys/types.h>
 #include <fcntl.h>
 #include <sys/select.h>
@@ -765,10 +764,9 @@ int libxl_create_device_model(struct libxl_ctx *ctx,
                               libxl_device_nic *vifs, int num_vifs,
                               libxl_device_model_starting **starting_r)
 {
-    char *path, *logfile, *logfile_new;
-    struct stat stat_buf;
+    char *path, *logfile;
     int logfile_w, null;
-    int i, rc;
+    int rc;
     char **args;
     struct libxl_spawn_starting buf_spawn, *for_spawn;
 
@@ -789,22 +787,9 @@ int libxl_create_device_model(struct libxl_ctx *ctx,
     path = libxl_sprintf(ctx, "/local/domain/0/device-model/%d", info->domid);
     xs_mkdir(ctx->xsh, XBT_NULL, path);
 
-    logfile = libxl_sprintf(ctx, "/var/log/xen/qemu-dm-%s.log", info->dom_name);
-    if (stat(logfile, &stat_buf) == 0) {
-        /* file exists, rotate */
-        logfile = libxl_sprintf(ctx, "/var/log/xen/qemu-dm-%s.log.10", info->dom_name);
-        unlink(logfile);
-        for (i = 9; i > 0; i--) {
-            logfile = libxl_sprintf(ctx, "/var/log/xen/qemu-dm-%s.log.%d", info->dom_name, i);
-            logfile_new = libxl_sprintf(ctx, "/var/log/xen/qemu-dm-%s.log.%d", info->dom_name, i + 1);
-            rename(logfile, logfile_new);
-        }
-        logfile = libxl_sprintf(ctx, "/var/log/xen/qemu-dm-%s.log", info->dom_name);
-        logfile_new = libxl_sprintf(ctx, "/var/log/xen/qemu-dm-%s.log.1", info->dom_name);
-        rename(logfile, logfile_new);
-    }
-    logfile = libxl_sprintf(ctx, "/var/log/xen/qemu-dm-%s.log", info->dom_name);
+    libxl_create_logfile(ctx, libxl_sprintf(ctx, "qemu-dm-%s", info->dom_name), &logfile);
     logfile_w = open(logfile, O_WRONLY|O_CREAT, 0644);
+    free(logfile);
     null = open("/dev/null", O_RDONLY);
 
     if (starting_r) {

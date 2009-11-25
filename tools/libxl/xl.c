@@ -35,9 +35,14 @@
 #include "libxl.h"
 #include "libxl_utils.h"
 
+int logfile = 2;
+
 void log_callback(void *userdata, int loglevel, const char *file, int line, const char *func, char *s)
 {
-    fprintf(stderr, "[%d] %s:%d:%s: %s\n", loglevel, file, line, func, s);
+    char str[1024];
+
+    snprintf(str, sizeof(str), "[%d] %s:%d:%s: %s\n", loglevel, file, line, func, s);
+    write(logfile, str, strlen(str));
 }
 
 static void printf_info(libxl_domain_create_info *c_info,
@@ -640,9 +645,18 @@ start:
     libxl_domain_unpause(&ctx, domid);
 
     if (need_daemon) {
+        char *fullname, *name;
+
+        asprintf(&name, "xl-%s", info1.name);
+        libxl_create_logfile(&ctx, name, &fullname);
+        logfile = open(fullname, O_WRONLY|O_CREAT, 0644);
+        free(fullname);
+        free(name);
+
         daemon(0, 0);
         need_daemon = 0;
     }
+    XL_LOG(&ctx, XL_LOG_DEBUG, "Waiting for domain %s (domid %d) to die", info1.name, domid);
     
     libxl_wait_for_domain_death(&ctx, domid, &fd);
     while (1) {
@@ -658,17 +672,23 @@ start:
         if (!ret)
             continue;
         if (libxl_is_domain_dead(&ctx, domid, &info)) {
+            XL_LOG(&ctx, XL_LOG_DEBUG, "Domain %d is dead", domid);
             if (info.crashed || info.dying || (info.shutdown && (info.shutdown_reason != SHUTDOWN_suspend))) {
+                XL_LOG(&ctx, XL_LOG_DEBUG, "Domain %d needs to be clean: destroying the domain", domid);
                 libxl_domain_destroy(&ctx, domid, 0);
                 if (info.shutdown && (info.shutdown_reason == SHUTDOWN_reboot)) {
                     libxl_ctx_free(&ctx);
+                    XL_LOG(&ctx, XL_LOG_DEBUG, "Done. Rebooting now");
                     goto start;
                 }
+                XL_LOG(&ctx, XL_LOG_DEBUG, "Done. Exiting now");
             }
+            XL_LOG(&ctx, XL_LOG_DEBUG, "Domain %d does not need to be clean, exiting now", domid);
             exit(0);
         }
     }
 
+    close(logfile);
     for (i = 0; i < num_vifs; i++) {
         free(vifs[i].smac);
         free(vifs[i].ifname);
