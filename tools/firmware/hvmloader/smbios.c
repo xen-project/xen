@@ -455,7 +455,7 @@ smbios_type_16_init(void *start, uint32_t memsize, int nr_mem_devs)
     
     p->location = 0x01; /* other */
     p->use = 0x03; /* system memory */
-    p->error_correction = 0x01; /* other */
+    p->error_correction = 0x06; /* Multi-bit ECC to make Microsoft happy */
     p->maximum_capacity = memsize * 1024;
     p->memory_error_information_handle = 0xfffe; /* none provided */
     p->number_of_memory_devices = nr_mem_devs;
