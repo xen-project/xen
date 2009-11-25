@@ -168,3 +168,22 @@ int libxl_param_to_domid(struct libxl_ctx *ctx, char *p, uint32_t *domid)
     }
     return libxl_name_to_domid(ctx, p, domid);
 }
+
+int libxl_get_stubdom_id(struct libxl_ctx *ctx, int guest_domid)
+{
+    char * stubdom_id_s = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/image/device-model-domid", libxl_xs_get_dompath(ctx, guest_domid)));
+    if (stubdom_id_s)
+        return atoi(stubdom_id_s);
+    else
+        return 0;
+}
+
+int libxl_is_stubdom(struct libxl_ctx *ctx, int domid)
+{
+    char *target = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/target", libxl_xs_get_dompath(ctx, domid)));
+    if (target)
+        return 1;
+    else
+        return 0;
+}
+

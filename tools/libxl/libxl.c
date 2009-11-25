@@ -359,8 +359,13 @@ static int libxl_destroy_device_model(struct libxl_ctx *ctx, uint32_t domid)
 
     pid = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "/local/domain/%d/image/device-model-pid", domid));
     if (!pid) {
-        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "Couldn't find device model's pid");
-        return -1;
+        int stubdomid = libxl_get_stubdom_id(ctx, domid);
+        if (!stubdomid) {
+            XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "Couldn't find device model's pid");
+            return -1;
+        }
+        XL_LOG(ctx, XL_LOG_ERROR, "Device model is a stubdom, domid=%d\n", stubdomid);
+        return libxl_domain_destroy(ctx, stubdomid, 0);
     }
     xs_rm(ctx->xsh, XBT_NULL, libxl_sprintf(ctx, "/local/domain/0/device-model/%d", domid));
 
@@ -402,6 +407,8 @@ int libxl_domain_destroy(struct libxl_ctx *ctx, uint32_t domid, int force)
         XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, rc, "xc_domain_pause failed for %d", domid);
         return -1;
     }
+    if (libxl_destroy_device_model(ctx, domid) < 0)
+        XL_LOG(ctx, XL_LOG_ERROR, "libxl_destroy_device_model failed for %d", domid);
     rc = xc_domain_destroy(ctx->xch, domid);
     if (rc < 0) {
         XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, rc, "xc_domain_destroy failed for %d", domid);
@@ -409,8 +416,6 @@ int libxl_domain_destroy(struct libxl_ctx *ctx, uint32_t domid, int force)
     }
     if (libxl_devices_destroy(ctx, domid, force) < 0)
         XL_LOG(ctx, XL_LOG_ERROR, "libxl_destroy_devices failed for %d", domid);
-    if (libxl_destroy_device_model(ctx, domid) < 0)
-        XL_LOG(ctx, XL_LOG_ERROR, "libxl_destroy_device_model failed for %d", domid);
     if (!xs_rm(ctx->xsh, XBT_NULL, dom_path))
         XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "xs_rm failed for %s", dom_path);
     snprintf(vm_path, sizeof(vm_path), "/vm/%s", libxl_uuid_to_string(ctx, uuid));
@@ -549,8 +554,165 @@ void dm_xenstore_record_pid(struct libxl_ctx *ctx, void *for_spawn,
                          (unsigned long)innerchild, starting->dom_path, kvs);
 }
 
+static int libxl_vfb_and_vkb_from_device_model_info(struct libxl_ctx *ctx,
+                                                    libxl_device_model_info *info,
+                                                    libxl_device_vfb *vfb,
+                                                    libxl_device_vkb *vkb)
+{
+    memset(vfb, 0x00, sizeof(libxl_device_vfb));
+    memset(vkb, 0x00, sizeof(libxl_device_vkb));
+
+    vfb->backend_domid = 0;
+    vfb->devid = 0;
+    vfb->vnc = info->vnc;
+    vfb->vnclisten = info->vnclisten;
+    vfb->vncdisplay = info->vncdisplay;
+    vfb->vncunused = info->vncunused;
+    vfb->keymap = info->keymap;
+    vfb->sdl = info->sdl;
+    vfb->opengl = info->opengl;
+
+    vkb->backend_domid = 0;
+    vkb->devid = 0;
+    return 0;
+}
+
+static int libxl_write_dmargs(struct libxl_ctx *ctx, int domid, int guest_domid, char **args)
+{
+    int i;
+    char *vm_path;
+    char *dmargs, *path;
+    int dmargs_size;
+    struct xs_permissions roperm[2];
+    xs_transaction_t t;
+
+    roperm[0].id = 0;
+    roperm[0].perms = XS_PERM_NONE;
+    roperm[1].id = domid;
+    roperm[1].perms = XS_PERM_READ;
+
+    vm_path = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "/local/domain/%d/vm", guest_domid));
+
+    i = 0;
+    dmargs_size = 0;
+    while (args[i] != NULL) {
+        dmargs_size = dmargs_size + strlen(args[i]) + 1;
+        i++;
+    }
+    dmargs_size++;
+    dmargs = (char *) malloc(dmargs_size);
+    i = 1;
+    dmargs[0] = '\0';
+    while (args[i] != NULL) {
+        if (strcmp(args[i], "-sdl") && strcmp(args[i], "-M") && strcmp(args[i], "xenfv")) {
+            strcat(dmargs, " ");
+            strcat(dmargs, args[i]);
+        }
+        i++;
+    }
+    path = libxl_sprintf(ctx, "%s/image/dmargs", vm_path);
+
+retry_transaction:
+    t = xs_transaction_start(ctx->xsh);
+    xs_write(ctx->xsh, t, path, dmargs, strlen(dmargs));
+    xs_set_permissions(ctx->xsh, t, path, roperm, ARRAY_SIZE(roperm));
+    xs_set_permissions(ctx->xsh, t, libxl_sprintf(ctx, "%s/rtc/timeoffset", vm_path), roperm, ARRAY_SIZE(roperm));
+    if (!xs_transaction_end(ctx->xsh, t, 0))
+        if (errno == EAGAIN)
+            goto retry_transaction;
+    free(dmargs);
+    return 0;
+}
+
+static int libxl_create_stubdom(struct libxl_ctx *ctx,
+                                libxl_device_model_info *info,
+                                libxl_device_disk *disks, int num_disks,
+                                libxl_device_nic *vifs, int num_vifs,
+                                libxl_device_vfb *vfb,
+                                libxl_device_vkb *vkb,
+                                libxl_device_model_starting **starting_r)
+{
+    int i;
+    libxl_device_console console;
+    libxl_domain_create_info c_info;
+    libxl_domain_build_info b_info;
+    libxl_domain_build_state state;
+    uint32_t domid;
+    char **args;
+    xen_uuid_t uuid[16];
+    struct xs_permissions perm[2];
+    xs_transaction_t t;
+
+    args = libxl_build_device_model_args(ctx, info, vifs, num_vifs);
+    if (!args)
+        return ERROR_FAIL;
+
+    memset(&c_info, 0x00, sizeof(libxl_domain_create_info));
+    c_info.hvm = 0;
+    c_info.name = libxl_sprintf(ctx, "%s-dm", libxl_domid_to_name(ctx, info->domid));
+    xen_uuid_generate(uuid);
+    c_info.uuid = uuid;
+
+    memset(&b_info, 0x00, sizeof(libxl_domain_build_info));
+    b_info.max_vcpus = 1;
+    b_info.max_memkb = 32 * 1024;
+    b_info.kernel = "/usr/lib/xen/boot/ioemu-stubdom.gz";
+    b_info.u.pv.cmdline = libxl_sprintf(ctx, " -d %d", info->domid);
+    b_info.u.pv.ramdisk = "";
+    b_info.u.pv.features = "";
+    b_info.hvm = 0;
+
+    libxl_domain_make(ctx, &c_info, &domid);
+    libxl_domain_build(ctx, &b_info, domid, &state);
+
+    libxl_write_dmargs(ctx, domid, info->domid, args);
+    libxl_xs_write(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/image/device-model-domid", libxl_xs_get_dompath(ctx, info->domid)), "%d", domid);
+    libxl_xs_write(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/target", libxl_xs_get_dompath(ctx, domid)), "%d", info->domid);
+    xc_domain_set_target(ctx->xch, domid, info->domid);
+    xs_set_target(ctx->xsh, domid, info->domid);
+
+    perm[0].id = domid;
+    perm[0].perms = XS_PERM_NONE;
+    perm[1].id = info->domid;
+    perm[1].perms = XS_PERM_READ;
+retry_transaction:
+    t = xs_transaction_start(ctx->xsh);
+    xs_mkdir(ctx->xsh, t, libxl_sprintf(ctx, "/local/domain/0/device-model/%d", info->domid));
+    xs_set_permissions(ctx->xsh, t, libxl_sprintf(ctx, "/local/domain/0/device-model/%d", info->domid), perm, ARRAY_SIZE(perm));
+    if (!xs_transaction_end(ctx->xsh, t, 0))
+        if (errno == EAGAIN)
+            goto retry_transaction;
+
+    for (i = 0; i < num_disks; i++) {
+        libxl_device_disk disk = disks[i];
+        disk_info_domid_fixup(&disk, domid);
+        libxl_device_disk_add(ctx, domid, &disk);
+    }
+    for (i = 0; i < num_vifs; i++) {
+        libxl_device_nic nic = vifs[i];
+        nic_info_domid_fixup(&nic, domid);
+        libxl_device_nic_add(ctx, domid, &nic);
+    }
+    vfb_info_domid_fixup(vfb, domid);
+    libxl_device_vfb_add(ctx, domid, vfb);
+    vkb_info_domid_fixup(vkb, domid);
+    libxl_device_vkb_add(ctx, domid, vkb);
+
+    init_console_info(&console, 0, &state);
+    console_info_domid_fixup(&console, domid);
+    console.constype = CONSTYPE_IOEMU;
+    libxl_device_console_add(ctx, domid, &console);
+    libxl_create_xenpv_qemu(ctx, vfb, 1, &console, starting_r);
+
+    libxl_domain_unpause(ctx, domid);
+
+    free(args);
+    return 0;
+}
+
 int libxl_create_device_model(struct libxl_ctx *ctx,
                               libxl_device_model_info *info,
+                              libxl_device_disk *disks, int num_disks,
                               libxl_device_nic *vifs, int num_vifs,
                               libxl_device_model_starting **starting_r)
 {
@@ -560,6 +722,14 @@ int libxl_create_device_model(struct libxl_ctx *ctx,
     int i, rc;
     char **args;
     struct libxl_spawn_starting buf_spawn, *for_spawn;
+
+    if (strstr(info->device_model, "stubdom-dm")) {
+        libxl_device_vfb vfb;
+        libxl_device_vkb vkb;
+
+        libxl_vfb_and_vkb_from_device_model_info(ctx, info, &vfb, &vkb);
+        return libxl_create_stubdom(ctx, info, disks, num_disks, vifs, num_vifs, &vfb, &vkb, starting_r);
+    }
 
     *starting_r= 0;
 
@@ -634,6 +804,7 @@ int libxl_confirm_device_model_startup(struct libxl_ctx *ctx,
                                               &starting->for_spawn);
     int detach = libxl_detach_device_model(ctx, starting);
     return problem ? problem : detach;
+    return 0;
 }
 
 
@@ -995,7 +1166,7 @@ int libxl_create_xenpv_qemu(struct libxl_ctx *ctx, libxl_device_vfb *vfb,
     libxl_device_model_info info;
 
     libxl_build_xenpv_qemu_args(ctx, vfb, num_console, console, &info);
-    libxl_create_device_model(ctx, &info, NULL, 0, starting_r);
+    libxl_create_device_model(ctx, &info, NULL, 0, NULL, 0, starting_r);
     return 0;
 }
 
@@ -1208,8 +1379,8 @@ retry_transaction:
 
 static int libxl_device_pci_remove_xenstore(struct libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev)
 {
-    char *be_path, *num_devs_path, *num_devs, *xsdev;
-    int num, i;
+    char *be_path, *num_devs_path, *num_devs, *xsdev, *tmp, *tmppath;
+    int num, i, j;
     xs_transaction_t t;
     unsigned int domain = 0, bus = 0, dev = 0, func = 0;
 
@@ -1219,15 +1390,10 @@ static int libxl_device_pci_remove_xenstore(struct libxl_ctx *ctx, uint32_t domi
     if (!num_devs)
         return -1;
     num = atoi(num_devs);
-    if (num == 1) {
-        libxl_device_destroy(ctx, be_path, 1);
-        xs_rm(ctx->xsh, XBT_NULL, be_path);
-        return 0;
-    }
 
     if (!is_hvm(ctx, domid)) {
         if (libxl_wait_for_backend(ctx, be_path, "4") < 0) {
-            XL_LOG(ctx, XL_LOG_DEBUG, "pci backend at %s is not ready");
+            XL_LOG(ctx, XL_LOG_DEBUG, "pci backend at %s is not ready", be_path);
             return -1;
         }
     }
@@ -1247,12 +1413,72 @@ static int libxl_device_pci_remove_xenstore(struct libxl_ctx *ctx, uint32_t domi
 
 retry_transaction:
     t = xs_transaction_start(ctx->xsh);
-    libxl_xs_write(ctx, t, num_devs_path, "%d", num - 1);
-    xs_write(ctx->xsh, t, libxl_sprintf(ctx, "%s/state-%d", be_path, i), "6", strlen("6"));
+    xs_write(ctx->xsh, t, libxl_sprintf(ctx, "%s/state-%d", be_path, i), "5", strlen("5"));
     xs_write(ctx->xsh, t, libxl_sprintf(ctx, "%s/state", be_path), "7", strlen("7"));
     if (!xs_transaction_end(ctx->xsh, t, 0))
         if (errno == EAGAIN)
             goto retry_transaction;
+
+    if (!is_hvm(ctx, domid)) {
+        if (libxl_wait_for_backend(ctx, be_path, "4") < 0) {
+            XL_LOG(ctx, XL_LOG_DEBUG, "pci backend at %s is not ready", be_path);
+            return -1;
+        }
+    }
+
+retry_transaction2:
+    t = xs_transaction_start(ctx->xsh);
+    xs_rm(ctx->xsh, t, libxl_sprintf(ctx, "%s/state-%d", be_path, i));
+    xs_rm(ctx->xsh, t, libxl_sprintf(ctx, "%s/key-%d", be_path, i));
+    xs_rm(ctx->xsh, t, libxl_sprintf(ctx, "%s/dev-%d", be_path, i));
+    xs_rm(ctx->xsh, t, libxl_sprintf(ctx, "%s/vdev-%d", be_path, i));
+    xs_rm(ctx->xsh, t, libxl_sprintf(ctx, "%s/opts-%d", be_path, i));
+    xs_rm(ctx->xsh, t, libxl_sprintf(ctx, "%s/vdevfn-%d", be_path, i));
+    libxl_xs_write(ctx, t, num_devs_path, "%d", num - 1);
+    for (j = i + 1; j < num; j++) {
+        tmppath = libxl_sprintf(ctx, "%s/state-%d", be_path, j);
+        tmp = libxl_xs_read(ctx, t, tmppath);
+        xs_write(ctx->xsh, t, libxl_sprintf(ctx, "%s/state-%d", be_path, j - 1), tmp, strlen(tmp));
+        xs_rm(ctx->xsh, t, tmppath);
+        tmppath = libxl_sprintf(ctx, "%s/dev-%d", be_path, j);
+        tmp = libxl_xs_read(ctx, t, tmppath);
+        xs_write(ctx->xsh, t, libxl_sprintf(ctx, "%s/dev-%d", be_path, j - 1), tmp, strlen(tmp));
+        xs_rm(ctx->xsh, t, tmppath);
+        tmppath = libxl_sprintf(ctx, "%s/key-%d", be_path, j);
+        tmp = libxl_xs_read(ctx, t, tmppath);
+        xs_write(ctx->xsh, t, libxl_sprintf(ctx, "%s/key-%d", be_path, j - 1), tmp, strlen(tmp));
+        xs_rm(ctx->xsh, t, tmppath);
+        tmppath = libxl_sprintf(ctx, "%s/vdev-%d", be_path, j);
+        tmp = libxl_xs_read(ctx, t, tmppath);
+        if (tmp) {
+            xs_write(ctx->xsh, t, libxl_sprintf(ctx, "%s/vdev-%d", be_path, j - 1), tmp, strlen(tmp));
+            xs_rm(ctx->xsh, t, tmppath);
+        }
+        tmppath = libxl_sprintf(ctx, "%s/opts-%d", be_path, j);
+        tmp = libxl_xs_read(ctx, t, tmppath);
+        if (tmp) {
+            xs_write(ctx->xsh, t, libxl_sprintf(ctx, "%s/opts-%d", be_path, j - 1), tmp, strlen(tmp));
+            xs_rm(ctx->xsh, t, tmppath);
+        }
+        tmppath = libxl_sprintf(ctx, "%s/vdevfn-%d", be_path, j);
+        tmp = libxl_xs_read(ctx, t, tmppath);
+        if (tmp) {
+            xs_write(ctx->xsh, t, libxl_sprintf(ctx, "%s/vdevfn-%d", be_path, j - 1), tmp, strlen(tmp));
+            xs_rm(ctx->xsh, t, tmppath);
+        }
+    }
+    if (!xs_transaction_end(ctx->xsh, t, 0))
+        if (errno == EAGAIN)
+            goto retry_transaction2;
+
+    if (num == 1) {
+        char *fe_path = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/frontend", be_path));
+        libxl_device_destroy(ctx, be_path, 1);
+        xs_rm(ctx->xsh, XBT_NULL, be_path);
+        xs_rm(ctx->xsh, XBT_NULL, fe_path);
+        return 0;
+    }
+
     return 0;
 }
 
@@ -1261,10 +1487,16 @@ int libxl_device_pci_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_pci
     char path[50];
     char *state, *vdevfn;
     int rc, hvm;
+    int stubdomid = 0;
 
     /* TODO: check if the device can be assigned */
 
     libxl_device_pci_flr(ctx, pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func);
+
+    if ((stubdomid = libxl_get_stubdom_id(ctx, domid)) != 0) {
+        libxl_device_pci pcidev_s = *pcidev;
+        libxl_device_pci_add(ctx, stubdomid, &pcidev_s);
+    }
 
     hvm = is_hvm(ctx, domid);
     if (hvm) {
@@ -1290,7 +1522,7 @@ int libxl_device_pci_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_pci
         snprintf(path, sizeof(path), "/local/domain/0/device-model/%d/state", domid);
         xs_write(ctx->xsh, XBT_NULL, path, state, strlen(state));
     } else {
-        char *sysfs_path = libxl_sprintf(ctx, "SYSFS_PCI_DEV/"PCI_BDF"/resource", pcidev->domain,
+        char *sysfs_path = libxl_sprintf(ctx, SYSFS_PCI_DEV"/"PCI_BDF"/resource", pcidev->domain,
                                          pcidev->bus, pcidev->dev, pcidev->func);
         FILE *f = fopen(sysfs_path, "r");
         unsigned int start = 0, end = 0, flags = 0, size = 0;
@@ -1318,7 +1550,7 @@ int libxl_device_pci_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_pci
             }
         }
         fclose(f);
-        sysfs_path = libxl_sprintf(ctx, "SYSFS_PCI_DEV/"PCI_BDF"/irq", pcidev->domain,
+        sysfs_path = libxl_sprintf(ctx, SYSFS_PCI_DEV"/"PCI_BDF"/irq", pcidev->domain,
                                    pcidev->bus, pcidev->dev, pcidev->func);
         f = fopen(sysfs_path, "r");
         if (f == NULL) {
@@ -1339,8 +1571,10 @@ int libxl_device_pci_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_pci
         fclose(f);
     }
 out:
-    if ((rc = xc_assign_device(ctx->xch, domid, pcidev->value)) < 0)
-        XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, rc, "xc_assign_device failed");
+    if (!libxl_is_stubdom(ctx, domid)) {
+        if ((rc = xc_assign_device(ctx->xch, domid, pcidev->value)) < 0)
+            XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, rc, "xc_assign_device failed");
+    }
 
     libxl_device_pci_add_xenstore(ctx, domid, pcidev);
     return 0;
@@ -1351,8 +1585,10 @@ int libxl_device_pci_remove(struct libxl_ctx *ctx, uint32_t domid, libxl_device_
     char path[50];
     char *state;
     int hvm, rc;
+    int stubdomid = 0;
 
     /* TODO: check if the device can be detached */
+    libxl_device_pci_remove_xenstore(ctx, domid, pcidev);
 
     hvm = is_hvm(ctx, domid);
     if (hvm) {
@@ -1373,7 +1609,7 @@ int libxl_device_pci_remove(struct libxl_ctx *ctx, uint32_t domid, libxl_device_
         snprintf(path, sizeof(path), "/local/domain/0/device-model/%d/state", domid);
         xs_write(ctx->xsh, XBT_NULL, path, state, strlen(state));
     } else {
-        char *sysfs_path = libxl_sprintf(ctx, "SYSFS_PCI_DEV/"PCI_BDF"/resource", pcidev->domain,
+        char *sysfs_path = libxl_sprintf(ctx, SYSFS_PCI_DEV"/"PCI_BDF"/resource", pcidev->domain,
                                          pcidev->bus, pcidev->dev, pcidev->func);
         FILE *f = fopen(sysfs_path, "r");
         unsigned int start = 0, end = 0, flags = 0, size = 0;
@@ -1402,7 +1638,7 @@ int libxl_device_pci_remove(struct libxl_ctx *ctx, uint32_t domid, libxl_device_
         }
         fclose(f);
 skip1:
-        sysfs_path = libxl_sprintf(ctx, "SYSFS_PCI_DEV/"PCI_BDF"/irq", pcidev->domain,
+        sysfs_path = libxl_sprintf(ctx, SYSFS_PCI_DEV"/"PCI_BDF"/irq", pcidev->domain,
                                    pcidev->bus, pcidev->dev, pcidev->func);
         f = fopen(sysfs_path, "r");
         if (f == NULL) {
@@ -1423,12 +1659,18 @@ skip1:
         fclose(f);
     }
 out:
-    libxl_device_pci_remove_xenstore(ctx, domid, pcidev);
-
     libxl_device_pci_flr(ctx, pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func);
 
-    if ((rc = xc_deassign_device(ctx->xch, domid, pcidev->value)) < 0)
-        XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, rc, "xc_deassign_device failed");
+    if (!libxl_is_stubdom(ctx, domid)) {
+        if ((rc = xc_deassign_device(ctx->xch, domid, pcidev->value)) < 0)
+            XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, rc, "xc_deassign_device failed");
+    }
+
+    if ((stubdomid = libxl_get_stubdom_id(ctx, domid)) != 0) {
+        libxl_device_pci pcidev_s = *pcidev;
+        libxl_device_pci_remove(ctx, stubdomid, &pcidev_s);
+    }
+
     return 0;
 }
 
@@ -1489,4 +1731,143 @@ int libxl_device_pci_shutdown(struct libxl_ctx *ctx, uint32_t domid)
     free(pcidevs);
     return 0;
 }
+
+void nic_info_domid_fixup(libxl_device_nic *nic_info, int domid)
+{
+    nic_info->domid = domid;
+    asprintf(&(nic_info->ifname), "tap%d.%d", domid, nic_info->devid - 1);
+}
+
+void disk_info_domid_fixup(libxl_device_disk *disk_info, int domid)
+{
+    disk_info->domid = domid;
+}
+
+void vfb_info_domid_fixup(libxl_device_vfb *vfb, int domid)
+{
+    vfb->domid = domid;
+}
+
+void vkb_info_domid_fixup(libxl_device_vkb *vkb, int domid)
+{
+    vkb->domid = domid;
+}
+
+void console_info_domid_fixup(libxl_device_console *console, int domid)
+{
+    console->domid = domid;
+}
+
+void device_model_info_domid_fixup(libxl_device_model_info *dm_info, int domid)
+{
+    dm_info->domid = domid;
+}
+
+void init_create_info(libxl_domain_create_info *c_info)
+{
+    memset(c_info, '\0', sizeof(*c_info));
+    c_info->xsdata = NULL;
+    c_info->platformdata = NULL;
+    c_info->hvm = 1;
+    c_info->ssidref = 0;
+}
+
+void init_build_info(libxl_domain_build_info *b_info, libxl_domain_create_info *c_info)
+{
+    memset(b_info, '\0', sizeof(*b_info));
+    b_info->timer_mode = -1;
+    b_info->hpet = 1;
+    b_info->vpt_align = -1;
+    b_info->max_vcpus = 1;
+    b_info->max_memkb = 32 * 1024;
+    if (c_info->hvm) {
+        b_info->shadow_memkb = libxl_get_required_shadow_memory(b_info->max_memkb, b_info->max_vcpus);
+        b_info->video_memkb = 8 * 1024;
+        b_info->kernel = "/usr/lib/xen/boot/hvmloader";
+        b_info->hvm = 1;
+        b_info->u.hvm.pae = 1;
+        b_info->u.hvm.apic = 1;
+        b_info->u.hvm.acpi = 1;
+        b_info->u.hvm.nx = 1;
+        b_info->u.hvm.viridian = 0;
+    }
+}
+
+void init_dm_info(libxl_device_model_info *dm_info,
+        libxl_domain_create_info *c_info, libxl_domain_build_info *b_info)
+{
+    memset(dm_info, '\0', sizeof(*dm_info));
+
+    dm_info->dom_name = c_info->name;
+    dm_info->device_model = "/usr/lib/xen/bin/qemu-dm";
+    dm_info->videoram = b_info->video_memkb / 1024;
+    dm_info->apic = b_info->u.hvm.apic;
+
+    dm_info->stdvga = 0;
+    dm_info->vnc = 1;
+    dm_info->vnclisten = "127.0.0.1";
+    dm_info->vncdisplay = 0;
+    dm_info->vncunused = 0;
+    dm_info->keymap = NULL;
+    dm_info->sdl = 0;
+    dm_info->opengl = 0;
+    dm_info->nographic = 0;
+    dm_info->serial = NULL;
+    dm_info->boot = "cda";
+    dm_info->usb = 0;
+    dm_info->usbdevice = NULL;
+}
+
+void init_nic_info(libxl_device_nic *nic_info, int devnum)
+{
+    memset(nic_info, '\0', sizeof(*nic_info));
+
+
+    nic_info->backend_domid = 0;
+    nic_info->domid = 0;
+    nic_info->devid = devnum;
+    nic_info->mtu = 1492;
+    nic_info->model = "e1000";
+    srand(time(0));
+    nic_info->mac[0] = 0x00;
+    nic_info->mac[1] = 0x16;
+    nic_info->mac[2] = 0x3e;
+    nic_info->mac[3] = 1 + (int) (0x7f * (rand() / (RAND_MAX + 1.0)));
+    nic_info->mac[4] = 1 + (int) (0xff * (rand() / (RAND_MAX + 1.0)));
+    nic_info->mac[5] = 1 + (int) (0xff * (rand() / (RAND_MAX + 1.0)));
+    asprintf(&(nic_info->smac), "%02x:%02x:%02x:%02x:%02x:%02x", nic_info->mac[0], nic_info->mac[1], nic_info->mac[2], nic_info->mac[3], nic_info->mac[4], nic_info->mac[5]);
+    nic_info->ifname = NULL;
+    nic_info->bridge = "xenbr0";
+    nic_info->script = "/etc/xen/scripts/vif-bridge";
+    nic_info->nictype = NICTYPE_IOEMU;
+}
+
+void init_vfb_info(libxl_device_vfb *vfb, int dev_num)
+{
+    memset(vfb, 0x00, sizeof(libxl_device_vfb));
+    vfb->devid = dev_num;
+    vfb->vnc = 1;
+    vfb->vnclisten = "127.0.0.1";
+    vfb->vncdisplay = 0;
+    vfb->vncunused = 1;
+    vfb->keymap = NULL;
+    vfb->sdl = 0;
+    vfb->opengl = 0;
+}
+
+void init_vkb_info(libxl_device_vkb *vkb, int dev_num)
+{
+    memset(vkb, 0x00, sizeof(libxl_device_vkb));
+    vkb->devid = dev_num;
+}
+
+void init_console_info(libxl_device_console *console, int dev_num, libxl_domain_build_state *state)
+{
+    memset(console, 0x00, sizeof(libxl_device_console));
+    console->devid = dev_num;
+    console->constype = CONSTYPE_XENCONSOLED;
+    if (state)
+        console->build_state = state;
+}
+
 

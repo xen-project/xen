@@ -29,6 +29,8 @@ int libxl_is_uuid(char *s);
 xen_uuid_t *libxl_string_to_uuid(struct libxl_ctx *ctx, char *s);
 char *libxl_uuid_to_string(struct libxl_ctx *ctx, xen_uuid_t *uuid);
 int libxl_param_to_domid(struct libxl_ctx *ctx, char *p, uint32_t *domid);
+int libxl_get_stubdom_id(struct libxl_ctx *ctx, int guest_domid);
+int libxl_is_stubdom(struct libxl_ctx *ctx, int domid);
 
 #endif
 

@@ -248,6 +248,7 @@ xc_dominfo_t * libxl_domain_infolist(struct libxl_ctx *ctx, int *nb_domain);
 typedef struct libxl_device_model_starting libxl_device_model_starting;
 int libxl_create_device_model(struct libxl_ctx *ctx,
                               libxl_device_model_info *info,
+                              libxl_device_disk *disk, int num_disks,
                               libxl_device_nic *vifs, int num_vifs,
                               libxl_device_model_starting **starting_r);
 int libxl_create_xenpv_qemu(struct libxl_ctx *ctx, libxl_device_vfb *vfb,
@@ -289,5 +290,21 @@ libxl_device_pci *libxl_device_pci_list(struct libxl_ctx *ctx, uint32_t domid, i
 int libxl_device_pci_init(libxl_device_pci *pcidev, unsigned int domain,
                           unsigned int bus, unsigned int dev,
                           unsigned int func, unsigned int vdevfn);
+
+void nic_info_domid_fixup(libxl_device_nic *nic_info, int domid);
+void disk_info_domid_fixup(libxl_device_disk *disk_info, int domid);
+void vfb_info_domid_fixup(libxl_device_vfb *vfb, int domid);
+void vkb_info_domid_fixup(libxl_device_vkb *vkb, int domid);
+void console_info_domid_fixup(libxl_device_console *console, int domid);
+void device_model_info_domid_fixup(libxl_device_model_info *dm_info, int domid);
+
+void init_create_info(libxl_domain_create_info *c_info);
+void init_build_info(libxl_domain_build_info *b_info, libxl_domain_create_info *c_info);
+void init_dm_info(libxl_device_model_info *dm_info,
+        libxl_domain_create_info *c_info, libxl_domain_build_info *b_info);
+void init_nic_info(libxl_device_nic *nic_info, int devnum);
+void init_vfb_info(libxl_device_vfb *vfb, int dev_num);
+void init_vkb_info(libxl_device_vkb *vkb, int dev_num);
+void init_console_info(libxl_device_console *console, int dev_num, libxl_domain_build_state *state);
 
 #endif

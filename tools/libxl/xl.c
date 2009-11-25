@@ -216,145 +216,6 @@ static char* compat_config_file(const char *filename)
     return newfile;
 }
 
-void init_create_info(libxl_domain_create_info *c_info)
-{
-    memset(c_info, '\0', sizeof(*c_info));
-    c_info->xsdata = NULL;
-    c_info->platformdata = NULL;
-    c_info->hvm = 1;
-    c_info->ssidref = 0;
-}
-
-void init_build_info(libxl_domain_build_info *b_info, libxl_domain_create_info *c_info)
-{
-    memset(b_info, '\0', sizeof(*b_info));
-    b_info->timer_mode = -1;
-    b_info->hpet = 1;
-    b_info->vpt_align = -1;
-    b_info->max_vcpus = 1;
-    b_info->max_memkb = 32 * 1024;
-    if (c_info->hvm) {
-        b_info->shadow_memkb = libxl_get_required_shadow_memory(b_info->max_memkb, b_info->max_vcpus);
-        b_info->video_memkb = 8 * 1024;
-        b_info->kernel = "/usr/lib/xen/boot/hvmloader";
-        b_info->hvm = 1;
-        b_info->u.hvm.pae = 1;
-        b_info->u.hvm.apic = 1;
-        b_info->u.hvm.acpi = 1;
-        b_info->u.hvm.nx = 1;
-        b_info->u.hvm.viridian = 0;
-    }
-}
-
-void init_dm_info(libxl_device_model_info *dm_info,
-        libxl_domain_create_info *c_info, libxl_domain_build_info *b_info)
-{
-    memset(dm_info, '\0', sizeof(*dm_info));
-
-    dm_info->dom_name = c_info->name;
-    dm_info->device_model = "/usr/lib/xen/bin/qemu-dm";
-    dm_info->videoram = b_info->video_memkb / 1024;
-    dm_info->apic = b_info->u.hvm.apic;
-
-    dm_info->stdvga = 0;
-    dm_info->vnc = 1;
-    dm_info->vnclisten = "127.0.0.1";
-    dm_info->vncdisplay = 0;
-    dm_info->vncunused = 0;
-    dm_info->keymap = NULL;
-    dm_info->sdl = 0;
-    dm_info->opengl = 0;
-    dm_info->nographic = 0;
-    dm_info->serial = NULL;
-    dm_info->boot = "cda";
-    dm_info->usb = 0;
-    dm_info->usbdevice = NULL;
-}
-
-void init_nic_info(libxl_device_nic *nic_info, int devnum)
-{
-    memset(nic_info, '\0', sizeof(*nic_info));
-
-
-    nic_info->backend_domid = 0;
-    nic_info->domid = 0;
-    nic_info->devid = devnum;
-    nic_info->mtu = 1492;
-    nic_info->model = "e1000";
-    srand(time(0));
-    nic_info->mac[0] = 0x00;
-    nic_info->mac[1] = 0x16;
-    nic_info->mac[2] = 0x3e;
-    nic_info->mac[3] = 1 + (int) (0x7f * (rand() / (RAND_MAX + 1.0)));
-    nic_info->mac[4] = 1 + (int) (0xff * (rand() / (RAND_MAX + 1.0)));
-    nic_info->mac[5] = 1 + (int) (0xff * (rand() / (RAND_MAX + 1.0)));
-    asprintf(&(nic_info->smac), "%02x:%02x:%02x:%02x:%02x:%02x", nic_info->mac[0], nic_info->mac[1], nic_info->mac[2], nic_info->mac[3], nic_info->mac[4], nic_info->mac[5]);
-    nic_info->ifname = NULL;
-    nic_info->bridge = "xenbr0";
-    nic_info->script = "/etc/xen/scripts/vif-bridge";
-    nic_info->nictype = NICTYPE_IOEMU;
-}
-
-void nic_info_domid_fixup(libxl_device_nic *nic_info, int domid)
-{
-    nic_info->domid = domid;
-    if (!nic_info->ifname)
-        asprintf(&(nic_info->ifname), "tap%d.%d", domid, nic_info->devid - 1);
-}
-
-void disk_info_domid_fixup(libxl_device_disk *disk_info, int domid)
-{
-    disk_info->domid = domid;
-}
-
-void vfb_info_domid_fixup(libxl_device_vfb *vfb, int domid)
-{
-    vfb->domid = domid;
-}
-
-void vkb_info_domid_fixup(libxl_device_vkb *vkb, int domid)
-{
-    vkb->domid = domid;
-}
-
-void console_info_domid_fixup(libxl_device_console *console, int domid)
-{
-    console->domid = domid;
-}
-
-void device_model_info_domid_fixup(libxl_device_model_info *dm_info, int domid)
-{
-    dm_info->domid = domid;
-}
-
-void init_vfb_info(libxl_device_vfb *vfb, int dev_num)
-{
-    memset(vfb, 0x00, sizeof(libxl_device_vfb));
-    vfb->devid = dev_num;
-    vfb->vnc = 1;
-    vfb->vnclisten = "127.0.0.1";
-    vfb->vncdisplay = 0;
-    vfb->vncunused = 1;
-    vfb->keymap = NULL;
-    vfb->sdl = 0;
-    vfb->opengl = 0;
-}
-
-void init_vkb_info(libxl_device_vkb *vkb, int dev_num)
-{
-    memset(vkb, 0x00, sizeof(libxl_device_vkb));
-    vkb->devid = dev_num;
-}
-
-void init_console_info(libxl_device_console *console, int dev_num, libxl_domain_build_state *state)
-{
-    memset(console, 0x00, sizeof(libxl_device_console));
-    console->devid = dev_num;
-    console->constype = CONSTYPE_XENCONSOLED;
-    if (state)
-        console->build_state = state;
-}
-
 static void parse_config_file(const char *filename,
                               libxl_domain_create_info *c_info,
                               libxl_domain_build_info *b_info,
@@ -746,8 +607,8 @@ static void create_domain(int debug, const char *filename)
     }
     if (info1.hvm) {
         device_model_info_domid_fixup(&dm_info, domid);
-        MUST( libxl_create_device_model(&ctx, &dm_info, vifs, num_vifs,
-                                        &dm_starting) );
+        MUST( libxl_create_device_model(&ctx, &dm_info, disks, num_disks,
+                                        vifs, num_vifs, &dm_starting) );
     } else {
         for (i = 0; i < num_vfbs; i++) {
             vfb_info_domid_fixup(vfbs + i, domid);
@@ -764,10 +625,10 @@ static void create_domain(int debug, const char *filename)
             libxl_create_xenpv_qemu(&ctx, vfbs, 1, &console, &dm_starting);
     }
 
-    for (i = 0; i < num_pcidevs; i++)
-        libxl_device_pci_add(&ctx, domid, &pcidevs[i]);
     if (dm_starting)
         MUST( libxl_confirm_device_model_startup(&ctx, dm_starting) );
+    for (i = 0; i < num_pcidevs; i++)
+        libxl_device_pci_add(&ctx, domid, &pcidevs[i]);
 
     libxl_domain_unpause(&ctx, domid);
 
