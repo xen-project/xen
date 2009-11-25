@@ -1029,6 +1029,24 @@ def make_config(vals):
     
     config = ['vm']
 
+    def vcpu_conf():
+        maxvcpus = False
+        vcpus = False
+        if hasattr(vals, 'maxvcpus'):
+            maxvcpus = getattr(vals, 'maxvcpus')
+        if hasattr(vals, 'vcpus'):
+            vcpus = getattr(vals, 'vcpus')
+
+        if maxvcpus and not vcpus:
+            config.append(['vcpus', maxvcpus])
+        if maxvcpus and vcpus:
+           config.append(['vcpu_avail', (1 << vcpus) - 1])
+
+        # For case we don't have maxvcpus set but we have vcpus we preserve
+        # old behaviour
+        if not maxvcpus and vcpus:
+            config.append(['vcpus', vcpus])
+
     def add_conf(n):
         if hasattr(vals, n):
             v = getattr(vals, n)
@@ -1037,10 +1055,11 @@ def make_config(vals):
 
     map(add_conf, ['name', 'memory', 'maxmem', 'shadow_memory',
                    'restart', 'on_poweroff',  'tsc_mode', 'nomigrate',
-                   'on_reboot', 'on_crash', 'vcpus', 'vcpu_avail', 'features',
-                   'on_xend_start', 'on_xend_stop', 'target', 'cpuid',
-                   'cpuid_check', 'machine_address_size', 'suppress_spurious_page_faults'])
+                   'on_reboot', 'on_crash', 'features', 'on_xend_start',
+                   'on_xend_stop', 'target', 'cpuid', 'cpuid_check',
+                   'machine_address_size', 'suppress_spurious_page_faults'])
 
+    vcpu_conf()
     if vals.uuid is not None:
         config.append(['uuid', vals.uuid])
     if vals.cpu is not None:
