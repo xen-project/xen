@@ -32,6 +32,7 @@
 #include <xen/cpuidle.h>
 
 #define BREAK_FUZZ      4       /* 4 us */
+#define PRED_HISTORY_PCT   50
 #define USEC_PER_SEC 1000000
 
 struct menu_device
@@ -39,6 +40,7 @@ struct menu_device
     int             last_state_idx;
     unsigned int    expected_us;
     unsigned int    predicted_us;
+    unsigned int    current_predicted_us;
     unsigned int    last_measured_us;
     unsigned int    elapsed_us;
 };
@@ -63,6 +65,12 @@ static int menu_select(struct acpi_processor_power *power)
 
     /* determine the expected residency time */
     data->expected_us = get_sleep_length_us();
+
+    /* Recalculate predicted_us based on prediction_history_pct */
+    data->predicted_us *= PRED_HISTORY_PCT;
+    data->predicted_us += (100 - PRED_HISTORY_PCT) *
+        data->current_predicted_us;
+    data->predicted_us /= 100;
 
     /* find the deepest idle state that satisfies our constraints */
     for ( i = 2; i < power->count; i++ )
@@ -94,7 +102,7 @@ static void menu_reflect(struct acpi_processor_power *power)
     measured_us = data->elapsed_us <= measured_us ? measured_us : -1;
 
     /* Predict time remaining until next break event */
-    data->predicted_us = max(measured_us, data->last_measured_us);
+    data->current_predicted_us = max(measured_us, data->last_measured_us);
 
     /* Distinguish between expected & non-expected events */
     if ( last_residency + BREAK_FUZZ
