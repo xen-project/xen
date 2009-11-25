@@ -466,15 +466,6 @@ int xc_domain_set_time_offset(int xc_handle,
     return do_domctl(xc_handle, &domctl);
 }
 
-int xc_domain_set_tsc_native(int xc_handle, uint32_t domid, int is_native)
-{
-    DECLARE_DOMCTL;
-    domctl.cmd = XEN_DOMCTL_set_tsc_native;
-    domctl.domain = (domid_t)domid;
-    domctl.u.set_tsc_native.is_native = is_native;
-    return do_domctl(xc_handle, &domctl);
-}
-
 int xc_domain_disable_migrate(int xc_handle, uint32_t domid)
 {
     DECLARE_DOMCTL;
@@ -483,6 +474,52 @@ int xc_domain_disable_migrate(int xc_handle, uint32_t domid)
     domctl.u.disable_migrate.disable = 1;
     return do_domctl(xc_handle, &domctl);
 }
+
+int xc_domain_set_tsc_info(int xc_handle,
+                           uint32_t domid,
+                           uint32_t tsc_mode,
+                           uint64_t elapsed_nsec,
+                           uint32_t gtsc_khz,
+                           uint32_t incarnation)
+{
+    DECLARE_DOMCTL;
+    domctl.cmd = XEN_DOMCTL_settscinfo;
+    domctl.domain = (domid_t)domid;
+    domctl.u.tsc_info.info.tsc_mode = tsc_mode;
+    domctl.u.tsc_info.info.elapsed_nsec = elapsed_nsec;
+    domctl.u.tsc_info.info.gtsc_khz = gtsc_khz;
+    domctl.u.tsc_info.info.incarnation = incarnation;
+    return do_domctl(xc_handle, &domctl);
+}
+
+int xc_domain_get_tsc_info(int xc_handle,
+                           uint32_t domid,
+                           uint32_t *tsc_mode,
+                           uint64_t *elapsed_nsec,
+                           uint32_t *gtsc_khz,
+                           uint32_t *incarnation)
+{
+    int rc;
+    DECLARE_DOMCTL;
+    xen_guest_tsc_info_t info = { 0 };
+
+    domctl.cmd = XEN_DOMCTL_gettscinfo;
+    domctl.domain = (domid_t)domid;
+    set_xen_guest_handle(domctl.u.tsc_info.out_info, &info);
+    if ( (rc = lock_pages(&info, sizeof(info))) != 0 )
+        return rc;
+    rc = do_domctl(xc_handle, &domctl);
+    if ( rc == 0 )
+    {
+        *tsc_mode = info.tsc_mode;
+        *elapsed_nsec = info.elapsed_nsec;
+        *gtsc_khz = info.gtsc_khz;
+        *incarnation = info.incarnation;
+    }
+    unlock_pages(&info,sizeof(info));
+    return rc;
+}
+
 
 int xc_domain_memory_increase_reservation(int xc_handle,
                                           uint32_t domid,

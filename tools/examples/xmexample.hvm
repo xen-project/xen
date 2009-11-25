@@ -178,11 +178,16 @@ stdvga=0
 serial='pty'
 
 #----------------------------------------------------------------------------
-#   tsc_native : TSC mode (0=emulate TSC, 1=native TSC)
+#   tsc_mode : TSC mode (0=default, 1=native TSC, 2=never emulate, 3=pvrdtscp)
 #   emulate TSC provides synced TSC for all vcpus, but lose perfomrance.
 #   native TSC leverages hardware's TSC(no perf loss), but vcpu's TSC may lose
-#   sync due to hardware's unreliable/unsynced TSC between CPUs.
-tsc_native=1
+#    sync due to hardware's unreliable/unsynced TSC between CPUs.
+#   default intelligently uses native TSC on machines where it is safe, but
+#    switches to emulated if necessary after save/restore/migration
+#   pvrdtscp is for intelligent apps that use special Xen-only paravirtualized
+#    cpuid instructions to obtain offset/scaling/migration info and maximize
+#    performance within pools of machines that support the rdtscp instruction
+tsc_mode=0
 
 #-----------------------------------------------------------------------------
 #   Qemu Monitor, default is disable

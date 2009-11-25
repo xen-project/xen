@@ -1084,6 +1084,18 @@ static int pagebuf_get_one(pagebuf_t* buf, int fd, int xch, uint32_t dom)
             return -1;
         }
         return pagebuf_get_one(buf, fd, xch, dom);
+    } else if ( count == -7 ) {
+        uint32_t tsc_mode, khz, incarn;
+        uint64_t nsec;
+        if ( read_exact(fd, &tsc_mode, sizeof(uint32_t)) ||
+             read_exact(fd, &nsec, sizeof(uint64_t)) ||
+             read_exact(fd, &khz, sizeof(uint32_t)) ||
+             read_exact(fd, &incarn, sizeof(uint32_t)) ||
+             xc_domain_set_tsc_info(xch, dom, tsc_mode, nsec, khz, incarn) ) {
+            ERROR("error reading/restoring tsc info");
+            return -1;
+        }
+        return pagebuf_get_one(buf, fd, xch, dom);
     } else if ( (count > MAX_BATCH_SIZE) || (count < 0) ) {
         ERROR("Max batch size exceeded (%d). Giving up.", count);
         return -1;

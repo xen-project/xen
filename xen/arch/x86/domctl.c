@@ -1101,7 +1101,32 @@ long arch_do_domctl(
     }
     break;
 
-    case XEN_DOMCTL_set_tsc_native:
+    case XEN_DOMCTL_gettscinfo:
+    {
+        struct domain *d;
+        xen_guest_tsc_info_t info;
+
+        ret = -ESRCH;
+        d = rcu_lock_domain_by_id(domctl->domain);
+        if ( d == NULL )
+            break;
+
+        domain_pause(d);
+        tsc_get_info(d, &info.tsc_mode,
+                        &info.elapsed_nsec,
+                        &info.gtsc_khz,
+                        &info.incarnation);
+        if ( copy_to_guest(domctl->u.tsc_info.out_info, &info, 1) )
+            ret = -EFAULT;
+        else
+            ret = 0;
+        domain_unpause(d);
+
+        rcu_unlock_domain(d);
+    }
+    break;
+
+    case XEN_DOMCTL_settscinfo:
     {
         struct domain *d;
 
@@ -1111,9 +1136,10 @@ long arch_do_domctl(
             break;
 
         domain_pause(d);
-        d->arch.vtsc = !domctl->u.set_tsc_native.is_native;
-        if ( is_hvm_domain(d) )
-            hvm_set_rdtsc_exiting(d, d->arch.vtsc || hvm_gtsc_need_scale(d));
+        tsc_set_info(d, domctl->u.tsc_info.info.tsc_mode,
+                     domctl->u.tsc_info.info.elapsed_nsec,
+                     domctl->u.tsc_info.info.gtsc_khz,
+                     domctl->u.tsc_info.info.incarnation);
         domain_unpause(d);
 
         rcu_unlock_domain(d);

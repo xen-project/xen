@@ -221,9 +221,9 @@ gopts.var('timer_mode', val='TIMER_MODE',
           use="""Timer mode (0=delay virtual time when ticks are missed;
           1=virtual time is always wallclock time.""")
 
-gopts.var('tsc_native', val='TSC_NATIVE',
+gopts.var('tsc_mode', val='TSC_MODE',
           fn=set_int, default=0,
-          use="""TSC mode (0=emulate TSC, 1=native TSC).""")
+          use="""TSC mode (0=default, 1=always emulate, 2=never emulate, 3=pvrdtscp).""")
 
 gopts.var('nomigrate', val='NOMIGRATE',
           fn=set_int, default=0,
@@ -738,8 +738,8 @@ def configure_image(vals):
     if vals.suppress_spurious_page_faults:
         config_image.append(['suppress_spurious_page_faults', vals.suppress_spurious_page_faults])
 
-    if vals.tsc_native is not None:
-        config_image.append(['tsc_native', vals.tsc_native])
+    if vals.tsc_mode is not None:
+        config_image.append(['tsc_mode', vals.tsc_mode])
 
     if vals.nomigrate is not None:
         config_image.append(['nomigrate', vals.nomigrate])
@@ -1036,7 +1036,7 @@ def make_config(vals):
                 config.append([n, v])
 
     map(add_conf, ['name', 'memory', 'maxmem', 'shadow_memory',
-                   'restart', 'on_poweroff', 'tsc_native', 'nomigrate',
+                   'restart', 'on_poweroff',  'tsc_mode', 'nomigrate',
                    'on_reboot', 'on_crash', 'vcpus', 'vcpu_avail', 'features',
                    'on_xend_start', 'on_xend_stop', 'target', 'cpuid',
                    'cpuid_check', 'machine_address_size', 'suppress_spurious_page_faults'])

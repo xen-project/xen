@@ -841,6 +841,24 @@ static xen_pfn_t *map_and_save_p2m_table(int xc_handle,
     return success ? p2m : NULL;
 }
 
+/* must be done AFTER suspend_and_state() */
+static int save_tsc_info(int xc_handle, uint32_t dom, int io_fd)
+{
+    int marker = -7;
+    uint32_t tsc_mode, khz, incarn;
+    uint64_t nsec;
+
+    if ( xc_domain_get_tsc_info(xc_handle, dom, &tsc_mode,
+                                &nsec, &khz, &incarn) < 0  ||
+         write_exact(io_fd, &marker, sizeof(marker)) ||
+         write_exact(io_fd, &tsc_mode, sizeof(tsc_mode)) ||
+         write_exact(io_fd, &nsec, sizeof(nsec)) ||
+         write_exact(io_fd, &khz, sizeof(khz)) ||
+         write_exact(io_fd, &incarn, sizeof(incarn)) )
+        return -1;
+    return 0;
+}
+
 int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                    uint32_t max_factor, uint32_t flags,
                    struct save_callbacks* callbacks,
@@ -1097,6 +1115,12 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     if ( tmem_saved == -1 )
     {
         ERROR("Error when writing to state file (tmem)");
+        goto out;
+    }
+
+    if ( !live && save_tsc_info(xc_handle, dom, io_fd) < 0 )
+    {
+        ERROR("Error when writing to state file (tsc)");
         goto out;
     }
 
@@ -1457,6 +1481,13 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                         ERROR("Error when writing to state file (tmem)");
                         goto out;
                 }
+
+                if ( save_tsc_info(xc_handle, dom, io_fd) < 0 )
+                {
+                    ERROR("Error when writing to state file (tsc)");
+                    goto out;
+                }
+
 
             }
 

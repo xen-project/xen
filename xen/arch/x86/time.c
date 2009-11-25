@@ -34,6 +34,7 @@
 #include <asm/hpet.h>
 #include <io_ports.h>
 #include <asm/setup.h> /* for early_time_init */
+#include <public/arch-x86/cpuid.h>
 
 /* opt_clocksource: Force clocksource to one of: pit, hpet, cyclone, acpi. */
 static char __initdata opt_clocksource[10];
@@ -45,10 +46,12 @@ unsigned long pit0_ticks;
 static u32 wc_sec, wc_nsec; /* UTC time at last 'time update'. */
 static DEFINE_SPINLOCK(wc_lock);
 
+/* moved to <asm/domain.h>
 struct time_scale {
     int shift;
     u32 mul_frac;
 };
+*/
 
 struct cpu_time {
     u64 local_tsc_stamp;
@@ -150,13 +153,32 @@ static inline u64 scale_delta(u64 delta, struct time_scale *scale)
     return product;
 }
 
+#define _TS_SHIFT_IDENTITY    1
+#define _TS_MUL_FRAC_IDENTITY 0x80000000UL
+#define _TS_IDENTITY { _TS_SHIFT_IDENTITY, _TS_MUL_FRAC_IDENTITY }
+static inline int time_scale_is_identity(struct time_scale *ts)
+{
+    if ( ts->shift != _TS_SHIFT_IDENTITY )
+        return 0;
+    else if ( ts->mul_frac != _TS_MUL_FRAC_IDENTITY )
+        return 0;
+    return 1;
+}
+
+static inline void set_time_scale_identity(struct time_scale *ts)
+{
+    ts->shift = _TS_SHIFT_IDENTITY;
+    ts->mul_frac = _TS_MUL_FRAC_IDENTITY;
+}
+
 /* Compute the reciprocal of the given time_scale. */
 static inline struct time_scale scale_reciprocal(struct time_scale scale)
 {
     struct time_scale reciprocal;
     u32 dividend;
 
-    dividend = 0x80000000u;
+    ASSERT(scale.mul_frac != 0);
+    dividend = _TS_MUL_FRAC_IDENTITY;
     reciprocal.shift = 1 - scale.shift;
     while ( unlikely(dividend >= scale.mul_frac) )
     {
@@ -818,6 +840,8 @@ static void __update_vcpu_system_time(struct vcpu *v, int force)
     struct cpu_time       *t;
     struct vcpu_time_info *u, _u;
     XEN_GUEST_HANDLE(vcpu_time_info_t) user_u;
+    struct domain *d = v->domain;
+    s_time_t tsc_stamp = 0;
 
     if ( v->vcpu_info == NULL )
         return;
@@ -825,20 +849,31 @@ static void __update_vcpu_system_time(struct vcpu *v, int force)
     t = &this_cpu(cpu_time);
     u = &vcpu_info(v, time);
 
+    if ( d->arch.vtsc )
+    {
+        tsc_stamp = t->stime_local_stamp - d->arch.vtsc_offset;
+        if ( !time_scale_is_identity(&d->arch.ns_to_vtsc) )
+            tsc_stamp = scale_delta(tsc_stamp, &d->arch.ns_to_vtsc);
+    }
+    else
+        tsc_stamp = t->local_tsc_stamp;
+
+    if ( d->arch.tsc_mode ==  TSC_MODE_PVRDTSCP &&
+              boot_cpu_has(X86_FEATURE_RDTSCP) )
+        write_rdtscp_aux(d->arch.incarnation);
+
     /* Don't bother unless timestamps have changed or we are forced. */
-    if ( !force && (u->tsc_timestamp == (v->domain->arch.vtsc
-                                         ? t->stime_local_stamp
-                                         : t->local_tsc_stamp)) )
+    if ( !force && (u->tsc_timestamp == tsc_stamp) )
         return;
 
     memset(&_u, 0, sizeof(_u));
 
-    if ( v->domain->arch.vtsc )
+    if ( d->arch.vtsc )
     {
-        _u.tsc_timestamp     = t->stime_local_stamp;
+        _u.tsc_timestamp     = tsc_stamp;
         _u.system_time       = t->stime_local_stamp;
-        _u.tsc_to_system_mul = 0x80000000u;
-        _u.tsc_shift         = 1;
+        _u.tsc_to_system_mul = d->arch.vtsc_to_ns.mul_frac;
+        _u.tsc_shift         = d->arch.vtsc_to_ns.shift;
     }
     else
     {
@@ -1556,7 +1591,7 @@ static void tsc_check_slave(void *unused)
     local_irq_enable();
 }
 
-static void tsc_check_reliability(void)
+void tsc_check_reliability(void)
 {
     unsigned int cpu = smp_processor_id();
     static DEFINE_SPINLOCK(lock);
@@ -1583,23 +1618,193 @@ static void tsc_check_reliability(void)
 void pv_soft_rdtsc(struct vcpu *v, struct cpu_user_regs *regs)
 {
     s_time_t now = get_s_time();
+    struct domain *d = v->domain;
 
-    spin_lock(&v->domain->arch.vtsc_lock);
+    spin_lock(&d->arch.vtsc_lock);
 
     if ( guest_kernel_mode(v, regs) )
-        v->domain->arch.vtsc_kerncount++;
+        d->arch.vtsc_kerncount++;
     else
-        v->domain->arch.vtsc_usercount++;
+        d->arch.vtsc_usercount++;
 
-    if ( (int64_t)(now - v->domain->arch.vtsc_last) > 0 )
-        v->domain->arch.vtsc_last = now;
+    if ( (int64_t)(now - d->arch.vtsc_last) > 0 )
+        d->arch.vtsc_last = now;
     else
-        now = ++v->domain->arch.vtsc_last;
+        now = ++d->arch.vtsc_last;
 
-    spin_unlock(&v->domain->arch.vtsc_lock);
+    spin_unlock(&d->arch.vtsc_lock);
+
+    now = now - d->arch.vtsc_offset;
+    if ( !time_scale_is_identity(&d->arch.ns_to_vtsc) )
+        now = scale_delta(now, &d->arch.ns_to_vtsc);
 
     regs->eax = (uint32_t)now;
     regs->edx = (uint32_t)(now >> 32);
+}
+
+static int host_tsc_is_safe(void)
+{
+    extern unsigned int max_cstate;
+
+    if ( boot_cpu_has(X86_FEATURE_TSC_RELIABLE) )
+        return 1;
+    if ( num_online_cpus() == 1 )
+        return 1;
+    if ( boot_cpu_has(X86_FEATURE_CONSTANT_TSC) && max_cstate <= 2 )
+    {
+        if ( !tsc_check_count )
+            tsc_check_reliability();
+        if ( tsc_max_warp == 0 )
+            return 1;
+    }
+    return 0;
+}
+
+void cpuid_time_leaf(uint32_t sub_idx, uint32_t *eax, uint32_t *ebx,
+                      uint32_t *ecx, uint32_t *edx)
+{
+    struct domain *d = current->domain;
+    struct cpu_time *t;
+
+    t = &this_cpu(cpu_time);
+    switch ( sub_idx )
+    {
+    case 0: /* features */
+        *eax = ( ( (!!d->arch.vtsc) << 0 ) |
+                 ( (!!host_tsc_is_safe()) << 1 ) |
+                 ( (!!boot_cpu_has(X86_FEATURE_RDTSCP)) << 2 ) |
+               0 );
+        *ebx = d->arch.tsc_mode;
+        *ecx = d->arch.tsc_khz;
+        *edx = d->arch.incarnation;
+        break;
+    case 1: /* pvclock group1 */ /* FIXME are these right? */
+        *eax = (uint32_t)t->local_tsc_stamp;
+        *ebx = (uint32_t)(t->local_tsc_stamp >> 32);
+        *ecx = t->tsc_scale.mul_frac;
+        *edx = d->arch.incarnation;
+        break;
+    case 2: /* pvclock scaling values */ /* FIXME  are these right? */
+        *eax = (uint32_t)t->stime_local_stamp;
+        *ebx = (uint32_t)(t->stime_local_stamp >> 32);
+        *ecx = t->tsc_scale.shift;
+        *edx = d->arch.incarnation;
+    case 3: /* physical cpu_khz */
+        *eax = cpu_khz;
+        *ebx = *ecx = 0;
+        *edx = d->arch.incarnation;
+        break;
+    }
+}
+
+/*
+ * called to collect tsc-related data only for save file or live
+ * migrate; called after last rdtsc is done on this incarnation
+ */
+void tsc_get_info(struct domain *d, uint32_t *tsc_mode,
+                  uint64_t *elapsed_nsec, uint32_t *gtsc_khz,
+                  uint32_t *incarnation)
+{
+    *incarnation = d->arch.incarnation;
+    switch ( *tsc_mode = d->arch.tsc_mode )
+    {
+    case TSC_MODE_NEVER_EMULATE:
+        *elapsed_nsec =  *gtsc_khz = 0;
+        break;
+    case TSC_MODE_ALWAYS_EMULATE:
+        *elapsed_nsec = get_s_time() - d->arch.vtsc_offset;
+        *gtsc_khz = 1000000UL;
+         break;
+    case TSC_MODE_DEFAULT:
+        if ( d->arch.vtsc )
+        {
+            *elapsed_nsec = get_s_time() - d->arch.vtsc_offset;
+            *gtsc_khz =  d->arch.tsc_khz;
+        }  else {
+            uint64_t tsc = 0;
+            rdtscll(tsc);
+            *elapsed_nsec = scale_delta(tsc,&d->arch.vtsc_to_ns);
+            *gtsc_khz =  cpu_khz;
+        }
+        break;
+    case TSC_MODE_PVRDTSCP:
+        *elapsed_nsec = get_s_time() - d->arch.vtsc_offset; /* FIXME scale? */
+        *gtsc_khz =  d->arch.tsc_khz;
+        break;
+    }
+}
+
+/*
+ * This may be called as many as three times for a domain, once when the
+ * hypervisor creates the domain, once when the toolstack creates the
+ * domain and, if restoring/migrating, once when saved/migrated values
+ * are restored.  Care must be taken that, if multiple calls occur,
+ * only the last "sticks" and all are completed before the guest executes
+ * an rdtsc instruction
+ */
+void tsc_set_info(struct domain *d,
+                  uint32_t tsc_mode, uint64_t elapsed_nsec,
+                  uint32_t gtsc_khz, uint32_t incarnation)
+{
+    if ( d->domain_id == 0 || d->domain_id == DOMID_INVALID )
+    {
+        d->arch.vtsc = 0;
+        return;
+    }
+    switch ( d->arch.tsc_mode = tsc_mode )
+    {
+    case TSC_MODE_NEVER_EMULATE:
+        gdprintk(XENLOG_G_INFO, "%s: never emulating TSC\n",__func__)
+        d->arch.vtsc = 0;
+        break;
+    case TSC_MODE_ALWAYS_EMULATE:
+        gdprintk(XENLOG_G_INFO, "%s: always emulating TSC\n",__func__)
+        d->arch.vtsc = 1;
+        d->arch.vtsc_offset = get_s_time() - elapsed_nsec;
+        set_time_scale_identity(&d->arch.vtsc_to_ns);
+        break;
+    case TSC_MODE_DEFAULT:
+        d->arch.vtsc_offset = get_s_time() - elapsed_nsec;
+        if ( (host_tsc_is_safe() && incarnation == 0) || !d->domain_id )
+        {
+            gdprintk(XENLOG_G_INFO, "%s: using safe native TSC\n",__func__)
+            /* use native TSC if initial host supports it */
+            d->arch.vtsc = 0;
+            d->arch.tsc_khz = gtsc_khz ? gtsc_khz : cpu_khz;
+            set_time_scale(&d->arch.vtsc_to_ns, d->arch.tsc_khz * 1000 );
+            set_time_scale_identity(&d->arch.ns_to_vtsc);
+        } else if ( gtsc_khz != 0  && gtsc_khz != 1000000UL ) {
+            gdprintk(XENLOG_G_INFO, "%s: safe native TSC on initial host,"
+                "but now using emulation\n",__func__)
+            /* was native on initial host, now emulated at initial tsc hz*/
+            d->arch.vtsc = 1;
+            d->arch.tsc_khz = gtsc_khz;
+            set_time_scale(&d->arch.vtsc_to_ns, gtsc_khz * 1000 );
+            d->arch.ns_to_vtsc =
+                scale_reciprocal(d->arch.vtsc_to_ns);
+        } else {
+            gdprintk(XENLOG_G_INFO, "%s: unsafe TSC on initial host,"
+                "using emulation\n",__func__)
+            d->arch.vtsc = 1;
+            set_time_scale_identity(&d->arch.vtsc_to_ns);
+            set_time_scale_identity(&d->arch.ns_to_vtsc);
+        }
+        break;
+    case TSC_MODE_PVRDTSCP:
+        gdprintk(XENLOG_G_INFO, "%s: using PVRDTSCP\n",__func__)
+        if ( boot_cpu_has(X86_FEATURE_RDTSCP) && gtsc_khz != 0 ) {
+            d->arch.vtsc = 0;
+            set_time_scale(&d->arch.vtsc_to_ns, gtsc_khz * 1000 );
+        } else {
+            d->arch.vtsc = 1;
+            d->arch.vtsc_offset = get_s_time() - elapsed_nsec;
+            set_time_scale_identity(&d->arch.vtsc_to_ns);
+        }
+        break;
+    }
+    d->arch.incarnation = incarnation + 1;
+    if ( is_hvm_domain(d) )
+        hvm_set_rdtsc_exiting(d, d->arch.vtsc || hvm_gtsc_need_scale(d));
 }
 
 /* vtsc may incur measurable performance degradation, diagnose with this */
@@ -1607,33 +1812,51 @@ static void dump_softtsc(unsigned char key)
 {
     struct domain *d;
     int domcnt = 0;
+    extern unsigned int max_cstate;
 
     tsc_check_reliability();
     if ( boot_cpu_has(X86_FEATURE_TSC_RELIABLE) )
         printk("TSC marked as reliable, "
                "warp = %lu (count=%lu)\n", tsc_max_warp, tsc_check_count);
     else if ( boot_cpu_has(X86_FEATURE_CONSTANT_TSC ) )
-        printk("TSC marked as constant but not reliable, "
-               "warp = %lu (count=%lu)\n", tsc_max_warp, tsc_check_count);
-    else
+    {
+        printk("TSC has constant rate, ");
+        if (max_cstate <= 2 && tsc_max_warp == 0)
+            printk("no deep Cstates, passed warp test, deemed reliable, ");
+        else
+            printk("deep Cstates possible, so not reliable, ");
+        printk("warp=%lu (count=%lu)\n", tsc_max_warp, tsc_check_count);
+    } else
         printk("TSC not marked as either constant or reliable, "
-               "warp = %lu (count=%lu)\n", tsc_max_warp, tsc_check_count);
+               "warp=%lu (count=%lu)\n", tsc_max_warp, tsc_check_count);
     for_each_domain ( d )
     {
-        if ( !d->arch.vtsc )
+        if ( d->domain_id == 0 && d->arch.tsc_mode == TSC_MODE_DEFAULT )
             continue;
+        printk("dom%u%s: mode=%d",d->domain_id,
+                is_hvm_domain(d) ? "(hvm)" : "", d->arch.tsc_mode);
+        if ( d->arch.vtsc_offset )
+            printk(",ofs=0x%"PRIx64"",d->arch.vtsc_offset);
+        if ( d->arch.tsc_khz )
+            printk(",khz=%"PRIu32"",d->arch.tsc_khz);
+        if ( d->arch.incarnation )
+            printk(",inc=%"PRIu32"",d->arch.incarnation);
+        if ( !d->arch.vtsc )
+        {
+            printk("\n");
+            continue;
+        }
         if ( is_hvm_domain(d) )
-            printk("dom%u (hvm) vtsc count: %"PRIu64" total\n",
-                   d->domain_id, d->arch.vtsc_kerncount);
+            printk(",vtsc count: %"PRIu64" total\n",
+                   d->arch.vtsc_kerncount);
         else
-            printk("dom%u vtsc count: %"PRIu64" kernel, %"PRIu64" user\n",
-                   d->domain_id, d->arch.vtsc_kerncount,
-                   d->arch.vtsc_usercount);
+            printk(",vtsc count: %"PRIu64" kernel, %"PRIu64" user\n",
+                   d->arch.vtsc_kerncount, d->arch.vtsc_usercount);
         domcnt++;
     }
 
     if ( !domcnt )
-            printk("All domains have native TSC\n");
+            printk("No domains have emulated TSC\n");
 }
 
 static struct keyhandler dump_softtsc_keyhandler = {

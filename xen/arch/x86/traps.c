@@ -679,8 +679,8 @@ int wrmsr_hypervisor_regs(uint32_t idx, uint64_t val)
     return 1;
 }
 
-int cpuid_hypervisor_leaves(
-    uint32_t idx, uint32_t *eax, uint32_t *ebx, uint32_t *ecx, uint32_t *edx)
+int cpuid_hypervisor_leaves( uint32_t idx, uint32_t sub_idx,
+               uint32_t *eax, uint32_t *ebx, uint32_t *ecx, uint32_t *edx)
 {
     struct domain *d = current->domain;
     /* Optionally shift out of the way of Viridian architectural leaves. */
@@ -693,7 +693,7 @@ int cpuid_hypervisor_leaves(
     switch ( idx )
     {
     case 0:
-        *eax = base + 2; /* Largest leaf */
+        *eax = base + 3; /* Largest leaf */
         *ebx = XEN_CPUID_SIGNATURE_EBX;
         *ecx = XEN_CPUID_SIGNATURE_ECX;
         *edx = XEN_CPUID_SIGNATURE_EDX;
@@ -717,6 +717,11 @@ int cpuid_hypervisor_leaves(
             *ecx |= XEN_CPUID_FEAT1_MMU_PT_UPDATE_PRESERVE_AD;
         break;
 
+    case 3:
+        *eax = *ebx = *ecx = *edx = 0;
+        cpuid_time_leaf( sub_idx, eax, ebx, ecx, edx );
+        break;
+
     default:
         BUG();
     }
@@ -735,7 +740,7 @@ static void pv_cpuid(struct cpu_user_regs *regs)
 
     if ( current->domain->domain_id != 0 )
     {
-        if ( !cpuid_hypervisor_leaves(a, &a, &b, &c, &d) )
+        if ( !cpuid_hypervisor_leaves(a, c, &a, &b, &c, &d) )
             domain_cpuid(current->domain, a, c, &a, &b, &c, &d);
         goto out;
     }
@@ -815,7 +820,7 @@ static void pv_cpuid(struct cpu_user_regs *regs)
         a = b = c = d = 0;
         break;
     default:
-        (void)cpuid_hypervisor_leaves(regs->eax, &a, &b, &c, &d);
+        (void)cpuid_hypervisor_leaves(regs->eax, 0, &a, &b, &c, &d);
         break;
     }
 

@@ -230,6 +230,11 @@ struct domain_mca_msrs
     spinlock_t lock;
 };
 
+struct time_scale {
+    int shift;
+    u32 mul_frac;
+};
+
 struct arch_domain
 {
 #ifdef CONFIG_X86_64
@@ -298,10 +303,17 @@ struct arch_domain
     /* For Guest vMCA handling */
     struct domain_mca_msrs vmca_msrs;
 
-    /* SoftTSC emulation */
-    bool_t vtsc;
-    s_time_t vtsc_last;
+    /* TSC management (emulation, pv, scaling, stats) */
+    int tsc_mode;            /* see include/asm-x86/time.h */
+    bool_t vtsc;             /* tsc is emulated (may change after migrate) */
+    s_time_t vtsc_last;      /* previous TSC value (guarantee monotonicity) */
     spinlock_t vtsc_lock;
+    uint64_t vtsc_offset;    /* adjustment for save/restore/migrate */
+    uint32_t tsc_khz;        /* cached khz for certain emulated cases */
+    struct time_scale vtsc_to_ns; /* scaling for certain emulated cases */
+    struct time_scale ns_to_vtsc; /* scaling for certain emulated cases */
+    uint32_t incarnation;    /* incremented every restore or live migrate
+                                (possibly other cases in the future */
     uint64_t vtsc_kerncount; /* for hvm, counts all vtsc */
     uint64_t vtsc_usercount; /* not used for hvm */
 } __cacheline_aligned;

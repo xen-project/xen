@@ -2468,9 +2468,9 @@ class XendDomainInfo:
         self._recreateDom()
 
         # Set TSC mode of domain
-        tsc_native = self.info["platform"].get("tsc_native")
-        if arch.type == "x86" and tsc_native is not None:
-            xc.domain_set_tsc_native(self.domid, int(tsc_native))
+        tsc_mode = self.info["platform"].get("tsc_mode")
+        if arch.type == "x86" and tsc_mode is not None:
+            xc.domain_set_tsc_info(self.domid, int(tsc_mode))
 
         # Set timer configuration of domain
         timer_mode = self.info["platform"].get("timer_mode")

@@ -1831,7 +1831,7 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
     if ( cpuid_viridian_leaves(input, eax, ebx, ecx, edx) )
         return;
 
-    if ( cpuid_hypervisor_leaves(input, eax, ebx, ecx, edx) )
+    if ( cpuid_hypervisor_leaves(input, count, eax, ebx, ecx, edx) )
         return;
 
     domain_cpuid(v->domain, input, *ecx, eax, ebx, ecx, edx);

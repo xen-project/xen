@@ -520,6 +520,8 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
         d->arch.cpuids[i].input[1] = XEN_CPUID_INPUT_UNUSED;
     }
 
+    /* initialize default tsc behavior in case tools don't */
+    tsc_set_info(d, TSC_MODE_DEFAULT, 0UL, 0, 0);
     spin_lock_init(&d->arch.vtsc_lock);
 
     return 0;

@@ -1486,14 +1486,14 @@ static PyObject *pyxc_domain_set_time_offset(XcObject *self, PyObject *args)
     return zero;
 }
 
-static PyObject *pyxc_domain_set_tsc_native(XcObject *self, PyObject *args)
+static PyObject *pyxc_domain_set_tsc_info(XcObject *self, PyObject *args)
 {
-    uint32_t dom, is_native;
+    uint32_t dom, tsc_mode;
 
-    if (!PyArg_ParseTuple(args, "ii", &dom, &is_native))
+    if (!PyArg_ParseTuple(args, "ii", &dom, &tsc_mode))
         return NULL;
 
-    if (xc_domain_set_tsc_native(self->xc_handle, dom, is_native) != 0)
+    if (xc_domain_set_tsc_info(self->xc_handle, dom, tsc_mode, 0, 0, 0) != 0)
         return pyxc_error_to_exception();
 
     Py_INCREF(zero);
@@ -2036,12 +2036,13 @@ static PyMethodDef pyxc_methods[] = {
       " offset     [int]: Time offset from UTC in seconds.\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
-    { "domain_set_tsc_native",
-      (PyCFunction)pyxc_domain_set_tsc_native,
+    { "domain_set_tsc_info",
+      (PyCFunction)pyxc_domain_set_tsc_info,
       METH_VARARGS, "\n"
-      "Set a domain's TSC mode (emulate vs native)\n"
+      "Set a domain's TSC mode\n"
       " dom        [int]: Domain whose TSC mode is being set.\n"
-      " is_native  [int]: 1=native, 0=emulate.\n"
+      " tsc_mode   [int]: 0=default (monotonic, but native where possible)\n"
+      "                   1=always emulate 2=never emulate 3=pvrdtscp\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "domain_disable_migrate",
