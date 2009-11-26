@@ -3440,14 +3440,12 @@ static int shadow_test_disable(struct domain *d)
  * with new content. It is responsible for update the entry, as well as other 
  * shadow processing jobs.
  */
-void
-shadow_write_p2m_entry(struct vcpu *v, unsigned long gfn, 
-                       l1_pgentry_t *p, mfn_t table_mfn, 
-                       l1_pgentry_t new, unsigned int level)
+
+static void sh_unshadow_for_p2m_change(struct vcpu *v, unsigned long gfn, 
+                                       l1_pgentry_t *p, mfn_t table_mfn, 
+                                       l1_pgentry_t new, unsigned int level)
 {
     struct domain *d = v->domain;
-    
-    shadow_lock(d);
 
     /* If we're removing an MFN from the p2m, remove it from the shadows too */
     if ( level == 1 )
@@ -3503,6 +3501,21 @@ shadow_write_p2m_entry(struct vcpu *v, unsigned long gfn,
                 unmap_domain_page(npte);
         }
     }
+}
+
+void
+shadow_write_p2m_entry(struct vcpu *v, unsigned long gfn, 
+                       l1_pgentry_t *p, mfn_t table_mfn, 
+                       l1_pgentry_t new, unsigned int level)
+{
+    struct domain *d = v->domain;
+    
+    shadow_lock(d);
+
+    /* If there are any shadows, update them.  But if shadow_teardown()
+     * has already been called then it's not safe to try. */ 
+    if ( likely(d->arch.paging.shadow.total_pages != 0) )
+         sh_unshadow_for_p2m_change(v, gfn, p, table_mfn, new, level);
 
     /* Update the entry with new content */
     safe_write_pte(p, new);
