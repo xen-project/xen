@@ -65,7 +65,7 @@ static void slt_tree(unsigned int s, unsigned int e)
 
 int main(void)
 {
-    unsigned int slot;
+    unsigned int slot, dev, intx, link;
 
     /**** DSDT DefinitionBlock start ****/
     /* (we append to existing DSDT definition block) */
@@ -74,6 +74,72 @@ int main(void)
 
     /**** PCI0 start ****/
     push_block("Scope", "\\_SB.PCI0");
+
+    /*** PCI-ISA link definitions ***/
+    /* BUFA: List of ISA IRQs available for linking to PCI INTx. */
+    stmt("Name", "BUFA, ResourceTemplate() { "
+         "IRQ(Level, ActiveLow, Shared) { 5, 10, 11 } }");
+    /* BUFB: IRQ descriptor for returning from link-device _CRS methods. */
+    stmt("Name", "BUFB, Buffer() { "
+         "0x23, 0x00, 0x00, 0x18, " /* IRQ descriptor */
+         "0x79, 0 }");              /* End tag, null checksum */
+    stmt("CreateWordField", "BUFB, 0x01, IRQV");
+    /* Create four PCI-ISA link devices: LNKA, LNKB, LNKC, LNKD. */
+    for ( link = 0; link < 4; link++ )
+    {
+        push_block("Device", "LNK%c", 'A'+link);
+        stmt("Name", "_HID,  EISAID(\"PNP0C0F\")");  /* PCI interrupt link */
+        stmt("Name", "_UID, %u", link+1);
+        push_block("Method", "_STA, 0");
+        push_block("If", "And(PIR%c, 0x80)", 'A'+link);
+        stmt("Return", "0x09");
+        pop_block();
+        push_block("Else", NULL);
+        stmt("Return", "0x0B");
+        pop_block();
+        pop_block();
+        push_block("Method", "_PRS");
+        stmt("Return", "BUFA");
+        pop_block();
+        push_block("Method", "_DIS");
+        stmt("Or", "PIR%c, 0x80, PIR%c", 'A'+link, 'A'+link);
+        pop_block();
+        push_block("Method", "_CRS");
+        stmt("And", "PIR%c, 0x0f, Local0", 'A'+link);
+        stmt("ShiftLeft", "0x1, Local0, IRQV");
+        stmt("Return", "BUFB");
+        pop_block();
+        push_block("Method", "_SRS, 1");
+        stmt("CreateWordField", "ARG0, 0x01, IRQ1");
+        stmt("FindSetRightBit", "IRQ1, Local0");
+        stmt("Decrement", "Local0");
+        stmt("Store", "Local0, PIR%c", 'A'+link);
+        pop_block();
+        pop_block();
+    }
+
+    /*** PCI interrupt routing definitions***/
+    /* _PRT: Method to return routing table. */
+    push_block("Method", "_PRT, 0");
+    push_block("If", "PICD");
+    stmt("Return", "PRTA");
+    pop_block();
+    stmt("Return", "PRTP");
+    pop_block();
+    /* PRTP: PIC routing table (via ISA links). */
+    printf("Name(PRTP, Package() {\n");
+    for ( dev = 1; dev < 32; dev++ )
+        for ( intx = 0; intx < 4; intx++ ) /* INTA-D */
+            printf("Package(){0x%04xffff, %u, \\_SB.PCI0.LNK%c, 0},\n",
+                   dev, intx, 'A'+((dev+intx)&3));
+    printf("})\n");
+    /* PRTA: APIC routing table (via non-legacy IOAPIC GSIs). */
+    printf("Name(PRTA, Package() {\n");
+    for ( dev = 1; dev < 32; dev++ )
+        for ( intx = 0; intx < 4; intx++ ) /* INTA-D */
+            printf("Package(){0x%04xffff, %u, 0, %u},\n",
+                   dev, intx, ((dev*4+dev/8+intx)&31)+16);
+    printf("})\n");
 
     /*
      * Each PCI hotplug slot needs at least two methods to handle
