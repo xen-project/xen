@@ -1640,7 +1640,7 @@ void pv_soft_rdtsc(struct vcpu *v, struct cpu_user_regs *regs, int rdtscp)
 
     if ( rdtscp )
          regs->ecx =
-             (d->arch.tsc_mode == TSC_MODE_PVRDTSCP) ?  d->arch.incarnation : 0;
+             (d->arch.tsc_mode == TSC_MODE_PVRDTSCP) ? d->arch.incarnation : 0;
 }
 
 static int host_tsc_is_safe(void)

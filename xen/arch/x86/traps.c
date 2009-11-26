@@ -2034,9 +2034,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
      * are executable only from guest kernel mode (virtual ring 0).
      */
     opcode = insn_fetch(u8, code_base, eip, code_limit);
-    if ( !guest_kernel_mode(v, regs) &&
-         (opcode != 0x1) && /* always emulate rdtscp */
-         !((opcode == 0x31) && v->domain->arch.vtsc) )
+    if ( !guest_kernel_mode(v, regs) && (opcode != 0x1) && (opcode != 0x31) )
         goto fail;
 
     if ( lock && (opcode & ~3) != 0x20 )
@@ -2044,6 +2042,9 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     switch ( opcode )
     {
     case 0x1: /* RDTSCP */
+        if ( (v->arch.guest_context.ctrlreg[4] & X86_CR4_TSD) &&
+             !guest_kernel_mode(v, regs) )
+            goto fail;
         if ( insn_fetch(u8, code_base, eip, code_limit) != 0xf9 )
             goto fail;
         pv_soft_rdtsc(v, regs, 1);
@@ -2093,12 +2094,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             break;
 
         case 4: /* Read CR4 */
-            /*
-             * Guests can read CR4 to see what features Xen has enabled. We
-             * therefore lie about PGE and PSE as they are unavailable to
-             * guests.
-             */
-            *reg = read_cr4() & ~(X86_CR4_PGE|X86_CR4_PSE);
+            *reg = v->arch.guest_context.ctrlreg[4];
             break;
 
         default:
@@ -2297,7 +2293,13 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     }
 
     case 0x31: /* RDTSC */
-        pv_soft_rdtsc(v, regs, 0);
+        if ( (v->arch.guest_context.ctrlreg[4] & X86_CR4_TSD) &&
+             !guest_kernel_mode(v, regs) )
+            goto fail;
+        if ( v->domain->arch.vtsc )
+            pv_soft_rdtsc(v, regs, 0);
+        else
+            rdtsc(regs->eax, regs->edx);
         break;
 
     case 0x32: /* RDMSR */
