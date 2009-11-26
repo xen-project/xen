@@ -3840,7 +3840,8 @@ class XendDomainInfo:
 
             try:
                 devid = dev_control.createDevice(config)
-                dev_control.waitForDevice(devid)
+                dev_type = self.getBlockDeviceClass(devid)
+                self._waitForDevice(dev_type, devid)
                 self.info.device_update(dev_uuid,
                                         cfg_xenapi = {'devid': devid})
             except Exception, exn:
