@@ -628,10 +628,10 @@ xc_domain_dumpcore_via_callback(int xc_handle,
         PERROR("Could not get section header for .xen_prstatus");
         goto out;
     }
-    filesz = sizeof(ctxt[0].c) * nr_vcpus;
+    filesz = sizeof(*ctxt) * nr_vcpus;
     sts = xc_core_shdr_set(shdr, strtab, XEN_DUMPCORE_SEC_PRSTATUS,
                            SHT_PROGBITS, offset, filesz,
-                           __alignof__(ctxt[0].c), sizeof(ctxt[0].c));
+                           __alignof__(*ctxt), sizeof(*ctxt));
     if ( sts != 0 )
         goto out;
     offset += filesz;
@@ -755,7 +755,7 @@ xc_domain_dumpcore_via_callback(int xc_handle,
         goto out;
 
     /* prstatus: .xen_prstatus */
-    sts = dump_rtn(args, (char *)&ctxt[0].c, sizeof(ctxt[0].c) * nr_vcpus);
+    sts = dump_rtn(args, (char *)ctxt, sizeof(*ctxt) * nr_vcpus);
     if ( sts != 0 )
         goto out;
 
