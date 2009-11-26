@@ -1221,12 +1221,6 @@ p2m_gfn_to_mfn(struct domain *d, unsigned long gfn, p2m_type_t *t,
 
     ASSERT(paging_mode_translate(d));
 
-    if ( unlikely(d->is_dying) )
-    {
-        *t = p2m_invalid;
-        return _mfn(INVALID_MFN);
-    }
-
     /* XXX This is for compatibility with the old model, where anything not 
      * XXX marked as RAM was considered to be emulated MMIO space.
      * XXX Once we start explicitly registering MMIO regions in the p2m 
