@@ -1041,6 +1041,7 @@ def make_config(vals):
             config.append(['vcpus', maxvcpus])
         if maxvcpus and vcpus:
            config.append(['vcpu_avail', (1 << vcpus) - 1])
+           config.append(['vcpus', maxvcpus])
 
         # For case we don't have maxvcpus set but we have vcpus we preserve
         # old behaviour
