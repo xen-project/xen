@@ -711,6 +711,8 @@ static void help(char *command)
         printf(" pci-attach                    insert a new pass-through pci device\n\n");
         printf(" pci-detach                    remove a domain's pass-through pci device\n\n");
         printf(" pci-list                      list pass-through pci devices for a domain\n\n");
+        printf(" pause                         pause execution of a domain\n\n");
+        printf(" unpause                       unpause a paused domain\n\n");
     } else if(!strcmp(command, "create")) {
         printf("Usage: xl create <ConfigFile> [options] [vars]\n\n");
         printf("Create a domain based on <ConfigFile>.\n\n");
@@ -729,6 +731,12 @@ static void help(char *command)
     } else if(!strcmp(command, "pci-list")) {
         printf("Usage: xl pci-list <Domain>\n\n");
         printf("List pass-through pci devices for a domain.\n\n");
+    } else if(!strcmp(command, "pause")) {
+        printf("Usage: xl pause <Domain>\n\n");
+        printf("Pause execution of a domain.\n\n");
+    } else if(!strcmp(command, "unpause")) {
+        printf("Usage: xl unpause <Domain>\n\n");
+        printf("Unpause a paused domain.\n\n");
     } else if(!strcmp(command, "destroy")) {
         printf("Usage: xl destroy <Domain>\n\n");
         printf("Terminate a domain immediately.\n\n");
@@ -881,6 +889,35 @@ int main_pciattach(int argc, char **argv)
     exit(0);
 }
 
+void pause_domain(char *p)
+{
+    struct libxl_ctx ctx;
+    uint32_t domid;
+
+    libxl_ctx_init(&ctx);
+    libxl_ctx_set_log(&ctx, log_callback, NULL);
+
+    if (libxl_param_to_domid(&ctx, p, &domid) < 0) {
+        fprintf(stderr, "%s is an invalid domain identifier\n", p);
+        exit(2);
+    }
+    libxl_domain_pause(&ctx, domid);
+}
+
+void unpause_domain(char *p)
+{
+    struct libxl_ctx ctx;
+    uint32_t domid;
+
+    libxl_ctx_init(&ctx);
+    libxl_ctx_set_log(&ctx, log_callback, NULL);
+
+    if (libxl_param_to_domid(&ctx, p, &domid) < 0) {
+        fprintf(stderr, "%s is an invalid domain identifier\n", p);
+        exit(2);
+    }
+    libxl_domain_unpause(&ctx, domid);
+}
 
 void destroy_domain(char *p)
 {
@@ -928,6 +965,60 @@ void list_domains(void)
                 ((float)info[i].cpu_time / 1e9));
     }
     free(info);
+}
+
+int main_pause(int argc, char **argv)
+{
+    int opt;
+    char *p;
+    
+
+    while ((opt = getopt(argc, argv, "h")) != -1) {
+        switch (opt) {
+        case 'h':
+            help("pause");
+            exit(0);
+        default:
+            fprintf(stderr, "option not supported\n");
+            break;
+        }
+    }
+    if (optind >= argc) {
+        help("pause");
+        exit(2);
+    }
+
+    p = argv[optind];
+
+    pause_domain(p);
+    exit(0);
+}
+
+int main_unpause(int argc, char **argv)
+{
+    int opt;
+    char *p;
+    
+
+    while ((opt = getopt(argc, argv, "h")) != -1) {
+        switch (opt) {
+        case 'h':
+            help("unpause");
+            exit(0);
+        default:
+            fprintf(stderr, "option not supported\n");
+            break;
+        }
+    }
+    if (optind >= argc) {
+        help("unpause");
+        exit(2);
+    }
+
+    p = argv[optind];
+
+    unpause_domain(p);
+    exit(0);
 }
 
 int main_destroy(int argc, char **argv)
@@ -1024,6 +1115,10 @@ int main(int argc, char **argv)
         main_pcidetach(argc - 1, argv + 1);
     } else if (!strcmp(argv[1], "pci-list")) {
         main_pcilist(argc - 1, argv + 1);
+    } else if (!strcmp(argv[1], "pause")) {
+        main_pause(argc - 1, argv + 1);
+    } else if (!strcmp(argv[1], "unpause")) {
+        main_unpause(argc - 1, argv + 1);
     } else if (!strcmp(argv[1], "help")) {
         if (argc > 2)
             help(argv[2]);
