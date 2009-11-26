@@ -2171,6 +2171,7 @@ static void hash_foreach(struct vcpu *v,
 
     /* Say we're here, to stop hash-lookups reordering the chains */
     ASSERT(shadow_locked_by_me(d));
+    ASSERT(d->arch.paging.shadow.hash_table);
     ASSERT(d->arch.paging.shadow.hash_walking == 0);
     d->arch.paging.shadow.hash_walking = 1;
 
@@ -3448,6 +3449,12 @@ shadow_write_p2m_entry(struct vcpu *v, unsigned long gfn,
     struct domain *d = v->domain;
     
     shadow_lock(d);
+
+    if ( unlikely(d->is_dying) )
+    {
+        shadow_unlock(d);
+        return;
+    }
 
     /* If we're removing an MFN from the p2m, remove it from the shadows too */
     if ( level == 1 )
