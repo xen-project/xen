@@ -851,9 +851,13 @@ static void __update_vcpu_system_time(struct vcpu *v, int force)
     else
         tsc_stamp = t->local_tsc_stamp;
 
-    if ( d->arch.tsc_mode ==  TSC_MODE_PVRDTSCP &&
-              boot_cpu_has(X86_FEATURE_RDTSCP) )
-        write_rdtscp_aux(d->arch.incarnation);
+    if ( boot_cpu_has(X86_FEATURE_RDTSCP) )
+    {
+        if ( d->arch.tsc_mode ==  TSC_MODE_PVRDTSCP )
+            write_rdtscp_aux(d->arch.incarnation);
+        else
+            write_rdtscp_aux(0);
+    }
 
     /* Don't bother unless timestamps have changed or we are forced. */
     if ( !force && (u->tsc_timestamp == tsc_stamp) )
@@ -1608,7 +1612,7 @@ void tsc_check_reliability(void)
  * PV SoftTSC Emulation.
  */
 
-void pv_soft_rdtsc(struct vcpu *v, struct cpu_user_regs *regs)
+void pv_soft_rdtsc(struct vcpu *v, struct cpu_user_regs *regs, int rdtscp)
 {
     s_time_t now = get_s_time();
     struct domain *d = v->domain;
@@ -1633,6 +1637,10 @@ void pv_soft_rdtsc(struct vcpu *v, struct cpu_user_regs *regs)
 
     regs->eax = (uint32_t)now;
     regs->edx = (uint32_t)(now >> 32);
+
+    if ( rdtscp )
+         regs->ecx =
+             (d->arch.tsc_mode == TSC_MODE_PVRDTSCP) ?  d->arch.incarnation : 0;
 }
 
 static int host_tsc_is_safe(void)
@@ -1826,7 +1834,7 @@ static void dump_softtsc(unsigned char key)
             printk(",khz=%"PRIu32"",d->arch.tsc_khz);
         if ( d->arch.incarnation )
             printk(",inc=%"PRIu32"",d->arch.incarnation);
-        if ( !d->arch.vtsc )
+        if ( !(d->arch.vtsc_kerncount | d->arch.vtsc_usercount) )
         {
             printk("\n");
             continue;

@@ -831,6 +831,26 @@ static void pv_cpuid(struct cpu_user_regs *regs)
     regs->edx = d;
 }
 
+static int emulate_invalid_rdtscp(struct cpu_user_regs *regs)
+{
+    char opcode[3];
+    unsigned long eip, rc;
+    struct vcpu *v = current;
+
+    eip = regs->eip;
+    if ( (rc = copy_from_user(opcode, (char *)eip, sizeof(opcode))) != 0 )
+    {
+        propagate_page_fault(eip + sizeof(opcode) - rc, 0);
+        return EXCRET_fault_fixed;
+    }
+    if ( memcmp(opcode, "\xf\x1\xf9", sizeof(opcode)) )
+        return 0;
+    eip += sizeof(opcode);
+    pv_soft_rdtsc(v, regs, 1);
+    instruction_done(regs, eip, 0);
+    return EXCRET_fault_fixed;
+}
+
 static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
 {
     char sig[5], instr[2];
@@ -879,7 +899,8 @@ asmlinkage void do_invalid_op(struct cpu_user_regs *regs)
 
     if ( likely(guest_mode(regs)) )
     {
-        if ( !emulate_forced_invalid_op(regs) )
+        if ( !emulate_invalid_rdtscp(regs) &&
+             !emulate_forced_invalid_op(regs) )
             do_guest_trap(TRAP_invalid_op, regs, 0);
         return;
     }
@@ -2009,11 +2030,12 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
 
  twobyte_opcode:
     /*
-     * All two-byte opcodes, except RDTSC (0x31) are executable only from
-     * guest kernel mode (virtual ring 0).
+     * All 2 and 3 byte opcodes, except RDTSC (0x31) and RDTSCP (0x1,0xF9)
+     * are executable only from guest kernel mode (virtual ring 0).
      */
     opcode = insn_fetch(u8, code_base, eip, code_limit);
     if ( !guest_kernel_mode(v, regs) &&
+         (opcode != 0x1) && /* always emulate rdtscp */
          !((opcode == 0x31) && v->domain->arch.vtsc) )
         goto fail;
 
@@ -2021,6 +2043,12 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         goto fail;
     switch ( opcode )
     {
+    case 0x1: /* RDTSCP */
+        if ( insn_fetch(u8, code_base, eip, code_limit) != 0xf9 )
+            goto fail;
+        pv_soft_rdtsc(v, regs, 1);
+        break;
+
     case 0x06: /* CLTS */
         (void)do_fpu_taskswitch(0);
         break;
@@ -2269,7 +2297,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     }
 
     case 0x31: /* RDTSC */
-        pv_soft_rdtsc(v, regs);
+        pv_soft_rdtsc(v, regs, 0);
         break;
 
     case 0x32: /* RDMSR */
