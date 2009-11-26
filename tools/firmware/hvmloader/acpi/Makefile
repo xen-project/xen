@@ -19,7 +19,6 @@ XEN_ROOT = ../../../..
 include $(XEN_ROOT)/tools/firmware/Rules.mk
 
 C_SRC = build.c dsdt.c static_tables.c
-H_SRC = $(wildcard *.h)
 OBJS  = $(patsubst %.c,%.o,$(C_SRC))
 
 CFLAGS += -I. -I.. $(CFLAGS_include)
@@ -33,12 +32,15 @@ ssdt_pm.h ssdt_tpm.h: %.h: %.asl
 	mv $*.hex $@
 	rm -f *.aml
 
-dsdt.c: dsdt.asl
+dsdt.c: dsdt.asl mk_dsdt.c
 	$(MAKE) iasl
-	iasl -tc dsdt.asl
-	mv dsdt.hex dsdt.c
+	$(HOSTCC) $(HOSTCFLAGS) -o mk_dsdt mk_dsdt.c
+	head -n -1 $< >_dsdt.asl
+	mk_dsdt >>_dsdt.asl
+	iasl -tc _dsdt.asl
+	mv _dsdt.hex dsdt.c
 	echo "int DsdtLen=sizeof(AmlCode);" >> dsdt.c
-	rm -f *.aml
+	rm -f *.aml _dsdt.asl mk_dsdt
 
 iasl:
 	@echo
@@ -50,9 +52,6 @@ iasl:
 
 acpi.a: $(OBJS)
 	$(AR) rc $@ $(OBJS)
-
-%.o: %.c $(H_SRC)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c -o $@ $<
 
 clean:
 	rm -rf *.a *.o $(IASL_VER) $(IASL_VER).tar.gz $(DEPS)
