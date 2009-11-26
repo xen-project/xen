@@ -1098,20 +1098,16 @@ void __init mp_config_acpi_legacy_irqs (void)
 	}
 }
 
-#define MAX_GSI_NUM	4096
-
 int mp_register_gsi (u32 gsi, int triggering, int polarity)
 {
 	int			ioapic = -1;
 	int			ioapic_pin = 0;
 	int			idx, bit = 0;
-	static int		pci_irq = 16;
 	/*
 	 * Mapping between Global System Interrups, which
 	 * represent all possible interrupts, and IRQs
 	 * assigned to actual devices.
 	 */
-	static int		gsi_to_irq[MAX_GSI_NUM];
 
 #ifdef CONFIG_ACPI_BUS
 	/* Don't set up the ACPI SCI because it's already set up */
@@ -1151,42 +1147,8 @@ int mp_register_gsi (u32 gsi, int triggering, int polarity)
 
 	mp_ioapic_routing[ioapic].pin_programmed[idx] |= (1<<bit);
 
-	if (triggering == ACPI_LEVEL_SENSITIVE) {
-		/*
-		 * For PCI devices assign IRQs in order, avoiding gaps
-		 * due to unused I/O APIC pins.
-		 */
-		int irq = gsi;
-		if (gsi < MAX_GSI_NUM) {
-			/*
-			 * Retain the VIA chipset work-around (gsi > 15), but
-			 * avoid a problem where the 8254 timer (IRQ0) is setup
-			 * via an override (so it's not on pin 0 of the ioapic),
-			 * and at the same time, the pin 0 interrupt is a PCI
-			 * type.  The gsi > 15 test could cause these two pins
-			 * to be shared as IRQ0, and they are not shareable.
-			 * So test for this condition, and if necessary, avoid
-			 * the pin collision.
-			 */
-			if (gsi > 15 || (gsi == 0 && !timer_uses_ioapic_pin_0))
-				gsi = pci_irq++;
-#ifdef CONFIG_ACPI_BUS
-			/*
-			 * Don't assign IRQ used by ACPI SCI
-			 */
-			if (gsi == acpi_fadt.sci_int)
-				gsi = pci_irq++;
-#endif
-			gsi_to_irq[irq] = gsi;
-		} else {
-			printk(KERN_ERR "GSI %u is too high\n", gsi);
-			return -E2BIG;
-		}
-	}
-
 	return io_apic_set_pci_routing(ioapic, ioapic_pin, gsi,
-		    triggering == ACPI_EDGE_SENSITIVE ? 0 : 1,
-		    polarity == ACPI_ACTIVE_HIGH ? 0 : 1);
+		    triggering, polarity);
 }
 
 #endif /* CONFIG_X86_IO_APIC */
