@@ -325,6 +325,20 @@ struct iremap_entry {
 #define iremap_set_present(v) do {(v).lo |= 1;} while(0)
 #define iremap_clear_present(v) do {(v).lo &= ~1;} while(0)
 
+/*
+ * Get the intr remap entry:
+ * maddr   - machine addr of the table
+ * index   - index of the entry
+ * entries - return addr of the page holding this entry, need unmap it
+ * entry   - return required entry
+ */
+#define GET_IREMAP_ENTRY(maddr, index, entries, entry)                        \
+do {                                                                          \
+    entries = (struct iremap_entry *)map_vtd_domain_page(                     \
+              (maddr) + (( (index) >> IREMAP_ENTRY_ORDER ) << PAGE_SHIFT ) ); \
+    entry = &entries[(index) % (1 << IREMAP_ENTRY_ORDER)];                    \
+} while(0)
+
 /* queue invalidation entry */
 struct qinval_entry {
     union {
@@ -472,7 +486,7 @@ struct qi_ctrl {
 
 struct ir_ctrl {
     u64 iremap_maddr;            /* interrupt remap table machine address */
-    int iremap_index;            /* interrupt remap index */
+    int iremap_num;              /* total num of used interrupt remap entry */
     spinlock_t iremap_lock;      /* lock for irq remappping table */
 };
 

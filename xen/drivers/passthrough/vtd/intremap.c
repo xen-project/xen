@@ -140,13 +140,72 @@ int iommu_supports_eim(void)
     return 1;
 }
 
+/* Mark specified intr remap entry as free */
+static void free_remap_entry(struct iommu *iommu, int index)
+{
+    struct iremap_entry *iremap_entry = NULL, *iremap_entries;
+    struct ir_ctrl *ir_ctrl = iommu_ir_ctrl(iommu);
+
+    if ( index < 0 || index > IREMAP_ENTRY_NR - 1 )
+        return;
+
+    ASSERT( spin_is_locked(&ir_ctrl->iremap_lock) );
+
+    GET_IREMAP_ENTRY(ir_ctrl->iremap_maddr, index,
+                     iremap_entries, iremap_entry);
+
+    memset(iremap_entry, 0, sizeof(struct iremap_entry));
+    iommu_flush_cache_entry(iremap_entry);
+    iommu_flush_iec_index(iommu, 0, index);
+
+    unmap_vtd_domain_page(iremap_entries);
+    ir_ctrl->iremap_num--;
+}
+
+/*
+ * Look for a free intr remap entry.
+ * Need hold iremap_lock, and setup returned entry before releasing lock.
+ */
+static int alloc_remap_entry(struct iommu *iommu)
+{
+    struct iremap_entry *iremap_entries = NULL;
+    struct ir_ctrl *ir_ctrl = iommu_ir_ctrl(iommu);
+    int i;
+
+    ASSERT( spin_is_locked(&ir_ctrl->iremap_lock) );
+
+    for ( i = 0; i < IREMAP_ENTRY_NR; i++ )
+    {
+        struct iremap_entry *p;
+        if ( i % (1 << IREMAP_ENTRY_ORDER) == 0 )
+        {
+            /* This entry across page boundry */
+            if ( iremap_entries )
+                unmap_vtd_domain_page(iremap_entries);
+
+            GET_IREMAP_ENTRY(ir_ctrl->iremap_maddr, i,
+                             iremap_entries, p);
+        }
+        else
+            p = &iremap_entries[i % (1 << IREMAP_ENTRY_ORDER)];
+
+        if ( p->lo_val == 0 && p->hi_val == 0 ) /* a free entry */
+            break;
+    }
+
+    if ( iremap_entries )
+        unmap_vtd_domain_page(iremap_entries);
+
+    ir_ctrl->iremap_num++;
+    return i;
+}
+
 static int remap_entry_to_ioapic_rte(
     struct iommu *iommu, int index, struct IO_xAPIC_route_entry *old_rte)
 {
     struct iremap_entry *iremap_entry = NULL, *iremap_entries;
     unsigned long flags;
     struct ir_ctrl *ir_ctrl = iommu_ir_ctrl(iommu);
-    u64 entry_base;
 
     if ( ir_ctrl == NULL )
     {
@@ -155,21 +214,26 @@ static int remap_entry_to_ioapic_rte(
         return -EFAULT;
     }
 
-    if ( index > ir_ctrl->iremap_index )
+    if ( index < 0 || index > IREMAP_ENTRY_NR - 1 )
     {
         dprintk(XENLOG_ERR VTDPREFIX,
-                "%s: index (%d) is larger than remap table entry size (%d)!\n",
-                __func__, index, ir_ctrl->iremap_index);
+                "%s: index (%d) for remap table is invalid !\n",
+                __func__, index);
         return -EFAULT;
     }
 
     spin_lock_irqsave(&ir_ctrl->iremap_lock, flags);
 
-    entry_base = ir_ctrl->iremap_maddr +
-                 (( index >> IREMAP_ENTRY_ORDER ) << PAGE_SHIFT );
-    iremap_entries =
-        (struct iremap_entry *)map_vtd_domain_page(entry_base);
-    iremap_entry = &iremap_entries[index % (1 << IREMAP_ENTRY_ORDER)];
+    GET_IREMAP_ENTRY(ir_ctrl->iremap_maddr, index,
+                     iremap_entries, iremap_entry);
+
+    if ( iremap_entry->hi_val == 0 && iremap_entry->lo_val == 0 )
+    {
+        dprintk(XENLOG_ERR VTDPREFIX,
+                "%s: index (%d) get an empty entry!\n",
+                __func__, index);
+        return -EFAULT;
+    }
 
     old_rte->vector = iremap_entry->lo.vector;
     old_rte->delivery_mode = iremap_entry->lo.dlm;
@@ -195,7 +259,6 @@ static int ioapic_rte_to_remap_entry(struct iommu *iommu,
     int index;
     unsigned long flags;
     struct ir_ctrl *ir_ctrl = iommu_ir_ctrl(iommu);
-    u64 entry_base;
 
     remap_rte = (struct IO_APIC_route_remap_entry *) old_rte;
     spin_lock_irqsave(&ir_ctrl->iremap_lock, flags);
@@ -203,8 +266,7 @@ static int ioapic_rte_to_remap_entry(struct iommu *iommu,
     index = apic_pin_2_ir_idx[apic][ioapic_pin];
     if ( index < 0 )
     {
-        ir_ctrl->iremap_index++;
-        index = ir_ctrl->iremap_index;
+        index = alloc_remap_entry(iommu);
         apic_pin_2_ir_idx[apic][ioapic_pin] = index;
     }
 
@@ -218,11 +280,8 @@ static int ioapic_rte_to_remap_entry(struct iommu *iommu,
         return -EFAULT;
     }
 
-    entry_base = ir_ctrl->iremap_maddr +
-                 (( index >> IREMAP_ENTRY_ORDER ) << PAGE_SHIFT );
-    iremap_entries =
-        (struct iremap_entry *)map_vtd_domain_page(entry_base);
-    iremap_entry = &iremap_entries[index % (1 << IREMAP_ENTRY_ORDER)];
+    GET_IREMAP_ENTRY(ir_ctrl->iremap_maddr, index,
+                     iremap_entries, iremap_entry);
 
     memcpy(&new_ire, iremap_entry, sizeof(struct iremap_entry));
 
@@ -291,7 +350,7 @@ unsigned int io_apic_read_remap_rte(
     struct ir_ctrl *ir_ctrl = iommu_ir_ctrl(iommu);
 
     if ( !iommu || !ir_ctrl || ir_ctrl->iremap_maddr == 0 ||
-        (ir_ctrl->iremap_index == -1) ||
+        (ir_ctrl->iremap_num == 0) ||
         ( (index = apic_pin_2_ir_idx[apic][ioapic_pin]) < 0 ) )
     {
         *IO_APIC_BASE(apic) = reg;
@@ -431,7 +490,6 @@ static int remap_entry_to_msi_msg(
     int index;
     unsigned long flags;
     struct ir_ctrl *ir_ctrl = iommu_ir_ctrl(iommu);
-    u64 entry_base;
 
     if ( ir_ctrl == NULL )
     {
@@ -444,21 +502,26 @@ static int remap_entry_to_msi_msg(
     index = (remap_rte->address_lo.index_15 << 15) |
              remap_rte->address_lo.index_0_14;
 
-    if ( index > ir_ctrl->iremap_index )
+    if ( index < 0 || index > IREMAP_ENTRY_NR - 1 )
     {
         dprintk(XENLOG_ERR VTDPREFIX,
-                "%s: index (%d) is larger than remap table entry size (%d)\n",
-                __func__, index, ir_ctrl->iremap_index);
+                "%s: index (%d) for remap table is invalid !\n",
+                __func__, index);
         return -EFAULT;
     }
 
     spin_lock_irqsave(&ir_ctrl->iremap_lock, flags);
 
-    entry_base = ir_ctrl->iremap_maddr +
-                 (( index >> IREMAP_ENTRY_ORDER ) << PAGE_SHIFT );
-    iremap_entries =
-        (struct iremap_entry *)map_vtd_domain_page(entry_base);
-    iremap_entry = &iremap_entries[index % (1 << IREMAP_ENTRY_ORDER)];
+    GET_IREMAP_ENTRY(ir_ctrl->iremap_maddr, index,
+                     iremap_entries, iremap_entry);
+
+    if ( iremap_entry->hi_val == 0 && iremap_entry->lo_val == 0 )
+    {
+        dprintk(XENLOG_ERR VTDPREFIX,
+                "%s: index (%d) get an empty entry!\n",
+                __func__, index);
+        return -EFAULT;
+    }
 
     msg->address_hi = MSI_ADDR_BASE_HI;
     msg->address_lo =
@@ -498,15 +561,27 @@ static int msi_msg_to_remap_entry(
     int index;
     unsigned long flags;
     struct ir_ctrl *ir_ctrl = iommu_ir_ctrl(iommu);
-    u64 entry_base;
 
     remap_rte = (struct msi_msg_remap_entry *) msg;
     spin_lock_irqsave(&ir_ctrl->iremap_lock, flags);
 
+    if ( msg == NULL )
+    {
+        /* Free specified unused IRTE */
+        free_remap_entry(iommu, msi_desc->remap_index);
+        spin_unlock_irqrestore(&ir_ctrl->iremap_lock, flags);
+        return 0;
+    }
+
     if ( msi_desc->remap_index < 0 )
     {
-        ir_ctrl->iremap_index++;
-        index = ir_ctrl->iremap_index;
+        /*
+         * TODO: Multiple-vector MSI requires allocating multiple continuous
+         * entries and configuring addr/data of msi_msg in different way. So
+         * alloca_remap_entry will be changed if enabling multiple-vector MSI
+         * in future.
+         */
+        index = alloc_remap_entry(iommu);
         msi_desc->remap_index = index;
     }
     else
@@ -523,11 +598,9 @@ static int msi_msg_to_remap_entry(
         return -EFAULT;
     }
 
-    entry_base = ir_ctrl->iremap_maddr +
-                 (( index >> IREMAP_ENTRY_ORDER ) << PAGE_SHIFT );
-    iremap_entries =
-        (struct iremap_entry *)map_vtd_domain_page(entry_base);
-    iremap_entry = &iremap_entries[index % (1 << IREMAP_ENTRY_ORDER)];
+    GET_IREMAP_ENTRY(ir_ctrl->iremap_maddr, index,
+                     iremap_entries, iremap_entry);
+
     memcpy(&new_ire, iremap_entry, sizeof(struct iremap_entry));
 
     /* Set interrupt remapping table entry */
@@ -642,7 +715,7 @@ int enable_intremap(struct iommu *iommu)
                     "Cannot allocate memory for ir_ctrl->iremap_maddr\n");
             return -ENOMEM;
         }
-        ir_ctrl->iremap_index = -1;
+        ir_ctrl->iremap_num = 0;
     }
 
 #ifdef CONFIG_X86

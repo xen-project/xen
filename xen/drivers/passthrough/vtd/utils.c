@@ -227,6 +227,7 @@ static void dump_iommu_info(unsigned char key)
             u64 iremap_maddr = dmar_readq(iommu->reg, DMAR_IRTA_REG);
             int nr_entry = 1 << ((iremap_maddr & 0xF) + 1);
             struct iremap_entry *iremap_entries = NULL;
+            int print_cnt = 0;
 
             printk("  Interrupt remapping table (nr_entry=0x%x. "
                 "Only dump P=1 entries here):\n", nr_entry);
@@ -238,14 +239,14 @@ static void dump_iommu_info(unsigned char key)
                 if ( i % (1 << IREMAP_ENTRY_ORDER) == 0 )
                 {
                     /* This entry across page boundry */
-                    u64 entry_base = iremap_maddr +
-                        (( i >> IREMAP_ENTRY_ORDER ) << PAGE_SHIFT );
                     if ( iremap_entries )
                         unmap_vtd_domain_page(iremap_entries);
-                    iremap_entries =
-                        (struct iremap_entry *)map_vtd_domain_page(entry_base);
+
+                    GET_IREMAP_ENTRY(iremap_maddr, i,
+                                     iremap_entries, p);
                 }
-                p = &iremap_entries[i % (1 << IREMAP_ENTRY_ORDER)];
+                else
+                    p = &iremap_entries[i % (1 << IREMAP_ENTRY_ORDER)];
 
                 if ( !p->lo.p )
                     continue;
@@ -255,9 +256,13 @@ static void dump_iommu_info(unsigned char key)
                     (u32)p->lo.dst, (u32)p->lo.vector, (u32)p->lo.avail,
                     (u32)p->lo.dlm, (u32)p->lo.tm, (u32)p->lo.rh,
                     (u32)p->lo.dm, (u32)p->lo.fpd, (u32)p->lo.p);
+                print_cnt++;
             }
             if ( iremap_entries )
                 unmap_vtd_domain_page(iremap_entries);
+            if ( iommu_ir_ctrl(iommu)->iremap_num != print_cnt )
+                printk("Warning: Print %d IRTE (actually have %d)!\n",
+                        print_cnt, iommu_ir_ctrl(iommu)->iremap_num);
 
         }
     }
@@ -276,7 +281,7 @@ static void dump_iommu_info(unsigned char key)
             iommu = ioapic_to_iommu(mp_ioapics[apic].mpc_apicid);
             ir_ctrl = iommu_ir_ctrl(iommu);
             if ( !iommu || !ir_ctrl || ir_ctrl->iremap_maddr == 0 ||
-                ir_ctrl->iremap_index == -1 )
+                ir_ctrl->iremap_num == 0 )
                 continue;
 
             printk( "\nRedirection table of IOAPIC %x:\n", apic);

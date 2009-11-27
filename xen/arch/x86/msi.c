@@ -438,6 +438,11 @@ int msi_free_irq(struct msi_desc *entry)
         start = (unsigned long)entry->mask_base & ~(PAGE_SIZE - 1);
         msix_put_fixmap(entry->dev, virt_to_fix(start));
     }
+
+    /* Free the unused IRTE if intr remap enabled */
+    if ( iommu_enabled )
+        iommu_update_ire_from_msi(entry, NULL);
+
     list_del(&entry->list);
     xfree(entry);
     return 0;
