@@ -180,7 +180,7 @@ SUBCOMMAND_HELP = {
                         '[vifname=<name>] [rate=<rate>] [model=<model>]'
                         '[accel=<accel>]',
                         'Create a new virtual network device.'),
-    'network-detach':  ('<Domain> <DevId> [-f|--force]',
+    'network-detach':  ('<Domain> <DevId|mac> [-f|--force]',
                         'Destroy a domain\'s virtual network device.'),
     'network-list'  :  ('<Domain> [--long]',
                         'List virtual network interfaces for a domain.'),
@@ -2804,23 +2804,44 @@ def xm_block_detach(args):
             detach(args, 'vbd')
 
 def xm_network_detach(args):
+    arg_check(args, "network-detach", 2, 3)
+    dom = args[0]
+    devid = args[1]
     if serverType == SERVER_XEN_API:
-        arg_check(args, "network-detach", 2, 3)
-        dom = args[0]
-        devid = args[1]
         vif_refs = server.xenapi.VM.get_VIFs(get_single_vm(dom))
-        vif_refs = [vif_ref for vif_ref in vif_refs
-                    if server.xenapi.VIF.\
-                    get_runtime_properties(vif_ref)["handle"] == devid]
+        if len(devid.split(":")) == 6:
+            mac = devid.lower()
+            vif_refs = [vif_ref for vif_ref in vif_refs
+                        if server.xenapi.VIF.\
+                        get_record(vif_ref)["MAC"].lower() == mac]
+        else:
+            vif_refs = [vif_ref for vif_ref in vif_refs
+                        if server.xenapi.VIF.\
+                        get_runtime_properties(vif_ref)["handle"] == devid]
+
         if len(vif_refs) > 0:
             vif_ref = vif_refs[0]
             
             server.xenapi.VIF.destroy(vif_ref)
         else:
-            print "Cannot find device '%s' in domain '%s'" % (devid,dom)
+            raise OptionError("Cannot find device '%s' in domain '%s'" % (devid, dom))
     else:
-        arg_check(args, 'network-detach', 2, 3)
-        detach(args, 'vif')
+        if len(devid.split(":")) == 6:
+            mac = devid.lower()
+            vifs = server.xend.domain.getDeviceSxprs(dom, "vif")
+            devids = [vif[0] for vif in vifs
+                      if parse_dev_info(vif[1])["mac"].lower() == mac]
+            if len(devids) > 0:
+                devid = str(devids[0])
+            else:
+                raise OptionError("Cannot find device '%s' in domain '%s'" % (devid, dom))
+
+        vif_args = [dom, devid]
+        try:
+            vif_args.append(args[2])
+        except IndexError:
+            pass
+        detach(vif_args, 'vif')
 
 def find_attached(attached, key, detaching):
     l = filter(lambda dev: pci_dict_cmp(dev, key), attached)
