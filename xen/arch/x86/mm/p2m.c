@@ -1497,7 +1497,7 @@ int set_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
 {
     unsigned long todo = 1ul << page_order;
     unsigned int order;
-    int rc = 0;
+    int rc = 1;
 
     while ( todo )
     {
@@ -1506,7 +1506,8 @@ int set_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
                 9 : 0;
         else
             order = 0;
-        rc = d->arch.p2m->set_entry(d, gfn, mfn, order, p2mt);
+        if ( !d->arch.p2m->set_entry(d, gfn, mfn, order, p2mt) )
+            rc = 0;
         gfn += 1ul << order;
         if ( mfn_x(mfn) != INVALID_MFN )
             mfn = _mfn(mfn_x(mfn) + (1ul << order));
