@@ -94,6 +94,8 @@ typedef struct {
 } libxl_domain_build_state;
 
 typedef struct {
+#define XL_SUSPEND_DEBUG 1
+#define XL_SUSPEND_LIVE 2
     int flags;
     int (*suspend_callback)(void *, int);
 } libxl_domain_suspend_info;
@@ -107,6 +109,7 @@ typedef struct {
     int domid;
     char *dom_name;
     char *device_model;
+    char *saved_state;
     libxl_qemu_machine_type type;
     int videoram; /* size of the videoram in MB */
     bool stdvga; /* stdvga enabled or disabled */
@@ -254,7 +257,8 @@ int libxl_ctx_set_log(struct libxl_ctx *ctx, libxl_log_callback log_callback, vo
 int libxl_domain_make(struct libxl_ctx *ctx, libxl_domain_create_info *info, uint32_t *domid);
 int libxl_domain_build(struct libxl_ctx *ctx, libxl_domain_build_info *info, uint32_t domid, /* out */ libxl_domain_build_state *state);
 int libxl_domain_restore(struct libxl_ctx *ctx, libxl_domain_build_info *info,
-                          uint32_t domid, int fd);
+                         uint32_t domid, int fd, libxl_domain_build_state *state,
+                         libxl_device_model_info *dm_info);
 int libxl_domain_suspend(struct libxl_ctx *ctx, libxl_domain_suspend_info *info,
                           uint32_t domid, int fd);
 int libxl_domain_shutdown(struct libxl_ctx *ctx, uint32_t domid, int req);

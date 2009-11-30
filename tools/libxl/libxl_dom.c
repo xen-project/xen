@@ -163,71 +163,36 @@ int restore_common(struct libxl_ctx *ctx, uint32_t domid,
                       state->store_port, &state->store_mfn,
                       state->console_port, &state->console_mfn,
                       info->hvm, info->u.hvm.pae, 0);
+#if defined(__i386__) || defined(__x86_64__)
+    xc_cpuid_apply_policy(ctx->xch, domid);
+#endif
     return 0;
 }
 
-/* the following code is extremely ugly and racy without forking.
-   we intend to fix the re-entrancy of the underlying code instead of forking */
-static struct libxl_ctx *global_suspend_ctx = NULL;
-static struct suspendinfo {
-    int xch;
+struct suspendinfo {
+    struct libxl_ctx *ctx;
     int xce; /* event channel handle */
     int suspend_eventchn;
     int domid;
     int hvm;
     unsigned int flags;
-} si;
+};
 
-void core_suspend_switch_qemu_logdirty(int domid, unsigned int enable)
+static void core_suspend_switch_qemu_logdirty(int domid, unsigned int enable)
 {
-    struct xs_handle *xs;
-    char *path, *ret_path, *cmd_path, *ret_str, *cmd_str, **watch;
-    unsigned int len;
-    struct timeval tv;
-    fd_set fdset;
-    struct libxl_ctx *ctx = global_suspend_ctx;
+    struct xs_handle *xsh;
+    char path[64];
 
-    xs = xs_daemon_open();
-    if (!xs)
-        return;
-    path = libxl_sprintf(ctx, "/local/domain/0/device-model/%i/logdirty", domid);
-    if (!path)
-        return;
-    ret_path = libxl_sprintf(ctx, "%s/ret", path);
-    if (!ret_path)
-        return;
-    cmd_path = libxl_sprintf(ctx, "%s/cmd", path);
-    if (!ret_path)
-        return;
+    snprintf(path, sizeof(path), "/local/domain/0/device-model/%u/logdirty/cmd", domid);
 
-    /* Watch for qemu's return value */
-    if (!xs_watch(xs, ret_path, "qemu-logdirty-ret"))
-        return;
+    xsh = xs_daemon_open();
 
-    cmd_str = (enable == 0) ? "disable" : "enable";
+    if (enable)
+        xs_write(xsh, XBT_NULL, path, "enable", strlen("enable"));
+    else
+        xs_write(xsh, XBT_NULL, path, "disable", strlen("disable"));
 
-    /* Tell qemu that we want it to start logging dirty page to Xen */
-    if (!xs_write(xs, XBT_NULL, cmd_path, cmd_str, strlen(cmd_str)))
-        return;
-
-    /* Wait a while for qemu to signal that it has service logdirty command */
-read_again:
-    tv.tv_sec = 5;
-    tv.tv_usec = 0;
-    FD_ZERO(&fdset);
-    FD_SET(xs_fileno(xs), &fdset);
-
-    if ((select(xs_fileno(xs) + 1, &fdset, NULL, NULL, &tv)) != 1)
-        return;
-
-    watch = xs_read_watch(xs, &len);
-    free(watch);
-
-    ret_str = xs_read(xs, XBT_NULL, ret_path, &len);
-    if (ret_str == NULL || strcmp(ret_str, cmd_str))
-        /* Watch fired but value is not yet right */
-        goto read_again;
-    free(ret_str);
+    xs_daemon_close(xsh);
 }
 
 static int core_suspend_callback(void *data)
@@ -235,46 +200,77 @@ static int core_suspend_callback(void *data)
     struct suspendinfo *si = data;
     unsigned long s_state = 0;
     int ret;
+    char *path, *state = "suspend";
+    int watchdog = 60;
 
     if (si->hvm)
-        xc_get_hvm_param(si->xch, si->domid, HVM_PARAM_ACPI_S_STATE, &s_state);
+        xc_get_hvm_param(si->ctx->xch, si->domid, HVM_PARAM_ACPI_S_STATE, &s_state);
     if ((s_state == 0) && (si->suspend_eventchn >= 0)) {
-        ret = xc_evtchn_notify(si->xch, si->suspend_eventchn);
+        ret = xc_evtchn_notify(si->xce, si->suspend_eventchn);
         if (ret < 0) {
+            XL_LOG(si->ctx, XL_LOG_ERROR, "xc_evtchn_notify failed ret=%d", ret);
             return 0;
         }
-        ret = xc_await_suspend(si->xch, si->suspend_eventchn);
+        ret = xc_await_suspend(si->xce, si->suspend_eventchn);
         if (ret < 0) {
+            XL_LOG(si->ctx, XL_LOG_ERROR, "xc_await_suspend failed ret=%d", ret);
             return 0;
         }
         return 1;
     }
-    /* need to shutdown (to suspend) the domain here */
-    return 0;
+    path = libxl_sprintf(si->ctx, "%s/control/shutdown", libxl_xs_get_dompath(si->ctx, si->domid));
+    libxl_xs_write(si->ctx, XBT_NULL, path, "suspend", strlen("suspend"));
+    if (si->hvm) {
+        unsigned long hvm_pvdrv, hvm_s_state;
+        xc_get_hvm_param(si->ctx->xch, si->domid, HVM_PARAM_CALLBACK_IRQ, &hvm_pvdrv);
+        xc_get_hvm_param(si->ctx->xch, si->domid, HVM_PARAM_ACPI_S_STATE, &hvm_s_state);
+        if (!hvm_pvdrv || hvm_s_state) {
+            XL_LOG(si->ctx, XL_LOG_DEBUG, "Calling xc_domain_shutdown on the domain");
+            xc_domain_shutdown(si->ctx->xch, si->domid, SHUTDOWN_suspend);
+        }
+    }
+    XL_LOG(si->ctx, XL_LOG_DEBUG, "wait for the guest to suspend");
+    while (!strcmp(state, "suspend") && watchdog > 0) {
+        int nb_domain, i;
+        xc_dominfo_t *list = NULL;
+        usleep(100000);
+        list = libxl_domain_infolist(si->ctx, &nb_domain);
+        for (i = 0; i < nb_domain; i++) {
+            if (si->domid == list[i].domid) {
+                if (list[i].shutdown != 0 && list[i].shutdown_reason == SHUTDOWN_suspend) {
+                    free(list);
+                    return 1;
+                }
+            }
+        }
+        free(list);
+        state = libxl_xs_read(si->ctx, XBT_NULL, path);
+        watchdog--;
+    }
+    if (!strcmp(state, "suspend")) {
+        XL_LOG(si->ctx, XL_LOG_ERROR, "guest didn't suspend in time");
+        libxl_xs_write(si->ctx, XBT_NULL, path, "", 1);
+    }
+    return 1;
 }
-
-static struct save_callbacks callbacks;
 
 int core_suspend(struct libxl_ctx *ctx, uint32_t domid, int fd,
 		int hvm, int live, int debug)
 {
     int flags;
     int port;
+    struct save_callbacks callbacks;
+    struct suspendinfo si;
 
     flags = (live) ? XCFLAGS_LIVE : 0
-          | (debug) ? XCFLAGS_DEBUG : 0;
-
-    /* crappy global lock until we make everything clean */
-    while (global_suspend_ctx) {
-        sleep(1);
-    }
-    global_suspend_ctx = ctx;
+          | (debug) ? XCFLAGS_DEBUG : 0
+          | (hvm) ? XCFLAGS_HVM : 0;
 
     si.domid = domid;
     si.flags = flags;
     si.hvm = hvm;
-    si.suspend_eventchn = si.xce = -1;
-    si.xch = ctx->xch;
+    si.ctx = ctx;
+    si.suspend_eventchn = -1;
 
     si.xce = xc_evtchn_open();
     if (si.xce < 0)
@@ -284,28 +280,28 @@ int core_suspend(struct libxl_ctx *ctx, uint32_t domid, int fd,
         port = xs_suspend_evtchn_port(si.domid);
 
         if (port < 0) {
+            XL_LOG(ctx, XL_LOG_WARNING, "Failed to get the suspend evtchn port");
         } else {
-            si.suspend_eventchn = xc_suspend_evtchn_init(si.xch, si.xce, si.domid, port);
+            si.suspend_eventchn = xc_suspend_evtchn_init(si.ctx->xch, si.xce, si.domid, port);
 
-            if (si.suspend_eventchn < 0) {
-            }
+            if (si.suspend_eventchn < 0)
+                XL_LOG(ctx, XL_LOG_WARNING, "Suspend event channel initialization failed");
         }
     }
 
+    memset(&callbacks, 0, sizeof(callbacks));
     callbacks.suspend = core_suspend_callback;
-    callbacks.postcopy = NULL;
-    callbacks.checkpoint = NULL;
     callbacks.data = &si;
 
     xc_domain_save(ctx->xch, fd, domid, 0, 0, flags,
                    &callbacks, hvm,
-                   core_suspend_switch_qemu_logdirty);
+                   &core_suspend_switch_qemu_logdirty);
 
     if (si.suspend_eventchn > 0)
         xc_suspend_evtchn_release(si.xce, si.suspend_eventchn);
     if (si.xce > 0)
         xc_evtchn_close(si.xce);
 
-    global_suspend_ctx = NULL;
     return 0;
 }
+

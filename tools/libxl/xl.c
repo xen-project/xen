@@ -32,6 +32,7 @@
 #include <arpa/inet.h>
 #include <xenctrl.h>
 
+
 #include "libxl.h"
 #include "libxl_utils.h"
 
@@ -575,7 +576,7 @@ skip_pci:
         }                                                               \
     })
 
-static void create_domain(int debug, const char *filename)
+static void create_domain(int debug, const char *config_file, const char *restore_file, int paused)
 {
     struct libxl_ctx ctx;
     uint32_t domid;
@@ -593,9 +594,10 @@ static void create_domain(int debug, const char *filename)
     int i, fd;
     int need_daemon = 1;
     libxl_device_model_starting *dm_starting = 0;
+    memset(&dm_info, 0x00, sizeof(dm_info));
 
-    printf("Parsing config file %s\n", filename);
-    parse_config_file(filename, &info1, &info2, &disks, &num_disks, &vifs, &num_vifs, &pcidevs, &num_pcidevs, &vfbs, &num_vfbs, &vkbs, &num_vkbs, &dm_info);
+    printf("Parsing config file %s\n", config_file);
+    parse_config_file(config_file, &info1, &info2, &disks, &num_disks, &vifs, &num_vifs, &pcidevs, &num_pcidevs, &vfbs, &num_vfbs, &vkbs, &num_vkbs, &dm_info);
     if (debug)
         printf_info(&info1, &info2, disks, num_disks, vifs, num_vifs, pcidevs, num_pcidevs, vfbs, num_vfbs, vkbs, num_vkbs, &dm_info);
 
@@ -605,7 +607,20 @@ start:
     libxl_ctx_init(&ctx);
     libxl_ctx_set_log(&ctx, log_callback, NULL);
     libxl_domain_make(&ctx, &info1, &domid);
-    libxl_domain_build(&ctx, &info2, domid, &state);
+
+    if (!restore_file || !need_daemon) {
+        if (dm_info.saved_state) {
+            free(dm_info.saved_state);
+            dm_info.saved_state = NULL;
+        }
+        libxl_domain_build(&ctx, &info2, domid, &state);
+    } else {
+        int restore_fd;
+
+        restore_fd = open(restore_file, O_RDONLY);
+        libxl_domain_restore(&ctx, &info2, domid, restore_fd, &state, &dm_info);
+        close(restore_fd);
+    }
 
     for (i = 0; i < num_disks; i++) {
         disk_info_domid_fixup(disks + i, domid);
@@ -640,7 +655,8 @@ start:
     for (i = 0; i < num_pcidevs; i++)
         libxl_device_pci_add(&ctx, domid, &pcidevs[i]);
 
-    libxl_domain_unpause(&ctx, domid);
+    if (!paused)
+        libxl_domain_unpause(&ctx, domid);
 
     if (need_daemon) {
         char *fullname, *name;
@@ -712,6 +728,8 @@ static void help(char *command)
         printf(" pause                         pause execution of a domain\n\n");
         printf(" unpause                       unpause a paused domain\n\n");
         printf(" console                       attach to domain's console\n\n");
+        printf(" save                          save a domain state to restore later\n\n");
+        printf(" restore                       restore a domain from a saved state\n\n");
     } else if(!strcmp(command, "create")) {
         printf("Usage: xl create <ConfigFile> [options] [vars]\n\n");
         printf("Create a domain based on <ConfigFile>.\n\n");
@@ -736,6 +754,18 @@ static void help(char *command)
     } else if(!strcmp(command, "unpause")) {
         printf("Usage: xl unpause <Domain>\n\n");
         printf("Unpause a paused domain.\n\n");
+    } else if(!strcmp(command, "save")) {
+        printf("Usage: xl save [options] <Domain> <CheckpointFile>\n\n");
+        printf("Save a domain state to restore later.\n\n");
+        printf("Options:\n\n");
+        printf("-h                     Print this help.\n");
+        printf("-c                     Leave domain running after creating the snapshot.\n");
+    } else if(!strcmp(command, "restore")) {
+        printf("Usage: xl restore [options] <ConfigFile> <CheckpointFile>\n\n");
+        printf("Restore a domain from a saved state.\n\n");
+        printf("Options:\n\n");
+        printf("-h                     Print this help.\n");
+        printf("-p                     Do not unpause domain after restoring it.\n");
     } else if(!strcmp(command, "destroy")) {
         printf("Usage: xl destroy <Domain>\n\n");
         printf("Terminate a domain immediately.\n\n");
@@ -1015,6 +1045,101 @@ void list_domains(void)
     free(info);
 }
 
+int save_domain(char *p, char *filename, int checkpoint)
+{
+    struct libxl_ctx ctx;
+    uint32_t domid;
+    int fd;
+
+    libxl_ctx_init(&ctx);
+    libxl_ctx_set_log(&ctx, log_callback, NULL);
+
+    if (libxl_param_to_domid(&ctx, p, &domid) < 0) {
+        fprintf(stderr, "%s is an invalid domain identifier\n", p);
+        exit(2);
+    }
+    fd = open(filename, O_WRONLY|O_CREAT|O_TRUNC, 0644);
+    if (fd < 0) {
+        fprintf(stderr, "Failed to open temp file %s for writing\n", filename);
+        exit(2);
+    }
+    libxl_domain_suspend(&ctx, NULL, domid, fd);
+    close(fd);
+
+    if (checkpoint)
+        libxl_domain_unpause(&ctx, domid);
+    else
+        libxl_domain_destroy(&ctx, domid, 0);
+
+    exit(0);
+}
+
+int main_restore(int argc, char **argv)
+{
+    char *checkpoint_file = NULL;
+    char *config_file = NULL;
+    int paused = 0, debug = 0;
+    int opt;
+
+    while ((opt = getopt(argc, argv, "hpd")) != -1) {
+        switch (opt) {
+        case 'p':
+            paused = 1;
+            break;
+        case 'd':
+            debug = 1;
+            break;
+        case 'h':
+            help("restore");
+            exit(0);
+        default:
+            fprintf(stderr, "option not supported\n");
+            break;
+        }
+    }
+
+    if (optind >= argc - 1) {
+        help("restore");
+        exit(2);
+    }
+
+    config_file = argv[optind];
+    checkpoint_file = argv[optind + 1];
+    create_domain(debug, config_file, checkpoint_file, paused);
+    exit(0);
+}
+
+int main_save(int argc, char **argv)
+{
+    char *filename = NULL, *p = NULL;
+    int checkpoint = 0;
+    int opt;
+
+    while ((opt = getopt(argc, argv, "hc")) != -1) {
+        switch (opt) {
+        case 'c':
+            checkpoint = 1;
+            break;
+        case 'h':
+            help("save");
+            exit(0);
+        default:
+            fprintf(stderr, "option not supported\n");
+            break;
+        }
+    }
+
+    if (optind >= argc - 1) {
+        help("save");
+        exit(2);
+    }
+
+    p = argv[optind];
+    filename = argv[optind + 1];
+    save_domain(p, filename, checkpoint);
+    exit(0);
+}
+
 int main_pause(int argc, char **argv)
 {
     int opt;
@@ -1140,7 +1265,7 @@ int main_create(int argc, char **argv)
     }
 
     filename = argv[optind];
-    create_domain(debug, filename);
+    create_domain(debug, filename, NULL, 0);
     exit(0);
 }
 
@@ -1169,6 +1294,10 @@ int main(int argc, char **argv)
         main_unpause(argc - 1, argv + 1);
     } else if (!strcmp(argv[1], "console")) {
         main_console(argc - 1, argv + 1);
+    } else if (!strcmp(argv[1], "save")) {
+        main_save(argc - 1, argv + 1);
+    } else if (!strcmp(argv[1], "restore")) {
+        main_restore(argc - 1, argv + 1);
     } else if (!strcmp(argv[1], "help")) {
         if (argc > 2)
             help(argv[2]);

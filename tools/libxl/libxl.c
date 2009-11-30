@@ -217,29 +217,36 @@ int libxl_domain_build(struct libxl_ctx *ctx, libxl_domain_build_info *info, uin
 }
 
 int libxl_domain_restore(struct libxl_ctx *ctx, libxl_domain_build_info *info,
-                          uint32_t domid, int fd)
+                         uint32_t domid, int fd, libxl_domain_build_state *state,
+                         libxl_device_model_info *dm_info)
 {
-    libxl_domain_build_state state;
     char **vments = NULL, **localents = NULL;
 
-    memset(&state, '\0', sizeof(state));
-
-    build_pre(ctx, domid, info, &state);
-    restore_common(ctx, domid, info, &state, fd);
+    build_pre(ctx, domid, info, state);
+    restore_common(ctx, domid, info, state, fd);
     if (info->hvm) {
-        vments = libxl_calloc(ctx, 4, sizeof(char *));
+        vments = libxl_calloc(ctx, 5, sizeof(char *));
         vments[0] = "rtc/timeoffset";
         vments[1] = (info->u.hvm.timeoffset) ? info->u.hvm.timeoffset : "";
+        vments[2] = "image/ostype";
+        vments[3] = "hvm";
     } else {
-        localents = libxl_calloc(ctx, 4 * 2, sizeof(char *));
-        localents[0] = "serial/0/limit";
-        localents[1] = libxl_sprintf(ctx, "%d", 65536);
-        localents[2] = "console/port";
-        localents[3] = libxl_sprintf(ctx, "%d", state.console_port);
-        localents[4] = "console/ring-ref";
-        localents[5] = libxl_sprintf(ctx, "%ld", state.console_mfn);
+        vments = libxl_calloc(ctx, 9, sizeof(char *));
+        vments[0] = "image/ostype";
+        vments[1] = "linux";
+        vments[2] = "image/kernel";
+        vments[3] = (char*) info->kernel;
+        vments[4] = "image/ramdisk";
+        vments[5] = (char*) info->u.pv.ramdisk;
+        vments[6] = "image/cmdline";
+        vments[7] = (char*) info->u.pv.cmdline;
     }
-    build_post(ctx, domid, info, &state, vments, localents);
+    build_post(ctx, domid, info, state, vments, localents);
+    if (info->hvm)
+        asprintf(&(dm_info->saved_state), "/var/lib/xen/qemu-save.%d", domid);
+    else
+        dm_info->saved_state = NULL;
+
     return 0;
 }
 
@@ -299,17 +306,37 @@ xc_dominfo_t * libxl_domain_infolist(struct libxl_ctx *ctx, int *nb_domain)
     return info;
 }
 
+static int libxl_save_device_model(struct libxl_ctx *ctx, uint32_t domid, int fd)
+{
+    int fd2, c;
+    char buf[1024];
+    char *filename = libxl_sprintf(ctx, "/var/lib/xen/qemu-save.%d", domid);
+
+    XL_LOG(ctx, XL_LOG_DEBUG, "Saving device model state to %s", filename);
+    libxl_xs_write(ctx, XBT_NULL, libxl_sprintf(ctx, "/local/domain/0/device-model/%d/command", domid), "save", strlen("save"));
+    libxl_wait_for_device_model(ctx, domid, "paused", NULL, NULL);
+
+    write(fd, QEMU_SIGNATURE, strlen(QEMU_SIGNATURE));
+    fd2 = open(filename, O_RDONLY);
+    while ((c = read(fd2, buf, sizeof(buf))) != 0) {
+        write(fd, buf, c);
+    }
+    close(fd2);
+    unlink(filename);
+    return 0;
+}
+
 int libxl_domain_suspend(struct libxl_ctx *ctx, libxl_domain_suspend_info *info,
                          uint32_t domid, int fd)
 {
-    int hvm = 1;
-    int live = 0;
-    int debug = 0;
-    char savesig[] = "XenSavedDomain\n";
+    int hvm = is_hvm(ctx, domid);
+    int live = info != NULL && info->flags & XL_SUSPEND_LIVE;
+    int debug = info != NULL && info->flags & XL_SUSPEND_LIVE;
 
-    write(fd, savesig, strlen(savesig));
 
     core_suspend(ctx, domid, fd, hvm, live, debug);
+    if (hvm)
+        libxl_save_device_model(ctx, domid, fd);
 
     return 0;
 }
@@ -322,7 +349,19 @@ int libxl_domain_pause(struct libxl_ctx *ctx, uint32_t domid)
 
 int libxl_domain_unpause(struct libxl_ctx *ctx, uint32_t domid)
 {
+    char path[50];
+    char *state;
+
+    if (is_hvm(ctx, domid)) {
+        snprintf(path, sizeof(path), "/local/domain/0/device-model/%d/state", domid);
+        state = libxl_xs_read(ctx, XBT_NULL, path);
+        if (state != NULL && !strcmp(state, "paused")) {
+            libxl_xs_write(ctx, XBT_NULL, libxl_sprintf(ctx, "/local/domain/0/device-model/%d/command", domid), "continue", strlen("continue"));
+            libxl_wait_for_device_model(ctx, domid, "running", NULL, NULL);
+        }
+    }
     xc_domain_unpause(ctx->xch, domid);
+
     return 0;
 }
 
@@ -578,6 +617,10 @@ static char ** libxl_build_device_model_args(struct libxl_ctx *ctx,
                             vifs[i].devid, vifs[i].ifname, vifs[i].bridge));
             }
         }
+    }
+    if (info->saved_state) {
+        flexarray_set(dm_args, num++, "-loadvm");
+        flexarray_set(dm_args, num++, info->saved_state);
     }
     for (i = 0; info->extra && info->extra[i] != NULL; i++)
         flexarray_set(dm_args, num++, info->extra[i]);

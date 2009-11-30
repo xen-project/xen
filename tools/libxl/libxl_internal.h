@@ -30,6 +30,7 @@
 #define LIBXL_DESTROY_TIMEOUT 10
 #define LIBXL_XENCONSOLE_LIMIT 1048576
 #define LIBXL_XENCONSOLE_PROTOCOL "vt100"
+#define QEMU_SIGNATURE "QemuDeviceModelRecord"
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))
 
