@@ -84,6 +84,7 @@ void tmh_copy_page(char *to, char*from)
 static inline void *cli_mfn_to_va(tmem_cli_mfn_t cmfn, unsigned long *pcli_mfn)
 {
     ASSERT(0);
+    return NULL;
 }
 #define paging_mark_dirty(_x,_y) do {} while(0)
 #else

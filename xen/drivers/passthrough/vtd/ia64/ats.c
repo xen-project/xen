@@ -28,6 +28,8 @@
 #include "../vtd.h"
 #include "../extern.h"
 
+struct pci_ats_dev;
+
 int ats_enabled = 0;
 
 struct acpi_drhd_unit * find_ats_dev_drhd(struct iommu *iommu)
@@ -44,12 +46,6 @@ int enable_ats_device(int seg, int bus, int devfn)
 {
     return 0;
 }        
-
-static int device_in_domain(struct iommu *iommu,
-                            struct pci_ats_dev *pdev, u16 did)
-{
-    return 0;
-}
 
 int dev_invalidate_iotlb(struct iommu *iommu, u16 did,
     u64 addr, unsigned int size_order, u64 type)

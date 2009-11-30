@@ -2875,6 +2875,7 @@ donate_page(struct domain *d, struct page_info *page, unsigned int memflags)
 {
     /* needs to be implemented for transcendent memory (tmem) */
     ASSERT(0);
+    return -ENOSYS;
 }
 
 static void

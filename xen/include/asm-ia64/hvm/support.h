@@ -25,13 +25,14 @@
 
 #include <xen/hvm/save.h>
 
-static int hvm_girq_dest_2_vcpu_id(struct domain *d, uint8_t dest,
+static inline int hvm_girq_dest_2_vcpu_id(struct domain *d, uint8_t dest,
                                 uint8_t dest_mode)
 {
     /* TODO */
+    return -ENOSYS;
 }
 
-static void hvm_migrate_pirqs(struct vcpu *v)
+static inline void hvm_migrate_pirqs(struct vcpu *v)
 {
     /* TODO */
 }
