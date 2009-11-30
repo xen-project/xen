@@ -263,12 +263,10 @@ static void parse_config_file(const char *filename,
 
     init_create_info(c_info);
 
-    if (config_lookup_string (&config, "builder", &buf) == CONFIG_TRUE) {
-        if (!strncmp(buf, "hvm", strlen(buf)))
-            c_info->hvm = 1;
-        else
-            c_info->hvm = 0;
-    }
+    c_info->hvm = 0;
+    if ((config_lookup_string (&config, "builder", &buf) == CONFIG_TRUE) &&
+        !strncmp(buf, "hvm", strlen(buf)))
+        c_info->hvm = 1;
 
     /* hap is missing */
     if (config_lookup_string (&config, "name", &buf) == CONFIG_TRUE)
