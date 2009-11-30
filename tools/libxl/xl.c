@@ -711,6 +711,7 @@ static void help(char *command)
         printf(" pci-list                      list pass-through pci devices for a domain\n\n");
         printf(" pause                         pause execution of a domain\n\n");
         printf(" unpause                       unpause a paused domain\n\n");
+        printf(" console                       attach to domain's console\n\n");
     } else if(!strcmp(command, "create")) {
         printf("Usage: xl create <ConfigFile> [options] [vars]\n\n");
         printf("Create a domain based on <ConfigFile>.\n\n");
@@ -738,7 +739,56 @@ static void help(char *command)
     } else if(!strcmp(command, "destroy")) {
         printf("Usage: xl destroy <Domain>\n\n");
         printf("Terminate a domain immediately.\n\n");
+    } else if (!strcmp(command, "console")) {
+        printf("Usage: xl console <Domain>\n\n");
+        printf("Attach to domain's console.\n\n");
     }
+}
+
+void console(char *p, int cons_num)
+{
+    struct libxl_ctx ctx;
+    uint32_t domid;
+
+    libxl_ctx_init(&ctx);
+    libxl_ctx_set_log(&ctx, log_callback, NULL);
+
+    if (libxl_param_to_domid(&ctx, p, &domid) < 0) {
+        fprintf(stderr, "%s is an invalid domain identifier\n", p);
+        exit(2);
+    }
+    libxl_console_attach(&ctx, domid, cons_num);
+}
+
+int main_console(int argc, char **argv)
+{
+    int opt = 0, cons_num = 0;
+    char *p = NULL;
+
+    while ((opt = getopt(argc, argv, "hn:")) != -1) {
+        switch (opt) {
+        case 'h':
+            help("console");
+            exit(0);
+        case 'n':
+            if (optarg) {
+                cons_num = strtol(optarg, NULL, 10);
+            }
+            break;
+        default:
+            fprintf(stderr, "option not supported\n");
+            break;
+        }
+    }
+    if (optind >= argc) {
+        help("console");
+        exit(2);
+    }
+
+    p = argv[optind];
+
+    console(p, cons_num);
+    exit(0);
 }
 
 void pcilist(char *dom)
@@ -1117,6 +1167,8 @@ int main(int argc, char **argv)
         main_pause(argc - 1, argv + 1);
     } else if (!strcmp(argv[1], "unpause")) {
         main_unpause(argc - 1, argv + 1);
+    } else if (!strcmp(argv[1], "console")) {
+        main_console(argc - 1, argv + 1);
     } else if (!strcmp(argv[1], "help")) {
         if (argc > 2)
             help(argv[2]);

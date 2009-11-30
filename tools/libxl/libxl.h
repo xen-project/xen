@@ -266,6 +266,8 @@ int libxl_is_domain_dead(struct libxl_ctx *ctx, uint32_t domid, xc_dominfo_t *in
 int libxl_domain_pause(struct libxl_ctx *ctx, uint32_t domid);
 int libxl_domain_unpause(struct libxl_ctx *ctx, uint32_t domid);
 
+int libxl_console_attach(struct libxl_ctx *ctx, uint32_t domid, int cons_num);
+
 struct libxl_dominfo * libxl_domain_list(struct libxl_ctx *ctx, int *nb_domain);
 xc_dominfo_t * libxl_domain_infolist(struct libxl_ctx *ctx, int *nb_domain);
 
