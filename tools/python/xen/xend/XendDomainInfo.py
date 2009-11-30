@@ -1667,6 +1667,7 @@ class XendDomainInfo:
             'name':               self.info['name_label'],
             'console/limit':      str(xoptions.get_console_limit() * 1024),
             'memory/target':      str(self.info['memory_dynamic_max'] / 1024),
+            'description':        str(self.info['description']),
             }
 
         def f(n, v):

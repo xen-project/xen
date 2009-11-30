@@ -127,6 +127,7 @@ XENAPI_CFG_TO_LEGACY_CFG = {
     'actions_after_crash': 'on_crash', 
     'PV_bootloader': 'bootloader',
     'PV_bootloader_args': 'bootloader_args',
+    'Description': 'description',
 }
 
 LEGACY_CFG_TO_XENAPI_CFG = reverse_dict(XENAPI_CFG_TO_LEGACY_CFG)
@@ -178,7 +179,6 @@ XENAPI_PLATFORM_CFG_TYPES = {
     'pci_power_mgmt': int,
     'xen_platform_pci': int,
     "gfx_passthru": int,
-    'description': str,
     'oos' : int,
 }
 
@@ -275,6 +275,7 @@ LEGACY_CFG_TYPES = {
     'rtc/timeoffset': str,
     'bootloader':    str,
     'bootloader_args': str,
+    'description':   str,
 }
 
 # Values that should be stored in xenstore's /vm/<uuid> that is used
@@ -405,6 +406,7 @@ class XendConfig(dict):
             'platform': {},
             'target': 0,
             'superpages': 0,
+            'description': '',
         }
         
         return defaults
@@ -496,8 +498,6 @@ class XendConfig(dict):
                 self['platform']['xen_platform_pci'] = 1
             if 'vpt_align' not in self['platform']:
                 self['platform']['vpt_align'] = 1
-            if 'description' not in self['platform']:
-                self['platform']['description'] = ''
             if 'loader' not in self['platform']:
                 # Old configs may have hvmloader set as PV_kernel param
                 if self.has_key('PV_kernel') and self['PV_kernel'] != '':
@@ -876,6 +876,7 @@ class XendConfig(dict):
 
         update_with('PV_bootloader',      'bootloader')
         update_with('PV_bootloader_args', 'bootloader_args')
+        update_with('Description', 'description')
 
         image_sxp = sxp.child_value(sxp_cfg, 'image', [])
         if image_sxp:
@@ -966,6 +967,7 @@ class XendConfig(dict):
         _set_cfg_if_exists('on_xend_start')
         _set_cfg_if_exists('vcpu_avail')
         _set_cfg_if_exists('change_home_server')
+        _set_cfg_if_exists('description')
         
         # Parse and store runtime configuration 
         _set_cfg_if_exists('start_time')

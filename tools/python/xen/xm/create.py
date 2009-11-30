@@ -997,7 +997,7 @@ def configure_hvm(config_image, vals):
     args = [ 'acpi', 'apic',
              'boot',
              'cpuid', 'cpuid_check',
-             'description', 'device_model', 'display',
+             'device_model', 'display',
              'fda', 'fdb',
              'gfx_passthru', 'guest_os_type',
              'hap', 'hpet',
@@ -1058,7 +1058,8 @@ def make_config(vals):
                    'restart', 'on_poweroff',  'tsc_mode', 'nomigrate',
                    'on_reboot', 'on_crash', 'features', 'on_xend_start',
                    'on_xend_stop', 'target', 'cpuid', 'cpuid_check',
-                   'machine_address_size', 'suppress_spurious_page_faults'])
+                   'machine_address_size', 'suppress_spurious_page_faults',
+                   'description'])
 
     vcpu_conf()
     if vals.uuid is not None:
