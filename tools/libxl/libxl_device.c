@@ -119,7 +119,8 @@ char *device_disk_backend_type_of_phystype(libxl_disk_phystype phystype)
         case PHYSTYPE_QCOW: return "tap";
         case PHYSTYPE_VHD: return "tap";
         case PHYSTYPE_AIO: return "tap";
-        case PHYSTYPE_FILE: return "file";
+        /* let's pretend file is tap:aio */
+        case PHYSTYPE_FILE: return "tap";
         case PHYSTYPE_PHY: return "phy";
         default: return NULL;
     }
