@@ -88,7 +88,8 @@ int build_post(struct libxl_ctx *ctx, uint32_t domid,
     ents[9] = libxl_sprintf(ctx, "%lu", state->store_mfn);
     for (i = 0; i < info->max_vcpus; i++) {
         ents[10+(i*2)]   = libxl_sprintf(ctx, "cpu/%d/availability", i);
-        ents[10+(i*2)+1] = "online";
+        ents[10+(i*2)+1] = (i && info->cur_vcpus && (i >= info->cur_vcpus))
+                            ? "offline" : "online";
     }
 
     dom_path = libxl_xs_get_dompath(ctx, domid);
