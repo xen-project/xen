@@ -40,6 +40,7 @@ struct restore_ctx {
     xen_pfn_t *live_p2m; /* Live mapping of the table mapping each PFN to its current MFN. */
     xen_pfn_t *p2m; /* A table mapping each PFN to its new MFN. */
     unsigned no_superpage_mem; /* If have enough continuous memory for super page allocation */
+    struct domain_info_context dinfo;
 };
 
 static struct restore_ctx _ctx = {
@@ -48,9 +49,6 @@ static struct restore_ctx _ctx = {
     .no_superpage_mem = 0,
 };
 static struct restore_ctx *ctx = &_ctx;
-
-static struct domain_info_context _dinfo;
-static struct domain_info_context *dinfo = &_dinfo;
 
 /*
 **
@@ -315,6 +313,7 @@ static int allocate_physmem(int xc_handle, uint32_t dom,
     /* Buffer of pfn list for 2M page, or series of 4K pages */
     xen_pfn_t   *batch_buf;
     unsigned int batch_buf_len;
+    struct domain_info_context *dinfo = &ctx->dinfo;
 
     if ( !superpages )
     {
@@ -504,6 +503,7 @@ static int uncanonicalize_pagetable(int xc_handle, uint32_t dom,
     int i, pte_last;
     unsigned long pfn;
     uint64_t pte;
+    struct domain_info_context *dinfo = &ctx->dinfo;
 
     pte_last = PAGE_SIZE / ((ctx->pt_levels == 2)? 4 : 8);
 
@@ -548,6 +548,7 @@ static xen_pfn_t *load_p2m_frame_list(
     xen_pfn_t *p2m_frame_list;
     vcpu_guest_context_any_t ctxt;
     xen_pfn_t p2m_fl_zero;
+    struct domain_info_context *dinfo = &ctx->dinfo;
 
     /* Read first entry of P2M list, or extended-info signature (~0UL). */
     if ( read_exact(io_fd, &p2m_fl_zero, sizeof(long)) )
@@ -864,6 +865,7 @@ static int buffer_tail_pv(struct tailbuf_pv *buf, int fd,
 {
     unsigned int i;
     size_t pfnlen, vcpulen;
+    struct domain_info_context *dinfo = &ctx->dinfo;
 
     /* TODO: handle changing pfntab and vcpu counts */
     /* PFN tab */
@@ -1172,6 +1174,7 @@ static int apply_batch(int xc_handle, uint32_t dom, xen_pfn_t* region_mfn,
     /* A temporary mapping, and a copy, of one frame of guest memory. */
     unsigned long *page = NULL;
     int nraces = 0;
+    struct domain_info_context *dinfo = &ctx->dinfo;
 
     unsigned long mfn, pfn, pagetype;
 
@@ -1346,6 +1349,8 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     pagebuf_t pagebuf;
     tailbuf_t tailbuf, tmptail;
     void* vcpup;
+
+    struct domain_info_context *dinfo = &ctx->dinfo;
 
     pagebuf_init(&pagebuf);
     memset(&tailbuf, 0, sizeof(tailbuf));
