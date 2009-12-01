@@ -128,4 +128,8 @@ static inline int xen_uuid_compare(xen_uuid_t *uuid1, xen_uuid_t *uuid2)
 
 #endif
 
+#ifndef UUID_LEN_STR
+#define UUID_LEN_STR  (128 /*bit*/ / 4 /*nibbles*/ + 4 /*hyphens*/)
+#endif /* UUID_LEN_STR */
+
 #endif /* __XEN_UUID_H__ */

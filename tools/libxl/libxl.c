@@ -284,7 +284,7 @@ redo:
             ptr = ptr2;
             size *= 2;
         }
-        memcpy(ptr[index].uuid, info[i].handle, 16 * sizeof(uint8_t));
+        memcpy(&(ptr[index].uuid), info[i].handle, sizeof(xen_domain_handle_t));
         ptr[index].domid = info[i].domain;
         first_domain = info[i].domain + 1;
         index++;
@@ -478,7 +478,7 @@ static int libxl_destroy_device_model(struct libxl_ctx *ctx, uint32_t domid)
 
 int libxl_domain_destroy(struct libxl_ctx *ctx, uint32_t domid, int force)
 {
-    char *dom_path, vm_path[41];
+    char *dom_path, vm_path[UUID_LEN_STR + 5];
     xen_uuid_t *uuid;
     int rc;
 

@@ -28,7 +28,7 @@
 typedef void (*libxl_log_callback)(void *userdata, int loglevel, const char *file,
                                    int line, const char *func, char *s);
 struct libxl_dominfo {
-    xen_uuid_t uuid[16];
+    xen_uuid_t uuid;
     uint32_t domid;
 };
 

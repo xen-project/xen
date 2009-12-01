@@ -92,7 +92,7 @@ int libxl_uuid_to_domid(struct libxl_ctx *ctx, xen_uuid_t *uuid, uint32_t *domid
     int nb_domain, i;
     struct libxl_dominfo *info = libxl_domain_list(ctx, &nb_domain);
     for (i = 0; i < nb_domain; i++) {
-        if (!memcmp(info[i].uuid, uuid, 16)) {
+        if (!xen_uuid_compare(&(info[i].uuid), uuid)) {
             *domid = info[i].domid;
             free(info);
             return 0;
@@ -108,8 +108,8 @@ int libxl_domid_to_uuid(struct libxl_ctx *ctx, xen_uuid_t **uuid, uint32_t domid
     struct libxl_dominfo *info = libxl_domain_list(ctx, &nb_domain);
     for (i = 0; i < nb_domain; i++) {
         if (domid == info[i].domid) {
-            *uuid = libxl_zalloc(ctx, 16);
-            memcpy(*uuid, info[i].uuid, 16);
+            *uuid = libxl_zalloc(ctx, sizeof(xen_uuid_t));
+            xen_uuid_copy(*uuid, &(info[i].uuid));
             free(info);
             return 0;
         }
@@ -121,9 +121,9 @@ int libxl_domid_to_uuid(struct libxl_ctx *ctx, xen_uuid_t **uuid, uint32_t domid
 int libxl_is_uuid(char *s)
 {
     int i;
-    if (!s || strlen(s) != 36)
+    if (!s || strlen(s) != UUID_LEN_STR)
         return 0;
-    for (i = 0; i < 36; i++) {
+    for (i = 0; i < UUID_LEN_STR; i++) {
         if (i == 8 || i == 13 || i == 18 || i == 23) {
             if (s[i] != '-')
                 return 0;
@@ -147,7 +147,7 @@ xen_uuid_t *libxl_string_to_uuid(struct libxl_ctx *ctx, char *s)
 
 char *libxl_uuid_to_string(struct libxl_ctx *ctx, xen_uuid_t *uuid)
 {
-    char uuid_str[39];
+    char uuid_str[UUID_LEN_STR + 3];
     if (!uuid)
         return NULL;
     xen_uuid_to_string(uuid, uuid_str, sizeof(uuid_str));
