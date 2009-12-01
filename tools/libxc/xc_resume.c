@@ -26,7 +26,9 @@ static int modify_returncode(int xc_handle, uint32_t domid)
     vcpu_guest_context_any_t ctxt;
     xc_dominfo_t info;
     xen_capabilities_info_t caps;
-    int rc, guest_width;
+    struct domain_info_context _dinfo = {};
+    struct domain_info_context *dinfo = &_dinfo;
+    int rc;
 
     if ( xc_domain_getinfo(xc_handle, domid, 1, &info) != 1 )
     {
@@ -48,13 +50,13 @@ static int modify_returncode(int xc_handle, uint32_t domid)
             PERROR("Could not get Xen capabilities\n");
             return -1;
         }
-        guest_width = strstr(caps, "x86_64") ? 8 : 4;
+        dinfo->guest_width = strstr(caps, "x86_64") ? 8 : 4;
     }
     else
     {
         /* Probe PV guest address width. */
-        guest_width = pv_guest_width(xc_handle, domid);
-        if ( guest_width < 0 )
+        dinfo->guest_width = pv_guest_width(xc_handle, domid);
+        if ( dinfo->guest_width < 0 )
             return -1;
     }
 
@@ -102,8 +104,9 @@ static int xc_domain_resume_any(int xc_handle, uint32_t domid)
     xc_dominfo_t info;
     int i, rc = -1;
 #if defined(__i386__) || defined(__x86_64__)
-    int guest_width;
-    unsigned long mfn, p2m_size = 0;
+    struct domain_info_context _dinfo = { .p2m_size = 0 };
+    struct domain_info_context *dinfo = &_dinfo;
+    unsigned long mfn;
     vcpu_guest_context_any_t ctxt;
     start_info_t *start_info;
     shared_info_t *shinfo = NULL;
@@ -128,8 +131,8 @@ static int xc_domain_resume_any(int xc_handle, uint32_t domid)
         return rc;
     }
 
-    guest_width = pv_guest_width(xc_handle, domid);
-    if ( guest_width != sizeof(long) )
+    dinfo->guest_width = pv_guest_width(xc_handle, domid);
+    if ( dinfo->guest_width != sizeof(long) )
     {
         ERROR("Cannot resume uncooperative cross-address-size guests");
         return rc;
@@ -144,7 +147,7 @@ static int xc_domain_resume_any(int xc_handle, uint32_t domid)
         goto out;
     }
 
-    p2m_size = shinfo->arch.max_pfn;
+    dinfo->p2m_size = shinfo->arch.max_pfn;
 
     p2m_frame_list_list =
         xc_map_foreign_range(xc_handle, domid, PAGE_SIZE, PROT_READ,

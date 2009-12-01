@@ -22,7 +22,7 @@
 #include "xc_core.h"
 #include "xc_e820.h"
 
-#define GET_FIELD(_p, _f) ((guest_width==8) ? ((_p)->x64._f) : ((_p)->x32._f))
+#define GET_FIELD(_p, _f) ((dinfo->guest_width==8) ? ((_p)->x64._f) : ((_p)->x32._f))
 
 #ifndef MAX
 #define MAX(_a, _b) ((_a) >= (_b) ? (_a) : (_b))
@@ -76,7 +76,7 @@ xc_core_arch_memory_map_get(int xc_handle, struct xc_core_arch_context *unused,
 }
 
 static int
-xc_core_arch_map_p2m_rw(int xc_handle, unsigned int guest_width, xc_dominfo_t *info,
+xc_core_arch_map_p2m_rw(int xc_handle, struct domain_info_context *dinfo, xc_dominfo_t *info,
                         shared_info_any_t *live_shinfo, xen_pfn_t **live_p2m,
                         unsigned long *pfnp, int rw)
 {
@@ -88,14 +88,14 @@ xc_core_arch_map_p2m_rw(int xc_handle, unsigned int guest_width, xc_dominfo_t *i
     xen_pfn_t *p2m_frame_list = NULL;
 
     uint32_t dom = info->domid;
-    unsigned long p2m_size = nr_gpfns(xc_handle, info->domid);
     int ret = -1;
     int err;
     int i;
 
-    if ( p2m_size < info->nr_pages  )
+    dinfo->p2m_size = nr_gpfns(xc_handle, info->domid);
+    if ( dinfo->p2m_size < info->nr_pages  )
     {
-        ERROR("p2m_size < nr_pages -1 (%lx < %lx", p2m_size, info->nr_pages - 1);
+        ERROR("p2m_size < nr_pages -1 (%lx < %lx", dinfo->p2m_size, info->nr_pages - 1);
         goto out;
     }
 
@@ -118,13 +118,13 @@ xc_core_arch_map_p2m_rw(int xc_handle, unsigned int guest_width, xc_dominfo_t *i
     memcpy(p2m_frame_list_list, live_p2m_frame_list_list, PAGE_SIZE);
 
     /* Canonicalize guest's unsigned long vs ours */
-    if ( guest_width > sizeof(unsigned long) )
+    if ( dinfo->guest_width > sizeof(unsigned long) )
         for ( i = 0; i < PAGE_SIZE/sizeof(unsigned long); i++ )
-            if ( i < PAGE_SIZE/guest_width )
+            if ( i < PAGE_SIZE/dinfo->guest_width )
                 p2m_frame_list_list[i] = ((uint64_t *)p2m_frame_list_list)[i];
             else
                 p2m_frame_list_list[i] = 0;
-    else if ( guest_width < sizeof(unsigned long) )
+    else if ( dinfo->guest_width < sizeof(unsigned long) )
         for ( i = PAGE_SIZE/sizeof(unsigned long) - 1; i >= 0; i-- )
             p2m_frame_list_list[i] = ((uint32_t *)p2m_frame_list_list)[i];
 
@@ -149,10 +149,10 @@ xc_core_arch_map_p2m_rw(int xc_handle, unsigned int guest_width, xc_dominfo_t *i
     memcpy(p2m_frame_list, live_p2m_frame_list, P2M_GUEST_FL_SIZE);
 
     /* Canonicalize guest's unsigned long vs ours */
-    if ( guest_width > sizeof(unsigned long) )
+    if ( dinfo->guest_width > sizeof(unsigned long) )
         for ( i = 0; i < P2M_FL_ENTRIES; i++ )
             p2m_frame_list[i] = ((uint64_t *)p2m_frame_list)[i];
-    else if ( guest_width < sizeof(unsigned long) )
+    else if ( dinfo->guest_width < sizeof(unsigned long) )
         for ( i = P2M_FL_ENTRIES - 1; i >= 0; i-- )
             p2m_frame_list[i] = ((uint32_t *)p2m_frame_list)[i];
 
@@ -167,7 +167,7 @@ xc_core_arch_map_p2m_rw(int xc_handle, unsigned int guest_width, xc_dominfo_t *i
         goto out;
     }
 
-    *pfnp = p2m_size;
+    *pfnp = dinfo->p2m_size;
 
     ret = 0;
 
@@ -195,7 +195,9 @@ xc_core_arch_map_p2m(int xc_handle, unsigned int guest_width, xc_dominfo_t *info
                         shared_info_any_t *live_shinfo, xen_pfn_t **live_p2m,
                         unsigned long *pfnp)
 {
-    return xc_core_arch_map_p2m_rw(xc_handle, guest_width, info,
+    struct domain_info_context _dinfo = { .guest_width = guest_width };
+    struct domain_info_context *dinfo = &_dinfo;
+    return xc_core_arch_map_p2m_rw(xc_handle, dinfo, info,
                                    live_shinfo, live_p2m, pfnp, 0);
 }
 
@@ -204,7 +206,9 @@ xc_core_arch_map_p2m_writable(int xc_handle, unsigned int guest_width, xc_dominf
                               shared_info_any_t *live_shinfo, xen_pfn_t **live_p2m,
                               unsigned long *pfnp)
 {
-    return xc_core_arch_map_p2m_rw(xc_handle, guest_width, info,
+    struct domain_info_context _dinfo = { .guest_width = guest_width };
+    struct domain_info_context *dinfo = &_dinfo;
+    return xc_core_arch_map_p2m_rw(xc_handle, dinfo, info,
                                    live_shinfo, live_p2m, pfnp, 1);
 }
 /*

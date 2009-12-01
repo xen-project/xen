@@ -22,7 +22,7 @@
 #define XC_CORE_X86_H
 
 #define ELF_ARCH_DATA           ELFDATA2LSB
-#define ELF_ARCH_MACHINE       (guest_width == 8 ? EM_X86_64 : EM_386)
+#define ELF_ARCH_MACHINE       (dinfo->guest_width == 8 ? EM_X86_64 : EM_386)
 
 struct xc_core_arch_context {
     /* nothing */

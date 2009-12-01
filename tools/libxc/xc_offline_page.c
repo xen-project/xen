@@ -45,8 +45,8 @@ struct pte_backup
     int cur;
 };
 
-/* Global definition for some MACRO */
-int guest_width, p2m_size;
+static struct domain_info_context _dinfo;
+static struct domain_info_context *dinfo = &_dinfo;
 
 int xc_mark_page_online(int xc, unsigned long start,
                         unsigned long end, uint32_t *status)
@@ -234,7 +234,7 @@ static int init_mem_info(int xc_handle, int domid,
         ERROR("Unable to get PT level info.");
         return -EFAULT;
     }
-    guest_width = minfo->guest_width;
+    dinfo->guest_width = minfo->guest_width;
 
     shared_info_frame = info->shared_info_frame;
 
@@ -255,7 +255,7 @@ static int init_mem_info(int xc_handle, int domid,
     munmap(live_shinfo, PAGE_SIZE);
     live_shinfo = NULL;
 
-    p2m_size = minfo->p2m_size;
+    dinfo->p2m_size = minfo->p2m_size;
 
     minfo->max_mfn = xc_memory_op(xc_handle, XENMEM_maximum_ram_page, NULL);
     if ( !(minfo->m2p_table =
@@ -286,7 +286,7 @@ static int init_mem_info(int xc_handle, int domid,
 
     for (i = 0; i < minfo->p2m_size ; i+=1024)
     {
-        int count = ((p2m_size - i ) > 1024 ) ? 1024: (p2m_size - i);
+        int count = ((dinfo->p2m_size - i ) > 1024 ) ? 1024: (dinfo->p2m_size - i);
         if ( ( rc = xc_get_pfn_type_batch(xc_handle, domid, count,
                   minfo->pfn_type + i)) )
         {

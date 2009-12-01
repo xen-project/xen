@@ -427,7 +427,8 @@ xc_domain_dumpcore_via_callback(int xc_handle,
 {
     xc_dominfo_t info;
     shared_info_any_t *live_shinfo = NULL;
-    unsigned int guest_width; 
+    struct domain_info_context _dinfo = {};
+    struct domain_info_context *dinfo = &_dinfo;
 
     int nr_vcpus = 0;
     char *dump_mem, *dump_mem_start = NULL;
@@ -462,7 +463,7 @@ xc_domain_dumpcore_via_callback(int xc_handle,
     struct xc_core_section_headers *sheaders = NULL;
     Elf64_Shdr *shdr;
  
-    if ( get_guest_width(xc_handle, domid, &guest_width) != 0 )
+    if ( get_guest_width(xc_handle, domid, &dinfo->guest_width) != 0 )
     {
         PERROR("Could not get address size for domain");
         return sts;
@@ -547,7 +548,7 @@ xc_domain_dumpcore_via_callback(int xc_handle,
             goto out;
         }
 
-        sts = xc_core_arch_map_p2m(xc_handle, guest_width, &info, live_shinfo,
+        sts = xc_core_arch_map_p2m(xc_handle, dinfo->guest_width, &info, live_shinfo,
                                    &p2m, &p2m_size);
         if ( sts != 0 )
             goto out;
@@ -745,7 +746,7 @@ xc_domain_dumpcore_via_callback(int xc_handle,
         goto out;
 
     /* elf note section: xen version */
-    sts = elfnote_dump_xen_version(args, dump_rtn, xc_handle, guest_width);
+    sts = elfnote_dump_xen_version(args, dump_rtn, xc_handle, dinfo->guest_width);
     if ( sts != 0 )
         goto out;
 
@@ -805,9 +806,9 @@ xc_domain_dumpcore_via_callback(int xc_handle,
 
             if ( !auto_translated_physmap )
             {
-                if ( guest_width >= sizeof(unsigned long) )
+                if ( dinfo->guest_width >= sizeof(unsigned long) )
                 {
-                    if ( guest_width == sizeof(unsigned long) )
+                    if ( dinfo->guest_width == sizeof(unsigned long) )
                         gmfn = p2m[i];
                     else
                         gmfn = ((uint64_t *)p2m)[i];

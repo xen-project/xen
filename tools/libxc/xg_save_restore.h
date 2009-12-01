@@ -112,34 +112,34 @@ static inline int get_platform_info(int xc_handle, uint32_t dom,
 #define is_mapped(pfn_type) (!((pfn_type) & 0x80000000UL))
 
 
-#define GET_FIELD(_p, _f) ((guest_width==8) ? ((_p)->x64._f) : ((_p)->x32._f))
+#define GET_FIELD(_p, _f) ((dinfo->guest_width==8) ? ((_p)->x64._f) : ((_p)->x32._f))
 
 #define SET_FIELD(_p, _f, _v) do {              \
-    if (guest_width == 8)                       \
+    if (dinfo->guest_width == 8)                \
         (_p)->x64._f = (_v);                    \
     else                                        \
         (_p)->x32._f = (_v);                    \
 } while (0)
 
 #define UNFOLD_CR3(_c)                                                  \
-  ((uint64_t)((guest_width == 8)                                        \
+  ((uint64_t)((dinfo->guest_width == 8)                                 \
               ? ((_c) >> 12)                                            \
               : (((uint32_t)(_c) >> 12) | ((uint32_t)(_c) << 20))))
 
 #define FOLD_CR3(_c)                                                    \
-  ((uint64_t)((guest_width == 8)                                        \
+  ((uint64_t)((dinfo->guest_width == 8)                                 \
               ? ((uint64_t)(_c)) << 12                                  \
               : (((uint32_t)(_c) << 12) | ((uint32_t)(_c) >> 20))))
 
 #define MEMCPY_FIELD(_d, _s, _f) do {                              \
-    if (guest_width == 8)                                          \
+    if (dinfo->guest_width == 8)                                   \
         memcpy(&(_d)->x64._f, &(_s)->x64._f,sizeof((_d)->x64._f)); \
     else                                                           \
         memcpy(&(_d)->x32._f, &(_s)->x32._f,sizeof((_d)->x32._f)); \
 } while (0)
 
 #define MEMSET_ARRAY_FIELD(_p, _f, _v) do {                        \
-    if (guest_width == 8)                                          \
+    if (dinfo->guest_width == 8)                                   \
         memset(&(_p)->x64._f[0], (_v), sizeof((_p)->x64._f));      \
     else                                                           \
         memset(&(_p)->x32._f[0], (_v), sizeof((_p)->x32._f));      \

@@ -39,8 +39,6 @@ static unsigned long hvirt_start;
 /* #levels of page tables used by the current guest */
 static unsigned int pt_levels;
 
-/* number of pfns this guest has (i.e. number of entries in the P2M) */
-static unsigned long p2m_size;
 
 /* Live mapping of the table mapping each PFN to its current MFN. */
 static xen_pfn_t *live_p2m = NULL;
@@ -49,8 +47,8 @@ static xen_pfn_t *live_p2m = NULL;
 static xen_pfn_t *live_m2p = NULL;
 static unsigned long m2p_mfn0;
 
-/* Address size of the guest */
-unsigned int guest_width;
+static struct domain_info_context _dinfo;
+static struct domain_info_context *dinfo = &_dinfo;
 
 /* buffer for output */
 struct outbuf {
@@ -66,7 +64,7 @@ struct outbuf {
 #define mfn_to_pfn(_mfn)  (live_m2p[(_mfn)])
 
 #define pfn_to_mfn(_pfn)                                            \
-  ((xen_pfn_t) ((guest_width==8)                                    \
+  ((xen_pfn_t) ((dinfo->guest_width==8)                               \
                 ? (((uint64_t *)live_p2m)[(_pfn)])                  \
                 : ((((uint32_t *)live_p2m)[(_pfn)]) == 0xffffffffU  \
                    ? (-1UL) : (((uint32_t *)live_p2m)[(_pfn)]))))
@@ -77,7 +75,7 @@ struct outbuf {
  */
 #define MFN_IS_IN_PSEUDOPHYS_MAP(_mfn)          \
     (((_mfn) < (max_mfn)) &&                    \
-     ((mfn_to_pfn(_mfn) < (p2m_size)) &&        \
+     ((mfn_to_pfn(_mfn) < (dinfo->p2m_size)) &&   \
       (pfn_to_mfn(mfn_to_pfn(_mfn)) == (_mfn))))
 
 /*
@@ -87,7 +85,7 @@ struct outbuf {
 
 #define BITS_PER_LONG (sizeof(unsigned long) * 8)
 #define BITS_TO_LONGS(bits) (((bits)+BITS_PER_LONG-1)/BITS_PER_LONG)
-#define BITMAP_SIZE   (BITS_TO_LONGS(p2m_size) * sizeof(unsigned long))
+#define BITMAP_SIZE   (BITS_TO_LONGS(dinfo->p2m_size) * sizeof(unsigned long))
 
 #define BITMAP_ENTRY(_nr,_bmap) \
    ((volatile unsigned long *)(_bmap))[(_nr)/BITS_PER_LONG]
@@ -401,7 +399,7 @@ static int print_stats(int xc_handle, uint32_t domid, int pages_sent,
 }
 
 
-static int analysis_phase(int xc_handle, uint32_t domid, int p2m_size,
+static int analysis_phase(int xc_handle, uint32_t domid,
                           unsigned long *arr, int runs)
 {
     long long start, now;
@@ -415,7 +413,7 @@ static int analysis_phase(int xc_handle, uint32_t domid, int p2m_size,
         int i;
 
         xc_shadow_control(xc_handle, domid, XEN_DOMCTL_SHADOW_OP_CLEAN,
-                          arr, p2m_size, NULL, 0, NULL);
+                          arr, dinfo->p2m_size, NULL, 0, NULL);
         DPRINTF("#Flush\n");
         for ( i = 0; i < 40; i++ )
         {
@@ -576,7 +574,7 @@ static int canonicalize_pagetable(unsigned long type, unsigned long pfn,
                  * compat m2p, so we quietly zap them.  This doesn't
                  * count as a race, so don't report it. */
                 if ( !(type == XEN_DOMCTL_PFINFO_L2TAB 
-                       && sizeof (unsigned long) > guest_width) )
+                       && sizeof (unsigned long) > dinfo->guest_width) )
                      race = 1;  /* inform the caller; fatal if !live */ 
             }
             else
@@ -673,7 +671,6 @@ err0:
 static xen_pfn_t *map_and_save_p2m_table(int xc_handle, 
                                          int io_fd, 
                                          uint32_t dom,
-                                         unsigned long p2m_size,
                                          shared_info_any_t *live_shinfo)
 {
     vcpu_guest_context_any_t ctxt;
@@ -705,13 +702,13 @@ static xen_pfn_t *map_and_save_p2m_table(int xc_handle,
     memcpy(p2m_frame_list_list, live_p2m_frame_list_list, PAGE_SIZE);
 
     /* Canonicalize guest's unsigned long vs ours */
-    if ( guest_width > sizeof(unsigned long) )
+    if ( dinfo->guest_width > sizeof(unsigned long) )
         for ( i = 0; i < PAGE_SIZE/sizeof(unsigned long); i++ )
-            if ( i < PAGE_SIZE/guest_width )
+            if ( i < PAGE_SIZE/dinfo->guest_width )
                 p2m_frame_list_list[i] = ((uint64_t *)p2m_frame_list_list)[i];
             else
                 p2m_frame_list_list[i] = 0;
-    else if ( guest_width < sizeof(unsigned long) )
+    else if ( dinfo->guest_width < sizeof(unsigned long) )
         for ( i = PAGE_SIZE/sizeof(unsigned long) - 1; i >= 0; i-- )
             p2m_frame_list_list[i] = ((uint32_t *)p2m_frame_list_list)[i];
 
@@ -735,10 +732,10 @@ static xen_pfn_t *map_and_save_p2m_table(int xc_handle,
     memcpy(p2m_frame_list, live_p2m_frame_list, P2M_GUEST_FL_SIZE);
 
     /* Canonicalize guest's unsigned long vs ours */
-    if ( guest_width > sizeof(unsigned long) )
+    if ( dinfo->guest_width > sizeof(unsigned long) )
         for ( i = 0; i < P2M_FL_ENTRIES; i++ )
             p2m_frame_list[i] = ((uint64_t *)p2m_frame_list)[i];
-    else if ( guest_width < sizeof(unsigned long) )
+    else if ( dinfo->guest_width < sizeof(unsigned long) )
         for ( i = P2M_FL_ENTRIES - 1; i >= 0; i-- )
             p2m_frame_list[i] = ((uint32_t *)p2m_frame_list)[i];
 
@@ -759,7 +756,7 @@ static xen_pfn_t *map_and_save_p2m_table(int xc_handle,
     live_p2m = p2m; /* So that translation macros will work */
     
     /* Canonicalise the pfn-to-mfn table frame-number list. */
-    for ( i = 0; i < p2m_size; i += FPP )
+    for ( i = 0; i < dinfo->p2m_size; i += FPP )
     {
         if ( !MFN_IS_IN_PSEUDOPHYS_MAP(p2m_frame_list[i/FPP]) )
         {
@@ -794,7 +791,7 @@ static xen_pfn_t *map_and_save_p2m_table(int xc_handle,
      */
     {
         unsigned long signature = ~0UL;
-        uint32_t chunk1_sz = ((guest_width==8) 
+        uint32_t chunk1_sz = ((dinfo->guest_width==8) 
                               ? sizeof(ctxt.x64) 
                               : sizeof(ctxt.x32));
         uint32_t chunk2_sz = 0;
@@ -927,7 +924,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     initialize_mbit_rate();
 
     if ( !get_platform_info(xc_handle, dom,
-                            &max_mfn, &hvirt_start, &pt_levels, &guest_width) )
+                            &max_mfn, &hvirt_start, &pt_levels, &dinfo->guest_width) )
     {
         ERROR("Unable to get platform info.");
         return 1;
@@ -954,7 +951,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     }
 
     /* Get the size of the P2M table */
-    p2m_size = xc_memory_op(xc_handle, XENMEM_maximum_gpfn, &dom) + 1;
+    dinfo->p2m_size = xc_memory_op(xc_handle, XENMEM_maximum_gpfn, &dom) + 1;
 
     /* Domain is still running at this point */
     if ( live )
@@ -1000,7 +997,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     last_iter = !live;
 
     /* pretend we sent all the pages last iteration */
-    sent_last_iter = p2m_size;
+    sent_last_iter = dinfo->p2m_size;
 
     /* Setup to_send / to_fix and to_skip bitmaps */
     to_send = xg_memalign(PAGE_SIZE, ROUNDUP(BITMAP_SIZE, PAGE_SHIFT)); 
@@ -1045,7 +1042,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         }
     }
 
-    analysis_phase(xc_handle, dom, p2m_size, to_skip, 0);
+    analysis_phase(xc_handle, dom, to_skip, 0);
 
     pfn_type   = xg_memalign(PAGE_SIZE, ROUNDUP(
                               MAX_BATCH_SIZE * sizeof(*pfn_type), PAGE_SHIFT));
@@ -1073,7 +1070,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     }
 
     /* Start writing out the saved-domain record. */
-    if ( write_exact(io_fd, &p2m_size, sizeof(unsigned long)) )
+    if ( write_exact(io_fd, &dinfo->p2m_size, sizeof(unsigned long)) )
     {
         PERROR("write: p2m_size");
         goto out;
@@ -1084,8 +1081,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         int err = 0;
 
         /* Map the P2M table, and write the list of P2M frames */
-        live_p2m = map_and_save_p2m_table(xc_handle, io_fd, dom, 
-                                          p2m_size, live_shinfo);
+        live_p2m = map_and_save_p2m_table(xc_handle, io_fd, dom, live_shinfo);
         if ( live_p2m == NULL )
         {
             ERROR("Failed to map/save the p2m frame list");
@@ -1096,7 +1092,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
          * Quick belt and braces sanity check.
          */
         
-        for ( i = 0; i < p2m_size; i++ )
+        for ( i = 0; i < dinfo->p2m_size; i++ )
         {
             mfn = pfn_to_mfn(i);
             if( (mfn != INVALID_P2M_ENTRY) && (mfn_to_pfn(mfn) != i) )
@@ -1144,9 +1140,9 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
         DPRINTF("Saving memory pages: iter %d   0%%", iter);
 
-        while ( N < p2m_size )
+        while ( N < dinfo->p2m_size )
         {
-            unsigned int this_pc = (N * 100) / p2m_size;
+            unsigned int this_pc = (N * 100) / dinfo->p2m_size;
 
             if ( (this_pc - prev_pc) >= 5 )
             {
@@ -1160,8 +1156,8 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                    but this is fast enough for the moment. */
                 frc = xc_shadow_control(
                     xc_handle, dom, XEN_DOMCTL_SHADOW_OP_PEEK, to_skip, 
-                    p2m_size, NULL, 0, NULL);
-                if ( frc != p2m_size )
+                    dinfo->p2m_size, NULL, 0, NULL);
+                if ( frc != dinfo->p2m_size )
                 {
                     ERROR("Error peeking shadow bitmap");
                     goto out;
@@ -1171,7 +1167,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             /* load pfn_type[] with the mfn of all the pages we're doing in
                this batch. */
             for  ( batch = 0;
-                   (batch < MAX_BATCH_SIZE) && (N < p2m_size);
+                   (batch < MAX_BATCH_SIZE) && (N < dinfo->p2m_size);
                    N++ )
             {
                 int n = N;
@@ -1433,7 +1429,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             print_stats( xc_handle, dom, sent_this_iter, &stats, 1);
 
             DPRINTF("Total pages sent= %ld (%.2fx)\n",
-                    total_sent, ((float)total_sent)/p2m_size );
+                    total_sent, ((float)total_sent)/dinfo->p2m_size );
             DPRINTF("(of which %ld were fixups)\n", needed_to_fix  );
         }
 
@@ -1462,7 +1458,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             if ( ((sent_this_iter > sent_last_iter) && RATE_IS_MAX()) ||
                  (iter >= max_iters) ||
                  (sent_this_iter+skip_this_iter < 50) ||
-                 (total_sent > p2m_size*max_factor) )
+                 (total_sent > dinfo->p2m_size*max_factor) )
             {
                 DPRINTF("Start last iteration\n");
                 last_iter = 1;
@@ -1493,7 +1489,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
             if ( xc_shadow_control(xc_handle, dom, 
                                    XEN_DOMCTL_SHADOW_OP_CLEAN, to_send, 
-                                   p2m_size, NULL, 0, &stats) != p2m_size )
+                                   dinfo->p2m_size, NULL, 0, &stats) != dinfo->p2m_size )
             {
                 ERROR("Error flushing shadow PT");
                 goto out;
@@ -1626,7 +1622,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         unsigned int i,j;
         unsigned long pfntab[1024];
 
-        for ( i = 0, j = 0; i < p2m_size; i++ )
+        for ( i = 0, j = 0; i < dinfo->p2m_size; i++ )
         {
             if ( !is_mapped(pfn_to_mfn(i)) )
                 j++;
@@ -1638,13 +1634,13 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             goto out;
         }
 
-        for ( i = 0, j = 0; i < p2m_size; )
+        for ( i = 0, j = 0; i < dinfo->p2m_size; )
         {
             if ( !is_mapped(pfn_to_mfn(i)) )
                 pfntab[j++] = i;
 
             i++;
-            if ( (j == 1024) || (i == p2m_size) )
+            if ( (j == 1024) || (i == dinfo->p2m_size) )
             {
                 if ( write_exact(io_fd, &pfntab, sizeof(unsigned long)*j) )
                 {
@@ -1717,7 +1713,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                 FOLD_CR3(mfn_to_pfn(UNFOLD_CR3(ctxt.x64.ctrlreg[1])));
         }
 
-        if ( write_exact(io_fd, &ctxt, ((guest_width==8) 
+        if ( write_exact(io_fd, &ctxt, ((dinfo->guest_width==8) 
                                         ? sizeof(ctxt.x64) 
                                         : sizeof(ctxt.x32))) )
         {
@@ -1789,7 +1785,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
         if ( xc_shadow_control(xc_handle, dom,
                                XEN_DOMCTL_SHADOW_OP_CLEAN, to_send,
-                               p2m_size, NULL, 0, &stats) != p2m_size )
+                               dinfo->p2m_size, NULL, 0, &stats) != dinfo->p2m_size )
         {
             ERROR("Error flushing shadow PT");
         }
