@@ -30,23 +30,22 @@
 #define DEF_MAX_ITERS   29   /* limit us to 30 times round loop   */
 #define DEF_MAX_FACTOR   3   /* never send more than 3x p2m_size  */
 
-struct save_context {
+struct save_ctx {
     unsigned long hvirt_start; /* virtual starting address of the hypervisor */
     unsigned int pt_levels; /* #levels of page tables used by the current guest */
     unsigned long max_mfn; /* max mfn of the whole machine */
     xen_pfn_t *live_p2m; /* Live mapping of the table mapping each PFN to its current MFN. */
     xen_pfn_t *live_m2p; /* Live mapping of system MFN to PFN table. */
     unsigned long m2p_mfn0;
+    struct domain_info_context dinfo;
 };
 
-static struct domain_info_context _dinfo;
-static struct domain_info_context *dinfo = &_dinfo;
-
-static struct save_context _ctx = {
+static struct save_ctx _ctx = {
     .live_p2m = NULL,
     .live_m2p = NULL,
 };
-static struct save_context *ctx = &_ctx;
+
+static struct save_ctx *ctx = &_ctx;
 
 /* buffer for output */
 struct outbuf {
@@ -403,6 +402,7 @@ static int analysis_phase(int xc_handle, uint32_t domid,
     long long start, now;
     xc_shadow_op_stats_t stats;
     int j;
+    struct domain_info_context *dinfo = &ctx->dinfo;
 
     start = llgettimeofday();
 
@@ -458,6 +458,7 @@ static void *map_frame_list_list(int xc_handle, uint32_t dom,
 {
     int count = 100;
     void *p;
+    struct domain_info_context *dinfo = &ctx->dinfo;
     uint64_t fll = GET_FIELD(shinfo, arch.pfn_to_mfn_frame_list_list);
 
     while ( count-- && (fll == 0) )
@@ -491,7 +492,7 @@ static void *map_frame_list_list(int xc_handle, uint32_t dom,
 static int canonicalize_pagetable(unsigned long type, unsigned long pfn,
                            const void *spage, void *dpage)
 {
-
+    struct domain_info_context *dinfo = &ctx->dinfo;
     int i, pte_last, xen_start, xen_end, race = 0; 
     uint64_t pte;
 
@@ -672,6 +673,7 @@ static xen_pfn_t *map_and_save_p2m_table(int xc_handle,
                                          shared_info_any_t *live_shinfo)
 {
     vcpu_guest_context_any_t ctxt;
+    struct domain_info_context *dinfo = &ctx->dinfo;
 
     /* Double and single indirect references to the live P2M table */
     void *live_p2m_frame_list_list = NULL;
@@ -910,6 +912,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     unsigned long mfn;
 
     struct outbuf ob;
+    struct domain_info_context *dinfo = &ctx->dinfo;
 
     int completed = 0;
 
