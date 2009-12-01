@@ -758,7 +758,7 @@ void __init __start_xen(unsigned long mbi_p)
 #endif
 
         /* Is the region suitable for relocating the multiboot modules? */
-        if ( !initial_images_start &&
+        if ( !initial_images_start && (s < e) &&
              ((e-s) >= (modules_length+modules_headroom)) )
         {
             initial_images_end = e;
@@ -776,7 +776,8 @@ void __init __start_xen(unsigned long mbi_p)
             }
         }
 
-        if ( !kexec_crash_area.start && ((e-s) >= kexec_crash_area.size) )
+        if ( !kexec_crash_area.start && (s < e) &&
+             ((e-s) >= kexec_crash_area.size) )
         {
             e = (e - kexec_crash_area.size) & PAGE_MASK;
             kexec_crash_area.start = e;
