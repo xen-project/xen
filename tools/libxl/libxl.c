@@ -480,7 +480,8 @@ static int libxl_destroy_device_model(struct libxl_ctx *ctx, uint32_t domid)
 
 int libxl_domain_destroy(struct libxl_ctx *ctx, uint32_t domid, int force)
 {
-    char *dom_path, vm_path[UUID_LEN_STR + 5];
+    char *dom_path, *uuid_str;
+    char vm_path[UUID_LEN_STR + 5], vss_path[UUID_LEN_STR + 6], xapi_path[20];
     xen_uuid_t *uuid;
     int rc;
 
@@ -508,9 +509,17 @@ int libxl_domain_destroy(struct libxl_ctx *ctx, uint32_t domid, int force)
         XL_LOG(ctx, XL_LOG_ERROR, "libxl_destroy_devices failed for %d", domid);
     if (!xs_rm(ctx->xsh, XBT_NULL, dom_path))
         XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "xs_rm failed for %s", dom_path);
-    snprintf(vm_path, sizeof(vm_path), "/vm/%s", libxl_uuid_to_string(ctx, uuid));
+    uuid_str = libxl_uuid_to_string(ctx, uuid);
+    snprintf(vm_path, sizeof(vm_path), "/vm/%s", uuid_str);
     if (!xs_rm(ctx->xsh, XBT_NULL, vm_path))
         XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "xs_rm failed for %s", vm_path);
+    snprintf(vss_path, sizeof(vss_path), "/vss/%s", uuid_str);
+    if (!xs_rm(ctx->xsh, XBT_NULL, vss_path))
+        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "xs_rm failed for %s", vss_path);
+    libxl_free(ctx, uuid_str);
+    snprintf(xapi_path, sizeof(xapi_path), "/xapi/%u", domid);
+    if (!xs_rm(ctx->xsh, XBT_NULL, xapi_path))
+        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "xs_rm failed for %s", xapi_path);
     rc = xc_domain_destroy(ctx->xch, domid);
     if (rc < 0) {
         XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, rc, "xc_domain_destroy failed for %d", domid);
