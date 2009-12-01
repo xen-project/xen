@@ -73,8 +73,9 @@ int build_post(struct libxl_ctx *ctx, uint32_t domid,
     char *dom_path, *vm_path;
     xs_transaction_t t;
     char **ents;
+    int i;
 
-    ents = libxl_calloc(ctx, 10 * 2, sizeof(char *));
+    ents = libxl_calloc(ctx, (10 + info->max_vcpus) * 2, sizeof(char *));
     ents[0] = "memory/static-max";
     ents[1] = libxl_sprintf(ctx, "%d", info->max_memkb);
     ents[2] = "memory/target";
@@ -85,6 +86,10 @@ int build_post(struct libxl_ctx *ctx, uint32_t domid,
     ents[7] = libxl_sprintf(ctx, "%"PRIu32, state->store_port);
     ents[8] = "store/ring-ref";
     ents[9] = libxl_sprintf(ctx, "%lu", state->store_mfn);
+    for (i = 0; i < info->max_vcpus; i++) {
+        ents[10+(i*2)]   = libxl_sprintf(ctx, "cpu/%d/availability", i);
+        ents[10+(i*2)+1] = "online";
+    }
 
     dom_path = libxl_xs_get_dompath(ctx, domid);
     if (!dom_path)
@@ -103,6 +108,8 @@ retry_transaction:
             goto retry_transaction;
     xs_introduce_domain(ctx->xsh, domid, state->store_mfn, state->store_port);
     free(vm_path);
+    libxl_free(ctx, ents);
+    libxl_free(ctx, dom_path);
     return 0;
 }
 
