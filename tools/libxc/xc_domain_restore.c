@@ -43,13 +43,6 @@ struct restore_ctx {
     struct domain_info_context dinfo;
 };
 
-static struct restore_ctx _ctx = {
-    .live_p2m = NULL,
-    .p2m = NULL,
-    .no_superpage_mem = 0,
-};
-static struct restore_ctx *ctx = &_ctx;
-
 /*
 **
 **
@@ -69,7 +62,7 @@ static struct restore_ctx *ctx = &_ctx;
 #define SUPER_PAGE_TRACKING(pfn) ( (pfn) != INVALID_SUPER_PAGE )
 #define SUPER_PAGE_DONE(pfn)     ( SUPER_PAGE_START(pfn) )
 
-static int super_page_populated(unsigned long pfn)
+static int super_page_populated(struct restore_ctx *ctx, unsigned long pfn)
 {
     int i;
     pfn &= ~(SUPERPAGE_NR_PFNS - 1);
@@ -87,6 +80,7 @@ static int super_page_populated(unsigned long pfn)
  */
 static int break_super_page(int xc_handle,
                             uint32_t dom,
+                            struct restore_ctx *ctx,
                             xen_pfn_t next_pfn)
 {
     xen_pfn_t *page_array, start_pfn, mfn;
@@ -200,6 +194,7 @@ out:
  */
 static int allocate_mfn_list(int xc_handle,
                               uint32_t dom,
+                              struct restore_ctx *ctx,
                               unsigned long nr_extents,
                               xen_pfn_t *batch_buf,
                               xen_pfn_t *next_pfn,
@@ -226,7 +221,7 @@ static int allocate_mfn_list(int xc_handle,
              !SUPER_PAGE_DONE(sp_pfn))
         {
             /* break previously allocated super page*/
-            if ( break_super_page(xc_handle, dom, sp_pfn) != 0 )
+            if ( break_super_page(xc_handle, dom, ctx, sp_pfn) != 0 )
             {
                 ERROR("Break previous super page fail!\n");
                 return 1;
@@ -249,7 +244,7 @@ static int allocate_mfn_list(int xc_handle,
         goto normal_page;
 
     pfn = batch_buf[0] & ~XEN_DOMCTL_PFINFO_LTAB_MASK;
-    if  ( super_page_populated(pfn) )
+    if  ( super_page_populated(ctx, pfn) )
         goto normal_page;
 
     pfn &= ~(SUPERPAGE_NR_PFNS - 1);
@@ -300,6 +295,7 @@ normal_page:
 }
 
 static int allocate_physmem(int xc_handle, uint32_t dom,
+                            struct restore_ctx *ctx,
                             unsigned long *region_pfn_type, int region_size,
                             unsigned int hvm, xen_pfn_t *region_mfn, int superpages)
 {
@@ -341,7 +337,7 @@ static int allocate_physmem(int xc_handle, uint32_t dom,
         if ( SUPER_PAGE_START(pfn) )
         {
             /* Start of a 2M extent, populate previsous buf */
-            if ( allocate_mfn_list(xc_handle, dom,
+            if ( allocate_mfn_list(xc_handle, dom, ctx,
                                    batch_buf_len, batch_buf,
                                    &required_pfn, superpages) != 0 )
             {
@@ -363,7 +359,7 @@ static int allocate_physmem(int xc_handle, uint32_t dom,
         else if ( SUPER_PAGE_TRACKING(required_pfn) )
         {
             /* break of a 2M extent, populate previous buf */
-            if ( allocate_mfn_list(xc_handle, dom,
+            if ( allocate_mfn_list(xc_handle, dom, ctx,
                                    batch_buf_len, batch_buf,
                                    &required_pfn, superpages) != 0 )
             {
@@ -404,7 +400,7 @@ static int allocate_physmem(int xc_handle, uint32_t dom,
 alloc_page:
     if ( batch_buf )
     {
-        if ( allocate_mfn_list(xc_handle, dom,
+        if ( allocate_mfn_list(xc_handle, dom, ctx,
                     batch_buf_len, batch_buf,
                     &required_pfn,
                     superpages) != 0 )
@@ -497,7 +493,7 @@ static ssize_t read_exact_timed(int fd, void* buf, size_t size)
 ** This function inverts that operation, replacing the pfn values with
 ** the (now known) appropriate mfn values.
 */
-static int uncanonicalize_pagetable(int xc_handle, uint32_t dom, 
+static int uncanonicalize_pagetable(int xc_handle, uint32_t dom, struct restore_ctx *ctx,
                                     unsigned long type, void *page, int superpages)
 {
     int i, pte_last;
@@ -524,7 +520,7 @@ static int uncanonicalize_pagetable(int xc_handle, uint32_t dom,
         if ( ctx->p2m[pfn] == INVALID_P2M_ENTRY )
         {
             unsigned long force_pfn = superpages ? FORCE_SP_MASK : pfn;
-            if (allocate_mfn_list(xc_handle, dom,
+            if (allocate_mfn_list(xc_handle, dom, ctx,
                         1, &pfn, &force_pfn, superpages) != 0)
                 return 0;
         }
@@ -542,7 +538,7 @@ static int uncanonicalize_pagetable(int xc_handle, uint32_t dom,
 
 
 /* Load the p2m frame list, plus potential extended info chunk */
-static xen_pfn_t *load_p2m_frame_list(
+static xen_pfn_t *load_p2m_frame_list(struct restore_ctx *ctx,
     int io_fd, int *pae_extended_cr3, int *ext_vcpucontext)
 {
     xen_pfn_t *p2m_frame_list;
@@ -798,7 +794,7 @@ static int dump_qemu(uint32_t dom, struct tailbuf_hvm *buf)
     return 0;
 }
 
-static int buffer_tail_hvm(struct tailbuf_hvm *buf, int fd,
+static int buffer_tail_hvm(struct restore_ctx *ctx, struct tailbuf_hvm *buf, int fd,
                            unsigned int max_vcpu_id, uint64_t vcpumap,
                            int ext_vcpucontext)
 {
@@ -859,7 +855,7 @@ static int buffer_tail_hvm(struct tailbuf_hvm *buf, int fd,
     return -1;
 }
 
-static int buffer_tail_pv(struct tailbuf_pv *buf, int fd,
+static int buffer_tail_pv(struct restore_ctx *ctx, struct tailbuf_pv *buf, int fd,
                           unsigned int max_vcpu_id, uint64_t vcpumap,
                           int ext_vcpucontext)
 {
@@ -937,14 +933,14 @@ static int buffer_tail_pv(struct tailbuf_pv *buf, int fd,
     return -1;
 }
 
-static int buffer_tail(tailbuf_t *buf, int fd, unsigned int max_vcpu_id,
+static int buffer_tail(struct restore_ctx *ctx, tailbuf_t *buf, int fd, unsigned int max_vcpu_id,
                        uint64_t vcpumap, int ext_vcpucontext)
 {
     if ( buf->ishvm )
-        return buffer_tail_hvm(&buf->u.hvm, fd, max_vcpu_id, vcpumap,
+        return buffer_tail_hvm(ctx, &buf->u.hvm, fd, max_vcpu_id, vcpumap,
                                ext_vcpucontext);
     else
-        return buffer_tail_pv(&buf->u.pv, fd, max_vcpu_id, vcpumap,
+        return buffer_tail_pv(ctx, &buf->u.pv, fd, max_vcpu_id, vcpumap,
                               ext_vcpucontext);
 }
 
@@ -1161,8 +1157,8 @@ static int pagebuf_get(pagebuf_t* buf, int fd, int xch, uint32_t dom)
     return rc;
 }
 
-static int apply_batch(int xc_handle, uint32_t dom, xen_pfn_t* region_mfn,
-                       unsigned long* pfn_type, int pae_extended_cr3,
+static int apply_batch(int xc_handle, uint32_t dom, struct restore_ctx *ctx,
+                       xen_pfn_t* region_mfn, unsigned long* pfn_type, int pae_extended_cr3,
                        unsigned int hvm, struct xc_mmu* mmu,
                        pagebuf_t* pagebuf, int curbatch, int superpages)
 {
@@ -1182,7 +1178,7 @@ static int apply_batch(int xc_handle, uint32_t dom, xen_pfn_t* region_mfn,
     if (j > MAX_BATCH_SIZE)
         j = MAX_BATCH_SIZE;
 
-    if (allocate_physmem(xc_handle, dom, &pagebuf->pfn_types[curbatch],
+    if (allocate_physmem(xc_handle, dom, ctx, &pagebuf->pfn_types[curbatch],
                          j, hvm, region_mfn, superpages) != 0)
     {
         ERROR("allocate_physmem() failed\n");
@@ -1243,7 +1239,7 @@ static int apply_batch(int xc_handle, uint32_t dom, xen_pfn_t* region_mfn,
                 pae_extended_cr3 ||
                 (pagetype != XEN_DOMCTL_PFINFO_L1TAB)) {
 
-                if (!uncanonicalize_pagetable(xc_handle, dom,
+                if (!uncanonicalize_pagetable(xc_handle, dom, ctx,
                                               pagetype, page, superpages)) {
                     /*
                     ** Failing to uncanonicalize a page table can be ok
@@ -1350,6 +1346,12 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     tailbuf_t tailbuf, tmptail;
     void* vcpup;
 
+    static struct restore_ctx _ctx = {
+        .live_p2m = NULL,
+        .p2m = NULL,
+        .no_superpage_mem = 0,
+    };
+    static struct restore_ctx *ctx = &_ctx;
     struct domain_info_context *dinfo = &ctx->dinfo;
 
     pagebuf_init(&pagebuf);
@@ -1386,7 +1388,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     if ( !hvm ) 
     {
         /* Load the p2m frame list, plus potential extended info chunk */
-        p2m_frame_list = load_p2m_frame_list(
+        p2m_frame_list = load_p2m_frame_list(ctx,
             io_fd, &pae_extended_cr3, &ext_vcpucontext);
         if ( !p2m_frame_list )
             goto out;
@@ -1500,7 +1502,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         while ( curbatch < j ) {
             int brc;
 
-            brc = apply_batch(xc_handle, dom, region_mfn, pfn_type,
+            brc = apply_batch(xc_handle, dom, ctx, region_mfn, pfn_type,
                               pae_extended_cr3, hvm, mmu, &pagebuf, curbatch, superpages);
             if ( brc < 0 )
                 goto out;
@@ -1541,7 +1543,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     if ( !completed ) {
         int flags = 0;
 
-        if ( buffer_tail(&tailbuf, io_fd, max_vcpu_id, vcpumap,
+        if ( buffer_tail(ctx, &tailbuf, io_fd, max_vcpu_id, vcpumap,
                          ext_vcpucontext) < 0 ) {
             ERROR ("error buffering image tail");
             goto out;
@@ -1561,7 +1563,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     }
     memset(&tmptail, 0, sizeof(tmptail));
     tmptail.ishvm = hvm;
-    if ( buffer_tail(&tmptail, io_fd, max_vcpu_id, vcpumap,
+    if ( buffer_tail(ctx, &tmptail, io_fd, max_vcpu_id, vcpumap,
                      ext_vcpucontext) < 0 ) {
         ERROR ("error buffering image tail, finishing");
         goto finish;
@@ -1664,7 +1666,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
                 for ( k = 0; k < j; k++ )
                 {
                     if ( !uncanonicalize_pagetable(
-                        xc_handle, dom, XEN_DOMCTL_PFINFO_L1TAB,
+                        xc_handle, dom, ctx, XEN_DOMCTL_PFINFO_L1TAB,
                         region_base + k*PAGE_SIZE, superpages) )
                     {
                         ERROR("failed uncanonicalize pt!");
