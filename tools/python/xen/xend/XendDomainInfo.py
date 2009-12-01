@@ -2637,8 +2637,7 @@ class XendDomainInfo:
                         nodeload[i] = int(nodeload[i] * 16 / len(info['node_to_cpu'][i]))
                     else:
                         nodeload[i] = sys.maxint
-                index = nodeload.index( min(nodeload) )    
-                return index
+                return map(lambda x: x[0], sorted(enumerate(nodeload), key=lambda x:x[1]))
 
             info = xc.physinfo()
             if info['nr_nodes'] > 1:
@@ -2648,8 +2647,15 @@ class XendDomainInfo:
                 for i in range(0, info['nr_nodes']):
                     if node_memory_list[i] >= needmem and len(info['node_to_cpu'][i]) > 0:
                         candidate_node_list.append(i)
-                index = find_relaxed_node(candidate_node_list)
-                cpumask = info['node_to_cpu'][index]
+                best_node = find_relaxed_node(candidate_node_list)[0]
+                cpumask = info['node_to_cpu'][best_node]
+                cores_per_node = info['nr_cpus'] / info['nr_nodes']
+                nodes_required = (self.info['VCPUs_max'] + cores_per_node - 1) / cores_per_node
+                if nodes_required > 1:
+                    log.debug("allocating %d NUMA nodes", nodes_required)
+                    best_nodes = find_relaxed_node(filter(lambda x: x != best_node, range(0,info['nr_nodes'])))
+                    for i in best_nodes[:nodes_required - 1]:
+                        cpumask = cpumask + info['node_to_cpu'][i]
                 for v in range(0, self.info['VCPUs_max']):
                     xc.vcpu_setaffinity(self.domid, v, cpumask)
         return index
