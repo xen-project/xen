@@ -937,6 +937,8 @@ static char *get_blktap2_device(struct libxl_ctx *ctx, char *name, char *type)
     while (!feof(f)) {
         fscanf(f, "%d %s", &devnum, buf);
         p = strchr(buf, ':');
+        if (p == NULL)
+            continue;
         p++;
         if (!strcmp(p, name) && !strncmp(buf, type, 3)) {
             fclose(f);
