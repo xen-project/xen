@@ -32,27 +32,22 @@
 #include <xen/hvm/ioreq.h>
 #include <xen/hvm/params.h>
 
-/* max mfn of the current host machine */
-static unsigned long max_mfn;
+struct restore_ctx {
+    unsigned long max_mfn; /* max mfn of the current host machine */
+    unsigned long hvirt_start; /* virtual starting address of the hypervisor */
+    unsigned int pt_levels; /* #levels of page tables used by the current guest */
+    unsigned long nr_pfns; /* number of 'in use' pfns in the guest (i.e. #P2M entries with a valid mfn) */
+    xen_pfn_t *live_p2m; /* Live mapping of the table mapping each PFN to its current MFN. */
+    xen_pfn_t *p2m; /* A table mapping each PFN to its new MFN. */
+    unsigned no_superpage_mem; /* If have enough continuous memory for super page allocation */
+};
 
-/* virtual starting address of the hypervisor */
-static unsigned long hvirt_start;
-
-/* #levels of page tables used by the current guest */
-static unsigned int pt_levels;
-
-
-/* number of 'in use' pfns in the guest (i.e. #P2M entries with a valid mfn) */
-static unsigned long nr_pfns;
-
-/* Live mapping of the table mapping each PFN to its current MFN. */
-static xen_pfn_t *live_p2m = NULL;
-
-/* A table mapping each PFN to its new MFN. */
-static xen_pfn_t *p2m = NULL;
-
-/* If have enough continuous memory for super page allocation */
-static unsigned no_superpage_mem = 0;
+static struct restore_ctx _ctx = {
+    .live_p2m = NULL,
+    .p2m = NULL,
+    .no_superpage_mem = 0,
+};
+static struct restore_ctx *ctx = &_ctx;
 
 static struct domain_info_context _dinfo;
 static struct domain_info_context *dinfo = &_dinfo;
@@ -82,7 +77,7 @@ static int super_page_populated(unsigned long pfn)
     pfn &= ~(SUPERPAGE_NR_PFNS - 1);
     for ( i = pfn; i < pfn + SUPERPAGE_NR_PFNS; i++ )
     {
-        if ( p2m[i] != INVALID_P2M_ENTRY )
+        if ( ctx->p2m[i] != INVALID_P2M_ENTRY )
             return 1;
     }
     return 0;
@@ -107,7 +102,7 @@ static int break_super_page(int xc_handle,
     for ( i = start_pfn; i < start_pfn + SUPERPAGE_NR_PFNS; i++ )
     {
         /* check the 2M page are populated */
-        if ( p2m[i] == INVALID_P2M_ENTRY ) {
+        if ( ctx->p2m[i] == INVALID_P2M_ENTRY ) {
             DPRINTF("Previous super page was populated wrongly!\n");
             return 1;
         }
@@ -156,7 +151,7 @@ static int break_super_page(int xc_handle,
     start_pfn = next_pfn & ~(SUPERPAGE_NR_PFNS - 1);
     for ( i = start_pfn; i < start_pfn + SUPERPAGE_NR_PFNS; i++ )
     {
-        p2m[i] = INVALID_P2M_ENTRY;
+        ctx->p2m[i] = INVALID_P2M_ENTRY;
     }
 
     for ( i = start_pfn; i < start_pfn + tot_pfns; i++ )
@@ -170,7 +165,7 @@ static int break_super_page(int xc_handle,
             rc = 1;
             goto out;
         }
-        p2m[i] = mfn;
+        ctx->p2m[i] = mfn;
     }
 
     /* restore contents */
@@ -222,7 +217,7 @@ static int allocate_mfn_list(int xc_handle,
     sp_pfn = *next_pfn;
 
     if ( !superpages ||
-         no_superpage_mem ||
+         ctx->no_superpage_mem ||
          !SUPER_PAGE_TRACKING(sp_pfn) )
         goto normal_page;
 
@@ -267,13 +262,13 @@ static int allocate_mfn_list(int xc_handle,
     {
         for ( i = pfn; i < pfn + SUPERPAGE_NR_PFNS; i++, mfn++ )
         {
-            p2m[i] = mfn;
+            ctx->p2m[i] = mfn;
         }
         return 0;
     }
     DPRINTF("No 2M page available for pfn 0x%lx, fall back to 4K page.\n",
             pfn);
-    no_superpage_mem = 1;
+    ctx->no_superpage_mem = 1;
 
 normal_page:
     if ( !batch_buf )
@@ -289,7 +284,7 @@ normal_page:
             continue;
 
         pfn = mfn = batch_buf[i] & ~XEN_DOMCTL_PFINFO_LTAB_MASK;
-        if ( p2m[pfn] == INVALID_P2M_ENTRY )
+        if ( ctx->p2m[pfn] == INVALID_P2M_ENTRY )
         {
             if (xc_domain_memory_populate_physmap(xc_handle, dom, 1, 0,
                         0, &mfn) != 0)
@@ -299,7 +294,7 @@ normal_page:
                 errno = ENOMEM;
                 return 1;
             }
-            p2m[pfn] = mfn;
+            ctx->p2m[pfn] = mfn;
         }
     }
 
@@ -436,7 +431,7 @@ alloc_page:
         }
         else 
         {
-            if (p2m[pfn] == INVALID_P2M_ENTRY)
+            if (ctx->p2m[pfn] == INVALID_P2M_ENTRY)
             {
                 DPRINTF("Warning: pfn 0x%lx are not allocated!\n", pfn);
                 /*XXX:allocate this page?*/
@@ -444,7 +439,7 @@ alloc_page:
 
             /* setup region_mfn[] for batch map.
              * For HVM guests, this interface takes PFNs, not MFNs */
-            region_mfn[i] = hvm ? pfn : p2m[pfn]; 
+            region_mfn[i] = hvm ? pfn : ctx->p2m[pfn]; 
         }
     }
     return 0;
@@ -510,11 +505,11 @@ static int uncanonicalize_pagetable(int xc_handle, uint32_t dom,
     unsigned long pfn;
     uint64_t pte;
 
-    pte_last = PAGE_SIZE / ((pt_levels == 2)? 4 : 8);
+    pte_last = PAGE_SIZE / ((ctx->pt_levels == 2)? 4 : 8);
 
     for ( i = 0; i < pte_last; i++ )
     {
-        if ( pt_levels == 2 )
+        if ( ctx->pt_levels == 2 )
             pte = ((uint32_t *)page)[i];
         else
             pte = ((uint64_t *)page)[i];
@@ -526,7 +521,7 @@ static int uncanonicalize_pagetable(int xc_handle, uint32_t dom,
         pfn = (pte >> PAGE_SHIFT) & MFN_MASK_X86;
 
         /* Allocate mfn if necessary */
-        if ( p2m[pfn] == INVALID_P2M_ENTRY )
+        if ( ctx->p2m[pfn] == INVALID_P2M_ENTRY )
         {
             unsigned long force_pfn = superpages ? FORCE_SP_MASK : pfn;
             if (allocate_mfn_list(xc_handle, dom,
@@ -534,9 +529,9 @@ static int uncanonicalize_pagetable(int xc_handle, uint32_t dom,
                 return 0;
         }
         pte &= ~MADDR_MASK_X86;
-        pte |= (uint64_t)p2m[pfn] << PAGE_SHIFT;
+        pte |= (uint64_t)ctx->p2m[pfn] << PAGE_SHIFT;
 
-        if ( pt_levels == 2 )
+        if ( ctx->pt_levels == 2 )
             ((uint32_t *)page)[i] = (uint32_t)pte;
         else
             ((uint64_t *)page)[i] = (uint64_t)pte;
@@ -594,13 +589,13 @@ static xen_pfn_t *load_p2m_frame_list(
                 if ( chunk_bytes == sizeof (ctxt.x32) )
                 {
                     dinfo->guest_width = 4;
-                    if ( pt_levels > 2 ) 
-                        pt_levels = 3; 
+                    if ( ctx->pt_levels > 2 ) 
+                        ctx->pt_levels = 3; 
                 }
                 else if ( chunk_bytes == sizeof (ctxt.x64) )
                 {
                     dinfo->guest_width = 8;
-                    pt_levels = 4;
+                    ctx->pt_levels = 4;
                 }
                 else 
                 {
@@ -1220,7 +1215,7 @@ static int apply_batch(int xc_handle, uint32_t dom, xen_pfn_t* region_mfn,
 
         pfn_type[pfn] = pagetype;
 
-        mfn = p2m[pfn];
+        mfn = ctx->p2m[pfn];
 
         /* In verify mode, we use a copy; otherwise we work in place */
         page = pagebuf->verify ? (void *)buf : (region_base + i*PAGE_SIZE);
@@ -1241,7 +1236,7 @@ static int apply_batch(int xc_handle, uint32_t dom, xen_pfn_t* region_mfn,
             ** so we may need to update the p2m after the main loop.
             ** Hence we defer canonicalization of L1s until then.
             */
-            if ((pt_levels != 3) ||
+            if ((ctx->pt_levels != 3) ||
                 pae_extended_cr3 ||
                 (pagetype != XEN_DOMCTL_PFINFO_L1TAB)) {
 
@@ -1357,7 +1352,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     tailbuf.ishvm = hvm;
 
     /* For info only */
-    nr_pfns = 0;
+    ctx->nr_pfns = 0;
 
     /* Always try to allocate 2M pages for HVM */
     if ( hvm )
@@ -1371,7 +1366,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     DPRINTF("xc_domain_restore start: p2m_size = %lx\n", dinfo->p2m_size);
 
     if ( !get_platform_info(xc_handle, dom,
-                            &max_mfn, &hvirt_start, &pt_levels, &dinfo->guest_width) )
+                            &ctx->max_mfn, &ctx->hvirt_start, &ctx->pt_levels, &dinfo->guest_width) )
     {
         ERROR("Unable to get platform info.");
         return 1;
@@ -1381,7 +1376,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
      * assume the guest will be the same as we are.  We'll fix that later
      * if we discover otherwise. */
     dinfo->guest_width = sizeof(unsigned long);
-    pt_levels = (dinfo->guest_width == 8) ? 4 : (pt_levels == 2) ? 2 : 3; 
+    ctx->pt_levels = (dinfo->guest_width == 8) ? 4 : (ctx->pt_levels == 2) ? 2 : 3; 
     
     if ( !hvm ) 
     {
@@ -1405,13 +1400,13 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     }
 
     /* We want zeroed memory so use calloc rather than malloc. */
-    p2m        = calloc(dinfo->p2m_size, sizeof(xen_pfn_t));
+    ctx->p2m   = calloc(dinfo->p2m_size, sizeof(xen_pfn_t));
     pfn_type   = calloc(dinfo->p2m_size, sizeof(unsigned long));
 
     region_mfn = xg_memalign(PAGE_SIZE, ROUNDUP(
                               MAX_BATCH_SIZE * sizeof(xen_pfn_t), PAGE_SHIFT));
 
-    if ( (p2m == NULL) || (pfn_type == NULL) ||
+    if ( (ctx->p2m == NULL) || (pfn_type == NULL) ||
          (region_mfn == NULL) )
     {
         ERROR("memory alloc failed");
@@ -1440,7 +1435,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
 
     /* Mark all PFNs as invalid; we allocate on demand */
     for ( pfn = 0; pfn < dinfo->p2m_size; pfn++ )
-        p2m[pfn] = INVALID_P2M_ENTRY;
+        ctx->p2m[pfn] = INVALID_P2M_ENTRY;
 
     mmu = xc_alloc_mmu_updates(xc_handle, dom);
     if ( mmu == NULL )
@@ -1575,7 +1570,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     if ( hvm )
         goto finish_hvm;
 
-    if ( (pt_levels == 3) && !pae_extended_cr3 )
+    if ( (ctx->pt_levels == 3) && !pae_extended_cr3 )
     {
         /*
         ** XXX SMH on PAE we need to ensure PGDs are in MFNs < 4G. This
@@ -1596,7 +1591,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         {
             if ( ((pfn_type[i] & XEN_DOMCTL_PFINFO_LTABTYPE_MASK) ==
                   XEN_DOMCTL_PFINFO_L3TAB) &&
-                 (p2m[i] > 0xfffffUL) )
+                 (ctx->p2m[i] > 0xfffffUL) )
             {
                 unsigned long new_mfn;
                 uint64_t l3ptes[4];
@@ -1604,21 +1599,21 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
 
                 l3tab = (uint64_t *)
                     xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
-                                         PROT_READ, p2m[i]);
+                                         PROT_READ, ctx->p2m[i]);
 
                 for ( j = 0; j < 4; j++ )
                     l3ptes[j] = l3tab[j];
 
                 munmap(l3tab, PAGE_SIZE);
 
-                new_mfn = xc_make_page_below_4G(xc_handle, dom, p2m[i]);
+                new_mfn = xc_make_page_below_4G(xc_handle, dom, ctx->p2m[i]);
                 if ( !new_mfn )
                 {
                     ERROR("Couldn't get a page below 4GB :-(");
                     goto out;
                 }
 
-                p2m[i] = new_mfn;
+                ctx->p2m[i] = new_mfn;
                 if ( xc_add_mmu_update(xc_handle, mmu,
                                        (((unsigned long long)new_mfn)
                                         << PAGE_SHIFT) |
@@ -1630,7 +1625,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
 
                 l3tab = (uint64_t *)
                     xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
-                                         PROT_READ | PROT_WRITE, p2m[i]);
+                                         PROT_READ | PROT_WRITE, ctx->p2m[i]);
 
                 for ( j = 0; j < 4; j++ )
                     l3tab[j] = l3ptes[j];
@@ -1647,7 +1642,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
             if ( ((pfn_type[i] & XEN_DOMCTL_PFINFO_LTABTYPE_MASK) ==
                   XEN_DOMCTL_PFINFO_L1TAB) )
             {
-                region_mfn[j] = p2m[i];
+                region_mfn[j] = ctx->p2m[i];
                 j++;
             }
 
@@ -1716,7 +1711,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
             continue;
         }
 
-        pin[nr_pins].arg1.mfn = p2m[i];
+        pin[nr_pins].arg1.mfn = ctx->p2m[i];
         nr_pins++;
 
         /* Batch full? Then flush. */
@@ -1739,7 +1734,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     }
 
     DPRINTF("\b\b\b\b100%%\n");
-    DPRINTF("Memory reloaded (%ld pages)\n", nr_pfns);
+    DPRINTF("Memory reloaded (%ld pages)\n", ctx->nr_pfns);
 
     /* Get the list of PFNs that are not in the psuedo-phys map */
     {
@@ -1749,12 +1744,12 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         {
             unsigned long pfn = tailbuf.u.pv.pfntab[i];
 
-            if ( p2m[pfn] != INVALID_P2M_ENTRY )
+            if ( ctx->p2m[pfn] != INVALID_P2M_ENTRY )
             {
                 /* pfn is not in physmap now, but was at some point during
                    the save/migration process - need to free it */
-                tailbuf.u.pv.pfntab[nr_frees++] = p2m[pfn];
-                p2m[pfn]  = INVALID_P2M_ENTRY; /* not in pseudo-physical map */
+                tailbuf.u.pv.pfntab[nr_frees++] = ctx->p2m[pfn];
+                ctx->p2m[pfn]  = INVALID_P2M_ENTRY; /* not in pseudo-physical map */
             }
         }
 
@@ -1812,17 +1807,17 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
                 ERROR("Suspend record frame number is bad");
                 goto out;
             }
-            mfn = p2m[pfn];
+            mfn = ctx->p2m[pfn];
             SET_FIELD(&ctxt, user_regs.edx, mfn);
             start_info = xc_map_foreign_range(
                 xc_handle, dom, PAGE_SIZE, PROT_READ | PROT_WRITE, mfn);
             SET_FIELD(start_info, nr_pages, dinfo->p2m_size);
             SET_FIELD(start_info, shared_info, shared_info_frame<<PAGE_SHIFT);
             SET_FIELD(start_info, flags, 0);
-            *store_mfn = p2m[GET_FIELD(start_info, store_mfn)];
+            *store_mfn = ctx->p2m[GET_FIELD(start_info, store_mfn)];
             SET_FIELD(start_info, store_mfn, *store_mfn);
             SET_FIELD(start_info, store_evtchn, store_evtchn);
-            *console_mfn = p2m[GET_FIELD(start_info, console.domU.mfn)];
+            *console_mfn = ctx->p2m[GET_FIELD(start_info, console.domU.mfn)];
             SET_FIELD(start_info, console.domU.mfn, *console_mfn);
             SET_FIELD(start_info, console.domU.evtchn, console_evtchn);
             munmap(start_info, PAGE_SIZE);
@@ -1844,7 +1839,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
                       j, (unsigned long)pfn);
                 goto out;
             }
-            SET_FIELD(&ctxt, gdt_frames[j], p2m[pfn]);
+            SET_FIELD(&ctxt, gdt_frames[j], ctx->p2m[pfn]);
         }
         /* Uncanonicalise the page table base pointer. */
         pfn = UNFOLD_CR3(GET_FIELD(&ctxt, ctrlreg[3]));
@@ -1857,17 +1852,17 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         }
 
         if ( (pfn_type[pfn] & XEN_DOMCTL_PFINFO_LTABTYPE_MASK) !=
-             ((unsigned long)pt_levels<<XEN_DOMCTL_PFINFO_LTAB_SHIFT) )
+             ((unsigned long)ctx->pt_levels<<XEN_DOMCTL_PFINFO_LTAB_SHIFT) )
         {
             ERROR("PT base is bad. pfn=%lu nr=%lu type=%08lx %08lx",
                   pfn, dinfo->p2m_size, pfn_type[pfn],
-                  (unsigned long)pt_levels<<XEN_DOMCTL_PFINFO_LTAB_SHIFT);
+                  (unsigned long)ctx->pt_levels<<XEN_DOMCTL_PFINFO_LTAB_SHIFT);
             goto out;
         }
-        SET_FIELD(&ctxt, ctrlreg[3], FOLD_CR3(p2m[pfn]));
+        SET_FIELD(&ctxt, ctrlreg[3], FOLD_CR3(ctx->p2m[pfn]));
 
         /* Guest pagetable (x86/64) stored in otherwise-unused CR1. */
-        if ( (pt_levels == 4) && (ctxt.x64.ctrlreg[1] & 1) )
+        if ( (ctx->pt_levels == 4) && (ctxt.x64.ctrlreg[1] & 1) )
         {
             pfn = UNFOLD_CR3(ctxt.x64.ctrlreg[1] & ~1);
             if ( pfn >= dinfo->p2m_size )
@@ -1877,14 +1872,14 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
                 goto out;
             }
             if ( (pfn_type[pfn] & XEN_DOMCTL_PFINFO_LTABTYPE_MASK) !=
-                 ((unsigned long)pt_levels<<XEN_DOMCTL_PFINFO_LTAB_SHIFT) )
+                 ((unsigned long)ctx->pt_levels<<XEN_DOMCTL_PFINFO_LTAB_SHIFT) )
             {
                 ERROR("User PT base is bad. pfn=%lu nr=%lu type=%08lx %08lx",
                       pfn, dinfo->p2m_size, pfn_type[pfn],
-                      (unsigned long)pt_levels<<XEN_DOMCTL_PFINFO_LTAB_SHIFT);
+                      (unsigned long)ctx->pt_levels<<XEN_DOMCTL_PFINFO_LTAB_SHIFT);
                 goto out;
             }
-            ctxt.x64.ctrlreg[1] = FOLD_CR3(p2m[pfn]);
+            ctxt.x64.ctrlreg[1] = FOLD_CR3(ctx->p2m[pfn]);
         }
         domctl.cmd = XEN_DOMCTL_setvcpucontext;
         domctl.domain = (domid_t)dom;
@@ -1943,11 +1938,11 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
             ERROR("PFN-to-MFN frame number %i (%#lx) is bad", i, pfn);
             goto out;
         }
-        p2m_frame_list[i] = p2m[pfn];
+        p2m_frame_list[i] = ctx->p2m[pfn];
     }
 
     /* Copy the P2M we've constructed to the 'live' P2M */
-    if ( !(live_p2m = xc_map_foreign_batch(xc_handle, dom, PROT_WRITE,
+    if ( !(ctx->live_p2m = xc_map_foreign_batch(xc_handle, dom, PROT_WRITE,
                                            p2m_frame_list, P2M_FL_ENTRIES)) )
     {
         ERROR("Couldn't map p2m table");
@@ -1958,13 +1953,13 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
      * we need to adjust the live_p2m assignment appropriately */
     if ( dinfo->guest_width > sizeof (xen_pfn_t) )
         for ( i = dinfo->p2m_size - 1; i >= 0; i-- )
-            ((int64_t *)live_p2m)[i] = (long)p2m[i];
+            ((int64_t *)ctx->live_p2m)[i] = (long)ctx->p2m[i];
     else if ( dinfo->guest_width < sizeof (xen_pfn_t) )
         for ( i = 0; i < dinfo->p2m_size; i++ )   
-            ((uint32_t *)live_p2m)[i] = p2m[i];
+            ((uint32_t *)ctx->live_p2m)[i] = ctx->p2m[i];
     else
-        memcpy(live_p2m, p2m, dinfo->p2m_size * sizeof(xen_pfn_t));
-    munmap(live_p2m, P2M_FL_ENTRIES * PAGE_SIZE);
+        memcpy(ctx->live_p2m, ctx->p2m, dinfo->p2m_size * sizeof(xen_pfn_t));
+    munmap(ctx->live_p2m, P2M_FL_ENTRIES * PAGE_SIZE);
 
     DPRINTF("Domain ready to be built.\n");
     rc = 0;
@@ -2018,7 +2013,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     if ( (rc != 0) && (dom != 0) )
         xc_domain_destroy(xc_handle, dom);
     free(mmu);
-    free(p2m);
+    free(ctx->p2m);
     free(pfn_type);
     tailbuf_free(&tailbuf);
 
