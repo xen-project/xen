@@ -69,6 +69,9 @@ unsigned long long xenstat_node_tot_mem(xenstat_node * node);
 /* Get amount of free memory on a node */
 unsigned long long xenstat_node_free_mem(xenstat_node * node);
 
+/* Get amount of tmem freeable memory (in MiB) on a node */
+long xenstat_node_freeable_mb(xenstat_node * node);
+
 /* Find the number of domains existing on a node */
 unsigned int xenstat_node_num_domains(xenstat_node * node);
 

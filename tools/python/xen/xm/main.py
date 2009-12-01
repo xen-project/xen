@@ -220,7 +220,7 @@ SUBCOMMAND_HELP = {
     'tmem-set'      :  ('[<Domain>|-a|--all] [weight=<weight>] [cap=<cap>] '
                         '[compress=<compress>]',
                         'Change tmem settings.'),
-    'tmem-freeable'  :  ('', 'Print number of freeable tmem pages.'),
+    'tmem-freeable'  :  ('', 'Print freeable tmem (in MiB).'),
     'tmem-shared-auth' :  ('[<Domain>|-a|--all] [--uuid=<uuid>] [--auth=<0|1>]', 'De/authenticate shared tmem pool.'),
 
     # security

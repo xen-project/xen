@@ -799,6 +799,7 @@ void do_summary(void)
 	         crash = 0, dying = 0, shutdown = 0;
 	unsigned i, num_domains = 0;
 	unsigned long long used = 0;
+	long freeable_mb = 0;
 	xenstat_domain *domain;
 	time_t curt;
 
@@ -825,12 +826,18 @@ void do_summary(void)
 	      num_domains, run, block, pause, crash, dying, shutdown);
 
 	used = xenstat_node_tot_mem(cur_node)-xenstat_node_free_mem(cur_node);
+	freeable_mb = xenstat_node_freeable_mb(cur_node);
 
 	/* Dump node memory and cpu information */
-	print("Mem: %lluk total, %lluk used, %lluk free    "
-	      "CPUs: %u @ %lluMHz\n",
+	if ( freeable_mb <= 0 )
+	     print("Mem: %lluk total, %lluk used, %lluk free    ",
 	      xenstat_node_tot_mem(cur_node)/1024, used/1024,
-	      xenstat_node_free_mem(cur_node)/1024,
+	      xenstat_node_free_mem(cur_node)/1024);
+	else
+	     print("Mem: %lluk total, %lluk used, %lluk free, %ldk freeable, ",
+	      xenstat_node_tot_mem(cur_node)/1024, used/1024,
+	      xenstat_node_free_mem(cur_node)/1024, freeable_mb*1024);
+	print("CPUs: %u @ %lluMHz\n",
 	      xenstat_node_num_cpus(cur_node),
 	      xenstat_node_cpu_hz(cur_node)/1000000);
 }

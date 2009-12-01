@@ -32,6 +32,7 @@
 #include <xen/xsm/acm.h>
 #include <xen/xsm/acm_ops.h>
 #include <xen/xsm/flask_op.h>
+#include <xen/tmem.h>
 
 #if defined(__i386__) || defined(__x86_64__)
 #include <xen/foreign/x86_32.h>

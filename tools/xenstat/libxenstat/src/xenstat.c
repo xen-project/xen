@@ -154,12 +154,16 @@ xenstat_node *xenstat_get_node(xenstat_handle * handle, unsigned int flags)
 		return NULL;
 	}
 
+
 	node->cpu_hz = ((unsigned long long)physinfo.cpu_khz) * 1000ULL;
         node->num_cpus = physinfo.nr_cpus;
 	node->tot_mem = ((unsigned long long)physinfo.total_pages)
 	    * handle->page_size;
 	node->free_mem = ((unsigned long long)physinfo.free_pages)
 	    * handle->page_size;
+
+	node->freeable_mb = (long)xc_tmem_control(handle->xc_handle, -1,
+				TMEMC_QUERY_FREEABLE_MB, -1, 0, 0, 0, NULL);
 
 	/* malloc(0) is not portable, so allocate a single domain.  This will
 	 * be resized below. */
@@ -302,6 +306,11 @@ unsigned long long xenstat_node_tot_mem(xenstat_node * node)
 unsigned long long xenstat_node_free_mem(xenstat_node * node)
 {
 	return node->free_mem;
+}
+
+long xenstat_node_freeable_mb(xenstat_node * node)
+{
+	return node->freeable_mb;
 }
 
 unsigned int xenstat_node_num_domains(xenstat_node * node)
