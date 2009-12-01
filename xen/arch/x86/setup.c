@@ -762,11 +762,9 @@ void __init __start_xen(unsigned long mbi_p)
              ((e-s) >= (modules_length+modules_headroom)) )
         {
             initial_images_end = e;
-            e = (e - modules_length) & PAGE_MASK;
-            initial_images_start = e;
-            e -= modules_headroom;
-            initial_images_base = e;
-            e += modules_length + modules_headroom;
+            initial_images_start = initial_images_end - modules_length;
+            initial_images_base = initial_images_start - modules_headroom;
+            initial_images_base &= PAGE_MASK;
             for ( j = mbi->mods_count-1; j >= 0; j-- )
             {
                 e -= mod[j].mod_end - mod[j].mod_start;
@@ -774,6 +772,7 @@ void __init __start_xen(unsigned long mbi_p)
                 mod[j].mod_end += e - mod[j].mod_start;
                 mod[j].mod_start = e;
             }
+            e = initial_images_base;
         }
 
         if ( !kexec_crash_area.start && (s < e) &&
