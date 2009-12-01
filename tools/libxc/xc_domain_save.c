@@ -30,25 +30,23 @@
 #define DEF_MAX_ITERS   29   /* limit us to 30 times round loop   */
 #define DEF_MAX_FACTOR   3   /* never send more than 3x p2m_size  */
 
-/* max mfn of the whole machine */
-static unsigned long max_mfn;
-
-/* virtual starting address of the hypervisor */
-static unsigned long hvirt_start;
-
-/* #levels of page tables used by the current guest */
-static unsigned int pt_levels;
-
-
-/* Live mapping of the table mapping each PFN to its current MFN. */
-static xen_pfn_t *live_p2m = NULL;
-
-/* Live mapping of system MFN to PFN table. */
-static xen_pfn_t *live_m2p = NULL;
-static unsigned long m2p_mfn0;
+struct save_context {
+    unsigned long hvirt_start; /* virtual starting address of the hypervisor */
+    unsigned int pt_levels; /* #levels of page tables used by the current guest */
+    unsigned long max_mfn; /* max mfn of the whole machine */
+    xen_pfn_t *live_p2m; /* Live mapping of the table mapping each PFN to its current MFN. */
+    xen_pfn_t *live_m2p; /* Live mapping of system MFN to PFN table. */
+    unsigned long m2p_mfn0;
+};
 
 static struct domain_info_context _dinfo;
 static struct domain_info_context *dinfo = &_dinfo;
+
+static struct save_context _ctx = {
+    .live_p2m = NULL,
+    .live_m2p = NULL,
+};
+static struct save_context *ctx = &_ctx;
 
 /* buffer for output */
 struct outbuf {
@@ -61,20 +59,20 @@ struct outbuf {
 
 /* grep fodder: machine_to_phys */
 
-#define mfn_to_pfn(_mfn)  (live_m2p[(_mfn)])
+#define mfn_to_pfn(_mfn)  (ctx->live_m2p[(_mfn)])
 
 #define pfn_to_mfn(_pfn)                                            \
   ((xen_pfn_t) ((dinfo->guest_width==8)                               \
-                ? (((uint64_t *)live_p2m)[(_pfn)])                  \
-                : ((((uint32_t *)live_p2m)[(_pfn)]) == 0xffffffffU  \
-                   ? (-1UL) : (((uint32_t *)live_p2m)[(_pfn)]))))
+                ? (((uint64_t *)ctx->live_p2m)[(_pfn)])                  \
+                : ((((uint32_t *)ctx->live_p2m)[(_pfn)]) == 0xffffffffU  \
+                   ? (-1UL) : (((uint32_t *)ctx->live_p2m)[(_pfn)]))))
 
 /*
  * Returns TRUE if the given machine frame number has a unique mapping
  * in the guest's pseudophysical map.
  */
 #define MFN_IS_IN_PSEUDOPHYS_MAP(_mfn)          \
-    (((_mfn) < (max_mfn)) &&                    \
+    (((_mfn) < (ctx->max_mfn)) &&                \
      ((mfn_to_pfn(_mfn) < (dinfo->p2m_size)) &&   \
       (pfn_to_mfn(mfn_to_pfn(_mfn)) == (_mfn))))
 
@@ -502,12 +500,12 @@ static int canonicalize_pagetable(unsigned long type, unsigned long pfn,
     ** reserved hypervisor mappings. This depends on the current
     ** page table type as well as the number of paging levels.
     */
-    xen_start = xen_end = pte_last = PAGE_SIZE / ((pt_levels == 2) ? 4 : 8);
+    xen_start = xen_end = pte_last = PAGE_SIZE / ((ctx->pt_levels == 2) ? 4 : 8);
 
-    if ( (pt_levels == 2) && (type == XEN_DOMCTL_PFINFO_L2TAB) )
-        xen_start = (hvirt_start >> L2_PAGETABLE_SHIFT);
+    if ( (ctx->pt_levels == 2) && (type == XEN_DOMCTL_PFINFO_L2TAB) )
+        xen_start = (ctx->hvirt_start >> L2_PAGETABLE_SHIFT);
 
-    if ( (pt_levels == 3) && (type == XEN_DOMCTL_PFINFO_L3TAB) )
+    if ( (ctx->pt_levels == 3) && (type == XEN_DOMCTL_PFINFO_L3TAB) )
         xen_start = L3_PAGETABLE_ENTRIES_PAE;
 
     /*
@@ -515,30 +513,30 @@ static int canonicalize_pagetable(unsigned long type, unsigned long pfn,
     ** We can spot this by looking for the guest's mappingof the m2p.
     ** Guests must ensure that this check will fail for other L2s.
     */
-    if ( (pt_levels == 3) && (type == XEN_DOMCTL_PFINFO_L2TAB) )
+    if ( (ctx->pt_levels == 3) && (type == XEN_DOMCTL_PFINFO_L2TAB) )
     {
         int hstart;
         uint64_t he;
 
-        hstart = (hvirt_start >> L2_PAGETABLE_SHIFT_PAE) & 0x1ff;
+        hstart = (ctx->hvirt_start >> L2_PAGETABLE_SHIFT_PAE) & 0x1ff;
         he = ((const uint64_t *) spage)[hstart];
 
-        if ( ((he >> PAGE_SHIFT) & MFN_MASK_X86) == m2p_mfn0 )
+        if ( ((he >> PAGE_SHIFT) & MFN_MASK_X86) == ctx->m2p_mfn0 )
         {
             /* hvirt starts with xen stuff... */
             xen_start = hstart;
         }
-        else if ( hvirt_start != 0xf5800000 )
+        else if ( ctx->hvirt_start != 0xf5800000 )
         {
             /* old L2s from before hole was shrunk... */
             hstart = (0xf5800000 >> L2_PAGETABLE_SHIFT_PAE) & 0x1ff;
             he = ((const uint64_t *) spage)[hstart];
-            if ( ((he >> PAGE_SHIFT) & MFN_MASK_X86) == m2p_mfn0 )
+            if ( ((he >> PAGE_SHIFT) & MFN_MASK_X86) == ctx->m2p_mfn0 )
                 xen_start = hstart;
         }
     }
 
-    if ( (pt_levels == 4) && (type == XEN_DOMCTL_PFINFO_L4TAB) )
+    if ( (ctx->pt_levels == 4) && (type == XEN_DOMCTL_PFINFO_L4TAB) )
     {
         /*
         ** XXX SMH: should compute these from hvirt_start (which we have)
@@ -553,7 +551,7 @@ static int canonicalize_pagetable(unsigned long type, unsigned long pfn,
     {
         unsigned long pfn, mfn;
 
-        if ( pt_levels == 2 )
+        if ( ctx->pt_levels == 2 )
             pte = ((const uint32_t*)spage)[i];
         else
             pte = ((const uint64_t*)spage)[i];
@@ -588,13 +586,13 @@ static int canonicalize_pagetable(unsigned long type, unsigned long pfn,
              * a 64bit hypervisor. We zap these here to avoid any
              * surprise at restore time...
              */
-            if ( (pt_levels == 3) &&
+            if ( (ctx->pt_levels == 3) &&
                  (type == XEN_DOMCTL_PFINFO_L3TAB) &&
                  (pte & (_PAGE_USER|_PAGE_RW|_PAGE_ACCESSED)) )
                 pte &= ~(_PAGE_USER|_PAGE_RW|_PAGE_ACCESSED);
         }
 
-        if ( pt_levels == 2 )
+        if ( ctx->pt_levels == 2 )
             ((uint32_t*)dpage)[i] = pte;
         else
             ((uint64_t*)dpage)[i] = pte;
@@ -753,7 +751,7 @@ static xen_pfn_t *map_and_save_p2m_table(int xc_handle,
         ERROR("Couldn't map p2m table");
         goto out;
     }
-    live_p2m = p2m; /* So that translation macros will work */
+    ctx->live_p2m = p2m; /* So that translation macros will work */
     
     /* Canonicalise the pfn-to-mfn table frame-number list. */
     for ( i = 0; i < dinfo->p2m_size; i += FPP )
@@ -762,15 +760,15 @@ static xen_pfn_t *map_and_save_p2m_table(int xc_handle,
         {
             ERROR("Frame# in pfn-to-mfn frame list is not in pseudophys");
             ERROR("entry %d: p2m_frame_list[%ld] is 0x%"PRIx64", max 0x%lx",
-                  i, i/FPP, (uint64_t)p2m_frame_list[i/FPP], max_mfn);
-            if ( p2m_frame_list[i/FPP] < max_mfn ) 
+                  i, i/FPP, (uint64_t)p2m_frame_list[i/FPP], ctx->max_mfn);
+            if ( p2m_frame_list[i/FPP] < ctx->max_mfn ) 
             {
                 ERROR("m2p[0x%"PRIx64"] = 0x%"PRIx64, 
                       (uint64_t)p2m_frame_list[i/FPP],
-                      (uint64_t)live_m2p[p2m_frame_list[i/FPP]]);
+                      (uint64_t)ctx->live_m2p[p2m_frame_list[i/FPP]]);
                 ERROR("p2m[0x%"PRIx64"] = 0x%"PRIx64, 
-                      (uint64_t)live_m2p[p2m_frame_list[i/FPP]],
-                      (uint64_t)p2m[live_m2p[p2m_frame_list[i/FPP]]]);
+                      (uint64_t)ctx->live_m2p[p2m_frame_list[i/FPP]],
+                      (uint64_t)p2m[ctx->live_m2p[p2m_frame_list[i/FPP]]]);
 
             }
             goto out;
@@ -924,7 +922,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     initialize_mbit_rate();
 
     if ( !get_platform_info(xc_handle, dom,
-                            &max_mfn, &hvirt_start, &pt_levels, &dinfo->guest_width) )
+                            &ctx->max_mfn, &ctx->hvirt_start, &ctx->pt_levels, &dinfo->guest_width) )
     {
         ERROR("Unable to get platform info.");
         return 1;
@@ -1063,7 +1061,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     }
 
     /* Setup the mfn_to_pfn table mapping */
-    if ( !(live_m2p = xc_map_m2p(xc_handle, max_mfn, PROT_READ, &m2p_mfn0)) )
+    if ( !(ctx->live_m2p = xc_map_m2p(xc_handle, ctx->max_mfn, PROT_READ, &ctx->m2p_mfn0)) )
     {
         ERROR("Failed to map live M2P table");
         goto out;
@@ -1081,8 +1079,8 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         int err = 0;
 
         /* Map the P2M table, and write the list of P2M frames */
-        live_p2m = map_and_save_p2m_table(xc_handle, io_fd, dom, live_shinfo);
-        if ( live_p2m == NULL )
+        ctx->live_p2m = map_and_save_p2m_table(xc_handle, io_fd, dom, live_shinfo);
+        if ( ctx->live_p2m == NULL )
         {
             ERROR("Failed to map/save the p2m frame list");
             goto out;
@@ -1701,7 +1699,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             FOLD_CR3(mfn_to_pfn(UNFOLD_CR3(GET_FIELD(&ctxt, ctrlreg[3])))));
 
         /* Guest pagetable (x86/64) stored in otherwise-unused CR1. */
-        if ( (pt_levels == 4) && ctxt.x64.ctrlreg[1] )
+        if ( (ctx->pt_levels == 4) && ctxt.x64.ctrlreg[1] )
         {
             if ( !MFN_IS_IN_PSEUDOPHYS_MAP(UNFOLD_CR3(ctxt.x64.ctrlreg[1])) )
             {
@@ -1809,11 +1807,11 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     if ( live_shinfo )
         munmap(live_shinfo, PAGE_SIZE);
 
-    if ( live_p2m )
-        munmap(live_p2m, P2M_FLL_ENTRIES * PAGE_SIZE);
+    if ( ctx->live_p2m )
+        munmap(ctx->live_p2m, P2M_FLL_ENTRIES * PAGE_SIZE);
 
-    if ( live_m2p )
-        munmap(live_m2p, M2P_SIZE(max_mfn));
+    if ( ctx->live_m2p )
+        munmap(ctx->live_m2p, M2P_SIZE(ctx->max_mfn));
 
     free(pfn_type);
     free(pfn_batch);
