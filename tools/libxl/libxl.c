@@ -738,8 +738,8 @@ static int libxl_create_stubdom(struct libxl_ctx *ctx,
                                 libxl_device_vkb *vkb,
                                 libxl_device_model_starting **starting_r)
 {
-    int i;
-    libxl_device_console console;
+    int i, num_console = 1;
+    libxl_device_console *console;
     libxl_domain_create_info c_info;
     libxl_domain_build_info b_info;
     libxl_domain_build_state state;
@@ -804,11 +804,19 @@ retry_transaction:
     vkb_info_domid_fixup(vkb, domid);
     libxl_device_vkb_add(ctx, domid, vkb);
 
-    init_console_info(&console, 0, &state);
-    console_info_domid_fixup(&console, domid);
-    console.constype = CONSTYPE_IOEMU;
-    libxl_device_console_add(ctx, domid, &console);
-    libxl_create_xenpv_qemu(ctx, vfb, 1, &console, starting_r);
+    if (info->serial)
+        num_console++;
+    console = libxl_calloc(ctx, num_console, sizeof(libxl_device_console));
+    for (i = 0; i < num_console; i++) {
+        if (!i)
+            init_console_info(&console[i], i, &state);
+        else
+            init_console_info(&console[i], i, NULL);
+        console_info_domid_fixup(&console[i], domid);
+        console[i].constype = CONSTYPE_IOEMU;
+        libxl_device_console_add(ctx, domid, &console[i]);
+    }
+    libxl_create_xenpv_qemu(ctx, vfb, num_console, console, starting_r);
 
     libxl_domain_unpause(ctx, domid);
 
