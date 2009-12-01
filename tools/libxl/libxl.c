@@ -101,7 +101,7 @@ int libxl_domain_make(struct libxl_ctx *ctx, libxl_domain_create_info *info,
     flags |= info->hap ? XEN_DOMCTL_CDF_hap : 0;
     *domid = 0;
 
-    /* XXX handle has to be initialised here.
+    /*
      * info->uuid != xen_domain_handle_t
      * See: 
      *      http://www.opengroup.org/dce/info/draft-leach-uuids-guids-01.txt
@@ -118,6 +118,8 @@ int libxl_domain_make(struct libxl_ctx *ctx, libxl_domain_create_info *info,
      *     uint8_t         node[_UUID_NODE_LEN];
      * };
      */
+    /* Ultimately, handle is an array of 16 uint8_t, same as uuid */
+    memcpy(handle, info->uuid, sizeof(xen_domain_handle_t));
 
     ret = xc_domain_create(ctx->xch, info->ssidref, handle, flags, domid);
     if (ret < 0) {
