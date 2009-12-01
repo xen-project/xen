@@ -651,12 +651,6 @@ static char ** libxl_build_device_model_args(struct libxl_ctx *ctx,
     return (char **) flexarray_contents(dm_args);
 }
 
-struct libxl_device_model_starting {
-    struct libxl_spawn_starting for_spawn; /* first! */
-    char *dom_path; /* from libxl_malloc, only for dm_xenstore_record_pid */
-    int domid;
-};
-
 void dm_xenstore_record_pid(struct libxl_ctx *ctx, void *for_spawn,
                             pid_t innerchild) {
     struct libxl_device_model_starting *starting = for_spawn;
@@ -675,6 +669,7 @@ void dm_xenstore_record_pid(struct libxl_ctx *ctx, void *for_spawn,
     if (rc) XL_LOG_ERRNO(ctx, XL_LOG_ERROR,
                          "Couldn't record device model pid %ld at %s/%s",
                          (unsigned long)innerchild, starting->dom_path, kvs);
+    xs_daemon_close(clone.xsh);
 }
 
 static int libxl_vfb_and_vkb_from_device_model_info(struct libxl_ctx *ctx,
@@ -765,6 +760,7 @@ static int libxl_create_stubdom(struct libxl_ctx *ctx,
     xen_uuid_t uuid[16];
     struct xs_permissions perm[2];
     xs_transaction_t t;
+    libxl_device_model_starting *dm_starting = 0;
 
     args = libxl_build_device_model_args(ctx, info, vifs, num_vifs);
     if (!args)
@@ -833,9 +829,23 @@ retry_transaction:
         console[i].constype = CONSTYPE_IOEMU;
         libxl_device_console_add(ctx, domid, &console[i]);
     }
-    libxl_create_xenpv_qemu(ctx, vfb, num_console, console, starting_r);
+    if (libxl_create_xenpv_qemu(ctx, vfb, num_console, console, &dm_starting) < 0) {
+        free(args);
+        return -1;
+    }
+    if (libxl_confirm_device_model_startup(ctx, dm_starting) < 0) {
+        free(args);
+        return -1;
+    }
 
     libxl_domain_unpause(ctx, domid);
+
+    if (starting_r) {
+        *starting_r = libxl_calloc(ctx, sizeof(libxl_device_model_starting), 1);
+        (*starting_r)->domid = domid;
+        (*starting_r)->dom_path = libxl_xs_get_dompath(ctx, info->domid);
+        (*starting_r)->for_spawn = NULL;
+    }
 
     free(args);
     return 0;
@@ -851,7 +861,7 @@ int libxl_create_device_model(struct libxl_ctx *ctx,
     int logfile_w, null;
     int rc;
     char **args;
-    struct libxl_spawn_starting buf_spawn, *for_spawn;
+    struct libxl_device_model_starting buf_starting, *p;
 
     if (strstr(info->device_model, "stubdom-dm")) {
         libxl_device_vfb vfb;
@@ -860,8 +870,6 @@ int libxl_create_device_model(struct libxl_ctx *ctx,
         libxl_vfb_and_vkb_from_device_model_info(ctx, info, &vfb, &vkb);
         return libxl_create_stubdom(ctx, info, disks, num_disks, vifs, num_vifs, &vfb, &vkb, starting_r);
     }
-
-    *starting_r= 0;
 
     args = libxl_build_device_model_args(ctx, info, vifs, num_vifs);
     if (!args)
@@ -877,19 +885,19 @@ int libxl_create_device_model(struct libxl_ctx *ctx,
 
     if (starting_r) {
         rc = ERROR_NOMEM;
-        *starting_r= libxl_calloc(ctx, sizeof(**starting_r), 1);
+        *starting_r = libxl_calloc(ctx, sizeof(libxl_device_model_starting), 1);
         if (!*starting_r) goto xit;
-        (*starting_r)->domid= info->domid;
-
-        (*starting_r)->dom_path = libxl_xs_get_dompath(ctx, info->domid);
-        if (!(*starting_r)->dom_path) { free(*starting_r); return ERROR_FAIL; }
-
-        for_spawn= &(*starting_r)->for_spawn;
+        p = *starting_r;
     } else {
-        for_spawn= &buf_spawn;
+        p = &buf_starting;
+        p->for_spawn = NULL;
     }
-    rc = libxl_spawn_spawn(ctx, for_spawn, "device model",
-                           dm_xenstore_record_pid);
+
+    p->domid = info->domid;
+    p->dom_path = libxl_xs_get_dompath(ctx, info->domid);
+    if (!p->dom_path) { libxl_free(ctx, p); return ERROR_FAIL; }
+
+    rc = libxl_spawn_spawn(ctx, p, "device model", dm_xenstore_record_pid);
     if (rc < 0) goto xit;
     if (!rc) { /* inner child */
         libxl_exec(ctx, null, logfile_w, logfile_w,
@@ -908,7 +916,8 @@ int libxl_create_device_model(struct libxl_ctx *ctx,
 int libxl_detach_device_model(struct libxl_ctx *ctx,
                               libxl_device_model_starting *starting) {
     int rc;
-    rc = libxl_spawn_detach(ctx, &starting->for_spawn);
+    rc = libxl_spawn_detach(ctx, starting->for_spawn);
+    if (starting->for_spawn) libxl_free(ctx, starting->for_spawn);
     libxl_free(ctx, starting);
     return rc;
 }
@@ -918,7 +927,7 @@ int libxl_confirm_device_model_startup(struct libxl_ctx *ctx,
                                        libxl_device_model_starting *starting) {
     int problem = libxl_wait_for_device_model(ctx, starting->domid, "running",
                                               libxl_spawn_check,
-                                              &starting->for_spawn);
+                                              starting->for_spawn);
     int detach = libxl_detach_device_model(ctx, starting);
     return problem ? problem : detach;
     return 0;

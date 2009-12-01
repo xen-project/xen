@@ -133,8 +133,14 @@ struct libxl_spawn_starting {
     char *what; /* malloc'd in spawn_spawn */
 };
 
+struct libxl_device_model_starting {
+    struct libxl_spawn_starting *for_spawn; /* first! */
+    char *dom_path; /* from libxl_malloc, only for dm_xenstore_record_pid */
+    int domid;
+};
+
 int libxl_spawn_spawn(struct libxl_ctx *ctx,
-                      struct libxl_spawn_starting *for_spawn,
+                      libxl_device_model_starting *starting,
                       const char *what,
                       void (*intermediate_hook)(struct libxl_ctx *ctx,
                                                 void *for_spawn,

@@ -99,7 +99,7 @@ pid_t libxl_waitpid_instead_default(pid_t pid, int *status, int flags) {
 
 
 int libxl_spawn_spawn(struct libxl_ctx *ctx,
-                      struct libxl_spawn_starting *for_spawn,
+                      libxl_device_model_starting *starting,
                       const char *what,
                       void (*intermediate_hook)(struct libxl_ctx *ctx,
                                                 void *for_spawn,
@@ -107,9 +107,10 @@ int libxl_spawn_spawn(struct libxl_ctx *ctx,
     pid_t child, got;
     int status;
     pid_t intermediate;
+    struct libxl_spawn_starting *for_spawn = starting->for_spawn;
 
     if (for_spawn) {
-        for_spawn->what= strdup(what);
+        for_spawn->what= libxl_sprintf(ctx, "%s", what);
         if (!for_spawn->what) return ERROR_NOMEM;
     }
 
@@ -130,7 +131,7 @@ int libxl_spawn_spawn(struct libxl_ctx *ctx,
     if (!child) return 0; /* caller runs child code */
     if (child<0) exit(255);
 
-    intermediate_hook(ctx, for_spawn, child);
+    intermediate_hook(ctx, starting, child);
 
     if (!for_spawn) _exit(0); /* just detach then */
 
