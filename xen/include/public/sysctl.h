@@ -454,7 +454,7 @@ struct xen_sysctl_page_offline_op {
 
 #define PG_OFFLINE_OWNER_SHIFT 16
 
-#define XEN_SYSCTL_lockprof_op       11
+#define XEN_SYSCTL_lockprof_op       15
 /* Sub-operations: */
 #define XEN_SYSCTL_LOCKPROF_reset 1   /* Reset all profile data to zero. */
 #define XEN_SYSCTL_LOCKPROF_query 2   /* Get lock profile information. */
