@@ -146,23 +146,7 @@ static inline u64 scale_delta(u64 delta, struct time_scale *scale)
     return product;
 }
 
-#define _TS_SHIFT_IDENTITY    1
 #define _TS_MUL_FRAC_IDENTITY 0x80000000UL
-#define _TS_IDENTITY { _TS_SHIFT_IDENTITY, _TS_MUL_FRAC_IDENTITY }
-static inline int time_scale_is_identity(struct time_scale *ts)
-{
-    if ( ts->shift != _TS_SHIFT_IDENTITY )
-        return 0;
-    else if ( ts->mul_frac != _TS_MUL_FRAC_IDENTITY )
-        return 0;
-    return 1;
-}
-
-static inline void set_time_scale_identity(struct time_scale *ts)
-{
-    ts->shift = _TS_SHIFT_IDENTITY;
-    ts->mul_frac = _TS_MUL_FRAC_IDENTITY;
-}
 
 /* Compute the reciprocal of the given time_scale. */
 static inline struct time_scale scale_reciprocal(struct time_scale scale)
@@ -843,11 +827,8 @@ static void __update_vcpu_system_time(struct vcpu *v, int force)
     u = &vcpu_info(v, time);
 
     if ( d->arch.vtsc )
-    {
-        tsc_stamp = t->stime_local_stamp - d->arch.vtsc_offset;
-        if ( !time_scale_is_identity(&d->arch.ns_to_vtsc) )
-            tsc_stamp = scale_delta(tsc_stamp, &d->arch.ns_to_vtsc);
-    }
+        tsc_stamp = scale_delta(t->stime_local_stamp - d->arch.vtsc_offset,
+                                &d->arch.ns_to_vtsc);
     else
         tsc_stamp = t->local_tsc_stamp;
 
@@ -1631,9 +1612,7 @@ void pv_soft_rdtsc(struct vcpu *v, struct cpu_user_regs *regs, int rdtscp)
 
     spin_unlock(&d->arch.vtsc_lock);
 
-    now = now - d->arch.vtsc_offset;
-    if ( !time_scale_is_identity(&d->arch.ns_to_vtsc) )
-        now = scale_delta(now, &d->arch.ns_to_vtsc);
+    now = scale_delta(now - d->arch.vtsc_offset, &d->arch.ns_to_vtsc);
 
     regs->eax = (uint32_t)now;
     regs->edx = (uint32_t)(now >> 32);
@@ -1714,7 +1693,7 @@ void tsc_get_info(struct domain *d, uint32_t *tsc_mode,
         break;
     case TSC_MODE_ALWAYS_EMULATE:
         *elapsed_nsec = get_s_time() - d->arch.vtsc_offset;
-        *gtsc_khz = 1000000UL;
+        *gtsc_khz =  d->arch.tsc_khz;
          break;
     case TSC_MODE_DEFAULT:
         if ( d->arch.vtsc )
@@ -1760,29 +1739,20 @@ void tsc_set_info(struct domain *d,
     case TSC_MODE_ALWAYS_EMULATE:
         d->arch.vtsc = 1;
         d->arch.vtsc_offset = get_s_time() - elapsed_nsec;
-        set_time_scale_identity(&d->arch.vtsc_to_ns);
+        d->arch.tsc_khz = gtsc_khz ? gtsc_khz : cpu_khz;
+        set_time_scale(&d->arch.vtsc_to_ns, d->arch.tsc_khz * 1000 );
+        d->arch.ns_to_vtsc = scale_reciprocal(d->arch.vtsc_to_ns);
         break;
     case TSC_MODE_DEFAULT:
+        d->arch.vtsc = 1;
         d->arch.vtsc_offset = get_s_time() - elapsed_nsec;
-        if ( (host_tsc_is_safe() && incarnation == 0) || !d->domain_id )
-        {
-            /* use native TSC if initial host supports it */
+        d->arch.tsc_khz = gtsc_khz ? gtsc_khz : cpu_khz;
+        set_time_scale(&d->arch.vtsc_to_ns, d->arch.tsc_khz * 1000 );
+        /* use native TSC if initial host has safe TSC and not migrated yet */
+        if ( host_tsc_is_safe() && incarnation == 0 )
             d->arch.vtsc = 0;
-            d->arch.tsc_khz = gtsc_khz ? gtsc_khz : cpu_khz;
-            set_time_scale(&d->arch.vtsc_to_ns, d->arch.tsc_khz * 1000 );
-            set_time_scale_identity(&d->arch.ns_to_vtsc);
-        } else if ( gtsc_khz != 0  && gtsc_khz != 1000000UL ) {
-            /* was native on initial host, now emulated at initial tsc hz*/
-            d->arch.vtsc = 1;
-            d->arch.tsc_khz = gtsc_khz;
-            set_time_scale(&d->arch.vtsc_to_ns, gtsc_khz * 1000 );
-            d->arch.ns_to_vtsc =
-                scale_reciprocal(d->arch.vtsc_to_ns);
-        } else {
-            d->arch.vtsc = 1;
-            set_time_scale_identity(&d->arch.vtsc_to_ns);
-            set_time_scale_identity(&d->arch.ns_to_vtsc);
-        }
+        else 
+            d->arch.ns_to_vtsc = scale_reciprocal(d->arch.vtsc_to_ns);
         break;
     case TSC_MODE_PVRDTSCP:
         if ( boot_cpu_has(X86_FEATURE_RDTSCP) && gtsc_khz != 0 ) {
@@ -1791,7 +1761,6 @@ void tsc_set_info(struct domain *d,
         } else {
             d->arch.vtsc = 1;
             d->arch.vtsc_offset = get_s_time() - elapsed_nsec;
-            set_time_scale_identity(&d->arch.vtsc_to_ns);
         }
         break;
     }
