@@ -40,13 +40,6 @@ struct save_ctx {
     struct domain_info_context dinfo;
 };
 
-static struct save_ctx _ctx = {
-    .live_p2m = NULL,
-    .live_m2p = NULL,
-};
-
-static struct save_ctx *ctx = &_ctx;
-
 /* buffer for output */
 struct outbuf {
     void* buf;
@@ -396,7 +389,7 @@ static int print_stats(int xc_handle, uint32_t domid, int pages_sent,
 }
 
 
-static int analysis_phase(int xc_handle, uint32_t domid,
+static int analysis_phase(int xc_handle, uint32_t domid, struct save_ctx *ctx,
                           unsigned long *arr, int runs)
 {
     long long start, now;
@@ -454,6 +447,7 @@ static int suspend_and_state(int (*suspend)(void*), void* data,
 ** it to update the MFN to a reasonable value.
 */
 static void *map_frame_list_list(int xc_handle, uint32_t dom,
+                                 struct save_ctx *ctx,
                                  shared_info_any_t *shinfo)
 {
     int count = 100;
@@ -489,7 +483,8 @@ static void *map_frame_list_list(int xc_handle, uint32_t dom,
 ** which entries do not require canonicalization (in particular, those
 ** entries which map the virtual address reserved for the hypervisor).
 */
-static int canonicalize_pagetable(unsigned long type, unsigned long pfn,
+static int canonicalize_pagetable(struct save_ctx *ctx,
+                           unsigned long type, unsigned long pfn,
                            const void *spage, void *dpage)
 {
     struct domain_info_context *dinfo = &ctx->dinfo;
@@ -670,6 +665,7 @@ err0:
 static xen_pfn_t *map_and_save_p2m_table(int xc_handle, 
                                          int io_fd, 
                                          uint32_t dom,
+                                         struct save_ctx *ctx,
                                          shared_info_any_t *live_shinfo)
 {
     vcpu_guest_context_any_t ctxt;
@@ -688,7 +684,7 @@ static xen_pfn_t *map_and_save_p2m_table(int xc_handle,
 
     int i, success = 0;
 
-    live_p2m_frame_list_list = map_frame_list_list(xc_handle, dom,
+    live_p2m_frame_list_list = map_frame_list_list(xc_handle, dom, ctx,
                                                    live_shinfo);
     if ( !live_p2m_frame_list_list )
         goto out;
@@ -912,6 +908,11 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     unsigned long mfn;
 
     struct outbuf ob;
+    static struct save_ctx _ctx = {
+        .live_p2m = NULL,
+        .live_m2p = NULL,
+    };
+    static struct save_ctx *ctx = &_ctx;
     struct domain_info_context *dinfo = &ctx->dinfo;
 
     int completed = 0;
@@ -1043,7 +1044,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         }
     }
 
-    analysis_phase(xc_handle, dom, to_skip, 0);
+    analysis_phase(xc_handle, dom, ctx, to_skip, 0);
 
     pfn_type   = xg_memalign(PAGE_SIZE, ROUNDUP(
                               MAX_BATCH_SIZE * sizeof(*pfn_type), PAGE_SHIFT));
@@ -1082,7 +1083,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         int err = 0;
 
         /* Map the P2M table, and write the list of P2M frames */
-        ctx->live_p2m = map_and_save_p2m_table(xc_handle, io_fd, dom, live_shinfo);
+        ctx->live_p2m = map_and_save_p2m_table(xc_handle, io_fd, dom, ctx, live_shinfo);
         if ( ctx->live_p2m == NULL )
         {
             ERROR("Failed to map/save the p2m frame list");
@@ -1376,7 +1377,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                 {
                     /* We have a pagetable page: need to rewrite it. */
                     race = 
-                        canonicalize_pagetable(pagetype, pfn, spage, page); 
+                        canonicalize_pagetable(ctx, pagetype, pfn, spage, page); 
 
                     if ( race && !live )
                     {
