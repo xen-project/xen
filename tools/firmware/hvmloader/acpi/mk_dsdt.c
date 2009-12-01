@@ -56,10 +56,10 @@ static void slt_tree(unsigned int s, unsigned int e)
     }
 
     push_block("If", "And(SLT, 0x%02x)", (e-s)/2);
-    slt_tree(s, (s+e)/2);
+    slt_tree((s+e)/2, e);
     pop_block();
     push_block("Else", NULL);
-    slt_tree((s+e)/2, e);
+    slt_tree(s, (s+e)/2);
     pop_block();
 }
 
