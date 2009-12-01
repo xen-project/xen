@@ -122,15 +122,6 @@ static struct mc_telem_ctl {
 /* Lock protecting all processing lists */
 static DEFINE_SPINLOCK(processing_lock);
 
-static void *cmpxchgptr(void *ptr, void *old, void *new)
-{
-	unsigned long *ulp = (unsigned long *)ptr;
-	unsigned long a = (unsigned long)old;
-	unsigned long b = (unsigned long)new;
-
-	return (void *)cmpxchg(ulp, a, b);
-}
-
 static void mctelem_xchg_head(struct mctelem_ent **headp,
 				struct mctelem_ent **old,
 				struct mctelem_ent *new)

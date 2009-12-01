@@ -475,10 +475,11 @@ static void do_nmi_stats(unsigned char key)
          ((v = d->vcpu[0]) == NULL) )
         return;
 
-    if ( v->nmi_pending || (v->trap_priority >= VCPU_TRAP_NMI) )
+    i = v->async_exception_mask & (1 << VCPU_TRAP_NMI);
+    if ( v->nmi_pending || i )
         printk("dom0 vpu0: NMI %s%s\n",
                v->nmi_pending ? "pending " : "",
-               (v->trap_priority >= VCPU_TRAP_NMI)  ? "masked " : "");
+               i ? "masked " : "");
     else
         printk("dom0 vcpu0: NMI neither pending nor masked\n");
 }

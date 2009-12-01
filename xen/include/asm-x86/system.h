@@ -134,6 +134,13 @@ static always_inline unsigned long __cmpxchg(
 
 #define __HAVE_ARCH_CMPXCHG
 
+#define cmpxchgptr(ptr,o,n) ({                                          \
+    const __typeof__(**(ptr)) *__o = (o);                               \
+    __typeof__(**(ptr)) *__n = (n);                                     \
+    ((__typeof__(*(ptr)))__cmpxchg((ptr),(unsigned long)__o,            \
+                                   (unsigned long)__n,sizeof(*(ptr)))); \
+})
+
 /*
  * Both Intel and AMD agree that, from a programmer's viewpoint:
  *  Loads cannot be reordered relative to other loads.

@@ -726,10 +726,11 @@ void vcpu_reset(struct vcpu *v)
     v->fpu_initialised = 0;
     v->fpu_dirtied     = 0;
     v->is_initialised  = 0;
-    v->nmi_pending     = 0;
-    v->mce_pending     = 0;
-    v->old_trap_priority = VCPU_TRAP_NONE;
-    v->trap_priority   = VCPU_TRAP_NONE;
+#ifdef VCPU_TRAP_LAST
+    v->async_exception_mask = 0;
+    memset(v->async_exception_state, 0, sizeof(v->async_exception_state));
+#endif
+    cpus_clear(v->cpu_affinity_tmp);
     clear_bit(_VPF_blocked, &v->pause_flags);
 
     domain_unlock(v->domain);
@@ -855,6 +856,7 @@ long do_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
 
         break;
 
+#ifdef VCPU_TRAP_NMI
     case VCPUOP_send_nmi:
         if ( !guest_handle_is_null(arg) )
             return -EINVAL;
@@ -863,6 +865,7 @@ long do_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
             vcpu_kick(v);
 
         break;
+#endif
 
     default:
         rc = arch_do_vcpu_op(cmd, v, arg);

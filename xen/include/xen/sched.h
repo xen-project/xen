@@ -113,20 +113,16 @@ struct vcpu
     bool_t           is_initialised;
     /* Currently running on a CPU? */
     bool_t           is_running;
-    /* MCE callback pending for this VCPU? */
-    bool_t           mce_pending;
-    /* NMI callback pending for this VCPU? */
-    bool_t           nmi_pending;
 
-    /* Higher priorized traps may interrupt lower priorized traps,
-     * lower priorized traps wait until higher priorized traps finished.
-     * Note: This concept is known as "system priority level" (spl)
-     * in the UNIX world. */
-    uint16_t         old_trap_priority;
-    uint16_t         trap_priority;
+#ifdef VCPU_TRAP_LAST
 #define VCPU_TRAP_NONE    0
-#define VCPU_TRAP_NMI     1
-#define VCPU_TRAP_MCE     2
+    struct {
+        bool_t           pending;
+        uint8_t          old_mask;
+    }                async_exception_state[VCPU_TRAP_LAST];
+#define async_exception_state(t) async_exception_state[(t)-1]
+    uint8_t          async_exception_mask;
+#endif
 
     /* Require shutdown to be deferred for some asynchronous operation? */
     bool_t           defer_shutdown;

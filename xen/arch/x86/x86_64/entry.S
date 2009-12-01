@@ -234,31 +234,33 @@ process_softirqs:
         ALIGN
 /* %rbx: struct vcpu */
 process_mce:
-        cmpw $VCPU_TRAP_MCE,VCPU_trap_priority(%rbx)
-        jae  test_guest_events
+        testb $1 << VCPU_TRAP_MCE,VCPU_async_exception_mask(%rbx)
+        jnz  test_guest_events
         sti
         movb $0,VCPU_mce_pending(%rbx)
         call set_guest_machinecheck_trapbounce
         test %eax,%eax
         jz   test_all_events
-        movw VCPU_trap_priority(%rbx),%dx           # safe priority for the
-        movw %dx,VCPU_old_trap_priority(%rbx)       # iret hypercall
-        movw $VCPU_TRAP_MCE,VCPU_trap_priority(%rbx)
+        movzbl VCPU_async_exception_mask(%rbx),%edx # save mask for the
+        movb %dl,VCPU_mce_old_mask(%rbx)            # iret hypercall
+        orl  $1 << VCPU_TRAP_MCE,%edx
+        movb %dl,VCPU_async_exception_mask(%rbx)
         jmp  process_trap
 
         ALIGN
 /* %rbx: struct vcpu */
 process_nmi:
-        cmpw $VCPU_TRAP_NMI,VCPU_trap_priority(%rbx)
-        jae  test_guest_events
+        cmpw $1 << VCPU_TRAP_NMI,VCPU_async_exception_mask(%rbx)
+        jnz  test_guest_events
         sti
         movb $0,VCPU_nmi_pending(%rbx)
         call set_guest_nmi_trapbounce
         test %eax,%eax
         jz   test_all_events
-        movw VCPU_trap_priority(%rbx),%dx           # safe priority for the
-        movw %dx,VCPU_old_trap_priority(%rbx)       # iret hypercall
-        movw $VCPU_TRAP_NMI,VCPU_trap_priority(%rbx)
+        movzbl VCPU_async_exception_mask(%rbx),%edx # save mask for the
+        movb %dl,VCPU_nmi_old_mask(%rbx)            # iret hypercall
+        orl  $1 << VCPU_TRAP_NMI,%edx
+        movb %dl,VCPU_async_exception_mask(%rbx)
         /* FALLTHROUGH */
 process_trap:
         leaq VCPU_trap_bounce(%rbx),%rdx

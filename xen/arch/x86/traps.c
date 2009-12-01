@@ -51,6 +51,7 @@
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/atomic.h>
+#include <asm/bitops.h>
 #include <asm/desc.h>
 #include <asm/debugreg.h>
 #include <asm/smp.h>
@@ -2892,6 +2893,82 @@ static void nmi_mce_softirq(void)
      * a safe (non-NMI/MCE) context.
      */
     vcpu_kick(st->vcpu);
+    st->vcpu = NULL;
+}
+
+void async_exception_cleanup(struct vcpu *curr)
+{
+    int trap;
+
+    if ( !curr->async_exception_mask )
+        return;
+
+    /* Restore affinity.  */
+    if ( !cpus_empty(curr->cpu_affinity_tmp) &&
+         !cpus_equal(curr->cpu_affinity_tmp, curr->cpu_affinity) )
+    {
+        vcpu_set_affinity(curr, &curr->cpu_affinity_tmp);
+        cpus_clear(curr->cpu_affinity_tmp);
+    }
+
+    if ( !(curr->async_exception_mask & (curr->async_exception_mask - 1)) )
+        trap = __scanbit(curr->async_exception_mask, VCPU_TRAP_NONE);
+    else
+        for ( trap = VCPU_TRAP_NONE + 1; trap <= VCPU_TRAP_LAST; ++trap )
+            if ( (curr->async_exception_mask ^
+                  curr->async_exception_state(trap).old_mask) == (1 << trap) )
+                break;
+    ASSERT(trap <= VCPU_TRAP_LAST);
+
+    /* inject vMCE to PV_Guest including DOM0. */
+    if ( trap == VCPU_TRAP_MCE )
+    {
+        gdprintk(XENLOG_DEBUG, "MCE: Return from vMCE# trap!\n");
+        if ( curr->vcpu_id == 0 )
+        {
+            struct domain *d = curr->domain;
+
+            if ( !d->arch.vmca_msrs.nr_injection )
+            {
+                printk(XENLOG_WARNING "MCE: ret from vMCE#, "
+                       "no injection node\n");
+                goto end;
+            }
+
+            d->arch.vmca_msrs.nr_injection--;
+            if ( !list_empty(&d->arch.vmca_msrs.impact_header) )
+            {
+                struct bank_entry *entry;
+
+                entry = list_entry(d->arch.vmca_msrs.impact_header.next,
+                                   struct bank_entry, list);
+                gdprintk(XENLOG_DEBUG, "MCE: delete last injection node\n");
+                list_del(&entry->list);
+            }
+            else
+                printk(XENLOG_ERR "MCE: didn't found last injection node\n");
+
+            /* further injection */
+            if ( d->arch.vmca_msrs.nr_injection > 0 &&
+                 guest_has_trap_callback(d, 0, TRAP_machine_check) &&
+                 !test_and_set_bool(curr->mce_pending) )
+            {
+                int cpu = smp_processor_id();
+                cpumask_t affinity;
+
+                curr->cpu_affinity_tmp = curr->cpu_affinity;
+                cpus_clear(affinity);
+                cpu_set(cpu, affinity);
+                printk(XENLOG_DEBUG "MCE: CPU%d set affinity, old %d\n",
+                       cpu, curr->processor);
+                vcpu_set_affinity(curr, &affinity);
+            }
+        }
+    }
+
+end:
+    /* Restore previous asynchronous exception mask. */
+    curr->async_exception_mask = curr->async_exception_state(trap).old_mask;
 }
 
 static void nmi_dom0_report(unsigned int reason_idx)
@@ -3255,7 +3332,7 @@ int guest_has_trap_callback(struct domain *d, uint16_t vcpuid, unsigned int trap
 int send_guest_trap(struct domain *d, uint16_t vcpuid, unsigned int trap_nr)
 {
     struct vcpu *v;
-    struct softirq_trap *st;
+    struct softirq_trap *st = &per_cpu(softirq_trap, smp_processor_id());
 
     BUG_ON(d == NULL);
     BUG_ON(vcpuid >= d->max_vcpus);
@@ -3263,25 +3340,27 @@ int send_guest_trap(struct domain *d, uint16_t vcpuid, unsigned int trap_nr)
 
     switch (trap_nr) {
     case TRAP_nmi:
+        if ( cmpxchgptr(&st->vcpu, NULL, v) )
+            return -EBUSY;
         if ( !test_and_set_bool(v->nmi_pending) ) {
-               st = &per_cpu(softirq_trap, smp_processor_id());
-               st->domain = dom0;
-               st->vcpu = dom0->vcpu[0];
-               st->processor = st->vcpu->processor;
+               st->domain = d;
+               st->processor = v->processor;
 
                /* not safe to wake up a vcpu here */
                raise_softirq(NMI_MCE_SOFTIRQ);
                return 0;
         }
+        st->vcpu = NULL;
         break;
 
     case TRAP_machine_check:
+        if ( cmpxchgptr(&st->vcpu, NULL, v) )
+            return -EBUSY;
 
         /* We are called by the machine check (exception or polling) handlers
          * on the physical CPU that reported a machine check error. */
 
         if ( !test_and_set_bool(v->mce_pending) ) {
-                st = &per_cpu(softirq_trap, smp_processor_id());
                 st->domain = d;
                 st->vcpu = v;
                 st->processor = v->processor;
@@ -3290,6 +3369,7 @@ int send_guest_trap(struct domain *d, uint16_t vcpuid, unsigned int trap_nr)
                 raise_softirq(NMI_MCE_SOFTIRQ);
                 return 0;
         }
+        st->vcpu = NULL;
         break;
     }
 

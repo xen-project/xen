@@ -18,6 +18,16 @@
 #endif
 #define is_pv_32on64_vcpu(v)   (is_pv_32on64_domain((v)->domain))
 
+#define VCPU_TRAP_NMI          1
+#define VCPU_TRAP_MCE          2
+#define VCPU_TRAP_LAST         VCPU_TRAP_MCE
+
+#define nmi_state              async_exception_state(VCPU_TRAP_NMI)
+#define mce_state              async_exception_state(VCPU_TRAP_MCE)
+
+#define nmi_pending            nmi_state.pending
+#define mce_pending            mce_state.pending
+
 struct trap_bounce {
     uint32_t      error_code;
     uint8_t       flags; /* TBF_ */
