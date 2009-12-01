@@ -191,6 +191,7 @@ retry_transaction:
 int libxl_domain_build(struct libxl_ctx *ctx, libxl_domain_build_info *info, uint32_t domid, libxl_domain_build_state *state)
 {
     char **vments = NULL, **localents = NULL;
+    int i;
 
     build_pre(ctx, domid, info, state);
     if (info->hvm) {
@@ -203,14 +204,19 @@ int libxl_domain_build(struct libxl_ctx *ctx, libxl_domain_build_info *info, uin
     } else {
         build_pv(ctx, domid, info, state);
         vments = libxl_calloc(ctx, 9, sizeof(char *));
-        vments[0] = "image/ostype";
-        vments[1] = "linux";
-        vments[2] = "image/kernel";
-        vments[3] = (char*) info->kernel;
-        vments[4] = "image/ramdisk";
-        vments[5] = (char*) info->u.pv.ramdisk;
-        vments[6] = "image/cmdline";
-        vments[7] = (char*) info->u.pv.cmdline;
+        i = 0;
+        vments[i++] = "image/ostype";
+        vments[i++] = "linux";
+        vments[i++] = "image/kernel";
+        vments[i++] = (char*) info->kernel;
+        if (info->u.pv.ramdisk) {
+            vments[i++] = "image/ramdisk";
+            vments[i++] = (char*) info->u.pv.ramdisk;
+        }
+        if (info->u.pv.cmdline) {
+            vments[i++] = "image/cmdline";
+            vments[i++] = (char*) info->u.pv.cmdline;
+        }
     }
     build_post(ctx, domid, info, state, vments, localents);
     return 0;
