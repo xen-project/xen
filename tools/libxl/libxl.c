@@ -82,7 +82,7 @@ int libxl_domain_make(struct libxl_ctx *ctx, libxl_domain_create_info *info,
 {
     int flags, ret, i;
     char *uuid_string;
-    char *rw_paths[] = { "device" };
+    char *rw_paths[] = { "device", "device/suspend/event-channel" };
     char *ro_paths[] = { "cpu", "memory", "device", "error", "drivers",
                          "control", "attr", "data", "messages" };
     char *dom_path, *vm_path, *vss_path;
