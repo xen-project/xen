@@ -124,12 +124,12 @@ int enable_ats_device(int seg, int bus, int devfn)
     pos = pci_find_ext_capability(seg, bus, devfn, PCI_EXT_CAP_ID_ATS);
     if ( !pos )
     {
-        dprintk(XENLOG_ERR VTDPREFIX, "ats capability not found %x:%x:%x\n",
+        dprintk(XENLOG_ERR VTDPREFIX, "ats capability not found %x:%x.%x\n",
                 bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
         return 0;
     }
     else
-        dprintk(XENLOG_ERR VTDPREFIX, "ats capability found %x:%x:%x\n",
+        dprintk(XENLOG_ERR VTDPREFIX, "ats capability found %x:%x.%x\n",
                 bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
 
     /* BUGBUG: add back seg when multi-seg platform support is enabled */

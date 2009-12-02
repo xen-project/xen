@@ -688,7 +688,7 @@ long arch_do_domctl(
         if ( device_assigned(bus, devfn) )
         {
             gdprintk(XENLOG_ERR, "XEN_DOMCTL_test_assign_device: "
-                     "%x:%x:%x already assigned, or non-existent\n",
+                     "%x:%x.%x already assigned, or non-existent\n",
                      bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
             break;
         }
@@ -732,7 +732,7 @@ long arch_do_domctl(
         ret = assign_device(d, bus, devfn);
         if ( ret )
             gdprintk(XENLOG_ERR, "XEN_DOMCTL_assign_device: "
-                     "assign device (%x:%x:%x) failed\n",
+                     "assign device (%x:%x.%x) failed\n",
                      bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
 
     assign_device_out:
@@ -774,7 +774,7 @@ long arch_do_domctl(
         spin_lock(&pcidevs_lock);
         ret = deassign_device(d, bus, devfn);
         spin_unlock(&pcidevs_lock);
-        gdprintk(XENLOG_INFO, "XEN_DOMCTL_deassign_device: bdf = %x:%x:%x\n",
+        gdprintk(XENLOG_INFO, "XEN_DOMCTL_deassign_device: bdf = %x:%x.%x\n",
             bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
 
     deassign_device_out:

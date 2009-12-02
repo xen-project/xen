@@ -1383,7 +1383,7 @@ static int domain_context_unmap(struct domain *domain, u8 bus, u8 devfn)
 
     default:
         gdprintk(XENLOG_ERR VTDPREFIX,
-                 "domain_context_unmap:unknown type: bdf = %x:%x:%x\n",
+                 "domain_context_unmap:unknown type: bdf = %x:%x.%x\n",
                  bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
         ret = -EINVAL;
         break;
