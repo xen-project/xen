@@ -1352,7 +1352,16 @@ static int libxl_build_xenpv_qemu_args(struct libxl_ctx *ctx,
             num++;
     }
     if (num > 0) {
-        info->serial = "pty";
+        uint32_t guest_domid = libxl_is_stubdom(ctx, vfb->domid);
+        if (guest_domid) {
+            char *filename;
+            char *name = libxl_sprintf(ctx, "qemu-dm-%s", libxl_domid_to_name(ctx, guest_domid));
+            libxl_create_logfile(ctx, name, &filename);
+            info->serial = libxl_sprintf(ctx, "file:%s", filename);
+            free(filename);
+        } else {
+            info->serial = "pty";
+        }
         num--;
     }
     if (num > 0) {

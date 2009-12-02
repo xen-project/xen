@@ -185,7 +185,7 @@ int libxl_is_stubdom(struct libxl_ctx *ctx, int domid)
 {
     char *target = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/target", libxl_xs_get_dompath(ctx, domid)));
     if (target)
-        return 1;
+        return atoi(target);
     else
         return 0;
 }
