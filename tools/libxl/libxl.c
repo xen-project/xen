@@ -663,10 +663,10 @@ void dm_xenstore_record_pid(struct libxl_ctx *ctx, void *for_spawn,
     /* we mustn't use the parent's handle in the child */
 
     kvs[0] = "image/device-model-pid";
-    kvs[1] = libxl_sprintf(ctx, "%d", innerchild);
+    kvs[1] = libxl_sprintf(&clone, "%d", innerchild);
     kvs[2] = NULL;
-    rc = libxl_xs_writev(ctx, XBT_NULL, starting->dom_path, kvs);
-    if (rc) XL_LOG_ERRNO(ctx, XL_LOG_ERROR,
+    rc = libxl_xs_writev(&clone, XBT_NULL, starting->dom_path, kvs);
+    if (rc) XL_LOG_ERRNO(&clone, XL_LOG_ERROR,
                          "Couldn't record device model pid %ld at %s/%s",
                          (unsigned long)innerchild, starting->dom_path, kvs);
     xs_daemon_close(clone.xsh);
