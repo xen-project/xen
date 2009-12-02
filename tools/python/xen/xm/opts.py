@@ -55,10 +55,19 @@ def wrap(text, width = 70):
     return lines
 
 class OptionError(Exception):
+    def _get_message(self):
+        return self.__message
+
+    def _set_message(self, value):
+        self.__message = value
+
+    message = property(_get_message, _set_message)
+
     """Denotes an error in option parsing."""
     def __init__(self, message, usage = ''):
         self.message = message
         self.usage = usage
+        Exception.__init__(self, message)
     def __str__(self):
         return self.message
 
