@@ -203,6 +203,7 @@ int show_vcpus = 0;
 int show_networks = 0;
 int show_vbds = 0;
 int repeat_header = 0;
+int show_full_name = 0;
 #define PROMPT_VAL_LEN 80
 char *prompt = NULL;
 char prompt_val[PROMPT_VAL_LEN];
@@ -231,6 +232,7 @@ static void usage(const char *program)
 	       "-v, --vcpus          output vcpu data\n"
 	       "-b, --batch	     output in batch mode, no user input accepted\n"
 	       "-i, --iterations     number of iterations before exiting\n"
+	       "-f, --full-name      output the full domain name (not truncated)\n"
 	       "\n" XENTOP_BUGSTO,
 	       program);
 	return;
@@ -427,7 +429,10 @@ int compare_name(xenstat_domain *domain1, xenstat_domain *domain2)
 /* Prints domain name */
 void print_name(xenstat_domain *domain)
 {
-	print("%10.10s", xenstat_domain_name(domain));
+	if(show_full_name)
+		print("%10s", xenstat_domain_name(domain));
+	else
+		print("%10.10s", xenstat_domain_name(domain));
 }
 
 struct {
@@ -1089,9 +1094,10 @@ int main(int argc, char **argv)
 		{ "delay",         required_argument, NULL, 'd' },
 		{ "batch",	   no_argument,	      NULL, 'b' },
 		{ "iterations",	   required_argument, NULL, 'i' },
+		{ "full-name",     no_argument,       NULL, 'f' },
 		{ 0, 0, 0, 0 },
 	};
-	const char *sopts = "hVnxrvd:bi:";
+	const char *sopts = "hVnxrvd:bi:f";
 
 	if (atexit(cleanup) != 0)
 		fail("Failed to install cleanup handler.\n");
@@ -1129,6 +1135,9 @@ int main(int argc, char **argv)
 		case 'i':
 			iterations = atoi(optarg);
 			loop = 0;
+			break;
+		case 'f':
+			show_full_name = 1;
 			break;
 		}
 	}
