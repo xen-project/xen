@@ -2521,16 +2521,18 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         int32_t ecode = -1, source;
         exit_qualification = __vmread(EXIT_QUALIFICATION);
         source = (exit_qualification >> 30) & 3;
-        inst_len = __get_instruction_length(); /* Safe: See SDM 3B 23.2.4 */
-        if ( (source == 3) && (idtv_info & INTR_INFO_VALID_MASK) )
-        {
-            /* ExtInt, NMI, HWException: no instruction to skip over. */
-            if ( !(idtv_info & (1u<<10)) ) /* 0 <= IntrType <= 3? */
-                inst_len = 0;
-            /* If there's an error code then we pass it along. */
-            if ( idtv_info & INTR_INFO_DELIVER_CODE_MASK )
-                ecode = __vmread(IDT_VECTORING_ERROR_CODE);
-        }
+        /* Vectored event should fill in interrupt information. */
+        WARN_ON((source == 3) && !(idtv_info & INTR_INFO_VALID_MASK));
+        /*
+         * In the following cases there is an instruction to skip over:
+         *  - TSW is due to a CALL, IRET or JMP instruction.
+         *  - TSW is a vectored event due to a SW exception or SW interrupt.
+         */
+        inst_len = ((source != 3) ||        /* CALL, IRET, or JMP? */
+                    (idtv_info & (1u<<10))) /* IntrType > 3? */
+            ? __get_instruction_length() /* Safe: SDM 3B 23.2.4 */ : 0;
+        if ( (source == 3) && (idtv_info & INTR_INFO_DELIVER_CODE_MASK) )
+            ecode = __vmread(IDT_VECTORING_ERROR_CODE);
         regs->eip += inst_len;
         hvm_task_switch((uint16_t)exit_qualification, reasons[source], ecode);
         break;
