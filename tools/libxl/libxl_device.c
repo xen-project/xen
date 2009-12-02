@@ -297,31 +297,47 @@ int libxl_wait_for_device_model(struct libxl_ctx *ctx,
 {
     char path[50];
     char *p;
-    int watchdog = 100;
     unsigned int len;
     int rc;
+    struct xs_handle *xsh;
+    int nfds;
+    fd_set rfds;
+    struct timeval tv;
+    unsigned int num;
+    char **l = NULL;
 
+    xsh = xs_daemon_open();
     snprintf(path, sizeof(path), "/local/domain/0/device-model/%d/state", domid);
-    while (watchdog > 0) {
-        p = xs_read(ctx->xsh, XBT_NULL, path, &len);
-        if (p == NULL) {
-            usleep(100000);
-            watchdog--;
-        } else {
-            if (state == NULL || !strcmp(state, p)) {
+    xs_watch(xsh, path, path);
+    tv.tv_sec = LIBXL_DEVICE_MODEL_START_TIMEOUT;
+    tv.tv_usec = 0;
+    nfds = xs_fileno(xsh) + 1;
+    while (tv.tv_sec > 0) {
+        FD_ZERO(&rfds);
+        FD_SET(xs_fileno(xsh), &rfds);
+        if (select(nfds, &rfds, NULL, NULL, &tv) > 0) {
+            l = xs_read_watch(xsh, &num);
+            if (l != NULL) {
+                free(l);
+                p = xs_read(xsh, XBT_NULL, path, &len);
+                if (!p)
+                    continue;
+                if (!state || !strcmp(state, p)) {
+                    free(p);
+                    xs_unwatch(xsh, path, path);
+                    xs_daemon_close(xsh);
+                    if (check_callback) {
+                        rc = check_callback(ctx, check_callback_userdata);
+                        if (rc) return rc;
+                    }
+                    return 0;
+                }
                 free(p);
-                return 0;
-            } else {
-                free(p);
-                usleep(100000);
-                watchdog--;
             }
         }
-        if (check_callback) {
-            rc = check_callback(ctx, check_callback_userdata);
-            if (rc) return rc;
-        }
     }
+    xs_unwatch(xsh, path, path);
+    xs_daemon_close(xsh);
     XL_LOG(ctx, XL_LOG_ERROR, "Device Model not ready");
     return -1;
 }

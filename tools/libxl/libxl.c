@@ -888,6 +888,7 @@ int libxl_create_device_model(struct libxl_ctx *ctx,
         *starting_r = libxl_calloc(ctx, sizeof(libxl_device_model_starting), 1);
         if (!*starting_r) goto xit;
         p = *starting_r;
+        p->for_spawn = libxl_calloc(ctx, sizeof(struct libxl_spawn_starting), 1);
     } else {
         p = &buf_starting;
         p->for_spawn = NULL;

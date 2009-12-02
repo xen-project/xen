@@ -28,6 +28,7 @@
 #include "libxl_utils.h"
 
 #define LIBXL_DESTROY_TIMEOUT 10
+#define LIBXL_DEVICE_MODEL_START_TIMEOUT 10
 #define LIBXL_XENCONSOLE_LIMIT 1048576
 #define LIBXL_XENCONSOLE_PROTOCOL "vt100"
 #define QEMU_SIGNATURE "QemuDeviceModelRecord"
