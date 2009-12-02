@@ -212,47 +212,50 @@ int libxl_devices_destroy(struct libxl_ctx *ctx, uint32_t domid, int force)
     fd_set rfds;
     struct timeval tv;
     flexarray_t *toremove;
+    struct libxl_ctx clone = *ctx;
 
+    clone.xsh = xs_daemon_open();
     toremove = flexarray_make(16, 1);
-    path = libxl_sprintf(ctx, "/local/domain/%d/device", domid);
-    l1 = libxl_xs_directory(ctx, XBT_NULL, path, &num1);
+    path = libxl_sprintf(&clone, "/local/domain/%d/device", domid);
+    l1 = libxl_xs_directory(&clone, XBT_NULL, path, &num1);
     if (!l1) {
-        XL_LOG(ctx, XL_LOG_ERROR, "%s is empty", path);
+        XL_LOG(&clone, XL_LOG_ERROR, "%s is empty", path);
+        xs_daemon_close(clone.xsh);
         return -1;
     }
     for (i = 0; i < num1; i++) {
-        path = libxl_sprintf(ctx, "/local/domain/%d/device/%s", domid, l1[i]);
-        l2 = libxl_xs_directory(ctx, XBT_NULL, path, &num2);
+        path = libxl_sprintf(&clone, "/local/domain/%d/device/%s", domid, l1[i]);
+        l2 = libxl_xs_directory(&clone, XBT_NULL, path, &num2);
         if (!l2)
             continue;
         for (j = 0; j < num2; j++) {
-            fe_path = libxl_sprintf(ctx, "/local/domain/%d/device/%s/%s", domid, l1[i], l2[j]);
-            be_path = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/backend", fe_path));
+            fe_path = libxl_sprintf(&clone, "/local/domain/%d/device/%s/%s", domid, l1[i], l2[j]);
+            be_path = libxl_xs_read(&clone, XBT_NULL, libxl_sprintf(&clone, "%s/backend", fe_path));
             if (be_path != NULL) {
-                if (libxl_device_destroy(ctx, be_path, force) > 0)
+                if (libxl_device_destroy(&clone, be_path, force) > 0)
                     n_watches++;
-                flexarray_set(toremove, n++, libxl_dirname(ctx, be_path));
+                flexarray_set(toremove, n++, libxl_dirname(&clone, be_path));
             } else {
-                xs_rm(ctx->xsh, XBT_NULL, path);
+                xs_rm(clone.xsh, XBT_NULL, path);
             }
         }
     }
     if (!force) {
-        nfds = xs_fileno(ctx->xsh) + 1;
+        nfds = xs_fileno(clone.xsh) + 1;
         /* Linux-ism */
         tv.tv_sec = LIBXL_DESTROY_TIMEOUT;
         tv.tv_usec = 0;
         while (n_watches > 0 && tv.tv_sec > 0) {
             FD_ZERO(&rfds);
-            FD_SET(xs_fileno(ctx->xsh), &rfds);
+            FD_SET(xs_fileno(clone.xsh), &rfds);
             if (select(nfds, &rfds, NULL, NULL, &tv) > 0) {
-                l1 = xs_read_watch(ctx->xsh, &num1);
+                l1 = xs_read_watch(clone.xsh, &num1);
                 if (l1 != NULL) {
-                    char *state = libxl_xs_read(ctx, XBT_NULL, l1[0]);
+                    char *state = libxl_xs_read(&clone, XBT_NULL, l1[0]);
                     if (!state || atoi(state) == 6) {
-                        xs_unwatch(ctx->xsh, l1[0], l1[1]);
-                        xs_rm(ctx->xsh, XBT_NULL, l1[1]);
-                        XL_LOG(ctx, XL_LOG_DEBUG, "Destroyed device backend at %s", l1[1]);
+                        xs_unwatch(clone.xsh, l1[0], l1[1]);
+                        xs_rm(clone.xsh, XBT_NULL, l1[1]);
+                        XL_LOG(&clone, XL_LOG_DEBUG, "Destroyed device backend at %s", l1[1]);
                         n_watches--;
                     }
                     free(l1);
@@ -263,9 +266,10 @@ int libxl_devices_destroy(struct libxl_ctx *ctx, uint32_t domid, int force)
     }
     for (i = 0; i < n; i++) {
         flexarray_get(toremove, i, (void**) &path);
-        xs_rm(ctx->xsh, XBT_NULL, path);
+        xs_rm(clone.xsh, XBT_NULL, path);
     }
     flexarray_free(toremove);
+    xs_daemon_close(clone.xsh);
     return 0;
 }
 
