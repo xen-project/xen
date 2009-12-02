@@ -1,0 +1,299 @@
+TSC_MODE HOW-TO
+by: Dan Magenheimer <dan.magenheimer@oracle.com>
+
+OVERVIEW
+
+As of Xen 4.0, a new config option called tsc_mode may be specified
+for each domain.  The default for tsc_mode handles the vast majority
+of hardware and software environments.  This document is targeted
+for Xen users and administrators that may need to select a non-default
+tsc_mode.
+
+Proper selection of tsc_mode depends on an understanding not only of
+the guest operating system (OS), but also of the application set that will
+ever run on this guest OS.  This is because tsc_mode applies
+equally to both the OS and ALL apps that are running on this
+domain, now or in the future.
+
+Key questions to be answered for the OS and/or each application are:
+- Does the OS/app use the rdtsc instruction at all?  (We will explain below
+  how to determine this.)
+- At what frequency is the rdtsc instruction executed by either the OS
+  or any running apps?  If the sum exceeds about 10,000 rdtsc instructions
+  per second per processor, we call this a "high-TSC-frequency"
+  OS/app/environment.  (This is relatively rare, and developers of OS's
+  and apps that are high-TSC-frequency are usually aware of it.)
+- If the OS/app does use rdtsc, will it behave incorrectly if "time goes
+  backwards" or if the frequency of the TSC suddenly changes?  If so,
+  we call this a "TSC-sensitive" app or OS; otherwise it is "TSC-resilient".
+
+This last is the US$64,000 question as it may be very difficult
+(or, for legacy apps, even impossible) to predict all possible
+failure cases.  As a result, unless proven otherwise, any app
+that uses rdtsc must be assumed to be TSC-sensitive and, as we
+will see, this is the default starting in Xen 4.0.
+
+Xen's new tsc_mode parameter determines the circumstances under which
+the family of rdtsc instructions are executed "natively" vs emulated.
+Roughly speaking, native means rdtsc is fast but TSC-sensitive apps
+may, under unpredictable circumstances, run incorrectly; emulated means
+there is some performance degradation (unobservable in most cases),
+but TSC-sensitive apps will always run correctly.  Prior to Xen 4.0,
+all rdtsc instructions were native: "fast but potentially incorrect."
+Starting at Xen 4.0, the default is that all rdtsc instructions are
+"correct but potentially slow".  The tsc_mode parameter in 4.0 provides
+an intelligent default but allows system administrator's to adjust
+how rdtsc instructions are executed differently for different domains.
+
+The non-default choices for tsc_mode are:
+- tsc_mode=1 (always emulate). All rdtsc instructions are emulated;
+   this is the best choice when TSC-sensitive apps are running and
+   it is necessary to understand worst-case performance degradation
+   for a specific hardware environment.
+- tsc_mode=2 (never emulate).  This is the same as prior to Xen 4.0
+   and is the best choice if it is certain that all apps running in
+   this VM are TSC-resilient and highest performance is required.
+- tsc_mode=3 (PVRDTSCP).  High-TSC-frequency apps may be paravirtualized
+   (modified) to obtain both correctness and highest performance; any
+   unmodified apps must be TSC-resilient.
+
+If tsc_mode is left unspecified (or set to tsc_mode=0), a hybrid
+algorithm is utilized to ensure correctness while providing the
+best performance possible given:
+- the requirement of correctness,
+- the underlying hardware, and
+- whether or not the VM has been saved/restored/migrated
+To understand this in more detail, the rest of this document must
+be read.
+
+DETERMINING RDTSC FREQUENCY
+
+To determine the frequency of rdtsc instructions that are emulated,
+an "xm" command can be used by a privileged user of domain0.  The
+command:
+
+# xm debug-key s; xm dmesg | tail
+
+provides information about TSC usage in each domain where TSC
+emulation is currently enabled.
+
+TSC HISTORY
+
+To understand tsc_mode completely, some background on TSC is required:
+
+The x86 "timestamp counter", or TSC, is a 64-bit register on each
+processor that increases monotonically.  Historically, TSC incremented
+every processor cycle, but on recent processors, it increases
+at a constant rate even if the processor changes frequency (for example,
+to reduce processor power usage).  TSC is known by x86 programmers
+as the fastest, highest-precision measurement of the passage of time
+so it is often used as a foundation for performance monitoring.
+And since it is guaranteed to be monotonically increasing and, at
+64 bits, is guaranteed to not wraparound within 10 years, it is
+sometimes used as a random number or a unique sequence identifier,
+such as to stamp transactions so they can be replayed in a specific
+order.
+
+On most older SMP and early multi-core machines, TSC was not synchronized
+between processors.  Thus if an application were to read the TSC on
+one processor, then was moved by the OS to another processor, then read
+TSC again, it might appear that "time went backwards".  This loss of
+monotonicity resulted in many obscure application bugs when TSC-sensitive
+apps were ported from a uniprocessor to an SMP environment; as a result,
+many applications -- especially in the Windows world -- removed their
+dependency on TSC and replaced their timestamp needs with OS-specific
+functions, losing both performance and precision. On some more recent
+generations of multi-core machines, especially multi-socket multi-core
+machines, the TSC was synchronized but if one processor were to enter
+certain low-power states, its TSC would stop, destroying the synchrony
+and again causing obscure bugs.  This reinforced decisions to avoid use
+of TSC altogether.  On the most recent generations of multi-core
+machines, however, synchronization is provided across all processors
+in all power states, even on multi-socket machines, and provide a
+flag that indicates that TSC is synchronized and "invariant".  Thus
+TSC is once again useful for applications, and even newer operating
+systems are using and depending upon TSC for critical timekeeping
+tasks when running on these recent machines.
+
+We will refer to hardware that ensures TSC is both synchronized and
+invariant as "TSC-safe" and any hardware on which TSC is not (or
+may not remain) synchronized as "TSC-unsafe".
+
+As a result of TSC's sordid history, two classes of applications use
+TSC: old applications designed for single processors, and the most recent
+enteprise applications which require high-frequency high-precision
+timestamping.
+
+We will refer to apps that might break if running on a TSC-unsafe
+machine as "TSC-sensitive"; apps that don't use TSC, or do use
+TSC but use it in a way that monotonicity and frequency invariance
+are unimportant as "TSC-resilient".
+
+The emergence of virtualization once again complicates the usage of
+TSC.  When features such as save/restore or live migration are employed,
+a guest OS and all its currently running applications may be invisibly
+transported to an entirely different physical machine.  While TSC
+may be "safe" on one machine, it is essentially impossible to precisely
+synchronize TSC across a data center or even a pool of machines.  As
+a result, when run in a virtualized environment, rare and obscure
+"time going backwards" problems might once again occur for those
+TSC-sensitive applications.  Worse, if a guest OS moves from, for
+example, a 3GHz
+machine to a 1.5GHz machine, attempts by an OS/app to measure time
+intervals with TSC may without notice be incorrect by a factor of two.
+
+The rdtsc (read timestamp counter) instruction is used to read the
+TSC register.  The rdtscp instruction is a variant of rdtsc on recent
+processors.  We refer to these together as the rdtsc family of instructions,
+or just "rdtsc".  Instructions in the rdtsc family are non-privileged, but
+privileged software may set a cpuid bit to cause all rdtsc family
+instructions to trap.  This trap can be detected by Xen, which can
+then transparently "emulate" the results of the rdtsc instruction and
+return control to the code following the rdtsc instruction.
+
+To provide a "safe" TSC, i.e. to ensure both TSC monontonicity and a
+fixed rate, Xen provides rdtsc emulation whenever necessary or when
+explicitly specified by a per-VM configuration option.  TSC emulation is
+relatively slow -- roughly 15-20 times slower than the rdtsc instruction
+when executed natively.  However, except when an OS or application uses
+the rdtsc instruction at a high frequency (e.g. more than about 10,000 times
+per second per processor), this performance degradation is not noticable
+(i.e. <0.3%).  And, TSC emulation is nearly always faster than
+OS-provided alternatives (e.g. Linux's gettimeofday).  For environments
+where it is certain that all apps are TSC-resilient (e.g.
+"TSC-safeness" is not necessary) and highest performance is a
+requirement, TSC emulation may be entirely disabled (tsc_mode==2).
+
+The default mode (tsc_mode==0) checks TSC-safeness of the underlying
+hardware on which the virtual machine is launched.  If it is
+TSC-safe, rdtsc will execute at hardware speed; if it is not, rdtsc
+will be emulated.  Once a virtual machine is save/restored or migrated,
+however, there are two possibilities:  For a paravirtualized (PV) domain,
+TSC will always be emulated.  For a fully-virtualized (HVM) domain,
+TSC remains native IF the source physical machine and target physical machine
+have the same TSC frequency; else TSC is emulated.  Note that, though
+emulated, the "apparent" TSC frequency will be the TSC frequency
+of the initial physical machine, even after migration.
+
+For environments where both TSC-safeness AND highest performance
+even across migration is a requirement, application code can be specially
+modified to use an algorithm explicitly designed into Xen for this purpose.
+This mode (tsc_mode==3) is called PVRDTSCP, because it requires
+app paravirtualization (awareness by the app that it may be running
+on top of Xen), and utilizes a variation of the rdtsc instruction
+called rdtscp that is available on most recent generation processors.
+(The rdtscp instruction differs from the rdtsc instruction in that it
+reads not only the TSC but an additional register set by system software.)
+When a pvrdtscp-modified app is running on a processor that is both TSC-safe
+and supports the rdtscp instruction, information can be obtained
+about migration and TSC frequency/offset adjustment to allow the
+vast majority of timestamps to be obtained at top performance; when
+running on a TSC-unsafe processor or a processor that doesn't support
+the rdtscp instruction, rdtscp is emulated.
+
+PVRDTSCP (tsc_mode==3) has two limitations.  First, it applies to
+all apps running in this virtual machine.  This means that all
+apps must either be TSC-resilient or pvrdtscp-modified.  Second,
+highest performance is only obtained on TSC-safe machines that
+support the rdtscp instruction; when running on older machines,
+rdtscp is emulated and thus slower.  For more information on PVRTSCP,
+see below.
+
+Finally, tsc_mode==1 always enables TSC emulation, regardless of
+the underlying physical hardware. The "apparent" TSC frequency will
+be the TSC frequency of the initial physical machine, even after migration.
+This mode is useful to measure any performance degradation that
+might be encountered by a tsc_mode==0 domain after migration occurs,
+or a tsc_mode==3 domain when it is running on TSC-unsafe hardware.
+
+Note that while Xen ensures that an emulated TSC is "safe" across migration,
+it does not ensure that it continues to tick at the same rate during
+the actual migration.  As an oversimplified example, if TSC is ticking
+once per second in a guest, and the guest is saved when the TSC is 1000,
+then restored 30 seconds later, TSC is only guaranteed to be greater
+than or equal to 1001, not precisely 1030.  This has some OS implications
+as will be seen in the next section.
+
+TSC INVARIANT BIT and NO_MIGRATE
+
+Related to TSC emulation, the "TSC Invariant" bit is architecturally defined
+in a cpuid bit on the most recent x86 processors.  If set, TSC invariance
+ensures that the TSC is "safe", that is it will increment at a constant rate
+regardless of power events, will be synchronized across all processors, and
+was properly initialized to zero on all processors at boot-time
+by system hardware/BIOS.  As long as system software never writes to TSC,
+TSC will be safe and continuously incremented at a fixed rate and thus
+can be used as a system "clocksource".
+
+This bit is used by some OS's, and specifically by Linux starting with
+version 2.6.30(?), to select TSC as a system clocksource.  Once selected,
+TSC remains the Linux system clocksource unless manually overridden.  In
+a virtualized environment, since it is not possible to synchronize TSC
+across all the machines in a pool or data center, a migration may "break"
+TSC as a usable clocksource; while time will not go backwards, it may
+not track wallclock time well enough to avoid certain time-sensitive
+consequences.  As a result, Xen can only expose the TSC Invariant bit
+to a guest OS if it is certain that the domain will never migrate.
+As of Xen 4.0, the "no_migrate=1" VM configuration option may be specified
+to disable migration.  If no_migrate is selected and the VM is running
+on a physical machine with "TSC Invariant", Linux 2.6.30+ will safely
+use TSC as the system clocksource.  But, attempts to migrate or, once
+saved, restore this domain will fail.
+
+There is another cpuid-related complication: The x86 cpuid instruction is
+non-privileged.  HVM domains are configured to always trap this instruction
+to Xen, where Xen can "filter" the result.  In a PV OS, all cpuid instructions
+have been replaced by a parvirtualized equivalent of the cpuid instruction
+("pvcpuid") and also trap to Xen.  But apps in a PV guest that use a
+cpuid instruction execute it directly, without a trap to Xen.  As a result,
+an app may directly examine the physical TSC Invariant cpuid bit and make
+decisions based on that bit.  This is still an unsolved problem, though
+a workaround exists as part of the PVRDTSCP tsc_mode for apps that
+can be modified.
+
+MORE ON PVRDTSCP
+
+Paravirtualized OS's use the "pvclock" algorithm to manage the passing
+of time.  This sophisticated algorithm obtains information from a memory
+page shared between Xen and the OS and selects information from this
+page based on the current virtual CPU (vcpu) in order to properly adapt to
+TSC-unsafe systems and changes that occur across migration.  Neither
+this shared page nor the vcpu information is available to a userland
+app so the pvclock algorithm cannot be directly used by an app, at least
+without performance degradation roughly equal to the cost of just
+emulating an rdtsc.
+
+As a result, as of 4.0, Xen provides capabilities for a userland app
+to obtain key time values similar to the information accessible
+to the PV OS pvclock algorithm.  The app uses the rdtscp instruction
+which is defined in recent processors to obtain both the TSC and an
+auxiliary value called TSC_AUX.  Xen is responsible for setting TSC_AUX
+to the same value on all vcpus running any domain with tsc_mode==3;
+further, Xen tools are responsible for monotonically incrementing TSC_AUX
+anytime the domain is restored/migrated (thus changing key time values);
+and, when the domain is running on a physical machine that either
+is not TSC-safe or does not support the rdtscp instruction, Xen
+is responsible for emulating the rdtscp instruction and for setting
+TSC_AUX to zero on all processors.
+
+Xen also provides pvclock information via a "pvcpuid" instruction.
+While this results in a slow trap, the information changes
+(and thus must be reobtained via pvcpuid) ONLY when TSC_AUX
+has changed, which should be very rare relative to a high
+frequency of rdtscp instructions.
+
+Finally, Xen provides additional time-related information via
+other pvcpuid instructions.  First, an app is capable of
+determining if it is currently running on Xen, next whether
+the tsc_mode setting of the domain in which it is running,
+and finally whether the underlying hardware is TSC-safe and
+supports the rdtscp instruction.
+
+As a result, a pvrdtscp-modified app has sufficient information
+to compute the pvclock "elapsed nanoseconds" which can
+be used as a timestamp.  And this can be done nearly as
+fast as a native rdtsc instruction, much faster than emulation,
+and also much faster than nearly all OS-provided time mechanisms.
+While pvrtscp is too complex for most apps, certain enterprise
+TSC-sensitive high-TSC-frequency apps may find it useful to
+obtain a significant performance gain.
