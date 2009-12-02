@@ -2758,10 +2758,13 @@ class XendDomainInfo:
             # set memory limit
             xc.domain_setmaxmem(self.domid, maxmem)
 
-            # Reserve 1 page per MiB of RAM for separate VT-d page table.
-            vtd_mem = 4 * (self.info['memory_static_max'] / 1024 / 1024)
-            # Round vtd_mem up to a multiple of a MiB.
-            vtd_mem = ((vtd_mem + 1023) / 1024) * 1024
+            vtd_mem = 0
+            info = xc.physinfo()
+            if 'hvm_directio' in info['virt_caps']:
+                # Reserve 1 page per MiB of RAM for separate VT-d page table.
+                vtd_mem = 4 * (self.info['memory_static_max'] / 1024 / 1024)
+                # Round vtd_mem up to a multiple of a MiB.
+                vtd_mem = ((vtd_mem + 1023) / 1024) * 1024
 
             self.guest_bitsize = self.image.getBitSize()
             # Make sure there's enough RAM available for the domain
