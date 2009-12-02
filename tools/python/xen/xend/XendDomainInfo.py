@@ -326,6 +326,10 @@ class XendDomainInfo:
     @type info: dictionary
     @ivar domid: Domain ID (if VM has started)
     @type domid: int or None
+    @ivar guest_bitsize: the bitsize of guest 
+    @type guest_bitsize: int or None
+    @ivar alloc_mem: the memory domain allocated when booting 
+    @type alloc_mem: int or None 
     @ivar vmpath: XenStore path to this VM.
     @type vmpath: string
     @ivar dompath: XenStore path to this Domain.
@@ -383,6 +387,8 @@ class XendDomainInfo:
             self.domid =  self.info.get('domid')
         else:
             self.domid = domid
+        self.guest_bitsize = None
+        self.alloc_mem = None
         
         #REMOVE: uuid is now generated in XendConfig
         #if not self._infoIsSet('uuid'):
@@ -2757,6 +2763,7 @@ class XendDomainInfo:
             # Round vtd_mem up to a multiple of a MiB.
             vtd_mem = ((vtd_mem + 1023) / 1024) * 1024
 
+            self.guest_bitsize = self.image.getBitSize()
             # Make sure there's enough RAM available for the domain
             balloon.free(memory + shadow + vtd_mem, self)
 
@@ -2947,7 +2954,6 @@ class XendDomainInfo:
 
         if self.domid is None:
             return
-
         from xen.xend import XendDomain
         log.debug("XendDomainInfo.destroy: domid=%s", str(self.domid))
 
@@ -2967,6 +2973,12 @@ class XendDomainInfo:
 
             XendDomain.instance().remove_domain(self)
             self.cleanupDomain()
+
+        if self.info.is_hvm() or self.guest_bitsize != 32:
+            if self.alloc_mem:
+                import MemoryPool 
+                log.debug("%s KiB need to add to Memory pool" %self.alloc_mem)
+                MemoryPool.instance().increase_memory(self.alloc_mem)
 
         self._cleanup_phantom_devs(paths)
         self._cleanupVm()

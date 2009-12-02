@@ -192,6 +192,16 @@
 # If enable-dom0-ballooning = no, dom0 will never balloon out.
 (enable-dom0-ballooning yes)
 
+# 32-bit paravirtual domains can only consume physical
+# memory below 168GB. On systems with memory beyond that address,
+# they'll be confined to memory below 128GB.
+# Using total_available_memory (in GB) to specify the amount of memory reserved
+# in the memory pool exclusively for 32-bit paravirtual domains.
+# Additionally you should use dom0_mem = <-Value> as a parameter in 
+# xen kernel to reserve the memory for 32-bit paravirtual domains, default 
+# is "0" (0GB).  
+(total_available_memory 0) 
+
 # In SMP system, dom0 will use dom0-cpus # of CPUS
 # If dom0-cpus = 0, dom0 will take all cpus available
 (dom0-cpus 0)

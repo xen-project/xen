@@ -13,6 +13,8 @@
 #define XCFLAGS_DEBUG     2
 #define XCFLAGS_HVM       4
 #define XCFLAGS_STDVGA    8
+#define X86_64_B_SIZE   64 
+#define X86_32_B_SIZE   32
 
 /* callbacks provided by xc_domain_save */
 struct save_callbacks {
@@ -160,6 +162,9 @@ int xc_suspend_evtchn_release(int xce, int suspend_evtchn);
 int xc_suspend_evtchn_init(int xc, int xce, int domid, int port);
 
 int xc_await_suspend(int xce, int suspend_evtchn);
+
+int xc_get_bit_size(const char *image_name, const char *cmdline,
+                      const char *features, int *type);
 
 int xc_mark_page_online(int xc, unsigned long start,
                         unsigned long end, uint32_t *status);

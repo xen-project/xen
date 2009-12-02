@@ -23,6 +23,7 @@ import xen.lowlevel.xc
 
 import XendDomain
 import XendOptions
+import MemoryPool
 from XendLogging import log
 from XendError import VmError
 import osdep
@@ -97,10 +98,22 @@ def free(need_mem, dominfo):
     xoptions = XendOptions.instance()
     dom0 = XendDomain.instance().privilegedDomain()
     xc = xen.lowlevel.xc.xc()
-
+    memory_pool = MemoryPool.instance() 
     try:
         dom0_min_mem = xoptions.get_dom0_min_mem() * 1024
         dom0_ballooning = xoptions.get_enable_dom0_ballooning()
+        guest_size = 0
+        hvm = dominfo.info.is_hvm()
+        if memory_pool.is_enabled() and dominfo.domid:
+            if not hvm :
+                if need_mem <= 4 * 1024: 
+                    guest_size = 32
+                else:
+                    guest_size = dominfo.image.getBitSize()
+            if guest_size == 32:
+                dom0_ballooning = 0
+        else: #no ballooning as memory pool enabled
+            dom0_ballooning = xoptions.get_enable_dom0_ballooning()
         dom0_alloc = get_dom0_current_alloc()
 
         retries = 0
@@ -109,6 +122,11 @@ def free(need_mem, dominfo):
         last_new_alloc = None
         last_free = None
         rlimit = RETRY_LIMIT
+        mem_need_balloon = 0
+        left_memory_pool = 0
+        mem_target = 0
+        untouched_memory_pool = 0
+        real_need_mem = need_mem
 
         # stop tmem from absorbing any more memory (must THAW when done!)
         xc.tmem_control(0,TMEMC_FREEZE,-1, 0, 0, 0, "")
@@ -119,6 +137,25 @@ def free(need_mem, dominfo):
         free_mem = physinfo['free_memory']
         scrub_mem = physinfo['scrub_memory']
         total_mem = physinfo['total_memory']
+        if memory_pool.is_enabled() and dominfo.domid:
+            if guest_size != 32 or hvm:
+                if need_mem > 4 * 1024: 
+                    dominfo.alloc_mem = need_mem
+                left_memory_pool = memory_pool.get_left_memory()
+                if need_mem > left_memory_pool:
+                    dominfo.alloc_mem = 0
+                    raise VmError(('Not enough free memory'
+                                   ' so I cannot release any more.  '
+                                   'I need %d KiB but only have %d in the pool.') %
+                                   (need_mem, memory_pool.get_left_memory()))
+                else:
+                    untouched_memory_pool = memory_pool.get_untouched_memory()
+                    if (left_memory_pool - untouched_memory_pool) > need_mem:
+                        dom0_ballooning = 0
+                    else:
+                        mem_need_balloon = need_mem - left_memory_pool + untouched_memory_pool
+                        need_mem = free_mem + scrub_mem + mem_need_balloon
+
         if dom0_ballooning:
             max_free_mem = total_mem - dom0_min_mem
         else:
@@ -170,15 +207,17 @@ def free(need_mem, dominfo):
 
             retries = 0
             sleep_time = SLEEP_TIME_GROWTH
-
         while retries < rlimit:
             physinfo = xc.physinfo()
             free_mem = physinfo['free_memory']
             scrub_mem = physinfo['scrub_memory']
-
             if free_mem >= need_mem:
-                log.debug("Balloon: %d KiB free; need %d; done.",
-                          free_mem, need_mem)
+                if (guest_size != 32 or hvm) and dominfo.domid:
+                    memory_pool.decrease_untouched_memory(mem_need_balloon)
+                    memory_pool.decrease_memory(real_need_mem)
+                else:
+                    log.debug("Balloon: %d KiB free; need %d; done.",
+                              free_mem, need_mem)
                 return
 
             if retries == 0:
@@ -189,7 +228,6 @@ def free(need_mem, dominfo):
             if dom0_ballooning:
                 dom0_alloc = get_dom0_current_alloc()
                 new_alloc = dom0_alloc - (need_mem - free_mem - scrub_mem)
-
                 if free_mem + scrub_mem >= need_mem:
                     if last_new_alloc == None:
                         log.debug("Balloon: waiting on scrubbing")
@@ -213,11 +251,13 @@ def free(need_mem, dominfo):
 
         # Not enough memory; diagnose the problem.
         if not dom0_ballooning:
+            dominfo.alloc_mem = 0 
             raise VmError(('Not enough free memory and enable-dom0-ballooning '
                            'is False, so I cannot release any more.  '
                            'I need %d KiB but only have %d.') %
                           (need_mem, free_mem))
         elif new_alloc < dom0_min_mem:
+            dominfo.alloc_mem = 0 
             raise VmError(
                 ('I need %d KiB, but dom0_min_mem is %d and shrinking to '
                  '%d KiB would leave only %d KiB free.') %
@@ -226,6 +266,7 @@ def free(need_mem, dominfo):
         else:
             dom0_start_alloc_mb = get_dom0_current_alloc() / 1024
             dom0.setMemoryTarget(dom0_start_alloc_mb)
+            dominfo.alloc_mem = 0 
             raise VmError(
                 ('Not enough memory is available, and dom0 cannot'
                  ' be shrunk any further'))

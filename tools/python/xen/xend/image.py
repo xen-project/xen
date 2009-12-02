@@ -736,6 +736,12 @@ class LinuxImageHandler(ImageHandler):
                               vhpt           = self.vhpt,
                               superpages     = self.superpages)
 
+    def getBitSize(self):
+        return xc.getBitSize(image    = self.kernel,
+                                 cmdline  = self.cmdline,
+                                 features = self.vm.getFeatures()
+                                 ).get('type') 
+
     def getRequiredAvailableMemory(self, mem_kb):
         if self.is_stubdom :
             mem_kb += self.vramsize
@@ -768,6 +774,9 @@ class HVMImageHandler(ImageHandler):
         ImageHandler.__init__(self, vm, vmConfig)
         self.shutdownWatch = None
         self.rebootFeatureWatch = None
+    
+    def getBitSize(self):
+        return None
 
     def configure(self, vmConfig):
         ImageHandler.configure(self, vmConfig)
@@ -1011,6 +1020,9 @@ class X86_HVM_ImageHandler(HVMImageHandler):
         rc = HVMImageHandler.buildDomain(self)
         self.setCpuid()
         return rc
+    
+    def getBitSize(self):
+        return None
 
     def getRequiredAvailableMemory(self, mem_kb):
         return mem_kb + self.vramsize

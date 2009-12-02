@@ -105,6 +105,8 @@ class XendOptions:
 
     dom0_min_mem_default = 0
 
+    reserved_memory_default = 0
+
     dom0_vcpus_default = 0
 
     vncpasswd_default = None
@@ -363,6 +365,13 @@ class XendOptions:
             enable_dom0_ballooning_default = 'no'
         return self.get_config_bool('enable-dom0-ballooning',
                                     enable_dom0_ballooning_default)
+
+    def get_reserved_memory(self):
+        if not self.get_enable_dom0_ballooning():
+            return 0 #no ballooning of dom0 will close this item
+        else:
+            return self.get_config_int('total_available_memory', self.reserved_memory_default)
+
 
     def get_dom0_vcpus(self):
         return self.get_config_int('dom0-cpus', self.dom0_vcpus_default)

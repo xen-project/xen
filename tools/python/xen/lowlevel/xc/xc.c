@@ -399,6 +399,25 @@ static PyObject *pyxc_vcpu_getinfo(XcObject *self,
     return info_dict;
 }
 
+static PyObject *pyxc_getBitSize(XcObject *self,
+                                    PyObject *args,
+                                    PyObject *kwds)
+{
+    PyObject *info_type;
+    char *image = NULL, *cmdline = "", *features = NULL;
+    int type = 0;
+    static char *kwd_list[] = { "image", "cmdline", "features"};
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "sss", kwd_list,
+                                      &image, &cmdline, &features) )
+        return NULL;
+    xc_get_bit_size(image, cmdline, features, &type);
+    if (type < 0)
+        return pyxc_error_to_exception();
+    info_type = Py_BuildValue("{s:i}",
+                              "type", type);
+    return info_type;
+}
+
 static PyObject *pyxc_linux_build(XcObject *self,
                                   PyObject *args,
                                   PyObject *kwds)
@@ -1776,6 +1795,13 @@ static PyMethodDef pyxc_methods[] = {
       " cmdline [str, n/a]: Kernel parameters, if any.\n\n"
       " vcpus   [int, 1]:   Number of Virtual CPUS in domain.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
+
+    {"getBitSize",
+      (PyCFunction)pyxc_getBitSize,
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "Get the bitsize of a guest OS.\n"
+      " image   [str]:      Name of kernel image file. May be gzipped.\n"
+      " cmdline [str, n/a]: Kernel parameters, if any.\n\n"},
 
     { "hvm_build", 
       (PyCFunction)pyxc_hvm_build, 
