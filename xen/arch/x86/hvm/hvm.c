@@ -927,7 +927,7 @@ bool_t hvm_hap_nested_page_fault(unsigned long gfn)
      * If this GFN is emulated MMIO or marked as read-only, pass the fault
      * to the mmio handler.
      */
-    if ( p2m_is_mmio(p2mt) || (p2mt == p2m_ram_ro) )
+    if ( (p2mt == p2m_mmio_dm) || (p2mt == p2m_ram_ro) )
     {
         if ( !handle_mmio() )
             hvm_inject_exception(TRAP_gp_fault, 0, 0);
@@ -935,7 +935,8 @@ bool_t hvm_hap_nested_page_fault(unsigned long gfn)
     }
 
     /* Log-dirty: mark the page dirty and let the guest write it again */
-    if ( p2mt == p2m_ram_logdirty )
+    if ( paging_mode_log_dirty(current->domain)
+         && p2m_is_ram(p2mt) && (p2mt != p2m_ram_ro) )
     {
         paging_mark_dirty(current->domain, mfn_x(mfn));
         p2m_change_type(current->domain, gfn, p2m_ram_logdirty, p2m_ram_rw);
