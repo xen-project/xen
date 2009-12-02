@@ -68,7 +68,7 @@ int libxl_name_to_domid(struct libxl_ctx *ctx, char *name, uint32_t *domid)
     for (i = 0; i < num; i++) {
         snprintf(path, sizeof(path), "/local/domain/%s/name", l[i]);
         domname = xs_read(ctx->xsh, XBT_NULL, path, &len);
-        if (domname != NULL && !strncmp(domname, name, len)) {
+        if (domname != NULL && len == strlen(name) && !strncmp(domname, name, len)) {
             int domid_i = atoi(l[i]);
             for (j = 0; j < nb_domains; j++) {
                 if (dominfo[j].domid == domid_i) {

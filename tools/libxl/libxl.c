@@ -842,7 +842,7 @@ retry_transaction:
 
     if (starting_r) {
         *starting_r = libxl_calloc(ctx, sizeof(libxl_device_model_starting), 1);
-        (*starting_r)->domid = domid;
+        (*starting_r)->domid = info->domid;
         (*starting_r)->dom_path = libxl_xs_get_dompath(ctx, info->domid);
         (*starting_r)->for_spawn = NULL;
     }
