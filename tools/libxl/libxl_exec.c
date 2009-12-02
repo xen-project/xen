@@ -25,6 +25,7 @@
 #include <assert.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <signal.h> /* for SIGKILL */
 
 #include "libxl.h"
 #include "libxl_internal.h"
