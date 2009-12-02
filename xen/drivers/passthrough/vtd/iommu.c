@@ -117,7 +117,7 @@ struct iommu_flush *iommu_get_flush(struct iommu *iommu)
 
 static unsigned int clflush_size;
 static int iommus_incoherent;
-static void __iommu_flush_cache(void *addr, int size)
+static void __iommu_flush_cache(void *addr, unsigned int size)
 {
     int i;
 
@@ -128,9 +128,9 @@ static void __iommu_flush_cache(void *addr, int size)
         cacheline_flush((char *)addr + i);
 }
 
-void iommu_flush_cache_entry(void *addr)
+void iommu_flush_cache_entry(void *addr, unsigned int size)
 {
-    __iommu_flush_cache(addr, 8);
+    __iommu_flush_cache(addr, size);
 }
 
 void iommu_flush_cache_page(void *addr, unsigned long npages)
@@ -190,7 +190,7 @@ static u64 bus_to_context_maddr(struct iommu *iommu, u8 bus)
         }
         set_root_value(*root, maddr);
         set_root_present(*root);
-        iommu_flush_cache_entry(root);
+        iommu_flush_cache_entry(root, sizeof(struct root_entry));
     }
     maddr = (u64) get_context_addr(*root);
     unmap_vtd_domain_page(root_entries);
@@ -249,7 +249,7 @@ static u64 addr_to_dma_page_maddr(struct domain *domain, u64 addr, int alloc)
              */
             dma_set_pte_readable(*pte);
             dma_set_pte_writable(*pte);
-            iommu_flush_cache_entry(pte);
+            iommu_flush_cache_entry(pte, sizeof(struct dma_pte));
         }
         else
         {
@@ -546,9 +546,9 @@ static void dma_pte_clear_one(struct domain *domain, u64 addr)
         return;
     }
 
-    dma_clear_pte(*pte); 
+    dma_clear_pte(*pte);
     spin_unlock(&hd->mapping_lock);
-    iommu_flush_cache_entry(pte);
+    iommu_flush_cache_entry(pte, sizeof(struct dma_pte));
 
     /* No need pcidevs_lock here since do that on assign/deassign device*/
     for_each_drhd_unit ( drhd )
@@ -587,7 +587,7 @@ static void iommu_free_pagetable(u64 pt_maddr, int level)
             iommu_free_pagetable(dma_pte_addr(*pte), next_level);
 
         dma_clear_pte(*pte);
-        iommu_flush_cache_entry(pte);
+        iommu_flush_cache_entry(pte, sizeof(struct dma_pte));
     }
 
     unmap_vtd_domain_page(pt_vaddr);
@@ -1178,7 +1178,7 @@ static int domain_context_mapping_one(
     context_set_address_width(*context, agaw);
     context_set_fault_enable(*context);
     context_set_present(*context);
-    iommu_flush_cache_entry(context);
+    iommu_flush_cache_entry(context, sizeof(struct context_entry));
     spin_unlock(&iommu->lock);
 
     /* Context entry was previously non-present (with domid 0). */
@@ -1309,7 +1309,7 @@ static int domain_context_unmap_one(
 
     context_clear_present(*context);
     context_clear_entry(*context);
-    iommu_flush_cache_entry(context);
+    iommu_flush_cache_entry(context, sizeof(struct context_entry));
 
     if ( iommu_flush_context_device(iommu, domain_iommu_domid(domain),
                                     (((u16)bus) << 8) | devfn,
@@ -1485,7 +1485,7 @@ static int intel_iommu_map_page(
     if ( iommu_snoop )
         dma_set_pte_snp(*pte);
 
-    iommu_flush_cache_entry(pte);
+    iommu_flush_cache_entry(pte, sizeof(struct dma_pte));
     spin_unlock(&hd->mapping_lock);
     unmap_vtd_domain_page(page);
 

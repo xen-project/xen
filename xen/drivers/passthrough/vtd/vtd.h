@@ -105,7 +105,7 @@ void free_pgtable_maddr(u64 maddr);
 void *map_vtd_domain_page(u64 maddr);
 void unmap_vtd_domain_page(void *va);
 
-void iommu_flush_cache_entry(void *addr);
+void iommu_flush_cache_entry(void *addr, unsigned int size);
 void iommu_flush_cache_page(void *addr, unsigned long npages);
 
 #endif // _VTD_H_
