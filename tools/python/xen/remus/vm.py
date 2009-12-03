@@ -3,9 +3,8 @@
 import xmlrpclib
 
 from xen.xend.XendClient import server
-from xen.xend import sxp
-# XXX XendDomain is voodoo to let balloon import succeed
-from xen.xend import XendDomain, balloon
+from xen.xend import sxp, osdep
+from xen.lowlevel.xc import xc
 
 import vif
 import blkdev
@@ -150,7 +149,13 @@ def getshadowmem(vm):
     # from XendDomainInfo.checkLiveMigrateMemory:
     # 1MB per vcpu plus 4Kib/Mib of RAM.  This is higher than
     # the minimum that Xen would allocate if no value were given.
-    needed = vcpus * 1024 + maxmem * 4 - shadow * 1024
+    shadowneeded = vcpus * 1024 + maxmem * 4 - shadow * 1024
+    physinfo = xc().physinfo()
+    freemem = int(physinfo['free_memory'])
+    needed = shadowneeded - freemem
     if needed > 0:
         print "Freeing %d kB for shadow mode" % needed
-        balloon.free(needed, vm.dominfo)
+        dom0cur = osdep.lookup_balloon_stat('current')
+        # target is in MB, not KB
+        target = (dom0cur - needed) / 1024
+        server.xend.domain.setMemoryTarget(0, target)
