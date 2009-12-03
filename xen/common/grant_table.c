@@ -1972,14 +1972,19 @@ gnttab_set_version(XEN_GUEST_HANDLE(gnttab_set_version_t uop))
     struct domain *d = current->domain;
     struct grant_table *gt = d->grant_table;
     struct active_grant_entry *act;
-    long res = 0;
+    long res;
     int i;
 
     if (copy_from_guest(&op, uop, 1))
         return -EFAULT;
 
+    res = -EINVAL;
     if (op.version != 1 && op.version != 2)
-        return -EINVAL;
+        goto out;
+
+    res = 0;
+    if ( gt->gt_version == op.version )
+        goto out;
 
     spin_lock(&gt->lock);
     /* Make sure that the grant table isn't currently in use when we
@@ -1997,7 +2002,7 @@ gnttab_set_version(XEN_GUEST_HANDLE(gnttab_set_version_t uop))
                          gt->gt_version,
                          op.version);
                 res = -EBUSY;
-                goto out;
+                goto out_unlock;
             }
         }
     }
@@ -2009,7 +2014,7 @@ gnttab_set_version(XEN_GUEST_HANDLE(gnttab_set_version_t uop))
     {
         res = gnttab_populate_status_frames(d, gt);
         if ( res < 0)
-            goto out;
+            goto out_unlock;
     }
 
     if ( op.version < 2 && gt->gt_version == 2 )
@@ -2025,8 +2030,14 @@ gnttab_set_version(XEN_GUEST_HANDLE(gnttab_set_version_t uop))
 
     gt->gt_version = op.version;
 
-out:
+out_unlock:
     spin_unlock(&gt->lock);
+
+out:
+    op.version = gt->gt_version;
+
+    if (copy_to_guest(uop, &op, 1))
+        res = -EFAULT;
 
     return res;
 }

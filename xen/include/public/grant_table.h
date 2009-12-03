@@ -463,7 +463,7 @@ DEFINE_XEN_GUEST_HANDLE(gnttab_unmap_and_replace_t);
  */
 #define GNTTABOP_set_version          8
 struct gnttab_set_version {
-    /* IN parameters */
+    /* IN/OUT parameters */
     uint32_t version;
 };
 typedef struct gnttab_set_version gnttab_set_version_t;
