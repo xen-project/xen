@@ -20,9 +20,12 @@ static char errbuf[256];
 static int setup_suspend_evtchn(checkpoint_state* s);
 static void release_suspend_evtchn(checkpoint_state *s);
 static int setup_shutdown_watch(checkpoint_state* s);
-static int check_shutdown_watch(checkpoint_state* s);
+static int check_shutdown(checkpoint_state* s);
 static void release_shutdown_watch(checkpoint_state* s);
-static int poll_evtchn(checkpoint_state* s);
+
+static int evtchn_suspend(checkpoint_state* s);
+static int compat_suspend(checkpoint_state* s);
+static int pollfd(checkpoint_state* s, int fd);
 
 static int switch_qemu_logdirty(checkpoint_state* s, int enable);
 static int suspend_hvm(checkpoint_state* s);
@@ -118,11 +121,10 @@ int checkpoint_open(checkpoint_state* s, unsigned int domid)
     }
 
     if (s->domtype == dt_pv) {
-       if (setup_suspend_evtchn(s) < 0) {
-           checkpoint_close(s);
-
-           return -1;
-       }
+	if (setup_suspend_evtchn(s) < 0) {
+	    fprintf(stderr, "WARNING: suspend event channel unavailable, "
+		    "falling back to slow xenstore signalling\n");
+	}
     } else if (s->domtype == dt_pvhvm) {
        checkpoint_close(s);
        s->errstr = "PV-on-HVM is unsupported";
@@ -158,7 +160,6 @@ void checkpoint_close(checkpoint_state* s)
 
   s->domid = 0;
   s->fd = -1;
-  s->suspend_evtchn = -1;
 }
 
 /* we toggle logdirty ourselves around the xc_domain_save call --
@@ -207,38 +208,14 @@ int checkpoint_suspend(checkpoint_state* s)
   fprintf(stderr, "PROF: suspending at %lu.%06lu\n", (unsigned long)tv.tv_sec,
          (unsigned long)tv.tv_usec);
 
-  if (s->domtype == dt_hvm) {
-      return suspend_hvm(s) < 0 ? 0 : 1;
-  }
+  if (s->suspend_evtchn >= 0)
+      rc = evtchn_suspend(s);
+  else if (s->domtype == dt_hvm)
+      rc = suspend_hvm(s);
+  else
+      rc = compat_suspend(s);
 
-  rc = xc_evtchn_notify(s->xce, s->suspend_evtchn);
-  if (rc < 0) {
-    snprintf(errbuf, sizeof(errbuf),
-            "failed to notify suspend event channel: %d", rc);
-    s->errstr = errbuf;
-
-    return 0;
-  }
-
-  do {
-    rc = poll_evtchn(s);
-  } while (rc >= 0 && rc != s->suspend_evtchn);
-  if (rc <= 0) {
-    snprintf(errbuf, sizeof(errbuf),
-            "failed to receive suspend notification: %d", rc);
-    s->errstr = errbuf;
-
-    return 0;
-  }
-  if (xc_evtchn_unmask(s->xce, s->suspend_evtchn) < 0) {
-    snprintf(errbuf, sizeof(errbuf),
-            "failed to unmask suspend notification channel: %d", rc);
-    s->errstr = errbuf;
-
-    return 0;
-  }
-
-  return 1;
+  return rc < 0 ? 0 : 1;
 }
 
 /* wait for a suspend to be triggered by another thread */
@@ -368,10 +345,8 @@ static int setup_suspend_evtchn(checkpoint_state* s)
 
   s->suspend_evtchn = xc_suspend_evtchn_init(s->xch, s->xce, s->domid, port);
   if (s->suspend_evtchn < 0) {
-    snprintf(errbuf, sizeof(errbuf), "failed to bind suspend event channel");
-    s->errstr = errbuf;
-
-    return -1;
+      s->errstr = "failed to bind suspend event channel";
+      return -1;
   }
 
   fprintf(stderr, "bound to suspend event channel %u:%d as %d\n", s->domid, port,
@@ -384,9 +359,9 @@ static int setup_suspend_evtchn(checkpoint_state* s)
 static void release_suspend_evtchn(checkpoint_state *s)
 {
   /* TODO: teach xen to clean up if port is unbound */
-  if (s->xce >= 0 && s->suspend_evtchn > 0) {
+  if (s->xce >= 0 && s->suspend_evtchn >= 0) {
     xc_suspend_evtchn_release(s->xce, s->suspend_evtchn);
-    s->suspend_evtchn = 0;
+    s->suspend_evtchn = -1;
   }
 }
 
@@ -402,81 +377,153 @@ static int setup_shutdown_watch(checkpoint_state* s)
   }
   /* watch fires once on registration */
   s->watching_shutdown = 1;
-  check_shutdown_watch(s);
+  check_shutdown(s);
 
   return 0;
 }
 
-static int check_shutdown_watch(checkpoint_state* s) {
-  unsigned int count;
-  char **vec;
-  char buf[16];
+/* returns -1 on error or death, 0 if domain is running, 1 if suspended */
+static int check_shutdown(checkpoint_state* s) {
+    unsigned int count;
+    int xsfd;
+    char **vec;
+    char buf[16];
+    xc_dominfo_t info;
 
-  vec = xs_read_watch(s->xsh, &count);
-  if (s->watching_shutdown == 1) {
-      s->watching_shutdown = 2;
-      return 0;
-  }
-  if (!vec) {
-    fprintf(stderr, "empty watch fired\n");
-    return 0;
-  }
-  snprintf(buf, sizeof(buf), "%d", s->domid);
-  if (!strcmp(vec[XS_WATCH_TOKEN], buf)) {
-    fprintf(stderr, "domain %d shut down\n", s->domid);
-    return -1;
-  }
+    xsfd = xs_fileno(s->xsh);
 
-  return 0;
+    /* loop on watch if it fires for another domain */
+    while (1) {
+	if (pollfd(s, xsfd) < 0)
+	    return -1;
+
+	vec = xs_read_watch(s->xsh, &count);
+	if (s->watching_shutdown == 1) {
+	    s->watching_shutdown = 2;
+	    return 0;
+	}
+	if (!vec) {
+	    fprintf(stderr, "empty watch fired\n");
+	    continue;
+	}
+	snprintf(buf, sizeof(buf), "%d", s->domid);
+	if (!strcmp(vec[XS_WATCH_TOKEN], buf))
+	    break;
+    }
+
+    if (xc_domain_getinfo(s->xch, s->domid, 1, &info) != 1
+	|| info.domid != s->domid) {
+	snprintf(errbuf, sizeof(errbuf),
+		 "error getting info for domain %u", s->domid);
+	s->errstr = errbuf;
+	return -1;
+    }
+    if (!info.shutdown) {
+	snprintf(errbuf, sizeof(errbuf),
+		 "domain %u not shut down", s->domid);
+	s->errstr = errbuf;
+	return 0;
+    }
+
+    if (info.shutdown_reason != SHUTDOWN_suspend)
+	return -1;
+
+    return 1;
 }
 
 static void release_shutdown_watch(checkpoint_state* s) {
   char buf[16];
 
   if (!s->xsh)
-    return;
-
+      return;
   if (!s->watching_shutdown)
       return;
 
   snprintf(buf, sizeof(buf), "%u", s->domid);
   if (!xs_unwatch(s->xsh, "@releaseDomain", buf))
     fprintf(stderr, "Could not release shutdown watch\n");
+
+  s->watching_shutdown = 0;
 }
 
-/* wrapper around xc_evtchn_pending which detects errors */
-static int poll_evtchn(checkpoint_state* s)
+static int evtchn_suspend(checkpoint_state* s)
 {
-  int fd, xsfd, maxfd;
-  fd_set rfds, efds;
-  struct timeval tv;
-  int rc;
+    int rc;
 
-  fd = xc_evtchn_fd(s->xce);
-  xsfd = xs_fileno(s->xsh);
-  maxfd = fd > xsfd ? fd : xsfd;
-  FD_ZERO(&rfds);
-  FD_ZERO(&efds);
-  FD_SET(fd, &rfds);
-  FD_SET(xsfd, &rfds);
-  FD_SET(fd, &efds);
-  FD_SET(xsfd, &efds);
+    rc = xc_evtchn_notify(s->xce, s->suspend_evtchn);
+    if (rc < 0) {
+	snprintf(errbuf, sizeof(errbuf),
+		 "failed to notify suspend event channel: %d", rc);
+	s->errstr = errbuf;
 
-  /* give it 500 ms to respond */
-  tv.tv_sec = 0;
-  tv.tv_usec = 500000;
+	return -1;
+    }
 
-  rc = select(maxfd + 1, &rfds, NULL, &efds, &tv);
-  if (rc < 0)
-    fprintf(stderr, "error polling event channel: %s\n", strerror(errno));
-  else if (!rc)
-    fprintf(stderr, "timeout waiting for event channel\n");
-  else if (FD_ISSET(fd, &rfds))
-    return xc_evtchn_pending(s->xce);
-  else if (FD_ISSET(xsfd, &rfds))
-    return check_shutdown_watch(s);
+    do
+	if (!(rc = pollfd(s, xc_evtchn_fd(s->xce))))
+	    rc = xc_evtchn_pending(s->xce);
+    while (rc >= 0 && rc != s->suspend_evtchn);
+    if (rc <= 0)
+	return -1;
 
-  return -1;
+    if (xc_evtchn_unmask(s->xce, s->suspend_evtchn) < 0) {
+	snprintf(errbuf, sizeof(errbuf),
+		 "failed to unmask suspend notification channel: %d", rc);
+	s->errstr = errbuf;
+
+	return -1;
+    }
+
+    return 0;
+}
+
+/* suspend through xenstore if suspend event channel is unavailable */
+static int compat_suspend(checkpoint_state* s)
+{
+    char path[128];
+
+    sprintf(path, "/local/domain/%u/control/shutdown", s->domid);
+
+    if (!xs_write(s->xsh, XBT_NULL, path, "suspend", 7)) {
+	s->errstr = "error signalling qemu logdirty";
+	return -1;
+    }
+
+    if (check_shutdown(s) != 1)
+	return -1;
+
+    return 0;
+}
+
+/* returns -1 if fd does not become readable within timeout */
+static int pollfd(checkpoint_state* s, int fd)
+{
+    fd_set rfds;
+    struct timeval tv;
+    int rc;
+
+    FD_ZERO(&rfds);
+    FD_SET(fd, &rfds);
+
+    tv.tv_sec = 0;
+    tv.tv_usec = 500000;
+
+    rc = select(fd + 1, &rfds, NULL, NULL, &tv);
+
+    if (rc < 0) {
+	snprintf(errbuf, sizeof(errbuf),
+		 "error polling fd: %s", strerror(errno));
+	s->errstr = errbuf;
+    } else if (!rc) {
+	snprintf(errbuf, sizeof(errbuf), "timeout polling fd");
+	s->errstr = errbuf;
+    } else if (! FD_ISSET(fd, &rfds)) {
+	snprintf(errbuf, sizeof(errbuf), "unknown error polling fd");
+	s->errstr = errbuf;
+    } else
+	return 0;
+
+    return -1;
 }
 
 /* adapted from the eponymous function in xc_save */
@@ -537,7 +584,7 @@ static int suspend_hvm(checkpoint_state *s)
     }
     fprintf(stderr, "suspend hypercall returned %d\n", rc);
 
-    if (check_shutdown_watch(s) >= 0)
+    if (check_shutdown(s) != 1)
        return -1;
 
     rc = suspend_qemu(s);
