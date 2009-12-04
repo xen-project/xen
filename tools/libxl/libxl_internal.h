@@ -63,6 +63,23 @@ typedef struct {
 #define PRINTF_ATTRIBUTE(x, y) __attribute__((format(printf, x, y)))
 
 /* memory allocation tracking/helpers */
+int libxl_clone_context(struct libxl_ctx *from, struct libxl_ctx *to);
+static inline int libxl_clone_context_xs(
+                struct libxl_ctx *from, struct libxl_ctx *to)
+{
+    int rc;
+    rc = libxl_clone_context(from, to);
+    if (rc) return rc;
+    to->xsh = xs_daemon_open();
+    return 0;
+}
+void libxl_discard_cloned_context(struct libxl_ctx *ctx);
+static inline void libxl_discard_cloned_context_xs(
+                struct libxl_ctx *ctx)
+{
+    libxl_discard_cloned_context(ctx);
+    xs_daemon_close(ctx->xsh);
+}
 int libxl_ptr_add(struct libxl_ctx *ctx, void *ptr);
 int libxl_free(struct libxl_ctx *ctx, void *ptr);
 int libxl_free_all(struct libxl_ctx *ctx);

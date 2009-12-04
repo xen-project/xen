@@ -212,15 +212,19 @@ int libxl_devices_destroy(struct libxl_ctx *ctx, uint32_t domid, int force)
     fd_set rfds;
     struct timeval tv;
     flexarray_t *toremove;
-    struct libxl_ctx clone = *ctx;
+    struct libxl_ctx clone;
 
-    clone.xsh = xs_daemon_open();
+    if (libxl_clone_context_xs(ctx, &clone)) {
+        XL_LOG(ctx, XL_LOG_ERROR, "Out of memory when cloning context");
+        return ERROR_NOMEM;
+    }
+
     toremove = flexarray_make(16, 1);
     path = libxl_sprintf(&clone, "/local/domain/%d/device", domid);
     l1 = libxl_xs_directory(&clone, XBT_NULL, path, &num1);
     if (!l1) {
         XL_LOG(&clone, XL_LOG_ERROR, "%s is empty", path);
-        xs_daemon_close(clone.xsh);
+        libxl_discard_cloned_context_xs(&clone);
         return -1;
     }
     for (i = 0; i < num1; i++) {
@@ -269,7 +273,7 @@ int libxl_devices_destroy(struct libxl_ctx *ctx, uint32_t domid, int force)
         xs_rm(clone.xsh, XBT_NULL, path);
     }
     flexarray_free(toremove);
-    xs_daemon_close(clone.xsh);
+    libxl_discard_cloned_context_xs(&clone);
     return 0;
 }
 

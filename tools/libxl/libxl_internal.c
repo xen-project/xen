@@ -28,6 +28,28 @@ int libxl_error_set(struct libxl_ctx *ctx, int code)
     return 0;
 }
 
+int libxl_clone_context(struct libxl_ctx *from, struct libxl_ctx *to)
+{
+    /* We could just copy the structs, but since
+     * maxsize is not a pointer we need to take care
+     * of our own GC. */
+    *to = *from;
+    to->alloc_ptrs = NULL;
+    to->alloc_maxsize = 256;
+    to->alloc_ptrs = calloc(to->alloc_maxsize, sizeof(void *));
+    if (!to->alloc_ptrs)
+        return ERROR_NOMEM;
+    return 0;
+}
+
+void libxl_discard_cloned_context(struct libxl_ctx *ctx)
+{
+    /* We only need to worry about GC-related fields */
+    (void)libxl_ctx_free(ctx);
+    if (ctx->alloc_ptrs)
+        free(ctx->alloc_ptrs);
+}
+
 int libxl_ptr_add(struct libxl_ctx *ctx, void *ptr)
 {
     int i;

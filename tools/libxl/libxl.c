@@ -656,10 +656,17 @@ void dm_xenstore_record_pid(struct libxl_ctx *ctx, void *for_spawn,
     struct libxl_device_model_starting *starting = for_spawn;
     struct libxl_ctx clone;
     char *kvs[3];
-    int rc;
+    int rc, cloned;
 
-    clone = *ctx;
-    clone.xsh = xs_daemon_open();
+    if (libxl_clone_context_xs(ctx, &clone)) {
+        XL_LOG(ctx, XL_LOG_ERROR, "Out of memory when cloning context");
+        /* Throw a prayer fallback */
+        clone = *ctx;
+        clone.xsh = xs_daemon_open();
+        cloned = 0;
+    } else {
+        cloned = 1;
+    }
     /* we mustn't use the parent's handle in the child */
 
     kvs[0] = "image/device-model-pid";
@@ -669,7 +676,11 @@ void dm_xenstore_record_pid(struct libxl_ctx *ctx, void *for_spawn,
     if (rc) XL_LOG_ERRNO(&clone, XL_LOG_ERROR,
                          "Couldn't record device model pid %ld at %s/%s",
                          (unsigned long)innerchild, starting->dom_path, kvs);
-    xs_daemon_close(clone.xsh);
+    if (cloned) {
+        libxl_discard_cloned_context_xs(&clone);
+    } else {
+        xs_daemon_close(clone.xsh);
+    }
 }
 
 static int libxl_vfb_and_vkb_from_device_model_info(struct libxl_ctx *ctx,
