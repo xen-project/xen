@@ -276,6 +276,7 @@ int libxl_console_attach(struct libxl_ctx *ctx, uint32_t domid, int cons_num);
 
 struct libxl_dominfo * libxl_domain_list(struct libxl_ctx *ctx, int *nb_domain);
 xc_dominfo_t * libxl_domain_infolist(struct libxl_ctx *ctx, int *nb_domain);
+xc_dominfo_t * libxl_domain_info(struct libxl_ctx *ctx, uint32_t domid);
 
 typedef struct libxl_device_model_starting libxl_device_model_starting;
 int libxl_create_device_model(struct libxl_ctx *ctx,

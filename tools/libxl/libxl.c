@@ -362,6 +362,31 @@ static int libxl_save_device_model(struct libxl_ctx *ctx, uint32_t domid, int fd
     return 0;
 }
 
+xc_dominfo_t *libxl_domain_info(struct libxl_ctx *ctx, uint32_t domid)
+{
+    xc_dominfo_t *info;
+    int rc;
+
+    info = (xc_dominfo_t *) calloc(1, sizeof(xc_dominfo_t));
+    if (!info) {
+        return NULL;
+    }
+    rc = xc_domain_getinfo(ctx->xch, domid, 1, info);
+    if (rc != 1) {
+        free(info);
+        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "Failed to get info for domain %u", 
+                        domid);
+        return NULL;
+    }
+    if (info->domid != domid) {
+        free(info);
+        XL_LOG(ctx, XL_LOG_ERROR, "Failed to get info for domain %u"
+                        ", seems to not exist anymore", domid);
+        return NULL;
+    }
+
+    return info;
+}
 int libxl_domain_suspend(struct libxl_ctx *ctx, libxl_domain_suspend_info *info,
                          uint32_t domid, int fd)
 {
