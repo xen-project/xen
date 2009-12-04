@@ -295,12 +295,10 @@ int libxl_detach_device_model(struct libxl_ctx *ctx,
   /* DM is detached even if error is returned */
 
 int libxl_device_disk_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk);
-int libxl_device_disk_clean_shutdown(struct libxl_ctx *ctx, uint32_t domid);
-int libxl_device_disk_hard_shutdown(struct libxl_ctx *ctx, uint32_t domid);
+int libxl_device_disk_del(struct libxl_ctx *ctx, libxl_device_disk *disk, int wait);
 
 int libxl_device_nic_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_nic *nic);
-int libxl_device_nic_clean_shutdown(struct libxl_ctx *ctx, uint32_t domid);
-int libxl_device_nic_hard_shutdown(struct libxl_ctx *ctx, uint32_t domid);
+int libxl_device_nic_del(struct libxl_ctx *ctx, libxl_device_nic *nic, int wait);
 
 int libxl_device_console_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_console *console);
 

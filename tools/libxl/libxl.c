@@ -1123,14 +1123,21 @@ int libxl_device_disk_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_di
     return 0;
 }
 
-int libxl_device_disk_clean_shutdown(struct libxl_ctx *ctx, uint32_t domid)
+int libxl_device_disk_del(struct libxl_ctx *ctx, 
+                          libxl_device_disk *disk, int wait)
 {
-    return ERROR_NI;
-}
+    libxl_device device;
+    int devid;
 
-int libxl_device_disk_hard_shutdown(struct libxl_ctx *ctx, uint32_t domid)
-{
-    return ERROR_NI;
+    devid = device_disk_dev_number(disk->virtpath);
+    device.backend_domid    = disk->backend_domid;
+    device.backend_devid    = devid;
+    device.backend_kind     = 
+        (disk->phystype == PHYSTYPE_PHY) ? DEVICE_VBD : DEVICE_TAP;
+    device.domid            = disk->domid;
+    device.devid            = devid;
+    device.kind             = DEVICE_VBD;
+    return libxl_device_del(ctx, &device, wait);
 }
 
 /******************************************************************************/
@@ -1196,14 +1203,19 @@ int libxl_device_nic_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_nic
     return 0;
 }
 
-int libxl_device_nic_clean_shutdown(struct libxl_ctx *ctx, uint32_t domid)
+int libxl_device_nic_del(struct libxl_ctx *ctx, 
+                         libxl_device_nic *nic, int wait)
 {
-    return ERROR_NI;
-}
+    libxl_device device;
 
-int libxl_device_nic_hard_shutdown(struct libxl_ctx *ctx, uint32_t domid)
-{
-    return ERROR_NI;
+    device.backend_devid    = nic->devid;
+    device.backend_domid    = nic->backend_domid;
+    device.backend_kind     = DEVICE_VIF;
+    device.devid            = nic->devid;
+    device.domid            = nic->domid;
+    device.kind             = DEVICE_VIF;
+
+    return libxl_device_del(ctx, &device, wait);
 }
 
 /******************************************************************************/
