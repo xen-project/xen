@@ -489,7 +489,16 @@ int libxl_domain_destroy(struct libxl_ctx *ctx, uint32_t domid, int force)
     char *dom_path, *uuid_str;
     char vm_path[UUID_LEN_STR + 5], vss_path[UUID_LEN_STR + 6], xapi_path[20];
     xen_uuid_t *uuid;
-    int rc;
+    int rc, dm_present;
+
+    if (is_hvm(ctx, domid)) {
+        dm_present = 1;
+    } else {
+        char *pid;
+        pid = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "/local/domain/%d/image/device-model-pid", domid));
+        dm_present = (pid != NULL);
+        libxl_free(ctx, pid);
+    }
 
     dom_path = libxl_xs_get_dompath(ctx, domid);
     if (!dom_path)
@@ -501,16 +510,20 @@ int libxl_domain_destroy(struct libxl_ctx *ctx, uint32_t domid, int force)
     }
     if (libxl_device_pci_shutdown(ctx, domid) < 0)
         XL_LOG(ctx, XL_LOG_ERROR, "pci shutdown failed for domid %d", domid);
-    xs_write(ctx->xsh, XBT_NULL,
-             libxl_sprintf(ctx, "/local/domain/0/device-model/%d/command", domid),
-             "shutdown", strlen("shutdown"));
+    if (dm_present) {
+        xs_write(ctx->xsh, XBT_NULL,
+                 libxl_sprintf(ctx, "/local/domain/0/device-model/%d/command", domid),
+                 "shutdown", strlen("shutdown"));
+    }
     rc = xc_domain_pause(ctx->xch, domid);
     if (rc < 0) {
         XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, rc, "xc_domain_pause failed for %d", domid);
         return -1;
     }
-    if (libxl_destroy_device_model(ctx, domid) < 0)
-        XL_LOG(ctx, XL_LOG_ERROR, "libxl_destroy_device_model failed for %d", domid);
+    if (dm_present) {
+        if (libxl_destroy_device_model(ctx, domid) < 0)
+            XL_LOG(ctx, XL_LOG_ERROR, "libxl_destroy_device_model failed for %d", domid);
+    }
     if (libxl_devices_destroy(ctx, domid, force) < 0)
         XL_LOG(ctx, XL_LOG_ERROR, "libxl_destroy_devices failed for %d", domid);
     if (!xs_rm(ctx->xsh, XBT_NULL, dom_path))
