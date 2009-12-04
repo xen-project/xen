@@ -4005,6 +4005,7 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         struct xen_add_to_physmap xatp;
         unsigned long prev_mfn, mfn = 0, gpfn;
         struct domain *d;
+        int rc;
 
         if ( copy_from_guest(&xatp, arg, 1) )
             return -EFAULT;
@@ -4089,7 +4090,7 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
             guest_physmap_remove_page(d, gpfn, mfn, 0);
 
         /* Map at new location. */
-        guest_physmap_add_page(d, xatp.gpfn, mfn, 0);
+        rc = guest_physmap_add_page(d, xatp.gpfn, mfn, 0);
 
         domain_unlock(d);
 
@@ -4098,7 +4099,7 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
 
         rcu_unlock_domain(d);
 
-        break;
+        return rc;
     }
 
     case XENMEM_set_memory_map:
