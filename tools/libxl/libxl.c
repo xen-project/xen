@@ -229,6 +229,7 @@ int libxl_domain_restore(struct libxl_ctx *ctx, libxl_domain_build_info *info,
                          libxl_device_model_info *dm_info)
 {
     char **vments = NULL, **localents = NULL;
+    int i;
 
     build_pre(ctx, domid, info, state);
     restore_common(ctx, domid, info, state, fd);
@@ -240,14 +241,19 @@ int libxl_domain_restore(struct libxl_ctx *ctx, libxl_domain_build_info *info,
         vments[3] = "hvm";
     } else {
         vments = libxl_calloc(ctx, 9, sizeof(char *));
-        vments[0] = "image/ostype";
-        vments[1] = "linux";
-        vments[2] = "image/kernel";
-        vments[3] = (char*) info->kernel;
-        vments[4] = "image/ramdisk";
-        vments[5] = (char*) info->u.pv.ramdisk;
-        vments[6] = "image/cmdline";
-        vments[7] = (char*) info->u.pv.cmdline;
+        i = 0;
+        vments[i++] = "image/ostype";
+        vments[i++] = "linux";
+        vments[i++] = "image/kernel";
+        vments[i++] = (char*) info->kernel;
+        if (info->u.pv.ramdisk) {
+            vments[i++] = "image/ramdisk";
+            vments[i++] = (char*) info->u.pv.ramdisk;
+        }
+        if (info->u.pv.cmdline) {
+            vments[i++] = "image/cmdline";
+            vments[i++] = (char*) info->u.pv.cmdline;
+        }
     }
     build_post(ctx, domid, info, state, vments, localents);
     if (info->hvm)
