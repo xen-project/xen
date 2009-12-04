@@ -69,9 +69,10 @@ install: all
 
 .PHONY: clean
 clean:
-	$(RM) -f *.o *.so* *.a $(CLIENTS)
+	$(RM) -f *.o *.so* *.a $(CLIENTS) $(DEPS)
 	$(RM) -rf $(LIBCONFIG_SOURCE)
 
 distclean: clean
 	$(RM) -f $(LIBCONFIG_SOURCE).tar.gz
 
+-include $(DEPS)
