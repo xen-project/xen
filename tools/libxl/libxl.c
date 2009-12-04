@@ -264,6 +264,28 @@ int libxl_domain_restore(struct libxl_ctx *ctx, libxl_domain_build_info *info,
     return 0;
 }
 
+int libxl_domain_resume(struct libxl_ctx *ctx, uint32_t domid)
+{
+    if (is_hvm(ctx, domid)) {
+        XL_LOG(ctx, XL_LOG_DEBUG, "Called domain_resume on "
+                "non-cooperative hvm domain %u", domid);
+        return ERROR_NI;
+    }
+    if (xc_domain_resume(ctx->xch, domid, 1)) {
+        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, 
+                        "xc_domain_resume failed for domain %u", 
+                        domid);
+        return ERROR_FAIL;
+    }
+    if (!xs_resume_domain(ctx->xsh, domid)) {
+        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, 
+                        "xs_resume_domain failed for domain %u", 
+                        domid);
+        return ERROR_FAIL;
+    }
+    return 0;
+}
+
 struct libxl_dominfo * libxl_domain_list(struct libxl_ctx *ctx, int *nb_domain)
 {
     struct libxl_dominfo *ptr;

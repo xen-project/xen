@@ -262,6 +262,7 @@ int libxl_domain_restore(struct libxl_ctx *ctx, libxl_domain_build_info *info,
                          libxl_device_model_info *dm_info);
 int libxl_domain_suspend(struct libxl_ctx *ctx, libxl_domain_suspend_info *info,
                           uint32_t domid, int fd);
+int libxl_domain_resume(struct libxl_ctx *ctx, uint32_t domid);
 int libxl_domain_shutdown(struct libxl_ctx *ctx, uint32_t domid, int req);
 int libxl_domain_destroy(struct libxl_ctx *ctx, uint32_t domid, int force);
 
