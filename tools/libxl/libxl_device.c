@@ -203,14 +203,40 @@ retry_transaction:
         return 0;
 }
 
+int wait_for_dev_destroy(struct libxl_ctx *ctx, struct timeval *tv)
+{
+    int nfds, rc;
+    unsigned int n;
+    fd_set rfds;
+    char **l1 = NULL;
+
+    rc = 1;
+    nfds = xs_fileno(ctx->xsh) + 1;
+    FD_ZERO(&rfds);
+    FD_SET(xs_fileno(ctx->xsh), &rfds);
+    if (select(nfds, &rfds, NULL, NULL, tv) > 0) {
+        l1 = xs_read_watch(ctx->xsh, &n);
+        if (l1 != NULL) {
+            char *state = libxl_xs_read(ctx, XBT_NULL, l1[XS_WATCH_PATH]);
+            if (!state || atoi(state) == 6) {
+                xs_unwatch(ctx->xsh, l1[0], l1[1]);
+                xs_rm(ctx->xsh, XBT_NULL, l1[XS_WATCH_TOKEN]);
+                XL_LOG(ctx, XL_LOG_DEBUG, "Destroyed device backend at %s", l1[XS_WATCH_TOKEN]);
+                rc = 0;
+            }
+            libxl_free(ctx, state);
+            free(l1);
+        }
+    }
+    return rc;
+}
+
 int libxl_devices_destroy(struct libxl_ctx *ctx, uint32_t domid, int force)
 {
     char *path, *be_path, *fe_path;
     unsigned int num1, num2;
     char **l1 = NULL, **l2 = NULL;
-    int i, j, nfds, n = 0, n_watches = 0;
-    fd_set rfds;
-    struct timeval tv;
+    int i, j, n = 0, n_watches = 0;
     flexarray_t *toremove;
     struct libxl_ctx clone;
 
@@ -245,27 +271,20 @@ int libxl_devices_destroy(struct libxl_ctx *ctx, uint32_t domid, int force)
         }
     }
     if (!force) {
-        nfds = xs_fileno(clone.xsh) + 1;
-        /* Linux-ism */
+        /* Linux-ism. Most implementations leave the timeout
+         * untouched after select. Linux, however, will chip
+         * away the elapsed time from it, which is what we 
+         * need to enforce a single time span waiting for
+         * device destruction. */
+        struct timeval tv;
         tv.tv_sec = LIBXL_DESTROY_TIMEOUT;
         tv.tv_usec = 0;
-        while (n_watches > 0 && tv.tv_sec > 0) {
-            FD_ZERO(&rfds);
-            FD_SET(xs_fileno(clone.xsh), &rfds);
-            if (select(nfds, &rfds, NULL, NULL, &tv) > 0) {
-                l1 = xs_read_watch(clone.xsh, &num1);
-                if (l1 != NULL) {
-                    char *state = libxl_xs_read(&clone, XBT_NULL, l1[0]);
-                    if (!state || atoi(state) == 6) {
-                        xs_unwatch(clone.xsh, l1[0], l1[1]);
-                        xs_rm(clone.xsh, XBT_NULL, l1[1]);
-                        XL_LOG(&clone, XL_LOG_DEBUG, "Destroyed device backend at %s", l1[1]);
-                        n_watches--;
-                    }
-                    free(l1);
-                }
-            } else
+        while (n_watches > 0) {
+            if (wait_for_dev_destroy(&clone, &tv)) {
                 break;
+            } else {
+                n_watches--;
+            }
         }
     }
     for (i = 0; i < n; i++) {
@@ -273,6 +292,49 @@ int libxl_devices_destroy(struct libxl_ctx *ctx, uint32_t domid, int force)
         xs_rm(clone.xsh, XBT_NULL, path);
     }
     flexarray_free(toremove);
+    libxl_discard_cloned_context_xs(&clone);
+    return 0;
+}
+
+int libxl_device_del(struct libxl_ctx *ctx, libxl_device *dev, int wait)
+{
+    char *dom_path_backend, *backend_path, *hotplug_path;
+    int rc;
+    struct libxl_ctx clone;
+
+    if (libxl_clone_context_xs(ctx, &clone)) {
+        XL_LOG(ctx, XL_LOG_ERROR, "Out of memory when cloning context");
+        return ERROR_NOMEM;
+    }
+
+    /* Create strings */
+    dom_path_backend    = libxl_xs_get_dompath(&clone, dev->backend_domid);
+    backend_path        = libxl_sprintf(&clone, "%s/backend/%s/%u/%d",
+                                    dom_path_backend, 
+                                    string_of_kinds[dev->backend_kind], 
+                                    dev->domid, dev->devid);
+    hotplug_path        = libxl_sprintf(&clone, "/xapi/%d/hotplug/%s/%d",
+                                    dev->domid,
+                                    string_of_kinds[dev->kind], 
+                                    dev->devid);
+    libxl_free(&clone, dom_path_backend);
+
+    rc = libxl_device_destroy(&clone, backend_path, !wait);
+    if (rc == -1) {
+        libxl_discard_cloned_context_xs(&clone);
+        return ERROR_FAIL;
+    }
+
+    if (wait) {
+        struct timeval tv;
+        tv.tv_sec = LIBXL_DESTROY_TIMEOUT;
+        tv.tv_usec = 0;
+        (void)wait_for_dev_destroy(&clone, &tv);
+    }
+
+    xs_rm(clone.xsh, XBT_NULL, hotplug_path);
+    libxl_free(&clone, hotplug_path);
+    libxl_free(&clone, backend_path);
     libxl_discard_cloned_context_xs(&clone);
     return 0;
 }

@@ -124,6 +124,7 @@ int device_disk_dev_number(char *virtpath);
 
 int libxl_device_generic_add(struct libxl_ctx *ctx, libxl_device *device,
                              char **bents, char **fents);
+int libxl_device_del(struct libxl_ctx *ctx, libxl_device *dev, int wait);
 int libxl_device_destroy(struct libxl_ctx *ctx, char *be_path, int force);
 int libxl_devices_destroy(struct libxl_ctx *ctx, uint32_t domid, int force);
 int libxl_wait_for_device_model(struct libxl_ctx *ctx,
