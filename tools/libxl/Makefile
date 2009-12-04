@@ -46,13 +46,11 @@ libxenlight.a: $(LIBXL_OBJS)
 $(LIBCONFIG_SOURCE).tar.gz:
 	$(WGET) $(LIBCONFIG_URL)/$@
 
-$(LIBCONFIG_SOURCE): $(LIBCONFIG_SOURCE).tar.gz
-	tar xzf $<
-
-$(LIBCONFIG_OUTPUT)/libconfig.so: $(LIBCONFIG_SOURCE)
+$(LIBCONFIG_OUTPUT)/libconfig.so: $(LIBCONFIG_SOURCE).tar.gz
+	[ ! -d "$(LIBCONFIG_SOURCE)" ] && tar xzf $<
 	cd $(LIBCONFIG_SOURCE) && ./configure --prefix=$(DESTDIR)$(PREFIX) && $(MAKE)
 
-xl.o: $(LIBCONFIG_SOURCE)
+xl.o: $(LIBCONFIG_OUTPUT)/libconfig.so xl.c
 	$(CC) $(CFLAGS) -I$(LIBCONFIG_SOURCE) -c xl.c
 
 $(CLIENTS): xl.o libxenlight.so $(LIBCONFIG_OUTPUT)/libconfig.so
