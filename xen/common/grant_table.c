@@ -35,6 +35,7 @@
 #include <xen/domain_page.h>
 #include <xen/iommu.h>
 #include <xen/paging.h>
+#include <xen/keyhandler.h>
 #include <xsm/xsm.h>
 
 #ifndef max_nr_grant_frames
@@ -2501,6 +2502,88 @@ grant_table_destroy(
     xfree(t);
     d->grant_table = NULL;
 }
+
+void gnttab_usage_print(struct domain *rd)
+{
+    int first = 1;
+    grant_ref_t ref;
+
+    printk("      -------- active --------       -------- shared --------\n");
+    printk("[ref] localdom mfn      pin          localdom gmfn     flags\n");
+
+    spin_lock(&rd->grant_table->lock);
+
+    for ( ref = 0; ref != nr_grant_entries(rd->grant_table); ref++ )
+    {
+        struct active_grant_entry *act;
+        struct grant_entry_header *sha;
+        grant_entry_v1_t *sha1;
+        grant_entry_v2_t *sha2;
+        uint16_t status;
+        uint64_t frame;
+
+        act = &active_entry(rd->grant_table, ref);
+        if ( !act->pin )
+            continue;
+
+        sha = shared_entry_header(rd->grant_table, ref);
+
+        if ( rd->grant_table->gt_version == 1 )
+        {
+            sha1 = &shared_entry_v1(rd->grant_table, ref);
+            sha2 = NULL;
+            status = sha->flags;
+            frame = sha1->frame;
+        }
+        else
+        {
+            sha2 = &shared_entry_v2(rd->grant_table, ref);
+            sha1 = NULL;
+            frame = sha2->full_page.frame;
+            status = status_entry(rd->grant_table, ref);
+        }
+
+        if ( first )
+        {
+            printk("grant-table for remote domain:%5d (v%d)\n",
+                   rd->domain_id, rd->grant_table->gt_version);
+            first = 0;
+        }
+
+        /*      [ddd]    ddddd 0xXXXXXX 0xXXXXXXXX      ddddd 0xXXXXXX 0xXX */
+        printk("[%3d]    %5d 0x%06lx 0x%08x      %5d 0x%06lx 0x%02x\n",
+               ref, act->domid, act->frame, act->pin,
+               sha->domid, frame, status);
+    }
+
+    spin_unlock(&rd->grant_table->lock);
+
+    if ( first )
+        printk("grant-table for remote domain:%5d ... "
+               "no active grant table entries\n", rd->domain_id);
+}
+
+static void gnttab_usage_print_all(unsigned char key)
+{
+    struct domain *d;
+    printk("%s [ key '%c' pressed\n", __FUNCTION__, key);
+    for_each_domain ( d )
+        gnttab_usage_print(d);
+    printk("%s ] done\n", __FUNCTION__);
+}
+
+static struct keyhandler gnttab_usage_print_all_keyhandler = {
+    .diagnostic = 1,
+    .u.fn = gnttab_usage_print_all,
+    .desc = "print grant table usage"
+};
+
+static int __init gnttab_usage_init(void)
+{
+    register_keyhandler('g', &gnttab_usage_print_all_keyhandler);
+    return 0;
+}
+__initcall(gnttab_usage_init);
 
 /*
  * Local variables:
