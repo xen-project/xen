@@ -406,7 +406,7 @@ static PyObject *pyxc_getBitSize(XcObject *self,
     PyObject *info_type;
     char *image = NULL, *cmdline = "", *features = NULL;
     int type = 0;
-    static char *kwd_list[] = { "image", "cmdline", "features"};
+    static char *kwd_list[] = { "image", "cmdline", "features", NULL };
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "sss", kwd_list,
                                       &image, &cmdline, &features) )
         return NULL;
@@ -1642,7 +1642,7 @@ static PyObject *pyxc_tmem_shared_auth(XcObject *self,
     char *uuid_str;
     int rc;
 
-    static char *kwd_list[] = { "cli_id", "uuid_str", "arg1" };
+    static char *kwd_list[] = { "cli_id", "uuid_str", "arg1", NULL };
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "isi", kwd_list,
                                    &cli_id, &uuid_str, &arg1) )
