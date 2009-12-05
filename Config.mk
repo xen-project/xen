@@ -150,9 +150,9 @@ QEMU_REMOTE=http://xenbits.xensource.com/git-http/qemu-xen-unstable.git
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= f72b6e0ffc3bb84d4442c5a7493bffbdce2a4468
-# Wed Nov 4 17:07:57 2009 +0000
-# fix drive name parsing (any_hdN erroneous local declaration)
+QEMU_TAG ?= 91ae19a7cc445030614bd0ae91548162cf0befbe
+# Fri Dec 4 16:15:10 2009 +0000
+# xen_console: fix memory leak "type"
 
 OCAML_XENSTORED_REPO=http://xenbits.xensource.com/ext/xen-ocaml-tools.hg
 
