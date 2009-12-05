@@ -80,6 +80,7 @@ typedef struct {
             char *timeoffset;
         } hvm;
         struct {
+            uint32_t   slack_memkb;
             const char *cmdline;
             const char *ramdisk;
             const char *features;

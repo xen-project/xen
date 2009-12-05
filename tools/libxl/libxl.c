@@ -2100,6 +2100,8 @@ void init_build_info(libxl_domain_build_info *b_info, libxl_domain_create_info *
         b_info->u.hvm.acpi = 1;
         b_info->u.hvm.nx = 1;
         b_info->u.hvm.viridian = 0;
+    } else {
+        b_info->u.pv.slack_memkb = 8 * 1024;
     }
 }
 
