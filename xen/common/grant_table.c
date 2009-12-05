@@ -2551,7 +2551,7 @@ void gnttab_usage_print(struct domain *rd)
         }
 
         /*      [ddd]    ddddd 0xXXXXXX 0xXXXXXXXX      ddddd 0xXXXXXX 0xXX */
-        printk("[%3d]    %5d 0x%06lx 0x%08x      %5d 0x%06lx 0x%02x\n",
+        printk("[%3d]    %5d 0x%06lx 0x%08x      %5d 0x%06"PRIx64" 0x%02x\n",
                ref, act->domid, act->frame, act->pin,
                sha->domid, frame, status);
     }
