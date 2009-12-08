@@ -518,6 +518,14 @@ class XendConfig(dict):
                self['platform'].get('enable_audio'):
                 self['platform']['soundhw'] = 'sb16'
 
+    def _vfb_sanity_check(self):
+        if 'keymap' in self['platform']:
+            for con in self['console_refs']:
+                if self['devices'][con][0] == 'vfb':
+                    if 'keymap' not in self['devices'][con][1]:
+                        self['devices'][con][1]['keymap'] = \
+                            self['platform']['keymap']
+
     def validate(self):
         self._uuid_sanity_check()
         self._name_sanity_check()
@@ -525,6 +533,7 @@ class XendConfig(dict):
         self._actions_sanity_check()
         self._vcpus_sanity_check()
         self._platform_sanity_check()
+        self._vfb_sanity_check()
 
     def _dominfo_to_xapi(self, dominfo, update_mem = False):
         self['domid'] = dominfo['domid']
