@@ -457,7 +457,6 @@ struct svm_domain {
 struct arch_svm_struct {
     struct vmcb_struct *vmcb;
     u64    vmcb_pa;
-    u64    asid_generation; /* ASID tracking, moved here for cache locality. */
     unsigned long *msrpm;
     int    launch_core;
     bool_t vmcb_in_sync;    /* VMCB sync'ed with VMSAVE? */

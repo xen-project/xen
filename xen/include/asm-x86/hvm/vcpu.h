@@ -70,6 +70,9 @@ struct hvm_vcpu {
     bool_t              debug_state_latch;
     bool_t              single_step;
 
+    u64                 asid_generation;
+    u32                 asid;
+
     union {
         struct arch_vmx_struct vmx;
         struct arch_svm_struct svm;

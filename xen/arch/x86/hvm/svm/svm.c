@@ -424,7 +424,7 @@ static void svm_update_guest_cr(struct vcpu *v, unsigned int cr)
         break;
     case 3:
         vmcb->cr3 = v->arch.hvm_vcpu.hw_cr[3];
-        svm_asid_inv_asid(v);
+        hvm_asid_invalidate_asid(v);
         break;
     case 4:
         vmcb->cr4 = HVM_CR4_HOST_MASK;
@@ -460,7 +460,7 @@ static void svm_flush_guest_tlbs(void)
     /* Roll over the CPU's ASID generation, so it gets a clean TLB when we
      * next VMRUN.  (If ASIDs are disabled, the whole TLB is flushed on
      * VMRUN anyway). */
-    svm_asid_inc_generation();
+    hvm_asid_flush_core();
 }
 
 static void svm_sync_vmcb(struct vcpu *v)
@@ -704,7 +704,7 @@ static void svm_do_resume(struct vcpu *v)
         hvm_migrate_timers(v);
 
         /* Migrating to another ASID domain.  Request a new ASID. */
-        svm_asid_init_vcpu(v);
+        hvm_asid_invalidate_asid(v);
     }
 
     /* Reflect the vlapic's TPR in the hardware vtpr */
