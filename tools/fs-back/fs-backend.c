@@ -179,6 +179,7 @@ void terminate_mount_request(struct fs_mount *mount)
 
 static void free_mount_request(struct fs_mount *mount) {
     FS_DEBUG("free_mount_request %s\n", mount->frontend);
+    xenbus_free_backend_node(mount);
     free(mount->frontend);
     free(mount->requests);
     free(mount->freelist);
@@ -356,8 +357,19 @@ static void await_connections(void)
                 if((dom_id >= 0) && (export_id >= 0) && d == 'd') {
                     char *frontend = xs_read(xsh, XBT_NULL, watch_paths[XS_WATCH_PATH], NULL);
                     if (frontend) {
+                        char *p, *wp = strdup(watch_paths[XS_WATCH_PATH]);
                         handle_connection(dom_id, export_id, frontend);
-                        xs_rm(xsh, XBT_NULL, watch_paths[XS_WATCH_PATH]);
+                        xs_rm(xsh, XBT_NULL, wp);
+                        p = strrchr(wp, '/');
+                        if (p) {
+                            *p = '\0';
+                            p = strrchr(wp, '/');
+                            if (p) {
+                                *p = '\0';
+                                xs_rm(xsh, XBT_NULL, wp);
+                            }
+                        }
+                        free(wp);
                     }
                 }
             } else if (!strcmp(watch_paths[XS_WATCH_TOKEN], "frontend-state")) {

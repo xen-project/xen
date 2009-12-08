@@ -204,6 +204,17 @@ bool xenbus_write_backend_state(struct fs_mount *mount, const char *state)
     return xs_write(xsh, XBT_NULL, node, state, strlen(state));
 }
 
+void xenbus_free_backend_node(struct fs_mount *mount)
+{
+    char node[1024];
+    int self_id;
+
+    assert(xsh != NULL);
+    self_id = get_self_id();
+    snprintf(node, sizeof(node), ROOT_NODE"/%d", mount->mount_id);
+    xs_rm(xsh, XBT_NULL, node);
+}
+
 bool xenbus_watch_frontend_state(struct fs_mount *mount)
 {
     char statepath[1024];

@@ -67,6 +67,7 @@ int xenbus_get_watch_fd(void);
 int xenbus_read_mount_request(struct fs_mount *mount, char *frontend);
 bool xenbus_write_backend_node(struct fs_mount *mount);
 bool xenbus_write_backend_state(struct fs_mount *mount, const char *state);
+void xenbus_free_backend_node(struct fs_mount *mount);
 int xenbus_frontend_state_changed(struct fs_mount *mount, const char *oldstate);
 bool xenbus_watch_frontend_state(struct fs_mount *mount);
 bool xenbus_unwatch_frontend_state(struct fs_mount *mount);
