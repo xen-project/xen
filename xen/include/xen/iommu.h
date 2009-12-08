@@ -55,6 +55,8 @@ struct iommu {
     u64 root_maddr; /* root entry machine address */
     int irq;
     struct intel_iommu *intel;
+    unsigned long *domid_bitmap;  /* domain id bitmap */
+    u16 *domid_map;               /* domain id mapping array */
 };
 
 int iommu_setup(void);

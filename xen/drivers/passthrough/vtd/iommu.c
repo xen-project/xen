@@ -38,46 +38,70 @@
 #include "extern.h"
 #include "vtd.h"
 
-#define domain_iommu_domid(d) ((d)->arch.hvm_domain.hvm_iommu.iommu_domid)
-
 int nr_iommus;
-static spinlock_t domid_bitmap_lock;    /* protect domain id bitmap */
-static int domid_bitmap_size;           /* domain id bitmap size in bits */
-static unsigned long *domid_bitmap;     /* iommu domain id bitmap */
 static bool_t rwbf_quirk;
 
 static void setup_dom0_devices(struct domain *d);
 static void setup_dom0_rmrr(struct domain *d);
 
-#define DID_FIELD_WIDTH 16
-#define DID_HIGH_OFFSET 8
-static void context_set_domain_id(struct context_entry *context,
-                                  struct domain *d)
+static int domain_iommu_domid(struct domain *d,
+                              struct iommu *iommu)
 {
-    domid_t iommu_domid = domain_iommu_domid(d);
+    unsigned long nr_dom, i;
 
-    if ( iommu_domid == 0 )
+    nr_dom = cap_ndoms(iommu->cap);
+    i = find_first_bit(iommu->domid_bitmap, nr_dom);
+    while ( i < nr_dom )
     {
-        spin_lock(&domid_bitmap_lock);
-        iommu_domid = find_first_zero_bit(domid_bitmap, domid_bitmap_size);
-        set_bit(iommu_domid, domid_bitmap);
-        spin_unlock(&domid_bitmap_lock);
-        d->arch.hvm_domain.hvm_iommu.iommu_domid = iommu_domid;
+        if ( iommu->domid_map[i] == d->domain_id )
+            return i;
+
+        i = find_next_bit(iommu->domid_bitmap, nr_dom, i+1);
     }
 
-    context->hi &= (1 << DID_HIGH_OFFSET) - 1;
-    context->hi |= iommu_domid << DID_HIGH_OFFSET;
+    gdprintk(XENLOG_ERR VTDPREFIX,
+             "Cannot get valid iommu domid: domid=%d iommu->index=%d\n",
+             d->domain_id, iommu->index);
+    return -1;
 }
 
-static void iommu_domid_release(struct domain *d)
+#define DID_FIELD_WIDTH 16
+#define DID_HIGH_OFFSET 8
+static int context_set_domain_id(struct context_entry *context,
+                                 struct domain *d,
+                                 struct iommu *iommu)
 {
-    domid_t iommu_domid = domain_iommu_domid(d);
+    unsigned long nr_dom, i;
+    int found = 0;
 
-    if ( iommu_domid != 0 )
+    ASSERT(spin_is_locked(&iommu->lock));
+
+    nr_dom = cap_ndoms(iommu->cap);
+    i = find_first_bit(iommu->domid_bitmap, nr_dom);
+    while ( i < nr_dom )
     {
-        d->arch.hvm_domain.hvm_iommu.iommu_domid = 0;
-        clear_bit(iommu_domid, domid_bitmap);
+        if ( iommu->domid_map[i] == d->domain_id )
+        {
+            found = 1;
+            break;
+        }
+        i = find_next_bit(iommu->domid_bitmap, nr_dom, i+1);
     }
+
+    if ( found == 0 )
+    {
+        i = find_first_zero_bit(iommu->domid_bitmap, nr_dom);
+        if ( i >= nr_dom )
+        {
+            gdprintk(XENLOG_ERR VTDPREFIX, "IOMMU: no free domain ids\n");
+            return -EFAULT;
+        }
+        iommu->domid_map[i] = d->domain_id;
+    }
+
+    set_bit(i, iommu->domid_bitmap);
+    context->hi |= (i & ((1 << DID_FIELD_WIDTH) - 1)) << DID_HIGH_OFFSET;
+    return 0;
 }
 
 static struct intel_iommu *alloc_intel_iommu(void)
@@ -526,6 +550,7 @@ static void dma_pte_clear_one(struct domain *domain, u64 addr)
     struct dma_pte *page = NULL, *pte = NULL;
     u64 pg_maddr;
     int flush_dev_iotlb;
+    int iommu_domid;
 
     spin_lock(&hd->mapping_lock);
     /* get last level pte */
@@ -557,7 +582,10 @@ static void dma_pte_clear_one(struct domain *domain, u64 addr)
         if ( test_bit(iommu->index, &hd->iommu_bitmap) )
         {
             flush_dev_iotlb = find_ats_dev_drhd(iommu) ? 1 : 0;
-            if ( iommu_flush_iotlb_psi(iommu, domain_iommu_domid(domain),
+            iommu_domid= domain_iommu_domid(domain, iommu);
+            if ( iommu_domid == -1 )
+                continue;
+            if ( iommu_flush_iotlb_psi(iommu, iommu_domid,
                                        addr, 1, 0, flush_dev_iotlb) )
                 iommu_flush_write_buffer(iommu);
         }
@@ -982,7 +1010,7 @@ static int iommu_set_interrupt(struct iommu *iommu)
 static int iommu_alloc(struct acpi_drhd_unit *drhd)
 {
     struct iommu *iommu;
-    unsigned long sagaw;
+    unsigned long sagaw, nr_dom;
     int agaw;
 
     if ( nr_iommus > MAX_IOMMUS )
@@ -1033,6 +1061,25 @@ static int iommu_alloc(struct acpi_drhd_unit *drhd)
     if ( !ecap_coherent(iommu->ecap) )
         iommus_incoherent = 1;
 
+    /* allocate domain id bitmap */
+    nr_dom = cap_ndoms(iommu->cap);
+    iommu->domid_bitmap = xmalloc_array(unsigned long, BITS_TO_LONGS(nr_dom));
+    if ( !iommu->domid_bitmap )
+        return -ENOMEM ;
+    memset(iommu->domid_bitmap, 0, nr_dom / 8);
+
+    /*
+     * if Caching mode is set, then invalid translations are tagged with
+     * domain id 0, Hence reserve bit 0 for it
+     */
+    if ( cap_caching_mode(iommu->cap) )
+        set_bit(0, iommu->domid_bitmap);
+
+    iommu->domid_map = xmalloc_array(u16, nr_dom);
+    if ( !iommu->domid_map )
+        return -ENOMEM ;
+    memset(iommu->domid_map, 0, nr_dom * sizeof(*iommu->domid_map));
+
     spin_lock_init(&iommu->lock);
     spin_lock_init(&iommu->register_lock);
 
@@ -1055,6 +1102,9 @@ static void iommu_free(struct acpi_drhd_unit *drhd)
 
     if ( iommu->reg )
         iounmap(iommu->reg);
+
+    xfree(iommu->domid_bitmap);
+    xfree(iommu->domid_map);
 
     free_intel_iommu(iommu->intel);
     destroy_irq(iommu->irq);
@@ -1174,7 +1224,12 @@ static int domain_context_mapping_one(
         spin_unlock(&hd->mapping_lock);
     }
 
-    context_set_domain_id(context, domain);
+    if ( context_set_domain_id(context, domain, iommu) )
+    {
+        spin_unlock(&iommu->lock);
+        return -EFAULT;
+    }
+
     context_set_address_width(*context, agaw);
     context_set_fault_enable(*context);
     context_set_present(*context);
@@ -1292,6 +1347,10 @@ static int domain_context_unmap_one(
 {
     struct context_entry *context, *context_entries;
     u64 maddr;
+    int iommu_domid;
+    struct pci_dev *pdev;
+    struct acpi_drhd_unit *drhd;
+    int found = 0;
 
     ASSERT(spin_is_locked(&pcidevs_lock));
     spin_lock(&iommu->lock);
@@ -1311,14 +1370,50 @@ static int domain_context_unmap_one(
     context_clear_entry(*context);
     iommu_flush_cache_entry(context, sizeof(struct context_entry));
 
-    if ( iommu_flush_context_device(iommu, domain_iommu_domid(domain),
+    iommu_domid= domain_iommu_domid(domain, iommu);
+    if ( iommu_domid == -1 )
+    {
+        spin_unlock(&iommu->lock);
+        unmap_vtd_domain_page(context_entries);
+        return -EINVAL;
+    }
+
+    if ( iommu_flush_context_device(iommu, iommu_domid,
                                     (((u16)bus) << 8) | devfn,
                                     DMA_CCMD_MASK_NOBIT, 0) )
         iommu_flush_write_buffer(iommu);
     else
     {
         int flush_dev_iotlb = find_ats_dev_drhd(iommu) ? 1 : 0;
-        iommu_flush_iotlb_dsi(iommu, domain_iommu_domid(domain), 0, flush_dev_iotlb);
+        iommu_flush_iotlb_dsi(iommu, iommu_domid, 0, flush_dev_iotlb);
+    }
+
+
+    /*
+     * if no other devices under the same iommu owned by this domain,
+     * clear iommu in iommu_bitmap and clear domain_id in domid_bitmp
+     */
+    for_each_pdev ( domain, pdev )
+    {
+        if ( pdev->bus == bus && pdev->devfn == devfn )
+            continue;
+
+        drhd = acpi_find_matched_drhd_unit(pdev);
+        if ( drhd && drhd->iommu == iommu )
+        {
+            found = 1;
+            break;
+        }
+    }
+
+    if ( found == 0 )
+    {
+        struct hvm_iommu *hd = domain_hvm_iommu(domain);
+
+        clear_bit(iommu->index, &hd->iommu_bitmap);
+
+        clear_bit(iommu_domid, iommu->domid_bitmap);
+        iommu->domid_map[iommu_domid] = 0;
     }
 
     spin_unlock(&iommu->lock);
@@ -1397,11 +1492,8 @@ static int reassign_device_ownership(
     struct domain *target,
     u8 bus, u8 devfn)
 {
-    struct hvm_iommu *source_hd = domain_hvm_iommu(source);
     struct pci_dev *pdev;
-    struct acpi_drhd_unit *drhd;
-    struct iommu *pdev_iommu;
-    int ret, found = 0;
+    int ret;
 
     ASSERT(spin_is_locked(&pcidevs_lock));
     pdev = pci_get_pdev_by_domain(source, bus, devfn);
@@ -1409,10 +1501,9 @@ static int reassign_device_ownership(
     if (!pdev)
         return -ENODEV;
 
-    if ( (drhd = acpi_find_matched_drhd_unit(pdev)) == NULL )
-        return -ENODEV;
-    pdev_iommu = drhd->iommu;
-    domain_context_unmap(source, bus, devfn);
+    ret = domain_context_unmap(source, bus, devfn);
+    if ( ret )
+        return ret;
 
     ret = domain_context_mapping(target, bus, devfn);
     if ( ret )
@@ -1420,19 +1511,6 @@ static int reassign_device_ownership(
 
     list_move(&pdev->domain_list, &target->arch.pdev_list);
     pdev->domain = target;
-
-    for_each_pdev ( source, pdev )
-    {
-        drhd = acpi_find_matched_drhd_unit(pdev);
-        if ( drhd && drhd->iommu == pdev_iommu )
-        {
-            found = 1;
-            break;
-        }
-    }
-
-    if ( !found )
-        clear_bit(pdev_iommu->index, &source_hd->iommu_bitmap);
 
     return ret;
 }
@@ -1448,8 +1526,6 @@ void iommu_domain_teardown(struct domain *d)
     iommu_free_pagetable(hd->pgd_maddr, agaw_to_level(hd->agaw));
     hd->pgd_maddr = 0;
     spin_unlock(&hd->mapping_lock);
-
-    iommu_domid_release(d);
 }
 
 static int intel_iommu_map_page(
@@ -1462,6 +1538,7 @@ static int intel_iommu_map_page(
     u64 pg_maddr;
     int pte_present;
     int flush_dev_iotlb;
+    int iommu_domid;
 
     /* do nothing if dom0 and iommu supports pass thru */
     if ( iommu_passthrough && (d->domain_id == 0) )
@@ -1501,7 +1578,10 @@ static int intel_iommu_map_page(
             continue;
 
         flush_dev_iotlb = find_ats_dev_drhd(iommu) ? 1 : 0;
-        if ( iommu_flush_iotlb_psi(iommu, domain_iommu_domid(d),
+        iommu_domid= domain_iommu_domid(d, iommu);
+        if ( iommu_domid == -1 )
+            continue;
+        if ( iommu_flush_iotlb_psi(iommu, iommu_domid,
                                    (paddr_t)gfn << PAGE_SHIFT_4K, 1,
                                    !pte_present, flush_dev_iotlb) )
             iommu_flush_write_buffer(iommu);
@@ -1780,7 +1860,6 @@ int intel_vtd_setup(void)
 
     platform_quirks();
 
-    spin_lock_init(&domid_bitmap_lock);
     clflush_size = get_cache_line_size();
 
     irq_to_iommu = xmalloc_array(struct iommu*, nr_irqs);
@@ -1827,16 +1906,6 @@ int intel_vtd_setup(void)
     P(iommu_qinval, "Queued Invalidation");
     P(iommu_intremap, "Interrupt Remapping");
 #undef P
-
-    /* Allocate domain id bitmap, and set bit 0 as reserved. */
-    drhd = list_entry(acpi_drhd_units.next, typeof(*drhd), list);
-    domid_bitmap_size = cap_ndoms(drhd->iommu->cap);
-    domid_bitmap = xmalloc_array(unsigned long,
-                                 BITS_TO_LONGS(domid_bitmap_size));
-    if ( domid_bitmap == NULL )
-        goto error;
-    memset(domid_bitmap, 0, domid_bitmap_size / 8);
-    __set_bit(0, domid_bitmap);
 
     scan_pci_devices();
 
