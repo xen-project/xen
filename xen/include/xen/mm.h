@@ -62,6 +62,7 @@ unsigned long avail_domheap_pages(void);
 unsigned int online_page(unsigned long mfn, uint32_t *status);
 int offline_page(unsigned long mfn, int broken, uint32_t *status);
 int query_page_offline(unsigned long mfn, uint32_t *status);
+unsigned long total_free_pages(void);
 
 void scrub_heap_pages(void);
 

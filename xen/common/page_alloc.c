@@ -222,6 +222,7 @@ static heap_by_zone_and_order_t *_heap[MAX_NUMNODES];
 #define heap(node, zone, order) ((*_heap[node])[zone][order])
 
 static unsigned long *avail[MAX_NUMNODES];
+static long total_avail_pages;
 
 static DEFINE_SPINLOCK(heap_lock);
 
@@ -350,6 +351,8 @@ static struct page_info *alloc_heap_pages(
 
     ASSERT(avail[node][zone] >= request);
     avail[node][zone] -= request;
+    total_avail_pages -= request;
+    ASSERT(total_avail_pages >= 0);
 
     spin_unlock(&heap_lock);
 
@@ -445,6 +448,8 @@ static int reserve_offlined_page(struct page_info *head)
             continue;
 
         avail[node][zone]--;
+        total_avail_pages--;
+        ASSERT(total_avail_pages >= 0);
 
         page_list_add_tail(cur_head,
                            test_bit(_PGC_broken, &cur_head->count_info) ?
@@ -497,6 +502,7 @@ static void free_heap_pages(
     spin_lock(&heap_lock);
 
     avail[node][zone] += 1 << order;
+    total_avail_pages += 1 << order;
 
     /* Merge chunks as far as possible. */
     while ( order < MAX_ORDER )
@@ -832,6 +838,11 @@ static unsigned long avail_heap_pages(
     }
 
     return free_pages;
+}
+
+unsigned long total_free_pages(void)
+{
+    return total_avail_pages;
 }
 
 void __init end_boot_allocator(void)
