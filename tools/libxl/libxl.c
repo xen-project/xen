@@ -875,6 +875,8 @@ retry_transaction:
     t = xs_transaction_start(ctx->xsh);
     xs_mkdir(ctx->xsh, t, libxl_sprintf(ctx, "/local/domain/0/device-model/%d", info->domid));
     xs_set_permissions(ctx->xsh, t, libxl_sprintf(ctx, "/local/domain/0/device-model/%d", info->domid), perm, ARRAY_SIZE(perm));
+    xs_mkdir(ctx->xsh, t, libxl_sprintf(ctx, "/local/domain/%d/device/vfs", domid));
+    xs_set_permissions(ctx->xsh, t, libxl_sprintf(ctx, "/local/domain/%d/device/vfs",domid), perm, ARRAY_SIZE(perm));
     if (!xs_transaction_end(ctx->xsh, t, 0))
         if (errno == EAGAIN)
             goto retry_transaction;

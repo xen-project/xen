@@ -254,6 +254,8 @@ int libxl_devices_destroy(struct libxl_ctx *ctx, uint32_t domid, int force)
         return -1;
     }
     for (i = 0; i < num1; i++) {
+        if (!strcmp("vfs", l1[i]))
+            continue;
         path = libxl_sprintf(&clone, "/local/domain/%d/device/%s", domid, l1[i]);
         l2 = libxl_xs_directory(&clone, XBT_NULL, path, &num2);
         if (!l2)
