@@ -460,25 +460,80 @@ int libxl_domain_shutdown(struct libxl_ctx *ctx, uint32_t domid, int req)
     return 0;
 }
 
-int libxl_wait_for_domain_death(struct libxl_ctx *ctx, uint32_t domid, int *fd)
+int libxl_get_wait_fd(struct libxl_ctx *ctx, int *fd)
 {
-    if (!xs_watch(ctx->xsh, "@releaseDomain", "domain_death"))
-        return -1;
     *fd = xs_fileno(ctx->xsh);
     return 0;
 }
 
-int libxl_is_domain_dead(struct libxl_ctx *ctx, uint32_t domid, xc_dominfo_t *info)
+int libxl_wait_for_domain_death(struct libxl_ctx *ctx, uint32_t domid, libxl_waiter *waiter)
+{
+    waiter->path = strdup("@releaseDomain");
+    asprintf(&(waiter->token), "%d", DOMAIN_DEATH);
+    if (!xs_watch(ctx->xsh, waiter->path, waiter->token))
+        return -1;
+    return 0;
+}
+
+int libxl_wait_for_disk_ejects(struct libxl_ctx *ctx, uint32_t guest_domid, libxl_device_disk *disks, int num_disks, libxl_waiter *waiter)
+{
+    int i;
+    uint32_t domid = libxl_get_stubdom_id(ctx, guest_domid);
+
+    if (!domid)
+        domid = guest_domid;
+
+    for (i = 0; i < num_disks; i++) {
+        asprintf(&(waiter[i].path), "%s/device/vbd/%d/eject", libxl_xs_get_dompath(ctx, domid), device_disk_dev_number(disks[i].virtpath));
+        asprintf(&(waiter[i].token), "%d", DISK_EJECT);
+        xs_watch(ctx->xsh, waiter->path, waiter->token);
+    }
+    return 0;
+}
+
+int libxl_get_event(struct libxl_ctx *ctx, libxl_event *event)
 {
     unsigned int num;
+    char **events = xs_read_watch(ctx->xsh, &num);
+    if (num != 2) {
+        free(events);
+        return -1;
+    }
+    event->path = strdup(events[XS_WATCH_PATH]);
+    event->token = strdup(events[XS_WATCH_TOKEN]);
+    event->type = atoi(event->token);
+    free(events);
+    return 0;
+}
+
+int libxl_stop_waiting(struct libxl_ctx *ctx, libxl_waiter *waiter)
+{
+    if (!xs_unwatch(ctx->xsh, waiter->path, waiter->token))
+        return -1;
+    else
+        return 0;
+}
+
+int libxl_free_event(libxl_event *event)
+{
+    free(event->path);
+    free(event->token);
+    return 0;
+}
+
+int libxl_free_waiter(libxl_waiter *waiter)
+{
+    free(waiter->path);
+    free(waiter->token);
+    return 0;
+}
+
+int libxl_event_get_domain_death_info(struct libxl_ctx *ctx, uint32_t domid, libxl_event *event, xc_dominfo_t *info)
+{
     int nb_domain, i, rc = 0;
-    char **vec = NULL;
     xc_dominfo_t *list = NULL;
 
-    vec = xs_read_watch(ctx->xsh, &num);
-    if (!vec)
-        return 0;
-    if (!strcmp(vec[XS_WATCH_TOKEN], "domain_death")) {
+    if (event && event->type == DOMAIN_DEATH) {
         list = libxl_domain_infolist(ctx, &nb_domain);
         for (i = 0; i < nb_domain; i++) {
             if (domid == list[i].domid) {
@@ -493,11 +548,39 @@ int libxl_is_domain_dead(struct libxl_ctx *ctx, uint32_t domid, xc_dominfo_t *in
         rc = 1;
         goto out;
     }
-
 out:
     free(list);
-    free(vec);
     return rc;
+}
+
+int libxl_event_get_disk_eject_info(struct libxl_ctx *ctx, uint32_t domid, libxl_event *event, libxl_device_disk *disk)
+{
+    if (event && event->type == DISK_EJECT) {
+        char *path;
+        char *backend;
+        char *value = libxl_xs_read(ctx, XBT_NULL, event->path);
+
+        if (!value || strcmp(value,  "eject"))
+            return 0;
+
+        path = strdup(event->path);
+        path[strlen(path) - 6] = '\0';
+        backend = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/backend", path));
+
+        disk->backend_domid = 0;
+        disk->domid = domid;
+        disk->physpath = NULL;
+        disk->phystype = 0;
+        /* this value is returned to the user: do not free right away */
+        disk->virtpath = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/dev", backend));
+        disk->unpluggable = 1;
+        disk->readwrite = 0;
+        disk->is_cdrom = 1;
+
+        free(path);
+        return 1;
+    }
+    return 0;
 }
 
 static int libxl_destroy_device_model(struct libxl_ctx *ctx, uint32_t domid)
@@ -1419,6 +1502,95 @@ int libxl_device_vkb_clean_shutdown(struct libxl_ctx *ctx, uint32_t domid)
 int libxl_device_vkb_hard_shutdown(struct libxl_ctx *ctx, uint32_t domid)
 {
     return ERROR_NI;
+}
+
+libxl_device_disk *libxl_device_disk_list(struct libxl_ctx *ctx, uint32_t domid, int *num)
+{
+    char *be_path_tap, *be_path_vbd;
+    libxl_device_disk *disks = NULL;
+    char **l = NULL;
+    unsigned int numl;
+    int num_disks = 0, i;
+    char *type;
+
+    be_path_vbd = libxl_sprintf(ctx, "%s/backend/vbd/%d", libxl_xs_get_dompath(ctx, 0), domid);
+    be_path_tap = libxl_sprintf(ctx, "%s/backend/tap/%d", libxl_xs_get_dompath(ctx, 0), domid);
+
+    l = libxl_xs_directory(ctx, XBT_NULL, be_path_vbd, &numl);
+    if (l) {
+        num_disks += numl;
+        disks = realloc(disks, sizeof(libxl_device_disk) * num_disks);
+        for (i = 0; i < numl; i++) {
+            disks[i].backend_domid = 0;
+            disks[i].domid = domid;
+            disks[i].physpath = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/%s/params", be_path_vbd, l[i]));
+            libxl_string_to_phystype(ctx, libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/%s/type", be_path_vbd, l[i])), &(disks[i].phystype));
+            disks[i].virtpath = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/%s/dev", be_path_vbd, l[i]));
+            disks[i].unpluggable = atoi(libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/%s/removable", be_path_vbd, l[i])));
+            if (!strcmp(libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/%s/mode", be_path_vbd, l[i])), "w"))
+                disks[i].readwrite = 1;
+            else
+                disks[i].readwrite = 0;
+            type = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/device-type", libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/%s/frontend", be_path_vbd, l[i]))));
+            disks[i].is_cdrom = !strcmp(type, "cdrom");
+        }
+        free(l);
+    }
+    l = libxl_xs_directory(ctx, XBT_NULL, be_path_tap, &numl);
+    if (l) {
+        num_disks += numl;
+        disks = realloc(disks, sizeof(libxl_device_disk) * num_disks);
+        for (i = 0; i < numl; i++) {
+            disks[i].backend_domid = 0;
+            disks[i].domid = domid;
+            disks[i].physpath = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/%s/params", be_path_tap, l[i]));
+            libxl_string_to_phystype(ctx, libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/%s/type", be_path_tap, l[i])), &(disks[i].phystype));
+            disks[i].virtpath = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/%s/dev", be_path_tap, l[i]));
+            disks[i].unpluggable = atoi(libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/%s/removable", be_path_tap, l[i])));
+            if (!strcmp(libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/%s/mode", be_path_tap, l[i])), "w"))
+                disks[i].readwrite = 1;
+            else
+                disks[i].readwrite = 0;
+            type = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/device-type", libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/%s/frontend", be_path_vbd, l[i]))));
+            disks[i].is_cdrom = !strcmp(type, "cdrom");
+        }
+        free(l);
+    }
+    *num = num_disks;
+    return disks;
+}
+
+int libxl_cdrom_insert(struct libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk)
+{
+    int num, i;
+    uint32_t stubdomid;
+    libxl_device_disk *disks;
+
+    if (!disk->physpath) {
+        disk->physpath = "";
+        disk->phystype = PHYSTYPE_PHY;
+    }
+    disks = libxl_device_disk_list(ctx, domid, &num);
+    for (i = 0; i < num; i++) {
+        if (disks[i].is_cdrom && !strcmp(disk->virtpath, disks[i].virtpath))
+            /* found */
+            break;
+    }
+    if (i == num) {
+        XL_LOG(ctx, XL_LOG_ERROR, "Virtual device not found");
+        return -1;
+    }
+    libxl_device_disk_del(ctx, disks + i, 1);
+    libxl_device_disk_add(ctx, domid, disk);
+    stubdomid = libxl_get_stubdom_id(ctx, domid);
+    if (stubdomid) {
+        disk_info_domid_fixup(disks + i, stubdomid);
+        libxl_device_disk_del(ctx, disks + i, 1);
+        disk_info_domid_fixup(disk, stubdomid);
+        libxl_device_disk_add(ctx, stubdomid, disk);
+        disk_info_domid_fixup(disk, domid);
+    }
+    return 0;
 }
 
 /******************************************************************************/

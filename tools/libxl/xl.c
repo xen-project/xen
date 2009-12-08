@@ -356,12 +356,14 @@ static void parse_config_file(const char *filename,
             if (p2 == NULL) {
                 (*disks)[*num_disks].virtpath = strdup(p);
                 (*disks)[*num_disks].is_cdrom = 0;
+                (*disks)[*num_disks].unpluggable = 1;
             } else {
                 *p2 = '\0';
                 (*disks)[*num_disks].virtpath = strdup(p);
-                if (!strcmp(p2 + 1, "cdrom"))
+                if (!strcmp(p2 + 1, "cdrom")) {
                     (*disks)[*num_disks].is_cdrom = 1;
-                else
+                    (*disks)[*num_disks].unpluggable = 1;
+                } else
                     (*disks)[*num_disks].is_cdrom = 0;
             }
             p = strtok(NULL, ",");
@@ -594,6 +596,7 @@ static void create_domain(int debug, const char *config_file, const char *restor
     int i, fd;
     int need_daemon = 1;
     libxl_device_model_starting *dm_starting = 0;
+    libxl_waiter *w1 = NULL, *w2 = NULL;
     memset(&dm_info, 0x00, sizeof(dm_info));
 
     printf("Parsing config file %s\n", config_file);
@@ -671,12 +674,17 @@ start:
         need_daemon = 0;
     }
     XL_LOG(&ctx, XL_LOG_DEBUG, "Waiting for domain %s (domid %d) to die", info1.name, domid);
-    
-    libxl_wait_for_domain_death(&ctx, domid, &fd);
+    w1 = (libxl_waiter*) malloc(sizeof(libxl_waiter) * num_disks);
+    w2 = (libxl_waiter*) malloc(sizeof(libxl_waiter));
+    libxl_wait_for_disk_ejects(&ctx, domid, disks, num_disks, w1);
+    libxl_wait_for_domain_death(&ctx, domid, w2);
+    libxl_get_wait_fd(&ctx, &fd);
     while (1) {
         int ret;
         fd_set rfds;
         xc_dominfo_t info;
+        libxl_event event;
+        libxl_device_disk disk;
         memset(&info, 0x00, sizeof(xc_dominfo_t));
 
         FD_ZERO(&rfds);
@@ -685,21 +693,35 @@ start:
         ret = select(fd + 1, &rfds, NULL, NULL, NULL);
         if (!ret)
             continue;
-        if (libxl_is_domain_dead(&ctx, domid, &info)) {
-            XL_LOG(&ctx, XL_LOG_DEBUG, "Domain %d is dead", domid);
-            if (info.crashed || info.dying || (info.shutdown && (info.shutdown_reason != SHUTDOWN_suspend))) {
-                XL_LOG(&ctx, XL_LOG_DEBUG, "Domain %d needs to be clean: destroying the domain", domid);
-                libxl_domain_destroy(&ctx, domid, 0);
-                if (info.shutdown && (info.shutdown_reason == SHUTDOWN_reboot)) {
-                    libxl_ctx_free(&ctx);
-                    XL_LOG(&ctx, XL_LOG_DEBUG, "Done. Rebooting now");
-                    goto start;
+        libxl_get_event(&ctx, &event);
+        switch (event.type) {
+            case DOMAIN_DEATH:
+                if (libxl_event_get_domain_death_info(&ctx, domid, &event, &info)) {
+                    XL_LOG(&ctx, XL_LOG_DEBUG, "Domain %d is dead", domid);
+                    if (info.crashed || info.dying || (info.shutdown && (info.shutdown_reason != SHUTDOWN_suspend))) {
+                        XL_LOG(&ctx, XL_LOG_DEBUG, "Domain %d needs to be clean: destroying the domain", domid);
+                        libxl_domain_destroy(&ctx, domid, 0);
+                        if (info.shutdown && (info.shutdown_reason == SHUTDOWN_reboot)) {
+                            libxl_free_waiter(w1);
+                            libxl_free_waiter(w2);
+                            free(w1);
+                            free(w2);
+                            libxl_ctx_free(&ctx);
+                            XL_LOG(&ctx, XL_LOG_DEBUG, "Done. Rebooting now");
+                            goto start;
+                        }
+                        XL_LOG(&ctx, XL_LOG_DEBUG, "Done. Exiting now");
+                    }
+                    XL_LOG(&ctx, XL_LOG_DEBUG, "Domain %d does not need to be clean, exiting now", domid);
+                    exit(0);
                 }
-                XL_LOG(&ctx, XL_LOG_DEBUG, "Done. Exiting now");
-            }
-            XL_LOG(&ctx, XL_LOG_DEBUG, "Domain %d does not need to be clean, exiting now", domid);
-            exit(0);
+                break;
+            case DISK_EJECT:
+                if (libxl_event_get_disk_eject_info(&ctx, domid, &event, &disk))
+                    libxl_cdrom_insert(&ctx, domid, &disk);
+                break;
         }
+        libxl_free_event(&event);
     }
 
     close(logfile);
@@ -730,6 +752,8 @@ static void help(char *command)
         printf(" console                       attach to domain's console\n\n");
         printf(" save                          save a domain state to restore later\n\n");
         printf(" restore                       restore a domain from a saved state\n\n");
+        printf(" cd-insert                     insert a cdrom into a guest's cd drive\n\n");
+        printf(" cd-eject                      eject a cdrom from a guest's cd drive\n\n");
     } else if(!strcmp(command, "create")) {
         printf("Usage: xl create <ConfigFile> [options] [vars]\n\n");
         printf("Create a domain based on <ConfigFile>.\n\n");
@@ -772,6 +796,12 @@ static void help(char *command)
     } else if (!strcmp(command, "console")) {
         printf("Usage: xl console <Domain>\n\n");
         printf("Attach to domain's console.\n\n");
+    } else if (!strcmp(command, "cd-insert")) {
+        printf("Usage: xl cd-insert <Domain> <VirtualDevice> <type:path>\n\n");
+        printf("Insert a cdrom into a guest's cd drive.\n\n");
+    } else if (!strcmp(command, "cd-eject")) {
+        printf("Usage: xl cd-eject <Domain> <VirtualDevice>\n\n");
+        printf("Eject a cdrom from a guest's cd drive.\n\n");
     }
 }
 
@@ -788,6 +818,108 @@ void console(char *p, int cons_num)
         exit(2);
     }
     libxl_console_attach(&ctx, domid, cons_num);
+}
+
+void cd_insert(char *dom, char *virtdev, char *phys)
+{
+    struct libxl_ctx ctx;
+    uint32_t domid;
+    libxl_device_disk disk;
+    char *p;
+
+    libxl_ctx_init(&ctx);
+    libxl_ctx_set_log(&ctx, log_callback, NULL);
+
+    if (libxl_param_to_domid(&ctx, dom, &domid) < 0) {
+        fprintf(stderr, "%s is an invalid domain identifier\n", dom);
+        exit(2);
+    }
+
+    disk.backend_domid = 0;
+    disk.domid = domid;
+    if (phys) {
+        p = strchr(phys, ':');
+        if (!p) {
+            fprintf(stderr, "No type specified, ");
+            disk.physpath = phys;
+            if (!strncmp(phys, "/dev", 4)) {
+                fprintf(stderr, "assuming phy:\n");
+                disk.phystype = PHYSTYPE_PHY;
+            } else {
+                fprintf(stderr, "assuming file:\n");
+                disk.phystype = PHYSTYPE_FILE;
+            }
+        } else {
+            p = '\0';
+            disk.physpath = strdup(p);
+            p++;
+            libxl_string_to_phystype(&ctx, p, &disk.phystype);
+        }
+    } else {
+            disk.physpath = NULL;
+            disk.phystype = 0;
+    }
+    disk.virtpath = virtdev;
+    disk.unpluggable = 1;
+    disk.readwrite = 0;
+    disk.is_cdrom = 1;
+
+    libxl_cdrom_insert(&ctx, domid, &disk);
+}
+
+int main_cd_eject(int argc, char **argv)
+{
+    int opt = 0;
+    char *p = NULL, *virtdev;
+
+    while ((opt = getopt(argc, argv, "hn:")) != -1) {
+        switch (opt) {
+        case 'h':
+            help("cd-eject");
+            exit(0);
+        default:
+            fprintf(stderr, "option not supported\n");
+            break;
+        }
+    }
+    if (optind >= argc - 1) {
+        help("cd-eject");
+        exit(2);
+    }
+
+    p = argv[optind];
+    virtdev = argv[optind + 1];
+
+    cd_insert(p, virtdev, NULL);
+    exit(0);
+}
+
+int main_cd_insert(int argc, char **argv)
+{
+    int opt = 0;
+    char *p = NULL, *file = NULL, *virtdev;
+
+    while ((opt = getopt(argc, argv, "hn:")) != -1) {
+        switch (opt) {
+        case 'h':
+            help("cd-insert");
+            exit(0);
+        default:
+            fprintf(stderr, "option not supported\n");
+            break;
+        }
+    }
+    if (optind >= argc - 2) {
+        help("cd-insert");
+        exit(2);
+    }
+
+    p = argv[optind];
+    virtdev = argv[optind + 1];
+    file = argv[optind + 2];
+
+    cd_insert(p, virtdev, file);
+    exit(0);
 }
 
 int main_console(int argc, char **argv)
@@ -1298,6 +1430,10 @@ int main(int argc, char **argv)
         main_save(argc - 1, argv + 1);
     } else if (!strcmp(argv[1], "restore")) {
         main_restore(argc - 1, argv + 1);
+    } else if (!strcmp(argv[1], "cd-insert")) {
+        main_cd_insert(argc - 1, argv + 1);
+    } else if (!strcmp(argv[1], "cd-eject")) {
+        main_cd_eject(argc - 1, argv + 1);
     } else if (!strcmp(argv[1], "help")) {
         if (argc > 2)
             help(argv[2]);

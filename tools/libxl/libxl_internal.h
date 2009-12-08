@@ -45,6 +45,8 @@ typedef enum {
     DEVICE_CONSOLE,
 } libxl_device_kinds;
 
+extern const char *string_of_kinds[];
+
 typedef struct {
     uint32_t backend_devid;
     uint32_t backend_domid;

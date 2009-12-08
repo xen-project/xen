@@ -26,7 +26,7 @@
 #include "libxl.h"
 #include "libxl_internal.h"
 
-char *string_of_kinds[] = {
+const char *string_of_kinds[] = {
     [DEVICE_VIF] = "vif",
     [DEVICE_VBD] = "vbd",
     [DEVICE_TAP] = "tap",

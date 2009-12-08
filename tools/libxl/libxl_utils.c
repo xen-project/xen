@@ -214,3 +214,33 @@ int libxl_create_logfile(struct libxl_ctx *ctx, char *name, char **full_name)
     return 0;
 }
 
+int libxl_string_to_phystype(struct libxl_ctx *ctx, char *s, libxl_disk_phystype *phystype)
+{
+    char *p;
+    int rc = 0;
+
+    if (!strcmp(s, "phy")) {
+        *phystype = PHYSTYPE_PHY;
+    } else if (!strcmp(s, "file")) {
+        *phystype = PHYSTYPE_FILE;
+    } else if (!strcmp(s, "tap")) {
+        p = strchr(s, ':');
+        if (!p) {
+            rc = -1;
+            goto out;
+        }
+        p++;
+        if (!strcmp(p, "aio")) {
+            *phystype = PHYSTYPE_AIO;
+        } else if (!strcmp(p, "vhd")) {
+            *phystype = PHYSTYPE_VHD;
+        } else if (!strcmp(p, "qcow")) {
+            *phystype = PHYSTYPE_QCOW;
+        } else if (!strcmp(p, "qcow2")) {
+            *phystype = PHYSTYPE_QCOW2;
+        }
+    }
+out:
+    return rc;
+}
+

@@ -267,8 +267,40 @@ int libxl_domain_resume(struct libxl_ctx *ctx, uint32_t domid);
 int libxl_domain_shutdown(struct libxl_ctx *ctx, uint32_t domid, int req);
 int libxl_domain_destroy(struct libxl_ctx *ctx, uint32_t domid, int force);
 
-int libxl_wait_for_domain_death(struct libxl_ctx *ctx, uint32_t domid, int *fd);
-int libxl_is_domain_dead(struct libxl_ctx *ctx, uint32_t domid, xc_dominfo_t *info);
+/* events handling */
+
+typedef enum {
+    DOMAIN_DEATH,
+    DISK_EJECT,
+} libxl_event_type;
+
+typedef struct {
+    /* event type */
+    libxl_event_type type;
+    /* data for internal use of the library */
+    char *path;
+    char *token;
+} libxl_event;
+
+typedef struct {
+    char *path;
+    char *token;
+} libxl_waiter;
+
+
+int libxl_get_wait_fd(struct libxl_ctx *ctx, int *fd);
+/* waiter is allocated by the caller */
+int libxl_wait_for_domain_death(struct libxl_ctx *ctx, uint32_t domid, libxl_waiter *waiter);
+/* waiter is a preallocated array of num_disks libxl_waiter elements */
+int libxl_wait_for_disk_ejects(struct libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disks, int num_disks, libxl_waiter *waiter);
+int libxl_get_event(struct libxl_ctx *ctx, libxl_event *event);
+int libxl_stop_waiting(struct libxl_ctx *ctx, libxl_waiter *waiter);
+int libxl_free_event(libxl_event *event);
+int libxl_free_waiter(libxl_waiter *waiter);
+
+int libxl_event_get_domain_death_info(struct libxl_ctx *ctx, uint32_t domid, libxl_event *event, xc_dominfo_t *info);
+int libxl_event_get_disk_eject_info(struct libxl_ctx *ctx, uint32_t domid, libxl_event *event, libxl_device_disk *disk);
+
 
 int libxl_domain_pause(struct libxl_ctx *ctx, uint32_t domid);
 int libxl_domain_unpause(struct libxl_ctx *ctx, uint32_t domid);
@@ -299,6 +331,8 @@ int libxl_detach_device_model(struct libxl_ctx *ctx,
 
 int libxl_device_disk_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk);
 int libxl_device_disk_del(struct libxl_ctx *ctx, libxl_device_disk *disk, int wait);
+libxl_device_disk *libxl_device_disk_list(struct libxl_ctx *ctx, uint32_t domid, int *num);
+int libxl_cdrom_insert(struct libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk);
 
 int libxl_device_nic_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_nic *nic);
 int libxl_device_nic_del(struct libxl_ctx *ctx, libxl_device_nic *nic, int wait);

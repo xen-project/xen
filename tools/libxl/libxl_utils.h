@@ -32,6 +32,7 @@ int libxl_param_to_domid(struct libxl_ctx *ctx, char *p, uint32_t *domid);
 int libxl_get_stubdom_id(struct libxl_ctx *ctx, int guest_domid);
 int libxl_is_stubdom(struct libxl_ctx *ctx, int domid);
 int libxl_create_logfile(struct libxl_ctx *ctx, char *name, char **full_name);
+int libxl_string_to_phystype(struct libxl_ctx *ctx, char *s, libxl_disk_phystype *phystype);
 
 #endif
 
