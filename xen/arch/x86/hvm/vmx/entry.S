@@ -142,9 +142,9 @@ vmx_asm_do_vmentry:
         call_with_regs(vmx_enter_realmode) 
 
 .Lvmx_not_realmode:
+        call vmx_vmenter_helper
         mov  VCPU_hvm_guest_cr2(r(bx)),r(ax)
         mov  r(ax),%cr2
-        call vmx_trace_vmentry
 
         lea  UREGS_rip(r(sp)),r(di)
         mov  $GUEST_RIP,%eax

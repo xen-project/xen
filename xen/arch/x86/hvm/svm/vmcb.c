@@ -114,9 +114,6 @@ static int construct_vmcb(struct vcpu *v)
     struct arch_svm_struct *arch_svm = &v->arch.hvm_svm;
     struct vmcb_struct *vmcb = arch_svm->vmcb;
 
-    /* TLB control, and ASID assigment. */
-    hvm_asid_invalidate_asid(v);
-
     vmcb->general1_intercepts = 
         GENERAL1_INTERCEPT_INTR        | GENERAL1_INTERCEPT_NMI         |
         GENERAL1_INTERCEPT_SMI         | GENERAL1_INTERCEPT_INIT        |

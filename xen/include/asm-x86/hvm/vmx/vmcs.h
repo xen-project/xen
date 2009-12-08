@@ -90,8 +90,6 @@ struct arch_vmx_struct {
     u32                  exec_control;
     u32                  secondary_exec_control;
 
-    u16                  vpid;
-
     /* PMU */
     struct vpmu_struct   vpmu;
 

@@ -400,9 +400,12 @@ int vmx_cpu_up(void)
         BUG();
     }
 
+    hvm_asid_init(cpu_has_vmx_vpid ? (1u << VMCS_VPID_WIDTH) : 0);
+
     ept_sync_all();
 
-    vpid_sync_all();
+    if ( cpu_has_vmx_vpid )
+        vpid_sync_all();
 
     return 1;
 }
@@ -558,6 +561,9 @@ static int construct_vmcs(struct vcpu *v)
         v->arch.hvm_vmx.exec_control |= CPU_BASED_RDTSC_EXITING;
 
     v->arch.hvm_vmx.secondary_exec_control = vmx_secondary_exec_control;
+
+    /* Disable VPID for now: we decide when to enable it on VMENTER. */
+    v->arch.hvm_vmx.secondary_exec_control &= ~SECONDARY_EXEC_ENABLE_VPID;
 
     if ( paging_mode_hap(d) )
     {
@@ -736,7 +742,7 @@ static int construct_vmcs(struct vcpu *v)
     }
 
     if ( cpu_has_vmx_vpid )
-        __vmwrite(VIRTUAL_PROCESSOR_ID, v->arch.hvm_vmx.vpid);
+        __vmwrite(VIRTUAL_PROCESSOR_ID, v->arch.hvm_vcpu.asid);
 
     if ( cpu_has_vmx_pat && paging_mode_hap(d) )
     {
@@ -946,7 +952,7 @@ void vmx_do_resume(struct vcpu *v)
         hvm_migrate_timers(v);
         hvm_migrate_pirqs(v);
         vmx_set_host_env(v);
-        vpid_sync_vcpu_all(v);
+        hvm_asid_flush_vcpu(v);
     }
 
     debug_state = v->domain->debugger_attached;

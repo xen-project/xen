@@ -314,20 +314,12 @@ void ept_sync_domain(struct domain *d);
 
 static inline void vpid_sync_vcpu_gva(struct vcpu *v, unsigned long gva)
 {
-    if ( cpu_has_vmx_vpid )
-        __invvpid(0, v->arch.hvm_vmx.vpid, (u64)gva);
-}
-
-static inline void vpid_sync_vcpu_all(struct vcpu *v)
-{
-    if ( cpu_has_vmx_vpid )
-        __invvpid(1, v->arch.hvm_vmx.vpid, 0);
+    __invvpid(0, v->arch.hvm_vcpu.asid, (u64)gva);
 }
 
 static inline void vpid_sync_all(void)
 {
-    if ( cpu_has_vmx_vpid )
-        __invvpid(2, 0, 0);
+    __invvpid(2, 0, 0);
 }
 
 static inline void __vmxoff(void)

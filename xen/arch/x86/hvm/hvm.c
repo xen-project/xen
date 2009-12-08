@@ -756,6 +756,8 @@ int hvm_vcpu_initialise(struct vcpu *v)
 {
     int rc;
 
+    hvm_asid_flush_vcpu(v);
+
     if ( cpu_has_xsave )
     {
         /* XSAVE/XRSTOR requires the save area be 64-byte-boundary aligned. */

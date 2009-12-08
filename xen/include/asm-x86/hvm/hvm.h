@@ -23,6 +23,7 @@
 
 #include <asm/current.h>
 #include <asm/x86_emulate.h>
+#include <asm/hvm/asid.h>
 #include <public/domctl.h>
 #include <public/hvm/save.h>
 
@@ -99,13 +100,6 @@ struct hvm_function_table {
      */
     void (*update_guest_cr)(struct vcpu *v, unsigned int cr);
     void (*update_guest_efer)(struct vcpu *v);
-
-    /*
-     * Called to ensure than all guest-specific mappings in a tagged TLB
-     * are flushed; does *not* flush Xen's TLB entries, and on
-     * processors without a tagged TLB it will be a noop.
-     */
-    void (*flush_guest_tlbs)(void);
 
     void (*set_tsc_offset)(struct vcpu *v, u64 offset);
 
@@ -201,11 +195,15 @@ static inline void hvm_update_guest_efer(struct vcpu *v)
     hvm_funcs.update_guest_efer(v);
 }
 
-static inline void 
-hvm_flush_guest_tlbs(void)
+/*
+ * Called to ensure than all guest-specific mappings in a tagged TLB are 
+ * flushed; does *not* flush Xen's TLB entries, and on processors without a 
+ * tagged TLB it will be a noop.
+ */
+static inline void hvm_flush_guest_tlbs(void)
 {
     if ( hvm_enabled )
-        hvm_funcs.flush_guest_tlbs();
+        hvm_asid_flush_core();
 }
 
 void hvm_hypercall_page_initialise(struct domain *d,

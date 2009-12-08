@@ -60,8 +60,6 @@ static void vmx_ctxt_switch_to(struct vcpu *v);
 
 static int  vmx_alloc_vlapic_mapping(struct domain *d);
 static void vmx_free_vlapic_mapping(struct domain *d);
-static int  vmx_alloc_vpid(struct vcpu *v);
-static void vmx_free_vpid(struct vcpu *v);
 static void vmx_install_vlapic_mapping(struct vcpu *v);
 static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr);
 static void vmx_update_guest_efer(struct vcpu *v);
@@ -104,9 +102,6 @@ static int vmx_vcpu_initialise(struct vcpu *v)
 
     spin_lock_init(&v->arch.hvm_vmx.vmcs_lock);
 
-    if ( (rc = vmx_alloc_vpid(v)) != 0 )
-        return rc;
-
     v->arch.schedule_tail    = vmx_do_resume;
     v->arch.ctxt_switch_from = vmx_ctxt_switch_from;
     v->arch.ctxt_switch_to   = vmx_ctxt_switch_to;
@@ -116,7 +111,6 @@ static int vmx_vcpu_initialise(struct vcpu *v)
         dprintk(XENLOG_WARNING,
                 "Failed to create VMCS for vcpu %d: err=%d.\n",
                 v->vcpu_id, rc);
-        vmx_free_vpid(v);
         return rc;
     }
 
@@ -136,7 +130,6 @@ static void vmx_vcpu_destroy(struct vcpu *v)
     vmx_destroy_vmcs(v);
     vpmu_destroy(v);
     passive_domain_destroy(v);
-    vmx_free_vpid(v);
 }
 
 #ifdef __x86_64__
@@ -1168,7 +1161,7 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
         }
  
         __vmwrite(GUEST_CR3, v->arch.hvm_vcpu.hw_cr[3]);
-        vpid_sync_vcpu_all(v);
+        hvm_asid_flush_vcpu(v);
         break;
     case 4:
         v->arch.hvm_vcpu.hw_cr[4] = HVM_CR4_HOST_MASK;
@@ -1212,19 +1205,6 @@ static void vmx_update_guest_efer(struct vcpu *v)
     if ( v == current )
         write_efer((read_efer() & ~EFER_SCE) |
                    (v->arch.hvm_vcpu.guest_efer & EFER_SCE));
-}
-
-static void vmx_flush_guest_tlbs(void)
-{
-    /*
-     * If VPID (i.e. tagged TLB support) is not enabled, the fact that
-     * we're in Xen at all means any guest will have a clean TLB when
-     * it's next run, because VMRESUME will flush it for us.
-     *
-     * If enabled, we invalidate all translations associated with all
-     * VPID values.
-     */
-    vpid_sync_all();
 }
 
 static void __ept_sync_domain(void *info)
@@ -1358,7 +1338,7 @@ static void vmx_set_uc_mode(struct vcpu *v)
     if ( paging_mode_hap(v->domain) )
         ept_change_entry_emt_with_range(
             v->domain, 0, v->domain->arch.p2m->max_mapped_pfn);
-    vpid_sync_all();
+    hvm_asid_flush_vcpu(v);
 }
 
 static void vmx_set_info_guest(struct vcpu *v)
@@ -1405,7 +1385,6 @@ static struct hvm_function_table __read_mostly vmx_function_table = {
     .update_host_cr3      = vmx_update_host_cr3,
     .update_guest_cr      = vmx_update_guest_cr,
     .update_guest_efer    = vmx_update_guest_efer,
-    .flush_guest_tlbs     = vmx_flush_guest_tlbs,
     .set_tsc_offset       = vmx_set_tsc_offset,
     .inject_exception     = vmx_inject_exception,
     .init_hypercall_page  = vmx_init_hypercall_page,
@@ -1423,9 +1402,6 @@ static struct hvm_function_table __read_mostly vmx_function_table = {
     .set_info_guest       = vmx_set_info_guest,
     .set_rdtsc_exiting    = vmx_set_rdtsc_exiting
 };
-
-static unsigned long *vpid_bitmap;
-#define VPID_BITMAP_SIZE (1u << VMCS_VPID_WIDTH)
 
 void start_vmx(void)
 {
@@ -1460,17 +1436,6 @@ void start_vmx(void)
 
     if ( cpu_has_vmx_ept )
         vmx_function_table.hap_supported = 1;
-
-    if ( cpu_has_vmx_vpid )
-    {
-        vpid_bitmap = xmalloc_array(
-            unsigned long, BITS_TO_LONGS(VPID_BITMAP_SIZE));
-        BUG_ON(vpid_bitmap == NULL);
-        memset(vpid_bitmap, 0, BITS_TO_LONGS(VPID_BITMAP_SIZE) * sizeof(long));
-
-        /* VPID 0 is used by VMX root mode (the hypervisor). */
-        __set_bit(0, vpid_bitmap);
-    }
 
     setup_vmcs_dump();
 
@@ -1584,7 +1549,7 @@ static void vmx_invlpg_intercept(unsigned long vaddr)
 {
     struct vcpu *curr = current;
     HVMTRACE_LONG_2D(INVLPG, /*invlpga=*/ 0, TRC_PAR_LONG(vaddr));
-    if ( paging_invlpg(curr, vaddr) )
+    if ( paging_invlpg(curr, vaddr) && cpu_has_vmx_vpid )
         vpid_sync_vcpu_gva(curr, vaddr);
 }
 
@@ -1929,36 +1894,6 @@ static void vmx_free_vlapic_mapping(struct domain *d)
     unsigned long mfn = d->arch.hvm_domain.vmx.apic_access_mfn;
     if ( mfn != 0 )
         free_xenheap_page(mfn_to_virt(mfn));
-}
-
-static int vmx_alloc_vpid(struct vcpu *v)
-{
-    int idx;
-
-    if ( !cpu_has_vmx_vpid )
-        return 0;
-
-    do {
-        idx = find_first_zero_bit(vpid_bitmap, VPID_BITMAP_SIZE);
-        if ( idx >= VPID_BITMAP_SIZE )
-        {
-            dprintk(XENLOG_WARNING, "VMX VPID space exhausted.\n");
-            return -EBUSY;
-        }
-    }
-    while ( test_and_set_bit(idx, vpid_bitmap) );
-
-    v->arch.hvm_vmx.vpid = idx;
-    return 0;
-}
-
-static void vmx_free_vpid(struct vcpu *v)
-{
-    if ( !cpu_has_vmx_vpid )
-        return;
-
-    if ( v->arch.hvm_vmx.vpid )
-        clear_bit(v->arch.hvm_vmx.vpid, vpid_bitmap);
 }
 
 static void vmx_install_vlapic_mapping(struct vcpu *v)
@@ -2675,8 +2610,44 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
     }
 }
 
-asmlinkage void vmx_trace_vmentry(void)
+asmlinkage void vmx_vmenter_helper(void)
 {
+    struct vcpu *curr = current;
+    u32 new_asid, old_asid;
+    bool_t need_flush;
+
+    if ( !cpu_has_vmx_vpid )
+        goto out;
+
+    old_asid = curr->arch.hvm_vcpu.asid;
+    need_flush = hvm_asid_handle_vmenter();
+    new_asid = curr->arch.hvm_vcpu.asid;
+
+    if ( unlikely(new_asid != old_asid) )
+    {
+        __vmwrite(VIRTUAL_PROCESSOR_ID, new_asid);
+        if ( !old_asid && new_asid )
+        {
+            /* VPID was disabled: now enabled. */
+            curr->arch.hvm_vmx.secondary_exec_control |=
+                SECONDARY_EXEC_ENABLE_VPID;
+            __vmwrite(SECONDARY_VM_EXEC_CONTROL,
+                      curr->arch.hvm_vmx.secondary_exec_control);
+        }
+        else if ( old_asid && !new_asid )
+        {
+            /* VPID was enabled: now disabled. */
+            curr->arch.hvm_vmx.secondary_exec_control &=
+                ~SECONDARY_EXEC_ENABLE_VPID;
+            __vmwrite(SECONDARY_VM_EXEC_CONTROL,
+                      curr->arch.hvm_vmx.secondary_exec_control);
+        }
+    }
+
+    if ( unlikely(need_flush) )
+        vpid_sync_all();
+
+ out:
     HVMTRACE_ND (VMENTRY, 1/*cycles*/, 0, 0, 0, 0, 0, 0, 0);
 }
 

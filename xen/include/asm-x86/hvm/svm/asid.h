@@ -41,7 +41,7 @@ static inline void svm_asid_g_invlpg(struct vcpu *v, unsigned long g_vaddr)
 #endif
 
     /* Safe fallback. Take a new ASID. */
-    hvm_asid_invalidate_asid(v);
+    hvm_asid_flush_vcpu(v);
 }
 
 #endif /* __ASM_X86_HVM_SVM_ASID_H__ */

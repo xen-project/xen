@@ -21,14 +21,14 @@
 #define __ASM_X86_HVM_ASID_H__
 
 #include <xen/config.h>
-#include <xen/sched.h>
-#include <asm/processor.h>
+
+struct vcpu;
 
 /* Initialise ASID management for the current physical CPU. */
 void hvm_asid_init(int nasids);
 
 /* Invalidate a VCPU's current ASID allocation: forces re-allocation. */
-void hvm_asid_invalidate_asid(struct vcpu *v);
+void hvm_asid_flush_vcpu(struct vcpu *v);
 
 /* Flush all ASIDs on this processor core. */
 void hvm_asid_flush_core(void);

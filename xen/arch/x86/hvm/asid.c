@@ -20,7 +20,9 @@
 #include <xen/config.h>
 #include <xen/init.h>
 #include <xen/lib.h>
-#include <xen/perfc.h>
+#include <xen/sched.h>
+#include <xen/smp.h>
+#include <xen/percpu.h>
 #include <asm/hvm/asid.h>
 
 /*
@@ -80,7 +82,7 @@ void hvm_asid_init(int nasids)
     data->next_asid = 1;
 }
 
-void hvm_asid_invalidate_asid(struct vcpu *v)
+void hvm_asid_flush_vcpu(struct vcpu *v)
 {
     v->arch.hvm_vcpu.asid_generation = 0;
 }
