@@ -688,7 +688,7 @@ int cpuid_hypervisor_leaves( uint32_t idx, uint32_t sub_idx,
     uint32_t base = is_viridian_domain(d) ? 0x40000100 : 0x40000000;
 
     idx -= base;
-    if ( idx > 2 ) 
+    if ( idx > 3 ) 
         return 0;
 
     switch ( idx )

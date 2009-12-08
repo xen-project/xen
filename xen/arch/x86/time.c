@@ -832,13 +832,9 @@ static void __update_vcpu_system_time(struct vcpu *v, int force)
     else
         tsc_stamp = t->local_tsc_stamp;
 
-    if ( boot_cpu_has(X86_FEATURE_RDTSCP) )
-    {
-        if ( d->arch.tsc_mode ==  TSC_MODE_PVRDTSCP )
-            write_rdtscp_aux(d->arch.incarnation);
-        else
-            write_rdtscp_aux(0);
-    }
+    if ( (d->arch.tsc_mode ==  TSC_MODE_PVRDTSCP) &&
+         boot_cpu_has(X86_FEATURE_RDTSCP) )
+        write_rdtscp_aux(d->arch.incarnation);
 
     /* Don't bother unless timestamps have changed or we are forced. */
     if ( !force && (u->tsc_timestamp == tsc_stamp) )
@@ -1644,9 +1640,8 @@ void cpuid_time_leaf(uint32_t sub_idx, uint32_t *eax, uint32_t *ebx,
                       uint32_t *ecx, uint32_t *edx)
 {
     struct domain *d = current->domain;
-    struct cpu_time *t;
+    uint64_t offset;
 
-    t = &this_cpu(cpu_time);
     switch ( sub_idx )
     {
     case 0: /* features */
@@ -1658,22 +1653,23 @@ void cpuid_time_leaf(uint32_t sub_idx, uint32_t *eax, uint32_t *ebx,
         *ecx = d->arch.tsc_khz;
         *edx = d->arch.incarnation;
         break;
-    case 1: /* pvclock group1 */ /* FIXME are these right? */
-        *eax = (uint32_t)t->local_tsc_stamp;
-        *ebx = (uint32_t)(t->local_tsc_stamp >> 32);
-        *ecx = t->tsc_scale.mul_frac;
-        *edx = d->arch.incarnation;
+    case 1: /* scale and offset */
+        if ( !d->arch.vtsc )
+            offset = d->arch.vtsc_offset;
+        else
+            /* offset already applied to value returned by virtual rdtscp */
+            offset = 0;
+        *eax = (uint32_t)offset;
+        *ebx = (uint32_t)(offset >> 32);
+        *ecx = d->arch.vtsc_to_ns.mul_frac;
+        *edx = (s8)d->arch.vtsc_to_ns.shift;
         break;
-    case 2: /* pvclock scaling values */ /* FIXME  are these right? */
-        *eax = (uint32_t)t->stime_local_stamp;
-        *ebx = (uint32_t)(t->stime_local_stamp >> 32);
-        *ecx = t->tsc_scale.shift;
-        *edx = d->arch.incarnation;
-    case 3: /* physical cpu_khz */
+    case 2: /* physical cpu_khz */
         *eax = cpu_khz;
-        *ebx = *ecx = 0;
-        *edx = d->arch.incarnation;
+        *ebx = *ecx = *edx = 0;
         break;
+    default:
+        *eax = *ebx = *ecx = *edx = 0;
     }
 }
 
@@ -1708,8 +1704,17 @@ void tsc_get_info(struct domain *d, uint32_t *tsc_mode,
         }
         break;
     case TSC_MODE_PVRDTSCP:
-        *elapsed_nsec = get_s_time() - d->arch.vtsc_offset; /* FIXME scale? */
-        *gtsc_khz =  d->arch.tsc_khz;
+        if ( d->arch.vtsc )
+        {
+            *elapsed_nsec = get_s_time() - d->arch.vtsc_offset;
+            *gtsc_khz =  cpu_khz;
+        } else {
+            uint64_t tsc = 0;
+            rdtscll(tsc);
+            *elapsed_nsec = scale_delta(tsc,&d->arch.vtsc_to_ns) -
+                            d->arch.vtsc_offset;
+            *gtsc_khz = 0; /* ignored by tsc_set_info */
+        }
         break;
     }
 }
@@ -1755,12 +1760,20 @@ void tsc_set_info(struct domain *d,
             d->arch.ns_to_vtsc = scale_reciprocal(d->arch.vtsc_to_ns);
         break;
     case TSC_MODE_PVRDTSCP:
-        if ( boot_cpu_has(X86_FEATURE_RDTSCP) && gtsc_khz != 0 ) {
-            d->arch.vtsc = 0;
-            set_time_scale(&d->arch.vtsc_to_ns, gtsc_khz * 1000 );
-        } else {
-            d->arch.vtsc = 1;
+        d->arch.vtsc =  boot_cpu_has(X86_FEATURE_RDTSCP) &&
+                        host_tsc_is_safe() ?  0 : 1;
+        d->arch.tsc_khz = cpu_khz;
+        set_time_scale(&d->arch.vtsc_to_ns, d->arch.tsc_khz * 1000 );
+        d->arch.ns_to_vtsc = scale_reciprocal(d->arch.vtsc_to_ns);
+        if ( d->arch.vtsc )
             d->arch.vtsc_offset = get_s_time() - elapsed_nsec;
+        else {
+            /* when using native TSC, offset is nsec relative to power-on
+             * of physical machine */
+            uint64_t tsc = 0;
+            rdtscll(tsc);
+            d->arch.vtsc_offset = scale_delta(tsc,&d->arch.vtsc_to_ns) -
+                                  elapsed_nsec;
         }
         break;
     }
