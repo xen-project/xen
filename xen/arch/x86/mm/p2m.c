@@ -898,12 +898,13 @@ p2m_pod_zero_check(struct domain *d, unsigned long *gfns, int count)
             if( *(map[i]+j) != 0 )
                 break;
 
+        unmap_domain_page(map[i]);
+
         /* See comment in p2m_pod_zero_check_superpage() re gnttab
          * check timing.  */
         if ( j < PAGE_SIZE/sizeof(*map[i]) )
         {
             set_p2m_entry(d, gfns[i], mfns[i], 0, types[i]);
-            continue;
         }
         else
         {
@@ -911,9 +912,6 @@ p2m_pod_zero_check(struct domain *d, unsigned long *gfns, int count)
             p2m_pod_cache_add(d, mfn_to_page(mfns[i]), 0);
             d->arch.p2m->pod.entry_count++;
         }
-
-        unmap_domain_page(map[i]);
-        map[i] = NULL;
     }
     
 }
