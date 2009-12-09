@@ -66,6 +66,7 @@ typedef struct {
     int max_vcpus;
     int cur_vcpus;
     uint32_t max_memkb;
+    uint32_t target_memkb;
     uint32_t video_memkb;
     uint32_t shadow_memkb;
     const char *kernel;
@@ -304,6 +305,8 @@ int libxl_event_get_disk_eject_info(struct libxl_ctx *ctx, uint32_t domid, libxl
 
 int libxl_domain_pause(struct libxl_ctx *ctx, uint32_t domid);
 int libxl_domain_unpause(struct libxl_ctx *ctx, uint32_t domid);
+
+int libxl_set_memory_target(struct libxl_ctx *ctx, uint32_t domid, uint32_t target_memkb);
 
 int libxl_console_attach(struct libxl_ctx *ctx, uint32_t domid, int cons_num);
 

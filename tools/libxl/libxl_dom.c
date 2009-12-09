@@ -52,7 +52,7 @@ int build_pre(struct libxl_ctx *ctx, uint32_t domid,
     if (info->vpt_align != -1)
         xc_set_hvm_param(ctx->xch, domid, HVM_PARAM_VPT_ALIGN, (unsigned long) info->vpt_align);
     xc_domain_max_vcpus(ctx->xch, domid, info->max_vcpus);
-    xc_domain_setmaxmem(ctx->xch, domid, info->max_memkb + info->video_memkb);
+    xc_domain_setmaxmem(ctx->xch, domid, info->target_memkb + LIBXL_MAXMEM_CONSTANT);
     xc_domain_set_memmap_limit(ctx->xch, domid, 
             (info->hvm) ? info->max_memkb : 
             (info->max_memkb + info->u.pv.slack_memkb));
@@ -81,7 +81,9 @@ int build_post(struct libxl_ctx *ctx, uint32_t domid,
     ents[0] = "memory/static-max";
     ents[1] = libxl_sprintf(ctx, "%d", info->max_memkb);
     ents[2] = "memory/target";
-    ents[3] = libxl_sprintf(ctx, "%d", info->max_memkb); /* PROBABLY WRONG */
+    ents[3] = libxl_sprintf(ctx, "%d", info->target_memkb);
+    ents[2] = "memory/videoram";
+    ents[3] = libxl_sprintf(ctx, "%d", info->video_memkb);
     ents[4] = "domid";
     ents[5] = libxl_sprintf(ctx, "%d", domid);
     ents[6] = "store/port";
@@ -145,7 +147,7 @@ int build_hvm(struct libxl_ctx *ctx, uint32_t domid,
 {
     int ret;
 
-    ret = xc_hvm_build(ctx->xch, domid, info->max_memkb / 1024, info->kernel);
+    ret = xc_hvm_build_target_mem(ctx->xch, domid, (info->max_memkb - info->video_memkb) / 1024, (info->target_memkb - info->video_memkb) / 1024, info->kernel);
     if (ret) {
         XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, ret, "hvm building failed");
         return ERROR_FAIL;

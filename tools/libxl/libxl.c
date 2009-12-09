@@ -935,6 +935,7 @@ static int libxl_create_stubdom(struct libxl_ctx *ctx,
     memset(&b_info, 0x00, sizeof(libxl_domain_build_info));
     b_info.max_vcpus = 1;
     b_info.max_memkb = 32 * 1024;
+    b_info.target_memkb = b_info.max_memkb;
     b_info.kernel = "/usr/lib/xen/boot/ioemu-stubdom.gz";
     b_info.u.pv.cmdline = libxl_sprintf(ctx, " -d %d", info->domid);
     b_info.u.pv.ramdisk = "";
@@ -2264,6 +2265,7 @@ void init_build_info(libxl_domain_build_info *b_info, libxl_domain_create_info *
     b_info->vpt_align = -1;
     b_info->max_vcpus = 1;
     b_info->max_memkb = 32 * 1024;
+    b_info->target_memkb = b_info->max_memkb;
     if (c_info->hvm) {
         b_info->shadow_memkb = libxl_get_required_shadow_memory(b_info->max_memkb, b_info->max_vcpus);
         b_info->video_memkb = 8 * 1024;
@@ -2354,6 +2356,24 @@ void init_console_info(libxl_device_console *console, int dev_num, libxl_domain_
     console->constype = CONSTYPE_XENCONSOLED;
     if (state)
         console->build_state = state;
+}
+
+int libxl_set_memory_target(struct libxl_ctx *ctx, uint32_t domid, uint32_t target_memkb)
+{
+    int rc = 0;
+    uint32_t videoram;
+    char *videoram_s = NULL;
+    char *dompath = libxl_xs_get_dompath(ctx, domid);
+
+    videoram_s = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/memory/videoram", dompath));
+    if (!videoram_s)
+        return -1;
+    videoram = atoi(videoram_s);
+
+    libxl_xs_write(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/memory/target", dompath), "%lu", target_memkb);
+    if ((rc = xc_domain_setmaxmem(ctx->xch, domid, target_memkb + LIBXL_MAXMEM_CONSTANT)) != 0) return rc;
+    rc = xc_domain_memory_set_pod_target(ctx->xch, domid, (target_memkb - videoram) / 4, NULL, NULL, NULL);
+    return rc;
 }
 
 

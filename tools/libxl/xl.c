@@ -85,6 +85,7 @@ static void printf_info(libxl_domain_create_info *c_info,
     printf("vpt_align: %d\n", b_info->vpt_align);
     printf("max_vcpus: %d\n", b_info->max_vcpus);
     printf("max_memkb: %d\n", b_info->max_memkb);
+    printf("target_memkb: %d\n", b_info->target_memkb);
     printf("kernel: %s\n", b_info->kernel);
     printf("hvm: %d\n", b_info->hvm);
 
@@ -283,8 +284,10 @@ static void parse_config_file(const char *filename,
     if (config_lookup_int (&config, "vcpus", &l) == CONFIG_TRUE)
         b_info->max_vcpus = l;
 
-    if (config_lookup_int (&config, "memory", &l) == CONFIG_TRUE)
+    if (config_lookup_int (&config, "memory", &l) == CONFIG_TRUE) {
         b_info->max_memkb = l * 1024;
+        b_info->target_memkb = b_info->max_memkb;
+    }
 
     if (config_lookup_int (&config, "shadow_memory", &l) == CONFIG_TRUE)
         b_info->shadow_memkb = l * 1024;
@@ -754,6 +757,7 @@ static void help(char *command)
         printf(" restore                       restore a domain from a saved state\n\n");
         printf(" cd-insert                     insert a cdrom into a guest's cd drive\n\n");
         printf(" cd-eject                      eject a cdrom from a guest's cd drive\n\n");
+        printf(" mem-set                       set the current memory usage for a domain\n\n");
     } else if(!strcmp(command, "create")) {
         printf("Usage: xl create <ConfigFile> [options] [vars]\n\n");
         printf("Create a domain based on <ConfigFile>.\n\n");
@@ -802,7 +806,52 @@ static void help(char *command)
     } else if (!strcmp(command, "cd-eject")) {
         printf("Usage: xl cd-eject <Domain> <VirtualDevice>\n\n");
         printf("Eject a cdrom from a guest's cd drive.\n\n");
+    } else if (!strcmp(command, "mem-set")) {
+        printf("Usage: xl mem-set <Domain> <MemKB>\n\n");
+        printf("Set the current memory usage for a domain.\n\n");
     }
+}
+
+void set_memory_target(char *p, char *mem)
+{
+    struct libxl_ctx ctx;
+    uint32_t domid;
+
+    libxl_ctx_init(&ctx);
+    libxl_ctx_set_log(&ctx, log_callback, NULL);
+
+    if (libxl_param_to_domid(&ctx, p, &domid) < 0) {
+        fprintf(stderr, "%s is an invalid domain identifier\n", p);
+        exit(2);
+    }
+    libxl_set_memory_target(&ctx, domid, atoi(mem));
+}
+
+int main_memset(int argc, char **argv)
+{
+    int opt = 0;
+    char *p = NULL, *mem;
+
+    while ((opt = getopt(argc, argv, "h:")) != -1) {
+        switch (opt) {
+        case 'h':
+            help("mem-set");
+            exit(0);
+        default:
+            fprintf(stderr, "option not supported\n");
+            break;
+        }
+    }
+    if (optind >= argc - 1) {
+        help("mem-set");
+        exit(2);
+    }
+
+    p = argv[optind];
+    mem = argv[optind + 1];
+
+    set_memory_target(p, mem);
+    exit(0);
 }
 
 void console(char *p, int cons_num)
@@ -1434,6 +1483,8 @@ int main(int argc, char **argv)
         main_cd_insert(argc - 1, argv + 1);
     } else if (!strcmp(argv[1], "cd-eject")) {
         main_cd_eject(argc - 1, argv + 1);
+    } else if (!strcmp(argv[1], "mem-set")) {
+        main_memset(argc - 1, argv + 1);
     } else if (!strcmp(argv[1], "help")) {
         if (argc > 2)
             help(argv[2]);
