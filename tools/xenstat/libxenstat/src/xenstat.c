@@ -131,6 +131,32 @@ void xenstat_uninit(xenstat_handle * handle)
 	}
 }
 
+static inline unsigned long long parse(char *s, char *match)
+{
+	char *s1 = strstr(s,match);
+	unsigned long long ret;
+
+	if ( s1 == NULL )
+		return 0LL;
+	s1 += 2;
+	if ( *s1++ != ':' )
+		return 0LL;
+	sscanf(s1,"%llu",&ret);
+	return ret;
+}
+
+void domain_get_tmem_stats(xenstat_handle * handle, xenstat_domain * domain)
+{
+	char buffer[4096];
+
+	xc_tmem_control(handle->xc_handle,-1,TMEMC_LIST,domain->id,
+                        sizeof(buffer),-1,-1,buffer);
+	domain->tmem_stats.curr_eph_pages = parse(buffer,"Ec");
+	domain->tmem_stats.succ_eph_gets = parse(buffer,"Ge");
+	domain->tmem_stats.succ_pers_puts = parse(buffer,"Pp");
+	domain->tmem_stats.succ_pers_gets = parse(buffer,"Gp");
+}
+
 xenstat_node *xenstat_get_node(xenstat_handle * handle, unsigned int flags)
 {
 #define DOMAIN_CHUNK_SIZE 256
@@ -232,11 +258,13 @@ xenstat_node *xenstat_get_node(xenstat_handle * handle, unsigned int flags)
 			domain->networks = NULL;
 			domain->num_vbds = 0;
 			domain->vbds = NULL;
+			domain_get_tmem_stats(handle,domain);
 
 			domain++;
 			node->num_domains++;
 		}
 	} while (new_domains == DOMAIN_CHUNK_SIZE);
+
 
 	/* Run all the extra data collectors requested */
 	node->flags = 0;
@@ -673,6 +701,40 @@ unsigned long long xenstat_vbd_wr_sects(xenstat_vbd * vbd)
 {
 	return vbd->wr_sects;
 }
+
+/*
+ * Tmem functions
+ */
+
+xenstat_tmem *xenstat_domain_tmem(xenstat_domain * domain)
+{
+	return &domain->tmem_stats;
+}
+
+/* Get the current number of ephemeral pages */
+unsigned long long xenstat_tmem_curr_eph_pages(xenstat_tmem *tmem)
+{
+	return tmem->curr_eph_pages;
+}
+
+/* Get the number of successful ephemeral gets */
+unsigned long long xenstat_tmem_succ_eph_gets(xenstat_tmem *tmem)
+{
+	return tmem->succ_eph_gets;
+}
+
+/* Get the number of successful persistent puts */
+unsigned long long xenstat_tmem_succ_pers_puts(xenstat_tmem *tmem)
+{
+	return tmem->succ_pers_puts;
+}
+
+/* Get the number of successful persistent gets */
+unsigned long long xenstat_tmem_succ_pers_gets(xenstat_tmem *tmem)
+{
+	return tmem->succ_pers_gets;
+}
+
 
 static char *xenstat_get_domain_name(xenstat_handle *handle, unsigned int domain_id)
 {

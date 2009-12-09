@@ -202,6 +202,7 @@ unsigned int iterations = 0;
 int show_vcpus = 0;
 int show_networks = 0;
 int show_vbds = 0;
+int show_tmem = 0;
 int repeat_header = 0;
 int show_full_name = 0;
 #define PROMPT_VAL_LEN 80
@@ -353,6 +354,9 @@ static int handle_key(int ch)
 			break;
 		case 'b': case 'B':
 			show_vbds ^= 1;
+			break;
+		case 't': case 'T':
+			show_tmem ^= 1;
 			break;
 		case 'r': case 'R':
 			repeat_header ^= 1;
@@ -889,6 +893,11 @@ void do_bottom_line(void)
 		attr_addstr(show_vbds ? COLOR_PAIR(1) : 0, "ds");
 		addstr("  ");
 
+		/* tmem */
+		addch(A_REVERSE | 'T');
+		attr_addstr(show_tmem ? COLOR_PAIR(1) : 0, "mem");
+		addstr("  ");
+
 
 		/* vcpus */
 		addch(A_REVERSE | 'V');
@@ -1018,6 +1027,23 @@ void do_vbd(xenstat_domain *domain)
 	}
 }
 
+/* Output all tmem information */
+void do_tmem(xenstat_domain *domain)
+{
+	xenstat_tmem *tmem = xenstat_domain_tmem(domain);
+	unsigned long long curr_eph_pages = xenstat_tmem_curr_eph_pages(tmem);
+	unsigned long long succ_eph_gets = xenstat_tmem_succ_eph_gets(tmem);
+	unsigned long long succ_pers_puts = xenstat_tmem_succ_pers_puts(tmem);
+	unsigned long long succ_pers_gets = xenstat_tmem_succ_pers_gets(tmem);
+
+	if (curr_eph_pages | succ_eph_gets | succ_pers_puts | succ_pers_gets)
+		print("Tmem:  Curr eph pages: %8llu   Succ eph gets: %8llu   "
+	              "Succ pers puts: %8llu   Succ pers gets: %8llu\n",
+			curr_eph_pages, succ_eph_gets,
+			succ_pers_puts, succ_pers_gets);
+
+}
+
 static void top(void)
 {
 	xenstat_domain **domains;
@@ -1064,6 +1090,8 @@ static void top(void)
 			do_network(domains[i]);
 		if (show_vbds)
 			do_vbd(domains[i]);
+		if (show_tmem)
+			do_tmem(domains[i]);
 	}
 
 	if (!batch)
@@ -1138,6 +1166,9 @@ int main(int argc, char **argv)
 			break;
 		case 'f':
 			show_full_name = 1;
+			break;
+		case 't':
+			show_tmem = 1;
 			break;
 		}
 	}
