@@ -252,6 +252,11 @@ static inline unsigned long tmh_freeable_mb(void)
             (20 - PAGE_SHIFT);
 }
 
+static inline unsigned long tmh_free_mb(void)
+{
+    return (tmh_avail_pages() + total_free_pages()) >> (20 - PAGE_SHIFT);
+}
+
 /*
  * Memory allocation for "infrastructure" data
  */
