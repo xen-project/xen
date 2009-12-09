@@ -28,6 +28,7 @@ custom_param("numa", numa_setup);
 
 struct node_data node_data[MAX_NUMNODES];
 
+/* Mapping from pdx to node id */
 int memnode_shift;
 u8  memnodemap[NODEMAPSIZE];
 
@@ -52,54 +53,81 @@ int acpi_numa __devinitdata;
  * 0 if memnodmap[] too small (of shift too small)
  * -1 if node overlap or lost ram (shift too big)
  */
-static int __devinit
-populate_memnodemap(const struct node *nodes, int numnodes, int shift)
+static int __init populate_memnodemap(const struct node *nodes,
+                                      int numnodes, int shift, int *nodeids)
 {
-	int i; 
-	int res = -1;
-	paddr_t addr, end;
+	unsigned long spdx, epdx;
+	int i, res = -1;
 
-	if (shift >= 64)
-		return -1;
-	memset(memnodemap, 0xff, sizeof(memnodemap));
+	memset(memnodemap, NUMA_NO_NODE, sizeof(memnodemap));
 	for (i = 0; i < numnodes; i++) {
-		addr = nodes[i].start;
-		end = nodes[i].end;
-		if (addr >= end)
+		spdx = paddr_to_pdx(nodes[i].start);
+		epdx = paddr_to_pdx(nodes[i].end);
+		if (spdx >= epdx)
 			continue;
-		if ((end >> shift) >= NODEMAPSIZE)
+		if ((epdx >> shift) >= NODEMAPSIZE)
 			return 0;
 		do {
-			if (memnodemap[addr >> shift] != 0xff)
+			if (memnodemap[spdx >> shift] != NUMA_NO_NODE)
 				return -1;
-			memnodemap[addr >> shift] = i;
-			addr += (1ULL << shift);
-		} while (addr < end);
+
+			if (!nodeids)
+				memnodemap[spdx >> shift] = i;
+			else
+				memnodemap[spdx >> shift] = nodeids[i];
+
+			spdx += (1UL << shift);
+		} while (spdx < epdx);
 		res = 1;
-	} 
+	}
 	return res;
 }
 
-int __init compute_hash_shift(struct node *nodes, int numnodes)
+/*
+ * The LSB of all start and end addresses in the node map is the value of the
+ * maximum possible shift.
+ */
+static int __init extract_lsb_from_nodes(const struct node *nodes,
+					 int numnodes)
 {
-	int shift = 20;
+	int i, nodes_used = 0;
+	unsigned long spdx, epdx;
+	unsigned long bitfield = 0, memtop = 0;
 
-	while (populate_memnodemap(nodes, numnodes, shift + 1) >= 0)
-		shift++;
+	for (i = 0; i < numnodes; i++) {
+		spdx = paddr_to_pdx(nodes[i].start);
+		epdx = paddr_to_pdx(nodes[i].end);
+		if (spdx >= epdx)
+			continue;
+		bitfield |= spdx;
+		nodes_used++;
+		if (epdx > memtop)
+			memtop = epdx;
+	}
+	if (nodes_used <= 1)
+		i = 63;
+	else
+		i = find_first_bit(&bitfield, sizeof(unsigned long)*8);
+	return i;
+}
 
+int __init compute_hash_shift(struct node *nodes, int numnodes,
+			      int *nodeids)
+{
+	int shift;
+
+	shift = extract_lsb_from_nodes(nodes, numnodes);
 	printk(KERN_DEBUG "NUMA: Using %d for the hash shift.\n",
 		shift);
 
-	if (populate_memnodemap(nodes, numnodes, shift) != 1) {
-		printk(KERN_INFO
-	"Your memory is not aligned you need to rebuild your kernel "
-	"with a bigger NODEMAPSIZE shift=%d\n",
-			shift);
+	if (populate_memnodemap(nodes, numnodes, shift, nodeids) != 1) {
+		printk(KERN_INFO "Your memory is not aligned you need to "
+		       "rebuild your kernel with a bigger NODEMAPSIZE "
+		       "shift=%d\n", shift);
 		return -1;
 	}
 	return shift;
 }
-
 /* initialize NODE_DATA given nodeid and start/end */
 void __init setup_node_bootmem(int nodeid, u64 start, u64 end)
 { 
@@ -167,7 +195,7 @@ static int numa_emulation(u64 start_pfn, u64 end_pfn)
 		       (nodes[i].end - nodes[i].start) >> 20);
 		node_set_online(i);
  	}
- 	memnode_shift = compute_hash_shift(nodes, numa_fake);
+ 	memnode_shift = compute_hash_shift(nodes, numa_fake, NULL);
  	if (memnode_shift < 0) {
  		memnode_shift = 0;
  		printk(KERN_ERR "No NUMA hash function found. Emulation disabled.\n");

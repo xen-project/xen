@@ -19,7 +19,8 @@ struct node {
 	u64 start,end; 
 };
 
-extern int compute_hash_shift(struct node *nodes, int numnodes);
+extern int __init compute_hash_shift(struct node *nodes, int numnodes,
+			      int *nodeids);
 extern int pxm_to_node(int nid);
 
 #define ZONE_ALIGN (1UL << (MAX_ORDER+PAGE_SHIFT))
@@ -48,7 +49,7 @@ static inline void clear_node_cpumask(int cpu)
 	cpu_clear(cpu, node_to_cpumask[cpu_to_node(cpu)]);
 }
 
-/* Simple perfect hash to map physical addresses to node numbers */
+/* Simple perfect hash to map pdx to node numbers */
 extern int memnode_shift; 
 extern u8  memnodemap[NODEMAPSIZE]; 
 
@@ -62,9 +63,9 @@ extern struct node_data node_data[];
 
 static inline __attribute__((pure)) int phys_to_nid(paddr_t addr) 
 { 
-	unsigned nid; 
-	VIRTUAL_BUG_ON((addr >> memnode_shift) >= NODEMAPSIZE);
-	nid = memnodemap[addr >> memnode_shift]; 
+	unsigned nid;
+	VIRTUAL_BUG_ON((paddr_to_pdx(addr) >> memnode_shift) >= NODEMAPSIZE);
+	nid = memnodemap[paddr_to_pdx(addr) >> memnode_shift]; 
 	VIRTUAL_BUG_ON(nid >= MAX_NUMNODES || !node_data[nid]); 
 	return nid; 
 } 
@@ -75,10 +76,11 @@ static inline __attribute__((pure)) int phys_to_nid(paddr_t addr)
 #define node_end_pfn(nid)       (NODE_DATA(nid)->node_start_pfn + \
 				 NODE_DATA(nid)->node_spanned_pages)
 
-
+extern int valid_numa_range(unsigned long start, unsigned long end, int node);
 #else
 #define init_cpu_to_node() do {} while (0)
 #define clear_node_cpumask(cpu) do {} while (0)
+#define valid_numa_range(start, end, node) {return 1;}
 #endif
 
 void srat_parse_regions(u64 addr);

@@ -368,6 +368,7 @@ pae_copy_root(struct vcpu *v, l3_pgentry_t *l3tab);
 int check_descriptor(const struct domain *, struct desc_struct *d);
 
 extern int opt_allow_hugepage;
+extern int mem_hotplug;
 
 /******************************************************************************
  * With shadow pagetables, the different kinds of address start 

@@ -27,6 +27,11 @@ static nodemask_t nodes_found __initdata;
 static struct node nodes[MAX_NUMNODES] __initdata;
 static u8 __read_mostly pxm2node[256] = { [0 ... 255] = 0xff };
 
+
+static int num_node_memblks;
+static struct node node_memblk_range[NR_NODE_MEMBLKS];
+static int memblk_nodeid[NR_NODE_MEMBLKS];
+
 /* Too small nodes confuse the VM badly. Usually they result
    from BIOS bugs. */
 #define NODE_MIN_SIZE (4*1024*1024)
@@ -54,17 +59,33 @@ __devinit int setup_node(int pxm)
 	return pxm2node[pxm];
 }
 
-static __init int conflicting_nodes(u64 start, u64 end)
+int valid_numa_range(unsigned long start, unsigned long end, int node)
 {
 	int i;
-	for_each_node_mask(i, nodes_parsed) {
-		struct node *nd = &nodes[i];
+
+	for (i = 0; i < num_node_memblks; i++) {
+		struct node *nd = &node_memblk_range[i];
+
+		if (nd->start <= start && nd->end > end &&
+			memblk_nodeid[i] == node )
+			return 1;
+	}
+
+	return 0;
+}
+
+static __init int conflicting_memblks(unsigned long start, unsigned long end)
+{
+	int i;
+
+	for (i = 0; i < num_node_memblks; i++) {
+		struct node *nd = &node_memblk_range[i];
 		if (nd->start == nd->end)
 			continue;
 		if (nd->end > start && nd->start < end)
-			return i;
+			return memblk_nodeid[i];
 		if (nd->end == end && nd->start == start)
-			return i;
+			return memblk_nodeid[i];
 	}
 	return -1;
 }
@@ -174,6 +195,15 @@ acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
 	}
 	if (!(ma->flags & ACPI_SRAT_MEM_ENABLED))
 		return;
+
+	if (num_node_memblks >= NR_NODE_MEMBLKS)
+	{
+		dprintk(XENLOG_WARNING,
+                "Too many numa entry, try bigger NR_NODE_MEMBLKS \n");
+		bad_srat();
+		return;
+	}
+
 	start = ma->base_address;
 	end = start + ma->length;
 	pxm = ma->proximity_domain;
@@ -187,9 +217,15 @@ acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
 	}
 	/* It is fine to add this area to the nodes data it will be used later*/
 	if (ma->flags & ACPI_SRAT_MEM_HOT_PLUGGABLE)
+	{
 		printk(KERN_INFO "SRAT: hot plug zone found %"PRIx64" - %"PRIx64" \n",
 				start, end);
-	i = conflicting_nodes(start, end);
+#ifdef CONFIG_X86_64
+		mem_hotplug = 1;
+#endif
+	}
+
+	i = conflicting_memblks(start, end);
 	if (i == node) {
 		printk(KERN_WARNING
 		"SRAT: Warning: PXM %d (%"PRIx64"-%"PRIx64") overlaps with itself (%"
@@ -213,7 +249,12 @@ acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
 			nd->end = end;
 	}
 	printk(KERN_INFO "SRAT: Node %u PXM %u %"PRIx64"-%"PRIx64"\n", node, pxm,
-	       nd->start, nd->end);
+	       start, end);
+
+	node_memblk_range[num_node_memblks].start = start;
+	node_memblk_range[num_node_memblks].end = end;
+	memblk_nodeid[num_node_memblks] = node;
+	num_node_memblks++;
 }
 
 /* Sanity check to catch more bad SRATs (they are amazingly common).
@@ -256,16 +297,6 @@ static int nodes_cover_memory(void)
 		}
 	}
 	return 1;
-}
-
-static void unparse_node(int node)
-{
-	int i;
-	node_clear(node, nodes_parsed);
-	for (i = 0; i < MAX_LOCAL_APIC; i++) {
-		if (apicid_to_node[i] == node)
-			apicid_to_node[i] = NUMA_NO_NODE;
-	}
 }
 
 void __init acpi_numa_arch_fixup(void) {}
@@ -340,11 +371,8 @@ int __init acpi_scan_nodes(u64 start, u64 end)
 	int i;
 
 	/* First clean up the node list */
-	for (i = 0; i < MAX_NUMNODES; i++) {
+	for (i = 0; i < MAX_NUMNODES; i++)
 		cutoff_node(i, start, end);
-		if ((nodes[i].end - nodes[i].start) < NODE_MIN_SIZE)
-			unparse_node(i);
-	}
 
 	if (acpi_numa <= 0)
 		return -1;
@@ -354,7 +382,9 @@ int __init acpi_scan_nodes(u64 start, u64 end)
 		return -1;
 	}
 
-	memnode_shift = compute_hash_shift(nodes, MAX_NUMNODES);
+	memnode_shift = compute_hash_shift(node_memblk_range, num_node_memblks,
+				memblk_nodeid);
+
 	if (memnode_shift < 0) {
 		printk(KERN_ERR
 		     "SRAT: No NUMA node hash function found. Contact maintainer\n");
@@ -364,7 +394,11 @@ int __init acpi_scan_nodes(u64 start, u64 end)
 
 	/* Finally register nodes */
 	for_each_node_mask(i, nodes_parsed)
+	{
+		if ((nodes[i].end - nodes[i].start) < NODE_MIN_SIZE)
+			continue;
 		setup_node_bootmem(i, nodes[i].start, nodes[i].end);
+	}
 	for (i = 0; i < NR_CPUS; i++) { 
 		if (cpu_to_node[i] == NUMA_NO_NODE)
 			continue;

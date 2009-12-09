@@ -257,6 +257,7 @@ void copy_page_sse2(void *, const void *);
 #define page_to_virt(pg)    __page_to_virt(pg)
 #define pfn_to_paddr(pfn)   __pfn_to_paddr(pfn)
 #define paddr_to_pfn(pa)    __paddr_to_pfn(pa)
+#define paddr_to_pdx(pa)    pfn_to_pdx(paddr_to_pfn(pa))
 
 #endif /* !defined(__ASSEMBLY__) */
 
