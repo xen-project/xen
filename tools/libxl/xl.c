@@ -581,7 +581,7 @@ skip_pci:
         }                                                               \
     })
 
-static void create_domain(int debug, const char *config_file, const char *restore_file, int paused)
+static void create_domain(int debug, int daemonize, const char *config_file, const char *restore_file, int paused)
 {
     struct libxl_ctx ctx;
     uint32_t domid;
@@ -663,6 +663,9 @@ start:
 
     if (!paused)
         libxl_domain_unpause(&ctx, domid);
+
+    if (!daemonize)
+        exit(0);
 
     if (need_daemon) {
         char *fullname, *name;
@@ -764,6 +767,7 @@ static void help(char *command)
         printf("Options:\n\n");
         printf("-h                     Print this help.\n");
         printf("-d                     Enable debug messages.\n");
+        printf("-e                     Do not wait in the background for the death of the domain.\n");
     } else if(!strcmp(command, "list")) {
         printf("Usage: xl list [Domain]\n\n");
         printf("List information about all/some domains.\n\n");
@@ -794,6 +798,7 @@ static void help(char *command)
         printf("Options:\n\n");
         printf("-h                     Print this help.\n");
         printf("-p                     Do not unpause domain after restoring it.\n");
+        printf("-e                     Do not wait in the background for the death of the domain.\n");
     } else if(!strcmp(command, "destroy")) {
         printf("Usage: xl destroy <Domain>\n\n");
         printf("Terminate a domain immediately.\n\n");
@@ -1259,16 +1264,19 @@ int main_restore(int argc, char **argv)
 {
     char *checkpoint_file = NULL;
     char *config_file = NULL;
-    int paused = 0, debug = 0;
+    int paused = 0, debug = 0, daemonize = 1;
     int opt;
 
-    while ((opt = getopt(argc, argv, "hpd")) != -1) {
+    while ((opt = getopt(argc, argv, "hpde")) != -1) {
         switch (opt) {
         case 'p':
             paused = 1;
             break;
         case 'd':
             debug = 1;
+            break;
+        case 'e':
+            daemonize = 0;
             break;
         case 'h':
             help("restore");
@@ -1286,7 +1294,7 @@ int main_restore(int argc, char **argv)
 
     config_file = argv[optind];
     checkpoint_file = argv[optind + 1];
-    create_domain(debug, config_file, checkpoint_file, paused);
+    create_domain(debug, daemonize, config_file, checkpoint_file, paused);
     exit(0);
 }
 
@@ -1423,13 +1431,16 @@ int main_list(int argc, char **argv)
 int main_create(int argc, char **argv)
 {
     char *filename = NULL;
-    int debug = 0;
+    int debug = 0, daemonize = 1;
     int opt;
 
-    while ((opt = getopt(argc, argv, "hd")) != -1) {
+    while ((opt = getopt(argc, argv, "hde")) != -1) {
         switch (opt) {
         case 'd':
             debug = 1;
+            break;
+        case 'e':
+            daemonize = 0;
             break;
         case 'h':
             help("create");
@@ -1446,7 +1457,7 @@ int main_create(int argc, char **argv)
     }
 
     filename = argv[optind];
-    create_domain(debug, filename, NULL, 0);
+    create_domain(debug, daemonize, filename, NULL, 0);
     exit(0);
 }
 
