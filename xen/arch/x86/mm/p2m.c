@@ -267,6 +267,8 @@ p2m_pod_cache_add(struct domain *d,
     }
 #endif
 
+    ASSERT(p2m_locked_by_me(p2md));
+
     /*
      * Pages from domain_alloc and returned by the balloon driver aren't
      * guaranteed to be zero; but by reclaiming zero pages, we implicitly
@@ -303,7 +305,9 @@ p2m_pod_cache_add(struct domain *d,
         BUG();
     }
 
-    BUG_ON(d->is_dying);
+    /* Ensure that the PoD cache has never been emptied.  
+     * This may cause "zombie domains" since the page will never be freed. */
+    BUG_ON( d->arch.relmem != RELMEM_not_started );
 
     spin_unlock(&d->page_alloc_lock);
 
@@ -501,6 +505,8 @@ p2m_pod_set_mem_target(struct domain *d, unsigned long target)
     int ret = 0;
     unsigned long populated;
 
+    p2m_lock(p2md);
+
     /* P == B: Nothing to do. */
     if ( p2md->pod.entry_count == 0 )
         goto out;
@@ -528,6 +534,8 @@ p2m_pod_set_mem_target(struct domain *d, unsigned long target)
     ret = p2m_pod_set_cache_target(d, pod_target);
 
 out:
+    p2m_unlock(p2md);
+
     return ret;
 }
 
@@ -536,6 +544,10 @@ p2m_pod_empty_cache(struct domain *d)
 {
     struct p2m_domain *p2md = d->arch.p2m;
     struct page_info *page;
+
+    /* After this barrier no new PoD activities can happen. */
+    BUG_ON(!d->is_dying);
+    spin_barrier(&p2md->lock);
 
     spin_lock(&d->page_alloc_lock);
 
@@ -588,7 +600,7 @@ p2m_pod_decrease_reservation(struct domain *d,
 
     /* If we don't have any outstanding PoD entries, let things take their
      * course */
-    if ( p2md->pod.entry_count == 0 || unlikely(d->is_dying) )
+    if ( p2md->pod.entry_count == 0 )
         goto out;
 
     /* Figure out if we need to steal some freed memory for our cache */
@@ -596,6 +608,9 @@ p2m_pod_decrease_reservation(struct domain *d,
 
     p2m_lock(p2md);
     audit_p2m(d);
+
+    if ( unlikely(d->is_dying) )
+        goto out_unlock;
 
     /* See what's in here. */
     /* FIXME: Add contiguous; query for PSE entries? */
@@ -1006,9 +1021,11 @@ p2m_pod_demand_populate(struct domain *d, unsigned long gfn,
     struct p2m_domain *p2md = d->arch.p2m;
     int i;
 
+    ASSERT(p2m_locked_by_me(d->arch.p2m));
+
     /* This check is done with the p2m lock held.  This will make sure that
-     * even if d->is_dying changes under our feet, empty_pod_cache() won't start
-     * until we're done. */
+     * even if d->is_dying changes under our feet, p2m_pod_empty_cache() 
+     * won't start until we're done. */
     if ( unlikely(d->is_dying) )
         goto out_fail;
 
