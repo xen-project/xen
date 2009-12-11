@@ -219,8 +219,16 @@ void __init init_frametable(void)
         init_frametable_chunk(pdx_to_page(sidx * PDX_GROUP_COUNT),
                               pdx_to_page(eidx * PDX_GROUP_COUNT));
     }
-    init_frametable_chunk(pdx_to_page(sidx * PDX_GROUP_COUNT),
-                          pdx_to_page(max_pdx - 1) + 1);
+    if ( !mem_hotplug )
+        init_frametable_chunk(pdx_to_page(sidx * PDX_GROUP_COUNT),
+                              pdx_to_page(max_pdx - 1) + 1);
+    else
+    {
+        init_frametable_chunk(pdx_to_page(sidx *PDX_GROUP_COUNT),
+                              pdx_to_page(max_idx * PDX_GROUP_COUNT));
+        memset(pdx_to_page(max_pdx), -1, (unsigned long)pdx_to_page(max_idx) -
+                        (unsigned long)(pdx_to_page(max_pdx)));
+    }
 }
 
 void __init arch_init_memory(void)

@@ -304,7 +304,7 @@ static void __init setup_max_pdx(void)
 #endif
 }
 
-static void __init set_pdx_range(unsigned long smfn, unsigned long emfn)
+void set_pdx_range(unsigned long smfn, unsigned long emfn)
 {
     unsigned long idx, eidx;
 

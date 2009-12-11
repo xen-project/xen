@@ -360,6 +360,8 @@ l2_pgentry_t *virt_to_xen_l2e(unsigned long v);
 l3_pgentry_t *virt_to_xen_l3e(unsigned long v);
 #endif
 
+extern void set_pdx_range(unsigned long smfn, unsigned long emfn);
+
 /* Map machine page range in Xen virtual address space. */
 #define MAP_SMALL_PAGES _PAGE_AVAIL0 /* don't use superpages for the mapping */
 int map_pages_to_xen(

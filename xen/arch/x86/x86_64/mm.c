@@ -801,6 +801,116 @@ int __cpuinit setup_compat_arg_xlat(unsigned int cpu, int node)
     return 0;
 }
 
+void cleanup_frame_table(struct mem_hotadd_info *info)
+{
+    unsigned long sva, eva;
+    l3_pgentry_t l3e;
+    l2_pgentry_t l2e;
+    unsigned long spfn, epfn;
+
+    spfn = info->spfn;
+    epfn = info->epfn;
+
+    sva = (unsigned long)pdx_to_page(pfn_to_pdx(spfn));
+    eva = (unsigned long)pdx_to_page(pfn_to_pdx(epfn));
+
+    /* Intialize all page */
+    memset(mfn_to_page(spfn), -1, mfn_to_page(epfn) - mfn_to_page(spfn));
+
+    while (sva < eva)
+    {
+        l3e = l4e_to_l3e(idle_pg_table[l4_table_offset(sva)])[
+          l3_table_offset(sva)];
+        if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) ||
+             (l3e_get_flags(l3e) & _PAGE_PSE) )
+        {
+            sva = (sva & ~((1UL << L3_PAGETABLE_SHIFT) - 1)) +
+                    (1UL << L3_PAGETABLE_SHIFT);
+            continue;
+        }
+
+        l2e = l3e_to_l2e(l3e)[l2_table_offset(sva)];
+        ASSERT(l2e_get_flags(l2e) & _PAGE_PRESENT);
+
+        if ( (l2e_get_flags(l2e) & (_PAGE_PRESENT | _PAGE_PSE)) ==
+              (_PAGE_PSE | _PAGE_PRESENT) )
+        {
+            if (hotadd_mem_valid(l2e_get_pfn(l2e), info))
+                destroy_xen_mappings(sva & ~((1UL << L2_PAGETABLE_SHIFT) - 1),
+                         ((sva & ~((1UL << L2_PAGETABLE_SHIFT) -1 )) +
+                            (1UL << L2_PAGETABLE_SHIFT) - 1));
+
+            sva = (sva & ~((1UL << L2_PAGETABLE_SHIFT) -1 )) +
+                  (1UL << L2_PAGETABLE_SHIFT);
+            continue;
+        }
+
+        ASSERT(l1e_get_flags(l2e_to_l1e(l2e)[l1_table_offset(sva)]) &
+                _PAGE_PRESENT);
+         sva = (sva & ~((1UL << PAGE_SHIFT) - 1)) +
+                    (1UL << PAGE_SHIFT);
+    }
+
+    /* Brute-Force flush all TLB */
+    flush_tlb_all();
+}
+
+/* Should we be paraniod failure in map_pages_to_xen? */
+static int setup_frametable_chunk(void *start, void *end,
+                                  struct mem_hotadd_info *info)
+{
+    unsigned long s = (unsigned long)start;
+    unsigned long e = (unsigned long)end;
+    unsigned long mfn;
+
+    ASSERT(!(s & ((1 << L2_PAGETABLE_SHIFT) - 1)));
+    ASSERT(!(e & ((1 << L2_PAGETABLE_SHIFT) - 1)));
+
+    for ( ; s < e; s += (1UL << L2_PAGETABLE_SHIFT))
+    {
+        mfn = alloc_hotadd_mfn(info);
+        map_pages_to_xen(s, mfn, 1UL << PAGETABLE_ORDER, PAGE_HYPERVISOR);
+    }
+    memset(start, -1, s - (unsigned long)start);
+
+    return 0;
+}
+
+int extend_frame_table(struct mem_hotadd_info *info)
+{
+    unsigned long cidx, nidx, eidx, spfn, epfn;
+
+    spfn = info->spfn;
+    epfn = info->epfn;
+
+    eidx = (pfn_to_pdx(epfn) + PDX_GROUP_COUNT - 1) / PDX_GROUP_COUNT;
+    nidx = cidx = pfn_to_pdx(spfn)/PDX_GROUP_COUNT;
+
+    ASSERT( pfn_to_pdx(epfn) <= (DIRECTMAP_SIZE >> PAGE_SHIFT) &&
+         (pfn_to_pdx(epfn) <= FRAMETABLE_SIZE / sizeof(struct page_info)) );
+
+    if ( test_bit(cidx, pdx_group_valid) )
+        cidx = find_next_zero_bit(pdx_group_valid, eidx, cidx);
+
+    if ( cidx >= eidx )
+        return 0;
+
+    while ( cidx < eidx )
+    {
+        nidx = find_next_bit(pdx_group_valid, eidx, cidx);
+        if ( nidx >= eidx )
+            nidx = eidx;
+        setup_frametable_chunk(pdx_to_page(cidx * PDX_GROUP_COUNT ),
+                                     pdx_to_page(nidx * PDX_GROUP_COUNT),
+                                     info);
+
+        cidx = find_next_zero_bit(pdx_group_valid, eidx, nidx);
+    }
+
+    memset(mfn_to_page(spfn), 0, mfn_to_page(epfn) - mfn_to_page(spfn));
+    return 0;
+}
+
 void __init subarch_init_memory(void)
 {
     unsigned long i, n, v, m2p_start_mfn;
