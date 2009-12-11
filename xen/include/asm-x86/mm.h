@@ -530,6 +530,12 @@ int donate_page(
 
 int map_ldt_shadow_page(unsigned int);
 
+#ifdef CONFIG_X86_64
+extern int memory_add(unsigned long spfn, unsigned long epfn, unsigned int pxm);
+#else
+int memory_add(uint64_t spfn, uint64_t epfn, uint32_t pxm) {return -ENOSYS};
+#endif
+
 #ifdef CONFIG_COMPAT
 void domain_set_alloc_bitsize(struct domain *d);
 unsigned int domain_clamp_alloc_bitsize(struct domain *d, unsigned int bits);

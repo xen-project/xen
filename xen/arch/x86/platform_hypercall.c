@@ -469,6 +469,11 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
                       op->u.cpu_add.pxm);
     break;
 
+    case XENPF_mem_hotadd:
+        ret = memory_add(op->u.mem_add.spfn,
+                      op->u.mem_add.epfn,
+                      op->u.mem_add.pxm);
+        break;
     default:
         ret = -ENOSYS;
         break;

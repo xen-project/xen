@@ -23,6 +23,7 @@
 #include <xen/mm.h>
 #include <xen/sched.h>
 #include <xen/numa.h>
+#include <xen/nodemask.h>
 #include <xen/guest_access.h>
 #include <asm/current.h>
 #include <asm/asm_defns.h>
@@ -32,6 +33,7 @@
 #include <asm/hypercall.h>
 #include <asm/msr.h>
 #include <asm/setup.h>
+#include <asm/numa.h>
 #include <public/memory.h>
 
 /* Parameters for PFN/MADDR compression. */
@@ -1307,6 +1309,126 @@ unsigned int domain_clamp_alloc_bitsize(struct domain *d, unsigned int bits)
     if ( (d == NULL) || (d->arch.physaddr_bitsize == 0) )
         return bits;
     return min(d->arch.physaddr_bitsize, bits);
+}
+
+int transfer_pages_to_heap(struct mem_hotadd_info *info)
+{
+    unsigned long i;
+    struct page_info *pg;
+
+    /*
+     * Mark the allocated page before put free pages to buddy allocator
+     * to avoid merge in free_heap_pages
+     */
+    for (i = info->spfn; i < info->cur; i++)
+    {
+        pg = mfn_to_page(i);
+        pg->count_info = PGC_state_inuse;
+    }
+
+    init_domheap_pages(pfn_to_paddr(info->cur), pfn_to_paddr(info->epfn));
+
+    return 0;
+}
+
+int mem_hotadd_check(unsigned long spfn, unsigned long epfn)
+{
+    /* TBD: Need make sure cover to m2p/ft page table */
+    return 1;
+}
+
+int memory_add(unsigned long spfn, unsigned long epfn, unsigned int pxm)
+{
+    struct mem_hotadd_info info;
+    int ret, node;
+    unsigned long old_max = max_page, old_total = total_pages;
+    unsigned long i;
+
+    printk("memory_add %lx ~ %lx with pxm %x\n", spfn, epfn, pxm);
+
+    /* the memory range should at least be 2M aligned */
+    if ( (spfn | epfn) & ((1UL << PAGETABLE_ORDER) - 1) )
+        return -EINVAL;
+
+    if ( (spfn | epfn) & pfn_hole_mask)
+        return -EINVAL;
+
+    if ( epfn < max_page )
+        return -EINVAL;
+
+    if ( (node = setup_node(pxm)) == -1 )
+        return -EINVAL;
+
+    if ( !valid_numa_range(spfn << PAGE_SHIFT, epfn << PAGE_SHIFT, node) )
+    {
+        dprintk(XENLOG_WARNING, "spfn %lx ~ epfn %lx pxm %x node %x"
+            "is not numa valid", spfn, epfn, pxm, node);
+        return -EINVAL;
+    }
+
+    if ( !mem_hotadd_check(spfn, epfn) )
+        return -EINVAL;
+
+    if ( !node_online(node) )
+    {
+        dprintk(XENLOG_WARNING, "node %x pxm %x is not online\n",node, pxm);
+        NODE_DATA(node)->node_id = node;
+        NODE_DATA(node)->node_start_pfn = spfn;
+        NODE_DATA(node)->node_spanned_pages =
+                epfn - node_start_pfn(node);
+        node_set_online(node);
+    }else
+    {
+        if (NODE_DATA(node)->node_start_pfn > spfn)
+            NODE_DATA(node)->node_start_pfn = spfn;
+        if (node_end_pfn(node) < epfn)
+            NODE_DATA(node)->node_spanned_pages = epfn - node_start_pfn(node);
+    }
+    ret =  map_pages_to_xen((unsigned long)mfn_to_virt(spfn), spfn,
+                            epfn - spfn, PAGE_HYPERVISOR);
+
+     if ( ret )
+        return ret;
+
+    ret = -EINVAL;
+    info.spfn = spfn;
+    info.epfn = epfn;
+    info.cur = spfn;
+
+    ret = extend_frame_table(&info);
+    if (ret)
+        goto destroy_frametable;
+    /* Set max_page as setup_m2p_table will use it*/
+    max_page = epfn;
+    max_pdx = pfn_to_pdx(max_page - 1) + 1;
+    total_pages += epfn - spfn;
+
+    set_pdx_range(spfn, epfn);
+    ret = setup_m2p_table(&info);
+
+    if ( ret )
+        goto destroy_m2p;
+
+    for ( i = old_max; i < epfn; i++ )
+        iommu_map_page(dom0, i, i);
+
+    /* We can't revert any more */
+    transfer_pages_to_heap(&info);
+
+    share_hotadd_m2p_table(&info);
+
+    return 0;
+
+destroy_m2p:
+    destroy_m2p_mapping(&info);
+destroy_frametable:
+    cleanup_frame_table(&info);
+    destroy_xen_mappings((unsigned long)mfn_to_virt(spfn),
+                         (unsigned long)mfn_to_virt(epfn));
+    max_page = old_max;
+    total_pages = old_total;
+    max_pdx = pfn_to_pdx(max_page - 1) + 1;
+    return ret;
 }
 
 #include "compat/mm.c"

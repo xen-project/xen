@@ -346,6 +346,15 @@ struct xenpf_cpu_hotadd
 	uint32_t pxm;
 };
 
+#define XENPF_mem_hotadd    59
+struct xenpf_mem_hotadd
+{
+    uint64_t spfn;
+    uint64_t epfn;
+    uint32_t pxm;
+    uint32_t flags;
+};
+
 struct xen_platform_op {
     uint32_t cmd;
     uint32_t interface_version; /* XENPF_INTERFACE_VERSION */
@@ -364,6 +373,7 @@ struct xen_platform_op {
         struct xenpf_pcpuinfo          pcpu_info;
         struct xenpf_cpu_ol            cpu_ol;
         struct xenpf_cpu_hotadd        cpu_add;
+        struct xenpf_mem_hotadd        mem_add;
         uint8_t                        pad[128];
     } u;
 };
