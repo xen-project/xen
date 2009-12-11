@@ -249,6 +249,104 @@ static int m2p_mapped(unsigned long spfn)
     return M2P_NO_MAPPED;
 }
 
+static void destroy_compat_m2p_mapping(struct mem_hotadd_info *info)
+{
+    unsigned long i, va, rwva, pt_pfn;
+    unsigned long smap = info->spfn, emap = info->spfn;
+
+    l3_pgentry_t *l3_ro_mpt;
+    l2_pgentry_t *l2_ro_mpt;
+
+    if ( smap > ((RDWR_COMPAT_MPT_VIRT_END - RDWR_COMPAT_MPT_VIRT_START) >> 2) )
+        return;
+
+    if ( emap > ((RDWR_COMPAT_MPT_VIRT_END - RDWR_COMPAT_MPT_VIRT_START) >> 2) )
+        emap = (RDWR_COMPAT_MPT_VIRT_END - RDWR_COMPAT_MPT_VIRT_START) >> 2;
+
+    l3_ro_mpt = l4e_to_l3e(idle_pg_table[l4_table_offset(HIRO_COMPAT_MPT_VIRT_START)]);
+
+    ASSERT(l3e_get_flags(l3_ro_mpt[l3_table_offset(HIRO_COMPAT_MPT_VIRT_START)]) & _PAGE_PRESENT);
+
+    l2_ro_mpt = l3e_to_l2e(l3_ro_mpt[l3_table_offset(HIRO_COMPAT_MPT_VIRT_START)]);
+
+    for ( i = smap; i < emap; )
+    {
+        va = HIRO_COMPAT_MPT_VIRT_START +
+              i * sizeof(*compat_machine_to_phys_mapping);
+        rwva = RDWR_COMPAT_MPT_VIRT_START +
+             i * sizeof(*compat_machine_to_phys_mapping);
+        if ( l2e_get_flags(l2_ro_mpt[l2_table_offset(va)]) & _PAGE_PRESENT )
+        {
+            pt_pfn = l2e_get_pfn(l2_ro_mpt[l2_table_offset(va)]);
+            if ( hotadd_mem_valid(pt_pfn, info) )
+            {
+                destroy_xen_mappings(rwva, rwva +
+                        (1UL << L2_PAGETABLE_SHIFT));
+                l2e_write(&l2_ro_mpt[l2_table_offset(va)], l2e_empty());
+            }
+        }
+
+        i += 1UL < (L2_PAGETABLE_SHIFT - 2);
+    }
+
+    return;
+}
+
+void destroy_m2p_mapping(struct mem_hotadd_info *info)
+{
+    l3_pgentry_t *l3_ro_mpt;
+    unsigned long i, va, rwva;
+    unsigned long smap = info->spfn, emap = info->epfn;
+
+    l3_ro_mpt = l4e_to_l3e(idle_pg_table[l4_table_offset(RO_MPT_VIRT_START)]);
+
+    /*
+     * No need to clean m2p structure existing before the hotplug
+     */
+    for (i = smap; i < emap;)
+    {
+        unsigned long pt_pfn;
+        l2_pgentry_t *l2_ro_mpt;
+
+        va = RO_MPT_VIRT_START + i * sizeof(*machine_to_phys_mapping);
+        rwva = RDWR_MPT_VIRT_START + i * sizeof(*machine_to_phys_mapping);
+
+        /* 1G mapping should not be created by mem hotadd */
+        if (!(l3e_get_flags(l3_ro_mpt[l3_table_offset(va)]) & _PAGE_PRESENT) ||
+            (l3e_get_flags(l3_ro_mpt[l3_table_offset(va)]) & _PAGE_PSE))
+        {
+            i = ( i & ~((1UL << (L3_PAGETABLE_SHIFT - 3)) - 1)) +
+                (1UL << (L3_PAGETABLE_SHIFT - 3) );
+            continue;
+        }
+
+        l2_ro_mpt = l3e_to_l2e(l3_ro_mpt[l3_table_offset(va)]);
+        if (!(l2e_get_flags(l2_ro_mpt[l2_table_offset(va)]) & _PAGE_PRESENT))
+        {
+            i = ( i & ~((1UL << (L2_PAGETABLE_SHIFT - 3)) - 1)) +
+                    (1UL << (L2_PAGETABLE_SHIFT - 3)) ;
+            continue;
+        }
+
+        pt_pfn = l2e_get_pfn(l2_ro_mpt[l2_table_offset(va)]);
+        if ( hotadd_mem_valid(pt_pfn, info) )
+        {
+            destroy_xen_mappings(rwva, rwva + (1UL << L2_PAGETABLE_SHIFT));
+
+            l2_ro_mpt = l3e_to_l2e(l3_ro_mpt[l3_table_offset(va)]);
+            l2e_write(&l2_ro_mpt[l2_table_offset(va)], l2e_empty());
+        }
+        i = ( i & ~((1UL << (L2_PAGETABLE_SHIFT - 3)) - 1)) +
+              (1UL << (L2_PAGETABLE_SHIFT - 3));
+    }
+
+    destroy_compat_m2p_mapping(info);
+
+    /* Brute-Force flush all TLB */
+    flush_tlb_all();
+    return;
+}
+
 /*
  * Allocate and map the compatibility mode machine-to-phys table.
  * spfn/epfn: the pfn ranges to be setup
