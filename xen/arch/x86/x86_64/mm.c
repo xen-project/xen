@@ -189,6 +189,246 @@ void __init pfn_pdx_hole_setup(unsigned long mask)
     ma_top_mask         = pfn_top_mask << PAGE_SHIFT;
 }
 
+/*
+ * Allocate page table pages for m2p table
+ */
+struct mem_hotadd_info
+{
+    unsigned long spfn;
+    unsigned long epfn;
+    unsigned long cur;
+};
+
+int hotadd_mem_valid(unsigned long pfn, struct mem_hotadd_info *info)
+{
+    return (pfn < info->epfn && pfn >= info->spfn);
+}
+
+static unsigned long alloc_hotadd_mfn(struct mem_hotadd_info *info)
+{
+    unsigned mfn;
+
+    ASSERT((info->cur + ( 1UL << PAGETABLE_ORDER) < info->epfn) &&
+            info->cur >= info->spfn);
+
+    mfn = info->cur;
+    info->cur += (1UL << PAGETABLE_ORDER);
+    return mfn;
+}
+
+#define M2P_NO_MAPPED   0
+#define M2P_2M_MAPPED   1
+#define M2P_1G_MAPPED   2
+static int m2p_mapped(unsigned long spfn)
+{
+    unsigned long va;
+    l3_pgentry_t *l3_ro_mpt;
+    l2_pgentry_t *l2_ro_mpt;
+
+    va = RO_MPT_VIRT_START + spfn * sizeof(*machine_to_phys_mapping);
+    l3_ro_mpt = l4e_to_l3e(idle_pg_table[l4_table_offset(va)]);
+
+    switch ( l3e_get_flags(l3_ro_mpt[l3_table_offset(va)]) &
+             (_PAGE_PRESENT |_PAGE_PSE))
+    {
+        case _PAGE_PSE|_PAGE_PRESENT:
+            return M2P_1G_MAPPED;
+            break;
+        /* Check for next level */
+        case _PAGE_PRESENT:
+            break;
+        default:
+            return M2P_NO_MAPPED;
+            break;
+    }
+    l2_ro_mpt = l3e_to_l2e(l3_ro_mpt[l3_table_offset(va)]);
+
+    if (l2e_get_flags(l2_ro_mpt[l2_table_offset(va)]) & _PAGE_PRESENT)
+        return M2P_2M_MAPPED;
+
+    return M2P_NO_MAPPED;
+}
+
+/*
+ * Allocate and map the compatibility mode machine-to-phys table.
+ * spfn/epfn: the pfn ranges to be setup
+ * free_s/free_e: the pfn ranges that is free still
+ */
+static int setup_compat_m2p_table(struct mem_hotadd_info *info)
+{
+    unsigned long i, va, smap, emap, rwva, epfn = info->epfn;
+    unsigned int n, memflags;
+    l3_pgentry_t *l3_ro_mpt = NULL;
+    l2_pgentry_t *l2_ro_mpt = NULL;
+    struct page_info *l1_pg;
+
+    smap = info->spfn & (~((1UL << (L2_PAGETABLE_SHIFT - 2)) -1));
+
+    /*
+     * Notice: For hot-added memory, only range below m2p_compat_vstart
+     * will be filled up (assuming memory is discontinous when booting).
+     */
+    if   ((smap > ((RDWR_COMPAT_MPT_VIRT_END - RDWR_COMPAT_MPT_VIRT_START) >> 2)) )
+        return 0;
+
+    if (epfn > (RDWR_COMPAT_MPT_VIRT_END - RDWR_COMPAT_MPT_VIRT_START))
+        epfn = (RDWR_COMPAT_MPT_VIRT_END - RDWR_COMPAT_MPT_VIRT_START) >> 2;
+
+    emap = ( (epfn + ((1UL << (L2_PAGETABLE_SHIFT - 2)) - 1 )) &
+                ~((1UL << (L2_PAGETABLE_SHIFT - 2)) - 1) );
+
+    va = HIRO_COMPAT_MPT_VIRT_START +
+         smap * sizeof(*compat_machine_to_phys_mapping);
+    l3_ro_mpt = l4e_to_l3e(idle_pg_table[l4_table_offset(va)]);
+
+    ASSERT(l3e_get_flags(l3_ro_mpt[l3_table_offset(va)]) & _PAGE_PRESENT);
+
+    l2_ro_mpt = l3e_to_l2e(l3_ro_mpt[l3_table_offset(va)]);
+
+#define MFN(x) (((x) << L2_PAGETABLE_SHIFT) / sizeof(unsigned int))
+#define CNT ((sizeof(*frame_table) & -sizeof(*frame_table)) / \
+             sizeof(*compat_machine_to_phys_mapping))
+    BUILD_BUG_ON((sizeof(*frame_table) & -sizeof(*frame_table)) % \
+                 sizeof(*compat_machine_to_phys_mapping));
+
+    for ( i = smap; i < emap; i += (1UL << (L2_PAGETABLE_SHIFT - 2)) )
+    {
+        va = HIRO_COMPAT_MPT_VIRT_START +
+              i * sizeof(*compat_machine_to_phys_mapping);
+
+        rwva = RDWR_COMPAT_MPT_VIRT_START +
+                i * sizeof(*compat_machine_to_phys_mapping);
+
+        if (l2e_get_flags(l2_ro_mpt[l2_table_offset(va)]) & _PAGE_PRESENT)
+            continue;
+
+        for ( n = 0; n < CNT; ++n)
+            if ( mfn_valid(i + n * PDX_GROUP_COUNT) )
+                break;
+        if ( n == CNT )
+            continue;
+
+        memflags = MEMF_node(phys_to_nid(i << PAGE_SHIFT));
+
+        l1_pg = mfn_to_page(alloc_hotadd_mfn(info));
+        map_pages_to_xen(rwva,
+                    page_to_mfn(l1_pg),
+                    1UL << PAGETABLE_ORDER,
+                    PAGE_HYPERVISOR);
+        memset((void *)rwva, 0x55, 1UL << L2_PAGETABLE_SHIFT);
+        /* NB. Cannot be GLOBAL as the ptes get copied into per-VM space. */
+        l2e_write(&l2_ro_mpt[l2_table_offset(va)], l2e_from_page(l1_pg, _PAGE_PSE|_PAGE_PRESENT));
+    }
+#undef CNT
+#undef MFN
+    return 0;
+}
+
+/*
+ * Allocate and map the machine-to-phys table.
+ * The L3 for RO/RWRW MPT and the L2 for compatible MPT should be setup already
+ */
+int setup_m2p_table(struct mem_hotadd_info *info)
+{
+    unsigned long i, va, smap, emap;
+    unsigned int n, memflags;
+    l2_pgentry_t *l2_ro_mpt = NULL;
+    l3_pgentry_t *l3_ro_mpt = NULL;
+    struct page_info *l1_pg, *l2_pg;
+    int ret = 0;
+
+    ASSERT(l4e_get_flags(idle_pg_table[l4_table_offset(RO_MPT_VIRT_START)])
+            & _PAGE_PRESENT);
+    l3_ro_mpt = l4e_to_l3e(idle_pg_table[l4_table_offset(RO_MPT_VIRT_START)]);
+
+    smap = (info->spfn & (~((1UL << (L2_PAGETABLE_SHIFT - 3)) -1)));
+    emap = ((info->epfn + ((1UL << (L2_PAGETABLE_SHIFT - 3)) - 1 )) &
+                ~((1UL << (L2_PAGETABLE_SHIFT - 3)) -1));
+
+    va = RO_MPT_VIRT_START + smap * sizeof(*machine_to_phys_mapping);
+
+#define MFN(x) (((x) << L2_PAGETABLE_SHIFT) / sizeof(unsigned long))
+#define CNT ((sizeof(*frame_table) & -sizeof(*frame_table)) / \
+             sizeof(*machine_to_phys_mapping))
+
+    BUILD_BUG_ON((sizeof(*frame_table) & -sizeof(*frame_table)) % \
+                 sizeof(*machine_to_phys_mapping));
+
+    i = smap;
+    while ( i < emap )
+    {
+        switch ( m2p_mapped(i) )
+        {
+        case M2P_1G_MAPPED:
+            i = ( i & ~((1UL << (L3_PAGETABLE_SHIFT - 3)) - 1)) +
+                (1UL << (L3_PAGETABLE_SHIFT - 3));
+            continue;
+        case M2P_2M_MAPPED:
+            i = (i & ~((1UL << (L2_PAGETABLE_SHIFT - 3)) - 1)) +
+                (1UL << (L2_PAGETABLE_SHIFT - 3));
+            continue;
+        default:
+            break;
+        }
+
+        va = RO_MPT_VIRT_START + i * sizeof(*machine_to_phys_mapping);
+        memflags = MEMF_node(phys_to_nid(i << PAGE_SHIFT));
+
+        for ( n = 0; n < CNT; ++n)
+            if ( mfn_valid(i + n * PDX_GROUP_COUNT) )
+                break;
+        if ( n == CNT )
+            l1_pg = NULL;
+        else
+        {
+            l1_pg = mfn_to_page(alloc_hotadd_mfn(info));
+            map_pages_to_xen(
+                        RDWR_MPT_VIRT_START + i * sizeof(unsigned long),
+                        page_to_mfn(l1_pg),
+                        1UL << PAGETABLE_ORDER,
+                        PAGE_HYPERVISOR);
+            memset((void *)(RDWR_MPT_VIRT_START + i * sizeof(unsigned long)),
+                   0x55, 1UL << L2_PAGETABLE_SHIFT);
+
+            ASSERT(!(l3e_get_flags(l3_ro_mpt[l3_table_offset(va)]) &
+                  _PAGE_PSE));
+            if ( l3e_get_flags(l3_ro_mpt[l3_table_offset(va)]) &
+              _PAGE_PRESENT )
+                l2_ro_mpt = l3e_to_l2e(l3_ro_mpt[l3_table_offset(va)]) +
+                  l2_table_offset(va);
+            else
+            {
+                l2_pg = alloc_domheap_page(NULL, memflags);
+
+                if (!l2_pg)
+                {
+                    ret = -ENOMEM;
+                    goto error;
+                }
+
+                l2_ro_mpt = page_to_virt(l2_pg);
+                clear_page(l2_ro_mpt);
+                l3e_write(&l3_ro_mpt[l3_table_offset(va)],
+                  l3e_from_page(l2_pg, __PAGE_HYPERVISOR | _PAGE_USER));
+               l2_ro_mpt += l2_table_offset(va);
+            }
+
+            /* NB. Cannot be GLOBAL as shadow_mode_translate reuses this area. */
+            l2e_write(l2_ro_mpt, l2e_from_page(l1_pg,
+                   /*_PAGE_GLOBAL|*/_PAGE_PSE|_PAGE_USER|_PAGE_PRESENT));
+        }
+        if ( !((unsigned long)l2_ro_mpt & ~PAGE_MASK) )
+            l2_ro_mpt = NULL;
+        i += ( 1UL << (L2_PAGETABLE_SHIFT - 3));
+    }
+#undef CNT
+#undef MFN
+
+    ret = setup_compat_m2p_table(info);
+error:
+    return ret;
+}
+
 void __init paging_init(void)
 {
     unsigned long i, mpt_size, va;
