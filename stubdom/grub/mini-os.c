@@ -173,6 +173,8 @@ load_file(char *name, void **ptr, long *size)
 void *kernel_image, *module_image;
 long  kernel_size, module_size;
 char *kernel_arg, *module_arg;
+void *multiboot_next_module;
+struct xen_multiboot_mod_list *multiboot_next_module_header;
 
 kernel_t
 load_image (char *kernel, char *arg, kernel_t suggested_type,
@@ -196,6 +198,8 @@ load_initrd (char *initrd)
     if (module_image)
         free(module_image);
     module_image = NULL;
+    multiboot_next_module = NULL;
+    multiboot_next_module_header = NULL;
     load_file (initrd, &module_image, &module_size);
     return ! errnum;
 }
@@ -203,20 +207,76 @@ load_initrd (char *initrd)
 int
 load_module (char *module, char *arg)
 {
-    if (module_image)
+    void *new_module, *new_module_image;
+    long new_module_size, rounded_new_module_size;
+
+    if (load_file (module, &new_module, &new_module_size))
+        return 0;
+    if (strlen(arg) >= PAGE_SIZE) {
+        /* Too big module command line */
+        errnum = ERR_WONT_FIT;
+        return 0;
+    }
+    rounded_new_module_size = (new_module_size + PAGE_SIZE - 1) & PAGE_MASK;
+
+    if (module_image && !multiboot_next_module_header) {
+        /* Initrd already loaded, drop it */
         free(module_image);
-    module_image = NULL;
-    load_file (module, &module_image, &module_size);
-    if (module_arg)
-        free(module_arg);
-    module_arg = strdup(arg);
-    return ! errnum;
+        if (module_arg)
+            free(module_arg);
+        module_image = NULL;
+    }
+    if (!module_image)
+        /* Reserve one page for the header */
+        multiboot_next_module = (void*) PAGE_SIZE;
+
+    /* Allocate more room for the new module plus its arg */
+    new_module_image = realloc(module_image,
+            (multiboot_next_module - module_image) + rounded_new_module_size + PAGE_SIZE);
+
+    /* Update pointers */
+    multiboot_next_module += new_module_image - module_image;
+    multiboot_next_module_header = (void*) multiboot_next_module_header + (new_module_image - module_image);
+    module_image = new_module_image;
+
+    if ((void*) (multiboot_next_module_header+1) - module_image > PAGE_SIZE) {
+        /* Too many modules */
+        ERR_WONT_FIT;
+        return 0;
+    }
+
+    /* Copy module */
+    memcpy(multiboot_next_module, new_module, new_module_size);
+    multiboot_next_module_header->mod_start = multiboot_next_module - module_image;
+    multiboot_next_module_header->mod_end = multiboot_next_module_header->mod_start + new_module_size - 1;
+    multiboot_next_module += rounded_new_module_size;
+
+    /* Copy cmdline */
+    strcpy(multiboot_next_module, arg);
+    multiboot_next_module_header->cmdline = multiboot_next_module - module_image;
+    multiboot_next_module += PAGE_SIZE;
+
+    /* Pad */
+    multiboot_next_module_header->pad = 0;
+
+    multiboot_next_module_header++;
+
+    return 1;
 }
 
 void
 pv_boot (void)
 {
-    kexec(kernel_image, kernel_size, module_image, module_size, kernel_arg);
+    unsigned long flags = 0;
+    if (multiboot_next_module_header) {
+        /* Termination entry */
+        multiboot_next_module_header->mod_start = 0;
+        /* Total size */
+        module_size = multiboot_next_module - module_image;
+        /* It's a multiboot module */
+        flags |= SIF_MULTIBOOT_MOD;
+    }
+    kexec(kernel_image, kernel_size, module_image, module_size, kernel_arg, flags);
 }
 
 /*

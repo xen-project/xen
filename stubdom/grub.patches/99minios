@@ -151,6 +151,14 @@ Index: grub/stage2/builtins.c
  
  /* print */
  static int
+@@ -2910,6 +2910,7 @@
+   switch (kernel_type)
+     {
+     case KERNEL_TYPE_MULTIBOOT:
++    case KERNEL_TYPE_PV:
+       if (mb_cmdline + len + 1 > (char *) MB_CMDLINE_BUF + MB_CMDLINE_BUFLEN)
+ 	{
+ 	  errnum = ERR_WONT_FIT;
 @@ -3776,6 +3802,7 @@
  };
  

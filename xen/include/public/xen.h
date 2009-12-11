@@ -584,7 +584,34 @@ typedef struct start_info start_info_t;
 /* These flags are passed in the 'flags' field of start_info_t. */
 #define SIF_PRIVILEGED    (1<<0)  /* Is the domain privileged? */
 #define SIF_INITDOMAIN    (1<<1)  /* Is this the initial control domain? */
+#define SIF_MULTIBOOT_MOD (1<<2)  /* Is mod_start a multiboot module? */
 #define SIF_PM_MASK       (0xFF<<8) /* reserve 1 byte for xen-pm options */
+
+/*
+ * A multiboot module is a package containing modules very similar to a
+ * multiboot module array. The only differences are:
+ * - the array of module descriptors is by convention simply at the beginning
+ *   of the multiboot module,
+ * - addresses in the module descriptors are based on the beginning of the
+ *   multiboot module,
+ * - the number of modules is determined by a termination descriptor that has
+ *   mod_start == 0.
+ *
+ * This permits to both build it statically and reference it in a configuration
+ * file, and let the PV guest easily rebase the addresses to virtual addresses
+ * and at the same time count the number of modules.
+ */
+struct xen_multiboot_mod_list
+{
+    /* Address of first byte of the module */
+    uint32_t mod_start;
+    /* Address of last byte of the module (inclusive) */
+    uint32_t mod_end;
+    /* Address of zero-terminated command line */
+    uint32_t cmdline;
+    /* Unused, must be zero */
+    uint32_t pad;
+};
 
 typedef struct dom0_vga_console_info {
     uint8_t video_type; /* DOM0_VGA_CONSOLE_??? */

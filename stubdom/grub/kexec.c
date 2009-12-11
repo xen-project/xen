@@ -103,7 +103,7 @@ int kexec_allocate(struct xc_dom_image *dom, xen_vaddr_t up_to)
     return 0;
 }
 
-void kexec(void *kernel, long kernel_size, void *module, long module_size, char *cmdline)
+void kexec(void *kernel, long kernel_size, void *module, long module_size, char *cmdline, unsigned long flags)
 {
     struct xc_dom_image *dom;
     int rc;
@@ -129,7 +129,7 @@ void kexec(void *kernel, long kernel_size, void *module, long module_size, char 
     dom->ramdisk_blob = module;
     dom->ramdisk_size = module_size;
 
-    dom->flags = 0;
+    dom->flags = flags;
     dom->console_evtchn = start_info.console.domU.evtchn;
     dom->xenstore_evtchn = start_info.store_evtchn;
 
