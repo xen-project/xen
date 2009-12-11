@@ -60,6 +60,18 @@ class UdevEventProtocol(protocol.Protocol):
                     log.info("Removing scsi device %s", hctl)
                     XendNode.instance().remove_PSCSI(hctl)
 
+            elif (udev_event.get('SUBSYSTEM', None) == 'usb'):
+                busid = udev_event.get('KERNEL', None)
+                if busid:
+                    if len(busid.split(':')) != 2:
+                        return
+                if (udev_event['ACTION'] == 'add'):
+                    log.info("Adding usb device %s", busid)
+                    XendNode.instance().add_usbdev(busid)
+                elif (udev_event['ACTION'] == 'remove'):
+                    log.info("Removing usb device %s", busid)
+                    XendNode.instance().remove_usbdev(busid)
+
             elif (udev_event.get('SUBSYSTEM', None) == 'net'):
                 interface = udev_event.get('INTERFACE', None)
                 if (udev_event['ACTION'] == 'add'):

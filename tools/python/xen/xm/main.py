@@ -39,6 +39,7 @@ import xml.dom.minidom
 from xen.util.blkif import blkdev_name_to_number
 from xen.util import vscsi_util
 from xen.util.pci import *
+from xen.util import vusb_util
 
 import warnings
 warnings.filterwarnings('ignore', category=FutureWarning)
@@ -211,6 +212,17 @@ SUBCOMMAND_HELP = {
                         'Detach a specified SCSI device.'),
     'scsi-list'    :  ('<Domain> [--long]',
                         'List all SCSI devices currently attached.'),
+    'usb-attach'  :  ('<Domain> <DevId> <PortNumber> <BusId>',
+                        'Attach a new USB physical bus to domain\'s virtual port.'),
+    'usb-detach'  :  ('<Domain> <DevId> <PortNumber>',
+                        'Detach a USB physical bus from domain\'s virtual port.'),
+    'usb-list'    :  ('<Domain>',
+                        'List domain\'s attachment state of all virtual port .'),
+    'usb-list-assignable-devices' : ('', 'List all the assignable usb devices'),
+    'usb-hc-create'  :  ('<Domain> <USBSpecVer> <NumberOfPorts>',
+                        'Create a domain\'s new virtual USB host controller.'),
+    'usb-hc-destroy'  :  ('<Domain> <DevId>',
+                        'Destroy a domain\'s virtual USB host controller.'),
 
     # tmem
     'tmem-list'     :  ('[-l|--long] [<Domain>|-a|--all]', 'List tmem pools.'),
@@ -429,6 +441,12 @@ device_commands = [
     "scsi-attach",
     "scsi-detach",
     "scsi-list",
+    "usb-attach",
+    "usb-detach",
+    "usb-list",
+    "usb-list-assignable-devices",
+    "usb-hc-create",
+    "usb-hc-destroy",
     ]
 
 vnet_commands = [
@@ -2409,6 +2427,58 @@ def xm_scsi_list(args):
                 print "%(idx)-3d %(backend-id)-3d %(state)-5d %(feature-host)-4d " % ni,
                 print "%(p-dev)-10s %(p-devname)-5s %(v-dev)-10s %(frontstate)-4s" % mi
 
+def xm_usb_list(args):
+    xenapi_unsupported()
+    arg_check(args, 'usb-list', 1)
+    dom = args[0]
+    devs = server.xend.domain.getDeviceSxprs(dom, 'vusb')
+    for x in devs:
+        print "%-3s %-3s %-5s %-7s  %-30s" \
+            % ('Idx', 'BE', 'state', 'usb-ver', 'BE-path')
+        ni = parse_dev_info(x[1])
+        ni['idx'] = int(x[0])
+        usbver = sxp.child_value(x[1], 'usb-ver')
+        if int(usbver) == 1:
+            ni['usb-ver'] = 'USB1.1'
+        else:
+            ni['usb-ver'] = 'USB2.0'
+        print "%(idx)-3d %(backend-id)-3d %(state)-5d %(usb-ver)-7s %(be-path)-30s  " % ni
+
+        ports = sxp.child(x[1], 'port')
+        for port in ports[1:]:
+            try:
+                num, bus = port
+                if bus != "" and vusb_util.usb_device_is_connected(bus):
+                        idvendor = vusb_util.get_usb_idvendor(bus)
+                        idproduct = vusb_util.get_usb_idproduct(bus)
+                        prodinfo = vusb_util.get_usbdevice_info(bus)
+                        print "port %i: %s [ID %-4s:%-4s %s]" \
+                            % (int(num), str(bus), idvendor, idproduct, prodinfo)
+                else:
+                    print "port %i: " % int(num) + str(bus)
+            except TypeError:
+                pass
+
+def xm_usb_list_assignable_devices(args):
+    xenapi_unsupported()
+    arg_check(args, 'usb-list-assignable-devices', 0)
+
+    usb_devs = vusb_util.get_usb_devices()
+    buses = vusb_util.get_assigned_buses()
+
+    for x in buses:
+        try:
+            usb_devs.remove(x)
+        except ValueError:
+            pass
+
+    for dev in usb_devs:
+        idvendor = vusb_util.get_usb_idvendor(dev)
+        idproduct = vusb_util.get_usb_idproduct(dev)
+        prodinfo = vusb_util.get_usbdevice_info(dev)
+        print "%-13s: ID %-4s:%-4s %s" \
+                % (dev, idvendor, idproduct, prodinfo)
+
 def parse_block_configuration(args):
     dom = args[0]
 
@@ -2757,6 +2827,64 @@ def xm_scsi_attach(args):
             scsi.append(['backend', args[3]])
         server.xend.domain.device_configure(dom, scsi)
 
+def xm_usb_attach(args):
+    xenapi_unsupported()
+    arg_check(args, 'usb-attach', 4)
+    dom = args[0]
+    dev = args[1]
+    port = args[2]
+    bus = args[3]
+
+    dev_exist = 0
+    num_ports = 0
+    devs = server.xend.domain.getDeviceSxprs(dom, 'vusb')
+    for x in devs:
+        if int(x[0]) == int(dev):
+            dev_exist = 1
+            num_ports = sxp.child_value(x[1], 'num-ports')
+
+    if dev_exist == 0:
+        print "Cannot find device '%s' in domain '%s'" % (dev,dom)
+        return False
+
+    if int(port) < 1 or int(port) > int(num_ports):
+        print "Invalid Port Number '%s'" % port
+        return False
+
+    bus_match = re.match(r"(^(?P<bus>[0-9]{1,2})[-,])" + \
+                         r"(?P<root_port>[0-9]{1,2})" + \
+                         r"(?P<port>([\.,]{1}[0-9]{1,2}){0,5})$", bus)
+    if bus_match is None:
+        print "Invalid Busid '%s'" % bus
+        return False
+
+    if vusb_util.bus_is_assigned(bus):
+        print "Cannot assign already attached bus '%s', detach first." % bus
+        return False
+
+    prev_bus = vusb_util.get_assigned_bus(domain_name_to_domid(dom), dev, port)
+    if not prev_bus == "": 
+        print "Cannot override already attached port '%s', detach first." % port
+        return False
+
+    usb = ['vusb', ['port', [port, str(bus)]]]
+    server.xend.domain.device_configure(dom, usb, dev)
+
+def xm_usb_hc_create(args):
+    xenapi_unsupported()
+    arg_check(args, 'usb-hc-create', 3)
+    dom = args[0]
+    ver = args[1]
+    num = args[2]
+    vusb_config = ['vusb']
+    vusb_config.append(['usb-ver', str(ver)])
+    vusb_config.append(['num-ports', str(num)])
+    port_config = ['port']
+    for i in range(1, int(num) + 1):
+        port_config.append(['%i' % i, ""])
+    vusb_config.append(port_config)
+    server.xend.domain.device_create(dom, vusb_config)
+
 def detach(args, deviceClass):
     rm_cfg = True
     dom = args[0]
@@ -2941,6 +3069,22 @@ def xm_scsi_detach(args):
 
     else:
         server.xend.domain.device_configure(dom, scsi)
+
+def xm_usb_detach(args):
+    xenapi_unsupported()
+    arg_check(args, 'usb-detach', 3)
+    dom = args[0]
+    dev = args[1]
+    port = args[2]
+    usb = ['vusb', ['port', [port, '']]]
+    server.xend.domain.device_configure(dom, usb, dev)
+
+def xm_usb_hc_destroy(args):
+    xenapi_unsupported()
+    arg_check(args, 'usb-hc-destroy', 2)
+    dom = args[0]
+    dev = args[1]
+    server.xend.domain.destroyDevice(dom, 'vusb', dev)
 
 def xm_vnet_list(args):
     xenapi_unsupported()
@@ -3372,6 +3516,13 @@ commands = {
     "scsi-attach": xm_scsi_attach,
     "scsi-detach": xm_scsi_detach,
     "scsi-list": xm_scsi_list,
+    # vusb
+    "usb-attach": xm_usb_attach,
+    "usb-detach": xm_usb_detach,
+    "usb-list": xm_usb_list,
+    "usb-list-assignable-devices": xm_usb_list_assignable_devices,
+    "usb-hc-create": xm_usb_hc_create,
+    "usb-hc-destroy": xm_usb_hc_destroy,
     # tmem
     "tmem-thaw": xm_tmem_thaw,
     "tmem-freeze": xm_tmem_freeze,

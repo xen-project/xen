@@ -350,6 +350,18 @@ gopts.var('vscsi', val='PDEV,VDEV[,DOM]',
           use="""Add a SCSI device to a domain. The physical device is PDEV,
           which is exported to the domain as VDEV(X:X:X:X).""")
 
+gopts.var('vusb', val="usbver=USBVER,numports=NUMPORTS," + \
+          "port_1=PORT1,port_2=PORT2,port_3=PORT3,port_4=PORT4" + \
+          "port_5=PORT5,port_6=PORT6,port_7=PORT7,port_8=PORT8" + \
+          "port_9=PORT9,port_10=PORT10,port_11=PORT11,port_12=PORT12" + \
+          "port_13=PORT13,port_14=PORT14,port_15=PORT15,port_16=PORT16",
+          fn=append_value, default=[],
+          use="""Add a Virtual USB Host Controller to a domain.
+          The USB Spec Version is usbver (1|2, default: 2).
+          usbver=1 means USB1.1, usbver=2 mens USB2.0.
+          The number of root ports is numports (1 to 16, default: 8).
+          This option may be repeated to add more than one host controller.""")
+
 gopts.var('ioports', val='FROM[-TO]',
           fn=append_value, default=[],
           use="""Add a legacy I/O range to a domain, using given params (in hex).
@@ -849,6 +861,38 @@ def configure_vscsis(config_devs, vals):
             device.append(['backend', config['backend']])
         config_devs.append(['device', device])
 
+def configure_vusbs(config_devs, vals):
+    """Create the config for virtual usb host controllers.
+    """
+    for f in vals.vusb:
+        d = comma_sep_kv_to_dict(f)
+        config = ['vusb']
+
+        usbver = 2
+        if d.has_key('usbver'):
+            usbver = int(d['usbver'])
+        if usbver == 1 or usbver == 2:
+            config.append(['usb-ver', str(usbver)])
+        else:
+            err('Invalid vusb option: ' + 'usbver')
+
+        numports = 8
+        if d.has_key('numports'):
+            numports = d['numports']
+        if int(numports) < 1 or int(numports) > 16:
+            err('Invalid vusb option: ' + 'numports')
+        config.append(['num-ports', str(numports)])
+
+        port_config = []
+        for i in range(1, int(numports) + 1):
+            if d.has_key('port_%i' % i):
+                port_config.append(['%i' % i, str(d['port_%i' % i])])
+            else:
+                port_config.append(['%i' % i, ""])
+        port_config.insert(0, 'port')
+        config.append(port_config)
+        config_devs.append(['device', config])        
+
 def configure_ioports(config_devs, vals):
     """Create the config for legacy i/o ranges.
     """
@@ -1103,6 +1147,7 @@ def make_config(vals):
     configure_disks(config_devs, vals)
     configure_pci(config_devs, vals)
     configure_vscsis(config_devs, vals)
+    configure_vusbs(config_devs, vals)
     configure_ioports(config_devs, vals)
     configure_irq(config_devs, vals)
     configure_vifs(config_devs, vals)

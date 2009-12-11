@@ -24,6 +24,7 @@ import xen.lowlevel.xc
 from xen.util import Brctl
 from xen.util import pci as PciUtil
 from xen.util import vscsi_util
+from xen.util import vusb_util
 from xen.xend import XendAPIStore
 from xen.xend import osdep
 from xen.xend.XendConstants import *
@@ -478,6 +479,20 @@ class XendNode:
 
                 return
 
+    def add_usbdev(self, busid):
+        # if the adding usb device should be owned by usbback
+        # and is probed by other usb drivers, seize it!
+        bus, intf = busid.split(':')
+        buses = vusb_util.get_assigned_buses()
+        if str(bus) in buses:
+            if not vusb_util.usb_intf_is_binded(busid):
+                log.debug("add_usb(): %s is binded to other driver" % busid)
+                vusb_util.unbind_usb_device(bus)
+                vusb_util.bind_usb_device(bus)
+        return
+
+    def remove_usbdev(self, busid):
+        log.debug("remove_usbdev(): Not implemented.")
 
 ##    def network_destroy(self, net_uuid):
  ##       del self.networks[net_uuid]

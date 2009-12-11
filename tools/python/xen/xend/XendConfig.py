@@ -1400,6 +1400,14 @@ class XendConfig(dict):
                           (vscsi_devs, vscsi_mode))
                 return vscsi_devs_uuid
 
+            if dev_type == 'vusb':
+                vusb_devs_uuid = sxp.child_value(config, 'uuid',
+                                                uuid.createString())
+                vusb_dict = self.vusb_convert_sxp_to_dict(config)
+                vusb_dict['uuid'] = vusb_devs_uuid
+                target['devices'][vusb_devs_uuid] = (dev_type, vusb_dict)
+                return vusb_devs_uuid
+
             for opt_val in config[1:]:
                 try:
                     opt, val = opt_val
@@ -1776,6 +1784,68 @@ class XendConfig(dict):
 
         return dev_config
 
+    def vusb_convert_sxp_to_dict(self, dev_sxp):
+        """Convert vusb device sxp to dict
+        @param dev_sxp: device configuration
+        @type  dev_sxp: SXP object (parsed config)
+        @return: dev_config
+        @rtype: dictionary
+        """
+        # Parsing USB devices SXP. 
+        #
+        # USB device's SXP looks like this:
+        #
+        # [device,
+        #   [vusb,
+        #     [usb-ver, 2],
+        #     [num-ports, 8],
+        #     [port,
+        #          [1, 1-1],
+        #          [2, 1-2],
+        #          [3, ''],
+        #          [4, ''],
+        #          [5, ''],
+        #          [6, ''],
+        #          [7, 6-2.1],        
+        #          [8, '']
+        #     ]
+        #   ],
+        #   [vusb,
+        #     [usb-ver, 1],
+        #     [num-ports, 2],
+        #     [port,
+        #          [1, 4-1],
+        #          [2, 4-2]
+        #     ]
+        #   ]  
+        # ]
+        #
+        # The dict looks like this
+        #
+        # { usb-ver: 2,
+        #   num-ports: 8,
+        #   port-1: 1-1,
+        #   port-2: 1-2,
+        #   port-3: "",
+        #   port-4: "",
+        #   port-5: "",
+        #   port-6: "",
+        #   port-7: "",
+        #   port-8: "" }
+
+        dev_config = {}
+        dev_config['usb-ver'] = sxp.child(dev_sxp, 'usb-ver')[1]
+        dev_config['num-ports'] = sxp.child(dev_sxp, 'num-ports')[1]
+        ports = sxp.child(dev_sxp, 'port')
+        for port in ports[1:]:
+            try:
+                num, bus = port
+                dev_config['port-%i' % int(num)] = str(bus)
+            except TypeError:
+                pass
+
+        return dev_config
+
     def console_add(self, protocol, location, other_config = {}):
         dev_uuid = uuid.createString()
         if protocol == 'vt100':
@@ -2001,6 +2071,18 @@ class XendConfig(dict):
                         sxpr.append(['backend', dev_info['backend']])
                 for pci_dev_info in dev_info['devs']:
                     sxpr.append(dev_dict_to_sxp(pci_dev_info))
+                sxprs.append((dev_type, sxpr))
+            elif dev_type == 'vusb':
+                sxpr = ['vusb', ['uuid', dev_info['uuid']],
+                                ['usb-ver', dev_info['usb-ver']],
+                                ['num-ports', dev_info['num-ports']]]
+                port_sxpr = ['port']
+                for i in range(1, int(dev_info['num-ports']) + 1):
+                    if dev_info.has_key('port-%i' % i):
+                        port_sxpr.append([i, str(dev_info['port-%i' % i])])
+                    else:
+                        port_sxpr.append([i, ""])
+                sxpr.append(port_sxpr)
                 sxprs.append((dev_type, sxpr))
             else:
                 sxpr = self.device_sxpr(dev_type = dev_type,

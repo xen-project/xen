@@ -1102,6 +1102,27 @@ class XendDomainInfo:
 
         return True
 
+    def vusb_device_configure(self, dev_sxp, devid):
+        """Configure a virtual root port.
+        """
+        dev_class = sxp.name(dev_sxp)
+        if dev_class != 'vusb':
+            return False
+
+        dev_config = {}
+        ports = sxp.child(dev_sxp, 'port')
+        for port in ports[1:]:
+            try:
+                num, bus = port
+                dev_config['port-%i' % int(num)] = str(bus)
+            except TypeError:
+                pass
+
+        dev_control = self.getDeviceController(dev_class)
+        dev_control.reconfigureDevice(devid, dev_config)
+
+        return True
+
     def device_configure(self, dev_sxp, devid = None):
         """Configure an existing device.
         
@@ -1122,6 +1143,9 @@ class XendDomainInfo:
 
         if dev_class == 'vscsi':
             return self.vscsi_device_configure(dev_sxp)
+
+        if dev_class == 'vusb':
+            return self.vusb_device_configure(dev_sxp, devid)
 
         for opt_val in dev_sxp[1:]:
             try:
@@ -1376,6 +1400,13 @@ class XendDomainInfo:
             devs = sxp.children(dev_info, 'dev')
             if devid == int(sxp.child_value(devs[0], 'devid')):
                 return dev_info
+        return None
+
+    def _getDeviceInfo_vusb(self, devid):
+        for dev_type, dev_info in self.info.all_devices_sxpr():
+            if dev_type != 'vusb':
+                continue
+            return dev_info
         return None
 
     def _get_assigned_pci_devices(self, devid = 0):
