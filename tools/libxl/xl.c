@@ -904,10 +904,10 @@ void cd_insert(char *dom, char *virtdev, char *phys)
                 disk.phystype = PHYSTYPE_FILE;
             }
         } else {
-            p = '\0';
-            disk.physpath = strdup(p);
+            *p = '\0';
             p++;
-            libxl_string_to_phystype(&ctx, p, &disk.phystype);
+            disk.physpath = p;
+            libxl_string_to_phystype(&ctx, phys, &disk.phystype);
         }
     } else {
             disk.physpath = NULL;
