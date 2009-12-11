@@ -1,10 +1,10 @@
 #################################
- __  __            _____ _  _   
- \ \/ /___ _ __   |___ /| || |  
-  \  // _ \ '_ \    |_ \| || |_ 
-  /  \  __/ | | |  ___) |__   _|
- /_/\_\___|_| |_| |____(_) |_|  
-                                 
+ __  __            _  _    ___  
+ \ \/ /___ _ __   | || |  / _ \ 
+  \  // _ \ '_ \  | || |_| | | |
+  /  \  __/ | | | |__   _| |_| |
+ /_/\_\___|_| |_|    |_|(_)___/ 
+
 #################################
 
 http://www.xen.org/
@@ -17,14 +17,12 @@ Systems Research Group of the University of Cambridge Computer
 Laboratory, as part of the UK-EPSRC funded XenoServers project.  Xen
 is freely-distributable Open Source software, released under the GNU
 GPL. Since its initial public release, Xen has grown a large
-development community, spearheaded by XenSource Inc, a company created
-by the original Xen development team to build enterprise products
-around Xen.
+development community, spearheaded by xen.org (http://www.xen.org).
 
-The 3.4 release offers excellent performance, hardware support and
+The 4.0 release offers excellent performance, hardware support and
 enterprise-grade features such as x86_32-PAE, x86_64, SMP guests and
-live relocation of VMs. Ports to Linux 2.6, Linux 2.4, NetBSD, FreeBSD
-and Solaris are available from the community.
+live relocation of VMs. Ports to Linux, NetBSD, FreeBSD and Solaris
+are available from the community.
 
 This file contains some quick-start instructions to install Xen on
 your system. For full documentation, see the Xen User Manual. If this
@@ -33,53 +31,8 @@ is a pre-built release then you can find the manual at:
 If you have a source release, then 'make -C docs' will build the
 manual at docs/pdf/user.pdf.
 
-Quick-Start Guide - Pre-Built Binary Release
-============================================
-
-[NB. Unless noted otherwise, all the following steps should be
-performed with root privileges.]
-
-1. Install the binary distribution onto your filesystem:
-
-    # sh ./install.sh
-
-   Among other things, this will install Xen and Xen-ready Linux
-   kernel files in /boot, kernel modules and Python packages in /lib,
-   and various control tools in standard 'bin' directories.
-
-2. Configure your bootloader to boot Xen and an initial Linux virtual
-   machine. Note that Xen currently only works with GRUB and pxelinux
-   derived boot loaders: less common alternatives such as LILO are
-   *not* supported. You can most likely find your GRUB menu file at
-   /boot/grub/menu.lst: edit this file to include an entry like the
-   following:
-
-    title Xen 3.4 / XenLinux 2.6
-       kernel /boot/xen-3.4.gz console=vga
-       module /boot/vmlinuz-2.6-xen root=<root-dev> ro console=tty0
-       module /boot/initrd-2.6-xen.img
-
-   NB: Not all kernel configs need an initial ram disk (initrd), but
-   if you do specify one you'll need to use the 'module' grub directive
-   rather than 'initrd'.
-
-   The linux command line takes all the usual options, such as
-   root=<root-dev> to specify your usual root partition (e.g.,
-   /dev/hda1).
-
-   The Xen command line takes a number of optional arguments described
-   in the manual. The most common is 'dom0_mem=xxxM' which sets the
-   amount of memory to allocate for use by your initial virtual
-   machine (known as domain 0). Note that Xen itself reserves about
-   32MB memory for internal use, which is not available for allocation
-   to virtual machines.
-
-3. Reboot your system and select the "Xen 3.4 / XenLinux 2.6" menu
-   option. After booting Xen, Linux will start and your initialisation
-   scripts should execute in the usual way.
-
-Quick-Start Guide - Source Release
-==================================
+Quick-Start Guide
+=================
 
 First, there are a number of prerequisites for building a Xen source
 release. Make sure you have all the following installed, either by
