@@ -2670,10 +2670,9 @@ class XendDomainInfo:
                                     nodeload[i] += 1
                                     break
                 for i in range(0, nr_nodes):
-                    if len(info['node_to_cpu'][i]) > 0 and i in node_list:
-                        nodeload[i] = int(nodeload[i] * 16 / len(info['node_to_cpu'][i]))
-                    else:
-                        nodeload[i] = sys.maxint
+                    nodeload[i] = int(nodeload[i] * 16 / len(info['node_to_cpu'][i]))
+                    if len(info['node_to_cpu'][i]) == 0 or i not in node_list:
+                        nodelist[i] += 8
                 return map(lambda x: x[0], sorted(enumerate(nodeload), key=lambda x:x[1]))
 
             info = xc.physinfo()
