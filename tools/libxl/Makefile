@@ -48,7 +48,7 @@ $(LIBCONFIG_SOURCE).tar.gz:
 
 $(LIBCONFIG_OUTPUT)/libconfig.so: $(LIBCONFIG_SOURCE).tar.gz
 	[ ! -d "$(LIBCONFIG_SOURCE)" ] && tar xzf $<
-	cd $(LIBCONFIG_SOURCE) && ./configure --prefix=$(DESTDIR)$(PREFIX) && $(MAKE)
+	cd $(LIBCONFIG_SOURCE) && ./configure --prefix=$(DESTDIR)$(PREFIX) --disable-cxx && $(MAKE)
 
 xl.o: $(LIBCONFIG_OUTPUT)/libconfig.so xl.c
 	$(CC) $(CFLAGS) -I$(LIBCONFIG_SOURCE) -c xl.c
