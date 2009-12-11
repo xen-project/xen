@@ -596,6 +596,32 @@ void __init paging_init(void)
     l2_pgentry_t *l2_ro_mpt = NULL;
     struct page_info *l1_pg, *l2_pg, *l3_pg;
 
+    /*
+     * We setup the L3s for 1:1 mapping if host support memory hotplug
+     * to avoid sync the 1:1 mapping on page fault handler
+     */
+    if ( mem_hotplug )
+    {
+        unsigned long va;
+
+        for ( va = DIRECTMAP_VIRT_START;
+              va < DIRECTMAP_VIRT_END;
+              va += (1UL << L4_PAGETABLE_SHIFT) )
+        {
+            if ( !(l4e_get_flags(idle_pg_table[l4_table_offset(va)]) &
+                  _PAGE_PRESENT) )
+            {
+                l3_pg = alloc_domheap_page(NULL, 0);
+                if ( !l3_pg )
+                    goto nomem;
+                l3_ro_mpt = page_to_virt(l3_pg);
+                clear_page(l3_ro_mpt);
+                l4e_write(&idle_pg_table[l4_table_offset(va)],
+                  l4e_from_page(l3_pg, __PAGE_HYPERVISOR));
+            }
+        }
+    }
+
     /* Create user-accessible L2 directory to map the MPT for guests. */
     if ( (l3_pg = alloc_domheap_page(NULL, 0)) == NULL )
         goto nomem;
