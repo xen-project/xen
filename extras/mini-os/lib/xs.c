@@ -49,6 +49,7 @@ void *xs_read(struct xs_handle *h, xs_transaction_t t,
     msg = xenbus_read(t, path, &value);
     if (msg) {
 	printk("xs_read(%s): %s\n", path, msg);
+	free(msg);
 	return NULL;
     }
 
@@ -69,6 +70,7 @@ bool xs_write(struct xs_handle *h, xs_transaction_t t,
     msg = xenbus_write(t, path, value);
     if (msg) {
 	printk("xs_write(%s): %s\n", path, msg);
+	free(msg);
 	return false;
     }
     return true;
