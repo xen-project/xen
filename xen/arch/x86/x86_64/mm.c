@@ -249,6 +249,67 @@ static int m2p_mapped(unsigned long spfn)
     return M2P_NO_MAPPED;
 }
 
+int share_hotadd_m2p_table(struct mem_hotadd_info *info)
+{
+    unsigned long i, n, v, m2p_start_mfn = 0;
+    l3_pgentry_t l3e;
+    l2_pgentry_t l2e;
+
+    /* M2P table is mappable read-only by privileged domains. */
+    for ( v  = RDWR_MPT_VIRT_START;
+          v != RDWR_MPT_VIRT_END;
+          v += n << PAGE_SHIFT )
+    {
+        n = L2_PAGETABLE_ENTRIES * L1_PAGETABLE_ENTRIES;
+        l3e = l4e_to_l3e(idle_pg_table[l4_table_offset(v)])[
+            l3_table_offset(v)];
+        if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) )
+            continue;
+        if ( !(l3e_get_flags(l3e) & _PAGE_PSE) )
+        {
+            n = L1_PAGETABLE_ENTRIES;
+            l2e = l3e_to_l2e(l3e)[l2_table_offset(v)];
+            if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
+                continue;
+            m2p_start_mfn = l2e_get_pfn(l2e);
+        }
+        else
+            continue;
+
+        for ( i = 0; i < n; i++ )
+        {
+            struct page_info *page = mfn_to_page(m2p_start_mfn + i);
+            if (hotadd_mem_valid(m2p_start_mfn + i, info))
+                share_xen_page_with_privileged_guests(page, XENSHARE_readonly);
+        }
+    }
+
+    for ( v  = RDWR_COMPAT_MPT_VIRT_START;
+          v != RDWR_COMPAT_MPT_VIRT_END;
+          v += 1 << L2_PAGETABLE_SHIFT )
+    {
+        l3e = l4e_to_l3e(idle_pg_table[l4_table_offset(v)])[
+            l3_table_offset(v)];
+        if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) )
+            continue;
+        l2e = l3e_to_l2e(l3e)[l2_table_offset(v)];
+        if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
+            continue;
+        m2p_start_mfn = l2e_get_pfn(l2e);
+
+        for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
+        {
+            struct page_info *page = mfn_to_page(m2p_start_mfn + i);
+            if (hotadd_mem_valid(m2p_start_mfn + i, info))
+            {
+                printk("now share page %lx\n", m2p_start_mfn + i);
+                share_xen_page_with_privileged_guests(page, XENSHARE_readonly);
+            }
+        }
+    }
+    return 0;
+}
+
 static void destroy_compat_m2p_mapping(struct mem_hotadd_info *info)
 {
     unsigned long i, va, rwva, pt_pfn;
