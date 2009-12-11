@@ -130,7 +130,7 @@ int build_pv(struct libxl_ctx *ctx, uint32_t domid,
         XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "xc_dom_allocate failed");
         return -1;
     }
-    if ((ret = xc_dom_linux_build(ctx->xch, dom, domid, info->max_memkb / 1024,
+    if ((ret = xc_dom_linux_build(ctx->xch, dom, domid, info->target_memkb / 1024,
                                   info->kernel, info->u.pv.ramdisk, flags,
                                   state->store_port, &state->store_mfn,
                                   state->console_port, &state->console_mfn)) != 0) {
