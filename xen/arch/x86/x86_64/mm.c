@@ -1182,6 +1182,87 @@ int check_descriptor(const struct domain *dom, struct desc_struct *d)
     return 0;
 }
 
+int pagefault_by_memadd(unsigned long addr, struct cpu_user_regs *regs)
+{
+    struct domain *d = current->domain;
+
+    if (guest_mode(regs) &&
+        is_pv_32bit_domain(d) &&
+        ((addr >= HYPERVISOR_COMPAT_VIRT_START(d)) &&
+             (addr < MACH2PHYS_COMPAT_VIRT_END)) )
+            return 1;
+    return 0;
+}
+
+int handle_memadd_fault(unsigned long addr, struct cpu_user_regs *regs)
+{
+    struct domain *d = current->domain;
+    l4_pgentry_t *pl4e = NULL;
+    l4_pgentry_t l4e;
+    l3_pgentry_t  *pl3e = NULL;
+    l3_pgentry_t l3e;
+    l2_pgentry_t *pl2e = NULL;
+    l2_pgentry_t l2e, idle_l2e;
+    unsigned long mfn, idle_index;
+    int ret = 0;
+
+    if (!is_pv_32on64_domain(d))
+        return 0;
+
+    if ((addr < HYPERVISOR_COMPAT_VIRT_START(d)) ||
+             (addr > MACH2PHYS_COMPAT_VIRT_END) )
+        return 0;
+
+    mfn = (read_cr3()) >> PAGE_SHIFT;
+
+    pl4e = map_domain_page(mfn);
+
+    l4e = pl4e[addr];
+
+    if (!(l4e_get_flags(l4e) & _PAGE_PRESENT))
+        goto unmap;
+
+    mfn = l4e_get_pfn(l4e);
+    /* We don't need get page type here since it is current CR3 */
+    pl3e = map_domain_page(mfn);
+
+    l3e = pl3e[3];
+
+    if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) )
+        goto unmap;
+
+    mfn = l3e_get_pfn(l3e);
+    pl2e = map_domain_page(mfn);
+
+    l2e = pl2e[l2_table_offset(addr)];
+
+    if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT))
+        goto unmap;
+
+    idle_index = (l2_table_offset(addr) -
+                        COMPAT_L2_PAGETABLE_FIRST_XEN_SLOT(d))/
+                  sizeof(l2_pgentry_t);
+    idle_l2e = compat_idle_pg_table_l2[idle_index];
+    if (!(l2e_get_flags(idle_l2e) & _PAGE_PRESENT))
+        goto unmap;
+
+    memcpy(&pl2e[l2_table_offset(addr)],
+            &compat_idle_pg_table_l2[idle_index],
+            sizeof(l2_pgentry_t));
+
+    ret = EXCRET_fault_fixed;
+
+unmap:
+    if ( pl4e )
+        unmap_domain_page(pl4e);
+    if ( pl3e )
+        unmap_domain_page(pl3e);
+    if ( pl2e )
+        unmap_domain_page(pl2e);
+
+    return ret;
+}
+
 void domain_set_alloc_bitsize(struct domain *d)
 {
     if ( !is_pv_32on64_domain(d) ||

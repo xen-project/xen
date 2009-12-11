@@ -1230,6 +1230,10 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
         return ret;
     }
 
+    if ( !(regs->error_code & PFEC_page_present) &&
+          (pagefault_by_memadd(addr, regs)) )
+        return handle_memadd_fault(addr, regs);
+
     if ( unlikely(IN_HYPERVISOR_RANGE(addr)) )
     {
         if ( !(regs->error_code & PFEC_reserved_bit) &&

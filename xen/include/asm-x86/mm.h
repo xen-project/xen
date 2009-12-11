@@ -476,6 +476,21 @@ int  ptwr_do_page_fault(struct vcpu *, unsigned long,
 
 int audit_adjust_pgtables(struct domain *d, int dir, int noisy);
 
+#ifdef CONFIG_X86_64
+extern int pagefault_by_memadd(unsigned long addr, struct cpu_user_regs *regs);
+extern int handle_memadd_fault(unsigned long addr, struct cpu_user_regs *regs);
+#else
+int pagefault_by_memadd(unsigned long addr, struct cpu_user_regs *regs)
+{
+    return 0;
+}
+
+int handle_memadd_fault(unsigned long addr, struct cpu_user_regs *regs)
+{
+    return 0;
+}
+#endif
+
 #ifndef NDEBUG
 
 #define AUDIT_SHADOW_ALREADY_LOCKED ( 1u << 0 )
