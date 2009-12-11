@@ -117,7 +117,8 @@ extern void timer_init(void);
  * Next timer deadline for each CPU.
  * Modified only by the local CPU and never in interrupt context.
  */
-DECLARE_PER_CPU(s_time_t, timer_deadline);
+DECLARE_PER_CPU(s_time_t, timer_deadline_start);
+DECLARE_PER_CPU(s_time_t, timer_deadline_end);
 
 /* Arch-defined function to reprogram timer hardware for new deadline. */
 extern int reprogram_timer(s_time_t timeout);

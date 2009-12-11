@@ -1367,7 +1367,7 @@ void pit_broadcast_exit(void)
     int cpu = smp_processor_id();
 
     if ( cpu_test_and_clear(cpu, pit_broadcast_mask) )
-        reprogram_timer(per_cpu(timer_deadline, cpu));
+        reprogram_timer(per_cpu(timer_deadline_start, cpu));
 }
 
 int pit_broadcast_is_available(void)

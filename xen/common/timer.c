@@ -38,7 +38,8 @@ struct timers {
 
 static DEFINE_PER_CPU(struct timers, timers);
 
-DEFINE_PER_CPU(s_time_t, timer_deadline);
+DEFINE_PER_CPU(s_time_t, timer_deadline_start);
+DEFINE_PER_CPU(s_time_t, timer_deadline_end);
 
 /****************************************************************************
  * HEAP OPERATIONS.
@@ -425,10 +426,11 @@ static void timer_softirq_action(void)
     if ( unlikely(ts->overflow) )
     {
         /* Find earliest deadline at head of list or top of heap. */
-        this_cpu(timer_deadline) = ts->list->expires;
+        this_cpu(timer_deadline_start) = ts->list->expires;
         if ( (GET_HEAP_SIZE(heap) != 0) &&
-             ((t = heap[1])->expires < this_cpu(timer_deadline)) )
-            this_cpu(timer_deadline) = t->expires;
+             ((t = heap[1])->expires < this_cpu(timer_deadline_start)) )
+            this_cpu(timer_deadline_start) = t->expires;
+        this_cpu(timer_deadline_end) = this_cpu(timer_deadline_start);
     }
     else
     {
@@ -455,10 +457,11 @@ static void timer_softirq_action(void)
                 end = t->expires_end;
         }
 
-        this_cpu(timer_deadline) = start;
+        this_cpu(timer_deadline_start) = start;
+        this_cpu(timer_deadline_end) = end;
     }
 
-    if ( !reprogram_timer(this_cpu(timer_deadline)) )
+    if ( !reprogram_timer(this_cpu(timer_deadline_start)) )
         raise_softirq(TIMER_SOFTIRQ);
 
     spin_unlock_irq(&ts->lock);

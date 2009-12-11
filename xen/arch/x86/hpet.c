@@ -190,10 +190,10 @@ again:
     /* find all expired events */
     for_each_cpu_mask(cpu, ch->cpumask)
     {
-        if ( per_cpu(timer_deadline, cpu) <= now )
+        if ( per_cpu(timer_deadline_start, cpu) <= now )
             cpu_set(cpu, mask);
-        else if ( per_cpu(timer_deadline, cpu) < next_event )
-            next_event = per_cpu(timer_deadline, cpu);
+        else if ( per_cpu(timer_deadline_end, cpu) < next_event )
+            next_event = per_cpu(timer_deadline_end, cpu);
     }
 
     /* wakeup the cpus which have an expired event. */
@@ -629,7 +629,7 @@ void hpet_broadcast_enter(void)
     int cpu = smp_processor_id();
     struct hpet_event_channel *ch = per_cpu(cpu_bc_channel, cpu);
 
-    if ( this_cpu(timer_deadline) == 0 )
+    if ( this_cpu(timer_deadline_start) == 0 )
         return;
 
     if ( !ch )
@@ -649,8 +649,8 @@ void hpet_broadcast_enter(void)
     cpu_set(cpu, ch->cpumask);
 
     /* reprogram if current cpu expire time is nearer */
-    if ( this_cpu(timer_deadline) < ch->next_event )
-        reprogram_hpet_evt_channel(ch, this_cpu(timer_deadline), NOW(), 1);
+    if ( this_cpu(timer_deadline_end) < ch->next_event )
+        reprogram_hpet_evt_channel(ch, this_cpu(timer_deadline_end), NOW(), 1);
 
     spin_unlock(&ch->lock);
 }
@@ -660,7 +660,7 @@ void hpet_broadcast_exit(void)
     int cpu = smp_processor_id();
     struct hpet_event_channel *ch = per_cpu(cpu_bc_channel, cpu);
 
-    if ( this_cpu(timer_deadline) == 0 )
+    if ( this_cpu(timer_deadline_start) == 0 )
         return;
 
     BUG_ON( !ch );
@@ -671,7 +671,7 @@ void hpet_broadcast_exit(void)
     {
         /* Reprogram the deadline; trigger timer work now if it has passed. */
         enable_APIC_timer();
-        if ( !reprogram_timer(per_cpu(timer_deadline, cpu)) )
+        if ( !reprogram_timer(this_cpu(timer_deadline_start)) )
             raise_softirq(TIMER_SOFTIRQ);
 
         if ( cpus_empty(ch->cpumask) && ch->next_event != STIME_MAX )
