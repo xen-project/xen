@@ -67,8 +67,8 @@ int xencons_ring_send(struct consfront_dev *dev, const char *data, unsigned len)
 
 static void handle_input(evtchn_port_t port, struct pt_regs *regs, void *data)
 {
-#ifdef HAVE_LIBC
 	struct consfront_dev *dev = (struct consfront_dev *) data;
+#ifdef HAVE_LIBC
         int fd = dev ? dev->fd : -1;
 
         if (fd != -1)
