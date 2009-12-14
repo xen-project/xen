@@ -338,7 +338,6 @@ static struct page_info * p2m_pod_cache_get(struct domain *d,
 
         /* Break up a superpage to make single pages. NB count doesn't
          * need to be adjusted. */
-        printk("%s: Breaking up superpage.\n", __func__);
         p = page_list_remove_head(&p2md->pod.super);
         mfn = mfn_x(page_to_mfn(p));
 
@@ -529,7 +528,7 @@ p2m_pod_set_mem_target(struct domain *d, unsigned long target)
     if ( pod_target > p2md->pod.entry_count )
         pod_target = p2md->pod.entry_count;
 
-    ASSERT( pod_target > p2md->pod.count );
+    ASSERT( pod_target >= p2md->pod.count );
 
     ret = p2m_pod_set_cache_target(d, pod_target);
 
@@ -695,7 +694,6 @@ out_entry_check:
     /* If we've reduced our "liabilities" beyond our "assets", free some */
     if ( p2md->pod.entry_count < p2md->pod.count )
     {
-        printk("b %d\n", p2md->pod.entry_count);
         p2m_pod_set_cache_target(d, p2md->pod.entry_count);
     }
 
