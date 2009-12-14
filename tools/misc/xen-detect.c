@@ -26,19 +26,16 @@
 
 #include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <unistd.h>
-
-static int pv_context;
+#include <setjmp.h>
+#include <signal.h>
 
 static void cpuid(uint32_t idx,
                   uint32_t *eax,
                   uint32_t *ebx,
                   uint32_t *ecx,
-                  uint32_t *edx)
+                  uint32_t *edx,
+                  int pv_context)
 {
     asm volatile (
         "test %1,%1 ; jz 1f ; ud2a ; .ascii \"xen\" ; 1: cpuid"
@@ -46,7 +43,7 @@ static void cpuid(uint32_t idx,
         : "0" (idx), "1" (pv_context) );
 }
 
-static int check_for_xen(void)
+static int check_for_xen(int pv_context)
 {
     uint32_t eax, ebx, ecx, edx;
     char signature[13];
@@ -54,7 +51,7 @@ static int check_for_xen(void)
 
     for ( base = 0x40000000; base < 0x40010000; base += 0x100 )
     {
-        cpuid(base, &eax, &ebx, &ecx, &edx);
+        cpuid(base, &eax, &ebx, &ecx, &edx, pv_context);
 
         *(uint32_t *)(signature + 0) = ebx;
         *(uint32_t *)(signature + 4) = ecx;
@@ -68,47 +65,32 @@ static int check_for_xen(void)
     return 0;
 
  found:
-    cpuid(base + 1, &eax, &ebx, &ecx, &edx);
+    cpuid(base + 1, &eax, &ebx, &ecx, &edx, pv_context);
     printf("Running in %s context on Xen v%d.%d.\n",
            pv_context ? "PV" : "HVM", (uint16_t)(eax >> 16), (uint16_t)eax);
     return 1;
 }
 
+static jmp_buf sigill_jmp;
+void sigill_handler(int sig)
+{
+    longjmp(sigill_jmp, 1);
+}
+
 int main(void)
 {
-    pid_t pid;
-    int status;
-    uint32_t dummy;
-
     /* Check for execution in HVM context. */
-    if ( check_for_xen() )
+    if ( check_for_xen(0) )
         return 0;
 
-    /* Now we check for execution in PV context. */
-    pv_context = 1;
-
     /*
-     * Fork a child to test the paravirtualised CPUID instruction.
-     * If executed outside Xen PV context, the extended opcode will fault.
+     * Set up a signal handler to test the paravirtualised CPUID instruction.
+     * If executed outside Xen PV context, the extended opcode will fault, we
+     * will longjmp via the signal handler, and print "Not running on Xen".
      */
-    pid = fork();
-    switch ( pid )
-    {
-    case 0:
-        /* Child: test paravirtualised CPUID opcode and then exit cleanly. */
-        cpuid(0x40000000, &dummy, &dummy, &dummy, &dummy);
-        exit(0);
-    case -1:
-        fprintf(stderr, "Fork failed.\n");
-        return 0;
-    }
-
-    /*
-     * Parent waits for child to terminate and checks for clean exit.
-     * Only if the exit is clean is it safe for us to try the extended CPUID.
-     */
-    waitpid(pid, &status, 0);
-    if ( WIFEXITED(status) && check_for_xen() )
+    if ( !setjmp(sigill_jmp)
+         && (signal(SIGILL, sigill_handler) != SIG_ERR)
+         && check_for_xen(1) )
         return 0;
 
     printf("Not running on Xen.\n");
