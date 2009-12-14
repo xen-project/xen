@@ -517,6 +517,8 @@ void irq_set_affinity(int irq, cpumask_t mask)
     cpus_copy(desc->pending_mask, mask);
 }
 
+DEFINE_PER_CPU(unsigned int, irq_count);
+
 asmlinkage void do_IRQ(struct cpu_user_regs *regs)
 {
     struct irqaction *action;
@@ -527,6 +529,8 @@ asmlinkage void do_IRQ(struct cpu_user_regs *regs)
     struct cpu_user_regs *old_regs = set_irq_regs(regs);
     
     perfc_incr(irqs);
+
+    this_cpu(irq_count)++;
 
     if (irq < 0) {
         ack_APIC_irq();

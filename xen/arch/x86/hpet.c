@@ -211,6 +211,9 @@ static void hpet_interrupt_handler(int irq, void *data,
         struct cpu_user_regs *regs)
 {
     struct hpet_event_channel *ch = (struct hpet_event_channel *)data;
+
+    this_cpu(irq_count)--;
+
     if ( !ch->event_handler )
     {
         printk(XENLOG_WARNING "Spurious HPET timer interrupt on HPET timer %d\n", ch->idx);
@@ -692,6 +695,8 @@ int hpet_broadcast_is_available(void)
 
 int hpet_legacy_irq_tick(void)
 {
+    this_cpu(irq_count)--;
+
     if ( !legacy_hpet_event.event_handler )
         return 0;
     legacy_hpet_event.event_handler(&legacy_hpet_event);
