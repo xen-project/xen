@@ -47,29 +47,137 @@ static void pop_block(void)
     printf("}\n");
 }
 
-static void slt_tree(unsigned int s, unsigned int e)
+static void cpu_hotplug_notify(unsigned int cpu)
+{
+    push_block("If", "LNotEqual(Arg1, \\_PR.PR%02X.FLG)", cpu);
+    stmt("Store", "Arg1, \\_PR.PR%02X.FLG", cpu);
+    push_block("If", "LEqual(Arg1, 1)");
+    stmt("Notify", "PR%02X, 1", cpu);
+    stmt("Subtract", "\\_PR.MSU, 1, \\_PR.MSU");
+    pop_block();
+    push_block("Else", NULL);
+    stmt("Notify", "PR%02X, 3", cpu);
+    stmt("Add", "\\_PR.MSU, 1, \\_PR.MSU");
+    pop_block();
+    pop_block();
+}
+
+static void pci_hotplug_notify(unsigned int slt)
+{
+    stmt("Notify", "\\_SB.PCI0.S%02X, EVT", slt);
+}
+
+static void decision_tree(
+    unsigned int s, unsigned int e, char *var, void (*leaf)(unsigned int))
 {
     if ( s == (e-1) )
     {
-        stmt("Notify", "\\_SB.PCI0.S%02X, EVT", s);
+        (*leaf)(s);
         return;
     }
 
-    push_block("If", "And(SLT, 0x%02x)", (e-s)/2);
-    slt_tree((s+e)/2, e);
+    push_block("If", "And(%s, 0x%02x)", var, (e-s)/2);
+    decision_tree((s+e)/2, e, var, leaf);
     pop_block();
     push_block("Else", NULL);
-    slt_tree(s, (s+e)/2);
+    decision_tree(s, (s+e)/2, var, leaf);
     pop_block();
 }
 
 int main(void)
 {
-    unsigned int slot, dev, intx, link;
+    unsigned int slot, dev, intx, link, cpu;
 
     /**** DSDT DefinitionBlock start ****/
     /* (we append to existing DSDT definition block) */
     indent_level++;
+
+    /**** Processor start ****/
+    push_block("Scope", "\\_PR");
+
+    /* MADT checksum */
+    stmt("OperationRegion", "MSUM, SystemMemory, \\_SB.MSUA, 1");
+    push_block("Field", "MSUM, ByteAcc, NoLock, Preserve");
+    indent(); printf("MSU, 8\n");
+    pop_block();
+
+    /* Define processor objects and control methods. */
+    for ( cpu = 0; cpu < 128; cpu++)
+    {
+        push_block("Processor", "PR%02X, %d, 0x0000b010, 0x06", cpu, cpu);
+
+        stmt("Name", "_HID, \"ACPI0007\"");
+
+        /* Name this processor's MADT LAPIC descriptor. */
+        stmt("OperationRegion", 
+             "MATR, SystemMemory, Add(\\_SB.MAPA, %d), 8", cpu*8);
+
+        push_block("Field", "MATR, ByteAcc, NoLock, Preserve");
+        indent(); printf("MAT, 64\n");
+        pop_block();
+
+        push_block("Field", "MATR, ByteAcc, NoLock, Preserve");
+        indent(); printf("Offset(4),\n");
+        indent(); printf("FLG, 1\n");
+        pop_block();
+
+        push_block("Method", "_MAT, 0");
+        stmt("Return", "ToBuffer(MAT)");
+        pop_block();
+
+        push_block("Method", "_STA");
+        push_block("If", "FLG");
+        stmt("Return", "0xF");
+        pop_block();
+        push_block("Else", NULL);
+        stmt("Return", "0x9");
+        pop_block();
+        pop_block();
+
+        push_block("Method", "_EJ0, 1, NotSerialized");
+        stmt("Sleep", "0xC8");
+        pop_block();
+
+        pop_block();
+    }
+
+    /* Define control method 'NTFY'. */
+    push_block("Method", "NTFY, 2");
+    decision_tree(0, 128, "Arg0", cpu_hotplug_notify);
+    stmt("Return", "One");
+    pop_block();
+
+    /* Define control method 'PRSC'. */
+    stmt("OperationRegion", "PRST, SystemIO, 0xaf00, 32");
+    push_block("Field", "PRST, ByteAcc, NoLock, Preserve");
+    indent(); printf("PRS, 256\n");
+    pop_block();
+
+    push_block("Method", "PRSC, 0");
+    stmt("Store", "PRS, Local3");
+    stmt("Store", "Zero, Local0");
+    push_block("While", "LLess(Local0, 32)");
+    stmt("Store", "Zero, Local1");
+    stmt("Store", "DerefOf(Index(Local3, Local0)), Local2");
+    push_block("While", "LLess(Local1, 8)");
+    stmt("NTFY", "Add(Multiply(Local0, 8), Local1), And(Local2, 1)");
+    stmt("ShiftRight", "Local2, 1, Local2");
+    stmt("Increment", "Local1");
+    pop_block();
+    stmt("Increment", "Local0");
+    pop_block();
+    stmt("Return", "One");
+    pop_block();
+
+    pop_block();
+
+    /* Define GPE control method '_L02'. */
+    push_block("Scope", "\\_GPE");
+    push_block("Method", "_L02");
+    stmt("Return", "\\_PR.PRSC()");
+    pop_block();
+    pop_block();
+    /**** Processor end ****/
 
 
     /**** PCI0 start ****/
@@ -230,7 +338,7 @@ int main(void)
     stmt("Store", "SLT, DPT1");
     stmt("Store", "EVT, DPT2");
     /* Decision tree */
-    slt_tree(0x00, 0x100);
+    decision_tree(0x00, 0x100, "SLT", pci_hotplug_notify);
     pop_block();
 
     pop_block();

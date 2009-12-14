@@ -27,31 +27,6 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
     Name (\APCL, 0x00010000)
     Name (\PUID, 0x00)
 
-    Scope (\_PR)
-    {
-        Processor (PR00, 0x00, 0x0000, 0x00) {}
-        Processor (PR01, 0x01, 0x0000, 0x00) {}
-        Processor (PR02, 0x02, 0x0000, 0x00) {}
-        Processor (PR03, 0x03, 0x0000, 0x00) {}
-        Processor (PR04, 0x04, 0x0000, 0x00) {}
-        Processor (PR05, 0x05, 0x0000, 0x00) {}
-        Processor (PR06, 0x06, 0x0000, 0x00) {}
-        Processor (PR07, 0x07, 0x0000, 0x00) {}
-        Processor (PR08, 0x08, 0x0000, 0x00) {}
-        Processor (PR09, 0x09, 0x0000, 0x00) {}
-        Processor (PR0A, 0x0a, 0x0000, 0x00) {}
-        Processor (PR0B, 0x0b, 0x0000, 0x00) {}
-        Processor (PR0C, 0x0c, 0x0000, 0x00) {}
-        Processor (PR0D, 0x0d, 0x0000, 0x00) {}
-        Processor (PR0E, 0x0e, 0x0000, 0x00) {}
-        /* No more than 15 Processor objects, as otherwise Windows 2000
-         * experiences a BSOD of KMODE_EXCEPTION_NOT_HANDLED. If we require
-         * more in some configurations then we should move \_PR scope into a
-         * SSDT, statically compiled with a range of different numbers of
-         * processors. We can then link the appropriate one into the RSDT/XSDT
-         * at HVM guest boot time. */
-    }
-
     /*
      * S3 (suspend-to-ram), S4 (suspend-to-disc) and S5 (power-off) type codes:
      * must match piix4 emulation.
@@ -87,14 +62,16 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
     Scope (\_SB)
     {
        /* BIOS_INFO_PHYSICAL_ADDRESS == 0xEA000 */
-       OperationRegion(BIOS, SystemMemory, 0xEA000, 16)
+       OperationRegion(BIOS, SystemMemory, 0xEA000, 24)
        Field(BIOS, ByteAcc, NoLock, Preserve) {
            UAR1, 1,
            UAR2, 1,
            HPET, 1,
            Offset(4),
            PMIN, 32,
-           PLEN, 32
+           PLEN, 32,
+           MSUA, 32, /* MADT checksum address */
+           MAPA, 32  /* MADT LAPIC0 address */
        }
 
         /* Fix HCT test for 0x400 pci memory:

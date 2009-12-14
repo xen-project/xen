@@ -746,6 +746,8 @@ int main(void)
     bios_info->hpet_present = hpet_exists(ACPI_HPET_ADDRESS);
     bios_info->pci_min = pci_mem_start;
     bios_info->pci_len = pci_mem_end - pci_mem_start;
+    bios_info->madt_csum_addr = madt_csum_addr;
+    bios_info->madt_lapic0_addr = madt_lapic0_addr;
     bios_info->bios32_entry = bios32_addr;
 
     printf("Invoking ROMBIOS ...\n");

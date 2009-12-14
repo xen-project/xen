@@ -25,6 +25,9 @@
 #define align16(sz)        (((sz) + 15) & ~15)
 #define fixed_strcpy(d, s) strncpy((d), (s), sizeof(d))
 
+/* MADT parameters for filling in bios_info structure for DSDT. */
+uint32_t madt_csum_addr, madt_lapic0_addr;
+
 extern struct acpi_20_rsdp Rsdp;
 extern struct acpi_20_rsdt Rsdt;
 extern struct acpi_20_xsdt Xsdt;
@@ -111,7 +114,8 @@ static int construct_madt(struct acpi_20_madt *madt)
     offset += sizeof(*io_apic);
 
     lapic = (struct acpi_20_madt_lapic *)(io_apic + 1);
-    for ( i = 0; i < hvm_info->nr_vcpus; i++ )
+    madt_lapic0_addr = (uint32_t)lapic;
+    for ( i = 0; i < MAX_VCPUS; i++ )
     {
         memset(lapic, 0, sizeof(*lapic));
         lapic->type    = ACPI_PROCESSOR_LOCAL_APIC;
@@ -119,13 +123,14 @@ static int construct_madt(struct acpi_20_madt *madt)
         /* Processor ID must match processor-object IDs in the DSDT. */
         lapic->acpi_processor_id = i;
         lapic->apic_id = LAPIC_ID(i);
-        lapic->flags   = ACPI_LOCAL_APIC_ENABLED;
+        lapic->flags = (i < hvm_info->nr_vcpus) ? ACPI_LOCAL_APIC_ENABLED : 0;
         offset += sizeof(*lapic);
         lapic++;
     }
 
     madt->header.length = offset;
     set_checksum(madt, offsetof(struct acpi_header, checksum), offset);
+    madt_csum_addr = (uint32_t)&madt->header.checksum;
 
     return align16(offset);
 }

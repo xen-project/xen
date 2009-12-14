@@ -50,14 +50,19 @@ extern unsigned long pci_mem_start, pci_mem_end;
 #define XEN_PF_IOBASE   0x10
 #define PFFLAG_ROM_LOCK 1 /* Sets whether ROM memory area is RW or RO */
 
+/* Maximum we can support with current vLAPIC ID mapping. */
+#define MAX_VCPUS 128
+
 /* Located at BIOS_INFO_PHYSICAL_ADDRESS. */
 struct bios_info {
     uint8_t  com1_present:1;    /* 0[0] - System has COM1? */
     uint8_t  com2_present:1;    /* 0[1] - System has COM2? */
     uint8_t  hpet_present:1;    /* 0[2] - System has HPET? */
     uint32_t pci_min, pci_len;  /* 4, 8 - PCI I/O hole boundaries */
-    uint32_t bios32_entry;      /* 12   - Entry point for 32-bit BIOS */
+    uint32_t madt_csum_addr;    /* 12   - Address of MADT checksum */
+    uint32_t madt_lapic0_addr;  /* 16   - Address of first MADT LAPIC struct */
+    uint32_t bios32_entry;      /* 20   - Entry point for 32-bit BIOS */
 };
-#define BIOSINFO_OFF_bios32_entry 12
+#define BIOSINFO_OFF_bios32_entry 20
 
 #endif /* __HVMLOADER_CONFIG_H__ */
