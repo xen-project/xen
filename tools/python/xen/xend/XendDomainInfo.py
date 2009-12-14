@@ -1903,6 +1903,9 @@ class XendDomainInfo:
     def getVCpuCount(self):
         return self.info['VCPUs_max']
 
+    def getVCpuAvail(self):
+        return self.info['vcpu_avail']
+
     def setVCpuCount(self, vcpus):
         def vcpus_valid(n):
             if vcpus <= 0:
