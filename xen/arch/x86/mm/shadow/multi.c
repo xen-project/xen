@@ -3305,7 +3305,8 @@ static int sh_page_fault(struct vcpu *v,
      * fault was a non-user write to a present page.  */
     if ( is_hvm_domain(d) 
          && unlikely(!hvm_wp_enabled(v)) 
-         && regs->error_code == (PFEC_write_access|PFEC_page_present) )
+         && regs->error_code == (PFEC_write_access|PFEC_page_present)
+         && mfn_valid(gmfn) )
     {
         perfc_incr(shadow_fault_emulate_wp);
         goto emulate;

@@ -2752,6 +2752,7 @@ void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int fast, int all)
     };
 
     ASSERT(!(all && fast));
+    ASSERT(mfn_valid(gmfn));
 
     /* Although this is an externally visible function, we do not know
      * whether the shadow lock will be held when it is called (since it
