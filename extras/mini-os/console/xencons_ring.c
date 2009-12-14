@@ -203,7 +203,7 @@ struct consfront_dev *init_consfront(char *_nodename)
     char* err;
     char* message=NULL;
     int retry=0;
-    char* msg;
+    char* msg = NULL;
     char nodename[256];
     char path[256];
     static int consfrontends = 1;
@@ -242,6 +242,7 @@ again:
     err = xenbus_transaction_start(&xbt);
     if (err) {
         printk("starting transaction\n");
+        free(err);
     }
 
     err = xenbus_printf(xbt, nodename, "ring-ref","%u",
@@ -278,6 +279,7 @@ again:
 
 
     err = xenbus_transaction_end(xbt, 0, &retry);
+    if (err) free(err);
     if (retry) {
             goto again;
         printk("completing transaction\n");
@@ -286,7 +288,8 @@ again:
     goto done;
 
 abort_transaction:
-    xenbus_transaction_end(xbt, 1, &retry);
+    free(err);
+    err = xenbus_transaction_end(xbt, 1, &retry);
     goto error;
 
 done:
@@ -323,6 +326,8 @@ done:
     return dev;
 
 error:
+    free(msg);
+    free(err);
     free_consfront(dev);
     return NULL;
 }

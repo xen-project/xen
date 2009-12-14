@@ -1103,6 +1103,7 @@ again:
     err = xenbus_transaction_start(&xbt);
     if (err) {
         printk("starting transaction\n");
+        free(err);
     }
     
     err = xenbus_printf(xbt, 
@@ -1140,9 +1141,10 @@ again:
     }
 
     err = xenbus_printf(xbt, nodename, "state", STATE_READY, 0xdeadbeef);
+    if (err) free(err);
 
-    
     err = xenbus_transaction_end(xbt, 0, &retry);
+    if (err) free(err);
     if (retry) {
             goto again;
         printk("completing transaction\n");
@@ -1159,7 +1161,9 @@ again:
     goto done;
 
 abort_transaction:
-    xenbus_transaction_end(xbt, 1, &retry);
+    free(err);
+    err = xenbus_transaction_end(xbt, 1, &retry);
+    if (err) free(err);
 
 done:
 
@@ -1189,7 +1193,8 @@ done:
     sprintf(token, "fs-front-%d", import->import_id);
     /* The token will not be unique if multiple imports are inited */
     xenbus_watch_path_token(XBT_NIL, r_nodename, r_nodename, &events);
-    xenbus_wait_for_value(r_nodename, STATE_READY, &events);
+    err = xenbus_wait_for_value(r_nodename, STATE_READY, &events);
+    if (err) free(err);
     xenbus_unwatch_path_token(XBT_NIL, r_nodename, r_nodename);
     printk("Backend ready.\n");
    

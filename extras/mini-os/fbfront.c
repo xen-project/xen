@@ -71,7 +71,7 @@ struct kbdfront_dev *init_kbdfront(char *_nodename, int abs_pointer)
     char* message=NULL;
     struct xenkbd_page *s;
     int retry=0;
-    char* msg;
+    char* msg = NULL;
     char* nodename = _nodename ? _nodename : "device/vkbd/0";
     struct kbdfront_dev *dev;
 
@@ -102,6 +102,7 @@ again:
     err = xenbus_transaction_start(&xbt);
     if (err) {
         printk("starting transaction\n");
+        free(err);
     }
 
     err = xenbus_printf(xbt, nodename, "page-ref","%u", virt_to_mfn(s));
@@ -124,11 +125,13 @@ again:
 
     snprintf(path, sizeof(path), "%s/state", nodename);
     err = xenbus_switch_state(xbt, path, XenbusStateInitialised);
-    if (err)
+    if (err) {
         printk("error writing initialized: %s\n", err);
-
+        free(err);
+    }
 
     err = xenbus_transaction_end(xbt, 0, &retry);
+    if (err) free(err);
     if (retry) {
             goto again;
         printk("completing transaction\n");
@@ -137,7 +140,8 @@ again:
     goto done;
 
 abort_transaction:
-    xenbus_transaction_end(xbt, 1, &retry);
+    free(err);
+    err = xenbus_transaction_end(xbt, 1, &retry);
     goto error;
 
 done:
@@ -186,6 +190,8 @@ done:
 
     return dev;
 error:
+    free(msg);
+    free(err);
     free_kbdfront(dev);
     return NULL;
 }
@@ -247,6 +253,7 @@ void shutdown_kbdfront(struct kbdfront_dev *dev)
     state = xenbus_read_integer(path);
     while (err == NULL && state < XenbusStateClosing)
         err = xenbus_wait_for_state_change(path, &state, &dev->events);
+    if (err) free(err);
 
     if ((err = xenbus_switch_state(XBT_NIL, nodename, XenbusStateClosed)) != NULL) {
         printk("shutdown_kbdfront: error changing state to %d: %s\n",
@@ -254,8 +261,10 @@ void shutdown_kbdfront(struct kbdfront_dev *dev)
         goto close_kbdfront;
     }
     state = xenbus_read_integer(path);
-    if (state < XenbusStateClosed)
-        xenbus_wait_for_state_change(path, &state, &dev->events);
+    if (state < XenbusStateClosed) {
+        err = xenbus_wait_for_state_change(path, &state, &dev->events);
+        if (err) free(err);
+    }
 
     if ((err = xenbus_switch_state(XBT_NIL, nodename, XenbusStateInitialising)) != NULL) {
         printk("shutdown_kbdfront: error changing state to %d: %s\n",
@@ -266,6 +275,7 @@ void shutdown_kbdfront(struct kbdfront_dev *dev)
     //xenbus_wait_for_value(path, "2", &dev->events);
 
 close_kbdfront:
+    if (err) free(err);
     xenbus_unwatch_path_token(XBT_NIL, path, path);
 
     snprintf(path, sizeof(path), "%s/page-ref", nodename);
@@ -446,6 +456,7 @@ again:
     err = xenbus_transaction_start(&xbt);
     if (err) {
         printk("starting transaction\n");
+        free(err);
     }
 
     err = xenbus_printf(xbt, nodename, "page-ref","%u", virt_to_mfn(s));
@@ -478,6 +489,7 @@ again:
     }
 
     err = xenbus_transaction_end(xbt, 0, &retry);
+    if (err) free(err);
     if (retry) {
             goto again;
         printk("completing transaction\n");
@@ -486,7 +498,8 @@ again:
     goto done;
 
 abort_transaction:
-    xenbus_transaction_end(xbt, 1, &retry);
+    free(err);
+    err = xenbus_transaction_end(xbt, 1, &retry);
     goto error;
 
 done:
@@ -539,6 +552,7 @@ done:
     return dev;
 
 error:
+    free(err);
     free_fbfront(dev);
     return NULL;
 }
@@ -627,6 +641,7 @@ void shutdown_fbfront(struct fbfront_dev *dev)
     state = xenbus_read_integer(path);
     while (err == NULL && state < XenbusStateClosing)
         err = xenbus_wait_for_state_change(path, &state, &dev->events);
+    if (err) free(err);
 
     if ((err = xenbus_switch_state(XBT_NIL, nodename, XenbusStateClosed)) != NULL) {
         printk("shutdown_fbfront: error changing state to %d: %s\n",
@@ -634,8 +649,10 @@ void shutdown_fbfront(struct fbfront_dev *dev)
         goto close_fbfront;
     }
     state = xenbus_read_integer(path);
-    if (state < XenbusStateClosed)
+    if (state < XenbusStateClosed) {
         xenbus_wait_for_state_change(path, &state, &dev->events);
+        if (err) free(err);
+    }
 
     if ((err = xenbus_switch_state(XBT_NIL, nodename, XenbusStateInitialising)) != NULL) {
         printk("shutdown_fbfront: error changing state to %d: %s\n",
@@ -646,6 +663,7 @@ void shutdown_fbfront(struct fbfront_dev *dev)
     //xenbus_wait_for_value(path, "2", &dev->events);
 
 close_fbfront:
+    if (err) free(err);
     xenbus_unwatch_path_token(XBT_NIL, path, path);
 
     snprintf(path, sizeof(path), "%s/page-ref", nodename);

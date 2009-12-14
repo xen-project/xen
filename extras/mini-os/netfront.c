@@ -305,7 +305,7 @@ struct netfront_dev *init_netfront(char *_nodename, void (*thenetif_rx)(unsigned
     struct netif_rx_sring *rxs;
     int retry=0;
     int i;
-    char* msg;
+    char* msg = NULL;
     char nodename[256];
     char path[256];
     struct netfront_dev *dev;
@@ -377,6 +377,7 @@ again:
     err = xenbus_transaction_start(&xbt);
     if (err) {
         printk("starting transaction\n");
+        free(err);
     }
 
     err = xenbus_printf(xbt, nodename, "tx-ring-ref","%u",
@@ -413,6 +414,7 @@ again:
     }
 
     err = xenbus_transaction_end(xbt, 0, &retry);
+    if (err) free(err);
     if (retry) {
             goto again;
         printk("completing transaction\n");
@@ -421,7 +423,8 @@ again:
     goto done;
 
 abort_transaction:
-    xenbus_transaction_end(xbt, 1, &retry);
+    free(err);
+    err = xenbus_transaction_end(xbt, 1, &retry);
     goto error;
 
 done:
@@ -479,6 +482,8 @@ done:
 
     return dev;
 error:
+    free(msg);
+    free(err);
     free_netfront(dev);
     return NULL;
 }
@@ -521,6 +526,7 @@ void shutdown_netfront(struct netfront_dev *dev)
     state = xenbus_read_integer(path);
     while (err == NULL && state < XenbusStateClosing)
         err = xenbus_wait_for_state_change(path, &state, &dev->events);
+    if (err) free(err);
 
     if ((err = xenbus_switch_state(XBT_NIL, nodename, XenbusStateClosed)) != NULL) {
         printk("shutdown_netfront: error changing state to %d: %s\n",
@@ -528,8 +534,10 @@ void shutdown_netfront(struct netfront_dev *dev)
         goto close;
     }
     state = xenbus_read_integer(path);
-    if (state < XenbusStateClosed)
-        xenbus_wait_for_state_change(path, &state, &dev->events);
+    if (state < XenbusStateClosed) {
+        err = xenbus_wait_for_state_change(path, &state, &dev->events);
+        if (err) free(err);
+    }
 
     if ((err = xenbus_switch_state(XBT_NIL, nodename, XenbusStateInitialising)) != NULL) {
         printk("shutdown_netfront: error changing state to %d: %s\n",
@@ -542,6 +550,7 @@ void shutdown_netfront(struct netfront_dev *dev)
         err = xenbus_wait_for_state_change(path, &state, &dev->events);
 
 close:
+    if (err) free(err);
     xenbus_unwatch_path_token(XBT_NIL, path, path);
 
     snprintf(path, sizeof(path), "%s/tx-ring-ref", nodename);

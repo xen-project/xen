@@ -135,7 +135,8 @@ char *xenbus_switch_state(xenbus_transaction_t xbt, const char* path, XenbusStat
 
     do {
         if (xbt == XBT_NIL) {
-            xenbus_transaction_start(&xbt);
+            msg = xenbus_transaction_start(&xbt);
+            if (msg) goto exit;
             xbt_flag = 1;
         }
 
