@@ -2331,14 +2331,32 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
 
 static void hvm_latch_shinfo_size(struct domain *d)
 {
+    bool_t new_has_32bit;
+
     /*
      * Called from operations which are among the very first executed by
      * PV drivers on initialisation or after save/restore. These are sensible
      * points at which to sample the execution mode of the guest and latch
      * 32- or 64-bit format for shared state.
      */
-    if ( current->domain == d )
-        d->arch.has_32bit_shinfo = (hvm_guest_x86_mode(current) != 8);
+    if ( current->domain == d ) {
+        new_has_32bit = (hvm_guest_x86_mode(current) != 8);
+        if (new_has_32bit != d->arch.has_32bit_shinfo) {
+            d->arch.has_32bit_shinfo = new_has_32bit;
+            /*
+             * Make sure that the timebase in the shared info
+             * structure is correct for its new bit-ness.  We should
+             * arguably try to convert the other fields as well, but
+             * that's much more problematic (e.g. what do you do if
+             * you're going from 64 bit to 32 bit and there's an event
+             * channel pending which doesn't exist in the 32 bit
+             * version?).  Just setting the wallclock time seems to be
+             * sufficient for everything we do, even if it is a bit of
+             * a hack.
+             */
+            update_domain_wallclock_time(d);
+        }
+    }
 }
 
 /* Initialise a hypercall transfer page for a VMX domain using
