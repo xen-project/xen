@@ -594,6 +594,11 @@ static int construct_vmcs(struct vcpu *v)
         __vmwrite(PLE_WINDOW, ple_window);
     }
 
+#ifdef __x86_64__
+    if ( cpu_has_rdtscp )
+        v->arch.hvm_vmx.secondary_exec_control |= SECONDARY_EXEC_ENABLE_RDTSCP;
+#endif
+
     if ( cpu_has_vmx_secondary_exec_control )
         __vmwrite(SECONDARY_VM_EXEC_CONTROL,
                   v->arch.hvm_vmx.secondary_exec_control);

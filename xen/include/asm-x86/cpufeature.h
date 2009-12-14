@@ -196,6 +196,8 @@
 
 #define cpu_has_arch_perfmon    boot_cpu_has(X86_FEATURE_ARCH_PERFMON)
 
+#define cpu_has_rdtscp          boot_cpu_has(X86_FEATURE_RDTSCP)
+
 #endif /* __ASM_I386_CPUFEATURE_H */
 
 /* 

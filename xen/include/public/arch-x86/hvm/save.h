@@ -137,6 +137,7 @@ struct hvm_hw_cpu {
     uint64_t msr_cstar;
     uint64_t msr_syscall_mask;
     uint64_t msr_efer;
+    uint64_t msr_tsc_aux;
 
     /* guest's idea of what rdtsc() would return */
     uint64_t tsc;

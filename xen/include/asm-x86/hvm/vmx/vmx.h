@@ -110,6 +110,7 @@ void vmx_update_debug_state(struct vcpu *v);
 #define EXIT_REASON_APIC_ACCESS         44
 #define EXIT_REASON_EPT_VIOLATION       48
 #define EXIT_REASON_EPT_MISCONFIG       49
+#define EXIT_REASON_RDTSCP              51
 #define EXIT_REASON_WBINVD              54
 #define EXIT_REASON_XSETBV              55
 
