@@ -1,0 +1,23 @@
+CPUID emulation for guest
+-------------------------
+
+When HVM guest tries to execute CPUID, or PV guest tries to execute XEN_CPUID,
+the xen hypervior traps and emultes them.
+
+For HVM guest and PV DomU guest, xen's CPUID emulation can be adjusted using
+the guest configation file if necessary (e.g., to supply better support for
+guest live migration). The CPUID syntax in guest configration file is
+described in detail in the examples like /etc/xen/xmexample.hvm,
+/etc/xen/xmexample.hvm-stubdom.
+
+However, a user (or an administrator) must be aware that the CPUID in guest
+configuration file can NOT be configured casually. The default CPUID
+configuration should be safe, but illegal configuration can cause unexpected
+behaviors of guest -- even can crash guest.
+
+For example, we should not expose the MONITOR CPUID feature flag (ECX bit 3;
+CPUID executed EAX = 1) to HVM guest, otherwise, on guest's attempt of
+executing MWAIT, the VMExit handler in Xen would inject #UD (Invalid Opcode
+Exception) into the HVM guest, and guest kernel would panic.
+
+/* We can add more unsafe CPUID configuration here in future. */
