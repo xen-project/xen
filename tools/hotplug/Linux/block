@@ -16,6 +16,26 @@ expand_dev() {
   echo -n $dev
 }
 
+find_free_loopback_helper() {
+  local next_devnum=0
+  local busy_devnum
+  while read busy_devnum; do
+    if [ "$next_devnum" != "$busy_devnum" ]; then
+      break
+    fi
+    let next_devnum=$next_devnum+1
+  done
+  echo "/dev/loop${next_devnum}"
+}
+
+# Not all distros have "losetup -f"
+find_free_loopback_dev() {
+  local loopdev
+  loopdev=$(losetup -a | sed -e 's+^/dev/loop++' -e 's/:.*//' | find_free_loopback_helper)
+  if [ -n "$loopdev" ] && [ -b "$loopdev" ]; then
+    echo "$loopdev"
+  fi
+}
 
 ##
 # check_sharing device mode
@@ -270,7 +290,7 @@ mount it read-write in a guest domain."
           done
         fi
 
-        loopdev=$(losetup -f)
+        loopdev=$(find_free_loopback_dev)
         if [ "$loopdev" = '' ]
         then
           release_lock "block"
