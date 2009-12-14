@@ -577,6 +577,8 @@ class XendConfig(dict):
         #    "0-3,^1"   -> [0,2,3]
         #    "0-3,^1,1" -> [0,1,2,3]
         l = []
+        if s == "":
+            return l
         for c in s.split(','):
             if c.find('-') != -1:
                 (x, y) = c.split('-')
