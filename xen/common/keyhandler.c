@@ -87,6 +87,7 @@ static void dump_registers(unsigned char key, struct cpu_user_regs *regs)
     unsigned int cpu;
 
     /* We want to get everything out that we possibly can. */
+    watchdog_disable();
     console_start_sync();
 
     printk("'%c' pressed -> dumping registers\n", key);
@@ -106,6 +107,7 @@ static void dump_registers(unsigned char key, struct cpu_user_regs *regs)
     printk("\n");
 
     console_end_sync();
+    watchdog_enable();
 }
 
 static struct keyhandler dump_registers_keyhandler = {
