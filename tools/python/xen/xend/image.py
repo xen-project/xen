@@ -938,6 +938,7 @@ class HVMImageHandler(ImageHandler):
         log.debug("memsize        = %d", memmax_mb)
         log.debug("target         = %d", mem_mb)
         log.debug("vcpus          = %d", self.vm.getVCpuCount())
+        log.debug("vcpu_avail     = %li", self.vm.getVCpuAvail())
         log.debug("acpi           = %d", self.acpi)
         log.debug("apic           = %d", self.apic)
 
@@ -946,6 +947,7 @@ class HVMImageHandler(ImageHandler):
                           memsize        = memmax_mb,
                           target         = mem_mb,
                           vcpus          = self.vm.getVCpuCount(),
+                          vcpu_avail     = self.vm.getVCpuAvail(),
                           acpi           = self.acpi,
                           apic           = self.apic)
         rc['notes'] = { 'SUSPEND_CANCEL': 1 }

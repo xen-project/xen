@@ -915,13 +915,14 @@ static PyObject *pyxc_hvm_build(XcObject *self,
 #endif
     char *image;
     int memsize, target=-1, vcpus = 1, acpi = 0, apic = 1;
+    uint64_t vcpu_avail = 1;
 
     static char *kwd_list[] = { "domid",
-                                "memsize", "image", "target", "vcpus", "acpi",
-                                "apic", NULL };
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iis|iiii", kwd_list,
+                                "memsize", "image", "target", "vcpus", 
+                                "vcpu_avail", "acpi", "apic", NULL };
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iis|iilii", kwd_list,
                                       &dom, &memsize, &image, &target, &vcpus,
-                                      &acpi, &apic) )
+                                      &vcpu_avail, &acpi, &apic) )
         return NULL;
 
     if ( target == -1 )
@@ -942,6 +943,8 @@ static PyObject *pyxc_hvm_build(XcObject *self,
     va_hvm->acpi_enabled = acpi;
     va_hvm->apic_mode    = apic;
     va_hvm->nr_vcpus     = vcpus;
+    ((uint64_t *)va_hvm->vcpu_online)[0] = vcpu_avail;
+    ((uint64_t *)va_hvm->vcpu_online)[1] = 0;    
     for ( i = 0, sum = 0; i < va_hvm->length; i++ )
         sum += ((uint8_t *)va_hvm)[i];
     va_hvm->checksum -= sum;
@@ -1810,6 +1813,7 @@ static PyMethodDef pyxc_methods[] = {
       " dom     [int]:      Identifier of domain to build into.\n"
       " image   [str]:      Name of HVM loader image file.\n"
       " vcpus   [int, 1]:   Number of Virtual CPUS in domain.\n\n"
+      " vcpu_avail [long, 1]: Which Virtual CPUS available.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "hvm_get_param", 

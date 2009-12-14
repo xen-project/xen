@@ -115,7 +115,7 @@ static int construct_madt(struct acpi_20_madt *madt)
 
     lapic = (struct acpi_20_madt_lapic *)(io_apic + 1);
     madt_lapic0_addr = (uint32_t)lapic;
-    for ( i = 0; i < MAX_VCPUS; i++ )
+    for ( i = 0; i < HVM_MAX_VCPUS; i++ )
     {
         memset(lapic, 0, sizeof(*lapic));
         lapic->type    = ACPI_PROCESSOR_LOCAL_APIC;
@@ -123,7 +123,9 @@ static int construct_madt(struct acpi_20_madt *madt)
         /* Processor ID must match processor-object IDs in the DSDT. */
         lapic->acpi_processor_id = i;
         lapic->apic_id = LAPIC_ID(i);
-        lapic->flags = (i < hvm_info->nr_vcpus) ? ACPI_LOCAL_APIC_ENABLED : 0;
+        lapic->flags = ((i < hvm_info->nr_vcpus) &&
+                        test_bit(i, hvm_info->vcpu_online)
+                        ? ACPI_LOCAL_APIC_ENABLED : 0);
         offset += sizeof(*lapic);
         lapic++;
     }

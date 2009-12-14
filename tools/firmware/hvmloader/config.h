@@ -50,9 +50,6 @@ extern unsigned long pci_mem_start, pci_mem_end;
 #define XEN_PF_IOBASE   0x10
 #define PFFLAG_ROM_LOCK 1 /* Sets whether ROM memory area is RW or RO */
 
-/* Maximum we can support with current vLAPIC ID mapping. */
-#define MAX_VCPUS 128
-
 /* Located at BIOS_INFO_PHYSICAL_ADDRESS. */
 struct bios_info {
     uint8_t  com1_present:1;    /* 0[0] - System has COM1? */
