@@ -2558,6 +2558,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         __update_guest_eip(inst_len);
         hvm_rdtsc_intercept(regs);
         break;
+#ifdef __x86_64__
     case EXIT_REASON_RDTSCP:
     {
         struct vmx_msr_state *guest_state = &v->arch.hvm_vmx.msr_state;
@@ -2567,6 +2568,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         regs->ecx = (uint32_t)(guest_state->msrs[VMX_INDEX_MSR_TSC_AUX]);
         break;
     }
+#endif
     case EXIT_REASON_VMCALL:
     {
         int rc;

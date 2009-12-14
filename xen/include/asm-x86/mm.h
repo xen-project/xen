@@ -480,12 +480,14 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy);
 extern int pagefault_by_memadd(unsigned long addr, struct cpu_user_regs *regs);
 extern int handle_memadd_fault(unsigned long addr, struct cpu_user_regs *regs);
 #else
-int pagefault_by_memadd(unsigned long addr, struct cpu_user_regs *regs)
+static inline int pagefault_by_memadd(unsigned long addr,
+                                      struct cpu_user_regs *regs)
 {
     return 0;
 }
 
-int handle_memadd_fault(unsigned long addr, struct cpu_user_regs *regs)
+static inline int handle_memadd_fault(unsigned long addr,
+                                      struct cpu_user_regs *regs)
 {
     return 0;
 }
@@ -533,7 +535,10 @@ int map_ldt_shadow_page(unsigned int);
 #ifdef CONFIG_X86_64
 extern int memory_add(unsigned long spfn, unsigned long epfn, unsigned int pxm);
 #else
-int memory_add(uint64_t spfn, uint64_t epfn, uint32_t pxm) {return -ENOSYS};
+static inline int memory_add(uint64_t spfn, uint64_t epfn, uint32_t pxm)
+{
+    return -ENOSYS;
+}
 #endif
 
 #ifdef CONFIG_COMPAT
