@@ -1298,6 +1298,10 @@ static void paravirt_ctxt_switch_to(struct vcpu *v)
         write_debugreg(6, v->arch.guest_context.debugreg[6]);
         write_debugreg(7, v->arch.guest_context.debugreg[7]);
     }
+
+    if ( (v->domain->arch.tsc_mode ==  TSC_MODE_PVRDTSCP) &&
+         boot_cpu_has(X86_FEATURE_RDTSCP) )
+        write_rdtscp_aux(v->domain->arch.incarnation);
 }
 
 /* Update per-VCPU guest runstate shared memory area (if registered). */

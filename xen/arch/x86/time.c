@@ -832,10 +832,6 @@ static void __update_vcpu_system_time(struct vcpu *v, int force)
     else
         tsc_stamp = t->local_tsc_stamp;
 
-    if ( (d->arch.tsc_mode ==  TSC_MODE_PVRDTSCP) &&
-         boot_cpu_has(X86_FEATURE_RDTSCP) )
-        write_rdtscp_aux(d->arch.incarnation);
-
     /* Don't bother unless timestamps have changed or we are forced. */
     if ( !force && (u->tsc_timestamp == tsc_stamp) )
         return;
