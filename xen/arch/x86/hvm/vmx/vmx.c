@@ -292,7 +292,7 @@ static enum handler_return long_mode_do_msr_write(struct cpu_user_regs *regs)
         {
             struct vmx_msr_state *guest_state = &v->arch.hvm_vmx.msr_state;
             guest_state->msrs[VMX_INDEX_MSR_TSC_AUX] = msr_content;
-            wrmsrl(MSR_TSC_AUX, msr_content);
+            wrmsrl(MSR_TSC_AUX, (uint32_t)msr_content);
         }
         else
         {
@@ -333,7 +333,8 @@ static void vmx_restore_host_msrs(void)
     }
 
     if ( cpu_has_rdtscp )
-        wrmsrl(MSR_TSC_AUX, host_msr_state->msrs[VMX_INDEX_MSR_TSC_AUX]);
+        wrmsrl(MSR_TSC_AUX,
+               (uint32_t)host_msr_state->msrs[VMX_INDEX_MSR_TSC_AUX]);
 }
 
 static void vmx_save_guest_msrs(struct vcpu *v)
@@ -383,7 +384,8 @@ static void vmx_restore_guest_msrs(struct vcpu *v)
     }
 
     if ( cpu_has_rdtscp )
-        wrmsrl(MSR_TSC_AUX, guest_msr_state->msrs[VMX_INDEX_MSR_TSC_AUX]);
+        wrmsrl(MSR_TSC_AUX,
+               (uint32_t)guest_msr_state->msrs[VMX_INDEX_MSR_TSC_AUX]);
 }
 
 #else  /* __i386__ */
@@ -627,6 +629,8 @@ static void vmx_save_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
     data->msr_syscall_mask = guest_state->msrs[VMX_INDEX_MSR_SYSCALL_MASK];
     if ( cpu_has_rdtscp )
         data->msr_tsc_aux = guest_state->msrs[VMX_INDEX_MSR_TSC_AUX];
+    else
+        data->msr_tsc_aux = 0;
 #endif
 
     data->tsc = hvm_get_guest_tsc(v);
@@ -647,6 +651,8 @@ static void vmx_load_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
     v->arch.hvm_vmx.shadow_gs = data->shadow_gs;
     if ( cpu_has_rdtscp )
         guest_state->msrs[VMX_INDEX_MSR_TSC_AUX] = data->msr_tsc_aux;
+    else
+        guest_state->msrs[VMX_INDEX_MSR_TSC_AUX] = 0;
 #endif
 
     hvm_set_guest_tsc(v, data->tsc);
@@ -1562,13 +1568,6 @@ static void vmx_cpuid_intercept(
                 *edx |= bitmaskof(X86_FEATURE_SYSCALL);
             else
                 *edx &= ~(bitmaskof(X86_FEATURE_SYSCALL));
-
-#ifdef __x86_64__
-            if ( cpu_has_rdtscp )
-                *edx |= bitmaskof(X86_FEATURE_RDTSCP);
-            else
-                *edx &= ~(bitmaskof(X86_FEATURE_RDTSCP));
-#endif
 
             break;
     }

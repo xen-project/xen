@@ -136,7 +136,8 @@ static void intel_xc_cpuid_policy(
         regs[2] &= (is_64bit ? bitmaskof(X86_FEATURE_LAHF_LM) : 0);
         regs[3] &= ((is_pae ? bitmaskof(X86_FEATURE_NX) : 0) |
                     (is_64bit ? bitmaskof(X86_FEATURE_LM) : 0) |
-                    (is_64bit ? bitmaskof(X86_FEATURE_SYSCALL) : 0));
+                    (is_64bit ? bitmaskof(X86_FEATURE_SYSCALL) : 0) |
+                    (is_64bit ? bitmaskof(X86_FEATURE_RDTSCP) : 0));
         break;
     }
 
