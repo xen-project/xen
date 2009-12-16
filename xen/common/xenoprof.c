@@ -693,7 +693,8 @@ int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg)
     {
     case XENOPROF_init:
         ret = xenoprof_op_init(arg);
-        if ( !ret )
+        if ( (ret == 0) &&
+             (current->domain == xenoprof_primary_profiler) )
             xenoprof_state = XENOPROF_INITIALIZED;
         break;
 
