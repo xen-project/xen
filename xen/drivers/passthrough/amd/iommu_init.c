@@ -270,26 +270,65 @@ static void set_iommu_event_log_control(struct amd_iommu *iommu,
     writel(entry, iommu->mmio_base + IOMMU_CONTROL_MMIO_OFFSET);
 }
 
-static int amd_iommu_read_event_log(struct amd_iommu *iommu, u32 event[])
+static void amd_iommu_reset_event_log(struct amd_iommu *iommu)
+{
+    u32 entry;
+    int log_run;
+    int loop_count = 1000;
+
+    /* wait until EventLogRun bit = 0 */
+    do {
+        entry = readl(iommu->mmio_base + IOMMU_STATUS_MMIO_OFFSET);
+        log_run = get_field_from_reg_u32(entry,
+                                        IOMMU_STATUS_EVENT_LOG_RUN_MASK,
+                                        IOMMU_STATUS_EVENT_LOG_RUN_SHIFT);
+        loop_count--;
+    } while ( log_run && loop_count );
+
+    if ( log_run )
+    {
+        AMD_IOMMU_DEBUG("Warning: EventLogRun bit is not cleared"
+                       "before reset!\n");
+        return;
+    }
+
+    set_iommu_event_log_control(iommu, IOMMU_CONTROL_DISABLED);
+
+    /*clear overflow bit */
+    set_field_in_reg_u32(IOMMU_CONTROL_DISABLED, entry,
+                         IOMMU_STATUS_EVENT_OVERFLOW_MASK,
+                         IOMMU_STATUS_EVENT_OVERFLOW_SHIFT, &entry);
+    writel(entry, iommu->mmio_base+IOMMU_STATUS_MMIO_OFFSET);
+
+    /*reset event log base address */
+    iommu->event_log_head = 0;
+
+    set_iommu_event_log_control(iommu, IOMMU_CONTROL_ENABLED);
+}
+
+static void parse_event_log_entry(u32 entry[]);
+
+static int amd_iommu_read_event_log(struct amd_iommu *iommu)
 {
     u32 tail, head, *event_log;
-    int i;
 
-     BUG_ON( !iommu || !event );
+    BUG_ON( !iommu );
 
     /* make sure there's an entry in the log */
-    tail = get_field_from_reg_u32(
-                readl(iommu->mmio_base + IOMMU_EVENT_LOG_TAIL_OFFSET),
-                IOMMU_EVENT_LOG_TAIL_MASK,
-                IOMMU_EVENT_LOG_TAIL_SHIFT);
-    if ( tail != iommu->event_log_head )
+    tail = readl(iommu->mmio_base + IOMMU_EVENT_LOG_TAIL_OFFSET);
+    tail = get_field_from_reg_u32(tail,
+                                  IOMMU_EVENT_LOG_TAIL_MASK,
+                                  IOMMU_EVENT_LOG_TAIL_SHIFT);
+
+    while ( tail != iommu->event_log_head )
     {
         /* read event log entry */
         event_log = (u32 *)(iommu->event_log.buffer +
-                                        (iommu->event_log_head *
-                                        IOMMU_EVENT_LOG_ENTRY_SIZE));
-        for ( i = 0; i < IOMMU_EVENT_LOG_U32_PER_ENTRY; i++ )
-            event[i] = event_log[i];
+                           (iommu->event_log_head *
+                           IOMMU_EVENT_LOG_ENTRY_SIZE));
+
+        parse_event_log_entry(event_log);
+
         if ( ++iommu->event_log_head == iommu->event_log.entries )
             iommu->event_log_head = 0;
 
@@ -298,10 +337,9 @@ static int amd_iommu_read_event_log(struct amd_iommu *iommu, u32 event[])
                              IOMMU_EVENT_LOG_HEAD_MASK,
                              IOMMU_EVENT_LOG_HEAD_SHIFT, &head);
         writel(head, iommu->mmio_base + IOMMU_EVENT_LOG_HEAD_OFFSET);
-        return 0;
     }
 
-    return -EFAULT;
+    return 0;
 }
 
 static void iommu_msi_set_affinity(unsigned int irq, cpumask_t mask)
@@ -459,14 +497,24 @@ static void parse_event_log_entry(u32 entry[])
 static void amd_iommu_page_fault(int irq, void *dev_id,
                              struct cpu_user_regs *regs)
 {
-    u32 event[4];
     u32 entry;
     unsigned long flags;
-    int ret = 0;
+    int of;
     struct amd_iommu *iommu = dev_id;
 
     spin_lock_irqsave(&iommu->lock, flags);
-    ret = amd_iommu_read_event_log(iommu, event);
+    amd_iommu_read_event_log(iommu);
+
+    /*check event overflow */
+    entry = readl(iommu->mmio_base + IOMMU_STATUS_MMIO_OFFSET);
+    of = get_field_from_reg_u32(entry,
+                               IOMMU_STATUS_EVENT_OVERFLOW_MASK,
+                               IOMMU_STATUS_EVENT_OVERFLOW_SHIFT);
+
+    /* reset event log if event overflow */
+    if ( of )
+        amd_iommu_reset_event_log(iommu);
+
     /* reset interrupt status bit */
     entry = readl(iommu->mmio_base + IOMMU_STATUS_MMIO_OFFSET);
     set_field_in_reg_u32(IOMMU_CONTROL_ENABLED, entry,
@@ -474,10 +522,6 @@ static void amd_iommu_page_fault(int irq, void *dev_id,
                          IOMMU_STATUS_EVENT_LOG_INT_SHIFT, &entry);
     writel(entry, iommu->mmio_base+IOMMU_STATUS_MMIO_OFFSET);
     spin_unlock_irqrestore(&iommu->lock, flags);
-
-    if ( ret != 0 )
-        return;
-    parse_event_log_entry(event);
 }
 
 static int set_iommu_interrupt_handler(struct amd_iommu *iommu)
