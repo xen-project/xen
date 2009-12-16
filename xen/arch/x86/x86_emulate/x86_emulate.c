@@ -292,6 +292,7 @@ struct operand {
 #define MSR_LSTAR        0xc0000082
 #define MSR_CSTAR        0xc0000083
 #define MSR_FMASK        0xc0000084
+#define MSR_TSC_AUX      0xc0000103
 
 /* Control register flags. */
 #define CR0_PE    (1<<0)
@@ -3503,6 +3504,16 @@ x86_emulate(
             break;
         }
 
+        if ( modrm == 0xf9 ) /* rdtscp */
+        {
+            uint64_t tsc_aux;
+            fail_if(ops->read_msr == NULL);
+            if ( (rc = ops->read_msr(MSR_TSC_AUX, &tsc_aux, ctxt)) != 0 )
+                goto done;
+            _regs.ecx = (uint32_t)tsc_aux;
+            goto rdtsc;
+        }
+
         switch ( modrm_reg & 7 )
         {
         case 0: /* sgdt */
@@ -3712,7 +3723,7 @@ x86_emulate(
         break;
     }
 
-    case 0x31: /* rdtsc */ {
+    case 0x31: rdtsc: /* rdtsc */ {
         unsigned long cr4;
         uint64_t val;
         if ( !mode_ring0() )
