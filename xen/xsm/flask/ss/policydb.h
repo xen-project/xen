@@ -181,6 +181,7 @@ struct ocontext {
 #define OCON_IOMEM   3    /* io memory */
 #define OCON_DEVICE  4    /* pci devices */
 #define OCON_NUM     5
+#define OCON_NUM_OLD 7
 
 /* The policy database */
 struct policydb {

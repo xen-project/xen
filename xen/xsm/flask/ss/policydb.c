@@ -66,6 +66,7 @@ struct policydb_compat_info {
     int version;
     int sym_num;
     int ocon_num;
+    int target_type;
 };
 
 /* These need to be updated if SYM_NUM or OCON_NUM changes */
@@ -74,62 +75,80 @@ static struct policydb_compat_info policydb_compat[] = {
         .version        = POLICYDB_VERSION_BASE,
         .sym_num        = SYM_NUM - 3,
         .ocon_num       = OCON_NUM - 1,
+        .target_type    = TARGET_XEN_OLD,
     },
     {
         .version        = POLICYDB_VERSION_BOOL,
         .sym_num        = SYM_NUM - 2,
         .ocon_num       = OCON_NUM - 1,
+        .target_type    = TARGET_XEN_OLD,
     },
     {
         .version        = POLICYDB_VERSION_IPV6,
         .sym_num        = SYM_NUM - 2,
         .ocon_num       = OCON_NUM,
+        .target_type    = TARGET_XEN_OLD,
     },
     {
         .version        = POLICYDB_VERSION_NLCLASS,
         .sym_num        = SYM_NUM - 2,
         .ocon_num       = OCON_NUM,
+        .target_type    = TARGET_XEN_OLD,
     },
     {
         .version        = POLICYDB_VERSION_MLS,
         .sym_num        = SYM_NUM,
         .ocon_num       = OCON_NUM,
+        .target_type    = TARGET_XEN_OLD,
     },
     {
         .version        = POLICYDB_VERSION_AVTAB,
         .sym_num        = SYM_NUM,
         .ocon_num       = OCON_NUM,
+        .target_type    = TARGET_XEN_OLD,
     },
     {
 	.version	= POLICYDB_VERSION_RANGETRANS,
 	.sym_num	= SYM_NUM,
 	.ocon_num	= OCON_NUM,
+        .target_type    = TARGET_XEN_OLD,
     },
     {
 	.version	= POLICYDB_VERSION_POLCAP,
 	.sym_num	= SYM_NUM,
 	.ocon_num	= OCON_NUM,
+        .target_type    = TARGET_XEN_OLD,
     },
     {
 	.version	= POLICYDB_VERSION_PERMISSIVE,
 	.sym_num	= SYM_NUM,
 	.ocon_num	= OCON_NUM,
+        .target_type    = TARGET_XEN_OLD,
+    },
+    {
+	.version	= POLICYDB_VERSION_BOUNDARY,
+        .sym_num        = SYM_NUM,
+        .ocon_num       = OCON_NUM_OLD,
+        .target_type    = TARGET_XEN_OLD,
     },
     {
 	.version	= POLICYDB_VERSION_BOUNDARY,
 	.sym_num	= SYM_NUM,
 	.ocon_num	= OCON_NUM,
+        .target_type    = TARGET_XEN,
     },
 };
 
-static struct policydb_compat_info *policydb_lookup_compat(int version)
+static struct policydb_compat_info *policydb_lookup_compat(int version,
+                                                            int target)
 {
     int i;
     struct policydb_compat_info *info = NULL;
 
     for ( i = 0; i < sizeof(policydb_compat)/sizeof(*info); i++ )
     {
-        if ( policydb_compat[i].version == version )
+        if ( policydb_compat[i].version == version &&
+             policydb_compat[i].target_type == target )
         {
             info = &policydb_compat[i];
             break;
@@ -1838,11 +1857,11 @@ int policydb_read(struct policydb *p, void *fp)
          ebitmap_read(&p->permissive_map, fp) != 0 )
         goto bad;
 
-    info = policydb_lookup_compat(p->policyvers);
+    info = policydb_lookup_compat(p->policyvers, p->target_type);
     if ( !info )
     {
         printk(KERN_ERR "Flask:  unable to find policy compat info "
-               "for version %d\n", p->policyvers);
+               "for version %d target %d\n", p->policyvers, p->target_type);
         goto bad;
     }
 
