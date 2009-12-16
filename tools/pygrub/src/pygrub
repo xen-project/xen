@@ -397,7 +397,7 @@ class Grub:
                 self.cf = parser()
                 self.cf.filename = f
                 break
-        if self.cf.filename is None:
+        if self.__dict__.get('cf', None) is None:
             raise RuntimeError, "couldn't find bootloader config file in the image provided."
         f = fs.open_file(self.cf.filename)
         buf = f.read()
