@@ -131,20 +131,30 @@ extern struct mpc_config_ioapic mp_ioapics[MAX_IO_APICS];
 /* Only need to remap ioapic RTE (reg: 10~3Fh) */
 #define ioapic_reg_remapped(reg) (iommu_enabled && ((reg) >= 0x10))
 
+static inline unsigned int __io_apic_read(unsigned int apic, unsigned int reg)
+{
+	*IO_APIC_BASE(apic) = reg;
+	return *(IO_APIC_BASE(apic)+4);
+}
+
 static inline unsigned int io_apic_read(unsigned int apic, unsigned int reg)
 {
 	if (ioapic_reg_remapped(reg))
 		return iommu_read_apic_from_ire(apic, reg);
+	return __io_apic_read(apic, reg);
+}
+
+static inline void __io_apic_write(unsigned int apic, unsigned int reg, unsigned int value)
+{
 	*IO_APIC_BASE(apic) = reg;
-	return *(IO_APIC_BASE(apic)+4);
+	*(IO_APIC_BASE(apic)+4) = value;
 }
 
 static inline void io_apic_write(unsigned int apic, unsigned int reg, unsigned int value)
 {
 	if (ioapic_reg_remapped(reg))
 		return iommu_update_ire_from_apic(apic, reg, value);
-	*IO_APIC_BASE(apic) = reg;
-	*(IO_APIC_BASE(apic)+4) = value;
+	__io_apic_write(apic, reg, value);
 }
 
 static inline void io_apic_eoi(unsigned int apic, unsigned int vector)

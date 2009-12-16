@@ -221,15 +221,21 @@ static void eoi_IO_APIC_irq(unsigned int irq)
     spin_unlock_irqrestore(&ioapic_lock, flags);
 }
 
-static void clear_IO_APIC_pin(unsigned int apic, unsigned int pin)
+#define clear_IO_APIC_pin(a,p)     __clear_IO_APIC_pin(a,p,0)
+#define clear_IO_APIC_pin_raw(a,p) __clear_IO_APIC_pin(a,p,1)
+static void __clear_IO_APIC_pin(unsigned int apic, unsigned int pin, int raw)
 {
+    unsigned int (*read)(unsigned int, unsigned int)
+        = raw ? __io_apic_read : io_apic_read;
+    void (*write)(unsigned int, unsigned int, unsigned int)
+        = raw ? __io_apic_write : io_apic_write;
     struct IO_APIC_route_entry entry;
     unsigned long flags;
     
     /* Check delivery_mode to be sure we're not clearing an SMI pin */
     spin_lock_irqsave(&ioapic_lock, flags);
-    *(((int*)&entry) + 0) = io_apic_read(apic, 0x10 + 2 * pin);
-    *(((int*)&entry) + 1) = io_apic_read(apic, 0x11 + 2 * pin);
+    *(((int*)&entry) + 0) = (*read)(apic, 0x10 + 2 * pin);
+    *(((int*)&entry) + 1) = (*read)(apic, 0x11 + 2 * pin);
     spin_unlock_irqrestore(&ioapic_lock, flags);
     if (entry.delivery_mode == dest_SMI)
         return;
@@ -240,8 +246,8 @@ static void clear_IO_APIC_pin(unsigned int apic, unsigned int pin)
     memset(&entry, 0, sizeof(entry));
     entry.mask = 1;
     spin_lock_irqsave(&ioapic_lock, flags);
-    io_apic_write(apic, 0x10 + 2 * pin, *(((int *)&entry) + 0));
-    io_apic_write(apic, 0x11 + 2 * pin, *(((int *)&entry) + 1));
+    (*write)(apic, 0x10 + 2 * pin, *(((int *)&entry) + 0));
+    (*write)(apic, 0x11 + 2 * pin, *(((int *)&entry) + 1));
     spin_unlock_irqrestore(&ioapic_lock, flags);
 }
 
@@ -249,9 +255,12 @@ static void clear_IO_APIC (void)
 {
     int apic, pin;
 
-    for (apic = 0; apic < nr_ioapics; apic++)
-        for (pin = 0; pin < nr_ioapic_registers[apic]; pin++)
+    for (apic = 0; apic < nr_ioapics; apic++) {
+        for (pin = 0; pin < nr_ioapic_registers[apic]; pin++) {
             clear_IO_APIC_pin(apic, pin);
+            clear_IO_APIC_pin_raw(apic, pin);
+        }
+    }
 }
 
 #ifdef CONFIG_SMP
