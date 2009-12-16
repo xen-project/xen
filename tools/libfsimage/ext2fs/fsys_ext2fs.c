@@ -49,6 +49,9 @@ typedef unsigned int __u32;
 #define EXT2_TIND_BLOCK                 (EXT2_DIND_BLOCK + 1)
 #define EXT2_N_BLOCKS                   (EXT2_TIND_BLOCK + 1)
 
+/* Inode flags */
+#define EXT4_EXTENTS_FL                 0x00080000 /* Inode uses extents */
+
 /* include/linux/ext2_fs.h */
 struct ext2_super_block
   {
@@ -234,6 +237,42 @@ struct ext2_dir_entry
 #define EXT2_DIR_REC_LEN(name_len)      (((name_len) + 8 + EXT2_DIR_ROUND) & \
                                          ~EXT2_DIR_ROUND)
 
+/* linux/ext4_fs_extents.h */
+/*
+ * This is the extent on-disk structure.
+ * It's used at the bottom of the tree.
+ */
+struct ext4_extent {
+    __u32 ee_block;       /* first logical block extent covers */
+    __u16 ee_len;         /* number of blocks covered by extent */
+    __u16 ee_start_hi;    /* high 16 bits of physical block */
+    __u32 ee_start;       /* low 32 bits of physical block */
+};
+
+/*
+ * This is index on-disk structure.
+ * It's used at all the levels except the bottom.
+ */
+struct ext4_extent_idx {
+    __u32 ei_block;       /* index covers logical blocks from 'block' */
+    __u32 ei_leaf;        /* pointer to the physical block of the next *
+                                 * level. leaf or next index could be there */
+    __u16 ei_leaf_hi;     /* high 16 bits of physical block */
+    __u16 ei_unused;
+};
+
+/*
+ * Each block (leaves and indexes), even inode-stored has header.
+ */
+struct ext4_extent_header {
+    __u16  eh_magic;       /* probably will support different formats */
+    __u16  eh_entries;     /* number of valid entries */
+    __u16  eh_max;         /* capacity of store in entries */
+    __u16  eh_depth;       /* has tree real underlying blocks? */
+    __u32  eh_generation;  /* generation of the tree */
+};
+
+#define EXT4_EXT_MAGIC          0xf30a
 
 /* ext2/super.c */
 #define log2(n) grub_log2(n)
@@ -311,6 +350,27 @@ ext2_rdfsb (fsi_file_t *ffi, int fsblock, char *buffer)
 		  EXT2_BLOCK_SIZE (SUPERBLOCK), (char *) buffer);
 }
 
+/* Walk through extents index tree to find the good leaf */
+static struct ext4_extent_header *
+ext4_recurse_extent_index(fsi_file_t *ffi, struct ext4_extent_header *extent_block, int logical_block)
+{
+  int i;
+  struct ext4_extent_idx *index = (struct ext4_extent_idx *) (extent_block + 1);
+  if (extent_block->eh_magic != EXT4_EXT_MAGIC)
+    return NULL;
+  if (extent_block->eh_depth == 0)
+    return extent_block;
+  for (i = 0; i < extent_block->eh_entries; i++)
+    {
+      if (logical_block < index[i].ei_block)
+        break;
+    }
+  if (i == 0 || !ext2_rdfsb(ffi, index[i-1].ei_leaf, DATABLOCK1))
+    return NULL;
+  return (ext4_recurse_extent_index(ffi, (struct ext4_extent_header *) DATABLOCK1, logical_block));
+}
+
+
 /* from
   ext2/inode.c:ext2_bmap()
 */
@@ -319,7 +379,6 @@ ext2_rdfsb (fsi_file_t *ffi, int fsblock, char *buffer)
 static int
 ext2fs_block_map (fsi_file_t *ffi, int logical_block)
 {
-
 #ifdef E2DEBUG
   unsigned char *i;
   for (i = (unsigned char *) INODE;
@@ -340,82 +399,106 @@ ext2fs_block_map (fsi_file_t *ffi, int logical_block)
   printf ("logical block %d\n", logical_block);
 #endif /* E2DEBUG */
 
-  /* if it is directly pointed to by the inode, return that physical addr */
-  if (logical_block < EXT2_NDIR_BLOCKS)
-    {
+  if (!(INODE->i_flags & EXT4_EXTENTS_FL))
+      {
+      /* if it is directly pointed to by the inode, return that physical addr */
+      if (logical_block < EXT2_NDIR_BLOCKS)
+        {
 #ifdef E2DEBUG
-      printf ("returning %d\n", (unsigned char *) (INODE->i_block[logical_block]));
-      printf ("returning %d\n", INODE->i_block[logical_block]);
+          printf ("returning %d\n", (unsigned char *) (INODE->i_block[logical_block]));
+          printf ("returning %d\n", INODE->i_block[logical_block]);
 #endif /* E2DEBUG */
-      return INODE->i_block[logical_block];
-    }
-  /* else */
-  logical_block -= EXT2_NDIR_BLOCKS;
-  /* try the indirect block */
-  if (logical_block < EXT2_ADDR_PER_BLOCK (SUPERBLOCK))
-    {
-      if (mapblock1 != 1
-	  && !ext2_rdfsb (ffi, INODE->i_block[EXT2_IND_BLOCK], DATABLOCK1))
-	{
-	  errnum = ERR_FSYS_CORRUPT;
-	  return -1;
-	}
-      mapblock1 = 1;
-      return ((__u32 *) DATABLOCK1)[logical_block];
-    }
-  /* else */
-  logical_block -= EXT2_ADDR_PER_BLOCK (SUPERBLOCK);
-  /* now try the double indirect block */
-  if (logical_block < (1 << (EXT2_ADDR_PER_BLOCK_BITS (SUPERBLOCK) * 2)))
-    {
-      int bnum;
-      if (mapblock1 != 2
-	  && !ext2_rdfsb (ffi, INODE->i_block[EXT2_DIND_BLOCK], DATABLOCK1))
-	{
-	  errnum = ERR_FSYS_CORRUPT;
-	  return -1;
-	}
-      mapblock1 = 2;
-      if ((bnum = (((__u32 *) DATABLOCK1)
-		   [logical_block >> EXT2_ADDR_PER_BLOCK_BITS (SUPERBLOCK)]))
-	  != mapblock2
-	  && !ext2_rdfsb (ffi, bnum, DATABLOCK2))
-	{
-	  errnum = ERR_FSYS_CORRUPT;
-	  return -1;
-	}
-      mapblock2 = bnum;
+          return INODE->i_block[logical_block];
+        }
+      /* else */
+      logical_block -= EXT2_NDIR_BLOCKS;
+      /* try the indirect block */
+      if (logical_block < EXT2_ADDR_PER_BLOCK (SUPERBLOCK))
+        {
+          if (mapblock1 != 1 && !ext2_rdfsb (ffi, INODE->i_block[EXT2_IND_BLOCK], DATABLOCK1))
+            {
+              errnum = ERR_FSYS_CORRUPT;
+              return -1;
+            }
+          mapblock1 = 1;
+          return ((__u32 *) DATABLOCK1)[logical_block];
+        }
+      /* else */
+      logical_block -= EXT2_ADDR_PER_BLOCK (SUPERBLOCK);
+      /* now try the double indirect block */
+      if (logical_block < (1 << (EXT2_ADDR_PER_BLOCK_BITS (SUPERBLOCK) * 2)))
+        {
+          int bnum;
+          if (mapblock1 != 2 && !ext2_rdfsb (ffi, INODE->i_block[EXT2_DIND_BLOCK], DATABLOCK1))
+            {
+              errnum = ERR_FSYS_CORRUPT;
+              return -1;
+            }
+          mapblock1 = 2;
+          if ((bnum = (((__u32 *) DATABLOCK1)
+                  [logical_block >> EXT2_ADDR_PER_BLOCK_BITS (SUPERBLOCK)]))
+         != mapblock2
+         && !ext2_rdfsb (ffi, bnum, DATABLOCK2))
+           {
+             errnum = ERR_FSYS_CORRUPT;
+             return -1;
+           }
+          mapblock2 = bnum;
+          return ((__u32 *) DATABLOCK2)
+            [logical_block & (EXT2_ADDR_PER_BLOCK (SUPERBLOCK) - 1)];
+        }
+      /* else */
+      mapblock2 = -1;
+      logical_block -= (1 << (EXT2_ADDR_PER_BLOCK_BITS (SUPERBLOCK) * 2));
+      if (mapblock1 != 3
+          && !ext2_rdfsb (ffi, INODE->i_block[EXT2_TIND_BLOCK], DATABLOCK1))
+        {
+          errnum = ERR_FSYS_CORRUPT;
+          return -1;
+        }
+      mapblock1 = 3;
+      if (!ext2_rdfsb (ffi, ((__u32 *) DATABLOCK1)
+                  [logical_block >> (EXT2_ADDR_PER_BLOCK_BITS (SUPERBLOCK)
+                                     * 2)],
+                  DATABLOCK2))
+        {
+          errnum = ERR_FSYS_CORRUPT;
+          return -1;
+        }
+      if (!ext2_rdfsb (ffi, ((__u32 *) DATABLOCK2)
+                  [(logical_block >> EXT2_ADDR_PER_BLOCK_BITS (SUPERBLOCK))
+                   & (EXT2_ADDR_PER_BLOCK (SUPERBLOCK) - 1)],
+                  DATABLOCK2))
+        {
+          errnum = ERR_FSYS_CORRUPT;
+          return -1;
+        }
+
       return ((__u32 *) DATABLOCK2)
-	[logical_block & (EXT2_ADDR_PER_BLOCK (SUPERBLOCK) - 1)];
+       [logical_block & (EXT2_ADDR_PER_BLOCK (SUPERBLOCK) - 1)];
     }
-  /* else */
-  mapblock2 = -1;
-  logical_block -= (1 << (EXT2_ADDR_PER_BLOCK_BITS (SUPERBLOCK) * 2));
-  if (mapblock1 != 3
-      && !ext2_rdfsb (ffi, INODE->i_block[EXT2_TIND_BLOCK], DATABLOCK1))
+    /* inode is in extents format */
+    else
     {
+      int i;
+      struct ext4_extent_header *extent_hdr =
+         ext4_recurse_extent_index(ffi, (struct ext4_extent_header *) INODE->i_block, logical_block);
+      struct ext4_extent *extent = (struct ext4_extent *) (extent_hdr + 1);
+      if ( extent_hdr == NULL || extent_hdr->eh_magic != EXT4_EXT_MAGIC)
+        {
+          errnum = ERR_FSYS_CORRUPT;
+          return -1;
+        }
+      for (i = 0; i<extent_hdr->eh_entries; i++)
+        {
+          if (extent[i].ee_block <= logical_block && logical_block < extent[i].ee_block + extent[i].ee_len && !(extent[i].ee_len>>15))
+            return (logical_block - extent[i].ee_block + extent[i].ee_start);
+        }
+      /* We should not arrive here */
+
       errnum = ERR_FSYS_CORRUPT;
       return -1;
     }
-  mapblock1 = 3;
-  if (!ext2_rdfsb (ffi, ((__u32 *) DATABLOCK1)
-		   [logical_block >> (EXT2_ADDR_PER_BLOCK_BITS (SUPERBLOCK)
-				      * 2)],
-		   DATABLOCK2))
-    {
-      errnum = ERR_FSYS_CORRUPT;
-      return -1;
-    }
-  if (!ext2_rdfsb (ffi, ((__u32 *) DATABLOCK2)
-		   [(logical_block >> EXT2_ADDR_PER_BLOCK_BITS (SUPERBLOCK))
-		    & (EXT2_ADDR_PER_BLOCK (SUPERBLOCK) - 1)],
-		   DATABLOCK2))
-    {
-      errnum = ERR_FSYS_CORRUPT;
-      return -1;
-    }
-  return ((__u32 *) DATABLOCK2)
-    [logical_block & (EXT2_ADDR_PER_BLOCK (SUPERBLOCK) - 1)];
 }
 
 /* preconditions: all preconds of ext2fs_block_map */
@@ -548,6 +631,8 @@ ext2fs_dir (fsi_file_t *ffi, char *dirname)
   int off;			/* offset within block of directory entry (off mod blocksize) */
   int loc;			/* location within a directory */
   int blk;			/* which data blk within dir entry (off div blocksize) */
+  int inodes_per_block;		/* number of inodes in each block */
+  int inode_offset;		/* inode offset in block */
   long map;			/* fs pointer of a particular block from dir entry */
   struct ext2_dir_entry *dp;	/* pointer to directory entry */
 #ifdef E2DEBUG
@@ -583,9 +668,9 @@ ext2fs_dir (fsi_file_t *ffi, char *dirname)
 	  return 0;
 	}
       gdp = GROUP_DESC;
-      ino_blk = gdp[desc].bg_inode_table +
-	(((current_ino - 1) % (SUPERBLOCK->s_inodes_per_group))
-	 >> log2 (EXT2_INODES_PER_BLOCK (SUPERBLOCK)));
+      inodes_per_block =  EXT2_BLOCK_SIZE (SUPERBLOCK) / EXT2_INODE_SIZE(SUPERBLOCK);
+      inode_offset = ((current_ino - 1) % (SUPERBLOCK->s_inodes_per_group));
+      ino_blk = gdp[desc].bg_inode_table + (inode_offset / inodes_per_block);
 #ifdef E2DEBUG
       printf ("inode table fsblock=%d\n", ino_blk);
 #endif /* E2DEBUG */
