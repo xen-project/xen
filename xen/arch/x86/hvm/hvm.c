@@ -478,6 +478,8 @@ static int hvm_save_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
         /* Architecture-specific vmcs/vmcb bits */
         hvm_funcs.save_cpu_ctxt(v, &ctxt);
 
+        ctxt.msr_tsc_aux = v->arch.hvm_vcpu.msr_tsc_aux;
+
         hvm_get_segment_register(v, x86_seg_idtr, &seg);
         ctxt.idtr_limit = seg.limit;
         ctxt.idtr_base = seg.base;
@@ -652,6 +654,8 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     /* Architecture-specific vmcs/vmcb bits */
     if ( hvm_funcs.load_cpu_ctxt(v, &ctxt) < 0 )
         return -EINVAL;
+
+    v->arch.hvm_vcpu.msr_tsc_aux = ctxt.msr_tsc_aux;
 
     seg.limit = ctxt.idtr_limit;
     seg.base = ctxt.idtr_base;
@@ -1929,6 +1933,10 @@ int hvm_msr_read_intercept(struct cpu_user_regs *regs)
         msr_content = hvm_get_guest_tsc(v);
         break;
 
+    case MSR_TSC_AUX:
+        msr_content = v->arch.hvm_vcpu.msr_tsc_aux;
+        break;
+
     case MSR_IA32_APICBASE:
         msr_content = vcpu_vlapic(v)->hw.apic_base_msr;
         break;
@@ -2017,8 +2025,14 @@ int hvm_msr_write_intercept(struct cpu_user_regs *regs)
 
     switch ( ecx )
     {
-     case MSR_IA32_TSC:
+    case MSR_IA32_TSC:
         hvm_set_guest_tsc(v, msr_content);
+        break;
+
+    case MSR_TSC_AUX:
+        v->arch.hvm_vcpu.msr_tsc_aux = (uint32_t)msr_content;
+        if ( cpu_has_rdtscp )
+            wrmsrl(MSR_TSC_AUX, (uint32_t)msr_content);
         break;
 
     case MSR_IA32_APICBASE:

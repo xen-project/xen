@@ -84,7 +84,7 @@ static inline void wrmsrl(unsigned int msr, __u64 val)
 
 #define write_tsc(val) wrmsrl(MSR_IA32_TSC, val)
 
-#define write_rdtscp_aux(val) wrmsr(0xc0000103, (val), 0)
+#define write_rdtscp_aux(val) wrmsr(MSR_TSC_AUX, (val), 0)
 
 #define rdpmc(counter,low,high) \
      __asm__ __volatile__("rdpmc" \

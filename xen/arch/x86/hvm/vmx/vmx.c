@@ -148,19 +148,8 @@ static void vmx_save_host_msrs(void)
     struct vmx_msr_state *host_msr_state = &this_cpu(host_msr_state);
     int i;
 
-    /*
-     * If new MSR is needed to add into msr_index[] and VMX_INDEX_MSR_*** enum,
-     * please note that elements in msr_index[] and VMX_INDEX_MSR_*** enum
-     * are not the same. Currently we only save three MSRs(MSR_LSTAR, MSR_STAR,
-     * and MSR_SYSCALL_MASK into host state. 
-     */
-    BUILD_BUG_ON(MSR_INDEX_SIZE != VMX_INDEX_MSR_TSC_AUX ||
-                 VMX_INDEX_MSR_TSC_AUX != VMX_MSR_COUNT - 1);
     for ( i = 0; i < MSR_INDEX_SIZE; i++ )
         rdmsrl(msr_index[i], host_msr_state->msrs[i]);
-
-    if ( cpu_has_rdtscp )
-        rdmsrl(MSR_TSC_AUX, host_msr_state->msrs[VMX_INDEX_MSR_TSC_AUX]);
 }
 
 #define WRITE_MSR(address)                                              \
@@ -210,21 +199,6 @@ static enum handler_return long_mode_do_msr_read(struct cpu_user_regs *regs)
     case MSR_SYSCALL_MASK:
         msr_content = guest_msr_state->msrs[VMX_INDEX_MSR_SYSCALL_MASK];
         break;
-
-    case MSR_TSC_AUX:
-        if ( cpu_has_rdtscp ) 
-        {
-            msr_content = guest_msr_state->msrs[VMX_INDEX_MSR_TSC_AUX];
-            break;
-        }
-        else
-        {
-            HVM_DBG_LOG(DBG_LEVEL_0, "Reading from nonexistence msr 0x%x\n",
-                        ecx);
-            vmx_inject_hw_exception(TRAP_gp_fault, 0);
-            return HNDL_exception_raised;
-        }
-            
 
     default:
         return HNDL_unhandled;
@@ -287,20 +261,6 @@ static enum handler_return long_mode_do_msr_write(struct cpu_user_regs *regs)
     case MSR_SYSCALL_MASK:
         WRITE_MSR(SYSCALL_MASK);
 
-    case MSR_TSC_AUX:
-        if ( cpu_has_rdtscp )
-        {
-            struct vmx_msr_state *guest_state = &v->arch.hvm_vmx.msr_state;
-            guest_state->msrs[VMX_INDEX_MSR_TSC_AUX] = msr_content;
-            wrmsrl(MSR_TSC_AUX, (uint32_t)msr_content);
-        }
-        else
-        {
-            HVM_DBG_LOG(DBG_LEVEL_0, "Writing to nonexistence msr 0x%x\n", ecx);
-            vmx_inject_hw_exception(TRAP_gp_fault, 0);
-            return HNDL_exception_raised;
-        }
-
     default:
         return HNDL_unhandled;
     }
@@ -331,22 +291,15 @@ static void vmx_restore_host_msrs(void)
         wrmsrl(msr_index[i], host_msr_state->msrs[i]);
         clear_bit(i, &host_msr_state->flags);
     }
-
-    if ( cpu_has_rdtscp )
-        wrmsrl(MSR_TSC_AUX,
-               (uint32_t)host_msr_state->msrs[VMX_INDEX_MSR_TSC_AUX]);
 }
 
 static void vmx_save_guest_msrs(struct vcpu *v)
 {
-    struct vmx_msr_state *guest_msr_state = &v->arch.hvm_vmx.msr_state;
     /*
      * We cannot cache SHADOW_GS_BASE while the VCPU runs, as it can
      * be updated at any time via SWAPGS, which we cannot trap.
      */
     rdmsrl(MSR_SHADOW_GS_BASE, v->arch.hvm_vmx.shadow_gs);
-    if ( cpu_has_rdtscp )
-        rdmsrl(MSR_TSC_AUX, guest_msr_state->msrs[VMX_INDEX_MSR_TSC_AUX]);
 }
 
 static void vmx_restore_guest_msrs(struct vcpu *v)
@@ -384,8 +337,7 @@ static void vmx_restore_guest_msrs(struct vcpu *v)
     }
 
     if ( cpu_has_rdtscp )
-        wrmsrl(MSR_TSC_AUX,
-               (uint32_t)guest_msr_state->msrs[VMX_INDEX_MSR_TSC_AUX]);
+        wrmsrl(MSR_TSC_AUX, v->arch.hvm_vcpu.msr_tsc_aux);
 }
 
 #else  /* __i386__ */
@@ -627,10 +579,6 @@ static void vmx_save_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
     data->msr_lstar        = guest_state->msrs[VMX_INDEX_MSR_LSTAR];
     data->msr_star         = guest_state->msrs[VMX_INDEX_MSR_STAR];
     data->msr_syscall_mask = guest_state->msrs[VMX_INDEX_MSR_SYSCALL_MASK];
-    if ( cpu_has_rdtscp )
-        data->msr_tsc_aux = guest_state->msrs[VMX_INDEX_MSR_TSC_AUX];
-    else
-        data->msr_tsc_aux = 0;
 #endif
 
     data->tsc = hvm_get_guest_tsc(v);
@@ -649,10 +597,6 @@ static void vmx_load_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
 
     v->arch.hvm_vmx.cstar     = data->msr_cstar;
     v->arch.hvm_vmx.shadow_gs = data->shadow_gs;
-    if ( cpu_has_rdtscp )
-        guest_state->msrs[VMX_INDEX_MSR_TSC_AUX] = data->msr_tsc_aux;
-    else
-        guest_state->msrs[VMX_INDEX_MSR_TSC_AUX] = 0;
 #endif
 
     hvm_set_guest_tsc(v, data->tsc);
@@ -2545,29 +2489,19 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         hvm_hlt(regs->eflags);
         break;
     case EXIT_REASON_INVLPG:
-    {
         inst_len = __get_instruction_length(); /* Safe: INVLPG */
         __update_guest_eip(inst_len);
         exit_qualification = __vmread(EXIT_QUALIFICATION);
         vmx_invlpg_intercept(exit_qualification);
         break;
-    }
+    case EXIT_REASON_RDTSCP:
+        regs->ecx = v->arch.hvm_vcpu.msr_tsc_aux;
+        /* fall through */
     case EXIT_REASON_RDTSC:
         inst_len = __get_instruction_length();
         __update_guest_eip(inst_len);
         hvm_rdtsc_intercept(regs);
         break;
-#ifdef __x86_64__
-    case EXIT_REASON_RDTSCP:
-    {
-        struct vmx_msr_state *guest_state = &v->arch.hvm_vmx.msr_state;
-        inst_len = __get_instruction_length();
-        __update_guest_eip(inst_len);
-        hvm_rdtsc_intercept(regs);
-        regs->ecx = (uint32_t)(guest_state->msrs[VMX_INDEX_MSR_TSC_AUX]);
-        break;
-    }
-#endif
     case EXIT_REASON_VMCALL:
     {
         int rc;

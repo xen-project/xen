@@ -73,6 +73,8 @@ struct hvm_vcpu {
     u64                 asid_generation;
     u32                 asid;
 
+    u32                 msr_tsc_aux;
+
     union {
         struct arch_vmx_struct vmx;
         struct arch_svm_struct svm;
