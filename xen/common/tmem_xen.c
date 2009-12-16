@@ -14,7 +14,7 @@
 
 #define EXPORT /* indicates code other modules are dependent upon */
 
-EXPORT int opt_tmem = 0;
+EXPORT int opt_tmem = 1;
 boolean_param("tmem", opt_tmem);
 
 EXPORT int opt_tmem_compress = 0;
