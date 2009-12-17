@@ -2138,7 +2138,9 @@ int free_page_type(struct page_info *page, unsigned long type,
 
         gmfn = mfn_to_gmfn(owner, page_to_mfn(page));
         ASSERT(VALID_M2P(gmfn));
-        shadow_remove_all_shadows(owner->vcpu[0], _mfn(gmfn));
+        /* Page sharing not supported for shadowed domains */
+        if(!SHARED_M2P(gmfn))
+            shadow_remove_all_shadows(owner->vcpu[0], _mfn(gmfn));
     }
 
     if ( !(type & PGT_partial) )
@@ -4234,12 +4236,22 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
             spin_unlock(&d->grant_table->lock);
             break;
         case XENMAPSPACE_gmfn:
-            xatp.idx = gmfn_to_mfn(d, xatp.idx);
+        {
+            p2m_type_t p2mt;
+
+            xatp.idx = mfn_x(gfn_to_mfn_unshare(d, xatp.idx, &p2mt, 0));
+            /* If the page is still shared, exit early */
+            if ( p2m_is_shared(p2mt) )
+            {
+                rcu_unlock_domain(d);
+                return -ENOMEM;
+            }
             if ( !get_page_from_pagenr(xatp.idx, d) )
                 break;
             mfn = xatp.idx;
             page = mfn_to_page(mfn);
             break;
+        }
         default:
             break;
         }
@@ -4268,6 +4280,7 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
 
         /* Unmap from old location, if any. */
         gpfn = get_gpfn_from_mfn(mfn);
+        ASSERT( gpfn != SHARED_M2P_ENTRY );
         if ( gpfn != INVALID_M2P_ENTRY )
             guest_physmap_remove_page(d, gpfn, mfn, 0);
 

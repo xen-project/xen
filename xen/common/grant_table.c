@@ -1195,6 +1195,8 @@ gnttab_setup_table(
     for ( i = 0; i < op.nr_frames; i++ )
     {
         gmfn = gnttab_shared_gmfn(d, d->grant_table, i);
+        /* Grant tables cannot be shared */
+        BUG_ON(SHARED_M2P(gmfn));
         (void)copy_to_guest_offset(op.frame_list, i, &gmfn, 1);
     }
 

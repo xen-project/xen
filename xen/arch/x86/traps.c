@@ -2088,15 +2088,27 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             break;
             
         case 3: /* Read CR3 */
+        {
+            unsigned long mfn;
+            
             if ( !is_pv_32on64_vcpu(v) )
+            {
+                mfn = pagetable_get_pfn(v->arch.guest_table);
                 *reg = xen_pfn_to_cr3(mfn_to_gmfn(
-                    v->domain, pagetable_get_pfn(v->arch.guest_table)));
+                    v->domain, mfn));
+            }
 #ifdef CONFIG_COMPAT
             else
+            {
+                mfn = l4e_get_pfn(*(l4_pgentry_t *)__va(pagetable_get_paddr(v->arch.guest_table)));
                 *reg = compat_pfn_to_cr3(mfn_to_gmfn(
-                    v->domain, l4e_get_pfn(*(l4_pgentry_t *)__va(pagetable_get_paddr(v->arch.guest_table)))));
+                    v->domain, mfn));
+            }
 #endif
-            break;
+            /* PTs should not be shared */
+            BUG_ON(page_get_owner(mfn_to_page(mfn)) == dom_cow);
+        }
+        break;
 
         case 4: /* Read CR4 */
             *reg = v->arch.guest_context.ctrlreg[4];

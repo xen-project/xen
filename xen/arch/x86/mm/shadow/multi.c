@@ -1070,6 +1070,8 @@ static inline void shadow_vram_get_l1e(shadow_l1e_t new_sl1e,
         return;
 
     gfn = mfn_to_gfn(d, mfn);
+    /* Page sharing not supported on shadow PTs */
+    BUG_ON(SHARED_M2P(gfn));
 
     if ( (gfn >= dirty_vram->begin_pfn) && (gfn < dirty_vram->end_pfn) )
     {
@@ -1099,6 +1101,8 @@ static inline void shadow_vram_put_l1e(shadow_l1e_t old_sl1e,
         return;
 
     gfn = mfn_to_gfn(d, mfn);
+    /* Page sharing not supported on shadow PTs */
+    BUG_ON(SHARED_M2P(gfn));
 
     if ( (gfn >= dirty_vram->begin_pfn) && (gfn < dirty_vram->end_pfn) )
     {

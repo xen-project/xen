@@ -931,6 +931,7 @@ int __init construct_dom0(
     page_list_for_each ( page, &d->page_list )
     {
         mfn = page_to_mfn(page);
+        BUG_ON(SHARED_M2P(get_gpfn_from_mfn(mfn)));
         if ( get_gpfn_from_mfn(mfn) >= count )
         {
             BUG_ON(is_pv_32bit_domain(d));

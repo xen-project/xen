@@ -216,6 +216,9 @@ int mem_sharing_nominate_page(struct domain *d,
         goto out;
     }
 
+    /* Update m2p entry to SHARED_M2P_ENTRY */
+    set_gpfn_from_mfn(mfn_x(mfn), SHARED_M2P_ENTRY);
+
     ret = 0;
 
 out:
@@ -260,6 +263,8 @@ private_page_found:
         printk("Could not change p2m type.\n");
         BUG();
     }
+    /* Update m2p entry */
+    set_gpfn_from_mfn(mfn_x(page_to_mfn(page)), gfn);
 
     return 0;
 }

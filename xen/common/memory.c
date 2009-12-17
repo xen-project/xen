@@ -22,6 +22,7 @@
 #include <xen/tmem.h>
 #include <asm/current.h>
 #include <asm/hardirq.h>
+#include <asm/p2m.h>
 #include <xen/numa.h>
 #include <public/memory.h>
 #include <xsm/xsm.h>
@@ -151,9 +152,10 @@ out:
 int guest_remove_page(struct domain *d, unsigned long gmfn)
 {
     struct page_info *page;
+    p2m_type_t p2mt;
     unsigned long mfn;
 
-    mfn = gmfn_to_mfn(d, gmfn);
+    mfn = mfn_x(gfn_to_mfn(d, gmfn, &p2mt)); 
     if ( unlikely(!mfn_valid(mfn)) )
     {
         gdprintk(XENLOG_INFO, "Domain %u page number %lx invalid\n",
@@ -162,6 +164,15 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
     }
             
     page = mfn_to_page(mfn);
+    /* If gmfn is shared, just drop the guest reference (which may or may not
+     * free the page) */
+    if(p2m_is_shared(p2mt))
+    {
+        put_page_and_type(page);
+        guest_physmap_remove_page(d, gmfn, mfn, 0);
+        return 1;
+    }
+
     if ( unlikely(!get_page(page, d)) )
     {
         gdprintk(XENLOG_INFO, "Bad page free for domain %u\n", d->domain_id);
@@ -319,7 +330,15 @@ static long memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
 
             for ( k = 0; k < (1UL << exch.in.extent_order); k++ )
             {
-                mfn = gmfn_to_mfn(d, gmfn + k);
+                p2m_type_t p2mt;
+
+                /* Shared pages cannot be exchanged */
+                mfn = mfn_x(gfn_to_mfn_unshare(d, gmfn + k, &p2mt, 0));
+                if ( p2m_is_shared(p2mt) )
+                {
+                    rc = -ENOMEM;
+                    goto fail; 
+                }
                 if ( unlikely(!mfn_valid(mfn)) )
                 {
                     rc = -EINVAL;
@@ -358,10 +377,15 @@ static long memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
         /* Destroy final reference to each input page. */
         while ( (page = page_list_remove_head(&in_chunk_list)) )
         {
+            unsigned long gfn;
+
             if ( !test_and_clear_bit(_PGC_allocated, &page->count_info) )
                 BUG();
             mfn = page_to_mfn(page);
-            guest_physmap_remove_page(d, mfn_to_gmfn(d, mfn), mfn, 0);
+            gfn = mfn_to_gmfn(d, mfn);
+            /* Pages were unshared above */
+            BUG_ON(SHARED_M2P(gfn));
+            guest_physmap_remove_page(d, gfn, mfn, 0);
             put_page(page);
         }
 

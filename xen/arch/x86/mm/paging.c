@@ -280,6 +280,8 @@ void paging_mark_dirty(struct domain *d, unsigned long guest_mfn)
 
     /* We /really/ mean PFN here, even for non-translated guests. */
     pfn = get_gpfn_from_mfn(mfn_x(gmfn));
+    /* Shared MFNs should NEVER be marked dirty */
+    BUG_ON(SHARED_M2P(pfn));
 
     /*
      * Values with the MSB set denote MFNs that aren't really part of the

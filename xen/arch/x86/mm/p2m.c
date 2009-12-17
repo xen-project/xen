@@ -1601,6 +1601,8 @@ int p2m_alloc_table(struct domain *d,
     {
         mfn = page_to_mfn(page);
         gfn = get_gpfn_from_mfn(mfn_x(mfn));
+        /* Pages should not be shared that early */
+        ASSERT(gfn != SHARED_M2P_ENTRY);
         page_count++;
         if (
 #ifdef __x86_64__
@@ -1712,6 +1714,13 @@ static void audit_p2m(struct domain *d)
             continue;
         }
 
+        if ( gfn == SHARED_P2M_ENTRY)
+        {
+            P2M_PRINTK("shared mfn (%lx) on domain page list!\n",
+                    mfn);
+            continue;
+        }
+
         p2mfn = gfn_to_mfn_type_foreign(d, gfn, &type, p2m_query);
         if ( mfn_x(p2mfn) != mfn )
         {
@@ -1803,7 +1812,9 @@ static void audit_p2m(struct domain *d)
                         for ( i1 = 0; i1 < L1_PAGETABLE_ENTRIES; i1++)
                         {
                             m2pfn = get_gpfn_from_mfn(mfn+i1);
-                            if ( m2pfn != (gfn + i1) )
+                            /* Allow shared M2Ps */
+                            if ( (m2pfn != (gfn + i1)) &&
+                                 (m2pfn != SHARED_M2P_ENTRY) )
                             {
                                 pmbad++;
                                 P2M_PRINTK("mismatch: gfn %#lx -> mfn %#lx"
@@ -1834,7 +1845,8 @@ static void audit_p2m(struct domain *d)
                         m2pfn = get_gpfn_from_mfn(mfn);
                         if ( m2pfn != gfn &&
                              type != p2m_mmio_direct &&
-                             !p2m_is_grant(type) )
+                             !p2m_is_grant(type) &&
+                             !p2m_is_shared(type) )
                         {
                             pmbad++;
                             printk("mismatch: gfn %#lx -> mfn %#lx"
@@ -2137,12 +2149,11 @@ void p2m_change_type_global(struct domain *d, p2m_type_t ot, p2m_type_t nt)
     l1_pgentry_t *l1e;
     l2_pgentry_t *l2e;
     mfn_t l1mfn, l2mfn;
-    int i1, i2;
+    unsigned long i1, i2, i3;
     l3_pgentry_t *l3e;
-    int i3;
 #if CONFIG_PAGING_LEVELS == 4
     l4_pgentry_t *l4e;
-    int i4;
+    unsigned long i4;
 #endif /* CONFIG_PAGING_LEVELS == 4 */
 
     BUG_ON(p2m_is_grant(ot) || p2m_is_grant(nt));
@@ -2193,7 +2204,10 @@ void p2m_change_type_global(struct domain *d, p2m_type_t ot, p2m_type_t nt)
                     if ( p2m_flags_to_type(flags) != ot )
                         continue;
                     mfn = l2e_get_pfn(l2e[i2]);
-                    gfn = get_gpfn_from_mfn(mfn);
+                    /* Do not use get_gpfn_from_mfn because it may return 
+                       SHARED_M2P_ENTRY */
+                    gfn = (i2 + (i3 + (i4 * L3_PAGETABLE_ENTRIES))
+                           * L2_PAGETABLE_ENTRIES) * L1_PAGETABLE_ENTRIES; 
                     flags = p2m_type_to_flags(nt);
                     l1e_content = l1e_from_pfn(mfn, flags | _PAGE_PSE);
                     paging_write_p2m_entry(d, gfn, (l1_pgentry_t *)&l2e[i2],
@@ -2210,7 +2224,8 @@ void p2m_change_type_global(struct domain *d, p2m_type_t ot, p2m_type_t nt)
                     if ( p2m_flags_to_type(flags) != ot )
                         continue;
                     mfn = l1e_get_pfn(l1e[i1]);
-                    gfn = get_gpfn_from_mfn(mfn);
+                    gfn = i1 + (i2 + (i3 + (i4 * L3_PAGETABLE_ENTRIES))
+                           * L2_PAGETABLE_ENTRIES) * L1_PAGETABLE_ENTRIES; 
                     /* create a new 1le entry with the new type */
                     flags = p2m_type_to_flags(nt);
                     l1e_content = l1e_from_pfn(mfn, flags);

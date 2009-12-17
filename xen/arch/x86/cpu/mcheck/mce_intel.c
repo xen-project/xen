@@ -356,6 +356,10 @@ static void intel_UCR_handler(struct mcinfo_bank *bank,
                       /* Fill vMCE# injection and vMCE# MSR virtualization "
                        * "related data */
                       bank->mc_domid = result->owner;
+                      /* XXX: Cannot handle shared pages yet 
+                       * (this should identify all domains and gfn mapping to
+                       *  the mfn in question) */
+                      BUG_ON( result->owner == DOMID_COW );
                       if ( result->owner != DOMID_XEN ) {
                           d = get_domain_by_id(result->owner);
                           gfn =
