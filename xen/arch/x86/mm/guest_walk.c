@@ -125,6 +125,13 @@ guest_walk_tables(struct vcpu *v, unsigned long va, walk_t *gw,
 
     /* Map the l3 table */
     gw->l3mfn = gfn_to_mfn(d, guest_l4e_get_gfn(gw->l4e), &p2mt);
+    if ( p2m_is_paging(p2mt) )
+    {
+        p2m_mem_paging_populate(d, gfn_x(guest_l4e_get_gfn(gw->l4e)));
+
+        rc = _PAGE_PAGED;
+        goto out;
+    }
     if ( !p2m_is_ram(p2mt) ) 
     {
         rc |= _PAGE_PRESENT;
@@ -154,6 +161,13 @@ guest_walk_tables(struct vcpu *v, unsigned long va, walk_t *gw,
 
     /* Map the l2 table */
     gw->l2mfn = gfn_to_mfn(d, guest_l3e_get_gfn(gw->l3e), &p2mt);
+    if ( p2m_is_paging(p2mt) )
+    {
+        p2m_mem_paging_populate(d, gfn_x(guest_l3e_get_gfn(gw->l3e)));
+
+        rc = _PAGE_PAGED;
+        goto out;
+    }
     if ( !p2m_is_ram(p2mt) )
     {
         rc |= _PAGE_PRESENT;
@@ -212,6 +226,13 @@ guest_walk_tables(struct vcpu *v, unsigned long va, walk_t *gw,
     {
         /* Not a superpage: carry on and find the l1e. */
         gw->l1mfn = gfn_to_mfn(d, guest_l2e_get_gfn(gw->l2e), &p2mt);
+        if ( p2m_is_paging(p2mt) )
+        {
+            p2m_mem_paging_populate(d, gfn_x(guest_l2e_get_gfn(gw->l2e)));
+
+            rc = _PAGE_PAGED;
+            goto out;
+        }
         if ( !p2m_is_ram(p2mt) )
         {
             rc |= _PAGE_PRESENT;
