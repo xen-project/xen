@@ -58,6 +58,10 @@ static void ept_p2m_type_to_flags(ept_entry_t *entry, p2m_type_t type)
         case p2m_invalid:
         case p2m_mmio_dm:
         case p2m_populate_on_demand:
+        case p2m_ram_paging_out:
+        case p2m_ram_paged:
+        case p2m_ram_paging_in:
+        case p2m_ram_paging_in_start:
         default:
             entry->r = entry->w = entry->x = 0;
             return;
@@ -219,7 +223,8 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
     if ( i == walk_level )
     {
         /* We reached the level we're looking for */
-        if ( mfn_valid(mfn_x(mfn)) || direct_mmio )
+        if ( mfn_valid(mfn_x(mfn)) || direct_mmio || p2m_is_paged(p2mt) ||
+             (p2mt == p2m_ram_paging_in_start) )
         {
             ept_entry->emt = epte_get_entry_emt(d, gfn, mfn, &igmt,
                                                 direct_mmio);
