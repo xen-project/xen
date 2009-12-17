@@ -3,6 +3,7 @@
  *
  * physical-to-machine mappings for automatically-translated domains.
  *
+ * Parts of this code are Copyright (c) 2009 by Citrix (R&D) Ltd. (Patrick Colp)
  * Parts of this code are Copyright (c) 2007 by Advanced Micro Devices.
  * Parts of this code are Copyright (c) 2006-2007 by XenSource Inc.
  * Parts of this code are Copyright (c) 2006 by Michael A Fetterman
@@ -29,6 +30,9 @@
 #include <asm/p2m.h>
 #include <asm/hvm/vmx/vmx.h> /* ept_p2m_init() */
 #include <xen/iommu.h>
+#include <asm/mem_event.h>
+#include <public/mem_event.h>
+#include <xen/event.h>
 
 /* Debugging and auditing of the P2M code? */
 #define P2M_AUDIT     0
@@ -2296,6 +2300,163 @@ clear_mmio_p2m_entry(struct domain *d, unsigned long gfn)
 
     return rc;
 }
+
+int p2m_mem_paging_nominate(struct domain *d, unsigned long gfn)
+{
+    struct page_info *page;
+    p2m_type_t p2mt;
+    mfn_t mfn;
+    int ret;
+
+    mfn = gfn_to_mfn(d, gfn, &p2mt);
+
+    /* Check if mfn is valid */
+    ret = -EINVAL;
+    if ( !mfn_valid(mfn) )
+        goto out;
+
+    /* Check p2m type */
+    ret = -EAGAIN;
+    if ( !p2m_is_pageable(p2mt) )
+        goto out;
+
+    /* Check for io memory page */
+    if ( is_iomem_page(mfn_x(mfn)) )
+        goto out;
+
+    /* Check page count and type */
+    page = mfn_to_page(mfn);
+    if ( (page->count_info & (PGC_count_mask | PGC_allocated)) !=
+         (1 | PGC_allocated) )
+        goto out;
+
+    if ( (page->u.inuse.type_info & PGT_type_mask) != PGT_none )
+        goto out;
+
+    /* Fix p2m entry */
+    p2m_lock(d->arch.p2m);
+    set_p2m_entry(d, gfn, mfn, 0, p2m_ram_paging_out);
+    p2m_unlock(d->arch.p2m);
+
+    ret = 0;
+
+ out:
+    return ret;
+}
+
+int p2m_mem_paging_evict(struct domain *d, unsigned long gfn)
+{
+    struct page_info *page;
+    p2m_type_t p2mt;
+    mfn_t mfn;
+
+    /* Get mfn */
+    mfn = gfn_to_mfn(d, gfn, &p2mt);
+    if ( unlikely(!mfn_valid(mfn)) )
+        return -EINVAL;
+
+    if ( (p2mt == p2m_ram_paged) || (p2mt == p2m_ram_paging_in) ||
+         (p2mt == p2m_ram_paging_in_start) )
+        return -EINVAL;
+
+    /* Get the page so it doesn't get modified under Xen's feet */
+    page = mfn_to_page(mfn);
+    if ( unlikely(!get_page(page, d)) )
+        return -EINVAL;
+
+    /* Decrement guest domain's ref count of the page */
+    if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
+        put_page(page);
+
+    /* Remove mapping from p2m table */
+    p2m_lock(d->arch.p2m);
+    set_p2m_entry(d, gfn, _mfn(PAGING_MFN), 0, p2m_ram_paged);
+    p2m_unlock(d->arch.p2m);
+
+    /* Put the page back so it gets freed */
+    put_page(page);
+
+    return 0;
+}
+
+void p2m_mem_paging_populate(struct domain *d, unsigned long gfn)
+{
+    struct vcpu *v = current;
+    mem_event_request_t req;
+    p2m_type_t p2mt;
+
+    memset(&req, 0, sizeof(req));
+
+    /* Check that there's space on the ring for this request */
+    if ( mem_event_check_ring(d) )
+        return;
+
+    /* Fix p2m mapping */
+    /* XXX: It seems inefficient to have this here, as it's only needed
+     *      in one case (ept guest accessing paging out page) */
+    gfn_to_mfn(d, gfn, &p2mt);
+    if ( p2mt != p2m_ram_paging_out )
+    {
+        p2m_lock(d->arch.p2m);
+        set_p2m_entry(d, gfn, _mfn(PAGING_MFN), 0, p2m_ram_paging_in_start);
+        p2m_unlock(d->arch.p2m);
+    }
+
+    /* Pause domain */
+    if ( v->domain->domain_id == d->domain_id )
+    {
+        vcpu_pause_nosync(v);
+        req.flags |= MEM_EVENT_FLAG_PAUSED;
+    }
+
+    /* Send request to pager */
+    req.gfn = gfn;
+    req.p2mt = p2mt;
+    req.vcpu_id = v->vcpu_id;
+
+    mem_event_put_request(d, &req);
+}
+
+int p2m_mem_paging_prep(struct domain *d, unsigned long gfn)
+{
+    struct page_info *page;
+
+    /* Get a free page */
+    page = alloc_domheap_page(d, 0);
+    if ( unlikely(page == NULL) )
+        return -EINVAL;
+
+    /* Fix p2m mapping */
+    p2m_lock(d->arch.p2m);
+    set_p2m_entry(d, gfn, page_to_mfn(page), 0, p2m_ram_paging_in);
+    p2m_unlock(d->arch.p2m);
+
+    return 0;
+}
+
+void p2m_mem_paging_resume(struct domain *d)
+{
+    mem_event_response_t rsp;
+    p2m_type_t p2mt;
+    mfn_t mfn;
+
+    /* Pull the response off the ring */
+    mem_event_get_response(d, &rsp);
+
+    /* Fix p2m entry */
+    mfn = gfn_to_mfn(d, rsp.gfn, &p2mt);
+    p2m_lock(d->arch.p2m);
+    set_p2m_entry(d, rsp.gfn, mfn, 0, p2m_ram_rw);
+    p2m_unlock(d->arch.p2m);
+
+    /* Unpause domain */
+    if ( rsp.flags & MEM_EVENT_FLAG_PAUSED )
+        vcpu_unpause(d->vcpu[rsp.vcpu_id]);
+
+    /* Unpause any domains that were paused because the ring was full */
+    mem_event_unpause_vcpus(d);
+}
+
 
 /*
  * Local variables:

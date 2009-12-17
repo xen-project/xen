@@ -75,6 +75,11 @@ typedef enum {
        #ifdef's everywhere else. */
     p2m_grant_map_rw = 7,       /* Read/write grant mapping */
     p2m_grant_map_ro = 8,       /* Read-only grant mapping */
+
+    p2m_ram_paging_out = 9,       /* Memory that is being paged out */
+    p2m_ram_paged = 10,           /* Memory that has been paged out */
+    p2m_ram_paging_in = 11,       /* Memory that is being paged in */
+    p2m_ram_paging_in_start = 12, /* Memory that is being paged in */
 } p2m_type_t;
 
 typedef enum {
@@ -87,9 +92,13 @@ typedef enum {
 #define p2m_to_mask(_t) (1UL << (_t))
 
 /* RAM types, which map to real machine frames */
-#define P2M_RAM_TYPES (p2m_to_mask(p2m_ram_rw)          \
-                       | p2m_to_mask(p2m_ram_logdirty)  \
-                       | p2m_to_mask(p2m_ram_ro))
+#define P2M_RAM_TYPES (p2m_to_mask(p2m_ram_rw)                \
+                       | p2m_to_mask(p2m_ram_logdirty)        \
+                       | p2m_to_mask(p2m_ram_ro)              \
+                       | p2m_to_mask(p2m_ram_paging_out)      \
+                       | p2m_to_mask(p2m_ram_paged)           \
+                       | p2m_to_mask(p2m_ram_paging_in_start) \
+                       | p2m_to_mask(p2m_ram_paging_in))
 
 /* Grant mapping types, which map to a real machine frame in another
  * VM */
@@ -107,6 +116,16 @@ typedef enum {
 
 #define P2M_MAGIC_TYPES (p2m_to_mask(p2m_populate_on_demand))
 
+/* Pageable types */
+#define P2M_PAGEABLE_TYPES (p2m_to_mask(p2m_ram_rw))
+
+#define P2M_PAGING_TYPES (p2m_to_mask(p2m_ram_paging_out)        \
+                          | p2m_to_mask(p2m_ram_paged)           \
+                          | p2m_to_mask(p2m_ram_paging_in_start) \
+                          | p2m_to_mask(p2m_ram_paging_in))
+
+#define P2M_PAGED_TYPES (p2m_to_mask(p2m_ram_paged))
+
 /* Useful predicates */
 #define p2m_is_ram(_t) (p2m_to_mask(_t) & P2M_RAM_TYPES)
 #define p2m_is_mmio(_t) (p2m_to_mask(_t) & P2M_MMIO_TYPES)
@@ -118,11 +137,15 @@ typedef enum {
    implementations, there's no way of synchronising against that. */
 #define p2m_is_valid(_t) (p2m_to_mask(_t) & (P2M_RAM_TYPES | P2M_MMIO_TYPES))
 #define p2m_has_emt(_t)  (p2m_to_mask(_t) & (P2M_RAM_TYPES | p2m_to_mask(p2m_mmio_direct)))
+#define p2m_is_pageable(_t) (p2m_to_mask(_t) & P2M_PAGEABLE_TYPES)
+#define p2m_is_paging(_t)   (p2m_to_mask(_t) & P2M_PAGING_TYPES)
+#define p2m_is_paged(_t)    (p2m_to_mask(_t) & P2M_PAGED_TYPES)
 
 /* Populate-on-demand */
 #define POPULATE_ON_DEMAND_MFN  (1<<9)
 #define POD_PAGE_ORDER 9
 
+#define PAGING_MFN  INVALID_MFN
 
 struct p2m_domain {
     /* Lock that protects updates to the p2m */
@@ -368,6 +391,17 @@ p2m_type_t p2m_change_type(struct domain *d, unsigned long gfn,
 /* Set mmio addresses in the p2m table (for pass-through) */
 int set_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn);
 int clear_mmio_p2m_entry(struct domain *d, unsigned long gfn);
+
+/* Check if a nominated gfn is valid to be paged out */
+int p2m_mem_paging_nominate(struct domain *d, unsigned long gfn);
+/* Evict a frame */
+int p2m_mem_paging_evict(struct domain *d, unsigned long gfn);
+/* Start populating a paged out frame */
+void p2m_mem_paging_populate(struct domain *d, unsigned long gfn);
+/* Prepare the p2m for paging a frame in */
+int p2m_mem_paging_prep(struct domain *d, unsigned long gfn);
+/* Resume normal operation (in case a domain was paused) */
+void p2m_mem_paging_resume(struct domain *d);
 
 #endif /* _XEN_P2M_H */
 
