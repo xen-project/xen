@@ -24,11 +24,18 @@
 #include <asm/string.h>
 #include <asm/p2m.h>
 #include <asm/mem_event.h>
+#include <asm/atomic.h>
 #include <xen/domain_page.h>
 #include <xen/types.h>
 #include <xen/spinlock.h>
 #include <xen/mm.h>
 #include <xen/sched.h>
+
+
+#define hap_enabled(d) \
+    (is_hvm_domain(d) && (d)->arch.hvm_domain.hap_enabled)
+#define mem_sharing_enabled(d) \
+    (is_hvm_domain(d) && (d)->arch.hvm_domain.mem_sharing_enabled)
  
 #undef mfn_to_page
 #define mfn_to_page(_m) __mfn_to_page(mfn_x(_m))
@@ -38,6 +45,7 @@
 #define page_to_mfn(_pg) _mfn(__page_to_mfn(_pg))
 
 static shr_handle_t next_handle = 1;
+static atomic_t nr_saved_mfns = ATOMIC_INIT(0); 
 
 typedef struct shr_hash_entry 
 {
@@ -64,6 +72,17 @@ typedef struct shr_lock
     const char *locker_function; /* func that took it */
 } shr_lock_t;
 static shr_lock_t shr_lock;
+
+/* Returns true if list has only one entry. O(1) complexity. */
+static inline int list_has_one_entry(struct list_head *head)
+{
+    return (head->next != head) && (head->next->next == head);
+}
+
+static inline struct gfn_info* gfn_get_info(struct list_head *list)
+{
+    return list_entry(list->next, struct gfn_info, list);
+}
 
 #define shr_lock_init(_i)                      \
     do {                                       \
@@ -97,8 +116,6 @@ static shr_lock_t shr_lock;
         spin_unlock(&shr_lock.lock);                      \
     } while (0)
 
-
-
 static void mem_sharing_hash_init(void)
 {
     int i;
@@ -123,9 +140,21 @@ static gfn_info_t *mem_sharing_gfn_alloc(void)
     return xmalloc(gfn_info_t); 
 }
 
-static void mem_sharing_gfn_destroy(gfn_info_t *gfn_info)
+static void mem_sharing_gfn_destroy(gfn_info_t *gfn, int was_shared)
 {
-    xfree(gfn_info);
+    /* Decrement the number of pages, if the gfn was shared before */
+    if(was_shared)
+    {
+        struct domain *d = get_domain_by_id(gfn->domain);
+        /* Domain may have been destroyed by now, if we are called from
+         * p2m_teardown */
+        if(d)
+        {
+            atomic_dec(&d->shr_pages);
+            put_domain(d);
+        }
+    }
+    xfree(gfn);
 }
 
 static shr_hash_entry_t* mem_sharing_hash_lookup(shr_handle_t handle)
@@ -219,6 +248,11 @@ static struct page_info* mem_sharing_alloc_page(struct domain *d,
     return page;
 }
 
+unsigned int mem_sharing_get_nr_saved_mfns(void)
+{
+    return (unsigned int)atomic_read(&nr_saved_mfns);
+}
+
 int mem_sharing_sharing_resume(struct domain *d)
 {
     mem_event_response_t rsp;
@@ -290,6 +324,61 @@ shared_entry_header(struct grant_table *t, grant_ref_t ref)
         return &shared_entry_v2(t, ref).hdr;
 }
 
+static int mem_sharing_gref_to_gfn(struct domain *d, 
+                                   grant_ref_t ref, 
+                                   unsigned long *gfn)
+{
+    if(d->grant_table->gt_version < 1)
+        return -1;
+
+    if (d->grant_table->gt_version == 1) 
+    {
+        grant_entry_v1_t *sha1;
+        sha1 = &shared_entry_v1(d->grant_table, ref);
+        *gfn = sha1->frame;
+        return 0;
+    } 
+    else 
+    {
+        grant_entry_v2_t *sha2;
+        sha2 = &shared_entry_v2(d->grant_table, ref);
+        *gfn = sha2->full_page.frame;
+        return 0;
+    }
+ 
+    return -2;
+}
+
+/* Account for a GFN being shared/unshared.
+ * When sharing this function needs to be called _before_ gfn lists are merged
+ * together, but _after_ gfn is removed from the list when unsharing.
+ */
+static int mem_sharing_gfn_account(struct gfn_info *gfn, int sharing)
+{
+    struct domain *d;
+
+    /* A) When sharing:
+     * if the gfn being shared is in > 1 long list, its already been 
+     * accounted for
+     * B) When unsharing:
+     * if the list is longer than > 1, we don't have to account yet. 
+     */
+    if(list_has_one_entry(&gfn->list))
+    {
+        d = get_domain_by_id(gfn->domain);
+        BUG_ON(!d);
+        if(sharing) 
+            atomic_inc(&d->shr_pages);
+        else
+            atomic_dec(&d->shr_pages);
+        put_domain(d);
+
+        return 1;
+    }
+
+    return 0;
+}
+
 int mem_sharing_debug_gref(struct domain *d, grant_ref_t ref)
 {
     grant_entry_header_t *shah;
@@ -302,21 +391,12 @@ int mem_sharing_debug_gref(struct domain *d, grant_ref_t ref)
                 d->domain_id, ref);
         return -1;
     }
+    mem_sharing_gref_to_gfn(d, ref, &gfn); 
     shah = shared_entry_header(d->grant_table, ref);
     if (d->grant_table->gt_version == 1) 
-    {
-        grant_entry_v1_t *sha1;
-        sha1 = &shared_entry_v1(d->grant_table, ref);
         status = shah->flags;
-        gfn = sha1->frame;
-    } 
     else 
-    {
-        grant_entry_v2_t *sha2;
-        sha2 = &shared_entry_v2(d->grant_table, ref);
         status = status_entry(d->grant_table, ref);
-        gfn = sha2->full_page.frame;
-    }
     
     printk("==> Grant [dom=%d,ref=%d], status=%x. ", 
             d->domain_id, ref, status);
@@ -381,7 +461,7 @@ int mem_sharing_nominate_page(struct domain *d,
          * since no-one knew that the mfn was temporarily sharable */
         ASSERT(page_make_private(d, page) == 0);
         mem_sharing_hash_destroy(hash_entry);
-        mem_sharing_gfn_destroy(gfn_info);
+        mem_sharing_gfn_destroy(gfn_info, 0);
         shr_unlock();
         goto out;
     }
@@ -415,14 +495,17 @@ int mem_sharing_share_pages(shr_handle_t sh, shr_handle_t ch)
 
     shr_lock();
 
-    ret = -1;
+    ret = XEN_DOMCTL_MEM_SHARING_S_HANDLE_INVALID;
     se = mem_sharing_hash_lookup(sh);
     if(se == NULL) goto err_out;
-    ret = -2;
+    ret = XEN_DOMCTL_MEM_SHARING_C_HANDLE_INVALID;
     ce = mem_sharing_hash_lookup(ch);
     if(ce == NULL) goto err_out;
     spage = mfn_to_page(se->mfn); 
     cpage = mfn_to_page(ce->mfn); 
+    /* gfn lists always have at least one entry => save to call list_entry */
+    mem_sharing_gfn_account(gfn_get_info(&ce->gfns), 1);
+    mem_sharing_gfn_account(gfn_get_info(&se->gfns), 1);
     list_for_each_safe(le, te, &ce->gfns)
     {
         gfn = list_entry(le, struct gfn_info, list);
@@ -440,6 +523,7 @@ int mem_sharing_share_pages(shr_handle_t sh, shr_handle_t ch)
     } 
     ASSERT(list_empty(&ce->gfns));
     mem_sharing_hash_delete(ch);
+    atomic_inc(&nr_saved_mfns);
     /* Free the client page */
     if(test_and_clear_bit(_PGC_allocated, &cpage->count_info))
         put_page(cpage);
@@ -491,8 +575,13 @@ gfn_found:
      * (possibly freeing the page), and exit early */
     if(flags & MEM_SHARING_DESTROY_GFN)
     {
-        mem_sharing_gfn_destroy(gfn_info);
-        if(last_gfn) mem_sharing_hash_delete(handle);
+        mem_sharing_gfn_destroy(gfn_info, !last_gfn);
+        if(last_gfn) 
+            mem_sharing_hash_delete(handle);
+        else 
+            /* Even though we don't allocate a private page, we have to account
+             * for the MFN that originally backed this PFN. */
+            atomic_dec(&nr_saved_mfns);
         shr_unlock();
         put_page_and_type(page);
         if(last_gfn && 
@@ -528,8 +617,11 @@ gfn_found:
 
 private_page_found:    
     /* We've got a private page, we can commit the gfn destruction */
-    mem_sharing_gfn_destroy(gfn_info);
-    if(last_gfn) mem_sharing_hash_delete(handle);
+    mem_sharing_gfn_destroy(gfn_info, !last_gfn);
+    if(last_gfn) 
+        mem_sharing_hash_delete(handle);
+    else
+        atomic_dec(&nr_saved_mfns);
     shr_unlock();
 
     if(p2m_change_type(d, gfn, p2m_ram_shared, p2m_ram_rw) != 
@@ -542,6 +634,93 @@ private_page_found:
     set_gpfn_from_mfn(mfn_x(page_to_mfn(page)), gfn);
 
     return 0;
+}
+
+int mem_sharing_domctl(struct domain *d, xen_domctl_mem_sharing_op_t *mec)
+{
+    int rc;
+
+    switch(mec->op)
+    {
+        case XEN_DOMCTL_MEM_SHARING_OP_CONTROL:
+        {
+            rc = 0;
+            if(!hap_enabled(d))
+                return -EINVAL;
+            d->arch.hvm_domain.mem_sharing_enabled = mec->enable;
+            return 0; 
+        }
+        break;
+
+        case XEN_DOMCTL_MEM_SHARING_OP_NOMINATE_GFN:
+        {
+            unsigned long gfn = mec->nominate.gfn;
+            shr_handle_t handle;
+            if(!mem_sharing_enabled(d))
+                return -EINVAL;
+            rc = mem_sharing_nominate_page(d, gfn, 0, &handle);
+            mec->nominate.handle = handle;
+        }
+        break;
+
+        case XEN_DOMCTL_MEM_SHARING_OP_NOMINATE_GREF:
+        {
+            grant_ref_t gref = mec->nominate.grant_ref;
+            unsigned long gfn;
+            shr_handle_t handle;
+
+            if(!mem_sharing_enabled(d))
+                return -EINVAL;
+            if(mem_sharing_gref_to_gfn(d, gref, &gfn) < 0)
+                return -EINVAL;
+            rc = mem_sharing_nominate_page(d, gfn, 3, &handle);
+            mec->nominate.handle = handle;
+        }
+        break;
+
+        case XEN_DOMCTL_MEM_SHARING_OP_SHARE:
+        {
+            shr_handle_t sh = mec->share.source_handle;
+            shr_handle_t ch = mec->share.client_handle;
+            rc = mem_sharing_share_pages(sh, ch); 
+        }
+        break;
+
+        case XEN_DOMCTL_MEM_SHARING_OP_RESUME:
+        {
+            if(!mem_sharing_enabled(d))
+                return -EINVAL;
+            rc = mem_sharing_sharing_resume(d);
+        }
+        break;
+
+        case XEN_DOMCTL_MEM_SHARING_OP_DEBUG_GFN:
+        {
+            unsigned long gfn = mec->debug.gfn;
+            rc = mem_sharing_debug_gfn(d, gfn);
+        }
+        break;
+
+        case XEN_DOMCTL_MEM_SHARING_OP_DEBUG_MFN:
+        {
+            unsigned long mfn = mec->debug.mfn;
+            rc = mem_sharing_debug_mfn(mfn);
+        }
+        break;
+
+        case XEN_DOMCTL_MEM_SHARING_OP_DEBUG_GREF:
+        {
+            grant_ref_t gref = mec->debug.gref;
+            rc = mem_sharing_debug_gref(d, gref);
+        }
+        break;
+
+        default:
+            rc = -ENOSYS;
+            break;
+    }
+
+    return rc;
 }
 
 void mem_sharing_init(void)

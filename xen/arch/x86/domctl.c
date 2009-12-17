@@ -32,6 +32,7 @@
 #include <xen/iommu.h>
 #include <asm/mem_event.h>
 #include <public/mem_event.h>
+#include <asm/mem_sharing.h>
 
 #ifdef XEN_GDBSX_CONFIG                    
 #ifdef XEN_KDB_CONFIG
@@ -1311,6 +1312,21 @@ long arch_do_domctl(
         {
             ret = mem_event_domctl(d, &domctl->u.mem_event_op,
                                    guest_handle_cast(u_domctl, void));
+            rcu_unlock_domain(d);
+            copy_to_guest(u_domctl, domctl, 1);
+        } 
+    }
+    break;
+
+    case XEN_DOMCTL_mem_sharing_op:
+    {
+        struct domain *d;
+
+        ret = -ESRCH;
+        d = rcu_lock_domain_by_id(domctl->domain);
+        if ( d != NULL )
+        {
+            ret = mem_sharing_domctl(d, &domctl->u.mem_sharing_op);
             rcu_unlock_domain(d);
             copy_to_guest(u_domctl, domctl, 1);
         } 

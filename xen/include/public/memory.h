@@ -281,6 +281,13 @@ struct xen_pod_target {
     domid_t domid;
 };
 typedef struct xen_pod_target xen_pod_target_t;
+
+/*
+ * Get the number of MFNs saved through memory sharing.
+ * The call never fails. 
+ */
+#define XENMEM_get_sharing_freed_pages    18
+
 #endif /* __XEN_PUBLIC_MEMORY_H__ */
 
 /*

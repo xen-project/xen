@@ -90,6 +90,7 @@ struct hvm_domain {
     struct viridian_domain viridian;
 
     bool_t                 hap_enabled;
+    bool_t                 mem_sharing_enabled;
     bool_t                 qemu_mapcache_invalidate;
     bool_t                 is_s3_suspended;
 

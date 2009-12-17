@@ -33,6 +33,7 @@
 #endif
 
 #include "xen.h"
+#include "grant_table.h"
 
 #define XEN_DOMCTL_INTERFACE_VERSION 0x00000005
 
@@ -103,6 +104,7 @@ struct xen_domctl_getdomaininfo {
     uint32_t flags;              /* XEN_DOMINF_* */
     uint64_aligned_t tot_pages;
     uint64_aligned_t max_pages;
+    uint64_aligned_t shr_pages;
     uint64_aligned_t shared_info_frame; /* GMFN of shared_info struct */
     uint64_aligned_t cpu_time;
     uint32_t nr_online_vcpus;    /* Number of VCPUs currently online. */
@@ -727,6 +729,52 @@ struct xen_domctl_mem_event_op {
 typedef struct xen_domctl_mem_event_op xen_domctl_mem_event_op_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_mem_event_op_t);
 
+/*
+ * Memory sharing operations
+ */
+#define XEN_DOMCTL_mem_sharing_op  58
+
+#define XEN_DOMCTL_MEM_SHARING_OP_CONTROL        0
+#define XEN_DOMCTL_MEM_SHARING_OP_NOMINATE_GFN   1
+#define XEN_DOMCTL_MEM_SHARING_OP_NOMINATE_GREF  2
+#define XEN_DOMCTL_MEM_SHARING_OP_SHARE          3
+#define XEN_DOMCTL_MEM_SHARING_OP_RESUME         4
+#define XEN_DOMCTL_MEM_SHARING_OP_DEBUG_GFN      5
+#define XEN_DOMCTL_MEM_SHARING_OP_DEBUG_MFN      6
+#define XEN_DOMCTL_MEM_SHARING_OP_DEBUG_GREF     7
+
+#define XEN_DOMCTL_MEM_SHARING_S_HANDLE_INVALID  (-10)
+#define XEN_DOMCTL_MEM_SHARING_C_HANDLE_INVALID  (-9)
+
+struct xen_domctl_mem_sharing_op {
+    uint8_t       op;            /* XEN_DOMCTL_MEM_EVENT_OP_* */
+
+    union {
+        int enable;                       /* for OP_CONTROL            */
+
+        struct mem_sharing_op_nominate {  /* for OP_NOMINATE           */
+            union {
+                unsigned long gfn;        /* IN: gfn to nominate       */
+                uint32_t      grant_ref;  /* IN: grant ref to nominate */
+            };
+            uint64_t       handle;        /* OUT: the handle           */
+        } nominate;
+        struct mem_sharing_op_share {
+            uint64_t source_handle;       /* IN: handle to the source page */
+            uint64_t client_handle;       /* IN: handle to the client page */
+        } share; 
+        struct mem_sharing_op_debug {
+            union {
+                unsigned long  gfn;        /* IN: gfn to debug          */
+                unsigned long  mfn;        /* IN: mfn to debug          */
+                grant_ref_t    gref;       /* IN: gref to debug         */
+            };
+        } debug;
+    };
+};
+typedef struct xen_domctl_mem_sharing_op xen_domctl_mem_sharing_op_t;
+DEFINE_XEN_GUEST_HANDLE(xen_domctl_mem_sharing_op_t);
+
 
 struct xen_domctl {
     uint32_t cmd;
@@ -772,6 +820,7 @@ struct xen_domctl {
         struct xen_domctl_subscribe         subscribe;
         struct xen_domctl_debug_op          debug_op;
         struct xen_domctl_mem_event_op      mem_event_op;
+        struct xen_domctl_mem_sharing_op    mem_sharing_op;
 #if defined(__i386__) || defined(__x86_64__)
         struct xen_domctl_cpuid             cpuid;
 #endif

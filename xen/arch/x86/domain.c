@@ -404,6 +404,7 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
         is_hvm_domain(d) &&
         hvm_funcs.hap_supported &&
         (domcr_flags & DOMCRF_hap);
+    d->arch.hvm_domain.mem_sharing_enabled = 0;
 
     d->arch.s3_integrity = !!(domcr_flags & DOMCRF_s3_integrity);
 

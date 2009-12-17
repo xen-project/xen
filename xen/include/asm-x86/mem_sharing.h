@@ -27,6 +27,7 @@
 
 typedef uint64_t shr_handle_t; 
 
+unsigned int mem_sharing_get_nr_saved_mfns(void);
 int mem_sharing_nominate_page(struct domain *d, 
                               unsigned long gfn,
                               int expected_refcnt,
@@ -38,6 +39,8 @@ int mem_sharing_unshare_page(struct domain *d,
                              uint16_t flags);
 int mem_sharing_sharing_resume(struct domain *d);
 int mem_sharing_cache_resize(struct domain *d, int new_size);
+int mem_sharing_domctl(struct domain *d, 
+                       xen_domctl_mem_sharing_op_t *mec);
 void mem_sharing_init(void);
 
 #endif /* __MEM_SHARING_H__ */

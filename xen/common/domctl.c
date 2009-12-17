@@ -136,6 +136,7 @@ void getdomaininfo(struct domain *d, struct xen_domctl_getdomaininfo *info)
 
     info->tot_pages         = d->tot_pages;
     info->max_pages         = d->max_pages;
+    info->shr_pages         = atomic_read(&d->shr_pages);
     info->shared_info_frame = mfn_to_gmfn(d, __pa(d->shared_info)>>PAGE_SHIFT);
     BUG_ON(SHARED_M2P(info->shared_info_frame));
 

@@ -201,6 +201,7 @@ struct domain
     struct page_list_head xenpage_list; /* linked list (size xenheap_pages) */
     unsigned int     tot_pages;       /* number of pages currently possesed */
     unsigned int     max_pages;       /* maximum value for tot_pages        */
+    atomic_t         shr_pages;       /* number of shared pages             */
     unsigned int     xenheap_pages;   /* # pages allocated from Xen heap    */
 
     unsigned int     max_vcpus;
