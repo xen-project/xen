@@ -442,13 +442,19 @@ void *xc_gnttab_map_grant_ref(int xcg_handle, uint32_t domid, uint32_t ref,
     if ( ioctl(xcg_handle, IOCTL_GNTDEV_MAP_GRANT_REF, &map) )
         return NULL;
 
+mmap_again:    
     addr = mmap(NULL, PAGE_SIZE, prot, MAP_SHARED, xcg_handle, map.index);
     if ( addr == MAP_FAILED )
     {
         int saved_errno = errno;
         struct ioctl_gntdev_unmap_grant_ref unmap_grant;
 
-        /* Unmap the driver slots used to store the grant information. */
+        if(saved_errno == EAGAIN)
+        {
+            usleep(1000);
+            goto mmap_again;
+        }
+         /* Unmap the driver slots used to store the grant information. */
         perror("xc_gnttab_map_grant_ref: mmap failed");
         unmap_grant.index = map.index;
         unmap_grant.count = 1;
