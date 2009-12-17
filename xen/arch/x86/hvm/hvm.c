@@ -1325,12 +1325,14 @@ static void *hvm_map_entry(unsigned long va)
     gfn = paging_gva_to_gfn(current, va, &pfec);
     if ( pfec == PFEC_page_paged )
         return NULL;
-    mfn = mfn_x(gfn_to_mfn_current(gfn, &p2mt));
+    mfn = mfn_x(gfn_to_mfn_unshare(current->domain, gfn, &p2mt, 0));
     if ( p2m_is_paging(p2mt) )
     {
         p2m_mem_paging_populate(current->domain, gfn);
         return NULL;
     }
+    if ( p2m_is_shared(p2mt) )
+        return NULL;
     if ( !p2m_is_ram(p2mt) )
     {
         gdprintk(XENLOG_ERR, "Failed to look up descriptor table entry\n");
@@ -2986,6 +2988,10 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
                 rc = -EINVAL;
                 goto param_fail3;
             }
+            if( p2m_is_shared(t) )
+                gdprintk(XENLOG_WARNING,
+                         "shared pfn 0x%lx modified?\n", pfn);
+            
             if ( mfn_x(mfn) != INVALID_MFN )
             {
                 paging_mark_dirty(d, mfn_x(mfn));
@@ -3038,7 +3044,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
             p2m_type_t t;
             p2m_type_t nt;
             mfn_t mfn;
-            mfn = gfn_to_mfn(d, pfn, &t);
+            mfn = gfn_to_mfn_unshare(d, pfn, &t, 0);
             if ( p2m_is_paging(t) )
             {
                 p2m_mem_paging_populate(d, pfn);
@@ -3046,6 +3052,11 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
                 rc = -EINVAL;
                 goto param_fail4;
             }
+            if ( p2m_is_shared(t) )
+            {
+                rc = -EINVAL;
+                goto param_fail4;
+            } 
             if ( p2m_is_grant(t) )
             {
                 gdprintk(XENLOG_WARNING,

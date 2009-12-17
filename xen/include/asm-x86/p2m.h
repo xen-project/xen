@@ -308,6 +308,31 @@ static inline mfn_t _gfn_to_mfn_type(struct domain *d,
 #define gfn_to_mfn_current(g, t) gfn_to_mfn_type_current((g), (t), p2m_alloc)
 #define gfn_to_mfn_foreign(d, g, t) gfn_to_mfn_type_foreign((d), (g), (t), p2m_alloc)
 
+static inline mfn_t gfn_to_mfn_unshare(struct domain *d,
+                                       unsigned long gfn,
+                                       p2m_type_t *p2mt,
+                                       int must_succeed)
+{
+    mfn_t mfn;
+    int ret;
+
+    mfn = gfn_to_mfn(d, gfn, p2mt);
+    if(p2m_is_shared(*p2mt))
+    {
+        ret = mem_sharing_unshare_page(d, gfn,
+                must_succeed ? MEM_SHARING_MUST_SUCCEED : 0);
+        if(ret < 0)
+        {
+            BUG_ON(must_succeed);
+            return mfn;
+        }
+        mfn = gfn_to_mfn(d, gfn, p2mt);
+    }
+
+    return mfn;
+}
+
+
 /* Compatibility function exporting the old untyped interface */
 static inline unsigned long gmfn_to_mfn(struct domain *d, unsigned long gpfn)
 {
