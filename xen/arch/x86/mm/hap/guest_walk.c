@@ -32,6 +32,7 @@
 #if GUEST_PAGING_LEVELS <= CONFIG_PAGING_LEVELS
 
 #include <asm/guest_pt.h>
+#include <asm/p2m.h>
 
 unsigned long hap_gva_to_gfn(GUEST_PAGING_LEVELS)(
     struct vcpu *v, unsigned long gva, uint32_t *pfec)
@@ -45,13 +46,18 @@ unsigned long hap_gva_to_gfn(GUEST_PAGING_LEVELS)(
 
     /* Get the top-level table's MFN */
     cr3 = v->arch.hvm_vcpu.guest_cr[3];
-    top_mfn = gfn_to_mfn(v->domain, _gfn(cr3 >> PAGE_SHIFT), &p2mt);
+    top_mfn = gfn_to_mfn_unshare(v->domain, cr3 >> PAGE_SHIFT, &p2mt, 0);
     if ( p2m_is_paging(p2mt) )
     {
 //        if ( p2m_is_paged(p2mt) )
             p2m_mem_paging_populate(v->domain, cr3 >> PAGE_SHIFT);
 
         pfec[0] = PFEC_page_paged;
+        return INVALID_GFN;
+    }
+    if ( p2m_is_shared(p2mt) )
+    {
+        pfec[0] = PFEC_page_shared;
         return INVALID_GFN;
     }
     if ( !p2m_is_ram(p2mt) )
@@ -73,13 +79,18 @@ unsigned long hap_gva_to_gfn(GUEST_PAGING_LEVELS)(
     if ( missing == 0 )
     {
         gfn_t gfn = guest_l1e_get_gfn(gw.l1e);
-        gfn_to_mfn(v->domain, gfn, &p2mt);
+        gfn_to_mfn_unshare(v->domain, gfn_x(gfn), &p2mt, 0);
         if ( p2m_is_paging(p2mt) )
         {
 //            if ( p2m_is_paged(p2mt) )
                 p2m_mem_paging_populate(v->domain, gfn_x(gfn));
 
             pfec[0] = PFEC_page_paged;
+            return INVALID_GFN;
+        }
+        if ( p2m_is_shared(p2mt) )
+        {
+            pfec[0] = PFEC_page_shared;
             return INVALID_GFN;
         }
 
@@ -91,6 +102,9 @@ unsigned long hap_gva_to_gfn(GUEST_PAGING_LEVELS)(
 
     if ( missing & _PAGE_PAGED )
         pfec[0] = PFEC_page_paged;
+
+    if ( missing & _PAGE_SHARED )
+        pfec[0] = PFEC_page_shared;
 
     return INVALID_GFN;
 }

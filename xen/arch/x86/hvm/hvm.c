@@ -311,7 +311,7 @@ static int hvm_set_ioreq_page(
     unsigned long mfn;
     void *va;
 
-    mfn = mfn_x(gfn_to_mfn(d, gmfn, &p2mt));
+    mfn = mfn_x(gfn_to_mfn_unshare(d, gmfn, &p2mt, 0));
     if ( !p2m_is_ram(p2mt) )
         return -EINVAL;
     if ( p2m_is_paging(p2mt) )
@@ -319,6 +319,8 @@ static int hvm_set_ioreq_page(
         p2m_mem_paging_populate(d, gmfn);
         return -ENOENT;
     }
+    if ( p2m_is_shared(p2mt) )
+        return -ENOENT;
     ASSERT(mfn_valid(mfn));
 
     page = mfn_to_page(mfn);
@@ -1323,7 +1325,7 @@ static void *hvm_map_entry(unsigned long va)
      * we still treat it as a kernel-mode read (i.e. no access checks). */
     pfec = PFEC_page_present;
     gfn = paging_gva_to_gfn(current, va, &pfec);
-    if ( pfec == PFEC_page_paged )
+    if ( pfec == PFEC_page_paged || pfec == PFEC_page_shared )
         return NULL;
     mfn = mfn_x(gfn_to_mfn_unshare(current->domain, gfn, &p2mt, 0));
     if ( p2m_is_paging(p2mt) )
@@ -1557,6 +1559,8 @@ void hvm_task_switch(
         goto out;
     if ( rc == HVMCOPY_gfn_paged_out )
         goto out;
+    if ( rc == HVMCOPY_gfn_shared )
+        goto out;
 
     eflags = regs->eflags;
     if ( taskswitch_reason == TSW_iret )
@@ -1595,6 +1599,8 @@ void hvm_task_switch(
         goto out;
     if ( rc == HVMCOPY_gfn_paged_out )
         goto out;
+    if ( rc == HVMCOPY_gfn_shared )
+        goto out;
 
     rc = hvm_copy_from_guest_virt(
         &tss, tr.base, sizeof(tss), PFEC_page_present);
@@ -1602,6 +1608,11 @@ void hvm_task_switch(
         goto out;
     if ( rc == HVMCOPY_gfn_paged_out )
         goto out;
+    /* Note: this could be optimised, if the callee functions knew we want RO
+     * access */
+    if ( rc == HVMCOPY_gfn_shared )
+        goto out;
+
 
     if ( hvm_set_cr3(tss.cr3) )
         goto out;
@@ -1638,6 +1649,8 @@ void hvm_task_switch(
     if ( rc == HVMCOPY_bad_gva_to_gfn )
         exn_raised = 1;
     if ( rc == HVMCOPY_gfn_paged_out )
+        goto out;
+    if ( rc == HVMCOPY_gfn_shared )
         goto out;
 
     if ( (tss.trace & 1) && !exn_raised )
@@ -1700,6 +1713,8 @@ static enum hvm_copy_result __hvm_copy(
             {
                 if ( pfec == PFEC_page_paged )
                     return HVMCOPY_gfn_paged_out;
+                if ( pfec == PFEC_page_shared )
+                    return HVMCOPY_gfn_shared;
                 if ( flags & HVMCOPY_fault )
                     hvm_inject_exception(TRAP_page_fault, pfec, addr);
                 return HVMCOPY_bad_gva_to_gfn;
@@ -1710,13 +1725,15 @@ static enum hvm_copy_result __hvm_copy(
             gfn = addr >> PAGE_SHIFT;
         }
 
-        mfn = mfn_x(gfn_to_mfn_current(gfn, &p2mt));
+        mfn = mfn_x(gfn_to_mfn_unshare(current->domain, gfn, &p2mt, 0));
 
         if ( p2m_is_paging(p2mt) )
         {
             p2m_mem_paging_populate(curr->domain, gfn);
             return HVMCOPY_gfn_paged_out;
         }
+        if ( p2m_is_shared(p2mt) )
+            return HVMCOPY_gfn_shared;
         if ( p2m_is_grant(p2mt) )
             return HVMCOPY_unhandleable;
         if ( !p2m_is_ram(p2mt) )

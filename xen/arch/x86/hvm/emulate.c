@@ -62,12 +62,14 @@ static int hvmemul_do_io(
     int rc;
 
     /* Check for paged out page */
-    ram_mfn = gfn_to_mfn(current->domain, ram_gfn, &p2mt);
+    ram_mfn = gfn_to_mfn_unshare(current->domain, ram_gfn, &p2mt, 0);
     if ( p2m_is_paging(p2mt) )
     {
         p2m_mem_paging_populate(curr->domain, ram_gfn);
         return X86EMUL_RETRY;
     }
+    if ( p2m_is_shared(p2mt) )
+        return X86EMUL_RETRY;
 
     /*
      * Weird-sized accesses have undefined behaviour: we discard writes
@@ -282,7 +284,7 @@ static int hvmemul_linear_to_phys(
     }
     else if ( (pfn = paging_gva_to_gfn(curr, addr, &pfec)) == INVALID_GFN )
     {
-        if ( pfec == PFEC_page_paged )
+        if ( pfec == PFEC_page_paged || pfec == PFEC_page_shared )
             return X86EMUL_RETRY;
         hvm_inject_exception(TRAP_page_fault, pfec, addr);
         return X86EMUL_EXCEPTION;
@@ -299,7 +301,7 @@ static int hvmemul_linear_to_phys(
         /* Is it contiguous with the preceding PFNs? If not then we're done. */
         if ( (npfn == INVALID_GFN) || (npfn != (pfn + (reverse ? -i : i))) )
         {
-            if ( pfec == PFEC_page_paged )
+            if ( pfec == PFEC_page_paged || pfec == PFEC_page_shared )
                 return X86EMUL_RETRY;
             done /= bytes_per_rep;
             if ( done == 0 )
@@ -441,6 +443,8 @@ static int __hvmemul_read(
         return hvmemul_do_mmio(gpa, &reps, bytes, 0, IOREQ_READ, 0, p_data);
     case HVMCOPY_gfn_paged_out:
         return X86EMUL_RETRY;
+    case HVMCOPY_gfn_shared:
+        return X86EMUL_RETRY;
     default:
         break;
     }
@@ -532,6 +536,8 @@ static int hvmemul_write(
         return hvmemul_do_mmio(gpa, &reps, bytes, 0,
                                IOREQ_WRITE, 0, p_data);
     case HVMCOPY_gfn_paged_out:
+        return X86EMUL_RETRY;
+    case HVMCOPY_gfn_shared:
         return X86EMUL_RETRY;
     default:
         break;
@@ -707,6 +713,8 @@ static int hvmemul_rep_movs(
     xfree(buf);
 
     if ( rc == HVMCOPY_gfn_paged_out )
+        return X86EMUL_RETRY;
+    if ( rc == HVMCOPY_gfn_shared )
         return X86EMUL_RETRY;
     if ( rc != HVMCOPY_okay )
     {

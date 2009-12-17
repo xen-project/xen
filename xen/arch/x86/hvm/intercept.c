@@ -72,12 +72,17 @@ static int hvm_mmio_access(struct vcpu *v,
     {
         for ( i = 0; i < p->count; i++ )
         {
+            int ret;
+
             rc = read_handler(v, p->addr + (sign * i * p->size), p->size,
                               &data);
             if ( rc != X86EMUL_OKAY )
                 break;
-            if ( hvm_copy_to_guest_phys(p->data + (sign * i * p->size), &data,
-                                        p->size) == HVMCOPY_gfn_paged_out )
+            ret = hvm_copy_to_guest_phys(p->data + (sign * i * p->size),
+                                         &data,
+                                         p->size);
+            if ( (ret == HVMCOPY_gfn_paged_out) || 
+                 (ret == HVMCOPY_gfn_shared) )
             {
                 rc = X86EMUL_RETRY;
                 break;
@@ -88,9 +93,13 @@ static int hvm_mmio_access(struct vcpu *v,
     {
         for ( i = 0; i < p->count; i++ )
         {
-            if ( hvm_copy_from_guest_phys(&data,
-                                          p->data + (sign * i * p->size),
-                                          p->size) == HVMCOPY_gfn_paged_out )
+            int ret;
+
+            ret = hvm_copy_from_guest_phys(&data,
+                                           p->data + (sign * i * p->size),
+                                           p->size);
+            if ( (ret == HVMCOPY_gfn_paged_out) || 
+                 (ret == HVMCOPY_gfn_shared) )
             {
                 rc = X86EMUL_RETRY;
                 break;

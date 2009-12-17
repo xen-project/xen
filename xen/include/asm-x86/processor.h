@@ -133,6 +133,7 @@
 #define PFEC_reserved_bit   (1U<<3)
 #define PFEC_insn_fetch     (1U<<4)
 #define PFEC_page_paged     (1U<<5)
+#define PFEC_page_shared    (1U<<6)
 
 #ifndef __ASSEMBLY__
 

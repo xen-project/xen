@@ -74,6 +74,7 @@ enum hvm_copy_result {
     HVMCOPY_bad_gfn_to_mfn,
     HVMCOPY_unhandleable,
     HVMCOPY_gfn_paged_out,
+    HVMCOPY_gfn_shared,
 };
 
 /*

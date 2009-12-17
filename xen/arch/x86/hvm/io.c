@@ -263,8 +263,11 @@ static int dpci_ioport_read(uint32_t mport, ioreq_t *p)
 
         if ( p->data_is_ptr )
         {
-            if ( hvm_copy_to_guest_phys(p->data + (sign * i * p->size), &data,
-                                        p->size) ==  HVMCOPY_gfn_paged_out )
+            int ret;
+            ret = hvm_copy_to_guest_phys(p->data + (sign * i * p->size), &data,
+                                         p->size);
+            if ( (ret == HVMCOPY_gfn_paged_out) ||
+                 (ret == HVMCOPY_gfn_shared) )
                 return X86EMUL_RETRY;
         }
         else
@@ -284,8 +287,13 @@ static int dpci_ioport_write(uint32_t mport, ioreq_t *p)
         data = p->data;
         if ( p->data_is_ptr )
         {
-            if ( hvm_copy_from_guest_phys(&data, p->data + (sign * i * p->size),
-                                          p->size) ==  HVMCOPY_gfn_paged_out )
+            int ret;
+            
+            ret = hvm_copy_from_guest_phys(&data, 
+                                           p->data + (sign * i * p->size),
+                                           p->size);
+            if ( (ret == HVMCOPY_gfn_paged_out) &&
+                 (ret == HVMCOPY_gfn_shared) )
                 return X86EMUL_RETRY;
         }
 

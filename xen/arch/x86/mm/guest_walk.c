@@ -86,6 +86,36 @@ static uint32_t set_ad_bits(void *guest_p, void *walk_p, int set_dirty)
     return 0;
 }
 
+static inline void *map_domain_gfn(struct domain *d,
+                                   gfn_t gfn, 
+                                   mfn_t *mfn,
+                                   p2m_type_t *p2mt,
+                                   uint32_t *rc) 
+{
+    /* Translate the gfn, unsharing if shared */
+    *mfn = gfn_to_mfn_unshare(d, gfn_x(gfn), p2mt, 0);
+    if ( p2m_is_paging(*p2mt) )
+    {
+        p2m_mem_paging_populate(d, gfn_x(gfn));
+
+        *rc = _PAGE_PAGED;
+        return NULL;
+    }
+    if ( p2m_is_shared(*p2mt) )
+    {
+        *rc = _PAGE_SHARED;
+        return NULL;
+    }
+    if ( !p2m_is_ram(*p2mt) ) 
+    {
+        *rc |= _PAGE_PRESENT;
+        return NULL;
+    }
+    ASSERT(mfn_valid(mfn_x(*mfn)));
+    
+    return map_domain_page(mfn_x(*mfn));
+}
+
 
 /* Walk the guest pagetables, after the manner of a hardware walker. */
 uint32_t
@@ -124,23 +154,14 @@ guest_walk_tables(struct vcpu *v, unsigned long va, walk_t *gw,
     if ( rc & _PAGE_PRESENT ) goto out;
 
     /* Map the l3 table */
-    gw->l3mfn = gfn_to_mfn(d, guest_l4e_get_gfn(gw->l4e), &p2mt);
-    if ( p2m_is_paging(p2mt) )
-    {
-        p2m_mem_paging_populate(d, gfn_x(guest_l4e_get_gfn(gw->l4e)));
-
-        rc = _PAGE_PAGED;
+    l3p = map_domain_gfn(d, 
+                         guest_l4e_get_gfn(gw->l4e), 
+                         &gw->l3mfn,
+                         &p2mt, 
+                         &rc); 
+    if(l3p == NULL)
         goto out;
-    }
-    if ( !p2m_is_ram(p2mt) ) 
-    {
-        rc |= _PAGE_PRESENT;
-        goto out;
-    }
-    ASSERT(mfn_valid(mfn_x(gw->l3mfn)));
-
     /* Get the l3e and check its flags*/
-    l3p = map_domain_page(mfn_x(gw->l3mfn));
     gw->l3e = l3p[guest_l3_table_offset(va)];
     gflags = guest_l3e_get_flags(gw->l3e) ^ _PAGE_NX_BIT;
     rc |= ((gflags & mflags) ^ mflags);
@@ -160,23 +181,14 @@ guest_walk_tables(struct vcpu *v, unsigned long va, walk_t *gw,
 #endif /* PAE or 64... */
 
     /* Map the l2 table */
-    gw->l2mfn = gfn_to_mfn(d, guest_l3e_get_gfn(gw->l3e), &p2mt);
-    if ( p2m_is_paging(p2mt) )
-    {
-        p2m_mem_paging_populate(d, gfn_x(guest_l3e_get_gfn(gw->l3e)));
-
-        rc = _PAGE_PAGED;
+    l2p = map_domain_gfn(d, 
+                         guest_l3e_get_gfn(gw->l3e), 
+                         &gw->l2mfn,
+                         &p2mt, 
+                         &rc); 
+    if(l2p == NULL)
         goto out;
-    }
-    if ( !p2m_is_ram(p2mt) )
-    {
-        rc |= _PAGE_PRESENT;
-        goto out;
-    }
-    ASSERT(mfn_valid(mfn_x(gw->l2mfn)));
-
     /* Get the l2e */
-    l2p = map_domain_page(mfn_x(gw->l2mfn));
     gw->l2e = l2p[guest_l2_table_offset(va)];
 
 #else /* 32-bit only... */
@@ -225,21 +237,13 @@ guest_walk_tables(struct vcpu *v, unsigned long va, walk_t *gw,
     else 
     {
         /* Not a superpage: carry on and find the l1e. */
-        gw->l1mfn = gfn_to_mfn(d, guest_l2e_get_gfn(gw->l2e), &p2mt);
-        if ( p2m_is_paging(p2mt) )
-        {
-            p2m_mem_paging_populate(d, gfn_x(guest_l2e_get_gfn(gw->l2e)));
-
-            rc = _PAGE_PAGED;
+        l1p = map_domain_gfn(d, 
+                             guest_l2e_get_gfn(gw->l2e), 
+                             &gw->l1mfn,
+                             &p2mt,
+                             &rc);
+        if(l1p == NULL)
             goto out;
-        }
-        if ( !p2m_is_ram(p2mt) )
-        {
-            rc |= _PAGE_PRESENT;
-            goto out;
-        }
-        ASSERT(mfn_valid(mfn_x(gw->l1mfn)));
-        l1p = map_domain_page(mfn_x(gw->l1mfn));
         gw->l1e = l1p[guest_l1_table_offset(va)];
         gflags = guest_l1e_get_flags(gw->l1e) ^ _PAGE_NX_BIT;
         rc |= ((gflags & mflags) ^ mflags);
