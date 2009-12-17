@@ -23,6 +23,7 @@
 #include "memshr-priv.h"
 #include "bidir-hash.h"
 #include "shm.h"
+#include "bidir-daemon.h"
 
 typedef struct {
     int     enabled;
@@ -31,6 +32,7 @@ typedef struct {
 } memshr_vbd_info_t;
 
 memshr_vbd_info_t vbd_info = {0, DOMID_INVALID};
+
 
 typedef struct {
     struct shared_memshr_info *shared_info;
@@ -73,6 +75,8 @@ void memshr_daemon_initialize(void)
         return;
     }
     memshr.shared_info->blockshr_hash_inited = 1;
+    
+    bidir_daemon_initialize(memshr.blks);
 }
 
 

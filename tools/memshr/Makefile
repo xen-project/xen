@@ -17,10 +17,12 @@ DEPS             = .*.d
 
 LIB-SRCS        := interface.c
 LIB-SRCS        += shm.c
+LIB-SRCS        += bidir-daemon.c
 LIB-SRCS        += bidir-hash.c
 
 LIB-OBJS        := interface.o
 LIB-OBJS        += shm.o
+LIB-OBJS        += bidir-daemon.o
 LIB-OBJS        += bidir-hash-fgprtshr.o
 LIB-OBJS        += bidir-hash-blockshr.o
 
