@@ -200,6 +200,7 @@ int xc_domain_getinfo(int xc_handle,
 
         info->ssidref  = domctl.u.getdomaininfo.ssidref;
         info->nr_pages = domctl.u.getdomaininfo.tot_pages;
+        info->nr_shared_pages = domctl.u.getdomaininfo.shr_pages;
         info->max_memkb = domctl.u.getdomaininfo.max_pages << (PAGE_SHIFT-10);
         info->shared_info_frame = domctl.u.getdomaininfo.shared_info_frame;
         info->cpu_time = domctl.u.getdomaininfo.cpu_time;

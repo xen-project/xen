@@ -163,6 +163,7 @@ typedef struct xc_dominfo {
                   hvm:1, debugged:1;
     unsigned int  shutdown_reason; /* only meaningful if shutdown==1 */
     unsigned long nr_pages; /* current number, not maximum */
+    unsigned long nr_shared_pages;
     unsigned long shared_info_frame;
     uint64_t      cpu_time;
     unsigned long max_memkb;
@@ -1331,5 +1332,34 @@ int xc_mem_paging_evict(int xc_handle, domid_t domain_id, unsigned long gfn);
 int xc_mem_paging_prep(int xc_handle, domid_t domain_id, unsigned long gfn);
 int xc_mem_paging_resume(int xc_handle, domid_t domain_id,
                          unsigned long gfn);
+
+/**
+ * memshr operations
+ */
+int xc_memshr_control(int xc_handle,
+                      uint32_t domid,
+                      int enable);
+int xc_memshr_nominate_gfn(int xc_handle,
+                           uint32_t domid,
+                           unsigned long gfn,
+                           uint64_t *handle);
+int xc_memshr_nominate_gref(int xc_handle,
+                            uint32_t domid,
+                            grant_ref_t gref,
+                            uint64_t *handle);
+int xc_memshr_share(int xc_handle,
+                    uint64_t source_handle,
+                    uint64_t client_handle);
+int xc_memshr_domain_resume(int xc_handle,
+                            uint32_t domid);
+int xc_memshr_debug_gfn(int xc_handle,
+                        uint32_t domid,
+                        unsigned long gfn);
+int xc_memshr_debug_mfn(int xc_handle,
+                        uint32_t domid,
+                        unsigned long mfn);
+int xc_memshr_debug_gref(int xc_handle,
+                         uint32_t domid,
+                         grant_ref_t gref);
 
 #endif /* XENCTRL_H */
