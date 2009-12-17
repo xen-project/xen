@@ -1325,4 +1325,11 @@ int xc_mem_event_enable(int xc_handle, domid_t domain_id,
                         void *shared_page, void *ring_page);
 int xc_mem_event_disable(int xc_handle, domid_t domain_id);
 
+int xc_mem_paging_nominate(int xc_handle, domid_t domain_id,
+                           unsigned long gfn);
+int xc_mem_paging_evict(int xc_handle, domid_t domain_id, unsigned long gfn);
+int xc_mem_paging_prep(int xc_handle, domid_t domain_id, unsigned long gfn);
+int xc_mem_paging_resume(int xc_handle, domid_t domain_id,
+                         unsigned long gfn);
+
 #endif /* XENCTRL_H */
