@@ -801,7 +801,7 @@ static int hvmemul_read_msr(
 
     _regs.ecx = (uint32_t)reg;
 
-    if ( (rc = hvm_msr_read_intercept(&_regs)) != 0 )
+    if ( (rc = hvm_msr_read_intercept(&_regs)) != X86EMUL_OKAY )
         return rc;
 
     *val = ((uint64_t)(uint32_t)_regs.edx << 32) | (uint32_t)_regs.eax;
