@@ -26,7 +26,7 @@
 #include <xen/sched.h>
 #include "private.h" /* for hap_gva_to_gfn_* */
 
-#define _hap_gva_to_gfn(levels) hap_gva_to_gfn_##levels##level
+#define _hap_gva_to_gfn(levels) hap_gva_to_gfn_##levels##_levels
 #define hap_gva_to_gfn(levels) _hap_gva_to_gfn(levels)
 
 #if GUEST_PAGING_LEVELS <= CONFIG_PAGING_LEVELS
