@@ -4,6 +4,7 @@ include $(XEN_ROOT)/tools/Rules.mk
 IBIN         = blktapctrl tapdisk
 QCOW_UTIL    = img2qcow qcow2raw qcow-create
 LIBAIO_DIR   = ../../libaio/src
+MEMSHR_DIR   = ../../memshr
 
 CFLAGS   += -Werror
 CFLAGS   += -Wno-unused
@@ -11,6 +12,7 @@ CFLAGS   += -I../lib
 CFLAGS   += $(CFLAGS_libxenctrl)
 CFLAGS   += $(CFLAGS_libxenstore)
 CFLAGS   += -I $(LIBAIO_DIR)
+CFLAGS   += -I $(MEMSHR_DIR)
 CFLAGS   += -D_GNU_SOURCE
 
 ifeq ($(shell . ./check_gcrypt $(CC)),yes)
@@ -21,7 +23,7 @@ CRYPT_LIB := -lcrypto
 $(warning === libgcrypt not installed: falling back to libcrypto ===)
 endif
 
-LDFLAGS_blktapctrl := $(LDFLAGS_libxenctrl) $(LDFLAGS_libxenstore) -L../lib -lblktap
+LDFLAGS_blktapctrl := $(LDFLAGS_libxenctrl) $(LDFLAGS_libxenstore) $(MEMSHR_DIR)/libmemshr.a -L../lib -lblktap -lrt -lm
 LDFLAGS_img := $(LIBAIO_DIR)/libaio.a $(CRYPT_LIB) -lpthread -lz
 
 BLK-OBJS-y  := block-aio.o

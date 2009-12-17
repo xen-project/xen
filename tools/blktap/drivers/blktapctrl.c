@@ -50,6 +50,7 @@
 #include <xs.h>
 #include <sys/time.h>
 #include <syslog.h>
+#include <memshr.h>
                                                                      
 #include "blktaplib.h"
 #include "blktapctrl.h"
@@ -857,6 +858,8 @@ int main(int argc, char *argv[])
 		DPRINTF("couldn't open blktap interface\n");
 		goto open_failed;
 	}
+
+    memshr_daemon_initialize();
 
  retry:
 	/* Set up store connection and watch. */

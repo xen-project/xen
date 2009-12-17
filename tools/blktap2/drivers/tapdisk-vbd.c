@@ -34,6 +34,7 @@
 #include <libgen.h>
 #include <sys/mman.h>
 #include <sys/ioctl.h>
+#include <memshr.h>
 
 #include "libvhd.h"
 #include "tapdisk-image.h"
@@ -105,6 +106,8 @@ tapdisk_vbd_initialize(int rfd, int wfd, uint16_t uuid)
 	/* default blktap ring completion */
 	vbd->callback = tapdisk_vbd_callback;
 	vbd->argument = vbd;
+    
+    memshr_vbd_initialize();
 
 	INIT_LIST_HEAD(&vbd->driver_stack);
 	INIT_LIST_HEAD(&vbd->images);

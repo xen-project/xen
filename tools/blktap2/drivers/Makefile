@@ -15,6 +15,7 @@ CFLAGS    += -fno-strict-aliasing
 CFLAGS    += -I../lib -I../../libxc
 CFLAGS    += -I../include -I../../include
 CFLAGS    += -I $(LIBAIO_DIR)
+CFLAGS    += -I $(MEMSHR_DIR)
 CFLAGS    += -D_GNU_SOURCE
 CFLAGS    += -DUSE_NFS_LOCKS
 
@@ -52,7 +53,9 @@ REMUS-OBJS  += hashtable_utility.o
 $(REMUS-OBJS): CFLAGS += -I$(XEN_XENSTORE)
 
 LIBAIO_DIR = $(XEN_ROOT)/tools/libaio/src
-tapdisk2 tapdisk-stream tapdisk-diff $(QCOW_UTIL): AIOLIBS := $(LIBAIO_DIR)/libaio.a
+MEMSHR_DIR = $(XEN_ROOT)/tools/memshr
+MEMSHRLIBS := $(MEMSHR_DIR)/libmemshr.a
+tapdisk2 tapdisk-stream tapdisk-diff $(QCOW_UTIL): AIOLIBS := $(LIBAIO_DIR)/libaio.a 
 tapdisk-client tapdisk-stream tapdisk-diff $(QCOW_UTIL): CFLAGS  += -I$(LIBAIO_DIR) -I$(XEN_LIBXC)
 
 ifeq ($(VHD_STATIC),y)
@@ -94,13 +97,13 @@ all: $(IBIN) lock-util qcow-util
 
 
 tapdisk2: $(TAP-OBJS-y) $(BLK-OBJS-y) $(MISC-OBJS-y) tapdisk2.c
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS) $(AIOLIBS) $(LDFLAGS_img)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS) $(AIOLIBS) $(MEMSHRLIBS) $(LDFLAGS_img)
 
 tapdisk-client: tapdisk-client.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS)  $(LDFLAGS_img)
 
 tapdisk-stream tapdisk-diff: %: %.o $(TAP-OBJS-y) $(BLK-OBJS-y)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS) $(AIOLIBS)  $(LDFLAGS_img)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS) $(AIOLIBS) $(MEMSHRLIBS) $(LDFLAGS_img)
 
 td-util: td.o tapdisk-utils.o tapdisk-log.o $(PORTABLE-OBJS-y)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS)  $(LDFLAGS_img)
@@ -112,7 +115,7 @@ lock-util: lock.c
 qcow-util: img2qcow qcow2raw qcow-create
 
 img2qcow qcow2raw qcow-create: %: %.o $(TAP-OBJS-y) $(BLK-OBJS-y)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS) $(AIOLIBS) $(LDFLAGS_img)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS) $(AIOLIBS) $(MEMSHRLIBS) $(LDFLAGS_img)
 
 install: all
 	$(INSTALL_DIR) -p $(DESTDIR)$(INST_DIR)
