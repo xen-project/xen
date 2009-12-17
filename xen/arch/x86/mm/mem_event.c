@@ -24,6 +24,7 @@
 #include <xen/event.h>
 #include <asm/p2m.h>
 #include <asm/mem_event.h>
+#include <asm/mem_paging.h>
 
 
 #define xen_mb()   mb()
@@ -274,7 +275,12 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
         }
     }
     else
+    {
         rc = -ENOSYS;
+
+        if ( mec->mode & XEN_DOMCTL_MEM_EVENT_OP_PAGING )
+            rc = mem_paging_domctl(d, mec, u_domctl);
+    }
 
     return rc;
 }

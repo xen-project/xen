@@ -140,6 +140,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_getmemlist_t);
 #define XEN_DOMCTL_PFINFO_LTABTYPE_MASK (0x7U<<28)
 #define XEN_DOMCTL_PFINFO_LPINTAB (0x1U<<31)
 #define XEN_DOMCTL_PFINFO_XTAB    (0xfU<<28) /* invalid page */
+#define XEN_DOMCTL_PFINFO_PAGEDTAB (0x8U<<28)
 #define XEN_DOMCTL_PFINFO_LTAB_MASK (0xfU<<28)
 
 struct xen_domctl_getpageframeinfo {
@@ -700,6 +701,17 @@ struct xen_domctl_gdbsx_domstatus {
 /* Add and remove memory handlers */
 #define XEN_DOMCTL_MEM_EVENT_OP_ENABLE     0
 #define XEN_DOMCTL_MEM_EVENT_OP_DISABLE    1
+
+/*
+ * Page memory in and out. 
+ */
+#define XEN_DOMCTL_MEM_EVENT_OP_PAGING (1 << 0)
+
+/* Domain memory paging */
+#define XEN_DOMCTL_MEM_EVENT_OP_PAGING_NOMINATE   0
+#define XEN_DOMCTL_MEM_EVENT_OP_PAGING_EVICT      1
+#define XEN_DOMCTL_MEM_EVENT_OP_PAGING_PREP       2
+#define XEN_DOMCTL_MEM_EVENT_OP_PAGING_RESUME     3
 
 struct xen_domctl_mem_event_op {
     uint32_t       op;           /* XEN_DOMCTL_MEM_EVENT_OP_* */
