@@ -17,13 +17,17 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 #include <string.h>
+#include <inttypes.h>
 
+#include "memshr.h"
 #include "memshr-priv.h"
+#include "bidir-hash.h"
 #include "shm.h"
 
 typedef struct {
     int     enabled;
     domid_t domid;
+    int     xc_handle;
 } memshr_vbd_info_t;
 
 memshr_vbd_info_t vbd_info = {0, DOMID_INVALID};
@@ -74,6 +78,8 @@ void memshr_daemon_initialize(void)
 
 void memshr_vbd_initialize(void)
 {
+    int xc_handle;
+
     memset(&memshr, 0, sizeof(private_memshr_info_t));
 
     if((SHARED_INFO = shm_shared_info_open(0)) == NULL)
@@ -103,6 +109,13 @@ void memshr_vbd_initialize(void)
     if(vbd_info.domid == DOMID_INVALID)
         return;
 
+    if((xc_handle = xc_interface_open()) < 0)
+    {
+        DPRINTF("Failed to open XC interface.\n");
+        return;
+    }
+
+    vbd_info.xc_handle = xc_handle;
     vbd_info.enabled = 1;
 }
 
@@ -125,4 +138,78 @@ void memshr_vbd_image_put(uint16_t memshr_id)
     shm_vbd_image_put(memshr_id, SHARED_INFO->vbd_images);
     if(pthread_mutex_unlock(&SHARED_INFO->lock)) return;
 }
+    
+int memshr_vbd_issue_ro_request(char *buf,
+                                grant_ref_t gref,
+                                uint16_t file_id, 
+                                uint64_t sec, 
+                                int secs,
+                                uint64_t *hnd)
+{
+    vbdblk_t blk;
+    uint64_t s_hnd, c_hnd;
+    int ret;
 
+    *hnd = 0;
+    if(!vbd_info.enabled) 
+        return -1;
+
+    if(secs != 8)
+        return -2;
+
+    /* Nominate the granted page for sharing */
+    ret = xc_memshr_nominate_gref(vbd_info.xc_handle,
+                                  vbd_info.domid,
+                                  gref,
+                                  &c_hnd);
+    /* If page couldn't be made sharable, we cannot do anything about it */
+    if(ret != 0)
+        return -3;
+    *hnd = c_hnd;
+
+    /* Check if we've read matching disk block previously */
+    blk.sec     = sec;
+    blk.disk_id = file_id;
+    if(blockshr_block_lookup(memshr.blks, blk, &s_hnd) > 0)
+    {
+        ret = xc_memshr_share(vbd_info.xc_handle, s_hnd, c_hnd);
+        if(!ret) return 0;
+        /* Handles failed to be shared => at least one of them must be invalid,
+           remove the relevant ones from the map */
+        switch(ret)
+        {
+            case XEN_DOMCTL_MEM_SHARING_S_HANDLE_INVALID:
+                ret = blockshr_shrhnd_remove(memshr.blks, s_hnd, NULL);
+                if(ret) DPRINTF("Could not rm invl s_hnd: %"PRId64"\n", s_hnd);
+                break;
+            case XEN_DOMCTL_MEM_SHARING_C_HANDLE_INVALID:
+                ret = blockshr_shrhnd_remove(memshr.blks, c_hnd, NULL);
+                if(ret) DPRINTF("Could not rm invl c_hnd: %"PRId64"\n", c_hnd);
+                break;
+            default:
+                break;
+        }
+        return -5;
+    }
+
+    return -4;
+}
+
+void memshr_vbd_complete_ro_request(uint64_t hnd,
+                                    uint16_t file_id, 
+                                    uint64_t sec, 
+                                    int secs)
+{
+    vbdblk_t blk;
+    
+    if(!vbd_info.enabled) 
+        return;
+
+    if(secs != 8)
+        return;
+
+    blk.sec     = sec;
+    blk.disk_id = file_id;
+    if(blockshr_insert(memshr.blks, blk, hnd) < 0)
+        DPRINTF("Could not insert block hint into hash.\n");
+}

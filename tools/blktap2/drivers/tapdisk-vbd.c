@@ -1418,11 +1418,26 @@ tapdisk_vbd_complete_vbd_request(td_vbd_t *vbd, td_vbd_request_t *vreq)
 	}
 }
 
+static uint64_t 
+tapdisk_vbd_breq_get_sector(blkif_request_t *breq, td_request_t treq)
+{
+    int seg, nsects; 
+    uint64_t sector_nr = breq->sector_number; 
+    
+    for(seg=0; seg < treq.sidx; seg++) {
+        nsects = breq->seg[seg].last_sect - breq->seg[seg].first_sect + 1;
+        sector_nr += nsects;
+    }
+
+    return sector_nr;
+}
+
 static void
 __tapdisk_vbd_complete_td_request(td_vbd_t *vbd, td_vbd_request_t *vreq,
 				  td_request_t treq, int res)
 {
 	int err;
+    td_image_t *image = treq.image;
 
 	err = (res <= 0 ? res : -res);
 	vbd->secs_pending  -= treq.secs;
@@ -1440,7 +1455,18 @@ __tapdisk_vbd_complete_td_request(td_vbd_t *vbd, td_vbd_request_t *vreq,
 			    (treq.op == TD_OP_WRITE ? "write" : "read"),
 			    treq.secs, treq.sec);
 		}
-	}
+	} else 
+    if(treq.op == TD_OP_READ && td_flag_test(image->flags, TD_OPEN_RDONLY)) {
+        uint64_t         hnd  = treq.memshr_hnd;
+        uint16_t         uid  = image->memshr_id;
+        blkif_request_t *breq = &vreq->req;
+        uint64_t         sec  = tapdisk_vbd_breq_get_sector(breq, treq);
+        int              secs = breq->seg[treq.sidx].last_sect -
+                                breq->seg[treq.sidx].first_sect + 1;
+
+        if(hnd != 0)
+            memshr_vbd_complete_ro_request(hnd, uid, sec, secs);
+    }
 
 	tapdisk_vbd_complete_vbd_request(vbd, vreq);
 }
@@ -1492,7 +1518,29 @@ __tapdisk_vbd_reissue_td_request(td_vbd_t *vbd,
 		break;
 
 	case TD_OP_READ:
-		td_queue_read(parent, treq);
+        if(td_flag_test(parent->flags, TD_OPEN_RDONLY))
+        {
+            int ret, seg = treq.sidx;
+            blkif_request_t *breq = &vreq->req;
+        
+            ret = memshr_vbd_issue_ro_request(treq.buf,
+                                              breq->seg[seg].gref,
+                                              parent->memshr_id,
+                                              treq.sec,
+                                              treq.secs,
+                                              &treq.memshr_hnd);
+            if(ret == 0)
+            {
+                /* Reset memshr handle. This'll prevent
+                 * memshr_vbd_complete_ro_request being called */
+                treq.memshr_hnd = 0;
+                td_complete_request(treq, 0);
+            }
+            else
+		        td_queue_read(parent, treq);
+        }
+        else
+		    td_queue_read(parent, treq);
 		break;
 	}
 

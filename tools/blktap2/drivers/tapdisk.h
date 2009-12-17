@@ -131,6 +131,8 @@ struct td_request {
 	uint64_t                     id;
 	int                          sidx;
 	void                        *private;
+    
+    uint64_t                     memshr_hnd;
 };
 
 /* 

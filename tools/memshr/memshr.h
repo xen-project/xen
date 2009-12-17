@@ -20,6 +20,8 @@
 #define __MEMSHR_H__
 
 #include <stdint.h>
+#include <xen/xen.h>
+#include <xen/grant_table.h>
 
 typedef uint64_t xen_mfn_t;
 
@@ -28,5 +30,16 @@ extern void memshr_daemon_initialize(void);
 extern void memshr_vbd_initialize(void);
 extern uint16_t memshr_vbd_image_get(char* file);
 extern void memshr_vbd_image_put(uint16_t memshr_id);
+extern int memshr_vbd_issue_ro_request(char *buf,
+                                       grant_ref_t gref,
+                                       uint16_t file_id, 
+                                       uint64_t sec, 
+                                       int secs,
+                                       uint64_t *hnd);
+extern void memshr_vbd_complete_ro_request(
+                                       uint64_t hnd,
+                                       uint16_t file_id, 
+                                       uint64_t sec, 
+                                       int secs);
 
 #endif /* __MEMSHR_H__ */

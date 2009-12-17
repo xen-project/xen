@@ -14,6 +14,7 @@ CFLAGS    += -Wno-unused
 CFLAGS    += -fno-strict-aliasing
 CFLAGS    += -I../lib -I../../libxc
 CFLAGS    += -I../include -I../../include
+CFLAGS    += $(CFLAGS_libxenctrl)
 CFLAGS    += -I $(LIBAIO_DIR)
 CFLAGS    += -I $(MEMSHR_DIR)
 CFLAGS    += -D_GNU_SOURCE
@@ -37,7 +38,7 @@ else
 CRYPT_LIB += -lcrypto
 endif
 
-LDFLAGS_img := $(CRYPT_LIB) -lpthread -lz -lm
+LDFLAGS_img := $(LDFLAGS_libxenctrl) $(CRYPT_LIB) -lpthread -lz -lm
 
 LIBS += -L$(LIBVHDDIR) -lvhd
 
