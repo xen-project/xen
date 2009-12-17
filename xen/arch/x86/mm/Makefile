@@ -8,6 +8,7 @@ obj-y += guest_walk_3.o
 obj-$(x86_64) += guest_walk_4.o
 obj-y += mem_event.o
 obj-y += mem_paging.o
+obj-y += mem_sharing.o
 
 guest_walk_%.o: guest_walk.c Makefile
 	$(CC) $(CFLAGS) -DGUEST_PAGING_LEVELS=$* -c $< -o $@

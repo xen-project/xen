@@ -32,6 +32,7 @@
 #include <xen/iommu.h>
 #include <asm/mem_event.h>
 #include <public/mem_event.h>
+#include <asm/mem_sharing.h>
 #include <xen/event.h>
 
 /* Debugging and auditing of the P2M code? */
@@ -1629,8 +1630,17 @@ void p2m_teardown(struct domain *d)
 {
     struct page_info *pg;
     struct p2m_domain *p2m = d->arch.p2m;
+    unsigned long gfn;
+    p2m_type_t t;
+    mfn_t mfn;
 
     p2m_lock(p2m);
+    for(gfn=0; gfn < p2m->max_mapped_pfn; gfn++)
+    {
+        mfn = p2m->get_entry(d, gfn, &t, p2m_query);
+        if(mfn_valid(mfn) && (t == p2m_ram_shared))
+            BUG_ON(mem_sharing_unshare_page(d, gfn, MEM_SHARING_DESTROY_GFN));
+    }
     d->arch.phys_table = pagetable_null();
 
     while ( (pg = page_list_remove_head(&p2m->pages)) )
@@ -2301,6 +2311,33 @@ clear_mmio_p2m_entry(struct domain *d, unsigned long gfn)
     return rc;
 }
 
+int
+set_shared_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
+{
+    int rc = 0;
+    p2m_type_t ot;
+    mfn_t omfn;
+
+    if ( !paging_mode_translate(d) )
+        return 0;
+
+    omfn = gfn_to_mfn_query(d, gfn, &ot);
+    /* At the moment we only allow p2m change if gfn has already been made
+     * sharable first */
+    ASSERT(p2m_is_shared(ot));
+    ASSERT(mfn_valid(omfn));
+    /* XXX: M2P translations have to be handled properly for shared pages */
+    set_gpfn_from_mfn(mfn_x(omfn), INVALID_M2P_ENTRY);
+
+    P2M_DEBUG("set shared %lx %lx\n", gfn, mfn_x(mfn));
+    rc = set_p2m_entry(d, gfn, mfn, 0, p2m_ram_shared);
+    if ( 0 == rc )
+        gdprintk(XENLOG_ERR,
+            "set_mmio_p2m_entry: set_p2m_entry failed! mfn=%08lx\n",
+            gmfn_to_mfn(d, gfn));
+    return rc;
+}
+
 int p2m_mem_paging_nominate(struct domain *d, unsigned long gfn)
 {
     struct page_info *page;
@@ -2406,7 +2443,7 @@ void p2m_mem_paging_populate(struct domain *d, unsigned long gfn)
     if ( v->domain->domain_id == d->domain_id )
     {
         vcpu_pause_nosync(v);
-        req.flags |= MEM_EVENT_FLAG_PAUSED;
+        req.flags |= MEM_EVENT_FLAG_VCPU_PAUSED;
     }
 
     /* Send request to pager */
@@ -2450,7 +2487,7 @@ void p2m_mem_paging_resume(struct domain *d)
     p2m_unlock(d->arch.p2m);
 
     /* Unpause domain */
-    if ( rsp.flags & MEM_EVENT_FLAG_PAUSED )
+    if ( rsp.flags & MEM_EVENT_FLAG_VCPU_PAUSED )
         vcpu_unpause(d->vcpu[rsp.vcpu_id]);
 
     /* Unpause any domains that were paused because the ring was full */

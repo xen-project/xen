@@ -34,7 +34,9 @@
 #define MEM_EVENT_MODE_SYNC_ALL (1 << 1)
 
 /* Memory event flags */
-#define MEM_EVENT_FLAG_PAUSED   (1 << 0)
+#define MEM_EVENT_FLAG_VCPU_PAUSED  (1 << 0)
+#define MEM_EVENT_FLAG_DOM_PAUSED   (1 << 1)
+#define MEM_EVENT_FLAG_OUT_OF_MEM   (1 << 2)
 
 
 typedef struct mem_event_shared_page {

@@ -28,6 +28,7 @@
 
 #include <xen/config.h>
 #include <xen/paging.h>
+#include <asm/mem_sharing.h>
 
 /*
  * The phys_to_machine_mapping maps guest physical frame numbers 
@@ -80,6 +81,8 @@ typedef enum {
     p2m_ram_paged = 10,           /* Memory that has been paged out */
     p2m_ram_paging_in = 11,       /* Memory that is being paged in */
     p2m_ram_paging_in_start = 12, /* Memory that is being paged in */
+
+    p2m_ram_shared = 13,          /* Shared or sharable memory */
 } p2m_type_t;
 
 typedef enum {
@@ -98,7 +101,8 @@ typedef enum {
                        | p2m_to_mask(p2m_ram_paging_out)      \
                        | p2m_to_mask(p2m_ram_paged)           \
                        | p2m_to_mask(p2m_ram_paging_in_start) \
-                       | p2m_to_mask(p2m_ram_paging_in))
+                       | p2m_to_mask(p2m_ram_paging_in)       \
+                       | p2m_to_mask(p2m_ram_shared))
 
 /* Grant mapping types, which map to a real machine frame in another
  * VM */
@@ -112,7 +116,8 @@ typedef enum {
 /* Read-only types, which must have the _PAGE_RW bit clear in their PTEs */
 #define P2M_RO_TYPES (p2m_to_mask(p2m_ram_logdirty)     \
                       | p2m_to_mask(p2m_ram_ro)         \
-                      | p2m_to_mask(p2m_grant_map_ro) )
+                      | p2m_to_mask(p2m_grant_map_ro)   \
+                      | p2m_to_mask(p2m_ram_shared) )
 
 #define P2M_MAGIC_TYPES (p2m_to_mask(p2m_populate_on_demand))
 
@@ -125,6 +130,12 @@ typedef enum {
                           | p2m_to_mask(p2m_ram_paging_in))
 
 #define P2M_PAGED_TYPES (p2m_to_mask(p2m_ram_paged))
+
+/* Shared types */
+/* XXX: Sharable types could include p2m_ram_ro too, but we would need to
+ * reinit the type correctly after fault */
+#define P2M_SHARABLE_TYPES (p2m_to_mask(p2m_ram_rw))
+#define P2M_SHARED_TYPES   (p2m_to_mask(p2m_ram_shared))
 
 /* Useful predicates */
 #define p2m_is_ram(_t) (p2m_to_mask(_t) & P2M_RAM_TYPES)
@@ -140,6 +151,8 @@ typedef enum {
 #define p2m_is_pageable(_t) (p2m_to_mask(_t) & P2M_PAGEABLE_TYPES)
 #define p2m_is_paging(_t)   (p2m_to_mask(_t) & P2M_PAGING_TYPES)
 #define p2m_is_paged(_t)    (p2m_to_mask(_t) & P2M_PAGED_TYPES)
+#define p2m_is_sharable(_t) (p2m_to_mask(_t) & P2M_SHARABLE_TYPES)
+#define p2m_is_shared(_t)   (p2m_to_mask(_t) & P2M_SHARED_TYPES)
 
 /* Populate-on-demand */
 #define POPULATE_ON_DEMAND_MFN  (1<<9)
@@ -391,6 +404,9 @@ p2m_type_t p2m_change_type(struct domain *d, unsigned long gfn,
 /* Set mmio addresses in the p2m table (for pass-through) */
 int set_mmio_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn);
 int clear_mmio_p2m_entry(struct domain *d, unsigned long gfn);
+/* Modify p2m table for shared gfn */
+int
+set_shared_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn);
 
 /* Check if a nominated gfn is valid to be paged out */
 int p2m_mem_paging_nominate(struct domain *d, unsigned long gfn);
