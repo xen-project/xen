@@ -64,11 +64,34 @@ int xc_interface_close(int xc_handle)
     return close(xc_handle);
 }
 
+static int xc_map_foreign_batch_single(int xc_handle, uint32_t dom, int prot,
+                                       xen_pfn_t *mfn, unsigned long addr)
+{
+    privcmd_mmapbatch_t ioctlx;
+    int rc;
+
+    ioctlx.num = 1;
+    ioctlx.dom = dom;
+    ioctlx.addr = addr;
+    ioctlx.arr = mfn;
+
+    do
+    {
+        *mfn ^= XEN_DOMCTL_PFINFO_PAGEDTAB;
+        usleep(100);
+        rc = ioctl(xc_handle, IOCTL_PRIVCMD_MMAPBATCH, &ioctlx);
+    }
+    while ( (rc < 0) && (errno == ENOENT) );
+
+    return rc;
+}
+
 void *xc_map_foreign_batch(int xc_handle, uint32_t dom, int prot,
                            xen_pfn_t *arr, int num)
 {
     privcmd_mmapbatch_t ioctlx;
     void *addr;
+    int rc;
 
     addr = mmap(NULL, num << PAGE_SHIFT, prot, MAP_SHARED, xc_handle, 0);
     if ( addr == MAP_FAILED )
@@ -82,7 +105,27 @@ void *xc_map_foreign_batch(int xc_handle, uint32_t dom, int prot,
     ioctlx.addr = (unsigned long)addr;
     ioctlx.arr = arr;
 
-    if ( ioctl(xc_handle, IOCTL_PRIVCMD_MMAPBATCH, &ioctlx) < 0 )
+    rc = ioctl(xc_handle, IOCTL_PRIVCMD_MMAPBATCH, &ioctlx);
+    if ( (rc < 0) && (errno == ENOENT) )
+    {
+        int i;
+
+        for ( i = 0; i < num; i++ )
+        {
+            if ( (arr[i] & XEN_DOMCTL_PFINFO_LTAB_MASK) ==
+                 XEN_DOMCTL_PFINFO_PAGEDTAB )
+            {
+                unsigned long paged_addr = (unsigned long)addr + (i << PAGE_SHIFT);
+                rc = xc_map_foreign_batch_single(xc_handle, dom, prot, &arr[i],
+                                                 paged_addr);
+                if ( rc < 0 )
+                    goto out;
+            }
+        }
+    }
+
+ out:
+    if ( rc < 0 )
     {
         int saved_errno = errno;
         perror("xc_map_foreign_batch: ioctl failed");
