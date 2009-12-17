@@ -3083,13 +3083,24 @@ int do_mmu_update(
              */
         case MMU_NORMAL_PT_UPDATE:
         case MMU_PT_UPDATE_PRESERVE_AD:
+        {
+            p2m_type_t p2mt;
+
             rc = xsm_mmu_normal_update(d, pg_owner, req.val);
             if ( rc )
                 break;
 
             req.ptr -= cmd;
             gmfn = req.ptr >> PAGE_SHIFT;
-            mfn = gmfn_to_mfn(pt_owner, gmfn);
+            mfn = mfn_x(gfn_to_mfn(pt_owner, gmfn, &p2mt));
+
+            if ( p2m_is_paged(p2mt) )
+            {
+                p2m_mem_paging_populate(pg_owner, gmfn);
+
+                rc = -ENOENT;
+                break;
+            }
 
             if ( unlikely(!get_page_from_pagenr(mfn, pt_owner)) )
             {
@@ -3109,6 +3120,22 @@ int do_mmu_update(
                 case PGT_l1_page_table:
                 {
                     l1_pgentry_t l1e = l1e_from_intpte(req.val);
+                    p2m_type_t l1e_p2mt;
+                    gfn_to_mfn(pg_owner, l1e_get_pfn(l1e), &l1e_p2mt);
+
+                    if ( p2m_is_paged(l1e_p2mt) )
+                    {
+                        p2m_mem_paging_populate(pg_owner, l1e_get_pfn(l1e));
+
+                        rc = -ENOENT;
+                        break;
+                    }
+                    else if ( p2m_ram_paging_in_start == l1e_p2mt )
+                    {
+                        rc = -ENOENT;
+                        break;
+                    }
+
                     okay = mod_l1_entry(va, l1e, mfn,
                                         cmd == MMU_PT_UPDATE_PRESERVE_AD, v,
                                         pg_owner);
@@ -3117,6 +3144,22 @@ int do_mmu_update(
                 case PGT_l2_page_table:
                 {
                     l2_pgentry_t l2e = l2e_from_intpte(req.val);
+                    p2m_type_t l2e_p2mt;
+                    gfn_to_mfn(pg_owner, l2e_get_pfn(l2e), &l2e_p2mt);
+
+                    if ( p2m_is_paged(l2e_p2mt) )
+                    {
+                        p2m_mem_paging_populate(pg_owner, l2e_get_pfn(l2e));
+
+                        rc = -ENOENT;
+                        break;
+                    }
+                    else if ( p2m_ram_paging_in_start == l2e_p2mt )
+                    {
+                        rc = -ENOENT;
+                        break;
+                    }
+
                     okay = mod_l2_entry(va, l2e, mfn,
                                         cmd == MMU_PT_UPDATE_PRESERVE_AD, v);
                 }
@@ -3124,6 +3167,22 @@ int do_mmu_update(
                 case PGT_l3_page_table:
                 {
                     l3_pgentry_t l3e = l3e_from_intpte(req.val);
+                    p2m_type_t l3e_p2mt;
+                    gfn_to_mfn(pg_owner, l3e_get_pfn(l3e), &l3e_p2mt);
+
+                    if ( p2m_is_paged(l3e_p2mt) )
+                    {
+                        p2m_mem_paging_populate(pg_owner, l3e_get_pfn(l3e));
+
+                        rc = -ENOENT;
+                        break;
+                    }
+                    else if ( p2m_ram_paging_in_start == l3e_p2mt )
+                    {
+                        rc = -ENOENT;
+                        break;
+                    }
+
                     rc = mod_l3_entry(va, l3e, mfn,
                                       cmd == MMU_PT_UPDATE_PRESERVE_AD, 1, v);
                     okay = !rc;
@@ -3133,6 +3192,22 @@ int do_mmu_update(
                 case PGT_l4_page_table:
                 {
                     l4_pgentry_t l4e = l4e_from_intpte(req.val);
+                    p2m_type_t l4e_p2mt;
+                    gfn_to_mfn(pg_owner, l4e_get_pfn(l4e), &l4e_p2mt);
+
+                    if ( p2m_is_paged(l4e_p2mt) )
+                    {
+                        p2m_mem_paging_populate(pg_owner, l4e_get_pfn(l4e));
+
+                        rc = -ENOENT;
+                        break;
+                    }
+                    else if ( p2m_ram_paging_in_start == l4e_p2mt )
+                    {
+                        rc = -ENOENT;
+                        break;
+                    }
+
                     rc = mod_l4_entry(va, l4e, mfn,
                                       cmd == MMU_PT_UPDATE_PRESERVE_AD, 1, v);
                     okay = !rc;
@@ -3159,7 +3234,8 @@ int do_mmu_update(
 
             unmap_domain_page_with_cache(va, &mapcache);
             put_page(page);
-            break;
+        }
+        break;
 
         case MMU_MACHPHYS_UPDATE:
 
