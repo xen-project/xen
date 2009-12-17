@@ -214,7 +214,7 @@ static void mem_sharing_hash_delete(shr_handle_t handle)
         pprev = &e->next;
         e = e->next;
     }
-    printk("Could not find shr entry for handle %lx\n", handle);
+    printk("Could not find shr entry for handle %"PRIx64"\n", handle);
     BUG();
 } 
 

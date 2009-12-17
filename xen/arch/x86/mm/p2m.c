@@ -2208,7 +2208,11 @@ void p2m_change_type_global(struct domain *d, p2m_type_t ot, p2m_type_t nt)
                     mfn = l2e_get_pfn(l2e[i2]);
                     /* Do not use get_gpfn_from_mfn because it may return 
                        SHARED_M2P_ENTRY */
-                    gfn = (i2 + (i3 + (i4 * L3_PAGETABLE_ENTRIES))
+                    gfn = (i2 + (i3
+#if CONFIG_PAGING_LEVELS >= 4
+				   + (i4 * L3_PAGETABLE_ENTRIES)
+#endif
+				)
                            * L2_PAGETABLE_ENTRIES) * L1_PAGETABLE_ENTRIES; 
                     flags = p2m_type_to_flags(nt);
                     l1e_content = l1e_from_pfn(mfn, flags | _PAGE_PSE);
@@ -2226,7 +2230,11 @@ void p2m_change_type_global(struct domain *d, p2m_type_t ot, p2m_type_t nt)
                     if ( p2m_flags_to_type(flags) != ot )
                         continue;
                     mfn = l1e_get_pfn(l1e[i1]);
-                    gfn = i1 + (i2 + (i3 + (i4 * L3_PAGETABLE_ENTRIES))
+                    gfn = i1 + (i2 + (i3
+#if CONFIG_PAGING_LEVELS >= 4
+					+ (i4 * L3_PAGETABLE_ENTRIES)
+#endif
+				     )
                            * L2_PAGETABLE_ENTRIES) * L1_PAGETABLE_ENTRIES; 
                     /* create a new 1le entry with the new type */
                     flags = p2m_type_to_flags(nt);
