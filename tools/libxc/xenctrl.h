@@ -47,6 +47,8 @@
 #define XC_PAGE_SIZE            (1UL << XC_PAGE_SHIFT)
 #define XC_PAGE_MASK            (~(XC_PAGE_SIZE-1))
 
+#define INVALID_MFN  (~0UL)
+
 /*
  *  DEFINITIONS FOR CPU BARRIERS
  */
@@ -1311,5 +1313,16 @@ int xc_tmem_save_extra(int xc_handle, int dom, int fd, int field_marker);
 void xc_tmem_save_done(int xc_handle, int dom);
 int xc_tmem_restore(int xc_handle, int dom, int fd);
 int xc_tmem_restore_extra(int xc_handle, int dom, int fd);
+
+/**
+ * mem_event operations
+ */
+int xc_mem_event_control(int xc_handle, domid_t domain_id, unsigned int op,
+                         unsigned int mode, void *shared_page,
+                          void *ring_page, unsigned long gfn);
+
+int xc_mem_event_enable(int xc_handle, domid_t domain_id,
+                        void *shared_page, void *ring_page);
+int xc_mem_event_disable(int xc_handle, domid_t domain_id);
 
 #endif /* XENCTRL_H */
