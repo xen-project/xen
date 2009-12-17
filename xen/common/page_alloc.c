@@ -1145,7 +1145,7 @@ void free_domheap_pages(struct page_info *pg, unsigned int order)
 
         spin_unlock_recursive(&d->page_alloc_lock);
     }
-    else if ( likely(d != NULL) )
+    else if ( likely(d != NULL) && likely(d != dom_cow) )
     {
         /* NB. May recursively lock from relinquish_memory(). */
         spin_lock_recursive(&d->page_alloc_lock);
@@ -1171,6 +1171,13 @@ void free_domheap_pages(struct page_info *pg, unsigned int order)
                 scrub_one_page(&pg[i]);
 
         free_heap_pages(pg, order);
+    }
+    else if ( unlikely(d == dom_cow) )
+    {
+        ASSERT(order == 0); 
+        scrub_one_page(pg);
+        free_heap_pages(pg, 0);
+        drop_dom_ref = 0;
     }
     else
     {

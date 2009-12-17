@@ -366,6 +366,10 @@ typedef uint16_t domid_t;
  */
 #define DOMID_XEN  (0x7FF2U)
 
+/*
+ * DOMID_COW is used as the owner of sharable pages */
+#define DOMID_COW  (0x7FF3U)
+
 /* DOMID_INVALID is used to identity invalid domid */
 #define DOMID_INVALID (0x7FFFU)
 

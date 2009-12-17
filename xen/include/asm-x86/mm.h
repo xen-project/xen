@@ -155,33 +155,34 @@ struct page_info
 #define PG_mask(x, idx) (x ## UL << PG_shift(idx))
 
  /* The following page types are MUTUALLY EXCLUSIVE. */
-#define PGT_none          PG_mask(0, 3) /* no special uses of this page */
-#define PGT_l1_page_table PG_mask(1, 3) /* using as an L1 page table? */
-#define PGT_l2_page_table PG_mask(2, 3) /* using as an L2 page table? */
-#define PGT_l3_page_table PG_mask(3, 3) /* using as an L3 page table? */
-#define PGT_l4_page_table PG_mask(4, 3) /* using as an L4 page table? */
-#define PGT_seg_desc_page PG_mask(5, 3) /* using this page in a GDT/LDT? */
-#define PGT_writable_page PG_mask(7, 3) /* has writable mappings? */
-#define PGT_type_mask     PG_mask(7, 3) /* Bits 29-31. */
+#define PGT_none          PG_mask(0, 4)  /* no special uses of this page   */
+#define PGT_l1_page_table PG_mask(1, 4)  /* using as an L1 page table?     */
+#define PGT_l2_page_table PG_mask(2, 4)  /* using as an L2 page table?     */
+#define PGT_l3_page_table PG_mask(3, 4)  /* using as an L3 page table?     */
+#define PGT_l4_page_table PG_mask(4, 4)  /* using as an L4 page table?     */
+#define PGT_seg_desc_page PG_mask(5, 4)  /* using this page in a GDT/LDT?  */
+#define PGT_writable_page PG_mask(7, 4)  /* has writable mappings?         */
+#define PGT_shared_page   PG_mask(8, 4)  /* CoW sharable page              */
+#define PGT_type_mask     PG_mask(15, 4) /* Bits 28-31 or 60-63.           */
 
  /* Owning guest has pinned this page to its current type? */
-#define _PGT_pinned       PG_shift(4)
-#define PGT_pinned        PG_mask(1, 4)
+#define _PGT_pinned       PG_shift(5)
+#define PGT_pinned        PG_mask(1, 5)
  /* Has this page been validated for use as its current type? */
-#define _PGT_validated    PG_shift(5)
-#define PGT_validated     PG_mask(1, 5)
+#define _PGT_validated    PG_shift(6)
+#define PGT_validated     PG_mask(1, 6)
  /* PAE only: is this an L2 page directory containing Xen-private mappings? */
-#define _PGT_pae_xen_l2   PG_shift(6)
-#define PGT_pae_xen_l2    PG_mask(1, 6)
+#define _PGT_pae_xen_l2   PG_shift(7)
+#define PGT_pae_xen_l2    PG_mask(1, 7)
 /* Has this page been *partially* validated for use as its current type? */
-#define _PGT_partial      PG_shift(7)
-#define PGT_partial       PG_mask(1, 7)
+#define _PGT_partial      PG_shift(8)
+#define PGT_partial       PG_mask(1, 8)
  /* Page is locked? */
-#define _PGT_locked       PG_shift(8)
-#define PGT_locked        PG_mask(1, 8)
+#define _PGT_locked       PG_shift(9)
+#define PGT_locked        PG_mask(1, 9)
 
  /* Count of uses of this frame as its current type. */
-#define PGT_count_width   PG_shift(8)
+#define PGT_count_width   PG_shift(9)
 #define PGT_count_mask    ((1UL<<PGT_count_width)-1)
 
  /* Cleared when the owning guest 'frees' this page. */
@@ -529,6 +530,10 @@ int steal_page(
     struct domain *d, struct page_info *page, unsigned int memflags);
 int donate_page(
     struct domain *d, struct page_info *page, unsigned int memflags);
+int page_make_sharable(struct domain *d, 
+                       struct page_info *page, 
+                       int expected_refcnt);
+int page_make_private(struct domain *d, struct page_info *page);
 
 int map_ldt_shadow_page(unsigned int);
 
@@ -551,6 +556,6 @@ unsigned int domain_clamp_alloc_bitsize(struct domain *d, unsigned int bits);
 
 unsigned long domain_get_maximum_gpfn(struct domain *d);
 
-extern struct domain *dom_xen, *dom_io;	/* for vmcoreinfo */
+extern struct domain *dom_xen, *dom_io, *dom_cow;	/* for vmcoreinfo */
 
 #endif /* __ASM_X86_MM_H__ */

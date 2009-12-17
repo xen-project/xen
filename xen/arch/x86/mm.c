@@ -138,7 +138,7 @@ l1_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
 int mem_hotplug = 0;
 
 /* Private domain structs for DOMID_XEN and DOMID_IO. */
-struct domain *dom_xen, *dom_io;
+struct domain *dom_xen, *dom_io, *dom_cow;
 
 /* Frame table size in pages. */
 unsigned long max_page;
@@ -250,6 +250,13 @@ void __init arch_init_memory(void)
      */
     dom_io = domain_create(DOMID_IO, DOMCRF_dummy, 0);
     BUG_ON(dom_io == NULL);
+    
+    /*
+     * Initialise our DOMID_IO domain.
+     * This domain owns sharable pages.
+     */
+    dom_cow = domain_create(DOMID_COW, DOMCRF_dummy, 0);
+    BUG_ON(dom_cow == NULL);
 
     /* First 1MB of RAM is historically marked as I/O. */
     for ( i = 0; i < 0x100; i++ )
@@ -3787,6 +3794,95 @@ int steal_page(
             (void *)page_to_mfn(page), d, d->domain_id,
             page_get_owner(page), page->count_info, page->u.inuse.type_info);
     return -1;
+}
+
+int page_make_sharable(struct domain *d, 
+                       struct page_info *page, 
+                       int expected_refcnt)
+{
+    unsigned long x, nx, y;
+
+    /* Acquire ref first, so that the page doesn't dissapear from us */
+    if(!get_page(page, d))
+        return -EINVAL;
+
+    spin_lock(&d->page_alloc_lock);
+
+    /* Change page type and count atomically */
+    y = page->u.inuse.type_info;
+    nx = PGT_shared_page | PGT_validated | 1; 
+    do {
+        x = y;
+        /* We can only change the type if count is zero, and 
+           type is PGT_none */
+        if((x & (PGT_type_mask | PGT_count_mask)) != PGT_none)
+        {
+            put_page(page);
+            spin_unlock(&d->page_alloc_lock);
+            return -EEXIST;
+        }
+        y = cmpxchg(&page->u.inuse.type_info, x, nx);
+    } while(x != y);
+
+    /* Check if the ref count is 2. The first from PGT_allocated, and the second
+     * from get_page at the top of this function */
+    if(page->count_info != (PGC_allocated | (2 + expected_refcnt)))
+    {
+        /* Return type count back to zero */
+        put_page_and_type(page);
+        spin_unlock(&d->page_alloc_lock);
+        return -E2BIG;
+    }
+
+    page_set_owner(page, dom_cow);
+    d->tot_pages--;
+    page_list_del(page, &d->page_list);
+    spin_unlock(&d->page_alloc_lock);
+
+    /* NOTE: We are not putting the page back. In effect this function acquires
+     * one ref and type ref for the caller */
+
+    return 0;
+}
+
+int page_make_private(struct domain *d, struct page_info *page)
+{
+    unsigned long x, y;
+
+    if(!get_page(page, dom_cow))
+        return -EINVAL;
+    
+    spin_lock(&d->page_alloc_lock);
+
+    /* Change page type and count atomically */
+    y = page->u.inuse.type_info;
+    do {
+        x = y;
+        /* We can only change the type if count is one */
+        if((x & (PGT_type_mask | PGT_count_mask)) != 
+                (PGT_shared_page | 1))
+        {
+            put_page(page);
+            spin_unlock(&d->page_alloc_lock);
+            return -EEXIST;
+        }
+        y = cmpxchg(&page->u.inuse.type_info, x, PGT_none);
+    } while(x != y);
+
+    /* We dropped type ref above, drop one ref count too */
+    put_page(page);
+
+    /* Change the owner */
+    ASSERT(page_get_owner(page) == dom_cow);
+    page_set_owner(page, d);
+
+    d->tot_pages++;
+    page_list_add_tail(page, &d->page_list);
+    spin_unlock(&d->page_alloc_lock);
+
+    put_page(page);
+
+    return 0;
 }
 
 static int __do_update_va_mapping(
