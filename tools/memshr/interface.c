@@ -21,6 +21,12 @@
 #include "memshr-priv.h"
 #include "shm.h"
 
+typedef struct {
+    int     enabled;
+    domid_t domid;
+} memshr_vbd_info_t;
+
+memshr_vbd_info_t vbd_info = {0, DOMID_INVALID};
 
 typedef struct {
     struct shared_memshr_info *shared_info;
@@ -31,6 +37,11 @@ typedef struct {
 private_memshr_info_t memshr;
 
 #define SHARED_INFO  (memshr.shared_info)
+
+void memshr_set_domid(int domid)
+{
+    vbd_info.domid = domid;
+}
 
 void memshr_daemon_initialize(void)
 {
@@ -88,5 +99,10 @@ void memshr_vbd_initialize(void)
         DPRINTF("Failed to open blockshr_hash.\n");
         return;
     }
+
+    if(vbd_info.domid == DOMID_INVALID)
+        return;
+
+    vbd_info.enabled = 1;
 }
 

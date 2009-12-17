@@ -34,6 +34,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/ioctl.h>
+#include <memshr.h>
 
 #include "tapdisk.h"
 #include "blktap2.h"
@@ -411,13 +412,17 @@ main(int argc, char *argv[])
 
 	params = NULL;
 
-	while ((c = getopt(argc, argv, "n:h")) != -1) {
+	while ((c = getopt(argc, argv, "n:s:h")) != -1) {
 		switch (c) {
 		case 'n':
 			params = optarg;
 			break;
 		case 'h':
 			usage(argv[0], 0);
+            break;
+        case 's':
+            memshr_set_domid(atoi(optarg));
+            break;
 		default:
 			usage(argv[0], EINVAL);
 		}

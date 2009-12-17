@@ -230,6 +230,7 @@ XENAPI_CFG_TYPES = {
     'suppress_spurious_page_faults': bool0,
     's3_integrity' : int,
     'superpages' : int,
+    'memory_sharing': int,
 }
 
 # List of legacy configuration keys that have no equivalent in the
@@ -328,7 +329,7 @@ class XendConfig(dict):
         
         dict.__init__(self)
         self.update(self._defaults())
-
+        
         if filename:
             try:
                 sxp_obj = sxp.parse(open(filename,'r'))
@@ -390,6 +391,7 @@ class XendConfig(dict):
             'shadow_memory': 0,
             'memory_static_max': 0,
             'memory_dynamic_max': 0,
+            'memory_sharing': 0,
             'devices': {},
             'on_xend_start': 'ignore',
             'on_xend_stop': 'ignore',
@@ -441,6 +443,12 @@ class XendConfig(dict):
         if not self["memory_static_max"] > 0:
             raise XendConfigError("memory_static_max must be greater " \
                                   "than zero")
+        if self["memory_sharing"] and not self.is_hvm():
+            raise XendConfigError("memory_sharing can only be enabled " \
+                                  "for HVM domains")
+        if self["memory_sharing"] and not self.is_hap():
+            raise XendConfigError("memory_sharing can only be enabled " \
+                                  "for HAP enabled boxes")
 
     def _actions_sanity_check(self):
         for event in ['shutdown', 'reboot', 'crash']:
@@ -2150,6 +2158,10 @@ class XendConfig(dict):
         val = sxp.child_value(image_sxp, 'superpages')
         if val is not None:
             self['superpages'] = val
+        
+        val = sxp.child_value(image_sxp, 'memory_sharing')
+        if val is not None:
+            self['memory_sharing'] = val
 
         for key in XENAPI_PLATFORM_CFG_TYPES.keys():
             val = sxp.child_value(image_sxp, key, None)

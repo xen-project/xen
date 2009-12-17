@@ -196,6 +196,10 @@ gopts.var('shadow_memory', val='MEMORY',
           fn=set_int, default=0,
           use="Domain shadow memory in MB.")
 
+gopts.var('memory_sharing', val='no|yes',
+          fn=set_bool, default=0,
+          use="Should memory be shared?")
+
 gopts.var('cpu', val='CPU',
           fn=set_int, default=None,
           use="CPU to run the VCPU0 on.")
@@ -1058,7 +1062,8 @@ def configure_hvm(config_image, vals):
              'usb', 'usbdevice',
              'vcpus', 'vnc', 'vncconsole', 'vncdisplay', 'vnclisten',
              'vncunused', 'viridian', 'vpt_align',
-             'xauthority', 'xen_extended_power_mgmt', 'xen_platform_pci' ]
+             'xauthority', 'xen_extended_power_mgmt', 'xen_platform_pci',
+             'memory_sharing' ]
 
     for a in args:
         if a in vals.__dict__ and vals.__dict__[a] is not None:

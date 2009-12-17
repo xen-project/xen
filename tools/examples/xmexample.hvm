@@ -25,6 +25,10 @@ memory = 128
 # Should be at least 2KB per MB of domain memory, plus a few MB per vcpu.
 # shadow_memory = 8
 
+# Whether to transparently share this domain's memory with other domains.
+# default = 0
+# memory_sharing = 0
+
 # A name for your domain. All domains must have different names.
 name = "ExampleHVMDomain"
 

@@ -84,6 +84,7 @@ class ImageHandler:
 
     ostype = None
     superpages = 0
+    memory_sharing = 0
 
     def __init__(self, vm, vmConfig):
         self.vm = vm
@@ -820,6 +821,8 @@ class HVMImageHandler(ImageHandler):
         self.apic = int(vmConfig['platform'].get('apic', 0))
         self.acpi = int(vmConfig['platform'].get('acpi', 0))
         self.guest_os_type = vmConfig['platform'].get('guest_os_type')
+        self.memory_sharing = int(vmConfig['memory_sharing'])
+        xc.dom_set_memshr(self.vm.getDomid(), self.memory_sharing)
 
 
     # Return a list of cmd line args to the device models based on the

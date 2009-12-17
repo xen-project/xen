@@ -1658,6 +1658,22 @@ static PyObject *pyxc_tmem_shared_auth(XcObject *self,
     return zero;
 }
 
+static PyObject *pyxc_dom_set_memshr(XcObject *self, PyObject *args)
+{
+    uint32_t dom;
+    int enable;
+
+    if (!PyArg_ParseTuple(args, "ii", &dom, &enable))
+        return NULL;
+
+    if (xc_memshr_control(self->xc_handle, dom, enable) != 0)
+        return pyxc_error_to_exception();
+    
+    Py_INCREF(zero);
+    return zero;
+}
+
+
 static PyMethodDef pyxc_methods[] = {
     { "handle",
       (PyCFunction)pyxc_handle,
@@ -2161,6 +2177,14 @@ static PyMethodDef pyxc_methods[] = {
       " uuid_str [str]: uuid.\n"
       " auth [int]: 0|1 .\n"
       "Returns: [int] 0 on success; exception on error.\n" },
+
+    { "dom_set_memshr", 
+      (PyCFunction)pyxc_dom_set_memshr,
+      METH_VARARGS, "\n"
+      "Enable/disable memory sharing for the domain.\n"
+      " dom     [int]:        Domain identifier.\n"
+      " enable  [int,0|1]:    Disable or enable?\n"
+      "Returns: [int] 0 on success; -1 on error.\n" },
 
     { NULL, NULL, 0, NULL }
 };

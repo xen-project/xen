@@ -198,7 +198,10 @@ class Blktap2Controller(BlktapController):
                     self.deviceClass = 'tap2'
                     return devid
 
-        cmd = [ TAPDISK_BINARY, '-n', '%s:%s' % (params, file) ]
+        if self.vm.image.memory_sharing:
+            cmd = [ TAPDISK_BINARY, '-n', '%s:%s' % (params, file), '-s', '%d' % self.vm.getDomid() ]
+        else:
+            cmd = [ TAPDISK_BINARY, '-n', '%s:%s' % (params, file) ]
         (rc,stdout,stderr) = doexec(cmd)
 
         if rc != 0:

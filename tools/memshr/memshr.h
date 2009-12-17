@@ -23,6 +23,7 @@
 
 typedef uint64_t xen_mfn_t;
 
+extern void memshr_set_domid(int domid);
 extern void memshr_daemon_initialize(void);
 extern void memshr_vbd_initialize(void);
 
