@@ -40,7 +40,9 @@ int xc_interface_open(void)
         PERROR("Could not get file handle flags");
         goto error;
     }
+
     flags |= FD_CLOEXEC;
+
     if ( fcntl(fd, F_SETFD, flags) < 0 )
     {
         PERROR("Could not set file handle flags");
@@ -53,6 +55,7 @@ int xc_interface_open(void)
     saved_errno = errno;
     close(fd);
     errno = saved_errno;
+
     return -1;
 }
 
@@ -66,30 +69,32 @@ void *xc_map_foreign_batch(int xc_handle, uint32_t dom, int prot,
 {
     privcmd_mmapbatch_t ioctlx;
     void *addr;
-    addr = mmap(NULL, num*PAGE_SIZE, prot, MAP_SHARED, xc_handle, 0);
-    if ( addr == MAP_FAILED ) {
+
+    addr = mmap(NULL, num << PAGE_SHIFT, prot, MAP_SHARED, xc_handle, 0);
+    if ( addr == MAP_FAILED )
+    {
         perror("xc_map_foreign_batch: mmap failed");
         return NULL;
     }
 
-    ioctlx.num=num;
-    ioctlx.dom=dom;
-    ioctlx.addr=(unsigned long)addr;
-    ioctlx.arr=arr;
+    ioctlx.num = num;
+    ioctlx.dom = dom;
+    ioctlx.addr = (unsigned long)addr;
+    ioctlx.arr = arr;
+
     if ( ioctl(xc_handle, IOCTL_PRIVCMD_MMAPBATCH, &ioctlx) < 0 )
     {
         int saved_errno = errno;
         perror("xc_map_foreign_batch: ioctl failed");
-        (void)munmap(addr, num*PAGE_SIZE);
+        (void)munmap(addr, num << PAGE_SHIFT);
         errno = saved_errno;
         return NULL;
     }
-    return addr;
 
+    return addr;
 }
 
-void *xc_map_foreign_range(int xc_handle, uint32_t dom,
-                           int size, int prot,
+void *xc_map_foreign_range(int xc_handle, uint32_t dom, int size, int prot,
                            unsigned long mfn)
 {
     xen_pfn_t *arr;
@@ -108,9 +113,9 @@ void *xc_map_foreign_range(int xc_handle, uint32_t dom,
     return ret;
 }
 
-void *xc_map_foreign_ranges(int xc_handle, uint32_t dom,
-                            size_t size, int prot, size_t chunksize,
-                            privcmd_mmap_entry_t entries[], int nentries)
+void *xc_map_foreign_ranges(int xc_handle, uint32_t dom, size_t size, int prot,
+                            size_t chunksize, privcmd_mmap_entry_t entries[],
+                            int nentries)
 {
     xen_pfn_t *arr;
     int num_per_entry;
@@ -139,8 +144,7 @@ static int do_privcmd(int xc_handle, unsigned int cmd, unsigned long data)
 
 int do_xen_hypercall(int xc_handle, privcmd_hypercall_t *hypercall)
 {
-    return do_privcmd(xc_handle,
-                      IOCTL_PRIVCMD_HYPERCALL,
+    return do_privcmd(xc_handle, IOCTL_PRIVCMD_HYPERCALL,
                       (unsigned long)hypercall);
 }
 
@@ -157,16 +161,10 @@ static int find_sysfsdir(char *sysfsdir)
     if ( (fp = fopen(MTAB, "r")) == NULL )
         return -1;
 
-    while ( fscanf(fp, "%*s %"
-                   STR(MAX_PATH)
-                   "s %"
-                   STR(MAX_PATH)
-                   "s %*s %*d %*d\n",
+    while ( fscanf(fp, "%*s %"STR(MAX_PATH)"s %"STR(MAX_PATH)"s %*s %*d %*d\n",
                    sysfsdir, type) == 2 )
-    {
         if ( strncmp(type, "sysfs", 5) == 0 )
             break;
-    }
 
     fclose(fp);
 
@@ -231,7 +229,7 @@ int xc_evtchn_open(void)
     if ( (fd = open(EVTCHN_DEV_NAME, O_RDWR)) == -1 )
     {
         if ( (errno == ENOENT) &&
-            ((mkdir("/dev/xen", 0755) == 0) || (errno == EEXIST)) &&
+             ((mkdir("/dev/xen", 0755) == 0) || (errno == EEXIST)) &&
              (mknod(EVTCHN_DEV_NAME, S_IFCHR|0600, devnum) == 0) )
             goto reopen;
 
@@ -360,14 +358,14 @@ int xc_gnttab_open(void)
     struct stat st;
     int fd;
     int devnum;
-    
+
     devnum = xc_find_device_number("gntdev");
-    
+
     /* Make sure any existing device file links to correct device. */
     if ( (lstat(GNTTAB_DEV_NAME, &st) != 0) || !S_ISCHR(st.st_mode) ||
          (st.st_rdev != devnum) )
         (void)unlink(GNTTAB_DEV_NAME);
-    
+
 reopen:
     if ( (fd = open(GNTTAB_DEV_NAME, O_RDWR)) == -1 )
     {
@@ -375,11 +373,11 @@ reopen:
              ((mkdir("/dev/xen", 0755) == 0) || (errno == EEXIST)) &&
              (mknod(GNTTAB_DEV_NAME, S_IFCHR|0600, devnum) == 0) )
             goto reopen;
-        
+
         PERROR("Could not open grant table interface");
         return -1;
     }
-    
+
     return fd;
 }
 
@@ -388,26 +386,25 @@ int xc_gnttab_close(int xcg_handle)
     return close(xcg_handle);
 }
 
-void *xc_gnttab_map_grant_ref(int xcg_handle,
-                              uint32_t domid,
-                              uint32_t ref,
+void *xc_gnttab_map_grant_ref(int xcg_handle, uint32_t domid, uint32_t ref,
                               int prot)
 {
     struct ioctl_gntdev_map_grant_ref map;
     void *addr;
-    
+
     map.count = 1;
     map.refs[0].domid = domid;
-    map.refs[0].ref   = ref;
+    map.refs[0].ref = ref;
 
     if ( ioctl(xcg_handle, IOCTL_GNTDEV_MAP_GRANT_REF, &map) )
         return NULL;
-    
+
     addr = mmap(NULL, PAGE_SIZE, prot, MAP_SHARED, xcg_handle, map.index);
     if ( addr == MAP_FAILED )
     {
         int saved_errno = errno;
         struct ioctl_gntdev_unmap_grant_ref unmap_grant;
+
         /* Unmap the driver slots used to store the grant information. */
         perror("xc_gnttab_map_grant_ref: mmap failed");
         unmap_grant.index = map.index;
@@ -416,34 +413,31 @@ void *xc_gnttab_map_grant_ref(int xcg_handle,
         errno = saved_errno;
         return NULL;
     }
-    
+
     return addr;
 }
 
-static void *do_gnttab_map_grant_refs(int xcg_handle,
-                               uint32_t count,
-                               uint32_t *domids,
-                               int domids_stride,
-                               uint32_t *refs,
-                               int prot)
+static void *do_gnttab_map_grant_refs(int xcg_handle, uint32_t count,
+                                      uint32_t *domids, int domids_stride,
+                                      uint32_t *refs, int prot)
 {
     struct ioctl_gntdev_map_grant_ref *map;
     void *addr = NULL;
     int i;
-    
+
     map = malloc(sizeof(*map) +
-                 (count-1) * sizeof(struct ioctl_gntdev_map_grant_ref));
+                 (count - 1) * sizeof(struct ioctl_gntdev_map_grant_ref));
     if ( map == NULL )
         return NULL;
 
     for ( i = 0; i < count; i++ )
     {
         map->refs[i].domid = domids[i * domids_stride];
-        map->refs[i].ref   = refs[i];
+        map->refs[i].ref = refs[i];
     }
 
     map->count = count;
-    
+
     if ( ioctl(xcg_handle, IOCTL_GNTDEV_MAP_GRANT_REF, map) )
         goto out;
 
@@ -453,6 +447,7 @@ static void *do_gnttab_map_grant_refs(int xcg_handle,
     {
         int saved_errno = errno;
         struct ioctl_gntdev_unmap_grant_ref unmap_grant;
+
         /* Unmap the driver slots used to store the grant information. */
         perror("xc_gnttab_map_grant_refs: mmap failed");
         unmap_grant.index = map->index;
@@ -464,30 +459,23 @@ static void *do_gnttab_map_grant_refs(int xcg_handle,
 
  out:
     free(map);
+
     return addr;
 }
 
-void *xc_gnttab_map_grant_refs(int xcg_handle,
-                               uint32_t count,
-                               uint32_t *domids,
-                               uint32_t *refs,
-                               int prot)
+void *xc_gnttab_map_grant_refs(int xcg_handle, uint32_t count, uint32_t *domids,
+                               uint32_t *refs, int prot)
 {
     return do_gnttab_map_grant_refs(xcg_handle, count, domids, 1, refs, prot);
 }
 
-void *xc_gnttab_map_domain_grant_refs(int xcg_handle,
-                               uint32_t count,
-                               uint32_t domid,
-                               uint32_t *refs,
-                               int prot)
+void *xc_gnttab_map_domain_grant_refs(int xcg_handle, uint32_t count,
+                                      uint32_t domid, uint32_t *refs, int prot)
 {
     return do_gnttab_map_grant_refs(xcg_handle, count, &domid, 0, refs, prot);
 }
 
-int xc_gnttab_munmap(int xcg_handle,
-                     void *start_address,
-                     uint32_t count)
+int xc_gnttab_munmap(int xcg_handle, void *start_address, uint32_t count)
 {
     struct ioctl_gntdev_get_offset_for_vaddr get_offset;
     struct ioctl_gntdev_unmap_grant_ref unmap_grant;
@@ -503,7 +491,7 @@ int xc_gnttab_munmap(int xcg_handle,
      * mmap() the pages.
      */
     get_offset.vaddr = (unsigned long)start_address;
-    if ( (rc = ioctl(xcg_handle, IOCTL_GNTDEV_GET_OFFSET_FOR_VADDR, 
+    if ( (rc = ioctl(xcg_handle, IOCTL_GNTDEV_GET_OFFSET_FOR_VADDR,
                      &get_offset)) )
         return rc;
 
@@ -516,7 +504,7 @@ int xc_gnttab_munmap(int xcg_handle,
     /* Next, unmap the memory. */
     if ( (rc = munmap(start_address, count * getpagesize())) )
         return rc;
-    
+
     /* Finally, unmap the driver slots used to store the grant information. */
     unmap_grant.index = get_offset.offset;
     unmap_grant.count = count;
@@ -526,8 +514,7 @@ int xc_gnttab_munmap(int xcg_handle,
     return 0;
 }
 
-int xc_gnttab_set_max_grants(int xcg_handle,
-                             uint32_t count)
+int xc_gnttab_set_max_grants(int xcg_handle, uint32_t count)
 {
     struct ioctl_gntdev_set_max_grants set_max;
     int rc;
@@ -539,13 +526,12 @@ int xc_gnttab_set_max_grants(int xcg_handle,
     return 0;
 }
 
-int xc_gnttab_op(int xc_handle, int cmd,
-                 void * op, int op_size, int count)
+int xc_gnttab_op(int xc_handle, int cmd, void * op, int op_size, int count)
 {
     int ret = 0;
     DECLARE_HYPERCALL;
 
-    hypercall.op     = __HYPERVISOR_grant_table_op;
+    hypercall.op = __HYPERVISOR_grant_table_op;
     hypercall.arg[0] = cmd;
     hypercall.arg[1] = (unsigned long)op;
     hypercall.arg[2] = count;
@@ -570,9 +556,9 @@ int xc_gnttab_get_version(int xc_handle, int domid)
     int rc;
 
     query.dom = domid;
-    rc = xc_gnttab_op(xc_handle, GNTTABOP_get_version,
-                      &query, sizeof(query), 1);
-    if (rc < 0)
+    rc = xc_gnttab_op(xc_handle, GNTTABOP_get_version, &query, sizeof(query),
+                      1);
+    if ( rc < 0 )
         return rc;
     else
         return query.version;
@@ -587,35 +573,32 @@ static void *_gnttab_map_table(int xc_handle, int domid, int *gnt_num)
     xen_pfn_t *pfn_list = NULL;
     grant_entry_v1_t *gnt = NULL;
 
-    if (!gnt_num)
+    if ( !gnt_num )
         return NULL;
 
     query.dom = domid;
-    rc = xc_gnttab_op(xc_handle, GNTTABOP_query_size,
-                     &query, sizeof(query), 1);
+    rc = xc_gnttab_op(xc_handle, GNTTABOP_query_size, &query, sizeof(query), 1);
 
-    if (rc || (query.status != GNTST_okay) )
+    if ( rc || (query.status != GNTST_okay) )
     {
         ERROR("Could not query dom's grant size\n", domid);
         return NULL;
     }
 
-    *gnt_num = query.nr_frames *
-            (PAGE_SIZE / sizeof(grant_entry_v1_t) );
+    *gnt_num = query.nr_frames * (PAGE_SIZE / sizeof(grant_entry_v1_t) );
 
     frame_list = malloc(query.nr_frames * sizeof(unsigned long));
-    if (!frame_list || lock_pages(frame_list, query.nr_frames *
-                                              sizeof(unsigned long)))
+    if ( !frame_list || lock_pages(frame_list,
+                                   query.nr_frames * sizeof(unsigned long)) )
     {
         ERROR("Alloc/lock frame_list in xc_gnttab_map_table\n");
-        if (frame_list)
+        if ( frame_list )
             free(frame_list);
         return NULL;
     }
 
     pfn_list = malloc(query.nr_frames * sizeof(xen_pfn_t));
-
-    if (!pfn_list)
+    if ( !pfn_list )
     {
         ERROR("Could not lock pfn_list in xc_gnttab_map_table\n");
         goto err;
@@ -626,33 +609,33 @@ static void *_gnttab_map_table(int xc_handle, int domid, int *gnt_num)
     set_xen_guest_handle(setup.frame_list, frame_list);
 
     /* XXX Any race with other setup_table hypercall? */
-    rc = xc_gnttab_op(xc_handle, GNTTABOP_setup_table,
-                      &setup, sizeof(setup), 1);
+    rc = xc_gnttab_op(xc_handle, GNTTABOP_setup_table, &setup, sizeof(setup),
+                      1);
 
-    if (rc ||( setup.status != GNTST_okay) )
+    if ( rc || (setup.status != GNTST_okay) )
     {
         ERROR("Could not get grant table frame list\n");
         goto err;
     }
 
-    for (i = 0; i < setup.nr_frames; i++)
+    for ( i = 0; i < setup.nr_frames; i++ )
         pfn_list[i] = frame_list[i];
 
-    gnt = xc_map_foreign_pages(xc_handle, domid, PROT_READ,
-                               pfn_list, setup.nr_frames);
-    if (!gnt)
+    gnt = xc_map_foreign_pages(xc_handle, domid, PROT_READ, pfn_list,
+                               setup.nr_frames);
+    if ( !gnt )
     {
         ERROR("Could not map grant table\n");
         goto err;
     }
 
 err:
-    if (frame_list)
+    if ( frame_list )
     {
-        unlock_pages(frame_list, query.nr_frames *  sizeof(unsigned long));
+        unlock_pages(frame_list, query.nr_frames * sizeof(unsigned long));
         free(frame_list);
     }
-    if (pfn_list)
+    if ( pfn_list )
         free(pfn_list);
 
     return gnt;
