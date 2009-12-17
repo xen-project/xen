@@ -72,7 +72,8 @@ enum hvm_copy_result {
     HVMCOPY_okay = 0,
     HVMCOPY_bad_gva_to_gfn,
     HVMCOPY_bad_gfn_to_mfn,
-    HVMCOPY_unhandleable
+    HVMCOPY_unhandleable,
+    HVMCOPY_gfn_paged_out,
 };
 
 /*

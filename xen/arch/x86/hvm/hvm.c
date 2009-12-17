@@ -314,6 +314,11 @@ static int hvm_set_ioreq_page(
     mfn = mfn_x(gfn_to_mfn(d, gmfn, &p2mt));
     if ( !p2m_is_ram(p2mt) )
         return -EINVAL;
+    if ( p2m_is_paging(p2mt) )
+    {
+        p2m_mem_paging_populate(d, gmfn);
+        return -ENOENT;
+    }
     ASSERT(mfn_valid(mfn));
 
     page = mfn_to_page(mfn);
@@ -1318,6 +1323,8 @@ static void *hvm_map_entry(unsigned long va)
      * we still treat it as a kernel-mode read (i.e. no access checks). */
     pfec = PFEC_page_present;
     gfn = paging_gva_to_gfn(current, va, &pfec);
+    if ( pfec == PFEC_page_paged )
+        return NULL;
     mfn = mfn_x(gfn_to_mfn_current(gfn, &p2mt));
     if ( p2m_is_paging(p2mt) )
     {
@@ -1546,6 +1553,8 @@ void hvm_task_switch(
         &tss, prev_tr.base, sizeof(tss), PFEC_page_present);
     if ( rc == HVMCOPY_bad_gva_to_gfn )
         goto out;
+    if ( rc == HVMCOPY_gfn_paged_out )
+        goto out;
 
     eflags = regs->eflags;
     if ( taskswitch_reason == TSW_iret )
@@ -1582,10 +1591,14 @@ void hvm_task_switch(
         prev_tr.base, &tss, sizeof(tss), PFEC_page_present);
     if ( rc == HVMCOPY_bad_gva_to_gfn )
         goto out;
+    if ( rc == HVMCOPY_gfn_paged_out )
+        goto out;
 
     rc = hvm_copy_from_guest_virt(
         &tss, tr.base, sizeof(tss), PFEC_page_present);
     if ( rc == HVMCOPY_bad_gva_to_gfn )
+        goto out;
+    if ( rc == HVMCOPY_gfn_paged_out )
         goto out;
 
     if ( hvm_set_cr3(tss.cr3) )
@@ -1622,6 +1635,8 @@ void hvm_task_switch(
         tr.base, &tss, sizeof(tss), PFEC_page_present);
     if ( rc == HVMCOPY_bad_gva_to_gfn )
         exn_raised = 1;
+    if ( rc == HVMCOPY_gfn_paged_out )
+        goto out;
 
     if ( (tss.trace & 1) && !exn_raised )
         hvm_inject_exception(TRAP_debug, tss_sel & 0xfff8, 0);
@@ -1681,6 +1696,8 @@ static enum hvm_copy_result __hvm_copy(
             gfn = paging_gva_to_gfn(curr, addr, &pfec);
             if ( gfn == INVALID_GFN )
             {
+                if ( pfec == PFEC_page_paged )
+                    return HVMCOPY_gfn_paged_out;
                 if ( flags & HVMCOPY_fault )
                     hvm_inject_exception(TRAP_page_fault, pfec, addr);
                 return HVMCOPY_bad_gva_to_gfn;
@@ -1693,6 +1710,11 @@ static enum hvm_copy_result __hvm_copy(
 
         mfn = mfn_x(gfn_to_mfn_current(gfn, &p2mt));
 
+        if ( p2m_is_paging(p2mt) )
+        {
+            p2m_mem_paging_populate(curr->domain, gfn);
+            return HVMCOPY_gfn_paged_out;
+        }
         if ( p2m_is_grant(p2mt) )
             return HVMCOPY_unhandleable;
         if ( !p2m_is_ram(p2mt) )

@@ -72,30 +72,31 @@ static int hvm_mmio_access(struct vcpu *v,
     {
         for ( i = 0; i < p->count; i++ )
         {
-            rc = read_handler(
-                v,
-                p->addr + (sign * i * p->size),
-                p->size, &data);
+            rc = read_handler(v, p->addr + (sign * i * p->size), p->size,
+                              &data);
             if ( rc != X86EMUL_OKAY )
                 break;
-            (void)hvm_copy_to_guest_phys(
-                p->data + (sign * i * p->size),
-                &data,
-                p->size);
+            if ( hvm_copy_to_guest_phys(p->data + (sign * i * p->size), &data,
+                                        p->size) == HVMCOPY_gfn_paged_out )
+            {
+                rc = X86EMUL_RETRY;
+                break;
+            }
         }
     }
     else
     {
         for ( i = 0; i < p->count; i++ )
         {
-            (void)hvm_copy_from_guest_phys(
-                &data,
-                p->data + (sign * i * p->size),
-                p->size);
-            rc = write_handler(
-                v,
-                p->addr + (sign * i * p->size),
-                p->size, data);
+            if ( hvm_copy_from_guest_phys(&data,
+                                          p->data + (sign * i * p->size),
+                                          p->size) == HVMCOPY_gfn_paged_out )
+            {
+                rc = X86EMUL_RETRY;
+                break;
+            }
+            rc = write_handler(v, p->addr + (sign * i * p->size), p->size,
+                               data);
             if ( rc != X86EMUL_OKAY )
                 break;
         }
@@ -190,8 +191,12 @@ int hvm_io_intercept(ioreq_t *p, int type)
     int i;
     unsigned long addr, size;
 
-    if ( (type == HVM_PORTIO) && (dpci_ioport_intercept(p)) )
-        return X86EMUL_OKAY;
+    if ( type == HVM_PORTIO )
+    {
+        int rc = dpci_ioport_intercept(p);
+        if ( (rc == X86EMUL_OKAY) || (rc == X86EMUL_RETRY) )
+            return rc;
+    }
 
     for ( i = 0; i < handler->num_slot; i++ )
     {

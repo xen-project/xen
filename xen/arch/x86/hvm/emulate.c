@@ -56,7 +56,18 @@ static int hvmemul_do_io(
     int value_is_ptr = (p_data == NULL);
     struct vcpu *curr = current;
     ioreq_t *p = get_ioreq(curr);
+    unsigned long ram_gfn = paddr_to_pfn(ram_gpa);
+    p2m_type_t p2mt;
+    mfn_t ram_mfn;
     int rc;
+
+    /* Check for paged out page */
+    ram_mfn = gfn_to_mfn(current->domain, ram_gfn, &p2mt);
+    if ( p2m_is_paging(p2mt) )
+    {
+        p2m_mem_paging_populate(curr->domain, ram_gfn);
+        return X86EMUL_RETRY;
+    }
 
     /*
      * Weird-sized accesses have undefined behaviour: we discard writes
@@ -271,6 +282,8 @@ static int hvmemul_linear_to_phys(
     }
     else if ( (pfn = paging_gva_to_gfn(curr, addr, &pfec)) == INVALID_GFN )
     {
+        if ( pfec == PFEC_page_paged )
+            return X86EMUL_RETRY;
         hvm_inject_exception(TRAP_page_fault, pfec, addr);
         return X86EMUL_EXCEPTION;
     }
@@ -286,6 +299,8 @@ static int hvmemul_linear_to_phys(
         /* Is it contiguous with the preceding PFNs? If not then we're done. */
         if ( (npfn == INVALID_GFN) || (npfn != (pfn + (reverse ? -i : i))) )
         {
+            if ( pfec == PFEC_page_paged )
+                return X86EMUL_RETRY;
             done /= bytes_per_rep;
             if ( done == 0 )
             {
@@ -424,6 +439,8 @@ static int __hvmemul_read(
         if ( rc != X86EMUL_OKAY )
             return rc;
         return hvmemul_do_mmio(gpa, &reps, bytes, 0, IOREQ_READ, 0, p_data);
+    case HVMCOPY_gfn_paged_out:
+        return X86EMUL_RETRY;
     default:
         break;
     }
@@ -514,6 +531,8 @@ static int hvmemul_write(
             return rc;
         return hvmemul_do_mmio(gpa, &reps, bytes, 0,
                                IOREQ_WRITE, 0, p_data);
+    case HVMCOPY_gfn_paged_out:
+        return X86EMUL_RETRY;
     default:
         break;
     }
@@ -687,6 +706,8 @@ static int hvmemul_rep_movs(
 
     xfree(buf);
 
+    if ( rc == HVMCOPY_gfn_paged_out )
+        return X86EMUL_RETRY;
     if ( rc != HVMCOPY_okay )
     {
         gdprintk(XENLOG_WARNING, "Failed memory-to-memory REP MOVS: sgpa=%"

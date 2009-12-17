@@ -239,7 +239,7 @@ void hvm_io_assist(void)
         vcpu_end_shutdown_deferral(curr);
 }
 
-static void dpci_ioport_read(uint32_t mport, ioreq_t *p)
+static int dpci_ioport_read(uint32_t mport, ioreq_t *p)
 {
     int i, sign = p->df ? -1 : 1;
     uint32_t data = 0;
@@ -262,14 +262,19 @@ static void dpci_ioport_read(uint32_t mport, ioreq_t *p)
         }
 
         if ( p->data_is_ptr )
-            (void)hvm_copy_to_guest_phys(
-                p->data + (sign * i * p->size), &data, p->size);
+        {
+            if ( hvm_copy_to_guest_phys(p->data + (sign * i * p->size), &data,
+                                        p->size) ==  HVMCOPY_gfn_paged_out )
+                return X86EMUL_RETRY;
+        }
         else
             p->data = data;
     }
+    
+    return X86EMUL_OKAY;
 }
 
-static void dpci_ioport_write(uint32_t mport, ioreq_t *p)
+static int dpci_ioport_write(uint32_t mport, ioreq_t *p)
 {
     int i, sign = p->df ? -1 : 1;
     uint32_t data;
@@ -278,8 +283,11 @@ static void dpci_ioport_write(uint32_t mport, ioreq_t *p)
     {
         data = p->data;
         if ( p->data_is_ptr )
-            (void)hvm_copy_from_guest_phys(
-                &data, p->data + (sign * i * p->size), p->size);
+        {
+            if ( hvm_copy_from_guest_phys(&data, p->data + (sign * i * p->size),
+                                          p->size) ==  HVMCOPY_gfn_paged_out )
+                return X86EMUL_RETRY;
+        }
 
         switch ( p->size )
         {
@@ -296,6 +304,8 @@ static void dpci_ioport_write(uint32_t mport, ioreq_t *p)
             BUG();
         }
     }
+
+    return X86EMUL_OKAY;
 }
 
 int dpci_ioport_intercept(ioreq_t *p)
@@ -305,6 +315,7 @@ int dpci_ioport_intercept(ioreq_t *p)
     struct g2m_ioport *g2m_ioport;
     unsigned int mport, gport = p->addr;
     unsigned int s = 0, e = 0;
+    int rc;
 
     list_for_each_entry( g2m_ioport, &hd->g2m_ioport_list, list )
     {
@@ -314,7 +325,7 @@ int dpci_ioport_intercept(ioreq_t *p)
             goto found;
     }
 
-    return 0;
+    return X86EMUL_UNHANDLEABLE;
 
  found:
     mport = (gport - s) + g2m_ioport->mport;
@@ -323,22 +334,23 @@ int dpci_ioport_intercept(ioreq_t *p)
     {
         gdprintk(XENLOG_ERR, "Error: access to gport=0x%x denied!\n",
                  (uint32_t)p->addr);
-        return 0;
+        return X86EMUL_UNHANDLEABLE;
     }
 
     switch ( p->dir )
     {
     case IOREQ_READ:
-        dpci_ioport_read(mport, p);
+        rc = dpci_ioport_read(mport, p);
         break;
     case IOREQ_WRITE:
-        dpci_ioport_write(mport, p);
+        rc = dpci_ioport_write(mport, p);
         break;
     default:
         gdprintk(XENLOG_ERR, "Error: couldn't handle p->dir = %d", p->dir);
+        rc = X86EMUL_UNHANDLEABLE;
     }
 
-    return 1;
+    return rc;
 }
 
 /*
