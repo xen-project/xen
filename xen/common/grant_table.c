@@ -1873,7 +1873,15 @@ __gnttab_copy(
     }
     else
     {
-        s_frame = gmfn_to_mfn(sd, op->source.u.gmfn);
+        p2m_type_t p2mt;
+        s_frame = mfn_x(gfn_to_mfn(sd, op->source.u.gmfn, &p2mt));
+        if ( p2m_is_paging(p2mt) )
+        {
+            p2m_mem_paging_populate(sd, op->source.u.gmfn);
+
+            rc = -ENOENT;
+            goto error_out;
+        }
         source_domain = sd;
     }
     if ( unlikely(!mfn_valid(s_frame)) )
@@ -1906,7 +1914,15 @@ __gnttab_copy(
     }
     else
     {
-        d_frame = gmfn_to_mfn(dd, op->dest.u.gmfn);
+        p2m_type_t p2mt;
+        d_frame = mfn_x(gfn_to_mfn(dd, op->dest.u.gmfn, &p2mt));
+        if ( p2m_is_paging(p2mt) )
+        {
+            p2m_mem_paging_populate(dd, op->dest.u.gmfn);
+
+            rc = -ENOENT;
+            goto error_out;
+        }
         dest_domain = dd;
     }
     if ( unlikely(!mfn_valid(d_frame)) )
