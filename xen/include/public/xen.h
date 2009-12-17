@@ -146,6 +146,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 #define VIRQ_XENOPROF   7  /* V. XenOprofile interrupt: new sample available */
 #define VIRQ_CON_RING   8  /* G. (DOM0) Bytes received on console            */
 #define VIRQ_PCPU_STATE 9  /* G. (DOM0) PCPU state changed                   */
+#define VIRQ_MEM_EVENT  10 /* G. (DOM0) A memory event has occured           */
 
 /* Architecture-specific VIRQ definitions. */
 #define VIRQ_ARCH_0    16

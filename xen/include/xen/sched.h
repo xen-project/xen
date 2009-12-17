@@ -20,6 +20,7 @@
 #include <xen/rcupdate.h>
 #include <xen/irq.h>
 #include <xen/mm.h>
+#include <public/mem_event.h>
 
 #ifdef CONFIG_COMPAT
 #include <compat/vcpu.h>
@@ -161,6 +162,32 @@ struct vcpu
 #define domain_unlock(d) spin_unlock_recursive(&(d)->domain_lock)
 #define domain_is_locked(d) spin_is_locked(&(d)->domain_lock)
 
+/* Memory event */
+struct mem_event_domain
+{
+    /* ring lock */
+    spinlock_t ring_lock;
+    /* shared page */
+    mem_event_shared_page_t *shared_page;
+    /* shared ring page */
+    void *ring_page;
+    /* front-end ring */
+    mem_event_front_ring_t front_ring;
+    /* if domain has been paused due to ring contention */
+    bool_t paused;
+    int paused_vcpus[MAX_VIRT_CPUS];
+    /* the memory event mode */
+    unsigned long mode;
+    /* domain to receive memory events */
+    struct domain *domain;
+    /* enabled? */
+    bool_t enabled;
+    /* event channel port (vcpu0 only) */
+    int xen_port;
+    /* tasklet */
+    struct tasklet tasklet;
+};
+ 
 struct domain
 {
     domid_t          domain_id;
@@ -277,6 +304,9 @@ struct domain
 
     /* Non-migratable and non-restoreable? */
     bool_t disable_migrate;
+
+    /* Memory paging support */
+    struct mem_event_domain mem_event;
 };
 
 struct domain_setup_info
