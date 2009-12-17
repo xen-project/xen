@@ -691,6 +691,31 @@ struct xen_domctl_gdbsx_domstatus {
 
 };
 
+/*
+ * Memory event operations
+ */
+
+#define XEN_DOMCTL_mem_event_op  56
+
+/* Add and remove memory handlers */
+#define XEN_DOMCTL_MEM_EVENT_OP_ENABLE     0
+#define XEN_DOMCTL_MEM_EVENT_OP_DISABLE    1
+
+struct xen_domctl_mem_event_op {
+    uint32_t       op;           /* XEN_DOMCTL_MEM_EVENT_OP_* */
+    uint32_t       mode;         /* XEN_DOMCTL_MEM_EVENT_ENABLE_* */
+
+    /* OP_ENABLE */
+    unsigned long  shared_addr;  /* IN:  Virtual address of shared page */
+    unsigned long  ring_addr;    /* IN:  Virtual address of ring page */
+
+    /* Other OPs */
+    unsigned long  gfn;          /* IN:  gfn of page being operated on */
+};
+typedef struct xen_domctl_mem_event_op xen_domctl_mem_event_op_t;
+DEFINE_XEN_GUEST_HANDLE(xen_domctl_mem_event_op_t);
+
+
 struct xen_domctl {
     uint32_t cmd;
     uint32_t interface_version; /* XEN_DOMCTL_INTERFACE_VERSION */
@@ -734,6 +759,7 @@ struct xen_domctl {
         struct xen_domctl_set_target        set_target;
         struct xen_domctl_subscribe         subscribe;
         struct xen_domctl_debug_op          debug_op;
+        struct xen_domctl_mem_event_op      mem_event_op;
 #if defined(__i386__) || defined(__x86_64__)
         struct xen_domctl_cpuid             cpuid;
 #endif

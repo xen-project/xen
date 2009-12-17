@@ -188,6 +188,97 @@ int mem_event_check_ring(struct domain *d)
     return ring_full;
 }
 
+int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
+                     XEN_GUEST_HANDLE(void) u_domctl)
+{
+    int rc;
+
+    if ( unlikely(d == current->domain) )
+    {
+        gdprintk(XENLOG_INFO, "Tried to do a memory paging op on itself.\n");
+        return -EINVAL;
+    }
+
+    if ( unlikely(d->is_dying) )
+    {
+        gdprintk(XENLOG_INFO, "Ignoring memory paging op on dying domain %u\n",
+                 d->domain_id);
+        return 0;
+    }
+
+    if ( unlikely(d->vcpu == NULL) || unlikely(d->vcpu[0] == NULL) )
+    {
+        MEM_EVENT_ERROR("Memory paging op on a domain (%u) with no vcpus\n",
+                         d->domain_id);
+        return -EINVAL;
+    }
+
+    /* TODO: XSM hook */
+#if 0
+    rc = xsm_mem_event_control(d, mec->op);
+    if ( rc )
+        return rc;
+#endif
+
+    if ( mec->mode == 0 )
+    {
+        switch( mec->op )
+        {
+        case XEN_DOMCTL_MEM_EVENT_OP_ENABLE:
+        {
+            struct domain *dom_mem_event = current->domain;
+            struct vcpu *v = current;
+            unsigned long ring_addr = mec->ring_addr;
+            unsigned long shared_addr = mec->shared_addr;
+            l1_pgentry_t l1e;
+            unsigned long gfn;
+            p2m_type_t p2mt;
+            mfn_t ring_mfn;
+            mfn_t shared_mfn;
+
+            /* Get MFN of ring page */
+            guest_get_eff_l1e(v, ring_addr, &l1e);
+            gfn = l1e_get_pfn(l1e);
+            ring_mfn = gfn_to_mfn(dom_mem_event, gfn, &p2mt);
+
+            rc = -EINVAL;
+            if ( unlikely(!mfn_valid(mfn_x(ring_mfn))) )
+                break;
+
+            /* Get MFN of shared page */
+            guest_get_eff_l1e(v, shared_addr, &l1e);
+            gfn = l1e_get_pfn(l1e);
+            shared_mfn = gfn_to_mfn(dom_mem_event, gfn, &p2mt);
+
+            rc = -EINVAL;
+            if ( unlikely(!mfn_valid(mfn_x(shared_mfn))) )
+                break;
+
+            rc = -EINVAL;
+            if ( mem_event_enable(d, ring_mfn, shared_mfn) != 0 )
+                break;
+
+            rc = 0;
+        }
+        break;
+
+        case XEN_DOMCTL_MEM_EVENT_OP_DISABLE:
+        {
+            rc = mem_event_disable(d);
+        }
+        break;
+
+        default:
+            rc = -ENOSYS;
+            break;
+        }
+    }
+    else
+        rc = -ENOSYS;
+
+    return rc;
+}
+
 
 /*
  * Local variables:

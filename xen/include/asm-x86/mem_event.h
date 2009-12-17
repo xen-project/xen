@@ -54,6 +54,9 @@ void mem_event_put_request(struct domain *d, mem_event_request_t *req);
 void mem_event_get_response(struct domain *d, mem_event_response_t *rsp);
 void mem_event_unpause_vcpus(struct domain *d);
 
+int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
+                     XEN_GUEST_HANDLE(void) u_domctl);
+
 
 #endif /* __MEM_EVENT_H__ */
 
