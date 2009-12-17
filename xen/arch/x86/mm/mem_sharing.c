@@ -31,6 +31,17 @@
 #include <xen/mm.h>
 #include <xen/sched.h>
 
+/* Auditing of memory sharing code? */
+#define MEM_SHARING_AUDIT  0 
+
+#if MEM_SHARING_AUDIT
+static void mem_sharing_audit(void);
+#define MEM_SHARING_DEBUG(_f, _a...)                                  \
+    debugtrace_printk("mem_sharing_debug: %s(): " _f, __func__, ##_a)
+#else
+# define mem_sharing_audit() do {} while(0)
+#endif /* MEM_SHARING_AUDIT */
+
 
 #define hap_enabled(d) \
     (is_hvm_domain(d) && (d)->arch.hvm_domain.hap_enabled)
@@ -207,6 +218,80 @@ static void mem_sharing_hash_delete(shr_handle_t handle)
     BUG();
 } 
 
+#if MEM_SHARING_AUDIT
+static void mem_sharing_audit(void)
+{
+    shr_hash_entry_t *e;
+    struct list_head *le;
+    gfn_info_t *g;
+    int bucket;
+    struct page_info *pg;
+
+    shr_lock();
+
+    for(bucket=0; bucket < SHR_HASH_LENGTH; bucket++)
+    {
+        e = shr_hash[bucket];    
+        /* Loop over all shr_hash_entries */ 
+        while(e != NULL)
+        {
+            int nr_gfns=0;
+
+            /* Check if the MFN has correct type, owner and handle */ 
+            pg = mfn_to_page(e->mfn);
+            if((pg->u.inuse.type_info & PGT_type_mask) != PGT_shared_page)
+                MEM_SHARING_DEBUG("mfn %lx not shared, but in the hash!\n",
+                                   mfn_x(e->mfn));
+            if(page_get_owner(pg) != dom_cow)
+                MEM_SHARING_DEBUG("mfn %lx shared, but wrong owner (%d)!\n",
+                                   mfn_x(e->mfn), 
+                                   page_get_owner(pg)->domain_id);
+            if(e->handle != pg->shr_handle)
+                MEM_SHARING_DEBUG("mfn %lx shared, but wrong handle "
+                                  "(%ld != %ld)!\n",
+                                   mfn_x(e->mfn), pg->shr_handle, e->handle);
+            /* Check if all GFNs map to the MFN, and the p2m types */
+            list_for_each(le, &e->gfns)
+            {
+                struct domain *d;
+                p2m_type_t t;
+                mfn_t mfn;
+
+                g = list_entry(le, struct gfn_info, list);
+                d = get_domain_by_id(g->domain);
+                if(d == NULL)
+                {
+                    MEM_SHARING_DEBUG("Unknow dom: %d, for PFN=%lx, MFN=%lx\n",
+                            g->domain, g->gfn, mfn_x(e->mfn));
+                    continue;
+                }
+                mfn = gfn_to_mfn(d, g->gfn, &t); 
+                if(mfn_x(mfn) != mfn_x(e->mfn))
+                    MEM_SHARING_DEBUG("Incorrect P2M for d=%d, PFN=%lx."
+                                      "Expecting MFN=%ld, got %ld\n",
+                                      g->domain, g->gfn, mfn_x(e->mfn),
+                                      mfn_x(mfn));
+                if(t != p2m_ram_shared)
+                    MEM_SHARING_DEBUG("Incorrect P2M type for d=%d, PFN=%lx."
+                                      "Expecting t=%d, got %d\n",
+                                      g->domain, g->gfn, mfn_x(e->mfn),
+                                      p2m_ram_shared, t);
+                put_domain(d);
+                nr_gfns++;
+            } 
+            if(nr_gfns != (pg->u.inuse.type_info & PGT_count_mask))
+                MEM_SHARING_DEBUG("Mismatched counts for MFN=%lx."
+                                  "nr_gfns in hash %d, in type_info %d\n",
+                                  mfn_x(e->mfn), nr_gfns, 
+                                 (pg->u.inuse.type_info & PGT_count_mask));
+            e = e->next;
+        }
+    }
+
+    shr_unlock();
+}
+#endif
+
 
 static struct page_info* mem_sharing_alloc_page(struct domain *d, 
                                                 unsigned long gfn,
@@ -375,6 +460,7 @@ static int mem_sharing_gfn_account(struct gfn_info *gfn, int sharing)
 
         return 1;
     }
+    mem_sharing_audit();
 
     return 0;
 }
@@ -554,6 +640,7 @@ int mem_sharing_unshare_page(struct domain *d,
     page = mfn_to_page(mfn);
     handle = page->shr_handle;
  
+    mem_sharing_audit();
     /* Remove the gfn_info from the list */
     shr_lock();
     hash_entry = mem_sharing_hash_lookup(handle); 
@@ -648,6 +735,7 @@ int mem_sharing_domctl(struct domain *d, xen_domctl_mem_sharing_op_t *mec)
             if(!hap_enabled(d))
                 return -EINVAL;
             d->arch.hvm_domain.mem_sharing_enabled = mec->enable;
+            mem_sharing_audit();
             return 0; 
         }
         break;
@@ -660,6 +748,7 @@ int mem_sharing_domctl(struct domain *d, xen_domctl_mem_sharing_op_t *mec)
                 return -EINVAL;
             rc = mem_sharing_nominate_page(d, gfn, 0, &handle);
             mec->nominate.handle = handle;
+            mem_sharing_audit();
         }
         break;
 
@@ -675,6 +764,7 @@ int mem_sharing_domctl(struct domain *d, xen_domctl_mem_sharing_op_t *mec)
                 return -EINVAL;
             rc = mem_sharing_nominate_page(d, gfn, 3, &handle);
             mec->nominate.handle = handle;
+            mem_sharing_audit();
         }
         break;
 
@@ -683,6 +773,7 @@ int mem_sharing_domctl(struct domain *d, xen_domctl_mem_sharing_op_t *mec)
             shr_handle_t sh = mec->share.source_handle;
             shr_handle_t ch = mec->share.client_handle;
             rc = mem_sharing_share_pages(sh, ch); 
+            mem_sharing_audit();
         }
         break;
 
@@ -690,6 +781,7 @@ int mem_sharing_domctl(struct domain *d, xen_domctl_mem_sharing_op_t *mec)
         {
             if(!mem_sharing_enabled(d))
                 return -EINVAL;
+            mem_sharing_audit();
             rc = mem_sharing_sharing_resume(d);
         }
         break;
@@ -698,6 +790,7 @@ int mem_sharing_domctl(struct domain *d, xen_domctl_mem_sharing_op_t *mec)
         {
             unsigned long gfn = mec->debug.gfn;
             rc = mem_sharing_debug_gfn(d, gfn);
+            mem_sharing_audit();
         }
         break;
 
@@ -705,6 +798,7 @@ int mem_sharing_domctl(struct domain *d, xen_domctl_mem_sharing_op_t *mec)
         {
             unsigned long mfn = mec->debug.mfn;
             rc = mem_sharing_debug_mfn(mfn);
+            mem_sharing_audit();
         }
         break;
 
@@ -712,6 +806,7 @@ int mem_sharing_domctl(struct domain *d, xen_domctl_mem_sharing_op_t *mec)
         {
             grant_ref_t gref = mec->debug.gref;
             rc = mem_sharing_debug_gref(d, gref);
+            mem_sharing_audit();
         }
         break;
 
