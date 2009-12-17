@@ -940,6 +940,10 @@ bool_t hvm_hap_nested_page_fault(unsigned long gfn)
         return 1;
     }
 
+    /* Check if the page has been paged out */
+    if ( p2m_is_paged(p2mt) || (p2mt == p2m_ram_paging_out) )
+        p2m_mem_paging_populate(current->domain, gfn);
+
     /* Log-dirty: mark the page dirty and let the guest write it again */
     if ( paging_mode_log_dirty(current->domain)
          && p2m_is_ram(p2mt) && (p2mt != p2m_ram_ro) )
@@ -1315,6 +1319,11 @@ static void *hvm_map_entry(unsigned long va)
     pfec = PFEC_page_present;
     gfn = paging_gva_to_gfn(current, va, &pfec);
     mfn = mfn_x(gfn_to_mfn_current(gfn, &p2mt));
+    if ( p2m_is_paging(p2mt) )
+    {
+        p2m_mem_paging_populate(current->domain, gfn);
+        return NULL;
+    }
     if ( !p2m_is_ram(p2mt) )
     {
         gdprintk(XENLOG_ERR, "Failed to look up descriptor table entry\n");
@@ -2948,6 +2957,13 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         {
             p2m_type_t t;
             mfn_t mfn = gfn_to_mfn(d, pfn, &t);
+            if ( p2m_is_paging(t) )
+            {
+                p2m_mem_paging_populate(d, pfn);
+
+                rc = -EINVAL;
+                goto param_fail3;
+            }
             if ( mfn_x(mfn) != INVALID_MFN )
             {
                 paging_mark_dirty(d, mfn_x(mfn));
@@ -3001,6 +3017,13 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
             p2m_type_t nt;
             mfn_t mfn;
             mfn = gfn_to_mfn(d, pfn, &t);
+            if ( p2m_is_paging(t) )
+            {
+                p2m_mem_paging_populate(d, pfn);
+
+                rc = -EINVAL;
+                goto param_fail4;
+            }
             if ( p2m_is_grant(t) )
             {
                 gdprintk(XENLOG_WARNING,
