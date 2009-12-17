@@ -92,6 +92,8 @@ static unsigned long p2m_type_to_flags(p2m_type_t t)
     case p2m_ram_ro:
     case p2m_grant_map_ro:
         return flags | P2M_BASE_FLAGS;
+    case p2m_ram_shared:
+        return flags | P2M_BASE_FLAGS;
     case p2m_mmio_dm:
         return flags;
     case p2m_mmio_direct:

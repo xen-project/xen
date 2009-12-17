@@ -37,6 +37,7 @@
 #include <asm/spinlock.h>
 #include <asm/paging.h>
 #include <asm/p2m.h>
+#include <asm/mem_sharing.h>
 #include <asm/hvm/emulate.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>

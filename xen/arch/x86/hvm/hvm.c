@@ -960,6 +960,13 @@ bool_t hvm_hap_nested_page_fault(unsigned long gfn)
         return 1;
     }
 
+    /* Mem sharing: unshare the page and try again */
+    if ( p2mt == p2m_ram_shared )
+    {
+        mem_sharing_unshare_page(current->domain, gfn, 0);
+        return 1;
+    }
+ 
     /* Shouldn't happen: Maybe the guest was writing to a r/o grant mapping? */
     if ( p2mt == p2m_grant_map_ro )
     {
