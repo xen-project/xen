@@ -337,7 +337,7 @@ static void vmx_restore_guest_msrs(struct vcpu *v)
     }
 
     if ( cpu_has_rdtscp )
-        wrmsrl(MSR_TSC_AUX, v->arch.hvm_vcpu.msr_tsc_aux);
+        wrmsrl(MSR_TSC_AUX, hvm_msr_tsc_aux(v));
 }
 
 #else  /* __i386__ */
@@ -2495,7 +2495,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         vmx_invlpg_intercept(exit_qualification);
         break;
     case EXIT_REASON_RDTSCP:
-        regs->ecx = v->arch.hvm_vcpu.msr_tsc_aux;
+        regs->ecx = hvm_msr_tsc_aux(v);
         /* fall through */
     case EXIT_REASON_RDTSC:
         inst_len = __get_instruction_length();

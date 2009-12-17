@@ -126,9 +126,8 @@ static int construct_vmcb(struct vcpu *v)
         GENERAL2_INTERCEPT_VMRUN       | GENERAL2_INTERCEPT_VMMCALL     |
         GENERAL2_INTERCEPT_VMLOAD      | GENERAL2_INTERCEPT_VMSAVE      |
         GENERAL2_INTERCEPT_STGI        | GENERAL2_INTERCEPT_CLGI        |
-        GENERAL2_INTERCEPT_SKINIT      | GENERAL2_INTERCEPT_RDTSCP      |
-        GENERAL2_INTERCEPT_WBINVD      | GENERAL2_INTERCEPT_MONITOR     |
-        GENERAL2_INTERCEPT_MWAIT;
+        GENERAL2_INTERCEPT_SKINIT      | GENERAL2_INTERCEPT_MWAIT       |
+        GENERAL2_INTERCEPT_WBINVD      | GENERAL2_INTERCEPT_MONITOR;
 
     /* Intercept all debug-register writes. */
     vmcb->dr_intercepts = ~0u;
@@ -165,7 +164,10 @@ static int construct_vmcb(struct vcpu *v)
     /* TSC. */
     vmcb->tsc_offset = 0;
     if ( v->domain->arch.vtsc )
+    {
         vmcb->general1_intercepts |= GENERAL1_INTERCEPT_RDTSC;
+        vmcb->general2_intercepts |= GENERAL2_INTERCEPT_RDTSCP;
+    }
 
     /* Guest EFER. */
     v->arch.hvm_vcpu.guest_efer = 0;

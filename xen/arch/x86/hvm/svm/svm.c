@@ -674,6 +674,9 @@ static void svm_ctxt_switch_to(struct vcpu *v)
 
     svm_vmsave(root_vmcb[cpu]);
     svm_vmload(v->arch.hvm_svm.vmcb);
+
+    if ( cpu_has_rdtscp )
+        wrmsrl(MSR_TSC_AUX, hvm_msr_tsc_aux(v));
 }
 
 static void svm_do_resume(struct vcpu *v) 
@@ -1457,11 +1460,13 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         hvm_triple_fault();
         break;
 
+    case VMEXIT_RDTSCP:
+        regs->ecx = hvm_msr_tsc_aux(v);
+        /* fall through */
     case VMEXIT_RDTSC:
         svm_vmexit_do_rdtsc(regs);
         break;
 
-    case VMEXIT_RDTSCP:
     case VMEXIT_MONITOR:
     case VMEXIT_MWAIT:
     case VMEXIT_VMRUN:

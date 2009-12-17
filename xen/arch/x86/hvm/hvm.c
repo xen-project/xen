@@ -478,7 +478,7 @@ static int hvm_save_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
         /* Architecture-specific vmcs/vmcb bits */
         hvm_funcs.save_cpu_ctxt(v, &ctxt);
 
-        ctxt.msr_tsc_aux = v->arch.hvm_vcpu.msr_tsc_aux;
+        ctxt.msr_tsc_aux = hvm_msr_tsc_aux(v);
 
         hvm_get_segment_register(v, x86_seg_idtr, &seg);
         ctxt.idtr_limit = seg.limit;
@@ -1898,6 +1898,11 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
             }
         }
         break;
+    case 0x80000001:
+        /* Don't expose RDTSCP feature when in PVRDTSCP mode. */
+        if ( v->domain->arch.tsc_mode == TSC_MODE_PVRDTSCP )
+            *edx &= ~bitmaskof(X86_FEATURE_RDTSCP);
+        break;
     }
 }
 
@@ -1934,7 +1939,7 @@ int hvm_msr_read_intercept(struct cpu_user_regs *regs)
         break;
 
     case MSR_TSC_AUX:
-        msr_content = v->arch.hvm_vcpu.msr_tsc_aux;
+        msr_content = hvm_msr_tsc_aux(v);
         break;
 
     case MSR_IA32_APICBASE:
@@ -2031,7 +2036,8 @@ int hvm_msr_write_intercept(struct cpu_user_regs *regs)
 
     case MSR_TSC_AUX:
         v->arch.hvm_vcpu.msr_tsc_aux = (uint32_t)msr_content;
-        if ( cpu_has_rdtscp )
+        if ( cpu_has_rdtscp
+             && (v->domain->arch.tsc_mode != TSC_MODE_PVRDTSCP) )
             wrmsrl(MSR_TSC_AUX, (uint32_t)msr_content);
         break;
 

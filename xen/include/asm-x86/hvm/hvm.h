@@ -333,4 +333,10 @@ int hvm_debug_op(struct vcpu *v, int32_t op);
 
 bool_t hvm_hap_nested_page_fault(unsigned long gfn);
 
+#define hvm_msr_tsc_aux(v) ({                                               \
+    struct domain *__d = (v)->domain;                                       \
+    (__d->arch.tsc_mode == TSC_MODE_PVRDTSCP)                               \
+        ? (u32)__d->arch.incarnation : (u32)(v)->arch.hvm_vcpu.msr_tsc_aux; \
+})
+
 #endif /* __ASM_X86_HVM_HVM_H__ */
