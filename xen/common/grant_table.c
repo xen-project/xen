@@ -105,6 +105,8 @@ static unsigned inline int max_nr_maptrack_frames(void)
     return (max_nr_grant_frames * MAX_MAPTRACK_TO_GRANTS_RATIO);
 }
 
+#define gfn_to_mfn_private(_d, _gfn, _p2mt) \
+    mfn_x(gfn_to_mfn_unshare(_d, _gfn, _p2mt, 1)) 
 
 #define SHGNT_PER_PAGE_V1 (PAGE_SIZE / sizeof(grant_entry_v1_t))
 #define shared_entry_v1(t, e) \
@@ -493,12 +495,16 @@ __gnttab_map_grant_ref(
 
         if ( !act->pin )
         {
+            p2m_type_t p2mt;
+
             act->domid = ld->domain_id;
             if ( sha1 )
                 act->gfn = sha1->frame;
             else
                 act->gfn = sha2->full_page.frame;
-            act->frame = gmfn_to_mfn(rd, act->gfn);
+            act->frame = (op->flags & GNTMAP_readonly) ?  
+                            gmfn_to_mfn(rd, act->gfn) :
+                            gfn_to_mfn_private(rd, act->gfn, &p2mt); 
             act->start = 0;
             act->length = PAGE_SIZE;
             act->is_sub_page = 0;
@@ -549,7 +555,7 @@ __gnttab_map_grant_ref(
         if ( rc != GNTST_okay )
             goto undo_out;
     }
-    else if ( owner == rd )
+    else if ( owner == rd || owner == dom_cow )
     {
         if ( gnttab_host_mapping_get_page_type(op, ld, rd) &&
              !get_page_type(pg, PGT_writable_page) )
@@ -1365,6 +1371,7 @@ gnttab_transfer(
     struct gnttab_transfer gop;
     unsigned long mfn;
     unsigned int max_bitsize;
+    p2m_type_t p2mt;
 
     for ( i = 0; i < count; i++ )
     {
@@ -1379,7 +1386,7 @@ gnttab_transfer(
             return -EFAULT;
         }
 
-        mfn = gmfn_to_mfn(d, gop.mfn);
+        mfn = gfn_to_mfn_private(d, gop.mfn, &p2mt);
 
         /* Check the passed page frame for basic validity. */
         if ( unlikely(!mfn_valid(mfn)) )
@@ -1650,6 +1657,7 @@ __acquire_grant_for_copy(
     int is_sub_page;
     struct domain *ignore;
     s16 rc = GNTST_okay;
+    p2m_type_t p2mt;
 
     *owning_domain = NULL;
 
@@ -1762,7 +1770,8 @@ __acquire_grant_for_copy(
         else if ( sha1 )
         {
             act->gfn = sha1->frame;
-            grant_frame = gmfn_to_mfn(rd, act->gfn);
+            grant_frame = readonly ? gmfn_to_mfn(rd, act->gfn) :
+                                     gfn_to_mfn_private(rd, act->gfn, &p2mt);
             is_sub_page = 0;
             trans_page_off = 0;
             trans_length = PAGE_SIZE;
@@ -1771,7 +1780,8 @@ __acquire_grant_for_copy(
         else if ( !(sha2->hdr.flags & GTF_sub_page) )
         {
             act->gfn = sha2->full_page.frame;
-            grant_frame = gmfn_to_mfn(rd, act->gfn);
+            grant_frame = readonly ? gmfn_to_mfn(rd, act->gfn) :
+                                     gfn_to_mfn_private(rd, act->gfn, &p2mt);
             is_sub_page = 0;
             trans_page_off = 0;
             trans_length = PAGE_SIZE;
@@ -1780,7 +1790,8 @@ __acquire_grant_for_copy(
         else
         {
             act->gfn = sha2->sub_page.frame;
-            grant_frame = gmfn_to_mfn(rd, act->gfn);
+            grant_frame = readonly ? gmfn_to_mfn(rd, act->gfn) :
+                                     gfn_to_mfn_private(rd, act->gfn, &p2mt);
             is_sub_page = 1;
             trans_page_off = sha2->sub_page.page_off;
             trans_length = sha2->sub_page.length;
@@ -1917,7 +1928,7 @@ __gnttab_copy(
     else
     {
         p2m_type_t p2mt;
-        d_frame = mfn_x(gfn_to_mfn(dd, op->dest.u.gmfn, &p2mt));
+        d_frame = gfn_to_mfn_private(dd, op->dest.u.gmfn, &p2mt);
         if ( p2m_is_paging(p2mt) )
         {
             p2m_mem_paging_populate(dd, op->dest.u.gmfn);
@@ -2351,7 +2362,7 @@ grant_table_create(
             goto no_mem_4;
         clear_page(t->shared_raw[i]);
     }
-
+    
     for ( i = 0; i < INITIAL_NR_GRANT_FRAMES; i++ )
         gnttab_create_shared_page(d, t, i);
 

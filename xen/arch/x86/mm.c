@@ -3147,6 +3147,20 @@ int do_mmu_update(
                         rc = -ENOENT;
                         break;
                     }
+                    /* XXX: Ugly: pull all the checks into a separate function. 
+                     * Don't want to do it now, not to interfere with mem_paging
+                     * patches */
+                    else if ( p2m_ram_shared == l1e_p2mt )
+                    {
+                        /* Unshare the page for RW foreign mappings */
+                        if(l1e_get_flags(l1e) & _PAGE_RW)
+                        {
+                            rc = mem_sharing_unshare_page(pg_owner, 
+                                                          l1e_get_pfn(l1e), 
+                                                          0);
+                            if(rc) break; 
+                        }
+                    } 
 
                     okay = mod_l1_entry(va, l1e, mfn,
                                         cmd == MMU_PT_UPDATE_PRESERVE_AD, v,
@@ -3171,6 +3185,13 @@ int do_mmu_update(
                         rc = -ENOENT;
                         break;
                     }
+                    else if ( p2m_ram_shared == l2e_p2mt )
+                    {
+                        MEM_LOG("Unexpected attempt to map shared page.\n");
+                        rc = -EINVAL;
+                        break;
+                    }
+
 
                     okay = mod_l2_entry(va, l2e, mfn,
                                         cmd == MMU_PT_UPDATE_PRESERVE_AD, v);
@@ -3192,6 +3213,12 @@ int do_mmu_update(
                     else if ( p2m_ram_paging_in_start == l3e_p2mt )
                     {
                         rc = -ENOENT;
+                        break;
+                    }
+                    else if ( p2m_ram_shared == l3e_p2mt )
+                    {
+                        MEM_LOG("Unexpected attempt to map shared page.\n");
+                        rc = -EINVAL;
                         break;
                     }
 
@@ -3217,6 +3244,12 @@ int do_mmu_update(
                     else if ( p2m_ram_paging_in_start == l4e_p2mt )
                     {
                         rc = -ENOENT;
+                        break;
+                    }
+                    else if ( p2m_ram_shared == l4e_p2mt )
+                    {
+                        MEM_LOG("Unexpected attempt to map shared page.\n");
+                        rc = -EINVAL;
                         break;
                     }
 
