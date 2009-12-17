@@ -238,6 +238,7 @@
 ^tools/xenfb/vncfb$
 ^tools/xenmon/xentrace_setmask$
 ^tools/xenmon/xenbaked$
+^tools/xenpaging/xenpaging$
 ^tools/xenpmd/xenpmd$
 ^tools/xenstat/xentop/xentop$
 ^tools/xenstore/testsuite/tmp/.*$
