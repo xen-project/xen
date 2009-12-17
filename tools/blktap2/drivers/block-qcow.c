@@ -1035,6 +1035,17 @@ void tdqcow_queue_read(td_driver_t *driver, td_request_t treq)
 		}
 		
 		if(!cluster_offset) {
+            int i;
+            /* Forward entire request if possible. */
+            for(i=0; i<nb_sectors; i++)
+                if(get_cluster_offset(s, (sector+i) << 9, 0, 0, 0, 0))
+                    goto coalesce_failed;
+            treq.buf  = buf;
+            treq.sec  = sector;
+            treq.secs = nb_sectors;
+			td_forward_request(treq);
+            return;
+coalesce_failed:            
 			treq.buf  = buf;
 			treq.sec  = sector;
 			treq.secs = n;
