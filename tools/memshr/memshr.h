@@ -26,5 +26,7 @@ typedef uint64_t xen_mfn_t;
 extern void memshr_set_domid(int domid);
 extern void memshr_daemon_initialize(void);
 extern void memshr_vbd_initialize(void);
+extern uint16_t memshr_vbd_image_get(char* file);
+extern void memshr_vbd_image_put(uint16_t memshr_id);
 
 #endif /* __MEMSHR_H__ */

@@ -28,6 +28,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <memshr.h>
 
 #include "tapdisk-image.h"
 #include "tapdisk-driver.h"
@@ -52,10 +53,11 @@ tapdisk_image_allocate(char *file, int type, int storage,
 		return NULL;
 	}
 
-	image->type    = type;
-	image->flags   = flags;
-	image->storage = storage;
-	image->private = private;
+	image->type      = type;
+	image->flags     = flags;
+	image->storage   = storage;
+	image->private   = private;
+    image->memshr_id = memshr_vbd_image_get(file);
 	INIT_LIST_HEAD(&image->next);
 
 	return image;
@@ -69,6 +71,7 @@ tapdisk_image_free(td_image_t *image)
 
 	list_del(&image->next);
 
+    memshr_vbd_image_put(image->memshr_id);
 	free(image->name);
 	tapdisk_driver_free(image->driver);
 	free(image);

@@ -106,3 +106,23 @@ void memshr_vbd_initialize(void)
     vbd_info.enabled = 1;
 }
 
+uint16_t memshr_vbd_image_get(char* file)
+{
+    uint16_t id;
+
+    if(pthread_mutex_lock(&SHARED_INFO->lock)) goto error_out;
+    id = shm_vbd_image_get(file, SHARED_INFO->vbd_images);
+    if(pthread_mutex_unlock(&SHARED_INFO->lock)) goto error_out;
+
+    return id;
+error_out:
+    return 0;    
+}
+
+void memshr_vbd_image_put(uint16_t memshr_id)
+{
+    if(pthread_mutex_lock(&SHARED_INFO->lock)) return;
+    shm_vbd_image_put(memshr_id, SHARED_INFO->vbd_images);
+    if(pthread_mutex_unlock(&SHARED_INFO->lock)) return;
+}
+

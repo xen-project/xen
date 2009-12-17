@@ -34,6 +34,7 @@
 struct td_image_handle {
 	int                          type;
 	char                        *name;
+    uint16_t                     memshr_id;
 
 	td_flag_t                    flags;
 	int                          storage;

@@ -92,10 +92,11 @@ shared_memshr_info_t * shm_shared_info_open(int unlink)
 {
     shared_memshr_info_t *shared_info;
     pthread_mutexattr_t  lock_attr;
+    int nr_pages, i;
 
-    assert(sizeof(shared_memshr_info_t) < XC_PAGE_SIZE);
+    nr_pages = (sizeof(shared_memshr_info_t) >> XC_PAGE_SHIFT) + 1;
     if(shm_area_open(MEMSHR_INFO_SHM_FILE, 
-                     XC_PAGE_SIZE,
+                     nr_pages * XC_PAGE_SIZE,
                      unlink, 
                      &(shm_info.shared_info_area)) < 0)
     {
@@ -114,6 +115,12 @@ shared_memshr_info_t * shm_shared_info_open(int unlink)
         {
             DPRINTF("Failed to init shared info lock.\n");
             return NULL;
+        }
+        strcpy(shared_info->vbd_images[0].file, "list-head");
+        for(i=1; i<MAX_NR_VBD_IMAGES; i++)
+        {
+            shared_info->vbd_images[i].next = i; 
+            shared_info->vbd_images[i].prev = i; 
         }
         shared_info->magic = MEMSHR_INFO_MAGIC;
     } 
@@ -179,4 +186,78 @@ struct blockshr_hash * shm_blockshr_hash_open(int unlink)
         
     return h;
 } 
+
+uint16_t shm_vbd_image_get(char* file, vbd_image_info_t *vbd_imgs)
+{
+    vbd_image_info_t *img, *next_img;
+    int i, img_id;
+
+    /* Try to find the file in the existing list first */ 
+    img = vbd_imgs;
+    while(img->next != 0)
+    {
+        img = vbd_imgs + img->next;
+        if(strncmp(img->file, file, MAX_NAME_LEN) == 0)
+        {
+            img->ref_cnt++;
+            return (uint16_t)(img - vbd_imgs); 
+        }
+    }
+    
+    /* Couldn't find an existing entry. We need to add one. Find empty slot */ 
+    for(i=1; i<MAX_NR_VBD_IMAGES; i++)
+    {
+        img = vbd_imgs + i;
+        if((img->next == i) && (img->prev == i))
+            break;
+    }
+    /* No entries left! */
+    if(i == MAX_NR_VBD_IMAGES)
+    {
+        DPRINTF("No space in vbds table.\n");
+        return 0;
+    }
+    if(strlen(file) > MAX_NAME_LEN)
+    {
+        DPRINTF("Filename: %s too long (>%d).\n", file, MAX_NAME_LEN);
+        return 0; 
+    }
+    /* Init the entry */
+    img_id = (img - vbd_imgs);
+    next_img = vbd_imgs + vbd_imgs[0].next;
+    strcpy(img->file, file);
+    img->ref_cnt = 1;
+    img->next = vbd_imgs[0].next;
+    img->prev = 0;
+    next_img->prev = img_id;
+    vbd_imgs[0].next = img_id;
+
+    return img_id;
+}
+
+
+void shm_vbd_image_put(uint16_t memshr_id, vbd_image_info_t *vbd_imgs)
+{
+    vbd_image_info_t *img, *next_img, *prev_img;
+    
+    img = vbd_imgs + memshr_id;
+    if(img->ref_cnt == 0)
+    {
+        DPRINTF("Incorrect image put.\n");
+        return;
+    }
+
+    img->ref_cnt--; 
+
+    /* Remove from list if ref_cnt is zero */
+    if(img->ref_cnt == 0)
+    {
+        next_img = vbd_imgs + img->next;
+        prev_img = vbd_imgs + img->prev;
+        prev_img->next = img->next;
+        next_img->prev = img->prev;
+        img->next = img->prev = (img - vbd_imgs);
+        memset(img->file, 0, MAX_NAME_LEN);
+    }
+}
 
