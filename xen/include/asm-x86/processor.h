@@ -132,6 +132,7 @@
 #define PFEC_user_mode      (1U<<2)
 #define PFEC_reserved_bit   (1U<<3)
 #define PFEC_insn_fetch     (1U<<4)
+#define PFEC_page_paged     (1U<<5)
 
 #ifndef __ASSEMBLY__
 

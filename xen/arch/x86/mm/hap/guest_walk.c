@@ -46,6 +46,14 @@ unsigned long hap_gva_to_gfn(GUEST_PAGING_LEVELS)(
     /* Get the top-level table's MFN */
     cr3 = v->arch.hvm_vcpu.guest_cr[3];
     top_mfn = gfn_to_mfn(v->domain, _gfn(cr3 >> PAGE_SHIFT), &p2mt);
+    if ( p2m_is_paging(p2mt) )
+    {
+//        if ( p2m_is_paged(p2mt) )
+            p2m_mem_paging_populate(v->domain, cr3 >> PAGE_SHIFT);
+
+        pfec[0] = PFEC_page_paged;
+        return INVALID_GFN;
+    }
     if ( !p2m_is_ram(p2mt) )
     {
         pfec[0] &= ~PFEC_page_present;
@@ -62,12 +70,28 @@ unsigned long hap_gva_to_gfn(GUEST_PAGING_LEVELS)(
     unmap_domain_page(top_map);
 
     /* Interpret the answer */
-    if ( missing == 0 ) 
-        return gfn_x(guest_l1e_get_gfn(gw.l1e));
-    
+    if ( missing == 0 )
+    {
+        gfn_t gfn = guest_l1e_get_gfn(gw.l1e);
+        gfn_to_mfn(v->domain, gfn, &p2mt);
+        if ( p2m_is_paging(p2mt) )
+        {
+//            if ( p2m_is_paged(p2mt) )
+                p2m_mem_paging_populate(v->domain, gfn_x(gfn));
+
+            pfec[0] = PFEC_page_paged;
+            return INVALID_GFN;
+        }
+
+        return gfn_x(gfn);
+    }
+
     if ( missing & _PAGE_PRESENT )
         pfec[0] &= ~PFEC_page_present;
-    
+
+    if ( missing & _PAGE_PAGED )
+        pfec[0] = PFEC_page_paged;
+
     return INVALID_GFN;
 }
 
