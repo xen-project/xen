@@ -24,9 +24,13 @@
 
 #define sharing_supported(_d) \
     (is_hvm_domain(_d) && (_d)->arch.hvm_domain.hap_enabled) 
+
+typedef uint64_t shr_handle_t; 
+
 int mem_sharing_nominate_page(struct domain *d, 
                               unsigned long gfn,
-                              int expected_refcnt);
+                              int expected_refcnt,
+                              shr_handle_t *phandle);
 #define MEM_SHARING_MUST_SUCCEED      (1<<0)
 #define MEM_SHARING_DESTROY_GFN       (1<<1)
 int mem_sharing_unshare_page(struct domain *d, 
@@ -34,5 +38,6 @@ int mem_sharing_unshare_page(struct domain *d,
                              uint16_t flags);
 int mem_sharing_sharing_resume(struct domain *d);
 int mem_sharing_cache_resize(struct domain *d, int new_size);
+void mem_sharing_init(void);
 
 #endif /* __MEM_SHARING_H__ */

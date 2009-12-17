@@ -114,6 +114,7 @@
 #include <xsm/xsm.h>
 #include <xen/trace.h>
 #include <asm/setup.h>
+#include <asm/mem_sharing.h>
 
 /*
  * Mapping of first 2 or 4 megabytes of memory. This is mapped with 4kB
@@ -314,6 +315,8 @@ void __init arch_init_memory(void)
     }
 
     subarch_init_memory();
+
+    mem_sharing_init();
 }
 
 int page_is_ram_type(unsigned long mfn, unsigned long mem_type)

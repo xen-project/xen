@@ -43,6 +43,8 @@ struct page_info
         struct page_list_entry list;
         /* For non-pinnable shadows, a higher entry that points at us. */
         paddr_t up;
+        /* For shared/sharable pages the sharing handle */
+        uint64_t shr_handle; 
     };
 
     /* Reference count and various PGC_xxx flags and fields. */
