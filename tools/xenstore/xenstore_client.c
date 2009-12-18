@@ -88,13 +88,13 @@ usage(enum mode mode, int incl_mode, const char *progname)
 	mstr = incl_mode ? "exists " : "";
     case MODE_list:
 	mstr = mstr ? : incl_mode ? "list " : "";
-	errx(1, "Usage: %s %s[-h] [-s] key [...]", progname, mstr);
+	errx(1, "Usage: %s %s[-h] [-p] [-s] key [...]", progname, mstr);
     case MODE_ls:
 	mstr = mstr ? : incl_mode ? "ls " : "";
-	errx(1, "Usage: %s %s[-h] [-s] [path]", progname, mstr);
+	errx(1, "Usage: %s %s[-h] [-f] [-p] [-s] [path]", progname, mstr);
     case MODE_chmod:
 	mstr = incl_mode ? "chmod " : "";
-	errx(1, "Usage: %s %s[-h] [-s] key <mode [modes...]>", progname, mstr);
+	errx(1, "Usage: %s %s[-h] [-u] [-r] [-s] key <mode [modes...]>", progname, mstr);
     }
 }
 
@@ -492,15 +492,16 @@ main(int argc, char **argv)
 	int c, index = 0;
 	static struct option long_options[] = {
 	    {"help",    0, 0, 'h'},
+	    {"flat",    0, 0, 'f'}, /* MODE_ls */
 	    {"socket",  0, 0, 's'},
-	    {"prefix",  0, 0, 'p'}, /* MODE_read || MODE_list */
+	    {"prefix",  0, 0, 'p'}, /* MODE_read || MODE_list || MODE_ls */
 	    {"tidy",    0, 0, 't'}, /* MODE_rm */
 	    {"upto",    0, 0, 'u'}, /* MODE_chmod */
 	    {"recurse", 0, 0, 'r'}, /* MODE_chmod */
 	    {0, 0, 0, 0}
 	};
 
-	c = getopt_long(argc - switch_argv, argv + switch_argv, "fhsptur",
+	c = getopt_long(argc - switch_argv, argv + switch_argv, "hfsptur",
 			long_options, &index);
 	if (c == -1)
 	    break;
@@ -510,7 +511,7 @@ main(int argc, char **argv)
 	    usage(mode, switch_argv, argv[0]);
 	    /* NOTREACHED */
         case 'f':
-	    if ( mode == MODE_read || mode == MODE_list || mode == MODE_ls ) {
+	    if ( mode == MODE_ls ) {
 		max_width = INT_MAX/2;
 		desired_width = 0;
 		show_whole_path = 1;
