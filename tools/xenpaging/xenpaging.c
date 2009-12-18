@@ -20,6 +20,7 @@
  */
 
 
+#include <inttypes.h>
 #include <stdlib.h>
 #include <xc_private.h>
 
@@ -184,7 +185,7 @@ xenpaging_t *xenpaging_init(domid_t domain_id)
         ERROR("Error allocating bitmap");
         goto err;
     }
-    DPRINTF("max_pages = %lx\n", paging->domain_info->max_pages);
+    DPRINTF("max_pages = %"PRIx64"\n", paging->domain_info->max_pages);
 
     /* Initialise policy */
     rc = policy_init(paging);
@@ -565,8 +566,10 @@ int main(int argc, char *argv[])
             }
             else
             {
-                DPRINTF("page already populated (domain = %d; vcpu = %d; gfn = %lx; paused = %ld)\n",
-                        paging->mem_event.domain_id, req.vcpu_id, req.gfn, req.flags & MEM_EVENT_FLAG_VCPU_PAUSED);
+                DPRINTF("page already populated (domain = %d; vcpu = %d;"
+                        " gfn = %lx; paused = %"PRId64")\n",
+                        paging->mem_event.domain_id, req.vcpu_id,
+                        req.gfn, req.flags & MEM_EVENT_FLAG_VCPU_PAUSED);
 
                 /* Tell Xen to resume the vcpu */
                 /* XXX: Maybe just check if the vcpu was paused? */
