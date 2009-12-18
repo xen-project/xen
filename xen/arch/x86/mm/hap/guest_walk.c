@@ -49,8 +49,7 @@ unsigned long hap_gva_to_gfn(GUEST_PAGING_LEVELS)(
     top_mfn = gfn_to_mfn_unshare(v->domain, cr3 >> PAGE_SHIFT, &p2mt, 0);
     if ( p2m_is_paging(p2mt) )
     {
-//        if ( p2m_is_paged(p2mt) )
-            p2m_mem_paging_populate(v->domain, cr3 >> PAGE_SHIFT);
+        p2m_mem_paging_populate(v->domain, cr3 >> PAGE_SHIFT);
 
         pfec[0] = PFEC_page_paged;
         return INVALID_GFN;
@@ -82,8 +81,7 @@ unsigned long hap_gva_to_gfn(GUEST_PAGING_LEVELS)(
         gfn_to_mfn_unshare(v->domain, gfn_x(gfn), &p2mt, 0);
         if ( p2m_is_paging(p2mt) )
         {
-//            if ( p2m_is_paged(p2mt) )
-                p2m_mem_paging_populate(v->domain, gfn_x(gfn));
+            p2m_mem_paging_populate(v->domain, gfn_x(gfn));
 
             pfec[0] = PFEC_page_paged;
             return INVALID_GFN;
