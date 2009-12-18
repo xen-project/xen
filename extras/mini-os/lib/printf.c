@@ -62,7 +62,7 @@
 #include <mini-os/lib.h>
 #include <mini-os/mm.h>
 #include <mini-os/ctype.h>
-#include <mini-os/limits.h>
+#include <mini-os/posix/limits.h>
 
 /**
  * simple_strtoul - convert a string to an unsigned long
