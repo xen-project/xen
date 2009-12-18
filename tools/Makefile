@@ -25,7 +25,6 @@ SUBDIRS-$(CONFIG_Linux) += memshr
 SUBDIRS-$(CONFIG_Linux) += blktap
 SUBDIRS-$(CONFIG_Linux) += blktap2
 SUBDIRS-$(CONFIG_NetBSD) += libaio
-SUBDIRS-$(CONFIG_NetBSD) += memshr 
 SUBDIRS-$(CONFIG_NetBSD) += blktap2
 SUBDIRS-$(CONFIG_NetBSD) += xenbackendd
 SUBDIRS-y += libfsimage
