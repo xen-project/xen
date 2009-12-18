@@ -18,6 +18,7 @@
  */
 #include <pthread.h>
 #include <inttypes.h>
+#include <unistd.h>
 
 #include "bidir-hash.h"
 #include "memshr-priv.h"
