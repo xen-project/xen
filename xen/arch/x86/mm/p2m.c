@@ -3,7 +3,7 @@
  *
  * physical-to-machine mappings for automatically-translated domains.
  *
- * Parts of this code are Copyright (c) 2009 by Citrix (R&D) Ltd. (Patrick Colp)
+ * Parts of this code are Copyright (c) 2009 by Citrix Systems, Inc. (Patrick Colp)
  * Parts of this code are Copyright (c) 2007 by Advanced Micro Devices.
  * Parts of this code are Copyright (c) 2006-2007 by XenSource Inc.
  * Parts of this code are Copyright (c) 2006 by Michael A Fetterman

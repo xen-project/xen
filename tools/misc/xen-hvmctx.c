@@ -4,7 +4,7 @@
  * Print out the contents of a HVM save record in a human-readable way.
  * 
  * Tim Deegan <Tim.Deegan@citrix.com>
- * Copyright (c) 2008 Citrix Systems (R&D) Limited
+ * Copyright (c) 2008 Citrix Systems, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to

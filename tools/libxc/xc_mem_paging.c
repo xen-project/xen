@@ -4,7 +4,7 @@
  *
  * Interface to low-level memory paging functionality.
  *
- * Copyright (c) 2009 by Citrix (R&D) Ltd. (Patrick Colp)
+ * Copyright (c) 2009 by Citrix Systems, Inc. (Patrick Colp)
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by

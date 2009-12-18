@@ -3,7 +3,7 @@
  *
  * Xen domain paging.
  *
- * Copyright (c) 2009 Citrix (R&D) Inc. (Patrick Colp)
+ * Copyright (c) 2009 Citrix Systems, Inc. (Patrick Colp)
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
