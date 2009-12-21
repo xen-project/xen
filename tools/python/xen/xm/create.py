@@ -217,7 +217,7 @@ gopts.var('pae', val='PAE',
           use="Disable or enable PAE of HVM domain.")
 
 gopts.var('hpet', val='HPET',
-          fn=set_int, default=1,
+          fn=set_int, default=0,
           use="Enable virtual high-precision event timer.")
 
 gopts.var('timer_mode', val='TIMER_MODE',

@@ -501,7 +501,7 @@ class XendConfig(dict):
             if 'rtc_timeoffset' not in self['platform']:
                 self['platform']['rtc_timeoffset'] = 0
             if 'hpet' not in self['platform']:
-                self['platform']['hpet'] = 1
+                self['platform']['hpet'] = 0
             if 'xen_platform_pci' not in self['platform']:
                 self['platform']['xen_platform_pci'] = 1
             if 'vpt_align' not in self['platform']:
