@@ -3105,6 +3105,8 @@ int do_mmu_update(
             req.ptr -= cmd;
             gmfn = req.ptr >> PAGE_SHIFT;
             mfn = mfn_x(gfn_to_mfn(pt_owner, gmfn, &p2mt));
+            if ( !p2m_is_valid(p2mt) )
+              mfn = INVALID_MFN;
 
             if ( p2m_is_paged(p2mt) )
             {

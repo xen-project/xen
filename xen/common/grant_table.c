@@ -1888,6 +1888,8 @@ __gnttab_copy(
     {
         p2m_type_t p2mt;
         s_frame = mfn_x(gfn_to_mfn(sd, op->source.u.gmfn, &p2mt));
+        if ( !p2m_is_valid(p2mt) )
+          s_frame = INVALID_MFN;
         if ( p2m_is_paging(p2mt) )
         {
             p2m_mem_paging_populate(sd, op->source.u.gmfn);
@@ -1929,6 +1931,8 @@ __gnttab_copy(
     {
         p2m_type_t p2mt;
         d_frame = gfn_to_mfn_private(dd, op->dest.u.gmfn, &p2mt);
+        if ( !p2m_is_valid(p2mt) )
+          d_frame = INVALID_MFN;
         if ( p2m_is_paging(p2mt) )
         {
             p2m_mem_paging_populate(dd, op->dest.u.gmfn);
