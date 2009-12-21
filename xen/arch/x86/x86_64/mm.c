@@ -303,10 +303,7 @@ int share_hotadd_m2p_table(struct mem_hotadd_info *info)
         {
             struct page_info *page = mfn_to_page(m2p_start_mfn + i);
             if (hotadd_mem_valid(m2p_start_mfn + i, info))
-            {
-                printk("now share page %lx\n", m2p_start_mfn + i);
                 share_xen_page_with_privileged_guests(page, XENSHARE_readonly);
-            }
         }
     }
     return 0;
@@ -1333,27 +1330,34 @@ int transfer_pages_to_heap(struct mem_hotadd_info *info)
 
 int mem_hotadd_check(unsigned long spfn, unsigned long epfn)
 {
+    if ( (spfn >= epfn) || (spfn < max_page) )
+        return 0;
+
+    if ( (spfn | epfn) & ((1UL << PAGETABLE_ORDER) - 1) )
+        return 0;
+
+    if ( (spfn | epfn) & pfn_hole_mask )
+        return 0;
+
     /* TBD: Need make sure cover to m2p/ft page table */
     return 1;
 }
 
+/*
+ * A bit paranoid for memory allocation failure issue since
+ * it may be reason for memory add
+ */
 int memory_add(unsigned long spfn, unsigned long epfn, unsigned int pxm)
 {
     struct mem_hotadd_info info;
     int ret, node;
     unsigned long old_max = max_page, old_total = total_pages;
+    unsigned long old_node_start, old_node_span, orig_online;
     unsigned long i;
 
-    printk("memory_add %lx ~ %lx with pxm %x\n", spfn, epfn, pxm);
+    dprintk(XENLOG_INFO, "memory_add %lx ~ %lx with pxm %x\n", spfn, epfn, pxm);
 
-    /* the memory range should at least be 2M aligned */
-    if ( (spfn | epfn) & ((1UL << PAGETABLE_ORDER) - 1) )
-        return -EINVAL;
-
-    if ( (spfn | epfn) & pfn_hole_mask)
-        return -EINVAL;
-
-    if ( epfn < max_page )
+    if ( !mem_hotadd_check(spfn, epfn) )
         return -EINVAL;
 
     if ( (node = setup_node(pxm)) == -1 )
@@ -1366,10 +1370,16 @@ int memory_add(unsigned long spfn, unsigned long epfn, unsigned int pxm)
         return -EINVAL;
     }
 
-    if ( !mem_hotadd_check(spfn, epfn) )
-        return -EINVAL;
+    ret =  map_pages_to_xen((unsigned long)mfn_to_virt(spfn), spfn,
+                            epfn - spfn, PAGE_HYPERVISOR);
+     if ( ret )
+        return ret;
 
-    if ( !node_online(node) )
+    old_node_start = NODE_DATA(node)->node_start_pfn;
+    old_node_span = NODE_DATA(node)->node_spanned_pages;
+    orig_online = node_online(node);
+
+    if ( !orig_online )
     {
         dprintk(XENLOG_WARNING, "node %x pxm %x is not online\n",node, pxm);
         NODE_DATA(node)->node_id = node;
@@ -1384,11 +1394,6 @@ int memory_add(unsigned long spfn, unsigned long epfn, unsigned int pxm)
         if (node_end_pfn(node) < epfn)
             NODE_DATA(node)->node_spanned_pages = epfn - node_start_pfn(node);
     }
-    ret =  map_pages_to_xen((unsigned long)mfn_to_virt(spfn), spfn,
-                            epfn - spfn, PAGE_HYPERVISOR);
-
-     if ( ret )
-        return ret;
 
     ret = -EINVAL;
     info.spfn = spfn;
@@ -1398,6 +1403,7 @@ int memory_add(unsigned long spfn, unsigned long epfn, unsigned int pxm)
     ret = extend_frame_table(&info);
     if (ret)
         goto destroy_frametable;
+
     /* Set max_page as setup_m2p_table will use it*/
     max_page = epfn;
     max_pdx = pfn_to_pdx(max_page - 1) + 1;
@@ -1410,7 +1416,11 @@ int memory_add(unsigned long spfn, unsigned long epfn, unsigned int pxm)
         goto destroy_m2p;
 
     for ( i = old_max; i < epfn; i++ )
-        iommu_map_page(dom0, i, i);
+        if ( iommu_map_page(dom0, i, i) )
+            break;
+
+    if ( i != epfn )
+        goto destroy_iommu;
 
     /* We can't revert any more */
     transfer_pages_to_heap(&info);
@@ -1419,15 +1429,27 @@ int memory_add(unsigned long spfn, unsigned long epfn, unsigned int pxm)
 
     return 0;
 
+destroy_iommu:
+    while (i-- > old_max)
+        iommu_unmap_page(dom0, i);
+
 destroy_m2p:
     destroy_m2p_mapping(&info);
+    max_page = old_max;
+    total_pages = old_total;
+    max_pdx = pfn_to_pdx(max_page - 1) + 1;
 destroy_frametable:
     cleanup_frame_table(&info);
     destroy_xen_mappings((unsigned long)mfn_to_virt(spfn),
                          (unsigned long)mfn_to_virt(epfn));
-    max_page = old_max;
-    total_pages = old_total;
-    max_pdx = pfn_to_pdx(max_page - 1) + 1;
+
+    if ( !orig_online )
+        node_set_offline(node);
+    NODE_DATA(node)->node_start_pfn = old_node_start;
+    NODE_DATA(node)->node_spanned_pages = old_node_span;
+
+    destroy_xen_mappings((unsigned long)mfn_to_virt(spfn),
+                         (unsigned long)mfn_to_virt(epfn));
     return ret;
 }
 
