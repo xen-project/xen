@@ -840,7 +840,8 @@ void cleanup_frame_table(struct mem_hotadd_info *info)
     eva = (unsigned long)pdx_to_page(pfn_to_pdx(epfn));
 
     /* Intialize all page */
-    memset(mfn_to_page(spfn), -1, mfn_to_page(epfn) - mfn_to_page(spfn));
+    memset(mfn_to_page(spfn), -1,
+           (unsigned long)mfn_to_page(epfn) - (unsigned long)mfn_to_page(spfn));
 
     while (sva < eva)
     {
@@ -932,7 +933,8 @@ int extend_frame_table(struct mem_hotadd_info *info)
         cidx = find_next_zero_bit(pdx_group_valid, eidx, nidx);
     }
 
-    memset(mfn_to_page(spfn), 0, mfn_to_page(epfn) - mfn_to_page(spfn));
+    memset(mfn_to_page(spfn), 0,
+           (unsigned long)mfn_to_page(epfn) - (unsigned long)mfn_to_page(spfn));
     return 0;
 }
 
