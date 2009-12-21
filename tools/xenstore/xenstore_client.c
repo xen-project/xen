@@ -343,8 +343,10 @@ perform(enum mode mode, int optind, int argc, char **argv, struct xs_handle *xsh
                         unsigned int num;
                         char ** list = xs_directory(xsh, xth, p, &num);
 
-                        if (list && num == 0) {
-                            goto again;
+                        if (list) {
+                            free(list);
+                            if (num == 0)
+                                goto again;
                         }
                     }
                 }
