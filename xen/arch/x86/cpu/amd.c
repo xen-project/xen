@@ -465,8 +465,6 @@ static void __devinit init_amd(struct cpuinfo_x86 *c)
 		if (c->x86_power & (1<<8)) {
 			set_bit(X86_FEATURE_CONSTANT_TSC, c->x86_capability);
 			set_bit(X86_FEATURE_NONSTOP_TSC, c->x86_capability);
-			if (c->x86 != 0x11)
-				set_bit(X86_FEATURE_TSC_RELIABLE, c->x86_capability);
 		}
 	}
 

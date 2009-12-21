@@ -212,7 +212,6 @@ static void __devinit init_intel(struct cpuinfo_x86 *c)
 	if (cpuid_edx(0x80000007) & (1u<<8)) {
 		set_bit(X86_FEATURE_CONSTANT_TSC, c->x86_capability);
 		set_bit(X86_FEATURE_NONSTOP_TSC, c->x86_capability);
-		set_bit(X86_FEATURE_TSC_RELIABLE, c->x86_capability);
 	}
 	if ((c->cpuid_level >= 0x00000006) &&
 	    (cpuid_eax(0x00000006) & (1u<<2)))

@@ -1135,6 +1135,107 @@ static void local_time_calibration(void)
 }
 
 /*
+ * TSC Reliability check
+ */
+
+/*
+ * The Linux original version of this function is
+ * Copyright (c) 2006, Red Hat, Inc., Ingo Molnar
+ */
+void check_tsc_warp(unsigned long tsc_khz, unsigned long *max_warp)
+{
+#define rdtsc_barrier() mb()
+    static DEFINE_SPINLOCK(sync_lock);
+    static cycles_t last_tsc;
+
+    cycles_t start, now, prev, end;
+    int i;
+
+    rdtsc_barrier();
+    start = get_cycles();
+    rdtsc_barrier();
+
+    /* The measurement runs for 20 msecs: */
+    end = start + tsc_khz * 20ULL;
+    now = start;
+
+    for ( i = 0; ; i++ )
+    {
+        /*
+         * We take the global lock, measure TSC, save the
+         * previous TSC that was measured (possibly on
+         * another CPU) and update the previous TSC timestamp.
+         */
+        spin_lock(&sync_lock);
+        prev = last_tsc;
+        rdtsc_barrier();
+        now = get_cycles();
+        rdtsc_barrier();
+        last_tsc = now;
+        spin_unlock(&sync_lock);
+
+        /*
+         * Be nice every now and then (and also check whether measurement is 
+         * done [we also insert a 10 million loops safety exit, so we dont 
+         * lock up in case the TSC readout is totally broken]):
+         */
+        if ( unlikely(!(i & 7)) )
+        {
+            if ( (now > end) || (i > 10000000) )
+                break;
+            cpu_relax();
+            /*touch_nmi_watchdog();*/
+        }
+
+        /*
+         * Outside the critical section we can now see whether we saw a 
+         * time-warp of the TSC going backwards:
+         */
+        if ( unlikely(prev > now) )
+        {
+            spin_lock(&sync_lock);
+            if ( *max_warp < prev - now )
+                *max_warp = prev - now;
+            spin_unlock(&sync_lock);
+        }
+    }
+}
+
+static unsigned long tsc_max_warp, tsc_check_count;
+static cpumask_t tsc_check_cpumask = CPU_MASK_NONE;
+
+static void tsc_check_slave(void *unused)
+{
+    unsigned int cpu = smp_processor_id();
+    local_irq_disable();
+    while ( !cpu_isset(cpu, tsc_check_cpumask) )
+        mb();
+    check_tsc_warp(cpu_khz, &tsc_max_warp);
+    cpu_clear(cpu, tsc_check_cpumask);
+    local_irq_enable();
+}
+
+void tsc_check_reliability(void)
+{
+    unsigned int cpu = smp_processor_id();
+    static DEFINE_SPINLOCK(lock);
+
+    spin_lock(&lock);
+
+    tsc_check_count++;
+    smp_call_function(tsc_check_slave, NULL, 0);
+    tsc_check_cpumask = cpu_online_map;
+    local_irq_disable();
+    check_tsc_warp(cpu_khz, &tsc_max_warp);
+    cpu_clear(cpu, tsc_check_cpumask);
+    local_irq_enable();
+    while ( !cpus_empty(tsc_check_cpumask) )
+        cpu_relax();
+
+    spin_unlock(&lock);
+}
+
+/*
  * Rendezvous for all CPUs in IRQ context.
  * Master CPU snapshots the platform timer.
  * All CPUS snapshot their local TSC and extrapolation of system time.
@@ -1271,16 +1372,30 @@ void init_percpu_time(void)
 /* Late init function (after all CPUs are booted). */
 int __init init_xen_time(void)
 {
+    extern unsigned int max_cstate;
+
     /* If we have constant-rate TSCs then scale factor can be shared. */
     if ( boot_cpu_has(X86_FEATURE_CONSTANT_TSC) )
     {
         int cpu;
         for_each_possible_cpu ( cpu )
             per_cpu(cpu_time, cpu).tsc_scale = per_cpu(cpu_time, 0).tsc_scale;
-        /* If TSCs are not marked as 'reliable', re-sync during rendezvous. */
-        if ( !boot_cpu_has(X86_FEATURE_TSC_RELIABLE) )
-            time_calibration_rendezvous_fn = time_calibration_tsc_rendezvous;
     }
+    if ( (boot_cpu_has(X86_FEATURE_CONSTANT_TSC) && max_cstate <= 2) ||
+         boot_cpu_has(X86_FEATURE_NONSTOP_TSC) )
+    {
+        /*
+         * Sadly, despite processor vendors' best design guidance efforts,
+         * on some systems, cpus may come out of reset improperly
+         * synchronized.  So we must verify there is no warp and we
+         * can't do that until all CPUs are booted
+         */
+        tsc_check_reliability();
+        if ( tsc_max_warp == 0 )
+            set_boot_cpu_bit(X86_FEATURE_TSC_RELIABLE);
+    }
+    if ( !boot_cpu_has(X86_FEATURE_TSC_RELIABLE) )
+            time_calibration_rendezvous_fn = time_calibration_tsc_rendezvous;
 
     open_softirq(TIME_CALIBRATE_SOFTIRQ, local_time_calibration);
 
@@ -1481,107 +1596,6 @@ struct tm wallclock_time(void)
 }
 
 /*
- * TSC Reliability check
- */
-
-/*
- * The Linux original version of this function is
- * Copyright (c) 2006, Red Hat, Inc., Ingo Molnar
- */
-void check_tsc_warp(unsigned long tsc_khz, unsigned long *max_warp)
-{
-#define rdtsc_barrier() mb()
-    static DEFINE_SPINLOCK(sync_lock);
-    static cycles_t last_tsc;
-
-    cycles_t start, now, prev, end;
-    int i;
-
-    rdtsc_barrier();
-    start = get_cycles();
-    rdtsc_barrier();
-
-    /* The measurement runs for 20 msecs: */
-    end = start + tsc_khz * 20ULL;
-    now = start;
-
-    for ( i = 0; ; i++ )
-    {
-        /*
-         * We take the global lock, measure TSC, save the
-         * previous TSC that was measured (possibly on
-         * another CPU) and update the previous TSC timestamp.
-         */
-        spin_lock(&sync_lock);
-        prev = last_tsc;
-        rdtsc_barrier();
-        now = get_cycles();
-        rdtsc_barrier();
-        last_tsc = now;
-        spin_unlock(&sync_lock);
-
-        /*
-         * Be nice every now and then (and also check whether measurement is 
-         * done [we also insert a 10 million loops safety exit, so we dont 
-         * lock up in case the TSC readout is totally broken]):
-         */
-        if ( unlikely(!(i & 7)) )
-        {
-            if ( (now > end) || (i > 10000000) )
-                break;
-            cpu_relax();
-            /*touch_nmi_watchdog();*/
-        }
-
-        /*
-         * Outside the critical section we can now see whether we saw a 
-         * time-warp of the TSC going backwards:
-         */
-        if ( unlikely(prev > now) )
-        {
-            spin_lock(&sync_lock);
-            if ( *max_warp < prev - now )
-                *max_warp = prev - now;
-            spin_unlock(&sync_lock);
-        }
-    }
-}
-
-static unsigned long tsc_max_warp, tsc_check_count;
-static cpumask_t tsc_check_cpumask = CPU_MASK_NONE;
-
-static void tsc_check_slave(void *unused)
-{
-    unsigned int cpu = smp_processor_id();
-    local_irq_disable();
-    while ( !cpu_isset(cpu, tsc_check_cpumask) )
-        mb();
-    check_tsc_warp(cpu_khz, &tsc_max_warp);
-    cpu_clear(cpu, tsc_check_cpumask);
-    local_irq_enable();
-}
-
-void tsc_check_reliability(void)
-{
-    unsigned int cpu = smp_processor_id();
-    static DEFINE_SPINLOCK(lock);
-
-    spin_lock(&lock);
-
-    tsc_check_count++;
-    smp_call_function(tsc_check_slave, NULL, 0);
-    tsc_check_cpumask = cpu_online_map;
-    local_irq_disable();
-    check_tsc_warp(cpu_khz, &tsc_max_warp);
-    cpu_clear(cpu, tsc_check_cpumask);
-    local_irq_enable();
-    while ( !cpus_empty(tsc_check_cpumask) )
-        cpu_relax();
-
-    spin_unlock(&lock);
-}
-
-/*
  * PV SoftTSC Emulation.
  */
 
@@ -1616,19 +1630,10 @@ void pv_soft_rdtsc(struct vcpu *v, struct cpu_user_regs *regs, int rdtscp)
 
 static int host_tsc_is_safe(void)
 {
-    extern unsigned int max_cstate;
-
     if ( boot_cpu_has(X86_FEATURE_TSC_RELIABLE) )
         return 1;
     if ( num_online_cpus() == 1 )
         return 1;
-    if ( boot_cpu_has(X86_FEATURE_CONSTANT_TSC) && max_cstate <= 2 )
-    {
-        if ( !tsc_check_count )
-            tsc_check_reliability();
-        if ( tsc_max_warp == 0 )
-            return 1;
-    }
     return 0;
 }
 
