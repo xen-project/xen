@@ -1332,6 +1332,8 @@ int transfer_pages_to_heap(struct mem_hotadd_info *info)
 
 int mem_hotadd_check(unsigned long spfn, unsigned long epfn)
 {
+    unsigned long s, e, length;
+
     if ( (spfn >= epfn) || (spfn < max_page) )
         return 0;
 
@@ -1341,7 +1343,31 @@ int mem_hotadd_check(unsigned long spfn, unsigned long epfn)
     if ( (spfn | epfn) & pfn_hole_mask )
         return 0;
 
-    /* TBD: Need make sure cover to m2p/ft page table */
+    /* Caculate at most required m2p/compat m2p/frametable pages */
+    s = (spfn & ~((1UL << (L2_PAGETABLE_SHIFT - 3)) - 1));
+    e = (epfn + (1UL << (L2_PAGETABLE_SHIFT - 3)) - 1) &
+            ~((1UL << (L2_PAGETABLE_SHIFT - 3)) - 1);
+
+    length = (e - s) * sizeof(unsigned long);
+
+    s = (spfn & ~((1UL << (L2_PAGETABLE_SHIFT - 2)) - 1));
+    e = (epfn + (1UL << (L2_PAGETABLE_SHIFT - 2)) - 1) &
+            ~((1UL << (L2_PAGETABLE_SHIFT - 2)) - 1);
+
+    e = min_t(unsigned long, e,
+            (RDWR_COMPAT_MPT_VIRT_END - RDWR_COMPAT_MPT_VIRT_START) >> 2);
+
+    if ( e > s )
+        length += (e -s) * sizeof(unsigned int);
+
+    s = pfn_to_pdx(spfn) & ~(PDX_GROUP_COUNT - 1);
+    e = ( pfn_to_pdx(epfn) + (PDX_GROUP_COUNT - 1) ) & ~(PDX_GROUP_COUNT - 1);
+
+    length += (e - s) * sizeof(struct page_info);
+
+    if ((length >> PAGE_SHIFT) > (epfn - spfn))
+        return 0;
+
     return 1;
 }
 
