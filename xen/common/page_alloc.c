@@ -893,7 +893,7 @@ void __init scrub_heap_pages(void)
 
     for ( mfn = first_valid_mfn; mfn < max_page; mfn++ )
     {
-        process_pending_timers();
+        process_pending_softirqs();
 
         pg = mfn_to_page(mfn);
 

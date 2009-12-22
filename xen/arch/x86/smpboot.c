@@ -1327,7 +1327,7 @@ void __cpu_die(unsigned int cpu)
 		}
 		mdelay(100);
 		mb();
-		process_pending_timers();
+		process_pending_softirqs();
 		if ((++i % 10) == 0)
 			printk(KERN_ERR "CPU %u still not dead...\n", cpu);
 	}
@@ -1547,7 +1547,7 @@ int __devinit __cpu_up(unsigned int cpu)
 	cpu_set(cpu, smp_commenced_mask);
 	while (!cpu_isset(cpu, cpu_online_map)) {
 		mb();
-		process_pending_timers();
+		process_pending_softirqs();
 	}
 
 	cpufreq_add_cpu(cpu);

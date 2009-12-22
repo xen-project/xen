@@ -22,7 +22,7 @@ irq_cpustat_t irq_stat[NR_CPUS];
 
 static softirq_handler softirq_handlers[NR_SOFTIRQS];
 
-asmlinkage void do_softirq(void)
+static void __do_softirq(unsigned long ignore_mask)
 {
     unsigned int i, cpu;
     unsigned long pending;
@@ -38,13 +38,25 @@ asmlinkage void do_softirq(void)
         if ( rcu_pending(cpu) )
             rcu_check_callbacks(cpu);
 
-        if ( (pending = softirq_pending(cpu)) == 0 )
+        if ( (pending = (softirq_pending(cpu) & ~ignore_mask)) == 0 )
             break;
 
         i = find_first_set_bit(pending);
         clear_bit(i, &softirq_pending(cpu));
         (*softirq_handlers[i])();
     }
+}
+
+void process_pending_softirqs(void)
+{
+    ASSERT(!in_irq() && local_irq_is_enabled());
+    /* Do not enter scheduler as it can preempt the calling context. */
+    __do_softirq(1ul<<SCHEDULE_SOFTIRQ);
+}
+
+asmlinkage void do_softirq(void)
+{
+    __do_softirq(0);
 }
 
 void open_softirq(int nr, softirq_handler handler)

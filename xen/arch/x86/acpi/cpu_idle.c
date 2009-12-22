@@ -230,7 +230,7 @@ static void acpi_processor_idle(void)
 
     sched_tick_suspend();
     /* sched_tick_suspend() can raise TIMER_SOFTIRQ. Process it now. */
-    process_pending_timers();
+    process_pending_softirqs();
 
     /*
      * Interrupts must be disabled during bus mastering calculations and

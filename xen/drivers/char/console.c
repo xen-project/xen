@@ -650,7 +650,7 @@ void __init console_endboot(void)
             printk("%d... ", 3-i);
             for ( j = 0; j < 100; j++ )
             {
-                process_pending_timers();
+                process_pending_softirqs();
                 mdelay(10);
             }
         }

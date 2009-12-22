@@ -103,12 +103,6 @@ extern void migrate_timer(struct timer *timer, unsigned int new_cpu);
 extern void kill_timer(struct timer *timer);
 
 /*
- * Process pending timers on this CPU. This should be called periodically
- * when performing work that prevents softirqs from running in a timely manner.
- */
-extern void process_pending_timers(void);
-
-/*
  * Bootstrap initialisation. Must be called before any other timer function.
  */
 extern void timer_init(void);

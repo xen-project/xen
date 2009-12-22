@@ -34,6 +34,13 @@ void cpu_raise_softirq(unsigned int cpu, unsigned int nr);
 void raise_softirq(unsigned int nr);
 
 /*
+ * Process pending softirqs on this CPU. This should be called periodically
+ * when performing work that prevents softirqs from running in a timely manner.
+ * Use this instead of do_softirq() when you do not want to be preempted.
+ */
+void process_pending_softirqs(void);
+
+/*
  * TASKLETS -- dynamically-allocatable tasks run in softirq context
  * on at most one CPU at a time.
  */
