@@ -37,7 +37,7 @@ int xc_memshr_control(int xc_handle,
     domctl.domain = (domid_t)domid;
     op = &(domctl.u.mem_sharing_op);
     op->op = XEN_DOMCTL_MEM_SHARING_OP_CONTROL;
-    op->enable = enable;
+    op->u.enable = enable;
 
     return do_domctl(xc_handle, &domctl);
 }
@@ -56,10 +56,10 @@ int xc_memshr_nominate_gfn(int xc_handle,
     domctl.domain = (domid_t)domid;
     op = &(domctl.u.mem_sharing_op);
     op->op = XEN_DOMCTL_MEM_SHARING_OP_NOMINATE_GFN;
-    op->nominate.gfn = gfn;
+    op->u.nominate.u.gfn = gfn;
 
     ret = do_domctl(xc_handle, &domctl);
-    if(!ret) *handle = op->nominate.handle; 
+    if(!ret) *handle = op->u.nominate.handle; 
 
     return ret;
 }
@@ -78,10 +78,10 @@ int xc_memshr_nominate_gref(int xc_handle,
     domctl.domain = (domid_t)domid;
     op = &(domctl.u.mem_sharing_op);
     op->op = XEN_DOMCTL_MEM_SHARING_OP_NOMINATE_GREF;
-    op->nominate.grant_ref = gref;
+    op->u.nominate.u.grant_ref = gref;
 
     ret = do_domctl(xc_handle, &domctl);
-    if(!ret) *handle = op->nominate.handle; 
+    if(!ret) *handle = op->u.nominate.handle; 
 
     return ret;
 }
@@ -98,8 +98,8 @@ int xc_memshr_share(int xc_handle,
     domctl.domain = 0;
     op = &(domctl.u.mem_sharing_op);
     op->op = XEN_DOMCTL_MEM_SHARING_OP_SHARE;
-    op->share.source_handle = source_handle;
-    op->share.client_handle = client_handle;
+    op->u.share.source_handle = source_handle;
+    op->u.share.client_handle = client_handle;
 
     return do_domctl(xc_handle, &domctl);
 }
@@ -131,7 +131,7 @@ int xc_memshr_debug_gfn(int xc_handle,
     domctl.domain = (domid_t)domid;
     op = &(domctl.u.mem_sharing_op);
     op->op = XEN_DOMCTL_MEM_SHARING_OP_DEBUG_GFN;
-    op->debug.gfn = gfn;
+    op->u.debug.u.gfn = gfn;
 
     return do_domctl(xc_handle, &domctl);
 }
@@ -148,7 +148,7 @@ int xc_memshr_debug_mfn(int xc_handle,
     domctl.domain = (domid_t)domid;
     op = &(domctl.u.mem_sharing_op);
     op->op = XEN_DOMCTL_MEM_SHARING_OP_DEBUG_MFN;
-    op->debug.mfn = mfn;
+    op->u.debug.u.mfn = mfn;
 
     return do_domctl(xc_handle, &domctl);
 }
@@ -165,7 +165,7 @@ int xc_memshr_debug_gref(int xc_handle,
     domctl.domain = (domid_t)domid;
     op = &(domctl.u.mem_sharing_op);
     op->op = XEN_DOMCTL_MEM_SHARING_OP_DEBUG_GREF;
-    op->debug.gref = gref;
+    op->u.debug.u.gref = gref;
 
     return do_domctl(xc_handle, &domctl);
 }

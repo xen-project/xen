@@ -35,7 +35,7 @@
 #include "xen.h"
 #include "grant_table.h"
 
-#define XEN_DOMCTL_INTERFACE_VERSION 0x00000005
+#define XEN_DOMCTL_INTERFACE_VERSION 0x00000006
 
 struct xenctl_cpumap {
     XEN_GUEST_HANDLE_64(uint8) bitmap;
@@ -539,7 +539,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_ioport_mapping_t);
 #define XEN_DOMCTL_MEM_CACHEATTR_UCM 7
 struct xen_domctl_pin_mem_cacheattr {
     uint64_aligned_t start, end;
-    unsigned int type; /* XEN_DOMCTL_MEM_CACHEATTR_* */
+    uint32_t type; /* XEN_DOMCTL_MEM_CACHEATTR_* */
 };
 typedef struct xen_domctl_pin_mem_cacheattr xen_domctl_pin_mem_cacheattr_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_pin_mem_cacheattr_t);
@@ -598,11 +598,11 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_set_target_t);
 # define XEN_CPUID_INPUT_UNUSED  0xFFFFFFFF
 # define XEN_DOMCTL_set_cpuid 49
 struct xen_domctl_cpuid {
-  unsigned int  input[2];
-  unsigned int  eax;
-  unsigned int  ebx;
-  unsigned int  ecx;
-  unsigned int  edx;
+  uint32_t input[2];
+  uint32_t eax;
+  uint32_t ebx;
+  uint32_t ecx;
+  uint32_t edx;
 };
 typedef struct xen_domctl_cpuid xen_domctl_cpuid_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_cpuid_t);
@@ -661,7 +661,7 @@ struct xen_guest_tsc_info {
     uint32_t gtsc_khz;
     uint32_t incarnation;
     uint32_t pad;
-    uint64_t elapsed_nsec;
+    uint64_aligned_t elapsed_nsec;
 };
 typedef struct xen_guest_tsc_info xen_guest_tsc_info_t;
 DEFINE_XEN_GUEST_HANDLE(xen_guest_tsc_info_t);
@@ -672,12 +672,14 @@ typedef struct xen_domctl_tsc_info {
 
 #define XEN_DOMCTL_gdbsx_guestmemio     1000 /* guest mem io */
 struct xen_domctl_gdbsx_memio {
+    /* IN */
     uint64_aligned_t pgd3val;/* optional: init_mm.pgd[3] value */
     uint64_aligned_t gva;    /* guest virtual address */
     uint64_aligned_t uva;    /* user buffer virtual address */
-    int              len;    /* number of bytes to read/write */
-    int              gwr;    /* 0 = read from guest. 1 = write to guest */
-    int              remain; /* bytes remaining to be copied */
+    uint32_t         len;    /* number of bytes to read/write */
+    uint8_t          gwr;    /* 0 = read from guest. 1 = write to guest */
+    /* OUT */
+    uint32_t         remain; /* bytes remaining to be copied */
 };
 
 #define XEN_DOMCTL_gdbsx_pausevcpu   1001  
@@ -688,10 +690,10 @@ struct xen_domctl_gdbsx_pauseunp_vcpu { /* pause/unpause a vcpu */
 
 #define XEN_DOMCTL_gdbsx_domstatus   1003  
 struct xen_domctl_gdbsx_domstatus {
-    int              paused;     /* is the domain paused */
+    /* OUT */
+    uint8_t          paused;     /* is the domain paused */
     uint32_t         vcpu_id;    /* any vcpu in an event? */
     uint32_t         vcpu_ev;    /* if yes, what event? */
-
 };
 
 /*
@@ -720,11 +722,11 @@ struct xen_domctl_mem_event_op {
     uint32_t       mode;         /* XEN_DOMCTL_MEM_EVENT_ENABLE_* */
 
     /* OP_ENABLE */
-    unsigned long  shared_addr;  /* IN:  Virtual address of shared page */
-    unsigned long  ring_addr;    /* IN:  Virtual address of ring page */
+    uint64_aligned_t shared_addr;  /* IN:  Virtual address of shared page */
+    uint64_aligned_t ring_addr;    /* IN:  Virtual address of ring page */
 
     /* Other OPs */
-    unsigned long  gfn;          /* IN:  gfn of page being operated on */
+    uint64_aligned_t gfn;          /* IN:  gfn of page being operated on */
 };
 typedef struct xen_domctl_mem_event_op xen_domctl_mem_event_op_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_mem_event_op_t);
@@ -747,30 +749,30 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_mem_event_op_t);
 #define XEN_DOMCTL_MEM_SHARING_C_HANDLE_INVALID  (-9)
 
 struct xen_domctl_mem_sharing_op {
-    uint8_t       op;            /* XEN_DOMCTL_MEM_EVENT_OP_* */
+    uint8_t op; /* XEN_DOMCTL_MEM_EVENT_OP_* */
 
     union {
-        int enable;                       /* for OP_CONTROL            */
+        uint8_t enable;                   /* OP_CONTROL                */
 
-        struct mem_sharing_op_nominate {  /* for OP_NOMINATE           */
+        struct mem_sharing_op_nominate {  /* OP_NOMINATE_xxx           */
             union {
-                unsigned long gfn;        /* IN: gfn to nominate       */
+                uint64_aligned_t gfn;     /* IN: gfn to nominate       */
                 uint32_t      grant_ref;  /* IN: grant ref to nominate */
-            };
-            uint64_t       handle;        /* OUT: the handle           */
+            } u;
+            uint64_aligned_t  handle;     /* OUT: the handle           */
         } nominate;
-        struct mem_sharing_op_share {
-            uint64_t source_handle;       /* IN: handle to the source page */
-            uint64_t client_handle;       /* IN: handle to the client page */
+        struct mem_sharing_op_share {     /* OP_SHARE */
+            uint64_aligned_t source_handle; /* IN: handle to the source page */
+            uint64_aligned_t client_handle; /* IN: handle to the client page */
         } share; 
-        struct mem_sharing_op_debug {
+        struct mem_sharing_op_debug {     /* OP_DEBUG_xxx */
             union {
-                unsigned long  gfn;        /* IN: gfn to debug          */
-                unsigned long  mfn;        /* IN: mfn to debug          */
+                uint64_aligned_t gfn;      /* IN: gfn to debug          */
+                uint64_aligned_t mfn;      /* IN: mfn to debug          */
                 grant_ref_t    gref;       /* IN: gref to debug         */
-            };
+            } u;
         } debug;
-    };
+    } u;
 };
 typedef struct xen_domctl_mem_sharing_op xen_domctl_mem_sharing_op_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_mem_sharing_op_t);

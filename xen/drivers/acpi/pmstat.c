@@ -212,37 +212,37 @@ static int get_cpufreq_para(struct xen_sysctl_pm_op *op)
     list_for_each(pos, &cpufreq_governor_list)
         gov_num++;
 
-    if ( (op->get_para.cpu_num  != cpus_weight(policy->cpus)) ||
-         (op->get_para.freq_num != pmpt->perf.state_count)    ||
-         (op->get_para.gov_num  != gov_num) )
+    if ( (op->u.get_para.cpu_num  != cpus_weight(policy->cpus)) ||
+         (op->u.get_para.freq_num != pmpt->perf.state_count)    ||
+         (op->u.get_para.gov_num  != gov_num) )
     {
-        op->get_para.cpu_num =  cpus_weight(policy->cpus);
-        op->get_para.freq_num = pmpt->perf.state_count;
-        op->get_para.gov_num  = gov_num;
+        op->u.get_para.cpu_num =  cpus_weight(policy->cpus);
+        op->u.get_para.freq_num = pmpt->perf.state_count;
+        op->u.get_para.gov_num  = gov_num;
         return -EAGAIN;
     }
 
-    if ( !(affected_cpus = xmalloc_array(uint32_t, op->get_para.cpu_num)) )
+    if ( !(affected_cpus = xmalloc_array(uint32_t, op->u.get_para.cpu_num)) )
         return -ENOMEM;
-    memset(affected_cpus, 0, op->get_para.cpu_num * sizeof(uint32_t));
+    memset(affected_cpus, 0, op->u.get_para.cpu_num * sizeof(uint32_t));
     for_each_cpu_mask(cpu, policy->cpus)
         affected_cpus[j++] = cpu;
-    ret = copy_to_guest(op->get_para.affected_cpus,
-                       affected_cpus, op->get_para.cpu_num);
+    ret = copy_to_guest(op->u.get_para.affected_cpus,
+                       affected_cpus, op->u.get_para.cpu_num);
     xfree(affected_cpus);
     if ( ret )
         return ret;
 
     if ( !(scaling_available_frequencies =
-        xmalloc_array(uint32_t, op->get_para.freq_num)) )
+        xmalloc_array(uint32_t, op->u.get_para.freq_num)) )
         return -ENOMEM;
     memset(scaling_available_frequencies, 0,
-           op->get_para.freq_num * sizeof(uint32_t));
-    for ( i = 0; i < op->get_para.freq_num; i++ )
+           op->u.get_para.freq_num * sizeof(uint32_t));
+    for ( i = 0; i < op->u.get_para.freq_num; i++ )
         scaling_available_frequencies[i] =
                         pmpt->perf.states[i].core_frequency * 1000;
-    ret = copy_to_guest(op->get_para.scaling_available_frequencies,
-                   scaling_available_frequencies, op->get_para.freq_num);
+    ret = copy_to_guest(op->u.get_para.scaling_available_frequencies,
+                   scaling_available_frequencies, op->u.get_para.freq_num);
     xfree(scaling_available_frequencies);
     if ( ret )
         return ret;
@@ -258,47 +258,47 @@ static int get_cpufreq_para(struct xen_sysctl_pm_op *op)
         xfree(scaling_available_governors);
         return ret;
     }
-    ret = copy_to_guest(op->get_para.scaling_available_governors,
+    ret = copy_to_guest(op->u.get_para.scaling_available_governors,
                 scaling_available_governors, gov_num * CPUFREQ_NAME_LEN);
     xfree(scaling_available_governors);
     if ( ret )
         return ret;
 
-    op->get_para.cpuinfo_cur_freq =
+    op->u.get_para.cpuinfo_cur_freq =
         cpufreq_driver->get ? cpufreq_driver->get(op->cpuid) : policy->cur;
-    op->get_para.cpuinfo_max_freq = policy->cpuinfo.max_freq;
-    op->get_para.cpuinfo_min_freq = policy->cpuinfo.min_freq;
-    op->get_para.scaling_cur_freq = policy->cur;
-    op->get_para.scaling_max_freq = policy->max;
-    op->get_para.scaling_min_freq = policy->min;
+    op->u.get_para.cpuinfo_max_freq = policy->cpuinfo.max_freq;
+    op->u.get_para.cpuinfo_min_freq = policy->cpuinfo.min_freq;
+    op->u.get_para.scaling_cur_freq = policy->cur;
+    op->u.get_para.scaling_max_freq = policy->max;
+    op->u.get_para.scaling_min_freq = policy->min;
 
     if ( cpufreq_driver->name )
-        strlcpy(op->get_para.scaling_driver, 
+        strlcpy(op->u.get_para.scaling_driver, 
             cpufreq_driver->name, CPUFREQ_NAME_LEN);
     else
-        strlcpy(op->get_para.scaling_driver, "Unknown", CPUFREQ_NAME_LEN);
+        strlcpy(op->u.get_para.scaling_driver, "Unknown", CPUFREQ_NAME_LEN);
 
     if ( policy->governor->name )
-        strlcpy(op->get_para.scaling_governor, 
+        strlcpy(op->u.get_para.scaling_governor, 
             policy->governor->name, CPUFREQ_NAME_LEN);
     else
-        strlcpy(op->get_para.scaling_governor, "Unknown", CPUFREQ_NAME_LEN);
+        strlcpy(op->u.get_para.scaling_governor, "Unknown", CPUFREQ_NAME_LEN);
 
     /* governor specific para */
-    if ( !strnicmp(op->get_para.scaling_governor, 
+    if ( !strnicmp(op->u.get_para.scaling_governor, 
                    "userspace", CPUFREQ_NAME_LEN) )
     {
-        op->get_para.u.userspace.scaling_setspeed = policy->cur;
+        op->u.get_para.u.userspace.scaling_setspeed = policy->cur;
     }
 
-    if ( !strnicmp(op->get_para.scaling_governor, 
+    if ( !strnicmp(op->u.get_para.scaling_governor, 
                    "ondemand", CPUFREQ_NAME_LEN) )
     {
         ret = get_cpufreq_ondemand_para(
-            &op->get_para.u.ondemand.sampling_rate_max,
-            &op->get_para.u.ondemand.sampling_rate_min,
-            &op->get_para.u.ondemand.sampling_rate,
-            &op->get_para.u.ondemand.up_threshold); 
+            &op->u.get_para.u.ondemand.sampling_rate_max,
+            &op->u.get_para.u.ondemand.sampling_rate_min,
+            &op->u.get_para.u.ondemand.sampling_rate,
+            &op->u.get_para.u.ondemand.up_threshold); 
     }
 
     return ret;
@@ -317,7 +317,7 @@ static int set_cpufreq_gov(struct xen_sysctl_pm_op *op)
 
     memcpy(&new_policy, old_policy, sizeof(struct cpufreq_policy));
 
-    new_policy.governor = __find_governor(op->set_gov.scaling_governor);
+    new_policy.governor = __find_governor(op->u.set_gov.scaling_governor);
     if (new_policy.governor == NULL)
         return -EINVAL;
 
@@ -336,14 +336,14 @@ static int set_cpufreq_para(struct xen_sysctl_pm_op *op)
     if ( !policy || !policy->governor )
         return -EINVAL;
 
-    switch(op->set_para.ctrl_type)
+    switch(op->u.set_para.ctrl_type)
     {
     case SCALING_MAX_FREQ:
     {
         struct cpufreq_policy new_policy;
 
         memcpy(&new_policy, policy, sizeof(struct cpufreq_policy));
-        new_policy.max = op->set_para.ctrl_value;
+        new_policy.max = op->u.set_para.ctrl_value;
         ret = __cpufreq_set_policy(policy, &new_policy);
 
         break;
@@ -354,7 +354,7 @@ static int set_cpufreq_para(struct xen_sysctl_pm_op *op)
         struct cpufreq_policy new_policy;
 
         memcpy(&new_policy, policy, sizeof(struct cpufreq_policy));
-        new_policy.min = op->set_para.ctrl_value;
+        new_policy.min = op->u.set_para.ctrl_value;
         ret = __cpufreq_set_policy(policy, &new_policy);
 
         break;
@@ -362,7 +362,7 @@ static int set_cpufreq_para(struct xen_sysctl_pm_op *op)
 
     case SCALING_SETSPEED:
     {
-        unsigned int freq =op->set_para.ctrl_value;
+        unsigned int freq =op->u.set_para.ctrl_value;
 
         if ( !strnicmp(policy->governor->name,
                        "userspace", CPUFREQ_NAME_LEN) )
@@ -375,7 +375,7 @@ static int set_cpufreq_para(struct xen_sysctl_pm_op *op)
 
     case SAMPLING_RATE:
     {
-        unsigned int sampling_rate = op->set_para.ctrl_value;
+        unsigned int sampling_rate = op->u.set_para.ctrl_value;
 
         if ( !strnicmp(policy->governor->name,
                        "ondemand", CPUFREQ_NAME_LEN) )
@@ -388,7 +388,7 @@ static int set_cpufreq_para(struct xen_sysctl_pm_op *op)
 
     case UP_THRESHOLD:
     {
-        unsigned int up_threshold = op->set_para.ctrl_value;
+        unsigned int up_threshold = op->u.set_para.ctrl_value;
 
         if ( !strnicmp(policy->governor->name,
                        "ondemand", CPUFREQ_NAME_LEN) )
@@ -412,7 +412,7 @@ static int get_cpufreq_avgfreq(struct xen_sysctl_pm_op *op)
     if ( !op || !cpu_online(op->cpuid) )
         return -EINVAL;
 
-    op->get_avgfreq = cpufreq_driver_getavg(op->cpuid, USR_GETAVG);
+    op->u.get_avgfreq = cpufreq_driver_getavg(op->cpuid, USR_GETAVG);
 
     return 0;
 }
@@ -424,9 +424,9 @@ static int get_cputopo (struct xen_sysctl_pm_op *op)
     XEN_GUEST_HANDLE_64(uint32) cpu_to_socket_arr;
     int arr_size, ret=0;
 
-    cpu_to_core_arr = op->get_topo.cpu_to_core;
-    cpu_to_socket_arr = op->get_topo.cpu_to_socket;
-    arr_size= min_t(uint32_t, op->get_topo.max_cpus, NR_CPUS);
+    cpu_to_core_arr = op->u.get_topo.cpu_to_core;
+    cpu_to_socket_arr = op->u.get_topo.cpu_to_socket;
+    arr_size= min_t(uint32_t, op->u.get_topo.max_cpus, NR_CPUS);
 
     if ( guest_handle_is_null( cpu_to_core_arr ) ||
             guest_handle_is_null(  cpu_to_socket_arr) )
@@ -458,7 +458,7 @@ static int get_cputopo (struct xen_sysctl_pm_op *op)
         }
     }
 
-    op->get_topo.nr_cpus = nr_cpus + 1;
+    op->u.get_topo.nr_cpus = nr_cpus + 1;
 out:
     return ret;
 }
@@ -519,33 +519,33 @@ int do_pm_op(struct xen_sysctl_pm_op *op)
         uint32_t saved_value;
 
         saved_value = sched_smt_power_savings;
-        sched_smt_power_savings = !!op->set_sched_opt_smt;
-        op->set_sched_opt_smt = saved_value;
+        sched_smt_power_savings = !!op->u.set_sched_opt_smt;
+        op->u.set_sched_opt_smt = saved_value;
 
         break;
     }
 
     case XEN_SYSCTL_pm_op_set_vcpu_migration_delay:
     {
-        set_vcpu_migration_delay(op->set_vcpu_migration_delay);
+        set_vcpu_migration_delay(op->u.set_vcpu_migration_delay);
         break;
     }
 
     case XEN_SYSCTL_pm_op_get_vcpu_migration_delay:
     {
-        op->get_vcpu_migration_delay = get_vcpu_migration_delay();
+        op->u.get_vcpu_migration_delay = get_vcpu_migration_delay();
         break;
     }
 
     case XEN_SYSCTL_pm_op_get_max_cstate:
     {
-        op->get_max_cstate = acpi_get_cstate_limit();
+        op->u.get_max_cstate = acpi_get_cstate_limit();
         break;
     }
 
     case XEN_SYSCTL_pm_op_set_max_cstate:
     {
-        acpi_set_cstate_limit(op->set_max_cstate);
+        acpi_set_cstate_limit(op->u.set_max_cstate);
         break;
     }
 
