@@ -95,6 +95,7 @@ int iommu_domain_init(struct domain *domain)
 
     spin_lock_init(&hd->mapping_lock);
     INIT_LIST_HEAD(&hd->g2m_ioport_list);
+    INIT_LIST_HEAD(&hd->mapped_rmrrs);
 
     if ( !iommu_enabled )
         return 0;
@@ -187,8 +188,9 @@ static int iommu_populate_page_table(struct domain *d)
 void iommu_domain_destroy(struct domain *d)
 {
     struct hvm_iommu *hd  = domain_hvm_iommu(d);
-    struct list_head *ioport_list, *tmp;
+    struct list_head *ioport_list, *rmrr_list, *tmp;
     struct g2m_ioport *ioport;
+    struct mapped_rmrr *mrmrr;
 
     if ( !iommu_enabled || !hd->platform_ops )
         return;
@@ -210,6 +212,13 @@ void iommu_domain_destroy(struct domain *d)
             ioport = list_entry(ioport_list, struct g2m_ioport, list);
             list_del(&ioport->list);
             xfree(ioport);
+        }
+
+        list_for_each_safe ( rmrr_list, tmp, &hd->mapped_rmrrs )
+        {
+            mrmrr = list_entry(rmrr_list, struct mapped_rmrr, list);
+            list_del(&mrmrr->list);
+            xfree(mrmrr);
         }
     }
 

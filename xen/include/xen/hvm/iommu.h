@@ -29,12 +29,19 @@ struct g2m_ioport {
     unsigned int np;
 };
 
+struct mapped_rmrr {
+    struct list_head list;
+    u64 base;
+    u64 end;
+};
+
 struct hvm_iommu {
     u64 pgd_maddr;                 /* io page directory machine address */
     spinlock_t mapping_lock;       /* io page table lock */
     int agaw;     /* adjusted guest address width, 0 is level 2 30-bit */
     struct list_head g2m_ioport_list;  /* guest to machine ioport mapping */
     u64 iommu_bitmap;              /* bitmap of iommu(s) that the domain uses */
+    struct list_head mapped_rmrrs;
 
     /* amd iommu support */
     int domain_id;

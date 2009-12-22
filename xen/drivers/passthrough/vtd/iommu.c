@@ -551,6 +551,8 @@ static void dma_pte_clear_one(struct domain *domain, u64 addr)
     u64 pg_maddr;
     int flush_dev_iotlb;
     int iommu_domid;
+    struct list_head *rmrr_list, *tmp;
+    struct mapped_rmrr *mrmrr;
 
     spin_lock(&hd->mapping_lock);
     /* get last level pte */
@@ -592,6 +594,22 @@ static void dma_pte_clear_one(struct domain *domain, u64 addr)
     }
 
     unmap_vtd_domain_page(page);
+
+    /* if the cleared address is between mapped RMRR region,
+     * remove the mapped RMRR
+     */
+    spin_lock(&pcidevs_lock);
+    list_for_each_safe ( rmrr_list, tmp, &hd->mapped_rmrrs )
+    {
+        mrmrr = list_entry(rmrr_list, struct mapped_rmrr, list);
+        if ( addr >= mrmrr->base && addr <= mrmrr->end )
+        {
+            list_del(&mrmrr->list);
+            xfree(mrmrr);
+            break;
+        }
+    }
+    spin_unlock(&pcidevs_lock);
 }
 
 static void iommu_free_pagetable(u64 pt_maddr, int level)
@@ -1261,21 +1279,6 @@ static int domain_context_mapping(struct domain *domain, u8 bus, u8 devfn)
     u8 secbus;
     struct pci_dev *pdev = pci_get_pdev(bus, devfn);
 
-    if ( pdev == NULL )
-    {
-        /* We can reach here by setup_dom0_rmrr() -> iommu_prepare_rmrr_dev()
-         * -> domain_context_mapping().
-         * In the case a user enables VT-d and disables USB (that usually needs
-         * RMRR) in BIOS, we can't discover the BDF of the USB controller in
-         * setup_dom0_devices(), but the ACPI RMRR structures may still contain
-         * the BDF and at last pci_get_pdev() returns NULL here.
-         */
-        gdprintk(XENLOG_WARNING VTDPREFIX,
-                "domain_context_mapping: can't find bdf = %x:%x.%x\n",
-                 bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
-        return 0;
-    }
-
     drhd = acpi_find_matched_drhd_unit(pdev);
     if ( !drhd )
         return -ENODEV;
@@ -1601,17 +1604,36 @@ static int intel_iommu_unmap_page(struct domain *d, unsigned long gfn)
     return 0;
 }
 
-static int iommu_prepare_rmrr_dev(struct domain *d,
-                                  struct acpi_rmrr_unit *rmrr,
-                                  u8 bus, u8 devfn)
+static int domain_rmrr_mapped(struct domain *d,
+                              struct acpi_rmrr_unit *rmrr)
 {
-    int ret = 0;
+    struct hvm_iommu *hd = domain_hvm_iommu(d);
+    struct mapped_rmrr *mrmrr;
+
+    list_for_each_entry( mrmrr, &hd->mapped_rmrrs, list )
+    {
+        if ( mrmrr->base == rmrr->base_address &&
+             mrmrr->end == rmrr->end_address )
+            return 1;
+    }
+
+    return 0;
+}
+
+static int rmrr_identity_mapping(struct domain *d,
+                                 struct acpi_rmrr_unit *rmrr)
+{
     u64 base, end;
     unsigned long base_pfn, end_pfn;
+    struct mapped_rmrr *mrmrr;
+    struct hvm_iommu *hd = domain_hvm_iommu(d);
 
     ASSERT(spin_is_locked(&pcidevs_lock));
     ASSERT(rmrr->base_address < rmrr->end_address);
-    
+
+    if ( domain_rmrr_mapped(d, rmrr) )
+        return 0;
+
     base = rmrr->base_address & PAGE_MASK_4K;
     base_pfn = base >> PAGE_SHIFT_4K;
     end = PAGE_ALIGN_4K(rmrr->end_address);
@@ -1619,13 +1641,19 @@ static int iommu_prepare_rmrr_dev(struct domain *d,
 
     while ( base_pfn < end_pfn )
     {
-        intel_iommu_map_page(d, base_pfn, base_pfn);
+        if ( intel_iommu_map_page(d, base_pfn, base_pfn) )
+            return -1;
         base_pfn++;
     }
 
-    ret = domain_context_mapping(d, bus, devfn);
+    mrmrr = xmalloc(struct mapped_rmrr);
+    if ( !mrmrr )
+        return -ENOMEM;
+    mrmrr->base = rmrr->base_address;
+    mrmrr->end = rmrr->end_address;
+    list_add_tail(&mrmrr->list, &hd->mapped_rmrrs);
 
-    return ret;
+    return 0;
 }
 
 static int intel_iommu_add_device(struct pci_dev *pdev)
@@ -1651,12 +1679,10 @@ static int intel_iommu_add_device(struct pci_dev *pdev)
     {
         if ( PCI_BUS(bdf) == pdev->bus && PCI_DEVFN2(bdf) == pdev->devfn )
         {
-            ret = iommu_prepare_rmrr_dev(pdev->domain, rmrr,
-                                         pdev->bus, pdev->devfn);
+            ret = rmrr_identity_mapping(pdev->domain, rmrr);
             if ( ret )
                 gdprintk(XENLOG_ERR VTDPREFIX,
                          "intel_iommu_add_device: RMRR mapping failed\n");
-            break;
         }
     }
 
@@ -1690,11 +1716,8 @@ static int intel_iommu_remove_device(struct pci_dev *pdev)
 
 static void setup_dom0_devices(struct domain *d)
 {
-    struct hvm_iommu *hd;
     struct pci_dev *pdev;
     int bus, devfn;
-
-    hd = domain_hvm_iommu(d);
 
     spin_lock(&pcidevs_lock);
     for ( bus = 0; bus < 256; bus++ )
@@ -1829,7 +1852,7 @@ static void setup_dom0_rmrr(struct domain *d)
     spin_lock(&pcidevs_lock);
     for_each_rmrr_device ( rmrr, bdf, i )
     {
-        ret = iommu_prepare_rmrr_dev(d, rmrr, PCI_BUS(bdf), PCI_DEVFN2(bdf));
+        ret = rmrr_identity_mapping(d, rmrr);
         if ( ret )
             dprintk(XENLOG_ERR VTDPREFIX,
                      "IOMMU: mapping reserved region failed\n");
@@ -1973,25 +1996,27 @@ static int intel_iommu_assign_device(struct domain *d, u8 bus, u8 devfn)
     if ( ret )
         goto done;
 
+    /* FIXME: Because USB RMRR conflicts with guest bios region,
+     * ignore USB RMRR temporarily.
+     */
+    if ( is_usb_device(bus, devfn) )
+    {
+        ret = 0;
+        goto done;
+    }
+
     /* Setup rmrr identity mapping */
     for_each_rmrr_device( rmrr, bdf, i )
     {
         if ( PCI_BUS(bdf) == bus && PCI_DEVFN2(bdf) == devfn )
         {
-            /* FIXME: Because USB RMRR conflicts with guest bios region,
-             * ignore USB RMRR temporarily.
-             */
-            if ( is_usb_device(bus, devfn) )
-            {
-                ret = 0;
-                goto done;
-            }
-
-            ret = iommu_prepare_rmrr_dev(d, rmrr, bus, devfn);
+            ret = rmrr_identity_mapping(d, rmrr);
             if ( ret )
+            {
                 gdprintk(XENLOG_ERR VTDPREFIX,
                          "IOMMU: mapping reserved region failed\n");
-            goto done; 
+                goto done;
+            }
         }
     }
 
