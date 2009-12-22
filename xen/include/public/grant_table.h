@@ -392,6 +392,8 @@ DEFINE_XEN_GUEST_HANDLE(gnttab_transfer_t);
 #define GNTCOPY_source_gref       (1<<_GNTCOPY_source_gref)
 #define _GNTCOPY_dest_gref        (1)
 #define GNTCOPY_dest_gref         (1<<_GNTCOPY_dest_gref)
+#define _GNTCOPY_can_fail         (2)
+#define GNTCOPY_can_fail          (1<<_GNTCOPY_can_fail) 
 
 #define GNTTABOP_copy                 5
 typedef struct gnttab_copy {
@@ -539,6 +541,9 @@ DEFINE_XEN_GUEST_HANDLE(gnttab_get_version_t);
 #define _GNTMAP_contains_pte    (4)
 #define GNTMAP_contains_pte     (1<<_GNTMAP_contains_pte)
 
+#define _GNTMAP_can_fail        (5)
+#define GNTMAP_can_fail         (1<<_GNTMAP_can_fail)
+
 /*
  * Bits to be placed in guest kernel available PTE bits (architecture
  * dependent; only supported when XENFEAT_gnttab_map_avail_bits is set).
@@ -561,6 +566,7 @@ DEFINE_XEN_GUEST_HANDLE(gnttab_get_version_t);
 #define GNTST_bad_page         (-9) /* Specified page was invalid for op.    */
 #define GNTST_bad_copy_arg    (-10) /* copy arguments cross page boundary.   */
 #define GNTST_address_too_big (-11) /* transfer page address too large.      */
+#define GNTST_eagain          (-12) /* Could not map at the moment. Retry.   */
 
 #define GNTTABOP_error_msgs {                   \
     "okay",                                     \
@@ -574,7 +580,8 @@ DEFINE_XEN_GUEST_HANDLE(gnttab_get_version_t);
     "permission denied",                        \
     "bad page",                                 \
     "copy arguments cross page boundary",       \
-    "page address size too large"               \
+    "page address size too large",              \
+    "could not map at the moment, retry"        \
 }
 
 #endif /* __XEN_PUBLIC_GRANT_TABLE_H__ */
