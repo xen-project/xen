@@ -25,10 +25,13 @@
  */
 
 #include <stdint.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <setjmp.h>
 #include <signal.h>
+#include <unistd.h>
+#include <getopt.h>
 
 static void cpuid(uint32_t idx,
                   uint32_t *eax,
@@ -66,8 +69,6 @@ static int check_for_xen(int pv_context)
 
  found:
     cpuid(base + 1, &eax, &ebx, &ecx, &edx, pv_context);
-    printf("Running in %s context on Xen v%d.%d.\n",
-           pv_context ? "PV" : "HVM", (uint16_t)(eax >> 16), (uint16_t)eax);
     return 1;
 }
 
@@ -77,22 +78,82 @@ void sigill_handler(int sig)
     longjmp(sigill_jmp, 1);
 }
 
-int main(void)
+static void usage(void)
 {
+    printf("Usage: xen_detect [options]\n");
+    printf("Options:\n");
+    printf("  -h, --help    Display this information\n");
+    printf("  -q, --quiet   Quiesce normal informational output\n");
+    printf("  -P, --pv      Exit status 1 if not running as PV guest\n");
+    printf("  -H, --hvm     Exit status 1 if not running as HVM guest.\n");
+    printf("  -N, --none    Exit status 1 if running on Xen (PV or HVM)\n");
+}
+
+int main(int argc, char **argv)
+{
+    enum { XEN_PV = 1, XEN_HVM = 2, XEN_NONE = 3 } detected = 0, expected = 0;
+    uint32_t version = 0;
+    int ch, quiet = 0;
+
+    const static char sopts[] = "hqPHN";
+    const static struct option lopts[] = {
+        { "help",  0, NULL, 'h' },
+        { "quiet", 0, NULL, 'q' },
+        { "pv",    0, NULL, 'P' },
+        { "hvm",   0, NULL, 'H' },
+        { "none",  0, NULL, 'N' },
+        { 0, 0, 0, 0}
+    };
+
+    while ( (ch = getopt_long(argc, argv, sopts, lopts, NULL)) != -1 )
+    {
+        switch ( ch )
+        {
+        case 'q':
+            quiet = 1;
+            break;
+        case 'P':
+            expected = XEN_PV;
+            break;
+        case 'H':
+            expected = XEN_HVM;
+            break;
+        case 'N':
+            expected = XEN_NONE;
+            break;
+        default:
+            usage();
+            exit(1);
+        }
+    }
+
     /* Check for execution in HVM context. */
-    if ( check_for_xen(0) )
-        return 0;
+    detected = XEN_HVM;
+    if ( (version = check_for_xen(0)) != 0 )
+        goto out;
 
     /*
      * Set up a signal handler to test the paravirtualised CPUID instruction.
      * If executed outside Xen PV context, the extended opcode will fault, we
      * will longjmp via the signal handler, and print "Not running on Xen".
      */
+    detected = XEN_PV;
     if ( !setjmp(sigill_jmp)
          && (signal(SIGILL, sigill_handler) != SIG_ERR)
-         && check_for_xen(1) )
-        return 0;
+         && ((version = check_for_xen(1)) != 0) )
+        goto out;
 
-    printf("Not running on Xen.\n");
-    return 0;
+    detected = XEN_NONE;
+
+ out:
+    if ( quiet )
+        /* nothing */;
+    else if ( detected == XEN_NONE )
+        printf("Not running on Xen.\n");
+    else
+        printf("Running in %s context on Xen v%d.%d.\n",
+               (detected == XEN_PV) ? "PV" : "HVM",
+               (uint16_t)(version >> 16), (uint16_t)version);
+
+    return expected && (expected != detected);
 }
