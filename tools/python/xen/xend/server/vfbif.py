@@ -6,8 +6,8 @@ import xen.xend
 import os
 
 CONFIG_ENTRIES = ['type', 'vncdisplay', 'vnclisten', 'vncpasswd', 'vncunused',
-                  'videoram', 'display', 'xauthority', 'keymap', 'vnc', 'sdl',
-                  'uuid', 'location', 'protocol', 'opengl']
+                  'display', 'xauthority', 'keymap', 'vnc', 'sdl', 'uuid',
+                  'location', 'protocol', 'opengl']
 
 class VfbifController(DevController):
     """Virtual frame buffer controller. Handles all vfb devices for a domain.
