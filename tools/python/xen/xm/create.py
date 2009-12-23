@@ -503,12 +503,16 @@ gopts.var('fdb', val='FILE',
           fn=set_value, default='',
           use="Path to fdb")
 
+gopts.var('parallel', val='FILE',
+          fn=set_value, default='',
+          use="Path to parallel or pty or vc")
+
 gopts.var('serial', val='FILE',
           fn=set_value, default='',
           use="Path to serial or pty or vc")
 
-gopts.var('monitor', val='no|yes',
-          fn=set_bool, default=0,
+gopts.var('monitor', val='0|1|FILE',
+          fn=set_value, default=1,
           use="""Should the device model use monitor?""")
 
 gopts.var('localtime', val='no|yes',
@@ -737,6 +741,12 @@ def configure_image(vals):
         config_image.append(['root', cmdline_root])
     if vals.videoram:
         config_image.append(['videoram', vals.videoram])
+    if vals.parallel:
+        config_image.append(['parallel', vals.parallel])
+    if vals.serial:
+        config_image.append(['serial', vals.serial])
+    if vals.monitor:
+        config_image.append(['monitor', vals.monitor])
     if vals.extra:
         config_image.append(['args', vals.extra])
     if vals.superpages:
@@ -1052,12 +1062,11 @@ def configure_hvm(config_image, vals):
              'isa',
              'keymap',
              'localtime',
-             'monitor',
              'nographic',
              'opengl', 'oos',
              'pae', 'pci', 'pci_msitranslate', 'pci_power_mgmt',
              'rtc_timeoffset',
-             'sdl', 'serial', 'soundhw', 'stdvga',
+             'sdl', 'soundhw', 'stdvga',
              'timer_mode',
              'usb', 'usbdevice',
              'vcpus', 'vnc', 'vncconsole', 'vncdisplay', 'vnclisten',

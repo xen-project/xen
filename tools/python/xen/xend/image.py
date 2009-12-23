@@ -368,8 +368,17 @@ class ImageHandler:
         if not has_sdl and not has_vnc :
             ret.append('-nographic')
 
-        if int(vmConfig['platform'].get('monitor', 0)) != 0:
-            ret = ret + ['-monitor', 'vc']
+        if vmConfig['platform'].get('parallel'):
+            ret = ret + ["-parallel", vmConfig['platform'].get('parallel')]
+
+        if type(vmConfig['platform'].get('monitor', 0)) is int:
+            if int(vmConfig['platform'].get('monitor', 0)) != 0:
+                ret = ret + ['-monitor', 'vc']
+            else:
+                ret = ret + ['-monitor', 'null']
+        else:
+            ret = ret + ['-monitor', vmConfig['platform'].get('monitor', 0)]
+
         return ret
 
     def getDeviceModelArgs(self, restore = False):
@@ -756,9 +765,10 @@ class LinuxImageHandler(ImageHandler):
 
     def parseDeviceModelArgs(self, vmConfig):
         ret = ImageHandler.parseDeviceModelArgs(self, vmConfig)
-        # Equivalent to old xenconsoled behaviour. Should make
-        # it configurable in future
-        ret = ["-serial", "pty"] + ret
+        if vmConfig['platform'].get('serial'):
+            ret = ["-serial", vmConfig['platform'].get('serial')] + ret
+        else:
+            ret = ["-serial", "pty"] + ret
         return ret
 
     def getDeviceModelArgs(self, restore = False):
