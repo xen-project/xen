@@ -222,8 +222,8 @@ struct item_head
 
 struct disk_child
 {
-  unsigned long       dc_block_number;              /* Disk child's block number. */
-  unsigned short      dc_size;		            /* Disk child's used space.   */
+  __u32		dc_block_number;		/* Disk child's block number. */
+  __u16		dc_size;			/* Disk child's used space.   */
 };
 
 #define DC_SIZE (sizeof (struct disk_child))
