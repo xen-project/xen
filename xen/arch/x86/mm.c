@@ -4304,6 +4304,9 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
 
         domain_lock(d);
 
+        if ( page )
+            put_page(page);
+
         /* Remove previously mapped page if it was present. */
         prev_mfn = gmfn_to_mfn(d, xatp.gpfn);
         if ( mfn_valid(prev_mfn) )
@@ -4326,9 +4329,6 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         rc = guest_physmap_add_page(d, xatp.gpfn, mfn, 0);
 
         domain_unlock(d);
-
-        if ( page )
-            put_page(page);
 
         rcu_unlock_domain(d);
 
