@@ -644,6 +644,14 @@ int uart_exists(uint16_t uart_base)
     return ((b == 0) && (c == 0xf));
 }
 
+int lpt_exists(uint16_t lpt_base)
+{
+    /* Idea taken from linux-2.6.31.5:parport_pc.c */
+    uint16_t control = lpt_base + 2;
+    outb(control, 0xc);
+    return ((inb(control) & 0xf) == 0xc);
+}
+
 int hpet_exists(unsigned long hpet_base)
 {
     uint32_t hpet_id = *(uint32_t *)hpet_base;

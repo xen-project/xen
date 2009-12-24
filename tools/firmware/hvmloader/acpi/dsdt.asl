@@ -66,6 +66,7 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
        Field(BIOS, ByteAcc, NoLock, Preserve) {
            UAR1, 1,
            UAR2, 1,
+           LTP1, 1,
            HPET, 1,
            Offset(4),
            PMIN, 32,
@@ -394,7 +395,11 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
                     Name (_UID, 0x02)
                     Method (_STA, 0, NotSerialized)
                     {
-                        Return (0x0F)
+                        If(LEqual(\_SB.LTP1, 0)) {
+                            Return(0x00)
+                        } Else {
+                            Return(0x0F)
+                        }
                     }
 
                     Name (_CRS, ResourceTemplate()

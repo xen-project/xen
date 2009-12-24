@@ -743,6 +743,7 @@ int main(void)
     memset(bios_info, 0, sizeof(*bios_info));
     bios_info->com1_present = uart_exists(0x3f8);
     bios_info->com2_present = uart_exists(0x2f8);
+    bios_info->lpt1_present = lpt_exists(0x378);
     bios_info->hpet_present = hpet_exists(ACPI_HPET_ADDRESS);
     bios_info->pci_min = pci_mem_start;
     bios_info->pci_len = pci_mem_end - pci_mem_start;

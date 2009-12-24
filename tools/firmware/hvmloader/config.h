@@ -54,7 +54,8 @@ extern unsigned long pci_mem_start, pci_mem_end;
 struct bios_info {
     uint8_t  com1_present:1;    /* 0[0] - System has COM1? */
     uint8_t  com2_present:1;    /* 0[1] - System has COM2? */
-    uint8_t  hpet_present:1;    /* 0[2] - System has HPET? */
+    uint8_t  lpt1_present:1;    /* 0[2] - System has LPT1? */
+    uint8_t  hpet_present:1;    /* 0[3] - System has HPET? */
     uint32_t pci_min, pci_len;  /* 4, 8 - PCI I/O hole boundaries */
     uint32_t madt_csum_addr;    /* 12   - Address of MADT checksum */
     uint32_t madt_lapic0_addr;  /* 16   - Address of first MADT LAPIC struct */

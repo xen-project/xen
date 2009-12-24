@@ -74,6 +74,7 @@ uint16_t get_cpu_mhz(void);
 
 /* Hardware detection. */
 int uart_exists(uint16_t uart_base);
+int lpt_exists(uint16_t lpt_base);
 int hpet_exists(unsigned long hpet_base);
 
 /* Do cpuid instruction, with operation 'idx' */
