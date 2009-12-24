@@ -317,7 +317,10 @@ struct domain *domain_create(
     if ( init_status & INIT_gnttab )
         grant_table_destroy(d);
     if ( init_status & INIT_evtchn )
+    {
         evtchn_destroy(d);
+        evtchn_destroy_final(d);
+    }
     if ( init_status & INIT_rangeset )
         rangeset_domain_destroy(d);
     if ( init_status & INIT_xsm )
@@ -605,6 +608,8 @@ static void complete_domain_destroy(struct rcu_head *head)
 
     if ( d->target != NULL )
         put_domain(d->target);
+
+    evtchn_destroy_final(d);
 
     xfree(d->pirq_mask);
     xfree(d->pirq_to_evtchn);

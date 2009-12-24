@@ -67,8 +67,9 @@ struct evtchn
 #endif
 };
 
-int  evtchn_init(struct domain *d);
-void evtchn_destroy(struct domain *d);
+int  evtchn_init(struct domain *d); /* from domain_create */
+void evtchn_destroy(struct domain *d); /* from domain_kill */
+void evtchn_destroy_final(struct domain *d); /* from complete_domain_destroy */
 
 struct vcpu 
 {

@@ -1052,12 +1052,17 @@ void evtchn_destroy(struct domain *d)
         d->evtchn[i] = NULL;
     }
     spin_unlock(&d->event_lock);
+}
 
+
+void evtchn_destroy_final(struct domain *d)
+{
 #if MAX_VIRT_CPUS > BITS_PER_LONG
     xfree(d->poll_mask);
     d->poll_mask = NULL;
 #endif
 }
+
 
 static void domain_dump_evtchn_info(struct domain *d)
 {
