@@ -511,9 +511,13 @@ gopts.var('serial', val='FILE',
           fn=set_value, default='',
           use="Path to serial or pty or vc")
 
-gopts.var('monitor', val='0|1|FILE',
-          fn=set_value, default=1,
+gopts.var('monitor', val='no|yes',
+          fn=set_bool, default=0,
           use="""Should the device model use monitor?""")
+
+gopts.var('monitor_path', val='FILE',
+          fn=set_value, default='',
+          use="Non-default path to device model monitor")
 
 gopts.var('localtime', val='no|yes',
           fn=set_bool, default=0,
@@ -745,7 +749,10 @@ def configure_image(vals):
         config_image.append(['parallel', vals.parallel])
     if vals.serial:
         config_image.append(['serial', vals.serial])
-    if vals.monitor:
+    if vals.monitor_path:
+        config_image.append(['monitor_path', vals.monitor_path])
+        config_image.append(['monitor', 1])
+    elif vals.monitor:
         config_image.append(['monitor', vals.monitor])
     if vals.extra:
         config_image.append(['args', vals.extra])

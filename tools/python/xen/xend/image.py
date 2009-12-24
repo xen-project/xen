@@ -371,13 +371,11 @@ class ImageHandler:
         if vmConfig['platform'].get('parallel'):
             ret = ret + ["-parallel", vmConfig['platform'].get('parallel')]
 
-        if type(vmConfig['platform'].get('monitor', 0)) is int:
-            if int(vmConfig['platform'].get('monitor', 0)) != 0:
-                ret = ret + ['-monitor', 'vc']
+        if int(vmConfig['platform'].get('monitor', 0)) != 0:
+            if vmConfig['platform'].get('monitor_path'):
+                ret = ret + ['-monitor', vmConfig['platform'].get('monitor_path')]
             else:
-                ret = ret + ['-monitor', 'null']
-        else:
-            ret = ret + ['-monitor', vmConfig['platform'].get('monitor', 0)]
+                ret = ret + ['-monitor', 'vc']
 
         return ret
 
