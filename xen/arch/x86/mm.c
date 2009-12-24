@@ -2645,9 +2645,8 @@ int do_mmuext_op(
 {
     struct mmuext_op op;
     int rc = 0, i = 0, okay;
-    unsigned long mfn = 0, gmfn = 0, type;
+    unsigned long type;
     unsigned int done = 0;
-    struct page_info *page;
     struct vcpu *curr = current;
     struct domain *d = curr->domain;
     struct domain *pg_owner;
@@ -2688,15 +2687,6 @@ int do_mmuext_op(
             break;
         }
 
-        gmfn  = op.arg1.mfn;
-        mfn = gmfn_to_mfn(pg_owner, gmfn);
-        if ( mfn == INVALID_MFN )
-        {
-            MEM_LOG("Bad gmfn_to_mfn");
-            rc = -EFAULT;
-            break;
-        }
-        page = mfn_to_page(mfn);
         okay = 1;
 
         switch ( op.cmd )
@@ -2718,10 +2708,9 @@ int do_mmuext_op(
                 break;
             type = PGT_l4_page_table;
 
-        pin_page:
-            rc = xsm_memory_pin_page(d, page);
-            if ( rc )
-                break;
+        pin_page: {
+            unsigned long mfn;
+            struct page_info *page;
 
             /* Ignore pinning of invalid paging levels. */
             if ( (op.cmd - MMUEXT_PIN_L1_TABLE) > (CONFIG_PAGING_LEVELS - 1) )
@@ -2730,6 +2719,7 @@ int do_mmuext_op(
             if ( paging_mode_refcounts(pg_owner) )
                 break;
 
+            mfn = gmfn_to_mfn(pg_owner, op.arg1.mfn);
             rc = get_page_and_type_from_pagenr(mfn, type, pg_owner, 0, 1);
             okay = !rc;
             if ( unlikely(!okay) )
@@ -2738,6 +2728,15 @@ int do_mmuext_op(
                     rc = -EAGAIN;
                 else if ( rc != -EAGAIN )
                     MEM_LOG("Error while pinning mfn %lx", mfn);
+                break;
+            }
+
+            page = mfn_to_page(mfn);
+
+            if ( (rc = xsm_memory_pin_page(d, page)) != 0 )
+            {
+                put_page_and_type(page);
+                okay = 0;
                 break;
             }
 
@@ -2767,43 +2766,50 @@ int do_mmuext_op(
             }
 
             break;
+        }
 
-        case MMUEXT_UNPIN_TABLE:
+        case MMUEXT_UNPIN_TABLE: {
+            unsigned long mfn;
+            struct page_info *page;
+
             if ( paging_mode_refcounts(d) )
                 break;
 
+            mfn = gmfn_to_mfn(pg_owner, op.arg1.mfn);
             if ( unlikely(!(okay = get_page_from_pagenr(mfn, d))) )
             {
-                MEM_LOG("Mfn %lx bad domain (dom=%p)",
-                        mfn, page_get_owner(page));
+                MEM_LOG("Mfn %lx bad domain", mfn);
+                break;
             }
-            else if ( likely(test_and_clear_bit(_PGT_pinned, 
-                                                &page->u.inuse.type_info)) )
-            {
-                put_page_and_type(page);
-                put_page(page);
-                if ( !rc )
-                {
-                    /* A page is dirtied when its pin status is cleared. */
-                    paging_mark_dirty(d, mfn);
-                }
-            }
-            else
+
+            page = mfn_to_page(mfn);
+
+            if ( !test_and_clear_bit(_PGT_pinned, &page->u.inuse.type_info) )
             {
                 okay = 0;
                 put_page(page);
                 MEM_LOG("Mfn %lx not pinned", mfn);
+                break;
             }
+
+            put_page_and_type(page);
+            put_page(page);
+
+            /* A page is dirtied when its pin status is cleared. */
+            paging_mark_dirty(d, mfn);
+
             break;
+        }
 
         case MMUEXT_NEW_BASEPTR:
-            okay = new_guest_cr3(mfn);
+            okay = new_guest_cr3(gmfn_to_mfn(d, op.arg1.mfn));
             break;
         
 #ifdef __x86_64__
         case MMUEXT_NEW_USER_BASEPTR: {
-            unsigned long old_mfn;
+            unsigned long old_mfn, mfn;
 
+            mfn = gmfn_to_mfn(d, op.arg1.mfn);
             if ( mfn != 0 )
             {
                 if ( paging_mode_refcounts(d) )
@@ -2911,10 +2917,11 @@ int do_mmuext_op(
             break;
         }
 
-        case MMUEXT_CLEAR_PAGE:
-        {
+        case MMUEXT_CLEAR_PAGE: {
+            unsigned long mfn;
             unsigned char *ptr;
 
+            mfn = gmfn_to_mfn(d, op.arg1.mfn);
             okay = !get_page_and_type_from_pagenr(mfn, PGT_writable_page,
                                                   pg_owner, 0, 0);
             if ( unlikely(!okay) )
@@ -2930,7 +2937,7 @@ int do_mmuext_op(
             clear_page(ptr);
             fixunmap_domain_page(ptr);
 
-            put_page_and_type(page);
+            put_page_and_type(mfn_to_page(mfn));
             break;
         }
 
@@ -2938,7 +2945,7 @@ int do_mmuext_op(
         {
             const unsigned char *src;
             unsigned char *dst;
-            unsigned long src_mfn;
+            unsigned long src_mfn, mfn;
 
             src_mfn = gmfn_to_mfn(pg_owner, op.arg2.src_mfn);
             okay = get_page_from_pagenr(src_mfn, pg_owner);
@@ -2948,6 +2955,7 @@ int do_mmuext_op(
                 break;
             }
 
+            mfn = gmfn_to_mfn(d, op.arg1.mfn);
             okay = !get_page_and_type_from_pagenr(mfn, PGT_writable_page,
                                                   pg_owner, 0, 0);
             if ( unlikely(!okay) )
@@ -2966,7 +2974,7 @@ int do_mmuext_op(
             fixunmap_domain_page(dst);
             unmap_domain_page(src);
 
-            put_page_and_type(page);
+            put_page_and_type(mfn_to_page(mfn));
             put_page(mfn_to_page(src_mfn));
             break;
         }
