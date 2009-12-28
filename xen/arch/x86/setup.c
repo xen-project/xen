@@ -20,6 +20,7 @@
 #include <xen/rcupdate.h>
 #include <xen/vga.h>
 #include <xen/dmi.h>
+#include <xen/nodemask.h>
 #include <public/version.h>
 #ifdef CONFIG_COMPAT
 #include <compat/platform.h>
@@ -252,7 +253,7 @@ void __devinit srat_detect_node(int cpu)
     u32 apicid = x86_cpu_to_apicid[cpu];
 
     node = apicid_to_node[apicid];
-    if ( node == NUMA_NO_NODE )
+    if ( node == NUMA_NO_NODE || !node_online(node) )
         node = 0;
     numa_set_node(cpu, node);
 

@@ -35,6 +35,9 @@ u8  memnodemap[NODEMAPSIZE];
 unsigned char cpu_to_node[NR_CPUS] __read_mostly = {
 	[0 ... NR_CPUS-1] = NUMA_NO_NODE
 };
+/*
+ * Keep BIOS's CPU2node information, should not be used for memory allocaion
+ */
 unsigned char apicid_to_node[MAX_LOCAL_APIC] __cpuinitdata = {
  	[0 ... MAX_LOCAL_APIC-1] = NUMA_NO_NODE
 };
@@ -288,14 +291,15 @@ static __init int numa_setup(char *opt)
  */
 void __devinit init_cpu_to_node(void)
 {
-	int i;
+	int i, node;
  	for (i = 0; i < NR_CPUS; i++) {
 		u32 apicid = x86_cpu_to_apicid[i];
 		if (apicid == BAD_APICID)
 			continue;
-		if (apicid_to_node[apicid] == NUMA_NO_NODE)
-			continue;
-		numa_set_node(i,apicid_to_node[apicid]);
+		node = apicid_to_node[apicid];
+		if ( node == NUMA_NO_NODE || !node_online(node) )
+			node = 0;
+		numa_set_node(i, node);
 	}
 }
 
