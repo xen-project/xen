@@ -75,7 +75,7 @@ struct __hash
                                            * *_tab, tab_size, size_idx, *_load
                                            * (all writes with wrlock)
                                            */
-    volatile uint32_t nr_ent;             /* # entries held in hashtables */
+    uint32_t nr_ent;                      /* # entries held in hashtables */
     struct bucket *key_tab;               /* forward mapping hashtable    */
     struct bucket *value_tab;             /* backward mapping hashtable   */
     struct bucket_lock *key_lock_tab;     /* key table bucket locks       */
@@ -100,6 +100,21 @@ int            __hash_iterator(struct __hash *h,
                         void *d);
 static void      hash_resize(struct __hash *h);
 
+static inline void atomic_add(uint32_t *v, uint32_t i)
+{
+    asm volatile(
+        "lock ; addl %1,%0"
+        :"=m" (*(volatile uint32_t *)v)
+        :"ir" (i), "m" (*(volatile uint32_t *)v) );
+}
+
+static inline void atomic_sub(uint32_t *v, uint32_t i)
+{
+    asm volatile (
+        "lock ; subl %1,%0"
+        : "=m" (*(volatile uint32_t *)v)
+        : "ir" (i), "m" (*(volatile uint32_t *)v) );
+}
 
 #ifdef BIDIR_USE_STDMALLOC
 
@@ -759,7 +774,6 @@ int __insert(struct __hash *h, __k_t k, __v_t v)
     struct bucket *bk, *bv;
     struct bucket_lock *bltk, *bltv;
 
-
     /* Allocate new entry before any locks (in case it fails) */
     entry = (struct hash_entry*)
                     alloc_entry(h, sizeof(struct hash_entry));
@@ -797,7 +811,7 @@ int __insert(struct __hash *h, __k_t k, __v_t v)
     TWO_BUCKETS_LOCK_WRUNLOCK(h, bltk, k_idx, bltv, v_idx);
 
     /* Book keeping */
-    __sync_add_and_fetch(&h->nr_ent, 1);
+    atomic_add(&h->nr_ent, 1);
 
     HASH_LOCK_RDUNLOCK(h);
 
@@ -931,7 +945,8 @@ found_again:
             *pek = e->__prim_next;
             *pev = e->__sec_next;
 
-            nr_ent = __sync_sub_and_fetch(&h->nr_ent, 1);
+            atomic_sub(&h->nr_ent, 1);
+            nr_ent = h->nr_ent;
             /* read min_load still under the hash lock! */
             min_load = h->min_load;
 
@@ -1079,7 +1094,8 @@ found_again:
             *pek = e->__prim_next;
             *pev = e->__sec_next;
 
-            nr_ent = __sync_sub_and_fetch(&h->nr_ent, 1);
+            atomic_sub(&h->nr_ent, 1);
+            nr_ent = h->nr_ent;
             /* read min_load still under the hash lock! */
             min_load = h->min_load;
 

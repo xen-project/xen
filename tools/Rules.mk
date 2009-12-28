@@ -64,7 +64,7 @@ INSTALL_PYTHON_PROG = \
 	$(CC) $(CPPFLAGS) $(CXXFLAGS) -c -o $@ $<
 
 subdirs-all subdirs-clean subdirs-install: .phony
-	@set -e; for subdir in $(SUBDIRS) $(SUBDIRS-y); do \
+	@set -e; for subdir in $(SUBDIRS) $(SUBDIRS-y) $(SUBDIRS-yy); do \
 		$(MAKE) subdir-$(patsubst subdirs-%,%,$@)-$$subdir; \
 	done
 
