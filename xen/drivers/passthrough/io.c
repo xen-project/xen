@@ -199,7 +199,8 @@ int pt_irq_create_bind_vtd(
             }
  
             /* if pirq is already mapped as vmsi, update the guest data/addr */
-            if ( hvm_irq_dpci->mirq[pirq].gmsi.gvec != pt_irq_bind->u.msi.gvec ) {
+            if ( hvm_irq_dpci->mirq[pirq].gmsi.gvec != pt_irq_bind->u.msi.gvec ||
+                hvm_irq_dpci->mirq[pirq].gmsi.gflags != pt_irq_bind->u.msi.gflags) {
                 hvm_irq_dpci->mirq[pirq].gmsi.old_gvec =
                                     hvm_irq_dpci->mirq[pirq].gmsi.gvec;
                 hvm_irq_dpci->mirq[pirq].gmsi.old_gflags =
