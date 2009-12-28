@@ -114,6 +114,25 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
                })
            }
 
+           /* Make cirrues VGA S3 suspend/resume work in Windows XP/2003 */
+           Device (VGA)
+           {
+               Name (_ADR, 0x00020000)
+
+               Method (_S1D, 0, NotSerialized)
+               {
+                   Return (0x00)
+               }
+               Method (_S2D, 0, NotSerialized)
+               {
+                   Return (0x00)
+               }
+               Method (_S3D, 0, NotSerialized)
+               {
+                   Return (0x00)
+               }
+           }
+
            Method (_CRS, 0, NotSerialized)
            {
                Name (PRT0, ResourceTemplate ()
