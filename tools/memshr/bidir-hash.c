@@ -100,21 +100,31 @@ int            __hash_iterator(struct __hash *h,
                         void *d);
 static void      hash_resize(struct __hash *h);
 
-static inline void atomic_add(uint32_t *v, uint32_t i)
-{
-    asm volatile(
-        "lock ; addl %1,%0"
-        :"=m" (*(volatile uint32_t *)v)
-        :"ir" (i), "m" (*(volatile uint32_t *)v) );
-}
-
-static inline void atomic_sub(uint32_t *v, uint32_t i)
+#if defined(__ia64__)
+#define ia64_fetchadd4_rel(p, inc) do {                         \
+    uint64_t ia64_intri_res;                                    \
+    asm volatile ("fetchadd4.rel %0=[%1],%2"                    \
+                : "=r"(ia64_intri_res) : "r"(p), "i" (inc)      \
+                : "memory");                                    \
+} while (0)
+static inline void atomic_inc(uint32_t *v) { ia64_fetchadd4_rel(v, 1); }
+static inline void atomic_dec(uint32_t *v) { ia64_fetchadd4_rel(v, -1); }
+#else /* __x86__ */
+static inline void atomic_inc(uint32_t *v)
 {
     asm volatile (
-        "lock ; subl %1,%0"
+        "lock ; incl %0"
         : "=m" (*(volatile uint32_t *)v)
-        : "ir" (i), "m" (*(volatile uint32_t *)v) );
+        : "m" (*(volatile uint32_t *)v) );
 }
+static inline void atomic_dec(uint32_t *v)
+{
+    asm volatile (
+        "lock ; decl %0"
+        : "=m" (*(volatile uint32_t *)v)
+        : "m" (*(volatile uint32_t *)v) );
+}
+#endif
 
 #ifdef BIDIR_USE_STDMALLOC
 
@@ -811,7 +821,7 @@ int __insert(struct __hash *h, __k_t k, __v_t v)
     TWO_BUCKETS_LOCK_WRUNLOCK(h, bltk, k_idx, bltv, v_idx);
 
     /* Book keeping */
-    atomic_add(&h->nr_ent, 1);
+    atomic_inc(&h->nr_ent);
 
     HASH_LOCK_RDUNLOCK(h);
 
@@ -945,7 +955,7 @@ found_again:
             *pek = e->__prim_next;
             *pev = e->__sec_next;
 
-            atomic_sub(&h->nr_ent, 1);
+            atomic_dec(&h->nr_ent);
             nr_ent = h->nr_ent;
             /* read min_load still under the hash lock! */
             min_load = h->min_load;
@@ -1094,7 +1104,7 @@ found_again:
             *pek = e->__prim_next;
             *pev = e->__sec_next;
 
-            atomic_sub(&h->nr_ent, 1);
+            atomic_dec(&h->nr_ent);
             nr_ent = h->nr_ent;
             /* read min_load still under the hash lock! */
             min_load = h->min_load;

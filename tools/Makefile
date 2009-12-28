@@ -21,6 +21,7 @@ SUBDIRS-$(VTPM_TOOLS) += vtpm_manager
 SUBDIRS-$(VTPM_TOOLS) += vtpm
 SUBDIRS-y += xenstat
 SUBDIRS-$(CONFIG_Linux) += libaio
+SUBDIRS-$(CONFIG_Linux) += memshr 
 SUBDIRS-$(CONFIG_Linux) += blktap
 SUBDIRS-$(CONFIG_Linux) += blktap2
 SUBDIRS-$(CONFIG_NetBSD) += libaio
@@ -34,9 +35,7 @@ SUBDIRS-$(CONFIG_IOEMU) += ioemu-dir
 SUBDIRS-y += xenpmd
 SUBDIRS-y += libxl
 SUBDIRS-y += remus
-
-SUBDIRS-$(CONFIG_X86)$(CONFIG_Linux) += memshr 
-SUBDIRS-$(CONFIG_X86)$(CONFIG_Linux) += xenpaging
+SUBDIRS-$(CONFIG_X86) += xenpaging
 
 # These don't cross-compile
 ifeq ($(XEN_COMPILE_ARCH),$(XEN_TARGET_ARCH))
