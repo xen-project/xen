@@ -105,8 +105,17 @@ static unsigned inline int max_nr_maptrack_frames(void)
     return (max_nr_grant_frames * MAX_MAPTRACK_TO_GRANTS_RATIO);
 }
 
-#define gfn_to_mfn_private(_d, _gfn, _p2mt) \
-    mfn_x(gfn_to_mfn_unshare(_d, _gfn, _p2mt, 1)) 
+#ifdef CONFIG_X86
+#define gfn_to_mfn_private(_d, _gfn) ({                     \
+    p2m_type_t __p2mt;                                      \
+    unsigned long __x;                                      \
+    __x = mfn_x(gfn_to_mfn_unshare(_d, _gfn, &__p2mt, 1));  \
+    if ( !p2m_is_valid(__p2mt) )                            \
+        __x = INVALID_MFN;                                  \
+    __x; })
+#else
+#define gfn_to_mfn_private(_d, _gfn) gmfn_to_mfn(rd, act->gfn)
+#endif
 
 #define SHGNT_PER_PAGE_V1 (PAGE_SIZE / sizeof(grant_entry_v1_t))
 #define shared_entry_v1(t, e) \
@@ -495,8 +504,6 @@ __gnttab_map_grant_ref(
 
         if ( !act->pin )
         {
-            p2m_type_t p2mt;
-
             act->domid = ld->domain_id;
             if ( sha1 )
                 act->gfn = sha1->frame;
@@ -504,7 +511,7 @@ __gnttab_map_grant_ref(
                 act->gfn = sha2->full_page.frame;
             act->frame = (op->flags & GNTMAP_readonly) ?  
                             gmfn_to_mfn(rd, act->gfn) :
-                            gfn_to_mfn_private(rd, act->gfn, &p2mt); 
+                            gfn_to_mfn_private(rd, act->gfn); 
             act->start = 0;
             act->length = PAGE_SIZE;
             act->is_sub_page = 0;
@@ -1371,7 +1378,6 @@ gnttab_transfer(
     struct gnttab_transfer gop;
     unsigned long mfn;
     unsigned int max_bitsize;
-    p2m_type_t p2mt;
 
     for ( i = 0; i < count; i++ )
     {
@@ -1386,7 +1392,7 @@ gnttab_transfer(
             return -EFAULT;
         }
 
-        mfn = gfn_to_mfn_private(d, gop.mfn, &p2mt);
+        mfn = gfn_to_mfn_private(d, gop.mfn);
 
         /* Check the passed page frame for basic validity. */
         if ( unlikely(!mfn_valid(mfn)) )
@@ -1657,7 +1663,6 @@ __acquire_grant_for_copy(
     int is_sub_page;
     struct domain *ignore;
     s16 rc = GNTST_okay;
-    p2m_type_t p2mt;
 
     *owning_domain = NULL;
 
@@ -1771,7 +1776,7 @@ __acquire_grant_for_copy(
         {
             act->gfn = sha1->frame;
             grant_frame = readonly ? gmfn_to_mfn(rd, act->gfn) :
-                                     gfn_to_mfn_private(rd, act->gfn, &p2mt);
+                                     gfn_to_mfn_private(rd, act->gfn);
             is_sub_page = 0;
             trans_page_off = 0;
             trans_length = PAGE_SIZE;
@@ -1781,7 +1786,7 @@ __acquire_grant_for_copy(
         {
             act->gfn = sha2->full_page.frame;
             grant_frame = readonly ? gmfn_to_mfn(rd, act->gfn) :
-                                     gfn_to_mfn_private(rd, act->gfn, &p2mt);
+                                     gfn_to_mfn_private(rd, act->gfn);
             is_sub_page = 0;
             trans_page_off = 0;
             trans_length = PAGE_SIZE;
@@ -1791,7 +1796,7 @@ __acquire_grant_for_copy(
         {
             act->gfn = sha2->sub_page.frame;
             grant_frame = readonly ? gmfn_to_mfn(rd, act->gfn) :
-                                     gfn_to_mfn_private(rd, act->gfn, &p2mt);
+                                     gfn_to_mfn_private(rd, act->gfn);
             is_sub_page = 1;
             trans_page_off = sha2->sub_page.page_off;
             trans_length = sha2->sub_page.length;
@@ -1886,6 +1891,7 @@ __gnttab_copy(
     }
     else
     {
+#ifdef CONFIG_X86
         p2m_type_t p2mt;
         s_frame = mfn_x(gfn_to_mfn(sd, op->source.u.gmfn, &p2mt));
         if ( !p2m_is_valid(p2mt) )
@@ -1893,10 +1899,12 @@ __gnttab_copy(
         if ( p2m_is_paging(p2mt) )
         {
             p2m_mem_paging_populate(sd, op->source.u.gmfn);
-
             rc = -ENOENT;
             goto error_out;
         }
+#else
+        s_frame = gmfn_to_mfn(sd, op->source.u.gmfn);        
+#endif
         source_domain = sd;
     }
     if ( unlikely(!mfn_valid(s_frame)) )
@@ -1929,17 +1937,20 @@ __gnttab_copy(
     }
     else
     {
+#ifdef CONFIG_X86
         p2m_type_t p2mt;
-        d_frame = gfn_to_mfn_private(dd, op->dest.u.gmfn, &p2mt);
+        d_frame = mfn_x(gfn_to_mfn_unshare(dd, op->dest.u.gmfn, &p2mt, 1));
         if ( !p2m_is_valid(p2mt) )
           d_frame = INVALID_MFN;
         if ( p2m_is_paging(p2mt) )
         {
             p2m_mem_paging_populate(dd, op->dest.u.gmfn);
-
             rc = -ENOENT;
             goto error_out;
         }
+#else
+        d_frame = gmfn_to_mfn(dd, op->dest.u.gmfn);
+#endif
         dest_domain = dd;
     }
     if ( unlikely(!mfn_valid(d_frame)) )
