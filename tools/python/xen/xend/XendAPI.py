@@ -2053,6 +2053,7 @@ class XendAPI(object):
 
         XendTask.log_progress(0, 100, vm.destroy_vbd, vbd_ref)
 
+        xendom.managed_config_save(vm)
         return xen_api_success_void()
 
     def _VBD_get(self, vbd_ref, prop):
@@ -2220,6 +2221,8 @@ class XendAPI(object):
             return xen_api_error(['HANDLE_INVALID', 'VIF', vif_ref])
 
         vm.destroy_vif(vif_ref)
+
+        xendom.managed_config_save(vm)
         return xen_api_success_void()
 
     def _VIF_get(self, ref, prop):
