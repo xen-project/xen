@@ -202,21 +202,32 @@ extern char __per_cpu_start[], __per_cpu_data_end[];
 static void __init percpu_init_areas(void)
 {
     unsigned int i, data_size = __per_cpu_data_end - __per_cpu_start;
-    unsigned int first_unused;
 
     BUG_ON(data_size > PERCPU_SIZE);
 
     /* Initialise per-cpu data area for all possible secondary CPUs. */
-    for ( i = 1; (i < NR_CPUS) && cpu_possible(i); i++ )
+    for ( i = 1; i < NR_CPUS; i++ )
         memcpy(__per_cpu_start + (i << PERCPU_SHIFT),
                __per_cpu_start,
                data_size);
+}
+
+static void __init percpu_free_unused_areas(void)
+{
+    unsigned int i, data_size = __per_cpu_data_end - __per_cpu_start;
+    unsigned int first_unused;
+
+    /* Find first 'impossible' secondary CPU. */
+    for ( i = 1; i < NR_CPUS; i++ )
+        if ( !cpu_possible(i) )
+            break;
     first_unused = i;
 
     /* Check that there are no holes in cpu_possible_map. */
     for ( ; i < NR_CPUS; i++ )
         BUG_ON(cpu_possible(i));
 
+    /* Free all unused per-cpu data areas. */
     free_xen_data(&__per_cpu_start[first_unused << PERCPU_SHIFT], __bss_start);
 
     data_size = (data_size + PAGE_SIZE + 1) & PAGE_MASK;
@@ -447,6 +458,8 @@ void __init __start_xen(unsigned long mbi_p)
         .parity    = 'n',
         .stop_bits = 1
     };
+
+    percpu_init_areas();
 
     set_intr_gate(TRAP_page_fault, &early_page_fault);
 
@@ -995,7 +1008,7 @@ void __init __start_xen(unsigned long mbi_p)
 
     init_apic_mappings();
 
-    percpu_init_areas();
+    percpu_free_unused_areas();
 
     init_IRQ();
 
