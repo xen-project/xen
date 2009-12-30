@@ -124,6 +124,9 @@ char **libxl_xs_directory(struct libxl_ctx *ctx, xs_transaction_t t, char *path,
 
 /* from xl_dom */
 int is_hvm(struct libxl_ctx *ctx, uint32_t domid);
+int get_shutdown_reason(struct libxl_ctx *ctx, uint32_t domid);
+#define dominfo_get_shutdown_reason(info) (((info)->flags >> XEN_DOMINF_shutdownshift) & XEN_DOMINF_shutdownmask)
+
 int build_pre(struct libxl_ctx *ctx, uint32_t domid,
               libxl_domain_build_info *info, libxl_domain_build_state *state);
 int build_post(struct libxl_ctx *ctx, uint32_t domid,

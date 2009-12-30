@@ -42,6 +42,21 @@ int is_hvm(struct libxl_ctx *ctx, uint32_t domid)
     return !!(info.flags & XEN_DOMINF_hvm_guest);
 }
 
+int get_shutdown_reason(struct libxl_ctx *ctx, uint32_t domid)
+{
+    xc_domaininfo_t info;
+    int ret;
+
+    ret = xc_domain_getinfolist(ctx->xch, domid, 1, &info);
+    if (ret != 1)
+        return -1;
+    if (info.domain != domid)
+        return -1;
+    if (!(info.flags & XEN_DOMINF_shutdown))
+        return -1;
+    return dominfo_get_shutdown_reason(&info);
+}
+
 int build_pre(struct libxl_ctx *ctx, uint32_t domid,
               libxl_domain_build_info *info, libxl_domain_build_state *state)
 {
