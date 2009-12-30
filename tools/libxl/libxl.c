@@ -44,8 +44,6 @@ int libxl_ctx_init(struct libxl_ctx *ctx)
 
     ctx->xch = xc_interface_open();
     ctx->xsh = xs_daemon_open();
-
-    ctx->waitpid_instead = libxl_waitpid_instead_default;
     return 0;
 }
 

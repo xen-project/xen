@@ -43,6 +43,11 @@ static pid_t libxl_fork(struct libxl_ctx *ctx)
     return pid;
 }
 
+static int call_waitpid(pid_t (*waitpid_cb)(pid_t, int *, int), pid_t pid, int *status, int options)
+{
+    return (waitpid_cb) ? waitpid_cb(pid, status, 0) : waitpid(pid, status, 0);
+}
+
 void libxl_exec(struct libxl_ctx *ctx, int stdinfd, int stdoutfd, int stderrfd,
                 char *arg0, char **args)
      /* call this in the child */
@@ -94,11 +99,6 @@ void libxl_report_child_exitstatus(struct libxl_ctx *ctx,
     }
 }
 
-pid_t libxl_waitpid_instead_default(pid_t pid, int *status, int flags)
-{
-    return waitpid(pid,status,flags);
-}
-
 int libxl_spawn_spawn(struct libxl_ctx *ctx,
                       libxl_device_model_starting *starting,
                       const char *what,
@@ -137,7 +137,7 @@ int libxl_spawn_spawn(struct libxl_ctx *ctx,
 
     if (!for_spawn) _exit(0); /* just detach then */
 
-    got = ctx->waitpid_instead(child, &status, 0);
+    got = call_waitpid(ctx->waitpid_instead, child, &status, 0);
     assert(got == child);
 
     libxl_report_child_exitstatus(ctx, what, child, status);
@@ -178,7 +178,7 @@ int libxl_spawn_detach(struct libxl_ctx *ctx,
                          (unsigned long)for_spawn->intermediate);
             abort(); /* things are very wrong */
         }
-        got = ctx->waitpid_instead(for_spawn->intermediate, &status, 0);
+        got = call_waitpid(ctx->waitpid_instead, for_spawn->intermediate, &status, 0);
         assert(got == for_spawn->intermediate);
         if (!(WIFSIGNALED(status) && WTERMSIG(status) == SIGKILL)) {
             report_spawn_intermediate_status(ctx, for_spawn, status);
@@ -202,7 +202,7 @@ int libxl_spawn_check(struct libxl_ctx *ctx, void *for_spawn_void)
     if (!for_spawn) return 0;
 
     assert(for_spawn->intermediate);
-    got = ctx->waitpid_instead(for_spawn->intermediate, &status, WNOHANG);
+    got = call_waitpid(ctx->waitpid_instead, for_spawn->intermediate, &status, 0);
     if (!got) return 0;
 
     assert(got == for_spawn->intermediate);

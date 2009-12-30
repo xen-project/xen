@@ -213,7 +213,6 @@ void libxl_exec(struct libxl_ctx *ctx, int stdinfd, int stdoutfd, int stderrfd,
                 char *arg0, char **args); // logs errors, never returns
 void libxl_log_child_exitstatus(struct libxl_ctx *ctx,
                                 const char *what, pid_t pid, int status);
-pid_t libxl_waitpid_instead_default(pid_t pid, int *status, int flags);
 
 #endif
 
