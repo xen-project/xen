@@ -751,6 +751,8 @@ static char ** libxl_build_device_model_args(struct libxl_ctx *ctx,
                 char *smac = libxl_sprintf(ctx, "%02x:%02x:%02x:%02x:%02x:%02x",
                                            vifs[i].mac[0], vifs[i].mac[1], vifs[i].mac[2],
                                            vifs[i].mac[3], vifs[i].mac[4], vifs[i].mac[5]);
+                if (!vifs[i].ifname)
+                    vifs[i].ifname = libxl_sprintf(ctx, "tap%d.%d", info->domid, vifs[i].devid - 1);
                 flexarray_set(dm_args, num++, "-net");
                 flexarray_set(dm_args, num++, libxl_sprintf(ctx, "nic,vlan=%d,macaddr=%s,model=%s",
                             vifs[i].devid, smac, vifs[i].model));
@@ -942,30 +944,27 @@ retry_transaction:
             goto retry_transaction;
 
     for (i = 0; i < num_disks; i++) {
-        libxl_device_disk disk = disks[i];
-        disk_info_domid_fixup(&disk, domid);
-        libxl_device_disk_add(ctx, domid, &disk);
+        disks[i].domid = domid;
+        libxl_device_disk_add(ctx, domid, &disks[i]);
     }
     for (i = 0; i < num_vifs; i++) {
-        libxl_device_nic nic = vifs[i];
-        nic_info_domid_fixup(&nic, domid);
-        libxl_device_nic_add(ctx, domid, &nic);
+        vifs[i].domid = domid;
+        libxl_device_nic_add(ctx, domid, &vifs[i]);
     }
-    vfb_info_domid_fixup(vfb, domid);
+    vfb->domid = domid;
     libxl_device_vfb_add(ctx, domid, vfb);
-    vkb_info_domid_fixup(vkb, domid);
+    vkb->domid = domid;
     libxl_device_vkb_add(ctx, domid, vkb);
 
     if (info->serial)
         num_console++;
     console = libxl_calloc(ctx, num_console, sizeof(libxl_device_console));
     for (i = 0; i < num_console; i++) {
-        if (!i)
-            init_console_info(&console[i], i, &state);
-        else
-            init_console_info(&console[i], i, NULL);
-        console_info_domid_fixup(&console[i], domid);
+        console[i].devid = i;
         console[i].constype = CONSTYPE_IOEMU;
+        console[i].domid = domid;
+        if (!i)
+            console[i].build_state = &state;
         libxl_device_console_add(ctx, domid, &console[i]);
     }
     if (libxl_create_xenpv_qemu(ctx, vfb, num_console, console, &dm_starting) < 0) {
@@ -1564,11 +1563,11 @@ int libxl_cdrom_insert(struct libxl_ctx *ctx, uint32_t domid, libxl_device_disk 
     libxl_device_disk_add(ctx, domid, disk);
     stubdomid = libxl_get_stubdom_id(ctx, domid);
     if (stubdomid) {
-        disk_info_domid_fixup(disks + i, stubdomid);
+        disks[i].domid = stubdomid;
         libxl_device_disk_del(ctx, disks + i, 1);
-        disk_info_domid_fixup(disk, stubdomid);
+        disk->domid = stubdomid;
         libxl_device_disk_add(ctx, stubdomid, disk);
-        disk_info_domid_fixup(disk, domid);
+        disk->domid = domid;
     }
     return 0;
 }
@@ -2200,146 +2199,6 @@ int libxl_device_pci_shutdown(struct libxl_ctx *ctx, uint32_t domid)
     return 0;
 }
 
-void nic_info_domid_fixup(libxl_device_nic *nic_info, int domid)
-{
-    nic_info->domid = domid;
-    asprintf(&(nic_info->ifname), "tap%d.%d", domid, nic_info->devid - 1);
-}
-
-void disk_info_domid_fixup(libxl_device_disk *disk_info, int domid)
-{
-    disk_info->domid = domid;
-}
-
-void vfb_info_domid_fixup(libxl_device_vfb *vfb, int domid)
-{
-    vfb->domid = domid;
-}
-
-void vkb_info_domid_fixup(libxl_device_vkb *vkb, int domid)
-{
-    vkb->domid = domid;
-}
-
-void console_info_domid_fixup(libxl_device_console *console, int domid)
-{
-    console->domid = domid;
-}
-
-void device_model_info_domid_fixup(libxl_device_model_info *dm_info, int domid)
-{
-    dm_info->domid = domid;
-}
-
-void init_create_info(libxl_domain_create_info *c_info)
-{
-    memset(c_info, '\0', sizeof(*c_info));
-    c_info->xsdata = NULL;
-    c_info->platformdata = NULL;
-    c_info->hvm = 1;
-    c_info->ssidref = 0;
-}
-
-void init_build_info(libxl_domain_build_info *b_info, libxl_domain_create_info *c_info)
-{
-    memset(b_info, '\0', sizeof(*b_info));
-    b_info->timer_mode = -1;
-    b_info->hpet = 1;
-    b_info->vpt_align = -1;
-    b_info->max_vcpus = 1;
-    b_info->max_memkb = 32 * 1024;
-    b_info->target_memkb = b_info->max_memkb;
-    if (c_info->hvm) {
-        b_info->shadow_memkb = libxl_get_required_shadow_memory(b_info->max_memkb, b_info->max_vcpus);
-        b_info->video_memkb = 8 * 1024;
-        b_info->kernel = "/usr/lib/xen/boot/hvmloader";
-        b_info->hvm = 1;
-        b_info->u.hvm.pae = 1;
-        b_info->u.hvm.apic = 1;
-        b_info->u.hvm.acpi = 1;
-        b_info->u.hvm.nx = 1;
-        b_info->u.hvm.viridian = 0;
-    } else {
-        b_info->u.pv.slack_memkb = 8 * 1024;
-    }
-}
-
-void init_dm_info(libxl_device_model_info *dm_info,
-        libxl_domain_create_info *c_info, libxl_domain_build_info *b_info)
-{
-    memset(dm_info, '\0', sizeof(*dm_info));
-
-    dm_info->dom_name = c_info->name;
-    dm_info->device_model = "/usr/lib/xen/bin/qemu-dm";
-    dm_info->videoram = b_info->video_memkb / 1024;
-    dm_info->apic = b_info->u.hvm.apic;
-
-    dm_info->stdvga = 0;
-    dm_info->vnc = 1;
-    dm_info->vnclisten = "127.0.0.1";
-    dm_info->vncdisplay = 0;
-    dm_info->vncunused = 0;
-    dm_info->keymap = NULL;
-    dm_info->sdl = 0;
-    dm_info->opengl = 0;
-    dm_info->nographic = 0;
-    dm_info->serial = NULL;
-    dm_info->boot = "cda";
-    dm_info->usb = 0;
-    dm_info->usbdevice = NULL;
-}
-
-void init_nic_info(libxl_device_nic *nic_info, int devnum)
-{
-    memset(nic_info, '\0', sizeof(*nic_info));
-
-
-    nic_info->backend_domid = 0;
-    nic_info->domid = 0;
-    nic_info->devid = devnum;
-    nic_info->mtu = 1492;
-    nic_info->model = "e1000";
-    srand(time(0));
-    nic_info->mac[0] = 0x00;
-    nic_info->mac[1] = 0x16;
-    nic_info->mac[2] = 0x3e;
-    nic_info->mac[3] = 1 + (int) (0x7f * (rand() / (RAND_MAX + 1.0)));
-    nic_info->mac[4] = 1 + (int) (0xff * (rand() / (RAND_MAX + 1.0)));
-    nic_info->mac[5] = 1 + (int) (0xff * (rand() / (RAND_MAX + 1.0)));
-    nic_info->ifname = NULL;
-    nic_info->bridge = "xenbr0";
-    nic_info->script = "/etc/xen/scripts/vif-bridge";
-    nic_info->nictype = NICTYPE_IOEMU;
-}
-
-void init_vfb_info(libxl_device_vfb *vfb, int dev_num)
-{
-    memset(vfb, 0x00, sizeof(libxl_device_vfb));
-    vfb->devid = dev_num;
-    vfb->vnc = 1;
-    vfb->vnclisten = "127.0.0.1";
-    vfb->vncdisplay = 0;
-    vfb->vncunused = 1;
-    vfb->keymap = NULL;
-    vfb->sdl = 0;
-    vfb->opengl = 0;
-}
-
-void init_vkb_info(libxl_device_vkb *vkb, int dev_num)
-{
-    memset(vkb, 0x00, sizeof(libxl_device_vkb));
-    vkb->devid = dev_num;
-}
-
-void init_console_info(libxl_device_console *console, int dev_num, libxl_domain_build_state *state)
-{
-    memset(console, 0x00, sizeof(libxl_device_console));
-    console->devid = dev_num;
-    console->constype = CONSTYPE_XENCONSOLED;
-    if (state)
-        console->build_state = state;
-}
-
 int libxl_set_memory_target(struct libxl_ctx *ctx, uint32_t domid, uint32_t target_memkb)
 {
     int rc = 0;
@@ -2359,5 +2218,3 @@ int libxl_set_memory_target(struct libxl_ctx *ctx, uint32_t domid, uint32_t targ
     rc = xc_domain_memory_set_pod_target(ctx->xch, domid, (target_memkb - videoram) / 4, NULL, NULL, NULL);
     return rc;
 }
-
-
