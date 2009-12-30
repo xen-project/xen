@@ -279,7 +279,7 @@ int libxl_stop_waiting(struct libxl_ctx *ctx, libxl_waiter *waiter);
 int libxl_free_event(libxl_event *event);
 int libxl_free_waiter(libxl_waiter *waiter);
 
-int libxl_event_get_domain_death_info(struct libxl_ctx *ctx, uint32_t domid, libxl_event *event, xc_dominfo_t *info);
+int libxl_event_get_domain_death_info(struct libxl_ctx *ctx, uint32_t domid, libxl_event *event, xc_domaininfo_t *info);
 int libxl_event_get_disk_eject_info(struct libxl_ctx *ctx, uint32_t domid, libxl_event *event, libxl_device_disk *disk);
 
 
@@ -291,8 +291,6 @@ int libxl_set_memory_target(struct libxl_ctx *ctx, uint32_t domid, uint32_t targ
 int libxl_console_attach(struct libxl_ctx *ctx, uint32_t domid, int cons_num);
 
 struct libxl_dominfo * libxl_domain_list(struct libxl_ctx *ctx, int *nb_domain);
-xc_dominfo_t * libxl_domain_infolist(struct libxl_ctx *ctx, int *nb_domain);
-xc_dominfo_t * libxl_domain_info(struct libxl_ctx *ctx, uint32_t domid);
 
 typedef struct libxl_device_model_starting libxl_device_model_starting;
 int libxl_create_device_model(struct libxl_ctx *ctx,

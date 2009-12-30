@@ -245,19 +245,17 @@ static int core_suspend_callback(void *data)
     }
     XL_LOG(si->ctx, XL_LOG_DEBUG, "wait for the guest to suspend");
     while (!strcmp(state, "suspend") && watchdog > 0) {
-        int nb_domain, i;
-        xc_dominfo_t *list = NULL;
+        xc_domaininfo_t info;
+
         usleep(100000);
-        list = libxl_domain_infolist(si->ctx, &nb_domain);
-        for (i = 0; i < nb_domain; i++) {
-            if (si->domid == list[i].domid) {
-                if (list[i].shutdown != 0 && list[i].shutdown_reason == SHUTDOWN_suspend) {
-                    free(list);
-                    return 1;
-                }
-            }
+        ret = xc_domain_getinfolist(si->ctx->xch, si->domid, 1, &info);
+        if (ret == 1 && info.domain == si->domid && info.flags & XEN_DOMINF_shutdown) {
+            int shutdown_reason;
+
+            shutdown_reason = (info.flags >> XEN_DOMINF_shutdownshift) & XEN_DOMINF_shutdownmask;
+            if (shutdown_reason == SHUTDOWN_suspend)
+                return 1;
         }
-        free(list);
         state = libxl_xs_read(si->ctx, XBT_NULL, path);
         watchdog--;
     }

@@ -808,7 +808,7 @@ start:
     while (1) {
         int ret;
         fd_set rfds;
-        xc_dominfo_t info;
+        xc_domaininfo_t info;
         libxl_event event;
         libxl_device_disk disk;
         memset(&info, 0x00, sizeof(xc_dominfo_t));
@@ -824,10 +824,11 @@ start:
             case DOMAIN_DEATH:
                 if (libxl_event_get_domain_death_info(&ctx, domid, &event, &info)) {
                     LOG("Domain %d is dead", domid);
-                    if (info.crashed || info.dying || (info.shutdown && (info.shutdown_reason != SHUTDOWN_suspend))) {
+                    if (info.flags & XEN_DOMINF_dying || (info.flags & XEN_DOMINF_shutdown && (((info.flags >> XEN_DOMINF_shutdownshift) & XEN_DOMINF_shutdownmask) != SHUTDOWN_suspend))) {
                         LOG("Domain %d needs to be clean: destroying the domain", domid);
                         libxl_domain_destroy(&ctx, domid, 0);
-                        if (info.shutdown && (info.shutdown_reason == SHUTDOWN_reboot)) {
+                        if (info.flags & XEN_DOMINF_shutdown &&
+                            (((info.flags >> XEN_DOMINF_shutdownshift) & XEN_DOMINF_shutdownmask) == SHUTDOWN_reboot)) {
                             libxl_free_waiter(w1);
                             libxl_free_waiter(w2);
                             free(w1);
@@ -1320,32 +1321,26 @@ void destroy_domain(char *p)
 void list_domains(void)
 {
     struct libxl_ctx ctx;
-    xc_dominfo_t *info;
+    struct libxl_dominfo *info;
     int nb_domain, i;
 
     libxl_ctx_init(&ctx);
     libxl_ctx_set_log(&ctx, log_callback, NULL);
 
-    info = libxl_domain_infolist(&ctx, &nb_domain);
+    info = libxl_domain_list(&ctx, &nb_domain);
 
     if (info < 0) {
         fprintf(stderr, "libxl_domain_infolist failed.\n");
         exit(1);
     }
-    printf("Name                                        ID   Mem VCPUs\tState\tTime(s)\n");
+    printf("Name                                        ID   \tState\n");
     for (i = 0; i < nb_domain; i++) {
-        printf("%-40s %5d %5lu %5d     %c%c%c%c%c%c %8.1f\n",
+        printf("%-40s %5d     %c%c%c\n",
                 libxl_domid_to_name(&ctx, info[i].domid),
                 info[i].domid,
-                info[i].nr_pages * XC_PAGE_SIZE/(1024*1024),
-                info[i].nr_online_vcpus,
                 info[i].running ? 'r' : '-',
-                info[i].blocked ? 'b' : '-',
                 info[i].paused ? 'p' : '-',
-                info[i].shutdown ? 's' : '-',
-                info[i].crashed ? 'c' : '-',
-                info[i].dying ? 'd' : '-',
-                ((float)info[i].cpu_time / 1e9));
+                info[i].dying ? 'd' : '-');
     }
     free(info);
 }

@@ -321,49 +321,6 @@ redo:
     return ptr;
 }
 
-xc_dominfo_t * libxl_domain_infolist(struct libxl_ctx *ctx, int *nb_domain)
-{
-    int index, first_domain;
-    xc_dominfo_t *info;
-    int size = 1024;
-
-    first_domain = 0;
-    index = 0;
-    info = (xc_dominfo_t *) calloc(size, sizeof(xc_dominfo_t));
-    if (!info) {
-        *nb_domain = 0;
-        return NULL;
-    }
-    *nb_domain = xc_domain_getinfo(ctx->xch, first_domain, 1024, info);
-    return info;
-}
-
-xc_dominfo_t *libxl_domain_info(struct libxl_ctx *ctx, uint32_t domid)
-{
-    xc_dominfo_t *info;
-    int rc;
-
-    info = (xc_dominfo_t *) calloc(1, sizeof(xc_dominfo_t));
-    if (!info) {
-        return NULL;
-    }
-    rc = xc_domain_getinfo(ctx->xch, domid, 1, info);
-    if (rc != 1) {
-        free(info);
-        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "Failed to get info for domain %u", 
-                        domid);
-        return NULL;
-    }
-    if (info->domid != domid) {
-        free(info);
-        XL_LOG(ctx, XL_LOG_ERROR, "Failed to get info for domain %u"
-                        ", seems to not exist anymore", domid);
-        return NULL;
-    }
-
-    return info;
-}
-
 int libxl_domain_suspend(struct libxl_ctx *ctx, libxl_domain_suspend_info *info,
                          uint32_t domid, int fd)
 {
@@ -503,28 +460,24 @@ int libxl_free_waiter(libxl_waiter *waiter)
     return 0;
 }
 
-int libxl_event_get_domain_death_info(struct libxl_ctx *ctx, uint32_t domid, libxl_event *event, xc_dominfo_t *info)
+int libxl_event_get_domain_death_info(struct libxl_ctx *ctx, uint32_t domid, libxl_event *event, xc_domaininfo_t *info)
 {
-    int nb_domain, i, rc = 0;
-    xc_dominfo_t *list = NULL;
+    int rc = 0, ret;
 
     if (event && event->type == DOMAIN_DEATH) {
-        list = libxl_domain_infolist(ctx, &nb_domain);
-        for (i = 0; i < nb_domain; i++) {
-            if (domid == list[i].domid) {
-                if (list[i].running || (!list[i].shutdown && !list[i].crashed && !list[i].dying))
+        ret = xc_domain_getinfolist(ctx->xch, domid, 1, info);
+        if (ret == 1 && info->domain == domid) {
+                if (info->flags & XEN_DOMINF_running ||
+                    (!(info->flags & XEN_DOMINF_shutdown) && !(info->flags & XEN_DOMINF_dying)))
                     goto out;
-                *info = list[i];
                 rc = 1;
                 goto out;
-            }
         }
-        memset(info, 0x00, sizeof(xc_dominfo_t));
+        memset(info, 0, sizeof(xc_dominfo_t));
         rc = 1;
         goto out;
     }
 out:
-    free(list);
     return rc;
 }
 
