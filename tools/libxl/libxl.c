@@ -304,6 +304,14 @@ redo:
         }
         memcpy(&(ptr[index].uuid), info[i].handle, sizeof(xen_domain_handle_t));
         ptr[index].domid = info[i].domain;
+
+        if (info[i].flags & XEN_DOMINF_dying)
+            ptr[index].dying = 1;
+        else if (info[i].flags & XEN_DOMINF_paused)
+            ptr[index].paused = 1;
+        else if (info[i].flags & XEN_DOMINF_blocked || info[i].flags & XEN_DOMINF_running)
+            ptr[index].running = 1;
+
         first_domain = info[i].domain + 1;
         index++;
     }
