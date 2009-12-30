@@ -24,6 +24,7 @@
 #include <xenctrl.h>
 #include <xc_dom.h>
 #include <xenguest.h>
+#include <fcntl.h>
 
 #include "libxl.h"
 #include "libxl_internal.h"
@@ -130,10 +131,11 @@ int build_pv(struct libxl_ctx *ctx, uint32_t domid,
         XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "xc_dom_allocate failed");
         return -1;
     }
-    if ((ret = xc_dom_linux_build(ctx->xch, dom, domid, info->target_memkb / 1024,
+    ret = xc_dom_linux_build(ctx->xch, dom, domid, info->target_memkb / 1024,
                                   info->kernel, info->u.pv.ramdisk, flags,
                                   state->store_port, &state->store_mfn,
-                                  state->console_port, &state->console_mfn)) != 0) {
+                                  state->console_port, &state->console_mfn);
+    if (ret != 0) {
         xc_dom_release(dom);
         XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, ret, "xc_dom_linux_build failed");
         return -2;
@@ -317,3 +319,22 @@ int core_suspend(struct libxl_ctx *ctx, uint32_t domid, int fd,
     return 0;
 }
 
+int save_device_model(struct libxl_ctx *ctx, uint32_t domid, int fd)
+{
+    int fd2, c;
+    char buf[1024];
+    char *filename = libxl_sprintf(ctx, "/var/lib/xen/qemu-save.%d", domid);
+
+    XL_LOG(ctx, XL_LOG_DEBUG, "Saving device model state to %s", filename);
+    libxl_xs_write(ctx, XBT_NULL, libxl_sprintf(ctx, "/local/domain/0/device-model/%d/command", domid), "save", strlen("save"));
+    libxl_wait_for_device_model(ctx, domid, "paused", NULL, NULL);
+
+    write(fd, QEMU_SIGNATURE, strlen(QEMU_SIGNATURE));
+    fd2 = open(filename, O_RDONLY);
+    while ((c = read(fd2, buf, sizeof(buf))) != 0) {
+        write(fd, buf, c);
+    }
+    close(fd2);
+    unlink(filename);
+    return 0;
+}

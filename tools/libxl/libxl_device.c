@@ -344,7 +344,7 @@ int libxl_device_del(struct libxl_ctx *ctx, libxl_device *dev, int wait)
 int libxl_device_pci_flr(struct libxl_ctx *ctx, unsigned int domain, unsigned int bus,
                          unsigned int dev, unsigned int func)
 {
-    char *do_flr= "/sys/bus/pci/drivers/pciback/do_flr";
+    char *do_flr = "/sys/bus/pci/drivers/pciback/do_flr";
     FILE *fd;
 
     fd = fopen(do_flr, "w");
@@ -367,7 +367,7 @@ int libxl_wait_for_device_model(struct libxl_ctx *ctx,
                                                       void *userdata),
                                 void *check_callback_userdata)
 {
-    char path[50];
+    char *path;
     char *p;
     unsigned int len;
     int rc;
@@ -379,7 +379,7 @@ int libxl_wait_for_device_model(struct libxl_ctx *ctx,
     char **l = NULL;
 
     xsh = xs_daemon_open();
-    snprintf(path, sizeof(path), "/local/domain/0/device-model/%d/state", domid);
+    path = libxl_sprintf(ctx, "/local/domain/0/device-model/%d/state", domid);
     xs_watch(xsh, path, path);
     tv.tv_sec = LIBXL_DEVICE_MODEL_START_TIMEOUT;
     tv.tv_usec = 0;

@@ -116,6 +116,7 @@ int build_hvm(struct libxl_ctx *ctx, uint32_t domid,
 int restore_common(struct libxl_ctx *ctx, uint32_t domid,
                    libxl_domain_build_info *info, libxl_domain_build_state *state, int fd);
 int core_suspend(struct libxl_ctx *ctx, uint32_t domid, int fd, int hvm, int live, int debug);
+int save_device_model(struct libxl_ctx *ctx, uint32_t domid, int fd);
 
 /* from xl_device */
 char *device_disk_backend_type_of_phystype(libxl_disk_phystype phystype);
@@ -186,7 +187,6 @@ int libxl_spawn_check(struct libxl_ctx *ctx,
 
  /* low-level stuff, for synchronous subprocesses etc. */
 
-pid_t libxl_fork(struct libxl_ctx *ctx); // logs errors
 void libxl_exec(struct libxl_ctx *ctx, int stdinfd, int stdoutfd, int stderrfd,
                 char *arg0, char **args); // logs errors, never returns
 void libxl_log_child_exitstatus(struct libxl_ctx *ctx,

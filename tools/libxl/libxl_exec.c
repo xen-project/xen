@@ -30,7 +30,7 @@
 #include "libxl.h"
 #include "libxl_internal.h"
 
-pid_t libxl_fork(struct libxl_ctx *ctx)
+static pid_t libxl_fork(struct libxl_ctx *ctx)
 {
     pid_t pid;
 
@@ -63,12 +63,13 @@ void libxl_exec(struct libxl_ctx *ctx, int stdinfd, int stdoutfd, int stderrfd,
 }
 
 void libxl_report_child_exitstatus(struct libxl_ctx *ctx,
-                                   const char *what, pid_t pid, int status) {
+                                   const char *what, pid_t pid, int status)
+{
     /* treats all exit statuses as errors; if that's not what you want,
      * check status yourself first */
 
     if (WIFEXITED(status)) {
-        int st= WEXITSTATUS(status);
+        int st = WEXITSTATUS(status);
         if (st)
             XL_LOG(ctx, XL_LOG_ERROR, "%s [%ld] exited"
                    " with error status %d", what, (unsigned long)pid, st);
@@ -76,9 +77,9 @@ void libxl_report_child_exitstatus(struct libxl_ctx *ctx,
             XL_LOG(ctx, XL_LOG_ERROR, "%s [%ld] unexpectedly"
                    " exited status zero", what, (unsigned long)pid);
     } else if (WIFSIGNALED(status)) {
-        int sig= WTERMSIG(status);
-        const char *str= strsignal(sig);
-        const char *coredump= WCOREDUMP(status) ? " (core dumped)" : "";
+        int sig = WTERMSIG(status);
+        const char *str = strsignal(sig);
+        const char *coredump = WCOREDUMP(status) ? " (core dumped)" : "";
         if (str)
             XL_LOG(ctx, XL_LOG_ERROR, "%s [%ld] died due to"
                    " fatal signal %s%s", what, (unsigned long)pid,
@@ -93,36 +94,36 @@ void libxl_report_child_exitstatus(struct libxl_ctx *ctx,
     }
 }
 
-pid_t libxl_waitpid_instead_default(pid_t pid, int *status, int flags) {
+pid_t libxl_waitpid_instead_default(pid_t pid, int *status, int flags)
+{
     return waitpid(pid,status,flags);
 }
-
-
 
 int libxl_spawn_spawn(struct libxl_ctx *ctx,
                       libxl_device_model_starting *starting,
                       const char *what,
                       void (*intermediate_hook)(struct libxl_ctx *ctx,
                                                 void *for_spawn,
-                                                pid_t innerchild)) {
+                                                pid_t innerchild))
+{
     pid_t child, got;
     int status;
     pid_t intermediate;
     struct libxl_spawn_starting *for_spawn = starting->for_spawn;
 
     if (for_spawn) {
-        for_spawn->what= libxl_sprintf(ctx, "%s", what);
+        for_spawn->what = libxl_sprintf(ctx, "%s", what);
         if (!for_spawn->what) return ERROR_NOMEM;
     }
 
     intermediate = libxl_fork(ctx);
-    if (intermediate==-1) {
+    if (intermediate ==-1) {
         if (for_spawn) free(for_spawn->what);
         return ERROR_FAIL;
     }
     if (intermediate) {
         /* parent */
-        if (for_spawn) for_spawn->intermediate= intermediate;
+        if (for_spawn) for_spawn->intermediate = intermediate;
         return 1;
     }
 
@@ -130,7 +131,7 @@ int libxl_spawn_spawn(struct libxl_ctx *ctx,
 
     child = libxl_fork(ctx);
     if (!child) return 0; /* caller runs child code */
-    if (child<0) exit(255);
+    if (child < 0) exit(255);
 
     intermediate_hook(ctx, starting, child);
 
@@ -141,17 +142,17 @@ int libxl_spawn_spawn(struct libxl_ctx *ctx,
 
     libxl_report_child_exitstatus(ctx, what, child, status);
     _exit(WIFEXITED(status) ? WEXITSTATUS(status) :
-          WIFSIGNALED(status) && WTERMSIG(status)<127
+          WIFSIGNALED(status) && WTERMSIG(status) < 127
           ? WTERMSIG(status)+128 : -1);
 }
 
 static void report_spawn_intermediate_status(struct libxl_ctx *ctx,
                                  struct libxl_spawn_starting *for_spawn,
-                                 int status) {
+                                 int status)
+{
     if (!WIFEXITED(status)) {
         /* intermediate process did the logging itself if it exited */
-        char *intermediate_what=
-            libxl_sprintf(ctx,
+        char *intermediate_what = libxl_sprintf(ctx,
                           "%s intermediate process (startup monitor)",
                           for_spawn->what);
         libxl_report_child_exitstatus(ctx, intermediate_what,
@@ -160,7 +161,8 @@ static void report_spawn_intermediate_status(struct libxl_ctx *ctx,
 }
 
 int libxl_spawn_detach(struct libxl_ctx *ctx,
-                       struct libxl_spawn_starting *for_spawn) {
+                       struct libxl_spawn_starting *for_spawn)
+{
     int r, status;
     pid_t got;
     int rc = 0;
@@ -178,7 +180,7 @@ int libxl_spawn_detach(struct libxl_ctx *ctx,
         }
         got = ctx->waitpid_instead(for_spawn->intermediate, &status, 0);
         assert(got == for_spawn->intermediate);
-        if (!(WIFSIGNALED(status) && WTERMSIG(status)==SIGKILL)) {
+        if (!(WIFSIGNALED(status) && WTERMSIG(status) == SIGKILL)) {
             report_spawn_intermediate_status(ctx, for_spawn, status);
             rc = ERROR_FAIL;
         }
@@ -191,7 +193,8 @@ int libxl_spawn_detach(struct libxl_ctx *ctx,
     return rc;
 }
 
-int libxl_spawn_check(struct libxl_ctx *ctx, void *for_spawn_void) {
+int libxl_spawn_check(struct libxl_ctx *ctx, void *for_spawn_void)
+{
     struct libxl_spawn_starting *for_spawn = for_spawn_void;
     pid_t got;
     int status;
@@ -205,6 +208,6 @@ int libxl_spawn_check(struct libxl_ctx *ctx, void *for_spawn_void) {
     assert(got == for_spawn->intermediate);
     report_spawn_intermediate_status(ctx, for_spawn, status);
 
-    for_spawn->intermediate= 0;
+    for_spawn->intermediate = 0;
     return ERROR_FAIL;
 }
