@@ -46,6 +46,21 @@ void log_callback(void *userdata, int loglevel, const char *file, int line, cons
     write(logfile, str, strlen(str));
 }
 
+#define LOG(_f, _a...)   dolog(__FILE__, __LINE__, __func__, _f, ##_a)
+
+void dolog(const char *file, int line, const char *func, char *fmt, ...)
+{
+    va_list ap;
+    char *s;
+    int rc;
+
+    va_start(ap, fmt);
+    rc = vasprintf(&s, fmt, ap);
+    va_end(ap);
+    if (rc >= 0)
+        write(logfile, s, rc);
+}
+
 static void init_create_info(libxl_domain_create_info *c_info)
 {
     memset(c_info, '\0', sizeof(*c_info));
@@ -784,7 +799,7 @@ start:
         daemon(0, 0);
         need_daemon = 0;
     }
-    XL_LOG(&ctx, XL_LOG_DEBUG, "Waiting for domain %s (domid %d) to die", info1.name, domid);
+    LOG("Waiting for domain %s (domid %d) to die", info1.name, domid);
     w1 = (libxl_waiter*) malloc(sizeof(libxl_waiter) * num_disks);
     w2 = (libxl_waiter*) malloc(sizeof(libxl_waiter));
     libxl_wait_for_disk_ejects(&ctx, domid, disks, num_disks, w1);
@@ -808,9 +823,9 @@ start:
         switch (event.type) {
             case DOMAIN_DEATH:
                 if (libxl_event_get_domain_death_info(&ctx, domid, &event, &info)) {
-                    XL_LOG(&ctx, XL_LOG_DEBUG, "Domain %d is dead", domid);
+                    LOG("Domain %d is dead", domid);
                     if (info.crashed || info.dying || (info.shutdown && (info.shutdown_reason != SHUTDOWN_suspend))) {
-                        XL_LOG(&ctx, XL_LOG_DEBUG, "Domain %d needs to be clean: destroying the domain", domid);
+                        LOG("Domain %d needs to be clean: destroying the domain", domid);
                         libxl_domain_destroy(&ctx, domid, 0);
                         if (info.shutdown && (info.shutdown_reason == SHUTDOWN_reboot)) {
                             libxl_free_waiter(w1);
@@ -818,12 +833,12 @@ start:
                             free(w1);
                             free(w2);
                             libxl_ctx_free(&ctx);
-                            XL_LOG(&ctx, XL_LOG_DEBUG, "Done. Rebooting now");
+                            LOG("Done. Rebooting now");
                             goto start;
                         }
-                        XL_LOG(&ctx, XL_LOG_DEBUG, "Done. Exiting now");
+                        LOG("Done. Exiting now");
                     }
-                    XL_LOG(&ctx, XL_LOG_DEBUG, "Domain %d does not need to be clean, exiting now", domid);
+                    LOG("Domain %d does not need to be clean, exiting now", domid);
                     exit(0);
                 }
                 break;

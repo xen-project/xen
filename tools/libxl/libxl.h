@@ -23,8 +23,6 @@
 
 #include "xen_uuid.h"
 
-#define XL_LOGGING_ENABLED
-
 typedef void (*libxl_log_callback)(void *userdata, int loglevel, const char *file,
                                    int line, const char *func, char *s);
 struct libxl_dominfo {
@@ -229,25 +227,6 @@ typedef struct  {
 #define ERROR_NI (-101)
 #define ERROR_NOMEM (-1032)
 #define ERROR_INVAL (-1245)
-
-/* logging */
-void xl_logv(struct libxl_ctx *ctx, int errnoval, int loglevel, const char *file, int line, const char *func, char *fmt, va_list al);
-void xl_log(struct libxl_ctx *ctx, int errnoval, int loglevel, const char *file, int line, const char *func, char *fmt, ...);
-
-#ifdef XL_LOGGING_ENABLED
-#define XL_LOG(ctx, loglevel, _f, _a...)   xl_log(ctx, loglevel, -1, __FILE__, __LINE__, __func__, _f, ##_a)
-#define XL_LOG_ERRNO(ctx, loglevel, _f, _a...)   xl_log(ctx, loglevel, errno, __FILE__, __LINE__, __func__, _f, ##_a)
-#define XL_LOG_ERRNOVAL(ctx, errnoval, loglevel, _f, _a...)   xl_log(ctx, loglevel, errnoval, __FILE__, __LINE__, __func__, _f, ##_a)
-#else
-#define XL_LOG(ctx, loglevel, _f, _a...)
-#define XL_LOG_ERRNO(ctx, loglevel, _f, _a...)
-#define XL_LOG_ERRNOVAL(ctx, loglevel, errnoval, _f, _a...)
-#endif
-
-#define XL_LOG_DEBUG 3
-#define XL_LOG_INFO 2
-#define XL_LOG_WARNING 1
-#define XL_LOG_ERROR 0
 
 /* context functions */
 int libxl_ctx_init(struct libxl_ctx *ctx);
