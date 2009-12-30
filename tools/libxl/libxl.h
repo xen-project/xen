@@ -226,10 +226,13 @@ typedef struct  {
     bool power_mgmt;
 } libxl_device_pci;
 
-#define ERROR_FAIL (-2)
-#define ERROR_NI (-101)
-#define ERROR_NOMEM (-1032)
-#define ERROR_INVAL (-1245)
+enum {
+    ERROR_VERSION = -1,
+    ERROR_FAIL = -2,
+    ERROR_NI = -3,
+    ERROR_NOMEM = -4,
+    ERROR_INVAL = -5,
+};
 
 /* context functions */
 int libxl_ctx_init(struct libxl_ctx *ctx);
