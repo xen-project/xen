@@ -344,7 +344,7 @@ void create_mp_tables(void)
             continue; /* skip the slave PIC connection */
         mpiie = (struct mp_io_intr_entry *)p;
         mpiie->type = ENTRY_TYPE_IO_INTR;
-        mpiie->intr_type = INTR_TYPE_EXTINT;
+        mpiie->intr_type = INTR_TYPE_INT;
         mpiie->io_intr_flags = (PCI_ISA_IRQ_MASK & (1U << i)) ? 0xf : 0x0;
         mpiie->src_bus_id = BUS_ID_ISA;
         mpiie->src_bus_irq = i;
