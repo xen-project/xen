@@ -2750,7 +2750,7 @@ int do_mmuext_op(
             }
 
             /* A page is dirtied when its pin status is set. */
-            paging_mark_dirty(d, mfn);
+            paging_mark_dirty(pg_owner, mfn);
            
             /* We can race domain destruction (domain_relinquish_resources). */
             if ( unlikely(pg_owner != d) )
@@ -2772,11 +2772,11 @@ int do_mmuext_op(
             unsigned long mfn;
             struct page_info *page;
 
-            if ( paging_mode_refcounts(d) )
+            if ( paging_mode_refcounts(pg_owner) )
                 break;
 
             mfn = gmfn_to_mfn(pg_owner, op.arg1.mfn);
-            if ( unlikely(!(okay = get_page_from_pagenr(mfn, d))) )
+            if ( unlikely(!(okay = get_page_from_pagenr(mfn, pg_owner))) )
             {
                 MEM_LOG("Mfn %lx bad domain", mfn);
                 break;
@@ -2796,7 +2796,7 @@ int do_mmuext_op(
             put_page(page);
 
             /* A page is dirtied when its pin status is cleared. */
-            paging_mark_dirty(d, mfn);
+            paging_mark_dirty(pg_owner, mfn);
 
             break;
         }
@@ -2922,8 +2922,8 @@ int do_mmuext_op(
             unsigned char *ptr;
 
             mfn = gmfn_to_mfn(d, op.arg1.mfn);
-            okay = !get_page_and_type_from_pagenr(mfn, PGT_writable_page,
-                                                  pg_owner, 0, 0);
+            okay = !get_page_and_type_from_pagenr(
+                mfn, PGT_writable_page, d, 0, 0);
             if ( unlikely(!okay) )
             {
                 MEM_LOG("Error while clearing mfn %lx", mfn);
@@ -2947,8 +2947,8 @@ int do_mmuext_op(
             unsigned char *dst;
             unsigned long src_mfn, mfn;
 
-            src_mfn = gmfn_to_mfn(pg_owner, op.arg2.src_mfn);
-            okay = get_page_from_pagenr(src_mfn, pg_owner);
+            src_mfn = gmfn_to_mfn(d, op.arg2.src_mfn);
+            okay = get_page_from_pagenr(src_mfn, d);
             if ( unlikely(!okay) )
             {
                 MEM_LOG("Error while copying from mfn %lx", src_mfn);
@@ -2956,8 +2956,8 @@ int do_mmuext_op(
             }
 
             mfn = gmfn_to_mfn(d, op.arg1.mfn);
-            okay = !get_page_and_type_from_pagenr(mfn, PGT_writable_page,
-                                                  pg_owner, 0, 0);
+            okay = !get_page_and_type_from_pagenr(
+                mfn, PGT_writable_page, d, 0, 0);
             if ( unlikely(!okay) )
             {
                 put_page(mfn_to_page(src_mfn));
