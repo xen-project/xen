@@ -748,9 +748,12 @@ static char ** libxl_build_device_model_args(struct libxl_ctx *ctx,
         }
         for (i = 0; i < num_vifs; i++) {
             if (vifs[i].nictype == NICTYPE_IOEMU) {
+                char *smac = libxl_sprintf(ctx, "%02x:%02x:%02x:%02x:%02x:%02x",
+                                           vifs[i].mac[0], vifs[i].mac[1], vifs[i].mac[2],
+                                           vifs[i].mac[3], vifs[i].mac[4], vifs[i].mac[5]);
                 flexarray_set(dm_args, num++, "-net");
                 flexarray_set(dm_args, num++, libxl_sprintf(ctx, "nic,vlan=%d,macaddr=%s,model=%s",
-                            vifs[i].devid, vifs[i].smac, vifs[i].model));
+                            vifs[i].devid, smac, vifs[i].model));
                 flexarray_set(dm_args, num++, "-net");
                 flexarray_set(dm_args, num++, libxl_sprintf(ctx, "tap,vlan=%d,ifname=%s,bridge=%s",
                             vifs[i].devid, vifs[i].ifname, vifs[i].bridge));
@@ -2303,7 +2306,6 @@ void init_nic_info(libxl_device_nic *nic_info, int devnum)
     nic_info->mac[3] = 1 + (int) (0x7f * (rand() / (RAND_MAX + 1.0)));
     nic_info->mac[4] = 1 + (int) (0xff * (rand() / (RAND_MAX + 1.0)));
     nic_info->mac[5] = 1 + (int) (0xff * (rand() / (RAND_MAX + 1.0)));
-    asprintf(&(nic_info->smac), "%02x:%02x:%02x:%02x:%02x:%02x", nic_info->mac[0], nic_info->mac[1], nic_info->mac[2], nic_info->mac[3], nic_info->mac[4], nic_info->mac[5]);
     nic_info->ifname = NULL;
     nic_info->bridge = "xenbr0";
     nic_info->script = "/etc/xen/scripts/vif-bridge";

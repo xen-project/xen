@@ -199,7 +199,6 @@ typedef struct {
     int mtu;
     char *model;
     uint8_t mac[6];
-    char *smac;
     struct in_addr ip;
     char *bridge;
     char *ifname;

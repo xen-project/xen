@@ -122,7 +122,6 @@ static void printf_info(libxl_domain_create_info *c_info,
         printf("mtu %d\n", vifs[i].mtu);
         printf("model %s\n", vifs[i].model);
         printf("mac %02x:%02x:%02x:%02x:%02x:%02x\n", vifs[i].mac[0], vifs[i].mac[1], vifs[i].mac[2], vifs[i].mac[3], vifs[i].mac[4], vifs[i].mac[5]);
-        printf("smac %s\n", vifs[i].mac);
     }
 
     for (i = 0; i < num_pcidevs; i++) {
@@ -399,7 +398,6 @@ static void parse_config_file(const char *filename,
                     (*vifs)[*num_vifs].model = strdup(p2 + 1);
                 } else if (!strcmp(p, "mac")) {
                     char *p3 = p2 + 1;
-                    (*vifs)[*num_vifs].smac = strdup(p3);
                     *(p3 + 2) = '\0';
                     (*vifs)[*num_vifs].mac[0] = strtol(p3, NULL, 16);
                     p3 = p3 + 3;
@@ -732,7 +730,6 @@ start:
 
     close(logfile);
     for (i = 0; i < num_vifs; i++) {
-        free(vifs[i].smac);
         free(vifs[i].ifname);
     }
     free(disks);
