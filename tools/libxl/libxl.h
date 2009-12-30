@@ -253,7 +253,6 @@ void xl_log(struct libxl_ctx *ctx, int errnoval, int loglevel, const char *file,
 /* context functions */
 int libxl_ctx_init(struct libxl_ctx *ctx);
 int libxl_ctx_free(struct libxl_ctx *ctx);
-int libxl_ctx_close(struct libxl_ctx *ctx);
 int libxl_ctx_set_log(struct libxl_ctx *ctx, libxl_log_callback log_callback, void *log_data);
 
 /* domain related functions */

@@ -53,16 +53,6 @@ int libxl_ctx_free(struct libxl_ctx *ctx)
 {
     libxl_free_all(ctx);
     free(ctx->alloc_ptrs);
-    ctx->alloc_ptrs = calloc(ctx->alloc_maxsize, sizeof(void *));
-    if (!ctx->alloc_ptrs)
-        return ERROR_NOMEM;
-    return 0;
-}
-
-int libxl_ctx_close(struct libxl_ctx *ctx)
-{
-    libxl_ctx_free(ctx);
-    free(ctx->alloc_ptrs);
     xc_interface_close(ctx->xch);
     xs_daemon_close(ctx->xsh); 
     return 0;
