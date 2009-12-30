@@ -730,7 +730,7 @@ static void create_domain(int debug, int daemonize, const char *config_file, con
 start:
     domid = 0;
 
-    libxl_ctx_init(&ctx);
+    libxl_ctx_init(&ctx, LIBXL_VERSION);
     libxl_ctx_set_log(&ctx, log_callback, NULL);
     libxl_domain_make(&ctx, &info1, &domid);
 
@@ -942,7 +942,7 @@ void set_memory_target(char *p, char *mem)
     struct libxl_ctx ctx;
     uint32_t domid;
 
-    libxl_ctx_init(&ctx);
+    libxl_ctx_init(&ctx, LIBXL_VERSION);
     libxl_ctx_set_log(&ctx, log_callback, NULL);
 
     if (libxl_param_to_domid(&ctx, p, &domid) < 0) {
@@ -984,7 +984,7 @@ void console(char *p, int cons_num)
     struct libxl_ctx ctx;
     uint32_t domid;
 
-    libxl_ctx_init(&ctx);
+    libxl_ctx_init(&ctx, LIBXL_VERSION);
     libxl_ctx_set_log(&ctx, log_callback, NULL);
 
     if (libxl_param_to_domid(&ctx, p, &domid) < 0) {
@@ -1001,7 +1001,7 @@ void cd_insert(char *dom, char *virtdev, char *phys)
     libxl_device_disk disk;
     char *p;
 
-    libxl_ctx_init(&ctx);
+    libxl_ctx_init(&ctx, LIBXL_VERSION);
     libxl_ctx_set_log(&ctx, log_callback, NULL);
 
     if (libxl_param_to_domid(&ctx, dom, &domid) < 0) {
@@ -1134,7 +1134,7 @@ void pcilist(char *dom)
     libxl_device_pci *pcidevs;
     int num, i;
 
-    libxl_ctx_init(&ctx);
+    libxl_ctx_init(&ctx, LIBXL_VERSION);
     libxl_ctx_set_log(&ctx, log_callback, NULL);
 
     if (libxl_param_to_domid(&ctx, dom, &domid) < 0) {
@@ -1184,7 +1184,7 @@ void pcidetach(char *dom, char *bdf)
     libxl_device_pci pcidev;
     unsigned int domain, bus, dev, func;
 
-    libxl_ctx_init(&ctx);
+    libxl_ctx_init(&ctx, LIBXL_VERSION);
     libxl_ctx_set_log(&ctx, log_callback, NULL);
 
     if (libxl_param_to_domid(&ctx, dom, &domid) < 0) {
@@ -1230,7 +1230,7 @@ void pciattach(char *dom, char *bdf, char *vs)
     libxl_device_pci pcidev;
     unsigned int domain, bus, dev, func;
 
-    libxl_ctx_init(&ctx);
+    libxl_ctx_init(&ctx, LIBXL_VERSION);
     libxl_ctx_set_log(&ctx, log_callback, NULL);
 
     if (libxl_param_to_domid(&ctx, dom, &domid) < 0) {
@@ -1278,7 +1278,7 @@ void pause_domain(char *p)
     struct libxl_ctx ctx;
     uint32_t domid;
 
-    libxl_ctx_init(&ctx);
+    libxl_ctx_init(&ctx, LIBXL_VERSION);
     libxl_ctx_set_log(&ctx, log_callback, NULL);
 
     if (libxl_param_to_domid(&ctx, p, &domid) < 0) {
@@ -1293,7 +1293,7 @@ void unpause_domain(char *p)
     struct libxl_ctx ctx;
     uint32_t domid;
 
-    libxl_ctx_init(&ctx);
+    libxl_ctx_init(&ctx, LIBXL_VERSION);
     libxl_ctx_set_log(&ctx, log_callback, NULL);
 
     if (libxl_param_to_domid(&ctx, p, &domid) < 0) {
@@ -1308,7 +1308,7 @@ void destroy_domain(char *p)
     struct libxl_ctx ctx;
     uint32_t domid;
 
-    libxl_ctx_init(&ctx);
+    libxl_ctx_init(&ctx, LIBXL_VERSION);
     libxl_ctx_set_log(&ctx, log_callback, NULL);
 
     if (libxl_param_to_domid(&ctx, p, &domid) < 0) {
@@ -1324,7 +1324,7 @@ void list_domains(void)
     struct libxl_dominfo *info;
     int nb_domain, i;
 
-    libxl_ctx_init(&ctx);
+    libxl_ctx_init(&ctx, LIBXL_VERSION);
     libxl_ctx_set_log(&ctx, log_callback, NULL);
 
     info = libxl_domain_list(&ctx, &nb_domain);
@@ -1351,7 +1351,7 @@ int save_domain(char *p, char *filename, int checkpoint)
     uint32_t domid;
     int fd;
 
-    libxl_ctx_init(&ctx);
+    libxl_ctx_init(&ctx, LIBXL_VERSION);
     libxl_ctx_set_log(&ctx, log_callback, NULL);
 
     if (libxl_param_to_domid(&ctx, p, &domid) < 0) {

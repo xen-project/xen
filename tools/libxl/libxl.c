@@ -34,8 +34,10 @@
 #include "libxl_internal.h"
 #include "flexarray.h"
 
-int libxl_ctx_init(struct libxl_ctx *ctx)
+int libxl_ctx_init(struct libxl_ctx *ctx, int version)
 {
+    if (version != LIBXL_VERSION)
+        return ERROR_VERSION;
     memset(ctx, 0, sizeof(struct libxl_ctx));
     ctx->alloc_maxsize = 256;
     ctx->alloc_ptrs = calloc(ctx->alloc_maxsize, sizeof(void *));

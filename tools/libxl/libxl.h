@@ -234,8 +234,10 @@ enum {
     ERROR_INVAL = -5,
 };
 
+#define LIBXL_VERSION 0
+
 /* context functions */
-int libxl_ctx_init(struct libxl_ctx *ctx);
+int libxl_ctx_init(struct libxl_ctx *ctx, int version);
 int libxl_ctx_free(struct libxl_ctx *ctx);
 int libxl_ctx_set_log(struct libxl_ctx *ctx, libxl_log_callback log_callback, void *log_data);
 
