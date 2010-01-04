@@ -1351,9 +1351,6 @@ static int domain_context_unmap_one(
     struct context_entry *context, *context_entries;
     u64 maddr;
     int iommu_domid;
-    struct pci_dev *pdev;
-    struct acpi_drhd_unit *drhd;
-    int found = 0;
 
     ASSERT(spin_is_locked(&pcidevs_lock));
     spin_lock(&iommu->lock);
@@ -1391,6 +1388,78 @@ static int domain_context_unmap_one(
         iommu_flush_iotlb_dsi(iommu, iommu_domid, 0, flush_dev_iotlb);
     }
 
+    spin_unlock(&iommu->lock);
+    unmap_vtd_domain_page(context_entries);
+
+    return 0;
+}
+
+static int domain_context_unmap(struct domain *domain, u8 bus, u8 devfn)
+{
+    struct acpi_drhd_unit *drhd;
+    struct iommu *iommu;
+    int ret = 0;
+    u32 type;
+    u8 tmp_bus, tmp_devfn, secbus;
+    struct pci_dev *pdev = pci_get_pdev(bus, devfn);
+    int found = 0;
+
+    BUG_ON(!pdev);
+
+    drhd = acpi_find_matched_drhd_unit(pdev);
+    if ( !drhd )
+        return -ENODEV;
+    iommu = drhd->iommu;
+
+    type = pdev_type(bus, devfn);
+    switch ( type )
+    {
+    case DEV_TYPE_PCIe_BRIDGE:
+    case DEV_TYPE_PCIe2PCI_BRIDGE:
+    case DEV_TYPE_LEGACY_PCI_BRIDGE:
+        goto out;
+
+    case DEV_TYPE_PCIe_ENDPOINT:
+        gdprintk(XENLOG_INFO VTDPREFIX,
+                 "domain_context_unmap:PCIe: bdf = %x:%x.%x\n",
+                 bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+        ret = domain_context_unmap_one(domain, iommu, bus, devfn);
+        break;
+
+    case DEV_TYPE_PCI:
+        gdprintk(XENLOG_INFO VTDPREFIX,
+                 "domain_context_unmap:PCI: bdf = %x:%x.%x\n",
+                 bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+        ret = domain_context_unmap_one(domain, iommu, bus, devfn);
+        if ( ret )
+            break;
+
+        tmp_bus = bus;
+        tmp_devfn = devfn;
+        if ( find_upstream_bridge(&tmp_bus, &tmp_devfn, &secbus) < 1 )
+            break;
+
+        /* PCIe to PCI/PCIx bridge */
+        if ( pdev_type(tmp_bus, tmp_devfn) == DEV_TYPE_PCIe2PCI_BRIDGE )
+        {
+            ret = domain_context_unmap_one(domain, iommu, tmp_bus, tmp_devfn);
+            if ( ret )
+                return ret;
+
+            ret = domain_context_unmap_one(domain, iommu, secbus, 0);
+        }
+        else /* Legacy PCI bridge */
+            ret = domain_context_unmap_one(domain, iommu, tmp_bus, tmp_devfn);
+
+        break;
+
+    default:
+        gdprintk(XENLOG_ERR VTDPREFIX,
+                 "domain_context_unmap:unknown type: bdf = %x:%x.%x\n",
+                 bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+        ret = -EINVAL;
+        goto out;
+    }
 
     /*
      * if no other devices under the same iommu owned by this domain,
@@ -1412,81 +1481,22 @@ static int domain_context_unmap_one(
     if ( found == 0 )
     {
         struct hvm_iommu *hd = domain_hvm_iommu(domain);
+        int iommu_domid;
 
         clear_bit(iommu->index, &hd->iommu_bitmap);
+
+        iommu_domid = domain_iommu_domid(domain, iommu);
+        if ( iommu_domid == -1 )
+        {
+            ret = -EINVAL;
+            goto out;
+        }
 
         clear_bit(iommu_domid, iommu->domid_bitmap);
         iommu->domid_map[iommu_domid] = 0;
     }
 
-    spin_unlock(&iommu->lock);
-    unmap_vtd_domain_page(context_entries);
-
-    return 0;
-}
-
-static int domain_context_unmap(struct domain *domain, u8 bus, u8 devfn)
-{
-    struct acpi_drhd_unit *drhd;
-    int ret = 0;
-    u32 type;
-    u8 secbus;
-    struct pci_dev *pdev = pci_get_pdev(bus, devfn);
-
-    BUG_ON(!pdev);
-
-    drhd = acpi_find_matched_drhd_unit(pdev);
-    if ( !drhd )
-        return -ENODEV;
-
-    type = pdev_type(bus, devfn);
-    switch ( type )
-    {
-    case DEV_TYPE_PCIe_BRIDGE:
-    case DEV_TYPE_PCIe2PCI_BRIDGE:
-    case DEV_TYPE_LEGACY_PCI_BRIDGE:
-        break;
-
-    case DEV_TYPE_PCIe_ENDPOINT:
-        gdprintk(XENLOG_INFO VTDPREFIX,
-                 "domain_context_unmap:PCIe: bdf = %x:%x.%x\n",
-                 bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
-        ret = domain_context_unmap_one(domain, drhd->iommu, bus, devfn);
-        break;
-
-    case DEV_TYPE_PCI:
-        gdprintk(XENLOG_INFO VTDPREFIX,
-                 "domain_context_unmap:PCI: bdf = %x:%x.%x\n",
-                 bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
-        ret = domain_context_unmap_one(domain, drhd->iommu, bus, devfn);
-        if ( ret )
-            break;
-
-        if ( find_upstream_bridge(&bus, &devfn, &secbus) < 1 )
-            break;
-
-        /* PCIe to PCI/PCIx bridge */
-        if ( pdev_type(bus, devfn) == DEV_TYPE_PCIe2PCI_BRIDGE )
-        {
-            ret = domain_context_unmap_one(domain, drhd->iommu, bus, devfn);
-            if ( ret )
-                return ret;
-
-            ret = domain_context_unmap_one(domain, drhd->iommu, secbus, 0);
-        }
-        else /* Legacy PCI bridge */
-            ret = domain_context_unmap_one(domain, drhd->iommu, bus, devfn);
-
-        break;
-
-    default:
-        gdprintk(XENLOG_ERR VTDPREFIX,
-                 "domain_context_unmap:unknown type: bdf = %x:%x.%x\n",
-                 bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
-        ret = -EINVAL;
-        break;
-    }
-
+out:
     return ret;
 }
 
