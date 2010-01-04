@@ -997,7 +997,7 @@ void __init subarch_init_memory(void)
     }
 
     if ( setup_compat_arg_xlat(smp_processor_id(),
-                               cpu_to_node[0]) )
+                               apicid_to_node[boot_cpu_physical_apicid]) )
         panic("Could not setup argument translation area");
 }
 

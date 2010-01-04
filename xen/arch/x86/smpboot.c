@@ -913,7 +913,7 @@ static int __devinit do_boot_cpu(int apicid, int cpu)
 	}
 #else
 	if (!per_cpu(compat_arg_xlat, cpu))
-		setup_compat_arg_xlat(cpu, cpu_to_node[cpu]);
+		setup_compat_arg_xlat(cpu, apicid_to_node[apicid]);
 #endif
 
 	if (!idt_tables[cpu]) {
