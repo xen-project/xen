@@ -195,34 +195,25 @@ void iommu_domain_destroy(struct domain *d)
     if ( !iommu_enabled || !hd->platform_ops )
         return;
 
-    if ( !need_iommu(d)  )
-        return;
-
     if ( need_iommu(d) )
     {
         d->need_iommu = 0;
         hd->platform_ops->teardown(d);
-        return;
     }
 
-    if ( hd )
+    list_for_each_safe ( ioport_list, tmp, &hd->g2m_ioport_list )
     {
-        list_for_each_safe ( ioport_list, tmp, &hd->g2m_ioport_list )
-        {
-            ioport = list_entry(ioport_list, struct g2m_ioport, list);
-            list_del(&ioport->list);
-            xfree(ioport);
-        }
-
-        list_for_each_safe ( rmrr_list, tmp, &hd->mapped_rmrrs )
-        {
-            mrmrr = list_entry(rmrr_list, struct mapped_rmrr, list);
-            list_del(&mrmrr->list);
-            xfree(mrmrr);
-        }
+        ioport = list_entry(ioport_list, struct g2m_ioport, list);
+        list_del(&ioport->list);
+        xfree(ioport);
     }
 
-    return hd->platform_ops->teardown(d);
+    list_for_each_safe ( rmrr_list, tmp, &hd->mapped_rmrrs )
+    {
+        mrmrr = list_entry(rmrr_list, struct mapped_rmrr, list);
+        list_del(&mrmrr->list);
+        xfree(mrmrr);
+    }
 }
 
 int iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn)
