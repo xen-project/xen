@@ -596,7 +596,7 @@ __gnttab_map_grant_ref(
         goto undo_out;
     }
 
-    if ( need_iommu(ld) &&
+    if ( (!is_hvm_domain(ld) && need_iommu(ld)) &&
          !(old_pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask)) &&
          (act_pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask)) )
     {
@@ -779,7 +779,7 @@ __gnttab_unmap_common(
             act->pin -= GNTPIN_hstw_inc;
     }
 
-    if ( need_iommu(ld) &&
+    if ( (!is_hvm_domain(ld) && need_iommu(ld)) &&
          (old_pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask)) &&
          !(act->pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask)) )
     {

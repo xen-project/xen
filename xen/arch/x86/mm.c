@@ -2391,7 +2391,7 @@ static int __get_page_type(struct page_info *page, unsigned long type,
     {
         /* Special pages should not be accessible from devices. */
         struct domain *d = page_get_owner(page);
-        if ( d && unlikely(need_iommu(d)) )
+        if ( d && !is_hvm_domain(d) && unlikely(need_iommu(d)) )
         {
             if ( (x & PGT_type_mask) == PGT_writable_page )
                 iommu_unmap_page(d, mfn_to_gmfn(d, page_to_mfn(page)));
