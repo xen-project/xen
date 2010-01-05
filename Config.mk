@@ -150,9 +150,9 @@ QEMU_REMOTE=http://xenbits.xensource.com/git-http/qemu-xen-unstable.git
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 9297e6402f6aa1b52e5577edc875eb2d2163baeb
-# Mon Dec 7 12:25:54 2009 +0000
-# passthrough: Fix no_wb not to crash on unknown registers
+QEMU_TAG ?= 2621a102cd74cd6691bed30f638581639fcb141d
+# Mon Jan 4 17:49:06 2010 +0000
+# passthrough: Fix MSI-x devices assignment.
 
 OCAML_XENSTORED_REPO=http://xenbits.xensource.com/ext/xen-ocaml-tools.hg
 
