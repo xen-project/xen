@@ -20,7 +20,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <libconfig.h>
-#include "xen_uuid.h"
 #include <unistd.h>
 #include <sys/time.h> /* for time */
 #include <getopt.h>
@@ -31,10 +30,12 @@
 #include <sys/select.h>
 #include <arpa/inet.h>
 #include <xenctrl.h>
-
+#include <ctype.h>
 
 #include "libxl.h"
 #include "libxl_utils.h"
+
+#define UUID_FMT "%02hhx%02hhx%02hhx%02hhx-%02hhx%02hhx-%02hhx%02hhx-%02hhx%02hhx-%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx"
 
 int logfile = 2;
 
@@ -44,6 +45,29 @@ void log_callback(void *userdata, int loglevel, const char *file, int line, cons
 
     snprintf(str, sizeof(str), "[%d] %s:%d:%s: %s\n", loglevel, file, line, func, s);
     write(logfile, str, strlen(str));
+}
+
+static int domain_qualifier_to_domid(struct libxl_ctx *ctx, char *p, uint32_t *domid)
+{
+    int i, alldigit;
+
+    alldigit = 1;
+    for (i = 0; p[i]; i++) {
+        if (!isdigit(p[i])) {
+            alldigit = 0;
+            break;
+        }
+    }
+
+    if (i == 0)
+        return -1;
+    if (alldigit) {
+        *domid = strtoul(p, NULL, 10);
+        return 0;
+    } else {
+        /* check here if it's a uuid and do proper conversion */
+    }
+    return libxl_name_to_domid(ctx, p, domid);
 }
 
 #define LOG(_f, _a...)   dolog(__FILE__, __LINE__, __func__, _f, ##_a)
@@ -97,7 +121,12 @@ static void init_build_info(libxl_domain_build_info *b_info, libxl_domain_create
 static void init_dm_info(libxl_device_model_info *dm_info,
         libxl_domain_create_info *c_info, libxl_domain_build_info *b_info)
 {
+    int i;
     memset(dm_info, '\0', sizeof(*dm_info));
+
+    for (i = 0; i < 16; i++) {
+        dm_info->uuid[i] = rand();
+    }
 
     dm_info->dom_name = c_info->name;
     dm_info->device_model = "/usr/lib/xen/bin/qemu-dm";
@@ -183,14 +212,16 @@ static void printf_info(libxl_domain_create_info *c_info,
                         libxl_device_model_info *dm_info)
 {
     int i;
-    char uuid_str[37];
     printf("*** domain_create_info ***\n");
     printf("hvm: %d\n", c_info->hvm);
     printf("hap: %d\n", c_info->hap);
     printf("ssidref: %d\n", c_info->ssidref);
     printf("name: %s\n", c_info->name);
-    xen_uuid_to_string(c_info->uuid, uuid_str, sizeof(uuid_str));
-    printf("uuid: %s\n", uuid_str);
+    printf("uuid: " UUID_FMT "\n",
+           (c_info->uuid)[0], (c_info->uuid)[1], (c_info->uuid)[2], (c_info->uuid)[3],
+           (c_info->uuid)[4], (c_info->uuid)[5], (c_info->uuid)[6], (c_info->uuid)[7],
+           (c_info->uuid)[8], (c_info->uuid)[9], (c_info->uuid)[10], (c_info->uuid)[11],
+           (c_info->uuid)[12], (c_info->uuid)[13], (c_info->uuid)[14], (c_info->uuid)[15]);
     if (c_info->xsdata)
         printf("xsdata: contains data\n");
     else
@@ -363,12 +394,12 @@ static void parse_config_file(const char *filename,
                               libxl_device_model_info *dm_info)
 {
     const char *buf;
-    xen_uuid_t uuid[16];
     long l;
     struct config_t config;
     struct config_setting_t *vbds, *nics, *pcis, *cvfbs;
     int pci_power_mgmt = 0;
     int pci_msitranslate = 1;
+    int i;
 
     config_init (&config);
 
@@ -396,8 +427,9 @@ static void parse_config_file(const char *filename,
         c_info->name = strdup(buf);
     else
         c_info->name = "test";
-    xen_uuid_generate(uuid);
-    c_info->uuid = uuid;
+    for (i = 0; i < 16; i++) {
+        c_info->uuid[i] = rand();
+    }
 
     init_build_info(b_info, c_info);
 
@@ -945,7 +977,7 @@ void set_memory_target(char *p, char *mem)
     libxl_ctx_init(&ctx, LIBXL_VERSION);
     libxl_ctx_set_log(&ctx, log_callback, NULL);
 
-    if (libxl_param_to_domid(&ctx, p, &domid) < 0) {
+    if (domain_qualifier_to_domid(&ctx, p, &domid) < 0) {
         fprintf(stderr, "%s is an invalid domain identifier\n", p);
         exit(2);
     }
@@ -987,7 +1019,7 @@ void console(char *p, int cons_num)
     libxl_ctx_init(&ctx, LIBXL_VERSION);
     libxl_ctx_set_log(&ctx, log_callback, NULL);
 
-    if (libxl_param_to_domid(&ctx, p, &domid) < 0) {
+    if (domain_qualifier_to_domid(&ctx, p, &domid) < 0) {
         fprintf(stderr, "%s is an invalid domain identifier\n", p);
         exit(2);
     }
@@ -1004,7 +1036,7 @@ void cd_insert(char *dom, char *virtdev, char *phys)
     libxl_ctx_init(&ctx, LIBXL_VERSION);
     libxl_ctx_set_log(&ctx, log_callback, NULL);
 
-    if (libxl_param_to_domid(&ctx, dom, &domid) < 0) {
+    if (domain_qualifier_to_domid(&ctx, dom, &domid) < 0) {
         fprintf(stderr, "%s is an invalid domain identifier\n", dom);
         exit(2);
     }
@@ -1137,7 +1169,7 @@ void pcilist(char *dom)
     libxl_ctx_init(&ctx, LIBXL_VERSION);
     libxl_ctx_set_log(&ctx, log_callback, NULL);
 
-    if (libxl_param_to_domid(&ctx, dom, &domid) < 0) {
+    if (domain_qualifier_to_domid(&ctx, dom, &domid) < 0) {
         fprintf(stderr, "%s is an invalid domain identifier\n", dom);
         exit(2);
     }
@@ -1187,7 +1219,7 @@ void pcidetach(char *dom, char *bdf)
     libxl_ctx_init(&ctx, LIBXL_VERSION);
     libxl_ctx_set_log(&ctx, log_callback, NULL);
 
-    if (libxl_param_to_domid(&ctx, dom, &domid) < 0) {
+    if (domain_qualifier_to_domid(&ctx, dom, &domid) < 0) {
         fprintf(stderr, "%s is an invalid domain identifier\n", dom);
         exit(2);
     }
@@ -1233,7 +1265,7 @@ void pciattach(char *dom, char *bdf, char *vs)
     libxl_ctx_init(&ctx, LIBXL_VERSION);
     libxl_ctx_set_log(&ctx, log_callback, NULL);
 
-    if (libxl_param_to_domid(&ctx, dom, &domid) < 0) {
+    if (domain_qualifier_to_domid(&ctx, dom, &domid) < 0) {
         fprintf(stderr, "%s is an invalid domain identifier\n", dom);
         exit(2);
     }
@@ -1281,7 +1313,7 @@ void pause_domain(char *p)
     libxl_ctx_init(&ctx, LIBXL_VERSION);
     libxl_ctx_set_log(&ctx, log_callback, NULL);
 
-    if (libxl_param_to_domid(&ctx, p, &domid) < 0) {
+    if (domain_qualifier_to_domid(&ctx, p, &domid) < 0) {
         fprintf(stderr, "%s is an invalid domain identifier\n", p);
         exit(2);
     }
@@ -1296,7 +1328,7 @@ void unpause_domain(char *p)
     libxl_ctx_init(&ctx, LIBXL_VERSION);
     libxl_ctx_set_log(&ctx, log_callback, NULL);
 
-    if (libxl_param_to_domid(&ctx, p, &domid) < 0) {
+    if (domain_qualifier_to_domid(&ctx, p, &domid) < 0) {
         fprintf(stderr, "%s is an invalid domain identifier\n", p);
         exit(2);
     }
@@ -1311,7 +1343,7 @@ void destroy_domain(char *p)
     libxl_ctx_init(&ctx, LIBXL_VERSION);
     libxl_ctx_set_log(&ctx, log_callback, NULL);
 
-    if (libxl_param_to_domid(&ctx, p, &domid) < 0) {
+    if (domain_qualifier_to_domid(&ctx, p, &domid) < 0) {
         fprintf(stderr, "%s is an invalid domain identifier\n", p);
         exit(2);
     }
@@ -1354,7 +1386,7 @@ int save_domain(char *p, char *filename, int checkpoint)
     libxl_ctx_init(&ctx, LIBXL_VERSION);
     libxl_ctx_set_log(&ctx, log_callback, NULL);
 
-    if (libxl_param_to_domid(&ctx, p, &domid) < 0) {
+    if (domain_qualifier_to_domid(&ctx, p, &domid) < 0) {
         fprintf(stderr, "%s is an invalid domain identifier\n", p);
         exit(2);
     }

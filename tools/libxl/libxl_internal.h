@@ -87,6 +87,12 @@ typedef struct {
 
 #define PRINTF_ATTRIBUTE(x, y) __attribute__((format(printf, x, y)))
 
+#define UUID_FMT "%02hhx%02hhx%02hhx%02hhx-%02hhx%02hhx-%02hhx%02hhx-%02hhx%02hhx-%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx"
+#define string_of_uuid(ctx, u) \
+    libxl_sprintf(ctx, UUID_FMT, \
+                (u)[0], (u)[1], (u)[2], (u)[3], (u)[4], (u)[5], (u)[6], (u)[7], \
+                (u)[8], (u)[9], (u)[10], (u)[11], (u)[12], (u)[13], (u)[14], (u)[15])
+
 /* memory allocation tracking/helpers */
 int libxl_clone_context(struct libxl_ctx *from, struct libxl_ctx *to);
 static inline int libxl_clone_context_xs(

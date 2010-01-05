@@ -12,12 +12,7 @@ MINOR = 0
 CFLAGS += -I. -fPIC
 CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenguest) $(CFLAGS_libxenstore)
 
-
 LIBS = $(LDFLAGS_libxenctrl) $(LDFLAGS_libxenguest) $(LDFLAGS_libxenstore)
-
-ifeq ($(CONFIG_Linux),y)
-LIBS += -luuid
-endif
 
 LIBCONFIG_URL ?= http://www.hyperrealm.com/libconfig
 LIBCONFIG_SOURCE = libconfig-1.3.2

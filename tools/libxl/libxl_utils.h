@@ -18,17 +18,9 @@
 
 #include "libxl.h"
 
-#define UUID_FMT "%02hhx%02hhx%02hhx%02hhx-%02hhx%02hhx-%02hhx%02hhx-%02hhx%02hhx-%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx"
-
 unsigned long libxl_get_required_shadow_memory(unsigned long maxmem_kb, unsigned int smp_cpus);
 int libxl_name_to_domid(struct libxl_ctx *ctx, char *name, uint32_t *domid);
 char *libxl_domid_to_name(struct libxl_ctx *ctx, uint32_t domid);
-int libxl_uuid_to_domid(struct libxl_ctx *ctx, xen_uuid_t *uuid, uint32_t *domid);
-int libxl_domid_to_uuid(struct libxl_ctx *ctx, xen_uuid_t **uuid, uint32_t domid);
-int libxl_is_uuid(char *s);
-xen_uuid_t *libxl_string_to_uuid(struct libxl_ctx *ctx, char *s);
-char *libxl_uuid_to_string(struct libxl_ctx *ctx, xen_uuid_t *uuid);
-int libxl_param_to_domid(struct libxl_ctx *ctx, char *p, uint32_t *domid);
 int libxl_get_stubdom_id(struct libxl_ctx *ctx, int guest_domid);
 int libxl_is_stubdom(struct libxl_ctx *ctx, int domid);
 int libxl_create_logfile(struct libxl_ctx *ctx, char *name, char **full_name);

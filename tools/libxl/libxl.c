@@ -81,9 +81,9 @@ int libxl_domain_make(struct libxl_ctx *ctx, libxl_domain_create_info *info,
     xs_transaction_t t;
     xen_domain_handle_t handle;
 
-    uuid_string = libxl_uuid_to_string(ctx, info->uuid);
+    uuid_string = string_of_uuid(ctx, info->uuid);
     if (!uuid_string) {
-        XL_LOG(ctx, XL_LOG_ERROR, "missing uuid");
+        XL_LOG(ctx, XL_LOG_ERROR, "cannot allocate uuid string");
         return ERROR_FAIL;
     }
 
@@ -91,23 +91,6 @@ int libxl_domain_make(struct libxl_ctx *ctx, libxl_domain_create_info *info,
     flags |= info->hap ? XEN_DOMCTL_CDF_hap : 0;
     *domid = 0;
 
-    /*
-     * info->uuid != xen_domain_handle_t
-     * See: 
-     *      http://www.opengroup.org/dce/info/draft-leach-uuids-guids-01.txt
-     *      http://www.opengroup.org/onlinepubs/009629399/apdxa.htm
-     *
-     * A DCE 1.1 compatible source representation of UUIDs.
-     *
-     * struct uuid {
-     *     uint32_t        time_low;
-     *     uint16_t        time_mid;
-     *     uint16_t        time_hi_and_version;
-     *     uint8_t         clock_seq_hi_and_reserved;
-     *     uint8_t         clock_seq_low;
-     *     uint8_t         node[_UUID_NODE_LEN];
-     * };
-     */
     /* Ultimately, handle is an array of 16 uint8_t, same as uuid */
     memcpy(handle, info->uuid, sizeof(xen_domain_handle_t));
 
@@ -546,9 +529,8 @@ static int libxl_destroy_device_model(struct libxl_ctx *ctx, uint32_t domid)
 
 int libxl_domain_destroy(struct libxl_ctx *ctx, uint32_t domid, int force)
 {
-    char *dom_path, *uuid_str;
+    char *dom_path;
     char *vm_path, *vss_path, *xapi_path;
-    xen_uuid_t *uuid;
     int rc, dm_present;
 
     if (is_hvm(ctx, domid)) {
@@ -564,10 +546,6 @@ int libxl_domain_destroy(struct libxl_ctx *ctx, uint32_t domid, int force)
     if (!dom_path)
         return -1;
 
-    if (libxl_domid_to_uuid(ctx, &uuid, domid) < 0) {
-        XL_LOG(ctx, XL_LOG_ERROR, "failed ot get uuid for %d", domid);
-        return -1;
-    }
     if (libxl_device_pci_shutdown(ctx, domid) < 0)
         XL_LOG(ctx, XL_LOG_ERROR, "pci shutdown failed for domid %d", domid);
     if (dm_present) {
@@ -589,13 +567,11 @@ int libxl_domain_destroy(struct libxl_ctx *ctx, uint32_t domid, int force)
     if (!xs_rm(ctx->xsh, XBT_NULL, dom_path))
         XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "xs_rm failed for %s", dom_path);
 
-    uuid_str = libxl_uuid_to_string(ctx, uuid);
-
-    vm_path = libxl_sprintf(ctx, "/vm/%s", uuid_str);
+    vm_path = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "/local/domain/%d/vm", domid));
     if (!xs_rm(ctx->xsh, XBT_NULL, vm_path))
         XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "xs_rm failed for %s", vm_path);
 
-    vss_path = libxl_sprintf(ctx, "/vss/%s", uuid_str);
+    vss_path = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "/local/domain/%d/vss", domid));
     if (!xs_rm(ctx->xsh, XBT_NULL, vss_path))
         XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "xs_rm failed for %s", vss_path);
 
@@ -856,7 +832,6 @@ static int libxl_create_stubdom(struct libxl_ctx *ctx,
     libxl_domain_build_state state;
     uint32_t domid;
     char **args;
-    xen_uuid_t uuid[16];
     struct xs_permissions perm[2];
     xs_transaction_t t;
     libxl_device_model_starting *dm_starting = 0;
@@ -868,8 +843,8 @@ static int libxl_create_stubdom(struct libxl_ctx *ctx,
     memset(&c_info, 0x00, sizeof(libxl_domain_create_info));
     c_info.hvm = 0;
     c_info.name = libxl_sprintf(ctx, "%s-dm", libxl_domid_to_name(ctx, info->domid));
-    xen_uuid_generate(uuid);
-    c_info.uuid = uuid;
+    for (i = 0; i < 16; i++)
+        c_info.uuid[i] = info->uuid[i];
 
     memset(&b_info, 0x00, sizeof(libxl_domain_build_info));
     b_info.max_vcpus = 1;

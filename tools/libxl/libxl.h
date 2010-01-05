@@ -21,12 +21,10 @@
 #include <xenctrl.h>
 #include <xs.h>
 
-#include "xen_uuid.h"
-
 typedef void (*libxl_log_callback)(void *userdata, int loglevel, const char *file,
                                    int line, const char *func, char *s);
 struct libxl_dominfo {
-    xen_uuid_t uuid;
+    uint8_t uuid[16];
     uint32_t domid;
     uint8_t dying:1;
     uint8_t paused:1;
@@ -55,7 +53,7 @@ typedef struct {
     bool hap;
     int ssidref;
     char *name;
-    xen_uuid_t *uuid;
+    uint8_t uuid[16];
     char **xsdata;
     char **platformdata;
 } libxl_domain_create_info;
@@ -111,6 +109,7 @@ typedef enum {
 
 typedef struct {
     int domid;
+    uint8_t uuid[16]; /* this is use only with stubdom, and must be different from the domain uuid */
     char *dom_name;
     char *device_model;
     char *saved_state;
