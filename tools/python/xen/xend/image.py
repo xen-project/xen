@@ -840,7 +840,7 @@ class HVMImageHandler(ImageHandler):
     def parseDeviceModelArgs(self, vmConfig):
         ret = ImageHandler.parseDeviceModelArgs(self, vmConfig)
         ret = ret + ['-vcpus', str(self.vm.getVCpuCount())]
-#        ret = ret + ['-vcpu_avail', str(self.vm.getVCpuAvail())]
+        ret = ret + ['-vcpu_avail', str(self.vm.getVCpuAvail())]
 
         if self.kernel:
             log.debug("kernel         = %s", self.kernel)
