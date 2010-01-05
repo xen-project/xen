@@ -58,6 +58,7 @@ install: all
 	ln -sf libxenlight.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)/libxenlight.so.$(MAJOR)
 	ln -sf libxenlight.so.$(MAJOR) $(DESTDIR)$(LIBDIR)/libxenlight.so
 	$(INSTALL_DATA) libxenlight.a $(DESTDIR)$(LIBDIR)
+	$(INSTALL_DATA) libxl.h $(DESTDIR)$(INCLUDEDIR)
 	cd $(LIBCONFIG_SOURCE) && DESTDIR= $(MAKE) install
 
 .PHONY: clean
