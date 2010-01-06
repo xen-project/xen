@@ -114,7 +114,7 @@ static unsigned inline int max_nr_maptrack_frames(void)
         __x = INVALID_MFN;                                  \
     __x; })
 #else
-#define gfn_to_mfn_private(_d, _gfn) gmfn_to_mfn(rd, act->gfn)
+#define gfn_to_mfn_private(_d, _gfn) gmfn_to_mfn(_d, _gfn)
 #endif
 
 #define SHGNT_PER_PAGE_V1 (PAGE_SIZE / sizeof(grant_entry_v1_t))

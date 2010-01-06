@@ -195,7 +195,7 @@ static void __xencomm_mark_dirty(struct domain *d,
 
 extern unsigned long ia64_iobase;
 
-struct domain *dom_xen, *dom_io;
+struct domain *dom_xen, *dom_io, *dom_cow;
 
 /*
  * This number is bigger than DOMID_SELF, DOMID_XEN and DOMID_IO.
@@ -223,6 +223,13 @@ alloc_dom_xen_and_dom_io(void)
      */
     dom_io = domain_create(DOMID_IO, DOMCRF_dummy, 0);
     BUG_ON(dom_io == NULL);
+    
+    /*
+     * Initialise our DOMID_IO domain.
+     * This domain owns sharable pages.
+     */
+    dom_cow = domain_create(DOMID_COW, DOMCRF_dummy, 0);
+    BUG_ON(dom_cow == NULL);
 }
 
 static int

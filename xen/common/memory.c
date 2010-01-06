@@ -22,7 +22,9 @@
 #include <xen/tmem.h>
 #include <asm/current.h>
 #include <asm/hardirq.h>
-#include <asm/p2m.h>
+#ifdef CONFIG_X86
+# include <asm/p2m.h>
+#endif
 #include <xen/numa.h>
 #include <public/memory.h>
 #include <xsm/xsm.h>
@@ -152,10 +154,16 @@ out:
 int guest_remove_page(struct domain *d, unsigned long gmfn)
 {
     struct page_info *page;
+#ifdef CONFIG_X86
     p2m_type_t p2mt;
+#endif
     unsigned long mfn;
 
+#ifdef CONFIG_X86
     mfn = mfn_x(gfn_to_mfn(d, gmfn, &p2mt)); 
+#else
+    mfn = gmfn_to_mfn(d, gmfn);
+#endif
     if ( unlikely(!mfn_valid(mfn)) )
     {
         gdprintk(XENLOG_INFO, "Domain %u page number %lx invalid\n",
@@ -164,6 +172,7 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
     }
             
     page = mfn_to_page(mfn);
+#ifdef CONFIG_X86
     /* If gmfn is shared, just drop the guest reference (which may or may not
      * free the page) */
     if(p2m_is_shared(p2mt))
@@ -173,6 +182,7 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
         return 1;
     }
 
+#endif /* CONFIG_X86 */
     if ( unlikely(!get_page(page, d)) )
     {
         gdprintk(XENLOG_INFO, "Bad page free for domain %u\n", d->domain_id);
@@ -330,6 +340,7 @@ static long memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
 
             for ( k = 0; k < (1UL << exch.in.extent_order); k++ )
             {
+#ifdef CONFIG_X86
                 p2m_type_t p2mt;
 
                 /* Shared pages cannot be exchanged */
@@ -339,6 +350,9 @@ static long memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
                     rc = -ENOMEM;
                     goto fail; 
                 }
+#else /* !CONFIG_X86 */
+                mfn = gmfn_to_mfn(d, gmfn + k);
+#endif
                 if ( unlikely(!mfn_valid(mfn)) )
                 {
                     rc = -EINVAL;
