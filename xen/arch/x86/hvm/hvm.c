@@ -951,15 +951,6 @@ bool_t hvm_hap_nested_page_fault(unsigned long gfn)
     if ( p2m_is_paged(p2mt) || (p2mt == p2m_ram_paging_out) )
         p2m_mem_paging_populate(current->domain, gfn);
 
-    /* Log-dirty: mark the page dirty and let the guest write it again */
-    if ( paging_mode_log_dirty(current->domain)
-         && p2m_is_ram(p2mt) && (p2mt != p2m_ram_ro) )
-    {
-        paging_mark_dirty(current->domain, mfn_x(mfn));
-        p2m_change_type(current->domain, gfn, p2m_ram_logdirty, p2m_ram_rw);
-        return 1;
-    }
-
     /* Mem sharing: unshare the page and try again */
     if ( p2mt == p2m_ram_shared )
     {
@@ -967,6 +958,14 @@ bool_t hvm_hap_nested_page_fault(unsigned long gfn)
         return 1;
     }
  
+    /* Spurious fault? PoD and log-dirty also take this path. */
+    if ( p2m_is_ram(p2mt) )
+    {
+        paging_mark_dirty(current->domain, mfn_x(mfn));
+        p2m_change_type(current->domain, gfn, p2m_ram_logdirty, p2m_ram_rw);
+        return 1;
+    }
+
     /* Shouldn't happen: Maybe the guest was writing to a r/o grant mapping? */
     if ( p2mt == p2m_grant_map_ro )
     {
