@@ -689,11 +689,24 @@ class XendDomainInfo:
                     raise VmError("device is already inserted")
 
         # Test whether the devices can be assigned.
-        self.pci_device_check_attachability(new_dev)
+        self.pci_dev_check_attachability_and_do_FLR(new_dev)
 
         return self.hvm_pci_device_insert_dev(new_dev)
 
-    def pci_device_check_attachability(self, new_dev):
+    def pci_dev_check_assignability_and_do_FLR(self, config):
+        """ In the case of static device assignment(i.e., the 'pci' string in
+        guest config file), we check if the device(s) specified in the 'pci'
+        can be  assigned to guest or not; if yes, we do_FLR the device(s).
+        """
+        pci_dev_ctrl = self.getDeviceController('pci')
+        return pci_dev_ctrl.dev_check_assignability_and_do_FLR(config)
+
+    def pci_dev_check_attachability_and_do_FLR(self, new_dev):
+        """ In the case of dynamic device assignment(i.e., xm pci-attach), we
+        check if the device can be attached to guest or not; if yes, we do_FLR
+        the device.
+        """
+
         # Test whether the devices can be assigned
 
         pci_name = pci_dict_to_bdf_str(new_dev)
@@ -720,6 +733,8 @@ class XendDomainInfo:
 
         # PV guest has less checkings.
         if not self.info.is_hvm():
+            # try to do FLR for PV guest
+            pci_device.do_FLR(self.info.is_hvm(), strict_check)
             return
 
         if not strict_check:
@@ -748,6 +763,9 @@ class XendDomainInfo:
                     " because one of its co-assignment device %s has been" + \
                     " assigned to other domain." \
                     )% (pci_device.name, self.info['name_label'], pci_str))
+
+        # try to do FLR for HVM guest
+        pci_device.do_FLR(self.info.is_hvm(), strict_check)
 
     def hvm_pci_device_insert(self, dev_config):
         log.debug("XendDomainInfo.hvm_pci_device_insert: %s"
@@ -919,7 +937,7 @@ class XendDomainInfo:
         # Do PV specific checking
             if pci_state == 'Initialising':
                 # PV PCI device attachment
-                self.pci_device_check_attachability(dev)
+                self.pci_dev_check_attachability_and_do_FLR(dev)
 
         # If pci platform does not exist, create and exit.
         if existing_dev_info is None :
@@ -1218,7 +1236,8 @@ class XendDomainInfo:
         coassignment_list.remove(pci_device.name)
         assigned_pci_device_str_list = self._get_assigned_pci_devices()
         for pci_str in coassignment_list:
-            if pci_str in assigned_pci_device_str_list:
+            if xoptions.get_pci_dev_assign_strict_check() and \
+                pci_str in assigned_pci_device_str_list:
                 raise VmError(("pci: failed to pci-detach %s from domain %s" + \
                     " because one of its co-assignment device %s is still " + \
                     " assigned to the domain." \
@@ -2312,6 +2331,10 @@ class XendDomainInfo:
             if devclass in XendDevices.valid_devices() and devclass != 'vscsi':
                 log.info("createDevice: %s : %s" % (devclass, scrub_password(config)))
                 dev_uuid = config.get('uuid')
+
+                if devclass == 'pci':
+                    self.pci_dev_check_assignability_and_do_FLR(config)
+
                 if devclass != 'pci' or not self.info.is_hvm() :
                     devid = self._createDevice(devclass, config)
                 

@@ -274,8 +274,8 @@ class PciController(DevController):
                 continue
 
             if sdev.driver!='pciback' and sdev.driver!='pci-stub':
-                raise VmError(("pci: PCI Backend and pci-stub don't\n "+ \
-                    "own sibling device %s of device %s\n"\
+                raise VmError(("pci: PCI Backend and pci-stub don't "+ \
+                    "own sibling device %s of device %s"\
                     )%(sdev.name, dev.name))
         return
 
@@ -292,16 +292,9 @@ class PciController(DevController):
 
         if dev.driver!='pciback' and dev.driver!='pci-stub':
             raise VmError(("pci: PCI Backend and pci-stub don't own "+ \
-                    "device %s\n") %(dev.name))
+                    "device %s") %(dev.name))
 
         self.CheckSiblingDevices(fe_domid, dev)
-
-        # We don't do FLR when we create domain and hotplug device into guest,
-        # namely, we only do FLR when we destroy domain or hotplug device from
-        # guest. This is mainly to work around the race condition in hotplug code
-        # paths. See the changeset's description for details.
-        # if arch.type != "ia64":
-        #    dev.do_FLR()
 
         if dev.driver == 'pciback':
             PCIQuirk(dev)
@@ -353,9 +346,7 @@ class PciController(DevController):
                 raise VmError(('pci: failed to configure irq on device '+
                             '%s - errno=%d')%(dev.name,rc))
 
-    def setupDevice(self, config):
-        """Setup devices from config
-        """
+    def dev_check_assignability_and_do_FLR(self, config):
         pci_dev_list = config.get('devs', [])
         pci_str_list = map(pci_dict_to_bdf_str, pci_dev_list)
 
@@ -363,12 +354,18 @@ class PciController(DevController):
             raise VmError('pci: duplicate devices specified in guest config?')
 
         strict_check = xoptions.get_pci_dev_assign_strict_check()
+        devs = []
         for pci_dev in pci_dev_list:
             try:
                 dev = PciDevice(pci_dev)
             except Exception, e:
                 raise VmError("pci: failed to locate device and "+
                         "parse its resources - "+str(e))
+            if dev.driver!='pciback' and dev.driver!='pci-stub':
+                raise VmError(("pci: PCI Backend and pci-stub don't own device"\
+                    " %s") %(dev.name))
+
+            devs.append(dev)
 
             if dev.has_non_page_aligned_bar and strict_check:
                 raise VmError("pci: %s: non-page-aligned MMIO BAR found." % dev.name)
@@ -435,18 +432,16 @@ class PciController(DevController):
                                 err_msg = 'pci: %s must be co-assigned to the'+\
                                     ' same guest with %s'
                                 raise VmError(err_msg % (s, dev.name))
+        # try to do FLR
+        for dev in devs:
+            dev.do_FLR(self.vm.info.is_hvm(), strict_check)
 
-        # Assigning device staticaly (namely, the pci string in guest config
-        # file) to PV guest needs this setupOneDevice().
-        # Assigning device dynamically (namely, 'xm pci-attach') to PV guest
-        #  would go through reconfigureDevice().
-        #
-        # For hvm guest, (from c/s 19679 on) assigning device statically and
-        # dynamically both go through reconfigureDevice(), so HERE the
-        # setupOneDevice() is not necessary.
-        if not self.vm.info.is_hvm():
-            for d in pci_dev_list:
-                self.setupOneDevice(d)
+    def setupDevice(self, config):
+        """Setup devices from config
+        """
+        pci_dev_list = config.get('devs', [])
+        for d in pci_dev_list:
+            self.setupOneDevice(d)
         wPath = '/local/domain/0/backend/pci/%u/0/aerState' % (self.getDomid())
         self.aerStateWatch = xswatch(wPath, self._handleAerStateWatch)
         log.debug('pci: register aer watch %s', wPath)
@@ -477,7 +472,7 @@ class PciController(DevController):
 
         if dev.driver!='pciback' and dev.driver!='pci-stub':
             raise VmError(("pci: PCI Backend and pci-stub don't own device "+ \
-                    "%s\n") %(dev.name))
+                    "%s") %(dev.name))
 
         # Need to do FLR here before deassign device in order to terminate
         # DMA transaction, etc
