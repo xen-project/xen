@@ -731,12 +731,9 @@ int mem_sharing_domctl(struct domain *d, xen_domctl_mem_sharing_op_t *mec)
     {
         case XEN_DOMCTL_MEM_SHARING_OP_CONTROL:
         {
-            rc = 0;
-            if(!hap_enabled(d))
-                return -EINVAL;
             d->arch.hvm_domain.mem_sharing_enabled = mec->u.enable;
             mem_sharing_audit();
-            return 0; 
+            rc = 0;
         }
         break;
 
