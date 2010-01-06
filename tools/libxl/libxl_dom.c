@@ -93,6 +93,10 @@ int build_post(struct libxl_ctx *ctx, uint32_t domid,
     char **ents;
     int i;
 
+#if defined(__i386__) || defined(__x86_64__)
+    xc_cpuid_apply_policy(ctx->xch, domid);
+#endif
+
     ents = libxl_calloc(ctx, (10 + info->max_vcpus) * 2, sizeof(char *));
     ents[0] = "memory/static-max";
     ents[1] = libxl_sprintf(ctx, "%d", info->max_memkb);
@@ -177,9 +181,6 @@ int build_hvm(struct libxl_ctx *ctx, uint32_t domid,
         XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, ret, "hvm build set params failed");
         return ERROR_FAIL;
     }
-#if defined(__i386__) || defined(__x86_64__)
-    xc_cpuid_apply_policy(ctx->xch, domid);
-#endif
     return 0;
 }
 
@@ -192,9 +193,6 @@ int restore_common(struct libxl_ctx *ctx, uint32_t domid,
                       state->store_port, &state->store_mfn,
                       state->console_port, &state->console_mfn,
                       info->hvm, info->u.hvm.pae, 0);
-#if defined(__i386__) || defined(__x86_64__)
-    xc_cpuid_apply_policy(ctx->xch, domid);
-#endif
     return 0;
 }
 
