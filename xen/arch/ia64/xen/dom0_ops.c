@@ -715,12 +715,12 @@ long arch_do_sysctl(xen_sysctl_t *op, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
         pi->cores_per_socket =
             cpus_weight(per_cpu(cpu_core_map, 0)) / pi->threads_per_core;
         pi->nr_cpus          = (u32)num_online_cpus();
-        pi->nr_nodes         = num_online_nodes();
         pi->total_pages      = total_pages; 
         pi->free_pages       = avail_domheap_pages();
         pi->scrub_pages      = 0;
         pi->cpu_khz          = local_cpu_data->proc_freq / 1000;
 
+        pi->max_node_id = last_node(node_online_map);
         pi->max_cpu_id = last_cpu(cpu_online_map);
         max_array_ent = min_t(uint32_t, max_array_ent, pi->max_cpu_id);
 

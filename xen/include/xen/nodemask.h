@@ -38,6 +38,7 @@
  *
  * int first_node(mask)			Number lowest set bit, or MAX_NUMNODES
  * int next_node(node, mask)		Next node past 'node', or MAX_NUMNODES
+ * int last_node(mask)			Number highest set bit, or MAX_NUMNODES
  * int first_unset_node(mask)		First node not set in mask, or 
  *					MAX_NUMNODES.
  *
@@ -214,16 +215,27 @@ static inline void __nodes_shift_left(nodemask_t *dstp,
 /* FIXME: better would be to fix all architectures to never return
           > MAX_NUMNODES, then the silly min_ts could be dropped. */
 
-#define first_node(src) __first_node(&(src))
-static inline int __first_node(const nodemask_t *srcp)
+#define first_node(src) __first_node(&(src), MAX_NUMNODES)
+static inline int __first_node(const nodemask_t *srcp, int nbits)
 {
-	return min_t(int, MAX_NUMNODES, find_first_bit(srcp->bits, MAX_NUMNODES));
+	return min_t(int, nbits, find_first_bit(srcp->bits, nbits));
 }
 
-#define next_node(n, src) __next_node((n), &(src))
-static inline int __next_node(int n, const nodemask_t *srcp)
+#define next_node(n, src) __next_node((n), &(src), MAX_NUMNODES)
+static inline int __next_node(int n, const nodemask_t *srcp, int nbits)
 {
-	return min_t(int,MAX_NUMNODES,find_next_bit(srcp->bits, MAX_NUMNODES, n+1));
+	return min_t(int, nbits, find_next_bit(srcp->bits, nbits, n+1));
+}
+
+#define last_node(src) __last_node(&(src), MAX_NUMNODES)
+static inline int __last_node(const nodemask_t *srcp, int nbits)
+{
+	int node, pnode = nbits;
+	for (node = __first_node(srcp, nbits);
+	     node < nbits;
+	     node = __next_node(node, srcp, nbits))
+		pnode = node;
+	return pnode;
 }
 
 #define nodemask_of_node(node)						\

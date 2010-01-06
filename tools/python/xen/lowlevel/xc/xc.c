@@ -1078,7 +1078,7 @@ static PyObject *pyxc_physinfo(XcObject *self)
 #define MAX_CPU_ID 255
     xc_physinfo_t info;
     char cpu_cap[128], virt_caps[128], *p;
-    int i, j, max_cpu_id;
+    int i, j, max_cpu_id, nr_nodes = 0;
     uint64_t free_heap;
     PyObject *ret_obj, *node_to_cpu_obj, *node_to_memory_obj;
     PyObject *node_to_dma32_mem_obj;
@@ -1105,8 +1105,53 @@ static PyObject *pyxc_physinfo(XcObject *self)
     if ( p != virt_caps )
       *(p-1) = '\0';
 
+    max_cpu_id = info.max_cpu_id;
+    if ( max_cpu_id > MAX_CPU_ID )
+        max_cpu_id = MAX_CPU_ID;
+
+    /* Construct node-to-* lists. */
+    node_to_cpu_obj = PyList_New(0);
+    node_to_memory_obj = PyList_New(0);
+    node_to_dma32_mem_obj = PyList_New(0);
+    for ( i = 0; i <= info.max_node_id; i++ )
+    {
+        int node_exists = 0;
+        PyObject *pyint;
+
+        /* CPUs. */
+        PyObject *cpus = PyList_New(0);
+        for ( j = 0; j <= max_cpu_id; j++ )
+        {
+            if ( i != map[j] )
+                continue;
+            pyint = PyInt_FromLong(j);
+            PyList_Append(cpus, pyint);
+            Py_DECREF(pyint);
+            node_exists = 1;
+        }
+        PyList_Append(node_to_cpu_obj, cpus); 
+        Py_DECREF(cpus);
+
+        /* Memory. */
+        xc_availheap(self->xc_handle, 0, 0, i, &free_heap);
+        node_exists = node_exists || (free_heap != 0);
+        pyint = PyInt_FromLong(free_heap / 1024);
+        PyList_Append(node_to_memory_obj, pyint);
+        Py_DECREF(pyint);
+
+        /* DMA memory. */
+        xc_availheap(self->xc_handle, 0, 32, i, &free_heap);
+        pyint = PyInt_FromLong(free_heap / 1024);
+        PyList_Append(node_to_dma32_mem_obj, pyint);
+        Py_DECREF(pyint);
+
+        if ( node_exists )
+            nr_nodes++;
+    }
+
     ret_obj = Py_BuildValue("{s:i,s:i,s:i,s:i,s:i,s:l,s:l,s:l,s:i,s:s:s:s}",
-                            "nr_nodes",         info.nr_nodes,
+                            "nr_nodes",         nr_nodes,
+                            "max_node_id",      info.max_node_id,
                             "max_cpu_id",       info.max_cpu_id,
                             "threads_per_core", info.threads_per_core,
                             "cores_per_socket", info.cores_per_socket,
@@ -1117,52 +1162,6 @@ static PyObject *pyxc_physinfo(XcObject *self)
                             "cpu_khz",          info.cpu_khz,
                             "hw_caps",          cpu_cap,
                             "virt_caps",        virt_caps);
-
-    max_cpu_id = info.max_cpu_id;
-    if ( max_cpu_id > MAX_CPU_ID )
-        max_cpu_id = MAX_CPU_ID;
-
-    /* Construct node-to-cpu lists. */
-    node_to_cpu_obj = PyList_New(0);
-
-    /* Make a list for each node. */
-    for ( i = 0; i < info.nr_nodes; i++ )
-    {
-        PyObject *cpus = PyList_New(0);
-        for ( j = 0; j <= max_cpu_id; j++ )
-            if ( i == map[j]) {
-                PyObject *pyint = PyInt_FromLong(j);
-                PyList_Append(cpus, pyint);
-                Py_DECREF(pyint);
-            }
-        PyList_Append(node_to_cpu_obj, cpus); 
-        Py_DECREF(cpus);
-    }
-
-    node_to_memory_obj = PyList_New(0);
-
-    for ( i = 0; i < info.nr_nodes; i++ )
-    {
-        PyObject *pyint;
-
-        xc_availheap(self->xc_handle, 0, 0, i, &free_heap);
-        pyint = PyInt_FromLong(free_heap / 1024);
-        PyList_Append(node_to_memory_obj, pyint);
-        Py_DECREF(pyint);
-    }
-
-    /* DMA memory. */
-    node_to_dma32_mem_obj = PyList_New(0);
-
-    for ( i = 0; i < info.nr_nodes; i++ )
-    {
-        PyObject *pyint;
-        xc_availheap(self->xc_handle, 0, 32, i, &free_heap);
-        pyint = PyInt_FromLong(free_heap / 1024);
-        PyList_Append(node_to_dma32_mem_obj, pyint);
-        Py_DECREF(pyint);
-    }
-
     PyDict_SetItemString(ret_obj, "node_to_cpu", node_to_cpu_obj);
     Py_DECREF(node_to_cpu_obj);
     PyDict_SetItemString(ret_obj, "node_to_memory", node_to_memory_obj);

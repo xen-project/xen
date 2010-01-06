@@ -34,7 +34,7 @@
 #include "xen.h"
 #include "domctl.h"
 
-#define XEN_SYSCTL_INTERFACE_VERSION 0x00000006
+#define XEN_SYSCTL_INTERFACE_VERSION 0x00000007
 
 /*
  * Read console content from Xen buffer ring.
@@ -94,7 +94,7 @@ struct xen_sysctl_physinfo {
     uint32_t threads_per_core;
     uint32_t cores_per_socket;
     uint32_t nr_cpus;
-    uint32_t nr_nodes;
+    uint32_t max_node_id;
     uint32_t cpu_khz;
     uint64_aligned_t total_pages;
     uint64_aligned_t free_pages;
