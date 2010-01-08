@@ -1149,7 +1149,7 @@ static PyObject *pyxc_physinfo(XcObject *self)
             nr_nodes++;
     }
 
-    ret_obj = Py_BuildValue("{s:i,s:i,s:i,s:i,s:i,s:l,s:l,s:l,s:i,s:s:s:s}",
+    ret_obj = Py_BuildValue("{s:i,s:i,s:i,s:i,s:i,s:i,s:l,s:l,s:l,s:i,s:s:s:s}",
                             "nr_nodes",         nr_nodes,
                             "max_node_id",      info.max_node_id,
                             "max_cpu_id",       info.max_cpu_id,
