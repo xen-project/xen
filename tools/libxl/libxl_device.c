@@ -240,9 +240,8 @@ int libxl_devices_destroy(struct libxl_ctx *ctx, uint32_t domid, int force)
     flexarray_t *toremove;
     struct libxl_ctx clone;
 
-    if (libxl_clone_context_xs(ctx, &clone)) {
-        XL_LOG(ctx, XL_LOG_ERROR, "Out of memory when cloning context");
-        return ERROR_NOMEM;
+    if (libxl_ctx_init(&clone, LIBXL_VERSION)) {
+        return -1;
     }
 
     toremove = flexarray_make(16, 1);
@@ -250,7 +249,7 @@ int libxl_devices_destroy(struct libxl_ctx *ctx, uint32_t domid, int force)
     l1 = libxl_xs_directory(&clone, XBT_NULL, path, &num1);
     if (!l1) {
         XL_LOG(&clone, XL_LOG_ERROR, "%s is empty", path);
-        libxl_discard_cloned_context_xs(&clone);
+        libxl_ctx_free(&clone);
         return -1;
     }
     for (i = 0; i < num1; i++) {
@@ -294,7 +293,7 @@ int libxl_devices_destroy(struct libxl_ctx *ctx, uint32_t domid, int force)
         xs_rm(clone.xsh, XBT_NULL, path);
     }
     flexarray_free(toremove);
-    libxl_discard_cloned_context_xs(&clone);
+    libxl_ctx_free(&clone);
     return 0;
 }
 
@@ -304,9 +303,8 @@ int libxl_device_del(struct libxl_ctx *ctx, libxl_device *dev, int wait)
     int rc;
     struct libxl_ctx clone;
 
-    if (libxl_clone_context_xs(ctx, &clone)) {
-        XL_LOG(ctx, XL_LOG_ERROR, "Out of memory when cloning context");
-        return ERROR_NOMEM;
+    if (libxl_ctx_init(&clone, LIBXL_VERSION)) {
+        return -1;
     }
 
     /* Create strings */
@@ -323,7 +321,7 @@ int libxl_device_del(struct libxl_ctx *ctx, libxl_device *dev, int wait)
 
     rc = libxl_device_destroy(&clone, backend_path, !wait);
     if (rc == -1) {
-        libxl_discard_cloned_context_xs(&clone);
+        libxl_ctx_free(&clone);
         return ERROR_FAIL;
     }
 
@@ -335,9 +333,7 @@ int libxl_device_del(struct libxl_ctx *ctx, libxl_device *dev, int wait)
     }
 
     xs_rm(clone.xsh, XBT_NULL, hotplug_path);
-    libxl_free(&clone, hotplug_path);
-    libxl_free(&clone, backend_path);
-    libxl_discard_cloned_context_xs(&clone);
+    libxl_ctx_free(&clone);
     return 0;
 }
 
