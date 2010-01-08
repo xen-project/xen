@@ -564,16 +564,19 @@ int libxl_domain_destroy(struct libxl_ctx *ctx, uint32_t domid, int force)
         XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "xs_rm failed for %s", dom_path);
 
     vm_path = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "/local/domain/%d/vm", domid));
-    if (!xs_rm(ctx->xsh, XBT_NULL, vm_path))
-        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "xs_rm failed for %s", vm_path);
+    if (vm_path)
+        if (!xs_rm(ctx->xsh, XBT_NULL, vm_path))
+            XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "xs_rm failed for %s", vm_path);
 
     vss_path = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "/local/domain/%d/vss", domid));
-    if (!xs_rm(ctx->xsh, XBT_NULL, vss_path))
-        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "xs_rm failed for %s", vss_path);
+    if (vss_path)
+        if (!xs_rm(ctx->xsh, XBT_NULL, vss_path))
+            XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "xs_rm failed for %s", vss_path);
 
     xapi_path = libxl_sprintf(ctx, "/xapi/%u", domid);
-    if (!xs_rm(ctx->xsh, XBT_NULL, xapi_path))
-        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "xs_rm failed for %s", xapi_path);
+    if (xapi_path)
+        if (!xs_rm(ctx->xsh, XBT_NULL, xapi_path))
+            XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "xs_rm failed for %s", xapi_path);
 
     rc = xc_domain_destroy(ctx->xch, domid);
     if (rc < 0) {
