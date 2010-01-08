@@ -357,6 +357,7 @@ void vmx_inject_extint(int trap);
 void vmx_inject_nmi(void);
 
 void ept_p2m_init(struct domain *d);
+void ept_walk_table(struct domain *d, unsigned long gfn);
 
 /* EPT violation qualifications definitions */
 #define _EPT_READ_VIOLATION         0

@@ -2116,6 +2116,8 @@ static void ept_handle_violation(unsigned long qualification, paddr_t gpa)
              (qualification & EPT_EFFECTIVE_EXEC) ? 'x' : '-',
              gpa, mfn_x(mfn), p2mt);
 
+    ept_walk_table(current->domain, gfn);
+
     if ( qualification & EPT_GLA_VALID )
     {
         gla = __vmread(GUEST_LINEAR_ADDRESS);

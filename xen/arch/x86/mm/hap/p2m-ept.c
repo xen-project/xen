@@ -496,6 +496,55 @@ static ept_entry_t ept_get_entry_content(struct domain *d, unsigned long gfn)
     return content;
 }
 
+void ept_walk_table(struct domain *d, unsigned long gfn)
+{
+    ept_entry_t *table =
+        map_domain_page(mfn_x(pagetable_get_mfn(d->arch.phys_table)));
+    unsigned long gfn_remainder = gfn;
+
+    int i;
+
+    gdprintk(XENLOG_ERR, "Walking EPT tables for domain %d gfn %lx\n",
+           d->domain_id, gfn);
+
+    /* This pfn is higher than the highest the p2m map currently holds */
+    if ( gfn > d->arch.p2m->max_mapped_pfn )
+    {
+        gdprintk(XENLOG_ERR, " gfn exceeds max_mapped_pfn %lx\n",
+               d->arch.p2m->max_mapped_pfn);
+        goto out;
+    }
+
+    for ( i = EPT_DEFAULT_GAW; i >= 0; i-- )
+    {
+        ept_entry_t *ept_entry, *next;
+        u32 index;
+
+        /* Stolen from ept_next_level */
+        index = gfn_remainder >> (i*EPT_TABLE_ORDER);
+        ept_entry = table + index;
+
+        gdprintk(XENLOG_ERR, " epte %"PRIx64"\n", ept_entry->epte);
+
+        if ( i==0 || !(ept_entry->epte & 0x7) || ept_entry->sp_avail)
+            goto out;
+        else
+        {
+            gfn_remainder &= (1UL << (i*EPT_TABLE_ORDER)) - 1;
+
+            next = map_domain_page(ept_entry->mfn);
+
+            unmap_domain_page(*table);
+
+            table = next;
+        }
+    }
+
+out:
+    unmap_domain_page(table);
+    return;
+}
+
 static mfn_t ept_get_entry_current(unsigned long gfn, p2m_type_t *t,
                                    p2m_query_t q)
 {
