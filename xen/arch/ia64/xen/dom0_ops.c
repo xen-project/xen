@@ -683,6 +683,35 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     }
     break;
 
+    case XEN_DOMCTL_mem_sharing_op:
+    {
+        xen_domctl_mem_sharing_op_t *mec = &op->u.mem_sharing_op;
+        struct domain *d = rcu_lock_domain_by_id(op->domain);
+
+        ret = -ESRCH;
+        if (d == NULL)
+            break;
+
+        switch(mec->op)
+        {
+            case XEN_DOMCTL_MEM_SHARING_OP_CONTROL:
+            {
+                if (mec->u.enable) {
+                    ret = -EINVAL; /* not implemented */
+                    break;
+                }
+                ret = 0;
+            }
+            break;
+
+            default:
+                ret = -ENOSYS;
+        }
+        
+        rcu_unlock_domain(d);
+    }
+    break;
+
     default:
         printk("arch_do_domctl: unrecognized domctl: %d!!!\n",op->cmd);
         ret = -ENOSYS;
