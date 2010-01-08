@@ -25,7 +25,6 @@ extern int pxm_to_node(int nid);
 
 #define ZONE_ALIGN (1UL << (MAX_ORDER+PAGE_SHIFT))
 #define VIRTUAL_BUG_ON(x) 
-#define NODEMAPSIZE 0xfff
 
 extern void numa_add_cpu(int cpu);
 extern void numa_init_array(void);
@@ -51,7 +50,8 @@ static inline void clear_node_cpumask(int cpu)
 
 /* Simple perfect hash to map pdx to node numbers */
 extern int memnode_shift; 
-extern u8  memnodemap[NODEMAPSIZE]; 
+extern unsigned long memnodemapsize;
+extern u8 *memnodemap;
 
 struct node_data {
     unsigned long node_start_pfn;
@@ -64,7 +64,7 @@ extern struct node_data node_data[];
 static inline __attribute__((pure)) int phys_to_nid(paddr_t addr) 
 { 
 	unsigned nid;
-	VIRTUAL_BUG_ON((paddr_to_pdx(addr) >> memnode_shift) >= NODEMAPSIZE);
+	VIRTUAL_BUG_ON((paddr_to_pdx(addr) >> memnode_shift) >= memnodemapsize);
 	nid = memnodemap[paddr_to_pdx(addr) >> memnode_shift]; 
 	VIRTUAL_BUG_ON(nid >= MAX_NUMNODES || !node_data[nid]); 
 	return nid; 

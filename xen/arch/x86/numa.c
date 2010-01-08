@@ -30,7 +30,9 @@ struct node_data node_data[MAX_NUMNODES];
 
 /* Mapping from pdx to node id */
 int memnode_shift;
-u8  memnodemap[NODEMAPSIZE];
+static typeof(*memnodemap) _memnodemap[2];
+unsigned long memnodemapsize;
+u8 *memnodemap;
 
 unsigned char cpu_to_node[NR_CPUS] __read_mostly = {
 	[0 ... NR_CPUS-1] = NUMA_NO_NODE
@@ -62,13 +64,13 @@ static int __init populate_memnodemap(const struct node *nodes,
 	unsigned long spdx, epdx;
 	int i, res = -1;
 
-	memset(memnodemap, NUMA_NO_NODE, sizeof(memnodemap));
+	memset(memnodemap, NUMA_NO_NODE, memnodemapsize * sizeof(*memnodemap));
 	for (i = 0; i < numnodes; i++) {
 		spdx = paddr_to_pdx(nodes[i].start);
-		epdx = paddr_to_pdx(nodes[i].end);
+		epdx = paddr_to_pdx(nodes[i].end - 1) + 1;
 		if (spdx >= epdx)
 			continue;
-		if ((epdx >> shift) >= NODEMAPSIZE)
+		if ((epdx >> shift) >= memnodemapsize)
 			return 0;
 		do {
 			if (memnodemap[spdx >> shift] != NUMA_NO_NODE)
@@ -86,6 +88,28 @@ static int __init populate_memnodemap(const struct node *nodes,
 	return res;
 }
 
+static int __init allocate_cachealigned_memnodemap(void)
+{
+	unsigned long size = PFN_UP(memnodemapsize * sizeof(*memnodemap));
+	unsigned long mfn = alloc_boot_pages(size, 1);
+
+	if (!mfn) {
+		printk(KERN_ERR
+		       "NUMA: Unable to allocate Memory to Node hash map\n");
+		memnodemapsize = 0;
+		return -1;
+	}
+
+	memnodemap = mfn_to_virt(mfn);
+	mfn <<= PAGE_SHIFT;
+	size <<= PAGE_SHIFT;
+	printk(KERN_DEBUG "NUMA: Allocated memnodemap from %lx - %lx\n",
+	       mfn, mfn + size);
+	memnodemapsize = size / sizeof(*memnodemap);
+
+	return 0;
+}
+
 /*
  * The LSB of all start and end addresses in the node map is the value of the
  * maximum possible shift.
@@ -99,7 +123,7 @@ static int __init extract_lsb_from_nodes(const struct node *nodes,
 
 	for (i = 0; i < numnodes; i++) {
 		spdx = paddr_to_pdx(nodes[i].start);
-		epdx = paddr_to_pdx(nodes[i].end);
+		epdx = paddr_to_pdx(nodes[i].end - 1) + 1;
 		if (spdx >= epdx)
 			continue;
 		bitfield |= spdx;
@@ -108,9 +132,10 @@ static int __init extract_lsb_from_nodes(const struct node *nodes,
 			memtop = epdx;
 	}
 	if (nodes_used <= 1)
-		i = 63;
+		i = BITS_PER_LONG - 1;
 	else
 		i = find_first_bit(&bitfield, sizeof(unsigned long)*8);
+	memnodemapsize = (memtop >> i) + 1;
 	return i;
 }
 
@@ -120,6 +145,10 @@ int __init compute_hash_shift(struct node *nodes, int numnodes,
 	int shift;
 
 	shift = extract_lsb_from_nodes(nodes, numnodes);
+	if (memnodemapsize <= ARRAY_SIZE(_memnodemap))
+		memnodemap = _memnodemap;
+	else if (allocate_cachealigned_memnodemap())
+		return -1;
 	printk(KERN_DEBUG "NUMA: Using %d for the hash shift.\n",
 		shift);
 
@@ -233,8 +262,8 @@ void __init numa_initmem_init(unsigned long start_pfn, unsigned long end_pfn)
 	       (u64)start_pfn << PAGE_SHIFT,
 	       (u64)end_pfn << PAGE_SHIFT);
 	/* setup dummy node covering all memory */ 
-	memnode_shift = 63; 
-	memnodemap[0] = 0;
+	memnode_shift = BITS_PER_LONG - 1;
+	memnodemap = _memnodemap;
 	nodes_clear(node_online_map);
 	node_set_online(0);
 	for (i = 0; i < NR_CPUS; i++)
