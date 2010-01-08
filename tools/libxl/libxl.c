@@ -45,7 +45,17 @@ int libxl_ctx_init(struct libxl_ctx *ctx, int version)
         return ERROR_NOMEM;
 
     ctx->xch = xc_interface_open();
+    if (ctx->xch == -1) {
+        free(ctx->alloc_ptrs);
+        return ERROR_FAIL;
+    }
+
     ctx->xsh = xs_daemon_open();
+    if (!ctx->xsh) {
+        xc_interface_close(ctx->xch);
+        free(ctx->alloc_ptrs);
+        return ERROR_FAIL;
+    }
     return 0;
 }
 
