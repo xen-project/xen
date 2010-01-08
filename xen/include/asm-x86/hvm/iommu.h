@@ -8,7 +8,7 @@ extern int intel_vtd_setup(void);
 extern int amd_iov_detect(void);
 
 static inline const struct iommu_ops *iommu_get_ops(void)
-{   
+{
     switch ( boot_cpu_data.x86_vendor )
     {
     case X86_VENDOR_INTEL:

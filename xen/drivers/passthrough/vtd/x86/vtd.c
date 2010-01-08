@@ -142,10 +142,10 @@ void iommu_set_dom0_mapping(struct domain *d)
     for ( i = 0; i < max_pfn; i++ )
     {
         /*
-         * Set up 1:1 mapping for dom0. Default to use only conventional RAM 
-         * areas and let RMRRs include needed reserved regions. When set, the 
+         * Set up 1:1 mapping for dom0. Default to use only conventional RAM
+         * areas and let RMRRs include needed reserved regions. When set, the
          * inclusive mapping maps in everything below 4GB except unusable
-         * ranges. 
+         * ranges.
          */
         if ( !page_is_ram_type(i, RAM_TYPE_CONVENTIONAL) &&
              (!iommu_inclusive_mapping ||

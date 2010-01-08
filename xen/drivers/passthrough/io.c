@@ -116,7 +116,7 @@ int pt_irq_create_bind_vtd(
             return -ENOMEM;
         }
         memset(hvm_irq_dpci, 0, sizeof(*hvm_irq_dpci));
-        tasklet_init(&hvm_irq_dpci->dirq_tasklet, 
+        tasklet_init(&hvm_irq_dpci->dirq_tasklet,
                      hvm_dirq_assist, (unsigned long)d);
         hvm_irq_dpci->mirq = xmalloc_array(struct hvm_mirq_dpci_mapping,
                                            d->nr_pirqs);
@@ -138,7 +138,7 @@ int pt_irq_create_bind_vtd(
                d->nr_pirqs * sizeof(*hvm_irq_dpci->mirq));
         bitmap_zero(hvm_irq_dpci->dirq_mask, d->nr_pirqs);
         bitmap_zero(hvm_irq_dpci->mapping, d->nr_pirqs);
-        memset(hvm_irq_dpci->hvm_timer, 0, 
+        memset(hvm_irq_dpci->hvm_timer, 0,
                 nr_irqs * sizeof(*hvm_irq_dpci->hvm_timer));
         for ( int i = 0; i < d->nr_pirqs; i++ ) {
             INIT_LIST_HEAD(&hvm_irq_dpci->mirq[i].digl_list);
@@ -197,7 +197,7 @@ int pt_irq_create_bind_vtd(
 	            spin_unlock(&d->event_lock);
         	    return -EBUSY;
             }
- 
+
             /* if pirq is already mapped as vmsi, update the guest data/addr */
             if ( hvm_irq_dpci->mirq[pirq].gmsi.gvec != pt_irq_bind->u.msi.gvec ||
                 hvm_irq_dpci->mirq[pirq].gmsi.gflags != pt_irq_bind->u.msi.gflags) {

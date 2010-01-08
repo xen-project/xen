@@ -150,7 +150,7 @@ int enable_ats_device(int seg, int bus, int devfn)
     list_add(&(pdev->list), &ats_devices);
 
     return pos;
-}        
+}
 
 static int device_in_domain(struct iommu *iommu, struct pci_ats_dev *pdev, u16 did)
 {
@@ -222,8 +222,8 @@ int dev_invalidate_iotlb(struct iommu *iommu, u16 did,
             addr &= ~0 << (PAGE_SHIFT + size_order);
 
             /* if size <= 4K, set sbit = 0, else set sbit = 1 */
-            sbit = size_order ? 1 : 0; 
- 
+            sbit = size_order ? 1 : 0;
+
             /* clear lower bits */
             addr &= (~0 << (PAGE_SHIFT + size_order));
 
@@ -236,7 +236,7 @@ int dev_invalidate_iotlb(struct iommu *iommu, u16 did,
             break;
         default:
             dprintk(XENLOG_WARNING VTDPREFIX, "invalid vt-d flush type\n");
-            break; 
+            break;
         }
     }
     return ret;

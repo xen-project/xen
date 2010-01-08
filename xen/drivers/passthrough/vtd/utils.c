@@ -126,7 +126,7 @@ void print_vtd_entries(struct iommu *iommu, int bus, int devfn, u64 gmfn)
     }
 
     root_entry = (struct root_entry *)map_vtd_domain_page(iommu->root_maddr);
- 
+
     printk("    root_entry = %p\n", root_entry);
     printk("    root_entry[%x] = %"PRIx64"\n", bus, root_entry[bus].val);
     if ( !root_present(root_entry[bus]) )

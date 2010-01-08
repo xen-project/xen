@@ -37,7 +37,7 @@ struct IO_xAPIC_route_entry {
         trigger         :  1,   /* 0: edge, 1: level */
         mask            :  1,   /* 0: enabled, 1: disabled */
         __reserved_2    : 15;
-   
+
     union {
         struct { __u32
             __reserved_1    : 24,

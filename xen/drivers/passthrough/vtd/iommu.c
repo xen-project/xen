@@ -959,7 +959,7 @@ static void dma_msi_set_affinity(unsigned int irq, cpumask_t mask)
     /* Follow MSI setting */
     if (x2apic_enabled)
         msg.address_hi = dest & 0xFFFFFF00;
-    msg.address_lo = (MSI_ADDRESS_HEADER << (MSI_ADDRESS_HEADER_SHIFT + 8)); 
+    msg.address_lo = (MSI_ADDRESS_HEADER << (MSI_ADDRESS_HEADER_SHIFT + 8));
     msg.address_lo |= INT_DEST_MODE ? MSI_ADDR_DESTMODE_LOGIC:
                     MSI_ADDR_DESTMODE_PHYS;
     msg.address_lo |= (INT_DELIVERY_MODE != dest_LowestPrio) ?
@@ -1008,7 +1008,7 @@ static int iommu_set_interrupt(struct iommu *iommu)
 
     irq_desc[irq].handler = &dma_msi_type;
     irq_to_iommu[irq] = iommu;
-#ifdef CONFIG_X86 
+#ifdef CONFIG_X86
     ret = request_irq(irq, iommu_page_fault, 0, "dmar", iommu);
 #else
     ret = request_irq_vector(irq, iommu_page_fault, 0, "dmar", iommu);
