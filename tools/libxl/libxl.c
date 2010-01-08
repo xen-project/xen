@@ -273,32 +273,20 @@ struct libxl_dominfo * libxl_domain_list(struct libxl_ctx *ctx, int *nb_domain)
 {
     struct libxl_dominfo *ptr;
     int index, i, ret, first_domain;
-    xc_domaininfo_t info[16];
-    int size = 16;
+    xc_domaininfo_t info[1024];
+    int size = 1024;
 
     first_domain = 1;
     index = 0;
     ptr = calloc(size, sizeof(struct libxl_dominfo));
     if (!ptr)
         return NULL;
-redo:
-    ret = xc_domain_getinfolist(ctx->xch, first_domain, 16, info);
-    for (i = 0; i < ret; i++) {
-        if (index == size) {
-            struct libxl_dominfo *ptr2;
 
-            ptr2 = calloc(size * 2, sizeof(struct libxl_dominfo));
-            if (!ptr2) {
-                free(ptr);
-                return NULL;
-            }
-            memcpy(ptr2, ptr, sizeof(struct libxl_dominfo) * size);
-            free(ptr);
-            ptr = ptr2;
-            size *= 2;
-        }
+    ret = xc_domain_getinfolist(ctx->xch, first_domain, 1024, info);
+    for (i = 0; i < ret; i++) {
         memcpy(&(ptr[index].uuid), info[i].handle, sizeof(xen_domain_handle_t));
         ptr[index].domid = info[i].domain;
+	    printf("domain %d [ret %d]\n", ptr[index].domid, ret);
 
         if (info[i].flags & XEN_DOMINF_dying)
             ptr[index].dying = 1;
@@ -310,8 +298,6 @@ redo:
         first_domain = info[i].domain + 1;
         index++;
     }
-    if (ret == 16)
-        goto redo;
     *nb_domain = index;
     return ptr;
 }
