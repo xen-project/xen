@@ -2177,7 +2177,7 @@ static NOINLINE int do_tmem_control(struct tmem_op *op)
         ret = tmemc_set_var(op->u.ctrl.cli_id,subop,op->u.ctrl.arg1);
         break;
     case TMEMC_QUERY_FREEABLE_MB:
-        ret = tmh_freeable_mb();
+        ret = tmh_freeable_pages() >> (20 - PAGE_SHIFT);
         break;
     case TMEMC_SAVE_BEGIN:
     case TMEMC_RESTORE_BEGIN:
@@ -2474,7 +2474,7 @@ EXPORT void *tmem_relinquish_pages(unsigned int order, unsigned int memflags)
     unsigned long evicts_per_relinq = 0;
     int max_evictions = 10;
 
-    if (!tmh_enabled())
+    if (!tmh_enabled() || !tmh_freeable_pages())
         return NULL;
 #ifdef __i386__
     return NULL;

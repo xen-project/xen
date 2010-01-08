@@ -246,10 +246,9 @@ static inline unsigned int tmem_subpage_maxsize(void)
     return tmh_mempool_maxalloc;
 }
 
-static inline unsigned long tmh_freeable_mb(void)
+static inline unsigned long tmh_freeable_pages(void)
 {
-    return (tmh_avail_pages() + _atomic_read(freeable_page_count)) >>
-            (20 - PAGE_SHIFT);
+    return tmh_avail_pages() + _atomic_read(freeable_page_count);
 }
 
 static inline unsigned long tmh_free_mb(void)
