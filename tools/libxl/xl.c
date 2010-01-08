@@ -888,9 +888,6 @@ start:
     }
 
     close(logfile);
-    for (i = 0; i < num_vifs; i++) {
-        free(vifs[i].ifname);
-    }
     free(disks);
     free(vifs);
     free(vfbs);
