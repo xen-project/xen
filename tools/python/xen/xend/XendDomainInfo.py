@@ -42,6 +42,7 @@ import xen.util.xsm.xsm as security
 from xen.util import xsconstants
 from xen.util import mkdir
 from xen.util.pci import serialise_pci_opts, pci_opts_list_to_sxp, \
+                         append_default_pci_opts, \
                          pci_dict_to_bdf_str, pci_dict_to_xc_str, \
                          pci_convert_sxp_to_dict, pci_convert_dict_to_sxp, \
                          pci_dict_cmp, PCI_DEVFN, PCI_SLOT, PCI_FUNC, parse_hex
@@ -784,8 +785,20 @@ class XendDomainInfo:
 
         if self.domid is not None:
             opts = ''
+            optslist = []
+            pci_defopts = []
+            if 'pci_msitranslate' in self.info['platform']:
+                pci_defopts.append(['msitranslate',
+                        str(self.info['platform']['pci_msitranslate'])])
+            if 'pci_power_mgmt' in self.info['platform']:
+                pci_defopts.append(['power_mgmt',
+                        str(self.info['platform']['pci_power_mgmt'])])
             if new_dev.has_key('opts'):
-                opts = ',' + serialise_pci_opts(new_dev['opts'])
+                optslist += new_dev['opts']
+
+            if optslist or pci_defopts:
+                opts = ',' + serialise_pci_opts(
+                       append_default_pci_opts(optslist, pci_defopts))
 
             bdf_str = "%s@%02x%s" % (pci_dict_to_bdf_str(new_dev),
                                      int(new_dev['vdevfn'], 16), opts)

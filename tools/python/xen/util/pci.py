@@ -158,6 +158,10 @@ def split_pci_opts(opts):
     return map(lambda x: x.split('='),
                filter(lambda x: x != '', opts.split(',')))
 
+def append_default_pci_opts(opts, defopts):
+    optsdict = dict(opts)
+    return opts + filter(lambda (k, v): not optsdict.has_key(k), defopts)
+
 def pci_opts_list_to_sxp(list):
     return dev_dict_to_sxp({'opts': list})
 
@@ -328,7 +332,7 @@ def parse_pci_name_extended(pci_dev_str):
     template['domain'] = "0x%04x" % domain
     template['bus']    = "0x%02x" % int(pci_dev_info['bus'], 16)
     template['slot']   = "0x%02x" % int(pci_dev_info['slot'], 16)
-    template['key']    = pci_dev_str
+    template['key']    = pci_dev_str.split(',')[0]
     if pci_dev_info['opts'] != '':
         template['opts'] = split_pci_opts(pci_dev_info['opts'])
         check_pci_opts(template['opts'])

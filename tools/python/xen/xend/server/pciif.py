@@ -97,6 +97,15 @@ class PciController(DevController):
         """@see DevController.getDeviceDetails"""
         back = {}
         pcidevid = 0
+        pci_defopts = []
+
+        if 'pci_msitranslate' in self.vm.info['platform']:
+            pci_defopts.append(['msitranslate',
+                    str(self.vm.info['platform']['pci_msitranslate'])])
+        if 'pci_power_mgmt' in self.vm.info['platform']:
+            pci_defopts.append(['power_mgmt',
+                    str(self.vm.info['platform']['pci_power_mgmt'])])
+
         for pci_config in config.get('devs', []):
             domain = parse_hex(pci_config.get('domain', 0))
             bus = parse_hex(pci_config.get('bus', 0))
@@ -105,8 +114,12 @@ class PciController(DevController):
             vdevfn = parse_hex(pci_config.get('vdevfn', \
                                               '0x%02x' % AUTO_PHP_SLOT))
 
+            optslist = []
             if pci_config.has_key('opts'):
-                opts = serialise_pci_opts(pci_config['opts'])
+                optslist += pci_config['opts']
+            if optslist or pci_defopts:
+                opts = serialise_pci_opts(
+                       append_default_pci_opts(optslist, pci_defopts))
                 back['opts-%i' % pcidevid] = opts
 
             back['dev-%i' % pcidevid] = "%04x:%02x:%02x.%01x" % \
@@ -118,10 +131,6 @@ class PciController(DevController):
 
         back['num_devs']=str(pcidevid)
         back['uuid'] = config.get('uuid','')
-        if 'pci_msitranslate' in self.vm.info['platform']:
-            back['msitranslate']=str(self.vm.info['platform']['pci_msitranslate'])
-        if 'pci_power_mgmt' in self.vm.info['platform']:
-            back['power_mgmt']=str(self.vm.info['platform']['pci_power_mgmt'])
 
         return (0, back, {})
 
