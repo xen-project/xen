@@ -534,7 +534,7 @@ void ept_walk_table(struct domain *d, unsigned long gfn)
 
             next = map_domain_page(ept_entry->mfn);
 
-            unmap_domain_page(*table);
+            unmap_domain_page(table);
 
             table = next;
         }
