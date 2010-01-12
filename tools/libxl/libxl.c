@@ -726,8 +726,8 @@ static char ** libxl_build_device_model_args(struct libxl_ctx *ctx,
     return (char **) flexarray_contents(dm_args);
 }
 
-void dm_xenstore_record_pid(struct libxl_ctx *ctx, void *for_spawn,
-                            pid_t innerchild) {
+void dm_xenstore_record_pid(void *for_spawn, pid_t innerchild)
+{
     struct libxl_device_model_starting *starting = for_spawn;
     char *kvs[3];
     int rc;

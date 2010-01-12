@@ -181,9 +181,7 @@ struct libxl_device_model_starting {
 int libxl_spawn_spawn(struct libxl_ctx *ctx,
                       libxl_device_model_starting *starting,
                       const char *what,
-                      void (*intermediate_hook)(struct libxl_ctx *ctx,
-                                                void *for_spawn,
-                                                pid_t innerchild));
+                      void (*intermediate_hook)(void *for_spawn, pid_t innerchild));
   /* Logs errors.  A copy of "what" is taken.  Return values:
    *  < 0   error, for_spawn need not be detached
    *   +1   caller is now the inner child, should probably call libxl_exec

@@ -100,8 +100,7 @@ void libxl_report_child_exitstatus(struct libxl_ctx *ctx,
 int libxl_spawn_spawn(struct libxl_ctx *ctx,
                       libxl_device_model_starting *starting,
                       const char *what,
-                      void (*intermediate_hook)(struct libxl_ctx *ctx,
-                                                void *for_spawn,
+                      void (*intermediate_hook)(void *for_spawn,
                                                 pid_t innerchild))
 {
     pid_t child, got;
@@ -127,18 +126,19 @@ int libxl_spawn_spawn(struct libxl_ctx *ctx,
 
     /* we are now the intermediate process */
 
-    child = libxl_fork(ctx);
-    if (!child) return 0; /* caller runs child code */
-    if (child < 0) exit(255);
+    child = fork();
+    if (child == -1)
+        exit(255);
+    if (!child)
+        return 0; /* caller runs child code */
 
-    intermediate_hook(ctx, starting, child);
+    intermediate_hook(starting, child);
 
     if (!for_spawn) _exit(0); /* just detach then */
 
     got = call_waitpid(ctx->waitpid_instead, child, &status, 0);
     assert(got == child);
 
-    libxl_report_child_exitstatus(ctx, what, child, status);
     _exit(WIFEXITED(status) ? WEXITSTATUS(status) :
           WIFSIGNALED(status) && WTERMSIG(status) < 127
           ? WTERMSIG(status)+128 : -1);
