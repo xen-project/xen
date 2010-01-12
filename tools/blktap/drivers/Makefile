@@ -23,7 +23,13 @@ CRYPT_LIB := -lcrypto
 $(warning === libgcrypt not installed: falling back to libcrypto ===)
 endif
 
-LDFLAGS_blktapctrl := $(LDFLAGS_libxenctrl) $(LDFLAGS_libxenstore) $(MEMSHR_DIR)/libmemshr.a -L../lib -lblktap -lrt -lm
+MEMSHRLIBS :=
+ifeq ($(CONFIG_Linux), y)
+CFLAGS += -DMEMSHR
+MEMSHRLIBS += $(MEMSHR_DIR)/libmemshr.a
+endif
+
+LDFLAGS_blktapctrl := $(LDFLAGS_libxenctrl) $(LDFLAGS_libxenstore) $(MEMSHRLIBS) -L../lib -lblktap -lrt -lm
 LDFLAGS_img := $(LIBAIO_DIR)/libaio.a $(CRYPT_LIB) -lpthread -lz
 
 BLK-OBJS-y  := block-aio.o

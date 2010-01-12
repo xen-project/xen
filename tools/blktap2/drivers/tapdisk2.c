@@ -34,7 +34,9 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/ioctl.h>
+#ifdef MEMSHR
 #include <memshr.h>
+#endif
 
 #include "tapdisk.h"
 #include "blktap2.h"
@@ -419,10 +421,15 @@ main(int argc, char *argv[])
 			break;
 		case 'h':
 			usage(argv[0], 0);
-            break;
-        case 's':
-            memshr_set_domid(atoi(optarg));
-            break;
+			break;
+		case 's':
+#ifdef MEMSHR
+			memshr_set_domid(atoi(optarg));
+#else
+			fprintf(stderr, "MEMSHR support not compiled in.\n");
+			exit(EXIT_FAILURE);
+#endif
+			break;
 		default:
 			usage(argv[0], EINVAL);
 		}

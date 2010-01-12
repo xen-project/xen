@@ -55,7 +55,13 @@ $(REMUS-OBJS): CFLAGS += -I$(XEN_XENSTORE)
 
 LIBAIO_DIR = $(XEN_ROOT)/tools/libaio/src
 MEMSHR_DIR = $(XEN_ROOT)/tools/memshr
-MEMSHRLIBS := $(MEMSHR_DIR)/libmemshr.a
+
+MEMSHRLIBS :=
+ifeq ($(CONFIG_Linux), y)
+CFLAGS += -DMEMSHR
+MEMSHRLIBS += $(MEMSHR_DIR)/libmemshr.a
+endif
+
 tapdisk2 tapdisk-stream tapdisk-diff $(QCOW_UTIL): AIOLIBS := $(LIBAIO_DIR)/libaio.a 
 tapdisk-client tapdisk-stream tapdisk-diff $(QCOW_UTIL): CFLAGS  += -I$(LIBAIO_DIR) -I$(XEN_LIBXC)
 

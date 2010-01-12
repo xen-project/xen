@@ -859,7 +859,9 @@ int main(int argc, char *argv[])
 		goto open_failed;
 	}
 
-    memshr_daemon_initialize();
+#ifdef MEMSHR
+	memshr_daemon_initialize();
+#endif
 
  retry:
 	/* Set up store connection and watch. */

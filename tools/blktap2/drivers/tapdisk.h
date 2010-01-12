@@ -132,7 +132,9 @@ struct td_request {
 	int                          sidx;
 	void                        *private;
     
-    uint64_t                     memshr_hnd;
+#ifdef MEMSHR
+	uint64_t                     memshr_hnd;
+#endif
 };
 
 /* 
