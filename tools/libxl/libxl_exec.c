@@ -45,7 +45,7 @@ static pid_t libxl_fork(struct libxl_ctx *ctx)
 
 static int call_waitpid(pid_t (*waitpid_cb)(pid_t, int *, int), pid_t pid, int *status, int options)
 {
-    return (waitpid_cb) ? waitpid_cb(pid, status, 0) : waitpid(pid, status, 0);
+    return (waitpid_cb) ? waitpid_cb(pid, status, options) : waitpid(pid, status, options);
 }
 
 void libxl_exec(struct libxl_ctx *ctx, int stdinfd, int stdoutfd, int stderrfd,
@@ -202,7 +202,7 @@ int libxl_spawn_check(struct libxl_ctx *ctx, void *for_spawn_void)
     if (!for_spawn) return 0;
 
     assert(for_spawn->intermediate);
-    got = call_waitpid(ctx->waitpid_instead, for_spawn->intermediate, &status, 0);
+    got = call_waitpid(ctx->waitpid_instead, for_spawn->intermediate, &status, WNOHANG);
     if (!got) return 0;
 
     assert(got == for_spawn->intermediate);
