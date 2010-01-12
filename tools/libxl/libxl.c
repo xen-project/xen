@@ -299,7 +299,6 @@ struct libxl_dominfo * libxl_domain_list(struct libxl_ctx *ctx, int *nb_domain)
     for (i = 0; i < ret; i++) {
         memcpy(&(ptr[index].uuid), info[i].handle, sizeof(xen_domain_handle_t));
         ptr[index].domid = info[i].domain;
-	    printf("domain %d [ret %d]\n", ptr[index].domid, ret);
 
         if (info[i].flags & XEN_DOMINF_dying)
             ptr[index].dying = 1;
@@ -1900,7 +1899,7 @@ int libxl_device_pci_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_pci
 
     hvm = is_hvm(ctx, domid);
     if (hvm) {
-        if (libxl_wait_for_device_model(ctx, domid, "running", 0,0) < 0) {
+        if (libxl_wait_for_device_model(ctx, domid, "running", NULL, NULL) < 0) {
             return -1;
         }
         path = libxl_sprintf(ctx, "/local/domain/0/device-model/%d/state", domid);
@@ -1914,7 +1913,7 @@ int libxl_device_pci_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_pci
                            pcidev->bus, pcidev->dev, pcidev->func);
         path = libxl_sprintf(ctx, "/local/domain/0/device-model/%d/command", domid);
         xs_write(ctx->xsh, XBT_NULL, path, "pci-ins", strlen("pci-ins"));
-        if (libxl_wait_for_device_model(ctx, domid, "pci-inserted", 0,0) < 0)
+        if (libxl_wait_for_device_model(ctx, domid, "pci-inserted", NULL, NULL) < 0)
             XL_LOG(ctx, XL_LOG_ERROR, "Device Model didn't respond in time");
         path = libxl_sprintf(ctx, "/local/domain/0/device-model/%d/parameter", domid);
         vdevfn = libxl_xs_read(ctx, XBT_NULL, path);
@@ -1993,7 +1992,7 @@ int libxl_device_pci_remove(struct libxl_ctx *ctx, uint32_t domid, libxl_device_
 
     hvm = is_hvm(ctx, domid);
     if (hvm) {
-        if (libxl_wait_for_device_model(ctx, domid, "running", 0,0) < 0) {
+        if (libxl_wait_for_device_model(ctx, domid, "running", NULL, NULL) < 0) {
             return -1;
         }
         path = libxl_sprintf(ctx, "/local/domain/0/device-model/%d/state", domid);
@@ -2003,7 +2002,7 @@ int libxl_device_pci_remove(struct libxl_ctx *ctx, uint32_t domid, libxl_device_
                        pcidev->bus, pcidev->dev, pcidev->func);
         path = libxl_sprintf(ctx, "/local/domain/0/device-model/%d/command", domid);
         xs_write(ctx->xsh, XBT_NULL, path, "pci-rem", strlen("pci-rem"));
-        if (libxl_wait_for_device_model(ctx, domid, "pci-removed", 0,0) < 0) {
+        if (libxl_wait_for_device_model(ctx, domid, "pci-removed", NULL, NULL) < 0) {
             XL_LOG(ctx, XL_LOG_ERROR, "Device Model didn't respond in time");
             return -1;
         }
