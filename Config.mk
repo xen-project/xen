@@ -150,7 +150,8 @@ QEMU_REMOTE=http://xenbits.xensource.com/git-http/qemu-xen-unstable.git
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 2621a102cd74cd6691bed30f638581639fcb141d
+QEMU_TAG := xen-4.0.0-rc1
+#QEMU_TAG ?= 2621a102cd74cd6691bed30f638581639fcb141d
 # Mon Jan 4 17:49:06 2010 +0000
 # passthrough: Fix MSI-x devices assignment.
 
