@@ -750,6 +750,7 @@ static void create_domain(int debug, int daemonize, const char *config_file, con
     int num_disks = 0, num_vifs = 0, num_pcidevs = 0, num_vfbs = 0, num_vkbs = 0;
     int i, fd;
     int need_daemon = 1;
+    int ret;
     libxl_device_model_starting *dm_starting = 0;
     libxl_waiter *w1 = NULL, *w2 = NULL;
     memset(&dm_info, 0x00, sizeof(dm_info));
@@ -768,29 +769,47 @@ start:
     }
 
     libxl_ctx_set_log(&ctx, log_callback, NULL);
-    libxl_domain_make(&ctx, &info1, &domid);
+
+    ret = libxl_domain_make(&ctx, &info1, &domid);
+    if (ret) {
+        fprintf(stderr, "cannot make domain: %d\n", ret);
+        return;
+    }
 
     if (!restore_file || !need_daemon) {
         if (dm_info.saved_state) {
             free(dm_info.saved_state);
             dm_info.saved_state = NULL;
         }
-        libxl_domain_build(&ctx, &info2, domid, &state);
+        ret = libxl_domain_build(&ctx, &info2, domid, &state);
     } else {
         int restore_fd;
 
         restore_fd = open(restore_file, O_RDONLY);
-        libxl_domain_restore(&ctx, &info2, domid, restore_fd, &state, &dm_info);
+        ret = libxl_domain_restore(&ctx, &info2, domid, restore_fd, &state, &dm_info);
         close(restore_fd);
+    }
+
+    if (ret) {
+        fprintf(stderr, "cannot (re-)build domain: %d\n", ret);
+        return;
     }
 
     for (i = 0; i < num_disks; i++) {
         disks[i].domid = domid;
-        libxl_device_disk_add(&ctx, domid, &disks[i]);
+        ret = libxl_device_disk_add(&ctx, domid, &disks[i]);
+        if (ret) {
+            fprintf(stderr, "cannot add disk %d to domain: %d\n", i, ret);
+            return;
+        }
     }
     for (i = 0; i < num_vifs; i++) {
         vifs[i].domid = domid;
-        libxl_device_nic_add(&ctx, domid, &vifs[i]);
+        ret = libxl_device_nic_add(&ctx, domid, &vifs[i]);
+        if (ret) {
+            fprintf(stderr, "cannot add nic %d to domain: %d\n", i, ret);
+            return;
+        }
     }
     if (info1.hvm) {
         dm_info.domid = domid;

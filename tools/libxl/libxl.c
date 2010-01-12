@@ -176,18 +176,24 @@ retry_transaction:
 int libxl_domain_build(struct libxl_ctx *ctx, libxl_domain_build_info *info, uint32_t domid, libxl_domain_build_state *state)
 {
     char **vments = NULL, **localents = NULL;
-    int i;
+    int i, ret;
 
-    build_pre(ctx, domid, info, state);
+    ret = build_pre(ctx, domid, info, state);
+    if (ret) goto out;
+
     if (info->hvm) {
-        build_hvm(ctx, domid, info, state);
+        ret = build_hvm(ctx, domid, info, state);
+        if (ret) goto out;
+
         vments = libxl_calloc(ctx, 5, sizeof(char *));
         vments[0] = "rtc/timeoffset";
         vments[1] = (info->u.hvm.timeoffset) ? info->u.hvm.timeoffset : "";
         vments[2] = "image/ostype";
         vments[3] = "hvm";
     } else {
-        build_pv(ctx, domid, info, state);
+        ret = build_pv(ctx, domid, info, state);
+        if (ret) goto out;
+
         vments = libxl_calloc(ctx, 9, sizeof(char *));
         i = 0;
         vments[i++] = "image/ostype";
@@ -203,8 +209,9 @@ int libxl_domain_build(struct libxl_ctx *ctx, libxl_domain_build_info *info, uin
             vments[i++] = (char*) info->u.pv.cmdline;
         }
     }
-    build_post(ctx, domid, info, state, vments, localents);
-    return 0;
+    ret = build_post(ctx, domid, info, state, vments, localents);
+out:
+    return ret;
 }
 
 int libxl_domain_restore(struct libxl_ctx *ctx, libxl_domain_build_info *info,
@@ -212,10 +219,14 @@ int libxl_domain_restore(struct libxl_ctx *ctx, libxl_domain_build_info *info,
                          libxl_device_model_info *dm_info)
 {
     char **vments = NULL, **localents = NULL;
-    int i;
+    int i, ret;
 
-    build_pre(ctx, domid, info, state);
-    restore_common(ctx, domid, info, state, fd);
+    ret = build_pre(ctx, domid, info, state);
+    if (ret) goto out;
+
+    ret = restore_common(ctx, domid, info, state, fd);
+    if (ret) goto out;
+
     if (info->hvm) {
         vments = libxl_calloc(ctx, 5, sizeof(char *));
         vments[0] = "rtc/timeoffset";
@@ -238,13 +249,15 @@ int libxl_domain_restore(struct libxl_ctx *ctx, libxl_domain_build_info *info,
             vments[i++] = (char*) info->u.pv.cmdline;
         }
     }
-    build_post(ctx, domid, info, state, vments, localents);
+    ret = build_post(ctx, domid, info, state, vments, localents);
+    if (ret) goto out;
+
     if (info->hvm)
         asprintf(&(dm_info->saved_state), "/var/lib/xen/qemu-save.%d", domid);
     else
         dm_info->saved_state = NULL;
-
-    return 0;
+out:
+    return ret;
 }
 
 int libxl_domain_resume(struct libxl_ctx *ctx, uint32_t domid)
