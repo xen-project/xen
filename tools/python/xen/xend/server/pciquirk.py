@@ -117,14 +117,14 @@ class PCIQuirk:
                     pci_perm_dev_config = ['']
                 else:
                     pci_perm_dev_config.insert(0, '')
-                self.pci_perm_dev_config = pci_perm_dev_config
             except Exception, ex:
                 raise XendError("Reading config file %s: %s" %
                                 (PERMISSIVE_CONFIG_FILE,str(ex)))
         else:
             log.info("Config file does not exist: %s" % PERMISSIVE_CONFIG_FILE)
-            self.pci_perm_dev_config = ['xend-pci-perm-devs']
+            pci_perm_dev_config = ['xend-pci-perm-devs']
 
+        self.pci_perm_dev_config = pci_perm_dev_config
         devices = child_at(child(self.pci_perm_dev_config,
                                  'unconstrained_dev_ids'),0)
         if self.__matchPCIdev( devices ):
