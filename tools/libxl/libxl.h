@@ -20,6 +20,7 @@
 #include <netinet/in.h>
 #include <xenctrl.h>
 #include <xs.h>
+#include <sys/wait.h> /* for pid_t */
 
 typedef void (*libxl_log_callback)(void *userdata, int loglevel, const char *file,
                                    int line, const char *func, char *s);

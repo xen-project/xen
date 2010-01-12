@@ -53,7 +53,7 @@ static int domain_qualifier_to_domid(struct libxl_ctx *ctx, char *p, uint32_t *d
 
     alldigit = 1;
     for (i = 0; p[i]; i++) {
-        if (!isdigit(p[i])) {
+        if (!isdigit((uint8_t)p[i])) {
             alldigit = 0;
             break;
         }

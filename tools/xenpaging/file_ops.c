@@ -36,7 +36,7 @@ static int file_op(int fd, void *page, int i,
     int bytes;
     int ret;
 
-    seek_ret = lseek64(fd, i << PAGE_SHIFT, SEEK_SET);
+    seek_ret = lseek(fd, i << PAGE_SHIFT, SEEK_SET);
 
     total = 0;
     while ( total < PAGE_SIZE )
