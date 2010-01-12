@@ -203,8 +203,7 @@ int libxl_spawn_check(struct libxl_ctx *ctx,
 
  /* low-level stuff, for synchronous subprocesses etc. */
 
-void libxl_exec(struct libxl_ctx *ctx, int stdinfd, int stdoutfd, int stderrfd,
-                char *arg0, char **args); // logs errors, never returns
+void libxl_exec(int stdinfd, int stdoutfd, int stderrfd, char *arg0, char **args); // logs errors, never returns
 void libxl_log_child_exitstatus(struct libxl_ctx *ctx,
                                 const char *what, pid_t pid, int status);
 

@@ -974,7 +974,7 @@ int libxl_create_device_model(struct libxl_ctx *ctx,
     rc = libxl_spawn_spawn(ctx, p, "device model", dm_xenstore_record_pid);
     if (rc < 0) goto xit;
     if (!rc) { /* inner child */
-        libxl_exec(ctx, null, logfile_w, logfile_w,
+        libxl_exec(null, logfile_w, logfile_w,
                    info->device_model, args);
     }
 
@@ -1118,7 +1118,7 @@ int libxl_device_disk_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_di
 
                         null_r = open("/dev/null", O_RDONLY);
                         null_w = open("/dev/null", O_WRONLY);
-                        libxl_exec(ctx, null_r, p[1], null_w, "/usr/sbin/tapdisk2", args);
+                        libxl_exec(null_r, p[1], null_w, "/usr/sbin/tapdisk2", args);
                         XL_LOG(ctx, XL_LOG_ERROR, "Error execing tapdisk2");
                     }
                     close(p[1]);
