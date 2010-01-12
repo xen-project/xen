@@ -993,6 +993,8 @@ void set_memory_target(char *p, char *mem)
 {
     struct libxl_ctx ctx;
     uint32_t domid;
+    uint32_t memorykb;
+    char *endptr;
 
     if (libxl_ctx_init(&ctx, LIBXL_VERSION)) {
         fprintf(stderr, "cannot init xl context\n");
@@ -1004,7 +1006,13 @@ void set_memory_target(char *p, char *mem)
         fprintf(stderr, "%s is an invalid domain identifier\n", p);
         exit(2);
     }
-    libxl_set_memory_target(&ctx, domid, atoi(mem));
+    memorykb = strtoul(mem, &endptr, 10);
+    if (*endptr != '\0') {
+        fprintf(stderr, "invalid memory size: %s\n", mem);
+        exit(3);
+    }
+    printf("setting domid %d memory to : %d\n", domid, memorykb);
+    libxl_set_memory_target(&ctx, domid, memorykb);
 }
 
 int main_memset(int argc, char **argv)
