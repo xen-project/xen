@@ -1955,8 +1955,10 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
         }
         break;
     case 0x80000001:
-        /* Don't expose RDTSCP feature when in PVRDTSCP mode. */
-        if ( v->domain->arch.tsc_mode == TSC_MODE_PVRDTSCP )
+        /* We expose RDTSCP feature to guest only when
+           tsc_mode == TSC_MODE_DEFAULT and host_tsc_is_safe() returns 1 */
+        if ( v->domain->arch.tsc_mode != TSC_MODE_DEFAULT ||
+             !host_tsc_is_safe() )
             *edx &= ~bitmaskof(X86_FEATURE_RDTSCP);
         break;
     }

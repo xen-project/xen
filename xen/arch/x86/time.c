@@ -1628,7 +1628,7 @@ void pv_soft_rdtsc(struct vcpu *v, struct cpu_user_regs *regs, int rdtscp)
              (d->arch.tsc_mode == TSC_MODE_PVRDTSCP) ? d->arch.incarnation : 0;
 }
 
-static int host_tsc_is_safe(void)
+int host_tsc_is_safe(void)
 {
     if ( boot_cpu_has(X86_FEATURE_TSC_RELIABLE) )
         return 1;
