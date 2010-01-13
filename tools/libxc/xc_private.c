@@ -149,14 +149,14 @@ void unlock_pages(void *addr, size_t len)
 }
 
 /* NB: arr must be locked */
-int xc_get_pfn_type_batch(int xc_handle,
-                          uint32_t dom, int num, uint32_t *arr)
+int xc_get_pfn_type_batch(int xc_handle, uint32_t dom,
+                          unsigned int num, xen_pfn_t *arr)
 {
     DECLARE_DOMCTL;
-    domctl.cmd = XEN_DOMCTL_getpageframeinfo2;
+    domctl.cmd = XEN_DOMCTL_getpageframeinfo3;
     domctl.domain = (domid_t)dom;
-    domctl.u.getpageframeinfo2.num    = num;
-    set_xen_guest_handle(domctl.u.getpageframeinfo2.array, arr);
+    domctl.u.getpageframeinfo3.num = num;
+    set_xen_guest_handle(domctl.u.getpageframeinfo3.array, arr);
     return do_domctl(xc_handle, &domctl);
 }
 

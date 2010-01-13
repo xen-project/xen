@@ -191,6 +191,9 @@ void *xc_map_foreign_ranges(int xc_handle, uint32_t dom,
                             size_t size, int prot, size_t chunksize,
                             privcmd_mmap_entry_t entries[], int nentries);
 
+int xc_get_pfn_type_batch(int xc_handle, uint32_t dom,
+                          unsigned int num, xen_pfn_t *);
+
 void bitmap_64_to_byte(uint8_t *bp, const uint64_t *lp, int nbits);
 void bitmap_byte_to_64(uint64_t *lp, const uint8_t *bp, int nbits);
 

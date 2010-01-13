@@ -24,7 +24,7 @@ struct domain_mem_info{
     int domid;
     unsigned int pt_level;
     unsigned int guest_width;
-    uint32_t *pfn_type;
+    xen_pfn_t *pfn_type;
     xen_pfn_t *p2m_table;
     unsigned long p2m_size;
     xen_pfn_t *m2p_table;
@@ -266,19 +266,18 @@ static int init_mem_info(int xc_handle, int domid,
     }
 
     /* Get pfn type */
-    minfo->pfn_type = malloc(sizeof(uint32_t) * minfo->p2m_size);
+    minfo->pfn_type = calloc(sizeof(*minfo->pfn_type), minfo->p2m_size);
     if (!minfo->pfn_type)
     {
         ERROR("Failed to malloc pfn_type\n");
         goto failed;
     }
-    memset(minfo->pfn_type, 0, sizeof(uint32_t) * minfo->p2m_size);
 
     for (i = 0; i < minfo->p2m_size; i++)
         minfo->pfn_type[i] = pfn_to_mfn(i, minfo->p2m_table,
                                         minfo->guest_width);
 
-    if ( lock_pages(minfo->pfn_type, minfo->p2m_size * sizeof(uint32_t)) )
+    if ( lock_pages(minfo->pfn_type, minfo->p2m_size * sizeof(*minfo->pfn_type)) )
     {
         ERROR("Unable to lock pfn_type array");
         goto failed;
@@ -297,12 +296,12 @@ static int init_mem_info(int xc_handle, int domid,
     return 0;
 
 unlock:
-    unlock_pages(minfo->pfn_type, minfo->p2m_size * sizeof(uint32_t));
+    unlock_pages(minfo->pfn_type, minfo->p2m_size * sizeof(*minfo->pfn_type));
 failed:
     if (minfo->pfn_type)
     {
-        minfo->pfn_type = NULL;
         free(minfo->pfn_type);
+        minfo->pfn_type = NULL;
     }
     if (live_shinfo)
         munmap(live_shinfo, PAGE_SIZE);
@@ -418,7 +417,9 @@ static int change_pte(int xc_handle, int domid,
         uint64_t pte, new_pte;
         int j;
 
-        if ( table_mfn == INVALID_P2M_ENTRY )
+        if ( (table_mfn == INVALID_P2M_ENTRY) ||
+             ((minfo->pfn_type[i] & XEN_DOMCTL_PFINFO_LTAB_MASK) ==
+              XEN_DOMCTL_PFINFO_XTAB) )
             continue;
 
         if ( minfo->pfn_type[i] & XEN_DOMCTL_PFINFO_LTABTYPE_MASK )

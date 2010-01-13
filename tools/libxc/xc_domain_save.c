@@ -959,6 +959,12 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     /* Get the size of the P2M table */
     dinfo->p2m_size = xc_memory_op(xc_handle, XENMEM_maximum_gpfn, &dom) + 1;
 
+    if ( dinfo->p2m_size > ~XEN_DOMCTL_PFINFO_LTAB_MASK )
+    {
+        ERROR("Cannot save this big a guest");
+        goto out;
+    }
+
     /* Domain is still running at this point */
     if ( live )
     {
@@ -1296,17 +1302,11 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             else
             {
                 /* Get page types */
-                for ( j = 0; j < batch; j++ )
-                    ((uint32_t *)pfn_type)[j] = pfn_type[j];
-                if ( xc_get_pfn_type_batch(xc_handle, dom, batch,
-                                           (uint32_t *)pfn_type) )
+                if ( xc_get_pfn_type_batch(xc_handle, dom, batch, pfn_type) )
                 {
                     ERROR("get_pfn_type_batch failed");
                     goto out;
                 }
-                for ( j = batch-1; j >= 0; j-- )
-                    pfn_type[j] = ((uint32_t *)pfn_type)[j] &
-                                  XEN_DOMCTL_PFINFO_LTAB_MASK;
 
                 for ( j = 0; j < batch; j++ )
                 {

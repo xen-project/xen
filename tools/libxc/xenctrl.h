@@ -802,9 +802,6 @@ int xc_mmuext_op(int xc_handle, struct mmuext_op *op, unsigned int nr_ops,
 
 int xc_memory_op(int xc_handle, int cmd, void *arg);
 
-int xc_get_pfn_type_batch(int xc_handle, uint32_t dom,
-                          int num, uint32_t *arr);
-
 
 /* Get current total pages allocated to a domain. */
 long xc_get_tot_pages(int xc_handle, uint32_t domid);

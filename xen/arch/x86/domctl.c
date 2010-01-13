@@ -160,6 +160,106 @@ long arch_do_domctl(
     }
     break;
 
+    case XEN_DOMCTL_getpageframeinfo3:
+#ifdef __x86_64__
+        if (!has_32bit_shinfo(current->domain))
+        {
+            unsigned int n, j;
+            unsigned int num = domctl->u.getpageframeinfo3.num;
+            domid_t dom = domctl->domain;
+            struct domain *d;
+            struct page_info *page;
+            xen_pfn_t *arr;
+
+            ret = -ESRCH;
+            if ( unlikely((d = rcu_lock_domain_by_id(dom)) == NULL) )
+                break;
+
+            if ( unlikely(num > 1024) ||
+                 unlikely(num != domctl->u.getpageframeinfo3.num) )
+            {
+                ret = -E2BIG;
+                rcu_unlock_domain(d);
+                break;
+            }
+
+            page = alloc_domheap_page(NULL, 0);
+            if ( !page )
+            {
+                ret = -ENOMEM;
+                rcu_unlock_domain(d);
+                break;
+            }
+            arr = page_to_virt(page);
+
+            for ( n = ret = 0; n < num; )
+            {
+                unsigned int k = min_t(unsigned int, num - n, PAGE_SIZE / 4);
+
+                if ( copy_from_guest_offset(arr,
+                                            domctl->u.getpageframeinfo3.array,
+                                            n, k) )
+                {
+                    ret = -EFAULT;
+                    break;
+                }
+
+                for ( j = 0; j < k; j++ )
+                {
+                    unsigned long type = 0, mfn = arr[j];
+
+                    page = mfn_to_page(mfn);
+
+                    if ( unlikely(!mfn_valid(mfn)) )
+                        type = XEN_DOMCTL_PFINFO_XTAB;
+                    else if ( xsm_getpageframeinfo(page) != 0 )
+                        ;
+                    else if ( likely(get_page(page, d)) )
+                    {
+                        switch( page->u.inuse.type_info & PGT_type_mask )
+                        {
+                        case PGT_l1_page_table:
+                            type = XEN_DOMCTL_PFINFO_L1TAB;
+                            break;
+                        case PGT_l2_page_table:
+                            type = XEN_DOMCTL_PFINFO_L2TAB;
+                            break;
+                        case PGT_l3_page_table:
+                            type = XEN_DOMCTL_PFINFO_L3TAB;
+                            break;
+                        case PGT_l4_page_table:
+                            type = XEN_DOMCTL_PFINFO_L4TAB;
+                            break;
+                        }
+
+                        if ( page->u.inuse.type_info & PGT_pinned )
+                            type |= XEN_DOMCTL_PFINFO_LPINTAB;
+
+                        put_page(page);
+                    }
+                    else
+                        type = XEN_DOMCTL_PFINFO_XTAB;
+
+                    arr[j] = type;
+                }
+
+                if ( copy_to_guest_offset(domctl->u.getpageframeinfo3.array,
+                                          n, arr, k) )
+                {
+                    ret = -EFAULT;
+                    break;
+                }
+
+                n += k;
+            }
+
+            free_domheap_page(virt_to_page(arr));
+
+            rcu_unlock_domain(d);
+            break;
+        }
+#endif
+        /* fall thru */
     case XEN_DOMCTL_getpageframeinfo2:
     {
         int n,j;
@@ -183,7 +283,7 @@ long arch_do_domctl(
         if ( !arr32 )
         {
             ret = -ENOMEM;
-            put_domain(d);
+            rcu_unlock_domain(d);
             break;
         }
  
@@ -209,11 +309,14 @@ long arch_do_domctl(
 
                 page = mfn_to_page(mfn);
 
-                ret = xsm_getpageframeinfo(page);
-                if ( ret )
-                    continue;
+                if ( domctl->cmd == XEN_DOMCTL_getpageframeinfo3)
+                    arr32[j] = 0;
 
-                if ( likely(mfn_valid(mfn) && get_page(page, d)) ) 
+                if ( unlikely(!mfn_valid(mfn)) )
+                    arr32[j] |= XEN_DOMCTL_PFINFO_XTAB;
+                else if ( xsm_getpageframeinfo(page) != 0 )
+                    continue;
+                else if ( likely(get_page(page, d)) )
                 {
                     unsigned long type = 0;
 

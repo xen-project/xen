@@ -161,6 +161,14 @@ struct xen_domctl_getpageframeinfo2 {
 typedef struct xen_domctl_getpageframeinfo2 xen_domctl_getpageframeinfo2_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_getpageframeinfo2_t);
 
+/* XEN_DOMCTL_getpageframeinfo3 */
+struct xen_domctl_getpageframeinfo3 {
+    /* IN variables. */
+    uint64_aligned_t num;
+    /* IN/OUT variables. */
+    XEN_GUEST_HANDLE_64(xen_pfn_t) array;
+};
+
 
 /*
  * Control shadow pagetables operation
@@ -832,6 +840,7 @@ struct xen_domctl {
 #define XEN_DOMCTL_disable_migrate               58
 #define XEN_DOMCTL_gettscinfo                    59
 #define XEN_DOMCTL_settscinfo                    60
+#define XEN_DOMCTL_getpageframeinfo3             61
 #define XEN_DOMCTL_gdbsx_guestmemio            1000
 #define XEN_DOMCTL_gdbsx_pausevcpu             1001
 #define XEN_DOMCTL_gdbsx_unpausevcpu           1002
@@ -844,6 +853,7 @@ struct xen_domctl {
         struct xen_domctl_getmemlist        getmemlist;
         struct xen_domctl_getpageframeinfo  getpageframeinfo;
         struct xen_domctl_getpageframeinfo2 getpageframeinfo2;
+        struct xen_domctl_getpageframeinfo3 getpageframeinfo3;
         struct xen_domctl_vcpuaffinity      vcpuaffinity;
         struct xen_domctl_shadow_op         shadow_op;
         struct xen_domctl_max_mem           max_mem;
