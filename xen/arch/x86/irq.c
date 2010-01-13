@@ -740,7 +740,6 @@ typedef struct {
 #define ACKTYPE_UNMASK 1     /* Unmask PIC hardware (from any CPU)   */
 #define ACKTYPE_EOI    2     /* EOI on the CPU that was interrupted  */
     cpumask_t cpu_eoi_map;   /* CPUs that need to EOI this interrupt */
-    u8 eoi_vector;           /* vector awaiting the EOI*/
     struct domain *guest[IRQ_MAX_GUESTS];
 } irq_guest_action_t;
 
@@ -749,8 +748,9 @@ typedef struct {
  * order, as only the current highest-priority pending irq can be EOIed.
  */
 struct pending_eoi {
-    u8 vector; /* vector awaiting EOI */
-    u8 ready;  /* Ready for EOI now?  */
+    u32 ready:1;  /* Ready for EOI now?  */
+    u32 irq:23;   /* irq of the vector */
+    u32 vector:8; /* vector awaiting EOI */
 };
 
 static DEFINE_PER_CPU(struct pending_eoi, pending_eoi[NR_VECTORS]);
@@ -817,11 +817,11 @@ static void __do_IRQ_guest(int irq)
         sp = pending_eoi_sp(peoi);
         ASSERT((sp == 0) || (peoi[sp-1].vector < vector));
         ASSERT(sp < (NR_VECTORS-1));
+        peoi[sp].irq = irq;
         peoi[sp].vector = vector;
         peoi[sp].ready = 0;
         pending_eoi_sp(peoi) = sp+1;
         cpu_set(smp_processor_id(), action->cpu_eoi_map);
-        action->eoi_vector = vector;
     }
 
     for ( i = 0; i < action->nr_guests; i++ )
@@ -913,7 +913,7 @@ static void flush_ready_eoi(void)
 
     while ( (--sp >= 0) && peoi[sp].ready )
     {
-        irq = __get_cpu_var(vector_irq[peoi[sp].vector]);
+        irq = peoi[sp].irq;
         ASSERT(irq > 0);
         desc = irq_to_desc(irq);
         spin_lock(&desc->lock);
@@ -941,7 +941,7 @@ static void __set_eoi_ready(struct irq_desc *desc)
 
     do {
         ASSERT(sp > 0);
-    } while ( peoi[--sp].vector != action->eoi_vector );
+    } while ( peoi[--sp].irq != irq );
     ASSERT(!peoi[sp].ready);
     peoi[sp].ready = 1;
 }
