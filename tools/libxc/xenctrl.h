@@ -749,12 +749,22 @@ void *xc_map_foreign_pages(int xc_handle, uint32_t dom, int prot,
                            const xen_pfn_t *arr, int num );
 
 /**
+ * DEPRECATED - use xc_map_foreign_bulk() instead.
+ *
  * Like xc_map_foreign_pages(), except it can succeeed partially.
  * When a page cannot be mapped, its PFN in @arr is or'ed with
  * 0xF0000000 to indicate the error.
  */
 void *xc_map_foreign_batch(int xc_handle, uint32_t dom, int prot,
                            xen_pfn_t *arr, int num );
+
+/**
+ * Like xc_map_foreign_pages(), except it can succeed partially.
+ * When a page cannot be mapped, its respective field in @err is
+ * set to the corresponding errno value.
+ */
+void *xc_map_foreign_bulk(int xc_handle, uint32_t dom, int prot,
+                          const xen_pfn_t *arr, int *err, unsigned int num);
 
 /**
  * Translates a virtual address in the context of a given domain and

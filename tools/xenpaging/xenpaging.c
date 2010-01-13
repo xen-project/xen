@@ -310,9 +310,9 @@ int xenpaging_evict_page(xenpaging_t *paging, xenpaging_victim_t *victim, int fd
     /* Map page */
     gfn = victim->gfn;
     ret = -EFAULT;
-    page = xc_map_foreign_batch(paging->xc_handle, victim->domain_id,
+    page = xc_map_foreign_pages(paging->xc_handle, victim->domain_id,
                                 PROT_READ | PROT_WRITE, &gfn, 1);
-    if ( (gfn & XEN_DOMCTL_PFINFO_LTAB_MASK) == XEN_DOMCTL_PFINFO_XTAB )
+    if ( page == NULL )
     {
         ERROR("Error mapping page");
         goto out;
@@ -386,19 +386,12 @@ int xenpaging_populate_page(xenpaging_t *paging, unsigned long *gfn, int fd, int
 
     /* Map page */
     ret = -EFAULT;
-    page = xc_map_foreign_batch(paging->xc_handle, paging->mem_event.domain_id,
+    page = xc_map_foreign_pages(paging->xc_handle, paging->mem_event.domain_id,
                                 PROT_READ | PROT_WRITE, gfn, 1);
     if ( page == NULL )
     {
         ERROR("Error mapping page: page is null");
         goto out_map;
-    }
-
-    /* Check that the page exists */
-    if ( (*gfn & XEN_DOMCTL_PFINFO_LTAB_MASK) == XEN_DOMCTL_PFINFO_XTAB )
-    {
-        ERROR("Error mapping page: gfn is invalid");
-        goto out;
     }
 
     /* Read page */

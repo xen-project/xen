@@ -709,7 +709,7 @@ static xen_pfn_t *map_and_save_p2m_table(int xc_handle,
             p2m_frame_list_list[i] = ((uint32_t *)p2m_frame_list_list)[i];
 
     live_p2m_frame_list =
-        xc_map_foreign_batch(xc_handle, dom, PROT_READ,
+        xc_map_foreign_pages(xc_handle, dom, PROT_READ,
                              p2m_frame_list_list,
                              P2M_FLL_ENTRIES);
     if ( !live_p2m_frame_list )
@@ -727,6 +727,9 @@ static xen_pfn_t *map_and_save_p2m_table(int xc_handle,
     memset(p2m_frame_list, 0, P2M_TOOLS_FL_SIZE);
     memcpy(p2m_frame_list, live_p2m_frame_list, P2M_GUEST_FL_SIZE);
 
+    munmap(live_p2m_frame_list, P2M_FLL_ENTRIES * PAGE_SIZE);
+    live_p2m_frame_list = NULL;
+
     /* Canonicalize guest's unsigned long vs ours */
     if ( dinfo->guest_width > sizeof(unsigned long) )
         for ( i = 0; i < P2M_FL_ENTRIES; i++ )
@@ -741,7 +744,7 @@ static xen_pfn_t *map_and_save_p2m_table(int xc_handle,
        (its not clear why it would want to change them, and we'll be OK
        from a safety POV anyhow. */
 
-    p2m = xc_map_foreign_batch(xc_handle, dom, PROT_READ,
+    p2m = xc_map_foreign_pages(xc_handle, dom, PROT_READ,
                                p2m_frame_list,
                                P2M_FL_ENTRIES);
     if ( !p2m )
@@ -873,8 +876,9 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     vcpu_guest_context_any_t ctxt;
 
     /* A table containing the type of each PFN (/not/ MFN!). */
-    unsigned long *pfn_type = NULL;
+    xen_pfn_t *pfn_type = NULL;
     unsigned long *pfn_batch = NULL;
+    int *pfn_err = NULL;
 
     /* A copy of one frame of guest memory. */
     char page[PAGE_SIZE];
@@ -1263,8 +1267,8 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             if ( batch == 0 )
                 goto skip; /* vanishingly unlikely... */
 
-            region_base = xc_map_foreign_batch(
-                xc_handle, dom, PROT_READ, pfn_type, batch);
+            region_base = xc_map_foreign_bulk(
+                xc_handle, dom, PROT_READ, pfn_type, pfn_err, batch);
             if ( region_base == NULL )
             {
                 ERROR("map batch failed");
@@ -1275,14 +1279,19 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             {
                 /* Look for and skip completely empty batches. */
                 for ( j = 0; j < batch; j++ )
-                    if ( (pfn_type[j] & XEN_DOMCTL_PFINFO_LTAB_MASK) !=
-                         XEN_DOMCTL_PFINFO_XTAB )
+                {
+                    if ( !pfn_err[j] )
                         break;
+                    pfn_type[j] |= XEN_DOMCTL_PFINFO_XTAB;
+                }
                 if ( j == batch )
                 {
                     munmap(region_base, batch*PAGE_SIZE);
                     continue; /* bail on this batch: no valid pages */
                 }
+                for ( ; j < batch; j++ )
+                    if ( pfn_err[j] )
+                        pfn_type[j] |= XEN_DOMCTL_PFINFO_XTAB;
             }
             else
             {
@@ -1296,16 +1305,17 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                     goto out;
                 }
                 for ( j = batch-1; j >= 0; j-- )
-                    pfn_type[j] = ((uint32_t *)pfn_type)[j];
+                    pfn_type[j] = ((uint32_t *)pfn_type)[j] &
+                                  XEN_DOMCTL_PFINFO_LTAB_MASK;
 
                 for ( j = 0; j < batch; j++ )
                 {
+                    unsigned long mfn = pfn_to_mfn(pfn_batch[j]);
                     
-                    if ( (pfn_type[j] & XEN_DOMCTL_PFINFO_LTAB_MASK) ==
-                         XEN_DOMCTL_PFINFO_XTAB )
+                    if ( pfn_type[j] == XEN_DOMCTL_PFINFO_XTAB )
                     {
                         DPRINTF("type fail: page %i mfn %08lx\n", 
-                                j, pfn_type[j]);
+                                j, mfn);
                         continue;
                     }
                     
@@ -1313,16 +1323,13 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                         DPRINTF("%d pfn= %08lx mfn= %08lx [mfn]= %08lx"
                                 " sum= %08lx\n",
                                 iter,
-                                (pfn_type[j] & XEN_DOMCTL_PFINFO_LTAB_MASK) |
-                                pfn_batch[j],
-                                pfn_type[j],
-                                mfn_to_pfn(pfn_type[j] &
-                                           ~XEN_DOMCTL_PFINFO_LTAB_MASK),
+                                pfn_type[j] | pfn_batch[j],
+                                mfn,
+                                mfn_to_pfn(mfn),
                                 csum_page(region_base + (PAGE_SIZE*j)));
                     
                     /* canonicalise mfn->pfn */
-                    pfn_type[j] = (pfn_type[j] & XEN_DOMCTL_PFINFO_LTAB_MASK) |
-                        pfn_batch[j];
+                    pfn_type[j] |= pfn_batch[j];
                 }
             }
 
@@ -1332,11 +1339,17 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                 goto out;
             }
 
+            if ( sizeof(unsigned long) < sizeof(*pfn_type) )
+                for ( j = 0; j < batch; j++ )
+                    ((unsigned long *)pfn_type)[j] = pfn_type[j];
             if ( write_exact(io_fd, pfn_type, sizeof(unsigned long)*batch) )
             {
                 PERROR("Error when writing to state file (3)");
                 goto out;
             }
+            if ( sizeof(unsigned long) < sizeof(*pfn_type) )
+                while ( --j >= 0 )
+                    pfn_type[j] = ((unsigned long *)pfn_type)[j];
 
             /* entering this loop, pfn_type is now in pfns (Not mfns) */
             run = 0;

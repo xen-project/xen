@@ -64,6 +64,14 @@ typedef struct privcmd_mmapbatch {
 	xen_pfn_t __user *arr; /* array of mfns - top nibble set on err */
 } privcmd_mmapbatch_t; 
 
+typedef struct privcmd_mmapbatch_v2 {
+	unsigned int num; /* number of pages to populate */
+	domid_t dom;      /* target domain */
+	__u64 addr;       /* virtual address */
+	const xen_pfn_t __user *arr; /* array of mfns */
+	int __user *err;  /* array of error codes */
+} privcmd_mmapbatch_v2_t;
+
 /*
  * @cmd: IOCTL_PRIVCMD_HYPERCALL
  * @arg: &privcmd_hypercall_t
@@ -75,5 +83,7 @@ typedef struct privcmd_mmapbatch {
 	_IOC(_IOC_NONE, 'P', 2, sizeof(privcmd_mmap_t))
 #define IOCTL_PRIVCMD_MMAPBATCH					\
 	_IOC(_IOC_NONE, 'P', 3, sizeof(privcmd_mmapbatch_t))
+#define IOCTL_PRIVCMD_MMAPBATCH_V2				\
+	_IOC(_IOC_NONE, 'P', 4, sizeof(privcmd_mmapbatch_v2_t))
 
 #endif /* __LINUX_PUBLIC_PRIVCMD_H__ */

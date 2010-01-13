@@ -158,7 +158,7 @@ static int xc_domain_resume_any(int xc_handle, uint32_t domid)
         goto out;
     }
 
-    p2m_frame_list = xc_map_foreign_batch(xc_handle, domid, PROT_READ,
+    p2m_frame_list = xc_map_foreign_pages(xc_handle, domid, PROT_READ,
                                           p2m_frame_list_list,
                                           P2M_FLL_ENTRIES);
     if ( p2m_frame_list == NULL )
@@ -171,7 +171,7 @@ static int xc_domain_resume_any(int xc_handle, uint32_t domid)
        the guest must not change which frames are used for this purpose.
        (its not clear why it would want to change them, and we'll be OK
        from a safety POV anyhow. */
-    p2m = xc_map_foreign_batch(xc_handle, domid, PROT_READ,
+    p2m = xc_map_foreign_pages(xc_handle, domid, PROT_READ,
                                p2m_frame_list,
                                P2M_FL_ENTRIES);
     if ( p2m == NULL )

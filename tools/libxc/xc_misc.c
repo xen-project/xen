@@ -352,25 +352,23 @@ int xc_hvm_set_mem_type(
 void *xc_map_foreign_pages(int xc_handle, uint32_t dom, int prot,
                            const xen_pfn_t *arr, int num)
 {
-    xen_pfn_t *pfn;
     void *res;
-    int i;
+    int i, *err;
 
-    pfn = malloc(num * sizeof(*pfn));
-    if (!pfn)
+    if (num < 0) {
+        errno = -EINVAL;
         return NULL;
-    memcpy(pfn, arr, num * sizeof(*pfn));
+    }
 
-    res = xc_map_foreign_batch(xc_handle, dom, prot, pfn, num);
+    err = calloc(num, sizeof(*err));
+    if (!err)
+        return NULL;
+
+    res = xc_map_foreign_bulk(xc_handle, dom, prot, arr, err, num);
     if (res) {
         for (i = 0; i < num; i++) {
-            if ((pfn[i] & 0xF0000000UL) == 0xF0000000UL) {
-                /*
-                 * xc_map_foreign_batch() doesn't give us an error
-                 * code, so we have to make one up.  May not be the
-                 * appropriate one.
-                 */
-                errno = EINVAL;
+            if (err[i]) {
+                errno = -err[i];
                 munmap(res, num * PAGE_SIZE);
                 res = NULL;
                 break;
@@ -378,8 +376,51 @@ void *xc_map_foreign_pages(int xc_handle, uint32_t dom, int prot,
         }
     }
 
-    free(pfn);
+    free(err);
     return res;
+}
+
+/* stub for all not yet converted OSes */
+void *
+#ifdef __GNUC__
+__attribute__((__weak__))
+#endif
+xc_map_foreign_bulk(int xc_handle, uint32_t dom, int prot,
+                    const xen_pfn_t *arr, int *err, unsigned int num)
+{
+    xen_pfn_t *pfn;
+    unsigned int i;
+    void *ret;
+
+    if ((int)num <= 0) {
+        errno = EINVAL;
+        return NULL;
+    }
+
+    pfn = calloc(num, sizeof(*pfn));
+    if (!pfn) {
+        errno = ENOMEM;
+        return NULL;
+    }
+
+    memcpy(pfn, arr, num * sizeof(*arr));
+    ret = xc_map_foreign_batch(xc_handle, dom, prot, pfn, num);
+
+    if (ret) {
+        for (i = 0; i < num; ++i)
+            switch (pfn[i] ^ arr[i]) {
+            case 0:
+                err[i] = 0;
+                break;
+            default:
+                err[i] = -EINVAL;
+                break;
+            }
+    }
+
+    free(pfn);
+
+    return ret;
 }
 
 /*

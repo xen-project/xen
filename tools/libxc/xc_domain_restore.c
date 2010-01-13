@@ -118,7 +118,7 @@ static int break_super_page(int xc_handle,
         page_array[i] = start_pfn + i;
     }
 
-    ram_base = xc_map_foreign_batch(xc_handle, dom, PROT_READ,
+    ram_base = xc_map_foreign_pages(xc_handle, dom, PROT_READ,
                                     page_array, tot_pfns);
 
     if ( ram_base == NULL )
@@ -166,7 +166,7 @@ static int break_super_page(int xc_handle,
         page_array[i] = start_pfn + i;
     }
 
-    ram_base = xc_map_foreign_batch(xc_handle, dom, PROT_WRITE,
+    ram_base = xc_map_foreign_pages(xc_handle, dom, PROT_WRITE,
                                     page_array, tot_pfns);
     if ( ram_base == NULL )
     {
@@ -494,7 +494,7 @@ static ssize_t read_exact_timed(int fd, void* buf, size_t size)
 ** the (now known) appropriate mfn values.
 */
 static int uncanonicalize_pagetable(int xc_handle, uint32_t dom, struct restore_ctx *ctx,
-                                    unsigned long type, void *page, int superpages)
+                                    void *page, int superpages)
 {
     int i, pte_last;
     unsigned long pfn;
@@ -1186,7 +1186,7 @@ static int apply_batch(int xc_handle, uint32_t dom, struct restore_ctx *ctx,
     }
 
     /* Map relevant mfns */
-    region_base = xc_map_foreign_batch(
+    region_base = xc_map_foreign_pages(
         xc_handle, dom, PROT_WRITE, region_mfn, j);
 
     if ( region_base == NULL )
@@ -1240,7 +1240,7 @@ static int apply_batch(int xc_handle, uint32_t dom, struct restore_ctx *ctx,
                 (pagetype != XEN_DOMCTL_PFINFO_L1TAB)) {
 
                 if (!uncanonicalize_pagetable(xc_handle, dom, ctx,
-                                              pagetype, page, superpages)) {
+                                              page, superpages)) {
                     /*
                     ** Failing to uncanonicalize a page table can be ok
                     ** under live migration since the pages type may have
@@ -1655,7 +1655,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
 
             if ( (i == (dinfo->p2m_size-1)) || (j == MAX_BATCH_SIZE) )
             {
-                region_base = xc_map_foreign_batch(
+                region_base = xc_map_foreign_pages(
                     xc_handle, dom, PROT_READ | PROT_WRITE, region_mfn, j);
                 if ( region_base == NULL )
                 {
@@ -1666,7 +1666,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
                 for ( k = 0; k < j; k++ )
                 {
                     if ( !uncanonicalize_pagetable(
-                        xc_handle, dom, ctx, XEN_DOMCTL_PFINFO_L1TAB,
+                        xc_handle, dom, ctx,
                         region_base + k*PAGE_SIZE, superpages) )
                     {
                         ERROR("failed uncanonicalize pt!");
@@ -1949,7 +1949,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     }
 
     /* Copy the P2M we've constructed to the 'live' P2M */
-    if ( !(ctx->live_p2m = xc_map_foreign_batch(xc_handle, dom, PROT_WRITE,
+    if ( !(ctx->live_p2m = xc_map_foreign_pages(xc_handle, dom, PROT_WRITE,
                                            p2m_frame_list, P2M_FL_ENTRIES)) )
     {
         ERROR("Couldn't map p2m table");
