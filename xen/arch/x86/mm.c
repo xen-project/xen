@@ -4235,7 +4235,6 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         struct xen_add_to_physmap xatp;
         unsigned long prev_mfn, mfn = 0, gpfn;
         struct domain *d;
-        int rc;
 
         if ( copy_from_guest(&xatp, arg, 1) )
             return -EFAULT;
@@ -4347,7 +4346,6 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
     {
         struct xen_foreign_memory_map fmap;
         struct domain *d;
-        int rc;
 
         if ( copy_from_guest(&fmap, arg, 1) )
             return -EFAULT;
@@ -4399,7 +4397,6 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         struct memory_map_context ctxt;
         XEN_GUEST_HANDLE(e820entry_t) buffer;
         unsigned int i;
-        int rc;
 
         if ( !IS_PRIV(current->domain) )
             return -EINVAL;
