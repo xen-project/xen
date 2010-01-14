@@ -180,7 +180,7 @@ void *xc_map_foreign_bulk(int xc_handle, uint32_t dom, int prot,
         }
     }
 
-    if ( rc < 0 && errno == ENOTTY && (int)num > 0 )
+    if ( rc < 0 && errno == EINVAL && (int)num > 0 )
     {
         /*
          * IOCTL_PRIVCMD_MMAPBATCH_V2 is not supported - fall back to
