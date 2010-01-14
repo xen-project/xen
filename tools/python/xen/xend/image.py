@@ -487,8 +487,8 @@ class ImageHandler:
 
                 time.sleep(0.1)
                 count += 1
-                if count < 100:
-                    continue
+                if count > 100:
+                    break
 
             domains.domains_lock.acquire()
 
