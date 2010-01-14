@@ -290,7 +290,7 @@ mount it read-write in a guest domain."
           done
         fi
 
-        loopdev=$(find_free_loopback_dev)
+        loopdev=$(losetup -f 2>/dev/null || find_free_loopback_dev)
         if [ "$loopdev" = '' ]
         then
           release_lock "block"
