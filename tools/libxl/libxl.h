@@ -104,7 +104,7 @@ typedef struct {
 } libxl_domain_suspend_info;
 
 typedef enum {
-    XENFV,
+    XENFV = 1,
     XENPV,
 } libxl_qemu_machine_type;
 
@@ -169,7 +169,7 @@ typedef struct {
 } libxl_device_console;
 
 typedef enum {
-    PHYSTYPE_QCOW,
+    PHYSTYPE_QCOW = 1,
     PHYSTYPE_QCOW2,
     PHYSTYPE_VHD,
     PHYSTYPE_AIO,
@@ -189,7 +189,7 @@ typedef struct {
 } libxl_device_disk;
 
 typedef enum {
-    NICTYPE_IOEMU,
+    NICTYPE_IOEMU = 1,
     NICTYPE_VIF,
 } libxl_nic_type;
 

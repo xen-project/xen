@@ -59,7 +59,7 @@ void xl_log(struct libxl_ctx *ctx, int errnoval, int loglevel, const char *file,
 
 
 typedef enum {
-    DEVICE_VIF,
+    DEVICE_VIF = 1,
     DEVICE_VBD,
     DEVICE_TAP,
     DEVICE_PCI,
