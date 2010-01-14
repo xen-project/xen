@@ -26,7 +26,7 @@
 #include "libxl.h"
 #include "libxl_internal.h"
 
-const char *string_of_kinds[] = {
+static const char *string_of_kinds[] = {
     [DEVICE_VIF] = "vif",
     [DEVICE_VBD] = "vbd",
     [DEVICE_TAP] = "tap",
@@ -44,6 +44,9 @@ int libxl_device_generic_add(struct libxl_ctx *ctx, libxl_device *device,
     struct xs_permissions frontend_perms[2];
     struct xs_permissions backend_perms[2];
     struct xs_permissions hotplug_perms[1];
+
+    if (!is_valid_device_kind(device->backend_kind) || !is_valid_device_kind(device->kind))
+        return ERROR_INVAL;
 
     dom_path_backend = libxl_xs_get_dompath(ctx, device->backend_domid);
     dom_path = libxl_xs_get_dompath(ctx, device->domid);
