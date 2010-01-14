@@ -230,7 +230,7 @@ static void __init percpu_free_unused_areas(void)
     /* Free all unused per-cpu data areas. */
     free_xen_data(&__per_cpu_start[first_unused << PERCPU_SHIFT], __bss_start);
 
-    data_size = (data_size + PAGE_SIZE + 1) & PAGE_MASK;
+    data_size = (data_size + PAGE_SIZE - 1) & PAGE_MASK;
     if ( data_size != PERCPU_SIZE )
         for ( i = 0; i < first_unused; i++ )
             free_xen_data(&__per_cpu_start[(i << PERCPU_SHIFT) + data_size],
@@ -1198,33 +1198,37 @@ void arch_get_xen_caps(xen_capabilities_info_t *info)
 int xen_in_range(paddr_t start, paddr_t end)
 {
     int i;
+
+    enum { region_s3, region_text, region_percpu, region_bss, nr_regions };
     static struct {
         paddr_t s, e;
-    } xen_regions[4];
+    } xen_regions[nr_regions];
+    static unsigned int percpu_data_size;
 
     /* initialize first time */
     if ( !xen_regions[0].s )
     {
         /* S3 resume code (and other real mode trampoline code) */
-        xen_regions[0].s = bootsym_phys(trampoline_start);
-        xen_regions[0].e = bootsym_phys(trampoline_end);
+        xen_regions[region_s3].s = bootsym_phys(trampoline_start);
+        xen_regions[region_s3].e = bootsym_phys(trampoline_end);
         /* hypervisor code + data */
-        xen_regions[1].s =__pa(&_stext);
-        xen_regions[1].e = __pa(&__init_begin);
+        xen_regions[region_text].s =__pa(&_stext);
+        xen_regions[region_text].e = __pa(&__init_begin);
         /* per-cpu data */
-        xen_regions[2].s = __pa(&__per_cpu_start);
-        xen_regions[2].e = xen_regions[2].s +
+        xen_regions[region_percpu].s = __pa(&__per_cpu_start);
+        xen_regions[region_percpu].e = xen_regions[2].s +
             (((paddr_t)last_cpu(cpu_possible_map) + 1) << PERCPU_SHIFT);
+        percpu_data_size = __per_cpu_data_end - __per_cpu_start;
+        percpu_data_size = (percpu_data_size + PAGE_SIZE - 1) & PAGE_MASK;
         /* bss */
-        xen_regions[3].s = __pa(&__bss_start);
-        xen_regions[3].e = __pa(&_end);
+        xen_regions[region_bss].s = __pa(&__bss_start);
+        xen_regions[region_bss].e = __pa(&_end);
     }
 
-    for ( i = 0; i < ARRAY_SIZE(xen_regions); i++ )
-    {
+    for ( i = 0; i < nr_regions; i++ )
         if ( (start < xen_regions[i].e) && (end > xen_regions[i].s) )
-            return 1;
-    }
+            return ((i != region_percpu) ||
+                    ((start & (PERCPU_SIZE - 1)) < percpu_data_size));
 
     return 0;
 }
