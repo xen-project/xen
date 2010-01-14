@@ -59,9 +59,7 @@ static int domain_qualifier_to_domid(struct libxl_ctx *ctx, char *p, uint32_t *d
         }
     }
 
-    if (i == 0)
-        return -1;
-    if (alldigit) {
+    if (i > 0 && alldigit) {
         *domid = strtoul(p, NULL, 10);
         return 0;
     } else {

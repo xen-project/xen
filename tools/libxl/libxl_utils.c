@@ -56,34 +56,23 @@ char *libxl_domid_to_name(struct libxl_ctx *ctx, uint32_t domid)
 
 int libxl_name_to_domid(struct libxl_ctx *ctx, char *name, uint32_t *domid)
 {
-    unsigned int num, len;
-    char path[strlen("/local/domain") + 12];
-    int i, j, nb_domains;
-    char *domname, **l;
+    int i, nb_domains;
+    char *domname;
     struct libxl_dominfo *dominfo;
 
     dominfo = libxl_domain_list(ctx, &nb_domains);
+    if (!dominfo)
+        return ERROR_NOMEM;
 
-    l = xs_directory(ctx->xsh, XBT_NULL, "/local/domain", &num);
-    for (i = 0; i < num; i++) {
-        snprintf(path, sizeof(path), "/local/domain/%s/name", l[i]);
-        domname = xs_read(ctx->xsh, XBT_NULL, path, &len);
-        if (domname != NULL && len == strlen(name) && !strncmp(domname, name, len)) {
-            int domid_i = atoi(l[i]);
-            for (j = 0; j < nb_domains; j++) {
-                if (dominfo[j].domid == domid_i) {
-                    *domid = domid_i;
-                    free(dominfo);
-                    free(l);
-                    free(domname);
-                    return 0;
-                }
-            }
+    for (i = 0; i < nb_domains; i++) {
+        domname = libxl_domid_to_name(ctx, dominfo[i].domid);
+        if (!domname)
+            continue;
+        if (strcmp(domname, name) == 0) {
+            *domid = dominfo[i].domid;
+            return 0;
         }
-        free(domname);
     }
-    free(dominfo);
-    free(l);
     return -1;
 }
 
