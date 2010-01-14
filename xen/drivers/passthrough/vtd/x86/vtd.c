@@ -133,7 +133,7 @@ void hvm_dpci_isairq_eoi(struct domain *d, unsigned int isairq)
 void iommu_set_dom0_mapping(struct domain *d)
 {
     u64 i, j, tmp, max_pfn;
-    extern int xen_in_range(paddr_t start, paddr_t end);
+    extern int xen_in_range(unsigned long mfn);
 
     BUG_ON(d->domain_id != 0);
 
@@ -153,7 +153,7 @@ void iommu_set_dom0_mapping(struct domain *d)
             continue;
 
         /* Exclude Xen bits */
-        if ( xen_in_range(i << PAGE_SHIFT, (i + 1) << PAGE_SHIFT) )
+        if ( xen_in_range(i) )
             continue;
 
         tmp = 1 << (PAGE_SHIFT - PAGE_SHIFT_4K);

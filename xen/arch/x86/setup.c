@@ -203,6 +203,8 @@ static void __init percpu_init_areas(void)
 {
     unsigned int i, data_size = __per_cpu_data_end - __per_cpu_start;
 
+    BUG_ON((unsigned long)__per_cpu_start & ~PAGE_MASK);
+    BUG_ON((unsigned long)__per_cpu_data_end & ~PAGE_MASK);
     BUG_ON(data_size > PERCPU_SIZE);
 
     /* Initialise per-cpu data area for all possible secondary CPUs. */
@@ -230,7 +232,6 @@ static void __init percpu_free_unused_areas(void)
     /* Free all unused per-cpu data areas. */
     free_xen_data(&__per_cpu_start[first_unused << PERCPU_SHIFT], __bss_start);
 
-    data_size = (data_size + PAGE_SIZE - 1) & PAGE_MASK;
     if ( data_size != PERCPU_SIZE )
         for ( i = 0; i < first_unused; i++ )
             free_xen_data(&__per_cpu_start[(i << PERCPU_SHIFT) + data_size],
@@ -1195,15 +1196,15 @@ void arch_get_xen_caps(xen_capabilities_info_t *info)
     }
 }
 
-int xen_in_range(paddr_t start, paddr_t end)
+int xen_in_range(unsigned long mfn)
 {
+    paddr_t start, end;
     int i;
 
     enum { region_s3, region_text, region_percpu, region_bss, nr_regions };
     static struct {
         paddr_t s, e;
     } xen_regions[nr_regions];
-    static unsigned int percpu_data_size;
 
     /* initialize first time */
     if ( !xen_regions[0].s )
@@ -1218,17 +1219,33 @@ int xen_in_range(paddr_t start, paddr_t end)
         xen_regions[region_percpu].s = __pa(&__per_cpu_start);
         xen_regions[region_percpu].e = xen_regions[2].s +
             (((paddr_t)last_cpu(cpu_possible_map) + 1) << PERCPU_SHIFT);
-        percpu_data_size = __per_cpu_data_end - __per_cpu_start;
-        percpu_data_size = (percpu_data_size + PAGE_SIZE - 1) & PAGE_MASK;
         /* bss */
         xen_regions[region_bss].s = __pa(&__bss_start);
         xen_regions[region_bss].e = __pa(&_end);
     }
 
+    start = (paddr_t)mfn << PAGE_SHIFT;
+    end = start + PAGE_SIZE;
     for ( i = 0; i < nr_regions; i++ )
-        if ( (start < xen_regions[i].e) && (end > xen_regions[i].s) )
-            return ((i != region_percpu) ||
-                    ((start & (PERCPU_SIZE - 1)) < percpu_data_size));
+    {
+        if ( (start >= xen_regions[i].e) || (end <= xen_regions[i].s) )
+            continue;
+
+        if ( i == region_percpu )
+        {
+            /*
+             * Check if the given page falls into an unused (and therefore
+             * freed) section of the per-cpu data space. Each CPU's data
+             * area is page-aligned, so the following arithmetic is safe.
+             */
+            unsigned int off = ((start - (unsigned long)__per_cpu_start)
+                                & (PERCPU_SIZE - 1));
+            unsigned int data_sz = __per_cpu_data_end - __per_cpu_start;
+            return off < data_sz;
+        }
+
+        return 1;
+    }
 
     return 0;
 }

@@ -104,6 +104,7 @@ SECTIONS
        *(.data.percpu)
        . = ALIGN(SMP_CACHE_BYTES);
        *(.data.percpu.read_mostly)
+       . = ALIGN(PAGE_SIZE);
        __per_cpu_data_end = .;
   } :text
   . = __per_cpu_start + (NR_CPUS << PERCPU_SHIFT);
