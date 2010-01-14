@@ -1244,10 +1244,11 @@ int shadow_cmpxchg_guest_entry(struct vcpu *v, intpte_t *p,
  * instruction, we must be able to map a large number (about thirty) VAs
  * at the same time, which means that to guarantee progress, we must
  * allow for more than ninety allocated pages per vcpu.  We round that
- * up to 128 pages, or half a megabyte per vcpu. */
+ * up to 128 pages, or half a megabyte per vcpu, and add 1 more vcpu's 
+ * worth to make sure we never return zero. */
 static unsigned int shadow_min_acceptable_pages(struct domain *d) 
 {
-    u32 vcpu_count = 0;
+    u32 vcpu_count = 1;
     struct vcpu *v;
 
     for_each_vcpu(d, v)
