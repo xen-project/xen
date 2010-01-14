@@ -824,7 +824,7 @@ static int libxl_create_stubdom(struct libxl_ctx *ctx,
                                 libxl_device_vkb *vkb,
                                 libxl_device_model_starting **starting_r)
 {
-    int i, num_console = 1;
+    int i, num_console = 1, ret;
     libxl_device_console *console;
     libxl_domain_create_info c_info;
     libxl_domain_build_info b_info;
@@ -855,12 +855,18 @@ static int libxl_create_stubdom(struct libxl_ctx *ctx,
     b_info.u.pv.features = "";
     b_info.hvm = 0;
 
-    libxl_domain_make(ctx, &c_info, &domid);
-    libxl_domain_build(ctx, &b_info, domid, &state);
+    ret = libxl_domain_make(ctx, &c_info, &domid);
+    if (ret) return ret;
+    ret = libxl_domain_build(ctx, &b_info, domid, &state);
+    if (ret) return ret;
 
     libxl_write_dmargs(ctx, domid, info->domid, args);
-    libxl_xs_write(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/image/device-model-domid", libxl_xs_get_dompath(ctx, info->domid)), "%d", domid);
-    libxl_xs_write(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/target", libxl_xs_get_dompath(ctx, domid)), "%d", info->domid);
+    libxl_xs_write(ctx, XBT_NULL,
+                   libxl_sprintf(ctx, "%s/image/device-model-domid", libxl_xs_get_dompath(ctx, info->domid)),
+                   "%d", domid);
+    libxl_xs_write(ctx, XBT_NULL,
+                   libxl_sprintf(ctx, "%s/target", libxl_xs_get_dompath(ctx, domid)),
+                   "%d", info->domid);
     xc_domain_set_target(ctx->xch, domid, info->domid);
     xs_set_target(ctx->xsh, domid, info->domid);
 
@@ -880,27 +886,36 @@ retry_transaction:
 
     for (i = 0; i < num_disks; i++) {
         disks[i].domid = domid;
-        libxl_device_disk_add(ctx, domid, &disks[i]);
+        ret = libxl_device_disk_add(ctx, domid, &disks[i]);
+        if (ret) return ret;
     }
     for (i = 0; i < num_vifs; i++) {
         vifs[i].domid = domid;
-        libxl_device_nic_add(ctx, domid, &vifs[i]);
+        ret = libxl_device_nic_add(ctx, domid, &vifs[i]);
+        if (ret) return ret;
     }
     vfb->domid = domid;
-    libxl_device_vfb_add(ctx, domid, vfb);
+    ret = libxl_device_vfb_add(ctx, domid, vfb);
+    if (ret) return ret;
     vkb->domid = domid;
-    libxl_device_vkb_add(ctx, domid, vkb);
+    ret = libxl_device_vkb_add(ctx, domid, vkb);
+    if (ret) return ret;
 
     if (info->serial)
         num_console++;
+
     console = libxl_calloc(ctx, num_console, sizeof(libxl_device_console));
+    if (!console)
+        return ERROR_NOMEM;
+
     for (i = 0; i < num_console; i++) {
         console[i].devid = i;
         console[i].constype = CONSTYPE_IOEMU;
         console[i].domid = domid;
         if (!i)
             console[i].build_state = &state;
-        libxl_device_console_add(ctx, domid, &console[i]);
+        ret = libxl_device_console_add(ctx, domid, &console[i]);
+        if (ret) return ret;
     }
     if (libxl_create_xenpv_qemu(ctx, vfb, num_console, console, &dm_starting) < 0) {
         free(args);
