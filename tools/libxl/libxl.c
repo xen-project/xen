@@ -1162,6 +1162,9 @@ int libxl_device_disk_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_di
 
             device.backend_kind = DEVICE_TAP;
             break;
+        default:
+            XL_LOG(ctx, XL_LOG_ERROR, "unrecognized disk physical type: %d\n", disk->phystype);
+            return ERROR_INVAL;
     }
 
     flexarray_set(back, boffset++, "frontend-id");
