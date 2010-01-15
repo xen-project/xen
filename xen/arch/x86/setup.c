@@ -1216,8 +1216,8 @@ int xen_in_range(unsigned long mfn)
         xen_regions[region_text].s =__pa(&_stext);
         xen_regions[region_text].e = __pa(&__init_begin);
         /* per-cpu data */
-        xen_regions[region_percpu].s = __pa(&__per_cpu_start);
-        xen_regions[region_percpu].e = xen_regions[2].s +
+        xen_regions[region_percpu].s = __pa(__per_cpu_start);
+        xen_regions[region_percpu].e = xen_regions[region_percpu].s +
             (((paddr_t)last_cpu(cpu_possible_map) + 1) << PERCPU_SHIFT);
         /* bss */
         xen_regions[region_bss].s = __pa(&__bss_start);
@@ -1238,7 +1238,7 @@ int xen_in_range(unsigned long mfn)
              * freed) section of the per-cpu data space. Each CPU's data
              * area is page-aligned, so the following arithmetic is safe.
              */
-            unsigned int off = ((start - (unsigned long)__per_cpu_start)
+            unsigned int off = ((start - __pa(__per_cpu_start))
                                 & (PERCPU_SIZE - 1));
             unsigned int data_sz = __per_cpu_data_end - __per_cpu_start;
             return off < data_sz;
