@@ -1433,6 +1433,36 @@ void list_domains(void)
     free(info);
 }
 
+void list_vm(void)
+{
+    struct libxl_ctx ctx;
+    struct libxl_vminfo *info;
+    int nb_vm, i;
+
+    if (libxl_ctx_init(&ctx, LIBXL_VERSION)) {
+        fprintf(stderr, "cannot init xl context\n");
+        return;
+    }
+    libxl_ctx_set_log(&ctx, log_callback, NULL);
+
+    info = libxl_list_vm(&ctx, &nb_vm);
+
+    if (info < 0) {
+        fprintf(stderr, "libxl_domain_infolist failed.\n");
+        exit(1);
+    }
+    printf("UUID                                  ID    name\n");
+    for (i = 0; i < nb_vm; i++) {
+        printf(UUID_FMT "  %d    %-30s\n",
+            info[i].uuid[0], info[i].uuid[1], info[i].uuid[2], info[i].uuid[3],
+            info[i].uuid[4], info[i].uuid[5], info[i].uuid[6], info[i].uuid[7],
+            info[i].uuid[8], info[i].uuid[9], info[i].uuid[10], info[i].uuid[11],
+            info[i].uuid[12], info[i].uuid[13], info[i].uuid[14], info[i].uuid[15],
+            info[i].domid, libxl_domid_to_name(&ctx, info[i].domid));
+    }
+    free(info);
+}
+
 int save_domain(char *p, char *filename, int checkpoint)
 {
     struct libxl_ctx ctx;
@@ -1633,6 +1663,25 @@ int main_list(int argc, char **argv)
     exit(0);
 }
 
+int main_list_vm(int argc, char **argv)
+{
+    int opt;
+
+    while ((opt = getopt(argc, argv, "h")) != -1) {
+        switch (opt) {
+        case 'h':
+            help("list-vm");
+            exit(0);
+        default:
+            fprintf(stderr, "option not supported\n");
+            break;
+        }
+    }
+
+    list_vm();
+    exit(0);
+}
+
 int main_create(int argc, char **argv)
 {
     char *filename = NULL;
@@ -1679,6 +1728,8 @@ int main(int argc, char **argv)
         main_create(argc - 1, argv + 1);
     } else if (!strcmp(argv[1], "list")) {
         main_list(argc - 1, argv + 1);
+    } else if (!strcmp(argv[1], "list-vm")) {
+        main_list_vm(argc - 1, argv + 1);
     } else if (!strcmp(argv[1], "destroy")) {
         main_destroy(argc - 1, argv + 1);
     } else if (!strcmp(argv[1], "pci-attach")) {
