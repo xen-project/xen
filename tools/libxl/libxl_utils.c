@@ -60,7 +60,7 @@ int libxl_name_to_domid(struct libxl_ctx *ctx, char *name, uint32_t *domid)
     char *domname;
     struct libxl_dominfo *dominfo;
 
-    dominfo = libxl_domain_list(ctx, &nb_domains);
+    dominfo = libxl_list_domain(ctx, &nb_domains);
     if (!dominfo)
         return ERROR_NOMEM;
 
@@ -85,13 +85,20 @@ int libxl_get_stubdom_id(struct libxl_ctx *ctx, int guest_domid)
         return 0;
 }
 
-int libxl_is_stubdom(struct libxl_ctx *ctx, int domid)
+int libxl_is_stubdom(struct libxl_ctx *ctx, uint32_t domid, uint32_t *target_domid)
 {
-    char *target = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/target", libxl_xs_get_dompath(ctx, domid)));
-    if (target)
-        return atoi(target);
-    else
+    char *target, *endptr;
+    uint32_t value;
+
+    target = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/target", libxl_xs_get_dompath(ctx, domid)));
+    if (!target)
         return 0;
+    value = strtol(target, &endptr, 10);
+    if (*endptr != '\0')
+        return 0;
+    if (target_domid)
+        *target_domid = value;
+    return 1;
 }
 
 int libxl_create_logfile(struct libxl_ctx *ctx, char *name, char **full_name)

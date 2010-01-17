@@ -30,6 +30,15 @@ struct libxl_dominfo {
     uint8_t dying:1;
     uint8_t paused:1;
     uint8_t running:1;
+    uint64_t max_memkb;
+    uint64_t cpu_time;
+    uint32_t vcpu_max_id;
+    uint32_t vcpu_online;
+};
+
+struct libxl_vminfo {
+    uint8_t uuid[16];
+    uint32_t domid;
 };
 
 struct libxl_ctx {
@@ -295,7 +304,8 @@ int libxl_set_memory_target(struct libxl_ctx *ctx, uint32_t domid, uint32_t targ
 
 int libxl_console_attach(struct libxl_ctx *ctx, uint32_t domid, int cons_num);
 
-struct libxl_dominfo * libxl_domain_list(struct libxl_ctx *ctx, int *nb_domain);
+struct libxl_dominfo * libxl_list_domain(struct libxl_ctx *ctx, int *nb_domain);
+struct libxl_vminfo * libxl_list_vm(struct libxl_ctx *ctx, int *nb_vm);
 
 typedef struct libxl_device_model_starting libxl_device_model_starting;
 int libxl_create_device_model(struct libxl_ctx *ctx,

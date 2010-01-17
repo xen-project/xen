@@ -34,6 +34,8 @@
 #include "libxl_internal.h"
 #include "flexarray.h"
 
+#define PAGE_TO_MEMKB(pages) ((pages) * 4)
+
 int libxl_ctx_init(struct libxl_ctx *ctx, int version)
 {
     if (version != LIBXL_VERSION)
@@ -282,21 +284,19 @@ int libxl_domain_resume(struct libxl_ctx *ctx, uint32_t domid)
     return 0;
 }
 
-struct libxl_dominfo * libxl_domain_list(struct libxl_ctx *ctx, int *nb_domain)
+struct libxl_dominfo * libxl_list_domain(struct libxl_ctx *ctx, int *nb_domain)
 {
     struct libxl_dominfo *ptr;
-    int index, i, ret, first_domain;
+    int index, i, ret;
     xc_domaininfo_t info[1024];
     int size = 1024;
 
-    first_domain = 1;
-    index = 0;
     ptr = calloc(size, sizeof(struct libxl_dominfo));
     if (!ptr)
         return NULL;
 
-    ret = xc_domain_getinfolist(ctx->xch, first_domain, 1024, info);
-    for (i = 0; i < ret; i++) {
+    ret = xc_domain_getinfolist(ctx->xch, 0, 1024, info);
+    for (index = i = 0; i < ret; i++) {
         memcpy(&(ptr[index].uuid), info[i].handle, sizeof(xen_domain_handle_t));
         ptr[index].domid = info[i].domain;
 
@@ -306,11 +306,39 @@ struct libxl_dominfo * libxl_domain_list(struct libxl_ctx *ctx, int *nb_domain)
             ptr[index].paused = 1;
         else if (info[i].flags & XEN_DOMINF_blocked || info[i].flags & XEN_DOMINF_running)
             ptr[index].running = 1;
+        ptr[index].max_memkb = PAGE_TO_MEMKB(info[i].max_pages);
+        ptr[index].cpu_time = info[i].cpu_time;
+        ptr[index].vcpu_max_id = info[i].max_vcpu_id;
+        ptr[index].vcpu_online = info[i].nr_online_vcpus;
 
-        first_domain = info[i].domain + 1;
         index++;
     }
     *nb_domain = index;
+    return ptr;
+}
+
+/* this API call only list VM running on this host. a VM can be an aggregate of multiple domains. */
+struct libxl_vminfo * libxl_list_vm(struct libxl_ctx *ctx, int *nb_vm)
+{
+    struct libxl_vminfo *ptr;
+    int index, i, ret;
+    xc_domaininfo_t info[1024];
+    int size = 1024;
+
+    ptr = calloc(size, sizeof(struct libxl_dominfo));
+    if (!ptr)
+        return NULL;
+
+    ret = xc_domain_getinfolist(ctx->xch, 1, 1024, info);
+    for (index = i = 0; i < ret; i++) {
+        if (libxl_is_stubdom(ctx, info[i].domain, NULL))
+            continue;
+        memcpy(&(ptr[index].uuid), info[i].handle, sizeof(xen_domain_handle_t));
+        ptr[index].domid = info[i].domain;
+
+        index++;
+    }
+    *nb_vm = index;
     return ptr;
 }
 
@@ -1530,7 +1558,8 @@ static int libxl_build_xenpv_qemu_args(struct libxl_ctx *ctx,
                                        libxl_device_vfb *vfb,
                                        int num_console,
                                        libxl_device_console *console,
-                                       libxl_device_model_info *info) {
+                                       libxl_device_model_info *info)
+{
     int i = 0, j = 0, num = 0;
     memset(info, 0x00, sizeof(libxl_device_model_info));
 
@@ -1548,8 +1577,8 @@ static int libxl_build_xenpv_qemu_args(struct libxl_ctx *ctx,
             num++;
     }
     if (num > 0) {
-        uint32_t guest_domid = libxl_is_stubdom(ctx, vfb->domid);
-        if (guest_domid) {
+        uint32_t guest_domid;
+        if (libxl_is_stubdom(ctx, vfb->domid, &guest_domid)) {
             char *filename;
             char *name = libxl_sprintf(ctx, "qemu-dm-%s", libxl_domid_to_name(ctx, guest_domid));
             libxl_create_logfile(ctx, name, &filename);
@@ -1988,7 +2017,7 @@ int libxl_device_pci_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_pci
         fclose(f);
     }
 out:
-    if (!libxl_is_stubdom(ctx, domid)) {
+    if (!libxl_is_stubdom(ctx, domid, NULL)) {
         rc = xc_assign_device(ctx->xch, domid, pcidev->value);
         if (rc < 0)
             XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, rc, "xc_assign_device failed");
@@ -2079,7 +2108,7 @@ skip1:
 out:
     libxl_device_pci_flr(ctx, pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func);
 
-    if (!libxl_is_stubdom(ctx, domid)) {
+    if (!libxl_is_stubdom(ctx, domid, NULL)) {
         rc = xc_deassign_device(ctx->xch, domid, pcidev->value);
         if (rc < 0)
             XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, rc, "xc_deassign_device failed");

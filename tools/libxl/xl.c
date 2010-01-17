@@ -1415,7 +1415,7 @@ void list_domains(void)
     }
     libxl_ctx_set_log(&ctx, log_callback, NULL);
 
-    info = libxl_domain_list(&ctx, &nb_domain);
+    info = libxl_list_domain(&ctx, &nb_domain);
 
     if (info < 0) {
         fprintf(stderr, "libxl_domain_infolist failed.\n");
