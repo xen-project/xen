@@ -2690,7 +2690,7 @@ class XendDomainInfo:
         else:
             def find_relaxed_node(node_list):
                 import sys
-                nr_nodes = info['nr_nodes']
+                nr_nodes = info['max_node_id']+1
                 if node_list is None:
                     node_list = range(0, nr_nodes)
                 nodeload = [0]
@@ -2722,12 +2722,12 @@ class XendDomainInfo:
                 node_memory_list = info['node_to_memory']
                 needmem = self.image.getRequiredAvailableMemory(self.info['memory_dynamic_max']) / 1024
                 candidate_node_list = []
-                for i in range(0, info['nr_nodes']):
+                for i in range(0, info['max_node_id']+1):
                     if node_memory_list[i] >= needmem and len(info['node_to_cpu'][i]) > 0:
                         candidate_node_list.append(i)
                 best_node = find_relaxed_node(candidate_node_list)[0]
                 cpumask = info['node_to_cpu'][best_node]
-                best_nodes = find_relaxed_node(filter(lambda x: x != best_node, range(0,info['nr_nodes'])))
+                best_nodes = find_relaxed_node(filter(lambda x: x != best_node, range(0,info['max_node_id']+1)))
                 for node_idx in best_nodes:
                     if len(cpumask) >= self.info['VCPUs_max']:
                         break
@@ -2754,9 +2754,9 @@ class XendDomainInfo:
             while (retries > 0):
                 physinfo = xc.physinfo()
                 free_mem = physinfo['free_memory']
-                nr_nodes = physinfo['nr_nodes']
+                max_node_id = physinfo['max_node_id']
                 node_to_dma32_mem = physinfo['node_to_dma32_mem']
-                if (node > nr_nodes):
+                if (node > max_node_id):
                     return
                 # Extra 2MB above 64GB seems to do the trick.
                 need_mem = 64 * 1024 + 2048 - node_to_dma32_mem[node]

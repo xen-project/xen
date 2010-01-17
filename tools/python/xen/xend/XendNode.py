@@ -879,7 +879,7 @@ class XendNode:
         whitespace=''
         try:
             node_to_cpu=pinfo['node_to_cpu']
-            for i in range(0, pinfo['nr_nodes']):
+            for i in range(0, pinfo['max_node_id']+1):
                 str+='%snode%d:%s\n' % (whitespace,
                                         i, 
                                       self.list_to_strrange(node_to_cpu[i]))
@@ -892,7 +892,7 @@ class XendNode:
         whitespace=''
         try:
             node_to_memory=pinfo[key]
-            for i in range(0, pinfo['nr_nodes']):
+            for i in range(0, pinfo['max_node_id']+1):
                 str+='%snode%d:%d\n' % (whitespace,
                                         i,
                                         node_to_memory[i] / 1024)
@@ -927,7 +927,8 @@ class XendNode:
                       'free_memory',
                       'node_to_cpu',
                       'node_to_memory',
-                      'node_to_dma32_mem'
+                      'node_to_dma32_mem',
+                      'max_node_id'
                       ]
 
         return [[k, info[k]] for k in ITEM_ORDER]
