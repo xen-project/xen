@@ -68,7 +68,7 @@ static int domain_qualifier_to_domid(struct libxl_ctx *ctx, char *p, uint32_t *d
     return libxl_name_to_domid(ctx, p, domid);
 }
 
-#define LOG(_f, _a...)   dolog(__FILE__, __LINE__, __func__, _f, ##_a)
+#define LOG(_f, _a...)   dolog(__FILE__, __LINE__, __func__, _f "\n", ##_a)
 
 void dolog(const char *file, int line, const char *func, char *fmt, ...)
 {
