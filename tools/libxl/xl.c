@@ -407,7 +407,7 @@ static void parse_config_file(const char *filename,
         newfilename = compat_config_file(filename);
         config_init (&config);
         if (!config_read_file(&config, newfilename)) {
-            fprintf(stderr, "Failed to parse config file %s, try removing any embedded python code\n", config_error_text(&config));
+            fprintf(stderr, "Failed to parse config file %s on line %d, try removing any embedded python code\n", config_error_text(&config), config_error_line(&config));
             exit(1);
         }
         free(newfilename);
