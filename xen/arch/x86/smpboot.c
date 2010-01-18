@@ -1518,7 +1518,11 @@ int cpu_add(uint32_t apic_id, uint32_t acpi_id, uint32_t pxm)
 
 int __devinit __cpu_up(unsigned int cpu)
 {
-	int ret = 0;
+	int ret;
+
+	ret = hvm_cpu_prepare(cpu);
+	if (ret)
+		return ret;
 
 	/*
 	 * We do warm boot only on cpus that had booted earlier

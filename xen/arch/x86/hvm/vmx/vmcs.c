@@ -320,6 +320,19 @@ static void vmx_load_vmcs(struct vcpu *v)
     local_irq_restore(flags);
 }
 
+int vmx_cpu_prepare(unsigned int cpu)
+{
+    if ( per_cpu(host_vmcs, cpu) != NULL )
+        return 0;
+
+    per_cpu(host_vmcs, cpu) = vmx_alloc_vmcs();
+    if ( per_cpu(host_vmcs, cpu) != NULL )
+        return 0;
+
+    printk("CPU%d: Could not allocate host VMCS\n", cpu);
+    return -ENOMEM;
+}
+
 int vmx_cpu_up(void)
 {
     u32 eax, edx;
@@ -367,15 +380,8 @@ int vmx_cpu_up(void)
 
     INIT_LIST_HEAD(&this_cpu(active_vmcs_list));
 
-    if ( this_cpu(host_vmcs) == NULL )
-    {
-        this_cpu(host_vmcs) = vmx_alloc_vmcs();
-        if ( this_cpu(host_vmcs) == NULL )
-        {
-            printk("CPU%d: Could not allocate host VMCS\n", cpu);
-            return 0;
-        }
-    }
+    if ( vmx_cpu_prepare(cpu) != 0 )
+        return 0;
 
     switch ( __vmxon(virt_to_maddr(this_cpu(host_vmcs))) )
     {

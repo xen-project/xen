@@ -111,6 +111,7 @@ struct hvm_function_table {
     int  (*event_pending)(struct vcpu *v);
     int  (*do_pmu_interrupt)(struct cpu_user_regs *regs);
 
+    int  (*cpu_prepare)(unsigned int cpu);
     int  (*cpu_up)(void);
     void (*cpu_down)(void);
 
@@ -290,11 +291,15 @@ uint8_t hvm_combine_hw_exceptions(uint8_t vec1, uint8_t vec2);
 void hvm_set_rdtsc_exiting(struct domain *d, bool_t enable);
 int hvm_gtsc_need_scale(struct domain *d);
 
+static inline int
+hvm_cpu_prepare(unsigned int cpu)
+{
+    return (hvm_funcs.cpu_prepare ? hvm_funcs.cpu_prepare(cpu) : 0);
+}
+
 static inline int hvm_cpu_up(void)
 {
-    if ( hvm_funcs.cpu_up )
-        return hvm_funcs.cpu_up();
-    return 1;
+    return (hvm_funcs.cpu_up ? hvm_funcs.cpu_up() : 1);
 }
 
 static inline void hvm_cpu_down(void)

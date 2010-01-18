@@ -26,6 +26,7 @@
 extern void start_vmx(void);
 extern void vmcs_dump_vcpu(struct vcpu *v);
 extern void setup_vmcs_dump(void);
+extern int  vmx_cpu_prepare(unsigned int cpu);
 extern int  vmx_cpu_up(void);
 extern void vmx_cpu_down(void);
 
