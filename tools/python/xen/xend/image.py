@@ -376,8 +376,6 @@ class ImageHandler:
                 ret = ret + ['-monitor', vmConfig['platform'].get('monitor_path')]
             else:
                 ret = ret + ['-monitor', 'vc']
-        else:
-            ret = ret + ['-monitor', 'null']
 
         return ret
 
