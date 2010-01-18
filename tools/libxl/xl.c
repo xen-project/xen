@@ -1421,14 +1421,17 @@ void list_domains(void)
         fprintf(stderr, "libxl_domain_infolist failed.\n");
         exit(1);
     }
-    printf("Name                                        ID   \tState\n");
+    printf("Name                                        ID   Mem VCPUs\tState\tTime(s)\n");
     for (i = 0; i < nb_domain; i++) {
-        printf("%-40s %5d     %c%c%c\n",
+        printf("%-40s %5d %5lu %5d        %c%c%c %8.1f\n",
                 libxl_domid_to_name(&ctx, info[i].domid),
                 info[i].domid,
+                (unsigned long) (info[i].max_memkb / 1024),
+                info[i].vcpu_online,
                 info[i].running ? 'r' : '-',
                 info[i].paused ? 'p' : '-',
-                info[i].dying ? 'd' : '-');
+                info[i].dying ? 'd' : '-',
+                ((float)info[i].cpu_time / 1e9));
     }
     free(info);
 }

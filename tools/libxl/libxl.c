@@ -287,7 +287,7 @@ int libxl_domain_resume(struct libxl_ctx *ctx, uint32_t domid)
 struct libxl_dominfo * libxl_list_domain(struct libxl_ctx *ctx, int *nb_domain)
 {
     struct libxl_dominfo *ptr;
-    int index, i, ret;
+    int i, ret;
     xc_domaininfo_t info[1024];
     int size = 1024;
 
@@ -296,24 +296,22 @@ struct libxl_dominfo * libxl_list_domain(struct libxl_ctx *ctx, int *nb_domain)
         return NULL;
 
     ret = xc_domain_getinfolist(ctx->xch, 0, 1024, info);
-    for (index = i = 0; i < ret; i++) {
-        memcpy(&(ptr[index].uuid), info[i].handle, sizeof(xen_domain_handle_t));
-        ptr[index].domid = info[i].domain;
+    for (i = 0; i < ret; i++) {
+        memcpy(&(ptr[i].uuid), info[i].handle, sizeof(xen_domain_handle_t));
+        ptr[i].domid = info[i].domain;
 
         if (info[i].flags & XEN_DOMINF_dying)
-            ptr[index].dying = 1;
+            ptr[i].dying = 1;
         else if (info[i].flags & XEN_DOMINF_paused)
-            ptr[index].paused = 1;
+            ptr[i].paused = 1;
         else if (info[i].flags & XEN_DOMINF_blocked || info[i].flags & XEN_DOMINF_running)
-            ptr[index].running = 1;
-        ptr[index].max_memkb = PAGE_TO_MEMKB(info[i].max_pages);
-        ptr[index].cpu_time = info[i].cpu_time;
-        ptr[index].vcpu_max_id = info[i].max_vcpu_id;
-        ptr[index].vcpu_online = info[i].nr_online_vcpus;
-
-        index++;
+            ptr[i].running = 1;
+        ptr[i].max_memkb = PAGE_TO_MEMKB(info[i].tot_pages);
+        ptr[i].cpu_time = info[i].cpu_time;
+        ptr[i].vcpu_max_id = info[i].max_vcpu_id;
+        ptr[i].vcpu_online = info[i].nr_online_vcpus;
     }
-    *nb_domain = index;
+    *nb_domain = ret;
     return ptr;
 }
 
