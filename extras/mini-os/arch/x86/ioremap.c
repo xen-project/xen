@@ -53,7 +53,7 @@ static void *__do_ioremap(unsigned long phys_addr, unsigned long size,
         }
     }   
     va = (unsigned long)map_frames_ex(&mfns, num_pages, 0, 1, 1,
-                                      DOMID_IO, 0, prot);
+                                      DOMID_IO, NULL, prot);
     return (void *)(va + offset);
     
 mfn_invalid:

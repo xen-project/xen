@@ -137,17 +137,17 @@ unsigned long allocate_ondemand(unsigned long n, unsigned long alignment)
 
 /* Helper function used in gnttab.c. */
 void do_map_frames(unsigned long addr,
-        unsigned long *f, unsigned long n, unsigned long stride,
-	unsigned long increment, domid_t id, int may_fail, unsigned long prot)
+    const unsigned long *f, unsigned long n, unsigned long stride,
+	unsigned long increment, domid_t id, int *err, unsigned long prot)
 {
 	/* TODO */
 	ASSERT(0);
 }
 
 void*
-map_frames_ex(unsigned long* frames, unsigned long n, unsigned long stride,
+map_frames_ex(const unsigned long* frames, unsigned long n, unsigned long stride,
 	unsigned long increment, unsigned long alignment, domid_t id,
-	int may_fail, unsigned long prot)
+	int *err, unsigned long prot)
 {
         /* TODO: incomplete! */
         ASSERT(n == 1 || (stride == 0 && increment == 1));

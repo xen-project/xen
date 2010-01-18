@@ -568,10 +568,9 @@ unsigned long allocate_ondemand(unsigned long n, unsigned long alignment)
  */
 #define MAP_BATCH ((STACK_SIZE / 2) / sizeof(mmu_update_t))
 void do_map_frames(unsigned long va,
-                   unsigned long *mfns, unsigned long n, 
+                   const unsigned long *mfns, unsigned long n, 
                    unsigned long stride, unsigned long incr, 
-                   domid_t id, int may_fail,
-                   unsigned long prot)
+                   domid_t id, int *err, unsigned long prot)
 {
     pgentry_t *pgt = NULL;
     unsigned long done = 0;
@@ -585,12 +584,14 @@ void do_map_frames(unsigned long va,
     }
     DEBUG("va=%p n=0x%lx, mfns[0]=0x%lx stride=0x%lx incr=0x%lx prot=0x%lx\n",
           va, n, mfns[0], stride, incr, prot);
- 
+
+    if ( err )
+        memset(err, 0x00, n * sizeof(int));
     while ( done < n )
     {
         unsigned long todo;
 
-        if ( may_fail )
+        if ( err )
             todo = 1;
         else
             todo = n - done;
@@ -615,8 +616,8 @@ void do_map_frames(unsigned long va,
             rc = HYPERVISOR_mmu_update(mmu_updates, todo, NULL, id);
             if ( rc < 0 )
             {
-                if (may_fail)
-                    mfns[done * stride] |= 0xF0000000;
+                if (err)
+                    err[done * stride] = rc;
                 else {
                     printk("Map %ld (%lx, ...) at %p failed: %d.\n",
                            todo, mfns[done * stride] + done * incr, va, rc);
@@ -632,17 +633,17 @@ void do_map_frames(unsigned long va,
  * Map an array of MFNs contiguous into virtual address space. Virtual
  * addresses are allocated from the on demand area.
  */
-void *map_frames_ex(unsigned long *mfns, unsigned long n, 
+void *map_frames_ex(const unsigned long *mfns, unsigned long n, 
                     unsigned long stride, unsigned long incr,
                     unsigned long alignment,
-                    domid_t id, int may_fail, unsigned long prot)
+                    domid_t id, int *err, unsigned long prot)
 {
     unsigned long va = allocate_ondemand(n, alignment);
 
     if ( !va )
         return NULL;
 
-    do_map_frames(va, mfns, n, stride, incr, id, may_fail, prot);
+    do_map_frames(va, mfns, n, stride, incr, id, err, prot);
 
     return (void *)va;
 }

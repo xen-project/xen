@@ -65,12 +65,12 @@ void arch_init_p2m(unsigned long max_pfn_p);
 
 unsigned long allocate_ondemand(unsigned long n, unsigned long alignment);
 /* map f[i*stride]+i*increment for i in 0..n-1, aligned on alignment pages */
-void *map_frames_ex(unsigned long *f, unsigned long n, unsigned long stride,
+void *map_frames_ex(const unsigned long *f, unsigned long n, unsigned long stride,
 	unsigned long increment, unsigned long alignment, domid_t id,
-	int may_fail, unsigned long prot);
+	int *err, unsigned long prot);
 void do_map_frames(unsigned long addr,
-        unsigned long *f, unsigned long n, unsigned long stride,
-	unsigned long increment, domid_t id, int may_fail, unsigned long prot);
+        const unsigned long *f, unsigned long n, unsigned long stride,
+	unsigned long increment, domid_t id, int *err, unsigned long prot);
 int unmap_frames(unsigned long va, unsigned long num_frames);
 unsigned long alloc_contig_pages(int order, unsigned int addr_bits);
 #ifdef HAVE_LIBC

@@ -35,9 +35,9 @@
 #define virt_to_mfn(x)	virt_to_pfn(x)
 #define virtual_to_mfn(x)      (ia64_tpa((uint64_t)(x)) >> PAGE_SHIFT)
 
-#define map_frames(f, n) map_frames_ex(f, n, 1, 0, 1, DOMID_SELF, 0, 0)
+#define map_frames(f, n) map_frames_ex(f, n, 1, 0, 1, DOMID_SELF, NULL, 0)
 /* TODO */
-#define map_zero(n, a) map_frames_ex(NULL, n, 0, 0, a, DOMID_SELF, 0, 0)
+#define map_zero(n, a) map_frames_ex(NULL, n, 0, 0, a, DOMID_SELF, NULL, 0)
 #define do_map_zero(start, n) ASSERT(n == 0)
 
 #endif /* __ARCH_MM_H__ */

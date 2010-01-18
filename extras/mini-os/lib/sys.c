@@ -1254,10 +1254,10 @@ void *mmap(void *start, size_t length, int prot, int flags, int fd, off_t offset
         return map_zero(n, 1);
     else if (files[fd].type == FTYPE_XC) {
         unsigned long zero = 0;
-        return map_frames_ex(&zero, n, 0, 0, 1, DOMID_SELF, 0, 0);
+        return map_frames_ex(&zero, n, 0, 0, 1, DOMID_SELF, NULL, 0);
     } else if (files[fd].type == FTYPE_MEM) {
         unsigned long first_mfn = offset >> PAGE_SHIFT;
-        return map_frames_ex(&first_mfn, n, 0, 1, 1, DOMID_IO, 0, _PAGE_PRESENT|_PAGE_RW);
+        return map_frames_ex(&first_mfn, n, 0, 1, 1, DOMID_IO, NULL, _PAGE_PRESENT|_PAGE_RW);
     } else ASSERT(0);
 }
 

@@ -44,8 +44,8 @@ int xc_interface_close(int xc_handle)
     return 0;
 }
 
-void *xc_map_foreign_batch(int xc_handle, uint32_t dom, int prot,
-                           xen_pfn_t *arr, int num)
+void *xc_map_foreign_bulk(int xc_handle, uint32_t dom, int prot,
+                          const xen_pfn_t *arr, int *err, unsigned int num)
 {
     unsigned long pt_prot = 0;
 #ifdef __ia64__
@@ -56,7 +56,31 @@ void *xc_map_foreign_batch(int xc_handle, uint32_t dom, int prot,
     if (prot & PROT_WRITE)
 	pt_prot = L1_PROT;
 #endif
-    return map_frames_ex(arr, num, 1, 0, 1, dom, 1, pt_prot);
+    return map_frames_ex(arr, num, 1, 0, 1, dom, err, pt_prot);    
+}
+
+void *xc_map_foreign_batch(int xc_handle, uint32_t dom, int prot,
+                           xen_pfn_t *arr, int num)
+{
+    unsigned long pt_prot = 0;
+    int err[num];
+    int i;
+    unsigned long addr;
+
+#ifdef __ia64__
+    /* TODO */
+#else
+    if (prot & PROT_READ)
+	pt_prot = L1_PROT_RO;
+    if (prot & PROT_WRITE)
+	pt_prot = L1_PROT;
+#endif
+    addr = (unsigned long) map_frames_ex(arr, num, 1, 0, 1, dom, err, pt_prot);
+    for (i = 0; i < num; i++) {
+        if (err[i])
+            arr[i] |= 0xF0000000;
+    }
+    return (void *) addr;
 }
 
 void *xc_map_foreign_range(int xc_handle, uint32_t dom,
@@ -73,7 +97,7 @@ void *xc_map_foreign_range(int xc_handle, uint32_t dom,
 	pt_prot = L1_PROT;
 #endif
     assert(!(size % getpagesize()));
-    return map_frames_ex(&mfn, size / getpagesize(), 0, 1, 1, dom, 0, pt_prot);
+    return map_frames_ex(&mfn, size / getpagesize(), 0, 1, 1, dom, NULL, pt_prot);
 }
 
 void *xc_map_foreign_ranges(int xc_handle, uint32_t dom,
@@ -100,7 +124,7 @@ void *xc_map_foreign_ranges(int xc_handle, uint32_t dom,
         for (j = 0; j < chunksize / PAGE_SIZE; j++)
             mfns[n++] = entries[i].mfn + j;
 
-    ret = map_frames_ex(mfns, n, 1, 0, 1, dom, 0, pt_prot);
+    ret = map_frames_ex(mfns, n, 1, 0, 1, dom, NULL, pt_prot);
     free(mfns);
     return ret;
 }
