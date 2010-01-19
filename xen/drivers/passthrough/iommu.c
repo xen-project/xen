@@ -37,26 +37,19 @@ static int iommu_populate_page_table(struct domain *d);
  *   no-intremap                Disable VT-d Interrupt Remapping
  */
 custom_param("iommu", parse_iommu_param);
-int iommu_enabled;
+int iommu_enabled = 1;
 int iommu_pv_enabled;
 int force_iommu;
 int iommu_passthrough;
-int iommu_snoop;
-int iommu_qinval;
-int iommu_intremap;
+int iommu_snoop = 1;
+int iommu_qinval = 1;
+int iommu_intremap = 1;
 int amd_iommu_debug;
 int amd_iommu_perdev_intremap;
 
 static void __init parse_iommu_param(char *s)
 {
     char *ss;
-
-    iommu_enabled = 1;
-    iommu_snoop = 1;
-    iommu_qinval = 1;
-    iommu_intremap = 1;
-    amd_iommu_debug = 0;
-    amd_iommu_perdev_intremap = 0;
 
     do {
         ss = strchr(s, ',');
