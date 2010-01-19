@@ -1273,6 +1273,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             if ( batch == 0 )
                 goto skip; /* vanishingly unlikely... */
 
+            pfn_err = realloc(pfn_err, sizeof(int) * batch);
             region_base = xc_map_foreign_bulk(
                 xc_handle, dom, PROT_READ, pfn_type, pfn_err, batch);
             if ( region_base == NULL )
@@ -1832,6 +1833,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
     free(pfn_type);
     free(pfn_batch);
+    free(pfn_err);
     free(to_send);
     free(to_fix);
     free(to_skip);
