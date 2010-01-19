@@ -1372,7 +1372,18 @@ void init_percpu_time(void)
 /* Late init function (after all CPUs are booted). */
 int __init init_xen_time(void)
 {
-    extern unsigned int max_cstate;
+    if ( boot_cpu_has(X86_FEATURE_TSC_RELIABLE) )
+    {
+        /*
+         * Sadly, despite processor vendors' best design guidance efforts, on
+         * some systems, cpus may come out of reset improperly synchronized.
+         * So we must verify there is no warp and we can't do that until all
+         * CPUs are booted.
+         */
+        tsc_check_reliability();
+        if ( tsc_max_warp )
+            setup_clear_cpu_cap(X86_FEATURE_TSC_RELIABLE);
+    }
 
     /* If we have constant-rate TSCs then scale factor can be shared. */
     if ( boot_cpu_has(X86_FEATURE_CONSTANT_TSC) )
@@ -1380,22 +1391,10 @@ int __init init_xen_time(void)
         int cpu;
         for_each_possible_cpu ( cpu )
             per_cpu(cpu_time, cpu).tsc_scale = per_cpu(cpu_time, 0).tsc_scale;
-    }
-    if ( (boot_cpu_has(X86_FEATURE_CONSTANT_TSC) && max_cstate <= 2) ||
-         boot_cpu_has(X86_FEATURE_NONSTOP_TSC) )
-    {
-        /*
-         * Sadly, despite processor vendors' best design guidance efforts,
-         * on some systems, cpus may come out of reset improperly
-         * synchronized.  So we must verify there is no warp and we
-         * can't do that until all CPUs are booted
-         */
-        tsc_check_reliability();
-        if ( tsc_max_warp == 0 )
-            set_boot_cpu_bit(X86_FEATURE_TSC_RELIABLE);
-    }
-    if ( !boot_cpu_has(X86_FEATURE_TSC_RELIABLE) )
+        /* If TSCs are not marked as 'reliable', re-sync during rendezvous. */
+        if ( !boot_cpu_has(X86_FEATURE_TSC_RELIABLE) )
             time_calibration_rendezvous_fn = time_calibration_tsc_rendezvous;
+    }
 
     open_softirq(TIME_CALIBRATE_SOFTIRQ, local_time_calibration);
 
@@ -1630,11 +1629,7 @@ void pv_soft_rdtsc(struct vcpu *v, struct cpu_user_regs *regs, int rdtscp)
 
 int host_tsc_is_safe(void)
 {
-    if ( boot_cpu_has(X86_FEATURE_TSC_RELIABLE) )
-        return 1;
-    if ( num_online_cpus() == 1 )
-        return 1;
-    return 0;
+    return boot_cpu_has(X86_FEATURE_TSC_RELIABLE) || (num_online_cpus() == 1);
 }
 
 void cpuid_time_leaf(uint32_t sub_idx, uint32_t *eax, uint32_t *ebx,

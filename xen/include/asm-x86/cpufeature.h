@@ -132,7 +132,6 @@
 
 #define cpu_has(c, bit)		test_bit(bit, (c)->x86_capability)
 #define boot_cpu_has(bit)	test_bit(bit, boot_cpu_data.x86_capability)
-#define set_boot_cpu_bit(bit)	set_bit(bit, boot_cpu_data.x86_capability)
 
 #ifdef __i386__
 #define cpu_has_vme		boot_cpu_has(X86_FEATURE_VME)
