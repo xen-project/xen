@@ -75,7 +75,7 @@ struct xen_sysctl_tbuf_op {
     uint32_t             evt_mask;
     /* OUT variables */
     uint64_aligned_t buffer_mfn;
-    uint32_t size;
+    uint32_t size;  /* Also an IN variable! */
 };
 typedef struct xen_sysctl_tbuf_op xen_sysctl_tbuf_op_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_tbuf_op_t);

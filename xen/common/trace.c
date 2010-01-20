@@ -46,8 +46,11 @@ static unsigned int opt_tbuf_size = 0;
 integer_param("tbuf_size", opt_tbuf_size);
 
 /* Pointers to the meta-data objects for all system trace buffers */
+static struct t_info *t_info;
+#define T_INFO_PAGES 2  /* Size fixed at 2 pages for now. */
 static DEFINE_PER_CPU_READ_MOSTLY(struct t_buf *, t_bufs);
 static DEFINE_PER_CPU_READ_MOSTLY(unsigned char *, t_data);
+static DEFINE_PER_CPU_READ_MOSTLY(spinlock_t, t_lock);
 static int data_size;
 
 /* High water mark for trace buffers; */
@@ -80,41 +83,104 @@ static u32 tb_event_mask = TRC_ALL;
  */
 static int alloc_trace_bufs(void)
 {
-    int           i, order;
+    int           i, cpu, order;
     unsigned long nr_pages;
-    char         *rawbuf;
-    struct t_buf *buf;
+    /* Start after a fixed-size array of NR_CPUS */
+    uint32_t *t_info_mfn_list = (uint32_t *)t_info;
+    int offset = (NR_CPUS * 2 + 1 + 1) / 4;
 
     if ( opt_tbuf_size == 0 )
         return -EINVAL;
 
-    nr_pages = num_online_cpus() * opt_tbuf_size;
-    order    = get_order_from_pages(nr_pages);
-    data_size  = (opt_tbuf_size * PAGE_SIZE - sizeof(struct t_buf));
-    
-    if ( (rawbuf = alloc_xenheap_pages(order, 0)) == NULL )
+    if ( !t_info )
     {
-        printk("Xen trace buffers: memory allocation failed\n");
-        opt_tbuf_size = 0;
+        printk("%s: t_info not allocated, cannot allocate trace buffers!\n",
+               __func__);
         return -EINVAL;
     }
 
-    /* Share pages so that xentrace can map them. */
-    for ( i = 0; i < nr_pages; i++ )
-        share_xen_page_with_privileged_guests(
-            virt_to_page(rawbuf) + i, XENSHARE_writable);
+    t_info->tbuf_size = opt_tbuf_size;
+    printk("tbuf_size %d\n", t_info->tbuf_size);
 
-    for_each_online_cpu ( i )
+    nr_pages = opt_tbuf_size;
+    order = get_order_from_pages(nr_pages);
+
+    /*
+     * First, allocate buffers for all of the cpus.  If any
+     * fails, deallocate what you have so far and exit. 
+     */
+    for_each_online_cpu(cpu)
     {
-        buf = per_cpu(t_bufs, i) = (struct t_buf *)
-            &rawbuf[i*opt_tbuf_size*PAGE_SIZE];
+        int flags;
+        char         *rawbuf;
+        struct t_buf *buf;
+
+        if ( (rawbuf = alloc_xenheap_pages(order, 0)) == NULL )
+        {
+            printk("Xen trace buffers: memory allocation failed\n");
+            opt_tbuf_size = 0;
+            goto out_dealloc;
+        }
+
+        spin_lock_irqsave(&per_cpu(t_lock, cpu), flags);
+
+        buf = per_cpu(t_bufs, cpu) = (struct t_buf *)rawbuf;
         buf->cons = buf->prod = 0;
-        per_cpu(t_data, i) = (unsigned char *)(buf + 1);
+        per_cpu(t_data, cpu) = (unsigned char *)(buf + 1);
+
+        spin_unlock_irqrestore(&per_cpu(t_lock, cpu), flags);
+
     }
 
+    /*
+     * Now share the pages to xentrace can map them, and write them in
+     * the global t_info structure.
+     */
+    for_each_online_cpu(cpu)
+    {
+        /* Share pages so that xentrace can map them. */
+        char         *rawbuf;
+
+        if ( (rawbuf = (char *)per_cpu(t_bufs, cpu)) )
+        {
+            struct page_info *p = virt_to_page(rawbuf);
+            uint32_t mfn = virt_to_mfn(rawbuf);
+
+            for ( i = 0; i < nr_pages; i++ )
+            {
+                share_xen_page_with_privileged_guests(
+                    p + i, XENSHARE_writable);
+            
+                t_info_mfn_list[offset + i]=mfn + i;
+            }
+            /* Write list first, then write per-cpu offset. */
+            wmb();
+            t_info->mfn_offset[cpu]=offset;
+            printk("p%d mfn %"PRIx32" offset %d\n",
+                   cpu, mfn, offset);
+            offset+=i;
+        }
+    }
+
+    data_size  = (opt_tbuf_size * PAGE_SIZE - sizeof(struct t_buf));
     t_buf_highwater = data_size >> 1; /* 50% high water */
 
     return 0;
+out_dealloc:
+    for_each_online_cpu(cpu)
+    {
+        int flags;
+        char * rawbuf;
+
+        spin_lock_irqsave(&per_cpu(t_lock, cpu), flags);
+        if ( (rawbuf = (char *)per_cpu(t_bufs, cpu)) )
+        {
+            ASSERT(!(virt_to_page(rawbuf)->count_info & PGC_allocated));
+            free_xenheap_pages(rawbuf, order);
+        }
+        spin_unlock_irqrestore(&per_cpu(t_lock, cpu), flags);
+    }
+    return -EINVAL;
 }
 
 
@@ -181,6 +247,26 @@ int trace_will_trace_event(u32 event)
  */
 void __init init_trace_bufs(void)
 {
+    int i;
+    /* t_info size fixed at 2 pages for now.  That should be big enough / small enough
+     * until it's worth making it dynamic. */
+    t_info = alloc_xenheap_pages(1, 0);
+
+    if ( t_info == NULL )
+    {
+        printk("Xen trace buffers: t_info allocation failed!  Tracing disabled.\n");
+        return;
+    }
+
+    for(i = 0; i < NR_CPUS; i++)
+        spin_lock_init(&per_cpu(t_lock, i));
+
+    for(i=0; i<T_INFO_PAGES; i++)
+        share_xen_page_with_privileged_guests(
+            virt_to_page(t_info) + i, XENSHARE_writable);
+
+
+
     if ( opt_tbuf_size == 0 )
     {
         printk("Xen trace buffers: disabled\n");
@@ -210,8 +296,8 @@ int tb_control(xen_sysctl_tbuf_op_t *tbc)
     {
     case XEN_SYSCTL_TBUFOP_get_info:
         tbc->evt_mask   = tb_event_mask;
-        tbc->buffer_mfn = opt_tbuf_size ? virt_to_mfn(per_cpu(t_bufs, 0)) : 0;
-        tbc->size       = opt_tbuf_size * PAGE_SIZE;
+        tbc->buffer_mfn = t_info ? virt_to_mfn(t_info) : 0;
+        tbc->size = T_INFO_PAGES;
         break;
     case XEN_SYSCTL_TBUFOP_set_cpu_mask:
         xenctl_cpumap_to_cpumask(&tb_cpu_mask, &tbc->cpu_mask);
@@ -220,7 +306,7 @@ int tb_control(xen_sysctl_tbuf_op_t *tbc)
         tb_event_mask = tbc->evt_mask;
         break;
     case XEN_SYSCTL_TBUFOP_set_size:
-        rc = !tb_init_done ? tb_set_size(tbc->size) : -EINVAL;
+        rc = tb_set_size(tbc->size);
         break;
     case XEN_SYSCTL_TBUFOP_enable:
         /* Enable trace buffers. Check buffers are already allocated. */
@@ -428,7 +514,7 @@ void __trace_var(u32 event, int cycles, int extra, unsigned char *extra_data)
     unsigned long flags, bytes_to_tail, bytes_to_wrap;
     int rec_size, total_size;
     int extra_word;
-    int started_below_highwater;
+    int started_below_highwater = 0;
 
     if( !tb_init_done )
         return;
@@ -462,9 +548,12 @@ void __trace_var(u32 event, int cycles, int extra, unsigned char *extra_data)
     /* Read tb_init_done /before/ t_bufs. */
     rmb();
 
+    spin_lock_irqsave(&this_cpu(t_lock), flags);
+
     buf = this_cpu(t_bufs);
 
-    local_irq_save(flags);
+    if ( unlikely(!buf) )
+        goto unlock;
 
     started_below_highwater = (calc_unconsumed_bytes(buf) < t_buf_highwater);
 
@@ -511,8 +600,8 @@ void __trace_var(u32 event, int cycles, int extra, unsigned char *extra_data)
     {
         if ( ++this_cpu(lost_records) == 1 )
             this_cpu(lost_records_first_tsc)=(u64)get_cycles();
-        local_irq_restore(flags);
-        return;
+        started_below_highwater = 0;
+        goto unlock;
     }
 
     /*
@@ -541,7 +630,8 @@ void __trace_var(u32 event, int cycles, int extra, unsigned char *extra_data)
     /* Write the original record */
     __insert_record(buf, event, extra, cycles, rec_size, extra_data);
 
-    local_irq_restore(flags);
+unlock:
+    spin_unlock_irqrestore(&this_cpu(t_lock), flags);
 
     /* Notify trace buffer consumer that we've crossed the high water mark. */
     if ( started_below_highwater &&

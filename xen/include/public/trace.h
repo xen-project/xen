@@ -195,6 +195,16 @@ struct t_buf {
     /*  Records follow immediately after the meta-data header.    */
 };
 
+/* Structure used to pass MFNs to the trace buffers back to trace consumers.
+ * Offset is an offset into the mapped structure where the mfn list will be held.
+ * MFNs will be at ((unsigned long *)(t_info))+(t_info->cpu_offset[cpu]).
+ */
+struct t_info {
+    uint16_t tbuf_size; /* Size in pages of each trace buffer */
+    uint16_t mfn_offset[];  /* Offset within t_info structure of the page list per cpu */
+    /* MFN lists immediately after the header */
+};
+
 #endif /* __XEN_PUBLIC_TRACE_H__ */
 
 /*

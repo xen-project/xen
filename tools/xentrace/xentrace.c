@@ -61,6 +61,12 @@ typedef struct settings_st {
         disable_tracing:1;
 } settings_t;
 
+struct t_struct {
+    struct t_info *t_info;  /* Structure with information about individual buffers */
+    struct t_buf **meta;    /* Pointers to trace buffer metadata */
+    unsigned char **data;   /* Pointers to trace buffer data areas */
+};
+
 settings_t opts;
 
 int interrupted = 0; /* gets set if we get a SIGHUP */
@@ -446,22 +452,61 @@ static void get_tbufs(unsigned long *mfn, unsigned long *size)
  *
  * Maps the Xen trace buffers them into process address space.
  */
-static struct t_buf *map_tbufs(unsigned long tbufs_mfn, unsigned int num,
-                        unsigned long size)
+static struct t_struct *map_tbufs(unsigned long tbufs_mfn, unsigned int num,
+                                  unsigned long tinfo_size)
 {
-    struct t_buf *tbufs_mapped;
+    static struct t_struct tbufs = { 0 };
+    int i;
 
-    tbufs_mapped = xc_map_foreign_range(xc_handle, DOMID_XEN,
-                                        size * num, PROT_READ | PROT_WRITE,
+    /* Map t_info metadata structure */
+    tbufs.t_info = xc_map_foreign_range(xc_handle, DOMID_XEN,
+                                        tinfo_size, PROT_READ | PROT_WRITE,
                                         tbufs_mfn);
 
-    if ( tbufs_mapped == 0 ) 
+    if ( tbufs.t_info == 0 ) 
     {
         PERROR("Failed to mmap trace buffers");
         exit(EXIT_FAILURE);
     }
 
-    return tbufs_mapped;
+    if ( tbufs.t_info->tbuf_size == 0 )
+    {
+        fprintf(stderr, "%s: tbuf_size 0!\n", __func__);
+        exit(EXIT_FAILURE);
+    }
+
+    /* Map per-cpu buffers */
+    tbufs.meta = (struct t_buf **)calloc(num, sizeof(struct t_buf *));
+    tbufs.data = (unsigned char **)calloc(num, sizeof(unsigned char *));
+    if ( tbufs.meta == NULL || tbufs.data == NULL )
+    {
+        PERROR( "Failed to allocate memory for buffer pointers\n");
+        exit(EXIT_FAILURE);
+    }
+
+    for(i=0; i<num; i++)
+    {
+        
+        uint32_t *mfn_list = ((uint32_t *)tbufs.t_info) + tbufs.t_info->mfn_offset[i];
+        int j;
+        xen_pfn_t pfn_list[tbufs.t_info->tbuf_size];
+
+        for ( j=0; j<tbufs.t_info->tbuf_size; j++)
+            pfn_list[j] = (xen_pfn_t)mfn_list[j];
+
+        tbufs.meta[i] = xc_map_foreign_batch(xc_handle, DOMID_XEN,
+                                             PROT_READ | PROT_WRITE,
+                                             pfn_list,
+                                             tbufs.t_info->tbuf_size);
+        if ( tbufs.meta[i] == NULL )
+        {
+            PERROR("Failed to map cpu buffer!");
+            exit(EXIT_FAILURE);
+        }
+        tbufs.data[i] = (unsigned char *)(tbufs.meta[i]+1);
+    }
+
+    return &tbufs;
 }
 
 /**
@@ -487,66 +532,6 @@ static void set_mask(uint32_t mask, int type)
         PERROR("Failure to get trace buffer pointer from Xen and set the new mask");
         exit(EXIT_FAILURE);
     }
-}
-
-/**
- * init_bufs_ptrs - initialises an array of pointers to the trace buffers
- * @bufs_mapped:    the userspace address where the trace buffers are mapped
- * @num:            number of trace buffers
- * @size:           trace buffer size
- *
- * Initialises an array of pointers to individual trace buffers within the
- * mapped region containing all trace buffers.
- */
-static struct t_buf **init_bufs_ptrs(void *bufs_mapped, unsigned int num,
-                              unsigned long size)
-{
-    int i;
-    struct t_buf **user_ptrs;
-
-    user_ptrs = (struct t_buf **)calloc(num, sizeof(struct t_buf *));
-    if ( user_ptrs == NULL )
-    {
-        PERROR( "Failed to allocate memory for buffer pointers\n");
-        exit(EXIT_FAILURE);
-    }
-    
-    /* initialise pointers to the trace buffers - given the size of a trace
-     * buffer and the value of bufs_maped, we can easily calculate these */
-    for ( i = 0; i<num; i++ )
-        user_ptrs[i] = (struct t_buf *)((unsigned long)bufs_mapped + size * i);
-
-    return user_ptrs;
-}
-
-
-/**
- * init_rec_ptrs - initialises data area pointers to locations in user space
- * @tbufs_mfn:     base mfn of the trace buffer area
- * @tbufs_mapped:  user virtual address of base of trace buffer area
- * @meta:          array of user-space pointers to struct t_buf's of metadata
- * @num:           number of trace buffers
- *
- * Initialises data area pointers to the locations that data areas have been
- * mapped in user space.  Note that the trace buffer metadata contains machine
- * pointers - the array returned allows more convenient access to them.
- */
-static unsigned char **init_rec_ptrs(struct t_buf **meta, unsigned int num)
-{
-    int i;
-    unsigned char **data;
-    
-    data = calloc(num, sizeof(unsigned char *));
-    if ( data == NULL )
-    {
-        PERROR("Failed to allocate memory for data pointers\n");
-        exit(EXIT_FAILURE);
-    }
-
-    for ( i = 0; i < num; i++ )
-        data[i] = (unsigned char *)(meta[i] + 1);
-
-    return data;
 }
 
 /**
@@ -638,12 +623,13 @@ static int monitor_tbufs(void)
 {
     int i;
 
-    void *tbufs_mapped;          /* pointer to where the tbufs are mapped    */
+    struct t_struct *tbufs;      /* Pointer to hypervisor maps */
     struct t_buf **meta;         /* pointers to the trace buffer metadata    */
     unsigned char **data;        /* pointers to the trace buffer data areas
                                   * where they are mapped into user space.   */
     unsigned long tbufs_mfn;     /* mfn of the tbufs                         */
     unsigned int  num;           /* number of trace buffers / logical CPUS   */
+    unsigned long tinfo_size;    /* size of t_info metadata map */
     unsigned long size;          /* size of a single trace buffer            */
 
     unsigned long data_size;
@@ -655,14 +641,15 @@ static int monitor_tbufs(void)
     num = get_num_cpus();
 
     /* setup access to trace buffers */
-    get_tbufs(&tbufs_mfn, &size);
-    tbufs_mapped = map_tbufs(tbufs_mfn, num, size);
+    get_tbufs(&tbufs_mfn, &tinfo_size);
+    tbufs = map_tbufs(tbufs_mfn, num, tinfo_size);
+
+    size = tbufs->t_info->tbuf_size * PAGE_SIZE;
 
     data_size = size - sizeof(struct t_buf);
 
-    /* build arrays of convenience ptrs */
-    meta  = init_bufs_ptrs(tbufs_mapped, num, size);
-    data  = init_rec_ptrs(meta, num);
+    meta = tbufs->meta;
+    data = tbufs->data;
 
     if ( opts.discard )
         for ( i = 0; i < num; i++ )
