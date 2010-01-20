@@ -911,19 +911,45 @@ static PyObject *pyxc_hvm_build(XcObject *self,
 #if !defined(__ia64__)
     struct hvm_info_table *va_hvm;
     uint8_t *va_map, sum;
-    int i;
 #endif
+    int i;
     char *image;
     int memsize, target=-1, vcpus = 1, acpi = 0, apic = 1;
-    uint64_t vcpu_avail = 1;
+    PyObject *vcpu_avail_handle = NULL;
+    uint8_t vcpu_avail[HVM_MAX_VCPUS/8];
 
     static char *kwd_list[] = { "domid",
                                 "memsize", "image", "target", "vcpus", 
                                 "vcpu_avail", "acpi", "apic", NULL };
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iis|iilii", kwd_list,
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iis|iiOii", kwd_list,
                                       &dom, &memsize, &image, &target, &vcpus,
-                                      &vcpu_avail, &acpi, &apic) )
+                                      &vcpu_avail_handle, &acpi, &apic) )
         return NULL;
+
+    memset(vcpu_avail, 0, sizeof(vcpu_avail));
+    vcpu_avail[0] = 1;
+    if ( vcpu_avail_handle != NULL )
+    {
+        if ( PyInt_Check(vcpu_avail_handle) )
+        {
+            unsigned long v = PyInt_AsLong(vcpu_avail_handle);
+            for ( i = 0; i < sizeof(long)/8; i++ )
+                vcpu_avail[i] = (uint8_t)(v>>(i*8));
+        }
+        else if ( PyLong_Check(vcpu_avail_handle) )
+        {
+            if ( _PyLong_AsByteArray((PyLongObject *)vcpu_avail_handle,
+                                     (unsigned char *)vcpu_avail,
+                                     sizeof(vcpu_avail), 1, 0) )
+                return NULL;
+        }
+        else
+        {
+            errno = EINVAL;
+            PyErr_SetFromErrno(xc_error_obj);
+            return NULL;
+        }
+    }
 
     if ( target == -1 )
         target = memsize;
@@ -943,8 +969,7 @@ static PyObject *pyxc_hvm_build(XcObject *self,
     va_hvm->acpi_enabled = acpi;
     va_hvm->apic_mode    = apic;
     va_hvm->nr_vcpus     = vcpus;
-    ((uint64_t *)va_hvm->vcpu_online)[0] = vcpu_avail;
-    ((uint64_t *)va_hvm->vcpu_online)[1] = 0;    
+    memcpy(va_hvm->vcpu_online, vcpu_avail, sizeof(vcpu_avail));
     for ( i = 0, sum = 0; i < va_hvm->length; i++ )
         sum += ((uint8_t *)va_hvm)[i];
     va_hvm->checksum -= sum;
