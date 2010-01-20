@@ -727,6 +727,19 @@ long arch_do_domctl(
         }
         break;
 
+        case XEN_DOMCTL_SENDTRIGGER_SLEEP:
+        {
+            extern void hvm_acpi_sleep_button(struct domain *d);
+
+            ret = -EINVAL;
+            if ( is_hvm_domain(d) ) 
+            {
+                ret = 0;
+                hvm_acpi_sleep_button(d);
+            }
+        }
+        break;
+
         default:
             ret = -ENOSYS;
         }

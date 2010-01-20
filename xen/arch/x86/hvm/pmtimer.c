@@ -32,14 +32,16 @@
 #define TMR_STS    (1 << 0)
 #define GBL_STS    (1 << 5)
 #define PWRBTN_STS (1 << 8)
+#define SLPBTN_STS (1 << 9)
 
 /* The same in PM1a_EN */
 #define TMR_EN     (1 << 0)
 #define GBL_EN     (1 << 5)
 #define PWRBTN_EN  (1 << 8)
+#define SLPBTN_EN  (1 << 9)
 
 /* Mask of bits in PM1a_STS that can generate an SCI. */
-#define SCI_MASK (TMR_STS|PWRBTN_STS|GBL_STS) 
+#define SCI_MASK (TMR_STS|PWRBTN_STS|SLPBTN_STS|GBL_STS) 
 
 /* SCI IRQ number (must match SCI_INT number in ACPI FADT in hvmloader) */
 #define SCI_IRQ 9
@@ -64,6 +66,15 @@ void hvm_acpi_power_button(struct domain *d)
     PMTState *s = &d->arch.hvm_domain.pl_time.vpmt;
     spin_lock(&s->lock);
     s->pm.pm1a_sts |= PWRBTN_STS;
+    pmt_update_sci(s);
+    spin_unlock(&s->lock);
+}
+
+void hvm_acpi_sleep_button(struct domain *d)
+{
+    PMTState *s = &d->arch.hvm_domain.pl_time.vpmt;
+    spin_lock(&s->lock);
+    s->pm.pm1a_sts |= SLPBTN_STS;
     pmt_update_sci(s);
     spin_unlock(&s->lock);
 }
