@@ -2198,3 +2198,21 @@ int libxl_set_memory_target(struct libxl_ctx *ctx, uint32_t domid, uint32_t targ
     rc = xc_domain_memory_set_pod_target(ctx->xch, domid, (target_memkb - videoram) / 4, NULL, NULL, NULL);
     return rc;
 }
+
+int libxl_button_press(struct libxl_ctx *ctx, uint32_t domid, libxl_button button)
+{
+    int rc = -1;
+
+    switch (button) {
+    case POWER_BUTTON:
+        rc = xc_domain_send_trigger(ctx->xch, domid, XEN_DOMCTL_SENDTRIGGER_POWER, 0);
+        break;
+    case SLEEP_BUTTON:
+        rc = xc_domain_send_trigger(ctx->xch, domid, XEN_DOMCTL_SENDTRIGGER_SLEEP, 0);
+        break;
+    default:
+        break;
+    }
+
+    return rc;
+}

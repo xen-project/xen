@@ -931,6 +931,7 @@ static void help(char *command)
         printf(" cd-insert                     insert a cdrom into a guest's cd drive\n\n");
         printf(" cd-eject                      eject a cdrom from a guest's cd drive\n\n");
         printf(" mem-set                       set the current memory usage for a domain\n\n");
+        printf(" button-press                  indicate an ACPI button press to the domain\n\n");
     } else if(!strcmp(command, "create")) {
         printf("Usage: xl create <ConfigFile> [options] [vars]\n\n");
         printf("Create a domain based on <ConfigFile>.\n\n");
@@ -984,6 +985,10 @@ static void help(char *command)
     } else if (!strcmp(command, "mem-set")) {
         printf("Usage: xl mem-set <Domain> <MemKB>\n\n");
         printf("Set the current memory usage for a domain.\n\n");
+    } else if (!strcmp(command, "button-press")) {
+        printf("Usage: xl button-press <Domain> <Button>\n\n");
+        printf("Indicate <Button> press to a domain.\n");
+        printf("<Button> may be 'power' or 'sleep'.\n\n");
     }
 }
 
@@ -1718,6 +1723,60 @@ int main_create(int argc, char **argv)
     exit(0);
 }
 
+void button_press(char *p, char *b)
+{
+    struct libxl_ctx ctx;
+    uint32_t domid;
+    libxl_button button;
+
+    libxl_ctx_init(&ctx, LIBXL_VERSION);
+    libxl_ctx_set_log(&ctx, log_callback, NULL);
+
+    if (domain_qualifier_to_domid(&ctx, p, &domid) < 0) {
+        fprintf(stderr, "%s is an invalid domain identifier\n", p);
+        exit(2);
+    }
+
+    if (!strcmp(b, "power")) {
+        button = POWER_BUTTON;
+    } else if (!strcmp(b, "sleep")) {
+        button = SLEEP_BUTTON;
+    } else {
+        fprintf(stderr, "%s is an invalid button identifier\n", b);
+        exit(2);
+    }
+
+    libxl_button_press(&ctx, domid, button);
+}
+
+int main_button_press(int argc, char **argv)
+{
+    int opt;
+    char *p;
+    char *b;
+
+    while ((opt = getopt(argc, argv, "h")) != -1) {
+        switch (opt) {
+        case 'h':
+            help("button-press");
+            exit(0);
+        default:
+            fprintf(stderr, "option not supported\n");
+            break;
+        }
+    }
+    if (optind >= argc - 1) {
+        help("button-press");
+        exit(2);
+    }
+
+    p = argv[optind];
+    b = argv[optind + 1];
+
+    button_press(p, b);
+    exit(0);
+}
+
 int main(int argc, char **argv)
 {
     if (argc < 2) {
@@ -1757,6 +1816,8 @@ int main(int argc, char **argv)
         main_cd_eject(argc - 1, argv + 1);
     } else if (!strcmp(argv[1], "mem-set")) {
         main_memset(argc - 1, argv + 1);
+    } else if (!strcmp(argv[1], "button-press")) {
+        main_button_press(argc - 1, argv + 1);
     } else if (!strcmp(argv[1], "help")) {
         if (argc > 2)
             help(argv[2]);

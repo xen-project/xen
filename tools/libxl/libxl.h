@@ -353,4 +353,12 @@ int libxl_device_pci_init(libxl_device_pci *pcidev, unsigned int domain,
                           unsigned int bus, unsigned int dev,
                           unsigned int func, unsigned int vdevfn);
 
-#endif
+typedef enum {
+    POWER_BUTTON,
+    SLEEP_BUTTON
+} libxl_button;
+
+int libxl_button_press(struct libxl_ctx *ctx, uint32_t domid, libxl_button button);
+
+#endif /* LIBXL_H */
+
