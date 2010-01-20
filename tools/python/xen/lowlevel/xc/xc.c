@@ -933,7 +933,7 @@ static PyObject *pyxc_hvm_build(XcObject *self,
         if ( PyInt_Check(vcpu_avail_handle) )
         {
             unsigned long v = PyInt_AsLong(vcpu_avail_handle);
-            for ( i = 0; i < sizeof(long)/8; i++ )
+            for ( i = 0; i < sizeof(long); i++ )
                 vcpu_avail[i] = (uint8_t)(v>>(i*8));
         }
         else if ( PyLong_Check(vcpu_avail_handle) )
