@@ -644,7 +644,7 @@ static int monitor_tbufs(void)
     get_tbufs(&tbufs_mfn, &tinfo_size);
     tbufs = map_tbufs(tbufs_mfn, num, tinfo_size);
 
-    size = tbufs->t_info->tbuf_size * PAGE_SIZE;
+    size = tbufs->t_info->tbuf_size * XC_PAGE_SIZE;
 
     data_size = size - sizeof(struct t_buf);
 
