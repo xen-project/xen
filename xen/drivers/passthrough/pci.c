@@ -362,6 +362,21 @@ out:
 }
 
 /*
+ * detect pci device, return 0 if it exists, or return 0
+ */
+int pci_device_detect(u8 bus, u8 dev, u8 func)
+{
+    u32 vendor;
+
+    vendor = pci_conf_read32(bus, dev, func, PCI_VENDOR_ID);
+    /* some broken boards return 0 or ~0 if a slot is empty: */
+    if ( (vendor == 0xffffffff) || (vendor == 0x00000000) ||
+         (vendor == 0x0000ffff) || (vendor == 0xffff0000) )
+        return 0;
+    return 1;
+}
+
+/*
  * scan pci devices to add all existed PCI devices to alldevs_list,
  * and setup pci hierarchy in array bus2bridge. This function is only
  * called in VT-d hardware setup
@@ -372,7 +387,6 @@ int __init scan_pci_devices(void)
     int bus, dev, func;
     u8 sec_bus, sub_bus;
     int type;
-    u32 l;
 
     spin_lock(&pcidevs_lock);
     for ( bus = 0; bus < 256; bus++ )
@@ -381,10 +395,7 @@ int __init scan_pci_devices(void)
         {
             for ( func = 0; func < 8; func++ )
             {
-                l = pci_conf_read32(bus, dev, func, PCI_VENDOR_ID);
-                /* some broken boards return 0 or ~0 if a slot is empty: */
-                if ( (l == 0xffffffff) || (l == 0x00000000) ||
-                     (l == 0x0000ffff) || (l == 0xffff0000) )
+                if ( pci_device_detect(bus, dev, func) == 0 )
                     continue;
 
                 pdev = alloc_pdev(bus, PCI_DEVFN(dev, func));

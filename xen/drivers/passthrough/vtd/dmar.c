@@ -410,14 +410,6 @@ acpi_parse_one_rmrr(struct acpi_dmar_entry_header *header)
     u64 base_addr = rmrr->base_address, end_addr = rmrr->end_address;
     int ret = 0;
 
-    if ( base_addr >= end_addr )
-    {
-        dprintk(XENLOG_ERR VTDPREFIX,
-                "RMRR error: base_addr %"PRIx64" end_address %"PRIx64"\n",
-                base_addr, end_addr);
-        return -EFAULT;
-    }
-
 #ifdef CONFIG_X86
     /* This check is here simply to detect when RMRR values are
      * not properly represented in the system memory map and
@@ -441,9 +433,6 @@ acpi_parse_one_rmrr(struct acpi_dmar_entry_header *header)
 
     rmrru->base_address = base_addr;
     rmrru->end_address = end_addr;
-    dprintk(XENLOG_INFO VTDPREFIX,
-            "  RMRR region: base_addr %"PRIx64" end_address %"PRIx64"\n",
-            rmrru->base_address, rmrru->end_address);
 
     dev_scope_start = (void *)(rmrr + 1);
     dev_scope_end   = ((void *)rmrr) + header->length;
@@ -453,7 +442,50 @@ acpi_parse_one_rmrr(struct acpi_dmar_entry_header *header)
     if ( ret || (rmrru->scope.devices_cnt == 0) )
         xfree(rmrru);
     else
-        acpi_register_rmrr_unit(rmrru);
+    {
+        u8 b, d, f;
+        int i, ignore = 0;
+
+        for ( i = 0; i < rmrru->scope.devices_cnt; i++ )
+        {
+            b = PCI_BUS(rmrru->scope.devices[i]);
+            d = PCI_SLOT(rmrru->scope.devices[i]);
+            f = PCI_FUNC(rmrru->scope.devices[i]);
+
+            if ( pci_device_detect(b, d, f) == 0 )
+                ignore = 1;
+            else
+            {
+                ignore = 0;
+                break;
+            }
+        }
+
+        if ( ignore )
+        {
+            dprintk(XENLOG_WARNING VTDPREFIX,
+                "  Ignore the RMRR (%"PRIx64", %"PRIx64") due to "
+                "devices under its scope are not PCI discoverable!\n",
+                rmrru->base_address, rmrru->end_address);
+            xfree(rmrru);
+        }
+        else if ( base_addr > end_addr )
+        {
+            dprintk(XENLOG_WARNING VTDPREFIX,
+                "  The RMRR (%"PRIx64", %"PRIx64") is incorrect!\n",
+                rmrru->base_address, rmrru->end_address);
+            xfree(rmrru);
+            ret = -EFAULT;
+        }
+        else
+        {
+            dprintk(XENLOG_INFO VTDPREFIX,
+                "  RMRR region: base_addr %"PRIx64" end_address %"PRIx64"\n",
+                rmrru->base_address, rmrru->end_address);
+            acpi_register_rmrr_unit(rmrru);
+        }
+    }
+
     return ret;
 }
 

@@ -74,6 +74,7 @@ enum {
     DEV_TYPE_PCI,
 };
 
+int pci_device_detect(u8 bus, u8 dev, u8 func);
 int scan_pci_devices(void);
 int pdev_type(u8 bus, u8 devfn);
 int find_upstream_bridge(u8 *bus, u8 *devfn, u8 *secbus);
