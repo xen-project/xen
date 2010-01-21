@@ -842,11 +842,8 @@ long arch_do_domctl(
         if ( !iommu_pv_enabled && !is_hvm_domain(d) )
         {
             ret = -ENOSYS;
-            put_domain(d);
-            break;
+            goto assign_device_out;
         }
-
-        ret = -EINVAL;
 
         ret = assign_device(d, bus, devfn);
         if ( ret )
@@ -872,7 +869,7 @@ long arch_do_domctl(
         if ( unlikely((d = get_domain_by_id(domctl->domain)) == NULL) )
         {
             gdprintk(XENLOG_ERR,
-                "XEN_DOMCTL_deassign_device: get_domain_by_id() failed\n"); 
+                "XEN_DOMCTL_deassign_device: get_domain_by_id() failed\n");
             break;
         }
 
@@ -886,15 +883,15 @@ long arch_do_domctl(
         if ( !iommu_pv_enabled && !is_hvm_domain(d) )
         {
             ret = -ENOSYS;
-            put_domain(d);
-            break;
+            goto deassign_device_out;
         }
-        ret = 0;
         spin_lock(&pcidevs_lock);
         ret = deassign_device(d, bus, devfn);
         spin_unlock(&pcidevs_lock);
-        gdprintk(XENLOG_INFO, "XEN_DOMCTL_deassign_device: bdf = %x:%x.%x\n",
-            bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+        if ( ret )
+            gdprintk(XENLOG_ERR, "XEN_DOMCTL_deassign_device: "
+                     "deassign device (%x:%x.%x) failed\n",
+                     bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
 
     deassign_device_out:
         put_domain(d);
@@ -948,7 +945,7 @@ long arch_do_domctl(
         ret = -EPERM;
         if ( !IS_PRIV(current->domain) &&
              !irq_access_permitted(current->domain, bind->machine_irq) )
-            goto bind_out;
+            goto unbind_out;
 
         if ( iommu_enabled )
         {
@@ -958,6 +955,8 @@ long arch_do_domctl(
         }
         if ( ret < 0 )
             gdprintk(XENLOG_ERR, "pt_irq_destroy_bind failed!\n");
+
+    unbind_out:
         rcu_unlock_domain(d);
     }
     break;

@@ -354,8 +354,10 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         }
 
         ret = assign_device(d, bus, devfn);
-        gdprintk(XENLOG_INFO, "XEN_DOMCTL_assign_device: bdf = %x:%x.%x\n",
-                 bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+        if ( ret )
+            gdprintk(XENLOG_ERR, "XEN_DOMCTL_assign_device: "
+                     "assign device (%x:%x.%x) failed\n",
+                     bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
         put_domain(d);
     }
     break;
@@ -388,10 +390,14 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         if ( !device_assigned(bus, devfn) )
             break;
 
-        ret = 0;
-        deassign_device(d, bus, devfn);
-        gdprintk(XENLOG_INFO, "XEN_DOMCTL_deassign_device: bdf = %x:%x.%x\n",
-            bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+        spin_lock(&pcidevs_lock);
+        ret = deassign_device(d, bus, devfn);
+        spin_unlock(&pcidevs_lock);
+        if ( ret )
+            gdprintk(XENLOG_ERR, "XEN_DOMCTL_deassign_device: "
+                     "deassign device (%x:%x.%x) failed\n",
+                     bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+
         put_domain(d);
     }
     break;

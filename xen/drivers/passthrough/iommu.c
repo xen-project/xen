@@ -234,23 +234,31 @@ int deassign_device(struct domain *d, u8 bus, u8 devfn)
 {
     struct hvm_iommu *hd = domain_hvm_iommu(d);
     struct pci_dev *pdev = NULL;
+    int ret = 0;
 
     if ( !iommu_enabled || !hd->platform_ops )
         return -EINVAL;
 
     ASSERT(spin_is_locked(&pcidevs_lock));
     pdev = pci_get_pdev(bus, devfn);
-    if (!pdev)
+    if ( !pdev )
         return -ENODEV;
 
-    if (pdev->domain != d)
+    if ( pdev->domain != d )
     {
         gdprintk(XENLOG_ERR VTDPREFIX,
                 "IOMMU: deassign a device not owned\n");
         return -EINVAL;
     }
 
-    hd->platform_ops->reassign_device(d, dom0, bus, devfn);
+    ret = hd->platform_ops->reassign_device(d, dom0, bus, devfn);
+    if ( ret )
+    {
+        gdprintk(XENLOG_ERR VTDPREFIX,
+                 "Deassign device (%x:%x.%x) failed!\n",
+                 bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+        return ret;
+    }
 
     if ( !has_arch_pdevs(d) && need_iommu(d) )
     {
@@ -258,7 +266,7 @@ int deassign_device(struct domain *d, u8 bus, u8 devfn)
         hd->platform_ops->teardown(d);
     }
 
-    return 0;
+    return ret;
 }
 
 int iommu_setup(void)

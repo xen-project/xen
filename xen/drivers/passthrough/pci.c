@@ -286,7 +286,10 @@ void pci_release_devices(struct domain *d)
     {
         pci_cleanup_msi(pdev);
         bus = pdev->bus; devfn = pdev->devfn;
-        deassign_device(d, bus, devfn);
+        if ( deassign_device(d, bus, devfn) )
+            printk("domain %d: deassign device (%02x:%02x.%x) failed!\n",
+                   d->domain_id, pdev->bus, PCI_SLOT(pdev->devfn),
+                   PCI_FUNC(pdev->devfn));
     }
     spin_unlock(&pcidevs_lock);
 }
