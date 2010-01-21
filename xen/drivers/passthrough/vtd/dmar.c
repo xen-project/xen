@@ -453,7 +453,13 @@ acpi_parse_one_rmrr(struct acpi_dmar_entry_header *header)
             f = PCI_FUNC(rmrru->scope.devices[i]);
 
             if ( pci_device_detect(b, d, f) == 0 )
+            {
+                dprintk(XENLOG_WARNING VTDPREFIX,
+                    "  Non-existent device (%x:%x.%x) is reported "
+                    "in RMRR (%"PRIx64", %"PRIx64")'s scope!\n",
+                    b, d, f, rmrru->base_address, rmrru->end_address);
                 ignore = 1;
+            }
             else
             {
                 ignore = 0;
