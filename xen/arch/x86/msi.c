@@ -391,6 +391,21 @@ static void msi_set_mask_bit(unsigned int irq, int flag)
     entry->msi_attrib.masked = !!flag;
 }
 
+static int msi_get_mask_bit(const struct msi_desc *entry)
+{
+    switch (entry->msi_attrib.type) {
+    case PCI_CAP_ID_MSI:
+        if (!entry->dev || !entry->msi_attrib.maskbit)
+            break;
+        return pci_conf_read32(entry->dev->bus, PCI_SLOT(entry->dev->devfn),
+                               PCI_FUNC(entry->dev->devfn),
+                               (unsigned long)entry->mask_base) & 1;
+    case PCI_CAP_ID_MSIX:
+        return readl(entry->mask_base + PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET) & 1;
+    }
+    return -1;
+}
+
 void mask_msi_irq(unsigned int irq)
 {
     msi_set_mask_bit(irq, 1);
@@ -834,3 +849,65 @@ unsigned int pci_msix_get_table_len(struct pci_dev *pdev)
 
     return len;
 }
+
+static void dump_msi(unsigned char key)
+{
+    unsigned int irq;
+
+    printk("PCI-MSI interrupt information:\n");
+
+    for ( irq = 0; irq < nr_irqs; irq++ )
+    {
+        struct irq_desc *desc = irq_to_desc(irq);
+        const struct msi_desc *entry;
+        u32 addr, data;
+        unsigned long flags;
+        char type;
+
+        spin_lock_irqsave(&desc->lock, flags);
+
+        entry = desc->msi_desc;
+        type = desc->handler == &pci_msi_type && entry;
+
+        spin_unlock_irqrestore(&desc->lock, flags);
+
+        if ( !type )
+            continue;
+
+        switch ( entry->msi_attrib.type )
+        {
+        case PCI_CAP_ID_MSI: type = ' '; break;
+        case PCI_CAP_ID_MSIX: type = 'X'; break;
+        default: type = '?'; break;
+        }
+
+        data = entry->msg.data;
+        addr = entry->msg.address_lo;
+
+        printk(" MSI%c %4u vec=%02x%7s%6s%3sassert%5s%7s"
+               " dest=%08x mask=%d/%d/%d\n",
+               type, irq,
+               (data & MSI_DATA_VECTOR_MASK) >> MSI_DATA_VECTOR_SHIFT,
+               data & MSI_DATA_DELIVERY_LOWPRI ? "lowest" : "fixed",
+               data & MSI_DATA_TRIGGER_LEVEL ? "level" : "edge",
+               data & MSI_DATA_LEVEL_ASSERT ? "" : "de",
+               addr & MSI_ADDR_DESTMODE_LOGIC ? "log" : "phys",
+               addr & MSI_ADDR_REDIRECTION_LOWPRI ? "lowest" : "cpu",
+               entry->msg.dest32,
+               entry->msi_attrib.maskbit, entry->msi_attrib.masked,
+               msi_get_mask_bit(entry));
+    }
+}
+
+static struct keyhandler dump_msi_keyhandler = {
+    .diagnostic = 1,
+    .u.fn = dump_msi,
+    .desc = "dump MSI state"
+};
+
+static int __init msi_setup_keyhandler(void)
+{
+    register_keyhandler('M', &dump_msi_keyhandler);
+    return 0;
+}
+__initcall(msi_setup_keyhandler);
