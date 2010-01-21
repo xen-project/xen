@@ -1570,6 +1570,7 @@ static void dump_irqs(unsigned char key)
     irq_guest_action_t *action;
     struct domain *d;
     unsigned long flags;
+    char cpustr[NR_CPUS/4+NR_CPUS/32+2];
 
     printk("Guest interrupt information:\n");
 
@@ -1584,20 +1585,19 @@ static void dump_irqs(unsigned char key)
 
         spin_lock_irqsave(&desc->lock, flags);
 
+        cpumask_scnprintf(cpustr, sizeof(cpustr), desc->affinity);
+        printk("   IRQ:%4d affinity:%s vec:%02x type=%-15s"
+               " status=%08x ",
+               irq, cpustr, cfg->vector,
+               desc->handler->typename, desc->status);
+
         if ( !(desc->status & IRQ_GUEST) )
-            /* Only show CPU0 - CPU31's affinity info.*/
-            printk("   IRQ:%4d, IRQ affinity:0x%08x, Vec:%3d type=%-15s"
-                    " status=%08x mapped, unbound\n",
-                   irq, *(int*)desc->affinity.bits, cfg->vector,
-                    desc->handler->typename, desc->status);
+            printk("mapped, unbound\n");
         else
         {
             action = (irq_guest_action_t *)desc->action;
 
-            printk("   IRQ:%4d, IRQ affinity:0x%08x, Vec:%3d type=%-15s "
-                    "status=%08x in-flight=%d domain-list=",
-                   irq, *(int*)desc->affinity.bits, cfg->vector,
-                   desc->handler->typename, desc->status, action->in_flight);
+            printk("in-flight=%d domain-list=", action->in_flight);
 
             for ( i = 0; i < action->nr_guests; i++ )
             {
