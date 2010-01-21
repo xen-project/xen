@@ -68,7 +68,9 @@ def find_sysfs_mount():
                 continue
             if sline[2] == 'sysfs':
                 sysfs_mount_point= sline[1]
-                return sysfs_mount_point
+                break
+        mounts_file.close()
+        return sysfs_mount_point
     except IOError, (errno, strerr):
         raise
 

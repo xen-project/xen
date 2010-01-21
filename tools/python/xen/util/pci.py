@@ -441,6 +441,8 @@ def find_sysfs_mnt():
 
 def get_all_pci_names():
     sysfs_mnt = find_sysfs_mnt()
+    if sysfs_mnt is None:
+        return None
     pci_names = os.popen('ls ' + sysfs_mnt + SYSFS_PCI_DEVS_PATH).read().split()
     return pci_names
 
