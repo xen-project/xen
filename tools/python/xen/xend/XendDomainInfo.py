@@ -390,6 +390,14 @@ class XendDomainInfo:
             self.domid = domid
         self.guest_bitsize = None
         self.alloc_mem = None
+
+        maxmem = self.info.get('memory_static_max', 0)
+        memory = self.info.get('memory_dynamic_max', 0)
+
+        if maxmem > memory:
+            self.pod_enabled = True
+        else:
+            self.pod_enabled = False
         
         #REMOVE: uuid is now generated in XendConfig
         #if not self._infoIsSet('uuid'):
@@ -694,11 +702,18 @@ class XendDomainInfo:
 
         return self.hvm_pci_device_insert_dev(new_dev)
 
+    def iommu_check_pod_mode(self):
+        """ Disallow PCI device assignment if pod is enabled. """
+        if self.pod_enabled:
+            raise VmError("failed to assign device since pod is enabled")
+
     def pci_dev_check_assignability_and_do_FLR(self, config):
         """ In the case of static device assignment(i.e., the 'pci' string in
         guest config file), we check if the device(s) specified in the 'pci'
         can be  assigned to guest or not; if yes, we do_FLR the device(s).
         """
+
+        self.iommu_check_pod_mode()
         pci_dev_ctrl = self.getDeviceController('pci')
         return pci_dev_ctrl.dev_check_assignability_and_do_FLR(config)
 
@@ -707,6 +722,8 @@ class XendDomainInfo:
         check if the device can be attached to guest or not; if yes, we do_FLR
         the device.
         """
+
+        self.iommu_check_pod_mode()
 
         # Test whether the devices can be assigned
 
