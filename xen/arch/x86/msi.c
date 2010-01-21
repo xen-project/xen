@@ -327,27 +327,6 @@ static void msix_set_enable(struct pci_dev *dev, int enable)
     }
 }
 
-static void msix_flush_writes(unsigned int irq)
-{
-    struct msi_desc *entry = irq_desc[irq].msi_desc;
-
-    BUG_ON(!entry || !entry->dev);
-    switch (entry->msi_attrib.type) {
-    case PCI_CAP_ID_MSI:
-        /* nothing to do */
-        break;
-    case PCI_CAP_ID_MSIX:
-    {
-        int offset = PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET;
-        readl(entry->mask_base + offset);
-        break;
-    }
-    default:
-        BUG();
-        break;
-    }
-}
-
 int msi_maskable_irq(const struct msi_desc *entry)
 {
     BUG_ON(!entry);
@@ -409,13 +388,11 @@ static int msi_get_mask_bit(const struct msi_desc *entry)
 void mask_msi_irq(unsigned int irq)
 {
     msi_set_mask_bit(irq, 1);
-    msix_flush_writes(irq);
 }
 
 void unmask_msi_irq(unsigned int irq)
 {
     msi_set_mask_bit(irq, 0);
-    msix_flush_writes(irq);
 }
 
 static struct msi_desc* alloc_msi_entry(void)
