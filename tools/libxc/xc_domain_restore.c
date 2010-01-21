@@ -1171,6 +1171,8 @@ static int apply_batch(int xc_handle, uint32_t dom, struct restore_ctx *ctx,
     unsigned long *page = NULL;
     int nraces = 0;
     struct domain_info_context *dinfo = &ctx->dinfo;
+    int* pfn_err = NULL;
+    int rc = -1;
 
     unsigned long mfn, pfn, pagetype;
 
@@ -1186,12 +1188,14 @@ static int apply_batch(int xc_handle, uint32_t dom, struct restore_ctx *ctx,
     }
 
     /* Map relevant mfns */
-    region_base = xc_map_foreign_pages(
-        xc_handle, dom, PROT_WRITE, region_mfn, j);
+    pfn_err = calloc(j, sizeof(*pfn_err));
+    region_base = xc_map_foreign_bulk(
+        xc_handle, dom, PROT_WRITE, region_mfn, pfn_err, j);
 
     if ( region_base == NULL )
     {
         ERROR("map batch failed");
+        free(pfn_err);
         return -1;
     }
 
@@ -1204,12 +1208,18 @@ static int apply_batch(int xc_handle, uint32_t dom, struct restore_ctx *ctx,
             /* a bogus/unmapped page: skip it */
             continue;
 
+        if (pfn_err[i])
+        {
+            ERROR("unexpected PFN mapping failure");
+            goto err_mapped;
+        }
+
         ++curpage;
 
         if ( pfn > dinfo->p2m_size )
         {
             ERROR("pfn out of range");
-            return -1;
+            goto err_mapped;
         }
 
         pfn_type[pfn] = pagetype;
@@ -1257,7 +1267,7 @@ static int apply_batch(int xc_handle, uint32_t dom, struct restore_ctx *ctx,
         {
             ERROR("Bogus page type %lx page table is out of range: "
                   "i=%d p2m_size=%lu", pagetype, i, dinfo->p2m_size);
-            return -1;
+            goto err_mapped;
         }
 
         if ( pagebuf->verify )
@@ -1288,13 +1298,17 @@ static int apply_batch(int xc_handle, uint32_t dom, struct restore_ctx *ctx,
                                | MMU_MACHPHYS_UPDATE, pfn) )
         {
             ERROR("failed machpys update mfn=%lx pfn=%lx", mfn, pfn);
-            return -1;
+            goto err_mapped;
         }
     } /* end of 'batch' for loop */
 
-    munmap(region_base, j*PAGE_SIZE);
+    rc = nraces;
 
-    return nraces;
+  err_mapped:
+    munmap(region_base, j*PAGE_SIZE);
+    free(pfn_err);
+
+    return rc;
 }
 
 int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
