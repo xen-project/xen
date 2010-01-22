@@ -360,7 +360,7 @@ void *xc_map_foreign_pages(int xc_handle, uint32_t dom, int prot,
         return NULL;
     }
 
-    err = calloc(num, sizeof(*err));
+    err = malloc(num * sizeof(*err));
     if (!err)
         return NULL;
 
@@ -397,7 +397,7 @@ xc_map_foreign_bulk(int xc_handle, uint32_t dom, int prot,
         return NULL;
     }
 
-    pfn = calloc(num, sizeof(*pfn));
+    pfn = malloc(num * sizeof(*pfn));
     if (!pfn) {
         errno = ENOMEM;
         return NULL;
@@ -416,7 +416,8 @@ xc_map_foreign_bulk(int xc_handle, uint32_t dom, int prot,
                 err[i] = -EINVAL;
                 break;
             }
-    }
+    } else
+        memset(err, 0, num * sizeof(*err));
 
     free(pfn);
 

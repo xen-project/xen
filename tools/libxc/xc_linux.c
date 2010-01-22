@@ -186,7 +186,7 @@ void *xc_map_foreign_bulk(int xc_handle, uint32_t dom, int prot,
          * IOCTL_PRIVCMD_MMAPBATCH_V2 is not supported - fall back to
          * IOCTL_PRIVCMD_MMAPBATCH.
          */
-        xen_pfn_t *pfn = calloc(num, sizeof(*pfn));
+        xen_pfn_t *pfn = malloc(num * sizeof(*pfn));
 
         if ( pfn )
         {

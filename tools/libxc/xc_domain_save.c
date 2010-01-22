@@ -1059,7 +1059,8 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     pfn_type   = xc_memalign(PAGE_SIZE, ROUNDUP(
                               MAX_BATCH_SIZE * sizeof(*pfn_type), PAGE_SHIFT));
     pfn_batch  = calloc(MAX_BATCH_SIZE, sizeof(*pfn_batch));
-    if ( (pfn_type == NULL) || (pfn_batch == NULL) )
+    pfn_err    = malloc(MAX_BATCH_SIZE * sizeof(*pfn_err));
+    if ( (pfn_type == NULL) || (pfn_batch == NULL) || (pfn_err == NULL) )
     {
         ERROR("failed to alloc memory for pfn_type and/or pfn_batch arrays");
         errno = ENOMEM;
@@ -1273,7 +1274,6 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             if ( batch == 0 )
                 goto skip; /* vanishingly unlikely... */
 
-            pfn_err = realloc(pfn_err, sizeof(int) * batch);
             region_base = xc_map_foreign_bulk(
                 xc_handle, dom, PROT_READ, pfn_type, pfn_err, batch);
             if ( region_base == NULL )
