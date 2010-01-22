@@ -232,8 +232,11 @@ static int check_sharing(struct xs_handle *h, struct backend_info *be)
 			ret = -1;
 			break;
 		}
+		cur_dom_uuid = NULL;
 		xs_gather(h, path, "vm", NULL, &cur_dom_uuid, NULL);
 		free(path);
+		if (!cur_dom_uuid)
+			continue;
 
 		if (!strcmp(cur_dom_uuid, dom_uuid)) {
 			free(cur_dom_uuid);
@@ -256,8 +259,11 @@ static int check_sharing(struct xs_handle *h, struct backend_info *be)
 				ret = -1;
 				break;
 			}
+			params = NULL;
 			xs_gather(h, path, "params", NULL, &params, NULL);
 			free(path);
+			if (!params)
+				continue;
 
 			image_path[1] = get_image_path(params);
 			if (!strcmp(image_path[0], image_path[1])) {
