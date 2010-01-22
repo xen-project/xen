@@ -175,29 +175,29 @@ int xc_hvm_set_pci_intx_level(
     unsigned int level)
 {
     DECLARE_HYPERCALL;
-    struct xen_hvm_set_pci_intx_level arg;
+    struct xen_hvm_set_pci_intx_level _arg, *arg = &_arg;
     int rc;
 
-    hypercall.op     = __HYPERVISOR_hvm_op;
-    hypercall.arg[0] = HVMOP_set_pci_intx_level;
-    hypercall.arg[1] = (unsigned long)&arg;
-
-    arg.domid  = dom;
-    arg.domain = domain;
-    arg.bus    = bus;
-    arg.device = device;
-    arg.intx   = intx;
-    arg.level  = level;
-
-    if ( (rc = lock_pages(&arg, sizeof(arg))) != 0 )
+    if ( (rc = hcall_buf_prep((void **)&arg, sizeof(*arg))) != 0 )
     {
         PERROR("Could not lock memory");
         return rc;
     }
 
+    hypercall.op     = __HYPERVISOR_hvm_op;
+    hypercall.arg[0] = HVMOP_set_pci_intx_level;
+    hypercall.arg[1] = (unsigned long)arg;
+
+    arg->domid  = dom;
+    arg->domain = domain;
+    arg->bus    = bus;
+    arg->device = device;
+    arg->intx   = intx;
+    arg->level  = level;
+
     rc = do_xen_hypercall(xc_handle, &hypercall);
 
-    unlock_pages(&arg, sizeof(arg));
+    hcall_buf_release((void **)&arg, sizeof(*arg));
 
     return rc;
 }
@@ -208,26 +208,26 @@ int xc_hvm_set_isa_irq_level(
     unsigned int level)
 {
     DECLARE_HYPERCALL;
-    struct xen_hvm_set_isa_irq_level arg;
+    struct xen_hvm_set_isa_irq_level _arg, *arg = &_arg;
     int rc;
 
-    hypercall.op     = __HYPERVISOR_hvm_op;
-    hypercall.arg[0] = HVMOP_set_isa_irq_level;
-    hypercall.arg[1] = (unsigned long)&arg;
-
-    arg.domid   = dom;
-    arg.isa_irq = isa_irq;
-    arg.level   = level;
-
-    if ( (rc = lock_pages(&arg, sizeof(arg))) != 0 )
+    if ( (rc = hcall_buf_prep((void **)&arg, sizeof(*arg))) != 0 )
     {
         PERROR("Could not lock memory");
         return rc;
     }
 
+    hypercall.op     = __HYPERVISOR_hvm_op;
+    hypercall.arg[0] = HVMOP_set_isa_irq_level;
+    hypercall.arg[1] = (unsigned long)arg;
+
+    arg->domid   = dom;
+    arg->isa_irq = isa_irq;
+    arg->level   = level;
+
     rc = do_xen_hypercall(xc_handle, &hypercall);
 
-    unlock_pages(&arg, sizeof(arg));
+    hcall_buf_release((void **)&arg, sizeof(*arg));
 
     return rc;
 }

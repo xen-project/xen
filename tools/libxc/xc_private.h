@@ -78,8 +78,13 @@ void xc_set_error(int code, const char *fmt, ...);
 #define PERROR(_m, _a...) xc_set_error(XC_INTERNAL_ERROR, _m " (%d = %s)", \
                                        ## _a , errno, safe_strerror(errno))
 
+void *xc_memalign(size_t alignment, size_t size);
+
 int lock_pages(void *addr, size_t len);
 void unlock_pages(void *addr, size_t len);
+
+int hcall_buf_prep(void **addr, size_t len);
+void hcall_buf_release(void **addr, size_t len);
 
 static inline void safe_munlock(const void *addr, size_t len)
 {
@@ -101,20 +106,21 @@ static inline int do_xen_version(int xc_handle, int cmd, void *dest)
     return do_xen_hypercall(xc_handle, &hypercall);
 }
 
-static inline int do_physdev_op(int xc_handle, int cmd, void *op)
+static inline int do_physdev_op(int xc_handle, int cmd, void *op, size_t len)
 {
     int ret = -1;
 
     DECLARE_HYPERCALL;
-    hypercall.op = __HYPERVISOR_physdev_op;
-    hypercall.arg[0] = (unsigned long) cmd;
-    hypercall.arg[1] = (unsigned long) op;
 
-    if ( lock_pages(op, sizeof(*op)) != 0 )
+    if ( hcall_buf_prep(&op, len) != 0 )
     {
         PERROR("Could not lock memory for Xen hypercall");
         goto out1;
     }
+
+    hypercall.op = __HYPERVISOR_physdev_op;
+    hypercall.arg[0] = (unsigned long) cmd;
+    hypercall.arg[1] = (unsigned long) op;
 
     if ( (ret = do_xen_hypercall(xc_handle, &hypercall)) < 0 )
     {
@@ -123,7 +129,7 @@ static inline int do_physdev_op(int xc_handle, int cmd, void *op)
                     " rebuild the user-space tool set?\n");
     }
 
-    unlock_pages(op, sizeof(*op));
+    hcall_buf_release(&op, len);
 
 out1:
     return ret;
@@ -134,16 +140,16 @@ static inline int do_domctl(int xc_handle, struct xen_domctl *domctl)
     int ret = -1;
     DECLARE_HYPERCALL;
 
-    domctl->interface_version = XEN_DOMCTL_INTERFACE_VERSION;
-
-    hypercall.op     = __HYPERVISOR_domctl;
-    hypercall.arg[0] = (unsigned long)domctl;
-
-    if ( lock_pages(domctl, sizeof(*domctl)) != 0 )
+    if ( hcall_buf_prep((void **)&domctl, sizeof(*domctl)) != 0 )
     {
         PERROR("Could not lock memory for Xen hypercall");
         goto out1;
     }
+
+    domctl->interface_version = XEN_DOMCTL_INTERFACE_VERSION;
+
+    hypercall.op     = __HYPERVISOR_domctl;
+    hypercall.arg[0] = (unsigned long)domctl;
 
     if ( (ret = do_xen_hypercall(xc_handle, &hypercall)) < 0 )
     {
@@ -152,7 +158,7 @@ static inline int do_domctl(int xc_handle, struct xen_domctl *domctl)
                     " rebuild the user-space tool set?\n");
     }
 
-    unlock_pages(domctl, sizeof(*domctl));
+    hcall_buf_release((void **)&domctl, sizeof(*domctl));
 
  out1:
     return ret;
@@ -163,16 +169,16 @@ static inline int do_sysctl(int xc_handle, struct xen_sysctl *sysctl)
     int ret = -1;
     DECLARE_HYPERCALL;
 
-    sysctl->interface_version = XEN_SYSCTL_INTERFACE_VERSION;
-
-    hypercall.op     = __HYPERVISOR_sysctl;
-    hypercall.arg[0] = (unsigned long)sysctl;
-
-    if ( lock_pages(sysctl, sizeof(*sysctl)) != 0 )
+    if ( hcall_buf_prep((void **)&sysctl, sizeof(*sysctl)) != 0 )
     {
         PERROR("Could not lock memory for Xen hypercall");
         goto out1;
     }
+
+    sysctl->interface_version = XEN_SYSCTL_INTERFACE_VERSION;
+
+    hypercall.op     = __HYPERVISOR_sysctl;
+    hypercall.arg[0] = (unsigned long)sysctl;
 
     if ( (ret = do_xen_hypercall(xc_handle, &hypercall)) < 0 )
     {
@@ -181,7 +187,7 @@ static inline int do_sysctl(int xc_handle, struct xen_sysctl *sysctl)
                     " rebuild the user-space tool set?\n");
     }
 
-    unlock_pages(sysctl, sizeof(*sysctl));
+    hcall_buf_release((void **)&sysctl, sizeof(*sysctl));
 
  out1:
     return ret;

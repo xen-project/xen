@@ -183,22 +183,6 @@ __attribute__((weak))
     return -1;
 }
 
-void *xg_memalign(size_t alignment, size_t size)
-{
-#if defined(_POSIX_C_SOURCE) && !defined(__sun__)
-    int ret;
-    void *ptr;
-    ret = posix_memalign(&ptr, alignment, size);
-    if (ret != 0)
-        return NULL;
-    return ptr;
-#elif defined(__NetBSD__) || defined(__OpenBSD__)
-    return valloc(size);
-#else
-    return memalign(alignment, size);
-#endif
-}
-
 /*
  * Local variables:
  * mode: C

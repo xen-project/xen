@@ -8,6 +8,9 @@
 #include "xc_private.h"
 #include "xg_private.h"
 #include <stdarg.h>
+#include <stdlib.h>
+#include <malloc.h>
+#include <unistd.h>
 #include <pthread.h>
 
 static pthread_key_t last_error_pkey;
@@ -126,27 +129,119 @@ void xc_set_error(int code, const char *fmt, ...)
     }
 }
 
+#ifdef __sun__
+
+int lock_pages(void *addr, size_t len) { return 0; }
+void unlock_pages(void *addr, size_t len) { }
+
+int hcall_buf_prep(void **addr, size_t len) { return 0; }
+void hcall_buf_release(void **addr, size_t len) { }
+
+#else /* !__sun__ */
+
 int lock_pages(void *addr, size_t len)
 {
-      int e = 0;
-#ifndef __sun__
+      int e;
       void *laddr = (void *)((unsigned long)addr & PAGE_MASK);
       size_t llen = (len + ((unsigned long)addr - (unsigned long)laddr) +
                      PAGE_SIZE - 1) & PAGE_MASK;
       e = mlock(laddr, llen);
-#endif
       return e;
 }
 
 void unlock_pages(void *addr, size_t len)
 {
-#ifndef __sun__
     void *laddr = (void *)((unsigned long)addr & PAGE_MASK);
     size_t llen = (len + ((unsigned long)addr - (unsigned long)laddr) +
                    PAGE_SIZE - 1) & PAGE_MASK;
     safe_munlock(laddr, llen);
-#endif
 }
+
+static pthread_key_t hcall_buf_pkey;
+static pthread_once_t hcall_buf_pkey_once = PTHREAD_ONCE_INIT;
+struct hcall_buf {
+    void *buf;
+    void *oldbuf;
+};
+
+static void _xc_clean_hcall_buf(void *m)
+{
+    struct hcall_buf *hcall_buf = m;
+
+    if ( hcall_buf )
+    {
+        if ( hcall_buf->buf )
+        {
+            unlock_pages(hcall_buf->buf, PAGE_SIZE);
+            free(hcall_buf->buf);
+        }
+
+        free(hcall_buf);
+    }
+
+    pthread_setspecific(hcall_buf_pkey, NULL);
+}
+
+static void _xc_init_hcall_buf(void)
+{
+    pthread_key_create(&hcall_buf_pkey, _xc_clean_hcall_buf);
+}
+
+int hcall_buf_prep(void **addr, size_t len)
+{
+    struct hcall_buf *hcall_buf;
+
+    pthread_once(&hcall_buf_pkey_once, _xc_init_hcall_buf);
+
+    hcall_buf = pthread_getspecific(hcall_buf_pkey);
+    if ( !hcall_buf )
+    {
+        hcall_buf = calloc(1, sizeof(*hcall_buf));
+        if ( !hcall_buf )
+            goto out;
+        pthread_setspecific(hcall_buf_pkey, hcall_buf);
+    }
+
+    if ( !hcall_buf->buf )
+    {
+        hcall_buf->buf = xc_memalign(PAGE_SIZE, PAGE_SIZE);
+        if ( !hcall_buf->buf || lock_pages(hcall_buf->buf, PAGE_SIZE) )
+        {
+            free(hcall_buf->buf);
+            hcall_buf->buf = NULL;
+            goto out;
+        }
+    }
+
+    if ( (len < PAGE_SIZE) && !hcall_buf->oldbuf )
+    {
+        memcpy(hcall_buf->buf, *addr, len);
+        hcall_buf->oldbuf = *addr;
+        *addr = hcall_buf->buf;
+        return 0;
+    }
+
+ out:
+    return lock_pages(*addr, len);
+}
+
+void hcall_buf_release(void **addr, size_t len)
+{
+    struct hcall_buf *hcall_buf = pthread_getspecific(hcall_buf_pkey);
+
+    if ( hcall_buf && (hcall_buf->buf == *addr) )
+    {
+        memcpy(hcall_buf->oldbuf, *addr, len);
+        *addr = hcall_buf->oldbuf;
+        hcall_buf->oldbuf = NULL;
+    }
+    else
+    {
+        unlock_pages(*addr, len);
+    }
+}
+
+#endif
 
 /* NB: arr must be locked */
 int xc_get_pfn_type_batch(int xc_handle, uint32_t dom,
@@ -169,21 +264,21 @@ int xc_mmuext_op(
     DECLARE_HYPERCALL;
     long ret = -EINVAL;
 
+    if ( hcall_buf_prep((void **)&op, nr_ops*sizeof(*op)) != 0 )
+    {
+        PERROR("Could not lock memory for Xen hypercall");
+        goto out1;
+    }
+
     hypercall.op     = __HYPERVISOR_mmuext_op;
     hypercall.arg[0] = (unsigned long)op;
     hypercall.arg[1] = (unsigned long)nr_ops;
     hypercall.arg[2] = (unsigned long)0;
     hypercall.arg[3] = (unsigned long)dom;
 
-    if ( lock_pages(op, nr_ops*sizeof(*op)) != 0 )
-    {
-        PERROR("Could not lock memory for Xen hypercall");
-        goto out1;
-    }
-
     ret = do_xen_hypercall(xc_handle, &hypercall);
 
-    unlock_pages(op, nr_ops*sizeof(*op));
+    hcall_buf_release((void **)&op, nr_ops*sizeof(*op));
 
  out1:
     return ret;
@@ -654,6 +749,22 @@ int xc_ffs64(uint64_t x)
 {
     uint32_t h = x>>32, l = x;
     return l ? xc_ffs32(l) : h ? xc_ffs32(h) + 32 : 0;
+}
+
+void *xc_memalign(size_t alignment, size_t size)
+{
+#if defined(_POSIX_C_SOURCE) && !defined(__sun__)
+    int ret;
+    void *ptr;
+    ret = posix_memalign(&ptr, alignment, size);
+    if (ret != 0)
+        return NULL;
+    return ptr;
+#elif defined(__NetBSD__) || defined(__OpenBSD__)
+    return valloc(size);
+#else
+    return memalign(alignment, size);
+#endif
 }
 
 /*

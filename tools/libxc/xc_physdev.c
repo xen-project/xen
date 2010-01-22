@@ -36,7 +36,7 @@ int xc_physdev_map_pirq(int xc_handle,
     map.index = index;
     map.pirq = *pirq;
 
-    rc = do_physdev_op(xc_handle, PHYSDEVOP_map_pirq, &map);
+    rc = do_physdev_op(xc_handle, PHYSDEVOP_map_pirq, &map, sizeof(map));
 
     if ( !rc )
         *pirq = map.pirq;
@@ -68,7 +68,7 @@ int xc_physdev_map_pirq_msi(int xc_handle,
     map.entry_nr = entry_nr;
     map.table_base = table_base;
 
-    rc = do_physdev_op(xc_handle, PHYSDEVOP_map_pirq, &map);
+    rc = do_physdev_op(xc_handle, PHYSDEVOP_map_pirq, &map, sizeof(map));
 
     if ( !rc )
         *pirq = map.pirq;
@@ -86,7 +86,7 @@ int xc_physdev_unmap_pirq(int xc_handle,
     unmap.domid = domid;
     unmap.pirq = pirq;
 
-    rc = do_physdev_op(xc_handle, PHYSDEVOP_unmap_pirq, &unmap);
+    rc = do_physdev_op(xc_handle, PHYSDEVOP_unmap_pirq, &unmap, sizeof(unmap));
 
     return rc;
 }

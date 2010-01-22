@@ -1012,9 +1012,9 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     sent_last_iter = dinfo->p2m_size;
 
     /* Setup to_send / to_fix and to_skip bitmaps */
-    to_send = xg_memalign(PAGE_SIZE, ROUNDUP(BITMAP_SIZE, PAGE_SHIFT)); 
+    to_send = xc_memalign(PAGE_SIZE, ROUNDUP(BITMAP_SIZE, PAGE_SHIFT)); 
     to_fix  = calloc(1, BITMAP_SIZE);
-    to_skip = xg_memalign(PAGE_SIZE, ROUNDUP(BITMAP_SIZE, PAGE_SHIFT)); 
+    to_skip = xc_memalign(PAGE_SIZE, ROUNDUP(BITMAP_SIZE, PAGE_SHIFT)); 
 
     if ( !to_send || !to_fix || !to_skip )
     {
@@ -1056,7 +1056,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
     analysis_phase(xc_handle, dom, ctx, to_skip, 0);
 
-    pfn_type   = xg_memalign(PAGE_SIZE, ROUNDUP(
+    pfn_type   = xc_memalign(PAGE_SIZE, ROUNDUP(
                               MAX_BATCH_SIZE * sizeof(*pfn_type), PAGE_SHIFT));
     pfn_batch  = calloc(MAX_BATCH_SIZE, sizeof(*pfn_batch));
     if ( (pfn_type == NULL) || (pfn_batch == NULL) )

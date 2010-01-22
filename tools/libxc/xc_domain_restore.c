@@ -1424,7 +1424,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     ctx->p2m   = calloc(dinfo->p2m_size, sizeof(xen_pfn_t));
     pfn_type   = calloc(dinfo->p2m_size, sizeof(unsigned long));
 
-    region_mfn = xg_memalign(PAGE_SIZE, ROUNDUP(
+    region_mfn = xc_memalign(PAGE_SIZE, ROUNDUP(
                               MAX_BATCH_SIZE * sizeof(xen_pfn_t), PAGE_SHIFT));
 
     if ( (ctx->p2m == NULL) || (pfn_type == NULL) ||

@@ -177,6 +177,4 @@ struct domain_info_context {
 int pin_table(int xc_handle, unsigned int type, unsigned long mfn,
               domid_t dom);
 
-void *xg_memalign(size_t alignment, size_t size);
-
 #endif /* XG_PRIVATE_H */
