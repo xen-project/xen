@@ -14,7 +14,8 @@ CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenguest) $(CFLAGS_libxenstore)
 
 LIBS = $(LDFLAGS_libxenctrl) $(LDFLAGS_libxenguest) $(LDFLAGS_libxenstore)
 
-LIBCONFIG_URL ?= http://www.hyperrealm.com/libconfig
+#LIBCONFIG_URL ?= http://www.hyperrealm.com/libconfig
+LIBCONFIG_URL = $(XEN_EXTFILES_URL)
 LIBCONFIG_SOURCE = libconfig-1.3.2
 LIBCONFIG_OUTPUT = $(LIBCONFIG_SOURCE)/.libs
 
