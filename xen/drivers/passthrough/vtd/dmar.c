@@ -396,8 +396,49 @@ acpi_parse_one_drhd(struct acpi_dmar_entry_header *header)
 
     if ( ret )
         xfree(dmaru);
-    else
+    else if ( force_iommu || dmaru->include_all )
         acpi_register_drhd_unit(dmaru);
+    else
+    {
+        u8 b, d, f;
+        int i, invalid_cnt = 0;
+
+        for ( i = 0; i < dmaru->scope.devices_cnt; i++ )
+        {
+            b = PCI_BUS(dmaru->scope.devices[i]);
+            d = PCI_SLOT(dmaru->scope.devices[i]);
+            f = PCI_FUNC(dmaru->scope.devices[i]);
+
+            if ( pci_device_detect(b, d, f) == 0 )
+            {
+                dprintk(XENLOG_WARNING VTDPREFIX,
+                    "  Non-existent device (%x:%x.%x) is reported "
+                    "in this DRHD's scope!\n", b, d, f);
+                invalid_cnt++;
+            }
+        }
+
+        if ( invalid_cnt )
+        {
+            xfree(dmaru);
+            if ( invalid_cnt == dmaru->scope.devices_cnt )
+            {
+                dprintk(XENLOG_WARNING VTDPREFIX,
+                    "  Ignore the DRHD due to all devices under "
+                    "its scope are not PCI discoverable!\n");
+            }
+            else
+            {
+                dprintk(XENLOG_WARNING VTDPREFIX,
+                    "  The DRHD is invalid due to some devices under "
+                    "its scope are not PCI discoverable!\n");
+                ret = -EINVAL;
+            }
+        }
+        else
+            acpi_register_drhd_unit(dmaru);
+    }
+
     return ret;
 }
 
