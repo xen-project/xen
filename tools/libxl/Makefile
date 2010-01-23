@@ -44,7 +44,7 @@ $(LIBCONFIG_SOURCE).tar.gz:
 
 $(LIBCONFIG_OUTPUT)/libconfig.so: $(LIBCONFIG_SOURCE).tar.gz
 	[ ! -d "$(LIBCONFIG_SOURCE)" ] && tar xzf $<
-	cd $(LIBCONFIG_SOURCE) && ./configure --prefix=$(DESTDIR)$(PREFIX) --disable-cxx && $(MAKE)
+	cd $(LIBCONFIG_SOURCE) && ./configure --prefix=$(PREFIX) --libdir=$(LIBDIR) --disable-cxx && $(MAKE)
 
 xl.o: $(LIBCONFIG_OUTPUT)/libconfig.so xl.c
 	$(CC) $(CFLAGS) -I$(LIBCONFIG_SOURCE) -c xl.c
@@ -60,7 +60,7 @@ install: all
 	ln -sf libxenlight.so.$(MAJOR) $(DESTDIR)$(LIBDIR)/libxenlight.so
 	$(INSTALL_DATA) libxenlight.a $(DESTDIR)$(LIBDIR)
 	$(INSTALL_DATA) libxl.h $(DESTDIR)$(INCLUDEDIR)
-	cd $(LIBCONFIG_SOURCE) && DESTDIR= $(MAKE) install
+	cd $(LIBCONFIG_SOURCE) && DESTDIR=$(DESTDIR) $(MAKE) install
 
 .PHONY: clean
 clean:
