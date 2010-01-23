@@ -62,6 +62,13 @@ MODULE_AUTHOR("ssmith@xensource.com");
 MODULE_DESCRIPTION("Xen platform PCI device");
 MODULE_LICENSE("GPL");
 
+/* NB. [aux-]ide-disks options do not unplug IDE CD-ROM drives. */
+/* NB. aux-ide-disks is equiv to ide-disks except ignores primary master. */
+static char *dev_unplug;
+module_param(dev_unplug, charp, 0644);
+MODULE_PARM_DESC(dev_unplug, "Emulated devices to unplug: "
+		 "[all,][ide-disks,][aux-ide-disks,][nics]\n");
+
 struct pci_dev *xen_platform_pdev;
 
 static unsigned long shared_info_frame;
@@ -272,19 +279,43 @@ int gnttab_init(void);
 #define XEN_IOPORT_LINUX_PRODNUM 0xffff /* NB: register a proper one */
 #define XEN_IOPORT_LINUX_DRVVER  ((LINUX_VERSION_CODE << 8) + 0x0)
 
+#define UNPLUG_ALL_IDE_DISKS 1
+#define UNPLUG_ALL_NICS 2
+#define UNPLUG_AUX_IDE_DISKS 4
+#define UNPLUG_ALL 7
+
 static int check_platform_magic(struct device *dev, long ioaddr, long iolen)
 {
-	short magic;
-	char protocol;
+	short magic, unplug = 0;
+	char protocol, *p, *q, *err;
 
-	if (iolen < 0x16)
-		return -ENODEV;
+	for (p = dev_unplug; p; p = q) {
+		q = strchr(dev_unplug, ',');
+		if (q)
+			*q++ = '\0';
+		if (!strcmp(p, "all"))
+			unplug |= UNPLUG_ALL;
+		else if (!strcmp(p, "ide-disks"))
+			unplug |= UNPLUG_ALL_IDE_DISKS;
+		else if (!strcmp(p, "aux-ide-disks"))
+			unplug |= UNPLUG_AUX_IDE_DISKS;
+		else if (!strcmp(p, "nics"))
+			unplug |= UNPLUG_ALL_NICS;
+		else
+			dev_warn(dev, "unrecognised option '%s' "
+				 "in module parameter 'dev_unplug'\n", p);
+	}
+
+	if (iolen < 0x16) {
+		err = "backend too old";
+		goto no_dev;
+	}
 
 	magic = inw(XEN_IOPORT_MAGIC);
 
 	if (magic != XEN_IOPORT_MAGIC_VAL) {
-		dev_err(dev, "invalid magic %#x", magic);
-		return -ENODEV;
+		err = "unrecognised magic value";
+		goto no_dev;
 	}
 
 	protocol = inb(XEN_IOPORT_PROTOVER);
@@ -293,8 +324,8 @@ static int check_platform_magic(struct device *dev, long ioaddr, long iolen)
 
 	switch (protocol) {
 	case 1:
-		outw(XEN_IOPORT_PRODNUM, 0xbeef);
-		outl(XEN_IOPORT_DRVVER, 0xdead);
+		outw(XEN_IOPORT_PRODNUM, XEN_IOPORT_LINUX_PRODNUM);
+		outl(XEN_IOPORT_DRVVER, XEN_IOPORT_LINUX_DRVVER);
 		if (inw(XEN_IOPORT_MAGIC) != XEN_IOPORT_MAGIC_VAL) {
 			dev_err(dev, "blacklisted by host\n");
 			return -ENODEV;
@@ -304,11 +335,18 @@ static int check_platform_magic(struct device *dev, long ioaddr, long iolen)
 		outw(XEN_IOPORT_UNPLUG, 0xf);
 		break;
 	default:
-		dev_err(dev, "unknown qemu version\n");
-		return -ENODEV;
+		err = "unknown I/O protocol version";
+		goto no_dev;
 	}
 
 	return 0;
+
+ no_dev:
+	dev_warn(dev, "failed backend handshake: %s\n", err);
+	if (!unplug)
+		return 0;
+	dev_err(dev, "failed to execute specified dev_unplug options!\n");
+	return -ENODEV;
 }
 
 static int __devinit platform_pci_init(struct pci_dev *pdev,
