@@ -150,7 +150,8 @@ QEMU_REMOTE=http://xenbits.xensource.com/git-http/qemu-xen-unstable.git
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= a0066d08514ecfec34c717c7184250e95519f39c
+QEMU_TAG := xen-4.0.0-rc2
+#QEMU_TAG ?= a0066d08514ecfec34c717c7184250e95519f39c
 # Thu Jan 14 18:27:13 2010 +0000
 # use new (replacement) mmap-batch ioctl
 
