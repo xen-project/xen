@@ -29,6 +29,7 @@
 extern int iommu_enabled;
 extern int iommu_pv_enabled;
 extern int force_iommu;
+extern int iommu_workaround_bios_bug;
 extern int iommu_passthrough;
 extern int iommu_snoop;
 extern int iommu_qinval;

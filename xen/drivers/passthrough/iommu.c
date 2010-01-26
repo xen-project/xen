@@ -30,6 +30,8 @@ static int iommu_populate_page_table(struct domain *d);
  *   pv                         Enable IOMMU for PV domains
  *   no-pv                      Disable IOMMU for PV domains (default)
  *   force|required             Don't boot unless IOMMU is enabled
+ *   workaround_bios_bug        Workaround some bios issue to still enable
+                                VT-d, don't guarantee security
  *   passthrough                Enable VT-d DMA passthrough (no DMA
  *                              translation for Dom0)
  *   no-snoop                   Disable VT-d Snoop Control
@@ -40,6 +42,7 @@ custom_param("iommu", parse_iommu_param);
 int iommu_enabled = 1;
 int iommu_pv_enabled;
 int force_iommu;
+int iommu_workaround_bios_bug;
 int iommu_passthrough;
 int iommu_snoop = 1;
 int iommu_qinval = 1;
@@ -65,6 +68,8 @@ static void __init parse_iommu_param(char *s)
             iommu_pv_enabled = 0;
         else if ( !strcmp(s, "force") || !strcmp(s, "required") )
             force_iommu = 1;
+        else if ( !strcmp(s, "workaround_bios_bug") )
+            iommu_workaround_bios_bug = 1;
         else if ( !strcmp(s, "passthrough") )
             iommu_passthrough = 1;
         else if ( !strcmp(s, "no-snoop") )

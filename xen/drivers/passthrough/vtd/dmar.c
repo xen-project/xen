@@ -421,17 +421,21 @@ acpi_parse_one_drhd(struct acpi_dmar_entry_header *header)
         if ( invalid_cnt )
         {
             xfree(dmaru);
-            if ( invalid_cnt == dmaru->scope.devices_cnt )
+
+            if ( iommu_workaround_bios_bug &&
+                 invalid_cnt == dmaru->scope.devices_cnt )
             {
                 dprintk(XENLOG_WARNING VTDPREFIX,
-                    "  Ignore the DRHD due to all devices under "
-                    "its scope are not PCI discoverable!\n");
+                    "  Workaround BIOS bug: ignore the DRHD due to all "
+                    "devices under its scope are not PCI discoverable!\n");
             }
             else
             {
                 dprintk(XENLOG_WARNING VTDPREFIX,
-                    "  The DRHD is invalid due to some devices under "
-                    "its scope are not PCI discoverable!\n");
+                    "  The DRHD is invalid due to there are devices under "
+                    "its scope are not PCI discoverable! Pls try option "
+                    "iommu=force or iommu=workaround_bios_bug if you "
+                    "really want VT-d\n");
                 ret = -EINVAL;
             }
         }
