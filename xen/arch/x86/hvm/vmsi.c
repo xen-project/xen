@@ -92,11 +92,8 @@ int vmsi_deliver(struct domain *d, int pirq)
     case dest_LowestPrio:
     {
         target = vlapic_lowest_prio(d, NULL, 0, dest, dest_mode);
-        if ( target != NULL ) {
+        if ( target != NULL )
             vmsi_inj_irq(d, target, vector, trig_mode, delivery_mode);
-            hvm_irq_dpci->mirq[pirq].gmsi.old_gvec =
-                                    hvm_irq_dpci->mirq[pirq].gmsi.gvec;
-        }
         else
             HVM_DBG_LOG(DBG_LEVEL_IOAPIC, "null round robin: "
                         "vector=%x delivery_mode=%x\n",
@@ -109,12 +106,9 @@ int vmsi_deliver(struct domain *d, int pirq)
     {
         for_each_vcpu ( d, v )
             if ( vlapic_match_dest(vcpu_vlapic(v), NULL,
-                                   0, dest, dest_mode) ) {
+                                   0, dest, dest_mode) )
                 vmsi_inj_irq(d, vcpu_vlapic(v),
                              vector, trig_mode, delivery_mode);
-                hvm_irq_dpci->mirq[pirq].gmsi.old_gvec =
-                                    hvm_irq_dpci->mirq[pirq].gmsi.gvec;
-            }
         break;
     }
 
