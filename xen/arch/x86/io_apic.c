@@ -1529,7 +1529,7 @@ static void mask_and_ack_level_ioapic_irq (unsigned int irq)
        !io_apic_level_ack_pending(irq))
         move_native_irq(irq);
 
-    if (!(v & (1 << (i & 0x1f)))) {
+    if (!directed_eoi_enabled && !(v & (1 << (i & 0x1f)))) {
         atomic_inc(&irq_mis_count);
         spin_lock(&ioapic_lock);
         __edge_IO_APIC_irq(irq);
