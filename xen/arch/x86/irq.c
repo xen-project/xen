@@ -753,8 +753,8 @@ struct pending_eoi {
     u32 vector:8; /* vector awaiting EOI */
 };
 
-static DEFINE_PER_CPU(struct pending_eoi, pending_eoi[NR_VECTORS]);
-#define pending_eoi_sp(p) ((p)[NR_VECTORS-1].vector)
+static DEFINE_PER_CPU(struct pending_eoi, pending_eoi[NR_DYNAMIC_VECTORS]);
+#define pending_eoi_sp(p) ((p)[NR_DYNAMIC_VECTORS-1].vector)
 
 static inline void set_pirq_eoi(struct domain *d, unsigned int irq)
 {
@@ -816,7 +816,7 @@ static void __do_IRQ_guest(int irq)
     {
         sp = pending_eoi_sp(peoi);
         ASSERT((sp == 0) || (peoi[sp-1].vector < vector));
-        ASSERT(sp < (NR_VECTORS-1));
+        ASSERT(sp < (NR_DYNAMIC_VECTORS-1));
         peoi[sp].irq = irq;
         peoi[sp].vector = vector;
         peoi[sp].ready = 0;
