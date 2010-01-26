@@ -219,6 +219,7 @@ class _GrubConfigFile(object):
     def _get_default(self):
         return self._default
     def _set_default(self, val):
+        val = val.strip("\"")
         if val == "saved":
             self._default = 0
         else:
@@ -315,6 +316,8 @@ class Grub2Image(_GrubImage):
                 setattr(self, self.commands[com], arg.strip())
             else:
                 logging.info("Ignored image directive %s" %(com,))
+        elif com.startswith('set:'):
+            pass
         else:
             logging.warning("Unknown image directive %s" %(com,))
 
@@ -328,6 +331,7 @@ class Grub2Image(_GrubImage):
     commands = {'set:root': 'root',
                 'linux': 'kernel',
                 'initrd': 'initrd',
+                'echo': None,
                 'insmod': None,
                 'search': None}
     
@@ -346,6 +350,7 @@ class Grub2ConfigFile(_GrubConfigFile):
         else:
             lines = buf.split("\n")
 
+        in_function = False
         img = None
         title = ""
         for l in lines:
@@ -356,6 +361,16 @@ class Grub2ConfigFile(_GrubConfigFile):
             # skip comments
             if l.startswith('#'):
                 continue
+
+            # skip function declarations
+            if l.startswith('function'):
+                in_function = True
+                continue
+            if in_function:
+                if l.startswith('}'):
+                    in_function = False
+                continue
+
             # new image
             title_match = re.match('^menuentry "(.*)" {', l)
             if title_match:
@@ -388,6 +403,8 @@ class Grub2ConfigFile(_GrubConfigFile):
                     setattr(self, self.commands[com], arg.strip())
                 else:
                     logging.info("Ignored directive %s" %(com,))
+            elif com.startswith('set:'):
+                pass
             else:
                 logging.warning("Unknown directive %s" %(com,))
             
@@ -400,11 +417,10 @@ class Grub2ConfigFile(_GrubConfigFile):
     commands = {'set:default': 'default',
                 'set:root': 'root',
                 'set:timeout': 'timeout',
-                'set:gfxmode': None,
-                'set:menu_color_normal': None,
-                'set:menu_color_highlight': None,
                 'terminal': None,
                 'insmod': None,
+                'load_env': None,
+                'save_env': None,
                 'search': None,
                 'if': None,
                 'fi': None,
