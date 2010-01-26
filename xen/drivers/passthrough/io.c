@@ -197,6 +197,8 @@ int pt_irq_create_bind_vtd(
             /* if pirq is already mapped as vmsi, update the guest data/addr */
             if ( hvm_irq_dpci->mirq[pirq].gmsi.gvec != pt_irq_bind->u.msi.gvec ||
                     hvm_irq_dpci->mirq[pirq].gmsi.gflags != pt_irq_bind->u.msi.gflags) {
+                /* Directly clear pending EOIs before enabling new MSI info. */
+                pirq_guest_eoi(d, pirq);
 
                 hvm_irq_dpci->mirq[pirq].gmsi.gvec = pt_irq_bind->u.msi.gvec;
                 hvm_irq_dpci->mirq[pirq].gmsi.gflags = pt_irq_bind->u.msi.gflags;
