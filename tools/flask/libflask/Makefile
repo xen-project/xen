@@ -38,7 +38,7 @@ install: build
 	$(INSTALL_DATA) libflask.a $(DESTDIR)$(LIBDIR)
 	ln -sf libflask.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)/libflask.so.$(MAJOR)
 	ln -sf libflask.so.$(MAJOR) $(DESTDIR)$(LIBDIR)/libflask.so
-	$(INSTALL_DATA) include/flask.h $(DESTDIR)$(INCLUDEDIR)
+	$(INSTALL_DATA) include/libflask.h $(DESTDIR)$(INCLUDEDIR)/xen/xsm
 
 .PHONY: TAGS
 TAGS:

@@ -16,7 +16,7 @@
 #include <sys/stat.h>
 #include <string.h>
 #include <unistd.h>
-#include <flask.h>
+#include <libflask.h>
 
 static void usage (int argCnt, const char *args[])
 {

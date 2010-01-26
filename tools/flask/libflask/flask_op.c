@@ -19,7 +19,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <sys/ioctl.h>
-#include <flask.h>
+#include <libflask.h>
 #include <xenctrl.h>
 
 int flask_load(int xc_handle, char *buf, uint32_t size)
@@ -341,4 +341,161 @@ int flask_del_device(int xc_handle, unsigned long device)
     free(buf);
     return 0;
 
+}
+
+int flask_access(int xc_handle, const char *scon, const char *tcon,
+                u_int16_t tclass, u_int32_t req,
+                u_int32_t *allowed, u_int32_t *decided,
+                u_int32_t *auditallow, u_int32_t *auditdeny,
+                u_int32_t *seqno)
+{
+/* maximum number of digits in a 16-bit decimal number: */
+#define MAX_SHORT_DEC_LEN 5
+
+    char *buf;
+    int bufLen;
+    int err;
+    flask_op_t op;
+    u_int32_t dummy_allowed;
+    u_int32_t dummy_decided;
+    u_int32_t dummy_auditallow;
+    u_int32_t dummy_auditdeny;
+    u_int32_t dummy_seqno;
+  
+    if (!allowed)
+        allowed = &dummy_allowed;
+    if (!decided)
+        decided = &dummy_decided;
+    if (!auditallow)
+        auditallow = &dummy_auditallow;
+    if (!auditdeny)
+        auditdeny = &dummy_auditdeny;
+    if (!seqno)
+        seqno = &dummy_seqno;
+
+    if (!scon)
+        return -EINVAL;
+    if (!tcon)
+        return -EINVAL;
+
+    bufLen = strlen(scon) + 1 + strlen(tcon) + 1 +
+        MAX_SHORT_DEC_LEN + 1 +
+        sizeof(req)*2 + 1;
+    buf = malloc(bufLen);
+    snprintf(buf, bufLen, "%s %s %hu %x", scon, tcon, tclass, req);
+
+    op.cmd = FLASK_ACCESS;
+    op.buf = buf;
+    op.size = strlen(buf)+1;
+    
+    if ( (err = xc_flask_op(xc_handle, &op)) != 0 )
+    {
+        free(buf);
+        return err;
+    }
+   
+    if (sscanf(op.buf, "%x %x %x %x %u",
+               allowed, decided,
+               auditallow, auditdeny,
+               seqno) != 5) {
+        err = -EILSEQ;
+    }
+
+    err = ((*allowed & req) == req)? 0 : -EPERM;
+
+    return err;
+
+}
+
+int flask_avc_hashstats(int xc_handle, char *buf, int size)
+{
+    int err;
+    flask_op_t op;
+  
+    op.cmd = FLASK_AVC_HASHSTATS;
+    op.buf = buf;
+    op.size = size;
+  
+    if ( (err = xc_flask_op(xc_handle, &op)) != 0 )
+    {
+        free(buf);
+        return err;
+    }
+
+    return 0;
+}
+
+int flask_avc_cachestats(int xc_handle, char *buf, int size)
+{
+    int err;
+    flask_op_t op;
+  
+    op.cmd = FLASK_AVC_CACHESTATS;
+    op.buf = buf;
+    op.size = size;
+  
+    if ( (err = xc_flask_op(xc_handle, &op)) != 0 )
+    {
+        free(buf);
+        return err;
+    }
+
+    return 0;
+}
+
+int flask_policyvers(int xc_handle, char *buf, int size)
+{
+    int err;
+    flask_op_t op;
+  
+    op.cmd = FLASK_POLICYVERS;
+    op.buf = buf;
+    op.size = size;
+
+    if ( (err = xc_flask_op(xc_handle, &op)) != 0 )
+    {
+        free(buf);
+        return err;
+    }
+
+    return 0;
+}
+
+int flask_getavc_threshold(int xc_handle)
+{
+    int err;
+    flask_op_t op;
+    char buf[20];            
+    int size = 20;
+    int threshold;
+ 
+    op.cmd = FLASK_GETAVC_THRESHOLD;
+    op.buf = buf;
+    op.size = size;
+    
+    if ( (err = xc_flask_op(xc_handle, &op)) != 0 )
+        return err;
+
+    sscanf(buf, "%i", &threshold);
+
+    return threshold;
+}
+
+int flask_setavc_threshold(int xc_handle, int threshold)
+{
+    int err;
+    flask_op_t op;
+    char buf[20];            
+    int size = 20;
+ 
+    op.cmd = FLASK_SETAVC_THRESHOLD;
+    op.buf = buf;
+    op.size = size;
+
+    snprintf(buf, size, "%i", threshold);
+ 
+    if ( (err = xc_flask_op(xc_handle, &op)) != 0 )
+        return err;
+
+    return 0;
 }

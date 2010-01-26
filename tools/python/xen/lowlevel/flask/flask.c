@@ -12,7 +12,7 @@
 
 #include <Python.h>
 #include <xenctrl.h>
-#include <flask.h>
+#include <libflask.h>
 
 #define PKG "xen.lowlevel.flask"
 #define CLS "flask"
@@ -190,6 +190,44 @@ static PyObject *pyflask_setenforce(PyObject *self, PyObject *args,
     return Py_BuildValue("i", ret);
 }
 
+static PyObject *pyflask_access(PyObject *self, PyObject *args,
+                                                       PyObject *kwds)
+{
+    int xc_handle;
+    char *tcon, *scon;
+    uint16_t tclass;
+    uint32_t req, allowed, decided, auditallow, auditdeny, seqno;
+    int ret;
+
+    static char *kwd_list[] = { "src_context", "tar_context", 
+                                "tar_class", "req_permissions",
+                                "decided", "auditallow","auditdeny",
+                                "seqno", NULL };
+
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "ssil|llll", kwd_list,
+                                      &scon, &tcon, &tclass, &req, &decided,
+                                      &auditallow, &auditdeny, &seqno) )
+        return NULL;
+
+    xc_handle = xc_interface_open();
+    if (xc_handle < 0) {
+        errno = xc_handle;
+        return PyErr_SetFromErrno(xc_error_obj);
+    }
+    
+    ret = flask_access(xc_handle, scon, tcon, tclass, req, &allowed, &decided,
+                        &auditallow, &auditdeny, &seqno);
+        
+    xc_interface_close(xc_handle);
+
+    if ( ret != 0 ) {
+        errno = -ret;
+        return PyErr_SetFromErrno(xc_error_obj);
+    }
+
+    return Py_BuildValue("i",ret);
+}
+
 static PyMethodDef pyflask_methods[] = {
     { "flask_context_to_sid",
       (PyCFunction)pyflask_context_to_sid,
@@ -224,7 +262,27 @@ static PyMethodDef pyflask_methods[] = {
       "Modifies the current mode for the Flask XSM module.\n"
       " mode [int]: mode to change to\n"
       "Returns: [int]: 0 on success; -1 on failure.\n" }, 
+
+    { "flask_access",
+      (PyCFunction)pyflask_access,
+      METH_KEYWORDS, "\n"
+      "Returns whether a source context has access to target context based on \
+       class and permissions requested.\n"
+      " scon [str]: source context\n"
+      " tcon [str]: target context\n"
+      " tclass [int]: target security class\n"
+      " req [int] requested permissions\n"
+      " allowed [int] permissions allow for the target class between the source \
+        and target context\n"
+      " decided [int] the permissions that were returned in the allowed \
+        parameter\n"
+      " auditallow [int] permissions set to audit on allow\n"
+      " auditdeny [int] permissions set to audit on deny\n"
+      " seqno [int] not used\n"
+      "Returns: [int]: 0 on all permission granted; -1 if any permissions are \
+       denied\n" }, 
     { NULL, NULL, 0, NULL }
+
 };
 
 PyMODINIT_FUNC initflask(void)

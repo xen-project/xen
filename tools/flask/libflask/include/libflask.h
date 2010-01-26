@@ -8,8 +8,8 @@
  *  as published by the Free Software Foundation.
  */
 
-#ifndef __FLASK_H__
-#define __FLASK_H__
+#ifndef __LIBFLASK_H__
+#define __LIBFLASK_H__
 
 #include <stdint.h>
 #include <xen/xen.h>
@@ -30,6 +30,16 @@ int flask_del_pirq(int xc_handle, unsigned int pirq);
 int flask_del_ioport(int xc_handle, unsigned long low, unsigned long high);
 int flask_del_iomem(int xc_handle, unsigned long low, unsigned long high);
 int flask_del_device(int xc_handle, unsigned long device);
+int flask_access(int xc_handle, const char *scon, const char *tcon,
+                  u_int16_t tclass, u_int32_t req,
+                  u_int32_t *allowed, u_int32_t *decided,
+                  u_int32_t *auditallow, u_int32_t *auditdeny,
+                  u_int32_t *seqno);
+int flask_avc_cachestats(int xc_handle, char *buf, int size);
+int flask_policyvers(int xc_handle, char *buf, int size);
+int flask_avc_hashstats(int xc_handle, char *buf, int size);
+int flask_getavc_threshold(int xc_handle);
+int flask_setavc_threshold(int xc_handle, int threshold);
 #define flask_add_single_ioport(x, l, s) flask_add_ioport(x, l, l, s)
 #define flask_add_single_iomem(x, l, s) flask_add_iomem(x, l, l, s)
 #define flask_del_single_ioport(x, l) flask_del_ioport(x, l, l)
@@ -40,4 +50,4 @@ int flask_del_device(int xc_handle, unsigned long device);
 #define OCON_IOMEM_STR  "iomem"
 #define OCON_DEVICE_STR "pcidevice"
 #define INITCONTEXTLEN  256
-#endif /* __FLASK_H__ */
+#endif /* __LIBFLASK_H__ */
