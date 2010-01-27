@@ -344,19 +344,18 @@ def restore(xd, fd, dominfo = None, paused = False, relocating = False):
 
         try:
             dominfo.waitForDevices() # Wait for backends to set up
-        except Exception, exn:
-            log.exception(exn)
-
-        if lock:
-            XendDomain.instance().domains_lock.acquire()
+        finally:
+            if lock:
+                XendDomain.instance().domains_lock.acquire()
 
         if not paused:
             dominfo.unpause()
 
         return dominfo
-    except:
+    except Exception, exn:
         dominfo.destroy()
-        raise
+        log.exception(exn)
+        raise exn
 
 
 class RestoreInputHandler:
