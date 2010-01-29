@@ -38,5 +38,6 @@ int tapdisk_set_resource_limits(void);
 int tapdisk_namedup(char **, const char *);
 int tapdisk_parse_disk_type(const char *, char **, int *);
 int tapdisk_get_image_size(int, uint64_t *, uint32_t *);
+int tapdisk_linux_version(void);
 
 #endif

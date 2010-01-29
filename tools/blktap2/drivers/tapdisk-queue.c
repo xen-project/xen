@@ -30,12 +30,18 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <libaio.h>
+#ifdef __linux__
+#include <linux/version.h>
+#endif
 
 #include "tapdisk.h"
 #include "tapdisk-log.h"
 #include "tapdisk-queue.h"
 #include "tapdisk-filter.h"
 #include "tapdisk-server.h"
+#include "tapdisk-utils.h"
+
+#include "libaio-compat.h"
 #include "atomicio.h"
 
 #define WARN(_f, _a...) tlog_write(TLOG_WARN, _f, ##_a)
@@ -270,9 +276,121 @@ struct lio {
 	io_context_t     aio_ctx;
 	struct io_event *aio_events;
 
-	int              poll_fd;
+	int              event_fd;
 	int              event_id;
+
+	int              flags;
 };
+
+#define LIO_FLAG_EVENTFD        (1<<0)
+
+static int
+tapdisk_lio_check_resfd(void)
+{
+	return tapdisk_linux_version() >= KERNEL_VERSION(2, 6, 22);
+}
+
+static void
+tapdisk_lio_destroy_aio(struct tqueue *queue)
+{
+	struct lio *lio = queue->tio_data;
+
+	if (lio->event_fd >= 0) {
+		close(lio->event_fd);
+		lio->event_fd = -1;
+	}
+
+	if (lio->aio_ctx) {
+		io_destroy(lio->aio_ctx);
+		lio->aio_ctx = 0;
+	}
+}
+
+static int
+__lio_setup_aio_poll(struct tqueue *queue, int qlen)
+{
+	struct lio *lio = queue->tio_data;
+	int err, fd;
+
+	lio->aio_ctx = REQUEST_ASYNC_FD;
+
+	fd = io_setup(qlen, &lio->aio_ctx);
+	if (fd < 0) {
+		lio->aio_ctx = 0;
+		err = -errno;
+
+		if (err == -EINVAL)
+			goto fail_fd;
+
+		goto fail;
+	}
+
+	lio->event_fd = fd;
+
+	return 0;
+
+fail_fd:
+	DPRINTF("Couldn't get fd for AIO poll support. This is probably "
+		"because your kernel does not have the aio-poll patch "
+		"applied.\n");
+fail:
+	return err;
+}
+
+static int
+__lio_setup_aio_eventfd(struct tqueue *queue, int qlen)
+{
+	struct lio *lio = queue->tio_data;
+	int err;
+
+	err = io_setup(qlen, &lio->aio_ctx);
+	if (err < 0) {
+		lio->aio_ctx = 0;
+		return err;
+	}
+
+	lio->event_fd = tapdisk_sys_eventfd(0);
+	if (lio->event_fd < 0)
+		return  -errno;
+
+	lio->flags |= LIO_FLAG_EVENTFD;
+
+	return 0;
+}
+
+static int
+tapdisk_lio_setup_aio(struct tqueue *queue, int qlen)
+{
+	struct lio *lio = queue->tio_data;
+	int err;
+
+	lio->aio_ctx  =  0;
+	lio->event_fd = -1;
+
+	/*
+	 * prefer the mainline eventfd(2) api, if available.
+	 * if not, fall back to the poll fd patch.
+	 */
+
+	err = !tapdisk_lio_check_resfd();
+	if (!err)
+		err = __lio_setup_aio_eventfd(queue, qlen);
+	if (err)
+		err = __lio_setup_aio_poll(queue, qlen);
+
+	if (err == -EAGAIN)
+		goto fail_rsv;
+fail:
+	return err;
+
+fail_rsv:
+	DPRINTF("Couldn't setup AIO context. If you are trying to "
+		"concurrently use a large number of blktap-based disks, you may "
+		"need to increase the system-wide aio request limit. "
+		"(e.g. 'echo 1048576 > /proc/sys/fs/aio-max-nr')\n");
+	goto fail;
+}
+
 
 static void
 tapdisk_lio_destroy(struct tqueue *queue)
@@ -287,15 +405,33 @@ tapdisk_lio_destroy(struct tqueue *queue)
 		lio->event_id = -1;
 	}
 
-	if (lio->aio_ctx) {
-		io_destroy(lio->aio_ctx);
-		lio->aio_ctx = NULL;
-	}
+	tapdisk_lio_destroy_aio(queue);
 
 	if (lio->aio_events) {
 		free(lio->aio_events);
 		lio->aio_events = NULL;
 	}
+}
+
+static void
+tapdisk_lio_set_eventfd(struct tqueue *queue, int n, struct iocb **iocbs)
+{
+	struct lio *lio = queue->tio_data;
+	int i;
+
+	if (lio->flags & LIO_FLAG_EVENTFD)
+		for (i = 0; i < n; ++i)
+			__io_set_eventfd(iocbs[i], lio->event_fd);
+}
+
+static void
+tapdisk_lio_ack_event(struct tqueue *queue)
+{
+	struct lio *lio = queue->tio_data;
+	uint64_t val;
+
+	if (lio->flags & LIO_FLAG_EVENTFD)
+		read(lio->event_fd, &val, sizeof(val));
 }
 
 static void
@@ -307,6 +443,8 @@ tapdisk_lio_event(event_id_t id, char mode, void *private)
 	struct iocb *iocb;
 	struct tiocb *tiocb;
 	struct io_event *ep;
+
+	tapdisk_lio_ack_event(queue);
 
 	lio   = queue->tio_data;
 	ret   = io_getevents(lio->aio_ctx, 0,
@@ -336,22 +474,14 @@ tapdisk_lio_setup(struct tqueue *queue, int qlen)
 	int err;
 
 	lio->event_id = -1;
-	lio->aio_ctx  = REQUEST_ASYNC_FD;
 
-	lio->poll_fd = io_setup(qlen, &lio->aio_ctx);
-	err = lio->poll_fd;
-	if (err < 0) {
-		lio->aio_ctx = NULL;
-
-		if (err == -EAGAIN)
-			goto fail_rsv;
-
-		goto fail_fd;
-	}
+	err = tapdisk_lio_setup_aio(queue, qlen);
+	if (err)
+		goto fail;
 
 	lio->event_id =
 		tapdisk_server_register_event(SCHEDULER_POLL_READ_FD,
-					      lio->poll_fd, 0,
+					      lio->event_fd, 0,
 					      tapdisk_lio_event,
 					      queue);
 	err = lio->event_id;
@@ -369,19 +499,6 @@ tapdisk_lio_setup(struct tqueue *queue, int qlen)
 fail:
 	tapdisk_lio_destroy(queue);
 	return err;
-
-fail_rsv:
-	DPRINTF("Couldn't setup AIO context. If you are trying to "
-		"concurrently use a large number of blktap-based disks, you may "
-		"need to increase the system-wide aio request limit. "
-		"(e.g. 'echo 1048576 > /proc/sys/fs/aio-max-nr')\n");
-	goto fail;
-
-fail_fd:
-	DPRINTF("Couldn't get fd for AIO poll support. This is probably "
-		"because your kernel does not have  the aio-poll patch "
-		"applied.\n");
-	goto fail;
 }
 
 static int
@@ -395,6 +512,7 @@ tapdisk_lio_submit(struct tqueue *queue)
 
 	tapdisk_filter_iocbs(queue->filter, queue->iocbs, queue->queued);
 	merged    = io_merge(&queue->opioctx, queue->iocbs, queue->queued);
+	tapdisk_lio_set_eventfd(queue, merged, queue->iocbs);
 	submitted = io_submit(lio->aio_ctx, merged, queue->iocbs);
 
 	DBG("queued: %d, merged: %d, submitted: %d\n",

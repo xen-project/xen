@@ -33,6 +33,10 @@
 #include <sys/mman.h>
 #include <sys/ioctl.h>
 #include <sys/resource.h>
+#include <sys/utsname.h>
+#ifdef __linux__
+#include <linux/version.h>
+#endif
 
 #include "blk.h"
 #include "tapdisk.h"
@@ -183,3 +187,31 @@ tapdisk_get_image_size(int fd, uint64_t *_sectors, uint32_t *_sector_size)
 
 	return 0;
 }
+
+#ifdef __linux__
+
+int tapdisk_linux_version(void)
+{
+	struct utsname uts;
+	unsigned int version, patchlevel, sublevel;
+	int n, err;
+
+	err = uname(&uts);
+	if (err)
+		return -errno;
+
+	n = sscanf(uts.release, "%u.%u.%u", &version, &patchlevel, &sublevel);
+	if (n != 3)
+		return -ENOSYS;
+
+	return KERNEL_VERSION(version, patchlevel, sublevel);
+}
+
+#else
+
+int tapdisk_linux_version(void)
+{
+	return -ENOSYS;
+}
+
+#endif

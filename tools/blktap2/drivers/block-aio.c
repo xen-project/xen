@@ -28,7 +28,6 @@
 
 
 #include <errno.h>
-#include <libaio.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
