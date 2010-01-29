@@ -235,7 +235,7 @@ int elf_phdr_is_loadable(struct elf_binary *elf, const elf_phdr * phdr)
     uint64_t p_type = elf_uval(elf, phdr, p_type);
     uint64_t p_flags = elf_uval(elf, phdr, p_flags);
 
-    return ((p_type == PT_LOAD) && (p_flags & (PF_W | PF_X)) != 0);
+    return ((p_type == PT_LOAD) && (p_flags & (PF_R | PF_W | PF_X)) != 0);
 }
 
 /*
