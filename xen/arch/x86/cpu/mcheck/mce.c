@@ -716,8 +716,8 @@ int mce_rdmsr(uint32_t msr, uint64_t *val)
         bank = (msr - MSR_IA32_MC0_CTL) / 4;
         if ( bank >= (d->arch.vmca_msrs.mcg_cap & MCG_CAP_COUNT) )
         {
-            mce_printk(MCE_QUIET, "MCE: bank %u does not exist\n", bank);
-            ret = -1;
+            mce_printk(MCE_QUIET, "MCE: MSR %x is not MCA MSR\n", msr);
+            ret = 0;
             break;
         }
         switch (msr & (MSR_IA32_MC0_CTL | 3))
@@ -848,8 +848,8 @@ int mce_wrmsr(u32 msr, u64 val)
         bank = (msr - MSR_IA32_MC0_CTL) / 4;
         if ( bank >= (d->arch.vmca_msrs.mcg_cap & MCG_CAP_COUNT) )
         {
-            mce_printk(MCE_QUIET, "MCE: bank %u does not exist\n", bank);
-            ret = -1;
+            mce_printk(MCE_QUIET, "MCE: MSR %x is not MCA MSR\n", msr);
+            ret = 0;
             break;
         }
         switch ( msr & (MSR_IA32_MC0_CTL | 3) )
