@@ -324,15 +324,15 @@ static int check_platform_magic(struct device *dev, long ioaddr, long iolen)
 
 	switch (protocol) {
 	case 1:
-		outw(XEN_IOPORT_PRODNUM, XEN_IOPORT_LINUX_PRODNUM);
-		outl(XEN_IOPORT_DRVVER, XEN_IOPORT_LINUX_DRVVER);
+		outw(XEN_IOPORT_LINUX_PRODNUM, XEN_IOPORT_PRODNUM);
+		outl(XEN_IOPORT_LINUX_DRVVER, XEN_IOPORT_DRVVER);
 		if (inw(XEN_IOPORT_MAGIC) != XEN_IOPORT_MAGIC_VAL) {
 			dev_err(dev, "blacklisted by host\n");
 			return -ENODEV;
 		}
 		/* Fall through */
 	case 0:
-		outw(XEN_IOPORT_UNPLUG, 0xf);
+		outw(0xf, XEN_IOPORT_UNPLUG);
 		break;
 	default:
 		err = "unknown I/O protocol version";
