@@ -1229,15 +1229,15 @@ static irq_guest_action_t *__pirq_guest_unbind(
 
     BUG_ON(!(desc->status & IRQ_GUEST));
 
-    if ( unlikely((desc->status | IRQ_DISABLED) && (desc->action == NULL)) )
-    {
-        dprintk(XENLOG_G_WARNING, "dom%d: pirq %d: desc->action is NULL!\n",
-            d->domain_id, pirq);
-        return NULL;
-    }
-
     action = (irq_guest_action_t *)desc->action;
     irq = desc - irq_desc;
+
+    if ( unlikely(action == NULL) )
+    {
+        dprintk(XENLOG_G_WARNING, "dom%d: pirq %d: desc->action is NULL!\n",
+                d->domain_id, pirq);
+        return NULL;
+    }
 
     for ( i = 0; (i < action->nr_guests) && (action->guest[i] != d); i++ )
         continue;
@@ -1360,7 +1360,7 @@ static int pirq_guest_force_unbind(struct domain *d, int irq)
         goto out;
 
     action = (irq_guest_action_t *)desc->action;
-    if ( unlikely((desc->status | IRQ_DISABLED) && (desc->action == NULL)) )
+    if ( unlikely(action == NULL) )
     {
         dprintk(XENLOG_G_WARNING, "dom%d: pirq %d: desc->action is NULL!\n",
             d->domain_id, irq);
