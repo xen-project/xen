@@ -371,8 +371,8 @@ static void intel_UCR_handler(struct mcinfo_bank *bank,
 
                           gfn =
                               mfn_to_gmfn(d, ((bank->mc_addr) >> PAGE_SHIFT));
-                          bank->mc_addr =
-                              gfn << PAGE_SHIFT | (bank->mc_addr & PAGE_MASK);
+                          bank->mc_addr =  gfn << PAGE_SHIFT |
+                                        (bank->mc_addr & (PAGE_SIZE -1 ));
                           if (fill_vmsr_data(bank, global->mc_gstatus) == -1)
                           {
                               mce_printk(MCE_QUIET, "Fill vMCE# data for DOM%d "
