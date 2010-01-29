@@ -31,6 +31,11 @@ unsigned int nr_mce_banks;
 
 static uint64_t g_mcg_cap;
 
+/* Real value in physical CTL MSR */
+static uint64_t h_mcg_ctl = 0UL;
+static uint64_t *h_mci_ctrl;
+int firstbank;
+
 static void intpose_init(void);
 static void mcinfo_clear(struct mc_info *);
 
@@ -642,6 +647,21 @@ void mcheck_init(struct cpuinfo_x86 *c)
 		break;
 	}
 
+    if ( !h_mci_ctrl )
+    {
+        h_mci_ctrl = xmalloc_array(uint64_t, nr_mce_banks);
+        if (!h_mci_ctrl)
+        {
+            dprintk(XENLOG_INFO, "Failed to alloc h_mci_ctrl\n");
+            return;
+        }
+        /* Don't care banks before firstbank */
+        memset(h_mci_ctrl, 0xff, sizeof(h_mci_ctrl));
+        for (i = firstbank; i < nr_mce_banks; i++)
+            rdmsrl(MSR_IA32_MC0_CTL + 4*i, h_mci_ctrl[i]);
+    }
+    if (g_mcg_cap & MCG_CTL_P)
+        rdmsrl(MSR_IA32_MCG_CTL, h_mcg_ctl);
     set_poll_bankmask(c);
 	if (!inited)
 		printk(XENLOG_INFO "CPU%i: No machine check initialization\n",
@@ -708,7 +728,8 @@ int mce_rdmsr(uint32_t msr, uint64_t *val)
             *val);
         break;
     case MSR_IA32_MCG_CTL:
-        *val = d->arch.vmca_msrs.mcg_ctl;
+        /* Always 0 if no CTL support */
+        *val = d->arch.vmca_msrs.mcg_ctl & h_mcg_ctl;
         mce_printk(MCE_VERBOSE, "MCE: rdmsr MCG_CTL 0x%"PRIx64"\n",
             *val);
         break;
@@ -723,7 +744,8 @@ int mce_rdmsr(uint32_t msr, uint64_t *val)
         switch (msr & (MSR_IA32_MC0_CTL | 3))
         {
         case MSR_IA32_MC0_CTL:
-            *val = d->arch.vmca_msrs.mci_ctl[bank];
+            *val = d->arch.vmca_msrs.mci_ctl[bank] &
+                    (h_mci_ctrl ? h_mci_ctrl[bank] : ~0UL);
             mce_printk(MCE_VERBOSE, "MCE: rdmsr MC%u_CTL 0x%"PRIx64"\n",
                      bank, *val);
             break;
@@ -805,13 +827,6 @@ int mce_wrmsr(u32 msr, u64 val)
     switch ( msr )
     {
     case MSR_IA32_MCG_CTL:
-        if ( val && (val + 1) )
-        {
-            mce_printk(MCE_QUIET, "MCE: val \"%"PRIx64"\" written "
-                     "to MCG_CTL should be all 0s or 1s\n", val);
-            ret = -1;
-            break;
-        }
         d->arch.vmca_msrs.mcg_ctl = val;
         break;
     case MSR_IA32_MCG_STATUS:
@@ -855,14 +870,6 @@ int mce_wrmsr(u32 msr, u64 val)
         switch ( msr & (MSR_IA32_MC0_CTL | 3) )
         {
         case MSR_IA32_MC0_CTL:
-            if ( val && (val + 1) )
-            {
-                mce_printk(MCE_QUIET, "MCE: val written to MC%u_CTL "
-                         "should be all 0s or 1s (is %"PRIx64")\n",
-                         bank, val);
-                ret = -1;
-                break;
-            }
             d->arch.vmca_msrs.mci_ctl[bank] = val;
             break;
         case MSR_IA32_MC0_STATUS:
@@ -1161,6 +1168,23 @@ void intpose_inval(unsigned int cpu_nr, uint64_t msr)
     ((r) >= MSR_IA32_MC0_CTL && \
     (r) <= MSR_IA32_MC0_MISC + (nr_mce_banks - 1) * 4 && \
     ((r) - MSR_IA32_MC0_CTL) % 4 != 0)	/* excludes MCi_CTL */
+
+int mca_ctl_conflict(struct mcinfo_bank *bank, struct domain *d)
+{
+    int bank_nr;
+
+    if ( !bank || !d || !h_mci_ctrl )
+        return 1;
+
+    /* Will MCE happen in host if If host mcg_ctl is 0? */
+    if ( ~d->arch.vmca_msrs.mcg_ctl & h_mcg_ctl )
+        return 1;
+
+    bank_nr = bank->mc_bank;
+    if (~d->arch.vmca_msrs.mci_ctl[bank_nr] & h_mci_ctrl[bank_nr] )
+        return 1;
+    return 0;
+}
 
 static int x86_mc_msrinject_verify(struct xen_mc_msrinject *mci)
 {

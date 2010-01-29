@@ -20,7 +20,6 @@ int cmci_support = 0;
 int ser_support = 0;
 
 static int nr_intel_ext_msrs = 0;
-static int firstbank;
 
 /* Below are for MCE handling */
 struct mce_softirq_barrier {
@@ -361,7 +360,15 @@ static void intel_UCR_handler(struct mcinfo_bank *bank,
                        *  the mfn in question) */
                       BUG_ON( result->owner == DOMID_COW );
                       if ( result->owner != DOMID_XEN ) {
+
                           d = get_domain_by_id(result->owner);
+                          if ( mca_ctl_conflict(bank, d) )
+                          {
+                              /* Guest has different MCE ctl with hypervisor */
+                              put_domain(d);
+                              return;
+                          }
+
                           gfn =
                               mfn_to_gmfn(d, ((bank->mc_addr) >> PAGE_SHIFT));
                           bank->mc_addr =
