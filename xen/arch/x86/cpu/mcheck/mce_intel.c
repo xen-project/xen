@@ -377,6 +377,7 @@ static void intel_UCR_handler(struct mcinfo_bank *bank,
                           {
                               mce_printk(MCE_QUIET, "Fill vMCE# data for DOM%d "
                                       "failed\n", result->owner);
+                              put_domain(d);
                               domain_crash(d);
                               return;
                           }
@@ -385,6 +386,7 @@ static void intel_UCR_handler(struct mcinfo_bank *bank,
                           {
                               mce_printk(MCE_QUIET, "inject vMCE to DOM%d"
                                           " failed\n", d->domain_id);
+                              put_domain(d);
                               domain_crash(d);
                               return;
                           }
@@ -394,6 +396,7 @@ static void intel_UCR_handler(struct mcinfo_bank *bank,
                            * its own recovery job.
                            */
                           result->result = MCA_RECOVERED;
+                          put_domain(d);
                       }
                   }
               }
