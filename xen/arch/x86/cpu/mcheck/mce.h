@@ -12,8 +12,10 @@
 #include "x86_mca.h"
 #include "mctelem.h"
 
-#define MCE_QUIET 0
-#define MCE_VERBOSE 1
+#define MCE_QUIET       0
+#define MCE_VERBOSE     1
+/* !only for developer debug as printk is unsafe in MCE context */
+#define MCE_CRITICAL    2
 
 extern int mce_verbosity;
 /* Define the default level of machine check related print.

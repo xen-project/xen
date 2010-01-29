@@ -687,7 +687,7 @@ static void intel_machine_check(struct cpu_user_regs * regs, long error_code)
         }
         atomic_set(&found_error, 1);
 
-        mce_printk(MCE_VERBOSE, "MCE: clear_bank map %lx on CPU%d\n",
+        mce_printk(MCE_CRITICAL, "MCE: clear_bank map %lx on CPU%d\n",
                 *((unsigned long*)clear_bank), smp_processor_id());
         mcheck_mca_clearbanks(clear_bank);
        /* Print MCE error */
@@ -714,13 +714,13 @@ static void intel_machine_check(struct cpu_user_regs * regs, long error_code)
     /* Clear error finding flags after all cpus finishes above judgement */
     mce_barrier_enter(&mce_trap_bar);
     if (atomic_read(&found_error)) {
-        mce_printk(MCE_VERBOSE, "MCE: Choose one CPU "
+        mce_printk(MCE_CRITICAL, "MCE: Choose one CPU "
 		        "to clear error finding flag\n ");
         atomic_set(&found_error, 0);
     }
     mca_rdmsrl(MSR_IA32_MCG_STATUS, gstatus);
     if ((gstatus & MCG_STATUS_MCIP) != 0) {
-        mce_printk(MCE_VERBOSE, "MCE: Clear MCIP@ last step");
+        mce_printk(MCE_CRITICAL, "MCE: Clear MCIP@ last step");
         mca_wrmsrl(MSR_IA32_MCG_STATUS, gstatus & ~MCG_STATUS_MCIP);
     }
     mce_barrier_exit(&mce_trap_bar);

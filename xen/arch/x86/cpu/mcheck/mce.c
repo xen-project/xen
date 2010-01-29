@@ -1605,7 +1605,7 @@ void set_poll_bankmask(struct cpuinfo_x86 *c)
 void mc_panic(char *s)
 {
     is_mc_panic = 1;
-    console_start_sync();
+    console_force_unlock();
     printk("Fatal machine check: %s\n", s);
     printk("\n"
            "****************************************\n"
