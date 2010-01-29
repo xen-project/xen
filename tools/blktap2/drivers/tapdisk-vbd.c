@@ -1260,6 +1260,8 @@ tapdisk_vbd_kick(td_vbd_t *vbd)
 	int n;
 	td_ring_t *ring;
 
+	tapdisk_vbd_check_state(vbd);
+
 	ring = &vbd->ring;
 	if (!ring->sring)
 		return 0;

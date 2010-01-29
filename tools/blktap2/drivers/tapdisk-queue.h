@@ -55,16 +55,14 @@ struct tlist {
 
 struct tqueue {
 	int                   size;
-	int                   sync;
 
-	int                   poll_fd;
-	event_id_t	      event;
-	io_context_t          aio_ctx;
+	const struct tio     *tio;
+	void                 *tio_data;
+
 	struct opioctx        opioctx;
 
 	int                   queued;
 	struct iocb         **iocbs;
-	struct io_event      *aio_events;
 
 	/* number of iocbs pending in the aio layer */
 	int                   iocbs_pending;
@@ -86,6 +84,20 @@ struct tqueue {
 	uint64_t              deferrals;
 };
 
+struct tio {
+	const char           *name;
+	size_t                data_size;
+
+	int  (*tio_setup)    (struct tqueue *queue, int qlen);
+	void (*tio_destroy)  (struct tqueue *queue);
+	int  (*tio_submit)   (struct tqueue *queue);
+};
+
+enum {
+	TIO_DRV_LIO     = 1,
+	TIO_DRV_RWIO    = 2,
+};
+
 /*
  * Interface for request producer (i.e., tapdisk)
  * NB: the following functions may cause additional tiocbs to be queued:
@@ -99,7 +111,7 @@ struct tqueue {
 #define tapdisk_queue_empty(q) ((q)->queued == 0)
 #define tapdisk_queue_full(q)  \
 	(((q)->tiocbs_pending + (q)->queued) >= (q)->size)
-int tapdisk_init_queue(struct tqueue *, int size, int sync, struct tfilter *);
+int tapdisk_init_queue(struct tqueue *, int size, int drv, struct tfilter *);
 void tapdisk_free_queue(struct tqueue *);
 void tapdisk_debug_queue(struct tqueue *);
 void tapdisk_queue_tiocb(struct tqueue *, struct tiocb *);

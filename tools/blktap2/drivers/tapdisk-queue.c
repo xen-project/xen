@@ -141,7 +141,7 @@ cancel_tiocbs(struct tqueue *queue, int err)
 	 * use a private linked list to keep track
 	 * of the tiocbs we're cancelling. 
 	 */
-	tiocb  = (struct tiocb *)queue->iocbs[0]->data;
+	tiocb  = queue->iocbs[0]->data;
 	queued = queue->queued;
 	queue->queued = 0;
 
@@ -165,8 +165,40 @@ fail_tiocbs(struct tqueue *queue, int succeeded, int total, int err)
 	return cancel_tiocbs(queue, err);
 }
 
+/*
+ * rwio
+ */
+
+struct rwio {
+	struct io_event *aio_events;
+};
+
+static void
+tapdisk_rwio_destroy(struct tqueue *queue)
+{
+	struct rwio *rwio = queue->tio_data;
+
+	if (rwio->aio_events) {
+		free(rwio->aio_events);
+		rwio->aio_events = NULL;
+	}
+}
+
+static int
+tapdisk_rwio_setup(struct tqueue *queue, int size)
+{
+	struct rwio *rwio = queue->tio_data;
+	int err;
+
+	rwio->aio_events = calloc(size, sizeof(struct io_event));
+	if (!rwio->aio_events)
+		return -errno;
+
+	return 0;
+}
+
 static inline ssize_t
-iocb_rw(struct iocb *iocb)
+tapdisk_rwio_rw(const struct iocb *iocb)
 {
 	int fd        = iocb->aio_fildes;
 	char *buf     = iocb->u.c.buf;
@@ -177,7 +209,7 @@ iocb_rw(struct iocb *iocb)
 
 	if (lseek(fd, off, SEEK_SET) == (off_t)-1)
 		return -errno;
-	
+
 	if (atomicio(func, fd, buf, size) != size)
 		return -errno;
 
@@ -185,8 +217,9 @@ iocb_rw(struct iocb *iocb)
 }
 
 static int
-io_synchronous_rw(struct tqueue *queue)
+tapdisk_rwio_submit(struct tqueue *queue)
 {
+	struct rwio *rwio = queue->tio_data;
 	int i, merged, split;
 	struct iocb *iocb;
 	struct tiocb *tiocb;
@@ -201,18 +234,18 @@ io_synchronous_rw(struct tqueue *queue)
 	queue->queued = 0;
 
 	for (i = 0; i < merged; i++) {
-		ep      = queue->aio_events + i;
+		ep      = rwio->aio_events + i;
 		iocb    = queue->iocbs[i];
 		ep->obj = iocb;
-		ep->res = iocb_rw(iocb);
+		ep->res = tapdisk_rwio_rw(iocb);
 	}
 
-	split = io_split(&queue->opioctx, queue->aio_events, merged);
-	tapdisk_filter_events(queue->filter, queue->aio_events, split);
+	split = io_split(&queue->opioctx, rwio->aio_events, merged);
+	tapdisk_filter_events(queue->filter, rwio->aio_events, split);
 
-	for (i = split, ep = queue->aio_events; i-- > 0; ep++) {
+	for (i = split, ep = rwio->aio_events; i-- > 0; ep++) {
 		iocb  = ep->obj;
-		tiocb = (struct tiocb *)iocb->data;
+		tiocb = iocb->data;
 		complete_tiocb(queue, tiocb, ep->res);
 	}
 
@@ -221,64 +254,257 @@ io_synchronous_rw(struct tqueue *queue)
 	return split;
 }
 
-static void tapdisk_tiocb_event(event_id_t id, char mode, void *private);
+static const struct tio td_tio_rwio = {
+	.name        = "rwio",
+	.data_size   = 0,
+	.tio_setup   = NULL,
+	.tio_destroy = NULL,
+	.tio_submit  = tapdisk_rwio_submit
+};
+
+/*
+ * libaio
+ */
+
+struct lio {
+	io_context_t     aio_ctx;
+	struct io_event *aio_events;
+
+	int              poll_fd;
+	int              event_id;
+};
+
+static void
+tapdisk_lio_destroy(struct tqueue *queue)
+{
+	struct lio *lio = queue->tio_data;
+
+	if (!lio)
+		return;
+
+	if (lio->event_id >= 0) {
+		tapdisk_server_unregister_event(lio->event_id);
+		lio->event_id = -1;
+	}
+
+	if (lio->aio_ctx) {
+		io_destroy(lio->aio_ctx);
+		lio->aio_ctx = NULL;
+	}
+
+	if (lio->aio_events) {
+		free(lio->aio_events);
+		lio->aio_events = NULL;
+	}
+}
+
+static void
+tapdisk_lio_event(event_id_t id, char mode, void *private)
+{
+	struct tqueue *queue = private;
+	struct lio *lio;
+	int i, ret, split;
+	struct iocb *iocb;
+	struct tiocb *tiocb;
+	struct io_event *ep;
+
+	lio   = queue->tio_data;
+	ret   = io_getevents(lio->aio_ctx, 0,
+			     queue->size, lio->aio_events, NULL);
+	split = io_split(&queue->opioctx, lio->aio_events, ret);
+	tapdisk_filter_events(queue->filter, lio->aio_events, split);
+
+	DBG("events: %d, tiocbs: %d\n", ret, split);
+
+	queue->iocbs_pending  -= ret;
+	queue->tiocbs_pending -= split;
+
+	for (i = split, ep = lio->aio_events; i-- > 0; ep++) {
+		iocb  = ep->obj;
+		tiocb = iocb->data;
+		complete_tiocb(queue, tiocb, ep->res);
+	}
+
+	queue_deferred_tiocbs(queue);
+}
+
+static int
+tapdisk_lio_setup(struct tqueue *queue, int qlen)
+{
+	struct lio *lio = queue->tio_data;
+	size_t sz;
+	int err;
+
+	lio->event_id = -1;
+	lio->aio_ctx  = REQUEST_ASYNC_FD;
+
+	lio->poll_fd = io_setup(qlen, &lio->aio_ctx);
+	err = lio->poll_fd;
+	if (err < 0) {
+		lio->aio_ctx = NULL;
+
+		if (err == -EAGAIN)
+			goto fail_rsv;
+
+		goto fail_fd;
+	}
+
+	lio->event_id =
+		tapdisk_server_register_event(SCHEDULER_POLL_READ_FD,
+					      lio->poll_fd, 0,
+					      tapdisk_lio_event,
+					      queue);
+	err = lio->event_id;
+	if (err < 0)
+		goto fail;
+
+	lio->aio_events = calloc(qlen, sizeof(struct io_event));
+	if (!lio->aio_events) {
+		err = -errno;
+		goto fail;
+	}
+
+	return 0;
+
+fail:
+	tapdisk_lio_destroy(queue);
+	return err;
+
+fail_rsv:
+	DPRINTF("Couldn't setup AIO context. If you are trying to "
+		"concurrently use a large number of blktap-based disks, you may "
+		"need to increase the system-wide aio request limit. "
+		"(e.g. 'echo 1048576 > /proc/sys/fs/aio-max-nr')\n");
+	goto fail;
+
+fail_fd:
+	DPRINTF("Couldn't get fd for AIO poll support. This is probably "
+		"because your kernel does not have  the aio-poll patch "
+		"applied.\n");
+	goto fail;
+}
+
+static int
+tapdisk_lio_submit(struct tqueue *queue)
+{
+	struct lio *lio = queue->tio_data;
+	int merged, submitted, err = 0;
+
+	if (!queue->queued)
+		return 0;
+
+	tapdisk_filter_iocbs(queue->filter, queue->iocbs, queue->queued);
+	merged    = io_merge(&queue->opioctx, queue->iocbs, queue->queued);
+	submitted = io_submit(lio->aio_ctx, merged, queue->iocbs);
+
+	DBG("queued: %d, merged: %d, submitted: %d\n",
+	    queue->queued, merged, submitted);
+
+	if (submitted < 0) {
+		err = submitted;
+		submitted = 0;
+	} else if (submitted < merged)
+		err = -EIO;
+
+	queue->iocbs_pending  += submitted;
+	queue->tiocbs_pending += queue->queued;
+	queue->queued          = 0;
+
+	if (err)
+		queue->tiocbs_pending -= 
+			fail_tiocbs(queue, submitted, merged, err);
+
+	return submitted;
+}
+
+static const struct tio td_tio_lio = {
+	.name        = "lio",
+	.data_size   = sizeof(struct lio),
+	.tio_setup   = tapdisk_lio_setup,
+	.tio_destroy = tapdisk_lio_destroy,
+	.tio_submit  = tapdisk_lio_submit,
+};
+
+static void
+tapdisk_queue_free_io(struct tqueue *queue)
+{
+	if (queue->tio) {
+		if (queue->tio->tio_destroy)
+			queue->tio->tio_destroy(queue);
+		queue->tio = NULL;
+	}
+
+	if (queue->tio_data) {
+		free(queue->tio_data);
+		queue->tio_data = NULL;
+	}
+}
+
+static int
+tapdisk_queue_init_io(struct tqueue *queue, int drv)
+{
+	const struct tio *tio;
+	int err;
+
+	switch (drv) {
+	case TIO_DRV_LIO:
+		tio = &td_tio_lio;
+		break;
+	case TIO_DRV_RWIO:
+		tio = &td_tio_rwio;
+		break;
+	default:
+		err = -EINVAL;
+		goto fail;
+	}
+
+	queue->tio_data = calloc(1, tio->data_size);
+	if (!queue->tio_data) {
+		PERROR("malloc(%zu)", tio->data_size);
+		err = -errno;
+		goto fail;
+	}
+
+	queue->tio = tio;
+
+	if (tio->tio_setup) {
+		err = tio->tio_setup(queue, queue->size);
+		if (err)
+			goto fail;
+	}
+
+	DPRINTF("I/O queue driver: %s\n", tio->name);
+
+	return 0;
+
+fail:
+	tapdisk_queue_free_io(queue);
+	return err;
+}
 
 int
 tapdisk_init_queue(struct tqueue *queue, int size,
-		   int sync, struct tfilter *filter)
+		   int drv, struct tfilter *filter)
 {
 	int i, err;
 
 	memset(queue, 0, sizeof(struct tqueue));
 
 	queue->size   = size;
-	queue->sync   = sync;
 	queue->filter = filter;
-
-	queue->event   = -1;
-	queue->aio_ctx = NULL;
 
 	if (!size)
 		return 0;
 
-	if (!sync) {
-		queue->aio_ctx = REQUEST_ASYNC_FD;
-		queue->poll_fd = io_setup(size, &queue->aio_ctx);
-		err = queue->poll_fd;
-		if (err < 0) {
-			if (err == -EAGAIN)
-				DPRINTF("Couldn't setup AIO context.  If you "
-					"are trying to concurrently use a "
-					"large number of blktap-based disks, "
-					"you may need to increase the "
-					"system-wide aio request limit. "
-					"(e.g. 'echo 1048576 > /proc/sys/fs/"
-					"aio-max-nr')\n");
-			else
-				DPRINTF("Couldn't get fd for AIO poll "
-					"support.  This is probably because "
-					"your kernel does not have the "
-					"aio-poll patch applied.\n");
-			queue->aio_ctx = NULL;
-			goto fail;
-		}
-
-		queue->event =
-			tapdisk_server_register_event(SCHEDULER_POLL_READ_FD,
-						      queue->poll_fd, 0,
-						      tapdisk_tiocb_event,
-						      queue);
-		err = queue->event;
-		if (err < 0)
-			goto fail;
-
-	}
-
-	err               = -ENOMEM;
-	queue->iocbs      = calloc(size, sizeof(struct iocb *));
-	queue->aio_events = calloc(size, sizeof(struct io_event));
-	if (!queue->iocbs || !queue->aio_events)
+	err = tapdisk_queue_init_io(queue, drv);
+	if (err)
 		goto fail;
+
+	queue->iocbs = calloc(size, sizeof(struct iocb *));
+	if (!queue->iocbs) {
+		err = -errno;
+		goto fail;
+	}
 
 	err = opio_init(&queue->opioctx, size);
 	if (err)
@@ -294,21 +520,10 @@ tapdisk_init_queue(struct tqueue *queue, int size,
 void
 tapdisk_free_queue(struct tqueue *queue)
 {
-	if (queue->event >= 0) {
-		tapdisk_server_unregister_event(queue->event);
-		queue->event = -1;
-	}
-
-	if (queue->aio_ctx) {
-		io_destroy(queue->aio_ctx);
-		queue->aio_ctx = NULL;
-	}
+	tapdisk_queue_free_io(queue);
 
 	free(queue->iocbs);
 	queue->iocbs = NULL;
-
-	free(queue->aio_events);
-	queue->aio_events = NULL;
 
 	opio_free(&queue->opioctx);
 }
@@ -319,9 +534,9 @@ tapdisk_debug_queue(struct tqueue *queue)
 	struct tiocb *tiocb = queue->deferred.head;
 
 	WARN("TAPDISK QUEUE:\n");
-	WARN("size: %d, sync: %d, queued: %d, iocbs_pending: %d, "
+	WARN("size: %d, tio: %s, queued: %d, iocbs_pending: %d, "
 	     "tiocbs_pending: %d, tiocbs_deferred: %d, deferrals: %"PRIx64"\n",
-	     queue->size, queue->sync, queue->queued, queue->iocbs_pending,
+	     queue->size, queue->tio->name, queue->queued, queue->iocbs_pending,
 	     queue->tiocbs_pending, queue->tiocbs_deferred, queue->deferrals);
 
 	if (tiocb) {
@@ -362,42 +577,14 @@ tapdisk_queue_tiocb(struct tqueue *queue, struct tiocb *tiocb)
 		defer_tiocb(queue, tiocb);
 }
 
+
 /*
  * fail_tiocbs may queue more tiocbs
  */
 int
 tapdisk_submit_tiocbs(struct tqueue *queue)
 {
-	int merged, submitted, err = 0;
-
-	if (!queue->queued)
-		return 0;
-
-	if (queue->sync)
-		return io_synchronous_rw(queue);
-
-	tapdisk_filter_iocbs(queue->filter, queue->iocbs, queue->queued);
-	merged    = io_merge(&queue->opioctx, queue->iocbs, queue->queued);
-	submitted = io_submit(queue->aio_ctx, merged, queue->iocbs);
-
-	DBG("queued: %d, merged: %d, submitted: %d\n",
-	    queue->queued, merged, submitted);
-
-	if (submitted < 0) {
-		err = submitted;
-		submitted = 0;
-	} else if (submitted < merged)
-		err = -EIO;
-
-	queue->iocbs_pending  += submitted;
-	queue->tiocbs_pending += queue->queued;
-	queue->queued          = 0;
-
-	if (err)
-		queue->tiocbs_pending -= 
-			fail_tiocbs(queue, submitted, merged, err);
-
-	return submitted;
+	return queue->tio->tio_submit(queue);
 }
 
 int
@@ -410,40 +597,6 @@ tapdisk_submit_all_tiocbs(struct tqueue *queue)
 	} while (!tapdisk_queue_empty(queue));
 
 	return submitted;
-}
-
-static void
-tapdisk_complete_tiocbs(struct tqueue *queue)
-{
-	int i, ret, split;
-	struct iocb *iocb;
-	struct tiocb *tiocb;
-	struct io_event *ep;
-
-	ret   = io_getevents(queue->aio_ctx, 0,
-			     queue->size, queue->aio_events, NULL);
-	split = io_split(&queue->opioctx, queue->aio_events, ret);
-	tapdisk_filter_events(queue->filter, queue->aio_events, split);
-
-	DBG("events: %d, tiocbs: %d\n", ret, split);
-
-	queue->iocbs_pending  -= ret;
-	queue->tiocbs_pending -= split;
-
-	for (i = split, ep = queue->aio_events; i-- > 0; ep++) {
-		iocb  = ep->obj;
-		tiocb = (struct tiocb *)iocb->data;
-		complete_tiocb(queue, tiocb, ep->res);
-	}
-
-	queue_deferred_tiocbs(queue);
-}
-
-static void
-tapdisk_tiocb_event(event_id_t id, char mode, void *private)
-{
-	struct tqueue *queue = private;
-	tapdisk_complete_tiocbs(queue);
 }
 
 /*

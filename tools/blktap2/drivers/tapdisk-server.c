@@ -236,7 +236,8 @@ tapdisk_server_close_ipc(void)
 static int
 tapdisk_server_init_aio(void)
 {
-	return tapdisk_init_queue(&server.aio_queue, TAPDISK_TIOCBS, 0, NULL);
+	return tapdisk_init_queue(&server.aio_queue, TAPDISK_TIOCBS,
+				  TIO_DRV_LIO, NULL);
 }
 
 static void
