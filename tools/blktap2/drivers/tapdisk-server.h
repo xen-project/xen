@@ -57,7 +57,6 @@ typedef struct tapdisk_server {
 	td_ipc_t                     ipc;
 	struct list_head             vbds;
 	scheduler_t                  scheduler;
-	event_id_t                   control_event;
 	struct tqueue                aio_queue;
 	event_id_t                   aio_queue_event_id;
 } tapdisk_server_t;

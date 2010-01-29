@@ -26,7 +26,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include <stdio.h>
-#include <fcntl.h>
 #include <errno.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -223,12 +222,6 @@ tapdisk_server_send_error(const char *message)
 }
 
 static void
-tapdisk_server_read_ipc_message(event_id_t id, char mode, void *private)
-{
-	tapdisk_ipc_read(&server.ipc);
-}
-
-static void
 tapdisk_server_aio_queue_event(event_id_t id, char mode, void *private)
 {
 	tapdisk_complete_tiocbs(&server.aio_queue);
@@ -239,6 +232,18 @@ tapdisk_server_free_aio_queue(void)
 {
 	tapdisk_server_unregister_event(server.aio_queue_event_id);
 	tapdisk_free_queue(&server.aio_queue);
+}
+
+static int
+tapdisk_server_init_ipc(const char *read, const char *write)
+{
+	return tapdisk_ipc_open(&server.ipc, read, write);
+}
+
+static void
+tapdisk_server_close_ipc(void)
+{
+	tapdisk_ipc_close(&server.ipc);
 }
 
 static int
@@ -270,15 +275,7 @@ static void
 tapdisk_server_close(void)
 {
 	tapdisk_server_free_aio_queue();
-
-	if (server.control_event)
-		scheduler_unregister_event(&server.scheduler, server.control_event);
-
-	if (server.ipc.rfd != -1)
-		close(server.ipc.rfd);
-
-	if (server.ipc.wfd != -1)
-		close(server.ipc.wfd);
+	tapdisk_server_close_ipc();
 }
 
 static void
@@ -334,63 +331,26 @@ int
 tapdisk_server_initialize(const char *read, const char *write)
 {
 	int err;
-	event_id_t event_id;
 
-	event_id = 0;
 	memset(&server, 0, sizeof(tapdisk_server_t));
-	server.ipc.rfd = server.ipc.wfd = -1;
-
 	INIT_LIST_HEAD(&server.vbds);
-
-	if (read) {
-		server.ipc.rfd = open(read, O_RDWR | O_NONBLOCK);
-		if (server.ipc.rfd < 0) {
-			err = -errno;
-			EPRINTF("FD open failed %s: %d\n", read, err);
-			goto fail;
-		}
-	}
-
-	if (write) {
-		server.ipc.wfd = open(write, O_RDWR | O_NONBLOCK);
-		if (server.ipc.wfd < 0) {
-			err = -errno;
-			EPRINTF("FD open failed %s, %d\n", write, err);
-			goto fail;
-		}
-	}
 
 	scheduler_initialize(&server.scheduler);
 
-	if (read) {
-		event_id = scheduler_register_event(&server.scheduler,
-						    SCHEDULER_POLL_READ_FD,
-						    server.ipc.rfd, 0,
-						    tapdisk_server_read_ipc_message,
-						    NULL);
-		if (event_id < 0) {
-			err = event_id;
-			goto fail;
-		}
-	}
+	err = tapdisk_server_init_ipc(read, write);
+	if (err)
+		goto fail;
 
 	err = tapdisk_server_initialize_aio_queue();
 	if (err)
 		goto fail;
 
-	server.control_event = event_id;
 	server.run = 1;
 
 	return 0;
 
 fail:
-	if (server.ipc.rfd > 0)
-		close(server.ipc.rfd);
-	if (server.ipc.wfd > 0)
-		close(server.ipc.wfd);
-	if (event_id > 0)
-		scheduler_unregister_event(&server.scheduler,
-					   server.control_event);
+	tapdisk_server_close_ipc();
 	return err;
 }
 

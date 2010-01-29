@@ -29,13 +29,17 @@
 #define _TAPDISK_IPC_H_
 
 #include "tapdisk-message.h"
+#include "scheduler.h"
 
 typedef struct td_ipc_handle {
 	int                         rfd;
 	int                         wfd;
+	event_id_t		    rfd_event;
 	td_uuid_t                   uuid;
 } td_ipc_t;
 
+int tapdisk_ipc_open(td_ipc_t *ipc, const char *read, const char *write);
+void tapdisk_ipc_close(td_ipc_t *ipc);
 int tapdisk_ipc_read(td_ipc_t *ipc);
 int tapdisk_ipc_write(td_ipc_t *ipc, int type);
 int tapdisk_ipc_write_error(td_ipc_t *ipc, const char *message);

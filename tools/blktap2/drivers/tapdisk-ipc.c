@@ -30,11 +30,85 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <fcntl.h>
 
 #include "tapdisk.h"
 #include "tapdisk-ipc.h"
 #include "tapdisk-vbd.h"
 #include "tapdisk-server.h"
+
+static void
+tapdisk_ipc_read_event(event_id_t id, char mode, void *private)
+{
+	td_ipc_t *ipc = private;
+	tapdisk_ipc_read(ipc);
+}
+
+static void
+__tapdisk_ipc_init(td_ipc_t *ipc)
+{
+	ipc->rfd = -1;
+	ipc->wfd = -1;
+	ipc->rfd_event = -1;
+}
+
+int
+tapdisk_ipc_open(td_ipc_t *ipc, const char *read, const char *write)
+{
+	int err;
+
+	memset(ipc, 0, sizeof(td_ipc_t));
+	__tapdisk_ipc_init(ipc);
+
+	if (read) {
+		ipc->rfd = open(read, O_RDWR | O_NONBLOCK);
+		if (ipc->rfd < 0) {
+			err = -errno;
+			EPRINTF("FD open failed %s: %d\n", read, err);
+			goto fail;
+		}
+
+		ipc->rfd_event = 
+			tapdisk_server_register_event(SCHEDULER_POLL_READ_FD,
+						      ipc->rfd, 0,
+						      tapdisk_ipc_read_event,
+						      ipc);
+		if (ipc->rfd_event < 0) {
+			err = ipc->rfd_event;
+			goto fail;
+		}
+	}
+
+	if (write) {
+		ipc->wfd = open(write, O_RDWR | O_NONBLOCK);
+		if (ipc->wfd < 0) {
+			err = -errno;
+			EPRINTF("FD open failed %s, %d\n", write, err);
+			goto fail;
+		}
+	}
+
+	return 0;
+
+fail:
+	tapdisk_ipc_close(ipc);
+	return err;
+}
+
+void
+tapdisk_ipc_close(td_ipc_t *ipc)
+{
+	if (ipc->rfd > 0)
+		close(ipc->rfd);
+
+	if (ipc->wfd > 0)
+		close(ipc->wfd);
+
+	if (ipc->rfd_event >= 0)
+		tapdisk_server_unregister_event(ipc->rfd_event);
+
+	__tapdisk_ipc_init(ipc);
+}
 
 static int
 tapdisk_ipc_write_message(int fd, tapdisk_message_t *message, int timeout)
