@@ -209,6 +209,11 @@ int main(int argc, char *argv[])
     if (load_file(fname))
         exit(EXIT_FAILURE);
 
+    if (!data_cur) {
+        fprintf(stderr, "file %s doesn't contain any valid record\n", fname);
+        exit(EXIT_FAILURE);
+    }
+
     if (mode_init())
         exit(EXIT_FAILURE);
 
@@ -939,14 +944,15 @@ int time_mode_rebuild(uint64_t start_time, uint64_t time_scale)
     struct cpu cur_state[MAX_CPU_NR];
     uint64_t tsc = start_time;
     struct state *state;
-    uint64_t number, temp;
+    uint64_t number, temp = 0;
     int state_cur = 0;
 
     for (i = 0; i < max_cpu_num; i++)
         cur_state[i].flag = FLAG_UNKNOWN;
 
     /* allocate spaces, it may be huge... */
-    temp = (data[data_cur-1].tsc - start_time)/time_scale;
+    if (time_scale)
+        temp = (data[data_cur-1].tsc - start_time)/time_scale;
     number = 10000UL;
     if (temp < number)
         number = temp;
