@@ -121,6 +121,7 @@ DECLARE_PER_CPU(cpu_banks_t, no_cmci_banks);
 extern int cmci_support;
 extern int ser_support;
 extern int is_mc_panic;
+extern int mce_broadcast;
 extern void mcheck_mca_clearbanks(cpu_banks_t);
 
 extern mctelem_cookie_t mcheck_mca_logout(enum mca_source, cpu_banks_t,

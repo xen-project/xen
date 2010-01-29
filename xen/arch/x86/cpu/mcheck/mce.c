@@ -25,10 +25,12 @@
 
 int mce_disabled;
 invbool_param("mce", mce_disabled);
-
+static int mce_force_broadcast;
+boolean_param("mce_fb", mce_force_broadcast);
 int is_mc_panic;
 unsigned int nr_mce_banks;
 
+int mce_broadcast = 0;
 static uint64_t g_mcg_cap;
 
 /* Real value in physical CTL MSR */
@@ -588,6 +590,21 @@ int mce_available(struct cpuinfo_x86 *c)
 	return cpu_has(c, X86_FEATURE_MCE) && cpu_has(c, X86_FEATURE_MCA);
 }
 
+static int mce_is_broadcast(struct cpuinfo_x86 *c)
+{
+    if (mce_force_broadcast)
+        return 1;
+
+    /* According to Intel SDM Dec, 2009, 15.10.4.1, For processors with
+     * DisplayFamily_DisplayModel encoding of 06H_EH and above,
+     * a MCA signal is broadcast to all logical processors in the system
+     */
+    if (c->x86_vendor == X86_VENDOR_INTEL && c->x86 == 6 &&
+        c->x86_model >= 0xe)
+            return 1;
+    return 0;
+}
+
 /*
  * Check if bank 0 is usable for MCE. It isn't for AMD K7,
  * and Intel P6 family before model 0x1a.
@@ -608,12 +625,23 @@ int mce_firstbank(struct cpuinfo_x86 *c)
 /* This has to be run for each processor */
 void mcheck_init(struct cpuinfo_x86 *c)
 {
-	int inited = 0, i;
+	int inited = 0, i, broadcast;
+    static int broadcast_check;
 
 	if (mce_disabled == 1) {
-		printk(XENLOG_INFO "MCE support disabled by bootparam\n");
+		dprintk(XENLOG_INFO, "MCE support disabled by bootparam\n");
 		return;
 	}
+
+    broadcast = mce_is_broadcast(c);
+    if (broadcast_check && (broadcast != mce_broadcast) )
+            dprintk(XENLOG_INFO,
+                "CPUs have mixed broadcast support"
+                "may cause undetermined result!!!\n");
+
+    broadcast_check = 1;
+    if (broadcast)
+        mce_broadcast = broadcast;
 
 	for (i = 0; i < MAX_NR_BANKS; i++)
 		set_bit(i,mca_allbanks);
@@ -1542,14 +1570,17 @@ long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)
 
 		if (target >= NR_CPUS)
 			return x86_mcerr("do_mca #MC: bad target", -EINVAL);
-		       
+
 		if (!cpu_isset(target, cpu_online_map))
 			return x86_mcerr("do_mca #MC: target offline", -EINVAL);
 
 		add_taint(TAINT_ERROR_INJECT);
 
-		on_selected_cpus(cpumask_of(target), x86_mc_mceinject,
-		                 mc_mceinject, 1);
+        if ( mce_broadcast )
+            on_each_cpu(x86_mc_mceinject, mc_mceinject, 0);
+        else
+            on_selected_cpus(cpumask_of(target), x86_mc_mceinject,
+                  mc_mceinject, 1);
 		break;
 
 	default:

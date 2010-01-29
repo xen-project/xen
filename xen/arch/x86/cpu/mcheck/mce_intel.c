@@ -612,6 +612,8 @@ static void mce_barrier_enter(struct mce_softirq_barrier *bar)
 {
       int gen;
 
+      if (!mce_broadcast)
+          return;
       atomic_inc(&bar->ingen);
       gen = atomic_read(&bar->outgen);
       mb();
@@ -627,6 +629,8 @@ static void mce_barrier_exit(struct mce_softirq_barrier *bar)
 {
       int gen;
 
+      if (!mce_broadcast)
+          return;
       atomic_inc(&bar->outgen);
       gen = atomic_read(&bar->ingen);
       mb();
