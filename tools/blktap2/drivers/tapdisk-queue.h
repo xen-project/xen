@@ -32,6 +32,7 @@
 #include <libaio.h>
 
 #include "io-optimize.h"
+#include "scheduler.h"
 
 struct tiocb;
 struct tfilter;
@@ -57,9 +58,9 @@ struct tqueue {
 	int                   sync;
 
 	int                   poll_fd;
+	event_id_t	      event;
 	io_context_t          aio_ctx;
 	struct opioctx        opioctx;
-	int                   dummy_pipe[2];
 
 	int                   queued;
 	struct iocb         **iocbs;
@@ -104,7 +105,6 @@ void tapdisk_debug_queue(struct tqueue *);
 void tapdisk_queue_tiocb(struct tqueue *, struct tiocb *);
 int tapdisk_submit_tiocbs(struct tqueue *);
 int tapdisk_submit_all_tiocbs(struct tqueue *);
-int tapdisk_complete_tiocbs(struct tqueue *);
 int tapdisk_cancel_tiocbs(struct tqueue *);
 int tapdisk_cancel_all_tiocbs(struct tqueue *);
 void tapdisk_prep_tiocb(struct tiocb *, int, int, char *, size_t,

@@ -101,12 +101,6 @@ static void print_bytes(void *ptr, int length)
     return;
 }
 
-void
-queue_event(event_id_t id, char mode, void *private)
-{
-  tapdisk_complete_tiocbs(&server.aio_queue);
-}
-
 static void debug_output(uint64_t progress, uint64_t size)
 {
         //Output progress every PROGRESS_QUANT 

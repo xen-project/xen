@@ -221,19 +221,6 @@ tapdisk_server_send_error(const char *message)
 		tapdisk_ipc_write_error(&vbd->ipc, message);
 }
 
-static void
-tapdisk_server_aio_queue_event(event_id_t id, char mode, void *private)
-{
-	tapdisk_complete_tiocbs(&server.aio_queue);
-}
-
-static void
-tapdisk_server_free_aio_queue(void)
-{
-	tapdisk_server_unregister_event(server.aio_queue_event_id);
-	tapdisk_free_queue(&server.aio_queue);
-}
-
 static int
 tapdisk_server_init_ipc(const char *read, const char *write)
 {
@@ -247,34 +234,21 @@ tapdisk_server_close_ipc(void)
 }
 
 static int
-tapdisk_server_initialize_aio_queue(void)
+tapdisk_server_init_aio(void)
 {
-	int err;
-	event_id_t id;
+	return tapdisk_init_queue(&server.aio_queue, TAPDISK_TIOCBS, 0, NULL);
+}
 
-	err = tapdisk_init_queue(&server.aio_queue,
-				 TAPDISK_TIOCBS, 0, NULL);
-	if (err)
-		return err;
-
-	id = tapdisk_server_register_event(SCHEDULER_POLL_READ_FD,
-					   server.aio_queue.poll_fd, 0,
-					   tapdisk_server_aio_queue_event,
-					   NULL);
-	if (id < 0) {
-		tapdisk_free_queue(&server.aio_queue);
-		return id;
-	}
-
-	server.aio_queue_event_id = id;
-
-	return 0;
+static void
+tapdisk_server_close_aio(void)
+{
+	tapdisk_free_queue(&server.aio_queue);
 }
 
 static void
 tapdisk_server_close(void)
 {
-	tapdisk_server_free_aio_queue();
+	tapdisk_server_close_aio();
 	tapdisk_server_close_ipc();
 }
 
@@ -341,7 +315,7 @@ tapdisk_server_initialize(const char *read, const char *write)
 	if (err)
 		goto fail;
 
-	err = tapdisk_server_initialize_aio_queue();
+	err = tapdisk_server_init_aio();
 	if (err)
 		goto fail;
 

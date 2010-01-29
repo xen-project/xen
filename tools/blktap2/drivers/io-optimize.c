@@ -51,9 +51,16 @@ void
 opio_free(struct opioctx *ctx)
 {
 	free(ctx->opios);
+	ctx->opios = NULL;
+
 	free(ctx->free_opios);
+	ctx->free_opios = NULL;
+
 	free(ctx->iocb_queue);
+	ctx->iocb_queue = NULL;
+
 	free(ctx->event_queue);
+	ctx->event_queue = NULL;
 }
 
 int

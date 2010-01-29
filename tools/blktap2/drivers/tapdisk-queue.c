@@ -35,6 +35,7 @@
 #include "tapdisk-log.h"
 #include "tapdisk-queue.h"
 #include "tapdisk-filter.h"
+#include "tapdisk-server.h"
 #include "atomicio.h"
 
 #define WARN(_f, _a...) tlog_write(TLOG_WARN, _f, ##_a)
@@ -46,7 +47,7 @@
  * so that we can concurrently poll on synchronous and async descriptors.
  * This is signalled by passing 1 as the io context to io_setup.
  */
-#define REQUEST_ASYNC_FD 1
+#define REQUEST_ASYNC_FD ((io_context_t)1)
 
 static inline void
 queue_tiocb(struct tqueue *queue, struct tiocb *tiocb)
@@ -220,6 +221,8 @@ io_synchronous_rw(struct tqueue *queue)
 	return split;
 }
 
+static void tapdisk_tiocb_event(event_id_t id, char mode, void *private);
+
 int
 tapdisk_init_queue(struct tqueue *queue, int size,
 		   int sync, struct tfilter *filter)
@@ -232,18 +235,18 @@ tapdisk_init_queue(struct tqueue *queue, int size,
 	queue->sync   = sync;
 	queue->filter = filter;
 
-	if (sync) {
-		/* set up a pipe so we can return
-		 * a poll fd that won't fire. */
-		if (pipe(queue->dummy_pipe))
-			return -errno;
-		queue->poll_fd = queue->dummy_pipe[0];
-	} else {
-		queue->aio_ctx = (io_context_t)REQUEST_ASYNC_FD;
-		queue->poll_fd = io_setup(size, &queue->aio_ctx);
+	queue->event   = -1;
+	queue->aio_ctx = NULL;
 
-		if (queue->poll_fd < 0) {
-			if (queue->poll_fd == -EAGAIN)
+	if (!size)
+		return 0;
+
+	if (!sync) {
+		queue->aio_ctx = REQUEST_ASYNC_FD;
+		queue->poll_fd = io_setup(size, &queue->aio_ctx);
+		err = queue->poll_fd;
+		if (err < 0) {
+			if (err == -EAGAIN)
 				DPRINTF("Couldn't setup AIO context.  If you "
 					"are trying to concurrently use a "
 					"large number of blktap-based disks, "
@@ -256,8 +259,19 @@ tapdisk_init_queue(struct tqueue *queue, int size,
 					"support.  This is probably because "
 					"your kernel does not have the "
 					"aio-poll patch applied.\n");
-			return queue->poll_fd;
+			queue->aio_ctx = NULL;
+			goto fail;
 		}
+
+		queue->event =
+			tapdisk_server_register_event(SCHEDULER_POLL_READ_FD,
+						      queue->poll_fd, 0,
+						      tapdisk_tiocb_event,
+						      queue);
+		err = queue->event;
+		if (err < 0)
+			goto fail;
+
 	}
 
 	err               = -ENOMEM;
@@ -280,14 +294,22 @@ tapdisk_init_queue(struct tqueue *queue, int size,
 void
 tapdisk_free_queue(struct tqueue *queue)
 {
-	if (queue->sync) {
-		close(queue->dummy_pipe[0]);
-		close(queue->dummy_pipe[1]);
-	} else
+	if (queue->event >= 0) {
+		tapdisk_server_unregister_event(queue->event);
+		queue->event = -1;
+	}
+
+	if (queue->aio_ctx) {
 		io_destroy(queue->aio_ctx);
+		queue->aio_ctx = NULL;
+	}
 
 	free(queue->iocbs);
+	queue->iocbs = NULL;
+
 	free(queue->aio_events);
+	queue->aio_events = NULL;
+
 	opio_free(&queue->opioctx);
 }
 
@@ -390,7 +412,7 @@ tapdisk_submit_all_tiocbs(struct tqueue *queue)
 	return submitted;
 }
 
-int
+static void
 tapdisk_complete_tiocbs(struct tqueue *queue)
 {
 	int i, ret, split;
@@ -415,8 +437,13 @@ tapdisk_complete_tiocbs(struct tqueue *queue)
 	}
 
 	queue_deferred_tiocbs(queue);
+}
 
-	return split;
+static void
+tapdisk_tiocb_event(event_id_t id, char mode, void *private)
+{
+	struct tqueue *queue = private;
+	tapdisk_complete_tiocbs(queue);
 }
 
 /*
