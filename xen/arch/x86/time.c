@@ -906,6 +906,19 @@ void update_domain_wallclock_time(struct domain *d)
     spin_unlock(&wc_lock);
 }
 
+static void update_domain_rtc(void)
+{
+    struct domain *d;
+
+    rcu_read_lock(&domlist_read_lock);
+
+    for_each_domain ( d )
+        if ( is_hvm_domain(d) )
+            rtc_update_clock(d);
+
+    rcu_read_unlock(&domlist_read_lock);
+}
+
 void domain_set_time_offset(struct domain *d, int32_t time_offset_seconds)
 {
     d->time_offset_seconds = time_offset_seconds;
@@ -1534,6 +1547,8 @@ int time_resume(void)
     do_settime(get_cmos_time() + cmos_utc_offset, 0, NOW());
 
     update_vcpu_system_time(current);
+
+    update_domain_rtc();
 
     return 0;
 }
