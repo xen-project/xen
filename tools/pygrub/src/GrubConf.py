@@ -1,6 +1,7 @@
 #
 # GrubConf.py - Simple grub.conf parsing
 #
+# Copyright 2009 Citrix Systems Inc.
 # Copyright 2005-2006 Red Hat, Inc.
 # Jeremy Katz <katzj@redhat.com>
 #

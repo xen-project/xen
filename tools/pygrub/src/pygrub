@@ -24,6 +24,7 @@ import getopt
 import fsimage
 import grub.GrubConf
 import grub.LiloConf
+import grub.ExtLinuxConf
 
 PYGRUB_VER = 0.6
 
@@ -383,7 +384,10 @@ class Grub:
                            ["/boot/grub/menu.lst", "/boot/grub/grub.conf",
                             "/grub/menu.lst", "/grub/grub.conf"]) + \
                        map(lambda x: (x,grub.GrubConf.Grub2ConfigFile),
-                           ["/boot/grub/grub.cfg"])
+                           ["/boot/grub/grub.cfg"]) + \
+                       map(lambda x: (x,grub.ExtLinuxConf.ExtLinuxConfigFile),
+                           ["/boot/isolinux/isolinux.cfg",
+                            "/boot/extlinux.conf"])
 
         if not fs:
             # set the config file and parse it
