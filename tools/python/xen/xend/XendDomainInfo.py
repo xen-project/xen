@@ -3472,7 +3472,7 @@ class XendDomainInfo:
 
     def _checkName(self, name):
         """Check if a vm name is valid. Valid names contain alphabetic
-        characters, digits, or characters in '_-.:/+'.
+        characters, digits, or characters in '_-.:+'.
         The same name cannot be used for more than one vm at the same time.
 
         @param name: name
@@ -3483,7 +3483,7 @@ class XendDomainInfo:
         if name is None or name == '':
             raise VmError('Missing VM Name')
 
-        if not re.search(r'^[A-Za-z0-9_\-\.\:\/\+]+$', name):
+        if not re.search(r'^[A-Za-z0-9_\-\.\:\+]+$', name):
             raise VmError('Invalid VM Name')
 
         dom =  XendDomain.instance().domain_lookup_nr(name)
