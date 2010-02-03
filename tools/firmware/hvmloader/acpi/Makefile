@@ -34,7 +34,7 @@ ssdt_pm.h ssdt_tpm.h: %.h: %.asl
 
 dsdt.c: dsdt.asl mk_dsdt.c
 	$(MAKE) iasl
-	$(HOSTCC) $(HOSTCFLAGS) -o mk_dsdt mk_dsdt.c
+	$(HOSTCC) $(HOSTCFLAGS) $(CFLAGS_include) -o mk_dsdt mk_dsdt.c
 	head -n -1 $< >_dsdt.asl
 	./mk_dsdt >>_dsdt.asl
 	iasl -tc _dsdt.asl

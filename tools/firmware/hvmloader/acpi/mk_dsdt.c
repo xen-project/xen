@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <stdarg.h>
+#include <stdint.h>
+#include <xen/hvm/hvm_info_table.h>
 
 static unsigned int indent_level;
 
@@ -47,21 +49,6 @@ static void pop_block(void)
     printf("}\n");
 }
 
-static void cpu_hotplug_notify(unsigned int cpu)
-{
-    push_block("If", "LNotEqual(Arg1, \\_PR.PR%02X.FLG)", cpu);
-    stmt("Store", "Arg1, \\_PR.PR%02X.FLG", cpu);
-    push_block("If", "LEqual(Arg1, 1)");
-    stmt("Notify", "PR%02X, 1", cpu);
-    stmt("Subtract", "\\_PR.MSU, 1, \\_PR.MSU");
-    pop_block();
-    push_block("Else", NULL);
-    stmt("Notify", "PR%02X, 3", cpu);
-    stmt("Add", "\\_PR.MSU, 1, \\_PR.MSU");
-    pop_block();
-    pop_block();
-}
-
 static void pci_hotplug_notify(unsigned int slt)
 {
     stmt("Notify", "\\_SB.PCI0.S%02X, EVT", slt);
@@ -102,7 +89,7 @@ int main(void)
     pop_block();
 
     /* Define processor objects and control methods. */
-    for ( cpu = 0; cpu < 128; cpu++)
+    for ( cpu = 0; cpu < HVM_MAX_VCPUS; cpu++)
     {
         push_block("Processor", "PR%02X, %d, 0x0000b010, 0x06", cpu, cpu);
 
@@ -141,31 +128,38 @@ int main(void)
         pop_block();
     }
 
-    /* Define control method 'NTFY'. */
-    push_block("Method", "NTFY, 2");
-    decision_tree(0, 128, "Arg0", cpu_hotplug_notify);
-    stmt("Return", "One");
-    pop_block();
-
-    /* Define control method 'PRSC'. */
+    /* Operation Region 'PRST': bitmask of online CPUs. */
     stmt("OperationRegion", "PRST, SystemIO, 0xaf00, 32");
     push_block("Field", "PRST, ByteAcc, NoLock, Preserve");
-    indent(); printf("PRS, 256\n");
+    indent(); printf("PRS, %u\n", HVM_MAX_VCPUS);
     pop_block();
 
+    /* Control method 'PRSC': CPU hotplug GPE handler. */
     push_block("Method", "PRSC, 0");
-    stmt("Store", "PRS, Local3");
-    stmt("Store", "Zero, Local0");
-    push_block("While", "LLess(Local0, 32)");
-    stmt("Store", "Zero, Local1");
-    stmt("Store", "DerefOf(Index(Local3, Local0)), Local2");
-    push_block("While", "LLess(Local1, 8)");
-    stmt("NTFY", "Add(Multiply(Local0, 8), Local1), And(Local2, 1)");
-    stmt("ShiftRight", "Local2, 1, Local2");
-    stmt("Increment", "Local1");
-    pop_block();
-    stmt("Increment", "Local0");
-    pop_block();
+    stmt("Store", "PRS, Local0");
+    for ( cpu = 0; cpu < HVM_MAX_VCPUS; cpu++ )
+    {
+        /* Read a byte at a time from the PRST online-CPU bitmask. */
+        if ( (cpu & 7) == 0 )
+            stmt("Store", "DerefOf(Index(Local0, %u)), Local1", cpu/8);
+        else
+            stmt("ShiftRight", "Local1, 1, Local1");
+        /* Extract current CPU's status: 0=offline; 1=online. */
+        stmt("And", "Local1, 1, Local2");
+        /* Check if status is up-to-date in the relevant MADT LAPIC entry... */
+        push_block("If", "LNotEqual(Local2, \\_PR.PR%02X.FLG)", cpu);
+        /* ...If not, update it and the MADT checksum, and notify OSPM. */
+        stmt("Store", "Local2, \\_PR.PR%02X.FLG", cpu);
+        push_block("If", "LEqual(Local2, 1)");
+        stmt("Notify", "PR%02X, 1", cpu); /* Notify: Device Check */
+        stmt("Subtract", "\\_PR.MSU, 1, \\_PR.MSU"); /* Adjust MADT csum */
+        pop_block();
+        push_block("Else", NULL);
+        stmt("Notify", "PR%02X, 3", cpu); /* Notify: Eject Request */
+        stmt("Add", "\\_PR.MSU, 1, \\_PR.MSU"); /* Adjust MADT csum */
+        pop_block();
+        pop_block();
+    }
     stmt("Return", "One");
     pop_block();
 
