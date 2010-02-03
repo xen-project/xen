@@ -932,8 +932,6 @@ void init_xenheap_pages(paddr_t ps, paddr_t pe)
     if ( pe <= ps )
         return;
 
-    memguard_guard_range(maddr_to_virt(ps), pe - ps);
-
     /*
      * Yuk! Ensure there is a one-page buffer between Xen and Dom zones, to
      * prevent merging of power-of-two blocks across the zone boundary.
@@ -942,6 +940,8 @@ void init_xenheap_pages(paddr_t ps, paddr_t pe)
         ps += PAGE_SIZE;
     if ( !is_xen_heap_mfn(paddr_to_pfn(pe)) )
         pe -= PAGE_SIZE;
+
+    memguard_guard_range(maddr_to_virt(ps), pe - ps);
 
     init_heap_pages(maddr_to_page(ps), (pe - ps) >> PAGE_SHIFT);
 }

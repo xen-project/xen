@@ -103,7 +103,7 @@ static void map_cpu_to_logical_apicid(void);
 /* State of each CPU. */
 DEFINE_PER_CPU(int, cpu_state) = { 0 };
 
-static void *stack_base[NR_CPUS];
+void *stack_base[NR_CPUS];
 DEFINE_SPINLOCK(cpu_add_remove_lock);
 
 /*

@@ -174,7 +174,7 @@ static void update_iommu_mac(vmac_ctx_t *ctx, uint64_t pt_maddr, int level)
 }
 
 #define is_page_in_use(page) \
-    ((page->count_info & PGC_count_mask) != 0 || page->count_info == 0)
+    (page_state_is(page, inuse) || page_state_is(page, offlining))
 
 static void update_pagetable_mac(vmac_ctx_t *ctx)
 {
@@ -236,6 +236,30 @@ static void tboot_gen_domain_integrity(const uint8_t key[TB_KEY_SIZE],
     memset(&ctx, 0, sizeof(ctx));
 }
 
+/*
+ * For stack overflow detection in debug build, a guard page is set up.
+ * This fn is used to detect whether a page is in the guarded pages for
+ * the above reason.
+ */
+static int mfn_in_guarded_stack(unsigned long mfn)
+{
+    extern void *stack_base[NR_CPUS];
+    void *p;
+    int i;
+
+    for ( i = 0; i < NR_CPUS; i++ )
+    {
+        if ( !stack_base[i] )
+            continue;
+        p = (void *)((unsigned long)stack_base[i] + STACK_SIZE -
+                     PRIMARY_STACK_SIZE - PAGE_SIZE);
+        if ( mfn == virt_to_mfn(p) )
+            return -1;
+    }
+
+    return 0;
+}
+
 static void tboot_gen_xenheap_integrity(const uint8_t key[TB_KEY_SIZE],
                                         vmac_t *mac)
 {
@@ -250,8 +274,21 @@ static void tboot_gen_xenheap_integrity(const uint8_t key[TB_KEY_SIZE],
 
         if ( !mfn_valid(mfn) )
             continue;
+        if ( (mfn << PAGE_SHIFT) < __pa(&_end) )
+            continue; /* skip Xen */
+        if ( (mfn >= PFN_DOWN(g_tboot_shared->tboot_base - 3 * PAGE_SIZE))
+             && (mfn < PFN_UP(g_tboot_shared->tboot_base
+                              + g_tboot_shared->tboot_size
+                              + 3 * PAGE_SIZE)) )
+            continue; /* skip tboot and its page tables */
+
         if ( is_page_in_use(page) && is_xen_heap_page(page) ) {
-            void *pg = mfn_to_virt(mfn);
+            void *pg;
+
+            if ( mfn_in_guarded_stack(mfn) )
+                continue; /* skip guard stack, see memguard_guard_stack() in mm.c */
+
+            pg = mfn_to_virt(mfn);
             vmac_update((uint8_t *)pg, PAGE_SIZE, &ctx);
         }
     }
@@ -266,12 +303,27 @@ static void tboot_gen_xenheap_integrity(const uint8_t key[TB_KEY_SIZE],
 static void tboot_gen_frametable_integrity(const uint8_t key[TB_KEY_SIZE],
                                            vmac_t *mac)
 {
+    unsigned int sidx, eidx, nidx;
+    unsigned int max_idx = (max_pdx + PDX_GROUP_COUNT - 1)/PDX_GROUP_COUNT;
     uint8_t nonce[16] = {};
     vmac_ctx_t ctx;
 
     vmac_set_key((uint8_t *)key, &ctx);
-    *mac = vmac((uint8_t *)frame_table,
-                PFN_UP(max_pdx * sizeof(*frame_table)), nonce, NULL, &ctx);
+    for ( sidx = 0; ; sidx = nidx )
+    {
+        eidx = find_next_zero_bit(pdx_group_valid, max_idx, sidx);
+        nidx = find_next_bit(pdx_group_valid, max_idx, eidx);
+        if ( nidx >= max_idx )
+            break;
+        vmac_update((uint8_t *)pdx_to_page(sidx * PDX_GROUP_COUNT),
+                       pdx_to_page(eidx * PDX_GROUP_COUNT)
+                       - pdx_to_page(sidx * PDX_GROUP_COUNT), &ctx);
+    }
+    vmac_update((uint8_t *)pdx_to_page(sidx * PDX_GROUP_COUNT),
+                   pdx_to_page(max_pdx - 1) + 1
+                   - pdx_to_page(sidx * PDX_GROUP_COUNT), &ctx);
+
+    *mac = vmac(NULL, 0, nonce, NULL, &ctx);
 
     printk("MAC for frametable is: 0x%08"PRIx64"\n", *mac);
 
