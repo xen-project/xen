@@ -82,6 +82,12 @@
 #define TRC_MEM_PAGE_GRANT_MAP      (TRC_MEM + 1)
 #define TRC_MEM_PAGE_GRANT_UNMAP    (TRC_MEM + 2)
 #define TRC_MEM_PAGE_GRANT_TRANSFER (TRC_MEM + 3)
+#define TRC_MEM_SET_P2M_ENTRY       (TRC_MEM + 4)
+#define TRC_MEM_DECREASE_RESERVATION (TRC_MEM + 5)
+#define TRC_MEM_POD_POPULATE        (TRC_MEM + 16)
+#define TRC_MEM_POD_ZERO_RECLAIM    (TRC_MEM + 17)
+#define TRC_MEM_POD_SUPERPAGE_SPLINTER (TRC_MEM + 18)
+
 
 #define TRC_PV_HYPERCALL             (TRC_PV +  1)
 #define TRC_PV_TRAP                  (TRC_PV +  3)
@@ -149,6 +155,8 @@
 #define TRC_HVM_LMSW            (TRC_HVM_HANDLER + 0x19)
 #define TRC_HVM_LMSW64          (TRC_HVM_HANDLER + TRC_64_FLAG + 0x19)
 #define TRC_HVM_INTR_WINDOW     (TRC_HVM_HANDLER + 0x20)
+#define TRC_HVM_NPF             (TRC_HVM_HANDLER + 0x21)
+
 #define TRC_HVM_IOPORT_WRITE    (TRC_HVM_HANDLER + 0x216)
 #define TRC_HVM_IOMEM_WRITE     (TRC_HVM_HANDLER + 0x217)
 

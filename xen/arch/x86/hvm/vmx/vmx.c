@@ -2100,6 +2100,22 @@ static void ept_handle_violation(unsigned long qualification, paddr_t gpa)
     mfn_t mfn;
     p2m_type_t p2mt;
 
+    if ( tb_init_done )
+    {
+        struct {
+            uint64_t gpa;
+            uint64_t mfn;
+            u32 qualification;
+            u32 p2mt;
+        } _d;
+
+        _d.gpa = gpa;
+        _d.qualification = qualification;
+        _d.mfn = mfn_x(gfn_to_mfn_query(current->domain, gfn, &_d.p2mt));
+        
+        __trace_var(TRC_HVM_NPF, 0, sizeof(_d), (unsigned char *)&_d);
+    }
+
     if ( (qualification & EPT_GLA_VALID) &&
          hvm_hap_nested_page_fault(gfn) )
         return;

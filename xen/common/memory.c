@@ -28,6 +28,7 @@
 #include <xen/numa.h>
 #include <public/memory.h>
 #include <xsm/xsm.h>
+#include <xen/trace.h>
 
 struct memop_args {
     /* INPUT */
@@ -221,6 +222,20 @@ static void decrease_reservation(struct memop_args *a)
 
         if ( unlikely(__copy_from_guest_offset(&gmfn, a->extent_list, i, 1)) )
             goto out;
+
+        if ( tb_init_done )
+        {
+            struct {
+                u64 gfn;
+                int d:16,order:16;
+            } t;
+
+            t.gfn = gmfn;
+            t.d = a->domain->domain_id;
+            t.order = a->extent_order;
+        
+            __trace_var(TRC_MEM_DECREASE_RESERVATION, 0, sizeof(t), (unsigned char *)&t);
+        }
 
         /* See if populate-on-demand wants to handle this */
         if ( is_hvm_domain(a->domain)

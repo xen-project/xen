@@ -829,6 +829,21 @@ p2m_pod_zero_check_superpage(struct domain *d, unsigned long gfn)
             goto out_reset;
     }
 
+    if ( tb_init_done )
+    {
+        struct {
+            u64 gfn, mfn;
+            int d:16,order:16;
+        } t;
+
+        t.gfn = gfn;
+        t.mfn = mfn_x(mfn);
+        t.d = d->domain_id;
+        t.order = 9;
+
+        __trace_var(TRC_MEM_POD_ZERO_RECLAIM, 0, sizeof(t), (unsigned char *)&t);
+    }
+
     /* Finally!  We've passed all the checks, and can add the mfn superpage
      * back on the PoD cache, and account for the new p2m PoD entries */
     p2m_pod_cache_add(d, mfn_to_page(mfn0), 9);
@@ -928,6 +943,21 @@ p2m_pod_zero_check(struct domain *d, unsigned long *gfns, int count)
         }
         else
         {
+            if ( tb_init_done )
+            {
+                struct {
+                    u64 gfn, mfn;
+                    int d:16,order:16;
+                } t;
+
+                t.gfn = gfns[i];
+                t.mfn = mfn_x(mfns[i]);
+                t.d = d->domain_id;
+                t.order = 0;
+        
+                __trace_var(TRC_MEM_POD_ZERO_RECLAIM, 0, sizeof(t), (unsigned char *)&t);
+            }
+
             /* Add to cache, and account for the new p2m PoD entry */
             p2m_pod_cache_add(d, mfn_to_page(mfns[i]), 0);
             d->arch.p2m->pod.entry_count++;
@@ -1073,6 +1103,21 @@ p2m_pod_demand_populate(struct domain *d, unsigned long gfn,
     p2md->pod.entry_count -= (1 << order); /* Lock: p2m */
     BUG_ON(p2md->pod.entry_count < 0);
 
+    if ( tb_init_done )
+    {
+        struct {
+            u64 gfn, mfn;
+            int d:16,order:16;
+        } t;
+
+        t.gfn = gfn;
+        t.mfn = mfn_x(mfn);
+        t.d = d->domain_id;
+        t.order = order;
+        
+        __trace_var(TRC_MEM_POD_POPULATE, 0, sizeof(t), (unsigned char *)&t);
+    }
+
     return 0;
 out_of_memory:
     spin_unlock(&d->page_alloc_lock);
@@ -1091,6 +1136,18 @@ remap_and_retry:
     for(i=0; i<(1<<order); i++)
         set_p2m_entry(d, gfn_aligned+i, _mfn(POPULATE_ON_DEMAND_MFN), 0,
                       p2m_populate_on_demand);
+    if ( tb_init_done )
+    {
+        struct {
+            u64 gfn;
+            int d:16;
+        } t;
+
+        t.gfn = gfn;
+        t.d = d->domain_id;
+        
+        __trace_var(TRC_MEM_POD_SUPERPAGE_SPLINTER, 0, sizeof(t), (unsigned char *)&t);
+    }
 
     return 0;
 }
@@ -1140,6 +1197,23 @@ p2m_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
     l1_pgentry_t entry_content;
     l2_pgentry_t l2e_content;
     int rv=0;
+
+    if ( tb_init_done )
+    {
+        struct {
+            u64 gfn, mfn;
+            int p2mt;
+            int d:16,order:16;
+        } t;
+
+        t.gfn = gfn;
+        t.mfn = mfn_x(mfn);
+        t.p2mt = p2mt;
+        t.d = d->domain_id;
+        t.order = page_order;
+
+        __trace_var(TRC_MEM_SET_P2M_ENTRY, 0, sizeof(t), (unsigned char *)&t);
+    }
 
 #if CONFIG_PAGING_LEVELS >= 4
     if ( !p2m_next_level(d, &table_mfn, &table, &gfn_remainder, gfn,
@@ -1225,7 +1299,7 @@ p2m_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
     /* Success */
     rv = 1;
 
- out:
+out:
     unmap_domain_page(table);
     return rv;
 }
