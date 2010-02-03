@@ -17,7 +17,7 @@ all:
 	if test -d $(KERNELDIR); then $(MAKE) -C $(KERNELDIR) SUBDIRS=`pwd` modules; fi
 
 .PHONY: install
-install:
+install: all
 	if test -d $(KERNELDIR); then $(MAKE) -C $(KERNELDIR) SUBDIRS=`pwd` INSTALL_MOD_PATH=$(DESTDIR) modules_install; fi
 
 clean::
