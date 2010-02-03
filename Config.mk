@@ -150,10 +150,9 @@ QEMU_REMOTE=http://xenbits.xensource.com/git-http/qemu-xen-unstable.git
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG := xen-4.0.0-rc2
-#QEMU_TAG ?= a0066d08514ecfec34c717c7184250e95519f39c
-# Thu Jan 14 18:27:13 2010 +0000
-# use new (replacement) mmap-batch ioctl
+QEMU_TAG ?= 575ed1016f6fba1c6a6cd32a828cb468bdee96bb
+# Mon Feb 1 16:33:52 2010 +0000
+# Fix lost serial TX interrupts.  Report receive overruns.
 
 OCAML_XENSTORED_REPO=http://xenbits.xensource.com/ext/xen-ocaml-tools.hg
 
