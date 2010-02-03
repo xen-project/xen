@@ -69,7 +69,7 @@ static int check_for_xen(int pv_context)
 
  found:
     cpuid(base + 1, &eax, &ebx, &ecx, &edx, pv_context);
-    return 1;
+    return eax;
 }
 
 static jmp_buf sigill_jmp;
