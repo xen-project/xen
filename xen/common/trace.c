@@ -316,11 +316,26 @@ int tb_control(xen_sysctl_tbuf_op_t *tbc)
             tb_init_done = 1;
         break;
     case XEN_SYSCTL_TBUFOP_disable:
+    {
         /*
          * Disable trace buffers. Just stops new records from being written,
          * does not deallocate any memory.
          */
+        int i;
+
         tb_init_done = 0;
+        wmb();
+        /* Clear any lost-record info so we don't get phantom lost records next time we
+         * start tracing.  Grab the lock to make sure we're not racing anyone.  After this
+         * hypercall returns, no more records should be placed into the buffers. */
+        for_each_online_cpu(i)
+        {
+            int flags;
+            spin_lock_irqsave(&per_cpu(t_lock, i), flags);
+            per_cpu(lost_records, i)=0;
+            spin_unlock_irqrestore(&per_cpu(t_lock, i), flags);
+        }
+    }
         break;
     default:
         rc = -EINVAL;
