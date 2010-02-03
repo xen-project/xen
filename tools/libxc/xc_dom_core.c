@@ -288,7 +288,9 @@ void *xc_dom_pfn_to_ptr(struct xc_dom_image *dom, xen_pfn_t pfn,
     unsigned int page_shift = XC_DOM_PAGE_SHIFT(dom);
     char *mode = "unset";
 
-    if ( pfn > dom->total_pages )
+    if ( pfn > dom->total_pages ||    /* multiple checks to avoid overflows */
+         count > dom->total_pages ||
+         pfn > dom->total_pages - count )
     {
         xc_dom_printf("%s: pfn out of range (0x%" PRIpfn " > 0x%" PRIpfn ")\n",
                       __FUNCTION__, pfn, dom->total_pages);
