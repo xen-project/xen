@@ -118,8 +118,13 @@ int enable_ats_device(int seg, int bus, int devfn)
     u16 queue_depth;
     int pos;
 
-    if ( acpi_find_matched_atsr_unit(bus, devfn) )
+    if ( !acpi_find_matched_atsr_unit(bus, devfn) )
+    {
+        dprintk(XENLOG_WARNING VTDPREFIX,
+                "cannot find matched atsr for %x:%x.%x\n",
+                bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
         return 0;
+    }
 
     pos = pci_find_ext_capability(seg, bus, devfn, PCI_EXT_CAP_ID_ATS);
     if ( !pos )
