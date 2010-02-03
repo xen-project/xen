@@ -199,8 +199,8 @@ class Netbuffer(BufferedDevice):
         for mod in ['sch_queue', 'imq', 'ebt_imq']:
             util.runcmd(['modprobe', mod])
         util.runcmd("ip link set %s up" % (imqdev))
-        util.runcmd("ebtables -F FORWARD")
-        util.runcmd("ebtables -A FORWARD -i %s -j imq --todev %s" % (vid, imqdev))
+        util.runcmd("%s -F FORWARD" % (imqebt))
+        util.runcmd("%s -A FORWARD -i %s -j imq --todev %s" % (imqebt, vid, imqdev))
 
         return imqdev
 
