@@ -634,6 +634,8 @@ static int monitor_tbufs(void)
 
     unsigned long data_size;
 
+    int last_read = 1;
+
     /* prepare to listen for VIRQ_TBUF */
     event_init();
 
@@ -712,13 +714,21 @@ static int monitor_tbufs(void)
         }
 
         if ( interrupted )
-            break;
+        {
+            if ( last_read )
+            {
+                /* Disable tracing, then read through all the buffers one last time */
+                if ( opts.disable_tracing )
+                    disable_tbufs();
+                last_read = 0;
+                continue;
+            }
+            else
+                break;
+        }
 
         wait_for_event_or_timeout(opts.poll_sleep);
     }
-
-    if ( opts.disable_tracing )
-        disable_tbufs();
 
     if ( opts.memory_buffer )
         membuf_dump();
