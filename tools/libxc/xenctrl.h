@@ -37,6 +37,7 @@
 #if defined(__i386__) || defined(__x86_64__)
 #include <xen/foreign/x86_32.h>
 #include <xen/foreign/x86_64.h>
+#include <xen/arch-x86/xen-mca.h>
 #endif
 
 #ifdef __ia64__
@@ -1207,6 +1208,7 @@ int xc_cpuid_apply_policy(int xc,
                           domid_t domid);
 void xc_cpuid_to_str(const unsigned int *regs,
                      char **strs);
+int xc_mca_op(int xc_handle, struct xen_mc *mc);
 #endif
 
 struct xc_px_val {

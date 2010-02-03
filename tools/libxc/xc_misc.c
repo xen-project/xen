@@ -96,6 +96,27 @@ int xc_sched_id(int xc_handle,
     return 0;
 }
 
+#if defined(__i386__) || defined(__x86_64__)
+int xc_mca_op(int xc_handle, struct xen_mc *mc)
+{
+    int ret = 0;
+    DECLARE_HYPERCALL;
+
+    mc->interface_version = XEN_MCA_INTERFACE_VERSION;
+    if ( lock_pages(mc, sizeof(mc)) )
+    {
+        PERROR("Could not lock xen_mc memory\n");
+        return -EINVAL;
+    }
+
+    hypercall.op = __HYPERVISOR_mca;
+    hypercall.arg[0] = (unsigned long)mc;
+    ret = do_xen_hypercall(xc_handle, &hypercall);
+    unlock_pages(mc, sizeof(mc));
+    return ret;
+}
+#endif
+
 int xc_perfc_control(int xc_handle,
                      uint32_t opcode,
                      xc_perfc_desc_t *desc,
