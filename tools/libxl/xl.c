@@ -344,6 +344,7 @@ static char* compat_config_file(const char *filename)
     }
 
     while (!feof(s)) {
+        buf[0] = 0;
         fgets(buf, size, s);
         while (buf[strlen(buf) - 1] != '\n' && !feof(s)) {
             size += 1024;
