@@ -225,10 +225,11 @@ void __init init_frametable(void)
                               pdx_to_page(max_pdx - 1) + 1);
     else
     {
-        init_frametable_chunk(pdx_to_page(sidx *PDX_GROUP_COUNT),
-                              pdx_to_page(max_idx * PDX_GROUP_COUNT));
-        memset(pdx_to_page(max_pdx), -1, (unsigned long)pdx_to_page(max_idx) -
-                        (unsigned long)(pdx_to_page(max_pdx)));
+        init_frametable_chunk(pdx_to_page(sidx * PDX_GROUP_COUNT),
+                              pdx_to_page(max_idx * PDX_GROUP_COUNT - 1) + 1);
+        memset(pdx_to_page(max_pdx), -1,
+               (unsigned long)pdx_to_page(max_idx * PDX_GROUP_COUNT) -
+               (unsigned long)pdx_to_page(max_pdx));
     }
 }
 
