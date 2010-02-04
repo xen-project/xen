@@ -1,4 +1,4 @@
-XEN_ROOT = ../../../
+XEN_ROOT = ../../..
 include $(XEN_ROOT)/tools/Rules.mk
 
 # Init scripts.

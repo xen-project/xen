@@ -1,5 +1,5 @@
-XEN_ROOT = ../../../
-BLKTAP_ROOT := ../
+XEN_ROOT = ../../..
+BLKTAP_ROOT := ..
 include $(XEN_ROOT)/tools/Rules.mk
 
 ifeq ($(LVM_UTIL_TEST),y)

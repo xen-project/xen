@@ -1,12 +1,12 @@
-XEN_ROOT=../../../../
-BLKTAP_ROOT := ../../
+XEN_ROOT=../../../..
+BLKTAP_ROOT := ../..
 include $(XEN_ROOT)/tools/Rules.mk
 
 LIBVHD-MAJOR     = 1.0
 LIBVHD-MINOR     = 0
 LIBVHD-SONAME    = libvhd.so.$(LIBVHD-MAJOR)
 
-LVM-UTIL-OBJ    := $(BLKTAP_ROOT)lvm/lvm-util.o
+LVM-UTIL-OBJ    := $(BLKTAP_ROOT)/lvm/lvm-util.o
 
 LIBVHD-BUILD    := libvhd.a
 
