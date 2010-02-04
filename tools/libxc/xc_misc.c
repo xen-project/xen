@@ -370,37 +370,6 @@ int xc_hvm_set_mem_type(
 }
 
 
-void *xc_map_foreign_pages(int xc_handle, uint32_t dom, int prot,
-                           const xen_pfn_t *arr, int num)
-{
-    void *res;
-    int i, *err;
-
-    if (num < 0) {
-        errno = -EINVAL;
-        return NULL;
-    }
-
-    err = malloc(num * sizeof(*err));
-    if (!err)
-        return NULL;
-
-    res = xc_map_foreign_bulk(xc_handle, dom, prot, arr, err, num);
-    if (res) {
-        for (i = 0; i < num; i++) {
-            if (err[i]) {
-                errno = -err[i];
-                munmap(res, num * PAGE_SIZE);
-                res = NULL;
-                break;
-            }
-        }
-    }
-
-    free(err);
-    return res;
-}
-
 /* stub for all not yet converted OSes */
 void *
 #ifdef __GNUC__
@@ -443,6 +412,37 @@ xc_map_foreign_bulk(int xc_handle, uint32_t dom, int prot,
     free(pfn);
 
     return ret;
+}
+
+void *xc_map_foreign_pages(int xc_handle, uint32_t dom, int prot,
+                           const xen_pfn_t *arr, int num)
+{
+    void *res;
+    int i, *err;
+
+    if (num < 0) {
+        errno = -EINVAL;
+        return NULL;
+    }
+
+    err = malloc(num * sizeof(*err));
+    if (!err)
+        return NULL;
+
+    res = xc_map_foreign_bulk(xc_handle, dom, prot, arr, err, num);
+    if (res) {
+        for (i = 0; i < num; i++) {
+            if (err[i]) {
+                errno = -err[i];
+                munmap(res, num * PAGE_SIZE);
+                res = NULL;
+                break;
+            }
+        }
+    }
+
+    free(err);
+    return res;
 }
 
 /*
