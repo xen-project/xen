@@ -14,6 +14,11 @@ CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenguest) $(CFLAGS_libxenstore)
 
 LIBS = $(LDFLAGS_libxenctrl) $(LDFLAGS_libxenguest) $(LDFLAGS_libxenstore)
 
+#LIBCONFIG_URL ?= http://www.hyperrealm.com/libconfig
+LIBCONFIG_URL = $(XEN_EXTFILES_URL)
+LIBCONFIG_SOURCE = libconfig-1.3.2
+LIBCONFIG_OUTPUT = $(LIBCONFIG_SOURCE)/.libs
+
 LIBXL_OBJS-y = osdeps.o
 LIBXL_OBJS = flexarray.o libxl.o libxl_dom.o libxl_exec.o libxl_xshelp.o libxl_device.o libxl_internal.o xenguest.o libxl_utils.o $(LIBXL_OBJS-y)
 
@@ -34,11 +39,18 @@ libxenlight.so.$(MAJOR).$(MINOR): $(LIBXL_OBJS)
 libxenlight.a: $(LIBXL_OBJS)
 	$(AR) rcs libxenlight.a $^
 
-xl.o: xl.c
-	$(CC) $(CFLAGS) -c xl.c
+$(LIBCONFIG_SOURCE).tar.gz:
+	$(WGET) $(LIBCONFIG_URL)/$@
 
-$(CLIENTS): xl.o libxenlight.so
-	$(CC) $(LDFLAGS) -o $@ $< $(LIBS) -L . -lxenlight -lconfig
+$(LIBCONFIG_OUTPUT)/libconfig.so: $(LIBCONFIG_SOURCE).tar.gz
+	[ ! -d "$(LIBCONFIG_SOURCE)" ] && tar xzf $<
+	cd $(LIBCONFIG_SOURCE) && ./configure --prefix=$(PREFIX) --libdir=$(LIBDIR) --disable-cxx && $(MAKE)
+
+xl.o: $(LIBCONFIG_OUTPUT)/libconfig.so xl.c
+	$(CC) $(CFLAGS) -I$(LIBCONFIG_SOURCE) -c xl.c
+
+$(CLIENTS): xl.o libxenlight.so $(LIBCONFIG_OUTPUT)/libconfig.so
+	$(CC) $(LDFLAGS) -o $@ $< $(LIBS) -L . -lxenlight -L$(LIBCONFIG_OUTPUT) -lconfig
 
 .PHONY: install
 install: all
@@ -48,11 +60,14 @@ install: all
 	ln -sf libxenlight.so.$(MAJOR) $(DESTDIR)$(LIBDIR)/libxenlight.so
 	$(INSTALL_DATA) libxenlight.a $(DESTDIR)$(LIBDIR)
 	$(INSTALL_DATA) libxl.h $(DESTDIR)$(INCLUDEDIR)
+	cd $(LIBCONFIG_SOURCE) && DESTDIR=$(DESTDIR) $(MAKE) install
 
 .PHONY: clean
 clean:
 	$(RM) -f *.o *.so* *.a $(CLIENTS) $(DEPS)
+	$(RM) -rf $(LIBCONFIG_SOURCE)
 
 distclean: clean
+	$(RM) -f $(LIBCONFIG_SOURCE).tar.gz
 
 -include $(DEPS)
