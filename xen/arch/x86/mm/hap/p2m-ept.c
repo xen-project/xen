@@ -105,11 +105,10 @@ static int ept_set_middle_entry(struct domain *d, ept_entry_t *ept_entry)
     page_list_add_tail(pg, &d->arch.p2m->pages);
 
     ept_entry->emt = 0;
-    ept_entry->igmt = 0;
+    ept_entry->ipat = 0;
     ept_entry->sp_avail = 0;
     ept_entry->avail1 = 0;
     ept_entry->mfn = page_to_mfn(pg);
-    ept_entry->rsvd = 0;
     ept_entry->avail2 = 0;
 
     ept_entry->r = ept_entry->w = ept_entry->x = 1;
@@ -186,7 +185,7 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
     int ret = 0;
     int walk_level = order / EPT_TABLE_ORDER;
     int direct_mmio = (p2mt == p2m_mmio_direct);
-    uint8_t igmt = 0;
+    uint8_t ipat = 0;
     int need_modify_vtd_table = 1;
 
     /* We only support 4k and 2m pages now */
@@ -227,9 +226,9 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
         if ( mfn_valid(mfn_x(mfn)) || direct_mmio || p2m_is_paged(p2mt) ||
              (p2mt == p2m_ram_paging_in_start) )
         {
-            ept_entry->emt = epte_get_entry_emt(d, gfn, mfn, &igmt,
+            ept_entry->emt = epte_get_entry_emt(d, gfn, mfn, &ipat,
                                                 direct_mmio);
-            ept_entry->igmt = igmt;
+            ept_entry->ipat = ipat;
             ept_entry->sp_avail = order ? 1 : 0;
 
             if ( ret == GUEST_TABLE_SUPER_PAGE )
@@ -253,7 +252,6 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
             }
 
             ept_entry->avail1 = p2mt;
-            ept_entry->rsvd = 0;
             ept_entry->avail2 = 0;
 
             ept_p2m_type_to_flags(ept_entry, p2mt);
@@ -292,8 +290,8 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
             split_ept_entry = split_table + i;
             split_ept_entry->emt = epte_get_entry_emt(d, gfn - offset + i,
                                                       _mfn(super_mfn + i),
-                                                      &igmt, direct_mmio);
-            split_ept_entry->igmt = igmt;
+                                                      &ipat, direct_mmio);
+            split_ept_entry->ipat = ipat;
             split_ept_entry->sp_avail =  0;
             /* Don't increment mfn if it's a PoD mfn */
             if ( super_p2mt != p2m_populate_on_demand )
@@ -301,7 +299,6 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
             else
                 split_ept_entry->mfn = super_mfn; 
             split_ept_entry->avail1 = super_p2mt;
-            split_ept_entry->rsvd = 0;
             split_ept_entry->avail2 = 0;
 
             ept_p2m_type_to_flags(split_ept_entry, super_p2mt);
@@ -309,9 +306,9 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
 
         /* Set the destinated 4k page as normal */
         split_ept_entry = split_table + offset;
-        split_ept_entry->emt = epte_get_entry_emt(d, gfn, mfn, &igmt,
+        split_ept_entry->emt = epte_get_entry_emt(d, gfn, mfn, &ipat,
                                                   direct_mmio);
-        split_ept_entry->igmt = igmt;
+        split_ept_entry->ipat = ipat;
 
         if ( split_ept_entry->mfn == mfn_x(mfn) )
             need_modify_vtd_table = 0;
@@ -556,16 +553,16 @@ static mfn_t ept_get_entry_current(unsigned long gfn, p2m_type_t *t,
  * return 1 to not to reset ept entry.
  */
 static int need_modify_ept_entry(struct domain *d, unsigned long gfn,
-                                 mfn_t mfn, uint8_t o_igmt, uint8_t o_emt,
+                                 mfn_t mfn, uint8_t o_ipat, uint8_t o_emt,
                                  p2m_type_t p2mt)
 {
-    uint8_t igmt;
+    uint8_t ipat;
     uint8_t emt;
     int direct_mmio = (p2mt == p2m_mmio_direct);
 
-    emt = epte_get_entry_emt(d, gfn, mfn, &igmt, direct_mmio);
+    emt = epte_get_entry_emt(d, gfn, mfn, &ipat, direct_mmio);
 
-    if ( (emt == o_emt) && (igmt == o_igmt) )
+    if ( (emt == o_emt) && (ipat == o_ipat) )
         return 0;
 
     return 1; 
@@ -599,21 +596,21 @@ void ept_change_entry_emt_with_range(struct domain *d, unsigned long start_gfn,
                  * Set emt for super page.
                  */
                 order = EPT_TABLE_ORDER;
-                if ( need_modify_ept_entry(d, gfn, mfn, e.igmt, e.emt, e.avail1) )
+                if ( need_modify_ept_entry(d, gfn, mfn, e.ipat, e.emt, e.avail1) )
                     ept_set_entry(d, gfn, mfn, order, e.avail1);
                 gfn += 0x1FF;
             }
             else
             {
                 /* Change emt for partial entries of the 2m area. */
-                if ( need_modify_ept_entry(d, gfn, mfn, e.igmt, e.emt, e.avail1) )
+                if ( need_modify_ept_entry(d, gfn, mfn, e.ipat, e.emt, e.avail1) )
                     ept_set_entry(d, gfn, mfn, order, e.avail1);
                 gfn = ((gfn >> EPT_TABLE_ORDER) << EPT_TABLE_ORDER) + 0x1FF;
             }
         }
         else /* gfn assigned with 4k */
         {
-            if ( need_modify_ept_entry(d, gfn, mfn, e.igmt, e.emt, e.avail1) )
+            if ( need_modify_ept_entry(d, gfn, mfn, e.ipat, e.emt, e.avail1) )
                 ept_set_entry(d, gfn, mfn, order, e.avail1);
         }
     }

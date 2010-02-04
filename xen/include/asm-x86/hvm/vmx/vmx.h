@@ -34,12 +34,11 @@ typedef union {
         w           :   1,
         x           :   1,
         emt         :   3, /* EPT Memory type */
-        igmt        :   1, /* Ignore MTRR memory type */
+        ipat        :   1, /* Ignore PAT memory type */
         sp_avail    :   1, /* Is this a superpage? */
         avail1      :   4,
-        mfn         :   45,
-        rsvd        :   5,
-        avail2      :   2;
+        mfn         :   40,
+        avail2      :   12;
     };
     u64 epte;
 } ept_entry_t;
