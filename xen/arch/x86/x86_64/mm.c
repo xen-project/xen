@@ -1332,15 +1332,32 @@ int transfer_pages_to_heap(struct mem_hotadd_info *info)
 
 int mem_hotadd_check(unsigned long spfn, unsigned long epfn)
 {
-    unsigned long s, e, length;
+    unsigned long s, e, length, sidx, eidx;
 
-    if ( (spfn >= epfn) || (spfn < max_page) )
+    if ( (spfn >= epfn) )
+        return 0;
+
+    if (pfn_to_pdx(epfn) > (FRAMETABLE_SIZE / sizeof(*frame_table)))
         return 0;
 
     if ( (spfn | epfn) & ((1UL << PAGETABLE_ORDER) - 1) )
         return 0;
 
     if ( (spfn | epfn) & pfn_hole_mask )
+        return 0;
+
+    /* Make sure the new range is not present now */
+    sidx = ((pfn_to_pdx(spfn) + PDX_GROUP_COUNT - 1)  & ~(PDX_GROUP_COUNT - 1))
+            / PDX_GROUP_COUNT;
+    eidx = (pfn_to_pdx(epfn - 1) & ~(PDX_GROUP_COUNT - 1)) / PDX_GROUP_COUNT;
+    if (sidx >= eidx)
+        return 0;
+
+    s = find_next_zero_bit(pdx_group_valid, eidx, sidx);
+    if ( s > eidx )
+        return 0;
+    e = find_next_bit(pdx_group_valid, eidx, s);
+    if ( e < eidx )
         return 0;
 
     /* Caculate at most required m2p/compat m2p/frametable pages */
@@ -1433,8 +1450,11 @@ int memory_add(unsigned long spfn, unsigned long epfn, unsigned int pxm)
         goto destroy_frametable;
 
     /* Set max_page as setup_m2p_table will use it*/
-    max_page = epfn;
-    max_pdx = pfn_to_pdx(max_page - 1) + 1;
+    if (max_page < epfn)
+    {
+        max_page = epfn;
+        max_pdx = pfn_to_pdx(max_page - 1) + 1;
+    }
     total_pages += epfn - spfn;
 
     set_pdx_range(spfn, epfn);
@@ -1443,7 +1463,7 @@ int memory_add(unsigned long spfn, unsigned long epfn, unsigned int pxm)
     if ( ret )
         goto destroy_m2p;
 
-    for ( i = old_max; i < epfn; i++ )
+    for ( i = spfn; i < epfn; i++ )
         if ( iommu_map_page(dom0, i, i) )
             break;
 
