@@ -4456,12 +4456,14 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
 
     case XENMEM_machphys_mapping:
     {
-        static const struct xen_machphys_mapping mapping = {
+        struct xen_machphys_mapping mapping = {
             .v_start = MACH2PHYS_VIRT_START,
             .v_end   = MACH2PHYS_VIRT_END,
             .max_mfn = MACH2PHYS_NR_ENTRIES - 1
         };
 
+        if ( !mem_hotplug )
+            mapping.max_mfn = max_page - 1;
         if ( copy_to_guest(arg, &mapping, 1) )
             return -EFAULT;
 
