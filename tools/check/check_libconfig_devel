@@ -1,0 +1,6 @@
+#!/bin/sh
+# CHECK-BUILD
+
+. ./funcs.sh
+
+has_header libconfig.h || fail "missing libconfig headers (package libconfig-devel)"
