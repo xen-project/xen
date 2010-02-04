@@ -19,6 +19,7 @@ from xen.xend import uuid
 from xen.xend import sxp
 from xen.xend.XendConstants import AUTO_PHP_SLOT
 from xen.xend.XendSXPDev import dev_dict_to_sxp
+from xen.xend.XendLogging import log
 
 # for 2.3 compatibility
 try:
@@ -93,6 +94,21 @@ VENDOR_INTEL  = 0x8086
 PCI_CAP_ID_VENDOR_SPECIFIC_CAP = 0x09
 PCI_CLASS_ID_USB = 0x0c03
 PCI_USB_FLRCTRL = 0x4
+
+PCI_DEVICE_ID = 0x02
+PCI_COMMAND = 0x04
+PCI_CLASS_ID_VGA = 0x0300
+
+PCI_DEVICE_ID_IGFX_GM45 = 0x2a42
+PCI_DEVICE_ID_IGFX_EAGLELAKE = 0x2e02
+PCI_DEVICE_ID_IGFX_Q45 = 0x2e12
+PCI_DEVICE_ID_IGFX_G45 = 0x2e22
+PCI_DEVICE_ID_IGFX_G41 = 0x2e32
+
+PCI_CAP_IGFX_CAP09_OFFSET = 0xa4
+PCI_CAP_IGFX_CAP13_OFFSET = 0xa4
+PCI_CAP_IGFX_GDRST = 0X0d
+PCI_CAP_IGFX_GDRST_OFFSET = 0xc0
 
 # The VF of Intel 82599 10GbE Controller
 # See http://download.intel.com/design/network/datashts/82599_datasheet.pdf
@@ -831,6 +847,45 @@ class PciDevice:
         if not self.do_Dstate_transition():
             self.do_vendor_specific_FLR_method()
 
+    def do_AF_FLR(self, af_pos):
+        ''' use PCI Advanced Capability to do FLR
+        '''
+        (pci_list, cfg_list) = save_pci_conf_space([self.name])
+        self.pci_conf_write8(af_pos + PCI_AF_CTL, PCI_AF_CTL_FLR)
+        time.sleep(0.100)
+        restore_pci_conf_space((pci_list, cfg_list))
+
+    def do_FLR_for_intel_4Series_iGFX(self):
+        af_pos = PCI_CAP_IGFX_CAP13_OFFSET
+        self.do_AF_FLR(af_pos)
+        log.debug("Intel 4 Series iGFX FLR done")
+
+    def do_FLR_for_GM45_iGFX(self):
+        reg32 = self.pci_conf_read32(PCI_CAP_IGFX_CAP09_OFFSET)
+        if ((reg32 >> 16) & 0x000000FF) != 0x06 or \
+            ((reg32 >> 24) & 0x000000F0) != 0x20:
+            return
+
+        self.pci_conf_write8(PCI_CAP_IGFX_GDRST_OFFSET, PCI_CAP_IGFX_GDRST)
+        for i in range(0, 10):
+            time.sleep(0.100)
+            reg8 = self.pci_conf_read8(PCI_CAP_IGFX_GDRST_OFFSET)
+            if (reg8 & 0x01) == 0:
+                break
+            if i == 10:
+                log.debug("Intel iGFX FLR fail on GM45")
+                return
+
+        # This specific reset will hang if the command register does not have
+        # memory space access enabled
+        cmd = self.pci_conf_read16(PCI_COMMAND)
+        self.pci_conf_write16(PCI_COMMAND, (cmd | 0x02))
+        af_pos = PCI_CAP_IGFX_CAP09_OFFSET
+        self.do_AF_FLR(af_pos)
+        self.pci_conf_write16(PCI_COMMAND, cmd)
+
+        log.debug("Intel iGFX FLR on GM45 done")
+
     def find_all_the_multi_functions(self):
         sysfs_mnt = find_sysfs_mnt()
         parentdict = self.find_parent()
@@ -1104,15 +1159,29 @@ class PciDevice:
         else:
             # For PCI device on host bus, we test "PCI Advanced Capabilities".
             if self.bus == 0 and self.pci_af_flr:
-                (pci_list, cfg_list) = save_pci_conf_space([self.name])
-                # We use Advanced Capability to do FLR.
-                pos = self.find_cap_offset(PCI_CAP_ID_AF)
-                self.pci_conf_write8(pos + PCI_AF_CTL, PCI_AF_CTL_FLR)
-                time.sleep(0.100)
-                restore_pci_conf_space((pci_list, cfg_list))
+                af_pos = self.find_cap_offset(PCI_CAP_ID_AF)
+                self.do_AF_FLR(af_pos)
             else:
                 if self.bus == 0:
-                    self.do_FLR_for_integrated_device()
+                    if self.slot == 0x02 and self.func == 0x0:
+                        vendor_id = self.pci_conf_read16(PCI_VENDOR_ID)
+                        if vendor_id != VENDOR_INTEL:
+                            return
+                        class_id = self.pci_conf_read16(PCI_CLASS_DEVICE)
+                        if class_id !=  PCI_CLASS_ID_VGA:
+                            return
+                        device_id = self.pci_conf_read16(PCI_DEVICE_ID)
+                        if device_id == PCI_DEVICE_ID_IGFX_GM45:
+                            self.do_FLR_for_GM45_iGFX()
+                        elif device_id == PCI_DEVICE_ID_IGFX_EAGLELAKE or \
+                             device_id == PCI_DEVICE_ID_IGFX_Q45 or \
+                             device_id == PCI_DEVICE_ID_IGFX_G45 or \
+                             device_id == PCI_DEVICE_ID_IGFX_G41:
+                            self.do_FLR_for_intel_4Series_iGFX()
+                        else:
+                            log.debug("Unknown iGFX device_id:%x", device_id)
+                    else:
+                        self.do_FLR_for_integrated_device()
                 else:
                     devs = self.find_coassigned_pci_devices(False)
                     # Remove the element 0 which is a bridge
