@@ -44,12 +44,17 @@ struct tc_queue_qopt {
 };
 
 /* borrowed from drivers/xen/netback/loopback.c */
+#ifdef CONFIG_X86
 static int is_foreign(unsigned long pfn)
 {
   /* NB. Play it safe for auto-translation mode. */
   return (xen_feature(XENFEAT_auto_translated_physmap) ||
          (phys_to_machine_mapping[pfn] & FOREIGN_FRAME_BIT));
 }
+#else
+/* How to detect a foreign mapping? Play it safe. */
+#define is_foreign(pfn)	(1)
+#endif
 
 static int skb_remove_foreign_references(struct sk_buff *skb)
 {
