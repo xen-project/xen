@@ -139,40 +139,88 @@ int device_physdisk_major_minor(char *physpath, int *major, int *minor)
     return 0;
 }
 
-int device_virtdisk_major_minor(char *virtpath, int *major, int *minor)
-{
-    if (strstr(virtpath, "sd") == virtpath) {
-        return -1;
-    } else if (strstr(virtpath, "xvd") == virtpath) {
-        return -1;
-    } else if (strstr(virtpath, "hd") == virtpath) {
-        char letter, letter2;
+static int device_virtdisk_matches(const char *virtpath, const char *devtype,
+                                   int *index_r, int max_index,
+                                   int *partition_r, int max_partition) {
+    const char *p;
+    char *ep;
+    int tl, c;
+    long pl;
 
-        *major = 0; *minor = 0;
-        letter = virtpath[2];
-        if (letter < 'a' || letter > 't')
-            return -1;
-        letter2 = virtpath[3];
-
-        *major = letter - 'a';
-        *minor = atoi(virtpath + 3);
+    tl = strlen(devtype);
+    if (memcmp(virtpath, devtype, tl))
         return 0;
-    } else {
-        return -1;
+
+    /* We decode the drive letter as if it were in base 52
+     * with digits a-zA-Z, more or less */
+    *index_r = -1;
+    p = virtpath + tl;
+    for (;;) {
+        c = *p++;
+        if (c >= 'a' && c <= 'z') {
+            c -= 'a';
+        } else {
+            --p;
+            break;
+        }
+        (*index_r)++;
+        (*index_r) *= 26;
+        (*index_r) += c;
+
+        if (*index_r > max_index)
+            return 0;
     }
+
+    if (!*p) {
+        *partition_r = 0;
+        return 1;
+    }
+
+    if (*p=='0')
+        return 0; /* leading zeroes not permitted in partition number */
+
+    pl = strtoul(p, &ep, 10);
+    if (pl > max_partition || *ep)
+        return 0;
+
+    *partition_r = pl;
+    return 1;
 }
 
 int device_disk_dev_number(char *virtpath)
 {
-    int majors_table[] = { 3, 22, 33, 34, 56, 57, 88, 89, 90, 91 };
-    int major, minor;
+    int disk, partition;
+    char *ep;
+    unsigned long ul;
+    int chrused;
 
-    if (strstr(virtpath, "hd") == virtpath) {
-        if (device_virtdisk_major_minor(virtpath, &major, &minor))
-            return -1;
-        return majors_table[major / 2] * 256 + (64 * (major % 2)) + minor;
-    } else if (strstr(virtpath, "xvd") == virtpath) {
-        return (202 << 8) + ((virtpath[3] - 'a') << 4) + (virtpath[4] ? (virtpath[4] - '0') : 0);
+    chrused = -1;
+    if ((sscanf(virtpath, "d%ip%i%n", &disk, &partition, &chrused)  >= 2
+         && chrused == strlen(virtpath) && disk < (1<<20) && partition < 256)
+        ||
+        device_virtdisk_matches(virtpath, "xvd",
+                                &disk, (1<<20)-1,
+                                &partition, 255)) {
+        if (disk <= 15 && partition <= 15)
+            return (202 << 8) | (disk << 4) | partition;
+        else
+            return (1 << 28) | (disk << 8) | partition;
+    }
+
+    errno = 0;
+    ul = strtoul(virtpath, &ep, 0);
+    if (!errno && !*ep && ul <= INT_MAX)
+        return ul;
+
+    if (device_virtdisk_matches(virtpath, "hd",
+                                &disk, 3,
+                                &partition, 63)) {
+        return ((disk<2 ? 3 : 22) << 8) | ((disk & 1) << 6) | partition;
+    }
+    if (device_virtdisk_matches(virtpath, "sd",
+                                &disk, 15,
+                                &partition, 15)) {
+        return (8 << 8) | (disk << 4) | partition;
     }
     return -1;
 }

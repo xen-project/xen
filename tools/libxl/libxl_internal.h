@@ -139,7 +139,6 @@ char *device_disk_backend_type_of_phystype(libxl_disk_phystype phystype);
 char *device_disk_string_of_phystype(libxl_disk_phystype phystype);
 
 int device_physdisk_major_minor(char *physpath, int *major, int *minor);
-int device_virtdisk_major_minor(char *virtpath, int *major, int *minor);
 int device_disk_dev_number(char *virtpath);
 
 int libxl_device_generic_add(struct libxl_ctx *ctx, libxl_device *device,
