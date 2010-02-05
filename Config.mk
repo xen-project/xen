@@ -150,9 +150,9 @@ QEMU_REMOTE=http://xenbits.xensource.com/git-http/qemu-xen-unstable.git
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 575ed1016f6fba1c6a6cd32a828cb468bdee96bb
-# Mon Feb 1 16:33:52 2010 +0000
-# Fix lost serial TX interrupts.  Report receive overruns.
+QEMU_TAG ?= d463cfee458bacfe1ee3cb9c3b4ce46a6be06edf
+# Thu Feb 4 17:04:48 2010 +0000
+# passthrough: support Intel IGD passthrough with VT-D
 
 OCAML_XENSTORED_REPO=http://xenbits.xensource.com/ext/xen-ocaml-tools.hg
 
