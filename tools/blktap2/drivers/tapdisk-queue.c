@@ -287,7 +287,11 @@ struct lio {
 static int
 tapdisk_lio_check_resfd(void)
 {
+#if defined(__linux__)
 	return tapdisk_linux_version() >= KERNEL_VERSION(2, 6, 22);
+#else
+	return 1;
+#endif
 }
 
 static void
