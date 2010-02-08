@@ -39,6 +39,7 @@ static struct ns16550 {
     /* UART with no IRQ line: periodically-polled I/O. */
     struct timer timer;
     unsigned int timeout_ms;
+    int probing, intr_works;
 } ns16550_com[2] = { { 0 } };
 
 /* Register offsets */
@@ -127,6 +128,13 @@ static void ns16550_interrupt(
     struct serial_port *port = dev_id;
     struct ns16550 *uart = port->uart;
 
+    if (uart->intr_works == 0)
+    {
+        uart->probing = 0;
+        uart->intr_works = 1;
+        stop_timer(&uart->timer);
+    }
+
     while ( !(ns_read_reg(uart, IIR) & IIR_NOINT) )
     {
         char lsr = ns_read_reg(uart, LSR);
@@ -142,6 +150,15 @@ static void ns16550_poll(void *data)
     struct serial_port *port = data;
     struct ns16550 *uart = port->uart;
     struct cpu_user_regs *regs = guest_cpu_user_regs();
+
+    if ( uart->intr_works )
+        return;     /* Interrupts work - no more polling */
+
+    if ( uart->probing ) {
+        uart->probing = 0;
+        if ( (ns_read_reg(uart, LSR) & 0xff) == 0xff )
+            return;     /* All bits set - probably no UART present */
+    }
 
     while ( ns_read_reg(uart, LSR) & LSR_DR )
         serial_rx_interrupt(port, regs);
@@ -230,15 +247,14 @@ static void __devinit ns16550_init_postirq(struct serial_port *port)
 
     serial_async_transmit(port);
 
+    init_timer(&uart->timer, ns16550_poll, port, 0);
+    /* Calculate time to fill RX FIFO and/or empty TX FIFO for polling. */
+    bits = uart->data_bits + uart->stop_bits + !!uart->parity;
+    uart->timeout_ms = max_t(
+        unsigned int, 1, (bits * port->tx_fifo_size * 1000) / uart->baud);
+
     if ( uart->irq == 0 )
-    {
-        /* Polled mode. Calculate time to fill RX FIFO and/or empty TX FIFO. */
-        bits = uart->data_bits + uart->stop_bits + !!uart->parity;
-        uart->timeout_ms = max_t(
-            unsigned int, 1, (bits * port->tx_fifo_size * 1000) / uart->baud);
-        init_timer(&uart->timer, ns16550_poll, port, 0);
         set_timer(&uart->timer, NOW() + MILLISECS(uart->timeout_ms));
-    }
     else
     {
         uart->irqaction.handler = ns16550_interrupt;
@@ -252,6 +268,12 @@ static void __devinit ns16550_init_postirq(struct serial_port *port)
 
         /* Enable receive and transmit interrupts. */
         ns_write_reg(uart, IER, IER_ERDAI | IER_ETHREI);
+
+        /* Do a timed write to make sure we are getting interrupts. */
+        uart->probing = 1;
+        uart->intr_works = 0;
+        ns_write_reg(uart, THR, 0xff);
+        set_timer(&uart->timer, NOW() + MILLISECS(uart->timeout_ms));
     }
 }
 
