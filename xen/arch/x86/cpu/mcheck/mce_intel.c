@@ -370,7 +370,7 @@ static void intel_UCR_handler(struct mcinfo_bank *bank,
                           }
 
                           gfn =
-                              mfn_to_gmfn(d, ((bank->mc_addr) >> PAGE_SHIFT));
+                              get_gpfn_from_mfn((bank->mc_addr) >> PAGE_SHIFT);
                           bank->mc_addr =  gfn << PAGE_SHIFT |
                                         (bank->mc_addr & (PAGE_SIZE -1 ));
                           if (fill_vmsr_data(bank, global->mc_gstatus) == -1)
@@ -663,6 +663,10 @@ static void intel_machine_check(struct cpu_user_regs * regs, long error_code)
     mctc = mcheck_mca_logout(MCA_MCE_SCAN, mca_allbanks, &bs, &clear_bank);
 
     if (bs.errcnt) {
+        /* dump MCE error */
+        if (mctc != NULL)
+            x86_mcinfo_dump(mctelem_dataptr(mctc));
+
         /*
          * Uncorrected errors must be dealth with in softirq context.
          */
@@ -690,9 +694,6 @@ static void intel_machine_check(struct cpu_user_regs * regs, long error_code)
         mce_printk(MCE_CRITICAL, "MCE: clear_bank map %lx on CPU%d\n",
                 *((unsigned long*)clear_bank), smp_processor_id());
         mcheck_mca_clearbanks(clear_bank);
-       /* Print MCE error */
-        x86_mcinfo_dump(mctelem_dataptr(mctc));
-
     } else {
         if (mctc != NULL)
             mctelem_dismiss(mctc);
