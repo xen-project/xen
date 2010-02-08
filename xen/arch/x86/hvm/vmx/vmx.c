@@ -2168,7 +2168,7 @@ static void vmx_failed_vmentry(unsigned int exit_reason,
     case EXIT_REASON_MCE_DURING_VMENTRY:
         printk("caused by machine check.\n");
         HVMTRACE_0D(MCE);
-        do_machine_check(regs);
+        /* Already handled. */
         break;
     default:
         printk("reason not known yet!");
@@ -2263,7 +2263,7 @@ err:
 
 asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
 {
-    unsigned int exit_reason, idtv_info;
+    unsigned int exit_reason, idtv_info, intr_info = 0, vector = 0;
     unsigned long exit_qualification, inst_len = 0;
     struct vcpu *v = current;
 
@@ -2285,8 +2285,22 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
     perfc_incra(vmexits, exit_reason);
 
     /* Handle the interrupt we missed before allowing any more in. */
-    if ( exit_reason == EXIT_REASON_EXTERNAL_INTERRUPT )
+    switch ( (uint16_t)exit_reason )
+    {
+    case EXIT_REASON_EXTERNAL_INTERRUPT:
         vmx_do_extint(regs);
+        break;
+    case EXIT_REASON_EXCEPTION_NMI:
+        intr_info = __vmread(VM_EXIT_INTR_INFO);
+        BUG_ON(!(intr_info & INTR_INFO_VALID_MASK));
+        vector = intr_info & INTR_INFO_VECTOR_MASK;
+        if ( vector == TRAP_machine_check )
+            do_machine_check(regs);
+        break;
+    case EXIT_REASON_MCE_DURING_VMENTRY:
+        do_machine_check(regs);
+        break;
+    }
 
     /* Now enable interrupts so it's safe to take locks. */
     local_irq_enable();
@@ -2296,8 +2310,6 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
 
     if ( v->arch.hvm_vmx.vmx_realmode )
     {
-        unsigned int vector;
-
         /* Put RFLAGS back the way the guest wants it */
         regs->eflags &= ~(X86_EFLAGS_VM | X86_EFLAGS_IOPL);
         regs->eflags |= (v->arch.hvm_vmx.vm86_saved_eflags & X86_EFLAGS_IOPL);
@@ -2307,7 +2319,6 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         switch ( exit_reason )
         {
         case EXIT_REASON_EXCEPTION_NMI:
-            vector = __vmread(VM_EXIT_INTR_INFO) & INTR_INFO_VECTOR_MASK;
             if ( vector != TRAP_page_fault
                  && vector != TRAP_nmi 
                  && vector != TRAP_machine_check ) 
@@ -2366,12 +2377,6 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
          * (1) We can get an exception (e.g. #PG) in the guest, or
          * (2) NMI
          */
-        unsigned int intr_info, vector;
-
-        intr_info = __vmread(VM_EXIT_INTR_INFO);
-        BUG_ON(!(intr_info & INTR_INFO_VALID_MASK));
-
-        vector = intr_info & INTR_INFO_VECTOR_MASK;
 
         /*
          * Re-set the NMI shadow if vmexit caused by a guest IRET fault (see 3B
@@ -2448,7 +2453,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
             break;
         case TRAP_machine_check:
             HVMTRACE_0D(MCE);
-            do_machine_check(regs);
+            /* Already handled above. */
             break;
         case TRAP_invalid_op:
             vmx_vmexit_ud_intercept(regs);
