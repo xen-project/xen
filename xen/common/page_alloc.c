@@ -1256,6 +1256,9 @@ void scrub_one_page(struct page_info *pg)
 {
     void *p = __map_domain_page(pg);
 
+    if ( unlikely(pg->count_info & PGC_broken) )
+        return;
+
 #ifndef NDEBUG
     /* Avoid callers relying on allocations returning zeroed pages. */
     memset(p, 0xc2, PAGE_SIZE);
