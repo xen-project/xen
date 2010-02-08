@@ -287,7 +287,13 @@ int main(int argc, char **argv)
 			exit(EINVAL);
 		}
 	}
-	
+
+	if (optind >= argc) {
+		fprintf(stderr, "DOMID should be specified\n");
+		fprintf(stderr, "Try `%s --help' for more information.\n",
+			argv[0]);
+		exit(EINVAL);
+	}
 	domid = strtol(argv[optind], &end, 10);
 	if (end && *end) {
 		fprintf(stderr, "Invalid DOMID `%s'\n", argv[optind]);
