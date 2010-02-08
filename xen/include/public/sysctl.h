@@ -298,6 +298,7 @@ struct xen_ondemand {
 
     uint32_t sampling_rate;
     uint32_t up_threshold;
+    uint32_t turbo_enabled;
 };
 typedef struct xen_ondemand xen_ondemand_t;
 
@@ -389,6 +390,10 @@ struct xen_sysctl_pm_op {
     /* set scheduler migration cost value */
     #define XEN_SYSCTL_pm_op_set_vcpu_migration_delay   0x24
     #define XEN_SYSCTL_pm_op_get_vcpu_migration_delay   0x25
+
+    /* enable/disable turbo mode when in dbs governor */
+    #define XEN_SYSCTL_pm_op_enable_turbo               0x26
+    #define XEN_SYSCTL_pm_op_disable_turbo              0x27
 
     uint32_t cmd;
     uint32_t cpuid;

@@ -298,7 +298,9 @@ static int get_cpufreq_para(struct xen_sysctl_pm_op *op)
             &op->u.get_para.u.ondemand.sampling_rate_max,
             &op->u.get_para.u.ondemand.sampling_rate_min,
             &op->u.get_para.u.ondemand.sampling_rate,
-            &op->u.get_para.u.ondemand.up_threshold); 
+            &op->u.get_para.u.ondemand.up_threshold);
+        op->u.get_para.u.ondemand.turbo_enabled =
+            cpufreq_dbs_get_turbo_status(op->cpuid);
     }
 
     return ret;
@@ -546,6 +548,18 @@ int do_pm_op(struct xen_sysctl_pm_op *op)
     case XEN_SYSCTL_pm_op_set_max_cstate:
     {
         acpi_set_cstate_limit(op->u.set_max_cstate);
+        break;
+    }
+
+    case XEN_SYSCTL_pm_op_enable_turbo:
+    {
+        cpufreq_dbs_enable_turbo(op->cpuid);
+        break;
+    }
+
+    case XEN_SYSCTL_pm_op_disable_turbo:
+    {
+        cpufreq_dbs_disable_turbo(op->cpuid);
         break;
     }
 

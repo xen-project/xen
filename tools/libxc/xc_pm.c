@@ -425,3 +425,28 @@ int xc_set_cpuidle_max_cstate(int xc_handle, uint32_t value)
     return do_sysctl(xc_handle, &sysctl);
 }
 
+int xc_enable_turbo(int xc_handle, int cpuid)
+{
+    DECLARE_SYSCTL;
+
+    if ( xc_handle < 0 )
+        return -EINVAL;
+
+    sysctl.cmd = XEN_SYSCTL_pm_op;
+    sysctl.u.pm_op.cmd = XEN_SYSCTL_pm_op_enable_turbo;
+    sysctl.u.pm_op.cpuid = cpuid;
+    return do_sysctl(xc_handle, &sysctl);
+}
+
+int xc_disable_turbo(int xc_handle, int cpuid)
+{
+    DECLARE_SYSCTL;
+
+    if ( xc_handle < 0 )
+        return -EINVAL;
+
+    sysctl.cmd = XEN_SYSCTL_pm_op;
+    sysctl.u.pm_op.cmd = XEN_SYSCTL_pm_op_disable_turbo;
+    sysctl.u.pm_op.cpuid = cpuid;
+    return do_sysctl(xc_handle, &sysctl);
+}

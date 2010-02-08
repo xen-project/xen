@@ -62,6 +62,8 @@ void show_help(void)
             " set-max-cstate        <num>         set the C-State limitation (<num> >= 0)\n"
             " start [seconds]                     start collect Cx/Px statistics,\n"
             "                                     output after CTRL-C or SIGINT or several seconds.\n"
+            " enable-turbo-mode     [cpuid]       enable Turbo Mode in DBS governor.\n"
+            " disable-turbo-mode    [cpuid]       disable Turbo Mode in DBS governor.\n"
             );
 }
 /* wrapper function */
@@ -527,6 +529,8 @@ static void print_cpufreq_para(int cpuid, struct xc_get_cpufreq_para *p_cpufreq)
                p_cpufreq->u.ondemand.sampling_rate);
         printf("    up_threshold     : %u\n",
                p_cpufreq->u.ondemand.up_threshold);
+        printf("    turbo mode       : %s\n",
+               p_cpufreq->u.ondemand.turbo_enabled ? "enabled" : "disabled");
     }
 
     printf("scaling_avail_freq   :");
@@ -951,6 +955,50 @@ void set_max_cstate_func(int argc, char *argv[])
     return;
 }
 
+void enable_turbo_mode(int argc, char *argv[])
+{
+    int cpuid = -1;
+
+    if ( argc > 0 && sscanf(argv[0], "%d", &cpuid) != 1 )
+        cpuid = -1;
+
+    if ( cpuid >= max_cpu_nr )
+        cpuid = -1;
+
+    if ( cpuid < 0 )
+    {
+        /* enable turbo modes on all cpus,
+         * only make effects on dbs governor */
+        int i;
+        for ( i = 0; i < max_cpu_nr; i++ )
+            xc_enable_turbo(xc_fd, i);
+    }
+    else
+        xc_enable_turbo(xc_fd, cpuid);
+}
+
+void disable_turbo_mode(int argc, char *argv[])
+{
+    int cpuid = -1;
+
+    if ( argc > 0 && sscanf(argv[0], "%d", &cpuid) != 1 )
+        cpuid = -1;
+
+    if ( cpuid >= max_cpu_nr )
+        cpuid = -1;
+
+    if ( cpuid < 0 )
+    {
+        /* disable turbo modes on all cpus,
+         * only make effects on dbs governor */
+        int i;
+        for ( i = 0; i < max_cpu_nr; i++ )
+            xc_disable_turbo(xc_fd, i);
+    }
+    else
+        xc_disable_turbo(xc_fd, cpuid);
+}
+
 struct {
     const char *name;
     void (*function)(int argc, char *argv[]);
@@ -971,6 +1019,8 @@ struct {
     { "get-vcpu-migration-delay", get_vcpu_migration_delay_func},
     { "set-vcpu-migration-delay", set_vcpu_migration_delay_func},
     { "set-max-cstate", set_max_cstate_func},
+    { "enable-turbo-mode", enable_turbo_mode },
+    { "disable-turbo-mode", disable_turbo_mode },
 };
 
 int main(int argc, char *argv[])

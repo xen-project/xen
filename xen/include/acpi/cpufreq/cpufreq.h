@@ -33,6 +33,7 @@ struct acpi_cpufreq_data {
 
 struct cpufreq_cpuinfo {
     unsigned int        max_freq;
+    unsigned int        second_max_freq;    /* P1 if Turbo Mode is on */
     unsigned int        min_freq;
     unsigned int        transition_latency; /* in 10^(-9) s = nanoseconds */
 };
@@ -222,6 +223,7 @@ struct cpu_dbs_info_s {
     int cpu;
     unsigned int enable:1;
     unsigned int stoppable:1;
+    unsigned int turbo_enabled:1;
 };
 
 int cpufreq_governor_dbs(struct cpufreq_policy *policy, unsigned int event);
@@ -236,4 +238,8 @@ int write_userspace_scaling_setspeed(unsigned int cpu, unsigned int freq);
 
 void cpufreq_dbs_timer_suspend(void);
 void cpufreq_dbs_timer_resume(void);
+
+void cpufreq_dbs_enable_turbo(int cpuid);
+void cpufreq_dbs_disable_turbo(int cpuid);
+unsigned int cpufreq_dbs_get_turbo_status(int cpuid);
 #endif /* __XEN_CPUFREQ_PM_H__ */

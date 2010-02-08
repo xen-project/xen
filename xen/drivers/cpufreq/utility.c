@@ -208,6 +208,7 @@ int cpufreq_frequency_table_cpuinfo(struct cpufreq_policy *policy,
 {
     unsigned int min_freq = ~0;
     unsigned int max_freq = 0;
+    unsigned int second_max_freq = 0;
     unsigned int i;
 
     for (i=0; (table[i].frequency != CPUFREQ_TABLE_END); i++) {
@@ -219,9 +220,21 @@ int cpufreq_frequency_table_cpuinfo(struct cpufreq_policy *policy,
         if (freq > max_freq)
             max_freq = freq;
     }
+    for (i=0; (table[i].frequency != CPUFREQ_TABLE_END); i++) {
+        unsigned int freq = table[i].frequency;
+        if (freq == CPUFREQ_ENTRY_INVALID || freq == max_freq)
+            continue;
+        if (freq > second_max_freq)
+            second_max_freq = freq;
+    }
+    if (second_max_freq == 0)
+        second_max_freq = max_freq;
+    printk(XENLOG_INFO "max_freq: %u    second_max_freq: %u\n",
+           max_freq, second_max_freq);
 
     policy->min = policy->cpuinfo.min_freq = min_freq;
     policy->max = policy->cpuinfo.max_freq = max_freq;
+    policy->cpuinfo.second_max_freq = second_max_freq;
 
     if (policy->min == ~0)
         return -EINVAL;

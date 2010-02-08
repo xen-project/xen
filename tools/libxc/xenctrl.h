@@ -1312,6 +1312,8 @@ int xc_get_vcpu_migration_delay(int xc_handle, uint32_t *value);
 int xc_get_cpuidle_max_cstate(int xc_handle, uint32_t *value);
 int xc_set_cpuidle_max_cstate(int xc_handle, uint32_t value);
 
+int xc_enable_turbo(int xc_handle, int cpuid);
+int xc_disable_turbo(int xc_handle, int cpuid);
 /**
  * tmem operations
  */
