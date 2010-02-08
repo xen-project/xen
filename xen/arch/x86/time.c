@@ -827,14 +827,14 @@ static void __update_vcpu_system_time(struct vcpu *v, int force)
     u = &vcpu_info(v, time);
 
     if ( d->arch.vtsc )
-        tsc_stamp = scale_delta(t->stime_local_stamp - d->arch.vtsc_offset,
-                                &d->arch.ns_to_vtsc);
+    {
+        u64 delta = max_t(s64, t->stime_local_stamp - d->arch.vtsc_offset, 0);
+        tsc_stamp = scale_delta(delta, &d->arch.ns_to_vtsc);
+    }
     else
+    {
         tsc_stamp = t->local_tsc_stamp;
-
-    /* Don't bother unless timestamps have changed or we are forced. */
-    if ( !force && (u->tsc_timestamp == tsc_stamp) )
-        return;
+    }
 
     memset(&_u, 0, sizeof(_u));
 
@@ -852,6 +852,11 @@ static void __update_vcpu_system_time(struct vcpu *v, int force)
         _u.tsc_to_system_mul = t->tsc_scale.mul_frac;
         _u.tsc_shift         = (s8)t->tsc_scale.shift;
     }
+
+    /* Don't bother unless timestamp record has changed or we are forced. */
+    _u.version = u->version; /* make versions match for memcmp test */
+    if ( !force && !memcmp(u, &_u, sizeof(_u)) )
+        return;
 
     /* 1. Update guest kernel version. */
     _u.version = u->version = version_update_begin(u->version);
@@ -1617,6 +1622,7 @@ void pv_soft_rdtsc(struct vcpu *v, struct cpu_user_regs *regs, int rdtscp)
 {
     s_time_t now = get_s_time();
     struct domain *d = v->domain;
+    u64 delta;
 
     spin_lock(&d->arch.vtsc_lock);
 
@@ -1632,7 +1638,8 @@ void pv_soft_rdtsc(struct vcpu *v, struct cpu_user_regs *regs, int rdtscp)
 
     spin_unlock(&d->arch.vtsc_lock);
 
-    now = scale_delta(now - d->arch.vtsc_offset, &d->arch.ns_to_vtsc);
+    delta = max_t(s64, now - d->arch.vtsc_offset, 0);
+    now = scale_delta(delta, &d->arch.ns_to_vtsc);
 
     regs->eax = (uint32_t)now;
     regs->edx = (uint32_t)(now >> 32);
@@ -1693,7 +1700,9 @@ void tsc_get_info(struct domain *d, uint32_t *tsc_mode,
                   uint32_t *incarnation)
 {
     *incarnation = d->arch.incarnation;
-    switch ( *tsc_mode = d->arch.tsc_mode )
+    *tsc_mode = d->arch.tsc_mode;
+
+    switch ( *tsc_mode )
     {
     case TSC_MODE_NEVER_EMULATE:
         *elapsed_nsec =  *gtsc_khz = 0;
@@ -1707,7 +1716,9 @@ void tsc_get_info(struct domain *d, uint32_t *tsc_mode,
         {
             *elapsed_nsec = get_s_time() - d->arch.vtsc_offset;
             *gtsc_khz =  d->arch.tsc_khz;
-        }  else {
+        }
+        else
+        {
             uint64_t tsc = 0;
             rdtscll(tsc);
             *elapsed_nsec = scale_delta(tsc,&d->arch.vtsc_to_ns);
@@ -1719,15 +1730,20 @@ void tsc_get_info(struct domain *d, uint32_t *tsc_mode,
         {
             *elapsed_nsec = get_s_time() - d->arch.vtsc_offset;
             *gtsc_khz =  cpu_khz;
-        } else {
+        }
+        else
+        {
             uint64_t tsc = 0;
             rdtscll(tsc);
-            *elapsed_nsec = scale_delta(tsc,&d->arch.vtsc_to_ns) -
-                            d->arch.vtsc_offset;
+            *elapsed_nsec = (scale_delta(tsc,&d->arch.vtsc_to_ns) -
+                             d->arch.vtsc_offset);
             *gtsc_khz = 0; /* ignored by tsc_set_info */
         }
         break;
     }
+
+    if ( (int64_t)*elapsed_nsec < 0 )
+        *elapsed_nsec = 0;
 }
 
 /*
