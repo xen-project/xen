@@ -15,6 +15,7 @@
  */
 
 #include "xc_private.h"
+#include <xen/trace.h>
 
 static int tbuf_enable(int xc_handle, int enable)
 {
@@ -44,6 +45,7 @@ int xc_tbuf_set_size(int xc_handle, unsigned long size)
 
 int xc_tbuf_get_size(int xc_handle, unsigned long *size)
 {
+    struct t_info *t_info;
     int rc;
     DECLARE_SYSCTL;
 
@@ -52,9 +54,19 @@ int xc_tbuf_get_size(int xc_handle, unsigned long *size)
     sysctl.u.tbuf_op.cmd  = XEN_SYSCTL_TBUFOP_get_info;
 
     rc = xc_sysctl(xc_handle, &sysctl);
-    if (rc == 0)
-        *size = sysctl.u.tbuf_op.size;
-    return rc;
+    if ( rc != 0 )
+        return rc;
+
+    t_info = xc_map_foreign_range(xc_handle, DOMID_XEN,
+                    sysctl.u.tbuf_op.size, PROT_READ | PROT_WRITE,
+                    sysctl.u.tbuf_op.buffer_mfn);
+
+    if ( t_info == NULL || t_info->tbuf_size == 0 )
+        return -1;
+
+    *size = t_info->tbuf_size;
+
+    return 0;
 }
 
 int xc_tbuf_enable(int xc_handle, unsigned long pages, unsigned long *mfn,
