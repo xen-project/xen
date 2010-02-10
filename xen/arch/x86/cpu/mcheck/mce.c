@@ -300,13 +300,15 @@ mctelem_cookie_t mcheck_mca_logout(enum mca_source who, cpu_banks_t bankmask,
 
 	if (mci != NULL && errcnt > 0) {
 		x86_mcinfo_lookup(mic, mci, MC_TYPE_GLOBAL);
-		mig = (struct mcinfo_global *)mic;
-		if (pcc)
-			mcg.mc_flags |= MC_FLAG_UNCORRECTABLE;
+		mig = container_of(mic, struct mcinfo_global, common);
+		if (mic == NULL)
+			;
+		else if (pcc)
+			mig->mc_flags |= MC_FLAG_UNCORRECTABLE;
 		else if (uc)
-			mcg.mc_flags |= MC_FLAG_RECOVERABLE;
+			mig->mc_flags |= MC_FLAG_RECOVERABLE;
 		else
-			mcg.mc_flags |= MC_FLAG_CORRECTABLE;
+			mig->mc_flags |= MC_FLAG_CORRECTABLE;
 	}
 
 

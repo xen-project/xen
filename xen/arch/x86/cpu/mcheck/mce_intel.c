@@ -225,22 +225,13 @@ static struct bank_entry* alloc_bank_entry(void) {
       for vMCE# MSRs virtualization
 */
 
-static int fill_vmsr_data(struct mcinfo_bank *mc_bank, 
+static int fill_vmsr_data(struct mcinfo_bank *mc_bank, struct domain *d,
         uint64_t gstatus) {
-    struct domain *d;
     struct bank_entry *entry;
 
     /* This error bank impacts one domain, we need to fill domain related
      * data for vMCE MSRs virtualization and vMCE# injection */
     if (mc_bank->mc_domid != (uint16_t)~0) {
-        d = get_domain_by_id(mc_bank->mc_domid);
-
-        /* Not impact a valid domain, skip this error of the bank */
-        if (!d) {
-            mce_printk(MCE_QUIET, "MCE: Not found valid impacted DOM\n");
-            return 0;
-        }
-
         /* For HVM guest, Only when first vMCE is consumed by HVM guest successfully,
          * will we generete another node and inject another vMCE
          */
@@ -365,15 +356,18 @@ static void intel_UCR_handler(struct mcinfo_bank *bank,
                           if ( mca_ctl_conflict(bank, d) )
                           {
                               /* Guest has different MCE ctl with hypervisor */
-                              put_domain(d);
+                              if ( d )
+                                  put_domain(d);
                               return;
                           }
 
+                          ASSERT(d);
                           gfn =
                               get_gpfn_from_mfn((bank->mc_addr) >> PAGE_SHIFT);
                           bank->mc_addr =  gfn << PAGE_SHIFT |
                                         (bank->mc_addr & (PAGE_SIZE -1 ));
-                          if (fill_vmsr_data(bank, global->mc_gstatus) == -1)
+                          if ( fill_vmsr_data(bank, d,
+                                              global->mc_gstatus) == -1 )
                           {
                               mce_printk(MCE_QUIET, "Fill vMCE# data for DOM%d "
                                       "failed\n", result->owner);
