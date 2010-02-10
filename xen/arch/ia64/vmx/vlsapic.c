@@ -242,7 +242,6 @@ void vtm_set_itc(VCPU *vcpu, uint64_t new_itc)
 }
 
 
-#define TIMER_SLOP (50*1000) /* ns */  /* copy from timer.c */
 extern u64 cycle_to_ns(u64 cyle);
 
 
@@ -258,7 +257,7 @@ void vtm_set_itm(VCPU *vcpu, uint64_t val)
         cur_itc = now_itc(vtm);
         if (time_before(val, cur_itc))
             val = cur_itc;
-        expires = NOW() + cycle_to_ns(val-cur_itc) + TIMER_SLOP;
+        expires = NOW() + cycle_to_ns(val-cur_itc);
         vmx_vcpu_unpend_interrupt(vcpu, ITV_VECTOR(vitv));
         set_timer(&vtm->vtm_timer, expires);
     }else{

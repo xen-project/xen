@@ -45,8 +45,6 @@ string_param("sched", opt_sched);
 int sched_smt_power_savings = 0;
 boolean_param("sched_smt_power_savings", sched_smt_power_savings);
 
-#define TIME_SLOP      (s32)MICROSECS(50)     /* allow time to slip a bit */
-
 /* Various timer handlers. */
 static void s_timer_fn(void *unused);
 static void vcpu_periodic_timer_fn(void *data);
@@ -775,8 +773,7 @@ static void vcpu_periodic_timer_work(struct vcpu *v)
 
     periodic_next_event = v->periodic_last_event + v->periodic_period;
 
-    /* The timer subsystem may call us up to TIME_SLOP ahead of deadline. */
-    if ( (now + TIME_SLOP) > periodic_next_event )
+    if ( now >= periodic_next_event )
     {
         send_timer_event(v);
         v->periodic_last_event = now;
