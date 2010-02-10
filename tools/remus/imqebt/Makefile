@@ -52,11 +52,12 @@ build: $(PROGRAMS)
 # a little scripting for a static binary, making one for ebtables-restore
 # should be completely analogous
 imqebt: extensions/ebt_*.c extensions/ebtable_*.c ebtables.c communication.c ebtables-standalone.c getethertype.c libebtc.c useful_functions.c
-	cp ebtables-standalone.c ebtables-standalone.c_ ; \
-	cp include/ebtables_u.h include/ebtables_u.h_ ; \
-	sed "s/ main(/ pseudomain(/" ebtables-standalone.c > ebtables-standalone.c__ ; \
-	mv ebtables-standalone.c__ ebtables-standalone.c ; \
+	set -e ; \
+	mv ebtables-standalone.c ebtables-standalone.c_ ; \
+	sed "s/ main(/ pseudomain(/" ebtables-standalone.c_ > ebtables-standalone.c ; \
 	printf "\nint main(int argc, char *argv[])\n{\n "  >> ebtables-standalone.c ; \
+	mv include/ebtables_u.h include/ebtables_u.h_ ; \
+	cat include/ebtables_u.h_ >include/ebtables_u.h ; \
 	for arg in $(EXT_FUNC) \
 	; do \
 	sed s/_init/_$${arg}_init/ extensions/ebt_$${arg}.c > extensions/ebt_$${arg}.c_ ; \
