@@ -2,6 +2,8 @@ obj-y += head.o
 
 head.o: reloc.S
 
-# NB. BOOT_TRAMPOLINE == 0x8c000
+BOOT_TRAMPOLINE := $(shell sed -n 's,^\#define[[:space:]]\+BOOT_TRAMPOLINE[[:space:]]\+,,p' $(BASEDIR)/include/asm-x86/config.h)
 %.S: %.c
-	RELOC=0x8c000 $(MAKE) -f build32.mk $@
+	RELOC=$(BOOT_TRAMPOLINE) $(MAKE) -f build32.mk $@
+
+reloc.S: $(BASEDIR)/include/asm-x86/config.h

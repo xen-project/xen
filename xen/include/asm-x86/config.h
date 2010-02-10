@@ -94,7 +94,7 @@
 /* Primary stack is restricted to 8kB by guard pages. */
 #define PRIMARY_STACK_SIZE 8192
 
-#define BOOT_TRAMPOLINE 0x8c000
+#define BOOT_TRAMPOLINE 0x88000
 #define bootsym_phys(sym)                                 \
     (((unsigned long)&(sym)-(unsigned long)&trampoline_start)+BOOT_TRAMPOLINE)
 #define bootsym(sym)                                      \

@@ -19,7 +19,9 @@ CFLAGS += -Werror -fno-builtin -msoft-float
 	$(OBJCOPY) -O binary $< $@
 
 %.lnk: %.o
-	$(LD) $(LDFLAGS_DIRECT) -N -Ttext 0x8c000 -o $@ $<
+	$(LD) $(LDFLAGS_DIRECT) -N -Ttext $(RELOC) -o $@ $<
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
+
+reloc.o: $(BASEDIR)/include/asm-x86/config.h
