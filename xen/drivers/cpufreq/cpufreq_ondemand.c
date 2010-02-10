@@ -345,11 +345,13 @@ struct cpufreq_governor cpufreq_gov_dbs = {
 
 static int __init cpufreq_gov_dbs_init(void)
 {
+#ifdef CONFIG_X86
     unsigned int eax = cpuid_eax(6);
     if ( eax & 0x2 ) {
         turbo_detected = 1;
         printk(XENLOG_INFO "Turbo Mode detected!\n");
     }
+#endif
     return cpufreq_register_governor(&cpufreq_gov_dbs);
 }
 __initcall(cpufreq_gov_dbs_init);
