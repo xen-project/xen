@@ -14,11 +14,7 @@
 
 #define EXPORT /* indicates code other modules are dependent upon */
 
-#ifdef __x86_64__
-EXPORT int opt_tmem = 1;
-#else
 EXPORT int opt_tmem = 0;
-#endif
 boolean_param("tmem", opt_tmem);
 
 EXPORT int opt_tmem_compress = 0;
