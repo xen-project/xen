@@ -3803,6 +3803,7 @@ int steal_page(
     struct domain *d, struct page_info *page, unsigned int memflags)
 {
     unsigned long x, y;
+    bool_t drop_dom_ref = 0;
 
     spin_lock(&d->page_alloc_lock);
 
@@ -3830,11 +3831,13 @@ int steal_page(
     } while ( (y = cmpxchg(&page->count_info, x, x | 1)) != x );
 
     /* Unlink from original owner. */
-    if ( !(memflags & MEMF_no_refcount) )
-        d->tot_pages--;
+    if ( !(memflags & MEMF_no_refcount) && !--d->tot_pages )
+        drop_dom_ref = 1;
     page_list_del(page, &d->page_list);
 
     spin_unlock(&d->page_alloc_lock);
+    if ( unlikely(drop_dom_ref) )
+        put_domain(d);
     return 0;
 
  fail:

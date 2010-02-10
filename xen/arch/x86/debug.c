@@ -252,10 +252,11 @@ dbg_rw_mem(dbgva_t addr, dbgbyte_t *buf, int len, domid_t domid, int toaddr,
         else
             len = __copy_from_user(buf, (void *)addr, len);
     }
-    else
+    else if ( dp )
     {
-        if ( dp && !dp->is_dying )   /* make sure guest is still there */
+        if ( !dp->is_dying )   /* make sure guest is still there */
             len= dbg_rw_guest_mem(addr, buf, len, dp, toaddr, pgd3);
+        put_domain(dp);
     }
 
     DBGP2("gmem:exit:len:$%d\n", len);

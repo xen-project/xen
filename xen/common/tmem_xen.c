@@ -286,17 +286,16 @@ static void tmh_persistent_pool_page_put(void *page_va)
 
 /******************  XEN-SPECIFIC CLIENT HANDLING ********************/
 
-EXPORT tmh_client_t *tmh_client_init(void)
+EXPORT tmh_client_t *tmh_client_init(cli_id_t cli_id)
 {
     tmh_client_t *tmh;
     char name[5];
-    domid_t domid = current->domain->domain_id;
     int i, shift;
 
     if ( (tmh = xmalloc(tmh_client_t)) == NULL )
         return NULL;
     for (i = 0, shift = 12; i < 4; shift -=4, i++)
-        name[i] = (((unsigned short)domid >> shift) & 0xf) + '0';
+        name[i] = (((unsigned short)cli_id >> shift) & 0xf) + '0';
     name[4] = '\0';
 #ifndef __i386__
     tmh->persistent_pool = xmem_pool_create(name, tmh_persistent_pool_page_get,
@@ -307,7 +306,6 @@ EXPORT tmh_client_t *tmh_client_init(void)
         return NULL;
     }
 #endif
-    tmh->domain = current->domain;
     return tmh;
 }
 
@@ -317,6 +315,7 @@ EXPORT void tmh_client_destroy(tmh_client_t *tmh)
     xmem_pool_destroy(tmh->persistent_pool);
 #endif
     put_domain(tmh->domain);
+    tmh->domain = NULL;
 }
 
 /******************  XEN-SPECIFIC HOST INITIALIZATION ********************/

@@ -43,8 +43,6 @@ extern rwlock_t tmem_rwlock;
 
 extern void tmh_copy_page(char *to, char*from);
 extern int tmh_init(void);
-extern tmh_client_t *tmh_client_init(void);
-extern void tmh_client_destroy(tmh_client_t *);
 #define tmh_hash hash_long
 
 extern void tmh_release_avail_pages_to_host(void);
@@ -281,6 +279,9 @@ typedef domid_t cli_id_t;
 typedef struct domain tmh_cli_ptr_t;
 typedef struct page_info pfp_t;
 
+extern tmh_client_t *tmh_client_init(cli_id_t);
+extern void tmh_client_destroy(tmh_client_t *);
+
 /* this appears to be unreliable when a domain is being shut down */
 static inline struct client *tmh_client_from_cli_id(cli_id_t cli_id)
 {
@@ -288,6 +289,11 @@ static inline struct client *tmh_client_from_cli_id(cli_id_t cli_id)
     if (d == NULL)
         return NULL;
     return (struct client *)(d->tmem);
+}
+
+static inline void tmh_client_put(tmh_client_t *tmh)
+{
+    put_domain(tmh->domain);
 }
 
 static inline struct client *tmh_client_from_current(void)
@@ -307,10 +313,12 @@ static inline tmh_cli_ptr_t *tmh_get_cli_ptr_from_current(void)
     return current->domain;
 }
 
-static inline void tmh_set_client_from_id(struct client *client,cli_id_t cli_id)
+static inline void tmh_set_client_from_id(struct client *client,
+                                          tmh_client_t *tmh, cli_id_t cli_id)
 {
     struct domain *d = get_domain_by_id(cli_id);
     d->tmem = client;
+    tmh->domain = d;
 }
 
 static inline bool_t tmh_current_is_privileged(void)
