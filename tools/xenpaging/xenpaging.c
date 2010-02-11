@@ -212,6 +212,9 @@ int xenpaging_teardown(xenpaging_t *paging)
 {
     int rc;
 
+    if ( paging == NULL )
+        return 0;
+
     /* Tear down domain paging in Xen */
     rc = xc_mem_event_disable(paging->xc_handle, paging->mem_event.domain_id);
     if ( rc != 0 )
@@ -447,19 +450,28 @@ static int evict_victim(xenpaging_t *paging, domid_t domain_id,
 
 int main(int argc, char *argv[])
 {
-    domid_t domain_id = atoi(argv[1]);
-    int num_pages = atoi(argv[2]);
+    domid_t domain_id;
+    int num_pages;
     xenpaging_t *paging;
-    xenpaging_victim_t victims[num_pages];
+    xenpaging_victim_t *victims;
     mem_event_request_t req;
     mem_event_response_t rsp;
     int i;
-    int rc;
+    int rc = -1, rc1;
 
     int open_flags = O_CREAT | O_TRUNC | O_RDWR;
     mode_t open_mode = S_IRUSR | S_IRGRP | S_IROTH | S_IWUSR | S_IWGRP | S_IWOTH;
     char filename[80];
     int fd;
+
+    if ( argc != 3 ) {
+        fprintf(stderr, "Usage: %s <domain_id> <num_pages>\n", argv[0]);
+	return -1;
+    }
+    domain_id = atoi(argv[1]);
+    num_pages = atoi(argv[2]);
+
+    victims = calloc(num_pages, sizeof(xenpaging_victim_t));
 
     /* Open file */
     sprintf(filename, "page_cache_%d", domain_id);
@@ -586,15 +598,17 @@ int main(int argc, char *argv[])
     }
 
  out:
-    /* Tear down domain paging */
-    rc = xenpaging_teardown(paging);
-    if ( rc != 0 )
-    {
-        ERROR("Error tearing down paging");
-        exit(1);
-    }
+    free(victims);
 
-    return 0;
+    /* Tear down domain paging */
+    rc1 = xenpaging_teardown(paging);
+    if ( rc1 != 0 )
+        ERROR("Error tearing down paging");
+
+    if ( rc == 0 )
+        rc = rc1;
+
+    return rc;
 }
 
 
