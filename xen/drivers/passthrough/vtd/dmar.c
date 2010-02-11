@@ -176,13 +176,18 @@ struct acpi_drhd_unit * acpi_find_matched_drhd_unit(struct pci_dev *pdev)
     if ( pdev == NULL )
         return NULL;
 
-    if (pdev->info.is_extfn) {
+    if ( pdev->info.is_extfn )
+    {
         bus = pdev->bus;
         devfn = 0;
-    } else if (pdev->info.is_virtfn) {
+    }
+    else if ( pdev->info.is_virtfn )
+    {
         bus = pdev->info.physfn.bus;
         devfn = PCI_SLOT(pdev->info.physfn.devfn) ? 0 : pdev->info.physfn.devfn;
-    } else {
+    }
+    else
+    {
         bus = pdev->bus;
         devfn = pdev->devfn;
     }
