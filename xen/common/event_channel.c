@@ -1068,7 +1068,10 @@ static void domain_dump_evtchn_info(struct domain *d)
 {
     unsigned int port;
 
-    printk("Domain %d polling vCPUs: %08lx\n", d->domain_id, d->poll_mask[0]);
+    bitmap_scnlistprintf(keyhandler_scratch, sizeof(keyhandler_scratch),
+                         d->poll_mask, d->max_vcpus);
+    printk("Domain %d polling vCPUs: {%s}\n",
+           d->domain_id, keyhandler_scratch);
 
     if ( !spin_trylock(&d->event_lock) )
         return;
