@@ -57,7 +57,7 @@ LIBAIO_DIR = $(XEN_ROOT)/tools/libaio/src
 MEMSHR_DIR = $(XEN_ROOT)/tools/memshr
 
 MEMSHRLIBS :=
-ifeq ($(CONFIG_Linux), y)
+ifeq ($(CONFIG_Linux), __fixme__)
 CFLAGS += -DMEMSHR
 MEMSHRLIBS += $(MEMSHR_DIR)/libmemshr.a
 endif
