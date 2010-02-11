@@ -623,7 +623,8 @@ static int __init acpi_parse_dmar(struct acpi_table_header *table)
     if ( !dmar->width )
     {
         dprintk(XENLOG_WARNING VTDPREFIX, "Zero: Invalid DMAR width\n");
-        return -EINVAL;
+        ret = -EINVAL;
+        goto out;
     }
 
     dmar_host_address_width = dmar->width + 1;
