@@ -71,9 +71,12 @@ static void decision_tree(
     pop_block();
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
-    unsigned int slot, dev, intx, link, cpu;
+    unsigned int slot, dev, intx, link, cpu, max_cpus = HVM_MAX_VCPUS;
+
+    /* Extract optional maximum-cpu specification from invocation name. */
+    sscanf(argv[0], "%*[^0-9]%u", &max_cpus); /* e.g., ./mk_dsdt15 */
 
     /**** DSDT DefinitionBlock start ****/
     /* (we append to existing DSDT definition block) */
@@ -89,7 +92,7 @@ int main(void)
     pop_block();
 
     /* Define processor objects and control methods. */
-    for ( cpu = 0; cpu < HVM_MAX_VCPUS; cpu++)
+    for ( cpu = 0; cpu < max_cpus; cpu++)
     {
         push_block("Processor", "PR%02X, %d, 0x0000b010, 0x06", cpu, cpu);
 
@@ -131,13 +134,13 @@ int main(void)
     /* Operation Region 'PRST': bitmask of online CPUs. */
     stmt("OperationRegion", "PRST, SystemIO, 0xaf00, 32");
     push_block("Field", "PRST, ByteAcc, NoLock, Preserve");
-    indent(); printf("PRS, %u\n", HVM_MAX_VCPUS);
+    indent(); printf("PRS, %u\n", max_cpus);
     pop_block();
 
     /* Control method 'PRSC': CPU hotplug GPE handler. */
     push_block("Method", "PRSC, 0");
     stmt("Store", "PRS, Local0");
-    for ( cpu = 0; cpu < HVM_MAX_VCPUS; cpu++ )
+    for ( cpu = 0; cpu < max_cpus; cpu++ )
     {
         /* Read a byte at a time from the PRST online-CPU bitmask. */
         if ( (cpu & 7) == 0 )

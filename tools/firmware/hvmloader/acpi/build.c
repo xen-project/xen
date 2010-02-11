@@ -33,8 +33,20 @@ extern struct acpi_20_rsdt Rsdt;
 extern struct acpi_20_xsdt Xsdt;
 extern struct acpi_20_fadt Fadt;
 extern struct acpi_20_facs Facs;
-extern unsigned char Dsdt[];
-extern int DsdtLen;
+
+/*
+ * Alternative DSDTs we get linked against. A cover-all DSDT for up to the
+ * implementation-defined maximum number of VCPUs, and an alternative for use
+ * when a guest can only have up to 15 VCPUs.
+ * 
+ * The latter is required for Windows 2000, which experiences a BSOD of
+ * KMODE_EXCEPTION_NOT_HANDLED if it sees more than 15 processor objects.
+ */
+extern unsigned char _dsdt[], _dsdt15;
+extern int _dsdt_len, _dsdt15_len;
+
+/* Number of processor objects in the chosen DSDT. */
+static unsigned int nr_processor_objects;
 
 static void set_checksum(
     void *table, uint32_t checksum_offset, uint32_t length)
@@ -115,7 +127,7 @@ static int construct_madt(struct acpi_20_madt *madt)
 
     lapic = (struct acpi_20_madt_lapic *)(io_apic + 1);
     madt_lapic0_addr = (uint32_t)lapic;
-    for ( i = 0; i < HVM_MAX_VCPUS; i++ )
+    for ( i = 0; i < nr_processor_objects; i++ )
     {
         memset(lapic, 0, sizeof(*lapic));
         lapic->type    = ACPI_PROCESSOR_LOCAL_APIC;
@@ -251,8 +263,18 @@ static void __acpi_build_tables(uint8_t *buf, int *low_sz, int *high_sz)
     offset += align16(sizeof(struct acpi_20_facs));
 
     dsdt = (unsigned char *)&buf[offset];
-    memcpy(dsdt, &Dsdt, DsdtLen);
-    offset += align16(DsdtLen);
+    if ( hvm_info->nr_vcpus <= 15 )
+    {
+        memcpy(dsdt, &_dsdt15, _dsdt15_len);
+        offset += align16(_dsdt15_len);
+        nr_processor_objects = 15;
+    }
+    else
+    {
+        memcpy(dsdt, &_dsdt, _dsdt_len);
+        offset += align16(_dsdt_len);
+        nr_processor_objects = HVM_MAX_VCPUS;
+    }
 
     /*
      * N.B. ACPI 1.0 operating systems may not handle FADT with revision 2
