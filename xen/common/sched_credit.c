@@ -21,6 +21,7 @@
 #include <xen/softirq.h>
 #include <asm/atomic.h>
 #include <xen/errno.h>
+#include <xen/keyhandler.h>
 
 /*
  * CSCHED_STATS
@@ -1241,7 +1242,7 @@ csched_dump_pcpu(int cpu)
     struct csched_pcpu *spc;
     struct csched_vcpu *svc;
     int loop;
-    char cpustr[100];
+#define cpustr keyhandler_scratch
 
     spc = CSCHED_PCPU(cpu);
     runq = &spc->runq;
@@ -1269,6 +1270,7 @@ csched_dump_pcpu(int cpu)
             csched_dump_vcpu(svc);
         }
     }
+#undef cpustr
 }
 
 static void
@@ -1276,7 +1278,7 @@ csched_dump(void)
 {
     struct list_head *iter_sdom, *iter_svc;
     int loop;
-    char idlers_buf[100];
+#define idlers_buf keyhandler_scratch
 
     printk("info:\n"
            "\tncpus              = %u\n"
@@ -1323,6 +1325,7 @@ csched_dump(void)
             csched_dump_vcpu(svc);
         }
     }
+#undef idlers_buf
 }
 
 static void

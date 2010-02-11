@@ -20,19 +20,18 @@
 static struct keyhandler *key_table[256];
 static unsigned char keypress_key;
 
+char keyhandler_scratch[100];
+
 static void keypress_action(unsigned long unused)
 {
-    unsigned char key = keypress_key;
-    console_start_log_everything();
-    if ( key_table[key] != NULL )
-        (*key_table[key]->u.fn)(key);
-    console_end_log_everything();
+    handle_keypress(keypress_key, NULL);
 }
 
 static DECLARE_TASKLET(keypress_tasklet, keypress_action, 0);
 
 void handle_keypress(unsigned char key, struct cpu_user_regs *regs)
 {
+    static bool_t executing_handler;
     struct keyhandler *h;
 
     if ( (h = key_table[key]) == NULL )
@@ -40,9 +39,18 @@ void handle_keypress(unsigned char key, struct cpu_user_regs *regs)
 
     if ( !in_irq() || h->irq_callback )
     {
+        /*
+         * No concurrent handler execution: prevents garbled console and
+         * protects keyhandler_scratch[].
+         */
+        if ( test_and_set_bool(executing_handler) )
+            return;
+        wmb();
         console_start_log_everything();
-        (*h->u.irq_fn)(key, regs);
+        h->irq_callback ? (*h->u.irq_fn)(key, regs) : (*h->u.fn)(key);
         console_end_log_everything();
+        wmb();
+        executing_handler = 0;
     }
     else
     {
@@ -174,7 +182,7 @@ static void dump_domains(unsigned char key)
     struct domain *d;
     struct vcpu   *v;
     s_time_t       now = NOW();
-    char           tmpstr[100];
+#define tmpstr keyhandler_scratch
 
     printk("'%c' pressed -> dumping domain info (now=0x%X:%08X)\n", key,
            (u32)(now>>32), (u32)now);
@@ -234,6 +242,7 @@ static void dump_domains(unsigned char key)
     }
 
     rcu_read_unlock(&domlist_read_lock);
+#undef tmpstr
 }
 
 static struct keyhandler dump_domains_keyhandler = {
