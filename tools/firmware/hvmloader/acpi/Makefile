@@ -29,8 +29,8 @@ all: acpi.a
 ssdt_pm.h ssdt_tpm.h: %.h: %.asl
 	$(MAKE) iasl
 	iasl -tc $<
-	mv $*.hex $@
-	rm -f *.aml
+	sed -e 's/AmlCode/$*/g' $*.hex >$@
+	rm -f *.aml $*.hex
 
 dsdt.c: dsdt.asl mk_dsdt.c
 	$(MAKE) iasl
@@ -38,9 +38,9 @@ dsdt.c: dsdt.asl mk_dsdt.c
 	head -n -1 $< >_dsdt.asl
 	./mk_dsdt >>_dsdt.asl
 	iasl -tc _dsdt.asl
-	mv _dsdt.hex dsdt.c
-	echo "int DsdtLen=sizeof(AmlCode);" >> dsdt.c
-	rm -f *.aml _dsdt.asl mk_dsdt
+	sed -e 's/AmlCode/Dsdt/g' _dsdt.hex >dsdt.c
+	echo "int DsdtLen=sizeof(Dsdt);" >> dsdt.c
+	rm -f *.aml _dsdt.asl mk_dsdt _dsdt.hex
 
 iasl:
 	@echo

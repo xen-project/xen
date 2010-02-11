@@ -33,7 +33,7 @@ extern struct acpi_20_rsdt Rsdt;
 extern struct acpi_20_xsdt Xsdt;
 extern struct acpi_20_fadt Fadt;
 extern struct acpi_20_facs Facs;
-extern unsigned char AmlCode[];
+extern unsigned char Dsdt[];
 extern int DsdtLen;
 
 static void set_checksum(
@@ -188,8 +188,8 @@ static int construct_secondary_tables(uint8_t *buf, unsigned long *table_ptrs)
     if ( battery_port_exists() ) 
     {
         table_ptrs[nr_tables++] = (unsigned long)&buf[offset];
-        memcpy(&buf[offset], AmlCode_PM, sizeof(AmlCode_PM));
-        offset += align16(sizeof(AmlCode_PM));
+        memcpy(&buf[offset], ssdt_pm, sizeof(ssdt_pm));
+        offset += align16(sizeof(ssdt_pm));
     }
 
     /* TPM TCPA and SSDT. */
@@ -198,9 +198,9 @@ static int construct_secondary_tables(uint8_t *buf, unsigned long *table_ptrs)
          (tis_hdr[1] == tis_signature[1]) &&
          (tis_hdr[2] == tis_signature[2]) )
     {
-        memcpy(&buf[offset], AmlCode_TPM, sizeof(AmlCode_TPM));
+        memcpy(&buf[offset], ssdt_tpm, sizeof(ssdt_tpm));
         table_ptrs[nr_tables++] = (unsigned long)&buf[offset];
-        offset += align16(sizeof(AmlCode_TPM));
+        offset += align16(sizeof(ssdt_tpm));
 
         tcpa = (struct acpi_20_tcpa *)&buf[offset];
         memset(tcpa, 0, sizeof(*tcpa));
@@ -251,7 +251,7 @@ static void __acpi_build_tables(uint8_t *buf, int *low_sz, int *high_sz)
     offset += align16(sizeof(struct acpi_20_facs));
 
     dsdt = (unsigned char *)&buf[offset];
-    memcpy(dsdt, &AmlCode, DsdtLen);
+    memcpy(dsdt, &Dsdt, DsdtLen);
     offset += align16(DsdtLen);
 
     /*
