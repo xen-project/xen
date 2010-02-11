@@ -137,7 +137,7 @@
 ^tools/firmware/etherboot/gpxe/.*$
 ^tools/firmware/extboot/extboot.img$
 ^tools/firmware/extboot/signrom$
-^tools/firmware/hvmloader/acpi/acpigen$
+^tools/firmware/hvmloader/acpi/dsdt.c$
 ^tools/firmware/hvmloader/hvmloader$
 ^tools/firmware/hvmloader/roms\.h$
 ^tools/firmware/rombios/BIOS-bochs-[^/]*$
