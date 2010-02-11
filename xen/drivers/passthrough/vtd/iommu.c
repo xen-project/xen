@@ -193,6 +193,12 @@ u64 alloc_pgtable_maddr(struct acpi_drhd_unit *drhd, unsigned long npages)
     return page_to_maddr(pg);
 }
 
+void free_pgtable_maddr(u64 maddr)
+{
+    if ( maddr != 0 )
+        free_domheap_page(maddr_to_page(maddr));
+}
+
 /* context entry handling */
 static u64 bus_to_context_maddr(struct iommu *iommu, u8 bus)
 {

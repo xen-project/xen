@@ -44,12 +44,6 @@ void unmap_vtd_domain_page(void *va)
     unmap_domain_page(va);
 }
 
-void free_pgtable_maddr(u64 maddr)
-{
-    if ( maddr != 0 )
-        free_domheap_page(maddr_to_page(maddr));
-}
-
 unsigned int get_cache_line_size(void)
 {
     return ((cpuid_ebx(1) >> 8) & 0xff) * 8;
