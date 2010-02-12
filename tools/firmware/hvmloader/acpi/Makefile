@@ -18,7 +18,7 @@
 XEN_ROOT = ../../../..
 include $(XEN_ROOT)/tools/firmware/Rules.mk
 
-C_SRC = build.c dsdt.c dsdt15.c static_tables.c
+C_SRC = build.c dsdt_anycpu.c dsdt_15cpu.c static_tables.c
 OBJS  = $(patsubst %.c,%.o,$(C_SRC))
 
 CFLAGS += -I. -I.. $(CFLAGS_include)
@@ -26,21 +26,19 @@ CFLAGS += -I. -I.. $(CFLAGS_include)
 vpath iasl $(PATH)
 all: acpi.a
 
-ssdt_pm.h ssdt_tpm.h: %.h: %.asl
-	$(MAKE) iasl
-	iasl -tc $<
+ssdt_pm.h ssdt_tpm.h: %.h: %.asl iasl
+	iasl -p $* -tc $<
 	sed -e 's/AmlCode/$*/g' $*.hex >$@
-	rm -f *.aml $*.hex
+	rm -f $*.hex $*.aml
 
-dsdt.c dsdt15.c: %.c: dsdt.asl mk_dsdt.c
-	$(MAKE) iasl
+dsdt_15cpu.c dsdt_anycpu.c: %.c: dsdt.asl mk_dsdt.c iasl
 	$(HOSTCC) $(HOSTCFLAGS) $(CFLAGS_include) -o mk_$* mk_dsdt.c
-	head -n -1 $< >_$*.asl
-	./mk_$* >>_$*.asl
-	iasl -tc _$*.asl
-	sed -e 's/AmlCode/_$*/g' _$*.hex >$@
-	echo "int _$*_len=sizeof(_$*);" >>$@
-	rm -f *.aml _dsdt* mk_$*
+	head -n -1 $< >$*.asl
+	./mk_$* >>$*.asl
+	iasl -p $* -tc $*.asl
+	sed -e 's/AmlCode/$*/g' $*.hex >$@
+	echo "int $*_len=sizeof($*);" >>$@
+	rm -f $*.hex $*.aml $*.asl mk_$*
 
 iasl:
 	@echo
@@ -50,11 +48,14 @@ iasl:
 	@echo 
 	@exit 1
 
+build.o: ssdt_pm.h ssdt_tpm.h
+
 acpi.a: $(OBJS)
 	$(AR) rc $@ $(OBJS)
 
 clean:
 	rm -rf *.a *.o $(IASL_VER) $(IASL_VER).tar.gz $(DEPS)
+	rm -rf ssdt_*.h dsdt*.c *~ *.aml *.hex mk_dsdt mk_dsdt15 dsdt_*cpu.asl
 
 install: all
 

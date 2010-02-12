@@ -42,8 +42,8 @@ extern struct acpi_20_facs Facs;
  * The latter is required for Windows 2000, which experiences a BSOD of
  * KMODE_EXCEPTION_NOT_HANDLED if it sees more than 15 processor objects.
  */
-extern unsigned char _dsdt[], _dsdt15;
-extern int _dsdt_len, _dsdt15_len;
+extern unsigned char dsdt_anycpu[], dsdt_15cpu;
+extern int dsdt_anycpu_len, dsdt_15cpu_len;
 
 /* Number of processor objects in the chosen DSDT. */
 static unsigned int nr_processor_objects;
@@ -265,14 +265,14 @@ static void __acpi_build_tables(uint8_t *buf, int *low_sz, int *high_sz)
     dsdt = (unsigned char *)&buf[offset];
     if ( hvm_info->nr_vcpus <= 15 )
     {
-        memcpy(dsdt, &_dsdt15, _dsdt15_len);
-        offset += align16(_dsdt15_len);
+        memcpy(dsdt, &dsdt_15cpu, dsdt_15cpu_len);
+        offset += align16(dsdt_15cpu_len);
         nr_processor_objects = 15;
     }
     else
     {
-        memcpy(dsdt, &_dsdt, _dsdt_len);
-        offset += align16(_dsdt_len);
+        memcpy(dsdt, &dsdt_anycpu, dsdt_anycpu_len);
+        offset += align16(dsdt_anycpu_len);
         nr_processor_objects = HVM_MAX_VCPUS;
     }
 
