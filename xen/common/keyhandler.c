@@ -20,7 +20,7 @@
 static struct keyhandler *key_table[256];
 static unsigned char keypress_key;
 
-char keyhandler_scratch[100];
+char keyhandler_scratch[1024];
 
 static void keypress_action(unsigned long unused)
 {
@@ -31,7 +31,6 @@ static DECLARE_TASKLET(keypress_tasklet, keypress_action, 0);
 
 void handle_keypress(unsigned char key, struct cpu_user_regs *regs)
 {
-    static bool_t executing_handler;
     struct keyhandler *h;
 
     if ( (h = key_table[key]) == NULL )
@@ -39,18 +38,9 @@ void handle_keypress(unsigned char key, struct cpu_user_regs *regs)
 
     if ( !in_irq() || h->irq_callback )
     {
-        /*
-         * No concurrent handler execution: prevents garbled console and
-         * protects keyhandler_scratch[].
-         */
-        if ( test_and_set_bool(executing_handler) )
-            return;
-        wmb();
         console_start_log_everything();
         h->irq_callback ? (*h->u.irq_fn)(key, regs) : (*h->u.fn)(key);
         console_end_log_everything();
-        wmb();
-        executing_handler = 0;
     }
     else
     {

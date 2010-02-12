@@ -53,6 +53,6 @@ extern void register_keyhandler(unsigned char key, struct keyhandler *handler);
 extern void handle_keypress(unsigned char key, struct cpu_user_regs *regs);
 
 /* Scratch space is available for use of any keyhandler. */
-extern char keyhandler_scratch[100];
+extern char keyhandler_scratch[1024];
 
 #endif /* __XEN_KEYHANDLER_H__ */
