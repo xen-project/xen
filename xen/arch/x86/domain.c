@@ -174,11 +174,15 @@ struct domain *alloc_domain_struct(void)
 {
     struct domain *d;
     /*
-     * We pack the MFN of the domain structure into a 32-bit field within
+     * We pack the PDX of the domain structure into a 32-bit field within
      * the page_info structure. Hence the MEMF_bits() restriction.
      */
-    d = alloc_xenheap_pages(
-        get_order_from_bytes(sizeof(*d)), MEMF_bits(32 + PAGE_SHIFT));
+    unsigned int bits = 32 + PAGE_SHIFT;
+
+#ifdef __x86_64__
+    bits += pfn_pdx_hole_shift;
+#endif
+    d = alloc_xenheap_pages(get_order_from_bytes(sizeof(*d)), MEMF_bits(bits));
     if ( d != NULL )
         memset(d, 0, sizeof(*d));
     return d;
