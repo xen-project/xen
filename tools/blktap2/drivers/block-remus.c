@@ -59,7 +59,7 @@
 #include <unistd.h>
 
 /* timeout for reads and writes in ms */
-#define NET_TIMEOUT 500
+#define HEARTBEAT_MS 1000
 #define RAMDISK_HASHSIZE 128
 
 /* connect retry timeout (seconds) */
@@ -604,8 +604,8 @@ static int mread(int fd, void* buf, size_t len)
 	int rc;
 	size_t cur = 0;
 	struct timeval tv = {
-		.tv_sec = 0,
-		.tv_usec = NET_TIMEOUT * 1000
+		.tv_sec = HEARTBEAT_MS / 1000,
+		.tv_usec = (HEARTBEAT_MS % 1000) * 1000
 	};
 
 	if (!len)
@@ -649,8 +649,8 @@ static int mwrite(int fd, void* buf, size_t len)
 	size_t cur = 0;
 	int rc;
 	struct timeval tv = {
-		.tv_sec = 0,
-		.tv_usec = NET_TIMEOUT * 1000
+		.tv_sec = HEARTBEAT_MS / 1000,
+		.tv_usec = (HEARTBEAT_MS % 1000) * 1000
 	};
 
 	if (!len)

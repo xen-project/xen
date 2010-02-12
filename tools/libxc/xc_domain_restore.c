@@ -444,7 +444,7 @@ alloc_page:
 /* set when a consistent image is available */
 static int completed = 0;
 
-#define HEARTBEAT_MS 500
+#define HEARTBEAT_MS 1000
 
 #ifndef __MINIOS__
 static ssize_t read_exact_timed(int fd, void* buf, size_t size)
@@ -458,8 +458,8 @@ static ssize_t read_exact_timed(int fd, void* buf, size_t size)
     {
         if ( completed ) {
             /* expect a heartbeat every HEARBEAT_MS ms maximum */
-            tv.tv_sec = 0;
-            tv.tv_usec = HEARTBEAT_MS * 1000;
+            tv.tv_sec = HEARTBEAT_MS / 1000;
+            tv.tv_usec = (HEARTBEAT_MS % 1000) * 1000;
 
             FD_ZERO(&rfds);
             FD_SET(fd, &rfds);
