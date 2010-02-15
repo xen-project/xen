@@ -83,7 +83,7 @@ int main(int argc, char **argv)
     indent_level++;
 
     /**** Processor start ****/
-    push_block("Scope", "\\_PR");
+    push_block("Scope", "\\_SB");
 
     /* MADT checksum */
     stmt("OperationRegion", "MSUM, SystemMemory, \\_SB.MSUA, 1");
@@ -120,7 +120,7 @@ int main(int argc, char **argv)
         stmt("Return", "0xF");
         pop_block();
         push_block("Else", NULL);
-        stmt("Return", "0x9");
+        stmt("Return", "0x0");
         pop_block();
         pop_block();
 
@@ -150,16 +150,16 @@ int main(int argc, char **argv)
         /* Extract current CPU's status: 0=offline; 1=online. */
         stmt("And", "Local1, 1, Local2");
         /* Check if status is up-to-date in the relevant MADT LAPIC entry... */
-        push_block("If", "LNotEqual(Local2, \\_PR.PR%02X.FLG)", cpu);
+        push_block("If", "LNotEqual(Local2, \\_SB.PR%02X.FLG)", cpu);
         /* ...If not, update it and the MADT checksum, and notify OSPM. */
-        stmt("Store", "Local2, \\_PR.PR%02X.FLG", cpu);
+        stmt("Store", "Local2, \\_SB.PR%02X.FLG", cpu);
         push_block("If", "LEqual(Local2, 1)");
         stmt("Notify", "PR%02X, 1", cpu); /* Notify: Device Check */
-        stmt("Subtract", "\\_PR.MSU, 1, \\_PR.MSU"); /* Adjust MADT csum */
+        stmt("Subtract", "\\_SB.MSU, 1, \\_SB.MSU"); /* Adjust MADT csum */
         pop_block();
         push_block("Else", NULL);
         stmt("Notify", "PR%02X, 3", cpu); /* Notify: Eject Request */
-        stmt("Add", "\\_PR.MSU, 1, \\_PR.MSU"); /* Adjust MADT csum */
+        stmt("Add", "\\_SB.MSU, 1, \\_SB.MSU"); /* Adjust MADT csum */
         pop_block();
         pop_block();
     }
@@ -171,7 +171,7 @@ int main(int argc, char **argv)
     /* Define GPE control method '_L02'. */
     push_block("Scope", "\\_GPE");
     push_block("Method", "_L02");
-    stmt("Return", "\\_PR.PRSC()");
+    stmt("Return", "\\_SB.PRSC()");
     pop_block();
     pop_block();
     /**** Processor end ****/
