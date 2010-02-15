@@ -929,7 +929,10 @@ void __init scheduler_init(void)
     }
     
     if ( schedulers[i] == NULL )
+    {
         printk("Could not find scheduler: %s\n", opt_sched);
+        ops = *schedulers[0];
+    }
 
     printk("Using scheduler: %s (%s)\n", ops.name, ops.opt_name);
     SCHED_OP(init);
