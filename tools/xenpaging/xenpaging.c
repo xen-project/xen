@@ -457,17 +457,20 @@ int main(int argc, char *argv[])
     mem_event_request_t req;
     mem_event_response_t rsp;
     int i;
-    int rc = -1, rc1;
+    int rc = -1;
+    int rc1;
 
     int open_flags = O_CREAT | O_TRUNC | O_RDWR;
     mode_t open_mode = S_IRUSR | S_IRGRP | S_IROTH | S_IWUSR | S_IWGRP | S_IWOTH;
     char filename[80];
     int fd;
 
-    if ( argc != 3 ) {
+    if ( argc != 3 )
+    {
         fprintf(stderr, "Usage: %s <domain_id> <num_pages>\n", argv[0]);
-	return -1;
+        return -1;
     }
+
     domain_id = atoi(argv[1]);
     num_pages = atoi(argv[2]);
 
