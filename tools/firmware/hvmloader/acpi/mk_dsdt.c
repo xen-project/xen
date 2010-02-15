@@ -139,7 +139,7 @@ int main(int argc, char **argv)
 
     /* Control method 'PRSC': CPU hotplug GPE handler. */
     push_block("Method", "PRSC, 0");
-    stmt("Store", "PRS, Local0");
+    stmt("Store", "ToBuffer(PRS), Local0");
     for ( cpu = 0; cpu < max_cpus; cpu++ )
     {
         /* Read a byte at a time from the PRST online-CPU bitmask. */
