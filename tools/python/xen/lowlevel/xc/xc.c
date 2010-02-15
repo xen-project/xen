@@ -916,7 +916,7 @@ static PyObject *pyxc_hvm_build(XcObject *self,
     char *image;
     int memsize, target=-1, vcpus = 1, acpi = 0, apic = 1;
     PyObject *vcpu_avail_handle = NULL;
-    uint8_t vcpu_avail[HVM_MAX_VCPUS/8];
+    uint8_t vcpu_avail[(HVM_MAX_VCPUS + 7)/8];
 
     static char *kwd_list[] = { "domid",
                                 "memsize", "image", "target", "vcpus", 

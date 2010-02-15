@@ -69,7 +69,7 @@ struct hvm_info_table {
     uint32_t    high_mem_pgend;
 
     /* Bitmap of which CPUs are online at boot time. */
-    uint8_t     vcpu_online[HVM_MAX_VCPUS/8];
+    uint8_t     vcpu_online[(HVM_MAX_VCPUS + 7)/8];
 };
 
 #endif /* __XEN_PUBLIC_HVM_HVM_INFO_TABLE_H__ */
