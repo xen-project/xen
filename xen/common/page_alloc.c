@@ -224,6 +224,10 @@ static heap_by_zone_and_order_t *_heap[MAX_NUMNODES];
 static unsigned long *avail[MAX_NUMNODES];
 static long total_avail_pages;
 
+/* TMEM: Reserve a fraction of memory for mid-size (0<order<9) allocations.*/
+static long midsize_alloc_zone_pages;
+#define MIDSIZE_ALLOC_FRAC 128
+
 static DEFINE_SPINLOCK(heap_lock);
 
 static unsigned long init_node_heap(int node, unsigned long mfn,
@@ -304,6 +308,14 @@ static struct page_info *alloc_heap_pages(
     spin_lock(&heap_lock);
 
     /*
+     * TMEM: When available memory is scarce, allow only mid-size allocations
+     * to avoid worst of fragmentation issues.
+     */
+    if ( opt_tmem && ((order == 0) || (order >= 9)) &&
+         (total_avail_pages <= midsize_alloc_zone_pages) )
+        goto fail;
+
+    /*
      * Start with requested node, but exhaust all node memory in requested 
      * zone before failing, only calc new node value if we fail to find memory 
      * in target node, this avoids needless computation on fast-path.
@@ -336,6 +348,7 @@ static struct page_info *alloc_heap_pages(
         return pg;
     }
 
+ fail:
     /* No suitable memory blocks. Fail the request. */
     spin_unlock(&heap_lock);
     return NULL;
@@ -503,6 +516,10 @@ static void free_heap_pages(
 
     avail[node][zone] += 1 << order;
     total_avail_pages += 1 << order;
+
+    if ( opt_tmem )
+        midsize_alloc_zone_pages = max(
+            midsize_alloc_zone_pages, total_avail_pages / MIDSIZE_ALLOC_FRAC);
 
     /* Merge chunks as far as possible. */
     while ( order < MAX_ORDER )
@@ -842,7 +859,7 @@ static unsigned long avail_heap_pages(
 
 unsigned long total_free_pages(void)
 {
-    return total_avail_pages;
+    return total_avail_pages - midsize_alloc_zone_pages;
 }
 
 void __init end_boot_allocator(void)
