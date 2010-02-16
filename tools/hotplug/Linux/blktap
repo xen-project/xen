@@ -23,7 +23,7 @@ check_blktap_sharing()
     do
         for dev in $(xenstore-list "$base_path/$dom")
         do
-            params=$(xenstore_read "$base_path/$dom/$dev/params" | cut -d: -f2)
+            params=$(xenstore_read_default "$base_path/$dom/$dev/params" "" | cut -d: -f2)
             if [ "$file" = "$params" ]
             then
 
@@ -35,7 +35,7 @@ check_blktap_sharing()
                         return
                     fi
                 else 
-                    local m=$(xenstore_read "$base_path/$dom/$dev/mode")
+                    local m=$(xenstore_read_default "$base_path/$dom/$dev/mode" "")
                     m=$(canonicalise_mode "$m")
 
                     if [ "$m" = 'w' ] 
