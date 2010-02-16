@@ -41,6 +41,7 @@
 #include <xen/keyhandler.h>
 #include <xen/cpuidle.h>
 #include <xen/trace.h>
+#include <xen/sched-if.h>
 #include <asm/cache.h>
 #include <asm/io.h>
 #include <asm/hpet.h>
@@ -216,6 +217,15 @@ static inline void trace_exit_reason(u32 *irq_traced)
     }
 }
 
+/* vcpu is urgent if vcpu is polling event channel
+ *
+ * if urgent vcpu exists, CPU should not enter deep C state
+ */
+static int sched_has_urgent_vcpu(void)
+{
+    return atomic_read(&this_cpu(schedule_data).urgent_count);
+}
+
 static void acpi_processor_idle(void)
 {
     struct acpi_processor_power *power = processor_powers[smp_processor_id()];
@@ -226,27 +236,7 @@ static void acpi_processor_idle(void)
     u32 exp = 0, pred = 0;
     u32 irq_traced[4] = { 0 };
 
-    cpufreq_dbs_timer_suspend();
-
-    sched_tick_suspend();
-    /* sched_tick_suspend() can raise TIMER_SOFTIRQ. Process it now. */
-    process_pending_softirqs();
-
-    /*
-     * Interrupts must be disabled during bus mastering calculations and
-     * for C2/C3 transitions.
-     */
-    local_irq_disable();
-
-    if ( softirq_pending(smp_processor_id()) )
-    {
-        local_irq_enable();
-        sched_tick_resume();
-        cpufreq_dbs_timer_resume();
-        return;
-    }
-
-    if ( max_cstate > 0 && power && 
+    if ( max_cstate > 0 && power && !sched_has_urgent_vcpu() &&
          (next_state = cpuidle_current_governor->select(power)) > 0 )
     {
         cx = &power->states[next_state];
@@ -263,6 +253,24 @@ static void acpi_processor_idle(void)
             pm_idle_save();
         else
             acpi_safe_halt();
+        return;
+    }
+
+    cpufreq_dbs_timer_suspend();
+
+    sched_tick_suspend();
+    /* sched_tick_suspend() can raise TIMER_SOFTIRQ. Process it now. */
+    process_pending_softirqs();
+
+    /*
+     * Interrupts must be disabled during bus mastering calculations and
+     * for C2/C3 transitions.
+     */
+    local_irq_disable();
+
+    if ( softirq_pending(smp_processor_id()) )
+    {
+        local_irq_enable();
         sched_tick_resume();
         cpufreq_dbs_timer_resume();
         return;

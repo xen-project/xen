@@ -100,6 +100,29 @@ static inline void trace_continue_running(struct vcpu *v)
                 (unsigned char *)&d);
 }
 
+static inline void vcpu_urgent_count_update(struct vcpu *v)
+{
+    if ( is_idle_vcpu(v) )
+        return;
+
+    if ( unlikely(v->is_urgent) )
+    {
+        if ( !test_bit(v->vcpu_id, v->domain->poll_mask) )
+        {
+            v->is_urgent = 0;
+            atomic_dec(&per_cpu(schedule_data,v->processor).urgent_count);
+        }
+    }
+    else
+    {
+        if ( unlikely(test_bit(v->vcpu_id, v->domain->poll_mask)) )
+        {
+            v->is_urgent = 1;
+            atomic_inc(&per_cpu(schedule_data,v->processor).urgent_count);
+        }
+    }
+}
+
 static inline void vcpu_runstate_change(
     struct vcpu *v, int new_state, s_time_t new_entry_time)
 {
@@ -107,6 +130,8 @@ static inline void vcpu_runstate_change(
 
     ASSERT(v->runstate.state != new_state);
     ASSERT(spin_is_locked(&per_cpu(schedule_data,v->processor).schedule_lock));
+
+    vcpu_urgent_count_update(v);
 
     trace_runstate_change(v, new_state);
 
@@ -188,6 +213,8 @@ void sched_destroy_vcpu(struct vcpu *v)
     kill_timer(&v->periodic_timer);
     kill_timer(&v->singleshot_timer);
     kill_timer(&v->poll_timer);
+    if ( test_and_clear_bool(v->is_urgent) )
+        atomic_dec(&per_cpu(schedule_data, v->processor).urgent_count);
     SCHED_OP(destroy_vcpu, v);
 }
 
@@ -277,7 +304,7 @@ void vcpu_unblock(struct vcpu *v)
 static void vcpu_migrate(struct vcpu *v)
 {
     unsigned long flags;
-    int old_cpu;
+    int old_cpu, new_cpu;
 
     vcpu_schedule_lock_irqsave(v, flags);
 
@@ -293,9 +320,23 @@ static void vcpu_migrate(struct vcpu *v)
         return;
     }
 
-    /* Switch to new CPU, then unlock old CPU. */
+    /* Select new CPU. */
     old_cpu = v->processor;
-    v->processor = SCHED_OP(pick_cpu, v);
+    new_cpu = SCHED_OP(pick_cpu, v);
+
+    /*
+     * Transfer urgency status to new CPU before switching CPUs, as once
+     * the switch occurs, v->is_urgent is no longer protected by the per-CPU
+     * scheduler lock we are holding.
+     */
+    if ( unlikely(v->is_urgent) && (old_cpu != new_cpu) )
+    {
+        atomic_inc(&per_cpu(schedule_data, new_cpu).urgent_count);
+        atomic_dec(&per_cpu(schedule_data, old_cpu).urgent_count);
+    }
+
+    /* Switch to new CPU, then unlock old CPU. */
+    v->processor = new_cpu;
     spin_unlock_irqrestore(
         &per_cpu(schedule_data, old_cpu).schedule_lock, flags);
 

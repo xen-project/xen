@@ -115,6 +115,8 @@ struct vcpu
     bool_t           is_initialised;
     /* Currently running on a CPU? */
     bool_t           is_running;
+    /* VCPU should wake fast (do not deep sleep the CPU). */
+    bool_t           is_urgent;
 
 #ifdef VCPU_TRAP_LAST
 #define VCPU_TRAP_NONE    0

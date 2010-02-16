@@ -16,6 +16,7 @@ struct schedule_data {
     struct vcpu        *idle;           /* idle task for this cpu          */
     void               *sched_priv;
     struct timer        s_timer;        /* scheduling timer                */
+    atomic_t            urgent_count;   /* how many urgent vcpus           */
 } __cacheline_aligned;
 
 DECLARE_PER_CPU(struct schedule_data, schedule_data);
