@@ -150,7 +150,8 @@ QEMU_REMOTE=http://xenbits.xensource.com/git-http/qemu-xen-unstable.git
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= d463cfee458bacfe1ee3cb9c3b4ce46a6be06edf
+QEMU_TAG := xen-4.0.0-rc3
+#QEMU_TAG ?= d463cfee458bacfe1ee3cb9c3b4ce46a6be06edf
 # Thu Feb 4 17:04:48 2010 +0000
 # passthrough: support Intel IGD passthrough with VT-D
 
