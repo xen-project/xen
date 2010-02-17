@@ -518,7 +518,7 @@ static void mce_softirq(void)
         }
 
         /* Step2: Send Log to DOM0 through vIRQ */
-        if (dom0 && guest_enabled_event(dom0->vcpu[0], VIRQ_MCA)) {
+        if (dom0_vmce_enabled()) {
             mce_printk(MCE_VERBOSE, "MCE: send MCE# to DOM0 through virq\n");
             send_guest_global_virq(dom0, VIRQ_MCA);
         }
@@ -864,7 +864,7 @@ static void cmci_discover(void)
         MCA_CMCI_HANDLER, __get_cpu_var(mce_banks_owned), &bs, NULL);
 
     if (bs.errcnt && mctc != NULL) {
-        if (guest_enabled_event(dom0->vcpu[0], VIRQ_MCA)) {
+        if (dom0_vmce_enabled()) {
             mctelem_commit(mctc);
             send_guest_global_virq(dom0, VIRQ_MCA);
         } else {
@@ -979,7 +979,7 @@ fastcall void smp_cmci_interrupt(struct cpu_user_regs *regs)
         MCA_CMCI_HANDLER, __get_cpu_var(mce_banks_owned), &bs, NULL);
 
     if (bs.errcnt && mctc != NULL) {
-        if (guest_enabled_event(dom0->vcpu[0], VIRQ_MCA)) {
+        if (dom0_vmce_enabled()) {
             mctelem_commit(mctc);
             mce_printk(MCE_VERBOSE, "CMCI: send CMCI to DOM0 through virq\n");
             send_guest_global_virq(dom0, VIRQ_MCA);

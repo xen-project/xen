@@ -55,6 +55,8 @@ void mc_panic(char *s);
 void x86_mc_get_cpu_info(unsigned, uint32_t *, uint16_t *, uint16_t *,
 			 uint32_t *, uint32_t *, uint32_t *, uint32_t *);
 
+#define dom0_vmce_enabled() (dom0 && dom0->max_vcpus && dom0->vcpu[0] \
+	&& guest_enabled_event(dom0->vcpu[0], VIRQ_MCA))
 
 /* Register a handler for machine check exceptions. */
 typedef void (*x86_mce_vector_t)(struct cpu_user_regs *, long);

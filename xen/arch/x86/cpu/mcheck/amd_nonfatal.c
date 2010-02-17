@@ -84,11 +84,8 @@ static void mce_amd_checkregs(void *info)
 {
 	mctelem_cookie_t mctc;
 	struct mca_summary bs;
-	unsigned int event_enabled;
 
 	mctc = mcheck_mca_logout(MCA_POLLER, mca_allbanks, &bs, NULL);
-
-	event_enabled = guest_enabled_event(dom0->vcpu[0], VIRQ_MCA);
 
 	if (bs.errcnt && mctc != NULL) {
 		static uint64_t dumpcount = 0;
@@ -101,7 +98,7 @@ static void mce_amd_checkregs(void *info)
 		 * a simple-minded attempt to avoid spamming the console
 		 * for corrected errors in early startup. */
 
-		if (event_enabled) {
+		if (dom0_vmce_enabled()) {
 			mctelem_commit(mctc);
 			send_guest_global_virq(dom0, VIRQ_MCA);
 		} else if (++dumpcount >= 10) {
@@ -136,7 +133,7 @@ static void mce_amd_work_fn(void *data)
 	on_each_cpu(mce_amd_checkregs, data, 1);
 
 	if (adjust > 0) {
-		if (!guest_enabled_event(dom0->vcpu[0], VIRQ_MCA) ) {
+		if (!dom0_vmce_enabled()) {
 			/* Dom0 did not enable VIRQ_MCA, so Xen is reporting. */
 			printk("MCE: polling routine found correctable error. "
 				" Use mcelog to parse above error output.\n");

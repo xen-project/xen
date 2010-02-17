@@ -53,7 +53,7 @@ static void mce_checkregs (void *info)
 		 * for corrected errors in early startup.
 		 */
 
-		if (guest_enabled_event(dom0->vcpu[0], VIRQ_MCA)) {
+		if (dom0_vmce_enabled()) {
 			mctelem_commit(mctc);
 			send_guest_global_virq(dom0, VIRQ_MCA);
 		} else if (++dumpcount >= 10) {

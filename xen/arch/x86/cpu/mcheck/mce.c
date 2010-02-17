@@ -414,7 +414,7 @@ void mcheck_cmn_handler(struct cpu_user_regs *regs, long error_code,
 	 * as terminal for any context.
 	 */
 	ctx_xen = SEG_PL(regs->cs) == 0;
-	ctx_dom0 = !ctx_xen && (domid == dom0->domain_id);
+	ctx_dom0 = !ctx_xen && (domid == 0);
 	ctx_domU = !ctx_xen && !ctx_dom0;
 
 	xen_state_lost = bs.uc != 0 || (ctx_xen && (bs.pcc || !ripv)) ||
@@ -463,7 +463,8 @@ void mcheck_cmn_handler(struct cpu_user_regs *regs, long error_code,
 	 * XXFM Could add some Solaris dom0 contract kill here?
 	 */
 	if (dom0_state_lost) {
-		if (guest_has_trap_callback(dom0, 0, TRAP_machine_check)) {
+		if (dom0 && dom0->max_vcpus && dom0->vcpu[0] &&
+		    guest_has_trap_callback(dom0, 0, TRAP_machine_check)) {
 			dom_state = DOM0_TRAP;
 			send_guest_trap(dom0, 0, TRAP_machine_check);
 			/* XXFM case of return with !ripv ??? */
@@ -532,7 +533,7 @@ cmn_handler_done:
 	if (bs.errcnt) {
 		/* Not panicing, so forward telemetry to dom0 now if it
 		 * is interested. */
-		if (guest_enabled_event(dom0->vcpu[0], VIRQ_MCA)) {
+		if (dom0_vmce_enabled()) {
 			if (mctc != NULL)
 				mctelem_commit(mctc);
 			send_guest_global_virq(dom0, VIRQ_MCA);
