@@ -130,6 +130,14 @@ static void __devinit set_cpuidmask(struct cpuinfo_x86 *c)
 		return;
 	}
 
+        /* Setting bits in the CPUID mask MSR that are not set in the
+         * unmasked CPUID response can cause those bits to be set in the
+         * masked response.  Avoid that by explicitly masking in software. */
+        feat_ecx &= cpuid_ecx(0x00000001);
+        feat_edx &= cpuid_edx(0x00000001);
+        extfeat_ecx &= cpuid_ecx(0x80000001);
+        extfeat_edx &= cpuid_edx(0x80000001);
+
 	status = set_mask;
 	printk("Writing CPUID feature mask ECX:EDX -> %08Xh:%08Xh\n", 
 	       feat_ecx, feat_edx);
