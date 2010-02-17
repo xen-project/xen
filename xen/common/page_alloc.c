@@ -309,11 +309,11 @@ static struct page_info *alloc_heap_pages(
 
     /*
      * TMEM: When available memory is scarce, allow only mid-size allocations
-     * to avoid worst of fragmentation issues.
+     * to avoid worst of fragmentation issues. Others try TMEM pools then fail.
      */
     if ( opt_tmem && ((order == 0) || (order >= 9)) &&
          (total_avail_pages <= midsize_alloc_zone_pages) )
-        goto fail;
+        goto try_tmem;
 
     /*
      * Start with requested node, but exhaust all node memory in requested 
@@ -340,6 +340,7 @@ static struct page_info *alloc_heap_pages(
             node = first_node(node_online_map);
     }
 
+ try_tmem:
     /* Try to free memory from tmem */
     if ( (pg = tmem_relinquish_pages(order,memflags)) != NULL )
     {
@@ -348,7 +349,6 @@ static struct page_info *alloc_heap_pages(
         return pg;
     }
 
- fail:
     /* No suitable memory blocks. Fail the request. */
     spin_unlock(&heap_lock);
     return NULL;
