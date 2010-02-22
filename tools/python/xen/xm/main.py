@@ -2144,8 +2144,11 @@ def xm_network_list(args):
 
     if serverType == SERVER_XEN_API:
         vif_refs = server.xenapi.VM.get_VIFs(get_single_vm(dom))
-        vif_properties = \
-            map(server.xenapi.VIF.get_runtime_properties, vif_refs)
+        vif_properties = []
+        for vif_ref in vif_refs:
+            vif_property = server.xenapi.VIF.get_runtime_properties(vif_ref)
+            vif_property['mac'] = server.xenapi.VIF.get_MAC(vif_ref)
+            vif_properties.append(vif_property)
         devs = map(lambda (handle, properties): [handle, map2sxp(properties)],
                    zip(range(len(vif_properties)), vif_properties))
     else:
