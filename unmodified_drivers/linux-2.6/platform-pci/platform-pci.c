@@ -332,7 +332,7 @@ static int check_platform_magic(struct device *dev, long ioaddr, long iolen)
 		}
 		/* Fall through */
 	case 0:
-		outw(0xf, XEN_IOPORT_UNPLUG);
+		outw(unplug, XEN_IOPORT_UNPLUG);
 		break;
 	default:
 		err = "unknown I/O protocol version";
