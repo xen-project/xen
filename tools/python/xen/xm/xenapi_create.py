@@ -78,7 +78,7 @@ class xenapi_create:
     def __init__(self):
         self.DEFAULT_STORAGE_REPOSITORY = get_default_SR()
 
-        self.dtd = join(SHAREDIR, "create.dtd")
+        self.dtd = join(SHAREDIR, "xen", "create.dtd")
 
     def create(self, filename=None, document=None, skipdtd=False):
         """

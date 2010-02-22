@@ -63,8 +63,8 @@ install: install-messages install-dtd
 		$(PYTHON_PREFIX_ARG) --root="$(DESTDIR)" --force
 
 install-dtd: all
-	$(INSTALL_DIR) $(DESTDIR)$(SHAREDIR)
-	$(INSTALL_DATA) xen/xm/create.dtd $(DESTDIR)$(SHAREDIR)
+	$(INSTALL_DIR) $(DESTDIR)$(SHAREDIR)/xen
+	$(INSTALL_DATA) xen/xm/create.dtd $(DESTDIR)$(SHAREDIR)/xen
 
 install-messages: all
 	set -e; if which $(MSGFMT) >/dev/null ; then \
