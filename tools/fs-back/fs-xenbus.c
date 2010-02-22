@@ -105,11 +105,18 @@ error_exit:
 int xenbus_get_watch_fd(void)
 {
     int res;
+#if DEBUG
+    int errno_orig;
+#endif
     assert(xsh != NULL);
     res = xs_watch(xsh, WATCH_NODE, "conn-watch");
     if (!res) {
+#if DEBUG
+	errno_orig = errno;
         FS_DEBUG("ERROR: xs_watch %s failed ret=%d errno=%d\n",
                  WATCH_NODE, res, errno);
+	errno = errno_orig;
+#endif
         return -1;
     }
     return xs_fileno(xsh); 

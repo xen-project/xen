@@ -300,7 +300,8 @@ static void await_connections(void)
     LIST_INIT (&mount_requests_head);
 
     assert(xsh != NULL);
-    fd = xenbus_get_watch_fd(); 
+    if ((fd = xenbus_get_watch_fd()) == -1)
+	    err(1, "xenbus_get_watch_fd: could not setup watch");
     /* Infinite watch loop */
     do {
 	FD_ZERO(&fds);
