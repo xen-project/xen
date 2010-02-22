@@ -31,9 +31,10 @@ ssdt_pm.h ssdt_tpm.h: %.h: %.asl iasl
 	sed -e 's/AmlCode/$*/g' $*.hex >$@
 	rm -f $*.hex $*.aml
 
+# NB. awk invocation is a portable alternative to 'head -n -1'
 dsdt_15cpu.c dsdt_anycpu.c: %.c: dsdt.asl mk_dsdt.c iasl
 	$(HOSTCC) $(HOSTCFLAGS) $(CFLAGS_include) -o mk_$* mk_dsdt.c
-	head -n -1 $< >$*.asl
+	awk 'NR > 1 {print s} {s=$$0}' $< >$*.asl
 	./mk_$* >>$*.asl
 	iasl -p $* -tc $*.asl
 	sed -e 's/AmlCode/$*/g' $*.hex >$@
