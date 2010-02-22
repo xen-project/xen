@@ -210,11 +210,12 @@ static void pci_setup(void)
         switch ( class )
         {
         case 0x0300:
+            /* If emulated VGA is found, preserve it as primary VGA. */
             if ( (vendor_id == 0x1234) && (device_id == 0x1111) )
                 virtual_vga = VGA_std;
             else if ( (vendor_id == 0x1013) && (device_id == 0xb8) )
                 virtual_vga = VGA_cirrus;
-            else
+            else if ( virtual_vga == VGA_none )
                 virtual_vga = VGA_pt;
             break;
         case 0x0680:
