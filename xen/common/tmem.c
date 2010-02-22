@@ -2529,7 +2529,9 @@ EXPORT void *tmem_relinquish_pages(unsigned int order, unsigned int memflags)
     relinq_attempts++;
     if ( order > 0 )
     {
+#ifndef NDEBUG
         printk("tmem_relinquish_page: failing order=%d\n", order);
+#endif
         return NULL;
     }
 
