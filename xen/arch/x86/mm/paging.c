@@ -166,9 +166,6 @@ void paging_free_log_dirty_bitmap(struct domain *d)
     if ( !mfn_valid(d->arch.paging.log_dirty.top) )
         return;
 
-    dprintk(XENLOG_DEBUG, "%s: used %d pages for domain %d dirty logging\n",
-            __FUNCTION__, d->arch.paging.log_dirty.allocs, d->domain_id);
-
     l4 = map_domain_page(mfn_x(d->arch.paging.log_dirty.top));
 
     for ( i4 = 0; i4 < LOGDIRTY_NODE_ENTRIES; i4++ )
