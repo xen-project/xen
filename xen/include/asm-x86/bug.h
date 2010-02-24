@@ -13,15 +13,16 @@ struct bug_frame {
     unsigned short id; /* BUGFRAME_??? */
 } __attribute__((packed));
 
-#define BUGFRAME_dump   0
+#define BUGFRAME_run_fn 0
 #define BUGFRAME_warn   1
 #define BUGFRAME_bug    2
 #define BUGFRAME_assert 3
 
-#define dump_execution_state()                     \
+#define run_in_exception_handler(fn)               \
     asm volatile (                                 \
-        "ud2 ; ret $0"                             \
-        : : "i" (BUGFRAME_dump) )
+        "ud2 ; ret %0" BUG_STR(1)                  \
+        : : "i" (BUGFRAME_run_fn),                 \
+            "i" (fn) )
 
 #define WARN()                                     \
     asm volatile (                                 \

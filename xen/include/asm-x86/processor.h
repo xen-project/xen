@@ -535,6 +535,7 @@ void show_stack(struct cpu_user_regs *regs);
 void show_stack_overflow(unsigned int cpu, unsigned long esp);
 void show_registers(struct cpu_user_regs *regs);
 void show_execution_state(struct cpu_user_regs *regs);
+#define dump_execution_state() run_in_exception_handler(show_execution_state)
 void show_page_walk(unsigned long addr);
 asmlinkage void fatal_trap(int trapnr, struct cpu_user_regs *regs);
 

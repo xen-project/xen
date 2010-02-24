@@ -892,6 +892,7 @@ asmlinkage void do_invalid_op(struct cpu_user_regs *regs)
 {
     struct bug_frame bug;
     struct bug_frame_str bug_str;
+    const void *p;
     const char *filename, *predicate, *eip = (char *)regs->eip;
     unsigned long fixup;
     int id, lineno;
@@ -913,26 +914,29 @@ asmlinkage void do_invalid_op(struct cpu_user_regs *regs)
         goto die;
     eip += sizeof(bug);
 
+    /* Decode first pointer argument. */
+    if ( !is_kernel(eip) ||
+         __copy_from_user(&bug_str, eip, sizeof(bug_str)) ||
+         (bug_str.mov != 0xbc) )
+        goto die;
+    p = bug_str(bug_str, eip);
+    if ( !is_kernel(p) )
+        goto die;
+    eip += sizeof(bug_str);
+
     id = bug.id & 3;
 
-    if ( id == BUGFRAME_dump )
+    if ( id == BUGFRAME_run_fn )
     {
-        show_execution_state(regs);
+        const void (*fn)(struct cpu_user_regs *) = p;
+        (*fn)(regs);
         regs->eip = (unsigned long)eip;
         return;
     }
 
     /* WARN, BUG or ASSERT: decode the filename pointer and line number. */
-    if ( !is_kernel(eip) ||
-         __copy_from_user(&bug_str, eip, sizeof(bug_str)) ||
-         (bug_str.mov != 0xbc) )
-        goto die;
-    filename = bug_str(bug_str, eip);
-    eip += sizeof(bug_str);
-
-    if ( !is_kernel(filename) )
-        filename = "<unknown>";
-    lineno   = bug.id >> 2;
+    filename = p;
+    lineno = bug.id >> 2;
 
     if ( id == BUGFRAME_warn )
     {

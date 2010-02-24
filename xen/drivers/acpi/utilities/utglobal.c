@@ -45,6 +45,7 @@
 
 #include <xen/config.h>
 #include <xen/lib.h>
+#include <asm/processor.h>
 #include <acpi/acpi.h>
 #include <acpi/acnamesp.h>
 

@@ -145,11 +145,13 @@ static void ns16550_interrupt(
     }
 }
 
-static void ns16550_poll(void *data)
+/* Safe: ns16550_poll() runs in softirq context so not reentrant on a given CPU. */
+static DEFINE_PER_CPU(struct serial_port *, poll_port);
+
+static void __ns16550_poll(struct cpu_user_regs *regs)
 {
-    struct serial_port *port = data;
+    struct serial_port *port = this_cpu(poll_port);
     struct ns16550 *uart = port->uart;
-    struct cpu_user_regs *regs = guest_cpu_user_regs();
 
     if ( uart->intr_works )
         return;     /* Interrupts work - no more polling */
@@ -167,6 +169,16 @@ static void ns16550_poll(void *data)
         serial_tx_interrupt(port, regs);
 
     set_timer(&uart->timer, NOW() + MILLISECS(uart->timeout_ms));
+}
+
+static void ns16550_poll(void *data)
+{
+    this_cpu(poll_port) = data;
+#ifdef run_in_exception_handler
+    run_in_exception_handler(__ns16550_poll);
+#else
+    __ns16550_poll(guest_cpu_user_regs());
+#endif
 }
 
 static int ns16550_tx_empty(struct serial_port *port)
