@@ -2122,7 +2122,7 @@ def arg_check_for_resource_list(args, name):
         (options, params) = getopt.gnu_getopt(args, 'l', ['long'])
     except getopt.GetoptError, opterr:
         err(opterr)
-        sys.exit(1)
+        usage(name)
 
     for (k, v) in options:
         if k in ['-l', '--long']:
