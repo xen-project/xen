@@ -107,7 +107,8 @@ static inline void vcpu_urgent_count_update(struct vcpu *v)
 
     if ( unlikely(v->is_urgent) )
     {
-        if ( !test_bit(v->vcpu_id, v->domain->poll_mask) )
+        if ( !test_bit(_VPF_blocked, &v->pause_flags) ||
+             !test_bit(v->vcpu_id, v->domain->poll_mask) )
         {
             v->is_urgent = 0;
             atomic_dec(&per_cpu(schedule_data,v->processor).urgent_count);
@@ -115,7 +116,8 @@ static inline void vcpu_urgent_count_update(struct vcpu *v)
     }
     else
     {
-        if ( unlikely(test_bit(v->vcpu_id, v->domain->poll_mask)) )
+        if ( unlikely(test_bit(_VPF_blocked, &v->pause_flags) &&
+                      test_bit(v->vcpu_id, v->domain->poll_mask)) )
         {
             v->is_urgent = 1;
             atomic_inc(&per_cpu(schedule_data,v->processor).urgent_count);
