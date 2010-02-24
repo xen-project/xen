@@ -892,8 +892,7 @@ asmlinkage void do_invalid_op(struct cpu_user_regs *regs)
 {
     struct bug_frame bug;
     struct bug_frame_str bug_str;
-    const void *p;
-    const char *filename, *predicate, *eip = (char *)regs->eip;
+    const char *p, *filename, *predicate, *eip = (char *)regs->eip;
     unsigned long fixup;
     int id, lineno;
 
@@ -928,7 +927,7 @@ asmlinkage void do_invalid_op(struct cpu_user_regs *regs)
 
     if ( id == BUGFRAME_run_fn )
     {
-        const void (*fn)(struct cpu_user_regs *) = p;
+        void (*fn)(struct cpu_user_regs *) = (void *)p;
         (*fn)(regs);
         regs->eip = (unsigned long)eip;
         return;
