@@ -76,11 +76,11 @@ static inline __attribute__((pure)) int phys_to_nid(paddr_t addr)
 #define node_end_pfn(nid)       (NODE_DATA(nid)->node_start_pfn + \
 				 NODE_DATA(nid)->node_spanned_pages)
 
-extern int valid_numa_range(unsigned long start, unsigned long end, int node);
+extern int valid_numa_range(u64 start, u64 end, int node);
 #else
 #define init_cpu_to_node() do {} while (0)
 #define clear_node_cpumask(cpu) do {} while (0)
-#define valid_numa_range(start, end, node) {return 1;}
+#define valid_numa_range(start, end, node) 1
 #endif
 
 void srat_parse_regions(u64 addr);

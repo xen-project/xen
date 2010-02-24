@@ -59,7 +59,7 @@ __devinit int setup_node(int pxm)
 	return pxm2node[pxm];
 }
 
-int valid_numa_range(unsigned long start, unsigned long end, int node)
+int valid_numa_range(u64 start, u64 end, int node)
 {
 	int i;
 
@@ -74,7 +74,7 @@ int valid_numa_range(unsigned long start, unsigned long end, int node)
 	return 0;
 }
 
-static __init int conflicting_memblks(unsigned long start, unsigned long end)
+static __init int conflicting_memblks(u64 start, u64 end)
 {
 	int i;
 
