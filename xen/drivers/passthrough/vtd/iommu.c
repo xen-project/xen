@@ -1827,6 +1827,23 @@ static int init_vtd_hw(void)
 
     if ( iommu_intremap )
     {
+        int apic;
+        for ( apic = 0; apic < nr_ioapics; apic++ )
+        {
+            if ( ioapic_to_iommu(IO_APIC_ID(apic)) == NULL )
+            {
+                iommu_intremap = 0;
+                dprintk(XENLOG_ERR VTDPREFIX,
+                    "ioapic_to_iommu: ioapic 0x%x (id: 0x%x) is NULL! "
+                    "Will not try to enable Interrupt Remapping.\n",
+                    apic, IO_APIC_ID(apic));
+                break;
+            }
+        }
+    }
+
+    if ( iommu_intremap )
+    {
         for_each_drhd_unit ( drhd )
         {
             iommu = drhd->iommu;

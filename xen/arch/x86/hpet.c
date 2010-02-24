@@ -380,6 +380,14 @@ static int hpet_fsb_cap_lookup(void)
     unsigned int num_chs, num_chs_used;
     int i;
 
+    /* TODO. */
+    if ( iommu_intremap )
+    {
+        printk(XENLOG_INFO "HPET's MSI mode hasn't been supported when "
+            "Interrupt Remapping is enabled.\n");
+        return 0;
+    }
+
     id = hpet_read32(HPET_ID);
 
     num_chs = ((id & HPET_ID_NUMBER) >> HPET_ID_NUMBER_SHIFT);
