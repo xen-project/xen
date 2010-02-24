@@ -128,7 +128,7 @@ struct usbif_urb_response {
 typedef struct usbif_urb_response usbif_urb_response_t;
 
 DEFINE_RING_TYPES(usbif_urb, struct usbif_urb_request, struct usbif_urb_response);
-#define USB_URB_RING_SIZE __RING_SIZE((struct usbif_urb_sring *)0, PAGE_SIZE)
+#define USB_URB_RING_SIZE __CONST_RING_SIZE(usbif_urb, PAGE_SIZE)
 
 /*
  * RING for notifying connect/disconnect events to frontend
@@ -146,6 +146,6 @@ struct usbif_conn_response {
 typedef struct usbif_conn_response usbif_conn_response_t;
 
 DEFINE_RING_TYPES(usbif_conn, struct usbif_conn_request, struct usbif_conn_response);
-#define USB_CONN_RING_SIZE __RING_SIZE((struct usbif_conn_sring *)0, PAGE_SIZE)
+#define USB_CONN_RING_SIZE __CONST_RING_SIZE(usbif_conn, PAGE_SIZE)
 
 #endif /* __XEN_PUBLIC_IO_USBIF_H__ */
