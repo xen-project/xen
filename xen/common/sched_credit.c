@@ -1060,7 +1060,7 @@ csched_runq_steal(int peer_cpu, int cpu, int pri)
                 /* We got a candidate. Grab it! */
                 CSCHED_VCPU_STAT_CRANK(speer, migrate_q);
                 CSCHED_STAT_CRANK(migrate_queued);
-                BUG_ON(vc->is_urgent);
+                WARN_ON(vc->is_urgent);
                 __runq_remove(speer);
                 vc->processor = cpu;
                 return speer;
