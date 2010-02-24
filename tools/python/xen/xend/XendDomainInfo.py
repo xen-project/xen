@@ -1642,6 +1642,11 @@ class XendDomainInfo:
                 console_uuid = serial_consoles[0].get('uuid')
                 self.info.console_update(console_uuid, 'location',
                                          self.console_port)
+                # Notify xenpv device model that console info is ready
+                if not self.info.is_hvm() and self.info.has_rfb():
+                    console_ctrl = self.getDeviceController('console')
+                    # The value is unchanged. Just for xenstore watcher
+                    console_ctrl.writeBackend(0, 'uuid', console_uuid)
                 
 
         # Update VNC port if it exists and write to xenstore
