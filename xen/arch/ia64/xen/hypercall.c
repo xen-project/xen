@@ -404,6 +404,18 @@ ia64_hypercall(struct pt_regs *regs)
 	return IA64_NO_FAULT;
 }
 
+#define next_arg(fmt, args) ({                                              \
+    unsigned long __arg;                                                    \
+    switch ( *(fmt)++ )                                                     \
+    {                                                                       \
+    case 'i': __arg = (unsigned long)va_arg(args, unsigned int);  break;    \
+    case 'l': __arg = (unsigned long)va_arg(args, unsigned long); break;    \
+    case 'h': __arg = (unsigned long)va_arg(args, void *);        break;    \
+    default:  __arg = 0; BUG();                                             \
+    }                                                                       \
+    __arg;                                                                  \
+})
+
 unsigned long hypercall_create_continuation(
 	unsigned int op, const char *format, ...)
 {
@@ -415,43 +427,36 @@ unsigned long hypercall_create_continuation(
     va_list args;
 
     va_start(args, format);
-    if (test_bit(_MCSF_in_multicall, &mcs->flags))
-        panic("PREEMPT happen in multicall\n");	// Not support yet
 
-    vcpu_set_gr(v, 15, op, 0);
+    if (test_bit(_MCSF_in_multicall, &mcs->flags)) {
+        dprintk(XENLOG_DEBUG, "PREEMPT happen in multicall\n");
+        __set_bit(_MCSF_call_preempted, &mcs->flags);
+        for (i = 0; *p != '\0'; i++)
+            mcs->call.args[i] = next_arg(p, args);
+    }
+    else {
+        vcpu_set_gr(v, 15, op, 0);
 
-    for (i = 0; *p != '\0'; i++) {
-        switch ( *p++ )
-        {
-        case 'i':
-            arg = (unsigned long)va_arg(args, unsigned int);
-            break;
-        case 'l':
-            arg = (unsigned long)va_arg(args, unsigned long);
-            break;
-        case 'h':
-            arg = (unsigned long)va_arg(args, void *);
-            break;
-        default:
-            arg = 0;
-            BUG();
+        for (i = 0; *p != '\0'; i++) {
+            arg = next_arg(p, args);
+            vcpu_set_gr(v, 16 + i, arg, 0);
         }
-        vcpu_set_gr(v, 16 + i, arg, 0);
-    }
     
-    if (i >= 6)
-        panic("Too many args for hypercall continuation\n");
+        if (i >= 6)
+            panic("Too many args for hypercall continuation\n");
 
-    // Clean other argument to 0
-    while (i < 6) {
-        vcpu_set_gr(v, 16 + i, 0, 0);
-        i++;
+        // Clean other argument to 0
+        while (i < 6) {
+            vcpu_set_gr(v, 16 + i, 0, 0);
+            i++;
+        }
+
+        // re-execute break;
+        vcpu_decrement_iip(v);
+    
+        v->arch.hypercall_continuation = 1;
     }
 
-    // re-execute break;
-    vcpu_decrement_iip(v);
-    
-    v->arch.hypercall_continuation = 1;
     va_end(args);
     return op;
 }
