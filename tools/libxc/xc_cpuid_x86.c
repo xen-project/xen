@@ -43,12 +43,21 @@ static void cpuid(const unsigned int *input, unsigned int *regs)
     unsigned int count = (input[1] == XEN_CPUID_INPUT_UNUSED) ? 0 : input[1];
     asm (
 #ifdef __i386__
-        "push %%ebx; cpuid; mov %%ebx,%1; pop %%ebx"
+        "push %%ebx; push %%edx\n\t"
 #else
-        "push %%rbx; cpuid; mov %%ebx,%1; pop %%rbx"
+        "push %%rbx; push %%rdx\n\t"
 #endif
-        : "=a" (regs[0]), "=r" (regs[1]), "=c" (regs[2]), "=d" (regs[3])
-        : "0" (input[0]), "2" (count) );
+        "cpuid\n\t"
+        "mov %%ebx,4(%4)\n\t"
+        "mov %%edx,12(%4)\n\t"
+#ifdef __i386__
+        "pop %%edx; pop %%ebx\n\t"
+#else
+        "pop %%rdx; pop %%rbx\n\t"
+#endif
+        : "=a" (regs[0]), "=c" (regs[2])
+        : "0" (input[0]), "1" (count), "S" (regs)
+        : "memory" );
 }
 
 /* Get the manufacturer brand name of the host processor. */
