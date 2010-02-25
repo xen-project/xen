@@ -140,11 +140,22 @@ static __init int slit_valid(struct acpi_table_slit *slit)
 /* Callback for SLIT parsing */
 void __init acpi_numa_slit_init(struct acpi_table_slit *slit)
 {
+#ifdef CONFIG_X86_64
+	unsigned long mfn;
 	if (!slit_valid(slit)) {
-		printk(KERN_INFO "ACPI: SLIT table looks invalid. Not used.\n");
+		printk(KERN_INFO "ACPI: SLIT table looks invalid. "
+		       "Not used.\n");
 		return;
 	}
-	acpi_slit = slit;
+	mfn = alloc_boot_pages(PFN_UP(slit->header.length), 1);
+	if (!mfn) {
+		printk(KERN_ERR "ACPI: Unable to allocate memory for "
+		       "saving ACPI SLIT numa information.\n");
+		return;
+	}
+	acpi_slit = mfn_to_virt(mfn);
+	memcpy(acpi_slit, slit, slit->header.length);
+#endif
 }
 
 /* Callback for Proximity Domain -> LAPIC mapping */
