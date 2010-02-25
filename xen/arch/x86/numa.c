@@ -30,7 +30,7 @@ struct node_data node_data[MAX_NUMNODES];
 
 /* Mapping from pdx to node id */
 int memnode_shift;
-static typeof(*memnodemap) _memnodemap[2];
+static typeof(*memnodemap) _memnodemap[64];
 unsigned long memnodemapsize;
 u8 *memnodemap;
 
@@ -90,6 +90,7 @@ static int __init populate_memnodemap(const struct node *nodes,
 
 static int __init allocate_cachealigned_memnodemap(void)
 {
+#ifndef __i386__
 	unsigned long size = PFN_UP(memnodemapsize * sizeof(*memnodemap));
 	unsigned long mfn = alloc_boot_pages(size, 1);
 
@@ -108,6 +109,13 @@ static int __init allocate_cachealigned_memnodemap(void)
 	memnodemapsize = size / sizeof(*memnodemap);
 
 	return 0;
+#else
+	printk(KERN_ERR
+	       "Memory to Node hash needs %lu entries, got only %zu\n",
+	       memnodemapsize, ARRAY_SIZE(_memnodemap));
+	memnodemapsize = 0;
+	return -1;
+#endif
 }
 
 /*
