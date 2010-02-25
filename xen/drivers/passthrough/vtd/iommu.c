@@ -38,6 +38,10 @@
 #include "extern.h"
 #include "vtd.h"
 
+#ifdef __ia64__
+#define nr_ioapics              iosapic_get_nr_iosapics()
+#endif
+
 int nr_iommus;
 static bool_t rwbf_quirk;
 
