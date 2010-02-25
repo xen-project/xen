@@ -365,10 +365,15 @@ acpi_fadt_parse_sleep_info(struct acpi_table_fadt *fadt)
 	       acpi_sinfo.pm1b_evt_blk.address);
 
 	/* Now FACS... */
-	if (fadt->header.revision >= FADT2_REVISION_ID)
-		facs_pa = fadt->Xfacs;
-	else
+	facs_pa = ((fadt->header.revision >= FADT2_REVISION_ID)
+		   ? fadt->Xfacs : (uint64_t)fadt->facs);
+	if (fadt->facs && ((uint64_t)fadt->facs != facs_pa)) {
+		printk(KERN_WARNING PREFIX
+		       "32/64X FACS address mismatch in FADT - "
+		       "%08x/%016"PRIx64", using 32",
+		       fadt->facs, facs_pa);
 		facs_pa = (uint64_t)fadt->facs;
+	}
 
 	facs = (struct acpi_table_facs *)
 		__acpi_map_table(facs_pa, sizeof(struct acpi_table_facs));
