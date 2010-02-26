@@ -714,13 +714,11 @@ int paging_domctl(struct domain *d, xen_domctl_shadow_op_t *sc,
                 hap_logdirty_init(d);
             return paging_log_dirty_enable(d);
         }
-        break;
 
     case XEN_DOMCTL_SHADOW_OP_OFF:
         if ( paging_mode_log_dirty(d) )
             if ( (rc = paging_log_dirty_disable(d)) != 0 )
                 return rc;
-        break;
 
     case XEN_DOMCTL_SHADOW_OP_CLEAN:
     case XEN_DOMCTL_SHADOW_OP_PEEK:
