@@ -114,6 +114,7 @@ static __init void bad_srat(void)
 		apicid_to_node[i] = NUMA_NO_NODE;
 }
 
+#ifdef CONFIG_X86_64
 /*
  * A lot of BIOS fill in 10 (= no distance) everywhere. This messes
  * up the NUMA heuristics which wants the local node to have a smaller
@@ -140,7 +141,6 @@ static __init int slit_valid(struct acpi_table_slit *slit)
 /* Callback for SLIT parsing */
 void __init acpi_numa_slit_init(struct acpi_table_slit *slit)
 {
-#ifdef CONFIG_X86_64
 	unsigned long mfn;
 	if (!slit_valid(slit)) {
 		printk(KERN_INFO "ACPI: SLIT table looks invalid. "
@@ -155,8 +155,12 @@ void __init acpi_numa_slit_init(struct acpi_table_slit *slit)
 	}
 	acpi_slit = mfn_to_virt(mfn);
 	memcpy(acpi_slit, slit, slit->header.length);
-#endif
 }
+#else
+void __init acpi_numa_slit_init(struct acpi_table_slit *slit)
+{
+}
+#endif
 
 /* Callback for Proximity Domain -> LAPIC mapping */
 void __init
