@@ -39,11 +39,12 @@ struct hpet_event_channel
 
     unsigned int idx;   /* physical channel idx */
     int cpu;            /* msi target */
-    unsigned int irq;/* msi irq */
+    int irq;            /* msi irq */
     unsigned int flags; /* HPET_EVT_x */
 } __cacheline_aligned;
 static struct hpet_event_channel legacy_hpet_event;
-static struct hpet_event_channel hpet_events[MAX_HPET_NUM];
+static struct hpet_event_channel hpet_events[MAX_HPET_NUM] = 
+    { [0 ... MAX_HPET_NUM-1].irq = -1 };
 static unsigned int num_hpets_used; /* msi hpet channels used for broadcast */
 
 DEFINE_PER_CPU(struct hpet_event_channel *, cpu_bc_channel);
@@ -353,24 +354,26 @@ static int hpet_setup_msi_irq(unsigned int irq)
 
 static int hpet_assign_irq(struct hpet_event_channel *ch)
 {
-    int irq;
+    int irq = ch->irq;
 
-    if ( ch->irq )
-        return 0;
+    if ( irq < 0 )
+    {
+        if ( (irq = create_irq()) < 0 )
+            return irq;
 
-    if ( (irq = create_irq()) < 0 )
-        return irq;
+        irq_channel[irq] = ch - &hpet_events[0];
+        ch->irq = irq;
+    }
 
-    irq_channel[irq] = ch - &hpet_events[0];
-
+    /* hpet_setup_msi_irq should also be called for S3 resuming */
     if ( hpet_setup_msi_irq(irq) )
     {
         destroy_irq(irq);
         irq_channel[irq] = -1;
+        ch->irq = -1;
         return -EINVAL;
     }
 
-    ch->irq = irq;
     return 0;
 }
 
@@ -532,10 +535,13 @@ void hpet_broadcast_init(void)
     u32 hpet_id, cfg;
     int i;
 
-    irq_channel= xmalloc_array(int, nr_irqs);
-    BUG_ON(!irq_channel);
-    for (i = 0; i < nr_irqs ; i++)
-        irq_channel[i] = -1;
+    if ( irq_channel == NULL )
+    {
+        irq_channel = xmalloc_array(int, nr_irqs);
+        BUG_ON(irq_channel == NULL);
+        for ( i = 0; i < nr_irqs; i++ )
+            irq_channel[i] = -1;
+    }
 
     hpet_rate = hpet_setup();
     if ( hpet_rate == 0 )
