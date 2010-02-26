@@ -194,7 +194,8 @@ long arch_do_domctl(
 
             for ( n = ret = 0; n < num; )
             {
-                unsigned int k = min_t(unsigned int, num - n, PAGE_SIZE / 4);
+                unsigned int k = min_t(unsigned int, num - n,
+                                       PAGE_SIZE / sizeof(*arr));
 
                 if ( copy_from_guest_offset(arr,
                                             domctl->u.getpageframeinfo3.array,
