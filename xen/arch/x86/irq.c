@@ -1584,7 +1584,6 @@ static void dump_irqs(unsigned char key)
     irq_guest_action_t *action;
     struct domain *d;
     unsigned long flags;
-    char cpustr[NR_CPUS/4+NR_CPUS/32+2];
 
     printk("Guest interrupt information:\n");
 
@@ -1599,10 +1598,11 @@ static void dump_irqs(unsigned char key)
 
         spin_lock_irqsave(&desc->lock, flags);
 
-        cpumask_scnprintf(cpustr, sizeof(cpustr), desc->affinity);
+        cpumask_scnprintf(keyhandler_scratch, sizeof(keyhandler_scratch),
+                          desc->affinity);
         printk("   IRQ:%4d affinity:%s vec:%02x type=%-15s"
                " status=%08x ",
-               irq, cpustr, cfg->vector,
+               irq, keyhandler_scratch, cfg->vector,
                desc->handler->typename, desc->status);
 
         if ( !(desc->status & IRQ_GUEST) )
