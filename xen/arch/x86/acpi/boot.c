@@ -370,7 +370,7 @@ acpi_fadt_parse_sleep_info(struct acpi_table_fadt *fadt)
 	if (fadt->facs && ((uint64_t)fadt->facs != facs_pa)) {
 		printk(KERN_WARNING PREFIX
 		       "32/64X FACS address mismatch in FADT - "
-		       "%08x/%016"PRIx64", using 32",
+		       "%08x/%016"PRIx64", using 32\n",
 		       fadt->facs, facs_pa);
 		facs_pa = (uint64_t)fadt->facs;
 	}
