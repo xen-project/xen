@@ -149,8 +149,9 @@ void domain_get_tmem_stats(xenstat_handle * handle, xenstat_domain * domain)
 {
 	char buffer[4096];
 
-	xc_tmem_control(handle->xc_handle,-1,TMEMC_LIST,domain->id,
-                        sizeof(buffer),-1,-1,buffer);
+	if (xc_tmem_control(handle->xc_handle,-1,TMEMC_LIST,domain->id,
+                        sizeof(buffer),-1,-1,buffer) < 0)
+		return;
 	domain->tmem_stats.curr_eph_pages = parse(buffer,"Ec");
 	domain->tmem_stats.succ_eph_gets = parse(buffer,"Ge");
 	domain->tmem_stats.succ_pers_puts = parse(buffer,"Pp");
