@@ -1213,12 +1213,9 @@ int pagefault_by_memadd(unsigned long addr, struct cpu_user_regs *regs)
 {
     struct domain *d = current->domain;
 
-    if (guest_mode(regs) &&
-        is_pv_32bit_domain(d) &&
-        ((addr >= HYPERVISOR_COMPAT_VIRT_START(d)) &&
-             (addr < MACH2PHYS_COMPAT_VIRT_END)) )
-            return 1;
-    return 0;
+    return mem_hotplug && guest_mode(regs) && is_pv_32bit_domain(d) &&
+           (addr >= HYPERVISOR_COMPAT_VIRT_START(d)) &&
+           (addr < MACH2PHYS_COMPAT_VIRT_END);
 }
 
 int handle_memadd_fault(unsigned long addr, struct cpu_user_regs *regs)
@@ -1236,15 +1233,15 @@ int handle_memadd_fault(unsigned long addr, struct cpu_user_regs *regs)
     if (!is_pv_32on64_domain(d))
         return 0;
 
-    if ((addr < HYPERVISOR_COMPAT_VIRT_START(d)) ||
-             (addr > MACH2PHYS_COMPAT_VIRT_END) )
+    if ( (addr < HYPERVISOR_COMPAT_VIRT_START(d)) ||
+         (addr >= MACH2PHYS_COMPAT_VIRT_END) )
         return 0;
 
     mfn = (read_cr3()) >> PAGE_SHIFT;
 
     pl4e = map_domain_page(mfn);
 
-    l4e = pl4e[addr];
+    l4e = pl4e[0];
 
     if (!(l4e_get_flags(l4e) & _PAGE_PRESENT))
         goto unmap;
