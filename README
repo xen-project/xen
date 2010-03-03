@@ -49,6 +49,7 @@ provided by your Linux distributor:
     * bridge-utils package (/sbin/brctl)
     * iproute package (/sbin/ip)
     * hotplug or udev
+    * GNU bison and GNU flex
 
 [NB. Unless noted otherwise, all the following steps should be
 performed with root privileges.]

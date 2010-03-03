@@ -19,7 +19,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <libconfig.h>
 #include <unistd.h>
 #include <sys/time.h> /* for time */
 #include <getopt.h>
@@ -34,6 +33,7 @@
 
 #include "libxl.h"
 #include "libxl_utils.h"
+#include "libxlutil.h"
 
 #define UUID_FMT "%02hhx%02hhx%02hhx%02hhx-%02hhx%02hhx-%02hhx%02hhx-%02hhx%02hhx-%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx"
 
@@ -320,63 +320,6 @@ static void printf_info(libxl_domain_create_info *c_info,
     }
 }
 
-static char* compat_config_file(const char *filename)
-{
-    char t;
-    char *newfile = (char*) malloc(strlen(filename) + 4);
-    char *buf = (char *) malloc(2048);
-    int size = 2048, i;
-    FILE *s;
-    FILE *d;
-
-    sprintf(newfile, "%s.xl", filename);
-
-    s = fopen(filename, "r");
-    if (!s) {
-        perror("cannot open file for reading");
-        return NULL;
-    }
-    d = fopen(newfile, "w");
-    if (!d) {
-        fclose(s);
-        perror("cannot open file for writting");
-        return NULL;
-    }
-
-    while (!feof(s)) {
-        buf[0] = 0;
-        fgets(buf, size, s);
-        while (buf[strlen(buf) - 1] != '\n' && !feof(s)) {
-            size += 1024;
-            buf = realloc(buf, size + 1024);
-            fgets(buf + (size - 1025), 1025, s);
-        }
-        for (i = 0; i < strlen(buf); i++)
-            if (buf[i] == '\'')
-                buf[i] = '\"';
-        if (strchr(buf, '=') != NULL) {
-            if ((buf[strlen(buf) - 1] == '\n' && buf[strlen(buf) - 2] == ';') ||
-                    buf[strlen(buf) - 1] == ';') {
-                fputs(buf, d);
-            } else {
-                t = buf[strlen(buf) - 1];
-                buf[strlen(buf) - 1] = ';';
-                fputs(buf, d);
-                fputc(t, d);
-            }
-        } else if (buf[0] == '#' || buf[0] == ' ' || buf[0] == '\n') {
-            fputs(buf, d);
-        }
-    }
-
-    fclose(s);
-    fclose(d);
-
-    free(buf);
-
-    return newfile;
-}
-
 static void parse_config_file(const char *filename,
                               libxl_domain_create_info *c_info,
                               libxl_domain_build_info *b_info,
@@ -394,35 +337,33 @@ static void parse_config_file(const char *filename,
 {
     const char *buf;
     long l;
-    struct config_t config;
-    struct config_setting_t *vbds, *nics, *pcis, *cvfbs;
+    XLU_Config *config;
+    XLU_ConfigList *vbds, *nics, *pcis, *cvfbs;
     int pci_power_mgmt = 0;
     int pci_msitranslate = 1;
-    int i;
+    int i, e;
 
-    config_init (&config);
+    config= xlu_cfg_init(stderr, filename);
+    if (!config) {
+        fprintf(stderr, "Failed to allocate for configuration\n");
+        exit(1);
+    }
 
-    if (!config_read_file(&config, filename)) {
-        char *newfilename;
-        config_destroy(&config);
-        newfilename = compat_config_file(filename);
-        config_init (&config);
-        if (!config_read_file(&config, newfilename)) {
-            fprintf(stderr, "Failed to parse config file %s on line %d, try removing any embedded python code\n", config_error_text(&config), config_error_line(&config));
-            exit(1);
-        }
-        free(newfilename);
+    e= xlu_cfg_readfile (config, filename);
+    if (e) {
+        fprintf(stderr, "Failed to parse config file: %s\n", strerror(e));
+        exit(1);
     }
 
     init_create_info(c_info);
 
     c_info->hvm = 0;
-    if ((config_lookup_string (&config, "builder", &buf) == CONFIG_TRUE) &&
+    if (!xlu_cfg_get_string (config, "builder", &buf) &&
         !strncmp(buf, "hvm", strlen(buf)))
         c_info->hvm = 1;
 
     /* hap is missing */
-    if (config_lookup_string (&config, "name", &buf) == CONFIG_TRUE)
+    if (!xlu_cfg_get_string (config, "name", &buf))
         c_info->name = strdup(buf);
     else
         c_info->name = "test";
@@ -433,48 +374,48 @@ static void parse_config_file(const char *filename,
     init_build_info(b_info, c_info);
 
     /* the following is the actual config parsing with overriding values in the structures */
-    if (config_lookup_int (&config, "vcpus", &l) == CONFIG_TRUE)
+    if (!xlu_cfg_get_long (config, "vcpus", &l))
         b_info->max_vcpus = l;
 
-    if (config_lookup_int (&config, "memory", &l) == CONFIG_TRUE) {
+    if (!xlu_cfg_get_long (config, "memory", &l)) {
         b_info->max_memkb = l * 1024;
         b_info->target_memkb = b_info->max_memkb;
     }
 
-    if (config_lookup_int (&config, "shadow_memory", &l) == CONFIG_TRUE)
+    if (!xlu_cfg_get_long (config, "shadow_memory", &l))
         b_info->shadow_memkb = l * 1024;
 
-    if (config_lookup_int (&config, "videoram", &l) == CONFIG_TRUE)
+    if (!xlu_cfg_get_long (config, "videoram", &l))
         b_info->video_memkb = l * 1024;
 
-    if (config_lookup_string (&config, "kernel", &buf) == CONFIG_TRUE)
+    if (!xlu_cfg_get_string (config, "kernel", &buf))
         b_info->kernel = strdup(buf);
 
     if (c_info->hvm == 1) {
-        if (config_lookup_int (&config, "pae", &l) == CONFIG_TRUE)
+        if (!xlu_cfg_get_long (config, "pae", &l))
             b_info->u.hvm.pae = l;
-        if (config_lookup_int (&config, "apic", &l) == CONFIG_TRUE)
+        if (!xlu_cfg_get_long (config, "apic", &l))
             b_info->u.hvm.apic = l;
-        if (config_lookup_int (&config, "acpi", &l) == CONFIG_TRUE)
+        if (!xlu_cfg_get_long (config, "acpi", &l))
             b_info->u.hvm.acpi = l;
-        if (config_lookup_int (&config, "nx", &l) == CONFIG_TRUE)
+        if (!xlu_cfg_get_long (config, "nx", &l))
             b_info->u.hvm.nx = l;
-        if (config_lookup_int (&config, "viridian", &l) == CONFIG_TRUE)
+        if (!xlu_cfg_get_long (config, "viridian", &l))
             b_info->u.hvm.viridian = l;
     } else {
         char *cmdline;
-        if (config_lookup_string (&config, "root", &buf) == CONFIG_TRUE) {
+        if (!xlu_cfg_get_string (config, "root", &buf)) {
             asprintf(&cmdline, "root=%s", buf);
             b_info->u.pv.cmdline = cmdline;
         }
-        if (config_lookup_string (&config, "ramdisk", &buf) == CONFIG_TRUE)
+        if (!xlu_cfg_get_string (config, "ramdisk", &buf))
             b_info->u.pv.ramdisk = strdup(buf);
     }
 
-    if ((vbds = config_lookup (&config, "disk")) != NULL) {
+    if (!xlu_cfg_get_list (config, "disk", &vbds, 0)) {
         *num_disks = 0;
         *disks = NULL;
-        while ((buf = config_setting_get_string_elem (vbds, *num_disks)) != NULL) {
+        while ((buf = xlu_cfg_get_listitem (vbds, *num_disks)) != NULL) {
             char *buf2 = strdup(buf);
             char *p, *p2;
             *disks = (libxl_device_disk *) realloc(*disks, sizeof (libxl_device_disk) * ((*num_disks) + 1));
@@ -530,10 +471,10 @@ static void parse_config_file(const char *filename,
         }
     }
 
-    if ((nics = config_lookup (&config, "vif")) != NULL) {
+    if (!xlu_cfg_get_list (config, "vif", &nics, 0)) {
         *num_vifs = 0;
         *vifs = NULL;
-        while ((buf = config_setting_get_string_elem (nics, *num_vifs)) != NULL) {
+        while ((buf = xlu_cfg_get_listitem (nics, *num_vifs)) != NULL) {
             char *buf2 = strdup(buf);
             char *p, *p2;
             *vifs = (libxl_device_nic *) realloc(*vifs, sizeof (libxl_device_nic) * ((*num_vifs) + 1));
@@ -593,12 +534,12 @@ skip:
         }
     }
 
-    if ((cvfbs = config_lookup (&config, "vfb")) != NULL) {
+    if (!xlu_cfg_get_list (config, "vfb", &cvfbs, 0)) {
         *num_vfbs = 0;
         *num_vkbs = 0;
         *vfbs = NULL;
         *vkbs = NULL;
-        while ((buf = config_setting_get_string_elem (cvfbs, *num_vfbs)) != NULL) {
+        while ((buf = xlu_cfg_get_listitem (cvfbs, *num_vfbs)) != NULL) {
             char *buf2 = strdup(buf);
             char *p, *p2;
             *vfbs = (libxl_device_vfb *) realloc(*vfbs, sizeof(libxl_device_vfb) * ((*num_vfbs) + 1));
@@ -643,16 +584,16 @@ skip_vfb:
         }
     }
 
-    if (config_lookup_int (&config, "pci_msitranslate", &l) == CONFIG_TRUE)
+    if (!xlu_cfg_get_long (config, "pci_msitranslate", &l))
         pci_msitranslate = l;
 
-    if (config_lookup_int (&config, "pci_power_mgmt", &l) == CONFIG_TRUE)
+    if (!xlu_cfg_get_long (config, "pci_power_mgmt", &l))
         pci_power_mgmt = l;
 
-    if ((pcis = config_lookup (&config, "pci")) != NULL) {
+    if (xlu_cfg_get_list (config, "pci", &pcis, 0)) {
         *num_pcidevs = 0;
         *pcidevs = NULL;
-        while ((buf = config_setting_get_string_elem (pcis, *num_pcidevs)) != NULL) {
+        while ((buf = xlu_cfg_get_listitem (pcis, *num_pcidevs)) != NULL) {
             unsigned int domain = 0, bus = 0, dev = 0, func = 0, vdevfn = 0;
             char *buf2 = strdup(buf);
             char *p;
@@ -690,37 +631,37 @@ skip_pci:
         init_dm_info(dm_info, c_info, b_info);
 
         /* then process config related to dm */
-        if (config_lookup_string (&config, "device_model", &buf) == CONFIG_TRUE)
+        if (!xlu_cfg_get_string (config, "device_model", &buf))
             dm_info->device_model = strdup(buf);
-        if (config_lookup_int (&config, "stdvga", &l) == CONFIG_TRUE)
+        if (!xlu_cfg_get_long (config, "stdvga", &l))
             dm_info->stdvga = l;
-        if (config_lookup_int (&config, "vnc", &l) == CONFIG_TRUE)
+        if (!xlu_cfg_get_long (config, "vnc", &l))
             dm_info->vnc = l;
-        if (config_lookup_string (&config, "vnclisten", &buf) == CONFIG_TRUE)
+        if (!xlu_cfg_get_string (config, "vnclisten", &buf))
             dm_info->vnclisten = strdup(buf);
-        if (config_lookup_int (&config, "vncdisplay", &l) == CONFIG_TRUE)
+        if (!xlu_cfg_get_long (config, "vncdisplay", &l))
             dm_info->vncdisplay = l;
-        if (config_lookup_int (&config, "vncunused", &l) == CONFIG_TRUE)
+        if (!xlu_cfg_get_long (config, "vncunused", &l))
             dm_info->vncunused = l;
-        if (config_lookup_string (&config, "keymap", &buf) == CONFIG_TRUE)
+        if (!xlu_cfg_get_string (config, "keymap", &buf))
             dm_info->keymap = strdup(buf);
-        if (config_lookup_int (&config, "sdl", &l) == CONFIG_TRUE)
+        if (!xlu_cfg_get_long (config, "sdl", &l))
             dm_info->sdl = l;
-        if (config_lookup_int (&config, "opengl", &l) == CONFIG_TRUE)
+        if (!xlu_cfg_get_long (config, "opengl", &l))
             dm_info->opengl = l;
-        if (config_lookup_int (&config, "nographic", &l) == CONFIG_TRUE)
+        if (!xlu_cfg_get_long (config, "nographic", &l))
             dm_info->nographic = l;
-        if (config_lookup_string (&config, "serial", &buf) == CONFIG_TRUE)
+        if (!xlu_cfg_get_string (config, "serial", &buf))
             dm_info->serial = strdup(buf);
-        if (config_lookup_string (&config, "boot", &buf) == CONFIG_TRUE)
+        if (!xlu_cfg_get_string (config, "boot", &buf))
             dm_info->boot = strdup(buf);
-        if (config_lookup_int (&config, "usb", &l) == CONFIG_TRUE)
+        if (!xlu_cfg_get_long (config, "usb", &l))
             dm_info->usb = l;
-        if (config_lookup_string (&config, "usbdevice", &buf) == CONFIG_TRUE)
+        if (!xlu_cfg_get_string (config, "usbdevice", &buf))
             dm_info->usbdevice = strdup(buf);
     }
 
-    config_destroy(&config);
+    xlu_cfg_destroy(config);
 }
 
 #define MUST( call ) ({                                                 \

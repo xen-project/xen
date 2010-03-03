@@ -35,6 +35,9 @@ EXTRA_INCLUDES += $(EXTRA_PREFIX)/include
 EXTRA_LIB += $(EXTRA_PREFIX)/$(LIBLEAFDIR)
 endif
 
+BISON	?= bison
+FLEX	?= flex
+
 PYTHON      ?= python
 PYTHON_PREFIX_ARG ?= --prefix="$(PREFIX)"
 # The above requires that PREFIX contains *no spaces*. This variable is here
