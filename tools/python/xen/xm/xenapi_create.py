@@ -664,11 +664,11 @@ class sxp2xml:
             = get_child_by_name(config, "on_crash", "restart")
 
         def conv_chk(val, vals):
-            val.replace("-", "_")
-            if val not in vals:
-                raise "Invalid value: " + val
+            lval = val.replace("-", "_")
+            if lval not in vals:
+                raise ValueError("Invalid value: %s" % val)
             else:
-                return val
+                return lval
 
         actions_after_shutdown = conv_chk(actions_after_shutdown,\
                                           XEN_API_ON_NORMAL_EXIT)
