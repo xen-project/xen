@@ -131,6 +131,9 @@ int iommu_supports_eim(void)
     if ( !iommu_enabled || !iommu_qinval || !iommu_intremap )
         return 0;
 
+    if ( list_empty(&acpi_drhd_units) )
+        return 0;
+
     for_each_drhd_unit ( drhd )
         if ( !ecap_queued_inval(drhd->ecap) ||
              !ecap_intr_remap(drhd->ecap) ||
