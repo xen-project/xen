@@ -107,7 +107,8 @@ SWIG_FLAGS=-module xenstat -Isrc
 # Python bindings
 PYTHON_VERSION=2.3
 PYTHON_FLAGS=-I/usr/include/python$(PYTHON_VERSION) -lpython$(PYTHON_VERSION)
-$(PYSRC) $(PYMOD): bindings/swig/xenstat.i
+$(PYMOD): $(PYSRC)
+$(PYSRC): bindings/swig/xenstat.i
 	swig -python $(SWIG_FLAGS) -outdir $(@D) -o $(PYSRC) $<
 
 $(PYLIB): $(PYSRC)
@@ -128,7 +129,8 @@ endif
 
 # Perl bindings
 PERL_FLAGS=`perl -MConfig -e 'print "$$Config{ccflags} -I$$Config{archlib}/CORE";'`
-$(PERLSRC) $(PERLMOD): bindings/swig/xenstat.i
+$(PERLMOD): $(PERLSRC)
+$(PERLSRC): bindings/swig/xenstat.i
 	swig -perl $(SWIG_FLAGS) -outdir $(@D) -o $(PERLSRC) $<
 
 $(PERLLIB): $(PERLSRC)

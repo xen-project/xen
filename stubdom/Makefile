@@ -265,8 +265,10 @@ $(TARGETS_MINIOS): mini-os-%:
 
 .PHONY: libxc
 libxc: libxc-$(XEN_TARGET_ARCH)/libxenctrl.a libxc-$(XEN_TARGET_ARCH)/libxenguest.a
-libxc-$(XEN_TARGET_ARCH)/libxenctrl.a libxc-$(XEN_TARGET_ARCH)/libxenguest.a:: cross-zlib
+libxc-$(XEN_TARGET_ARCH)/libxenctrl.a: cross-zlib
 	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) -C libxc-$(XEN_TARGET_ARCH)
+
+ libxc-$(XEN_TARGET_ARCH)/libxenguest.a: libxc-$(XEN_TARGET_ARCH)/libxenctrl.a
 
 #######
 # ioemu
