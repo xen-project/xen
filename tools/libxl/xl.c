@@ -590,7 +590,7 @@ skip_vfb:
     if (!xlu_cfg_get_long (config, "pci_power_mgmt", &l))
         pci_power_mgmt = l;
 
-    if (xlu_cfg_get_list (config, "pci", &pcis, 0)) {
+    if (!xlu_cfg_get_list (config, "pci", &pcis, 0)) {
         *num_pcidevs = 0;
         *pcidevs = NULL;
         while ((buf = xlu_cfg_get_listitem (pcis, *num_pcidevs)) != NULL) {
