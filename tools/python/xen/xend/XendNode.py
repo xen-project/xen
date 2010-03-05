@@ -333,7 +333,11 @@ class XendNode:
                     pscsi_uuid = uuid.createString()
                     saved_pscsi_table[scsi_id] = pscsi_uuid
                 else:
-                    saved_HBA_uuid = saved_pscsis[pscsi_uuid].get('HBA', None)
+                    try:
+                        saved_HBA_uuid = saved_pscsis[pscsi_uuid].get('HBA', None)
+                    except KeyError:
+                        log.warn("Multi-path SCSI devices are not supported for XenAPI")
+                        return
 
                 physical_host = int(pscsi_record['physical_HCTL'].split(':')[0])
                 if pscsi_HBA_table.has_key(physical_host):
