@@ -52,11 +52,17 @@ kernel = "pv-grub.gz"
 
 extra = "(hd0,0)/boot/grub/menu.lst"
 
-you can also use a tftp path (dhcp will be automatically performed):
+or you can provide the content of a menu.lst stored in dom0 by passing it as a
+ramdisk:
+
+ramdisk = "/boot/domU-1-menu.lst"
+
+or you can also use a tftp path (dhcp will be automatically performed):
 
 extra = "(nd)/somepath/menu.lst"
 
-or you can set it in option 150 of your dhcp server and leave extra empty
+or you can set it in option 150 of your dhcp server and leave extra and ramdisk
+empty (dhcp will be automatically performed)
 
 Limitations
 ===========
@@ -68,6 +74,13 @@ export XEN_TARGET_ARCH=x86_32
 
 - bootsplash is supported, but the ioemu backend does not yet support restart
 for use by the booted kernel.
+
+- PV-GRUB doesn't support virtualized partitions. For instance:
+
+disk = [ 'phy:hda7,hda7,w' ]
+
+will be seen by PV-GRUB as (hd0), not (hd0,6), since GRUB will not see any
+partition table.
 
 
                                 Your own stubdom
