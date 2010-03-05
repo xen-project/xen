@@ -384,7 +384,7 @@ class Grub:
                            ["/boot/grub/menu.lst", "/boot/grub/grub.conf",
                             "/grub/menu.lst", "/grub/grub.conf"]) + \
                        map(lambda x: (x,grub.GrubConf.Grub2ConfigFile),
-                           ["/boot/grub/grub.cfg"]) + \
+                           ["/boot/grub/grub.cfg", "/grub/grub.cfg"]) + \
                        map(lambda x: (x,grub.ExtLinuxConf.ExtLinuxConfigFile),
                            ["/boot/isolinux/isolinux.cfg",
                             "/boot/extlinux.conf"])
