@@ -45,7 +45,7 @@
 #define EPRINTF(_f, _a...) syslog(LOG_ERR, "tap-err:%s: " _f, __func__, ##_a)
 #define PERROR(_f, _a...)  EPRINTF(_f ": %s", ##_a, strerror(errno))
 
-#define BLK_RING_SIZE __RING_SIZE((blkif_sring_t *)0, XC_PAGE_SIZE)
+#define BLK_RING_SIZE __CONST_RING_SIZE(blkif, XC_PAGE_SIZE)
 
 /* size of the extra VMA area to map in attached pages. */
 #define BLKTAP_VMA_PAGES BLK_RING_SIZE

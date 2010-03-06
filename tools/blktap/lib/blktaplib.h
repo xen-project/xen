@@ -42,7 +42,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#define BLK_RING_SIZE __RING_SIZE((blkif_sring_t *)0, XC_PAGE_SIZE)
+#define BLK_RING_SIZE __CONST_RING_SIZE(blkif, XC_PAGE_SIZE)
 
 /* size of the extra VMA area to map in attached pages. */
 #define BLKTAP_VMA_PAGES BLK_RING_SIZE
