@@ -149,7 +149,7 @@ bool xs_strings_to_perms(struct xs_permissions *perms, unsigned int num,
 bool xs_perm_to_string(const struct xs_permissions *perm,
                        char *buffer, size_t buf_len)
 {
-	switch (perm->perms) {
+	switch ((int)perm->perms) {
 	case XS_PERM_WRITE:
 		*buffer = 'w';
 		break;
