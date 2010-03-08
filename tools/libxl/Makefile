@@ -89,7 +89,7 @@ install: all
 .PHONY: clean
 clean:
 	$(RM) -f *.o *.so* *.a $(CLIENTS) $(DEPS)
-	$(RM) -f $(AUTOSRCS) $(AUTOINCS)
+#	$(RM) -f $(AUTOSRCS) $(AUTOINCS)
 
 distclean: clean
 
