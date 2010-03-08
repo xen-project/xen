@@ -1658,15 +1658,7 @@ static void end_msi_irq(unsigned int irq)
         ack_APIC_irq(); /* ACKTYPE_EOI */
 }
 
-static void shutdown_msi_irq(unsigned int irq)
-{
-    mask_msi_irq(irq);
-}
-
-static void set_msi_affinity_irq(unsigned int irq, cpumask_t cpu_mask)
-{
-    set_msi_affinity(irq, cpu_mask);
-}
+#define shutdown_msi_irq mask_msi_irq
 
 /*
  * IRQ Chip for MSI PCI/PCI-X/PCI-Express Devices,
@@ -1680,7 +1672,7 @@ hw_irq_controller pci_msi_type = {
     .disable    = mask_msi_irq,
     .ack        = ack_msi_irq,
     .end        = end_msi_irq,
-    .set_affinity   = set_msi_affinity_irq,
+    .set_affinity   = set_msi_affinity,
 };
 
 static inline void init_IO_APIC_traps(void)
