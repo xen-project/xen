@@ -128,44 +128,61 @@
 })
 
 
+#define CHECK_NAME(name, tag) __check ## tag ## name
+#define CHECK_NAME_(k, n, tag) __check ## tag ## k ## _ ## n
+
 #define CHECK_TYPE(name) \
-    typedef int __checkT ## name[1 - ((xen_ ## name ## _t *)0 != \
-                                   (compat_ ## name ## _t *)0) * 2]
+static inline int CHECK_NAME(name, T)(xen_ ## name ## _t *x, \
+                                      compat_ ## name ## _t *c) \
+{ \
+    return x == c; \
+}
 #define CHECK_TYPE_(k, n) \
-    typedef int __checkT ## k ## _ ## n[1 - ((k xen_ ## n *)0 != \
-                                          (k compat_ ## n *)0) * 2]
+static inline int CHECK_NAME_(k, n, T)(k xen_ ## n *x, \
+                                       k compat_ ## n *c) \
+{ \
+    return x == c; \
+}
 
 #define CHECK_SIZE(name) \
-    typedef int __checkS ## name[1 - (sizeof(xen_ ## name ## _t) != \
-                                   sizeof(compat_ ## name ## _t)) * 2]
+    typedef int CHECK_NAME(name, S)[1 - (sizeof(xen_ ## name ## _t) != \
+                                         sizeof(compat_ ## name ## _t)) * 2]
 #define CHECK_SIZE_(k, n) \
-    typedef int __checkS ## k ## _ ## n[1 - (sizeof(k xen_ ## n) != \
+    typedef int CHECK_NAME_(k, n, S)[1 - (sizeof(k xen_ ## n) != \
                                           sizeof(k compat_ ## n)) * 2]
 
+#define CHECK_FIELD_COMMON(name, t, f) \
+static inline int name(xen_ ## t ## _t *x, compat_ ## t ## _t *c) \
+{ \
+    BUILD_BUG_ON(offsetof(xen_ ## t ## _t, f) != \
+                 offsetof(compat_ ## t ## _t, f)); \
+    return &x->f == &c->f; \
+}
+#define CHECK_FIELD_COMMON_(k, name, n, f) \
+static inline int name(k xen_ ## n *x, k compat_ ## n *c) \
+{ \
+    BUILD_BUG_ON(offsetof(k xen_ ## n, f) != \
+                 offsetof(k compat_ ## n, f)); \
+    return &x->f == &c->f; \
+}
+
 #define CHECK_FIELD(t, f) \
-    typedef int __checkF ## t ## __ ## f[1 - (&((xen_ ## t ## _t *)0)->f != \
-                                           &((compat_ ## t ## _t *)0)->f) * 2]
+    CHECK_FIELD_COMMON(CHECK_NAME(t ## __ ## f, F), t, f)
 #define CHECK_FIELD_(k, n, f) \
-    typedef int __checkF ## k ## _ ## n ## __ ## f[1 - (&((k xen_ ## n *)0)->f != \
-                                                     &((k compat_ ## n *)0)->f) * 2]
+    CHECK_FIELD_COMMON_(k, CHECK_NAME_(k, n ## __ ## f, F), n, f)
 
 #define CHECK_SUBFIELD_1(t, f1, f2) \
-    typedef int __checkF1 ## t ## __ ## f1 ## __ ## f2 \
-                [1 - (&((xen_ ## t ## _t *)0)->f1.f2 != \
-                   &((compat_ ## t ## _t *)0)->f1.f2) * 2]
+    CHECK_FIELD_COMMON(CHECK_NAME(t ## __ ## f1 ## __ ## f2, F1), t, f1.f2)
 #define CHECK_SUBFIELD_1_(k, n, f1, f2) \
-    typedef int __checkF1 ## k ## _ ## n ## __ ## f1 ## __ ## f2 \
-                [1 - (&((k xen_ ## n *)0)->f1.f2 != \
-                   &((k compat_ ## n *)0)->f1.f2) * 2]
+    CHECK_FIELD_COMMON_(k, CHECK_NAME_(k, n ## __ ## f1 ## __ ## f2, F1), \
+                        n, f1.f2)
 
 #define CHECK_SUBFIELD_2(t, f1, f2, f3) \
-    typedef int __checkF2 ## t ## __ ## f1 ## __ ## f2 ## __ ## f3 \
-                [1 - (&((xen_ ## t ## _t *)0)->f1.f2.f3 != \
-                   &((compat_ ## t ## _t *)0)->f1.f2.f3) * 2]
+    CHECK_FIELD_COMMON(CHECK_NAME(t ## __ ## f1 ## __ ## f2 ## __ ## f3, F2), \
+                       t, f1.f2.f3)
 #define CHECK_SUBFIELD_2_(k, n, f1, f2, f3) \
-    typedef int __checkF2 ## k ## _ ## n ## __ ## f1 ## __ ## f2 ## __ ## f3 \
-                [1 - (&((k xen_ ## n *)0)->f1.f2.f3 != \
-                   &((k compat_ ## n *)0)->f1.f2.f3) * 2]
+    CHECK_FIELD_COMMON_(k, CHECK_NAME_(k, n ## __ ## f1 ## __ ## f2 ## __ ## \
+                                       f3, F2), n, f1.f2.f3)
 
 int hypercall_xlat_continuation(unsigned int *id, unsigned int mask, ...);
 

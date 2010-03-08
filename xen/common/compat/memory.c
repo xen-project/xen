@@ -7,6 +7,12 @@
 #include <asm/current.h>
 #include <compat/memory.h>
 
+#define xen_domid_t domid_t
+#define compat_domid_t domid_compat_t
+CHECK_TYPE(domid);
+#undef compat_domid_t
+#undef xen_domid_t
+
 int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE(void) compat)
 {
     int rc, split, op = cmd & MEMOP_CMD_MASK;
@@ -169,13 +175,6 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE(void) compat)
         case XENMEM_current_reservation:
         case XENMEM_maximum_reservation:
         case XENMEM_maximum_gpfn:
-        {
-#define xen_domid_t domid_t
-#define compat_domid_t domid_compat_t
-            CHECK_TYPE(domid);
-#undef compat_domid_t
-#undef xen_domid_t
-        }
         case XENMEM_maximum_ram_page:
             nat.hnd = compat;
             break;
