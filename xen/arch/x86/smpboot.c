@@ -1391,6 +1391,8 @@ int cpu_up(unsigned int cpu)
 		goto out;
 	}
 
+	rcu_online_cpu(cpu);
+
 	err = __cpu_up(cpu);
 	if (err < 0)
 		goto out;
