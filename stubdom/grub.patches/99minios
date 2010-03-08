@@ -1501,3 +1501,70 @@ diff -u -p -r1.5 fsys_xfs.c
  #else
  	/* This is slower but this works on all x86 architectures.  */
  	__asm__("xchgb %b0, %h0" \
+--- grub.orig/stage2/gunzip.c	2010-03-07 23:03:34.000000000 +0100
++++ grub/stage2/gunzip.c	2010-03-07 23:05:36.000000000 +0100
+@@ -141,7 +141,7 @@
+ static int gzip_filemax;
+ static int gzip_fsmax;
+ static int saved_filepos;
+-static unsigned long gzip_crc;
++static unsigned int gzip_crc;
+ 
+ /* internal extra variables for use of inflate code */
+ static int block_type;
+@@ -157,7 +157,7 @@
+  *  Linear allocator.
+  */
+ 
+-static unsigned long linalloc_topaddr;
++static unsigned int linalloc_topaddr;
+ 
+ static void *
+ linalloc (int size)
+@@ -253,7 +253,7 @@
+ 
+ typedef unsigned char uch;
+ typedef unsigned short ush;
+-typedef unsigned long ulg;
++typedef unsigned int ulg;
+ 
+ /*
+  *  Window Size
+@@ -316,8 +316,8 @@
+       return 0;
+     }
+ 
+-  gzip_crc = *((unsigned long *) buf);
+-  gzip_fsmax = gzip_filemax = *((unsigned long *) (buf + 4));
++  gzip_crc = *((unsigned int *) buf);
++  gzip_fsmax = gzip_filemax = *((unsigned int *) (buf + 4));
+ 
+   initialize_tables ();
+ 
+diff -ur grub.orig/stage2/fsys_iso9660.c grub-upstream/stage2/fsys_iso9660.c
+--- grub.orig/stage2/fsys_iso9660.c	2010-03-07 23:39:00.000000000 +0100
++++ grub/stage2/fsys_iso9660.c	2010-03-07 23:39:56.000000000 +0100
+@@ -43,7 +43,7 @@
+ 
+ /* iso fs inode data in memory */
+ struct iso_inode_info {
+-  unsigned long file_start;
++  unsigned int file_start;
+ };
+ 
+ #define ISO_SUPER	\
+@@ -88,12 +88,12 @@
+   if (byte_len <= 0)
+     return 1;
+ 
+-  sector += (byte_offset >> sector_size_lg2);
+-  byte_offset &= (buf_geom.sector_size - 1);
+   asm volatile ("shl%L0 %1,%0"
+ 		: "=r"(sector)
+ 		: "Ic"((int8_t)(ISO_SECTOR_BITS - sector_size_lg2)),
+ 		"0"(sector));
++  sector += (byte_offset >> sector_size_lg2);
++  byte_offset &= (buf_geom.sector_size - 1);
+ 
+ #if !defined(STAGE1_5)
+   if (disk_read_hook && debug)
