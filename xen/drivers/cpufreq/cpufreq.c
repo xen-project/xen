@@ -177,6 +177,15 @@ int cpufreq_add_cpu(unsigned int cpu)
             processor_pminfo[firstcpu]->perf.domain_info.coord_type) ||
             (perf->domain_info.num_processors !=
             processor_pminfo[firstcpu]->perf.domain_info.num_processors)) {
+
+            printk(KERN_WARNING "cpufreq fail to add CPU%d:"
+                   "incorrect _PSD(%"PRIu64":%"PRIu64"), "
+                   "expect(%"PRIu64"/%"PRIu64")\n",
+                   cpu, perf->domain_info.coord_type,
+                   perf->domain_info.num_processors,
+                   processor_pminfo[firstcpu]->perf.domain_info.coord_type,
+                   processor_pminfo[firstcpu]->perf.domain_info.num_processors
+                );
             return -EINVAL;
         }
     }
@@ -193,6 +202,7 @@ int cpufreq_add_cpu(unsigned int cpu)
         ret = cpufreq_driver->init(policy);
         if (ret) {
             xfree(policy);
+            cpufreq_cpu_policy[cpu] = NULL;
             return ret;
         }
         printk(KERN_EMERG"CPU %u initialization completed\n", cpu);

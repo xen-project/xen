@@ -286,6 +286,12 @@ int cpufreq_governor_dbs(struct cpufreq_policy *policy, unsigned int event)
         break;
 
     case CPUFREQ_GOV_LIMITS:
+        if ( this_dbs_info->cur_policy == NULL )
+        {
+            printk(KERN_WARNING "CPU%d ondemand governor not started yet,"
+                    "unable to GOV_LIMIT\n", cpu);
+            return -EINVAL;
+        }
         if (policy->max < this_dbs_info->cur_policy->cur)
             __cpufreq_driver_target(this_dbs_info->cur_policy,
                 policy->max, CPUFREQ_RELATION_H);
