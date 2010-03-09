@@ -165,7 +165,7 @@ static void rtc_set_time(RTCState *s)
       
     ASSERT(spin_is_locked(&s->lock));
 
-    before = mktime(tm->tm_year, tm->tm_mon, tm->tm_mday,
+    before = mktime(tm->tm_year, tm->tm_mon + 1, tm->tm_mday,
 		    tm->tm_hour, tm->tm_min, tm->tm_sec);
     
     tm->tm_sec = from_bcd(s, s->hw.cmos_data[RTC_SECONDS]);
@@ -179,7 +179,7 @@ static void rtc_set_time(RTCState *s)
     tm->tm_mon = from_bcd(s, s->hw.cmos_data[RTC_MONTH]) - 1;
     tm->tm_year = from_bcd(s, s->hw.cmos_data[RTC_YEAR]) + 100;
 
-    after = mktime(tm->tm_year, tm->tm_mon, tm->tm_mday,
+    after = mktime(tm->tm_year, tm->tm_mon + 1, tm->tm_mday,
                    tm->tm_hour, tm->tm_min, tm->tm_sec);
 
     /* We use the guest's setting of the RTC to define the local-time 
