@@ -561,8 +561,9 @@ static int stdvga_intercept_mmio(ioreq_t *p)
         {
         case IOREQ_TYPE_COPY:
             buf = mmio_move(s, p);
-            if ( buf )
-                break;
+            if ( !buf )
+                s->cache = 0;
+            break;
         default:
             gdprintk(XENLOG_WARNING, "unsupported mmio request type:%d "
                      "addr:0x%04x data:0x%04x size:%d count:%d state:%d "
