@@ -127,9 +127,15 @@ static void set_ioapic_source_id(int apic_id, struct iremap_entry *ire)
 int iommu_supports_eim(void)
 {
     struct acpi_drhd_unit *drhd;
+    int apic;
 
     if ( !iommu_enabled || !iommu_qinval || !iommu_intremap )
         return 0;
+
+    /* We MUST have a DRHD unit for each IOAPIC. */
+    for ( apic = 0; apic < nr_ioapics; apic++ )
+        if ( !ioapic_to_iommu(IO_APIC_ID(apic)) )
+            return 0;
 
     if ( list_empty(&acpi_drhd_units) )
         return 0;
