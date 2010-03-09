@@ -2551,13 +2551,17 @@ void gnttab_usage_print(struct domain *rd)
 {
     int first = 1;
     grant_ref_t ref;
+    struct grant_table *gt = rd->grant_table;
 
     printk("      -------- active --------       -------- shared --------\n");
     printk("[ref] localdom mfn      pin          localdom gmfn     flags\n");
 
-    spin_lock(&rd->grant_table->lock);
+    spin_lock(&gt->lock);
 
-    for ( ref = 0; ref != nr_grant_entries(rd->grant_table); ref++ )
+    if ( gt->gt_version == 0 )
+        goto out;
+
+    for ( ref = 0; ref != nr_grant_entries(gt); ref++ )
     {
         struct active_grant_entry *act;
         struct grant_entry_header *sha;
@@ -2566,31 +2570,31 @@ void gnttab_usage_print(struct domain *rd)
         uint16_t status;
         uint64_t frame;
 
-        act = &active_entry(rd->grant_table, ref);
+        act = &active_entry(gt, ref);
         if ( !act->pin )
             continue;
 
-        sha = shared_entry_header(rd->grant_table, ref);
+        sha = shared_entry_header(gt, ref);
 
-        if ( rd->grant_table->gt_version == 1 )
+        if ( gt->gt_version == 1 )
         {
-            sha1 = &shared_entry_v1(rd->grant_table, ref);
+            sha1 = &shared_entry_v1(gt, ref);
             sha2 = NULL;
             status = sha->flags;
             frame = sha1->frame;
         }
         else
         {
-            sha2 = &shared_entry_v2(rd->grant_table, ref);
+            sha2 = &shared_entry_v2(gt, ref);
             sha1 = NULL;
             frame = sha2->full_page.frame;
-            status = status_entry(rd->grant_table, ref);
+            status = status_entry(gt, ref);
         }
 
         if ( first )
         {
             printk("grant-table for remote domain:%5d (v%d)\n",
-                   rd->domain_id, rd->grant_table->gt_version);
+                   rd->domain_id, gt->gt_version);
             first = 0;
         }
 
@@ -2600,7 +2604,8 @@ void gnttab_usage_print(struct domain *rd)
                sha->domid, frame, status);
     }
 
-    spin_unlock(&rd->grant_table->lock);
+ out:
+    spin_unlock(&gt->lock);
 
     if ( first )
         printk("grant-table for remote domain:%5d ... "
