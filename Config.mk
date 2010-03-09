@@ -153,7 +153,7 @@ QEMU_REMOTE=http://xenbits.xensource.com/git-http/qemu-xen-unstable.git
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG := xen-4.0.0-rc5
+QEMU_TAG := xen-4.0.0-rc6
 #QEMU_TAG ?= e5d14857cd67490bf956d97c8888c0be95ed3f78
 # Thu Feb 18 15:36:29 2010 +0000
 # When xen_platform_pci=0 also disable fixed Xen platform ioports
