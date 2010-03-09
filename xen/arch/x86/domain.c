@@ -970,6 +970,11 @@ arch_do_vcpu_op(
         break;
     }
 
+    /*
+     * XXX Disable for 4.0.0: __update_vcpu_system_time() writes to the given
+     * virtual address even when running in another domain's address space.
+     */
+#if 0
     case VCPUOP_register_vcpu_time_memory_area:
     {
         struct vcpu_register_time_memory_area area;
@@ -988,6 +993,7 @@ arch_do_vcpu_op(
 
         break;
     }
+#endif
 
     case VCPUOP_get_physid:
     {
