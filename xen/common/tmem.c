@@ -1308,7 +1308,7 @@ static NOINLINE int do_tmem_put(pool_t *pool,
 copy_uncompressed:
     if ( ( pgp->pfp = tmem_page_alloc(pool) ) == NULL )
     {
-        ret == -ENOMEM;
+        ret = -ENOMEM;
         goto delete_and_free;
     }
     /* tmh_copy_from_client properly handles len==0 (TMEM_NEW_PAGE) */
