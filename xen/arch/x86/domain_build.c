@@ -143,16 +143,19 @@ static struct page_info * __init alloc_chunk(
 }
 
 static unsigned long __init compute_dom0_nr_pages(
-#ifdef __x86_64__
-    unsigned long vstart, unsigned long vend, size_t sizeof_long)
-#else
-    void)
-#endif
+    struct domain *d, struct elf_dom_parms *parms, unsigned long initrd_len)
 {
     unsigned long avail = avail_domheap_pages() + initial_images_nrpages();
     unsigned long nr_pages = dom0_nrpages;
     unsigned long min_pages = dom0_min_nrpages;
     unsigned long max_pages = dom0_max_nrpages;
+
+    /* Reserve memory for further dom0 vcpu-struct allocations... */
+    avail -= (opt_dom0_max_vcpus - 1UL)
+             << get_order_from_bytes(sizeof(struct vcpu));
+    /* ...and compat_l4's, if needed. */
+    if ( is_pv_32on64_domain(d) )
+        avail -= opt_dom0_max_vcpus - 1;
 
     /*
      * If domain 0 allocation isn't specified, reserve 1/16th of available
@@ -173,8 +176,8 @@ static unsigned long __init compute_dom0_nr_pages(
     nr_pages = min(nr_pages, avail);
 
 #ifdef __x86_64__
-    if ( vstart && dom0_nrpages <= 0 &&
-         (dom0_min_nrpages <= 0 || nr_pages > min_pages) )
+    if ( (parms->p2m_base == UNSET_ADDR) && (dom0_nrpages <= 0) &&
+         ((dom0_min_nrpages <= 0) || (nr_pages > min_pages)) )
     {
         /*
          * Legacy Linux kernels (i.e. such without a XEN_ELFNOTE_INIT_P2M
@@ -184,7 +187,12 @@ static unsigned long __init compute_dom0_nr_pages(
          * allocation doesn't consume more than about half the space that's
          * available between params.virt_base and the address space end.
          */
-        unsigned long end = vend + nr_pages * sizeof_long;
+        unsigned long vstart, vend, end;
+        size_t sizeof_long = is_pv_32bit_domain(d) ? sizeof(int) : sizeof(long);
+
+        vstart = parms->virt_base;
+        vend = round_pgup(parms->virt_kend) + round_pgup(initrd_len);
+        end = vend + nr_pages * sizeof_long;
 
         if ( end > vstart )
             end += end - vstart;
@@ -367,20 +375,10 @@ int __init construct_dom0(
     {
         d->arch.is_32bit_pv = d->arch.has_32bit_shinfo = 1;
         v->vcpu_info = (void *)&d->shared_info->compat.vcpu_info[0];
-
-        nr_pages = compute_dom0_nr_pages(parms.virt_base,
-            round_pgup(parms.virt_kend) + round_pgup(initrd_len),
-            sizeof(unsigned int));
     }
-    else if (parms.p2m_base != UNSET_ADDR)
-        nr_pages = compute_dom0_nr_pages(0, 0, 0);
-    else
-        nr_pages = compute_dom0_nr_pages(parms.virt_base,
-            round_pgup(parms.virt_kend) + round_pgup(initrd_len),
-            sizeof(unsigned long));
-#else
-    nr_pages = compute_dom0_nr_pages();
 #endif
+
+    nr_pages = compute_dom0_nr_pages(d, &parms, initrd_len);
 
     if ( parms.pae == PAEKERN_extended_cr3 )
             set_bit(VMASST_TYPE_pae_extended_cr3, &d->vm_assist);
