@@ -1260,7 +1260,7 @@ static int role_read(struct policydb *p, struct hashtab *h, void *fp)
 {
     char *key = NULL;
     struct role_datum *role;
-    int rc, to_read = 2;
+    int rc;
     __le32 buf[3];
     u32 len;
 
@@ -1273,9 +1273,10 @@ static int role_read(struct policydb *p, struct hashtab *h, void *fp)
     memset(role, 0, sizeof(*role));
 
     if ( p->policyvers >= POLICYDB_VERSION_BOUNDARY )
-        to_read = 3;
+        rc = next_entry(buf, fp, sizeof(buf[0]) * 3);
+    else
+        rc = next_entry(buf, fp, sizeof(buf[0]) * 2);
 
-    rc = next_entry(buf, fp, sizeof(buf[0]) * to_read);
     if ( rc < 0 )
         goto bad;
 
@@ -1330,7 +1331,7 @@ static int type_read(struct policydb *p, struct hashtab *h, void *fp)
 {
     char *key = NULL;
     struct type_datum *typdatum;
-    int rc, to_read = 3;
+    int rc;
     __le32 buf[4];
     u32 len;
 
@@ -1343,9 +1344,10 @@ static int type_read(struct policydb *p, struct hashtab *h, void *fp)
     memset(typdatum, 0, sizeof(*typdatum));
 
     if ( p->policyvers >= POLICYDB_VERSION_BOUNDARY )
-        to_read = 4;
+        rc = next_entry(buf, fp, sizeof(buf[0]) * 4);
+    else
+        rc = next_entry(buf, fp, sizeof(buf[0]) * 3);
 
-    rc = next_entry(buf, fp, sizeof(buf[0]) * to_read);
     if ( rc < 0 )
         goto bad;
 
@@ -1423,7 +1425,7 @@ static int user_read(struct policydb *p, struct hashtab *h, void *fp)
 {
     char *key = NULL;
     struct user_datum *usrdatum;
-    int rc, to_read = 2;
+    int rc;
     __le32 buf[3];
     u32 len;
 
@@ -1436,9 +1438,10 @@ static int user_read(struct policydb *p, struct hashtab *h, void *fp)
     memset(usrdatum, 0, sizeof(*usrdatum));
 
     if ( p->policyvers >= POLICYDB_VERSION_BOUNDARY )
-        to_read = 3;
+        rc = next_entry(buf, fp, sizeof(buf[0]) * 3);
+    else
+        rc = next_entry(buf, fp, sizeof(buf[0]) * 2);
 
-    rc = next_entry(buf, fp, sizeof(buf[0]) * to_read);
     if ( rc < 0 )
         goto bad;
 
