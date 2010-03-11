@@ -288,7 +288,12 @@ int iommu_setup(void)
         panic("IOMMU setup failed, crash Xen for security purpose!\n");
 
     if ( !iommu_enabled )
+    {
         iommu_pv_enabled = 0;
+        iommu_snoop = 0;
+        iommu_qinval = 0;
+        iommu_intremap = 0;
+    }
     printk("I/O virtualisation %sabled\n", iommu_enabled ? "en" : "dis");
     if ( iommu_enabled )
         printk("I/O virtualisation for PV guests %sabled\n",
