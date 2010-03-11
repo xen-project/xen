@@ -407,9 +407,15 @@ acpi_parse_one_drhd(struct acpi_dmar_entry_header *header)
     {
         u8 b, d, f;
         int i, invalid_cnt = 0;
+        void *p;
 
-        for ( i = 0; i < dmaru->scope.devices_cnt; i++ )
+        for ( i = 0, p = dev_scope_start; i < dmaru->scope.devices_cnt;
+              i++, p += ((struct acpi_dev_scope *)p)->length )
         {
+            if ( ((struct acpi_dev_scope *)p)->dev_type == ACPI_DEV_IOAPIC ||
+                 ((struct acpi_dev_scope *)p)->dev_type == ACPI_DEV_MSI_HPET )
+                continue;
+
             b = PCI_BUS(dmaru->scope.devices[i]);
             d = PCI_SLOT(dmaru->scope.devices[i]);
             f = PCI_FUNC(dmaru->scope.devices[i]);
