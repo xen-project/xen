@@ -59,45 +59,28 @@ void disable_pmr(struct iommu *iommu)
 void print_iommu_regs(struct acpi_drhd_unit *drhd)
 {
     struct iommu *iommu = drhd->iommu;
+    u64 cap;
 
     printk("---- print_iommu_regs ----\n");
-    printk("print_iommu_regs: drhd->address = %"PRIx64"\n", drhd->address);
-    printk("print_iommu_regs: DMAR_VER_REG = %x\n",
-           dmar_readl(iommu->reg,DMAR_VER_REG));
-    printk("print_iommu_regs: DMAR_CAP_REG = %"PRIx64"\n",
-           dmar_readq(iommu->reg,DMAR_CAP_REG));
-    printk("print_iommu_regs: n_fault_reg = %"PRIx64"\n",
-           cap_num_fault_regs(dmar_readq(iommu->reg, DMAR_CAP_REG)));
-    printk("print_iommu_regs: fault_recording_offset_l = %"PRIx64"\n",
-           cap_fault_reg_offset(dmar_readq(iommu->reg, DMAR_CAP_REG)));
-    printk("print_iommu_regs: fault_recording_offset_h = %"PRIx64"\n",
-           cap_fault_reg_offset(dmar_readq(iommu->reg, DMAR_CAP_REG)) + 8);
-    printk("print_iommu_regs: fault_recording_reg_l = %"PRIx64"\n",
-           dmar_readq(iommu->reg,
-               cap_fault_reg_offset(dmar_readq(iommu->reg, DMAR_CAP_REG))));
-    printk("print_iommu_regs: fault_recording_reg_h = %"PRIx64"\n",
-           dmar_readq(iommu->reg,
-               cap_fault_reg_offset(dmar_readq(iommu->reg, DMAR_CAP_REG)) + 8));
-    printk("print_iommu_regs: DMAR_ECAP_REG = %"PRIx64"\n",
-           dmar_readq(iommu->reg,DMAR_ECAP_REG));
-    printk("print_iommu_regs: DMAR_GCMD_REG = %x\n",
-           dmar_readl(iommu->reg,DMAR_GCMD_REG));
-    printk("print_iommu_regs: DMAR_GSTS_REG = %x\n",
-           dmar_readl(iommu->reg,DMAR_GSTS_REG));
-    printk("print_iommu_regs: DMAR_RTADDR_REG = %"PRIx64"\n",
-           dmar_readq(iommu->reg,DMAR_RTADDR_REG));
-    printk("print_iommu_regs: DMAR_CCMD_REG = %"PRIx64"\n",
-           dmar_readq(iommu->reg,DMAR_CCMD_REG));
-    printk("print_iommu_regs: DMAR_FSTS_REG = %x\n",
-           dmar_readl(iommu->reg,DMAR_FSTS_REG));
-    printk("print_iommu_regs: DMAR_FECTL_REG = %x\n",
-           dmar_readl(iommu->reg,DMAR_FECTL_REG));
-    printk("print_iommu_regs: DMAR_FEDATA_REG = %x\n",
-           dmar_readl(iommu->reg,DMAR_FEDATA_REG));
-    printk("print_iommu_regs: DMAR_FEADDR_REG = %x\n",
-           dmar_readl(iommu->reg,DMAR_FEADDR_REG));
-    printk("print_iommu_regs: DMAR_FEUADDR_REG = %x\n",
-           dmar_readl(iommu->reg,DMAR_FEUADDR_REG));
+    printk(" drhd->address = %"PRIx64"\n", drhd->address);
+    printk(" VER = %x\n", dmar_readl(iommu->reg, DMAR_VER_REG));
+    printk(" CAP = %"PRIx64"\n", cap = dmar_readq(iommu->reg, DMAR_CAP_REG));
+    printk(" n_fault_reg = %"PRIx64"\n", cap_num_fault_regs(cap));
+    printk(" fault_recording_offset = %"PRIx64"\n", cap_fault_reg_offset(cap));
+    printk(" fault_recording_reg_l = %"PRIx64"\n",
+           dmar_readq(iommu->reg, cap_fault_reg_offset(cap)));
+    printk(" fault_recording_reg_h = %"PRIx64"\n",
+           dmar_readq(iommu->reg, cap_fault_reg_offset(cap) + 8));
+    printk(" ECAP = %"PRIx64"\n", dmar_readq(iommu->reg, DMAR_ECAP_REG));
+    printk(" GCMD = %x\n", dmar_readl(iommu->reg, DMAR_GCMD_REG));
+    printk(" GSTS = %x\n", dmar_readl(iommu->reg, DMAR_GSTS_REG));
+    printk(" RTADDR = %"PRIx64"\n", dmar_readq(iommu->reg,DMAR_RTADDR_REG));
+    printk(" CCMD = %"PRIx64"\n", dmar_readq(iommu->reg, DMAR_CCMD_REG));
+    printk(" FSTS = %x\n", dmar_readl(iommu->reg, DMAR_FSTS_REG));
+    printk(" FECTL = %x\n", dmar_readl(iommu->reg, DMAR_FECTL_REG));
+    printk(" FEDATA = %x\n", dmar_readl(iommu->reg, DMAR_FEDATA_REG));
+    printk(" FEADDR = %x\n", dmar_readl(iommu->reg, DMAR_FEADDR_REG));
+    printk(" FEUADDR = %x\n", dmar_readl(iommu->reg, DMAR_FEUADDR_REG));
 }
 
 static u32 get_level_index(unsigned long gmfn, int level)

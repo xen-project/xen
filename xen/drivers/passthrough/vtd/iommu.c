@@ -1068,9 +1068,21 @@ static int iommu_alloc(struct acpi_drhd_unit *drhd)
     iommu->cap = dmar_readq(iommu->reg, DMAR_CAP_REG);
     iommu->ecap = dmar_readq(iommu->reg, DMAR_ECAP_REG);
 
-    dprintk(XENLOG_INFO VTDPREFIX,
-             "drhd->address = %"PRIx64"\n", drhd->address);
-    dprintk(XENLOG_INFO VTDPREFIX, "iommu->reg = %p\n", iommu->reg);
+    drhd->iommu = iommu;
+
+    dprintk(XENLOG_DEBUG VTDPREFIX,
+            "drhd->address = %"PRIx64" iommu->reg = %p\n",
+            drhd->address, iommu->reg);
+    dprintk(XENLOG_DEBUG VTDPREFIX,
+            "cap = %"PRIx64" ecap = %"PRIx64"\n", iommu->cap, iommu->ecap);
+    if ( cap_fault_reg_offset(iommu->cap) +
+         cap_num_fault_regs(iommu->cap) * PRIMARY_FAULT_REG_LEN >= PAGE_SIZE ||
+         ecap_iotlb_offset(iommu->ecap) >= PAGE_SIZE )
+    {
+        dprintk(XENLOG_ERR VTDPREFIX, "IOMMU: unsupported\n");
+        print_iommu_regs(drhd);
+        return -ENODEV;
+    }
 
     /* Calculate number of pagetable levels: between 2 and 4. */
     sagaw = cap_sagaw(iommu->cap);
@@ -1081,7 +1093,7 @@ static int iommu_alloc(struct acpi_drhd_unit *drhd)
     {
         dprintk(XENLOG_ERR VTDPREFIX,
                  "IOMMU: unsupported sagaw %lx\n", sagaw);
-        xfree(iommu);
+        print_iommu_regs(drhd);
         return -ENODEV;
     }
     iommu->nr_pt_levels = agaw_to_level(agaw);
@@ -1111,7 +1123,6 @@ static int iommu_alloc(struct acpi_drhd_unit *drhd)
     spin_lock_init(&iommu->lock);
     spin_lock_init(&iommu->register_lock);
 
-    drhd->iommu = iommu;
     return 0;
 }
 
@@ -1121,6 +1132,8 @@ static void iommu_free(struct acpi_drhd_unit *drhd)
 
     if ( iommu == NULL )
         return;
+
+    drhd->iommu = NULL;
 
     if ( iommu->root_maddr != 0 )
     {
@@ -1135,10 +1148,9 @@ static void iommu_free(struct acpi_drhd_unit *drhd)
     xfree(iommu->domid_map);
 
     free_intel_iommu(iommu->intel);
-    destroy_irq(iommu->irq);
+    if ( iommu->irq >= 0 )
+        destroy_irq(iommu->irq);
     xfree(iommu);
-
-    drhd->iommu = NULL;
 }
 
 #define guestwidth_to_adjustwidth(gaw) ({       \
@@ -1765,13 +1777,8 @@ void clear_fault_bits(struct iommu *iommu)
     unsigned long flags;
 
     spin_lock_irqsave(&iommu->register_lock, flags);
-    val = dmar_readq(
-        iommu->reg,
-        cap_fault_reg_offset(dmar_readq(iommu->reg,DMAR_CAP_REG))+0x8);
-    dmar_writeq(
-        iommu->reg,
-        cap_fault_reg_offset(dmar_readq(iommu->reg,DMAR_CAP_REG))+8,
-        val);
+    val = dmar_readq(iommu->reg, cap_fault_reg_offset(iommu->cap) + 8);
+    dmar_writeq(iommu->reg, cap_fault_reg_offset(iommu->cap) + 8, val);
     dmar_writel(iommu->reg, DMAR_FSTS_REG, DMA_FSTS_FAULTS);
     spin_unlock_irqrestore(&iommu->register_lock, flags);
 }
