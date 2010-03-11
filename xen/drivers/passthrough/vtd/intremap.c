@@ -134,7 +134,7 @@ int iommu_supports_eim(void)
 
     /* We MUST have a DRHD unit for each IOAPIC. */
     for ( apic = 0; apic < nr_ioapics; apic++ )
-        if ( !ioapic_to_iommu(IO_APIC_ID(apic)) )
+        if ( !ioapic_to_drhd(IO_APIC_ID(apic)) )
             return 0;
 
     if ( list_empty(&acpi_drhd_units) )
