@@ -220,7 +220,6 @@ class _GrubConfigFile(object):
     def _get_default(self):
         return self._default
     def _set_default(self, val):
-        val = val.strip("\"")
         if val == "saved":
             self._default = 0
         else:
@@ -300,7 +299,15 @@ class GrubConfigFile(_GrubConfigFile):
 
         if self.hasPassword():
             self.setPasswordAccess(False)
-    
+
+def grub2_handle_set(arg):
+    (com,arg) = grub_split(arg,2)
+    com="set:" + com
+    m = re.match("([\"\'])(.*)\\1", arg)
+    if m is not None:
+        arg=m.group(2) 
+    return (com,arg)
+
 class Grub2Image(_GrubImage):
     def __init__(self, title, lines):
         _GrubImage.__init__(self, title, lines)
@@ -309,9 +316,8 @@ class Grub2Image(_GrubImage):
         (com, arg) = grub_exact_split(line, 2)
 
         if com == "set":
-            (com,arg) = grub_split(arg,2)
-            com="set:" + com
-                
+            (com,arg) = grub2_handle_set(arg)
+            
         if self.commands.has_key(com):
             if self.commands[com] is not None:
                 setattr(self, self.commands[com], arg.strip())
@@ -373,17 +379,17 @@ class Grub2ConfigFile(_GrubConfigFile):
                 continue
 
             # new image
-            title_match = re.match('^menuentry "(.*)" {', l)
+            title_match = re.match('^menuentry "(.*)" (.*){', l)
             if title_match:
                 if img is not None:
-                    raise RuntimeError, "syntax error 1 %d %s" % (len(img),img)
+                    raise RuntimeError, "syntax error: cannot nest menuentry (%d %s)" % (len(img),img)
                 img = []
                 title = title_match.group(1)
                 continue
             
             if l.startswith("}"):
                 if img is None:
-                    raise RuntimeError, "syntax error 2 %d %s" % (len(img),img)
+                    raise RuntimeError, "syntax error: closing brace without menuentry"
 
                 self.add_image(Grub2Image(title, img))
                 img = None
@@ -396,8 +402,7 @@ class Grub2ConfigFile(_GrubConfigFile):
             (com, arg) = grub_exact_split(l, 2)
         
             if com == "set":
-                (com,arg) = grub_split(arg,2)
-                com="set:" + com
+                (com,arg) = grub2_handle_set(arg)
                 
             if self.commands.has_key(com):
                 if self.commands[com] is not None:
@@ -410,7 +415,7 @@ class Grub2ConfigFile(_GrubConfigFile):
                 logging.warning("Unknown directive %s" %(com,))
             
         if img is not None:
-            raise RuntimeError, "syntax error 3 %d %s" % (len(img),img)
+            raise RuntimeError, "syntax error: end of file with open menuentry(%d %s)" % (len(img),img)
 
         if self.hasPassword():
             self.setPasswordAccess(False)
