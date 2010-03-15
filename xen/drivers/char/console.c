@@ -198,7 +198,7 @@ long read_console_ring(struct xen_sysctl_readconsole *op)
     sofar = 0;
 
     c = conringc;
-    if ( op->incremental && ((int32_t)(op->index - c) < 0) )
+    if ( op->incremental && ((int32_t)(op->index - c) > 0) )
         c = op->index;
 
     while ( (c != conringp) && (sofar < max) )
