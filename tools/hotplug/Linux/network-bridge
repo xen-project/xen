@@ -50,8 +50,10 @@
 
 
 dir=$(dirname "$0")
+. "$dir/logging.sh"
 . "$dir/xen-script-common.sh"
 . "$dir/xen-network-common.sh"
+. "$dir/locking.sh"
 
 findCommand "$@"
 evalVariables "$@"
@@ -219,6 +221,8 @@ op_start () {
         return
     fi
 
+    claim_lock "network-bridge"
+
     create_bridge ${tdev}
 
     preiftransfer ${netdev}
@@ -249,6 +253,8 @@ op_start () {
     if [ ${antispoof} = 'yes' ] ; then
 	antispoofing
     fi
+
+    release_lock "network-bridge"
 }
 
 op_stop () {
@@ -258,6 +264,8 @@ op_stop () {
     if ! link_exists "$bridge"; then
 	return
     fi
+
+    claim_lock "network-bridge"
 
     transfer_addrs ${bridge} ${pdev}
     if ! ifdown ${bridge}; then
@@ -274,6 +282,8 @@ op_stop () {
     do_ifup ${netdev}
 
     brctl delbr ${tdev}
+
+    release_lock "network-bridge"
 }
 
 # adds $dev to $bridge but waits for $dev to be in running state first
