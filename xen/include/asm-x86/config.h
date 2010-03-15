@@ -26,6 +26,7 @@
 #define CONFIG_NUMA 1
 #define CONFIG_DISCONTIGMEM 1
 #define CONFIG_NUMA_EMU 1
+#define CONFIG_PAGEALLOC_MAX_ORDER (2 * PAGETABLE_ORDER)
 
 /* Intel P4 currently has largest cache line (L2 line size is 128 bytes). */
 #define CONFIG_X86_L1_CACHE_SHIFT 7

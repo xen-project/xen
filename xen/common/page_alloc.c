@@ -231,7 +231,7 @@ static long midsize_alloc_zone_pages;
 static DEFINE_SPINLOCK(heap_lock);
 
 static unsigned long init_node_heap(int node, unsigned long mfn,
-                                    unsigned long nr)
+                                    unsigned long nr, bool_t *use_tail)
 {
     /* First node to be discovered has its heap metadata statically alloced. */
     static heap_by_zone_and_order_t _heap_static;
@@ -250,12 +250,20 @@ static unsigned long init_node_heap(int node, unsigned long mfn,
         needed = 0;
     }
 #ifdef DIRECTMAP_VIRT_END
+    else if ( *use_tail && nr >= needed &&
+              (mfn + nr) <= (virt_to_mfn(DIRECTMAP_VIRT_END - 1) + 1) )
+    {
+        _heap[node] = mfn_to_virt(mfn + nr - needed);
+        avail[node] = mfn_to_virt(mfn + nr - 1) +
+                      PAGE_SIZE - sizeof(**avail) * NR_ZONES;
+    }
     else if ( nr >= needed &&
               (mfn + needed) <= (virt_to_mfn(DIRECTMAP_VIRT_END - 1) + 1) )
     {
         _heap[node] = mfn_to_virt(mfn);
         avail[node] = mfn_to_virt(mfn + needed - 1) +
                       PAGE_SIZE - sizeof(**avail) * NR_ZONES;
+        *use_tail = 0;
     }
 #endif
     else if ( get_order_from_bytes(sizeof(**_heap)) ==
@@ -812,15 +820,24 @@ static void init_heap_pages(
 
         if ( unlikely(!avail[nid_curr]) )
         {
+            unsigned long s = page_to_mfn(pg + i);
+            unsigned long e = page_to_mfn(pg + nr_pages - 1) + 1;
+            bool_t use_tail = (nid_curr == phys_to_nid(pfn_to_paddr(e - 1))) &&
+                              !(s & ((1UL << MAX_ORDER) - 1)) &&
+                              (find_first_set_bit(e) <= find_first_set_bit(s));
             unsigned long n;
 
-            n = init_node_heap(nid_curr, page_to_mfn(pg+i), nr_pages - i);
-            if ( n )
+            n = init_node_heap(nid_curr, page_to_mfn(pg+i), nr_pages - i,
+                               &use_tail);
+            BUG_ON(i + n > nr_pages);
+            if ( n && !use_tail )
             {
-                BUG_ON(i + n > nr_pages);
                 i += n - 1;
                 continue;
             }
+            if ( i + n == nr_pages )
+                break;
+            nr_pages -= n;
         }
 
         /*
@@ -868,6 +885,17 @@ void __init end_boot_allocator(void)
 
     /* Pages that are free now go to the domain sub-allocator. */
     for ( i = 0; i < nr_bootmem_regions; i++ )
+    {
+        struct bootmem_region *r = &bootmem_region_list[i];
+        if ( (r->s < r->e) &&
+             (phys_to_nid(pfn_to_paddr(r->s)) == cpu_to_node(0)) )
+        {
+            init_heap_pages(mfn_to_page(r->s), r->e - r->s);
+            r->e = r->s;
+            break;
+        }
+    }
+    for ( i = nr_bootmem_regions; i-- > 0; )
     {
         struct bootmem_region *r = &bootmem_region_list[i];
         if ( r->s < r->e )
