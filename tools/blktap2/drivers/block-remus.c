@@ -57,6 +57,7 @@
 #include <sys/param.h>
 #include <sys/sysctl.h>
 #include <unistd.h>
+#include <sys/stat.h>
 
 /* timeout for reads and writes in ms */
 #define HEARTBEAT_MS 1000

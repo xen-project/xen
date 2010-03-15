@@ -36,6 +36,7 @@
 #include <libgen.h>
 #include <iconv.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
 
 #include "libvhd.h"
 #include "relative-path.h"

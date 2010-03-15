@@ -29,7 +29,7 @@ CFLAGS += -DMEMSHR
 MEMSHRLIBS += $(MEMSHR_DIR)/libmemshr.a
 endif
 
-LDFLAGS_blktapctrl := $(LDFLAGS_libxenctrl) $(LDFLAGS_libxenstore) $(MEMSHRLIBS) -L../lib -lblktap -lrt -lm
+LDFLAGS_blktapctrl := $(LDFLAGS_libxenctrl) $(LDFLAGS_libxenstore) $(MEMSHRLIBS) -L../lib -lblktap -lrt -lm -lpthread
 LDFLAGS_img := $(LIBAIO_DIR)/libaio.a $(CRYPT_LIB) -lpthread -lz
 
 BLK-OBJS-y  := block-aio.o

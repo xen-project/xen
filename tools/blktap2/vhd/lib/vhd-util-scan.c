@@ -34,6 +34,7 @@
 #include <unistd.h>
 #include <fnmatch.h>
 #include <libgen.h>	/* for basename() */
+#include <sys/stat.h>
 
 #include "list.h"
 #include "libvhd.h"

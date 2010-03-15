@@ -51,6 +51,7 @@
 #include <sys/time.h>
 #include <syslog.h>
 #include <memshr.h>
+#include <sys/stat.h>
                                                                      
 #include "blktaplib.h"
 #include "blktapctrl.h"
