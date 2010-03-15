@@ -126,7 +126,8 @@ static struct page_info * __init alloc_chunk(
     struct domain *d, unsigned long max_pages)
 {
     struct page_info *page;
-    unsigned int order;
+    unsigned int order, free_order;
+
     /*
      * Allocate up to 2MB at a time: It prevents allocating very large chunks
      * from DMA pools before the >4GB pool is fully depleted.
@@ -139,6 +140,26 @@ static struct page_info * __init alloc_chunk(
     while ( (page = alloc_domheap_pages(d, order, 0)) == NULL )
         if ( order-- == 0 )
             break;
+    /*
+     * Make a reasonable attempt at finding a smaller chunk at a higher
+     * address, to avoid allocating from low memory as much as possible.
+     */
+    for ( free_order = order; page && order--; )
+    {
+        struct page_info *pg2;
+
+        if ( d->tot_pages + (1 << order) > d->max_pages )
+            continue;
+        pg2 = alloc_domheap_pages(d, order, 0);
+        if ( pg2 > page )
+        {
+            free_domheap_pages(page, free_order);
+            page = pg2;
+            free_order = order;
+        }
+        else if ( pg2 )
+            free_domheap_pages(pg2, order);
+    }
     return page;
 }
 
