@@ -82,7 +82,8 @@ static void continue_nonidle_domain(struct vcpu *v)
 static void default_idle(void)
 {
     local_irq_disable();
-    if ( !softirq_pending(smp_processor_id()) )
+    if ( !softirq_pending(smp_processor_id()) &&
+         cpu_online(smp_processor_id()) )
         safe_halt();
     else
         local_irq_enable();
