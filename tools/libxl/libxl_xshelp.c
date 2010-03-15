@@ -33,11 +33,11 @@ int xs_writev(struct xs_handle *xsh, xs_transaction_t t, char *dir, char *kvs[])
 
     for (i = 0; kvs[i] != NULL; i += 2) {
         asprintf(&path, "%s/%s", dir, kvs[i]);
-        if (path) {
+        if (path && kvs[i + 1]) {
             int length = strlen(kvs[i + 1]);
             xs_write(xsh, t, path, kvs[i + 1], length);
-            free(path);
         }
+        free(path);
     }
     return 0;
 }
@@ -74,7 +74,7 @@ int libxl_xs_writev(struct libxl_ctx *ctx, xs_transaction_t t,
 
     for (i = 0; kvs[i] != NULL; i += 2) {
         path = libxl_sprintf(ctx, "%s/%s", dir, kvs[i]);
-        if (path) {
+        if (path && kvs[i + 1]) {
             int length = strlen(kvs[i + 1]);
             xs_write(ctx->xsh, t, path, kvs[i + 1], length);
         }
