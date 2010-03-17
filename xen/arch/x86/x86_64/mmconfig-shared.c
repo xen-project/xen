@@ -454,12 +454,7 @@ int pci_find_ext_capability(int seg, int bus, int devfn, int cap)
      * cap version and next pointer all being 0.
      */
     if ( (header == 0) || (header == -1) )
-    {
-        dprintk(XENLOG_INFO VTDPREFIX,
-                "next cap:%x:%x.%x:  no extended config\n",
-                bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
         return 0;
-    }
 
     while ( ttl-- > 0 ) {
         if ( PCI_EXT_CAP_ID(header) == cap )

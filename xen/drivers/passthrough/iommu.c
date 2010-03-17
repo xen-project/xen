@@ -39,16 +39,17 @@ static int iommu_populate_page_table(struct domain *d);
  *   no-intremap                Disable VT-d Interrupt Remapping
  */
 custom_param("iommu", parse_iommu_param);
-int iommu_enabled = 1;
-int iommu_pv_enabled;
-int force_iommu;
-int iommu_workaround_bios_bug;
-int iommu_passthrough;
-int iommu_snoop = 1;
-int iommu_qinval = 1;
-int iommu_intremap = 1;
-int amd_iommu_debug;
-int amd_iommu_perdev_intremap;
+bool_t __read_mostly iommu_enabled = 1;
+bool_t __read_mostly iommu_pv_enabled;
+bool_t __read_mostly force_iommu;
+bool_t __read_mostly iommu_verbose;
+bool_t __read_mostly iommu_workaround_bios_bug;
+bool_t __read_mostly iommu_passthrough;
+bool_t __read_mostly iommu_snoop = 1;
+bool_t __read_mostly iommu_qinval = 1;
+bool_t __read_mostly iommu_intremap = 1;
+bool_t __read_mostly amd_iommu_debug;
+bool_t __read_mostly amd_iommu_perdev_intremap;
 
 static void __init parse_iommu_param(char *s)
 {
@@ -72,6 +73,8 @@ static void __init parse_iommu_param(char *s)
             iommu_workaround_bios_bug = 1;
         else if ( !strcmp(s, "passthrough") )
             iommu_passthrough = 1;
+        else if ( !strcmp(s, "verbose") )
+            iommu_verbose = 1;
         else if ( !strcmp(s, "no-snoop") )
             iommu_snoop = 0;
         else if ( !strcmp(s, "no-qinval") )
@@ -251,17 +254,17 @@ int deassign_device(struct domain *d, u8 bus, u8 devfn)
 
     if ( pdev->domain != d )
     {
-        gdprintk(XENLOG_ERR VTDPREFIX,
-                "IOMMU: deassign a device not owned\n");
+        dprintk(XENLOG_ERR VTDPREFIX,
+                "d%d: deassign a device not owned\n", d->domain_id);
         return -EINVAL;
     }
 
     ret = hd->platform_ops->reassign_device(d, dom0, bus, devfn);
     if ( ret )
     {
-        gdprintk(XENLOG_ERR VTDPREFIX,
-                 "Deassign device (%x:%x.%x) failed!\n",
-                 bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+        dprintk(XENLOG_ERR VTDPREFIX,
+                "d%d: Deassign device (%x:%x.%x) failed!\n",
+                d->domain_id, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
         return ret;
     }
 

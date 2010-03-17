@@ -355,7 +355,7 @@ static void iommu_msi_set_affinity(unsigned int irq, cpumask_t mask)
 
     dest = set_desc_affinity(desc, mask);
     if (dest == BAD_APICID){
-        gdprintk(XENLOG_ERR, "Set iommu interrupt affinity error!\n");
+        dprintk(XENLOG_ERR, "Set iommu interrupt affinity error!\n");
         return;
     }
 
@@ -531,7 +531,7 @@ static int set_iommu_interrupt_handler(struct amd_iommu *iommu)
     irq = create_irq();
     if ( irq <= 0 )
     {
-        gdprintk(XENLOG_ERR VTDPREFIX, "IOMMU: no irqs\n");
+        dprintk(XENLOG_ERR, "IOMMU: no irqs\n");
         return 0;
     }
     

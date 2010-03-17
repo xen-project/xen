@@ -292,10 +292,12 @@ int pt_irq_create_bind_vtd(
             }
         }
 
-        gdprintk(XENLOG_INFO VTDPREFIX,
-                 "VT-d irq bind: m_irq = %x device = %x intx = %x\n",
-                 machine_gsi, device, intx);
         spin_unlock(&d->event_lock);
+
+        if ( iommu_verbose )
+            dprintk(VTDPREFIX,
+                    "d%d: bind: m_gsi=%u g_gsi=%u device=%u intx=%u\n",
+                    d->domain_id, machine_gsi, guest_gsi, device, intx);
     }
     return 0;
 }
@@ -316,10 +318,11 @@ int pt_irq_destroy_bind_vtd(
     guest_gsi = hvm_pci_intx_gsi(device, intx);
     link = hvm_pci_intx_link(device, intx);
 
-    gdprintk(XENLOG_INFO,
-             "pt_irq_destroy_bind_vtd: machine_gsi=%d "
-             "guest_gsi=%d, device=%d, intx=%d.\n",
-             machine_gsi, guest_gsi, device, intx);
+    if ( iommu_verbose )
+        dprintk(VTDPREFIX,
+                "d%d: unbind: m_gsi=%u g_gsi=%u device=%u intx=%u\n",
+                d->domain_id, machine_gsi, guest_gsi, device, intx);
+
     spin_lock(&d->event_lock);
 
     hvm_irq_dpci = domain_get_irq_dpci(d);
@@ -372,9 +375,11 @@ int pt_irq_destroy_bind_vtd(
         }
     }
     spin_unlock(&d->event_lock);
-    gdprintk(XENLOG_INFO,
-             "XEN_DOMCTL_irq_unmapping: m_irq = 0x%x device = 0x%x intx = 0x%x\n",
-             machine_gsi, device, intx);
+
+    if ( iommu_verbose )
+        dprintk(VTDPREFIX,
+                "d%d unmap: m_irq=%u device=%u intx=%u\n",
+                d->domain_id, machine_gsi, device, intx);
 
     return 0;
 }

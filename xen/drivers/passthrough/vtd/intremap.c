@@ -484,9 +484,9 @@ static void set_msi_source_id(struct pci_dev *pdev, struct iremap_entry *ire)
         break;
 
     default:
-        gdprintk(XENLOG_WARNING VTDPREFIX,
-                 "set_msi_source_id: unknown type : bdf = %x:%x.%x\n",
-                 bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+        dprintk(XENLOG_WARNING VTDPREFIX, "d%d: unknown(%u): bdf = %x:%x.%x\n",
+                pdev->domain->domain_id, type,
+                bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
         break;
    }
 }

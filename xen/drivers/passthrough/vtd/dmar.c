@@ -313,27 +313,31 @@ static int __init acpi_parse_dev_scope(void *start, void *end,
                 bus, path->dev, path->fn, PCI_SECONDARY_BUS);
             sub_bus = pci_conf_read8(
                 bus, path->dev, path->fn, PCI_SUBORDINATE_BUS);
-            dprintk(XENLOG_INFO VTDPREFIX,
-                    "  bridge: %x:%x.%x  start = %x sec = %x  sub = %x\n",
-                    bus, path->dev, path->fn,
-                    acpi_scope->start_bus, sec_bus, sub_bus);
+            if ( iommu_verbose )
+                dprintk(VTDPREFIX,
+                        "  bridge: %x:%x.%x  start = %x sec = %x  sub = %x\n",
+                        bus, path->dev, path->fn,
+                        acpi_scope->start_bus, sec_bus, sub_bus);
 
             dmar_scope_add_buses(scope, sec_bus, sub_bus);
             break;
 
         case ACPI_DEV_MSI_HPET:
-            dprintk(XENLOG_INFO VTDPREFIX, "  MSI HPET: %x:%x.%x\n",
-                    bus, path->dev, path->fn);
+            if ( iommu_verbose )
+                dprintk(VTDPREFIX, "  MSI HPET: %x:%x.%x\n",
+                        bus, path->dev, path->fn);
             break;
 
         case ACPI_DEV_ENDPOINT:
-            dprintk(XENLOG_INFO VTDPREFIX, "  endpoint: %x:%x.%x\n",
-                    bus, path->dev, path->fn);
+            if ( iommu_verbose )
+                dprintk(VTDPREFIX, "  endpoint: %x:%x.%x\n",
+                        bus, path->dev, path->fn);
             break;
 
         case ACPI_DEV_IOAPIC:
-            dprintk(XENLOG_INFO VTDPREFIX, "  IOAPIC: %x:%x.%x\n",
-                    bus, path->dev, path->fn);
+            if ( iommu_verbose )
+                dprintk(VTDPREFIX, "  IOAPIC: %x:%x.%x\n",
+                        bus, path->dev, path->fn);
 
             if ( type == DMAR_TYPE )
             {
@@ -375,8 +379,9 @@ acpi_parse_one_drhd(struct acpi_dmar_entry_header *header)
     dmaru->address = drhd->address;
     dmaru->include_all = drhd->flags & 1; /* BIT0: INCLUDE_ALL */
     INIT_LIST_HEAD(&dmaru->ioapic_list);
-    dprintk(XENLOG_INFO VTDPREFIX, "  dmaru->address = %"PRIx64"\n",
-            dmaru->address);
+    if ( iommu_verbose )
+        dprintk(VTDPREFIX, "  dmaru->address = %"PRIx64"\n",
+                dmaru->address);
 
     addr = map_to_nocache_virt(0, drhd->address);
     dmaru->ecap = dmar_readq(addr, DMAR_ECAP_REG);
@@ -388,7 +393,8 @@ acpi_parse_one_drhd(struct acpi_dmar_entry_header *header)
 
     if ( dmaru->include_all )
     {
-        dprintk(XENLOG_INFO VTDPREFIX, "  flags: INCLUDE_ALL\n");
+        if ( iommu_verbose )
+            dprintk(VTDPREFIX, "  flags: INCLUDE_ALL\n");
         /* Only allow one INCLUDE_ALL */
         if ( include_all )
         {
@@ -541,9 +547,11 @@ acpi_parse_one_rmrr(struct acpi_dmar_entry_header *header)
         }
         else
         {
-            dprintk(XENLOG_INFO VTDPREFIX,
-                "  RMRR region: base_addr %"PRIx64" end_address %"PRIx64"\n",
-                rmrru->base_address, rmrru->end_address);
+            if ( iommu_verbose )
+                dprintk(VTDPREFIX,
+                        "  RMRR region: base_addr %"PRIx64
+                        " end_address %"PRIx64"\n",
+                        rmrru->base_address, rmrru->end_address);
             acpi_register_rmrr_unit(rmrru);
         }
     }
@@ -566,8 +574,9 @@ acpi_parse_one_atsr(struct acpi_dmar_entry_header *header)
     memset(atsru, 0, sizeof(struct acpi_atsr_unit));
 
     atsru->all_ports = atsr->flags & 1; /* BIT0: ALL_PORTS */
-    dprintk(XENLOG_INFO VTDPREFIX,
-            "  atsru->all_ports: %x\n", atsru->all_ports);
+    if ( iommu_verbose )
+        dprintk(VTDPREFIX,
+                "  atsru->all_ports: %x\n", atsru->all_ports);
     if ( !atsru->all_ports )
     {
         dev_scope_start = (void *)(atsr + 1);
@@ -577,7 +586,8 @@ acpi_parse_one_atsr(struct acpi_dmar_entry_header *header)
     }
     else
     {
-        dprintk(XENLOG_INFO VTDPREFIX, "  flags: ALL_PORTS\n");
+        if ( iommu_verbose )
+            dprintk(VTDPREFIX, "  flags: ALL_PORTS\n");
         /* Only allow one ALL_PORTS */
         if ( all_ports )
         {
@@ -610,9 +620,11 @@ acpi_parse_one_rhsa(struct acpi_dmar_entry_header *header)
     rhsau->address = rhsa->address;
     rhsau->proximity_domain = rhsa->proximity_domain;
     list_add_tail(&rhsau->list, &acpi_rhsa_units);
-    dprintk(XENLOG_INFO VTDPREFIX,
-            "  rhsau->address: %"PRIx64" rhsau->proximity_domain: %"PRIx32"\n",
-            rhsau->address, rhsau->proximity_domain);
+    if ( iommu_verbose )
+        dprintk(VTDPREFIX,
+                "  rhsau->address: %"PRIx64
+                " rhsau->proximity_domain: %"PRIx32"\n",
+                rhsau->address, rhsau->proximity_domain);
 
     return ret;
 }
@@ -639,8 +651,9 @@ static int __init acpi_parse_dmar(struct acpi_table_header *table)
     }
 
     dmar_host_address_width = dmar->width + 1;
-    dprintk(XENLOG_INFO VTDPREFIX, "Host address width %d\n",
-            dmar_host_address_width);
+    if ( iommu_verbose )
+        dprintk(VTDPREFIX, "Host address width %d\n",
+                dmar_host_address_width);
 
     entry_header = (struct acpi_dmar_entry_header *)(dmar + 1);
     while ( ((unsigned long)entry_header) <
@@ -649,23 +662,29 @@ static int __init acpi_parse_dmar(struct acpi_table_header *table)
         switch ( entry_header->type )
         {
         case ACPI_DMAR_DRHD:
-            dprintk(XENLOG_INFO VTDPREFIX, "found ACPI_DMAR_DRHD:\n");
+            if ( iommu_verbose )
+                dprintk(VTDPREFIX, "found ACPI_DMAR_DRHD:\n");
             ret = acpi_parse_one_drhd(entry_header);
             break;
         case ACPI_DMAR_RMRR:
-            dprintk(XENLOG_INFO VTDPREFIX, "found ACPI_DMAR_RMRR:\n");
+            if ( iommu_verbose )
+                dprintk(VTDPREFIX, "found ACPI_DMAR_RMRR:\n");
             ret = acpi_parse_one_rmrr(entry_header);
             break;
         case ACPI_DMAR_ATSR:
-            dprintk(XENLOG_INFO VTDPREFIX, "found ACPI_DMAR_ATSR:\n");
+            if ( iommu_verbose )
+                dprintk(VTDPREFIX, "found ACPI_DMAR_ATSR:\n");
             ret = acpi_parse_one_atsr(entry_header);
             break;
         case ACPI_DMAR_RHSA:
-            dprintk(XENLOG_INFO VTDPREFIX, "found ACPI_DMAR_RHSA:\n");
+            if ( iommu_verbose )
+                dprintk(VTDPREFIX, "found ACPI_DMAR_RHSA:\n");
             ret = acpi_parse_one_rhsa(entry_header);
             break;
         default:
-            dprintk(XENLOG_WARNING VTDPREFIX, "Unknown DMAR structure type\n");
+            dprintk(XENLOG_WARNING VTDPREFIX,
+                    "Unknown DMAR structure type %x\n",
+                    entry_header->type);
             ret = -EINVAL;
             break;
         }

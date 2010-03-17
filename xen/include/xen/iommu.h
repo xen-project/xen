@@ -26,14 +26,10 @@
 #include <public/hvm/ioreq.h>
 #include <public/domctl.h>
 
-extern int iommu_enabled;
-extern int iommu_pv_enabled;
-extern int force_iommu;
-extern int iommu_workaround_bios_bug;
-extern int iommu_passthrough;
-extern int iommu_snoop;
-extern int iommu_qinval;
-extern int iommu_intremap;
+extern bool_t iommu_enabled, iommu_pv_enabled;
+extern bool_t force_iommu, iommu_verbose;
+extern bool_t iommu_workaround_bios_bug, iommu_passthrough;
+extern bool_t iommu_snoop, iommu_qinval, iommu_intremap;
 
 #define domain_hvm_iommu(d)     (&d->arch.hvm_domain.hvm_iommu)
 

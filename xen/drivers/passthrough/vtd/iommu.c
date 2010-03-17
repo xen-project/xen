@@ -63,9 +63,9 @@ static int domain_iommu_domid(struct domain *d,
         i = find_next_bit(iommu->domid_bitmap, nr_dom, i+1);
     }
 
-    gdprintk(XENLOG_ERR VTDPREFIX,
-             "Cannot get valid iommu domid: domid=%d iommu->index=%d\n",
-             d->domain_id, iommu->index);
+    dprintk(XENLOG_ERR VTDPREFIX,
+            "Cannot get valid iommu domid: domid=%d iommu->index=%d\n",
+            d->domain_id, iommu->index);
     return -1;
 }
 
@@ -97,7 +97,7 @@ static int context_set_domain_id(struct context_entry *context,
         i = find_first_zero_bit(iommu->domid_bitmap, nr_dom);
         if ( i >= nr_dom )
         {
-            gdprintk(XENLOG_ERR VTDPREFIX, "IOMMU: no free domain ids\n");
+            dprintk(XENLOG_ERR VTDPREFIX, "IOMMU: no free domain ids\n");
             return -EFAULT;
         }
         iommu->domid_map[i] = d->domain_id;
@@ -690,8 +690,9 @@ static void iommu_enable_translation(struct iommu *iommu)
     u32 sts;
     unsigned long flags;
 
-    dprintk(XENLOG_INFO VTDPREFIX,
-            "iommu_enable_translation: iommu->reg = %p\n", iommu->reg);
+    if ( iommu_verbose )
+        dprintk(VTDPREFIX,
+                "iommu_enable_translation: iommu->reg = %p\n", iommu->reg);
     spin_lock_irqsave(&iommu->register_lock, flags);
     sts = dmar_readl(iommu->reg, DMAR_GSTS_REG);
     dmar_writel(iommu->reg, DMAR_GCMD_REG, sts | DMA_GCMD_TE);
@@ -1070,11 +1071,14 @@ static int iommu_alloc(struct acpi_drhd_unit *drhd)
 
     drhd->iommu = iommu;
 
-    dprintk(XENLOG_DEBUG VTDPREFIX,
-            "drhd->address = %"PRIx64" iommu->reg = %p\n",
-            drhd->address, iommu->reg);
-    dprintk(XENLOG_DEBUG VTDPREFIX,
-            "cap = %"PRIx64" ecap = %"PRIx64"\n", iommu->cap, iommu->ecap);
+    if ( iommu_verbose )
+    {
+        dprintk(VTDPREFIX,
+                "drhd->address = %"PRIx64" iommu->reg = %p\n",
+                drhd->address, iommu->reg);
+        dprintk(VTDPREFIX,
+                "cap = %"PRIx64" ecap = %"PRIx64"\n", iommu->cap, iommu->ecap);
+    }
     if ( cap_fault_reg_offset(iommu->cap) +
          cap_num_fault_regs(iommu->cap) * PRIMARY_FAULT_REG_LEN >= PAGE_SIZE ||
          ecap_iotlb_offset(iommu->ecap) >= PAGE_SIZE )
@@ -1316,16 +1320,16 @@ static int domain_context_mapping(struct domain *domain, u8 bus, u8 devfn)
         break;
 
     case DEV_TYPE_PCIe_ENDPOINT:
-        gdprintk(XENLOG_INFO VTDPREFIX,
-                 "domain_context_mapping:PCIe: bdf = %x:%x.%x\n",
-                 bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+        if ( iommu_verbose )
+            dprintk(VTDPREFIX, "d%d:PCIe: map bdf = %x:%x.%x\n",
+                    domain->domain_id, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
         ret = domain_context_mapping_one(domain, drhd->iommu, bus, devfn);
         break;
 
     case DEV_TYPE_PCI:
-        gdprintk(XENLOG_INFO VTDPREFIX,
-                 "domain_context_mapping:PCI: bdf = %x:%x.%x\n",
-                 bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+        if ( iommu_verbose )
+            dprintk(VTDPREFIX, "d%d:PCI: map bdf = %x:%x.%x\n",
+                    domain->domain_id, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
 
         ret = domain_context_mapping_one(domain, drhd->iommu, bus, devfn);
         if ( ret )
@@ -1355,12 +1359,15 @@ static int domain_context_mapping(struct domain *domain, u8 bus, u8 devfn)
         break;
 
     default:
-        gdprintk(XENLOG_ERR VTDPREFIX,
-                 "domain_context_mapping:unknown type : bdf = %x:%x.%x\n",
-                 bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+        dprintk(XENLOG_ERR VTDPREFIX, "d%d:unknown(%u): bdf = %x:%x.%x\n",
+                domain->domain_id, type,
+                bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
         ret = -EINVAL;
         break;
     }
+
+    if ( iommu_verbose )
+        process_pending_softirqs();
 
     return ret;
 }
@@ -1442,16 +1449,16 @@ static int domain_context_unmap(struct domain *domain, u8 bus, u8 devfn)
         goto out;
 
     case DEV_TYPE_PCIe_ENDPOINT:
-        gdprintk(XENLOG_INFO VTDPREFIX,
-                 "domain_context_unmap:PCIe: bdf = %x:%x.%x\n",
-                 bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+        if ( iommu_verbose )
+            dprintk(VTDPREFIX, "d%d:PCIe: unmap bdf = %x:%x.%x\n",
+                    domain->domain_id, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
         ret = domain_context_unmap_one(domain, iommu, bus, devfn);
         break;
 
     case DEV_TYPE_PCI:
-        gdprintk(XENLOG_INFO VTDPREFIX,
-                 "domain_context_unmap:PCI: bdf = %x:%x.%x\n",
-                 bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+        if ( iommu_verbose )
+            dprintk(VTDPREFIX, "d%d:PCI: unmap bdf = %x:%x.%x\n",
+                    domain->domain_id, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
         ret = domain_context_unmap_one(domain, iommu, bus, devfn);
         if ( ret )
             break;
@@ -1476,9 +1483,9 @@ static int domain_context_unmap(struct domain *domain, u8 bus, u8 devfn)
         break;
 
     default:
-        gdprintk(XENLOG_ERR VTDPREFIX,
-                 "domain_context_unmap:unknown type: bdf = %x:%x.%x\n",
-                 bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+        dprintk(XENLOG_ERR VTDPREFIX, "d%d:unknown(%u): bdf = %x:%x.%x\n",
+                domain->domain_id, type,
+                bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
         ret = -EINVAL;
         goto out;
     }
@@ -1702,8 +1709,8 @@ static int intel_iommu_add_device(struct pci_dev *pdev)
     ret = domain_context_mapping(pdev->domain, pdev->bus, pdev->devfn);
     if ( ret )
     {
-        gdprintk(XENLOG_ERR VTDPREFIX,
-                 "intel_iommu_add_device: context mapping failed\n");
+        dprintk(XENLOG_ERR VTDPREFIX, "d%d: context mapping failed\n",
+                pdev->domain->domain_id);
         return ret;
     }
 
@@ -1713,8 +1720,8 @@ static int intel_iommu_add_device(struct pci_dev *pdev)
         {
             ret = rmrr_identity_mapping(pdev->domain, rmrr);
             if ( ret )
-                gdprintk(XENLOG_ERR VTDPREFIX,
-                         "intel_iommu_add_device: RMRR mapping failed\n");
+                dprintk(XENLOG_ERR VTDPREFIX, "d%d: RMRR mapping failed\n",
+                        pdev->domain->domain_id);
         }
     }
 
@@ -2031,7 +2038,7 @@ static int intel_iommu_assign_device(struct domain *d, u8 bus, u8 devfn)
 
     if (pdev->domain != dom0)
     {
-        gdprintk(XENLOG_ERR VTDPREFIX,
+        dprintk(XENLOG_ERR VTDPREFIX,
                 "IOMMU: assign a assigned device\n");
        return -EBUSY;
     }
@@ -2057,8 +2064,8 @@ static int intel_iommu_assign_device(struct domain *d, u8 bus, u8 devfn)
             ret = rmrr_identity_mapping(d, rmrr);
             if ( ret )
             {
-                gdprintk(XENLOG_ERR VTDPREFIX,
-                         "IOMMU: mapping reserved region failed\n");
+                dprintk(XENLOG_ERR VTDPREFIX,
+                        "IOMMU: mapping reserved region failed\n");
                 goto done;
             }
         }
