@@ -65,7 +65,12 @@ size_param("conring_size", opt_conring_size);
 
 #define _CONRING_SIZE 16384
 #define CONRING_IDX_MASK(i) ((i)&(conring_size-1))
-static char _conring[_CONRING_SIZE], *__read_mostly conring = _conring;
+static char
+#if _CONRING_SIZE >= PAGE_SIZE
+    __attribute__((__section__(".bss.page_aligned"), __aligned__(PAGE_SIZE)))
+#endif
+    _conring[_CONRING_SIZE];
+static char *__read_mostly conring = _conring;
 static uint32_t __read_mostly conring_size = _CONRING_SIZE;
 static uint32_t conringc, conringp;
 
@@ -595,6 +600,8 @@ void __init console_init_postirq(void)
 
     serial_init_postirq();
 
+    if ( !opt_conring_size )
+        opt_conring_size = num_present_cpus() << (9 + xenlog_lower_thresh);
     /* Round size down to a power of two. */
     while ( opt_conring_size & (opt_conring_size - 1) )
         opt_conring_size &= opt_conring_size - 1;
@@ -618,6 +625,8 @@ void __init console_init_postirq(void)
     spin_unlock_irq(&console_lock);
 
     printk("Allocated console ring of %u KiB.\n", opt_conring_size >> 10);
+
+    init_xenheap_pages(__pa(_conring), __pa(_conring + _CONRING_SIZE));
 }
 
 void __init console_endboot(void)

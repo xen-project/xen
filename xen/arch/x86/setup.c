@@ -269,8 +269,8 @@ void __devinit srat_detect_node(int cpu)
         node = 0;
     numa_set_node(cpu, node);
 
-    if ( acpi_numa > 0 )
-        printk(KERN_INFO "CPU %d APIC %d -> Node %d\n", cpu, apicid, node);
+    if ( opt_cpu_info && acpi_numa > 0 )
+        printk("CPU %d APIC %d -> Node %d\n", cpu, apicid, node);
 }
 
 /*

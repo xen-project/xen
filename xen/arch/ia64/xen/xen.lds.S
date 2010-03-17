@@ -223,7 +223,12 @@ SECTIONS
   .sbss : AT(ADDR(.sbss) - LOAD_OFFSET)
 	{ *(.sbss) *(.scommon) }
   .bss : AT(ADDR(.bss) - LOAD_OFFSET)
-	{ *(.bss) *(COMMON) }
+	{
+		. = ALIGN(PAGE_SIZE);
+		*(.bss.page_aligned)
+		*(.bss)
+		*(COMMON)
+	}
 
   _end = .;
 

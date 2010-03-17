@@ -59,6 +59,7 @@ static DEFINE_PER_CPU(struct hvm_asid_data, hvm_asid_data);
 
 void hvm_asid_init(int nasids)
 {
+    static s8 g_disabled = -1;
     struct hvm_asid_data *data = &this_cpu(hvm_asid_data);
 
     /*
@@ -72,8 +73,12 @@ void hvm_asid_init(int nasids)
     data->max_asid = nasids - 1;
     data->disabled = (nasids <= 1);
 
-    printk("HVM: ASIDs %s \n",
-           (data->disabled ? "disabled." : "enabled."));
+    if ( g_disabled != data->disabled )
+    {
+        printk("HVM: ASIDs %sabled.\n", data->disabled ? "dis" : "en");
+        if ( g_disabled < 0 )
+            g_disabled = data->disabled;
+    }
 
     /* Zero indicates 'invalid generation', so we start the count at one. */
     data->core_asid_generation = 1;

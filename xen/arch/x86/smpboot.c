@@ -877,7 +877,9 @@ static int __devinit do_boot_cpu(int apicid, int cpu)
 	start_eip = setup_trampoline();
 
 	/* So we see what's up   */
-	printk("Booting processor %d/%d eip %lx\n", cpu, apicid, start_eip);
+	if (opt_cpu_info)
+		printk("Booting processor %d/%d eip %lx\n",
+		       cpu, apicid, start_eip);
 
 	stack_start.esp = prepare_idle_stack(cpu);
 
@@ -960,8 +962,7 @@ static int __devinit do_boot_cpu(int apicid, int cpu)
 		if (cpu_isset(cpu, cpu_callin_map)) {
 			/* number CPUs logically, starting from 1 (BSP is 0) */
 			Dprintk("OK.\n");
-			printk("CPU%d: ", cpu);
-			print_cpu_info(&cpu_data[cpu]);
+			print_cpu_info(cpu);
 			Dprintk("CPU has booted.\n");
 		} else {
 			boot_error = 1;
@@ -1062,8 +1063,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	 * Setup boot CPU information
 	 */
 	smp_store_cpu_info(0); /* Final full version of the data */
-	printk("CPU%d: ", 0);
-	print_cpu_info(&cpu_data[0]);
+	print_cpu_info(0);
 
 	boot_cpu_physical_apicid = get_apic_id();
 	x86_cpu_to_apicid[0] = boot_cpu_physical_apicid;

@@ -59,6 +59,9 @@ static struct cpu_dev * this_cpu = &default_cpu;
 
 integer_param("cachesize", cachesize_override);
 
+int __cpuinitdata opt_cpu_info;
+boolean_param("cpuinfo", opt_cpu_info);
+
 int __cpuinit get_model_name(struct cpuinfo_x86 *c)
 {
 	unsigned int *v;
@@ -97,8 +100,10 @@ void __cpuinit display_cacheinfo(struct cpuinfo_x86 *c)
 
 	if (n >= 0x80000005) {
 		cpuid(0x80000005, &dummy, &dummy, &ecx, &edx);
-		printk(KERN_INFO "CPU: L1 I Cache: %dK (%d bytes/line), D cache %dK (%d bytes/line)\n",
-			edx>>24, edx&0xFF, ecx>>24, ecx&0xFF);
+		if (opt_cpu_info)
+			printk("CPU: L1 I cache %dK (%d bytes/line),"
+			              " D cache %dK (%d bytes/line)\n",
+			       edx>>24, edx&0xFF, ecx>>24, ecx&0xFF);
 		c->x86_cache_size=(ecx>>24)+(edx>>24);	
 	}
 
@@ -121,8 +126,9 @@ void __cpuinit display_cacheinfo(struct cpuinfo_x86 *c)
 
 	c->x86_cache_size = l2size;
 
-	printk(KERN_INFO "CPU: L2 Cache: %dK (%d bytes/line)\n",
-	       l2size, ecx & 0xFF);
+	if (opt_cpu_info)
+		printk("CPU: L2 Cache: %dK (%d bytes/line)\n",
+		       l2size, ecx & 0xFF);
 }
 
 /* Naming convention should be: <Name> [(<Codename>)] */
@@ -495,8 +501,9 @@ void __cpuinit detect_ht(struct cpuinfo_x86 *c)
 		index_msb = get_count_order(c->x86_num_siblings);
 		phys_proc_id[cpu] = phys_pkg_id((ebx >> 24) & 0xFF, index_msb);
 
-		printk(KERN_INFO  "CPU: Physical Processor ID: %d\n",
-		       phys_proc_id[cpu]);
+		if (opt_cpu_info)
+			printk("CPU: Physical Processor ID: %d\n",
+			       phys_proc_id[cpu]);
 
 		c->x86_num_siblings = c->x86_num_siblings / c->x86_max_cores;
 
@@ -507,16 +514,22 @@ void __cpuinit detect_ht(struct cpuinfo_x86 *c)
 		cpu_core_id[cpu] = phys_pkg_id((ebx >> 24) & 0xFF, index_msb) &
 					       ((1 << core_bits) - 1);
 
-		if (c->x86_max_cores > 1)
-			printk(KERN_INFO  "CPU: Processor Core ID: %d\n",
+		if (opt_cpu_info && c->x86_max_cores > 1)
+			printk("CPU: Processor Core ID: %d\n",
 			       cpu_core_id[cpu]);
 	}
 }
 #endif
 
-void __cpuinit print_cpu_info(struct cpuinfo_x86 *c)
+void __cpuinit print_cpu_info(unsigned int cpu)
 {
-	char *vendor = NULL;
+	const struct cpuinfo_x86 *c = cpu_data + cpu;
+	const char *vendor = NULL;
+
+	if (!opt_cpu_info)
+		return;
+
+	printk("CPU%u: ", cpu);
 
 	if (c->x86_vendor < X86_VENDOR_NUM)
 		vendor = this_cpu->c_vendor;
@@ -578,7 +591,8 @@ void __cpuinit cpu_init(void)
 		printk(KERN_WARNING "CPU#%d already initialized!\n", cpu);
 		for (;;) local_irq_enable();
 	}
-	printk(KERN_INFO "Initializing CPU#%d\n", cpu);
+	if (opt_cpu_info)
+		printk("Initializing CPU#%d\n", cpu);
 
 	if (cpu_has_pat)
 		wrmsrl(MSR_IA32_CR_PAT, host_pat);

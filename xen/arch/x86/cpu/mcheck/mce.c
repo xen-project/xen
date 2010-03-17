@@ -562,9 +562,9 @@ void mcheck_mca_clearbanks(cpu_banks_t bankmask)
 	}
 }
 
-static int amd_mcheck_init(struct cpuinfo_x86 *ci)
+static enum mcheck_type amd_mcheck_init(struct cpuinfo_x86 *ci)
 {
-	int rc = 0;
+	enum mcheck_type rc = mcheck_none;
 
 	switch (ci->x86) {
 	case 6:
@@ -628,7 +628,9 @@ int mce_firstbank(struct cpuinfo_x86 *c)
 /* This has to be run for each processor */
 void mcheck_init(struct cpuinfo_x86 *c)
 {
-	int inited = 0, i, broadcast;
+	int i, broadcast;
+	enum mcheck_type inited = mcheck_none;
+	static enum mcheck_type g_type = mcheck_unset;
     static int broadcast_check;
 
 	if (mce_disabled == 1) {
@@ -694,9 +696,37 @@ void mcheck_init(struct cpuinfo_x86 *c)
     if (g_mcg_cap & MCG_CTL_P)
         rdmsrl(MSR_IA32_MCG_CTL, h_mcg_ctl);
     set_poll_bankmask(c);
-	if (!inited)
-		printk(XENLOG_INFO "CPU%i: No machine check initialization\n",
-		    smp_processor_id());
+
+	if (inited != g_type) {
+		char prefix[20];
+		static const char *const type_str[] = {
+			[mcheck_amd_famXX] = "AMD",
+			[mcheck_amd_k7] = "AMD K7",
+			[mcheck_amd_k8] = "AMD K8",
+			[mcheck_intel] = "Intel"
+		};
+
+		snprintf(prefix, ARRAY_SIZE(prefix),
+			 g_type != mcheck_unset ? XENLOG_WARNING "CPU%i: "
+						: XENLOG_INFO,
+			 smp_processor_id());
+		BUG_ON(inited >= ARRAY_SIZE(type_str));
+		switch (inited) {
+		default:
+			printk("%s%s machine check reporting enabled\n",
+			       prefix, type_str[inited]);
+			break;
+		case mcheck_amd_famXX:
+			printk("%s%s Fam%xh machine check reporting enabled\n",
+			       prefix, type_str[inited], c->x86);
+			break;
+		case mcheck_none:
+			printk("%sNo machine check initialization\n", prefix);
+			break;
+		}
+
+		g_type = inited;
+	}
 }
 
 u64 mce_cap_init(void)

@@ -28,13 +28,21 @@ extern int mce_verbosity;
             printk(s, ##a);       \
         } while (0)
 
+enum mcheck_type {
+	mcheck_unset = -1,
+	mcheck_none,
+	mcheck_amd_famXX,
+	mcheck_amd_k7,
+	mcheck_amd_k8,
+	mcheck_intel
+};
 
 /* Init functions */
-int amd_k7_mcheck_init(struct cpuinfo_x86 *c);
-int amd_k8_mcheck_init(struct cpuinfo_x86 *c);
-int amd_f10_mcheck_init(struct cpuinfo_x86 *c);
+enum mcheck_type amd_k7_mcheck_init(struct cpuinfo_x86 *c);
+enum mcheck_type amd_k8_mcheck_init(struct cpuinfo_x86 *c);
+enum mcheck_type amd_f10_mcheck_init(struct cpuinfo_x86 *c);
 
-int intel_mcheck_init(struct cpuinfo_x86 *c);
+enum mcheck_type intel_mcheck_init(struct cpuinfo_x86 *c);
 
 void intel_mcheck_timer(struct cpuinfo_x86 *c);
 void mce_intel_feature_init(struct cpuinfo_x86 *c);

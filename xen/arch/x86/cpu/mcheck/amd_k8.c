@@ -76,14 +76,14 @@ static void k8_machine_check(struct cpu_user_regs *regs, long error_code)
 }
 
 /* AMD K8 machine check */
-int amd_k8_mcheck_init(struct cpuinfo_x86 *c)
+enum mcheck_type amd_k8_mcheck_init(struct cpuinfo_x86 *c)
 {
 	uint32_t i;
 	enum mcequirk_amd_flags quirkflag;
 
 	/* Check for PPro style MCA; our caller has confirmed MCE support. */
 	if (!cpu_has(c, X86_FEATURE_MCA))
-		return 0;
+		return mcheck_none;
 
 	quirkflag = mcequirk_lookup_amd_quirkdata(c);
 
@@ -102,9 +102,6 @@ int amd_k8_mcheck_init(struct cpuinfo_x86 *c)
 	}
 
 	set_in_cr4(X86_CR4_MCE);
-	if (c->x86 < 0x10 || c->x86 > 0x11)
-		printk("CPU%i: AMD K8 machine check reporting enabled\n",
-		       smp_processor_id());
 
-	return 1;
+	return mcheck_amd_k8;
 }

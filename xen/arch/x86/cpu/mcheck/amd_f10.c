@@ -83,15 +83,12 @@ amd_f10_handler(struct mc_info *mi, uint16_t bank, uint64_t status)
 }
 
 /* AMD Family10 machine check */
-int amd_f10_mcheck_init(struct cpuinfo_x86 *c) 
+enum mcheck_type amd_f10_mcheck_init(struct cpuinfo_x86 *c)
 { 
-	if (!amd_k8_mcheck_init(c))
-		return 0;
+	if (amd_k8_mcheck_init(c) == mcheck_none)
+		return mcheck_none;
 
 	x86_mce_callback_register(amd_f10_handler);
 
-	printk("CPU%i: AMD Family%xh machine check reporting enabled\n",
-	       smp_processor_id(), c->x86);
-
-	return 1;
+	return mcheck_amd_famXX;
 }

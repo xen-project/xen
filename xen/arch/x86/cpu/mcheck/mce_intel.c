@@ -141,8 +141,9 @@ static void intel_init_thermal(struct cpuinfo_x86 *c)
 
     l = apic_read (APIC_LVTTHMR);
     apic_write_around (APIC_LVTTHMR, l & ~APIC_LVT_MASKED);
-    printk (KERN_INFO "CPU%d: Thermal monitoring enabled (%s)\n", 
-            cpu, tm2 ? "TM2" : "TM1");
+    if (opt_cpu_info)
+        printk(KERN_INFO "CPU%u: Thermal monitoring enabled (%s)\n",
+                cpu, tm2 ? "TM2" : "TM1");
     return;
 }
 #endif /* CONFIG_X86_MCE_THERMAL */
@@ -946,7 +947,8 @@ static void intel_init_cmci(struct cpuinfo_x86 *c)
     int cpu = smp_processor_id();
 
     if (!mce_available(c) || !cmci_support) {
-        mce_printk(MCE_QUIET, "CMCI: CPU%d has no CMCI support\n", cpu);
+        if (opt_cpu_info)
+            mce_printk(MCE_QUIET, "CMCI: CPU%d has no CMCI support\n", cpu);
         return;
     }
 
@@ -1068,11 +1070,9 @@ static void mce_init(void)
 }
 
 /* p4/p6 family have similar MCA initialization process */
-int intel_mcheck_init(struct cpuinfo_x86 *c)
+enum mcheck_type intel_mcheck_init(struct cpuinfo_x86 *c)
 {
     _mce_cap_init(c);
-    mce_printk(MCE_QUIET, "Intel machine check reporting enabled on CPU#%d.\n",
-            smp_processor_id());
 
     /* machine check is available */
     x86_mce_vector_register(intel_machine_check);
@@ -1085,7 +1085,7 @@ int intel_mcheck_init(struct cpuinfo_x86 *c)
     mce_set_owner();
 
     open_softirq(MACHINE_CHECK_SOFTIRQ, mce_softirq);
-    return 1;
+    return mcheck_intel;
 }
 
 int intel_mce_wrmsr(uint32_t msr, uint64_t val)
