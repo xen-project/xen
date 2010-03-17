@@ -2280,17 +2280,23 @@ int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
     
     if ( desc->action )
     {
-        WARN_BOGUS_WRITE("Attempt to modify IO-APIC pin for in-use IRQ!\n");
+        spin_lock_irqsave(&ioapic_lock, flags);
+        ret = io_apic_read(apic, 0x10 + 2 * pin);
+        spin_unlock_irqrestore(&ioapic_lock, flags);
+        rte.vector = cfg->vector;
+        if ( *(u32*)&rte != ret )
+            WARN_BOGUS_WRITE("old_entry=%08x pirq=%d\n%s: "
+                             "Attempt to modify IO-APIC pin for in-use IRQ!\n",
+                             ret, pirq, __FUNCTION__);
         return 0;
     }
 
     if ( cfg->vector <= 0 || cfg->vector > LAST_DYNAMIC_VECTOR ) {
-
-        printk("allocated vector for irq:%d\n", irq);
-        
         vector = assign_irq_vector(irq);
         if ( vector < 0 )
             return vector;
+
+        printk(XENLOG_INFO "allocated vector %02x for irq %d\n", vector, irq);
 
         add_pin_to_irq(irq, apic, pin);
     }
