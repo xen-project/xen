@@ -21,6 +21,7 @@ static void vesa_redraw_puts(const char *s);
 static void vesa_scroll_puts(const char *s);
 
 static unsigned char *lfb, *lbuf, *text_buf;
+static unsigned int *__initdata line_len;
 static const struct font_desc *font;
 static bool_t vga_compat;
 static unsigned int pixel_on;
@@ -96,6 +97,10 @@ void __init vesa_init(void)
     if ( !text_buf )
         goto fail;
 
+    line_len = xmalloc_array(unsigned int, text_columns);
+    if ( !line_len )
+        goto fail;
+
     if ( map_pages_to_xen(IOREMAP_VIRT_START,
                           vlfb_info.lfb_base >> PAGE_SHIFT,
                           vram_remap >> PAGE_SHIFT,
@@ -104,6 +109,7 @@ void __init vesa_init(void)
 
     lfb = memset((void *)IOREMAP_VIRT_START, 0, vram_remap);
     memset(text_buf, 0, text_columns * text_rows);
+    memset(line_len, 0, text_columns * sizeof(*line_len));
 
     vga_puts = vesa_redraw_puts;
 
@@ -144,6 +150,7 @@ void __init vesa_init(void)
  fail:
     xfree(lbuf);
     xfree(text_buf);
+    xfree(line_len);
 }
 
 void __init vesa_endboot(bool_t keep)
@@ -160,6 +167,8 @@ void __init vesa_endboot(bool_t keep)
             memset(lfb + i * vlfb_info.bytes_per_line, 0,
                    vlfb_info.width * bpp);
     }
+
+    xfree(line_len);
 }
 
 #if defined(CONFIG_X86)
@@ -212,7 +221,8 @@ static void lfb_flush(void)
 static void vesa_show_line(
     const unsigned char *text_line,
     unsigned char *video_line,
-    unsigned int nr_chars)
+    unsigned int nr_chars,
+    unsigned int nr_cells)
 {
     unsigned int i, j, b, bpp, pixel;
 
@@ -236,13 +246,13 @@ static void vesa_show_line(
         }
 
         memset(ptr, 0, (vlfb_info.width - nr_chars * font->width) * bpp);
-        memcpy(video_line, lbuf, vlfb_info.width * bpp);
+        memcpy(video_line, lbuf, nr_cells * font->width * bpp);
         video_line += vlfb_info.bytes_per_line;
     }
 }
 
 /* Fast mode which redraws all modified parts of a 2D text buffer. */
-static void vesa_redraw_puts(const char *s)
+static void __init vesa_redraw_puts(const char *s)
 {
     unsigned int i, min_redraw_y = ypos;
     char c;
@@ -269,9 +279,18 @@ static void vesa_redraw_puts(const char *s)
 
     /* Render modified section of text buffer to VESA linear framebuffer. */
     for ( i = min_redraw_y; i <= ypos; i++ )
-        vesa_show_line(text_buf + i * text_columns,
+    {
+        const unsigned char *line = text_buf + i * text_columns;
+        unsigned int width;
+
+        for ( width = text_columns; width; --width )
+            if ( line[width - 1] )
+                 break;
+        vesa_show_line(line,
                        lfb + i * font->height * vlfb_info.bytes_per_line,
-                       text_columns);
+                       width, max(line_len[i], width));
+        line_len[i] = width;
+    }
 
     lfb_flush();
 }
@@ -303,7 +322,7 @@ static void vesa_scroll_puts(const char *s)
             vesa_show_line(
                 text_buf,
                 lfb + (text_rows-1) * font->height * vlfb_info.bytes_per_line,
-                xpos);
+                xpos, text_columns);
 
             xpos = 0;
         }
