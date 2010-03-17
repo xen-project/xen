@@ -211,6 +211,7 @@ static void dbs_timer_init(struct cpu_dbs_info_s *dbs_info)
 static void dbs_timer_exit(struct cpu_dbs_info_s *dbs_info)
 {
     dbs_info->enable = 0;
+    dbs_info->stoppable = 0;
     stop_timer(&dbs_timer[dbs_info->cpu]);
 }
 
