@@ -309,11 +309,13 @@ int xc_domain_shutdown(int xc_handle,
 int xc_vcpu_setaffinity(int xc_handle,
                         uint32_t domid,
                         int vcpu,
-                        uint64_t cpumap);
+                        uint64_t *cpumap,
+                        int cpusize);
 int xc_vcpu_getaffinity(int xc_handle,
                         uint32_t domid,
                         int vcpu,
-                        uint64_t *cpumap);
+                        uint64_t *cpumap,
+                        int cpusize);
 
 /**
  * This function will return information about one or more domains. It is

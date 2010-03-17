@@ -215,35 +215,54 @@ static PyObject *pyxc_vcpu_setaffinity(XcObject *self,
 {
     uint32_t dom;
     int vcpu = 0, i;
-    uint64_t  cpumap = ~0ULL;
+    uint64_t  *cpumap;
     PyObject *cpulist = NULL;
+    int nr_cpus, size;
+    xc_physinfo_t info; 
+    xc_cpu_to_node_t map[1];
+    uint64_t cpumap_size = sizeof(cpumap); 
 
     static char *kwd_list[] = { "domid", "vcpu", "cpumap", NULL };
+    
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i|iO", kwd_list, 
                                       &dom, &vcpu, &cpulist) )
         return NULL;
 
+    set_xen_guest_handle(info.cpu_to_node, map);
+    info.max_cpu_id = 1;
+    if ( xc_physinfo(self->xc_handle, &info) != 0 )
+        return pyxc_error_to_exception();
+  
+    nr_cpus = info.nr_cpus;
+
+    size = (nr_cpus + cpumap_size * 8 - 1)/ (cpumap_size * 8);
+    cpumap = malloc(cpumap_size * size);
+    if(cpumap == NULL)
+        return pyxc_error_to_exception();
+    
+
     if ( (cpulist != NULL) && PyList_Check(cpulist) )
     {
-        cpumap = 0ULL;
+        for ( i = 0; i < size; i++)
+        {
+            cpumap[i] = 0ULL;
+        }
         for ( i = 0; i < PyList_Size(cpulist); i++ ) 
         {
             long cpu = PyInt_AsLong(PyList_GetItem(cpulist, i));
-            if ( cpu >= 64 )
-            {
-                errno = EINVAL;
-                PyErr_SetFromErrno(xc_error_obj);
-                return NULL;
-            }
-            cpumap |= (uint64_t)1 << cpu;
+            *(cpumap + cpu / (cpumap_size * 8)) |= (uint64_t)1 << (cpu % (cpumap_size * 8));
         }
     }
   
-    if ( xc_vcpu_setaffinity(self->xc_handle, dom, vcpu, cpumap) != 0 )
+    if ( xc_vcpu_setaffinity(self->xc_handle, dom, vcpu, cpumap, size * cpumap_size) != 0 )
+    {
+        free(cpumap);
         return pyxc_error_to_exception();
-    
+    }
+
     Py_INCREF(zero);
+    free(cpumap); 
     return zero;
 }
 
@@ -362,7 +381,11 @@ static PyObject *pyxc_vcpu_getinfo(XcObject *self,
     uint32_t dom, vcpu = 0;
     xc_vcpuinfo_t info;
     int rc, i;
-    uint64_t cpumap;
+    uint64_t *cpumap;
+    int nr_cpus, size;
+    xc_physinfo_t pinfo = { 0 };
+    xc_cpu_to_node_t map[1];
+    uint64_t cpumap_size = sizeof(cpumap);
 
     static char *kwd_list[] = { "domid", "vcpu", NULL };
     
@@ -370,12 +393,25 @@ static PyObject *pyxc_vcpu_getinfo(XcObject *self,
                                       &dom, &vcpu) )
         return NULL;
 
+    set_xen_guest_handle(pinfo.cpu_to_node, map);
+    pinfo.max_cpu_id = 1;
+    if ( xc_physinfo(self->xc_handle, &pinfo) != 0 ) 
+        return pyxc_error_to_exception();
+    nr_cpus = pinfo.nr_cpus;
     rc = xc_vcpu_getinfo(self->xc_handle, dom, vcpu, &info);
     if ( rc < 0 )
         return pyxc_error_to_exception();
-    rc = xc_vcpu_getaffinity(self->xc_handle, dom, vcpu, &cpumap);
+    size = (nr_cpus + cpumap_size * 8 - 1)/ (cpumap_size * 8); 
+
+    if((cpumap = malloc(cpumap_size * size)) == NULL)
+        return pyxc_error_to_exception(); 
+
+    rc = xc_vcpu_getaffinity(self->xc_handle, dom, vcpu, cpumap, cpumap_size * size);
     if ( rc < 0 )
+    {
+        free(cpumap);
         return pyxc_error_to_exception();
+    }
 
     info_dict = Py_BuildValue("{s:i,s:i,s:i,s:L,s:i}",
                               "online",   info.online,
@@ -385,17 +421,18 @@ static PyObject *pyxc_vcpu_getinfo(XcObject *self,
                               "cpu",      info.cpu);
 
     cpulist = PyList_New(0);
-    for ( i = 0; cpumap != 0; i++ )
+    for ( i = 0; i < size * cpumap_size * 8; i++ )
     {
-        if ( cpumap & 1 ) {
+        if (*(cpumap + i / (cpumap_size * 8)) & 1 ) {
             PyObject *pyint = PyInt_FromLong(i);
             PyList_Append(cpulist, pyint);
             Py_DECREF(pyint);
         }
-        cpumap >>= 1;
+        *(cpumap + i / (cpumap_size * 8)) >>= 1;
     }
     PyDict_SetItemString(info_dict, "cpumap", cpulist);
     Py_DECREF(cpulist);
+    free(cpumap);
     return info_dict;
 }
 

@@ -98,23 +98,28 @@ int xc_domain_shutdown(int xc_handle,
 int xc_vcpu_setaffinity(int xc_handle,
                         uint32_t domid,
                         int vcpu,
-                        uint64_t cpumap)
+                        uint64_t *cpumap, int cpusize)
 {
     DECLARE_DOMCTL;
     int ret = -1;
-    uint8_t local[sizeof (cpumap)];
+    uint8_t *local = malloc(cpusize); 
 
+    if(local == NULL)
+    {
+        PERROR("Could not alloc memory for Xen hypercall");
+        goto out;
+    }
     domctl.cmd = XEN_DOMCTL_setvcpuaffinity;
     domctl.domain = (domid_t)domid;
     domctl.u.vcpuaffinity.vcpu    = vcpu;
 
-    bitmap_64_to_byte(local, &cpumap, sizeof(cpumap) * 8);
+    bitmap_64_to_byte(local, cpumap, cpusize * 8);
 
     set_xen_guest_handle(domctl.u.vcpuaffinity.cpumap.bitmap, local);
 
-    domctl.u.vcpuaffinity.cpumap.nr_cpus = sizeof(cpumap) * 8;
+    domctl.u.vcpuaffinity.cpumap.nr_cpus = cpusize * 8;
     
-    if ( lock_pages(local, sizeof(local)) != 0 )
+    if ( lock_pages(local, cpusize) != 0 )
     {
         PERROR("Could not lock memory for Xen hypercall");
         goto out;
@@ -122,9 +127,10 @@ int xc_vcpu_setaffinity(int xc_handle,
 
     ret = do_domctl(xc_handle, &domctl);
 
-    unlock_pages(local, sizeof(local));
+    unlock_pages(local, cpusize);
 
  out:
+    free(local);
     return ret;
 }
 
@@ -132,18 +138,26 @@ int xc_vcpu_setaffinity(int xc_handle,
 int xc_vcpu_getaffinity(int xc_handle,
                         uint32_t domid,
                         int vcpu,
-                        uint64_t *cpumap)
+                        uint64_t *cpumap,
+                        int cpusize)
 {
     DECLARE_DOMCTL;
     int ret = -1;
-    uint8_t local[sizeof (cpumap)];
+    uint8_t * local = malloc(cpusize);
+
+    if(local == NULL)
+    {
+        PERROR("Could not alloc memory for Xen hypercall");
+        goto out;
+    }
 
     domctl.cmd = XEN_DOMCTL_getvcpuaffinity;
     domctl.domain = (domid_t)domid;
     domctl.u.vcpuaffinity.vcpu = vcpu;
 
+
     set_xen_guest_handle(domctl.u.vcpuaffinity.cpumap.bitmap, local);
-    domctl.u.vcpuaffinity.cpumap.nr_cpus = sizeof(cpumap) * 8;
+    domctl.u.vcpuaffinity.cpumap.nr_cpus = cpusize * 8;
     
     if ( lock_pages(local, sizeof(local)) != 0 )
     {
@@ -154,8 +168,9 @@ int xc_vcpu_getaffinity(int xc_handle,
     ret = do_domctl(xc_handle, &domctl);
 
     unlock_pages(local, sizeof (local));
-    bitmap_byte_to_64(cpumap, local, sizeof(local) * 8);
- out:
+    bitmap_byte_to_64(cpumap, local, cpusize * 8);
+out:
+    free(local);
     return ret;
 }
 
