@@ -233,6 +233,7 @@ XENAPI_CFG_TYPES = {
     's3_integrity' : int,
     'superpages' : int,
     'memory_sharing': int,
+    'Description': str,
 }
 
 # List of legacy configuration keys that have no equivalent in the
