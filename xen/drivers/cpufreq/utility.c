@@ -229,8 +229,9 @@ int cpufreq_frequency_table_cpuinfo(struct cpufreq_policy *policy,
     }
     if (second_max_freq == 0)
         second_max_freq = max_freq;
-    printk(XENLOG_INFO "max_freq: %u    second_max_freq: %u\n",
-           max_freq, second_max_freq);
+    if (cpufreq_verbose)
+        printk("max_freq: %u    second_max_freq: %u\n",
+               max_freq, second_max_freq);
 
     policy->min = policy->cpuinfo.min_freq = min_freq;
     policy->max = policy->cpuinfo.max_freq = max_freq;

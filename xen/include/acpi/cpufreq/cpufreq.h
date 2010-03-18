@@ -22,6 +22,8 @@
 
 DECLARE_PER_CPU(spinlock_t, cpufreq_statistic_lock);
 
+extern bool_t __read_mostly cpufreq_verbose;
+
 struct cpufreq_governor;
 
 struct acpi_cpufreq_data {

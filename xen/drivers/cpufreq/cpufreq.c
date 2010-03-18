@@ -59,6 +59,8 @@ static LIST_HEAD(cpufreq_dom_list_head);
 struct cpufreq_governor *cpufreq_opt_governor;
 LIST_HEAD(cpufreq_governor_list);
 
+bool_t __read_mostly cpufreq_verbose;
+
 struct cpufreq_governor *__find_governor(const char *governor)
 {
     struct cpufreq_governor *t;
@@ -205,13 +207,15 @@ int cpufreq_add_cpu(unsigned int cpu)
             cpufreq_cpu_policy[cpu] = NULL;
             return ret;
         }
-        printk(KERN_EMERG"CPU %u initialization completed\n", cpu);
+        if (cpufreq_verbose)
+            printk("CPU %u initialization completed\n", cpu);
     } else {
         firstcpu = first_cpu(cpufreq_dom->map);
         policy = cpufreq_cpu_policy[firstcpu];
 
         cpufreq_cpu_policy[cpu] = policy;
-        printk(KERN_EMERG"adding CPU %u\n", cpu);
+        if (cpufreq_verbose)
+            printk("adding CPU %u\n", cpu);
     }
 
     cpu_set(cpu, policy->cpus);
@@ -325,47 +329,47 @@ int cpufreq_del_cpu(unsigned int cpu)
         xfree(cpufreq_dom);
     }
 
-    printk(KERN_EMERG"deleting CPU %u\n", cpu);
+    if (cpufreq_verbose)
+        printk("deleting CPU %u\n", cpu);
     return 0;
 }
 
 static void print_PCT(struct xen_pct_register *ptr)
 {
-    printk(KERN_INFO "\t_PCT: descriptor=%d, length=%d, space_id=%d, "
-            "bit_width=%d, bit_offset=%d, reserved=%d, address=%"PRId64"\n",
-            ptr->descriptor, ptr->length, ptr->space_id, ptr->bit_width, 
-            ptr->bit_offset, ptr->reserved, ptr->address);
+    printk("\t_PCT: descriptor=%d, length=%d, space_id=%d, "
+           "bit_width=%d, bit_offset=%d, reserved=%d, address=%"PRId64"\n",
+           ptr->descriptor, ptr->length, ptr->space_id, ptr->bit_width,
+           ptr->bit_offset, ptr->reserved, ptr->address);
 }
 
 static void print_PSS(struct xen_processor_px *ptr, int count)
 {
     int i;
-    printk(KERN_INFO "\t_PSS: state_count=%d\n", count);
+    printk("\t_PSS: state_count=%d\n", count);
     for (i=0; i<count; i++){
-        printk(KERN_INFO "\tState%d: %"PRId64"MHz %"PRId64"mW %"PRId64"us "
+        printk("\tState%d: %"PRId64"MHz %"PRId64"mW %"PRId64"us "
                "%"PRId64"us 0x%"PRIx64" 0x%"PRIx64"\n",
-                i,
-                ptr[i].core_frequency,
-                ptr[i].power, 
-                ptr[i].transition_latency,
-                ptr[i].bus_master_latency,
-                ptr[i].control,
-                ptr[i].status
-              );
+               i,
+               ptr[i].core_frequency,
+               ptr[i].power,
+               ptr[i].transition_latency,
+               ptr[i].bus_master_latency,
+               ptr[i].control,
+               ptr[i].status);
     }
 }
 
 static void print_PSD( struct xen_psd_package *ptr)
 {
-    printk(KERN_INFO "\t_PSD: num_entries=%"PRId64" rev=%"PRId64
+    printk("\t_PSD: num_entries=%"PRId64" rev=%"PRId64
            " domain=%"PRId64" coord_type=%"PRId64" num_processors=%"PRId64"\n",
-            ptr->num_entries, ptr->revision, ptr->domain, ptr->coord_type, 
-            ptr->num_processors);
+           ptr->num_entries, ptr->revision, ptr->domain, ptr->coord_type,
+           ptr->num_processors);
 }
 
 static void print_PPC(unsigned int platform_limit)
 {
-    printk(KERN_INFO "\t_PPC: %d\n", platform_limit);
+    printk("\t_PPC: %d\n", platform_limit);
 }
 
 int set_px_pminfo(uint32_t acpi_id, struct xen_processor_performance *dom0_px_info)
@@ -380,8 +384,9 @@ int set_px_pminfo(uint32_t acpi_id, struct xen_processor_performance *dom0_px_in
         ret = -EINVAL;
         goto out;
     }
-    printk(KERN_INFO "Set CPU acpi_id(%d) cpuid(%d) Px State info:\n",
-            acpi_id, cpuid);
+    if ( cpufreq_verbose )
+        printk("Set CPU acpi_id(%d) cpuid(%d) Px State info:\n",
+               acpi_id, cpuid);
 
     pmpt = processor_pminfo[cpuid];
     if ( !pmpt )
@@ -425,8 +430,12 @@ int set_px_pminfo(uint32_t acpi_id, struct xen_processor_performance *dom0_px_in
         memcpy ((void *)&pxpt->status_register,
                 (void *)&dom0_px_info->status_register,
                 sizeof(struct xen_pct_register));
-        print_PCT(&pxpt->control_register);
-        print_PCT(&pxpt->status_register);
+
+        if ( cpufreq_verbose )
+        {
+            print_PCT(&pxpt->control_register);
+            print_PCT(&pxpt->status_register);
+        }
     }
 
     if ( dom0_px_info->flags & XEN_PX_PSS ) 
@@ -447,7 +456,9 @@ int set_px_pminfo(uint32_t acpi_id, struct xen_processor_performance *dom0_px_in
         copy_from_guest(pxpt->states, dom0_px_info->states, 
                                       dom0_px_info->state_count);
         pxpt->state_count = dom0_px_info->state_count;
-        print_PSS(pxpt->states,pxpt->state_count);
+
+        if ( cpufreq_verbose )
+            print_PSS(pxpt->states,pxpt->state_count);
     }
 
     if ( dom0_px_info->flags & XEN_PX_PSD )
@@ -468,13 +479,17 @@ int set_px_pminfo(uint32_t acpi_id, struct xen_processor_performance *dom0_px_in
         memcpy ((void *)&pxpt->domain_info,
                 (void *)&dom0_px_info->domain_info,
                 sizeof(struct xen_psd_package));
-        print_PSD(&pxpt->domain_info);
+
+        if ( cpufreq_verbose )
+            print_PSD(&pxpt->domain_info);
     }
 
     if ( dom0_px_info->flags & XEN_PX_PPC )
     {
         pxpt->platform_limit = dom0_px_info->platform_limit;
-        print_PPC(pxpt->platform_limit);
+
+        if ( cpufreq_verbose )
+            print_PPC(pxpt->platform_limit);
 
         if ( pxpt->init == XEN_PX_INIT )
         {
@@ -513,6 +528,11 @@ static int __init cpufreq_handle_common_option(const char *name, const char *val
 
     if (!strcmp(name, "minfreq") && val) {
         usr_min_freq = simple_strtoul(val, NULL, 0);
+        return 1;
+    }
+
+    if (!strcmp(name, "verbose")) {
+        cpufreq_verbose = !val || !!simple_strtoul(val, NULL, 0);
         return 1;
     }
 

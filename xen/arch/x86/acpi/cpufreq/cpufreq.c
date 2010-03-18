@@ -540,13 +540,15 @@ acpi_cpufreq_cpu_init(struct cpufreq_policy *policy)
 
     switch (perf->control_register.space_id) {
     case ACPI_ADR_SPACE_SYSTEM_IO:
-        printk("xen_pminfo: @acpi_cpufreq_cpu_init,"
-            "SYSTEM IO addr space\n");
+        if (cpufreq_verbose)
+            printk("xen_pminfo: @acpi_cpufreq_cpu_init,"
+                   "SYSTEM IO addr space\n");
         data->cpu_feature = SYSTEM_IO_CAPABLE;
         break;
     case ACPI_ADR_SPACE_FIXED_HARDWARE:
-        printk("xen_pminfo: @acpi_cpufreq_cpu_init," 
-            "HARDWARE addr space\n");
+        if (cpufreq_verbose)
+            printk("xen_pminfo: @acpi_cpufreq_cpu_init,"
+                   "HARDWARE addr space\n");
         if (!check_est_cpu(cpu)) {
             result = -ENODEV;
             goto err_unreg;
