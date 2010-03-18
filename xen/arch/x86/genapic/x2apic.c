@@ -23,19 +23,19 @@
 #include <xen/smp.h>
 #include <asm/mach-default/mach_mpparse.h>
 
-static int __initdata x2apic = 1;
+static int x2apic = 1;
 boolean_param("x2apic", x2apic);
 
-static int __initdata x2apic_phys; /* By default we use logical cluster mode. */
+static int  x2apic_phys; /* By default we use logical cluster mode. */
 boolean_param("x2apic_phys", x2apic_phys);
 
-static int __init probe_x2apic_phys(void)
+static int probe_x2apic_phys(void)
 {
     return x2apic && x2apic_phys && x2apic_is_available() &&
         iommu_supports_eim();
 }
 
-static int __init probe_x2apic_cluster(void)
+static int probe_x2apic_cluster(void)
 {
     return x2apic && !x2apic_phys && x2apic_is_available() &&
         iommu_supports_eim();

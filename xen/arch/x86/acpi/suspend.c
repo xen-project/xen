@@ -82,5 +82,4 @@ void restore_rest_processor_state(void)
         wrmsrl(MSR_IA32_CR_PAT, host_pat);
 
     mtrr_bp_restore();
-    mcheck_init(&boot_cpu_data);
 }
