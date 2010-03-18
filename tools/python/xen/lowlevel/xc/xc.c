@@ -220,10 +220,9 @@ static PyObject *pyxc_vcpu_setaffinity(XcObject *self,
     int nr_cpus, size;
     xc_physinfo_t info; 
     xc_cpu_to_node_t map[1];
-    uint64_t cpumap_size = sizeof(cpumap); 
+    uint64_t cpumap_size = sizeof(*cpumap); 
 
     static char *kwd_list[] = { "domid", "vcpu", "cpumap", NULL };
-    
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i|iO", kwd_list, 
                                       &dom, &vcpu, &cpulist) )
@@ -240,7 +239,6 @@ static PyObject *pyxc_vcpu_setaffinity(XcObject *self,
     cpumap = malloc(cpumap_size * size);
     if(cpumap == NULL)
         return pyxc_error_to_exception();
-    
 
     if ( (cpulist != NULL) && PyList_Check(cpulist) )
     {
@@ -251,7 +249,7 @@ static PyObject *pyxc_vcpu_setaffinity(XcObject *self,
         for ( i = 0; i < PyList_Size(cpulist); i++ ) 
         {
             long cpu = PyInt_AsLong(PyList_GetItem(cpulist, i));
-            *(cpumap + cpu / (cpumap_size * 8)) |= (uint64_t)1 << (cpu % (cpumap_size * 8));
+            cpumap[cpu / (cpumap_size * 8)] |= (uint64_t)1 << (cpu % (cpumap_size * 8));
         }
     }
   
@@ -260,7 +258,6 @@ static PyObject *pyxc_vcpu_setaffinity(XcObject *self,
         free(cpumap);
         return pyxc_error_to_exception();
     }
-
     Py_INCREF(zero);
     free(cpumap); 
     return zero;
@@ -385,7 +382,7 @@ static PyObject *pyxc_vcpu_getinfo(XcObject *self,
     int nr_cpus, size;
     xc_physinfo_t pinfo = { 0 };
     xc_cpu_to_node_t map[1];
-    uint64_t cpumap_size = sizeof(cpumap);
+    uint64_t cpumap_size = sizeof(*cpumap);
 
     static char *kwd_list[] = { "domid", "vcpu", NULL };
     
@@ -419,16 +416,15 @@ static PyObject *pyxc_vcpu_getinfo(XcObject *self,
                               "running",  info.running,
                               "cpu_time", info.cpu_time,
                               "cpu",      info.cpu);
-
     cpulist = PyList_New(0);
-    for ( i = 0; i < size * cpumap_size * 8; i++ )
+    for ( i = 0; i < nr_cpus; i++ )
     {
         if (*(cpumap + i / (cpumap_size * 8)) & 1 ) {
             PyObject *pyint = PyInt_FromLong(i);
             PyList_Append(cpulist, pyint);
             Py_DECREF(pyint);
         }
-        *(cpumap + i / (cpumap_size * 8)) >>= 1;
+        cpumap[i / (cpumap_size * 8)] >>= 1;
     }
     PyDict_SetItemString(info_dict, "cpumap", cpulist);
     Py_DECREF(cpulist);

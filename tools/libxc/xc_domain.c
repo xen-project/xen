@@ -138,8 +138,7 @@ int xc_vcpu_setaffinity(int xc_handle,
 int xc_vcpu_getaffinity(int xc_handle,
                         uint32_t domid,
                         int vcpu,
-                        uint64_t *cpumap,
-                        int cpusize)
+                        uint64_t *cpumap, int cpusize)
 {
     DECLARE_DOMCTL;
     int ret = -1;
