@@ -153,10 +153,9 @@ QEMU_REMOTE=http://xenbits.xensource.com/git-http/qemu-xen-unstable.git
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG := xen-4.0.0-rc6
-#QEMU_TAG ?= e5d14857cd67490bf956d97c8888c0be95ed3f78
-# Thu Feb 18 15:36:29 2010 +0000
-# When xen_platform_pci=0 also disable fixed Xen platform ioports
+QEMU_TAG ?= 435718fb726b80462b4028128301dcf92214cc6a
+# Thu Mar 18 16:48:03 2010 +0000
+# Fix const-correctness in dma bitmap hex parser
 
 OCAML_XENSTORED_REPO=http://xenbits.xensource.com/ext/xen-ocaml-tools.hg
 
