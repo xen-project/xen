@@ -48,7 +48,11 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
     if ( op->interface_version != XEN_SYSCTL_INTERFACE_VERSION )
         return -EACCES;
 
-    spin_lock(&sysctl_lock);
+    /* spin_trylock() avoids deadlock with stop_machine_run(). */
+    while ( !spin_trylock(&sysctl_lock) )
+        if ( hypercall_preempt_check() )
+            return hypercall_create_continuation(
+                __HYPERVISOR_sysctl, "h", u_sysctl);
 
     switch ( op->cmd )
     {

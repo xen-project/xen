@@ -73,7 +73,11 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
     if ( op->interface_version != XENPF_INTERFACE_VERSION )
         return -EACCES;
 
-    spin_lock(&xenpf_lock);
+    /* spin_trylock() avoids deadlock with stop_machine_run(). */
+    while ( !spin_trylock(&xenpf_lock) )
+        if ( hypercall_preempt_check() )
+            return hypercall_create_continuation(
+                __HYPERVISOR_platform_op, "h", u_xenpf_op);
 
     switch ( op->cmd )
     {
@@ -398,7 +402,12 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
 
         g_info = &op->u.pcpu_info;
 
-        spin_lock(&cpu_add_remove_lock);
+        /* spin_trylock() avoids deadlock with stop_machine_run(). */
+        if ( !spin_trylock(&cpu_add_remove_lock) )
+        {
+            ret = -EBUSY;
+            break;
+        }
 
         if ( (g_info->xen_cpuid >= NR_CPUS) ||
              (g_info->xen_cpuid < 0) ||

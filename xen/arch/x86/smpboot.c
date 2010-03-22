@@ -1342,7 +1342,12 @@ int cpu_down(unsigned int cpu)
 {
 	int err = 0;
 
-	spin_lock(&cpu_add_remove_lock);
+	/* spin_trylock() avoids deadlock with stop_machine_run(). */
+	if (!spin_trylock(&cpu_add_remove_lock)) {
+		err = -EBUSY;
+		goto out;
+	}
+
 	if (num_online_cpus() == 1) {
 		err = -EBUSY;
 		goto out;
@@ -1384,7 +1389,10 @@ int cpu_up(unsigned int cpu)
 {
 	int err = 0;
 
-	spin_lock(&cpu_add_remove_lock);
+	/* spin_trylock() avoids deadlock with stop_machine_run(). */
+	if (!spin_trylock(&cpu_add_remove_lock))
+	    return -EBUSY;
+
 	if (cpu_online(cpu)) {
 		printk("Bring up a online cpu. Bogus!\n");
 		err = -EBUSY;
@@ -1419,6 +1427,8 @@ void disable_nonboot_cpus(void)
 		if (cpu == 0)
 			continue;
 		error = cpu_down(cpu);
+		/* No need to check EBUSY here */
+		ASSERT(error != -EBUSY);
 		if (!error) {
 			cpu_set(cpu, frozen_cpus);
 			printk("CPU%d is down\n", cpu);
@@ -1439,6 +1449,8 @@ void enable_nonboot_cpus(void)
 	mtrr_aps_sync_begin();
 	for_each_cpu_mask(cpu, frozen_cpus) {
 		error = cpu_up(cpu);
+		/* No conflict will happen here */
+		ASSERT(error != -EBUSY);
 		if (!error) {
 			printk("CPU%d is up\n", cpu);
 			continue;
@@ -1481,7 +1493,9 @@ int cpu_add(uint32_t apic_id, uint32_t acpi_id, uint32_t pxm)
 	if ( physid_isset(apic_id, phys_cpu_present_map) )
 		return -EEXIST;
 
-	spin_lock(&cpu_add_remove_lock);
+	/* spin_trylock() avoids deadlock with stop_machine_run(). */
+	if (!spin_trylock(&cpu_add_remove_lock))
+		return -EBUSY;
 
 	cpu = mp_register_lapic(apic_id, 1);
 
