@@ -985,10 +985,8 @@ static int __devinit do_boot_cpu(int apicid, int cpu)
 		cpucount--;
 
 		/* Mark the CPU as non-present */
-		spin_lock(&cpu_add_remove_lock);
 		x86_cpu_to_apicid[cpu] = BAD_APICID;
 		cpu_clear(cpu, cpu_present_map);
-		spin_unlock(&cpu_add_remove_lock);
 	} else {
 	}
 
