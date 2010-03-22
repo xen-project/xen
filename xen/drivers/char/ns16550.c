@@ -259,7 +259,9 @@ static void __devinit ns16550_init_postirq(struct serial_port *port)
 
     serial_async_transmit(port);
 
-    init_timer(&uart->timer, ns16550_poll, port, 0);
+    if ( !uart->timer.function )
+        init_timer(&uart->timer, ns16550_poll, port, 0);
+
     /* Calculate time to fill RX FIFO and/or empty TX FIFO for polling. */
     bits = uart->data_bits + uart->stop_bits + !!uart->parity;
     uart->timeout_ms = max_t(
