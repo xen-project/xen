@@ -153,7 +153,8 @@ QEMU_REMOTE=http://xenbits.xensource.com/git-http/qemu-xen-unstable.git
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 73cef2cca413c17f314724c66194315038ea66c3
+QEMU_TAG := xen-4.0.0-rc7
+#QEMU_TAG ?= 73cef2cca413c17f314724c66194315038ea66c3
 # Thu Mar 18 16:50:44 2010 +0000
 # Allow changing CD for /dev/xvdX devices.
 
