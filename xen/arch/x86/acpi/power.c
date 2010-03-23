@@ -147,6 +147,7 @@ static int enter_state(u32 state)
 {
     unsigned long flags;
     int error;
+    unsigned long cr4;
 
     if ( (state <= ACPI_STATE_S0) || (state > ACPI_S_STATES_MAX) )
         return -EINVAL;
@@ -201,13 +202,15 @@ static int enter_state(u32 state)
     }
 
     /* Restore CR4 and EFER from cached values. */
-    write_cr4(read_cr4());
+    cr4 = read_cr4();
+    write_cr4(cr4 & ~X86_CR4_MCE);
     if ( cpu_has_efer )
         write_efer(read_efer());
 
     device_power_up();
 
     mcheck_init(&boot_cpu_data);
+    write_cr4(cr4);
 
     printk(XENLOG_INFO "Finishing wakeup from ACPI S%d state.\n", state);
 
