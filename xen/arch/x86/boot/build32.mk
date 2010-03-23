@@ -22,6 +22,6 @@ CFLAGS += -Werror -fno-builtin -msoft-float
 	$(LD) $(LDFLAGS_DIRECT) -N -Ttext $(RELOC) -o $@ $<
 
 %.o: %.c
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -DXEN_BITSPERLONG=$(XEN_BITSPERLONG) -c $< -o $@
 
 reloc.o: $(BASEDIR)/include/asm-x86/config.h

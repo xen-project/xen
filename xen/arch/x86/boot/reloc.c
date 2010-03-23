@@ -70,8 +70,28 @@ multiboot_info_t *reloc(multiboot_info_t *mbi_old)
             (module_t *)mbi->mods_addr, mbi->mods_count * sizeof(module_t));
         mbi->mods_addr = (u32)mods;
         for ( i = 0; i < mbi->mods_count; i++ )
+        {
+#if XEN_BITSPERLONG == 32
+            /*
+             * 32-bit Xen only maps bottom 1GB of memory at boot time.
+             * Relocate modules which extend beyond this (GRUB2 in particular
+             * likes to place modules as high as possible below 4GB).
+             */
+#define BOOTMAP_END (1ul<<30) /* 1GB */
+            static void *mod_alloc = (void *)BOOTMAP_END;
+            u32 mod_len = mods[i].mod_end - mods[i].mod_start;
+            if ( mods[i].mod_end > BOOTMAP_END )
+            {
+                mod_alloc = (void *)
+                    (((unsigned long)mod_alloc - mod_len) & ~15ul);
+                mods[i].mod_start = (u32)memcpy(
+                    mod_alloc, (char *)mods[i].mod_start, mod_len);
+                mods[i].mod_end = mods[i].mod_start + mod_len;
+            }
+#endif
             if ( mods[i].string )
                 mods[i].string = (u32)reloc_mbi_string((char *)mods[i].string);
+        }
     }
 
     if ( mbi->flags & MBI_MEMMAP )
