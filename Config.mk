@@ -153,9 +153,9 @@ QEMU_REMOTE=http://xenbits.xensource.com/git-http/qemu-xen-unstable.git
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 435718fb726b80462b4028128301dcf92214cc6a
-# Thu Mar 18 16:48:03 2010 +0000
-# Fix const-correctness in dma bitmap hex parser
+QEMU_TAG ?= 73cef2cca413c17f314724c66194315038ea66c3
+# Thu Mar 18 16:50:44 2010 +0000
+# Allow changing CD for /dev/xvdX devices.
 
 OCAML_XENSTORED_REPO=http://xenbits.xensource.com/ext/xen-ocaml-tools.hg
 
