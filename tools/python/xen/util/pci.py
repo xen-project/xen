@@ -1251,6 +1251,9 @@ class PciDevice:
         except IOError, (errno, strerr):
             raise PciDeviceParseError(('Failed to locate sysfs mount: %s: %s (%d)' %
                 (PROC_PCI_PATH, strerr, errno)))
+        except TypeError, err:
+            log.debug("Caught TypeError '%s'" % err)
+            pass
 
     def get_info_from_sysfs(self):
         self.find_capability(0x11)
