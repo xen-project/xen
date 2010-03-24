@@ -67,10 +67,13 @@ void print_iommu_regs(struct acpi_drhd_unit *drhd)
     printk(" CAP = %"PRIx64"\n", cap = dmar_readq(iommu->reg, DMAR_CAP_REG));
     printk(" n_fault_reg = %"PRIx64"\n", cap_num_fault_regs(cap));
     printk(" fault_recording_offset = %"PRIx64"\n", cap_fault_reg_offset(cap));
-    printk(" fault_recording_reg_l = %"PRIx64"\n",
-           dmar_readq(iommu->reg, cap_fault_reg_offset(cap)));
-    printk(" fault_recording_reg_h = %"PRIx64"\n",
-           dmar_readq(iommu->reg, cap_fault_reg_offset(cap) + 8));
+    if ( cap_fault_reg_offset(cap) < PAGE_SIZE )
+    {
+        printk(" fault_recording_reg_l = %"PRIx64"\n",
+               dmar_readq(iommu->reg, cap_fault_reg_offset(cap)));
+        printk(" fault_recording_reg_h = %"PRIx64"\n",
+               dmar_readq(iommu->reg, cap_fault_reg_offset(cap) + 8));
+    }
     printk(" ECAP = %"PRIx64"\n", dmar_readq(iommu->reg, DMAR_ECAP_REG));
     printk(" GCMD = %x\n", dmar_readl(iommu->reg, DMAR_GCMD_REG));
     printk(" GSTS = %x\n", dmar_readl(iommu->reg, DMAR_GSTS_REG));
