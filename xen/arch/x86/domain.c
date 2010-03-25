@@ -1808,6 +1808,7 @@ static int relinquish_memory(
             break;
         case -EAGAIN:
         case -EINTR:
+            ret = -EAGAIN;
             page_list_add(page, list);
             set_bit(_PGT_pinned, &page->u.inuse.type_info);
             put_page(page);
