@@ -218,6 +218,8 @@ static int set_irq_msi(struct msi_desc *entry)
 
 static void write_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
 {
+    entry->msg = *msg;
+
     if ( iommu_enabled )
         iommu_update_ire_from_msi(entry, msg);
 
@@ -260,7 +262,6 @@ static void write_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
     default:
         BUG();
     }
-    entry->msg = *msg;
 }
 
 void set_msi_affinity(unsigned int irq, cpumask_t mask)
