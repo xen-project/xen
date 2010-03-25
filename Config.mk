@@ -153,10 +153,9 @@ QEMU_REMOTE=http://xenbits.xensource.com/git-http/qemu-xen-unstable.git
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG := xen-4.0.0-rc7
-#QEMU_TAG ?= 73cef2cca413c17f314724c66194315038ea66c3
-# Thu Mar 18 16:50:44 2010 +0000
-# Allow changing CD for /dev/xvdX devices.
+QEMU_TAG ?= f1d909f0f854194f5a40d850886d1413fb8b63c2
+# Wed Mar 24 17:16:51 2010 +0000
+# Make hweight32 function static
 
 OCAML_XENSTORED_REPO=http://xenbits.xensource.com/ext/xen-ocaml-tools.hg
 
