@@ -213,22 +213,23 @@ struct acpi_table_drhd {
 struct acpi_table_rmrr {
 	struct	acpi_dmar_entry_header header;
 	u16	reserved;
-       u16     segment;
+	u16	segment;
 	u64	base_address;
 	u64	end_address;
 } __attribute__ ((packed));
 
 struct acpi_table_atsr {
-        struct  acpi_dmar_entry_header header;
-        u8      flags;
-        u8      reserved;
-        u16     segment;
+	struct	acpi_dmar_entry_header header;
+	u8	flags;
+	u8	reserved;
+	u16	segment;
 } __attribute__ ((packed));
 
 struct acpi_table_rhsa {
-        struct  acpi_dmar_entry_header header;
-        u32     proximity_domain;
-        u64     address; /* register base address for this drhd */
+	struct	acpi_dmar_entry_header header;
+	u32	reserved;
+	u64	address; /* register base address for this drhd */
+	u32	proximity_domain;
 } __attribute__ ((packed));
 
 enum acpi_dev_scope_type {
