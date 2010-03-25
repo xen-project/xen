@@ -193,6 +193,13 @@ map_domain_va(
     if (map == NULL)
         return NULL;
 
+    /*
+     * Due to the use of API fallback code in libxc, errno may
+     * be clobberred during successful operations.  Since the caller
+     * of xc_ptrace is depending on errno for return status, clear
+     * errno here.
+     */
+    errno = 0;
     return map + (va & ~PAGE_MASK);
 }
 
