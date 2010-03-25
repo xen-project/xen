@@ -361,6 +361,17 @@ static int __init acpi_parse_dev_scope(void *start, void *end,
     return 0;
 }
 
+static int __init acpi_dmar_check_length(
+    struct acpi_dmar_entry_header *h, unsigned int min_len)
+{
+    if ( h->length >= min_len )
+        return 0;
+    dprintk(XENLOG_ERR VTDPREFIX,
+            "Invalid ACPI DMAR entry length: 0x%x\n",
+            h->length);
+    return -EINVAL;
+}
+
 static int __init
 acpi_parse_one_drhd(struct acpi_dmar_entry_header *header)
 {
@@ -368,8 +379,11 @@ acpi_parse_one_drhd(struct acpi_dmar_entry_header *header)
     void *dev_scope_start, *dev_scope_end;
     struct acpi_drhd_unit *dmaru;
     void *addr;
-    int ret = 0;
+    int ret;
     static int include_all = 0;
+
+    if ( (ret = acpi_dmar_check_length(header, sizeof(*drhd))) != 0 )
+        return ret;
 
     dmaru = xmalloc(struct acpi_drhd_unit);
     if ( !dmaru )
@@ -470,7 +484,10 @@ acpi_parse_one_rmrr(struct acpi_dmar_entry_header *header)
     struct acpi_rmrr_unit *rmrru;
     void *dev_scope_start, *dev_scope_end;
     u64 base_addr = rmrr->base_address, end_addr = rmrr->end_address;
-    int ret = 0;
+    int ret;
+
+    if ( (ret = acpi_dmar_check_length(header, sizeof(*rmrr))) != 0 )
+        return ret;
 
 #ifdef CONFIG_X86
     /* This check is here simply to detect when RMRR values are
@@ -564,9 +581,12 @@ acpi_parse_one_atsr(struct acpi_dmar_entry_header *header)
 {
     struct acpi_table_atsr *atsr = (struct acpi_table_atsr *)header;
     struct acpi_atsr_unit *atsru;
-    int ret = 0;
+    int ret;
     static int all_ports;
     void *dev_scope_start, *dev_scope_end;
+
+    if ( (ret = acpi_dmar_check_length(header, sizeof(*atsr))) != 0 )
+        return ret;
 
     atsru = xmalloc(struct acpi_atsr_unit);
     if ( !atsru )
@@ -610,7 +630,10 @@ acpi_parse_one_rhsa(struct acpi_dmar_entry_header *header)
 {
     struct acpi_table_rhsa *rhsa = (struct acpi_table_rhsa *)header;
     struct acpi_rhsa_unit *rhsau;
-    int ret = 0;
+    int ret;
+
+    if ( (ret = acpi_dmar_check_length(header, sizeof(*rhsa))) != 0 )
+        return ret;
 
     rhsau = xmalloc(struct acpi_rhsa_unit);
     if ( !rhsau )
@@ -659,6 +682,11 @@ static int __init acpi_parse_dmar(struct acpi_table_header *table)
     while ( ((unsigned long)entry_header) <
             (((unsigned long)dmar) + table->length) )
     {
+        ret = acpi_dmar_check_length(
+            entry_header, sizeof(struct acpi_dmar_entry_header));
+        if ( ret )
+            break;
+
         switch ( entry_header->type )
         {
         case ACPI_DMAR_DRHD:
