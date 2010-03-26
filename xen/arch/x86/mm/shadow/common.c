@@ -180,6 +180,9 @@ hvm_read(enum x86_segment seg,
     case HVMCOPY_bad_gfn_to_mfn:
     case HVMCOPY_unhandleable:
         return X86EMUL_UNHANDLEABLE;
+    case HVMCOPY_gfn_paged_out:
+    case HVMCOPY_gfn_shared:
+        return X86EMUL_RETRY;
     }
 
     BUG();
