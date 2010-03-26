@@ -661,6 +661,8 @@ skip_pci:
             dm_info->usbdevice = strdup(buf);
     }
 
+    dm_info->type = c_info->hvm ? XENFV : XENPV;
+
     xlu_cfg_destroy(config);
 }
 
