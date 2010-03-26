@@ -22,6 +22,7 @@
 
 
 #include <errno.h>
+#include <string.h>
 #include <sys/poll.h>
 #include <xc_private.h>
 #include <xg_save_restore.h>
@@ -56,7 +57,7 @@ int xc_mem_paging_flush_ioemu_cache(domid_t domain_id)
     if ( xsh == NULL )
         return -EIO;
 
-    rc = xs_write(xsh, XBT_NULL, path, "flush-cache", strlen(path));
+    rc = xs_write(xsh, XBT_NULL, path, "flush-cache", strlen("flush-cache")); 
 
     xs_daemon_close(xsh);
 
