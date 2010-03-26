@@ -63,13 +63,14 @@ void cpufreq_residency_update(unsigned int cpu, uint8_t state)
 
 void cpufreq_statistic_update(unsigned int cpu, uint8_t from, uint8_t to)
 {
-    struct pm_px *pxpt = cpufreq_statistic_data[cpu];
+    struct pm_px *pxpt;
     struct processor_pminfo *pmpt = processor_pminfo[cpu];
     spinlock_t *cpufreq_statistic_lock = 
                &per_cpu(cpufreq_statistic_lock, cpu);
 
     spin_lock(cpufreq_statistic_lock);
 
+    pxpt = cpufreq_statistic_data[cpu];
     if ( !pxpt || !pmpt ) {
         spin_unlock(cpufreq_statistic_lock);
         return;
@@ -89,7 +90,7 @@ void cpufreq_statistic_update(unsigned int cpu, uint8_t from, uint8_t to)
 int cpufreq_statistic_init(unsigned int cpuid)
 {
     uint32_t i, count;
-    struct pm_px *pxpt = cpufreq_statistic_data[cpuid];
+    struct pm_px *pxpt;
     const struct processor_pminfo *pmpt = processor_pminfo[cpuid];
     spinlock_t *cpufreq_statistic_lock = 
                           &per_cpu(cpufreq_statistic_lock, cpuid);
@@ -99,6 +100,7 @@ int cpufreq_statistic_init(unsigned int cpuid)
 
     spin_lock(cpufreq_statistic_lock);
 
+    pxpt = cpufreq_statistic_data[cpuid];
     if ( pxpt ) {
         spin_unlock(cpufreq_statistic_lock);
         return 0;
@@ -148,12 +150,13 @@ int cpufreq_statistic_init(unsigned int cpuid)
 
 void cpufreq_statistic_exit(unsigned int cpuid)
 {
-    struct pm_px *pxpt = cpufreq_statistic_data[cpuid];
+    struct pm_px *pxpt;
     spinlock_t *cpufreq_statistic_lock = 
                &per_cpu(cpufreq_statistic_lock, cpuid);
 
     spin_lock(cpufreq_statistic_lock);
 
+    pxpt = cpufreq_statistic_data[cpuid];
     if (!pxpt) {
         spin_unlock(cpufreq_statistic_lock);
         return;
@@ -170,13 +173,14 @@ void cpufreq_statistic_exit(unsigned int cpuid)
 void cpufreq_statistic_reset(unsigned int cpuid)
 {
     uint32_t i, j, count;
-    struct pm_px *pxpt = cpufreq_statistic_data[cpuid];
+    struct pm_px *pxpt;
     const struct processor_pminfo *pmpt = processor_pminfo[cpuid];
     spinlock_t *cpufreq_statistic_lock = 
                &per_cpu(cpufreq_statistic_lock, cpuid);
 
     spin_lock(cpufreq_statistic_lock);
 
+    pxpt = cpufreq_statistic_data[cpuid];
     if ( !pmpt || !pxpt || !pxpt->u.pt || !pxpt->u.trans_pt ) {
         spin_unlock(cpufreq_statistic_lock);
         return;
