@@ -153,7 +153,8 @@ QEMU_REMOTE=http://xenbits.xensource.com/git-http/qemu-xen-unstable.git
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= f1d909f0f854194f5a40d850886d1413fb8b63c2
+QEMU_TAG := xen-4.0.0-rc8
+#QEMU_TAG ?= f1d909f0f854194f5a40d850886d1413fb8b63c2
 # Wed Mar 24 17:16:51 2010 +0000
 # Make hweight32 function static
 
