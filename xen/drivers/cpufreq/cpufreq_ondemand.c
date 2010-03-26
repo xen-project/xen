@@ -196,8 +196,9 @@ static void dbs_timer_init(struct cpu_dbs_info_s *dbs_info)
 {
     dbs_info->enable = 1;
 
-    init_timer(&dbs_timer[dbs_info->cpu], do_dbs_timer, 
-        (void *)dbs_info, dbs_info->cpu);
+    if ( !dbs_timer[dbs_info->cpu].function )
+        init_timer(&dbs_timer[dbs_info->cpu], do_dbs_timer, 
+            (void *)dbs_info, dbs_info->cpu);
 
     set_timer(&dbs_timer[dbs_info->cpu], NOW()+dbs_tuners_ins.sampling_rate);
 
