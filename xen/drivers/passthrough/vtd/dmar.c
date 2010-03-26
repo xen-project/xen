@@ -711,7 +711,7 @@ static int __init acpi_parse_dmar(struct acpi_table_header *table)
             break;
         default:
             dprintk(XENLOG_WARNING VTDPREFIX,
-                    "Unknown DMAR structure type %x\n",
+                    "Ignore unknown DMAR structure type (0x%x)\n",
                     entry_header->type);
             break;
         }
