@@ -435,7 +435,7 @@ class ImageHandler:
                 os.rename(self.logfile, self.logfile + ".1")
 
         null = os.open("/dev/null", os.O_RDONLY)
-        logfd = os.open(self.logfile, logfile_mode)
+        logfd = os.open(self.logfile, logfile_mode, 0666)
         
         sys.stderr.flush()
         contract = osdep.prefork("%s:%d" %
