@@ -1234,7 +1234,9 @@ void ept_sync_domain(struct domain *d)
      * the ept_synced mask before on_selected_cpus() reads it, resulting in
      * unnecessary extra flushes, to avoid allocating a cpumask_t on the stack.
      */
-    d->arch.hvm_domain.vmx.ept_synced = d->domain_dirty_cpumask;
+    cpus_and(d->arch.hvm_domain.vmx.ept_synced,
+             d->domain_dirty_cpumask, cpu_online_map);
+
     on_selected_cpus(&d->arch.hvm_domain.vmx.ept_synced,
                      __ept_sync_domain, d, 1);
 }
