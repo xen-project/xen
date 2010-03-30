@@ -69,7 +69,7 @@ void pcifront_watches(void *opaque)
     snprintf(fe_state, sizeof(fe_state), "%s/state", nodename);
 
     while (1) {
-        printk("pcifront_watches: waiting for backend path to happear %s\n", path);
+        printk("pcifront_watches: waiting for backend path to appear %s\n", path);
         xenbus_watch_path_token(XBT_NIL, path, path, &events);
         while ((err = xenbus_read(XBT_NIL, path, &be_path)) != NULL) {
             free(err);
