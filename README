@@ -1,10 +1,10 @@
 #################################
- __  __            _  _    ___  
- \ \/ /___ _ __   | || |  / _ \ 
-  \  // _ \ '_ \  | || |_| | | |
-  /  \  __/ | | | |__   _| |_| |
- /_/\_\___|_| |_|    |_|(_)___/ 
-
+ __  __            _  _    _ 
+ \ \/ /___ _ __   | || |  / |
+  \  // _ \ '_ \  | || |_ | |
+  /  \  __/ | | | |__   _|| |
+ /_/\_\___|_| |_|    |_|(_)_|
+                             
 #################################
 
 http://www.xen.org/
@@ -19,7 +19,7 @@ is freely-distributable Open Source software, released under the GNU
 GPL. Since its initial public release, Xen has grown a large
 development community, spearheaded by xen.org (http://www.xen.org).
 
-The 4.0 release offers excellent performance, hardware support and
+The 4.1 release offers excellent performance, hardware support and
 enterprise-grade features such as x86_32-PAE, x86_64, SMP guests and
 live relocation of VMs. Ports to Linux, NetBSD, FreeBSD and Solaris
 are available from the community.
