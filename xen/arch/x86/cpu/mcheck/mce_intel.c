@@ -824,6 +824,8 @@ static int do_cmci_discover(int i)
         clear_bit(i, __get_cpu_var(mce_banks_owned));
         goto out;
     }
+
+    val &= ~CMCI_THRESHOLD_MASK;
     wrmsrl(msr, val | CMCI_EN | CMCI_THRESHOLD);
     rdmsrl(msr, val);
 
