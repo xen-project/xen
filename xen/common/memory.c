@@ -525,7 +525,7 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE(void) arg)
         if ( reservation.nr_extents > (ULONG_MAX >> MEMOP_EXTENT_SHIFT) )
             return start_extent;
 
-        if ( unlikely(start_extent > reservation.nr_extents) )
+        if ( unlikely(start_extent >= reservation.nr_extents) )
             return start_extent;
 
         args.extent_list  = reservation.extent_start;
