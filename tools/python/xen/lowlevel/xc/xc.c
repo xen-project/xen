@@ -218,8 +218,7 @@ static PyObject *pyxc_vcpu_setaffinity(XcObject *self,
     uint64_t  *cpumap;
     PyObject *cpulist = NULL;
     int nr_cpus, size;
-    xc_physinfo_t info; 
-    xc_cpu_to_node_t map[1];
+    xc_physinfo_t info = {0}; 
     uint64_t cpumap_size = sizeof(*cpumap); 
 
     static char *kwd_list[] = { "domid", "vcpu", "cpumap", NULL };
@@ -228,8 +227,6 @@ static PyObject *pyxc_vcpu_setaffinity(XcObject *self,
                                       &dom, &vcpu, &cpulist) )
         return NULL;
 
-    set_xen_guest_handle(info.cpu_to_node, map);
-    info.max_cpu_id = 1;
     if ( xc_physinfo(self->xc_handle, &info) != 0 )
         return pyxc_error_to_exception();
   
@@ -381,7 +378,6 @@ static PyObject *pyxc_vcpu_getinfo(XcObject *self,
     uint64_t *cpumap;
     int nr_cpus, size;
     xc_physinfo_t pinfo = { 0 };
-    xc_cpu_to_node_t map[1];
     uint64_t cpumap_size = sizeof(*cpumap);
 
     static char *kwd_list[] = { "domid", "vcpu", NULL };
@@ -390,18 +386,18 @@ static PyObject *pyxc_vcpu_getinfo(XcObject *self,
                                       &dom, &vcpu) )
         return NULL;
 
-    set_xen_guest_handle(pinfo.cpu_to_node, map);
-    pinfo.max_cpu_id = 1;
     if ( xc_physinfo(self->xc_handle, &pinfo) != 0 ) 
         return pyxc_error_to_exception();
     nr_cpus = pinfo.nr_cpus;
+
     rc = xc_vcpu_getinfo(self->xc_handle, dom, vcpu, &info);
     if ( rc < 0 )
         return pyxc_error_to_exception();
-    size = (nr_cpus + cpumap_size * 8 - 1)/ (cpumap_size * 8); 
 
+    size = (nr_cpus + cpumap_size * 8 - 1)/ (cpumap_size * 8); 
     if((cpumap = malloc(cpumap_size * size)) == NULL)
         return pyxc_error_to_exception(); 
+    memset(cpumap, 0, cpumap_size * size);
 
     rc = xc_vcpu_getaffinity(self->xc_handle, dom, vcpu, cpumap, cpumap_size * size);
     if ( rc < 0 )
