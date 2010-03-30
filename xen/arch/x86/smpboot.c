@@ -1302,10 +1302,9 @@ int __cpu_disable(void)
 
 	remove_siblinginfo(cpu);
 
-	cpu_clear(cpu, cpu_online_map);
-	fixup_irqs();
 	/* It's now safe to remove this processor from the online map */
 	cpu_clear(cpu, cpu_online_map);
+	fixup_irqs();
 
 	cpu_disable_scheduler();
 
