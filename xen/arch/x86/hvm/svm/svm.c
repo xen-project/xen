@@ -42,6 +42,7 @@
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
 #include <asm/hvm/io.h>
+#include <asm/hvm/emulate.h>
 #include <asm/hvm/svm/asid.h>
 #include <asm/hvm/svm/svm.h>
 #include <asm/hvm/svm/vmcb.h>
@@ -1244,6 +1245,23 @@ static void svm_vmexit_do_invalidate_cache(struct cpu_user_regs *regs)
     __update_guest_eip(regs, inst_len);
 }
 
+static int svm_vmexit_do_io(struct vmcb_struct *vmcb,
+                             struct cpu_user_regs *regs)
+{
+    uint16_t port;
+    int bytes, dir;
+    int rc;
+
+    port = (vmcb->exitinfo1 >> 16) & 0xFFFF;
+    bytes = ((vmcb->exitinfo1 >> 4) & 0x07);
+    dir = (vmcb->exitinfo1 & 1) ? IOREQ_READ : IOREQ_WRITE;
+
+    rc = handle_mmio_decoded(port, bytes, dir);
+    if ( rc != X86EMUL_RETRY )
+        __update_guest_eip(regs, vmcb->exitinfo2 - vmcb->rip);
+    return rc;
+}
+
 static void svm_invlpg_intercept(unsigned long vaddr)
 {
     struct vcpu *curr = current;
@@ -1450,11 +1468,17 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         svm_vmexit_do_hlt(vmcb, regs);
         break;
 
+    case VMEXIT_IOIO:
+        if ( ( vmcb->exitinfo1 & ( 1 << 2 ) ) == 0 ) {
+            if ( !svm_vmexit_do_io(vmcb, regs) )
+                hvm_inject_exception(TRAP_gp_fault, 0, 0);
+            break;
+        }
+        /* fallthrough to emulation if a string instruction */
     case VMEXIT_CR0_READ ... VMEXIT_CR15_READ:
     case VMEXIT_CR0_WRITE ... VMEXIT_CR15_WRITE:
     case VMEXIT_INVLPG:
     case VMEXIT_INVLPGA:
-    case VMEXIT_IOIO:
         if ( !handle_mmio() )
             hvm_inject_exception(TRAP_gp_fault, 0, 0);
         break;

@@ -48,7 +48,7 @@ static void hvmtrace_io_assist(int is_mmio, ioreq_t *p)
     trace_var(event, 0/*!cycles*/, size, buffer);
 }
 
-static int hvmemul_do_io(
+int hvmemul_do_io(
     int is_mmio, paddr_t addr, unsigned long *reps, int size,
     paddr_t ram_gpa, int dir, int df, void *p_data)
 {

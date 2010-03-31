@@ -171,10 +171,22 @@ int handle_mmio(void)
     struct hvm_emulate_ctxt ctxt;
     struct vcpu *curr = current;
     int rc;
+    unsigned long data, reps = 1;
 
-    hvm_emulate_prepare(&ctxt, guest_cpu_user_regs());
-
-    rc = hvm_emulate_one(&ctxt);
+    if ( curr->arch.hvm_vcpu.io_size == 0 ) {
+        hvm_emulate_prepare(&ctxt, guest_cpu_user_regs());
+        rc = hvm_emulate_one(&ctxt);
+    } else {
+        if ( curr->arch.hvm_vcpu.io_dir == 0 )
+            data = guest_cpu_user_regs()->eax;
+        rc = hvmemul_do_io(0, curr->arch.hvm_vcpu.io_port, &reps,
+                           curr->arch.hvm_vcpu.io_size, 0,
+                           curr->arch.hvm_vcpu.io_dir, 0, &data);
+        if ( curr->arch.hvm_vcpu.io_dir == 1 && rc == X86EMUL_OKAY ) {
+            memcpy(&(guest_cpu_user_regs()->eax),
+                   &data, curr->arch.hvm_vcpu.io_size);
+        }
+    }
 
     if ( curr->arch.hvm_vcpu.io_state == HVMIO_awaiting_completion )
         curr->arch.hvm_vcpu.io_state = HVMIO_handle_mmio_awaiting_completion;
@@ -184,14 +196,21 @@ int handle_mmio(void)
     switch ( rc )
     {
     case X86EMUL_UNHANDLEABLE:
-        gdprintk(XENLOG_WARNING,
-                 "MMIO emulation failed @ %04x:%lx: "
-                 "%02x %02x %02x %02x %02x %02x\n",
-                 hvmemul_get_seg_reg(x86_seg_cs, &ctxt)->sel,
-                 ctxt.insn_buf_eip,
-                 ctxt.insn_buf[0], ctxt.insn_buf[1],
-                 ctxt.insn_buf[2], ctxt.insn_buf[3],
-                 ctxt.insn_buf[4], ctxt.insn_buf[5]);
+        if ( curr->arch.hvm_vcpu.io_size == 0 )
+            gdprintk(XENLOG_WARNING,
+                     "MMIO emulation failed @ %04x:%lx: "
+                     "%02x %02x %02x %02x %02x %02x\n",
+                     hvmemul_get_seg_reg(x86_seg_cs, &ctxt)->sel,
+                     ctxt.insn_buf_eip,
+                     ctxt.insn_buf[0], ctxt.insn_buf[1],
+                     ctxt.insn_buf[2], ctxt.insn_buf[3],
+                     ctxt.insn_buf[4], ctxt.insn_buf[5]);
+        else
+            gdprintk(XENLOG_WARNING,
+                     "I/O emulation failed: %s 0x%04x, %i bytes, data=%08lx\n",
+                      curr->arch.hvm_vcpu.io_dir ? "in" : "out",
+                      curr->arch.hvm_vcpu.io_port,
+                      curr->arch.hvm_vcpu.io_size, data);
         return 0;
     case X86EMUL_EXCEPTION:
         if ( ctxt.exn_pending )
@@ -201,15 +220,29 @@ int handle_mmio(void)
         break;
     }
 
-    hvm_emulate_writeback(&ctxt);
+    if ( curr->arch.hvm_vcpu.io_size == 0 )
+        hvm_emulate_writeback(&ctxt);
+    else
+        curr->arch.hvm_vcpu.io_size = 0;
 
-    return 1;
+    if (rc == X86EMUL_RETRY)
+        return rc;
+    else
+        return 1;
 }
 
 int handle_mmio_with_translation(unsigned long gva, unsigned long gpfn)
 {
     current->arch.hvm_vcpu.mmio_gva = gva & PAGE_MASK;
     current->arch.hvm_vcpu.mmio_gpfn = gpfn;
+    return handle_mmio();
+}
+
+int handle_mmio_decoded(uint16_t port, int size, int dir)
+{
+    current->arch.hvm_vcpu.io_port = port;
+    current->arch.hvm_vcpu.io_size = size;
+    current->arch.hvm_vcpu.io_dir = dir;
     return handle_mmio();
 }
 

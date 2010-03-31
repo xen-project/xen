@@ -103,6 +103,10 @@ struct hvm_vcpu {
      */
     unsigned long       mmio_gva;
     unsigned long       mmio_gpfn;
+    uint16_t            io_port;
+    int                 io_size;
+    unsigned            io_dir;
+
     /* Callback into x86_emulate when emulating FPU/MMX/XMM instructions. */
     void (*fpu_exception_callback)(void *, struct cpu_user_regs *);
     void *fpu_exception_callback_arg;

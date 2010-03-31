@@ -1721,6 +1721,25 @@ static int vmx_cr_access(unsigned long exit_qualification,
     return 1;
 }
 
+static int vmx_io_intercept(unsigned long exit_qualification,
+                            struct cpu_user_regs *regs)
+{
+    uint16_t port;
+    int bytes, dir;
+    int rc;
+    int inst_len;
+
+    port = (exit_qualification >> 16) & 0xFFFF;
+    bytes = (exit_qualification & 0x07) + 1;
+    dir = (exit_qualification & 0x08) ? IOREQ_READ : IOREQ_WRITE;
+
+    inst_len = __get_instruction_length();
+    rc = handle_mmio_decoded(port, bytes, dir);
+    if ( rc != X86EMUL_RETRY)
+        __update_guest_eip(inst_len);
+    return rc;
+}
+
 static const struct lbr_info {
     u32 base, count;
 } p4_lbr[] = {
@@ -2589,8 +2608,14 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
         break;
 
     case EXIT_REASON_IO_INSTRUCTION:
-        if ( !handle_mmio() )
-            vmx_inject_hw_exception(TRAP_gp_fault, 0);
+        exit_qualification = __vmread(EXIT_QUALIFICATION);
+        if (exit_qualification & 0x10) {
+            if ( !handle_mmio() )
+                vmx_inject_hw_exception(TRAP_gp_fault, 0);
+        } else {
+            if ( !vmx_io_intercept(exit_qualification, regs) )
+                vmx_inject_hw_exception(TRAP_gp_fault, 0);
+        }
         break;
 
     case EXIT_REASON_INVD:

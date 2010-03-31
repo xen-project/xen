@@ -149,6 +149,9 @@ int __get_instruction_length_from_list(struct vcpu *v,
     if ( (inst_len = svm_nextrip_insn_length(v)) != 0 )
         return inst_len;
 
+    if ( vmcb->exitcode == VMEXIT_IOIO )
+        return vmcb->exitinfo2 - vmcb->rip;
+
     /* Fetch up to the next page break; we'll fetch from the next page
      * later if we have to. */
     fetch_addr = svm_rip2pointer(v);
