@@ -19,7 +19,7 @@
 
 /*
  * Configure serial port with a string:
- *   <baud>[/<clock_hz>][,DPS[,<io-base>[,<irq>]]].
+ *   <baud>[/<clock_hz>][,DPS[,<io-base>[,<irq>[,<port-bdf>[,<bridge-bdf>]]]]].
  * The tail of the string can be omitted if platform defaults are sufficient.
  * If the baud rate is pre-configured, perhaps by a bootloader, then 'auto'
  * can be specified in place of a numeric baud rate. Polled mode is specified
@@ -39,7 +39,12 @@ static struct ns16550 {
     /* UART with no IRQ line: periodically-polled I/O. */
     struct timer timer;
     unsigned int timeout_ms;
-    int probing, intr_works;
+    bool_t probing, intr_works;
+    /* PCI card parameters. */
+    unsigned int pb_bdf[3]; /* pci bridge BDF */
+    unsigned int ps_bdf[3]; /* pci serial port BDF */
+    bool_t pb_bdf_enable;   /* if =1, pb-bdf effective, port behind bridge */
+    bool_t ps_bdf_enable;   /* if =1, ps_bdf effective, port on pci card */
 } ns16550_com[2] = { { 0 } };
 
 /* Register offsets */
@@ -204,11 +209,28 @@ static int ns16550_getc(struct serial_port *port, char *pc)
     return 1;
 }
 
+static void pci_serial_early_init(struct ns16550 *uart)
+{
+    if ( !uart->ps_bdf_enable )
+        return;
+    
+    if ( uart->pb_bdf_enable )
+        pci_conf_write16(uart->pb_bdf[0], uart->pb_bdf[1], uart->pb_bdf[2],
+            0x1c, (uart->io_base & 0xF000) | ((uart->io_base & 0xF000) >> 8));
+
+    pci_conf_write32(uart->ps_bdf[0], uart->ps_bdf[1], uart->ps_bdf[2],
+        0x10, uart->io_base | 0x1);
+    pci_conf_write16(uart->ps_bdf[0], uart->ps_bdf[1], uart->ps_bdf[2],
+        0x4, 0x1);
+}
+
 static void __devinit ns16550_init_preirq(struct serial_port *port)
 {
     struct ns16550 *uart = port->uart;
     unsigned char lcr;
     unsigned int  divisor;
+
+    pci_serial_early_init(uart);
 
     /* I/O ports are distinguished by their size (16 bits). */
     if ( uart->io_base >= 0x10000 )
@@ -336,6 +358,19 @@ static int __init parse_parity_char(int c)
     return 0;
 }
 
+static void __init parse_pci_bdf(const char **conf, unsigned int bdf[3])
+{
+    bdf[0] = simple_strtoul(*conf, conf, 16);
+    if ( **conf != ':' )
+        return;
+    (*conf)++;
+    bdf[1] = simple_strtoul(*conf, conf, 16);
+    if ( **conf != '.' )
+        return;
+    (*conf)++;
+    bdf[2] = simple_strtoul(*conf, conf, 16);
+}
+
 static int __init check_existence(struct ns16550 *uart)
 {
     unsigned char status, scratch, scratch2, scratch3;
@@ -347,6 +382,8 @@ static int __init check_existence(struct ns16550 *uart)
     if ( uart->io_base >= 0x10000 )
         return 1;
 
+    pci_serial_early_init(uart);
+    
     /*
      * Do a simple existence test first; if we fail this,
      * there's no point trying anything else.
@@ -428,6 +465,18 @@ static void __init ns16550_parse_port_config(
         {
             conf++;
             uart->irq = simple_strtoul(conf, &conf, 10);
+            if ( *conf == ',' )
+            {
+                conf++;
+                uart->ps_bdf_enable = 1;
+                parse_pci_bdf(&conf, &uart->ps_bdf[0]);
+                if ( *conf == ',' )
+                {
+                    conf++;
+                    uart->pb_bdf_enable = 1;
+                    parse_pci_bdf(&conf, &uart->pb_bdf[0]);
+                }
+            }
         }
     }
 
