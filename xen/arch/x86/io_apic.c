@@ -2111,6 +2111,7 @@ int __init io_apic_get_redir_entries (int ioapic)
 
 int io_apic_set_pci_routing (int ioapic, int pin, int irq, int edge_level, int active_high_low)
 {
+    struct irq_desc *desc = irq_to_desc(irq);
     struct IO_APIC_route_entry entry;
     unsigned long flags;
     int vector;
@@ -2163,6 +2164,11 @@ int io_apic_set_pci_routing (int ioapic, int pin, int irq, int edge_level, int a
     io_apic_write(ioapic, 0x10+2*pin, *(((int *)&entry)+0));
     set_native_irq_info(irq, TARGET_CPUS);
     spin_unlock_irqrestore(&ioapic_lock, flags);
+
+    spin_lock(&desc->lock);
+    if (!(desc->status & (IRQ_DISABLED | IRQ_GUEST)))
+        desc->handler->startup(irq);
+    spin_unlock(&desc->lock);
 
     return 0;
 }
