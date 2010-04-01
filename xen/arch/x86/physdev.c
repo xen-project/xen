@@ -476,12 +476,8 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         ret = -EINVAL;
         if ( setup_gsi.gsi < 0 || setup_gsi.gsi >= nr_irqs_gsi )
             break;
-        /* GSI < 16 has been setup by hypervisor */
-        if ( setup_gsi.gsi >= 16 )
-            ret = mp_register_gsi(setup_gsi.gsi, setup_gsi.triggering,
-                            setup_gsi.polarity);
-        else 
-            ret = -EEXIST;
+        ret = mp_register_gsi(setup_gsi.gsi, setup_gsi.triggering,
+                              setup_gsi.polarity);
         break; 
     }
     default:
