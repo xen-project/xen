@@ -583,6 +583,16 @@ static int hvm_save_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     return 0;
 }
 
+static bool_t hvm_efer_valid(uint64_t value, uint64_t efer_validbits)
+{
+    return !((value & ~efer_validbits) ||
+             ((sizeof(long) != 8) && (value & EFER_LME)) ||
+             (!cpu_has_nx && (value & EFER_NX)) ||
+             (!cpu_has_syscall && (value & EFER_SCE)) ||
+             (!cpu_has_ffxsr && (value & EFER_FFXSE)) ||
+             ((value & (EFER_LME|EFER_LMA)) == EFER_LMA));
+}
+
 static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
 {
     int vcpuid, rc;
@@ -629,13 +639,8 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
         return -EINVAL;
     }
 
-    if ( (ctxt.msr_efer & ~(EFER_FFXSE | EFER_LME | EFER_LMA |
-                            EFER_NX | EFER_SCE)) ||
-         ((sizeof(long) != 8) && (ctxt.msr_efer & EFER_LME)) ||
-         (!cpu_has_nx && (ctxt.msr_efer & EFER_NX)) ||
-         (!cpu_has_syscall && (ctxt.msr_efer & EFER_SCE)) ||
-         (!cpu_has_ffxsr && (ctxt.msr_efer & EFER_FFXSE)) ||
-         ((ctxt.msr_efer & (EFER_LME|EFER_LMA)) == EFER_LMA) )
+    if ( !hvm_efer_valid(
+        ctxt.msr_efer, EFER_FFXSE | EFER_LME | EFER_LMA | EFER_NX | EFER_SCE) )
     {
         gdprintk(XENLOG_ERR, "HVM restore: bad EFER 0x%"PRIx64"\n",
                  ctxt.msr_efer);
@@ -984,11 +989,7 @@ int hvm_set_efer(uint64_t value)
 
     value &= ~EFER_LMA;
 
-    if ( (value & ~(EFER_FFXSE | EFER_LME | EFER_NX | EFER_SCE)) ||
-         ((sizeof(long) != 8) && (value & EFER_LME)) ||
-         (!cpu_has_nx && (value & EFER_NX)) ||
-         (!cpu_has_syscall && (value & EFER_SCE)) ||
-         (!cpu_has_ffxsr && (value & EFER_FFXSE)) )
+    if ( !hvm_efer_valid(value, EFER_FFXSE | EFER_LME | EFER_NX | EFER_SCE) )
     {
         gdprintk(XENLOG_WARNING, "Trying to set reserved bit in "
                  "EFER: %"PRIx64"\n", value);
