@@ -878,6 +878,7 @@ static void help(char *command)
         printf(" button-press                  indicate an ACPI button press to the domain\n\n");
         printf(" vcpu-list                     list the VCPUs for all/some domains.\n\n");
         printf(" vcpu-pin                      Set which CPUs a VCPU can use.\n\n");
+        printf(" vcpu-set                      Set the number of active VCPUs allowed for the domain.\n\n");
     } else if(!strcmp(command, "create")) {
         printf("Usage: xl create <ConfigFile> [options] [vars]\n\n");
         printf("Create a domain based on <ConfigFile>.\n\n");
@@ -941,6 +942,9 @@ static void help(char *command)
     } else if (!strcmp(command, "vcpu-pin")) {
         printf("Usage: xl vcpu-pin <Domain> <VCPU|all> <CPUs|all>\n\n");
         printf("Set which CPUs a VCPU can use.\n\n");
+    } else if (!strcmp(command, "vcpu-set")) {
+        printf("Usage: xl vcpu-set <Domain> <vCPUs>\n\n");
+        printf("Set the number of active VCPUs for allowed for the domain.\n\n");
     }
 }
 
@@ -1980,6 +1984,60 @@ int main_vcpupin(int argc, char **argv)
     exit(0);
 }
 
+void vcpuset(char *d, char* nr_vcpus)
+{
+    struct libxl_ctx ctx;
+    char *endptr;
+    uint32_t domid;
+    unsigned int max_vcpus;
+
+    max_vcpus = strtoul(nr_vcpus, &endptr, 10);
+    if (nr_vcpus == endptr) {
+        fprintf(stderr, "Error: Invalid argument.\n");
+        return;
+    }
+
+    if (libxl_ctx_init(&ctx, LIBXL_VERSION)) {
+        fprintf(stderr, "cannot init xl context\n");
+        return;
+    }
+    libxl_ctx_set_log(&ctx, log_callback, NULL);
+
+    if (domain_qualifier_to_domid(&ctx, d, &domid) < 0) {
+        fprintf(stderr, "%s is an invalid domain identifier\n", d);
+        goto vcpuset_out;
+    }
+    if (libxl_set_vcpucount(&ctx, domid, max_vcpus) == ERROR_INVAL) {
+        fprintf(stderr, "Error: Cannot set vcpus greater than max vcpus on running domain or lesser than 1.\n");
+    }
+
+  vcpuset_out:
+    libxl_ctx_free(&ctx);
+}
+
+int main_vcpuset(int argc, char **argv)
+{
+    int opt;
+
+    if (argc != 3) {
+        help("vcpu-set");
+        exit(0);
+    }
+    while ((opt = getopt(argc, argv, "h")) != -1) {
+        switch (opt) {
+        case 'h':
+        help("vcpu-set");
+            exit(0);
+        default:
+            fprintf(stderr, "option `%c' not supported.\n", opt);
+            break;
+        }
+    }
+
+    vcpuset(argv[1], argv[2]);
+    exit(0);
+}
+
 int main(int argc, char **argv)
 {
     if (argc < 2) {
@@ -2025,6 +2083,8 @@ int main(int argc, char **argv)
         main_vcpulist(argc - 1, argv + 1);
     } else if (!strcmp(argv[1], "vcpu-pin")) {
         main_vcpupin(argc - 1, argv + 1);
+    } else if (!strcmp(argv[1], "vcpu-set")) {
+        main_vcpuset(argc - 1, argv + 1);
     } else if (!strcmp(argv[1], "help")) {
         if (argc > 2)
             help(argv[2]);

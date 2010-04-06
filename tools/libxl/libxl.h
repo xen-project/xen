@@ -388,5 +388,6 @@ struct libxl_vcpuinfo *libxl_list_vcpu(struct libxl_ctx *ctx, uint32_t domid,
                                        int *nb_vcpu, int *cpusize);
 int libxl_set_vcpuaffinity(struct libxl_ctx *ctx, uint32_t domid, uint32_t vcpuid,
                            uint64_t *cpumap, int cpusize);
+int libxl_set_vcpucount(struct libxl_ctx *ctx, uint32_t domid, uint32_t count);
 #endif /* LIBXL_H */
 

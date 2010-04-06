@@ -2289,3 +2289,26 @@ int libxl_set_vcpuaffinity(struct libxl_ctx *ctx, uint32_t domid, uint32_t vcpui
 {
     return (xc_vcpu_setaffinity(ctx->xch, domid, vcpuid, cpumap, cpusize));
 }
+
+int libxl_set_vcpucount(struct libxl_ctx *ctx, uint32_t domid, uint32_t count)
+{
+    xc_domaininfo_t domaininfo;
+    char *dompath;
+    int i;
+
+    if (xc_domain_getinfolist(ctx->xch, domid, 1, &domaininfo) != 1) {
+        return ERROR_FAIL;
+    }
+    if (!count || ((domaininfo.max_vcpu_id + 1) < count)) {
+        return ERROR_INVAL;
+    }
+    if (!(dompath = libxl_xs_get_dompath(ctx, domid)))
+        return ERROR_FAIL;
+
+    for (i = 0; i <= domaininfo.max_vcpu_id; ++i) {
+        libxl_xs_write(ctx, XBT_NULL,
+                       libxl_sprintf(ctx, "%s/cpu/%u/availability", dompath, i),
+                       "%s", ((1 << i) & ((1 << count) - 1)) ? "online" : "offline");
+    }
+    return 0;
+}
