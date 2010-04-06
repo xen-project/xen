@@ -110,13 +110,39 @@ void parse_global(char *s)
     unsigned long long rtree_node_max = parse(s,"Nm");
     unsigned long long pgp_count = parse(s,"Pc");
     unsigned long long pgp_max = parse(s,"Pm");
+    unsigned long long page_count = parse(s,"Fc");
+    unsigned long long max_page_count = parse(s,"Fm");
+    unsigned long long pcd_count = parse(s,"Sc");
+    unsigned long long max_pcd_count = parse(s,"Sm");
+    unsigned long long pcd_tot_tze_size = parse(s,"Zt");
+    unsigned long long pcd_tot_csize = parse(s,"Gz");
+    unsigned long long deduped_puts = parse(s,"Gd");
+    unsigned long long tot_good_eph_puts = parse(s,"Ep");
 
     printf("total tmem ops=%llu (errors=%llu) -- tmem pages avail=%llu\n",
            total_ops, errored_ops, avail_pages);
     printf("datastructs: objs=%llu (max=%llu) pgps=%llu (max=%llu) "
-           "nodes=%llu (max=%llu)\n",
+           "nodes=%llu (max=%llu) pages=%llu (max=%llu) ",
            obj_count, obj_max, pgp_count, pgp_max,
-           rtree_node_count, rtree_node_max);
+           rtree_node_count, rtree_node_max,
+           page_count,max_page_count);
+    if (max_pcd_count != 0 && global_eph_count != 0 && tot_good_eph_puts != 0) {
+           printf("pcds=%llu (max=%llu) ",
+               pcd_count,max_pcd_count);
+           printf("deduped: avg=%4.2f%% (curr=%4.2f%%) ",
+                   ((deduped_puts*1.0)/tot_good_eph_puts)*100,
+                   (1.0-(pcd_count*1.0)/global_eph_count)*100);
+    }
+    if (pcd_count != 0)
+    {
+           if (pcd_tot_tze_size && (pcd_tot_tze_size < pcd_count*PAGE_SIZE))
+               printf("tze savings=%4.2f%% ",
+                   (1.0-(pcd_tot_tze_size*1.0)/(pcd_count*PAGE_SIZE))*100);
+           if (pcd_tot_csize && (pcd_tot_csize < pcd_count*PAGE_SIZE))
+               printf("compression savings=%4.2f%% ",
+                   (1.0-(pcd_tot_csize*1.0)/(pcd_count*PAGE_SIZE))*100);
+    }
+    printf("\n");
     printf("misc: failed_copies=%llu alloc_failed=%llu alloc_page_failed=%llu "
            "low_mem=%llu evicted=%llu/%llu relinq=%llu/%llu, "
            "max_evicts_per_relinq=%llu, flush_pools=%llu, "

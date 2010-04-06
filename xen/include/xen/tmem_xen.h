@@ -26,6 +26,8 @@ struct tmem_host_dependent_client {
 };
 typedef struct tmem_host_dependent_client tmh_client_t;
 
+typedef uint32_t pagesize_t;  /* like size_t, must handle largest PAGE_SIZE */
+
 #define IS_PAGE_ALIGNED(addr) \
   ((void *)((((unsigned long)addr + (PAGE_SIZE - 1)) & PAGE_MASK)) == addr)
 #define IS_VALID_PAGE(_pi)  ( mfn_valid(page_to_mfn(_pi)) )
@@ -52,6 +54,23 @@ extern int opt_tmem_compress;
 static inline int tmh_compression_enabled(void)
 {
     return opt_tmem_compress;
+}
+
+extern int opt_tmem_dedup;
+static inline int tmh_dedup_enabled(void)
+{
+    return opt_tmem_dedup;
+}
+
+extern int opt_tmem_tze;
+static inline int tmh_tze_enabled(void)
+{
+    return opt_tmem_tze;
+}
+
+static inline void tmh_tze_disable(void)
+{
+    opt_tmem_tze = 0;
 }
 
 extern int opt_tmem_shared_auth;
@@ -326,6 +345,101 @@ static inline bool_t tmh_current_is_privileged(void)
     return IS_PRIV(current->domain);
 }
 
+static inline uint8_t tmh_get_first_byte(pfp_t *pfp)
+{
+    void *p = __map_domain_page(pfp);
+
+    return (uint8_t)(*(char *)p);
+}
+
+static inline int tmh_page_cmp(pfp_t *pfp1, pfp_t *pfp2)
+{
+    const uint64_t *p1 = (uint64_t *)__map_domain_page(pfp1);
+    const uint64_t *p2 = (uint64_t *)__map_domain_page(pfp2);
+    int i;
+
+    // FIXME: code in assembly?
+ASSERT(p1 != NULL);
+ASSERT(p2 != NULL);
+    for ( i = PAGE_SIZE/sizeof(uint64_t); i && *p1 == *p2; i--, *p1++, *p2++ );
+    if ( !i )
+        return 0;
+    if ( *p1 < *p2 )
+        return -1;
+    return 1;
+}
+
+static inline int tmh_pcd_cmp(void *va1, pagesize_t len1, void *va2, pagesize_t len2)
+{
+    const char *p1 = (char *)va1;
+    const char *p2 = (char *)va2;
+    pagesize_t i;
+
+    ASSERT(len1 <= PAGE_SIZE);
+    ASSERT(len2 <= PAGE_SIZE);
+    if ( len1 < len2 )
+        return -1;
+    if ( len1 > len2 )
+        return 1;
+    ASSERT(len1 == len2);
+    for ( i = len2; i && *p1 == *p2; i--, *p1++, *p2++ );
+    if ( !i )
+        return 0;
+    if ( *p1 < *p2 )
+        return -1;
+    return 1;
+}
+
+static inline int tmh_tze_pfp_cmp(pfp_t *pfp1, pagesize_t pfp_len, void *tva, pagesize_t tze_len)
+{
+    const uint64_t *p1 = (uint64_t *)__map_domain_page(pfp1);
+    const uint64_t *p2;
+    pagesize_t i;
+
+    if ( tze_len == PAGE_SIZE )
+       p2 = (uint64_t *)__map_domain_page((pfp_t *)tva);
+    else
+       p2 = (uint64_t *)tva;
+    ASSERT(pfp_len <= PAGE_SIZE);
+    ASSERT(!(pfp_len & (sizeof(uint64_t)-1)));
+    ASSERT(tze_len <= PAGE_SIZE);
+    ASSERT(!(tze_len & (sizeof(uint64_t)-1)));
+    if ( pfp_len < tze_len )
+        return -1;
+    if ( pfp_len > tze_len )
+        return 1;
+    ASSERT(pfp_len == tze_len);
+    for ( i = tze_len/sizeof(uint64_t); i && *p1 == *p2; i--, *p1++, *p2++ );
+    if ( !i )
+        return 0;
+    if ( *p1 < *p2 )
+        return -1;
+    return 1;
+}
+
+/* return the size of the data in the pfp, ignoring trailing zeroes and
+ * rounded up to the nearest multiple of 8 */
+static inline pagesize_t tmh_tze_pfp_scan(pfp_t *pfp)
+{
+    const uint64_t *p = (uint64_t *)__map_domain_page(pfp);
+    pagesize_t bytecount = PAGE_SIZE;
+    pagesize_t len = PAGE_SIZE/sizeof(uint64_t);
+    p += len;
+    while ( len-- && !*--p )
+        bytecount -= sizeof(uint64_t);
+    return bytecount;
+}
+
+static inline void tmh_tze_copy_from_pfp(void *tva, pfp_t *pfp, pagesize_t len)
+{
+    uint64_t *p1 = (uint64_t *)tva;
+    const uint64_t *p2 = (uint64_t *)__map_domain_page(pfp);
+
+    pagesize_t i;
+    ASSERT(!(len & (sizeof(uint64_t)-1)));
+    for ( i = len/sizeof(uint64_t); i--; *p1++ = *p2++);
+}
+
 /* these typedefs are in the public/tmem.h interface
 typedef XEN_GUEST_HANDLE(void) cli_mfn_t;
 typedef XEN_GUEST_HANDLE(char) cli_va_t;
@@ -378,11 +492,13 @@ extern int tmh_decompress_to_client(tmem_cli_mfn_t,void*,size_t,void*);
 extern int tmh_compress_from_client(tmem_cli_mfn_t,void**,size_t *,void*);
 
 extern int tmh_copy_from_client(pfp_t *pfp,
-    tmem_cli_mfn_t cmfn, uint32_t tmem_offset,
-    uint32_t pfn_offset, uint32_t len, void *cva);
+    tmem_cli_mfn_t cmfn, pagesize_t tmem_offset,
+    pagesize_t pfn_offset, pagesize_t len, void *cva);
 
 extern int tmh_copy_to_client(tmem_cli_mfn_t cmfn, pfp_t *pfp,
-    uint32_t tmem_offset, uint32_t pfn_offset, uint32_t len, void *cva);
+    pagesize_t tmem_offset, pagesize_t pfn_offset, pagesize_t len, void *cva);
+
+extern int tmh_copy_tze_to_client(tmem_cli_mfn_t cmfn, void *tmem_va, pagesize_t len);
 
 
 #define TMEM_PERF
