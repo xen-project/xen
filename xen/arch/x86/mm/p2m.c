@@ -187,7 +187,36 @@ p2m_next_level(struct domain *d, mfn_t *table_mfn, void **table,
 
     ASSERT(l1e_get_flags(*p2m_entry) & (_PAGE_PRESENT|_PAGE_PSE));
 
-    /* split single large page into 4KB page in P2M table */
+    /* split 1GB pages into 2MB pages */
+    if ( type == PGT_l2_page_table && (l1e_get_flags(*p2m_entry) & _PAGE_PSE) )
+    {
+        unsigned long flags, pfn;
+        struct page_info *pg = d->arch.p2m->alloc_page(d);
+        if ( pg == NULL )
+            return 0;
+        page_list_add_tail(pg, &d->arch.p2m->pages);
+        pg->u.inuse.type_info = PGT_l2_page_table | 1 | PGT_validated;
+        pg->count_info = 1;
+        
+        flags = l1e_get_flags(*p2m_entry);
+        pfn = l1e_get_pfn(*p2m_entry);
+        
+        l1_entry = map_domain_page(mfn_x(page_to_mfn(pg)));
+        for ( i = 0; i < L2_PAGETABLE_ENTRIES; i++ )
+        {
+            new_entry = l1e_from_pfn(pfn + (i * L1_PAGETABLE_ENTRIES), flags);
+            paging_write_p2m_entry(d, gfn, l1_entry+i, *table_mfn, new_entry,
+                                   2);
+        }
+        unmap_domain_page(l1_entry);
+        new_entry = l1e_from_pfn(mfn_x(page_to_mfn(pg)),
+                                 __PAGE_HYPERVISOR|_PAGE_USER); //disable PSE
+        paging_write_p2m_entry(d, gfn,
+                               p2m_entry, *table_mfn, new_entry, 3);
+    }
+
+
+    /* split single 2MB large page into 4KB page in P2M table */
     if ( type == PGT_l1_page_table && (l1e_get_flags(*p2m_entry) & _PAGE_PSE) )
     {
         unsigned long flags, pfn;
@@ -1064,6 +1093,23 @@ p2m_pod_demand_populate(struct domain *d, unsigned long gfn,
     if ( unlikely(d->is_dying) )
         goto out_fail;
 
+    /* Because PoD does not have cache list for 1GB pages, it has to remap
+     * 1GB region to 2MB chunks for a retry. */
+    if ( order == 18 )
+    {
+        gfn_aligned = (gfn >> order) << order;
+        /* Note that we are supposed to call set_p2m_entry() 512 times to 
+         * split 1GB into 512 2MB pages here. But We only do once here because
+         * set_p2m_entry() should automatically shatter the 1GB page into 
+         * 512 2MB pages. The rest of 511 calls are unnecessary.
+         */
+        set_p2m_entry(d, gfn_aligned, _mfn(POPULATE_ON_DEMAND_MFN), 9,
+                      p2m_populate_on_demand);
+        audit_p2m(d);
+        p2m_unlock(p2md);
+        return 0;
+    }
+
     /* If we're low, start a sweep */
     if ( order == 9 && page_list_empty(&p2md->pod.super) )
         p2m_pod_emergency_sweep_super(d);
@@ -1196,6 +1242,7 @@ p2m_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
     l1_pgentry_t *p2m_entry;
     l1_pgentry_t entry_content;
     l2_pgentry_t l2e_content;
+    l3_pgentry_t l3e_content;
     int rv=0;
 
     if ( tb_init_done )
@@ -1222,18 +1269,41 @@ p2m_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
         goto out;
 #endif
     /*
+     * Try to allocate 1GB page table if this feature is supported.
+     */
+    if ( page_order == 18 )
+    {
+        p2m_entry = p2m_find_entry(table, &gfn_remainder, gfn,
+                                   L3_PAGETABLE_SHIFT - PAGE_SHIFT,
+                                   L3_PAGETABLE_ENTRIES);
+        ASSERT(p2m_entry);
+        if ( (l1e_get_flags(*p2m_entry) & _PAGE_PRESENT) &&
+             !(l1e_get_flags(*p2m_entry) & _PAGE_PSE) )
+        {
+            P2M_ERROR("configure P2M table L3 entry with large page\n");
+            domain_crash(d);
+            goto out;
+        }
+        l3e_content = mfn_valid(mfn) 
+            ? l3e_from_pfn(mfn_x(mfn), p2m_type_to_flags(p2mt) | _PAGE_PSE)
+            : l3e_empty();
+        entry_content.l1 = l3e_content.l3;
+        paging_write_p2m_entry(d, gfn, p2m_entry, table_mfn, entry_content, 3);
+
+    }
+    /*
      * When using PAE Xen, we only allow 33 bits of pseudo-physical
      * address in translated guests (i.e. 8 GBytes).  This restriction
      * comes from wanting to map the P2M table into the 16MB RO_MPT hole
      * in Xen's address space for translated PV guests.
      * When using AMD's NPT on PAE Xen, we are restricted to 4GB.
      */
-    if ( !p2m_next_level(d, &table_mfn, &table, &gfn_remainder, gfn,
-                         L3_PAGETABLE_SHIFT - PAGE_SHIFT,
-                         ((CONFIG_PAGING_LEVELS == 3)
-                          ? (paging_mode_hap(d) ? 4 : 8)
-                          : L3_PAGETABLE_ENTRIES),
-                         PGT_l2_page_table) )
+    else if ( !p2m_next_level(d, &table_mfn, &table, &gfn_remainder, gfn,
+                              L3_PAGETABLE_SHIFT - PAGE_SHIFT,
+                              ((CONFIG_PAGING_LEVELS == 3)
+                               ? (paging_mode_hap(d) ? 4 : 8)
+                               : L3_PAGETABLE_ENTRIES),
+                              PGT_l2_page_table) )
         goto out;
 
     if ( page_order == 0 )
@@ -1255,7 +1325,7 @@ p2m_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
         /* level 1 entry */
         paging_write_p2m_entry(d, gfn, p2m_entry, table_mfn, entry_content, 1);
     }
-    else 
+    else if ( page_order == 9 )
     {
         p2m_entry = p2m_find_entry(table, &gfn_remainder, gfn,
                                    L2_PAGETABLE_SHIFT - PAGE_SHIFT,
@@ -1352,11 +1422,34 @@ p2m_gfn_to_mfn(struct domain *d, unsigned long gfn, p2m_type_t *t,
 #else
         l3e += l3_table_offset(addr);
 #endif
+pod_retry_l3:
         if ( (l3e_get_flags(*l3e) & _PAGE_PRESENT) == 0 )
         {
+            if ( p2m_flags_to_type(l3e_get_flags(*l3e)) == p2m_populate_on_demand )
+            {
+                if ( q != p2m_query )
+                {
+                    if ( !p2m_pod_demand_populate(d, gfn, 18, q) )
+                        goto pod_retry_l3;
+                }
+                else
+                    *t = p2m_populate_on_demand;
+            }
             unmap_domain_page(l3e);
             return _mfn(INVALID_MFN);
         }
+        else if ( (l3e_get_flags(*l3e) & _PAGE_PSE) )
+        {
+            mfn = _mfn(l3e_get_pfn(*l3e) +
+                       l2_table_offset(addr) * L1_PAGETABLE_ENTRIES +
+                       l1_table_offset(addr));
+            *t = p2m_flags_to_type(l3e_get_flags(*l3e));
+            unmap_domain_page(l3e);
+
+            ASSERT(mfn_valid(mfn) || !p2m_is_ram(*t));
+            return (p2m_is_valid(*t)) ? mfn : _mfn(INVALID_MFN);
+        }
+
         mfn = _mfn(l3e_get_pfn(*l3e));
         unmap_domain_page(l3e);
     }
@@ -1437,10 +1530,57 @@ static mfn_t p2m_gfn_to_mfn_current(unsigned long gfn, p2m_type_t *t,
     {
         l1_pgentry_t l1e = l1e_empty(), *p2m_entry;
         l2_pgentry_t l2e = l2e_empty();
+        l3_pgentry_t l3e = l3e_empty();
         int ret;
 
         ASSERT(gfn < (RO_MPT_VIRT_END - RO_MPT_VIRT_START) 
                / sizeof(l1_pgentry_t));
+
+        /*
+         * Read & process L3
+         */
+        p2m_entry = (l1_pgentry_t *)
+            &__linear_l2_table[l2_linear_offset(RO_MPT_VIRT_START)
+                               + l3_linear_offset(addr)];
+    pod_retry_l3:
+        ret = __copy_from_user(&l3e, p2m_entry, sizeof(l3e));
+
+        if ( ret != 0 || !(l3e_get_flags(l3e) & _PAGE_PRESENT) )
+        {
+            if ( (l3e_get_flags(l3e) & _PAGE_PSE) &&
+                 (p2m_flags_to_type(l3e_get_flags(l3e)) == p2m_populate_on_demand) )
+            {
+                /* The read has succeeded, so we know that mapping exists */
+                if ( q != p2m_query )
+                {
+                    if ( !p2m_pod_demand_populate(current->domain, gfn, 18, q) )
+                        goto pod_retry_l3;
+                    p2mt = p2m_invalid;
+                    printk("%s: Allocate 1GB failed!\n", __func__);
+                    goto out;
+                }
+                else
+                {
+                    p2mt = p2m_populate_on_demand;
+                    goto out;
+                }
+            }
+            goto pod_retry_l2;
+        }
+
+        if ( l3e_get_flags(l3e) & _PAGE_PSE )
+        {
+            p2mt = p2m_flags_to_type(l3e_get_flags(l3e));
+            ASSERT(l3e_get_pfn(l3e) != INVALID_MFN || !p2m_is_ram(p2mt));
+            if (p2m_is_valid(p2mt) )
+                mfn = _mfn(l3e_get_pfn(l3e) + 
+                           l2_table_offset(addr) * L1_PAGETABLE_ENTRIES + 
+                           l1_table_offset(addr));
+            else
+                p2mt = p2m_mmio_dm;
+            
+            goto out;
+        }
 
         /*
          * Read & process L2
@@ -1596,10 +1736,18 @@ int set_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
     while ( todo )
     {
         if ( is_hvm_domain(d) && paging_mode_hap(d) )
-            order = (((gfn | mfn_x(mfn) | todo) & (SUPERPAGE_PAGES - 1)) == 0) ?
-                9 : 0;
+            order = ( (((gfn | mfn_x(mfn) | todo) & ((1ul << 18) - 1)) == 0) ) ?
+                18 :
+            (((gfn | mfn_x(mfn) | todo) & ((1ul << 9) - 1)) == 0) ? 9 : 0;
         else
             order = 0;
+
+        /* Note that we only enable hap_1gb_pgtb when CONFIG_PAGING_LEVELS==4. 
+         * So 1GB should never be enabled under 32bit or PAE modes. But for
+         * safety's reason, we double-check the page order again..
+         */
+        BUG_ON(order == 18 && CONFIG_PAGING_LEVELS < 4);
+
         if ( !d->arch.p2m->set_entry(d, gfn, mfn, order, p2mt) )
             rc = 0;
         gfn += 1ul << order;
@@ -1867,6 +2015,31 @@ static void audit_p2m(struct domain *d)
                     gfn += 1 << (L3_PAGETABLE_SHIFT - PAGE_SHIFT);
                     continue;
                 }
+
+                /* check for 1GB super page */
+                if ( l3e_get_flags(l3e[i3]) & _PAGE_PSE )
+                {
+                    mfn = l3e_get_pfn(l3e[i3]);
+                    ASSERT(mfn_valid(_mfn(mfn)));
+                    /* we have to cover 512x512 4K pages */
+                    for ( i2 = 0; 
+                          i2 < (L2_PAGETABLE_ENTRIES * L1_PAGETABLE_ENTRIES);
+                          i2++)
+                    {
+                        m2pfn = get_gpfn_from_mfn(mfn+i2);
+                        if ( m2pfn != (gfn + i2) )
+                        {
+                            pmbad++;
+                            P2M_PRINTK("mismatch: gfn %#lx -> mfn %#lx"
+                                       " -> gfn %#lx\n", gfn+i2, mfn+i2,
+                                       m2pfn);
+                            BUG();
+                        }
+                        gfn += 1 << (L3_PAGETABLE_SHIFT - PAGE_SHIFT);
+                        continue;
+                    }
+                }
+
                 l2e = map_domain_page(mfn_x(_mfn(l3e_get_pfn(l3e[i3]))));
                 for ( i2 = 0; i2 < L2_PAGETABLE_ENTRIES; i2++ )
                 {
@@ -2224,7 +2397,7 @@ void p2m_change_type_global(struct domain *d, p2m_type_t ot, p2m_type_t nt)
     l1_pgentry_t l1e_content;
     l1_pgentry_t *l1e;
     l2_pgentry_t *l2e;
-    mfn_t l1mfn, l2mfn;
+    mfn_t l1mfn, l2mfn, l3mfn;
     unsigned long i1, i2, i3;
     l3_pgentry_t *l3e;
 #if CONFIG_PAGING_LEVELS == 4
@@ -2245,6 +2418,7 @@ void p2m_change_type_global(struct domain *d, p2m_type_t ot, p2m_type_t nt)
 #if CONFIG_PAGING_LEVELS == 4
     l4e = map_domain_page(mfn_x(pagetable_get_mfn(d->arch.phys_table)));
 #else /* CONFIG_PAGING_LEVELS == 3 */
+    l3mfn = _mfn(mfn_x(pagetable_get_mfn(d->arch.phys_table)));
     l3e = map_domain_page(mfn_x(pagetable_get_mfn(d->arch.phys_table)));
 #endif
 
@@ -2255,6 +2429,7 @@ void p2m_change_type_global(struct domain *d, p2m_type_t ot, p2m_type_t nt)
         {
             continue;
         }
+        l3mfn = _mfn(l4e_get_pfn(l4e[i4]));
         l3e = map_domain_page(l4e_get_pfn(l4e[i4]));
 #endif
         for ( i3 = 0;
@@ -2265,6 +2440,20 @@ void p2m_change_type_global(struct domain *d, p2m_type_t ot, p2m_type_t nt)
             {
                 continue;
             }
+            if ( (l3e_get_flags(l3e[i3]) & _PAGE_PSE) )
+            {
+                flags = l3e_get_flags(l3e[i3]);
+                if ( p2m_flags_to_type(flags) != ot )
+                    continue;
+                mfn = l3e_get_pfn(l3e[i3]);
+                gfn = get_gpfn_from_mfn(mfn);
+                flags = p2m_type_to_flags(nt);
+                l1e_content = l1e_from_pfn(mfn, flags | _PAGE_PSE);
+                paging_write_p2m_entry(d, gfn, (l1_pgentry_t *)&l3e[i3],
+                                       l3mfn, l1e_content, 3);
+                continue;
+            }
+
             l2mfn = _mfn(l3e_get_pfn(l3e[i3]));
             l2e = map_domain_page(l3e_get_pfn(l3e[i3]));
             for ( i2 = 0; i2 < L2_PAGETABLE_ENTRIES; i2++ )
