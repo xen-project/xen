@@ -152,12 +152,11 @@ again:
     }
 
     snprintf(path, sizeof(path), "%s/state", nodename);
-    err = xenbus_switch_state(xbt, path, XenbusStateConnected);
+    err = xenbus_switch_state(xbt, path, XenbusStateInitialised);
     if (err) {
-        message = "switching state";
+        printk("error writing blk initialized on %s: %s\n", path, err);
         goto abort_transaction;
     }
-
 
     err = xenbus_transaction_end(xbt, 0, &retry);
     if (err) free(err);
@@ -189,6 +188,7 @@ done:
     {
         XenbusState state;
         char path[strlen(dev->backend) + 1 + 19 + 1];
+        char frontpath[strlen(nodename) + 1 + 6 + 1];
         snprintf(path, sizeof(path), "%s/mode", dev->backend);
         msg = xenbus_read(XBT_NIL, path, &c);
         if (msg) {
@@ -232,7 +232,18 @@ done:
         dev->info.flush = xenbus_read_integer(path);
 
         *info = dev->info;
+
+        printk("%s connected\n", dev->backend);
+
+        snprintf(frontpath, sizeof(frontpath), "%s/state", nodename);
+        if((err = xenbus_switch_state(XBT_NIL, frontpath, XenbusStateConnected))
+            != NULL) {
+            printk("error switching state: %s\n", err);
+            xenbus_unwatch_path_token(XBT_NIL, path, path);
+            goto error;
+        }
     }
+
     unmask_evtchn(dev->evtchn);
 
     printk("%u sectors of %u bytes\n", dev->info.sectors, dev->info.sector_size);

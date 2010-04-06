@@ -126,8 +126,8 @@ again:
     snprintf(path, sizeof(path), "%s/state", nodename);
     err = xenbus_switch_state(xbt, path, XenbusStateInitialised);
     if (err) {
-        printk("error writing initialized: %s\n", err);
-        free(err);
+        printk("error writing fb initialized: %s\n", err);
+        goto abort_transaction;
     }
 
     err = xenbus_transaction_end(xbt, 0, &retry);
@@ -189,6 +189,7 @@ done:
     printk("************************** KBDFRONT\n");
 
     return dev;
+
 error:
     free(msg);
     free(err);

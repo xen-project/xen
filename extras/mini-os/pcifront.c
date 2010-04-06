@@ -143,7 +143,7 @@ struct pcifront_dev *init_pcifront(char *_nodename)
     char* err;
     char* message=NULL;
     int retry=0;
-    char* msg;
+    char* msg = NULL;
     char* nodename = _nodename ? _nodename : "device/pci/0";
     int dom;
 
@@ -206,7 +206,7 @@ again:
     snprintf(path, sizeof(path), "%s/state", nodename);
     err = xenbus_switch_state(xbt, path, XenbusStateInitialised);
     if (err) {
-        message = "switching state";
+        printk("error writing pci initialized: %s\n", err);
         goto abort_transaction;
     }
 
@@ -237,7 +237,7 @@ done:
 
     {
         char path[strlen(dev->backend) + 1 + 5 + 1];
-        char frontpath[strlen(nodename) + 1 + 5 + 1];
+        char frontpath[strlen(nodename) + 1 + 6 + 1];
         XenbusState state;
         snprintf(path, sizeof(path), "%s/state", dev->backend);
 
@@ -254,9 +254,9 @@ done:
         }
 
         snprintf(frontpath, sizeof(frontpath), "%s/state", nodename);
-        if ((err = xenbus_switch_state(XBT_NIL, frontpath, XenbusStateConnected))
+        if((err = xenbus_switch_state(XBT_NIL, frontpath, XenbusStateConnected))
             != NULL) {
-            printk("error switching state %s\n", err);
+            printk("error switching state: %s\n", err);
             xenbus_unwatch_path_token(XBT_NIL, path, path);
             goto error;
         }
@@ -271,6 +271,7 @@ done:
     return dev;
 
 error:
+    free(msg);
     free(err);
     free_pcifront(dev);
     return NULL;
