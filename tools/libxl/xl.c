@@ -877,6 +877,7 @@ static void help(char *command)
         printf(" mem-set                       set the current memory usage for a domain\n\n");
         printf(" button-press                  indicate an ACPI button press to the domain\n\n");
         printf(" vcpu-list                     list the VCPUs for all/some domains.\n\n");
+        printf(" vcpu-pin                      Set which CPUs a VCPU can use.\n\n");
     } else if(!strcmp(command, "create")) {
         printf("Usage: xl create <ConfigFile> [options] [vars]\n\n");
         printf("Create a domain based on <ConfigFile>.\n\n");
@@ -937,6 +938,9 @@ static void help(char *command)
     } else if (!strcmp(command, "vcpu-list")) {
         printf("Usage: xl vcpu-list [Domain, ...]\n\n");
         printf("List the VCPUs for all/some domains.\n\n");
+    } else if (!strcmp(command, "vcpu-pin")) {
+        printf("Usage: xl vcpu-pin <Domain> <VCPU|all> <CPUs|all>\n\n");
+        printf("Set which CPUs a VCPU can use.\n\n");
     }
 }
 
@@ -1863,6 +1867,119 @@ void main_vcpulist(int argc, char **argv)
     exit(0);
 }
 
+void vcpupin(char *d, const char *vcpu, char *cpu)
+{
+    struct libxl_ctx ctx;
+    struct libxl_vcpuinfo *vcpuinfo;
+    struct libxl_physinfo physinfo;
+    uint64_t *cpumap = NULL;
+
+    uint32_t domid, vcpuid, cpuida, cpuidb;
+    char *endptr, *toka, *tokb;
+    int i, nb_vcpu, cpusize;
+
+    vcpuid = strtoul(vcpu, &endptr, 10);
+    if (vcpu == endptr) {
+        if (strcmp(vcpu, "all")) {
+            fprintf(stderr, "Error: Invalid argument.\n");
+            return;
+        }
+        vcpuid = -1;
+    }
+
+    if (libxl_ctx_init(&ctx, LIBXL_VERSION)) {
+        fprintf(stderr, "cannot init xl context\n");
+        return;
+    }
+    libxl_ctx_set_log(&ctx, log_callback, NULL);
+
+    if (domain_qualifier_to_domid(&ctx, d, &domid) < 0) {
+        fprintf(stderr, "%s is an invalid domain identifier\n", d);
+        goto vcpupin_out1;
+    }
+    if (libxl_get_physinfo(&ctx, &physinfo) != 0) {
+        fprintf(stderr, "libxl_get_physinfo failed.\n");
+        goto vcpupin_out1;
+    }
+
+    cpumap = calloc(physinfo.max_cpu_id + 1, sizeof (uint64_t));
+    if (!cpumap) {
+        goto vcpupin_out1;
+    }
+    if (strcmp(cpu, "all")) {
+        for (toka = strtok(cpu, ","), i = 0; toka; toka = strtok(NULL, ","), ++i) {
+            cpuida = strtoul(toka, &endptr, 10);
+            if (toka == endptr) {
+                fprintf(stderr, "Error: Invalid argument.\n");
+                goto vcpupin_out;
+            }
+            if (*endptr == '-') {
+                tokb = endptr + 1;
+                cpuidb = strtoul(tokb, &endptr, 10);
+                if ((tokb == endptr) || (cpuida > cpuidb)) {
+                    fprintf(stderr, "Error: Invalid argument.\n");
+                    goto vcpupin_out;
+                }
+                while (cpuida <= cpuidb) {
+                    cpumap[cpuida / 64] |= (1 << (cpuida % 64));
+                    ++cpuida;
+                }
+            } else {
+                cpumap[cpuida / 64] |= (1 << (cpuida % 64));
+            }
+        }
+    }
+    else {
+        memset(cpumap, -1, sizeof (uint64_t) * (physinfo.max_cpu_id + 1));
+    }
+
+    if (vcpuid != -1) {
+        if (libxl_set_vcpuaffinity(&ctx, domid, vcpuid,
+                                   cpumap, physinfo.max_cpu_id + 1) == -1) {
+            fprintf(stderr, "Could not set affinity for vcpu `%u'.\n", vcpuid);
+        }
+    }
+    else {
+        if (!(vcpuinfo = libxl_list_vcpu(&ctx, domid, &nb_vcpu, &cpusize))) {
+            fprintf(stderr, "libxl_list_vcpu failed.\n");
+            goto vcpupin_out;
+        }
+        for (; nb_vcpu > 0; --nb_vcpu, ++vcpuinfo) {
+            if (libxl_set_vcpuaffinity(&ctx, domid, vcpuinfo->vcpuid,
+                                       cpumap, physinfo.max_cpu_id + 1) == -1) {
+                fprintf(stderr, "libxl_list_vcpu failed on vcpu `%u'.\n", vcpuinfo->vcpuid);
+            }
+        }
+    }
+  vcpupin_out1:
+    free(cpumap);
+  vcpupin_out:
+    libxl_ctx_free(&ctx);
+}
+
+int main_vcpupin(int argc, char **argv)
+{
+    int opt;
+
+    if (argc != 4) {
+        help("vcpu-pin");
+        exit(0);
+    }
+    while ((opt = getopt(argc, argv, "h")) != -1) {
+        switch (opt) {
+        case 'h':
+            help("vcpu-pin");
+            exit(0);
+        default:
+            fprintf(stderr, "option `%c' not supported.\n", opt);
+            break;
+        }
+    }
+
+    vcpupin(argv[1], argv[2] , argv[3]);
+    exit(0);
+}
+
 int main(int argc, char **argv)
 {
     if (argc < 2) {
@@ -1906,6 +2023,8 @@ int main(int argc, char **argv)
         main_button_press(argc - 1, argv + 1);
     } else if (!strcmp(argv[1], "vcpu-list")) {
         main_vcpulist(argc - 1, argv + 1);
+    } else if (!strcmp(argv[1], "vcpu-pin")) {
+        main_vcpupin(argc - 1, argv + 1);
     } else if (!strcmp(argv[1], "help")) {
         if (argc > 2)
             help(argv[2]);

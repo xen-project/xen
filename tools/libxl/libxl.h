@@ -374,6 +374,7 @@ struct libxl_physinfo {
     uint32_t threads_per_core;
     uint32_t cores_per_socket;
 
+    uint32_t max_cpu_id;
     uint32_t nr_cpus;
     uint32_t cpu_khz;
 
@@ -385,6 +386,7 @@ struct libxl_physinfo {
 int libxl_get_physinfo(struct libxl_ctx *ctx, struct libxl_physinfo *physinfo);
 struct libxl_vcpuinfo *libxl_list_vcpu(struct libxl_ctx *ctx, uint32_t domid,
                                        int *nb_vcpu, int *cpusize);
-
+int libxl_set_vcpuaffinity(struct libxl_ctx *ctx, uint32_t domid, uint32_t vcpuid,
+                           uint64_t *cpumap, int cpusize);
 #endif /* LIBXL_H */
 

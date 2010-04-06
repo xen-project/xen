@@ -2233,6 +2233,7 @@ int libxl_get_physinfo(struct libxl_ctx *ctx, struct libxl_physinfo *physinfo)
     }
     physinfo->threads_per_core = xcphysinfo.threads_per_core;
     physinfo->cores_per_socket = xcphysinfo.cores_per_socket;
+    physinfo->max_cpu_id = xcphysinfo.max_cpu_id;
     physinfo->nr_cpus = xcphysinfo.nr_cpus;
     physinfo->cpu_khz = xcphysinfo.cpu_khz;
     physinfo->total_pages = xcphysinfo.total_pages;
@@ -2281,4 +2282,10 @@ struct libxl_vcpuinfo *libxl_list_vcpu(struct libxl_ctx *ctx, uint32_t domid,
         ptr->vcpu_time = vcpuinfo.cpu_time;
     }
     return ret;
+}
+
+int libxl_set_vcpuaffinity(struct libxl_ctx *ctx, uint32_t domid, uint32_t vcpuid,
+                           uint64_t *cpumap, int cpusize)
+{
+    return (xc_vcpu_setaffinity(ctx->xch, domid, vcpuid, cpumap, cpusize));
 }
