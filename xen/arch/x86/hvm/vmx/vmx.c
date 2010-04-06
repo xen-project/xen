@@ -1445,6 +1445,8 @@ void start_vmx(void)
 
     if ( cpu_has_vmx_ept )
         vmx_function_table.hap_supported = 1;
+    
+    vmx_function_table.hap_1gb_pgtb = 0;
 
     setup_vmcs_dump();
 

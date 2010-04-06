@@ -884,6 +884,8 @@ void start_svm(struct cpuinfo_x86 *c)
                          cpuid_edx(0x8000000A) : 0);
 
     svm_function_table.hap_supported = cpu_has_svm_npt;
+    svm_function_table.hap_1gb_pgtb = 
+        (CONFIG_PAGING_LEVELS == 4)? !!(cpuid_edx(0x80000001) & 0x04000000):0;
 
     hvm_enable(&svm_function_table);
 }

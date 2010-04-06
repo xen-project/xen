@@ -39,6 +39,10 @@
 #define P2M_AUDIT     0
 #define P2M_DEBUGGING 0
 
+/* turn on/off 1GB host page table support for hap */
+static int opt_hap_1gb = 0;
+boolean_param("hap_1gb", opt_hap_1gb);
+
 /* Printouts */
 #define P2M_PRINTK(_f, _a...)                                \
     debugtrace_printk("p2m: %s(): " _f, __func__, ##_a)
@@ -1736,9 +1740,9 @@ int set_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
     while ( todo )
     {
         if ( is_hvm_domain(d) && paging_mode_hap(d) )
-            order = ( (((gfn | mfn_x(mfn) | todo) & ((1ul << 18) - 1)) == 0) ) ?
-                18 :
-            (((gfn | mfn_x(mfn) | todo) & ((1ul << 9) - 1)) == 0) ? 9 : 0;
+            order = ( (((gfn | mfn_x(mfn) | todo) & ((1ul << 18) - 1)) == 0) &&
+                      hvm_funcs.hap_1gb_pgtb && opt_hap_1gb ) ? 18 :
+                (((gfn | mfn_x(mfn) | todo) & ((1ul << 9) - 1)) == 0) ? 9 : 0;
         else
             order = 0;
 

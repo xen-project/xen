@@ -3452,6 +3452,11 @@ static void sh_unshadow_for_p2m_change(struct vcpu *v, unsigned long gfn,
 {
     struct domain *d = v->domain;
 
+    /* The following assertion is to make sure we don't step on 1GB host
+     * page support of HVM guest. */
+    ASSERT(!(level > 2 && (l1e_get_flags(*p) & _PAGE_PRESENT) &&
+             (l1e_get_flags(*p) & _PAGE_PSE)));
+
     /* If we're removing an MFN from the p2m, remove it from the shadows too */
     if ( level == 1 )
     {
