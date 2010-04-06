@@ -966,6 +966,11 @@ bool_t hvm_hap_nested_page_fault(unsigned long gfn)
     /* Spurious fault? PoD and log-dirty also take this path. */
     if ( p2m_is_ram(p2mt) )
     {
+        /*
+         * Page log dirty is always done with order 0. If this mfn resides in
+         * a large page, we do not change other pages type within that large
+         * page.
+         */
         paging_mark_dirty(current->domain, mfn_x(mfn));
         p2m_change_type(current->domain, gfn, p2m_ram_logdirty, p2m_ram_rw);
         return 1;

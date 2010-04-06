@@ -64,6 +64,7 @@ u32 vmx_cpu_based_exec_control __read_mostly;
 u32 vmx_secondary_exec_control __read_mostly;
 u32 vmx_vmexit_control __read_mostly;
 u32 vmx_vmentry_control __read_mostly;
+u8 vmx_ept_super_page_level_limit __read_mostly;
 bool_t cpu_has_vmx_ins_outs_instr_info __read_mostly;
 
 static DEFINE_PER_CPU_READ_MOSTLY(struct vmcs_struct *, host_vmcs);
@@ -183,6 +184,21 @@ static void vmx_init_vmcs_config(void)
             _vmx_secondary_exec_control &=
                 ~(SECONDARY_EXEC_ENABLE_EPT |
                   SECONDARY_EXEC_UNRESTRICTED_GUEST);
+        if ( _vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_EPT )
+        {
+            uint64_t cap;
+            rdmsrl(MSR_IA32_VMX_EPT_VPID_CAP, cap);
+            if ( cap & VMX_EPT_SUPER_PAGE_1G )
+            {
+                vmx_ept_super_page_level_limit = 2;
+                printk("EPT support 1G super page.\n");
+            }
+            else if ( cap & VMX_EPT_SUPER_PAGE_2M )
+            {
+                vmx_ept_super_page_level_limit = 1; 
+                printk("EPT support 2M super page.\n");
+            }
+        }
     }
 
     if ( (_vmx_secondary_exec_control & SECONDARY_EXEC_PAUSE_LOOP_EXITING) &&

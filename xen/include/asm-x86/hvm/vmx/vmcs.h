@@ -176,6 +176,11 @@ extern u32 vmx_secondary_exec_control;
 
 extern bool_t cpu_has_vmx_ins_outs_instr_info;
 
+extern u8 vmx_ept_super_page_level_limit;
+
+#define VMX_EPT_SUPER_PAGE_2M              0x00010000
+#define VMX_EPT_SUPER_PAGE_1G              0x00020000
+
 #define cpu_has_wbinvd_exiting \
     (vmx_secondary_exec_control & SECONDARY_EXEC_WBINVD_EXITING)
 #define cpu_has_vmx_virtualize_apic_accesses \
@@ -203,6 +208,8 @@ extern bool_t cpu_has_vmx_ins_outs_instr_info;
      SECONDARY_EXEC_UNRESTRICTED_GUEST)
 #define cpu_has_vmx_ple \
     (vmx_secondary_exec_control & SECONDARY_EXEC_PAUSE_LOOP_EXITING)
+#define cpu_vmx_ept_super_page_level_limit  \
+    vmx_ept_super_page_level_limit
 
 /* GUEST_INTERRUPTIBILITY_INFO flags. */
 #define VMX_INTR_SHADOW_STI             0x00000001
