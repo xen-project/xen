@@ -235,6 +235,7 @@ static void printf_info(libxl_domain_create_info *c_info,
     printf("hpet: %d\n", b_info->hpet);
     printf("vpt_align: %d\n", b_info->vpt_align);
     printf("max_vcpus: %d\n", b_info->max_vcpus);
+    printf("tsc_mode: %d\n", b_info->tsc_mode);
     printf("max_memkb: %d\n", b_info->max_memkb);
     printf("target_memkb: %d\n", b_info->target_memkb);
     printf("kernel: %s\n", b_info->kernel);
@@ -381,6 +382,9 @@ static void parse_config_file(const char *filename,
         b_info->max_memkb = l * 1024;
         b_info->target_memkb = b_info->max_memkb;
     }
+
+    if (!xlu_cfg_get_long(config, "tsc_mode", &l))
+        b_info->tsc_mode = l;
 
     if (!xlu_cfg_get_long (config, "shadow_memory", &l))
         b_info->shadow_memkb = l * 1024;

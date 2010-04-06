@@ -74,6 +74,7 @@ typedef struct {
     int vpt_align;
     int max_vcpus;
     int cur_vcpus;
+    int tsc_mode;
     uint32_t max_memkb;
     uint32_t target_memkb;
     uint32_t video_memkb;
