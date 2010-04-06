@@ -228,6 +228,11 @@ static void burn_credits(struct csched_vcpu *svc, s_time_t now)
     svc->start_time += (credits * MILLISECS(1)) / CSCHED_CREDITS_PER_MSEC;
 }
 
+static int opt_tickle_one_idle __read_mostly = 1;
+boolean_param("tickle_one_idle_cpu", opt_tickle_one_idle);
+
+DEFINE_PER_CPU(unsigned int, last_tickle_cpu) = 0;
+
 static inline void
 __runq_tickle(unsigned int cpu, struct csched_vcpu *new)
 {
@@ -265,8 +270,21 @@ __runq_tickle(unsigned int cpu, struct csched_vcpu *new)
         }
         else
         {
-            CSCHED_STAT_CRANK(tickle_idlers_some);
-            cpus_or(mask, mask, csched_priv.idlers);
+            cpumask_t idle_mask;
+
+            cpus_and(idle_mask, csched_priv.idlers, new->vcpu->cpu_affinity);
+            if ( !cpus_empty(idle_mask) )
+            {
+                CSCHED_STAT_CRANK(tickle_idlers_some);
+                if ( opt_tickle_one_idle )
+                {
+                    this_cpu(last_tickle_cpu) = 
+                        cycle_cpu(this_cpu(last_tickle_cpu), idle_mask);
+                    cpu_set(this_cpu(last_tickle_cpu), mask);
+                }
+                else
+                    cpus_or(mask, mask, idle_mask);
+            }
             cpus_and(mask, mask, new->vcpu->cpu_affinity);
         }
     }
