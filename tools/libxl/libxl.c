@@ -2221,3 +2221,64 @@ int libxl_button_press(struct libxl_ctx *ctx, uint32_t domid, libxl_button butto
 
     return rc;
 }
+
+int libxl_get_physinfo(struct libxl_ctx *ctx, struct libxl_physinfo *physinfo)
+{
+    xc_physinfo_t xcphysinfo = { 0 };
+    int rc;
+
+    rc = xc_physinfo(ctx->xch, &xcphysinfo);
+    if (rc != 0) {
+        return rc;
+    }
+    physinfo->threads_per_core = xcphysinfo.threads_per_core;
+    physinfo->cores_per_socket = xcphysinfo.cores_per_socket;
+    physinfo->nr_cpus = xcphysinfo.nr_cpus;
+    physinfo->cpu_khz = xcphysinfo.cpu_khz;
+    physinfo->total_pages = xcphysinfo.total_pages;
+    physinfo->free_pages = xcphysinfo.free_pages;
+    physinfo->scrub_pages = xcphysinfo.scrub_pages;
+    return 0;
+}
+
+struct libxl_vcpuinfo *libxl_list_vcpu(struct libxl_ctx *ctx, uint32_t domid,
+                                       int *nb_vcpu, int *cpusize)
+{
+    struct libxl_vcpuinfo *ptr, *ret;
+    xc_domaininfo_t domaininfo;
+    xc_vcpuinfo_t vcpuinfo;
+    xc_physinfo_t physinfo = { 0 };
+
+    if (xc_domain_getinfolist(ctx->xch, domid, 1, &domaininfo) != 1) {
+        return NULL;
+    }
+    if (xc_physinfo(ctx->xch, &physinfo) == -1) {
+        return NULL;
+    }
+    *cpusize = physinfo.max_cpu_id + 1;
+    ptr = libxl_calloc(ctx, domaininfo.max_vcpu_id + 1, sizeof (struct libxl_vcpuinfo));
+    if (!ptr) {
+        return NULL;
+    }
+
+    ret = ptr;
+    for (*nb_vcpu = 0; *nb_vcpu <= domaininfo.max_vcpu_id; ++*nb_vcpu, ++ptr) {
+        ptr->cpumap = libxl_calloc(ctx, (*cpusize + 63) / 64, sizeof (uint64_t));
+        if (!ptr->cpumap) {
+            return NULL;
+        }
+        if (xc_vcpu_getinfo(ctx->xch, domid, *nb_vcpu, &vcpuinfo) == -1) {
+            return NULL;
+        }
+        if (xc_vcpu_getaffinity(ctx->xch, domid, *nb_vcpu, ptr->cpumap, *cpusize) == -1) {
+            return NULL;
+        }
+        ptr->vcpuid = *nb_vcpu;
+        ptr->cpu = vcpuinfo.cpu;
+        ptr->online = !!vcpuinfo.online;
+        ptr->blocked = !!vcpuinfo.blocked;
+        ptr->running = !!vcpuinfo.running;
+        ptr->vcpu_time = vcpuinfo.cpu_time;
+    }
+    return ret;
+}

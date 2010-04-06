@@ -360,5 +360,31 @@ typedef enum {
 
 int libxl_button_press(struct libxl_ctx *ctx, uint32_t domid, libxl_button button);
 
+struct libxl_vcpuinfo {
+    uint32_t vcpuid; /* vcpu's id */
+    uint32_t cpu; /* current mapping */
+    uint8_t online:1; /* currently online (not hotplugged)? */
+    uint8_t blocked:1; /* blocked waiting for an event? */
+    uint8_t running:1; /* currently scheduled on its CPU? */
+    uint64_t vcpu_time; /* total vcpu time ran (ns) */
+    uint64_t *cpumap; /* current cpu's affinities */
+};
+
+struct libxl_physinfo {
+    uint32_t threads_per_core;
+    uint32_t cores_per_socket;
+
+    uint32_t nr_cpus;
+    uint32_t cpu_khz;
+
+    uint64_t total_pages;
+    uint64_t free_pages;
+    uint64_t scrub_pages;
+};
+
+int libxl_get_physinfo(struct libxl_ctx *ctx, struct libxl_physinfo *physinfo);
+struct libxl_vcpuinfo *libxl_list_vcpu(struct libxl_ctx *ctx, uint32_t domid,
+                                       int *nb_vcpu, int *cpusize);
+
 #endif /* LIBXL_H */
 

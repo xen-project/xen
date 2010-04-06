@@ -876,6 +876,7 @@ static void help(char *command)
         printf(" cd-eject                      eject a cdrom from a guest's cd drive\n\n");
         printf(" mem-set                       set the current memory usage for a domain\n\n");
         printf(" button-press                  indicate an ACPI button press to the domain\n\n");
+        printf(" vcpu-list                     list the VCPUs for all/some domains.\n\n");
     } else if(!strcmp(command, "create")) {
         printf("Usage: xl create <ConfigFile> [options] [vars]\n\n");
         printf("Create a domain based on <ConfigFile>.\n\n");
@@ -933,6 +934,9 @@ static void help(char *command)
         printf("Usage: xl button-press <Domain> <Button>\n\n");
         printf("Indicate <Button> press to a domain.\n");
         printf("<Button> may be 'power' or 'sleep'.\n\n");
+    } else if (!strcmp(command, "vcpu-list")) {
+        printf("Usage: xl vcpu-list [Domain, ...]\n\n");
+        printf("List the VCPUs for all/some domains.\n\n");
     }
 }
 
@@ -1721,6 +1725,144 @@ int main_button_press(int argc, char **argv)
     exit(0);
 }
 
+static void print_vcpuinfo(struct libxl_ctx *ctx, uint32_t domid,
+                           const struct libxl_vcpuinfo *vcpuinfo,
+                           uint32_t nr_cpus)
+{
+    int i, l;
+    uint64_t *cpumap;
+    uint64_t pcpumap;
+
+    /*      NAME  ID  VCPU */
+    printf("%-32s %5u %5u",
+           libxl_domid_to_name(ctx, domid), domid, vcpuinfo->vcpuid);
+    if (!vcpuinfo->online) {
+        /*      CPU STA */
+        printf("%5c %3c%cp ", '-', '-', '-');
+    } else {
+        /*      CPU STA */
+        printf("%5u %3c%c- ", vcpuinfo->cpu,
+               vcpuinfo->running ? 'r' : '-',
+               vcpuinfo->blocked ? 'b' : '-');
+    }
+    /*      TIM */
+    printf("%9.1f  ", ((float)vcpuinfo->vcpu_time / 1e9));
+    /* CPU AFFINITY */
+    pcpumap = nr_cpus > 64 ? -1 : ((1 << nr_cpus) - 1);
+    for (cpumap = vcpuinfo->cpumap; nr_cpus; ++cpumap) {
+        if (*cpumap < pcpumap) {
+            break;
+        }
+        if (nr_cpus > 64) {
+            pcpumap = -1;
+            nr_cpus -= 64;
+        } else {
+            pcpumap = ((1 << nr_cpus) - 1);
+            nr_cpus = 0;
+        }
+    }
+    if (!nr_cpus) {
+        printf("any cpu\n");
+    } else {
+        for (cpumap = vcpuinfo->cpumap; nr_cpus; ++cpumap) {
+            pcpumap = *cpumap;
+            for (i = 0; !(pcpumap & 1); ++i, pcpumap >>= 1)
+                ;
+            printf("%u", i);
+            for (l = i, pcpumap = (pcpumap >> 1); (pcpumap & 1); ++i, pcpumap >>= 1)
+                ;
+            if (l < i) {
+                printf("-%u", i);
+            }
+            for (++i; pcpumap; ++i, pcpumap >>= 1) {
+                if (pcpumap & 1) {
+                    printf(",%u", i);
+                    for (l = i, pcpumap = (pcpumap >> 1); (pcpumap & 1); ++i, pcpumap >>= 1)
+                        ;
+                    if (l < i) {
+                        printf("-%u", i);
+                    }
+                    ++i;
+                }
+            }
+            printf("\n");
+            nr_cpus = nr_cpus > 64 ? nr_cpus - 64 : 0;
+        }
+    }
+}
+
+void vcpulist(int argc, char **argv)
+{
+    struct libxl_ctx ctx;
+    struct libxl_dominfo *dominfo;
+    uint32_t domid;
+    struct libxl_vcpuinfo *vcpuinfo;
+    struct libxl_physinfo physinfo;
+    int nb_vcpu, nb_domain, cpusize;
+
+    if (libxl_ctx_init(&ctx, LIBXL_VERSION)) {
+        fprintf(stderr, "cannot init xl context\n");
+        return;
+    }
+    libxl_ctx_set_log(&ctx, log_callback, NULL);
+
+    if (libxl_get_physinfo(&ctx, &physinfo) != 0) {
+        fprintf(stderr, "libxl_physinfo failed.\n");
+        goto vcpulist_out;
+    }
+    printf("%-32s %5s %5s %5s %5s %9s %s\n",
+           "Name", "ID", "VCPU", "CPU", "State", "Time(s)", "CPU Affinity");
+    if (!argc) {
+        if (!(dominfo = libxl_list_domain(&ctx, &nb_domain))) {
+            fprintf(stderr, "libxl_list_domain failed.\n");
+            goto vcpulist_out;
+        }
+        for (; nb_domain > 0; --nb_domain, ++dominfo) {
+            if (!(vcpuinfo = libxl_list_vcpu(&ctx, dominfo->domid, &nb_vcpu, &cpusize))) {
+                fprintf(stderr, "libxl_list_vcpu failed.\n");
+                goto vcpulist_out;
+            }
+            for (; nb_vcpu > 0; --nb_vcpu, ++vcpuinfo) {
+                print_vcpuinfo(&ctx, dominfo->domid, vcpuinfo, physinfo.nr_cpus);
+            }
+        }
+    } else {
+        for (; argc > 0; ++argv, --argc) {
+            if (domain_qualifier_to_domid(&ctx, *argv, &domid) < 0) {
+                fprintf(stderr, "%s is an invalid domain identifier\n", *argv);
+            }
+            if (!(vcpuinfo = libxl_list_vcpu(&ctx, domid, &nb_vcpu, &cpusize))) {
+                fprintf(stderr, "libxl_list_vcpu failed.\n");
+                goto vcpulist_out;
+            }
+            for (; nb_vcpu > 0; --nb_vcpu, ++vcpuinfo) {
+                print_vcpuinfo(&ctx, domid, vcpuinfo, physinfo.nr_cpus);
+            }
+        }
+    }
+  vcpulist_out:
+    libxl_ctx_free(&ctx);
+}
+
+void main_vcpulist(int argc, char **argv)
+{
+    int opt;
+
+    while ((opt = getopt(argc, argv, "h")) != -1) {
+        switch (opt) {
+        case 'h':
+            help("vcpu-list");
+            exit(0);
+        default:
+            fprintf(stderr, "option `%c' not supported.\n", opt);
+            break;
+        }
+    }
+
+    vcpulist(argc - 1, argv + 1);
+    exit(0);
+}
+
 int main(int argc, char **argv)
 {
     if (argc < 2) {
@@ -1762,6 +1904,8 @@ int main(int argc, char **argv)
         main_memset(argc - 1, argv + 1);
     } else if (!strcmp(argv[1], "button-press")) {
         main_button_press(argc - 1, argv + 1);
+    } else if (!strcmp(argv[1], "vcpu-list")) {
+        main_vcpulist(argc - 1, argv + 1);
     } else if (!strcmp(argv[1], "help")) {
         if (argc > 2)
             help(argv[2]);
@@ -1773,4 +1917,3 @@ int main(int argc, char **argv)
         exit(1);
     }
 }
-
