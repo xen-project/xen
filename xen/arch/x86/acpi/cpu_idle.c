@@ -69,6 +69,14 @@ boolean_param("lapic_timer_c2_ok", local_apic_timer_c2_ok);
 
 static struct acpi_processor_power *__read_mostly processor_powers[NR_CPUS];
 
+static char* acpi_cstate_method_name[] =
+{
+    "NONE",
+    "SYSIO",
+    "FFH",
+    "HALT"
+};
+
 static void print_acpi_power(uint32_t cpu, struct acpi_processor_power *power)
 {
     uint32_t i, idle_usage = 0;
@@ -92,6 +100,7 @@ static void print_acpi_power(uint32_t cpu, struct acpi_processor_power *power)
         printk("type[C%d] ", power->states[i].type);
         printk("latency[%03d] ", power->states[i].latency);
         printk("usage[%08d] ", power->states[i].usage);
+        printk("method[%5s] ", acpi_cstate_method_name[power->states[i].entry_method]);
         printk("duration[%"PRId64"]\n", res);
     }
     printk("    C0:\tusage[%08d] duration[%"PRId64"]\n",
@@ -140,11 +149,43 @@ static void acpi_safe_halt(void)
 
 #define MWAIT_ECX_INTERRUPT_BREAK   (0x1)
 
+/*
+ * The bit is set iff cpu use monitor/mwait to enter C state
+ * with this flag set, CPU can be waken up from C state
+ * by writing to specific memory address, instead of sending IPI
+ */
+static cpumask_t cpuidle_mwait_flags;
+
+void cpuidle_wakeup_mwait(cpumask_t *mask)
+{
+    cpumask_t target;
+    int cpu;
+
+    cpus_and(target, *mask, cpuidle_mwait_flags);
+
+    /* cpu is 'mwait'ing at softirq_pending,
+       writing to it will wake up CPU */
+    for_each_cpu_mask(cpu, target)
+        set_bit(TIMER_SOFTIRQ, &softirq_pending(cpu));
+
+    cpus_andnot(*mask, *mask, cpuidle_mwait_flags);
+}
+
 static void mwait_idle_with_hints(unsigned long eax, unsigned long ecx)
 {
-    __monitor((void *)current, 0, 0);
+    int cpu = smp_processor_id();
+
+    __monitor((void *)&softirq_pending(cpu), 0, 0);
+
     smp_mb();
-    __mwait(eax, ecx);
+    if (!softirq_pending(cpu))
+    {
+        cpu_set(cpu, cpuidle_mwait_flags);
+
+        __mwait(eax, ecx);
+
+        cpu_clear(cpu, cpuidle_mwait_flags);
+    }
 }
 
 static void acpi_processor_ffh_cstate_enter(struct acpi_processor_cx *cx)

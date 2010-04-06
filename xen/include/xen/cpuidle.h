@@ -86,6 +86,8 @@ struct cpuidle_governor
 extern struct cpuidle_governor *cpuidle_current_governor;
 void cpuidle_disable_deep_cstate(void);
 
+extern void cpuidle_wakeup_mwait(cpumask_t *mask);
+
 #define CPUIDLE_DRIVER_STATE_START  1
 
 #endif /* _XEN_CPUIDLE_H */
