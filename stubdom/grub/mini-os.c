@@ -651,12 +651,11 @@ int console_getkey (void)
     return 0;
 }
 
+static DECLARE_MUTEX_LOCKED(kbd_sem);
 static void kbd_thread(void *p)
 {
-    struct semaphore *sem = p;
-
     kbd_dev = init_kbdfront(NULL, 1);
-    up(sem);
+    up(&kbd_sem);
 }
 
 struct fbfront_dev *fb_open(void *fb, int width, int height, int depth)
@@ -665,10 +664,9 @@ struct fbfront_dev *fb_open(void *fb, int width, int height, int depth)
     int linesize = width * (depth / 8);
     int memsize = linesize * height;
     int numpages = (memsize + PAGE_SIZE - 1) / PAGE_SIZE;
-    DECLARE_MUTEX_LOCKED(sem);
     int i;
 
-    create_thread("kbdfront", kbd_thread, &sem);
+    create_thread("kbdfront", kbd_thread, &kbd_sem);
 
     mfns = malloc(numpages * sizeof(*mfns));
     for (i = 0; i < numpages; i++) {
@@ -681,7 +679,7 @@ struct fbfront_dev *fb_open(void *fb, int width, int height, int depth)
     if (!fb_dev)
         return NULL;
 
-    down(&sem);
+    down(&kbd_sem);
     if (!kbd_dev)
         return NULL;
 
