@@ -353,6 +353,7 @@ static struct kbdfront_dev *kbd_dev;
 static void kbdfront_thread(void *p)
 {
     DEFINE_WAIT(w);
+    DEFINE_WAIT(w2);
     int x = WIDTH / 2, y = HEIGHT / 2, z = 0;
 
     kbd_dev = init_kbdfront(NULL, 1);
@@ -367,7 +368,7 @@ static void kbdfront_thread(void *p)
         int sleep = 1;
 
         add_waiter(w, kbdfront_queue);
-        add_waiter(w, fbfront_queue);
+        add_waiter(w2, fbfront_queue);
 
         while (kbdfront_receive(kbd_dev, &kbdevent, 1) != 0) {
             sleep = 0;
