@@ -19,8 +19,10 @@
 
 #include <xen/libelf/libelf.h>
 
-#define SUPERPAGE_PFN_SHIFT  9
-#define SUPERPAGE_NR_PFNS    (1UL << SUPERPAGE_PFN_SHIFT)
+#define SUPERPAGE_2MB_SHIFT   9
+#define SUPERPAGE_2MB_NR_PFNS (1UL << SUPERPAGE_2MB_SHIFT)
+#define SUPERPAGE_1GB_SHIFT   18
+#define SUPERPAGE_1GB_NR_PFNS (1UL << SUPERPAGE_1GB_SHIFT)
 
 #define SPECIALPAGE_BUFIOREQ 0
 #define SPECIALPAGE_XENSTORE 1
@@ -100,6 +102,19 @@ static int loadelfimage(
     return rc;
 }
 
+/*
+ * Check whether there exists mmio hole in the specified memory range.
+ * Returns 1 if exists, else returns 0.
+ */
+static int check_mmio_hole(uint64_t start, uint64_t memsize)
+{
+    if ( start + memsize <= HVM_BELOW_4G_MMIO_START ||
+         start >= HVM_BELOW_4G_MMIO_START + HVM_BELOW_4G_MMIO_LENGTH )
+        return 0;
+    else
+        return 1;
+}
+
 static int setup_guest(int xc_handle,
                        uint32_t dom, int memsize, int target,
                        char *image, unsigned long image_size)
@@ -117,8 +132,9 @@ static int setup_guest(int xc_handle,
     uint64_t v_start, v_end;
     int rc;
     xen_capabilities_info_t caps;
+    unsigned long stat_normal_pages = 0, stat_2mb_pages = 0, 
+        stat_1gb_pages = 0;
     int pod_mode = 0;
-    
 
     /* An HVM guest must be initialised with at least 2MB memory. */
     if ( memsize < 2 || target < 2 )
@@ -166,35 +182,40 @@ static int setup_guest(int xc_handle,
 
     /*
      * Allocate memory for HVM guest, skipping VGA hole 0xA0000-0xC0000.
-     * We allocate pages in batches of no more than 8MB to ensure that
-     * we can be preempted and hence dom0 remains responsive.
+     *
+     * We attempt to allocate 1GB pages if possible. It falls back on 2MB
+     * pages if 1GB allocation fails. 4KB pages will be used eventually if
+     * both fail.
+     * 
+     * Under 2MB mode, we allocate pages in batches of no more than 8MB to 
+     * ensure that we can be preempted and hence dom0 remains responsive.
      */
     rc = xc_domain_memory_populate_physmap(
         xc_handle, dom, 0xa0, 0, 0, &page_array[0x00]);
     cur_pages = 0xc0;
+    stat_normal_pages = 0xc0;
     while ( (rc == 0) && (nr_pages > cur_pages) )
     {
-        /* Clip count to maximum 8MB extent. */
+        /* Clip count to maximum 1GB extent. */
         unsigned long count = nr_pages - cur_pages;
-        if ( count > 2048 )
-            count = 2048;
+        unsigned long max_pages = SUPERPAGE_1GB_NR_PFNS;
 
-        /* Clip partial superpage extents to superpage boundaries. */
-        if ( ((cur_pages & (SUPERPAGE_NR_PFNS-1)) != 0) &&
-             (count > (-cur_pages & (SUPERPAGE_NR_PFNS-1))) )
-            count = -cur_pages & (SUPERPAGE_NR_PFNS-1); /* clip s.p. tail */
-        else if ( ((count & (SUPERPAGE_NR_PFNS-1)) != 0) &&
-                  (count > SUPERPAGE_NR_PFNS) )
-            count &= ~(SUPERPAGE_NR_PFNS - 1); /* clip non-s.p. tail */
-
-        /* Attempt to allocate superpage extents. */
-        if ( ((count | cur_pages) & (SUPERPAGE_NR_PFNS - 1)) == 0 )
+        if ( count > max_pages )
+            count = max_pages;
+        
+        /* Attemp to allocate 1GB super page. Because in each pass we only
+         * allocate at most 1GB, we don't have to clip super page boundaries.
+         */
+        if ( ((count | cur_pages) & (SUPERPAGE_1GB_NR_PFNS - 1)) == 0 &&
+             /* Check if there exists MMIO hole in the 1GB memory range */
+             !check_mmio_hole(cur_pages << PAGE_SHIFT,
+                              SUPERPAGE_1GB_NR_PFNS << PAGE_SHIFT) )
         {
             long done;
-            xen_pfn_t sp_extents[count >> SUPERPAGE_PFN_SHIFT];
+            xen_pfn_t sp_extents[count >> SUPERPAGE_1GB_SHIFT];
             struct xen_memory_reservation sp_req = {
-                .nr_extents   = count >> SUPERPAGE_PFN_SHIFT,
-                .extent_order = SUPERPAGE_PFN_SHIFT,
+                .nr_extents   = count >> SUPERPAGE_1GB_SHIFT,
+                .extent_order = SUPERPAGE_1GB_SHIFT,
                 .domid        = dom
             };
 
@@ -203,11 +224,12 @@ static int setup_guest(int xc_handle,
 
             set_xen_guest_handle(sp_req.extent_start, sp_extents);
             for ( i = 0; i < sp_req.nr_extents; i++ )
-                sp_extents[i] = page_array[cur_pages+(i<<SUPERPAGE_PFN_SHIFT)];
+                sp_extents[i] = page_array[cur_pages+(i<<SUPERPAGE_1GB_SHIFT)];
             done = xc_memory_op(xc_handle, XENMEM_populate_physmap, &sp_req);
             if ( done > 0 )
             {
-                done <<= SUPERPAGE_PFN_SHIFT;
+                stat_1gb_pages += done;
+                done <<= SUPERPAGE_1GB_SHIFT;
                 if ( pod_mode && target_pages > cur_pages )
                 {
                     int d = target_pages - cur_pages;
@@ -218,12 +240,61 @@ static int setup_guest(int xc_handle,
             }
         }
 
+        if ( count != 0 )
+        {
+            /* Clip count to maximum 8MB extent. */
+            max_pages = SUPERPAGE_2MB_NR_PFNS * 4;
+            if ( count > max_pages )
+                count = max_pages;
+            
+            /* Clip partial superpage extents to superpage boundaries. */
+            if ( ((cur_pages & (SUPERPAGE_2MB_NR_PFNS-1)) != 0) &&
+                 (count > (-cur_pages & (SUPERPAGE_2MB_NR_PFNS-1))) )
+                count = -cur_pages & (SUPERPAGE_2MB_NR_PFNS-1);
+            else if ( ((count & (SUPERPAGE_2MB_NR_PFNS-1)) != 0) &&
+                      (count > SUPERPAGE_2MB_NR_PFNS) )
+                count &= ~(SUPERPAGE_2MB_NR_PFNS - 1); /* clip non-s.p. tail */
+
+            /* Attempt to allocate superpage extents. */
+            if ( ((count | cur_pages) & (SUPERPAGE_2MB_NR_PFNS - 1)) == 0 )
+            {
+                long done;
+                xen_pfn_t sp_extents[count >> SUPERPAGE_2MB_SHIFT];
+                struct xen_memory_reservation sp_req = {
+                    .nr_extents   = count >> SUPERPAGE_2MB_SHIFT,
+                    .extent_order = SUPERPAGE_2MB_SHIFT,
+                    .domid        = dom
+                };
+
+                if ( pod_mode )
+                    sp_req.mem_flags = XENMEMF_populate_on_demand;
+
+                set_xen_guest_handle(sp_req.extent_start, sp_extents);
+                for ( i = 0; i < sp_req.nr_extents; i++ )
+                    sp_extents[i] = page_array[cur_pages+(i<<SUPERPAGE_2MB_SHIFT)];
+                done = xc_memory_op(xc_handle, XENMEM_populate_physmap, &sp_req);
+                if ( done > 0 )
+                {
+                    stat_2mb_pages += done;
+                    done <<= SUPERPAGE_2MB_SHIFT;
+                    if ( pod_mode && target_pages > cur_pages )
+                    {
+                        int d = target_pages - cur_pages;
+                        pod_pages += ( done < d ) ? done : d;
+                    }
+                    cur_pages += done;
+                    count -= done;
+                }
+            }
+        }
+
         /* Fall back to 4kB extents. */
         if ( count != 0 )
         {
             rc = xc_domain_memory_populate_physmap(
                 xc_handle, dom, count, 0, 0, &page_array[cur_pages]);
             cur_pages += count;
+            stat_normal_pages += count;
             if ( pod_mode )
                 pod_pages -= count;
         }
@@ -241,6 +312,12 @@ static int setup_guest(int xc_handle,
         goto error_out;
     }
 
+    IPRINTF("PHYSICAL MEMORY ALLOCATION:\n"
+            "  4KB PAGES: 0x%016lx\n"
+            "  2MB PAGES: 0x%016lx\n"
+            "  1GB PAGES: 0x%016lx\n",
+            stat_normal_pages, stat_2mb_pages, stat_1gb_pages);
+    
     if ( loadelfimage(&elf, xc_handle, dom, page_array) != 0 )
         goto error_out;
 
