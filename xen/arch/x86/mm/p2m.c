@@ -1231,7 +1231,7 @@ p2m_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
     if ( !p2m_next_level(d, &table_mfn, &table, &gfn_remainder, gfn,
                          L3_PAGETABLE_SHIFT - PAGE_SHIFT,
                          ((CONFIG_PAGING_LEVELS == 3)
-                          ? (d->arch.hvm_domain.hap_enabled ? 4 : 8)
+                          ? (paging_mode_hap(d) ? 4 : 8)
                           : L3_PAGETABLE_ENTRIES),
                          PGT_l2_page_table) )
         goto out;
@@ -1568,7 +1568,7 @@ int p2m_init(struct domain *d)
     p2m->get_entry_current = p2m_gfn_to_mfn_current;
     p2m->change_entry_type_global = p2m_change_type_global;
 
-    if ( is_hvm_domain(d) && d->arch.hvm_domain.hap_enabled &&
+    if ( is_hvm_domain(d) && paging_mode_hap(d) &&
          (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL) )
         ept_p2m_init(d);
 
@@ -1595,7 +1595,7 @@ int set_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
 
     while ( todo )
     {
-        if ( is_hvm_domain(d) && d->arch.hvm_domain.hap_enabled )
+        if ( is_hvm_domain(d) && paging_mode_hap(d) )
             order = (((gfn | mfn_x(mfn) | todo) & (SUPERPAGE_PAGES - 1)) == 0) ?
                 9 : 0;
         else

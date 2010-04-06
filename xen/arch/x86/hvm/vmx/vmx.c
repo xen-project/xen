@@ -92,7 +92,7 @@ static int vmx_domain_initialise(struct domain *d)
 
 static void vmx_domain_destroy(struct domain *d)
 {
-    if ( d->arch.hvm_domain.hap_enabled )
+    if ( paging_mode_hap(d) )
         on_each_cpu(__ept_sync_domain, d, 1);
     vmx_free_vlapic_mapping(d);
 }
@@ -678,7 +678,7 @@ static void vmx_ctxt_switch_to(struct vcpu *v)
     if ( old_cr4 != new_cr4 )
         write_cr4(new_cr4);
 
-    if ( d->arch.hvm_domain.hap_enabled )
+    if ( paging_mode_hap(d) )
     {
         unsigned int cpu = smp_processor_id();
         /* Test-and-test-and-set this CPU in the EPT-is-synced mask. */
@@ -1222,7 +1222,7 @@ static void __ept_sync_domain(void *info)
 void ept_sync_domain(struct domain *d)
 {
     /* Only if using EPT and this domain has some VCPUs to dirty. */
-    if ( !d->arch.hvm_domain.hap_enabled || !d->vcpu || !d->vcpu[0] )
+    if ( !paging_mode_hap(d) || !d->vcpu || !d->vcpu[0] )
         return;
 
     ASSERT(local_irq_is_enabled());

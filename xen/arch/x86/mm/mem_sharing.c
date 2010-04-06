@@ -44,7 +44,7 @@ static void mem_sharing_audit(void);
 
 
 #define hap_enabled(d) \
-    (is_hvm_domain(d) && (d)->arch.hvm_domain.hap_enabled)
+    (is_hvm_domain(d) && paging_mode_hap(d))
 #define mem_sharing_enabled(d) \
     (is_hvm_domain(d) && (d)->arch.hvm_domain.mem_sharing_enabled)
  
