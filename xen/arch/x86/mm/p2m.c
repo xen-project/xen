@@ -1534,12 +1534,15 @@ static mfn_t p2m_gfn_to_mfn_current(unsigned long gfn, p2m_type_t *t,
     {
         l1_pgentry_t l1e = l1e_empty(), *p2m_entry;
         l2_pgentry_t l2e = l2e_empty();
-        l3_pgentry_t l3e = l3e_empty();
         int ret;
+#if CONFIG_PAGING_LEVELS >= 4
+        l3_pgentry_t l3e = l3e_empty();
+#endif
 
         ASSERT(gfn < (RO_MPT_VIRT_END - RO_MPT_VIRT_START) 
                / sizeof(l1_pgentry_t));
 
+#if CONFIG_PAGING_LEVELS >= 4
         /*
          * Read & process L3
          */
@@ -1585,7 +1588,7 @@ static mfn_t p2m_gfn_to_mfn_current(unsigned long gfn, p2m_type_t *t,
             
             goto out;
         }
-
+#endif
         /*
          * Read & process L2
          */
