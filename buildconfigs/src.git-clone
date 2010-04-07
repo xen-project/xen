@@ -23,9 +23,7 @@ $(LINUX_SRCDIR)/.valid-src: $(__XEN_LINUX_UPDATE)
 	if ! [ -d $(LINUX_SRCDIR) ]; then \
 		rm -rf $(LINUX_SRCDIR) $(LINUX_SRCDIR).tmp; \
 		mkdir $(LINUX_SRCDIR).tmp; rmdir $(LINUX_SRCDIR).tmp; \
-		$(GIT) clone $(XEN_LINUX_GIT_URL) $(LINUX_SRCDIR).tmp; \
-		cd $(LINUX_SRCDIR).tmp; \
-		$(GIT) checkout $(XEN_LINUX_GIT_REMOTEBRANCH); \
-		cd ..; mv $(LINUX_SRCDIR).tmp $(LINUX_SRCDIR); \
+		$(GIT) clone -o xen -b $(XEN_LINUX_GIT_REMOTEBRANCH) $(XEN_LINUX_GIT_URL) $(LINUX_SRCDIR).tmp; \
+		mv $(LINUX_SRCDIR).tmp $(LINUX_SRCDIR); \
 	fi
 	touch $@
