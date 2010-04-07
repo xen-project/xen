@@ -184,15 +184,11 @@ def free(need_mem, dominfo):
             waitscrub = 1
             vcpus = dominfo.info['cpus'][0]
             for vcpu in vcpus:
-                nodenum = 0
-                for node in physinfo['node_to_cpu']:
-                    for cpu in node:
-                        if vcpu == cpu:
-                            if oldnode == -1:
-                                oldnode = nodenum
-                            elif oldnode != nodenum:
-                                waitscrub = 0
-                    nodenum = nodenum + 1
+                nodenum = xc.numainfo()['cpu_to_node'][cpu]
+                if oldnode == -1:
+                    oldnode = nodenum
+                elif oldnode != nodenum:
+                    waitscrub = 0
 
             if waitscrub == 1 and scrub_mem > 0:
                 log.debug("wait for scrub %s", scrub_mem)

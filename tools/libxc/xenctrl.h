@@ -612,9 +612,19 @@ int xc_readconsolering(int xc_handle,
 int xc_send_debug_keys(int xc_handle, char *keys);
 
 typedef xen_sysctl_physinfo_t xc_physinfo_t;
+typedef xen_sysctl_topologyinfo_t xc_topologyinfo_t;
+typedef xen_sysctl_numainfo_t xc_numainfo_t;
+
 typedef uint32_t xc_cpu_to_node_t;
-int xc_physinfo(int xc_handle,
-                xc_physinfo_t *info);
+typedef uint32_t xc_cpu_to_socket_t;
+typedef uint32_t xc_cpu_to_core_t;
+typedef uint64_t xc_node_to_memsize_t;
+typedef uint64_t xc_node_to_memfree_t;
+typedef uint32_t xc_node_to_node_dist_t;
+
+int xc_physinfo(int xc_handle, xc_physinfo_t *info);
+int xc_topologyinfo(int xc_handle, xc_topologyinfo_t *info);
+int xc_numainfo(int xc_handle, xc_numainfo_t *info);
 
 int xc_sched_id(int xc_handle,
                 int *sched_id);

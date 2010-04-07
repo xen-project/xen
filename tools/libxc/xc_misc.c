@@ -80,6 +80,43 @@ int xc_physinfo(int xc_handle,
     return 0;
 }
 
+int xc_topologyinfo(int xc_handle,
+                xc_topologyinfo_t *put_info)
+{
+    int ret;
+    DECLARE_SYSCTL;
+
+    sysctl.cmd = XEN_SYSCTL_topologyinfo;
+
+    memcpy(&sysctl.u.topologyinfo, put_info, sizeof(*put_info));
+
+    if ( (ret = do_sysctl(xc_handle, &sysctl)) != 0 )
+        return ret;
+
+    memcpy(put_info, &sysctl.u.topologyinfo, sizeof(*put_info));
+
+    return 0;
+}
+
+int xc_numainfo(int xc_handle,
+                xc_numainfo_t *put_info)
+{
+    int ret;
+    DECLARE_SYSCTL;
+
+    sysctl.cmd = XEN_SYSCTL_numainfo;
+
+    memcpy(&sysctl.u.numainfo, put_info, sizeof(*put_info));
+
+    if ((ret = do_sysctl(xc_handle, &sysctl)) != 0)
+        return ret;
+
+    memcpy(put_info, &sysctl.u.numainfo, sizeof(*put_info));
+
+    return 0;
+}
+
+
 int xc_sched_id(int xc_handle,
                 int *sched_id)
 {

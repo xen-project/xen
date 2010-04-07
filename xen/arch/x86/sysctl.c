@@ -35,6 +35,8 @@ static long cpu_down_helper(void *data)
     return cpu_down(cpu);
 }
 
+extern int __node_distance(int a, int b);
+
 long arch_do_sysctl(
     struct xen_sysctl *sysctl, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
 {
@@ -45,25 +47,22 @@ long arch_do_sysctl(
 
     case XEN_SYSCTL_physinfo:
     {
-        uint32_t i, max_array_ent;
-        XEN_GUEST_HANDLE_64(uint32) cpu_to_node_arr;
-
         xen_sysctl_physinfo_t *pi = &sysctl->u.physinfo;
 
         ret = xsm_physinfo();
         if ( ret )
             break;
 
-        max_array_ent = pi->max_cpu_id;
-        cpu_to_node_arr = pi->cpu_to_node;
 
         memset(pi, 0, sizeof(*pi));
-        pi->cpu_to_node = cpu_to_node_arr;
         pi->threads_per_core =
             cpus_weight(per_cpu(cpu_sibling_map, 0));
         pi->cores_per_socket =
             cpus_weight(per_cpu(cpu_core_map, 0)) / pi->threads_per_core;
         pi->nr_cpus = (u32)num_online_cpus();
+        pi->nr_nodes = (u32)num_online_nodes();
+        pi->sockets_per_node =  pi->nr_cpus / 
+                     (pi->nr_nodes * pi->cores_per_socket * pi->threads_per_core);
         pi->total_pages = total_pages;
         pi->free_pages = avail_domheap_pages();
         pi->scrub_pages = 0;
@@ -74,15 +73,56 @@ long arch_do_sysctl(
         if ( iommu_enabled )
             pi->capabilities |= XEN_SYSCTL_PHYSCAP_hvm_directio;
 
-        pi->max_node_id = last_node(node_online_map);
-        pi->max_cpu_id = last_cpu(cpu_online_map);
-        max_array_ent = min_t(uint32_t, max_array_ent, pi->max_cpu_id);
+        if ( copy_to_guest(u_sysctl, sysctl, 1) )
+            ret = -EFAULT;
+    }
+    break;
+        
+    case XEN_SYSCTL_topologyinfo:
+    {
+        uint32_t i, max_cpu_index;
+        XEN_GUEST_HANDLE_64(uint32) cpu_to_core_arr;
+        XEN_GUEST_HANDLE_64(uint32) cpu_to_socket_arr;
+        XEN_GUEST_HANDLE_64(uint32) cpu_to_node_arr;
+
+        xen_sysctl_topologyinfo_t *ti = &sysctl->u.topologyinfo;
+
+        max_cpu_index = ti->max_cpu_index;
+        cpu_to_core_arr = ti->cpu_to_core;
+        cpu_to_socket_arr = ti->cpu_to_socket;
+        cpu_to_node_arr = ti->cpu_to_node;
+
+        memset(ti, 0, sizeof(*ti));
+        ti->cpu_to_core = cpu_to_core_arr;
+        ti->cpu_to_socket = cpu_to_socket_arr;
+        ti->cpu_to_node = cpu_to_node_arr;
+
+        max_cpu_index = min_t(uint32_t, max_cpu_index, num_online_cpus());
+        ti->max_cpu_index = max_cpu_index;
 
         ret = 0;
 
-        if ( !guest_handle_is_null(cpu_to_node_arr) )
+        for ( i = 0; i < max_cpu_index; i++ )
         {
-            for ( i = 0; i <= max_array_ent; i++ )
+            if ( !guest_handle_is_null(cpu_to_core_arr) )
+            {
+                uint32_t core = cpu_online(i) ? cpu_to_core(i) : ~0u;
+                if ( copy_to_guest_offset(cpu_to_core_arr, i, &core, 1) )
+                {
+                    ret = -EFAULT;
+                    break;
+                }
+            }
+            if ( !guest_handle_is_null(cpu_to_socket_arr) )
+            {
+                uint32_t socket = cpu_online(i) ? cpu_to_socket(i) : ~0u;
+                if ( copy_to_guest_offset(cpu_to_socket_arr, i, &socket, 1) )
+                {
+                    ret = -EFAULT;
+                    break;
+                }
+            }
+            if ( !guest_handle_is_null(cpu_to_node_arr) )
             {
                 uint32_t node = cpu_online(i) ? cpu_to_node(i) : ~0u;
                 if ( copy_to_guest_offset(cpu_to_node_arr, i, &node, 1) )
@@ -92,6 +132,82 @@ long arch_do_sysctl(
                 }
             }
         }
+
+        if (ret)
+            break;
+ 
+        if ( copy_to_guest(u_sysctl, sysctl, 1) )
+            ret = -EFAULT;
+    }
+    break;
+
+    case XEN_SYSCTL_numainfo:
+    {
+        uint32_t i, max_node_index;
+        XEN_GUEST_HANDLE_64(uint64) node_to_memsize_arr;
+        XEN_GUEST_HANDLE_64(uint64) node_to_memfree_arr;
+        XEN_GUEST_HANDLE_64(uint32) node_to_node_distance_arr;
+
+        xen_sysctl_numainfo_t *ni = &sysctl->u.numainfo;
+
+        max_node_index = ni->max_node_index;
+        node_to_memsize_arr = ni->node_to_memsize;
+        node_to_memfree_arr = ni->node_to_memfree;
+        node_to_node_distance_arr = ni->node_to_node_distance;
+
+        memset(ni, 0, sizeof(*ni));
+        ni->node_to_memsize = node_to_memsize_arr;
+        ni->node_to_memfree = node_to_memfree_arr;
+        ni->node_to_node_distance = node_to_node_distance_arr;
+
+        max_node_index = min_t(uint32_t, max_node_index, num_online_nodes());
+        ni->max_node_index = max_node_index;
+
+        ret = 0;
+
+        for ( i = 0; i < max_node_index; i++ )
+        {
+            if ( !guest_handle_is_null(node_to_memsize_arr) )
+            {
+                uint64_t memsize = node_online(i) ? 
+                                   node_spanned_pages(i) << PAGE_SHIFT : 0ul;
+                if ( copy_to_guest_offset(node_to_memsize_arr, i, &memsize, 1) )
+                {
+                    ret = -EFAULT;
+                    break;
+                }
+            }
+            if ( !guest_handle_is_null(node_to_memfree_arr) )
+            {
+                uint64_t memfree = node_online(i) ? 
+                                   avail_node_heap_pages(i) << PAGE_SHIFT : 0ul;
+                if ( copy_to_guest_offset(node_to_memfree_arr, i, &memfree, 1) )
+                {
+                    ret = -EFAULT;
+                    break;
+                }
+            }
+
+            if ( !guest_handle_is_null(node_to_node_distance_arr) )
+	    {
+                int j;
+                for ( j = 0; j < max_node_index; j++)
+                {
+                    uint32_t distance = ~0u;
+                    if (node_online(i) && node_online (j)) 
+                        distance = __node_distance(i, j);
+                    
+                    if ( copy_to_guest_offset(node_to_node_distance_arr, 
+                         (i * max_node_index + j), &distance, 1) )
+                    {
+                        ret = -EFAULT;
+                        break;
+                    }
+                }
+            }
+        }
+        if (ret)
+            break;
 
         if ( copy_to_guest(u_sysctl, sysctl, 1) )
             ret = -EFAULT;

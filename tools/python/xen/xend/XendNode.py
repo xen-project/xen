@@ -878,65 +878,70 @@ class XendNode:
     def list_to_strrange(self,list):
         return self.format_pairs(self.list_to_rangepairs(list))
 
-    def format_node_to_cpu(self, pinfo):
-        str=''
-        whitespace=''
+    def format_cpu_to_core_socket_node(self, tinfo):
         try:
-            node_to_cpu=pinfo['node_to_cpu']
-            for i in range(0, pinfo['max_node_id']+1):
-                str+='%snode%d:%s\n' % (whitespace,
-                                        i, 
-                                      self.list_to_strrange(node_to_cpu[i]))
-                whitespace='%25s' % ''        
-        except:
-            str='none\n'
-        return str[:-1];
-    def format_node_to_memory(self, pinfo, key):
-        str=''
-        whitespace=''
-        try:
-            node_to_memory=pinfo[key]
-            for i in range(0, pinfo['max_node_id']+1):
-                str+='%snode%d:%d\n' % (whitespace,
-                                        i,
-                                        node_to_memory[i] / 1024)
-                whitespace='%25s' % ''
+            nr_cpus=tinfo['max_cpu_index']
+            str='\ncpu:    core    socket     node\n'
+            for i in range(0, nr_cpus):
+                str+='%3d:%8d %8d %8d\n' % (i, 
+                                          tinfo['cpu_to_core'][i],
+                                          tinfo['cpu_to_socket'][i],
+                                          tinfo['cpu_to_node'][i])
         except:
             str='none\n'
         return str[:-1];
 
+    def format_numa_info(self, ninfo):
+        try:
+            nr_nodes=ninfo['max_node_index']
+            str='\nnode: TotalMemory FreeMemory dma32Memory NodeDist:'
+            for i in range(0, nr_nodes):
+                str+='%4d ' % i
+            str+='\n'
+            for i in range(0, nr_nodes):
+                str+='%4d:  %8dMB %8dMB  %8dMB         :' % (i, 
+                                      ninfo['node_memsize'][i],
+                                      ninfo['node_memfree'][i],
+                                      ninfo['node_to_dma32_mem'][i])
+                for j in range(0, nr_nodes):
+                    str+='%4d ' % ninfo['node_to_node_dist'][(i*nr_nodes)+j]
+                str+='\n'
+        except:
+            str='none\n'
+        return str[:-1];
 
     def physinfo(self):
         info = self.xc.physinfo()
+        tinfo = self.xc.topologyinfo()
+        ninfo = self.xc.numainfo()
 
         info['cpu_mhz'] = info['cpu_khz'] / 1000
         
         # physinfo is in KiB, need it in MiB
         info['total_memory'] = info['total_memory'] / 1024
         info['free_memory']  = info['free_memory'] / 1024
-        info['node_to_cpu']  = self.format_node_to_cpu(info)
-        info['node_to_memory'] = \
-            self.format_node_to_memory(info, 'node_to_memory')
-        info['node_to_dma32_mem'] = \
-            self.format_node_to_memory(info, 'node_to_dma32_mem')
+
+        info['cpu_topology']  = \
+             self.format_cpu_to_core_socket_node(tinfo)
+
+        info['numa_info']  = \
+             self.format_numa_info(ninfo)
 
         ITEM_ORDER = ['nr_cpus',
                       'nr_nodes',
                       'cores_per_socket',
                       'threads_per_core',
+                      'sockets_per_node',
                       'cpu_mhz',
                       'hw_caps',
                       'virt_caps',
                       'total_memory',
                       'free_memory',
-                      'node_to_cpu',
-                      'node_to_memory',
-                      'node_to_dma32_mem',
-                      'max_node_id'
+                      'cpu_topology',
+                      'numa_info',
                       ]
 
         return [[k, info[k]] for k in ITEM_ORDER]
-
 
     def pciinfo(self):
         from xen.xend.server.pciif import get_all_assigned_pci_devices

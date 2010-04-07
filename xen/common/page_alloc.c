@@ -1256,6 +1256,12 @@ unsigned long avail_domheap_pages(void)
                             -1);
 }
 
+unsigned long avail_node_heap_pages(unsigned int nodeid)
+{
+    return avail_heap_pages(MEMZONE_XEN, NR_ZONES -1, nodeid);
+}
+
+
 static void pagealloc_info(unsigned char key)
 {
     unsigned int zone = MEMZONE_XEN;

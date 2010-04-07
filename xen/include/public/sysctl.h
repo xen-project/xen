@@ -34,7 +34,7 @@
 #include "xen.h"
 #include "domctl.h"
 
-#define XEN_SYSCTL_INTERFACE_VERSION 0x00000007
+#define XEN_SYSCTL_INTERFACE_VERSION 0x00000008
 
 /*
  * Read console content from Xen buffer ring.
@@ -93,29 +93,14 @@ DEFINE_XEN_GUEST_HANDLE(xen_sysctl_tbuf_op_t);
 struct xen_sysctl_physinfo {
     uint32_t threads_per_core;
     uint32_t cores_per_socket;
+    uint32_t sockets_per_node;
     uint32_t nr_cpus;
-    uint32_t max_node_id;
+    uint32_t nr_nodes;
     uint32_t cpu_khz;
     uint64_aligned_t total_pages;
     uint64_aligned_t free_pages;
     uint64_aligned_t scrub_pages;
     uint32_t hw_cap[8];
-
-    /*
-     * IN: maximum addressable entry in the caller-provided cpu_to_node array.
-     * OUT: largest cpu identifier in the system.
-     * If OUT is greater than IN then the cpu_to_node array is truncated!
-     */
-    uint32_t max_cpu_id;
-    /*
-     * If not NULL, this array is filled with node identifier for each cpu.
-     * If a cpu has no node information (e.g., cpu not present) then the
-     * sentinel value ~0u is written.
-     * The size of this array is specified by the caller in @max_cpu_id.
-     * If the actual @max_cpu_id is smaller than the array then the trailing
-     * elements of the array will not be written by the sysctl.
-     */
-    XEN_GUEST_HANDLE_64(uint32) cpu_to_node;
 
     /* XEN_SYSCTL_PHYSCAP_??? */
     uint32_t capabilities;
@@ -491,6 +476,73 @@ struct xen_sysctl_lockprof_op {
 typedef struct xen_sysctl_lockprof_op xen_sysctl_lockprof_op_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_lockprof_op_t);
 
+#define XEN_SYSCTL_topologyinfo         16 
+struct xen_sysctl_topologyinfo {
+
+    /*
+     * IN: maximum addressable entry in the caller-provided cpu_to_core, 
+     * cpu_to_socket & cpu_to_node arrays.
+     * OUT: largest cpu identifier in the system.
+     * If OUT is greater than IN then the cpu_to_node array is truncated!
+     */
+    uint32_t max_cpu_index;
+
+    /*
+     * If not NULL, this array is filled with core/socket/node identifier for 
+     * each cpu.
+     * If a cpu has no core/socket/node information (e.g., cpu not present) 
+     * then the sentinel value ~0u is written.
+     * The size of this array is specified by the caller in @max_cpu_index.
+     * If the actual @max_cpu_index is smaller than the array then the trailing
+     * elements of the array will not be written by the sysctl.
+     */
+    XEN_GUEST_HANDLE_64(uint32) cpu_to_core;
+    XEN_GUEST_HANDLE_64(uint32) cpu_to_socket;
+    XEN_GUEST_HANDLE_64(uint32) cpu_to_node;  /* node_number */
+
+};
+typedef struct xen_sysctl_topologyinfo xen_sysctl_topologyinfo_t;
+DEFINE_XEN_GUEST_HANDLE(xen_sysctl_topologyinfo_t);
+
+#define XEN_SYSCTL_numainfo          17	
+struct xen_sysctl_numainfo {
+    /*
+     * IN: maximum addressable entry in the caller-provided node_numbers, 
+     * node_to_memsize & node_to_memfree arrays.
+     * OUT: largest possible node index for the system.
+     * If OUT is greater than IN then these arrays are truncated!
+     */
+    uint32_t max_node_index;
+
+    /* For node_to_memsize & node_to_memfree arrays, the 
+     * entry with same index corrosponds to the same node.
+     * If a entry has no node information (e.g., node not present) then the 
+     * sentinel value ~0u is written for_node_number, and value 0u is written 
+     * for node_to_memsize & node_to_memfree.
+     * The size of this array is specified by the caller in @max_node_index. 
+     * If the actual @max_node_index is smaller than the array then the 
+     * trailing elements of the array will not be written by the sysctl.
+     */
+    XEN_GUEST_HANDLE_64(uint64) node_to_memsize;
+    XEN_GUEST_HANDLE_64(uint64) node_to_memfree;
+
+
+    /* node_to_node_distance is array of size (nr_nodes * nr_nodes) listing
+     * memory access distances between nodes. i'th  entry in the array 
+     * specifies distance between node (i / nr_nodes) & node (i % nr_nodes)
+     * If a entry has no node distance information (e.g., node not present) 
+     * then the sentinel value ~0u is written.
+     * The size of this array is specified by the caller in 
+     * @max_node_distance_index. If the max_node_index*max_node_index is 
+     * smaller than the array then the trailing elements of the array will 
+     * not be written by the sysctl.
+     */
+    XEN_GUEST_HANDLE_64(uint32) node_to_node_distance;
+};
+typedef struct xen_sysctl_numainfo xen_sysctl_numainfo_t;
+DEFINE_XEN_GUEST_HANDLE(xen_sysctl_numainfo_t);
+
+
 struct xen_sysctl {
     uint32_t cmd;
     uint32_t interface_version; /* XEN_SYSCTL_INTERFACE_VERSION */
@@ -498,6 +550,8 @@ struct xen_sysctl {
         struct xen_sysctl_readconsole       readconsole;
         struct xen_sysctl_tbuf_op           tbuf_op;
         struct xen_sysctl_physinfo          physinfo;
+        struct xen_sysctl_topologyinfo      topologyinfo;
+        struct xen_sysctl_numainfo          numainfo;
         struct xen_sysctl_sched_id          sched_id;
         struct xen_sysctl_perfc_op          perfc_op;
         struct xen_sysctl_getdomaininfolist getdomaininfolist;

@@ -73,6 +73,7 @@ static inline __attribute__((pure)) int phys_to_nid(paddr_t addr)
 #define NODE_DATA(nid)		(&(node_data[nid]))
 
 #define node_start_pfn(nid)	(NODE_DATA(nid)->node_start_pfn)
+#define node_spanned_pages(nid)	(NODE_DATA(nid)->node_spanned_pages)
 #define node_end_pfn(nid)       (NODE_DATA(nid)->node_start_pfn + \
 				 NODE_DATA(nid)->node_spanned_pages)
 

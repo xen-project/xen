@@ -1151,105 +1151,178 @@ static PyObject *pyxc_pages_to_kib(XcObject *self, PyObject *args)
     return PyLong_FromUnsignedLong(pages_to_kib(pages));
 }
 
-
 static PyObject *pyxc_physinfo(XcObject *self)
 {
-#define MAX_CPU_ID 255
-    xc_physinfo_t info;
+    xc_physinfo_t pinfo;
     char cpu_cap[128], virt_caps[128], *p;
-    int i, j, max_cpu_id, nr_nodes = 0;
-    uint64_t free_heap;
-    PyObject *ret_obj, *node_to_cpu_obj, *node_to_memory_obj;
-    PyObject *node_to_dma32_mem_obj;
-    xc_cpu_to_node_t map[MAX_CPU_ID + 1];
+    int i;
     const char *virtcap_names[] = { "hvm", "hvm_directio" };
 
-    set_xen_guest_handle(info.cpu_to_node, map);
-    info.max_cpu_id = MAX_CPU_ID;
-
-    if ( xc_physinfo(self->xc_handle, &info) != 0 )
+    if ( xc_physinfo(self->xc_handle, &pinfo) != 0 )
         return pyxc_error_to_exception();
 
     p = cpu_cap;
     *p = '\0';
-    for ( i = 0; i < sizeof(info.hw_cap)/4; i++ )
-        p += sprintf(p, "%08x:", info.hw_cap[i]);
+    for ( i = 0; i < sizeof(pinfo.hw_cap)/4; i++ )
+        p += sprintf(p, "%08x:", pinfo.hw_cap[i]);
     *(p-1) = 0;
 
     p = virt_caps;
     *p = '\0';
     for ( i = 0; i < 2; i++ )
-        if ( (info.capabilities >> i) & 1 )
+        if ( (pinfo.capabilities >> i) & 1 )
           p += sprintf(p, "%s ", virtcap_names[i]);
     if ( p != virt_caps )
       *(p-1) = '\0';
 
-    max_cpu_id = info.max_cpu_id;
-    if ( max_cpu_id > MAX_CPU_ID )
-        max_cpu_id = MAX_CPU_ID;
+    return Py_BuildValue("{s:i,s:i,s:i,s:i,s:i,s:l,s:l,s:l,s:i,s:s,s:s}",
+                            "nr_nodes",         pinfo.nr_nodes,
+                            "threads_per_core", pinfo.threads_per_core,
+                            "cores_per_socket", pinfo.cores_per_socket,
+                            "sockets_per_node", pinfo.sockets_per_node,
+                            "nr_cpus",          pinfo.nr_cpus, 
+                            "total_memory",     pages_to_kib(pinfo.total_pages),
+                            "free_memory",      pages_to_kib(pinfo.free_pages),
+                            "scrub_memory",     pages_to_kib(pinfo.scrub_pages),
+                            "cpu_khz",          pinfo.cpu_khz,
+                            "hw_caps",          cpu_cap,
+                            "virt_caps",        virt_caps);
+}
 
-    /* Construct node-to-* lists. */
-    node_to_cpu_obj = PyList_New(0);
-    node_to_memory_obj = PyList_New(0);
-    node_to_dma32_mem_obj = PyList_New(0);
-    for ( i = 0; i <= info.max_node_id; i++ )
+static PyObject *pyxc_topologyinfo(XcObject *self)
+{
+#define MAX_CPU_INDEX 255
+    xc_topologyinfo_t tinfo;
+    int i, max_cpu_index;
+    PyObject *ret_obj;
+    PyObject *cpu_to_core_obj, *cpu_to_socket_obj, *cpu_to_node_obj;
+    xc_cpu_to_core_t coremap[MAX_CPU_INDEX + 1];
+    xc_cpu_to_socket_t socketmap[MAX_CPU_INDEX + 1];
+    xc_cpu_to_node_t nodemap[MAX_CPU_INDEX + 1];
+
+
+    set_xen_guest_handle(tinfo.cpu_to_core, coremap);
+    set_xen_guest_handle(tinfo.cpu_to_socket, socketmap);
+    set_xen_guest_handle(tinfo.cpu_to_node, nodemap);
+    tinfo.max_cpu_index = MAX_CPU_INDEX;
+
+    if ( xc_topologyinfo(self->xc_handle, &tinfo) != 0 )
+        return pyxc_error_to_exception();
+
+    max_cpu_index = tinfo.max_cpu_index;
+    if ( max_cpu_index > MAX_CPU_INDEX )
+        max_cpu_index = MAX_CPU_INDEX;
+
+    /* Construct cpu-to-* lists. */
+    cpu_to_core_obj = PyList_New(0);
+    cpu_to_socket_obj = PyList_New(0);
+    cpu_to_node_obj = PyList_New(0);
+    for ( i = 0; i < max_cpu_index; i++ )
     {
-        int node_exists = 0;
         PyObject *pyint;
 
-        /* CPUs. */
-        PyObject *cpus = PyList_New(0);
-        for ( j = 0; j <= max_cpu_id; j++ )
-        {
-            if ( i != map[j] )
-                continue;
-            pyint = PyInt_FromLong(j);
-            PyList_Append(cpus, pyint);
-            Py_DECREF(pyint);
-            node_exists = 1;
-        }
-        PyList_Append(node_to_cpu_obj, cpus); 
-        Py_DECREF(cpus);
+        pyint = PyInt_FromLong(coremap[i]);
+        PyList_Append(cpu_to_core_obj, pyint);
+        Py_DECREF(pyint);
 
-        /* Memory. */
-        xc_availheap(self->xc_handle, 0, 0, i, &free_heap);
-        node_exists = node_exists || (free_heap != 0);
-        pyint = PyInt_FromLong(free_heap / 1024);
-        PyList_Append(node_to_memory_obj, pyint);
+        pyint = PyInt_FromLong(socketmap[i]);
+        PyList_Append(cpu_to_socket_obj, pyint);
+        Py_DECREF(pyint);
+
+        pyint = PyInt_FromLong(nodemap[i]);
+        PyList_Append(cpu_to_node_obj, pyint);
+        Py_DECREF(pyint);
+    }
+
+    ret_obj = Py_BuildValue("{s:i}", "max_cpu_index", max_cpu_index);
+
+    PyDict_SetItemString(ret_obj, "cpu_to_core", cpu_to_core_obj);
+    Py_DECREF(cpu_to_core_obj);
+
+    PyDict_SetItemString(ret_obj, "cpu_to_socket", cpu_to_socket_obj);
+    Py_DECREF(cpu_to_socket_obj);
+ 
+    PyDict_SetItemString(ret_obj, "cpu_to_node", cpu_to_node_obj);
+    Py_DECREF(cpu_to_node_obj);
+ 
+    return ret_obj;
+#undef MAX_CPU_INDEX
+}
+
+static PyObject *pyxc_numainfo(XcObject *self)
+{
+#define MAX_NODE_INDEX 31
+    xc_numainfo_t ninfo;
+    int i, j, max_node_index;
+    uint64_t free_heap;
+    PyObject *ret_obj;
+    PyObject *node_to_memsize_obj, *node_to_memfree_obj;
+    PyObject *node_to_dma32_mem_obj, *node_to_node_dist_obj;
+    xc_node_to_memsize_t node_memsize[MAX_NODE_INDEX + 1];
+    xc_node_to_memfree_t node_memfree[MAX_NODE_INDEX + 1];
+    xc_node_to_node_dist_t nodes_dist[(MAX_NODE_INDEX * MAX_NODE_INDEX) + 1];
+
+    set_xen_guest_handle(ninfo.node_to_memsize, node_memsize);
+    set_xen_guest_handle(ninfo.node_to_memfree, node_memfree);
+    set_xen_guest_handle(ninfo.node_to_node_distance, nodes_dist);
+    ninfo.max_node_index = MAX_NODE_INDEX;
+    if( xc_numainfo(self->xc_handle, &ninfo) != 0 )
+        return pyxc_error_to_exception();
+
+    max_node_index = ninfo.max_node_index;
+    if ( max_node_index > MAX_NODE_INDEX )
+        max_node_index = MAX_NODE_INDEX;
+
+    /* Construct node-to-* lists. */
+    node_to_memsize_obj = PyList_New(0);
+    node_to_memfree_obj = PyList_New(0);
+    node_to_dma32_mem_obj = PyList_New(0);
+    node_to_node_dist_obj = PyList_New(0);
+    for ( i = 0; i < max_node_index; i++ )
+    {
+        PyObject *pyint;
+
+        /* Total Memory */
+        pyint = PyInt_FromLong(node_memsize[i] >> 20); /* MB */
+        PyList_Append(node_to_memsize_obj, pyint);
+        Py_DECREF(pyint);
+
+        /* Free Memory */
+        pyint = PyInt_FromLong(node_memfree[i] >> 20); /* MB */
+        PyList_Append(node_to_memfree_obj, pyint);
         Py_DECREF(pyint);
 
         /* DMA memory. */
         xc_availheap(self->xc_handle, 0, 32, i, &free_heap);
-        pyint = PyInt_FromLong(free_heap / 1024);
+        pyint = PyInt_FromLong(free_heap >> 20); /* MB */
         PyList_Append(node_to_dma32_mem_obj, pyint);
         Py_DECREF(pyint);
 
-        if ( node_exists )
-            nr_nodes++;
+        /* Node to Node Distance */
+        for ( j = 0; j < ninfo.max_node_index; j++ )
+        {
+            pyint = PyInt_FromLong(nodes_dist[(i * ninfo.max_node_index) + j]);
+            PyList_Append(node_to_node_dist_obj, pyint);
+            Py_DECREF(pyint);
+        }
     }
 
-    ret_obj = Py_BuildValue("{s:i,s:i,s:i,s:i,s:i,s:i,s:l,s:l,s:l,s:i,s:s:s:s}",
-                            "nr_nodes",         nr_nodes,
-                            "max_node_id",      info.max_node_id,
-                            "max_cpu_id",       info.max_cpu_id,
-                            "threads_per_core", info.threads_per_core,
-                            "cores_per_socket", info.cores_per_socket,
-                            "nr_cpus",          info.nr_cpus, 
-                            "total_memory",     pages_to_kib(info.total_pages),
-                            "free_memory",      pages_to_kib(info.free_pages),
-                            "scrub_memory",     pages_to_kib(info.scrub_pages),
-                            "cpu_khz",          info.cpu_khz,
-                            "hw_caps",          cpu_cap,
-                            "virt_caps",        virt_caps);
-    PyDict_SetItemString(ret_obj, "node_to_cpu", node_to_cpu_obj);
-    Py_DECREF(node_to_cpu_obj);
-    PyDict_SetItemString(ret_obj, "node_to_memory", node_to_memory_obj);
-    Py_DECREF(node_to_memory_obj);
+    ret_obj = Py_BuildValue("{s:i}", "max_node_index", max_node_index);
+
+    PyDict_SetItemString(ret_obj, "node_memsize", node_to_memsize_obj);
+    Py_DECREF(node_to_memsize_obj);
+
+    PyDict_SetItemString(ret_obj, "node_memfree", node_to_memfree_obj);
+    Py_DECREF(node_to_memfree_obj);
+
     PyDict_SetItemString(ret_obj, "node_to_dma32_mem", node_to_dma32_mem_obj);
     Py_DECREF(node_to_dma32_mem_obj);
+
+    PyDict_SetItemString(ret_obj, "node_to_node_dist", node_to_node_dist_obj);
+    Py_DECREF(node_to_node_dist_obj);
  
     return ret_obj;
-#undef MAX_CPU_ID
+#undef MAX_NODE_INDEX
 }
 
 static PyObject *pyxc_xeninfo(XcObject *self)
@@ -2056,6 +2129,20 @@ static PyMethodDef pyxc_methods[] = {
       METH_NOARGS, "\n"
       "Get information about the physical host machine\n"
       "Returns [dict]: information about the hardware"
+      "        [None]: on failure.\n" },
+
+    { "topologyinfo",
+      (PyCFunction)pyxc_topologyinfo,
+      METH_NOARGS, "\n"
+      "Get information about the cpu topology on the host machine\n"
+      "Returns [dict]: information about the cpu topology on host"
+      "        [None]: on failure.\n" },
+
+    { "numainfo",
+      (PyCFunction)pyxc_numainfo,
+      METH_NOARGS, "\n"
+      "Get NUMA information on the host machine\n"
+      "Returns [dict]: NUMA information on host"
       "        [None]: on failure.\n" },
 
     { "xeninfo",
