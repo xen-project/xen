@@ -1715,7 +1715,7 @@ int p2m_init(struct domain *d)
     p2m->get_entry_current = p2m_gfn_to_mfn_current;
     p2m->change_entry_type_global = p2m_change_type_global;
 
-    if ( is_hvm_domain(d) && paging_mode_hap(d) &&
+    if ( is_hvm_domain(d) && d->arch.hvm_domain.hap_enabled &&
          (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL) )
         ept_p2m_init(d);
 
