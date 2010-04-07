@@ -378,7 +378,8 @@ close_pcifront:
     snprintf(path, sizeof(path), "%s/event-channel", nodename);
     xenbus_rm(XBT_NIL, path);
 
-    free_pcifront(dev);
+    if (!err)
+        free_pcifront(dev);
 }
 
 int pcifront_physical_to_virtual (struct pcifront_dev *dev,

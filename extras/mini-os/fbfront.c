@@ -288,7 +288,8 @@ close_kbdfront:
     snprintf(path, sizeof(path), "%s/request-abs-pointer", nodename);
     xenbus_rm(XBT_NIL, path);
 
-    free_kbdfront(dev);
+    if (!err)
+        free_kbdfront(dev);
 }
 
 #ifdef HAVE_LIBC
@@ -681,7 +682,8 @@ close_fbfront:
     snprintf(path, sizeof(path), "%s/feature-update", nodename);
     xenbus_rm(XBT_NIL, path);
 
-    free_fbfront(dev);
+    if (!err)
+        free_fbfront(dev);
 }
 
 #ifdef HAVE_LIBC

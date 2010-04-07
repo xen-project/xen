@@ -574,7 +574,8 @@ close:
     snprintf(path, sizeof(path), "%s/request-rx-copy", nodename);
     xenbus_rm(XBT_NIL, path);
 
-    free_netfront(dev);
+    if (!err)
+        free_netfront(dev);
 }
 
 

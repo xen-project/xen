@@ -313,7 +313,8 @@ close:
     snprintf(path, sizeof(path), "%s/event-channel", nodename);
     xenbus_rm(XBT_NIL, path);
 
-    free_blkfront(dev);
+    if (!err)
+        free_blkfront(dev);
 }
 
 static void blkfront_wait_slot(struct blkfront_dev *dev)
