@@ -154,8 +154,10 @@ char *xenbus_switch_state(xenbus_transaction_t xbt, const char* path, XenbusStat
         msg = xenbus_write(xbt, path, value);
 
 exit:
-        if (xbt_flag)
+        if (xbt_flag) {
             msg2 = xenbus_transaction_end(xbt, 0, &retry);
+            xbt = XBT_NIL;
+        }
         if (msg == NULL && msg2 != NULL)
             msg = msg2;
     } while (retry);
