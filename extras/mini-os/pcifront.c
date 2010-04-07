@@ -354,7 +354,7 @@ void shutdown_pcifront(struct pcifront_dev *dev)
         goto close_pcifront;
     }
     state = xenbus_read_integer(path);
-    if (state < XenbusStateClosed) {
+    while (state < XenbusStateClosed) {
         err = xenbus_wait_for_state_change(path, &state, &dev->events);
         free(err);
     }

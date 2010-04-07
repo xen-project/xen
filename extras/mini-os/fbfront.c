@@ -262,7 +262,7 @@ void shutdown_kbdfront(struct kbdfront_dev *dev)
         goto close_kbdfront;
     }
     state = xenbus_read_integer(path);
-    if (state < XenbusStateClosed) {
+    while (state < XenbusStateClosed) {
         err = xenbus_wait_for_state_change(path, &state, &dev->events);
         if (err) free(err);
     }
@@ -272,8 +272,10 @@ void shutdown_kbdfront(struct kbdfront_dev *dev)
                 XenbusStateInitialising, err);
         goto close_kbdfront;
     }
-    // does not work yet.
-    //xenbus_wait_for_value(path, "2", &dev->events);
+    err = NULL;
+    state = xenbus_read_integer(path);
+    while (err == NULL && (state < XenbusStateInitWait || state >= XenbusStateClosed))
+    err = xenbus_wait_for_state_change(path, &state, &dev->events);
 
 close_kbdfront:
     if (err) free(err);
@@ -660,8 +662,11 @@ void shutdown_fbfront(struct fbfront_dev *dev)
                 XenbusStateInitialising, err);
         goto close_fbfront;
     }
-    // does not work yet
-    //xenbus_wait_for_value(path, "2", &dev->events);
+
+    err = NULL;
+    state = xenbus_read_integer(path);
+    while (err == NULL && (state < XenbusStateInitWait || state >= XenbusStateClosed))
+        err = xenbus_wait_for_state_change(path, &state, &dev->events);
 
 close_fbfront:
     if (err) free(err);
