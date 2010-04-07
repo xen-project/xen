@@ -997,17 +997,13 @@ static int __devinit do_boot_cpu(int apicid, int cpu)
 	return boot_error;
 }
 
-static void idle_task_exit(void)
-{
-	/* Give up lazy state borrowed by this idle vcpu */
-	__sync_lazy_execstate();
-}
-
 void cpu_exit_clear(void)
 {
 	int cpu = raw_smp_processor_id();
 
-	idle_task_exit();
+	/* Previous non-idle state should be synchronised already. */
+	if (__sync_lazy_execstate())
+		BUG();
 
 	cpucount --;
 	cpu_uninit();
@@ -1301,6 +1297,13 @@ int __cpu_disable(void)
 	cpu_mcheck_disable();
 
 	remove_siblinginfo(cpu);
+
+	/*
+	 * If we are running the idle vcpu, sync last non-idle vcpu's state
+	 * before changing cpu_online_map. If we are running non-idle vcpu,
+	 * we will synchronously sync the state in context_switch() later.
+	 */
+	__sync_lazy_execstate();
 
 	/* It's now safe to remove this processor from the online map */
 	cpu_clear(cpu, cpu_online_map);
