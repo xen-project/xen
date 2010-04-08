@@ -28,6 +28,7 @@
 #include <xen/sched.h>
 #include <xen/perfc.h>
 #include <xen/domain_page.h>
+#include <xen/iocap.h>
 #include <asm/page.h>
 #include <asm/current.h>
 #include <asm/shadow.h>
@@ -546,7 +547,8 @@ _sh_propagate(struct vcpu *v,
      * For HVM domains with direct access to MMIO areas, set the correct
      * caching attributes in the shadows to match what was asked for.
      */
-    if ( (level == 1) && is_hvm_domain(d) && has_arch_pdevs(d) &&
+    if ( (level == 1) && is_hvm_domain(d) &&
+         iomem_access_permitted(d, mfn_x(target_mfn), mfn_x(target_mfn) + 1) &&
          !is_xen_heap_mfn(mfn_x(target_mfn)) )
     {
         unsigned int type;

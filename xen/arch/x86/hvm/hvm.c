@@ -1126,7 +1126,7 @@ int hvm_set_cr0(unsigned long value)
         }
     }
 
-    if ( has_arch_pdevs(v->domain) )
+    if ( has_arch_mmios(v->domain) )
     {
         if ( (value & X86_CR0_CD) && !(value & X86_CR0_NW) )
         {

@@ -1228,7 +1228,7 @@ static void wbinvd_ipi(void *info)
 
 static void svm_wbinvd_intercept(void)
 {
-    if ( has_arch_pdevs(current->domain) )
+    if ( has_arch_mmios(current->domain) )
         on_each_cpu(wbinvd_ipi, NULL, 1);
 }
 

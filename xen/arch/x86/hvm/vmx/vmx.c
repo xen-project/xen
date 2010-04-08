@@ -2109,7 +2109,7 @@ static void wbinvd_ipi(void *info)
 
 static void vmx_wbinvd_intercept(void)
 {
-    if ( !has_arch_pdevs(current->domain) )
+    if ( !has_arch_mmios(current->domain) )
         return;
 
     if ( cpu_has_wbinvd_exiting )
