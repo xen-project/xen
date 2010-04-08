@@ -15,6 +15,7 @@
 #include <xen/sched.h>  /* struct domain */
 #include <xen/guest_access.h> /* copy_from_guest */
 #include <xen/hash.h> /* hash_long */
+#include <xen/domain_page.h> /* __map_domain_page */
 #include <public/tmem.h>
 #ifdef CONFIG_COMPAT
 #include <compat/tmem.h>
