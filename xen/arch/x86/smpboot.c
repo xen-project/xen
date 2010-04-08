@@ -1343,10 +1343,8 @@ int cpu_down(unsigned int cpu)
 	int err = 0;
 
 	/* spin_trylock() avoids deadlock with stop_machine_run(). */
-	if (!spin_trylock(&cpu_add_remove_lock)) {
-		err = -EBUSY;
-		goto out;
-	}
+	if (!spin_trylock(&cpu_add_remove_lock))
+		return -EBUSY;
 
 	if (num_online_cpus() == 1) {
 		err = -EBUSY;

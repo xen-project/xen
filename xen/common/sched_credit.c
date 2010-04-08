@@ -428,7 +428,7 @@ _csched_cpu_pick(struct vcpu *vc, bool_t commit)
      * like run two VCPUs on co-hyperthreads while there are idle cores
      * or sockets.
      */
-    idlers = csched_priv.idlers;
+    cpus_and(idlers, cpu_online_map, csched_priv.idlers);
     cpu_set(cpu, idlers);
     cpus_and(cpus, cpus, idlers);
     cpu_clear(cpu, cpus);
