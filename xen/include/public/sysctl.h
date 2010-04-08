@@ -94,8 +94,8 @@ struct xen_sysctl_physinfo {
     uint32_t threads_per_core;
     uint32_t cores_per_socket;
     uint32_t sockets_per_node;
-    uint32_t nr_cpus;
-    uint32_t nr_nodes;
+    uint32_t nr_cpus, max_cpu_id;
+    uint32_t nr_nodes, max_node_id;
     uint32_t cpu_khz;
     uint64_aligned_t total_pages;
     uint64_aligned_t free_pages;
