@@ -247,6 +247,7 @@ int xc_get_cpufreq_para(int xc_handle, int cpuid,
         user_para->scaling_cur_freq = sys_para->scaling_cur_freq;
         user_para->scaling_max_freq = sys_para->scaling_max_freq;
         user_para->scaling_min_freq = sys_para->scaling_min_freq;
+        user_para->turbo_enabled    = sys_para->turbo_enabled;
 
         memcpy(user_para->scaling_driver, 
                 sys_para->scaling_driver, CPUFREQ_NAME_LEN);

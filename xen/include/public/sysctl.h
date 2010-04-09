@@ -283,7 +283,6 @@ struct xen_ondemand {
 
     uint32_t sampling_rate;
     uint32_t up_threshold;
-    uint32_t turbo_enabled;
 };
 typedef struct xen_ondemand xen_ondemand_t;
 
@@ -319,6 +318,8 @@ struct xen_get_cpufreq_para {
         struct  xen_userspace userspace;
         struct  xen_ondemand ondemand;
     } u;
+
+    int32_t turbo_enabled;
 };
 
 struct xen_set_cpufreq_gov {

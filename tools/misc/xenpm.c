@@ -30,6 +30,10 @@
 
 #define ARRAY_SIZE(a) (sizeof (a) / sizeof ((a)[0]))
 
+#define CPUFREQ_TURBO_DISABLED      -1
+#define CPUFREQ_TURBO_UNSUPPORTED   0
+#define CPUFREQ_TURBO_ENABLED       1
+
 static int xc_fd;
 static int max_cpu_nr;
 
@@ -62,8 +66,8 @@ void show_help(void)
             " set-max-cstate        <num>         set the C-State limitation (<num> >= 0)\n"
             " start [seconds]                     start collect Cx/Px statistics,\n"
             "                                     output after CTRL-C or SIGINT or several seconds.\n"
-            " enable-turbo-mode     [cpuid]       enable Turbo Mode in DBS governor.\n"
-            " disable-turbo-mode    [cpuid]       disable Turbo Mode in DBS governor.\n"
+            " enable-turbo-mode     [cpuid]       enable Turbo Mode for processors that support it.\n"
+            " disable-turbo-mode    [cpuid]       disable Turbo Mode for processors that support it.\n"
             );
 }
 /* wrapper function */
@@ -529,8 +533,6 @@ static void print_cpufreq_para(int cpuid, struct xc_get_cpufreq_para *p_cpufreq)
                p_cpufreq->u.ondemand.sampling_rate);
         printf("    up_threshold     : %u\n",
                p_cpufreq->u.ondemand.up_threshold);
-        printf("    turbo mode       : %s\n",
-               p_cpufreq->u.ondemand.turbo_enabled ? "enabled" : "disabled");
     }
 
     printf("scaling_avail_freq   :");
@@ -546,6 +548,13 @@ static void print_cpufreq_para(int cpuid, struct xc_get_cpufreq_para *p_cpufreq)
            p_cpufreq->scaling_max_freq,
            p_cpufreq->scaling_min_freq,
            p_cpufreq->scaling_cur_freq);
+    if (p_cpufreq->turbo_enabled != CPUFREQ_TURBO_UNSUPPORTED) {
+           printf("turbo mode           : ");
+           if (p_cpufreq->turbo_enabled == CPUFREQ_TURBO_ENABLED)
+               printf("enabled\n");
+           else
+               printf("disabled\n");
+    }
     printf("\n");
 }
 
@@ -561,6 +570,7 @@ static int show_cpufreq_para_by_cpuid(int xc_fd, int cpuid)
     p_cpufreq->affected_cpus = NULL;
     p_cpufreq->scaling_available_frequencies = NULL;
     p_cpufreq->scaling_available_governors = NULL;
+    p_cpufreq->turbo_enabled = 0;
 
     do
     {

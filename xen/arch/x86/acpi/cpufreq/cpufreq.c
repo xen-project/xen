@@ -410,6 +410,10 @@ static int acpi_cpufreq_target(struct cpufreq_policy *policy,
         return -ENODEV;
     }
 
+    if (policy->turbo == CPUFREQ_TURBO_DISABLED)
+        if (target_freq > policy->cpuinfo.second_max_freq)
+            target_freq = policy->cpuinfo.second_max_freq;
+
     perf = data->acpi_data;
     result = cpufreq_frequency_table_target(policy,
                                             data->freq_table,
@@ -610,12 +614,19 @@ acpi_cpufreq_cpu_init(struct cpufreq_policy *policy)
         break;
     }
 
-    /* Check for APERF/MPERF support in hardware */
+    /* Check for APERF/MPERF support in hardware
+     * also check for boost support */
     if (c->x86_vendor == X86_VENDOR_INTEL && c->cpuid_level >= 6) {
         unsigned int ecx;
+        unsigned int eax;
         ecx = cpuid_ecx(6);
         if (ecx & CPUID_6_ECX_APERFMPERF_CAPABILITY)
             acpi_cpufreq_driver.getavg = get_measured_perf;
+        eax = cpuid_eax(6);
+        if ( eax & 0x2 ) {
+            policy->turbo = CPUFREQ_TURBO_ENABLED;
+            printk(XENLOG_INFO "Turbo Mode detected and enabled!\n");
+        }
     }
 
     /*

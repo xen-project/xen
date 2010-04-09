@@ -1292,6 +1292,8 @@ struct xc_get_cpufreq_para {
         xc_userspace_t userspace;
         xc_ondemand_t ondemand;
     } u;
+
+    int32_t turbo_enabled;
 };
 
 int xc_get_cpufreq_para(int xc_handle, int cpuid,

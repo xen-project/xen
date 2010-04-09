@@ -55,6 +55,9 @@ struct cpufreq_policy {
 
     unsigned int        resume; /* flag for cpufreq 1st run
                                  * S3 wakeup, hotplug cpu, etc */
+    int                 turbo;  /* tristate flag: 0 for unsupported
+                                 * -1 for disable, 1 for enabled
+                                 * See CPUFREQ_TURBO_* below for defines */
 };
 extern struct cpufreq_policy *cpufreq_cpu_policy[NR_CPUS];
 
@@ -113,6 +116,14 @@ extern int __cpufreq_driver_target(struct cpufreq_policy *policy,
 #define GOV_GETAVG     1
 #define USR_GETAVG     2
 extern int cpufreq_driver_getavg(unsigned int cpu, unsigned int flag);
+
+#define CPUFREQ_TURBO_DISABLED      -1
+#define CPUFREQ_TURBO_UNSUPPORTED   0
+#define CPUFREQ_TURBO_ENABLED       1
+
+extern void cpufreq_enable_turbo(int cpuid);
+extern void cpufreq_disable_turbo(int cpuid);
+extern int cpufreq_get_turbo_status(int cpuid);
 
 static __inline__ int 
 __cpufreq_governor(struct cpufreq_policy *policy, unsigned int event)
@@ -241,7 +252,4 @@ int write_userspace_scaling_setspeed(unsigned int cpu, unsigned int freq);
 void cpufreq_dbs_timer_suspend(void);
 void cpufreq_dbs_timer_resume(void);
 
-void cpufreq_dbs_enable_turbo(int cpuid);
-void cpufreq_dbs_disable_turbo(int cpuid);
-unsigned int cpufreq_dbs_get_turbo_status(int cpuid);
 #endif /* __XEN_CPUFREQ_PM_H__ */

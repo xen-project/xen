@@ -58,9 +58,6 @@ static struct dbs_tuners {
 
 static struct timer dbs_timer[NR_CPUS];
 
-/* Turbo Mode */
-static int turbo_detected = 0;
-
 int write_ondemand_sampling_rate(unsigned int sampling_rate)
 {
     if ( (sampling_rate > MAX_SAMPLING_RATE / MICROSECS(1)) ||
@@ -111,10 +108,6 @@ static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
 
     policy = this_dbs_info->cur_policy;
     max = policy->max;
-    if (turbo_detected && !this_dbs_info->turbo_enabled) {
-        if (max > policy->cpuinfo.second_max_freq)
-            max = policy->cpuinfo.second_max_freq;
-    }
 
     if (unlikely(policy->resume)) {
         __cpufreq_driver_target(policy, max,CPUFREQ_RELATION_H);
@@ -276,7 +269,6 @@ int cpufreq_governor_dbs(struct cpufreq_policy *policy, unsigned int event)
             } else
                 dbs_tuners_ins.sampling_rate = usr_sampling_rate;
         }
-        this_dbs_info->turbo_enabled = 1;
         dbs_timer_init(this_dbs_info);
 
         break;
@@ -353,13 +345,6 @@ struct cpufreq_governor cpufreq_gov_dbs = {
 
 static int __init cpufreq_gov_dbs_init(void)
 {
-#ifdef CONFIG_X86
-    unsigned int eax = cpuid_eax(6);
-    if ( eax & 0x2 ) {
-        turbo_detected = 1;
-        printk(XENLOG_INFO "Turbo Mode detected!\n");
-    }
-#endif
     return cpufreq_register_governor(&cpufreq_gov_dbs);
 }
 __initcall(cpufreq_gov_dbs_init);
@@ -404,19 +389,3 @@ void cpufreq_dbs_timer_resume(void)
         }
     }
 }
-
-void cpufreq_dbs_enable_turbo(int cpuid)
-{
-    per_cpu(cpu_dbs_info, cpuid).turbo_enabled = 1;
-}
-
-void cpufreq_dbs_disable_turbo(int cpuid)
-{
-    per_cpu(cpu_dbs_info, cpuid).turbo_enabled = 0;
-}
-
-unsigned int cpufreq_dbs_get_turbo_status(int cpuid)
-{
-    return turbo_detected && per_cpu(cpu_dbs_info, cpuid).turbo_enabled;
-}
-
