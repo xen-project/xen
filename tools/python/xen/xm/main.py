@@ -1458,6 +1458,8 @@ def xm_vcpu_pin(args):
     def cpu_make_map(cpulist):
         cpus = []
         for c in cpulist.split(','):
+            if c == '':
+                continue
             if c.find('-') != -1:
                 (x,y) = c.split('-')
                 for i in range(int(x),int(y)+1):
