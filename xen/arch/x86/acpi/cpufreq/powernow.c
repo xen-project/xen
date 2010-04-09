@@ -38,6 +38,7 @@
 #include <acpi/acpi.h>
 #include <acpi/cpufreq/cpufreq.h>
 
+#define CPUID_6_ECX_APERFMPERF_CAPABILITY       (0x1)
 #define CPUID_FREQ_VOLT_CAPABILITIES    0x80000007
 #define CPB_CAPABLE             0x00000200
 #define USE_HW_PSTATE           0x00000080
@@ -60,6 +61,8 @@ struct powernow_cpufreq_data {
 };
 
 static struct powernow_cpufreq_data *drv_data[NR_CPUS];
+
+static struct cpufreq_driver powernow_cpufreq_driver;
 
 struct drv_cmd {
     unsigned int type;
@@ -249,6 +252,10 @@ static int powernow_cpufreq_cpu_init(struct cpufreq_policy *policy)
 
     if (c->cpuid_level >= 6) {
         unsigned int edx;
+        unsigned int ecx;
+        ecx = cpuid_ecx(6);
+        if (ecx & CPUID_6_ECX_APERFMPERF_CAPABILITY)
+            powernow_cpufreq_driver.getavg = get_measured_perf;
         edx = cpuid_edx(CPUID_FREQ_VOLT_CAPABILITIES);
         if ((edx & CPB_CAPABLE) == CPB_CAPABLE) {
             policy->turbo = CPUFREQ_TURBO_ENABLED;

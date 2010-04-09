@@ -29,7 +29,6 @@ struct cpufreq_governor;
 struct acpi_cpufreq_data {
     struct processor_performance *acpi_data;
     struct cpufreq_frequency_table *freq_table;
-    unsigned int max_freq;
     unsigned int cpu_feature;
 };
 

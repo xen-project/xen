@@ -269,7 +269,7 @@ static void read_measured_perf_ctrs(void *_readin)
  * Only IA32_APERF/IA32_MPERF ratio is architecturally defined and
  * no meaning should be associated with absolute values of these MSRs.
  */
-static unsigned int get_measured_perf(unsigned int cpu, unsigned int flag)
+unsigned int get_measured_perf(unsigned int cpu, unsigned int flag)
 {
     struct cpufreq_policy *policy;    
     struct perf_pair readin, cur, *saved;
@@ -353,7 +353,7 @@ static unsigned int get_measured_perf(unsigned int cpu, unsigned int flag)
 
 #endif
 
-    retval = drv_data[policy->cpu]->max_freq * perf_percent / 100;
+    retval = policy->cpuinfo.max_freq * perf_percent / 100;
 
     return retval;
 }
@@ -582,7 +582,6 @@ acpi_cpufreq_cpu_init(struct cpufreq_policy *policy)
 
     policy->governor = cpufreq_opt_governor ? : CPUFREQ_DEFAULT_GOVERNOR;
 
-    data->max_freq = perf->states[0].core_frequency * 1000;
     /* table init */
     for (i=0; i<perf->state_count; i++) {
         if (i>0 && perf->states[i].core_frequency >=
