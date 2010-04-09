@@ -39,6 +39,7 @@
 #include <acpi/cpufreq/cpufreq.h>
 
 #define CPUID_FREQ_VOLT_CAPABILITIES    0x80000007
+#define CPB_CAPABLE             0x00000200
 #define USE_HW_PSTATE           0x00000080
 #define HW_PSTATE_MASK          0x00000007
 #define HW_PSTATE_VALID_MASK    0x80000000
@@ -48,6 +49,7 @@
 #define MSR_PSTATE_STATUS       0xc0010063 /* Pstate Status MSR */
 #define MSR_PSTATE_CTRL         0xc0010062 /* Pstate control MSR */
 #define MSR_PSTATE_CUR_LIMIT    0xc0010061 /* pstate current limit MSR */
+#define MSR_HWCR_CPBDIS_MASK    0x02000000
 
 struct powernow_cpufreq_data {
     struct processor_performance *acpi_data;
@@ -62,8 +64,8 @@ static struct powernow_cpufreq_data *drv_data[NR_CPUS];
 struct drv_cmd {
     unsigned int type;
     cpumask_t mask;
-    u64 addr;
     u32 val;
+    int turbo;
 };
 
 static void transition_pstate(void *drvcmd)
@@ -71,6 +73,15 @@ static void transition_pstate(void *drvcmd)
     struct drv_cmd *cmd;
     cmd = (struct drv_cmd *) drvcmd;
 
+    if (cmd->turbo != CPUFREQ_TURBO_UNSUPPORTED) {
+        u32 lo, hi;
+        rdmsr(MSR_K8_HWCR, lo, hi);
+        if (cmd->turbo == CPUFREQ_TURBO_ENABLED)
+            lo &= ~MSR_HWCR_CPBDIS_MASK;
+        else
+            lo |= MSR_HWCR_CPBDIS_MASK; 
+        wrmsr(MSR_K8_HWCR, lo, hi);
+    }
     wrmsr(MSR_PSTATE_CTRL, cmd->val, 0);
 }
 
@@ -121,6 +132,7 @@ static int powernow_cpufreq_target(struct cpufreq_policy *policy,
     freqs.new = data->freq_table[next_state].frequency;
 
     cmd.val = next_perf_state;
+    cmd.turbo = policy->turbo;
 
     on_selected_cpus(&cmd.mask, transition_pstate, &cmd, 0);
 
@@ -159,6 +171,7 @@ static int powernow_cpufreq_cpu_init(struct cpufreq_policy *policy)
     unsigned int result = 0;
     struct processor_performance *perf;
     u32 max_hw_pstate, hi = 0, lo = 0;
+    struct cpuinfo_x86 *c = &cpu_data[policy->cpu];
 
     data = xmalloc(struct powernow_cpufreq_data);
     if (!data)
@@ -234,6 +247,15 @@ static int powernow_cpufreq_cpu_init(struct cpufreq_policy *policy)
     if (result)
         goto err_freqfree;
 
+    if (c->cpuid_level >= 6) {
+        unsigned int edx;
+        edx = cpuid_edx(CPUID_FREQ_VOLT_CAPABILITIES);
+        if ((edx & CPB_CAPABLE) == CPB_CAPABLE) {
+            policy->turbo = CPUFREQ_TURBO_ENABLED;
+            printk(XENLOG_INFO "Core Boost/Turbo detected and enabled\n");
+        }
+    }
+      
     /*
      * the first call to ->target() should result in us actually
      * writing something to the appropriate registers.
