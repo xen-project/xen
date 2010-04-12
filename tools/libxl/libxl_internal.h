@@ -49,11 +49,6 @@
 #endif
   /* all of these macros preserve errno (saving and restoring) */
 
-#define XL_LOG_DEBUG 3
-#define XL_LOG_INFO 2
-#define XL_LOG_WARNING 1
-#define XL_LOG_ERROR 0
-
 /* logging */
 void xl_logv(struct libxl_ctx *ctx, int errnoval, int loglevel, const char *file, int line, const char *func, char *fmt, va_list al);
 void xl_log(struct libxl_ctx *ctx, int errnoval, int loglevel, const char *file, int line, const char *func, char *fmt, ...);

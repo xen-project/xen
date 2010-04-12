@@ -48,5 +48,16 @@ pid_t libxl_fork(struct libxl_ctx *ctx);
 int libxl_pipe(struct libxl_ctx *ctx, int pipes[2]);
   /* Just like fork(2), pipe(2), but log errors. */
 
+void libxl_report_child_exitstatus(struct libxl_ctx *ctx, int level,
+                                   const char *what, pid_t pid, int status);
+    /* treats all exit statuses as errors; if that's not what you want,
+     * check status yourself first */
+
+/* log levels: */
+#define XL_LOG_DEBUG 3
+#define XL_LOG_INFO 2
+#define XL_LOG_WARNING 1
+#define XL_LOG_ERROR 0
+
 #endif
 
