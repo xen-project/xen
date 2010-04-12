@@ -47,6 +47,7 @@
 #define XL_LOG_ERRNO(ctx, loglevel, _f, _a...)
 #define XL_LOG_ERRNOVAL(ctx, loglevel, errnoval, _f, _a...)
 #endif
+  /* all of these macros preserve errno (saving and restoring) */
 
 #define XL_LOG_DEBUG 3
 #define XL_LOG_INFO 2
@@ -56,6 +57,7 @@
 /* logging */
 void xl_logv(struct libxl_ctx *ctx, int errnoval, int loglevel, const char *file, int line, const char *func, char *fmt, va_list al);
 void xl_log(struct libxl_ctx *ctx, int errnoval, int loglevel, const char *file, int line, const char *func, char *fmt, ...);
+  /* these functions preserve errno (saving and restoring) */
 
 
 typedef enum {
