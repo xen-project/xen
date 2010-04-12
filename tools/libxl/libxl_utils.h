@@ -19,7 +19,7 @@
 #include "libxl.h"
 
 unsigned long libxl_get_required_shadow_memory(unsigned long maxmem_kb, unsigned int smp_cpus);
-int libxl_name_to_domid(struct libxl_ctx *ctx, char *name, uint32_t *domid);
+int libxl_name_to_domid(struct libxl_ctx *ctx, const char *name, uint32_t *domid);
 char *libxl_domid_to_name(struct libxl_ctx *ctx, uint32_t domid);
 int libxl_get_stubdom_id(struct libxl_ctx *ctx, int guest_domid);
 int libxl_is_stubdom(struct libxl_ctx *ctx, uint32_t domid, uint32_t *target_domid);

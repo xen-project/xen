@@ -55,7 +55,8 @@ char *libxl_domid_to_name(struct libxl_ctx *ctx, uint32_t domid)
     return s;
 }
 
-int libxl_name_to_domid(struct libxl_ctx *ctx, char *name, uint32_t *domid)
+int libxl_name_to_domid(struct libxl_ctx *ctx, const char *name,
+                        uint32_t *domid)
 {
     int i, nb_domains;
     char *domname;

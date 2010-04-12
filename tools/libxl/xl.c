@@ -37,7 +37,14 @@
 
 #define UUID_FMT "%02hhx%02hhx%02hhx%02hhx-%02hhx%02hhx-%02hhx%02hhx-%02hhx%02hhx-%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx"
 
-int logfile = 2;
+static int logfile = 2;
+
+/* every libxl action in xl uses this same libxl context */
+static struct libxl_ctx ctx;
+
+/* when we operate on a domain, it is this one: */
+static uint32_t domid;
+static const char *common_domname;
 
 void log_callback(void *userdata, int loglevel, const char *file, int line, const char *func, char *s)
 {
@@ -47,7 +54,8 @@ void log_callback(void *userdata, int loglevel, const char *file, int line, cons
     write(logfile, str, strlen(str));
 }
 
-static int domain_qualifier_to_domid(struct libxl_ctx *ctx, char *p, uint32_t *domid)
+static int domain_qualifier_to_domid(const char *p, uint32_t *domid_r,
+                                     int *was_name_r)
 {
     int i, alldigit;
 
@@ -60,12 +68,26 @@ static int domain_qualifier_to_domid(struct libxl_ctx *ctx, char *p, uint32_t *d
     }
 
     if (i > 0 && alldigit) {
-        *domid = strtoul(p, NULL, 10);
+        *domid_r = strtoul(p, NULL, 10);
+        if (was_name_r) *was_name_r = 0;
         return 0;
     } else {
         /* check here if it's a uuid and do proper conversion */
     }
-    return libxl_name_to_domid(ctx, p, domid);
+    if (was_name_r) *was_name_r = 1;
+    return libxl_name_to_domid(&ctx, p, domid_r);
+}
+
+static void find_domain(const char *p)
+{
+    int rc, was_name;
+
+    rc = domain_qualifier_to_domid(p, &domid, &was_name);
+    if (rc) {
+        fprintf(stderr, "%s is an invalid domain identifier (rc=%d)\n", p, rc);
+        exit(2);
+    }
+    common_domname = was_name ? p : 0;
 }
 
 #define LOG(_f, _a...)   dolog(__FILE__, __LINE__, __func__, _f "\n", ##_a)
@@ -681,8 +703,6 @@ skip_pci:
 
 static void create_domain(int debug, int daemonize, const char *config_file, const char *restore_file, int paused)
 {
-    struct libxl_ctx ctx;
-    uint32_t domid;
     libxl_domain_create_info info1;
     libxl_domain_build_info info2;
     libxl_domain_build_state state;
@@ -708,13 +728,6 @@ static void create_domain(int debug, int daemonize, const char *config_file, con
 
 start:
     domid = 0;
-
-    if (libxl_ctx_init(&ctx, LIBXL_VERSION)) {
-        fprintf(stderr, "cannot init xl context\n");
-        return;
-    }
-
-    libxl_ctx_set_log(&ctx, log_callback, NULL);
 
     ret = libxl_domain_make(&ctx, &info1, &domid);
     if (ret) {
@@ -834,7 +847,6 @@ start:
                             libxl_free_waiter(w2);
                             free(w1);
                             free(w2);
-                            libxl_ctx_free(&ctx);
                             LOG("Done. Rebooting now");
                             goto start;
                         }
@@ -954,21 +966,11 @@ static void help(char *command)
 
 void set_memory_target(char *p, char *mem)
 {
-    struct libxl_ctx ctx;
-    uint32_t domid;
-    uint32_t memorykb;
     char *endptr;
+    uint32_t memorykb;
 
-    if (libxl_ctx_init(&ctx, LIBXL_VERSION)) {
-        fprintf(stderr, "cannot init xl context\n");
-        return;
-    }
-    libxl_ctx_set_log(&ctx, log_callback, NULL);
+    find_domain(p);
 
-    if (domain_qualifier_to_domid(&ctx, p, &domid) < 0) {
-        fprintf(stderr, "%s is an invalid domain identifier\n", p);
-        exit(2);
-    }
     memorykb = strtoul(mem, &endptr, 10);
     if (*endptr != '\0') {
         fprintf(stderr, "invalid memory size: %s\n", mem);
@@ -1007,39 +1009,16 @@ int main_memset(int argc, char **argv)
 
 void console(char *p, int cons_num)
 {
-    struct libxl_ctx ctx;
-    uint32_t domid;
-
-    if (libxl_ctx_init(&ctx, LIBXL_VERSION)) {
-        fprintf(stderr, "cannot init xl context\n");
-        return;
-    }
-    libxl_ctx_set_log(&ctx, log_callback, NULL);
-
-    if (domain_qualifier_to_domid(&ctx, p, &domid) < 0) {
-        fprintf(stderr, "%s is an invalid domain identifier\n", p);
-        exit(2);
-    }
+    find_domain(p);
     libxl_console_attach(&ctx, domid, cons_num);
 }
 
 void cd_insert(char *dom, char *virtdev, char *phys)
 {
-    struct libxl_ctx ctx;
-    uint32_t domid;
     libxl_device_disk disk;
     char *p;
 
-    if (libxl_ctx_init(&ctx, LIBXL_VERSION)) {
-        fprintf(stderr, "cannot init xl context\n");
-        return;
-    }
-    libxl_ctx_set_log(&ctx, log_callback, NULL);
-
-    if (domain_qualifier_to_domid(&ctx, dom, &domid) < 0) {
-        fprintf(stderr, "%s is an invalid domain identifier\n", dom);
-        exit(2);
-    }
+    find_domain(dom);
 
     disk.backend_domid = 0;
     disk.domid = domid;
@@ -1161,21 +1140,11 @@ int main_console(int argc, char **argv)
 
 void pcilist(char *dom)
 {
-    struct libxl_ctx ctx;
-    uint32_t domid;
     libxl_device_pci *pcidevs;
     int num, i;
 
-    if (libxl_ctx_init(&ctx, LIBXL_VERSION)) {
-        fprintf(stderr, "cannot init xl context\n");
-        return;
-    }
-    libxl_ctx_set_log(&ctx, log_callback, NULL);
+    find_domain(dom);
 
-    if (domain_qualifier_to_domid(&ctx, dom, &domid) < 0) {
-        fprintf(stderr, "%s is an invalid domain identifier\n", dom);
-        exit(2);
-    }
     pcidevs = libxl_device_pci_list(&ctx, domid, &num);
     if (!num)
         return;
@@ -1214,21 +1183,11 @@ int main_pcilist(int argc, char **argv)
 
 void pcidetach(char *dom, char *bdf)
 {
-    struct libxl_ctx ctx;
-    uint32_t domid;
     libxl_device_pci pcidev;
     unsigned int domain, bus, dev, func;
 
-    if (libxl_ctx_init(&ctx, LIBXL_VERSION)) {
-        fprintf(stderr, "cannot init xl context\n");
-        return;
-    }
-    libxl_ctx_set_log(&ctx, log_callback, NULL);
+    find_domain(dom);
 
-    if (domain_qualifier_to_domid(&ctx, dom, &domid) < 0) {
-        fprintf(stderr, "%s is an invalid domain identifier\n", dom);
-        exit(2);
-    }
     memset(&pcidev, 0x00, sizeof(pcidev));
     sscanf(bdf, PCI_BDF, &domain, &bus, &dev, &func);
     libxl_device_pci_init(&pcidev, domain, bus, dev, func, 0);
@@ -1263,21 +1222,11 @@ int main_pcidetach(int argc, char **argv)
 }
 void pciattach(char *dom, char *bdf, char *vs)
 {
-    struct libxl_ctx ctx;
-    uint32_t domid;
     libxl_device_pci pcidev;
     unsigned int domain, bus, dev, func;
 
-    if (libxl_ctx_init(&ctx, LIBXL_VERSION)) {
-        fprintf(stderr, "cannot init xl context\n");
-        return;
-    }
-    libxl_ctx_set_log(&ctx, log_callback, NULL);
+    find_domain(dom);
 
-    if (domain_qualifier_to_domid(&ctx, dom, &domid) < 0) {
-        fprintf(stderr, "%s is an invalid domain identifier\n", dom);
-        exit(2);
-    }
     memset(&pcidev, 0x00, sizeof(pcidev));
     sscanf(bdf, PCI_BDF, &domain, &bus, &dev, &func);
     libxl_device_pci_init(&pcidev, domain, bus, dev, func, 0);
@@ -1316,69 +1265,26 @@ int main_pciattach(int argc, char **argv)
 
 void pause_domain(char *p)
 {
-    struct libxl_ctx ctx;
-    uint32_t domid;
-
-    if (libxl_ctx_init(&ctx, LIBXL_VERSION)) {
-        fprintf(stderr, "cannot init xl context\n");
-        return;
-    }
-    libxl_ctx_set_log(&ctx, log_callback, NULL);
-
-    if (domain_qualifier_to_domid(&ctx, p, &domid) < 0) {
-        fprintf(stderr, "%s is an invalid domain identifier\n", p);
-        exit(2);
-    }
+    find_domain(p);
     libxl_domain_pause(&ctx, domid);
 }
 
 void unpause_domain(char *p)
 {
-    struct libxl_ctx ctx;
-    uint32_t domid;
-
-    if (libxl_ctx_init(&ctx, LIBXL_VERSION)) {
-        fprintf(stderr, "cannot init xl context\n");
-        return;
-    }
-    libxl_ctx_set_log(&ctx, log_callback, NULL);
-
-    if (domain_qualifier_to_domid(&ctx, p, &domid) < 0) {
-        fprintf(stderr, "%s is an invalid domain identifier\n", p);
-        exit(2);
-    }
+    find_domain(p);
     libxl_domain_unpause(&ctx, domid);
 }
 
 void destroy_domain(char *p)
 {
-    struct libxl_ctx ctx;
-    uint32_t domid;
-
-    if (libxl_ctx_init(&ctx, LIBXL_VERSION)) {
-        fprintf(stderr, "cannot init xl context\n");
-        return;
-    }
-    libxl_ctx_set_log(&ctx, log_callback, NULL);
-
-    if (domain_qualifier_to_domid(&ctx, p, &domid) < 0) {
-        fprintf(stderr, "%s is an invalid domain identifier\n", p);
-        exit(2);
-    }
+    find_domain(p);
     libxl_domain_destroy(&ctx, domid, 0);
 }
 
 void list_domains(int verbose)
 {
-    struct libxl_ctx ctx;
     struct libxl_dominfo *info;
     int nb_domain, i;
-
-    if (libxl_ctx_init(&ctx, LIBXL_VERSION)) {
-        fprintf(stderr, "cannot init xl context\n");
-        return;
-    }
-    libxl_ctx_set_log(&ctx, log_callback, NULL);
 
     info = libxl_list_domain(&ctx, &nb_domain);
 
@@ -1408,15 +1314,8 @@ void list_domains(int verbose)
 
 void list_vm(void)
 {
-    struct libxl_ctx ctx;
     struct libxl_vminfo *info;
     int nb_vm, i;
-
-    if (libxl_ctx_init(&ctx, LIBXL_VERSION)) {
-        fprintf(stderr, "cannot init xl context\n");
-        return;
-    }
-    libxl_ctx_set_log(&ctx, log_callback, NULL);
 
     info = libxl_list_vm(&ctx, &nb_vm);
 
@@ -1438,20 +1337,9 @@ void list_vm(void)
 
 int save_domain(char *p, char *filename, int checkpoint)
 {
-    struct libxl_ctx ctx;
-    uint32_t domid;
     int fd;
 
-    if (libxl_ctx_init(&ctx, LIBXL_VERSION)) {
-        fprintf(stderr, "cannot init xl context\n");
-        exit(2);
-    }
-    libxl_ctx_set_log(&ctx, log_callback, NULL);
-
-    if (domain_qualifier_to_domid(&ctx, p, &domid) < 0) {
-        fprintf(stderr, "%s is an invalid domain identifier\n", p);
-        exit(2);
-    }
+    find_domain(p);
     fd = open(filename, O_WRONLY|O_CREAT|O_TRUNC, 0644);
     if (fd < 0) {
         fprintf(stderr, "Failed to open temp file %s for writing\n", filename);
@@ -1693,17 +1581,9 @@ int main_create(int argc, char **argv)
 
 void button_press(char *p, char *b)
 {
-    struct libxl_ctx ctx;
-    uint32_t domid;
     libxl_button button;
 
-    libxl_ctx_init(&ctx, LIBXL_VERSION);
-    libxl_ctx_set_log(&ctx, log_callback, NULL);
-
-    if (domain_qualifier_to_domid(&ctx, p, &domid) < 0) {
-        fprintf(stderr, "%s is an invalid domain identifier\n", p);
-        exit(2);
-    }
+    find_domain(p);
 
     if (!strcmp(b, "power")) {
         button = POWER_BUTTON;
@@ -1745,7 +1625,7 @@ int main_button_press(int argc, char **argv)
     exit(0);
 }
 
-static void print_vcpuinfo(struct libxl_ctx *ctx, uint32_t domid,
+static void print_vcpuinfo(uint32_t tdomid,
                            const struct libxl_vcpuinfo *vcpuinfo,
                            uint32_t nr_cpus)
 {
@@ -1755,7 +1635,7 @@ static void print_vcpuinfo(struct libxl_ctx *ctx, uint32_t domid,
 
     /*      NAME  ID  VCPU */
     printf("%-32s %5u %5u",
-           libxl_domid_to_name(ctx, domid), domid, vcpuinfo->vcpuid);
+           libxl_domid_to_name(&ctx, tdomid), tdomid, vcpuinfo->vcpuid);
     if (!vcpuinfo->online) {
         /*      CPU STA */
         printf("%5c %3c%cp ", '-', '-', '-');
@@ -1813,18 +1693,10 @@ static void print_vcpuinfo(struct libxl_ctx *ctx, uint32_t domid,
 
 void vcpulist(int argc, char **argv)
 {
-    struct libxl_ctx ctx;
     struct libxl_dominfo *dominfo;
-    uint32_t domid;
     struct libxl_vcpuinfo *vcpuinfo;
     struct libxl_physinfo physinfo;
     int nb_vcpu, nb_domain, cpusize;
-
-    if (libxl_ctx_init(&ctx, LIBXL_VERSION)) {
-        fprintf(stderr, "cannot init xl context\n");
-        return;
-    }
-    libxl_ctx_set_log(&ctx, log_callback, NULL);
 
     if (libxl_get_physinfo(&ctx, &physinfo) != 0) {
         fprintf(stderr, "libxl_physinfo failed.\n");
@@ -1843,12 +1715,12 @@ void vcpulist(int argc, char **argv)
                 goto vcpulist_out;
             }
             for (; nb_vcpu > 0; --nb_vcpu, ++vcpuinfo) {
-                print_vcpuinfo(&ctx, dominfo->domid, vcpuinfo, physinfo.nr_cpus);
+                print_vcpuinfo(dominfo->domid, vcpuinfo, physinfo.nr_cpus);
             }
         }
     } else {
         for (; argc > 0; ++argv, --argc) {
-            if (domain_qualifier_to_domid(&ctx, *argv, &domid) < 0) {
+            if (domain_qualifier_to_domid(*argv, &domid, 0) < 0) {
                 fprintf(stderr, "%s is an invalid domain identifier\n", *argv);
             }
             if (!(vcpuinfo = libxl_list_vcpu(&ctx, domid, &nb_vcpu, &cpusize))) {
@@ -1856,12 +1728,12 @@ void vcpulist(int argc, char **argv)
                 goto vcpulist_out;
             }
             for (; nb_vcpu > 0; --nb_vcpu, ++vcpuinfo) {
-                print_vcpuinfo(&ctx, domid, vcpuinfo, physinfo.nr_cpus);
+                print_vcpuinfo(domid, vcpuinfo, physinfo.nr_cpus);
             }
         }
     }
   vcpulist_out:
-    libxl_ctx_free(&ctx);
+    ;
 }
 
 void main_vcpulist(int argc, char **argv)
@@ -1885,12 +1757,11 @@ void main_vcpulist(int argc, char **argv)
 
 void vcpupin(char *d, const char *vcpu, char *cpu)
 {
-    struct libxl_ctx ctx;
     struct libxl_vcpuinfo *vcpuinfo;
     struct libxl_physinfo physinfo;
     uint64_t *cpumap = NULL;
 
-    uint32_t domid, vcpuid, cpuida, cpuidb;
+    uint32_t vcpuid, cpuida, cpuidb;
     char *endptr, *toka, *tokb;
     int i, nb_vcpu, cpusize;
 
@@ -1903,16 +1774,8 @@ void vcpupin(char *d, const char *vcpu, char *cpu)
         vcpuid = -1;
     }
 
-    if (libxl_ctx_init(&ctx, LIBXL_VERSION)) {
-        fprintf(stderr, "cannot init xl context\n");
-        return;
-    }
-    libxl_ctx_set_log(&ctx, log_callback, NULL);
+    find_domain(d);
 
-    if (domain_qualifier_to_domid(&ctx, d, &domid) < 0) {
-        fprintf(stderr, "%s is an invalid domain identifier\n", d);
-        goto vcpupin_out1;
-    }
     if (libxl_get_physinfo(&ctx, &physinfo) != 0) {
         fprintf(stderr, "libxl_get_physinfo failed.\n");
         goto vcpupin_out1;
@@ -1970,7 +1833,7 @@ void vcpupin(char *d, const char *vcpu, char *cpu)
   vcpupin_out1:
     free(cpumap);
   vcpupin_out:
-    libxl_ctx_free(&ctx);
+    ;
 }
 
 int main_vcpupin(int argc, char **argv)
@@ -1998,9 +1861,7 @@ int main_vcpupin(int argc, char **argv)
 
 void vcpuset(char *d, char* nr_vcpus)
 {
-    struct libxl_ctx ctx;
     char *endptr;
-    uint32_t domid;
     unsigned int max_vcpus;
 
     max_vcpus = strtoul(nr_vcpus, &endptr, 10);
@@ -2009,22 +1870,11 @@ void vcpuset(char *d, char* nr_vcpus)
         return;
     }
 
-    if (libxl_ctx_init(&ctx, LIBXL_VERSION)) {
-        fprintf(stderr, "cannot init xl context\n");
-        return;
-    }
-    libxl_ctx_set_log(&ctx, log_callback, NULL);
+    find_domain(d);
 
-    if (domain_qualifier_to_domid(&ctx, d, &domid) < 0) {
-        fprintf(stderr, "%s is an invalid domain identifier\n", d);
-        goto vcpuset_out;
-    }
     if (libxl_set_vcpucount(&ctx, domid, max_vcpus) == ERROR_INVAL) {
         fprintf(stderr, "Error: Cannot set vcpus greater than max vcpus on running domain or lesser than 1.\n");
     }
-
-  vcpuset_out:
-    libxl_ctx_free(&ctx);
 }
 
 int main_vcpuset(int argc, char **argv)
@@ -2055,6 +1905,15 @@ int main(int argc, char **argv)
     if (argc < 2) {
         help(NULL);
         exit(1);
+    }
+
+    if (libxl_ctx_init(&ctx, LIBXL_VERSION)) {
+        fprintf(stderr, "cannot init xl context\n");
+        exit(1);
+    }
+    if (libxl_ctx_set_log(&ctx, log_callback, NULL)) {
+        fprintf(stderr, "cannot set xl log callback\n");
+        exit(-ERROR_FAIL);
     }
 
     srand(time(0));
