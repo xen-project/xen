@@ -767,7 +767,7 @@ static void create_domain(int debug, int daemonize, const char *config_file, con
     int num_disks = 0, num_vifs = 0, num_pcidevs = 0, num_vfbs = 0, num_vkbs = 0;
     int i, fd;
     int need_daemon = 1;
-    int ret;
+    int ret, rc;
     libxl_device_model_starting *dm_starting = 0;
     libxl_waiter *w1 = NULL, *w2 = NULL;
     void *config_data = 0;
@@ -781,6 +781,7 @@ static void create_domain(int debug, int daemonize, const char *config_file, con
         fprintf(stderr, "cannot init xl context\n");
         exit(1);
     }
+    libxl_ctx_set_log(&ctx, log_callback, NULL);
 
     if (restore_file) {
         uint8_t *optdata_begin = 0;
@@ -948,17 +949,56 @@ start:
 
     if (need_daemon) {
         char *fullname, *name;
+        pid_t child1, got_child;
+        int nullfd;
+
+        child1 = libxl_fork(&ctx);
+        if (child1) {
+            int status;
+            for (;;) {
+                got_child = waitpid(child1, &status, 0);
+                if (got_child == child1) break;
+                assert(got_child == -1);
+                if (errno != EINTR) {
+                    perror("failed to wait for daemonizing child");
+                    return ERROR_FAIL;
+                }
+            }
+            if (status) {
+                libxl_report_child_exitstatus(&ctx, XL_LOG_ERROR,
+                           "daemonizing child", child1, status);
+                return ERROR_FAIL;
+            }
+            return 0; /* caller gets success in parent */
+        }
+
+        rc = libxl_ctx_postfork(&ctx);
+        if (rc) {
+            LOG("failed to reinitialise context after fork");
+            exit(-1);
+        }
 
         asprintf(&name, "xl-%s", info1.name);
-        libxl_create_logfile(&ctx, name, &fullname);
-        logfile = open(fullname, O_WRONLY|O_CREAT, 0644);
+        rc = libxl_create_logfile(&ctx, name, &fullname);
+        if (rc) {
+            LOG("failed to open logfile %s",fullname,strerror(errno));
+            exit(-1);
+        }
+
+        CHK_ERRNO(( logfile = open(fullname, O_WRONLY|O_CREAT, 0644) )<0);
         free(fullname);
         free(name);
 
-        daemon(0, 0);
+        CHK_ERRNO(( nullfd = open("/dev/null", O_RDONLY) )<0);
+        dup2(nullfd, 0);
+        dup2(logfile, 1);
+        dup2(logfile, 2);
+
+        daemon(0, 1);
         need_daemon = 0;
     }
-    LOG("Waiting for domain %s (domid %d) to die", info1.name, domid);
+    LOG("Waiting for domain %s (domid %d) to die [pid %ld]",
+        info1.name, domid, (long)getpid());
     w1 = (libxl_waiter*) xmalloc(sizeof(libxl_waiter) * num_disks);
     w2 = (libxl_waiter*) xmalloc(sizeof(libxl_waiter));
     libxl_wait_for_disk_ejects(&ctx, domid, disks, num_disks, w1);
