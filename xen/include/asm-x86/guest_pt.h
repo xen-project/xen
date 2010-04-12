@@ -29,6 +29,10 @@
 #ifndef _XEN_ASM_GUEST_PT_H
 #define _XEN_ASM_GUEST_PT_H
 
+#if !defined(GUEST_PAGING_LEVELS)
+#error GUEST_PAGING_LEVELS not defined
+#endif
+
 /* Type of the guest's frame numbers */
 TYPE_SAFE(unsigned long,gfn)
 #define PRI_gfn "05lx"
