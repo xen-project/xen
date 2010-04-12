@@ -301,7 +301,7 @@ int libxl_devices_destroy(struct libxl_ctx *ctx, uint32_t domid, int force)
     if (!l1) {
         XL_LOG(&clone, XL_LOG_ERROR, "%s is empty", path);
         libxl_ctx_free(&clone);
-        return -1;
+        return 0;
     }
     for (i = 0; i < num1; i++) {
         if (!strcmp("vfs", l1[i]))

@@ -1277,8 +1277,10 @@ void unpause_domain(char *p)
 
 void destroy_domain(char *p)
 {
+    int rc;
     find_domain(p);
-    libxl_domain_destroy(&ctx, domid, 0);
+    rc = libxl_domain_destroy(&ctx, domid, 0);
+    if (rc) { fprintf(stderr,"destroy failed (rc=%d)\n.",rc); exit(-1); }
 }
 
 void list_domains(int verbose)
