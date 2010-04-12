@@ -373,6 +373,24 @@ int libxl_domain_resume(struct libxl_ctx *ctx, uint32_t domid)
     return 0;
 }
 
+static void xcinfo2xlinfo(const xc_domaininfo_t *xcinfo,
+                          struct libxl_dominfo *xlinfo) {
+    memcpy(&(xlinfo->uuid), xcinfo->handle, sizeof(xen_domain_handle_t));
+    xlinfo->domid = xcinfo->domain;
+
+    if (xcinfo->flags & XEN_DOMINF_dying)
+        xlinfo->dying = 1;
+    else if (xcinfo->flags & XEN_DOMINF_paused)
+        xlinfo->paused = 1;
+    else if (xcinfo->flags & XEN_DOMINF_blocked ||
+             xcinfo->flags & XEN_DOMINF_running)
+        xlinfo->running = 1;
+    xlinfo->max_memkb = PAGE_TO_MEMKB(xcinfo->tot_pages);
+    xlinfo->cpu_time = xcinfo->cpu_time;
+    xlinfo->vcpu_max_id = xcinfo->max_vcpu_id;
+    xlinfo->vcpu_online = xcinfo->nr_online_vcpus;
+}
+
 struct libxl_dominfo * libxl_list_domain(struct libxl_ctx *ctx, int *nb_domain)
 {
     struct libxl_dominfo *ptr;
@@ -381,27 +399,29 @@ struct libxl_dominfo * libxl_list_domain(struct libxl_ctx *ctx, int *nb_domain)
     int size = 1024;
 
     ptr = calloc(size, sizeof(struct libxl_dominfo));
-    if (!ptr)
-        return NULL;
+    if (!ptr) return NULL;
 
     ret = xc_domain_getinfolist(ctx->xch, 0, 1024, info);
-    for (i = 0; i < ret; i++) {
-        memcpy(&(ptr[i].uuid), info[i].handle, sizeof(xen_domain_handle_t));
-        ptr[i].domid = info[i].domain;
+    if (ret<0) return NULL;
 
-        if (info[i].flags & XEN_DOMINF_dying)
-            ptr[i].dying = 1;
-        else if (info[i].flags & XEN_DOMINF_paused)
-            ptr[i].paused = 1;
-        else if (info[i].flags & XEN_DOMINF_blocked || info[i].flags & XEN_DOMINF_running)
-            ptr[i].running = 1;
-        ptr[i].max_memkb = PAGE_TO_MEMKB(info[i].tot_pages);
-        ptr[i].cpu_time = info[i].cpu_time;
-        ptr[i].vcpu_max_id = info[i].max_vcpu_id;
-        ptr[i].vcpu_online = info[i].nr_online_vcpus;
+    for (i = 0; i < ret; i++) {
+        xcinfo2xlinfo(&info[i], &ptr[i]);
     }
     *nb_domain = ret;
     return ptr;
+}
+
+int libxl_domain_info(struct libxl_ctx *ctx, struct libxl_dominfo *info_r,
+                      uint32_t domid) {
+    xc_domaininfo_t xcinfo;
+    int ret;
+
+    ret = xc_domain_getinfolist(ctx->xch, domid, 1, &xcinfo);
+    if (ret<0) return ERROR_FAIL;
+    if (ret==0 || xcinfo.domain != domid) return ERROR_INVAL;
+
+    xcinfo2xlinfo(&xcinfo, info_r);
+    return 0;
 }
 
 /* this API call only list VM running on this host. a VM can be an aggregate of multiple domains. */

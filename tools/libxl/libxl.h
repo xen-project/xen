@@ -315,7 +315,9 @@ int libxl_set_memory_target(struct libxl_ctx *ctx, uint32_t domid, uint32_t targ
 
 int libxl_console_attach(struct libxl_ctx *ctx, uint32_t domid, int cons_num);
 
-struct libxl_dominfo * libxl_list_domain(struct libxl_ctx *ctx, int *nb_domain);
+int libxl_domain_info(struct libxl_ctx*, struct libxl_dominfo *info_r,
+                      uint32_t domid);
+struct libxl_dominfo * libxl_list_domain(struct libxl_ctx*, int *nb_domain);
 struct libxl_vminfo * libxl_list_vm(struct libxl_ctx *ctx, int *nb_vm);
 
 typedef struct libxl_device_model_starting libxl_device_model_starting;
