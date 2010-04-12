@@ -1764,6 +1764,13 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         goto out;
     }
 
+    /* Flush last write and check for errors. */
+    if ( fsync(io_fd) && errno != EINVAL )
+    {
+        PERROR("Error when flushing state file");
+        goto out;
+    }
+
     /* Success! */
     rc = 0;
 
