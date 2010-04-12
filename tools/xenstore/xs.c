@@ -223,10 +223,39 @@ struct xs_handle *xs_domain_open(void)
 	return get_handle(xs_domain_dev());
 }
 
-void xs_daemon_close(struct xs_handle *h)
-{
+static void close_free_msgs(struct xs_handle *h) {
 	struct xs_stored_msg *msg, *tmsg;
 
+	list_for_each_entry_safe(msg, tmsg, &h->reply_list, list) {
+		free(msg->body);
+		free(msg);
+	}
+
+	list_for_each_entry_safe(msg, tmsg, &h->watch_list, list) {
+		free(msg->body);
+		free(msg);
+	}
+}
+
+static void close_fds_free(struct xs_handle *h) {
+	if (h->watch_pipe[0] != -1) {
+		close(h->watch_pipe[0]);
+		close(h->watch_pipe[1]);
+	}
+
+        close(h->fd);
+        
+	free(h);
+}
+
+void xs_daemon_destroy_postfork(struct xs_handle *h)
+{
+        close_free_msgs(h);
+        close_fds_free(h);
+}
+
+void xs_daemon_close(struct xs_handle *h)
+{
 	mutex_lock(&h->request_mutex);
 	mutex_lock(&h->reply_mutex);
 	mutex_lock(&h->watch_mutex);
@@ -239,28 +268,13 @@ void xs_daemon_close(struct xs_handle *h)
 	}
 #endif
 
-	list_for_each_entry_safe(msg, tmsg, &h->reply_list, list) {
-		free(msg->body);
-		free(msg);
-	}
-
-	list_for_each_entry_safe(msg, tmsg, &h->watch_list, list) {
-		free(msg->body);
-		free(msg);
-	}
+        close_free_msgs(h);
 
 	mutex_unlock(&h->request_mutex);
 	mutex_unlock(&h->reply_mutex);
 	mutex_unlock(&h->watch_mutex);
 
-	if (h->watch_pipe[0] != -1) {
-		close(h->watch_pipe[0]);
-		close(h->watch_pipe[1]);
-	}
-
-	close(h->fd);
-
-	free(h);
+        close_fds_free(h);
 }
 
 static bool read_all(int fd, void *data, unsigned int len)

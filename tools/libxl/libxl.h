@@ -250,6 +250,7 @@ enum {
 int libxl_ctx_init(struct libxl_ctx *ctx, int version);
 int libxl_ctx_free(struct libxl_ctx *ctx);
 int libxl_ctx_set_log(struct libxl_ctx *ctx, libxl_log_callback log_callback, void *log_data);
+int libxl_ctx_postfork(struct libxl_ctx *ctx);
 
 /* domain related functions */
 int libxl_domain_make(struct libxl_ctx *ctx, libxl_domain_create_info *info, uint32_t *domid);

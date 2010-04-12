@@ -66,7 +66,7 @@ int libxl_ctx_free(struct libxl_ctx *ctx)
     libxl_free_all(ctx);
     free(ctx->alloc_ptrs);
     xc_interface_close(ctx->xch);
-    xs_daemon_close(ctx->xsh); 
+    if (ctx->xsh) xs_daemon_close(ctx->xsh); 
     return 0;
 }
 

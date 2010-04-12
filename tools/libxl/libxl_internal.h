@@ -185,8 +185,8 @@ int libxl_spawn_spawn(struct libxl_ctx *ctx,
                       void (*intermediate_hook)(void *for_spawn, pid_t innerchild));
   /* Logs errors.  A copy of "what" is taken.  Return values:
    *  < 0   error, for_spawn need not be detached
-   *   +1   caller is now the inner child, should probably call libxl_exec
-   *    0   caller is the parent, must call detach on *for_spawn eventually
+   *   +1   caller is the parent, must call detach on *for_spawn eventually
+   *    0   caller is now the inner child, should probably call libxl_exec
    * Caller, may pass 0 for for_spawn, in which case no need to detach.
    */
 int libxl_spawn_detach(struct libxl_ctx *ctx,
