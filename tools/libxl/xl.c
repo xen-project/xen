@@ -30,6 +30,7 @@
 #include <arpa/inet.h>
 #include <xenctrl.h>
 #include <ctype.h>
+#include <inttypes.h>
 
 #include "libxl.h"
 #include "libxl_utils.h"
@@ -45,6 +46,25 @@ static struct libxl_ctx ctx;
 /* when we operate on a domain, it is this one: */
 static uint32_t domid;
 static const char *common_domname;
+
+static const char savefileheader_magic[32]=
+    "Xen saved domain, xl format\n \0 \r";
+
+struct save_file_header {
+    char magic[32]; /* savefileheader_magic */
+    /* All uint32_ts are in domain's byte order. */
+    uint32_t byteorder; /* SAVEFILE_BYTEORDER_VALUE */
+    uint32_t mandatory_flags; /* unknown flags => reject restore */
+    uint32_t optional_flags; /* unknown flags => reject restore */
+    uint32_t optional_data_len; /* skip, or skip tail, if not understood */
+};
+
+/* Optional data, in order:
+ *   4 bytes uint32_t  config file size
+ *   n bytes           config file in Unix text file format
+ */
+
+#define SAVEFILE_BYTEORDER_VALUE ((uint32_t)0x01020304UL)
 
 void log_callback(void *userdata, int loglevel, const char *file, int line, const char *func, char *s)
 {
@@ -343,7 +363,9 @@ static void printf_info(libxl_domain_create_info *c_info,
     }
 }
 
-static void parse_config_file(const char *filename,
+static void parse_config_data(const char *configfile_filename_report,
+                              const char *configfile_data,
+                              int configfile_len,
                               libxl_domain_create_info *c_info,
                               libxl_domain_build_info *b_info,
                               libxl_device_disk **disks,
@@ -366,13 +388,13 @@ static void parse_config_file(const char *filename,
     int pci_msitranslate = 1;
     int i, e;
 
-    config= xlu_cfg_init(stderr, filename);
+    config= xlu_cfg_init(stderr, configfile_filename_report);
     if (!config) {
         fprintf(stderr, "Failed to allocate for configuration\n");
         exit(1);
     }
 
-    e= xlu_cfg_readfile (config, filename);
+    e= xlu_cfg_readdata(config, configfile_data, configfile_len);
     if (e) {
         fprintf(stderr, "Failed to parse config file: %s\n", strerror(e));
         exit(1);
@@ -692,6 +714,15 @@ skip_pci:
     xlu_cfg_destroy(config);
 }
 
+#define CHK_ERRNO( call ) ({                                            \
+        int chk_errno = (call);                                         \
+        if (chk_errno) {                                                \
+            fprintf(stderr,"xl: fatal error: %s:%d: %s: %s\n",          \
+                    __FILE__,__LINE__, strerror(chk_errno), #call);     \
+            exit(-ERROR_FAIL);                                          \
+        }                                                               \
+    })
+
 #define MUST( call ) ({                                                 \
         int must_rc = (call);                                           \
         if (must_rc) {                                                  \
@@ -700,6 +731,26 @@ skip_pci:
             exit(-must_rc);                                             \
         }                                                               \
     })
+
+static void *xmalloc(size_t sz) {
+    void *r;
+    r = malloc(sz);
+    if (!r) { fprintf(stderr,"xl: Unable to malloc %lu bytes.\n",
+                      (unsigned long)sz); exit(-ERROR_FAIL); }
+    return r;
+}
+
+static void *xrealloc(void *ptr, size_t sz) {
+    void *r;
+    if (!sz) { free(ptr); return 0; }
+      /* realloc(non-0, 0) has a useless return value;
+       * but xrealloc(anything, 0) is like free
+       */
+    r = realloc(ptr, sz);
+    if (!r) { fprintf(stderr,"xl: Unable to realloc to %lu bytes.\n",
+                      (unsigned long)sz); exit(-ERROR_FAIL); }
+    return r;
+}
 
 static void create_domain(int debug, int daemonize, const char *config_file, const char *restore_file, int paused)
 {
@@ -719,10 +770,100 @@ static void create_domain(int debug, int daemonize, const char *config_file, con
     int ret;
     libxl_device_model_starting *dm_starting = 0;
     libxl_waiter *w1 = NULL, *w2 = NULL;
+    void *config_data = 0;
+    int config_len = 0;
+    int restore_fd = -1;
+    struct save_file_header hdr;
+
     memset(&dm_info, 0x00, sizeof(dm_info));
 
+    if (libxl_ctx_init(&ctx, LIBXL_VERSION)) {
+        fprintf(stderr, "cannot init xl context\n");
+        exit(1);
+    }
+
+    if (restore_file) {
+        uint8_t *optdata_begin = 0;
+        const uint8_t *optdata_here = 0;
+        union { uint32_t u32; char b[4]; } u32buf;
+        uint32_t badflags;
+
+        restore_fd = open(restore_file, O_RDONLY);
+
+        CHK_ERRNO( libxl_read_exactly(&ctx, restore_fd, &hdr,
+                   sizeof(hdr), restore_file, "header") );
+        if (memcmp(hdr.magic, savefileheader_magic, sizeof(hdr.magic))) {
+            fprintf(stderr, "File has wrong magic number -"
+                    " corrupt or for a different tool?\n");
+            exit(2);
+        }
+        if (hdr.byteorder != SAVEFILE_BYTEORDER_VALUE) {
+            fprintf(stderr, "File has wrong byte order\n");
+            exit(2);
+        }
+        fprintf(stderr, "Loading new save file %s"
+                " (new xl fmt info"
+                " 0x%"PRIx32"/0x%"PRIx32"/%"PRIu32")\n",
+                restore_file, hdr.mandatory_flags, hdr.optional_flags,
+                hdr.optional_data_len);
+
+        badflags = hdr.mandatory_flags & ~( 0 /* none understood yet */ );
+        if (badflags) {
+            fprintf(stderr, "Savefile has mandatory flag(s) 0x%"PRIx32" "
+                    "which are not supported; need newer xl\n",
+                    badflags);
+            exit(2);
+        }
+        if (hdr.optional_data_len) {
+            optdata_begin = xmalloc(hdr.optional_data_len);
+            CHK_ERRNO( libxl_read_exactly(&ctx, restore_fd, optdata_begin,
+                   hdr.optional_data_len, restore_file, "optdata") );
+        }
+
+#define OPTDATA_LEFT  (hdr.optional_data_len - (optdata_here - optdata_begin))
+#define WITH_OPTDATA(amt, body)                                         \
+            if (OPTDATA_LEFT < (amt)) {                                 \
+                fprintf(stderr, "Savefile truncated.\n"); exit(2);      \
+            } else {                                                    \
+                body;                                                   \
+                optdata_here += (amt);                                  \
+            }
+
+        optdata_here = optdata_begin;
+
+        if (OPTDATA_LEFT) {
+            fprintf(stderr, " Savefile contains xl domain config\n");
+            WITH_OPTDATA(4, {
+                memcpy(u32buf.b, optdata_here, 4);
+                config_len = u32buf.u32;
+            });
+            WITH_OPTDATA(config_len, {
+                config_data = xmalloc(config_len);
+                memcpy(config_data, optdata_here, config_len);
+            });
+        }
+
+    }
+
+    if (config_file) {
+        free(config_data);  config_data = 0;
+        ret = libxl_read_file_contents(&ctx, config_file,
+                                       &config_data, &config_len);
+        if (ret) { fprintf(stderr, "Failed to read config file: %s: %s\n",
+                           config_file, strerror(errno)); exit(1); }
+    } else {
+        if (!config_data) {
+            fprintf(stderr, "Config file not specified and"
+                    " none in save file\n");
+            exit(1);
+        }
+        config_file = "<saved>";
+    }
+
     printf("Parsing config file %s\n", config_file);
-    parse_config_file(config_file, &info1, &info2, &disks, &num_disks, &vifs, &num_vifs, &pcidevs, &num_pcidevs, &vfbs, &num_vfbs, &vkbs, &num_vkbs, &dm_info);
+
+    parse_config_data(config_file, config_data, config_len, &info1, &info2, &disks, &num_disks, &vifs, &num_vifs, &pcidevs, &num_pcidevs, &vfbs, &num_vfbs, &vkbs, &num_vkbs, &dm_info);
+
     if (debug)
         printf_info(&info1, &info2, disks, num_disks, vifs, num_vifs, pcidevs, num_pcidevs, vfbs, num_vfbs, vkbs, num_vkbs, &dm_info);
 
@@ -732,7 +873,14 @@ start:
     ret = libxl_domain_make(&ctx, &info1, &domid);
     if (ret) {
         fprintf(stderr, "cannot make domain: %d\n", ret);
-        return;
+        exit(1);
+    }
+
+    ret = libxl_userdata_store(&ctx, domid, "xl",
+                                    config_data, config_len);
+    if (ret) {
+        perror("cannot save config file");
+        exit(1);
     }
 
     if (!restore_file || !need_daemon) {
@@ -742,16 +890,13 @@ start:
         }
         ret = libxl_domain_build(&ctx, &info2, domid, &state);
     } else {
-        int restore_fd;
-
-        restore_fd = open(restore_file, O_RDONLY);
         ret = libxl_domain_restore(&ctx, &info2, domid, restore_fd, &state, &dm_info);
         close(restore_fd);
     }
 
     if (ret) {
         fprintf(stderr, "cannot (re-)build domain: %d\n", ret);
-        return;
+        exit(1);
     }
 
     for (i = 0; i < num_disks; i++) {
@@ -759,7 +904,7 @@ start:
         ret = libxl_device_disk_add(&ctx, domid, &disks[i]);
         if (ret) {
             fprintf(stderr, "cannot add disk %d to domain: %d\n", i, ret);
-            return;
+            exit(1);
         }
     }
     for (i = 0; i < num_vifs; i++) {
@@ -767,7 +912,7 @@ start:
         ret = libxl_device_nic_add(&ctx, domid, &vifs[i]);
         if (ret) {
             fprintf(stderr, "cannot add nic %d to domain: %d\n", i, ret);
-            return;
+            exit(1);
         }
     }
     if (info1.hvm) {
@@ -814,8 +959,8 @@ start:
         need_daemon = 0;
     }
     LOG("Waiting for domain %s (domid %d) to die", info1.name, domid);
-    w1 = (libxl_waiter*) malloc(sizeof(libxl_waiter) * num_disks);
-    w2 = (libxl_waiter*) malloc(sizeof(libxl_waiter));
+    w1 = (libxl_waiter*) xmalloc(sizeof(libxl_waiter) * num_disks);
+    w2 = (libxl_waiter*) xmalloc(sizeof(libxl_waiter));
     libxl_wait_for_disk_ejects(&ctx, domid, disks, num_disks, w1);
     libxl_wait_for_domain_death(&ctx, domid, w2);
     libxl_get_wait_fd(&ctx, &fd);
@@ -870,6 +1015,7 @@ start:
     free(vfbs);
     free(vkbs);
     free(pcidevs);
+    free(config_data);
 }
 
 static void help(char *command)
@@ -921,13 +1067,13 @@ static void help(char *command)
         printf("Usage: xl unpause <Domain>\n\n");
         printf("Unpause a paused domain.\n\n");
     } else if(!strcmp(command, "save")) {
-        printf("Usage: xl save [options] <Domain> <CheckpointFile>\n\n");
+        printf("Usage: xl save [options] <Domain> <CheckpointFile> [<ConfigFile>]\n\n");
         printf("Save a domain state to restore later.\n\n");
         printf("Options:\n\n");
         printf("-h                     Print this help.\n");
         printf("-c                     Leave domain running after creating the snapshot.\n");
     } else if(!strcmp(command, "restore")) {
-        printf("Usage: xl restore [options] <ConfigFile> <CheckpointFile>\n\n");
+        printf("Usage: xl restore [options] [<ConfigFile>] <CheckpointFile>\n\n");
         printf("Restore a domain from a saved state.\n\n");
         printf("Options:\n\n");
         printf("-h                     Print this help.\n");
@@ -1337,9 +1483,15 @@ void list_vm(void)
     free(info);
 }
 
-int save_domain(char *p, char *filename, int checkpoint)
+int save_domain(char *p, char *filename, int checkpoint,
+                const char *override_config_file)
 {
-    int fd;
+    int fd, rc;
+    struct save_file_header hdr;
+    uint8_t *config_data = 0;
+    int config_len;
+    uint8_t *optdata_begin;
+    union { uint32_t u32; char b[4]; } u32buf;
 
     find_domain(p);
     fd = open(filename, O_WRONLY|O_CREAT|O_TRUNC, 0644);
@@ -1347,6 +1499,57 @@ int save_domain(char *p, char *filename, int checkpoint)
         fprintf(stderr, "Failed to open temp file %s for writing\n", filename);
         exit(2);
     }
+
+    memset(&hdr, 0, sizeof(hdr));
+    memcpy(hdr.magic, savefileheader_magic, sizeof(hdr.magic));
+    hdr.byteorder = SAVEFILE_BYTEORDER_VALUE;
+
+    optdata_begin= 0;
+
+#define ADD_OPTDATA(ptr, len) ({                                            \
+    if ((len)) {                                                        \
+        hdr.optional_data_len += (len);                                 \
+        optdata_begin = xrealloc(optdata_begin, hdr.optional_data_len); \
+        memcpy(optdata_begin + hdr.optional_data_len - (len),           \
+               (ptr), (len));                                           \
+    }                                                                   \
+                          })
+
+    /* configuration file in optional data: */
+
+    if (override_config_file) {
+        void *config_v = 0;
+        rc = libxl_read_file_contents(&ctx, override_config_file,
+                                      &config_v, &config_len);
+        config_data = config_v;
+    } else {
+        rc = libxl_userdata_retrieve(&ctx, domid, "xl",
+                                          &config_data, &config_len);
+    }
+    if (rc) {
+        fputs("Unable to get config file\n",stderr);
+        exit(2);
+    }
+    if (!config_len) {
+        fputs(" Savefile will not contain xl domain config\n", stderr);
+    }
+
+    u32buf.u32 = config_len;
+    ADD_OPTDATA(u32buf.b,    4);
+    ADD_OPTDATA(config_data, config_len);
+
+    /* that's the optional data */
+
+    CHK_ERRNO( libxl_write_exactly(&ctx, fd,
+        &hdr, sizeof(hdr), filename, "header") );
+    CHK_ERRNO( libxl_write_exactly(&ctx, fd,
+        optdata_begin, hdr.optional_data_len, filename, "header") );
+
+    fprintf(stderr, "Saving to %s new xl format (info"
+            " 0x%"PRIx32"/0x%"PRIx32"/%"PRIu32")\n",
+            filename, hdr.mandatory_flags, hdr.optional_flags,
+            hdr.optional_data_len);
+
     libxl_domain_suspend(&ctx, NULL, domid, fd);
     close(fd);
 
@@ -1385,13 +1588,15 @@ int main_restore(int argc, char **argv)
         }
     }
 
-    if (optind >= argc - 1) {
+    if (argc-optind == 1) {
+        checkpoint_file = argv[optind];
+    } else if (argc-optind == 2) {
+        config_file = argv[optind];
+        checkpoint_file = argv[optind + 1];
+    } else {
         help("restore");
         exit(2);
     }
-
-    config_file = argv[optind];
-    checkpoint_file = argv[optind + 1];
     create_domain(debug, daemonize, config_file, checkpoint_file, paused);
     exit(0);
 }
@@ -1399,6 +1604,7 @@ int main_restore(int argc, char **argv)
 int main_save(int argc, char **argv)
 {
     char *filename = NULL, *p = NULL;
+    const char *config_filename;
     int checkpoint = 0;
     int opt;
 
@@ -1416,14 +1622,15 @@ int main_save(int argc, char **argv)
         }
     }
 
-    if (optind >= argc - 1) {
+    if (argc-optind < 1 || argc-optind > 3) {
         help("save");
         exit(2);
     }
 
     p = argv[optind];
     filename = argv[optind + 1];
-    save_domain(p, filename, checkpoint);
+    config_filename = argv[optind + 2];
+    save_domain(p, filename, checkpoint, config_filename);
     exit(0);
 }
 

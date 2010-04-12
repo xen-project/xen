@@ -53,6 +53,43 @@ int xlu_cfg_readfile(XLU_Config *cfg, const char *real_filename) {
     return ctx.err;
 }
 
+int xlu_cfg_readdata(XLU_Config *cfg, const char *data, int length) {
+    CfgParseContext ctx;
+    int e, r;
+    YY_BUFFER_STATE buf= 0;
+
+    ctx.scanner= 0;
+    ctx.cfg= cfg;
+    ctx.err= 0;
+    ctx.lexerrlineno= -1;
+
+    e= xlu__cfg_yylex_init_extra(&ctx, &ctx.scanner);
+    if (e) {
+        fprintf(cfg->report,"%s: unable to create scanner: %s\n",
+                cfg->filename, strerror(e));
+        ctx.err= e;
+        ctx.scanner= 0;
+        goto xe;
+    }
+
+    buf = xlu__cfg_yy_scan_bytes(data, length, ctx.scanner);
+    if (!buf) {
+        fprintf(cfg->report,"%s: unable to allocate scanner buffer\n",
+                cfg->filename);
+        ctx.err= ENOMEM;
+        goto xe;
+    }
+
+    r= xlu__cfg_yyparse(&ctx);
+    if (r) assert(ctx.err);
+
+ xe:
+    if (buf) xlu__cfg_yy_delete_buffer(buf, ctx.scanner);
+    if (ctx.scanner) xlu__cfg_yylex_destroy(ctx.scanner);
+
+    return ctx.err;
+}
+
 void xlu__cfg_set_free(XLU_ConfigSetting *set) {
     free(set->name);
     free(set->values);

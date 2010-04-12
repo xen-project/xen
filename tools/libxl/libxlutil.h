@@ -30,7 +30,8 @@ XLU_Config *xlu_cfg_init(FILE *report, const char *report_filename);
    *  until the Config is destroyed. */
 
 int xlu_cfg_readfile(XLU_Config*, const char *real_filename);
-  /* If this fails, then it is undefined behaviour to call xlu_cfg_get_...
+int xlu_cfg_readdata(XLU_Config*, const char *data, int length);
+  /* If these fail, then it is undefined behaviour to call xlu_cfg_get_...
    * functions.  You have to just xlu_cfg_destroy. */
  
 void xlu_cfg_destroy(XLU_Config*);
