@@ -44,5 +44,9 @@ int libxl_write_exactly(struct libxl_ctx *ctx, int fd, const void *data,
    * logged using filename (which is only used for logging) and what
    * (which may be 0). */
     
+pid_t libxl_fork(struct libxl_ctx *ctx);
+int libxl_pipe(struct libxl_ctx *ctx, int pipes[2]);
+  /* Just like fork(2), pipe(2), but log errors. */
+
 #endif
 

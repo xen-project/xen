@@ -1238,15 +1238,9 @@ int libxl_device_disk_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_di
                 char buf[1024], *dev;
                 dev = get_blktap2_device(ctx, disk->physpath, device_disk_string_of_phystype(disk->phystype));
                 if (dev == NULL) {
-                    if (pipe(p) < 0) {
-                        XL_LOG(ctx, XL_LOG_ERROR, "Failed to create a pipe");
-                        return -1;
-                    }
-                    rc = fork();
-                    if (rc < 0) {
-                        XL_LOG(ctx, XL_LOG_ERROR, "Failed to fork a new process");
-                        return -1;
-                    } else if (!rc) { /* child */
+                    rc= libxl_pipe(ctx, p);  if (rc==-1) return -1;
+                    rc= libxl_fork(ctx);  if (rc==-1) return -1;
+                    if (!rc) { /* child */
                         int null_r, null_w;
                         char *args[4];
                         args[0] = "tapdisk2";

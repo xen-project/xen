@@ -30,19 +30,6 @@
 #include "libxl.h"
 #include "libxl_internal.h"
 
-static pid_t libxl_fork(struct libxl_ctx *ctx)
-{
-    pid_t pid;
-
-    pid = fork();
-    if (pid == -1) {
-        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "fork failed");
-        return -1;
-    }
-
-    return pid;
-}
-
 static int call_waitpid(pid_t (*waitpid_cb)(pid_t, int *, int), pid_t pid, int *status, int options)
 {
     return (waitpid_cb) ? waitpid_cb(pid, status, options) : waitpid(pid, status, options);
@@ -61,6 +48,11 @@ void libxl_exec(int stdinfd, int stdoutfd, int stderrfd, char *arg0, char **args
         dup2(stderrfd, STDERR_FILENO);
     for (i = 4; i < 256; i++)
         close(i);
+
+    signal(SIGPIPE, SIG_DFL);
+    /* in case our caller set it to IGN.  subprocesses are entitled
+     * to assume they got DFL. */
+
     execv(arg0, args);
     _exit(-1);
 }

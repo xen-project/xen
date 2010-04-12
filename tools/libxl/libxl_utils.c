@@ -280,3 +280,26 @@ int libxl_read_file_contents(struct libxl_ctx *ctx, const char *filename,
 
 READ_WRITE_EXACTLY(read, 1, /* */)
 READ_WRITE_EXACTLY(write, 0, const)
+
+
+pid_t libxl_fork(struct libxl_ctx *ctx)
+{
+    pid_t pid;
+
+    pid = fork();
+    if (pid == -1) {
+        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "fork failed");
+        return -1;
+    }
+
+    return pid;
+}
+
+int libxl_pipe(struct libxl_ctx *ctx, int pipes[2])
+{
+    if (pipe(pipes) < 0) {
+        XL_LOG(ctx, XL_LOG_ERROR, "Failed to create a pipe");
+        return -1;
+    }
+    return 0;
+}
