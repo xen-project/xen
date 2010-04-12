@@ -101,11 +101,25 @@ int libxl_is_stubdom(struct libxl_ctx *ctx, uint32_t domid, uint32_t *target_dom
     return 1;
 }
 
+static int logrename(struct libxl_ctx *ctx, const char *old, const char *new) {
+    int r;
+
+    r = rename(old, new);
+    if (r) {
+        if (errno == ENOENT) return 0; /* ok */
+
+        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "failed to rotate logfile - could not"
+                     " rename %s to %s", old, new);
+        return ERROR_FAIL;
+    }
+    return 0;
+}
+
 int libxl_create_logfile(struct libxl_ctx *ctx, char *name, char **full_name)
 {
     struct stat stat_buf;
     char *logfile, *logfile_new;
-    int i;
+    int i, rc;
 
     logfile = libxl_sprintf(ctx, "/var/log/xen/%s.log", name);
     if (stat(logfile, &stat_buf) == 0) {
@@ -115,11 +129,19 @@ int libxl_create_logfile(struct libxl_ctx *ctx, char *name, char **full_name)
         for (i = 9; i > 0; i--) {
             logfile = libxl_sprintf(ctx, "/var/log/xen/%s.log.%d", name, i);
             logfile_new = libxl_sprintf(ctx, "/var/log/xen/%s.log.%d", name, i + 1);
-            rename(logfile, logfile_new);
+            rc = logrename(ctx, logfile, logfile_new);
+            if (rc) return rc;
         }
         logfile = libxl_sprintf(ctx, "/var/log/xen/%s.log", name);
         logfile_new = libxl_sprintf(ctx, "/var/log/xen/%s.log.1", name);
-        rename(logfile, logfile_new);
+
+        rc = logrename(ctx, logfile, logfile_new);
+        if (rc) return rc;
+    } else {
+        if (errno != ENOENT)
+            XL_LOG_ERRNO(ctx, XL_LOG_WARNING, "problem checking existence of"
+                         " logfile %s, which might have needed to be rotated",
+                         name);
     }
     *full_name = strdup(logfile);
     return 0;
