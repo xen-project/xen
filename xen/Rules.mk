@@ -82,7 +82,7 @@ LDFLAGS += $(LDFLAGS_DIRECT)
 include Makefile
 
 # Ensure each subdirectory has exactly one trailing slash.
-subdir-n := $(patsubst %,%/,$(patsubst %/,%,$(subdir-n)))
+subdir-n := $(patsubst %,%/,$(patsubst %/,%,$(subdir-n) $(subdir-)))
 subdir-y := $(patsubst %,%/,$(patsubst %/,%,$(subdir-y)))
 
 # Add explicitly declared subdirectories to the object list.
