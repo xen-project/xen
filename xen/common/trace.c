@@ -48,6 +48,9 @@ integer_param("tbuf_size", opt_tbuf_size);
 /* Pointers to the meta-data objects for all system trace buffers */
 static struct t_info *t_info;
 #define T_INFO_PAGES 2  /* Size fixed at 2 pages for now. */
+#define T_INFO_SIZE ((T_INFO_PAGES)*(PAGE_SIZE))
+/* t_info.tbuf_size + list of mfn offsets + 1 to round up / sizeof uint32_t */
+#define T_INFO_FIRST_OFFSET ((sizeof(int16_t) + NR_CPUS * sizeof(int16_t) + 1) / sizeof(uint32_t))
 static DEFINE_PER_CPU_READ_MOSTLY(struct t_buf *, t_bufs);
 static DEFINE_PER_CPU_READ_MOSTLY(unsigned char *, t_data);
 static DEFINE_PER_CPU_READ_MOSTLY(spinlock_t, t_lock);
@@ -72,6 +75,15 @@ static cpumask_t tb_cpu_mask = CPU_MASK_ALL;
 static u32 tb_event_mask = TRC_ALL;
 
 /**
+ * check_tbuf_size - check to make sure that the proposed size will fit
+ * in the currently sized struct t_info.
+ */
+static inline int check_tbuf_size(int size)
+{
+    return (num_online_cpus() * size + T_INFO_FIRST_OFFSET) > (T_INFO_SIZE / sizeof(uint32_t));
+}
+
+/**
  * alloc_trace_bufs - performs initialization of the per-cpu trace buffers.
  *
  * This function is called at start of day in order to initialize the per-cpu
@@ -87,7 +99,9 @@ static int alloc_trace_bufs(void)
     unsigned long nr_pages;
     /* Start after a fixed-size array of NR_CPUS */
     uint32_t *t_info_mfn_list = (uint32_t *)t_info;
-    int offset = (NR_CPUS * 2 + 1 + 1) / 4;
+    int offset = T_INFO_FIRST_OFFSET;
+
+    BUG_ON(check_tbuf_size(opt_tbuf_size));
 
     if ( opt_tbuf_size == 0 )
         return -EINVAL;
@@ -180,7 +194,8 @@ out_dealloc:
         }
         spin_unlock_irqrestore(&per_cpu(t_lock, cpu), flags);
     }
-    return -EINVAL;
+    
+    return -ENOMEM;
 }
 
 
@@ -197,19 +212,35 @@ static int tb_set_size(int size)
      * boot time or via control tools, but not by both. Once buffers
      * are created they cannot be destroyed.
      */
-    if ( (opt_tbuf_size != 0) || (size <= 0) )
+    int ret = 0;
+
+
+
+    if ( (opt_tbuf_size != 0) )
     {
-        gdprintk(XENLOG_INFO, "tb_set_size from %d to %d not implemented\n",
-                opt_tbuf_size, size);
+        if ( size != opt_tbuf_size )
+            gdprintk(XENLOG_INFO, "tb_set_size from %d to %d not implemented\n",
+                     opt_tbuf_size, size);
+        return -EINVAL;
+    }
+
+    if ( size <= 0 )
+        return -EINVAL;
+
+    if ( check_tbuf_size(size) )
+    {
+        gdprintk(XENLOG_INFO, "tb size %d too large\n", size);
         return -EINVAL;
     }
 
     opt_tbuf_size = size;
-    if ( alloc_trace_bufs() != 0 )
-        return -EINVAL;
 
-    printk("Xen trace buffers: initialized\n");
-    return 0;
+    if ( (ret = alloc_trace_bufs()) == 0 )
+        printk("Xen trace buffers: initialized\n");
+    else
+        opt_tbuf_size = 0;
+
+    return ret;
 }
 
 int trace_will_trace_event(u32 event)
@@ -265,12 +296,17 @@ void __init init_trace_bufs(void)
         share_xen_page_with_privileged_guests(
             virt_to_page(t_info) + i, XENSHARE_writable);
 
-
-
     if ( opt_tbuf_size == 0 )
     {
         printk("Xen trace buffers: disabled\n");
         return;
+    }
+    else if ( check_tbuf_size(opt_tbuf_size) )
+    {
+        gdprintk(XENLOG_INFO, "Xen trace buffers: "
+                 "tb size %d too large, disabling\n",
+                 opt_tbuf_size);
+        opt_tbuf_size = 0;
     }
 
     if ( alloc_trace_bufs() == 0 )
@@ -278,6 +314,13 @@ void __init init_trace_bufs(void)
         printk("Xen trace buffers: initialised\n");
         wmb(); /* above must be visible before tb_init_done flag set */
         tb_init_done = 1;
+    }
+    else
+    {
+        gdprintk(XENLOG_INFO, "Xen trace buffers: "
+                 "allocation size %d failed, disabling\n",
+                 opt_tbuf_size);
+        opt_tbuf_size = 0;
     }
 }
 
