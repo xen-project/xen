@@ -2163,12 +2163,12 @@ int io_apic_set_pci_routing (int ioapic, int pin, int irq, int edge_level, int a
     io_apic_write(ioapic, 0x11+2*pin, *(((int *)&entry)+1));
     io_apic_write(ioapic, 0x10+2*pin, *(((int *)&entry)+0));
     set_native_irq_info(irq, TARGET_CPUS);
-    spin_unlock_irqrestore(&ioapic_lock, flags);
+    spin_unlock(&ioapic_lock);
 
     spin_lock(&desc->lock);
     if (!(desc->status & (IRQ_DISABLED | IRQ_GUEST)))
         desc->handler->startup(irq);
-    spin_unlock(&desc->lock);
+    spin_unlock_irqrestore(&desc->lock, flags);
 
     return 0;
 }
