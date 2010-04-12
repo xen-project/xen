@@ -189,9 +189,8 @@ static void dbs_timer_init(struct cpu_dbs_info_s *dbs_info)
 {
     dbs_info->enable = 1;
 
-    if ( !dbs_timer[dbs_info->cpu].function )
-        init_timer(&dbs_timer[dbs_info->cpu], do_dbs_timer, 
-            (void *)dbs_info, dbs_info->cpu);
+    init_timer(&dbs_timer[dbs_info->cpu], do_dbs_timer, 
+        (void *)dbs_info, dbs_info->cpu);
 
     set_timer(&dbs_timer[dbs_info->cpu], NOW()+dbs_tuners_ins.sampling_rate);
 
@@ -206,7 +205,7 @@ static void dbs_timer_exit(struct cpu_dbs_info_s *dbs_info)
 {
     dbs_info->enable = 0;
     dbs_info->stoppable = 0;
-    stop_timer(&dbs_timer[dbs_info->cpu]);
+    kill_timer(&dbs_timer[dbs_info->cpu]);
 }
 
 int cpufreq_governor_dbs(struct cpufreq_policy *policy, unsigned int event)
