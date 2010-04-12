@@ -241,6 +241,23 @@ shadow_check_gwalk(struct vcpu *v, unsigned long va, walk_t *gw, int version)
     return !mismatch;
 }
 
+static int
+shadow_check_gl1e(struct vcpu *v, walk_t *gw)
+{
+    guest_l1e_t *l1p, nl1e;
+
+    if ( !mfn_valid(gw->l1mfn) )
+        return 0;
+
+    /* Can't just pull-through because mfn may have changed */
+    l1p = map_domain_page(mfn_x(gw->l1mfn));
+    nl1e.l1 = l1p[guest_l1_table_offset(gw->va)].l1;
+    unmap_domain_page(l1p);
+
+    return gw->l1e.l1 != nl1e.l1;
+}
+
+
 /* Remove write access permissions from a gwalk_t in a batch, and
  * return OR-ed result for TLB flush hint and need to rewalk the guest
  * pages.
@@ -3236,6 +3253,15 @@ static int sh_page_fault(struct vcpu *v,
          * OOS but not in the hash table anymore. */
         shadow_unlock(d);
         return 0;
+    }
+
+    /* Final check: if someone has synced a page, it's possible that
+     * our l1e is stale.  Compare the entries, and rewalk if necessary. */
+    if ( shadow_check_gl1e(v, &gw)  )
+    {
+        perfc_incr(shadow_inconsistent_gwalk);
+        shadow_unlock(d);
+        goto rewalk;
     }
 #endif /* OOS */
 
