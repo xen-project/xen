@@ -221,7 +221,7 @@ int libxl_domain_restore(struct libxl_ctx *ctx, libxl_domain_build_info *info,
                          libxl_device_model_info *dm_info)
 {
     char **vments = NULL, **localents = NULL;
-    int i, ret;
+    int i, ret, esave, flags;
 
     ret = build_pre(ctx, domid, info, state);
     if (ret) goto out;
@@ -259,6 +259,19 @@ int libxl_domain_restore(struct libxl_ctx *ctx, libxl_domain_build_info *info,
     else
         dm_info->saved_state = NULL;
 out:
+    esave = errno;
+
+    flags = fcntl(fd, F_GETFL);
+    if (flags == -1) {
+        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "unable to get flags on restore fd");
+    } else {
+        flags &= ~O_NONBLOCK;
+        if (fcntl(fd, F_SETFL, flags) == -1)
+            XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "unable to put restore fd"
+                         " back to blocking mode");
+    }
+
+    errno = esave;
     return ret;
 }
 
