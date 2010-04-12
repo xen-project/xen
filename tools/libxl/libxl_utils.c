@@ -26,6 +26,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <assert.h>
 
 #include "libxl_utils.h"
 #include "libxl_internal.h"
@@ -177,3 +178,105 @@ out:
     return rc;
 }
 
+int libxl_read_file_contents(struct libxl_ctx *ctx, const char *filename,
+                             void **data_r, int *datalen_r) {
+    FILE *f = 0;
+    uint8_t *data = 0;
+    int datalen = 0;
+    int e;
+    struct stat stab;
+    ssize_t rs;
+    
+    f = fopen(filename, "r");
+    if (!f) {
+        if (errno == ENOENT) return ENOENT;
+        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "failed to open %s", filename);
+        goto xe;
+    }
+
+    if (fstat(fileno(f), &stab)) {
+        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "failed to fstat %s", filename);
+        goto xe;
+    }
+
+    if (!S_ISREG(stab.st_mode)) {
+        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "%s is not a plain file", filename);
+        errno = ENOTTY;
+        goto xe;
+    }
+
+    if (stab.st_size > INT_MAX) {
+        XL_LOG(ctx, XL_LOG_ERROR, "file %s is far too large", filename);
+        errno = EFBIG;
+        goto xe;
+    }
+
+    datalen = stab.st_size;
+
+    if (stab.st_size && data_r) {
+        data = malloc(datalen);
+        if (!data) goto xe;
+
+        rs = fread(data, 1, datalen, f);
+        if (rs != datalen) {
+            if (ferror(f))
+                XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "failed to read %s", filename);
+            else if (feof(f))
+                XL_LOG(ctx, XL_LOG_ERROR, "%s changed size while we"
+                       " were reading it", filename);
+            else
+                abort();
+            goto xe;
+        }
+    }
+
+    if (fclose(f)) {
+        f = 0;
+        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "failed to close %s", filename);
+        goto xe;
+    }
+
+    if (data_r) *data_r = data;
+    if (datalen_r) *datalen_r = datalen;
+
+    return 0;
+
+ xe:
+    e = errno;
+    assert(e != ENOENT);
+    if (f) fclose(f);
+    if (data) free(data);
+    return e;
+}
+
+#define READ_WRITE_EXACTLY(rw, zero_is_eof, constdata)                    \
+                                                                          \
+  int libxl_##rw##_exactly(struct libxl_ctx *ctx, int fd,                 \
+                           constdata void *data, ssize_t sz,              \
+                           const char *filename, const char *what) {      \
+      ssize_t got;                                                        \
+                                                                          \
+      while (sz > 0) {                                                    \
+          got = rw(fd, data, sz);                                         \
+          if (got == -1) {                                                \
+              if (errno == EINTR) continue;                               \
+              XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "failed to " #rw " %s%s%s", \
+                           what?what:"", what?" from ":"", filename);     \
+              return errno;                                               \
+          }                                                               \
+          if (got == 0) {                                                 \
+              XL_LOG(ctx, XL_LOG_ERROR,                                   \
+                     zero_is_eof                                          \
+                     ? "file/stream truncated reading %s%s%s"             \
+                     : "file/stream write returned 0! writing %s%s%s",    \
+                     what?what:"", what?" from ":"", filename);           \
+              return EPROTO;                                              \
+          }                                                               \
+          sz -= got;                                                      \
+          data = (char*)data + got;                                       \
+      }                                                                   \
+      return 0;                                                           \
+  }
+
+READ_WRITE_EXACTLY(read, 1, /* */)
+READ_WRITE_EXACTLY(write, 0, const)

@@ -26,5 +26,23 @@ int libxl_is_stubdom(struct libxl_ctx *ctx, uint32_t domid, uint32_t *target_dom
 int libxl_create_logfile(struct libxl_ctx *ctx, char *name, char **full_name);
 int libxl_string_to_phystype(struct libxl_ctx *ctx, char *s, libxl_disk_phystype *phystype);
 
+int libxl_read_file_contents(struct libxl_ctx *ctx, const char *filename,
+                             void **data_r, int *datalen_r);
+  /* Reads the contents of the plain file filename into a mallocd
+   * buffer.  Returns 0 or errno.  Any errors other than ENOENT are logged.
+   * If the file is empty, *data_r and *datalen_r are set to 0.
+   * On error, *data_r and *datalen_r are undefined.
+   * data_r and/or datalen_r may be 0.
+   */
+
+int libxl_read_exactly(struct libxl_ctx *ctx, int fd, void *data, ssize_t sz,
+                       const char *filename, const char *what);
+int libxl_write_exactly(struct libxl_ctx *ctx, int fd, const void *data,
+                        ssize_t sz, const char *filename, const char *what);
+  /* Returns 0 or errno.  If file is truncated on reading, returns
+   * EPROTO and you have no way to tell how much was read.  Errors are
+   * logged using filename (which is only used for logging) and what
+   * (which may be 0). */
+    
 #endif
 
