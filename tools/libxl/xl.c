@@ -891,7 +891,7 @@ static void help(char *command)
         printf("-d                     Enable debug messages.\n");
         printf("-e                     Do not wait in the background for the death of the domain.\n");
     } else if(!strcmp(command, "list")) {
-        printf("Usage: xl list [Domain]\n\n");
+        printf("Usage: xl list [-v] [Domain]\n\n");
         printf("List information about all/some domains.\n\n");
     } else if(!strcmp(command, "pci-attach")) {
         printf("Usage: xl pci-attach <Domain> <BDF> [Virtual Slot]\n\n");
@@ -1368,7 +1368,7 @@ void destroy_domain(char *p)
     libxl_domain_destroy(&ctx, domid, 0);
 }
 
-void list_domains(void)
+void list_domains(int verbose)
 {
     struct libxl_ctx ctx;
     struct libxl_dominfo *info;
@@ -1388,7 +1388,7 @@ void list_domains(void)
     }
     printf("Name                                        ID   Mem VCPUs\tState\tTime(s)\n");
     for (i = 0; i < nb_domain; i++) {
-        printf("%-40s %5d %5lu %5d        %c%c%c %8.1f\n",
+        printf("%-40s %5d %5lu %5d        %c%c%c %8.1f",
                 libxl_domid_to_name(&ctx, info[i].domid),
                 info[i].domid,
                 (unsigned long) (info[i].max_memkb / 1024),
@@ -1397,6 +1397,11 @@ void list_domains(void)
                 info[i].paused ? 'p' : '-',
                 info[i].dying ? 'd' : '-',
                 ((float)info[i].cpu_time / 1e9));
+        if (verbose) {
+            char *uuid = libxl_uuid2string(&ctx, info[i].uuid);
+            printf(" %s", uuid);
+        }
+        putchar('\n');
     }
     free(info);
 }
@@ -1614,20 +1619,23 @@ int main_destroy(int argc, char **argv)
 
 int main_list(int argc, char **argv)
 {
-    int opt;
+    int opt, verbose = 0;
 
-    while ((opt = getopt(argc, argv, "h")) != -1) {
+    while ((opt = getopt(argc, argv, "hv")) != -1) {
         switch (opt) {
         case 'h':
             help("list");
             exit(0);
+        case 'v':
+            verbose = 1;
+            break;
         default:
             fprintf(stderr, "option not supported\n");
             break;
         }
     }
 
-    list_domains();
+    list_domains(verbose);
     exit(0);
 }
 

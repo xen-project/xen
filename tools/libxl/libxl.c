@@ -93,11 +93,8 @@ int libxl_domain_make(struct libxl_ctx *ctx, libxl_domain_create_info *info,
     xs_transaction_t t;
     xen_domain_handle_t handle;
 
-    uuid_string = string_of_uuid(ctx, info->uuid);
-    if (!uuid_string) {
-        XL_LOG(ctx, XL_LOG_ERROR, "cannot allocate uuid string");
-        return ERROR_FAIL;
-    }
+    uuid_string = libxl_uuid2string(ctx, info->uuid);
+    if (!uuid_string) return ERROR_NOMEM;
 
     flags = info->hvm ? XEN_DOMCTL_CDF_hvm_guest : 0;
     flags |= info->hap ? XEN_DOMCTL_CDF_hap : 0;

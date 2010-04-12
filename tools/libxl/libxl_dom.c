@@ -350,3 +350,9 @@ int save_device_model(struct libxl_ctx *ctx, uint32_t domid, int fd)
     unlink(filename);
     return 0;
 }
+
+char *libxl_uuid2string(struct libxl_ctx *ctx, uint8_t uuid[16]) {
+    char *s = string_of_uuid(ctx, uuid);
+    if (!s) XL_LOG(ctx, XL_LOG_ERROR, "cannot allocate for uuid");
+    return s;
+}

@@ -264,6 +264,9 @@ int libxl_domain_resume(struct libxl_ctx *ctx, uint32_t domid);
 int libxl_domain_shutdown(struct libxl_ctx *ctx, uint32_t domid, int req);
 int libxl_domain_destroy(struct libxl_ctx *ctx, uint32_t domid, int force);
 
+char *libxl_uuid2string(struct libxl_ctx *ctx, uint8_t uuid[16]);
+  /* 0 means ERROR_ENOMEM, which we have logged */
+
 /* events handling */
 
 typedef enum {
