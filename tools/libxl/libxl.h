@@ -242,6 +242,7 @@ enum {
     ERROR_NI = -3,
     ERROR_NOMEM = -4,
     ERROR_INVAL = -5,
+    ERROR_BADFAIL = -6,
 };
 
 #define LIBXL_VERSION 0
