@@ -16,6 +16,8 @@
 #include "libxl_osdeps.h"
 
 #include <stdio.h>
+#include <assert.h>
+#include <glob.h>
 #include <inttypes.h>
 #include <string.h>
 #include <sys/time.h> /* for struct timeval */
@@ -355,4 +357,129 @@ char *libxl_uuid2string(struct libxl_ctx *ctx, uint8_t uuid[16]) {
     char *s = string_of_uuid(ctx, uuid);
     if (!s) XL_LOG(ctx, XL_LOG_ERROR, "cannot allocate for uuid");
     return s;
+}
+
+static const char *userdata_path(struct libxl_ctx *ctx, uint32_t domid,
+                                      const char *userdata_userid,
+                                      const char *wh) {
+    char *path, *uuid_string;
+    struct libxl_dominfo info;
+    int rc;
+
+    rc = libxl_domain_info(ctx, &info, domid);
+    if (rc) {
+        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "unable to find domain info"
+                     " for domain %l"PRIu32, domid);
+        return 0;
+    }
+    uuid_string = string_of_uuid(ctx, info.uuid);
+
+    path = libxl_sprintf(ctx, "/var/lib/xen/"
+                         "userdata-%s.%s.%s",
+                         wh, uuid_string, userdata_userid);
+    if (!path)
+        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "unable to allocate for"
+                     " userdata path");
+    return path;
+}
+
+static int userdata_delete(struct libxl_ctx *ctx, const char *path) {
+    int r;
+    r = unlink(path);
+    if (r) {
+        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "remove failed for %s", path);
+        return errno;
+    }
+    return 0;
+}
+
+void libxl__userdata_destroyall(struct libxl_ctx *ctx, uint32_t domid) {
+    const char *pattern;
+    glob_t gl;
+    int r, i;
+
+    pattern = userdata_path(ctx, domid, "*", "?");
+    if (!pattern) return;
+
+    gl.gl_pathc = 0;
+    gl.gl_pathv = 0;
+    gl.gl_offs = 0;
+    r = glob(pattern, GLOB_ERR|GLOB_NOSORT|GLOB_MARK, 0, &gl);
+    if (r == GLOB_NOMATCH) return;
+    if (r) XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "glob failed for %s", pattern);
+
+    for (i=0; i<gl.gl_pathc; i++) {
+        userdata_delete(ctx, gl.gl_pathv[i]);
+    }
+    globfree(&gl);
+}
+
+int libxl_userdata_store(struct libxl_ctx *ctx, uint32_t domid,
+                              const char *userdata_userid,
+                              const uint8_t *data, int datalen) {
+    const char *filename;
+    const char *newfilename;
+    int e;
+    int fd = -1;
+    FILE *f = 0;
+    size_t rs;
+
+    filename = userdata_path(ctx, domid, userdata_userid, "d");
+    if (!filename) return ENOMEM;
+
+    if (!datalen)
+        return userdata_delete(ctx, filename);
+
+    newfilename = userdata_path(ctx, domid, userdata_userid, "n");
+    if (!newfilename) return ENOMEM;
+
+    fd= open(newfilename, O_RDWR|O_CREAT|O_TRUNC, 0600);
+    if (fd<0) goto xe;
+
+    f= fdopen(fd, "wb");
+    if (!f) goto xe;
+    fd = -1;
+
+    rs = fwrite(data, 1, datalen, f);
+    if (rs != datalen) { assert(ferror(f)); goto xe; }
+
+    if (fclose(f)) goto xe;
+    f = 0;
+
+    if (rename(newfilename,filename)) goto xe;
+
+    return 0;
+
+ xe:
+    e = errno;
+    if (f) fclose(f);
+    if (fd>=0) close(fd);
+
+    XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "cannot write %s for %s",
+                 newfilename, filename);
+    return e;
+}
+
+int libxl_userdata_retrieve(struct libxl_ctx *ctx, uint32_t domid,
+                                 const char *userdata_userid,
+                                 uint8_t **data_r, int *datalen_r) {
+    const char *filename;
+    int e;
+    int datalen = 0;
+    void *data = 0;
+
+    filename = userdata_path(ctx, domid, userdata_userid, "d");
+    if (!filename) return ENOMEM;
+
+    e = libxl_read_file_contents(ctx, filename, data_r ? &data : 0, &datalen);
+
+    if (!e && !datalen) {
+        XL_LOG(ctx, XL_LOG_ERROR, "userdata file %s is empty", filename);
+        if (data_r) assert(!*data_r);
+        return EPROTO;
+    }
+
+    if (data_r) *data_r = data;
+    if (datalen_r) *datalen_r = datalen;
+    return 0;
 }

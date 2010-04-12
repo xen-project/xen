@@ -725,6 +725,8 @@ int libxl_domain_destroy(struct libxl_ctx *ctx, uint32_t domid, int force)
         if (!xs_rm(ctx->xsh, XBT_NULL, xapi_path))
             XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "xs_rm failed for %s", xapi_path);
 
+    libxl__userdata_destroyall(ctx, domid);
+
     rc = xc_domain_destroy(ctx->xch, domid);
     if (rc < 0) {
         XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, rc, "xc_domain_destroy failed for %d", domid);

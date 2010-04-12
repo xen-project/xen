@@ -366,6 +366,37 @@ int libxl_device_pci_init(libxl_device_pci *pcidev, unsigned int domain,
                           unsigned int bus, unsigned int dev,
                           unsigned int func, unsigned int vdevfn);
 
+/*
+ * Functions for allowing users of libxl to store private data
+ * relating to a domain.  The data is an opaque sequence of bytes and
+ * is not interpreted or used by libxl.
+ *
+ * Data is indexed by the userdata userid, which is a short printable
+ * ASCII string.  The following list is a registry of userdata userids
+ * (the registry may be updated by posting a patch to xen-devel):
+ *
+ *  userid      Data contents
+ *   "xl"        domain config file in xl format, Unix line endings
+ *
+ * libxl does not enforce the registration of userdata userids or the
+ * semantics of the data.  For specifications of the data formats
+ * see the code or documentation for the libxl caller in question.
+ */
+int libxl_userdata_store(struct libxl_ctx *ctx, uint32_t domid,
+                              const char *userdata_userid,
+                              const uint8_t *data, int datalen);
+  /* If datalen==0, data is not used and the user data for
+   * that domain and userdata_userid is deleted. */
+int libxl_userdata_retrieve(struct libxl_ctx *ctx, uint32_t domid,
+                                 const char *userdata_userid,
+                                 uint8_t **data_r, int *datalen_r);
+  /* On successful return, *data_r is from malloc.
+   * If there is no data for that domain and userdata_userid,
+   * *data_r and *datalen_r will be set to 0.
+   * data_r and datalen_r may be 0.
+   * On error return, *data_r and *datalen_r are undefined.
+   */
+
 typedef enum {
     POWER_BUTTON,
     SLEEP_BUTTON

@@ -130,6 +130,7 @@ int restore_common(struct libxl_ctx *ctx, uint32_t domid,
                    libxl_domain_build_info *info, libxl_domain_build_state *state, int fd);
 int core_suspend(struct libxl_ctx *ctx, uint32_t domid, int fd, int hvm, int live, int debug);
 int save_device_model(struct libxl_ctx *ctx, uint32_t domid, int fd);
+void libxl__userdata_destroyall(struct libxl_ctx *ctx, uint32_t domid);
 
 /* from xl_device */
 char *device_disk_backend_type_of_phystype(libxl_disk_phystype phystype);
