@@ -17,6 +17,7 @@ import os, sys, string, struct, tempfile, re
 import copy
 import logging
 import platform
+import xen.lowlevel.xc
 
 import curses, _curses, curses.wrapper, curses.textpad, curses.ascii
 import getopt
@@ -573,27 +574,28 @@ def run_grub(file, entry, fs, arg):
 
     return grubcfg
 
+def supports64bitPVguest():
+    xc = xen.lowlevel.xc.xc()
+    caps = xc.xeninfo()['xen_caps'].split(" ")
+    for cap in caps:
+        if cap == "xen-3.0-x86_64":
+            return True
+    return False
+
 # If nothing has been specified, look for a Solaris domU. If found, perform the
 # necessary tweaks.
 def sniff_solaris(fs, cfg):
     if not fs.file_exists("/platform/i86xpv/kernel/unix"):
         return cfg
-    
-    # darned python
-    longmode = (sys.maxint != 2147483647L)
-    if not longmode:
-        longmode = os.uname()[4] == "x86_64"
-    if not longmode:
-        if (os.access("/usr/bin/isainfo", os.R_OK) and
-            os.popen("/usr/bin/isainfo -b").read() == "64\n"):
-            longmode = True
 
     if not cfg["kernel"]:
-        cfg["kernel"] = "/platform/i86xpv/kernel/unix"
-        cfg["ramdisk"] = "/platform/i86pc/boot_archive"
-        if longmode:
+        if supports64bitPVguest() and \
+          fs.file_exists("/platform/i86xpv/kernel/amd64/unix"):
             cfg["kernel"] = "/platform/i86xpv/kernel/amd64/unix"
             cfg["ramdisk"] = "/platform/i86pc/amd64/boot_archive"
+        else:
+            cfg["kernel"] = "/platform/i86xpv/kernel/unix"
+            cfg["ramdisk"] = "/platform/i86pc/boot_archive"
 
     # Unpleasant. Typically we'll have 'root=foo -k' or 'root=foo /kernel -k',
     # and we need to maintain Xen properties (root= and ip=) and the kernel
