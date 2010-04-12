@@ -86,12 +86,13 @@ int do_get_pm_info(struct xen_sysctl_get_pmstat *op)
     case PMSTAT_get_pxstat:
     {
         uint32_t ct;
-        struct pm_px *pxpt = cpufreq_statistic_data[op->cpuid];
+        struct pm_px *pxpt;
         spinlock_t *cpufreq_statistic_lock = 
                    &per_cpu(cpufreq_statistic_lock, op->cpuid);
 
         spin_lock(cpufreq_statistic_lock);
 
+        pxpt = cpufreq_statistic_data[op->cpuid];
         if ( !pxpt || !pxpt->u.pt || !pxpt->u.trans_pt )
         {
             spin_unlock(cpufreq_statistic_lock);
