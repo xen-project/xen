@@ -877,6 +877,11 @@ static void schedule(void)
              next_slice.time);
 
     ASSERT(prev->runstate.state == RUNSTATE_running);
+
+    TRACE_4D(TRC_SCHED_SWITCH,
+             prev->domain->domain_id, prev->vcpu_id,
+             next->domain->domain_id, next->vcpu_id);
+
     vcpu_runstate_change(
         prev,
         (test_bit(_VPF_blocked, &prev->pause_flags) ? RUNSTATE_blocked :
@@ -886,6 +891,11 @@ static void schedule(void)
 
     ASSERT(next->runstate.state != RUNSTATE_running);
     vcpu_runstate_change(next, RUNSTATE_running, now);
+
+    /*
+     * NB. Don't add any trace records from here until the actual context
+     * switch, else lost_records resume will not work properly.
+     */
 
     ASSERT(!next->is_running);
     next->is_running = 1;
@@ -899,10 +909,6 @@ static void schedule(void)
     /* Ensure that the domain has an up-to-date time base. */
     update_vcpu_system_time(next);
     vcpu_periodic_timer_work(next);
-
-    TRACE_4D(TRC_SCHED_SWITCH,
-             prev->domain->domain_id, prev->vcpu_id,
-             next->domain->domain_id, next->vcpu_id);
 
     context_switch(prev, next);
 }
