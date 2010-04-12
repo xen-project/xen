@@ -297,6 +297,12 @@ int libxl_free_waiter(libxl_waiter *waiter);
 int libxl_event_get_domain_death_info(struct libxl_ctx *ctx, uint32_t domid, libxl_event *event, xc_domaininfo_t *info);
 int libxl_event_get_disk_eject_info(struct libxl_ctx *ctx, uint32_t domid, libxl_event *event, libxl_device_disk *disk);
 
+int libxl_domain_rename(struct libxl_ctx *ctx, uint32_t domid,
+                        const char *old_name, const char *new_name,
+                        xs_transaction_t trans);
+  /* if old_name is NULL, any old name is OK; otherwise we check
+   * transactionally that the domain has the old old name; if
+   * trans is not 0 we use caller's transaction and caller must do retries */
 
 int libxl_domain_pause(struct libxl_ctx *ctx, uint32_t domid);
 int libxl_domain_unpause(struct libxl_ctx *ctx, uint32_t domid);

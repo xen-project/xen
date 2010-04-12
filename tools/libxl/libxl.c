@@ -82,7 +82,7 @@ int libxl_ctx_set_log(struct libxl_ctx *ctx, libxl_log_callback log_callback, vo
 int libxl_domain_make(struct libxl_ctx *ctx, libxl_domain_create_info *info,
                        uint32_t *domid)
 {
-    int flags, ret, i;
+    int flags, ret, i, rc;
     char *uuid_string;
     char *rw_paths[] = { "device", "device/suspend/event-channel" , "data"};
     char *ro_paths[] = { "cpu", "memory", "device", "error", "drivers",
@@ -146,7 +146,8 @@ retry_transaction:
 
     xs_write(ctx->xsh, t, libxl_sprintf(ctx, "%s/vm", dom_path), vm_path, strlen(vm_path));
     xs_write(ctx->xsh, t, libxl_sprintf(ctx, "%s/vss", dom_path), vss_path, strlen(vss_path));
-    xs_write(ctx->xsh, t, libxl_sprintf(ctx, "%s/name", dom_path), info->name, strlen(info->name));
+    rc = libxl_domain_rename(ctx, *domid, 0, info->name, t);
+    if (rc) return rc;
 
     for (i = 0; i < ARRAY_SIZE(rw_paths); i++) {
         char *path = libxl_sprintf(ctx, "%s/%s", dom_path, rw_paths[i]);
@@ -173,6 +174,84 @@ retry_transaction:
         if (errno == EAGAIN)
             goto retry_transaction;
     return 0;
+}
+
+int libxl_domain_rename(struct libxl_ctx *ctx, uint32_t domid,
+                        const char *old_name, const char *new_name,
+                        xs_transaction_t trans) {
+    char *dom_path = 0;
+    const char *name_path;
+    char *got_old_name;
+    unsigned int got_old_len;
+    xs_transaction_t our_trans = 0;
+    int rc;
+
+    dom_path = libxl_xs_get_dompath(ctx, domid);
+    if (!dom_path) goto x_nomem;
+
+    name_path= libxl_sprintf(ctx, "%s/name", dom_path);
+    if (!name_path) goto x_nomem;
+
+ retry_transaction:
+    if (!trans) {
+        trans = our_trans = xs_transaction_start(ctx->xsh);
+        if (!our_trans) {
+            XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, errno,
+                            "create xs transaction for domain (re)name");
+            goto x_fail;
+        }
+    }
+
+    if (old_name) {
+        got_old_name = xs_read(ctx->xsh, trans, name_path, &got_old_len);
+        if (!got_old_name) {
+            XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, errno, "check old name"
+                            " for domain %"PRIu32" allegedly named `%s'",
+                            domid, old_name);
+            goto x_fail;
+        }
+        if (strcmp(old_name, got_old_name)) {
+            XL_LOG(ctx, XL_LOG_ERROR, "domain %"PRIu32" allegedly named "
+                   "`%s' is actually named `%s' - racing ?",
+                   domid, old_name, got_old_name);
+            free(got_old_name);
+            goto x_fail;
+        }
+        free(got_old_name);
+    }
+    if (!xs_write(ctx->xsh, trans, name_path,
+                  new_name, strlen(new_name))) {
+        XL_LOG(ctx, XL_LOG_ERROR, "failed to write new name `%s'"
+               " for domain %"PRIu32" previously named `%s'",
+               domid, new_name, old_name);
+        goto x_fail;
+    }
+
+    if (our_trans) {
+        if (!xs_transaction_end(ctx->xsh, our_trans, 0)) {
+            trans = our_trans = 0;
+            if (errno != EAGAIN) {
+                XL_LOG(ctx, XL_LOG_ERROR, "failed to commit new name `%s'"
+                       " for domain %"PRIu32" previously named `%s'",
+                       domid, new_name, old_name);
+                goto x_fail;
+            }
+            XL_LOG(ctx, XL_LOG_DEBUG, "need to retry rename transaction"
+                   " for domain %"PRIu32" (name_path=\"%s\", new_name=\"%s\")",
+                   domid, name_path, new_name);
+            goto retry_transaction;
+        }
+        our_trans = 0;
+    }
+
+    rc = 0;
+ x_rc:
+    if (dom_path) libxl_free(ctx, dom_path);
+    if (our_trans) xs_transaction_end(ctx->xsh, our_trans, 1);
+    return rc;
+
+ x_fail:  rc = ERROR_FAIL;  goto x_rc;
+ x_nomem: rc = ERROR_NOMEM; goto x_rc;
 }
 
 int libxl_domain_build(struct libxl_ctx *ctx, libxl_domain_build_info *info, uint32_t domid, libxl_domain_build_state *state)
