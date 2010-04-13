@@ -1103,6 +1103,8 @@ int mp_register_gsi (u32 gsi, int triggering, int polarity)
 	int			ioapic = -1;
 	int			ioapic_pin = 0;
 	int			idx, bit = 0;
+	struct irq_desc *	desc;
+	unsigned long		flags;
 
 	/*
 	 * Mapping between Global System Interrups, which
@@ -1127,8 +1129,13 @@ int mp_register_gsi (u32 gsi, int triggering, int polarity)
 	if (ioapic_renumber_irq)
 		gsi = ioapic_renumber_irq(ioapic, gsi);
 
-	if (!(irq_to_desc(gsi)->status & IRQ_DISABLED))
+	desc = irq_to_desc(gsi);
+	spin_lock_irqsave(&desc->lock, flags);
+	if (!(desc->status & IRQ_DISABLED) && desc->handler != &no_irq_type) {
+		spin_unlock_irqrestore(&desc->lock, flags);
 		return -EEXIST;
+	}
+	spin_unlock_irqrestore(&desc->lock, flags);
 
 	/* 
 	 * Avoid pin reprogramming.  PRTs typically include entries  
