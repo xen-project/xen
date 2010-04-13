@@ -893,18 +893,21 @@ class XendNode:
 
     def format_numa_info(self, ninfo):
         try:
-            nr_nodes=ninfo['max_node_index']
+            max_node_index=ninfo['max_node_index']
             str='\nnode: TotalMemory FreeMemory dma32Memory NodeDist:'
-            for i in range(0, nr_nodes):
+            for i in range(0, max_node_index+1):
                 str+='%4d ' % i
             str+='\n'
-            for i in range(0, nr_nodes):
+            for i in range(0, max_node_index+1):
                 str+='%4d:  %8dMB %8dMB  %8dMB         :' % (i, 
                                       ninfo['node_memsize'][i],
                                       ninfo['node_memfree'][i],
                                       ninfo['node_to_dma32_mem'][i])
                 for j in range(0, nr_nodes):
-                    str+='%4d ' % ninfo['node_to_node_dist'][(i*nr_nodes)+j]
+                    try:
+                        str+='%4d ' % ninfo['node_to_node_dist'][i][j]
+                    except:
+                        str+='-    '
                 str+='\n'
         except:
             str='none\n'

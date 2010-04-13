@@ -116,74 +116,49 @@ long arch_do_sysctl(
 
     case XEN_SYSCTL_numainfo:
     {
-        uint32_t i, max_node_index;
-        XEN_GUEST_HANDLE_64(uint64) node_to_memsize_arr;
-        XEN_GUEST_HANDLE_64(uint64) node_to_memfree_arr;
-        XEN_GUEST_HANDLE_64(uint32) node_to_node_distance_arr;
-
+        uint32_t i, j, max_node_index, last_online_node;
         xen_sysctl_numainfo_t *ni = &sysctl->u.numainfo;
 
-        max_node_index = ni->max_node_index;
-        node_to_memsize_arr = ni->node_to_memsize;
-        node_to_memfree_arr = ni->node_to_memfree;
-        node_to_node_distance_arr = ni->node_to_node_distance;
+        last_online_node = last_node(node_online_map);
+        max_node_index = min_t(uint32_t, ni->max_node_index, last_online_node);
+        ni->max_node_index = last_online_node;
 
-        memset(ni, 0, sizeof(*ni));
-        ni->node_to_memsize = node_to_memsize_arr;
-        ni->node_to_memfree = node_to_memfree_arr;
-        ni->node_to_node_distance = node_to_node_distance_arr;
-
-        max_node_index = min_t(uint32_t, max_node_index, num_online_nodes());
-        ni->max_node_index = max_node_index;
-
-        ret = 0;
-
-        for ( i = 0; i < max_node_index; i++ )
+        for ( i = 0; i <= max_node_index; i++ )
         {
-            if ( !guest_handle_is_null(node_to_memsize_arr) )
+            if ( !guest_handle_is_null(ni->node_to_memsize) )
             {
                 uint64_t memsize = node_online(i) ? 
                                    node_spanned_pages(i) << PAGE_SHIFT : 0ul;
-                if ( copy_to_guest_offset(node_to_memsize_arr, i, &memsize, 1) )
-                {
-                    ret = -EFAULT;
+                if ( copy_to_guest_offset(ni->node_to_memsize, i, &memsize, 1) )
                     break;
-                }
             }
-            if ( !guest_handle_is_null(node_to_memfree_arr) )
+            if ( !guest_handle_is_null(ni->node_to_memfree) )
             {
                 uint64_t memfree = node_online(i) ? 
                                    avail_node_heap_pages(i) << PAGE_SHIFT : 0ul;
-                if ( copy_to_guest_offset(node_to_memfree_arr, i, &memfree, 1) )
-                {
-                    ret = -EFAULT;
+                if ( copy_to_guest_offset(ni->node_to_memfree, i, &memfree, 1) )
                     break;
-                }
             }
 
-            if ( !guest_handle_is_null(node_to_node_distance_arr) )
-	    {
-                int j;
-                for ( j = 0; j < max_node_index; j++)
+            if ( !guest_handle_is_null(ni->node_to_node_distance) )
+            {
+                for ( j = 0; j <= max_node_index; j++)
                 {
                     uint32_t distance = ~0u;
-                    if (node_online(i) && node_online (j)) 
+                    if ( node_online(i) && node_online(j) )
                         distance = __node_distance(i, j);
-                    
-                    if ( copy_to_guest_offset(node_to_node_distance_arr, 
-                         (i * max_node_index + j), &distance, 1) )
-                    {
-                        ret = -EFAULT;
+                    if ( copy_to_guest_offset(
+                        ni->node_to_node_distance, 
+                        i*(max_node_index+1) + j, &distance, 1) )
                         break;
-                    }
                 }
+                if ( j <= max_node_index )
+                    break;
             }
         }
-        if (ret)
-            break;
 
-        if ( copy_to_guest(u_sysctl, sysctl, 1) )
-            ret = -EFAULT;
+        ret = ((i <= max_node_index) || copy_to_guest(u_sysctl, sysctl, 1))
+            ? -EFAULT : 0;
     }
     break;
     

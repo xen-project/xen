@@ -1269,21 +1269,22 @@ static PyObject *pyxc_topologyinfo(XcObject *self)
 static PyObject *pyxc_numainfo(XcObject *self)
 {
 #define MAX_NODE_INDEX 31
-    xc_numainfo_t ninfo;
+    xc_numainfo_t ninfo = { 0 };
     int i, j, max_node_index;
     uint64_t free_heap;
-    PyObject *ret_obj;
+    PyObject *ret_obj, *node_to_node_dist_list_obj;
     PyObject *node_to_memsize_obj, *node_to_memfree_obj;
     PyObject *node_to_dma32_mem_obj, *node_to_node_dist_obj;
     xc_node_to_memsize_t node_memsize[MAX_NODE_INDEX + 1];
     xc_node_to_memfree_t node_memfree[MAX_NODE_INDEX + 1];
-    xc_node_to_node_dist_t nodes_dist[(MAX_NODE_INDEX * MAX_NODE_INDEX) + 1];
+    xc_node_to_node_dist_t nodes_dist[(MAX_NODE_INDEX+1) * (MAX_NODE_INDEX+1)];
 
     set_xen_guest_handle(ninfo.node_to_memsize, node_memsize);
     set_xen_guest_handle(ninfo.node_to_memfree, node_memfree);
     set_xen_guest_handle(ninfo.node_to_node_distance, nodes_dist);
     ninfo.max_node_index = MAX_NODE_INDEX;
-    if( xc_numainfo(self->xc_handle, &ninfo) != 0 )
+
+    if ( xc_numainfo(self->xc_handle, &ninfo) != 0 )
         return pyxc_error_to_exception();
 
     max_node_index = ninfo.max_node_index;
@@ -1294,7 +1295,7 @@ static PyObject *pyxc_numainfo(XcObject *self)
     node_to_memsize_obj = PyList_New(0);
     node_to_memfree_obj = PyList_New(0);
     node_to_dma32_mem_obj = PyList_New(0);
-    node_to_node_dist_obj = PyList_New(0);
+    node_to_node_dist_list_obj = PyList_New(0);
     for ( i = 0; i < max_node_index; i++ )
     {
         PyObject *pyint;
@@ -1316,12 +1317,23 @@ static PyObject *pyxc_numainfo(XcObject *self)
         Py_DECREF(pyint);
 
         /* Node to Node Distance */
+        node_to_node_dist_obj = PyList_New(0);
         for ( j = 0; j < ninfo.max_node_index; j++ )
         {
-            pyint = PyInt_FromLong(nodes_dist[(i * ninfo.max_node_index) + j]);
-            PyList_Append(node_to_node_dist_obj, pyint);
-            Py_DECREF(pyint);
+            uint32_t dist = nodes_dist[i*(max_node_index+1) + j];
+            if ( dist == INVALID_TOPOLOGY_ID )
+            {
+                PyList_Append(node_to_node_dist_obj, Py_None);
+            }
+            else
+            {
+                pyint = PyInt_FromLong(dist);
+                PyList_Append(node_to_node_dist_obj, pyint);
+                Py_DECREF(pyint);
+            }
         }
+        PyList_Append(node_to_node_dist_list_obj, node_to_node_dist_obj);
+        Py_DECREF(node_to_node_dist_obj);
     }
 
     ret_obj = Py_BuildValue("{s:i}", "max_node_index", max_node_index);
@@ -1335,8 +1347,9 @@ static PyObject *pyxc_numainfo(XcObject *self)
     PyDict_SetItemString(ret_obj, "node_to_dma32_mem", node_to_dma32_mem_obj);
     Py_DECREF(node_to_dma32_mem_obj);
 
-    PyDict_SetItemString(ret_obj, "node_to_node_dist", node_to_node_dist_obj);
-    Py_DECREF(node_to_node_dist_obj);
+    PyDict_SetItemString(ret_obj, "node_to_node_dist",
+                         node_to_node_dist_list_obj);
+    Py_DECREF(node_to_node_dist_list_obj);
  
     return ret_obj;
 #undef MAX_NODE_INDEX

@@ -460,10 +460,9 @@ DEFINE_XEN_GUEST_HANDLE(xen_sysctl_lockprof_op_t);
 #define INVALID_TOPOLOGY_ID  (~0U)
 struct xen_sysctl_topologyinfo {
     /*
-     * IN: maximum addressable entry in the caller-provided cpu_to_core, 
-     * cpu_to_socket & cpu_to_node arrays.
+     * IN: maximum addressable entry in the caller-provided arrays.
      * OUT: largest cpu identifier in the system.
-     * If OUT is greater than IN then the cpu_to_node array is truncated!
+     * If OUT is greater than IN then the arrays are truncated!
      */
     uint32_t max_cpu_index;
 
@@ -486,35 +485,29 @@ DEFINE_XEN_GUEST_HANDLE(xen_sysctl_topologyinfo_t);
 #define XEN_SYSCTL_numainfo          17	
 struct xen_sysctl_numainfo {
     /*
-     * IN: maximum addressable entry in the caller-provided node_numbers, 
-     * node_to_memsize & node_to_memfree arrays.
-     * OUT: largest possible node index for the system.
-     * If OUT is greater than IN then these arrays are truncated!
+     * IN: maximum addressable entry in the caller-provided arrays.
+     * OUT: largest node identifier in the system.
+     * If OUT is greater than IN then the arrays are truncated!
      */
     uint32_t max_node_index;
 
-    /* For node_to_memsize & node_to_memfree arrays, the 
-     * entry with same index corrosponds to the same node.
-     * If a entry has no node information (e.g., node not present) then the 
-     * sentinel value ~0u is written for_node_number, and value 0u is written 
-     * for node_to_memsize & node_to_memfree.
-     * The size of this array is specified by the caller in @max_node_index. 
-     * If the actual @max_node_index is smaller than the array then the 
-     * trailing elements of the array will not be written by the sysctl.
-     */
+    /* NB. Entries are 0 if node is not present. */
     XEN_GUEST_HANDLE_64(uint64) node_to_memsize;
     XEN_GUEST_HANDLE_64(uint64) node_to_memfree;
 
-
-    /* node_to_node_distance is array of size (nr_nodes * nr_nodes) listing
-     * memory access distances between nodes. i'th  entry in the array 
-     * specifies distance between node (i / nr_nodes) & node (i % nr_nodes)
-     * If a entry has no node distance information (e.g., node not present) 
-     * then the sentinel value ~0u is written.
-     * The size of this array is specified by the caller in 
-     * @max_node_distance_index. If the max_node_index*max_node_index is 
-     * smaller than the array then the trailing elements of the array will 
-     * not be written by the sysctl.
+    /*
+     * Array, of size (max_node_index+1)^2, listing memory access distances
+     * between nodes. If an entry has no node distance information (e.g., node 
+     * not present) then the value ~0u is written.
+     * 
+     * Note that the array rows must be indexed by multiplying by the minimum 
+     * of the caller-provided max_node_index and the returned value of
+     * max_node_index. That is, if the largest node index in the system is
+     * smaller than the caller can handle, a smaller 2-d array is constructed
+     * within the space provided by the caller. When this occurs, trailing
+     * space provided by the caller is not modified. If the largest node index
+     * in the system is larger than the caller can handle, then a 2-d array of
+     * the maximum size handleable by the caller is constructed.
      */
     XEN_GUEST_HANDLE_64(uint32) node_to_node_distance;
 };
