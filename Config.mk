@@ -153,10 +153,9 @@ QEMU_REMOTE=http://xenbits.xensource.com/git-http/qemu-xen-unstable.git
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG := xen-4.0.0-rc8
-#QEMU_TAG ?= f1d909f0f854194f5a40d850886d1413fb8b63c2
-# Wed Mar 24 17:16:51 2010 +0000
-# Make hweight32 function static
+QEMU_TAG ?= b5160622517fb2d16d0836172a2e34633c9d94bf
+# Tue Apr 13 12:07:33 2010 +0100
+# passthrough: fix segmentation fault after hotplug pass-through device
 
 OCAML_XENSTORED_REPO=http://xenbits.xensource.com/ext/xen-ocaml-tools.hg
 
