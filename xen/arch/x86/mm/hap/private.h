@@ -30,5 +30,4 @@ unsigned long hap_gva_to_gfn_3_levels(struct vcpu *v, unsigned long gva,
 unsigned long hap_gva_to_gfn_4_levels(struct vcpu *v, unsigned long gva,
                                      uint32_t *pfec);
 
-
-#endif /* __SVM_NPT_H__ */
+#endif /* __HAP_PRIVATE_H__ */

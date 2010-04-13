@@ -134,6 +134,22 @@ p2m_find_entry(void *table, unsigned long *gfn_remainder,
     return (l1_pgentry_t *)table + index;
 }
 
+struct page_info *
+p2m_alloc_ptp(struct domain *d, unsigned long type)
+{
+    struct page_info *pg;
+
+    pg = d->arch.p2m->alloc_page(d);
+    if (pg == NULL)
+        return NULL;
+
+    page_list_add_tail(pg, &d->arch.p2m->pages);
+    pg->u.inuse.type_info = type | 1 | PGT_validated;
+    pg->count_info |= 1;
+
+    return pg;
+}
+
 // Walk one level of the P2M table, allocating a new table if required.
 // Returns 0 on error.
 //
@@ -156,15 +172,14 @@ p2m_next_level(struct domain *d, mfn_t *table_mfn, void **table,
     /* PoD: Not present doesn't imply empty. */
     if ( !l1e_get_flags(*p2m_entry) )
     {
-        struct page_info *pg = d->arch.p2m->alloc_page(d);
+        struct page_info *pg;
+
+        pg = p2m_alloc_ptp(d, type);
         if ( pg == NULL )
             return 0;
-        page_list_add_tail(pg, &d->arch.p2m->pages);
-        pg->u.inuse.type_info = type | 1 | PGT_validated;
-        pg->count_info |= 1;
 
         new_entry = l1e_from_pfn(mfn_x(page_to_mfn(pg)),
-                                 __PAGE_HYPERVISOR|_PAGE_USER);
+                                 __PAGE_HYPERVISOR | _PAGE_USER);
 
         switch ( type ) {
         case PGT_l3_page_table:
@@ -195,16 +210,15 @@ p2m_next_level(struct domain *d, mfn_t *table_mfn, void **table,
     if ( type == PGT_l2_page_table && (l1e_get_flags(*p2m_entry) & _PAGE_PSE) )
     {
         unsigned long flags, pfn;
-        struct page_info *pg = d->arch.p2m->alloc_page(d);
+        struct page_info *pg;
+
+        pg = p2m_alloc_ptp(d, PGT_l2_page_table);
         if ( pg == NULL )
             return 0;
-        page_list_add_tail(pg, &d->arch.p2m->pages);
-        pg->u.inuse.type_info = PGT_l2_page_table | 1 | PGT_validated;
-        pg->count_info = 1;
-        
+
         flags = l1e_get_flags(*p2m_entry);
         pfn = l1e_get_pfn(*p2m_entry);
-        
+
         l1_entry = map_domain_page(mfn_x(page_to_mfn(pg)));
         for ( i = 0; i < L2_PAGETABLE_ENTRIES; i++ )
         {
@@ -224,13 +238,12 @@ p2m_next_level(struct domain *d, mfn_t *table_mfn, void **table,
     if ( type == PGT_l1_page_table && (l1e_get_flags(*p2m_entry) & _PAGE_PSE) )
     {
         unsigned long flags, pfn;
-        struct page_info *pg = d->arch.p2m->alloc_page(d);
+        struct page_info *pg;
+
+        pg = p2m_alloc_ptp(d, PGT_l1_page_table);
         if ( pg == NULL )
             return 0;
-        page_list_add_tail(pg, &d->arch.p2m->pages);
-        pg->u.inuse.type_info = PGT_l1_page_table | 1 | PGT_validated;
-        pg->count_info |= 1;
-        
+
         /* New splintered mappings inherit the flags of the old superpage, 
          * with a little reorganisation for the _PAGE_PSE_PAT bit. */
         flags = l1e_get_flags(*p2m_entry);

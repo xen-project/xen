@@ -97,13 +97,9 @@ static int ept_set_middle_entry(struct domain *d, ept_entry_t *ept_entry)
 {
     struct page_info *pg;
 
-    pg = d->arch.p2m->alloc_page(d);
+    pg = p2m_alloc_ptp(d, 0);
     if ( pg == NULL )
         return 0;
-
-    pg->count_info = 1;
-    pg->u.inuse.type_info = 1 | PGT_validated;
-    page_list_add_tail(pg, &d->arch.p2m->pages);
 
     ept_entry->emt = 0;
     ept_entry->ipat = 0;

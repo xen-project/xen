@@ -444,6 +444,8 @@ int p2m_mem_paging_prep(struct domain *d, unsigned long gfn);
 /* Resume normal operation (in case a domain was paused) */
 void p2m_mem_paging_resume(struct domain *d);
 
+struct page_info *p2m_alloc_ptp(struct domain *d, unsigned long type);
+
 #endif /* _XEN_P2M_H */
 
 /*
