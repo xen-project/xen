@@ -149,6 +149,7 @@ void membuf_reserve_window(unsigned cpu, unsigned long window_size)
 {
     struct cpu_change_record *rec;
     long need_to_consume, free, freed;
+    int last_cpu = -1;
 
     if ( membuf.pending_size > 0 )
     {
@@ -193,10 +194,24 @@ void membuf_reserve_window(unsigned cpu, unsigned long window_size)
 
         if ( need_to_consume > 0 )
         {
+            last_cpu = rec->data.cpu;
             MEMBUF_CONS_INCREMENT(freed);
             need_to_consume -= freed;
         }
     } while( need_to_consume > 0 );
+
+    /* For good tsc consistency, we need to start at a low-cpu buffer.  Keep
+     * skipping until the cpu goes down or stays the same. */
+    rec = (struct cpu_change_record *)MEMBUF_POINTER(membuf.cons);
+    while ( rec->data.cpu > last_cpu )
+    {
+        last_cpu = rec->data.cpu; 
+
+        freed = sizeof(*rec) + rec->data.window_size;
+        
+        MEMBUF_CONS_INCREMENT(freed);
+        rec = (struct cpu_change_record *)MEMBUF_POINTER(membuf.cons);
+    }
 
 start_window:
     /*
