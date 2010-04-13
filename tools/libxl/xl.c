@@ -26,7 +26,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <sys/signal.h>
+#include <signal.h>
 #include <sys/socket.h>
 #include <sys/select.h>
 #include <arpa/inet.h>
