@@ -842,32 +842,32 @@ void cpu_topology_func(int argc, char *argv[])
 {
     uint32_t cpu_to_core[MAX_NR_CPU];
     uint32_t cpu_to_socket[MAX_NR_CPU];
-    struct xc_get_cputopo info;
-    int i, ret;
+    uint32_t cpu_to_node[MAX_NR_CPU];
+    xc_topologyinfo_t info = { 0 };
+    int i;
 
-    info.cpu_to_core = cpu_to_core;
-    info.cpu_to_socket = cpu_to_socket;
-    info.max_cpus = MAX_NR_CPU;
-    ret = xc_get_cputopo(xc_fd, &info);
-    if (!ret)
+    set_xen_guest_handle(info.cpu_to_core, cpu_to_core);
+    set_xen_guest_handle(info.cpu_to_socket, cpu_to_socket);
+    set_xen_guest_handle(info.cpu_to_node, cpu_to_node);
+    info.max_cpu_index = MAX_NR_CPU-1;
+
+    if ( xc_topologyinfo(xc_fd, &info) )
     {
-        printf("CPU\tcore\tsocket\n");
-        for (i=0; i<info.nr_cpus; i++)
-        {
-            if ( info.cpu_to_core[i] != INVALID_TOPOLOGY_ID &&
-                    info.cpu_to_socket[i] != INVALID_TOPOLOGY_ID )
-            {
-            printf("CPU%d\t %d\t %d\n", i, info.cpu_to_core[i],
-                    info.cpu_to_socket[i]);
-            }
-        }
-    }
-    else
-    {
-        printf("Can not get Xen CPU topology!\n");
+        printf("Can not get Xen CPU topology: %d\n", errno);
+        return;
     }
 
-    return ;
+    if ( info.max_cpu_index > (MAX_NR_CPU-1) )
+        info.max_cpu_index = MAX_NR_CPU-1;
+
+    printf("CPU\tcore\tsocket\tnode\n");
+    for ( i = 0; i < info.max_cpu_index; i++ )
+    {
+        if ( cpu_to_core[i] == INVALID_TOPOLOGY_ID )
+            continue;
+        printf("CPU%d\t %d\t %d\t %d\n",
+               i, cpu_to_core[i], cpu_to_socket[i], cpu_to_node[i]);
+    }
 }
 
 void set_sched_smt_func(int argc, char *argv[])

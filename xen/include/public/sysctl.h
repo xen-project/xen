@@ -336,22 +336,6 @@ struct xen_set_cpufreq_para {
     uint32_t ctrl_value;
 };
 
-/* Get physical CPU topology information. */
-#define INVALID_TOPOLOGY_ID  (~0U)
-struct xen_get_cputopo {
-     /* IN: maximum addressable entry in
-      * the caller-provided cpu_to_core/socket.
-      */
-    uint32_t max_cpus;
-    XEN_GUEST_HANDLE_64(uint32) cpu_to_core;
-    XEN_GUEST_HANDLE_64(uint32) cpu_to_socket;
-
-    /* OUT: number of cpus returned
-     * If OUT is greater than IN then the cpu_to_core/socket is truncated!
-     */
-    uint32_t nr_cpus;
-};
-
 struct xen_sysctl_pm_op {
     #define PM_PARA_CATEGORY_MASK      0xf0
     #define CPUFREQ_PARA               0x10
@@ -361,9 +345,6 @@ struct xen_sysctl_pm_op {
     #define SET_CPUFREQ_GOV            (CPUFREQ_PARA | 0x02)
     #define SET_CPUFREQ_PARA           (CPUFREQ_PARA | 0x03)
     #define GET_CPUFREQ_AVGFREQ        (CPUFREQ_PARA | 0x04)
-
-    /* get CPU topology */
-    #define XEN_SYSCTL_pm_op_get_cputopo  0x20
 
     /* set/reset scheduler power saving option */
     #define XEN_SYSCTL_pm_op_set_sched_opt_smt    0x21
@@ -387,7 +368,6 @@ struct xen_sysctl_pm_op {
         struct xen_set_cpufreq_gov  set_gov;
         struct xen_set_cpufreq_para set_para;
         uint64_aligned_t get_avgfreq;
-        struct xen_get_cputopo      get_topo;
         uint32_t                    set_sched_opt_smt;
         uint32_t                    get_max_cstate;
         uint32_t                    set_max_cstate;
@@ -477,8 +457,8 @@ typedef struct xen_sysctl_lockprof_op xen_sysctl_lockprof_op_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_lockprof_op_t);
 
 #define XEN_SYSCTL_topologyinfo         16 
+#define INVALID_TOPOLOGY_ID  (~0U)
 struct xen_sysctl_topologyinfo {
-
     /*
      * IN: maximum addressable entry in the caller-provided cpu_to_core, 
      * cpu_to_socket & cpu_to_node arrays.
@@ -498,8 +478,7 @@ struct xen_sysctl_topologyinfo {
      */
     XEN_GUEST_HANDLE_64(uint32) cpu_to_core;
     XEN_GUEST_HANDLE_64(uint32) cpu_to_socket;
-    XEN_GUEST_HANDLE_64(uint32) cpu_to_node;  /* node_number */
-
+    XEN_GUEST_HANDLE_64(uint32) cpu_to_node;
 };
 typedef struct xen_sysctl_topologyinfo xen_sysctl_topologyinfo_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_topologyinfo_t);

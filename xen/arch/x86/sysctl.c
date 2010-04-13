@@ -80,64 +80,37 @@ long arch_do_sysctl(
         
     case XEN_SYSCTL_topologyinfo:
     {
-        uint32_t i, max_cpu_index;
-        XEN_GUEST_HANDLE_64(uint32) cpu_to_core_arr;
-        XEN_GUEST_HANDLE_64(uint32) cpu_to_socket_arr;
-        XEN_GUEST_HANDLE_64(uint32) cpu_to_node_arr;
-
+        uint32_t i, max_cpu_index, last_online_cpu;
         xen_sysctl_topologyinfo_t *ti = &sysctl->u.topologyinfo;
 
-        max_cpu_index = ti->max_cpu_index;
-        cpu_to_core_arr = ti->cpu_to_core;
-        cpu_to_socket_arr = ti->cpu_to_socket;
-        cpu_to_node_arr = ti->cpu_to_node;
+        last_online_cpu = last_cpu(cpu_online_map);
+        max_cpu_index = min_t(uint32_t, ti->max_cpu_index, last_online_cpu);
+        ti->max_cpu_index = last_online_cpu;
 
-        memset(ti, 0, sizeof(*ti));
-        ti->cpu_to_core = cpu_to_core_arr;
-        ti->cpu_to_socket = cpu_to_socket_arr;
-        ti->cpu_to_node = cpu_to_node_arr;
-
-        max_cpu_index = min_t(uint32_t, max_cpu_index, num_online_cpus());
-        ti->max_cpu_index = max_cpu_index;
-
-        ret = 0;
-
-        for ( i = 0; i < max_cpu_index; i++ )
+        for ( i = 0; i <= max_cpu_index; i++ )
         {
-            if ( !guest_handle_is_null(cpu_to_core_arr) )
+            if ( !guest_handle_is_null(ti->cpu_to_core) )
             {
                 uint32_t core = cpu_online(i) ? cpu_to_core(i) : ~0u;
-                if ( copy_to_guest_offset(cpu_to_core_arr, i, &core, 1) )
-                {
-                    ret = -EFAULT;
+                if ( copy_to_guest_offset(ti->cpu_to_core, i, &core, 1) )
                     break;
-                }
             }
-            if ( !guest_handle_is_null(cpu_to_socket_arr) )
+            if ( !guest_handle_is_null(ti->cpu_to_socket) )
             {
                 uint32_t socket = cpu_online(i) ? cpu_to_socket(i) : ~0u;
-                if ( copy_to_guest_offset(cpu_to_socket_arr, i, &socket, 1) )
-                {
-                    ret = -EFAULT;
+                if ( copy_to_guest_offset(ti->cpu_to_socket, i, &socket, 1) )
                     break;
-                }
             }
-            if ( !guest_handle_is_null(cpu_to_node_arr) )
+            if ( !guest_handle_is_null(ti->cpu_to_node) )
             {
                 uint32_t node = cpu_online(i) ? cpu_to_node(i) : ~0u;
-                if ( copy_to_guest_offset(cpu_to_node_arr, i, &node, 1) )
-                {
-                    ret = -EFAULT;
+                if ( copy_to_guest_offset(ti->cpu_to_node, i, &node, 1) )
                     break;
-                }
             }
         }
 
-        if (ret)
-            break;
- 
-        if ( copy_to_guest(u_sysctl, sysctl, 1) )
-            ret = -EFAULT;
+        ret = ((i <= max_cpu_index) || copy_to_guest(u_sysctl, sysctl, 1))
+            ? -EFAULT : 0;
     }
     break;
 

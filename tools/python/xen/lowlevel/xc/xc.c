@@ -1191,14 +1191,13 @@ static PyObject *pyxc_physinfo(XcObject *self)
 static PyObject *pyxc_topologyinfo(XcObject *self)
 {
 #define MAX_CPU_INDEX 255
-    xc_topologyinfo_t tinfo;
+    xc_topologyinfo_t tinfo = { 0 };
     int i, max_cpu_index;
     PyObject *ret_obj;
     PyObject *cpu_to_core_obj, *cpu_to_socket_obj, *cpu_to_node_obj;
     xc_cpu_to_core_t coremap[MAX_CPU_INDEX + 1];
     xc_cpu_to_socket_t socketmap[MAX_CPU_INDEX + 1];
     xc_cpu_to_node_t nodemap[MAX_CPU_INDEX + 1];
-
 
     set_xen_guest_handle(tinfo.cpu_to_core, coremap);
     set_xen_guest_handle(tinfo.cpu_to_socket, socketmap);
@@ -1218,19 +1217,38 @@ static PyObject *pyxc_topologyinfo(XcObject *self)
     cpu_to_node_obj = PyList_New(0);
     for ( i = 0; i < max_cpu_index; i++ )
     {
-        PyObject *pyint;
+        if ( coremap[i] == INVALID_TOPOLOGY_ID )
+        {
+            PyList_Append(cpu_to_core_obj, Py_None);
+        }
+        else
+        {
+            PyObject *pyint = PyInt_FromLong(coremap[i]);
+            PyList_Append(cpu_to_core_obj, pyint);
+            Py_DECREF(pyint);
+        }
 
-        pyint = PyInt_FromLong(coremap[i]);
-        PyList_Append(cpu_to_core_obj, pyint);
-        Py_DECREF(pyint);
+        if ( socketmap[i] == INVALID_TOPOLOGY_ID )
+        {
+            PyList_Append(cpu_to_socket_obj, Py_None);
+        }
+        else
+        {
+            PyObject *pyint = PyInt_FromLong(socketmap[i]);
+            PyList_Append(cpu_to_socket_obj, pyint);
+            Py_DECREF(pyint);
+        }
 
-        pyint = PyInt_FromLong(socketmap[i]);
-        PyList_Append(cpu_to_socket_obj, pyint);
-        Py_DECREF(pyint);
-
-        pyint = PyInt_FromLong(nodemap[i]);
-        PyList_Append(cpu_to_node_obj, pyint);
-        Py_DECREF(pyint);
+        if ( nodemap[i] == INVALID_TOPOLOGY_ID )
+        {
+            PyList_Append(cpu_to_node_obj, Py_None);
+        }
+        else
+        {
+            PyObject *pyint = PyInt_FromLong(nodemap[i]);
+            PyList_Append(cpu_to_node_obj, pyint);
+            Py_DECREF(pyint);
+        }
     }
 
     ret_obj = Py_BuildValue("{s:i}", "max_cpu_index", max_cpu_index);

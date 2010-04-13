@@ -879,16 +879,16 @@ class XendNode:
         return self.format_pairs(self.list_to_rangepairs(list))
 
     def format_cpu_to_core_socket_node(self, tinfo):
-        try:
-            nr_cpus=tinfo['max_cpu_index']
-            str='\ncpu:    core    socket     node\n'
-            for i in range(0, nr_cpus):
+        max_cpu_index=tinfo['max_cpu_index']
+        str='\ncpu:    core    socket     node\n'
+        for i in range(0, max_cpu_index+1):
+            try:
                 str+='%3d:%8d %8d %8d\n' % (i, 
-                                          tinfo['cpu_to_core'][i],
-                                          tinfo['cpu_to_socket'][i],
-                                          tinfo['cpu_to_node'][i])
-        except:
-            str='none\n'
+                                            tinfo['cpu_to_core'][i],
+                                            tinfo['cpu_to_socket'][i],
+                                            tinfo['cpu_to_node'][i])
+            except:
+                pass
         return str[:-1];
 
     def format_numa_info(self, ninfo):

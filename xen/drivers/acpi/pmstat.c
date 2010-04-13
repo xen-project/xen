@@ -419,52 +419,6 @@ static int get_cpufreq_avgfreq(struct xen_sysctl_pm_op *op)
     return 0;
 }
 
-static int get_cputopo (struct xen_sysctl_pm_op *op)
-{
-    uint32_t i, nr_cpus;
-    XEN_GUEST_HANDLE_64(uint32) cpu_to_core_arr;
-    XEN_GUEST_HANDLE_64(uint32) cpu_to_socket_arr;
-    int arr_size, ret=0;
-
-    cpu_to_core_arr = op->u.get_topo.cpu_to_core;
-    cpu_to_socket_arr = op->u.get_topo.cpu_to_socket;
-    arr_size= min_t(uint32_t, op->u.get_topo.max_cpus, NR_CPUS);
-
-    if ( guest_handle_is_null( cpu_to_core_arr ) ||
-            guest_handle_is_null(  cpu_to_socket_arr) )
-    {
-        ret = -EINVAL;
-        goto out;
-    }
-
-    nr_cpus = 0;
-    for ( i = 0; i < arr_size; i++ )
-    {
-        uint32_t core, socket;
-        if ( cpu_online(i) )
-        {
-            core = cpu_to_core(i);
-            socket = cpu_to_socket(i);
-            nr_cpus = i;
-        }
-        else
-        {
-            core = socket = INVALID_TOPOLOGY_ID;
-        }
-
-        if ( copy_to_guest_offset(cpu_to_core_arr, i, &core, 1) ||
-                copy_to_guest_offset(cpu_to_socket_arr, i, &socket, 1))
-        {
-            ret = -EFAULT;
-            goto out;
-        }
-    }
-
-    op->u.get_topo.nr_cpus = nr_cpus + 1;
-out:
-    return ret;
-}
-
 int do_pm_op(struct xen_sysctl_pm_op *op)
 {
     int ret = 0;
@@ -507,12 +461,6 @@ int do_pm_op(struct xen_sysctl_pm_op *op)
     case GET_CPUFREQ_AVGFREQ:
     {
         ret = get_cpufreq_avgfreq(op);
-        break;
-    }
-
-    case XEN_SYSCTL_pm_op_get_cputopo:
-    {
-        ret = get_cputopo(op);
         break;
     }
 

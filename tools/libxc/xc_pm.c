@@ -326,26 +326,6 @@ int xc_get_cpufreq_avgfreq(int xc_handle, int cpuid, int *avg_freq)
     return ret;
 }
 
-int xc_get_cputopo(int xc_handle, struct xc_get_cputopo *info)
-{
-    int rc;
-    DECLARE_SYSCTL;
-
-    sysctl.cmd = XEN_SYSCTL_pm_op;
-    sysctl.u.pm_op.cmd = XEN_SYSCTL_pm_op_get_cputopo;
-    sysctl.u.pm_op.cpuid = 0;
-    set_xen_guest_handle( sysctl.u.pm_op.u.get_topo.cpu_to_core,
-                         info->cpu_to_core );
-    set_xen_guest_handle( sysctl.u.pm_op.u.get_topo.cpu_to_socket,
-                         info->cpu_to_socket );
-    sysctl.u.pm_op.u.get_topo.max_cpus = info->max_cpus;
-
-    rc = do_sysctl(xc_handle, &sysctl);
-    info->nr_cpus = sysctl.u.pm_op.u.get_topo.nr_cpus;
-
-    return rc;
-}
-
 /* value:   0 - disable sched_smt_power_savings 
             1 - enable sched_smt_power_savings
  */
