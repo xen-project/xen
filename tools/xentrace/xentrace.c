@@ -58,7 +58,8 @@ typedef struct settings_st {
     unsigned long timeout;
     unsigned long memory_buffer;
     uint8_t discard:1,
-        disable_tracing:1;
+        disable_tracing:1,
+        start_disabled:1;
 } settings_t;
 
 struct t_struct {
@@ -659,6 +660,10 @@ static int monitor_tbufs(void)
 
     /* setup access to trace buffers */
     get_tbufs(&tbufs_mfn, &tinfo_size);
+
+    if ( opts.start_disabled )
+        disable_tbufs();
+    
     tbufs = map_tbufs(tbufs_mfn, num, tinfo_size);
 
     size = tbufs->t_info->tbuf_size * XC_PAGE_SIZE;
@@ -791,6 +796,9 @@ static void usage(void)
 "                          it exits. Selecting this option will tell it to\n" \
 "                          keep tracing on.  Traces will be collected in\n" \
 "                          Xen's trace buffers until they become full.\n" \
+"  -X  --start-disabled    Setup trace buffers and listen, but don't enable\n" \
+"                          tracing. (Useful if tracing will be enabled by\n" \
+"                          else.)\n" \
 "  -T  --time-interval=s   Run xentrace for s seconds and quit.\n" \
 "  -?, --help              Show this message\n" \
 "  -V, --version           Print program version\n" \
@@ -914,12 +922,13 @@ static void parse_args(int argc, char **argv)
         { "memory-buffer",  required_argument, 0, 'M' },
         { "discard-buffers", no_argument,      0, 'D' },
         { "dont-disable-tracing", no_argument, 0, 'x' },
+        { "start-disabled", no_argument,       0, 'X' },
         { "help",           no_argument,       0, '?' },
         { "version",        no_argument,       0, 'V' },
         { 0, 0, 0, 0 }
     };
 
-    while ( (option = getopt_long(argc, argv, "t:s:c:e:S:r:T:M:Dx?V",
+    while ( (option = getopt_long(argc, argv, "t:s:c:e:S:r:T:M:DxX?V",
                     long_options, NULL)) != -1) 
     {
         switch ( option )
@@ -955,6 +964,10 @@ static void parse_args(int argc, char **argv)
 
         case 'x': /* Don't disable tracing */
             opts.disable_tracing = 0;
+            break;
+
+        case 'X': /* Start disabled */
+            opts.start_disabled = 1;
             break;
 
         case 'T':
@@ -993,6 +1006,7 @@ int main(int argc, char **argv)
     opts.cpu_mask = 0;
     opts.disk_rsvd = 0;
     opts.disable_tracing = 1;
+    opts.start_disabled = 0;
     opts.timeout = 0;
 
     parse_args(argc, argv);
