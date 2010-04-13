@@ -63,9 +63,6 @@ long arch_do_sysctl(
         pi->nr_nodes = num_online_nodes();
         pi->max_node_id = last_node(node_online_map);
         pi->max_cpu_id = last_cpu(cpu_online_map);
-        pi->sockets_per_node = 
-            pi->nr_cpus / 
-            (pi->nr_nodes * pi->cores_per_socket * pi->threads_per_core);
         pi->total_pages = total_pages;
         pi->free_pages = avail_domheap_pages();
         pi->scrub_pages = 0;

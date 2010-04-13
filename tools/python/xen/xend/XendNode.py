@@ -931,7 +931,6 @@ class XendNode:
                       'nr_nodes',
                       'cores_per_socket',
                       'threads_per_core',
-                      'sockets_per_node',
                       'cpu_mhz',
                       'hw_caps',
                       'virt_caps',

@@ -1179,7 +1179,6 @@ static PyObject *pyxc_physinfo(XcObject *self)
                             "nr_nodes",         pinfo.nr_nodes,
                             "threads_per_core", pinfo.threads_per_core,
                             "cores_per_socket", pinfo.cores_per_socket,
-                            "sockets_per_node", pinfo.sockets_per_node,
                             "nr_cpus",          pinfo.nr_cpus, 
                             "total_memory",     pages_to_kib(pinfo.total_pages),
                             "free_memory",      pages_to_kib(pinfo.free_pages),
