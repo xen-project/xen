@@ -147,6 +147,8 @@ struct vcpu *alloc_vcpu(
 
     spin_lock_init(&v->virq_lock);
 
+    tasklet_init(&v->continue_hypercall_tasklet, NULL, 0);
+
     if ( is_idle_domain(d) )
     {
         v->runstate.state = RUNSTATE_running;
@@ -587,6 +589,7 @@ static void complete_domain_destroy(struct rcu_head *head)
     {
         if ( (v = d->vcpu[i]) == NULL )
             continue;
+        tasklet_kill(&v->continue_hypercall_tasklet);
         vcpu_destroy(v);
         sched_destroy_vcpu(v);
     }
@@ -902,6 +905,7 @@ struct migrate_info {
     long (*func)(void *data);
     void *data;
     struct vcpu *vcpu;
+    unsigned int cpu;
     unsigned int nest;
 };
 
@@ -912,23 +916,39 @@ static void continue_hypercall_tasklet_handler(unsigned long _info)
     struct migrate_info *info = (struct migrate_info *)_info;
     struct vcpu *v = info->vcpu;
 
-    vcpu_sleep_sync(v);
+    /*
+     * Wait for vcpu to be entirely descheduled. We re-schedule ourselves
+     * meanwhile to allow other work to be done (e.g., descheduling the vcpu!).
+     */
+    BUG_ON(vcpu_runnable(v));
+    if ( v->is_running )
+    {
+        tasklet_schedule(&v->continue_hypercall_tasklet);
+        return;
+    }
+
+    /* Once descheduled, we need to gain access to its register state. */
+    sync_vcpu_execstate(v);
 
     this_cpu(continue_info) = info;
-    return_reg(v) = info->func(info->data);
+    return_reg(v) = (info->cpu == smp_processor_id())
+        ? info->func(info->data) : -EINVAL;
     this_cpu(continue_info) = NULL;
 
     if ( info->nest-- == 0 )
     {
         xfree(info);
         vcpu_unpause(v);
+        put_domain(v->domain);
     }
 }
 
 int continue_hypercall_on_cpu(int cpu, long (*func)(void *data), void *data)
 {
-    struct vcpu *curr = current;
     struct migrate_info *info;
+
+    if ( (cpu >= NR_CPUS) || !cpu_online(cpu) )
+        return -EINVAL;
 
     if ( cpu == smp_processor_id() )
         return func(data);
@@ -936,6 +956,8 @@ int continue_hypercall_on_cpu(int cpu, long (*func)(void *data), void *data)
     info = this_cpu(continue_info);
     if ( info == NULL )
     {
+        struct vcpu *curr = current;
+
         info = xmalloc(struct migrate_info);
         if ( info == NULL )
             return -ENOMEM;
@@ -943,11 +965,14 @@ int continue_hypercall_on_cpu(int cpu, long (*func)(void *data), void *data)
         info->vcpu = curr;
         info->nest = 0;
 
+        tasklet_kill(
+            &curr->continue_hypercall_tasklet);
         tasklet_init(
             &curr->continue_hypercall_tasklet,
             continue_hypercall_tasklet_handler,
             (unsigned long)info);
 
+        get_knownalive_domain(curr->domain);
         vcpu_pause_nosync(curr);
     }
     else
@@ -958,8 +983,9 @@ int continue_hypercall_on_cpu(int cpu, long (*func)(void *data), void *data)
 
     info->func = func;
     info->data = data;
+    info->cpu  = cpu;
 
-    tasklet_schedule_on_cpu(&curr->continue_hypercall_tasklet, cpu);
+    tasklet_schedule_on_cpu(&info->vcpu->continue_hypercall_tasklet, cpu);
 
     /* Dummy return value will be overwritten by tasklet. */
     return 0;
