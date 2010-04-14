@@ -885,6 +885,8 @@ void context_saved(struct vcpu *prev)
     /* Check for migration request /after/ clearing running flag. */
     smp_mb();
 
+    SCHED_OP(context_saved, prev);
+
     if ( unlikely(test_bit(_VPF_migrating, &prev->pause_flags)) )
         vcpu_migrate(prev);
 }

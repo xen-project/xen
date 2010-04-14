@@ -70,6 +70,7 @@ struct scheduler {
 
     void         (*sleep)          (struct vcpu *);
     void         (*wake)           (struct vcpu *);
+    void         (*context_saved)  (struct vcpu *);
 
     struct task_slice (*do_schedule) (s_time_t);
 
