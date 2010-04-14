@@ -21,6 +21,8 @@
  * Use is subject to license terms.
  */
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 #include "fsys_zfs.h"
 
 #define	MATCH_BITS	6
@@ -32,11 +34,10 @@
 int
 lzjb_decompress(void *s_start, void *d_start, size_t s_len, size_t d_len)
 {
-	unsigned char *src = s_start;
-	unsigned char *dst = d_start;
-	unsigned char *d_end = (unsigned char *)d_start + d_len;
-	unsigned char *cpy;
-	unsigned char copymap = '\0';
+	uchar_t *src = s_start;
+	uchar_t *dst = d_start;
+	uchar_t *d_end = (uchar_t *)d_start + d_len;
+	uchar_t *cpy, copymap = '\0';
 	int copymask = 1 << (NBBY - 1);
 
 	while (dst < d_end) {
@@ -44,11 +45,11 @@ lzjb_decompress(void *s_start, void *d_start, size_t s_len, size_t d_len)
 			copymask = 1;
 			copymap = *src++;
 		}
-		if (copymap & (unsigned char)copymask) {
+		if (copymap & copymask) {
 			int mlen = (src[0] >> (NBBY - MATCH_BITS)) + MATCH_MIN;
 			int offset = ((src[0] << NBBY) | src[1]) & OFFSET_MASK;
 			src += 2;
-			if ((cpy = dst - offset) < (unsigned char *)d_start)
+			if ((cpy = dst - offset) < (uchar_t *)d_start)
 				return (-1);
 			while (--mlen >= 0 && dst < d_end)
 				*dst++ = *cpy++;

@@ -24,6 +24,13 @@
 #ifndef	_SYS_FS_ZFS_ACL_H
 #define	_SYS_FS_ZFS_ACL_H
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#ifndef _UID_T
+#define	_UID_T
+typedef	unsigned int uid_t;			/* UID type */
+#endif /* _UID_T */
+
 typedef struct zfs_oldace {
 	uint32_t	z_fuid;		/* "who" */
 	uint32_t	z_access_mask;  /* access mask */

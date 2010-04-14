@@ -24,7 +24,8 @@
 
 XEN_ROOT = ../../..
 
-LIB_SRCS-y = fsys_zfs.c zfs_lzjb.c zfs_sha256.c zfs_fletcher.c
+CFLAGS += -DFSYS_ZFS -DFSIMAGE -I$(XEN_ROOT)/tools/libfsimage/zfs
+LIB_SRCS-y = zfs_lzjb.c zfs_sha256.c zfs_fletcher.c fsi_zfs.c fsys_zfs.c
 
 FS = zfs
 

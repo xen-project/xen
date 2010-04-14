@@ -17,63 +17,55 @@
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #ifndef _FSYS_ZFS_H
 #define	_FSYS_ZFS_H
 
-#include <fsimage_grub.h>
-#include <fsimage_priv.h>
+#ifdef	FSYS_ZFS
 
-#include "zfs-include/zfs.h"
-#include "zfs-include/dmu.h"
-#include "zfs-include/spa.h"
-#include "zfs-include/zio.h"
-#include "zfs-include/zio_checksum.h"
-#include "zfs-include/vdev_impl.h"
-#include "zfs-include/zap_impl.h"
-#include "zfs-include/zap_leaf.h"
-#include "zfs-include/uberblock_impl.h"
-#include "zfs-include/dnode.h"
-#include "zfs-include/dsl_dir.h"
-#include "zfs-include/zfs_acl.h"
-#include "zfs-include/zfs_znode.h"
-#include "zfs-include/dsl_dataset.h"
-#include "zfs-include/zil.h"
-#include "zfs-include/dmu_objset.h"
+#ifndef	FSIMAGE
+typedef unsigned long long uint64_t;
+typedef unsigned int uint32_t;
+typedef unsigned short uint16_t;
+typedef unsigned char uint8_t;
+typedef unsigned char uchar_t;
+
+#if defined(_LP64) || defined(_I32LPx)
+typedef	unsigned long size_t;
+#else
+typedef	unsigned int size_t;
+#endif
+#else
+#include "fsi_zfs.h"
+#endif	/* !FSIMAGE */
+
+#include <zfs-include/zfs.h>
+#include <zfs-include/dmu.h>
+#include <zfs-include/spa.h>
+#include <zfs-include/zio.h>
+#include <zfs-include/zio_checksum.h>
+#include <zfs-include/vdev_impl.h>
+#include <zfs-include/zap_impl.h>
+#include <zfs-include/zap_leaf.h>
+#include <zfs-include/uberblock_impl.h>
+#include <zfs-include/dnode.h>
+#include <zfs-include/dsl_dir.h>
+#include <zfs-include/zfs_acl.h>
+#include <zfs-include/zfs_znode.h>
+#include <zfs-include/dsl_dataset.h>
+#include <zfs-include/zil.h>
+#include <zfs-include/dmu_objset.h>
+#include <zfs-include/sa_impl.h>
 
 /*
  * Global Memory addresses to store MOS and DNODE data
  */
-#define	MOS		((dnode_phys_t *)(((zfs_bootarea_t *) \
-			    (ffi->ff_fsi->f_data))->zfs_data))
+#define	MOS		((dnode_phys_t *)\
+	(RAW_ADDR((mbi.mem_upper << 10) + 0x100000) - ZFS_SCRATCH_SIZE))
 #define	DNODE		(MOS+1) /* move sizeof(dnode_phys_t) bytes */
 #define	ZFS_SCRATCH	((char *)(DNODE+1))
-
-#define	MAXNAMELEN	256
-
-typedef struct zfs_bootarea {
-	char zfs_current_bootpath[MAXNAMELEN];
-	char zfs_current_rootpool[MAXNAMELEN];
-	char zfs_current_bootfs[MAXNAMELEN];
-	uint64_t zfs_current_bootfs_obj;
-	int zfs_open;
-
-	/* cache for a file block of the currently zfs_open()-ed file */
-	void *zfs_file_buf;
-	uint64_t zfs_file_start;
-	uint64_t zfs_file_end;
-
-	/* cache for a dnode block */
-	dnode_phys_t *zfs_dnode_buf;
-	dnode_phys_t *zfs_dnode_mdn;
-	uint64_t zfs_dnode_start;
-	uint64_t zfs_dnode_end;
-
-	char *zfs_stackbase;
-	char zfs_data[0x400000];
-} zfs_bootarea_t;
 
 /*
  * Verify dnode type.
@@ -108,9 +100,8 @@ typedef struct zfs_bootarea {
  * can support large sector disks.
  */
 #define	UBERBLOCK_SIZE		(1ULL << UBERBLOCK_SHIFT)
-#undef	offsetof
-#define	offsetof(t, m)   (size_t)(&(((t *)0)->m))
 #define	VDEV_UBERBLOCK_SHIFT	UBERBLOCK_SHIFT
+#include <stddef.h>
 #define	VDEV_UBERBLOCK_OFFSET(n) \
 offsetof(vdev_label_t, vl_uberblock[(n) << VDEV_UBERBLOCK_SHIFT])
 
@@ -120,8 +111,8 @@ typedef struct uberblock uberblock_t;
 typedef struct uberblock_phys {
 	uberblock_t	ubp_uberblock;
 	char		ubp_pad[UBERBLOCK_SIZE - sizeof (uberblock_t) -
-				sizeof (zio_block_tail_t)];
-	zio_block_tail_t ubp_zbt;
+				sizeof (zio_eck_t)];
+	zio_eck_t	ubp_zec;
 } uberblock_phys_t;
 
 /*
@@ -130,6 +121,15 @@ typedef struct uberblock_phys {
 #define	P2PHASE(x, align)		((x) & ((align) - 1))
 #define	DVA_OFFSET_TO_PHYS_SECTOR(offset) \
 	((offset + VDEV_LABEL_START_SIZE) >> SPA_MINBLOCKSHIFT)
+
+/*
+ * return x rounded down to an align boundary
+ * eg, P2ALIGN(1200, 1024) == 1024 (1*align)
+ * eg, P2ALIGN(1024, 1024) == 1024 (1*align)
+ * eg, P2ALIGN(0x1234, 0x100) == 0x1200 (0x12*align)
+ * eg, P2ALIGN(0x5600, 0x100) == 0x5600 (0x56*align)
+ */
+#define	P2ALIGN(x, align)		((x) & -(align))
 
 /*
  * For nvlist manipulation. (from nvpair.h)
@@ -199,5 +199,7 @@ extern void fletcher_4_native(const void *, uint64_t, zio_cksum_t *);
 extern void fletcher_4_byteswap(const void *, uint64_t, zio_cksum_t *);
 extern void zio_checksum_SHA256(const void *, uint64_t, zio_cksum_t *);
 extern int lzjb_decompress(void *, void *, size_t, size_t);
+
+#endif	/* FSYS_ZFS */
 
 #endif /* !_FSYS_ZFS_H */

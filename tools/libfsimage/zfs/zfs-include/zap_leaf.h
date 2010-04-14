@@ -24,6 +24,8 @@
 #ifndef	_SYS_ZAP_LEAF_H
 #define	_SYS_ZAP_LEAF_H
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 #define	ZAP_LEAF_MAGIC 0x2AB1EAF
 
 /* chunk size = 24 bytes */

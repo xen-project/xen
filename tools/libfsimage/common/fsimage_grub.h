@@ -78,6 +78,7 @@ unsigned long fsig_log2(unsigned long);
 #define	ERR_DEV_VALUES 1
 #define	ERR_WONT_FIT 1
 #define	ERR_READ 1
+#define	ERR_NEWER_VERSION 1
 
 fsi_plugin_ops_t *fsig_init(fsi_plugin_t *, fsig_plugin_ops_t *);
 

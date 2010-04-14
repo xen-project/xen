@@ -20,23 +20,14 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+#ifndef _FILESYS_H
+#define _FILESYS_H
 
-#ifndef _SYS_ZIO_CHECKSUM_H
-#define	_SYS_ZIO_CHECKSUM_H
+#ifdef  FSYS_ZFS
 
-/*
- * Signature for checksum functions.
- */
-typedef void zio_checksum_t(const void *data, uint64_t size, zio_cksum_t *zcp);
+/* THIS FILE IS INTENTIONALLY BLANK */
 
-/*
- * Information about each checksum function.
- */
-typedef struct zio_checksum_info {
-	zio_checksum_t	*ci_func[2]; /* checksum function for each byteorder */
-	int		ci_correctable;	/* number of correctable bits	*/
-	int		ci_eck;		/* uses zio embedded checksum? */
-	char		*ci_name;	/* descriptive name */
-} zio_checksum_info_t;
+#endif  /* FSI_ZFS */
 
-#endif	/* _SYS_ZIO_CHECKSUM_H */
+#endif /* !_FILESYS_H */
+
