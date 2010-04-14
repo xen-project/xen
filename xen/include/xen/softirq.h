@@ -47,7 +47,7 @@ void process_pending_softirqs(void);
 struct tasklet
 {
     struct list_head list;
-    bool_t is_scheduled;
+    int scheduled_on;
     bool_t is_running;
     bool_t is_dead;
     void (*func)(unsigned long);
@@ -55,10 +55,12 @@ struct tasklet
 };
 
 #define DECLARE_TASKLET(name, func, data) \
-    struct tasklet name = { LIST_HEAD_INIT(name.list), 0, 0, 0, func, data }
+    struct tasklet name = { LIST_HEAD_INIT(name.list), -1, 0, 0, func, data }
 
+void tasklet_schedule_on_cpu(struct tasklet *t, unsigned int cpu);
 void tasklet_schedule(struct tasklet *t);
 void tasklet_kill(struct tasklet *t);
+void migrate_tasklets_from_cpu(unsigned int cpu);
 void tasklet_init(
     struct tasklet *t, void (*func)(unsigned long), unsigned long data);
 

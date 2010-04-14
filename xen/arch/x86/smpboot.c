@@ -1374,6 +1374,7 @@ int cpu_down(unsigned int cpu)
 
 	BUG_ON(cpu_online(cpu));
 
+	migrate_tasklets_from_cpu(cpu);
 	cpu_mcheck_distribute_cmci();
 
 out:
