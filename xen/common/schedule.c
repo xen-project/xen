@@ -131,7 +131,7 @@ static inline void vcpu_runstate_change(
     s_time_t delta;
 
     ASSERT(v->runstate.state != new_state);
-    ASSERT(spin_is_locked(&per_cpu(schedule_data,v->processor).schedule_lock));
+    ASSERT(spin_is_locked(per_cpu(schedule_data,v->processor).schedule_lock));
 
     vcpu_urgent_count_update(v);
 
@@ -340,7 +340,7 @@ static void vcpu_migrate(struct vcpu *v)
     /* Switch to new CPU, then unlock old CPU. */
     v->processor = new_cpu;
     spin_unlock_irqrestore(
-        &per_cpu(schedule_data, old_cpu).schedule_lock, flags);
+        per_cpu(schedule_data, old_cpu).schedule_lock, flags);
 
     /* Wake on new CPU. */
     vcpu_wake(v);
@@ -808,7 +808,7 @@ static void schedule(void)
 
     sd = &this_cpu(schedule_data);
 
-    spin_lock_irq(&sd->schedule_lock);
+    spin_lock_irq(sd->schedule_lock);
 
     stop_timer(&sd->s_timer);
     
@@ -824,7 +824,7 @@ static void schedule(void)
 
     if ( unlikely(prev == next) )
     {
-        spin_unlock_irq(&sd->schedule_lock);
+        spin_unlock_irq(sd->schedule_lock);
         trace_continue_running(next);
         return continue_running(prev);
     }
@@ -862,7 +862,7 @@ static void schedule(void)
     ASSERT(!next->is_running);
     next->is_running = 1;
 
-    spin_unlock_irq(&sd->schedule_lock);
+    spin_unlock_irq(sd->schedule_lock);
 
     perfc_incr(sched_ctx);
 
@@ -930,7 +930,9 @@ void __init scheduler_init(void)
 
     for_each_possible_cpu ( i )
     {
-        spin_lock_init(&per_cpu(schedule_data, i).schedule_lock);
+        spin_lock_init(&per_cpu(schedule_data, i)._lock);
+        per_cpu(schedule_data, i).schedule_lock
+            = &per_cpu(schedule_data, i)._lock;
         init_timer(&per_cpu(schedule_data, i).s_timer, s_timer_fn, NULL, i);
     }
 
@@ -967,10 +969,10 @@ void dump_runq(unsigned char key)
 
     for_each_online_cpu ( i )
     {
-        spin_lock(&per_cpu(schedule_data, i).schedule_lock);
+        spin_lock(per_cpu(schedule_data, i).schedule_lock);
         printk("CPU[%02d] ", i);
         SCHED_OP(dump_cpu_state, i);
-        spin_unlock(&per_cpu(schedule_data, i).schedule_lock);
+        spin_unlock(per_cpu(schedule_data, i).schedule_lock);
     }
 
     local_irq_restore(flags);

@@ -394,7 +394,7 @@ static void ptc_ga_remote_func (void *varg)
     if (cpu != current->processor)
         return;
     local_irq_save(flags);
-    if (!spin_trylock(&per_cpu(schedule_data, cpu).schedule_lock))
+    if (!spin_trylock(per_cpu(schedule_data, cpu).schedule_lock))
         goto bail2;
     if (v->processor != cpu)
         goto bail1;
@@ -416,7 +416,7 @@ static void ptc_ga_remote_func (void *varg)
     ia64_dv_serialize_data();
     args->vcpu = NULL;
 bail1:
-    spin_unlock(&per_cpu(schedule_data, cpu).schedule_lock);
+    spin_unlock(per_cpu(schedule_data, cpu).schedule_lock);
 bail2:
     local_irq_restore(flags);
 }
@@ -446,7 +446,7 @@ IA64FAULT vmx_vcpu_ptc_ga(VCPU *vcpu, u64 va, u64 ps)
         do {
             cpu = v->processor;
             if (cpu != current->processor) {
-                spin_barrier(&per_cpu(schedule_data, cpu).schedule_lock);
+                spin_barrier(per_cpu(schedule_data, cpu).schedule_lock);
                 /* Flush VHPT on remote processors. */
                 smp_call_function_single(cpu, &ptc_ga_remote_func, &args, 1);
             } else {

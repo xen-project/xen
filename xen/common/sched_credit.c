@@ -789,7 +789,7 @@ csched_runq_sort(unsigned int cpu)
 
     spc->runq_sort_last = sort_epoch;
 
-    spin_lock_irqsave(&per_cpu(schedule_data, cpu).schedule_lock, flags);
+    spin_lock_irqsave(per_cpu(schedule_data, cpu).schedule_lock, flags);
 
     runq = &spc->runq;
     elem = runq->next;
@@ -814,7 +814,7 @@ csched_runq_sort(unsigned int cpu)
         elem = next;
     }
 
-    spin_unlock_irqrestore(&per_cpu(schedule_data, cpu).schedule_lock, flags);
+    spin_unlock_irqrestore(per_cpu(schedule_data, cpu).schedule_lock, flags);
 }
 
 static void
@@ -1130,7 +1130,7 @@ csched_load_balance(int cpu, struct csched_vcpu *snext)
          * cause a deadlock if the peer CPU is also load balancing and trying
          * to lock this CPU.
          */
-        if ( !spin_trylock(&per_cpu(schedule_data, peer_cpu).schedule_lock) )
+        if ( !spin_trylock(per_cpu(schedule_data, peer_cpu).schedule_lock) )
         {
             CSCHED_STAT_CRANK(steal_trylock_failed);
             continue;
@@ -1140,7 +1140,7 @@ csched_load_balance(int cpu, struct csched_vcpu *snext)
          * Any work over there to steal?
          */
         speer = csched_runq_steal(peer_cpu, cpu, snext->pri);
-        spin_unlock(&per_cpu(schedule_data, peer_cpu).schedule_lock);
+        spin_unlock(per_cpu(schedule_data, peer_cpu).schedule_lock);
         if ( speer != NULL )
             return speer;
     }

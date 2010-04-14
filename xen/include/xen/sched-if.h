@@ -10,8 +10,19 @@
 
 #include <xen/percpu.h>
 
+/*
+ * In order to allow a scheduler to remap the lock->cpu mapping,
+ * we have a per-cpu pointer, along with a pre-allocated set of
+ * locks.  The generic schedule init code will point each schedule lock
+ * pointer to the schedule lock; if the scheduler wants to remap them,
+ * it can simply modify the schedule locks.
+ * 
+ * For cache betterness, keep the actual lock in the same cache area
+ * as the rest of the struct.  Just have the scheduler point to the
+ * one it wants (This may be the one right in front of it).*/
 struct schedule_data {
-    spinlock_t          schedule_lock;  /* spinlock protecting curr        */
+    spinlock_t         *schedule_lock,
+                       _lock;
     struct vcpu        *curr;           /* current task                    */
     struct vcpu        *idle;           /* idle task for this cpu          */
     void               *sched_priv;
@@ -27,11 +38,19 @@ static inline void vcpu_schedule_lock(struct vcpu *v)
 
     for ( ; ; )
     {
+        /* NB: For schedulers with multiple cores per runqueue,
+         * a vcpu may change processor w/o changing runqueues;
+         * so we may release a lock only to grab it again.
+         *
+         * If that is measured to be an issue, then the check
+         * should be changed to checking if the locks pointed to
+         * by cpu and v->processor are still the same.
+         */
         cpu = v->processor;
-        spin_lock(&per_cpu(schedule_data, cpu).schedule_lock);
+        spin_lock(per_cpu(schedule_data, cpu).schedule_lock);
         if ( likely(v->processor == cpu) )
             break;
-        spin_unlock(&per_cpu(schedule_data, cpu).schedule_lock);
+        spin_unlock(per_cpu(schedule_data, cpu).schedule_lock);
     }
 }
 
@@ -42,7 +61,7 @@ static inline void vcpu_schedule_lock(struct vcpu *v)
 
 static inline void vcpu_schedule_unlock(struct vcpu *v)
 {
-    spin_unlock(&per_cpu(schedule_data, v->processor).schedule_lock);
+    spin_unlock(per_cpu(schedule_data, v->processor).schedule_lock);
 }
 
 #define vcpu_schedule_unlock_irq(v) \
