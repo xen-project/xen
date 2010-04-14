@@ -303,6 +303,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_max_vcpus_t);
 /* Scheduler types. */
 #define XEN_SCHEDULER_SEDF     4
 #define XEN_SCHEDULER_CREDIT   5
+#define XEN_SCHEDULER_CREDIT2  6
 /* Set or get info? */
 #define XEN_DOMCTL_SCHEDOP_putinfo 0
 #define XEN_DOMCTL_SCHEDOP_getinfo 1
@@ -321,6 +322,9 @@ struct xen_domctl_scheduler_op {
             uint16_t weight;
             uint16_t cap;
         } credit;
+        struct xen_domctl_sched_credit2 {
+            uint16_t weight;
+        } credit2;
     } u;
 };
 typedef struct xen_domctl_scheduler_op xen_domctl_scheduler_op_t;

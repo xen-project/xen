@@ -56,9 +56,11 @@ DEFINE_PER_CPU(struct schedule_data, schedule_data);
 
 extern const struct scheduler sched_sedf_def;
 extern const struct scheduler sched_credit_def;
+extern const struct scheduler sched_credit2_def;
 static const struct scheduler *__initdata schedulers[] = {
     &sched_sedf_def,
     &sched_credit_def,
+    &sched_credit2_def,
     NULL
 };
 
