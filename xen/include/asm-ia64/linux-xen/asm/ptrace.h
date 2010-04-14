@@ -198,6 +198,8 @@ static inline struct cpu_user_regs *vcpu_regs(struct vcpu *v)
 	return (struct cpu_user_regs *)((unsigned long)v + IA64_STK_OFFSET) - 1;
 }
 
+#define return_reg(v) (vcpu_regs(v)->r8)
+
 struct cpu_user_regs *guest_cpu_user_regs(void);
 
 extern void show_stack(struct task_struct *task, unsigned long *sp);

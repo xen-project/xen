@@ -3,6 +3,7 @@
 #define __XEN_DOMAIN_H__
 
 #include <public/xen.h>
+#include <asm/domain.h>
 
 typedef union {
     struct vcpu_guest_context *nat;
@@ -61,6 +62,9 @@ void arch_vcpu_reset(struct vcpu *v);
 
 bool_t domctl_lock_acquire(void);
 void domctl_lock_release(void);
+
+/* Continue the current hypercall via func(data) on specified cpu. */
+int continue_hypercall_on_cpu(int cpu, long (*func)(void *data), void *data);
 
 extern unsigned int xen_processor_pmbits;
 

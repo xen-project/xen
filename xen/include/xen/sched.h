@@ -15,7 +15,7 @@
 #include <xen/timer.h>
 #include <xen/grant_table.h>
 #include <xen/rangeset.h>
-#include <asm/domain.h>
+#include <xen/domain.h>
 #include <xen/xenoprof.h>
 #include <xen/rcupdate.h>
 #include <xen/irq.h>
@@ -132,8 +132,6 @@ struct vcpu
     bool_t           defer_shutdown;
     /* VCPU is paused following shutdown request (d->is_shutting_down)? */
     bool_t           paused_for_shutdown;
-    /* VCPU affinity is temporarily locked from controller changes? */
-    bool_t           affinity_locked;
 
     /*
      * > 0: a single port is being polled;
@@ -156,6 +154,9 @@ struct vcpu
 
     /* Bitmask of CPUs which are holding onto this VCPU's state. */
     cpumask_t        vcpu_dirty_cpumask;
+
+    /* Tasklet for continue_hypercall_on_cpu(). */
+    struct tasklet   continue_hypercall_tasklet;
 
     struct arch_vcpu arch;
 };
@@ -581,9 +582,6 @@ void cpu_init(void);
 void vcpu_force_reschedule(struct vcpu *v);
 void cpu_disable_scheduler(void);
 int vcpu_set_affinity(struct vcpu *v, cpumask_t *affinity);
-int vcpu_lock_affinity(struct vcpu *v, cpumask_t *affinity);
-int vcpu_locked_change_affinity(struct vcpu *v, cpumask_t *affinity);
-void vcpu_unlock_affinity(struct vcpu *v, cpumask_t *affinity);
 
 void vcpu_runstate_get(struct vcpu *v, struct vcpu_runstate_info *runstate);
 uint64_t get_cpu_idle_time(unsigned int cpu);

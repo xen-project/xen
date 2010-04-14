@@ -408,26 +408,18 @@ void cpu_disable_scheduler(void)
     }
 }
 
-static int __vcpu_set_affinity(
-    struct vcpu *v, cpumask_t *affinity,
-    bool_t old_lock_status, bool_t new_lock_status)
+int vcpu_set_affinity(struct vcpu *v, cpumask_t *affinity)
 {
     cpumask_t online_affinity, old_affinity;
+
+    if ( v->domain->is_pinned )
+        return -EINVAL;
 
     cpus_and(online_affinity, *affinity, cpu_online_map);
     if ( cpus_empty(online_affinity) )
         return -EINVAL;
 
     vcpu_schedule_lock_irq(v);
-
-    if ( v->affinity_locked != old_lock_status )
-    {
-        BUG_ON(!v->affinity_locked);
-        vcpu_schedule_unlock_irq(v);
-        return -EBUSY;
-    }
-
-    v->affinity_locked = new_lock_status;
 
     old_affinity = v->cpu_affinity;
     v->cpu_affinity = *affinity;
@@ -444,36 +436,6 @@ static int __vcpu_set_affinity(
     }
 
     return 0;
-}
-
-int vcpu_set_affinity(struct vcpu *v, cpumask_t *affinity)
-{
-    if ( v->domain->is_pinned )
-        return -EINVAL;
-    return __vcpu_set_affinity(v, affinity, 0, 0);
-}
-
-int vcpu_lock_affinity(struct vcpu *v, cpumask_t *affinity)
-{
-    return __vcpu_set_affinity(v, affinity, 0, 1);
-}
-
-int vcpu_locked_change_affinity(struct vcpu *v, cpumask_t *affinity)
-{
-    return __vcpu_set_affinity(v, affinity, 1, 1);
-}
-
-void vcpu_unlock_affinity(struct vcpu *v, cpumask_t *affinity)
-{
-    cpumask_t online_affinity;
-
-    /* Do not fail if no CPU in old affinity mask is online. */
-    cpus_and(online_affinity, *affinity, cpu_online_map);
-    if ( cpus_empty(online_affinity) )
-        *affinity = cpu_online_map;
-
-    if ( __vcpu_set_affinity(v, affinity, 1, 0) != 0 )
-        BUG();
 }
 
 /* Block the currently-executing domain until a pertinent event occurs. */

@@ -898,6 +898,73 @@ long vm_assist(struct domain *p, unsigned int cmd, unsigned int type)
     return -ENOSYS;
 }
 
+struct migrate_info {
+    long (*func)(void *data);
+    void *data;
+    struct vcpu *vcpu;
+    unsigned int nest;
+};
+
+static DEFINE_PER_CPU(struct migrate_info *, continue_info);
+
+static void continue_hypercall_tasklet_handler(unsigned long _info)
+{
+    struct migrate_info *info = (struct migrate_info *)_info;
+    struct vcpu *v = info->vcpu;
+
+    vcpu_sleep_sync(v);
+
+    this_cpu(continue_info) = info;
+    return_reg(v) = info->func(info->data);
+    this_cpu(continue_info) = NULL;
+
+    if ( info->nest-- == 0 )
+    {
+        xfree(info);
+        vcpu_unpause(v);
+    }
+}
+
+int continue_hypercall_on_cpu(int cpu, long (*func)(void *data), void *data)
+{
+    struct vcpu *curr = current;
+    struct migrate_info *info;
+
+    if ( cpu == smp_processor_id() )
+        return func(data);
+
+    info = this_cpu(continue_info);
+    if ( info == NULL )
+    {
+        info = xmalloc(struct migrate_info);
+        if ( info == NULL )
+            return -ENOMEM;
+
+        info->vcpu = curr;
+        info->nest = 0;
+
+        tasklet_init(
+            &curr->continue_hypercall_tasklet,
+            continue_hypercall_tasklet_handler,
+            (unsigned long)info);
+
+        vcpu_pause_nosync(curr);
+    }
+    else
+    {
+        BUG_ON(info->nest != 0);
+        info->nest++;
+    }
+
+    info->func = func;
+    info->data = data;
+
+    tasklet_schedule_on_cpu(&curr->continue_hypercall_tasklet, cpu);
+
+    /* Dummy return value will be overwritten by tasklet. */
+    return 0;
+}
+
 /*
  * Local variables:
  * mode: C
