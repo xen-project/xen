@@ -779,6 +779,8 @@ class XendNode:
             return 'sedf'
         elif sched_id == xen.lowlevel.xc.XEN_SCHEDULER_CREDIT:
             return 'credit'
+        elif sched_id == xen.lowlevel.xc.XEN_SCHEDULER_CREDIT2:
+            return 'credit2'
         else:
             return 'unknown'
 
@@ -988,6 +990,8 @@ class XendNode:
             return 'sedf'
         elif sched_id == xen.lowlevel.xc.XEN_SCHEDULER_CREDIT:
             return 'credit'
+        elif sched_id == xen.lowlevel.xc.XEN_SCHEDULER_CREDIT2:
+            return 'credit2'
         else:
             return 'unknown'
 

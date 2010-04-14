@@ -163,6 +163,20 @@ class SrvDomain(SrvDir):
         val = fn(req.args, {'dom': self.dom.getName()})
         return val
 
+    def op_domain_sched_credit2_get(self, _, req):
+        fn = FormFn(self.xd.domain_sched_credit2_get,
+                    [['dom', 'str']])
+        val = fn(req.args, {'dom': self.dom.getName()})
+        return val
+
+
+    def op_domain_sched_credit2_set(self, _, req):
+        fn = FormFn(self.xd.domain_sched_credit2_set,
+                    [['dom', 'str'],
+                     ['weight', 'int']])
+        val = fn(req.args, {'dom': self.dom.getName()})
+        return val
+
     def op_maxmem_set(self, _, req):
         return self.call(self.dom.setMemoryMaximum,
                          [['memory', 'int']],

@@ -1558,6 +1558,45 @@ static PyObject *pyxc_sched_credit_domain_get(XcObject *self, PyObject *args)
                          "cap",     sdom.cap);
 }
 
+static PyObject *pyxc_sched_credit2_domain_set(XcObject *self,
+                                              PyObject *args,
+                                              PyObject *kwds)
+{
+    uint32_t domid;
+    uint16_t weight;
+    static char *kwd_list[] = { "domid", "weight", NULL };
+    static char kwd_type[] = "I|H";
+    struct xen_domctl_sched_credit2 sdom;
+
+    weight = 0;
+    if( !PyArg_ParseTupleAndKeywords(args, kwds, kwd_type, kwd_list,
+                                     &domid, &weight) )
+        return NULL;
+
+    sdom.weight = weight;
+
+    if ( xc_sched_credit2_domain_set(self->xc_handle, domid, &sdom) != 0 )
+        return pyxc_error_to_exception();
+
+    Py_INCREF(zero);
+    return zero;
+}
+
+static PyObject *pyxc_sched_credit2_domain_get(XcObject *self, PyObject *args)
+{
+    uint32_t domid;
+    struct xen_domctl_sched_credit2 sdom;
+
+    if( !PyArg_ParseTuple(args, "I", &domid) )
+        return NULL;
+
+    if ( xc_sched_credit2_domain_get(self->xc_handle, domid, &sdom) != 0 )
+        return pyxc_error_to_exception();
+
+    return Py_BuildValue("{s:H}",
+                         "weight",  sdom.weight);
+}
+
 static PyObject *pyxc_domain_setmaxmem(XcObject *self, PyObject *args)
 {
     uint32_t dom;
@@ -2113,6 +2152,24 @@ static PyMethodDef pyxc_methods[] = {
       "Returns:   [dict]\n"
       " weight    [short]: domain's scheduling weight\n"},
 
+    { "sched_credit2_domain_set",
+      (PyCFunction)pyxc_sched_credit2_domain_set,
+      METH_KEYWORDS, "\n"
+      "Set the scheduling parameters for a domain when running with the\n"
+      "SMP credit2 scheduler.\n"
+      " domid     [int]:   domain id to set\n"
+      " weight    [short]: domain's scheduling weight\n"
+      "Returns: [int] 0 on success; -1 on error.\n" },
+
+    { "sched_credit2_domain_get",
+      (PyCFunction)pyxc_sched_credit2_domain_get,
+      METH_VARARGS, "\n"
+      "Get the scheduling parameters for a domain when running with the\n"
+      "SMP credit2 scheduler.\n"
+      " domid     [int]:   domain id to get\n"
+      "Returns:   [dict]\n"
+      " weight    [short]: domain's scheduling weight\n"},
+
     { "evtchn_alloc_unbound", 
       (PyCFunction)pyxc_evtchn_alloc_unbound,
       METH_VARARGS | METH_KEYWORDS, "\n"
@@ -2495,6 +2552,7 @@ PyMODINIT_FUNC initxc(void)
     /* Expose some libxc constants to Python */
     PyModule_AddIntConstant(m, "XEN_SCHEDULER_SEDF", XEN_SCHEDULER_SEDF);
     PyModule_AddIntConstant(m, "XEN_SCHEDULER_CREDIT", XEN_SCHEDULER_CREDIT);
+    PyModule_AddIntConstant(m, "XEN_SCHEDULER_CREDIT2", XEN_SCHEDULER_CREDIT2);
 
 }
 

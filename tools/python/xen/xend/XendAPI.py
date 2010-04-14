@@ -1626,8 +1626,7 @@ class XendAPI(object):
         if 'weight' in xeninfo.info['vcpus_params'] \
            and 'cap' in xeninfo.info['vcpus_params']:
             weight = xeninfo.info['vcpus_params']['weight']
-            cap = xeninfo.info['vcpus_params']['cap']
-            xendom.domain_sched_credit_set(xeninfo.getDomid(), weight, cap)
+            xendom.domain_sched_credit2_set(xeninfo.getDomid(), weight)
 
     def VM_set_VCPUs_number_live(self, _, vm_ref, num):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)

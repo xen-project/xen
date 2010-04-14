@@ -151,6 +151,8 @@ SUBCOMMAND_HELP = {
     'sched-sedf'  : ('<Domain> [options]', 'Get/set EDF parameters.'),
     'sched-credit': ('[-d <Domain> [-w[=WEIGHT]|-c[=CAP]]]',
                      'Get/set credit scheduler parameters.'),
+    'sched-credit2': ('[-d <Domain> [-w[=WEIGHT]]',
+                     'Get/set credit2 scheduler parameters.'),
     'sysrq'       : ('<Domain> <letter>', 'Send a sysrq to a domain.'),
     'debug-keys'  : ('<Keys>', 'Send debug keys to Xen.'),
     'trigger'     : ('<Domain> <nmi|reset|init|s3resume|power> [<VCPU>]',
@@ -276,6 +278,10 @@ SUBCOMMAND_OPTIONS = {
        ('-d DOMAIN', '--domain=DOMAIN', 'Domain to modify'),
        ('-w WEIGHT', '--weight=WEIGHT', 'Weight (int)'),
        ('-c CAP',    '--cap=CAP',       'Cap (int)'),
+    ),
+    'sched-credit2': (
+       ('-d DOMAIN', '--domain=DOMAIN', 'Domain to modify'),
+       ('-w WEIGHT', '--weight=WEIGHT', 'Weight (int)'),
     ),
     'list': (
        ('-l', '--long',         'Output all VM details in SXP'),
@@ -418,6 +424,7 @@ host_commands = [
     ]
 
 scheduler_commands = [
+    "sched-credit2",
     "sched-credit",
     "sched-sedf",
     ]
@@ -1737,6 +1744,80 @@ def xm_sched_credit(args):
                     cap)
         else:
             result = server.xend.domain.sched_credit_set(domid, weight, cap)
+            if result != 0:
+                err(str(result))
+
+def xm_sched_credit2(args):
+    """Get/Set options for Credit2 Scheduler."""
+
+    check_sched_type('credit2')
+
+    try:
+        opts, params = getopt.getopt(args, "d:w:",
+            ["domain=", "weight="])
+    except getopt.GetoptError, opterr:
+        err(opterr)
+        usage('sched-credit2')
+
+    domid = None
+    weight = None
+
+    for o, a in opts:
+        if o in ["-d", "--domain"]:
+            domid = a
+        elif o in ["-w", "--weight"]:
+            weight = int(a)
+
+    doms = filter(lambda x : domid_match(domid, x),
+                  [parse_doms_info(dom)
+                  for dom in getDomains(None, 'all')])
+
+    if weight is None:
+        if domid is not None and doms == []:
+            err("Domain '%s' does not exist." % domid)
+            usage('sched-credit2')
+        # print header if we aren't setting any parameters
+        print '%-33s %4s %6s' % ('Name','ID','Weight')
+
+        for d in doms:
+            try:
+                if serverType == SERVER_XEN_API:
+                    info = server.xenapi.VM_metrics.get_VCPUs_params(
+                        server.xenapi.VM.get_metrics(
+                            get_single_vm(d['name'])))
+                else:
+                    info = server.xend.domain.sched_credit2_get(d['name'])
+            except xmlrpclib.Fault:
+                pass
+
+            if 'weight' not in info:
+                # domain does not support sched-credit2?
+                info = {'weight': -1}
+
+            info['weight'] = int(info['weight'])
+
+            info['name']  = d['name']
+            info['domid'] = str(d['domid'])
+            print( ("%(name)-32s %(domid)5s %(weight)6d") % info)
+    else:
+        if domid is None:
+            # place holder for system-wide scheduler parameters
+            err("No domain given.")
+            usage('sched-credit2')
+
+        if serverType == SERVER_XEN_API:
+            if doms[0]['domid']:
+                server.xenapi.VM.add_to_VCPUs_params_live(
+                    get_single_vm(domid),
+                    "weight",
+                    weight)
+            else:
+                server.xenapi.VM.add_to_VCPUs_params(
+                    get_single_vm(domid),
+                    "weight",
+                    weight)
+        else:
+            result = server.xend.domain.sched_credit2_set(domid, weight)
             if result != 0:
                 err(str(result))
 
@@ -3490,6 +3571,7 @@ commands = {
     # scheduler
     "sched-sedf": xm_sched_sedf,
     "sched-credit": xm_sched_credit,
+    "sched-credit2": xm_sched_credit2,
     # block
     "block-attach": xm_block_attach,
     "block-detach": xm_block_detach,

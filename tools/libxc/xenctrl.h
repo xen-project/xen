@@ -475,6 +475,14 @@ int xc_sched_credit_domain_get(int xc_handle,
                                uint32_t domid,
                                struct xen_domctl_sched_credit *sdom);
 
+int xc_sched_credit2_domain_set(int xc_handle,
+                               uint32_t domid,
+                               struct xen_domctl_sched_credit2 *sdom);
+
+int xc_sched_credit2_domain_get(int xc_handle,
+                               uint32_t domid,
+                               struct xen_domctl_sched_credit2 *sdom);
+
 /**
  * This function sends a trigger to a domain.
  *

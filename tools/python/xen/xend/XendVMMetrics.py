@@ -129,6 +129,7 @@ class XendVMMetrics(XendBase):
                 params_live['cpumap%i' % i] = \
                     ",".join(map(str, info['cpumap']))
 
+                # FIXME: credit2??
             params_live.update(xc.sched_credit_domain_get(domid))
             
             return params_live

@@ -1757,6 +1757,60 @@ class XendDomain:
             log.exception(ex)
             raise XendError(str(ex))
 
+    def domain_sched_credit2_get(self, domid):
+        """Get credit2 scheduler parameters for a domain.
+
+        @param domid: Domain ID or Name
+        @type domid: int or string.
+        @rtype: dict with keys 'weight'
+        @return: credit2 scheduler parameters
+        """
+        dominfo = self.domain_lookup_nr(domid)
+        if not dominfo:
+            raise XendInvalidDomain(str(domid))
+
+        if dominfo._stateGet() in (DOM_STATE_RUNNING, DOM_STATE_PAUSED):
+            try:
+                return xc.sched_credit2_domain_get(dominfo.getDomid())
+            except Exception, ex:
+                raise XendError(str(ex))
+        else:
+            return {'weight' : dominfo.getWeight()}
+
+    def domain_sched_credit2_set(self, domid, weight = None):
+        """Set credit2 scheduler parameters for a domain.
+
+        @param domid: Domain ID or Name
+        @type domid: int or string.
+        @type weight: int
+        @rtype: 0
+        """
+        set_weight = False
+        dominfo = self.domain_lookup_nr(domid)
+        if not dominfo:
+            raise XendInvalidDomain(str(domid))
+        try:
+            if weight is None:
+                weight = int(0)
+            elif weight < 1 or weight > 65535:
+                raise XendError("weight is out of range")
+            else:
+                set_weight = True
+
+            assert type(weight) == int
+
+            rc = 0
+            if dominfo._stateGet() in (DOM_STATE_RUNNING, DOM_STATE_PAUSED):
+                rc = xc.sched_credit2_domain_set(dominfo.getDomid(), weight)
+            if rc == 0:
+                if set_weight:
+                    dominfo.setWeight(weight)
+                self.managed_config_save(dominfo)
+            return rc
+        except Exception, ex:
+            log.exception(ex)
+            raise XendError(str(ex))
+
     def domain_maxmem_set(self, domid, mem):
         """Set the memory limit for a domain.
 

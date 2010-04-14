@@ -2811,6 +2811,10 @@ class XendDomainInfo:
             XendDomain.instance().domain_sched_credit_set(self.getDomid(),
                                                           self.getWeight(),
                                                           self.getCap())
+        elif XendNode.instance().xenschedinfo() == 'credit2':
+            from xen.xend import XendDomain
+            XendDomain.instance().domain_sched_credit2_set(self.getDomid(),
+                                                           self.getWeight())
 
     def _initDomain(self):
         log.debug('XendDomainInfo.initDomain: %s %s',
