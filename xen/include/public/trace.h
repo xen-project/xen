@@ -53,6 +53,7 @@
 #define TRC_HVM_HANDLER   0x00082000   /* various HVM handlers      */
 
 #define TRC_SCHED_MIN       0x00021000   /* Just runstate changes */
+#define TRC_SCHED_CLASS     0x00022000   /* Scheduler-specific    */
 #define TRC_SCHED_VERBOSE   0x00028000   /* More inclusive scheduling */
 
 /* Trace events per class */
