@@ -149,15 +149,7 @@ static int enter_state(u32 state)
     int error;
     unsigned long cr4;
 
-    if ( (state <= ACPI_STATE_S0) || (state > ACPI_S_STATES_MAX) )
-        return -EINVAL;
-
-    if ( !spin_trylock(&pm_lock) )
-        return -EBUSY;
-
-    printk(XENLOG_INFO "Preparing system for ACPI S%d state.", state);
-
-    freeze_domains();
+    BUG_ON(!spin_is_locked(&pm_lock));
 
     disable_nonboot_cpus();
     if ( num_online_cpus() != 1 )
@@ -246,6 +238,9 @@ static long enter_state_helper(void *data)
  */
 int acpi_enter_sleep(struct xenpf_enter_acpi_sleep *sleep)
 {
+    int rc;
+    u32 state;
+
     if ( !IS_PRIV(current->domain) || !acpi_sinfo.pm1a_cnt_blk.address )
         return -EPERM;
 
@@ -258,14 +253,31 @@ int acpi_enter_sleep(struct xenpf_enter_acpi_sleep *sleep)
         return -EINVAL;
     }
 
-    if ( sleep->flags )
+    state = sleep->sleep_state;
+    if ( sleep->flags ||
+         (state <= ACPI_STATE_S0) || (state > ACPI_S_STATES_MAX) )
         return -EINVAL;
+
+    if ( !spin_trylock(&pm_lock) )
+        return -EBUSY;
 
     acpi_sinfo.pm1a_cnt_val = sleep->pm1a_cnt_val;
     acpi_sinfo.pm1b_cnt_val = sleep->pm1b_cnt_val;
-    acpi_sinfo.sleep_state = sleep->sleep_state;
+    acpi_sinfo.sleep_state = state;
 
-    return continue_hypercall_on_cpu(0, enter_state_helper, &acpi_sinfo);
+    printk(XENLOG_INFO "Preparing system for ACPI S%d state.", state);
+
+    freeze_domains();
+
+    rc = continue_hypercall_on_cpu(0, enter_state_helper, &acpi_sinfo);
+    if ( rc )
+    {
+        /* Continuation will not execute: undo our own work so far. */
+        thaw_domains();
+        spin_unlock(&pm_lock);
+    }
+
+    return rc;
 }
 
 static int acpi_get_wake_status(void)
