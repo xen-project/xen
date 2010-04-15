@@ -822,7 +822,7 @@ void __init __start_xen(unsigned long mbi_p)
      * Walk every RAM region and map it in its entirety (on x86/64, at least)
      * and notify it to the boot allocator.
      */
-    for ( nr_pages = i = 0; i < boot_e820.nr_map; i++ )
+    for ( i = 0; i < boot_e820.nr_map; i++ )
     {
         uint64_t s, e, map_s, map_e, mask = PAGE_SIZE - 1;
 
@@ -897,11 +897,14 @@ void __init __start_xen(unsigned long mbi_p)
 
         /* Pass remainder of this memory chunk to the allocator. */
         init_boot_pages(map_s, e);
-        nr_pages += (e - s) >> PAGE_SHIFT;
     }
 
     memguard_init();
 
+    nr_pages = 0;
+    for ( i = 0; i < e820.nr_map; i++ )
+        if ( e820.map[i].type == E820_RAM )
+            nr_pages += e820.map[i].size >> PAGE_SHIFT;
     printk("System RAM: %luMB (%lukB)\n",
            nr_pages >> (20 - PAGE_SHIFT),
            nr_pages << (PAGE_SHIFT - 10));
