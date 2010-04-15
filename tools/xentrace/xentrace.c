@@ -804,6 +804,9 @@ static void usage(void)
 "  -V, --version           Print program version\n" \
 "  -M, --memory-buffer=b   Copy trace records to a circular memory buffer.\n" \
 "                          Dump to file on exit.\n" \
+"  -r  --reserve-disk-space=n Before writing trace records to disk, check to see\n" \
+"                          that after the write there will be at least n space\n" \
+"                          left on the disk.\n" \
 "\n" \
 "This tool is used to capture trace buffer data from Xen. The\n" \
 "data is output in a binary format, in the following order:\n" \
