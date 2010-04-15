@@ -9,6 +9,9 @@ endif
 ifeq ($(KERNELS),linux-2.6-xen0)
 LINUX_VER=2.6.18-xen0
 endif
+ifeq ($(KERNELS),linux-2.6-pvops)
+LINUX_VER=2.6-pvops
+endif
 
 KERNELDIR ?= $(XEN_ROOT)/build-linux-$(LINUX_VER)_$(XEN_TARGET_ARCH)
 
