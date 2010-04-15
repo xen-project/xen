@@ -73,7 +73,11 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
     if ( op->interface_version != XENPF_INTERFACE_VERSION )
         return -EACCES;
 
-    /* spin_trylock() avoids deadlock with stop_machine_run(). */
+    /*
+     * Trylock here avoids deadlock with an existing platform critical section
+     * which might (for some current or future reason) want to synchronise
+     * with this vcpu.
+     */
     while ( !spin_trylock(&xenpf_lock) )
         if ( hypercall_preempt_check() )
             return hypercall_create_continuation(

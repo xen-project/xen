@@ -48,7 +48,11 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
     if ( op->interface_version != XEN_SYSCTL_INTERFACE_VERSION )
         return -EACCES;
 
-    /* spin_trylock() avoids deadlock with stop_machine_run(). */
+    /*
+     * Trylock here avoids deadlock with an existing sysctl critical section
+     * which might (for some current or future reason) want to synchronise
+     * with this vcpu.
+     */
     while ( !spin_trylock(&sysctl_lock) )
         if ( hypercall_preempt_check() )
             return hypercall_create_continuation(
