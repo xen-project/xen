@@ -951,9 +951,6 @@ int continue_hypercall_on_cpu(
     if ( (cpu >= NR_CPUS) || !cpu_online(cpu) )
         return -EINVAL;
 
-    if ( cpu == smp_processor_id() )
-        return func(data);
-
     info = this_cpu(continue_info);
     if ( info == NULL )
     {

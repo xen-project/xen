@@ -63,7 +63,12 @@ void arch_vcpu_reset(struct vcpu *v);
 bool_t domctl_lock_acquire(void);
 void domctl_lock_release(void);
 
-/* Continue the current hypercall via func(data) on specified cpu. */
+/*
+ * Continue the current hypercall via func(data) on specified cpu.
+ * If this function returns 0 then the function is guaranteed to run at some
+ * point in the future. If this function returns an error code then the
+ * function has not been and will not be executed.
+ */
 int continue_hypercall_on_cpu(
     unsigned int cpu, long (*func)(void *data), void *data);
 
