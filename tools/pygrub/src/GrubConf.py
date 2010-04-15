@@ -379,7 +379,7 @@ class Grub2ConfigFile(_GrubConfigFile):
                 continue
 
             # new image
-            title_match = re.match('^menuentry "(.*)" (.*){', l)
+            title_match = re.match('^menuentry ["\'](.*)["\'] (.*){', l)
             if title_match:
                 if img is not None:
                     raise RuntimeError, "syntax error: cannot nest menuentry (%d %s)" % (len(img),img)
