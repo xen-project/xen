@@ -64,7 +64,8 @@ bool_t domctl_lock_acquire(void);
 void domctl_lock_release(void);
 
 /* Continue the current hypercall via func(data) on specified cpu. */
-int continue_hypercall_on_cpu(int cpu, long (*func)(void *data), void *data);
+int continue_hypercall_on_cpu(
+    unsigned int cpu, long (*func)(void *data), void *data);
 
 extern unsigned int xen_processor_pmbits;
 

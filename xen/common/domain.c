@@ -943,7 +943,8 @@ static void continue_hypercall_tasklet_handler(unsigned long _info)
     }
 }
 
-int continue_hypercall_on_cpu(int cpu, long (*func)(void *data), void *data)
+int continue_hypercall_on_cpu(
+    unsigned int cpu, long (*func)(void *data), void *data)
 {
     struct migrate_info *info;
 
