@@ -227,7 +227,8 @@ static uint8_t twobyte_table[256] = {
     DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM, 0, 0,
     /* 0xA8 - 0xAF */
     ImplicitOps, ImplicitOps, 0, DstBitBase|SrcReg|ModRM,
-    DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM, 0, DstReg|SrcMem|ModRM,
+    DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
+    ImplicitOps|ModRM, DstReg|SrcMem|ModRM,
     /* 0xB0 - 0xB7 */
     ByteOp|DstMem|SrcReg|ModRM, DstMem|SrcReg|ModRM,
     DstReg|SrcMem|ModRM|Mov, DstBitBase|SrcReg|ModRM,
@@ -4006,6 +4007,19 @@ x86_emulate(
 
     case 0xab: bts: /* bts */
         emulate_2op_SrcV_nobyte("bts", src, dst, _regs.eflags);
+        break;
+
+    case 0xae: /* Grp15 */
+        switch ( modrm_reg & 7 )
+        {
+        case 7: /* clflush */
+            fail_if(ops->wbinvd == NULL);
+            if ( (rc = ops->wbinvd(ctxt)) != 0 )
+                goto done;
+            break;
+        default:
+            goto cannot_emulate;
+        }
         break;
 
     case 0xaf: /* imul */
