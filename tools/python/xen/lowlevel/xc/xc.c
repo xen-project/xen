@@ -1215,7 +1215,7 @@ static PyObject *pyxc_topologyinfo(XcObject *self)
     cpu_to_core_obj = PyList_New(0);
     cpu_to_socket_obj = PyList_New(0);
     cpu_to_node_obj = PyList_New(0);
-    for ( i = 0; i < max_cpu_index; i++ )
+    for ( i = 0; i <= max_cpu_index; i++ )
     {
         if ( coremap[i] == INVALID_TOPOLOGY_ID )
         {
@@ -1296,7 +1296,7 @@ static PyObject *pyxc_numainfo(XcObject *self)
     node_to_memfree_obj = PyList_New(0);
     node_to_dma32_mem_obj = PyList_New(0);
     node_to_node_dist_list_obj = PyList_New(0);
-    for ( i = 0; i < max_node_index; i++ )
+    for ( i = 0; i <= max_node_index; i++ )
     {
         PyObject *pyint;
 
@@ -1318,7 +1318,7 @@ static PyObject *pyxc_numainfo(XcObject *self)
 
         /* Node to Node Distance */
         node_to_node_dist_obj = PyList_New(0);
-        for ( j = 0; j < ninfo.max_node_index; j++ )
+        for ( j = 0; j <= max_node_index; j++ )
         {
             uint32_t dist = nodes_dist[i*(max_node_index+1) + j];
             if ( dist == INVALID_TOPOLOGY_ID )
