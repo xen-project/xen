@@ -149,7 +149,7 @@ static void tasklet_action(void)
         BUG_ON(t->is_dead || !list_empty(&t->list));
         list_add_tail(&t->list, &per_cpu(tasklet_list, t->scheduled_on));
         if ( t->scheduled_on != cpu )
-            cpu_raise_softirq(cpu, TASKLET_SOFTIRQ);
+            cpu_raise_softirq(t->scheduled_on, TASKLET_SOFTIRQ);
     }
 
     /*
