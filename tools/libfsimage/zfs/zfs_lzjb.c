@@ -34,10 +34,10 @@
 int
 lzjb_decompress(void *s_start, void *d_start, size_t s_len, size_t d_len)
 {
-	uchar_t *src = s_start;
-	uchar_t *dst = d_start;
-	uchar_t *d_end = (uchar_t *)d_start + d_len;
-	uchar_t *cpy, copymap = '\0';
+	uint8_t *src = s_start;
+	uint8_t *dst = d_start;
+	uint8_t *d_end = (uint8_t *)d_start + d_len;
+	uint8_t *cpy, copymap = '\0';
 	int copymask = 1 << (NBBY - 1);
 
 	while (dst < d_end) {
@@ -49,7 +49,7 @@ lzjb_decompress(void *s_start, void *d_start, size_t s_len, size_t d_len)
 			int mlen = (src[0] >> (NBBY - MATCH_BITS)) + MATCH_MIN;
 			int offset = ((src[0] << NBBY) | src[1]) & OFFSET_MASK;
 			src += 2;
-			if ((cpy = dst - offset) < (uchar_t *)d_start)
+			if ((cpy = dst - offset) < (uint8_t *)d_start)
 				return (-1);
 			while (--mlen >= 0 && dst < d_end)
 				*dst++ = *cpy++;

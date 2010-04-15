@@ -80,8 +80,8 @@ static int zio_read_data(blkptr_t *bp, void *buf, char *stack);
 static int
 zfs_bcmp(const void *s1, const void *s2, size_t n)
 {
-	const uchar_t *ps1 = s1;
-	const uchar_t *ps2 = s2;
+	const uint8_t *ps1 = s1;
+	const uint8_t *ps2 = s2;
 
 	if (s1 != s2 && n != 0) {
 		do {
@@ -802,11 +802,11 @@ dnode_get_path(dnode_phys_t *mdn, char *path, dnode_phys_t *dn,
 	while (*path == '/')
 		path++;
 
-	while (*path && !isspace(*path)) {
+	while (*path && !isspace((uint8_t)*path)) {
 
 		/* get the next component name */
 		cname = path;
-		while (*path && !isspace(*path) && *path != '/')
+		while (*path && !isspace((uint8_t)*path) && *path != '/')
 			path++;
 		ch = *path;
 		*path = 0;   /* ensure null termination */
@@ -914,23 +914,23 @@ get_objset_mdn(dnode_phys_t *mosmdn, char *fsname, uint64_t *obj,
 	}
 
 	/* take out the pool name */
-	while (*fsname && !isspace(*fsname) && *fsname != '/')
+	while (*fsname && !isspace((uint8_t)*fsname) && *fsname != '/')
 		fsname++;
 
-	while (*fsname && !isspace(*fsname)) {
+	while (*fsname && !isspace((uint8_t)*fsname)) {
 		uint64_t childobj;
 
 		while (*fsname == '/')
 			fsname++;
 
 		cname = fsname;
-		while (*fsname && !isspace(*fsname) && *fsname != '/')
+		while (*fsname && !isspace((uint8_t)*fsname) && *fsname != '/')
 			fsname++;
 		ch = *fsname;
 		*fsname = 0;
 
 		snapname = cname;
-		while (*snapname && !isspace(*snapname) && *snapname != '@')
+		while (*snapname && !isspace((uint8_t)*snapname) && *snapname != '@')
 			snapname++;
 		if (*snapname == '@') {
 			issnapshot = 1;
