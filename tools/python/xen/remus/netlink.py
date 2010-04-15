@@ -77,7 +77,7 @@ class rtattr(object):
         return align(self.rta_len)
 
     def pack(self):
-        self.rta_len = align(self.fmtlen + len(self.body))
+        self.rta_len = self.fmtlen + align(len(self.body), 2)
         s = struct.pack(self.fmt, self.rta_len, self.rta_type) + self.body
         pad = self.rta_len - len(s)
         if pad:
@@ -88,7 +88,7 @@ class rtattr(object):
         args = struct.unpack(self.fmt, msg[:self.fmtlen])
         self.rta_len, self.rta_type = args
 
-        self.body = msg[align(self.fmtlen):self.rta_len]
+        self.body = msg[self.fmtlen:self.rta_len]
 
 class rtattrlist(object):
     def __init__(self, msg):
