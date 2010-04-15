@@ -145,7 +145,8 @@ SUBCOMMAND_HELP = {
     'domname'     : ('<DomId>', 'Convert a domain id to domain name.'),
     'dump-core'   : ('[-L|--live] [-C|--crash] [-R|--reset] <Domain> [Filename]',
                      'Dump core for a specific domain.'),
-    'info'        : ('[-c|--config]', 'Get information about Xen host.'),
+    'info'        : ('[-c|--config] [-n|--numa]',
+                     'Get information about Xen host.'),
     'log'         : ('', 'Print Xend log'),
     'rename'      : ('<Domain> <NewDomainName>', 'Rename a domain.'),
     'sched-sedf'  : ('<Domain> [options]', 'Get/set EDF parameters.'),
@@ -326,6 +327,7 @@ SUBCOMMAND_OPTIONS = {
     ),
     'info': (
        ('-c', '--config', 'List Xend configuration parameters'),
+       ('-n', '--numa', 'List host NUMA topology information'),
     ),
     'tmem-list': (
        ('-l', '--long', 'List tmem stats.'),
@@ -1825,15 +1827,18 @@ def xm_info(args):
     arg_check(args, "info", 0, 1)
     
     try:
-        (options, params) = getopt.gnu_getopt(args, 'c', ['config'])
+        (options, params) = getopt.gnu_getopt(args, 'cn', ['config','numa'])
     except getopt.GetoptError, opterr:
         err(opterr)
         usage('info')
     
     show_xend_config = 0
+    show_numa_topology = 0
     for (k, v) in options:
         if k in ['-c', '--config']:
             show_xend_config = 1
+        if k in ['-n', '--numa']:
+            show_numa_topology = 1
 
     if show_xend_config:
         for name, obj in inspect.getmembers(xoptions):
@@ -1920,7 +1925,7 @@ def xm_info(args):
         for (k, v) in sorted:
            print "%-23s:" % k, v 
     else:
-        info = server.xend.node.info()
+        info = server.xend.node.info(show_numa_topology)
         for x in info[1:]:
             if len(x) < 2: 
                 print "%-23s: (none)" % x[0]

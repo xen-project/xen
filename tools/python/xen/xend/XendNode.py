@@ -835,8 +835,8 @@ class XendNode:
     # Getting host information.
     #
 
-    def info(self):
-        return (self.nodeinfo() + self.physinfo() + self.xeninfo() +
+    def info(self, show_numa = 1):
+        return (self.nodeinfo() + self.physinfo(show_numa) + self.xeninfo() +
                 self.xendinfo())
 
     def nodeinfo(self):
@@ -915,7 +915,7 @@ class XendNode:
             str='none\n'
         return str[:-1];
 
-    def physinfo(self):
+    def physinfo(self, show_numa):
         info = self.xc.physinfo()
         tinfo = self.xc.topologyinfo()
         ninfo = self.xc.numainfo()
@@ -926,12 +926,6 @@ class XendNode:
         info['total_memory'] = info['total_memory'] / 1024
         info['free_memory']  = info['free_memory'] / 1024
 
-        info['cpu_topology']  = \
-             self.format_cpu_to_core_socket_node(tinfo)
-
-        info['numa_info']  = \
-             self.format_numa_info(ninfo)
-
         ITEM_ORDER = ['nr_cpus',
                       'nr_nodes',
                       'cores_per_socket',
@@ -941,9 +935,16 @@ class XendNode:
                       'virt_caps',
                       'total_memory',
                       'free_memory',
-                      'cpu_topology',
-                      'numa_info',
                       ]
+
+        if show_numa != 0:
+            info['cpu_topology']  = \
+                 self.format_cpu_to_core_socket_node(tinfo)
+
+            info['numa_info']  = \
+                 self.format_numa_info(ninfo)
+
+            ITEM_ORDER += [ 'cpu_topology', 'numa_info' ]
 
         return [[k, info[k]] for k in ITEM_ORDER]
 
@@ -1056,7 +1057,7 @@ class XendNode:
     def xeninfo_dict(self):
         return dict(self.xeninfo())
     def physinfo_dict(self):
-        return dict(self.physinfo())
+        return dict(self.physinfo(1))
     def info_dict(self):
         return dict(self.info())
 
