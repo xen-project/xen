@@ -74,10 +74,13 @@ static void device_power_up(void)
     console_resume();
 }
 
-static void freeze_domains(void)
+static int freeze_domains(void)
 {
     struct domain *d;
     struct vcpu *v;
+
+    if ( !spin_trylock(&current->domain->hypercall_deadlock_mutex) )
+        return -EBUSY;
 
     rcu_read_lock(&domlist_read_lock);
     for_each_domain ( d )
@@ -91,6 +94,10 @@ static void freeze_domains(void)
         }
     }
     rcu_read_unlock(&domlist_read_lock);
+
+    spin_unlock(&current->domain->hypercall_deadlock_mutex);
+
+    return 0;
 }
 
 static void thaw_domains(void)
@@ -254,16 +261,22 @@ int acpi_enter_sleep(struct xenpf_enter_acpi_sleep *sleep)
 
     printk(XENLOG_INFO "Preparing system for ACPI S%d state.", state);
 
-    freeze_domains();
+    rc = freeze_domains();
+    if ( rc )
+        goto unlock_and_fail;
 
     rc = continue_hypercall_on_cpu(0, enter_state_helper, &acpi_sinfo);
     if ( rc )
     {
         /* Continuation will not execute: undo our own work so far. */
         thaw_domains();
-        spin_unlock(&pm_lock);
+        goto unlock_and_fail;
     }
 
+    return 0;
+
+ unlock_and_fail:
+    spin_unlock(&pm_lock);
     return rc;
 }
 
