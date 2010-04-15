@@ -82,16 +82,12 @@ static void freeze_domains(void)
     rcu_read_lock(&domlist_read_lock);
     for_each_domain ( d )
     {
-        switch ( d->domain_id )
+        for_each_vcpu ( d, v )
         {
-        case 0:
-            for_each_vcpu ( d, v )
-                if ( v != current )
-                    vcpu_pause(v);
-            break;
-        default:
-            domain_pause(d);
-            break;
+            if ( v != current )
+                vcpu_pause(v);
+            else
+                vcpu_pause_nosync(v);
         }
     }
     rcu_read_unlock(&domlist_read_lock);
@@ -105,17 +101,8 @@ static void thaw_domains(void)
     rcu_read_lock(&domlist_read_lock);
     for_each_domain ( d )
     {
-        switch ( d->domain_id )
-        {
-        case 0:
-            for_each_vcpu ( d, v )
-                if ( v != current )
-                    vcpu_unpause(v);
-            break;
-        default:
-            domain_unpause(d);
-            break;
-        }
+        for_each_vcpu ( d, v )
+            vcpu_unpause(v);
     }
     rcu_read_unlock(&domlist_read_lock);
 }
