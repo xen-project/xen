@@ -2711,7 +2711,7 @@ class XendDomainInfo:
         else:
             def find_relaxed_node(node_list):
                 import sys
-                nr_nodes = info['max_node_id']+1
+                nr_nodes = info['max_node_index'] + 1
                 if node_list is None:
                     node_list = range(0, nr_nodes)
                 nodeload = [0]
@@ -2724,35 +2724,40 @@ class XendDomainInfo:
                         if sxp.child_value(vcpu, 'online') == 0: continue
                         cpumap = list(sxp.child_value(vcpu,'cpumap'))
                         for i in range(0, nr_nodes):
-                            node_cpumask = info['node_to_cpu'][i]
+                            node_cpumask = node_to_cpu[i]
                             for j in node_cpumask:
                                 if j in cpumap:
                                     nodeload[i] += 1
                                     break
                 for i in range(0, nr_nodes):
-                    if len(info['node_to_cpu'][i]) == 0:
+                    if len(node_to_cpu[i]) == 0:
                         nodeload[i] += 8
                     else:
-                        nodeload[i] = int(nodeload[i] * 16 / len(info['node_to_cpu'][i]))
+                        nodeload[i] = int(nodeload[i] * 16 / len(node_to_cpu[i]))
                         if i not in node_list:
                             nodeload[i] += 8
                 return map(lambda x: x[0], sorted(enumerate(nodeload), key=lambda x:x[1]))
 
-            info = xc.physinfo()
-            if info['nr_nodes'] > 1:
-                node_memory_list = info['node_to_memory']
+            info = xc.numainfo()
+            if info['max_node_index'] > 0:
+                node_memory_list = info['node_memfree']
+                node_to_cpu = []
+                for i in range(0, info['max_node_index'] + 1):
+                    node_to_cpu.append([])
+                for cpu, node in enumerate(xc.topologyinfo()['cpu_to_node']):
+                    node_to_cpu[node].append(cpu)
                 needmem = self.image.getRequiredAvailableMemory(self.info['memory_dynamic_max']) / 1024
                 candidate_node_list = []
-                for i in range(0, info['max_node_id']+1):
-                    if node_memory_list[i] >= needmem and len(info['node_to_cpu'][i]) > 0:
+                for i in range(0, info['max_node_index'] + 1):
+                    if node_memory_list[i] >= needmem and len(node_to_cpu[i]) > 0:
                         candidate_node_list.append(i)
                 best_node = find_relaxed_node(candidate_node_list)[0]
-                cpumask = info['node_to_cpu'][best_node]
-                best_nodes = find_relaxed_node(filter(lambda x: x != best_node, range(0,info['max_node_id']+1)))
+                cpumask = node_to_cpu[best_node]
+                best_nodes = find_relaxed_node(filter(lambda x: x != best_node, range(0,info['max_node_index']+1)))
                 for node_idx in best_nodes:
                     if len(cpumask) >= self.info['VCPUs_max']:
                         break
-                    cpumask = cpumask + info['node_to_cpu'][node_idx]
+                    cpumask = cpumask + node_to_cpu[node_idx]
                     log.debug("allocating additional NUMA node %d", node_idx)
                 for v in range(0, self.info['VCPUs_max']):
                     xc.vcpu_setaffinity(self.domid, v, cpumask)
