@@ -1,8 +1,8 @@
 /******************************************************************************
  * tasklet.h
  * 
- * Dynamically-allocatable tasks run in softirq context on at most one CPU at
- * a time.
+ * Tasklets are dynamically-allocatable tasks run in VCPU context
+ * (specifically, the idle VCPU's context) on at most one CPU at a time.
  */
 
 #ifndef __XEN_TASKLET_H__
@@ -26,6 +26,8 @@ struct tasklet
 
 void tasklet_schedule_on_cpu(struct tasklet *t, unsigned int cpu);
 void tasklet_schedule(struct tasklet *t);
+void do_tasklet(void);
+bool_t tasklet_queue_empty(unsigned int cpu);
 void tasklet_kill(struct tasklet *t);
 void migrate_tasklets_from_cpu(unsigned int cpu);
 void tasklet_init(

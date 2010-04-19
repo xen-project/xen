@@ -173,7 +173,6 @@ struct csched_runqueue_data {
 struct csched_private {
     spinlock_t lock;
     uint32_t ncpus;
-    struct domain *idle_domain;
 
     struct list_head sdom; /* Used mostly for dump keyhandler. */
 
@@ -572,8 +571,6 @@ csched_vcpu_init(struct vcpu *vc)
         BUG_ON( sdom != NULL );
         svc->credit = CSCHED_IDLE_CREDIT;
         svc->weight = 0;
-        if ( csched_priv.idle_domain == NULL )
-            csched_priv.idle_domain = dom;
     }
 
     CSCHED_VCPU_CHECK(vc);
@@ -877,6 +874,13 @@ csched_schedule(s_time_t now)
     /* Update credits */
     burn_credits(rqd, scurr, now);
 
+    /* Tasklet work (which runs in idle VCPU context) overrides all else. */
+    if ( !tasklet_queue_empty(cpu) )
+    {
+        snext = CSCHED_VCPU(idle_vcpu[cpu]);
+        goto out;
+    }
+
     /*
      * Select next runnable local VCPU (ie top of local runq).
      *
@@ -891,7 +895,7 @@ csched_schedule(s_time_t now)
      * vcpu for this processor.
      */
     if ( list_empty(runq) )
-        snext = CSCHED_VCPU(csched_priv.idle_domain->vcpu[cpu]);
+        snext = CSCHED_VCPU(idle_vcpu[cpu]);
     else
         snext = __runq_elem(runq->next);
 
@@ -946,6 +950,8 @@ csched_schedule(s_time_t now)
         snext->start_time = now;
         snext->vcpu->processor = cpu; /* Safe because lock for old processor is held */
     }
+
+ out:
     /*
      * Return task to run next...
      */

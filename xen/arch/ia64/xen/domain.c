@@ -338,7 +338,7 @@ update_pal_halt_status(int status)
 static void default_idle(void)
 {
 	local_irq_disable();
-	if ( !softirq_pending(smp_processor_id()) ) {
+	if ( cpu_is_haltable(smp_processor_id()) ) {
 		if (can_do_pal_halt)
 			safe_halt();
 		else
@@ -360,9 +360,10 @@ static void continue_cpu_idle_loop(void)
 #else
 	    irq_stat[cpu].idle_timestamp = jiffies;
 #endif
-	    while ( !softirq_pending(cpu) )
+	    while ( cpu_is_haltable(cpu) )
 	        default_idle();
 	    raise_softirq(SCHEDULE_SOFTIRQ);
+	    do_tasklet();
 	    do_softirq();
 	    if (!cpu_online(cpu))
 	        play_dead();

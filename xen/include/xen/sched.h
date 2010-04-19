@@ -579,6 +579,13 @@ int vcpu_set_affinity(struct vcpu *v, cpumask_t *affinity);
 void vcpu_runstate_get(struct vcpu *v, struct vcpu_runstate_info *runstate);
 uint64_t get_cpu_idle_time(unsigned int cpu);
 
+/*
+ * Used by idle loop to decide whether there is work to do:
+ *  (1) Run softirqs; or (2) Play dead; or (3) Run tasklets.
+ */
+#define cpu_is_haltable(cpu) \
+    (!softirq_pending(cpu) && cpu_online(cpu) && tasklet_queue_empty(cpu))
+
 #define IS_PRIV(_d) ((_d)->is_privileged)
 #define IS_PRIV_FOR(_d, _t) (IS_PRIV(_d) || ((_d)->target && (_d)->target == (_t)))
 

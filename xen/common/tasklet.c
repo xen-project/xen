@@ -1,8 +1,8 @@
 /******************************************************************************
  * tasklet.c
  * 
- * Dynamically-allocatable tasks run in softirq context on at most one CPU at
- * a time.
+ * Tasklets are dynamically-allocatable tasks run in VCPU context
+ * (specifically, the idle VCPU's context) on at most one CPU at a time.
  * 
  * Copyright (c) 2010, Citrix Systems, Inc.
  * Copyright (c) 1992, Linus Torvalds
@@ -17,8 +17,16 @@
 #include <xen/softirq.h>
 #include <xen/tasklet.h>
 
+/* Some subsystems call into us before we are initialised. We ignore them. */
 static bool_t tasklets_initialised;
+
+/*
+ * NB. Any modification to a tasklet_list requires the scheduler to run
+ * on the related CPU so that its idle VCPU's priority is set correctly.
+ */
 static DEFINE_PER_CPU(struct list_head, tasklet_list);
+
+/* Protects all lists and tasklet structures. */
 static DEFINE_SPINLOCK(tasklet_lock);
 
 void tasklet_schedule_on_cpu(struct tasklet *t, unsigned int cpu)
@@ -34,7 +42,7 @@ void tasklet_schedule_on_cpu(struct tasklet *t, unsigned int cpu)
         {
             list_del(&t->list);
             list_add_tail(&t->list, &per_cpu(tasklet_list, cpu));
-            cpu_raise_softirq(cpu, TASKLET_SOFTIRQ);
+            cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
         }
     }
 
@@ -46,7 +54,7 @@ void tasklet_schedule(struct tasklet *t)
     tasklet_schedule_on_cpu(t, smp_processor_id());
 }
 
-static void tasklet_action(void)
+void do_tasklet(void)
 {
     unsigned int cpu = smp_processor_id();
     struct list_head *list = &per_cpu(tasklet_list, cpu);
@@ -78,17 +86,17 @@ static void tasklet_action(void)
         BUG_ON(t->is_dead || !list_empty(&t->list));
         list_add_tail(&t->list, &per_cpu(tasklet_list, t->scheduled_on));
         if ( t->scheduled_on != cpu )
-            cpu_raise_softirq(t->scheduled_on, TASKLET_SOFTIRQ);
+            cpu_raise_softirq(t->scheduled_on, SCHEDULE_SOFTIRQ);
     }
 
-    /*
-     * If there is more work to do then reschedule. We don't grab more work
-     * immediately as we want to allow other softirq work to happen first.
-     */
-    if ( !list_empty(list) )
-        raise_softirq(TASKLET_SOFTIRQ);
+    raise_softirq(SCHEDULE_SOFTIRQ);
 
     spin_unlock_irq(&tasklet_lock);
+}
+
+bool_t tasklet_queue_empty(unsigned int cpu)
+{
+    return list_empty(&per_cpu(tasklet_list, cpu));
 }
 
 void tasklet_kill(struct tasklet *t)
@@ -101,7 +109,9 @@ void tasklet_kill(struct tasklet *t)
     {
         BUG_ON(t->is_dead || t->is_running || (t->scheduled_on < 0));
         list_del_init(&t->list);
+        cpu_raise_softirq(t->scheduled_on, SCHEDULE_SOFTIRQ);
     }
+
     t->scheduled_on = -1;
     t->is_dead = 1;
 
@@ -132,7 +142,7 @@ void migrate_tasklets_from_cpu(unsigned int cpu)
         list_add_tail(&t->list, &this_cpu(tasklet_list));
     }
 
-    raise_softirq(TASKLET_SOFTIRQ);
+    raise_softirq(SCHEDULE_SOFTIRQ);
 
     spin_unlock_irqrestore(&tasklet_lock, flags);
 }
@@ -153,8 +163,6 @@ void __init tasklet_subsys_init(void)
 
     for_each_possible_cpu ( cpu )
         INIT_LIST_HEAD(&per_cpu(tasklet_list, cpu));
-
-    open_softirq(TASKLET_SOFTIRQ, tasklet_action);
 
     tasklets_initialised = 1;
 }

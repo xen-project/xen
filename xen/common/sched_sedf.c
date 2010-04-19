@@ -790,7 +790,13 @@ static struct task_slice sedf_do_schedule(s_time_t now)
     /*now simply pick the first domain from the runqueue, which has the
       earliest deadline, because the list is sorted*/
  
-    if ( !list_empty(runq) )
+    /* Tasklet work (which runs in idle VCPU context) overrides all else. */
+    if ( !tasklet_queue_empty(cpu) || (list_empty(runq) && list_empty(waitq)) )
+    {
+        ret.task = IDLETASK(cpu);
+        ret.time = SECONDS(1);
+    }
+    else if ( !list_empty(runq) )
     {
         runinf   = list_entry(runq->next,struct sedf_vcpu_info,list);
         ret.task = runinf->vcpu;
@@ -808,29 +814,16 @@ static struct task_slice sedf_do_schedule(s_time_t now)
         {
             ret.time = runinf->slice - runinf->cputime;
         }
-        CHECK(ret.time > 0);
-        goto sched_done;
     }
- 
-    if ( !list_empty(waitq) )
+    else
     {
         waitinf  = list_entry(waitq->next,struct sedf_vcpu_info, list);
         /*we could not find any suitable domain 
           => look for domains that are aware of extratime*/
         ret = sedf_do_extra_schedule(now, PERIOD_BEGIN(waitinf),
                                      extraq, cpu);
-        CHECK(ret.time > 0);
-    }
-    else
-    {
-        /*this could probably never happen, but one never knows...*/
-        /*it can... imagine a second CPU, which is pure scifi ATM,
-          but one never knows ;)*/
-        ret.task = IDLETASK(cpu);
-        ret.time = SECONDS(1);
     }
 
- sched_done: 
     /*TODO: Do something USEFUL when this happens and find out, why it
       still can happen!!!*/
     if ( ret.time < 0)

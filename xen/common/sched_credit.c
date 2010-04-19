@@ -1167,11 +1167,16 @@ csched_schedule(s_time_t now)
     CSCHED_STAT_CRANK(schedule);
     CSCHED_VCPU_CHECK(current);
 
-    /* Update credits */
     if ( !is_idle_vcpu(scurr->vcpu) )
     {
+        /* Update credits of a non-idle VCPU. */
         burn_credits(scurr, now);
         scurr->start_time -= now;
+    }
+    else
+    {
+        /* Re-instate a boosted idle VCPU as normal-idle. */
+        scurr->pri = CSCHED_PRI_IDLE;
     }
 
     /*
@@ -1183,6 +1188,13 @@ csched_schedule(s_time_t now)
         BUG_ON( is_idle_vcpu(current) || list_empty(runq) );
 
     snext = __runq_elem(runq->next);
+
+    /* Tasklet work (which runs in idle VCPU context) overrides all else. */
+    if ( !tasklet_queue_empty(cpu) )
+    {
+        snext = CSCHED_VCPU(idle_vcpu[cpu]);
+        snext->pri = CSCHED_PRI_TS_BOOST;
+    }
 
     /*
      * SMP Load balance:

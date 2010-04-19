@@ -310,8 +310,7 @@ static void acpi_processor_idle(void)
      */
     local_irq_disable();
 
-    if ( softirq_pending(smp_processor_id()) ||
-         cpu_is_offline(smp_processor_id()) )
+    if ( !cpu_is_haltable(smp_processor_id()) )
     {
         local_irq_enable();
         sched_tick_resume();
