@@ -161,7 +161,8 @@ typedef enum mca_extinfo (*x86_mce_callback_t)
     (struct mc_info *, uint16_t, uint64_t);
 extern void x86_mce_callback_register(x86_mce_callback_t);
 
-int x86_mcinfo_add(struct mc_info *mi, void *mcinfo);
+void *x86_mcinfo_add(struct mc_info *mi, void *mcinfo);
+void *x86_mcinfo_reserve(struct mc_info *mi, int size);
 void x86_mcinfo_dump(struct mc_info *mi);
 
 int fill_vmsr_data(struct mcinfo_bank *mc_bank, struct domain *d,

@@ -233,10 +233,11 @@ struct mcinfo_recovery
 #define MCINFO_HYPERCALLSIZE	1024
 #define MCINFO_MAXSIZE		768
 
+#define MCINFO_FLAGS_UNCOMPLETE 0x1
 struct mc_info {
     /* Number of mcinfo_* entries in mi_data */
     uint32_t mi_nentries;
-    uint32_t _pad0;
+    uint32_t flags;
     uint64_t mi_data[(MCINFO_MAXSIZE - 1) / 8];
 };
 typedef struct mc_info mc_info_t;

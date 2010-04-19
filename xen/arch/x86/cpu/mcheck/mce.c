@@ -125,6 +125,88 @@ void mce_need_clearbank_register(mce_need_clearbank_t cbfunc)
     mc_need_clearbank_scan = cbfunc;
 }
 
+static struct mcinfo_bank *mca_init_bank(enum mca_source who,
+                                         struct mc_info *mi, int bank)
+{
+	struct mcinfo_bank *mib;
+	uint64_t addr=0, misc = 0;
+
+	if (!mi)
+		return NULL;
+
+	mib = x86_mcinfo_reserve(mi, sizeof(struct mcinfo_bank));
+	if (!mib)
+	{
+		mi->flags |= MCINFO_FLAGS_UNCOMPLETE;
+		return NULL;
+	}
+
+	memset(mib, 0, sizeof (struct mcinfo_bank));
+	mca_rdmsrl(MSR_IA32_MC0_STATUS + bank * 4, mib->mc_status);
+
+	mib->common.type = MC_TYPE_BANK;
+	mib->common.size = sizeof (struct mcinfo_bank);
+	mib->mc_bank = bank;
+
+	addr = misc = 0;
+	if (mib->mc_status & MCi_STATUS_MISCV)
+		mca_rdmsrl(MSR_IA32_MC0_MISC + 4 * bank, mib->mc_misc);
+
+	if (mib->mc_status & MCi_STATUS_ADDRV)
+	{
+		mca_rdmsrl(MSR_IA32_MC0_ADDR + 4 * bank, mib->mc_addr);
+
+		if (mfn_valid(paddr_to_pfn(mib->mc_addr))) {
+			struct domain *d;
+
+			d = maddr_get_owner(mib->mc_addr);
+			if (d != NULL && (who == MCA_POLLER ||
+				  who == MCA_CMCI_HANDLER))
+				mib->mc_domid = d->domain_id;
+		}
+	}
+
+	if (who == MCA_CMCI_HANDLER) {
+		mca_rdmsrl(MSR_IA32_MC0_CTL2 + bank, mib->mc_ctrl2);
+		rdtscll(mib->mc_tsc);
+	}
+
+	return mib;
+}
+
+static int mca_init_global(uint32_t flags, struct mcinfo_global *mig)
+{
+	uint64_t status;
+	int cpu_nr;
+	struct vcpu *v = current;
+	struct domain *d;
+
+	/* Set global information */
+	memset(mig, 0, sizeof (struct mcinfo_global));
+	mig->common.type = MC_TYPE_GLOBAL;
+	mig->common.size = sizeof (struct mcinfo_global);
+	mca_rdmsrl(MSR_IA32_MCG_STATUS, status);
+	mig->mc_gstatus = status;
+	mig->mc_domid = mig->mc_vcpuid = -1;
+	mig->mc_flags = flags;
+	cpu_nr = smp_processor_id();
+	/* Retrieve detector information */
+	x86_mc_get_cpu_info(cpu_nr, &mig->mc_socketid,
+	  &mig->mc_coreid, &mig->mc_core_threadid,
+	  &mig->mc_apicid, NULL, NULL, NULL);
+
+	/* This is really meaningless */
+	if (v != NULL && ((d = v->domain) != NULL)) {
+		mig->mc_domid = d->domain_id;
+		mig->mc_vcpuid = v->vcpu_id;
+	} else {
+		mig->mc_domid = -1;
+		mig->mc_vcpuid = -1;
+	}
+
+	return 0;
+}
+
 /* Utility function to perform MCA bank telemetry readout and to push that
  * telemetry towards an interested dom0 for logging and diagnosis.
  * The caller - #MC handler or MCA poll function - must arrange that we
@@ -139,53 +221,32 @@ void mce_need_clearbank_register(mce_need_clearbank_t cbfunc)
 mctelem_cookie_t mcheck_mca_logout(enum mca_source who, cpu_banks_t bankmask,
     struct mca_summary *sp, cpu_banks_t* clear_bank)
 {
-	struct vcpu *v = current;
-	struct domain *d;
-	uint64_t gstatus, status, addr, misc;
-	struct mcinfo_global mcg;	/* on stack */
-	struct mcinfo_common *mic;
-	struct mcinfo_global *mig;	/* on stack */
+	uint64_t gstatus, status;
+	struct mcinfo_global *mig = NULL;	/* on stack */
 	mctelem_cookie_t mctc = NULL;
-	uint32_t uc = 0, pcc = 0, recover, need_clear = 1 ;
+	uint32_t uc = 0, pcc = 0, recover, need_clear = 1, mc_flags = 0;
 	struct mc_info *mci = NULL;
 	mctelem_class_t which = MC_URGENT;	/* XXXgcc */
-	unsigned int cpu_nr;
 	int errcnt = 0;
 	int i;
 	enum mca_extinfo cbret = MCA_EXTINFO_IGNORED;
 
-	cpu_nr = smp_processor_id();
-	BUG_ON(cpu_nr != v->processor);
-
 	mca_rdmsrl(MSR_IA32_MCG_STATUS, gstatus);
-
-	memset(&mcg, 0, sizeof (mcg));
-	mcg.common.type = MC_TYPE_GLOBAL;
-	mcg.common.size = sizeof (mcg);
-	if (v != NULL && ((d = v->domain) != NULL)) {
-		mcg.mc_domid = d->domain_id;
-		mcg.mc_vcpuid = v->vcpu_id;
-	} else {
-		mcg.mc_domid = -1;
-		mcg.mc_vcpuid = -1;
-	}
-	mcg.mc_gstatus = gstatus;	/* MCG_STATUS */
-
 	switch (who) {
 	case MCA_MCE_HANDLER:
 	case MCA_MCE_SCAN:
-		mcg.mc_flags = MC_FLAG_MCE;
+		mc_flags = MC_FLAG_MCE;
 		which = MC_URGENT;
 		break;
 
 	case MCA_POLLER:
 	case MCA_RESET:
-		mcg.mc_flags = MC_FLAG_POLLED;
+		mc_flags = MC_FLAG_POLLED;
 		which = MC_NONURGENT;
 		break;
 
 	case MCA_CMCI_HANDLER:
-		mcg.mc_flags = MC_FLAG_CMCI;
+		mc_flags = MC_FLAG_CMCI;
 		which = MC_NONURGENT;
 		break;
 
@@ -193,18 +254,13 @@ mctelem_cookie_t mcheck_mca_logout(enum mca_source who, cpu_banks_t bankmask,
 		BUG();
 	}
 
-	/* Retrieve detector information */
-	x86_mc_get_cpu_info(cpu_nr, &mcg.mc_socketid,
-	    &mcg.mc_coreid, &mcg.mc_core_threadid,
-	    &mcg.mc_apicid, NULL, NULL, NULL);
-
 	/* If no mc_recovery_scan callback handler registered,
 	 * this error is not recoverable
 	 */
 	recover = (mc_recoverable_scan)? 1: 0;
 
 	for (i = 0; i < 32 && i < nr_mce_banks; i++) {
-		struct mcinfo_bank mcb;		/* on stack */
+		struct mcinfo_bank *mib;		/* on stack */
 
 		/* Skip bank if corresponding bit in bankmask is clear */
 		if (!test_bit(i, bankmask))
@@ -227,17 +283,16 @@ mctelem_cookie_t mcheck_mca_logout(enum mca_source who, cpu_banks_t bankmask,
 		 * a poller;  this can fail (for example dom0 may not
 		 * yet have consumed past telemetry). */
 		if (errcnt == 0) {
-			if ((mctc = mctelem_reserve(which)) != NULL) {
+			if ( (mctc = mctelem_reserve(which)) != NULL ) {
 				mci = mctelem_dataptr(mctc);
 				mcinfo_clear(mci);
+				mig = (struct mcinfo_global*)x86_mcinfo_reserve
+				  (mci, sizeof(struct mcinfo_global));
+				/* mc_info should at least hold up the global information */
+				ASSERT(mig);
+				mca_init_global(mc_flags, mig);
 			}
 		}
-
-		memset(&mcb, 0, sizeof (mcb));
-		mcb.common.type = MC_TYPE_BANK;
-		mcb.common.size = sizeof (mcb);
-		mcb.mc_bank = i;
-		mcb.mc_status = status;
 
 		/* form a mask of which banks have logged uncorrected errors */
 		if ((status & MCi_STATUS_UC) != 0)
@@ -252,37 +307,7 @@ mctelem_cookie_t mcheck_mca_logout(enum mca_source who, cpu_banks_t bankmask,
 		  */
 			recover = mc_recoverable_scan(status);
 
-		addr = misc = 0;
-
-		if (status & MCi_STATUS_ADDRV) {
-			mca_rdmsrl(MSR_IA32_MC0_ADDR + 4 * i, addr);
-			if (mfn_valid(paddr_to_pfn(addr))) {
-				d = maddr_get_owner(addr);
-				if (d != NULL && (who == MCA_POLLER ||
-				    who == MCA_CMCI_HANDLER))
-					mcb.mc_domid = d->domain_id;
-			}
-		}
-
-		if (status & MCi_STATUS_MISCV)
-			mca_rdmsrl(MSR_IA32_MC0_MISC + 4 * i, misc);
-
-		mcb.mc_addr = addr;
-		mcb.mc_misc = misc;
-
-		if (who == MCA_CMCI_HANDLER) {
-			mca_rdmsrl(MSR_IA32_MC0_CTL2 + i, mcb.mc_ctrl2);
-			rdtscll(mcb.mc_tsc);
-		}
-
-		/* Increment the error count;  if this is the first bank
-		 * with a valid error then add the global info to the mcinfo. */
-		if (errcnt++ == 0 && mci != NULL)
-			x86_mcinfo_add(mci, &mcg);
-
-		/* Add the bank data */
-		if (mci != NULL)
-			x86_mcinfo_add(mci, &mcb);
+		mib = mca_init_bank(who, mci, i);
 
 		if (mc_callback_bank_extended && cbret != MCA_EXTINFO_GLOBAL) {
 			cbret = mc_callback_bank_extended(mci, i, status);
@@ -298,12 +323,8 @@ mctelem_cookie_t mcheck_mca_logout(enum mca_source who, cpu_banks_t bankmask,
 		wmb();
 	}
 
-	if (mci != NULL && errcnt > 0) {
-		x86_mcinfo_lookup(mic, mci, MC_TYPE_GLOBAL);
-		mig = container_of(mic, struct mcinfo_global, common);
-		if (mic == NULL)
-			;
-		else if (pcc)
+	if (mig && errcnt > 0) {
+		if (pcc)
 			mig->mc_flags |= MC_FLAG_UNCORRECTABLE;
 		else if (uc)
 			mig->mc_flags |= MC_FLAG_RECOVERABLE;
@@ -758,13 +779,12 @@ static void mcinfo_clear(struct mc_info *mi)
 	x86_mcinfo_nentries(mi) = 0;
 }
 
-int x86_mcinfo_add(struct mc_info *mi, void *mcinfo)
+void *x86_mcinfo_reserve(struct mc_info *mi, int size)
 {
 	int i;
 	unsigned long end1, end2;
-	struct mcinfo_common *mic, *mic_base, *mic_index;
+	struct mcinfo_common *mic_base, *mic_index;
 
-	mic = (struct mcinfo_common *)mcinfo;
 	mic_index = mic_base = x86_mcinfo_first(mi);
 
 	/* go to first free entry */
@@ -774,16 +794,35 @@ int x86_mcinfo_add(struct mc_info *mi, void *mcinfo)
 
 	/* check if there is enough size */
 	end1 = (unsigned long)((uint8_t *)mic_base + sizeof(struct mc_info));
-	end2 = (unsigned long)((uint8_t *)mic_index + mic->size);
+	end2 = (unsigned long)((uint8_t *)mic_index + size);
 
 	if (end1 < end2)
-		return x86_mcerr("mcinfo_add: no more sparc", -ENOSPC);
+	{
+		mce_printk(MCE_CRITICAL,
+			"mcinfo_add: No space left in mc_info\n");
+		return NULL;
+	}
 
 	/* there's enough space. add entry. */
-	memcpy(mic_index, mic, mic->size);
 	x86_mcinfo_nentries(mi)++;
 
-	return 0;
+    return mic_index;
+}
+
+void *x86_mcinfo_add(struct mc_info *mi, void *mcinfo)
+{
+	struct mcinfo_common *mic, *buf;
+
+	mic = (struct mcinfo_common *)mcinfo;
+	buf = x86_mcinfo_reserve(mi, mic->size);
+
+	if ( !buf )
+		mce_printk(MCE_CRITICAL,
+			"mcinfo_add: No space left in mc_info\n");
+	else
+		memcpy(buf, mic, mic->size);
+
+	return buf;
 }
 
 /* Dump machine check information in a format,
