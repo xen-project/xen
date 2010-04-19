@@ -49,6 +49,7 @@
 #include <asm/msr.h>
 #include <asm/traps.h>
 #include <asm/nmi.h>
+#include <asm/mce.h>
 #include <xen/numa.h>
 #include <xen/iommu.h>
 #ifdef CONFIG_COMPAT
@@ -501,7 +502,7 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
             goto fail;
 
         /* For Guest vMCE MSRs virtualization */
-        mce_init_msr(d);
+        vmce_init_msr(d);
     }
 
     if ( is_hvm_domain(d) )

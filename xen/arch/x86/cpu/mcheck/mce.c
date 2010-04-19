@@ -31,11 +31,11 @@ int is_mc_panic;
 unsigned int nr_mce_banks;
 
 int mce_broadcast = 0;
-static uint64_t g_mcg_cap;
+uint64_t g_mcg_cap;
 
 /* Real value in physical CTL MSR */
-static uint64_t h_mcg_ctl = 0UL;
-static uint64_t *h_mci_ctrl;
+uint64_t h_mcg_ctl = 0UL;
+uint64_t *h_mci_ctrl;
 int firstbank;
 
 static void intpose_init(void);
@@ -752,234 +752,6 @@ u64 mce_cap_init(void)
     return value;
 }
 
-/* Guest vMCE# MSRs virtualization ops (rdmsr/wrmsr) */
-void mce_init_msr(struct domain *d)
-{
-    d->arch.vmca_msrs.mcg_status = 0x0;
-    d->arch.vmca_msrs.mcg_cap = g_mcg_cap;
-    d->arch.vmca_msrs.mcg_ctl = ~(uint64_t)0x0;
-    d->arch.vmca_msrs.nr_injection = 0;
-    memset(d->arch.vmca_msrs.mci_ctl, ~0,
-           sizeof(d->arch.vmca_msrs.mci_ctl));
-    INIT_LIST_HEAD(&d->arch.vmca_msrs.impact_header);
-    spin_lock_init(&d->arch.vmca_msrs.lock);
-}
-
-int mce_rdmsr(uint32_t msr, uint64_t *val)
-{
-    struct domain *d = current->domain;
-    int ret = 1;
-    unsigned int bank;
-    struct bank_entry *entry = NULL;
-
-    *val = 0;
-    spin_lock(&d->arch.vmca_msrs.lock);
-
-    switch ( msr )
-    {
-    case MSR_IA32_MCG_STATUS:
-        *val = d->arch.vmca_msrs.mcg_status;
-        if (*val)
-            mce_printk(MCE_VERBOSE,
-                "MCE: rdmsr MCG_STATUS 0x%"PRIx64"\n", *val);
-        break;
-    case MSR_IA32_MCG_CAP:
-        *val = d->arch.vmca_msrs.mcg_cap;
-        mce_printk(MCE_VERBOSE, "MCE: rdmsr MCG_CAP 0x%"PRIx64"\n",
-            *val);
-        break;
-    case MSR_IA32_MCG_CTL:
-        /* Always 0 if no CTL support */
-        *val = d->arch.vmca_msrs.mcg_ctl & h_mcg_ctl;
-        mce_printk(MCE_VERBOSE, "MCE: rdmsr MCG_CTL 0x%"PRIx64"\n",
-            *val);
-        break;
-    case MSR_IA32_MC0_CTL ... MSR_IA32_MC0_CTL + 4 * MAX_NR_BANKS - 1:
-        bank = (msr - MSR_IA32_MC0_CTL) / 4;
-        if ( bank >= (d->arch.vmca_msrs.mcg_cap & MCG_CAP_COUNT) )
-        {
-            mce_printk(MCE_QUIET, "MCE: MSR %x is not MCA MSR\n", msr);
-            ret = 0;
-            break;
-        }
-        switch (msr & (MSR_IA32_MC0_CTL | 3))
-        {
-        case MSR_IA32_MC0_CTL:
-            *val = d->arch.vmca_msrs.mci_ctl[bank] &
-                    (h_mci_ctrl ? h_mci_ctrl[bank] : ~0UL);
-            mce_printk(MCE_VERBOSE, "MCE: rdmsr MC%u_CTL 0x%"PRIx64"\n",
-                     bank, *val);
-            break;
-        case MSR_IA32_MC0_STATUS:
-            /* Only error bank is read. Non-error banks simply return. */
-            if ( !list_empty(&d->arch.vmca_msrs.impact_header) )
-            {
-                entry = list_entry(d->arch.vmca_msrs.impact_header.next,
-                                   struct bank_entry, list);
-                if (entry->bank == bank) {
-                    *val = entry->mci_status;
-                    mce_printk(MCE_VERBOSE,
-                             "MCE: rd MC%u_STATUS in vMCE# context "
-                             "value 0x%"PRIx64"\n", bank, *val);
-                }
-                else
-                    entry = NULL;
-            }
-            break;
-        case MSR_IA32_MC0_ADDR:
-            if ( !list_empty(&d->arch.vmca_msrs.impact_header) )
-            {
-                entry = list_entry(d->arch.vmca_msrs.impact_header.next,
-                                   struct bank_entry, list);
-                if ( entry->bank == bank )
-                {
-                    *val = entry->mci_addr;
-                    mce_printk(MCE_VERBOSE,
-                             "MCE: rdmsr MC%u_ADDR in vMCE# context "
-                             "0x%"PRIx64"\n", bank, *val);
-                }
-            }
-            break;
-        case MSR_IA32_MC0_MISC:
-            if ( !list_empty(&d->arch.vmca_msrs.impact_header) )
-            {
-                entry = list_entry(d->arch.vmca_msrs.impact_header.next,
-                                   struct bank_entry, list);
-                if ( entry->bank == bank )
-                {
-                    *val = entry->mci_misc;
-                    mce_printk(MCE_VERBOSE,
-                             "MCE: rd MC%u_MISC in vMCE# context "
-                             "0x%"PRIx64"\n", bank, *val);
-                }
-            }
-            break;
-        }
-        break;
-    default:
-        switch ( boot_cpu_data.x86_vendor )
-        {
-        case X86_VENDOR_INTEL:
-            ret = intel_mce_rdmsr(msr, val);
-            break;
-        default:
-            ret = 0;
-            break;
-        }
-        break;
-    }
-
-    spin_unlock(&d->arch.vmca_msrs.lock);
-    return ret;
-}
-
-int mce_wrmsr(u32 msr, u64 val)
-{
-    struct domain *d = current->domain;
-    struct bank_entry *entry = NULL;
-    unsigned int bank;
-    int ret = 1;
-
-    if ( !g_mcg_cap )
-        return 0;
-
-    spin_lock(&d->arch.vmca_msrs.lock);
-
-    switch ( msr )
-    {
-    case MSR_IA32_MCG_CTL:
-        d->arch.vmca_msrs.mcg_ctl = val;
-        break;
-    case MSR_IA32_MCG_STATUS:
-        d->arch.vmca_msrs.mcg_status = val;
-        mce_printk(MCE_VERBOSE, "MCE: wrmsr MCG_STATUS %"PRIx64"\n", val);
-        /* For HVM guest, this is the point for deleting vMCE injection node */
-        if ( d->is_hvm && (d->arch.vmca_msrs.nr_injection > 0) )
-        {
-            d->arch.vmca_msrs.nr_injection--; /* Should be 0 */
-            if ( !list_empty(&d->arch.vmca_msrs.impact_header) )
-            {
-                entry = list_entry(d->arch.vmca_msrs.impact_header.next,
-                    struct bank_entry, list);
-                if ( entry->mci_status & MCi_STATUS_VAL )
-                    mce_printk(MCE_QUIET, "MCE: MCi_STATUS MSR should have "
-                                "been cleared before write MCG_STATUS MSR\n");
-
-                mce_printk(MCE_QUIET, "MCE: Delete HVM last injection "
-                                "Node, nr_injection %u\n",
-                                d->arch.vmca_msrs.nr_injection);
-                list_del(&entry->list);
-                xfree(entry);
-            }
-            else
-                mce_printk(MCE_QUIET, "MCE: Not found HVM guest"
-                    " last injection Node, something Wrong!\n");
-        }
-        break;
-    case MSR_IA32_MCG_CAP:
-        mce_printk(MCE_QUIET, "MCE: MCG_CAP is read-only\n");
-        ret = -1;
-        break;
-    case MSR_IA32_MC0_CTL ... MSR_IA32_MC0_CTL + 4 * MAX_NR_BANKS - 1:
-        bank = (msr - MSR_IA32_MC0_CTL) / 4;
-        if ( bank >= (d->arch.vmca_msrs.mcg_cap & MCG_CAP_COUNT) )
-        {
-            mce_printk(MCE_QUIET, "MCE: MSR %x is not MCA MSR\n", msr);
-            ret = 0;
-            break;
-        }
-        switch ( msr & (MSR_IA32_MC0_CTL | 3) )
-        {
-        case MSR_IA32_MC0_CTL:
-            d->arch.vmca_msrs.mci_ctl[bank] = val;
-            break;
-        case MSR_IA32_MC0_STATUS:
-            /* Give the first entry of the list, it corresponds to current
-             * vMCE# injection. When vMCE# is finished processing by the
-             * the guest, this node will be deleted.
-             * Only error bank is written. Non-error banks simply return.
-             */
-            if ( !list_empty(&d->arch.vmca_msrs.impact_header) )
-            {
-                entry = list_entry(d->arch.vmca_msrs.impact_header.next,
-                                   struct bank_entry, list);
-                if ( entry->bank == bank )
-                    entry->mci_status = val;
-                mce_printk(MCE_VERBOSE,
-                         "MCE: wr MC%u_STATUS %"PRIx64" in vMCE#\n",
-                         bank, val);
-            }
-            else
-                mce_printk(MCE_VERBOSE,
-                         "MCE: wr MC%u_STATUS %"PRIx64"\n", bank, val);
-            break;
-        case MSR_IA32_MC0_ADDR:
-            mce_printk(MCE_QUIET, "MCE: MC%u_ADDR is read-only\n", bank);
-            ret = -1;
-            break;
-        case MSR_IA32_MC0_MISC:
-            mce_printk(MCE_QUIET, "MCE: MC%u_MISC is read-only\n", bank);
-            ret = -1;
-            break;
-        }
-        break;
-    default:
-        switch ( boot_cpu_data.x86_vendor )
-        {
-        case X86_VENDOR_INTEL:
-            ret = intel_mce_wrmsr(msr, val);
-            break;
-        default:
-            ret = 0;
-            break;
-        }
-        break;
-    }
-
-    spin_unlock(&d->arch.vmca_msrs.lock);
-    return ret;
-}
-
 static void mcinfo_clear(struct mc_info *mi)
 {
 	memset(mi, 0, sizeof(struct mc_info));
@@ -1238,11 +1010,11 @@ int mca_ctl_conflict(struct mcinfo_bank *bank, struct domain *d)
         return 1;
 
     /* Will MCE happen in host if If host mcg_ctl is 0? */
-    if ( ~d->arch.vmca_msrs.mcg_ctl & h_mcg_ctl )
+    if ( ~d->arch.vmca_msrs->mcg_ctl & h_mcg_ctl )
         return 1;
 
     bank_nr = bank->mc_bank;
-    if (~d->arch.vmca_msrs.mci_ctl[bank_nr] & h_mci_ctrl[bank_nr] )
+    if (~d->arch.vmca_msrs->mci_ctl[bank_nr] & h_mci_ctrl[bank_nr] )
         return 1;
     return 0;
 }

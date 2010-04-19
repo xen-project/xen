@@ -47,6 +47,7 @@
 #include <asm/traps.h>
 #include <asm/mc146818rtc.h>
 #include <asm/spinlock.h>
+#include <asm/mce.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/vpt.h>
 #include <asm/hvm/support.h>
@@ -2061,7 +2062,7 @@ int hvm_msr_read_intercept(struct cpu_user_regs *regs)
          break;
 
     default:
-        ret = mce_rdmsr(ecx, &msr_content);
+        ret = vmce_rdmsr(ecx, &msr_content);
         if ( ret < 0 )
             goto gp_fault;
         else if ( ret )
@@ -2160,7 +2161,7 @@ int hvm_msr_write_intercept(struct cpu_user_regs *regs)
         break;
 
     default:
-        ret = mce_wrmsr(ecx, msr_content);
+        ret = vmce_wrmsr(ecx, msr_content);
         if ( ret < 0 )
             goto gp_fault;
         else if ( ret )

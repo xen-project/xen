@@ -11,6 +11,7 @@
 #include <asm/system.h>
 #include <asm/msr.h>
 #include <asm/p2m.h>
+#include <asm/mce.h>
 #include "mce.h"
 #include "x86_mca.h"
 
@@ -199,126 +200,6 @@ intel_get_extended_msrs(struct mc_info *mci, uint16_t bank, uint64_t status)
     return MCA_EXTINFO_GLOBAL;
 }
 
-/* This node list records errors impacting a domain. when one
- * MCE# happens, one error bank impacts a domain. This error node
- * will be inserted to the tail of the per_dom data for vMCE# MSR
- * virtualization. When one vMCE# injection is finished processing
- * processed by guest, the corresponding node will be deleted. 
- * This node list is for GUEST vMCE# MSRS virtualization.
- */
-static struct bank_entry* alloc_bank_entry(void) {
-    struct bank_entry *entry;
-
-    entry = xmalloc(struct bank_entry);
-    if (!entry) {
-        printk(KERN_ERR "MCE: malloc bank_entry failed\n");
-        return NULL;
-    }
-    memset(entry, 0x0, sizeof(entry));
-    INIT_LIST_HEAD(&entry->list);
-    return entry;
-}
-
-/* Fill error bank info for #vMCE injection and GUEST vMCE#
- * MSR virtualization data
- * 1) Log down how many nr_injections of the impacted.
- * 2) Copy MCE# error bank to impacted DOM node list, 
-      for vMCE# MSRs virtualization
-*/
-
-static int fill_vmsr_data(struct mcinfo_bank *mc_bank, struct domain *d,
-        uint64_t gstatus) {
-    struct bank_entry *entry;
-
-    /* This error bank impacts one domain, we need to fill domain related
-     * data for vMCE MSRs virtualization and vMCE# injection */
-    if (mc_bank->mc_domid != (uint16_t)~0) {
-        /* For HVM guest, Only when first vMCE is consumed by HVM guest successfully,
-         * will we generete another node and inject another vMCE
-         */
-        if ( (d->is_hvm) && (d->arch.vmca_msrs.nr_injection > 0) )
-        {
-            mce_printk(MCE_QUIET, "MCE: HVM guest has not handled previous"
-                        " vMCE yet!\n");
-            return -1;
-        }
-        entry = alloc_bank_entry();
-        if (entry == NULL)
-            return -1;
-
-        entry->mci_status = mc_bank->mc_status;
-        entry->mci_addr = mc_bank->mc_addr;
-        entry->mci_misc = mc_bank->mc_misc;
-        entry->bank = mc_bank->mc_bank;
-
-        spin_lock(&d->arch.vmca_msrs.lock);
-        /* New error Node, insert to the tail of the per_dom data */
-        list_add_tail(&entry->list, &d->arch.vmca_msrs.impact_header);
-        /* Fill MSR global status */
-        d->arch.vmca_msrs.mcg_status = gstatus;
-        /* New node impact the domain, need another vMCE# injection*/
-        d->arch.vmca_msrs.nr_injection++;
-        spin_unlock(&d->arch.vmca_msrs.lock);
-
-        mce_printk(MCE_VERBOSE,"MCE: Found error @[BANK%d "
-                "status %"PRIx64" addr %"PRIx64" domid %d]\n ",
-                mc_bank->mc_bank, mc_bank->mc_status, mc_bank->mc_addr,
-                mc_bank->mc_domid);
-    }
-    return 0;
-}
-
-static int inject_mce(struct domain *d)
-{
-    int cpu = smp_processor_id();
-    cpumask_t affinity;
-
-    /* PV guest and HVM guest have different vMCE# injection
-     * methods*/
-
-    if ( !test_and_set_bool(d->vcpu[0]->mce_pending) )
-    {
-        if (d->is_hvm)
-        {
-            mce_printk(MCE_VERBOSE, "MCE: inject vMCE to HVM DOM %d\n", 
-                        d->domain_id);
-            vcpu_kick(d->vcpu[0]);
-        }
-        /* PV guest including DOM0 */
-        else
-        {
-            mce_printk(MCE_VERBOSE, "MCE: inject vMCE to PV DOM%d\n", 
-                        d->domain_id);
-            if (guest_has_trap_callback
-                   (d, 0, TRAP_machine_check))
-            {
-                d->vcpu[0]->cpu_affinity_tmp =
-                        d->vcpu[0]->cpu_affinity;
-                cpus_clear(affinity);
-                cpu_set(cpu, affinity);
-                mce_printk(MCE_VERBOSE, "MCE: CPU%d set affinity, old %d\n", cpu,
-                            d->vcpu[0]->processor);
-                vcpu_set_affinity(d->vcpu[0], &affinity);
-                vcpu_kick(d->vcpu[0]);
-            }
-            else
-            {
-                mce_printk(MCE_VERBOSE, "MCE: Kill PV guest with No MCE handler\n");
-                domain_crash(d);
-            }
-        }
-    }
-    else {
-        /* new vMCE comes while first one has not been injected yet,
-         * in this case, inject fail. [We can't lose this vMCE for
-         * the mce node's consistency].
-        */
-        mce_printk(MCE_QUIET, "There's a pending vMCE waiting to be injected "
-                    " to this DOM%d!\n", d->domain_id);
-        return -1;
-    }
-    return 0;
-}
 
 static void intel_UCR_handler(struct mcinfo_bank *bank,
              struct mcinfo_global *global,
@@ -377,7 +258,7 @@ static void intel_UCR_handler(struct mcinfo_bank *bank,
                               return;
                           }
                           /* We will inject vMCE to DOMU*/
-                          if ( inject_mce(d) < 0 )
+                          if ( inject_vmce(d) < 0 )
                           {
                               mce_printk(MCE_QUIET, "inject vMCE to DOM%d"
                                           " failed\n", d->domain_id);

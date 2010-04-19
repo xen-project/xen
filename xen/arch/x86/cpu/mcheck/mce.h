@@ -164,4 +164,32 @@ extern void x86_mce_callback_register(x86_mce_callback_t);
 int x86_mcinfo_add(struct mc_info *mi, void *mcinfo);
 void x86_mcinfo_dump(struct mc_info *mi);
 
+int fill_vmsr_data(struct mcinfo_bank *mc_bank, struct domain *d,
+        uint64_t gstatus);
+int inject_vmce(struct domain *d);
+int vmce_domain_inject(struct mcinfo_bank *bank, struct domain *d, struct mcinfo_global *global);
+
+extern uint64_t g_mcg_cap;
+/* Real value in physical CTL MSR */
+extern uint64_t h_mcg_ctl;
+extern uint64_t *h_mci_ctrl;
+
+extern unsigned int nr_mce_banks;
+
+static inline int mce_vendor_bank_msr(uint32_t msr)
+{
+    if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL &&
+        (msr > MSR_IA32_MC0_CTL2 && msr < (MSR_IA32_MC0_CTL2 + nr_mce_banks)) )
+          return 1;
+    return 0;
+}
+
+static inline int mce_bank_msr(uint32_t msr)
+{
+    if ( (msr > MSR_IA32_MC0_CTL2 &&
+         msr < (MSR_IA32_MC0_CTL + 4 * nr_mce_banks - 1)) ||
+        mce_vendor_bank_msr(msr) )
+        return 1;
+    return 0;
+}
 #endif /* _MCE_H */

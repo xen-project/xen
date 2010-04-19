@@ -65,6 +65,7 @@
 #include <asm/traps.h>
 #include <asm/hvm/vpt.h>
 #include <asm/hypercall.h>
+#include <asm/mce.h>
 #include <public/arch-x86/cpuid.h>
 
 /*
@@ -2295,7 +2296,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             if ( wrmsr_hypervisor_regs(regs->ecx, val) )
                 break;
 
-            rc = mce_wrmsr(regs->ecx, val);
+            rc = vmce_wrmsr(regs->ecx, val);
             if ( rc < 0 )
                 goto fail;
             if ( rc )
@@ -2388,7 +2389,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                 break;
             }
 
-            rc = mce_rdmsr(regs->ecx, &val);
+            rc = vmce_rdmsr(regs->ecx, &val);
             if ( rc < 0 )
                 goto fail;
             if ( rc )
@@ -2947,19 +2948,19 @@ void async_exception_cleanup(struct vcpu *curr)
         {
             struct domain *d = curr->domain;
 
-            if ( !d->arch.vmca_msrs.nr_injection )
+            if ( !d->arch.vmca_msrs->nr_injection )
             {
                 printk(XENLOG_WARNING "MCE: ret from vMCE#, "
                        "no injection node\n");
                 goto end;
             }
 
-            d->arch.vmca_msrs.nr_injection--;
-            if ( !list_empty(&d->arch.vmca_msrs.impact_header) )
+            d->arch.vmca_msrs->nr_injection--;
+            if ( !list_empty(&d->arch.vmca_msrs->impact_header) )
             {
                 struct bank_entry *entry;
 
-                entry = list_entry(d->arch.vmca_msrs.impact_header.next,
+                entry = list_entry(d->arch.vmca_msrs->impact_header.next,
                                    struct bank_entry, list);
                 gdprintk(XENLOG_DEBUG, "MCE: delete last injection node\n");
                 list_del(&entry->list);
@@ -2968,7 +2969,7 @@ void async_exception_cleanup(struct vcpu *curr)
                 printk(XENLOG_ERR "MCE: didn't found last injection node\n");
 
             /* further injection */
-            if ( d->arch.vmca_msrs.nr_injection > 0 &&
+            if ( d->arch.vmca_msrs->nr_injection > 0 &&
                  guest_has_trap_callback(d, 0, TRAP_machine_check) &&
                  !test_and_set_bool(curr->mce_pending) )
             {
