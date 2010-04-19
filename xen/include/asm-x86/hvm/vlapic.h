@@ -58,7 +58,9 @@ struct vlapic {
     struct periodic_time     pt;
     s_time_t                 timer_last_update;
     struct page_info         *regs_page;
-    struct tasklet           init_tasklet;
+    /* INIT-SIPI-SIPI work gets deferred to a tasklet. */
+    uint32_t                 init_sipi_tasklet_icr;
+    struct tasklet           init_sipi_tasklet;
 };
 
 static inline uint32_t vlapic_get_reg(struct vlapic *vlapic, uint32_t reg)

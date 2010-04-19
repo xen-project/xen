@@ -226,73 +226,46 @@ bool_t vlapic_match_dest(
     return 0;
 }
 
-static int vlapic_vcpu_pause_async(struct vcpu *v)
-{
-    vcpu_pause_nosync(v);
-
-    if ( v->is_running )
-    {
-        vcpu_unpause(v);
-        return 0;
-    }
-
-    sync_vcpu_execstate(v);
-    return 1;
-}
-
-static void vlapic_init_action(unsigned long _vcpu)
+static void vlapic_init_sipi_action(unsigned long _vcpu)
 {
     struct vcpu *v = (struct vcpu *)_vcpu;
     struct domain *d = v->domain;
-    bool_t fpu_initialised;
+    uint32_t icr = vcpu_vlapic(v)->init_sipi_tasklet_icr;
 
-    /* If the VCPU is not on its way down we have nothing to do. */
-    if ( !test_bit(_VPF_down, &v->pause_flags) )
-        return;
+    vcpu_pause(v);
 
-    if ( !vlapic_vcpu_pause_async(v) )
+    switch ( icr & APIC_MODE_MASK )
     {
-        tasklet_schedule(&vcpu_vlapic(v)->init_tasklet);
-        return;
+    case APIC_DM_INIT: {
+        bool_t fpu_initialised;
+        domain_lock(d);
+        /* Reset necessary VCPU state. This does not include FPU state. */
+        fpu_initialised = v->fpu_initialised;
+        vcpu_reset(v);
+        v->fpu_initialised = fpu_initialised;
+        vlapic_reset(vcpu_vlapic(v));
+        domain_unlock(d);
+        break;
     }
 
-    /* Reset necessary VCPU state. This does not include FPU state. */
-    domain_lock(d);
-    fpu_initialised = v->fpu_initialised;
-    vcpu_reset(v);
-    v->fpu_initialised = fpu_initialised;
-    vlapic_reset(vcpu_vlapic(v));
-    domain_unlock(d);
+    case APIC_DM_STARTUP: {
+        uint16_t reset_cs = (icr & 0xffu) << 8;
+        hvm_vcpu_reset_state(v, reset_cs, 0);
+        break;
+    }
+
+    default:
+        BUG();
+    }
 
     vcpu_unpause(v);
 }
 
-static int vlapic_accept_init(struct vcpu *v)
+static int vlapic_schedule_init_sipi_tasklet(struct vcpu *v, uint32_t icr)
 {
-    /* Nothing to do if the VCPU is already reset. */
-    if ( !v->is_initialised )
-        return X86EMUL_OKAY;
-
-    /* Asynchronously take the VCPU down and schedule reset work. */
-    hvm_vcpu_down(v);
-    tasklet_schedule(&vcpu_vlapic(v)->init_tasklet);
+    vcpu_vlapic(v)->init_sipi_tasklet_icr = icr;
+    tasklet_schedule(&vcpu_vlapic(v)->init_sipi_tasklet);
     return X86EMUL_RETRY;
-}
-
-static int vlapic_accept_sipi(struct vcpu *v, int trampoline_vector)
-{
-    /* If the VCPU is not on its way down we have nothing to do. */
-    if ( !test_bit(_VPF_down, &v->pause_flags) )
-        return X86EMUL_OKAY;
-
-    if ( !vlapic_vcpu_pause_async(v) )
-        return X86EMUL_RETRY;
-
-    hvm_vcpu_reset_state(v, trampoline_vector << 8, 0);
-
-    vcpu_unpause(v);
-
-    return X86EMUL_OKAY;
 }
 
 /* Add a pending IRQ into lapic. */
@@ -329,11 +302,18 @@ static int vlapic_accept_irq(struct vcpu *v, uint32_t icr_low)
         if ( (icr_low & (APIC_INT_LEVELTRIG | APIC_INT_ASSERT)) ==
              APIC_INT_LEVELTRIG )
             break;
-        rc = vlapic_accept_init(v);
+        /* Nothing to do if the VCPU is already reset. */
+        if ( !v->is_initialised )
+            break;
+        hvm_vcpu_down(v);
+        rc = vlapic_schedule_init_sipi_tasklet(v, icr_low);
         break;
 
     case APIC_DM_STARTUP:
-        rc = vlapic_accept_sipi(v, vector);
+        /* Nothing to do if the VCPU is not on its way down. */
+        if ( !test_bit(_VPF_down, &v->pause_flags) )
+            break;
+        rc = vlapic_schedule_init_sipi_tasklet(v, icr_low);
         break;
 
     default:
@@ -1002,7 +982,9 @@ int vlapic_init(struct vcpu *v)
     if ( v->vcpu_id == 0 )
         vlapic->hw.apic_base_msr |= MSR_IA32_APICBASE_BSP;
 
-    tasklet_init(&vlapic->init_tasklet, vlapic_init_action, (unsigned long)v);
+    tasklet_init(&vlapic->init_sipi_tasklet,
+                 vlapic_init_sipi_action,
+                 (unsigned long)v);
 
     return 0;
 }
@@ -1011,7 +993,7 @@ void vlapic_destroy(struct vcpu *v)
 {
     struct vlapic *vlapic = vcpu_vlapic(v);
 
-    tasklet_kill(&vlapic->init_tasklet);
+    tasklet_kill(&vlapic->init_sipi_tasklet);
     destroy_periodic_time(&vlapic->pt);
     unmap_domain_page_global(vlapic->regs);
     free_domheap_page(vlapic->regs_page);
