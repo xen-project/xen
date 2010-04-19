@@ -77,46 +77,25 @@ static void device_power_up(void)
 static void freeze_domains(void)
 {
     struct domain *d;
-    struct vcpu *v;
 
     rcu_read_lock(&domlist_read_lock);
+    /*
+     * Note that we iterate in order of domain-id. Hence we will pause dom0
+     * first which is required for correctness (as only dom0 can add domains to
+     * the domain list). Otherwise we could miss concurrently-created domains.
+     */
     for_each_domain ( d )
-    {
-        switch ( d->domain_id )
-        {
-        case 0:
-            for_each_vcpu ( d, v )
-                if ( v != current )
-                    vcpu_pause(v);
-            break;
-        default:
-            domain_pause(d);
-            break;
-        }
-    }
+        domain_pause(d);
     rcu_read_unlock(&domlist_read_lock);
 }
 
 static void thaw_domains(void)
 {
     struct domain *d;
-    struct vcpu *v;
 
     rcu_read_lock(&domlist_read_lock);
     for_each_domain ( d )
-    {
-        switch ( d->domain_id )
-        {
-        case 0:
-            for_each_vcpu ( d, v )
-                if ( v != current )
-                    vcpu_unpause(v);
-            break;
-        default:
-            domain_unpause(d);
-            break;
-        }
-    }
+        domain_unpause(d);
     rcu_read_unlock(&domlist_read_lock);
 }
 
