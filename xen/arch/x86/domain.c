@@ -1429,7 +1429,7 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
     ASSERT(cpus_weight(dirty_mask) <= 1);
     if ( unlikely(!cpu_isset(cpu, dirty_mask) && !cpus_empty(dirty_mask)) )
     {
-        /* Other cpus call __sync_lazy_execstate from flush ipi handler. */
+        /* Other cpus call __sync_local_execstate from flush ipi handler. */
         flush_tlb_mask(&dirty_mask);
     }
 
@@ -1489,7 +1489,7 @@ void continue_running(struct vcpu *same)
     BUG();
 }
 
-int __sync_lazy_execstate(void)
+int __sync_local_execstate(void)
 {
     unsigned long flags;
     int switch_required;
@@ -1511,15 +1511,15 @@ int __sync_lazy_execstate(void)
 
 void sync_local_execstate(void)
 {
-    (void)__sync_lazy_execstate();
+    (void)__sync_local_execstate();
 }
 
 void sync_vcpu_execstate(struct vcpu *v)
 {
     if ( cpu_isset(smp_processor_id(), v->vcpu_dirty_cpumask) )
-        (void)__sync_lazy_execstate();
+        sync_local_execstate();
 
-    /* Other cpus call __sync_lazy_execstate from flush ipi handler. */
+    /* Other cpus call __sync_local_execstate from flush ipi handler. */
     flush_tlb_mask(&v->vcpu_dirty_cpumask);
 }
 

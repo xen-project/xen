@@ -532,7 +532,7 @@ void update_cr3(struct vcpu *v);
 void propagate_page_fault(unsigned long addr, u16 error_code);
 void *do_page_walk(struct vcpu *v, unsigned long addr);
 
-int __sync_lazy_execstate(void);
+int __sync_local_execstate(void);
 
 /* Arch-specific portion of memory_op hypercall. */
 long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg);

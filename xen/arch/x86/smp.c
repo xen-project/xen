@@ -211,7 +211,7 @@ fastcall void smp_invalidate_interrupt(void)
     ack_APIC_irq();
     perfc_incr(ipis);
     irq_enter();
-    if ( !__sync_lazy_execstate() ||
+    if ( !__sync_local_execstate() ||
          (flush_flags & (FLUSH_TLB_GLOBAL | FLUSH_CACHE)) )
         flush_area_local(flush_va, flush_flags);
     cpu_clear(smp_processor_id(), flush_cpumask);
