@@ -480,6 +480,9 @@ void vcpu_sleep_sync(struct vcpu *d);
  */
 void sync_vcpu_execstate(struct vcpu *v);
 
+/* As above, for any lazy state being held on the local CPU. */
+void sync_local_execstate(void);
+
 /*
  * Called by the scheduler to switch to another VCPU. This function must
  * call context_saved(@prev) when the local CPU is no longer running in

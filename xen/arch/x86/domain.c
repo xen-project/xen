@@ -1509,6 +1509,11 @@ int __sync_lazy_execstate(void)
     return switch_required;
 }
 
+void sync_local_execstate(void)
+{
+    (void)__sync_lazy_execstate();
+}
+
 void sync_vcpu_execstate(struct vcpu *v)
 {
     if ( cpu_isset(smp_processor_id(), v->vcpu_dirty_cpumask) )

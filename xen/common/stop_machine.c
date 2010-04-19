@@ -24,7 +24,7 @@
 #include <xen/init.h>
 #include <xen/sched.h>
 #include <xen/spinlock.h>
-#include <xen/softirq.h>
+#include <xen/tasklet.h>
 #include <xen/stop_machine.h>
 #include <xen/errno.h>
 #include <xen/smp.h>
@@ -51,6 +51,7 @@ struct stopmachine_data {
     void *fn_data;
 };
 
+static DEFINE_PER_CPU(struct tasklet, stopmachine_tasklet);
 static struct stopmachine_data stopmachine_data;
 static DEFINE_SPINLOCK(stopmachine_lock);
 
@@ -81,10 +82,7 @@ int stop_machine_run(int (*fn)(void *), void *data, unsigned int cpu)
         return (*fn)(data);
     }
 
-    /* Note: We shouldn't spin on lock when it's held by others since others
-     * is expecting this cpus to enter softirq context. Or else deadlock
-     * is caused.
-     */
+    /* Must not spin here as the holder will expect us to be descheduled. */
     if ( !spin_trylock(&stopmachine_lock) )
         return -EBUSY;
 
@@ -98,8 +96,9 @@ int stop_machine_run(int (*fn)(void *), void *data, unsigned int cpu)
     smp_wmb();
 
     for_each_cpu_mask ( i, allbutself )
-        cpu_raise_softirq(i, STOPMACHINE_SOFTIRQ);
+        tasklet_schedule_on_cpu(&per_cpu(stopmachine_tasklet, i), i);
 
+    sync_local_execstate();
     stopmachine_set_state(STOPMACHINE_PREPARE);
 
     local_irq_disable();
@@ -118,10 +117,11 @@ int stop_machine_run(int (*fn)(void *), void *data, unsigned int cpu)
     return ret;
 }
 
-static void stopmachine_softirq(void)
+static void stopmachine_action(unsigned long unused)
 {
     enum stopmachine_state state = STOPMACHINE_START;
 
+    sync_local_execstate();
     smp_mb();
 
     while ( state != STOPMACHINE_EXIT )
@@ -153,7 +153,10 @@ static void stopmachine_softirq(void)
 
 static int __init cpu_stopmachine_init(void)
 {
-    open_softirq(STOPMACHINE_SOFTIRQ, stopmachine_softirq);
+    unsigned int cpu;
+    for_each_possible_cpu ( cpu )
+        tasklet_init(&per_cpu(stopmachine_tasklet, cpu),
+                     stopmachine_action, 0);
     return 0;
 }
 __initcall(cpu_stopmachine_init);

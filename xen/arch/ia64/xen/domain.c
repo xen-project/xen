@@ -2343,6 +2343,10 @@ void machine_halt(void)
 	while(1);
 }
 
+void sync_local_execstate(void)
+{
+}
+
 void sync_vcpu_execstate(struct vcpu *v)
 {
 //	__ia64_save_fpu(v->arch._thread.fph);
