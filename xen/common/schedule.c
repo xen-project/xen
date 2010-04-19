@@ -370,7 +370,7 @@ void vcpu_force_reschedule(struct vcpu *v)
 
 /*
  * This function is used by cpu_hotplug code from stop_machine context.
- * Hence we can avoid needing to take the 
+ * Hence we can avoid needing to take certain locks.
  */
 void cpu_disable_scheduler(void)
 {
@@ -382,9 +382,6 @@ void cpu_disable_scheduler(void)
     {
         for_each_vcpu ( d, v )
         {
-            if ( is_idle_vcpu(v) )
-                continue;
-
             if ( (cpus_weight(v->cpu_affinity) == 1) &&
                  cpu_isset(cpu, v->cpu_affinity) )
             {
