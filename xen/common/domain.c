@@ -919,19 +919,8 @@ static void continue_hypercall_tasklet_handler(unsigned long _info)
     struct migrate_info *info = (struct migrate_info *)_info;
     struct vcpu *v = info->vcpu;
 
-    /*
-     * Wait for vcpu to be entirely descheduled. We re-schedule ourselves
-     * meanwhile to allow other work to be done (e.g., descheduling the vcpu!).
-     */
-    BUG_ON(vcpu_runnable(v));
-    if ( v->is_running )
-    {
-        tasklet_schedule(&v->continue_hypercall_tasklet);
-        return;
-    }
-
-    /* Once descheduled, we need to gain access to its register state. */
-    sync_vcpu_execstate(v);
+    /* Wait for vcpu to sleep so that we can access its register state. */
+    vcpu_sleep_sync(v);
 
     this_cpu(continue_info) = info;
     return_reg(v) = (info->cpu == smp_processor_id())
