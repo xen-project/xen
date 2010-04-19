@@ -24,6 +24,7 @@
 #include <asm/hvm/iommu.h>
 #include <asm/hvm/support.h>
 #include <xen/hvm/irq.h>
+#include <xen/tasklet.h>
 
 static void hvm_dirq_assist(unsigned long _d);
 

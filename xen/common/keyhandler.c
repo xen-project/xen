@@ -9,7 +9,7 @@
 #include <xen/console.h>
 #include <xen/serial.h>
 #include <xen/sched.h>
-#include <xen/softirq.h>
+#include <xen/tasklet.h>
 #include <xen/domain.h>
 #include <xen/rangeset.h>
 #include <xen/compat.h>

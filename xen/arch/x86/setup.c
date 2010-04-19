@@ -972,6 +972,7 @@ void __init __start_xen(unsigned long mbi_p)
 #endif
 
     softirq_init();
+    tasklet_subsys_init();
 
     early_cpu_init();
 

@@ -24,7 +24,7 @@
 
 #include <xen/types.h>
 #include <xen/spinlock.h>
-#include <xen/softirq.h>
+#include <xen/tasklet.h>
 #include <asm/irq.h>
 #include <public/hvm/save.h>
 

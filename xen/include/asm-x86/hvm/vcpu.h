@@ -20,6 +20,7 @@
 #ifndef __ASM_X86_HVM_VCPU_H__
 #define __ASM_X86_HVM_VCPU_H__
 
+#include <xen/tasklet.h>
 #include <asm/hvm/io.h>
 #include <asm/hvm/vlapic.h>
 #include <asm/hvm/vmx/vmcs.h>

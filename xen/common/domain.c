@@ -17,6 +17,7 @@
 #include <xen/time.h>
 #include <xen/console.h>
 #include <xen/softirq.h>
+#include <xen/tasklet.h>
 #include <xen/domain_page.h>
 #include <xen/rangeset.h>
 #include <xen/guest_access.h>

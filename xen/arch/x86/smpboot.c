@@ -42,6 +42,7 @@
 #include <xen/irq.h>
 #include <xen/delay.h>
 #include <xen/softirq.h>
+#include <xen/tasklet.h>
 #include <xen/serial.h>
 #include <xen/numa.h>
 #include <xen/event.h>

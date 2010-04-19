@@ -21,7 +21,7 @@
 #ifndef __ASM_X86_HVM_VLAPIC_H__
 #define __ASM_X86_HVM_VLAPIC_H__
 
-#include <xen/softirq.h>
+#include <xen/tasklet.h>
 #include <asm/msr.h>
 #include <public/hvm/ioreq.h>
 #include <asm/hvm/vpt.h>

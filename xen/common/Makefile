@@ -23,6 +23,7 @@ obj-y += stop_machine.o
 obj-y += string.o
 obj-y += symbols.o
 obj-y += sysctl.o
+obj-y += tasklet.o
 obj-y += time.o
 obj-y += timer.o
 obj-y += trace.o

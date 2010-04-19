@@ -21,6 +21,7 @@
 #include <xen/console.h>
 #include <xen/serial.h>
 #include <xen/softirq.h>
+#include <xen/tasklet.h>
 #include <xen/keyhandler.h>
 #include <xen/mm.h>
 #include <xen/delay.h>

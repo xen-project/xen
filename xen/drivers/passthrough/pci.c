@@ -25,7 +25,7 @@
 #include <asm/hvm/irq.h>
 #include <xen/delay.h>
 #include <xen/keyhandler.h>
-
+#include <xen/tasklet.h>
 
 LIST_HEAD(alldevs_list);
 spinlock_t pcidevs_lock = SPIN_LOCK_UNLOCKED;

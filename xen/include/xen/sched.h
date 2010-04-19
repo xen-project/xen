@@ -20,6 +20,7 @@
 #include <xen/rcupdate.h>
 #include <xen/irq.h>
 #include <xen/mm.h>
+#include <xen/tasklet.h>
 #include <public/mem_event.h>
 
 #ifdef CONFIG_COMPAT

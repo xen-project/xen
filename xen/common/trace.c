@@ -25,7 +25,7 @@
 #include <xen/trace.h>
 #include <xen/errno.h>
 #include <xen/event.h>
-#include <xen/softirq.h>
+#include <xen/tasklet.h>
 #include <xen/init.h>
 #include <xen/mm.h>
 #include <xen/percpu.h>
