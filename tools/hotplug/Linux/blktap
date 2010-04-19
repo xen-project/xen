@@ -59,6 +59,7 @@ t=$(xenstore_read_default "$XENBUS_PATH/type" 'MISSING')
 if [ -n "$t" ]
 then
     p=$(xenstore_read "$XENBUS_PATH/params")
+    p=${p#tapdisk:}
     # if we have a ':', chew from head including :
     if echo $p | grep -q \:
     then
