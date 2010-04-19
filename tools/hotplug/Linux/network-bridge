@@ -80,7 +80,7 @@ find_alt_device () {
     local interf=$1
     local prefix=${interf%[[:digit:]]}
     local ifs=$(ip link show | grep " $prefix" |\
-                gawk '{ printf ("%s",substr($2,1,length($2)-1)) }' |\
+                awk '{ printf ("%s",substr($2,1,length($2)-1)) }' |\
                 sed s/$interf//)
     echo "$ifs"
 }

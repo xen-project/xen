@@ -98,7 +98,7 @@ function vtpmdb_is_free_instancenum () {
 		avail=0
 	else
 		instances=$(cat $VTPMDB |                \
-		           gawk                          \
+		           awk                          \
 		           '{                            \
 		               if (1 != index($1,"#")) { \
 		                 printf("%s ",$2);       \
@@ -120,7 +120,7 @@ function vtpmdb_is_free_instancenum () {
 function vtpmdb_get_free_instancenum () {
 	local ctr instances don found
 	instances=$(cat $VTPMDB |                \
-	           gawk                          \
+	           awk                          \
 	           '{                            \
 	               if (1 != index($1,"#")) { \
 	                 printf("%s ",$2);       \
@@ -174,7 +174,7 @@ function vtpmdb_validate_entry () {
 	inst=$2
 
 	res=$(cat $VTPMDB |            \
-	     gawk -vvmname=$vmname     \
+	     awk -vvmname=$vmname     \
 	          -vinst=$inst         \
 	     '{                        \
 	         if ( 1 == index($1,"#")) {\
@@ -209,7 +209,7 @@ function vtpmdb_remove_entry () {
 	VTPMDB_TMP="$VTPMDB".tmp
 
 	$(cat $VTPMDB |            \
-	 gawk -vvmname=$vmname     \
+	 awk -vvmname=$vmname     \
 	 '{                        \
 	    if ( $1 != vmname ) {  \
 	      print $0;            \
@@ -350,13 +350,13 @@ function vtpm_delete_instance () {
 function vtpm_isLocalAddress() {
 	local addr res
 	addr=$(ping $1 -c 1 |  \
-	       gawk '{ print substr($3,2,length($3)-2); exit }')
+	       awk '{ print substr($3,2,length($3)-2); exit }')
 	if [ "$addr" == "" ]; then
 		echo "-1"
 		return
 	fi
 	res=$(ifconfig | grep "inet addr" |  \
-	     gawk -vaddr=$addr               \
+	     awk -vaddr=$addr               \
 	     '{                              \
 	        if ( addr == substr($2, 6)) {\
 	          print "1";                 \
