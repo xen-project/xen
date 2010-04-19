@@ -98,7 +98,6 @@ int stop_machine_run(int (*fn)(void *), void *data, unsigned int cpu)
     for_each_cpu_mask ( i, allbutself )
         tasklet_schedule_on_cpu(&per_cpu(stopmachine_tasklet, i), i);
 
-    sync_local_execstate();
     stopmachine_set_state(STOPMACHINE_PREPARE);
 
     local_irq_disable();
@@ -121,7 +120,6 @@ static void stopmachine_action(unsigned long unused)
 {
     enum stopmachine_state state = STOPMACHINE_START;
 
-    sync_local_execstate();
     smp_mb();
 
     while ( state != STOPMACHINE_EXIT )
