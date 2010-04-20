@@ -1002,11 +1002,7 @@ void cpu_exit_clear(void)
 {
 	int cpu = raw_smp_processor_id();
 
-	/* Previous non-idle state should be synchronised already. */
-	if (__sync_local_execstate())
-		BUG();
-
-	cpucount --;
+	cpucount--;
 	cpu_uninit();
 
 	cpu_clear(cpu, cpu_callout_map);
@@ -1298,13 +1294,6 @@ int __cpu_disable(void)
 	cpu_mcheck_disable();
 
 	remove_siblinginfo(cpu);
-
-	/*
-	 * If we are running the idle vcpu, sync last non-idle vcpu's state
-	 * before changing cpu_online_map. If we are running non-idle vcpu,
-	 * we will synchronously sync the state in context_switch() later.
-	 */
-	sync_local_execstate();
 
 	/* It's now safe to remove this processor from the online map */
 	cpu_clear(cpu, cpu_online_map);
