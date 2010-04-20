@@ -60,9 +60,12 @@ void do_tasklet(void)
     struct list_head *list = &per_cpu(tasklet_list, cpu);
     struct tasklet *t;
 
+    if ( likely(list_empty(list)) )
+        return;
+
     spin_lock_irq(&tasklet_lock);
 
-    if ( list_empty(list) )
+    if ( unlikely(list_empty(list)) )
     {
         spin_unlock_irq(&tasklet_lock);
         return;
