@@ -56,6 +56,7 @@ Name & Description \\
 {\tt debug} & A basic class for testing \\
 {\tt XSPolicy} & A class for handling Xen Security Policies \\
 {\tt ACMPolicy} & A class for handling ACM-type policies \\
+{\tt cpu\_pool} & A container for VMs which should shared the same host\_cpu(s) \\
 \hline
 \end{tabular}\end{center}
 \section{Relationships Between Classes}
@@ -88,6 +89,9 @@ PSCSI.HBA & PSCSI\_HBA.PSCSIs & one-to-many\\
 PSCSI\_HBA.host & host.PSCSI\_HBAs & one-to-many\\
 host.resident\_VMs & VM.resident\_on & many-to-one\\
 host.host\_CPUs & host\_cpu.host & many-to-one\\
+host.resident\_cpu\_pools & cpu\_pool.resident\_on & many-to-one\\
+cpu\_pool.started\_VMs & VM.cpu\_pool & many-to-one\\
+cpu\_pool.host\_CPUs & host\_cpu.cpu\_pool & many-to-one\\
 \hline
 \end{tabular}\end{center}
 
@@ -497,6 +501,56 @@ error code and a message describing the error.
 \vspace{0.3cm}
 {\bf Signature:}
 \begin{verbatim}SECURITY_ERROR(xserr, message)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{POOL\_BAD\_STATE}
+
+You attempted an operation on a pool that was not in an appropriate state
+at the time; for example, you attempted to activate a pool that was
+already activated.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}POOL_BAD_STATE(current pool state)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{INSUFFICIENT\_CPUS}
+
+You attempted to activate a cpu\_pool but there are not enough
+unallocated CPUs to satisfy the request.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}INSUFFICIENT_CPUS(needed cpu count, available cpu count)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{UNKOWN\_SCHED\_POLICY}
+
+The specified scheduler policy is unkown to the host.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}UNKOWN_SCHED_POLICY()\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{INVALID\_CPU}
+
+You tried to reconfigure a cpu\_pool with a CPU that is unkown to the host
+or has a wrong state.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}INVALID_CPU(message)\end{verbatim}
+\begin{center}\rule{10em}{0.1pt}\end{center}
+
+\subsubsection{LAST\_CPU\_NOT\_REMOVEABLE}
+
+You tried to remove the last CPU from a cpu\_pool that has one or more
+active domains.
+
+\vspace{0.3cm}
+{\bf Signature:}
+\begin{verbatim}LAST_CPU_NOT_REMOVEABLE(message)\end{verbatim}
 \begin{center}\rule{10em}{0.1pt}\end{center}
 
 
@@ -4847,6 +4901,135 @@ references to objects with match names
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
+\subsubsection{RPC name:~get\_cpu\_pool}
+
+{\bf Overview:}
+Get the cpu\_pool field of the given VM.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} ((cpu_pool ref) Set) get_cpu_pool (session_id s, VM ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+\hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+(cpu\_pool ref) Set
+}
+
+
+references to cpu\_pool objects.
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_pool\_name}
+
+{\bf Overview:}
+Get the pool\_name field of the given VM.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} string get_cpu_pool (session_id s, VM ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+\hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+string
+}
+
+
+name of cpu pool to use
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~cpu\_pool\_migrate}
+
+{\bf Overview:}
+Migrate the VM to another cpu\_pool.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} void cpu_pool_migrate (session_id s, VM ref self, cpu_pool ref pool)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+\hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline
+{\tt cpu\_pool ref} & pool & reference to new cpu\_pool \\ \hline
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+void
+}
+
+\vspace{0.3cm}
+
+\noindent{\bf Possible Error Codes:} {\tt POOL\_BAD\_STATE, VM\_BAD\_POWER\_STATE}
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_pool\_name}
+
+{\bf Overview:}
+Set cpu pool name to use for next activation.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} void set_pool_name (session_id s, VM ref self, string pool\_name)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+\hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt VM ref } & self & reference to the object \\ \hline
+{\tt string} & pool\_name & New pool name \\ \hline
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+void
+}
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+
+
+
 
 \vspace{1cm}
 \newpage
@@ -5681,6 +5864,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt PSCSIs} & (PSCSI ref) Set & physical SCSI dev
 $\mathit{RO}_\mathit{run}$ &  {\tt PSCSI\_HBAs} & (PSCSI\_HBA ref) Set & physical SCSI host bus adapters \\
 $\mathit{RO}_\mathit{run}$ &  {\tt host\_CPUs} & (host\_cpu ref) Set & The physical CPUs on this host \\
 $\mathit{RO}_\mathit{run}$ &  {\tt metrics} & host\_metrics ref & metrics associated with this host \\
+$\mathit{RO}_\mathit{run}$ &  {\tt resident\_cpu\_pools} & (cpu\_pool ref) Set & list of cpu\_pools currently resident on the host \\
 \hline
 \end{longtable}
 \subsection{RPCs associated with class: host}
@@ -7229,6 +7413,38 @@ references to objects with match names
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
+\subsubsection{RPC name:~get\_resident\_cpu\_pools}
+
+{\bf Overview:}
+Get the resident\_cpu\_pools field of the given host.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} ((cpu_pool ref) Set) get_resident_cpu_pools (session_id s, host ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt host ref } & self & reference to the object \\ \hline
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+(cpu\_pool ref) Set
+}
+
+
+references to all known cpu\_pools.
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+
 
 \vspace{1cm}
 \newpage
@@ -7484,6 +7700,7 @@ $\mathit{RO}_\mathit{run}$ &  {\tt stepping} & string & the stepping of the phys
 $\mathit{RO}_\mathit{run}$ &  {\tt flags} & string & the flags of the physical CPU (a decoded version of the features field) \\
 $\mathit{RO}_\mathit{run}$ &  {\tt features} & string & the physical CPU feature bitmap \\
 $\mathit{RO}_\mathit{run}$ &  {\tt utilisation} & float & the current CPU utilisation \\
+$\mathit{RO}_\mathit{run}$ &  {\tt cpu\_pool} & (cpu\_pool ref) Set & reference to cpu\_pool the cpu belongs to \\
 \hline
 \end{longtable}
 \subsection{RPCs associated with class: host\_cpu}
@@ -7896,6 +8113,70 @@ all fields from the object
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
+\subsubsection{RPC name:~get\_cpu\_pool}
+
+{\bf Overview:}
+Get the cpu\_pool field of the given host\_cpu.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} ((cpu_pool) Set) get_cpu_pool (session_id s, host_cpu ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt host\_cpu ref } & self & reference to the object \\ \hline
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+(cpu\_pool) Set
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_unassigned\_cpus}
+
+{\bf Overview:}
+Get a reference to all cpus that are not assigend to any cpu\_pool.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} ((host_cpu) Set) get_unassigned_cpus (session_id s)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+(host\_cpu ref) Set
+}
+
+
+Set of free (not assigned) cpus
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+
+
 
 \vspace{1cm}
 \newpage
@@ -18891,4 +19172,1074 @@ all fields from the object
 \vspace{0.3cm}
 \vspace{0.3cm}
 \vspace{0.3cm}
+
+\newpage
+\section{Class: cpu\_pool}
+\subsection{Fields for class: cpu\_pool}
+\begin{longtable}{|lllp{0.38\textwidth}|}
+\hline
+\multicolumn{1}{|l}{Name} & \multicolumn{3}{l|}{\bf cpu\_pool} \\
+\multicolumn{1}{|l}{Description} & \multicolumn{3}{l|}{\parbox{11cm}{\em A CPU pool}} \\
+\hline
+Quals & Field & Type & Description \\
+\hline
+$\mathit{RO}_\mathit{run}$ &  {\tt uuid} & string & unique identifier / object reference \\
+$\mathit{RW}$              &  {\tt name\_label} & string & name of cpu\_pool \\
+$\mathit{RW}$              &  {\tt name\_description} & string & cpu\_pool description \\
+$\mathit{RO}_\mathit{run}$ &  {\tt resident\_on} & host ref & the host the cpu\_pool is currently resident on \\
+$\mathit{RW}$              &  {\tt auto\_power\_on} & bool & True if this cpu\_pool should be activated automatically after host boot \\
+$\mathit{RO}_\mathit{run}$ &  {\tt started\_VMs} & (VM ref) Set & list of VMs currently started in this cpu\_pool \\
+$\mathit{RW}$              &  {\tt ncpu} & integer & number of host\_CPUs requested for this cpu\_pool at next start \\
+$\mathit{RW}$              &  {\tt sched\_policy} & string & scheduler policy on this cpu\_pool \\
+$\mathit{RW}$              &  {\tt proposed\_CPUs} & (string) Set & list of proposed host\_CPUs to assign at next activation \\
+$\mathit{RO}_\mathit{run}$ &  {\tt host\_CPUs} & (VM ref) Set & list of host\_cpus currently assigned to this cpu\_pool \\
+$\mathit{RO}_\mathit{run}$ &  {\tt activated} & bool & True if this cpu\_pool is activated \\
+$\mathit{RW}$              &  {\tt other\_config} & (string $\rightarrow$ string) Map & additional configuration \\
+\hline
+\end{longtable}
+\subsection{RPCs associated with class: cpu\_pool}
+\subsubsection{RPC name:~activate}
+
+{\bf Overview:}
+Activate the cpu\_pool and assign the given CPUs to it.
+CPUs specified in field proposed\_CPUs, that are not existing or not free, are
+ignored. If value of ncpu is greater than the number of CPUs in field
+proposed\_CPUs, additional free CPUs are assigned to the cpu\_pool.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} void activate (session_id s, cpu_pool ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt cpu\_pool ref } & self & reference to the object \\ \hline
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+void
+}
+
+\vspace{0.3cm}
+
+\noindent {\bf Possible Error Codes:}
+    {\tt POOL\_BAD\_STATE, INSUFFICIENT\_CPUS, UNKOWN\_SCHED\_POLICY}
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~create}
+
+{\bf Overview:}
+Create a new cpu\_pool instance, and return its handle.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} (cpu_pool ref) create (session_id s, cpu_pool record args)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt cpu\_pool record } & args & All constructor arguments \\ \hline
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+cpu\_pool ref
+}
+
+
+reference to the newly created object
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~deactivate}
+
+{\bf Overview:}
+Deactivate the cpu\_pool and release all CPUs assigned to it.
+This function can only be called if there are no domains active in the
+cpu\_pool.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} void deactivate (session_id s, cpu_pool ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt cpu\_pool ref } & self & reference to the object \\ \hline
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+void
+}
+
+\vspace{0.3cm}
+
+\noindent {\bf Possible Error Codes:} {\tt POOL\_BAD\_STATE}
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~destroy}
+
+{\bf Overview:}
+Destroy the specified cpu\_pool. The cpu\_pool is completely removed from the
+system.
+This function can only be called if the cpu\_pool is deactivated.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} void destroy (session_id s, cpu_pool ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt cpu\_pool ref } & self & reference to the object \\ \hline
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+void
+}
+
+\vspace{0.3cm}
+
+\noindent {\bf Possible Error Codes:} {\tt POOL\_BAD\_STATE}
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~add\_host\_CPU\_live}
+
+
+{\bf Overview:}
+Add a additional CPU immediatly to the cpu\_pool.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} void add_host_CPU_live (session_id s, cpu_pool ref self, host_cpu ref host_cpu)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt cpu\_pool ref } & self & reference to the object \\ \hline
+{\tt host\_cpu ref } & host\_cpu & CPU to add \\ \hline
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+void
+}
+
+\vspace{0.3cm}
+
+\noindent {\bf Possible Error Codes:}
+    {\tt POOL\_BAD\_STATE, INVALID\_CPU}
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~remove\_host\_CPU\_live}
+
+
+{\bf Overview:}
+Remove a CPU immediatly from the cpu\_pool.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} void remove_host_CPU_live (session_id s, cpu_pool ref self, host_cpu ref host_cpu)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt cpu\_pool ref } & self & reference to the object \\ \hline
+{\tt host\_cpu ref } & host\_cpu & CPU to remove \\ \hline
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+void
+}
+
+\vspace{0.3cm}
+
+\noindent {\bf Possible Error Codes:}
+    {\tt POOL\_BAD\_STATE, INVALID\_CPU, LAST\_CPU\_NOT\_REMOVEABLE}
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_all}
+
+
+{\bf Overview:}
+Return a list of all the cpu pools known to the system.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} ((cpu_pool ref) Set) get_all (session_id s)\end{verbatim}
+
+
+ \noindent {\bf Return Type:}
+{\tt
+(cpu\_pool ref) Set
+}
+A list of all the IDs of the cpu pools.
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_all\_records}
+
+
+{\bf Overview:}
+Return a map of all the cpu pool records known to the system.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} (((cpu_pool ref) -> (cpu_pool record)) Map) get_all_records (session_id s)\end{verbatim}
+
+
+ \noindent {\bf Return Type:}
+{\tt
+((cpu\_pool ref) $\rightarrow$ (cpu\_pool record)) Map
+}
+A map of all the cpu pool records indexed by cpu pool ref.
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_by\_name\_label}
+
+{\bf Overview:}
+Get all the cpu\_pool instances with the given label.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} ((cpu_pool ref) Set) get_by_name_label (session_id s, string label)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt string } & label & label of object to return \\ \hline
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+(cpu\_pool ref) Set
+}
+
+
+references to objects with matching names
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_by\_uuid}
+
+{\bf Overview:}
+Get a reference to the cpu\_pool instance with the specified UUID.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} (cpu_pool ref) get_by_uuid (session_id s, string uuid)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt string } & uuid & UUID of object to return \\ \hline
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+cpu\_pool ref
+}
+
+
+reference to the object
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_activated}
+
+
+{\bf Overview:}
+Return the activation state of the cpu\_pool object.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} bool get_activated (session_id s, cpu_pool ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt cpu\_pool ref } & self & reference to the object \\ \hline
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+bool
+}
+Returns {\bf true} if cpu\_pool is active.
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_auto\_power\_on}
+
+
+{\bf Overview:}
+Return the auto power attribute of the cpu\_pool object.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} bool get_auto_power_on (session_id s, cpu_pool ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt cpu\_pool ref } & self & reference to the object \\ \hline
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+bool
+}
+Returns {\bf true} if cpu\_pool has to be activated on xend start.
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_host\_CPUs}
+
+
+{\bf Overview:}
+Return the list of host\_cpu refs assigned to the cpu\_pool object.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} ((host_cpu ref) Set) get_host_CPUs (session_id s, cpu_pool ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt cpu\_pool ref } & self & reference to the object \\ \hline
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+(host\_cpu ref) Set
+}
+Returns a list of references of all host cpus assigned to the cpu\_pool.
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_name\_description}
+
+{\bf Overview:}
+Get the name/description field of the given cpu\_pool.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} string get_name_description (session_id s, cpu_pool ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt cpu\_pool ref } & self & reference to the object \\ \hline
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_name\_label}
+
+{\bf Overview:}
+Get the name/label field of the given cpu\_pool.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} string get_name_label (session_id s, cpu_pool ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt cpu\_pool ref } & self & reference to the object \\ \hline
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_ncpu}
+
+{\bf Overview:}
+Get the ncpu field of the given cpu\_pool.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} int get_ncpu (session_id s, cpu_pool ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt cpu\_pool ref } & self & reference to the object \\ \hline
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+int
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_proposed\_CPUs}
+
+{\bf Overview:}
+Get the proposed\_CPUs field of the given cpu\_pool.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} ((string) Set) get_proposed_CPUs (session_id s, cpu_pool ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt cpu\_pool ref } & self & reference to the object \\ \hline
+
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+(string) Set
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_other\_config}
+
+{\bf Overview:}
+Get the other\_config field of the given cpu\_pool.
+
+\noindent {\bf Signature:}
+\begin{verbatim} ((string -> string) Map) get_other_config (session_id s, cpu_pool ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt cpu\_pool ref } & self & reference to the object \\ \hline
+\end{tabular}
+
+\vspace{0.3cm}
+
+\noindent {\bf Return Type:}
+{\tt
+(string $\rightarrow$ string) Map
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_record}
+
+{\bf Overview:}
+Get a record containing the current state of the given cpu\_pool.
+
+\noindent {\bf Signature:}
+\begin{verbatim} (cpu_pool record) get_record (session_id s, cpu_pool ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt cpu\_pool ref } & self & reference to the object \\ \hline
+\end{tabular}
+
+\vspace{0.3cm}
+
+\noindent {\bf Return Type:}
+{\tt
+cpu\_pool record
+}
+
+
+all fields of the object.
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_resident\_on}
+
+{\bf Overview:}
+Get the resident\_on field of the given cpu\_pool.
+
+\noindent {\bf Signature:}
+\begin{verbatim} (host ref) get_resident_on (session_id s, cpu_pool ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt cpu\_pool ref } & self & reference to the object \\ \hline
+\end{tabular}
+
+\vspace{0.3cm}
+
+\noindent {\bf Return Type:}
+{\tt
+host ref
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_sched\_policy}
+
+{\bf Overview:}
+Get the sched\_policy field of the given cpu\_pool.
+
+\noindent {\bf Signature:}
+\begin{verbatim} string get_sched_policy (session_id s, cpu_pool ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt cpu\_pool ref } & self & reference to the object \\ \hline
+\end{tabular}
+
+\vspace{0.3cm}
+
+\noindent {\bf Return Type:}
+{\tt
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_started\_VMs}
+
+{\bf Overview:}
+Get the started\_VMs field of the given cpu\_pool.
+
+\noindent {\bf Signature:}
+\begin{verbatim} ((VM ref) Set) get_started_VMs (session_id s, cpu_pool ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt cpu\_pool ref } & self & reference to the object \\ \hline
+\end{tabular}
+
+\vspace{0.3cm}
+
+\noindent {\bf Return Type:}
+{\tt
+(VM ref) Set
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~get\_uuid}
+
+{\bf Overview:}
+Get the uuid field of the given cpu\_pool.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} string get_uuid (session_id s, cpu_pool ref self)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt cpu\_pool ref } & self & reference to the object \\ \hline
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+string
+}
+
+
+value of the field
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_auto\_power\_on}
+
+{\bf Overview:}
+Set the auto\_power\_on field of the given cpu\_pool.
+
+\noindent {\bf Signature:}
+\begin{verbatim} void set_auto_power_on (session_id s, cpu_pool ref self, bool value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt cpu\_pool ref } & self & reference to the object \\ \hline
+{\tt bool } & value & new auto\_power\_on value \\ \hline
+\end{tabular}
+
+\vspace{0.3cm}
+
+\noindent {\bf Return Type:}
+{\tt
+void
+}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_proposed\_CPUs}
+
+{\bf Overview:}
+Set the proposed\_CPUs field of the given cpu\_pool.
+
+\noindent {\bf Signature:}
+\begin{verbatim} void set_proposed_CPUs (session_id s, cpu_pool ref self, string Set cpus)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt cpu\_pool ref } & self & reference to the object \\ \hline
+{\tt string Set } & cpus & Set of preferred CPU (numbers) to use \\ \hline
+\end{tabular}
+
+\vspace{0.3cm}
+
+\noindent {\bf Return Type:}
+{\tt
+void
+}
+\vspace{0.3cm}
+
+\noindent {\bf Possible Error Codes:}
+    {\tt POOL\_BAD\_STATE}
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:add\_to\_proposed\_CPUs}
+
+{\bf Overview:}
+Add a CPU (number) to the proposed\_CPUs field of the given cpu\_pool.
+
+\noindent {\bf Signature:}
+\begin{verbatim} void add_to_proposed_CPUs (session_id s, cpu_pool ref self, integer cpu)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+ \hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt cpu\_pool ref } & self & reference to the object \\ \hline
+{\tt integer } & cpu & Number of CPU to add \\ \hline
+\end{tabular}
+
+\vspace{0.3cm}
+
+\noindent {\bf Return Type:}
+{\tt
+void
+}
+\vspace{0.3cm}
+
+\noindent {\bf Possible Error Codes:}
+    {\tt POOL\_BAD\_STATE}
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:remove\_from\_proposed\_CPUs}
+
+{\bf Overview:}
+Remove a CPU (number) from the proposed\_CPUs field of the given cpu\_pool.
+
+\noindent {\bf Signature:}
+\begin{verbatim} void remove_from_proposed_CPUs (session_id s, cpu_pool ref self, integer cpu)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+\hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt cpu\_pool ref } & self & reference to the object \\ \hline
+{\tt integer } & cpu & Number of CPU to remove \\ \hline
+\end{tabular}
+
+\vspace{0.3cm}
+
+\noindent {\bf Return Type:}
+{\tt
+void
+}
+\vspace{0.3cm}
+
+\noindent {\bf Possible Error Codes:}
+    {\tt POOL\_BAD\_STATE}
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_name\_label}
+
+{\bf Overview:}
+Set the name/label field of the given cpu\_pool.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} void set_name_label (session_id s, cpu_pool ref self, string value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+\hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt cpu\_pool ref } & self & reference to the object \\ \hline
+{\tt string } & value & New value to set \\ \hline
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_ncpu}
+
+{\bf Overview:}
+Set the ncpu field of the given cpu\_pool.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} void set_ncpu (session_id s, cpu_pool ref self, integer value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+\hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt cpu\_pool ref } & self & reference to the object \\ \hline
+{\tt integer } & value & Number of cpus to use \\ \hline
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+void
+}
+
+\vspace{0.3cm}
+
+\noindent {\bf Possible Error Codes:}
+    {\tt POOL\_BAD\_STATE}
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_other\_config}
+
+{\bf Overview:}
+Set the other\_config field of the given cpu\_pool.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} void set_other_config (session_id s, cpu_pool ref self, (string -> string) Map value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+\hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt cpu\_pool ref } & self & reference to the object \\ \hline
+{\tt (string $\rightarrow$ string) Map } & value & New value to set \\ \hline
+\end{tabular}
+
+\vspace{0.3cm}
+
+\noindent {\bf Return Type:}
+{\tt
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~add\_to\_other\_config}
+
+{\bf Overview:}
+Add the given key-value pair to the other\_config field of the given cpu\_pool.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} void add_to_other_config (session_id s, cpu_pool ref self, string key, string value)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+\hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt cpu\_pool ref } & self & reference to the object \\ \hline
+{\tt string } & key & Key to add \\ \hline
+{\tt string } & value & Value to add \\ \hline
+\end{tabular}
+
+\vspace{0.3cm}
+
+ \noindent {\bf Return Type:}
+{\tt
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~remove\_from\_other\_config}
+
+{\bf Overview:}
+Remove the given key and its corresponding value from the other\_config
+field of the given cpu\_pool.  If the key is not in that Map, then do nothing.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} void remove_from_other_config (session_id s, cpu_pool ref self, string key)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+\hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt cpu\_pool ref } & self & reference to the object \\ \hline
+{\tt string } & key & Key to remove \\ \hline
+\end{tabular}
+
+\vspace{0.3cm}
+
+\noindent {\bf Return Type:}
+{\tt
+void
+}
+
+
+
+\vspace{0.3cm}
+\vspace{0.3cm}
+\vspace{0.3cm}
+\subsubsection{RPC name:~set\_sched\_policy}
+
+{\bf Overview:}
+Set the sched\_policy field of the given cpu\_pool.
+
+ \noindent {\bf Signature:}
+\begin{verbatim} void set_sched_policy (session_id s, cpu_pool ref self, string new_sched_policy)\end{verbatim}
+
+
+\noindent{\bf Arguments:}
+
+
+\vspace{0.3cm}
+\begin{tabular}{|c|c|p{7cm}|}
+\hline
+{\bf type} & {\bf name} & {\bf description} \\ \hline
+{\tt cpu\_pool ref } & self & reference to the object \\ \hline
+{\tt string } & new\_sched\_policy & New value to set \\ \hline
+\end{tabular}
+\vspace{0.3cm}
+
+\noindent {\bf Return Type:}
+{\tt
+void
+}
+
 
