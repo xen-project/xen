@@ -20,6 +20,12 @@ boolean_param("tmem", opt_tmem);
 EXPORT int opt_tmem_compress = 0;
 boolean_param("tmem_compress", opt_tmem_compress);
 
+EXPORT int opt_tmem_dedup = 0;
+boolean_param("tmem_dedup", opt_tmem_dedup);
+
+EXPORT int opt_tmem_tze = 0;
+boolean_param("tmem_tze", opt_tmem_tze);
+
 EXPORT int opt_tmem_shared_auth = 0;
 boolean_param("tmem_shared_auth", opt_tmem_shared_auth);
 
@@ -103,8 +109,8 @@ static inline void *cli_mfn_to_va(tmem_cli_mfn_t cmfn, unsigned long *pcli_mfn)
 #endif
 
 EXPORT int tmh_copy_from_client(pfp_t *pfp,
-    tmem_cli_mfn_t cmfn, uint32_t tmem_offset,
-    uint32_t pfn_offset, uint32_t len, void *cli_va)
+    tmem_cli_mfn_t cmfn, pagesize_t tmem_offset,
+    pagesize_t pfn_offset, pagesize_t len, void *cli_va)
 {
     unsigned long tmem_mfn;
     void *tmem_va;
@@ -148,7 +154,7 @@ EXPORT int tmh_compress_from_client(tmem_cli_mfn_t cmfn,
 }
 
 EXPORT int tmh_copy_to_client(tmem_cli_mfn_t cmfn, pfp_t *pfp,
-    uint32_t tmem_offset, uint32_t pfn_offset, uint32_t len, void *cli_va)
+    pagesize_t tmem_offset, pagesize_t pfn_offset, pagesize_t len, void *cli_va)
 {
     unsigned long tmem_mfn, cli_mfn = 0;
     int mark_dirty = 1;
@@ -195,6 +201,27 @@ EXPORT int tmh_decompress_to_client(tmem_cli_mfn_t cmfn, void *tmem_va,
         unmap_domain_page(cli_va);
         paging_mark_dirty(current->domain,cli_mfn);
     }
+    mb();
+    return 1;
+}
+
+EXPORT int tmh_copy_tze_to_client(tmem_cli_mfn_t cmfn, void *tmem_va,
+                                    pagesize_t len)
+{
+    void *cli_va;
+    unsigned long cli_mfn;
+
+    ASSERT(!(len & (sizeof(uint64_t)-1)));
+    ASSERT(len <= PAGE_SIZE);
+    ASSERT(len > 0 || tmem_va == NULL);
+    if ( (cli_va = cli_mfn_to_va(cmfn,&cli_mfn)) == NULL)
+        return -EFAULT;
+    if ( len > 0 )
+        memcpy((char *)cli_va,(char *)tmem_va,len);
+    if ( len < PAGE_SIZE )
+        memset((char *)cli_va+len,0,PAGE_SIZE-len);
+    unmap_domain_page(cli_va);
+    paging_mark_dirty(current->domain,cli_mfn);
     mb();
     return 1;
 }

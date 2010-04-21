@@ -6,11 +6,10 @@
  * Copyright (c) 2009, Dan Magenheimer, Oracle Corp.
  */
 
-/* TODO list: 090129
-   - improve on reclamation policy
+/* TODO list: 090129 (updated 100318)
+   - any better reclamation policy?
    - use different tlsf pools for each client (maybe each pool)
-   - implement page accounting and minimal QoS limits
-   - test shared access more completely (need pv cluster fs)
+   - test shared access more completely (ocfs2)
    - add feedback-driven compression (not for persistent pools though!)
    - add data-structure total bytes overhead stats
  */
@@ -77,12 +76,17 @@ static unsigned long evicted_pgs = 0, evict_attempts = 0;
 static unsigned long relinq_pgs = 0, relinq_attempts = 0;
 static unsigned long max_evicts_per_relinq = 0;
 static unsigned long low_on_memory = 0;
+static unsigned long deduped_puts = 0;
+static unsigned long tot_good_eph_puts = 0;
 static int global_obj_count_max = 0;
 static int global_pgp_count_max = 0;
+static int global_pcd_count_max = 0;
 static int global_page_count_max = 0;
 static int global_rtree_node_count_max = 0;
 static long global_eph_count_max = 0;
 static unsigned long failed_copies;
+static unsigned long pcd_tot_tze_size = 0;
+static unsigned long pcd_tot_csize = 0;
 
 DECL_CYC_COUNTER(succ_get);
 DECL_CYC_COUNTER(succ_put);
@@ -108,6 +112,7 @@ DECL_CYC_COUNTER(decompress);
 
 struct tm_pool;
 struct tmem_page_descriptor;
+struct tmem_page_content_descriptor;
 struct client {
     struct list_head client_list;
     struct tm_pool *pools[MAX_POOLS_PER_DOMAIN];
@@ -219,12 +224,17 @@ struct tmem_page_descriptor {
         obj_t *obj;
         uint64_t inv_oid;  /* used for invalid list only */
     };
-    uint32_t index;
-    size_t size; /* 0 == PAGE_SIZE (pfp), -1 == data invalid,
+    pagesize_t size; /* 0 == PAGE_SIZE (pfp), -1 == data invalid,
                     else compressed data (cdata) */
+    uint32_t index;
+    /* must hold pcd_tree_rwlocks[firstbyte] to use pcd pointer/siblings */
+    uint16_t firstbyte; /* NON_SHAREABLE->pfp  otherwise->pcd */
+    bool_t eviction_attempted;  /* CHANGE TO lifetimes? (settable) */
+    struct list_head pcd_siblings;
     union {
         pfp_t *pfp;  /* page frame pointer */
         char *cdata; /* compressed data */
+        struct tmem_page_content_descriptor *pcd; /* page dedup */
     };
     union {
         uint64_t timestamp;
@@ -233,6 +243,25 @@ struct tmem_page_descriptor {
     DECL_SENTINEL
 };
 typedef struct tmem_page_descriptor pgp_t;
+
+#define PCD_TZE_MAX_SIZE (PAGE_SIZE - (PAGE_SIZE/64))
+
+struct tmem_page_content_descriptor {
+    union {
+        pfp_t *pfp;  /* page frame pointer */
+        char *cdata; /* if compression_enabled */
+        char *tze; /* if !compression_enabled, trailing zeroes eliminated */
+    };
+    struct list_head pgp_list;
+    struct rb_node pcd_rb_tree_node;
+    uint32_t pgp_ref_count;
+    pagesize_t size; /* if compression_enabled -> 0<size<PAGE_SIZE (*cdata)
+                     * else if tze, 0<=size<PAGE_SIZE, rounded up to mult of 8
+                     * else PAGE_SIZE -> *pfp */
+};
+typedef struct tmem_page_content_descriptor pcd_t;
+struct rb_root pcd_tree_roots[256]; /* choose based on first byte of page */
+rwlock_t pcd_tree_rwlocks[256]; /* poor man's concurrency for now */
 
 static LIST_HEAD(global_ephemeral_page_list); /* all pages in ephemeral pools */
 
@@ -267,6 +296,7 @@ static DEFINE_SPINLOCK(pers_lists_spinlock);
 static long global_eph_count = 0; /* atomicity depends on eph_lists_spinlock */
 static atomic_t global_obj_count = ATOMIC_INIT(0);
 static atomic_t global_pgp_count = ATOMIC_INIT(0);
+static atomic_t global_pcd_count = ATOMIC_INIT(0);
 static atomic_t global_page_count = ATOMIC_INIT(0);
 static atomic_t global_rtree_node_count = ATOMIC_INIT(0);
 
@@ -336,6 +366,229 @@ static NOINLINE void tmem_page_free(pool_t *pool, pfp_t *pfp)
     atomic_dec_and_assert(global_page_count);
 }
 
+/************ PAGE CONTENT DESCRIPTOR MANIPULATION ROUTINES ***********/
+
+#define NOT_SHAREABLE ((uint16_t)-1UL)
+
+static NOINLINE int pcd_copy_to_client(tmem_cli_mfn_t cmfn, pgp_t *pgp)
+{
+    uint8_t firstbyte = pgp->firstbyte;
+    pcd_t *pcd;
+    int ret;
+
+    ASSERT(tmh_dedup_enabled());
+    tmem_read_lock(&pcd_tree_rwlocks[firstbyte]);
+    pcd = pgp->pcd;
+    if ( pgp->size < PAGE_SIZE && pgp->size != 0 &&
+         pcd->size < PAGE_SIZE && pcd->size != 0 )
+        ret = tmh_decompress_to_client(cmfn, pcd->cdata, pcd->size, NULL);
+    else if ( tmh_tze_enabled() && pcd->size < PAGE_SIZE )
+        ret = tmh_copy_tze_to_client(cmfn, pcd->tze, pcd->size);
+    else
+        ret = tmh_copy_to_client(cmfn, pcd->pfp, 0, 0, PAGE_SIZE, NULL);
+    tmem_read_unlock(&pcd_tree_rwlocks[firstbyte]);
+    return ret;
+}
+
+/* ensure pgp no longer points to pcd, nor vice-versa */
+/* take pcd rwlock unless have_pcd_rwlock is set, always unlock when done */
+static NOINLINE void pcd_disassociate(pgp_t *pgp, pool_t *pool, bool_t have_pcd_rwlock)
+{
+    pcd_t *pcd = pgp->pcd;
+    pfp_t *pfp = pgp->pcd->pfp;
+    uint16_t firstbyte = pgp->firstbyte;
+    char *pcd_tze = pgp->pcd->tze;
+    pagesize_t pcd_size = pcd->size;
+    pagesize_t pgp_size = pgp->size;
+    char *pcd_cdata = pgp->pcd->cdata;
+    pagesize_t pcd_csize = pgp->pcd->size;
+
+    ASSERT(tmh_dedup_enabled());
+    ASSERT(firstbyte != NOT_SHAREABLE);
+    ASSERT(firstbyte < 256);
+
+    if ( have_pcd_rwlock )
+        ASSERT_WRITELOCK(&pcd_tree_rwlocks[firstbyte]);
+    else
+        tmem_write_lock(&pcd_tree_rwlocks[firstbyte]);
+    list_del_init(&pgp->pcd_siblings);
+    pgp->pcd = NULL;
+    pgp->firstbyte = NOT_SHAREABLE;
+    pgp->size = -1;
+    if ( --pcd->pgp_ref_count )
+    {
+        tmem_write_unlock(&pcd_tree_rwlocks[firstbyte]);
+        return;
+    }
+
+    /* no more references to this pcd, recycle it and the physical page */
+    ASSERT(list_empty(&pcd->pgp_list));
+    pcd->pfp = NULL;
+    /* remove pcd from rbtree */
+    rb_erase(&pcd->pcd_rb_tree_node,&pcd_tree_roots[firstbyte]);
+    /* reinit the struct for safety for now */
+    RB_CLEAR_NODE(&pcd->pcd_rb_tree_node);
+    /* now free up the pcd memory */
+    tmem_free(pcd,sizeof(pcd_t),NULL);
+    atomic_dec_and_assert(global_pcd_count);
+    if ( pgp_size != 0 && pcd_size < PAGE_SIZE )
+    {
+        /* compressed data */
+        tmem_free(pcd_cdata,pcd_csize,pool);
+        pcd_tot_csize -= pcd_csize;
+    }
+    else if ( pcd_size != PAGE_SIZE )
+    {
+        /* trailing zero data */
+        pcd_tot_tze_size -= pcd_size;
+        if ( pcd_size )
+            tmem_free(pcd_tze,pcd_size,pool);
+    } else {
+        /* real physical page */
+        if ( tmh_tze_enabled() )
+            pcd_tot_tze_size -= PAGE_SIZE;
+        if ( tmh_compression_enabled() )
+            pcd_tot_csize -= PAGE_SIZE;
+        tmem_page_free(pool,pfp);
+    }
+    tmem_write_unlock(&pcd_tree_rwlocks[firstbyte]);
+}
+
+
+static NOINLINE int pcd_associate(pgp_t *pgp, char *cdata, pagesize_t csize)
+{
+    struct rb_node **new, *parent = NULL;
+    struct rb_root *root;
+    pcd_t *pcd;
+    int cmp;
+    pagesize_t pfp_size = 0;
+    uint8_t firstbyte = (cdata == NULL) ? tmh_get_first_byte(pgp->pfp) : *cdata;
+    int ret = 0;
+
+    if ( !tmh_dedup_enabled() )
+        return 0;
+    ASSERT(pgp->obj != NULL);
+    ASSERT(pgp->obj->pool != NULL);
+    ASSERT(!pgp->obj->pool->persistent);
+    if ( cdata == NULL )
+    {
+        ASSERT(pgp->pfp != NULL);
+        pfp_size = PAGE_SIZE;
+        if ( tmh_tze_enabled() )
+        {
+            pfp_size = tmh_tze_pfp_scan(pgp->pfp);
+            if ( pfp_size > PCD_TZE_MAX_SIZE )
+                pfp_size = PAGE_SIZE;
+        }
+        ASSERT(pfp_size <= PAGE_SIZE);
+        ASSERT(!(pfp_size & (sizeof(uint64_t)-1)));
+    }
+    tmem_write_lock(&pcd_tree_rwlocks[firstbyte]);
+
+    /* look for page match */
+    root = &pcd_tree_roots[firstbyte];
+    new = &(root->rb_node);
+    while ( *new )
+    {
+        pcd = container_of(*new, pcd_t, pcd_rb_tree_node);
+        parent = *new;
+        /* compare new entry and rbtree entry, set cmp accordingly */
+        if ( cdata != NULL )
+        {
+            if ( pcd->size < PAGE_SIZE )
+                /* both new entry and rbtree entry are compressed */
+                cmp = tmh_pcd_cmp(cdata,csize,pcd->cdata,pcd->size);
+            else
+                /* new entry is compressed, rbtree entry is not */
+                cmp = -1;
+        } else if ( pcd->size < PAGE_SIZE )
+            /* rbtree entry is compressed, rbtree entry is not */
+            cmp = 1;
+        else if ( tmh_tze_enabled() ) {
+            if ( pcd->size < PAGE_SIZE )
+                /* both new entry and rbtree entry are trailing zero */
+                cmp = tmh_tze_pfp_cmp(pgp->pfp,pfp_size,pcd->tze,pcd->size);
+            else
+                /* new entry is trailing zero, rbtree entry is not */
+                cmp = tmh_tze_pfp_cmp(pgp->pfp,pfp_size,pcd->pfp,PAGE_SIZE);
+        } else  {
+            /* both new entry and rbtree entry are full physical pages */
+            ASSERT(pgp->pfp != NULL);
+            ASSERT(pcd->pfp != NULL);
+            cmp = tmh_page_cmp(pgp->pfp,pcd->pfp);
+        }
+
+        /* walk tree or match depending on cmp */
+        if ( cmp < 0 )
+            new = &((*new)->rb_left);
+        else if ( cmp > 0 )
+            new = &((*new)->rb_right);
+        else
+        {
+            /* match! if not compressed, free the no-longer-needed page */
+            /* but if compressed, data is assumed static so don't free! */
+            if ( cdata == NULL )
+                tmem_page_free(pgp->obj->pool,pgp->pfp);
+            deduped_puts++;
+            goto match;
+        }
+    }
+
+    /* exited while loop with no match, so alloc a pcd and put it in the tree */
+    if ( (pcd = tmem_malloc(pcd_t, NULL)) == NULL )
+    {
+        ret = -ENOMEM;
+        goto unlock;
+    } else if ( cdata != NULL ) {
+        if ( (pcd->cdata = tmem_malloc_bytes(csize,pgp->obj->pool)) == NULL )
+        {
+            tmem_free(pcd,sizeof(pcd_t),NULL);
+            ret = -ENOMEM;
+            goto unlock;
+        }
+    }
+    atomic_inc_and_max(global_pcd_count);
+    RB_CLEAR_NODE(&pcd->pcd_rb_tree_node);  /* is this necessary */
+    INIT_LIST_HEAD(&pcd->pgp_list);  /* is this necessary */
+    pcd->pgp_ref_count = 0;
+    if ( cdata != NULL )
+    {
+        memcpy(pcd->cdata,cdata,csize);
+        pcd->size = csize;
+        pcd_tot_csize += csize;
+    } else if ( pfp_size == 0 ) {
+        ASSERT(tmh_tze_enabled());
+        pcd->size = 0;
+        pcd->tze = NULL;
+    } else if ( pfp_size < PAGE_SIZE &&
+         ((pcd->tze = tmem_malloc_bytes(pfp_size,pgp->obj->pool)) != NULL) ) {
+        tmh_tze_copy_from_pfp(pcd->tze,pgp->pfp,pfp_size);
+        pcd->size = pfp_size;
+        pcd_tot_tze_size += pfp_size;
+        tmem_page_free(pgp->obj->pool,pgp->pfp);
+    } else {
+        pcd->pfp = pgp->pfp;
+        pcd->size = PAGE_SIZE;
+        if ( tmh_tze_enabled() )
+            pcd_tot_tze_size += PAGE_SIZE;
+        if ( tmh_compression_enabled() )
+            pcd_tot_csize += PAGE_SIZE;
+    }
+    rb_link_node(&pcd->pcd_rb_tree_node, parent, new);
+    rb_insert_color(&pcd->pcd_rb_tree_node, root);
+
+match:
+    pcd->pgp_ref_count++;
+    list_add(&pgp->pcd_siblings,&pcd->pgp_list);
+    pgp->firstbyte = firstbyte;
+    pgp->eviction_attempted = 0;
+    pgp->pcd = pcd;
+
+unlock:
+    tmem_write_unlock(&pcd_tree_rwlocks[firstbyte]);
+    return ret;
+}
+
 /************ PAGE DESCRIPTOR MANIPULATION ROUTINES *******************/
 
 /* allocate a pgp_t and associate it with an object */
@@ -353,6 +606,12 @@ static NOINLINE pgp_t *pgp_alloc(obj_t *obj)
     INIT_LIST_HEAD(&pgp->global_eph_pages);
     INIT_LIST_HEAD(&pgp->client_eph_pages);
     pgp->pfp = NULL;
+    if ( tmh_dedup_enabled() )
+    {
+        pgp->firstbyte = NOT_SHAREABLE;
+        pgp->eviction_attempted = 0;
+        INIT_LIST_HEAD(&pgp->pcd_siblings);
+    }
     pgp->size = -1;
     pgp->index = -1;
     pgp->timestamp = get_cycles();
@@ -374,18 +633,20 @@ static pgp_t *pgp_lookup_in_obj(obj_t *obj, uint32_t index)
 
 static NOINLINE void pgp_free_data(pgp_t *pgp, pool_t *pool)
 {
+    pagesize_t pgp_size = pgp->size;
+
     if ( pgp->pfp == NULL )
         return;
-    if ( !pgp->size )
-        tmem_page_free(pgp->obj->pool,pgp->pfp);
+    if ( tmh_dedup_enabled() && pgp->firstbyte != NOT_SHAREABLE )
+        pcd_disassociate(pgp,pool,0); /* pgp->size lost */
+    else if ( pgp_size )
+        tmem_free(pgp->cdata,pgp_size,pool);
     else
+        tmem_page_free(pgp->obj->pool,pgp->pfp);
+    if ( pool != NULL && pgp_size )
     {
-        tmem_free(pgp->cdata,pgp->size,pool);
-        if ( pool != NULL )
-        {
-            pool->client->compressed_pages--;
-            pool->client->compressed_sum_size -= pgp->size;
-        }
+        pool->client->compressed_pages--;
+        pool->client->compressed_sum_size -= pgp_size;
     }
     pgp->pfp = NULL;
     pgp->size = -1;
@@ -987,10 +1248,56 @@ static void client_freeze(client_t *client, int freeze)
 
 /************ MEMORY REVOCATION ROUTINES *******************************/
 
+static bool_t tmem_try_to_evict_pgp(pgp_t *pgp, bool_t *hold_pool_rwlock)
+{
+    obj_t *obj = pgp->obj;
+    pool_t *pool = obj->pool;
+    client_t *client = pool->client;
+    uint16_t firstbyte = pgp->firstbyte;
+
+    if ( pool->is_dying )
+        return 0;
+    if ( tmh_lock_all && !obj->no_evict )
+       return 1;
+    if ( tmem_spin_trylock(&obj->obj_spinlock) )
+    {
+        if ( tmh_dedup_enabled() )
+        {
+            firstbyte = pgp->firstbyte;
+            if ( firstbyte ==  NOT_SHAREABLE )
+                goto obj_unlock;
+            ASSERT(firstbyte < 256);
+            if ( !tmem_write_trylock(&pcd_tree_rwlocks[firstbyte]) )
+                goto obj_unlock;
+            if ( pgp->pcd->pgp_ref_count > 1 && !pgp->eviction_attempted )
+            {
+                pgp->eviction_attempted++;
+                list_del(&pgp->global_eph_pages);
+                list_add_tail(&pgp->global_eph_pages,&global_ephemeral_page_list);
+                list_del(&pgp->client_eph_pages);
+                list_add_tail(&pgp->client_eph_pages,&client->ephemeral_page_list);
+                goto pcd_unlock;
+            }
+        }
+        if ( obj->pgp_count > 1 )
+            return 1;
+        if ( tmem_write_trylock(&pool->pool_rwlock) )
+        {
+            *hold_pool_rwlock = 1;
+            return 1;
+        }
+pcd_unlock:
+        tmem_write_unlock(&pcd_tree_rwlocks[firstbyte]);
+obj_unlock:
+        tmem_spin_unlock(&obj->obj_spinlock);
+    }
+    return 0;
+}
+
 static int tmem_evict(void)
 {
     client_t *client = tmh_client_from_current();
-    pgp_t *pgp = NULL, *pgp_del;
+    pgp_t *pgp = NULL, *pgp2, *pgp_del;
     obj_t *obj;
     pool_t *pool;
     int ret = 0;
@@ -1001,49 +1308,15 @@ static int tmem_evict(void)
     if ( (client != NULL) && client_over_quota(client) &&
          !list_empty(&client->ephemeral_page_list) )
     {
-        list_for_each_entry(pgp,&client->ephemeral_page_list,client_eph_pages)
-        {
-            obj = pgp->obj;
-            pool = obj->pool;
-            if ( pool->is_dying )
-                continue;
-            if ( tmh_lock_all && !obj->no_evict )
+        list_for_each_entry_safe(pgp,pgp2,&client->ephemeral_page_list,client_eph_pages)
+            if ( tmem_try_to_evict_pgp(pgp,&hold_pool_rwlock) )
                 goto found;
-            if ( tmem_spin_trylock(&obj->obj_spinlock) )
-            {
-                if ( obj->pgp_count > 1 )
-                    goto found;
-                if ( tmem_write_trylock(&pool->pool_rwlock) )
-                {
-                    hold_pool_rwlock = 1;
-                    goto found;
-                }
-                tmem_spin_unlock(&obj->obj_spinlock);
-            }
-        }
     } else if ( list_empty(&global_ephemeral_page_list) ) {
         goto out;
     } else {
-        list_for_each_entry(pgp,&global_ephemeral_page_list,global_eph_pages)
-        {
-            obj = pgp->obj;
-            pool = obj->pool;
-            if ( pool->is_dying )
-                continue;
-            if ( tmh_lock_all && !obj->no_evict )
+        list_for_each_entry_safe(pgp,pgp2,&global_ephemeral_page_list,global_eph_pages)
+            if ( tmem_try_to_evict_pgp(pgp,&hold_pool_rwlock) )
                 goto found;
-            if ( tmem_spin_trylock(&obj->obj_spinlock) )
-            {
-                if ( obj->pgp_count > 1 )
-                    goto found;
-                if ( tmem_write_trylock(&pool->pool_rwlock) )
-                {
-                    hold_pool_rwlock = 1;
-                    goto found;
-                }
-                tmem_spin_unlock(&obj->obj_spinlock);
-            }
-        }
     }
 
     ret = 0;
@@ -1057,10 +1330,16 @@ found:
     ASSERT(obj->no_evict == 0);
     ASSERT(obj->pool != NULL);
     ASSERT_SENTINEL(obj,OBJ);
+    pool = obj->pool;
 
     ASSERT_SPINLOCK(&obj->obj_spinlock);
     pgp_del = pgp_delete_from_obj(obj, pgp->index);
     ASSERT(pgp_del == pgp);
+    if ( tmh_dedup_enabled() && pgp->firstbyte != NOT_SHAREABLE )
+    {
+        ASSERT(pgp->pcd->pgp_ref_count == 1 || pgp->eviction_attempted);
+        pcd_disassociate(pgp,pool,1);
+    }
     pgp_delete(pgp,1);
     if ( obj->pgp_count == 0 )
     {
@@ -1129,25 +1408,30 @@ static NOINLINE int do_tmem_put_compress(pgp_t *pgp, tmem_cli_mfn_t cmfn,
 #ifdef __i386__
     return -ENOMEM;
 #endif
+
     if ( pgp->pfp != NULL )
-        pgp_free_data(pgp, pgp->obj->pool);  /* FIXME... is this right? */
+        pgp_free_data(pgp, pgp->obj->pool);
     START_CYC_COUNTER(compress);
     ret = tmh_compress_from_client(cmfn, &dst, &size, cva);
     if ( (ret == -EFAULT) || (ret == 0) )
         goto out;
-    else if ( (size == 0) || (size >= tmem_subpage_maxsize()) )
+    else if ( (size == 0) || (size >= tmem_subpage_maxsize()) ) {
         ret = 0;
-    else if ( (p = tmem_malloc_bytes(size,pgp->obj->pool)) == NULL )
+        goto out;
+    } else if ( tmh_dedup_enabled() && !is_persistent(pgp->obj->pool) ) {
+        if ( (ret = pcd_associate(pgp,dst,size)) == -ENOMEM )
+            goto out;
+    } else if ( (p = tmem_malloc_bytes(size,pgp->obj->pool)) == NULL ) {
         ret = -ENOMEM;
-    else
-    {
+        goto out;
+    } else {
         memcpy(p,dst,size);
         pgp->cdata = p;
-        pgp->size = size;
-        pgp->obj->pool->client->compressed_pages++;
-        pgp->obj->pool->client->compressed_sum_size += size;
-        ret = 1;
     }
+    pgp->size = size;
+    pgp->obj->pool->client->compressed_pages++;
+    pgp->obj->pool->client->compressed_sum_size += size;
+    ret = 1;
 
 out:
     END_CYC_COUNTER(compress);
@@ -1155,7 +1439,7 @@ out:
 }
 
 static NOINLINE int do_tmem_dup_put(pgp_t *pgp, tmem_cli_mfn_t cmfn,
-       uint32_t tmem_offset, uint32_t pfn_offset, uint32_t len, void *cva)
+       pagesize_t tmem_offset, pagesize_t pfn_offset, pagesize_t len, void *cva)
 {
     pool_t *pool;
     obj_t *obj;
@@ -1197,6 +1481,11 @@ copy_uncompressed:
     ret = tmh_copy_from_client(pgp->pfp,cmfn,tmem_offset,pfn_offset,len,0);
     if ( ret == -EFAULT )
         goto bad_copy;
+    if ( tmh_dedup_enabled() && !is_persistent(pool) )
+    {
+        if ( pcd_associate(pgp,NULL,0) == -ENOMEM )
+            goto failed_dup;
+    }
     pgp->size = 0;
 
 done:
@@ -1239,8 +1528,8 @@ failed_dup:
 
 static NOINLINE int do_tmem_put(pool_t *pool,
               uint64_t oid, uint32_t index,
-              tmem_cli_mfn_t cmfn, uint32_t tmem_offset,
-              uint32_t pfn_offset, uint32_t len, void *cva)
+              tmem_cli_mfn_t cmfn, pagesize_t tmem_offset,
+              pagesize_t pfn_offset, pagesize_t len, void *cva)
 {
     obj_t *obj = NULL, *objfound = NULL, *objnew = NULL;
     pgp_t *pgp = NULL, *pgpdel = NULL;
@@ -1315,6 +1604,11 @@ copy_uncompressed:
     ret = tmh_copy_from_client(pgp->pfp,cmfn,tmem_offset,pfn_offset,len,cva);
     if ( ret == -EFAULT )
         goto bad_copy;
+    if ( tmh_dedup_enabled() && !is_persistent(pool) )
+    {
+        if ( pcd_associate(pgp,NULL,0) == -ENOMEM )
+            goto delete_and_free;
+    }
     pgp->size = 0;
 
 insert_page:
@@ -1344,6 +1638,8 @@ insert_page:
     pool->good_puts++;
     if ( is_persistent(pool) )
         client->succ_pers_puts++;
+    else
+        tot_good_eph_puts++;
     return 1;
 
 delete_and_free:
@@ -1376,8 +1672,8 @@ ASSERT(0);
 }
 
 static NOINLINE int do_tmem_get(pool_t *pool, uint64_t oid, uint32_t index,
-              tmem_cli_mfn_t cmfn, uint32_t tmem_offset,
-              uint32_t pfn_offset, uint32_t len, void *cva)
+              tmem_cli_mfn_t cmfn, pagesize_t tmem_offset,
+              pagesize_t pfn_offset, pagesize_t len, void *cva)
 {
     obj_t *obj;
     pgp_t *pgp;
@@ -1404,15 +1700,18 @@ static NOINLINE int do_tmem_get(pool_t *pool, uint64_t oid, uint32_t index,
         return 0;
     }
     ASSERT(pgp->size != -1);
-    if ( pgp->size != 0 )
+    if ( tmh_dedup_enabled() && !is_persistent(pool) &&
+              pgp->firstbyte != NOT_SHAREABLE )
     {
+        if ( pcd_copy_to_client(cmfn, pgp) == -EFAULT )
+            goto bad_copy;
+    } else if ( pgp->size != 0 ) {
         START_CYC_COUNTER(decompress);
         if ( tmh_decompress_to_client(cmfn, pgp->cdata,
                                       pgp->size, cva) == -EFAULT )
             goto bad_copy;
         END_CYC_COUNTER(decompress);
-    }
-    else if ( tmh_copy_to_client(cmfn, pgp->pfp, tmem_offset,
+    } else if ( tmh_copy_to_client(cmfn, pgp->pfp, tmem_offset,
                                  pfn_offset, len, cva) == -EFAULT)
         goto bad_copy;
     if ( is_ephemeral(pool) )
@@ -1855,11 +2154,15 @@ static int tmemc_list_global(tmem_cli_va_t buf, int off, uint32_t len,
       total_flush_pool, use_long ? ',' : '\n');
     if (use_long)
         n += scnprintf(info+n,BSIZE-n,
-          "Ec:%ld,Em:%ld,Oc:%d,Om:%d,Nc:%d,Nm:%d,Pc:%d,Pm:%d\n",
+          "Ec:%ld,Em:%ld,Oc:%d,Om:%d,Nc:%d,Nm:%d,Pc:%d,Pm:%d,"
+          "Fc:%d,Fm:%d,Sc:%d,Sm:%d,Ep:%lu,Gd:%lu,Zt:%lu,Gz:%lu\n",
           global_eph_count, global_eph_count_max,
           _atomic_read(global_obj_count), global_obj_count_max,
           _atomic_read(global_rtree_node_count), global_rtree_node_count_max,
-          _atomic_read(global_pgp_count), global_pgp_count_max);
+          _atomic_read(global_pgp_count), global_pgp_count_max,
+          _atomic_read(global_page_count), global_page_count_max,
+          _atomic_read(global_pcd_count), global_pcd_count_max,
+         tot_good_eph_puts,deduped_puts,pcd_tot_tze_size,pcd_tot_csize);
     if ( sum + n >= len )
         return sum;
     tmh_copy_to_client_buf_offset(buf,off+sum,info,n+1);
@@ -1912,6 +2215,13 @@ static int tmemc_set_var_one(client_t *client, uint32_t subop, uint32_t arg1)
 #ifdef __i386__
         return -1;
 #endif
+        if ( tmh_dedup_enabled() )
+        {
+            printk("tmem: compression %s for all %ss, cannot be changed "
+                   "when tmem_dedup is enabled\n",
+            tmh_compression_enabled() ? "enabled" : "disabled",client_str);
+            return -1;
+        }
         client->compress = arg1 ? 1 : 0;
         printk("tmem: compression %s for %s=%d\n",
             arg1 ? "enabled" : "disabled",cli_id_str,cli_id);
@@ -2569,14 +2879,28 @@ EXPORT void *tmem_relinquish_pages(unsigned int order, unsigned int memflags)
 /* called at hypervisor startup */
 EXPORT void init_tmem(void)
 {
+    int i;
     if ( !tmh_enabled() )
         return;
 
     radix_tree_init();
+    if ( tmh_dedup_enabled() )
+        for (i = 0; i < 256; i++ )
+        {
+            pcd_tree_roots[i] = RB_ROOT;
+            rwlock_init(&pcd_tree_rwlocks[i]);
+        }
+
     if ( tmh_init() )
     {
-        printk("tmem: initialized comp=%d global-lock=%d\n",
-            tmh_compression_enabled(), tmh_lock_all);
+        printk("tmem: initialized comp=%d dedup=%d tze=%d global-lock=%d\n",
+            tmh_compression_enabled(), tmh_dedup_enabled(), tmh_tze_enabled(),
+            tmh_lock_all);
+        if ( tmh_dedup_enabled()&&tmh_compression_enabled()&&tmh_tze_enabled() )
+        {
+            tmh_tze_disable();
+            printk("tmem: tze and compression not compatible, disabling tze\n");
+        }
         tmem_initialized = 1;
     }
     else
