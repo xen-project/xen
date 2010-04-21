@@ -28,6 +28,7 @@
 #include <xen/api/xen_all.h>
 
 //#define PRINT_XML
+//////////////#define POOL_TESTS
 
 static void usage()
 {
@@ -123,6 +124,649 @@ static void print_error(xen_session *session)
     }
     fprintf(stderr, "\n");
 }
+
+
+#ifdef POOL_TESTS
+#define NAME_DESCRIPTION "TestPool"
+#define NAME_DESCRIPTION_2 "TestPool-2"
+#define NAME_LABEL "Pool-1"
+#define NAME_LABEL_2 "Pool-2"
+#define SCHED_NAME "credit"
+#define NCPU_VAL   2
+#define NCPU_VAL_2   1
+
+
+static int pool_tests(xen_session *session, xen_host host)
+{
+    int rc = 1;
+    xen_cpu_pool_set            *pools = NULL;
+    xen_host_record             *host_record = NULL;
+    xen_cpu_pool_record_opt     *cpu_pool_opt = NULL;
+    xen_cpu_pool_record         *cpu_pool_rec = NULL;
+    xen_host_cpu_set            *host_cpu_set = NULL;
+    xen_host_cpu_record         *host_cpu_record = NULL;
+    xen_vm_set                  *vm_set = NULL;
+    xen_cpu_pool                pool = NULL;
+    xen_cpu_pool                pool_out = NULL;
+    xen_string_string_map       *pool_other_config = NULL;
+    xen_vm_record               *vm_record = NULL;
+    xen_string_set              *proposed_cpus = NULL;
+    xen_host                    res_host = NULL;
+    char                        *name_description = NULL;
+    char                        *name_label = NULL;
+    char                        *sched_policy = NULL;
+    char                        *pool_uuid = NULL;
+    int64_t                     ncpu;
+
+    for (int loop= 0; loop < 1; loop++)
+    {
+        // Test extensions of class host
+        printf("Test cpu_pool extension of host class -----------------------------------------\n");
+
+        printf("host.get_resident_cpu_pools\n");
+        if (!xen_host_get_resident_cpu_pools(session, &pools, host))
+        {
+            break;
+        }
+        if (pools->size != 1)
+        {
+            printf("Wrong pool count; only one pool expected\n");
+            break;
+        }
+        printf("Pool UUID %s\n", (char*)pools->contents[0]);
+        xen_cpu_pool_set_free(pools);
+        pools = NULL;
+
+        printf("host.get_record\n");
+        if (!xen_host_get_record(session, &host_record, host))
+        {
+            break;
+        }
+        printf("Pool count %d\n", (int)host_record->resident_cpu_pools->size);
+        if (host_record->resident_cpu_pools->size != 1)
+        {
+            break;
+        }
+        cpu_pool_opt = host_record->resident_cpu_pools->contents[0];
+        printf("Pool UUID %s\n", (char*)cpu_pool_opt->u.handle);
+        xen_host_record_free(host_record);
+        host_record = NULL;
+        cpu_pool_opt = NULL;
+
+
+        // Test extensions of class host_cpu
+        printf("host_cpu.get_all\n");
+        if (!xen_host_cpu_get_all(session, &host_cpu_set))
+        {
+            break;
+        }
+
+        printf("host_cpu.get_cpu_pool & host_cpu.get_record\n");
+        for (int i= 0; i < host_cpu_set->size; i++)
+        {
+            if (!xen_host_cpu_get_cpu_pool(session, &pools, host_cpu_set->contents[i]))
+            {
+                break;
+            }
+            if (pools->size > 1)
+            {
+                printf("Wrong pool count (xen_host_cpu_get_cpu_pool)\n");
+                break;
+            }
+
+            printf("host_cpu (get_cpu_pool) %s, cpu_pool %s\n", (char*)host_cpu_set->contents[i],
+                pools->size != 0 ? (char*)pools->contents[0] : "(None)");
+
+            if (!xen_host_cpu_get_record(session, &host_cpu_record, host_cpu_set->contents[i]))
+            {
+                break;
+            }
+            if (host_cpu_record->cpu_pools->size > 1)
+            {
+                printf("Wrong pool count (xen_host_cpu_get_record)\n");
+                break;
+            }
+
+            printf("host_cpu (get_record) %s, cpu_pool %s\n", (char*)host_cpu_set->contents[i],
+                host_cpu_record->cpu_pools->size != 0
+                ? (char*)((xen_cpu_pool_record_opt*)(host_cpu_record->cpu_pools->contents[0])->u.handle)
+                : "(None)");
+
+        }
+        xen_host_cpu_record_free(host_cpu_record);
+        host_cpu_record = NULL;
+        xen_host_cpu_set_free(host_cpu_set);
+        host_cpu_set = NULL;
+        xen_cpu_pool_set_free(pools);
+        pools = NULL;
+
+        printf("host_cpu.get_unassigned_cpus\n");
+        if (!xen_host_cpu_get_unassigned_cpus(session, &host_cpu_set))
+        {
+            break;
+        }
+        printf("Free cpus (not bound to a pool)\n");
+        for (int i= 0; i < host_cpu_set->size; i++)
+        {
+            printf("  cpu UUID %s\n", (char*)host_cpu_set->contents[i]);
+        }
+        xen_host_cpu_set_free(host_cpu_set);
+        host_cpu_set = NULL;
+
+
+        printf("vm.get_record\n");
+        if (!xen_vm_get_all(session, &vm_set))
+        {
+            break;
+        }
+
+        if (!xen_vm_get_record(session, &vm_record, vm_set->contents[0]))
+        {
+            break;
+        }
+        printf("VM %s, pool_name %s, cpu_pool %s\n", (char*)vm_set->contents[0],
+            vm_record->pool_name, (char*)vm_record->cpu_pool->contents[0]);
+
+        xen_vm_record_free(vm_record);
+        vm_record = NULL;
+
+        printf("vm.get_cpu_pool\n");
+        if (!xen_vm_get_cpu_pool(session, &pools, vm_set->contents[0]))
+        {
+            break;
+        }
+        printf("vm_get_cpu_pool %s\n", (char*)pools->contents[0]);
+
+        xen_vm_set_free(vm_set);
+        xen_cpu_pool_set_free(pools);
+        vm_set = NULL;
+        pools = NULL;
+
+
+        // Class cpu_pool
+
+        // create
+        pool_other_config = xen_string_string_map_alloc(1);
+        pool_other_config->contents[0].key = strdup("type");
+        pool_other_config->contents[0].val = strdup("bs2000");
+        xen_string_set *proposed_CPUs_set = xen_string_set_alloc(1);
+        proposed_CPUs_set->contents[0] = strdup("3");
+
+        xen_cpu_pool_record new_cpu_pool_record =
+        {
+            .name_label = NAME_LABEL,
+            .name_description = NAME_DESCRIPTION,
+            .auto_power_on = false,
+            .ncpu = NCPU_VAL,
+            .sched_policy = SCHED_NAME,
+            .proposed_cpus = proposed_CPUs_set,
+            .other_config = pool_other_config,
+        };
+
+        printf("cpu_pool.create\n");
+        if (!xen_cpu_pool_create(session, &pool, &new_cpu_pool_record))
+        {
+            break;
+        }
+        printf("New Pool UUID %s\n", (char*)pool);
+        xen_string_set_free(proposed_CPUs_set);
+        proposed_CPUs_set = NULL;
+        xen_string_string_map_free(pool_other_config);
+        pool_other_config = NULL;
+
+        // get_by_name_label
+        printf("cpu_pool.get_by_name_label\n");
+        if (!xen_cpu_pool_get_by_name_label(session, &pools, "Pool-1"))
+        {
+            break;
+        }
+        if (strcmp((char*)pools->contents[0], (char*)pool) != 0)
+        {
+            break;
+        }
+        xen_cpu_pool_set_free(pools);
+        pools = NULL;
+
+
+        // get_by_uuid
+        printf("cpu_pool.get_by_uuid\n");
+        if (!xen_cpu_pool_get_by_uuid(session, &pool_out, pool))
+        {
+            break;
+        }
+        if (strcmp((char*)pool_out, (char*)pool) != 0)
+        {
+            printf("Wrong pool returned\n");
+            break;
+        }
+        xen_cpu_pool_free(pool_out);
+        pool_out = NULL;
+
+        // get_all
+        printf("cpu_pool.get_all\n");
+        if (!xen_cpu_pool_get_all(session, &pools))
+        {
+            break;
+        }
+        if (pools->size != 2)
+        {
+            printf("Wrong pool count (%d)\n", (int)pools->size);
+            break;
+        }
+        xen_cpu_pool_set_free(pools);
+        pools = NULL;
+
+
+        // get_activated
+        printf("cpu_pool.get_activated\n");
+        bool activated_state = true;
+        if (!xen_cpu_pool_get_activated(session, &activated_state, pool))
+        {
+            break;
+        }
+        if (activated_state)
+        {
+            printf("Pool must not be activated\n");
+            break;
+        }
+
+
+        // get_auto_power_on
+        printf("cpu_pool.get_auto_power_on\n");
+        bool power_state = true;
+        if (!xen_cpu_pool_get_auto_power_on(session, &power_state, pool))
+        {
+            break;
+        }
+        if (power_state)
+        {
+            printf("Pool must not have attibute 'auto_power_on'\n");
+            break;
+        }
+
+        // get_host_CPUs
+        printf("cpu_pool.get_host_CPUs\n");
+        if (!xen_cpu_pool_get_host_CPUs(session, &host_cpu_set, pool))
+        {
+            break;
+        }
+        if (host_cpu_set->size != 0)
+        {
+            printf("Pool must not have any attached cpus\n");
+            break;
+        }
+        xen_host_cpu_set_free(host_cpu_set);
+        host_cpu_set = NULL;
+
+
+        // get_name_description
+        printf("cpu_pool.get_name_description\n");
+        if (!xen_cpu_pool_get_name_description(session, &name_description, pool))
+        {
+            break;
+        }
+        if (strcmp(NAME_DESCRIPTION, name_description) != 0)
+        {
+            printf("Pool has wrong name_description\n");
+            break;
+        }
+        free(name_description);
+        name_description = NULL;
+
+
+        // get_name_label
+        printf("cpu_pool.get_name_label\n");
+        if (!xen_cpu_pool_get_name_label(session, &name_label, pool))
+        {
+            break;
+        }
+        if (strcmp(NAME_LABEL, name_label) != 0)
+        {
+            printf("Pool has wrong name_label\n");
+            break;
+        }
+        free(name_label);
+        name_label = NULL;
+
+        // get_ncpu
+        printf("cpu_pool.get_ncpu\n");
+        if (!xen_cpu_pool_get_ncpu(session, &ncpu, pool))
+        {
+            break;
+        }
+        if (NCPU_VAL != ncpu)
+        {
+            printf("Pool has wrong ncpu\n");
+            break;
+        }
+
+        // get_proposed_CPUs
+        printf("cpu_pool.get_proposed_CPUs\n");
+        if (!xen_cpu_pool_get_proposed_CPUs(session, &proposed_cpus, pool))
+        {
+            break;
+        }
+        if (proposed_cpus->size != 1)
+        {
+            printf("Pool has wrong proposed_cpus count\n");
+            break;
+        }
+        xen_string_set_free(proposed_cpus);
+        proposed_cpus = NULL;
+
+
+        // get_other_config
+        printf("cpu_pool.get_other_config\n");
+        if (!xen_cpu_pool_get_other_config(session, &pool_other_config, pool))
+        {
+            break;
+        }
+        if (pool_other_config->size != 1)
+        {
+            printf("Pool has wrong other_config element count\n");
+            break;
+        }
+        if ((strcmp(pool_other_config->contents[0].key, "type") != 0) ||
+            (strcmp(pool_other_config->contents[0].val, "bs2000") != 0))
+        {
+            printf("Pool has wrong other_config attributes\n");
+            break;
+        }
+        xen_string_string_map_free(pool_other_config);
+        pool_other_config = NULL;
+
+
+        // get_record
+        printf("cpu_pool.get_record\n");
+        if (!xen_cpu_pool_get_record(session, &cpu_pool_rec, pool))
+        {
+            break;
+        }
+        if ( (strcmp(cpu_pool_rec->name_label, NAME_LABEL) != 0) ||
+             (strcmp(cpu_pool_rec->name_description, NAME_DESCRIPTION) != 0) ||
+             (cpu_pool_rec->auto_power_on) ||
+             (cpu_pool_rec->ncpu != NCPU_VAL) ||
+             (cpu_pool_rec->started_vms->size != 0) ||
+             (strcmp(cpu_pool_rec->sched_policy, SCHED_NAME) != 0) ||
+             (cpu_pool_rec->proposed_cpus->size != 1) ||
+             (cpu_pool_rec->host_cpus->size != 0) ||
+             (cpu_pool_rec->activated) ||
+             (strcmp(cpu_pool_rec->resident_on->u.handle, host) != 0) ||
+             (strcmp(cpu_pool_rec->uuid, pool) != 0) ||
+             (cpu_pool_rec->other_config->size != 1))
+        {
+            printf("Wrong record output\n");
+            break;
+        }
+        xen_cpu_pool_record_free(cpu_pool_rec);
+        cpu_pool_rec = NULL;
+
+
+        // get_resident_on
+        printf("cpu_pool.get_resident_on\n");
+        if (!xen_cpu_pool_get_resident_on(session, &res_host, pool))
+        {
+            break;
+        }
+        if (strcmp(res_host, host) != 0)
+        {
+            printf("Wrong resident host returned\n");
+            break;
+        }
+        xen_host_free(res_host);
+        res_host = NULL;
+
+
+        // get_sched_policy
+        printf("cpu_pool.get_sched_policy\n");
+        if (!xen_cpu_pool_get_sched_policy(session, &sched_policy, pool))
+        {
+            break;
+        }
+        if (strcmp(sched_policy, SCHED_NAME) != 0)
+        {
+            printf("Wrong sched_policy returned\n");
+            break;
+        }
+        free(sched_policy);
+        sched_policy = NULL;
+
+
+        // get_started_VMs
+        printf("cpu_pool.get_started_VMs\n");
+        if (!xen_cpu_pool_get_started_VMs(session, &vm_set, pool))
+        {
+            break;
+        }
+        if (vm_set->size != 0)
+        {
+            printf("Wrong count of started VMs\n");
+            break;
+        }
+        xen_vm_set_free(vm_set);
+        vm_set = NULL;
+
+
+        // get_uuid
+        printf("cpu_pool.get_uuid\n");
+        if (!xen_cpu_pool_get_uuid(session, &pool_uuid, pool))
+        {
+            break;
+        }
+        if (strcmp(pool_uuid, pool) != 0)
+        {
+            printf("Wrong Pool UUID returnd\n");
+            break;
+        }
+        free(pool_uuid);
+        pool_uuid = NULL;
+
+
+        // set_auto_power_on
+        printf("cpu_pool.set_auto_power_on\n");
+        if (!xen_cpu_pool_set_auto_power_on(session, pool, true))
+            break;
+
+
+        // set_proposed_CPUs
+        printf("cpu_pool.set_proposed_CPUs\n");
+        proposed_CPUs_set = xen_string_set_alloc(2);
+        proposed_CPUs_set->contents[0] = strdup("2");
+        proposed_CPUs_set->contents[1] = strdup("4");
+        if (!xen_cpu_pool_set_proposed_CPUs(session, pool, proposed_CPUs_set))
+            break;
+        xen_string_set_free(proposed_CPUs_set);
+        proposed_CPUs_set = NULL;
+
+
+        // add_to_proposed_CPUs
+        printf("cpu_pool.add_to_proposed_CPUs\n");
+        if (!xen_cpu_pool_add_to_proposed_CPUs(session, pool, "3"))
+            break;
+
+
+        // remove_from_proposed_CPUs
+        printf("cpu_pool.remove_from_proposed_CPUs\n");
+        if (!xen_cpu_pool_remove_from_proposed_CPUs(session, pool, "4"))
+            break;
+
+
+        // set_name_label
+        printf("cpu_pool.set_name_label\n");
+        if (!xen_cpu_pool_set_name_label(session, pool, NAME_LABEL_2))
+            break;
+
+
+        // set_name_description
+        printf("cpu_pool.set_name_description\n");
+        if (!xen_cpu_pool_set_name_description(session, pool, NAME_DESCRIPTION_2))
+            break;
+
+
+        // set_ncpu
+        printf("cpu_pool.set_ncpu\n");
+        if (!xen_cpu_pool_set_ncpu(session, pool, NCPU_VAL_2))
+            break;
+
+
+        // set_other_config
+        printf("cpu_pool.set_other_config\n");
+        pool_other_config = xen_string_string_map_alloc(2);
+        pool_other_config->contents[0].key = strdup("test1");
+        pool_other_config->contents[0].val = strdup("field1");
+        pool_other_config->contents[1].key = strdup("test2");
+        pool_other_config->contents[1].val = strdup("field2");
+        if (!xen_cpu_pool_set_other_config(session, pool, pool_other_config))
+            break;
+        xen_string_string_map_free(pool_other_config);
+        pool_other_config = NULL;
+
+
+        // add_to_other_config
+        printf("cpu_pool.add_to_other_config\n");
+        if (!xen_cpu_pool_add_to_other_config(session, pool, "test3", "field3"))
+            break;
+
+
+        // remove_from_other_config
+        printf("cpu_pool.remove_from_other_config\n");
+        if (!xen_cpu_pool_remove_from_other_config(session, pool, "test2"))
+            break;
+
+
+        // set_sched_policy
+        printf("cpu_pool.set_sched_policy\n");
+        if (!xen_cpu_pool_set_sched_policy(session, pool, SCHED_NAME))
+            break;
+
+
+        // check get_record again
+        printf("check cpu_pool record\n");
+        if (!xen_cpu_pool_get_record(session, &cpu_pool_rec, pool))
+        {
+            break;
+        }
+        if ( (strcmp(cpu_pool_rec->name_label, NAME_LABEL_2) != 0) ||
+             (strcmp(cpu_pool_rec->name_description, NAME_DESCRIPTION_2) != 0) ||
+             (!cpu_pool_rec->auto_power_on) ||
+             (cpu_pool_rec->ncpu != NCPU_VAL_2) ||
+             (cpu_pool_rec->started_vms->size != 0) ||
+             (strcmp(cpu_pool_rec->sched_policy, SCHED_NAME) != 0) ||
+             (cpu_pool_rec->proposed_cpus->size != 2) ||
+             (cpu_pool_rec->host_cpus->size != 0) ||
+             (cpu_pool_rec->activated) ||
+             (strcmp(cpu_pool_rec->resident_on->u.handle, host) != 0) ||
+             (strcmp(cpu_pool_rec->uuid, pool) != 0) ||
+             (cpu_pool_rec->other_config->size != 2))
+        {
+            printf("Wrong record output\n");
+            break;
+        }
+        xen_cpu_pool_record_free(cpu_pool_rec);
+        cpu_pool_rec = NULL;
+
+
+        // activate pool
+        printf("cpu_pool.activate\n");
+        if (!xen_cpu_pool_activate(session, pool))
+            break;
+
+
+        // add_host_CPU_live
+        printf("cpu_pool.add_host_CPU_live\n");
+        if (!xen_host_cpu_get_unassigned_cpus(session, &host_cpu_set))
+        {
+            break;
+        }
+        if (host_cpu_set->size < 1)
+        {
+            printf("No free CPU found\n");
+            break;
+        }
+        if (!xen_cpu_pool_add_host_CPU_live(session, pool, host_cpu_set->contents[0]))
+            break;
+
+
+        // remove_host_CPU_live
+        printf("cpu_pool.remove_host_CPU_live\n");
+        if (!xen_cpu_pool_remove_host_CPU_live(session, pool, host_cpu_set->contents[0]))
+            break;
+
+        xen_host_cpu_set_free(host_cpu_set);
+        host_cpu_set = NULL;
+
+
+        // check get_record again
+        printf("check cpu_pool record\n");
+        if (!xen_cpu_pool_get_record(session, &cpu_pool_rec, pool))
+        {
+            break;
+        }
+        if ( (strcmp(cpu_pool_rec->name_label, NAME_LABEL_2) != 0) ||
+             (strcmp(cpu_pool_rec->name_description, NAME_DESCRIPTION_2) != 0) ||
+             (!cpu_pool_rec->auto_power_on) ||
+             (cpu_pool_rec->ncpu != NCPU_VAL_2) ||
+             (cpu_pool_rec->started_vms->size != 0) ||
+             (strcmp(cpu_pool_rec->sched_policy, SCHED_NAME) != 0) ||
+             (cpu_pool_rec->proposed_cpus->size != 2) ||
+             (cpu_pool_rec->host_cpus->size != 1) ||
+             (!cpu_pool_rec->activated) ||
+             (strcmp(cpu_pool_rec->resident_on->u.handle, host) != 0) ||
+             (strcmp(cpu_pool_rec->uuid, pool) != 0) ||
+             (cpu_pool_rec->other_config->size != 2))
+        {
+            printf("Wrong record output\n");
+            break;
+        }
+        xen_cpu_pool_record_free(cpu_pool_rec);
+        cpu_pool_rec = NULL;
+
+
+        // deactivate pool
+        printf("cpu_pool.deactivate\n");
+        if (!xen_cpu_pool_deactivate(session, pool))
+            break;
+
+
+        // Pool delete
+        if (!xen_cpu_pool_destroy(session, pool))
+        {
+            break;
+        }
+        xen_cpu_pool_free(pool);
+        pool = NULL;
+
+        // Tests OK
+        printf("Pool Tests OK\n");
+        rc= 0;
+    }
+
+    if (rc != 0)
+    {
+        print_error(session);
+    }
+
+    xen_cpu_pool_set_free(pools);
+    xen_host_record_free(host_record);
+    xen_cpu_pool_record_opt_free(cpu_pool_opt);
+    xen_host_cpu_set_free(host_cpu_set);
+    xen_host_cpu_record_free(host_cpu_record);
+    xen_vm_set_free(vm_set);
+    xen_cpu_pool_free(pool);
+    xen_cpu_pool_free(pool_out);
+    xen_string_string_map_free(pool_other_config);
+    xen_vm_record_free(vm_record);
+    xen_string_set_free(proposed_cpus);
+    free(name_description);
+    free(name_label);
+    free(sched_policy);
+    free(pool_uuid);
+    xen_cpu_pool_record_free(cpu_pool_rec);
+    xen_host_free(res_host);
+
+    return rc;
+}
+#endif
 
 
 int main(int argc, char **argv)
@@ -364,6 +1008,11 @@ int main(int argc, char **argv)
     xen_uuid_free(vm_uuid);
 
     xen_vm_record_free(vm_record);
+
+#ifdef POOL_TESTS
+    if (pool_tests(session, host) != 0)
+        return 1;
+#endif
 
     xen_host_free(host);
     xen_string_string_map_free(versions);

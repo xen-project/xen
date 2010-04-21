@@ -34,6 +34,7 @@
 #include <xen/api/xen_vm_metrics_decl.h>
 #include <xen/api/xen_vm_power_state.h>
 #include <xen/api/xen_vtpm_decl.h>
+#include <xen/api/xen_cpu_pool_decl.h>
 
 
 /*
@@ -113,6 +114,8 @@ typedef struct xen_vm_record
     struct xen_vm_metrics_record_opt *metrics;
     struct xen_vm_guest_metrics_record_opt *guest_metrics;
     char *security_label;
+    char *pool_name;
+    struct xen_cpu_pool_record_opt_set *cpu_pool;
 } xen_vm_record;
 
 /**
@@ -904,5 +907,34 @@ xen_vm_set_security_label(xen_session *session, int64_t *result, xen_vm vm,
  */
 extern bool
 xen_vm_get_security_label(xen_session *session, char **result, xen_vm vm);
+
+
+/**
+ * Get the cpu_pool ref field of a domain.
+ */
+extern bool
+xen_vm_get_cpu_pool(xen_session *session, struct xen_cpu_pool_set **result, xen_vm vm);
+
+
+/**
+ * Get the pool_name field of a domain.
+ */
+extern bool
+xen_vm_get_pool_name(xen_session *session, char **result, xen_vm vm);
+
+
+/**
+ * Set the pool_name field of a domain.
+ */
+extern bool
+xen_vm_set_pool_name(xen_session *session, xen_vm vm, char *pool_name);
+
+
+/**
+ * Migrate the VM to another cpu_pool (on the same host). This can only be
+ * called when the specified VM is in the Running state.
+ */
+extern bool
+xen_vm_cpu_pool_migrate(xen_session *session, xen_vm vm, xen_cpu_pool cpu_pool);
 
 #endif

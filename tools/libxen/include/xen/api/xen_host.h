@@ -29,7 +29,7 @@
 #include <xen/api/xen_string_set.h>
 #include <xen/api/xen_string_string_map.h>
 #include <xen/api/xen_vm_decl.h>
-
+#include <xen/api/xen_cpu_pool_decl.h>
 
 /*
  * The host class.
@@ -91,6 +91,7 @@ typedef struct xen_host_record
     struct xen_pbd_record_opt_set *pbds;
     struct xen_host_cpu_record_opt_set *host_cpus;
     struct xen_host_metrics_record_opt *metrics;
+    struct xen_cpu_pool_record_opt_set *resident_cpu_pools;
 } xen_host_record;
 
 /**
@@ -493,5 +494,12 @@ xen_host_list_methods(xen_session *session, struct xen_string_set **result);
 extern bool
 xen_host_get_all(xen_session *session, struct xen_host_set **result);
 
+
+/**
+ * Get list of resident cpu pools.
+ */
+extern bool
+xen_host_get_resident_cpu_pools(xen_session *session, struct xen_cpu_pool_set **result,
+       xen_host host);
 
 #endif

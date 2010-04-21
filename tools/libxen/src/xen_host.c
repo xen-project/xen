@@ -30,6 +30,7 @@
 #include <xen/api/xen_sr.h>
 #include <xen/api/xen_string_string_map.h>
 #include <xen/api/xen_vm.h>
+#include <xen/api/xen_cpu_pool.h>
 
 
 XEN_FREE(xen_host)
@@ -108,7 +109,10 @@ static const struct_member xen_host_record_struct_members[] =
           .offset = offsetof(xen_host_record, host_cpus) },
         { .key = "metrics",
           .type = &abstract_type_ref,
-          .offset = offsetof(xen_host_record, metrics) }
+          .offset = offsetof(xen_host_record, metrics) },
+        { .key = "resident_cpu_pools",
+          .type = &abstract_type_ref_set,
+          .offset = offsetof(xen_host_record, resident_cpu_pools) }
     };
 
 const abstract_type xen_host_record_abstract_type_ =
@@ -148,6 +152,7 @@ xen_host_record_free(xen_host_record *record)
     xen_pbd_record_opt_set_free(record->pbds);
     xen_host_cpu_record_opt_set_free(record->host_cpus);
     xen_host_metrics_record_opt_free(record->metrics);
+    xen_cpu_pool_record_opt_set_free(record->resident_cpu_pools);
     free(record);
 }
 
@@ -889,3 +894,22 @@ xen_host_get_uuid(xen_session *session, char **result, xen_host host)
     XEN_CALL_("host.get_uuid");
     return session->ok;
 }
+
+
+bool
+xen_host_get_resident_cpu_pools(xen_session *session, struct xen_cpu_pool_set **result,
+        xen_host host)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = host }
+        };
+
+    abstract_type result_type = abstract_type_string_set;
+
+    *result = NULL;
+    XEN_CALL_("host.get_resident_cpu_pools");
+    return session->ok;
+}
+

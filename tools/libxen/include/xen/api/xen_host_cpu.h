@@ -22,6 +22,7 @@
 #include <xen/api/xen_common.h>
 #include <xen/api/xen_host_cpu_decl.h>
 #include <xen/api/xen_host_decl.h>
+#include <xen/api/xen_cpu_pool_decl.h>
 
 
 /*
@@ -72,6 +73,7 @@ typedef struct xen_host_cpu_record
     char *flags;
     char *features;
     double utilisation;
+    struct xen_cpu_pool_record_opt_set *cpu_pools;
 } xen_host_cpu_record;
 
 /**
@@ -242,6 +244,20 @@ xen_host_cpu_get_utilisation(xen_session *session, double *result, xen_host_cpu 
  */
 extern bool
 xen_host_cpu_get_all(xen_session *session, struct xen_host_cpu_set **result);
+
+
+/**
+ * Get the ref of the cpu_pool to which the host_cpu belongs.
+ */
+extern bool
+xen_host_cpu_get_cpu_pool(xen_session *session, struct xen_cpu_pool_set **result, xen_host_cpu host_cpu);
+
+
+/**
+ * Return a list of all the host_cpus not assigned to a cpu_pool.
+ */
+extern bool
+xen_host_cpu_get_unassigned_cpus(xen_session *session, struct xen_host_cpu_set **result);
 
 
 #endif

@@ -36,6 +36,7 @@
 #include <xen/api/xen_vm_guest_metrics.h>
 #include <xen/api/xen_vm_metrics.h>
 #include <xen/api/xen_vtpm.h>
+#include <xen/api/xen_cpu_pool.h>
 
 
 XEN_FREE(xen_vm)
@@ -165,7 +166,13 @@ static const struct_member xen_vm_record_struct_members[] =
           .offset = offsetof(xen_vm_record, guest_metrics) },
         { .key = "security_label",
           .type = &abstract_type_string,
-          .offset = offsetof(xen_vm_record, security_label) }
+          .offset = offsetof(xen_vm_record, security_label) },
+        { .key = "pool_name",
+          .type = &abstract_type_string,
+          .offset = offsetof(xen_vm_record, pool_name) },
+        { .key = "cpu_pool",
+          .type = &abstract_type_ref_set,
+          .offset = offsetof(xen_vm_record, cpu_pool) },
     };
 
 const abstract_type xen_vm_record_abstract_type_ =
@@ -209,6 +216,7 @@ xen_vm_record_free(xen_vm_record *record)
     xen_string_string_map_free(record->other_config);
     xen_vm_metrics_record_opt_free(record->metrics);
     xen_vm_guest_metrics_record_opt_free(record->guest_metrics);
+    xen_cpu_pool_record_opt_set_free(record->cpu_pool);
     free(record->security_label);
     free(record);
 }
@@ -1781,3 +1789,71 @@ xen_vm_get_security_label(xen_session *session, char **result, xen_vm vm)
     XEN_CALL_("VM.get_security_label");
     return session->ok;
 }
+
+
+bool
+xen_vm_get_cpu_pool(xen_session *session, struct xen_cpu_pool_set **result, xen_vm vm)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm },
+        };
+
+    abstract_type result_type = abstract_type_string_set;
+
+    *result = NULL;
+    XEN_CALL_("VM.get_cpu_pool");
+    return session->ok;
+}
+
+
+bool
+xen_vm_get_pool_name(xen_session *session, char **result, xen_vm vm)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm },
+        };
+
+    abstract_type result_type = abstract_type_string;
+
+    *result = NULL;
+    XEN_CALL_("VM.get_pool_name");
+    return session->ok;
+}
+
+
+bool
+xen_vm_set_pool_name(xen_session *session, xen_vm vm, char *pool_name)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm },
+            { .type = &abstract_type_string,
+              .u.string_val = pool_name }
+        };
+
+    xen_call_(session, "VM.set_pool_name", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+
+bool
+xen_vm_cpu_pool_migrate(xen_session *session, xen_vm vm, xen_cpu_pool cpu_pool)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = vm },
+            { .type = &abstract_type_string,
+              .u.string_val = cpu_pool }
+        };
+
+    xen_call_(session, "VM.cpu_pool_migrate", param_values, 2, NULL, NULL);
+    return session->ok;
+}
+
+

@@ -24,6 +24,7 @@
 #include <xen/api/xen_common.h>
 #include <xen/api/xen_host.h>
 #include <xen/api/xen_host_cpu.h>
+#include <xen/api/xen_cpu_pool.h>
 
 
 XEN_FREE(xen_host_cpu)
@@ -66,7 +67,10 @@ static const struct_member xen_host_cpu_record_struct_members[] =
           .offset = offsetof(xen_host_cpu_record, features) },
         { .key = "utilisation",
           .type = &abstract_type_float,
-          .offset = offsetof(xen_host_cpu_record, utilisation) }
+          .offset = offsetof(xen_host_cpu_record, utilisation) },
+        { .key = "cpu_pool",
+          .type = &abstract_type_ref_set,
+          .offset = offsetof(xen_host_cpu_record, cpu_pools) },
     };
 
 const abstract_type xen_host_cpu_record_abstract_type_ =
@@ -94,6 +98,7 @@ xen_host_cpu_record_free(xen_host_cpu_record *record)
     free(record->stepping);
     free(record->flags);
     free(record->features);
+    xen_cpu_pool_record_opt_set_free(record->cpu_pools);
     free(record);
 }
 
@@ -315,3 +320,34 @@ xen_host_cpu_get_uuid(xen_session *session, char **result, xen_host_cpu host_cpu
     XEN_CALL_("host_cpu.get_uuid");
     return session->ok;
 }
+
+
+bool
+xen_host_cpu_get_cpu_pool(xen_session *session, struct xen_cpu_pool_set **result, xen_host_cpu host_cpu)
+{
+    abstract_value param_values[] =
+        {
+            { .type = &abstract_type_string,
+              .u.string_val = host_cpu }
+        };
+
+    abstract_type result_type = abstract_type_string_set;
+
+    *result = NULL;
+    XEN_CALL_("host_cpu.get_cpu_pool");
+    return session->ok;
+}
+
+
+bool
+xen_host_cpu_get_unassigned_cpus(xen_session *session, struct xen_host_cpu_set **result)
+{
+    abstract_type result_type = abstract_type_string_set;
+
+    *result = NULL;
+    xen_call_(session, "host_cpu.get_unassigned_cpus", NULL, 0, &result_type, result);
+    return session->ok;
+}
+
+
+
