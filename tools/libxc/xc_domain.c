@@ -220,6 +220,7 @@ int xc_domain_getinfo(int xc_handle,
         info->cpu_time = domctl.u.getdomaininfo.cpu_time;
         info->nr_online_vcpus = domctl.u.getdomaininfo.nr_online_vcpus;
         info->max_vcpu_id = domctl.u.getdomaininfo.max_vcpu_id;
+        info->cpupool = domctl.u.getdomaininfo.cpupool;
 
         memcpy(info->handle, domctl.u.getdomaininfo.handle,
                sizeof(xen_domain_handle_t));

@@ -171,6 +171,7 @@ typedef struct xc_dominfo {
     unsigned int  nr_online_vcpus;
     unsigned int  max_vcpu_id;
     xen_domain_handle_t handle;
+    unsigned int  cpupool;
 } xc_dominfo_t;
 
 typedef xen_domctl_getdomaininfo_t xc_domaininfo_t;
@@ -508,6 +509,100 @@ int xc_domain_send_trigger(int xc_handle,
 int xc_domain_setdebugging(int xc_handle,
                            uint32_t domid,
                            unsigned int enable);
+
+/*
+ * CPUPOOL MANAGEMENT FUNCTIONS
+ */
+
+typedef struct xc_cpupoolinfo {
+    uint32_t cpupool_id;
+    uint32_t sched_id;
+    uint32_t n_dom;
+    uint64_t cpumap;
+} xc_cpupoolinfo_t;
+
+/**
+ * Create a new cpupool.
+ *
+ * @parm xc_handle a handle to an open hypervisor interface
+ * @parm ppoolid pointer to the new cpupool id (in/out)
+ * @parm sched_id id of scheduler to use for pool
+ * return 0 on success, -1 on failure
+ */
+int xc_cpupool_create(int xc_handle,
+                      uint32_t *ppoolid,
+                      uint32_t sched_id);
+
+/**
+ * Destroy a cpupool. Pool must be unused and have no cpu assigned.
+ *
+ * @parm xc_handle a handle to an open hypervisor interface
+ * @parm poolid id of the cpupool to destroy
+ * return 0 on success, -1 on failure
+ */
+int xc_cpupool_destroy(int xc_handle,
+                       uint32_t poolid);
+
+/**
+ * Get cpupool info. Returns info for up to the specified number of cpupools
+ * starting at the given id.
+ * @parm xc_handle a handle to an open hypervisor interface
+ * @parm first_poolid lowest id for which info is returned
+ * @parm n_max maximum number of cpupools to return info
+ * @parm info pointer to xc_cpupoolinfo_t array
+ * return number of cpupool infos
+ */
+int xc_cpupool_getinfo(int xc_handle,
+                       uint32_t first_poolid,
+                       uint32_t n_max,
+                       xc_cpupoolinfo_t *info);
+
+/**
+ * Add cpu to a cpupool. cpu may be -1 indicating the first unassigned.
+ *
+ * @parm xc_handle a handle to an open hypervisor interface
+ * @parm poolid id of the cpupool
+ * @parm cpu cpu number to add
+ * return 0 on success, -1 on failure
+ */
+int xc_cpupool_addcpu(int xc_handle,
+                      uint32_t poolid,
+                      int cpu);
+
+/**
+ * Remove cpu from cpupool. cpu may be -1 indicating the last cpu of the pool.
+ *
+ * @parm xc_handle a handle to an open hypervisor interface
+ * @parm poolid id of the cpupool
+ * @parm cpu cpu number to remove
+ * return 0 on success, -1 on failure
+ */
+int xc_cpupool_removecpu(int xc_handle,
+                         uint32_t poolid,
+                         int cpu);
+
+/**
+ * Move domain to another cpupool.
+ *
+ * @parm xc_handle a handle to an open hypervisor interface
+ * @parm poolid id of the destination cpupool
+ * @parm domid id of the domain to move
+ * return 0 on success, -1 on failure
+ */
+int xc_cpupool_movedomain(int xc_handle,
+                          uint32_t poolid,
+                          uint32_t domid);
+
+/**
+ * Return map of cpus not in any cpupool.
+ *
+ * @parm xc_handle a handle to an open hypervisor interface
+ * @parm cpumap pointer where to store the cpumap
+ * return 0 on success, -1 on failure
+ */
+int xc_cpupool_freeinfo(int xc_handle,
+                        uint64_t *cpumap);
+
 
 /*
  * EVENT CHANNEL FUNCTIONS

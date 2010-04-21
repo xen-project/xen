@@ -164,6 +164,19 @@ static inline int do_domctl(int xc_handle, struct xen_domctl *domctl)
     return ret;
 }
 
+static inline int do_domctl_save(int xc_handle, struct xen_domctl *domctl)
+{
+    int ret;
+
+    do
+    {
+        ret = do_domctl(xc_handle, domctl);
+    }
+    while ( (ret < 0 ) && (errno == EAGAIN) );
+
+    return ret;
+}
+
 static inline int do_sysctl(int xc_handle, struct xen_sysctl *sysctl)
 {
     int ret = -1;
