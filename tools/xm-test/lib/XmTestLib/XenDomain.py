@@ -181,6 +181,7 @@ class XenDomain:
 
         if not self.isManaged:
             ret, output = traceCommand("xm create %s" % self.config)
+            print self.config
         else:
             ret, output = traceCommand("xm new %s" % self.config)
             if ret != 0:

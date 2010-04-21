@@ -161,6 +161,7 @@ AC_CONFIG_FILES([
     tests/vtpm/Makefile
     tests/xapi/Makefile
     tests/enforce_dom0_cpus/Makefile
+    tests/cpupool/Makefile
     lib/XmTestReport/xmtest.py
     lib/XmTestLib/config.py
     ])

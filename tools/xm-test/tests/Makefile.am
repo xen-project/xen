@@ -28,7 +28,8 @@ SUBDIRS = 	               	\
 		vcpu-pin	\
 		vtpm            \
 		enforce_dom0_cpus	\
-		save restore migrate
+		save restore migrate	\
+		cpupool
 
 EXTRA_DIST = $(SUBDIRS) Makefile.am.template
 
