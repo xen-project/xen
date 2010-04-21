@@ -189,7 +189,7 @@ class Blktap2Controller(BlktapController):
             blktap2_installed=1;
 
         if typ in ('tap'):
-            if subtyp in ('tapdisk'):
+            if subtyp in ('tapdisk', 'ioemu'):
                 if params not in blktap2_disk_types or not blktap2_installed:
                     # pass this device off to BlktapController
                     log.warn('WARNING: using deprecated blktap module')
