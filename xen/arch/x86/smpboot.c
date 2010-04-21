@@ -39,6 +39,7 @@
 #include <xen/mm.h>
 #include <xen/domain.h>
 #include <xen/sched.h>
+#include <xen/sched-if.h>
 #include <xen/irq.h>
 #include <xen/delay.h>
 #include <xen/softirq.h>
@@ -1296,10 +1297,11 @@ int __cpu_disable(void)
 	remove_siblinginfo(cpu);
 
 	/* It's now safe to remove this processor from the online map */
+	cpu_clear(cpu, cpupool0->cpu_valid);
 	cpu_clear(cpu, cpu_online_map);
 	fixup_irqs();
 
-	cpu_disable_scheduler();
+	cpu_disable_scheduler(cpu);
 
 	return 0;
 }
@@ -1336,11 +1338,6 @@ int cpu_down(unsigned int cpu)
 	if (!spin_trylock(&cpu_add_remove_lock))
 		return -EBUSY;
 
-	if (num_online_cpus() == 1) {
-		err = -EBUSY;
-		goto out;
-	}
-
 	/* Can not offline BSP */
 	if (cpu == 0) {
 		err = -EINVAL;
@@ -1352,13 +1349,19 @@ int cpu_down(unsigned int cpu)
 		goto out;
 	}
 
+	err = cpupool_cpu_remove(cpu);
+	if (err)
+		goto out;
+
 	printk("Prepare to bring CPU%d down...\n", cpu);
 
 	cpufreq_del_cpu(cpu);
 
 	err = stop_machine_run(take_cpu_down, NULL, cpu);
-	if (err < 0)
+	if (err < 0) {
+		cpupool_cpu_add(cpu);
 		goto out;
+	}
 
 	__cpu_die(cpu);
 
@@ -1559,6 +1562,7 @@ int __devinit __cpu_up(unsigned int cpu)
 		process_pending_softirqs();
 	}
 
+	cpupool_cpu_add(cpu);
 	cpufreq_add_cpu(cpu);
 	return 0;
 }

@@ -35,7 +35,7 @@
 #include "xen.h"
 #include "grant_table.h"
 
-#define XEN_DOMCTL_INTERFACE_VERSION 0x00000006
+#define XEN_DOMCTL_INTERFACE_VERSION 0x00000007
 
 struct xenctl_cpumap {
     XEN_GUEST_HANDLE_64(uint8) bitmap;
@@ -60,10 +60,10 @@ struct xen_domctl_createdomain {
  /* Should domain memory integrity be verifed by tboot during Sx? */
 #define _XEN_DOMCTL_CDF_s3_integrity  2
 #define XEN_DOMCTL_CDF_s3_integrity   (1U<<_XEN_DOMCTL_CDF_s3_integrity)
-    uint32_t flags;
  /* Disable out-of-sync shadow page tables? */
 #define _XEN_DOMCTL_CDF_oos_off       3
 #define XEN_DOMCTL_CDF_oos_off        (1U<<_XEN_DOMCTL_CDF_oos_off)
+    uint32_t flags;
 };
 typedef struct xen_domctl_createdomain xen_domctl_createdomain_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_createdomain_t);
@@ -106,6 +106,7 @@ struct xen_domctl_getdomaininfo {
     uint32_t max_vcpu_id;        /* Maximum VCPUID in use by this domain. */
     uint32_t ssidref;
     xen_domain_handle_t handle;
+    uint32_t cpupool;
 };
 typedef struct xen_domctl_getdomaininfo xen_domctl_getdomaininfo_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_getdomaininfo_t);
@@ -785,6 +786,30 @@ struct xen_domctl_mem_sharing_op {
 typedef struct xen_domctl_mem_sharing_op xen_domctl_mem_sharing_op_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_mem_sharing_op_t);
 
+/*
+ * cpupool operations
+ */
+/* XEN_DOMCTL_cpupool_op */
+#define XEN_DOMCTL_CPUPOOL_OP_CREATE                1  /* C */
+#define XEN_DOMCTL_CPUPOOL_OP_DESTROY               2  /* D */
+#define XEN_DOMCTL_CPUPOOL_OP_INFO                  3  /* I */
+#define XEN_DOMCTL_CPUPOOL_OP_ADDCPU                4  /* A */
+#define XEN_DOMCTL_CPUPOOL_OP_RMCPU                 5  /* R */
+#define XEN_DOMCTL_CPUPOOL_OP_MOVEDOMAIN            6  /* M */
+#define XEN_DOMCTL_CPUPOOL_OP_FREEINFO              7  /* F */
+#define XEN_DOMCTL_CPUPOOL_PAR_ANY     0xFFFFFFFF
+struct xen_domctl_cpupool_op {
+    uint32_t op;          /* IN */
+    uint32_t cpupool_id;  /* IN: CDIARM OUT: CI */
+    uint32_t sched_id;    /* IN: C      OUT: I  */
+    uint32_t domid;       /* IN: M              */
+    uint32_t cpu;         /* IN: AR             */
+    uint32_t n_dom;       /*            OUT: I  */
+    struct xenctl_cpumap cpumap; /*     OUT: IF */
+};
+typedef struct xen_domctl_cpupool_op xen_domctl_cpupool_op_t;
+DEFINE_XEN_GUEST_HANDLE(xen_domctl_cpupool_op_t);
+
 
 struct xen_domctl {
     uint32_t cmd;
@@ -846,6 +871,7 @@ struct xen_domctl {
 #define XEN_DOMCTL_gettscinfo                    59
 #define XEN_DOMCTL_settscinfo                    60
 #define XEN_DOMCTL_getpageframeinfo3             61
+#define XEN_DOMCTL_cpupool_op                    62
 #define XEN_DOMCTL_gdbsx_guestmemio            1000
 #define XEN_DOMCTL_gdbsx_pausevcpu             1001
 #define XEN_DOMCTL_gdbsx_unpausevcpu           1002
@@ -894,6 +920,7 @@ struct xen_domctl {
         struct xen_domctl_debug_op          debug_op;
         struct xen_domctl_mem_event_op      mem_event_op;
         struct xen_domctl_mem_sharing_op    mem_sharing_op;
+        struct xen_domctl_cpupool_op        cpupool_op;
 #if defined(__i386__) || defined(__x86_64__)
         struct xen_domctl_cpuid             cpuid;
 #endif

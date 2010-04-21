@@ -11,6 +11,7 @@
 #include <xen/lib.h>
 #include <xen/mm.h>
 #include <xen/sched.h>
+#include <xen/sched-if.h>
 #include <xen/domain.h>
 #include <xen/event.h>
 #include <xen/domain_page.h>
@@ -140,10 +141,12 @@ void getdomaininfo(struct domain *d, struct xen_domctl_getdomaininfo *info)
     info->shared_info_frame = mfn_to_gmfn(d, __pa(d->shared_info)>>PAGE_SHIFT);
     BUG_ON(SHARED_M2P(info->shared_info_frame));
 
+    info->cpupool = d->cpupool ? d->cpupool->cpupool_id : CPUPOOLID_NONE;
+
     memcpy(info->handle, d->handle, sizeof(xen_domain_handle_t));
 }
 
-static unsigned int default_vcpu0_location(void)
+static unsigned int default_vcpu0_location(cpumask_t *online)
 {
     struct domain *d;
     struct vcpu   *v;
@@ -173,7 +176,7 @@ static unsigned int default_vcpu0_location(void)
     if ( cpus_weight(per_cpu(cpu_sibling_map, 0)) > 1 )
         cpu = next_cpu(cpu, per_cpu(cpu_sibling_map, 0));
     cpu_exclude_map = per_cpu(cpu_sibling_map, 0);
-    for_each_online_cpu ( i )
+    for_each_cpu_mask(i, *online)
     {
         if ( cpu_isset(i, cpu_exclude_map) )
             continue;
@@ -450,6 +453,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     {
         struct domain *d;
         unsigned int i, max = op->u.max_vcpus.max, cpu;
+        cpumask_t *online;
 
         ret = -ESRCH;
         if ( (d = rcu_lock_domain_by_id(op->domain)) == NULL )
@@ -498,6 +502,7 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
             goto maxvcpu_out;
 
         ret = -ENOMEM;
+        online = (d->cpupool == NULL) ? &cpu_online_map : &d->cpupool->cpu_valid;
         if ( max > d->max_vcpus )
         {
             struct vcpu **vcpus;
@@ -521,8 +526,8 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
                 continue;
 
             cpu = (i == 0) ?
-                default_vcpu0_location() :
-                cycle_cpu(d->vcpu[i-1]->processor, cpu_online_map);
+                default_vcpu0_location(online) :
+                cycle_cpu(d->vcpu[i-1]->processor, *online);
 
             if ( alloc_vcpu(d, i, cpu) == NULL )
                 goto maxvcpu_out;
@@ -958,6 +963,14 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
             rcu_unlock_domain(d);
             ret = 0;
         }
+    }
+    break;
+
+    case XEN_DOMCTL_cpupool_op:
+    {
+        ret = cpupool_do_domctl(&op->u.cpupool_op);
+        if ( (ret == 0) && copy_to_guest(u_domctl, op, 1) )
+            ret = -EFAULT;
     }
     break;
 

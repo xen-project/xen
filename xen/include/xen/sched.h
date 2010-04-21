@@ -213,6 +213,7 @@ struct domain
 
     /* Scheduling. */
     void            *sched_priv;    /* scheduler-specific data */
+    struct cpupool  *cpupool;
 
     struct domain   *next_in_list;
     struct domain   *next_in_hashbucket;
@@ -465,6 +466,7 @@ int  sched_init_vcpu(struct vcpu *v, unsigned int processor);
 void sched_destroy_vcpu(struct vcpu *v);
 int  sched_init_domain(struct domain *d);
 void sched_destroy_domain(struct domain *d);
+int sched_move_domain(struct domain *d, struct cpupool *c);
 long sched_adjust(struct domain *, struct xen_domctl_scheduler_op *);
 int  sched_id(void);
 void sched_tick_suspend(void);
@@ -575,8 +577,13 @@ void domain_pause_by_systemcontroller(struct domain *d);
 void domain_unpause_by_systemcontroller(struct domain *d);
 void cpu_init(void);
 
+struct scheduler;
+
+int schedule_init_global(char *name, struct scheduler *sched);
+void schedule_deinit_global(struct scheduler *sched);
+void schedule_cpu_switch(unsigned int cpu, struct cpupool *c);
 void vcpu_force_reschedule(struct vcpu *v);
-void cpu_disable_scheduler(void);
+int cpu_disable_scheduler(unsigned int cpu);
 int vcpu_set_affinity(struct vcpu *v, cpumask_t *affinity);
 
 void vcpu_runstate_get(struct vcpu *v, struct vcpu_runstate_info *runstate);
@@ -606,6 +613,19 @@ extern int sched_smt_power_savings;
 extern enum cpufreq_controller {
     FREQCTL_none, FREQCTL_dom0_kernel, FREQCTL_xen
 } cpufreq_controller;
+
+#define CPUPOOLID_NONE    -1
+
+struct cpupool *cpupool_create(int poolid, char *sched);
+int cpupool_destroy(struct cpupool *c);
+int cpupool0_cpu_assign(struct cpupool *c);
+int cpupool_assign_ncpu(struct cpupool *c, int ncpu);
+void cpupool_cpu_add(unsigned int cpu);
+int cpupool_cpu_remove(unsigned int cpu);
+int cpupool_add_domain(struct domain *d, int poolid);
+void cpupool_rm_domain(struct domain *d);
+int cpupool_do_domctl(struct xen_domctl_cpupool_op *op);
+#define num_cpupool_cpus(c) (cpus_weight((c)->cpu_valid))
 
 #endif /* __SCHED_H__ */
 

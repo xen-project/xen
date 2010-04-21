@@ -2,6 +2,7 @@
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/sched.h>
+#include <xen/sched-if.h>
 #include <xen/domain.h>
 #include <xen/serial.h>
 #include <xen/softirq.h>
@@ -1092,6 +1093,11 @@ void __init __start_xen(unsigned long mbi_p)
     
     if ( !tboot_protect_mem_regions() )
         panic("Could not protect TXT memory regions\n");
+
+    /* Create initial cpupool 0. */
+    cpupool0 = cpupool_create(0, NULL);
+    if ( (cpupool0 == NULL) || cpupool0_cpu_assign(cpupool0) )
+        panic("Error creating cpupool 0\n");
 
     /* Create initial domain 0. */
     dom0 = domain_create(0, DOMCRF_s3_integrity, DOM0_SSIDREF);

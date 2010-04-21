@@ -10,6 +10,12 @@
 
 #include <xen/percpu.h>
 
+/* A global pointer to the initial cpupool (POOL0). */
+extern struct cpupool *cpupool0;
+
+/* cpus currently in no cpupool */
+extern cpumask_t cpupool_free_cpus;
+
 /*
  * In order to allow a scheduler to remap the lock->cpu mapping,
  * we have a per-cpu pointer, along with a pre-allocated set of
@@ -26,11 +32,14 @@ struct schedule_data {
     struct vcpu        *curr;           /* current task                    */
     struct vcpu        *idle;           /* idle task for this cpu          */
     void               *sched_priv;
+    void               *sched_idlevpriv; /* default scheduler vcpu data    */
     struct timer        s_timer;        /* scheduling timer                */
     atomic_t            urgent_count;   /* how many urgent vcpus           */
 } __cacheline_aligned;
 
 DECLARE_PER_CPU(struct schedule_data, schedule_data);
+DECLARE_PER_CPU(struct scheduler *, scheduler);
+DECLARE_PER_CPU(struct cpupool *, cpupool);
 
 static inline void vcpu_schedule_lock(struct vcpu *v)
 {
@@ -78,29 +87,50 @@ struct scheduler {
     char *name;             /* full name for this scheduler      */
     char *opt_name;         /* option name for this scheduler    */
     unsigned int sched_id;  /* ID for this scheduler             */
+    void *sched_data;       /* global data pointer               */
 
-    void         (*init)           (void);
+    int          (*init)           (struct scheduler *, int);
+    void         (*deinit)         (struct scheduler *);
 
-    int          (*init_domain)    (struct domain *);
-    void         (*destroy_domain) (struct domain *);
+    void         (*free_vdata)     (struct scheduler *, void *);
+    void *       (*alloc_vdata)    (struct scheduler *, struct vcpu *,
+                                    void *);
+    void         (*free_pdata)     (struct scheduler *, void *, int);
+    void *       (*alloc_pdata)    (struct scheduler *, int);
+    void         (*free_domdata)   (struct scheduler *, void *);
+    void *       (*alloc_domdata)  (struct scheduler *, struct domain *);
 
-    int          (*init_vcpu)      (struct vcpu *);
-    void         (*destroy_vcpu)   (struct vcpu *);
+    int          (*init_domain)    (struct scheduler *, struct domain *);
+    void         (*destroy_domain) (struct scheduler *, struct domain *);
 
-    void         (*sleep)          (struct vcpu *);
-    void         (*wake)           (struct vcpu *);
-    void         (*context_saved)  (struct vcpu *);
+    void         (*insert_vcpu)    (struct scheduler *, struct vcpu *);
+    void         (*destroy_vcpu)   (struct scheduler *, struct vcpu *);
 
-    struct task_slice (*do_schedule) (s_time_t);
+    void         (*sleep)          (struct scheduler *, struct vcpu *);
+    void         (*wake)           (struct scheduler *, struct vcpu *);
+    void         (*context_saved)  (struct scheduler *, struct vcpu *);
 
-    int          (*pick_cpu)       (struct vcpu *);
-    int          (*adjust)         (struct domain *,
+    struct task_slice (*do_schedule) (struct scheduler *, s_time_t);
+
+    int          (*pick_cpu)       (struct scheduler *, struct vcpu *);
+    int          (*adjust)         (struct scheduler *, struct domain *,
                                     struct xen_domctl_scheduler_op *);
-    void         (*dump_settings)  (void);
-    void         (*dump_cpu_state) (int);
+    void         (*dump_settings)  (struct scheduler *);
+    void         (*dump_cpu_state) (struct scheduler *, int);
 
-    void         (*tick_suspend)    (void);
-    void         (*tick_resume)     (void);
+    void         (*tick_suspend)    (struct scheduler *, unsigned int);
+    void         (*tick_resume)     (struct scheduler *, unsigned int);
 };
+
+struct cpupool
+{
+    int              cpupool_id;
+    cpumask_t        cpu_valid;      /* all cpus assigned to pool */
+    struct cpupool   *next;
+    unsigned int     n_dom;
+    struct scheduler sched;
+};
+
+const struct scheduler *scheduler_get_by_id(unsigned int id);
 
 #endif /* __XEN_SCHED_IF_H__ */

@@ -21,6 +21,9 @@
             printk(_a );                        \
     } while ( 0 )
 
+#define SEDF_CPUONLINE(_pool)                                             \
+    (((_pool) == NULL) ? &cpupool_free_cpus : &(_pool)->cpu_valid)
+
 #ifndef NDEBUG
 #define SEDF_STATS
 #define CHECK(_p)                                           \
@@ -132,7 +135,7 @@ struct sedf_cpu_info {
 #define sedf_runnable(edom)  (!(EDOM_INFO(edom)->status & SEDF_ASLEEP))
 
 
-static void sedf_dump_cpu_state(int i);
+static void sedf_dump_cpu_state(struct scheduler *ops, int i);
 
 static inline int extraq_on(struct vcpu *d, int i)
 {
@@ -329,30 +332,17 @@ static inline void __add_to_runqueue_sort(struct vcpu *v)
 }
 
 
-static int sedf_init_vcpu(struct vcpu *v)
+static void *sedf_alloc_vdata(struct scheduler *ops, struct vcpu *v, void *dd)
 {
     struct sedf_vcpu_info *inf;
 
-    if ( (v->sched_priv = xmalloc(struct sedf_vcpu_info)) == NULL )
-        return -1;
-    memset(v->sched_priv, 0, sizeof(struct sedf_vcpu_info));
+    inf = xmalloc(struct sedf_vcpu_info);
+    if ( inf == NULL )
+        return NULL;
 
-    inf = EDOM_INFO(v);
+    memset(inf, 0, sizeof(struct sedf_vcpu_info));
     inf->vcpu = v;
- 
-    /* Allocate per-CPU context if this is the first domain to be added. */
-    if ( unlikely(per_cpu(schedule_data, v->processor).sched_priv == NULL) )
-    {
-        per_cpu(schedule_data, v->processor).sched_priv = 
-            xmalloc(struct sedf_cpu_info);
-        BUG_ON(per_cpu(schedule_data, v->processor).sched_priv == NULL);
-        memset(CPU_INFO(v->processor), 0, sizeof(*CPU_INFO(v->processor)));
-        INIT_LIST_HEAD(WAITQ(v->processor));
-        INIT_LIST_HEAD(RUNQ(v->processor));
-        INIT_LIST_HEAD(EXTRAQ(v->processor,EXTRA_PEN_Q));
-        INIT_LIST_HEAD(EXTRAQ(v->processor,EXTRA_UTIL_Q));
-    }
-       
+
     /* Every VCPU gets an equal share of extratime by default. */
     inf->deadl_abs   = 0;
     inf->latency     = 0;
@@ -383,39 +373,88 @@ static int sedf_init_vcpu(struct vcpu *v)
     }
     else
     {
-        EDOM_INFO(v)->deadl_abs = 0;
-        EDOM_INFO(v)->status &= ~SEDF_ASLEEP;
+        inf->deadl_abs = 0;
+        inf->status &= ~SEDF_ASLEEP;
     }
 
-    return 0;
+    return inf;
 }
 
-static void sedf_destroy_vcpu(struct vcpu *v)
+static void *
+sedf_alloc_pdata(struct scheduler *ops, int cpu)
 {
-    xfree(v->sched_priv);
+    struct sedf_cpu_info *spc;
+
+    spc = xmalloc(struct sedf_cpu_info);
+    BUG_ON(spc == NULL);
+    memset(spc, 0, sizeof(*spc));
+    INIT_LIST_HEAD(&spc->waitq);
+    INIT_LIST_HEAD(&spc->runnableq);
+    INIT_LIST_HEAD(&spc->extraq[EXTRA_PEN_Q]);
+    INIT_LIST_HEAD(&spc->extraq[EXTRA_UTIL_Q]);
+
+    return (void *)spc;
 }
 
-static int sedf_init_domain(struct domain *d)
+static void
+sedf_free_pdata(struct scheduler *ops, void *spc, int cpu)
 {
-    d->sched_priv = xmalloc(struct sedf_dom_info);
+    if ( spc == NULL )
+        return;
+
+    xfree(spc);
+}
+
+static void sedf_free_vdata(struct scheduler *ops, void *priv)
+{
+    xfree(priv);
+}
+
+static void sedf_destroy_vcpu(struct scheduler *ops, struct vcpu *v)
+{
+    sedf_free_vdata(ops, v->sched_priv);
+}
+
+static void *
+sedf_alloc_domdata(struct scheduler *ops, struct domain *d)
+{
+    void *mem;
+
+    mem = xmalloc(struct sedf_dom_info);
+    if ( mem == NULL )
+        return NULL;
+
+    memset(mem, 0, sizeof(struct sedf_dom_info));
+
+    return mem;
+}
+
+static int sedf_init_domain(struct scheduler *ops, struct domain *d)
+{
+    d->sched_priv = sedf_alloc_domdata(ops, d);
     if ( d->sched_priv == NULL )
         return -ENOMEM;
 
-    memset(d->sched_priv, 0, sizeof(struct sedf_dom_info));
-
     return 0;
 }
 
-static void sedf_destroy_domain(struct domain *d)
+static void sedf_free_domdata(struct scheduler *ops, void *data)
 {
-    xfree(d->sched_priv);
+    xfree(data);
 }
 
-static int sedf_pick_cpu(struct vcpu *v)
+static void sedf_destroy_domain(struct scheduler *ops, struct domain *d)
+{
+    sedf_free_domdata(ops, d->sched_priv);
+}
+
+static int sedf_pick_cpu(struct scheduler *ops, struct vcpu *v)
 {
     cpumask_t online_affinity;
+    cpumask_t *online;
 
-    cpus_and(online_affinity, v->cpu_affinity, cpu_online_map);
+    online = SEDF_CPUONLINE(v->domain->cpupool);
+    cpus_and(online_affinity, v->cpu_affinity, *online);
     return first_cpu(online_affinity);
 }
 
@@ -751,7 +790,7 @@ static struct task_slice sedf_do_extra_schedule(
    -timeslice for the current period used up
    -domain on waitqueue has started it's period
    -and various others ;) in general: determine which domain to run next*/
-static struct task_slice sedf_do_schedule(s_time_t now)
+static struct task_slice sedf_do_schedule(struct scheduler *ops, s_time_t now)
 {
     int                   cpu      = smp_processor_id();
     struct list_head     *runq     = RUNQ(cpu);
@@ -786,6 +825,13 @@ static struct task_slice sedf_do_schedule(s_time_t now)
     }
  check_waitq:
     update_queues(now, runq, waitq);
+
+    if ( unlikely(!cpu_isset(cpu, *SEDF_CPUONLINE(per_cpu(cpupool, cpu)))) )
+    {
+        ret.task = IDLETASK(cpu);
+        ret.time = SECONDS(1);
+        goto sched_done;
+    }
  
     /*now simply pick the first domain from the runqueue, which has the
       earliest deadline, because the list is sorted*/
@@ -824,6 +870,7 @@ static struct task_slice sedf_do_schedule(s_time_t now)
                                      extraq, cpu);
     }
 
+  sched_done:
     /*TODO: Do something USEFUL when this happens and find out, why it
       still can happen!!!*/
     if ( ret.time < 0)
@@ -841,7 +888,7 @@ static struct task_slice sedf_do_schedule(s_time_t now)
 }
 
 
-static void sedf_sleep(struct vcpu *d)
+static void sedf_sleep(struct scheduler *ops, struct vcpu *d)
 {
     PRINT(2,"sedf_sleep was called, domain-id %i.%i\n",
           d->domain->domain_id, d->vcpu_id);
@@ -1060,7 +1107,7 @@ static inline int should_switch(struct vcpu *cur,
     return 1;
 }
 
-static void sedf_wake(struct vcpu *d)
+static void sedf_wake(struct scheduler *ops, struct vcpu *d)
 {
     s_time_t              now = NOW();
     struct sedf_vcpu_info* inf = EDOM_INFO(d);
@@ -1213,8 +1260,8 @@ static void sedf_dump_domain(struct vcpu *d)
 }
 
 
-/* dumps all domains on hte specified cpu */
-static void sedf_dump_cpu_state(int i)
+/* dumps all domains on the specified cpu */
+static void sedf_dump_cpu_state(struct scheduler *ops, int i)
 {
     struct list_head      *list, *queue, *tmp;
     struct sedf_vcpu_info *d_inf;
@@ -1287,7 +1334,7 @@ static void sedf_dump_cpu_state(int i)
 
 
 /* Adjusts periods and slices of the domains accordingly to their weights. */
-static int sedf_adjust_weights(struct xen_domctl_scheduler_op *cmd)
+static int sedf_adjust_weights(struct cpupool *c, struct xen_domctl_scheduler_op *cmd)
 {
     struct vcpu *p;
     struct domain      *d;
@@ -1308,6 +1355,8 @@ static int sedf_adjust_weights(struct xen_domctl_scheduler_op *cmd)
     rcu_read_lock(&domlist_read_lock);
     for_each_domain( d )
     {
+        if ( c != d->cpupool )
+            continue;
         for_each_vcpu( d, p )
         {
             if ( EDOM_INFO(p)->weight )
@@ -1359,7 +1408,7 @@ static int sedf_adjust_weights(struct xen_domctl_scheduler_op *cmd)
 
 
 /* set or fetch domain scheduling parameters */
-static int sedf_adjust(struct domain *p, struct xen_domctl_scheduler_op *op)
+static int sedf_adjust(struct scheduler *ops, struct domain *p, struct xen_domctl_scheduler_op *op)
 {
     struct vcpu *v;
     int rc;
@@ -1368,9 +1417,6 @@ static int sedf_adjust(struct domain *p, struct xen_domctl_scheduler_op *op)
           "new slice %"PRIu64"\nlatency %"PRIu64" extra:%s\n",
           p->domain_id, op->u.sedf.period, op->u.sedf.slice,
           op->u.sedf.latency, (op->u.sedf.extratime)?"yes":"no");
-
-    if ( !p->vcpu )
-        return -EINVAL;
 
     if ( op->cmd == XEN_DOMCTL_SCHEDOP_putinfo )
     {
@@ -1421,7 +1467,7 @@ static int sedf_adjust(struct domain *p, struct xen_domctl_scheduler_op *op)
             }
         }
 
-        rc = sedf_adjust_weights(op);
+        rc = sedf_adjust_weights(p->cpupool, op);
         if ( rc )
             return rc;
 
@@ -1449,7 +1495,7 @@ static int sedf_adjust(struct domain *p, struct xen_domctl_scheduler_op *op)
     return 0;
 }
 
-const struct scheduler sched_sedf_def = {
+struct scheduler sched_sedf_def = {
     .name     = "Simple EDF Scheduler",
     .opt_name = "sedf",
     .sched_id = XEN_SCHEDULER_SEDF,
@@ -1457,8 +1503,14 @@ const struct scheduler sched_sedf_def = {
     .init_domain    = sedf_init_domain,
     .destroy_domain = sedf_destroy_domain,
 
-    .init_vcpu      = sedf_init_vcpu,
     .destroy_vcpu   = sedf_destroy_vcpu,
+
+    .alloc_vdata    = sedf_alloc_vdata,
+    .free_vdata     = sedf_free_vdata,
+    .alloc_pdata    = sedf_alloc_pdata,
+    .free_pdata     = sedf_free_pdata,
+    .alloc_domdata  = sedf_alloc_domdata,
+    .free_domdata   = sedf_free_domdata,
 
     .do_schedule    = sedf_do_schedule,
     .pick_cpu       = sedf_pick_cpu,

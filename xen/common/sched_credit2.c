@@ -149,12 +149,16 @@
 /*
  * Useful macros
  */
+#define CSCHED_PRIV(_ops)   \
+    ((struct csched_private *)((_ops)->sched_data))
 #define CSCHED_VCPU(_vcpu)  ((struct csched_vcpu *) (_vcpu)->sched_priv)
 #define CSCHED_DOM(_dom)    ((struct csched_dom *) (_dom)->sched_priv)
+#define CSCHED_CPUONLINE(_pool)    \
+    (((_pool) == NULL) ? &cpupool_free_cpus : &(_pool)->cpu_valid)
 /* CPU to runq_id macro */
-#define c2r(_cpu)           (csched_priv.runq_map[(_cpu)])
+#define c2r(_ops, _cpu)     (CSCHED_PRIV(_ops)->runq_map[(_cpu)])
 /* CPU to runqueue struct macro */
-#define RQD(_cpu)          (&csched_priv.rqd[c2r(_cpu)])
+#define RQD(_ops, _cpu)     (&CSCHED_PRIV(_ops)->rqd[c2r(_ops, _cpu)])
 
 /*
  * Per-runqueue data
@@ -212,11 +216,6 @@ struct csched_dom {
     uint16_t nr_vcpus;
 };
 
-
-/*
- * Global variables
- */
-static struct csched_private csched_priv;
 
 /*
  * Time-to-credit, credit-to-time.
@@ -284,15 +283,15 @@ __runq_insert(struct list_head *runq, struct csched_vcpu *svc)
 }
 
 static void
-runq_insert(unsigned int cpu, struct csched_vcpu *svc)
+runq_insert(struct scheduler *ops, unsigned int cpu, struct csched_vcpu *svc)
 {
-    struct list_head * runq = &RQD(cpu)->runq;
+    struct list_head * runq = &RQD(ops, cpu)->runq;
     int pos = 0;
 
     ASSERT( spin_is_locked(per_cpu(schedule_data, cpu).schedule_lock) );
 
     BUG_ON( __vcpu_on_runq(svc) );
-    BUG_ON( c2r(cpu) != c2r(svc->vcpu->processor) );
+    BUG_ON( c2r(ops, cpu) != c2r(ops, svc->vcpu->processor) );
 
     pos = __runq_insert(runq, svc);
 
@@ -324,11 +323,12 @@ void burn_credits(struct csched_runqueue_data *rqd, struct csched_vcpu *, s_time
 /* Check to see if the item on the runqueue is higher priority than what's
  * currently running; if so, wake up the processor */
 static /*inline*/ void
-runq_tickle(unsigned int cpu, struct csched_vcpu *new, s_time_t now)
+runq_tickle(struct scheduler *ops, unsigned int cpu, struct csched_vcpu *new, s_time_t now)
 {
     int i, ipid=-1;
     s_time_t lowest=(1<<30);
-    struct csched_runqueue_data *rqd = RQD(cpu);
+    struct csched_runqueue_data *rqd = RQD(ops, cpu);
+    cpumask_t *online;
 
     d2printk("rqt d%dv%d cd%dv%d\n",
              new->vcpu->domain->domain_id,
@@ -336,13 +336,14 @@ runq_tickle(unsigned int cpu, struct csched_vcpu *new, s_time_t now)
              current->domain->domain_id,
              current->vcpu_id);
 
+    online = CSCHED_CPUONLINE(per_cpu(cpupool, cpu));
     /* Find the cpu in this queue group that has the lowest credits */
     for ( i=rqd->cpu_min ; i < rqd->cpu_max ; i++ )
     {
         struct csched_vcpu * cur;
 
         /* Skip cpus that aren't online */
-        if ( !cpu_online(i) )
+        if ( !cpu_isset(i, *online) )
             continue;
 
         cur = CSCHED_VCPU(per_cpu(schedule_data, i).curr);
@@ -396,11 +397,11 @@ runq_tickle(unsigned int cpu, struct csched_vcpu *new, s_time_t now)
 /*
  * Credit-related code
  */
-static void reset_credit(int cpu, s_time_t now)
+static void reset_credit(struct scheduler *ops, int cpu, s_time_t now)
 {
     struct list_head *iter;
 
-    list_for_each( iter, &RQD(cpu)->svc )
+    list_for_each( iter, &RQD(ops, cpu)->svc )
     {
         struct csched_vcpu * svc = list_entry(iter, struct csched_vcpu, rqd_elem);
 
@@ -521,64 +522,100 @@ __csched_vcpu_check(struct vcpu *vc)
 #define CSCHED_VCPU_CHECK(_vc)
 #endif
 
-static int
-csched_vcpu_init(struct vcpu *vc)
+static void *
+csched_alloc_vdata(struct scheduler *ops, struct vcpu *vc, void *dd)
 {
-    struct domain * const dom = vc->domain;
-    struct csched_dom *sdom = CSCHED_DOM(dom);
     struct csched_vcpu *svc;
-
-    printk("%s: Initializing d%dv%d\n",
-           __func__, dom->domain_id, vc->vcpu_id);
 
     /* Allocate per-VCPU info */
     svc = xmalloc(struct csched_vcpu);
     if ( svc == NULL )
-        return -1;
+        return NULL;
+    memset(svc, 0, sizeof(*svc));
 
     INIT_LIST_HEAD(&svc->rqd_elem);
     INIT_LIST_HEAD(&svc->sdom_elem);
     INIT_LIST_HEAD(&svc->runq_elem);
 
-    svc->sdom = sdom;
+    svc->sdom = dd;
     svc->vcpu = vc;
     svc->flags = 0U;
-    vc->sched_priv = svc;
 
     if ( ! is_idle_vcpu(vc) )
     {
-        BUG_ON( sdom == NULL );
+        BUG_ON( svc->sdom == NULL );
 
         svc->credit = CSCHED_CREDIT_INIT;
-        svc->weight = sdom->weight;
+        svc->weight = svc->sdom->weight;
+    }
+    else
+    {
+        BUG_ON( svc->sdom != NULL );
+        svc->credit = CSCHED_IDLE_CREDIT;
+        svc->weight = 0;
+    }
 
+    return svc;
+}
+
+static void
+csched_vcpu_insert(struct scheduler *ops, struct vcpu *vc)
+{
+    struct csched_vcpu *svc = vc->sched_priv;
+    struct domain * const dom = vc->domain;
+    struct csched_dom *sdom = CSCHED_DOM(dom);
+
+    printk("%s: Inserting d%dv%d\n",
+           __func__, dom->domain_id, vc->vcpu_id);
+
+    if ( ! is_idle_vcpu(vc) )
+    {
         /* FIXME: Do we need the private lock here? */
-        list_add_tail(&svc->sdom_elem, &sdom->vcpu);
+        list_add_tail(&svc->sdom_elem, &svc->sdom->vcpu);
 
         /* Add vcpu to runqueue of initial processor */
         /* FIXME: Abstract for multiple runqueues */
         vcpu_schedule_lock_irq(vc);
 
-        list_add_tail(&svc->rqd_elem, &RQD(vc->processor)->svc);
-        update_max_weight(RQD(vc->processor), svc->weight, 0);
+        list_add_tail(&svc->rqd_elem, &RQD(ops, vc->processor)->svc);
+        update_max_weight(RQD(ops, vc->processor), svc->weight, 0);
 
         vcpu_schedule_unlock_irq(vc);
 
         sdom->nr_vcpus++;
     }
-    else
-    {
-        BUG_ON( sdom != NULL );
-        svc->credit = CSCHED_IDLE_CREDIT;
-        svc->weight = 0;
-    }
 
     CSCHED_VCPU_CHECK(vc);
-    return 0;
 }
 
 static void
-csched_vcpu_destroy(struct vcpu *vc)
+csched_free_vdata(struct scheduler *ops, void *priv)
+{
+    struct csched_vcpu *svc = priv;
+    struct vcpu *vc = svc->vcpu;
+
+    if ( ! is_idle_vcpu(vc) )
+    {
+        /* Remove from runqueue */
+        vcpu_schedule_lock_irq(vc);
+
+        list_del_init(&svc->rqd_elem);
+        update_max_weight(RQD(ops, vc->processor), 0, svc->weight);
+
+        vcpu_schedule_unlock_irq(vc);
+
+        /* Remove from sdom list.  Don't need a lock for this, as it's called
+         * syncronously when nothing else can happen. */
+        list_del_init(&svc->sdom_elem);
+
+        svc->sdom->nr_vcpus--;
+    }
+
+    xfree(svc);
+}
+
+static void
+csched_vcpu_destroy(struct scheduler *ops, struct vcpu *vc)
 {
     struct csched_vcpu * const svc = CSCHED_VCPU(vc);
     struct csched_dom * const sdom = svc->sdom;
@@ -586,25 +623,11 @@ csched_vcpu_destroy(struct vcpu *vc)
     BUG_ON( sdom == NULL );
     BUG_ON( !list_empty(&svc->runq_elem) );
 
-    /* Remove from runqueue */
-    vcpu_schedule_lock_irq(vc);
-
-    list_del_init(&svc->rqd_elem);
-    update_max_weight(RQD(vc->processor), 0, svc->weight);
-
-    vcpu_schedule_unlock_irq(vc);
-
-    /* Remove from sdom list.  Don't need a lock for this, as it's called
-     * syncronously when nothing else can happen. */
-    list_del_init(&svc->sdom_elem);
-
-    sdom->nr_vcpus--;
-
-    xfree(svc);
+    csched_free_vdata(ops, svc);
 }
 
 static void
-csched_vcpu_sleep(struct vcpu *vc)
+csched_vcpu_sleep(struct scheduler *ops, struct vcpu *vc)
 {
     struct csched_vcpu * const svc = CSCHED_VCPU(vc);
 
@@ -617,7 +640,7 @@ csched_vcpu_sleep(struct vcpu *vc)
 }
 
 static void
-csched_vcpu_wake(struct vcpu *vc)
+csched_vcpu_wake(struct scheduler *ops, struct vcpu *vc)
 {
     struct csched_vcpu * const svc = CSCHED_VCPU(vc);
     const unsigned int cpu = vc->processor;
@@ -654,8 +677,8 @@ csched_vcpu_wake(struct vcpu *vc)
     now = NOW();
 
     /* Put the VCPU on the runq */
-    runq_insert(cpu, svc);
-    runq_tickle(cpu, svc, now);
+    runq_insert(ops, cpu, svc);
+    runq_tickle(ops, cpu, svc, now);
 
 out:
     d2printk("w-\n");
@@ -663,7 +686,7 @@ out:
 }
 
 static void
-csched_context_saved(struct vcpu *vc)
+csched_context_saved(struct scheduler *ops, struct vcpu *vc)
 {
     struct csched_vcpu * const svc = CSCHED_VCPU(vc);
 
@@ -688,15 +711,15 @@ csched_context_saved(struct vcpu *vc)
 
         BUG_ON(__vcpu_on_runq(svc));
 
-        runq_insert(cpu, svc);
-        runq_tickle(cpu, svc, NOW());
+        runq_insert(ops, cpu, svc);
+        runq_tickle(ops, cpu, svc, NOW());
     }
 
     vcpu_schedule_unlock_irq(vc);
 }
 
 static int
-csched_cpu_pick(struct vcpu *vc)
+csched_cpu_pick(struct scheduler *ops, struct vcpu *vc)
 {
     /* FIXME: Chose a schedule group based on load */
     /* FIXME: Migrate the vcpu to the new runqueue list, updating
@@ -706,10 +729,12 @@ csched_cpu_pick(struct vcpu *vc)
 
 static int
 csched_dom_cntl(
+    struct scheduler *ops,
     struct domain *d,
     struct xen_domctl_scheduler_op *op)
 {
     struct csched_dom * const sdom = CSCHED_DOM(d);
+    struct csched_private *prv = CSCHED_PRIV(ops);
     unsigned long flags;
 
     if ( op->cmd == XEN_DOMCTL_SCHEDOP_getinfo )
@@ -727,7 +752,7 @@ csched_dom_cntl(
 
             /* Must hold csched_priv lock to update sdom, runq lock to
              * update csvcs. */
-            spin_lock_irqsave(&csched_priv.lock, flags);
+            spin_lock_irqsave(&prv->lock, flags);
 
             old_weight = sdom->weight;
 
@@ -744,32 +769,28 @@ csched_dom_cntl(
                 vcpu_schedule_lock_irq(svc->vcpu);
 
                 svc->weight = sdom->weight;
-                update_max_weight(RQD(svc->vcpu->processor), svc->weight, old_weight);
+                update_max_weight(RQD(ops, svc->vcpu->processor), svc->weight, old_weight);
 
                 vcpu_schedule_unlock_irq(svc->vcpu);
             }
 
-            spin_unlock_irqrestore(&csched_priv.lock, flags);
+            spin_unlock_irqrestore(&prv->lock, flags);
         }
     }
 
     return 0;
 }
 
-static int
-csched_dom_init(struct domain *dom)
+static void *
+csched_alloc_domdata(struct scheduler *ops, struct domain *dom)
 {
     struct csched_dom *sdom;
     int flags;
 
-    printk("%s: Initializing domain %d\n", __func__, dom->domain_id);
-
-    if ( is_idle_domain(dom) )
-        return 0;
-
     sdom = xmalloc(struct csched_dom);
     if ( sdom == NULL )
-        return -ENOMEM;
+        return NULL;
+    memset(sdom, 0, sizeof(*sdom));
 
     /* Initialize credit and weight */
     INIT_LIST_HEAD(&sdom->vcpu);
@@ -778,40 +799,65 @@ csched_dom_init(struct domain *dom)
     sdom->weight = CSCHED_DEFAULT_WEIGHT;
     sdom->nr_vcpus = 0;
 
+    spin_lock_irqsave(&CSCHED_PRIV(ops)->lock, flags);
+
+    list_add_tail(&sdom->sdom_elem, &CSCHED_PRIV(ops)->sdom);
+
+    spin_unlock_irqrestore(&CSCHED_PRIV(ops)->lock, flags);
+
+    return (void *)sdom;
+}
+
+static int
+csched_dom_init(struct scheduler *ops, struct domain *dom)
+{
+    struct csched_dom *sdom;
+
+    printk("%s: Initializing domain %d\n", __func__, dom->domain_id);
+
+    if ( is_idle_domain(dom) )
+        return 0;
+
+    sdom = csched_alloc_domdata(ops, dom);
+    if ( sdom == NULL )
+        return -ENOMEM;
+
     dom->sched_priv = sdom;
-
-    spin_lock_irqsave(&csched_priv.lock, flags);
-
-    list_add_tail(&sdom->sdom_elem, &csched_priv.sdom);
-
-    spin_unlock_irqrestore(&csched_priv.lock, flags);
 
     return 0;
 }
 
 static void
-csched_dom_destroy(struct domain *dom)
+csched_free_domdata(struct scheduler *ops, void *data)
 {
-    struct csched_dom *sdom = CSCHED_DOM(dom);
     int flags;
+    struct csched_dom *sdom = data;
 
-    BUG_ON(!list_empty(&sdom->vcpu));
-
-    spin_lock_irqsave(&csched_priv.lock, flags);
+    spin_lock_irqsave(&CSCHED_PRIV(ops)->lock, flags);
 
     list_del_init(&sdom->sdom_elem);
 
-    spin_unlock_irqrestore(&csched_priv.lock, flags);
+    spin_unlock_irqrestore(&CSCHED_PRIV(ops)->lock, flags);
 
-    xfree(CSCHED_DOM(dom));
+    xfree(data);
+}
+
+static void
+csched_dom_destroy(struct scheduler *ops, struct domain *dom)
+{
+    struct csched_dom *sdom = CSCHED_DOM(dom);
+
+    BUG_ON(!list_empty(&sdom->vcpu));
+
+    csched_free_domdata(ops, CSCHED_DOM(dom));
 }
 
 /* How long should we let this vcpu run for? */
 static s_time_t
-csched_runtime(int cpu, struct csched_vcpu *snext)
+csched_runtime(struct scheduler *ops, int cpu, struct csched_vcpu *snext)
 {
     s_time_t time = CSCHED_MAX_TIMER;
-    struct csched_runqueue_data *rqd = RQD(cpu);
+    struct csched_runqueue_data *rqd = RQD(ops, cpu);
     struct list_head *runq = &rqd->runq;
 
     if ( is_idle_vcpu(snext->vcpu) )
@@ -851,10 +897,10 @@ void __dump_execstate(void *unused);
  * fast for the common case.
  */
 static struct task_slice
-csched_schedule(s_time_t now)
+csched_schedule(struct scheduler *ops, s_time_t now)
 {
     const int cpu = smp_processor_id();
-    struct csched_runqueue_data *rqd = RQD(cpu);
+    struct csched_runqueue_data *rqd = RQD(ops, cpu);
     struct list_head * const runq = &rqd->runq;
     struct csched_vcpu * const scurr = CSCHED_VCPU(current);
     struct csched_vcpu *snext = NULL;
@@ -927,7 +973,7 @@ csched_schedule(s_time_t now)
     }
 
     if ( !is_idle_vcpu(snext->vcpu) && snext->credit <= CSCHED_CREDIT_RESET )
-        reset_credit(cpu, now);
+        reset_credit(ops, cpu, now);
 
 #if 0
     /*
@@ -955,7 +1001,7 @@ csched_schedule(s_time_t now)
     /*
      * Return task to run next...
      */
-    ret.time = csched_runtime(cpu, snext);
+    ret.time = csched_runtime(ops, cpu, snext);
     ret.task = snext->vcpu;
 
     CSCHED_VCPU_CHECK(ret.task);
@@ -977,7 +1023,7 @@ csched_dump_vcpu(struct csched_vcpu *svc)
 }
 
 static void
-csched_dump_pcpu(int cpu)
+csched_dump_pcpu(struct scheduler *ops, int cpu)
 {
     struct list_head *runq, *iter;
     struct csched_vcpu *svc;
@@ -986,7 +1032,7 @@ csched_dump_pcpu(int cpu)
 
     /* FIXME: Do locking properly for access to runqueue structures */
 
-    runq = &RQD(cpu)->runq;
+    runq = &RQD(ops, cpu)->runq;
 
     cpumask_scnprintf(cpustr, sizeof(cpustr), per_cpu(cpu_sibling_map,cpu));
     printk(" sibling=%s, ", cpustr);
@@ -1014,22 +1060,23 @@ csched_dump_pcpu(int cpu)
 }
 
 static void
-csched_dump(void)
+csched_dump(struct scheduler *ops)
 {
     struct list_head *iter_sdom, *iter_svc;
+    struct csched_private *prv = CSCHED_PRIV(ops);
     int loop;
 
     printk("info:\n"
            "\tncpus              = %u\n"
            "\tdefault-weight     = %d\n",
-           csched_priv.ncpus,
+           prv->ncpus,
            CSCHED_DEFAULT_WEIGHT);
 
     /* FIXME: Locking! */
 
     printk("active vcpus:\n");
     loop = 0;
-    list_for_each( iter_sdom, &csched_priv.sdom )
+    list_for_each( iter_sdom, &prv->sdom )
     {
         struct csched_dom *sdom;
         sdom = list_entry(iter_sdom, struct csched_dom, sdom_elem);
@@ -1046,42 +1093,49 @@ csched_dump(void)
 }
 
 static void
-make_runq_map(void)
+make_runq_map(struct scheduler *ops)
 {
     int cpu, cpu_count=0;
+    struct csched_private *prv = CSCHED_PRIV(ops);
 
     /* FIXME: Read pcpu layout and do this properly */
     for_each_possible_cpu( cpu )
     {
-        csched_priv.runq_map[cpu] = 0;
+        prv->runq_map[cpu] = 0;
         cpu_count++;
     }
-    csched_priv.runq_count = 1;
+    prv->runq_count = 1;
 
     /* Move to the init code...? */
-    csched_priv.rqd[0].cpu_min = 0;
-    csched_priv.rqd[0].cpu_max = cpu_count;
+    prv->rqd[0].cpu_min = 0;
+    prv->rqd[0].cpu_max = cpu_count;
 }
 
-static void
-csched_init(void)
+static int
+csched_init(struct scheduler *ops, int pool0)
 {
     int i;
+    struct csched_private *prv;
 
     printk("Initializing Credit2 scheduler\n" \
            " WARNING: This is experimental software in development.\n" \
            " Use at your own risk.\n");
 
-    spin_lock_init(&csched_priv.lock);
-    INIT_LIST_HEAD(&csched_priv.sdom);
+    prv = xmalloc(struct csched_private);
+    if ( prv == NULL )
+        return 1;
+    memset(prv, 0, sizeof(*prv));
 
-    csched_priv.ncpus = 0;
+    spin_lock_init(&prv->lock);
+    INIT_LIST_HEAD(&prv->sdom);
 
-    make_runq_map();
+    prv->ncpus = 0;
 
-    for ( i=0; i<csched_priv.runq_count ; i++ )
+    make_runq_map(ops);
+
+    for ( i=0; i<prv->runq_count ; i++ )
     {
-        struct csched_runqueue_data *rqd = csched_priv.rqd + i;
+        struct csched_runqueue_data *rqd = prv->rqd + i;
 
         rqd->max_weight = 1;
         rqd->id = i;
@@ -1096,24 +1150,40 @@ csched_init(void)
         spinlock_t *lock;
 
         /* Point the per-cpu schedule lock to the runq_id lock */
-        runq_id = csched_priv.runq_map[i];
+        runq_id = prv->runq_map[i];
         lock = &per_cpu(schedule_data, runq_id)._lock;
 
         per_cpu(schedule_data, i).schedule_lock = lock;
 
-        csched_priv.ncpus++;
+        prv->ncpus++;
     }
+
+    return 0;
 }
+
+static void
+csched_deinit(struct scheduler *ops)
+{
+    struct csched_private *prv;
+
+    prv = CSCHED_PRIV(ops);
+    if ( prv != NULL )
+        xfree(prv);
+}
+
+
+static struct csched_private _csched_priv;
 
 struct scheduler sched_credit2_def = {
     .name           = "SMP Credit Scheduler rev2",
     .opt_name       = "credit2",
     .sched_id       = XEN_SCHEDULER_CREDIT2,
+    .sched_data     = &_csched_priv,
 
     .init_domain    = csched_dom_init,
     .destroy_domain = csched_dom_destroy,
 
-    .init_vcpu      = csched_vcpu_init,
+    .insert_vcpu    = csched_vcpu_insert,
     .destroy_vcpu   = csched_vcpu_destroy,
 
     .sleep          = csched_vcpu_sleep,
@@ -1128,4 +1198,9 @@ struct scheduler sched_credit2_def = {
     .dump_cpu_state = csched_dump_pcpu,
     .dump_settings  = csched_dump,
     .init           = csched_init,
+    .deinit         = csched_deinit,
+    .alloc_vdata    = csched_alloc_vdata,
+    .free_vdata     = csched_free_vdata,
+    .alloc_domdata  = csched_alloc_domdata,
+    .free_domdata   = csched_free_domdata,
 };

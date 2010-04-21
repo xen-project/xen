@@ -218,6 +218,7 @@ struct domain *domain_create(
     enum { INIT_xsm = 1u<<0, INIT_rangeset = 1u<<1, INIT_evtchn = 1u<<2,
            INIT_gnttab = 1u<<3, INIT_arch = 1u<<4 };
     int init_status = 0;
+    int poolid = CPUPOOLID_NONE;
 
     if ( (d = alloc_domain_struct()) == NULL )
         return NULL;
@@ -282,6 +283,8 @@ struct domain *domain_create(
         if ( grant_table_create(d) != 0 )
             goto fail;
         init_status |= INIT_gnttab;
+
+        poolid = 0;
     }
 
     if ( arch_domain_create(d, domcr_flags) != 0 )
@@ -291,6 +294,9 @@ struct domain *domain_create(
     d->iomem_caps = rangeset_new(d, "I/O Memory", RANGESETF_prettyprint_hex);
     d->irq_caps   = rangeset_new(d, "Interrupts", 0);
     if ( (d->iomem_caps == NULL) || (d->irq_caps == NULL) )
+        goto fail;
+
+    if ( cpupool_add_domain(d, poolid) != 0 )
         goto fail;
 
     if ( sched_init_domain(d) != 0 )
@@ -600,6 +606,8 @@ static void complete_domain_destroy(struct rcu_head *head)
     arch_domain_destroy(d);
 
     rangeset_domain_destroy(d);
+
+    cpupool_rm_domain(d);
 
     sched_destroy_domain(d);
 
