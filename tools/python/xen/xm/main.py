@@ -56,6 +56,7 @@ from xen.util.xmlrpcclient import ServerProxy
 import xen.util.xsm.xsm as security
 from xen.util.xsm.xsm import XSMError
 from xen.util.acmpolicy import ACM_LABEL_UNLABELED_DISPLAY
+from xen.util.sxputils import sxp2map, map2sxp as map_to_sxp
 from xen.util import auxbin
 
 import XenAPI
@@ -238,6 +239,23 @@ SUBCOMMAND_HELP = {
     'tmem-freeable'  :  ('', 'Print freeable tmem (in MiB).'),
     'tmem-shared-auth' :  ('[<Domain>|-a|--all] [--uuid=<uuid>] [--auth=<0|1>]', 'De/authenticate shared tmem pool.'),
 
+    #
+    # pool commands
+    #
+    'pool-create'   :  ('<ConfigFile> [vars]',
+                        'Create a CPU pool based an ConfigFile.'),
+    'pool-new'      :  ('<ConfigFile> [vars]',
+                        'Adds a CPU pool to Xend CPU pool management'),
+    'pool-start'    :  ('<CPU Pool>', 'Starts a Xend CPU pool'),
+    'pool-list'     :  ('[<CPU Pool>] [-l|--long] [-c|--cpus]', 'List CPU pools on host'),
+    'pool-destroy'  :  ('<CPU Pool>', 'Deactivates a CPU pool'),
+    'pool-delete'   :  ('<CPU Pool>',
+                        'Removes a CPU pool from Xend management'),
+    'pool-cpu-add'  :  ('<CPU Pool> <CPU nr>', 'Adds a CPU to a CPU pool'),
+    'pool-cpu-remove': ('<CPU Pool> <CPU nr>', 'Removes a CPU from a CPU pool'),
+    'pool-migrate'  :  ('<Domain> <CPU Pool>',
+                        'Moves a domain into a CPU pool'),
+
     # security
 
     'addlabel'      :  ('<label> {dom <ConfigFile>|res <resource>|mgt <managed domain>} [<policy>]',
@@ -288,6 +306,7 @@ SUBCOMMAND_OPTIONS = {
        ('-l', '--long',         'Output all VM details in SXP'),
        ('', '--label',          'Include security labels'),
        ('', '--state=<state>',  'Select only VMs with the specified state'),
+       ('', '--pool=<pool>',    'Select only VMs in specified cpu pool'),
     ),
     'console': (
        ('-q', '--quiet', 'Do not print an error message if the domain does not exist'),
@@ -348,6 +367,10 @@ SUBCOMMAND_OPTIONS = {
        ('-a', '--all', 'Authenticate for all tmem pools.'),
        ('-u', '--uuid', 'Specify uuid (abcdef01-2345-6789-01234567890abcdef).'),
        ('-A', '--auth', '0=auth,1=deauth'),
+    ),
+    'pool-list': (
+       ('-l', '--long', 'Output all CPU pool details in SXP format'),
+       ('-c', '--cpus', 'Output list of CPUs used by a pool'),
     ),
 }
 
@@ -494,9 +517,21 @@ tmem_commands = [
     "tmem-shared-auth",
     ]
 
+pool_commands = [
+    "pool-create",
+    "pool-new",
+    "pool-start",
+    "pool-list",
+    "pool-destroy",
+    "pool-delete",
+    "pool-cpu-add",
+    "pool-cpu-remove",
+    "pool-migrate",
+    ]
+
 all_commands = (domain_commands + host_commands + scheduler_commands +
                 device_commands + vnet_commands + security_commands +
-                acm_commands + flask_commands + tmem_commands + 
+                acm_commands + flask_commands + tmem_commands + pool_commands +
                 ['shell', 'event-monitor'])
 
 
@@ -890,7 +925,7 @@ def datetime_to_secs(v):
         v = str(v).replace(c, "")
     return time.mktime(time.strptime(v[0:14], '%Y%m%dT%H%M%S'))
 
-def getDomains(domain_names, state, full = 0):
+def getDomains(domain_names, state, full = 0, pool = None):
     if serverType == SERVER_XEN_API:
         doms_sxp = []
         doms_dict = []
@@ -899,6 +934,9 @@ def getDomains(domain_names, state, full = 0):
         dom_metrics_recs = server.xenapi.VM_metrics.get_all_records()
 
         for dom_ref, dom_rec in dom_recs.items():
+            if pool and pool != dom_rec['pool_name']:
+                continue
+
             dom_metrics_rec = dom_metrics_recs[dom_rec['metrics']]
 
             states = ('running', 'blocked', 'paused', 'shutdown',
@@ -939,7 +977,15 @@ def getDomains(domain_names, state, full = 0):
         if domain_names:
             return [server.xend.domain(dom, full) for dom in domain_names]
         else:
-            return server.xend.domains_with_state(True, state, full)
+            doms = server.xend.domains_with_state(True, state, full)
+            if not pool:
+                return doms
+            else:
+                doms_in_pool = []
+                for dom in doms:
+                    if sxp.child_value(dom, 'pool_name', '') == pool:
+                        doms_in_pool.append(dom)
+                return doms_in_pool
 
 
 def xm_list(args):
@@ -947,10 +993,11 @@ def xm_list(args):
     show_vcpus = 0
     show_labels = 0
     state = 'all'
+    pool = None
     try:
         (options, params) = getopt.gnu_getopt(args, 'lv',
                                               ['long','vcpus','label',
-                                               'state='])
+                                               'state=','pool='])
     except getopt.GetoptError, opterr:
         err(opterr)
         usage('list')
@@ -964,10 +1011,16 @@ def xm_list(args):
             show_labels = 1
         if k in ['--state']:
             state = v
+        if k in ['--pool']:
+            pool = v
 
     if state != 'all' and len(params) > 0:
         raise OptionError(
             "You may specify either a state or a particular VM, but not both")
+
+    if pool and len(params) > 0:
+        raise OptionError(
+            "You may specify either a pool or a particular VM, but not both")
 
     if show_vcpus:
         print >>sys.stderr, (
@@ -975,7 +1028,7 @@ def xm_list(args):
         xm_vcpu_list(params)
         return
 
-    doms = getDomains(params, state, use_long)
+    doms = getDomains(params, state, use_long, pool)
 
     if use_long:
         map(PrettyPrint.prettyprint, doms)
@@ -1890,6 +1943,13 @@ def xm_info(args):
             else:
                 return ""
                 
+        def getFreeCpuCount():
+            cnt = 0
+            for host_cpu_record in host_cpu_records:
+                if len(host_cpu_record.get("cpu_pool", [])) == 0:
+                    cnt += 1
+            return cnt
+
         info = {
             "host":              getVal(["name_label"]),
             "release":           getVal(["software_version", "release"]),
@@ -1901,6 +1961,7 @@ def xm_info(args):
             "threads_per_core":  getVal(["cpu_configuration", "threads_per_core"]),
             "cpu_mhz":           getCpuMhz(),
             "hw_caps":           getCpuFeatures(),
+            "free_cpus":         getFreeCpuCount(),
             "total_memory":      int(host_metrics_record["memory_total"])/1024/1024,
             "free_memory":       int(host_metrics_record["memory_free"])/1024/1024,
             "xen_major":         getVal(["software_version", "xen_major"]),
@@ -3529,6 +3590,169 @@ def xm_tmem_shared_auth(args):
     else:
         return server.xend.node.tmem_shared_auth(domid,uuid_str,auth)
 
+def get_pool_ref(name):
+    refs = server.xenapi.cpu_pool.get_by_name_label(name)
+    if len(refs) > 0:
+        return refs[0]
+    else:
+        err('unknown pool name')
+        sys.exit(1)
+
+def xm_pool_start(args):
+    arg_check(args, "pool-start", 1)
+    if serverType == SERVER_XEN_API:
+        ref = get_pool_ref(args[0])
+        server.xenapi.cpu_pool.activate(ref)
+    else:
+        server.xend.cpu_pool.start(args[0])
+
+def brief_pool_list(sxprs):
+    format_str = "%-16s   %3s  %8s       %s          %s"
+    for sxpr in sxprs:
+        if sxpr == sxprs[0]:
+            print "Name               CPUs   Sched     Active   Domain count"
+        record = sxp2map(sxpr)
+        name = record['name_label']
+        sched_policy = record['sched_policy']
+        if record['activated']:
+            cpus = record.get('host_CPU_numbers', [])
+            vms = record.get('started_VM_names', [])
+            if not isinstance(cpus, types.ListType):
+                cpus = [cpus]
+            if not isinstance(vms, types.ListType):
+                vms = [vms]
+            cpu_count = len(cpus)
+            vm_count  = len(vms)
+            active = 'y'
+        else:
+            cpu_count = record['ncpu']
+            vm_count  = 0
+            active = 'n'
+        print format_str % (name, cpu_count, sched_policy, active, vm_count)
+
+def brief_pool_list_cpus(sxprs):
+    format_str = "%-16s %s"
+    for sxpr in sxprs:
+        if sxpr == sxprs[0]:
+            print format_str % ("Name", "CPU list")
+        record = sxp2map(sxpr)
+        name = record['name_label']
+        cpus = ""
+        if record['activated']:
+            cpus = record.get('host_CPU_numbers', [])
+            if isinstance(cpus, types.ListType):
+                cpus.sort()
+                cpus = reduce(lambda x,y: x + "%s," % y, cpus, "")
+                cpus = cpus[0:len(cpus)-1]
+            else:
+                cpus = str(cpus)
+        if len(cpus) == 0:
+            cpus = "-"
+        print format_str % (name, cpus)
+
+def xm_pool_list(args):
+    arg_check(args, "pool-list", 0, 2)
+    try:
+        (options, params) = getopt.gnu_getopt(args, 'lc', ['long','cpus'])
+    except getopt.GetoptError, opterr:
+        err(opterr)
+        usage('pool-list')
+    if len(params) > 1:
+        err("Only one pool name for selection allowed")
+        usage('pool-list')
+
+    use_long = False
+    show_cpus = False
+    for (k, _) in options:
+        if k in ['-l', '--long']:
+            use_long = True
+        if k in ['-c', '--cpus']:
+            show_cpus = True
+
+    if serverType == SERVER_XEN_API:
+        pools = server.xenapi.cpu_pool.get_all_records()
+        cpu_recs = server.xenapi.host_cpu.get_all_records()
+        sxprs = []
+        for pool in pools.values():
+            if pool['name_label'] in params or len(params) == 0:
+                started_VM_names = [['started_VM_names'] + [
+                    server.xenapi.VM.get_name_label(started_VM)
+                    for started_VM in pool['started_VMs'] ] ]
+                host_CPU_numbers = [['host_CPU_numbers'] + [
+                    cpu_recs[cpu_ref]['number']
+                    for cpu_ref in pool['host_CPUs'] ] ]
+                sxpr = [ pool['uuid'] ] + map_to_sxp(pool) + \
+                    host_CPU_numbers + started_VM_names
+                sxprs.append(sxpr)
+    else:
+        sxprs = server.xend.cpu_pool.list(params)
+
+    if len(params) > 0 and len(sxprs) == 0:
+        # pool not found
+        err("Pool '%s' does not exist." % params[0])
+
+    if use_long:
+        for sxpr in sxprs:
+            PrettyPrint.prettyprint(sxpr)
+    elif show_cpus:
+        brief_pool_list_cpus(sxprs)
+    else:
+        brief_pool_list(sxprs)
+
+def xm_pool_destroy(args):
+    arg_check(args, "pool-destroy", 1)
+    if serverType == SERVER_XEN_API:
+        ref = get_pool_ref(args[0])
+        server.xenapi.cpu_pool.deactivate(ref)
+    else:
+        server.xend.cpu_pool.destroy(args[0])
+
+def xm_pool_delete(args):
+    arg_check(args, "pool-delete", 1)
+    if serverType == SERVER_XEN_API:
+        ref = get_pool_ref(args[0])
+        server.xenapi.cpu_pool.destroy(ref)
+    else:
+        server.xend.cpu_pool.delete(args[0])
+
+def xm_pool_cpu_add(args):
+    arg_check(args, "pool-cpu-add", 2)
+    if serverType == SERVER_XEN_API:
+        ref = get_pool_ref(args[0])
+        cpu_ref_list = server.xenapi.host_cpu.get_all_records()
+        cpu_ref = [ c_rec['uuid'] for c_rec in cpu_ref_list.values()
+                                  if c_rec['number'] == args[1] ]
+        if len(cpu_ref) == 0:
+            err('cpu number unknown')
+        else:
+            server.xenapi.cpu_pool.add_host_CPU_live(ref, cpu_ref[0])
+    else:
+        server.xend.cpu_pool.cpu_add(args[0], args[1])
+
+def xm_pool_cpu_remove(args):
+    arg_check(args, "pool-cpu-remove", 2)
+    if serverType == SERVER_XEN_API:
+        ref = get_pool_ref(args[0])
+        cpu_ref_list = server.xenapi.host_cpu.get_all_records()
+        cpu_ref = [ c_rec['uuid'] for c_rec in cpu_ref_list.values()
+                                  if c_rec['number'] ==  args[1] ]
+        if len(cpu_ref) == 0:
+            err('cpu number unknown')
+        else:
+            server.xenapi.cpu_pool.remove_host_CPU_live(ref, cpu_ref[0])
+    else:
+        server.xend.cpu_pool.cpu_remove(args[0], args[1])
+
+def xm_pool_migrate(args):
+    arg_check(args, "pool-migrate", 2)
+    domname = args[0]
+    poolname = args[1]
+    if serverType == SERVER_XEN_API:
+        pool_ref = get_pool_ref(poolname)
+        server.xenapi.VM.cpu_pool_migrate(get_single_vm(domname), pool_ref)
+    else:
+        server.xend.cpu_pool.migrate(domname, poolname)
+
 
 commands = {
     "shell": xm_shell,
@@ -3615,6 +3839,14 @@ commands = {
     "usb-list-assignable-devices": xm_usb_list_assignable_devices,
     "usb-hc-create": xm_usb_hc_create,
     "usb-hc-destroy": xm_usb_hc_destroy,
+    # pool
+    "pool-start": xm_pool_start,
+    "pool-list": xm_pool_list,
+    "pool-destroy": xm_pool_destroy,
+    "pool-delete": xm_pool_delete,
+    "pool-cpu-add": xm_pool_cpu_add,
+    "pool-cpu-remove": xm_pool_cpu_remove,
+    "pool-migrate": xm_pool_migrate,
     # tmem
     "tmem-thaw": xm_tmem_thaw,
     "tmem-freeze": xm_tmem_freeze,
@@ -3646,6 +3878,8 @@ IMPORTED_COMMANDS = [
     'resetpolicy',
     'getenforce',
     'setenforce',
+    'pool-create',
+    'pool-new',
     ]
 
 for c in IMPORTED_COMMANDS:

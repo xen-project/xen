@@ -43,6 +43,7 @@ from XendStateStore import XendStateStore
 from XendMonitor import XendMonitor
 from XendPPCI import XendPPCI
 from XendPSCSI import XendPSCSI, XendPSCSI_HBA
+from xen.xend.XendCPUPool import XendCPUPool
 
 class XendNode:
     """XendNode - Represents a Domain 0 Host."""
@@ -158,6 +159,8 @@ class XendNode:
         self._init_PPCIs()
 
         self._init_PSCSIs()
+
+        self._init_cpu_pools()
 
 
     def _init_networks(self):
@@ -360,6 +363,18 @@ class XendNode:
 
         for physical_host, pscsi_HBA_uuid in pscsi_HBA_table.items():
             XendPSCSI_HBA(pscsi_HBA_uuid, {'physical_host': physical_host})
+
+    def _init_cpu_pools(self):
+        # Initialise cpu_pools
+        saved_cpu_pools = self.state_store.load_state(XendCPUPool.getClass())
+        if saved_cpu_pools:
+            for cpu_pool_uuid, cpu_pool in saved_cpu_pools.items():
+                try:
+                    XendCPUPool.recreate(cpu_pool, cpu_pool_uuid)
+                except CreateUnspecifiedAttributeError:
+                    log.warn("Error recreating %s %s",
+                             (XendCPUPool.getClass(), cpu_pool_uuid))
+        XendCPUPool.recreate_active_pools()
 
 
     def add_network(self, interface):
@@ -581,6 +596,7 @@ class XendNode:
         self.save_PPCIs()
         self.save_PSCSIs()
         self.save_PSCSI_HBAs()
+        self.save_cpu_pools()
 
     def save_PIFs(self):
         pif_records = dict([(pif_uuid, XendAPIStore.get(
@@ -622,6 +638,12 @@ class XendNode:
                                       pscsi_HBA_uuid, "PSCSI_HBA").get_record())
                                 for pscsi_HBA_uuid in XendPSCSI_HBA.get_all()])
         self.state_store.save_state('pscsi_HBA', pscsi_HBA_records)
+
+    def save_cpu_pools(self):
+        cpu_pool_records = dict([(cpu_pool_uuid, XendAPIStore.get(
+                    cpu_pool_uuid, XendCPUPool.getClass()).get_record())
+                    for cpu_pool_uuid in XendCPUPool.get_all_managed()])
+        self.state_store.save_state(XendCPUPool.getClass(), cpu_pool_records)
 
     def shutdown(self):
         return 0
@@ -925,6 +947,7 @@ class XendNode:
         # physinfo is in KiB, need it in MiB
         info['total_memory'] = info['total_memory'] / 1024
         info['free_memory']  = info['free_memory'] / 1024
+        info['free_cpus'] = len(XendCPUPool.unbound_cpus())
 
         ITEM_ORDER = ['nr_cpus',
                       'nr_nodes',
@@ -935,6 +958,7 @@ class XendNode:
                       'virt_caps',
                       'total_memory',
                       'free_memory',
+                      'free_cpus',
                       ]
 
         if show_numa != 0:

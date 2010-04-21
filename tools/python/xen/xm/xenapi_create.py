@@ -310,6 +310,8 @@ class xenapi_create:
                 get_child_nodes_as_dict(vm, "platform", "key", "value"),
             "other_config":
                 get_child_nodes_as_dict(vm, "other_config", "key", "value"),
+            "pool_name":
+                vm.attributes["pool_name"].value,
             "PV_bootloader":
                 "",
             "PV_kernel":
@@ -696,6 +698,8 @@ class sxp2xml:
             = str(get_child_by_name(config, "s3_integrity", 0))
         vm.attributes["superpages"] \
             = str(get_child_by_name(config, "superpages", 0))
+        vm.attributes["pool_name"] \
+            = str(get_child_by_name(config, "pool_name", "Pool-0"))
 
         sec_data = get_child_by_name(config, "security")
         if sec_data:

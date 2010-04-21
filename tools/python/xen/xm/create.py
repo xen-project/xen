@@ -659,6 +659,10 @@ gopts.var('suppress_spurious_page_faults', val='yes|no',
           fn=set_bool, default=None,
           use="""Do not inject spurious page faults into this guest""")
 
+gopts.var('pool', val='POOL NAME',
+          fn=set_value, default=None,
+          use="""CPU pool to use for the VM""")
+
 gopts.var('pci_msitranslate', val='TRANSLATE',
           fn=set_int, default=1,
           use="""Global PCI MSI-INTx translation flag (0=disable;
@@ -1147,6 +1151,8 @@ def make_config(vals):
         config.append(['localtime', vals.localtime])
     if vals.oos:
         config.append(['oos', vals.oos])
+    if vals.pool:
+        config.append(['pool_name', vals.pool])
 
     config_image = configure_image(vals)
     if vals.bootloader:

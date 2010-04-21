@@ -33,6 +33,7 @@ from xen.xend.XendClient import XML_RPC_SOCKET
 from xen.xend.XendConstants import DOM_STATE_RUNNING
 from xen.xend.XendLogging import log
 from xen.xend.XendError import XendInvalidDomain
+from xen.xend.XendCPUPool import XendCPUPool
 
 # vcpu_avail is a long and is not needed by the clients.  It's far easier
 # to just remove it then to try and marshal the long.
@@ -97,6 +98,10 @@ methods = ['device_create', 'device_configure',
            'getRestartCount', 'getBlockDeviceClass']
 
 exclude = ['domain_create', 'domain_restore']
+
+POOL_FUNCS = ['pool_create', 'pool_new', 'pool_start', 'pool_list',
+              'pool_destroy', 'pool_delete', 'pool_cpu_add', 'pool_cpu_remove',
+              'pool_migrate']
 
 class XMLRPCServer:
     def __init__(self, auth, use_xenapi, use_tcp = False,
@@ -196,6 +201,11 @@ class XMLRPCServer:
             if name.startswith("domain_") and callable(fn):
                 if name not in exclude:
                     self.server.register_function(fn, "xend.domain.%s" % name[7:])
+
+        # Functions in XendPool
+        for name in POOL_FUNCS:
+            fn = getattr(XendCPUPool, name)
+            self.server.register_function(fn, "xend.cpu_pool.%s" % name[5:])
 
         # Functions in XendNode and XendDmesg
         for type, lst, n in [(XendNode,

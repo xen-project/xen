@@ -128,6 +128,7 @@ XENAPI_CFG_TO_LEGACY_CFG = {
     'PV_bootloader': 'bootloader',
     'PV_bootloader_args': 'bootloader_args',
     'Description': 'description',
+    'pool_name' : 'pool_name',
 }
 
 LEGACY_CFG_TO_XENAPI_CFG = reverse_dict(XENAPI_CFG_TO_LEGACY_CFG)
@@ -233,6 +234,7 @@ XENAPI_CFG_TYPES = {
     's3_integrity' : int,
     'superpages' : int,
     'memory_sharing': int,
+    'pool_name' : str,
     'Description': str,
 }
 
@@ -279,6 +281,7 @@ LEGACY_CFG_TYPES = {
     'bootloader':    str,
     'bootloader_args': str,
     'description':   str,
+    'pool_name':     str,
 }
 
 # Values that should be stored in xenstore's /vm/<uuid> that is used
@@ -300,6 +303,7 @@ LEGACY_XENSTORE_VM_PARAMS = [
     'on_xend_stop',
     'bootloader',
     'bootloader_args',
+    'pool_name',
 ]
 
 ##
@@ -408,6 +412,7 @@ class XendConfig(dict):
             'other_config': {},
             'platform': {},
             'target': 0,
+            'pool_name' : 'Pool-0',
             'superpages': 0,
             'description': '',
         }

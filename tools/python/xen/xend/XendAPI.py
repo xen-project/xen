@@ -51,6 +51,7 @@ from XendDPCI import XendDPCI
 from XendPSCSI import XendPSCSI, XendPSCSI_HBA
 from XendDSCSI import XendDSCSI, XendDSCSI_HBA
 from XendXSPolicy import XendXSPolicy, XendACMPolicy
+from xen.xend.XendCPUPool import XendCPUPool
 
 from XendAPIConstants import *
 from xen.util.xmlrpclib2 import stringify
@@ -498,6 +499,7 @@ classes = {
     'PSCSI_HBA'    : valid_object("PSCSI_HBA"),
     'DSCSI'        : valid_object("DSCSI"),
     'DSCSI_HBA'    : valid_object("DSCSI_HBA"),
+    'cpu_pool'     : valid_object("cpu_pool"),
 }
 
 autoplug_classes = {
@@ -514,6 +516,7 @@ autoplug_classes = {
     'DSCSI_HBA'   : XendDSCSI_HBA,
     'XSPolicy'    : XendXSPolicy,
     'ACMPolicy'   : XendACMPolicy,
+    'cpu_pool'    : XendCPUPool,
 }
 
 class XendAPI(object):
@@ -914,7 +917,8 @@ class XendAPI(object):
                     'API_version_minor',
                     'API_version_vendor',
                     'API_version_vendor_implementation',
-                    'enabled']
+                    'enabled',
+                    'resident_cpu_pools']
     
     host_attr_rw = ['name_label',
                     'name_description',
@@ -1014,6 +1018,8 @@ class XendAPI(object):
         return xen_api_todo()
     def host_get_logging(self, _, host_ref):
         return xen_api_todo()
+    def host_get_resident_cpu_pools(self, _, host_ref):
+        return xen_api_success(XendCPUPool.get_all())
 
     # object methods
     def host_disable(self, session, host_ref):
@@ -1076,7 +1082,9 @@ class XendAPI(object):
                   'PBDs': XendPBD.get_all(),
                   'PPCIs': XendPPCI.get_all(),
                   'PSCSIs': XendPSCSI.get_all(),
-                  'PSCSI_HBAs': XendPSCSI_HBA.get_all()}
+                  'PSCSI_HBAs': XendPSCSI_HBA.get_all(),
+                  'resident_cpu_pools': XendCPUPool.get_all(),
+                 }
         return xen_api_success(record)
 
     def host_tmem_thaw(self, _, host_ref, cli_id):
@@ -1185,7 +1193,10 @@ class XendAPI(object):
                         'stepping',
                         'flags',
                         'utilisation',
-                        'features']
+                        'features',
+                        'cpu_pool']
+
+    host_cpu_funcs  = [('get_unassigned_cpus', 'Set(host_cpu)')]
 
     # attributes
     def _host_cpu_get(self, ref, field):
@@ -1210,21 +1221,28 @@ class XendAPI(object):
         return self._host_cpu_get(ref, 'flags')
     def host_cpu_get_utilisation(self, _, ref):
         return xen_api_success(XendNode.instance().get_host_cpu_load(ref))
+    def host_cpu_get_cpu_pool(self, _, ref):
+        return xen_api_success(XendCPUPool.get_cpu_pool_by_cpu_ref(ref))
 
     # object methods
     def host_cpu_get_record(self, _, ref):
         node = XendNode.instance()
         record = dict([(f, node.get_host_cpu_field(ref, f))
                        for f in self.host_cpu_attr_ro
-                       if f not in ['uuid', 'host', 'utilisation']])
+                       if f not in ['uuid', 'host', 'utilisation', 'cpu_pool']])
         record['uuid'] = ref
         record['host'] = node.uuid
         record['utilisation'] = node.get_host_cpu_load(ref)
+        record['cpu_pool'] = XendCPUPool.get_cpu_pool_by_cpu_ref(ref)
         return xen_api_success(record)
 
     # class methods
     def host_cpu_get_all(self, session):
         return xen_api_success(XendNode.instance().get_host_cpu_refs())
+    def host_cpu_get_unassigned_cpus(self, session):
+        return xen_api_success(
+            [ref for ref in XendNode.instance().get_host_cpu_refs()
+                 if len(XendCPUPool.get_cpu_pool_by_cpu_ref(ref)) == 0])
 
 
     # Xen API: Class host_metrics
@@ -1284,6 +1302,7 @@ class XendAPI(object):
                   'is_control_domain',
                   'metrics',
                   'crash_dumps',
+                  'cpu_pool',
                   ]
                   
     VM_attr_rw = ['name_label',
@@ -1312,7 +1331,9 @@ class XendAPI(object):
                   'platform',
                   'PCI_bus',
                   'other_config',
-                  'security_label']
+                  'security_label',
+                  'pool_name',
+                  ]
 
     VM_methods = [('clone', 'VM'),
                   ('start', None),
@@ -1340,7 +1361,9 @@ class XendAPI(object):
                   ('set_memory_dynamic_min_live', None),
                   ('send_trigger', None),
                   ('migrate', None),
-                  ('destroy', None)]
+                  ('destroy', None),
+                  ('cpu_pool_migrate', None),
+                  ]
     
     VM_funcs  = [('create', 'VM'),
                  ('restore', None),
@@ -1540,6 +1563,17 @@ class XendAPI(object):
         return xen_api_success(
             xd.get_vm_by_uuid(vm_ref) == xd.privilegedDomain())
 
+    def VM_get_cpu_pool(self, session, vm_ref):
+        dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
+        pool_ref = XendCPUPool.query_pool_ref(dom.get_cpu_pool())
+        return xen_api_success(pool_ref)
+
+    def VM_get_pool_name(self, session, vm_ref):
+        return self.VM_get('pool_name', session, vm_ref)
+
+    def VM_set_pool_name(self, session, vm_ref, value):
+        return self.VM_set('pool_name', session, vm_ref, value)
+
     def VM_set_name_label(self, session, vm_ref, label):
         dom = XendDomain.instance().get_vm_by_uuid(vm_ref)
         dom.setName(label)
@@ -1618,7 +1652,8 @@ class XendAPI(object):
             if key.startswith("cpumap"):
                 vcpu = int(key[6:])
                 try:
-                    xendom.domain_pincpu(xeninfo.getDomid(), vcpu, value)
+                    cpus = map(int, value.split(","))
+                    xendom.domain_pincpu(xeninfo.getDomid(), vcpu, cpus)
                 except Exception, ex:
                     log.exception(ex)
 
@@ -1834,7 +1869,9 @@ class XendAPI(object):
             'is_control_domain': xeninfo.info['is_control_domain'],
             'metrics': xeninfo.get_metrics(),
             'security_label': xeninfo.get_security_label(),
-            'crash_dumps': []
+            'crash_dumps': [],
+            'pool_name': xeninfo.info.get('pool_name'),
+            'cpu_pool' : XendCPUPool.query_pool_ref(xeninfo.get_cpu_pool()),
         }
         return xen_api_success(record)
 
@@ -1930,6 +1967,25 @@ class XendAPI(object):
     def VM_restore(self, _, src, paused):
         xendom = XendDomain.instance()
         xendom.domain_restore(src, bool(paused))
+        return xen_api_success_void()
+
+    def VM_cpu_pool_migrate(self, session, vm_ref, cpu_pool_ref):
+        xendom = XendDomain.instance()
+        xeninfo = xendom.get_vm_by_uuid(vm_ref)
+        domid = xeninfo.getDomid()
+        pool = XendAPIStore.get(cpu_pool_ref, XendCPUPool.getClass())
+        if pool == None:
+            return xen_api_error(['HANDLE_INVALID', 'cpu_pool', cpu_pool_ref])
+        if domid is not None:
+            if domid == 0:
+                return xen_api_error(['OPERATION_NOT_ALLOWED',
+                    'could not move Domain-0'])
+            try:
+                XendCPUPool.move_domain(cpu_pool_ref, domid)
+            except Exception, ex:
+                return xen_api_error(['INTERNAL_ERROR',
+                    'could not move domain'])
+        self.VM_set('pool_name', session, vm_ref, pool.get_name_label())
         return xen_api_success_void()
 
 

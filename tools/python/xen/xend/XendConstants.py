@@ -133,6 +133,8 @@ VTPM_DELETE_SCRIPT = auxbin.scripts_dir() + '/vtpm-delete'
 
 XS_VMROOT = "/vm/"
 
+XS_POOLROOT = "/local/pool/"
+
 NR_PCI_FUNC = 8
 NR_PCI_DEV = 32
 NR_PCI_DEVFN = NR_PCI_FUNC * NR_PCI_DEV

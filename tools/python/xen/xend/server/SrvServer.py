@@ -52,6 +52,7 @@ from xen.xend import XendNode, XendOptions, XendAPI
 from xen.xend.XendLogging import log
 from xen.xend.XendClient import XEN_API_SOCKET
 from xen.xend.XendDomain import instance as xenddomain
+from xen.xend.XendCPUPool import XendCPUPool
 from xen.web.SrvDir import SrvDir
 
 from SrvRoot import SrvRoot
@@ -145,6 +146,12 @@ class XendServers:
                 status.write('0')
                 status.close()
                 status = None
+
+            # auto start pools before domains are started
+            try:
+                XendCPUPool.autostart_pools()
+            except Exception, e:
+                log.exception("Failed while autostarting pools")
 
             # Reaching this point means we can auto start domains
             try:

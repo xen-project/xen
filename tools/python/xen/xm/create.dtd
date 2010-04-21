@@ -50,6 +50,7 @@
                  s3_integrity           CDATA #REQUIRED
                  vcpus_max              CDATA #REQUIRED
                  vcpus_at_startup       CDATA #REQUIRED
+                 pool_name              CDATA #REQUIRED
                  actions_after_shutdown %NORMAL_EXIT; #REQUIRED 
                  actions_after_reboot   %NORMAL_EXIT; #REQUIRED
                  actions_after_crash    %CRASH_BEHAVIOUR; #REQUIRED

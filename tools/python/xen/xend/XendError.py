@@ -18,6 +18,7 @@
 
 from xmlrpclib import Fault
 
+import types
 import XendClient
 
 class XendInvalidDomain(Fault):
@@ -185,6 +186,26 @@ class DirectPCIError(XendAPIError):
 
     def __str__(self):
         return 'DIRECT_PCI_ERROR: %s' % self.error
+
+class PoolError(XendAPIError):
+    def __init__(self, error, spec=None):
+        XendAPIError.__init__(self)
+        self.spec = []
+        if spec:
+            if isinstance(spec, types.ListType):
+                self.spec = spec
+            else:
+                self.spec = [spec]
+        self.error = error
+
+    def get_api_error(self):
+        return [self.error] + self.spec
+
+    def __str__(self):
+        if self.spec:
+            return '%s: %s' % (self.error, self.spec)
+        else:
+            return '%s' % self.error
 
 class VDIError(XendAPIError):
     def __init__(self, error, vdi):

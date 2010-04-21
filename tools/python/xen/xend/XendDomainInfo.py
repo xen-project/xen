@@ -32,11 +32,12 @@ import re
 import copy
 import os
 import stat
+import shutil
 import traceback
 from types import StringTypes
 
 import xen.lowlevel.xc
-from xen.util import asserts, auxbin
+from xen.util import asserts, auxbin, mkdir
 from xen.util.blkif import blkdev_uname_to_file, blkdev_uname_to_taptype
 import xen.util.xsm.xsm as security
 from xen.util import xsconstants
@@ -60,6 +61,7 @@ from xen.xend.xenstore.xsutil import GetDomainPath, IntroduceDomain, SetTarget, 
 from xen.xend.xenstore.xswatch import xswatch
 from xen.xend.XendConstants import *
 from xen.xend.XendAPIConstants import *
+from xen.xend.XendCPUPool import XendCPUPool
 from xen.xend.server.DevConstants import xenbusState
 from xen.xend.server.BlktapController import TAPDISK_DEVICE, parseDeviceString
 
@@ -2540,6 +2542,19 @@ class XendDomainInfo:
         oos = self.info['platform'].get('oos', 1)
         oos_off = 1 - int(oos)
 
+        # look-up pool id to use
+        pool_name = self.info['pool_name']
+        if len(pool_name) == 0:
+            pool_name = "Pool-0"
+
+        pool = XendCPUPool.lookup_pool(pool_name)
+
+        if pool is None:
+            raise VmError("unknown pool %s" % pool_name)
+        pool_id = pool.query_pool_id()
+        if pool_id is None:
+            raise VmError("pool %s not activated" % pool_name)
+
         flags = (int(hvm) << 0) | (int(hap) << 1) | (int(s3_integrity) << 2) | (int(oos_off) << 3)
 
         try:
@@ -2548,6 +2563,7 @@ class XendDomainInfo:
                 ssidref = ssidref,
                 handle = uuid.fromString(self.info['uuid']),
                 flags = flags,
+                #cpupool = pool_id,
                 target = self.info.target())
         except Exception, e:
             # may get here if due to ACM the operation is not permitted
@@ -2560,6 +2576,11 @@ class XendDomainInfo:
             if self.domid:
                 failmsg += ', error=%i' % int(self.domid)
             raise VmError(failmsg)
+
+        try:
+            xc.cpupool_movedomain(pool_id, self.domid)
+        except Exception, e:
+            raise VmError('Moving domain to target pool failed')
 
         self.dompath = GetDomainPath(self.domid)
 
@@ -3585,6 +3606,11 @@ class XendDomainInfo:
 
         retval = xc.sched_credit_domain_get(self.getDomid())
         return retval
+    def get_cpu_pool(self):
+        if self.getDomid() is None:
+            return None
+        xeninfo = dom_get(self.domid)
+        return xeninfo['cpupool']
     def get_power_state(self):
         return XEN_API_VM_POWER_STATE[self._stateGet()]
     def get_platform(self):
