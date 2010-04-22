@@ -203,6 +203,14 @@ static int setup_guest(int xc_handle,
         if ( count > max_pages )
             count = max_pages;
         
+        /* Take care the corner cases of super page tails */
+        if ( ((cur_pages & (SUPERPAGE_1GB_NR_PFNS-1)) != 0) &&
+             (count > (-cur_pages & (SUPERPAGE_1GB_NR_PFNS-1))) )
+            count = -cur_pages & (SUPERPAGE_1GB_NR_PFNS-1);
+        else if ( ((count & (SUPERPAGE_1GB_NR_PFNS-1)) != 0) &&
+                  (count > SUPERPAGE_1GB_NR_PFNS) )
+            count &= ~(SUPERPAGE_1GB_NR_PFNS - 1);
+
         /* Attemp to allocate 1GB super page. Because in each pass we only
          * allocate at most 1GB, we don't have to clip super page boundaries.
          */
