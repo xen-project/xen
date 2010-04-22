@@ -2421,3 +2421,16 @@ int libxl_set_vcpucount(struct libxl_ctx *ctx, uint32_t domid, uint32_t count)
     }
     return 0;
 }
+
+/*
+ * returns one of the XEN_SCHEDULER_* constants from public/domctl.h
+ * or -1 if an error occured.
+ */
+int libxl_get_sched_id(struct libxl_ctx *ctx)
+{
+    int sched, ret;
+
+    if ((ret = xc_sched_id(ctx->xch, &sched)) != 0)
+        return ret;
+    return sched;
+}
