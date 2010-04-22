@@ -2408,8 +2408,13 @@ class XendDomainInfo:
 
     def _releaseDevices(self, suspend = False):
         """Release all domain's devices.  Nothrow guarantee."""
+        t = xstransact("%s/device" % self.vmpath)
         if self.image:
             try:
+                for dev in t.list('tap'):
+                    log.debug("Early removing %s", dev);
+                    self.getDeviceController('tap').destroyDevice(dev, True)
+                time.sleep(0.1)
                 log.debug("Destroying device model")
                 self.image.destroyDeviceModel()
             except Exception, e:
@@ -2418,9 +2423,10 @@ class XendDomainInfo:
             log.debug("No device model")
 
         log.debug("Releasing devices")
-        t = xstransact("%s/device" % self.vmpath)
         try:
             for devclass in XendDevices.valid_devices():
+                if devclass is 'tap':
+                    continue
                 for dev in t.list(devclass):
                     try:
                         log.debug("Removing %s", dev);
