@@ -41,6 +41,21 @@ struct libxl_vminfo {
     uint32_t domid;
 };
 
+typedef struct {
+    int xen_version_major;
+    int xen_version_minor;
+    char *xen_version_extra;
+    char *compiler;
+    char *compile_by;
+    char *compile_domain;
+    char *compile_date;
+    char *capabilities;
+    char *changeset;
+    unsigned long virt_start;
+    unsigned long pagesize;
+    char *commandline;
+} libxl_version_info;
+
 struct libxl_ctx {
     int xch;
     struct xs_handle *xsh;
@@ -56,7 +71,10 @@ struct libxl_ctx {
      * set this after libxl_init and before any other call - or
      * may leave them untouched */
     int (*waitpid_instead)(pid_t pid, int *status, int flags);
+    libxl_version_info version_info;
 };
+
+const libxl_version_info* libxl_get_version_info(struct libxl_ctx *ctx);
 
 typedef struct {
     bool hvm;

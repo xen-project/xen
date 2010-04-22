@@ -45,6 +45,7 @@ int libxl_ctx_init(struct libxl_ctx *ctx, int version)
     ctx->alloc_ptrs = calloc(ctx->alloc_maxsize, sizeof(void *));
     if (!ctx->alloc_ptrs)
         return ERROR_NOMEM;
+    memset(&ctx->version_info, 0, sizeof(libxl_version_info));
 
     ctx->xch = xc_interface_open();
     if (ctx->xch == -1) {
@@ -2349,6 +2350,51 @@ int libxl_get_physinfo(struct libxl_ctx *ctx, struct libxl_physinfo *physinfo)
     physinfo->phys_cap = xcphysinfo.capabilities;
 
     return 0;
+}
+
+const libxl_version_info* libxl_get_version_info(struct libxl_ctx *ctx)
+{
+    union {
+        xen_extraversion_t xen_extra;
+        xen_compile_info_t xen_cc;
+        xen_changeset_info_t xen_chgset;
+        xen_capabilities_info_t xen_caps;
+        xen_platform_parameters_t p_parms;
+        xen_commandline_t xen_commandline;
+    } u;
+    long xen_version;
+    libxl_version_info *info = &ctx->version_info;
+
+    if (info->xen_version_extra != NULL)
+        return info;
+
+    xen_version = xc_version(ctx->xch, XENVER_version, NULL);
+    info->xen_version_major = xen_version >> 16;
+    info->xen_version_minor = xen_version & 0xFF;
+    xc_version(ctx->xch, XENVER_extraversion, &u.xen_extra);
+    info->xen_version_extra = libxl_sprintf(ctx, "%s", u.xen_extra);
+
+    xc_version(ctx->xch, XENVER_compile_info, &u.xen_cc);
+    info->compiler = libxl_sprintf(ctx, "%s", u.xen_cc.compiler);
+    info->compile_by = libxl_sprintf(ctx, "%s", u.xen_cc.compile_by);
+    info->compile_domain = libxl_sprintf(ctx, "%s", u.xen_cc.compile_domain);
+    info->compile_date = libxl_sprintf(ctx, "%s", u.xen_cc.compile_date);
+
+    xc_version(ctx->xch, XENVER_capabilities, &u.xen_caps);
+    info->capabilities = libxl_sprintf(ctx, "%s", u.xen_caps);
+
+    xc_version(ctx->xch, XENVER_changeset, &u.xen_chgset);
+    info->changeset = libxl_sprintf(ctx, "%s", u.xen_chgset);
+
+    xc_version(ctx->xch, XENVER_platform_parameters, &u.p_parms);
+    info->virt_start = u.p_parms.virt_start;
+
+    info->pagesize = xc_version(ctx->xch, XENVER_pagesize, NULL);
+
+    xc_version(ctx->xch, XENVER_commandline, &u.xen_commandline);
+    info->commandline = libxl_sprintf(ctx, "%s", u.xen_commandline);
+
+    return info;
 }
 
 struct libxl_vcpuinfo *libxl_list_vcpu(struct libxl_ctx *ctx, uint32_t domid,
