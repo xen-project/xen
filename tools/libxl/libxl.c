@@ -2344,6 +2344,10 @@ int libxl_get_physinfo(struct libxl_ctx *ctx, struct libxl_physinfo *physinfo)
     physinfo->total_pages = xcphysinfo.total_pages;
     physinfo->free_pages = xcphysinfo.free_pages;
     physinfo->scrub_pages = xcphysinfo.scrub_pages;
+    physinfo->nr_nodes = xcphysinfo.nr_nodes;
+    memcpy(physinfo->hw_cap,xcphysinfo.hw_cap, sizeof(physinfo->hw_cap));
+    physinfo->phys_cap = xcphysinfo.capabilities;
+
     return 0;
 }
 

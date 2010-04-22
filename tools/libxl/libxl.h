@@ -426,6 +426,10 @@ struct libxl_physinfo {
     uint64_t total_pages;
     uint64_t free_pages;
     uint64_t scrub_pages;
+
+    uint32_t nr_nodes;
+    uint32_t hw_cap[8];
+    uint32_t phys_cap;
 };
 
 int libxl_get_physinfo(struct libxl_ctx *ctx, struct libxl_physinfo *physinfo);
