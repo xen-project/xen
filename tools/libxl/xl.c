@@ -30,6 +30,7 @@
 #include <sys/socket.h>
 #include <sys/select.h>
 #include <arpa/inet.h>
+#include <sys/utsname.h> /* for utsname in xl info */
 #include <xenctrl.h>
 #include <ctype.h>
 #include <inttypes.h>
@@ -2636,6 +2637,117 @@ int main_vcpuset(int argc, char **argv)
     exit(0);
 }
 
+static void output_xeninfo(void)
+{
+    const libxl_version_info *info;
+    int sched_id;
+
+    info = libxl_get_version_info(&ctx);
+    if ((sched_id = libxl_get_sched_id(&ctx)) < 0) {
+        fprintf(stderr, "get_sched_id sysctl failed.\n");
+        return;
+    }
+
+    printf("xen_major              : %d\n", info->xen_version_major);
+    printf("xen_minor              : %d\n", info->xen_version_minor);
+    printf("xen_extra              : %s\n", info->xen_version_extra);
+    printf("xen_caps               : %s\n", info->capabilities);
+    printf("xen_scheduler          : %s\n",
+        sched_id == XEN_SCHEDULER_SEDF ? "sedf" :
+        sched_id == XEN_SCHEDULER_CREDIT ? "credit" :
+        sched_id == XEN_SCHEDULER_CREDIT2 ? "credit2" : "unknown");
+    printf("xen_pagesize           : %lu\n", info->pagesize);
+    printf("platform_params        : virt_start=0x%lx\n", info->virt_start);
+    printf("xen_changeset          : %s\n", info->changeset);
+    printf("xen_commandline        : %s\n", info->commandline);
+    printf("cc_compiler            : %s\n", info->compiler);
+    printf("cc_compile_by          : %s\n", info->compile_by);
+    printf("cc_compile_domain      : %s\n", info->compile_domain);
+    printf("cc_compile_date        : %s\n", info->compile_date);
+
+    return;
+}
+
+static void output_nodeinfo(void)
+{
+    struct utsname utsbuf;
+
+    uname(&utsbuf);
+
+    printf("host                   : %s\n", utsbuf.nodename);
+    printf("release                : %s\n", utsbuf.release);
+    printf("version                : %s\n", utsbuf.version);
+    printf("machine                : %s\n", utsbuf.machine);
+
+    return;
+}
+
+static void output_physinfo(void)
+{
+    struct libxl_physinfo info;
+    const libxl_version_info *vinfo;
+    unsigned int i;
+
+    if (libxl_get_physinfo(&ctx, &info) != 0) {
+        fprintf(stderr, "libxl_physinfo failed.\n");
+        return;
+    }
+
+    printf("nr_cpus                : %d\n", info.nr_cpus);
+    printf("nr_nodes               : %d\n", info.nr_nodes);
+    printf("cores_per_socket       : %d\n", info.cores_per_socket);
+    printf("threads_per_core       : %d\n", info.threads_per_core);
+    printf("cpu_mhz                : %d\n", info.cpu_khz / 1000);
+    printf("hw_caps                : ");
+    for (i = 0; i < 8; i++)
+        printf("%08x%c", info.hw_cap[i], i < 7 ? ':' : '\n');
+    printf("virt_caps              :");
+    if (info.phys_cap & XEN_SYSCTL_PHYSCAP_hvm)
+        printf(" hvm");
+    if (info.phys_cap & XEN_SYSCTL_PHYSCAP_hvm_directio)
+        printf(" hvm_directio");
+    printf("\n");
+    vinfo = libxl_get_version_info(&ctx);
+    i = (1 << 20) / vinfo->pagesize;
+    printf("total_memory           : %lu\n", info.total_pages / i);
+    printf("free_memory            : %lu\n", info.free_pages / i);
+
+    return;
+}
+
+void info(int verbose)
+{
+    output_nodeinfo();
+
+    output_physinfo();
+
+    output_xeninfo();
+
+    printf("xend_config_format     : 4\n");
+
+    return;
+}
+
+void main_info(int argc, char **argv)
+{
+    int opt, verbose;
+
+    verbose = 0;
+    while ((opt = getopt(argc, argv, "h")) != -1) {
+        switch (opt) {
+        case 'h':
+            help("vcpu-list");
+            exit(0);
+        default:
+            fprintf(stderr, "option `%c' not supported.\n", opt);
+            break;
+        }
+    }
+
+    info(verbose);
+    exit(0);
+}
+
 int main(int argc, char **argv)
 {
     if (argc < 2) {
@@ -2696,6 +2808,8 @@ int main(int argc, char **argv)
         main_vcpupin(argc - 1, argv + 1);
     } else if (!strcmp(argv[1], "vcpu-set")) {
         main_vcpuset(argc - 1, argv + 1);
+    } else if (!strcmp(argv[1], "info")) {
+        main_info(argc - 1, argv + 1);
     } else if (!strcmp(argv[1], "help")) {
         if (argc > 2)
             help(argv[2]);
