@@ -1171,8 +1171,8 @@ class XendConfig(dict):
                                     config.append(['VDI', dev_cfg.get('VDI', '')])
 
                                 sxpr.append(['device', config])
+                                found = True
 
-                            found = True
                         except:
                             log.exception("dumping sxp from device controllers")
                             pass
