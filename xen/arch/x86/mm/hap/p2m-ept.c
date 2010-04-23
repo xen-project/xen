@@ -29,6 +29,8 @@
 #include <xen/iommu.h>
 #include <asm/mtrr.h>
 #include <asm/hvm/cacheattr.h>
+#include <xen/keyhandler.h>
+#include <xen/softirq.h>
 
 /* Non-ept "lock-and-check" wrapper */
 static int ept_pod_check_and_populate(struct domain *d, unsigned long gfn,
@@ -723,6 +725,77 @@ void ept_p2m_init(struct domain *d)
     d->arch.p2m->get_entry = ept_get_entry;
     d->arch.p2m->get_entry_current = ept_get_entry_current;
     d->arch.p2m->change_entry_type_global = ept_change_entry_type_global;
+}
+
+static void ept_dump_p2m_table(unsigned char key)
+{
+    struct domain *d;
+    ept_entry_t *table, *ept_entry;
+    mfn_t mfn;
+    int order;
+    int i;
+    int is_pod;
+    int ret;
+    unsigned long index;
+    unsigned long gfn, gfn_remainder;
+    unsigned long record_counter = 0;
+
+    for_each_domain(d)
+    {
+        if ( !(is_hvm_domain(d) && d->arch.hvm_domain.hap_enabled) )
+            continue;
+
+        printk("\ndomain%d EPT p2m table: \n", d->domain_id);
+
+        for ( gfn = 0; gfn <= d->arch.p2m->max_mapped_pfn; gfn += (1 << order) )
+        {
+            gfn_remainder = gfn;
+            mfn = _mfn(INVALID_MFN);
+            table =
+                map_domain_page(mfn_x(pagetable_get_mfn(d->arch.phys_table)));
+
+            for ( i = EPT_DEFAULT_GAW; i > 0; i-- )
+            {
+                ret = ept_next_level(d, 1, &table, &gfn_remainder,
+                                     i * EPT_TABLE_ORDER);
+                if ( ret != GUEST_TABLE_NORMAL_PAGE )
+                    break;
+            }
+
+            order = i * EPT_TABLE_ORDER;
+
+            if ( ret == GUEST_TABLE_MAP_FAILED )
+                goto out;
+
+            index = gfn_remainder >> order;
+            ept_entry = table + index;
+            if ( ept_entry->avail1 != p2m_invalid )
+            {
+                ( ept_entry->avail1 == p2m_populate_on_demand ) ? 
+                ( mfn = _mfn(INVALID_MFN), is_pod = 1 ) :
+                ( mfn = _mfn(ept_entry->mfn), is_pod = 0 );
+
+                printk("gfn: %-16lx  mfn: %-16lx  order: %2d  is_pod: %d\n",
+                       gfn, mfn_x(mfn), order, is_pod);
+
+                if ( !(record_counter++ % 100) )
+                    process_pending_softirqs();
+            }
+out:
+            unmap_domain_page(table);
+        }
+    }
+}
+
+static struct keyhandler ept_p2m_table = {
+    .diagnostic = 0,
+    .u.fn = ept_dump_p2m_table,
+    .desc = "dump ept p2m table"
+};
+
+void setup_ept_dump(void)
+{
+    register_keyhandler('D', &ept_p2m_table);
 }
 
 /*

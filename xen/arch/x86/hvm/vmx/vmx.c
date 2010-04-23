@@ -1444,7 +1444,10 @@ void start_vmx(void)
     }
 
     if ( cpu_has_vmx_ept )
+    {
         vmx_function_table.hap_supported = 1;
+        setup_ept_dump();
+    }
     
     vmx_function_table.hap_1gb_pgtb = ( vmx_ept_super_page_level_limit == 2 ) ?
                                         1 : 0;
