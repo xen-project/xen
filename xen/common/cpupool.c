@@ -520,6 +520,12 @@ addcpu_out:
             rcu_unlock_domain(d);
             break;
         }
+        if ( op->cpupool_id == d->cpupool->cpupool_id )
+        {
+            ret = 0;
+            rcu_unlock_domain(d);
+            break;
+        }
         printk(XENLOG_DEBUG "cpupool move_domain(dom=%d)->pool=%d\n",
             d->domain_id, op->cpupool_id);
         ret = -ENOENT;
