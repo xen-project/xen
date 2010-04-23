@@ -151,6 +151,7 @@ static void init_create_info(libxl_domain_create_info *c_info)
     c_info->xsdata = NULL;
     c_info->platformdata = NULL;
     c_info->hvm = 1;
+    c_info->oos = 1;
     c_info->ssidref = 0;
 }
 
@@ -275,6 +276,7 @@ static void printf_info(libxl_domain_create_info *c_info,
     printf("*** domain_create_info ***\n");
     printf("hvm: %d\n", c_info->hvm);
     printf("hap: %d\n", c_info->hap);
+    printf("oos: %d\n", c_info->oos);
     printf("ssidref: %d\n", c_info->ssidref);
     printf("name: %s\n", c_info->name);
     printf("uuid: " UUID_FMT "\n",
@@ -435,6 +437,9 @@ static void parse_config_data(const char *configfile_filename_report,
     for (i = 0; i < 16; i++) {
         c_info->uuid[i] = rand();
     }
+
+    if (!xlu_cfg_get_long(config, "oos", &l))
+        c_info->oos = l;
 
     init_build_info(b_info, c_info);
 

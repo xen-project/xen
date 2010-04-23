@@ -99,6 +99,7 @@ int libxl_domain_make(struct libxl_ctx *ctx, libxl_domain_create_info *info,
 
     flags = info->hvm ? XEN_DOMCTL_CDF_hvm_guest : 0;
     flags |= info->hap ? XEN_DOMCTL_CDF_hap : 0;
+    flags |= info->oos ? 0 : XEN_DOMCTL_CDF_oos_off;
     *domid = -1;
 
     /* Ultimately, handle is an array of 16 uint8_t, same as uuid */

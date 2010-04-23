@@ -79,6 +79,7 @@ const libxl_version_info* libxl_get_version_info(struct libxl_ctx *ctx);
 typedef struct {
     bool hvm;
     bool hap;
+    bool oos;
     int ssidref;
     char *name;
     uint8_t uuid[16];
