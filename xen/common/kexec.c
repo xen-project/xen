@@ -47,14 +47,108 @@ static unsigned char vmcoreinfo_data[VMCOREINFO_BYTES];
 static size_t vmcoreinfo_size = 0;
 
 xen_kexec_reserve_t kexec_crash_area;
+static struct {
+    u64 start, end;
+    unsigned long size;
+} ranges[16] __initdata;
 
+/*
+ * Parse command lines in the format
+ *
+ *   crashkernel=<ramsize-range>:<size>[,...][@<offset>]
+ *
+ * with <ramsize-range> being of form
+ *
+ *   <start>-[<end>]
+ *
+ * as well as the legacy ones in the format
+ *
+ *   crashkernel=<size>[@<offset>]
+ */
 static void __init parse_crashkernel(const char *str)
 {
-    kexec_crash_area.size = parse_size_and_unit(str, &str);
-    if ( *str == '@' )
-        kexec_crash_area.start = parse_size_and_unit(str+1, NULL);
+    const char *cur;
+
+    if ( strchr(str, ':' ) )
+    {
+        unsigned int idx = 0;
+
+        do {
+            if ( idx >= ARRAY_SIZE(ranges) )
+            {
+                printk(XENLOG_WARNING "crashkernel: too many ranges\n");
+                cur = NULL;
+                str = strchr(str, '@');
+                break;
+            }
+
+            ranges[idx].start = parse_size_and_unit(cur = str + !!idx, &str);
+            if ( cur == str )
+                break;
+
+            if ( *str != '-' )
+            {
+                printk(XENLOG_WARNING "crashkernel: '-' expected\n");
+                break;
+            }
+
+            if ( *++str != ':' )
+            {
+                ranges[idx].end = parse_size_and_unit(cur = str, &str);
+                if ( cur == str )
+                    break;
+                if ( ranges[idx].end <= ranges[idx].start )
+                {
+                    printk(XENLOG_WARNING "crashkernel: end <= start\n");
+                    break;
+                }
+            }
+            else
+                ranges[idx].end = -1;
+
+            if ( *str != ':' )
+            {
+                printk(XENLOG_WARNING "crashkernel: ':' expected\n");
+                break;
+            }
+
+            ranges[idx].size = parse_size_and_unit(cur = str + 1, &str);
+            if ( cur == str )
+                break;
+
+            ++idx;
+        } while ( *str == ',' );
+        if ( idx < ARRAY_SIZE(ranges) )
+            ranges[idx].size = 0;
+    }
+    else
+        kexec_crash_area.size = parse_size_and_unit(cur = str, &str);
+    if ( cur != str && *str == '@' )
+        kexec_crash_area.start = parse_size_and_unit(cur = str + 1, &str);
+    if ( cur == str )
+        printk(XENLOG_WARNING "crashkernel: memory value expected\n");
 }
 custom_param("crashkernel", parse_crashkernel);
+
+void __init set_kexec_crash_area_size(u64 system_ram)
+{
+    unsigned int idx;
+
+    for ( idx = 0; idx < ARRAY_SIZE(ranges) && !kexec_crash_area.size; ++idx )
+    {
+        if ( !ranges[idx].size )
+            break;
+
+        if ( ranges[idx].size >= system_ram )
+        {
+            printk(XENLOG_WARNING "crashkernel: invalid size\n");
+            continue;
+        }
+
+        if ( ranges[idx].start <= system_ram && ranges[idx].end > system_ram )
+            kexec_crash_area.size = ranges[idx].size;
+    }
+}
 
 static void one_cpu_only(void)
 {

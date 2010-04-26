@@ -643,6 +643,11 @@ void __init __start_xen(unsigned long mbi_p)
     memcpy(&boot_e820, &e820, sizeof(e820));
 
     /* Early kexec reservation (explicit static start address). */
+    nr_pages = 0;
+    for ( i = 0; i < e820.nr_map; i++ )
+        if ( e820.map[i].type == E820_RAM )
+            nr_pages += e820.map[i].size >> PAGE_SHIFT;
+    set_kexec_crash_area_size((u64)nr_pages << PAGE_SHIFT);
     kexec_reserve_area(&boot_e820);
 
     /*
