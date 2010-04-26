@@ -1521,7 +1521,7 @@ void list_domains(int verbose)
 
     info = libxl_list_domain(&ctx, &nb_domain);
 
-    if (info < 0) {
+    if (!info) {
         fprintf(stderr, "libxl_domain_infolist failed.\n");
         exit(1);
     }
