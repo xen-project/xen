@@ -1112,6 +1112,7 @@ static void help(char *command)
         printf("Create a domain based on <ConfigFile>.\n\n");
         printf("Options:\n\n");
         printf("-h                     Print this help.\n");
+        printf("-p                     Leave the domain paused after it is created.\n");
         printf("-d                     Enable debug messages.\n");
         printf("-e                     Do not wait in the background for the death of the domain.\n");
     } else if(!strcmp(command, "list")) {
@@ -2290,11 +2291,14 @@ int main_list_vm(int argc, char **argv)
 int main_create(int argc, char **argv)
 {
     char *filename = NULL;
-    int debug = 0, daemonize = 1;
+    int paused = 0, debug = 0, daemonize = 1;
     int opt, rc;
 
-    while ((opt = getopt(argc, argv, "hde")) != -1) {
+    while ((opt = getopt(argc, argv, "hdep")) != -1) {
         switch (opt) {
+        case 'p':
+            paused = 1;
+            break;
         case 'd':
             debug = 1;
             break;
@@ -2316,7 +2320,7 @@ int main_create(int argc, char **argv)
     }
 
     filename = argv[optind];
-    rc = create_domain(debug, daemonize, filename, NULL, 0,
+    rc = create_domain(debug, daemonize, filename, NULL, paused,
                        -1, 0);
     exit(-rc);
 }
