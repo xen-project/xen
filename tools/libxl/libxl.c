@@ -739,16 +739,9 @@ int libxl_domain_destroy(struct libxl_ctx *ctx, uint32_t domid, int force)
 
 int libxl_console_attach(struct libxl_ctx *ctx, uint32_t domid, int cons_num)
 {
-    struct stat st;
-    const char *XENCONSOLE = "/usr/lib/xen/bin/xenconsole";
-    char *cmd;
-
-    if (stat(XENCONSOLE, &st) != 0) {
-        XL_LOG(ctx, XL_LOG_ERROR, "could not access %s", XENCONSOLE);
-        return ERROR_FAIL;
-    }
-
-    cmd = libxl_sprintf(ctx, "%s %d --num %d", XENCONSOLE, domid, cons_num);
+    char *cmd = libxl_sprintf(
+        ctx, "%s/xenconsole %d --num %d",
+        libxl_private_bindir_path(), domid, cons_num);
     return (system(cmd) != 0) ? ERROR_FAIL : 0;
 }
 

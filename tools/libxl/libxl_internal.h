@@ -202,5 +202,16 @@ void libxl_exec(int stdinfd, int stdoutfd, int stderrfd, char *arg0, char **args
 void libxl_log_child_exitstatus(struct libxl_ctx *ctx,
                                 const char *what, pid_t pid, int status);
 
+/* libxl_paths.c */
+const char *libxl_sbindir_path(void);
+const char *libxl_bindir_path(void);
+const char *libxl_libexec_path(void);
+const char *libxl_libdir_path(void);
+const char *libxl_sharedir_path(void);
+const char *libxl_private_bindir_path(void);
+const char *libxl_xenfirmwaredir_path(void);
+const char *libxl_xen_config_dir_path(void);
+const char *libxl_xen_script_dir_path(void);
+
 #endif
 

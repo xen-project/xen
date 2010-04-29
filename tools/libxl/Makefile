@@ -17,7 +17,7 @@ CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenguest) $(CFLAGS_libxenstore)
 
 LIBS = $(LDFLAGS_libxenctrl) $(LDFLAGS_libxenguest) $(LDFLAGS_libxenstore)
 
-LIBXL_OBJS-y = osdeps.o
+LIBXL_OBJS-y = osdeps.o libxl_paths.o
 LIBXL_OBJS = flexarray.o libxl.o libxl_dom.o libxl_exec.o libxl_xshelp.o libxl_device.o libxl_internal.o xenguest.o libxl_utils.o $(LIBXL_OBJS-y)
 
 AUTOINCS= libxlu_cfg_y.h libxlu_cfg_l.h
@@ -42,6 +42,15 @@ $(LIBXLU_OBJS): $(AUTOINCS)
 
 %.c: %.l
 	$(FLEX) --header-file=$*.h --outfile=$@ $<
+
+genpath-target = $(call buildmakevars2file,_libxl_paths.h)
+$(eval $(genpath-target))
+
+_libxl_paths.h: genpath
+	sed -e "s/\([^=]*\)=\(.*\)/#define \1 \2/g" $@ >_$@
+	mv _$@ $@
+
+libxl_paths.c: _libxl_paths.h
 
 libxenlight.so: libxenlight.so.$(MAJOR)
 	ln -sf $< $@
@@ -88,7 +97,7 @@ install: all
 
 .PHONY: clean
 clean:
-	$(RM) -f *.o *.so* *.a $(CLIENTS) $(DEPS)
+	$(RM) -f _*.h *.o *.so* *.a $(CLIENTS) $(DEPS)
 #	$(RM) -f $(AUTOSRCS) $(AUTOINCS)
 
 distclean: clean

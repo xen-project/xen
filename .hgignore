@@ -180,6 +180,7 @@
 ^tools/libxen/libxenapi-
 ^tools/libxen/test/test_bindings$
 ^tools/libxen/test/test_event_handling$
+^tools/libxl/_.*\.h$
 ^tools/libxl/libxlu_cfg_y\.output$
 ^tools/libxl/xl$
 ^tools/libaio/src/.*\.ol$
