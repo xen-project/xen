@@ -11,7 +11,7 @@ MINOR = 0
 XLUMAJOR = 1.0
 XLUMINOR = 0
 
-#CFLAGS += -Werror
+CFLAGS += -Werror
 CFLAGS += -I. -fPIC
 CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenguest) $(CFLAGS_libxenstore)
 
