@@ -82,7 +82,10 @@ xl.o: xl.c
 xl_cmdimpl.o: xl_cmdimpl.c
 	$(CC) $(CFLAGS) -c xl_cmdimpl.c
 
-$(CLIENTS): xl.o xl_cmdimpl.o libxlutil.so libxenlight.so
+xl_cmdtable.o: xl_cmdtable.c
+	$(CC) $(CFLAGS) -c xl_cmdtable.c
+
+$(CLIENTS): xl.o xl_cmdimpl.o xl_cmdtable.o libxlutil.so libxenlight.so
 	$(CC) $(LDFLAGS) -o $@ $^ $(LIBS)
 
 .PHONY: install

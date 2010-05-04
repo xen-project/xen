@@ -17,30 +17,8 @@
 struct cmd_spec {
     char *cmd_name;
     int (*cmd_impl)(int argc, char **argv);
+    char *cmd_desc;
 };
 
-struct cmd_spec cmd_table[] = {
-    { "create", &main_create },
-    { "list", &main_list },
-    { "destroy", &main_destroy },
-    { "pci-attach", &main_pciattach },
-    { "pci-detach", &main_pcidetach },
-    { "pci-list", &main_pcilist },
-    { "pause", &main_pause },
-    { "unpause", &main_unpause },
-    { "console", &main_console },
-    { "save", &main_save },
-    { "restore", &main_restore },
-    { "cd-insert", &main_cd_insert },
-    { "cd-eject", &main_cd_eject },
-    { "mem-set", &main_memset },
-    { "button-press", &main_button_press },
-    { "vcpu-list", &main_vcpulist },
-    { "vcpu-pin", &main_vcpupin },
-    { "vcpu-set", &main_vcpuset },
-    { "list-vm", &main_list_vm },
-    { "info", &main_info },
-    { "sched-credit", &main_sched_credit },
-};
-
-int cmdtable_len = sizeof(cmd_table)/sizeof(struct cmd_spec);
+extern struct cmd_spec cmd_table[];
+extern int cmdtable_len;

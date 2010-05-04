@@ -38,6 +38,7 @@
 #include "libxl.h"
 #include "libxl_utils.h"
 #include "libxlutil.h"
+#include "xl_cmdtable.h"
 
 #define UUID_FMT "%02hhx%02hhx%02hhx%02hhx-%02hhx%02hhx-%02hhx%02hhx-%02hhx%02hhx-%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx"
 
@@ -1078,28 +1079,14 @@ start:
 
 void help(char *command)
 {
+    int i;
+
     if (!command || !strcmp(command, "help")) {
         printf("Usage xl <subcommand> [args]\n\n");
         printf("xl full list of subcommands:\n\n");
-        printf(" create                        create a domain from config file <filename>\n\n");
-        printf(" list                          list information about all domains\n\n");
-        printf(" destroy                       terminate a domain immediately\n\n");
-        printf(" pci-attach                    insert a new pass-through pci device\n\n");
-        printf(" pci-detach                    remove a domain's pass-through pci device\n\n");
-        printf(" pci-list                      list pass-through pci devices for a domain\n\n");
-        printf(" pause                         pause execution of a domain\n\n");
-        printf(" unpause                       unpause a paused domain\n\n");
-        printf(" console                       attach to domain's console\n\n");
-        printf(" save                          save a domain state to restore later\n\n");
-        printf(" restore                       restore a domain from a saved state\n\n");
-        printf(" cd-insert                     insert a cdrom into a guest's cd drive\n\n");
-        printf(" cd-eject                      eject a cdrom from a guest's cd drive\n\n");
-        printf(" mem-set                       set the current memory usage for a domain\n\n");
-        printf(" button-press                  indicate an ACPI button press to the domain\n\n");
-        printf(" vcpu-list                     list the VCPUs for all/some domains.\n\n");
-        printf(" vcpu-pin                      Set which CPUs a VCPU can use.\n\n");
-        printf(" vcpu-set                      Set the number of active VCPUs allowed for the domain.\n\n");
-        printf(" sched-credit                  Get/set credit scheduler parameters.\n\n");
+        for (i = 0; i < cmdtable_len; i++)
+            printf(" %-25s%s\n\n",
+                   cmd_table[i].cmd_name, cmd_table[i].cmd_desc);
     } else if(!strcmp(command, "create")) {
         printf("Usage: xl create <ConfigFile> [options] [vars]\n\n");
         printf("Create a domain based on <ConfigFile>.\n\n");
@@ -2481,7 +2468,7 @@ void vcpulist(int argc, char **argv)
     ;
 }
 
-void main_vcpulist(int argc, char **argv)
+int main_vcpulist(int argc, char **argv)
 {
     int opt;
 
@@ -2736,7 +2723,7 @@ static void info(int verbose)
     return;
 }
 
-void main_info(int argc, char **argv)
+int main_info(int argc, char **argv)
 {
     int opt, verbose;
 
