@@ -2640,7 +2640,11 @@ static void output_xeninfo(void)
     const libxl_version_info *info;
     int sched_id;
 
-    info = libxl_get_version_info(&ctx);
+    if (!(info = libxl_get_version_info(&ctx))) {
+        fprintf(stderr, "libxl_get_version_info failed.\n");
+        return;
+    }
+
     if ((sched_id = libxl_get_sched_id(&ctx)) < 0) {
         fprintf(stderr, "get_sched_id sysctl failed.\n");
         return;
@@ -2670,14 +2674,13 @@ static void output_nodeinfo(void)
 {
     struct utsname utsbuf;
 
-    uname(&utsbuf);
+    if (uname(&utsbuf) < 0)
+        return;
 
     printf("host                   : %s\n", utsbuf.nodename);
     printf("release                : %s\n", utsbuf.release);
     printf("version                : %s\n", utsbuf.version);
     printf("machine                : %s\n", utsbuf.machine);
-
-    return;
 }
 
 static void output_physinfo(void)
@@ -2706,9 +2709,11 @@ static void output_physinfo(void)
         printf(" hvm_directio");
     printf("\n");
     vinfo = libxl_get_version_info(&ctx);
-    i = (1 << 20) / vinfo->pagesize;
-    printf("total_memory           : %lu\n", info.total_pages / i);
-    printf("free_memory            : %lu\n", info.free_pages / i);
+    if (vinfo) {
+        i = (1 << 20) / vinfo->pagesize;
+        printf("total_memory           : %lu\n", info.total_pages / i);
+        printf("free_memory            : %lu\n", info.free_pages / i);
+    }
 
     return;
 }
