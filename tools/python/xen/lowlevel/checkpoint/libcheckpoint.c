@@ -360,7 +360,7 @@ static void release_suspend_evtchn(checkpoint_state *s)
 {
   /* TODO: teach xen to clean up if port is unbound */
   if (s->xce >= 0 && s->suspend_evtchn >= 0) {
-    xc_suspend_evtchn_release(s->xce, s->suspend_evtchn);
+    xc_suspend_evtchn_release(s->xce, s->domid, s->suspend_evtchn);
     s->suspend_evtchn = -1;
   }
 }

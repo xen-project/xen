@@ -326,7 +326,7 @@ int core_suspend(struct libxl_ctx *ctx, uint32_t domid, int fd,
                    &core_suspend_switch_qemu_logdirty);
 
     if (si.suspend_eventchn > 0)
-        xc_suspend_evtchn_release(si.xce, si.suspend_eventchn);
+        xc_suspend_evtchn_release(si.xce, domid, si.suspend_eventchn);
     if (si.xce > 0)
         xc_evtchn_close(si.xce);
 

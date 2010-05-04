@@ -157,7 +157,7 @@ int xc_hvm_build_mem(int xc_handle,
                      const char *image_buffer,
                      unsigned long image_size);
 
-int xc_suspend_evtchn_release(int xce, int suspend_evtchn);
+int xc_suspend_evtchn_release(int xce, int domid, int suspend_evtchn);
 
 int xc_suspend_evtchn_init(int xc, int xce, int domid, int port);
 

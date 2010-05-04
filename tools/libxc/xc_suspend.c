@@ -7,18 +7,22 @@
 #include "xc_private.h"
 #include "xenguest.h"
 
-#define SUSPEND_LOCK_FILE "/var/lib/xen/suspend_evtchn_lock.d"
-static int lock_suspend_event(void)
+#define SUSPEND_LOCK_FILE "/var/lib/xen/suspend_evtchn"
+static int lock_suspend_event(int domid)
 {
     int fd, rc;
     mode_t mask;
     char buf[128];
+    char suspend_file[256];
 
+    snprintf(suspend_file, sizeof(suspend_file), "%s_%d_lock.d",
+	    SUSPEND_LOCK_FILE, domid);
     mask = umask(022);
-    fd = open(SUSPEND_LOCK_FILE, O_CREAT | O_EXCL | O_RDWR, 0666);
+    fd = open(suspend_file, O_CREAT | O_EXCL | O_RDWR, 0666);
     if (fd < 0)
     {
-        ERROR("Can't create lock file for suspend event channel\n");
+        ERROR("Can't create lock file for suspend event channel %s\n",
+		suspend_file);
         return -EINVAL;
     }
     umask(mask);
@@ -30,12 +34,15 @@ static int lock_suspend_event(void)
     return rc;
 }
 
-static int unlock_suspend_event(void)
+static int unlock_suspend_event(int domid)
 {
     int fd, pid, n;
     char buf[128];
+    char suspend_file[256];
 
-    fd = open(SUSPEND_LOCK_FILE, O_RDWR);
+    snprintf(suspend_file, sizeof(suspend_file), "%s_%d_lock.d",
+	    SUSPEND_LOCK_FILE, domid);
+    fd = open(suspend_file, O_RDWR);
 
     if (fd < 0)
         return -EINVAL;
@@ -50,7 +57,7 @@ static int unlock_suspend_event(void)
         /* We are the owner, so we can simply delete the file */
         if (pid == getpid())
         {
-            unlink(SUSPEND_LOCK_FILE);
+            unlink(suspend_file);
             return 0;
         }
     }
@@ -77,19 +84,19 @@ int xc_await_suspend(int xce, int suspend_evtchn)
     return 0;
 }
 
-int xc_suspend_evtchn_release(int xce, int suspend_evtchn)
+int xc_suspend_evtchn_release(int xce, int domid, int suspend_evtchn)
 {
     if (suspend_evtchn >= 0)
         xc_evtchn_unbind(xce, suspend_evtchn);
 
-    return unlock_suspend_event();
+    return unlock_suspend_event(domid);
 }
 
 int xc_suspend_evtchn_init(int xc, int xce, int domid, int port)
 {
     int rc, suspend_evtchn = -1;
 
-    if (lock_suspend_event())
+    if (lock_suspend_event(domid))
         return -EINVAL;
 
     suspend_evtchn = xc_evtchn_bind_interdomain(xce, domid, port);
@@ -111,7 +118,7 @@ int xc_suspend_evtchn_init(int xc, int xce, int domid, int port)
 
 cleanup:
     if (suspend_evtchn != -1)
-        xc_suspend_evtchn_release(xce, suspend_evtchn);
+        xc_suspend_evtchn_release(xce, domid, suspend_evtchn);
 
     return -1;
 }

@@ -210,7 +210,7 @@ main(int argc, char **argv)
                          &switch_qemu_logdirty);
 
     if (si.suspend_evtchn > 0)
-        xc_suspend_evtchn_release(si.xce, si.suspend_evtchn);
+	 xc_suspend_evtchn_release(si.xce, si.domid, si.suspend_evtchn);
 
     if (si.xce > 0)
         xc_evtchn_close(si.xce);
