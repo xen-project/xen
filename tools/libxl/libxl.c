@@ -2292,9 +2292,7 @@ int libxl_set_memory_target(struct libxl_ctx *ctx, uint32_t domid, uint32_t targ
     char *dompath = libxl_xs_get_dompath(ctx, domid);
 
     videoram_s = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/memory/videoram", dompath));
-    if (!videoram_s)
-        return -1;
-    videoram = atoi(videoram_s);
+    videoram = videoram_s ? atoi(videoram_s) : 0;
 
     libxl_xs_write(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/memory/target", dompath), "%lu", target_memkb);
     rc = xc_domain_setmaxmem(ctx->xch, domid, target_memkb + LIBXL_MAXMEM_CONSTANT);
