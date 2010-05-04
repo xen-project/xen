@@ -394,9 +394,9 @@ int cpupool_cpu_remove(unsigned int cpu)
 }
 
 /*
- * do cpupool related domctl operations
+ * do cpupool related sysctl operations
  */
-int cpupool_do_domctl(struct xen_domctl_cpupool_op *op)
+int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op)
 {
     int ret;
     struct cpupool *c;
@@ -404,12 +404,12 @@ int cpupool_do_domctl(struct xen_domctl_cpupool_op *op)
     switch ( op->op )
     {
 
-    case XEN_DOMCTL_CPUPOOL_OP_CREATE:
+    case XEN_SYSCTL_CPUPOOL_OP_CREATE:
     {
         int poolid;
         const struct scheduler *sched;
 
-        poolid = (op->cpupool_id == XEN_DOMCTL_CPUPOOL_PAR_ANY) ?
+        poolid = (op->cpupool_id == XEN_SYSCTL_CPUPOOL_PAR_ANY) ?
             CPUPOOLID_NONE: op->cpupool_id;
         sched = scheduler_get_by_id(op->sched_id);
         ret = -ENOENT;
@@ -424,7 +424,7 @@ int cpupool_do_domctl(struct xen_domctl_cpupool_op *op)
     }
     break;
 
-    case XEN_DOMCTL_CPUPOOL_OP_DESTROY:
+    case XEN_SYSCTL_CPUPOOL_OP_DESTROY:
     {
         spin_lock(&cpupool_lock);
         c = cpupool_find_by_id(op->cpupool_id, 1);
@@ -436,7 +436,7 @@ int cpupool_do_domctl(struct xen_domctl_cpupool_op *op)
     }
     break;
 
-    case XEN_DOMCTL_CPUPOOL_OP_INFO:
+    case XEN_SYSCTL_CPUPOOL_OP_INFO:
     {
         spin_lock(&cpupool_lock);
         c = cpupool_find_by_id(op->cpupool_id, 0);
@@ -452,7 +452,7 @@ int cpupool_do_domctl(struct xen_domctl_cpupool_op *op)
     }
     break;
 
-    case XEN_DOMCTL_CPUPOOL_OP_ADDCPU:
+    case XEN_SYSCTL_CPUPOOL_OP_ADDCPU:
     {
         unsigned cpu;
 
@@ -460,7 +460,7 @@ int cpupool_do_domctl(struct xen_domctl_cpupool_op *op)
         printk(XENLOG_DEBUG "cpupool_assign_cpu(pool=%d,cpu=%d)\n",
             op->cpupool_id, cpu);
         spin_lock(&cpupool_lock);
-        if ( cpu == XEN_DOMCTL_CPUPOOL_PAR_ANY )
+        if ( cpu == XEN_SYSCTL_CPUPOOL_PAR_ANY )
             cpu = first_cpu(cpupool_free_cpus);
         ret = -EINVAL;
         if ( cpu >= NR_CPUS )
@@ -480,7 +480,7 @@ addcpu_out:
     }
     break;
 
-    case XEN_DOMCTL_CPUPOOL_OP_RMCPU:
+    case XEN_SYSCTL_CPUPOOL_OP_RMCPU:
     {
         unsigned cpu;
 
@@ -491,7 +491,7 @@ addcpu_out:
         if ( c == NULL )
             break;
         cpu = op->cpu;
-        if ( cpu == XEN_DOMCTL_CPUPOOL_PAR_ANY )
+        if ( cpu == XEN_SYSCTL_CPUPOOL_PAR_ANY )
             cpu = last_cpu(c->cpu_valid);
         ret = -EINVAL;
         if ( cpu >= NR_CPUS )
@@ -503,7 +503,7 @@ addcpu_out:
     }
     break;
 
-    case XEN_DOMCTL_CPUPOOL_OP_MOVEDOMAIN:
+    case XEN_SYSCTL_CPUPOOL_OP_MOVEDOMAIN:
     {
         struct domain *d;
 
@@ -547,7 +547,7 @@ addcpu_out:
     }
     break;
 
-    case XEN_DOMCTL_CPUPOOL_OP_FREEINFO:
+    case XEN_SYSCTL_CPUPOOL_OP_FREEINFO:
     {
         cpumask_to_xenctl_cpumap(&(op->cpumap),
             &cpupool_free_cpus);

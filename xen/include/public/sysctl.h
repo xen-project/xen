@@ -514,6 +514,27 @@ struct xen_sysctl_numainfo {
 typedef struct xen_sysctl_numainfo xen_sysctl_numainfo_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_numainfo_t);
 
+#define XEN_SYSCTL_cpupool_op        18	
+/* XEN_SYSCTL_cpupool_op */
+#define XEN_SYSCTL_CPUPOOL_OP_CREATE                1  /* C */
+#define XEN_SYSCTL_CPUPOOL_OP_DESTROY               2  /* D */
+#define XEN_SYSCTL_CPUPOOL_OP_INFO                  3  /* I */
+#define XEN_SYSCTL_CPUPOOL_OP_ADDCPU                4  /* A */
+#define XEN_SYSCTL_CPUPOOL_OP_RMCPU                 5  /* R */
+#define XEN_SYSCTL_CPUPOOL_OP_MOVEDOMAIN            6  /* M */
+#define XEN_SYSCTL_CPUPOOL_OP_FREEINFO              7  /* F */
+#define XEN_SYSCTL_CPUPOOL_PAR_ANY     0xFFFFFFFF
+struct xen_sysctl_cpupool_op {
+    uint32_t op;          /* IN */
+    uint32_t cpupool_id;  /* IN: CDIARM OUT: CI */
+    uint32_t sched_id;    /* IN: C      OUT: I  */
+    uint32_t domid;       /* IN: M              */
+    uint32_t cpu;         /* IN: AR             */
+    uint32_t n_dom;       /*            OUT: I  */
+    struct xenctl_cpumap cpumap; /*     OUT: IF */
+};
+typedef struct xen_sysctl_cpupool_op xen_sysctl_cpupool_op_t;
+DEFINE_XEN_GUEST_HANDLE(xen_sysctl_cpupool_op_t);
 
 struct xen_sysctl {
     uint32_t cmd;
@@ -535,6 +556,7 @@ struct xen_sysctl {
         struct xen_sysctl_pm_op             pm_op;
         struct xen_sysctl_page_offline_op   page_offline;
         struct xen_sysctl_lockprof_op       lockprof_op;
+        struct xen_sysctl_cpupool_op        cpupool_op;
         uint8_t                             pad[128];
     } u;
 };

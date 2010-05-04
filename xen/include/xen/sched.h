@@ -9,6 +9,7 @@
 #include <xen/shared.h>
 #include <public/xen.h>
 #include <public/domctl.h>
+#include <public/sysctl.h>
 #include <public/vcpu.h>
 #include <public/xsm/acm.h>
 #include <xen/time.h>
@@ -624,7 +625,7 @@ void cpupool_cpu_add(unsigned int cpu);
 int cpupool_cpu_remove(unsigned int cpu);
 int cpupool_add_domain(struct domain *d, int poolid);
 void cpupool_rm_domain(struct domain *d);
-int cpupool_do_domctl(struct xen_domctl_cpupool_op *op);
+int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op);
 #define num_cpupool_cpus(c) (cpus_weight((c)->cpu_valid))
 
 #endif /* __SCHED_H__ */

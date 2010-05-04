@@ -966,14 +966,6 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
     }
     break;
 
-    case XEN_DOMCTL_cpupool_op:
-    {
-        ret = cpupool_do_domctl(&op->u.cpupool_op);
-        if ( (ret == 0) && copy_to_guest(u_domctl, op, 1) )
-            ret = -EFAULT;
-    }
-    break;
-
     default:
         ret = arch_do_domctl(op, u_domctl);
         break;

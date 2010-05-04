@@ -318,6 +318,14 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
     }
     break;
 
+    case XEN_SYSCTL_cpupool_op:
+    {
+        ret = cpupool_do_sysctl(&op->u.cpupool_op);
+        if ( (ret == 0) && copy_to_guest(u_sysctl, op, 1) )
+            ret = -EFAULT;
+    }
+    break;
+
     default:
         ret = arch_do_sysctl(op, u_sysctl);
         break;
