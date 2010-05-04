@@ -39,7 +39,7 @@
 /*
  * Read console content from Xen buffer ring.
  */
-#define XEN_SYSCTL_readconsole       1
+/* XEN_SYSCTL_readconsole */
 struct xen_sysctl_readconsole {
     /* IN: Non-zero -> clear after reading. */
     uint8_t clear;
@@ -60,7 +60,7 @@ typedef struct xen_sysctl_readconsole xen_sysctl_readconsole_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_readconsole_t);
 
 /* Get trace buffers machine base address */
-#define XEN_SYSCTL_tbuf_op           2
+/* XEN_SYSCTL_tbuf_op */
 struct xen_sysctl_tbuf_op {
     /* IN variables */
 #define XEN_SYSCTL_TBUFOP_get_info     0
@@ -83,7 +83,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_sysctl_tbuf_op_t);
 /*
  * Get physical information about the host machine
  */
-#define XEN_SYSCTL_physinfo          3
+/* XEN_SYSCTL_physinfo */
  /* (x86) The platform supports HVM guests. */
 #define _XEN_SYSCTL_PHYSCAP_hvm          0
 #define XEN_SYSCTL_PHYSCAP_hvm           (1u<<_XEN_SYSCTL_PHYSCAP_hvm)
@@ -110,7 +110,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_sysctl_physinfo_t);
 /*
  * Get the ID of the current scheduler.
  */
-#define XEN_SYSCTL_sched_id          4
+/* XEN_SYSCTL_sched_id */
 struct xen_sysctl_sched_id {
     /* OUT variable */
     uint32_t sched_id;
@@ -119,7 +119,7 @@ typedef struct xen_sysctl_sched_id xen_sysctl_sched_id_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_sched_id_t);
 
 /* Interface for controlling Xen software performance counters. */
-#define XEN_SYSCTL_perfc_op          5
+/* XEN_SYSCTL_perfc_op */
 /* Sub-operations: */
 #define XEN_SYSCTL_PERFCOP_reset 1   /* Reset all counters to zero. */
 #define XEN_SYSCTL_PERFCOP_query 2   /* Get perfctr information. */
@@ -146,7 +146,7 @@ struct xen_sysctl_perfc_op {
 typedef struct xen_sysctl_perfc_op xen_sysctl_perfc_op_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_perfc_op_t);
 
-#define XEN_SYSCTL_getdomaininfolist 6
+/* XEN_SYSCTL_getdomaininfolist */
 struct xen_sysctl_getdomaininfolist {
     /* IN variables. */
     domid_t               first_domain;
@@ -159,7 +159,7 @@ typedef struct xen_sysctl_getdomaininfolist xen_sysctl_getdomaininfolist_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_getdomaininfolist_t);
 
 /* Inject debug keys into Xen. */
-#define XEN_SYSCTL_debug_keys        7
+/* XEN_SYSCTL_debug_keys */
 struct xen_sysctl_debug_keys {
     /* IN variables. */
     XEN_GUEST_HANDLE_64(char) keys;
@@ -169,7 +169,7 @@ typedef struct xen_sysctl_debug_keys xen_sysctl_debug_keys_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_debug_keys_t);
 
 /* Get physical CPU information. */
-#define XEN_SYSCTL_getcpuinfo        8
+/* XEN_SYSCTL_getcpuinfo */
 struct xen_sysctl_cpuinfo {
     uint64_aligned_t idletime;
 };
@@ -185,7 +185,7 @@ struct xen_sysctl_getcpuinfo {
 typedef struct xen_sysctl_getcpuinfo xen_sysctl_getcpuinfo_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_getcpuinfo_t); 
 
-#define XEN_SYSCTL_availheap         9
+/* XEN_SYSCTL_availheap */
 struct xen_sysctl_availheap {
     /* IN variables. */
     uint32_t min_bitwidth;  /* Smallest address width (zero if don't care). */
@@ -197,7 +197,7 @@ struct xen_sysctl_availheap {
 typedef struct xen_sysctl_availheap xen_sysctl_availheap_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_availheap_t);
 
-#define XEN_SYSCTL_get_pmstat        10
+/* XEN_SYSCTL_get_pmstat */
 struct pm_px_val {
     uint64_aligned_t freq;        /* Px core frequency */
     uint64_aligned_t residency;   /* Px residency time */
@@ -254,7 +254,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_sysctl_get_pmstat_t);
 #define XEN_CPU_HOTPLUG_STATUS_ONLINE  2
 #define XEN_CPU_HOTPLUG_STATUS_NEW     3
 
-#define XEN_SYSCTL_cpu_hotplug       11
+/* XEN_SYSCTL_cpu_hotplug */
 struct xen_sysctl_cpu_hotplug {
     /* IN variables */
     uint32_t cpu;   /* Physical cpu. */
@@ -270,7 +270,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_sysctl_cpu_hotplug_t);
  * Get/set xen power management, include 
  * 1. cpufreq governors and related parameters
  */
-#define XEN_SYSCTL_pm_op        12
+/* XEN_SYSCTL_pm_op */
 struct xen_userspace {
     uint32_t scaling_setspeed;
 };
@@ -376,7 +376,7 @@ struct xen_sysctl_pm_op {
     } u;
 };
 
-#define XEN_SYSCTL_page_offline_op        14
+/* XEN_SYSCTL_page_offline_op */
 struct xen_sysctl_page_offline_op {
     /* IN: range of page to be offlined */
 #define sysctl_page_offline     1
@@ -424,7 +424,7 @@ struct xen_sysctl_page_offline_op {
 
 #define PG_OFFLINE_OWNER_SHIFT 16
 
-#define XEN_SYSCTL_lockprof_op       15
+/* XEN_SYSCTL_lockprof_op */
 /* Sub-operations: */
 #define XEN_SYSCTL_LOCKPROF_reset 1   /* Reset all profile data to zero. */
 #define XEN_SYSCTL_LOCKPROF_query 2   /* Get lock profile information. */
@@ -456,7 +456,7 @@ struct xen_sysctl_lockprof_op {
 typedef struct xen_sysctl_lockprof_op xen_sysctl_lockprof_op_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_lockprof_op_t);
 
-#define XEN_SYSCTL_topologyinfo         16 
+/* XEN_SYSCTL_topologyinfo */
 #define INVALID_TOPOLOGY_ID  (~0U)
 struct xen_sysctl_topologyinfo {
     /*
@@ -482,7 +482,7 @@ struct xen_sysctl_topologyinfo {
 typedef struct xen_sysctl_topologyinfo xen_sysctl_topologyinfo_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_topologyinfo_t);
 
-#define XEN_SYSCTL_numainfo          17	
+/* XEN_SYSCTL_numainfo */
 struct xen_sysctl_numainfo {
     /*
      * IN: maximum addressable entry in the caller-provided arrays.
@@ -514,7 +514,6 @@ struct xen_sysctl_numainfo {
 typedef struct xen_sysctl_numainfo xen_sysctl_numainfo_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_numainfo_t);
 
-#define XEN_SYSCTL_cpupool_op        18	
 /* XEN_SYSCTL_cpupool_op */
 #define XEN_SYSCTL_CPUPOOL_OP_CREATE                1  /* C */
 #define XEN_SYSCTL_CPUPOOL_OP_DESTROY               2  /* D */
@@ -536,7 +535,7 @@ struct xen_sysctl_cpupool_op {
 typedef struct xen_sysctl_cpupool_op xen_sysctl_cpupool_op_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_cpupool_op_t);
 
-#define XEN_SYSCTL_scheduler_op      19
+/* XEN_SYSCTL_scheduler_op */
 /* Set or get info? */
 #define XEN_SYSCTL_SCHEDOP_putinfo 0
 #define XEN_SYSCTL_SCHEDOP_getinfo 1
@@ -551,6 +550,24 @@ DEFINE_XEN_GUEST_HANDLE(xen_sysctl_scheduler_op_t);
 
 struct xen_sysctl {
     uint32_t cmd;
+#define XEN_SYSCTL_readconsole                    1
+#define XEN_SYSCTL_tbuf_op                        2
+#define XEN_SYSCTL_physinfo                       3
+#define XEN_SYSCTL_sched_id                       4
+#define XEN_SYSCTL_perfc_op                       5
+#define XEN_SYSCTL_getdomaininfolist              6
+#define XEN_SYSCTL_debug_keys                     7
+#define XEN_SYSCTL_getcpuinfo                     8
+#define XEN_SYSCTL_availheap                      9
+#define XEN_SYSCTL_get_pmstat                    10
+#define XEN_SYSCTL_cpu_hotplug                   11
+#define XEN_SYSCTL_pm_op                         12
+#define XEN_SYSCTL_page_offline_op               14
+#define XEN_SYSCTL_lockprof_op                   15
+#define XEN_SYSCTL_topologyinfo                  16 
+#define XEN_SYSCTL_numainfo                      17
+#define XEN_SYSCTL_cpupool_op                    18
+#define XEN_SYSCTL_scheduler_op                  19
     uint32_t interface_version; /* XEN_SYSCTL_INTERFACE_VERSION */
     union {
         struct xen_sysctl_readconsole       readconsole;
