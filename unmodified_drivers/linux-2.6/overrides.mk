@@ -11,7 +11,7 @@ ifeq ($(ARCH),ia64)
   _XEN_CPPFLAGS += -DCONFIG_VMX_GUEST
 endif
 
-_XEN_CPPFLAGS += -include $(objtree)/include/linux/autoconf.h
+_XEN_CPPFLAGS += -include $(wildcard $(objtree)/include/*/autoconf.h)
 
 EXTRA_CFLAGS += $(_XEN_CPPFLAGS)
 EXTRA_AFLAGS += $(_XEN_CPPFLAGS)
