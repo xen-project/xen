@@ -770,7 +770,18 @@ static void *xrealloc(void *ptr, size_t sz) {
     return r;
 }
 
-static int create_domain(int debug, int daemonize, const char *config_file, const char *restore_file, int paused, int migrate_fd /* -1 means none */, char **migration_domname_r)
+struct domain_create {
+    int debug;
+    int daemonize;
+    int paused;
+    const char *config_file;
+    const char *extra_config; /* extra config string */
+    const char *restore_file;
+    int migrate_fd; /* -1 means none */
+    char **migration_domname_r;
+};
+
+static int create_domain(struct domain_create *dom_info)
 {
     libxl_domain_create_info info1;
     libxl_domain_build_info info2;
@@ -782,6 +793,16 @@ static int create_domain(int debug, int daemonize, const char *config_file, cons
     libxl_device_vfb *vfbs = NULL;
     libxl_device_vkb *vkbs = NULL;
     libxl_device_console console;
+
+    int debug = dom_info->debug;
+    int daemonize = dom_info->daemonize;
+    int paused = dom_info->paused;
+    const char *config_file = dom_info->config_file;
+    const char *extra_config = dom_info->extra_config;
+    const char *restore_file = dom_info->restore_file;
+    int migrate_fd = dom_info->migrate_fd;
+    char **migration_domname_r = dom_info->migration_domname_r;
+
     int num_disks = 0, num_vifs = 0, num_pcidevs = 0, num_vfbs = 0, num_vkbs = 0;
     int i, fd;
     int need_daemon = 1;
@@ -866,6 +887,23 @@ static int create_domain(int debug, int daemonize, const char *config_file, cons
                                        &config_data, &config_len);
         if (ret) { fprintf(stderr, "Failed to read config file: %s: %s\n",
                            config_file, strerror(errno)); return ERROR_FAIL; }
+        if (!restore_file && extra_config
+            && strlen(extra_config)) {
+            if (config_len > INT_MAX - (strlen(extra_config) + 2)) {
+                fprintf(stderr, "Failed to attach extra configration\n");
+                return ERROR_FAIL;
+            }
+            config_data = realloc(config_data, config_len
+                + strlen(extra_config) + 2);
+            if (!config_data) {
+                fprintf(stderr, "Failed to realloc config_data\n");
+                return ERROR_FAIL;
+            }
+            strcat(config_data, "\n");
+            strcat(config_data, extra_config);
+            strcat(config_data, "\n");
+            config_len += (strlen(extra_config) + 2);
+        }
     } else {
         if (!config_data) {
             fprintf(stderr, "Config file not specified and"
@@ -1910,6 +1948,7 @@ static void migrate_receive(int debug, int daemonize)
     int rc, rc2;
     char rc_buf;
     char *migration_domname;
+    struct domain_create dom_info;
 
     signal(SIGPIPE, SIG_IGN);
     /* if we get SIGPIPE we'd rather just have it as an error */
@@ -1922,10 +1961,14 @@ static void migrate_receive(int debug, int daemonize)
                                    "migration ack stream",
                                    "banner") );
 
-    rc = create_domain(debug, daemonize,
-                       0 /* no config file, use incoming */,
-                       "incoming migration stream", 1,
-                       0, &migration_domname);
+    memset(&dom_info, 0, sizeof(dom_info));
+    dom_info.debug = debug;
+    dom_info.daemonize = daemonize;
+    dom_info.paused = 1;
+    dom_info.restore_file = "incoming migration stream";
+    dom_info.migration_domname_r = &migration_domname;
+
+    rc = create_domain(&dom_info);
     if (rc) {
         fprintf(stderr, "migration target: Domain creation failed"
                 " (code %d).\n", rc);
@@ -2002,6 +2045,7 @@ int main_restore(int argc, char **argv)
 {
     char *checkpoint_file = NULL;
     char *config_file = NULL;
+    struct domain_create dom_info;
     int paused = 0, debug = 0, daemonize = 1;
     int opt, rc;
 
@@ -2034,8 +2078,16 @@ int main_restore(int argc, char **argv)
         help("restore");
         exit(2);
     }
-    rc = create_domain(debug, daemonize, config_file,
-                       checkpoint_file, paused, -1, 0);
+
+    memset(&dom_info, 0, sizeof(dom_info));
+    dom_info.debug = debug;
+    dom_info.daemonize = daemonize;
+    dom_info.paused = paused;
+    dom_info.config_file = config_file;
+    dom_info.restore_file = checkpoint_file;
+    dom_info.migrate_fd = -1;
+
+    rc = create_domain(&dom_info);
     exit(-rc);
 }
 
@@ -2280,6 +2332,8 @@ int main_list_vm(int argc, char **argv)
 int main_create(int argc, char **argv)
 {
     char *filename = NULL;
+    char *p, extra_config[1024];
+    struct domain_create dom_info;
     int paused = 0, debug = 0, daemonize = 1;
     int opt, rc;
 
@@ -2303,14 +2357,32 @@ int main_create(int argc, char **argv)
         }
     }
 
-    if (optind >= argc) {
-        help("create");
-        exit(2);
+    memset(extra_config, 0, sizeof(extra_config));
+    while (optind < argc) {
+        if ((p = strchr(argv[optind], '='))) {
+            if (strlen(extra_config) + 1 < sizeof(extra_config)) {
+                if (strlen(extra_config))
+                    strcat(extra_config, "\n");
+                strcat(extra_config, argv[optind]);
+            }
+        } else if (!filename) {
+            filename = argv[optind];
+        } else {
+            help("create");
+            exit(2);
+        }
+        optind++;
     }
 
-    filename = argv[optind];
-    rc = create_domain(debug, daemonize, filename, NULL, paused,
-                       -1, 0);
+    memset(&dom_info, 0, sizeof(dom_info));
+    dom_info.debug = debug;
+    dom_info.daemonize = daemonize;
+    dom_info.paused = paused;
+    dom_info.config_file = filename;
+    dom_info.extra_config = extra_config;
+    dom_info.migrate_fd = -1;
+
+    rc = create_domain(&dom_info);
     exit(-rc);
 }
 
