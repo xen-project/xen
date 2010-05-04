@@ -35,7 +35,7 @@ class addrequest(request):
         flags = netlink.NLM_F_EXCL|netlink.NLM_F_CREATE
         super(addrequest, self).__init__(netlink.RTM_NEWQDISC, flags=flags,
                                          dev=dev, handle=handle)
-        self.n.addattr(netlink.TCA_KIND, qdisc.kind)
+        self.n.addattr(netlink.TCA_KIND, qdisc.kind + '\0')
         opts = qdisc.pack()
         if opts:
             self.n.addattr(netlink.TCA_OPTIONS, opts)
@@ -49,7 +49,7 @@ class changerequest(request):
     def __init__(self, dev, handle, qdisc):
         super(changerequest, self).__init__(netlink.RTM_NEWQDISC,
                                             dev=dev, handle=handle)
-        self.n.addattr(netlink.TCA_KIND, qdisc.kind)
+        self.n.addattr(netlink.TCA_KIND, qdisc.kind + '\0')
         opts = qdisc.pack()
         if opts:
             self.n.addattr(netlink.TCA_OPTIONS, opts)
@@ -59,7 +59,7 @@ class Qdisc(object):
         if qdict:
             kind = qdict.get('kind')
             cls = qdisc_kinds.get(kind, cls)
-        obj = super(Qdisc, cls).__new__(cls, qdict=qdict, *args, **opts)
+        obj = super(Qdisc, cls).__new__(cls)
         return obj
 
     def __init__(self, qdict):
