@@ -1007,7 +1007,7 @@ start:
         libxl_domain_unpause(&ctx, domid);
 
     if (!daemonize)
-        return 0; /* caller gets success in parent */
+        return domid; /* caller gets success in parent */
 
     if (need_daemon) {
         char *fullname, *name;
@@ -1031,7 +1031,7 @@ start:
                            "daemonizing child", child1, status);
                 return ERROR_FAIL;
             }
-            return 0; /* caller gets success in parent */
+            return domid; /* caller gets success in parent */
         }
 
         rc = libxl_ctx_postfork(&ctx);
@@ -1131,6 +1131,7 @@ void help(char *command)
         printf("Options:\n\n");
         printf("-h                     Print this help.\n");
         printf("-p                     Leave the domain paused after it is created.\n");
+        printf("-c                     Connect to the console after the domain is created.\n");
         printf("-d                     Enable debug messages.\n");
         printf("-e                     Do not wait in the background for the death of the domain.\n");
     } else if(!strcmp(command, "list")) {
@@ -1969,7 +1970,7 @@ static void migrate_receive(int debug, int daemonize)
     dom_info.migration_domname_r = &migration_domname;
 
     rc = create_domain(&dom_info);
-    if (rc) {
+    if (rc < 0) {
         fprintf(stderr, "migration target: Domain creation failed"
                 " (code %d).\n", rc);
         exit(-rc);
@@ -2088,7 +2089,10 @@ int main_restore(int argc, char **argv)
     dom_info.migrate_fd = -1;
 
     rc = create_domain(&dom_info);
-    exit(-rc);
+    if (rc < 0)
+        exit(-rc);
+
+    exit(0);
 }
 
 int main_migrate_receive(int argc, char **argv)
@@ -2334,13 +2338,17 @@ int main_create(int argc, char **argv)
     char *filename = NULL;
     char *p, extra_config[1024];
     struct domain_create dom_info;
-    int paused = 0, debug = 0, daemonize = 1;
+    char dom[10]; /* long enough */
+    int paused = 0, debug = 0, daemonize = 1, console_autoconnect = 0;
     int opt, rc;
 
-    while ((opt = getopt(argc, argv, "hdep")) != -1) {
+    while ((opt = getopt(argc, argv, "hpcde")) != -1) {
         switch (opt) {
         case 'p':
             paused = 1;
+            break;
+        case 'c':
+            console_autoconnect = 1;
             break;
         case 'd':
             debug = 1;
@@ -2383,7 +2391,15 @@ int main_create(int argc, char **argv)
     dom_info.migrate_fd = -1;
 
     rc = create_domain(&dom_info);
-    exit(-rc);
+    if (rc < 0)
+        exit(-rc);
+
+    if (console_autoconnect) {
+        snprintf(dom, sizeof(dom), "%d", rc);
+        console(dom, 0);
+    }
+
+    exit(0);
 }
 
 void button_press(char *p, char *b)
