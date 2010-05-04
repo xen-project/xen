@@ -28,7 +28,7 @@ def execute(exe, args = None):
         a.extend(args)
     try:
         os.execv(exepath, a)
-    except OSError, exn:
+    except (OSError, TypeError), exn:
         print exepath, ": ", exn
         sys.exit(1)
 
