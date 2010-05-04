@@ -42,8 +42,9 @@ class VM(object):
         self.vifs = getvifs(self.dom)
 
     def __str__(self):
-        return 'VM %d (%s), MACs: [%s], disks: [%s]' % \
-               (self.domid, self.name, self.epoch, ', '.join(self.macs),
+        return 'VM %d (%s), vifs: [%s], disks: [%s]' % \
+               (self.domid, self.name,
+                ', '.join([str(v) for v in self.vifs]),
                 ', '.join([str(d) for d in self.disks]))
 
 def parsedominfo(dominfo):
