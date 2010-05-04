@@ -29,6 +29,7 @@
 
 #include "libxl.h"
 #include "xl_cmdimpl.h"
+#include "xl_cmdtable.h"
 
 extern struct libxl_ctx ctx;
 extern int logfile;
@@ -43,6 +44,8 @@ void log_callback(void *userdata, int loglevel, const char *file, int line, cons
 
 int main(int argc, char **argv)
 {
+    int i;
+
     if (argc < 2) {
         help(NULL);
         exit(1);
@@ -59,60 +62,21 @@ int main(int argc, char **argv)
 
     srand(time(0));
 
-    if (!strcmp(argv[1], "create")) {
-        main_create(argc - 1, argv + 1);
-    } else if (!strcmp(argv[1], "list")) {
-        main_list(argc - 1, argv + 1);
-    } else if (!strcmp(argv[1], "list-vm")) {
-        main_list_vm(argc - 1, argv + 1);
-    } else if (!strcmp(argv[1], "destroy")) {
-        main_destroy(argc - 1, argv + 1);
-    } else if (!strcmp(argv[1], "pci-attach")) {
-        main_pciattach(argc - 1, argv + 1);
-    } else if (!strcmp(argv[1], "pci-detach")) {
-        main_pcidetach(argc - 1, argv + 1);
-    } else if (!strcmp(argv[1], "pci-list")) {
-        main_pcilist(argc - 1, argv + 1);
-    } else if (!strcmp(argv[1], "pause")) {
-        main_pause(argc - 1, argv + 1);
-    } else if (!strcmp(argv[1], "unpause")) {
-        main_unpause(argc - 1, argv + 1);
-    } else if (!strcmp(argv[1], "console")) {
-        main_console(argc - 1, argv + 1);
-    } else if (!strcmp(argv[1], "save")) {
-        main_save(argc - 1, argv + 1);
-    } else if (!strcmp(argv[1], "migrate")) {
-        main_migrate(argc - 1, argv + 1);
-    } else if (!strcmp(argv[1], "restore")) {
-        main_restore(argc - 1, argv + 1);
-    } else if (!strcmp(argv[1], "migrate-receive")) {
-        main_migrate_receive(argc - 1, argv + 1);
-    } else if (!strcmp(argv[1], "cd-insert")) {
-        main_cd_insert(argc - 1, argv + 1);
-    } else if (!strcmp(argv[1], "cd-eject")) {
-        main_cd_eject(argc - 1, argv + 1);
-    } else if (!strcmp(argv[1], "mem-set")) {
-        main_memset(argc - 1, argv + 1);
-    } else if (!strcmp(argv[1], "button-press")) {
-        main_button_press(argc - 1, argv + 1);
-    } else if (!strcmp(argv[1], "vcpu-list")) {
-        main_vcpulist(argc - 1, argv + 1);
-    } else if (!strcmp(argv[1], "vcpu-pin")) {
-        main_vcpupin(argc - 1, argv + 1);
-    } else if (!strcmp(argv[1], "vcpu-set")) {
-        main_vcpuset(argc - 1, argv + 1);
-    } else if (!strcmp(argv[1], "info")) {
-        main_info(argc - 1, argv + 1);
-    } else if (!strcmp(argv[1], "sched-credit")) {
-        main_sched_credit(argc - 1, argv + 1);
-    } else if (!strcmp(argv[1], "help")) {
-        if (argc > 2)
-            help(argv[2]);
-        else
-            help(NULL);
-        exit(0);
-    } else {
-        fprintf(stderr, "command not implemented\n");
-        exit(1);
+    for (i = 0; i < cmdtable_len; i++) {
+        if (!strcmp(argv[1], cmd_table[i].cmd_name))
+        	cmd_table[i].cmd_impl(argc - 1, argv + 1);
+    }
+
+    if (i >= cmdtable_len) {
+        if (!strcmp(argv[1], "help")) {
+            if (argc > 2)
+                help(argv[2]);
+            else
+                help(NULL);
+            exit(0);
+        } else {
+            fprintf(stderr, "command not implemented\n");
+            exit(1);
+        }
     }
 }

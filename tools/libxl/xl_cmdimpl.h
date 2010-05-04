@@ -34,6 +34,6 @@ int main_button_press(int argc, char **argv);
 int main_vcpupin(int argc, char **argv);
 int main_vcpuset(int argc, char **argv);
 int main_memset(int argc, char **argv);
-void main_sched_credit(int argc, char **argv);
+int main_sched_credit(int argc, char **argv);
 
 void help(char *command);

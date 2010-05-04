@@ -2790,7 +2790,7 @@ static void sched_credit_domain_output(
         scinfo->cap);
 }
 
-void main_sched_credit(int argc, char **argv)
+int main_sched_credit(int argc, char **argv)
 {
     struct libxl_dominfo *info;
     struct libxl_sched_credit scinfo;
