@@ -207,18 +207,18 @@ class XendOptions:
     def get_xend_tcp_xmlrpc_server_ssl_key_file(self):
         name = 'xend-tcp-xmlrpc-server-ssl-key-file'
         file = self.get_config_string(name)
-        if os.path.dirname(file) == "":
+        if file and os.path.dirname(file) == "":
             file = auxbin.xen_configdir() + '/' + file;
-        if not os.path.exists(file):
+        if file and not os.path.exists(file):
             raise XendError("invalid xend config %s: directory '%s' does not exist" % (name, file))
         return file
 
     def get_xend_tcp_xmlrpc_server_ssl_cert_file(self):
         name = 'xend-tcp-xmlrpc-server-ssl-cert-file'
         file = self.get_config_string(name)
-        if os.path.dirname(file) == "":
+        if file and os.path.dirname(file) == "":
             file = auxbin.xen_configdir() + '/' + file;
-        if not os.path.exists(file):
+        if file and not os.path.exists(file):
             raise XendError("invalid xend config %s: directory '%s' does not exist" % (name, file))
         return file
 
