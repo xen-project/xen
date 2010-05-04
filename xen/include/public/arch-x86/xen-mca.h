@@ -400,11 +400,8 @@ struct xen_mc_msrinject {
 #define MC_MSRINJ_F_INTERPOSE   0x1
 
 #define XEN_MC_mceinject    5
-#define XEN_MC_UC           0
-#define XEN_MC_CE           1
 struct xen_mc_mceinject {
-	uint32_t mceinj_cpunr;      /* target processor id */
-	uint32_t mceinj_flag;       /* UC error or CE error flag */
+	unsigned int mceinj_cpunr;      /* target processor id */
 };
 
 struct xen_mc {
