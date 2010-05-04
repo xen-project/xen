@@ -9,7 +9,8 @@
 import optparse, os, re, select, signal, sys, time
 
 from xen.remus import save, util, vm
-from xen.remus.device import ReplicatedDisk, BufferedNIC
+from xen.remus.device import ReplicatedDisk, ReplicatedDiskException
+from xen.remus.device import BufferedNIC, BufferedNICException
 from xen.xend import XendOptions
 
 class CfgException(Exception): pass
@@ -115,7 +116,7 @@ def run(cfg):
 
     if cfg.netbuffer:
         for vif in dom.vifs:
-            bufs.append(Netbuffer(dom.domid))
+            bufs.append(BufferedNIC(vif))
 
     fd = save.MigrationSocket((cfg.host, cfg.port))
 
