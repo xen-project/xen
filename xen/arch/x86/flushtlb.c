@@ -149,7 +149,7 @@ void flush_area_local(const void *va, unsigned int flags)
     {
         unsigned long i, sz = 0;
 
-        if ( order < (BITS_PER_LONG - PAGE_SHIFT - 1) )
+        if ( order < (BITS_PER_LONG - PAGE_SHIFT) )
             sz = 1UL << (order + PAGE_SHIFT);
 
         if ( c->x86_clflush_size && c->x86_cache_size && sz &&
