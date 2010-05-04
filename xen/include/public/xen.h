@@ -239,6 +239,10 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
  * 
  * cmd: MMUEXT_FLUSH_CACHE
  * No additional arguments. Writes back and flushes cache contents.
+ *
+ * cmd: MMUEXT_FLUSH_CACHE_GLOBAL
+ * No additional arguments. Writes back and flushes cache contents
+ * on all CPUs in the system.
  * 
  * cmd: MMUEXT_SET_LDT
  * linear_addr: Linear address of LDT base (NB. must be page-aligned).
@@ -268,6 +272,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 #define MMUEXT_NEW_USER_BASEPTR 15
 #define MMUEXT_CLEAR_PAGE       16
 #define MMUEXT_COPY_PAGE        17
+#define MMUEXT_FLUSH_CACHE_GLOBAL 18
 
 #ifndef __ASSEMBLY__
 struct mmuext_op {

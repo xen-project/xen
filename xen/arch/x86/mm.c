@@ -2888,6 +2888,27 @@ int do_mmuext_op(
             }
             break;
 
+        case MMUEXT_FLUSH_CACHE_GLOBAL:
+            if ( unlikely(foreigndom != DOMID_SELF) )
+                okay = 0;
+            else if ( likely(cache_flush_permitted(d)) )
+            {
+                unsigned int cpu;
+                cpumask_t mask = CPU_MASK_NONE;
+
+                for_each_online_cpu(cpu)
+                    if ( !cpus_intersects(mask,
+                                          per_cpu(cpu_sibling_map, cpu)) )
+                        cpu_set(cpu, mask);
+                flush_mask(&mask, FLUSH_CACHE);
+            }
+            else
+            {
+                MEM_LOG("Non-physdev domain tried to FLUSH_CACHE_GLOBAL");
+                okay = 0;
+            }
+            break;
+
         case MMUEXT_SET_LDT:
         {
             unsigned long ptr  = op.arg1.linear_addr;
