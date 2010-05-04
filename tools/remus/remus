@@ -22,7 +22,6 @@ class Cfg(object):
         self.port = XendOptions.instance().get_xend_relocation_port()
         self.interval = 200
         self.netbuffer = True
-        self.nobackup = False
         self.timer = False
 
         parser = optparse.OptionParser()
@@ -36,10 +35,6 @@ class Cfg(object):
                           help='run without net buffering (benchmark option)')
         parser.add_option('', '--timer', dest='timer', action='store_true',
                           help='force pause at checkpoint interval (experimental)')
-        parser.add_option('', '--no-backup', dest='nobackup',
-                          action='store_true',
-                          help='prevent backup from starting up (benchmark '
-                          'option)')
         self.parser = parser
 
     def usage(self):
@@ -106,20 +101,12 @@ class ReplicatedDisk(BufferedDevice):
     def __del__(self):
         self.uninstall()
 
-    def setup(self):
-        #self.ctlfd.write('buffer')
-        #self.ctlfd.flush()
-        self.installed = True
-
     def uninstall(self):
         if self.ctlfd:
             self.ctlfd.close()
             self.ctlfd = None
 
     def postsuspend(self):
-        if not self.installed:
-            self.setup()
-
         os.write(self.ctlfd.fileno(), 'flush')
 
     def commit(self):
@@ -339,11 +326,6 @@ def run(cfg):
 
     for buf in bufs:
         buf.uninstall()
-
-    if cfg.nobackup:
-        # lame attempt to kill backup if protection is stopped deliberately.
-        # It would be much better to move this into the heartbeat "protocol".
-        print util.runcmd(['sudo', '-u', os.getlogin(), 'ssh', cfg.host, 'sudo', 'xm', 'destroy', dom.name])
 
     sys.exit(rc)
 
