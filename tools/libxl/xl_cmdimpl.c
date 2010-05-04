@@ -1173,6 +1173,9 @@ void help(char *command)
     } else if (!strcmp(command, "vcpu-set")) {
         printf("Usage: xl vcpu-set <Domain> <vCPUs>\n\n");
         printf("Set the number of active VCPUs for allowed for the domain.\n\n");
+    } else if(!strcmp(command, "info")) {
+        printf("Usage: xl info\n\n");
+        printf("Get information about Xen host.\n\n");
     } else if (!strcmp(command, "sched-credit")) {
         printf("Usage: xl sched-credit [-d <Domain> [-w[=WEIGHT]|-c[=CAP]]]\n\n");
         printf("Get/set credit scheduler parameters.\n");
@@ -2731,7 +2734,7 @@ int main_info(int argc, char **argv)
     while ((opt = getopt(argc, argv, "h")) != -1) {
         switch (opt) {
         case 'h':
-            help("vcpu-list");
+            help("info");
             exit(0);
         default:
             fprintf(stderr, "option `%c' not supported.\n", opt);
