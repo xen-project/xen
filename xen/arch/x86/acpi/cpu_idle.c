@@ -153,40 +153,45 @@ static void acpi_safe_halt(void)
 /*
  * The bit is set iff cpu use monitor/mwait to enter C state
  * with this flag set, CPU can be waken up from C state
- * by writing to specific memory address, instead of sending IPI
+ * by writing to specific memory address, instead of sending an IPI.
  */
 static cpumask_t cpuidle_mwait_flags;
 
 void cpuidle_wakeup_mwait(cpumask_t *mask)
 {
     cpumask_t target;
-    int cpu;
+    unsigned int cpu;
 
     cpus_and(target, *mask, cpuidle_mwait_flags);
 
-    /* cpu is 'mwait'ing at softirq_pending,
-       writing to it will wake up CPU */
+    /* CPU is MWAITing on the cpuidle_mwait_wakeup flag. */
     for_each_cpu_mask(cpu, target)
-        set_bit(TIMER_SOFTIRQ, &softirq_pending(cpu));
+        mwait_wakeup(cpu) = 0;
 
-    cpus_andnot(*mask, *mask, cpuidle_mwait_flags);
+    cpus_andnot(*mask, *mask, target);
 }
 
 static void mwait_idle_with_hints(unsigned long eax, unsigned long ecx)
 {
-    int cpu = smp_processor_id();
+    unsigned int cpu = smp_processor_id();
+    s_time_t expires = per_cpu(timer_deadline_start, cpu);
 
-    __monitor((void *)&softirq_pending(cpu), 0, 0);
-
+    __monitor((void *)&mwait_wakeup(cpu), 0, 0);
     smp_mb();
-    if (!softirq_pending(cpu))
+
+    /*
+     * Timer deadline passing is the event on which we will be woken via
+     * cpuidle_mwait_wakeup. So check it now that the location is armed.
+     */
+    if ( expires > NOW() || expires == 0 )
     {
         cpu_set(cpu, cpuidle_mwait_flags);
-
         __mwait(eax, ecx);
-
         cpu_clear(cpu, cpuidle_mwait_flags);
     }
+
+    if ( expires <= NOW() && expires > 0 )
+        raise_softirq(TIMER_SOFTIRQ);
 }
 
 static void acpi_processor_ffh_cstate_enter(struct acpi_processor_cx *cx)
