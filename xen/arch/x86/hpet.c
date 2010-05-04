@@ -186,6 +186,9 @@ static void handle_hpet_broadcast(struct hpet_event_channel *ch)
 
 again:
     ch->next_event = STIME_MAX;
+
+    spin_unlock_irq(&ch->lock);
+
     next_event = STIME_MAX;
     mask = (cpumask_t)CPU_MASK_NONE;
     now = NOW();
@@ -193,10 +196,17 @@ again:
     /* find all expired events */
     for_each_cpu_mask(cpu, ch->cpumask)
     {
-        if ( per_cpu(timer_deadline_start, cpu) <= now )
-            cpu_set(cpu, mask);
-        else if ( per_cpu(timer_deadline_end, cpu) < next_event )
-            next_event = per_cpu(timer_deadline_end, cpu);
+        spin_lock_irq(&ch->lock);
+
+        if ( cpumask_test_cpu(cpu, ch->cpumask) )
+        {
+            if ( per_cpu(timer_deadline_start, cpu) <= now )
+                cpu_set(cpu, mask);
+            else if ( per_cpu(timer_deadline_end, cpu) < next_event )
+                next_event = per_cpu(timer_deadline_end, cpu);
+        }
+
+        spin_unlock_irq(&ch->lock);
     }
 
     /* wakeup the cpus which have an expired event. */
@@ -204,10 +214,14 @@ again:
 
     if ( next_event != STIME_MAX )
     {
-        if ( reprogram_hpet_evt_channel(ch, next_event, now, 0) )
+        spin_lock_irq(&ch->lock);
+
+        if ( next_event < ch->next_event &&
+             reprogram_hpet_evt_channel(ch, next_event, now, 0) )
             goto again;
+
+        spin_unlock_irq(&ch->lock);
     }
-    spin_unlock_irq(&ch->lock);
 }
 
 static void hpet_interrupt_handler(int irq, void *data,
@@ -656,17 +670,23 @@ void hpet_broadcast_enter(void)
     BUG_ON( !ch );
 
     ASSERT(!local_irq_is_enabled());
-    spin_lock(&ch->lock);
 
     if ( hpet_attach_channel )
+    {
+        spin_lock(&ch->lock);
+
         hpet_attach_channel(cpu, ch);
+
+        spin_unlock(&ch->lock);
+    }
 
     /* Cancel any outstanding LAPIC timer event and disable interrupts. */
     reprogram_timer(0);
     disable_APIC_timer();
 
-    cpu_set(cpu, ch->cpumask);
+    spin_lock(&ch->lock);
 
+    cpu_set(cpu, ch->cpumask);
     /* reprogram if current cpu expire time is nearer */
     if ( this_cpu(timer_deadline_end) < ch->next_event )
         reprogram_hpet_evt_channel(ch, this_cpu(timer_deadline_end), NOW(), 1);
@@ -684,23 +704,28 @@ void hpet_broadcast_exit(void)
 
     BUG_ON( !ch );
 
+    /* Reprogram the deadline; trigger timer work now if it has passed. */
+    enable_APIC_timer();
+    if ( !reprogram_timer(this_cpu(timer_deadline_start)) )
+        raise_softirq(TIMER_SOFTIRQ);
+
     spin_lock_irq(&ch->lock);
 
-    if ( cpu_test_and_clear(cpu, ch->cpumask) )
-    {
-        /* Reprogram the deadline; trigger timer work now if it has passed. */
-        enable_APIC_timer();
-        if ( !reprogram_timer(this_cpu(timer_deadline_start)) )
-            raise_softirq(TIMER_SOFTIRQ);
-
-        if ( cpus_empty(ch->cpumask) && ch->next_event != STIME_MAX )
-            reprogram_hpet_evt_channel(ch, STIME_MAX, 0, 0);
-    }
-
-    if ( hpet_detach_channel )
-        hpet_detach_channel(cpu);
+    cpu_clear(cpu, ch->cpumask);
+    if ( cpus_empty(ch->cpumask) && ch->next_event != STIME_MAX )
+        reprogram_hpet_evt_channel(ch, STIME_MAX, 0, 0);
 
     spin_unlock_irq(&ch->lock);
+
+
+    if ( hpet_detach_channel )
+    {
+        spin_lock_irq(&ch->lock);
+
+        hpet_detach_channel(cpu);
+
+        spin_unlock_irq(&ch->lock);
+    }
 }
 
 int hpet_broadcast_is_available(void)
