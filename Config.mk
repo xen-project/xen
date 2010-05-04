@@ -153,9 +153,9 @@ QEMU_REMOTE=http://xenbits.xensource.com/git-http/qemu-xen-unstable.git
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= b5160622517fb2d16d0836172a2e34633c9d94bf
-# Tue Apr 13 12:07:33 2010 +0100
-# passthrough: fix segmentation fault after hotplug pass-through device
+QEMU_TAG ?= 01626771cf2e9285fbfddcbded2820fc77745e4b
+# Fri Apr 30 17:41:45 2010 +0100
+# Implement 'xm vcpu-set' command for HVM guest
 
 OCAML_XENSTORED_REPO=http://xenbits.xensource.com/ext/xen-ocaml-tools.hg
 
