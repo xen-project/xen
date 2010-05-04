@@ -407,9 +407,9 @@ again:
     }
 
     snprintf(path, sizeof(path), "%s/state", nodename);
-    err = xenbus_switch_state(xbt, path, XenbusStateInitialised);
+    err = xenbus_switch_state(xbt, path, XenbusStateConnected);
     if (err) {
-        printk("error writing net initialized: %s\n", err);
+        message = "switching state";
         goto abort_transaction;
     }
 
@@ -445,7 +445,6 @@ done:
     {
         XenbusState state;
         char path[strlen(dev->backend) + 1 + 5 + 1];
-        char frontpath[strlen(nodename) + 1 + 6 + 1];
         snprintf(path, sizeof(path), "%s/state", dev->backend);
 
         xenbus_watch_path_token(XBT_NIL, path, path, &dev->events);
@@ -463,16 +462,6 @@ done:
         if (ip) {
             snprintf(path, sizeof(path), "%s/ip", dev->backend);
             xenbus_read(XBT_NIL, path, ip);
-        }
-
-        printk("%s connected\n", dev->backend);
-
-        snprintf(frontpath, sizeof(frontpath), "%s/state", nodename);
-        if((err = xenbus_switch_state(XBT_NIL, frontpath, XenbusStateConnected))
-            != NULL) {
-            printk("error switching state: %s\n", err);
-            xenbus_unwatch_path_token(XBT_NIL, path, path);
-            goto error;
         }
     }
 
@@ -492,7 +481,6 @@ done:
             &rawmac[5]);
 
     return dev;
-
 error:
     free(msg);
     free(err);
