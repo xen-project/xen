@@ -41,7 +41,7 @@
 #ifdef XL_LOGGING_ENABLED
 #define XL_LOG(ctx, loglevel, _f, _a...)   xl_log(ctx, loglevel, -1, __FILE__, __LINE__, __func__, _f, ##_a)
 #define XL_LOG_ERRNO(ctx, loglevel, _f, _a...)   xl_log(ctx, loglevel, errno, __FILE__, __LINE__, __func__, _f, ##_a)
-#define XL_LOG_ERRNOVAL(ctx, errnoval, loglevel, _f, _a...)   xl_log(ctx, loglevel, errnoval, __FILE__, __LINE__, __func__, _f, ##_a)
+#define XL_LOG_ERRNOVAL(ctx, loglevel, errnoval, _f, _a...)   xl_log(ctx, loglevel, errnoval, __FILE__, __LINE__, __func__, _f, ##_a)
 #else
 #define XL_LOG(ctx, loglevel, _f, _a...)
 #define XL_LOG_ERRNO(ctx, loglevel, _f, _a...)
