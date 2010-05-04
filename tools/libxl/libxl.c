@@ -2474,3 +2474,53 @@ int libxl_get_sched_id(struct libxl_ctx *ctx)
         return ret;
     return sched;
 }
+
+int libxl_sched_credit_domain_get(struct libxl_ctx *ctx, uint32_t domid, struct libxl_sched_credit *scinfo)
+{
+    struct xen_domctl_sched_credit sdom;
+    int rc;
+
+    rc = xc_sched_credit_domain_get(ctx->xch, domid, &sdom);
+    if (rc != 0)
+        return rc;
+
+    scinfo->weight = sdom.weight;
+    scinfo->cap = sdom.cap;
+
+    return 0;
+}
+
+int libxl_sched_credit_domain_set(struct libxl_ctx *ctx, uint32_t domid, struct libxl_sched_credit *scinfo)
+{
+    struct xen_domctl_sched_credit sdom;
+    xc_domaininfo_t domaininfo;
+    int rc;
+
+    rc = xc_domain_getinfolist(ctx->xch, domid, 1, &domaininfo);
+    if (rc != 1 || domaininfo.domain != domid)
+        return rc;
+
+
+    if (scinfo->weight < 1 || scinfo->weight > 65535) {
+        XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, rc,
+            "Cpu weight out of range, valid values are within range from 1 to 65535");
+        return -1;
+    }
+
+    if (scinfo->cap < 0 || scinfo->cap > (domaininfo.max_vcpu_id + 1) * 100) {
+        XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, rc,
+            "Cpu cap out of range, valid range is from 0 to %d for specified number of vcpus",
+            ((domaininfo.max_vcpu_id + 1) * 100));
+        return -1;
+    }
+
+    sdom.weight = scinfo->weight;
+    sdom.cap = scinfo->cap;
+
+    rc = xc_sched_credit_domain_set(ctx->xch, domid, &sdom);
+    if (rc != 0)
+        return rc;
+
+    return 0;
+}
+

@@ -459,5 +459,16 @@ int libxl_set_vcpuaffinity(struct libxl_ctx *ctx, uint32_t domid, uint32_t vcpui
 int libxl_set_vcpucount(struct libxl_ctx *ctx, uint32_t domid, uint32_t count);
 
 int libxl_get_sched_id(struct libxl_ctx *ctx);
+
+
+struct libxl_sched_credit {
+    int weight;
+    int cap;
+};
+
+int libxl_sched_credit_domain_get(struct libxl_ctx *ctx, uint32_t domid,
+                                  struct libxl_sched_credit *scinfo);
+int libxl_sched_credit_domain_set(struct libxl_ctx *ctx, uint32_t domid,
+                                  struct libxl_sched_credit *scinfo);
 #endif /* LIBXL_H */
 

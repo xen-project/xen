@@ -1107,6 +1107,7 @@ static void help(char *command)
         printf(" vcpu-list                     list the VCPUs for all/some domains.\n\n");
         printf(" vcpu-pin                      Set which CPUs a VCPU can use.\n\n");
         printf(" vcpu-set                      Set the number of active VCPUs allowed for the domain.\n\n");
+        printf(" sched-credit                  Get/set credit scheduler parameters.\n\n");
     } else if(!strcmp(command, "create")) {
         printf("Usage: xl create <ConfigFile> [options] [vars]\n\n");
         printf("Create a domain based on <ConfigFile>.\n\n");
@@ -1193,6 +1194,12 @@ static void help(char *command)
     } else if (!strcmp(command, "vcpu-set")) {
         printf("Usage: xl vcpu-set <Domain> <vCPUs>\n\n");
         printf("Set the number of active VCPUs for allowed for the domain.\n\n");
+    } else if (!strcmp(command, "sched-credit")) {
+        printf("Usage: xl sched-credit [-d <Domain> [-w[=WEIGHT]|-c[=CAP]]]\n\n");
+        printf("Get/set credit scheduler parameters.\n");
+        printf("  -d DOMAIN, --domain=DOMAIN     Domain to modify\n");
+        printf("  -w WEIGHT, --weight=WEIGHT     Weight (int)\n");
+        printf("  -c CAP, --cap=CAP              Cap (int)\n");
     }
 }
 
@@ -2757,6 +2764,111 @@ void main_info(int argc, char **argv)
     exit(0);
 }
 
+int sched_credit_domain_get(int domid, struct libxl_sched_credit *scinfo)
+{
+    int rc;
+
+    rc = libxl_sched_credit_domain_get(&ctx, domid, scinfo);
+    if (rc)
+        fprintf(stderr, "libxl_sched_credit_domain_get failed.\n");
+    
+    return rc;
+}
+
+int sched_credit_domain_set(int domid, struct libxl_sched_credit *scinfo)
+{
+    int rc;
+
+    rc = libxl_sched_credit_domain_set(&ctx, domid, scinfo);
+    if (rc)
+        fprintf(stderr, "libxl_sched_credit_domain_set failed.\n");
+
+    return rc;
+}
+
+void sched_credit_domain_output(int domid, struct libxl_sched_credit *scinfo)
+{
+    printf("%-33s %4d %6d %4d\n",
+        libxl_domid_to_name(&ctx, domid),
+        domid,
+        scinfo->weight,
+        scinfo->cap);
+}
+
+void main_sched_credit(int argc, char **argv)
+{
+    struct libxl_dominfo *info;
+    struct libxl_sched_credit scinfo;
+    int nb_domain, i;
+    char *dom = NULL;
+    int weight = 256, cap = 0, opt_w = 0, opt_c = 0;
+    int opt, rc;
+
+    while ((opt = getopt(argc, argv, "hd:w:c:")) != -1) {
+        switch (opt) {
+        case 'd':
+            dom = optarg;
+            break;
+        case 'w':
+            weight = strtol(optarg, NULL, 10);
+            opt_w = 1;
+            break;
+        case 'c':
+            cap = strtol(optarg, NULL, 10);
+            opt_c = 1;
+            break;
+        case 'h':
+            help("sched-credit");
+            exit(0);
+        default:
+            fprintf(stderr, "option `%c' not supported.\n", opt);
+            break;
+        }
+    }
+
+    if (!dom && (opt_w || opt_c)) {
+        fprintf(stderr, "Must specify a domain.\n");
+        exit(1);
+    }
+
+    if (!dom) { /* list all domain's credit scheduler info */
+        info = libxl_list_domain(&ctx, &nb_domain);
+        if (!info) {
+            fprintf(stderr, "libxl_domain_infolist failed.\n");
+            exit(1);
+        }
+
+        printf("%-33s %4s %6s %4s\n", "Name", "ID", "Weight", "Cap");
+        for (i = 0; i < nb_domain; i++) {
+            rc = sched_credit_domain_get(info[i].domid, &scinfo);
+            if (rc)
+                exit(-rc);
+            sched_credit_domain_output(info[i].domid, &scinfo);
+        }
+    } else {
+        find_domain(dom);
+
+        rc = sched_credit_domain_get(domid, &scinfo);
+        if (rc)
+            exit(-rc);
+
+        if (!opt_w && !opt_c) { /* output credit scheduler info */
+            printf("%-33s %4s %6s %4s\n", "Name", "ID", "Weight", "Cap");
+            sched_credit_domain_output(domid, &scinfo);
+        } else { /* set credit scheduler paramaters */
+            if (opt_w)
+                scinfo.weight = weight;
+            if (opt_c)
+                scinfo.cap = cap;
+            rc = sched_credit_domain_set(domid, &scinfo);
+            if (rc)
+                exit(-rc);
+        }
+    }
+
+    exit(0);
+}
+
 int main(int argc, char **argv)
 {
     if (argc < 2) {
@@ -2819,6 +2931,8 @@ int main(int argc, char **argv)
         main_vcpuset(argc - 1, argv + 1);
     } else if (!strcmp(argv[1], "info")) {
         main_info(argc - 1, argv + 1);
+    } else if (!strcmp(argv[1], "sched-credit")) {
+        main_sched_credit(argc - 1, argv + 1);
     } else if (!strcmp(argv[1], "help")) {
         if (argc > 2)
             help(argv[2]);
