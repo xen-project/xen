@@ -113,7 +113,13 @@ def getvifs(dom):
     if type(vifs) != list:
         vifs = [vifs]
 
-    return [vif.parse(v) for v in vifs]
+    vifno = 0
+    parsed = []
+    for v in vifs:
+        parsed.append(vif.parse(v, dom['domid'], vifno))
+        vifno += 1
+
+    return parsed
 
 def getdisks(dom):
     "return block device objects for devices in dom"
