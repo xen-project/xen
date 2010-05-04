@@ -2713,7 +2713,7 @@ static void output_physinfo(void)
     return;
 }
 
-static void info(int verbose)
+static void info(void)
 {
     output_nodeinfo();
 
@@ -2728,9 +2728,8 @@ static void info(int verbose)
 
 int main_info(int argc, char **argv)
 {
-    int opt, verbose;
+    int opt;
 
-    verbose = 0;
     while ((opt = getopt(argc, argv, "h")) != -1) {
         switch (opt) {
         case 'h':
@@ -2742,7 +2741,7 @@ int main_info(int argc, char **argv)
         }
     }
 
-    info(verbose);
+    info();
     exit(0);
 }
 
