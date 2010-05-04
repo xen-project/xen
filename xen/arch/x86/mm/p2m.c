@@ -1814,22 +1814,19 @@ int p2m_alloc_table(struct domain *d,
     p2m->alloc_page = alloc_page;
     p2m->free_page = free_page;
 
-    p2m_top = p2m->alloc_page(d);
-    if ( p2m_top == NULL )
-    {
-        p2m_unlock(p2m);
-        return -ENOMEM;
-    }
-    page_list_add_tail(p2m_top, &p2m->pages);
-
-    p2m_top->count_info = 1;
-    p2m_top->u.inuse.type_info =
+    p2m_top = p2m_alloc_ptp(d,
 #if CONFIG_PAGING_LEVELS == 4
         PGT_l4_page_table
 #else
         PGT_l3_page_table
 #endif
-        | 1 | PGT_validated;
+        );
+
+    if ( p2m_top == NULL )
+    {
+        p2m_unlock(p2m);
+        return -ENOMEM;
+    }
 
     d->arch.phys_table = pagetable_from_mfn(page_to_mfn(p2m_top));
 
