@@ -1157,8 +1157,9 @@ struct page_info *alloc_domheap_pages(
         pg = alloc_heap_pages(dma_zone + 1, zone_hi, node, order, memflags);
 
     if ( (pg == NULL) &&
-         ((pg = alloc_heap_pages(MEMZONE_XEN + 1, zone_hi,
-                                 node, order, memflags)) == NULL) )
+         ((memflags & MEMF_no_dma) ||
+          ((pg = alloc_heap_pages(MEMZONE_XEN + 1, zone_hi,
+                                  node, order, memflags)) == NULL)) )
          return NULL;
 
     if ( (d != NULL) && assign_pages(d, pg, order, memflags) )

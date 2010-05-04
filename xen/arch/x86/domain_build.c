@@ -126,26 +126,36 @@ string_param("dom0_ioports_disable", opt_dom0_ioports_disable);
 static struct page_info * __init alloc_chunk(
     struct domain *d, unsigned long max_pages)
 {
+    static unsigned int __initdata last_order = MAX_ORDER;
+    static unsigned int __initdata memflags = MEMF_no_dma;
     struct page_info *page;
-    unsigned int order, free_order;
+    unsigned int order = get_order_from_pages(max_pages), free_order;
 
-    /*
-     * Allocate up to 2MB at a time: It prevents allocating very large chunks
-     * from DMA pools before the >4GB pool is fully depleted.
-     */
-    if ( max_pages > (2UL << (20 - PAGE_SHIFT)) )
-        max_pages = 2UL << (20 - PAGE_SHIFT);
-    order = get_order_from_pages(max_pages);
-    if ( (max_pages & (max_pages-1)) != 0 )
-        order--;
-    while ( (page = alloc_domheap_pages(d, order, 0)) == NULL )
+    if ( order > last_order )
+        order = last_order;
+    else if ( max_pages & (max_pages - 1) )
+        --order;
+    while ( (page = alloc_domheap_pages(d, order, memflags)) == NULL )
         if ( order-- == 0 )
             break;
+    if ( page )
+        last_order = order;
+    else if ( memflags )
+    {
+        /*
+         * Allocate up to 2MB at a time: It prevents allocating very large
+         * chunks from DMA pools before the >4GB pool is fully depleted.
+         */
+        last_order = 21 - PAGE_SHIFT;
+        memflags = 0;
+        return alloc_chunk(d, max_pages);
+    }
+
     /*
      * Make a reasonable attempt at finding a smaller chunk at a higher
      * address, to avoid allocating from low memory as much as possible.
      */
-    for ( free_order = order; page && order--; )
+    for ( free_order = order; !memflags && page && order--; )
     {
         struct page_info *pg2;
 
