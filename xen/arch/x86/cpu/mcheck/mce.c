@@ -1274,6 +1274,7 @@ long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)
 	unsigned int target;
 	struct xen_mc_msrinject *mc_msrinject;
 	struct xen_mc_mceinject *mc_mceinject;
+	cpumask_t target_map;
 
 	if (!IS_PRIV(v->domain) )
 		return x86_mcerr(NULL, -EPERM);
@@ -1411,6 +1412,7 @@ long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)
 
 		mc_mceinject = &op->u.mc_mceinject;
 		target = mc_mceinject->mceinj_cpunr;
+		flags = mc_mceinject->mceinj_flag;
 
 		if (target >= NR_CPUS)
 			return x86_mcerr("do_mca #MC: bad target", -EINVAL);
@@ -1419,12 +1421,22 @@ long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)
 			return x86_mcerr("do_mca #MC: target offline", -EINVAL);
 
 		add_taint(TAINT_ERROR_INJECT);
-
-        if ( mce_broadcast )
-            on_each_cpu(x86_mc_mceinject, mc_mceinject, 0);
-        else
-            on_selected_cpus(cpumask_of(target), x86_mc_mceinject,
-                  mc_mceinject, 1);
+		if (flags == XEN_MC_UC) {
+			if ( mce_broadcast )
+				on_each_cpu(x86_mc_mceinject, mc_mceinject, 0);
+			else
+				on_selected_cpus(cpumask_of(target), x86_mc_mceinject,
+					mc_mceinject, 1);
+		}
+		else if (flags == XEN_MC_CE) {
+			if (mce_broadcast)
+				send_IPI_mask(&cpu_online_map, CMCI_APIC_VECTOR);
+			else {
+				cpus_clear(target_map);
+				cpu_set(target, target_map);
+				send_IPI_mask(&target_map, CMCI_APIC_VECTOR);
+			}
+		}
 		break;
 
 	default:
