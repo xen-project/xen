@@ -79,7 +79,10 @@ libxlutil.a: $(LIBXLU_OBJS)
 xl.o: xl.c
 	$(CC) $(CFLAGS) -c xl.c
 
-$(CLIENTS): xl.o libxlutil.so libxenlight.so
+xl_cmdimpl.o: xl_cmdimpl.c
+	$(CC) $(CFLAGS) -c xl_cmdimpl.c
+
+$(CLIENTS): xl.o xl_cmdimpl.o libxlutil.so libxenlight.so
 	$(CC) $(LDFLAGS) -o $@ $^ $(LIBS)
 
 .PHONY: install
