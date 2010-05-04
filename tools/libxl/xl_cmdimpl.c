@@ -1123,7 +1123,7 @@ void help(char *command)
         printf("Usage xl <subcommand> [args]\n\n");
         printf("xl full list of subcommands:\n\n");
         for (i = 0; i < cmdtable_len; i++)
-            printf(" %-25s%s\n\n",
+            printf(" %-20s%s\n",
                    cmd_table[i].cmd_name, cmd_table[i].cmd_desc);
     } else if(!strcmp(command, "create")) {
         printf("Usage: xl create <ConfigFile> [options] [vars]\n\n");
