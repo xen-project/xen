@@ -133,7 +133,7 @@ static int suspend_guest(int xc_handle, int xce, int domid, int *evtchn)
 
 failed:
     if (suspend_evtchn != -1)
-        xc_suspend_evtchn_release(xce, suspend_evtchn);
+        xc_suspend_evtchn_release(xce, domid, suspend_evtchn);
 
     return -1;
 }
@@ -228,7 +228,7 @@ static int hp_mem_offline_func(int argc, char *argv[])
                                 mfn, domid);
                     }
                     xc_domain_resume(xc_fd, domid, 1);
-                    xc_suspend_evtchn_release(xce, suspend_evtchn);
+                    xc_suspend_evtchn_release(xce, domid, suspend_evtchn);
                     xc_evtchn_close(xce);
                 }
                 break;
