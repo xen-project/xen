@@ -90,36 +90,38 @@ struct scheduler {
     void *sched_data;       /* global data pointer               */
 
     int          (*init)           (struct scheduler *, int);
-    void         (*deinit)         (struct scheduler *);
+    void         (*deinit)         (const struct scheduler *);
 
-    void         (*free_vdata)     (struct scheduler *, void *);
-    void *       (*alloc_vdata)    (struct scheduler *, struct vcpu *,
+    void         (*free_vdata)     (const struct scheduler *, void *);
+    void *       (*alloc_vdata)    (const struct scheduler *, struct vcpu *,
                                     void *);
-    void         (*free_pdata)     (struct scheduler *, void *, int);
-    void *       (*alloc_pdata)    (struct scheduler *, int);
-    void         (*free_domdata)   (struct scheduler *, void *);
-    void *       (*alloc_domdata)  (struct scheduler *, struct domain *);
+    void         (*free_pdata)     (const struct scheduler *, void *, int);
+    void *       (*alloc_pdata)    (const struct scheduler *, int);
+    void         (*free_domdata)   (const struct scheduler *, void *);
+    void *       (*alloc_domdata)  (const struct scheduler *, struct domain *);
 
-    int          (*init_domain)    (struct scheduler *, struct domain *);
-    void         (*destroy_domain) (struct scheduler *, struct domain *);
+    int          (*init_domain)    (const struct scheduler *, struct domain *);
+    void         (*destroy_domain) (const struct scheduler *, struct domain *);
 
-    void         (*insert_vcpu)    (struct scheduler *, struct vcpu *);
-    void         (*destroy_vcpu)   (struct scheduler *, struct vcpu *);
+    void         (*insert_vcpu)    (const struct scheduler *, struct vcpu *);
+    void         (*destroy_vcpu)   (const struct scheduler *, struct vcpu *);
 
-    void         (*sleep)          (struct scheduler *, struct vcpu *);
-    void         (*wake)           (struct scheduler *, struct vcpu *);
-    void         (*context_saved)  (struct scheduler *, struct vcpu *);
+    void         (*sleep)          (const struct scheduler *, struct vcpu *);
+    void         (*wake)           (const struct scheduler *, struct vcpu *);
+    void         (*context_saved)  (const struct scheduler *, struct vcpu *);
 
-    struct task_slice (*do_schedule) (struct scheduler *, s_time_t);
+    struct task_slice (*do_schedule) (const struct scheduler *, s_time_t);
 
-    int          (*pick_cpu)       (struct scheduler *, struct vcpu *);
-    int          (*adjust)         (struct scheduler *, struct domain *,
+    int          (*pick_cpu)       (const struct scheduler *, struct vcpu *);
+    int          (*adjust)         (const struct scheduler *, struct domain *,
                                     struct xen_domctl_scheduler_op *);
-    void         (*dump_settings)  (struct scheduler *);
-    void         (*dump_cpu_state) (struct scheduler *, int);
+    int          (*adjust_global)  (const struct scheduler *,
+                                    struct xen_sysctl_scheduler_op *);
+    void         (*dump_settings)  (const struct scheduler *);
+    void         (*dump_cpu_state) (const struct scheduler *, int);
 
-    void         (*tick_suspend)    (struct scheduler *, unsigned int);
-    void         (*tick_resume)     (struct scheduler *, unsigned int);
+    void         (*tick_suspend)    (const struct scheduler *, unsigned int);
+    void         (*tick_resume)     (const struct scheduler *, unsigned int);
 };
 
 struct cpupool

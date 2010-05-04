@@ -303,7 +303,7 @@ __runq_tickle(unsigned int cpu, struct csched_vcpu *new)
 }
 
 static void
-csched_free_pdata(struct scheduler *ops, void *pcpu, int cpu)
+csched_free_pdata(const struct scheduler *ops, void *pcpu, int cpu)
 {
     struct csched_private *prv = CSCHED_PRIV(ops);
     struct csched_pcpu *spc = pcpu;
@@ -333,7 +333,7 @@ csched_free_pdata(struct scheduler *ops, void *pcpu, int cpu)
 }
 
 static void *
-csched_alloc_pdata(struct scheduler *ops, int cpu)
+csched_alloc_pdata(const struct scheduler *ops, int cpu)
 {
     struct csched_pcpu *spc;
     struct csched_private *prv = CSCHED_PRIV(ops);
@@ -448,7 +448,7 @@ __csched_vcpu_is_migrateable(struct vcpu *vc, int dest_cpu)
 }
 
 static int
-_csched_cpu_pick(struct scheduler *ops, struct vcpu *vc, bool_t commit)
+_csched_cpu_pick(const struct scheduler *ops, struct vcpu *vc, bool_t commit)
 {
     cpumask_t cpus;
     cpumask_t idlers;
@@ -524,7 +524,7 @@ _csched_cpu_pick(struct scheduler *ops, struct vcpu *vc, bool_t commit)
 }
 
 static int
-csched_cpu_pick(struct scheduler *ops, struct vcpu *vc)
+csched_cpu_pick(const struct scheduler *ops, struct vcpu *vc)
 {
     return _csched_cpu_pick(ops, vc, 1);
 }
@@ -579,7 +579,7 @@ static void
 csched_vcpu_acct(struct csched_private *prv, unsigned int cpu)
 {
     struct csched_vcpu * const svc = CSCHED_VCPU(current);
-    struct scheduler *ops = per_cpu(scheduler, cpu);
+    const struct scheduler *ops = per_cpu(scheduler, cpu);
 
     ASSERT( current->processor == cpu );
     ASSERT( svc->sdom != NULL );
@@ -620,7 +620,7 @@ csched_vcpu_acct(struct csched_private *prv, unsigned int cpu)
 }
 
 static void *
-csched_alloc_vdata(struct scheduler *ops, struct vcpu *vc, void *dd)
+csched_alloc_vdata(const struct scheduler *ops, struct vcpu *vc, void *dd)
 {
     struct csched_vcpu *svc;
 
@@ -644,7 +644,7 @@ csched_alloc_vdata(struct scheduler *ops, struct vcpu *vc, void *dd)
 }
 
 static void
-csched_vcpu_insert(struct scheduler *ops, struct vcpu *vc)
+csched_vcpu_insert(const struct scheduler *ops, struct vcpu *vc)
 {
     struct csched_vcpu *svc = vc->sched_priv;
 
@@ -653,7 +653,7 @@ csched_vcpu_insert(struct scheduler *ops, struct vcpu *vc)
 }
 
 static void
-csched_free_vdata(struct scheduler *ops, void *priv)
+csched_free_vdata(const struct scheduler *ops, void *priv)
 {
     struct csched_private *prv = CSCHED_PRIV(ops);
     struct csched_vcpu *svc = priv;
@@ -673,7 +673,7 @@ csched_free_vdata(struct scheduler *ops, void *priv)
 }
 
 static void
-csched_vcpu_destroy(struct scheduler *ops, struct vcpu *vc)
+csched_vcpu_destroy(const struct scheduler *ops, struct vcpu *vc)
 {
     struct csched_vcpu * const svc = CSCHED_VCPU(vc);
     struct csched_dom * const sdom = svc->sdom;
@@ -687,7 +687,7 @@ csched_vcpu_destroy(struct scheduler *ops, struct vcpu *vc)
 }
 
 static void
-csched_vcpu_sleep(struct scheduler *ops, struct vcpu *vc)
+csched_vcpu_sleep(const struct scheduler *ops, struct vcpu *vc)
 {
     struct csched_vcpu * const svc = CSCHED_VCPU(vc);
 
@@ -702,7 +702,7 @@ csched_vcpu_sleep(struct scheduler *ops, struct vcpu *vc)
 }
 
 static void
-csched_vcpu_wake(struct scheduler *ops, struct vcpu *vc)
+csched_vcpu_wake(const struct scheduler *ops, struct vcpu *vc)
 {
     struct csched_vcpu * const svc = CSCHED_VCPU(vc);
     const unsigned int cpu = vc->processor;
@@ -758,7 +758,7 @@ csched_vcpu_wake(struct scheduler *ops, struct vcpu *vc)
 
 static int
 csched_dom_cntl(
-    struct scheduler *ops,
+    const struct scheduler *ops,
     struct domain *d,
     struct xen_domctl_scheduler_op *op)
 {
@@ -797,7 +797,7 @@ csched_dom_cntl(
 }
 
 static void *
-csched_alloc_domdata(struct scheduler *ops, struct domain *dom)
+csched_alloc_domdata(const struct scheduler *ops, struct domain *dom)
 {
     struct csched_dom *sdom;
 
@@ -818,7 +818,7 @@ csched_alloc_domdata(struct scheduler *ops, struct domain *dom)
 }
 
 static int
-csched_dom_init(struct scheduler *ops, struct domain *dom)
+csched_dom_init(const struct scheduler *ops, struct domain *dom)
 {
     struct csched_dom *sdom;
 
@@ -837,13 +837,13 @@ csched_dom_init(struct scheduler *ops, struct domain *dom)
 }
 
 static void
-csched_free_domdata(struct scheduler *ops, void *data)
+csched_free_domdata(const struct scheduler *ops, void *data)
 {
     xfree(data);
 }
 
 static void
-csched_dom_destroy(struct scheduler *ops, struct domain *dom)
+csched_dom_destroy(const struct scheduler *ops, struct domain *dom)
 {
     CSCHED_STAT_CRANK(dom_destroy);
     csched_free_domdata(ops, CSCHED_DOM(dom));
@@ -1243,7 +1243,7 @@ csched_load_balance(struct csched_private *prv, int cpu,
  * fast for the common case.
  */
 static struct task_slice
-csched_schedule(struct scheduler *ops, s_time_t now)
+csched_schedule(const struct scheduler *ops, s_time_t now)
 {
     const int cpu = smp_processor_id();
     struct list_head * const runq = RUNQ(cpu);
@@ -1355,7 +1355,7 @@ csched_dump_vcpu(struct csched_vcpu *svc)
 }
 
 static void
-csched_dump_pcpu(struct scheduler *ops, int cpu)
+csched_dump_pcpu(const struct scheduler *ops, int cpu)
 {
     struct list_head *runq, *iter;
     struct csched_pcpu *spc;
@@ -1393,7 +1393,7 @@ csched_dump_pcpu(struct scheduler *ops, int cpu)
 }
 
 static void
-csched_dump(struct scheduler *ops)
+csched_dump(const struct scheduler *ops)
 {
     struct list_head *iter_sdom, *iter_svc;
     struct csched_private *prv = CSCHED_PRIV(ops);
@@ -1503,7 +1503,7 @@ static __init int csched_start_tickers(void)
 __initcall(csched_start_tickers);
 
 static void
-csched_deinit(struct scheduler *ops)
+csched_deinit(const struct scheduler *ops)
 {
     struct csched_private *prv;
 
@@ -1512,7 +1512,7 @@ csched_deinit(struct scheduler *ops)
         xfree(prv);
 }
 
-static void csched_tick_suspend(struct scheduler *ops, unsigned int cpu)
+static void csched_tick_suspend(const struct scheduler *ops, unsigned int cpu)
 {
     struct csched_pcpu *spc;
 
@@ -1521,7 +1521,7 @@ static void csched_tick_suspend(struct scheduler *ops, unsigned int cpu)
     stop_timer(&spc->ticker);
 }
 
-static void csched_tick_resume(struct scheduler *ops, unsigned int cpu)
+static void csched_tick_resume(const struct scheduler *ops, unsigned int cpu)
 {
     struct csched_pcpu *spc;
     uint64_t now = NOW();
@@ -1548,7 +1548,7 @@ static void csched_tick_resume(struct scheduler *ops, unsigned int cpu)
 
 static struct csched_private _csched_priv;
 
-struct scheduler sched_credit_def = {
+const struct scheduler sched_credit_def = {
     .name           = "SMP Credit Scheduler",
     .opt_name       = "credit",
     .sched_id       = XEN_SCHEDULER_CREDIT,
