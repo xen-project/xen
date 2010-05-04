@@ -882,6 +882,21 @@ long sched_adjust(struct domain *d, struct xen_domctl_scheduler_op *op)
     return ret;
 }
 
+long sched_adjust_global(struct xen_sysctl_scheduler_op *op)
+{
+    const struct scheduler *sched;
+
+    sched = scheduler_get_by_id(op->sched_id);
+    if ( sched == NULL )
+        return -ESRCH;
+
+    if ( (op->cmd != XEN_DOMCTL_SCHEDOP_putinfo) &&
+         (op->cmd != XEN_DOMCTL_SCHEDOP_getinfo) )
+        return -EINVAL;
+
+    return SCHED_OP(sched, adjust_global, op);
+}
+
 static void vcpu_periodic_timer_work(struct vcpu *v)
 {
     s_time_t now = NOW();

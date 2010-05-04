@@ -469,6 +469,7 @@ int  sched_init_domain(struct domain *d);
 void sched_destroy_domain(struct domain *d);
 int sched_move_domain(struct domain *d, struct cpupool *c);
 long sched_adjust(struct domain *, struct xen_domctl_scheduler_op *);
+long sched_adjust_global(struct xen_sysctl_scheduler_op *);
 int  sched_id(void);
 void sched_tick_suspend(void);
 void sched_tick_resume(void);

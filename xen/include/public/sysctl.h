@@ -536,6 +536,19 @@ struct xen_sysctl_cpupool_op {
 typedef struct xen_sysctl_cpupool_op xen_sysctl_cpupool_op_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_cpupool_op_t);
 
+#define XEN_SYSCTL_scheduler_op      19
+/* Set or get info? */
+#define XEN_SYSCTL_SCHEDOP_putinfo 0
+#define XEN_SYSCTL_SCHEDOP_getinfo 1
+struct xen_sysctl_scheduler_op {
+    uint32_t sched_id;  /* XEN_SCHEDULER_* (domctl.h) */
+    uint32_t cmd;       /* XEN_SYSCTL_SCHEDOP_* */
+    union {
+    } u;
+};
+typedef struct xen_sysctl_scheduler_op xen_sysctl_scheduler_op_t;
+DEFINE_XEN_GUEST_HANDLE(xen_sysctl_scheduler_op_t);
+
 struct xen_sysctl {
     uint32_t cmd;
     uint32_t interface_version; /* XEN_SYSCTL_INTERFACE_VERSION */
@@ -557,6 +570,7 @@ struct xen_sysctl {
         struct xen_sysctl_page_offline_op   page_offline;
         struct xen_sysctl_lockprof_op       lockprof_op;
         struct xen_sysctl_cpupool_op        cpupool_op;
+        struct xen_sysctl_scheduler_op      scheduler_op;
         uint8_t                             pad[128];
     } u;
 };
