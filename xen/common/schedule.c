@@ -216,7 +216,8 @@ int sched_init_vcpu(struct vcpu *v, unsigned int processor)
 
     TRACE_2D(TRC_SCHED_DOM_ADD, v->domain->domain_id, v->vcpu_id);
 
-    if ( unlikely(per_cpu(schedule_data, v->processor).sched_priv == NULL) )
+    if ( unlikely(per_cpu(schedule_data, v->processor).sched_priv == NULL)
+         && (DOM2OP(d)->alloc_pdata != NULL) )
     {
         per_cpu(schedule_data, v->processor).sched_priv =
             SCHED_OP(DOM2OP(d), alloc_pdata, processor);
