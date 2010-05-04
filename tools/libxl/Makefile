@@ -100,6 +100,7 @@ install: all
 	ln -sf libxlutil.so.$(XLUMAJOR) $(DESTDIR)$(LIBDIR)/libxlutil.so
 	$(INSTALL_DATA) libxlutil.a $(DESTDIR)$(LIBDIR)
 	$(INSTALL_DATA) libxl.h $(DESTDIR)$(INCLUDEDIR)
+	$(INSTALL_DATA) bash-completion $(BASH_COMPLETION_DIR)/xl.sh
 
 .PHONY: clean
 clean:

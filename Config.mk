@@ -29,6 +29,7 @@ include $(XEN_ROOT)/config/$(XEN_TARGET_ARCH).mk
 SHAREDIR    ?= $(PREFIX)/share
 DOCDIR      ?= $(SHAREDIR)/doc/xen
 MANDIR      ?= $(SHAREDIR)/man
+BASH_COMPLETION_DIR ?= /etc/profile.d
 
 ifneq ($(EXTRA_PREFIX),)
 EXTRA_INCLUDES += $(EXTRA_PREFIX)/include
