@@ -376,8 +376,9 @@ int vmx_cpu_up(void)
     bios_locked = !!(eax & IA32_FEATURE_CONTROL_MSR_LOCK);
     if ( bios_locked )
     {
-        if ( !(eax & (IA32_FEATURE_CONTROL_MSR_ENABLE_VMXON_OUTSIDE_SMX |
-                      IA32_FEATURE_CONTROL_MSR_ENABLE_VMXON_INSIDE_SMX)) )
+        if ( !(eax & (tboot_in_measured_env()
+                      ? IA32_FEATURE_CONTROL_MSR_ENABLE_VMXON_INSIDE_SMX
+                      : IA32_FEATURE_CONTROL_MSR_ENABLE_VMXON_OUTSIDE_SMX)) )
         {
             printk("CPU%d: VMX disabled by BIOS.\n", cpu);
             return 0;
