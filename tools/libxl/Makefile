@@ -90,6 +90,10 @@ $(CLIENTS): xl.o xl_cmdimpl.o xl_cmdtable.o libxlutil.so libxenlight.so
 
 .PHONY: install
 install: all
+	$(INSTALL_DIR) $(DESTDIR)$(SBINDIR)
+	$(INSTALL_DIR) $(DESTDIR)$(LIBDIR)
+	$(INSTALL_DIR) $(DESTDIR)$(INCLUDEDIR)
+	$(INSTALL_DIR) $(DESTDIR)$(BASH_COMPLETION_DIR)
 	$(INSTALL_PROG) xl $(DESTDIR)$(SBINDIR)
 	$(INSTALL_PROG) libxenlight.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)
 	ln -sf libxenlight.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)/libxenlight.so.$(MAJOR)
@@ -100,7 +104,7 @@ install: all
 	ln -sf libxlutil.so.$(XLUMAJOR) $(DESTDIR)$(LIBDIR)/libxlutil.so
 	$(INSTALL_DATA) libxlutil.a $(DESTDIR)$(LIBDIR)
 	$(INSTALL_DATA) libxl.h $(DESTDIR)$(INCLUDEDIR)
-	$(INSTALL_DATA) bash-completion $(BASH_COMPLETION_DIR)/xl.sh
+	$(INSTALL_DATA) bash-completion $(DESTDIR)$(BASH_COMPLETION_DIR)/xl.sh
 
 .PHONY: clean
 clean:
