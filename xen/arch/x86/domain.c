@@ -535,6 +535,7 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
 
  fail:
     d->is_dying = DOMDYING_dead;
+    vmce_destroy_msr(d);
     xfree(d->arch.pirq_irq);
     xfree(d->arch.irq_pirq);
     free_xenheap_page(d->shared_info);
@@ -562,6 +563,7 @@ void arch_domain_destroy(struct domain *d)
     if ( is_hvm_domain(d) )
         hvm_domain_destroy(d);
 
+    vmce_destroy_msr(d);
     pci_release_devices(d);
     free_domain_pirqs(d);
     if ( !is_idle_domain(d) )

@@ -625,8 +625,6 @@ static void complete_domain_destroy(struct rcu_head *head)
 
     xfree(d->pirq_mask);
     xfree(d->pirq_to_evtchn);
-    xfree(dom_vmce(d)->mci_ctl);
-    xfree(dom_vmce(d));
 
     xsm_free_security_domain(d);
     free_domain_struct(d);

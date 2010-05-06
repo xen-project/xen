@@ -27,10 +27,9 @@ struct domain_mca_msrs
     spinlock_t lock;
 };
 
-#define dom_vmce(x)   ((x)->arch.vmca_msrs)
-
 /* Guest vMCE MSRs virtualization */
 extern int vmce_init_msr(struct domain *d);
+extern void vmce_destroy_msr(struct domain *d);
 extern int vmce_wrmsr(uint32_t msr, uint64_t val);
 extern int vmce_rdmsr(uint32_t msr, uint64_t *val);
 #endif
