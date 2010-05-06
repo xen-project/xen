@@ -74,10 +74,15 @@ def runVncViewer(domid, do_autopass, do_daemonize=False):
     if do_daemonize:
         pid = utils.daemonize('vncviewer', cmdl, vnc_password_tmpfile)
         if pid == 0:
-            puts >>sys.stderr, 'failed to invoke vncviewer'
+            print >>sys.stderr, 'failed to invoke vncviewer'
             os._exit(-1)
     else:
         print 'invoking ', ' '.join(cmdl)
         if vnc_password_tmpfile is not None:
             os.dup2(vnc_password_tmpfile.fileno(), 0)
-        os.execvp('vncviewer', cmdl)
+        try:
+            os.execvp('vncviewer', cmdl)
+        except OSError:
+            print >>sys.stderr, 'Error: external vncviewer missing or not \
+in the path\nExiting'
+            os._exit(-1)
