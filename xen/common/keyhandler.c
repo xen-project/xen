@@ -71,14 +71,40 @@ static struct keyhandler show_handlers_keyhandler = {
     .desc = "show this message"
 };
 
-static void __dump_execstate(void *unused)
+static cpumask_t dump_execstate_mask;
+
+void dump_execstate(struct cpu_user_regs *regs)
 {
-    dump_execution_state();
-    printk("*** Dumping CPU%d guest state: ***\n", smp_processor_id());
-    if ( is_idle_vcpu(current) )
-        printk("No guest context (CPU is idle).\n");
-    else
+    unsigned int cpu = smp_processor_id();
+
+    if ( !guest_mode(regs) )
+    {
+        printk("*** Dumping CPU%u host state: ***\n", cpu);
+        show_execution_state(regs);
+    }
+
+    if ( !is_idle_vcpu(current) )
+    {
+        printk("*** Dumping CPU%u guest state (d%d:v%d): ***\n",
+               smp_processor_id(), current->domain->domain_id,
+               current->vcpu_id);
         show_execution_state(guest_cpu_user_regs());
+        printk("\n");
+    }
+
+    cpu_clear(cpu, dump_execstate_mask);
+    if ( !alt_key_handling )
+        return;
+
+    cpu = cycle_cpu(cpu, dump_execstate_mask);
+    if ( cpu < NR_CPUS )
+    {
+        smp_send_state_dump(cpu);
+        return;
+    }
+
+    console_end_sync();
+    watchdog_enable();
 }
 
 static void dump_registers(unsigned char key, struct cpu_user_regs *regs)
@@ -89,21 +115,24 @@ static void dump_registers(unsigned char key, struct cpu_user_regs *regs)
     watchdog_disable();
     console_start_sync();
 
-    printk("'%c' pressed -> dumping registers\n", key);
+    printk("'%c' pressed -> dumping registers\n\n", key);
+
+    dump_execstate_mask = cpu_online_map;
 
     /* Get local execution state out immediately, in case we get stuck. */
-    printk("\n*** Dumping CPU%d host state: ***\n", smp_processor_id());
-    __dump_execstate(NULL);
+    dump_execstate(regs);
 
-    for_each_online_cpu ( cpu )
+    /* Alt. handling: remaining CPUs are dumped asynchronously one-by-one. */
+    if ( alt_key_handling )
+        return;
+
+    /* Normal handling: synchronously dump the remaining CPUs' states. */
+    for_each_cpu_mask ( cpu, dump_execstate_mask )
     {
-        if ( cpu == smp_processor_id() )
-            continue;
-        printk("\n*** Dumping CPU%d host state: ***\n", cpu);
-        on_selected_cpus(cpumask_of(cpu), __dump_execstate, NULL, 1);
+        smp_send_state_dump(cpu);
+        while ( cpu_isset(cpu, dump_execstate_mask) )
+            cpu_relax();
     }
-
-    printk("\n");
 
     console_end_sync();
     watchdog_enable();

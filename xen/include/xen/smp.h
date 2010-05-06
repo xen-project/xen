@@ -13,6 +13,8 @@ extern void smp_send_event_check_mask(const cpumask_t *mask);
 #define smp_send_event_check_cpu(cpu) \
     smp_send_event_check_mask(cpumask_of(cpu))
 
+extern void smp_send_state_dump(unsigned int cpu);
+
 /*
  * Prepare machine for booting other CPUs.
  */

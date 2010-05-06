@@ -94,6 +94,7 @@ static volatile struct call_data_struct *call_data;
 
 #define IPI_CALL_FUNC		0
 #define IPI_CPU_STOP		1
+#define IPI_STATE_DUMP		2
 
 /* This needs to be cacheline aligned because it is written to by *other* CPUs.  */
 static DEFINE_PER_CPU(u64, ipi_operation) ____cacheline_aligned;
@@ -200,6 +201,10 @@ handle_IPI (int irq, void *dev_id, struct pt_regs *regs)
 
 			      case IPI_CPU_STOP:
 				stop_this_cpu();
+				break;
+
+			      case IPI_STATE_DUMP:
+				dump_execstate(regs);
 				break;
 
 			      default:
@@ -477,6 +482,12 @@ void
 smp_send_stop (void)
 {
 	send_IPI_allbutself(IPI_CPU_STOP);
+}
+
+void
+smp_send_state_dump (unsigned int cpu)
+{
+	send_IPI_single(cpu, IPI_STATE_DUMP);
 }
 
 int __init

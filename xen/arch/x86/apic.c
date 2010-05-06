@@ -1233,8 +1233,17 @@ fastcall void smp_apic_timer_interrupt(struct cpu_user_regs * regs)
     set_irq_regs(old_regs);
 }
 
+static DEFINE_PER_CPU(bool_t, state_dump_pending);
+
+void smp_send_state_dump(unsigned int cpu)
+{
+    /* We overload the spurious interrupt handler to handle the dump. */
+    per_cpu(state_dump_pending, cpu) = 1;
+    send_IPI_mask(cpumask_of(cpu), SPURIOUS_APIC_VECTOR);
+}
+
 /*
- * This interrupt should _never_ happen with our APIC/SMP architecture
+ * Spurious interrupts should _never_ happen with our APIC/SMP architecture.
  */
 fastcall void smp_spurious_interrupt(struct cpu_user_regs *regs)
 {
@@ -1242,18 +1251,27 @@ fastcall void smp_spurious_interrupt(struct cpu_user_regs *regs)
     struct cpu_user_regs *old_regs = set_irq_regs(regs);
 
     irq_enter();
+
     /*
-     * Check if this really is a spurious interrupt and ACK it
-     * if it is a vectored one.  Just in case...
-     * Spurious interrupts should not be ACKed.
+     * Check if this is a vectored interrupt (most likely, as this is probably
+     * a request to dump local CPU state). Vectored interrupts are ACKed;
+     * spurious interrupts are not.
      */
     v = apic_read(APIC_ISR + ((SPURIOUS_APIC_VECTOR & ~0x1f) >> 1));
-    if (v & (1 << (SPURIOUS_APIC_VECTOR & 0x1f)))
+    if (v & (1 << (SPURIOUS_APIC_VECTOR & 0x1f))) {
         ack_APIC_irq();
+        if (this_cpu(state_dump_pending)) {
+            this_cpu(state_dump_pending) = 0;
+            dump_execstate(regs);
+            goto out;
+        }
+    }
 
     /* see sw-dev-man vol 3, chapter 7.4.13.5 */
-    printk(KERN_INFO "spurious APIC interrupt on CPU#%d, should never happen.\n",
-           smp_processor_id());
+    printk(KERN_INFO "spurious APIC interrupt on CPU#%d, should "
+           "never happen.\n", smp_processor_id());
+
+ out:
     irq_exit();
     set_irq_regs(old_regs);
 }

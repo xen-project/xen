@@ -111,4 +111,7 @@ extern int tainted;
 extern char *print_tainted(char *str);
 extern void add_taint(unsigned);
 
+struct cpu_user_regs;
+void dump_execstate(struct cpu_user_regs *);
+
 #endif /* __LIB_H__ */

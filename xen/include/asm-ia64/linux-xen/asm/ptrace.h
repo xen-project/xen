@@ -280,7 +280,7 @@ struct switch_stack {
 # define ia64_task_regs(t)		(((struct pt_regs *) ((char *) (t) + IA64_STK_OFFSET)) - 1)
 # define ia64_psr(regs)			((struct ia64_psr *) &(regs)->cr_ipsr)
 #ifdef XEN
-# define guest_mode(regs)		(ia64_psr(regs)->cpl != 0)
+# define guest_mode(regs)		(ia64_psr(regs)->cpl && !ia64_psr(regs)->vm)
 # define guest_kernel_mode(regs)	(ia64_psr(regs)->cpl == CONFIG_CPL0_EMUL)
 # define vmx_guest_kernel_mode(regs)	(ia64_psr(regs)->cpl == 0)
 # define regs_increment_iip(regs)					\
