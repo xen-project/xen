@@ -1,0 +1,4 @@
+version = "@VERSION@"
+description = "Eventchn interface extension"
+archive(byte) = "eventchn.cma"
+archive(native) = "eventchn.cmxa"

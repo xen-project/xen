@@ -1,0 +1,4 @@
+version = "@VERSION@"
+description = "XenBus Interface"
+archive(byte) = "xb.cma"
+archive(native) = "xb.cmxa"

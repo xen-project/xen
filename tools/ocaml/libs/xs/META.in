@@ -1,0 +1,4 @@
+version = "@VERSION@"
+description = "XenStore Interface"
+archive(byte) = "xs.cma"
+archive(native) = "xs.cmxa"
