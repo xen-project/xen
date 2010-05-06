@@ -78,7 +78,8 @@ ignore_int:
 
 /*** DESCRIPTOR TABLES ***/
 
-        .align 8, 0xCC
+        .data
+        .align 8
 multiboot_ptr:
         .long   0
 
@@ -95,6 +96,7 @@ idt_descr:
 ENTRY(stack_start)
         .quad   cpu0_stack
 
+        .section .data.page_aligned, "aw", @progbits
         .align PAGE_SIZE, 0
 ENTRY(boot_cpu_gdt_table)
         .quad 0x0000000000000000     /* unused */

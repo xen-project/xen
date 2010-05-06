@@ -61,6 +61,8 @@ ignore_int:
         jnz     0b
 1:      jmp     1b
 
+        .data
+        ALIGN
 ENTRY(stack_start)
         .long cpu0_stack
         
@@ -88,6 +90,7 @@ ENTRY(idle_pg_table)
         .long sym_phys(idle_pg_table_l2) + 2*PAGE_SIZE + 0x01, 0
         .long sym_phys(idle_pg_table_l2) + 3*PAGE_SIZE + 0x01, 0
 
+        .section .data.page_aligned, "aw", @progbits
         .align PAGE_SIZE, 0
 /* NB. Rings != 0 get access up to MACH2PHYS_VIRT_END. This allows access to */
 /*     the machine->physical mapping table. Ring 0 can access all memory.    */

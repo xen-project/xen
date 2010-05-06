@@ -53,6 +53,8 @@ SECTIONS
   } :text
 
   .data : {                    /* Data */
+       . = ALIGN(PAGE_SIZE);
+       *(.data.page_aligned)
        *(.data)
        CONSTRUCTORS
   } :text

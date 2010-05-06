@@ -151,6 +151,8 @@ compatibility_mode:
         call *%eax
         ud2
 
+        .data
+        .align 4
 compat_page_list:
         .fill 12,4,0
 
@@ -166,8 +168,8 @@ compat_pg_table:
         .long SYM_PHYS(compat_pg_table_l2) + 2*PAGE_SIZE + 0x01, 0
         .long SYM_PHYS(compat_pg_table_l2) + 3*PAGE_SIZE + 0x01, 0
 
-        .align 4096,0
-
+        .section .data.page_aligned, "aw", @progbits
+        .align PAGE_SIZE,0
 compat_pg_table_l2:
         .macro identmap from=0, count=512
         .if \count-1
