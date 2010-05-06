@@ -981,7 +981,7 @@ static int libxl_create_stubdom(struct libxl_ctx *ctx,
     b_info.max_vcpus = 1;
     b_info.max_memkb = 32 * 1024;
     b_info.target_memkb = b_info.max_memkb;
-    b_info.kernel = "/usr/lib/xen/boot/ioemu-stubdom.gz";
+    b_info.kernel = libxl_abs_path(ctx, "ioemu-stubdom.gz", libxl_xenfirmwaredir_path());
     b_info.u.pv.cmdline = libxl_sprintf(ctx, " -d %d", info->domid);
     b_info.u.pv.ramdisk = "";
     b_info.u.pv.features = "";
@@ -1122,7 +1122,8 @@ int libxl_create_device_model(struct libxl_ctx *ctx,
     if (rc < 0) goto xit;
     if (!rc) { /* inner child */
         libxl_exec(null, logfile_w, logfile_w,
-                   info->device_model, args);
+                   libxl_abs_path(ctx, info->device_model, libxl_private_bindir_path()),
+                   args);
     }
 
     rc = 0;
@@ -1702,7 +1703,7 @@ static int libxl_build_xenpv_qemu_args(struct libxl_ctx *ctx,
     }
     info->domid = vfb->domid;
     info->dom_name = libxl_domid_to_name(ctx, vfb->domid);
-    info->device_model = "/usr/lib/xen/bin/qemu-dm";
+    info->device_model = libxl_abs_path(ctx, "qemu-dm", libxl_private_bindir_path());
     info->type = XENPV;
     return 0;
 }

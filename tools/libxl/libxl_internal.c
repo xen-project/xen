@@ -194,3 +194,11 @@ void xl_log(struct libxl_ctx *ctx, int loglevel, int errnoval,
     xl_logv(ctx, loglevel, errnoval, file, line, func, fmt, ap);
     va_end(ap);
 }
+
+char *libxl_abs_path(struct libxl_ctx *ctx, char *s, const char *path)
+{
+    if (!s || s[0] == '/')
+        return s;
+    return libxl_sprintf(ctx, "%s/%s", path, s);
+}
+

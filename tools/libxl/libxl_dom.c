@@ -171,7 +171,13 @@ int build_hvm(struct libxl_ctx *ctx, uint32_t domid,
 {
     int ret;
 
-    ret = xc_hvm_build_target_mem(ctx->xch, domid, (info->max_memkb - info->video_memkb) / 1024, (info->target_memkb - info->video_memkb) / 1024, info->kernel);
+    ret = xc_hvm_build_target_mem(
+        ctx->xch,
+        domid,
+        (info->max_memkb - info->video_memkb) / 1024,
+        (info->target_memkb - info->video_memkb) / 1024,
+        libxl_abs_path(ctx, (char *)info->kernel,
+                       libxl_xenfirmwaredir_path()));
     if (ret) {
         XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, ret, "hvm building failed");
         return ERROR_FAIL;
