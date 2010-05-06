@@ -1,0 +1,4 @@
+version = "@VERSION@"
+description = "Log - logging library"
+archive(byte) = "log.cma"
+archive(native) = "log.cmxa"
