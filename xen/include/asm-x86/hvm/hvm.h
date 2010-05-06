@@ -135,6 +135,7 @@ struct hvm_function_table {
 
 extern struct hvm_function_table hvm_funcs;
 extern int hvm_enabled;
+extern bool_t cpu_has_lmsl;
 
 int hvm_domain_initialise(struct domain *d);
 void hvm_domain_relinquish_resources(struct domain *d);

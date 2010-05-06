@@ -57,6 +57,9 @@
 
 u32 svm_feature_flags;
 
+/* Indicates whether guests may use EFER.LMSLE. */
+bool_t cpu_has_lmsl;
+
 #define set_segment_register(name, value)  \
     asm volatile ( "movw %%ax ,%%" STR(name) "" : : "a" (value) )
 
@@ -847,6 +850,29 @@ static int svm_cpu_up(struct cpuinfo_x86 *c)
 
     /* Initialize core's ASID handling. */
     svm_asid_init(c);
+
+#ifdef __x86_64__
+    /*
+     * Check whether EFER.LMSLE can be written.
+     * Unfortunately there's no feature bit defined for this.
+     */
+    eax = read_efer();
+    edx = read_efer() >> 32;
+    if ( wrmsr_safe(MSR_EFER, eax | EFER_LMSLE, edx) == 0 )
+        rdmsr(MSR_EFER, eax, edx);
+    if ( eax & EFER_LMSLE )
+    {
+        if ( c == &boot_cpu_data )
+            cpu_has_lmsl = 1;
+        wrmsr(MSR_EFER, eax ^ EFER_LMSLE, edx);
+    }
+    else
+    {
+        if ( cpu_has_lmsl )
+            printk(XENLOG_WARNING "Inconsistent LMLSE support across CPUs!\n");
+        cpu_has_lmsl = 0;
+    }
+#endif
 
     return 1;
 }

@@ -590,6 +590,7 @@ static bool_t hvm_efer_valid(uint64_t value, uint64_t efer_validbits)
              ((sizeof(long) != 8) && (value & EFER_LME)) ||
              (!cpu_has_nx && (value & EFER_NX)) ||
              (!cpu_has_syscall && (value & EFER_SCE)) ||
+             (!cpu_has_lmsl && (value & EFER_LMSLE)) ||
              (!cpu_has_ffxsr && (value & EFER_FFXSE)) ||
              ((value & (EFER_LME|EFER_LMA)) == EFER_LMA));
 }
@@ -641,7 +642,8 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     }
 
     if ( !hvm_efer_valid(
-        ctxt.msr_efer, EFER_FFXSE | EFER_LME | EFER_LMA | EFER_NX | EFER_SCE) )
+        ctxt.msr_efer,
+        EFER_FFXSE | EFER_LMSLE | EFER_LME | EFER_LMA | EFER_NX | EFER_SCE) )
     {
         gdprintk(XENLOG_ERR, "HVM restore: bad EFER 0x%"PRIx64"\n",
                  ctxt.msr_efer);
@@ -995,7 +997,8 @@ int hvm_set_efer(uint64_t value)
 
     value &= ~EFER_LMA;
 
-    if ( !hvm_efer_valid(value, EFER_FFXSE | EFER_LME | EFER_NX | EFER_SCE) )
+    if ( !hvm_efer_valid(value,
+            EFER_FFXSE | EFER_LMSLE | EFER_LME | EFER_NX | EFER_SCE) )
     {
         gdprintk(XENLOG_WARNING, "Trying to set reserved bit in "
                  "EFER: %"PRIx64"\n", value);
