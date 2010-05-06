@@ -91,6 +91,10 @@ static void __init vmx_display_features(void)
 
     if ( !printed )
         printk(" - none\n");
+
+    if ( vmx_ept_super_page_level_limit )
+        printk("EPT supports %s super page.\n",
+               vmx_ept_super_page_level_limit > 1 ? "1G" : "2M");
 }
 
 static u32 adjust_vmx_controls(u32 ctl_min, u32 ctl_opt, u32 msr)
@@ -114,6 +118,7 @@ static void vmx_init_vmcs_config(void)
     u32 _vmx_pin_based_exec_control;
     u32 _vmx_cpu_based_exec_control;
     u32 _vmx_secondary_exec_control = 0;
+    u8 ept_super_page_level_limit = 0;
     u32 _vmx_vmexit_control;
     u32 _vmx_vmentry_control;
 
@@ -189,15 +194,9 @@ static void vmx_init_vmcs_config(void)
             uint64_t cap;
             rdmsrl(MSR_IA32_VMX_EPT_VPID_CAP, cap);
             if ( cap & VMX_EPT_SUPER_PAGE_1G )
-            {
-                vmx_ept_super_page_level_limit = 2;
-                printk("EPT support 1G super page.\n");
-            }
+                ept_super_page_level_limit = 2;
             else if ( cap & VMX_EPT_SUPER_PAGE_2M )
-            {
-                vmx_ept_super_page_level_limit = 1; 
-                printk("EPT support 2M super page.\n");
-            }
+                ept_super_page_level_limit = 1;
         }
     }
 
@@ -235,6 +234,7 @@ static void vmx_init_vmcs_config(void)
         vmx_pin_based_exec_control = _vmx_pin_based_exec_control;
         vmx_cpu_based_exec_control = _vmx_cpu_based_exec_control;
         vmx_secondary_exec_control = _vmx_secondary_exec_control;
+        vmx_ept_super_page_level_limit = ept_super_page_level_limit;
         vmx_vmexit_control         = _vmx_vmexit_control;
         vmx_vmentry_control        = _vmx_vmentry_control;
         cpu_has_vmx_ins_outs_instr_info = !!(vmx_basic_msr_high & (1U<<22));
@@ -247,6 +247,7 @@ static void vmx_init_vmcs_config(void)
         BUG_ON(vmx_pin_based_exec_control != _vmx_pin_based_exec_control);
         BUG_ON(vmx_cpu_based_exec_control != _vmx_cpu_based_exec_control);
         BUG_ON(vmx_secondary_exec_control != _vmx_secondary_exec_control);
+        BUG_ON(vmx_ept_super_page_level_limit > ept_super_page_level_limit);
         BUG_ON(vmx_vmexit_control != _vmx_vmexit_control);
         BUG_ON(vmx_vmentry_control != _vmx_vmentry_control);
         BUG_ON(cpu_has_vmx_ins_outs_instr_info !=
