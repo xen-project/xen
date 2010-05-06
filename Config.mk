@@ -163,6 +163,7 @@ XENSTAT_XENTOP     ?= y
 VTPM_TOOLS         ?= n
 LIBXENAPI_BINDINGS ?= n
 PYTHON_TOOLS       ?= y
+OCAML_TOOLS        ?= n
 CONFIG_MINITERM    ?= n
 CONFIG_LOMOUNT     ?= n
 

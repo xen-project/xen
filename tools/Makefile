@@ -40,6 +40,7 @@ SUBDIRS-$(CONFIG_X86) += xenpaging
 ifeq ($(XEN_COMPILE_ARCH),$(XEN_TARGET_ARCH))
 SUBDIRS-$(PYTHON_TOOLS) += python
 SUBDIRS-$(PYTHON_TOOLS) += pygrub
+SUBDIRS-$(OCAML_TOOLS) += ocaml
 endif
 
 # For the sake of linking, set the sys-root
