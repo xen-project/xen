@@ -19,6 +19,7 @@
 
 static struct keyhandler *key_table[256];
 static unsigned char keypress_key;
+static bool_t alt_key_handling;
 
 char keyhandler_scratch[1024];
 
@@ -115,6 +116,26 @@ static struct keyhandler dump_registers_keyhandler = {
     .desc = "dump registers"
 };
 
+static DECLARE_TASKLET(dump_dom0_tasklet, NULL, 0);
+
+static void dump_dom0_action(unsigned long arg)
+{
+    struct vcpu *v = (void *)arg;
+
+    for ( ; ; )
+    {
+        vcpu_show_execution_state(v);
+        if ( (v = v->next_in_list) == NULL )
+            break;
+        if ( softirq_pending(smp_processor_id()) )
+        {
+            dump_dom0_tasklet.data = (unsigned long)v;
+            tasklet_schedule_on_cpu(&dump_dom0_tasklet, v->processor);
+            break;
+        }
+    }
+}
+
 static void dump_dom0_registers(unsigned char key)
 {
     struct vcpu *v;
@@ -125,7 +146,17 @@ static void dump_dom0_registers(unsigned char key)
     printk("'%c' pressed -> dumping Dom0's registers\n", key);
 
     for_each_vcpu ( dom0, v )
+    {
+        if ( alt_key_handling && softirq_pending(smp_processor_id()) )
+        {
+            tasklet_kill(&dump_dom0_tasklet);
+            tasklet_init(&dump_dom0_tasklet, dump_dom0_action,
+                         (unsigned long)v);
+            tasklet_schedule_on_cpu(&dump_dom0_tasklet, v->processor);
+            return;
+        }
         vcpu_show_execution_state(v);
+    }
 }
 
 static struct keyhandler dump_dom0_registers_keyhandler = {
@@ -425,8 +456,28 @@ static struct keyhandler do_debug_key_keyhandler = {
     .desc = "trap to xendbg"
 };
 
+static void do_toggle_alt_key(unsigned char key, struct cpu_user_regs *regs)
+{
+    alt_key_handling = !alt_key_handling;
+    printk("'%c' pressed -> using %s key handling\n", key,
+           alt_key_handling ? "alternative" : "normal");
+}
+
+static struct keyhandler toggle_alt_keyhandler = {
+    .irq_callback = 1,
+    .u.irq_fn = do_toggle_alt_key,
+    .desc = "toggle alternative key handling"
+};
+
 void __init initialize_keytable(void)
 {
+    if ( num_present_cpus() > 16 )
+    {
+        alt_key_handling = 1;
+        printk(XENLOG_INFO "Defaulting to alternative key handling; "
+               "send 'A' to switch to normal mode.\n");
+    }
+    register_keyhandler('A', &toggle_alt_keyhandler);
     register_keyhandler('d', &dump_registers_keyhandler);
     register_keyhandler('h', &show_handlers_keyhandler);
     register_keyhandler('q', &dump_domains_keyhandler);
