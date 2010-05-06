@@ -2811,8 +2811,8 @@ static void output_physinfo(void)
     vinfo = libxl_get_version_info(&ctx);
     if (vinfo) {
         i = (1 << 20) / vinfo->pagesize;
-        printf("total_memory           : %lu\n", info.total_pages / i);
-        printf("free_memory            : %lu\n", info.free_pages / i);
+        printf("total_memory           : %"PRIu64"\n", info.total_pages / i);
+        printf("free_memory            : %"PRIu64"\n", info.free_pages / i);
     }
 
     return;
