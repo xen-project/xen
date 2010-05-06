@@ -1,0 +1,93 @@
+ifdef V
+  ifeq ("$(origin V)", "command line")
+    BUILD_VERBOSE = $(V)
+  endif
+endif
+ifndef BUILD_VERBOSE
+  BUILD_VERBOSE = 0
+endif
+ifeq ($(BUILD_VERBOSE),1)
+  E = @true
+  Q =
+else
+  E = @echo
+  Q = @
+endif
+
+ALL_OCAML_OBJS ?= $(OBJS)
+
+%.cmo: %.ml
+	$(call quiet-command, $(OCAMLC) $(OCAMLCFLAGS) -c -o $@ $<,MLC,$@)
+
+%.cmi: %.mli
+	$(call quiet-command, $(OCAMLC) $(OCAMLCFLAGS) -c -o $@ $<,MLI,$@)
+
+%.cmx: %.ml
+	$(call quiet-command, $(OCAMLOPT) $(OCAMLOPTFLAGS) -c -o $@ $<,MLOPT,$@)
+
+%.ml: %.mll
+	$(call quiet-command, $(OCAMLLEX) -q -o $@ $<,MLLEX,$@)
+
+%.ml: %.mly
+	$(call quiet-command, $(OCAMLYACC) -q $<,MLYACC,$@)
+
+%.o: %.c
+	$(call quiet-command, $(CC) $(CFLAGS) -c -o $@ $<,CC,$@)
+
+META: META.in
+	sed 's/@VERSION@/$(VERSION)/g' < $< $o
+
+ALL_OCAML_OBJ_SOURCES=$(addsuffix .ml, $(ALL_OCAML_OBJS))
+
+.ocamldep.make: $(ALL_OCAML_OBJ_SOURCES) Makefile $(TOPLEVEL)/Makefile.rules
+	$(call quiet-command, $(OCAMLDEP) $(ALL_OCAML_OBJ_SOURCES) *.mli $o,MLDEP,)
+
+clean: $(CLEAN_HOOKS)
+	$(Q)rm -f *.o *.so *.a *.cmo *.cmi *.cma *.cmx *.cmxa *.annot $(LIBS) $(PROGRAMS) $(GENERATED_FILES) .ocamldep.make
+
+quiet-command = $(if $(V),$1,@printf " %-8s %s\n" "$2" "$3" && $1)
+
+mk-caml-lib-native = $(call quiet-command, $(OCAMLOPT) $(OCAMLOPTFLAGS) -a -o $1 $2 $3,MLA,$1)
+mk-caml-lib-bytecode = $(call quiet-command, $(OCAMLC) $(OCAMLCFLAGS) -a -o $1 $2 $3,MLA,$1)
+
+mk-caml-stubs = $(call quiet-command, $(OCAMLMKLIB) -o `basename $1 .a` $2,MKLIB,$1)
+mk-caml-lib-stubs = \
+	$(call quiet-command, $(AR) rcs $1 $2 && $(OCAMLMKLIB) -o `basename $1 .a | sed -e 's/^lib//'` $2,MKLIB,$1)
+
+# define a library target <name>.cmxa and <name>.cma
+define OCAML_LIBRARY_template
+ $(1).cmxa: lib$(1)_stubs.a $(foreach obj,$($(1)_OBJS),$(obj).cmx)
+	$(call mk-caml-lib-native,$$@, -cclib -l$(1)_stubs, $(foreach obj,$($(1)_OBJS),$(obj).cmx))
+ $(1).cma: $(foreach obj,$($(1)_OBJS),$(obj).cmo)
+	$(call mk-caml-lib-bytecode,$$@, -dllib dll$(1)_stubs.so -cclib -l$(1)_stubs, $$+)
+ $(1)_stubs.a: $(foreach obj,$$($(1)_C_OBJS),$(obj).o)
+	$(call mk-caml-stubs,$$@, $$+)
+ lib$(1)_stubs.a: $(foreach obj,$($(1)_C_OBJS),$(obj).o)
+	$(call mk-caml-lib-stubs,$$@, $$+)
+endef
+
+define OCAML_NOC_LIBRARY_template
+ $(1).cmxa: $(foreach obj,$($(1)_OBJS),$(obj).cmx)
+	$(call mk-caml-lib-native,$$@, , $(foreach obj,$($(1)_OBJS),$(obj).cmx))
+ $(1).cma: $(foreach obj,$($(1)_OBJS),$(obj).cmo)
+	$(call mk-caml-lib-bytecode,$$@, , $$+)
+endef
+
+define OCAML_PROGRAM_template
+ $(1): $(foreach obj,$($(1)_OBJS),$(obj).cmx) $($(1)_EXTRA_DEPS)
+	$(call quiet-command, $(OCAMLOPT) $(OCAMLOPTFLAGS) -o $$@ $($(1)_LIBS) $$+,MLBIN,$$@)
+ $(1).byte: $(foreach obj,$($(1)_OBJS),$(obj).cmo)
+	$(call quiet-command, $(OCAMLC) $(OCAMLCFLAGS) -o $$@ $($(1)_BYTE_LIBS) $$+,MLBIN,$$@)
+endef
+
+define C_PROGRAM_template
+ $(1): $(foreach obj,$($(1)_OBJS),$(obj).o)
+	$(call quiet-command, $(CC) $(CFLAGS) -o $$@ $$+,BIN,$$@)
+endef
+
+-include .ocamldep.make
+
+$(foreach lib,$(OCAML_LIBRARY),$(eval $(call OCAML_LIBRARY_template,$(lib))))
+$(foreach lib,$(OCAML_NOC_LIBRARY),$(eval $(call OCAML_NOC_LIBRARY_template,$(lib))))
+$(foreach p,$(OCAML_PROGRAM),$(eval $(call OCAML_PROGRAM_template,$(p))))
+$(foreach p,$(C_PROGRAM),$(eval $(call C_PROGRAM_template,$(p))))
