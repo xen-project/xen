@@ -6,7 +6,6 @@ SUBDIRS-y += check
 SUBDIRS-y += include
 SUBDIRS-y += libxc
 SUBDIRS-y += flask
-SUBDIRS-$(CONFIG_OCAML_XENSTORED) += ocaml-xenstored
 SUBDIRS-y += xenstore
 SUBDIRS-y += misc
 SUBDIRS-y += examples
@@ -114,23 +113,3 @@ subdir-clean-ioemu-dir:
 		$(buildmakevars2shellvars); \
 		$(MAKE) -C ioemu-dir clean; \
 	fi
-
-ocaml-xenstored:
-	set -ex; \
-	rm -rf ocaml-xenstored.tmp; \
-	hg clone $(OCAML_XENSTORED_REPO) ocaml-xenstored.tmp; \
-	if [ "$(OCAML_XENSTORED_TAG)" ]; then \
-		hg -R ocaml-xenstored.tmp update -r $(OCAML_XENSTORED_TAG) ;\
-		hg -R ocaml-xenstored.tmp branch mybranch ;\
-	fi;						\
-	mv ocaml-xenstored.tmp ocaml-xenstored; \
-
-subdir-all-ocaml-xenstored subdir-install-ocaml-xenstored: ocaml-xenstored
-	$(absolutify_xen_root); \
-	$(MAKE) -C ocaml-xenstored $(patsubst subdir-%-ocaml-xenstored,%,$@);
-
-subdir-clean-ocaml-xenstored:
-	set -e; if test -d ocaml-xenstored; then \
-		$(MAKE) -C ocaml-xenstored clean; \
-	fi
-

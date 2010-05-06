@@ -95,11 +95,6 @@ tarball: clean
 
 .PHONY: install
 install: all
-ifneq ($(CONFIG_OCAML_XENSTORED),y)
-	$(INSTALL_DIR) $(DESTDIR)/var/run/xenstored
-	$(INSTALL_DIR) $(DESTDIR)/var/lib/xenstored
-	$(INSTALL_PROG) xenstored $(DESTDIR)$(SBINDIR)
-endif
 	$(INSTALL_DIR) $(DESTDIR)$(BINDIR)
 	$(INSTALL_DIR) $(DESTDIR)$(SBINDIR)
 	$(INSTALL_DIR) $(DESTDIR)$(INCLUDEDIR)

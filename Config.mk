@@ -158,12 +158,6 @@ QEMU_TAG ?= 01626771cf2e9285fbfddcbded2820fc77745e4b
 # Fri Apr 30 17:41:45 2010 +0100
 # Implement 'xm vcpu-set' command for HVM guest
 
-OCAML_XENSTORED_REPO=http://xenbits.xensource.com/ext/xen-ocaml-tools.hg
-
-# Build OCAML version of xenstored instead of the in-tree C version?
-# This will cause $(OCAML_XENSTORED_REPO) to be cloned.
-CONFIG_OCAML_XENSTORED ?= n
-
 # Optional components
 XENSTAT_XENTOP     ?= y
 VTPM_TOOLS         ?= n
