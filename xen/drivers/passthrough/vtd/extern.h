@@ -48,7 +48,6 @@ struct iommu * ioapic_to_iommu(unsigned int apic_id);
 struct acpi_drhd_unit * ioapic_to_drhd(unsigned int apic_id);
 struct acpi_drhd_unit * iommu_to_drhd(struct iommu *iommu);
 struct acpi_rhsa_unit * drhd_to_rhsa(struct acpi_drhd_unit *drhd);
-void clear_fault_bits(struct iommu *iommu);
 int ats_device(int seg, int bus, int devfn);
 int enable_ats_device(int seg, int bus, int devfn);
 int disable_ats_device(int seg, int bus, int devfn);

@@ -109,7 +109,7 @@ static int context_set_domain_id(struct context_entry *context,
     return 0;
 }
 
-static struct intel_iommu *alloc_intel_iommu(void)
+static struct intel_iommu *__init alloc_intel_iommu(void)
 {
     struct intel_iommu *intel;
 
@@ -124,7 +124,7 @@ static struct intel_iommu *alloc_intel_iommu(void)
     return intel;
 }
 
-static void free_intel_iommu(struct intel_iommu *intel)
+static void __init free_intel_iommu(struct intel_iommu *intel)
 {
     xfree(intel);
 }
@@ -1037,7 +1037,7 @@ static int iommu_set_interrupt(struct iommu *iommu)
     return irq;
 }
 
-static int iommu_alloc(struct acpi_drhd_unit *drhd)
+static int __init iommu_alloc(struct acpi_drhd_unit *drhd)
 {
     struct iommu *iommu;
     unsigned long sagaw, nr_dom;
@@ -1131,7 +1131,7 @@ static int iommu_alloc(struct acpi_drhd_unit *drhd)
     return 0;
 }
 
-static void iommu_free(struct acpi_drhd_unit *drhd)
+static void __init iommu_free(struct acpi_drhd_unit *drhd)
 {
     struct iommu *iommu = drhd->iommu;
 
@@ -1779,7 +1779,7 @@ static void setup_dom0_devices(struct domain *d)
     spin_unlock(&pcidevs_lock);
 }
 
-void clear_fault_bits(struct iommu *iommu)
+static void clear_fault_bits(struct iommu *iommu)
 {
     u64 val;
     unsigned long flags;
@@ -1912,7 +1912,7 @@ static void setup_dom0_rmrr(struct domain *d)
     spin_unlock(&pcidevs_lock);
 }
 
-static void platform_quirks(void)
+static void __init platform_quirks(void)
 {
     u32 id;
 
@@ -1925,7 +1925,7 @@ static void platform_quirks(void)
     }
 }
 
-int intel_vtd_setup(void)
+int __init intel_vtd_setup(void)
 {
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;

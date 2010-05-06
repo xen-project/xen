@@ -158,7 +158,7 @@ static void amd_iommu_setup_dom0_devices(struct domain *d)
     spin_unlock(&pcidevs_lock);
 }
 
-int amd_iov_detect(void)
+int __init amd_iov_detect(void)
 {
     INIT_LIST_HEAD(&amd_iommu_head);
 

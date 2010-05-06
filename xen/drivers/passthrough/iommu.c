@@ -277,7 +277,7 @@ int deassign_device(struct domain *d, u8 bus, u8 devfn)
     return ret;
 }
 
-int iommu_setup(void)
+int __init iommu_setup(void)
 {
     int rc = -ENODEV;
 
