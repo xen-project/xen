@@ -129,122 +129,6 @@ struct _cpuid4_info {
 
 unsigned short			num_cache_leaves;
 
-/* AMD doesn't have CPUID4. Emulate it here to report the same
-   information to the user.  This makes some assumptions about the machine:
-   L2 not shared, no SMT etc. that is currently true on AMD CPUs.
-
-   In theory the TLBs could be reported as fake type (they are in "dummy").
-   Maybe later */
-union l1_cache {
-	struct {
-		unsigned line_size : 8;
-		unsigned lines_per_tag : 8;
-		unsigned assoc : 8;
-		unsigned size_in_kb : 8;
-	};
-	unsigned val;
-};
-
-union l2_cache {
-	struct {
-		unsigned line_size : 8;
-		unsigned lines_per_tag : 4;
-		unsigned assoc : 4;
-		unsigned size_in_kb : 16;
-	};
-	unsigned val;
-};
-
-union l3_cache {
-	struct {
-		unsigned line_size : 8;
-		unsigned lines_per_tag : 4;
-		unsigned assoc : 4;
-		unsigned res : 2;
-		unsigned size_encoded : 14;
-	};
-	unsigned val;
-};
-
-static const unsigned short assocs[] = {
-	[1] = 1, [2] = 2, [4] = 4, [6] = 8,
-	[8] = 16, [0xa] = 32, [0xb] = 48,
-	[0xc] = 64,
-	[0xf] = 0xffff // ??
-};
-
-static const unsigned char levels[] = { 1, 1, 2, 3 };
-static const unsigned char types[] = { 1, 2, 3, 3 };
-
-static void __cpuinit amd_cpuid4(int leaf, union _cpuid4_leaf_eax *eax,
-		       union _cpuid4_leaf_ebx *ebx,
-		       union _cpuid4_leaf_ecx *ecx)
-{
-	unsigned dummy;
-	unsigned line_size, lines_per_tag, assoc, size_in_kb;
-	union l1_cache l1i, l1d;
-	union l2_cache l2;
-	union l3_cache l3;
-	union l1_cache *l1 = &l1d;
-
-	eax->full = 0;
-	ebx->full = 0;
-	ecx->full = 0;
-
-	cpuid(0x80000005, &dummy, &dummy, &l1d.val, &l1i.val);
-	cpuid(0x80000006, &dummy, &dummy, &l2.val, &l3.val);
-
-	switch (leaf) {
-	case 1:
-		l1 = &l1i;
-	case 0:
-		if (!l1->val)
-			return;
-		assoc = l1->assoc;
-		line_size = l1->line_size;
-		lines_per_tag = l1->lines_per_tag;
-		size_in_kb = l1->size_in_kb;
-		break;
-	case 2:
-		if (!l2.val)
-			return;
-		assoc = l2.assoc;
-		line_size = l2.line_size;
-		lines_per_tag = l2.lines_per_tag;
-		/* cpu_data has errata corrections for K7 applied */
-		size_in_kb = current_cpu_data.x86_cache_size;
-		break;
-	case 3:
-		if (!l3.val)
-			return;
-		assoc = l3.assoc;
-		line_size = l3.line_size;
-		lines_per_tag = l3.lines_per_tag;
-		size_in_kb = l3.size_encoded * 512;
-		break;
-	default:
-		return;
-	}
-
-	eax->split.is_self_initializing = 1;
-	eax->split.type = types[leaf];
-	eax->split.level = levels[leaf];
-	if (leaf == 3)
-		eax->split.num_threads_sharing = current_cpu_data.x86_max_cores - 1;
-	else
-		eax->split.num_threads_sharing = 0;
-	eax->split.num_cores_on_die = current_cpu_data.x86_max_cores - 1;
-
-
-	if (assoc == 0xf)
-		eax->split.is_fully_associative = 1;
-	ebx->split.coherency_line_size = line_size - 1;
-	ebx->split.ways_of_associativity = assocs[assoc] - 1;
-	ebx->split.physical_line_partition = lines_per_tag - 1;
-	ecx->split.number_of_sets = (size_in_kb * 1024) / line_size /
-		(ebx->split.ways_of_associativity + 1) - 1;
-}
-
 static int __cpuinit cpuid4_cache_lookup(int index, struct _cpuid4_info *this_leaf)
 {
 	union _cpuid4_leaf_eax 	eax;
@@ -252,10 +136,7 @@ static int __cpuinit cpuid4_cache_lookup(int index, struct _cpuid4_info *this_le
 	union _cpuid4_leaf_ecx 	ecx;
 	unsigned		edx;
 
-	if (boot_cpu_data.x86_vendor == X86_VENDOR_AMD)
-		amd_cpuid4(index, &eax, &ebx, &ecx);
-	else
-		cpuid_count(4, index, &eax.full, &ebx.full, &ecx.full,  &edx);
+        cpuid_count(4, index, &eax.full, &ebx.full, &ecx.full,  &edx);
 	if (eax.split.type == CACHE_TYPE_NULL)
 		return -EIO; /* better error ? */
 
