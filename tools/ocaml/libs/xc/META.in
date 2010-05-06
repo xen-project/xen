@@ -1,0 +1,4 @@
+version = "@VERSION@"
+description = "Xen Control Interface"
+archive(byte) = "xc.cma"
+archive(native) = "xc.cmxa"
