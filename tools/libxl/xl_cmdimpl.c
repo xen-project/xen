@@ -937,14 +937,16 @@ start:
     ret = libxl_domain_make(&ctx, &info1, &domid);
     if (ret) {
         fprintf(stderr, "cannot make domain: %d\n", ret);
-        return ERROR_FAIL;
+        ret = ERROR_FAIL;
+        goto error_out;
     }
 
     ret = libxl_userdata_store(&ctx, domid, "xl",
                                     config_data, config_len);
     if (ret) {
         perror("cannot save config file");
-        return ERROR_FAIL;
+        ret = ERROR_FAIL;
+        goto error_out;
     }
 
     if (!restore_file || !need_daemon) {
@@ -959,7 +961,8 @@ start:
 
     if (ret) {
         fprintf(stderr, "cannot (re-)build domain: %d\n", ret);
-        return ERROR_FAIL;
+        ret = ERROR_FAIL;
+        goto error_out;
     }
 
     for (i = 0; i < num_disks; i++) {
@@ -967,7 +970,8 @@ start:
         ret = libxl_device_disk_add(&ctx, domid, &disks[i]);
         if (ret) {
             fprintf(stderr, "cannot add disk %d to domain: %d\n", i, ret);
-            return ERROR_FAIL;
+            ret = ERROR_FAIL;
+            goto error_out;
         }
     }
     for (i = 0; i < num_vifs; i++) {
@@ -975,7 +979,8 @@ start:
         ret = libxl_device_nic_add(&ctx, domid, &vifs[i]);
         if (ret) {
             fprintf(stderr, "cannot add nic %d to domain: %d\n", i, ret);
-            return ERROR_FAIL;
+            ret = ERROR_FAIL;
+            goto error_out;
         }
     }
     if (info1.hvm) {
@@ -1023,13 +1028,15 @@ start:
                 assert(got_child == -1);
                 if (errno != EINTR) {
                     perror("failed to wait for daemonizing child");
-                    return ERROR_FAIL;
+                    ret = ERROR_FAIL;
+                    goto error_out;
                 }
             }
             if (status) {
                 libxl_report_child_exitstatus(&ctx, XL_LOG_ERROR,
                            "daemonizing child", child1, status);
-                return ERROR_FAIL;
+                ret = ERROR_FAIL;
+                goto error_out;
             }
             return domid; /* caller gets success in parent */
         }
@@ -1113,6 +1120,11 @@ start:
 
     close(logfile);
     exit(0);
+
+error_out:
+    if (domid)
+        libxl_domain_destroy(&ctx, domid, 0);
+    return ret;
 }
 
 void help(char *command)
