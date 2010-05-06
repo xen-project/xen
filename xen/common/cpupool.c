@@ -37,6 +37,7 @@ static cpumask_t cpupool_locked_cpus = CPU_MASK_NONE;
  *               as it was obtained!
  */
 static DEFINE_SPINLOCK(cpupool_lock);
+static DEFINE_SPINLOCK(cpupool_ctl_lock);
 
 DEFINE_PER_CPU(struct cpupool *, cpupool);
 
@@ -401,6 +402,8 @@ int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op)
     int ret;
     struct cpupool *c;
 
+    spin_lock(&cpupool_ctl_lock);
+
     switch ( op->op )
     {
 
@@ -426,9 +429,7 @@ int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op)
 
     case XEN_SYSCTL_CPUPOOL_OP_DESTROY:
     {
-        spin_lock(&cpupool_lock);
         c = cpupool_find_by_id(op->cpupool_id, 1);
-        spin_unlock(&cpupool_lock);
         ret = -ENOENT;
         if ( c == NULL )
             break;
@@ -438,9 +439,7 @@ int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op)
 
     case XEN_SYSCTL_CPUPOOL_OP_INFO:
     {
-        spin_lock(&cpupool_lock);
         c = cpupool_find_by_id(op->cpupool_id, 0);
-        spin_unlock(&cpupool_lock);
         ret = -ENOENT;
         if ( c == NULL )
             break;
@@ -484,9 +483,7 @@ addcpu_out:
     {
         unsigned cpu;
 
-        spin_lock(&cpupool_lock);
         c = cpupool_find_by_id(op->cpupool_id, 0);
-        spin_unlock(&cpupool_lock);
         ret = -ENOENT;
         if ( c == NULL )
             break;
@@ -559,6 +556,8 @@ addcpu_out:
         ret = -ENOSYS;
 
     }
+
+    spin_unlock(&cpupool_ctl_lock);
 
     return ret;
 }
