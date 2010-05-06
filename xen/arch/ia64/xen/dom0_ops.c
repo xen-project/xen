@@ -735,20 +735,13 @@ long arch_do_sysctl(xen_sysctl_t *op, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
     {
     case XEN_SYSCTL_physinfo:
     {
-        int i;
-        uint32_t max_array_ent;
-        XEN_GUEST_HANDLE_64(uint32) cpu_to_node_arr;
-
         xen_sysctl_physinfo_t *pi = &op->u.physinfo;
 
-        max_array_ent = pi->max_cpu_id;
-        cpu_to_node_arr = pi->cpu_to_node;
-
         memset(pi, 0, sizeof(*pi));
-        pi->cpu_to_node = cpu_to_node_arr;
         pi->threads_per_core = cpus_weight(per_cpu(cpu_sibling_map, 0));
         pi->cores_per_socket =
             cpus_weight(per_cpu(cpu_core_map, 0)) / pi->threads_per_core;
+        pi->nr_nodes         = (u32)num_online_nodes();
         pi->nr_cpus          = (u32)num_online_cpus();
         pi->total_pages      = total_pages; 
         pi->free_pages       = avail_domheap_pages();
@@ -757,21 +750,55 @@ long arch_do_sysctl(xen_sysctl_t *op, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
 
         pi->max_node_id = last_node(node_online_map);
         pi->max_cpu_id = last_cpu(cpu_online_map);
-        max_array_ent = min_t(uint32_t, max_array_ent, pi->max_cpu_id);
 
-        ret = 0;
+        if ( copy_field_to_guest(u_sysctl, op, u.physinfo) )
+            ret = -EFAULT;
+    }
+    break;
 
-        if (!guest_handle_is_null(cpu_to_node_arr)) {
-            for (i = 0; i <= max_array_ent; i++) {
-                uint32_t node = cpu_online(i) ? cpu_to_node(i) : ~0u;
-                if (copy_to_guest_offset(cpu_to_node_arr, i, &node, 1)) {
+    case XEN_SYSCTL_topologyinfo:
+    {
+        xen_sysctl_topologyinfo_t *ti = &op->u.topologyinfo;
+        XEN_GUEST_HANDLE_64(uint32) arr;
+        uint32_t i, val, max_array_ent = ti->max_cpu_index;
+
+        ti->max_cpu_index = last_cpu(cpu_online_map);
+        max_array_ent = min(max_array_ent, ti->max_cpu_index);
+
+        arr = ti->cpu_to_core;
+        if ( !guest_handle_is_null(arr) )
+        {
+            for ( i = 0; ret == 0 && i <= max_array_ent; i++ )
+            {
+                val = cpu_online(i) ? cpu_to_core(i) : ~0u;
+                if ( copy_to_guest_offset(arr, i, &val, 1) )
                     ret = -EFAULT;
-                    break;
-                }
             }
         }
 
-        if ( copy_to_guest(u_sysctl, op, 1) )
+        arr = ti->cpu_to_socket;
+        if ( !guest_handle_is_null(arr) )
+        {
+            for ( i = 0; ret == 0 && i <= max_array_ent; i++ )
+            {
+                val = cpu_online(i) ? cpu_to_socket(i) : ~0u;
+                if ( copy_to_guest_offset(arr, i, &val, 1) )
+                    ret = -EFAULT;
+            }
+        }
+
+        arr = ti->cpu_to_node;
+        if ( !guest_handle_is_null(arr) )
+        {
+            for ( i = 0; ret == 0 && i <= max_array_ent; i++ )
+            {
+                val = cpu_online(i) ? cpu_to_node(i) : ~0u;
+                if ( copy_to_guest_offset(arr, i, &val, 1) )
+                    ret = -EFAULT;
+            }
+        }
+
+        if ( copy_field_to_guest(u_sysctl, op, u.topologyinfo.max_cpu_index) )
             ret = -EFAULT;
     }
     break;
