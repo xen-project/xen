@@ -147,10 +147,6 @@
 3:      pop     %ebx
         ret
 
-/* multiboot_info structure offsets. */
-#define MB_flags   0
-#define MB_cmdline 16
-
 cmdline_parse_early:
         pusha
 

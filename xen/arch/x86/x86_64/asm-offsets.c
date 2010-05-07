@@ -10,6 +10,7 @@
 #include <compat/xen.h>
 #include <asm/fixmap.h>
 #include <asm/hardirq.h>
+#include <xen/multiboot.h>
 
 #define DEFINE(_sym, _val) \
     __asm__ __volatile__ ( "\n->" #_sym " %0 " #_val : : "i" (_val) )
@@ -151,4 +152,8 @@ void __dummy__(void)
     BLANK();
 
     OFFSET(CPUINFO_ext_features, struct cpuinfo_x86, x86_capability[1]);
+    BLANK();
+
+    OFFSET(MB_flags, multiboot_info_t, flags);
+    OFFSET(MB_cmdline, multiboot_info_t, cmdline);
 }
