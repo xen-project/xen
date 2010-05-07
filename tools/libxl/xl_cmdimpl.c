@@ -1240,6 +1240,9 @@ void help(char *command)
     } else if (!strcmp(command, "domid")) {
         printf("Usage: xl domid <DomainName>\n\n");
         printf("Convert a domain name to domain id.\n");
+    } else if (!strcmp(command, "domname")) {
+        printf("Usage: xl domname <DomainId>\n\n");
+        printf("Convert a domain id to domain name.\n");
     }
 }
 
@@ -2994,6 +2997,46 @@ int main_domid(int argc, char **argv)
     }
 
     printf("%d\n", domid);
+
+    exit(0);
+}
+
+int main_domname(int argc, char **argv)
+{
+    int opt;
+    char *domname = NULL;
+    char *endptr = NULL;
+
+    while ((opt = getopt(argc, argv, "h")) != -1) {
+        switch (opt) {
+        case 'h':
+            help("domname");
+            exit(0);
+        default:
+            fprintf(stderr, "option `%c' not supported.\n", opt);
+            break;
+        }
+    }
+
+    if (!argv[optind]) {
+        fprintf(stderr, "Must specify a domain id.\n\n");
+        help("domname");
+        exit(1);
+    }
+    domid = strtol(argv[optind], &endptr, 10);
+    if (domid == 0 && !strcmp(endptr, argv[optind])) {
+        /*no digits at all*/
+        fprintf(stderr, "Invalid domain id.\n\n");
+        exit(1);
+    }
+
+    domname = libxl_domid_to_name(&ctx, domid);
+    if (!domname) {
+        fprintf(stderr, "Can't get domain name of domain id '%d', maybe this domain does not exist.\n", domid);
+        exit(1);
+    }
+
+    printf("%s\n", domname);
 
     exit(0);
 }

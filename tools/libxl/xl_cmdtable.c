@@ -37,6 +37,7 @@ struct cmd_spec cmd_table[] = {
     { "info", &main_info, "get information about Xen host" },
     { "sched-credit", &main_sched_credit, "get/set credit scheduler parameters" },
     { "domid", &main_domid, "convert a domain name to domain id"},
+    { "domname", &main_domname, "convert a domain id to domain name"},
 };
 
 int cmdtable_len = sizeof(cmd_table)/sizeof(struct cmd_spec);
