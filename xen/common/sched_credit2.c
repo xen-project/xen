@@ -1093,10 +1093,42 @@ csched_dump(const struct scheduler *ops)
 }
 
 static void
-make_runq_map(const struct scheduler *ops)
+csched_free_pdata(const struct scheduler *ops, void *pcpu, int cpu)
+{
+    unsigned long flags;
+    struct csched_private *prv = CSCHED_PRIV(ops);
+
+    spin_lock_irqsave(&prv->lock, flags);
+    prv->ncpus--;
+    spin_unlock_irqrestore(&prv->lock, flags);
+
+    return;
+}
+
+static void *
+csched_alloc_pdata(const struct scheduler *ops, int cpu)
+{
+    spinlock_t *new_lock;
+    spinlock_t *old_lock = per_cpu(schedule_data, cpu).schedule_lock;
+    unsigned long flags;
+    struct csched_private *prv = CSCHED_PRIV(ops);
+
+    spin_lock_irqsave(old_lock, flags);
+    new_lock = &per_cpu(schedule_data, prv->runq_map[cpu])._lock;
+    per_cpu(schedule_data, cpu).schedule_lock = new_lock;
+    spin_unlock_irqrestore(old_lock, flags);
+
+    spin_lock_irqsave(&prv->lock, flags);
+    prv->ncpus++;
+    spin_unlock_irqrestore(&prv->lock, flags);
+
+    return (void *)1;
+}
+
+static void
+make_runq_map(struct csched_private *prv)
 {
     int cpu, cpu_count=0;
-    struct csched_private *prv = CSCHED_PRIV(ops);
 
     /* FIXME: Read pcpu layout and do this properly */
     for_each_possible_cpu( cpu )
@@ -1125,13 +1157,14 @@ csched_init(struct scheduler *ops, int pool0)
     if ( prv == NULL )
         return 1;
     memset(prv, 0, sizeof(*prv));
+    ops->sched_data = prv;
 
     spin_lock_init(&prv->lock);
     INIT_LIST_HEAD(&prv->sdom);
 
     prv->ncpus = 0;
 
-    make_runq_map(ops);
+    make_runq_map(prv);
 
     for ( i=0; i<prv->runq_count ; i++ )
     {
@@ -1141,21 +1174,6 @@ csched_init(struct scheduler *ops, int pool0)
         rqd->id = i;
         INIT_LIST_HEAD(&rqd->svc);
         INIT_LIST_HEAD(&rqd->runq);
-    }
-
-    /* Initialize pcpu structures */
-    for_each_possible_cpu(i)
-    {
-        int runq_id;
-        spinlock_t *lock;
-
-        /* Point the per-cpu schedule lock to the runq_id lock */
-        runq_id = prv->runq_map[i];
-        lock = &per_cpu(schedule_data, runq_id)._lock;
-
-        per_cpu(schedule_data, i).schedule_lock = lock;
-
-        prv->ncpus++;
     }
 
     return 0;
@@ -1201,6 +1219,8 @@ const struct scheduler sched_credit2_def = {
     .deinit         = csched_deinit,
     .alloc_vdata    = csched_alloc_vdata,
     .free_vdata     = csched_free_vdata,
+    .alloc_pdata    = csched_alloc_pdata,
+    .free_pdata     = csched_free_pdata,
     .alloc_domdata  = csched_alloc_domdata,
     .free_domdata   = csched_free_domdata,
 };
