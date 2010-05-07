@@ -544,7 +544,7 @@ static void parse_config_data(const char *configfile_filename_report,
             char *buf2 = strdup(buf);
             char *p, *p2;
             *vifs = (libxl_device_nic *) realloc(*vifs, sizeof (libxl_device_nic) * ((*num_vifs) + 1));
-            init_nic_info((*vifs) + (*num_vifs), (*num_vifs) + 1);
+            init_nic_info((*vifs) + (*num_vifs), (*num_vifs));
             p = strtok(buf2, ",");
             if (!p)
                 goto skip;
