@@ -499,10 +499,7 @@ static void print_cpufreq_para(int cpuid, struct xc_get_cpufreq_para *p_cpufreq)
 
     printf("affected_cpus        :");
     for ( i = 0; i < p_cpufreq->cpu_num; i++ )
-        if ( i == cpuid )
-            printf(" *%d", p_cpufreq->affected_cpus[i]);
-        else
-            printf(" %d", p_cpufreq->affected_cpus[i]);
+        printf(" %d", p_cpufreq->affected_cpus[i]);
     printf("\n");
 
     printf("cpuinfo frequency    : max [%u] min [%u] cur [%u]\n",
