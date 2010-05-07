@@ -1318,7 +1318,10 @@ int libxl_device_disk_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_di
 
                         null_r = open("/dev/null", O_RDONLY);
                         null_w = open("/dev/null", O_WRONLY);
-                        libxl_exec(null_r, p[1], null_w, "/usr/sbin/tapdisk2", args);
+                        libxl_exec(null_r, p[1], null_w,
+                                   libxl_abs_path(ctx, "tapdisk2",
+                                                  libxl_sbindir_path()),
+                                   args);
                         XL_LOG(ctx, XL_LOG_ERROR, "Error execing tapdisk2");
                     }
                     close(p[1]);
@@ -1758,7 +1761,7 @@ static int libxl_build_xenpv_qemu_args(struct libxl_ctx *ctx,
     }
     info->domid = vfb->domid;
     info->dom_name = libxl_domid_to_name(ctx, vfb->domid);
-    info->device_model = libxl_abs_path(ctx, "qemu-dm", libxl_private_bindir_path());
+    info->device_model = libxl_abs_path(ctx, "qemu-dm", libxl_libexec_path());
     info->type = XENPV;
     return 0;
 }

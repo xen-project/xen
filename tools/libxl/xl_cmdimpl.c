@@ -178,7 +178,7 @@ static void init_build_info(libxl_domain_build_info *b_info, libxl_domain_create
     if (c_info->hvm) {
         b_info->shadow_memkb = libxl_get_required_shadow_memory(b_info->max_memkb, b_info->max_vcpus);
         b_info->video_memkb = 8 * 1024;
-        b_info->kernel = "/usr/lib/xen/boot/hvmloader";
+        b_info->kernel = "hvmloader";
         b_info->hvm = 1;
         b_info->u.hvm.pae = 1;
         b_info->u.hvm.apic = 1;
@@ -201,7 +201,7 @@ static void init_dm_info(libxl_device_model_info *dm_info,
     }
 
     dm_info->dom_name = c_info->name;
-    dm_info->device_model = "/usr/lib/xen/bin/qemu-dm";
+    dm_info->device_model = "qemu-dm";
     dm_info->videoram = b_info->video_memkb / 1024;
     dm_info->apic = b_info->u.hvm.apic;
 
