@@ -20,20 +20,10 @@
 #include <unistd.h>
 #include <errno.h>
 #include <stdint.h>
-
 #include <sys/ioctl.h>
-
-#define __XEN_TOOLS__
-
 #include <xen/sysctl.h>
-
-#if XEN_SYSCTL_INTERFACE_VERSION < 4
-#include <xen/linux/evtchn.h>
-#else
 #include <xen/xen.h>
 #include <xen/sys/evtchn.h>
-#endif
-
 #include <xenctrl.h>
 
 #define CAML_NAME_SPACE

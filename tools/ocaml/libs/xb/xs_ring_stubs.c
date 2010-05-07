@@ -21,10 +21,7 @@
 #include <errno.h>
 #include <string.h>
 
-#define __XEN_TOOLS__
-
 #include <xenctrl.h>
-#define u32 uint32_t
 #include <xen/io/xs_wire.h>
 
 #include <caml/mlvalues.h>

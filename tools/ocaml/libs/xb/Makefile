@@ -1,4 +1,5 @@
 TOPLEVEL=../..
+XEN_ROOT=$(TOPLEVEL)/../..
 include $(TOPLEVEL)/common.make
 
 CFLAGS += -I../mmap

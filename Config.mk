@@ -168,11 +168,7 @@ CONFIG_MINITERM    ?= n
 CONFIG_LOMOUNT     ?= n
 
 ifeq ($(OCAML_TOOLS),y)
-ifeq ($(CONFIG_Linux),y)
 OCAML_TOOLS := $(shell ocamlopt -v > /dev/null 2>&1 && echo "y" || echo "n")
-else
-OCAML_TOOLS := n
-endif
 endif
 
 -include $(XEN_ROOT)/.config

@@ -631,9 +631,9 @@ int xc_domain_getinfo(int handle, unsigned int domid, xc_domaininfo_t *info)
 
 int xc_domain_setmaxmem(int handle, unsigned int domid, unsigned int max_memkb)
 {
+	int ret;
 	DECLARE_DOMCTL(XEN_DOMCTL_max_mem, domid);
 	domctl.u.max_mem.max_memkb = max_memkb;
-	int ret;
 
 	ret = do_domctl(handle, &domctl);
 	if (ret < 0)
@@ -682,9 +682,9 @@ int xc_domain_set_memmap_limit(int handle, unsigned int domid,
 
 int xc_domain_set_time_offset(int handle, unsigned int domid, int time_offset)
 {
+	int ret;
 	DECLARE_DOMCTL(XEN_DOMCTL_settimeoffset, domid);
 	domctl.u.settimeoffset.time_offset_seconds = time_offset;
-	int ret;
 
 	ret = do_domctl(handle, &domctl);
 	if (ret < 0)
@@ -884,10 +884,10 @@ int xc_vcpu_setcontext(int handle, unsigned int domid,
 int xc_domain_irq_permission(int handle, unsigned int domid,
                              unsigned char pirq, unsigned char allow_access)
 {
+	int ret;
 	DECLARE_DOMCTL(XEN_DOMCTL_irq_permission, domid);
 	domctl.u.irq_permission.pirq = pirq;
 	domctl.u.irq_permission.allow_access = allow_access;
-	int ret;
 
 	ret = do_domctl(handle, &domctl);
 	if (ret)
@@ -900,11 +900,11 @@ int xc_domain_iomem_permission(int handle, unsigned int domid,
                                unsigned long first_mfn, unsigned long nr_mfns,
                                unsigned char allow_access)
 {
+	int ret;
 	DECLARE_DOMCTL(XEN_DOMCTL_iomem_permission, domid);
 	domctl.u.iomem_permission.first_mfn = first_mfn;
 	domctl.u.iomem_permission.nr_mfns = nr_mfns;
 	domctl.u.iomem_permission.allow_access = allow_access;
-	int ret;
 
 	ret = do_domctl(handle, &domctl);
 	if (ret)

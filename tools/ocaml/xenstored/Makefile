@@ -1,3 +1,4 @@
+XEN_ROOT = ../../..
 OCAML_TOPLEVEL = ..
 include $(OCAML_TOPLEVEL)/common.make
 

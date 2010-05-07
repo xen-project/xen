@@ -14,19 +14,13 @@
  * GNU Lesser General Public License for more details.
  */
 
-#define __XEN_TOOLS__
-
 #include <xen/xen.h>
 #include <xen/memory.h>
 #include <xen/sysctl.h>
 #include <xen/domctl.h>
 #include <xen/sched.h>
 #include <xen/sysctl.h>
-#if XEN_SYSCTL_INTERFACE_VERSION < 4
-#include <xen/linux/privcmd.h>
-#else
 #include <xen/sys/privcmd.h>
-#endif
 #include <xen/version.h>
 #include <xen/foreign/x86_32.h>
 #include <xen/foreign/x86_64.h>

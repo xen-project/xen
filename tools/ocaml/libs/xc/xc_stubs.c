@@ -99,7 +99,7 @@ CAMLprim value stub_marshall_core_header(value header)
 	CAMLreturn(s);
 }
 
-CAMLprim value stub_xc_interface_open()
+CAMLprim value stub_xc_interface_open(void)
 {
         int handle;
         handle = xc_interface_open();
@@ -109,12 +109,12 @@ CAMLprim value stub_xc_interface_open()
 }
 
 
-CAMLprim value stub_xc_interface_open_fake()
+CAMLprim value stub_xc_interface_open_fake(void)
 {
 	return Val_int(-1);
 }
 
-CAMLprim value stub_xc_using_injection()
+CAMLprim value stub_xc_using_injection(void)
 {
 	if (xc_using_injection ()){
 		return Val_int(1);
@@ -312,7 +312,9 @@ CAMLprim value stub_xc_domain_getinfolist(value xc_handle, value first_domain, v
 	CAMLparam3(xc_handle, first_domain, nb);
 	CAMLlocal2(result, temp);
 	xc_domaininfo_t * info;
-	int i, ret, toalloc;
+	int i, ret, toalloc, c_xc_handle, retval;
+	unsigned int c_max_domains;
+	uint32_t c_first_domain;
 
 	/* get the minimum number of allocate byte we need and bump it up to page boundary */
 	toalloc = (sizeof(xc_domaininfo_t) * Int_val(nb)) | 0xfff;
@@ -322,12 +324,12 @@ CAMLprim value stub_xc_domain_getinfolist(value xc_handle, value first_domain, v
 
 	result = temp = Val_emptylist;
 
-	int c_xc_handle = _H(xc_handle);
-	uint32_t c_first_domain = _D(first_domain);
-	unsigned int c_max_domains = Int_val(nb);
+	c_xc_handle = _H(xc_handle);
+	c_first_domain = _D(first_domain);
+	c_max_domains = Int_val(nb);
 	// caml_enter_blocking_section();
-	int retval = xc_domain_getinfolist(c_xc_handle, c_first_domain,
-					   c_max_domains, info);
+	retval = xc_domain_getinfolist(c_xc_handle, c_first_domain,
+				       c_max_domains, info);
 	// caml_leave_blocking_section();
 
 	if (retval < 0) {
@@ -849,15 +851,18 @@ CAMLprim value stub_map_foreign_range(value xc_handle, value dom,
 	CAMLparam4(xc_handle, dom, size, mfn);
 	CAMLlocal1(result);
 	struct mmap_interface *intf;
+	int c_xc_handle;
+	uint32_t c_dom;
+	unsigned long c_mfn;
 
 	result = caml_alloc(sizeof(struct mmap_interface), Abstract_tag);
 	intf = (struct mmap_interface *) result;
 
 	intf->len = Int_val(size);
 
-	int c_xc_handle = _H(xc_handle);
-	uint32_t c_dom = _D(dom);
-	unsigned long c_mfn = Nativeint_val(mfn);
+	c_xc_handle = _H(xc_handle);
+	c_dom = _D(dom);
+	c_mfn = Nativeint_val(mfn);
 	// caml_enter_blocking_section();
 	intf->addr = xc_map_foreign_range(c_xc_handle, c_dom,
 	                                  intf->len, PROT_READ|PROT_WRITE,

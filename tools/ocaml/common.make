@@ -1,3 +1,5 @@
+include $(XEN_ROOT)/tools/Rules.mk
+
 CC ?= gcc
 OCAMLOPT ?= ocamlopt
 OCAMLC ?= ocamlc
@@ -6,10 +8,10 @@ OCAMLDEP ?= ocamldep
 OCAMLLEX ?= ocamllex
 OCAMLYACC ?= ocamlyacc
 
-CFLAGS ?= -Wall -fPIC -O2 -Werror
-
+CFLAGS += -fPIC -Werror
 CFLAGS += -I$(TOPLEVEL)/../include -I$(TOPLEVEL)/../libxc
-CFLAGS += -I/usr/lib64/ocaml -I/usr/lib/ocaml
+CFLAGS-$(CONFIG_Linux) += -I/usr/lib64/ocaml -I/usr/lib/ocaml
+CFLAGS-$(CONFIG_NetBSD) += -I/usr/pkg/lib/ocaml -fPIC
 
 OCAMLOPTFLAG_G := $(shell $(OCAMLOPT) -h 2>&1 | sed -n 's/^  *\(-g\) .*/\1/p')
 OCAMLOPTFLAGS = $(OCAMLOPTFLAG_G) -ccopt "$(LDFLAGS)" -dtypes $(OCAMLINCLUDE) -cc $(CC) -w F -warn-error F

@@ -27,10 +27,7 @@
 #include <caml/fail.h>
 #include <caml/callback.h>
 
-#define __XEN_TOOLS__
-
 #include <xenctrl.h>
-#define u32 uint32_t
 #include <xen/io/xs_wire.h>
 
 CAMLprim value stub_header_size(void)
