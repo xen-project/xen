@@ -35,7 +35,8 @@ struct cmd_spec cmd_table[] = {
     { "vcpu-set", &main_vcpuset, "set the number of active VCPUs allowed for the domain" },
     { "list-vm", &main_list_vm, "list the VMs,without DOM0" },
     { "info", &main_info, "get information about Xen host" },
-    { "sched-credit", &main_sched_credit, "get/set credit scheduler parameters" }
+    { "sched-credit", &main_sched_credit, "get/set credit scheduler parameters" },
+    { "domid", &main_domid, "convert a domain name to domain id"},
 };
 
 int cmdtable_len = sizeof(cmd_table)/sizeof(struct cmd_spec);
