@@ -13,21 +13,24 @@ SUBDIRS = $(SUBDIRS_LIBS) $(SUBDIRS_PROGRAMS)
 .PHONY: all
 all: build
 
-.PHONY: build $(SUBDIRS)
-build: $(SUBDIRS)
+.PHONY: build
+build: SUBDIRS
 
-$(SUBDIRS):
-	@echo " === building $@"
-	@$(MAKE) --no-print-directory -C $@
+.PHONY: SUBDIRS SUBDIRS_PROGRAMS SUBDIRS_LIBS
+SUBDIRS SUBDIRS_PROGRAMS SUBDIRS_LIBS:
+	@set -e; for d in $($@); do			\
+		echo " === building $$d";		\
+		$(MAKE) --no-print-directory -C $$d;	\
+	done
 
 .PHONY: install install-libs install-program
 install: install-libs install-program
 
-install-program: $(SUBDIRS_PROGRAMS)
+install-program: SUBDIRS_PROGRAMS
 	$(INSTALL_DIR) $(DESTDIR)$(SBINDIR)
 	$(INSTALL_PROG) xenstored/oxenstored $(DESTDIR)$(SBINDIR)
 
-install-libs: $(SUBDIRS_LIBS)
+install-libs: SUBDIRS_LIBS
 
 .PHONY: clean
 clean:
