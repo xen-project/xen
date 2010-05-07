@@ -165,6 +165,27 @@ static int powernow_cpufreq_verify(struct cpufreq_policy *policy)
     return cpufreq_frequency_table_verify(policy, data->freq_table);
 }
 
+static void feature_detect(void *info)
+{
+    struct cpufreq_policy *policy = info;
+    unsigned int ecx, edx;
+
+    ecx = cpuid_ecx(6);
+    if (ecx & CPUID_6_ECX_APERFMPERF_CAPABILITY) {
+        policy->aperf_mperf = 1;
+        powernow_cpufreq_driver.getavg = get_measured_perf;
+    }
+
+    edx = cpuid_edx(CPUID_FREQ_VOLT_CAPABILITIES);
+    if ((edx & CPB_CAPABLE) == CPB_CAPABLE) {
+        policy->turbo = CPUFREQ_TURBO_ENABLED;
+        if (cpufreq_verbose)
+            printk(XENLOG_INFO
+                   "CPU%u: Core Boost/Turbo detected and enabled\n",
+                   smp_processor_id());
+    }
+}
+
 static int powernow_cpufreq_cpu_init(struct cpufreq_policy *policy)
 {
     unsigned int i;
@@ -250,18 +271,8 @@ static int powernow_cpufreq_cpu_init(struct cpufreq_policy *policy)
     if (result)
         goto err_freqfree;
 
-    if (c->cpuid_level >= 6) {
-        unsigned int edx;
-        unsigned int ecx;
-        ecx = cpuid_ecx(6);
-        if (ecx & CPUID_6_ECX_APERFMPERF_CAPABILITY)
-            powernow_cpufreq_driver.getavg = get_measured_perf;
-        edx = cpuid_edx(CPUID_FREQ_VOLT_CAPABILITIES);
-        if ((edx & CPB_CAPABLE) == CPB_CAPABLE) {
-            policy->turbo = CPUFREQ_TURBO_ENABLED;
-            printk(XENLOG_INFO "Core Boost/Turbo detected and enabled\n");
-        }
-    }
+    if (c->cpuid_level >= 6)
+        on_selected_cpus(cpumask_of(cpu), feature_detect, policy, 1);
       
     /*
      * the first call to ->target() should result in us actually

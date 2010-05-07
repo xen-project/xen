@@ -52,11 +52,12 @@ struct cpufreq_policy {
                                  * governors are used */
     struct cpufreq_governor     *governor;
 
-    unsigned int        resume; /* flag for cpufreq 1st run
+    bool_t              resume; /* flag for cpufreq 1st run
                                  * S3 wakeup, hotplug cpu, etc */
-    int                 turbo;  /* tristate flag: 0 for unsupported
+    s8                  turbo;  /* tristate flag: 0 for unsupported
                                  * -1 for disable, 1 for enabled
                                  * See CPUFREQ_TURBO_* below for defines */
+    bool_t              aperf_mperf; /* CPU has APERF/MPERF MSRs */
 };
 extern struct cpufreq_policy *cpufreq_cpu_policy[NR_CPUS];
 

@@ -280,7 +280,7 @@ unsigned int get_measured_perf(unsigned int cpu, unsigned int flag)
         return 0;
 
     policy = cpufreq_cpu_policy[cpu];
-    if (!policy)
+    if (!policy || !policy->aperf_mperf)
         return 0;
 
     switch (flag)
@@ -375,6 +375,26 @@ static unsigned int get_cur_freq_on_cpu(unsigned int cpu)
 
     freq = extract_freq(get_cur_val(cpumask_of_cpu(cpu)), data);
     return freq;
+}
+
+static void feature_detect(void *info)
+{
+    struct cpufreq_policy *policy = info;
+    unsigned int eax, ecx;
+
+    ecx = cpuid_ecx(6);
+    if (ecx & CPUID_6_ECX_APERFMPERF_CAPABILITY) {
+        policy->aperf_mperf = 1;
+        acpi_cpufreq_driver.getavg = get_measured_perf;
+    }
+
+    eax = cpuid_eax(6);
+    if (eax & 0x2) {
+        policy->turbo = CPUFREQ_TURBO_ENABLED;
+        if (cpufreq_verbose)
+            printk(XENLOG_INFO "CPU%u: Turbo Mode detected and enabled\n",
+                   smp_processor_id());
+    }
 }
 
 static unsigned int check_freqs(cpumask_t mask, unsigned int freq,
@@ -615,18 +635,8 @@ acpi_cpufreq_cpu_init(struct cpufreq_policy *policy)
 
     /* Check for APERF/MPERF support in hardware
      * also check for boost support */
-    if (c->x86_vendor == X86_VENDOR_INTEL && c->cpuid_level >= 6) {
-        unsigned int ecx;
-        unsigned int eax;
-        ecx = cpuid_ecx(6);
-        if (ecx & CPUID_6_ECX_APERFMPERF_CAPABILITY)
-            acpi_cpufreq_driver.getavg = get_measured_perf;
-        eax = cpuid_eax(6);
-        if ( eax & 0x2 ) {
-            policy->turbo = CPUFREQ_TURBO_ENABLED;
-            printk(XENLOG_INFO "Turbo Mode detected and enabled!\n");
-        }
-    }
+    if (c->x86_vendor == X86_VENDOR_INTEL && c->cpuid_level >= 6)
+        on_selected_cpus(cpumask_of(cpu), feature_detect, policy, 1);
 
     /*
      * the first call to ->target() should result in us actually
