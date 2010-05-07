@@ -26,10 +26,7 @@ LIBXENSTORE := libxenstore.a
 xenstore xenstore-control: CFLAGS += -static
 endif
 
-ALL_TARGETS = libxenstore.so libxenstore.a clients xs_tdb_dump 
-ifneq ($(CONFIG_OCAML_XENSTORED),y)
- ALL_TARGETS += xenstored
-endif
+ALL_TARGETS = libxenstore.so libxenstore.a clients xs_tdb_dump xenstored
 
 .PHONY: all
 all: $(ALL_TARGETS)
@@ -98,6 +95,9 @@ install: all
 	$(INSTALL_DIR) $(DESTDIR)$(BINDIR)
 	$(INSTALL_DIR) $(DESTDIR)$(SBINDIR)
 	$(INSTALL_DIR) $(DESTDIR)$(INCLUDEDIR)
+	$(INSTALL_DIR) $(DESTDIR)/var/run/xenstored
+	$(INSTALL_DIR) $(DESTDIR)/var/lib/xenstored
+	$(INSTALL_PROG) xenstored $(DESTDIR)$(SBINDIR)
 	$(INSTALL_PROG) xenstore-control $(DESTDIR)$(BINDIR)
 	$(INSTALL_PROG) xenstore $(DESTDIR)$(BINDIR)
 	set -e ; for c in $(CLIENTS) ; do \
