@@ -6,7 +6,7 @@ OCAMLDEP ?= ocamldep
 OCAMLLEX ?= ocamllex
 OCAMLYACC ?= ocamlyacc
 
-CFLAGS ?= -Wall -fPIC -O2
+CFLAGS ?= -Wall -fPIC -O2 -Werror
 
 CFLAGS += -I$(TOPLEVEL)/../include -I$(TOPLEVEL)/../libxc
 CFLAGS += -I/usr/lib64/ocaml -I/usr/lib/ocaml

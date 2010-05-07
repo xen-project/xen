@@ -395,12 +395,12 @@ CAMLprim value stub_xc_vcpu_context_get(value xc_handle, value domid,
 	CAMLparam3(xc_handle, domid, cpu);
 	CAMLlocal1(context);
 	int ret;
-	struct vcpu_guest_context ctxt;
+	vcpu_guest_context_any_t ctxt;
 
 	ret = xc_vcpu_getcontext(_H(xc_handle), _D(domid), Int_val(cpu), &ctxt);
 
 	context = caml_alloc_string(sizeof(ctxt));
-	memcpy(String_val(context), (char *) &ctxt, sizeof(ctxt));
+	memcpy(String_val(context), (char *) &ctxt.c, sizeof(ctxt.c));
 
 	CAMLreturn(context);
 }
@@ -552,13 +552,13 @@ CAMLprim value stub_xc_pcpu_info(value xc_handle, value nr_cpus)
 {
 	CAMLparam2(xc_handle, nr_cpus);
 	CAMLlocal2(pcpus, v);
-	uint64_t *info;
+	xen_sysctl_cpuinfo_t *info;
 	int r, size;
 
 	if (Int_val(nr_cpus) < 1)
 		caml_invalid_argument("nr_cpus");
 	
-	info = calloc(Int_val(nr_cpus) + 1, sizeof(uint64_t));
+	info = calloc(Int_val(nr_cpus) + 1, sizeof(*info));
 	if (!info)
 		caml_raise_out_of_memory();
 
@@ -575,7 +575,7 @@ CAMLprim value stub_xc_pcpu_info(value xc_handle, value nr_cpus)
 		int i;
 		pcpus = caml_alloc(size, 0);
 		for (i = 0; i < size; i++) {
-			v = caml_copy_int64(info[i]);
+			v = caml_copy_int64(info[i].idletime);
 			caml_modify(&Field(pcpus, i), v);
 		}
 	} else

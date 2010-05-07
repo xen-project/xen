@@ -130,7 +130,8 @@ int xc_readconsolering(int handle, char **pbuffer,
                        unsigned int *pnr_chars, int clear);
 int xc_send_debug_keys(int handle, char *keys);
 int xc_physinfo(int handle, xc_physinfo_t *put_info);
-int xc_pcpu_info(int handle, int max_cpus, uint64_t *info, int *nr_cpus);
+int xc_pcpu_info(
+	int handle, int max_cpus, xen_sysctl_cpuinfo_t *info, int *nr_cpus);
 int xc_sched_id(int handle, int *sched_id);
 int xc_version(int handle, int cmd, void *arg);
 int xc_evtchn_alloc_unbound(int handle, unsigned int domid,

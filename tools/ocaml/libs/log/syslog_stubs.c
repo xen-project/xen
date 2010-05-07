@@ -25,9 +25,11 @@ static int __syslog_level_table[] = {
 	LOG_NOTICE, LOG_INFO, LOG_DEBUG
 };
 
+/*
 static int __syslog_options_table[] = {
 	LOG_CONS, LOG_NDELAY, LOG_NOWAIT, LOG_ODELAY, LOG_PERROR, LOG_PID
 };
+*/
 
 static int __syslog_facility_table[] = {
 	LOG_AUTH, LOG_AUTHPRIV, LOG_CRON, LOG_DAEMON, LOG_FTP, LOG_KERN,
