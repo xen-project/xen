@@ -36,6 +36,10 @@ struct libxl_dominfo {
     uint32_t vcpu_online;
 };
 
+struct libxl_poolinfo {
+    uint32_t poolid;
+};
+
 struct libxl_vminfo {
     uint8_t uuid[16];
     uint32_t domid;
@@ -85,6 +89,8 @@ typedef struct {
     uint8_t uuid[16];
     char **xsdata;
     char **platformdata;
+    uint32_t poolid;
+    char *poolname;
 } libxl_domain_create_info;
 
 typedef struct {
@@ -340,6 +346,7 @@ int libxl_console_attach(struct libxl_ctx *ctx, uint32_t domid, int cons_num);
 int libxl_domain_info(struct libxl_ctx*, struct libxl_dominfo *info_r,
                       uint32_t domid);
 struct libxl_dominfo * libxl_list_domain(struct libxl_ctx*, int *nb_domain);
+struct libxl_poolinfo * libxl_list_pool(struct libxl_ctx*, int *nb_pool);
 struct libxl_vminfo * libxl_list_vm(struct libxl_ctx *ctx, int *nb_vm);
 
 typedef struct libxl_device_model_starting libxl_device_model_starting;

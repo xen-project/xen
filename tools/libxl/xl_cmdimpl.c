@@ -87,8 +87,7 @@ struct save_file_header {
 
 #define SAVEFILE_BYTEORDER_VALUE ((uint32_t)0x01020304UL)
 
-static int domain_qualifier_to_domid(const char *p, uint32_t *domid_r,
-                                     int *was_name_r)
+static int qualifier_to_id(const char *p, uint32_t *id_r)
 {
     int i, alldigit;
 
@@ -101,14 +100,32 @@ static int domain_qualifier_to_domid(const char *p, uint32_t *domid_r,
     }
 
     if (i > 0 && alldigit) {
-        *domid_r = strtoul(p, NULL, 10);
-        if (was_name_r) *was_name_r = 0;
+        *id_r = strtoul(p, NULL, 10);
         return 0;
     } else {
         /* check here if it's a uuid and do proper conversion */
     }
-    if (was_name_r) *was_name_r = 1;
-    return libxl_name_to_domid(&ctx, p, domid_r);
+    return 1;
+}
+
+static int domain_qualifier_to_domid(const char *p, uint32_t *domid_r,
+                                     int *was_name_r)
+{
+    int was_name;
+
+    was_name = qualifier_to_id(p, domid_r);
+    if (was_name_r) *was_name_r = was_name;
+    return was_name ? libxl_name_to_domid(&ctx, p, domid_r) : 0;
+}
+
+static int pool_qualifier_to_poolid(const char *p, uint32_t *poolid_r,
+                                     int *was_name_r)
+{
+    int was_name;
+
+    was_name = qualifier_to_id(p, poolid_r);
+    if (was_name_r) *was_name_r = was_name;
+    return was_name ? libxl_name_to_poolid(&ctx, p, poolid_r) : 0;
 }
 
 static void find_domain(const char *p)
@@ -146,6 +163,7 @@ static void init_create_info(libxl_domain_create_info *c_info)
     c_info->hvm = 1;
     c_info->oos = 1;
     c_info->ssidref = 0;
+    c_info->poolid = 0;
 }
 
 static void init_build_info(libxl_domain_build_info *b_info, libxl_domain_create_info *c_info)
@@ -277,6 +295,7 @@ static void printf_info(libxl_domain_create_info *c_info,
            (c_info->uuid)[4], (c_info->uuid)[5], (c_info->uuid)[6], (c_info->uuid)[7],
            (c_info->uuid)[8], (c_info->uuid)[9], (c_info->uuid)[10], (c_info->uuid)[11],
            (c_info->uuid)[12], (c_info->uuid)[13], (c_info->uuid)[14], (c_info->uuid)[15]);
+    printf("cpupool: %s (%d)\n", c_info->poolname, c_info->poolid);
     if (c_info->xsdata)
         printf("xsdata: contains data\n");
     else
@@ -433,6 +452,10 @@ static void parse_config_data(const char *configfile_filename_report,
 
     if (!xlu_cfg_get_long(config, "oos", &l))
         c_info->oos = l;
+
+    if (!xlu_cfg_get_string (config, "pool", &buf))
+        pool_qualifier_to_poolid(buf, &c_info->poolid, NULL);
+    c_info->poolname = libxl_poolid_to_name(&ctx, c_info->poolid);
 
     init_build_info(b_info, c_info);
 

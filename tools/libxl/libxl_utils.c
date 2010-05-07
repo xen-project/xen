@@ -78,6 +78,41 @@ int libxl_name_to_domid(struct libxl_ctx *ctx, const char *name,
     return -1;
 }
 
+char *libxl_poolid_to_name(struct libxl_ctx *ctx, uint32_t poolid)
+{
+    unsigned int len;
+    char path[strlen("/local/pool") + 12];
+    char *s;
+
+    snprintf(path, sizeof(path), "/local/pool/%d/name", poolid);
+    s = xs_read(ctx->xsh, XBT_NULL, path, &len);
+    libxl_ptr_add(ctx, s);
+    return s;
+}
+
+int libxl_name_to_poolid(struct libxl_ctx *ctx, const char *name,
+                        uint32_t *poolid)
+{
+    int i, nb_pools;
+    char *poolname;
+    struct libxl_poolinfo *poolinfo;
+
+    poolinfo = libxl_list_pool(ctx, &nb_pools);
+    if (!poolinfo)
+        return ERROR_NOMEM;
+
+    for (i = 0; i < nb_pools; i++) {
+        poolname = libxl_poolid_to_name(ctx, poolinfo[i].poolid);
+        if (!poolname)
+            continue;
+        if (strcmp(poolname, name) == 0) {
+            *poolid = poolinfo[i].poolid;
+            return 0;
+        }
+    }
+    return -1;
+}
+
 int libxl_get_stubdom_id(struct libxl_ctx *ctx, int guest_domid)
 {
     char * stubdom_id_s = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/image/device-model-domid", libxl_xs_get_dompath(ctx, guest_domid)));

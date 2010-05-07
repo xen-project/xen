@@ -111,6 +111,12 @@ int libxl_domain_make(struct libxl_ctx *ctx, libxl_domain_create_info *info,
         return ERROR_FAIL;
     }
 
+    ret = xc_cpupool_movedomain(ctx->xch, info->poolid, *domid);
+    if (ret < 0) {
+        XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, ret, "domain move fail");
+        return ERROR_FAIL;
+    }
+
     dom_path = libxl_xs_get_dompath(ctx, *domid);
     if (!dom_path)
         return ERROR_FAIL;
@@ -163,6 +169,7 @@ retry_transaction:
 
     xs_write(ctx->xsh, t, libxl_sprintf(ctx, "%s/uuid", vm_path), uuid_string, strlen(uuid_string));
     xs_write(ctx->xsh, t, libxl_sprintf(ctx, "%s/name", vm_path), info->name, strlen(info->name));
+    xs_write(ctx->xsh, t, libxl_sprintf(ctx, "%s/pool_name", vm_path), info->poolname, strlen(info->poolname));
 
     libxl_xs_writev(ctx, t, dom_path, info->xsdata);
     libxl_xs_writev(ctx, t, libxl_sprintf(ctx, "%s/platform", dom_path), info->platformdata);
@@ -424,6 +431,26 @@ int libxl_domain_info(struct libxl_ctx *ctx, struct libxl_dominfo *info_r,
 
     xcinfo2xlinfo(&xcinfo, info_r);
     return 0;
+}
+
+struct libxl_poolinfo * libxl_list_pool(struct libxl_ctx *ctx, int *nb_pool)
+{
+    struct libxl_poolinfo *ptr;
+    int i, ret;
+    xc_cpupoolinfo_t info[256];
+    int size = 256;
+
+    ptr = calloc(size, sizeof(struct libxl_poolinfo));
+    if (!ptr) return NULL;
+
+    ret = xc_cpupool_getinfo(ctx->xch, 0, 256, info);
+    if (ret<0) return NULL;
+
+    for (i = 0; i < ret; i++) {
+        ptr[i].poolid = info[i].cpupool_id;
+    }
+    *nb_pool = ret;
+    return ptr;
 }
 
 /* this API call only list VM running on this host. a VM can be an aggregate of multiple domains. */
