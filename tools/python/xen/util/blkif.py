@@ -86,7 +86,7 @@ def _parse_uname(uname):
             else:
                 fn = "/dev/%s" %(fn,)
                
-        if typ == "tap":
+        if typ in ("tap", "tap2"):
             (taptype, fn) = fn.split(":", 1)
     return (fn, taptype)
 
