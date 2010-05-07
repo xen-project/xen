@@ -407,20 +407,21 @@ void relinquish_vcpu_resources(struct vcpu *v)
 
 struct domain *alloc_domain_struct(void)
 {
-#ifdef CONFIG_IA64_PICKLE_DOMAIN
 	struct domain *d;
+#ifdef CONFIG_IA64_PICKLE_DOMAIN
 	/*
 	 * We pack the MFN of the domain structure into a 32-bit field within
 	 * the page_info structure. Hence the MEMF_bits() restriction.
 	 */
 	d = alloc_xenheap_pages(get_order_from_bytes(sizeof(*d)),
 				MEMF_bits(32 + PAGE_SHIFT));
+#else
+	d = xmalloc(struct domain);
+#endif
+
 	if ( d != NULL )
 		memset(d, 0, sizeof(*d));
 	return d;
-#else
-	return xmalloc(struct domain);
-#endif
 }
 
 void free_domain_struct(struct domain *d)

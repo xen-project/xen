@@ -223,7 +223,6 @@ struct domain *domain_create(
     if ( (d = alloc_domain_struct()) == NULL )
         return NULL;
 
-    memset(d, 0, sizeof(*d));
     d->domain_id = domid;
 
     lock_profile_register_struct(LOCKPROF_TYPE_PERDOM, d, domid, "Domain");
