@@ -88,10 +88,21 @@ static void enable_intr_window(struct vcpu *v, struct hvm_intack intack)
      * guest can accept the real interrupt.
      *
      * TODO: Better NMI handling. We need a way to skip a MOV SS interrupt
-     * shadow. This is hard to do without hardware support. We should also
-     * track 'NMI blocking' from NMI injection until IRET. This can be done
-     * quite easily in software by intercepting the unblocking IRET.
+     * shadow. This is hard to do without hardware support. Also we should
+     * not be waiting for EFLAGS.IF to become 1.
      */
+
+    /*
+     * NMI-blocking window is handled by IRET interception. We should not
+     * inject a VINTR in this case as VINTR is unaware of NMI-blocking and
+     * hence we can enter an endless loop (VINTR intercept fires, yet
+     * hvm_interrupt_blocked() still indicates NMI-blocking is active, so
+     * we inject a VINTR, ...).
+     */
+    if ( (intack.source == hvm_intsrc_nmi) &&
+         (vmcb->general1_intercepts & GENERAL1_INTERCEPT_IRET) )
+        return;
+
     intr = vmcb->vintr;
     intr.fields.irq     = 1;
     intr.fields.vector  = 0;
