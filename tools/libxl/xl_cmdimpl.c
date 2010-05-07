@@ -627,6 +627,8 @@ skip:
                     (*vfbs)[*num_vfbs].vnc = atoi(p2 + 1);
                 } else if (!strcmp(p, "vnclisten")) {
                     (*vfbs)[*num_vfbs].vnclisten = strdup(p2 + 1);
+                } else if (!strcmp(p, "vncpasswd")) {
+                    (*vfbs)[*num_vfbs].vncpasswd = strdup(p2 + 1);
                 } else if (!strcmp(p, "vncdisplay")) {
                     (*vfbs)[*num_vfbs].vncdisplay = atoi(p2 + 1);
                 } else if (!strcmp(p, "vncunused")) {
@@ -705,6 +707,8 @@ skip_pci:
             dm_info->vnc = l;
         if (!xlu_cfg_get_string (config, "vnclisten", &buf))
             dm_info->vnclisten = strdup(buf);
+        if (!xlu_cfg_get_string (config, "vncpasswd", &buf))
+            dm_info->vncpasswd = strdup(buf);
         if (!xlu_cfg_get_long (config, "vncdisplay", &l))
             dm_info->vncdisplay = l;
         if (!xlu_cfg_get_long (config, "vncunused", &l))

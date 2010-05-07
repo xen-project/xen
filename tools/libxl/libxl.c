@@ -769,7 +769,12 @@ static char ** libxl_build_device_model_args(struct libxl_ctx *ctx,
         flexarray_set(dm_args, num++, "-vnc");
         if (info->vncdisplay) {
             if (info->vnclisten && strchr(info->vnclisten, ':') == NULL) {
-                flexarray_set(dm_args, num++, libxl_sprintf(ctx, "%s:%d", info->vnclisten, info->vncdisplay));
+                flexarray_set(
+                    dm_args, num++,
+                    libxl_sprintf(ctx, "%s:%d%s",
+                                  info->vnclisten,
+                                  info->vncdisplay,
+                                  info->vncpasswd ? ",password" : ""));
             } else {
                 flexarray_set(dm_args, num++, libxl_sprintf(ctx, "127.0.0.1:%d", info->vncdisplay));
             }
@@ -892,6 +897,7 @@ static int libxl_vfb_and_vkb_from_device_model_info(struct libxl_ctx *ctx,
     vfb->vnclisten = info->vnclisten;
     vfb->vncdisplay = info->vncdisplay;
     vfb->vncunused = info->vncunused;
+    vfb->vncpasswd = info->vncpasswd;
     vfb->keymap = info->keymap;
     vfb->sdl = info->sdl;
     vfb->opengl = info->opengl;
@@ -1082,6 +1088,9 @@ int libxl_create_device_model(struct libxl_ctx *ctx,
     int rc;
     char **args;
     struct libxl_device_model_starting buf_starting, *p;
+    xs_transaction_t t; 
+    char *vm_path;
+    char **pass_stuff;
 
     if (strstr(info->device_model, "stubdom-dm")) {
         libxl_device_vfb vfb;
@@ -1117,6 +1126,23 @@ int libxl_create_device_model(struct libxl_ctx *ctx,
     p->domid = info->domid;
     p->dom_path = libxl_xs_get_dompath(ctx, info->domid);
     if (!p->dom_path) { libxl_free(ctx, p); return ERROR_FAIL; }
+
+    if (info->vncpasswd) {
+    retry_transaction:
+        /* Find uuid and the write the vnc password to xenstore for qemu. */
+        t = xs_transaction_start(ctx->xsh);
+        vm_path = libxl_xs_read(ctx,t,libxl_sprintf(ctx, "%s/vm", p->dom_path));
+        if (vm_path) {
+            /* Now write the vncpassword into it. */
+            pass_stuff = libxl_calloc(ctx, 2, sizeof(char *));
+            pass_stuff[0] = "vncpasswd";
+            pass_stuff[1] = info->vncpasswd;
+            libxl_xs_writev(ctx,t,vm_path,pass_stuff);
+            if (!xs_transaction_end(ctx->xsh, t, 0))
+                if (errno == EAGAIN)
+                    goto retry_transaction;
+        }
+    }
 
     rc = libxl_spawn_spawn(ctx, p, "device model", dm_xenstore_record_pid);
     if (rc < 0) goto xit;
@@ -1672,6 +1698,8 @@ static int libxl_build_xenpv_qemu_args(struct libxl_ctx *ctx,
         info->vnclisten = libxl_sprintf(ctx, "%s", vfb->vnclisten);
     info->vncdisplay = vfb->vncdisplay;
     info->vncunused = vfb->vncunused;
+    if (vfb->vncpasswd)
+        info->vncpasswd = vfb->vncpasswd;
     if (vfb->keymap)
         info->keymap = libxl_sprintf(ctx, "%s", vfb->keymap);
     info->sdl = vfb->sdl;
@@ -1753,6 +1781,8 @@ int libxl_device_vfb_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_vfb
     flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", vfb->vnc));
     flexarray_set(back, boffset++, "vnclisten");
     flexarray_set(back, boffset++, vfb->vnclisten);
+    flexarray_set(back, boffset++, "vncpasswd");
+    flexarray_set(back, boffset++, vfb->vncpasswd);
     flexarray_set(back, boffset++, "vncdisplay");
     flexarray_set(back, boffset++, libxl_sprintf(ctx, "%d", vfb->vncdisplay));
     flexarray_set(back, boffset++, "vncunused");

@@ -148,6 +148,7 @@ typedef struct {
     bool stdvga; /* stdvga enabled or disabled */
     bool vnc; /* vnc enabled or disabled */
     char *vnclisten; /* address:port that should be listened on for the VNC server if vnc is set */
+    char *vncpasswd; /* the VNC password */
     int vncdisplay; /* set VNC display number */
     bool vncunused; /* try to find an unused port for the VNC server */
     char *keymap; /* set keyboard layout, default is en-us keyboard */
@@ -169,6 +170,7 @@ typedef struct {
     int devid;
     bool vnc; /* vnc enabled or disabled */
     char *vnclisten; /* address:port that should be listened on for the VNC server if vnc is set */
+    char *vncpasswd; /* the VNC password */
     int vncdisplay; /* set VNC display number */
     bool vncunused; /* try to find an unused port for the VNC server */
     char *keymap; /* set keyboard layout, default is en-us keyboard */
