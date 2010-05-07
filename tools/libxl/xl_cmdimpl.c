@@ -1243,6 +1243,9 @@ void help(char *command)
     } else if (!strcmp(command, "domname")) {
         printf("Usage: xl domname <DomainId>\n\n");
         printf("Convert a domain id to domain name.\n");
+    } else if (!strcmp(command, "rename")) {
+        printf("Usage: xl rename <Domain> <NewDomainName>\n\n");
+        printf("Rename a domain.\n");
     }
 }
 
@@ -3037,6 +3040,48 @@ int main_domname(int argc, char **argv)
     }
 
     printf("%s\n", domname);
+
+    exit(0);
+}
+
+int main_rename(int argc, char **argv)
+{
+    int opt;
+    char *dom;
+    char *new_name;
+    xs_transaction_t t;
+
+    while ((opt = getopt(argc, argv, "h")) != -1) {
+        switch (opt) {
+        case 'h':
+            help("rename");
+            exit(0);
+        default:
+            fprintf(stderr, "option `%c' not supported.\n", opt);
+            break;
+        }
+    }
+
+    dom = argv[optind++];
+    if (!dom || !argv[optind]) {
+        fprintf(stderr, "'xl rename' requires 2 arguments.\n\n");
+        help("rename");
+        exit(1);
+    }
+
+    find_domain(dom);
+    new_name = argv[optind];
+
+retry_transaction:
+    t = xs_transaction_start(ctx.xsh);
+    if (libxl_domain_rename(&ctx, domid, common_domname, new_name, t)) {
+        fprintf(stderr, "Can't rename domain '%s'.\n", dom);
+        exit(1);
+    }
+
+    if (!xs_transaction_end(ctx.xsh, t, 0))
+        if (errno == EAGAIN)
+            goto retry_transaction;
 
     exit(0);
 }
