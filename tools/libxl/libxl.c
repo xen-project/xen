@@ -2348,11 +2348,22 @@ int libxl_set_memory_target(struct libxl_ctx *ctx, uint32_t domid, uint32_t targ
     uint32_t videoram;
     char *videoram_s = NULL;
     char *dompath = libxl_xs_get_dompath(ctx, domid);
+    xc_domaininfo_t info;
+    struct libxl_dominfo ptr;
+    char *uuid;
 
     videoram_s = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/memory/videoram", dompath));
     videoram = videoram_s ? atoi(videoram_s) : 0;
 
     libxl_xs_write(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/memory/target", dompath), "%lu", target_memkb);
+
+    rc = xc_domain_getinfolist(ctx->xch, domid, 1, &info);
+    if (rc != 1 || info.domain != domid)
+        return rc;
+    xcinfo2xlinfo(&info, &ptr);
+    uuid = libxl_uuid2string(ctx, ptr.uuid);
+    libxl_xs_write(ctx, XBT_NULL, libxl_sprintf(ctx, "/vm/%s/memory", uuid), "%lu", target_memkb / 1024);
+
     rc = xc_domain_setmaxmem(ctx->xch, domid, target_memkb + LIBXL_MAXMEM_CONSTANT);
     if (rc != 0)
         return rc;
