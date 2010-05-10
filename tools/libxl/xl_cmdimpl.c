@@ -3078,7 +3078,6 @@ int main_rename(int argc, char **argv)
     int opt;
     char *dom;
     char *new_name;
-    xs_transaction_t t;
 
     while ((opt = getopt(argc, argv, "h")) != -1) {
         switch (opt) {
@@ -3101,16 +3100,10 @@ int main_rename(int argc, char **argv)
     find_domain(dom);
     new_name = argv[optind];
 
-retry_transaction:
-    t = xs_transaction_start(ctx.xsh);
-    if (libxl_domain_rename(&ctx, domid, common_domname, new_name, t)) {
+    if (libxl_domain_rename(&ctx, domid, common_domname, new_name, 0)) {
         fprintf(stderr, "Can't rename domain '%s'.\n", dom);
         exit(1);
     }
-
-    if (!xs_transaction_end(ctx.xsh, t, 0))
-        if (errno == EAGAIN)
-            goto retry_transaction;
 
     exit(0);
 }
