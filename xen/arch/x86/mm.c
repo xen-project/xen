@@ -158,7 +158,8 @@ boolean_param("allowhugepage", opt_allow_hugepage);
     ((d != dom_io) &&                                           \
      (rangeset_is_empty((d)->iomem_caps) &&                     \
       rangeset_is_empty((d)->arch.ioport_caps) &&               \
-      !has_arch_pdevs(d)) ?                                     \
+      !has_arch_pdevs(d) &&                                     \
+      !is_hvm_domain(d)) ?                                      \
      L1_DISALLOW_MASK : (L1_DISALLOW_MASK & ~PAGE_CACHE_ATTRS))
 
 #ifdef __x86_64__

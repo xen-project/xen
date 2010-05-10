@@ -565,7 +565,6 @@ _sh_propagate(struct vcpu *v,
      * caching attributes in the shadows to match what was asked for.
      */
     if ( (level == 1) && is_hvm_domain(d) &&
-         iomem_access_permitted(d, mfn_x(target_mfn), mfn_x(target_mfn) + 1) &&
          !is_xen_heap_mfn(mfn_x(target_mfn)) )
     {
         unsigned int type;
@@ -581,20 +580,24 @@ _sh_propagate(struct vcpu *v,
             sflags |= pat_type_2_pte_flags(type);
         else if ( d->arch.hvm_domain.is_in_uc_mode )
             sflags |= pat_type_2_pte_flags(PAT_TYPE_UNCACHABLE);
-        else if ( p2mt == p2m_mmio_direct )
-            sflags |= get_pat_flags(v,
-                                    gflags,
-                                    gfn_to_paddr(target_gfn),
-                                    ((paddr_t)mfn_x(target_mfn)) << PAGE_SHIFT,
-                                    MTRR_TYPE_UNCACHABLE); 
-        else if ( iommu_snoop )
-            sflags |= pat_type_2_pte_flags(PAT_TYPE_WRBACK);
         else
-            sflags |= get_pat_flags(v,
-                                    gflags,
-                                    gfn_to_paddr(target_gfn),
-                                    ((paddr_t)mfn_x(target_mfn)) << PAGE_SHIFT,
-                                    NO_HARDCODE_MEM_TYPE);
+            if ( iomem_access_permitted(d, mfn_x(target_mfn), mfn_x(target_mfn) + 1) )
+            {
+                if ( p2mt == p2m_mmio_direct )
+                    sflags |= get_pat_flags(v,
+                            gflags,
+                            gfn_to_paddr(target_gfn),
+                            ((paddr_t)mfn_x(target_mfn)) << PAGE_SHIFT,
+                            MTRR_TYPE_UNCACHABLE); 
+                else if ( iommu_snoop )
+                    sflags |= pat_type_2_pte_flags(PAT_TYPE_WRBACK);
+                else
+                    sflags |= get_pat_flags(v,
+                            gflags,
+                            gfn_to_paddr(target_gfn),
+                            ((paddr_t)mfn_x(target_mfn)) << PAGE_SHIFT,
+                            NO_HARDCODE_MEM_TYPE);
+            }
     }
 
     // Set the A&D bits for higher level shadows.
