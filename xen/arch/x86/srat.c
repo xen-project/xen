@@ -25,7 +25,7 @@ static struct acpi_table_slit *__read_mostly acpi_slit;
 static nodemask_t nodes_parsed __initdata;
 static nodemask_t nodes_found __initdata;
 static struct node nodes[MAX_NUMNODES] __initdata;
-static u8 __read_mostly pxm2node[256] = { [0 ... 255] = 0xff };
+static u8 __read_mostly pxm2node[256] = { [0 ... 255] = NUMA_NO_NODE };
 
 
 static int num_node_memblks;
@@ -112,6 +112,8 @@ static __init void bad_srat(void)
 	acpi_numa = -1;
 	for (i = 0; i < MAX_LOCAL_APIC; i++)
 		apicid_to_node[i] = NUMA_NO_NODE;
+	for (i = 0; i < ARRAY_SIZE(pxm2node); i++)
+		pxm2node[i] = NUMA_NO_NODE;
 }
 
 #ifdef CONFIG_X86_64
