@@ -818,7 +818,7 @@ static char ** libxl_build_device_model_args(struct libxl_ctx *ctx,
             flexarray_set(dm_args, num++, "-vncunused");
         }
     }
-    if (info->sdl || info->opengl) {
+    if (info->sdl) {
         flexarray_set(dm_args, num++, "-sdl");
         if (info->opengl) {
             flexarray_set(dm_args, num++, "-disable-opengl");
