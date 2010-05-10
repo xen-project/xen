@@ -862,17 +862,23 @@ static int tdqcow_open (struct disk_driver *dd, const char *name, td_flag_t flag
 		be32_to_cpus(&exthdr->xmagic);
 		if(exthdr->xmagic != XEN_MAGIC) 
 			goto end_xenhdr;
-    
+	
+		be32_to_cpus(&exthdr->flags);
 		/* Try to detect old tapdisk images. They have to be fixed because 
 		 * they don't use big endian but native endianess for the L1 table */
 		if ((exthdr->flags & EXTHDR_L1_BIG_ENDIAN) == 0) {
-
+			QCowHeader_ext *tmphdr = (QCowHeader_ext *)(buf2 + sizeof(QCowHeader));
 			/* 
 			   The image is broken. Fix it. The L1 table has already been 
 			   byte-swapped, so we can write it to the image file as it is
 			   currently in memory. Then swap it back to native endianess
 			   for operation.
 			 */
+
+			/* Change ENDIAN flag and copy it to store buffer */
+			exthdr->flags |= EXTHDR_L1_BIG_ENDIAN;
+			tmphdr->flags = cpu_to_be32(exthdr->flags);
+
 
 			DPRINTF("qcow: Converting image to big endian L1 table\n");
 
@@ -888,13 +894,6 @@ static int tdqcow_open (struct disk_driver *dd, const char *name, td_flag_t flag
 				cpu_to_be64s(&s->l1_table[i]);
 			}
 
-			/* Write the big endian flag to the extended header */
-			exthdr->flags |= EXTHDR_L1_BIG_ENDIAN;
-
-			if (write(fd, buf, 512) != 512) {
-				DPRINTF("qcow: Failed to write extended header\n");
-				goto fail;
-			}
 		}
 
 		/*Finally check the L1 table cksum*/
@@ -905,7 +904,6 @@ static int tdqcow_open (struct disk_driver *dd, const char *name, td_flag_t flag
 			goto end_xenhdr;
 			
 		be32_to_cpus(&exthdr->min_cluster_alloc);
-		be32_to_cpus(&exthdr->flags);
 		s->sparse = (exthdr->flags & SPARSE_FILE);
 		s->min_cluster_alloc = exthdr->min_cluster_alloc; 
 	}
@@ -1263,6 +1261,7 @@ int qcow_create(const char *filename, uint64_t total_size,
 	} else
 		flags = SPARSE_FILE;
 
+	flags |= EXTHDR_L1_BIG_ENDIAN;
 	exthdr.flags = cpu_to_be32(flags);
 	
 	/* write all the data */
