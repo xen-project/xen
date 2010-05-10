@@ -453,9 +453,15 @@ static void parse_config_data(const char *configfile_filename_report,
     if (!xlu_cfg_get_long(config, "oos", &l))
         c_info->oos = l;
 
-    if (!xlu_cfg_get_string (config, "pool", &buf))
+    if (!xlu_cfg_get_string (config, "pool", &buf)) {
+        c_info->poolid = -1;
         pool_qualifier_to_poolid(buf, &c_info->poolid, NULL);
+    }
     c_info->poolname = libxl_poolid_to_name(&ctx, c_info->poolid);
+    if (!c_info->poolname) {
+        fprintf(stderr, "Illegal pool specified\n");
+        exit(1);
+    }
 
     init_build_info(b_info, c_info);
 
