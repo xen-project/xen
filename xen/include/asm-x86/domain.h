@@ -329,6 +329,7 @@ struct arch_domain
 } __cacheline_aligned;
 
 #define has_arch_pdevs(d)    (!list_empty(&(d)->arch.pdev_list))
+#define has_arch_mmios(d)    (!rangeset_is_empty((d)->iomem_caps))
 
 #ifdef CONFIG_X86_64
 #define perdomain_pt_pgidx(v) \

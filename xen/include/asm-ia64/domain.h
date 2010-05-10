@@ -45,6 +45,7 @@ extern void panic_domain(struct pt_regs *, const char *, ...)
      __attribute__ ((noreturn, format (printf, 2, 3)));
 
 #define has_arch_pdevs(d)    (!list_empty(&(d)->arch.pdev_list))
+#define has_arch_mmios(d)    (!rangeset_is_empty((d)->iomem_caps))
 
 struct mm_struct {
 	volatile pgd_t * pgd;
