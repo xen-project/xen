@@ -1170,114 +1170,20 @@ void help(char *command)
         for (i = 0; i < cmdtable_len; i++)
             printf(" %-20s%s\n",
                    cmd_table[i].cmd_name, cmd_table[i].cmd_desc);
-    } else if(!strcmp(command, "create")) {
-        printf("Usage: xl create <ConfigFile> [options] [vars]\n\n");
-        printf("Create a domain based on <ConfigFile>.\n\n");
-        printf("Options:\n\n");
-        printf("-h                     Print this help.\n");
-        printf("-p                     Leave the domain paused after it is created.\n");
-        printf("-c                     Connect to the console after the domain is created.\n");
-        printf("-d                     Enable debug messages.\n");
-        printf("-e                     Do not wait in the background for the death of the domain.\n");
-    } else if(!strcmp(command, "list")) {
-        printf("Usage: xl list [-v] [Domain]\n\n");
-        printf("List information about all/some domains.\n\n");
-    } else if(!strcmp(command, "pci-attach")) {
-        printf("Usage: xl pci-attach <Domain> <BDF> [Virtual Slot]\n\n");
-        printf("Insert a new pass-through pci device.\n\n");
-    } else if(!strcmp(command, "pci-detach")) {
-        printf("Usage: xl pci-detach <Domain> <BDF>\n\n");
-        printf("Remove a domain's pass-through pci device.\n\n");
-    } else if(!strcmp(command, "pci-list")) {
-        printf("Usage: xl pci-list <Domain>\n\n");
-        printf("List pass-through pci devices for a domain.\n\n");
-    } else if(!strcmp(command, "pause")) {
-        printf("Usage: xl pause <Domain>\n\n");
-        printf("Pause execution of a domain.\n\n");
-    } else if(!strcmp(command, "unpause")) {
-        printf("Usage: xl unpause <Domain>\n\n");
-        printf("Unpause a paused domain.\n\n");
-    } else if(!strcmp(command, "save")) {
-        printf("Usage: xl save [options] <Domain> <CheckpointFile> [<ConfigFile>]\n\n");
-        printf("Save a domain state to restore later.\n\n");
-        printf("Options:\n\n");
-        printf("-h                     Print this help.\n");
-        printf("-c                     Leave domain running after creating the snapshot.\n");
-    } else if(!strcmp(command, "restore")) {
-        printf("Usage: xl restore [options] [<ConfigFile>] <CheckpointFile>\n\n");
-        printf("Restore a domain from a saved state.\n\n");
-        printf("Options:\n\n");
-        printf("-h                     Print this help.\n");
-        printf("-p                     Do not unpause domain after restoring it.\n");
-        printf("-e                     Do not wait in the background for the death of the domain.\n");
-        printf("-d                     Enable debug messages.\n");
-    } else if(!strcmp(command, "migrate")) {
-        printf("Usage: xl migrate [options] <Domain> <host>\n\n");
-        printf("Save a domain state to restore later.\n\n");
-        printf("Options:\n\n");
-        printf("-h                     Print this help.\n");
-        printf("-C <config>            Send <config> instead of config file from creation.\n");
-        printf("-s <sshcommand>        Use <sshcommand> instead of ssh.  String will be passed to sh.  If empty, run <host> instead of ssh <host> xl migrate-receive [-d -e]\n");
-        printf("-e                     Do not wait in the background (on <host>) for the death of the domain.\n");
-    } else if(!strcmp(command, "migrate-receive")) {
-        printf("Usage: xl migrate-receive  - for internal use only");
-    } else if(!strcmp(command, "restore")) {
-        printf("Usage: xl restore [options] [<ConfigFile>] <CheckpointFile>\n\n");
-        printf("Restore a domain from a saved state.\n\n");
-        printf("Options:\n\n");
-        printf("-h                     Print this help.\n");
-        printf("-O                     Old (configless) xl save format.\n");
-        printf("-p                     Do not unpause domain after restoring it.\n");
-        printf("-e                     Do not wait in the background for the death of the domain.\n");
-    } else if(!strcmp(command, "destroy")) {
-        printf("Usage: xl destroy <Domain>\n\n");
-        printf("Terminate a domain immediately.\n\n");
-    } else if (!strcmp(command, "console")) {
-        printf("Usage: xl console <Domain>\n\n");
-        printf("Attach to domain's console.\n\n");
-    } else if (!strcmp(command, "cd-insert")) {
-        printf("Usage: xl cd-insert <Domain> <VirtualDevice> <type:path>\n\n");
-        printf("Insert a cdrom into a guest's cd drive.\n\n");
-    } else if (!strcmp(command, "cd-eject")) {
-        printf("Usage: xl cd-eject <Domain> <VirtualDevice>\n\n");
-        printf("Eject a cdrom from a guest's cd drive.\n\n");
-    } else if (!strcmp(command, "mem-set")) {
-        printf("Usage: xl mem-set <Domain> <MemKB>\n\n");
-        printf("Set the current memory usage for a domain.\n\n");
-    } else if (!strcmp(command, "button-press")) {
-        printf("Usage: xl button-press <Domain> <Button>\n\n");
-        printf("Indicate <Button> press to a domain.\n");
-        printf("<Button> may be 'power' or 'sleep'.\n\n");
-    } else if (!strcmp(command, "vcpu-list")) {
-        printf("Usage: xl vcpu-list [Domain, ...]\n\n");
-        printf("List the VCPUs for all/some domains.\n\n");
-    } else if (!strcmp(command, "vcpu-pin")) {
-        printf("Usage: xl vcpu-pin <Domain> <VCPU|all> <CPUs|all>\n\n");
-        printf("Set which CPUs a VCPU can use.\n\n");
-    } else if (!strcmp(command, "vcpu-set")) {
-        printf("Usage: xl vcpu-set <Domain> <vCPUs>\n\n");
-        printf("Set the number of active VCPUs for allowed for the domain.\n\n");
-    } else if(!strcmp(command, "info")) {
-        printf("Usage: xl info\n\n");
-        printf("Get information about Xen host.\n\n");
-    } else if (!strcmp(command, "sched-credit")) {
-        printf("Usage: xl sched-credit [-d <Domain> [-w[=WEIGHT]|-c[=CAP]]]\n\n");
-        printf("Get/set credit scheduler parameters.\n");
-        printf("  -d DOMAIN, --domain=DOMAIN     Domain to modify\n");
-        printf("  -w WEIGHT, --weight=WEIGHT     Weight (int)\n");
-        printf("  -c CAP, --cap=CAP              Cap (int)\n");
-    } else if (!strcmp(command, "domid")) {
-        printf("Usage: xl domid <DomainName>\n\n");
-        printf("Convert a domain name to domain id.\n");
-    } else if (!strcmp(command, "domname")) {
-        printf("Usage: xl domname <DomainId>\n\n");
-        printf("Convert a domain id to domain name.\n");
-    } else if (!strcmp(command, "rename")) {
-        printf("Usage: xl rename <Domain> <NewDomainName>\n\n");
-        printf("Rename a domain.\n");
-    } else if (!strcmp(command, "trigger")) {
-        printf("Usage: xm trigger <Domain> <nmi|reset|init|power|sleep> [<VCPU>]\n\n");
-        printf("Send a trigger to a domain.\n");
+    } else {
+        for (i = 0; i < cmdtable_len; i++)
+            if (!strcmp(command, cmd_table[i].cmd_name))
+                break;
+        if (i == cmdtable_len) {
+            printf("command not implemented\n");
+        } else {
+            printf("Usage: xl %s %s\n\n%s.\n\n",
+                   cmd_table[i].cmd_name,
+                   cmd_table[i].cmd_usage,
+                   cmd_table[i].cmd_desc);
+            if (cmd_table[i].cmd_option)
+            printf("Options:\n\n%s\n", cmd_table[i].cmd_option);
+        }
     }
 }
 

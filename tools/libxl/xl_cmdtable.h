@@ -18,6 +18,8 @@ struct cmd_spec {
     char *cmd_name;
     int (*cmd_impl)(int argc, char **argv);
     char *cmd_desc;
+    char *cmd_usage;
+    char *cmd_option;
 };
 
 extern struct cmd_spec cmd_table[];
