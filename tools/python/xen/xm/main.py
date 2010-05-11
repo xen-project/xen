@@ -2487,8 +2487,10 @@ def xm_usb_list_assignable_devices(args):
 def parse_block_configuration(args):
     dom = args[0]
 
-    if args[1].startswith('tap:'):
+    if args[1].startswith('tap2:'):
         cls = 'tap2'
+    elif args[1].startswith('tap:'):
+        cls = 'tap'
     else:
         cls = 'vbd'
 
