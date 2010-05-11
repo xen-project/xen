@@ -84,6 +84,8 @@ char *libxl_poolid_to_name(struct libxl_ctx *ctx, uint32_t poolid)
     char path[strlen("/local/pool") + 12];
     char *s;
 
+    if (poolid == 0)
+        return "Pool-0";
     snprintf(path, sizeof(path), "/local/pool/%d/name", poolid);
     s = xs_read(ctx->xsh, XBT_NULL, path, &len);
     libxl_ptr_add(ctx, s);

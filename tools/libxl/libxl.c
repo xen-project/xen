@@ -169,7 +169,8 @@ retry_transaction:
 
     xs_write(ctx->xsh, t, libxl_sprintf(ctx, "%s/uuid", vm_path), uuid_string, strlen(uuid_string));
     xs_write(ctx->xsh, t, libxl_sprintf(ctx, "%s/name", vm_path), info->name, strlen(info->name));
-    xs_write(ctx->xsh, t, libxl_sprintf(ctx, "%s/pool_name", vm_path), info->poolname, strlen(info->poolname));
+    if (info->poolname)
+        xs_write(ctx->xsh, t, libxl_sprintf(ctx, "%s/pool_name", vm_path), info->poolname, strlen(info->poolname));
 
     libxl_xs_writev(ctx, t, dom_path, info->xsdata);
     libxl_xs_writev(ctx, t, libxl_sprintf(ctx, "%s/platform", dom_path), info->platformdata);
