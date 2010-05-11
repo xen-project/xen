@@ -1275,6 +1275,9 @@ void help(char *command)
     } else if (!strcmp(command, "rename")) {
         printf("Usage: xl rename <Domain> <NewDomainName>\n\n");
         printf("Rename a domain.\n");
+    } else if (!strcmp(command, "trigger")) {
+        printf("Usage: xm trigger <Domain> <nmi|reset|init|power|sleep> [<VCPU>]\n\n");
+        printf("Send a trigger to a domain.\n");
     }
 }
 
@@ -3104,6 +3107,48 @@ int main_rename(int argc, char **argv)
         fprintf(stderr, "Can't rename domain '%s'.\n", dom);
         exit(1);
     }
+
+    exit(0);
+}
+
+int main_trigger(int argc, char **argv)
+{
+    int opt;
+    char *trigger_name = NULL;
+    char *endptr = NULL;
+    char *dom = NULL;
+    int vcpuid = 0;
+
+    while ((opt = getopt(argc, argv, "h")) != -1) {
+        switch (opt) {
+        case 'h':
+            help("trigger");
+            exit(0);
+        default:
+            fprintf(stderr, "option `%c' not supported.\n", opt);
+            break;
+        }
+    }
+
+    dom = argv[optind++];
+    if (!dom || !argv[optind]) {
+        fprintf(stderr, "'xl trigger' requires between 2 and 3 arguments.\n\n");
+        help("trigger");
+        exit(1);
+    }
+
+    find_domain(dom);
+
+    trigger_name = argv[optind++];
+
+    if (argv[optind]) {
+        vcpuid = strtol(argv[optind], &endptr, 10);
+        if (vcpuid == 0 && !strcmp(endptr, argv[optind])) {
+            fprintf(stderr, "Invalid vcpuid, using default vcpuid=0.\n\n");
+        }
+    }
+
+    libxl_send_trigger(&ctx, domid, trigger_name, vcpuid);
 
     exit(0);
 }

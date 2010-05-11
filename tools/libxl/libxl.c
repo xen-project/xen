@@ -2595,3 +2595,37 @@ int libxl_sched_credit_domain_set(struct libxl_ctx *ctx, uint32_t domid, struct 
     return 0;
 }
 
+static int trigger_type_from_string(char *trigger_name)
+{
+    if (!strcmp(trigger_name, "nmi"))
+        return XEN_DOMCTL_SENDTRIGGER_NMI;
+    else if (!strcmp(trigger_name, "reset"))
+        return XEN_DOMCTL_SENDTRIGGER_RESET;
+    else if (!strcmp(trigger_name, "init"))
+        return XEN_DOMCTL_SENDTRIGGER_INIT;
+    else if (!strcmp(trigger_name, "power"))
+        return XEN_DOMCTL_SENDTRIGGER_POWER;
+    else if (!strcmp(trigger_name, "sleep"))
+        return XEN_DOMCTL_SENDTRIGGER_SLEEP;
+    else
+        return -1;
+}
+
+int libxl_send_trigger(struct libxl_ctx *ctx, uint32_t domid, char *trigger_name, uint32_t vcpuid)
+{
+    int rc = -1;
+    int trigger_type = trigger_type_from_string(trigger_name);
+
+    if (trigger_type == -1) {
+        XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, -1,
+            "Invalid trigger, valid triggers are <nmi|reset|init|power|sleep>");
+        return -1;
+    }
+
+    rc = xc_domain_send_trigger(ctx->xch, domid, trigger_type, vcpuid);
+    if (rc != 0)
+        XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, rc,
+            "Send trigger '%s' failed", trigger_name);
+
+    return rc;
+}

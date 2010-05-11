@@ -479,5 +479,7 @@ int libxl_sched_credit_domain_get(struct libxl_ctx *ctx, uint32_t domid,
                                   struct libxl_sched_credit *scinfo);
 int libxl_sched_credit_domain_set(struct libxl_ctx *ctx, uint32_t domid,
                                   struct libxl_sched_credit *scinfo);
+int libxl_send_trigger(struct libxl_ctx *ctx, uint32_t domid,
+                       char *trigger_name, uint32_t vcpuid);
 #endif /* LIBXL_H */
 

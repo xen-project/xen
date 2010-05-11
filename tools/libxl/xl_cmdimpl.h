@@ -38,5 +38,6 @@ int main_sched_credit(int argc, char **argv);
 int main_domid(int argc, char **argv);
 int main_domname(int argc, char **argv);
 int main_rename(int argc, char **argv);
+int main_trigger(int argc, char **argv);
 
 void help(char *command);

@@ -41,6 +41,7 @@ struct cmd_spec cmd_table[] = {
     { "domid", &main_domid, "convert a domain name to domain id"},
     { "domname", &main_domname, "convert a domain id to domain name"},
     { "rename", &main_rename, "rename a domain"},
+    { "trigger", &main_trigger, "send a trigger to a domain"},
 };
 
 int cmdtable_len = sizeof(cmd_table)/sizeof(struct cmd_spec);
