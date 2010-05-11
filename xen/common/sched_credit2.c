@@ -897,7 +897,8 @@ void __dump_execstate(void *unused);
  * fast for the common case.
  */
 static struct task_slice
-csched_schedule(const struct scheduler *ops, s_time_t now)
+csched_schedule(
+    const struct scheduler *ops, s_time_t now, bool_t tasklet_work_scheduled)
 {
     const int cpu = smp_processor_id();
     struct csched_runqueue_data *rqd = RQD(ops, cpu);
@@ -921,7 +922,7 @@ csched_schedule(const struct scheduler *ops, s_time_t now)
     burn_credits(rqd, scurr, now);
 
     /* Tasklet work (which runs in idle VCPU context) overrides all else. */
-    if ( !tasklet_queue_empty(cpu) )
+    if ( tasklet_work_scheduled )
     {
         snext = CSCHED_VCPU(idle_vcpu[cpu]);
         goto out;

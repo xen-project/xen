@@ -24,10 +24,16 @@ struct tasklet
 #define DECLARE_TASKLET(name, func, data) \
     struct tasklet name = { LIST_HEAD_INIT(name.list), -1, 0, 0, func, data }
 
+/* Indicates status of tasklet work on each CPU. */
+DECLARE_PER_CPU(unsigned long, tasklet_work_to_do);
+#define _TASKLET_enqueued  0 /* Tasklet work is enqueued for this CPU. */
+#define _TASKLET_scheduled 1 /* Scheduler has scheduled do_tasklet(). */
+#define TASKLET_enqueued   (1ul << _TASKLET_enqueued)
+#define TASKLET_scheduled  (1ul << _TASKLET_scheduled)
+
 void tasklet_schedule_on_cpu(struct tasklet *t, unsigned int cpu);
 void tasklet_schedule(struct tasklet *t);
 void do_tasklet(void);
-bool_t tasklet_queue_empty(unsigned int cpu);
 void tasklet_kill(struct tasklet *t);
 void migrate_tasklets_from_cpu(unsigned int cpu);
 void tasklet_init(

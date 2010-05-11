@@ -790,7 +790,8 @@ static struct task_slice sedf_do_extra_schedule(
    -timeslice for the current period used up
    -domain on waitqueue has started it's period
    -and various others ;) in general: determine which domain to run next*/
-static struct task_slice sedf_do_schedule(const struct scheduler *ops, s_time_t now)
+static struct task_slice sedf_do_schedule(
+    const struct scheduler *ops, s_time_t now, bool_t tasklet_work_scheduled)
 {
     int                   cpu      = smp_processor_id();
     struct list_head     *runq     = RUNQ(cpu);
@@ -826,18 +827,13 @@ static struct task_slice sedf_do_schedule(const struct scheduler *ops, s_time_t 
  check_waitq:
     update_queues(now, runq, waitq);
 
-    if ( unlikely(!cpu_isset(cpu, *SEDF_CPUONLINE(per_cpu(cpupool, cpu)))) )
-    {
-        ret.task = IDLETASK(cpu);
-        ret.time = SECONDS(1);
-        goto sched_done;
-    }
- 
     /*now simply pick the first domain from the runqueue, which has the
       earliest deadline, because the list is sorted*/
  
     /* Tasklet work (which runs in idle VCPU context) overrides all else. */
-    if ( !tasklet_queue_empty(cpu) || (list_empty(runq) && list_empty(waitq)) )
+    if ( tasklet_work_scheduled ||
+         (list_empty(runq) && list_empty(waitq)) ||
+         unlikely(!cpu_isset(cpu, *SEDF_CPUONLINE(per_cpu(cpupool, cpu)))) )
     {
         ret.task = IDLETASK(cpu);
         ret.time = SECONDS(1);
@@ -870,7 +866,6 @@ static struct task_slice sedf_do_schedule(const struct scheduler *ops, s_time_t 
                                      extraq, cpu);
     }
 
-  sched_done:
     /*TODO: Do something USEFUL when this happens and find out, why it
       still can happen!!!*/
     if ( ret.time < 0)

@@ -110,7 +110,8 @@ struct scheduler {
     void         (*wake)           (const struct scheduler *, struct vcpu *);
     void         (*context_saved)  (const struct scheduler *, struct vcpu *);
 
-    struct task_slice (*do_schedule) (const struct scheduler *, s_time_t);
+    struct task_slice (*do_schedule) (const struct scheduler *, s_time_t,
+                                      bool_t tasklet_work_scheduled);
 
     int          (*pick_cpu)       (const struct scheduler *, struct vcpu *);
     int          (*adjust)         (const struct scheduler *, struct domain *,

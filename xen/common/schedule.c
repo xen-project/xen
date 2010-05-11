@@ -930,6 +930,8 @@ static void schedule(void)
     struct vcpu          *prev = current, *next = NULL;
     s_time_t              now = NOW();
     struct scheduler     *sched = this_cpu(scheduler);
+    unsigned long        *tasklet_work = &this_cpu(tasklet_work_to_do);
+    bool_t                tasklet_work_scheduled = 0;
     struct schedule_data *sd;
     struct task_slice     next_slice;
 
@@ -940,12 +942,29 @@ static void schedule(void)
 
     sd = &this_cpu(schedule_data);
 
+    /* Update tasklet scheduling status. */
+    switch ( *tasklet_work )
+    {
+    case TASKLET_enqueued:
+        set_bit(_TASKLET_scheduled, tasklet_work);
+    case TASKLET_enqueued|TASKLET_scheduled:
+        tasklet_work_scheduled = 1;
+        break;
+    case TASKLET_scheduled:
+        clear_bit(_TASKLET_scheduled, tasklet_work);
+    case 0:
+        /*tasklet_work_scheduled = 0;*/
+        break;
+    default:
+        BUG();
+    }
+
     spin_lock_irq(sd->schedule_lock);
 
     stop_timer(&sd->s_timer);
     
     /* get policy-specific decision on scheduling... */
-    next_slice = sched->do_schedule(sched, now);
+    next_slice = sched->do_schedule(sched, now, tasklet_work_scheduled);
 
     next = next_slice.task;
 

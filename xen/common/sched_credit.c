@@ -1243,7 +1243,8 @@ csched_load_balance(struct csched_private *prv, int cpu,
  * fast for the common case.
  */
 static struct task_slice
-csched_schedule(const struct scheduler *ops, s_time_t now)
+csched_schedule(
+    const struct scheduler *ops, s_time_t now, bool_t tasklet_work_scheduled)
 {
     const int cpu = smp_processor_id();
     struct list_head * const runq = RUNQ(cpu);
@@ -1278,7 +1279,7 @@ csched_schedule(const struct scheduler *ops, s_time_t now)
     snext = __runq_elem(runq->next);
 
     /* Tasklet work (which runs in idle VCPU context) overrides all else. */
-    if ( !tasklet_queue_empty(cpu) )
+    if ( tasklet_work_scheduled )
     {
         snext = CSCHED_VCPU(idle_vcpu[cpu]);
         snext->pri = CSCHED_PRI_TS_BOOST;
