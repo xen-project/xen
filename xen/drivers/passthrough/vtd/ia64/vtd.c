@@ -19,6 +19,7 @@
  */
 
 #include <xen/sched.h>
+#include <xen/softirq.h>
 #include <xen/domain_page.h>
 #include <xen/iommu.h>
 #include <xen/numa.h>
@@ -110,6 +111,9 @@ static int do_dom0_iommu_mapping(unsigned long start, unsigned long end,
             iommu_map_page(d, (pfn*tmp+j), (pfn*tmp+j));
 
 	page_addr += PAGE_SIZE;
+
+        if (!(pfn & (0xfffff >> (PAGE_SHIFT - PAGE_SHIFT_4K))))
+            process_pending_softirqs();
     }
     return 0;
 }
