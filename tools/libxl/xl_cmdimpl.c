@@ -209,7 +209,7 @@ static void init_dm_info(libxl_device_model_info *dm_info,
     dm_info->vnc = 1;
     dm_info->vnclisten = "127.0.0.1";
     dm_info->vncdisplay = 0;
-    dm_info->vncunused = 0;
+    dm_info->vncunused = 1;
     dm_info->keymap = NULL;
     dm_info->sdl = 0;
     dm_info->opengl = 0;
