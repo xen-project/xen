@@ -45,8 +45,6 @@ struct hvm_domain {
     struct hvm_ioreq_page  ioreq;
     struct hvm_ioreq_page  buf_ioreq;
 
-    uint32_t               gtsc_khz; /* kHz */
-    bool_t                 tsc_scaled;
     struct pl_time         pl_time;
 
     struct hvm_io_handler  io_handler;
