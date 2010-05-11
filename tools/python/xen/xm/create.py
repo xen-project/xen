@@ -787,8 +787,10 @@ def configure_disks(config_devs, vals):
     """Create the config for disks (virtual block devices).
     """
     for (uname, dev, mode, backend, protocol) in vals.disk:
-        if uname.startswith('tap:'):
+        if uname.startswith('tap2:'):
             cls = 'tap2'
+        elif uname.startswith('tap:'):
+            cls = 'tap'
         else:
             cls = 'vbd'
 
