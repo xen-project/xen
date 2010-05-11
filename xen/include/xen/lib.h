@@ -40,6 +40,11 @@ do {                                                            \
 #define ASSERT(p) ((void)0)
 #endif
 
+#define ABS(_x) ({                              \
+    typeof(_x) __x = (_x);                      \
+    (__x < 0) ? -__x : __x;                     \
+})
+
 #define SWAP(_a, _b) \
    do { typeof(_a) _t = (_a); (_a) = (_b); (_b) = _t; } while ( 0 )
 
