@@ -2382,12 +2382,33 @@ int libxl_domain_setmaxmem(struct libxl_ctx *ctx, uint32_t domid, uint32_t max_m
 int libxl_set_memory_target(struct libxl_ctx *ctx, uint32_t domid, uint32_t target_memkb)
 {
     int rc = 0;
-    uint32_t videoram;
-    char *videoram_s = NULL;
+    uint32_t memorykb, videoram;
+    char *memmax, *endptr, *videoram_s = NULL;
     char *dompath = libxl_xs_get_dompath(ctx, domid);
     xc_domaininfo_t info;
     struct libxl_dominfo ptr;
     char *uuid;
+
+    if (domid) {
+        memmax = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/memory/static-max", dompath));
+        if (!memmax) {
+            XL_LOG_ERRNO(ctx, XL_LOG_ERROR,
+                "cannot get memory info from %s/memory/static-max\n", dompath);
+            return 1;
+        }
+        memorykb = strtoul(memmax, &endptr, 10);
+        if (*endptr != '\0') {
+            XL_LOG_ERRNO(ctx, XL_LOG_ERROR,
+                "invalid max memory %s from %s/memory/static-max\n", memmax, dompath);
+            return 1;
+        }
+
+        if (target_memkb > memorykb) {
+            XL_LOG_ERRNO(ctx, XL_LOG_ERROR,
+                "memory_dynamic_max must be less than or equal to memory_static_max\n");
+            return 1;
+        }
+    }
 
     videoram_s = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/memory/videoram", dompath));
     videoram = videoram_s ? atoi(videoram_s) : 0;
@@ -2401,9 +2422,6 @@ int libxl_set_memory_target(struct libxl_ctx *ctx, uint32_t domid, uint32_t targ
     uuid = libxl_uuid2string(ctx, ptr.uuid);
     libxl_xs_write(ctx, XBT_NULL, libxl_sprintf(ctx, "/vm/%s/memory", uuid), "%lu", target_memkb / 1024);
 
-    rc = xc_domain_setmaxmem(ctx->xch, domid, target_memkb + LIBXL_MAXMEM_CONSTANT);
-    if (rc != 0)
-        return rc;
     rc = xc_domain_memory_set_pod_target(ctx->xch, domid, (target_memkb - videoram) / 4, NULL, NULL, NULL);
     return rc;
 }
