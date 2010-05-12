@@ -921,18 +921,16 @@ csched_schedule(
     /* Update credits */
     burn_credits(rqd, scurr, now);
 
-    /* Tasklet work (which runs in idle VCPU context) overrides all else. */
-    if ( tasklet_work_scheduled )
-    {
-        snext = CSCHED_VCPU(idle_vcpu[cpu]);
-        goto out;
-    }
-
     /*
      * Select next runnable local VCPU (ie top of local runq).
      *
      * If the current vcpu is runnable, and has higher credit than
-     * the next guy on the queue (or there is noone else), we want to run him again.
+     * the next guy on the queue (or there is noone else), we want to
+     * run him again.
+     *
+     * If there's tasklet work to do, we want to chose the idle vcpu
+     * for this processor, and mark the current for delayed runqueue
+     * add.
      *
      * If the current vcpu is runnable, and the next guy on the queue
      * has higher credit, we want to mark current for delayed runqueue
@@ -941,7 +939,7 @@ csched_schedule(
      * If the current vcpu is not runnable, we want to chose the idle
      * vcpu for this processor.
      */
-    if ( list_empty(runq) )
+    if ( list_empty(runq) || tasklet_work_scheduled )
         snext = CSCHED_VCPU(idle_vcpu[cpu]);
     else
         snext = __runq_elem(runq->next);
@@ -949,9 +947,10 @@ csched_schedule(
     if ( !is_idle_vcpu(current) && vcpu_runnable(current) )
     {
         /* If the current vcpu is runnable, and has higher credit
-         * than the next on the runqueue, run him again.
+         * than the next on the runqueue, and isn't being preempted
+         * by a tasklet, run him again.
          * Otherwise, set him for delayed runq add. */
-        if ( scurr->credit > snext->credit)
+        if ( !tasklet_work_scheduled && scurr->credit > snext->credit)
             snext = scurr;
         else
             set_bit(__CSFLAG_delayed_runq_add, &scurr->flags);
@@ -998,7 +997,6 @@ csched_schedule(
         snext->vcpu->processor = cpu; /* Safe because lock for old processor is held */
     }
 
- out:
     /*
      * Return task to run next...
      */
