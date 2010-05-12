@@ -85,6 +85,8 @@ struct xs_handle {
 #define mutex_unlock(m)		pthread_mutex_unlock(m)
 #define condvar_signal(c)	pthread_cond_signal(c)
 #define condvar_wait(c,m,hnd)	pthread_cond_wait(c,m)
+#define cleanup_push(f, a)	pthread_cleanup_push((void (*)(void *))(f), (void *)(a))
+#define cleanup_pop(run)	pthread_cleanup_pop(run)
 
 static void *read_thread(void *arg);
 
@@ -102,6 +104,8 @@ struct xs_handle {
 #define mutex_unlock(m)		((void)0)
 #define condvar_signal(c)	((void)0)
 #define condvar_wait(c,m,hnd)	read_message(hnd)
+#define cleanup_push(f, a)	((void)0)
+#define cleanup_pop(run)	((void)0)
 
 #endif
 
@@ -262,7 +266,6 @@ void xs_daemon_close(struct xs_handle *h)
 
 #ifdef USE_PTHREAD
 	if (h->read_thr_exists) {
-		/* XXX FIXME: May leak an unpublished message buffer. */
 		pthread_cancel(h->read_thr);
 		pthread_join(h->read_thr, NULL);
 	}
@@ -860,44 +863,53 @@ static int read_message(struct xs_handle *h)
 {
 	struct xs_stored_msg *msg = NULL;
 	char *body = NULL;
-	int saved_errno;
+	int saved_errno = 0;
+	int ret = -1;
 
 	/* Allocate message structure and read the message header. */
 	msg = malloc(sizeof(*msg));
 	if (msg == NULL)
 		goto error;
-	if (!read_all(h->fd, &msg->hdr, sizeof(msg->hdr)))
-		goto error;
+	cleanup_push(free, msg);
+	if (!read_all(h->fd, &msg->hdr, sizeof(msg->hdr))) { /* Cancellation point */
+		saved_errno = errno;
+		goto error_freemsg;
+	}
 
 	/* Allocate and read the message body. */
 	body = msg->body = malloc(msg->hdr.len + 1);
 	if (body == NULL)
-		goto error;
-	if (!read_all(h->fd, body, msg->hdr.len))
-		goto error;
+		goto error_freemsg;
+	cleanup_push(free, body);
+	if (!read_all(h->fd, body, msg->hdr.len)) { /* Cancellation point */
+		saved_errno = errno;
+		goto error_freebody;
+	}
+
 	body[msg->hdr.len] = '\0';
 
 	if (msg->hdr.type == XS_WATCH_EVENT) {
 		mutex_lock(&h->watch_mutex);
+		cleanup_push(pthread_mutex_unlock, &h->watch_mutex);
 
 		/* Kick users out of their select() loop. */
 		if (list_empty(&h->watch_list) &&
 		    (h->watch_pipe[1] != -1))
-			while (write(h->watch_pipe[1], body, 1) != 1)
+			while (write(h->watch_pipe[1], body, 1) != 1) /* Cancellation point */
 				continue;
 
 		list_add_tail(&msg->list, &h->watch_list);
 
 		condvar_signal(&h->watch_condvar);
 
-		mutex_unlock(&h->watch_mutex);
+		cleanup_pop(1);
 	} else {
 		mutex_lock(&h->reply_mutex);
 
 		/* There should only ever be one response pending! */
 		if (!list_empty(&h->reply_list)) {
 			mutex_unlock(&h->reply_mutex);
-			goto error;
+			goto error_freebody;
 		}
 
 		list_add_tail(&msg->list, &h->reply_list);
@@ -906,14 +918,16 @@ static int read_message(struct xs_handle *h)
 		mutex_unlock(&h->reply_mutex);
 	}
 
-	return 0;
+	ret = 0;
 
- error:
-	saved_errno = errno;
-	free(msg);
-	free(body);
+error_freebody:
+	cleanup_pop(ret == -1);
+error_freemsg:
+	cleanup_pop(ret == -1);
+error:
 	errno = saved_errno;
-	return -1;
+
+	return ret;
 }
 
 #ifdef USE_PTHREAD
