@@ -3058,3 +3058,43 @@ int main_trigger(int argc, char **argv)
 
     exit(0);
 }
+
+
+int main_sysrq(int argc, char **argv)
+{
+    int opt;
+    char *sysrq = NULL;
+    char *dom = NULL;
+
+    while ((opt = getopt(argc, argv, "h")) != -1) {
+        switch (opt) {
+        case 'h':
+            help("sysrq");
+            exit(0);
+        default:
+            fprintf(stderr, "option `%c' not supported.\n", opt);
+            break;
+        }
+    }
+
+    dom = argv[optind++];
+    if (!dom || !argv[optind]) {
+        fprintf(stderr, "'xl sysrq' requires 2 arguments.\n\n");
+        help("sysrq");
+        exit(1);
+    }
+
+    find_domain(dom);
+
+    sysrq = argv[optind];
+
+    if (sysrq[1] != '\0') {
+        fprintf(stderr, "Invalid sysrq.\n\n");
+        help("sysrq");
+        exit(1);
+    }
+
+    libxl_send_sysrq(&ctx, domid, sysrq[0]);
+
+    exit(0);
+}

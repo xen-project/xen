@@ -2629,3 +2629,13 @@ int libxl_send_trigger(struct libxl_ctx *ctx, uint32_t domid, char *trigger_name
 
     return rc;
 }
+
+int libxl_send_sysrq(struct libxl_ctx *ctx, uint32_t domid, char sysrq)
+{
+    char *dompath = libxl_xs_get_dompath(ctx, domid);
+
+    libxl_xs_write(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/control/sysrq", dompath), "%c", sysrq);
+
+    return 0;
+}
+

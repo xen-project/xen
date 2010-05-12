@@ -172,6 +172,11 @@ struct cmd_spec cmd_table[] = {
       "Send a trigger to a domain",
       "<Domain> <nmi|reset|init|power|sleep> [<VCPU>]",
     },
+    { "sysrq",
+      &main_sysrq,
+      "Send a sysrq to a domain",
+      "<Domain> <letter>",
+    },
 };
 
 int cmdtable_len = sizeof(cmd_table)/sizeof(struct cmd_spec);
