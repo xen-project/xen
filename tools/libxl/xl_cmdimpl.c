@@ -1187,6 +1187,59 @@ void help(char *command)
     }
 }
 
+int set_memory_max(char *p, char *mem)
+{
+    char *endptr;
+    uint32_t memorykb;
+    int rc;
+
+    find_domain(p);
+
+    memorykb = strtoul(mem, &endptr, 10);
+    if (*endptr != '\0') {
+        fprintf(stderr, "invalid memory size: %s\n", mem);
+        exit(3);
+    }
+
+    rc = libxl_domain_setmaxmem(&ctx, domid, memorykb);
+
+    return rc;
+}
+
+int main_memmax(int argc, char **argv)
+{
+    int opt = 0;
+    char *p = NULL, *mem;
+    int rc;
+
+    while ((opt = getopt(argc, argv, "h")) != -1) {
+        switch (opt) {
+        case 'h':
+            help("mem-max");
+            exit(0);
+        default:
+            fprintf(stderr, "option not supported\n");
+            break;
+        }
+    }
+    if (optind >= argc - 1) {
+        help("mem-max");
+        exit(2);
+    }
+
+    p = argv[optind];
+    mem = argv[optind + 1];
+
+    rc = set_memory_max(p, mem);
+    if (rc) {
+        fprintf(stderr, "cannot set domid %d static max memory to : %s\n", domid, mem);
+        exit(1);
+    }
+
+    printf("setting domid %d static max memory to : %s\n", domid, mem);
+    exit(0);
+}
+
 void set_memory_target(char *p, char *mem)
 {
     char *endptr;

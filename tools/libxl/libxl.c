@@ -2346,6 +2346,39 @@ int libxl_device_pci_shutdown(struct libxl_ctx *ctx, uint32_t domid)
     return 0;
 }
 
+int libxl_domain_setmaxmem(struct libxl_ctx *ctx, uint32_t domid, uint32_t max_memkb)
+{
+    char *mem, *endptr;
+    uint32_t memorykb;
+    char *dompath = libxl_xs_get_dompath(ctx, domid);
+    int rc;
+
+    mem = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/memory/target", dompath));
+    if (!mem) {
+        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "cannot get memory info from %s/memory/target\n", dompath);
+        return 1;
+    }
+    memorykb = strtoul(mem, &endptr, 10);
+    if (*endptr != '\0') {
+        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "invalid memory %s from %s/memory/target\n", mem, dompath);
+        return 1;
+    }
+
+    if (max_memkb < memorykb) {
+        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "memory_static_max must be greater than or or equal to memory_dynamic_max\n");
+        return 1;
+    }
+
+    rc = xc_domain_setmaxmem(ctx->xch, domid, max_memkb);
+    if (rc != 0)
+        return rc;
+
+    if (domid != 0)
+        libxl_xs_write(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/memory/static-max", dompath), "%lu", max_memkb);
+
+    return rc;
+}
+
 int libxl_set_memory_target(struct libxl_ctx *ctx, uint32_t domid, uint32_t target_memkb)
 {
     int rc = 0;
