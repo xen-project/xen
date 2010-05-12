@@ -177,6 +177,11 @@ struct cmd_spec cmd_table[] = {
       "Send a sysrq to a domain",
       "<Domain> <letter>",
     },
+    { "top",
+      &main_top,
+      "Monitor a host and the domains in real time",
+      "",
+    },
 };
 
 int cmdtable_len = sizeof(cmd_table)/sizeof(struct cmd_spec);

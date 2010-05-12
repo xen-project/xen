@@ -3098,3 +3098,23 @@ int main_sysrq(int argc, char **argv)
 
     exit(0);
 }
+
+int main_top(int argc, char **argv)
+{
+    int opt;
+
+    while ((opt = getopt(argc, argv, "h")) != -1) {
+        switch (opt) {
+        case 'h':
+            help("top");
+            exit(0);
+        default:
+            fprintf(stderr, "option `%c' not supported.\n", opt);
+            break;
+        }
+    }
+
+    system("xentop");
+
+    exit(0);
+}
