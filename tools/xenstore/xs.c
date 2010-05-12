@@ -260,16 +260,16 @@ void xs_daemon_destroy_postfork(struct xs_handle *h)
 
 void xs_daemon_close(struct xs_handle *h)
 {
-	mutex_lock(&h->request_mutex);
-	mutex_lock(&h->reply_mutex);
-	mutex_lock(&h->watch_mutex);
-
 #ifdef USE_PTHREAD
 	if (h->read_thr_exists) {
 		pthread_cancel(h->read_thr);
 		pthread_join(h->read_thr, NULL);
 	}
 #endif
+
+	mutex_lock(&h->request_mutex);
+	mutex_lock(&h->reply_mutex);
+	mutex_lock(&h->watch_mutex);
 
         close_free_msgs(h);
 
