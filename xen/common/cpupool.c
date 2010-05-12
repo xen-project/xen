@@ -446,8 +446,7 @@ int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op)
         op->cpupool_id = c->cpupool_id;
         op->sched_id = c->sched.sched_id;
         op->n_dom = c->n_dom;
-        cpumask_to_xenctl_cpumap(&(op->cpumap), &(c->cpu_valid));
-        ret = 0;
+        ret = cpumask_to_xenctl_cpumap(&(op->cpumap), &(c->cpu_valid));
     }
     break;
 
@@ -546,15 +545,14 @@ addcpu_out:
 
     case XEN_SYSCTL_CPUPOOL_OP_FREEINFO:
     {
-        cpumask_to_xenctl_cpumap(&(op->cpumap),
-            &cpupool_free_cpus);
-        ret = 0;
+        ret = cpumask_to_xenctl_cpumap(
+            &op->cpumap, &cpupool_free_cpus);
     }
     break;
 
     default:
         ret = -ENOSYS;
-
+        break;
     }
 
     spin_unlock(&cpupool_ctl_lock);

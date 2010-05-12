@@ -344,7 +344,8 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
         guest_from_compat_handle(cpumap_bitmap,
                                  op->u.getidletime.cpumap_bitmap);
         ctlmap.bitmap.p = cpumap_bitmap.p; /* handle -> handle_64 conversion */
-        xenctl_cpumap_to_cpumask(&cpumap, &ctlmap);
+        if ( (ret = xenctl_cpumap_to_cpumask(&cpumap, &ctlmap)) != 0 )
+            goto out;
         guest_from_compat_handle(idletimes, op->u.getidletime.idletime);
 
         for_each_cpu_mask ( cpu, cpumap )
@@ -359,7 +360,9 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
         }
 
         op->u.getidletime.now = now;
-        cpumask_to_xenctl_cpumap(&ctlmap, &cpumap);
+        if ( (ret = cpumask_to_xenctl_cpumap(&ctlmap, &cpumap)) != 0 )
+            goto out;
+
         ret = copy_to_guest(u_xenpf_op, op, 1) ? -EFAULT : 0;
     }
     break;

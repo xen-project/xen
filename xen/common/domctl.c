@@ -31,15 +31,12 @@ static DEFINE_SPINLOCK(domctl_lock);
 extern long arch_do_domctl(
     struct xen_domctl *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl);
 
-void cpumask_to_xenctl_cpumap(
+int cpumask_to_xenctl_cpumap(
     struct xenctl_cpumap *xenctl_cpumap, cpumask_t *cpumask)
 {
     unsigned int guest_bytes, copy_bytes, i;
     uint8_t zero = 0;
     uint8_t bytemap[(NR_CPUS + 7) / 8];
-
-    if ( guest_handle_is_null(xenctl_cpumap->bitmap) )
-        return;
 
     guest_bytes = (xenctl_cpumap->nr_cpus + 7) / 8;
     copy_bytes  = min_t(unsigned int, guest_bytes, sizeof(bytemap));
@@ -47,20 +44,21 @@ void cpumask_to_xenctl_cpumap(
     bitmap_long_to_byte(bytemap, cpus_addr(*cpumask), NR_CPUS);
 
     if ( copy_bytes != 0 )
-        copy_to_guest(xenctl_cpumap->bitmap, bytemap, copy_bytes);
+        if ( copy_to_guest(xenctl_cpumap->bitmap, bytemap, copy_bytes) )
+            return -EFAULT;
 
     for ( i = copy_bytes; i < guest_bytes; i++ )
-        copy_to_guest_offset(xenctl_cpumap->bitmap, i, &zero, 1);
+        if ( copy_to_guest_offset(xenctl_cpumap->bitmap, i, &zero, 1) )
+            return -EFAULT;
+
+    return 0;
 }
 
-void xenctl_cpumap_to_cpumask(
+int xenctl_cpumap_to_cpumask(
     cpumask_t *cpumask, struct xenctl_cpumap *xenctl_cpumap)
 {
     unsigned int guest_bytes, copy_bytes;
     uint8_t bytemap[(NR_CPUS + 7) / 8];
-
-    if ( guest_handle_is_null(xenctl_cpumap->bitmap) )
-        return;
 
     guest_bytes = (xenctl_cpumap->nr_cpus + 7) / 8;
     copy_bytes  = min_t(unsigned int, guest_bytes, sizeof(bytemap));
@@ -69,12 +67,15 @@ void xenctl_cpumap_to_cpumask(
 
     if ( copy_bytes != 0 )
     {
-        copy_from_guest(bytemap, xenctl_cpumap->bitmap, copy_bytes);
+        if ( copy_from_guest(bytemap, xenctl_cpumap->bitmap, copy_bytes) )
+            return -EFAULT;
         if ( (xenctl_cpumap->nr_cpus & 7) && (guest_bytes <= sizeof(bytemap)) )
             bytemap[guest_bytes-1] &= ~(0xff << (xenctl_cpumap->nr_cpus & 7));
     }
 
     bitmap_byte_to_long(cpus_addr(*cpumask), bytemap, NR_CPUS);
+
+    return 0;
 }
 
 static inline int is_free_domid(domid_t dom)
@@ -579,15 +580,15 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 
         if ( op->cmd == XEN_DOMCTL_setvcpuaffinity )
         {
-            xenctl_cpumap_to_cpumask(
+            ret = xenctl_cpumap_to_cpumask(
                 &new_affinity, &op->u.vcpuaffinity.cpumap);
-            ret = vcpu_set_affinity(v, &new_affinity);
+            if ( !ret )
+                ret = vcpu_set_affinity(v, &new_affinity);
         }
         else
         {
-            cpumask_to_xenctl_cpumap(
+            ret = cpumask_to_xenctl_cpumap(
                 &op->u.vcpuaffinity.cpumap, &v->cpu_affinity);
-            ret = 0;
         }
 
     vcpuaffinity_out:
