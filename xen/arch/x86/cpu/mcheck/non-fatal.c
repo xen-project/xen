@@ -91,7 +91,7 @@ static int __init init_nonfatal_mce_checker(void)
 	struct cpuinfo_x86 *c = &boot_cpu_data;
 
 	/* Check for MCE support */
-	if (!mce_available(c))
+	if (mce_disabled || !mce_available(c))
 		return -ENODEV;
 
 	/*
