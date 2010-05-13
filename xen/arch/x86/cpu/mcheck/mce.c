@@ -1421,7 +1421,7 @@ long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)
 		add_taint(TAINT_ERROR_INJECT);
 
         if ( mce_broadcast )
-            on_each_cpu(x86_mc_mceinject, mc_mceinject, 0);
+            on_each_cpu(x86_mc_mceinject, mc_mceinject, 1);
         else
             on_selected_cpus(cpumask_of(target), x86_mc_mceinject,
                   mc_mceinject, 1);
