@@ -298,11 +298,13 @@ int libxl_read_file_contents(struct libxl_ctx *ctx, const char *filename,
           got = rw(fd, data, sz);                                         \
           if (got == -1) {                                                \
               if (errno == EINTR) continue;                               \
+              if (!ctx) return errno;                                     \
               XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "failed to " #rw " %s%s%s", \
                            what?what:"", what?" from ":"", filename);     \
               return errno;                                               \
           }                                                               \
           if (got == 0) {                                                 \
+              if (!ctx) return EPROTO;                                    \
               XL_LOG(ctx, XL_LOG_ERROR,                                   \
                      zero_is_eof                                          \
                      ? "file/stream truncated reading %s%s%s"             \

@@ -349,10 +349,21 @@ int save_device_model(struct libxl_ctx *ctx, uint32_t domid, int fd)
     libxl_xs_write(ctx, XBT_NULL, libxl_sprintf(ctx, "/local/domain/0/device-model/%d/command", domid), "save", strlen("save"));
     libxl_wait_for_device_model(ctx, domid, "paused", NULL, NULL);
 
-    write(fd, QEMU_SIGNATURE, strlen(QEMU_SIGNATURE));
+    c = libxl_write_exactly(ctx, fd, QEMU_SIGNATURE, strlen(QEMU_SIGNATURE),
+                            "saved-state file", "qemu signature");
+    if (c)
+        return c;
     fd2 = open(filename, O_RDONLY);
     while ((c = read(fd2, buf, sizeof(buf))) != 0) {
-        write(fd, buf, c);
+        if (c < 0) {
+            if (errno == EINTR)
+                continue;
+            return errno;
+        }
+        c = libxl_write_exactly(
+            ctx, fd, buf, c, "saved-state file", "qemu state");
+        if (c)
+            return c;
     }
     close(fd2);
     unlink(filename);

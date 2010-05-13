@@ -152,7 +152,7 @@ void dolog(const char *file, int line, const char *func, char *fmt, ...)
     rc = vasprintf(&s, fmt, ap);
     va_end(ap);
     if (rc >= 0)
-        write(logfile, s, rc);
+        libxl_write_exactly(NULL, logfile, s, rc, NULL, NULL);
 }
 
 static void init_create_info(libxl_domain_create_info *c_info)
@@ -500,7 +500,10 @@ static void parse_config_data(const char *configfile_filename_report,
     } else {
         char *cmdline;
         if (!xlu_cfg_get_string (config, "root", &buf)) {
-            asprintf(&cmdline, "root=%s", buf);
+            if (asprintf(&cmdline, "root=%s", buf) < 0) {
+                fprintf(stderr, "Failed to allocate memory in asprintf\n");
+                exit(1);
+            }
             b_info->u.pv.cmdline = cmdline;
         }
         if (!xlu_cfg_get_string (config, "ramdisk", &buf))
@@ -956,7 +959,10 @@ static int create_domain(struct domain_create *dom_info)
              * file; and we receive it to a temporary name */
             assert(!common_domname);
             common_domname = info1.name;
-            asprintf(migration_domname_r, "%s--incoming", info1.name);
+            if (asprintf(migration_domname_r, "%s--incoming", info1.name) < 0) {
+                fprintf(stderr, "Failed to allocate memory in asprintf\n");
+                exit(1);
+            }
             info1.name = *migration_domname_r;
         }
     }
@@ -1080,7 +1086,10 @@ start:
             exit(-1);
         }
 
-        asprintf(&name, "xl-%s", info1.name);
+        if (asprintf(&name, "xl-%s", info1.name) < 0) {
+            LOG("Failed to allocate memory in asprintf");
+            exit(1);
+        }
         rc = libxl_create_logfile(&ctx, name, &fullname);
         if (rc) {
             LOG("failed to open logfile %s",fullname,strerror(errno));
@@ -1096,7 +1105,7 @@ start:
         dup2(logfile, 1);
         dup2(logfile, 2);
 
-        daemon(0, 1);
+        CHK_ERRNO(daemon(0, 1) < 0);
         need_daemon = 0;
     }
     LOG("Waiting for domain %s (domid %d) to die [pid %ld]",
@@ -1699,7 +1708,7 @@ int save_domain(char *p, char *filename, int checkpoint,
 
     save_domain_core_writeconfig(fd, filename, config_data, config_len);
 
-    libxl_domain_suspend(&ctx, NULL, domid, fd);
+    CHK_ERRNO(libxl_domain_suspend(&ctx, NULL, domid, fd));
     close(fd);
 
     if (checkpoint)
@@ -1882,7 +1891,8 @@ static void migrate_domain(char *domain_spec, const char *rune,
     fprintf(stderr, "migration sender: Target has acknowledged transfer.\n");
 
     if (common_domname) {
-        asprintf(&away_domname, "%s--migratedaway", common_domname);
+        if (asprintf(&away_domname, "%s--migratedaway", common_domname) < 0)
+            goto failed_resume;
         rc = libxl_domain_rename(&ctx, domid,
                                  common_domname, away_domname, 0);
         if (rc) goto failed_resume;
@@ -2218,10 +2228,11 @@ int main_migrate(int argc, char **argv)
     if (!ssh_command[0]) {
         rune= host;
     } else {
-        asprintf(&rune, "exec %s %s xl migrate-receive%s%s",
-                 ssh_command, host,
-                 daemonize ? "" : " -e",
-                 debug ? " -d" : "");
+        if (asprintf(&rune, "exec %s %s xl migrate-receive%s%s",
+                     ssh_command, host,
+                     daemonize ? "" : " -e",
+                     debug ? " -d" : "") < 0)
+            exit(1);
     }
 
     migrate_domain(p, rune, config_filename);

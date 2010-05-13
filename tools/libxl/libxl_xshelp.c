@@ -32,7 +32,8 @@ int xs_writev(struct xs_handle *xsh, xs_transaction_t t, char *dir, char *kvs[])
         return 0;
 
     for (i = 0; kvs[i] != NULL; i += 2) {
-        asprintf(&path, "%s/%s", dir, kvs[i]);
+        if (asprintf(&path, "%s/%s", dir, kvs[i]) < 0)
+            return -1;
         if (path && kvs[i + 1]) {
             int length = strlen(kvs[i + 1]);
             xs_write(xsh, t, path, kvs[i + 1], length);

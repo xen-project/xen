@@ -28,18 +28,22 @@
 #include <inttypes.h>
 
 #include "libxl.h"
+#include "libxl_utils.h"
 #include "xl_cmdimpl.h"
 #include "xl_cmdtable.h"
 
 extern struct libxl_ctx ctx;
 extern int logfile;
 
-void log_callback(void *userdata, int loglevel, const char *file, int line, const char *func, char *s)
+void log_callback(
+    void *userdata, int loglevel, const char *file,
+    int line, const char *func, char *s)
 {
     char str[1024];
 
-    snprintf(str, sizeof(str), "[%d] %s:%d:%s: %s\n", loglevel, file, line, func, s);
-    write(logfile, str, strlen(str));
+    snprintf(str, sizeof(str), "[%d] %s:%d:%s: %s\n",
+             loglevel, file, line, func, s);
+    libxl_write_exactly(NULL, logfile, str, strlen(str), NULL, NULL);
 }
 
 int main(int argc, char **argv)

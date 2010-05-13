@@ -340,10 +340,13 @@ int libxl_domain_restore(struct libxl_ctx *ctx, libxl_domain_build_info *info,
     ret = build_post(ctx, domid, info, state, vments, localents);
     if (ret) goto out;
 
-    if (info->hvm)
-        asprintf(&(dm_info->saved_state), "/var/lib/xen/qemu-save.%d", domid);
-    else
-        dm_info->saved_state = NULL;
+    dm_info->saved_state = NULL;
+    if (info->hvm) {
+        ret = asprintf(&dm_info->saved_state,
+                       "/var/lib/xen/qemu-save.%d", domid);
+        ret = (ret < 0) ? ERROR_FAIL : 0;
+    }
+
 out:
     esave = errno;
 
@@ -488,7 +491,7 @@ int libxl_domain_suspend(struct libxl_ctx *ctx, libxl_domain_suspend_info *info,
 
     core_suspend(ctx, domid, fd, hvm, live, debug);
     if (hvm)
-        save_device_model(ctx, domid, fd);
+        return save_device_model(ctx, domid, fd);
     return 0;
 }
 
@@ -559,7 +562,8 @@ int libxl_get_wait_fd(struct libxl_ctx *ctx, int *fd)
 int libxl_wait_for_domain_death(struct libxl_ctx *ctx, uint32_t domid, libxl_waiter *waiter)
 {
     waiter->path = strdup("@releaseDomain");
-    asprintf(&(waiter->token), "%d", DOMAIN_DEATH);
+    if (asprintf(&(waiter->token), "%d", DOMAIN_DEATH) < 0)
+        return -1;
     if (!xs_watch(ctx->xsh, waiter->path, waiter->token))
         return -1;
     return 0;
@@ -574,8 +578,12 @@ int libxl_wait_for_disk_ejects(struct libxl_ctx *ctx, uint32_t guest_domid, libx
         domid = guest_domid;
 
     for (i = 0; i < num_disks; i++) {
-        asprintf(&(waiter[i].path), "%s/device/vbd/%d/eject", libxl_xs_get_dompath(ctx, domid), device_disk_dev_number(disks[i].virtpath));
-        asprintf(&(waiter[i].token), "%d", DISK_EJECT);
+        if (asprintf(&(waiter[i].path), "%s/device/vbd/%d/eject",
+                     libxl_xs_get_dompath(ctx, domid),
+                     device_disk_dev_number(disks[i].virtpath)) < 0)
+            return -1;
+        if (asprintf(&(waiter[i].token), "%d", DISK_EJECT) < 0)
+            return -1;
         xs_watch(ctx->xsh, waiter->path, waiter->token);
     }
     return 0;
@@ -902,7 +910,8 @@ void dm_xenstore_record_pid(void *for_spawn, pid_t innerchild)
     /* we mustn't use the parent's handle in the child */
 
     kvs[0] = "image/device-model-pid";
-    asprintf(&kvs[1], "%d", innerchild);
+    if (asprintf(&kvs[1], "%d", innerchild) < 0)
+        return;
     kvs[2] = NULL;
 
     rc = xs_writev(xsh, XBT_NULL, starting->dom_path, kvs);
