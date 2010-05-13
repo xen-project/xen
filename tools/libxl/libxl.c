@@ -1420,6 +1420,8 @@ int libxl_device_nic_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_nic
     unsigned int boffset = 0;
     unsigned int foffset = 0;
     libxl_device device;
+    char *dompath, **l;
+    unsigned int nb;
 
     front = flexarray_make(16, 1);
     if (!front)
@@ -1427,6 +1429,19 @@ int libxl_device_nic_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_nic
     back = flexarray_make(16, 1);
     if (!back)
         return ERROR_NOMEM;
+
+    if (nic->devid == -1) {
+        if (!(dompath = libxl_xs_get_dompath(ctx, domid))) {
+            return ERROR_FAIL;
+        }
+        if (!(l = libxl_xs_directory(ctx, XBT_NULL,
+                                     libxl_sprintf(ctx, "%s/device/vif", dompath), &nb))) {
+            nic->devid = 0;
+        } else {
+            nic->devid = strtoul(l[nb - 1], NULL, 10) + 1;
+            libxl_free(ctx, l);
+        }
+    }
 
     device.backend_devid = nic->devid;
     device.backend_domid = nic->backend_domid;

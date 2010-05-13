@@ -573,7 +573,7 @@ static void parse_config_data(const char *configfile_filename_report,
             char *buf2 = strdup(buf);
             char *p, *p2;
             *vifs = (libxl_device_nic *) realloc(*vifs, sizeof (libxl_device_nic) * ((*num_vifs) + 1));
-            init_nic_info((*vifs) + (*num_vifs), (*num_vifs));
+            init_nic_info((*vifs) + (*num_vifs), (*num_vifs) + 1);
             p = strtok(buf2, ",");
             if (!p)
                 goto skip;
@@ -3169,5 +3169,88 @@ int main_top(int argc, char **argv)
 
     system("xentop");
 
+    exit(0);
+}
+
+int main_networkattach(int argc, char **argv)
+{
+    int opt;
+    libxl_device_nic nic;
+    char *endptr, *tok;
+    int i;
+    unsigned int val;
+
+    if ((argc < 2) || (argc > 11)) {
+        help("network-attach");
+        exit(0);
+    }
+    while ((opt = getopt(argc, argv, "hl")) != -1) {
+        switch (opt) {
+        case 'h':
+            help("network-attach");
+            exit(0);
+        default:
+            fprintf(stderr, "option `%c' not supported.\n", opt);
+            break;
+        }
+    }
+
+    if (domain_qualifier_to_domid(argv[1], &domid, 0) < 0) {
+        fprintf(stderr, "%s is an invalid domain identifier\n", argv[1]);
+        exit(1);
+    }
+    init_nic_info(&nic, -1);
+    for (argv += 2, argc -= 2; argc > 0; ++argv, --argc) {
+        if (!strncmp("type=", *argv, 5)) {
+            if (!strncmp("vif", (*argv) + 5, 4)) {
+                nic.nictype = NICTYPE_VIF;
+            } else if (!strncmp("ioemu", (*argv) + 5, 5)) {
+                nic.nictype = NICTYPE_IOEMU;
+            } else {
+                fprintf(stderr, "Invalid parameter `type'.\n");
+                exit(1);
+            }
+        } else if (!strncmp("mac=", *argv, 4)) {
+            tok = strtok((*argv) + 4, ":");
+            for (i = 0; tok && i < 6; tok = strtok(NULL, ":"), ++i) {
+                val = strtoul(tok, &endptr, 16);
+                if ((tok == endptr) || (val > 255)) {
+                    fprintf(stderr, "Invalid parameter `mac'.\n");
+                    exit(1);
+                }
+                nic.mac[i] = val;
+            }
+        } else if (!strncmp("bridge=", *argv, 7)) {
+            nic.bridge = (*argv) + 7;
+        } else if (!strncmp("ip=", *argv, 3)) {
+            if (!inet_aton((*argv) + 3, &(nic.ip))) {
+                fprintf(stderr, "Invalid parameter `ip'.\n");
+                exit(1);
+            }
+        } else if (!strncmp("script=", *argv, 6)) {
+            nic.script = (*argv) + 6;
+        } else if (!strncmp("backend=", *argv, 8)) {
+            val = strtoul((*argv) + 8, &endptr, 10);
+            if (((*argv) + 8) == endptr) {
+                fprintf(stderr, "Invalid parameter `backend'.\n");
+                exit(1);
+            }
+            nic.backend_domid = val;
+        } else if (!strncmp("vifname=", *argv, 8)) {
+            nic.ifname = (*argv) + 8;
+        } else if (!strncmp("model=", *argv, 6)) {
+            nic.model = (*argv) + 6;
+        } else if (!strncmp("rate=", *argv, 5)) {
+        } else if (!strncmp("accel=", *argv, 6)) {
+        } else {
+            fprintf(stderr, "unrecognized argument `%s'\n", *argv);
+            exit(1);
+        }
+    }
+    nic.domid = domid;
+    if (libxl_device_nic_add(&ctx, domid, &nic)) {
+        fprintf(stderr, "libxl_device_nic_add failed.\n");
+        exit(1);
+    }
     exit(0);
 }

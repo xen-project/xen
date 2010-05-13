@@ -187,6 +187,13 @@ struct cmd_spec cmd_table[] = {
       "Monitor a host and the domains in real time",
       "",
     },
+    { "network-attach",
+      &main_networkattach,
+      "Create a new virtual network device",
+      "<Domain> [type=<type>] [mac=<mac>] [bridge=<bridge>] "
+      "[ip=<ip>] [script=<script>] [backend=<BackDomain>] [vifname=<name>] "
+      "[rate=<rate>] [model=<model>][accel=<accel>]",
+    },
 };
 
 int cmdtable_len = sizeof(cmd_table)/sizeof(struct cmd_spec);
