@@ -3461,3 +3461,37 @@ int main_blocklist(int argc, char **argv)
     }
     exit(0);
 }
+
+int main_blockdetach(int argc, char **argv)
+{
+    int opt;
+    libxl_device_disk disk;
+
+    if (argc != 3) {
+        help("block-detach");
+        exit(0);
+    }
+    while ((opt = getopt(argc, argv, "h")) != -1) {
+        switch (opt) {
+        case 'h':
+            help("block-detach");
+            exit(0);
+        default:
+            fprintf(stderr, "option `%c' not supported.\n", opt);
+            break;
+        }
+    }
+
+    if (domain_qualifier_to_domid(argv[1], &domid, 0) < 0) {
+        fprintf(stderr, "%s is an invalid domain identifier\n", argv[1]);
+        exit(1);
+    }
+    if (libxl_devid_to_device_disk(&ctx, domid, argv[2], &disk)) {
+        fprintf(stderr, "Error: Device %s not connected.\n", argv[2]);
+        exit(1);
+    }
+    if (libxl_device_disk_del(&ctx, &disk, 1)) {
+        fprintf(stderr, "libxl_device_del failed.\n");
+    }
+    exit(0);
+}

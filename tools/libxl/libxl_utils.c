@@ -430,3 +430,38 @@ int libxl_devid_to_device_nic(struct libxl_ctx *ctx, uint32_t domid,
     libxl_free(ctx, nic_path_be);
     return 0;
 }
+
+int libxl_devid_to_device_disk(struct libxl_ctx *ctx, uint32_t domid,
+                               const char *devid, libxl_device_disk *disk)
+{
+    char *endptr, *val;
+    char *dompath, *diskpath, *be_path;
+    unsigned int devid_n;
+
+    devid_n = strtoul(devid, &endptr, 10);
+    if (devid == endptr) {
+        return ERROR_INVAL;
+    }
+    dompath = libxl_xs_get_dompath(ctx, domid);
+    diskpath = libxl_sprintf(ctx, "%s/device/vbd/%s", dompath, devid);
+    if (!diskpath) {
+        return ERROR_FAIL;
+    }
+
+    val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/backend-id", diskpath));
+    disk->backend_domid = strtoul(val, NULL, 10);
+    disk->domid = domid;
+    be_path = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/backend", diskpath));
+    disk->physpath = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/params", be_path));
+    val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/type", be_path));
+    libxl_string_to_phystype(ctx, val, &(disk->phystype));
+    disk->virtpath = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/dev", be_path));
+    val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/removable", be_path));
+    disk->unpluggable = !strcmp(val, "1");
+    val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/mode", be_path));
+    disk->readwrite = !!strcmp(val, "w");
+    val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/device-type", diskpath));
+    disk->is_cdrom = !strcmp(val, "cdrom");
+
+    return 0;
+}

@@ -214,6 +214,11 @@ struct cmd_spec cmd_table[] = {
       "List virtual block devices for a domain",
       "<Domain(s)>",
     },
+    { "block-detach",
+      &main_blockdetach,
+      "Destroy a domain's virtual block device",
+      "<Domain> <DevId>",
+    },
 };
 
 int cmdtable_len = sizeof(cmd_table)/sizeof(struct cmd_spec);

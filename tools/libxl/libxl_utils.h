@@ -61,6 +61,9 @@ int libxl_mac_to_device_nic(struct libxl_ctx *ctx, uint32_t domid,
 int libxl_devid_to_device_nic(struct libxl_ctx *ctx, uint32_t domid,
                               const char *devid, libxl_device_nic *nic);
 
+int libxl_devid_to_device_disk(struct libxl_ctx *ctx, uint32_t domid,
+                               const char *devid, libxl_device_disk *disk);
+
 /* log levels: */
 #define XL_LOG_DEBUG 3
 #define XL_LOG_INFO 2
