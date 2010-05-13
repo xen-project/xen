@@ -204,6 +204,11 @@ struct cmd_spec cmd_table[] = {
       "Destroy a domain's virtual network device",
       "<Domain> <DevId|mac>",
     },
+    { "block-attach",
+      &main_blockattach,
+      "Create a new virtual block device",
+      "<Domain> <BackDev> <FrontDev> <Mode> [BackDomain]",
+    },
 };
 
 int cmdtable_len = sizeof(cmd_table)/sizeof(struct cmd_spec);

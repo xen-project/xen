@@ -3344,3 +3344,75 @@ int main_networkdetach(int argc, char **argv)
     }
     exit(0);
 }
+
+int main_blockattach(int argc, char **argv)
+{
+    int opt;
+    char *tok;
+    uint32_t fe_domid, be_domid = 0;
+    libxl_device_disk disk = { 0 };
+
+    if ((argc < 3) || (argc > 6)) {
+        help("block-attach");
+        exit(0);
+    }
+    while ((opt = getopt(argc, argv, "h")) != -1) {
+        switch (opt) {
+        case 'h':
+            help("block-attach");
+            exit(0);
+        default:
+            fprintf(stderr, "option `%c' not supported.\n", opt);
+            break;
+        }
+    }
+
+    tok = strtok(argv[2], ":");
+    if (!strcmp(tok, "phy")) {
+        disk.phystype = PHYSTYPE_PHY;
+    } else if (!strcmp(tok, "file")) {
+        disk.phystype = PHYSTYPE_FILE;
+    } else if (!strcmp(tok, "tap")) {
+        tok = strtok(NULL, ":");
+        if (!strcmp(tok, "aio")) {
+            disk.phystype = PHYSTYPE_AIO;
+        } else if (!strcmp(tok, "vhd")) {
+            disk.phystype = PHYSTYPE_VHD;
+        } else if (!strcmp(tok, "qcow")) {
+            disk.phystype = PHYSTYPE_QCOW;
+        } else if (!strcmp(tok, "qcow2")) {
+            disk.phystype = PHYSTYPE_QCOW2;
+        } else {
+            fprintf(stderr, "Error: `%s' is not a valid disk image.\n", tok);
+            exit(1);
+        }
+    } else {
+        fprintf(stderr, "Error: `%s' is not a valid block device.\n", tok);
+        exit(1);
+    }
+    disk.physpath = strtok(NULL, "\0");
+    if (!disk.physpath) {
+        fprintf(stderr, "Error: missing path to disk image.\n");
+        exit(1);
+    }
+    disk.virtpath = argv[3];
+    disk.unpluggable = 1;
+    disk.readwrite = (argv[4][0] == 'w') ? 1 : 0;
+
+    if (domain_qualifier_to_domid(argv[1], &fe_domid, 0) < 0) {
+        fprintf(stderr, "%s is an invalid domain identifier\n", argv[1]);
+        exit(1);
+    }
+    if (argc == 6) {
+        if (domain_qualifier_to_domid(argv[5], &be_domid, 0) < 0) {
+            fprintf(stderr, "%s is an invalid domain identifier\n", argv[5]);
+            exit(1);
+        }
+    }
+    disk.domid = fe_domid;
+    disk.backend_domid = be_domid;
+    if (libxl_device_disk_add(&ctx, fe_domid, &disk)) {
+        fprintf(stderr, "libxl_device_disk_add failed.\n");
+    }
+    exit(0);
+}
