@@ -85,8 +85,14 @@ struct xs_handle {
 #define mutex_unlock(m)		pthread_mutex_unlock(m)
 #define condvar_signal(c)	pthread_cond_signal(c)
 #define condvar_wait(c,m,hnd)	pthread_cond_wait(c,m)
-#define cleanup_push(f, a)	pthread_cleanup_push((void (*)(void *))(f), (void *)(a))
-#define cleanup_pop(run)	pthread_cleanup_pop(run)
+#define cleanup_push(f, a)	\
+    pthread_cleanup_push((void (*)(void *))(f), (void *)(a))
+/*
+ * Some definitions of pthread_cleanup_pop() are a macro starting with an
+ * end-brace. GCC then complains if we immediately precede that with a label.
+ * Hence we insert a dummy statement to appease the compiler in this situation.
+ */
+#define cleanup_pop(run)        ((void)0); pthread_cleanup_pop(run)
 
 static void *read_thread(void *arg);
 
