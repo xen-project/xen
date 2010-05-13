@@ -245,11 +245,16 @@ struct domain *domain_create(
         d->disable_migrate = 1;
     }
 
-    if ( domcr_flags & DOMCRF_dummy )
-        return d;
-
     rangeset_domain_initialise(d);
     init_status |= INIT_rangeset;
+
+    d->iomem_caps = rangeset_new(d, "I/O Memory", RANGESETF_prettyprint_hex);
+    d->irq_caps   = rangeset_new(d, "Interrupts", 0);
+    if ( (d->iomem_caps == NULL) || (d->irq_caps == NULL) )
+        goto fail;
+
+    if ( domcr_flags & DOMCRF_dummy )
+        return d;
 
     if ( !is_idle_domain(d) )
     {
@@ -284,11 +289,6 @@ struct domain *domain_create(
     if ( arch_domain_create(d, domcr_flags) != 0 )
         goto fail;
     init_status |= INIT_arch;
-
-    d->iomem_caps = rangeset_new(d, "I/O Memory", RANGESETF_prettyprint_hex);
-    d->irq_caps   = rangeset_new(d, "Interrupts", 0);
-    if ( (d->iomem_caps == NULL) || (d->irq_caps == NULL) )
-        goto fail;
 
     if ( sched_init_domain(d) != 0 )
         goto fail;
