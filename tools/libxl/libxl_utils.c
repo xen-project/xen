@@ -356,3 +356,77 @@ int libxl_pipe(struct libxl_ctx *ctx, int pipes[2])
     }
     return 0;
 }
+
+int libxl_mac_to_device_nic(struct libxl_ctx *ctx, uint32_t domid,
+                            const char *mac, libxl_device_nic *nic)
+{
+    libxl_nicinfo *nics;
+    unsigned int nb, i;
+    uint8_t mac_n[6];
+    uint8_t *a, *b;
+    const char *tok;
+    char *endptr;
+
+    nics = libxl_list_nics(ctx, domid, &nb);
+    if (!nics) {
+        return ERROR_FAIL;
+    }
+
+    for (i = 0, tok = mac; *tok && (i < 6); ++i, tok += 3) {
+        mac_n[i] = strtol(tok, &endptr, 16);
+        if (endptr != (tok + 2)) {
+            return ERROR_INVAL;
+        }
+    }
+    memset(nic, 0, sizeof (libxl_device_nic));
+    for (; nb; --nb, ++nics) {
+        for (i = 0, a = nics->mac, b = mac_n;
+             (b < mac_n + 6) && (*a == *b); ++a, ++b)
+            ;
+        if ((b >= mac_n + 6) && (*a == *b)) {
+            nic->backend_domid = nics->backend_id;
+            nic->domid = nics->frontend_id;
+            nic->devid = nics->devid;
+            memcpy(nic->mac, nics->mac, sizeof (nic->mac));
+            nic->script = nics->script;
+            libxl_free(ctx, nics);
+            return 0;
+        }
+    }
+
+    libxl_free(ctx, nics);
+    return 0;
+}
+
+int libxl_devid_to_device_nic(struct libxl_ctx *ctx, uint32_t domid,
+                              const char *devid, libxl_device_nic *nic)
+{
+    char *tok, *val;
+    char *dompath, *nic_path_fe, *nic_path_be;
+    unsigned int i;
+
+    memset(nic, 0, sizeof (libxl_device_nic));
+    dompath = libxl_xs_get_dompath(ctx, domid);
+    if (!dompath) {
+        return ERROR_FAIL;
+    }
+    nic_path_fe = libxl_sprintf(ctx, "%s/device/vif/%s", dompath, devid);
+    nic_path_be = libxl_xs_read(ctx, XBT_NULL,
+                                libxl_sprintf(ctx, "%s/backend", nic_path_fe));
+    val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/backend-id", nic_path_fe));
+    nic->backend_domid = strtoul(val, NULL, 10);
+    nic->devid = strtoul(devid, NULL, 10);
+    libxl_free(ctx, val);
+
+    val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/mac", nic_path_fe));
+    for (i = 0, tok = strtok(val, ":"); tok && (i < 6);
+         ++i, tok = strtok(NULL, ":")) {
+        nic->mac[i] = strtoul(tok, NULL, 16);
+    }
+    libxl_free(ctx, val);
+    nic->script = libxl_xs_read(ctx, XBT_NULL,
+                                libxl_sprintf(ctx, "%s/script", nic_path_be));
+    libxl_free(ctx, nic_path_fe);
+    libxl_free(ctx, nic_path_be);
+    return 0;
+}

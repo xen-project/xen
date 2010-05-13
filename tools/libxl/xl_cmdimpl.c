@@ -3302,3 +3302,45 @@ int main_networklist(int argc, char **argv)
     }
     exit(0);
 }
+
+int main_networkdetach(int argc, char **argv)
+{
+    int opt;
+    libxl_device_nic nic;
+
+    if (argc != 3) {
+        help("network-detach");
+        exit(0);
+    }
+    while ((opt = getopt(argc, argv, "hl")) != -1) {
+        switch (opt) {
+        case 'h':
+            help("network-detach");
+            exit(0);
+        default:
+            fprintf(stderr, "option `%c' not supported.\n", opt);
+            break;
+        }
+    }
+
+    if (domain_qualifier_to_domid(argv[1], &domid, 0) < 0) {
+        fprintf(stderr, "%s is an invalid domain identifier\n", argv[1]);
+        exit(1);
+    }
+
+    if (!strchr(argv[2], ':')) {
+        if (libxl_devid_to_device_nic(&ctx, domid, argv[2], &nic)) {
+            fprintf(stderr, "Unknown device %s.\n", argv[2]);
+            exit(1);
+        }
+    } else {
+        if (libxl_mac_to_device_nic(&ctx, domid, argv[2], &nic)) {
+            fprintf(stderr, "Unknown device %s.\n", argv[2]);
+            exit(1);
+        }
+    }
+    if (libxl_device_nic_del(&ctx, &nic, 1)) {
+        fprintf(stderr, "libxl_device_nic_del failed.\n");
+    }
+    exit(0);
+}

@@ -55,6 +55,12 @@ void libxl_report_child_exitstatus(struct libxl_ctx *ctx, int level,
     /* treats all exit statuses as errors; if that's not what you want,
      * check status yourself first */
 
+
+int libxl_mac_to_device_nic(struct libxl_ctx *ctx, uint32_t domid,
+                            const char *mac, libxl_device_nic *nic);
+int libxl_devid_to_device_nic(struct libxl_ctx *ctx, uint32_t domid,
+                              const char *devid, libxl_device_nic *nic);
+
 /* log levels: */
 #define XL_LOG_DEBUG 3
 #define XL_LOG_INFO 2
