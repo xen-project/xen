@@ -21,7 +21,7 @@
 
 #include <asm/config.h>
 #include <asm/hvm/io.h>
-#include <asm/hvm/vmx/vpmu.h>
+#include <asm/hvm/vpmu.h>
 
 extern void start_vmx(void);
 extern void vmcs_dump_vcpu(struct vcpu *v);

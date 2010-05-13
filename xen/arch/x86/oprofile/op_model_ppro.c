@@ -18,7 +18,7 @@
 #include <xen/sched.h>
 #include <asm/regs.h>
 #include <asm/current.h>
-#include <asm/hvm/vmx/vpmu.h>
+#include <asm/hvm/vpmu.h>
 #include <asm/hvm/vmx/vpmu_core2.h>
  
 #include "op_x86_model.h"

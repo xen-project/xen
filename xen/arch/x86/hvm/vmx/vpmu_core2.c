@@ -32,7 +32,7 @@
 #include <asm/hvm/vmx/vmcs.h>
 #include <public/sched.h>
 #include <public/hvm/save.h>
-#include <asm/hvm/vmx/vpmu.h>
+#include <asm/hvm/vpmu.h>
 #include <asm/hvm/vmx/vpmu_core2.h>
 
 u32 core2_counters_msr[] =   {
