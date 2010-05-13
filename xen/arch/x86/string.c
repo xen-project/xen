@@ -14,25 +14,12 @@ void *memcpy(void *dest, const void *src, size_t n)
     long d0, d1, d2;
 
     asm volatile (
-#ifdef __i386__
-        "   rep movsl        ; "
-#else
-        "   rep movsq        ; "
-        "   testb $4,%b4     ; "
-        "   je 0f            ; "
-        "   movsl            ; "
-        "0:                  ; "
-#endif
-        "   testb $2,%b4     ; "
-        "   je 1f            ; "
-        "   movsw            ; "
-        "1: testb $1,%b4     ; "
-        "   je 2f            ; "
-        "   movsb            ; "
-        "2:                    "
+        "   rep ; movs"__OS" ; "
+        "   mov %4,%3        ; "
+        "   rep ; movsb        "
         : "=&c" (d0), "=&D" (d1), "=&S" (d2)
-        : "0" (n/sizeof(long)), "q" (n), "1" (dest), "2" (src)
-        : "memory");
+        : "0" (n/BYTES_PER_LONG), "r" (n%BYTES_PER_LONG), "1" (dest), "2" (src)
+        : "memory" );
 
     return dest;
 }
@@ -55,7 +42,7 @@ void *memset(void *s, int c, size_t n)
 void *memmove(void *dest, const void *src, size_t n)
 {
     long d0, d1, d2;
- 
+
     if ( dest < src )
         return memcpy(dest, src, n);
 
