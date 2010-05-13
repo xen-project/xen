@@ -23,9 +23,9 @@
 #define __ASM_X86_HVM_VPMU_H_
 
 #define msraddr_to_bitpos(x) (((x)&0xffff) + ((x)>>31)*0x2000)
-#define vcpu_vpmu(vcpu)   (&(vcpu)->arch.hvm_vcpu.u.vmx.vpmu)
+#define vcpu_vpmu(vcpu)   (&((vcpu)->arch.hvm_vcpu.vpmu))
 #define vpmu_vcpu(vpmu)   (container_of((vpmu), struct vcpu, \
-                                          arch.hvm_vcpu.u.vmx.vpmu))
+                                          arch.hvm_vcpu.vpmu))
 #define vpmu_domain(vpmu) (vpmu_vcpu(vpmu)->domain)
 
 #define MSR_TYPE_COUNTER            0

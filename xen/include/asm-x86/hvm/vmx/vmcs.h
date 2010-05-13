@@ -91,9 +91,6 @@ struct arch_vmx_struct {
     u32                  exec_control;
     u32                  secondary_exec_control;
 
-    /* PMU */
-    struct vpmu_struct   vpmu;
-
 #ifdef __x86_64__
     struct vmx_msr_state msr_state;
     unsigned long        shadow_gs;
