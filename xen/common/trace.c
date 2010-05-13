@@ -343,7 +343,7 @@ int tb_control(xen_sysctl_tbuf_op_t *tbc)
         tbc->size = T_INFO_PAGES * PAGE_SIZE;
         break;
     case XEN_SYSCTL_TBUFOP_set_cpu_mask:
-        xenctl_cpumap_to_cpumask(&tb_cpu_mask, &tbc->cpu_mask);
+        rc = xenctl_cpumap_to_cpumask(&tb_cpu_mask, &tbc->cpu_mask);
         break;
     case XEN_SYSCTL_TBUFOP_set_evt_mask:
         tb_event_mask = tbc->evt_mask;
