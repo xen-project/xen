@@ -194,6 +194,11 @@ struct cmd_spec cmd_table[] = {
       "[ip=<ip>] [script=<script>] [backend=<BackDomain>] [vifname=<name>] "
       "[rate=<rate>] [model=<model>][accel=<accel>]",
     },
+    { "network-list",
+      &main_networklist,
+      "List virtual network interfaces for a domain",
+      "<Domain(s)>",
+    },
 };
 
 int cmdtable_len = sizeof(cmd_table)/sizeof(struct cmd_spec);

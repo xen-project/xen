@@ -3254,3 +3254,51 @@ int main_networkattach(int argc, char **argv)
     }
     exit(0);
 }
+
+int main_networklist(int argc, char **argv)
+{
+    int opt;
+    libxl_nicinfo *nics;
+    unsigned int nb;
+
+    if (argc < 2) {
+        help("network-list");
+        exit(1);
+    }
+    while ((opt = getopt(argc, argv, "hl")) != -1) {
+        switch (opt) {
+            case 'h':
+                help("network-list");
+                exit(0);
+            default:
+                fprintf(stderr, "option `%c' not supported.\n", opt);
+                break;
+        }
+    }
+
+    /*      Idx  BE   MAC   Hdl  Sta  evch txr/rxr  BE-path */
+    printf("%-3s %-2s %-17s %-6s %-5s %-6s %5s/%-5s %-30s\n",
+           "Idx", "BE", "Mac Addr.", "handle", "state", "evt-ch", "tx-", "rx-ring-ref", "BE-path");
+    for (++argv, --argc; argc > 0; --argc, ++argv) {
+        if (domain_qualifier_to_domid(*argv, &domid, 0) < 0) {
+            fprintf(stderr, "%s is an invalid domain identifier\n", *argv);
+            continue;
+        }
+        if (!(nics = libxl_list_nics(&ctx, domid, &nb))) {
+            continue;
+        }
+        for (; nb > 0; --nb, ++nics) {
+            /* Idx BE */
+            printf("%-3d %-2d ", nics->devid, nics->backend_id);
+            /* MAC */
+            printf("%02x:%02x:%02x:%02x:%02x:%02x ",
+                   nics->mac[0], nics->mac[1], nics->mac[2],
+                   nics->mac[3], nics->mac[4], nics->mac[5]);
+            /* Hdl  Sta  evch txr/rxr  BE-path */
+            printf("%6d %5d %6d %5d/%-11d %-30s\n",
+                   nics->devid, nics->state, nics->evtch,
+                   nics->rref_tx, nics->rref_rx, nics->backend);
+        }
+    }
+    exit(0);
+}

@@ -373,8 +373,23 @@ int libxl_device_disk_del(struct libxl_ctx *ctx, libxl_device_disk *disk, int wa
 libxl_device_disk *libxl_device_disk_list(struct libxl_ctx *ctx, uint32_t domid, int *num);
 int libxl_cdrom_insert(struct libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk);
 
+typedef struct {
+    char *backend;
+    uint32_t backend_id;
+    char *frontend;
+    uint32_t frontend_id;
+    int devid;
+    int state;
+    char *script;
+    uint8_t mac[6];
+    int evtch;
+    int rref_tx;
+    int rref_rx;
+} libxl_nicinfo;
+
 int libxl_device_nic_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_nic *nic);
 int libxl_device_nic_del(struct libxl_ctx *ctx, libxl_device_nic *nic, int wait);
+libxl_nicinfo *libxl_list_nics(struct libxl_ctx *ctx, uint32_t domid, unsigned int *nb);
 
 int libxl_device_console_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_console *console);
 

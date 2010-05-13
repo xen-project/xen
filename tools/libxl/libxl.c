@@ -1505,6 +1505,66 @@ int libxl_device_nic_del(struct libxl_ctx *ctx,
     return libxl_device_del(ctx, &device, wait);
 }
 
+libxl_nicinfo *libxl_list_nics(struct libxl_ctx *ctx, uint32_t domid, unsigned int *nb)
+{
+    char *dompath, *nic_path_fe;
+    char **l;
+    char *val, *tok;
+    unsigned int nb_nics, i;
+    libxl_nicinfo *res, *nics;
+
+    dompath = libxl_xs_get_dompath(ctx, domid);
+    if (!dompath) {
+        return NULL;
+    }
+    l = libxl_xs_directory(ctx, XBT_NULL,
+                           libxl_sprintf(ctx, "%s/device/vif", dompath), &nb_nics);
+    if (!l) {
+        return NULL;
+    }
+    res = libxl_calloc(ctx, nb_nics, sizeof (libxl_device_nic));
+    if (!res) {
+        libxl_free(ctx, l);
+        return NULL;
+    }
+    nics = res;
+    for (*nb = nb_nics; nb_nics > 0; --nb_nics, ++l, ++nics) {
+        nic_path_fe = libxl_sprintf(ctx, "%s/device/vif/%s", dompath, *l);
+
+        nics->backend = libxl_xs_read(ctx, XBT_NULL,
+                                      libxl_sprintf(ctx, "%s/backend", nic_path_fe));
+        val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/backend-id", nic_path_fe));
+        nics->backend_id = val ? strtoul(val, NULL, 10) : -1;
+
+        nics->devid = strtoul(*l, NULL, 10);
+        val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/state", nic_path_fe));
+        nics->state = val ? strtoul(val, NULL, 10) : -1;
+        val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/mac", nic_path_fe));
+        for (i = 0, tok = strtok(val, ":"); tok && (i < 6);
+             ++i, tok = strtok(NULL, ":")) {
+            nics->mac[i] = strtoul(tok, NULL, 16);
+        }
+        val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/event-channel", nic_path_fe));
+        nics->evtch = val ? strtol(val, NULL, 10) : -1;
+        val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/tx-ring-ref", nic_path_fe));
+        nics->rref_tx = val ? strtol(val, NULL, 10) : -1;
+        val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/rx-ring-ref", nic_path_fe));
+        nics->rref_rx = val ? strtol(val, NULL, 10) : -1;
+        nics->frontend = libxl_xs_read(ctx, XBT_NULL,
+                                       libxl_sprintf(ctx, "%s/frontend", nics->backend));
+        val = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/frontend-id", nics->backend));
+        nics->frontend_id = val ? strtoul(val, NULL, 10) : -1;
+        nics->script = libxl_xs_read(ctx, XBT_NULL,
+                                     libxl_sprintf(ctx, "%s/script", nics->backend));
+
+        libxl_free(ctx, nic_path_fe);
+    }
+
+    libxl_free(ctx, l);
+    return res;
+}
+
+
 /******************************************************************************/
 int libxl_device_console_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_console *console)
 {
