@@ -27,6 +27,7 @@
 #include <asm/processor.h>
 #include <asm/hvm/svm/vmcb.h>
 #include <asm/i387.h>
+#include <asm/hvm/vpmu.h>
 
 void svm_dump_vmcb(const char *from, struct vmcb_struct *vmcb);
 

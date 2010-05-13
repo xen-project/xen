@@ -30,6 +30,8 @@
 #include <public/sched.h>
 #include <public/hvm/save.h>
 #include <asm/hvm/vpmu.h>
+#include <asm/hvm/svm/svm.h>
+#include <asm/hvm/svm/vmcb.h>
 
 static int __read_mostly opt_vpmu_enabled;
 boolean_param("vpmu", opt_vpmu_enabled);
@@ -78,9 +80,14 @@ void vpmu_load(struct vcpu *v)
 }
 
 extern struct arch_vpmu_ops core2_vpmu_ops;
+extern struct arch_vpmu_ops amd_vpmu_ops;
+
 void vpmu_initialise(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
+    __u8 vendor = current_cpu_data.x86_vendor;
+    __u8 family = current_cpu_data.x86;
+    __u8 cpu_model = current_cpu_data.x86_model;
 
     if ( !opt_vpmu_enabled )
         return;
@@ -88,17 +95,45 @@ void vpmu_initialise(struct vcpu *v)
     if ( vpmu->flags & VPMU_CONTEXT_ALLOCATED )
         vpmu_destroy(v);
 
-    if ( current_cpu_data.x86 == 6 )
+    switch ( vendor )
     {
-        switch ( current_cpu_data.x86_model )
+        case X86_VENDOR_AMD:
         {
-        case 15:
-        case 23:
-        case 26:
-        case 29:
-            vpmu->arch_vpmu_ops = &core2_vpmu_ops;
-            break;
+            switch ( family )
+            {
+            case 0x10:
+                vpmu->arch_vpmu_ops = &amd_vpmu_ops;
+                break;
+            default:
+                printk("VMPU: Initialization failed. "
+                       "AMD processor family %d has not "
+                       "been supported\n", family);
+                return;
+            }
         }
+        break;
+
+        case X86_VENDOR_INTEL:
+        {
+            if ( family == 6 )
+            {
+                switch ( cpu_model )
+                {
+                case 15:
+                case 23:
+                case 26:
+                case 29:
+                    vpmu->arch_vpmu_ops = &core2_vpmu_ops;
+                    break;
+                }
+            }
+        }
+        break;
+
+        default:
+            printk("VMPU: Initialization failed. "
+                   "Unknown CPU vendor %d\n", vendor);
+            return;
     }
 
     if ( vpmu->arch_vpmu_ops != NULL )

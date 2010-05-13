@@ -639,6 +639,7 @@ static void svm_ctxt_switch_from(struct vcpu *v)
     svm_fpu_leave(v);
 
     svm_save_dr(v);
+    vpmu_save(v);
 
     svm_sync_vmcb(v);
     svm_vmload(root_vmcb[cpu]);
@@ -679,6 +680,7 @@ static void svm_ctxt_switch_to(struct vcpu *v)
 
     svm_vmsave(root_vmcb[cpu]);
     svm_vmload(v->arch.hvm_svm.vmcb);
+    vpmu_load(v);
 
     if ( cpu_has_rdtscp )
         wrmsrl(MSR_TSC_AUX, hvm_msr_tsc_aux(v));
@@ -742,12 +744,15 @@ static int svm_vcpu_initialise(struct vcpu *v)
         return rc;
     }
 
+    vpmu_initialise(v);
     return 0;
 }
 
 static void svm_vcpu_destroy(struct vcpu *v)
 {
     svm_destroy_vmcb(v);
+    vpmu_destroy(v);
+    passive_domain_destroy(v);
 }
 
 static void svm_inject_exception(
@@ -810,7 +815,7 @@ static int svm_event_pending(struct vcpu *v)
 
 static int svm_do_pmu_interrupt(struct cpu_user_regs *regs)
 {
-    return 0;
+    return vpmu_do_interrupt(regs);
 }
 
 static int svm_cpu_prepare(unsigned int cpu)
@@ -1071,6 +1076,17 @@ static int svm_msr_read_intercept(struct cpu_user_regs *regs)
         msr_content = vmcb->lastinttoip;
         break;
 
+    case MSR_K7_PERFCTR0:
+    case MSR_K7_PERFCTR1:
+    case MSR_K7_PERFCTR2:
+    case MSR_K7_PERFCTR3:
+    case MSR_K7_EVNTSEL0:
+    case MSR_K7_EVNTSEL1:
+    case MSR_K7_EVNTSEL2:
+    case MSR_K7_EVNTSEL3:
+        vpmu_do_rdmsr(regs);
+        goto done;
+
     default:
 
         if ( rdmsr_viridian_regs(ecx, &msr_content) ||
@@ -1089,6 +1105,7 @@ static int svm_msr_read_intercept(struct cpu_user_regs *regs)
     regs->eax = (uint32_t)msr_content;
     regs->edx = (uint32_t)(msr_content >> 32);
 
+done:
     HVMTRACE_3D (MSR_READ, ecx, regs->eax, regs->edx);
     HVM_DBG_LOG(DBG_LEVEL_1, "returns: ecx=%x, eax=%lx, edx=%lx",
                 ecx, (unsigned long)regs->eax, (unsigned long)regs->edx);
@@ -1153,6 +1170,17 @@ static int svm_msr_write_intercept(struct cpu_user_regs *regs)
         vmcb->lastinttoip = msr_content;
         break;
 
+    case MSR_K7_PERFCTR0:
+    case MSR_K7_PERFCTR1:
+    case MSR_K7_PERFCTR2:
+    case MSR_K7_PERFCTR3:
+    case MSR_K7_EVNTSEL0:
+    case MSR_K7_EVNTSEL1:
+    case MSR_K7_EVNTSEL2:
+    case MSR_K7_EVNTSEL3:
+        vpmu_do_wrmsr(regs);
+        goto done;
+
     default:
         if ( wrmsr_viridian_regs(ecx, msr_content) )
             break;
@@ -1169,7 +1197,7 @@ static int svm_msr_write_intercept(struct cpu_user_regs *regs)
         }
         break;
     }
-
+done:
     return X86EMUL_OKAY;
 
  gpf:
