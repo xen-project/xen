@@ -368,9 +368,22 @@ int libxl_detach_device_model(struct libxl_ctx *ctx,
                               libxl_device_model_starting *starting);
   /* DM is detached even if error is returned */
 
+typedef struct {
+    char *backend;
+    uint32_t backend_id;
+    char *frontend;
+    uint32_t frontend_id;
+    int devid;
+    int state;
+    int evtch;
+    int rref;
+} libxl_diskinfo;
+
 int libxl_device_disk_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk);
 int libxl_device_disk_del(struct libxl_ctx *ctx, libxl_device_disk *disk, int wait);
 libxl_device_disk *libxl_device_disk_list(struct libxl_ctx *ctx, uint32_t domid, int *num);
+int libxl_device_disk_getinfo(struct libxl_ctx *ctx, uint32_t domid,
+                              libxl_device_disk *disk, libxl_diskinfo *diskinfo);
 int libxl_cdrom_insert(struct libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk);
 
 typedef struct {

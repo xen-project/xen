@@ -3416,3 +3416,48 @@ int main_blockattach(int argc, char **argv)
     }
     exit(0);
 }
+
+int main_blocklist(int argc, char **argv)
+{
+    int opt;
+    int nb;
+    libxl_device_disk *disks;
+    libxl_diskinfo diskinfo;
+
+    if (argc < 2) {
+        help("block-list");
+        exit(0);
+    }
+    while ((opt = getopt(argc, argv, "h")) != -1) {
+        switch (opt) {
+        case 'h':
+            help("block-list");
+            exit(0);
+        default:
+            fprintf(stderr, "option `%c' not supported.\n", opt);
+            break;
+        }
+    }
+
+    printf("%-5s %-3s %-6s %-5s %-6s %-8s %-30s\n",
+           "Vdev", "BE", "handle", "state", "evt-ch", "ring-ref", "BE-path");
+    for (++argv, --argc; argc > 0; --argc, ++argv) {
+        if (domain_qualifier_to_domid(*argv, &domid, 0) < 0) {
+            fprintf(stderr, "%s is an invalid domain identifier\n", *argv);
+            continue;
+        }
+        disks = libxl_device_disk_list(&ctx, domid, &nb);
+        if (!disks) {
+            continue;
+        }
+        for (; nb > 0; --nb, ++disks) {
+            if (!libxl_device_disk_getinfo(&ctx, domid, disks, &diskinfo)) {
+                /*      Vdev BE   hdl  st   evch rref BE-path*/
+                printf("%-5d %-3d %-6d %-5d %-6d %-8d %-30s\n",
+                       diskinfo.devid, diskinfo.backend_id, diskinfo.frontend_id,
+                       diskinfo.state, diskinfo.evtch, diskinfo.rref, diskinfo.backend);
+            }
+        }
+    }
+    exit(0);
+}

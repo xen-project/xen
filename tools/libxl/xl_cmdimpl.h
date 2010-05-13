@@ -46,5 +46,6 @@ int main_networkattach(int argc, char **argv);
 int main_networklist(int argc, char **argv);
 int main_networkdetach(int argc, char **argv);
 int main_blockattach(int argc, char **argv);
+int main_blocklist(int argc, char **argv);
 
 void help(char *command);

@@ -209,6 +209,11 @@ struct cmd_spec cmd_table[] = {
       "Create a new virtual block device",
       "<Domain> <BackDev> <FrontDev> <Mode> [BackDomain]",
     },
+    { "block-list",
+      &main_blocklist,
+      "List virtual block devices for a domain",
+      "<Domain(s)>",
+    },
 };
 
 int cmdtable_len = sizeof(cmd_table)/sizeof(struct cmd_spec);
