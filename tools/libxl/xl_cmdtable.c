@@ -219,6 +219,11 @@ struct cmd_spec cmd_table[] = {
       "Destroy a domain's virtual block device",
       "<Domain> <DevId>",
     },
+    { "uptime",
+      &main_uptime,
+      "Print uptime for all/some domains",
+      "[-s] [Domain]",
+    },
 };
 
 int cmdtable_len = sizeof(cmd_table)/sizeof(struct cmd_spec);

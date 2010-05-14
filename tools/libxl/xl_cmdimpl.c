@@ -3510,3 +3510,160 @@ int main_blockdetach(int argc, char **argv)
     }
     exit(0);
 }
+
+static char *uptime_to_string(unsigned long time, int short_mode)
+{
+    int sec, min, hour, day;
+    char *time_string;
+
+    day = (int)(time / 86400);
+    time -= (day * 86400);
+    hour = (int)(time / 3600);
+    time -= (hour * 3600);
+    min = (int)(time / 60);
+    time -= (min * 60);
+    sec = time;
+
+    if (short_mode)
+        if (day > 1)
+            asprintf(&time_string, "%d days, %2d:%02d", day, hour, min);
+        else if (day == 1)
+            asprintf(&time_string, "%d day, %2d:%02d", day, hour, min);
+        else
+            asprintf(&time_string, "%2d:%02d", hour, min);
+    else
+        if (day > 1)
+            asprintf(&time_string, "%d days, %2d:%02d:%02d", day, hour, min, sec);
+        else if (day == 1)
+            asprintf(&time_string, "%d day, %2d:%02d:%02d", day, hour, min, sec);
+        else
+            asprintf(&time_string, "%2d:%02d:%02d", hour, min, sec);
+
+    return time_string;
+}
+
+static char *current_time_to_string(time_t now)
+{
+    char now_str[100];
+    struct tm *tmp;
+
+    tmp = localtime(&now);
+    if (tmp == NULL) {
+        fprintf(stderr, "Get localtime error");
+        exit(-1);
+    }
+    if (strftime(now_str, sizeof(now_str), "%H:%M:%S", tmp) == 0) {
+        fprintf(stderr, "strftime returned 0");
+        exit(-1);
+    }
+    return strdup(now_str);
+}
+
+static void print_dom0_uptime(int short_mode, time_t now)
+{
+    int fd;
+    char buf[512];
+    uint32_t uptime = 0;
+
+    fd = open("/proc/uptime", 'r');
+    if (fd == -1)
+        goto err;
+
+    if (read(fd, buf, sizeof(buf)) == -1) {
+        close(fd);
+        goto err;
+    }
+    close(fd);
+
+    strtok(buf, " ");
+    uptime = strtoul(buf, NULL, 10);
+
+    if (short_mode)
+        printf(" %s up %s, %s (%d)\n", current_time_to_string(now),
+               uptime_to_string(uptime, 1), libxl_domid_to_name(&ctx, 0), 0);
+    else
+        printf("%-33s %4d %s\n", libxl_domid_to_name(&ctx, 0),
+               0, uptime_to_string(uptime, 0));
+
+    return;
+err:
+    fprintf(stderr, "Can not get Dom0 uptime.\n");
+    exit(-1);
+}
+
+static void print_domU_uptime(uint32_t domuid, int short_mode, time_t now)
+{
+    uint32_t s_time = 0;
+    uint32_t uptime = 0;
+
+    s_time = libxl_vm_get_start_time(&ctx, domuid);
+    if (s_time == -1)
+        return;
+    uptime = now - s_time;
+    if (short_mode)
+        printf(" %s up %s, %s (%d)\n", current_time_to_string(now),
+               uptime_to_string(uptime, 1),
+               libxl_domid_to_name(&ctx, domuid),
+               domuid);
+    else
+        printf("%-33s %4d %s\n", libxl_domid_to_name(&ctx, domuid),
+               domuid, uptime_to_string(uptime, 0));
+}
+
+static void print_uptime(int short_mode, uint32_t doms[], int nb_doms)
+{
+    struct libxl_vminfo *info;
+    time_t now;
+    int nb_vm, i;
+
+    now = time(NULL);
+
+    if (!short_mode)
+        printf("%-33s %4s %s\n", "Name", "ID", "Uptime");
+
+    if (nb_doms == 0) {
+        print_dom0_uptime(short_mode, now);
+        info = libxl_list_vm(&ctx, &nb_vm);
+        for (i = 0; i < nb_vm; i++)
+            print_domU_uptime(info[i].domid, short_mode, now);
+    } else {
+        for (i = 0; i < nb_doms; i++) {
+            if (doms[i] == 0)
+                print_dom0_uptime(short_mode, now);
+            else
+                print_domU_uptime(doms[i], short_mode, now);
+        }
+    }
+}
+
+int main_uptime(int argc, char **argv)
+{
+    char *dom = NULL;
+    int short_mode = 0;
+    uint32_t domains[100];
+    int nb_doms = 0;
+    int opt;
+
+    while ((opt = getopt(argc, argv, "hs")) != -1) {
+        switch (opt) {
+        case 's':
+            short_mode = 1;
+            break;
+        case 'h':
+            help("uptime");
+            exit(0);
+        default:
+            fprintf(stderr, "option `%c' not supported.\n", opt);
+            break;
+        }
+    }
+
+    for (;(dom = argv[optind]) != NULL; nb_doms++,optind++) {
+        find_domain(dom);
+        domains[nb_doms] = domid;
+    }
+
+    print_uptime(short_mode, domains, nb_doms);
+
+    exit(0);
+}

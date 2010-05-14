@@ -2807,3 +2807,21 @@ int libxl_send_sysrq(struct libxl_ctx *ctx, uint32_t domid, char sysrq)
     return 0;
 }
 
+uint32_t libxl_vm_get_start_time(struct libxl_ctx *ctx, uint32_t domid)
+{
+    char *dompath = libxl_xs_get_dompath(ctx, domid);
+    char *vm_path, *start_time;
+
+    vm_path = libxl_xs_read(
+        ctx, XBT_NULL, libxl_sprintf(ctx, "%s/vm", dompath));
+    start_time = libxl_xs_read(
+        ctx, XBT_NULL, libxl_sprintf(ctx, "%s/start_time", vm_path));
+    if (start_time == NULL) {
+        XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, -1,
+                        "Can't get start time of domain '%d'", domid);
+        return -1;
+    }
+
+    return strtoul(start_time, NULL, 10);
+}
+
