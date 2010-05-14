@@ -160,7 +160,7 @@ static int __init cpu_stopmachine_init(void)
     unsigned int cpu;
     for_each_possible_cpu ( cpu )
         tasklet_init(&per_cpu(stopmachine_tasklet, cpu),
-                     stopmachine_action, 0);
+                     stopmachine_action, cpu);
     return 0;
 }
 __initcall(cpu_stopmachine_init);
