@@ -89,6 +89,8 @@ SECTIONS
   } :text
   .initcall.init : {
        __initcall_start = .;
+       *(.initcallpresmp.init)
+       __presmp_initcall_end = .;
        *(.initcall1.init)
        __initcall_end = .;
   } :text

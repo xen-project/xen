@@ -147,6 +147,22 @@ void add_taint(unsigned flag)
     tainted |= flag;
 }
 
+extern initcall_t __initcall_start, __presmp_initcall_end, __initcall_end;
+
+void __init do_presmp_initcalls(void)
+{
+    initcall_t *call;
+    for ( call = &__initcall_start; call < &__presmp_initcall_end; call++ )
+        (*call)();
+}
+
+void __init do_initcalls(void)
+{
+    initcall_t *call;
+    for ( call = &__presmp_initcall_end; call < &__initcall_end; call++ )
+        (*call)();
+}
+
 # define DO(fn) long do_##fn
 
 #endif

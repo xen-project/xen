@@ -33,6 +33,7 @@
 #include <xen/guest_access.h>
 #include <xen/event.h>
 #include <xen/paging.h>
+#include <xen/cpu.h>
 #include <asm/shadow.h>
 #include <asm/hap.h>
 #include <asm/current.h>
@@ -70,6 +71,28 @@ struct hvm_function_table hvm_funcs __read_mostly;
 unsigned long __attribute__ ((__section__ (".bss.page_aligned")))
     hvm_io_bitmap[3*PAGE_SIZE/BYTES_PER_LONG];
 
+static int cpu_callback(
+    struct notifier_block *nfb, unsigned long action, void *hcpu)
+{
+    unsigned int cpu = (unsigned long)hcpu;
+    int rc = 0;
+
+    switch ( action )
+    {
+    case CPU_UP_PREPARE:
+        rc = hvm_funcs.cpu_prepare(cpu);
+        break;
+    default:
+        break;
+    }
+
+    return !rc ? NOTIFY_DONE : notifier_from_errno(rc);
+}
+
+static struct notifier_block cpu_nfb = {
+    .notifier_call = cpu_callback
+};
+
 void hvm_enable(struct hvm_function_table *fns)
 {
     extern int hvm_port80_allowed;
@@ -91,6 +114,8 @@ void hvm_enable(struct hvm_function_table *fns)
 
     if ( hvm_funcs.hap_supported )
         printk("HVM: Hardware Assisted Paging detected.\n");
+
+    register_cpu_notifier(&cpu_nfb);
 }
 
 /*

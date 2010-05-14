@@ -16,9 +16,10 @@
 #include <xen/sched.h>
 #include <xen/softirq.h>
 #include <xen/tasklet.h>
+#include <xen/cpu.h>
 
 /* Some subsystems call into us before we are initialised. We ignore them. */
-static bool_t tasklets_initialised;
+static cpumask_t tasklets_initialised;
 
 DEFINE_PER_CPU(unsigned long, tasklet_work_to_do);
 
@@ -43,7 +44,7 @@ void tasklet_schedule_on_cpu(struct tasklet *t, unsigned int cpu)
 
     spin_lock_irqsave(&tasklet_lock, flags);
 
-    if ( tasklets_initialised && !t->is_dead )
+    if ( cpu_isset(cpu, tasklets_initialised) && !t->is_dead )
     {
         t->scheduled_on = cpu;
         if ( !t->is_running )
@@ -135,7 +136,7 @@ void tasklet_kill(struct tasklet *t)
     spin_unlock_irqrestore(&tasklet_lock, flags);
 }
 
-void migrate_tasklets_from_cpu(unsigned int cpu)
+static void migrate_tasklets_from_cpu(unsigned int cpu)
 {
     struct list_head *list = &per_cpu(tasklet_list, cpu);
     unsigned long flags;
@@ -165,14 +166,36 @@ void tasklet_init(
     t->data = data;
 }
 
+static int cpu_callback(
+    struct notifier_block *nfb, unsigned long action, void *hcpu)
+{
+    unsigned int cpu = (unsigned long)hcpu;
+
+    switch ( action )
+    {
+    case CPU_UP_PREPARE:
+        if ( !cpu_test_and_set(cpu, tasklets_initialised) )
+            INIT_LIST_HEAD(&per_cpu(tasklet_list, cpu));
+        break;
+    case CPU_DEAD:
+        migrate_tasklets_from_cpu(cpu);
+        break;
+    default:
+        break;
+    }
+
+    return NOTIFY_DONE;
+}
+
+static struct notifier_block cpu_nfb = {
+    .notifier_call = cpu_callback
+};
+
 void __init tasklet_subsys_init(void)
 {
-    unsigned int cpu;
-
-    for_each_possible_cpu ( cpu )
-        INIT_LIST_HEAD(&per_cpu(tasklet_list, cpu));
-
-    tasklets_initialised = 1;
+    void *hcpu = (void *)(long)smp_processor_id();
+    cpu_callback(&cpu_nfb, CPU_UP_PREPARE, hcpu);
+    register_cpu_notifier(&cpu_nfb);
 }
 
 /*

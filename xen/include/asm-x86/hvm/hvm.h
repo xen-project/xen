@@ -295,12 +295,6 @@ uint8_t hvm_combine_hw_exceptions(uint8_t vec1, uint8_t vec2);
 
 void hvm_set_rdtsc_exiting(struct domain *d, bool_t enable);
 
-static inline int
-hvm_cpu_prepare(unsigned int cpu)
-{
-    return (hvm_funcs.cpu_prepare ? hvm_funcs.cpu_prepare(cpu) : 0);
-}
-
 static inline int hvm_cpu_up(void)
 {
     return (hvm_funcs.cpu_up ? hvm_funcs.cpu_up() : 1);

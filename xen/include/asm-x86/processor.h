@@ -551,8 +551,6 @@ extern void mtrr_bp_init(void);
 
 void mcheck_init(struct cpuinfo_x86 *c);
 asmlinkage void do_machine_check(struct cpu_user_regs *regs);
-void cpu_mcheck_distribute_cmci(void);
-void cpu_mcheck_disable(void);
 
 int cpuid_hypervisor_leaves( uint32_t idx, uint32_t sub_idx,
           uint32_t *eax, uint32_t *ebx, uint32_t *ecx, uint32_t *edx);

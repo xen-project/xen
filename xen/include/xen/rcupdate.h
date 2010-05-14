@@ -190,7 +190,6 @@ typedef struct _rcu_read_lock rcu_read_lock_t;
 #define rcu_assign_pointer(p, v) ({ smp_wmb(); (p) = (v); })
 
 void rcu_init(void);
-void __devinit rcu_online_cpu(int cpu);
 void rcu_check_callbacks(int cpu);
 
 /* Exported interfaces */

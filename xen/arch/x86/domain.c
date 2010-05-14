@@ -32,6 +32,7 @@
 #include <xen/acpi.h>
 #include <xen/pci.h>
 #include <xen/paging.h>
+#include <xen/cpu.h>
 #include <public/sysctl.h>
 #include <asm/regs.h>
 #include <asm/mc146818rtc.h>

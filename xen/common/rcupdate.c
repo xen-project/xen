@@ -43,6 +43,7 @@
 #include <xen/bitops.h>
 #include <xen/percpu.h>
 #include <xen/softirq.h>
+#include <xen/cpu.h>
 
 /* Definition for rcupdate control block. */
 struct rcu_ctrlblk rcu_ctrlblk = {
@@ -334,15 +335,33 @@ static void rcu_init_percpu_data(int cpu, struct rcu_ctrlblk *rcp,
     rdp->blimit = blimit;
 }
 
-void __devinit rcu_online_cpu(int cpu)
+static int cpu_callback(
+    struct notifier_block *nfb, unsigned long action, void *hcpu)
 {
-    struct rcu_data *rdp = &per_cpu(rcu_data, cpu);
+    unsigned int cpu = (unsigned long)hcpu;
 
-    rcu_init_percpu_data(cpu, &rcu_ctrlblk, rdp);
+    switch ( action )
+    {
+    case CPU_UP_PREPARE: {
+        struct rcu_data *rdp = &per_cpu(rcu_data, cpu);
+        rcu_init_percpu_data(cpu, &rcu_ctrlblk, rdp);
+        break;
+    }
+    default:
+        break;
+    }
+
+    return NOTIFY_DONE;
 }
+
+static struct notifier_block cpu_nfb = {
+    .notifier_call = cpu_callback
+};
 
 void __init rcu_init(void)
 {
-    rcu_online_cpu(smp_processor_id());
+    void *cpu = (void *)(long)smp_processor_id();
+    cpu_callback(&cpu_nfb, CPU_ONLINE, cpu);
+    register_cpu_notifier(&cpu_nfb);
     open_softirq(RCU_SOFTIRQ, rcu_process_callbacks);
 }

@@ -18,8 +18,8 @@
     __attribute_used__ __attribute__ ((__section__ (".exit.data")))
 #define __initsetup  \
     __attribute_used__ __attribute__ ((__section__ (".init.setup")))
-#define __init_call  \
-    __attribute_used__ __attribute__ ((__section__ (".initcall1.init")))
+#define __init_call(lvl)  \
+    __attribute_used__ __attribute__ ((__section__ (".initcall" lvl ".init")))
 #define __exit_call  \
     __attribute_used__ __attribute__ ((__section__ (".exitcall.exit")))
 
@@ -66,12 +66,15 @@
 typedef int (*initcall_t)(void);
 typedef void (*exitcall_t)(void);
 
-extern initcall_t __initcall_start, __initcall_end;
-
+#define presmp_initcall(fn) \
+    static initcall_t __initcall_##fn __init_call("presmp") = fn
 #define __initcall(fn) \
-    static initcall_t __initcall_##fn __init_call = fn
+    static initcall_t __initcall_##fn __init_call("1") = fn
 #define __exitcall(fn) \
     static exitcall_t __exitcall_##fn __exit_call = fn
+
+void do_presmp_initcalls(void);
+void do_initcalls(void);
 
 /*
  * Used for kernel command line parameter setup

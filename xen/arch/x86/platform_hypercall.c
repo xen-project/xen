@@ -19,6 +19,7 @@
 #include <xen/iocap.h>
 #include <xen/guest_access.h>
 #include <xen/acpi.h>
+#include <xen/cpu.h>
 #include <asm/current.h>
 #include <public/platform.h>
 #include <acpi/cpufreq/processor_perf.h>

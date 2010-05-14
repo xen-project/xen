@@ -44,6 +44,7 @@
 #include <xen/console.h>
 #include <xen/errno.h>
 #include <xen/delay.h>
+#include <xen/init.h>
 #include <asm/byteorder.h>
 
 /* Printk isn't particularly safe just after we've trapped to the
@@ -639,23 +640,25 @@ __trap_to_gdb(struct cpu_user_regs *regs, unsigned long cookie)
     return rc;
 }
 
-void __init
-initialise_gdb(void)
+static int __init initialise_gdb(void)
 {
     if ( *opt_gdb == '\0' )
-        return;
+        return 0;
 
     gdb_ctx->serhnd = serial_parse_handle(opt_gdb);
     if ( gdb_ctx->serhnd == -1 )
     {
         printk("Bad gdb= option '%s'\n", opt_gdb);
-        return;
+        return 0;
     }
 
     serial_start_sync(gdb_ctx->serhnd);
 
     printk("GDB stub initialised.\n");
+
+    return 0;
 }
+presmp_initcall(initialise_gdb);
 
 static void gdb_pause_this_cpu(void *unused)
 {

@@ -89,13 +89,6 @@ xen_count_pages(u64 start, u64 end, void *arg)
     return 0;
 }
 
-static void __init do_initcalls(void)
-{
-    initcall_t *call;
-    for ( call = &__initcall_start; call < &__initcall_end; call++ )
-        (*call)();
-}
-
 /*
  * IPF loader only supports one command line currently, for
  * both xen and guest kernel. This function provides pre-parse
@@ -612,15 +605,15 @@ skip_move:
     /*  Enable IRQ to receive IPI (needed for ITC sync).  */
     local_irq_enable();
 
+    do_presmp_initcalls();
+
 printk("num_online_cpus=%d, max_cpus=%d\n",num_online_cpus(),max_cpus);
     for_each_present_cpu ( i )
     {
         if ( num_online_cpus() >= max_cpus )
             break;
-        if ( !cpu_online(i) ) {
-            rcu_online_cpu(i);
-            __cpu_up(i);
-	}
+        if ( !cpu_online(i) )
+            cpu_up(i);
     }
 
     local_irq_disable();
@@ -628,8 +621,6 @@ printk("num_online_cpus=%d, max_cpus=%d\n",num_online_cpus(),max_cpus);
     printk("Brought up %ld CPUs\n", (long)num_online_cpus());
     smp_cpus_done(max_cpus);
 #endif
-
-    initialise_gdb(); /* could be moved earlier */
 
     iommu_setup();    /* setup iommu if available */
 

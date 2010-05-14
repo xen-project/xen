@@ -65,6 +65,9 @@ static int notifier_call_chain(
     int ret = NOTIFY_DONE;
     struct notifier_block *nb, *next_nb;
 
+    if ( nr_calls )
+        *nr_calls = 0;
+
     nb = rcu_dereference(*nl);
 
     while ( nb && nr_to_call )

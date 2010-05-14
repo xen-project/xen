@@ -6,6 +6,7 @@
 #include <xen/delay.h>
 #include <xen/smp.h>
 #include <xen/mm.h>
+#include <xen/cpu.h>
 #include <asm/processor.h> 
 #include <public/sysctl.h>
 #include <asm/system.h>
@@ -788,7 +789,7 @@ static void __cpu_mcheck_distribute_cmci(void *unused)
     cmci_discover();
 }
 
-void cpu_mcheck_distribute_cmci(void)
+static void cpu_mcheck_distribute_cmci(void)
 {
     if (cmci_support && !mce_disabled)
         on_each_cpu(__cpu_mcheck_distribute_cmci, NULL, 0);
@@ -816,7 +817,7 @@ static void clear_cmci(void)
     }
 }
 
-void cpu_mcheck_disable(void)
+static void cpu_mcheck_disable(void)
 {
     clear_in_cr4(X86_CR4_MCE);
 
@@ -1007,4 +1008,31 @@ int intel_mce_rdmsr(uint32_t msr, uint64_t *val)
     return ret;
 }
 
+static int cpu_callback(
+    struct notifier_block *nfb, unsigned long action, void *hcpu)
+{
+    switch ( action )
+    {
+    case CPU_DYING:
+        cpu_mcheck_disable();
+        break;
+    case CPU_DEAD:
+        cpu_mcheck_distribute_cmci();
+        break;
+    default:
+        break;
+    }
 
+    return NOTIFY_DONE;
+}
+
+static struct notifier_block cpu_nfb = {
+    .notifier_call = cpu_callback
+};
+
+static int __init intel_mce_initcall(void)
+{
+    register_cpu_notifier(&cpu_nfb);
+    return 0;
+}
+presmp_initcall(intel_mce_initcall);

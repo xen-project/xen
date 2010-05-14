@@ -47,6 +47,7 @@
 #include <xen/serial.h>
 #include <xen/numa.h>
 #include <xen/event.h>
+#include <xen/cpu.h>
 #include <asm/current.h>
 #include <asm/mc146818rtc.h>
 #include <asm/desc.h>
@@ -106,7 +107,6 @@ static void map_cpu_to_logical_apicid(void);
 DEFINE_PER_CPU(int, cpu_state) = { 0 };
 
 void *stack_base[NR_CPUS];
-DEFINE_SPINLOCK(cpu_add_remove_lock);
 
 /*
  * The bootstrap kernel entry code has set these up. Save them for
@@ -1272,17 +1272,6 @@ int __cpu_disable(void)
 {
 	int cpu = smp_processor_id();
 
-	/*
-	 * Perhaps use cpufreq to drop frequency, but that could go
-	 * into generic code.
- 	 *
-	 * We won't take down the boot processor on i386 due to some
-	 * interrupts only being able to be serviced by the BSP.
-	 * Especially so if we're not using an IOAPIC	-zwane
-	 */
-	if (cpu == 0)
-		return -EBUSY;
-
 	local_irq_disable();
 	clear_local_APIC();
 	/* Allow any queued timer interrupts to get serviced */
@@ -1291,8 +1280,6 @@ int __cpu_disable(void)
 	local_irq_disable();
 
 	time_suspend();
-
-	cpu_mcheck_disable();
 
 	remove_siblinginfo(cpu);
 
@@ -1313,10 +1300,8 @@ void __cpu_die(unsigned int cpu)
 
 	for (;;) {
 		/* They ack this in play_dead by setting CPU_DEAD */
-		if (per_cpu(cpu_state, cpu) == CPU_DEAD) {
-			printk ("CPU %u is now offline\n", cpu);
+		if (per_cpu(cpu_state, cpu) == CPU_DEAD)
 			return;
-		}
 		mdelay(100);
 		mb();
 		process_pending_softirqs();
@@ -1327,7 +1312,19 @@ void __cpu_die(unsigned int cpu)
 
 static int take_cpu_down(void *unused)
 {
-	return __cpu_disable();
+	void *hcpu = (void *)(long)smp_processor_id();
+	int rc;
+
+	spin_lock(&cpu_add_remove_lock);
+
+	if (cpu_notifier_call_chain(CPU_DYING, hcpu) != NOTIFY_DONE)
+		BUG();
+
+	rc = __cpu_disable();
+
+	spin_unlock(&cpu_add_remove_lock);
+
+	return rc;
 }
 
 /*
@@ -1339,7 +1336,8 @@ static cpumask_t cpu_offlining;
 
 int cpu_down(unsigned int cpu)
 {
-	int err = 0;
+	int err, notifier_rc, nr_calls;
+	void *hcpu = (void *)(long)cpu;
 
 	spin_lock(&cpu_add_remove_lock);
 
@@ -1350,32 +1348,42 @@ int cpu_down(unsigned int cpu)
 
 	cpu_set(cpu, cpu_offlining);
 
-	err = cpupool_cpu_remove(cpu);
-	if (err)
-		goto out;
-
 	printk("Prepare to bring CPU%d down...\n", cpu);
 
-	cpufreq_del_cpu(cpu);
+	notifier_rc = __cpu_notifier_call_chain(
+		CPU_DOWN_PREPARE, hcpu, -1, &nr_calls);
+	if (notifier_rc != NOTIFY_DONE) {
+		err = notifier_to_errno(notifier_rc);
+		nr_calls--;
+		notifier_rc = __cpu_notifier_call_chain(
+			CPU_DOWN_FAILED, hcpu, nr_calls, NULL);
+		BUG_ON(notifier_rc != NOTIFY_DONE);
+		goto out;
+	}
 
 	spin_unlock(&cpu_add_remove_lock);
 	err = stop_machine_run(take_cpu_down, NULL, cpu);
 	spin_lock(&cpu_add_remove_lock);
 
 	if (err < 0) {
-		cpupool_cpu_add(cpu);
+		notifier_rc = cpu_notifier_call_chain(CPU_DOWN_FAILED, hcpu);
+		BUG_ON(notifier_rc != NOTIFY_DONE);
 		goto out;
 	}
 
 	__cpu_die(cpu);
 	BUG_ON(cpu_online(cpu));
 
-	migrate_tasklets_from_cpu(cpu);
-	cpu_mcheck_distribute_cmci();
+	notifier_rc = cpu_notifier_call_chain(CPU_DEAD, hcpu);
+	BUG_ON(notifier_rc != NOTIFY_DONE);
 
 out:
-	if (!err)
+	if (!err) {
+		printk("CPU %u is now offline\n", cpu);
 		send_guest_global_virq(dom0, VIRQ_PCPU_STATE);
+	} else {
+		printk("Failed to take down CPU %u (error %d)\n", cpu, err);
+	}
 	cpu_clear(cpu, cpu_offlining);
 	spin_unlock(&cpu_add_remove_lock);
 	return err;
@@ -1391,8 +1399,6 @@ int cpu_up(unsigned int cpu)
 		err = -EINVAL;
 		goto out;
 	}
-
-	rcu_online_cpu(cpu);
 
 	err = __cpu_up(cpu);
 	if (err < 0)
@@ -1525,11 +1531,16 @@ int cpu_add(uint32_t apic_id, uint32_t acpi_id, uint32_t pxm)
 
 int __devinit __cpu_up(unsigned int cpu)
 {
-	int ret;
+	int notifier_rc, ret = 0, nr_calls;
+	void *hcpu = (void *)(long)cpu;
 
-	ret = hvm_cpu_prepare(cpu);
-	if (ret)
-		return ret;
+	notifier_rc = __cpu_notifier_call_chain(
+		CPU_UP_PREPARE, hcpu, -1, &nr_calls);
+	if (notifier_rc != NOTIFY_DONE) {
+		ret = notifier_to_errno(notifier_rc);
+		nr_calls--;
+		goto fail;
+	}
 
 	/*
 	 * We do warm boot only on cpus that had booted earlier
@@ -1542,18 +1553,18 @@ int __devinit __cpu_up(unsigned int cpu)
 		smpboot_restore_warm_reset_vector();
 	}
 
-	if (ret)
-		return -EIO;
+	if (ret) {
+		ret = -EIO;
+		goto fail;
+	}
 
 	/* In case one didn't come up */
 	if (!cpu_isset(cpu, cpu_callin_map)) {
 		printk(KERN_DEBUG "skipping cpu%d, didn't come online\n", cpu);
-		local_irq_enable();
-		return -EIO;
+		ret = -EIO;
+		goto fail;
 	}
 
-	local_irq_enable();
-	/*per_cpu(cpu_state, cpu) = CPU_UP_PREPARE;*/
 	/* Unleash the CPU! */
 	cpu_set(cpu, smp_commenced_mask);
 	while (!cpu_isset(cpu, cpu_online_map)) {
@@ -1561,9 +1572,15 @@ int __devinit __cpu_up(unsigned int cpu)
 		process_pending_softirqs();
 	}
 
-	cpupool_cpu_add(cpu);
-	cpufreq_add_cpu(cpu);
+	notifier_rc = cpu_notifier_call_chain(CPU_ONLINE, hcpu);
+	BUG_ON(notifier_rc != NOTIFY_DONE);
 	return 0;
+
+ fail:
+	notifier_rc = __cpu_notifier_call_chain(
+		CPU_UP_CANCELED, hcpu, nr_calls, NULL);
+	BUG_ON(notifier_rc != NOTIFY_DONE);
+	return ret;
 }
 
 

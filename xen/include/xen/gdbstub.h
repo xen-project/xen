@@ -88,12 +88,6 @@ void gdb_arch_exit(struct cpu_user_regs *regs);
 #define SIGALRM         14
 #define SIGTERM         15
 
-void initialise_gdb(void);
-
-#else
-
-#define initialise_gdb() ((void)0)
-
 #endif
 
 #endif /* __XEN_GDBSTUB_H__ */

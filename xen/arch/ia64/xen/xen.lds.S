@@ -139,6 +139,8 @@ SECTIONS
   .initcall.init : AT(ADDR(.initcall.init) - LOAD_OFFSET)
 	{
 	  __initcall_start = .;
+	  *(.initcallpresmp.init)
+	  __presmp_initcall_end = .;
 	  *(.initcall1.init)
 	  *(.initcall2.init)
 	  *(.initcall3.init)

@@ -53,10 +53,7 @@ extern u32 cpu_2_logical_apicid[];
 #define cpu_physical_id(cpu)	x86_cpu_to_apicid[cpu]
 
 /* State of each CPU. */
-#define CPU_ONLINE	0x0002	/* CPU is up */
-#define CPU_DEAD	0x0004	/* CPU is dead */
 DECLARE_PER_CPU(int, cpu_state);
-extern spinlock_t(cpu_add_remove_lock);
 
 #define cpu_is_offline(cpu) unlikely(!cpu_online(cpu))
 extern int cpu_down(unsigned int cpu);

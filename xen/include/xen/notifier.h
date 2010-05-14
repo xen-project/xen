@@ -52,38 +52,21 @@ int __raw_notifier_call_chain(
     struct raw_notifier_head *nh, unsigned long val, void *v,
     int nr_to_call, int *nr_calls);
 
-#define NOTIFY_DONE  0x0000  /* Don't care */
-#define NOTIFY_OK  0x0001  /* Suits me */
-#define NOTIFY_STOP_MASK 0x8000  /* Don't call further */
-#define NOTIFY_BAD  (NOTIFY_STOP_MASK|0x0002)
-/* Bad/Veto action */
-/*
- * Clean way to return from the notifier and stop further calls.
- */
-#define NOTIFY_STOP  (NOTIFY_OK|NOTIFY_STOP_MASK)
+#define NOTIFY_DONE      0x0000
+#define NOTIFY_STOP_MASK 0x8000
+#define NOTIFY_STOP      (NOTIFY_STOP_MASK|NOTIFY_DONE)
+#define NOTIFY_BAD       (NOTIFY_STOP_MASK|EINVAL)
 
-/* Encapsulate (negative) errno value (in particular, NOTIFY_BAD <=> EPERM). */
+/* Encapsulate (negative) errno value. */
 static inline int notifier_from_errno(int err)
 {
-    return NOTIFY_STOP_MASK | (NOTIFY_OK - err);
+    return NOTIFY_STOP_MASK | -err;
 }
 
 /* Restore (negative) errno value from notify return value. */
 static inline int notifier_to_errno(int ret)
 {
-    ret &= ~NOTIFY_STOP_MASK;
-    return ret > NOTIFY_OK ? NOTIFY_OK - ret : 0;
+    return -(ret & ~NOTIFY_STOP_MASK);
 }
-
-#define CPU_ONLINE  0x0002 /* CPU (unsigned)v is up */
-#define CPU_UP_PREPARE  0x0003 /* CPU (unsigned)v coming up */
-#define CPU_UP_CANCELED  0x0004 /* CPU (unsigned)v NOT coming up */
-#define CPU_DOWN_PREPARE 0x0005 /* CPU (unsigned)v going down */
-#define CPU_DOWN_FAILED  0x0006 /* CPU (unsigned)v NOT going down */
-#define CPU_DEAD  0x0007 /* CPU (unsigned)v dead */
-#define CPU_DYING  0x0008 /* CPU (unsigned)v not running any task,
-                           * not handling interrupts, soon dead */
-#define CPU_POST_DEAD  0x0009 /* CPU (unsigned)v dead, cpu_hotplug
-                               * lock is dropped */
 
 #endif /* __XEN_NOTIFIER_H__ */

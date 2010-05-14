@@ -35,7 +35,6 @@ void tasklet_schedule_on_cpu(struct tasklet *t, unsigned int cpu);
 void tasklet_schedule(struct tasklet *t);
 void do_tasklet(void);
 void tasklet_kill(struct tasklet *t);
-void migrate_tasklets_from_cpu(unsigned int cpu);
 void tasklet_init(
     struct tasklet *t, void (*func)(unsigned long), unsigned long data);
 void tasklet_subsys_init(void);

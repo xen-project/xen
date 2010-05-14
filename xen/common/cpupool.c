@@ -17,6 +17,7 @@
 #include <xen/percpu.h>
 #include <xen/sched.h>
 #include <xen/sched-if.h>
+#include <xen/cpu.h>
 
 #define for_each_cpupool(ptr)    \
     for ((ptr) = &cpupool_list; *(ptr) != NULL; (ptr) = &((*(ptr))->next))
@@ -178,10 +179,8 @@ static int cpupool_assign_cpu_locked(struct cpupool *c, unsigned int cpu)
  */
 int cpupool_assign_ncpu(struct cpupool *c, int ncpu)
 {
-    int i;
-    int n;
+    int i, n = 0;
 
-    n = 0;
     spin_lock(&cpupool_lock);
     for_each_cpu_mask(i, cpupool_free_cpus)
     {
@@ -294,21 +293,6 @@ out:
 }
 
 /*
- * assign cpus to the default cpupool
- * default are all cpus, less cpus may be specified as boot parameter
- * possible failures:
- * - no cpu assigned
- */
-int __init cpupool0_cpu_assign(struct cpupool *c)
-{
-    if ( (cpupool0_max_cpus == 0) || (cpupool0_max_cpus > num_online_cpus()) )
-        cpupool0_max_cpus = num_online_cpus();
-    if ( !cpupool_assign_ncpu(cpupool0, cpupool0_max_cpus) )
-        return 1;
-    return 0;
-}
-
-/*
  * add a new domain to a cpupool
  * possible failures:
  * - pool does not exist
@@ -363,16 +347,14 @@ void cpupool_rm_domain(struct domain *d)
  * called to add a new cpu to pool admin
  * we add a hotplugged cpu to the cpupool0 to be able to add it to dom0
  */
-void cpupool_cpu_add(unsigned int cpu)
+static void cpupool_cpu_add(unsigned int cpu)
 {
-    if ( cpupool0 == NULL )
-        return;
     spin_lock(&cpupool_lock);
     cpu_clear(cpu, cpupool_locked_cpus);
     cpu_set(cpu, cpupool_free_cpus);
-    cpupool_assign_cpu_locked(cpupool0, cpu);
+    if ( cpupool0 != NULL )
+        cpupool_assign_cpu_locked(cpupool0, cpu);
     spin_unlock(&cpupool_lock);
-    return;
 }
 
 /*
@@ -380,7 +362,7 @@ void cpupool_cpu_add(unsigned int cpu)
  * the cpu to be removed is locked to avoid removing it from dom0
  * returns failure if not in pool0
  */
-int cpupool_cpu_remove(unsigned int cpu)
+static int cpupool_cpu_remove(unsigned int cpu)
 {
     int ret = 0;
 	
@@ -588,10 +570,52 @@ void dump_runq(unsigned char key)
     spin_unlock(&cpupool_lock);
 }
 
+static int cpu_callback(
+    struct notifier_block *nfb, unsigned long action, void *hcpu)
+{
+    unsigned int cpu = (unsigned long)hcpu;
+    int rc = 0;
+
+    switch ( action )
+    {
+    case CPU_DOWN_FAILED:
+    case CPU_ONLINE:
+        cpupool_cpu_add(cpu);
+        break;
+    case CPU_DOWN_PREPARE:
+        rc = cpupool_cpu_remove(cpu);
+        break;
+    default:
+        break;
+    }
+
+    return !rc ? NOTIFY_DONE : notifier_from_errno(rc);
+}
+
+static struct notifier_block cpu_nfb = {
+    .notifier_call = cpu_callback
+};
+
+static int __init cpupool_presmp_init(void)
+{
+    void *cpu = (void *)(long)smp_processor_id();
+    cpu_callback(&cpu_nfb, CPU_ONLINE, cpu);
+    register_cpu_notifier(&cpu_nfb);
+    return 0;
+}
+presmp_initcall(cpupool_presmp_init);
+
 static int __init cpupool_init(void)
 {
-    cpupool_free_cpus = cpu_online_map;
-    cpupool_list = NULL;
+    cpupool0 = cpupool_create(0, NULL);
+    BUG_ON(cpupool0 == NULL);
+
+    if ( (cpupool0_max_cpus == 0) || (cpupool0_max_cpus > num_online_cpus()) )
+        cpupool0_max_cpus = num_online_cpus();
+
+    if ( !cpupool_assign_ncpu(cpupool0, cpupool0_max_cpus) )
+        BUG();
+
     return 0;
 }
 __initcall(cpupool_init);

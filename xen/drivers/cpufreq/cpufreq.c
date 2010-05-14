@@ -38,6 +38,7 @@
 #include <xen/xmalloc.h>
 #include <xen/guest_access.h>
 #include <xen/domain.h>
+#include <xen/cpu.h>
 #include <asm/bug.h>
 #include <asm/io.h>
 #include <asm/config.h>
@@ -582,3 +583,38 @@ void __init cpufreq_cmdline_parse(char *str)
         str = end;
     } while (str);
 }
+
+static int cpu_callback(
+    struct notifier_block *nfb, unsigned long action, void *hcpu)
+{
+    unsigned int cpu = (unsigned long)hcpu;
+
+    switch ( action )
+    {
+    case CPU_DOWN_FAILED:
+    case CPU_ONLINE:
+        (void)cpufreq_add_cpu(cpu);
+        break;
+    case CPU_DOWN_PREPARE:
+        (void)cpufreq_del_cpu(cpu);
+        break;
+    default:
+        break;
+    }
+
+    return NOTIFY_DONE;
+}
+
+static struct notifier_block cpu_nfb = {
+    .notifier_call = cpu_callback
+};
+
+static int __init cpufreq_presmp_init(void)
+{
+    void *cpu = (void *)(long)smp_processor_id();
+    cpu_callback(&cpu_nfb, CPU_ONLINE, cpu);
+    register_cpu_notifier(&cpu_nfb);
+    return 0;
+}
+presmp_initcall(cpufreq_presmp_init);
+

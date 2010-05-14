@@ -156,13 +156,6 @@ static void __init parse_acpi_param(char *s)
     }
 }
 
-static void __init do_initcalls(void)
-{
-    initcall_t *call;
-    for ( call = &__initcall_start; call < &__initcall_end; call++ )
-        (*call)();
-}
-
 #define EARLY_FAIL(f, a...) do {                \
     printk( f , ## a );                         \
     for ( ; ; ) halt();                         \
@@ -1070,15 +1063,14 @@ void __init __start_xen(unsigned long mbi_p)
 
     console_init_postirq();
 
+    do_presmp_initcalls();
+
     for_each_present_cpu ( i )
     {
         if ( num_online_cpus() >= max_cpus )
             break;
         if ( !cpu_online(i) )
-        {
-            rcu_online_cpu(i);
-            __cpu_up(i);
-        }
+            cpu_up(i);
 
         /* Set up cpu_to_node[]. */
         srat_detect_node(i);
@@ -1089,8 +1081,6 @@ void __init __start_xen(unsigned long mbi_p)
     printk("Brought up %ld CPUs\n", (long)num_online_cpus());
     smp_cpus_done(max_cpus);
 
-    initialise_gdb(); /* could be moved earlier */
-
     do_initcalls();
 
     if ( opt_watchdog ) 
@@ -1098,11 +1088,6 @@ void __init __start_xen(unsigned long mbi_p)
     
     if ( !tboot_protect_mem_regions() )
         panic("Could not protect TXT memory regions\n");
-
-    /* Create initial cpupool 0. */
-    cpupool0 = cpupool_create(0, NULL);
-    if ( (cpupool0 == NULL) || cpupool0_cpu_assign(cpupool0) )
-        panic("Error creating cpupool 0\n");
 
     /* Create initial domain 0. */
     dom0 = domain_create(0, DOMCRF_s3_integrity, DOM0_SSIDREF);
