@@ -409,12 +409,7 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
 
         g_info = &op->u.pcpu_info;
 
-        /* spin_trylock() avoids deadlock with stop_machine_run(). */
-        if ( !spin_trylock(&cpu_add_remove_lock) )
-        {
-            ret = -EBUSY;
-            break;
-        }
+        spin_lock(&cpu_add_remove_lock);
 
         if ( (g_info->xen_cpuid >= NR_CPUS) ||
              (g_info->xen_cpuid < 0) ||

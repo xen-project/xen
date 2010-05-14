@@ -1330,24 +1330,25 @@ static int take_cpu_down(void *unused)
 	return __cpu_disable();
 }
 
+/*
+ * Protects against concurrent offline/online requests for a single CPU.
+ * We need this extra protection because cpu_down() cannot continuously hold
+ * the cpu_add_remove_lock, as it cannot be held across stop_machine_run().
+ */
+static cpumask_t cpu_offlining;
+
 int cpu_down(unsigned int cpu)
 {
 	int err = 0;
 
-	/* spin_trylock() avoids deadlock with stop_machine_run(). */
-	if (!spin_trylock(&cpu_add_remove_lock))
-		return -EBUSY;
+	spin_lock(&cpu_add_remove_lock);
 
-	/* Can not offline BSP */
-	if (cpu == 0) {
-		err = -EINVAL;
-		goto out;
+	if ((cpu == 0) || !cpu_online(cpu) || cpu_isset(cpu, cpu_offlining)) {
+		spin_unlock(&cpu_add_remove_lock);
+		return -EINVAL;
 	}
 
-	if (!cpu_online(cpu)) {
-		err = -EINVAL;
-		goto out;
-	}
+	cpu_set(cpu, cpu_offlining);
 
 	err = cpupool_cpu_remove(cpu);
 	if (err)
@@ -1357,14 +1358,16 @@ int cpu_down(unsigned int cpu)
 
 	cpufreq_del_cpu(cpu);
 
+	spin_unlock(&cpu_add_remove_lock);
 	err = stop_machine_run(take_cpu_down, NULL, cpu);
+	spin_lock(&cpu_add_remove_lock);
+
 	if (err < 0) {
 		cpupool_cpu_add(cpu);
 		goto out;
 	}
 
 	__cpu_die(cpu);
-
 	BUG_ON(cpu_online(cpu));
 
 	migrate_tasklets_from_cpu(cpu);
@@ -1373,6 +1376,7 @@ int cpu_down(unsigned int cpu)
 out:
 	if (!err)
 		send_guest_global_virq(dom0, VIRQ_PCPU_STATE);
+	cpu_clear(cpu, cpu_offlining);
 	spin_unlock(&cpu_add_remove_lock);
 	return err;
 }
@@ -1381,13 +1385,10 @@ int cpu_up(unsigned int cpu)
 {
 	int err = 0;
 
-	/* spin_trylock() avoids deadlock with stop_machine_run(). */
-	if (!spin_trylock(&cpu_add_remove_lock))
-	    return -EBUSY;
+	spin_lock(&cpu_add_remove_lock);
 
-	if (cpu_online(cpu)) {
-		printk("Bring up a online cpu. Bogus!\n");
-		err = -EBUSY;
+	if (cpu_online(cpu) || cpu_isset(cpu, cpu_offlining)) {
+		err = -EINVAL;
 		goto out;
 	}
 
@@ -1485,9 +1486,7 @@ int cpu_add(uint32_t apic_id, uint32_t acpi_id, uint32_t pxm)
 	if ( physid_isset(apic_id, phys_cpu_present_map) )
 		return -EEXIST;
 
-	/* spin_trylock() avoids deadlock with stop_machine_run(). */
-	if (!spin_trylock(&cpu_add_remove_lock))
-		return -EBUSY;
+	spin_lock(&cpu_add_remove_lock);
 
 	cpu = mp_register_lapic(apic_id, 1);
 
