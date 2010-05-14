@@ -78,7 +78,7 @@ void do_tasklet(void)
 
     spin_lock_irq(&tasklet_lock);
 
-    if ( unlikely(list_empty(list)) )
+    if ( unlikely(list_empty(list) || cpu_is_offline(cpu)) )
         goto out;
 
     t = list_entry(list->next, struct tasklet, list);

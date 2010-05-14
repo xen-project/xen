@@ -80,7 +80,13 @@ static int cpu_callback(
     switch ( action )
     {
     case CPU_UP_PREPARE:
-        rc = hvm_funcs.cpu_prepare(cpu);
+        rc = hvm_funcs.cpu_up_prepare(cpu);
+        break;
+    case CPU_DYING:
+        hvm_cpu_down();
+        break;
+    case CPU_DEAD:
+        hvm_funcs.cpu_dead(cpu);
         break;
     default:
         break;

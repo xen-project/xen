@@ -1265,9 +1265,9 @@ remove_siblinginfo(int cpu)
 	cpu_clear(cpu, cpu_sibling_setup_map);
 }
 
-extern void fixup_irqs(void);
-int __cpu_disable(void)
+void __cpu_disable(void)
 {
+	extern void fixup_irqs(void);
 	int cpu = smp_processor_id();
 
 	local_irq_disable();
@@ -1287,8 +1287,6 @@ int __cpu_disable(void)
 	fixup_irqs();
 
 	cpu_disable_scheduler(cpu);
-
-	return 0;
 }
 
 void __cpu_die(unsigned int cpu)

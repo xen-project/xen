@@ -38,7 +38,8 @@ static void __do_softirq(unsigned long ignore_mask)
         if ( rcu_pending(cpu) )
             rcu_check_callbacks(cpu);
 
-        if ( (pending = (softirq_pending(cpu) & ~ignore_mask)) == 0 )
+        if ( ((pending = (softirq_pending(cpu) & ~ignore_mask)) == 0)
+             || cpu_is_offline(cpu) )
             break;
 
         i = find_first_set_bit(pending);

@@ -818,13 +818,25 @@ static int svm_do_pmu_interrupt(struct cpu_user_regs *regs)
     return vpmu_do_interrupt(regs);
 }
 
-static int svm_cpu_prepare(unsigned int cpu)
+static void svm_cpu_dead(unsigned int cpu)
+{
+    free_xenheap_page(hsa[cpu]);
+    hsa[cpu] = NULL;
+    free_vmcb(root_vmcb[cpu]);
+    root_vmcb[cpu] = NULL;
+}
+
+static int svm_cpu_up_prepare(unsigned int cpu)
 {
     if ( ((hsa[cpu] == NULL) &&
           ((hsa[cpu] = alloc_host_save_area()) == NULL)) ||
          ((root_vmcb[cpu] == NULL) &&
           ((root_vmcb[cpu] = alloc_vmcb()) == NULL)) )
+    {
+        svm_cpu_dead(cpu);
         return -ENOMEM;
+    }
+
     return 0;
 }
 
@@ -842,7 +854,7 @@ static int svm_cpu_up(struct cpuinfo_x86 *c)
         return 0;
     }
 
-    if ( svm_cpu_prepare(cpu) != 0 )
+    if ( svm_cpu_up_prepare(cpu) != 0 )
         return 0;
 
     write_efer(read_efer() | EFER_SVME);
@@ -1328,7 +1340,8 @@ static void svm_invlpg_intercept(unsigned long vaddr)
 
 static struct hvm_function_table __read_mostly svm_function_table = {
     .name                 = "SVM",
-    .cpu_prepare          = svm_cpu_prepare,
+    .cpu_up_prepare       = svm_cpu_up_prepare,
+    .cpu_dead             = svm_cpu_dead,
     .cpu_down             = svm_cpu_down,
     .domain_initialise    = svm_domain_initialise,
     .domain_destroy       = svm_domain_destroy,

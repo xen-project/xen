@@ -98,15 +98,8 @@ static void default_dead_idle(void)
 
 static void play_dead(void)
 {
-    /*
-     * Flush pending softirqs if any. They can be queued up before this CPU
-     * was taken out of cpu_online_map in __cpu_disable().
-     */
-    do_softirq();
-
     /* This must be done before dead CPU ack */
     cpu_exit_clear();
-    hvm_cpu_down();
     wbinvd();
     mb();
     /* Ack it */

@@ -118,10 +118,7 @@ max_xtp (void)
 #define hard_smp_processor_id()		ia64_get_lid()
 
 /* Upping and downing of CPUs */
-extern int __cpu_disable (void);
-extern void __cpu_die (unsigned int cpu);
 extern void cpu_die (void) __attribute__ ((noreturn));
-extern int __cpu_up (unsigned int cpu);
 extern void __init smp_build_cpu_map(void);
 
 extern void __init init_smp_config (void);

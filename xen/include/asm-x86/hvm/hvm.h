@@ -115,7 +115,9 @@ struct hvm_function_table {
     int  (*event_pending)(struct vcpu *v);
     int  (*do_pmu_interrupt)(struct cpu_user_regs *regs);
 
-    int  (*cpu_prepare)(unsigned int cpu);
+    int  (*cpu_up_prepare)(unsigned int cpu);
+    void (*cpu_dead)(unsigned int cpu);
+
     int  (*cpu_up)(void);
     void (*cpu_down)(void);
 

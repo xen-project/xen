@@ -721,15 +721,9 @@ remove_siblinginfo(int cpu)
 
 extern void fixup_irqs(void);
 /* must be called with cpucontrol mutex held */
-int __cpu_disable(void)
+void __cpu_disable(void)
 {
 	int cpu = smp_processor_id();
-
-	/*
-	 * dont permit boot processor for now
-	 */
-	if (cpu == 0)
-		return -EBUSY;
 
 	remove_siblinginfo(cpu);
 	cpu_clear(cpu, cpu_online_map);
@@ -738,12 +732,11 @@ int __cpu_disable(void)
 #endif
 	local_flush_tlb_all();
 	cpu_clear(cpu, cpu_callin_map);
-	return 0;
 }
 #else /* !CONFIG_HOTPLUG_CPU */
-int __cpu_disable(void)
+void __cpu_disable(void)
 {
-	return -ENOSYS;
+	BUG();
 }
 #endif /* CONFIG_HOTPLUG_CPU */
 

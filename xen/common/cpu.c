@@ -68,7 +68,8 @@ static int take_cpu_down(void *unused)
     void *hcpu = (void *)(long)smp_processor_id();
     if ( raw_notifier_call_chain(&cpu_chain, CPU_DYING, hcpu) != NOTIFY_DONE )
         BUG();
-    return __cpu_disable();
+    __cpu_disable();
+    return 0;
 }
 
 int cpu_down(unsigned int cpu)

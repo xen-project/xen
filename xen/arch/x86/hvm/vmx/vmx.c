@@ -1379,7 +1379,8 @@ static void vmx_set_info_guest(struct vcpu *v)
 
 static struct hvm_function_table __read_mostly vmx_function_table = {
     .name                 = "VMX",
-    .cpu_prepare          = vmx_cpu_prepare,
+    .cpu_up_prepare       = vmx_cpu_up_prepare,
+    .cpu_dead             = vmx_cpu_dead,
     .domain_initialise    = vmx_domain_initialise,
     .domain_destroy       = vmx_domain_destroy,
     .vcpu_initialise      = vmx_vcpu_initialise,

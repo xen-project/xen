@@ -17,8 +17,14 @@ void cpu_hotplug_done(void);
 int register_cpu_notifier(struct notifier_block *nb);
 
 /*
- * Notification actions: note that only CPU_{UP,DOWN}_PREPARE may fail ---
- * all other handlers *must* return NOTIFY_DONE.
+ * Possible event sequences for a given CPU:
+ *  CPU_UP_PREPARE -> CPU_UP_CANCELLED        -- failed CPU up
+ *  CPU_UP_PREPARE -> CPU_ONLINE              -- successful CPU up
+ *  CPU_DOWN_PREPARE -> CPU_DOWN_FAILED       -- failed CPU down
+ *  CPU_DOWN_PREPARE -> CPU_DYING -> CPU_DEAD -- successful CPU down
+ * 
+ * Hence note that only CPU_*_PREPARE handlers are allowed to fail. Also note
+ * that once CPU_DYING is delivered, an offline action can no longer fail.
  */
 #define CPU_UP_PREPARE   0x0002 /* CPU is coming up */
 #define CPU_UP_CANCELED  0x0003 /* CPU is no longer coming up */
@@ -35,5 +41,10 @@ int cpu_up(unsigned int cpu);
 /* Power management. */
 int disable_nonboot_cpus(void);
 void enable_nonboot_cpus(void);
+
+/* Private arch-dependent helpers for CPU hotplug. */
+int __cpu_up(unsigned int cpunum);
+void __cpu_disable(void);
+void __cpu_die(unsigned int cpu);
 
 #endif /* __XEN_CPU_H__ */
