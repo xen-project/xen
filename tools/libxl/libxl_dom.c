@@ -100,22 +100,22 @@ int build_post(struct libxl_ctx *ctx, uint32_t domid,
     xc_cpuid_apply_policy(ctx->xch, domid);
 #endif
 
-    ents = libxl_calloc(ctx, (10 + info->max_vcpus) * 2, sizeof(char *));
+    ents = libxl_calloc(ctx, (12 + info->max_vcpus) * 2, sizeof(char *));
     ents[0] = "memory/static-max";
     ents[1] = libxl_sprintf(ctx, "%d", info->max_memkb);
     ents[2] = "memory/target";
     ents[3] = libxl_sprintf(ctx, "%d", info->target_memkb);
-    ents[2] = "memory/videoram";
-    ents[3] = libxl_sprintf(ctx, "%d", info->video_memkb);
-    ents[4] = "domid";
-    ents[5] = libxl_sprintf(ctx, "%d", domid);
-    ents[6] = "store/port";
-    ents[7] = libxl_sprintf(ctx, "%"PRIu32, state->store_port);
-    ents[8] = "store/ring-ref";
-    ents[9] = libxl_sprintf(ctx, "%lu", state->store_mfn);
+    ents[4] = "memory/videoram";
+    ents[5] = libxl_sprintf(ctx, "%d", info->video_memkb);
+    ents[6] = "domid";
+    ents[7] = libxl_sprintf(ctx, "%d", domid);
+    ents[8] = "store/port";
+    ents[9] = libxl_sprintf(ctx, "%"PRIu32, state->store_port);
+    ents[10] = "store/ring-ref";
+    ents[11] = libxl_sprintf(ctx, "%lu", state->store_mfn);
     for (i = 0; i < info->max_vcpus; i++) {
-        ents[10+(i*2)]   = libxl_sprintf(ctx, "cpu/%d/availability", i);
-        ents[10+(i*2)+1] = (i && info->cur_vcpus && (i >= info->cur_vcpus))
+        ents[12+(i*2)]   = libxl_sprintf(ctx, "cpu/%d/availability", i);
+        ents[12+(i*2)+1] = (i && info->cur_vcpus && (i >= info->cur_vcpus))
                             ? "offline" : "online";
     }
 
