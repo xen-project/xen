@@ -254,6 +254,9 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
  * cmd: MMUEXT_COPY_PAGE
  * mfn: Machine frame number of the destination page.
  * src_mfn: Machine frame number of the source page.
+ *
+ * cmd: MMUEXT_[UN]MARK_SUPER
+ * mfn: Machine frame number of head of superpage to be [un]marked.
  */
 #define MMUEXT_PIN_L1_TABLE      0
 #define MMUEXT_PIN_L2_TABLE      1
@@ -273,13 +276,15 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 #define MMUEXT_CLEAR_PAGE       16
 #define MMUEXT_COPY_PAGE        17
 #define MMUEXT_FLUSH_CACHE_GLOBAL 18
+#define MMUEXT_MARK_SUPER       19
+#define MMUEXT_UNMARK_SUPER     20
 
 #ifndef __ASSEMBLY__
 struct mmuext_op {
     unsigned int cmd;
     union {
         /* [UN]PIN_TABLE, NEW_BASEPTR, NEW_USER_BASEPTR
-         * CLEAR_PAGE, COPY_PAGE */
+         * CLEAR_PAGE, COPY_PAGE, [UN]MARK_SUPER */
         xen_pfn_t     mfn;
         /* INVLPG_LOCAL, INVLPG_ALL, SET_LDT */
         unsigned long linear_addr;
