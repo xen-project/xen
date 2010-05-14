@@ -282,7 +282,7 @@ mctelem_cookie_t mcheck_mca_logout(enum mca_source who, cpu_banks_t bankmask,
 		 * depending on whethere we are called from an exception or
 		 * a poller;  this can fail (for example dom0 may not
 		 * yet have consumed past telemetry). */
-		if (errcnt == 0) {
+		if (errcnt++ == 0) {
 			if ( (mctc = mctelem_reserve(which)) != NULL ) {
 				mci = mctelem_dataptr(mctc);
 				mcinfo_clear(mci);
