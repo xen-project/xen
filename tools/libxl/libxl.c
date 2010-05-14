@@ -2468,7 +2468,6 @@ int libxl_domain_setmaxmem(struct libxl_ctx *ctx, uint32_t domid, uint32_t max_m
     char *mem, *endptr;
     uint32_t memorykb;
     char *dompath = libxl_xs_get_dompath(ctx, domid);
-    int rc;
 
     mem = libxl_xs_read(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/memory/target", dompath));
     if (!mem) {
@@ -2486,20 +2485,16 @@ int libxl_domain_setmaxmem(struct libxl_ctx *ctx, uint32_t domid, uint32_t max_m
         return 1;
     }
 
-    rc = xc_domain_setmaxmem(ctx->xch, domid, max_memkb);
-    if (rc != 0)
-        return rc;
-
     if (domid != 0)
         libxl_xs_write(ctx, XBT_NULL, libxl_sprintf(ctx, "%s/memory/static-max", dompath), "%lu", max_memkb);
 
-    return rc;
+    return 0;
 }
 
-int libxl_set_memory_target(struct libxl_ctx *ctx, uint32_t domid, uint32_t target_memkb)
+int libxl_set_memory_target(struct libxl_ctx *ctx, uint32_t domid, uint32_t target_memkb, int enforce)
 {
     int rc = 0;
-    uint32_t memorykb, videoram;
+    uint32_t memorykb = 0, videoram = 0;
     char *memmax, *endptr, *videoram_s = NULL;
     char *dompath = libxl_xs_get_dompath(ctx, domid);
     xc_domaininfo_t info;
@@ -2539,6 +2534,11 @@ int libxl_set_memory_target(struct libxl_ctx *ctx, uint32_t domid, uint32_t targ
     uuid = libxl_uuid2string(ctx, ptr.uuid);
     libxl_xs_write(ctx, XBT_NULL, libxl_sprintf(ctx, "/vm/%s/memory", uuid), "%lu", target_memkb / 1024);
 
+    if (enforce || !domid)
+        memorykb = target_memkb;
+    rc = xc_domain_setmaxmem(ctx->xch, domid, memorykb + LIBXL_MAXMEM_CONSTANT);
+    if (rc != 0)
+        return rc;
     rc = xc_domain_memory_set_pod_target(ctx->xch, domid, (target_memkb - videoram) / 4, NULL, NULL, NULL);
     return rc;
 }

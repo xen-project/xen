@@ -1262,7 +1262,7 @@ void set_memory_target(char *p, char *mem)
         exit(3);
     }
     printf("setting domid %d memory to : %d\n", domid, memorykb);
-    libxl_set_memory_target(&ctx, domid, memorykb);
+    libxl_set_memory_target(&ctx, domid, memorykb, /* enforce */ 1);
 }
 
 int main_memset(int argc, char **argv)
