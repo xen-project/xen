@@ -12,6 +12,9 @@
  * GNU Lesser General Public License for more details.
  */
 
+#ifndef XL_CMDTABLE_H
+#define XL_CMDTABLE_H
+
 #include "xl_cmdimpl.h"
 
 struct cmd_spec {
@@ -24,3 +27,5 @@ struct cmd_spec {
 
 extern struct cmd_spec cmd_table[];
 extern int cmdtable_len;
+
+#endif /* XL_CMDTABLE_H */

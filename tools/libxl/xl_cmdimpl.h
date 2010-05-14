@@ -12,6 +12,9 @@
  * GNU Lesser General Public License for more details.
  */
 
+#ifndef XL_CMDIMPL_H
+#define XL_CMDIMPL_H
+
 int main_vcpulist(int argc, char **argv);
 int main_info(int argc, char **argv);
 int main_cd_eject(int argc, char **argv);
@@ -51,3 +54,5 @@ int main_blockdetach(int argc, char **argv);
 int main_uptime(int argc, char **argv);
 
 void help(char *command);
+
+#endif /* XL_CMDIMPL_H */
