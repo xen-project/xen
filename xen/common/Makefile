@@ -11,6 +11,7 @@ obj-y += kexec.o
 obj-y += lib.o
 obj-y += memory.o
 obj-y += multicall.o
+obj-y += notifier.o
 obj-y += page_alloc.o
 obj-y += rangeset.o
 obj-y += sched_credit.o
