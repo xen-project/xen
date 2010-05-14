@@ -135,7 +135,7 @@ static int enter_state(u32 state)
     if ( !spin_trylock(&pm_lock) )
         return -EBUSY;
 
-    printk(XENLOG_INFO "Preparing system for ACPI S%d state.", state);
+    printk(XENLOG_INFO "Preparing system for ACPI S%d state.\n", state);
 
     freeze_domains();
 

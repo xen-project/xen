@@ -85,8 +85,6 @@ int cpu_down(unsigned int cpu)
         return -EINVAL;
     }
 
-    printk("Prepare to bring CPU%d down...\n", cpu);
-
     notifier_rc = __raw_notifier_call_chain(
         &cpu_chain, CPU_DOWN_PREPARE, hcpu, -1, &nr_calls);
     if ( notifier_rc != NOTIFY_DONE )
@@ -115,14 +113,9 @@ int cpu_down(unsigned int cpu)
 
  out:
     if ( !err )
-    {
-        printk("CPU %u is now offline\n", cpu);
         send_guest_global_virq(dom0, VIRQ_PCPU_STATE);
-    }
     else
-    {
         printk("Failed to take down CPU %u (error %d)\n", cpu, err);
-    }
     cpu_hotplug_done();
     return err;
 }
@@ -195,7 +188,6 @@ int disable_nonboot_cpus(void)
         }
 
         cpu_set(cpu, frozen_cpus);
-        printk("CPU%d is down\n", cpu);
     }
 
     BUG_ON(!error && (num_online_cpus() != 1));
@@ -214,9 +206,7 @@ void enable_nonboot_cpus(void)
         {
             BUG_ON(error == -EBUSY);
             printk("Error taking CPU%d up: %d\n", cpu, error);
-            continue;
         }
-        printk("CPU%d is up\n", cpu);
     }
 
     cpus_clear(frozen_cpus);
