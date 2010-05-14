@@ -150,10 +150,7 @@ static int allocate_msrs(void)
 	size_t counters_size = sizeof(struct op_msr) * model->num_counters;
 
 	int i;
-	for (i = 0; i < NR_CPUS; ++i) {
-		if (!test_bit(i, &cpu_online_map))
-			continue;
-
+	for_each_online_cpu (i) {
 		cpu_msrs[i].counters = xmalloc_bytes(counters_size);
 		if (!cpu_msrs[i].counters) {
 			success = 0;

@@ -361,7 +361,7 @@ static struct notifier_block cpu_nfb = {
 void __init rcu_init(void)
 {
     void *cpu = (void *)(long)smp_processor_id();
-    cpu_callback(&cpu_nfb, CPU_ONLINE, cpu);
+    cpu_callback(&cpu_nfb, CPU_UP_PREPARE, cpu);
     register_cpu_notifier(&cpu_nfb);
     open_softirq(RCU_SOFTIRQ, rcu_process_callbacks);
 }

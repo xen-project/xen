@@ -1401,6 +1401,10 @@ void init_percpu_time(void)
     unsigned long flags;
     s_time_t now;
 
+    /* If we have constant-rate TSCs then scale factor can be shared. */
+    if ( boot_cpu_has(X86_FEATURE_CONSTANT_TSC) )
+        this_cpu(cpu_time).tsc_scale = per_cpu(cpu_time, 0).tsc_scale;
+
     local_irq_save(flags);
     rdtscll(t->local_tsc_stamp);
     now = read_platform_stime();
@@ -1435,9 +1439,6 @@ int __init init_xen_time(void)
     /* If we have constant-rate TSCs then scale factor can be shared. */
     if ( boot_cpu_has(X86_FEATURE_CONSTANT_TSC) )
     {
-        int cpu;
-        for_each_possible_cpu ( cpu )
-            per_cpu(cpu_time, cpu).tsc_scale = per_cpu(cpu_time, 0).tsc_scale;
         /* If TSCs are not marked as 'reliable', re-sync during rendezvous. */
         if ( !boot_cpu_has(X86_FEATURE_TSC_RELIABLE) )
             time_calibration_rendezvous_fn = time_calibration_tsc_rendezvous;

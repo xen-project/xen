@@ -2877,11 +2877,11 @@ EXPORT void *tmem_relinquish_pages(unsigned int order, unsigned int memflags)
 }
 
 /* called at hypervisor startup */
-EXPORT void init_tmem(void)
+static int __init init_tmem(void)
 {
     int i;
     if ( !tmh_enabled() )
-        return;
+        return 0;
 
     radix_tree_init();
     if ( tmh_dedup_enabled() )
@@ -2905,7 +2905,10 @@ EXPORT void init_tmem(void)
     }
     else
         printk("tmem: initialization FAILED\n");
+
+    return 0;
 }
+__initcall(init_tmem);
 
 /*
  * Local variables:

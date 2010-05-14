@@ -155,12 +155,31 @@ static void stopmachine_action(unsigned long cpu)
     local_irq_enable();
 }
 
+static int cpu_callback(
+    struct notifier_block *nfb, unsigned long action, void *hcpu)
+{
+    unsigned int cpu = (unsigned long)hcpu;
+
+    if ( action == CPU_UP_PREPARE )
+        tasklet_init(&per_cpu(stopmachine_tasklet, cpu),
+                     stopmachine_action, cpu);
+
+    return NOTIFY_DONE;
+}
+
+static struct notifier_block cpu_nfb = {
+    .notifier_call = cpu_callback
+};
+
 static int __init cpu_stopmachine_init(void)
 {
     unsigned int cpu;
-    for_each_possible_cpu ( cpu )
-        tasklet_init(&per_cpu(stopmachine_tasklet, cpu),
-                     stopmachine_action, cpu);
+    for_each_online_cpu ( cpu )
+    {
+        void *hcpu = (void *)(long)cpu;
+        cpu_callback(&cpu_nfb, CPU_UP_PREPARE, hcpu);
+    }
+    register_cpu_notifier(&cpu_nfb);
     return 0;
 }
 __initcall(cpu_stopmachine_init);

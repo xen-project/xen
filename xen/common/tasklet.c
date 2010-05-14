@@ -19,7 +19,7 @@
 #include <xen/cpu.h>
 
 /* Some subsystems call into us before we are initialised. We ignore them. */
-static cpumask_t tasklets_initialised;
+static bool_t tasklets_initialised;
 
 DEFINE_PER_CPU(unsigned long, tasklet_work_to_do);
 
@@ -44,7 +44,7 @@ void tasklet_schedule_on_cpu(struct tasklet *t, unsigned int cpu)
 
     spin_lock_irqsave(&tasklet_lock, flags);
 
-    if ( cpu_isset(cpu, tasklets_initialised) && !t->is_dead )
+    if ( tasklets_initialised && !t->is_dead )
     {
         t->scheduled_on = cpu;
         if ( !t->is_running )
@@ -174,9 +174,9 @@ static int cpu_callback(
     switch ( action )
     {
     case CPU_UP_PREPARE:
-        if ( !cpu_test_and_set(cpu, tasklets_initialised) )
-            INIT_LIST_HEAD(&per_cpu(tasklet_list, cpu));
+        INIT_LIST_HEAD(&per_cpu(tasklet_list, cpu));
         break;
+    case CPU_UP_CANCELED:
     case CPU_DEAD:
         migrate_tasklets_from_cpu(cpu);
         break;
@@ -196,6 +196,7 @@ void __init tasklet_subsys_init(void)
     void *hcpu = (void *)(long)smp_processor_id();
     cpu_callback(&cpu_nfb, CPU_UP_PREPARE, hcpu);
     register_cpu_notifier(&cpu_nfb);
+    tasklets_initialised = 1;
 }
 
 /*

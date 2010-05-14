@@ -9,7 +9,6 @@
 #ifndef __XEN_TMEM_H__
 #define __XEN_TMEM_H__
 
-extern void init_tmem(void);
 extern void tmem_destroy(void *);
 extern void *tmem_relinquish_pages(unsigned int, unsigned int);
 extern int  opt_tmem;

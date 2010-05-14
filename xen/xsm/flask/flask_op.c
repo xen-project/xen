@@ -680,7 +680,6 @@ static int flask_security_avc_cachestats(char *buf, uint32_t count)
     char *page = NULL;
     int len = 0;
     int length = 0;
-    long long idx = 0;
     int cpu;
     struct avc_cache_stats *st;
 
@@ -701,11 +700,8 @@ static int flask_security_avc_cachestats(char *buf, uint32_t count)
     length += len;
     count -= len;
 
-    for ( cpu = idx; cpu < NR_CPUS; ++cpu )
+    for_each_online_cpu ( cpu )
     {
-        if ( !cpu_possible(cpu) )
-            continue;
-        idx = cpu + 1;
         st = &per_cpu(avc_cache_stats, cpu);
 
         len = snprintf(page, PAGE_SIZE, "%u %u %u %u %u %u\n", st->lookups,

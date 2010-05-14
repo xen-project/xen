@@ -18,6 +18,7 @@
 #include <xen/timer.h>
 #include <xen/keyhandler.h>
 #include <xen/percpu.h>
+#include <xen/cpu.h>
 #include <asm/system.h>
 #include <asm/desc.h>
 
@@ -514,10 +515,29 @@ static struct keyhandler dump_timerq_keyhandler = {
     .desc = "dump timer queues"
 };
 
+static struct timer *dummy_heap;
+
+static int cpu_callback(
+    struct notifier_block *nfb, unsigned long action, void *hcpu)
+{
+    unsigned int cpu = (unsigned long)hcpu;
+
+    if ( action == CPU_UP_PREPARE )
+    {
+        spin_lock_init(&per_cpu(timers, cpu).lock);
+        per_cpu(timers, cpu).heap = &dummy_heap;
+    }
+
+    return NOTIFY_DONE;
+}
+
+static struct notifier_block cpu_nfb = {
+    .notifier_call = cpu_callback
+};
+
 void __init timer_init(void)
 {
-    static struct timer *dummy_heap;
-    int i;
+    void *cpu = (void *)(long)smp_processor_id();
 
     open_softirq(TIMER_SOFTIRQ, timer_softirq_action);
 
@@ -528,11 +548,8 @@ void __init timer_init(void)
     SET_HEAP_SIZE(&dummy_heap, 0);
     SET_HEAP_LIMIT(&dummy_heap, 0);
 
-    for_each_possible_cpu ( i )
-    {
-        spin_lock_init(&per_cpu(timers, i).lock);
-        per_cpu(timers, i).heap = &dummy_heap;
-    }
+    cpu_callback(&cpu_nfb, CPU_UP_PREPARE, cpu);
+    register_cpu_notifier(&cpu_nfb);
 
     register_keyhandler('a', &dump_timerq_keyhandler);
 }

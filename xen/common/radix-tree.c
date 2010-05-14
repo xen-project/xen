@@ -31,6 +31,7 @@
  */
 
 #include <xen/config.h>
+#include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/types.h>
 #include <xen/errno.h>
@@ -429,7 +430,7 @@ void radix_tree_destroy(struct radix_tree_root *root,
 }
 EXPORT_SYMBOL(radix_tree_destroy);
 
-static /*__init*/ unsigned long __maxindex(unsigned int height)
+static unsigned long __init __maxindex(unsigned int height)
 {
     unsigned int tmp = height * RADIX_TREE_MAP_SHIFT;
     unsigned long index = (~0UL >> (RADIX_TREE_INDEX_BITS - tmp - 1)) >> 1;
@@ -439,7 +440,7 @@ static /*__init*/ unsigned long __maxindex(unsigned int height)
     return index;
 }
 
-/*__init*/ void radix_tree_init(void)
+void __init radix_tree_init(void)
 {
     unsigned int i;
 

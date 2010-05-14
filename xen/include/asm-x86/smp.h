@@ -69,7 +69,6 @@ int cpu_add(uint32_t apic_id, uint32_t acpi_id, uint32_t pxm);
 
 extern cpumask_t cpu_callout_map;
 extern cpumask_t cpu_callin_map;
-/* cpu_possible_map declared in <xen/cpumask.h> */
 
 /* We don't mark CPUs online until __cpu_up(), so we need another measure */
 static inline int num_booting_cpus(void)

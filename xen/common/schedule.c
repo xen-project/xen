@@ -31,6 +31,7 @@
 #include <xen/errno.h>
 #include <xen/guest_access.h>
 #include <xen/multicall.h>
+#include <xen/cpu.h>
 #include <public/sched.h>
 #include <xsm/xsm.h>
 
@@ -1089,9 +1090,39 @@ const struct scheduler *scheduler_get_by_id(unsigned int id)
     return NULL;
 }
 
+static int cpu_callback(
+    struct notifier_block *nfb, unsigned long action, void *hcpu)
+{
+    unsigned int cpu = (unsigned long)hcpu;
+
+    switch ( action )
+    {
+    case CPU_UP_PREPARE:
+        per_cpu(scheduler, cpu) = &ops;
+        spin_lock_init(&per_cpu(schedule_data, cpu)._lock);
+        per_cpu(schedule_data, cpu).schedule_lock
+            = &per_cpu(schedule_data, cpu)._lock;
+        init_timer(&per_cpu(schedule_data, cpu).s_timer,
+                   s_timer_fn, NULL, cpu);
+        break;
+    case CPU_DEAD:
+        kill_timer(&per_cpu(schedule_data, cpu).s_timer);
+        break;
+    default:
+        break;
+    }
+
+    return NOTIFY_DONE;
+}
+
+static struct notifier_block cpu_nfb = {
+    .notifier_call = cpu_callback
+};
+
 /* Initialise the data structures. */
 void __init scheduler_init(void)
 {
+    void *hcpu = (void *)(long)smp_processor_id();
     int i;
 
     open_softirq(SCHEDULE_SOFTIRQ, schedule);
@@ -1109,14 +1140,8 @@ void __init scheduler_init(void)
         ops = *schedulers[0];
     }
 
-    for_each_possible_cpu ( i )
-    {
-        per_cpu(scheduler, i) = &ops;
-        spin_lock_init(&per_cpu(schedule_data, i)._lock);
-        per_cpu(schedule_data, i).schedule_lock
-            = &per_cpu(schedule_data, i)._lock;
-        init_timer(&per_cpu(schedule_data, i).s_timer, s_timer_fn, NULL, i);
-    }
+    cpu_callback(&cpu_nfb, CPU_UP_PREPARE, hcpu);
+    register_cpu_notifier(&cpu_nfb);
 
     printk("Using scheduler: %s (%s)\n", ops.name, ops.opt_name);
     if ( SCHED_OP(&ops, init, 1) )

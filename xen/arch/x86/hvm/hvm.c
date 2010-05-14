@@ -85,6 +85,7 @@ static int cpu_callback(
     case CPU_DYING:
         hvm_cpu_down();
         break;
+    case CPU_UP_CANCELED:
     case CPU_DEAD:
         hvm_funcs.cpu_dead(cpu);
         break;

@@ -1333,7 +1333,7 @@ static int sedf_adjust_weights(struct cpupool *c, struct xen_domctl_scheduler_op
 {
     struct vcpu *p;
     struct domain      *d;
-    unsigned int        nr_cpus = last_cpu(cpu_possible_map) + 1;
+    unsigned int        cpu, nr_cpus = last_cpu(cpu_online_map) + 1;
     int                *sumw = xmalloc_array(int, nr_cpus);
     s_time_t           *sumt = xmalloc_array(s_time_t, nr_cpus);
 
@@ -1354,9 +1354,12 @@ static int sedf_adjust_weights(struct cpupool *c, struct xen_domctl_scheduler_op
             continue;
         for_each_vcpu( d, p )
         {
+            if ( (cpu = p->processor) >= nr_cpus )
+                continue;
+
             if ( EDOM_INFO(p)->weight )
             {
-                sumw[p->processor] += EDOM_INFO(p)->weight;
+                sumw[cpu] += EDOM_INFO(p)->weight;
             }
             else
             {
@@ -1367,7 +1370,7 @@ static int sedf_adjust_weights(struct cpupool *c, struct xen_domctl_scheduler_op
                 /*check for overflows*/
                 ASSERT((WEIGHT_PERIOD < ULONG_MAX) 
                        && (EDOM_INFO(p)->slice_orig < ULONG_MAX));
-                sumt[p->processor] += 
+                sumt[cpu] += 
                     (WEIGHT_PERIOD * EDOM_INFO(p)->slice_orig) / 
                     EDOM_INFO(p)->period_orig;
             }
@@ -1381,6 +1384,8 @@ static int sedf_adjust_weights(struct cpupool *c, struct xen_domctl_scheduler_op
     {
         for_each_vcpu ( d, p )
         {
+            if ( (cpu = p->processor) >= nr_cpus )
+                continue;
             if ( EDOM_INFO(p)->weight )
             {
                 EDOM_INFO(p)->period_orig = 
@@ -1388,8 +1393,7 @@ static int sedf_adjust_weights(struct cpupool *c, struct xen_domctl_scheduler_op
                 EDOM_INFO(p)->slice_orig  =
                     EDOM_INFO(p)->slice   = 
                     (EDOM_INFO(p)->weight *
-                     (WEIGHT_PERIOD - WEIGHT_SAFETY - sumt[p->processor])) / 
-                    sumw[p->processor];
+                     (WEIGHT_PERIOD - WEIGHT_SAFETY - sumt[cpu])) / sumw[cpu];
             }
         }
     }

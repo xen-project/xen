@@ -114,8 +114,6 @@ void perfc_printall(unsigned char key)
         }
         printk("\n");
     }
-
-    arch_perfc_printall();
 }
 
 void perfc_reset(unsigned char key)
@@ -136,13 +134,13 @@ void perfc_reset(unsigned char key)
         switch ( perfc_info[i].type )
         {
         case TYPE_SINGLE:
-            for_each_possible_cpu ( cpu )
+            for_each_online_cpu ( cpu )
                 per_cpu(perfcounters, cpu)[j] = 0;
         case TYPE_S_SINGLE:
             ++j;
             break;
         case TYPE_ARRAY:
-            for_each_possible_cpu ( cpu )
+            for_each_online_cpu ( cpu )
                 memset(per_cpu(perfcounters, cpu) + j, 0,
                        perfc_info[i].nr_elements * sizeof(perfc_t));
         case TYPE_S_ARRAY:
@@ -157,15 +155,22 @@ void perfc_reset(unsigned char key)
 static xen_sysctl_perfc_desc_t perfc_d[NR_PERFCTRS];
 static xen_sysctl_perfc_val_t *perfc_vals;
 static unsigned int      perfc_nbr_vals;
-static int               perfc_init = 0;
+static cpumask_t         perfc_cpumap;
+
 static int perfc_copy_info(XEN_GUEST_HANDLE_64(xen_sysctl_perfc_desc_t) desc,
                            XEN_GUEST_HANDLE_64(xen_sysctl_perfc_val_t) val)
 {
     unsigned int i, j, v;
 
     /* We only copy the name and array-size information once. */
-    if ( !perfc_init ) 
+    if ( !cpus_equal(cpu_online_map, perfc_cpumap) )
     {
+        unsigned int nr_cpus;
+        perfc_cpumap = cpu_online_map;
+        nr_cpus = cpus_weight(perfc_cpumap);
+
+        perfc_nbr_vals = 0;
+
         for ( i = 0; i < NR_PERFCTRS; i++ )
         {
             safe_strcpy(perfc_d[i].name, perfc_info[i].name);
@@ -174,7 +179,7 @@ static int perfc_copy_info(XEN_GUEST_HANDLE_64(xen_sysctl_perfc_desc_t) desc,
             {
             case TYPE_SINGLE:
             case TYPE_S_SINGLE:
-                perfc_d[i].nr_vals = num_possible_cpus();
+                perfc_d[i].nr_vals = nr_cpus;
                 break;
             case TYPE_ARRAY:
             case TYPE_S_ARRAY:
@@ -183,8 +188,9 @@ static int perfc_copy_info(XEN_GUEST_HANDLE_64(xen_sysctl_perfc_desc_t) desc,
             }
             perfc_nbr_vals += perfc_d[i].nr_vals;
         }
+
+        xfree(perfc_vals);
         perfc_vals = xmalloc_array(xen_sysctl_perfc_val_t, perfc_nbr_vals);
-        perfc_init = 1;
     }
 
     if ( guest_handle_is_null(desc) )
@@ -205,14 +211,14 @@ static int perfc_copy_info(XEN_GUEST_HANDLE_64(xen_sysctl_perfc_desc_t) desc,
         {
         case TYPE_SINGLE:
         case TYPE_S_SINGLE:
-            for_each_possible_cpu ( cpu )
+            for_each_cpu_mask ( cpu, perfc_cpumap )
                 perfc_vals[v++] = per_cpu(perfcounters, cpu)[j];
             ++j;
             break;
         case TYPE_ARRAY:
         case TYPE_S_ARRAY:
             memset(perfc_vals + v, 0, perfc_d[i].nr_vals * sizeof(*perfc_vals));
-            for_each_possible_cpu ( cpu )
+            for_each_cpu_mask ( cpu, perfc_cpumap )
             {
                 perfc_t *counters = per_cpu(perfcounters, cpu) + j;
                 unsigned int k;

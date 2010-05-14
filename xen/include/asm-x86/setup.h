@@ -22,7 +22,6 @@ void arch_init_memory(void);
 void subarch_init_memory(void);
 
 void init_IRQ(void);
-void init_tmem(void);
 void vesa_init(void);
 void vesa_mtrr_init(void);
 

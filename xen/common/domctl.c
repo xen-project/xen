@@ -155,7 +155,7 @@ static unsigned int default_vcpu0_location(cpumask_t *online)
     cpumask_t      cpu_exclude_map;
 
     /* Do an initial CPU placement. Pick the least-populated CPU. */
-    nr_cpus = last_cpu(cpu_possible_map) + 1;
+    nr_cpus = last_cpu(cpu_online_map) + 1;
     cnt = xmalloc_array(unsigned int, nr_cpus);
     if ( cnt )
     {
@@ -164,8 +164,9 @@ static unsigned int default_vcpu0_location(cpumask_t *online)
         rcu_read_lock(&domlist_read_lock);
         for_each_domain ( d )
             for_each_vcpu ( d, v )
-                if ( !test_bit(_VPF_down, &v->pause_flags) )
-                    cnt[v->processor]++;
+                if ( !test_bit(_VPF_down, &v->pause_flags)
+                     && ((cpu = v->processor) < nr_cpus) )
+                    cnt[cpu]++;
         rcu_read_unlock(&domlist_read_lock);
     }
 

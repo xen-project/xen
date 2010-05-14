@@ -4,10 +4,6 @@
 #include <asm/vhpt.h>
 #include <asm/privop_stat.h>
 
-static inline void arch_perfc_printall(void)
-{
-}
-
 static inline void arch_perfc_reset(void)
 {
   reset_privop_addrs();

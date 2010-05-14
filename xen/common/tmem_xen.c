@@ -11,6 +11,7 @@
 #include <xen/lzo.h> /* compression code */
 #include <xen/paging.h>
 #include <xen/domain_page.h>
+#include <xen/cpu.h>
 
 #define EXPORT /* indicates code other modules are dependent upon */
 
@@ -277,7 +278,7 @@ static void tmh_mempool_page_put(void *page_va)
     tmh_free_page(virt_to_page(page_va));
 }
 
-static int tmh_mempool_init(void)
+static int __init tmh_mempool_init(void)
 {
     tmh_mempool = xmem_pool_create("tmem", tmh_mempool_page_get,
         tmh_mempool_page_put, PAGE_SIZE, 0, PAGE_SIZE);
@@ -347,32 +348,83 @@ EXPORT void tmh_client_destroy(tmh_client_t *tmh)
 
 /******************  XEN-SPECIFIC HOST INITIALIZATION ********************/
 
-EXPORT int tmh_init(void)
-{
 #ifndef __i386__
-    int dstmem_order, workmem_order;
-    bool_t bad_alloc = 0;
-    struct page_info *pi;
-    unsigned char *p1, *p2;
-    int cpu;
+
+static int dstmem_order, workmem_order;
+
+static int cpu_callback(
+    struct notifier_block *nfb, unsigned long action, void *hcpu)
+{
+    unsigned int cpu = (unsigned long)hcpu;
+
+    switch ( action )
+    {
+    case CPU_UP_PREPARE: {
+        if ( per_cpu(dstmem, cpu) == NULL )
+        {
+            struct page_info *p = alloc_domheap_pages(0, dstmem_order, 0);
+            per_cpu(dstmem, cpu) = p ? page_to_virt(p) : NULL;
+        }
+        if ( per_cpu(workmem, cpu) == NULL )
+        {
+            struct page_info *p = alloc_domheap_pages(0, workmem_order, 0);
+            per_cpu(workmem, cpu) = p ? page_to_virt(p) : NULL;
+        }
+        break;
+    }
+    case CPU_DEAD:
+    case CPU_UP_CANCELED: {
+        if ( per_cpu(dstmem, cpu) != NULL )
+        {
+            struct page_info *p = virt_to_page(per_cpu(dstmem, cpu));
+            free_domheap_pages(p, dstmem_order);
+            per_cpu(dstmem, cpu) = NULL;
+        }
+        if ( per_cpu(workmem, cpu) != NULL )
+        {
+            struct page_info *p = virt_to_page(per_cpu(workmem, cpu));
+            free_domheap_pages(p, workmem_order);
+            per_cpu(workmem, cpu) = NULL;
+        }
+        break;
+    }
+    default:
+        break;
+    }
+
+    return NOTIFY_DONE;
+}
+
+static struct notifier_block cpu_nfb = {
+    .notifier_call = cpu_callback
+};
+
+EXPORT int __init tmh_init(void)
+{
+    unsigned int cpu;
 
     if ( !tmh_mempool_init() )
         return 0;
 
     dstmem_order = get_order_from_pages(LZO_DSTMEM_PAGES);
     workmem_order = get_order_from_bytes(LZO1X_1_MEM_COMPRESS);
-    for_each_possible_cpu ( cpu )
+
+    for_each_online_cpu ( cpu )
     {
-        pi = alloc_domheap_pages(0,dstmem_order,0);
-        per_cpu(dstmem, cpu) = p1 = ((pi == NULL) ? NULL : page_to_virt(pi));
-        pi = alloc_domheap_pages(0,workmem_order,0);
-        per_cpu(workmem, cpu) = p2 = ((pi == NULL) ? NULL : page_to_virt(pi));
-        if ( (p1 == NULL) || (p2 == NULL) )
-            bad_alloc++;
+        void *hcpu = (void *)(long)cpu;
+        cpu_callback(&cpu_nfb, CPU_UP_PREPARE, hcpu);
     }
-    if ( bad_alloc )
-        printk("tmem: can't allocate compression buffers for %d cpus\n",
-               bad_alloc);
-#endif
+
+    register_cpu_notifier(&cpu_nfb);
+
     return 1;
 }
+
+#else
+
+EXPORT int __init tmh_init(void)
+{
+    return 1;
+}
+
+#endif
