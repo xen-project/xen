@@ -46,7 +46,6 @@
 #include <xen/tasklet.h>
 #include <xen/serial.h>
 #include <xen/numa.h>
-#include <xen/event.h>
 #include <xen/cpu.h>
 #include <asm/current.h>
 #include <asm/mc146818rtc.h>
@@ -58,7 +57,6 @@
 #include <mach_apic.h>
 #include <mach_wakecpu.h>
 #include <smpboot_hooks.h>
-#include <xen/stop_machine.h>
 #include <acpi/cpufreq/processor_perf.h>
 
 #define setup_trampoline()    (bootsym_phys(trampoline_realmode_entry))
@@ -1310,169 +1308,9 @@ void __cpu_die(unsigned int cpu)
 	}
 }
 
-static int take_cpu_down(void *unused)
-{
-	void *hcpu = (void *)(long)smp_processor_id();
-	int rc;
-
-	spin_lock(&cpu_add_remove_lock);
-
-	if (cpu_notifier_call_chain(CPU_DYING, hcpu) != NOTIFY_DONE)
-		BUG();
-
-	rc = __cpu_disable();
-
-	spin_unlock(&cpu_add_remove_lock);
-
-	return rc;
-}
-
-/*
- * Protects against concurrent offline/online requests for a single CPU.
- * We need this extra protection because cpu_down() cannot continuously hold
- * the cpu_add_remove_lock, as it cannot be held across stop_machine_run().
- */
-static cpumask_t cpu_offlining;
-
-int cpu_down(unsigned int cpu)
-{
-	int err, notifier_rc, nr_calls;
-	void *hcpu = (void *)(long)cpu;
-
-	spin_lock(&cpu_add_remove_lock);
-
-	if ((cpu == 0) || !cpu_online(cpu) || cpu_isset(cpu, cpu_offlining)) {
-		spin_unlock(&cpu_add_remove_lock);
-		return -EINVAL;
-	}
-
-	cpu_set(cpu, cpu_offlining);
-
-	printk("Prepare to bring CPU%d down...\n", cpu);
-
-	notifier_rc = __cpu_notifier_call_chain(
-		CPU_DOWN_PREPARE, hcpu, -1, &nr_calls);
-	if (notifier_rc != NOTIFY_DONE) {
-		err = notifier_to_errno(notifier_rc);
-		nr_calls--;
-		notifier_rc = __cpu_notifier_call_chain(
-			CPU_DOWN_FAILED, hcpu, nr_calls, NULL);
-		BUG_ON(notifier_rc != NOTIFY_DONE);
-		goto out;
-	}
-
-	spin_unlock(&cpu_add_remove_lock);
-	err = stop_machine_run(take_cpu_down, NULL, cpu);
-	spin_lock(&cpu_add_remove_lock);
-
-	if (err < 0) {
-		notifier_rc = cpu_notifier_call_chain(CPU_DOWN_FAILED, hcpu);
-		BUG_ON(notifier_rc != NOTIFY_DONE);
-		goto out;
-	}
-
-	__cpu_die(cpu);
-	BUG_ON(cpu_online(cpu));
-
-	notifier_rc = cpu_notifier_call_chain(CPU_DEAD, hcpu);
-	BUG_ON(notifier_rc != NOTIFY_DONE);
-
-out:
-	if (!err) {
-		printk("CPU %u is now offline\n", cpu);
-		send_guest_global_virq(dom0, VIRQ_PCPU_STATE);
-	} else {
-		printk("Failed to take down CPU %u (error %d)\n", cpu, err);
-	}
-	cpu_clear(cpu, cpu_offlining);
-	spin_unlock(&cpu_add_remove_lock);
-	return err;
-}
-
-int cpu_up(unsigned int cpu)
-{
-	int err = 0;
-
-	spin_lock(&cpu_add_remove_lock);
-
-	if (cpu_online(cpu) || cpu_isset(cpu, cpu_offlining)) {
-		err = -EINVAL;
-		goto out;
-	}
-
-	err = __cpu_up(cpu);
-	if (err < 0)
-		goto out;
-
-out:
-	if (!err)
-		send_guest_global_virq(dom0, VIRQ_PCPU_STATE);
-	spin_unlock(&cpu_add_remove_lock);
-	return err;
-}
-
-/* From kernel/power/main.c */
-/* This is protected by pm_sem semaphore */
-static cpumask_t frozen_cpus;
-
-void disable_nonboot_cpus(void)
-{
-	int cpu, error;
-
-	error = 0;
-	cpus_clear(frozen_cpus);
-	printk("Freezing cpus ...\n");
-	for_each_online_cpu(cpu) {
-		if (cpu == 0)
-			continue;
-		error = cpu_down(cpu);
-		/* No need to check EBUSY here */
-		ASSERT(error != -EBUSY);
-		if (!error) {
-			cpu_set(cpu, frozen_cpus);
-			printk("CPU%d is down\n", cpu);
-			continue;
-		}
-		printk("Error taking cpu %d down: %d\n", cpu, error);
-	}
-	BUG_ON(raw_smp_processor_id() != 0);
-	if (error)
-		panic("cpus not sleeping");
-}
-
-void enable_nonboot_cpus(void)
-{
-	int cpu, error;
-
-	printk("Thawing cpus ...\n");
-	mtrr_aps_sync_begin();
-	for_each_cpu_mask(cpu, frozen_cpus) {
-		error = cpu_up(cpu);
-		/* No conflict will happen here */
-		ASSERT(error != -EBUSY);
-		if (!error) {
-			printk("CPU%d is up\n", cpu);
-			continue;
-		}
-		printk("Error taking cpu %d up: %d\n", cpu, error);
-		panic("Not enough cpus");
-	}
-	mtrr_aps_sync_end();
-	cpus_clear(frozen_cpus);
-
-	/*
-	 * Cleanup possible dangling ends after sleep...
-	 */
-	smpboot_restore_warm_reset_vector();
-}
-
 int cpu_add(uint32_t apic_id, uint32_t acpi_id, uint32_t pxm)
 {
-	int cpu = -1;
-
-#ifndef CONFIG_ACPI
-	return -ENOSYS;
-#endif
+	int node, cpu = -1;
 
 	dprintk(XENLOG_DEBUG, "cpu_add apic_id %x acpi_id %x pxm %x\n",
 		apic_id, acpi_id, pxm);
@@ -1480,68 +1318,53 @@ int cpu_add(uint32_t apic_id, uint32_t acpi_id, uint32_t pxm)
 	if ( acpi_id > MAX_MADT_ENTRIES || apic_id > MAX_APICS || pxm > 256 )
 		return -EINVAL;
 
+	if ( !cpu_hotplug_begin() )
+		return -EBUSY;
+
 	/* Detect if the cpu has been added before */
-	if ( x86_acpiid_to_apicid[acpi_id] != 0xff)
+	if ( x86_acpiid_to_apicid[acpi_id] != 0xff )
 	{
-		if (x86_acpiid_to_apicid[acpi_id] != apic_id)
-			return -EINVAL;
-		else
-			return -EEXIST;
+		cpu = (x86_acpiid_to_apicid[acpi_id] != apic_id)
+			? -EINVAL : -EEXIST;
+		goto out;
 	}
 
 	if ( physid_isset(apic_id, phys_cpu_present_map) )
-		return -EEXIST;
-
-	spin_lock(&cpu_add_remove_lock);
-
-	cpu = mp_register_lapic(apic_id, 1);
-
-	if (cpu < 0)
 	{
-		spin_unlock(&cpu_add_remove_lock);
-		return cpu;
+		cpu = -EEXIST;
+		goto out;
 	}
+
+	if ( (cpu = mp_register_lapic(apic_id, 1)) < 0 )
+		goto out;
 
 	x86_acpiid_to_apicid[acpi_id] = apic_id;
 
 	if ( !srat_disabled() )
 	{
-		int node;
-
-		node = setup_node(pxm);
-		if (node < 0)
+		if ( (node = setup_node(pxm)) < 0 )
 		{
 			dprintk(XENLOG_WARNING,
 				"Setup node failed for pxm %x\n", pxm);
 			x86_acpiid_to_apicid[acpi_id] = 0xff;
 			mp_unregister_lapic(apic_id, cpu);
-			spin_unlock(&cpu_add_remove_lock);
-			return node;
+			cpu = node;
+			goto out;
 		}
 		apicid_to_node[apic_id] = node;
 	}
 
 	srat_detect_node(cpu);
 	numa_add_cpu(cpu);
-	spin_unlock(&cpu_add_remove_lock);
 	dprintk(XENLOG_INFO, "Add CPU %x with index %x\n", apic_id, cpu);
+ out:
+	cpu_hotplug_done();
 	return cpu;
 }
 
 
 int __devinit __cpu_up(unsigned int cpu)
 {
-	int notifier_rc, ret = 0, nr_calls;
-	void *hcpu = (void *)(long)cpu;
-
-	notifier_rc = __cpu_notifier_call_chain(
-		CPU_UP_PREPARE, hcpu, -1, &nr_calls);
-	if (notifier_rc != NOTIFY_DONE) {
-		ret = notifier_to_errno(notifier_rc);
-		nr_calls--;
-		goto fail;
-	}
-
 	/*
 	 * We do warm boot only on cpus that had booted earlier
 	 * Otherwise cold boot is all handled from smp_boot_cpus().
@@ -1549,20 +1372,15 @@ int __devinit __cpu_up(unsigned int cpu)
 	 * when a cpu is taken offline from cpu_exit_clear().
 	 */
 	if (!cpu_isset(cpu, cpu_callin_map)) {
-		ret = __smp_prepare_cpu(cpu);
+		if (__smp_prepare_cpu(cpu))
+			return -EIO;
 		smpboot_restore_warm_reset_vector();
-	}
-
-	if (ret) {
-		ret = -EIO;
-		goto fail;
 	}
 
 	/* In case one didn't come up */
 	if (!cpu_isset(cpu, cpu_callin_map)) {
 		printk(KERN_DEBUG "skipping cpu%d, didn't come online\n", cpu);
-		ret = -EIO;
-		goto fail;
+		return -EIO;
 	}
 
 	/* Unleash the CPU! */
@@ -1572,15 +1390,7 @@ int __devinit __cpu_up(unsigned int cpu)
 		process_pending_softirqs();
 	}
 
-	notifier_rc = cpu_notifier_call_chain(CPU_ONLINE, hcpu);
-	BUG_ON(notifier_rc != NOTIFY_DONE);
 	return 0;
-
- fail:
-	notifier_rc = __cpu_notifier_call_chain(
-		CPU_UP_CANCELED, hcpu, nr_calls, NULL);
-	BUG_ON(notifier_rc != NOTIFY_DONE);
-	return ret;
 }
 
 

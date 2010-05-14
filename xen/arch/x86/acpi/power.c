@@ -25,6 +25,7 @@
 #include <xen/domain.h>
 #include <xen/console.h>
 #include <xen/iommu.h>
+#include <xen/cpu.h>
 #include <public/platform.h>
 #include <asm/tboot.h>
 
@@ -138,12 +139,8 @@ static int enter_state(u32 state)
 
     freeze_domains();
 
-    disable_nonboot_cpus();
-    if ( num_online_cpus() != 1 )
-    {
-        error = -EBUSY;
+    if ( (error = disable_nonboot_cpus()) )
         goto enable_cpu;
-    }
 
     cpufreq_del_cpu(0);
 
@@ -207,7 +204,9 @@ static int enter_state(u32 state)
  enable_cpu:
     cpufreq_add_cpu(0);
     microcode_resume_cpu(0);
+    mtrr_aps_sync_begin();
     enable_nonboot_cpus();
+    mtrr_aps_sync_end();
     thaw_domains();
     spin_unlock(&pm_lock);
     return error;

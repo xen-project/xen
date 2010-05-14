@@ -28,6 +28,7 @@
 #include <xen/stop_machine.h>
 #include <xen/errno.h>
 #include <xen/smp.h>
+#include <xen/cpu.h>
 #include <asm/current.h>
 #include <asm/processor.h>
 
@@ -72,19 +73,20 @@ int stop_machine_run(int (*fn)(void *), void *data, unsigned int cpu)
 
     BUG_ON(!local_irq_is_enabled());
 
+    /* cpu_online_map must not change. */
+    if ( !get_cpu_maps() )
+        return -EBUSY;
+
     allbutself = cpu_online_map;
     cpu_clear(smp_processor_id(), allbutself);
     nr_cpus = cpus_weight(allbutself);
 
-    if ( nr_cpus == 0 )
-    {
-        BUG_ON(cpu != smp_processor_id());
-        return (*fn)(data);
-    }
-
     /* Must not spin here as the holder will expect us to be descheduled. */
     if ( !spin_trylock(&stopmachine_lock) )
+    {
+        put_cpu_maps();
         return -EBUSY;
+    }
 
     stopmachine_data.fn = fn;
     stopmachine_data.fn_data = data;
@@ -113,12 +115,16 @@ int stop_machine_run(int (*fn)(void *), void *data, unsigned int cpu)
 
     spin_unlock(&stopmachine_lock);
 
+    put_cpu_maps();
+
     return ret;
 }
 
-static void stopmachine_action(unsigned long unused)
+static void stopmachine_action(unsigned long cpu)
 {
     enum stopmachine_state state = STOPMACHINE_START;
+
+    BUG_ON(cpu != smp_processor_id());
 
     smp_mb();
 

@@ -410,7 +410,11 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
 
         g_info = &op->u.pcpu_info;
 
-        spin_lock(&cpu_add_remove_lock);
+        if ( !get_cpu_maps() )
+        {
+            ret = -EBUSY;
+            break;
+        }
 
         if ( (g_info->xen_cpuid >= NR_CPUS) ||
              (g_info->xen_cpuid < 0) ||
@@ -429,7 +433,7 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
 
         g_info->max_present = last_cpu(cpu_present_map);
 
-        spin_unlock(&cpu_add_remove_lock);
+        put_cpu_maps();
 
         ret = copy_to_guest(u_xenpf_op, op, 1) ? -EFAULT : 0;
     }

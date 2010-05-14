@@ -186,7 +186,7 @@ void _spin_barrier_irq(spinlock_t *lock)
     local_irq_restore(flags);
 }
 
-void _spin_lock_recursive(spinlock_t *lock)
+int _spin_trylock_recursive(spinlock_t *lock)
 {
     int cpu = smp_processor_id();
 
@@ -197,13 +197,22 @@ void _spin_lock_recursive(spinlock_t *lock)
 
     if ( likely(lock->recurse_cpu != cpu) )
     {
-        spin_lock(lock);
+        if ( !spin_trylock(lock) )
+            return 0;
         lock->recurse_cpu = cpu;
     }
 
     /* We support only fairly shallow recursion, else the counter overflows. */
     ASSERT(lock->recurse_cnt < 0xfu);
     lock->recurse_cnt++;
+
+    return 1;
+}
+
+void _spin_lock_recursive(spinlock_t *lock)
+{
+    while ( !spin_trylock_recursive(lock) )
+        cpu_relax();
 }
 
 void _spin_unlock_recursive(spinlock_t *lock)

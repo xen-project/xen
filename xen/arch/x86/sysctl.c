@@ -25,6 +25,7 @@
 #include <asm/processor.h>
 #include <asm/numa.h>
 #include <xen/nodemask.h>
+#include <xen/cpu.h>
 #include <xsm/xsm.h>
 
 #define get_xen_guest_handle(val, hnd)  do { val = (hnd).p; } while (0)

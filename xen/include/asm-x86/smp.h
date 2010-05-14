@@ -56,12 +56,8 @@ extern u32 cpu_2_logical_apicid[];
 DECLARE_PER_CPU(int, cpu_state);
 
 #define cpu_is_offline(cpu) unlikely(!cpu_online(cpu))
-extern int cpu_down(unsigned int cpu);
-extern int cpu_up(unsigned int cpu);
 extern void cpu_exit_clear(void);
 extern void cpu_uninit(void);
-extern void disable_nonboot_cpus(void);
-extern void enable_nonboot_cpus(void);
 int cpu_add(uint32_t apic_id, uint32_t acpi_id, uint32_t pxm);
 
 /*

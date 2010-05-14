@@ -43,6 +43,7 @@
 #include <asm/bzimage.h> /* for bzimage_headroom */
 #include <asm/mach-generic/mach_apic.h> /* for generic_apic_probe */
 #include <asm/setup.h>
+#include <xen/cpu.h>
 
 #if defined(CONFIG_X86_64)
 #define BOOTSTRAP_DIRECTMAP_END (1UL << 32) /* 4GB */

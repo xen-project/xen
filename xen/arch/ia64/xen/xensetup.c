@@ -32,6 +32,7 @@
 #include <xsm/acm/acm_hooks.h>
 #include <asm/sn/simulator.h>
 #include <asm/sal.h>
+#include <xen/cpu.h>
 
 unsigned long total_pages;
 

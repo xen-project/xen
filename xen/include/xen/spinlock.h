@@ -146,6 +146,7 @@ int _spin_trylock(spinlock_t *lock);
 void _spin_barrier(spinlock_t *lock);
 void _spin_barrier_irq(spinlock_t *lock);
 
+int _spin_trylock_recursive(spinlock_t *lock);
 void _spin_lock_recursive(spinlock_t *lock);
 void _spin_unlock_recursive(spinlock_t *lock);
 
@@ -191,6 +192,7 @@ int _rw_is_write_locked(rwlock_t *lock);
  * are any critical regions that cannot form part of such a set, they can use
  * standard spin_[un]lock().
  */
+#define spin_trylock_recursive(l)     _spin_trylock_recursive(l)
 #define spin_lock_recursive(l)        _spin_lock_recursive(l)
 #define spin_unlock_recursive(l)      _spin_unlock_recursive(l)
 
