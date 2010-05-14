@@ -29,6 +29,7 @@
 #include <xen/init.h>
 #include <xen/mm.h>
 #include <xen/percpu.h>
+#include <xen/cpu.h>
 #include <asm/atomic.h>
 #include <public/sysctl.h>
 
@@ -214,8 +215,6 @@ static int tb_set_size(int size)
      */
     int ret = 0;
 
-
-
     if ( (opt_tbuf_size != 0) )
     {
         if ( size != opt_tbuf_size )
@@ -269,6 +268,20 @@ int trace_will_trace_event(u32 event)
     return 1;
 }
 
+static int cpu_callback(
+    struct notifier_block *nfb, unsigned long action, void *hcpu)
+{
+    unsigned int cpu = (unsigned long)hcpu;
+
+    if ( action == CPU_UP_PREPARE )
+        spin_lock_init(&per_cpu(t_lock, cpu));
+
+    return NOTIFY_DONE;
+}
+
+static struct notifier_block cpu_nfb = {
+    .notifier_call = cpu_callback
+};
 /**
  * init_trace_bufs - performs initialization of the per-cpu trace buffers.
  *
@@ -289,8 +302,9 @@ void __init init_trace_bufs(void)
         return;
     }
 
-    for(i = 0; i < NR_CPUS; i++)
+    for_each_online_cpu ( i )
         spin_lock_init(&per_cpu(t_lock, i));
+    register_cpu_notifier(&cpu_nfb);
 
     for(i=0; i<T_INFO_PAGES; i++)
         share_xen_page_with_privileged_guests(
