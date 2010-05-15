@@ -1127,19 +1127,10 @@ csched_alloc_pdata(const struct scheduler *ops, int cpu)
 static void
 make_runq_map(struct csched_private *prv)
 {
-    int cpu, cpu_count=0;
-
     /* FIXME: Read pcpu layout and do this properly */
-    for_each_possible_cpu( cpu )
-    {
-        prv->runq_map[cpu] = 0;
-        cpu_count++;
-    }
     prv->runq_count = 1;
-
-    /* Move to the init code...? */
     prv->rqd[0].cpu_min = 0;
-    prv->rqd[0].cpu_max = cpu_count;
+    prv->rqd[0].cpu_max = NR_CPUS;
 }
 
 static int
