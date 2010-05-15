@@ -191,17 +191,17 @@ static int __devinit MP_processor_info (struct mpc_config_processor *m)
 		return -ENOSPC;
 	}
 
-    /* Boot cpu has been marked present in smp_prepare_boot_cpu */
-    if (!(m->mpc_cpuflag & CPU_BOOTPROCESSOR)) {
-        cpu = alloc_cpu_id();
-        if (cpu < 0) {
-            printk(KERN_WARNING "WARNING: Can't alloc cpu_id."
-              " Processor with apicid %i ignored\n", apicid);
-            return cpu;
-        }
-        x86_cpu_to_apicid[cpu] = apicid;
-        cpu_set(cpu, cpu_present_map);
-    }
+	/* Boot cpu has been marked present in smp_prepare_boot_cpu */
+	if (!(m->mpc_cpuflag & CPU_BOOTPROCESSOR)) {
+		cpu = alloc_cpu_id();
+		if (cpu < 0) {
+			printk(KERN_WARNING "WARNING: Can't alloc cpu_id."
+			       " Processor with apicid %i ignored\n", apicid);
+			return cpu;
+		}
+		x86_cpu_to_apicid[cpu] = apicid;
+		cpu_set(cpu, cpu_present_map);
+	}
 
 	cpu_set(num_processors, cpu_possible_map);
 	num_processors++;
@@ -214,7 +214,7 @@ static int __devinit MP_processor_info (struct mpc_config_processor *m)
 		def_to_bigsmp = 1;
 	}
 
-    return cpu;
+	return cpu;
 }
 
 static void __init MP_bus_info (struct mpc_config_bus *m)
@@ -365,7 +365,7 @@ static void __init smp_read_mpc_oem(struct mp_config_oemtable *oemtable, \
 				return;
 			}
 		}
-       }
+	}
 }
 
 static inline void mps_oem_check(struct mp_config_table *mpc, char *oem,
@@ -824,12 +824,10 @@ void __init find_smp_config (void)
 void __init mp_register_lapic_address (
 	u64			address)
 {
-    if ( !x2apic_enabled )
-    {
-    	mp_lapic_addr = (unsigned long) address;
-
-	    set_fixmap_nocache(FIX_APIC_BASE, mp_lapic_addr);
-    }
+	if (!x2apic_enabled) {
+		mp_lapic_addr = (unsigned long) address;
+		set_fixmap_nocache(FIX_APIC_BASE, mp_lapic_addr);
+	}
 
 	if (boot_cpu_physical_apicid == -1U)
 		boot_cpu_physical_apicid = get_apic_id();
@@ -865,22 +863,22 @@ int __devinit mp_register_lapic (
 	processor.mpc_reserved[0] = 0;
 	processor.mpc_reserved[1] = 0;
 
-    return MP_processor_info(&processor);
+	return MP_processor_info(&processor);
 }
 
 void mp_unregister_lapic(uint32_t apic_id, uint32_t cpu)
 {
-    if (!cpu || (apic_id == boot_cpu_physical_apicid))
-        return;
+	if (!cpu || (apic_id == boot_cpu_physical_apicid))
+		return;
 
-    if (x86_cpu_to_apicid[cpu] != apic_id)
-        return;
+	if (x86_cpu_to_apicid[cpu] != apic_id)
+		return;
 
-    physid_clear(apic_id, phys_cpu_present_map);
+	physid_clear(apic_id, phys_cpu_present_map);
 
-    x86_cpu_to_apicid[cpu] = BAD_APICID;
-    cpu_clear(cpu, cpu_present_map);
- }
+	x86_cpu_to_apicid[cpu] = BAD_APICID;
+	cpu_clear(cpu, cpu_present_map);
+}
 
 #ifdef	CONFIG_X86_IO_APIC
 
@@ -971,20 +969,16 @@ void __init mp_register_ioapic (
 
 unsigned highest_gsi(void)
 {
-    unsigned x;
-    unsigned res;
-
-    res = 0;
-    for (x = 0; x < nr_ioapics; x++) {
-        if (res < mp_ioapic_routing[x].gsi_end)
-            res = mp_ioapic_routing[x].gsi_end;
-    }
-    return res;
+	unsigned x, res = 0;
+	for (x = 0; x < nr_ioapics; x++)
+		if (res < mp_ioapic_routing[x].gsi_end)
+			res = mp_ioapic_routing[x].gsi_end;
+	return res;
 }
 
 unsigned apic_gsi_base(int apic)
 {
-    return mp_ioapic_routing[apic].gsi_base;
+	return mp_ioapic_routing[apic].gsi_base;
 }
 
 void __init mp_override_legacy_irq (
@@ -1159,7 +1153,7 @@ int mp_register_gsi (u32 gsi, int triggering, int polarity)
 	mp_ioapic_routing[ioapic].pin_programmed[idx] |= (1<<bit);
 
 	return io_apic_set_pci_routing(ioapic, ioapic_pin, gsi,
-		    triggering, polarity);
+				       triggering, polarity);
 }
 
 #endif /* CONFIG_X86_IO_APIC */
