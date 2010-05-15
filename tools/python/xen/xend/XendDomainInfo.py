@@ -1925,7 +1925,7 @@ class XendDomainInfo:
         dom_list = xstransact.List('/local/domain')
         for d in dom_list:
             target = xstransact.Read('/local/domain/' + d + '/target')
-            if target is not None and int(target) is self.domid :
+            if target is not None and int(target) == self.domid:
                 return int(d)
         return None
 
