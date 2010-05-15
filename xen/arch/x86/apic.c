@@ -823,7 +823,7 @@ static int __init detect_init_APIC (void)
     switch (boot_cpu_data.x86_vendor) {
     case X86_VENDOR_AMD:
         if ((boot_cpu_data.x86 == 6 && boot_cpu_data.x86_model > 1) ||
-            (boot_cpu_data.x86 >= 15 && boot_cpu_data.x86 <= 17))
+            (boot_cpu_data.x86 >= 0xf && boot_cpu_data.x86 <= 0x17))
             break;
         goto no_apic;
     case X86_VENDOR_INTEL:

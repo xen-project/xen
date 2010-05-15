@@ -599,8 +599,7 @@ static enum mcheck_type amd_mcheck_init(struct cpuinfo_x86 *ci)
 		rc = amd_k8_mcheck_init(ci);
 		break;
 
-	case 0x10:
-	case 0x11:
+	case 0x10 ... 0x17:
 		rc = amd_f10_mcheck_init(ci);
 		break;
 	}

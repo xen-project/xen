@@ -2246,7 +2246,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             break;
         case MSR_AMD64_NB_CFG:
             if ( boot_cpu_data.x86_vendor != X86_VENDOR_AMD ||
-                 boot_cpu_data.x86 < 0x10 || boot_cpu_data.x86 > 0x11 )
+                 boot_cpu_data.x86 < 0x10 || boot_cpu_data.x86 > 0x17 )
                 goto fail;
             if ( !IS_PRIV(v->domain) )
                 break;
@@ -2259,7 +2259,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             break;
         case MSR_FAM10H_MMIO_CONF_BASE:
             if ( boot_cpu_data.x86_vendor != X86_VENDOR_AMD ||
-                 boot_cpu_data.x86 < 0x10 || boot_cpu_data.x86 > 0x11 )
+                 boot_cpu_data.x86 < 0x10 || boot_cpu_data.x86 > 0x17 )
                 goto fail;
             if ( !IS_PRIV(v->domain) )
                 break;
@@ -3247,8 +3247,7 @@ void __devinit percpu_traps_init(void)
         switch ( boot_cpu_data.x86 )
         {
         case 6:
-        case 15:
-        case 16:
+        case 0xf ... 0x17:
             this_cpu(ler_msr) = MSR_IA32_LASTINTFROMIP;
             break;
         }

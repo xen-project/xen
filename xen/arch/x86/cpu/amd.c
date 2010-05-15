@@ -433,10 +433,9 @@ static void __devinit init_amd(struct cpuinfo_x86 *c)
 	}
 
 	switch (c->x86) {
-	case 15:
+	case 0xf:
 	/* Use K8 tuning for Fam10h and Fam11h */
-	case 0x10:
-	case 0x11:
+	case 0x10 ... 0x17:
 		set_bit(X86_FEATURE_K8, c->x86_capability);
 		disable_c1e(NULL);
 		if (acpi_smi_cmd && (acpi_enable_value | acpi_disable_value))
@@ -500,7 +499,7 @@ static void __devinit init_amd(struct cpuinfo_x86 *c)
 #endif
 
 	/* Pointless to use MWAIT on Family10 as it does not deep sleep. */
-	if (c->x86 == 0x10 && !force_mwait)
+	if (c->x86 >= 0x10 && !force_mwait)
 		clear_bit(X86_FEATURE_MWAIT, c->x86_capability);
 
 	/* K6s reports MCEs but don't actually have all the MSRs */

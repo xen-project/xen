@@ -448,6 +448,18 @@ static int __init nmi_init(void)
 				model = &op_athlon_spec;
 				cpu_type = "x86-64/family11";
 				break;
+                        case 0x12:
+				model = &op_athlon_spec;
+				cpu_type = "x86-64/family12";
+				break;
+			case 0x14:
+                                model = &op_athlon_spec;
+                                cpu_type = "x86-64/family14";
+                                break;
+                        case 0x15:
+                                model = &op_athlon_spec;
+                                cpu_type = "x86-64/family15";
+                                break;
 			}
 			break;
  
