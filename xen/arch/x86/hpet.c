@@ -428,16 +428,7 @@ static int hpet_fsb_cap_lookup(void)
         if ( hpet_assign_irq(ch) )
             continue;
 
-        /* set default irq affinity */
-        ch->cpu = num_chs_used;
-        per_cpu(cpu_bc_channel, ch->cpu) = ch;
-        irq_desc[ch->irq].handler->
-            set_affinity(ch->irq, cpumask_of_cpu(ch->cpu));
-
         num_chs_used++;
-
-        if ( num_chs_used == num_possible_cpus() )
-            break;
     }
 
     printk(XENLOG_INFO
@@ -455,6 +446,9 @@ static struct hpet_event_channel *hpet_get_channel(int cpu)
     int i;
     int next;
     struct hpet_event_channel *ch;
+
+    if ( num_hpets_used == 0 )
+        return &legacy_hpet_event;
 
     spin_lock(&next_lock);
     next = next_channel = (next_channel + 1) % num_hpets_used;
@@ -479,8 +473,10 @@ static struct hpet_event_channel *hpet_get_channel(int cpu)
     return ch;
 }
 
-static void hpet_attach_channel_share(int cpu, struct hpet_event_channel *ch)
+static void hpet_attach_channel(int cpu, struct hpet_event_channel *ch)
 {
+    ASSERT(spin_is_locked(&ch->lock));
+
     per_cpu(cpu_bc_channel, cpu) = ch;
 
     /* try to be the channel owner again while holding the lock */
@@ -495,9 +491,10 @@ static void hpet_attach_channel_share(int cpu, struct hpet_event_channel *ch)
         set_affinity(ch->irq, cpumask_of_cpu(ch->cpu));
 }
 
-static void hpet_detach_channel_share(int cpu)
+static void hpet_detach_channel(int cpu, struct hpet_event_channel *ch)
 {
-    struct hpet_event_channel *ch = per_cpu(cpu_bc_channel, cpu);
+    ASSERT(spin_is_locked(&ch->lock));
+    ASSERT(ch == per_cpu(cpu_bc_channel, cpu));
 
     per_cpu(cpu_bc_channel, cpu) = NULL;
 
@@ -516,9 +513,6 @@ static void hpet_detach_channel_share(int cpu)
     irq_desc[ch->irq].handler->
         set_affinity(ch->irq, cpumask_of_cpu(ch->cpu));
 }
-
-static void (*hpet_attach_channel)(int cpu, struct hpet_event_channel *ch);
-static void (*hpet_detach_channel)(int cpu);
 
 #include <asm/mc146818rtc.h>
 
@@ -587,12 +581,6 @@ void hpet_broadcast_init(void)
             spin_lock_init(&hpet_events[i].lock);
         }
 
-        if ( num_hpets_used < num_possible_cpus() )
-        {
-            hpet_attach_channel = hpet_attach_channel_share;
-            hpet_detach_channel = hpet_detach_channel_share;
-        }
-
         return;
     }
 
@@ -625,9 +613,6 @@ void hpet_broadcast_init(void)
     legacy_hpet_event.idx = 0;
     legacy_hpet_event.flags = 0;
     spin_lock_init(&legacy_hpet_event.lock);
-
-    for_each_possible_cpu(i)
-        per_cpu(cpu_bc_channel, i) = &legacy_hpet_event;
 
     if ( !force_hpet_broadcast )
         pv_rtc_handler = handle_rtc_once;
@@ -667,16 +652,13 @@ void hpet_broadcast_enter(void)
 
     if ( !ch )
         ch = hpet_get_channel(cpu);
-    BUG_ON( !ch );
 
     ASSERT(!local_irq_is_enabled());
 
-    if ( hpet_attach_channel )
+    if ( ch != &legacy_hpet_event )
     {
         spin_lock(&ch->lock);
-
         hpet_attach_channel(cpu, ch);
-
         spin_unlock(&ch->lock);
     }
 
@@ -702,8 +684,6 @@ void hpet_broadcast_exit(void)
     if ( this_cpu(timer_deadline_start) == 0 )
         return;
 
-    BUG_ON( !ch );
-
     /* Reprogram the deadline; trigger timer work now if it has passed. */
     enable_APIC_timer();
     if ( !reprogram_timer(this_cpu(timer_deadline_start)) )
@@ -717,13 +697,10 @@ void hpet_broadcast_exit(void)
 
     spin_unlock_irq(&ch->lock);
 
-
-    if ( hpet_detach_channel )
+    if ( ch != &legacy_hpet_event )
     {
         spin_lock_irq(&ch->lock);
-
-        hpet_detach_channel(cpu);
-
+        hpet_detach_channel(cpu, ch);
         spin_unlock_irq(&ch->lock);
     }
 }
