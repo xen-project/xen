@@ -53,17 +53,14 @@
  * for_each_node_mask(node, mask)	for-loop node over mask
  *
  * int num_online_nodes()		Number of online Nodes
- * int num_possible_nodes()		Number of all possible Nodes
  *
  * int node_online(node)		Is some node online?
- * int node_possible(node)		Is some node possible?
  *
  * int any_online_node(mask)		First online node in mask
  *
  * node_set_online(node)		set bit 'node' in node_online_map
  * node_set_offline(node)		clear bit 'node' in node_online_map
  *
- * for_each_node(node)			for-loop node over node_possible_map
  * for_each_online_node(node)		for-loop node over node_online_map
  *
  * Subtlety:
@@ -314,22 +311,17 @@ static inline int __nodemask_parse(const char __user *buf, int len,
 
 /*
  * The following particular system nodemasks and operations
- * on them manage all possible and online nodes.
+ * on them manage online nodes.
  */
 
 extern nodemask_t node_online_map;
-extern nodemask_t node_possible_map;
 
 #if MAX_NUMNODES > 1
 #define num_online_nodes()	nodes_weight(node_online_map)
-#define num_possible_nodes()	nodes_weight(node_possible_map)
 #define node_online(node)	node_isset((node), node_online_map)
-#define node_possible(node)	node_isset((node), node_possible_map)
 #else
 #define num_online_nodes()	1
-#define num_possible_nodes()	1
 #define node_online(node)	((node) == 0)
-#define node_possible(node)	((node) == 0)
 #endif
 
 #define any_online_node(mask)			\
@@ -344,7 +336,6 @@ extern nodemask_t node_possible_map;
 #define node_set_online(node)	   set_bit((node), node_online_map.bits)
 #define node_set_offline(node)	   clear_bit((node), node_online_map.bits)
 
-#define for_each_node(node)	   for_each_node_mask((node), node_possible_map)
 #define for_each_online_node(node) for_each_node_mask((node), node_online_map)
 
 #endif /* __LINUX_NODEMASK_H */
