@@ -264,30 +264,37 @@ int libxl_domain_rename(struct libxl_ctx *ctx, uint32_t domid,
 int libxl_domain_build(struct libxl_ctx *ctx, libxl_domain_build_info *info, uint32_t domid, libxl_domain_build_state *state)
 {
     char **vments = NULL, **localents = NULL;
+    struct timeval start_time;
     int i, ret;
 
     ret = build_pre(ctx, domid, info, state);
     if (ret) goto out;
 
+    gettimeofday(&start_time, NULL);
+
     if (info->hvm) {
         ret = build_hvm(ctx, domid, info, state);
         if (ret) goto out;
 
-        vments = libxl_calloc(ctx, 5, sizeof(char *));
+        vments = libxl_calloc(ctx, 7, sizeof(char *));
         vments[0] = "rtc/timeoffset";
         vments[1] = (info->u.hvm.timeoffset) ? info->u.hvm.timeoffset : "";
         vments[2] = "image/ostype";
         vments[3] = "hvm";
+        vments[4] = "start_time";
+        vments[5] = libxl_sprintf(ctx, "%lu.%02d", start_time.tv_sec,(int)start_time.tv_usec/10000);
     } else {
         ret = build_pv(ctx, domid, info, state);
         if (ret) goto out;
 
-        vments = libxl_calloc(ctx, 9, sizeof(char *));
+        vments = libxl_calloc(ctx, 11, sizeof(char *));
         i = 0;
         vments[i++] = "image/ostype";
         vments[i++] = "linux";
         vments[i++] = "image/kernel";
         vments[i++] = (char*) info->kernel;
+        vments[i++] = "start_time";
+        vments[i++] = libxl_sprintf(ctx, "%lu.%02d", start_time.tv_sec,(int)start_time.tv_usec/10000);
         if (info->u.pv.ramdisk) {
             vments[i++] = "image/ramdisk";
             vments[i++] = (char*) info->u.pv.ramdisk;
@@ -307,6 +314,7 @@ int libxl_domain_restore(struct libxl_ctx *ctx, libxl_domain_build_info *info,
                          libxl_device_model_info *dm_info)
 {
     char **vments = NULL, **localents = NULL;
+    struct timeval start_time;
     int i, ret, esave, flags;
 
     ret = build_pre(ctx, domid, info, state);
@@ -315,19 +323,25 @@ int libxl_domain_restore(struct libxl_ctx *ctx, libxl_domain_build_info *info,
     ret = restore_common(ctx, domid, info, state, fd);
     if (ret) goto out;
 
+    gettimeofday(&start_time, NULL);
+
     if (info->hvm) {
-        vments = libxl_calloc(ctx, 5, sizeof(char *));
+        vments = libxl_calloc(ctx, 7, sizeof(char *));
         vments[0] = "rtc/timeoffset";
         vments[1] = (info->u.hvm.timeoffset) ? info->u.hvm.timeoffset : "";
         vments[2] = "image/ostype";
         vments[3] = "hvm";
+        vments[4] = "start_time";
+        vments[5] = libxl_sprintf(ctx, "%lu.%02d", start_time.tv_sec,(int)start_time.tv_usec/10000);
     } else {
-        vments = libxl_calloc(ctx, 9, sizeof(char *));
+        vments = libxl_calloc(ctx, 11, sizeof(char *));
         i = 0;
         vments[i++] = "image/ostype";
         vments[i++] = "linux";
         vments[i++] = "image/kernel";
         vments[i++] = (char*) info->kernel;
+        vments[i++] = "start_time";
+        vments[i++] = libxl_sprintf(ctx, "%lu.%02d", start_time.tv_sec,(int)start_time.tv_usec/10000);
         if (info->u.pv.ramdisk) {
             vments[i++] = "image/ramdisk";
             vments[i++] = (char*) info->u.pv.ramdisk;
