@@ -31,7 +31,7 @@ then
 	mount -t xenfs xenfs /proc/xen
 fi
 
-if ! grep -q "control_d" /proc/xen/capabilities ; then
+if ! grep -qs "control_d" /proc/xen/capabilities ; then
 	exit 0
 fi
 
