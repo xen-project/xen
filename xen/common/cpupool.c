@@ -27,9 +27,6 @@ cpumask_t cpupool_free_cpus;             /* cpus not in any cpupool */
 
 static struct cpupool *cpupool_list;     /* linked list, sorted by poolid */
 
-static int cpupool0_max_cpus;
-integer_param("pool0_max_cpus", cpupool0_max_cpus);
-
 static int cpupool_moving_cpu = -1;
 static struct cpupool *cpupool_cpu_moving = NULL;
 static cpumask_t cpupool_locked_cpus = CPU_MASK_NONE;
@@ -110,7 +107,7 @@ struct cpupool *cpupool_create(int poolid, char *sched)
     }
     *q = c;
     c->cpupool_id = (poolid == CPUPOOLID_NONE) ? (last + 1) : poolid;
-    if ( schedule_init_global(sched, &(c->sched)) )
+    if ( (c->sched = scheduler_alloc(sched)) == NULL )
     {
         spin_unlock(&cpupool_lock);
         cpupool_destroy(c);
@@ -119,7 +116,7 @@ struct cpupool *cpupool_create(int poolid, char *sched)
     spin_unlock(&cpupool_lock);
 
     printk("Created cpupool %d with scheduler %s (%s)\n", c->cpupool_id,
-        c->sched.name, c->sched.opt_name);
+           c->sched->name, c->sched->opt_name);
 
     return c;
 }
@@ -147,7 +144,7 @@ int cpupool_destroy(struct cpupool *c)
     *q = c->next;
     spin_unlock(&cpupool_lock);
     printk(XENLOG_DEBUG "cpupool_destroy(pool=%d)\n", c->cpupool_id);
-    schedule_deinit_global(&(c->sched));
+    scheduler_free(c->sched);
     free_cpupool_struct(c);
     return 0;
 }
@@ -170,29 +167,6 @@ static int cpupool_assign_cpu_locked(struct cpupool *c, unsigned int cpu)
     }
     cpu_set(cpu, c->cpu_valid);
     return 0;
-}
-
-/*
- * assign free physical cpus to a cpupool
- * cpus assigned are unused cpus with lowest possible ids
- * returns the number of cpus assigned
- */
-int cpupool_assign_ncpu(struct cpupool *c, int ncpu)
-{
-    int i, n = 0;
-
-    spin_lock(&cpupool_lock);
-    for_each_cpu_mask(i, cpupool_free_cpus)
-    {
-        if ( cpupool_assign_cpu_locked(c, i) == 0 )
-            n++;
-        if ( n == ncpu )
-            break;
-    }
-    spin_unlock(&cpupool_lock);
-    printk(XENLOG_DEBUG "cpupool_assign_ncpu(pool=%d,ncpu=%d) rc %d\n",
-        c->cpupool_id, ncpu, n);
-    return n;
 }
 
 static long cpupool_unassign_cpu_helper(void *info)
@@ -352,8 +326,7 @@ static void cpupool_cpu_add(unsigned int cpu)
     spin_lock(&cpupool_lock);
     cpu_clear(cpu, cpupool_locked_cpus);
     cpu_set(cpu, cpupool_free_cpus);
-    if ( cpupool0 != NULL )
-        cpupool_assign_cpu_locked(cpupool0, cpu);
+    cpupool_assign_cpu_locked(cpupool0, cpu);
     spin_unlock(&cpupool_lock);
 }
 
@@ -426,7 +399,7 @@ int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op)
         if ( c == NULL )
             break;
         op->cpupool_id = c->cpupool_id;
-        op->sched_id = c->sched.sched_id;
+        op->sched_id = c->sched->sched_id;
         op->n_dom = c->n_dom;
         ret = cpumask_to_xenctl_cpumap(&(op->cpumap), &(c->cpu_valid));
     }
@@ -599,26 +572,13 @@ static struct notifier_block cpu_nfb = {
 static int __init cpupool_presmp_init(void)
 {
     void *cpu = (void *)(long)smp_processor_id();
+    cpupool0 = cpupool_create(0, NULL);
+    BUG_ON(cpupool0 == NULL);
     cpu_callback(&cpu_nfb, CPU_ONLINE, cpu);
     register_cpu_notifier(&cpu_nfb);
     return 0;
 }
 presmp_initcall(cpupool_presmp_init);
-
-static int __init cpupool_init(void)
-{
-    cpupool0 = cpupool_create(0, NULL);
-    BUG_ON(cpupool0 == NULL);
-
-    if ( (cpupool0_max_cpus == 0) || (cpupool0_max_cpus > num_online_cpus()) )
-        cpupool0_max_cpus = num_online_cpus();
-
-    if ( !cpupool_assign_ncpu(cpupool0, cpupool0_max_cpus) )
-        BUG();
-
-    return 0;
-}
-__initcall(cpupool_init);
 
 /*
  * Local variables:

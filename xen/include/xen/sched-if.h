@@ -89,7 +89,7 @@ struct scheduler {
     unsigned int sched_id;  /* ID for this scheduler             */
     void *sched_data;       /* global data pointer               */
 
-    int          (*init)           (struct scheduler *, int);
+    int          (*init)           (struct scheduler *);
     void         (*deinit)         (const struct scheduler *);
 
     void         (*free_vdata)     (const struct scheduler *, void *);
@@ -131,7 +131,7 @@ struct cpupool
     cpumask_t        cpu_valid;      /* all cpus assigned to pool */
     struct cpupool   *next;
     unsigned int     n_dom;
-    struct scheduler sched;
+    struct scheduler *sched;
 };
 
 const struct scheduler *scheduler_get_by_id(unsigned int id);

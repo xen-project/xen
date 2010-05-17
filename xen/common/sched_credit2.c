@@ -1134,7 +1134,7 @@ make_runq_map(struct csched_private *prv)
 }
 
 static int
-csched_init(struct scheduler *ops, int pool0)
+csched_init(struct scheduler *ops)
 {
     int i;
     struct csched_private *prv;
@@ -1145,7 +1145,7 @@ csched_init(struct scheduler *ops, int pool0)
 
     prv = xmalloc(struct csched_private);
     if ( prv == NULL )
-        return 1;
+        return -ENOMEM;
     memset(prv, 0, sizeof(*prv));
     ops->sched_data = prv;
 

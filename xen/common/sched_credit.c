@@ -169,14 +169,7 @@ struct csched_private {
     uint32_t credit;
     int credit_balance;
     uint32_t runq_sort;
-    int ticker_active;
 };
-
-
-/*
- * Global variables
- */
-static struct csched_private *csched_priv0 = NULL;
 
 static void csched_tick(void *_cpu);
 static void csched_acct(void *dummy);
@@ -351,17 +344,16 @@ csched_alloc_pdata(const struct scheduler *ops, int cpu)
     prv->credit += CSCHED_CREDITS_PER_ACCT;
     prv->ncpus++;
     cpu_set(cpu, prv->cpus);
-    if ( (prv->ncpus == 1) && (prv != csched_priv0) )
+    if ( prv->ncpus == 1 )
     {
         prv->master = cpu;
-        init_timer( &prv->master_ticker, csched_acct, prv, cpu);
-        prv->ticker_active = 2;
+        init_timer(&prv->master_ticker, csched_acct, prv, cpu);
+        set_timer(&prv->master_ticker, NOW() +
+                  MILLISECS(CSCHED_MSECS_PER_TICK) * CSCHED_TICKS_PER_ACCT);
     }
 
     init_timer(&spc->ticker, csched_tick, (void *)(unsigned long)cpu, cpu);
-
-    if ( prv == csched_priv0 )
-        prv->master = first_cpu(prv->cpus);
+    set_timer(&spc->ticker, NOW() + MILLISECS(CSCHED_MSECS_PER_TICK));
 
     INIT_LIST_HEAD(&spc->runq);
     spc->runq_sort_last = prv->runq_sort;
@@ -1450,58 +1442,22 @@ csched_dump(const struct scheduler *ops)
 }
 
 static int
-csched_init(struct scheduler *ops, int pool0)
+csched_init(struct scheduler *ops)
 {
     struct csched_private *prv;
 
     prv = xmalloc(struct csched_private);
     if ( prv == NULL )
-        return 1;
+        return -ENOMEM;
+
     memset(prv, 0, sizeof(*prv));
-    if ( pool0 )
-        csched_priv0 = prv;
     ops->sched_data = prv;
     spin_lock_init(&prv->lock);
     INIT_LIST_HEAD(&prv->active_sdom);
-    prv->ncpus = 0;
     prv->master = UINT_MAX;
-    cpus_clear(prv->idlers);
-    prv->weight = 0U;
-    prv->credit = 0U;
-    prv->credit_balance = 0;
-    prv->runq_sort = 0U;
-    prv->ticker_active = (csched_priv0 == prv) ? 0 : 1;
 
     return 0;
 }
-
-/* Tickers cannot be kicked until SMP subsystem is alive. */
-static __init int csched_start_tickers(void)
-{
-    struct csched_pcpu *spc;
-    unsigned int cpu;
-
-    /* Is the credit scheduler initialised? */
-    if ( (csched_priv0 == NULL) || (csched_priv0->ncpus == 0) )
-        return 0;
-
-    csched_priv0->ticker_active = 1;
-
-    for_each_online_cpu ( cpu )
-    {
-        spc = CSCHED_PCPU(cpu);
-        set_timer(&spc->ticker, NOW() + MILLISECS(CSCHED_MSECS_PER_TICK));
-    }
-
-    init_timer( &csched_priv0->master_ticker, csched_acct, csched_priv0,
-                    csched_priv0->master);
-
-    set_timer( &csched_priv0->master_ticker, NOW() +
-            MILLISECS(CSCHED_MSECS_PER_TICK) * CSCHED_TICKS_PER_ACCT );
-
-    return 0;
-}
-__initcall(csched_start_tickers);
 
 static void
 csched_deinit(const struct scheduler *ops)
@@ -1526,25 +1482,11 @@ static void csched_tick_resume(const struct scheduler *ops, unsigned int cpu)
 {
     struct csched_pcpu *spc;
     uint64_t now = NOW();
-    struct csched_private *prv;
-
-    prv = CSCHED_PRIV(ops);
-    if ( !prv->ticker_active )
-        return;
-
 
     spc = CSCHED_PCPU(cpu);
 
     set_timer(&spc->ticker, now + MILLISECS(CSCHED_MSECS_PER_TICK)
             - now % MILLISECS(CSCHED_MSECS_PER_TICK) );
-
-    if ( (prv->ticker_active == 2) && (prv->master == cpu) )
-    {
-        set_timer( &prv->master_ticker, now +
-            MILLISECS(CSCHED_MSECS_PER_TICK) * CSCHED_TICKS_PER_ACCT -
-            now % MILLISECS(CSCHED_MSECS_PER_TICK) * CSCHED_TICKS_PER_ACCT);
-        prv->ticker_active = 1;
-    }
 }
 
 static struct csched_private _csched_priv;

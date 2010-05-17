@@ -72,7 +72,7 @@ static struct scheduler __read_mostly ops;
          (( (opsptr)->fn != NULL ) ? (opsptr)->fn(opsptr, ##__VA_ARGS__ )  \
           : (typeof((opsptr)->fn(opsptr, ##__VA_ARGS__)))0 )
 
-#define DOM2OP(_d)    (((_d)->cpupool == NULL) ? &ops : &((_d)->cpupool->sched))
+#define DOM2OP(_d)    (((_d)->cpupool == NULL) ? &ops : ((_d)->cpupool->sched))
 #define VCPU2OP(_v)   (DOM2OP((_v)->domain))
 #define VCPU2ONLINE(_v)                                                    \
          (((_v)->domain->cpupool == NULL) ? &cpu_online_map                \
@@ -243,21 +243,21 @@ int sched_move_domain(struct domain *d, struct cpupool *c)
     void **vcpu_priv;
     void *domdata;
 
-    domdata = SCHED_OP(&(c->sched), alloc_domdata, d);
+    domdata = SCHED_OP(c->sched, alloc_domdata, d);
     if ( domdata == NULL )
         return -ENOMEM;
 
     vcpu_priv = xmalloc_array(void *, d->max_vcpus);
     if ( vcpu_priv == NULL )
     {
-        SCHED_OP(&(c->sched), free_domdata, domdata);
+        SCHED_OP(c->sched, free_domdata, domdata);
         return -ENOMEM;
     }
 
     memset(vcpu_priv, 0, d->max_vcpus * sizeof(void *));
     for_each_vcpu ( d, v )
     {
-        vcpu_priv[v->vcpu_id] = SCHED_OP(&(c->sched), alloc_vdata, v, domdata);
+        vcpu_priv[v->vcpu_id] = SCHED_OP(c->sched, alloc_vdata, v, domdata);
         if ( vcpu_priv[v->vcpu_id] == NULL )
         {
             for_each_vcpu ( d, v )
@@ -266,7 +266,7 @@ int sched_move_domain(struct domain *d, struct cpupool *c)
                     xfree(vcpu_priv[v->vcpu_id]);
             }
             xfree(vcpu_priv);
-            SCHED_OP(&(c->sched), free_domdata, domdata);
+            SCHED_OP(c->sched, free_domdata, domdata);
             return -ENOMEM;
         }
     }
@@ -1133,7 +1133,7 @@ void __init scheduler_init(void)
         if ( strcmp(ops.opt_name, opt_sched) == 0 )
             break;
     }
-    
+
     if ( schedulers[i] == NULL )
     {
         printk("Could not find scheduler: %s\n", opt_sched);
@@ -1144,23 +1144,21 @@ void __init scheduler_init(void)
     register_cpu_notifier(&cpu_nfb);
 
     printk("Using scheduler: %s (%s)\n", ops.name, ops.opt_name);
-    if ( SCHED_OP(&ops, init, 1) )
+    if ( SCHED_OP(&ops, init) )
         panic("scheduler returned error on init\n");
 }
 
-/* switch scheduler on cpu */
 void schedule_cpu_switch(unsigned int cpu, struct cpupool *c)
 {
     unsigned long flags;
     struct vcpu *v;
-    void *vpriv = NULL;
-    void *ppriv;
-    void *ppriv_old;
-    struct scheduler *old_ops;
-    struct scheduler *new_ops;
+    void *ppriv, *ppriv_old, *vpriv = NULL;
+    struct scheduler *old_ops = per_cpu(scheduler, cpu);
+    struct scheduler *new_ops = (c == NULL) ? &ops : c->sched;
 
-    old_ops = per_cpu(scheduler, cpu);
-    new_ops = (c == NULL) ? &ops : &(c->sched);
+    if ( old_ops == new_ops )
+        return;
+
     v = per_cpu(schedule_data, cpu).idle;
     ppriv = SCHED_OP(new_ops, alloc_pdata, cpu);
     if ( c != NULL )
@@ -1192,11 +1190,14 @@ void schedule_cpu_switch(unsigned int cpu, struct cpupool *c)
     SCHED_OP(old_ops, free_pdata, ppriv_old, cpu);
 }
 
-/* init scheduler global data */
-int schedule_init_global(char *name, struct scheduler *sched)
+struct scheduler *scheduler_alloc(char *name)
 {
     int i;
     const struct scheduler *data;
+    struct scheduler *sched;
+
+    if ( name == NULL )
+        return &ops;
 
     data = &ops;
     for ( i = 0; (schedulers[i] != NULL) && (name != NULL) ; i++ )
@@ -1207,14 +1208,24 @@ int schedule_init_global(char *name, struct scheduler *sched)
             break;
         }
     }
+
+    if ( (sched = xmalloc(struct scheduler)) == NULL )
+        return NULL;
     memcpy(sched, data, sizeof(*sched));
-    return SCHED_OP(sched, init, 0);
+    if ( SCHED_OP(sched, init) != 0 )
+    {
+        xfree(sched);
+        sched = NULL;
+    }
+
+    return sched;
 }
 
-/* deinitialize scheduler global data */
-void schedule_deinit_global(struct scheduler *sched)
+void scheduler_free(struct scheduler *sched)
 {
+    BUG_ON(sched == &ops);
     SCHED_OP(sched, deinit);
+    xfree(sched);
 }
 
 void schedule_dump(struct cpupool *c)
@@ -1223,7 +1234,7 @@ void schedule_dump(struct cpupool *c)
     struct scheduler *sched;
     cpumask_t        *cpus;
 
-    sched = (c == NULL) ? &ops : &(c->sched);
+    sched = (c == NULL) ? &ops : c->sched;
     cpus = (c == NULL) ? &cpupool_free_cpus : &c->cpu_valid;
     printk("Scheduler: %s (%s)\n", sched->name, sched->opt_name);
     SCHED_OP(sched, dump_settings);

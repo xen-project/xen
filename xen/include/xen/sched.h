@@ -581,8 +581,8 @@ void cpu_init(void);
 
 struct scheduler;
 
-int schedule_init_global(char *name, struct scheduler *sched);
-void schedule_deinit_global(struct scheduler *sched);
+struct scheduler *scheduler_alloc(char *name);
+void scheduler_free(struct scheduler *sched);
 void schedule_cpu_switch(unsigned int cpu, struct cpupool *c);
 void vcpu_force_reschedule(struct vcpu *v);
 int cpu_disable_scheduler(unsigned int cpu);

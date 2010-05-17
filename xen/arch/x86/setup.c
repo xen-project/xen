@@ -1019,14 +1019,14 @@ void __init __start_xen(unsigned long mbi_p)
 
     xsm_init(&initrdidx, mbi, initial_images_start);
 
+    timer_init();
+
     init_idle_domain();
 
     trap_init();
 
     rcu_init();
     
-    timer_init();
-
     early_time_init();
 
     arch_init_memory();
