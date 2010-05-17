@@ -62,7 +62,7 @@
 #define setup_trampoline()    (bootsym_phys(trampoline_realmode_entry))
 
 /* Set if we find a B stepping CPU */
-static int __devinitdata smp_b_stepping;
+static int smp_b_stepping;
 
 /* Package ID of each logical CPU */
 int phys_proc_id[NR_CPUS] __read_mostly = {[0 ... NR_CPUS-1] = BAD_APICID};
@@ -75,43 +75,26 @@ DEFINE_PER_CPU_READ_MOSTLY(cpumask_t, cpu_sibling_map);
 /* representing HT and core siblings of each logical CPU */
 DEFINE_PER_CPU_READ_MOSTLY(cpumask_t, cpu_core_map);
 
-/* bitmap of online cpus */
 cpumask_t cpu_online_map __read_mostly;
 EXPORT_SYMBOL(cpu_online_map);
 
 cpumask_t cpu_callin_map;
 cpumask_t cpu_callout_map;
-EXPORT_SYMBOL(cpu_callout_map);
 cpumask_t cpu_possible_map = CPU_MASK_ALL;
-EXPORT_SYMBOL(cpu_possible_map);
 static cpumask_t smp_commenced_mask;
 
-/* TSC's upper 32 bits can't be written in eariler CPU (before prescott), there
- * is no way to resync one AP against BP. TBD: for prescott and above, we
- * should use IA64's algorithm
- */
-static int __devinitdata tsc_sync_disabled;
-
-/* Per CPU bogomips and other parameters */
 struct cpuinfo_x86 cpu_data[NR_CPUS];
-EXPORT_SYMBOL(cpu_data);
 
 u32 x86_cpu_to_apicid[NR_CPUS] __read_mostly =
 			{ [0 ... NR_CPUS-1] = -1U };
-EXPORT_SYMBOL(x86_cpu_to_apicid);
 
 static void map_cpu_to_logical_apicid(void);
-/* State of each CPU. */
-DEFINE_PER_CPU(int, cpu_state) = { 0 };
+
+DEFINE_PER_CPU(int, cpu_state);
 
 void *stack_base[NR_CPUS];
 
-/*
- * The bootstrap kernel entry code has set these up. Save them for
- * a given CPU
- */
-
-static void __devinit smp_store_cpu_info(int id)
+static void smp_store_cpu_info(int id)
 {
 	struct cpuinfo_x86 *c = cpu_data + id;
 
@@ -164,156 +147,9 @@ valid_k7:
 	;
 }
 
-/*
- * TSC synchronization.
- *
- * We first check whether all CPUs have their TSC's synchronized,
- * then we print a warning if not, and always resync.
- */
-
-static atomic_t tsc_start_flag = ATOMIC_INIT(0);
-static atomic_t tsc_count_start = ATOMIC_INIT(0);
-static atomic_t tsc_count_stop = ATOMIC_INIT(0);
-static unsigned long long tsc_values[NR_CPUS];
-
-#define NR_LOOPS 5
-
-static void __init synchronize_tsc_bp (void)
-{
-	int i;
-	unsigned long long t0;
-	unsigned long long sum, avg;
-	long long delta;
-	unsigned int one_usec;
-	int buggy = 0;
-
-	if (boot_cpu_has(X86_FEATURE_TSC_RELIABLE)) {
-		printk("TSC is reliable, synchronization unnecessary\n");
-		return;
-	}
-       
-	printk("checking TSC synchronization across %u CPUs: ", num_booting_cpus());
-
-	/* convert from kcyc/sec to cyc/usec */
-	one_usec = cpu_khz / 1000;
-
-	atomic_set(&tsc_start_flag, 1);
-	wmb();
-
-	/*
-	 * We loop a few times to get a primed instruction cache,
-	 * then the last pass is more or less synchronized and
-	 * the BP and APs set their cycle counters to zero all at
-	 * once. This reduces the chance of having random offsets
-	 * between the processors, and guarantees that the maximum
-	 * delay between the cycle counters is never bigger than
-	 * the latency of information-passing (cachelines) between
-	 * two CPUs.
-	 */
-	for (i = 0; i < NR_LOOPS; i++) {
-		/*
-		 * all APs synchronize but they loop on '== num_cpus'
-		 */
-		while (atomic_read(&tsc_count_start) != num_booting_cpus()-1)
-			mb();
-		atomic_set(&tsc_count_stop, 0);
-		wmb();
-		/*
-		 * this lets the APs save their current TSC:
-		 */
-		atomic_inc(&tsc_count_start);
-
-		rdtscll(tsc_values[smp_processor_id()]);
-		/*
-		 * We clear the TSC in the last loop:
-		 */
-		if (i == NR_LOOPS-1)
-			write_tsc(0L);
-
-		/*
-		 * Wait for all APs to leave the synchronization point:
-		 */
-		while (atomic_read(&tsc_count_stop) != num_booting_cpus()-1)
-			mb();
-		atomic_set(&tsc_count_start, 0);
-		wmb();
-		atomic_inc(&tsc_count_stop);
-	}
-
-	sum = 0;
-	for (i = 0; i < NR_CPUS; i++) {
-		if (cpu_isset(i, cpu_callout_map)) {
-			t0 = tsc_values[i];
-			sum += t0;
-		}
-	}
-	avg = sum;
-	do_div(avg, num_booting_cpus());
-
-	sum = 0;
-	for (i = 0; i < NR_CPUS; i++) {
-		if (!cpu_isset(i, cpu_callout_map))
-			continue;
-		delta = tsc_values[i] - avg;
-		if (delta < 0)
-			delta = -delta;
-		/*
-		 * We report bigger than 2 microseconds clock differences.
-		 */
-		if (delta > 2*one_usec) {
-			long realdelta;
-			if (!buggy) {
-				buggy = 1;
-				printk("\n");
-			}
-			realdelta = delta;
-			do_div(realdelta, one_usec);
-			if (tsc_values[i] < avg)
-				realdelta = -realdelta;
-
-			printk("CPU#%d had %ld usecs TSC skew, fixed it up.\n", i, realdelta);
-		}
-
-		sum += delta;
-	}
-	if (!buggy)
-		printk("passed.\n");
-}
-
-static void __init synchronize_tsc_ap (void)
-{
-	int i;
-
-	if (boot_cpu_has(X86_FEATURE_TSC_RELIABLE))
-		return;
-
-	/*
-	 * Not every cpu is online at the time
-	 * this gets called, so we first wait for the BP to
-	 * finish SMP initialization:
-	 */
-	while (!atomic_read(&tsc_start_flag)) mb();
-
-	for (i = 0; i < NR_LOOPS; i++) {
-		atomic_inc(&tsc_count_start);
-		while (atomic_read(&tsc_count_start) != num_booting_cpus())
-			mb();
-
-		rdtscll(tsc_values[smp_processor_id()]);
-		if (i == NR_LOOPS-1)
-			write_tsc(0L);
-
-		atomic_inc(&tsc_count_stop);
-		while (atomic_read(&tsc_count_stop) != num_booting_cpus()) mb();
-	}
-}
-#undef NR_LOOPS
-
-extern void calibrate_delay(void);
-
 static atomic_t init_deasserted;
 
-void __devinit smp_callin(void)
+void smp_callin(void)
 {
 	int cpuid, phys_id, i;
 
@@ -357,7 +193,7 @@ void __devinit smp_callin(void)
 		 */
 		if (cpu_isset(cpuid, cpu_callout_map))
 			break;
-		rep_nop();
+		cpu_relax();
 		mdelay(10);
 	}
 
@@ -379,14 +215,6 @@ void __devinit smp_callin(void)
 	setup_local_APIC();
 	map_cpu_to_logical_apicid();
 
-#if 0
-	/*
-	 * Get our bogomips.
-	 */
-	calibrate_delay();
-	Dprintk("Stack at about %p\n",&cpuid);
-#endif
-
 	/*
 	 * Save our processor parameters
 	 */
@@ -396,18 +224,9 @@ void __devinit smp_callin(void)
 	 * Allow the master to continue.
 	 */
 	cpu_set(cpuid, cpu_callin_map);
-
-	/*
-	 *      Synchronize the TSC with the BP
-	 */
-	if (cpu_has_tsc && cpu_khz && !tsc_sync_disabled) {
-		synchronize_tsc_ap();
-		/* No sync for same reason as above */
-		calibrate_tsc_ap();
-	}
 }
 
-static int cpucount, booting_cpu;
+static int booting_cpu;
 
 /* representing cpus for which sibling maps can be computed */
 static cpumask_t cpu_sibling_setup_map;
@@ -478,7 +297,7 @@ static void construct_percpu_idt(unsigned int cpu)
 /*
  * Activate a secondary processor.
  */
-void __devinit start_secondary(void *unused)
+void start_secondary(void *unused)
 {
 	/*
 	 * Dont put anything before smp_callin(), SMP
@@ -515,10 +334,10 @@ void __devinit start_secondary(void *unused)
 	percpu_traps_init();
 
 	cpu_init();
-	/*preempt_disable();*/
+
 	smp_callin();
 	while (!cpu_isset(smp_processor_id(), smp_commenced_mask))
-		rep_nop();
+		cpu_relax();
 
 	/*
 	 * At this point, boot CPU has fully initialised the IDT. It is
@@ -620,81 +439,7 @@ static inline void __inquire_remote_apic(int apicid)
 }
 #endif
 
-#ifdef WAKE_SECONDARY_VIA_NMI
-
-static int logical_apicid_to_cpu(int logical_apicid)
-{
-	int i;
-
-	for ( i = 0; i < sizeof(cpu_2_logical_apicid); i++ )
-		if ( cpu_2_logical_apicid[i] == logical_apicid )
-			break;
-
-	if ( i == sizeof(cpu_2_logical_apicid) );
-		i = -1; /* not found */
-
-	return i;
-}
-
-/* 
- * Poke the other CPU in the eye via NMI to wake it up. Remember that the normal
- * INIT, INIT, STARTUP sequence will reset the chip hard for us, and this
- * won't ... remember to clear down the APIC, etc later.
- */
-static int __devinit
-wakeup_secondary_cpu(int logical_apicid, unsigned long start_eip)
-{
-	unsigned long send_status = 0, accept_status = 0;
-	int timeout, maxlvt;
-	int dest_cpu;
-	u32 dest;
-
-	dest_cpu = logical_apicid_to_cpu(logical_apicid);
-	BUG_ON(dest_cpu == -1);
-
-	dest = cpu_physical_id(dest_cpu);
-
-	/* Boot on the stack */
-	apic_icr_write(APIC_DM_NMI | APIC_DEST_PHYSICAL, dest_cpu);
-
-	Dprintk("Waiting for send to finish...\n");
-	timeout = 0;
-	do {
-		Dprintk("+");
-		udelay(100);
-		if ( !x2apic_enabled )
-			send_status = apic_read(APIC_ICR) & APIC_ICR_BUSY;
-		else
-			send_status = 0; /* We go out of the loop directly. */
-	} while (send_status && (timeout++ < 1000));
-
-	/*
-	 * Give the other CPU some time to accept the IPI.
-	 */
-	udelay(200);
-	/*
-	 * Due to the Pentium erratum 3AP.
-	 */
-	maxlvt = get_maxlvt();
-	if (maxlvt > 3) {
-		apic_read_around(APIC_SPIV);
-		apic_write(APIC_ESR, 0);
-	}
-	accept_status = (apic_read(APIC_ESR) & 0xEF);
-	Dprintk("NMI sent.\n");
-
-	if (send_status)
-		printk("APIC never delivered???\n");
-	if (accept_status)
-		printk("APIC delivery error (%lx).\n", accept_status);
-
-	return (send_status | accept_status);
-}
-#endif	/* WAKE_SECONDARY_VIA_NMI */
-
-#ifdef WAKE_SECONDARY_VIA_INIT
-static int __devinit
-wakeup_secondary_cpu(int phys_apicid, unsigned long start_eip)
+static int wakeup_secondary_cpu(int phys_apicid, unsigned long start_eip)
 {
 	unsigned long send_status = 0, accept_status = 0;
 	int maxlvt, timeout, num_starts, j;
@@ -817,7 +562,6 @@ wakeup_secondary_cpu(int phys_apicid, unsigned long start_eip)
 
 	return (send_status | accept_status);
 }
-#endif	/* WAKE_SECONDARY_VIA_INIT */
 
 extern cpumask_t cpu_initialized;
 /*
@@ -842,7 +586,7 @@ static void *prepare_idle_stack(unsigned int cpu)
 	return stack_base[cpu];
 }
 
-static int __devinit do_boot_cpu(int apicid, int cpu)
+static int do_boot_cpu(int apicid, int cpu)
 /*
  * NOTE - on most systems this is a PHYSICAL apic ID, but on multiquad
  * (ie clustered apic addressing mode), this is a LOGICAL apic ID.
@@ -865,8 +609,6 @@ static int __devinit do_boot_cpu(int apicid, int cpu)
 	 * (e.g. by the ACPI SMI) to initialize new CPUs with MTRRs in sync:
 	 */
 	mtrr_save_state();
-
-	++cpucount;
 
 	booting_cpu = cpu;
 
@@ -980,28 +722,27 @@ static int __devinit do_boot_cpu(int apicid, int cpu)
 	if (boot_error) {
 		/* Try to put things back the way they were before ... */
 		unmap_cpu_to_logical_apicid(cpu);
-		cpu_clear(cpu, cpu_callout_map); /* was set here (do_boot_cpu()) */
+		cpu_clear(cpu, cpu_callout_map); /* was set here */
 		cpu_clear(cpu, cpu_initialized); /* was set by cpu_init() */
-		cpucount--;
 
 		/* Mark the CPU as non-present */
 		x86_cpu_to_apicid[cpu] = BAD_APICID;
 		cpu_clear(cpu, cpu_present_map);
-	} else {
 	}
 
 	/* mark "stuck" area as not stuck */
 	bootsym(trampoline_cpu_started) = 0;
 	mb();
 
-	return boot_error;
+	smpboot_restore_warm_reset_vector();
+
+	return boot_error ? -EIO : 0;
 }
 
 void cpu_exit_clear(void)
 {
 	int cpu = raw_smp_processor_id();
 
-	cpucount--;
 	cpu_uninit();
 
 	cpu_clear(cpu, cpu_callout_map);
@@ -1011,43 +752,9 @@ void cpu_exit_clear(void)
 	unmap_cpu_to_logical_apicid(cpu);
 }
 
-static int __cpuinit __smp_prepare_cpu(int cpu)
+void __init smp_prepare_cpus(unsigned int max_cpus)
 {
-	int	apicid, ret;
-
-	apicid = x86_cpu_to_apicid[cpu];
-	if (apicid == BAD_APICID) {
-		ret = -ENODEV;
-		goto exit;
-	}
-
-	tsc_sync_disabled = 1;
-
-	do_boot_cpu(apicid, cpu);
-
-	tsc_sync_disabled = 0;
-
-	ret = 0;
-exit:
-	return ret;
-}
-
-/*
- * Cycle through the processors sending APIC IPIs to boot each.
- */
-
-/* Where the IO area was mapped on multiquad, always 0 otherwise */
-void *xquad_portio;
-#ifdef CONFIG_X86_NUMAQ
-EXPORT_SYMBOL(xquad_portio);
-#endif
-
-static void __init smp_boot_cpus(unsigned int max_cpus)
-{
-	int apicid, cpu, kicked;
-#ifdef BOGOMIPS
-	unsigned long bogosum = 0;
-#endif
+	mtrr_aps_sync_begin();
 
 	/*
 	 * Setup boot CPU information
@@ -1059,9 +766,6 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	x86_cpu_to_apicid[0] = boot_cpu_physical_apicid;
 
 	stack_base[0] = stack_start.esp;
-
-	/*current_thread_info()->cpu = 0;*/
-	/*smp_tune_scheduling();*/
 
 	set_cpu_sibling_map(0);
 
@@ -1096,7 +800,8 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	/*
 	 * If we couldn't find a local APIC, then get out of here now!
 	 */
-	if (APIC_INTEGRATED(apic_version[boot_cpu_physical_apicid]) && !cpu_has_apic) {
+	if (APIC_INTEGRATED(apic_version[boot_cpu_physical_apicid])
+	    && !cpu_has_apic) {
 		printk(KERN_ERR "BIOS bug, local APIC #%d not detected!...\n",
 			boot_cpu_physical_apicid);
 		goto init_uniprocessor;
@@ -1104,95 +809,9 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 
 	verify_local_APIC();
 
-	/*
-	 * If SMP should be disabled, then really disable it!
-	 */
-	if (!max_cpus)
-		goto init_uniprocessor;
-
 	connect_bsp_APIC();
 	setup_local_APIC();
 	map_cpu_to_logical_apicid();
-
-
-	setup_portio_remap();
-
-	/*
-	 * Scan the CPU present map and fire up the other CPUs via do_boot_cpu
-	 *
-	 * In clustered apic mode, phys_cpu_present_map is a constructed thus:
-	 * bits 0-3 are quad0, 4-7 are quad1, etc. A perverse twist on the 
-	 * clustered apic ID.
-	 */
-	Dprintk("CPU present map: %lx\n", physids_coerce(phys_cpu_present_map));
-
-	kicked = 1;
-
-	for_each_present_cpu ( cpu )
-	{
-		apicid = x86_cpu_to_apicid[cpu];
-
-		/*
-		 * Don't even attempt to start the boot CPU!
-		 */
-		if ((apicid == boot_cpu_apicid) || (apicid == BAD_APICID))
-			continue;
-
-		if (!check_apicid_present(apicid)) {
-			dprintk(XENLOG_WARNING,
-				"Present CPU has valid apicid\n");
-			continue;
-		}
-
-		if (max_cpus <= cpucount+1)
-			continue;
-
-		if ( do_boot_cpu(apicid, cpu))
-			printk("CPU #%d not responding - cannot use it.\n",
-								apicid);
-		else
-			++kicked;
-	}
-
-	/*
-	 * Cleanup possible dangling ends...
-	 */
-	smpboot_restore_warm_reset_vector();
-
-#ifdef BOGOMIPS
-	/*
-	 * Allow the user to impress friends.
-	 */
-	Dprintk("Before bogomips.\n");
-	for (cpu = 0; cpu < NR_CPUS; cpu++)
-		if (cpu_isset(cpu, cpu_callout_map))
-			bogosum += cpu_data[cpu].loops_per_jiffy;
-	printk(KERN_INFO
-		"Total of %d processors activated (%lu.%02lu BogoMIPS).\n",
-		cpucount+1,
-		bogosum/(500000/HZ),
-		(bogosum/(5000/HZ))%100);
-#else
-	printk("Total of %d processors activated.\n", cpucount+1);
-#endif
-	
-	Dprintk("Before bogocount - setting activated=1.\n");
-
-	if (smp_b_stepping)
-		printk(KERN_WARNING "WARNING: SMP operation may be unreliable with B stepping processors.\n");
-
-	/*
-	 * Don't taint if we are running SMP kernel on a single non-MP
-	 * approved Athlon
-	 */
-	if (tainted & TAINT_UNSAFE_SMP) {
-		if (cpucount)
-			printk (KERN_INFO "WARNING: This combination of AMD processors is not suitable for SMP.\n");
-		else
-			tainted &= ~TAINT_UNSAFE_SMP;
-	}
-
-	Dprintk("Boot done.\n");
 
 	/*
 	 * construct cpu_sibling_map, so that we can tell sibling CPUs
@@ -1201,34 +820,15 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	cpu_set(0, per_cpu(cpu_sibling_map, 0));
 	cpu_set(0, per_cpu(cpu_core_map, 0));
 
-	if (nmi_watchdog == NMI_LOCAL_APIC)
-		check_nmi_watchdog();
-
 	smpboot_setup_io_apic();
 
 	setup_boot_APIC_clock();
-
-	/*
-	 * Synchronize the TSC with the AP
-	 */
-	if (cpu_has_tsc && cpucount && cpu_khz)
-		synchronize_tsc_bp();
-	calibrate_tsc_bp();
 }
 
-/* These are wrappers to interface to the new boot process.  Someone
-   who understands all this stuff should rewrite it properly. --RR 15/Jul/02 */
-void __init smp_prepare_cpus(unsigned int max_cpus)
+void __init smp_prepare_boot_cpu(void)
 {
-	smp_commenced_mask = cpumask_of_cpu(0);
-	cpu_callin_map = cpumask_of_cpu(0);
-	mb();
-	smp_boot_cpus(max_cpus);
-	mtrr_aps_sync_begin();
-}
-
-void __devinit smp_prepare_boot_cpu(void)
-{
+	cpu_set(smp_processor_id(), smp_commenced_mask);
+	cpu_set(smp_processor_id(), cpu_callin_map);
 	cpu_set(smp_processor_id(), cpu_online_map);
 	cpu_set(smp_processor_id(), cpu_callout_map);
 	cpu_set(smp_processor_id(), cpu_present_map);
@@ -1292,9 +892,9 @@ void __cpu_die(unsigned int cpu)
 	for (;;) {
 		/* They ack this in play_dead by setting CPU_DEAD */
 		if (per_cpu(cpu_state, cpu) == CPU_DEAD)
-			return;
+			break;
 		mdelay(100);
-		mb();
+		cpu_relax();
 		process_pending_softirqs();
 		if ((++i % 10) == 0)
 			printk(KERN_ERR "CPU %u still not dead...\n", cpu);
@@ -1356,30 +956,21 @@ int cpu_add(uint32_t apic_id, uint32_t acpi_id, uint32_t pxm)
 }
 
 
-int __devinit __cpu_up(unsigned int cpu)
+int __cpu_up(unsigned int cpu)
 {
-	/*
-	 * We do warm boot only on cpus that had booted earlier
-	 * Otherwise cold boot is all handled from smp_boot_cpus().
-	 * cpu_callin_map is set during AP kickstart process. Its reset
-	 * when a cpu is taken offline from cpu_exit_clear().
-	 */
-	if (!cpu_isset(cpu, cpu_callin_map)) {
-		if (__smp_prepare_cpu(cpu))
-			return -EIO;
-		smpboot_restore_warm_reset_vector();
-	}
+	int apicid, ret;
 
-	/* In case one didn't come up */
-	if (!cpu_isset(cpu, cpu_callin_map)) {
-		printk(KERN_DEBUG "skipping cpu%d, didn't come online\n", cpu);
-		return -EIO;
-	}
+	BUG_ON(cpu_isset(cpu, cpu_callin_map));
 
-	/* Unleash the CPU! */
+	if ((apicid = x86_cpu_to_apicid[cpu]) == BAD_APICID)
+		return -ENODEV;
+
+	if ((ret = do_boot_cpu(apicid, cpu)) != 0)
+	    return ret;
+
 	cpu_set(cpu, smp_commenced_mask);
 	while (!cpu_isset(cpu, cpu_online_map)) {
-		mb();
+		cpu_relax();
 		process_pending_softirqs();
 	}
 
@@ -1389,9 +980,27 @@ int __devinit __cpu_up(unsigned int cpu)
 
 void __init smp_cpus_done(unsigned int max_cpus)
 {
-#ifdef CONFIG_X86_IO_APIC
+	if (smp_b_stepping)
+		printk(KERN_WARNING "WARNING: SMP operation may be "
+		       "unreliable with B stepping processors.\n");
+
+	/*
+	 * Don't taint if we are running SMP kernel on a single non-MP
+	 * approved Athlon
+	 */
+	if (tainted & TAINT_UNSAFE_SMP) {
+		if (num_online_cpus() > 1)
+			printk(KERN_INFO "WARNING: This combination of AMD "
+			       "processors is not suitable for SMP.\n");
+		else
+			tainted &= ~TAINT_UNSAFE_SMP;
+	}
+
+	if (nmi_watchdog == NMI_LOCAL_APIC)
+		check_nmi_watchdog();
+
 	setup_ioapic_dest();
-#endif
+
 	mtrr_save_state();
 	mtrr_aps_sync_end();
 }

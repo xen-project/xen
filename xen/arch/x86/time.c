@@ -304,52 +304,6 @@ static void set_time_scale(struct time_scale *ts, u64 ticks_per_sec)
     ts->shift    = shift;
 }
 
-static atomic_t tsc_calibrate_gang = ATOMIC_INIT(0);
-static unsigned int tsc_calibrate_status = 0;
-
-void calibrate_tsc_bp(void)
-{
-    while ( atomic_read(&tsc_calibrate_gang) != (num_booting_cpus() - 1) )
-        mb();
-
-    outb(CALIBRATE_LATCH & 0xff, PIT_CH2);
-    outb(CALIBRATE_LATCH >> 8, PIT_CH2);
-
-    tsc_calibrate_status = 1;
-    wmb();
-
-    while ( (inb(0x61) & 0x20) == 0 )
-        continue;
-
-    tsc_calibrate_status = 2;
-    wmb();
-
-    while ( atomic_read(&tsc_calibrate_gang) != 0 )
-        mb();
-}
-
-void calibrate_tsc_ap(void)
-{
-    u64 t1, t2, ticks_per_sec;
-
-    atomic_inc(&tsc_calibrate_gang);
-
-    while ( tsc_calibrate_status < 1 )
-        mb();
-
-    rdtscll(t1);
-
-    while ( tsc_calibrate_status < 2 )
-        mb();
-
-    rdtscll(t2);
-
-    ticks_per_sec = (t2 - t1) * (u64)CALIBRATE_FRAC;
-    set_time_scale(&this_cpu(cpu_time).tsc_scale, ticks_per_sec);
-
-    atomic_dec(&tsc_calibrate_gang);
-}
-
 static char *freq_string(u64 freq)
 {
     static char s[20];
@@ -1401,9 +1355,8 @@ void init_percpu_time(void)
     unsigned long flags;
     s_time_t now;
 
-    /* If we have constant-rate TSCs then scale factor can be shared. */
-    if ( boot_cpu_has(X86_FEATURE_CONSTANT_TSC) )
-        this_cpu(cpu_time).tsc_scale = per_cpu(cpu_time, 0).tsc_scale;
+    /* Initial estimate for TSC rate. */
+    this_cpu(cpu_time).tsc_scale = per_cpu(cpu_time, 0).tsc_scale;
 
     local_irq_save(flags);
     rdtscll(t->local_tsc_stamp);
@@ -1568,10 +1521,7 @@ int time_suspend(void)
 
 int time_resume(void)
 {
-    /*u64 tmp = */init_pit_and_calibrate_tsc();
-
-    /* Disable this while calibrate_tsc_ap() also is skipped. */
-    /*set_time_scale(&this_cpu(cpu_time).tsc_scale, tmp);*/
+    init_pit_and_calibrate_tsc();
 
     resume_platform_timer();
 

@@ -37,10 +37,6 @@ static inline int mpc_apic_id(struct mpc_config_processor *m,
 	return (m->mpc_apicid);
 }
 
-static inline void setup_portio_remap(void)
-{
-}
-
 static inline int multi_timer_check(int apic, int irq)
 {
 	return 0;

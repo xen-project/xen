@@ -22,9 +22,6 @@
 #define TSC_MODE_NEVER_EMULATE    2
 #define TSC_MODE_PVRDTSCP         3
 
-void calibrate_tsc_bp(void);
-void calibrate_tsc_ap(void);
-
 typedef u64 cycles_t;
 
 static inline cycles_t get_cycles(void)
