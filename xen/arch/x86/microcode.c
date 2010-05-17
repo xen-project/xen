@@ -66,11 +66,9 @@ static void microcode_fini_cpu(int cpu)
 
 int microcode_resume_cpu(int cpu)
 {
-    int err = 0;
+    int err;
     struct ucode_cpu_info *uci = &per_cpu(ucode_cpu_info, cpu);
     struct cpu_signature nsig;
-
-    gdprintk(XENLOG_INFO, "microcode: CPU%d resumed\n", cpu);
 
     if ( !uci->mc.mc_valid )
         return -EIO;
