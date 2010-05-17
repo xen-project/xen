@@ -24,14 +24,6 @@ static inline void smp_callin_clear_local_apic(void)
 {
 }
 
-static inline void store_NMI_vector(unsigned short *high, unsigned short *low)
-{
-}
-
-static inline void restore_NMI_vector(unsigned short *high, unsigned short *low)
-{
-}
-
 #if APIC_DEBUG
  #define inquire_remote_apic(apicid) __inquire_remote_apic(apicid)
 #else

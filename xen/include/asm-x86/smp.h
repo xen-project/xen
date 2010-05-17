@@ -57,7 +57,7 @@ DECLARE_PER_CPU(int, cpu_state);
 
 #define cpu_is_offline(cpu) unlikely(!cpu_online(cpu))
 extern void cpu_exit_clear(void);
-extern void cpu_uninit(void);
+extern void cpu_uninit(unsigned int cpu);
 int cpu_add(uint32_t apic_id, uint32_t acpi_id, uint32_t pxm);
 
 /*

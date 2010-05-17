@@ -550,7 +550,7 @@ void __cpuinit print_cpu_info(unsigned int cpu)
 		printk("\n");
 }
 
-cpumask_t cpu_initialized __cpuinitdata = CPU_MASK_NONE;
+static cpumask_t cpu_initialized;
 
 /* This is hacky. :)
  * We're emulating future behavior.
@@ -629,8 +629,7 @@ void __cpuinit cpu_init(void)
 #undef CD
 }
 
-void __cpuinit cpu_uninit(void)
+void cpu_uninit(unsigned int cpu)
 {
-	int cpu = raw_smp_processor_id();
 	cpu_clear(cpu, cpu_initialized);
 }
