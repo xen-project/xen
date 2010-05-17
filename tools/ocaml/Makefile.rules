@@ -14,6 +14,8 @@ else
   Q = @
 endif
 
+.NOTPARALLEL:
+
 ALL_OCAML_OBJS ?= $(OBJS)
 
 %.cmo: %.ml
