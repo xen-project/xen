@@ -521,18 +521,29 @@ static int cpu_callback(
     struct notifier_block *nfb, unsigned long action, void *hcpu)
 {
     unsigned int cpu = (unsigned long)hcpu;
+    struct timers *ts = &per_cpu(timers, cpu);
 
-    if ( action == CPU_UP_PREPARE )
+    switch ( action )
     {
-        spin_lock_init(&per_cpu(timers, cpu).lock);
-        per_cpu(timers, cpu).heap = &dummy_heap;
+    case CPU_UP_PREPARE:
+        spin_lock_init(&ts->lock);
+        ts->heap = &dummy_heap;
+        break;
+    case CPU_UP_CANCELED:
+    case CPU_DEAD:
+        /* Enable this later. */
+        /*WARN_ON(GET_HEAP_SIZE(ts->heap) || ts->list);*/
+        break;
+    default:
+        break;
     }
 
     return NOTIFY_DONE;
 }
 
 static struct notifier_block cpu_nfb = {
-    .notifier_call = cpu_callback
+    .notifier_call = cpu_callback,
+    .priority = 99
 };
 
 void __init timer_init(void)

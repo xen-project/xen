@@ -188,7 +188,8 @@ static int cpu_callback(
 }
 
 static struct notifier_block cpu_nfb = {
-    .notifier_call = cpu_callback
+    .notifier_call = cpu_callback,
+    .priority = 99
 };
 
 void __init tasklet_subsys_init(void)
