@@ -146,6 +146,11 @@
 #define MSR_IA32_MC8_ADDR		0x00000422
 #define MSR_IA32_MC8_MISC		0x00000423
 
+#define MSR_IA32_MCx_CTL(x)		(MSR_IA32_MC0_CTL + 4*(x))
+#define MSR_IA32_MCx_STATUS(x)		(MSR_IA32_MC0_STATUS + 4*(x))
+#define MSR_IA32_MCx_ADDR(x)		(MSR_IA32_MC0_ADDR + 4*(x))
+#define MSR_IA32_MCx_MISC(x)		(MSR_IA32_MC0_MISC + 4*(x)) 
+
 #define MSR_P6_PERFCTR0			0x000000c1
 #define MSR_P6_PERFCTR1			0x000000c2
 #define MSR_P6_EVNTSEL0			0x00000186
@@ -225,6 +230,7 @@
 
 /* AMD64 MSRs */
 #define MSR_AMD64_NB_CFG		0xc001001f
+#define MSR_AMD64_DC_CFG		0xc0011022
 #define AMD64_NB_CFG_CF8_EXT_ENABLE_BIT	46
 
 /* AMD Family10h machine check MSRs */

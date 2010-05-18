@@ -73,6 +73,8 @@ static void *hsa[NR_CPUS] __read_mostly;
 /* vmcb used for extended host state */
 static void *root_vmcb[NR_CPUS] __read_mostly;
 
+static bool_t amd_erratum383_found __read_mostly;
+
 static void inline __update_guest_eip(
     struct cpu_user_regs *regs, unsigned int inst_len)
 {
@@ -840,6 +842,20 @@ static int svm_cpu_up_prepare(unsigned int cpu)
     return 0;
 }
 
+static void svm_init_erratum_383(struct cpuinfo_x86 *c)
+{
+    uint64_t msr_content;
+
+    /* only family 10h is affected */
+    if ( c->x86 != 0x10 )
+        return;
+
+    rdmsrl(MSR_AMD64_DC_CFG, msr_content);
+    wrmsrl(MSR_AMD64_DC_CFG, msr_content | (1ULL << 47));
+
+    amd_erratum383_found = 1;
+}
+
 static int svm_cpu_up(struct cpuinfo_x86 *c)
 {
     u32 eax, edx, phys_hsa_lo, phys_hsa_hi;   
@@ -864,6 +880,9 @@ static int svm_cpu_up(struct cpuinfo_x86 *c)
     phys_hsa_lo = (u32)phys_hsa;
     phys_hsa_hi = (u32)(phys_hsa >> 32);    
     wrmsr(MSR_K8_VM_HSAVE_PA, phys_hsa_lo, phys_hsa_hi);
+
+    /* check for erratum 383 */
+    svm_init_erratum_383(c);
 
     /* Initialize core's ASID handling. */
     svm_asid_init(c);
@@ -1287,6 +1306,47 @@ static void svm_vmexit_ud_intercept(struct cpu_user_regs *regs)
     }
 }
 
+extern unsigned int nr_mce_banks; /* from mce.h */
+
+static int svm_is_erratum_383(struct cpu_user_regs *regs)
+{
+    uint64_t msr_content;
+    uint32_t i;
+    struct vcpu *v = current;
+
+    if ( !amd_erratum383_found )
+        return 0;
+
+    rdmsrl(MSR_IA32_MC0_STATUS, msr_content);
+    /* Bit 62 may or may not be set for this mce */
+    msr_content &= ~(1ULL << 62);
+
+    if ( msr_content != 0xb600000000010015ULL )
+        return 0;
+    
+    /* Clear MCi_STATUS registers */
+    for (i = 0; i < nr_mce_banks; i++)
+        wrmsrl(MSR_IA32_MCx_STATUS(i), 0ULL);
+    
+    rdmsrl(MSR_IA32_MCG_STATUS, msr_content);
+    wrmsrl(MSR_IA32_MCG_STATUS, msr_content & ~(1ULL << 2));
+
+    /* flush TLB */
+    flush_tlb_mask(&v->domain->domain_dirty_cpumask);
+
+    return 1;
+}
+
+static void svm_vmexit_mce_intercept(
+    struct vcpu *v, struct cpu_user_regs *regs)
+{
+    if ( svm_is_erratum_383(regs) )
+    {
+        gdprintk(XENLOG_ERR, "SVM hits AMD erratum 383\n");
+        domain_crash(v->domain);
+    }
+}
+
 static void wbinvd_ipi(void *info)
 {
     wbinvd();
@@ -1493,6 +1553,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
     /* Asynchronous event, handled when we STGI'd after the VMEXIT. */
     case VMEXIT_EXCEPTION_MC:
         HVMTRACE_0D(MCE);
+        svm_vmexit_mce_intercept(v, regs);
         break;
 
     case VMEXIT_VINTR:
