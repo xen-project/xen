@@ -51,96 +51,87 @@ void cpu_hotplug_done(void)
     put_cpu_maps();
 }
 
-static RAW_NOTIFIER_HEAD(cpu_chain);
+static NOTIFIER_HEAD(cpu_chain);
 
-int register_cpu_notifier(struct notifier_block *nb)
+void register_cpu_notifier(struct notifier_block *nb)
 {
-    int ret;
     if ( !spin_trylock(&cpu_add_remove_lock) )
         BUG(); /* Should never fail as we are called only during boot. */
-    ret = raw_notifier_chain_register(&cpu_chain, nb);
+    notifier_chain_register(&cpu_chain, nb);
     spin_unlock(&cpu_add_remove_lock);
-    return ret;
 }
 
 static int take_cpu_down(void *unused)
 {
     void *hcpu = (void *)(long)smp_processor_id();
-    if ( raw_notifier_call_chain(&cpu_chain, CPU_DYING, hcpu) != NOTIFY_DONE )
-        BUG();
+    int notifier_rc = notifier_call_chain(&cpu_chain, CPU_DYING, hcpu, NULL);
+    BUG_ON(notifier_rc != NOTIFY_DONE);
     __cpu_disable();
     return 0;
 }
 
 int cpu_down(unsigned int cpu)
 {
-    int err, notifier_rc, nr_calls;
+    int err, notifier_rc;
     void *hcpu = (void *)(long)cpu;
+    struct notifier_block *nb = NULL;
 
     if ( !cpu_hotplug_begin() )
         return -EBUSY;
 
-    if ( (cpu == 0) || !cpu_online(cpu) )
+    if ( (cpu >= NR_CPUS) || (cpu == 0) || !cpu_online(cpu) )
     {
         cpu_hotplug_done();
         return -EINVAL;
     }
 
-    notifier_rc = __raw_notifier_call_chain(
-        &cpu_chain, CPU_DOWN_PREPARE, hcpu, -1, &nr_calls);
+    notifier_rc = notifier_call_chain(&cpu_chain, CPU_DOWN_PREPARE, hcpu, &nb);
     if ( notifier_rc != NOTIFY_DONE )
     {
         err = notifier_to_errno(notifier_rc);
-        nr_calls--;
-        notifier_rc = __raw_notifier_call_chain(
-            &cpu_chain, CPU_DOWN_FAILED, hcpu, nr_calls, NULL);
-        BUG_ON(notifier_rc != NOTIFY_DONE);
-        goto out;
+        goto fail;
     }
 
     if ( (err = stop_machine_run(take_cpu_down, NULL, cpu)) < 0 )
-    {
-        notifier_rc = raw_notifier_call_chain(
-            &cpu_chain, CPU_DOWN_FAILED, hcpu);
-        BUG_ON(notifier_rc != NOTIFY_DONE);
-        goto out;
-    }
+        goto fail;
 
     __cpu_die(cpu);
     BUG_ON(cpu_online(cpu));
 
-    notifier_rc = raw_notifier_call_chain(&cpu_chain, CPU_DEAD, hcpu);
+    notifier_rc = notifier_call_chain(&cpu_chain, CPU_DEAD, hcpu, NULL);
     BUG_ON(notifier_rc != NOTIFY_DONE);
 
- out:
-    if ( !err )
-        send_guest_global_virq(dom0, VIRQ_PCPU_STATE);
-    else
-        printk("Failed to take down CPU %u (error %d)\n", cpu, err);
+    send_guest_global_virq(dom0, VIRQ_PCPU_STATE);
+    cpu_hotplug_done();
+    return 0;
+
+ fail:
+    notifier_rc = notifier_call_chain(&cpu_chain, CPU_DOWN_FAILED, hcpu, &nb);
+    BUG_ON(notifier_rc != NOTIFY_DONE);
+    printk("Failed to take down CPU %u (error %d)\n", cpu, err);
     cpu_hotplug_done();
     return err;
 }
 
 int cpu_up(unsigned int cpu)
 {
-    int notifier_rc, nr_calls, err = 0;
+    int notifier_rc, err = 0;
     void *hcpu = (void *)(long)cpu;
+    struct notifier_block *nb = NULL;
 
     if ( !cpu_hotplug_begin() )
         return -EBUSY;
 
-    if ( cpu_online(cpu) || !cpu_present(cpu) )
+    if ( (cpu >= NR_CPUS) || cpu_online(cpu) || !cpu_present(cpu) )
     {
         cpu_hotplug_done();
         return -EINVAL;
     }
 
-    notifier_rc = __raw_notifier_call_chain(
-        &cpu_chain, CPU_UP_PREPARE, hcpu, -1, &nr_calls);
+    notifier_rc = notifier_call_chain(&cpu_chain, CPU_UP_PREPARE, hcpu, &nb);
     if ( notifier_rc != NOTIFY_DONE )
     {
         err = notifier_to_errno(notifier_rc);
-        nr_calls--;
         goto fail;
     }
 
@@ -148,7 +139,7 @@ int cpu_up(unsigned int cpu)
     if ( err < 0 )
         goto fail;
 
-    notifier_rc = raw_notifier_call_chain(&cpu_chain, CPU_ONLINE, hcpu);
+    notifier_rc = notifier_call_chain(&cpu_chain, CPU_ONLINE, hcpu, NULL);
     BUG_ON(notifier_rc != NOTIFY_DONE);
 
     send_guest_global_virq(dom0, VIRQ_PCPU_STATE);
@@ -157,9 +148,9 @@ int cpu_up(unsigned int cpu)
     return 0;
 
  fail:
-    notifier_rc = __raw_notifier_call_chain(
-        &cpu_chain, CPU_UP_CANCELED, hcpu, nr_calls, NULL);
+    notifier_rc = notifier_call_chain(&cpu_chain, CPU_UP_CANCELED, hcpu, &nb);
     BUG_ON(notifier_rc != NOTIFY_DONE);
+    printk("Failed to bring up CPU %u (error %d)\n", cpu, err);
     cpu_hotplug_done();
     return err;
 }

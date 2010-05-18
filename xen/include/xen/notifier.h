@@ -13,6 +13,8 @@
 #include <xen/config.h>
 #include <xen/types.h>
 #include <xen/errno.h>
+#include <xen/kernel.h>
+#include <xen/list.h>
 
 /*
  * Xen includes only one type of notifier chains inherited from Linux:
@@ -23,35 +25,33 @@
 
 struct notifier_block {
     int (*notifier_call)(struct notifier_block *, unsigned long, void *);
-    struct notifier_block *next;
+    struct list_head chain;
     int priority;
 };
 
-struct raw_notifier_head {
-    struct notifier_block *head;
+struct notifier_head {
+    struct notifier_block head;
 };
 
-#define RAW_INIT_NOTIFIER_HEAD(name) do {       \
-    (name)->head = NULL;                        \
-} while (0)
+#define NOTIFIER_INIT(name) { .head.chain = LIST_HEAD_INIT(name.head.chain) }
 
-#define RAW_NOTIFIER_INIT(name) { .head = NULL }
+#define NOTIFIER_HEAD(name) \
+    struct notifier_head name = NOTIFIER_INIT(name)
 
-#define RAW_NOTIFIER_HEAD(name) \
-    struct raw_notifier_head name = RAW_NOTIFIER_INIT(name)
+void notifier_chain_register(
+    struct notifier_head *nh, struct notifier_block *nb);
+void notifier_chain_unregister(
+    struct notifier_head *nh, struct notifier_block *nb);
 
-int raw_notifier_chain_register(
-    struct raw_notifier_head *nh, struct notifier_block *nb);
+int notifier_call_chain(
+    struct notifier_head *nh, unsigned long val, void *v,
+    struct notifier_block **pcursor);
 
-int raw_notifier_chain_unregister(
-    struct raw_notifier_head *nh, struct notifier_block *nb);
+/* Notifier flag values: OR into @val passed to notifier_call_chain(). */
+#define NOTIFY_FORWARD 0x0000 /* Call chain highest-priority-first */
+#define NOTIFY_REVERSE 0x8000 /* Call chain lowest-priority-first */
 
-int raw_notifier_call_chain(
-    struct raw_notifier_head *nh, unsigned long val, void *v);
-int __raw_notifier_call_chain(
-    struct raw_notifier_head *nh, unsigned long val, void *v,
-    int nr_to_call, int *nr_calls);
-
+/* Handler completion values */
 #define NOTIFY_DONE      0x0000
 #define NOTIFY_STOP_MASK 0x8000
 #define NOTIFY_STOP      (NOTIFY_STOP_MASK|NOTIFY_DONE)

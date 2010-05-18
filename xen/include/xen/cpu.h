@@ -14,7 +14,7 @@ bool_t cpu_hotplug_begin(void);
 void cpu_hotplug_done(void);
 
 /* Receive notification of CPU hotplug events. */
-int register_cpu_notifier(struct notifier_block *nb);
+void register_cpu_notifier(struct notifier_block *nb);
 
 /*
  * Possible event sequences for a given CPU:
@@ -25,14 +25,26 @@ int register_cpu_notifier(struct notifier_block *nb);
  * 
  * Hence note that only CPU_*_PREPARE handlers are allowed to fail. Also note
  * that once CPU_DYING is delivered, an offline action can no longer fail.
+ * 
+ * Notifiers are called highest-priority-first when:
+ *  (a) A CPU is coming up; or (b) CPU_DOWN_FAILED
+ * Notifiers are called lowest-priority-first when:
+ *  (a) A CPU is going down; or (b) CPU_UP_CANCELED
  */
-#define CPU_UP_PREPARE   0x0002 /* CPU is coming up */
-#define CPU_UP_CANCELED  0x0003 /* CPU is no longer coming up */
-#define CPU_ONLINE       0x0004 /* CPU is up */
-#define CPU_DOWN_PREPARE 0x0005 /* CPU is going down */
-#define CPU_DOWN_FAILED  0x0006 /* CPU is no longer going down */
-#define CPU_DYING        0x0007 /* CPU is nearly dead (in stop_machine ctxt) */
-#define CPU_DEAD         0x0008 /* CPU is dead */
+/* CPU_UP_PREPARE: CPU is coming up */
+#define CPU_UP_PREPARE   (0x0002 | NOTIFY_FORWARD)
+/* CPU_UP_CANCELED: CPU is no longer coming up. */
+#define CPU_UP_CANCELED  (0x0003 | NOTIFY_REVERSE)
+/* CPU_ONLINE: CPU is up. */
+#define CPU_ONLINE       (0x0004 | NOTIFY_FORWARD)
+/* CPU_DOWN_PREPARE: CPU is going down. */
+#define CPU_DOWN_PREPARE (0x0005 | NOTIFY_REVERSE)
+/* CPU_DOWN_FAILED: CPU is no longer going down. */
+#define CPU_DOWN_FAILED  (0x0006 | NOTIFY_FORWARD)
+/* CPU_DYING: CPU is nearly dead (in stop_machine context). */
+#define CPU_DYING        (0x0007 | NOTIFY_REVERSE)
+/* CPU_DEAD: CPU is dead. */
+#define CPU_DEAD         (0x0008 | NOTIFY_REVERSE)
 
 /* Perform CPU hotplug. May return -EAGAIN. */
 int cpu_down(unsigned int cpu);
