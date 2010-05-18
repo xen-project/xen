@@ -23,7 +23,7 @@
 #define __MEM_SHARING_H__
 
 #define sharing_supported(_d) \
-    (is_hvm_domain(_d) && (_d)->arch.hvm_domain.hap_enabled) 
+    (is_hvm_domain(_d) && paging_mode_hap(_d)) 
 
 typedef uint64_t shr_handle_t; 
 
