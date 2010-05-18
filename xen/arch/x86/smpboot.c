@@ -67,7 +67,6 @@ EXPORT_SYMBOL(cpu_online_map);
 
 cpumask_t cpu_callin_map;
 cpumask_t cpu_callout_map;
-cpumask_t cpu_possible_map = CPU_MASK_ALL;
 static cpumask_t smp_commenced_mask;
 
 struct cpuinfo_x86 cpu_data[NR_CPUS];
@@ -837,7 +836,6 @@ void __init smp_prepare_boot_cpu(void)
     cpu_set(smp_processor_id(), cpu_online_map);
     cpu_set(smp_processor_id(), cpu_callout_map);
     cpu_set(smp_processor_id(), cpu_present_map);
-    cpu_set(smp_processor_id(), cpu_possible_map);
     per_cpu(cpu_state, smp_processor_id()) = CPU_ONLINE;
 }
 

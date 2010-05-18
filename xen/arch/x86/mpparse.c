@@ -203,10 +203,7 @@ static int __devinit MP_processor_info (struct mpc_config_processor *m)
 		cpu_set(cpu, cpu_present_map);
 	}
 
-	cpu_set(num_processors, cpu_possible_map);
-	num_processors++;
-
-	if (num_processors > 8) {
+	if (++num_processors > 8) {
 		/*
 		 * No need for processor or APIC checks: physical delivery
 		 * (bigsmp) mode should always work.
