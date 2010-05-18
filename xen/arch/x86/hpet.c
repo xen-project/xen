@@ -684,6 +684,9 @@ void hpet_broadcast_exit(void)
     if ( this_cpu(timer_deadline_start) == 0 )
         return;
 
+    if ( !ch )
+        ch = hpet_get_channel(cpu);
+
     /* Reprogram the deadline; trigger timer work now if it has passed. */
     enable_APIC_timer();
     if ( !reprogram_timer(this_cpu(timer_deadline_start)) )
