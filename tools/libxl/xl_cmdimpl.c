@@ -1200,16 +1200,45 @@ void help(char *command)
     }
 }
 
-int set_memory_max(char *p, char *mem)
+static int64_t parse_mem_size_kb(char *mem)
 {
     char *endptr;
-    uint32_t memorykb;
+    int64_t kbytes;
+
+    kbytes = strtoll(mem, &endptr, 10);
+
+    if (strlen(endptr) > 1)
+        return -1;
+
+    switch (tolower(*endptr)) {
+    case 't':
+        kbytes <<= 10;
+    case 'g':
+        kbytes <<= 10;
+    case 'm':
+        kbytes <<= 10;
+    case '\0':
+    case 'k':
+        break;
+    case 'b':
+        kbytes >>= 10;
+        break;
+    default:
+        return -1;
+    }
+
+    return kbytes;
+}
+
+int set_memory_max(char *p, char *mem)
+{
+    int64_t memorykb;
     int rc;
 
     find_domain(p);
 
-    memorykb = strtoul(mem, &endptr, 10);
-    if (*endptr != '\0') {
+    memorykb = parse_mem_size_kb(mem);
+    if (memorykb == -1) {
         fprintf(stderr, "invalid memory size: %s\n", mem);
         exit(3);
     }
@@ -1255,17 +1284,17 @@ int main_memmax(int argc, char **argv)
 
 void set_memory_target(char *p, char *mem)
 {
-    char *endptr;
-    uint32_t memorykb;
+    long long int memorykb;
 
     find_domain(p);
 
-    memorykb = strtoul(mem, &endptr, 10);
-    if (*endptr != '\0') {
+    memorykb = parse_mem_size_kb(mem);
+    if (memorykb == -1)  {
         fprintf(stderr, "invalid memory size: %s\n", mem);
         exit(3);
     }
-    printf("setting domid %d memory to : %d\n", domid, memorykb);
+
+    printf("setting domid %d memory to : %lld\n", domid, memorykb);
     libxl_set_memory_target(&ctx, domid, memorykb, /* enforce */ 1);
 }
 
