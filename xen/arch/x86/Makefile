@@ -36,6 +36,7 @@ obj-y += mpparse.o
 obj-y += nmi.o
 obj-y += numa.o
 obj-y += pci.o
+obj-y += percpu.o
 obj-y += physdev.o
 obj-y += setup.o
 obj-y += shutdown.o

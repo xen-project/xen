@@ -59,7 +59,7 @@ SECTIONS
        CONSTRUCTORS
   } :text
 
-  . = ALIGN(128);
+  . = ALIGN(SMP_CACHE_BYTES);
   .data.read_mostly : {
        *(.data.read_mostly)
   } :text
@@ -71,7 +71,7 @@ SECTIONS
   __lock_profile_end = .;
 #endif
 
-  . = ALIGN(4096);             /* Init code and data */
+  . = ALIGN(PAGE_SIZE);             /* Init code and data */
   __init_begin = .;
   .init.text : {
        _sinittext = .;
@@ -99,33 +99,22 @@ SECTIONS
        *(.xsm_initcall.init)
        __xsm_initcall_end = .;
   } :text
-  . = ALIGN(PAGE_SIZE);
+  . = ALIGN(STACK_SIZE);
   __init_end = .;
 
-  __per_cpu_shift = PERCPU_SHIFT; /* kdump assist */
-  .data.percpu : {
-       __per_cpu_start = .;
-       *(.data.percpu)
-       . = ALIGN(SMP_CACHE_BYTES);
-       *(.data.percpu.read_mostly)
-       . = ALIGN(PAGE_SIZE);
-       __per_cpu_data_end = .;
-  } :text
-  . = __per_cpu_start + (NR_CPUS << PERCPU_SHIFT);
-  . = ALIGN(PAGE_SIZE);
-
-  /*
-   * Do not insert anything here - the unused portion of .data.percpu
-   * will be freed/unmapped up to __bss_start (defined below).
-   */
-
   .bss : {                     /* BSS */
-       . = ALIGN(STACK_SIZE);
        __bss_start = .;
        *(.bss.stack_aligned)
        . = ALIGN(PAGE_SIZE);
        *(.bss.page_aligned)
        *(.bss)
+       . = ALIGN(SMP_CACHE_BYTES);
+       __per_cpu_start = .;
+       *(.bss.percpu)
+       . = ALIGN(SMP_CACHE_BYTES);
+       *(.bss.percpu.read_mostly)
+       . = ALIGN(SMP_CACHE_BYTES);
+       __per_cpu_data_end = .;
   } :text
   _end = . ;
 

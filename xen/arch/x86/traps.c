@@ -83,6 +83,11 @@ string_param("nmi", opt_nmi);
 
 DEFINE_PER_CPU_READ_MOSTLY(u32, ler_msr);
 
+DEFINE_PER_CPU_READ_MOSTLY(struct desc_struct *, gdt_table);
+#ifdef CONFIG_COMPAT
+DEFINE_PER_CPU_READ_MOSTLY(struct desc_struct *, compat_gdt_table);
+#endif
+
 /* Master table, used by CPU0. */
 idt_entry_t idt_table[IDT_ENTRIES];
 
@@ -3289,6 +3294,11 @@ void __init trap_init(void)
 
     /* CPU0 uses the master IDT. */
     idt_tables[0] = idt_table;
+
+    this_cpu(gdt_table) = boot_cpu_gdt_table;
+#ifdef CONFIG_COMPAT
+    this_cpu(compat_gdt_table) = boot_cpu_compat_gdt_table;
+#endif
 
     percpu_traps_init();
 

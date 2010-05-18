@@ -118,7 +118,7 @@ struct avc_callback_node {
 unsigned int avc_cache_threshold = AVC_DEF_CACHE_THRESHOLD;
 
 #ifdef FLASK_AVC_STATS
-DEFINE_PER_CPU(struct avc_cache_stats, avc_cache_stats) = { 0 };
+DEFINE_PER_CPU(struct avc_cache_stats, avc_cache_stats);
 #endif
 
 static struct avc_cache avc_cache;

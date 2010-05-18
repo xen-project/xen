@@ -487,7 +487,7 @@ static int wakeup_secondary_cpu(int phys_apicid, unsigned long start_eip)
 
     for ( i = 0; i < num_starts; i++ )
     {
-        Dprintk("Sending STARTUP #%d.\n",j);
+        Dprintk("Sending STARTUP #%d.\n", i+1);
         apic_read_around(APIC_SPIV);
         apic_write(APIC_ESR, 0);
         apic_read(APIC_ESR);

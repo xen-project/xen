@@ -68,7 +68,7 @@
         movslq VCPU_processor(_cur),_cur;       \
         pushq %rdx;                             \
         leaq per_cpu__perfcounters(%rip),%rdx;  \
-        shlq $PERCPU_SHIFT,_cur;                \
+        movq __per_cpu_offset(,_cur,8),_cur;    \
         addq %rdx,_cur;                         \
         popq %rdx;                              \
         incl _name*4(_cur,_idx,4);              \

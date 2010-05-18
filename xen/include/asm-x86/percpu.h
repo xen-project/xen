@@ -1,17 +1,20 @@
 #ifndef __X86_PERCPU_H__
 #define __X86_PERCPU_H__
 
-#define PERCPU_SHIFT 13
-#define PERCPU_SIZE  (1UL << PERCPU_SHIFT)
+#ifndef __ASSEMBLY__
+extern char __per_cpu_start[], __per_cpu_data_end[];
+extern unsigned long __per_cpu_offset[NR_CPUS];
+void percpu_init_areas(void);
+#endif
 
 /* Separate out the type, so (int[3], foo) works. */
 #define __DEFINE_PER_CPU(type, name, suffix)                    \
-    __attribute__((__section__(".data.percpu" #suffix)))        \
+    __attribute__((__section__(".bss.percpu" #suffix)))         \
     __typeof__(type) per_cpu_##name
 
 /* var is in discarded region: offset to particular copy we want */
 #define per_cpu(var, cpu)  \
-    (*RELOC_HIDE(&per_cpu__##var, ((unsigned int)(cpu))<<PERCPU_SHIFT))
+    (*RELOC_HIDE(&per_cpu__##var, __per_cpu_offset[cpu]))
 #define __get_cpu_var(var) \
     (per_cpu(var, smp_processor_id()))
 

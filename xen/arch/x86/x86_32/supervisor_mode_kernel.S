@@ -102,7 +102,7 @@ ENTRY(fixup_ring0_guest_stack)
 
         movl  $PER_CPU_GDT_ENTRY*8,%ecx
         lsll  %ecx,%ecx
-        shll  $PERCPU_SHIFT,%ecx
+        movl  __per_cpu_offset(,%ecx,4),%ecx
         addl  $per_cpu__init_tss,%ecx
 
         # Load Xen stack from TSS.

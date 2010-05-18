@@ -53,7 +53,7 @@ struct rcu_ctrlblk rcu_ctrlblk = {
     .cpumask = CPU_MASK_NONE,
 };
 
-DEFINE_PER_CPU(struct rcu_data, rcu_data) = { 0L };
+DEFINE_PER_CPU(struct rcu_data, rcu_data);
 
 static int blimit = 10;
 static int qhimark = 10000;

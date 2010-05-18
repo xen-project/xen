@@ -82,7 +82,7 @@
 #define PERFC_INCR(_name,_idx,_cur)                     \
         pushl _cur;                                     \
         movl VCPU_processor(_cur),_cur;                 \
-        shll $PERCPU_SHIFT,_cur;                        \
+        movl __per_cpu_offset(,_cur,4),_cur;            \
         incl per_cpu__perfcounters+_name*4(_cur,_idx,4);\
         popl _cur
 #else

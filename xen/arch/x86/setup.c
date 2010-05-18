@@ -107,12 +107,6 @@ unsigned long __initdata xenheap_initial_phys_start;
 unsigned long __read_mostly xenheap_phys_end;
 #endif
 
-DEFINE_PER_CPU_READ_MOSTLY(struct desc_struct *, gdt_table) = boot_cpu_gdt_table;
-#ifdef CONFIG_COMPAT
-DEFINE_PER_CPU_READ_MOSTLY(struct desc_struct *, compat_gdt_table)
-    = boot_cpu_compat_gdt_table;
-#endif
-
 DEFINE_PER_CPU(struct tss_struct, init_tss);
 
 char __attribute__ ((__section__(".bss.stack_aligned"))) cpu0_stack[STACK_SIZE];
@@ -192,46 +186,6 @@ static void free_xen_data(char *s, char *e)
 }
 
 extern char __init_begin[], __init_end[], __bss_start[];
-extern char __per_cpu_start[], __per_cpu_data_end[];
-
-static void __init percpu_init_areas(void)
-{
-    unsigned int i, data_size = __per_cpu_data_end - __per_cpu_start;
-
-    BUG_ON((unsigned long)__per_cpu_start & ~PAGE_MASK);
-    BUG_ON((unsigned long)__per_cpu_data_end & ~PAGE_MASK);
-    BUG_ON(data_size > PERCPU_SIZE);
-
-    /* Initialise per-cpu data area for all possible secondary CPUs. */
-    for ( i = 1; i < NR_CPUS; i++ )
-        memcpy(__per_cpu_start + (i << PERCPU_SHIFT),
-               __per_cpu_start,
-               data_size);
-}
-
-static void __init percpu_free_unused_areas(void)
-{
-    unsigned int i, data_size = __per_cpu_data_end - __per_cpu_start;
-    unsigned int first_unused;
-
-    /* Find first 'impossible' secondary CPU. */
-    for ( i = 1; i < NR_CPUS; i++ )
-        if ( !cpu_possible(i) )
-            break;
-    first_unused = i;
-
-    /* Check that there are no holes in cpu_possible_map. */
-    for ( ; i < NR_CPUS; i++ )
-        BUG_ON(cpu_possible(i));
-
-    /* Free all unused per-cpu data areas. */
-    free_xen_data(&__per_cpu_start[first_unused << PERCPU_SHIFT], __bss_start);
-
-    if ( data_size != PERCPU_SIZE )
-        for ( i = 0; i < first_unused; i++ )
-            free_xen_data(&__per_cpu_start[(i << PERCPU_SHIFT) + data_size],
-                          &__per_cpu_start[(i+1) << PERCPU_SHIFT]);
-}
 
 static void __init init_idle_domain(void)
 {
@@ -1013,8 +967,6 @@ void __init __start_xen(unsigned long mbi_p)
 
     init_apic_mappings();
 
-    percpu_free_unused_areas();
-
     init_IRQ();
 
     xsm_init(&initrdidx, mbi, initial_images_start);
@@ -1200,7 +1152,7 @@ int xen_in_range(unsigned long mfn)
     paddr_t start, end;
     int i;
 
-    enum { region_s3, region_text, region_percpu, region_bss, nr_regions };
+    enum { region_s3, region_text, region_bss, nr_regions };
     static struct {
         paddr_t s, e;
     } xen_regions[nr_regions];
@@ -1214,10 +1166,6 @@ int xen_in_range(unsigned long mfn)
         /* hypervisor code + data */
         xen_regions[region_text].s =__pa(&_stext);
         xen_regions[region_text].e = __pa(&__init_begin);
-        /* per-cpu data */
-        xen_regions[region_percpu].s = __pa(__per_cpu_start);
-        xen_regions[region_percpu].e = xen_regions[region_percpu].s +
-            (((paddr_t)last_cpu(cpu_possible_map) + 1) << PERCPU_SHIFT);
         /* bss */
         xen_regions[region_bss].s = __pa(&__bss_start);
         xen_regions[region_bss].e = __pa(&_end);
@@ -1226,25 +1174,8 @@ int xen_in_range(unsigned long mfn)
     start = (paddr_t)mfn << PAGE_SHIFT;
     end = start + PAGE_SIZE;
     for ( i = 0; i < nr_regions; i++ )
-    {
-        if ( (start >= xen_regions[i].e) || (end <= xen_regions[i].s) )
-            continue;
-
-        if ( i == region_percpu )
-        {
-            /*
-             * Check if the given page falls into an unused (and therefore
-             * freed) section of the per-cpu data space. Each CPU's data
-             * area is page-aligned, so the following arithmetic is safe.
-             */
-            unsigned int off = ((start - __pa(__per_cpu_start))
-                                & (PERCPU_SIZE - 1));
-            unsigned int data_sz = __per_cpu_data_end - __per_cpu_start;
-            return off < data_sz;
-        }
-
-        return 1;
-    }
+        if ( (start < xen_regions[i].e) && (end > xen_regions[i].s) )
+            return 1;
 
     return 0;
 }

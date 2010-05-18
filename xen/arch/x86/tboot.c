@@ -357,7 +357,7 @@ void tboot_shutdown(uint32_t shutdown_type)
         /*
          * Xen regions for tboot to MAC
          */
-        g_tboot_shared->num_mac_regions = 4;
+        g_tboot_shared->num_mac_regions = 3;
         /* S3 resume code (and other real mode trampoline code) */
         g_tboot_shared->mac_regions[0].start = bootsym_phys(trampoline_start);
         g_tboot_shared->mac_regions[0].size = bootsym_phys(trampoline_end) -
@@ -366,13 +366,9 @@ void tboot_shutdown(uint32_t shutdown_type)
         g_tboot_shared->mac_regions[1].start = (uint64_t)__pa(&_stext);
         g_tboot_shared->mac_regions[1].size = __pa(&__init_begin) -
                                               __pa(&_stext);
-        /* per-cpu data */
-        g_tboot_shared->mac_regions[2].start = (uint64_t)__pa(&__per_cpu_start);
-        g_tboot_shared->mac_regions[2].size =
-            (((uint64_t)last_cpu(cpu_possible_map) + 1) << PERCPU_SHIFT);
         /* bss */
-        g_tboot_shared->mac_regions[3].start = (uint64_t)__pa(&__bss_start);
-        g_tboot_shared->mac_regions[3].size = __pa(&_end) - __pa(&__bss_start);
+        g_tboot_shared->mac_regions[2].start = (uint64_t)__pa(&__bss_start);
+        g_tboot_shared->mac_regions[2].size = __pa(&_end) - __pa(&__bss_start);
 
         /*
          * MAC domains and other Xen memory

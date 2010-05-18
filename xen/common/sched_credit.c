@@ -231,7 +231,7 @@ static void burn_credits(struct csched_vcpu *svc, s_time_t now)
 static int opt_tickle_one_idle __read_mostly = 1;
 boolean_param("tickle_one_idle_cpu", opt_tickle_one_idle);
 
-DEFINE_PER_CPU(unsigned int, last_tickle_cpu) = 0;
+DEFINE_PER_CPU(unsigned int, last_tickle_cpu);
 
 static inline void
 __runq_tickle(unsigned int cpu, struct csched_vcpu *new)

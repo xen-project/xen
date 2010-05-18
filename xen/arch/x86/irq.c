@@ -50,9 +50,7 @@ static struct timer *__read_mostly irq_guest_eoi_timer;
 
 static DEFINE_SPINLOCK(vector_lock);
 
-DEFINE_PER_CPU(vector_irq_t, vector_irq) = {
-    [0 ... NR_VECTORS - 1] = -1
-};
+DEFINE_PER_CPU(vector_irq_t, vector_irq);
 
 DEFINE_PER_CPU(struct cpu_user_regs *, __irq_regs);
 
@@ -269,7 +267,10 @@ int init_irq_data(void)
 {
     struct irq_desc *desc;
     struct irq_cfg *cfg;
-    int irq;
+    int irq, vector;
+
+    for (vector = 0; vector < NR_VECTORS; ++vector)
+        this_cpu(vector_irq)[vector] = -1;
 
     irq_desc = xmalloc_array(struct irq_desc, nr_irqs);
     irq_cfg = xmalloc_array(struct irq_cfg, nr_irqs);
