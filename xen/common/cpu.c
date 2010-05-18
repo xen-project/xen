@@ -161,7 +161,7 @@ int disable_nonboot_cpus(void)
 {
     int cpu, error = 0;
 
-    BUG_ON(raw_smp_processor_id() != 0);
+    BUG_ON(smp_processor_id() != 0);
 
     cpus_clear(frozen_cpus);
 

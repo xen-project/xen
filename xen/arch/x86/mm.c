@@ -5331,6 +5331,13 @@ void memguard_guard_stack(void *p)
     memguard_guard_range(p, PAGE_SIZE);
 }
 
+void memguard_unguard_stack(void *p)
+{
+    p = (void *)((unsigned long)p + STACK_SIZE -
+                 PRIMARY_STACK_SIZE - PAGE_SIZE);
+    memguard_unguard_range(p, PAGE_SIZE);
+}
+
 /*
  * Local variables:
  * mode: C

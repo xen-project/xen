@@ -336,7 +336,7 @@ void start_secondary(void *unused)
 
     /* This must be done before setting cpu_online_map */
     spin_debug_enable();
-    set_cpu_sibling_map(raw_smp_processor_id());
+    set_cpu_sibling_map(smp_processor_id());
     wmb();
 
     /*
@@ -545,24 +545,11 @@ int alloc_cpu_id(void)
     return (cpu < NR_CPUS) ? cpu : -ENODEV;
 }
 
-static void *prepare_idle_stack(unsigned int cpu)
-{
-    if ( !stack_base[cpu] )
-        stack_base[cpu] = alloc_xenheap_pages(STACK_ORDER, 0);
-    return stack_base[cpu];
-}
-
 static int do_boot_cpu(int apicid, int cpu)
 {
     unsigned long boot_error;
-    unsigned int order;
     int timeout;
     unsigned long start_eip;
-    struct vcpu *v;
-    struct desc_struct *gdt;
-#ifdef __x86_64__
-    struct page_info *page;
-#endif
 
     /*
      * Save current MTRR state in case it was changed since early boot
@@ -572,62 +559,15 @@ static int do_boot_cpu(int apicid, int cpu)
 
     booting_cpu = cpu;
 
-    v = alloc_idle_vcpu(cpu);
-    BUG_ON(v == NULL);
-
     /* start_eip had better be page-aligned! */
     start_eip = setup_trampoline();
 
     /* So we see what's up   */
-    if (opt_cpu_info)
+    if ( opt_cpu_info )
         printk("Booting processor %d/%d eip %lx\n",
                cpu, apicid, start_eip);
 
-    stack_start.esp = prepare_idle_stack(cpu);
-
-    /* Debug build: detect stack overflow by setting up a guard page. */
-    memguard_guard_stack(stack_start.esp);
-
-    gdt = per_cpu(gdt_table, cpu);
-    if ( gdt == boot_cpu_gdt_table )
-    {
-        order = get_order_from_pages(NR_RESERVED_GDT_PAGES);
-#ifdef __x86_64__
-        page = alloc_domheap_pages(NULL, order,
-                                   MEMF_node(cpu_to_node(cpu)));
-        per_cpu(compat_gdt_table, cpu) = gdt = page_to_virt(page);
-        memcpy(gdt, boot_cpu_compat_gdt_table,
-               NR_RESERVED_GDT_PAGES * PAGE_SIZE);
-        gdt[PER_CPU_GDT_ENTRY - FIRST_RESERVED_GDT_ENTRY].a = cpu;
-        page = alloc_domheap_pages(NULL, order,
-                                   MEMF_node(cpu_to_node(cpu)));
-        per_cpu(gdt_table, cpu) = gdt = page_to_virt(page);
-#else
-        per_cpu(gdt_table, cpu) = gdt = alloc_xenheap_pages(order, 0);
-#endif
-        memcpy(gdt, boot_cpu_gdt_table,
-               NR_RESERVED_GDT_PAGES * PAGE_SIZE);
-        BUILD_BUG_ON(NR_CPUS > 0x10000);
-        gdt[PER_CPU_GDT_ENTRY - FIRST_RESERVED_GDT_ENTRY].a = cpu;
-    }
-
-#ifdef __i386__
-    if ( !per_cpu(doublefault_tss, cpu) )
-    {
-        per_cpu(doublefault_tss, cpu) = alloc_xenheap_page();
-        memset(per_cpu(doublefault_tss, cpu), 0, PAGE_SIZE);
-    }
-#else
-    if ( !per_cpu(compat_arg_xlat, cpu) )
-        setup_compat_arg_xlat(cpu, cpu_to_node[cpu]);
-#endif
-
-    if ( !idt_tables[cpu] )
-    {
-        idt_tables[cpu] = xmalloc_array(idt_entry_t, IDT_ENTRIES);
-        memcpy(idt_tables[cpu], idt_table,
-               IDT_ENTRIES*sizeof(idt_entry_t));
-    }
+    stack_start.esp = stack_base[cpu];
 
     /* This grunge runs the startup process for the targeted processor. */
 
@@ -677,16 +617,7 @@ static int do_boot_cpu(int apicid, int cpu)
     }
 
     if ( boot_error )
-    {
-        /* Try to put things back the way they were before ... */
-        unmap_cpu_to_logical_apicid(cpu);
-        cpu_clear(cpu, cpu_callout_map); /* was set here */
-        cpu_uninit(cpu); /* undoes cpu_init() */
-
-        /* Mark the CPU as non-present */
-        x86_cpu_to_apicid[cpu] = BAD_APICID;
-        cpu_clear(cpu, cpu_present_map);
-    }
+        cpu_exit_clear(cpu);
 
     /* mark "stuck" area as not stuck */
     bootsym(trampoline_cpu_started) = 0;
@@ -697,10 +628,8 @@ static int do_boot_cpu(int apicid, int cpu)
     return boot_error ? -EIO : 0;
 }
 
-void cpu_exit_clear(void)
+void cpu_exit_clear(unsigned int cpu)
 {
-    int cpu = raw_smp_processor_id();
-
     cpu_uninit(cpu);
 
     cpu_clear(cpu, cpu_callout_map);
@@ -710,8 +639,127 @@ void cpu_exit_clear(void)
     unmap_cpu_to_logical_apicid(cpu);
 }
 
+static void cpu_smpboot_free(unsigned int cpu)
+{
+    unsigned int order;
+
+    xfree(idt_tables[cpu]);
+    idt_tables[cpu] = NULL;
+
+#ifdef __x86_64__
+    free_compat_arg_xlat(cpu);
+#endif
+
+    order = get_order_from_pages(NR_RESERVED_GDT_PAGES);
+#ifdef __x86_64__
+    if ( per_cpu(compat_gdt_table, cpu) )
+        free_domheap_pages(virt_to_page(per_cpu(gdt_table, cpu)), order);
+    if ( per_cpu(gdt_table, cpu) )
+        free_domheap_pages(virt_to_page(per_cpu(compat_gdt_table, cpu)),
+                           order);
+    per_cpu(compat_gdt_table, cpu) = NULL;
+#else
+    free_xenheap_pages(per_cpu(gdt_table, cpu), order);
+#endif
+    per_cpu(gdt_table, cpu) = NULL;
+
+    if ( stack_base[cpu] != NULL )
+    {
+        memguard_guard_stack(stack_base[cpu]);
+        free_xenheap_pages(stack_base[cpu], STACK_ORDER);
+        stack_base[cpu] = NULL;
+    }
+}
+
+static int cpu_smpboot_alloc(unsigned int cpu)
+{
+    unsigned int order;
+    struct desc_struct *gdt;
+#ifdef __x86_64__
+    struct page_info *page;
+#endif
+
+    if ( alloc_idle_vcpu(cpu) == NULL )
+        goto oom;
+
+    stack_base[cpu] = alloc_xenheap_pages(STACK_ORDER, 0);
+    if ( stack_base[cpu] == NULL )
+        goto oom;
+    memguard_guard_stack(stack_base[cpu]);
+
+    order = get_order_from_pages(NR_RESERVED_GDT_PAGES);
+#ifdef __x86_64__
+    page = alloc_domheap_pages(NULL, order,
+                               MEMF_node(cpu_to_node(cpu)));
+    if ( !page )
+        goto oom;
+    per_cpu(compat_gdt_table, cpu) = gdt = page_to_virt(page);
+    memcpy(gdt, boot_cpu_compat_gdt_table,
+           NR_RESERVED_GDT_PAGES * PAGE_SIZE);
+    gdt[PER_CPU_GDT_ENTRY - FIRST_RESERVED_GDT_ENTRY].a = cpu;
+    page = alloc_domheap_pages(NULL, order,
+                               MEMF_node(cpu_to_node(cpu)));
+    if ( !page )
+        goto oom;
+    per_cpu(gdt_table, cpu) = gdt = page_to_virt(page);
+#else
+    per_cpu(gdt_table, cpu) = gdt = alloc_xenheap_pages(order, 0);
+    if ( !gdt )
+        goto oom;
+#endif
+    memcpy(gdt, boot_cpu_gdt_table,
+           NR_RESERVED_GDT_PAGES * PAGE_SIZE);
+    BUILD_BUG_ON(NR_CPUS > 0x10000);
+    gdt[PER_CPU_GDT_ENTRY - FIRST_RESERVED_GDT_ENTRY].a = cpu;
+
+#ifdef __x86_64__
+    if ( setup_compat_arg_xlat(cpu, cpu_to_node[cpu]) )
+        goto oom;
+#endif
+
+    idt_tables[cpu] = xmalloc_array(idt_entry_t, IDT_ENTRIES);
+    if ( idt_tables[cpu] == NULL )
+        goto oom;
+    memcpy(idt_tables[cpu], idt_table,
+           IDT_ENTRIES*sizeof(idt_entry_t));
+
+    return 0;
+
+ oom:
+    cpu_smpboot_free(cpu);
+    return -ENOMEM;
+}
+
+static int cpu_smpboot_callback(
+    struct notifier_block *nfb, unsigned long action, void *hcpu)
+{
+    unsigned int cpu = (unsigned long)hcpu;
+    int rc = 0;
+
+    switch ( action )
+    {
+    case CPU_UP_PREPARE:
+        rc = cpu_smpboot_alloc(cpu);
+        break;
+    case CPU_UP_CANCELED:
+    case CPU_DEAD:
+        cpu_smpboot_free(cpu);
+        break;
+    default:
+        break;
+    }
+
+    return !rc ? NOTIFY_DONE : notifier_from_errno(rc);
+}
+
+static struct notifier_block cpu_smpboot_nfb = {
+    .notifier_call = cpu_smpboot_callback
+};
+
 void __init smp_prepare_cpus(unsigned int max_cpus)
 {
+    register_cpu_notifier(&cpu_smpboot_nfb);
+
     mtrr_aps_sync_begin();
 
     /* Setup boot CPU information */

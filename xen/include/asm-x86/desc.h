@@ -197,8 +197,6 @@ do {                                                     \
         (((u32)(addr) & 0x00FF0000U) >> 16);             \
 } while (0)
 
-DECLARE_PER_CPU(struct tss_struct *, doublefault_tss);
-
 #endif
 
 struct desc_ptr {

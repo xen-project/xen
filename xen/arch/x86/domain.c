@@ -99,7 +99,7 @@ static void default_dead_idle(void)
 static void play_dead(void)
 {
     /* This must be done before dead CPU ack */
-    cpu_exit_clear();
+    cpu_exit_clear(smp_processor_id());
     wbinvd();
     mb();
     /* Ack it */

@@ -810,20 +810,22 @@ void __init zap_low_mappings(void)
 int __cpuinit setup_compat_arg_xlat(unsigned int cpu, int node)
 {
     unsigned int order = get_order_from_bytes(COMPAT_ARG_XLAT_SIZE);
-    unsigned long sz = PAGE_SIZE << order;
     unsigned int memflags = node != NUMA_NO_NODE ? MEMF_node(node) : 0;
     struct page_info *pg;
 
+    BUG_ON((PAGE_SIZE << order) != COMPAT_ARG_XLAT_SIZE);
+
     pg = alloc_domheap_pages(NULL, order, memflags);
-    if ( !pg )
-        return -ENOMEM;
+    per_cpu(compat_arg_xlat, cpu) = pg ? page_to_virt(pg) : NULL;
+    return pg ? 0 : -ENOMEM;
+}
 
-    for ( ; (sz -= PAGE_SIZE) >= COMPAT_ARG_XLAT_SIZE; ++pg )
-        free_domheap_page(pg);
-
-    per_cpu(compat_arg_xlat, cpu) = page_to_virt(pg);
-
-    return 0;
+void __cpuinit free_compat_arg_xlat(unsigned int cpu)
+{
+    unsigned int order = get_order_from_bytes(COMPAT_ARG_XLAT_SIZE);
+    if ( per_cpu(compat_arg_xlat, cpu) != NULL )
+        free_domheap_pages(virt_to_page(per_cpu(compat_arg_xlat, cpu)), order);
+    per_cpu(compat_arg_xlat, cpu) = NULL;
 }
 
 void cleanup_frame_table(struct mem_hotadd_info *info)

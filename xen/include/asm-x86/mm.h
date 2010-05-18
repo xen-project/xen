@@ -485,6 +485,7 @@ void memguard_unguard_range(void *p, unsigned long l);
 #endif
 
 void memguard_guard_stack(void *p);
+void memguard_unguard_stack(void *p);
 
 int  ptwr_do_page_fault(struct vcpu *, unsigned long,
                         struct cpu_user_regs *);

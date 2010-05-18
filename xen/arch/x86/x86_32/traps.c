@@ -11,6 +11,7 @@
 #include <xen/symbols.h>
 #include <xen/shutdown.h>
 #include <xen/nmi.h>
+#include <xen/cpu.h>
 #include <asm/current.h>
 #include <asm/flushtlb.h>
 #include <asm/traps.h>
@@ -191,9 +192,40 @@ void show_page_walk(unsigned long addr)
     unmap_domain_page(l1t);
 }
 
-DEFINE_PER_CPU_READ_MOSTLY(struct tss_struct *, doublefault_tss);
+static DEFINE_PER_CPU_READ_MOSTLY(struct tss_struct *, doublefault_tss);
 static unsigned char __attribute__ ((__section__ (".bss.page_aligned")))
     boot_cpu_doublefault_space[PAGE_SIZE];
+
+static int cpu_doublefault_tss_callback(
+    struct notifier_block *nfb, unsigned long action, void *hcpu)
+{
+    unsigned int cpu = (unsigned long)hcpu;
+    void *p;
+    int rc = 0;
+
+    switch ( action )
+    {
+    case CPU_UP_PREPARE:
+        per_cpu(doublefault_tss, cpu) = p = alloc_xenheap_page();
+        if ( p == NULL )
+            rc = -ENOMEM;
+        else
+            memset(p, 0, PAGE_SIZE);
+        break;
+    case CPU_UP_CANCELED:
+    case CPU_DEAD:
+        free_xenheap_page(per_cpu(doublefault_tss, cpu));
+        break;
+    default:
+        break;
+    }
+
+    return !rc ? NOTIFY_DONE : notifier_from_errno(rc);
+}
+
+static struct notifier_block cpu_doublefault_tss_nfb = {
+    .notifier_call = cpu_doublefault_tss_callback
+};
 
 asmlinkage void do_double_fault(void)
 {
@@ -300,17 +332,22 @@ static void set_task_gate(unsigned int n, unsigned int sel)
 
 void __devinit subarch_percpu_traps_init(void)
 {
-    struct tss_struct *tss = this_cpu(doublefault_tss);
+    struct tss_struct *tss;
     asmlinkage int hypercall(void);
+    int cpu = smp_processor_id();
 
-    if ( !tss )
+    if ( cpu == 0 )
     {
         /* The hypercall entry vector is only accessible from ring 1. */
         _set_gate(idt_table+HYPERCALL_VECTOR, 14, 1, &hypercall);
 
-        tss = (void *)boot_cpu_doublefault_space;
-        this_cpu(doublefault_tss) = tss;
+        this_cpu(doublefault_tss) = (void *)boot_cpu_doublefault_space;
+
+        register_cpu_notifier(&cpu_doublefault_tss_nfb);
     }
+
+    tss = this_cpu(doublefault_tss);
+    BUG_ON(tss == NULL);
 
     /*
      * Make a separate task for double faults. This will get us debug output if
