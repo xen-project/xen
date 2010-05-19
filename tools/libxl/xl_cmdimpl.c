@@ -507,14 +507,25 @@ static void parse_config_data(const char *configfile_filename_report,
         if (!xlu_cfg_get_long (config, "viridian", &l))
             b_info->u.hvm.viridian = l;
     } else {
-        char *cmdline;
-        if (!xlu_cfg_get_string (config, "root", &buf)) {
-            if (asprintf(&cmdline, "root=%s", buf) < 0) {
-                fprintf(stderr, "Failed to allocate memory in asprintf\n");
-                exit(1);
-            }
-            b_info->u.pv.cmdline = cmdline;
+        char *cmdline = NULL;
+        const char *root = NULL, *extra = "";
+
+        xlu_cfg_get_string (config, "root", &root);
+        xlu_cfg_get_string (config, "extra", &extra);
+
+        if (root) {
+            if (asprintf(&cmdline, "root=%s %s", root, extra) == -1)
+                cmdline = NULL;
+        } else {
+            cmdline = strdup(extra);
         }
+
+        if ((root || extra) && !cmdline) {
+            fprintf(stderr, "Failed to allocate memory for cmdline\n");
+            exit(1);
+        }
+
+        b_info->u.pv.cmdline = cmdline;
         if (!xlu_cfg_get_string (config, "ramdisk", &buf))
             b_info->u.pv.ramdisk = strdup(buf);
     }
