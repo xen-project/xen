@@ -636,6 +636,8 @@ static int construct_vmcs(struct vcpu *v)
     struct domain *d = v->domain;
     uint16_t sysenter_cs;
     unsigned long sysenter_eip;
+    u32 vmexit_ctl = vmx_vmexit_control;
+    u32 vmentry_ctl = vmx_vmentry_control;
 
     vmx_vmcs_enter(v);
 
@@ -662,17 +664,17 @@ static int construct_vmcs(struct vcpu *v)
         v->arch.hvm_vmx.secondary_exec_control &= 
             ~(SECONDARY_EXEC_ENABLE_EPT | 
               SECONDARY_EXEC_UNRESTRICTED_GUEST);
-        vmx_vmexit_control &= ~(VM_EXIT_SAVE_GUEST_PAT |
-                                VM_EXIT_LOAD_HOST_PAT);
-        vmx_vmentry_control &= ~VM_ENTRY_LOAD_GUEST_PAT;
+        vmexit_ctl &= ~(VM_EXIT_SAVE_GUEST_PAT |
+                        VM_EXIT_LOAD_HOST_PAT);
+        vmentry_ctl &= ~VM_ENTRY_LOAD_GUEST_PAT;
     }
 
     /* Do not enable Monitor Trap Flag unless start single step debug */
     v->arch.hvm_vmx.exec_control &= ~CPU_BASED_MONITOR_TRAP_FLAG;
 
     __vmwrite(CPU_BASED_VM_EXEC_CONTROL, v->arch.hvm_vmx.exec_control);
-    __vmwrite(VM_EXIT_CONTROLS, vmx_vmexit_control);
-    __vmwrite(VM_ENTRY_CONTROLS, vmx_vmentry_control);
+    __vmwrite(VM_EXIT_CONTROLS, vmexit_ctl);
+    __vmwrite(VM_ENTRY_CONTROLS, vmentry_ctl);
 
     if ( cpu_has_vmx_ple )
     {
