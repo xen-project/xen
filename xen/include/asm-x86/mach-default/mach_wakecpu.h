@@ -13,17 +13,6 @@
 
 #define boot_cpu_apicid boot_cpu_physical_apicid
 
-static inline void wait_for_init_deassert(atomic_t *deassert)
-{
-	while (!atomic_read(deassert));
-	return;
-}
-
-/* Nothing to do for most platforms, since cleared by the INIT cycle */
-static inline void smp_callin_clear_local_apic(void)
-{
-}
-
 #if APIC_DEBUG
  #define inquire_remote_apic(apicid) __inquire_remote_apic(apicid)
 #else

@@ -65,17 +65,20 @@ DEFINE_PER_CPU_READ_MOSTLY(cpumask_t, cpu_core_map);
 cpumask_t cpu_online_map __read_mostly;
 EXPORT_SYMBOL(cpu_online_map);
 
-cpumask_t cpu_callin_map;
-cpumask_t cpu_callout_map;
-static cpumask_t smp_commenced_mask;
-
 struct cpuinfo_x86 cpu_data[NR_CPUS];
 
 u32 x86_cpu_to_apicid[NR_CPUS] __read_mostly = { [0 ... NR_CPUS-1] = -1U };
 
 static void map_cpu_to_logical_apicid(void);
 
-DEFINE_PER_CPU(int, cpu_state);
+enum cpu_state {
+    CPU_STATE_DEAD = 0, /* slave -> master: I am completely dead */
+    CPU_STATE_INIT,     /* master -> slave: Early bringup phase 1 */
+    CPU_STATE_CALLOUT,  /* master -> slave: Early bringup phase 2 */
+    CPU_STATE_CALLIN,   /* slave -> master: Completed phase 2 */
+    CPU_STATE_ONLINE    /* master -> slave: Go fully online now. */
+} cpu_state;
+#define set_cpu_state(state) do { mb(); cpu_state = (state); } while (0)
 
 void *stack_base[NR_CPUS];
 
@@ -128,75 +131,38 @@ static void smp_store_cpu_info(int id)
     ;
 }
 
-static atomic_t init_deasserted;
-
 void smp_callin(void)
 {
-    int cpuid, phys_id, i;
-
-    /*
-     * If waken up by an INIT in an 82489DX configuration
-     * we may get here before an INIT-deassert IPI reaches
-     * our local APIC.  We have to wait for the IPI or we'll
-     * lock up on an APIC access.
-     */
-    wait_for_init_deassert(&init_deasserted);
-
-    if ( x2apic_enabled )
-        enable_x2apic();
-
-    /*
-     * (This works even if the APIC is not enabled.)
-     */
-    phys_id = get_apic_id();
-    cpuid = smp_processor_id();
-    if ( cpu_isset(cpuid, cpu_callin_map) )
-    {
-        printk("huh, phys CPU#%d, CPU#%d already present??\n",
-               phys_id, cpuid);
-        BUG();
-    }
-    Dprintk("CPU#%d (phys ID: %d) waiting for CALLOUT\n", cpuid, phys_id);
-
-    /*
-     * STARTUP IPIs are fragile beasts as they might sometimes
-     * trigger some glue motherboard logic. Complete APIC bus
-     * silence for 1 second, this overestimates the time the
-     * boot CPU is spending to send the up to 2 STARTUP IPIs
-     * by a factor of two. This should be enough.
-     */
+    int i;
 
     /* Wait 2s total for startup. */
-    for ( i = 0; (i < 200) && !cpu_isset(cpuid, cpu_callout_map); i++ )
+    Dprintk("Waiting for CALLOUT.\n");
+    for ( i = 0; cpu_state != CPU_STATE_CALLOUT; i++ )
     {
+        BUG_ON(i >= 200);
         cpu_relax();
         mdelay(10);
     }
 
-    if ( !cpu_isset(cpuid, cpu_callout_map) )
-    {
-        printk("BUG: CPU%d started up but did not get a callout!\n",
-               cpuid);
-        BUG();
-    }
-
     /*
-     * the boot CPU has finished the init stage and is spinning
-     * on callin_map until we finish. We are free to set up this
-     * CPU, first the APIC. (this is probably redundant on most
-     * boards)
+     * The boot CPU has finished the init stage and is spinning on cpu_state
+     * update until we finish. We are free to set up this CPU: first the APIC.
      */
-
     Dprintk("CALLIN, before setup_local_APIC().\n");
-    smp_callin_clear_local_apic();
+    if ( x2apic_enabled )
+        enable_x2apic();
     setup_local_APIC();
     map_cpu_to_logical_apicid();
 
     /* Save our processor parameters. */
-    smp_store_cpu_info(cpuid);
+    smp_store_cpu_info(smp_processor_id());
 
     /* Allow the master to continue. */
-    cpu_set(cpuid, cpu_callin_map);
+    set_cpu_state(CPU_STATE_CALLIN);
+
+    /* And wait for our final Ack. */
+    while ( cpu_state != CPU_STATE_ONLINE )
+        cpu_relax();
 }
 
 static int booting_cpu;
@@ -316,8 +282,6 @@ void start_secondary(void *unused)
     cpu_init();
 
     smp_callin();
-    while (!cpu_isset(smp_processor_id(), smp_commenced_mask))
-        cpu_relax();
 
     /*
      * At this point, boot CPU has fully initialised the IDT. It is
@@ -347,8 +311,6 @@ void start_secondary(void *unused)
     __setup_vector_irq(smp_processor_id());
     cpu_set(smp_processor_id(), cpu_online_map);
     unlock_vector_lock();
-
-    per_cpu(cpu_state, smp_processor_id()) = CPU_ONLINE;
 
     init_percpu_time();
 
@@ -469,8 +431,6 @@ static int wakeup_secondary_cpu(int phys_apicid, unsigned long start_eip)
             send_status = apic_read(APIC_ICR) & APIC_ICR_BUSY;
     } while ( send_status && (timeout++ < 1000) );
 
-    atomic_set(&init_deasserted, 1);
-
     /*
      * Should we send STARTUP IPIs ?
      *
@@ -570,7 +530,7 @@ static int do_boot_cpu(int apicid, int cpu)
 
     /* This grunge runs the startup process for the targeted processor. */
 
-    atomic_set(&init_deasserted, 0);
+    set_cpu_state(CPU_STATE_INIT);
 
     Dprintk("Setting warm reset code and vector.\n");
 
@@ -582,19 +542,18 @@ static int do_boot_cpu(int apicid, int cpu)
     if ( !boot_error )
     {
         /* Allow AP to start initializing. */
-        Dprintk("Before Callout %d.\n", cpu);
-        cpu_set(cpu, cpu_callout_map);
+        set_cpu_state(CPU_STATE_CALLOUT);
         Dprintk("After Callout %d.\n", cpu);
 
         /* Wait 5s total for a response. */
         for ( timeout = 0; timeout < 50000; timeout++ )
         {
-            if ( cpu_isset(cpu, cpu_callin_map) )
+            if ( cpu_state == CPU_STATE_CALLIN )
                 break; /* It has booted */
             udelay(100);
         }
 
-        if ( cpu_isset(cpu, cpu_callin_map) )
+        if ( cpu_state == CPU_STATE_CALLIN )
         {
             /* number CPUs logically, starting from 1 (BSP is 0) */
             Dprintk("OK.\n");
@@ -630,12 +589,8 @@ static int do_boot_cpu(int apicid, int cpu)
 void cpu_exit_clear(unsigned int cpu)
 {
     cpu_uninit(cpu);
-
-    cpu_clear(cpu, cpu_callout_map);
-    cpu_clear(cpu, cpu_callin_map);
-
-    cpu_clear(cpu, smp_commenced_mask);
     unmap_cpu_to_logical_apicid(cpu);
+    set_cpu_state(CPU_STATE_DEAD);
 }
 
 static void cpu_smpboot_free(unsigned int cpu)
@@ -828,12 +783,8 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 
 void __init smp_prepare_boot_cpu(void)
 {
-    cpu_set(smp_processor_id(), smp_commenced_mask);
-    cpu_set(smp_processor_id(), cpu_callin_map);
     cpu_set(smp_processor_id(), cpu_online_map);
-    cpu_set(smp_processor_id(), cpu_callout_map);
     cpu_set(smp_processor_id(), cpu_present_map);
-    per_cpu(cpu_state, smp_processor_id()) = CPU_ONLINE;
 }
 
 static void
@@ -888,7 +839,7 @@ void __cpu_die(unsigned int cpu)
     /* We don't do anything here: idle task is faking death itself. */
     unsigned int i = 0;
 
-    while ( per_cpu(cpu_state, cpu) != CPU_DEAD )
+    while ( cpu_state != CPU_STATE_DEAD )
     {
         mdelay(100);
         cpu_relax();
@@ -957,15 +908,13 @@ int __cpu_up(unsigned int cpu)
 {
     int apicid, ret;
 
-    BUG_ON(cpu_isset(cpu, cpu_callin_map));
-
     if ( (apicid = x86_cpu_to_apicid[cpu]) == BAD_APICID )
         return -ENODEV;
 
     if ( (ret = do_boot_cpu(apicid, cpu)) != 0 )
         return ret;
 
-    cpu_set(cpu, smp_commenced_mask);
+    set_cpu_state(CPU_STATE_ONLINE);
     while ( !cpu_isset(cpu, cpu_online_map) )
     {
         cpu_relax();

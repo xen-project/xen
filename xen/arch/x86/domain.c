@@ -98,15 +98,10 @@ static void default_dead_idle(void)
 
 static void play_dead(void)
 {
-    /* This must be done before dead CPU ack */
     cpu_exit_clear(smp_processor_id());
-    wbinvd();
     mb();
-    /* Ack it */
-    __get_cpu_var(cpu_state) = CPU_DEAD;
-
-    /* With physical CPU hotplug, we should halt the cpu. */
     local_irq_disable();
+    wbinvd();
     (*dead_idle)();
 }
 

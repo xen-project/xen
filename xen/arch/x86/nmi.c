@@ -105,16 +105,13 @@ int __init check_nmi_watchdog (void)
 
     printk("Testing NMI watchdog --- ");
 
-    for ( cpu = 0; cpu < NR_CPUS; cpu++ ) 
+    for_each_online_cpu ( cpu )
         prev_nmi_count[cpu] = nmi_count(cpu);
     local_irq_enable();
     mdelay((10*1000)/nmi_hz); /* wait 10 ticks */
 
-    for ( cpu = 0; cpu < NR_CPUS; cpu++ ) 
+    for_each_online_cpu ( cpu )
     {
-        if ( !cpu_isset(cpu, cpu_callin_map) && 
-             !cpu_isset(cpu, cpu_online_map) )
-            continue;
         if ( nmi_count(cpu) - prev_nmi_count[cpu] <= 5 )
             printk("CPU#%d stuck. ", cpu);
         else

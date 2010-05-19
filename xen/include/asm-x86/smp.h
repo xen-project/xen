@@ -52,9 +52,6 @@ extern u32 cpu_2_logical_apicid[];
 
 #define cpu_physical_id(cpu)	x86_cpu_to_apicid[cpu]
 
-/* State of each CPU. */
-DECLARE_PER_CPU(int, cpu_state);
-
 #define cpu_is_offline(cpu) unlikely(!cpu_online(cpu))
 extern void cpu_exit_clear(unsigned int cpu);
 extern void cpu_uninit(unsigned int cpu);
@@ -66,15 +63,6 @@ int cpu_add(uint32_t apic_id, uint32_t acpi_id, uint32_t pxm);
  * so this is correct in the x86 case.
  */
 #define raw_smp_processor_id() (get_processor_id())
-
-extern cpumask_t cpu_callout_map;
-extern cpumask_t cpu_callin_map;
-
-/* We don't mark CPUs online until __cpu_up(), so we need another measure */
-static inline int num_booting_cpus(void)
-{
-	return cpus_weight(cpu_callout_map);
-}
 
 #ifdef CONFIG_X86_LOCAL_APIC
 
