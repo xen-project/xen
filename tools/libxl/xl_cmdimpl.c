@@ -180,7 +180,7 @@ static void init_build_info(libxl_domain_build_info *b_info, libxl_domain_create
     b_info->max_memkb = 32 * 1024;
     b_info->target_memkb = b_info->max_memkb;
     if (c_info->hvm) {
-        b_info->shadow_memkb = libxl_get_required_shadow_memory(b_info->max_memkb, b_info->max_vcpus);
+        b_info->shadow_memkb = 0; /* Set later */
         b_info->video_memkb = 8 * 1024;
         b_info->kernel = "hvmloader";
         b_info->hvm = 1;
@@ -478,11 +478,16 @@ static void parse_config_data(const char *configfile_filename_report,
         b_info->target_memkb = b_info->max_memkb;
     }
 
+    /* libxl_get_required_shadow_memory() must be called after final values
+     * (default or specified) for vcpus and memory are set, because the
+     * calculation depends on those values. */
+    b_info->shadow_memkb = !xlu_cfg_get_long(config, "shadow_memory", &l)
+        ? l * 1024
+        : libxl_get_required_shadow_memory(b_info->max_memkb,
+                                           b_info->max_vcpus);
+
     if (!xlu_cfg_get_long(config, "tsc_mode", &l))
         b_info->tsc_mode = l;
-
-    if (!xlu_cfg_get_long (config, "shadow_memory", &l))
-        b_info->shadow_memkb = l * 1024;
 
     if (!xlu_cfg_get_long (config, "videoram", &l))
         b_info->video_memkb = l * 1024;
