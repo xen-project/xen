@@ -235,9 +235,6 @@ static int vmx_init_vmcs_config(void)
     _vmx_vmentry_control = adjust_vmx_controls(
         min, opt, MSR_IA32_VMX_ENTRY_CTLS);
 
-    if ( smp_processor_id() == 2 )
-        vmx_basic_msr_low = 0xdeadbeef;
-
     if ( !vmx_pin_based_exec_control )
     {
         /* First time through. */
