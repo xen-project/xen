@@ -123,7 +123,7 @@ struct sedf_cpu_info {
 #define RUNQ(cpu)      (&CPU_INFO(cpu)->runnableq)
 #define WAITQ(cpu)     (&CPU_INFO(cpu)->waitq)
 #define EXTRAQ(cpu,i)  (&(CPU_INFO(cpu)->extraq[i]))
-#define IDLETASK(cpu)  ((struct vcpu *)per_cpu(schedule_data, cpu).idle)
+#define IDLETASK(cpu)  (idle_vcpu[cpu])
 
 #define PERIOD_BEGIN(inf) ((inf)->deadl_abs - (inf)->period)
 

@@ -194,12 +194,6 @@ struct vcpu *alloc_vcpu(
     return v;
 }
 
-struct vcpu *alloc_idle_vcpu(unsigned int cpu_id)
-{
-    return idle_vcpu[cpu_id] ?: alloc_vcpu(idle_vcpu[0]->domain,
-                                           cpu_id, cpu_id);
-}
-
 static unsigned int __read_mostly extra_dom0_irqs = 256;
 static unsigned int __read_mostly extra_domU_irqs = 32;
 static void __init parse_extra_guest_irqs(const char *s)

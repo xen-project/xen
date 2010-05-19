@@ -341,7 +341,6 @@ void __init start_kernel(void)
     unsigned long dom0_memory_start, dom0_memory_size;
     unsigned long dom0_initrd_start, dom0_initrd_size;
     unsigned long md_end, relo_start, relo_end, relo_size = 0;
-    struct domain *idle_domain;
     struct vcpu *dom0_vcpu0;
     efi_memory_desc_t *kern_md, *last_md, *md;
     unsigned long xenheap_phys_end;
@@ -560,15 +559,8 @@ skip_move:
 
     late_setup_arch(&cmdline);
 
-    scheduler_init();
     idle_vcpu[0] = (struct vcpu*) ia64_r13;
-    idle_domain = domain_create(IDLE_DOMAIN_ID, 0, 0);
-    if ( idle_domain == NULL )
-        BUG();
-    idle_domain->vcpu = idle_vcpu;
-    idle_domain->max_vcpus = NR_CPUS;
-    if ( alloc_vcpu(idle_domain, 0, 0) == NULL )
-        BUG();
+    scheduler_init();
 
     alloc_dom_xen_and_dom_io();
     setup_per_cpu_areas();

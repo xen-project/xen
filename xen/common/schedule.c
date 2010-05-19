@@ -211,27 +211,14 @@ int sched_init_vcpu(struct vcpu *v, unsigned int processor)
     if ( is_idle_domain(d) )
     {
         per_cpu(schedule_data, v->processor).curr = v;
-        per_cpu(schedule_data, v->processor).idle = v;
         v->is_running = 1;
     }
 
     TRACE_2D(TRC_SCHED_DOM_ADD, v->domain->domain_id, v->vcpu_id);
 
-    if ( unlikely(per_cpu(schedule_data, v->processor).sched_priv == NULL)
-         && (DOM2OP(d)->alloc_pdata != NULL) )
-    {
-        per_cpu(schedule_data, v->processor).sched_priv =
-            SCHED_OP(DOM2OP(d), alloc_pdata, processor);
-        if ( per_cpu(schedule_data, v->processor).sched_priv == NULL )
-            return 1;
-    }
-
     v->sched_priv = SCHED_OP(DOM2OP(d), alloc_vdata, v, d->sched_priv);
     if ( v->sched_priv == NULL )
         return 1;
-
-    if ( is_idle_domain(d) )
-        per_cpu(schedule_data, v->processor).sched_idlevpriv = v->sched_priv;
 
     return 0;
 }
@@ -1090,39 +1077,73 @@ const struct scheduler *scheduler_get_by_id(unsigned int id)
     return NULL;
 }
 
-static int cpu_callback(
+static int cpu_schedule_up(unsigned int cpu)
+{
+    struct schedule_data *sd = &per_cpu(schedule_data, cpu);
+
+    per_cpu(scheduler, cpu) = &ops;
+    spin_lock_init(&sd->_lock);
+    sd->schedule_lock = &sd->_lock;
+    sd->curr = idle_vcpu[cpu];
+    init_timer(&sd->s_timer, s_timer_fn, NULL, cpu);
+    atomic_set(&sd->urgent_count, 0);
+
+    /* Boot CPU is dealt with later in schedule_init(). */
+    if ( cpu == 0 )
+        return 0;
+
+    if ( idle_vcpu[cpu] == NULL )
+        alloc_vcpu(idle_vcpu[0]->domain, cpu, cpu);
+    if ( idle_vcpu[cpu] == NULL )
+        return -ENOMEM;
+
+    if ( (ops.alloc_pdata != NULL) &&
+         ((sd->sched_priv = ops.alloc_pdata(&ops, cpu)) == NULL) )
+        return -ENOMEM;
+
+    return 0;
+}
+
+static void cpu_schedule_down(unsigned int cpu)
+{
+    struct schedule_data *sd = &per_cpu(schedule_data, cpu);
+
+    if ( sd->sched_priv != NULL )
+        SCHED_OP(&ops, free_pdata, sd->sched_priv, cpu);
+
+    kill_timer(&sd->s_timer);
+}
+
+static int cpu_schedule_callback(
     struct notifier_block *nfb, unsigned long action, void *hcpu)
 {
     unsigned int cpu = (unsigned long)hcpu;
+    int rc = 0;
 
     switch ( action )
     {
     case CPU_UP_PREPARE:
-        per_cpu(scheduler, cpu) = &ops;
-        spin_lock_init(&per_cpu(schedule_data, cpu)._lock);
-        per_cpu(schedule_data, cpu).schedule_lock
-            = &per_cpu(schedule_data, cpu)._lock;
-        init_timer(&per_cpu(schedule_data, cpu).s_timer,
-                   s_timer_fn, NULL, cpu);
+        rc = cpu_schedule_up(cpu);
         break;
+    case CPU_UP_CANCELED:
     case CPU_DEAD:
-        kill_timer(&per_cpu(schedule_data, cpu).s_timer);
+        cpu_schedule_down(cpu);
         break;
     default:
         break;
     }
 
-    return NOTIFY_DONE;
+    return !rc ? NOTIFY_DONE : notifier_from_errno(rc);
 }
 
-static struct notifier_block cpu_nfb = {
-    .notifier_call = cpu_callback
+static struct notifier_block cpu_schedule_nfb = {
+    .notifier_call = cpu_schedule_callback
 };
 
 /* Initialise the data structures. */
 void __init scheduler_init(void)
 {
-    void *hcpu = (void *)(long)smp_processor_id();
+    struct domain *idle_domain;
     int i;
 
     open_softirq(SCHEDULE_SOFTIRQ, schedule);
@@ -1140,53 +1161,54 @@ void __init scheduler_init(void)
         ops = *schedulers[0];
     }
 
-    cpu_callback(&cpu_nfb, CPU_UP_PREPARE, hcpu);
-    register_cpu_notifier(&cpu_nfb);
+    if ( cpu_schedule_up(0) )
+        BUG();
+    register_cpu_notifier(&cpu_schedule_nfb);
 
     printk("Using scheduler: %s (%s)\n", ops.name, ops.opt_name);
     if ( SCHED_OP(&ops, init) )
         panic("scheduler returned error on init\n");
+
+    idle_domain = domain_create(IDLE_DOMAIN_ID, 0, 0);
+    BUG_ON(idle_domain == NULL);
+    idle_domain->vcpu = idle_vcpu;
+    idle_domain->max_vcpus = NR_CPUS;
+    if ( alloc_vcpu(idle_domain, 0, 0) == NULL )
+        BUG();
+    if ( ops.alloc_pdata &&
+         !(this_cpu(schedule_data).sched_priv = ops.alloc_pdata(&ops, 0)) )
+        BUG();
 }
 
 void schedule_cpu_switch(unsigned int cpu, struct cpupool *c)
 {
     unsigned long flags;
-    struct vcpu *v;
-    void *ppriv, *ppriv_old, *vpriv = NULL;
+    struct vcpu *idle;
+    void *ppriv, *ppriv_old, *vpriv, *vpriv_old;
     struct scheduler *old_ops = per_cpu(scheduler, cpu);
     struct scheduler *new_ops = (c == NULL) ? &ops : c->sched;
 
     if ( old_ops == new_ops )
         return;
 
-    v = per_cpu(schedule_data, cpu).idle;
+    idle = idle_vcpu[cpu];
     ppriv = SCHED_OP(new_ops, alloc_pdata, cpu);
-    if ( c != NULL )
-        vpriv = SCHED_OP(new_ops, alloc_vdata, v, v->domain->sched_priv);
+    vpriv = SCHED_OP(new_ops, alloc_vdata, idle, idle->domain->sched_priv);
 
     spin_lock_irqsave(per_cpu(schedule_data, cpu).schedule_lock, flags);
 
-    if ( c == NULL )
-    {
-        vpriv = v->sched_priv;
-        v->sched_priv = per_cpu(schedule_data, cpu).sched_idlevpriv;
-    }
-    else
-    {
-        v->sched_priv = vpriv;
-        vpriv = NULL;
-    }
     SCHED_OP(old_ops, tick_suspend, cpu);
+    vpriv_old = idle->sched_priv;
+    idle->sched_priv = vpriv;
     per_cpu(scheduler, cpu) = new_ops;
     ppriv_old = per_cpu(schedule_data, cpu).sched_priv;
     per_cpu(schedule_data, cpu).sched_priv = ppriv;
     SCHED_OP(new_ops, tick_resume, cpu);
-    SCHED_OP(new_ops, insert_vcpu, v);
+    SCHED_OP(new_ops, insert_vcpu, idle);
 
     spin_unlock_irqrestore(per_cpu(schedule_data, cpu).schedule_lock, flags);
 
-    if ( vpriv != NULL )
-        SCHED_OP(old_ops, free_vdata, vpriv);
+    SCHED_OP(old_ops, free_vdata, vpriv);
     SCHED_OP(old_ops, free_pdata, ppriv_old, cpu);
 }
 

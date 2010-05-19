@@ -30,12 +30,10 @@ struct schedule_data {
     spinlock_t         *schedule_lock,
                        _lock;
     struct vcpu        *curr;           /* current task                    */
-    struct vcpu        *idle;           /* idle task for this cpu          */
     void               *sched_priv;
-    void               *sched_idlevpriv; /* default scheduler vcpu data    */
     struct timer        s_timer;        /* scheduling timer                */
     atomic_t            urgent_count;   /* how many urgent vcpus           */
-} __cacheline_aligned;
+};
 
 DECLARE_PER_CPU(struct schedule_data, schedule_data);
 DECLARE_PER_CPU(struct scheduler *, scheduler);

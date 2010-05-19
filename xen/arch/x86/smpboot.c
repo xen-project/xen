@@ -678,9 +678,6 @@ static int cpu_smpboot_alloc(unsigned int cpu)
     struct page_info *page;
 #endif
 
-    if ( alloc_idle_vcpu(cpu) == NULL )
-        goto oom;
-
     stack_base[cpu] = alloc_xenheap_pages(STACK_ORDER, 0);
     if ( stack_base[cpu] == NULL )
         goto oom;

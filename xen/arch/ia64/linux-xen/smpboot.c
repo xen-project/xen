@@ -526,7 +526,7 @@ do_rest:
 #else
 	struct vcpu *v;
 
-	v = alloc_idle_vcpu(cpu);
+	v = idle_vcpu[cpu];
 	BUG_ON(v == NULL);
 
 	//printf ("do_boot_cpu: cpu=%d, domain=%p, vcpu=%p\n", cpu, idle, v);

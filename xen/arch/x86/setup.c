@@ -189,22 +189,9 @@ extern char __init_begin[], __init_end[], __bss_start[];
 
 static void __init init_idle_domain(void)
 {
-    struct domain *idle_domain;
-
-    /* Domain creation requires that scheduler structures are initialised. */
     scheduler_init();
-
-    idle_domain = domain_create(IDLE_DOMAIN_ID, 0, 0);
-    if ( idle_domain == NULL )
-        BUG();
-    idle_domain->vcpu = idle_vcpu;
-    idle_domain->max_vcpus = NR_CPUS;
-    if ( alloc_vcpu(idle_domain, 0, 0) == NULL )
-        BUG();
-
     set_current(idle_vcpu[0]);
     this_cpu(curr_vcpu) = current;
-
     setup_idle_pagetable();
 }
 
