@@ -1007,15 +1007,13 @@ void __init __start_xen(unsigned long mbi_p)
 
     for_each_present_cpu ( i )
     {
-        if ( num_online_cpus() >= max_cpus )
-            break;
-        if ( !cpu_online(i) )
-            cpu_up(i);
-
         /* Set up cpu_to_node[]. */
         srat_detect_node(i);
         /* Set up node_to_cpumask based on cpu_to_node[]. */
         numa_add_cpu(i);        
+
+        if ( (num_online_cpus() < max_cpus) && !cpu_online(i) )
+            cpu_up(i);
     }
 
     printk("Brought up %ld CPUs\n", (long)num_online_cpus());
