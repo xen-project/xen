@@ -47,6 +47,11 @@ int enable_ats_device(int seg, int bus, int devfn)
     return 0;
 }
 
+int disable_ats_device(int seg, int bus, int devfn)
+{
+    return 0;
+}
+
 int dev_invalidate_iotlb(struct iommu *iommu, u16 did,
     u64 addr, unsigned int size_order, u64 type)
 {

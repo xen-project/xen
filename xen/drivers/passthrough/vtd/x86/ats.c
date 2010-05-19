@@ -92,6 +92,9 @@ int ats_device(int seg, int bus, int devfn)
 
     pdev = pci_get_pdev(bus, devfn);
     drhd = acpi_find_matched_drhd_unit(pdev);
+    if ( !drhd )
+        return 0;
+
     if ( !ecap_queued_inval(drhd->iommu->ecap) ||
          !ecap_dev_iotlb(drhd->iommu->ecap) )
         return 0;
@@ -144,6 +147,9 @@ int enable_ats_device(int seg, int bus, int devfn)
 
     value = pci_conf_read16(bus, PCI_SLOT(devfn),
                             PCI_FUNC(devfn), pos + ATS_REG_CTL);
+    if ( value & ATS_ENABLE )
+        return 0;
+
     value |= ATS_ENABLE;
     pci_conf_write16(bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
                      pos + ATS_REG_CTL, value);
@@ -153,9 +159,49 @@ int enable_ats_device(int seg, int bus, int devfn)
     pdev->devfn = devfn;
     pdev->ats_queue_depth = queue_depth;
     list_add(&(pdev->list), &ats_devices);
+    if ( iommu_verbose )
+        dprintk(XENLOG_INFO VTDPREFIX, "%x:%x.%x: ATS is enabled\n",
+                bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
 
     return pos;
 }
+
+int disable_ats_device(int seg, int bus, int devfn)
+{
+    struct list_head *pdev_list, *tmp;
+    struct pci_ats_dev *pdev;
+    u32 value;
+    int pos;
+
+    pos = pci_find_ext_capability(seg, bus, devfn, PCI_EXT_CAP_ID_ATS);
+    if ( !pos )
+        return 0;
+
+    /* BUGBUG: add back seg when multi-seg platform support is enabled */
+    value = pci_conf_read16(bus, PCI_SLOT(devfn),
+                            PCI_FUNC(devfn), pos + ATS_REG_CTL);
+    value &= ~ATS_ENABLE;
+    pci_conf_write16(bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
+                     pos + ATS_REG_CTL, value);
+
+    list_for_each_safe( pdev_list, tmp, &ats_devices )
+    {
+        pdev = list_entry(pdev_list, struct pci_ats_dev, list);
+        if ( pdev->bus == bus && pdev->devfn == devfn )
+        {
+            list_del(&pdev->list);
+            xfree(pdev);
+            break;
+        }
+    }
+
+    if ( iommu_verbose )
+        dprintk(XENLOG_INFO VTDPREFIX, "%x:%x.%x: ATS is disabled\n",
+                bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+
+    return 0;
+}
+
 
 static int device_in_domain(struct iommu *iommu, struct pci_ats_dev *pdev, u16 did)
 {

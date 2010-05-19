@@ -1325,6 +1325,9 @@ static int domain_context_mapping(struct domain *domain, u8 bus, u8 devfn)
             dprintk(VTDPREFIX, "d%d:PCIe: map bdf = %x:%x.%x\n",
                     domain->domain_id, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
         ret = domain_context_mapping_one(domain, drhd->iommu, bus, devfn);
+        if ( !ret && ats_device(0, bus, devfn) )
+            enable_ats_device(0, bus, devfn);
+
         break;
 
     case DEV_TYPE_PCI:
@@ -1454,6 +1457,9 @@ static int domain_context_unmap(struct domain *domain, u8 bus, u8 devfn)
             dprintk(VTDPREFIX, "d%d:PCIe: unmap bdf = %x:%x.%x\n",
                     domain->domain_id, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
         ret = domain_context_unmap_one(domain, iommu, bus, devfn);
+        if ( !ret && ats_device(0, bus, devfn) )
+            disable_ats_device(0, bus, devfn);
+
         break;
 
     case DEV_TYPE_PCI:
@@ -1772,8 +1778,6 @@ static void setup_dom0_devices(struct domain *d)
             list_add(&pdev->domain_list, &d->arch.pdev_list);
             domain_context_mapping(d, pdev->bus, pdev->devfn);
             pci_enable_acs(pdev);
-            if ( ats_device(0, pdev->bus, pdev->devfn) )
-                enable_ats_device(0, pdev->bus, pdev->devfn);
         }
     }
     spin_unlock(&pcidevs_lock);
