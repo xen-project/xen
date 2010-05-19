@@ -1262,7 +1262,8 @@ static char *get_blktap2_device(struct libxl_ctx *ctx, char *name, char *type)
 
     
     while (!feof(f)) {
-        fscanf(f, "%d %s", &devnum, buf);
+        if (fscanf(f, "%d %s", &devnum, buf) != 2)
+            continue;
         p = strchr(buf, ':');
         if (p == NULL)
             continue;
@@ -2276,7 +2277,8 @@ int libxl_device_pci_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_pci
             return -1;
         }
         for (i = 0; i < PROC_PCI_NUM_RESOURCES; i++) {
-            fscanf(f, "0x%x 0x%x 0x%x", &start, &end, &flags);
+            if (fscanf(f, "0x%x 0x%x 0x%x", &start, &end, &flags) != 3)
+                continue;
             size = end - start + 1;
             if (start) {
                 if (flags & PCI_BAR_IO) {
@@ -2299,8 +2301,7 @@ int libxl_device_pci_add(struct libxl_ctx *ctx, uint32_t domid, libxl_device_pci
             XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "Couldn't open %s", sysfs_path);
             goto out;
         }
-        fscanf(f, "%u", &irq);
-        if (irq) {
+        if ((fscanf(f, "%u", &irq) == 1) && irq) {
             rc = xc_physdev_map_pirq(ctx->xch, domid, irq, &irq);
             if (rc < 0) {
                 XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, rc, "Error: xc_physdev_map_pirq irq=%d", irq);
@@ -2364,7 +2365,8 @@ int libxl_device_pci_remove(struct libxl_ctx *ctx, uint32_t domid, libxl_device_
             goto skip1;
         }
         for (i = 0; i < PROC_PCI_NUM_RESOURCES; i++) {
-            fscanf(f, "0x%x 0x%x 0x%x\n", &start, &end, &flags);
+            if (fscanf(f, "0x%x 0x%x 0x%x\n", &start, &end, &flags) != 3)
+                continue;
             size = end - start + 1;
             if (start) {
                 if (flags & PCI_BAR_IO) {
@@ -2388,8 +2390,7 @@ skip1:
             XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "Couldn't open %s", sysfs_path);
             goto out;
         }
-        fscanf(f, "%u", &irq);
-        if (irq) {
+        if ((fscanf(f, "%u", &irq) == 1) && irq) {
             rc = xc_physdev_unmap_pirq(ctx->xch, domid, irq);
             if (rc < 0) {
                 XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, rc, "xc_physdev_map_pirq irq=%d", irq);

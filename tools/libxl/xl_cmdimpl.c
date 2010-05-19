@@ -1141,7 +1141,7 @@ start:
         xc_domaininfo_t info;
         libxl_event event;
         libxl_device_disk disk;
-        memset(&info, 0x00, sizeof(xc_dominfo_t));
+        memset(&info, 0x00, sizeof(xc_domaininfo_t));
 
         FD_ZERO(&rfds);
         FD_SET(fd, &rfds);
@@ -3227,9 +3227,7 @@ int main_top(int argc, char **argv)
         }
     }
 
-    system("xentop");
-
-    exit(0);
+    exit(system("xentop"));
 }
 
 int main_networkattach(int argc, char **argv)
@@ -3560,6 +3558,7 @@ static char *uptime_to_string(unsigned long time, int short_mode)
 {
     int sec, min, hour, day;
     char *time_string;
+    int ret;
 
     day = (int)(time / 86400);
     time -= (day * 86400);
@@ -3571,19 +3570,21 @@ static char *uptime_to_string(unsigned long time, int short_mode)
 
     if (short_mode)
         if (day > 1)
-            asprintf(&time_string, "%d days, %2d:%02d", day, hour, min);
+            ret = asprintf(&time_string, "%d days, %2d:%02d", day, hour, min);
         else if (day == 1)
-            asprintf(&time_string, "%d day, %2d:%02d", day, hour, min);
+            ret = asprintf(&time_string, "%d day, %2d:%02d", day, hour, min);
         else
-            asprintf(&time_string, "%2d:%02d", hour, min);
+            ret = asprintf(&time_string, "%2d:%02d", hour, min);
     else
         if (day > 1)
-            asprintf(&time_string, "%d days, %2d:%02d:%02d", day, hour, min, sec);
+            ret = asprintf(&time_string, "%d days, %2d:%02d:%02d", day, hour, min, sec);
         else if (day == 1)
-            asprintf(&time_string, "%d day, %2d:%02d:%02d", day, hour, min, sec);
+            ret = asprintf(&time_string, "%d day, %2d:%02d:%02d", day, hour, min, sec);
         else
-            asprintf(&time_string, "%2d:%02d:%02d", hour, min, sec);
+            ret = asprintf(&time_string, "%2d:%02d:%02d", hour, min, sec);
 
+    if (ret < 0)
+        return NULL;
     return time_string;
 }
 
@@ -3609,8 +3610,9 @@ static void print_dom0_uptime(int short_mode, time_t now)
     int fd;
     char buf[512];
     uint32_t uptime = 0;
+    char *uptime_str = 0;
 
-    fd = open("/proc/uptime", 'r');
+    fd = open("/proc/uptime", O_RDONLY);
     if (fd == -1)
         goto err;
 
@@ -3624,12 +3626,20 @@ static void print_dom0_uptime(int short_mode, time_t now)
     uptime = strtoul(buf, NULL, 10);
 
     if (short_mode)
+    {
+        uptime_str = uptime_to_string(uptime, 1);
         printf(" %s up %s, %s (%d)\n", current_time_to_string(now),
-               uptime_to_string(uptime, 1), libxl_domid_to_name(&ctx, 0), 0);
+               uptime_str, libxl_domid_to_name(&ctx, 0), 0);
+    }
     else
+    {
+        uptime_str = uptime_to_string(uptime, 0);
         printf("%-33s %4d %s\n", libxl_domid_to_name(&ctx, 0),
-               0, uptime_to_string(uptime, 0));
+               0, uptime_str);
+    }
 
+    if (uptime_str)
+        free(uptime_str);
     return;
 err:
     fprintf(stderr, "Can not get Dom0 uptime.\n");
@@ -3640,19 +3650,28 @@ static void print_domU_uptime(uint32_t domuid, int short_mode, time_t now)
 {
     uint32_t s_time = 0;
     uint32_t uptime = 0;
+    char *uptime_str = 0;
 
     s_time = libxl_vm_get_start_time(&ctx, domuid);
     if (s_time == -1)
         return;
     uptime = now - s_time;
     if (short_mode)
+    {
+        uptime_str = uptime_to_string(uptime, 1);
         printf(" %s up %s, %s (%d)\n", current_time_to_string(now),
-               uptime_to_string(uptime, 1),
-               libxl_domid_to_name(&ctx, domuid),
-               domuid);
+               uptime_str, libxl_domid_to_name(&ctx, domuid), domuid);
+    }
     else
+    {
+        uptime_str = uptime_to_string(uptime, 0);
         printf("%-33s %4d %s\n", libxl_domid_to_name(&ctx, domuid),
-               domuid, uptime_to_string(uptime, 0));
+               domuid, uptime_str);
+    }
+
+    if (uptime_str)
+        free(uptime_str);
+    return;
 }
 
 static void print_uptime(int short_mode, uint32_t doms[], int nb_doms)
