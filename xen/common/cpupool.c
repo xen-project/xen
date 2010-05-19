@@ -39,6 +39,8 @@ static DEFINE_SPINLOCK(cpupool_ctl_lock);
 
 DEFINE_PER_CPU(struct cpupool *, cpupool);
 
+#define cpupool_dprintk(x...) ((void)0)
+
 static struct cpupool *alloc_cpupool_struct(void)
 {
     return xmalloc(struct cpupool);
@@ -87,7 +89,7 @@ struct cpupool *cpupool_create(int poolid, char *sched)
         return NULL;
     memset(c, 0, sizeof(*c));
 
-    printk(XENLOG_DEBUG "cpupool_create(pool=%d,sched=%s)\n", poolid, sched);
+    cpupool_dprintk("cpupool_create(pool=%d,sched=%s)\n", poolid, sched);
     spin_lock(&cpupool_lock);
     for_each_cpupool(q)
     {
@@ -115,8 +117,8 @@ struct cpupool *cpupool_create(int poolid, char *sched)
     }
     spin_unlock(&cpupool_lock);
 
-    printk("Created cpupool %d with scheduler %s (%s)\n", c->cpupool_id,
-           c->sched->name, c->sched->opt_name);
+    cpupool_dprintk("Created cpupool %d with scheduler %s (%s)\n",
+                    c->cpupool_id, c->sched->name, c->sched->opt_name);
 
     return c;
 }
@@ -143,7 +145,7 @@ int cpupool_destroy(struct cpupool *c)
     }
     *q = c->next;
     spin_unlock(&cpupool_lock);
-    printk(XENLOG_DEBUG "cpupool_destroy(pool=%d)\n", c->cpupool_id);
+    cpupool_dprintk("cpupool_destroy(pool=%d)\n", c->cpupool_id);
     scheduler_free(c->sched);
     free_cpupool_struct(c);
     return 0;
@@ -171,10 +173,11 @@ static int cpupool_assign_cpu_locked(struct cpupool *c, unsigned int cpu)
 
 static long cpupool_unassign_cpu_helper(void *info)
 {
-    struct cpupool *c = (struct cpupool *)info;
     int cpu = cpupool_moving_cpu;
     long ret;
-    int cpupool_id = c->cpupool_id;
+
+    cpupool_dprintk("cpupool_unassign_cpu(pool=%d,cpu=%d) ret %ld\n",
+                    cpupool_id, cpu, ret);
 
     ret = cpu_disable_scheduler(cpu);
     cpu_set(cpu, cpupool_free_cpus);
@@ -186,8 +189,6 @@ static long cpupool_unassign_cpu_helper(void *info)
         cpupool_cpu_moving = NULL;
     }
     spin_unlock(&cpupool_lock);
-    printk(XENLOG_DEBUG "cpupool_unassign_cpu(pool=%d,cpu=%d) ret %ld\n",
-        cpupool_id, cpu, ret);
     return ret;
 }
 
@@ -208,10 +209,10 @@ int cpupool_unassign_cpu(struct cpupool *c, unsigned int cpu)
     int work_cpu;
     int ret;
     struct domain *d;
-    int cpupool_id = c->cpupool_id;
 
-    printk(XENLOG_DEBUG "cpupool_unassign_cpu(pool=%d,cpu=%d)\n",
-        cpupool_id, cpu);
+    cpupool_dprintk("cpupool_unassign_cpu(pool=%d,cpu=%d)\n",
+                    c->cpupool_id, cpu);
+
     spin_lock(&cpupool_lock);
     ret = -EBUSY;
     if ( (cpupool_moving_cpu != -1) && (cpu != cpupool_moving_cpu) )
@@ -261,8 +262,8 @@ int cpupool_unassign_cpu(struct cpupool *c, unsigned int cpu)
 
 out:
     spin_unlock(&cpupool_lock);
-    printk(XENLOG_DEBUG "cpupool_unassign_cpu(pool=%d,cpu=%d) ret %d\n",
-        cpupool_id, cpu, ret);
+    cpupool_dprintk("cpupool_unassign_cpu(pool=%d,cpu=%d) ret %d\n",
+                    cpupool_id, cpu, ret);
     return ret;
 }
 
@@ -290,9 +291,8 @@ int cpupool_add_domain(struct domain *d, int poolid)
         rc = 0;
     }
     spin_unlock(&cpupool_lock);
-    if (!rc)
-        printk(XENLOG_DEBUG "cpupool_add_domain(dom=%d,pool=%d) n_dom %d\n",
-            d->domain_id, poolid, n_dom);
+    cpupool_dprintk("cpupool_add_domain(dom=%d,pool=%d) n_dom %d rc %d\n",
+                    d->domain_id, poolid, n_dom, rc);
     return rc;
 }
 
@@ -312,8 +312,8 @@ void cpupool_rm_domain(struct domain *d)
     n_dom = d->cpupool->n_dom;
     d->cpupool = NULL;
     spin_unlock(&cpupool_lock);
-    printk(XENLOG_DEBUG "cpupool_rm_domain(dom=%d,pool=%d) n_dom %d\n",
-        d->domain_id, cpupool_id, n_dom);
+    cpupool_dprintk("cpupool_rm_domain(dom=%d,pool=%d) n_dom %d\n",
+                    d->domain_id, cpupool_id, n_dom);
     return;
 }
 
@@ -410,8 +410,8 @@ int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op)
         unsigned cpu;
 
         cpu = op->cpu;
-        printk(XENLOG_DEBUG "cpupool_assign_cpu(pool=%d,cpu=%d)\n",
-            op->cpupool_id, cpu);
+        cpupool_dprintk("cpupool_assign_cpu(pool=%d,cpu=%d)\n",
+                        op->cpupool_id, cpu);
         spin_lock(&cpupool_lock);
         if ( cpu == XEN_SYSCTL_CPUPOOL_PAR_ANY )
             cpu = first_cpu(cpupool_free_cpus);
@@ -426,10 +426,10 @@ int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op)
         if ( c == NULL )
             goto addcpu_out;
         ret = cpupool_assign_cpu_locked(c, cpu);
-addcpu_out:
+    addcpu_out:
         spin_unlock(&cpupool_lock);
-        printk(XENLOG_DEBUG "cpupool_assign_cpu(pool=%d,cpu=%d) ret %d\n",
-            op->cpupool_id, cpu, ret);
+        cpupool_dprintk("cpupool_assign_cpu(pool=%d,cpu=%d) ret %d\n",
+                        op->cpupool_id, cpu, ret);
     }
     break;
 
@@ -477,8 +477,8 @@ addcpu_out:
             rcu_unlock_domain(d);
             break;
         }
-        printk(XENLOG_DEBUG "cpupool move_domain(dom=%d)->pool=%d\n",
-            d->domain_id, op->cpupool_id);
+        cpupool_dprintk("cpupool move_domain(dom=%d)->pool=%d\n",
+                        d->domain_id, op->cpupool_id);
         ret = -ENOENT;
         spin_lock(&cpupool_lock);
         c = cpupool_find_by_id(op->cpupool_id, 1);
@@ -492,8 +492,8 @@ addcpu_out:
                 c->n_dom++;
         }
         spin_unlock(&cpupool_lock);
-        printk(XENLOG_DEBUG "cpupool move_domain(dom=%d)->pool=%d ret %d\n",
-            d->domain_id, op->cpupool_id, ret);
+        cpupool_dprintk("cpupool move_domain(dom=%d)->pool=%d ret %d\n",
+                        d->domain_id, op->cpupool_id, ret);
         rcu_unlock_domain(d);
     }
     break;
