@@ -1,23 +1,24 @@
 #include <xenctrl.h>
 #include <xc_private.h>
 #include <xc_core.h>
+#include <errno.h>
 
 #define ARRAY_SIZE(a) (sizeof (a) / sizeof ((a)[0]))
 
 static int xc_fd;
 
-/* help message */
 void show_help(void)
 {
     fprintf(stderr,
-            "\nxen cpu memory hotplug tool\n\n"
-            "usage: xen-hptool <command> [args]\n\n"
-            "xen-hptool command list:\n\n"
-            "cpu-online    <cpuid>    online CPU <cpuid>\n"
-            "cpu-offline   <cpuid>    offline CPU <cpuid>\n"
-            "mem-online    <mfn>      online MEMORY <mfn>\n"
-            "mem-offline   <mfn>      offline MEMORY <mfn>\n"
-            "mem-status    <mfn>      query Memory status<mfn>\n"
+            "xen-hptool: Xen CPU/memory hotplug tool\n"
+            "Usage: xen-hptool <command> [args]\n"
+            "Commands:\n"
+            "  help                     display this help\n"
+            "  cpu-online    <cpuid>    online CPU <cpuid>\n"
+            "  cpu-offline   <cpuid>    offline CPU <cpuid>\n"
+            "  mem-online    <mfn>      online MEMORY <mfn>\n"
+            "  mem-offline   <mfn>      offline MEMORY <mfn>\n"
+            "  mem-status    <mfn>      query Memory status<mfn>\n"
            );
 }
 
@@ -244,7 +245,7 @@ static int hp_cpu_online_func(int argc, char *argv[])
 {
     int cpu, ret;
 
-    if (argc != 1)
+    if ( argc != 1 )
     {
         show_help();
         return -1;
@@ -254,7 +255,8 @@ static int hp_cpu_online_func(int argc, char *argv[])
     printf("Prepare to online CPU %d\n", cpu);
     ret = xc_cpu_online(xc_fd, cpu);
     if (ret < 0)
-        fprintf(stderr, "CPU %d onlined failed\n", cpu);
+        fprintf(stderr, "CPU %d online failed (error %d: %s)\n",
+                cpu, errno, strerror(errno));
     else
         printf("CPU %d onlined successfully\n", cpu);
 
@@ -265,7 +267,7 @@ static int hp_cpu_offline_func(int argc, char *argv[])
 {
     int cpu, ret;
 
-    if (argc !=1)
+    if (argc != 1 )
     {
         show_help();
         return -1;
@@ -274,7 +276,8 @@ static int hp_cpu_offline_func(int argc, char *argv[])
     printf("Prepare to offline CPU %d\n", cpu);
     ret = xc_cpu_offline(xc_fd, cpu);
     if (ret < 0)
-        fprintf(stderr, "CPU %d offlined failed\n", cpu);
+        fprintf(stderr, "CPU %d offline failed (error %d: %s)\n",
+                cpu, errno, strerror(errno));
     else
         printf("CPU %d offlined successfully\n", cpu);
 
@@ -297,6 +300,7 @@ struct {
 int main(int argc, char *argv[])
 {
     int i, ret;
+
     if (argc < 2)
     {
         show_help();
@@ -310,20 +314,19 @@ int main(int argc, char *argv[])
         return 0;
     }
 
-    for (i = 0; i < ARRAY_SIZE(main_options); i++)
-    {
+    for ( i = 0; i < ARRAY_SIZE(main_options); i++ )
         if (!strncmp(main_options[i].name, argv[1], strlen(argv[1])))
-        {
-            ret = main_options[i].function(argc -2, argv + 2);
             break;
-        }
+    if ( i == ARRAY_SIZE(main_options) )
+    {
+        fprintf(stderr, "Unrecognised command '%s' -- try "
+                "'xen-hptool help'\n", argv[1]);
+        return 1;
     }
-    if (i >= ARRAY_SIZE(main_options))
-        show_help();
-    else if (ret < 0)
-        fprintf(stderr, "Required Ops failed\n");
+
+    ret = main_options[i].function(argc -2, argv + 2);
 
     xc_interface_close(xc_fd);
 
-    return 0;
+    return !!ret;
 }
