@@ -52,6 +52,12 @@ int main_blockattach(int argc, char **argv);
 int main_blocklist(int argc, char **argv);
 int main_blockdetach(int argc, char **argv);
 int main_uptime(int argc, char **argv);
+int main_tmem_list(int argc, char **argv);
+int main_tmem_freeze(int argc, char **argv);
+int main_tmem_destroy(int argc, char **argv);
+int main_tmem_thaw(int argc, char **argv);
+int main_tmem_set(int argc, char **argv);
+int main_tmem_shared_auth(int argc, char **argv);
 
 void help(char *command);
 

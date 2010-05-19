@@ -2840,3 +2840,111 @@ uint32_t libxl_vm_get_start_time(struct libxl_ctx *ctx, uint32_t domid)
     return strtoul(start_time, NULL, 10);
 }
 
+char *libxl_tmem_list(struct libxl_ctx *ctx, uint32_t domid, int use_long)
+{
+    int rc;
+    char _buf[32768];
+
+    rc = xc_tmem_control(ctx->xch, -1, TMEMC_LIST, domid, 32768, use_long,
+                         0, _buf);
+    if (rc < 0) {
+        XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, rc,
+            "Can not get tmem list");
+        return NULL;
+    }
+
+    return strdup(_buf);
+}
+
+int libxl_tmem_freeze(struct libxl_ctx *ctx, uint32_t domid)
+{
+    int rc;
+
+    rc = xc_tmem_control(ctx->xch, -1, TMEMC_FREEZE, domid, 0, 0,
+                         0, NULL);
+    if (rc < 0) {
+        XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, rc,
+            "Can not freeze tmem pools");
+        return -1;
+    }
+
+    return rc;
+}
+
+int libxl_tmem_destroy(struct libxl_ctx *ctx, uint32_t domid)
+{
+    int rc;
+
+    rc = xc_tmem_control(ctx->xch, -1, TMEMC_DESTROY, domid, 0, 0,
+                         0, NULL);
+    if (rc < 0) {
+        XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, rc,
+            "Can not destroy tmem pools");
+        return -1;
+    }
+
+    return rc;
+}
+
+int libxl_tmem_thaw(struct libxl_ctx *ctx, uint32_t domid)
+{
+    int rc;
+
+    rc = xc_tmem_control(ctx->xch, -1, TMEMC_THAW, domid, 0, 0,
+                         0, NULL);
+    if (rc < 0) {
+        XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, rc,
+            "Can not thaw tmem pools");
+        return -1;
+    }
+
+    return rc;
+}
+
+static int32_t tmem_setop_from_string(char *set_name)
+{
+    if (!strcmp(set_name, "weight"))
+        return TMEMC_SET_WEIGHT;
+    else if (!strcmp(set_name, "cap"))
+        return TMEMC_SET_CAP;
+    else if (!strcmp(set_name, "compress"))
+        return TMEMC_SET_COMPRESS;
+    else
+        return -1;
+}
+
+int libxl_tmem_set(struct libxl_ctx *ctx, uint32_t domid, char* name, uint32_t set)
+{
+    int rc;
+    int32_t subop = tmem_setop_from_string(name);
+
+    if (subop == -1) {
+        XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, -1,
+            "Invalid set, valid sets are <weight|cap|compress>");
+        return -1;
+    }
+    rc = xc_tmem_control(ctx->xch, -1, subop, domid, set, 0, 0, NULL);
+    if (rc < 0) {
+        XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, rc,
+            "Can not set tmem %s", name);
+        return -1;
+    }
+
+    return rc;
+}
+
+int libxl_tmem_shared_auth(struct libxl_ctx *ctx, uint32_t domid,
+                           char* uuid, int auth)
+{
+    int rc;
+
+    rc = xc_tmem_auth(ctx->xch, domid, uuid, auth);
+    if (rc < 0) {
+        XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, rc,
+            "Can not set tmem shared auth");
+        return -1;
+    }
+
+    return rc;
+}
+

@@ -228,6 +228,48 @@ struct cmd_spec cmd_table[] = {
       "Print uptime for all/some domains",
       "[-s] [Domain]",
     },
+    { "tmem-list",
+      &main_tmem_list,
+      "List tmem pools",
+      "[-l] [<Domain>|-a]",
+      "  -l                             List tmem stats",
+    },
+    { "tmem-freeze",
+      &main_tmem_freeze,
+      "Freeze tmem pools",
+      "[<Domain>|-a]",
+      "  -a                             Freeze all tmem",
+    },
+    { "tmem-destroy",
+      &main_tmem_destroy,
+      "Destroy tmem pools",
+      "[<Domain>|-a]",
+      "  -a                             Destroy all tmem",
+    },
+    { "tmem-thaw",
+      &main_tmem_thaw,
+      "Thaw tmem pools",
+      "[<Domain>|-a]",
+      "  -a                             Thaw all tmem",
+    },
+    { "tmem-set",
+      &main_tmem_set,
+      "Change tmem settings",
+      "[<Domain>|-a] [-w[=WEIGHT]|-c[=CAP]|-p[=COMPRESS]]",
+      "  -a                             Operate on all tmem\n"
+      "  -w WEIGHT                      Weight (int)\n"
+      "  -c CAP                         Cap (int)\n"
+      "  -p COMPRESS                    Compress (int)",
+    },
+    { "tmem-shared-auth",
+      &main_tmem_shared_auth,
+      "De/authenticate shared tmem pool",
+      "[<Domain>|-a] [-u[=UUID] [-A[=AUTH]",
+      "  -a                             Authenticate for all tmem pools\n"
+      "  -u UUID                        Specify uuid\n"
+      "                                 (abcdef01-2345-6789-1234-567890abcdef)\n"
+      "  -A AUTH                        0=auth,1=deauth",
+    },
 };
 
 int cmdtable_len = sizeof(cmd_table)/sizeof(struct cmd_spec);

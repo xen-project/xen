@@ -513,5 +513,13 @@ int libxl_send_trigger(struct libxl_ctx *ctx, uint32_t domid,
 int libxl_send_sysrq(struct libxl_ctx *ctx, uint32_t domid, char sysrq);
 uint32_t libxl_vm_get_start_time(struct libxl_ctx *ctx, uint32_t domid);
 
+char *libxl_tmem_list(struct libxl_ctx *ctx, uint32_t domid, int use_long);
+int libxl_tmem_freeze(struct libxl_ctx *ctx, uint32_t domid);
+int libxl_tmem_destroy(struct libxl_ctx *ctx, uint32_t domid);
+int libxl_tmem_thaw(struct libxl_ctx *ctx, uint32_t domid);
+int libxl_tmem_set(struct libxl_ctx *ctx, uint32_t domid, char* name,
+                   uint32_t set);
+int libxl_tmem_shared_auth(struct libxl_ctx *ctx, uint32_t domid, char* uuid,
+                           int auth);
 #endif /* LIBXL_H */
 

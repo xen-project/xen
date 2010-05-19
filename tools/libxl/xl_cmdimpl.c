@@ -3731,3 +3731,279 @@ int main_uptime(int argc, char **argv)
 
     exit(0);
 }
+
+int main_tmem_list(int argc, char **argv)
+{
+    char *dom = NULL;
+    char *buf = NULL;
+    int use_long = 0;
+    int all = 0;
+    int opt;
+
+    while ((opt = getopt(argc, argv, "alh")) != -1) {
+        switch (opt) {
+        case 'l':
+            use_long = 1;
+            break;
+        case 'a':
+            all = 1;
+            break;
+        case 'h':
+            help("tmem-list");
+            exit(0);
+        default:
+            fprintf(stderr, "option `%c' not supported.\n", opt);
+            break;
+        }
+    }
+
+    dom = argv[optind];
+    if (!dom && all == 0) {
+        fprintf(stderr, "You must specify -a or a domain id.\n\n");
+        help("tmem-list");
+        exit(1);
+    }
+
+    if (all)
+        domid = -1;
+    else
+        find_domain(dom);
+
+    buf = libxl_tmem_list(&ctx, domid, use_long);
+    if (buf == NULL)
+        exit(-1);
+
+    printf("%s\n", buf);
+    free(buf);
+    exit(0);
+}
+
+int main_tmem_freeze(int argc, char **argv)
+{
+    char *dom = NULL;
+    int all = 0;
+    int opt;
+
+    while ((opt = getopt(argc, argv, "ah")) != -1) {
+        switch (opt) {
+        case 'a':
+            all = 1;
+            break;
+        case 'h':
+            help("tmem-freeze");
+            exit(0);
+        default:
+            fprintf(stderr, "option `%c' not supported.\n", opt);
+            break;
+        }
+    }
+
+    dom = argv[optind];
+    if (!dom && all == 0) {
+        fprintf(stderr, "You must specify -a or a domain id.\n\n");
+        help("tmem-freeze");
+        exit(1);
+    }
+
+    if (all)
+        domid = -1;
+    else
+        find_domain(dom);
+
+    libxl_tmem_freeze(&ctx, domid);
+    exit(0);
+}
+
+int main_tmem_destroy(int argc, char **argv)
+{
+    char *dom = NULL;
+    int all = 0;
+    int opt;
+
+    while ((opt = getopt(argc, argv, "ah")) != -1) {
+        switch (opt) {
+        case 'a':
+            all = 1;
+            break;
+        case 'h':
+            help("tmem-destroy");
+            exit(0);
+        default:
+            fprintf(stderr, "option `%c' not supported.\n", opt);
+            break;
+        }
+    }
+
+    dom = argv[optind];
+    if (!dom && all == 0) {
+        fprintf(stderr, "You must specify -a or a domain id.\n\n");
+        help("tmem-destroy");
+        exit(1);
+    }
+
+    if (all)
+        domid = -1;
+    else
+        find_domain(dom);
+
+    libxl_tmem_destroy(&ctx, domid);
+    exit(0);
+}
+
+int main_tmem_thaw(int argc, char **argv)
+{
+    char *dom = NULL;
+    int all = 0;
+    int opt;
+
+    while ((opt = getopt(argc, argv, "ah")) != -1) {
+        switch (opt) {
+        case 'a':
+            all = 1;
+            break;
+        case 'h':
+            help("tmem-thaw");
+            exit(0);
+        default:
+            fprintf(stderr, "option `%c' not supported.\n", opt);
+            break;
+        }
+    }
+
+    dom = argv[optind];
+    if (!dom && all == 0) {
+        fprintf(stderr, "You must specify -a or a domain id.\n\n");
+        help("tmem-thaw");
+        exit(1);
+    }
+
+    if (all)
+        domid = -1;
+    else
+        find_domain(dom);
+
+    libxl_tmem_thaw(&ctx, domid);
+    exit(0);
+}
+
+int main_tmem_set(int argc, char **argv)
+{
+    char *dom = NULL;
+    uint32_t weight = 0, cap = 0, compress = 0;
+    int opt_w = 0, opt_c = 0, opt_p = 0;
+    int all = 0;
+    int opt;
+
+    while ((opt = getopt(argc, argv, "aw:c:p:h")) != -1) {
+        switch (opt) {
+        case 'a':
+            all = 1;
+            break;
+        case 'w':
+            weight = strtol(optarg, NULL, 10);
+            opt_w = 1;
+            break;
+        case 'c':
+            cap = strtol(optarg, NULL, 10);
+            opt_c = 1;
+            break;
+        case 'p':
+            compress = strtol(optarg, NULL, 10);
+            opt_p = 1;
+            break;
+        case 'h':
+            help("tmem-set");
+            exit(0);
+        default:
+            fprintf(stderr, "option `%c' not supported.\n", opt);
+            break;
+        }
+    }
+
+    dom = argv[optind];
+    if (!dom && all == 0) {
+        fprintf(stderr, "You must specify -a or a domain id.\n\n");
+        help("tmem-set");
+        exit(1);
+    }
+
+    if (all)
+        domid = -1;
+    else
+        find_domain(dom);
+
+    if (!opt_w && !opt_c && !opt_p) {
+        fprintf(stderr, "No set value specified.\n\n");
+        help("tmem-set");
+        exit(1);
+    }
+
+    if (opt_w)
+        libxl_tmem_set(&ctx, domid, "weight", weight);
+    if (opt_c)
+        libxl_tmem_set(&ctx, domid, "cap", cap);
+    if (opt_p)
+        libxl_tmem_set(&ctx, domid, "compress", compress);
+
+    exit(0);
+}
+
+int main_tmem_shared_auth(int argc, char **argv)
+{
+    char *autharg = NULL;
+    char *endptr = NULL;
+    char *dom = NULL;
+    char *uuid = NULL;
+    int auth = -1;
+    int all = 0;
+    int opt;
+
+    while ((opt = getopt(argc, argv, "au:A:h")) != -1) {
+        switch (opt) {
+        case 'a':
+            all = 1;
+            break;
+        case 'u':
+            uuid = optarg;
+            break;
+        case 'A':
+            autharg = optarg;
+            break;
+        case 'h':
+            help("tmem-shared-auth");
+            exit(0);
+        default:
+            fprintf(stderr, "option `%c' not supported.\n", opt);
+            break;
+        }
+    }
+
+    dom = argv[optind];
+    if (!dom && all == 0) {
+        fprintf(stderr, "You must specify -a or a domain id.\n\n");
+        help("tmem-shared-auth");
+        exit(1);
+    }
+
+    if (all)
+        domid = -1;
+    else
+        find_domain(dom);
+
+    if (uuid == NULL || autharg == NULL) {
+        fprintf(stderr, "No uuid or auth specified.\n\n");
+        help("tmem-shared-auth");
+        exit(1);
+    }
+
+    auth = strtol(autharg, &endptr, 10);
+    if (*endptr != '\0') {
+        fprintf(stderr, "Invalid auth, valid auth are <0|1>.\n\n");
+        exit(1);
+    }
+
+    libxl_tmem_shared_auth(&ctx, domid, uuid, auth);
+
+    exit(0);
+}
+
