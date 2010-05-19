@@ -24,6 +24,7 @@
 #include <xen/console.h>
 #include <xen/smp.h>
 #include <xen/keyhandler.h>
+#include <xen/cpu.h>
 #include <asm/current.h>
 #include <asm/mc146818rtc.h>
 #include <asm/msr.h>
@@ -353,6 +354,32 @@ void __pminit setup_apic_nmi_watchdog(void)
     nmi_active = 1;
 }
 
+static int cpu_nmi_callback(
+    struct notifier_block *nfb, unsigned long action, void *hcpu)
+{
+    unsigned int cpu = (unsigned long)hcpu;
+
+    switch ( action )
+    {
+    case CPU_UP_PREPARE:
+        init_timer(&per_cpu(nmi_timer, cpu), nmi_timer_fn, NULL, cpu);
+        set_timer(&per_cpu(nmi_timer, cpu), NOW());
+        break;
+    case CPU_UP_CANCELED:
+    case CPU_DEAD:
+        kill_timer(&per_cpu(nmi_timer, cpu));
+        break;
+    default:
+        break;
+    }
+
+    return NOTIFY_DONE;
+}
+
+static struct notifier_block cpu_nmi_nfb = {
+    .notifier_call = cpu_nmi_callback
+};
+
 static DEFINE_PER_CPU(unsigned int, last_irq_sums);
 static DEFINE_PER_CPU(unsigned int, alert_counter);
 
@@ -377,10 +404,8 @@ void watchdog_enable(void)
      * setup because the timer infrastructure is not available.
      */
     for_each_online_cpu ( cpu )
-    {
-        init_timer(&per_cpu(nmi_timer, cpu), nmi_timer_fn, NULL, cpu);
-        set_timer(&per_cpu(nmi_timer, cpu), NOW());
-    }
+        cpu_nmi_callback(&cpu_nmi_nfb, CPU_UP_PREPARE, (void *)(long)cpu);
+    register_cpu_notifier(&cpu_nmi_nfb);
 }
 
 void nmi_watchdog_tick(struct cpu_user_regs * regs)
