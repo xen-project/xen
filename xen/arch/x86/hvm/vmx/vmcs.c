@@ -97,7 +97,8 @@ static void __init vmx_display_features(void)
                vmx_ept_super_page_level_limit > 1 ? "1G" : "2M");
 }
 
-static u32 adjust_vmx_controls(u32 ctl_min, u32 ctl_opt, u32 msr)
+static u32 adjust_vmx_controls(
+    const char *name, u32 ctl_min, u32 ctl_opt, u32 msr, bool_t *mismatch)
 {
     u32 vmx_msr_low, vmx_msr_high, ctl = ctl_min | ctl_opt;
 
@@ -107,7 +108,12 @@ static u32 adjust_vmx_controls(u32 ctl_min, u32 ctl_opt, u32 msr)
     ctl |= vmx_msr_low;  /* bit == 1 in low word  ==> must be one  */
 
     /* Ensure minimum (required) set of control bits are supported. */
-    BUG_ON(ctl_min & ~ctl);
+    if ( ctl_min & ~ctl )
+    {
+        *mismatch = 1;
+        printk("VMX: CPU%d has insufficent %s (%08x but requires min %08x)\n",
+               smp_processor_id(), name, ctl, ctl_min);
+    }
 
     return ctl;
 }
@@ -136,7 +142,8 @@ static int vmx_init_vmcs_config(void)
            PIN_BASED_NMI_EXITING);
     opt = PIN_BASED_VIRTUAL_NMIS;
     _vmx_pin_based_exec_control = adjust_vmx_controls(
-        min, opt, MSR_IA32_VMX_PINBASED_CTLS);
+        "Pin-Based Exec Control", min, opt,
+        MSR_IA32_VMX_PINBASED_CTLS, &mismatch);
 
     min = (CPU_BASED_HLT_EXITING |
            CPU_BASED_INVLPG_EXITING |
@@ -153,14 +160,16 @@ static int vmx_init_vmcs_config(void)
            CPU_BASED_MONITOR_TRAP_FLAG |
            CPU_BASED_ACTIVATE_SECONDARY_CONTROLS);
     _vmx_cpu_based_exec_control = adjust_vmx_controls(
-        min, opt, MSR_IA32_VMX_PROCBASED_CTLS);
+        "CPU-Based Exec Control", min, opt,
+        MSR_IA32_VMX_PROCBASED_CTLS, &mismatch);
     _vmx_cpu_based_exec_control &= ~CPU_BASED_RDTSC_EXITING;
 #ifdef __x86_64__
     if ( !(_vmx_cpu_based_exec_control & CPU_BASED_TPR_SHADOW) )
     {
         min |= CPU_BASED_CR8_LOAD_EXITING | CPU_BASED_CR8_STORE_EXITING;
         _vmx_cpu_based_exec_control = adjust_vmx_controls(
-            min, opt, MSR_IA32_VMX_PROCBASED_CTLS);
+            "CPU-Based Exec Control", min, opt,
+            MSR_IA32_VMX_PROCBASED_CTLS, &mismatch);
     }
 #endif
 
@@ -178,7 +187,8 @@ static int vmx_init_vmcs_config(void)
             opt |= SECONDARY_EXEC_UNRESTRICTED_GUEST;
 
         _vmx_secondary_exec_control = adjust_vmx_controls(
-            min, opt, MSR_IA32_VMX_PROCBASED_CTLS2);
+            "Secondary Exec Control", min, opt,
+            MSR_IA32_VMX_PROCBASED_CTLS2, &mismatch);
     }
 
     if ( _vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_EPT )
@@ -228,12 +238,15 @@ static int vmx_init_vmcs_config(void)
     min |= VM_EXIT_IA32E_MODE;
 #endif
     _vmx_vmexit_control = adjust_vmx_controls(
-        min, opt, MSR_IA32_VMX_EXIT_CTLS);
+        "VMExit Control", min, opt, MSR_IA32_VMX_EXIT_CTLS, &mismatch);
 
     min = 0;
     opt = VM_ENTRY_LOAD_GUEST_PAT;
     _vmx_vmentry_control = adjust_vmx_controls(
-        min, opt, MSR_IA32_VMX_ENTRY_CTLS);
+        "VMEntry Control", min, opt, MSR_IA32_VMX_ENTRY_CTLS, &mismatch);
+
+    if ( mismatch )
+        return -EINVAL;
 
     if ( !vmx_pin_based_exec_control )
     {
