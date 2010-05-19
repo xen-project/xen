@@ -271,7 +271,7 @@ static int kexec_get_cpu(xen_kexec_range_t *range)
     int nr = range->nr;
     int nr_bytes = 0;
 
-    if ( nr < 0 || nr >= num_present_cpus() )
+    if ( nr < 0 || nr >= NR_CPUS || !cpu_online(nr) )
         return -EINVAL;
 
     nr_bytes += sizeof_note("CORE", sizeof(ELF_Prstatus));
