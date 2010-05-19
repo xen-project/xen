@@ -2822,6 +2822,11 @@ int libxl_send_sysrq(struct libxl_ctx *ctx, uint32_t domid, char sysrq)
     return 0;
 }
 
+int libxl_send_debug_keys(struct libxl_ctx *ctx, char *keys)
+{
+    return xc_send_debug_keys(ctx->xch, keys);
+}
+
 uint32_t libxl_vm_get_start_time(struct libxl_ctx *ctx, uint32_t domid)
 {
     char *dompath = libxl_xs_get_dompath(ctx, domid);

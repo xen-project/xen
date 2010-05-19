@@ -511,6 +511,7 @@ int libxl_sched_credit_domain_set(struct libxl_ctx *ctx, uint32_t domid,
 int libxl_send_trigger(struct libxl_ctx *ctx, uint32_t domid,
                        char *trigger_name, uint32_t vcpuid);
 int libxl_send_sysrq(struct libxl_ctx *ctx, uint32_t domid, char sysrq);
+int libxl_send_debug_keys(struct libxl_ctx *ctx, char *keys);
 uint32_t libxl_vm_get_start_time(struct libxl_ctx *ctx, uint32_t domid);
 
 char *libxl_tmem_list(struct libxl_ctx *ctx, uint32_t domid, int use_long);

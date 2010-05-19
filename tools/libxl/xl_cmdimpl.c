@@ -3212,6 +3212,36 @@ int main_sysrq(int argc, char **argv)
     exit(0);
 }
 
+int main_debug_keys(int argc, char **argv)
+{
+    int opt;
+    char *keys;
+
+    while ((opt = getopt(argc, argv, "h")) != -1) {
+        switch (opt) {
+        case 'h':
+            help("debug-keys");
+            exit(0);
+        default:
+            fprintf(stderr, "option not supported\n");
+            break;
+        }
+    }
+    if (optind >= argc) {
+        help("debug-keys");
+        exit(2);
+    }
+
+    keys = argv[optind];
+
+    if (libxl_send_debug_keys(&ctx, keys)) {
+        fprintf(stderr, "cannot send debug keys: %s\n", keys);
+        exit(1);
+    }
+
+    exit(0);
+}
+
 int main_top(int argc, char **argv)
 {
     int opt;
