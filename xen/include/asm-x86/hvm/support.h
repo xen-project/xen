@@ -66,8 +66,6 @@ extern unsigned int opt_hvm_debug_level;
 
 extern unsigned long hvm_io_bitmap[];
 
-void hvm_enable(struct hvm_function_table *);
-
 enum hvm_copy_result {
     HVMCOPY_okay = 0,
     HVMCOPY_bad_gva_to_gfn,

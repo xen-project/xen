@@ -198,7 +198,7 @@ static int enter_state(u32 state)
     local_irq_restore(flags);
     console_end_sync();
     acpi_sleep_post(state);
-    if ( !hvm_cpu_up() )
+    if ( hvm_cpu_up() )
         BUG();
 
  enable_cpu:

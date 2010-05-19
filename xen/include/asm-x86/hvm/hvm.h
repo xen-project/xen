@@ -299,7 +299,7 @@ void hvm_set_rdtsc_exiting(struct domain *d, bool_t enable);
 
 static inline int hvm_cpu_up(void)
 {
-    return (hvm_funcs.cpu_up ? hvm_funcs.cpu_up() : 1);
+    return (hvm_funcs.cpu_up ? hvm_funcs.cpu_up() : 0);
 }
 
 static inline void hvm_cpu_down(void)

@@ -23,7 +23,6 @@
 #include <asm/hvm/io.h>
 #include <asm/hvm/vpmu.h>
 
-extern void start_vmx(void);
 extern void vmcs_dump_vcpu(struct vcpu *v);
 extern void setup_vmcs_dump(void);
 extern int  vmx_cpu_up_prepare(unsigned int cpu);

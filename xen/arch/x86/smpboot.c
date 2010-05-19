@@ -71,7 +71,8 @@ u32 x86_cpu_to_apicid[NR_CPUS] __read_mostly = { [0 ... NR_CPUS-1] = -1U };
 
 static void map_cpu_to_logical_apicid(void);
 
-enum cpu_state {
+static int cpu_error;
+static enum cpu_state {
     CPU_STATE_DEAD = 0, /* slave -> master: I am completely dead */
     CPU_STATE_INIT,     /* master -> slave: Early bringup phase 1 */
     CPU_STATE_CALLOUT,  /* master -> slave: Early bringup phase 2 */
@@ -133,7 +134,8 @@ static void smp_store_cpu_info(int id)
 
 void smp_callin(void)
 {
-    int i;
+    unsigned int cpu = smp_processor_id();
+    int i, rc;
 
     /* Wait 2s total for startup. */
     Dprintk("Waiting for CALLOUT.\n");
@@ -155,7 +157,16 @@ void smp_callin(void)
     map_cpu_to_logical_apicid();
 
     /* Save our processor parameters. */
-    smp_store_cpu_info(smp_processor_id());
+    smp_store_cpu_info(cpu);
+
+    if ( (rc = hvm_cpu_up()) != 0 )
+    {
+        extern void (*dead_idle) (void);
+        printk("CPU%d: Failed to initialise HVM. Not coming online.\n", cpu);
+        cpu_error = rc;
+        cpu_exit_clear(cpu);
+        (*dead_idle)();
+    }
 
     /* Allow the master to continue. */
     set_cpu_state(CPU_STATE_CALLIN);
@@ -507,7 +518,7 @@ int alloc_cpu_id(void)
 static int do_boot_cpu(int apicid, int cpu)
 {
     unsigned long boot_error;
-    int timeout;
+    int timeout, rc = 0;
     unsigned long start_eip;
 
     /*
@@ -548,8 +559,8 @@ static int do_boot_cpu(int apicid, int cpu)
         /* Wait 5s total for a response. */
         for ( timeout = 0; timeout < 50000; timeout++ )
         {
-            if ( cpu_state == CPU_STATE_CALLIN )
-                break; /* It has booted */
+            if ( cpu_state != CPU_STATE_CALLOUT )
+                break;
             udelay(100);
         }
 
@@ -559,6 +570,11 @@ static int do_boot_cpu(int apicid, int cpu)
             Dprintk("OK.\n");
             print_cpu_info(cpu);
             Dprintk("CPU has booted.\n");
+        }
+        else if ( cpu_state == CPU_STATE_DEAD )
+        {
+            rmb();
+            rc = cpu_error;
         }
         else
         {
@@ -575,7 +591,10 @@ static int do_boot_cpu(int apicid, int cpu)
     }
 
     if ( boot_error )
+    {
         cpu_exit_clear(cpu);
+        rc = -EIO;
+    }
 
     /* mark "stuck" area as not stuck */
     bootsym(trampoline_cpu_started) = 0;
@@ -583,7 +602,7 @@ static int do_boot_cpu(int apicid, int cpu)
 
     smpboot_restore_warm_reset_vector();
 
-    return boot_error ? -EIO : 0;
+    return rc;
 }
 
 void cpu_exit_clear(unsigned int cpu)

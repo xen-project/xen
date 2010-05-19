@@ -218,8 +218,6 @@ static void __devinit init_intel(struct cpuinfo_x86 *c)
 	    (cpuid_eax(0x00000006) & (1u<<2)))
 		set_bit(X86_FEATURE_ARAT, c->x86_capability);
 
-	start_vmx();
-
 	if ( !use_xsave )
 		clear_bit(X86_FEATURE_XSAVE, boot_cpu_data.x86_capability);
 

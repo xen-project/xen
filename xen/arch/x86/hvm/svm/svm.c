@@ -856,22 +856,23 @@ static void svm_init_erratum_383(struct cpuinfo_x86 *c)
     amd_erratum383_found = 1;
 }
 
-static int svm_cpu_up(struct cpuinfo_x86 *c)
+static int svm_cpu_up(void)
 {
     u32 eax, edx, phys_hsa_lo, phys_hsa_hi;   
     u64 phys_hsa;
-    int cpu = smp_processor_id();
+    int rc, cpu = smp_processor_id();
+    struct cpuinfo_x86 *c = &cpu_data[cpu];
  
     /* Check whether SVM feature is disabled in BIOS */
     rdmsr(MSR_K8_VM_CR, eax, edx);
     if ( eax & K8_VMCR_SVME_DISABLE )
     {
         printk("CPU%d: AMD SVM Extension is disabled in BIOS.\n", cpu);
-        return 0;
+        return -EINVAL;
     }
 
-    if ( svm_cpu_up_prepare(cpu) != 0 )
-        return 0;
+    if ( (rc = svm_cpu_up_prepare(cpu)) != 0 )
+        return rc;
 
     write_efer(read_efer() | EFER_SVME);
 
@@ -905,39 +906,26 @@ static int svm_cpu_up(struct cpuinfo_x86 *c)
     else
     {
         if ( cpu_has_lmsl )
-            printk(XENLOG_WARNING "Inconsistent LMLSE support across CPUs!\n");
+            printk(XENLOG_WARNING "Inconsistent LMSLE support across CPUs!\n");
         cpu_has_lmsl = 0;
     }
 #endif
 
-    return 1;
+    return 0;
 }
 
-void start_svm(struct cpuinfo_x86 *c)
+struct hvm_function_table * __init start_svm(void)
 {
-    static bool_t bootstrapped;
-
-    if ( test_and_set_bool(bootstrapped) )
-    {
-        if ( hvm_enabled && !svm_cpu_up(c) )
-        {
-            printk("SVM: FATAL: failed to initialise CPU%d!\n",
-                   smp_processor_id());
-            BUG();
-        }
-        return;
-    }
-
     /* Xen does not fill x86_capability words except 0. */
     boot_cpu_data.x86_capability[5] = cpuid_ecx(0x80000001);
 
     if ( !test_bit(X86_FEATURE_SVME, &boot_cpu_data.x86_capability) )
-        return;
+        return NULL;
 
-    if ( !svm_cpu_up(c) )
+    if ( svm_cpu_up() )
     {
         printk("SVM: failed to initialise.\n");
-        return;
+        return NULL;
     }
 
     setup_vmcb_dump();
@@ -949,7 +937,7 @@ void start_svm(struct cpuinfo_x86 *c)
     svm_function_table.hap_1gb_pgtb = 
         (CONFIG_PAGING_LEVELS == 4)? !!(cpuid_edx(0x80000001) & 0x04000000):0;
 
-    hvm_enable(&svm_function_table);
+    return &svm_function_table;
 }
 
 static void svm_do_nested_pgfault(paddr_t gpa)
@@ -1402,6 +1390,7 @@ static struct hvm_function_table __read_mostly svm_function_table = {
     .name                 = "SVM",
     .cpu_up_prepare       = svm_cpu_up_prepare,
     .cpu_dead             = svm_cpu_dead,
+    .cpu_up               = svm_cpu_up,
     .cpu_down             = svm_cpu_down,
     .domain_initialise    = svm_domain_initialise,
     .domain_destroy       = svm_domain_destroy,

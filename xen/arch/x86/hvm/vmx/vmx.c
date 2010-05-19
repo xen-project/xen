@@ -1413,35 +1413,22 @@ static struct hvm_function_table __read_mostly vmx_function_table = {
     .set_rdtsc_exiting    = vmx_set_rdtsc_exiting
 };
 
-void start_vmx(void)
+struct hvm_function_table * __init start_vmx(void)
 {
-    static bool_t bootstrapped;
-
     vmx_save_host_msrs();
-
-    if ( test_and_set_bool(bootstrapped) )
-    {
-        if ( hvm_enabled && !vmx_cpu_up() )
-        {
-            printk("VMX: FATAL: failed to initialise CPU%d!\n",
-                   smp_processor_id());
-            BUG();
-        }
-        return;
-    }
 
     /* Xen does not fill x86_capability words except 0. */
     boot_cpu_data.x86_capability[4] = cpuid_ecx(1);
 
     if ( !test_bit(X86_FEATURE_VMXE, &boot_cpu_data.x86_capability) )
-        return;
+        return NULL;
 
     set_in_cr4(X86_CR4_VMXE);
 
-    if ( !vmx_cpu_up() )
+    if ( vmx_cpu_up() )
     {
         printk("VMX: failed to initialise.\n");
-        return;
+        return NULL;
     }
 
     if ( cpu_has_vmx_ept )
@@ -1450,12 +1437,11 @@ void start_vmx(void)
         setup_ept_dump();
     }
     
-    vmx_function_table.hap_1gb_pgtb = ( vmx_ept_super_page_level_limit == 2 ) ?
-                                        1 : 0;
+    vmx_function_table.hap_1gb_pgtb = (vmx_ept_super_page_level_limit == 2);
 
     setup_vmcs_dump();
 
-    hvm_enable(&vmx_function_table);
+    return &vmx_function_table;
 }
 
 /*

@@ -100,12 +100,35 @@ static struct notifier_block cpu_nfb = {
     .notifier_call = cpu_callback
 };
 
-void hvm_enable(struct hvm_function_table *fns)
+static int __init hvm_enable(void)
 {
+    extern struct hvm_function_table *start_svm(void);
+    extern struct hvm_function_table *start_vmx(void);
     extern int hvm_port80_allowed;
 
-    BUG_ON(hvm_enabled);
-    printk("HVM: %s enabled\n", fns->name);
+    struct hvm_function_table *fns = NULL;
+
+    switch ( boot_cpu_data.x86_vendor )
+    {
+    case X86_VENDOR_INTEL:
+        fns = start_vmx();
+        break;
+    case X86_VENDOR_AMD:
+        fns = start_svm();
+        break;
+    default:
+        break;
+    }
+
+    if ( fns == NULL )
+        return 0;
+
+    hvm_funcs = *fns;
+    hvm_enabled = 1;
+
+    printk("HVM: %s enabled\n", hvm_funcs.name);
+    if ( hvm_funcs.hap_supported )
+        printk("HVM: Hardware Assisted Paging detected.\n");
 
     /*
      * Allow direct access to the PC debug ports 0x80 and 0xed (they are
@@ -116,14 +139,11 @@ void hvm_enable(struct hvm_function_table *fns)
         __clear_bit(0x80, hvm_io_bitmap);
     __clear_bit(0xed, hvm_io_bitmap);
 
-    hvm_funcs   = *fns;
-    hvm_enabled = 1;
-
-    if ( hvm_funcs.hap_supported )
-        printk("HVM: Hardware Assisted Paging detected.\n");
-
     register_cpu_notifier(&cpu_nfb);
+
+    return 0;
 }
+presmp_initcall(hvm_enable);
 
 /*
  * Need to re-inject a given event? We avoid re-injecting software exceptions

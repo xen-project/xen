@@ -13,8 +13,6 @@
 #include "cpu.h"
 #include "amd.h"
 
-void start_svm(struct cpuinfo_x86 *c);
-
 /*
  * Pre-canned values for overriding the CPUID features 
  * and extended features masks.
@@ -516,8 +514,6 @@ static void __devinit init_amd(struct cpuinfo_x86 *c)
 		disable_c1_ramping();
 
 	set_cpuidmask(c);
-
-	start_svm(c);
 }
 
 static unsigned int __cpuinit amd_size_cache(struct cpuinfo_x86 * c, unsigned int size)

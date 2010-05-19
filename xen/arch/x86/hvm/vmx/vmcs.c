@@ -112,7 +112,14 @@ static u32 adjust_vmx_controls(u32 ctl_min, u32 ctl_opt, u32 msr)
     return ctl;
 }
 
-static void vmx_init_vmcs_config(void)
+static bool_t cap_check(const char *name, u32 expected, u32 saw)
+{
+    if ( saw != expected )
+        printk("VMX %s: saw 0x%08x expected 0x%08x\n", name, saw, expected);
+    return saw != expected;
+}
+
+static int vmx_init_vmcs_config(void)
 {
     u32 vmx_basic_msr_low, vmx_basic_msr_high, min, opt;
     u32 _vmx_pin_based_exec_control;
@@ -121,6 +128,7 @@ static void vmx_init_vmcs_config(void)
     u8 ept_super_page_level_limit = 0;
     u32 _vmx_vmexit_control;
     u32 _vmx_vmentry_control;
+    bool_t mismatch = 0;
 
     rdmsr(MSR_IA32_VMX_BASIC, vmx_basic_msr_low, vmx_basic_msr_high);
 
@@ -227,6 +235,9 @@ static void vmx_init_vmcs_config(void)
     _vmx_vmentry_control = adjust_vmx_controls(
         min, opt, MSR_IA32_VMX_ENTRY_CTLS);
 
+    if ( smp_processor_id() == 2 )
+        vmx_basic_msr_low = 0xdeadbeef;
+
     if ( !vmx_pin_based_exec_control )
     {
         /* First time through. */
@@ -243,27 +254,73 @@ static void vmx_init_vmcs_config(void)
     else
     {
         /* Globals are already initialised: re-check them. */
-        BUG_ON(vmcs_revision_id != vmx_basic_msr_low);
-        BUG_ON(vmx_pin_based_exec_control != _vmx_pin_based_exec_control);
-        BUG_ON(vmx_cpu_based_exec_control != _vmx_cpu_based_exec_control);
-        BUG_ON(vmx_secondary_exec_control != _vmx_secondary_exec_control);
-        BUG_ON(vmx_ept_super_page_level_limit > ept_super_page_level_limit);
-        BUG_ON(vmx_vmexit_control != _vmx_vmexit_control);
-        BUG_ON(vmx_vmentry_control != _vmx_vmentry_control);
-        BUG_ON(cpu_has_vmx_ins_outs_instr_info !=
-               !!(vmx_basic_msr_high & (1U<<22)));
+        mismatch |= cap_check(
+            "VMCS revision ID",
+            vmcs_revision_id, vmx_basic_msr_low);
+        mismatch |= cap_check(
+            "Pin-Based Exec Control",
+            vmx_pin_based_exec_control, _vmx_pin_based_exec_control);
+        mismatch |= cap_check(
+            "CPU-Based Exec Control",
+            vmx_cpu_based_exec_control, _vmx_cpu_based_exec_control);
+        mismatch |= cap_check(
+            "Secondary Exec Control",
+            vmx_secondary_exec_control, _vmx_secondary_exec_control);
+        mismatch |= cap_check(
+            "VMExit Control",
+            vmx_vmexit_control, _vmx_vmexit_control);
+        mismatch |= cap_check(
+            "VMEntry Control",
+            vmx_vmentry_control, _vmx_vmentry_control);
+        if ( vmx_ept_super_page_level_limit > ept_super_page_level_limit )
+        {
+            printk("EPT Super Page Limit: saw %u expected >= %u\n",
+                   ept_super_page_level_limit, vmx_ept_super_page_level_limit);
+            mismatch = 1;
+        }
+        if ( cpu_has_vmx_ins_outs_instr_info !=
+             !!(vmx_basic_msr_high & (1U<<22)) )
+        {
+            printk("VMX INS/OUTS Instruction Info: saw %d expected %d\n",
+                   !!(vmx_basic_msr_high & (1U<<22)),
+                   cpu_has_vmx_ins_outs_instr_info);
+            mismatch = 1;
+        }
+        if ( mismatch )
+        {
+            printk("VMX: Capabilities fatally differ between CPU%d and CPU0\n",
+                   smp_processor_id());
+            return -EINVAL;
+        }
     }
 
     /* IA-32 SDM Vol 3B: VMCS size is never greater than 4kB. */
-    BUG_ON((vmx_basic_msr_high & 0x1fff) > PAGE_SIZE);
+    if ( (vmx_basic_msr_high & 0x1fff) > PAGE_SIZE )
+    {
+        printk("VMX: CPU%d VMCS size is too big (%u bytes)\n",
+               smp_processor_id(), vmx_basic_msr_high & 0x1fff);
+        return -EINVAL;
+    }
 
 #ifdef __x86_64__
     /* IA-32 SDM Vol 3B: 64-bit CPUs always have VMX_BASIC_MSR[48]==0. */
-    BUG_ON(vmx_basic_msr_high & (1u<<16));
+    if ( vmx_basic_msr_high & (1u<<16) )
+    {
+        printk("VMX: CPU%d limits VMX structure pointers to 32 bits\n",
+               smp_processor_id());
+        return -EINVAL;
+    }
 #endif
 
     /* Require Write-Back (WB) memory type for VMCS accesses. */
-    BUG_ON(((vmx_basic_msr_high >> 18) & 15) != 6);
+    if ( ((vmx_basic_msr_high >> 18) & 15) != 6 )
+    {
+        printk("VMX: CPU%d has unexpected VMCS access type %u\n",
+               smp_processor_id(), (vmx_basic_msr_high >> 18) & 15);
+        return -EINVAL;
+    }
+
+    return 0;
 }
 
 static struct vmcs_struct *vmx_alloc_vmcs(void)
@@ -359,7 +416,7 @@ void vmx_cpu_dead(unsigned int cpu)
 int vmx_cpu_up(void)
 {
     u32 eax, edx;
-    int bios_locked, cpu = smp_processor_id();
+    int rc, bios_locked, cpu = smp_processor_id();
     u64 cr0, vmx_cr0_fixed0, vmx_cr0_fixed1;
 
     BUG_ON(!(read_cr4() & X86_CR4_VMXE));
@@ -375,7 +432,7 @@ int vmx_cpu_up(void)
     {
         printk("CPU%d: some settings of host CR0 are " 
                "not allowed in VMX operation.\n", cpu);
-        return 0;
+        return -EINVAL;
     }
 
     rdmsr(IA32_FEATURE_CONTROL_MSR, eax, edx);
@@ -388,7 +445,7 @@ int vmx_cpu_up(void)
                       : IA32_FEATURE_CONTROL_MSR_ENABLE_VMXON_OUTSIDE_SMX)) )
         {
             printk("CPU%d: VMX disabled by BIOS.\n", cpu);
-            return 0;
+            return -EINVAL;
         }
     }
     else
@@ -400,12 +457,13 @@ int vmx_cpu_up(void)
         wrmsr(IA32_FEATURE_CONTROL_MSR, eax, 0);
     }
 
-    vmx_init_vmcs_config();
+    if ( (rc = vmx_init_vmcs_config()) != 0 )
+        return rc;
 
     INIT_LIST_HEAD(&this_cpu(active_vmcs_list));
 
-    if ( vmx_cpu_up_prepare(cpu) != 0 )
-        return 0;
+    if ( (rc = vmx_cpu_up_prepare(cpu)) != 0 )
+        return rc;
 
     switch ( __vmxon(virt_to_maddr(this_cpu(host_vmcs))) )
     {
@@ -419,12 +477,12 @@ int vmx_cpu_up(void)
                    "in your BIOS configuration?\n", cpu);
             printk(" --> Disable TXT in your BIOS unless using a secure "
                    "bootloader.\n");
-            return 0;
+            return -EINVAL;
         }
         /* fall through */
     case -1: /* CF==1 or ZF==1 */
         printk("CPU%d: unexpected VMXON failure\n", cpu);
-        return 0;
+        return -EINVAL;
     case 0: /* success */
         break;
     default:
@@ -438,7 +496,7 @@ int vmx_cpu_up(void)
     if ( cpu_has_vmx_vpid )
         vpid_sync_all();
 
-    return 1;
+    return 0;
 }
 
 void vmx_cpu_down(void)
