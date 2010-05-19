@@ -322,6 +322,36 @@ void rcu_check_callbacks(int cpu)
     raise_softirq(RCU_SOFTIRQ);
 }
 
+static void rcu_move_batch(struct rcu_data *this_rdp, struct rcu_head *list,
+                           struct rcu_head **tail)
+{
+    local_irq_disable();
+    *this_rdp->nxttail = list;
+    if (list)
+        this_rdp->nxttail = tail;
+    local_irq_enable();
+}
+
+static void rcu_offline_cpu(struct rcu_data *this_rdp,
+                            struct rcu_ctrlblk *rcp, struct rcu_data *rdp)
+{
+    /* If the cpu going offline owns the grace period we can block
+     * indefinitely waiting for it, so flush it here.
+     */
+    spin_lock(&rcp->lock);
+    if (rcp->cur != rcp->completed)
+        cpu_quiet(rdp->cpu, rcp);
+    spin_unlock(&rcp->lock);
+
+    rcu_move_batch(this_rdp, rdp->donelist, rdp->donetail);
+    rcu_move_batch(this_rdp, rdp->curlist, rdp->curtail);
+    rcu_move_batch(this_rdp, rdp->nxtlist, rdp->nxttail);
+
+    local_irq_disable();
+    this_rdp->qlen += rdp->qlen;
+    local_irq_enable();
+}
+
 static void rcu_init_percpu_data(int cpu, struct rcu_ctrlblk *rcp,
                                  struct rcu_data *rdp)
 {
@@ -339,14 +369,17 @@ static int cpu_callback(
     struct notifier_block *nfb, unsigned long action, void *hcpu)
 {
     unsigned int cpu = (unsigned long)hcpu;
+    struct rcu_data *rdp = &per_cpu(rcu_data, cpu);
 
     switch ( action )
     {
-    case CPU_UP_PREPARE: {
-        struct rcu_data *rdp = &per_cpu(rcu_data, cpu);
+    case CPU_UP_PREPARE:
         rcu_init_percpu_data(cpu, &rcu_ctrlblk, rdp);
         break;
-    }
+    case CPU_UP_CANCELED:
+    case CPU_DEAD:
+        rcu_offline_cpu(&this_cpu(rcu_data), &rcu_ctrlblk, rdp);
+        break;
     default:
         break;
     }
