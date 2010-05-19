@@ -164,6 +164,8 @@ void smp_callin(void)
         extern void (*dead_idle) (void);
         printk("CPU%d: Failed to initialise HVM. Not coming online.\n", cpu);
         cpu_error = rc;
+        clear_local_APIC();
+        spin_debug_enable();
         cpu_exit_clear(cpu);
         (*dead_idle)();
     }
