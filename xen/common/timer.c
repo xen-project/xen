@@ -515,6 +515,29 @@ static struct keyhandler dump_timerq_keyhandler = {
     .desc = "dump timer queues"
 };
 
+static void migrate_timers_from_cpu(unsigned int cpu)
+{
+    struct timers *ts;
+    struct timer *t;
+
+    ASSERT((cpu != 0) && cpu_online(0));
+
+    ts = &per_cpu(timers, cpu);
+
+    spin_lock_irq(&per_cpu(timers, 0).lock);
+    spin_lock(&ts->lock);
+
+    while ( (t = GET_HEAP_SIZE(ts->heap) ? ts->heap[1] : ts->list) != NULL )
+    {
+        remove_entry(ts, t);
+        t->cpu = 0;
+        __add_timer(t);
+    }
+
+    spin_unlock(&ts->lock);
+    spin_unlock_irq(&per_cpu(timers, 0).lock);
+}
+
 static struct timer *dummy_heap;
 
 static int cpu_callback(
@@ -531,8 +554,7 @@ static int cpu_callback(
         break;
     case CPU_UP_CANCELED:
     case CPU_DEAD:
-        /* Enable this later. */
-        /*WARN_ON(GET_HEAP_SIZE(ts->heap) || ts->list);*/
+        migrate_timers_from_cpu(cpu);
         break;
     default:
         break;
