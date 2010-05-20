@@ -292,20 +292,22 @@ int xenstat_collect_networks(xenstat_node * node)
 
 		/* If the device parsed is network bridge and both tx & rx packets are zero, we are most */
 		/* likely using bonding so we alter the configuration for dom0 to have bridge stats */
-		if ((strstr(iface, devBridge) != NULL) && (strstr(iface, devNoBridge) == NULL)) {
-			domain = xenstat_node_domain(node, 0);
+		if ((strstr(iface, devBridge) != NULL) &&
+		    (strstr(iface, devNoBridge) == NULL) &&
+		    ((domain = xenstat_node_domain(node, 0)) != NULL)) {
 			for (i = 0; i < domain->num_networks; i++) {
-				if ((domain->networks[i].id == 0) && (domain->networks[i].tbytes == 0)
-					&& (domain->networks[i].rbytes == 0)) {
-						domain->networks[i].tbytes = txBytes;
-						domain->networks[i].tpackets = txPackets;
-						domain->networks[i].terrs = txErrs;
-						domain->networks[i].tdrop = txDrops;
-						domain->networks[i].rbytes = rxBytes;
-						domain->networks[i].rpackets = rxPackets;
-						domain->networks[i].rerrs = rxErrs;
-						domain->networks[i].rdrop = rxDrops;
-				}
+				if ((domain->networks[i].id != 0) ||
+				    (domain->networks[i].tbytes != 0) ||
+				    (domain->networks[i].rbytes != 0))
+					continue;
+				domain->networks[i].tbytes = txBytes;
+				domain->networks[i].tpackets = txPackets;
+				domain->networks[i].terrs = txErrs;
+				domain->networks[i].tdrop = txDrops;
+				domain->networks[i].rbytes = rxBytes;
+				domain->networks[i].rpackets = rxPackets;
+				domain->networks[i].rerrs = rxErrs;
+				domain->networks[i].rdrop = rxDrops;
 			}
 		}
 		else /* Otherwise we need to preserve old behaviour */
