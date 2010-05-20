@@ -358,45 +358,6 @@ static void unmap_cpu_to_logical_apicid(int cpu)
     cpu_2_logical_apicid[cpu] = BAD_APICID;
 }
 
-#if APIC_DEBUG
-static void __inquire_remote_apic(int apicid)
-{
-    int i, regs[] = { APIC_ID >> 4, APIC_LVR >> 4, APIC_SPIV >> 4 };
-    char *names[] = { "ID", "VERSION", "SPIV" };
-    int timeout, status;
-
-    printk("Inquiring remote APIC #%d...\n", apicid);
-
-    for ( i = 0; i < ARRAY_SIZE(regs); i++ )
-    {
-        printk("... APIC #%d %s: ", apicid, names[i]);
-
-        /*
-         * Wait for idle.
-         */
-        apic_wait_icr_idle();
-
-        apic_icr_write(APIC_DM_REMRD | regs[i], apicid);
-
-        timeout = 0;
-        do {
-            udelay(100);
-            status = apic_read(APIC_ICR) & APIC_ICR_RR_MASK;
-        } while ( status == APIC_ICR_RR_INPROG && timeout++ < 1000 );
-
-        switch ( status )
-        {
-        case APIC_ICR_RR_VALID:
-            status = apic_read(APIC_RRR);
-            printk("%08x\n", status);
-            break;
-        default:
-            printk("failed\n");
-        }
-    }
-}
-#endif
-
 static int wakeup_secondary_cpu(int phys_apicid, unsigned long start_eip)
 {
     unsigned long send_status = 0, accept_status = 0;
@@ -588,7 +549,6 @@ static int do_boot_cpu(int apicid, int cpu)
             else
                 /* trampoline code not run */
                 printk("Not responding.\n");
-            inquire_remote_apic(apicid);
         }
     }
 
