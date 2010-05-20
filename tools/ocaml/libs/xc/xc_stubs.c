@@ -952,11 +952,11 @@ CAMLprim value stub_xc_domain_get_pfn_list(value xc_handle, value domid,
 	CAMLlocal2(array, v);
 	unsigned long c_nr_pfns;
 	long ret, i;
-	xen_pfn_t *c_array;
+	uint64_t *c_array;
 
 	c_nr_pfns = Nativeint_val(nr_pfns);
 
-	c_array = malloc(sizeof(xen_pfn_t) * c_nr_pfns);
+	c_array = malloc(sizeof(uint64_t) * c_nr_pfns);
 	if (!c_array)
 		caml_raise_out_of_memory();
 

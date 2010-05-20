@@ -1208,7 +1208,7 @@ int xc_shadow_allocation_set(int handle, unsigned int domid, uint32_t mb)
 }
 
 int xc_domain_get_pfn_list(int handle, unsigned int domid,
-                           xen_pfn_t *pfn_array, unsigned long max_pfns)
+                           uint64_t *pfn_array, unsigned long max_pfns)
 {
 	int ret;
 	DECLARE_DOMCTL(XEN_DOMCTL_getmemlist, domid);
