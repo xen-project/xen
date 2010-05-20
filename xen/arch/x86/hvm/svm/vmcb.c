@@ -26,7 +26,7 @@
 #include <asm/cpufeature.h>
 #include <asm/processor.h>
 #include <asm/msr.h>
-#include <asm/paging.h>
+#include <asm/p2m.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/io.h>
 #include <asm/hvm/support.h>
@@ -232,7 +232,7 @@ static int construct_vmcb(struct vcpu *v)
     {
         vmcb->np_enable = 1; /* enable nested paging */
         vmcb->g_pat = MSR_IA32_CR_PAT_RESET; /* guest PAT */
-        vmcb->h_cr3 = pagetable_get_paddr(v->domain->arch.phys_table);
+        vmcb->h_cr3 = pagetable_get_paddr(p2m_get_pagetable(p2m_get_hostp2m(v->domain)));
 
         /* No point in intercepting CR3 reads/writes. */
         vmcb->cr_intercepts &= ~(CR_INTERCEPT_CR3_READ|CR_INTERCEPT_CR3_WRITE);

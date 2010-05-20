@@ -247,9 +247,6 @@ struct arch_domain
     struct paging_domain paging;
     struct p2m_domain *p2m;
 
-    /* Shadow translated domain: P2M mapping */
-    pagetable_t phys_table;
-
     /* NB. protected by d->event_lock and by irq_desc[irq].lock */
     int *irq_pirq;
     int *pirq_irq;

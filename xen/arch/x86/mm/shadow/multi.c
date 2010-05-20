@@ -1476,7 +1476,7 @@ void sh_install_xen_entries_in_l4(struct vcpu *v, mfn_t gl4mfn, mfn_t sl4mfn)
     {
         /* install domain-specific P2M table */
         sl4e[shadow_l4_table_offset(RO_MPT_VIRT_START)] =
-            shadow_l4e_from_mfn(pagetable_get_mfn(d->arch.phys_table),
+            shadow_l4e_from_mfn(pagetable_get_mfn(p2m_get_pagetable(p2m_get_hostp2m(d))),
                                 __PAGE_HYPERVISOR);
     }
 
@@ -1535,8 +1535,8 @@ static void sh_install_xen_entries_in_l2h(struct vcpu *v, mfn_t sl2hmfn)
     {
         /* Install the domain-specific p2m table */
         l3_pgentry_t *p2m;
-        ASSERT(pagetable_get_pfn(d->arch.phys_table) != 0);
-        p2m = sh_map_domain_page(pagetable_get_mfn(d->arch.phys_table));
+        ASSERT(pagetable_get_pfn(p2m_get_pagetable(p2m_get_hostp2m(d))) != 0);
+        p2m = sh_map_domain_page(pagetable_get_mfn(p2m_get_pagetable(p2m_get_hostp2m(d))));
         for ( i = 0; i < MACHPHYS_MBYTES>>1; i++ )
         {
             sl2e[shadow_l2_table_offset(RO_MPT_VIRT_START) + i] =

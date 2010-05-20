@@ -410,7 +410,7 @@ static void hap_install_xen_entries_in_l4(struct vcpu *v, mfn_t l4mfn)
 
     /* Install the domain-specific P2M table */
     l4e[l4_table_offset(RO_MPT_VIRT_START)] =
-        l4e_from_pfn(mfn_x(pagetable_get_mfn(d->arch.phys_table)),
+        l4e_from_pfn(mfn_x(pagetable_get_mfn(p2m_get_pagetable(p2m_get_hostp2m(d)))),
                      __PAGE_HYPERVISOR);
 
     hap_unmap_domain_page(l4e);
@@ -421,6 +421,7 @@ static void hap_install_xen_entries_in_l4(struct vcpu *v, mfn_t l4mfn)
 static void hap_install_xen_entries_in_l2h(struct vcpu *v, mfn_t l2hmfn)
 {
     struct domain *d = v->domain;
+    struct p2m_domain *hostp2m = p2m_get_hostp2m(d);
     l2_pgentry_t *l2e;
     l3_pgentry_t *p2m;
     int i;
@@ -446,8 +447,8 @@ static void hap_install_xen_entries_in_l2h(struct vcpu *v, mfn_t l2hmfn)
             l2e_empty();
 
     /* Install the domain-specific p2m table */
-    ASSERT(pagetable_get_pfn(d->arch.phys_table) != 0);
-    p2m = hap_map_domain_page(pagetable_get_mfn(d->arch.phys_table));
+    ASSERT(pagetable_get_pfn(p2m_get_pagetable(hostp2m)) != 0);
+    p2m = hap_map_domain_page(pagetable_get_mfn(p2m_get_pagetable(hostp2m)));
     for ( i = 0; i < MACHPHYS_MBYTES>>1; i++ )
     {
         l2e[l2_table_offset(RO_MPT_VIRT_START) + i] =

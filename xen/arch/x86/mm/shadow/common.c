@@ -3177,7 +3177,7 @@ int shadow_enable(struct domain *d, u32 mode)
  out_locked:
     shadow_unlock(d);
  out_unlocked:
-    if ( rv != 0 && !pagetable_is_null(d->arch.phys_table) )
+    if ( rv != 0 && !pagetable_is_null(p2m_get_pagetable(p2m_get_hostp2m(d))) )
         p2m_teardown(d);
     if ( rv != 0 && pg != NULL )
         shadow_free_p2m_page(d, pg);

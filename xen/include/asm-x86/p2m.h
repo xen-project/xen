@@ -29,6 +29,7 @@
 #include <xen/config.h>
 #include <xen/paging.h>
 #include <asm/mem_sharing.h>
+#include <asm/page.h>    /* for pagetable_t */
 
 /*
  * The phys_to_machine_mapping maps guest physical frame numbers 
@@ -166,6 +167,9 @@ struct p2m_domain {
     int                locker;   /* processor which holds the lock */
     const char        *locker_function; /* Func that took it */
 
+    /* Shadow translated domain: p2m mapping */
+    pagetable_t        phys_table;
+
     /* Pages used to construct the p2m */
     struct page_list_head pages;
 
@@ -214,6 +218,11 @@ struct p2m_domain {
         unsigned         max_guest;    /* gpfn of max guest demand-populate */
     } pod;
 };
+
+/* get host p2m table */
+#define p2m_get_hostp2m(d)      ((d)->arch.p2m)
+
+#define p2m_get_pagetable(p2m)  ((p2m)->phys_table)
 
 /*
  * The P2M lock.  This protects all updates to the p2m table.

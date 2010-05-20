@@ -242,12 +242,13 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
     int direct_mmio = (p2mt == p2m_mmio_direct);
     uint8_t ipat = 0;
     int need_modify_vtd_table = 1;
+    struct p2m_domain *p2m = p2m_get_hostp2m(d);
 
     if (  order != 0 )
         if ( (gfn & ((1UL << order) - 1)) )
             return 1;
 
-    table = map_domain_page(mfn_x(pagetable_get_mfn(d->arch.phys_table)));
+    table = map_domain_page(mfn_x(pagetable_get_mfn(p2m_get_pagetable(p2m))));
 
     ASSERT(table != NULL);
 
@@ -370,7 +371,7 @@ static mfn_t ept_get_entry(struct domain *d, unsigned long gfn, p2m_type_t *t,
                            p2m_query_t q)
 {
     ept_entry_t *table =
-        map_domain_page(mfn_x(pagetable_get_mfn(d->arch.phys_table)));
+        map_domain_page(mfn_x(pagetable_get_mfn(p2m_get_pagetable(p2m_get_hostp2m(d)))));
     unsigned long gfn_remainder = gfn;
     ept_entry_t *ept_entry;
     u32 index;
@@ -464,7 +465,7 @@ out:
 static ept_entry_t ept_get_entry_content(struct domain *d, unsigned long gfn, int *level)
 {
     ept_entry_t *table =
-        map_domain_page(mfn_x(pagetable_get_mfn(d->arch.phys_table)));
+        map_domain_page(mfn_x(pagetable_get_mfn(p2m_get_pagetable(p2m_get_hostp2m(d)))));
     unsigned long gfn_remainder = gfn;
     ept_entry_t *ept_entry;
     ept_entry_t content = { .epte = 0 };
@@ -499,7 +500,7 @@ static ept_entry_t ept_get_entry_content(struct domain *d, unsigned long gfn, in
 void ept_walk_table(struct domain *d, unsigned long gfn)
 {
     ept_entry_t *table =
-        map_domain_page(mfn_x(pagetable_get_mfn(d->arch.phys_table)));
+        map_domain_page(mfn_x(pagetable_get_mfn(p2m_get_pagetable(p2m_get_hostp2m(d)))));
     unsigned long gfn_remainder = gfn;
 
     int i;
@@ -639,12 +640,12 @@ static void ept_change_entry_type_global(struct domain *d, p2m_type_t ot,
     int i2;
     int i1;
 
-    if ( pagetable_get_pfn(d->arch.phys_table) == 0 )
+    if ( pagetable_get_pfn(p2m_get_pagetable(p2m_get_hostp2m(d))) == 0 )
         return;
 
     BUG_ON(EPT_DEFAULT_GAW != 3);
 
-    l4e = map_domain_page(mfn_x(pagetable_get_mfn(d->arch.phys_table)));
+    l4e = map_domain_page(mfn_x(pagetable_get_mfn(p2m_get_pagetable(p2m_get_hostp2m(d)))));
     for (i4 = 0; i4 < EPT_PAGETABLE_ENTRIES; i4++ )
     {
         if ( !l4e[i4].epte )
@@ -739,12 +740,14 @@ static void ept_dump_p2m_table(unsigned char key)
     unsigned long index;
     unsigned long gfn, gfn_remainder;
     unsigned long record_counter = 0;
+    struct p2m_domain *p2m;
 
     for_each_domain(d)
     {
         if ( !(is_hvm_domain(d) && d->arch.hvm_domain.hap_enabled) )
             continue;
 
+        p2m = p2m_get_hostp2m(d);
         printk("\ndomain%d EPT p2m table: \n", d->domain_id);
 
         for ( gfn = 0; gfn <= d->arch.p2m->max_mapped_pfn; gfn += (1 << order) )
@@ -752,7 +755,7 @@ static void ept_dump_p2m_table(unsigned char key)
             gfn_remainder = gfn;
             mfn = _mfn(INVALID_MFN);
             table =
-                map_domain_page(mfn_x(pagetable_get_mfn(d->arch.phys_table)));
+                map_domain_page(mfn_x(pagetable_get_mfn(p2m_get_pagetable(p2m))));
 
             for ( i = EPT_DEFAULT_GAW; i > 0; i-- )
             {

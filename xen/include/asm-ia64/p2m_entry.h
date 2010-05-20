@@ -63,6 +63,8 @@ p2m_entry_retry(struct p2m_entry* entry)
 #endif
 }
 
+#define p2m_get_hostp2m(d) (d)
+
 #endif // __ASM_P2M_ENTRY_H__
 
 /*

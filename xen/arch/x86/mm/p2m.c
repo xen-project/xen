@@ -1253,7 +1253,7 @@ p2m_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
               unsigned int page_order, p2m_type_t p2mt)
 {
     // XXX -- this might be able to be faster iff current->domain == d
-    mfn_t table_mfn = pagetable_get_mfn(d->arch.phys_table);
+    mfn_t table_mfn = pagetable_get_mfn(p2m_get_pagetable(p2m_get_hostp2m(d)));
     void *table =map_domain_page(mfn_x(table_mfn));
     unsigned long i, gfn_remainder = gfn;
     l1_pgentry_t *p2m_entry;
@@ -1408,7 +1408,7 @@ p2m_gfn_to_mfn(struct domain *d, unsigned long gfn, p2m_type_t *t,
      * XXX we will return p2m_invalid for unmapped gfns */
     *t = p2m_mmio_dm;
 
-    mfn = pagetable_get_mfn(d->arch.phys_table);
+    mfn = pagetable_get_mfn(p2m_get_pagetable(p2m_get_hostp2m(d)));
 
     if ( gfn > d->arch.p2m->max_mapped_pfn )
         /* This pfn is higher than the highest the p2m map currently holds */
@@ -1798,11 +1798,11 @@ int p2m_alloc_table(struct domain *d,
     struct page_info *page, *p2m_top;
     unsigned int page_count = 0;
     unsigned long gfn = -1UL;
-    struct p2m_domain *p2m = d->arch.p2m;
+    struct p2m_domain *p2m = p2m_get_hostp2m(d);
 
     p2m_lock(p2m);
 
-    if ( pagetable_get_pfn(d->arch.phys_table) != 0 )
+    if ( pagetable_get_pfn(p2m_get_pagetable(p2m)) != 0 )
     {
         P2M_ERROR("p2m already allocated for this domain\n");
         p2m_unlock(p2m);
@@ -1828,7 +1828,7 @@ int p2m_alloc_table(struct domain *d,
         return -ENOMEM;
     }
 
-    d->arch.phys_table = pagetable_from_mfn(page_to_mfn(p2m_top));
+    p2m->phys_table = pagetable_from_mfn(page_to_mfn(p2m_top));
 
     P2M_PRINTK("populating p2m table\n");
 
@@ -1872,7 +1872,7 @@ void p2m_teardown(struct domain *d)
  * We know we don't have any extra mappings to these pages */
 {
     struct page_info *pg;
-    struct p2m_domain *p2m = d->arch.p2m;
+    struct p2m_domain *p2m = p2m_get_hostp2m(d);
     unsigned long gfn;
     p2m_type_t t;
     mfn_t mfn;
@@ -1884,7 +1884,7 @@ void p2m_teardown(struct domain *d)
         if(mfn_valid(mfn) && (t == p2m_ram_shared))
             BUG_ON(mem_sharing_unshare_page(d, gfn, MEM_SHARING_DESTROY_GFN));
     }
-    d->arch.phys_table = pagetable_null();
+    p2m->phys_table = pagetable_null();
 
     while ( (pg = page_list_remove_head(&p2m->pages)) )
         p2m->free_page(d, pg);
@@ -1995,7 +1995,7 @@ static void audit_p2m(struct domain *d)
     spin_unlock(&d->page_alloc_lock);
 
     /* Audit part two: walk the domain's p2m table, checking the entries. */
-    if ( pagetable_get_pfn(d->arch.phys_table) != 0 )
+    if ( pagetable_get_pfn(p2m_get_pagetable(p2m_get_hostp2m(d)) != 0 )
     {
         l2_pgentry_t *l2e;
         l1_pgentry_t *l1e;
@@ -2005,11 +2005,11 @@ static void audit_p2m(struct domain *d)
         l4_pgentry_t *l4e;
         l3_pgentry_t *l3e;
         int i3, i4;
-        l4e = map_domain_page(mfn_x(pagetable_get_mfn(d->arch.phys_table)));
+        l4e = map_domain_page(mfn_x(pagetable_get_mfn(p2m_get_pagetable(p2m_get_hostp2m(d)))));
 #else /* CONFIG_PAGING_LEVELS == 3 */
         l3_pgentry_t *l3e;
         int i3;
-        l3e = map_domain_page(mfn_x(pagetable_get_mfn(d->arch.phys_table)));
+        l3e = map_domain_page(mfn_x(pagetable_get_mfn(p2m_get_pagetable(p2m_get_hostp2m(d)))));
 #endif
 
         gfn = 0;
@@ -2421,22 +2421,23 @@ void p2m_change_type_global(struct domain *d, p2m_type_t ot, p2m_type_t nt)
     l4_pgentry_t *l4e;
     unsigned long i4;
 #endif /* CONFIG_PAGING_LEVELS == 4 */
+    struct p2m_domain *p2m = p2m_get_hostp2m(d);
 
     BUG_ON(p2m_is_grant(ot) || p2m_is_grant(nt));
 
     if ( !paging_mode_translate(d) )
         return;
 
-    if ( pagetable_get_pfn(d->arch.phys_table) == 0 )
+    if ( pagetable_get_pfn(p2m_get_pagetable(p2m)) == 0 )
         return;
 
     ASSERT(p2m_locked_by_me(d->arch.p2m));
 
 #if CONFIG_PAGING_LEVELS == 4
-    l4e = map_domain_page(mfn_x(pagetable_get_mfn(d->arch.phys_table)));
+    l4e = map_domain_page(mfn_x(pagetable_get_mfn(p2m_get_pagetable(p2m))));
 #else /* CONFIG_PAGING_LEVELS == 3 */
-    l3mfn = _mfn(mfn_x(pagetable_get_mfn(d->arch.phys_table)));
-    l3e = map_domain_page(mfn_x(pagetable_get_mfn(d->arch.phys_table)));
+    l3mfn = _mfn(mfn_x(pagetable_get_mfn(p2m_get_pagetable(p2m))));
+    l3e = map_domain_page(mfn_x(pagetable_get_mfn(p2m_get_pagetable(p2m))));
 #endif
 
 #if CONFIG_PAGING_LEVELS >= 4

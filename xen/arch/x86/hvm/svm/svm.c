@@ -217,6 +217,7 @@ static int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     unsigned long mfn = 0;
     p2m_type_t p2mt;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+    struct p2m_domain *p2m = p2m_get_hostp2m(v->domain);
 
     if ( c->pending_valid &&
          ((c->pending_type == 1) || (c->pending_type > 6) ||
@@ -262,7 +263,7 @@ static int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     {
         vmcb->np_enable = 1;
         vmcb->g_pat = MSR_IA32_CR_PAT_RESET; /* guest PAT */
-        vmcb->h_cr3 = pagetable_get_paddr(v->domain->arch.phys_table);
+        vmcb->h_cr3 = pagetable_get_paddr(p2m_get_pagetable(p2m));
     }
 
     if ( c->pending_valid ) 

@@ -81,7 +81,7 @@ static int vmx_domain_initialise(struct domain *d)
     d->arch.hvm_domain.vmx.ept_control.etmt = EPT_DEFAULT_MT;
     d->arch.hvm_domain.vmx.ept_control.gaw  = EPT_DEFAULT_GAW;
     d->arch.hvm_domain.vmx.ept_control.asr  =
-        pagetable_get_pfn(d->arch.phys_table);
+        pagetable_get_pfn(p2m_get_pagetable(p2m_get_hostp2m(d)));
 
 
     if ( (rc = vmx_alloc_vlapic_mapping(d)) != 0 )
