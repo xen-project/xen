@@ -205,6 +205,32 @@ void hvm_set_rdtsc_exiting(struct domain *d, bool_t enable)
         hvm_funcs.set_rdtsc_exiting(v, enable);
 }
 
+int hvm_gtsc_need_scale(struct domain *d)
+{
+    uint32_t gtsc_mhz, htsc_mhz;
+
+    if ( d->arch.vtsc )
+        return 0;
+
+    gtsc_mhz = d->arch.hvm_domain.gtsc_khz / 1000;
+    htsc_mhz = (uint32_t)cpu_khz / 1000;
+
+    d->arch.hvm_domain.tsc_scaled = (gtsc_mhz && (gtsc_mhz != htsc_mhz));
+    return d->arch.hvm_domain.tsc_scaled;
+}
+
+static u64 hvm_h2g_scale_tsc(struct vcpu *v, u64 host_tsc)
+{
+    uint32_t gtsc_khz, htsc_khz;
+
+    if ( !v->domain->arch.hvm_domain.tsc_scaled )
+        return host_tsc;
+
+    htsc_khz = cpu_khz;
+    gtsc_khz = v->domain->arch.hvm_domain.gtsc_khz;
+    return muldiv64(host_tsc, gtsc_khz, htsc_khz);
+}
+
 void hvm_set_guest_tsc(struct vcpu *v, u64 guest_tsc)
 {
     uint64_t tsc;
@@ -212,11 +238,11 @@ void hvm_set_guest_tsc(struct vcpu *v, u64 guest_tsc)
     if ( v->domain->arch.vtsc )
     {
         tsc = hvm_get_guest_time(v);
-        tsc = gtime_to_gtsc(v->domain, tsc);
     }
     else
     {
         rdtscll(tsc);
+        tsc = hvm_h2g_scale_tsc(v, tsc);
     }
 
     v->arch.hvm_vcpu.cache_tsc_offset = guest_tsc - tsc;
@@ -230,12 +256,12 @@ u64 hvm_get_guest_tsc(struct vcpu *v)
     if ( v->domain->arch.vtsc )
     {
         tsc = hvm_get_guest_time(v);
-        tsc = gtime_to_gtsc(v->domain, tsc);
         v->domain->arch.vtsc_kerncount++;
     }
     else
     {
         rdtscll(tsc);
+        tsc = hvm_h2g_scale_tsc(v, tsc);
     }
 
     return tsc + v->arch.hvm_vcpu.cache_tsc_offset;

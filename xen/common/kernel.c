@@ -259,8 +259,6 @@ DO(xen_version)(int cmd, XEN_GUEST_HANDLE(void) arg)
                 fi.submap |= (1U << XENFEAT_mmu_pt_update_preserve_ad) |
                              (1U << XENFEAT_highmem_assist) |
                              (1U << XENFEAT_gnttab_map_avail_bits);
-            else
-                fi.submap |= (1U << XENFEAT_hvm_safe_pvclock);
 #endif
             break;
         default:

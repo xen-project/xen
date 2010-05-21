@@ -68,9 +68,6 @@
  */
 #define XENFEAT_gnttab_map_avail_bits      7
 
-/* x86: pvclock algorithm is safe to use on HVM */
-#define XENFEAT_hvm_safe_pvclock           9
-
 #define XENFEAT_NR_SUBMAPS 1
 
 #endif /* __XEN_PUBLIC_FEATURES_H__ */

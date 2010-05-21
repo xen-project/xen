@@ -32,6 +32,9 @@ void hvm_init_guest_time(struct domain *d)
     spin_lock_init(&pl->pl_time_lock);
     pl->stime_offset = -(u64)get_s_time();
     pl->last_guest_time = 0;
+
+    d->arch.hvm_domain.gtsc_khz = cpu_khz;
+    d->arch.hvm_domain.tsc_scaled = 0;
 }
 
 u64 hvm_get_guest_time(struct vcpu *v)
