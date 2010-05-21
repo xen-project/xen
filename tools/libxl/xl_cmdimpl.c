@@ -3444,7 +3444,7 @@ int main_blockattach(int argc, char **argv)
     uint32_t fe_domid, be_domid = 0;
     libxl_device_disk disk = { 0 };
 
-    if ((argc < 3) || (argc > 6)) {
+    if ((argc < 4) || (argc > 6)) {
         help("block-attach");
         exit(0);
     }
@@ -3489,7 +3489,7 @@ int main_blockattach(int argc, char **argv)
     }
     disk.virtpath = argv[3];
     disk.unpluggable = 1;
-    disk.readwrite = (argv[4][0] == 'w') ? 1 : 0;
+    disk.readwrite = (argc <= 4 || argv[4][0] == 'w') ? 1 : 0;
 
     if (domain_qualifier_to_domid(argv[1], &fe_domid, 0) < 0) {
         fprintf(stderr, "%s is an invalid domain identifier\n", argv[1]);
