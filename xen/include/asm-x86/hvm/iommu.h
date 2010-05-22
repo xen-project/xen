@@ -1,6 +1,8 @@
 #ifndef __ASM_X86_HVM_IOMMU_H__
 #define __ASM_X86_HVM_IOMMU_H__
 
+#include <xen/errno.h>
+
 struct iommu_ops;
 extern const struct iommu_ops intel_iommu_ops;
 extern const struct iommu_ops amd_iommu_ops;
@@ -31,7 +33,7 @@ static inline int iommu_hardware_setup(void)
     case X86_VENDOR_AMD:
         return amd_iov_detect();
     default:
-        BUG();
+        return -ENODEV;
     }
 
     return 0;
