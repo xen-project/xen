@@ -33,7 +33,7 @@ void arch_hvm_save(struct domain *d, struct hvm_save_header *hdr)
     hdr->cpuid = eax;
 
     /* Save guest's preferred TSC. */
-    hdr->gtsc_khz = d->arch.hvm_domain.gtsc_khz;
+    hdr->gtsc_khz = d->arch.tsc_khz;
 }
 
 int arch_hvm_load(struct domain *d, struct hvm_save_header *hdr)
@@ -62,8 +62,8 @@ int arch_hvm_load(struct domain *d, struct hvm_save_header *hdr)
 
     /* Restore guest's preferred TSC frequency. */
     if ( hdr->gtsc_khz )
-        d->arch.hvm_domain.gtsc_khz = hdr->gtsc_khz;
-    if ( hvm_gtsc_need_scale(d) )
+        d->arch.tsc_khz = hdr->gtsc_khz;
+    if ( d->arch.vtsc )
     {
         hvm_set_rdtsc_exiting(d, 1);
         gdprintk(XENLOG_WARNING, "Domain %d expects freq %uMHz "

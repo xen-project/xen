@@ -804,8 +804,13 @@ static void __update_vcpu_system_time(struct vcpu *v, int force)
 
     if ( d->arch.vtsc )
     {
-        u64 delta = max_t(s64, t->stime_local_stamp - d->arch.vtsc_offset, 0);
-        tsc_stamp = scale_delta(delta, &d->arch.ns_to_vtsc);
+        u64 stime = t->stime_local_stamp;
+        if ( is_hvm_domain(d) )
+        {
+            struct pl_time *pl = &v->domain->arch.hvm_domain.pl_time;
+            stime += pl->stime_offset + v->arch.hvm_vcpu.stime_offset;
+        }
+        tsc_stamp = gtime_to_gtsc(d, stime);
     }
     else
     {
@@ -828,6 +833,8 @@ static void __update_vcpu_system_time(struct vcpu *v, int force)
         _u.tsc_to_system_mul = t->tsc_scale.mul_frac;
         _u.tsc_shift         = (s8)t->tsc_scale.shift;
     }
+    if ( is_hvm_domain(d) )
+        _u.tsc_timestamp += v->arch.hvm_vcpu.cache_tsc_offset;
 
     /* Don't bother unless timestamp record has changed or we are forced. */
     _u.version = u->version; /* make versions match for memcmp test */
@@ -1591,11 +1598,17 @@ struct tm wallclock_time(void)
  * PV SoftTSC Emulation.
  */
 
+u64 gtime_to_gtsc(struct domain *d, u64 tsc)
+{
+    if ( !is_hvm_domain(d) )
+        tsc = max_t(s64, tsc - d->arch.vtsc_offset, 0);
+    return scale_delta(tsc, &d->arch.ns_to_vtsc);
+}
+
 void pv_soft_rdtsc(struct vcpu *v, struct cpu_user_regs *regs, int rdtscp)
 {
     s_time_t now = get_s_time();
     struct domain *d = v->domain;
-    u64 delta;
 
     spin_lock(&d->arch.vtsc_lock);
 
@@ -1611,8 +1624,7 @@ void pv_soft_rdtsc(struct vcpu *v, struct cpu_user_regs *regs, int rdtscp)
 
     spin_unlock(&d->arch.vtsc_lock);
 
-    delta = max_t(s64, now - d->arch.vtsc_offset, 0);
-    now = scale_delta(delta, &d->arch.ns_to_vtsc);
+    now = gtime_to_gtsc(d, now);
 
     regs->eax = (uint32_t)now;
     regs->edx = (uint32_t)(now >> 32);
@@ -1753,8 +1765,10 @@ void tsc_set_info(struct domain *d,
         d->arch.vtsc_offset = get_s_time() - elapsed_nsec;
         d->arch.tsc_khz = gtsc_khz ? gtsc_khz : cpu_khz;
         set_time_scale(&d->arch.vtsc_to_ns, d->arch.tsc_khz * 1000 );
-        /* use native TSC if initial host has safe TSC and not migrated yet */
-        if ( host_tsc_is_safe() && incarnation == 0 )
+        /* use native TSC if initial host has safe TSC, has not migrated
+         * yet and tsc_khz == cpu_khz */
+        if ( host_tsc_is_safe() && incarnation == 0 &&
+                d->arch.tsc_khz == cpu_khz )
             d->arch.vtsc = 0;
         else 
             d->arch.ns_to_vtsc = scale_reciprocal(d->arch.vtsc_to_ns);
@@ -1779,7 +1793,7 @@ void tsc_set_info(struct domain *d,
     }
     d->arch.incarnation = incarnation + 1;
     if ( is_hvm_domain(d) )
-        hvm_set_rdtsc_exiting(d, d->arch.vtsc || hvm_gtsc_need_scale(d));
+        hvm_set_rdtsc_exiting(d, d->arch.vtsc);
 }
 
 /* vtsc may incur measurable performance degradation, diagnose with this */
