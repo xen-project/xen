@@ -1226,7 +1226,7 @@ static int64_t parse_mem_size_kb(char *mem)
     if (strlen(endptr) > 1)
         return -1;
 
-    switch (tolower(*endptr)) {
+    switch (tolower((uint8_t)*endptr)) {
     case 't':
         kbytes <<= 10;
     case 'g':
