@@ -110,6 +110,8 @@
 # Address xend should listen on for relocation-socket connections, if
 # xend-relocation-server is set.
 # Meaning and default as for xend-address above.
+# Also, interface name is allowed (e.g. eth0) there to get the
+# relocation address to be bound on.
 #(xend-relocation-address '')
 
 # The hosts allowed to talk to the relocation port.  If this is empty (the
