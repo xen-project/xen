@@ -54,12 +54,14 @@ struct hvm_irq {
         enum {
             HVMIRQ_callback_none,
             HVMIRQ_callback_gsi,
-            HVMIRQ_callback_pci_intx
+            HVMIRQ_callback_pci_intx,
+            HVMIRQ_callback_vector
         } callback_via_type;
     };
     union {
         uint32_t gsi;
         struct { uint8_t dev, intx; } pci;
+        uint32_t vector;
     } callback_via;
 
     /* Number of INTx wires asserting each PCI-ISA link. */

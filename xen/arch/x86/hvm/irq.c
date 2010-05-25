@@ -185,16 +185,16 @@ void hvm_maybe_deassert_evtchn_irq(void)
 
 void hvm_assert_evtchn_irq(struct vcpu *v)
 {
-    if ( v->vcpu_id != 0 )
-        return;
-
     if ( unlikely(in_irq() || !local_irq_is_enabled()) )
     {
         tasklet_schedule(&v->arch.hvm_vcpu.assert_evtchn_irq_tasklet);
         return;
     }
 
-    hvm_set_callback_irq_level(v);
+    if ( is_hvm_pv_evtchn_vcpu(v) )
+        vcpu_kick(v);
+    else if ( v->vcpu_id == 0 )
+        hvm_set_callback_irq_level(v);
 }
 
 void hvm_set_pci_link_route(struct domain *d, u8 link, u8 isa_irq)
@@ -251,7 +251,7 @@ void hvm_set_callback_via(struct domain *d, uint64_t via)
 
     via_type = (uint8_t)(via >> 56) + 1;
     if ( ((via_type == HVMIRQ_callback_gsi) && (via == 0)) ||
-         (via_type > HVMIRQ_callback_pci_intx) )
+         (via_type > HVMIRQ_callback_vector) )
         via_type = HVMIRQ_callback_none;
 
     spin_lock(&d->arch.hvm_domain.irq_lock);
@@ -297,6 +297,9 @@ void hvm_set_callback_via(struct domain *d, uint64_t via)
         if ( hvm_irq->callback_via_asserted )
              __hvm_pci_intx_assert(d, pdev, pintx);
         break;
+    case HVMIRQ_callback_vector:
+        hvm_irq->callback_via.vector = (uint8_t)via;
+        break;
     default:
         break;
     }
@@ -312,6 +315,9 @@ void hvm_set_callback_via(struct domain *d, uint64_t via)
     case HVMIRQ_callback_pci_intx:
         printk("PCI INTx Dev 0x%02x Int%c\n", pdev, 'A' + pintx);
         break;
+    case HVMIRQ_callback_vector:
+        printk("Direct Vector 0x%02x\n", (uint8_t)via);
+        break;
     default:
         printk("None\n");
         break;
@@ -322,6 +328,10 @@ struct hvm_intack hvm_vcpu_has_pending_irq(struct vcpu *v)
 {
     struct hvm_domain *plat = &v->domain->arch.hvm_domain;
     int vector;
+
+    if ( (plat->irq.callback_via_type == HVMIRQ_callback_vector)
+         && vcpu_info(v, evtchn_upcall_pending) )
+        return hvm_intack_vector(plat->irq.callback_via.vector);
 
     if ( unlikely(v->nmi_pending) )
         return hvm_intack_nmi;
@@ -363,6 +373,8 @@ struct hvm_intack hvm_vcpu_ack_pending_irq(
     case hvm_intsrc_lapic:
         if ( !vlapic_ack_pending_irq(v, intack.vector) )
             intack = hvm_intack_none;
+        break;
+    case hvm_intsrc_vector:
         break;
     default:
         intack = hvm_intack_none;

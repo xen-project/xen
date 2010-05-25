@@ -19,6 +19,10 @@
 #endif
 #define is_pv_32on64_vcpu(v)   (is_pv_32on64_domain((v)->domain))
 
+#define is_hvm_pv_evtchn_domain(d) (is_hvm_domain(d) && \
+        d->arch.hvm_domain.irq.callback_via_type == HVMIRQ_callback_vector)
+#define is_hvm_pv_evtchn_vcpu(v) (is_hvm_pv_evtchn_domain(v->domain))
+
 #define VCPU_TRAP_NMI          1
 #define VCPU_TRAP_MCE          2
 #define VCPU_TRAP_LAST         VCPU_TRAP_MCE
