@@ -147,6 +147,12 @@ class LiloConfigFile(object):
     def add_image(self, image):
         self.images.append(image)
 
+    def new_image(self, title, lines):
+        # LiloImage constructor doesn't have title but since path
+        # is being used by get_{kernel|initrd} functions we pass
+        # empty string rather than None (see lines above)
+        return LiloImage(lines, "")
+
     def _get_default(self):
         for i in range(len(self.images)):
             if self.images[i].title == self._default:

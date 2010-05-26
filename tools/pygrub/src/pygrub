@@ -356,7 +356,7 @@ class Grub:
                     continue
 
                 # if we got boot, then we want to boot the entered image 
-                img = grub.GrubConf.GrubImage(lines)
+                img = self.cf.new_image("entered", lines)
                 self.cf.add_image(img)
                 self.selected_image = len(self.cf.images) - 1
                 self.isdone = True
@@ -392,9 +392,11 @@ class Grub:
 
         if not fs:
             # set the config file and parse it
-            self.cf.filename = fn
-            self.cf.parse()
-            return
+            for f,parser in cfg_list:
+                self.cf = parser()
+                self.cf.filename = fn
+                self.cf.parse()
+                return
 
         for f,parser in cfg_list:
             if fs.file_exists(f):
@@ -689,7 +691,7 @@ if __name__ == "__main__":
     if isconfig:
         chosencfg = run_grub(file, entry, fs, incfg["args"])
         print "  kernel: %s" % chosencfg["kernel"]
-        if img.initrd:
+        if chosencfg["ramdisk"]:
             print "  initrd: %s" % chosencfg["ramdisk"]
         print "  args: %s" % chosencfg["args"]
         sys.exit(0)
