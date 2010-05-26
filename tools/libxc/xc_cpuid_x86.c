@@ -190,7 +190,8 @@ static void xc_cpuid_hvm_policy(
                     bitmaskof(X86_FEATURE_CX16) |
                     bitmaskof(X86_FEATURE_SSE4_1) |
                     bitmaskof(X86_FEATURE_SSE4_2) |
-                    bitmaskof(X86_FEATURE_POPCNT));
+                    bitmaskof(X86_FEATURE_POPCNT) |
+                    bitmaskof(X86_FEATURE_AES));
 
         regs[2] |= bitmaskof(X86_FEATURE_HYPERVISOR);
 

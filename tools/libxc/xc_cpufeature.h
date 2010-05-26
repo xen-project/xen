@@ -83,6 +83,7 @@
 #define X86_FEATURE_SSE4_1	(4*32+19) /* Streaming SIMD Extensions 4.1 */
 #define X86_FEATURE_SSE4_2	(4*32+20) /* Streaming SIMD Extensions 4.2 */
 #define X86_FEATURE_POPCNT	(4*32+23) /* POPCNT instruction */
+#define X86_FEATURE_AES		(4*32+25) /* AES acceleration instructions */
 #define X86_FEATURE_XSAVE	(4*32+26) /* XSAVE/XRSTOR/XSETBV/XGETBV */
 #define X86_FEATURE_HYPERVISOR	(4*32+31) /* Running under some hypervisor */
 
