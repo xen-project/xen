@@ -1011,10 +1011,6 @@ static void schedule(void)
     update_vcpu_system_time(next);
     vcpu_periodic_timer_work(next);
 
-    TRACE_4D(TRC_SCHED_SWITCH,
-             prev->domain->domain_id, prev->vcpu_id,
-             next->domain->domain_id, next->vcpu_id);
-
     context_switch(prev, next);
 }
 

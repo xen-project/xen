@@ -622,7 +622,6 @@ extern enum cpufreq_controller {
 
 struct cpupool *cpupool_create(int poolid, char *sched);
 int cpupool_destroy(struct cpupool *c);
-int cpupool_assign_ncpu(struct cpupool *c, int ncpu);
 int cpupool_add_domain(struct domain *d, int poolid);
 void cpupool_rm_domain(struct domain *d);
 int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op);
