@@ -110,17 +110,13 @@ struct cmd_spec cmd_table[] = {
     },
     { "mem-max",
       &main_memmax,
-      "Set the maximum amount reservation for a domain.\n"
-      "Units default to kilobytes, but can be suffixed with\n"
-      "'b' (bytes), 'k' (KB), 'm' (MB), 'g' (GB) or 't' (TB)",
-      "<Domain> <MemKB>",
+      "Set the maximum amount reservation for a domain",
+      "<Domain> <MemKB['b'[bytes]|'k'[KB]|'m'[MB]|'g'[GB]|'t'[TB]]>",
     },
     { "mem-set",
       &main_memset,
-      "Set the current memory usage for a domain.\n"
-      "Units default to kilobytes, but can be suffixed with\n"
-      "'b' (bytes), 'k' (KB), 'm' (MB), 'g' (GB) or 't' (TB)",
-      "<Domain> <MemKB>",
+      "Set the current memory usage for a domain",
+      "<Domain> <MemKB['b'[bytes]|'k'[KB]|'m'[MB]|'g'[GB]|'t'[TB]]>",
     },
     { "button-press",
       &main_button_press,

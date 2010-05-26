@@ -2531,7 +2531,7 @@ int libxl_set_memory_target(struct libxl_ctx *ctx, uint32_t domid, uint32_t targ
         }
 
         if (target_memkb > memorykb) {
-            XL_LOG_ERRNO(ctx, XL_LOG_ERROR,
+            XL_LOG(ctx, XL_LOG_ERROR,
                 "memory_dynamic_max must be less than or equal to memory_static_max\n");
             return 1;
         }

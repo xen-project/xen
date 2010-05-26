@@ -3678,7 +3678,8 @@ static void print_dom0_uptime(int short_mode, time_t now)
     int fd;
     char buf[512];
     uint32_t uptime = 0;
-    char *uptime_str = 0;
+    char *uptime_str = NULL;
+    char *now_str = NULL;
 
     fd = open("/proc/uptime", O_RDONLY);
     if (fd == -1)
@@ -3695,9 +3696,10 @@ static void print_dom0_uptime(int short_mode, time_t now)
 
     if (short_mode)
     {
+        now_str = current_time_to_string(now);
         uptime_str = uptime_to_string(uptime, 1);
-        printf(" %s up %s, %s (%d)\n", current_time_to_string(now),
-               uptime_str, libxl_domid_to_name(&ctx, 0), 0);
+        printf(" %s up %s, %s (%d)\n", now_str, uptime_str,
+               libxl_domid_to_name(&ctx, 0), 0);
     }
     else
     {
@@ -3706,6 +3708,8 @@ static void print_dom0_uptime(int short_mode, time_t now)
                0, uptime_str);
     }
 
+    if (now_str)
+        free(now_str);
     if (uptime_str)
         free(uptime_str);
     return;
@@ -3718,7 +3722,8 @@ static void print_domU_uptime(uint32_t domuid, int short_mode, time_t now)
 {
     uint32_t s_time = 0;
     uint32_t uptime = 0;
-    char *uptime_str = 0;
+    char *uptime_str = NULL;
+    char *now_str = NULL;
 
     s_time = libxl_vm_get_start_time(&ctx, domuid);
     if (s_time == -1)
@@ -3726,9 +3731,10 @@ static void print_domU_uptime(uint32_t domuid, int short_mode, time_t now)
     uptime = now - s_time;
     if (short_mode)
     {
+        now_str = current_time_to_string(now);
         uptime_str = uptime_to_string(uptime, 1);
-        printf(" %s up %s, %s (%d)\n", current_time_to_string(now),
-               uptime_str, libxl_domid_to_name(&ctx, domuid), domuid);
+        printf(" %s up %s, %s (%d)\n", now_str, uptime_str,
+               libxl_domid_to_name(&ctx, domuid), domuid);
     }
     else
     {
@@ -3737,6 +3743,8 @@ static void print_domU_uptime(uint32_t domuid, int short_mode, time_t now)
                domuid, uptime_str);
     }
 
+    if (now_str)
+        free(now_str);
     if (uptime_str)
         free(uptime_str);
     return;
