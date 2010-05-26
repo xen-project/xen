@@ -138,10 +138,6 @@ static void find_domain(const char *p)
         exit(2);
     }
     common_domname = was_name ? p : libxl_domid_to_name(&ctx, domid);
-    if (!common_domname) {
-        fprintf(stderr, "%s is an invalid domain identifier.\n", p);
-        exit(2);
-    }
 }
 
 #define LOG(_f, _a...)   dolog(__FILE__, __LINE__, __func__, _f "\n", ##_a)
