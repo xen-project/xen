@@ -242,6 +242,7 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
     int direct_mmio = (p2mt == p2m_mmio_direct);
     uint8_t ipat = 0;
     int need_modify_vtd_table = 1;
+    int needs_sync = 1;
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
 
     if (  order != 0 )
@@ -276,6 +277,11 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
     if ( i == walk_level )
     {
         /* We reached the level we're looking for */
+
+        /* No need to flush if the old entry wasn't valid */
+        if ( !(ept_entry->epte & 7) )
+            needs_sync = 0;
+
         if ( mfn_valid(mfn_x(mfn)) || direct_mmio || p2m_is_paged(p2mt) ||
              (p2mt == p2m_ram_paging_in_start) )
         {
@@ -336,7 +342,8 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
 out:
     unmap_domain_page(table);
 
-    ept_sync_domain(d);
+    if ( needs_sync )
+        ept_sync_domain(d);
 
     /* Now the p2m table is not shared with vt-d page table */
     if ( rv && iommu_enabled && need_iommu(d) && need_modify_vtd_table )
