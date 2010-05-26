@@ -42,6 +42,18 @@ struct tm gmtime(unsigned long t)
     int y;
     const unsigned short int *ip;
 
+    y = 1970;
+#ifdef __x86_64__
+    /* Allow the concept of time before 1970.  64-bit only; for 32-bit
+     * time after 2038 seems more important than time before 1970. */
+    while ( t & (1UL<<39) )
+    {
+        y -= 400;
+        t += ((unsigned long)(365 * 303 + 366 * 97)) * SECS_PER_DAY;
+    }
+    t &= (1UL << 40) - 1;
+#endif
+
     days = t / SECS_PER_DAY;
     rem = t % SECS_PER_DAY;
 
@@ -53,7 +65,6 @@ struct tm gmtime(unsigned long t)
     tbuf.tm_wday = (4 + days) % 7;
     if ( tbuf.tm_wday < 0 )
         tbuf.tm_wday += 7;
-    y = 1970;
     while ( days >= (rem = __isleap(y) ? 366 : 365) )
     {
         ++y;
