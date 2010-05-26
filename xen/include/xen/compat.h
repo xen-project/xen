@@ -90,8 +90,9 @@
  * Allows use of faster __copy_* functions.
  */
 #define compat_handle_okay(hnd, nr)                                  \
+    (paging_mode_external(current->domain) ||                        \
     compat_array_access_ok((void *)(full_ptr_t)(hnd).c, (nr),        \
-                           sizeof(**(hnd)._))
+                           sizeof(**(hnd)._)))
 
 #define __copy_to_compat_offset(hnd, off, ptr, nr) ({                \
     const typeof(*(ptr)) *_s = (ptr);                                \
