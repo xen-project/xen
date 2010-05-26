@@ -272,8 +272,8 @@ mount it read-write in a guest domain."
 
         if [ "x$mode" != 'x!' ]
         then
-          inode=$(stat -c '%i' $file)
-          dev=$(stat -c '%D' $file)
+          inode=$(stat -c '%i' "$file")
+          dev=$(stat -c '%D' "$file")
           if [ -z "$inode" ] || [ -z "$dev" ]
           then
             fatal "Unable to lookup $file: dev: $dev inode: $inode"
