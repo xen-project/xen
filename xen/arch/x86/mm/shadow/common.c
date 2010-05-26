@@ -2173,8 +2173,13 @@ static void hash_foreach(struct vcpu *v,
     struct domain *d = v->domain;
     struct page_info *x;
 
-    /* Say we're here, to stop hash-lookups reordering the chains */
     ASSERT(shadow_locked_by_me(d));
+
+    /* Can be called via p2m code &c after shadow teardown. */
+    if ( unlikely(!d->arch.paging.shadow.hash_table) )
+        return;
+
+    /* Say we're here, to stop hash-lookups reordering the chains */
     ASSERT(d->arch.paging.shadow.hash_walking == 0);
     d->arch.paging.shadow.hash_walking = 1;
 
