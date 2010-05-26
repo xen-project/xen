@@ -3246,6 +3246,44 @@ int main_debug_keys(int argc, char **argv)
     exit(0);
 }
 
+int main_dmesg(int argc, char **argv)
+{
+    unsigned int clear = 0;
+    struct libxl_xen_console_reader *cr;
+    char *line;
+    int opt, ret = 1;
+
+    while ((opt = getopt(argc, argv, "hc")) != -1) {
+        switch (opt) {
+        case 'c':
+            clear = 1;
+            break;
+        case 'h':
+            help("dmesg");
+            exit(0);
+        default:
+            fprintf(stderr, "option not supported\n");
+            break;
+        }
+    }
+
+    cr = libxl_xen_console_read_start(&ctx, clear);
+    if (!cr)
+        goto finish;
+
+    while (1) {
+        ret = libxl_xen_console_read_line(&ctx, cr, &line);
+        if (ret > 0)
+            printf(line);
+        else
+            break;
+    }
+
+finish:
+    libxl_xen_console_read_finish(&ctx, cr);
+    exit(ret);
+}
+
 int main_top(int argc, char **argv)
 {
     int opt;

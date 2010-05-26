@@ -2827,6 +2827,72 @@ int libxl_send_debug_keys(struct libxl_ctx *ctx, char *keys)
     return xc_send_debug_keys(ctx->xch, keys);
 }
 
+struct libxl_xen_console_reader *
+    libxl_xen_console_read_start(struct libxl_ctx *ctx, int clear)
+{
+    struct libxl_xen_console_reader *cr;
+    unsigned int size = 16384;
+    char *buf = malloc(size);
+
+    if (!buf) {
+        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "cannot malloc buffer for libxl_xen_console_reader,"
+            " size is %u", size);
+        return NULL;
+    }
+
+    cr = malloc(sizeof(struct libxl_xen_console_reader));
+    if (!cr) {
+        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "cannot malloc libxl_xen_console_reader");
+        return NULL;
+    }
+
+    memset(cr, 0, sizeof(struct libxl_xen_console_reader));
+    cr->buffer = buf;
+    cr->size = size;
+    cr->count = size;
+    cr->clear = clear;
+    cr->incremental = 1;
+
+    return cr;
+}
+
+/* return values:                                          *line_r
+ *   1          success, whole line obtained from buffer    non-0
+ *   0          no more lines available right now           0
+ *   negative   error code ERROR_*                          0
+ * On success *line_r is updated to point to a nul-terminated
+ * string which is valid until the next call on the same console
+ * reader.  The libxl caller may overwrite parts of the string
+ * if it wishes. */
+int libxl_xen_console_read_line(struct libxl_ctx *ctx,
+                                struct libxl_xen_console_reader *cr,
+                                char **line_r)
+{
+    int ret;
+
+    memset(cr->buffer, 0, cr->size);
+    ret = xc_readconsolering(ctx->xch, &cr->buffer, &cr->count,
+                             cr->clear, cr->incremental, &cr->index);
+    if (!ret) {
+        if (cr->count) {
+            *line_r = cr->buffer;
+            ret = 1;
+        } else {
+            *line_r = NULL;
+            ret = 0;
+        }
+    }
+
+    return ret;
+}
+
+void libxl_xen_console_read_finish(struct libxl_ctx *ctx,
+                                   struct libxl_xen_console_reader *cr)
+{
+    free(cr->buffer);
+    free(cr);
+}
+
 uint32_t libxl_vm_get_start_time(struct libxl_ctx *ctx, uint32_t domid)
 {
     char *dompath = libxl_xs_get_dompath(ctx, domid);

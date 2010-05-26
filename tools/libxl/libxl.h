@@ -512,6 +512,24 @@ int libxl_send_trigger(struct libxl_ctx *ctx, uint32_t domid,
                        char *trigger_name, uint32_t vcpuid);
 int libxl_send_sysrq(struct libxl_ctx *ctx, uint32_t domid, char sysrq);
 int libxl_send_debug_keys(struct libxl_ctx *ctx, char *keys);
+
+struct libxl_xen_console_reader {
+    char *buffer;
+    unsigned int size;
+    unsigned int count;
+    unsigned int clear;
+    unsigned int incremental;
+    unsigned int index;
+};
+
+struct libxl_xen_console_reader *
+    libxl_xen_console_read_start(struct libxl_ctx *ctx, int clear);
+int libxl_xen_console_read_line(struct libxl_ctx *ctx,
+                                struct libxl_xen_console_reader *cr,
+                                char **line_r);
+void libxl_xen_console_read_finish(struct libxl_ctx *ctx,
+                                   struct libxl_xen_console_reader *cr);
+
 uint32_t libxl_vm_get_start_time(struct libxl_ctx *ctx, uint32_t domid);
 
 char *libxl_tmem_list(struct libxl_ctx *ctx, uint32_t domid, int use_long);

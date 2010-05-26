@@ -45,6 +45,7 @@ int main_rename(int argc, char **argv);
 int main_trigger(int argc, char **argv);
 int main_sysrq(int argc, char **argv);
 int main_debug_keys(int argc, char **argv);
+int main_dmesg(int argc, char **argv);
 int main_top(int argc, char **argv);
 int main_networkattach(int argc, char **argv);
 int main_networklist(int argc, char **argv);
