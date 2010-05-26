@@ -129,7 +129,7 @@ class ImageHandler:
         self.dmargs = self.parseDeviceModelArgs(vmConfig)
         self.pid = None
         rtc_timeoffset = int(vmConfig['platform'].get('rtc_timeoffset', 0))
-        if vmConfig['platform'].get('localtime', 0):
+        if int(vmConfig['platform'].get('localtime', 0)):
             if time.localtime(time.time())[8]:
                 rtc_timeoffset -= time.altzone
             else:
