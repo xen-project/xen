@@ -431,6 +431,8 @@ int vmx_cpu_up(void)
 
     BUG_ON(!(read_cr4() & X86_CR4_VMXE));
 
+    vmx_save_host_msrs();
+
     /* 
      * Ensure the current processor operating mode meets 
      * the requred CRO fixed bits in VMX operation. 

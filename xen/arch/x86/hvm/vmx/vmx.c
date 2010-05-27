@@ -144,7 +144,7 @@ static u32 msr_index[] =
 
 #define MSR_INDEX_SIZE (ARRAY_SIZE(msr_index))
 
-static void vmx_save_host_msrs(void)
+void vmx_save_host_msrs(void)
 {
     struct vmx_msr_state *host_msr_state = &this_cpu(host_msr_state);
     int i;
@@ -343,7 +343,7 @@ static void vmx_restore_guest_msrs(struct vcpu *v)
 
 #else  /* __i386__ */
 
-#define vmx_save_host_msrs()        ((void)0)
+void vmx_save_host_msrs(void) {}
 #define vmx_restore_host_msrs()     ((void)0)
 
 #define vmx_save_guest_msrs(v)      ((void)0)
@@ -1415,8 +1415,6 @@ static struct hvm_function_table __read_mostly vmx_function_table = {
 
 struct hvm_function_table * __init start_vmx(void)
 {
-    vmx_save_host_msrs();
-
     /* Xen does not fill x86_capability words except 0. */
     boot_cpu_data.x86_capability[4] = cpuid_ecx(1);
 
