@@ -7,6 +7,7 @@
 #define L3_PAGETABLE_SHIFT      30
 #define L4_PAGETABLE_SHIFT      39
 #define PAGE_SHIFT              L1_PAGETABLE_SHIFT
+#define SUPERPAGE_SHIFT         L2_PAGETABLE_SHIFT
 #define ROOT_PAGETABLE_SHIFT    L4_PAGETABLE_SHIFT
 
 #define PAGETABLE_ORDER         9
@@ -15,6 +16,7 @@
 #define L3_PAGETABLE_ENTRIES    (1<<PAGETABLE_ORDER)
 #define L4_PAGETABLE_ENTRIES    (1<<PAGETABLE_ORDER)
 #define ROOT_PAGETABLE_ENTRIES  L4_PAGETABLE_ENTRIES
+#define SUPERPAGE_ORDER         PAGETABLE_ORDER
 
 #define __PAGE_OFFSET           DIRECTMAP_VIRT_START
 #define __XEN_VIRT_START        XEN_VIRT_START
@@ -41,6 +43,8 @@ extern void pfn_pdx_hole_setup(unsigned long);
 
 #define page_to_pdx(pg)  ((pg) - frame_table)
 #define pdx_to_page(pdx) (frame_table + (pdx))
+#define spage_to_pdx(spg) ((spg>>(SUPERPAGE_SHIFT-PAGE_SHIFT)) - spage_table)
+#define pdx_to_spage(pdx) (spage_table + ((pdx)<<(SUPERPAGE_SHIFT-PAGE_SHIFT)))
 /*
  * Note: These are solely for the use by page_{get,set}_owner(), and
  *       therefore don't need to handle the XEN_VIRT_{START,END} range.
@@ -62,6 +66,16 @@ static inline unsigned long pdx_to_pfn(unsigned long pdx)
 {
     return (pdx & pfn_pdx_bottom_mask) |
            ((pdx << pfn_pdx_hole_shift) & pfn_top_mask);
+}
+
+static inline unsigned long pfn_to_sdx(unsigned long pfn)
+{
+    return pfn_to_pdx(pfn) >> (SUPERPAGE_SHIFT-PAGE_SHIFT);
+}
+
+static inline unsigned long sdx_to_pfn(unsigned long sdx)
+{
+    return pdx_to_pfn(sdx << (SUPERPAGE_SHIFT-PAGE_SHIFT));
 }
 
 static inline unsigned long __virt_to_maddr(unsigned long va)

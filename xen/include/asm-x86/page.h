@@ -240,6 +240,14 @@ void copy_page_sse2(void *, const void *);
 #define __pfn_to_paddr(pfn) ((paddr_t)(pfn) << PAGE_SHIFT)
 #define __paddr_to_pfn(pa)  ((unsigned long)((pa) >> PAGE_SHIFT))
 
+/* Convert between machine frame numbers and spage-info structures. */
+#define __mfn_to_spage(mfn)  (spage_table + pfn_to_sdx(mfn))
+#define __spage_to_mfn(pg)   sdx_to_pfn((unsigned long)((pg) - spage_table))
+
+/* Convert between page-info structures and spage-info structures. */
+#define page_to_spage(page)  (spage_table+(((page)-frame_table)>>(SUPERPAGE_SHIFT-PAGE_SHIFT)))
+#define spage_to_page(spage)  (frame_table+(((spage)-spage_table)<<(SUPERPAGE_SHIFT-PAGE_SHIFT)))
+
 /*
  * We define non-underscored wrappers for above conversion functions. These are
  * overridden in various source files while underscored versions remain intact.
@@ -251,6 +259,8 @@ void copy_page_sse2(void *, const void *);
 #define maddr_to_virt(ma)   __maddr_to_virt((unsigned long)(ma))
 #define mfn_to_page(mfn)    __mfn_to_page(mfn)
 #define page_to_mfn(pg)     __page_to_mfn(pg)
+#define mfn_to_spage(mfn)    __mfn_to_spage(mfn)
+#define spage_to_mfn(pg)     __spage_to_mfn(pg)
 #define maddr_to_page(ma)   __maddr_to_page(ma)
 #define page_to_maddr(pg)   __page_to_maddr(pg)
 #define virt_to_page(va)    __virt_to_page(va)

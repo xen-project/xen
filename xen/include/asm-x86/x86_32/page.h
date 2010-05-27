@@ -6,6 +6,7 @@
 #define L2_PAGETABLE_SHIFT      21
 #define L3_PAGETABLE_SHIFT      30
 #define PAGE_SHIFT              L1_PAGETABLE_SHIFT
+#define SUPERPAGE_SHIFT         L2_PAGETABLE_SHIFT
 #define ROOT_PAGETABLE_SHIFT    L3_PAGETABLE_SHIFT
 
 #define PAGETABLE_ORDER         9
@@ -13,6 +14,7 @@
 #define L2_PAGETABLE_ENTRIES    (1<<PAGETABLE_ORDER)
 #define L3_PAGETABLE_ENTRIES    4
 #define ROOT_PAGETABLE_ENTRIES  L3_PAGETABLE_ENTRIES
+#define SUPERPAGE_ORDER         PAGETABLE_ORDER
 
 /*
  * Architecturally, physical addresses may be up to 52 bits. However, the
@@ -52,6 +54,9 @@
 #define pdx_to_pfn(pdx)         (pdx)
 #define virt_to_pdx(va)         virt_to_mfn(va)
 #define pdx_to_virt(pdx)        mfn_to_virt(pdx)
+
+#define pfn_to_sdx(pfn)         ((pfn)>>(SUPERPAGE_SHIFT-PAGE_SHIFT))
+#define sdx_to_pfn(sdx)         ((sdx)<<(SUPERPAGE_SHIFT-PAGE_SHIFT))
 
 static inline unsigned long __virt_to_maddr(unsigned long va)
 {

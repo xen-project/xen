@@ -225,6 +225,11 @@ extern unsigned int video_mode, video_flags;
 /* Slot 261: xen text, static data and bss (1GB). */
 #define XEN_VIRT_START          (HIRO_COMPAT_MPT_VIRT_END)
 #define XEN_VIRT_END            (XEN_VIRT_START + GB(1))
+/* Slot 261: superpage information array (20MB). */
+#define SPAGETABLE_VIRT_END     FRAMETABLE_VIRT_START
+#define SPAGETABLE_SIZE         ((DIRECTMAP_SIZE >> SUPERPAGE_SHIFT) * \
+                                 sizeof(struct spage_info))
+#define SPAGETABLE_VIRT_START   (SPAGETABLE_VIRT_END - SPAGETABLE_SIZE)
 /* Slot 261: page-frame information array (40GB). */
 #define FRAMETABLE_VIRT_END     DIRECTMAP_VIRT_START
 #define FRAMETABLE_SIZE         ((DIRECTMAP_SIZE >> PAGE_SHIFT) * \
