@@ -132,6 +132,49 @@ static void smp_store_cpu_info(int id)
     ;
 }
 
+static atomic_t tsc_count;
+static uint64_t tsc_value;
+static cpumask_t tsc_sync_cpu_mask;
+
+static void synchronize_tsc_master(unsigned int slave)
+{
+    unsigned int i;
+
+    if ( boot_cpu_has(X86_FEATURE_TSC_RELIABLE) &&
+         !cpu_isset(slave, tsc_sync_cpu_mask) )
+        return;
+
+    for ( i = 1; i <= 5; i++ )
+    {
+        rdtscll(tsc_value);
+        wmb();
+        atomic_inc(&tsc_count);
+        while ( atomic_read(&tsc_count) != (i<<1) )
+            cpu_relax();
+    }
+
+    atomic_set(&tsc_count, 0);
+    cpu_clear(slave, tsc_sync_cpu_mask);
+}
+
+static void synchronize_tsc_slave(unsigned int slave)
+{
+    unsigned int i;
+
+    if ( boot_cpu_has(X86_FEATURE_TSC_RELIABLE) &&
+         !cpu_isset(slave, tsc_sync_cpu_mask) )
+        return;
+
+    for ( i = 1; i <= 5; i++ )
+    {
+        while ( atomic_read(&tsc_count) != ((i<<1)-1) )
+            cpu_relax();
+        rmb();
+        write_tsc(tsc_value);
+        atomic_inc(&tsc_count);
+    }
+}
+
 void smp_callin(void)
 {
     unsigned int cpu = smp_processor_id();
@@ -172,6 +215,8 @@ void smp_callin(void)
 
     /* Allow the master to continue. */
     set_cpu_state(CPU_STATE_CALLIN);
+
+    synchronize_tsc_slave(cpu);
 
     /* And wait for our final Ack. */
     while ( cpu_state != CPU_STATE_ONLINE )
@@ -532,6 +577,7 @@ static int do_boot_cpu(int apicid, int cpu)
             /* number CPUs logically, starting from 1 (BSP is 0) */
             Dprintk("OK.\n");
             print_cpu_info(cpu);
+            synchronize_tsc_master(cpu);
             Dprintk("CPU has booted.\n");
         }
         else if ( cpu_state == CPU_STATE_DEAD )
@@ -875,6 +921,9 @@ int cpu_add(uint32_t apic_id, uint32_t acpi_id, uint32_t pxm)
         }
         apicid_to_node[apic_id] = node;
     }
+
+    /* Physically added CPUs do not have synchronised TSC. */
+    cpu_set(cpu, tsc_sync_cpu_mask);
 
     srat_detect_node(cpu);
     numa_add_cpu(cpu);
