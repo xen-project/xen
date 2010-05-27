@@ -202,18 +202,25 @@ static void buffer_append(struct domain *dom)
 	}
 
 	if (discard_overflowed_data && buffer->max_capacity &&
-	    buffer->size > buffer->max_capacity) {
-		/* Discard the middle of the data. */
+	    buffer->size > 5 * buffer->max_capacity / 4) {
+		if (buffer->consumed > buffer->max_capacity / 4) {
+			/* Move data up in buffer, since beginning has
+			 * been output.  Only needed because buffer is
+			 * not a ring buffer *sigh* */
+			memmove(buffer->data,
+				buffer->data + buffer->consumed,
+				buffer->size - buffer->consumed);
+			buffer->size -= buffer->consumed;
+			buffer->consumed = 0;
+		} else {
+			/* Discard the middle of the data. */
+			size_t over = buffer->size - buffer->max_capacity;
 
-		size_t over = buffer->size - buffer->max_capacity;
-		char *maxpos = buffer->data + buffer->max_capacity;
-
-		memmove(maxpos - over, maxpos, over);
-		buffer->data = realloc(buffer->data, buffer->max_capacity);
-		buffer->size = buffer->capacity = buffer->max_capacity;
-
-		if (buffer->consumed > buffer->max_capacity - over)
-			buffer->consumed = buffer->max_capacity - over;
+			memmove(buffer->data + buffer->max_capacity / 2,
+				buffer->data + buffer->max_capacity,
+				over);
+			buffer->size = buffer->max_capacity / 2 + over;
+		}
 	}
 }
 
