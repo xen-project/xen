@@ -3267,13 +3267,8 @@ int main_dmesg(int argc, char **argv)
     if (!cr)
         goto finish;
 
-    while (1) {
-        ret = libxl_xen_console_read_line(&ctx, cr, &line);
-        if (ret > 0)
-            printf(line);
-        else
-            break;
-    }
+    while ((ret = libxl_xen_console_read_line(&ctx, cr, &line)) > 0)
+        printf("%s", line);
 
 finish:
     libxl_xen_console_read_finish(&ctx, cr);
