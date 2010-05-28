@@ -72,8 +72,11 @@ struct hvm_function_table {
     /* Support Hardware-Assisted Paging? */
     int hap_supported;
 
-    /* Support 1GB Harware-Assisted Paging? */
-    int hap_1gb_pgtb;
+    /*
+     * Indicate HAP super page level.
+     * 0 -- 4KB, 1 -- 2MB, 2 -- 1GB.
+     */
+    int hap_superpage_level;
 
 
     /*

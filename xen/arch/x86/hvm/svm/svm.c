@@ -935,8 +935,9 @@ struct hvm_function_table * __init start_svm(void)
                          cpuid_edx(0x8000000A) : 0);
 
     svm_function_table.hap_supported = cpu_has_svm_npt;
-    svm_function_table.hap_1gb_pgtb = 
-        (CONFIG_PAGING_LEVELS == 4)? !!(cpuid_edx(0x80000001) & 0x04000000):0;
+    svm_function_table.hap_superpage_level =
+        ((CONFIG_PAGING_LEVELS == 4) && (cpuid_edx(0x80000001) & 0x04000000)) ?
+            2 : 1;
 
     return &svm_function_table;
 }

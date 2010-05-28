@@ -1757,16 +1757,12 @@ int set_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
     {
         if ( is_hvm_domain(d) && paging_mode_hap(d) )
             order = ( (((gfn | mfn_x(mfn) | todo) & ((1ul << 18) - 1)) == 0) &&
-                      hvm_funcs.hap_1gb_pgtb && opt_hap_1gb ) ? 18 :
-                (((gfn | mfn_x(mfn) | todo) & ((1ul << 9) - 1)) == 0) ? 9 : 0;
+                      (hvm_funcs.hap_superpage_level == 2) &&
+                      opt_hap_1gb ) ? 18 :
+                ((((gfn | mfn_x(mfn) | todo) & ((1ul << 9) - 1)) == 0) &&
+                      (hvm_funcs.hap_superpage_level >= 1)) ? 9 : 0;
         else
             order = 0;
-
-        /* Note that we only enable hap_1gb_pgtb when CONFIG_PAGING_LEVELS==4. 
-         * So 1GB should never be enabled under 32bit or PAE modes. But for
-         * safety's reason, we double-check the page order again..
-         */
-        BUG_ON(order == 18 && CONFIG_PAGING_LEVELS < 4);
 
         if ( !d->arch.p2m->set_entry(d, gfn, mfn, order, p2mt) )
             rc = 0;

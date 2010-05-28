@@ -94,7 +94,8 @@ static void __init vmx_display_features(void)
 
     if ( vmx_ept_super_page_level_limit )
         printk("EPT supports %s super page.\n",
-               vmx_ept_super_page_level_limit > 1 ? "1G" : "2M");
+               (vmx_ept_super_page_level_limit == 2) ? "1G" :
+               ((vmx_ept_super_page_level_limit == 1) ? "2M" : "4K"));
 }
 
 static u32 adjust_vmx_controls(

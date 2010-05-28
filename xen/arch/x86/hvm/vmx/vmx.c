@@ -1435,7 +1435,7 @@ struct hvm_function_table * __init start_vmx(void)
         setup_ept_dump();
     }
     
-    vmx_function_table.hap_1gb_pgtb = (vmx_ept_super_page_level_limit == 2);
+    vmx_function_table.hap_superpage_level = vmx_ept_super_page_level_limit;
 
     setup_vmcs_dump();
 
