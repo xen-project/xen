@@ -51,8 +51,9 @@ struct xentoollog_logger {
 
 /*---------- facilities for consuming log messages ----------*/
 
-#define XTL_STDIOSTREAM_SHOW_PID  01u
-#define XTL_STDIOSTREAM_SHOW_DATE 02u
+#define XTL_STDIOSTREAM_SHOW_PID      01u
+#define XTL_STDIOSTREAM_SHOW_DATE     02u
+#define XTL_STDIOSTREAM_HIDE_PROGRESS 04u
 
 typedef struct xentoollog_logger_stdiostream  xentoollog_logger_stdiostream;
 
@@ -60,6 +61,12 @@ xentoollog_logger_stdiostream *xtl_createlogger_stdiostream
         (FILE *f, xentoollog_level min_level, unsigned flags);
     /* may return 0 if malloc fails, in which case error was logged */
     /* destroy on this logger does not close the file */
+
+void xtl_stdiostream_set_minlevel(xentoollog_logger_stdiostream*,
+                                  xentoollog_level min_level);
+void xtl_stdiostream_adjust_flags(xentoollog_logger_stdiostream*,
+                                  unsigned set_flags, unsigned clear_flags);
+  /* if set_flags and clear_flags overlap, set_flags takes precedence */
 
 void xtl_logger_destroy(struct xentoollog_logger *logger /* 0 is ok */);
 

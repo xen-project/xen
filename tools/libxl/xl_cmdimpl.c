@@ -1923,6 +1923,8 @@ static void migrate_domain(char *domain_spec, const char *rune,
     save_domain_core_writeconfig(send_fd, "migration stream",
                                  config_data, config_len);
 
+    xtl_stdiostream_adjust_flags(logger, XTL_STDIOSTREAM_HIDE_PROGRESS, 0);
+
     memset(&suspinfo, 0, sizeof(suspinfo));
     suspinfo.flags |= XL_SUSPEND_LIVE;
     rc = libxl_domain_suspend(&ctx, &suspinfo, domid, send_fd);
@@ -1932,12 +1934,16 @@ static void migrate_domain(char *domain_spec, const char *rune,
         goto failed_resume;
     }
 
-    fprintf(stderr, "migration sender: Transfer complete.\n");
+    //fprintf(stderr, "migration sender: Transfer complete.\n");
+    // Should only be printed when debugging as it's a bit messy with
+    // progress indication.
 
     rc = migrate_read_fixedmessage(recv_fd, migrate_receiver_ready,
                                    sizeof(migrate_receiver_ready),
                                    "ready message", rune);
     if (rc) goto failed_resume;
+
+    xtl_stdiostream_adjust_flags(logger, 0, XTL_STDIOSTREAM_HIDE_PROGRESS);
 
     /* right, at this point we are about give the destination
      * permission to rename and resume, so we must first rename the

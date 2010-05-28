@@ -75,6 +75,9 @@ static void stdiostream_progress(struct xentoollog_logger *logger_in,
     int newpel, extra_erase;
     xentoollog_level this_level;
 
+    if (!(lg->flags & XTL_STDIOSTREAM_HIDE_PROGRESS))
+        return;
+
     if (percent < lg->progress_last_percent) {
         this_level = XTL_PROGRESS;
     } else if (percent == lg->progress_last_percent) {
@@ -108,6 +111,18 @@ static void stdiostream_destroy(struct xentoollog_logger *logger_in) {
     free(lg);
 }
 
+void xtl_stdiostream_set_minlevel(xentoollog_logger_stdiostream *lg,
+                                  xentoollog_level min_level) {
+    lg->min_level = min_level;
+}
+
+void xtl_stdiostream_adjust_flags(xentoollog_logger_stdiostream *lg,
+                                  unsigned set_flags, unsigned clear_flags) {
+    unsigned new_flags = (lg->flags & ~clear_flags) | set_flags;
+    if (new_flags & XTL_STDIOSTREAM_HIDE_PROGRESS)
+        progress_erase(lg);
+    lg->flags = new_flags;
+}
 
 xentoollog_logger_stdiostream *xtl_createlogger_stdiostream
         (FILE *f, xentoollog_level min_level, unsigned flags) {
