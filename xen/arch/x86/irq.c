@@ -1243,7 +1243,8 @@ static irq_guest_action_t *__pirq_guest_unbind(
     for ( i = 0; (i < action->nr_guests) && (action->guest[i] != d); i++ )
         continue;
     BUG_ON(i == action->nr_guests);
-    memmove(&action->guest[i], &action->guest[i+1], IRQ_MAX_GUESTS-i-1);
+    memmove(&action->guest[i], &action->guest[i+1],
+            (action->nr_guests-i-1) * sizeof(action->guest[0]));
     action->nr_guests--;
 
     switch ( action->ack_type )
