@@ -61,7 +61,7 @@ static void stdiostream_vmessage(xentoollog_logger *logger_in,
     vfprintf(lg->f, format, al);
 
     if (errnoval >= 0)
-        vfprintf(lg->f, ": %s", strerror(errnoval));
+        fprintf(lg->f, ": %s", strerror(errnoval));
 
     putc('\n', lg->f);
     fflush(lg->f);
