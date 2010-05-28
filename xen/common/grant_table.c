@@ -596,17 +596,20 @@ __gnttab_map_grant_ref(
         goto undo_out;
     }
 
-    if ( (!is_hvm_domain(ld) && need_iommu(ld)) &&
-         !(old_pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask)) &&
-         (act_pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask)) )
+    if ( !is_hvm_domain(ld) && need_iommu(ld) )
     {
-        /* Shouldn't happen, because you can't use iommu in a HVM
-         * domain. */
+        int err = 0;
+        /* Shouldn't happen, because you can't use iommu in a HVM domain. */
         BUG_ON(paging_mode_translate(ld));
         /* We're not translated, so we know that gmfns and mfns are
            the same things, so the IOMMU entry is always 1-to-1. */
-        if ( iommu_map_page(ld, frame, frame,
-                            IOMMUF_readable|IOMMUF_writable) )
+        if ( (act_pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask)) &&
+             !(old_pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask)) )
+            err = iommu_map_page(ld, frame, frame,
+                                 IOMMUF_readable|IOMMUF_writable);
+        else if ( act_pin && !old_pin )
+            err = iommu_map_page(ld, frame, frame, IOMMUF_readable);
+        if ( err )
         {
             rc = GNTST_general_error;
             goto undo_out;
@@ -780,12 +783,16 @@ __gnttab_unmap_common(
             act->pin -= GNTPIN_hstw_inc;
     }
 
-    if ( (!is_hvm_domain(ld) && need_iommu(ld)) &&
-         (old_pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask)) &&
-         !(act->pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask)) )
+    if ( !is_hvm_domain(ld) && need_iommu(ld) )
     {
+        int err = 0;
         BUG_ON(paging_mode_translate(ld));
-        if ( iommu_unmap_page(ld, op->frame) )
+        if ( old_pin && !act->pin )
+            err = iommu_unmap_page(ld, op->frame);
+        else if ( (old_pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask)) &&
+                  !(act->pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask)) )
+            err = iommu_map_page(ld, op->frame, op->frame, IOMMUF_readable);
+        if ( err )
         {
             rc = GNTST_general_error;
             goto unmap_out;
