@@ -1463,7 +1463,7 @@ int memory_add(unsigned long spfn, unsigned long epfn, unsigned int pxm)
         goto destroy_m2p;
 
     for ( i = spfn; i < epfn; i++ )
-        if ( iommu_map_page(dom0, i, i) )
+        if ( iommu_map_page(dom0, i, i, IOMMUF_readable|IOMMUF_writable) )
             break;
 
     if ( i != epfn )

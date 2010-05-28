@@ -153,7 +153,8 @@ void iommu_set_dom0_mapping(struct domain *d)
 
         tmp = 1 << (PAGE_SHIFT - PAGE_SHIFT_4K);
         for ( j = 0; j < tmp; j++ )
-            iommu_map_page(d, (i*tmp+j), (i*tmp+j));
+            iommu_map_page(d, (i*tmp+j), (i*tmp+j),
+                           IOMMUF_readable|IOMMUF_writable);
 
         if (!(i & (0xfffff >> (PAGE_SHIFT - PAGE_SHIFT_4K))))
             process_pending_softirqs();

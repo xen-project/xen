@@ -1578,7 +1578,8 @@ void iommu_domain_teardown(struct domain *d)
 }
 
 static int intel_iommu_map_page(
-    struct domain *d, unsigned long gfn, unsigned long mfn)
+    struct domain *d, unsigned long gfn, unsigned long mfn,
+    unsigned int flags)
 {
     struct hvm_iommu *hd = domain_hvm_iommu(d);
     struct acpi_drhd_unit *drhd;
@@ -1605,7 +1606,9 @@ static int intel_iommu_map_page(
     pte = page + (gfn & LEVEL_MASK);
     pte_present = dma_pte_present(*pte);
     dma_set_pte_addr(*pte, (paddr_t)mfn << PAGE_SHIFT_4K);
-    dma_set_pte_prot(*pte, DMA_PTE_READ | DMA_PTE_WRITE);
+    dma_set_pte_prot(*pte,
+                     ((flags & IOMMUF_readable) ? DMA_PTE_READ  : 0) |
+                     ((flags & IOMMUF_writable) ? DMA_PTE_WRITE : 0));
 
     /* Set the SNP on leaf page table if Snoop Control available */
     if ( iommu_snoop )
@@ -1687,7 +1690,8 @@ static int rmrr_identity_mapping(struct domain *d,
 
     while ( base_pfn < end_pfn )
     {
-        if ( intel_iommu_map_page(d, base_pfn, base_pfn) )
+        if ( intel_iommu_map_page(d, base_pfn, base_pfn,
+                                  IOMMUF_readable|IOMMUF_writable) )
             return -1;
         base_pfn++;
     }

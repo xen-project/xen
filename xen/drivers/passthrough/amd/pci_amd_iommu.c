@@ -235,7 +235,8 @@ static int amd_iommu_domain_init(struct domain *domain)
         {
             /* setup 1:1 page table for dom0 */
             for ( i = 0; i < max_page; i++ )
-                amd_iommu_map_page(domain, i, i);
+                amd_iommu_map_page(domain, i, i,
+                                   IOMMUF_readable|IOMMUF_writable);
         }
 
         amd_iommu_setup_dom0_devices(domain);

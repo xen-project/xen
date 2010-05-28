@@ -2402,7 +2402,8 @@ static int __get_page_type(struct page_info *page, unsigned long type,
                 iommu_unmap_page(d, mfn_to_gmfn(d, page_to_mfn(page)));
             else if ( type == PGT_writable_page )
                 iommu_map_page(d, mfn_to_gmfn(d, page_to_mfn(page)),
-                               page_to_mfn(page));
+                               page_to_mfn(page),
+                               IOMMUF_readable|IOMMUF_writable);
         }
     }
 

@@ -450,12 +450,11 @@ static u64 iommu_l2e_from_pfn(struct page_info *table, int level,
     return next_table_maddr;
 }
 
-int amd_iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn)
+int amd_iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn,
+                       unsigned int flags)
 {
     u64 iommu_l2e;
     struct hvm_iommu *hd = domain_hvm_iommu(d);
-    int iw = IOMMU_IO_WRITE_ENABLED;
-    int ir = IOMMU_IO_READ_ENABLED;
 
     BUG_ON( !hd->root_table );
 
@@ -469,7 +468,10 @@ int amd_iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn)
         domain_crash(d);
         return -EFAULT;
     }
-    set_iommu_l1e_present(iommu_l2e, gfn, (u64)mfn << PAGE_SHIFT, iw, ir);
+
+    set_iommu_l1e_present(iommu_l2e, gfn, (u64)mfn << PAGE_SHIFT,
+                          !!(flags & IOMMUF_writable),
+                          !!(flags & IOMMUF_readable));
 
     spin_unlock(&hd->mapping_lock);
     return 0;

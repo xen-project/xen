@@ -605,7 +605,8 @@ __gnttab_map_grant_ref(
         BUG_ON(paging_mode_translate(ld));
         /* We're not translated, so we know that gmfns and mfns are
            the same things, so the IOMMU entry is always 1-to-1. */
-        if ( iommu_map_page(ld, frame, frame) )
+        if ( iommu_map_page(ld, frame, frame,
+                            IOMMUF_readable|IOMMUF_writable) )
         {
             rc = GNTST_general_error;
             goto undo_out;

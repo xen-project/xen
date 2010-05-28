@@ -353,10 +353,13 @@ out:
             if ( order == EPT_TABLE_ORDER )
             {
                 for ( i = 0; i < (1 << order); i++ )
-                    iommu_map_page(d, gfn - offset + i, mfn_x(mfn) - offset + i);
+                    iommu_map_page(
+                        d, gfn - offset + i, mfn_x(mfn) - offset + i,
+                        IOMMUF_readable|IOMMUF_writable);
             }
             else if ( !order )
-                iommu_map_page(d, gfn, mfn_x(mfn));
+                iommu_map_page(
+                    d, gfn, mfn_x(mfn), IOMMUF_readable|IOMMUF_writable);
         }
         else
         {

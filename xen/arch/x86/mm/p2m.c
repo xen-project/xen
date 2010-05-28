@@ -1377,7 +1377,8 @@ p2m_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
     {
         if ( p2mt == p2m_ram_rw )
             for ( i = 0; i < (1UL << page_order); i++ )
-                iommu_map_page(d, gfn+i, mfn_x(mfn)+i );
+                iommu_map_page(d, gfn+i, mfn_x(mfn)+i,
+                               IOMMUF_readable|IOMMUF_writable);
         else
             for ( int i = 0; i < (1UL << page_order); i++ )
                 iommu_unmap_page(d, gfn+i);
@@ -2294,12 +2295,16 @@ guest_physmap_add_entry(struct domain *d, unsigned long gfn,
         if ( need_iommu(d) && t == p2m_ram_rw )
         {
             for ( i = 0; i < (1 << page_order); i++ )
-                if ( (rc = iommu_map_page(d, mfn + i, mfn + i)) != 0 )
+            {
+                rc = iommu_map_page(
+                    d, mfn + i, mfn + i, IOMMUF_readable|IOMMUF_writable);
+                if ( rc != 0 )
                 {
                     while ( i-- > 0 )
                         iommu_unmap_page(d, mfn + i);
                     return rc;
                 }
+            }
         }
         return 0;
     }
