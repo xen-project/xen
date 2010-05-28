@@ -923,7 +923,17 @@ int cpu_add(uint32_t apic_id, uint32_t acpi_id, uint32_t pxm)
     }
 
     /* Physically added CPUs do not have synchronised TSC. */
-    cpu_set(cpu, tsc_sync_cpu_mask);
+    if ( boot_cpu_has(X86_FEATURE_TSC_RELIABLE) )
+    {
+        static bool_t once_only;
+        if ( !test_and_set_bool(once_only) )
+            printk(XENLOG_WARNING
+                   " ** New physical CPU %u may have skewed TSC and hence "
+                   "break assumed cross-CPU TSC coherency.\n"
+                   " ** Consider using boot parameter \"tsc=skewed\" "
+                   "which forces TSC emulation where appropriate.\n", cpu);
+        cpu_set(cpu, tsc_sync_cpu_mask);
+    }
 
     srat_detect_node(cpu);
     numa_add_cpu(cpu);

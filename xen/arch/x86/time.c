@@ -1598,6 +1598,25 @@ struct tm wallclock_time(void)
  * PV SoftTSC Emulation.
  */
 
+/*
+ * tsc=unstable: Override all tests; assume TSC is unreliable.
+ * tsc=skewed: Assume TSCs are individually reliable, but skewed across CPUs.
+ */
+static void __init tsc_parse(const char *s)
+{
+    if ( !strcmp(s, "unstable") )
+    {
+        setup_clear_cpu_cap(X86_FEATURE_CONSTANT_TSC);
+        setup_clear_cpu_cap(X86_FEATURE_NONSTOP_TSC);
+        setup_clear_cpu_cap(X86_FEATURE_TSC_RELIABLE);
+    }
+    else if ( !strcmp(s, "skewed") )
+    {
+        setup_clear_cpu_cap(X86_FEATURE_TSC_RELIABLE);
+    }
+}
+custom_param("tsc", tsc_parse);
+
 u64 gtime_to_gtsc(struct domain *d, u64 tsc)
 {
     if ( !is_hvm_domain(d) )
@@ -1636,7 +1655,7 @@ void pv_soft_rdtsc(struct vcpu *v, struct cpu_user_regs *regs, int rdtscp)
 
 int host_tsc_is_safe(void)
 {
-    return boot_cpu_has(X86_FEATURE_TSC_RELIABLE) || (num_online_cpus() == 1);
+    return boot_cpu_has(X86_FEATURE_TSC_RELIABLE);
 }
 
 void cpuid_time_leaf(uint32_t sub_idx, uint32_t *eax, uint32_t *ebx,
