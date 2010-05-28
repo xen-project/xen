@@ -19,6 +19,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <inttypes.h>
 
 #include "libxl.h"
 #include "libxl_internal.h"
@@ -119,7 +120,7 @@ char *libxl_xs_get_dompath(struct libxl_ctx *ctx, uint32_t domid)
 {
     char *s = xs_get_domain_path(ctx->xsh, domid);
     if (!s) {
-        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "failed to get dompath for %lu",
+        XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "failed to get dompath for %" PRIu32,
                      domid);
         return NULL;
     }

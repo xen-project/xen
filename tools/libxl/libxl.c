@@ -230,7 +230,7 @@ int libxl_domain_rename(struct libxl_ctx *ctx, uint32_t domid,
                   new_name, strlen(new_name))) {
         XL_LOG(ctx, XL_LOG_ERROR, "failed to write new name `%s'"
                " for domain %"PRIu32" previously named `%s'",
-               domid, new_name, old_name);
+               new_name, domid, old_name);
         goto x_fail;
     }
 
@@ -240,7 +240,7 @@ int libxl_domain_rename(struct libxl_ctx *ctx, uint32_t domid,
             if (errno != EAGAIN) {
                 XL_LOG(ctx, XL_LOG_ERROR, "failed to commit new name `%s'"
                        " for domain %"PRIu32" previously named `%s'",
-                       domid, new_name, old_name);
+                       new_name, domid, old_name);
                 goto x_fail;
             }
             XL_LOG(ctx, XL_LOG_DEBUG, "need to retry rename transaction"

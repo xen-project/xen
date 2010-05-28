@@ -386,7 +386,7 @@ static const char *userdata_path(struct libxl_ctx *ctx, uint32_t domid,
     rc = libxl_domain_info(ctx, &info, domid);
     if (rc) {
         XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "unable to find domain info"
-                     " for domain %l"PRIu32, domid);
+                     " for domain %"PRIu32, domid);
         return 0;
     }
     uuid_string = string_of_uuid(ctx, info.uuid);
