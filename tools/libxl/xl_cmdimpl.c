@@ -1519,7 +1519,10 @@ void pcidetach(char *dom, char *bdf)
     find_domain(dom);
 
     memset(&pcidev, 0x00, sizeof(pcidev));
-    sscanf(bdf, PCI_BDF, &domain, &bus, &dev, &func);
+    if (sscanf(bdf, PCI_BDF, &domain, &bus, &dev, &func) != 4) {
+        fprintf(stderr, "pci-detach: malformed BDF specification \"%s\"\n", bdf);
+        exit(2);
+    }
     libxl_device_pci_init(&pcidev, domain, bus, dev, func, 0);
     libxl_device_pci_remove(&ctx, domid, &pcidev);
 }
@@ -1558,7 +1561,10 @@ void pciattach(char *dom, char *bdf, char *vs)
     find_domain(dom);
 
     memset(&pcidev, 0x00, sizeof(pcidev));
-    sscanf(bdf, PCI_BDF, &domain, &bus, &dev, &func);
+    if (sscanf(bdf, PCI_BDF, &domain, &bus, &dev, &func) != 4) {
+        fprintf(stderr, "pci-attach: malformed BDF specification \"%s\"\n", bdf);
+        exit(2);
+    }
     libxl_device_pci_init(&pcidev, domain, bus, dev, func, 0);
     libxl_device_pci_add(&ctx, domid, &pcidev);
 }
