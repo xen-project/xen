@@ -74,4 +74,7 @@ void help(char *command);
 extern struct cmd_spec cmd_table[];
 extern int cmdtable_len;
 
+extern struct libxl_ctx ctx;
+extern int logfile;
+
 #endif /* XL_H */

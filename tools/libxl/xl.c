@@ -31,9 +31,6 @@
 #include "libxl_utils.h"
 #include "xl.h"
 
-extern struct libxl_ctx ctx;
-extern int logfile;
-
 void log_callback(
     void *userdata, int loglevel, const char *file,
     int line, const char *func, char *s)
