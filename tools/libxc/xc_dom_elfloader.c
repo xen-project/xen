@@ -21,11 +21,18 @@
 
 static void log_callback(struct elf_binary *elf, void *caller_data,
                          int iserr, const char *fmt, va_list al) {
-    vfprintf(caller_data,fmt,al);
+    struct xc_interface *xch = caller_data;
+
+    xc_reportv(xch,
+          xch->dombuild_logger ? xch->dombuild_logger : xch->error_handler,
+                       iserr ? XTL_ERROR : XTL_DETAIL,
+                       iserr ? XC_INVALID_KERNEL : XC_ERROR_NONE,
+                       fmt, al);
 }
 
-void xc_elf_set_logfile(struct elf_binary *elf, FILE *f, int verbose) {
-    elf_set_log(elf, log_callback, f, verbose);
+void xc_elf_set_logfile(struct xc_interface *xch, struct elf_binary *elf,
+                        int verbose) {
+    elf_set_log(elf, log_callback, xch, verbose);
 }
 
 /* ------------------------------------------------------------------------ */
@@ -68,7 +75,8 @@ static int check_elf_kernel(struct xc_dom_image *dom, int verbose)
     if ( dom->kernel_blob == NULL )
     {
         if ( verbose )
-            xc_dom_panic(XC_INTERNAL_ERROR, "%s: no kernel image loaded\n",
+            xc_dom_panic(dom->xch,
+                         XC_INTERNAL_ERROR, "%s: no kernel image loaded",
                          __FUNCTION__);
         return -EINVAL;
     }
@@ -76,7 +84,8 @@ static int check_elf_kernel(struct xc_dom_image *dom, int verbose)
     if ( !elf_is_elfbinary(dom->kernel_blob) )
     {
         if ( verbose )
-            xc_dom_panic(XC_INVALID_KERNEL, "%s: kernel is not an ELF image\n",
+            xc_dom_panic(dom->xch,
+                         XC_INVALID_KERNEL, "%s: kernel is not an ELF image",
                          __FUNCTION__);
         return -EINVAL;
     }
@@ -100,8 +109,8 @@ static int xc_dom_load_elf_symtab(struct xc_dom_image *dom,
 
     if ( elf_swap(elf) )
     {
-        xc_dom_printf("%s: non-native byte order, bsd symtab not supported\n",
-                      __FUNCTION__);
+        DOMPRINTF("%s: non-native byte order, bsd symtab not supported",
+                  __FUNCTION__);
         return 0;
     }
 
@@ -150,18 +159,17 @@ static int xc_dom_load_elf_symtab(struct xc_dom_image *dom,
     if ( elf_init(&syms, hdr + sizeof(int), size - sizeof(int)) )
         return -1;
 
-    if ( xc_dom_logfile )
-        xc_elf_set_logfile(&syms, xc_dom_logfile, 1);
+    xc_elf_set_logfile(dom->xch, &syms, 1);
 
     symtab = dom->bsd_symtab_start + sizeof(int);
     maxaddr = elf_round_up(&syms, symtab + elf_size(&syms, syms.ehdr) +
                            elf_shdr_count(&syms) * elf_size(&syms, shdr));
 
-    xc_dom_printf("%s/%s: bsd_symtab_start=%" PRIx64 ", kernel.end=0x%" PRIx64
-                  " -- symtab=0x%" PRIx64 ", maxaddr=0x%" PRIx64 "\n",
-                  __FUNCTION__, load ? "load" : "parse",
-                  dom->bsd_symtab_start, dom->kernel_seg.vend,
-                  symtab, maxaddr);
+    DOMPRINTF("%s/%s: bsd_symtab_start=%" PRIx64 ", kernel.end=0x%" PRIx64
+              " -- symtab=0x%" PRIx64 ", maxaddr=0x%" PRIx64 "",
+              __FUNCTION__, load ? "load" : "parse",
+              dom->bsd_symtab_start, dom->kernel_seg.vend,
+              symtab, maxaddr);
 
     count = elf_shdr_count(&syms);
     for ( h = 0; h < count; h++ )
@@ -199,10 +207,10 @@ static int xc_dom_load_elf_symtab(struct xc_dom_image *dom,
             size = elf_uval(&syms, shdr, sh_size);
             maxaddr = elf_round_up(&syms, maxaddr + size);
             tables++;
-            xc_dom_printf("%s: h=%d %s, size=0x%zx, maxaddr=0x%" PRIx64 "\n",
-                          __FUNCTION__, h,
-                          type == SHT_SYMTAB ? "symtab" : "strtab",
-                          size, maxaddr);
+            DOMPRINTF("%s: h=%d %s, size=0x%zx, maxaddr=0x%" PRIx64 "",
+                      __FUNCTION__, h,
+                      type == SHT_SYMTAB ? "symtab" : "strtab",
+                      size, maxaddr);
 
             if ( load )
             {
@@ -222,7 +230,7 @@ static int xc_dom_load_elf_symtab(struct xc_dom_image *dom,
 
     if ( tables == 0 )
     {
-        xc_dom_printf("%s: no symbol table present\n", __FUNCTION__);
+        DOMPRINTF("%s: no symbol table present", __FUNCTION__);
         dom->bsd_symtab_start = 0;
         return 0;
     }
@@ -243,11 +251,10 @@ static int xc_dom_parse_elf_kernel(struct xc_dom_image *dom)
     elf = xc_dom_malloc(dom, sizeof(*elf));
     dom->private_loader = elf;
     rc = elf_init(elf, dom->kernel_blob, dom->kernel_size);
-    if ( xc_dom_logfile )
-        xc_elf_set_logfile(elf, xc_dom_logfile, 1);
+    xc_elf_set_logfile(dom->xch, elf, 1);
     if ( rc != 0 )
     {
-        xc_dom_panic(XC_INVALID_KERNEL, "%s: corrupted ELF image\n",
+        xc_dom_panic(dom->xch, XC_INVALID_KERNEL, "%s: corrupted ELF image",
                      __FUNCTION__);
         return rc;
     }
@@ -255,8 +262,8 @@ static int xc_dom_parse_elf_kernel(struct xc_dom_image *dom)
     /* Find the section-header strings table. */
     if ( elf->sec_strtab == NULL )
     {
-        xc_dom_panic(XC_INVALID_KERNEL, "%s: ELF image has no shstrtab\n",
-                     __FUNCTION__);
+        xc_dom_panic(dom->xch, XC_INVALID_KERNEL, "%s: ELF image"
+                     " has no shstrtab", __FUNCTION__);
         return -EINVAL;
     }
 
@@ -273,9 +280,9 @@ static int xc_dom_parse_elf_kernel(struct xc_dom_image *dom)
         xc_dom_load_elf_symtab(dom, elf, 0);
 
     dom->guest_type = xc_dom_guest_type(dom, elf);
-    xc_dom_printf("%s: %s: 0x%" PRIx64 " -> 0x%" PRIx64 "\n",
-                  __FUNCTION__, dom->guest_type,
-                  dom->kernel_seg.vstart, dom->kernel_seg.vend);
+    DOMPRINTF("%s: %s: 0x%" PRIx64 " -> 0x%" PRIx64 "",
+              __FUNCTION__, dom->guest_type,
+              dom->kernel_seg.vstart, dom->kernel_seg.vend);
     return 0;
 }
 

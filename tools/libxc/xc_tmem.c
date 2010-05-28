@@ -7,7 +7,7 @@
 #include "xc_private.h"
 #include <xen/tmem.h>
 
-static int do_tmem_op(int xc, tmem_op_t *op)
+static int do_tmem_op(xc_interface *xch, tmem_op_t *op)
 {
     int ret;
     DECLARE_HYPERCALL;
@@ -19,7 +19,7 @@ static int do_tmem_op(int xc, tmem_op_t *op)
         PERROR("Could not lock memory for Xen hypercall");
         return -EFAULT;
     }
-    if ((ret = do_xen_hypercall(xc, &hypercall)) < 0)
+    if ((ret = do_xen_hypercall(xch, &hypercall)) < 0)
     {
         if ( errno == EACCES )
             DPRINTF("tmem operation failed -- need to"
@@ -30,7 +30,7 @@ static int do_tmem_op(int xc, tmem_op_t *op)
     return ret;
 }
 
-int xc_tmem_control(int xc,
+int xc_tmem_control(xc_interface *xch,
                     int32_t pool_id,
                     uint32_t subop,
                     uint32_t cli_id,
@@ -64,7 +64,7 @@ int xc_tmem_control(int xc,
         memset(buf, 0, arg1);
 #endif
 
-    rc = do_tmem_op(xc, &op);
+    rc = do_tmem_op(xch, &op);
 
     if (subop == TMEMC_LIST) {
         if (arg1 != 0)
@@ -106,7 +106,7 @@ static int xc_tmem_uuid_parse(char *uuid_str, uint64_t *uuid_lo, uint64_t *uuid_
     return 0;
 }
 
-int xc_tmem_auth(int xc,
+int xc_tmem_auth(xc_interface *xch,
                  int cli_id,
                  char *uuid_str,
                  int arg1)
@@ -124,7 +124,7 @@ int xc_tmem_auth(int xc,
         return -1;
     }
 
-    return do_tmem_op(xc, &op);
+    return do_tmem_op(xch, &op);
 }
 
 /* Save/restore/live migrate */
@@ -143,7 +143,8 @@ int xc_tmem_auth(int xc,
  */
 
 /* returns 0 if nothing to save, -1 if error saving, 1 if saved successfully */
-int xc_tmem_save(int xc, int dom, int io_fd, int live, int field_marker)
+int xc_tmem_save(xc_interface *xch,
+                 int dom, int io_fd, int live, int field_marker)
 {
     int marker = field_marker;
     int i, j;
@@ -153,28 +154,28 @@ int xc_tmem_save(int xc, int dom, int io_fd, int live, int field_marker)
     uint32_t minusone = -1;
     struct tmem_handle *h;
 
-    if ( xc_tmem_control(xc,0,TMEMC_SAVE_BEGIN,dom,live,0,0,NULL) <= 0 )
+    if ( xc_tmem_control(xch,0,TMEMC_SAVE_BEGIN,dom,live,0,0,NULL) <= 0 )
         return 0;
 
     if ( write_exact(io_fd, &marker, sizeof(marker)) )
         return -1;
-    version = xc_tmem_control(xc,0,TMEMC_SAVE_GET_VERSION,0,0,0,0,NULL);
+    version = xc_tmem_control(xch,0,TMEMC_SAVE_GET_VERSION,0,0,0,0,NULL);
     if ( write_exact(io_fd, &version, sizeof(version)) )
         return -1;
-    max_pools = xc_tmem_control(xc,0,TMEMC_SAVE_GET_MAXPOOLS,0,0,0,0,NULL);
+    max_pools = xc_tmem_control(xch,0,TMEMC_SAVE_GET_MAXPOOLS,0,0,0,0,NULL);
     if ( write_exact(io_fd, &max_pools, sizeof(max_pools)) )
         return -1;
     if ( version == -1 || max_pools == -1 )
         return -1;
     if ( write_exact(io_fd, &minusone, sizeof(minusone)) )
         return -1;
-    flags = xc_tmem_control(xc,0,TMEMC_SAVE_GET_CLIENT_FLAGS,dom,0,0,0,NULL);
+    flags = xc_tmem_control(xch,0,TMEMC_SAVE_GET_CLIENT_FLAGS,dom,0,0,0,NULL);
     if ( write_exact(io_fd, &flags, sizeof(flags)) )
         return -1;
-    weight = xc_tmem_control(xc,0,TMEMC_SAVE_GET_CLIENT_WEIGHT,dom,0,0,0,NULL);
+    weight = xc_tmem_control(xch,0,TMEMC_SAVE_GET_CLIENT_WEIGHT,dom,0,0,0,NULL);
     if ( write_exact(io_fd, &weight, sizeof(weight)) )
         return -1;
-    cap = xc_tmem_control(xc,0,TMEMC_SAVE_GET_CLIENT_CAP,dom,0,0,0,NULL);
+    cap = xc_tmem_control(xch,0,TMEMC_SAVE_GET_CLIENT_CAP,dom,0,0,0,NULL);
     if ( write_exact(io_fd, &cap, sizeof(cap)) )
         return -1;
     if ( flags == -1 || weight == -1 || cap == -1 )
@@ -191,14 +192,14 @@ int xc_tmem_save(int xc, int dom, int io_fd, int live, int field_marker)
         int checksum = 0;
 
         /* get pool id, flags, pagesize, n_pages, uuid */
-        flags = xc_tmem_control(xc,i,TMEMC_SAVE_GET_POOL_FLAGS,dom,0,0,0,NULL);
+        flags = xc_tmem_control(xch,i,TMEMC_SAVE_GET_POOL_FLAGS,dom,0,0,0,NULL);
         if ( flags != -1 )
         {
             pool_id = i;
-            n_pages = xc_tmem_control(xc,i,TMEMC_SAVE_GET_POOL_NPAGES,dom,0,0,0,NULL);
+            n_pages = xc_tmem_control(xch,i,TMEMC_SAVE_GET_POOL_NPAGES,dom,0,0,0,NULL);
             if ( !(flags & TMEM_POOL_PERSIST) )
                 n_pages = 0;
-            (void)xc_tmem_control(xc,i,TMEMC_SAVE_GET_POOL_UUID,dom,sizeof(uuid),0,0,&uuid);
+            (void)xc_tmem_control(xch,i,TMEMC_SAVE_GET_POOL_UUID,dom,sizeof(uuid),0,0,&uuid);
             if ( write_exact(io_fd, &pool_id, sizeof(pool_id)) )
                 return -1;
             if ( write_exact(io_fd, &flags, sizeof(flags)) )
@@ -221,7 +222,7 @@ int xc_tmem_save(int xc, int dom, int io_fd, int live, int field_marker)
             for ( j = n_pages; j > 0; j-- )
             {
                 int ret;
-                if ( (ret = xc_tmem_control(xc, pool_id,
+                if ( (ret = xc_tmem_control(xch, pool_id,
                                             TMEMC_SAVE_GET_NEXT_PAGE, dom,
                                             bufsize, 0, 0, buf)) > 0 )
                 {
@@ -258,7 +259,7 @@ int xc_tmem_save(int xc, int dom, int io_fd, int live, int field_marker)
 }
 
 /* only called for live migration */
-int xc_tmem_save_extra(int xc, int dom, int io_fd, int field_marker)
+int xc_tmem_save_extra(xc_interface *xch, int dom, int io_fd, int field_marker)
 {
     struct tmem_handle handle;
     int marker = field_marker;
@@ -267,7 +268,7 @@ int xc_tmem_save_extra(int xc, int dom, int io_fd, int field_marker)
 
     if ( write_exact(io_fd, &marker, sizeof(marker)) )
         return -1;
-    while ( xc_tmem_control(xc, 0, TMEMC_SAVE_GET_NEXT_INV, dom,
+    while ( xc_tmem_control(xch, 0, TMEMC_SAVE_GET_NEXT_INV, dom,
                             sizeof(handle),0,0,&handle) > 0 ) {
         if ( write_exact(io_fd, &handle.pool_id, sizeof(handle.pool_id)) )
             return -1;
@@ -287,15 +288,15 @@ int xc_tmem_save_extra(int xc, int dom, int io_fd, int field_marker)
 }
 
 /* only called for live migration */
-void xc_tmem_save_done(int xc, int dom)
+void xc_tmem_save_done(xc_interface *xch, int dom)
 {
-    xc_tmem_control(xc,0,TMEMC_SAVE_END,dom,0,0,0,NULL);
+    xc_tmem_control(xch,0,TMEMC_SAVE_END,dom,0,0,0,NULL);
 }
 
 /* restore routines */
 
 static int xc_tmem_restore_new_pool(
-                    int xc,
+                    xc_interface *xch,
                     int cli_id,
                     uint32_t pool_id,
                     uint32_t flags,
@@ -311,10 +312,10 @@ static int xc_tmem_restore_new_pool(
     op.u.new.uuid[0] = uuid_lo;
     op.u.new.uuid[1] = uuid_hi;
 
-    return do_tmem_op(xc, &op);
+    return do_tmem_op(xch, &op);
 }
 
-int xc_tmem_restore(int xc, int dom, int io_fd)
+int xc_tmem_restore(xc_interface *xch, int dom, int io_fd)
 {
     uint32_t save_max_pools, save_version;
     uint32_t this_max_pools, this_version;
@@ -323,10 +324,10 @@ int xc_tmem_restore(int xc, int dom, int io_fd)
     uint32_t weight, cap, flags;
     int checksum = 0;
 
-    save_version = xc_tmem_control(xc,0,TMEMC_SAVE_GET_VERSION,dom,0,0,0,NULL);
+    save_version = xc_tmem_control(xch,0,TMEMC_SAVE_GET_VERSION,dom,0,0,0,NULL);
     if ( save_version == -1 )
         return -1; /* domain doesn't exist */
-    save_max_pools = xc_tmem_control(xc,0,TMEMC_SAVE_GET_MAXPOOLS,0,0,0,0,NULL);
+    save_max_pools = xc_tmem_control(xch,0,TMEMC_SAVE_GET_MAXPOOLS,0,0,0,0,NULL);
     if ( read_exact(io_fd, &this_version, sizeof(this_version)) )
         return -1;
     if ( read_exact(io_fd, &this_max_pools, sizeof(this_max_pools)) )
@@ -336,23 +337,23 @@ int xc_tmem_restore(int xc, int dom, int io_fd)
         return -1;
     if ( minusone != -1 )
         return -1;
-    if ( xc_tmem_control(xc,0,TMEMC_RESTORE_BEGIN,dom,0,0,0,NULL) < 0 )
+    if ( xc_tmem_control(xch,0,TMEMC_RESTORE_BEGIN,dom,0,0,0,NULL) < 0 )
         return -1;
     if ( read_exact(io_fd, &flags, sizeof(flags)) )
         return -1;
     if ( flags & TMEM_CLIENT_COMPRESS )
-        if ( xc_tmem_control(xc,0,TMEMC_SET_COMPRESS,dom,1,0,0,NULL) < 0 )
+        if ( xc_tmem_control(xch,0,TMEMC_SET_COMPRESS,dom,1,0,0,NULL) < 0 )
             return -1;
     if ( flags & TMEM_CLIENT_FROZEN )
-        if ( xc_tmem_control(xc,0,TMEMC_FREEZE,dom,0,0,0,NULL) < 0 )
+        if ( xc_tmem_control(xch,0,TMEMC_FREEZE,dom,0,0,0,NULL) < 0 )
             return -1;
     if ( read_exact(io_fd, &weight, sizeof(weight)) )
         return -1;
-    if ( xc_tmem_control(xc,0,TMEMC_SET_WEIGHT,dom,0,0,0,NULL) < 0 )
+    if ( xc_tmem_control(xch,0,TMEMC_SET_WEIGHT,dom,0,0,0,NULL) < 0 )
         return -1;
     if ( read_exact(io_fd, &cap, sizeof(cap)) )
         return -1;
-    if ( xc_tmem_control(xc,0,TMEMC_SET_CAP,dom,0,0,0,NULL) < 0 )
+    if ( xc_tmem_control(xch,0,TMEMC_SET_CAP,dom,0,0,0,NULL) < 0 )
         return -1;
     if ( read_exact(io_fd, &minusone, sizeof(minusone)) )
         return -1;
@@ -370,7 +371,7 @@ int xc_tmem_restore(int xc, int dom, int io_fd)
             return -1;
         if ( read_exact(io_fd, &uuid, sizeof(uuid)) )
             return -1;
-        if ( xc_tmem_restore_new_pool(xc, dom, pool_id,
+        if ( xc_tmem_restore_new_pool(xch, dom, pool_id,
                                  flags, uuid[0], uuid[1]) < 0)
             return -1;
         if ( n_pages <= 0 )
@@ -398,7 +399,7 @@ int xc_tmem_restore(int xc, int dom, int io_fd)
             if ( read_exact(io_fd, buf, pagesize) )
                 return -1;
             checksum += *buf;
-            if ( (rc = xc_tmem_control(xc, pool_id, TMEMC_RESTORE_PUT_PAGE,
+            if ( (rc = xc_tmem_control(xch, pool_id, TMEMC_RESTORE_PUT_PAGE,
                                  dom, bufsize, index, oid, buf)) <= 0 )
             {
                 DPRINTF("xc_tmem_restore: putting page failed, rc=%d\n",rc);
@@ -416,7 +417,7 @@ int xc_tmem_restore(int xc, int dom, int io_fd)
 }
 
 /* only called for live migration, must be called after suspend */
-int xc_tmem_restore_extra(int xc, int dom, int io_fd)
+int xc_tmem_restore_extra(xc_interface *xch, int dom, int io_fd)
 {
     uint32_t pool_id;
     uint64_t oid;
@@ -430,7 +431,7 @@ int xc_tmem_restore_extra(int xc, int dom, int io_fd)
             return -1;
         if ( read_exact(io_fd, &index, sizeof(index)) )
             return -1;
-        if ( xc_tmem_control(xc, pool_id, TMEMC_RESTORE_FLUSH_PAGE, dom,
+        if ( xc_tmem_control(xch, pool_id, TMEMC_RESTORE_FLUSH_PAGE, dom,
                              0,index,oid,NULL) <= 0 )
             return -1;
         count++;

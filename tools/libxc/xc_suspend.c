@@ -8,7 +8,7 @@
 #include "xenguest.h"
 
 #define SUSPEND_LOCK_FILE "/var/lib/xen/suspend_evtchn"
-static int lock_suspend_event(int domid)
+static int lock_suspend_event(xc_interface *xch, int domid)
 {
     int fd, rc;
     mode_t mask;
@@ -34,7 +34,7 @@ static int lock_suspend_event(int domid)
     return rc;
 }
 
-static int unlock_suspend_event(int domid)
+static int unlock_suspend_event(xc_interface *xch, int domid)
 {
     int fd, pid, n;
     char buf[128];
@@ -65,7 +65,7 @@ static int unlock_suspend_event(int domid)
     return -EPERM;
 }
 
-int xc_await_suspend(int xce, int suspend_evtchn)
+int xc_await_suspend(xc_interface *xch, int xce, int suspend_evtchn)
 {
     int rc;
 
@@ -84,19 +84,19 @@ int xc_await_suspend(int xce, int suspend_evtchn)
     return 0;
 }
 
-int xc_suspend_evtchn_release(int xce, int domid, int suspend_evtchn)
+int xc_suspend_evtchn_release(xc_interface *xch, int xce, int domid, int suspend_evtchn)
 {
     if (suspend_evtchn >= 0)
         xc_evtchn_unbind(xce, suspend_evtchn);
 
-    return unlock_suspend_event(domid);
+    return unlock_suspend_event(xch, domid);
 }
 
-int xc_suspend_evtchn_init(int xc, int xce, int domid, int port)
+int xc_suspend_evtchn_init(xc_interface *xch, int xce, int domid, int port)
 {
     int rc, suspend_evtchn = -1;
 
-    if (lock_suspend_event(domid))
+    if (lock_suspend_event(xch, domid))
         return -EINVAL;
 
     suspend_evtchn = xc_evtchn_bind_interdomain(xce, domid, port);
@@ -105,20 +105,20 @@ int xc_suspend_evtchn_init(int xc, int xce, int domid, int port)
         goto cleanup;
     }
 
-    rc = xc_domain_subscribe_for_suspend(xc, domid, port);
+    rc = xc_domain_subscribe_for_suspend(xch, domid, port);
     if (rc < 0) {
         ERROR("failed to subscribe to domain: %d", rc);
         goto cleanup;
     }
 
     /* event channel is pending immediately after binding */
-    xc_await_suspend(xce, suspend_evtchn);
+    xc_await_suspend(xch, xce, suspend_evtchn);
 
     return suspend_evtchn;
 
 cleanup:
     if (suspend_evtchn != -1)
-        xc_suspend_evtchn_release(xce, domid, suspend_evtchn);
+        xc_suspend_evtchn_release(xch, xce, domid, suspend_evtchn);
 
     return -1;
 }

@@ -3,6 +3,7 @@
 #define XC_PRIVATE_H
 
 #include <unistd.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -39,10 +40,6 @@
 #define PAGE_SIZE               (1UL << PAGE_SHIFT)
 #define PAGE_MASK               (~(PAGE_SIZE-1))
 
-#define DEBUG    1
-#define INFO     1
-#define PROGRESS 0
-
 /* Force a compilation error if condition is true */
 #define XC_BUILD_BUG_ON(p) ((void)sizeof(struct { int:-!!(p); }))
 
@@ -53,30 +50,37 @@
 */
 #define MAX_PAGECACHE_USAGE (4*1024)
 
-#if INFO
-#define IPRINTF(_f, _a...) printf(_f , ## _a)
-#else
-#define IPRINTF(_f, _a...) ((void)0)
-#endif
-
-#if DEBUG
-#define DPRINTF(_f, _a...) fprintf(stderr, _f , ## _a)
-#else
-#define DPRINTF(_f, _a...) ((void)0)
-#endif
-
-#if PROGRESS
-#define PPRINTF(_f, _a...) fprintf(stderr, _f , ## _a)
-#else
-#define PPRINTF(_f, _a...)
-#endif
+struct xc_interface {
+    int fd;
+    xentoollog_logger *error_handler,   *error_handler_tofree;
+    xentoollog_logger *dombuild_logger, *dombuild_logger_tofree;
+    struct xc_error last_error; /* for xc_get_last_error */
+    FILE *dombuild_logger_file;
+    const char *currently_progress_reporting;
+};
 
 char *safe_strerror(int errcode);
-void xc_set_error(int code, const char *fmt, ...);
+void xc_report_error(xc_interface *xch, int code, const char *fmt, ...);
+void xc_reportv(xc_interface *xch, xentoollog_logger *lg, xentoollog_level,
+                int code, const char *fmt, va_list args)
+     __attribute__((format(printf,5,0)));
+void xc_report(xc_interface *xch, xentoollog_logger *lg, xentoollog_level,
+               int code, const char *fmt, ...)
+     __attribute__((format(printf,5,6)));
 
-#define ERROR(_m, _a...)  xc_set_error(XC_INTERNAL_ERROR, _m , ## _a )
-#define PERROR(_m, _a...) xc_set_error(XC_INTERNAL_ERROR, _m " (%d = %s)", \
-                                       ## _a , errno, safe_strerror(errno))
+void xc_report_progress_start(xc_interface *xch, const char *doing,
+                              unsigned long total);
+void xc_report_progress_step(xc_interface *xch,
+                             unsigned long done, unsigned long total);
+
+/* anamorphic macros:  struct xc_interface *xch  must be in scope */
+
+#define IPRINTF(_f, _a...) xc_report(xch, xch->error_handler, XTL_INFO,0, _f , ## _a)
+#define DPRINTF(_f, _a...) xc_report(xch, xch->error_handler, XTL_DETAIL,0, _f , ## _a)
+
+#define ERROR(_m, _a...)  xc_report_error(xch,XC_INTERNAL_ERROR,_m , ## _a )
+#define PERROR(_m, _a...) xc_report_error(xch,XC_INTERNAL_ERROR,_m \
+                  " (%d = %s)", ## _a , errno, safe_strerror(errno))
 
 void *xc_memalign(size_t alignment, size_t size);
 
@@ -93,9 +97,9 @@ static inline void safe_munlock(const void *addr, size_t len)
     errno = saved_errno;
 }
 
-int do_xen_hypercall(int xc_handle, privcmd_hypercall_t *hypercall);
+int do_xen_hypercall(xc_interface *xch, privcmd_hypercall_t *hypercall);
 
-static inline int do_xen_version(int xc_handle, int cmd, void *dest)
+static inline int do_xen_version(xc_interface *xch, int cmd, void *dest)
 {
     DECLARE_HYPERCALL;
 
@@ -103,10 +107,10 @@ static inline int do_xen_version(int xc_handle, int cmd, void *dest)
     hypercall.arg[0] = (unsigned long) cmd;
     hypercall.arg[1] = (unsigned long) dest;
 
-    return do_xen_hypercall(xc_handle, &hypercall);
+    return do_xen_hypercall(xch, &hypercall);
 }
 
-static inline int do_physdev_op(int xc_handle, int cmd, void *op, size_t len)
+static inline int do_physdev_op(xc_interface *xch, int cmd, void *op, size_t len)
 {
     int ret = -1;
 
@@ -122,7 +126,7 @@ static inline int do_physdev_op(int xc_handle, int cmd, void *op, size_t len)
     hypercall.arg[0] = (unsigned long) cmd;
     hypercall.arg[1] = (unsigned long) op;
 
-    if ( (ret = do_xen_hypercall(xc_handle, &hypercall)) < 0 )
+    if ( (ret = do_xen_hypercall(xch, &hypercall)) < 0 )
     {
         if ( errno == EACCES )
             DPRINTF("physdev operation failed -- need to"
@@ -135,7 +139,7 @@ out1:
     return ret;
 }
 
-static inline int do_domctl(int xc_handle, struct xen_domctl *domctl)
+static inline int do_domctl(xc_interface *xch, struct xen_domctl *domctl)
 {
     int ret = -1;
     DECLARE_HYPERCALL;
@@ -151,7 +155,7 @@ static inline int do_domctl(int xc_handle, struct xen_domctl *domctl)
     hypercall.op     = __HYPERVISOR_domctl;
     hypercall.arg[0] = (unsigned long)domctl;
 
-    if ( (ret = do_xen_hypercall(xc_handle, &hypercall)) < 0 )
+    if ( (ret = do_xen_hypercall(xch, &hypercall)) < 0 )
     {
         if ( errno == EACCES )
             DPRINTF("domctl operation failed -- need to"
@@ -164,7 +168,7 @@ static inline int do_domctl(int xc_handle, struct xen_domctl *domctl)
     return ret;
 }
 
-static inline int do_sysctl(int xc_handle, struct xen_sysctl *sysctl)
+static inline int do_sysctl(xc_interface *xch, struct xen_sysctl *sysctl)
 {
     int ret = -1;
     DECLARE_HYPERCALL;
@@ -180,7 +184,7 @@ static inline int do_sysctl(int xc_handle, struct xen_sysctl *sysctl)
     hypercall.op     = __HYPERVISOR_sysctl;
     hypercall.arg[0] = (unsigned long)sysctl;
 
-    if ( (ret = do_xen_hypercall(xc_handle, &hypercall)) < 0 )
+    if ( (ret = do_xen_hypercall(xch, &hypercall)) < 0 )
     {
         if ( errno == EACCES )
             DPRINTF("sysctl operation failed -- need to"
@@ -193,18 +197,21 @@ static inline int do_sysctl(int xc_handle, struct xen_sysctl *sysctl)
     return ret;
 }
 
-void *xc_map_foreign_ranges(int xc_handle, uint32_t dom,
+int xc_interface_open_core(xc_interface *xch); /* returns fd, logs errors */
+int xc_interface_close_core(xc_interface *xch, int fd); /* no logging */
+
+void *xc_map_foreign_ranges(xc_interface *xch, uint32_t dom,
                             size_t size, int prot, size_t chunksize,
                             privcmd_mmap_entry_t entries[], int nentries);
 
-int xc_get_pfn_type_batch(int xc_handle, uint32_t dom,
+int xc_get_pfn_type_batch(xc_interface *xch, uint32_t dom,
                           unsigned int num, xen_pfn_t *);
 
 void bitmap_64_to_byte(uint8_t *bp, const uint64_t *lp, int nbits);
 void bitmap_byte_to_64(uint64_t *lp, const uint8_t *bp, int nbits);
 
 /* Optionally flush file to disk and discard page cache */
-void discard_file_cache(int fd, int flush);
+void discard_file_cache(xc_interface *xch, int fd, int flush);
 
 #define MAX_MMU_UPDATES 1024
 struct xc_mmu {
@@ -213,10 +220,10 @@ struct xc_mmu {
     domid_t      subject;
 };
 /* Structure returned by xc_alloc_mmu_updates must be free()'ed by caller. */
-struct xc_mmu *xc_alloc_mmu_updates(int xc_handle, domid_t dom);
-int xc_add_mmu_update(int xc_handle, struct xc_mmu *mmu,
+struct xc_mmu *xc_alloc_mmu_updates(xc_interface *xch, domid_t dom);
+int xc_add_mmu_update(xc_interface *xch, struct xc_mmu *mmu,
                    unsigned long long ptr, unsigned long long val);
-int xc_flush_mmu_updates(int xc_handle, struct xc_mmu *mmu);
+int xc_flush_mmu_updates(xc_interface *xch, struct xc_mmu *mmu);
 
 /* Return 0 on success; -1 on error. */
 int read_exact(int fd, void *data, size_t size);
@@ -226,5 +233,8 @@ int xc_ffs8(uint8_t x);
 int xc_ffs16(uint16_t x);
 int xc_ffs32(uint32_t x);
 int xc_ffs64(uint64_t x);
+
+#define DOMPRINTF(fmt, args...) xc_dom_printf(dom->xch, fmt, ## args)
+#define DOMPRINTF_CALLED(xch) xc_dom_printf((xch), "%s: called", __FUNCTION__)
 
 #endif /* __XC_PRIVATE_H__ */

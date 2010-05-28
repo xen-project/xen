@@ -10,20 +10,21 @@
 
 int main(int argc, char **argv)
 {
-    int xc_fd, domid, port, rc;
+    xc_interface *xch;
+    int domid, port, rc;
     xc_evtchn_status_t status;
 
     domid = (argc > 1) ? strtol(argv[1], NULL, 10) : 0;
 
-    xc_fd = xc_interface_open();
-    if ( xc_fd < 0 )
+    xch = xc_interface_open(0,0,0);
+    if ( !xch )
         errx(1, "failed to open control interface");
 
     for ( port = 0; ; port++ )
     {
         status.dom = domid;
         status.port = port;
-        rc = xc_evtchn_status(xc_fd, &status);
+        rc = xc_evtchn_status(xch, &status);
         if ( rc < 0 )
             break;
 
@@ -59,7 +60,7 @@ int main(int argc, char **argv)
         printf("\n");
     }
 
-    xc_interface_close(xc_fd);
+    xc_interface_close(xch);
 
     return 0;
 }

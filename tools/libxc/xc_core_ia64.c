@@ -67,7 +67,7 @@ xc_core_arch_auto_translated_physmap(const xc_dominfo_t *info)
 
 /* see setup_guest() @ xc_linux_build.c */
 static int
-memory_map_get_old_domu(int xc_handle, xc_dominfo_t *info,
+memory_map_get_old_domu(xc_interface *xch, xc_dominfo_t *info,
                         shared_info_any_t *live_shinfo,
                         xc_core_memory_map_t **mapp, unsigned int *nr_entries)
 {
@@ -95,7 +95,7 @@ out:
 
 /* see setup_guest() @ xc_ia64_hvm_build.c */
 static int
-memory_map_get_old_hvm(int xc_handle, xc_dominfo_t *info, 
+memory_map_get_old_hvm(xc_interface *xch, xc_dominfo_t *info, 
                        shared_info_any_t *live_shinfo,
                        xc_core_memory_map_t **mapp, unsigned int *nr_entries)
 {
@@ -154,21 +154,21 @@ out:
 }
 
 static int
-memory_map_get_old(int xc_handle, xc_dominfo_t *info, 
+memory_map_get_old(xc_interface *xch, xc_dominfo_t *info, 
                    shared_info_any_t *live_shinfo,
                    xc_core_memory_map_t **mapp, unsigned int *nr_entries)
 {
     if ( info->hvm )
-        return memory_map_get_old_hvm(xc_handle, info, live_shinfo,
+        return memory_map_get_old_hvm(xch, info, live_shinfo,
                                       mapp, nr_entries);
     if ( live_shinfo == NULL )
         return -1;
-    return memory_map_get_old_domu(xc_handle, info, live_shinfo,
+    return memory_map_get_old_domu(xch, info, live_shinfo,
                                    mapp, nr_entries);
 }
 
 int
-xc_core_arch_memory_map_get(int xc_handle,
+xc_core_arch_memory_map_get(xc_interface *xch,
                             struct xc_core_arch_context *arch_ctxt,
                             xc_dominfo_t *info,
                             shared_info_any_t *live_shinfo,
@@ -191,7 +191,7 @@ xc_core_arch_memory_map_get(int xc_handle,
     }
 
     /* copy before use in case someone updating them */
-    if (xc_ia64_copy_memmap(xc_handle, info->domid, &live_shinfo->s,
+    if (xc_ia64_copy_memmap(xch, info->domid, &live_shinfo->s,
                             &memmap_info, NULL)) {
         goto old;
     }
@@ -223,7 +223,7 @@ xc_core_arch_memory_map_get(int xc_handle,
     }
     ret = 0;
 
-    xc_ia64_p2m_map(&arch_ctxt->p2m_table, xc_handle, info->domid,
+    xc_ia64_p2m_map(&arch_ctxt->p2m_table, xch, info->domid,
                     memmap_info, 0);
     if ( memmap_info != NULL )
         free(memmap_info);
@@ -232,11 +232,11 @@ xc_core_arch_memory_map_get(int xc_handle,
     
 old:
     DPRINTF("Falling back old method.\n");
-    return memory_map_get_old(xc_handle, info, live_shinfo, mapp, nr_entries);
+    return memory_map_get_old(xch, info, live_shinfo, mapp, nr_entries);
 }
 
 int
-xc_core_arch_map_p2m(int xc_handle, unsigned int guest_width, xc_dominfo_t *info,
+xc_core_arch_map_p2m(xc_interface *xch, unsigned int guest_width, xc_dominfo_t *info,
                      shared_info_any_t *live_shinfo, xen_pfn_t **live_p2m,
                      unsigned long *pfnp)
 {
@@ -273,7 +273,7 @@ xc_core_arch_context_free(struct xc_core_arch_context* arch_ctxt)
 int
 xc_core_arch_context_get(struct xc_core_arch_context* arch_ctxt,
                          vcpu_guest_context_any_t* ctxt_any,
-                         int xc_handle, uint32_t domid)
+                         xc_interface *xch, uint32_t domid)
 {
     vcpu_guest_context_t *ctxt = &ctxt_any->c;
     mapped_regs_t* mapped_regs;
@@ -302,7 +302,7 @@ xc_core_arch_context_get(struct xc_core_arch_context* arch_ctxt,
         arch_ctxt->mapped_regs = new;
     }
 
-    mapped_regs = xc_map_foreign_range(xc_handle, domid,
+    mapped_regs = xc_map_foreign_range(xch, domid,
                                        arch_ctxt->mapped_regs_size,
                                        PROT_READ, ctxt->privregs_pfn);
     if ( mapped_regs == NULL )

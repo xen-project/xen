@@ -38,18 +38,32 @@ static PyObject *xc_error_obj, *zero;
 
 typedef struct {
     PyObject_HEAD;
-    int xc_handle;
+    xc_interface *xc_handle;
 } XcObject;
 
 
 static PyObject *dom_op(XcObject *self, PyObject *args,
-                        int (*fn)(int, uint32_t));
+                        int (*fn)(xc_interface *, uint32_t));
 
-static PyObject *pyxc_error_to_exception(void)
+static PyObject *pyxc_error_to_exception(xc_interface *xch)
 {
     PyObject *pyerr;
-    const xc_error *err = xc_get_last_error();
-    const char *desc = xc_error_code_to_desc(err->code);
+    static xc_error err_buf;
+    const char *desc;
+    const xc_error *err;
+
+    if (xch) {
+        err = xc_get_last_error(xch);
+    } else {
+        snprintf(err_buf.message, sizeof(err_buf.message),
+                 "xc_interface_open failed: %s",
+                 strerror(errno));
+        err_buf.message[sizeof(err_buf)-1] = 0;
+        err_buf.code = XC_INTERNAL_ERROR;
+        err = &err_buf;
+    }
+
+    desc = xc_error_code_to_desc(err->code);
 
     if ( err->code == XC_ERROR_NONE )
         return PyErr_SetFromErrno(xc_error_obj);
@@ -59,7 +73,7 @@ static PyObject *pyxc_error_to_exception(void)
     else
         pyerr = Py_BuildValue("(is)", err->code, desc);
 
-    xc_clear_last_error();
+    xc_clear_last_error(xch);
 
     if ( pyerr != NULL )
     {
@@ -82,15 +96,10 @@ static PyObject *pyxc_domain_dumpcore(XcObject *self, PyObject *args)
         return NULL;
 
     if ( xc_domain_dumpcore(self->xc_handle, dom, corefile) != 0 )
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
     
     Py_INCREF(zero);
     return zero;
-}
-
-static PyObject *pyxc_handle(XcObject *self)
-{
-    return PyInt_FromLong(self->xc_handle);
 }
 
 static PyObject *pyxc_domain_create(XcObject *self,
@@ -126,11 +135,11 @@ static PyObject *pyxc_domain_create(XcObject *self,
 
     if ( (ret = xc_domain_create(self->xc_handle, ssidref,
                                  handle, flags, &dom)) < 0 )
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
 
     if ( target )
         if ( (ret = xc_domain_set_target(self->xc_handle, dom, target)) < 0 )
-            return pyxc_error_to_exception();
+            return pyxc_error_to_exception(self->xc_handle);
 
 
     return PyInt_FromLong(dom);
@@ -149,7 +158,7 @@ static PyObject *pyxc_domain_max_vcpus(XcObject *self, PyObject *args)
       return NULL;
 
     if (xc_domain_max_vcpus(self->xc_handle, dom, max) != 0)
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
     
     Py_INCREF(zero);
     return zero;
@@ -188,7 +197,7 @@ static PyObject *pyxc_domain_shutdown(XcObject *self, PyObject *args)
       return NULL;
 
     if ( xc_domain_shutdown(self->xc_handle, dom, reason) != 0 )
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
     
     Py_INCREF(zero);
     return zero;
@@ -203,7 +212,7 @@ static PyObject *pyxc_domain_resume(XcObject *self, PyObject *args)
         return NULL;
 
     if ( xc_domain_resume(self->xc_handle, dom, fast) != 0 )
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
 
     Py_INCREF(zero);
     return zero;
@@ -228,14 +237,14 @@ static PyObject *pyxc_vcpu_setaffinity(XcObject *self,
         return NULL;
 
     if ( xc_physinfo(self->xc_handle, &info) != 0 )
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
   
     nr_cpus = info.nr_cpus;
 
     size = (nr_cpus + cpumap_size * 8 - 1)/ (cpumap_size * 8);
     cpumap = malloc(cpumap_size * size);
     if(cpumap == NULL)
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
 
     if ( (cpulist != NULL) && PyList_Check(cpulist) )
     {
@@ -253,7 +262,7 @@ static PyObject *pyxc_vcpu_setaffinity(XcObject *self,
     if ( xc_vcpu_setaffinity(self->xc_handle, dom, vcpu, cpumap, size * cpumap_size) != 0 )
     {
         free(cpumap);
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
     }
     Py_INCREF(zero);
     free(cpumap); 
@@ -285,7 +294,7 @@ static PyObject *pyxc_domain_sethandle(XcObject *self, PyObject *args)
     }
 
     if (xc_domain_sethandle(self->xc_handle, dom, handle) < 0)
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
     
     Py_INCREF(zero);
     return zero;
@@ -321,7 +330,7 @@ static PyObject *pyxc_domain_getinfo(XcObject *self,
     if (nr_doms < 0)
     {
         free(info);
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
     }
 
     list = PyList_New(nr_doms);
@@ -388,23 +397,23 @@ static PyObject *pyxc_vcpu_getinfo(XcObject *self,
         return NULL;
 
     if ( xc_physinfo(self->xc_handle, &pinfo) != 0 ) 
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
     nr_cpus = pinfo.nr_cpus;
 
     rc = xc_vcpu_getinfo(self->xc_handle, dom, vcpu, &info);
     if ( rc < 0 )
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
 
     size = (nr_cpus + cpumap_size * 8 - 1)/ (cpumap_size * 8); 
     if((cpumap = malloc(cpumap_size * size)) == NULL)
-        return pyxc_error_to_exception(); 
+        return pyxc_error_to_exception(self->xc_handle); 
     memset(cpumap, 0, cpumap_size * size);
 
     rc = xc_vcpu_getaffinity(self->xc_handle, dom, vcpu, cpumap, cpumap_size * size);
     if ( rc < 0 )
     {
         free(cpumap);
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
     }
 
     info_dict = Py_BuildValue("{s:i,s:i,s:i,s:L,s:i}",
@@ -440,9 +449,10 @@ static PyObject *pyxc_getBitSize(XcObject *self,
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "sss", kwd_list,
                                       &image, &cmdline, &features) )
         return NULL;
-    xc_get_bit_size(image, cmdline, features, &type);
+
+    xc_get_bit_size(self->xc_handle, image, cmdline, features, &type);
     if (type < 0)
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
     info_type = Py_BuildValue("{s:i}",
                               "type", type);
     return info_type;
@@ -481,9 +491,9 @@ static PyObject *pyxc_linux_build(XcObject *self,
                                       &features, &vhpt, &superpages) )
         return NULL;
 
-    xc_dom_loginit();
-    if (!(dom = xc_dom_allocate(cmdline, features)))
-        return pyxc_error_to_exception();
+    xc_dom_loginit(self->xc_handle);
+    if (!(dom = xc_dom_allocate(self->xc_handle, cmdline, features)))
+        return pyxc_error_to_exception(self->xc_handle);
 
     /* for IA64 */
     dom->vhpt_size_log2 = vhpt;
@@ -537,7 +547,7 @@ static PyObject *pyxc_linux_build(XcObject *self,
 
   out:
     xc_dom_release(dom);
-    return pyxc_error_to_exception();
+    return pyxc_error_to_exception(self->xc_handle);
 }
 
 static PyObject *pyxc_get_hvm_param(XcObject *self,
@@ -554,7 +564,7 @@ static PyObject *pyxc_get_hvm_param(XcObject *self,
         return NULL;
 
     if ( xc_get_hvm_param(self->xc_handle, dom, param, &value) != 0 )
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
 
     return PyLong_FromUnsignedLong(value);
 
@@ -574,7 +584,7 @@ static PyObject *pyxc_set_hvm_param(XcObject *self,
         return NULL;
 
     if ( xc_set_hvm_param(self->xc_handle, dom, param, value) != 0 )
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
 
     Py_INCREF(zero);
     return zero;
@@ -734,7 +744,7 @@ static PyObject *pyxc_get_device_group(XcObject *self,
     if ( rc < 0 )
     {
         free(sdev_array); 
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
     }
 
     if ( !num_sdevs )
@@ -855,7 +865,7 @@ static PyObject *pyxc_dom_check_cpuid(XcObject *self,
 
     if ( xc_cpuid_check(self->xc_handle, input,
                         (const char **)regs, regs_transform) )
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
 
     return pyxc_create_cpuid_dict(regs_transform);
 }
@@ -869,7 +879,7 @@ static PyObject *pyxc_dom_set_policy_cpuid(XcObject *self,
         return NULL;
 
     if ( xc_cpuid_apply_policy(self->xc_handle, domid) )
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
 
     Py_INCREF(zero);
     return zero;
@@ -895,7 +905,7 @@ static PyObject *pyxc_dom_set_cpuid(XcObject *self,
 
     if ( xc_cpuid_set(self->xc_handle, domid, input, (const char **)regs,
                       regs_transform) )
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
 
     return pyxc_create_cpuid_dict(regs_transform);
 }
@@ -910,7 +920,7 @@ static PyObject *pyxc_dom_set_machine_address_size(XcObject *self,
 	return NULL;
 
     if (xc_domain_set_machine_address_size(self->xc_handle, dom, width) != 0)
-	return pyxc_error_to_exception();
+	return pyxc_error_to_exception(self->xc_handle);
 
     Py_INCREF(zero);
     return zero;
@@ -926,7 +936,7 @@ static PyObject *pyxc_dom_suppress_spurious_page_faults(XcObject *self,
 	return NULL;
 
     if (xc_domain_suppress_spurious_page_faults(self->xc_handle, dom) != 0)
-	return pyxc_error_to_exception();
+	return pyxc_error_to_exception(self->xc_handle);
 
     Py_INCREF(zero);
     return zero;
@@ -986,7 +996,7 @@ static PyObject *pyxc_hvm_build(XcObject *self,
 
     if ( xc_hvm_build_target_mem(self->xc_handle, dom, memsize,
                                  target, image) != 0 )
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
 
 #if !defined(__ia64__)
     /* Fix up the HVM info table. */
@@ -1023,7 +1033,7 @@ static PyObject *pyxc_evtchn_alloc_unbound(XcObject *self,
         return NULL;
 
     if ( (port = xc_evtchn_alloc_unbound(self->xc_handle, dom, remote_dom)) < 0 )
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
 
     return PyInt_FromLong(port);
 }
@@ -1040,7 +1050,7 @@ static PyObject *pyxc_evtchn_reset(XcObject *self,
         return NULL;
 
     if ( xc_evtchn_reset(self->xc_handle, dom) < 0 )
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
 
     Py_INCREF(zero);
     return zero;
@@ -1061,7 +1071,7 @@ static PyObject *pyxc_physdev_map_pirq(PyObject *self,
         return NULL;
     ret = xc_physdev_map_pirq(xc->xc_handle, dom, index, &pirq);
     if ( ret != 0 )
-          return pyxc_error_to_exception();
+          return pyxc_error_to_exception(xc->xc_handle);
     return PyLong_FromUnsignedLong(pirq);
 }
 
@@ -1081,7 +1091,7 @@ static PyObject *pyxc_physdev_pci_access_modify(XcObject *self,
     ret = xc_physdev_pci_access_modify(
         self->xc_handle, dom, bus, dev, func, enable);
     if ( ret != 0 )
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
 
     Py_INCREF(zero);
     return zero;
@@ -1107,7 +1117,7 @@ static PyObject *pyxc_readconsolering(XcObject *self,
     ret = xc_readconsolering(self->xc_handle, &str, &count, clear,
                              incremental, &index);
     if ( ret < 0 )
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
 
     while ( !incremental && count == size )
     {
@@ -1160,7 +1170,7 @@ static PyObject *pyxc_physinfo(XcObject *self)
     const char *virtcap_names[] = { "hvm", "hvm_directio" };
 
     if ( xc_physinfo(self->xc_handle, &pinfo) != 0 )
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
 
     p = cpu_cap;
     *p = '\0';
@@ -1206,7 +1216,7 @@ static PyObject *pyxc_topologyinfo(XcObject *self)
     tinfo.max_cpu_index = MAX_CPU_INDEX;
 
     if ( xc_topologyinfo(self->xc_handle, &tinfo) != 0 )
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
 
     max_cpu_index = tinfo.max_cpu_index;
     if ( max_cpu_index > MAX_CPU_INDEX )
@@ -1286,7 +1296,7 @@ static PyObject *pyxc_numainfo(XcObject *self)
     ninfo.max_node_index = MAX_NODE_INDEX;
 
     if ( xc_numainfo(self->xc_handle, &ninfo) != 0 )
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
 
     max_node_index = ninfo.max_node_index;
     if ( max_node_index > MAX_NODE_INDEX )
@@ -1371,28 +1381,28 @@ static PyObject *pyxc_xeninfo(XcObject *self)
     xen_version = xc_version(self->xc_handle, XENVER_version, NULL);
 
     if ( xc_version(self->xc_handle, XENVER_extraversion, &xen_extra) != 0 )
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
 
     if ( xc_version(self->xc_handle, XENVER_compile_info, &xen_cc) != 0 )
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
 
     if ( xc_version(self->xc_handle, XENVER_changeset, &xen_chgset) != 0 )
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
 
     if ( xc_version(self->xc_handle, XENVER_capabilities, &xen_caps) != 0 )
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
 
     if ( xc_version(self->xc_handle, XENVER_platform_parameters, &p_parms) != 0 )
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
 
     if ( xc_version(self->xc_handle, XENVER_commandline, &xen_commandline) != 0 )
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
 
     snprintf(str, sizeof(str), "virt_start=0x%lx", p_parms.virt_start);
 
     xen_pagesize = xc_version(self->xc_handle, XENVER_pagesize, NULL);
     if (xen_pagesize < 0 )
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
 
     return Py_BuildValue("{s:i,s:i,s:s,s:s,s:i,s:s,s:s,s:s,s:s,s:s,s:s,s:s}",
                          "xen_major", xen_version >> 16,
@@ -1426,7 +1436,7 @@ static PyObject *pyxc_sedf_domain_set(XcObject *self,
         return NULL;
    if ( xc_sedf_domain_set(self->xc_handle, domid, period,
                            slice, latency, extratime,weight) != 0 )
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
 
     Py_INCREF(zero);
     return zero;
@@ -1443,7 +1453,7 @@ static PyObject *pyxc_sedf_domain_get(XcObject *self, PyObject *args)
     
     if (xc_sedf_domain_get(self->xc_handle, domid, &period,
                            &slice,&latency,&extratime,&weight))
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
 
     return Py_BuildValue("{s:i,s:L,s:L,s:L,s:i,s:i}",
                          "domid",    domid,
@@ -1471,7 +1481,7 @@ static PyObject *pyxc_shadow_control(PyObject *self,
     
     if ( xc_shadow_control(xc->xc_handle, dom, op, NULL, 0, NULL, 0, NULL) 
          < 0 )
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(xc->xc_handle);
     
     Py_INCREF(zero);
     return zero;
@@ -1501,7 +1511,7 @@ static PyObject *pyxc_shadow_mem_control(PyObject *self,
         op = XEN_DOMCTL_SHADOW_OP_SET_ALLOCATION;
     }
     if ( xc_shadow_control(xc->xc_handle, dom, op, NULL, 0, &mb, 0, NULL) < 0 )
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(xc->xc_handle);
     
     mbarg = mb;
     return Py_BuildValue("i", mbarg);
@@ -1537,7 +1547,7 @@ static PyObject *pyxc_sched_credit_domain_set(XcObject *self,
     sdom.cap = cap;
 
     if ( xc_sched_credit_domain_set(self->xc_handle, domid, &sdom) != 0 )
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
 
     Py_INCREF(zero);
     return zero;
@@ -1552,7 +1562,7 @@ static PyObject *pyxc_sched_credit_domain_get(XcObject *self, PyObject *args)
         return NULL;
     
     if ( xc_sched_credit_domain_get(self->xc_handle, domid, &sdom) != 0 )
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
 
     return Py_BuildValue("{s:H,s:H}",
                          "weight",  sdom.weight,
@@ -1577,7 +1587,7 @@ static PyObject *pyxc_sched_credit2_domain_set(XcObject *self,
     sdom.weight = weight;
 
     if ( xc_sched_credit2_domain_set(self->xc_handle, domid, &sdom) != 0 )
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
 
     Py_INCREF(zero);
     return zero;
@@ -1592,7 +1602,7 @@ static PyObject *pyxc_sched_credit2_domain_get(XcObject *self, PyObject *args)
         return NULL;
 
     if ( xc_sched_credit2_domain_get(self->xc_handle, domid, &sdom) != 0 )
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
 
     return Py_BuildValue("{s:H}",
                          "weight",  sdom.weight);
@@ -1607,7 +1617,7 @@ static PyObject *pyxc_domain_setmaxmem(XcObject *self, PyObject *args)
         return NULL;
 
     if (xc_domain_setmaxmem(self->xc_handle, dom, maxmem_kb) != 0)
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
     
     Py_INCREF(zero);
     return zero;
@@ -1625,7 +1635,7 @@ static PyObject *pyxc_domain_set_target_mem(XcObject *self, PyObject *args)
 
     if (xc_domain_memory_set_pod_target(self->xc_handle, dom, mem_pages,
                                         NULL, NULL, NULL) != 0)
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
     
     Py_INCREF(zero);
     return zero;
@@ -1640,7 +1650,7 @@ static PyObject *pyxc_domain_set_memmap_limit(XcObject *self, PyObject *args)
         return NULL;
 
     if ( xc_domain_set_memmap_limit(self->xc_handle, dom, maplimit_kb) != 0 )
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
     
     Py_INCREF(zero);
     return zero;
@@ -1662,7 +1672,7 @@ static PyObject *pyxc_domain_ioport_permission(XcObject *self,
     ret = xc_domain_ioport_permission(
         self->xc_handle, dom, first_port, nr_ports, allow_access);
     if ( ret != 0 )
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
 
     Py_INCREF(zero);
     return zero;
@@ -1685,7 +1695,7 @@ static PyObject *pyxc_domain_irq_permission(PyObject *self,
     ret = xc_domain_irq_permission(
         xc->xc_handle, dom, pirq, allow_access);
     if ( ret != 0 )
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(xc->xc_handle);
 
     Py_INCREF(zero);
     return zero;
@@ -1708,7 +1718,7 @@ static PyObject *pyxc_domain_iomem_permission(PyObject *self,
     ret = xc_domain_iomem_permission(
         xc->xc_handle, dom, first_pfn, nr_pfns, allow_access);
     if ( ret != 0 )
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(xc->xc_handle);
 
     Py_INCREF(zero);
     return zero;
@@ -1723,7 +1733,7 @@ static PyObject *pyxc_domain_set_time_offset(XcObject *self, PyObject *args)
         return NULL;
 
     if (xc_domain_set_time_offset(self->xc_handle, dom, offset) != 0)
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
 
     Py_INCREF(zero);
     return zero;
@@ -1737,7 +1747,7 @@ static PyObject *pyxc_domain_set_tsc_info(XcObject *self, PyObject *args)
         return NULL;
 
     if (xc_domain_set_tsc_info(self->xc_handle, dom, tsc_mode, 0, 0, 0) != 0)
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
 
     Py_INCREF(zero);
     return zero;
@@ -1751,7 +1761,7 @@ static PyObject *pyxc_domain_disable_migrate(XcObject *self, PyObject *args)
         return NULL;
 
     if (xc_domain_disable_migrate(self->xc_handle, dom) != 0)
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
 
     Py_INCREF(zero);
     return zero;
@@ -1771,7 +1781,7 @@ static PyObject *pyxc_domain_send_trigger(XcObject *self,
         return NULL;
 
     if (xc_domain_send_trigger(self->xc_handle, dom, trigger, vcpu) != 0)
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
 
     Py_INCREF(zero);
     return zero;
@@ -1789,14 +1799,14 @@ static PyObject *pyxc_send_debug_keys(XcObject *self,
         return NULL;
 
     if ( xc_send_debug_keys(self->xc_handle, keys) != 0 )
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
 
     Py_INCREF(zero);
     return zero;
 }
 
 static PyObject *dom_op(XcObject *self, PyObject *args,
-                        int (*fn)(int, uint32_t))
+                        int (*fn)(xc_interface*, uint32_t))
 {
     uint32_t dom;
 
@@ -1804,7 +1814,7 @@ static PyObject *dom_op(XcObject *self, PyObject *args,
         return NULL;
 
     if (fn(self->xc_handle, dom) != 0)
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
 
     Py_INCREF(zero);
     return zero;
@@ -1888,7 +1898,7 @@ static PyObject *pyxc_dom_set_memshr(XcObject *self, PyObject *args)
         return NULL;
 
     if (xc_memshr_control(self->xc_handle, dom, enable) != 0)
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
     
     Py_INCREF(zero);
     return zero;
@@ -1927,7 +1937,7 @@ static PyObject *pyxc_cpupool_create(XcObject *self,
         return NULL;
 
     if ( xc_cpupool_create(self->xc_handle, &cpupool, sched) < 0 )
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
 
     return PyInt_FromLong(cpupool);
 }
@@ -1941,7 +1951,7 @@ static PyObject *pyxc_cpupool_destroy(XcObject *self,
         return NULL;
 
     if (xc_cpupool_destroy(self->xc_handle, cpupool) != 0)
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
 
     Py_INCREF(zero);
     return zero;
@@ -1972,7 +1982,7 @@ static PyObject *pyxc_cpupool_getinfo(XcObject *self,
     if (nr_pools < 0)
     {
         free(info);
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
     }
 
     list = PyList_New(nr_pools);
@@ -2013,7 +2023,7 @@ static PyObject *pyxc_cpupool_addcpu(XcObject *self,
         return NULL;
 
     if (xc_cpupool_addcpu(self->xc_handle, cpupool, cpu) != 0)
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
 
     Py_INCREF(zero);
     return zero;
@@ -2033,7 +2043,7 @@ static PyObject *pyxc_cpupool_removecpu(XcObject *self,
         return NULL;
 
     if (xc_cpupool_removecpu(self->xc_handle, cpupool, cpu) != 0)
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
 
     Py_INCREF(zero);
     return zero;
@@ -2052,7 +2062,7 @@ static PyObject *pyxc_cpupool_movedomain(XcObject *self,
         return NULL;
 
     if (xc_cpupool_movedomain(self->xc_handle, cpupool, domid) != 0)
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
 
     Py_INCREF(zero);
     return zero;
@@ -2063,18 +2073,12 @@ static PyObject *pyxc_cpupool_freeinfo(XcObject *self)
     uint64_t cpumap;
 
     if (xc_cpupool_freeinfo(self->xc_handle, &cpumap) != 0)
-        return pyxc_error_to_exception();
+        return pyxc_error_to_exception(self->xc_handle);
 
     return cpumap_to_cpulist(cpumap);
 }
 
 static PyMethodDef pyxc_methods[] = {
-    { "handle",
-      (PyCFunction)pyxc_handle,
-      METH_NOARGS, "\n"
-      "Query the xc control interface file descriptor.\n\n"
-      "Returns: [int] file descriptor\n" },
-
     { "domain_create", 
       (PyCFunction)pyxc_domain_create, 
       METH_VARARGS | METH_KEYWORDS, "\n"
@@ -2689,7 +2693,7 @@ static PyObject *PyXc_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     if (self == NULL)
         return NULL;
 
-    self->xc_handle = -1;
+    self->xc_handle = NULL;
 
     return (PyObject *)self;
 }
@@ -2697,8 +2701,8 @@ static PyObject *PyXc_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 static int
 PyXc_init(XcObject *self, PyObject *args, PyObject *kwds)
 {
-    if ((self->xc_handle = xc_interface_open()) == -1) {
-        pyxc_error_to_exception();
+    if ((self->xc_handle = xc_interface_open(0,0,0)) == 0) {
+        pyxc_error_to_exception(0);
         return -1;
     }
 
@@ -2707,9 +2711,9 @@ PyXc_init(XcObject *self, PyObject *args, PyObject *kwds)
 
 static void PyXc_dealloc(XcObject *self)
 {
-    if (self->xc_handle != -1) {
+    if (self->xc_handle) {
         xc_interface_close(self->xc_handle);
-        self->xc_handle = -1;
+        self->xc_handle = NULL;
     }
 
     self->ob_type->tp_free((PyObject *)self);

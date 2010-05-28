@@ -100,8 +100,8 @@ xenstat_handle *xenstat_init(void)
 	}
 #endif
 
-	handle->xc_handle = xc_interface_open();
-	if (handle->xc_handle == -1) {
+	handle->xc_handle = xc_interface_open(0,0,0);
+	if (!handle->xc_handle) {
 		perror("xc_interface_open");
 		free(handle);
 		return NULL;

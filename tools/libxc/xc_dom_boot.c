@@ -34,33 +34,34 @@ static int setup_hypercall_page(struct xc_dom_image *dom)
     pfn = (dom->parms.virt_hypercall - dom->parms.virt_base)
         >> XC_DOM_PAGE_SHIFT(dom);
 
-    xc_dom_printf("%s: vaddr=0x%" PRIx64 " pfn=0x%" PRIpfn "\n", __FUNCTION__,
+    DOMPRINTF("%s: vaddr=0x%" PRIx64 " pfn=0x%" PRIpfn "", __FUNCTION__,
                   dom->parms.virt_hypercall, pfn);
     domctl.cmd = XEN_DOMCTL_hypercall_init;
     domctl.domain = dom->guest_domid;
     domctl.u.hypercall_init.gmfn = xc_dom_p2m_guest(dom, pfn);
-    rc = do_domctl(dom->guest_xc, &domctl);
+    rc = do_domctl(dom->xch, &domctl);
     if ( rc != 0 )
-        xc_dom_panic(XC_INTERNAL_ERROR, "%s: HYPERCALL_INIT failed (rc=%d)\n",
+        xc_dom_panic(dom->xch,
+                     XC_INTERNAL_ERROR, "%s: HYPERCALL_INIT failed (rc=%d)",
                      __FUNCTION__, rc);
     return rc;
 }
 
-static int launch_vm(int xc, domid_t domid, void *ctxt)
+static int launch_vm(xc_interface *xch, domid_t domid, void *ctxt)
 {
     DECLARE_DOMCTL;
     int rc;
 
-    xc_dom_printf("%s: called, ctxt=%p\n", __FUNCTION__, ctxt);
+    xc_dom_printf(xch, "%s: called, ctxt=%p", __FUNCTION__, ctxt);
     memset(&domctl, 0, sizeof(domctl));
     domctl.cmd = XEN_DOMCTL_setvcpucontext;
     domctl.domain = domid;
     domctl.u.vcpucontext.vcpu = 0;
     set_xen_guest_handle(domctl.u.vcpucontext.ctxt, ctxt);
-    rc = do_domctl(xc, &domctl);
+    rc = do_domctl(xch, &domctl);
     if ( rc != 0 )
-        xc_dom_panic(XC_INTERNAL_ERROR,
-                     "%s: SETVCPUCONTEXT failed (rc=%d)\n", __FUNCTION__, rc);
+        xc_dom_panic(xch, XC_INTERNAL_ERROR,
+                     "%s: SETVCPUCONTEXT failed (rc=%d)", __FUNCTION__, rc);
     return rc;
 }
 
@@ -73,13 +74,13 @@ static int clear_page(struct xc_dom_image *dom, xen_pfn_t pfn)
         return 0;
 
     dst = xc_dom_p2m_host(dom, pfn);
-    xc_dom_printf("%s: pfn 0x%" PRIpfn ", mfn 0x%" PRIpfn "\n",
-                  __FUNCTION__, pfn, dst);
-    rc = xc_clear_domain_page(dom->guest_xc, dom->guest_domid, dst);
+    DOMPRINTF("%s: pfn 0x%" PRIpfn ", mfn 0x%" PRIpfn "",
+              __FUNCTION__, pfn, dst);
+    rc = xc_clear_domain_page(dom->xch, dom->guest_domid, dst);
     if ( rc != 0 )
-        xc_dom_panic(XC_INTERNAL_ERROR,
+        xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
                      "%s: xc_clear_domain_page failed (pfn 0x%" PRIpfn
-                     ", rc=%d)\n", __FUNCTION__, pfn, rc);
+                     ", rc=%d)", __FUNCTION__, pfn, rc);
     return rc;
 }
 
@@ -99,33 +100,33 @@ int xc_dom_compat_check(struct xc_dom_image *dom)
           item != NULL ; item = strtok_r(NULL, " ", &ptr) )
     {
         match = !strcmp(dom->guest_type, item);
-        xc_dom_printf("%s: supported guest type: %s%s\n", __FUNCTION__,
-                      item, match ? " <= matches" : "");
+        DOMPRINTF("%s: supported guest type: %s%s", __FUNCTION__,
+                  item, match ? " <= matches" : "");
         if ( match )
             found++;
     }
     if ( !found )
-        xc_dom_panic(XC_INVALID_KERNEL,
-                     "%s: guest type %s not supported by xen kernel, sorry\n",
+        xc_dom_panic(dom->xch, XC_INVALID_KERNEL,
+                     "%s: guest type %s not supported by xen kernel, sorry",
                      __FUNCTION__, dom->guest_type);
 
     return found;
 }
 
-int xc_dom_boot_xen_init(struct xc_dom_image *dom, int xc, domid_t domid)
+int xc_dom_boot_xen_init(struct xc_dom_image *dom, xc_interface *xch, domid_t domid)
 {
-    dom->guest_xc = xc;
+    dom->xch = xch;
     dom->guest_domid = domid;
 
-    dom->xen_version = xc_version(dom->guest_xc, XENVER_version, NULL);
-    if ( xc_version(xc, XENVER_capabilities, &dom->xen_caps) < 0 )
+    dom->xen_version = xc_version(xch, XENVER_version, NULL);
+    if ( xc_version(xch, XENVER_capabilities, &dom->xen_caps) < 0 )
     {
-        xc_dom_panic(XC_INTERNAL_ERROR, "can't get xen capabilities");
+        xc_dom_panic(xch, XC_INTERNAL_ERROR, "can't get xen capabilities");
         return -1;
     }
-    xc_dom_printf("%s: ver %d.%d, caps %s\n", __FUNCTION__,
-                  dom->xen_version >> 16, dom->xen_version & 0xff,
-                  dom->xen_caps);
+    DOMPRINTF("%s: ver %d.%d, caps %s", __FUNCTION__,
+              dom->xen_version >> 16, dom->xen_version & 0xff,
+              dom->xen_caps);
     return 0;
 }
 
@@ -133,13 +134,13 @@ int xc_dom_boot_mem_init(struct xc_dom_image *dom)
 {
     long rc;
 
-    xc_dom_printf("%s: called\n", __FUNCTION__);
+    DOMPRINTF_CALLED(dom->xch);
 
     rc = arch_setup_meminit(dom);
     if ( rc != 0 )
     {
-        xc_dom_panic(XC_OUT_OF_MEMORY,
-                     "%s: can't allocate low memory for domain\n",
+        xc_dom_panic(dom->xch, XC_OUT_OF_MEMORY,
+                     "%s: can't allocate low memory for domain",
                      __FUNCTION__);
         return rc;
     }
@@ -159,24 +160,24 @@ void *xc_dom_boot_domU_map(struct xc_dom_image *dom, xen_pfn_t pfn,
     entries = xc_dom_malloc(dom, count * sizeof(privcmd_mmap_entry_t));
     if ( entries == NULL )
     {
-        xc_dom_panic(XC_INTERNAL_ERROR,
+        xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
                      "%s: failed to mmap domU pages 0x%" PRIpfn "+0x%" PRIpfn
-                     " [malloc]\n", __FUNCTION__, pfn, count);
+                     " [malloc]", __FUNCTION__, pfn, count);
         return NULL;
     }
 
     for ( i = 0; i < count; i++ )
         entries[i].mfn = xc_dom_p2m_host(dom, pfn + i);
 
-    ptr = xc_map_foreign_ranges(dom->guest_xc, dom->guest_domid,
+    ptr = xc_map_foreign_ranges(dom->xch, dom->guest_domid,
                 count << page_shift, PROT_READ | PROT_WRITE, 1 << page_shift,
                 entries, count);
     if ( ptr == NULL )
     {
         err = errno;
-        xc_dom_panic(XC_INTERNAL_ERROR,
+        xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
                      "%s: failed to mmap domU pages 0x%" PRIpfn "+0x%" PRIpfn
-                     " [mmap, errno=%i (%s)]\n", __FUNCTION__, pfn, count,
+                     " [mmap, errno=%i (%s)]", __FUNCTION__, pfn, count,
                      err, strerror(err));
         return NULL;
     }
@@ -190,7 +191,7 @@ int xc_dom_boot_image(struct xc_dom_image *dom)
     vcpu_guest_context_any_t ctxt;
     int rc;
 
-    xc_dom_printf("%s: called\n", __FUNCTION__);
+    DOMPRINTF_CALLED(dom->xch);
 
     /* misc ia64 stuff*/
     if ( (rc = arch_setup_bootearly(dom)) != 0 )
@@ -199,17 +200,17 @@ int xc_dom_boot_image(struct xc_dom_image *dom)
     /* collect some info */
     domctl.cmd = XEN_DOMCTL_getdomaininfo;
     domctl.domain = dom->guest_domid;
-    rc = do_domctl(dom->guest_xc, &domctl);
+    rc = do_domctl(dom->xch, &domctl);
     if ( rc != 0 )
     {
-        xc_dom_panic(XC_INTERNAL_ERROR,
-                     "%s: getdomaininfo failed (rc=%d)\n", __FUNCTION__, rc);
+        xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
+                     "%s: getdomaininfo failed (rc=%d)", __FUNCTION__, rc);
         return rc;
     }
     if ( domctl.domain != dom->guest_domid )
     {
-        xc_dom_panic(XC_INTERNAL_ERROR,
-                     "%s: Huh? domid mismatch (%d != %d)\n", __FUNCTION__,
+        xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
+                     "%s: Huh? domid mismatch (%d != %d)", __FUNCTION__,
                      domctl.domain, dom->guest_domid);
         return -1;
     }
@@ -249,7 +250,7 @@ int xc_dom_boot_image(struct xc_dom_image *dom)
     if ( (rc = dom->arch_hooks->vcpu(dom, &ctxt)) != 0 )
         return rc;
     xc_dom_unmap_all(dom);
-    rc = launch_vm(dom->guest_xc, dom->guest_domid, &ctxt);
+    rc = launch_vm(dom->xch, dom->guest_domid, &ctxt);
 
     return rc;
 }

@@ -377,7 +377,8 @@ static void dump_viridian(void)
 
 int main(int argc, char **argv)
 {
-    int entry, domid, xch;
+    int entry, domid;
+    xc_interface *xch;
 
     struct hvm_save_descriptor desc;
 
@@ -387,8 +388,8 @@ int main(int argc, char **argv)
         exit(1);
     }
 
-    xch = xc_interface_open();
-    if ( xch < 0 )
+    xch = xc_interface_open(0,0,0);
+    if ( !xch )
     {
         fprintf(stderr, "Error: can't open libxc handle\n");
         exit(1);

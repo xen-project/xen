@@ -39,7 +39,7 @@
 **
 ** Returns 1 on success, 0 on failure.
 */
-static inline int get_platform_info(int xc_handle, uint32_t dom,
+static inline int get_platform_info(xc_interface *xch, uint32_t dom,
                                     /* OUT */ unsigned long *max_mfn,
                                     /* OUT */ unsigned long *hvirt_start,
                                     /* OUT */ unsigned int *pt_levels,
@@ -49,13 +49,13 @@ static inline int get_platform_info(int xc_handle, uint32_t dom,
     xen_platform_parameters_t xen_params;
     DECLARE_DOMCTL;
 
-    if (xc_version(xc_handle, XENVER_platform_parameters, &xen_params) != 0)
+    if (xc_version(xch, XENVER_platform_parameters, &xen_params) != 0)
         return 0;
 
-    if (xc_version(xc_handle, XENVER_capabilities, &xen_caps) != 0)
+    if (xc_version(xch, XENVER_capabilities, &xen_caps) != 0)
         return 0;
 
-    *max_mfn = xc_memory_op(xc_handle, XENMEM_maximum_ram_page, NULL);
+    *max_mfn = xc_memory_op(xch, XENMEM_maximum_ram_page, NULL);
 
     *hvirt_start = xen_params.virt_start;
 
@@ -63,7 +63,7 @@ static inline int get_platform_info(int xc_handle, uint32_t dom,
     domctl.domain = dom;
     domctl.cmd = XEN_DOMCTL_get_address_size;
 
-    if ( do_domctl(xc_handle, &domctl) != 0 )
+    if ( do_domctl(xch, &domctl) != 0 )
         return 0; 
 
     *guest_width = domctl.u.address_size.size / 8;

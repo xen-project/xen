@@ -29,7 +29,7 @@ static unsigned long p2m_size;
 static unsigned long nr_pfns;
 
 static int
-populate_page_if_necessary(int xc_handle, uint32_t dom, unsigned long gmfn,
+populate_page_if_necessary(xc_interface *xc_handle, uint32_t dom, unsigned long gmfn,
                            struct xen_ia64_p2m_table *p2m_table)
 {
     if (xc_ia64_p2m_present(p2m_table, gmfn))
@@ -39,7 +39,7 @@ populate_page_if_necessary(int xc_handle, uint32_t dom, unsigned long gmfn,
 }
 
 static int
-read_page(int xc_handle, int io_fd, uint32_t dom, unsigned long pfn)
+read_page(xc_interface *xc_handle, int io_fd, uint32_t dom, unsigned long pfn)
 {
     void *mem;
 
@@ -65,7 +65,7 @@ read_page(int xc_handle, int io_fd, uint32_t dom, unsigned long pfn)
  * pages here.
  */
 static int
-xc_ia64_recv_unallocated_list(int xc_handle, int io_fd, uint32_t dom,
+xc_ia64_recv_unallocated_list(xc_interface *xc_handle, int io_fd, uint32_t dom,
                               struct xen_ia64_p2m_table *p2m_table)
 {
     int rc = -1;
@@ -116,7 +116,7 @@ xc_ia64_recv_unallocated_list(int xc_handle, int io_fd, uint32_t dom,
 }
 
 static int
-xc_ia64_recv_vcpu_context(int xc_handle, int io_fd, uint32_t dom,
+xc_ia64_recv_vcpu_context(xc_interface *xc_handle, int io_fd, uint32_t dom,
                           uint32_t vcpu, vcpu_guest_context_any_t *ctxt_any)
 {
     vcpu_guest_context_t *ctxt = &ctxt_any->c;
@@ -147,7 +147,7 @@ xc_ia64_recv_vcpu_context(int xc_handle, int io_fd, uint32_t dom,
 
 /* Read shared info.  */
 static int
-xc_ia64_recv_shared_info(int xc_handle, int io_fd, uint32_t dom,
+xc_ia64_recv_shared_info(xc_interface *xc_handle, int io_fd, uint32_t dom,
                          unsigned long shared_info_frame,
                          unsigned long *start_info_pfn)
 {
@@ -222,7 +222,7 @@ xc_ia64_recv_vcpumap(const xc_dominfo_t *info, int io_fd, uint64_t **vcpumapp)
 }
 
 static int
-xc_ia64_pv_recv_vcpu_context(int xc_handle, int io_fd, int32_t dom,
+xc_ia64_pv_recv_vcpu_context(xc_interface *xc_handle, int io_fd, int32_t dom,
                              uint32_t vcpu)
 {
     int rc = -1;
@@ -254,7 +254,7 @@ xc_ia64_pv_recv_vcpu_context(int xc_handle, int io_fd, int32_t dom,
 }
 
 static int
-xc_ia64_pv_recv_shared_info(int xc_handle, int io_fd, int32_t dom, 
+xc_ia64_pv_recv_shared_info(xc_interface *xc_handle, int io_fd, int32_t dom, 
                             unsigned long shared_info_frame,
                             struct xen_ia64_p2m_table *p2m_table,
                             unsigned int store_evtchn,
@@ -296,7 +296,7 @@ xc_ia64_pv_recv_shared_info(int xc_handle, int io_fd, int32_t dom,
 }
 
 static int
-xc_ia64_pv_recv_context_ver_one_or_two(int xc_handle, int io_fd, uint32_t dom,
+xc_ia64_pv_recv_context_ver_one_or_two(xc_interface *xc_handle, int io_fd, uint32_t dom,
                                        unsigned long shared_info_frame,
                                        struct xen_ia64_p2m_table *p2m_table,
                                        unsigned int store_evtchn,
@@ -320,7 +320,7 @@ xc_ia64_pv_recv_context_ver_one_or_two(int xc_handle, int io_fd, uint32_t dom,
 }
 
 static int
-xc_ia64_pv_recv_context_ver_three(int xc_handle, int io_fd, uint32_t dom,
+xc_ia64_pv_recv_context_ver_three(xc_interface *xc_handle, int io_fd, uint32_t dom,
                                   unsigned long shared_info_frame,
                                   struct xen_ia64_p2m_table *p2m_table,
                                   unsigned int store_evtchn,
@@ -365,7 +365,7 @@ xc_ia64_pv_recv_context_ver_three(int xc_handle, int io_fd, uint32_t dom,
 
 static int
 xc_ia64_pv_recv_context(unsigned long format_version,
-                        int xc_handle, int io_fd, uint32_t dom,
+                        xc_interface *xc_handle, int io_fd, uint32_t dom,
                         unsigned long shared_info_frame,
                         struct xen_ia64_p2m_table *p2m_table,
                         unsigned int store_evtchn,
@@ -399,7 +399,7 @@ xc_ia64_pv_recv_context(unsigned long format_version,
 }
 
 static int
-xc_ia64_hvm_recv_context(int xc_handle, int io_fd, uint32_t dom,
+xc_ia64_hvm_recv_context(xc_interface *xc_handle, int io_fd, uint32_t dom,
                          unsigned long shared_info_frame,
                          struct xen_ia64_p2m_table *p2m_table,
                          unsigned int store_evtchn, unsigned long *store_mfn,
@@ -521,7 +521,7 @@ out:
  * hvm domain requires IO pages allocated when XEN_DOMCTL_arch_setup
  */
 static int
-xc_ia64_hvm_domain_setup(int xc_handle, uint32_t dom)
+xc_ia64_hvm_domain_setup(xc_interface *xc_handle, uint32_t dom)
 {
     int rc;
     xen_pfn_t pfn_list[] = {
@@ -539,7 +539,7 @@ xc_ia64_hvm_domain_setup(int xc_handle, uint32_t dom)
 }
 
 int
-xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
+xc_domain_restore(xc_interface *xc_handle, int io_fd, uint32_t dom,
                   unsigned int store_evtchn, unsigned long *store_mfn,
                   unsigned int console_evtchn, unsigned long *console_mfn,
                   unsigned int hvm, unsigned int pae, int superpages)

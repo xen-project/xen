@@ -137,7 +137,8 @@ static uint64_t tv_delta(struct timeval *new, struct timeval *old)
             (new->tv_usec - old->tv_usec));
 }
 
-static int noncached_write(int fd, int live, void *buffer, int len) 
+static int noncached_write(xc_interface *xch,
+                           int fd, int live, void *buffer, int len) 
 {
     static int write_count = 0;
     int rc = (write_exact(fd, buffer, len) == 0) ? len : -1;
@@ -146,14 +147,14 @@ static int noncached_write(int fd, int live, void *buffer, int len)
     if ( write_count >= (MAX_PAGECACHE_USAGE * PAGE_SIZE) )
     {
         /* Time to discard cache - dont care if this fails */
-        discard_file_cache(fd, 0 /* no flush */);
+        discard_file_cache(xch, fd, 0 /* no flush */);
         write_count = 0;
     }
 
     return rc;
 }
 
-static int outbuf_init(struct outbuf* ob, size_t size)
+static int outbuf_init(xc_interface *xch, struct outbuf* ob, size_t size)
 {
     memset(ob, 0, sizeof(*ob));
 
@@ -167,7 +168,8 @@ static int outbuf_init(struct outbuf* ob, size_t size)
     return 0;
 }
 
-static inline int outbuf_write(struct outbuf* ob, void* buf, size_t len)
+static inline int outbuf_write(xc_interface *xch,
+                               struct outbuf* ob, void* buf, size_t len)
 {
     if ( len > ob->size - ob->pos ) {
         DPRINTF("outbuf_write: %zu > %zu@%zu\n", len, ob->size - ob->pos, ob->pos);
@@ -181,7 +183,7 @@ static inline int outbuf_write(struct outbuf* ob, void* buf, size_t len)
 }
 
 /* prep for nonblocking I/O */
-static int outbuf_flush(struct outbuf* ob, int fd)
+static int outbuf_flush(xc_interface *xch, struct outbuf* ob, int fd)
 {
     int rc;
     int cur = 0;
@@ -207,27 +209,29 @@ static int outbuf_flush(struct outbuf* ob, int fd)
 }
 
 /* if there's no room in the buffer, flush it and try again. */
-static inline int outbuf_hardwrite(struct outbuf* ob, int fd, void* buf,
+static inline int outbuf_hardwrite(xc_interface *xch,
+                                   struct outbuf* ob, int fd, void* buf,
                                    size_t len)
 {
     if ( !len )
         return 0;
 
-    if ( !outbuf_write(ob, buf, len) )
+    if ( !outbuf_write(xch, ob, buf, len) )
         return 0;
 
-    if ( outbuf_flush(ob, fd) < 0 )
+    if ( outbuf_flush(xch, ob, fd) < 0 )
         return -1;
 
-    return outbuf_write(ob, buf, len);
+    return outbuf_write(xch, ob, buf, len);
 }
 
 /* start buffering output once we've reached checkpoint mode. */
-static inline int write_buffer(int dobuf, struct outbuf* ob, int fd, void* buf,
+static inline int write_buffer(xc_interface *xch,
+                               int dobuf, struct outbuf* ob, int fd, void* buf,
                                size_t len)
 {
     if ( dobuf )
-        return outbuf_hardwrite(ob, fd, buf, len);
+        return outbuf_hardwrite(xch, ob, fd, buf, len);
     else
         return write_exact(fd, buf, len);
 }
@@ -259,7 +263,7 @@ static inline void initialize_mbit_rate()
     mbit_rate = START_MBIT_RATE;
 }
 
-static int ratewrite(int io_fd, int live, void *buf, int n)
+static int ratewrite(xc_interface *xch, int io_fd, int live, void *buf, int n)
 {
     static int budget = 0;
     static int burst_time_us = -1;
@@ -319,22 +323,23 @@ static int ratewrite(int io_fd, int live, void *buf, int n)
 #else /* ! ADAPTIVE SAVE */
 
 #define RATE_IS_MAX() (0)
-#define ratewrite(_io_fd, _live, _buf, _n) noncached_write((_io_fd), (_live), (_buf), (_n))
+#define ratewrite(xch, _io_fd, _live, _buf, _n) noncached_write((xch), (_io_fd), (_live), (_buf), (_n))
 #define initialize_mbit_rate()
 
 #endif
 
 /* like write_buffer for ratewrite, which returns number of bytes written */
-static inline int ratewrite_buffer(int dobuf, struct outbuf* ob, int fd,
+static inline int ratewrite_buffer(xc_interface *xch,
+                                   int dobuf, struct outbuf* ob, int fd,
                                    int live, void* buf, size_t len)
 {
     if ( dobuf )
-        return outbuf_hardwrite(ob, fd, buf, len) ? -1 : len;
+        return outbuf_hardwrite(xch, ob, fd, buf, len) ? -1 : len;
     else
-        return ratewrite(fd, live, buf, len);
+        return ratewrite(xch, fd, live, buf, len);
 }
 
-static int print_stats(int xc_handle, uint32_t domid, int pages_sent,
+static int print_stats(xc_interface *xch, uint32_t domid, int pages_sent,
                        xc_shadow_op_stats_t *stats, int print)
 {
     static struct timeval wall_last;
@@ -348,8 +353,8 @@ static int print_stats(int xc_handle, uint32_t domid, int pages_sent,
 
     gettimeofday(&wall_now, NULL);
 
-    d0_cpu_now = xc_domain_get_cpu_usage(xc_handle, 0, /* FIXME */ 0)/1000;
-    d1_cpu_now = xc_domain_get_cpu_usage(xc_handle, domid, /* FIXME */ 0)/1000;
+    d0_cpu_now = xc_domain_get_cpu_usage(xch, 0, /* FIXME */ 0)/1000;
+    d1_cpu_now = xc_domain_get_cpu_usage(xch, domid, /* FIXME */ 0)/1000;
 
     if ( (d0_cpu_now == -1) || (d1_cpu_now == -1) )
         DPRINTF("ARRHHH!!\n");
@@ -389,7 +394,7 @@ static int print_stats(int xc_handle, uint32_t domid, int pages_sent,
 }
 
 
-static int analysis_phase(int xc_handle, uint32_t domid, struct save_ctx *ctx,
+static int analysis_phase(xc_interface *xch, uint32_t domid, struct save_ctx *ctx,
                           unsigned long *arr, int runs)
 {
     long long start, now;
@@ -403,14 +408,14 @@ static int analysis_phase(int xc_handle, uint32_t domid, struct save_ctx *ctx,
     {
         int i;
 
-        xc_shadow_control(xc_handle, domid, XEN_DOMCTL_SHADOW_OP_CLEAN,
+        xc_shadow_control(xch, domid, XEN_DOMCTL_SHADOW_OP_CLEAN,
                           arr, dinfo->p2m_size, NULL, 0, NULL);
         DPRINTF("#Flush\n");
         for ( i = 0; i < 40; i++ )
         {
             usleep(50000);
             now = llgettimeofday();
-            xc_shadow_control(xc_handle, domid, XEN_DOMCTL_SHADOW_OP_PEEK,
+            xc_shadow_control(xch, domid, XEN_DOMCTL_SHADOW_OP_PEEK,
                               NULL, 0, NULL, 0, &stats);
             DPRINTF("now= %lld faults= %"PRId32" dirty= %"PRId32"\n",
                     ((now-start)+500)/1000,
@@ -422,7 +427,7 @@ static int analysis_phase(int xc_handle, uint32_t domid, struct save_ctx *ctx,
 }
 
 static int suspend_and_state(int (*suspend)(void*), void* data,
-                             int xc_handle, int io_fd, int dom,
+                             xc_interface *xch, int io_fd, int dom,
                              xc_dominfo_t *info)
 {
     if ( !(*suspend)(data) )
@@ -431,7 +436,7 @@ static int suspend_and_state(int (*suspend)(void*), void* data,
         return -1;
     }
 
-    if ( (xc_domain_getinfo(xc_handle, dom, 1, info) != 1) ||
+    if ( (xc_domain_getinfo(xch, dom, 1, info) != 1) ||
          !info->shutdown || (info->shutdown_reason != SHUTDOWN_suspend) )
     {
         ERROR("Domain not in suspended state");
@@ -446,7 +451,7 @@ static int suspend_and_state(int (*suspend)(void*), void* data,
 ** finished resuming from a previous restore operation, so we wait a while for
 ** it to update the MFN to a reasonable value.
 */
-static void *map_frame_list_list(int xc_handle, uint32_t dom,
+static void *map_frame_list_list(xc_interface *xch, uint32_t dom,
                                  struct save_ctx *ctx,
                                  shared_info_any_t *shinfo)
 {
@@ -467,7 +472,7 @@ static void *map_frame_list_list(int xc_handle, uint32_t dom,
         return NULL;
     }
 
-    p = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE, PROT_READ, fll);
+    p = xc_map_foreign_range(xch, dom, PAGE_SIZE, PROT_READ, fll);
     if ( p == NULL )
         ERROR("Couldn't map p2m_frame_list_list (errno %d)", errno);
 
@@ -597,7 +602,7 @@ static int canonicalize_pagetable(struct save_ctx *ctx,
     return race;
 }
 
-xen_pfn_t *xc_map_m2p(int xc_handle,
+xen_pfn_t *xc_map_m2p(xc_interface *xch,
                                  unsigned long max_mfn,
                                  int prot,
                                  unsigned long *mfn0)
@@ -623,7 +628,7 @@ xen_pfn_t *xc_map_m2p(int xc_handle,
     }
     set_xen_guest_handle(xmml.extent_start, extent_start);
 
-    if ( xc_memory_op(xc_handle, XENMEM_machphys_mfn_list, &xmml) ||
+    if ( xc_memory_op(xch, XENMEM_machphys_mfn_list, &xmml) ||
          (xmml.nr_extents != m2p_chunks) )
     {
         ERROR("xc_get_m2p_mfns");
@@ -640,7 +645,7 @@ xen_pfn_t *xc_map_m2p(int xc_handle,
     for ( i = 0; i < m2p_chunks; i++ )
         entries[i].mfn = extent_start[i];
 
-    m2p = xc_map_foreign_ranges(xc_handle, DOMID_XEN,
+    m2p = xc_map_foreign_ranges(xch, DOMID_XEN,
 			m2p_size, prot, M2P_CHUNK_SIZE,
 			entries, m2p_chunks);
     if (m2p == NULL)
@@ -662,7 +667,7 @@ err0:
 }
 
 
-static xen_pfn_t *map_and_save_p2m_table(int xc_handle, 
+static xen_pfn_t *map_and_save_p2m_table(xc_interface *xch, 
                                          int io_fd, 
                                          uint32_t dom,
                                          struct save_ctx *ctx,
@@ -684,7 +689,7 @@ static xen_pfn_t *map_and_save_p2m_table(int xc_handle,
 
     int i, success = 0;
 
-    live_p2m_frame_list_list = map_frame_list_list(xc_handle, dom, ctx,
+    live_p2m_frame_list_list = map_frame_list_list(xch, dom, ctx,
                                                    live_shinfo);
     if ( !live_p2m_frame_list_list )
         goto out;
@@ -709,7 +714,7 @@ static xen_pfn_t *map_and_save_p2m_table(int xc_handle,
             p2m_frame_list_list[i] = ((uint32_t *)p2m_frame_list_list)[i];
 
     live_p2m_frame_list =
-        xc_map_foreign_pages(xc_handle, dom, PROT_READ,
+        xc_map_foreign_pages(xch, dom, PROT_READ,
                              p2m_frame_list_list,
                              P2M_FLL_ENTRIES);
     if ( !live_p2m_frame_list )
@@ -744,7 +749,7 @@ static xen_pfn_t *map_and_save_p2m_table(int xc_handle,
        (its not clear why it would want to change them, and we'll be OK
        from a safety POV anyhow. */
 
-    p2m = xc_map_foreign_pages(xc_handle, dom, PROT_READ,
+    p2m = xc_map_foreign_pages(xch, dom, PROT_READ,
                                p2m_frame_list,
                                P2M_FL_ENTRIES);
     if ( !p2m )
@@ -777,7 +782,7 @@ static xen_pfn_t *map_and_save_p2m_table(int xc_handle,
         p2m_frame_list[i/FPP] = mfn_to_pfn(p2m_frame_list[i/FPP]);
     }
 
-    if ( xc_vcpu_getcontext(xc_handle, dom, 0, &ctxt) )
+    if ( xc_vcpu_getcontext(xch, dom, 0, &ctxt) )
     {
         ERROR("Could not get vcpu context");
         goto out;
@@ -838,13 +843,13 @@ static xen_pfn_t *map_and_save_p2m_table(int xc_handle,
 }
 
 /* must be done AFTER suspend_and_state() */
-static int save_tsc_info(int xc_handle, uint32_t dom, int io_fd)
+static int save_tsc_info(xc_interface *xch, uint32_t dom, int io_fd)
 {
     int marker = -7;
     uint32_t tsc_mode, khz, incarn;
     uint64_t nsec;
 
-    if ( xc_domain_get_tsc_info(xc_handle, dom, &tsc_mode,
+    if ( xc_domain_get_tsc_info(xch, dom, &tsc_mode,
                                 &nsec, &khz, &incarn) < 0  ||
          write_exact(io_fd, &marker, sizeof(marker)) ||
          write_exact(io_fd, &tsc_mode, sizeof(tsc_mode)) ||
@@ -855,7 +860,7 @@ static int save_tsc_info(int xc_handle, uint32_t dom, int io_fd)
     return 0;
 }
 
-int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
+int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iters,
                    uint32_t max_factor, uint32_t flags,
                    struct save_callbacks* callbacks,
                    int hvm, void (*switch_qemu_logdirty)(int, unsigned))
@@ -866,7 +871,8 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     int rc = 1, frc, i, j, last_iter = 0, iter = 0;
     int live  = (flags & XCFLAGS_LIVE);
     int debug = (flags & XCFLAGS_DEBUG);
-    int race = 0, sent_last_iter, skip_this_iter;
+    int race = 0, sent_last_iter, skip_this_iter = 0;
+    unsigned int sent_this_iter = 0;
     int tmem_saved = 0;
 
     /* The new domain's shared-info frame number. */
@@ -921,7 +927,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
     int completed = 0;
 
-    outbuf_init(&ob, OUTBUF_SIZE);
+    outbuf_init(xch, &ob, OUTBUF_SIZE);
 
     /* If no explicit control parameters given, use defaults */
     max_iters  = max_iters  ? : DEF_MAX_ITERS;
@@ -929,14 +935,14 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
     initialize_mbit_rate();
 
-    if ( !get_platform_info(xc_handle, dom,
+    if ( !get_platform_info(xch, dom,
                             &ctx->max_mfn, &ctx->hvirt_start, &ctx->pt_levels, &dinfo->guest_width) )
     {
         ERROR("Unable to get platform info.");
         return 1;
     }
 
-    if ( xc_domain_getinfo(xc_handle, dom, 1, &info) != 1 )
+    if ( xc_domain_getinfo(xch, dom, 1, &info) != 1 )
     {
         ERROR("Could not get domain info");
         return 1;
@@ -947,7 +953,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     /* Map the shared info frame */
     if ( !hvm )
     {
-        live_shinfo = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
+        live_shinfo = xc_map_foreign_range(xch, dom, PAGE_SIZE,
                                            PROT_READ, shared_info_frame);
         if ( !live_shinfo )
         {
@@ -957,7 +963,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     }
 
     /* Get the size of the P2M table */
-    dinfo->p2m_size = xc_memory_op(xc_handle, XENMEM_maximum_gpfn, &dom) + 1;
+    dinfo->p2m_size = xc_memory_op(xch, XENMEM_maximum_gpfn, &dom) + 1;
 
     if ( dinfo->p2m_size > ~XEN_DOMCTL_PFINFO_LTAB_MASK )
     {
@@ -969,17 +975,17 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     if ( live )
     {
         /* Live suspend. Enable log-dirty mode. */
-        if ( xc_shadow_control(xc_handle, dom,
+        if ( xc_shadow_control(xch, dom,
                                XEN_DOMCTL_SHADOW_OP_ENABLE_LOGDIRTY,
                                NULL, 0, NULL, 0, NULL) < 0 )
         {
             /* log-dirty already enabled? There's no test op,
                so attempt to disable then reenable it */
-            frc = xc_shadow_control(xc_handle, dom, XEN_DOMCTL_SHADOW_OP_OFF,
+            frc = xc_shadow_control(xch, dom, XEN_DOMCTL_SHADOW_OP_OFF,
                                     NULL, 0, NULL, 0, NULL);
             if ( frc >= 0 )
             {
-                frc = xc_shadow_control(xc_handle, dom,
+                frc = xc_shadow_control(xch, dom,
                                         XEN_DOMCTL_SHADOW_OP_ENABLE_LOGDIRTY,
                                         NULL, 0, NULL, 0, NULL);
             }
@@ -998,7 +1004,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     else
     {
         /* This is a non-live suspend. Suspend the domain .*/
-        if ( suspend_and_state(callbacks->suspend, callbacks->data, xc_handle,
+        if ( suspend_and_state(callbacks->suspend, callbacks->data, xch,
                                io_fd, dom, &info) )
         {
             ERROR("Domain appears not to have suspended");
@@ -1040,7 +1046,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     if ( hvm ) 
     {
         /* Need another buffer for HVM context */
-        hvm_buf_size = xc_domain_hvm_getcontext(xc_handle, dom, 0, 0);
+        hvm_buf_size = xc_domain_hvm_getcontext(xch, dom, 0, 0);
         if ( hvm_buf_size == -1 )
         {
             ERROR("Couldn't get HVM context size from Xen");
@@ -1054,7 +1060,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         }
     }
 
-    analysis_phase(xc_handle, dom, ctx, to_skip, 0);
+    analysis_phase(xch, dom, ctx, to_skip, 0);
 
     pfn_type   = xc_memalign(PAGE_SIZE, ROUNDUP(
                               MAX_BATCH_SIZE * sizeof(*pfn_type), PAGE_SHIFT));
@@ -1076,7 +1082,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     }
 
     /* Setup the mfn_to_pfn table mapping */
-    if ( !(ctx->live_m2p = xc_map_m2p(xc_handle, ctx->max_mfn, PROT_READ, &ctx->m2p_mfn0)) )
+    if ( !(ctx->live_m2p = xc_map_m2p(xch, ctx->max_mfn, PROT_READ, &ctx->m2p_mfn0)) )
     {
         ERROR("Failed to map live M2P table");
         goto out;
@@ -1094,7 +1100,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         int err = 0;
 
         /* Map the P2M table, and write the list of P2M frames */
-        ctx->live_p2m = map_and_save_p2m_table(xc_handle, io_fd, dom, ctx, live_shinfo);
+        ctx->live_p2m = map_and_save_p2m_table(xch, io_fd, dom, ctx, live_shinfo);
         if ( ctx->live_p2m == NULL )
         {
             ERROR("Failed to map/save the p2m frame list");
@@ -1118,57 +1124,55 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         DPRINTF("Had %d unexplained entries in p2m table\n", err);
     }
 
-    print_stats(xc_handle, dom, 0, &stats, 0);
+    print_stats(xch, dom, 0, &stats, 0);
 
-    tmem_saved = xc_tmem_save(xc_handle, dom, io_fd, live, -5);
+    tmem_saved = xc_tmem_save(xch, dom, io_fd, live, -5);
     if ( tmem_saved == -1 )
     {
         ERROR("Error when writing to state file (tmem)");
         goto out;
     }
 
-    if ( !live && save_tsc_info(xc_handle, dom, io_fd) < 0 )
+    if ( !live && save_tsc_info(xch, dom, io_fd) < 0 )
     {
         ERROR("Error when writing to state file (tsc)");
         goto out;
     }
 
   copypages:
-#define wrexact(fd, buf, len) write_buffer(last_iter, &ob, (fd), (buf), (len))
+#define wrexact(fd, buf, len) write_buffer(xch, last_iter, &ob, (fd), (buf), (len))
 #ifdef ratewrite
 #undef ratewrite
 #endif
-#define ratewrite(fd, live, buf, len) ratewrite_buffer(last_iter, &ob, (fd), (live), (buf), (len))
+#define ratewrite(fd, live, buf, len) ratewrite_buffer(xch, last_iter, &ob, (fd), (live), (buf), (len))
 
     /* Now write out each data page, canonicalising page tables as we go... */
     for ( ; ; )
     {
-        unsigned int prev_pc, sent_this_iter, N, batch, run;
+        unsigned int N, batch, run;
+        char reportbuf[80];
+
+        snprintf(reportbuf, sizeof(reportbuf),
+                 "Saving memory: iter %d (last sent %u skipped %u)",
+                 iter, sent_this_iter, skip_this_iter);
+
+        xc_report_progress_start(xch, reportbuf, dinfo->p2m_size);
 
         iter++;
         sent_this_iter = 0;
         skip_this_iter = 0;
-        prev_pc = 0;
         N = 0;
-
-        DPRINTF("Saving memory pages: iter %d   0%%", iter);
 
         while ( N < dinfo->p2m_size )
         {
-            unsigned int this_pc = (N * 100) / dinfo->p2m_size;
-
-            if ( (this_pc - prev_pc) >= 5 )
-            {
-                DPRINTF("\b\b\b\b%3d%%", this_pc);
-                prev_pc = this_pc;
-            }
+            xc_report_progress_step(xch, N, dinfo->p2m_size);
 
             if ( !last_iter )
             {
                 /* Slightly wasteful to peek the whole array evey time,
                    but this is fast enough for the moment. */
                 frc = xc_shadow_control(
-                    xc_handle, dom, XEN_DOMCTL_SHADOW_OP_PEEK, to_skip, 
+                    xch, dom, XEN_DOMCTL_SHADOW_OP_PEEK, to_skip, 
                     dinfo->p2m_size, NULL, 0, NULL);
                 if ( frc != dinfo->p2m_size )
                 {
@@ -1275,7 +1279,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                 goto skip; /* vanishingly unlikely... */
 
             region_base = xc_map_foreign_bulk(
-                xc_handle, dom, PROT_READ, pfn_type, pfn_err, batch);
+                xch, dom, PROT_READ, pfn_type, pfn_err, batch);
             if ( region_base == NULL )
             {
                 ERROR("map batch failed");
@@ -1303,7 +1307,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
             else
             {
                 /* Get page types */
-                if ( xc_get_pfn_type_batch(xc_handle, dom, batch, pfn_type) )
+                if ( xc_get_pfn_type_batch(xch, dom, batch, pfn_type) )
                 {
                     ERROR("get_pfn_type_batch failed");
                     goto out;
@@ -1437,12 +1441,9 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
         total_sent += sent_this_iter;
 
-        DPRINTF("\r %d: sent %d, skipped %d, ",
-                iter, sent_this_iter, skip_this_iter );
-
         if ( last_iter )
         {
-            print_stats( xc_handle, dom, sent_this_iter, &stats, 1);
+            print_stats( xch, dom, sent_this_iter, &stats, 1);
 
             DPRINTF("Total pages sent= %ld (%.2fx)\n",
                     total_sent, ((float)total_sent)/dinfo->p2m_size );
@@ -1480,7 +1481,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                 last_iter = 1;
 
                 if ( suspend_and_state(callbacks->suspend, callbacks->data,
-                                       xc_handle, io_fd, dom, &info) )
+                                       xch, io_fd, dom, &info) )
                 {
                     ERROR("Domain appears not to have suspended");
                     goto out;
@@ -1488,13 +1489,13 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
                 DPRINTF("SUSPEND shinfo %08lx\n", info.shared_info_frame);
                 if ( (tmem_saved > 0) &&
-                     (xc_tmem_save_extra(xc_handle,dom,io_fd,-6) == -1) )
+                     (xc_tmem_save_extra(xch,dom,io_fd,-6) == -1) )
                 {
                         ERROR("Error when writing to state file (tmem)");
                         goto out;
                 }
 
-                if ( save_tsc_info(xc_handle, dom, io_fd) < 0 )
+                if ( save_tsc_info(xch, dom, io_fd) < 0 )
                 {
                     ERROR("Error when writing to state file (tsc)");
                     goto out;
@@ -1503,7 +1504,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
             }
 
-            if ( xc_shadow_control(xc_handle, dom, 
+            if ( xc_shadow_control(xch, dom, 
                                    XEN_DOMCTL_SHADOW_OP_CLEAN, to_send, 
                                    dinfo->p2m_size, NULL, 0, &stats) != dinfo->p2m_size )
             {
@@ -1513,7 +1514,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
             sent_last_iter = sent_this_iter;
 
-            print_stats(xc_handle, dom, sent_this_iter, &stats, 1);
+            print_stats(xch, dom, sent_this_iter, &stats, 1);
 
         }
     } /* end of infinite for loop */
@@ -1536,7 +1537,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         for ( i = 1; i <= info.max_vcpu_id; i++ )
         {
             xc_vcpuinfo_t vinfo;
-            if ( (xc_vcpu_getinfo(xc_handle, dom, i, &vinfo) == 0) &&
+            if ( (xc_vcpu_getinfo(xch, dom, i, &vinfo) == 0) &&
                  vinfo.online )
                 vcpumap |= 1ULL << i;
         }
@@ -1558,7 +1559,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         } chunk = { 0, };
 
         chunk.id = -3;
-        xc_get_hvm_param(xc_handle, dom, HVM_PARAM_IDENT_PT,
+        xc_get_hvm_param(xch, dom, HVM_PARAM_IDENT_PT,
                          (unsigned long *)&chunk.data);
 
         if ( (chunk.data != 0) &&
@@ -1569,7 +1570,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         }
 
         chunk.id = -4;
-        xc_get_hvm_param(xc_handle, dom, HVM_PARAM_VM86_TSS,
+        xc_get_hvm_param(xch, dom, HVM_PARAM_VM86_TSS,
                          (unsigned long *)&chunk.data);
 
         if ( (chunk.data != 0) &&
@@ -1594,11 +1595,11 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 
         /* Save magic-page locations. */
         memset(magic_pfns, 0, sizeof(magic_pfns));
-        xc_get_hvm_param(xc_handle, dom, HVM_PARAM_IOREQ_PFN,
+        xc_get_hvm_param(xch, dom, HVM_PARAM_IOREQ_PFN,
                          (unsigned long *)&magic_pfns[0]);
-        xc_get_hvm_param(xc_handle, dom, HVM_PARAM_BUFIOREQ_PFN,
+        xc_get_hvm_param(xch, dom, HVM_PARAM_BUFIOREQ_PFN,
                          (unsigned long *)&magic_pfns[1]);
-        xc_get_hvm_param(xc_handle, dom, HVM_PARAM_STORE_PFN,
+        xc_get_hvm_param(xch, dom, HVM_PARAM_STORE_PFN,
                          (unsigned long *)&magic_pfns[2]);
         if ( wrexact(io_fd, magic_pfns, sizeof(magic_pfns)) )
         {
@@ -1607,7 +1608,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         }
 
         /* Get HVM context from Xen and save it too */
-        if ( (rec_size = xc_domain_hvm_getcontext(xc_handle, dom, hvm_buf, 
+        if ( (rec_size = xc_domain_hvm_getcontext(xch, dom, hvm_buf, 
                                                   hvm_buf_size)) == -1 )
         {
             ERROR("HVM:Could not get hvm buffer");
@@ -1668,7 +1669,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         }
     }
 
-    if ( xc_vcpu_getcontext(xc_handle, dom, 0, &ctxt) )
+    if ( xc_vcpu_getcontext(xch, dom, 0, &ctxt) )
     {
         ERROR("Could not get vcpu context");
         goto out;
@@ -1688,7 +1689,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         if ( !(vcpumap & (1ULL << i)) )
             continue;
 
-        if ( (i != 0) && xc_vcpu_getcontext(xc_handle, dom, i, &ctxt) )
+        if ( (i != 0) && xc_vcpu_getcontext(xch, dom, i, &ctxt) )
         {
             ERROR("No context for VCPU%d", i);
             goto out;
@@ -1740,7 +1741,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         domctl.cmd = XEN_DOMCTL_get_ext_vcpucontext;
         domctl.domain = dom;
         domctl.u.ext_vcpucontext.vcpu = i;
-        if ( xc_domctl(xc_handle, &domctl) < 0 )
+        if ( xc_domctl(xch, &domctl) < 0 )
         {
             ERROR("No extended context for VCPU%d", i);
             goto out;
@@ -1781,32 +1782,32 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
         callbacks->postcopy(callbacks->data);
 
     /* Flush last write and discard cache for file. */
-    if ( outbuf_flush(&ob, io_fd) < 0 ) {
+    if ( outbuf_flush(xch, &ob, io_fd) < 0 ) {
         ERROR("Error when flushing output buffer\n");
         rc = 1;
     }
 
-    discard_file_cache(io_fd, 1 /* flush */);
+    discard_file_cache(xch, io_fd, 1 /* flush */);
 
     /* checkpoint_cb can spend arbitrarily long in between rounds */
     if (!rc && callbacks->checkpoint &&
         callbacks->checkpoint(callbacks->data) > 0)
     {
         /* reset stats timer */
-        print_stats(xc_handle, dom, 0, &stats, 0);
+        print_stats(xch, dom, 0, &stats, 0);
 
         rc = 1;
         /* last_iter = 1; */
-        if ( suspend_and_state(callbacks->suspend, callbacks->data, xc_handle,
+        if ( suspend_and_state(callbacks->suspend, callbacks->data, xch,
                                io_fd, dom, &info) )
         {
             ERROR("Domain appears not to have suspended");
             goto out;
         }
         DPRINTF("SUSPEND shinfo %08lx\n", info.shared_info_frame);
-        print_stats(xc_handle, dom, 0, &stats, 1);
+        print_stats(xch, dom, 0, &stats, 1);
 
-        if ( xc_shadow_control(xc_handle, dom,
+        if ( xc_shadow_control(xch, dom,
                                XEN_DOMCTL_SHADOW_OP_CLEAN, to_send,
                                dinfo->p2m_size, NULL, 0, &stats) != dinfo->p2m_size )
         {
@@ -1817,11 +1818,11 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
     }
 
     if ( tmem_saved != 0 && live )
-        xc_tmem_save_done(xc_handle, dom);
+        xc_tmem_save_done(xch, dom);
 
     if ( live )
     {
-        if ( xc_shadow_control(xc_handle, dom, 
+        if ( xc_shadow_control(xch, dom, 
                                XEN_DOMCTL_SHADOW_OP_OFF,
                                NULL, 0, NULL, 0, NULL) < 0 )
             DPRINTF("Warning - couldn't disable shadow mode");

@@ -23,6 +23,7 @@
 
 #include <errno.h>
 #include <string.h>
+#include <stdarg.h>
 #include <sys/poll.h>
 #include <xc_private.h>
 #include <xg_save_restore.h>
@@ -64,7 +65,7 @@ int xc_mem_paging_flush_ioemu_cache(domid_t domain_id)
     return rc;
 }
 
-int xc_wait_for_event_or_timeout(int xce_handle, unsigned long ms)
+int xc_wait_for_event_or_timeout(xc_interface *xch, int xce_handle, unsigned long ms)
 {
     struct pollfd fd = { .fd = xce_handle, .events = POLLIN | POLLERR };
     int port;
@@ -105,12 +106,12 @@ int xc_wait_for_event_or_timeout(int xce_handle, unsigned long ms)
     return -errno;
 }
 
-int xc_wait_for_event(int xce_handle)
+int xc_wait_for_event(xc_interface *xch, int xce_handle)
 {
-    return xc_wait_for_event_or_timeout(xce_handle, -1);
+    return xc_wait_for_event_or_timeout(xch, xce_handle, -1);
 }
 
-int xc_get_platform_info(int xc_handle, domid_t domain_id,
+int xc_get_platform_info(xc_interface *xc_handle, domid_t domain_id,
                          xc_platform_info_t *platform_info)
 {
     return get_platform_info(xc_handle, domain_id,

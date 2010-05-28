@@ -119,9 +119,11 @@ struct xc_core_strtab;
 struct xc_core_section_headers;
 
 Elf64_Shdr*
-xc_core_shdr_get(struct xc_core_section_headers *sheaders);
+xc_core_shdr_get(xc_interface *xch,
+                 struct xc_core_section_headers *sheaders);
 int
-xc_core_shdr_set(Elf64_Shdr *shdr,
+xc_core_shdr_set(xc_interface *xch,
+                 Elf64_Shdr *shdr,
                  struct xc_core_strtab *strtab,
                  const char *name, uint32_t type,
                  uint64_t offset, uint64_t size,
@@ -134,16 +136,16 @@ struct xc_core_memory_map {
 typedef struct xc_core_memory_map xc_core_memory_map_t;
 int xc_core_arch_auto_translated_physmap(const xc_dominfo_t *info);
 struct xc_core_arch_context;
-int xc_core_arch_memory_map_get(int xc_handle,
+int xc_core_arch_memory_map_get(xc_interface *xch,
                                 struct xc_core_arch_context *arch_ctxt,
                                 xc_dominfo_t *info, shared_info_any_t *live_shinfo,
                                 xc_core_memory_map_t **mapp,
                                 unsigned int *nr_entries);
-int xc_core_arch_map_p2m(int xc_handle, unsigned int guest_width,
+int xc_core_arch_map_p2m(xc_interface *xch, unsigned int guest_width,
                          xc_dominfo_t *info, shared_info_any_t *live_shinfo,
                          xen_pfn_t **live_p2m, unsigned long *pfnp);
 
-int xc_core_arch_map_p2m_writable(int xc_handle, unsigned int guest_width,
+int xc_core_arch_map_p2m_writable(xc_interface *xch, unsigned int guest_width,
                                   xc_dominfo_t *info,
                                   shared_info_any_t *live_shinfo,
                                   xen_pfn_t **live_p2m, unsigned long *pfnp);

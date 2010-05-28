@@ -20,7 +20,8 @@ main(int argc, char **argv)
 {
     unsigned int domid, store_evtchn, console_evtchn;
     unsigned int hvm, pae, apic;
-    int xc_fd, io_fd, ret;
+    xc_interface *xch;
+    int io_fd, ret;
     int superpages;
     unsigned long store_mfn, console_mfn;
 
@@ -28,8 +29,8 @@ main(int argc, char **argv)
         errx(1, "usage: %s iofd domid store_evtchn "
              "console_evtchn hvm pae apic [superpages]", argv[0]);
 
-    xc_fd = xc_interface_open();
-    if ( xc_fd < 0 )
+    xch = xc_interface_open(0,0,0);
+    if ( !xch )
         errx(1, "failed to open control interface");
 
     io_fd = atoi(argv[1]);
@@ -44,7 +45,7 @@ main(int argc, char **argv)
     else
 	    superpages = 0;
 
-    ret = xc_domain_restore(xc_fd, io_fd, domid, store_evtchn, &store_mfn,
+    ret = xc_domain_restore(xch, io_fd, domid, store_evtchn, &store_mfn,
                             console_evtchn, &console_mfn, hvm, pae, superpages);
 
     if ( ret == 0 )
@@ -55,7 +56,7 @@ main(int argc, char **argv)
 	fflush(stdout);
     }
 
-    xc_interface_close(xc_fd);
+    xc_interface_close(xch);
 
     return ret;
 }

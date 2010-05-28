@@ -11,7 +11,7 @@
 #include "xc_private.h"
 
 int xc_sedf_domain_set(
-    int xc_handle,
+    xc_interface *xch,
     uint32_t domid,
     uint64_t period,
     uint64_t slice,
@@ -32,11 +32,11 @@ int xc_sedf_domain_set(
     p->latency   = latency;
     p->extratime = extratime;
     p->weight    = weight;
-    return do_domctl(xc_handle, &domctl);
+    return do_domctl(xch, &domctl);
 }
 
 int xc_sedf_domain_get(
-    int xc_handle,
+    xc_interface *xch,
     uint32_t domid,
     uint64_t *period,
     uint64_t *slice,
@@ -53,7 +53,7 @@ int xc_sedf_domain_get(
     domctl.u.scheduler_op.sched_id = XEN_SCHEDULER_SEDF;
     domctl.u.scheduler_op.cmd = XEN_DOMCTL_SCHEDOP_getinfo;
 
-    ret = do_domctl(xc_handle, &domctl);
+    ret = do_domctl(xch, &domctl);
 
     *period    = p->period;
     *slice     = p->slice;

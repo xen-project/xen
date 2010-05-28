@@ -12,7 +12,7 @@
 #define EFER_LMA 0x400
 
 
-unsigned long xc_translate_foreign_address(int xc_handle, uint32_t dom,
+unsigned long xc_translate_foreign_address(xc_interface *xch, uint32_t dom,
                                            int vcpu, unsigned long long virt)
 {
     xc_dominfo_t dominfo;
@@ -20,14 +20,14 @@ unsigned long xc_translate_foreign_address(int xc_handle, uint32_t dom,
     int size, level, pt_levels = 2;
     void *map;
 
-    if (xc_domain_getinfo(xc_handle, dom, 1, &dominfo) != 1 
+    if (xc_domain_getinfo(xch, dom, 1, &dominfo) != 1 
         || dominfo.domid != dom)
         return 0;
 
     /* What kind of paging are we dealing with? */
     if (dominfo.hvm) {
         struct hvm_hw_cpu ctx;
-        if (xc_domain_hvm_getcontext_partial(xc_handle, dom,
+        if (xc_domain_hvm_getcontext_partial(xch, dom,
                                              HVM_SAVE_CODE(CPU), vcpu,
                                              &ctx, sizeof ctx) != 0)
             return 0;
@@ -38,11 +38,11 @@ unsigned long xc_translate_foreign_address(int xc_handle, uint32_t dom,
     } else {
         DECLARE_DOMCTL;
         vcpu_guest_context_any_t ctx;
-        if (xc_vcpu_getcontext(xc_handle, dom, vcpu, &ctx) != 0)
+        if (xc_vcpu_getcontext(xch, dom, vcpu, &ctx) != 0)
             return 0;
         domctl.domain = dom;
         domctl.cmd = XEN_DOMCTL_get_address_size;
-        if ( do_domctl(xc_handle, &domctl) != 0 )
+        if ( do_domctl(xch, &domctl) != 0 )
             return 0;
         if (domctl.u.address_size.size == 64) {
             pt_levels = 4;
@@ -69,7 +69,7 @@ unsigned long xc_translate_foreign_address(int xc_handle, uint32_t dom,
     /* Walk the pagetables */
     for (level = pt_levels; level > 0; level--) {
         paddr += ((virt & mask) >> (xc_ffs64(mask) - 1)) * size;
-        map = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE, PROT_READ, 
+        map = xc_map_foreign_range(xch, dom, PAGE_SIZE, PROT_READ, 
                                    paddr >>PAGE_SHIFT);
         if (!map) 
             return 0;

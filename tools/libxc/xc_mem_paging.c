@@ -25,33 +25,33 @@
 #include "xc_private.h"
 
 
-int xc_mem_paging_nominate(int xc_handle, domid_t domain_id, unsigned long gfn)
+int xc_mem_paging_nominate(xc_interface *xch, domid_t domain_id, unsigned long gfn)
 {
-    return xc_mem_event_control(xc_handle, domain_id,
+    return xc_mem_event_control(xch, domain_id,
                                 XEN_DOMCTL_MEM_EVENT_OP_PAGING_NOMINATE,
                                 XEN_DOMCTL_MEM_EVENT_OP_PAGING, NULL, NULL,
                                 gfn);
 }
 
-int xc_mem_paging_evict(int xc_handle, domid_t domain_id, unsigned long gfn)
+int xc_mem_paging_evict(xc_interface *xch, domid_t domain_id, unsigned long gfn)
 {
-    return xc_mem_event_control(xc_handle, domain_id,
+    return xc_mem_event_control(xch, domain_id,
                                 XEN_DOMCTL_MEM_EVENT_OP_PAGING_EVICT,
                                 XEN_DOMCTL_MEM_EVENT_OP_PAGING, NULL, NULL,
                                 gfn);
 }
 
-int xc_mem_paging_prep(int xc_handle, domid_t domain_id, unsigned long gfn)
+int xc_mem_paging_prep(xc_interface *xch, domid_t domain_id, unsigned long gfn)
 {
-    return xc_mem_event_control(xc_handle, domain_id,
+    return xc_mem_event_control(xch, domain_id,
                                 XEN_DOMCTL_MEM_EVENT_OP_PAGING_PREP,
                                 XEN_DOMCTL_MEM_EVENT_OP_PAGING, NULL, NULL,
                                 gfn);
 }
 
-int xc_mem_paging_resume(int xc_handle, domid_t domain_id, unsigned long gfn)
+int xc_mem_paging_resume(xc_interface *xch, domid_t domain_id, unsigned long gfn)
 {
-    return xc_mem_event_control(xc_handle, domain_id,
+    return xc_mem_event_control(xch, domain_id,
                                 XEN_DOMCTL_MEM_EVENT_OP_PAGING_RESUME,
                                 XEN_DOMCTL_MEM_EVENT_OP_PAGING, NULL, NULL,
                                 gfn);

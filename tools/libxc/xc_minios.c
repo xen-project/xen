@@ -33,18 +33,18 @@
 
 extern struct wait_queue_head event_queue;
 
-int xc_interface_open(void)
+int xc_interface_open_core(xc_interface *xch)
 {
     return alloc_fd(FTYPE_XC);
 }
 
-int xc_interface_close(int xc_handle)
+int xc_interface_close_core(xc_interface *xch, int fd)
 {
-    files[xc_handle].type = FTYPE_NONE;
+    files[fd].type = FTYPE_NONE;
     return 0;
 }
 
-void *xc_map_foreign_bulk(int xc_handle, uint32_t dom, int prot,
+void *xc_map_foreign_bulk(xc_interface *xch, uint32_t dom, int prot,
                           const xen_pfn_t *arr, int *err, unsigned int num)
 {
     unsigned long pt_prot = 0;
@@ -59,7 +59,7 @@ void *xc_map_foreign_bulk(int xc_handle, uint32_t dom, int prot,
     return map_frames_ex(arr, num, 1, 0, 1, dom, err, pt_prot);    
 }
 
-void *xc_map_foreign_batch(int xc_handle, uint32_t dom, int prot,
+void *xc_map_foreign_batch(xc_interface *xch, uint32_t dom, int prot,
                            xen_pfn_t *arr, int num)
 {
     unsigned long pt_prot = 0;
@@ -83,7 +83,7 @@ void *xc_map_foreign_batch(int xc_handle, uint32_t dom, int prot,
     return (void *) addr;
 }
 
-void *xc_map_foreign_range(int xc_handle, uint32_t dom,
+void *xc_map_foreign_range(xc_interface *xch, uint32_t dom,
                            int size, int prot,
                            unsigned long mfn)
 {
@@ -100,7 +100,7 @@ void *xc_map_foreign_range(int xc_handle, uint32_t dom,
     return map_frames_ex(&mfn, size / getpagesize(), 0, 1, 1, dom, NULL, pt_prot);
 }
 
-void *xc_map_foreign_ranges(int xc_handle, uint32_t dom,
+void *xc_map_foreign_ranges(xc_interface *xch, uint32_t dom,
                             size_t size, int prot, size_t chunksize,
                             privcmd_mmap_entry_t entries[], int nentries)
 {
@@ -130,7 +130,7 @@ void *xc_map_foreign_ranges(int xc_handle, uint32_t dom,
 }
 
 
-int do_xen_hypercall(int xc_handle, privcmd_hypercall_t *hypercall)
+int do_xen_hypercall(xc_interface *xch, privcmd_hypercall_t *hypercall)
 {
     multicall_entry_t call;
     int i, ret;
@@ -351,13 +351,13 @@ int xc_evtchn_unmask(int xce_handle, evtchn_port_t port)
 }
 
 /* Optionally flush file to disk and discard page cache */
-void discard_file_cache(int fd, int flush)
+void discard_file_cache(xc_interface *xch, int fd, int flush)
 {
     if (flush)
         fsync(fd);
 }
 
-int xc_gnttab_open(void)
+int xc_gnttab_open(xc_interface *xch)
 {
     int xcg_handle;
     xcg_handle = alloc_fd(FTYPE_GNTMAP);
@@ -365,14 +365,14 @@ int xc_gnttab_open(void)
     return xcg_handle;
 }
 
-int xc_gnttab_close(int xcg_handle)
+int xc_gnttab_close(xc_interface *xch, int xcg_handle)
 {
     gntmap_fini(&files[xcg_handle].gntmap);
     files[xcg_handle].type = FTYPE_NONE;
     return 0;
 }
 
-void *xc_gnttab_map_grant_ref(int xcg_handle,
+void *xc_gnttab_map_grant_ref(xc_interface *xch, int xcg_handle,
                               uint32_t domid,
                               uint32_t ref,
                               int prot)
@@ -384,7 +384,7 @@ void *xc_gnttab_map_grant_ref(int xcg_handle,
                                  prot & PROT_WRITE);
 }
 
-void *xc_gnttab_map_grant_refs(int xcg_handle,
+void *xc_gnttab_map_grant_refs(xc_interface *xch, int xcg_handle,
                                uint32_t count,
                                uint32_t *domids,
                                uint32_t *refs,
@@ -397,7 +397,7 @@ void *xc_gnttab_map_grant_refs(int xcg_handle,
                                  prot & PROT_WRITE);
 }
 
-void *xc_gnttab_map_domain_grant_refs(int xcg_handle,
+void *xc_gnttab_map_domain_grant_refs(xc_interface *xch, int xcg_handle,
                                       uint32_t count,
                                       uint32_t domid,
                                       uint32_t *refs,
@@ -410,7 +410,7 @@ void *xc_gnttab_map_domain_grant_refs(int xcg_handle,
                                  prot & PROT_WRITE);
 }
 
-int xc_gnttab_munmap(int xcg_handle,
+int xc_gnttab_munmap(xc_interface *xch, int xcg_handle,
                      void *start_address,
                      uint32_t count)
 {
@@ -425,7 +425,7 @@ int xc_gnttab_munmap(int xcg_handle,
     return ret;
 }
 
-int xc_gnttab_set_max_grants(int xcg_handle,
+int xc_gnttab_set_max_grants(xc_interface *xch, int xcg_handle,
                              uint32_t count)
 {
     int ret;
@@ -439,13 +439,13 @@ int xc_gnttab_set_max_grants(int xcg_handle,
 }
 
 grant_entry_v1_t *xc_gnttab_map_table_v1(
-    int xc_handle, int domid, int *gnt_num)
+    xc_interface *xch, int domid, int *gnt_num)
 {
     return NULL;
 }
 
 grant_entry_v2_t *xc_gnttab_map_table_v2(
-    int xc_handle, int domid, int *gnt_num)
+    xc_interface *xch, int domid, int *gnt_num)
 {
     return NULL;
 }

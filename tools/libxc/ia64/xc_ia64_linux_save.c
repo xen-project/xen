@@ -54,7 +54,7 @@ static inline void set_bit(int nr, volatile void * addr)
 
 static int
 suspend_and_state(int (*suspend)(void*), void* data,
-                  int xc_handle, int io_fd,
+                  xc_interface *xc_handle, int io_fd,
                   int dom, xc_dominfo_t *info)
 {
     if ( !(*suspend)(data) ) {
@@ -86,7 +86,7 @@ md_is_not_ram(const efi_memory_desc_t *md)
  * page after pausing the domain.
  */
 static int
-xc_ia64_send_unallocated_list(int xc_handle, int io_fd, 
+xc_ia64_send_unallocated_list(xc_interface *xc_handle, int io_fd, 
                               struct xen_ia64_p2m_table *p2m_table,
                               xen_ia64_memmap_info_t *memmap_info, 
                               void *memmap_desc_start, void *memmap_desc_end)
@@ -155,7 +155,7 @@ xc_ia64_send_unallocated_list(int xc_handle, int io_fd,
 }
 
 static int
-xc_ia64_send_vcpu_context(int xc_handle, int io_fd, uint32_t dom,
+xc_ia64_send_vcpu_context(xc_interface *xc_handle, int io_fd, uint32_t dom,
                           uint32_t vcpu, vcpu_guest_context_any_t *ctxt_any)
 {
     vcpu_guest_context_t *ctxt = &ctxt_any->c;
@@ -174,7 +174,7 @@ xc_ia64_send_vcpu_context(int xc_handle, int io_fd, uint32_t dom,
 }
 
 static int
-xc_ia64_send_shared_info(int xc_handle, int io_fd, shared_info_t *live_shinfo)
+xc_ia64_send_shared_info(xc_interface *xc_handle, int io_fd, shared_info_t *live_shinfo)
 {
     if (write_exact(io_fd, live_shinfo, PAGE_SIZE)) {
         ERROR("Error when writing to state file (1)");
@@ -184,7 +184,7 @@ xc_ia64_send_shared_info(int xc_handle, int io_fd, shared_info_t *live_shinfo)
 }
 
 static int
-xc_ia64_send_vcpumap(int xc_handle, int io_fd, uint32_t dom,
+xc_ia64_send_vcpumap(xc_interface *xc_handle, int io_fd, uint32_t dom,
                      const xc_dominfo_t *info, uint64_t max_virt_cpus,
                      uint64_t **vcpumapp)
 {
@@ -231,7 +231,7 @@ xc_ia64_send_vcpumap(int xc_handle, int io_fd, uint32_t dom,
 
 
 static int
-xc_ia64_pv_send_context(int xc_handle, int io_fd, uint32_t dom,
+xc_ia64_pv_send_context(xc_interface *xc_handle, int io_fd, uint32_t dom,
                         const xc_dominfo_t *info, shared_info_t *live_shinfo)
 {
     int rc = -1;
@@ -280,7 +280,7 @@ xc_ia64_pv_send_context(int xc_handle, int io_fd, uint32_t dom,
 }
 
 static int
-xc_ia64_hvm_send_context(int xc_handle, int io_fd, uint32_t dom,
+xc_ia64_hvm_send_context(xc_interface *xc_handle, int io_fd, uint32_t dom,
                          const xc_dominfo_t *info, shared_info_t *live_shinfo)
 {
     int rc = -1;
@@ -381,7 +381,7 @@ out:
 }
 
 int
-xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
+xc_domain_save(xc_interface *xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
                uint32_t max_factor, uint32_t flags,
                struct save_callbacks* callbacks,
                int hvm, void (*switch_qemu_logdirty)(int, unsigned))

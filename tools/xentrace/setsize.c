@@ -6,7 +6,7 @@
 int main(int argc, char * argv[])
 {
     unsigned long size;
-    int xc_handle = xc_interface_open();
+    xc_interface *xc_handle = xc_interface_open(0,0,0);
   
     if ( xc_tbuf_get_size(xc_handle, &size) != 0 )
     {

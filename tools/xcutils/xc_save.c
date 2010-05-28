@@ -24,7 +24,7 @@
 #include <xenguest.h>
 
 static struct suspendinfo {
-    int xc_fd; /* libxc handle */
+    xc_interface *xch;
     int xce; /* event channel handle */
     int suspend_evtchn;
     int domid;
@@ -59,7 +59,7 @@ static int evtchn_suspend(void)
         return 0;
     }
 
-    if (xc_await_suspend(si.xce, si.suspend_evtchn) < 0) {
+    if (xc_await_suspend(si.xch, si.xce, si.suspend_evtchn) < 0) {
         warnx("suspend failed");
         return 0;
     }
@@ -77,7 +77,7 @@ static int suspend(void* data)
 
     /* Cannot notify guest to shut itself down if it's in ACPI sleep state. */
     if (si.flags & XCFLAGS_HVM)
-        xc_get_hvm_param(si.xc_fd, si.domid,
+        xc_get_hvm_param(si.xch, si.domid,
                          HVM_PARAM_ACPI_S_STATE, &sx_state);
 
     if ((sx_state == 0) && (si.suspend_evtchn >= 0))
@@ -171,8 +171,8 @@ main(int argc, char **argv)
     if (argc != 6)
         errx(1, "usage: %s iofd domid maxit maxf flags", argv[0]);
 
-    si.xc_fd = xc_interface_open();
-    if (si.xc_fd < 0)
+    si.xch = xc_interface_open(0,0,0);
+    if (!si.xch)
         errx(1, "failed to open control interface");
 
     io_fd = atoi(argv[1]);
@@ -196,7 +196,7 @@ main(int argc, char **argv)
         else
         {
             si.suspend_evtchn =
-              xc_suspend_evtchn_init(si.xc_fd, si.xce, si.domid, port);
+              xc_suspend_evtchn_init(si.xch, si.xce, si.domid, port);
 
             if (si.suspend_evtchn < 0)
                 warnx("suspend event channel initialization failed"
@@ -205,17 +205,17 @@ main(int argc, char **argv)
     }
     memset(&callbacks, 0, sizeof(callbacks));
     callbacks.suspend = suspend;
-    ret = xc_domain_save(si.xc_fd, io_fd, si.domid, maxit, max_f, si.flags, 
+    ret = xc_domain_save(si.xch, io_fd, si.domid, maxit, max_f, si.flags, 
                          &callbacks, !!(si.flags & XCFLAGS_HVM),
                          &switch_qemu_logdirty);
 
     if (si.suspend_evtchn > 0)
-	 xc_suspend_evtchn_release(si.xce, si.domid, si.suspend_evtchn);
+	 xc_suspend_evtchn_release(si.xch, si.xce, si.domid, si.suspend_evtchn);
 
     if (si.xce > 0)
         xc_evtchn_close(si.xce);
 
-    xc_interface_close(si.xc_fd);
+    xc_interface_close(si.xch);
 
     return ret;
 }

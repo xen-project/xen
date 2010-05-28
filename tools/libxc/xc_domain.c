@@ -11,7 +11,7 @@
 #include <xen/memory.h>
 #include <xen/hvm/hvm_op.h>
 
-int xc_domain_create(int xc_handle,
+int xc_domain_create(xc_interface *xch,
                      uint32_t ssidref,
                      xen_domain_handle_t handle,
                      uint32_t flags,
@@ -25,7 +25,7 @@ int xc_domain_create(int xc_handle,
     domctl.u.createdomain.ssidref = ssidref;
     domctl.u.createdomain.flags   = flags;
     memcpy(domctl.u.createdomain.handle, handle, sizeof(xen_domain_handle_t));
-    if ( (err = do_domctl(xc_handle, &domctl)) != 0 )
+    if ( (err = do_domctl(xch, &domctl)) != 0 )
         return err;
 
     *pdomid = (uint16_t)domctl.domain;
@@ -33,27 +33,27 @@ int xc_domain_create(int xc_handle,
 }
 
 
-int xc_domain_pause(int xc_handle,
+int xc_domain_pause(xc_interface *xch,
                     uint32_t domid)
 {
     DECLARE_DOMCTL;
     domctl.cmd = XEN_DOMCTL_pausedomain;
     domctl.domain = (domid_t)domid;
-    return do_domctl(xc_handle, &domctl);
+    return do_domctl(xch, &domctl);
 }
 
 
-int xc_domain_unpause(int xc_handle,
+int xc_domain_unpause(xc_interface *xch,
                       uint32_t domid)
 {
     DECLARE_DOMCTL;
     domctl.cmd = XEN_DOMCTL_unpausedomain;
     domctl.domain = (domid_t)domid;
-    return do_domctl(xc_handle, &domctl);
+    return do_domctl(xch, &domctl);
 }
 
 
-int xc_domain_destroy(int xc_handle,
+int xc_domain_destroy(xc_interface *xch,
                       uint32_t domid)
 {
     int ret;
@@ -61,12 +61,12 @@ int xc_domain_destroy(int xc_handle,
     domctl.cmd = XEN_DOMCTL_destroydomain;
     domctl.domain = (domid_t)domid;
     do {
-        ret = do_domctl(xc_handle, &domctl);
+        ret = do_domctl(xch, &domctl);
     } while ( ret && (errno == EAGAIN) );
     return ret;
 }
 
-int xc_domain_shutdown(int xc_handle,
+int xc_domain_shutdown(xc_interface *xch,
                        uint32_t domid,
                        int reason)
 {
@@ -86,7 +86,7 @@ int xc_domain_shutdown(int xc_handle,
         goto out1;
     }
 
-    ret = do_xen_hypercall(xc_handle, &hypercall);
+    ret = do_xen_hypercall(xch, &hypercall);
 
     unlock_pages(&arg, sizeof(arg));
 
@@ -95,7 +95,7 @@ int xc_domain_shutdown(int xc_handle,
 }
 
 
-int xc_vcpu_setaffinity(int xc_handle,
+int xc_vcpu_setaffinity(xc_interface *xch,
                         uint32_t domid,
                         int vcpu,
                         uint64_t *cpumap, int cpusize)
@@ -125,7 +125,7 @@ int xc_vcpu_setaffinity(int xc_handle,
         goto out;
     }
 
-    ret = do_domctl(xc_handle, &domctl);
+    ret = do_domctl(xch, &domctl);
 
     unlock_pages(local, cpusize);
 
@@ -135,7 +135,7 @@ int xc_vcpu_setaffinity(int xc_handle,
 }
 
 
-int xc_vcpu_getaffinity(int xc_handle,
+int xc_vcpu_getaffinity(xc_interface *xch,
                         uint32_t domid,
                         int vcpu,
                         uint64_t *cpumap, int cpusize)
@@ -164,7 +164,7 @@ int xc_vcpu_getaffinity(int xc_handle,
         goto out;
     }
 
-    ret = do_domctl(xc_handle, &domctl);
+    ret = do_domctl(xch, &domctl);
 
     unlock_pages(local, sizeof (local));
     bitmap_byte_to_64(cpumap, local, cpusize * 8);
@@ -174,7 +174,7 @@ out:
 }
 
 
-int xc_domain_getinfo(int xc_handle,
+int xc_domain_getinfo(xc_interface *xch,
                       uint32_t first_domid,
                       unsigned int max_doms,
                       xc_dominfo_t *info)
@@ -190,7 +190,7 @@ int xc_domain_getinfo(int xc_handle,
     {
         domctl.cmd = XEN_DOMCTL_getdomaininfo;
         domctl.domain = (domid_t)next_domid;
-        if ( (rc = do_domctl(xc_handle, &domctl)) < 0 )
+        if ( (rc = do_domctl(xch, &domctl)) < 0 )
             break;
         info->domid      = (uint16_t)domctl.domain;
 
@@ -235,7 +235,7 @@ int xc_domain_getinfo(int xc_handle,
     return nr_doms;
 }
 
-int xc_domain_getinfolist(int xc_handle,
+int xc_domain_getinfolist(xc_interface *xch,
                           uint32_t first_domain,
                           unsigned int max_domains,
                           xc_domaininfo_t *info)
@@ -251,7 +251,7 @@ int xc_domain_getinfolist(int xc_handle,
     sysctl.u.getdomaininfolist.max_domains  = max_domains;
     set_xen_guest_handle(sysctl.u.getdomaininfolist.buffer, info);
 
-    if ( xc_sysctl(xc_handle, &sysctl) < 0 )
+    if ( xc_sysctl(xch, &sysctl) < 0 )
         ret = -1;
     else
         ret = sysctl.u.getdomaininfolist.num_domains;
@@ -262,7 +262,7 @@ int xc_domain_getinfolist(int xc_handle,
 }
 
 /* get info from hvm guest for save */
-int xc_domain_hvm_getcontext(int xc_handle,
+int xc_domain_hvm_getcontext(xc_interface *xch,
                              uint32_t domid,
                              uint8_t *ctxt_buf,
                              uint32_t size)
@@ -279,7 +279,7 @@ int xc_domain_hvm_getcontext(int xc_handle,
         if ( (ret = lock_pages(ctxt_buf, size)) != 0 )
             return ret;
 
-    ret = do_domctl(xc_handle, &domctl);
+    ret = do_domctl(xch, &domctl);
 
     if ( ctxt_buf ) 
         unlock_pages(ctxt_buf, size);
@@ -289,7 +289,7 @@ int xc_domain_hvm_getcontext(int xc_handle,
 
 /* Get just one element of the HVM guest context.
  * size must be >= HVM_SAVE_LENGTH(type) */
-int xc_domain_hvm_getcontext_partial(int xc_handle,
+int xc_domain_hvm_getcontext_partial(xc_interface *xch,
                                      uint32_t domid,
                                      uint16_t typecode,
                                      uint16_t instance,
@@ -311,7 +311,7 @@ int xc_domain_hvm_getcontext_partial(int xc_handle,
     if ( (ret = lock_pages(ctxt_buf, size)) != 0 )
         return ret;
     
-    ret = do_domctl(xc_handle, &domctl);
+    ret = do_domctl(xch, &domctl);
 
     if ( ctxt_buf ) 
         unlock_pages(ctxt_buf, size);
@@ -320,7 +320,7 @@ int xc_domain_hvm_getcontext_partial(int xc_handle,
 }
 
 /* set info to hvm guest for restore */
-int xc_domain_hvm_setcontext(int xc_handle,
+int xc_domain_hvm_setcontext(xc_interface *xch,
                              uint32_t domid,
                              uint8_t *ctxt_buf,
                              uint32_t size)
@@ -336,14 +336,14 @@ int xc_domain_hvm_setcontext(int xc_handle,
     if ( (ret = lock_pages(ctxt_buf, size)) != 0 )
         return ret;
 
-    ret = do_domctl(xc_handle, &domctl);
+    ret = do_domctl(xch, &domctl);
 
     unlock_pages(ctxt_buf, size);
 
     return ret;
 }
 
-int xc_vcpu_getcontext(int xc_handle,
+int xc_vcpu_getcontext(xc_interface *xch,
                        uint32_t domid,
                        uint32_t vcpu,
                        vcpu_guest_context_any_t *ctxt)
@@ -360,14 +360,14 @@ int xc_vcpu_getcontext(int xc_handle,
     
     if ( (rc = lock_pages(ctxt, sz)) != 0 )
         return rc;
-    rc = do_domctl(xc_handle, &domctl);
+    rc = do_domctl(xch, &domctl);
     unlock_pages(ctxt, sz);
 
     return rc;
 }
 
 
-int xc_shadow_control(int xc_handle,
+int xc_shadow_control(xc_interface *xch,
                       uint32_t domid,
                       unsigned int sop,
                       unsigned long *dirty_bitmap,
@@ -387,7 +387,7 @@ int xc_shadow_control(int xc_handle,
     set_xen_guest_handle(domctl.u.shadow_op.dirty_bitmap,
                          (uint8_t *)dirty_bitmap);
 
-    rc = do_domctl(xc_handle, &domctl);
+    rc = do_domctl(xch, &domctl);
 
     if ( stats )
         memcpy(stats, &domctl.u.shadow_op.stats,
@@ -399,7 +399,7 @@ int xc_shadow_control(int xc_handle,
     return (rc == 0) ? domctl.u.shadow_op.pages : rc;
 }
 
-int xc_domain_setmaxmem(int xc_handle,
+int xc_domain_setmaxmem(xc_interface *xch,
                         uint32_t domid,
                         unsigned int max_memkb)
 {
@@ -407,10 +407,10 @@ int xc_domain_setmaxmem(int xc_handle,
     domctl.cmd = XEN_DOMCTL_max_mem;
     domctl.domain = (domid_t)domid;
     domctl.u.max_mem.max_memkb = max_memkb;
-    return do_domctl(xc_handle, &domctl);
+    return do_domctl(xch, &domctl);
 }
 
-int xc_domain_pin_memory_cacheattr(int xc_handle,
+int xc_domain_pin_memory_cacheattr(xc_interface *xch,
                                    uint32_t domid,
                                    uint64_t start,
                                    uint64_t end,
@@ -422,12 +422,12 @@ int xc_domain_pin_memory_cacheattr(int xc_handle,
     domctl.u.pin_mem_cacheattr.start = start;
     domctl.u.pin_mem_cacheattr.end = end;
     domctl.u.pin_mem_cacheattr.type = type;
-    return do_domctl(xc_handle, &domctl);
+    return do_domctl(xch, &domctl);
 }
 
 #if defined(__i386__) || defined(__x86_64__)
 #include "xc_e820.h"
-int xc_domain_set_memmap_limit(int xc_handle,
+int xc_domain_set_memmap_limit(xc_interface *xch,
                                uint32_t domid,
                                unsigned long map_limitkb)
 {
@@ -453,7 +453,7 @@ int xc_domain_set_memmap_limit(int xc_handle,
         goto out;
     }
 
-    rc = xc_memory_op(xc_handle, XENMEM_set_memory_map, &fmap);
+    rc = xc_memory_op(xch, XENMEM_set_memory_map, &fmap);
 
  out:
     unlock_pages(&fmap, sizeof(fmap));
@@ -461,7 +461,7 @@ int xc_domain_set_memmap_limit(int xc_handle,
     return rc;
 }
 #else
-int xc_domain_set_memmap_limit(int xc_handle,
+int xc_domain_set_memmap_limit(xc_interface *xch,
                                uint32_t domid,
                                unsigned long map_limitkb)
 {
@@ -471,7 +471,7 @@ int xc_domain_set_memmap_limit(int xc_handle,
 }
 #endif
 
-int xc_domain_set_time_offset(int xc_handle,
+int xc_domain_set_time_offset(xc_interface *xch,
                               uint32_t domid,
                               int32_t time_offset_seconds)
 {
@@ -479,19 +479,19 @@ int xc_domain_set_time_offset(int xc_handle,
     domctl.cmd = XEN_DOMCTL_settimeoffset;
     domctl.domain = (domid_t)domid;
     domctl.u.settimeoffset.time_offset_seconds = time_offset_seconds;
-    return do_domctl(xc_handle, &domctl);
+    return do_domctl(xch, &domctl);
 }
 
-int xc_domain_disable_migrate(int xc_handle, uint32_t domid)
+int xc_domain_disable_migrate(xc_interface *xch, uint32_t domid)
 {
     DECLARE_DOMCTL;
     domctl.cmd = XEN_DOMCTL_disable_migrate;
     domctl.domain = (domid_t)domid;
     domctl.u.disable_migrate.disable = 1;
-    return do_domctl(xc_handle, &domctl);
+    return do_domctl(xch, &domctl);
 }
 
-int xc_domain_set_tsc_info(int xc_handle,
+int xc_domain_set_tsc_info(xc_interface *xch,
                            uint32_t domid,
                            uint32_t tsc_mode,
                            uint64_t elapsed_nsec,
@@ -505,10 +505,10 @@ int xc_domain_set_tsc_info(int xc_handle,
     domctl.u.tsc_info.info.elapsed_nsec = elapsed_nsec;
     domctl.u.tsc_info.info.gtsc_khz = gtsc_khz;
     domctl.u.tsc_info.info.incarnation = incarnation;
-    return do_domctl(xc_handle, &domctl);
+    return do_domctl(xch, &domctl);
 }
 
-int xc_domain_get_tsc_info(int xc_handle,
+int xc_domain_get_tsc_info(xc_interface *xch,
                            uint32_t domid,
                            uint32_t *tsc_mode,
                            uint64_t *elapsed_nsec,
@@ -524,7 +524,7 @@ int xc_domain_get_tsc_info(int xc_handle,
     set_xen_guest_handle(domctl.u.tsc_info.out_info, &info);
     if ( (rc = lock_pages(&info, sizeof(info))) != 0 )
         return rc;
-    rc = do_domctl(xc_handle, &domctl);
+    rc = do_domctl(xch, &domctl);
     if ( rc == 0 )
     {
         *tsc_mode = info.tsc_mode;
@@ -537,7 +537,7 @@ int xc_domain_get_tsc_info(int xc_handle,
 }
 
 
-int xc_domain_memory_increase_reservation(int xc_handle,
+int xc_domain_memory_increase_reservation(xc_interface *xch,
                                           uint32_t domid,
                                           unsigned long nr_extents,
                                           unsigned int extent_order,
@@ -555,7 +555,7 @@ int xc_domain_memory_increase_reservation(int xc_handle,
     /* may be NULL */
     set_xen_guest_handle(reservation.extent_start, extent_start);
 
-    err = xc_memory_op(xc_handle, XENMEM_increase_reservation, &reservation);
+    err = xc_memory_op(xch, XENMEM_increase_reservation, &reservation);
     if ( err == nr_extents )
         return 0;
 
@@ -571,7 +571,7 @@ int xc_domain_memory_increase_reservation(int xc_handle,
     return err;
 }
 
-int xc_domain_memory_decrease_reservation(int xc_handle,
+int xc_domain_memory_decrease_reservation(xc_interface *xch,
                                           uint32_t domid,
                                           unsigned long nr_extents,
                                           unsigned int extent_order,
@@ -594,7 +594,7 @@ int xc_domain_memory_decrease_reservation(int xc_handle,
         return -1;
     }
 
-    err = xc_memory_op(xc_handle, XENMEM_decrease_reservation, &reservation);
+    err = xc_memory_op(xch, XENMEM_decrease_reservation, &reservation);
     if ( err == nr_extents )
         return 0;
 
@@ -609,7 +609,7 @@ int xc_domain_memory_decrease_reservation(int xc_handle,
     return err;
 }
 
-int xc_domain_memory_populate_physmap(int xc_handle,
+int xc_domain_memory_populate_physmap(xc_interface *xch,
                                       uint32_t domid,
                                       unsigned long nr_extents,
                                       unsigned int extent_order,
@@ -625,7 +625,7 @@ int xc_domain_memory_populate_physmap(int xc_handle,
     };
     set_xen_guest_handle(reservation.extent_start, extent_start);
 
-    err = xc_memory_op(xc_handle, XENMEM_populate_physmap, &reservation);
+    err = xc_memory_op(xch, XENMEM_populate_physmap, &reservation);
     if ( err == nr_extents )
         return 0;
 
@@ -640,7 +640,7 @@ int xc_domain_memory_populate_physmap(int xc_handle,
     return err;
 }
 
-static int xc_domain_memory_pod_target(int xc_handle,
+static int xc_domain_memory_pod_target(xc_interface *xch,
                                        int op,
                                        uint32_t domid,
                                        uint64_t target_pages,
@@ -655,7 +655,7 @@ static int xc_domain_memory_pod_target(int xc_handle,
         .target_pages = target_pages
     };
 
-    err = xc_memory_op(xc_handle, op, &pod_target);
+    err = xc_memory_op(xch, op, &pod_target);
 
     if ( err < 0 )
     {
@@ -679,14 +679,14 @@ static int xc_domain_memory_pod_target(int xc_handle,
 }
                                        
 
-int xc_domain_memory_set_pod_target(int xc_handle,
+int xc_domain_memory_set_pod_target(xc_interface *xch,
                                     uint32_t domid,
                                     uint64_t target_pages,
                                     uint64_t *tot_pages,
                                     uint64_t *pod_cache_pages,
                                     uint64_t *pod_entries)
 {
-    return xc_domain_memory_pod_target(xc_handle,
+    return xc_domain_memory_pod_target(xch,
                                        XENMEM_set_pod_target,
                                        domid,
                                        target_pages,
@@ -695,13 +695,13 @@ int xc_domain_memory_set_pod_target(int xc_handle,
                                        pod_entries);
 }
 
-int xc_domain_memory_get_pod_target(int xc_handle,
+int xc_domain_memory_get_pod_target(xc_interface *xch,
                                     uint32_t domid,
                                     uint64_t *tot_pages,
                                     uint64_t *pod_cache_pages,
                                     uint64_t *pod_entries)
 {
-    return xc_domain_memory_pod_target(xc_handle,
+    return xc_domain_memory_pod_target(xch,
                                        XENMEM_get_pod_target,
                                        domid,
                                        -1,
@@ -710,16 +710,16 @@ int xc_domain_memory_get_pod_target(int xc_handle,
                                        pod_entries);
 }
 
-int xc_domain_max_vcpus(int xc_handle, uint32_t domid, unsigned int max)
+int xc_domain_max_vcpus(xc_interface *xch, uint32_t domid, unsigned int max)
 {
     DECLARE_DOMCTL;
     domctl.cmd = XEN_DOMCTL_max_vcpus;
     domctl.domain = (domid_t)domid;
     domctl.u.max_vcpus.max    = max;
-    return do_domctl(xc_handle, &domctl);
+    return do_domctl(xch, &domctl);
 }
 
-int xc_domain_sethandle(int xc_handle, uint32_t domid,
+int xc_domain_sethandle(xc_interface *xch, uint32_t domid,
                         xen_domain_handle_t handle)
 {
     DECLARE_DOMCTL;
@@ -727,10 +727,10 @@ int xc_domain_sethandle(int xc_handle, uint32_t domid,
     domctl.domain = (domid_t)domid;
     memcpy(domctl.u.setdomainhandle.handle, handle,
            sizeof(xen_domain_handle_t));
-    return do_domctl(xc_handle, &domctl);
+    return do_domctl(xch, &domctl);
 }
 
-int xc_vcpu_getinfo(int xc_handle,
+int xc_vcpu_getinfo(xc_interface *xch,
                     uint32_t domid,
                     uint32_t vcpu,
                     xc_vcpuinfo_t *info)
@@ -742,14 +742,14 @@ int xc_vcpu_getinfo(int xc_handle,
     domctl.domain = (domid_t)domid;
     domctl.u.getvcpuinfo.vcpu   = (uint16_t)vcpu;
 
-    rc = do_domctl(xc_handle, &domctl);
+    rc = do_domctl(xch, &domctl);
 
     memcpy(info, &domctl.u.getvcpuinfo, sizeof(*info));
 
     return rc;
 }
 
-int xc_domain_ioport_permission(int xc_handle,
+int xc_domain_ioport_permission(xc_interface *xch,
                                 uint32_t domid,
                                 uint32_t first_port,
                                 uint32_t nr_ports,
@@ -763,10 +763,10 @@ int xc_domain_ioport_permission(int xc_handle,
     domctl.u.ioport_permission.nr_ports = nr_ports;
     domctl.u.ioport_permission.allow_access = allow_access;
 
-    return do_domctl(xc_handle, &domctl);
+    return do_domctl(xch, &domctl);
 }
 
-int xc_availheap(int xc_handle,
+int xc_availheap(xc_interface *xch,
                  int min_width,
                  int max_width,
                  int node,
@@ -780,14 +780,14 @@ int xc_availheap(int xc_handle,
     sysctl.u.availheap.max_bitwidth = max_width;
     sysctl.u.availheap.node = node;
 
-    rc = xc_sysctl(xc_handle, &sysctl);
+    rc = xc_sysctl(xch, &sysctl);
 
     *bytes = sysctl.u.availheap.avail_bytes;
 
     return rc;
 }
 
-int xc_vcpu_setcontext(int xc_handle,
+int xc_vcpu_setcontext(xc_interface *xch,
                        uint32_t domid,
                        uint32_t vcpu,
                        vcpu_guest_context_any_t *ctxt)
@@ -809,14 +809,14 @@ int xc_vcpu_setcontext(int xc_handle,
 
     if ( (rc = lock_pages(ctxt, sz)) != 0 )
         return rc;
-    rc = do_domctl(xc_handle, &domctl);
+    rc = do_domctl(xch, &domctl);
     
     unlock_pages(ctxt, sz);
 
     return rc;
 }
 
-int xc_domain_irq_permission(int xc_handle,
+int xc_domain_irq_permission(xc_interface *xch,
                              uint32_t domid,
                              uint8_t pirq,
                              uint8_t allow_access)
@@ -828,10 +828,10 @@ int xc_domain_irq_permission(int xc_handle,
     domctl.u.irq_permission.pirq = pirq;
     domctl.u.irq_permission.allow_access = allow_access;
 
-    return do_domctl(xc_handle, &domctl);
+    return do_domctl(xch, &domctl);
 }
 
-int xc_domain_iomem_permission(int xc_handle,
+int xc_domain_iomem_permission(xc_interface *xch,
                                uint32_t domid,
                                unsigned long first_mfn,
                                unsigned long nr_mfns,
@@ -845,10 +845,10 @@ int xc_domain_iomem_permission(int xc_handle,
     domctl.u.iomem_permission.nr_mfns = nr_mfns;
     domctl.u.iomem_permission.allow_access = allow_access;
 
-    return do_domctl(xc_handle, &domctl);
+    return do_domctl(xch, &domctl);
 }
 
-int xc_domain_send_trigger(int xc_handle,
+int xc_domain_send_trigger(xc_interface *xch,
                            uint32_t domid,
                            uint32_t trigger,
                            uint32_t vcpu)
@@ -860,10 +860,10 @@ int xc_domain_send_trigger(int xc_handle,
     domctl.u.sendtrigger.trigger = trigger;
     domctl.u.sendtrigger.vcpu = vcpu;
 
-    return do_domctl(xc_handle, &domctl);
+    return do_domctl(xch, &domctl);
 }
 
-int xc_set_hvm_param(int handle, domid_t dom, int param, unsigned long value)
+int xc_set_hvm_param(xc_interface *handle, domid_t dom, int param, unsigned long value)
 {
     DECLARE_HYPERCALL;
     xen_hvm_param_t arg;
@@ -882,7 +882,7 @@ int xc_set_hvm_param(int handle, domid_t dom, int param, unsigned long value)
     return rc;
 }
 
-int xc_get_hvm_param(int handle, domid_t dom, int param, unsigned long *value)
+int xc_get_hvm_param(xc_interface *handle, domid_t dom, int param, unsigned long *value)
 {
     DECLARE_HYPERCALL;
     xen_hvm_param_t arg;
@@ -901,7 +901,7 @@ int xc_get_hvm_param(int handle, domid_t dom, int param, unsigned long *value)
     return rc;
 }
 
-int xc_domain_setdebugging(int xc_handle,
+int xc_domain_setdebugging(xc_interface *xch,
                            uint32_t domid,
                            unsigned int enable)
 {
@@ -910,11 +910,11 @@ int xc_domain_setdebugging(int xc_handle,
     domctl.cmd = XEN_DOMCTL_setdebugging;
     domctl.domain = domid;
     domctl.u.setdebugging.enable = enable;
-    return do_domctl(xc_handle, &domctl);
+    return do_domctl(xch, &domctl);
 }
 
 int xc_assign_device(
-    int xc_handle,
+    xc_interface *xch,
     uint32_t domid,
     uint32_t machine_bdf)
 {
@@ -924,11 +924,11 @@ int xc_assign_device(
     domctl.domain = domid;
     domctl.u.assign_device.machine_bdf = machine_bdf;
 
-    return do_domctl(xc_handle, &domctl);
+    return do_domctl(xch, &domctl);
 }
 
 int xc_get_device_group(
-    int xc_handle,
+    xc_interface *xch,
     uint32_t domid,
     uint32_t machine_bdf,
     uint32_t max_sdevs,
@@ -951,7 +951,7 @@ int xc_get_device_group(
         PERROR("Could not lock memory for xc_get_device_group\n");
         return -ENOMEM;
     }
-    rc = do_domctl(xc_handle, &domctl);
+    rc = do_domctl(xch, &domctl);
     unlock_pages(sdev_array, max_sdevs * sizeof(*sdev_array));
 
     *num_sdevs = domctl.u.get_device_group.num_sdevs;
@@ -959,7 +959,7 @@ int xc_get_device_group(
 }
 
 int xc_test_assign_device(
-    int xc_handle,
+    xc_interface *xch,
     uint32_t domid,
     uint32_t machine_bdf)
 {
@@ -969,11 +969,11 @@ int xc_test_assign_device(
     domctl.domain = domid;
     domctl.u.assign_device.machine_bdf = machine_bdf;
 
-    return do_domctl(xc_handle, &domctl);
+    return do_domctl(xch, &domctl);
 }
 
 int xc_deassign_device(
-    int xc_handle,
+    xc_interface *xch,
     uint32_t domid,
     uint32_t machine_bdf)
 {
@@ -983,11 +983,11 @@ int xc_deassign_device(
     domctl.domain = domid;
     domctl.u.assign_device.machine_bdf = machine_bdf;
  
-    return do_domctl(xc_handle, &domctl);
+    return do_domctl(xch, &domctl);
 }
 
 int xc_domain_update_msi_irq(
-    int xc_handle,
+    xc_interface *xch,
     uint32_t domid,
     uint32_t gvec,
     uint32_t pirq,
@@ -1010,12 +1010,12 @@ int xc_domain_update_msi_irq(
     bind->u.msi.gflags = gflags;
     bind->u.msi.gtable = gtable;
 
-    rc = do_domctl(xc_handle, &domctl);
+    rc = do_domctl(xch, &domctl);
     return rc;
 }
 
 int xc_domain_unbind_msi_irq(
-    int xc_handle,
+    xc_interface *xch,
     uint32_t domid,
     uint32_t gvec,
     uint32_t pirq,
@@ -1036,13 +1036,13 @@ int xc_domain_unbind_msi_irq(
     bind->u.msi.gvec = gvec;
     bind->u.msi.gflags = gflags;
 
-    rc = do_domctl(xc_handle, &domctl);
+    rc = do_domctl(xch, &domctl);
     return rc;
 }
 
 /* Pass-through: binds machine irq to guests irq */
 int xc_domain_bind_pt_irq(
-    int xc_handle,
+    xc_interface *xch,
     uint32_t domid,
     uint8_t machine_irq,
     uint8_t irq_type,
@@ -1072,12 +1072,12 @@ int xc_domain_bind_pt_irq(
     else if ( irq_type == PT_IRQ_TYPE_ISA )
         bind->u.isa.isa_irq = isa_irq;
     
-    rc = do_domctl(xc_handle, &domctl);
+    rc = do_domctl(xch, &domctl);
     return rc;
 }
 
 int xc_domain_unbind_pt_irq(
-    int xc_handle,
+    xc_interface *xch,
     uint32_t domid,
     uint8_t machine_irq,
     uint8_t irq_type,
@@ -1102,12 +1102,12 @@ int xc_domain_unbind_pt_irq(
     bind->u.pci.intx = intx;
     bind->u.isa.isa_irq = isa_irq;
     
-    rc = do_domctl(xc_handle, &domctl);
+    rc = do_domctl(xch, &domctl);
     return rc;
 }
 
 int xc_domain_bind_pt_pci_irq(
-    int xc_handle,
+    xc_interface *xch,
     uint32_t domid,
     uint8_t machine_irq,
     uint8_t bus,
@@ -1115,22 +1115,22 @@ int xc_domain_bind_pt_pci_irq(
     uint8_t intx)
 {
 
-    return (xc_domain_bind_pt_irq(xc_handle, domid, machine_irq,
+    return (xc_domain_bind_pt_irq(xch, domid, machine_irq,
                                   PT_IRQ_TYPE_PCI, bus, device, intx, 0));
 }
 
 int xc_domain_bind_pt_isa_irq(
-    int xc_handle,
+    xc_interface *xch,
     uint32_t domid,
     uint8_t machine_irq)
 {
 
-    return (xc_domain_bind_pt_irq(xc_handle, domid, machine_irq,
+    return (xc_domain_bind_pt_irq(xch, domid, machine_irq,
                                   PT_IRQ_TYPE_ISA, 0, 0, 0, machine_irq));
 }
 
 int xc_domain_memory_mapping(
-    int xc_handle,
+    xc_interface *xch,
     uint32_t domid,
     unsigned long first_gfn,
     unsigned long first_mfn,
@@ -1146,11 +1146,11 @@ int xc_domain_memory_mapping(
     domctl.u.memory_mapping.nr_mfns = nr_mfns;
     domctl.u.memory_mapping.add_mapping = add_mapping;
 
-    return do_domctl(xc_handle, &domctl);
+    return do_domctl(xch, &domctl);
 }
 
 int xc_domain_ioport_mapping(
-    int xc_handle,
+    xc_interface *xch,
     uint32_t domid,
     uint32_t first_gport,
     uint32_t first_mport,
@@ -1166,11 +1166,11 @@ int xc_domain_ioport_mapping(
     domctl.u.ioport_mapping.nr_ports = nr_ports;
     domctl.u.ioport_mapping.add_mapping = add_mapping;
 
-    return do_domctl(xc_handle, &domctl);
+    return do_domctl(xch, &domctl);
 }
 
 int xc_domain_set_target(
-    int xc_handle,
+    xc_interface *xch,
     uint32_t domid,
     uint32_t target)
 {
@@ -1180,11 +1180,11 @@ int xc_domain_set_target(
     domctl.domain = domid;
     domctl.u.set_target.target = target;
 
-    return do_domctl(xc_handle, &domctl);
+    return do_domctl(xch, &domctl);
 }
 
 int xc_domain_subscribe_for_suspend(
-    int xc_handle, domid_t dom, evtchn_port_t port)
+    xc_interface *xch, domid_t dom, evtchn_port_t port)
 {
     DECLARE_DOMCTL;
 
@@ -1192,10 +1192,10 @@ int xc_domain_subscribe_for_suspend(
     domctl.domain = dom;
     domctl.u.subscribe.port = port;
 
-    return do_domctl(xc_handle, &domctl);
+    return do_domctl(xch, &domctl);
 }
 
-int xc_domain_set_machine_address_size(int xc,
+int xc_domain_set_machine_address_size(xc_interface *xch,
                                        uint32_t domid,
                                        unsigned int width)
 {
@@ -1206,11 +1206,11 @@ int xc_domain_set_machine_address_size(int xc,
     domctl.cmd    = XEN_DOMCTL_set_machine_address_size;
     domctl.u.address_size.size = width;
 
-    return do_domctl(xc, &domctl);
+    return do_domctl(xch, &domctl);
 }
 
 
-int xc_domain_get_machine_address_size(int xc, uint32_t domid)
+int xc_domain_get_machine_address_size(xc_interface *xch, uint32_t domid)
 {
     DECLARE_DOMCTL;
     int rc;
@@ -1219,12 +1219,12 @@ int xc_domain_get_machine_address_size(int xc, uint32_t domid)
     domctl.domain = domid;
     domctl.cmd    = XEN_DOMCTL_get_machine_address_size;
 
-    rc = do_domctl(xc, &domctl);
+    rc = do_domctl(xch, &domctl);
 
     return rc == 0 ? domctl.u.address_size.size : rc;
 }
 
-int xc_domain_suppress_spurious_page_faults(int xc, uint32_t domid)
+int xc_domain_suppress_spurious_page_faults(xc_interface *xc, uint32_t domid)
 {
     DECLARE_DOMCTL;
 
@@ -1236,7 +1236,7 @@ int xc_domain_suppress_spurious_page_faults(int xc, uint32_t domid)
 
 }
 
-int xc_domain_debug_control(int xc, uint32_t domid, uint32_t sop, uint32_t vcpu)
+int xc_domain_debug_control(xc_interface *xc, uint32_t domid, uint32_t sop, uint32_t vcpu)
 {
     DECLARE_DOMCTL;
 

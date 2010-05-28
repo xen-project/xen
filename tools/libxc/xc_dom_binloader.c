@@ -143,20 +143,20 @@ static int xc_dom_parse_bin_kernel(struct xc_dom_image *dom)
     if ( !image_info )
         return -EINVAL;
 
-    xc_dom_printf("%s: multiboot header fields\n", __FUNCTION__);
-    xc_dom_printf("  flags:         0x%" PRIx32 "\n", image_info->flags);
-    xc_dom_printf("  header_addr:   0x%" PRIx32 "\n", image_info->header_addr);
-    xc_dom_printf("  load_addr:     0x%" PRIx32 "\n", image_info->load_addr);
-    xc_dom_printf("  load_end_addr: 0x%" PRIx32 "\n", image_info->load_end_addr);
-    xc_dom_printf("  bss_end_addr:  0x%" PRIx32 "\n", image_info->bss_end_addr);
-    xc_dom_printf("  entry_addr:    0x%" PRIx32 "\n", image_info->entry_addr);
+    DOMPRINTF("%s: multiboot header fields", __FUNCTION__);
+    DOMPRINTF("  flags:         0x%" PRIx32 "", image_info->flags);
+    DOMPRINTF("  header_addr:   0x%" PRIx32 "", image_info->header_addr);
+    DOMPRINTF("  load_addr:     0x%" PRIx32 "", image_info->load_addr);
+    DOMPRINTF("  load_end_addr: 0x%" PRIx32 "", image_info->load_end_addr);
+    DOMPRINTF("  bss_end_addr:  0x%" PRIx32 "", image_info->bss_end_addr);
+    DOMPRINTF("  entry_addr:    0x%" PRIx32 "", image_info->entry_addr);
 
     /* Check the flags */
     if ( (image_info->flags & FLAGS_MASK) != FLAGS_REQUIRED )
     {
-        xc_dom_panic(XC_INVALID_KERNEL,
+        xc_dom_panic(dom->xch, XC_INVALID_KERNEL,
                      "%s: xen_bin_image_table flags required "
-                     "0x%08" PRIx32 " found 0x%08" PRIx32 "\n",
+                     "0x%08" PRIx32 " found 0x%08" PRIx32 "",
                      __FUNCTION__, FLAGS_REQUIRED, image_info->flags & FLAGS_MASK);
         return -EINVAL;
     }
@@ -166,7 +166,7 @@ static int xc_dom_parse_bin_kernel(struct xc_dom_image *dom)
          ((char *) image_info - image) <
          (image_info->header_addr - image_info->load_addr) )
     {
-        xc_dom_panic(XC_INVALID_KERNEL, "%s: Invalid header_addr.",
+        xc_dom_panic(dom->xch, XC_INVALID_KERNEL, "%s: Invalid header_addr.",
                      __FUNCTION__);
         return -EINVAL;
     }
@@ -175,21 +175,21 @@ static int xc_dom_parse_bin_kernel(struct xc_dom_image *dom)
     load_end_addr = image_info->load_end_addr ?: start_addr + image_size;
     bss_end_addr = image_info->bss_end_addr ?: load_end_addr;
 
-    xc_dom_printf("%s: calculated addresses\n", __FUNCTION__);
-    xc_dom_printf("  start_addr:    0x%" PRIx32 "\n", start_addr);
-    xc_dom_printf("  load_end_addr: 0x%" PRIx32 "\n", load_end_addr);
-    xc_dom_printf("  bss_end_addr:  0x%" PRIx32 "\n", bss_end_addr);
+    DOMPRINTF("%s: calculated addresses", __FUNCTION__);
+    DOMPRINTF("  start_addr:    0x%" PRIx32 "", start_addr);
+    DOMPRINTF("  load_end_addr: 0x%" PRIx32 "", load_end_addr);
+    DOMPRINTF("  bss_end_addr:  0x%" PRIx32 "", bss_end_addr);
 
     if ( (start_addr + image_size) < load_end_addr )
     {
-        xc_dom_panic(XC_INVALID_KERNEL, "%s: Invalid load_end_addr.\n",
+        xc_dom_panic(dom->xch, XC_INVALID_KERNEL, "%s: Invalid load_end_addr.",
                      __FUNCTION__);
         return -EINVAL;
     }
 
     if ( bss_end_addr < load_end_addr)
     {
-        xc_dom_panic(XC_INVALID_KERNEL, "%s: Invalid bss_end_addr.\n",
+        xc_dom_panic(dom->xch, XC_INVALID_KERNEL, "%s: Invalid bss_end_addr.",
                      __FUNCTION__);
         return -EINVAL;
     }
@@ -217,7 +217,7 @@ static int xc_dom_parse_bin_kernel(struct xc_dom_image *dom)
         dom->guest_type = "xen-3.0-x86_32";
         if ( strstr(dom->xen_caps, "xen-3.0-x86_32p") )
         {
-            xc_dom_printf("%s: PAE fixup\n", __FUNCTION__);
+            DOMPRINTF("%s: PAE fixup", __FUNCTION__);
             dom->guest_type = "xen-3.0-x86_32p";
             dom->parms.pae  = 2;
         }
@@ -250,10 +250,10 @@ static int xc_dom_load_bin_kernel(struct xc_dom_image *dom)
     text_size = load_end_addr - image_info->load_addr;
     bss_size = bss_end_addr - load_end_addr;
 
-    xc_dom_printf("%s: calculated sizes\n", __FUNCTION__);
-    xc_dom_printf("  skip:      0x%" PRIx32 "\n", skip);
-    xc_dom_printf("  text_size: 0x%" PRIx32 "\n", text_size);
-    xc_dom_printf("  bss_size:  0x%" PRIx32 "\n", bss_size);
+    DOMPRINTF("%s: calculated sizes", __FUNCTION__);
+    DOMPRINTF("  skip:      0x%" PRIx32 "", skip);
+    DOMPRINTF("  text_size: 0x%" PRIx32 "", text_size);
+    DOMPRINTF("  bss_size:  0x%" PRIx32 "", bss_size);
 
     dest = xc_dom_vaddr_to_ptr(dom, dom->kernel_seg.vstart);
     memcpy(dest, image + skip, text_size);

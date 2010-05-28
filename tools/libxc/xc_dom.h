@@ -93,7 +93,7 @@ struct xc_dom_image {
     unsigned int xenstore_evtchn;
     xen_pfn_t shared_info_mfn;
 
-    int guest_xc;
+    xc_interface *xch;
     domid_t guest_domid;
     int8_t vhpt_size_log2; /* for IA64 */
     int8_t superpages;
@@ -153,13 +153,16 @@ void xc_dom_register_arch_hooks(struct xc_dom_arch *hooks);
 
 /* --- main functions ---------------------------------------------- */
 
-struct xc_dom_image *xc_dom_allocate(const char *cmdline, const char *features);
+struct xc_dom_image *xc_dom_allocate(xc_interface *xch,
+                                     const char *cmdline, const char *features);
 void xc_dom_release_phys(struct xc_dom_image *dom);
 void xc_dom_release(struct xc_dom_image *dom);
 int xc_dom_mem_init(struct xc_dom_image *dom, unsigned int mem_mb);
 
-size_t xc_dom_check_gzip(void *blob, size_t ziplen);
-int xc_dom_do_gunzip(void *src, size_t srclen, void *dst, size_t dstlen);
+size_t xc_dom_check_gzip(xc_interface *xch,
+                     void *blob, size_t ziplen);
+int xc_dom_do_gunzip(xc_interface *xch,
+                     void *src, size_t srclen, void *dst, size_t dstlen);
 int xc_dom_try_gunzip(struct xc_dom_image *dom, void **blob, size_t * size);
 
 int xc_dom_kernel_file(struct xc_dom_image *dom, const char *filename);
@@ -170,11 +173,12 @@ int xc_dom_ramdisk_mem(struct xc_dom_image *dom, const void *mem,
                        size_t memsize);
 
 int xc_dom_parse_image(struct xc_dom_image *dom);
-struct xc_dom_arch *xc_dom_find_arch_hooks(char *guest_type);
+struct xc_dom_arch *xc_dom_find_arch_hooks(xc_interface *xch, char *guest_type);
 int xc_dom_build_image(struct xc_dom_image *dom);
 int xc_dom_update_guest_p2m(struct xc_dom_image *dom);
 
-int xc_dom_boot_xen_init(struct xc_dom_image *dom, int xc, domid_t domid);
+int xc_dom_boot_xen_init(struct xc_dom_image *dom, xc_interface *xch,
+                     domid_t domid);
 int xc_dom_boot_mem_init(struct xc_dom_image *dom);
 void *xc_dom_boot_domU_map(struct xc_dom_image *dom, xen_pfn_t pfn,
                            xen_pfn_t count);
@@ -183,15 +187,17 @@ int xc_dom_compat_check(struct xc_dom_image *dom);
 
 /* --- debugging bits ---------------------------------------------- */
 
-extern FILE *xc_dom_logfile;
+int xc_dom_loginit(xc_interface *xch);
 
-void xc_dom_loginit(void);
-int xc_dom_printf(const char *fmt, ...) __attribute__ ((format(printf, 1, 2)));
-int xc_dom_panic_func(const char *file, int line, xc_error_code err,
+void xc_dom_printf(xc_interface *xch, const char *fmt, ...)
+     __attribute__ ((format(printf, 2, 3)));
+void xc_dom_panic_func(xc_interface *xch,
+                      const char *file, int line, xc_error_code err,
                       const char *fmt, ...)
-    __attribute__ ((format(printf, 4, 5)));
-#define xc_dom_panic(err, fmt, args...) \
-    xc_dom_panic_func(__FILE__, __LINE__, err, fmt, ## args)
+    __attribute__ ((format(printf, 5, 6)));
+
+#define xc_dom_panic(xch, err, fmt, args...) \
+    xc_dom_panic_func(xch, __FILE__, __LINE__, err, fmt, ## args)
 #define xc_dom_trace(mark) \
     xc_dom_printf("%s:%d: trace %s\n", __FILE__, __LINE__, mark)
 

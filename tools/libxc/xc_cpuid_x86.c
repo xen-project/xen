@@ -31,10 +31,10 @@
 #define DEF_MAX_BASE 0x0000000du
 #define DEF_MAX_EXT  0x80000008u
 
-static int hypervisor_is_64bit(int xc)
+static int hypervisor_is_64bit(xc_interface *xch)
 {
     xen_capabilities_info_t xen_caps = "";
-    return ((xc_version(xc, XENVER_capabilities, &xen_caps) == 0) &&
+    return ((xc_version(xch, XENVER_capabilities, &xen_caps) == 0) &&
             (strstr(xen_caps, "x86_64") != NULL));
 }
 
@@ -75,7 +75,8 @@ static void xc_cpuid_brand_get(char *str)
 }
 
 static void amd_xc_cpuid_policy(
-    int xc, domid_t domid, const unsigned int *input, unsigned int *regs,
+    xc_interface *xch, domid_t domid,
+    const unsigned int *input, unsigned int *regs,
     int is_pae)
 {
     switch ( input[0] )
@@ -86,7 +87,7 @@ static void amd_xc_cpuid_policy(
         break;
 
     case 0x80000001: {
-        int is_64bit = hypervisor_is_64bit(xc) && is_pae;
+        int is_64bit = hypervisor_is_64bit(xch) && is_pae;
 
         if ( !is_pae )
             clear_bit(X86_FEATURE_PAE, regs[3]);
@@ -123,7 +124,8 @@ static void amd_xc_cpuid_policy(
 }
 
 static void intel_xc_cpuid_policy(
-    int xc, domid_t domid, const unsigned int *input, unsigned int *regs,
+    xc_interface *xch, domid_t domid,
+    const unsigned int *input, unsigned int *regs,
     int is_pae)
 {
     switch ( input[0] )
@@ -139,7 +141,7 @@ static void intel_xc_cpuid_policy(
         break;
 
     case 0x80000001: {
-        int is_64bit = hypervisor_is_64bit(xc) && is_pae;
+        int is_64bit = hypervisor_is_64bit(xch) && is_pae;
 
         /* Only a few features are advertised in Intel's 0x80000001. */
         regs[2] &= (is_64bit ? bitmaskof(X86_FEATURE_LAHF_LM) : 0);
@@ -162,13 +164,14 @@ static void intel_xc_cpuid_policy(
 }
 
 static void xc_cpuid_hvm_policy(
-    int xc, domid_t domid, const unsigned int *input, unsigned int *regs)
+    xc_interface *xch, domid_t domid,
+    const unsigned int *input, unsigned int *regs)
 {
     char brand[13];
     unsigned long pae;
     int is_pae;
 
-    xc_get_hvm_param(xc, domid, HVM_PARAM_PAE_ENABLED, &pae);
+    xc_get_hvm_param(xch, domid, HVM_PARAM_PAE_ENABLED, &pae);
     is_pae = !!pae;
 
     switch ( input[0] )
@@ -265,17 +268,18 @@ static void xc_cpuid_hvm_policy(
 
     xc_cpuid_brand_get(brand);
     if ( strstr(brand, "AMD") )
-        amd_xc_cpuid_policy(xc, domid, input, regs, is_pae);
+        amd_xc_cpuid_policy(xch, domid, input, regs, is_pae);
     else
-        intel_xc_cpuid_policy(xc, domid, input, regs, is_pae);
+        intel_xc_cpuid_policy(xch, domid, input, regs, is_pae);
 
 }
 
 static void xc_cpuid_pv_policy(
-    int xc, domid_t domid, const unsigned int *input, unsigned int *regs)
+    xc_interface *xch, domid_t domid,
+    const unsigned int *input, unsigned int *regs)
 {
     DECLARE_DOMCTL;
-    int guest_64bit, xen_64bit = hypervisor_is_64bit(xc);
+    int guest_64bit, xen_64bit = hypervisor_is_64bit(xch);
     char brand[13];
 
     xc_cpuid_brand_get(brand);
@@ -283,7 +287,7 @@ static void xc_cpuid_pv_policy(
     memset(&domctl, 0, sizeof(domctl));
     domctl.domain = domid;
     domctl.cmd = XEN_DOMCTL_get_address_size;
-    do_domctl(xc, &domctl);
+    do_domctl(xch, &domctl);
     guest_64bit = (domctl.u.address_size.size == 64);
 
     if ( (input[0] & 0x7fffffff) == 1 )
@@ -352,23 +356,24 @@ static void xc_cpuid_pv_policy(
 }
 
 static int xc_cpuid_policy(
-    int xc, domid_t domid, const unsigned int *input, unsigned int *regs)
+    xc_interface *xch, domid_t domid,
+    const unsigned int *input, unsigned int *regs)
 {
     xc_dominfo_t        info;
 
-    if ( xc_domain_getinfo(xc, domid, 1, &info) == 0 )
+    if ( xc_domain_getinfo(xch, domid, 1, &info) == 0 )
         return -EINVAL;
 
     if ( info.hvm )
-        xc_cpuid_hvm_policy(xc, domid, input, regs);
+        xc_cpuid_hvm_policy(xch, domid, input, regs);
     else
-        xc_cpuid_pv_policy(xc, domid, input, regs);
+        xc_cpuid_pv_policy(xch, domid, input, regs);
 
     return 0;
 }
 
 static int xc_cpuid_do_domctl(
-    int xc, domid_t domid,
+    xc_interface *xch, domid_t domid,
     const unsigned int *input, const unsigned int *regs)
 {
     DECLARE_DOMCTL;
@@ -383,7 +388,7 @@ static int xc_cpuid_do_domctl(
     domctl.u.cpuid.ecx = regs[2];
     domctl.u.cpuid.edx = regs[3];
 
-    return do_domctl(xc, &domctl);
+    return do_domctl(xch, &domctl);
 }
 
 static char *alloc_str(void)
@@ -405,7 +410,7 @@ void xc_cpuid_to_str(const unsigned int *regs, char **strs)
     }
 }
 
-int xc_cpuid_apply_policy(int xc, domid_t domid)
+int xc_cpuid_apply_policy(xc_interface *xch, domid_t domid)
 {
     unsigned int input[2] = { 0, 0 }, regs[4];
     unsigned int base_max, ext_max;
@@ -422,11 +427,11 @@ int xc_cpuid_apply_policy(int xc, domid_t domid)
     for ( ; ; )
     {
         cpuid(input, regs);
-        xc_cpuid_policy(xc, domid, input, regs);
+        xc_cpuid_policy(xch, domid, input, regs);
 
         if ( regs[0] || regs[1] || regs[2] || regs[3] )
         {
-            rc = xc_cpuid_do_domctl(xc, domid, input, regs);
+            rc = xc_cpuid_do_domctl(xch, domid, input, regs);
             if ( rc )
                 return rc;
 
@@ -462,7 +467,7 @@ int xc_cpuid_apply_policy(int xc, domid_t domid)
  *  's' -> (same) must be the same
  */
 int xc_cpuid_check(
-    int xc, const unsigned int *input,
+    xc_interface *xch, const unsigned int *input,
     const char **config,
     char **config_transformed)
 {
@@ -522,7 +527,7 @@ int xc_cpuid_check(
  * For 's' and 'x' the configuration is overwritten with the value applied.
  */
 int xc_cpuid_set(
-    int xc, domid_t domid, const unsigned int *input,
+    xc_interface *xch, domid_t domid, const unsigned int *input,
     const char **config, char **config_transformed)
 {
     int rc;
@@ -533,7 +538,7 @@ int xc_cpuid_set(
     cpuid(input, regs);
 
     memcpy(polregs, regs, sizeof(regs));
-    xc_cpuid_policy(xc, domid, input, polregs);
+    xc_cpuid_policy(xch, domid, input, polregs);
 
     for ( i = 0; i < 4; i++ )
     {
@@ -572,7 +577,7 @@ int xc_cpuid_set(
         }
     }
 
-    rc = xc_cpuid_do_domctl(xc, domid, input, regs);
+    rc = xc_cpuid_do_domctl(xch, domid, input, regs);
     if ( rc == 0 )
         return 0;
 

@@ -28,7 +28,7 @@
 #include <xen/foreign/x86_64.h>
 #include <xen/hvm/save.h>
 
-int xc_handle = 0;
+xc_interface *xc_handle = 0;
 int domid = 0;
 int frame_ptrs = 0;
 int stack_trace = 0;
@@ -823,7 +823,7 @@ static void dump_ctx(int vcpu)
     vcpu_guest_context_any_t ctx;
     xc_dominfo_t dominfo;
 
-    xc_handle = xc_interface_open(); /* for accessing control interface */
+    xc_handle = xc_interface_open(0,0,0); /* for accessing control interface */
 
     ret = xc_domain_getinfo(xc_handle, domid, 1, &dominfo);
     if (ret < 0) {
@@ -890,7 +890,7 @@ static void dump_ctx(int vcpu)
         }
     }
 
-    xc_interface_close(xc_handle);
+    ret = xc_interface_close(xc_handle);
     if (ret < 0) {
         perror("xc_interface_close");
         exit(-1);

@@ -25,7 +25,7 @@
 #include <xen/memory.h>
 #include <xen/grant_table.h>
 
-int xc_memshr_control(int xc_handle,
+int xc_memshr_control(xc_interface *xch,
                       uint32_t domid,
                       int enable)
 {
@@ -39,10 +39,10 @@ int xc_memshr_control(int xc_handle,
     op->op = XEN_DOMCTL_MEM_SHARING_OP_CONTROL;
     op->u.enable = enable;
 
-    return do_domctl(xc_handle, &domctl);
+    return do_domctl(xch, &domctl);
 }
 
-int xc_memshr_nominate_gfn(int xc_handle,
+int xc_memshr_nominate_gfn(xc_interface *xch,
                            uint32_t domid,
                            unsigned long gfn,
                            uint64_t *handle)
@@ -58,13 +58,13 @@ int xc_memshr_nominate_gfn(int xc_handle,
     op->op = XEN_DOMCTL_MEM_SHARING_OP_NOMINATE_GFN;
     op->u.nominate.u.gfn = gfn;
 
-    ret = do_domctl(xc_handle, &domctl);
+    ret = do_domctl(xch, &domctl);
     if(!ret) *handle = op->u.nominate.handle; 
 
     return ret;
 }
 
-int xc_memshr_nominate_gref(int xc_handle,
+int xc_memshr_nominate_gref(xc_interface *xch,
                             uint32_t domid,
                             grant_ref_t gref,
                             uint64_t *handle)
@@ -80,13 +80,13 @@ int xc_memshr_nominate_gref(int xc_handle,
     op->op = XEN_DOMCTL_MEM_SHARING_OP_NOMINATE_GREF;
     op->u.nominate.u.grant_ref = gref;
 
-    ret = do_domctl(xc_handle, &domctl);
+    ret = do_domctl(xch, &domctl);
     if(!ret) *handle = op->u.nominate.handle; 
 
     return ret;
 }
 
-int xc_memshr_share(int xc_handle,
+int xc_memshr_share(xc_interface *xch,
                     uint64_t source_handle,
                     uint64_t client_handle)
 {
@@ -101,10 +101,10 @@ int xc_memshr_share(int xc_handle,
     op->u.share.source_handle = source_handle;
     op->u.share.client_handle = client_handle;
 
-    return do_domctl(xc_handle, &domctl);
+    return do_domctl(xch, &domctl);
 }
 
-int xc_memshr_domain_resume(int xc_handle,
+int xc_memshr_domain_resume(xc_interface *xch,
                             uint32_t domid)
 {
     DECLARE_DOMCTL;
@@ -116,10 +116,10 @@ int xc_memshr_domain_resume(int xc_handle,
     op = &(domctl.u.mem_sharing_op);
     op->op = XEN_DOMCTL_MEM_SHARING_OP_RESUME;
 
-    return do_domctl(xc_handle, &domctl);
+    return do_domctl(xch, &domctl);
 }
 
-int xc_memshr_debug_gfn(int xc_handle,
+int xc_memshr_debug_gfn(xc_interface *xch,
                         uint32_t domid,
                         unsigned long gfn)
 {
@@ -133,10 +133,10 @@ int xc_memshr_debug_gfn(int xc_handle,
     op->op = XEN_DOMCTL_MEM_SHARING_OP_DEBUG_GFN;
     op->u.debug.u.gfn = gfn;
 
-    return do_domctl(xc_handle, &domctl);
+    return do_domctl(xch, &domctl);
 }
 
-int xc_memshr_debug_mfn(int xc_handle,
+int xc_memshr_debug_mfn(xc_interface *xch,
                         uint32_t domid,
                         unsigned long mfn)
 {
@@ -150,10 +150,10 @@ int xc_memshr_debug_mfn(int xc_handle,
     op->op = XEN_DOMCTL_MEM_SHARING_OP_DEBUG_MFN;
     op->u.debug.u.mfn = mfn;
 
-    return do_domctl(xc_handle, &domctl);
+    return do_domctl(xch, &domctl);
 }
 
-int xc_memshr_debug_gref(int xc_handle,
+int xc_memshr_debug_gref(xc_interface *xch,
                          uint32_t domid,
                          grant_ref_t gref)
 {
@@ -167,6 +167,6 @@ int xc_memshr_debug_gref(int xc_handle,
     op->op = XEN_DOMCTL_MEM_SHARING_OP_DEBUG_GREF;
     op->u.debug.u.gref = gref;
 
-    return do_domctl(xc_handle, &domctl);
+    return do_domctl(xch, &domctl);
 }
 

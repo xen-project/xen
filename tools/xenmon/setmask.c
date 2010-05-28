@@ -43,7 +43,7 @@ int main(int argc, char * argv[])
     struct xen_sysctl sysctl;
     int ret;
 
-    int xc_handle = xc_interface_open();
+    xc_interface *xc_handle = xc_interface_open(0,0,0);
     sysctl.cmd = XEN_SYSCTL_tbuf_op;
     sysctl.interface_version = XEN_SYSCTL_INTERFACE_VERSION;
     sysctl.u.tbuf_op.cmd  = XEN_SYSCTL_TBUFOP_get_info;

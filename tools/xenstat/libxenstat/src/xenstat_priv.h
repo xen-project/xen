@@ -33,7 +33,7 @@
 #define VERSION_SIZE (2 * SHORT_ASC_LEN + 1 + sizeof(xen_extraversion_t) + 1)
 
 struct xenstat_handle {
-	int xc_handle;
+	xc_interface *xc_handle;
 	struct xs_handle *xshandle; /* xenstore handle */
 	int page_size;
 	void *priv;

@@ -25,7 +25,7 @@
 
 #include "xc_private.h"
 
-int xc_cpu_online(int xc_handle, int cpu)
+int xc_cpu_online(xc_interface *xch, int cpu)
 {
     DECLARE_SYSCTL;
     int ret;
@@ -33,12 +33,12 @@ int xc_cpu_online(int xc_handle, int cpu)
     sysctl.cmd = XEN_SYSCTL_cpu_hotplug;
     sysctl.u.cpu_hotplug.cpu = cpu;
     sysctl.u.cpu_hotplug.op = XEN_SYSCTL_CPU_HOTPLUG_ONLINE;
-    ret = xc_sysctl(xc_handle, &sysctl);
+    ret = xc_sysctl(xch, &sysctl);
 
     return ret;
 }
 
-int xc_cpu_offline(int xc_handle, int cpu)
+int xc_cpu_offline(xc_interface *xch, int cpu)
 {
     DECLARE_SYSCTL;
     int ret;
@@ -46,7 +46,7 @@ int xc_cpu_offline(int xc_handle, int cpu)
     sysctl.cmd = XEN_SYSCTL_cpu_hotplug;
     sysctl.u.cpu_hotplug.cpu = cpu;
     sysctl.u.cpu_hotplug.op = XEN_SYSCTL_CPU_HOTPLUG_OFFLINE;
-    ret = xc_sysctl(xc_handle, &sysctl);
+    ret = xc_sysctl(xch, &sysctl);
 
     return ret;
 }

@@ -50,7 +50,7 @@ static unsigned long *pages;
 static unsigned long *pages_mfns;
 static unsigned long allocated;
 
-int pin_table(int xc_handle, unsigned int type, unsigned long mfn,
+int pin_table(xc_interface *xc_handle, unsigned int type, unsigned long mfn,
               domid_t dom);
 
 /* We need mfn to appear as target_pfn, so exchange with the MFN there */
@@ -109,7 +109,7 @@ void kexec(void *kernel, long kernel_size, void *module, long module_size, char 
     int rc;
     domid_t domid = DOMID_SELF;
     xen_pfn_t pfn;
-    int xc_handle;
+    xc_interface *xc_handle;
     unsigned long i;
     void *seg;
     xen_pfn_t boot_page_mfn = virt_to_mfn(&_boot_page);
@@ -118,9 +118,9 @@ void kexec(void *kernel, long kernel_size, void *module, long module_size, char 
     unsigned long nr_m2p_updates;
 
     DEBUG("booting with cmdline %s\n", cmdline);
-    xc_handle = xc_interface_open();
+    xc_handle = xc_interface_open(0,0,0);
 
-    dom = xc_dom_allocate(cmdline, features);
+    dom = xc_dom_allocate(xc_handle, cmdline, features);
     dom->allocate = kexec_allocate;
 
     dom->kernel_blob = kernel;
@@ -160,7 +160,7 @@ void kexec(void *kernel, long kernel_size, void *module, long module_size, char 
 #endif
 
     /* equivalent of xc_dom_mem_init */
-    dom->arch_hooks = xc_dom_find_arch_hooks(dom->guest_type);
+    dom->arch_hooks = xc_dom_find_arch_hooks(xc_handle, dom->guest_type);
     dom->total_pages = start_info.nr_pages;
 
     /* equivalent of arch_setup_meminit */
@@ -238,7 +238,7 @@ void kexec(void *kernel, long kernel_size, void *module, long module_size, char 
         munmap((void*) pages[pfn], PAGE_SIZE);
 
     /* Pin the boot page table base */
-    if ( (rc = pin_table(dom->guest_xc, 
+    if ( (rc = pin_table(dom->xch,
 #ifdef __i386__
                 MMUEXT_PIN_L3_TABLE,
 #endif

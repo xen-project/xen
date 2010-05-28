@@ -22,7 +22,7 @@
 /* ------------------------------------------------------------------------ */
 
 static int xc_linux_build_internal(struct xc_dom_image *dom,
-                                   int xc_handle, uint32_t domid,
+                                   xc_interface *xch, uint32_t domid,
                                    unsigned int mem_mb,
                                    unsigned long flags,
                                    unsigned int store_evtchn,
@@ -36,7 +36,7 @@ static int xc_linux_build_internal(struct xc_dom_image *dom,
     dom->console_evtchn = console_evtchn;
     dom->xenstore_evtchn = store_evtchn;
 
-    if ( (rc = xc_dom_boot_xen_init(dom, xc_handle, domid)) != 0 )
+    if ( (rc = xc_dom_boot_xen_init(dom, xch, domid)) != 0 )
         goto out;
     if ( (rc = xc_dom_parse_image(dom)) != 0 )
         goto out;
@@ -56,7 +56,7 @@ static int xc_linux_build_internal(struct xc_dom_image *dom,
     return rc;
 }
 
-int xc_linux_build_mem(int xc_handle, uint32_t domid,
+int xc_linux_build_mem(xc_interface *xch, uint32_t domid,
                        unsigned int mem_mb,
                        const char *image_buffer,
                        unsigned long image_size,
@@ -73,14 +73,14 @@ int xc_linux_build_mem(int xc_handle, uint32_t domid,
     struct xc_dom_image *dom;
     int rc;
 
-    xc_dom_loginit();
-    dom = xc_dom_allocate(cmdline, features);
+    xc_dom_loginit(xch);
+    dom = xc_dom_allocate(xch, cmdline, features);
     if ( (rc = xc_dom_kernel_mem(dom, image_buffer, image_size)) != 0 )
         goto out;
     if ( initrd && ((rc = xc_dom_ramdisk_mem(dom, initrd, initrd_len)) != 0) )
         goto out;
 
-    rc = xc_linux_build_internal(dom, xc_handle, domid,
+    rc = xc_linux_build_internal(dom, xch, domid,
                                  mem_mb, flags,
                                  store_evtchn, store_mfn,
                                  console_evtchn, console_mfn);
@@ -90,7 +90,7 @@ int xc_linux_build_mem(int xc_handle, uint32_t domid,
     return rc;
 }
 
-int xc_linux_build(int xc_handle, uint32_t domid,
+int xc_linux_build(xc_interface *xch, uint32_t domid,
                    unsigned int mem_mb,
                    const char *image_name,
                    const char *initrd_name,
@@ -105,15 +105,15 @@ int xc_linux_build(int xc_handle, uint32_t domid,
     struct xc_dom_image *dom;
     int rc;
 
-    xc_dom_loginit();
-    dom = xc_dom_allocate(cmdline, features);
+    xc_dom_loginit(xch);
+    dom = xc_dom_allocate(xch, cmdline, features);
     if ( (rc = xc_dom_kernel_file(dom, image_name)) != 0 )
         goto out;
     if ( initrd_name && strlen(initrd_name) &&
          ((rc = xc_dom_ramdisk_file(dom, initrd_name)) != 0) )
         goto out;
 
-    rc = xc_linux_build_internal(dom, xc_handle, domid,
+    rc = xc_linux_build_internal(dom, xch, domid,
                                  mem_mb, flags,
                                  store_evtchn, store_mfn,
                                  console_evtchn, console_mfn);
@@ -122,13 +122,14 @@ int xc_linux_build(int xc_handle, uint32_t domid,
     xc_dom_release(dom);
     return rc;
 }
-int xc_get_bit_size(const char *image_name, const char *cmdline, 
-                      const char *features, int *bit_size)
+int xc_get_bit_size(xc_interface *xch,
+                    const char *image_name, const char *cmdline, 
+                    const char *features, int *bit_size)
 {
     struct xc_dom_image *dom;
     int rc;
     *bit_size = 0;
-    dom = xc_dom_allocate(cmdline, features);
+    dom = xc_dom_allocate(xch, cmdline, features);
     if ( (rc = xc_dom_kernel_file(dom, image_name)) != 0 )
         goto out;
     if ( (rc = xc_dom_parse_image(dom)) != 0 )
@@ -145,7 +146,7 @@ out:
     return rc;
 }
 
-int xc_dom_linux_build(int xc_handle,
+int xc_dom_linux_build(xc_interface *xch,
                        struct xc_dom_image *dom,
                        uint32_t domid,
                        unsigned int mem_mb,
@@ -164,7 +165,7 @@ int xc_dom_linux_build(int xc_handle,
          ((rc = xc_dom_ramdisk_file(dom, initrd_name)) != 0) )
         return rc;
 
-    return xc_linux_build_internal(dom, xc_handle, domid,
+    return xc_linux_build_internal(dom, xch, domid,
                                    mem_mb, flags,
                                    store_evtchn, store_mfn,
                                    console_evtchn, console_mfn);

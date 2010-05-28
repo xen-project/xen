@@ -9,18 +9,18 @@
 #include <stdarg.h>
 #include "xc_private.h"
 
-static int do_sysctl_save(int xc_handle, struct xen_sysctl *sysctl)
+static int do_sysctl_save(xc_interface *xch, struct xen_sysctl *sysctl)
 {
     int ret;
 
     do {
-        ret = do_sysctl(xc_handle, sysctl);
+        ret = do_sysctl(xch, sysctl);
     } while ( (ret < 0) && (errno == EAGAIN) );
 
     return ret;
 }
 
-int xc_cpupool_create(int xc_handle,
+int xc_cpupool_create(xc_interface *xch,
                       uint32_t *ppoolid,
                       uint32_t sched_id)
 {
@@ -32,14 +32,14 @@ int xc_cpupool_create(int xc_handle,
     sysctl.u.cpupool_op.cpupool_id = (*ppoolid == 0) ?
         XEN_SYSCTL_CPUPOOL_PAR_ANY : *ppoolid;
     sysctl.u.cpupool_op.sched_id = sched_id;
-    if ( (err = do_sysctl_save(xc_handle, &sysctl)) != 0 )
+    if ( (err = do_sysctl_save(xch, &sysctl)) != 0 )
         return err;
 
     *ppoolid = sysctl.u.cpupool_op.cpupool_id;
     return 0;
 }
 
-int xc_cpupool_destroy(int xc_handle,
+int xc_cpupool_destroy(xc_interface *xch,
                        uint32_t poolid)
 {
     DECLARE_SYSCTL;
@@ -47,10 +47,10 @@ int xc_cpupool_destroy(int xc_handle,
     sysctl.cmd = XEN_SYSCTL_cpupool_op;
     sysctl.u.cpupool_op.op = XEN_SYSCTL_CPUPOOL_OP_DESTROY;
     sysctl.u.cpupool_op.cpupool_id = poolid;
-    return do_sysctl_save(xc_handle, &sysctl);
+    return do_sysctl_save(xch, &sysctl);
 }
 
-int xc_cpupool_getinfo(int xc_handle, 
+int xc_cpupool_getinfo(xc_interface *xch, 
                        uint32_t first_poolid,
                        uint32_t n_max, 
                        xc_cpupoolinfo_t *info)
@@ -76,7 +76,7 @@ int xc_cpupool_getinfo(int xc_handle,
             PERROR("Could not lock memory for Xen hypercall");
             break;
         }
-        err = do_sysctl_save(xc_handle, &sysctl);
+        err = do_sysctl_save(xch, &sysctl);
         unlock_pages(local, sizeof (local));
 
         if ( err < 0 )
@@ -96,7 +96,7 @@ int xc_cpupool_getinfo(int xc_handle,
     return p;
 }
 
-int xc_cpupool_addcpu(int xc_handle,
+int xc_cpupool_addcpu(xc_interface *xch,
                       uint32_t poolid,
                       int cpu)
 {
@@ -106,10 +106,10 @@ int xc_cpupool_addcpu(int xc_handle,
     sysctl.u.cpupool_op.op = XEN_SYSCTL_CPUPOOL_OP_ADDCPU;
     sysctl.u.cpupool_op.cpupool_id = poolid;
     sysctl.u.cpupool_op.cpu = (cpu < 0) ? XEN_SYSCTL_CPUPOOL_PAR_ANY : cpu;
-    return do_sysctl_save(xc_handle, &sysctl);
+    return do_sysctl_save(xch, &sysctl);
 }
 
-int xc_cpupool_removecpu(int xc_handle,
+int xc_cpupool_removecpu(xc_interface *xch,
                          uint32_t poolid,
                          int cpu)
 {
@@ -119,10 +119,10 @@ int xc_cpupool_removecpu(int xc_handle,
     sysctl.u.cpupool_op.op = XEN_SYSCTL_CPUPOOL_OP_RMCPU;
     sysctl.u.cpupool_op.cpupool_id = poolid;
     sysctl.u.cpupool_op.cpu = (cpu < 0) ? XEN_SYSCTL_CPUPOOL_PAR_ANY : cpu;
-    return do_sysctl_save(xc_handle, &sysctl);
+    return do_sysctl_save(xch, &sysctl);
 }
 
-int xc_cpupool_movedomain(int xc_handle,
+int xc_cpupool_movedomain(xc_interface *xch,
                           uint32_t poolid,
                           uint32_t domid)
 {
@@ -132,10 +132,10 @@ int xc_cpupool_movedomain(int xc_handle,
     sysctl.u.cpupool_op.op = XEN_SYSCTL_CPUPOOL_OP_MOVEDOMAIN;
     sysctl.u.cpupool_op.cpupool_id = poolid;
     sysctl.u.cpupool_op.domid = domid;
-    return do_sysctl_save(xc_handle, &sysctl);
+    return do_sysctl_save(xch, &sysctl);
 }
 
-int xc_cpupool_freeinfo(int xc_handle,
+int xc_cpupool_freeinfo(xc_interface *xch,
                         uint64_t *cpumap)
 {
     int err;
@@ -153,7 +153,7 @@ int xc_cpupool_freeinfo(int xc_handle,
         return err;
     }
 
-    err = do_sysctl_save(xc_handle, &sysctl);
+    err = do_sysctl_save(xch, &sysctl);
     unlock_pages(local, sizeof (local));
 
     if (err < 0)

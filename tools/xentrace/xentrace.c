@@ -72,7 +72,7 @@ settings_t opts;
 
 int interrupted = 0; /* gets set if we get a SIGHUP */
 
-static int xc_handle = -1;
+static xc_interface *xc_handle;
 static int event_fd = -1;
 static int virq_port = -1;
 static int outfd = 1;
@@ -424,10 +424,10 @@ fail:
 
 static void disable_tbufs(void)
 {
-    int xc_handle = xc_interface_open();
+    xc_interface *xc_handle = xc_interface_open(0,0,0);
     int ret;
 
-    if ( xc_handle < 0 ) 
+    if ( !xc_handle ) 
     {
         perror("Couldn't open xc handle to disable tbufs.");
         goto out;
@@ -578,7 +578,7 @@ static void event_init(void)
 
     rc = xc_evtchn_open();
     if (rc < 0) {
-        perror(xc_get_last_error()->message);
+        perror("event channel open");
         exit(EXIT_FAILURE);
     }
     event_fd = rc;
@@ -1014,10 +1014,10 @@ int main(int argc, char **argv)
 
     parse_args(argc, argv);
 
-    xc_handle = xc_interface_open();
-    if ( xc_handle < 0 ) 
+    xc_handle = xc_interface_open(0,0,0);
+    if ( !xc_handle ) 
     {
-        perror(xc_get_last_error()->message);
+        perror("xenctrl interface open");
         exit(EXIT_FAILURE);
     }
 

@@ -34,7 +34,8 @@
 #define round_up(addr, mask)     ((addr) | (mask))
 
 static unsigned long
-nr_page_tables(xen_vaddr_t start, xen_vaddr_t end, unsigned long bits)
+nr_page_tables(struct xc_dom_image *dom,
+               xen_vaddr_t start, xen_vaddr_t end, unsigned long bits)
 {
     xen_vaddr_t mask = bits_to_mask(bits);
     int tables;
@@ -56,9 +57,9 @@ nr_page_tables(xen_vaddr_t start, xen_vaddr_t end, unsigned long bits)
         tables = ((end - start) >> bits) + 1;
     }
 
-    xc_dom_printf("%s: 0x%016" PRIx64 "/%ld: 0x%016" PRIx64
-                  " -> 0x%016" PRIx64 ", %d table(s)\n",
-                  __FUNCTION__, mask, bits, start, end, tables);
+    DOMPRINTF("%s: 0x%016" PRIx64 "/%ld: 0x%016" PRIx64
+              " -> 0x%016" PRIx64 ", %d table(s)",
+              __FUNCTION__, mask, bits, start, end, tables);
     return tables;
 }
 
@@ -77,17 +78,17 @@ static int count_pgtables(struct xc_dom_image *dom, int pae,
         try_virt_end = round_up(dom->virt_alloc_end + pages * PAGE_SIZE_X86,
                                 bits_to_mask(22)); /* 4MB alignment */
         dom->pg_l4 =
-            nr_page_tables(dom->parms.virt_base, try_virt_end, l4_bits);
+            nr_page_tables(dom, dom->parms.virt_base, try_virt_end, l4_bits);
         dom->pg_l3 =
-            nr_page_tables(dom->parms.virt_base, try_virt_end, l3_bits);
+            nr_page_tables(dom, dom->parms.virt_base, try_virt_end, l3_bits);
         dom->pg_l2 =
-            nr_page_tables(dom->parms.virt_base, try_virt_end, l2_bits);
+            nr_page_tables(dom, dom->parms.virt_base, try_virt_end, l2_bits);
         dom->pg_l1 =
-            nr_page_tables(dom->parms.virt_base, try_virt_end, l1_bits);
+            nr_page_tables(dom, dom->parms.virt_base, try_virt_end, l1_bits);
         if (pae && try_virt_end < 0xc0000000)
         {
-            xc_dom_printf("%s: PAE: extra l2 page table for l3#3\n",
-                          __FUNCTION__);
+            DOMPRINTF("%s: PAE: extra l2 page table for l3#3",
+                      __FUNCTION__);
             dom->pg_l2++;
         }
         dom->pgtables = dom->pg_l4 + dom->pg_l3 + dom->pg_l2 + dom->pg_l1;
@@ -168,18 +169,17 @@ static xen_pfn_t move_l3_below_4G(struct xc_dom_image *dom,
     xen_pfn_t new_l3mfn;
     struct xc_mmu *mmu;
     void *l3tab;
-    int xc = dom->guest_xc;
 
-    mmu = xc_alloc_mmu_updates(xc, dom->guest_domid);
+    mmu = xc_alloc_mmu_updates(dom->xch, dom->guest_domid);
     if ( mmu == NULL )
     {
-        xc_dom_printf("%s: failed at %d\n", __FUNCTION__, __LINE__);
+        DOMPRINTF("%s: failed at %d", __FUNCTION__, __LINE__);
         return l3mfn;
     }
 
     xc_dom_unmap_one(dom, l3pfn);
 
-    new_l3mfn = xc_make_page_below_4G(dom->guest_xc, dom->guest_domid, l3mfn);
+    new_l3mfn = xc_make_page_below_4G(dom->xch, dom->guest_domid, l3mfn);
     if ( !new_l3mfn )
         goto out;
 
@@ -187,13 +187,13 @@ static xen_pfn_t move_l3_below_4G(struct xc_dom_image *dom,
     if ( xc_dom_update_guest_p2m(dom) != 0 )
         goto out;
 
-    if ( xc_add_mmu_update(xc, mmu,
+    if ( xc_add_mmu_update(dom->xch, mmu,
                            (((unsigned long long)new_l3mfn)
                             << XC_DOM_PAGE_SHIFT(dom)) |
                            MMU_MACHPHYS_UPDATE, l3pfn) )
         goto out;
 
-    if ( xc_flush_mmu_updates(xc, mmu) )
+    if ( xc_flush_mmu_updates(dom->xch, mmu) )
         goto out;
 
     /*
@@ -207,9 +207,9 @@ static xen_pfn_t move_l3_below_4G(struct xc_dom_image *dom,
     l3tab = xc_dom_pfn_to_ptr(dom, l3pfn, 1);
     memset(l3tab, 0, XC_DOM_PAGE_SIZE(dom));
 
-    xc_dom_printf("%s: successfully relocated L3 below 4G. "
-                  "(L3 PFN %#"PRIpfn" MFN %#"PRIpfn"=>%#"PRIpfn")\n",
-                  __FUNCTION__, l3pfn, l3mfn, new_l3mfn);
+    DOMPRINTF("%s: successfully relocated L3 below 4G. "
+              "(L3 PFN %#"PRIpfn" MFN %#"PRIpfn"=>%#"PRIpfn")",
+              __FUNCTION__, l3pfn, l3mfn, new_l3mfn);
 
     l3mfn = new_l3mfn;
 
@@ -239,9 +239,9 @@ static int setup_pgtables_x86_32_pae(struct xc_dom_image *dom)
 
         if ( l3mfn >= 0x100000 )
         {
-            xc_dom_panic(XC_INTERNAL_ERROR,"%s: cannot move L3 below 4G. "
-                         "extended-cr3 not supported by guest. "
-                         "(L3 PFN %#"PRIpfn" MFN %#"PRIpfn")\n",
+            xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,"%s: cannot move L3"
+                         " below 4G. extended-cr3 not supported by guest. "
+                         "(L3 PFN %#"PRIpfn" MFN %#"PRIpfn")",
                          __FUNCTION__, l3pfn, l3mfn);
             return -EINVAL;
         }
@@ -288,7 +288,7 @@ static int setup_pgtables_x86_32_pae(struct xc_dom_image *dom)
 
     if ( dom->virt_pgtab_end <= 0xc0000000 )
     {
-        xc_dom_printf("%s: PAE: extra l2 page table for l3#3\n", __FUNCTION__);
+        DOMPRINTF("%s: PAE: extra l2 page table for l3#3", __FUNCTION__);
         l3tab[3] = pfn_to_paddr(xc_dom_p2m_guest(dom, l2pfn)) | L3_PROT;
     }
     return 0;
@@ -418,7 +418,7 @@ static int start_info_x86_32(struct xc_dom_image *dom)
         xc_dom_feature_translated(dom) ? dom->shared_info_pfn : dom->
         shared_info_mfn;
 
-    xc_dom_printf("%s: called\n", __FUNCTION__);
+    DOMPRINTF_CALLED(dom->xch);
 
     memset(start_info, 0, sizeof(*start_info));
     strncpy(start_info->magic, dom->guest_type, sizeof(start_info->magic));
@@ -458,7 +458,7 @@ static int start_info_x86_64(struct xc_dom_image *dom)
         xc_dom_feature_translated(dom) ? dom->shared_info_pfn : dom->
         shared_info_mfn;
 
-    xc_dom_printf("%s: called\n", __FUNCTION__);
+    DOMPRINTF_CALLED(dom->xch);
 
     memset(start_info, 0, sizeof(*start_info));
     strncpy(start_info->magic, dom->guest_type, sizeof(start_info->magic));
@@ -495,7 +495,7 @@ static int shared_info_x86_32(struct xc_dom_image *dom, void *ptr)
     shared_info_x86_32_t *shared_info = ptr;
     int i;
 
-    xc_dom_printf("%s: called\n", __FUNCTION__);
+    DOMPRINTF_CALLED(dom->xch);
 
     memset(shared_info, 0, sizeof(*shared_info));
     for ( i = 0; i < XEN_LEGACY_MAX_VCPUS; i++ )
@@ -508,7 +508,7 @@ static int shared_info_x86_64(struct xc_dom_image *dom, void *ptr)
     shared_info_x86_64_t *shared_info = ptr;
     int i;
 
-    xc_dom_printf("%s: called\n", __FUNCTION__);
+    DOMPRINTF_CALLED(dom->xch);
 
     memset(shared_info, 0, sizeof(*shared_info));
     for ( i = 0; i < XEN_LEGACY_MAX_VCPUS; i++ )
@@ -523,7 +523,7 @@ static int vcpu_x86_32(struct xc_dom_image *dom, void *ptr)
     vcpu_guest_context_x86_32_t *ctxt = ptr;
     xen_pfn_t cr3_pfn;
 
-    xc_dom_printf("%s: called\n", __FUNCTION__);
+    DOMPRINTF_CALLED(dom->xch);
 
     /* clear everything */
     memset(ctxt, 0, sizeof(*ctxt));
@@ -551,8 +551,8 @@ static int vcpu_x86_32(struct xc_dom_image *dom, void *ptr)
 
     cr3_pfn = xc_dom_p2m_guest(dom, dom->pgtables_seg.pfn);
     ctxt->ctrlreg[3] = xen_pfn_to_cr3_x86_32(cr3_pfn);
-    xc_dom_printf("%s: cr3: pfn 0x%" PRIpfn " mfn 0x%" PRIpfn "\n",
-                  __FUNCTION__, dom->pgtables_seg.pfn, cr3_pfn);
+    DOMPRINTF("%s: cr3: pfn 0x%" PRIpfn " mfn 0x%" PRIpfn "",
+              __FUNCTION__, dom->pgtables_seg.pfn, cr3_pfn);
 
     return 0;
 }
@@ -562,7 +562,7 @@ static int vcpu_x86_64(struct xc_dom_image *dom, void *ptr)
     vcpu_guest_context_x86_64_t *ctxt = ptr;
     xen_pfn_t cr3_pfn;
 
-    xc_dom_printf("%s: called\n", __FUNCTION__);
+    DOMPRINTF_CALLED(dom->xch);
 
     /* clear everything */
     memset(ctxt, 0, sizeof(*ctxt));
@@ -586,8 +586,8 @@ static int vcpu_x86_64(struct xc_dom_image *dom, void *ptr)
     ctxt->flags = VGCF_in_kernel_X86_64 | VGCF_online_X86_64;
     cr3_pfn = xc_dom_p2m_guest(dom, dom->pgtables_seg.pfn);
     ctxt->ctrlreg[3] = xen_pfn_to_cr3_x86_64(cr3_pfn);
-    xc_dom_printf("%s: cr3: pfn 0x%" PRIpfn " mfn 0x%" PRIpfn "\n",
-                  __FUNCTION__, dom->pgtables_seg.pfn, cr3_pfn);
+    DOMPRINTF("%s: cr3: pfn 0x%" PRIpfn " mfn 0x%" PRIpfn "",
+              __FUNCTION__, dom->pgtables_seg.pfn, cr3_pfn);
 
     return 0;
 }
@@ -639,7 +639,7 @@ static void __init register_arch_hooks(void)
     xc_dom_register_arch_hooks(&xc_dom_64);
 }
 
-static int x86_compat(int xc, domid_t domid, char *guest_type)
+static int x86_compat(xc_interface *xch, domid_t domid, char *guest_type)
 {
     static const struct {
         char           *guest;
@@ -661,36 +661,36 @@ static int x86_compat(int xc, domid_t domid, char *guest_type)
         /* nothing to do */
         return 0;
 
-    xc_dom_printf("%s: guest %s, address size %" PRId32 "\n", __FUNCTION__,
+    xc_dom_printf(xch, "%s: guest %s, address size %" PRId32 "", __FUNCTION__,
                   guest_type, domctl.u.address_size.size);
-    rc = do_domctl(xc, &domctl);
+    rc = do_domctl(xch, &domctl);
     if ( rc != 0 )
-        xc_dom_printf("%s: warning: failed (rc=%d)\n",
+        xc_dom_printf(xch, "%s: warning: failed (rc=%d)",
                       __FUNCTION__, rc);
     return rc;
 }
 
 
-static int x86_shadow(int xc, domid_t domid)
+static int x86_shadow(xc_interface *xch, domid_t domid)
 {
     int rc, mode;
 
-    xc_dom_printf("%s: called\n", __FUNCTION__);
+    DOMPRINTF_CALLED(xch);
 
     mode = XEN_DOMCTL_SHADOW_ENABLE_REFCOUNT |
         XEN_DOMCTL_SHADOW_ENABLE_TRANSLATE;
 
-    rc = xc_shadow_control(xc, domid,
+    rc = xc_shadow_control(xch, domid,
                            XEN_DOMCTL_SHADOW_OP_ENABLE,
                            NULL, 0, NULL, mode, NULL);
     if ( rc != 0 )
     {
-        xc_dom_panic(XC_INTERNAL_ERROR,
-                     "%s: SHADOW_OP_ENABLE (mode=0x%x) failed (rc=%d)\n",
+        xc_dom_panic(xch, XC_INTERNAL_ERROR,
+                     "%s: SHADOW_OP_ENABLE (mode=0x%x) failed (rc=%d)",
                      __FUNCTION__, mode, rc);
         return rc;
     }
-    xc_dom_printf("%s: shadow enabled (mode=0x%x)\n", __FUNCTION__, mode);
+    xc_dom_printf(xch, "%s: shadow enabled (mode=0x%x)", __FUNCTION__, mode);
     return rc;
 }
 
@@ -699,13 +699,13 @@ int arch_setup_meminit(struct xc_dom_image *dom)
     int rc;
     xen_pfn_t pfn, allocsz, i, j, mfn;
 
-    rc = x86_compat(dom->guest_xc, dom->guest_domid, dom->guest_type);
+    rc = x86_compat(dom->xch, dom->guest_domid, dom->guest_type);
     if ( rc )
         return rc;
     if ( xc_dom_feature_translated(dom) )
     {
         dom->shadow_enabled = 1;
-        rc = x86_shadow(dom->guest_xc, dom->guest_domid);
+        rc = x86_shadow(dom->xch, dom->guest_domid);
         if ( rc )
             return rc;
     }
@@ -716,10 +716,10 @@ int arch_setup_meminit(struct xc_dom_image *dom)
         int count = dom->total_pages >> SUPERPAGE_PFN_SHIFT;
         xen_pfn_t extents[count];
 
-        xc_dom_printf("Populating memory with %d superpages\n", count);
+        DOMPRINTF("Populating memory with %d superpages", count);
         for ( pfn = 0; pfn < count; pfn++ )
             extents[pfn] = pfn << SUPERPAGE_PFN_SHIFT;
-        rc = xc_domain_memory_populate_physmap(dom->guest_xc, dom->guest_domid,
+        rc = xc_domain_memory_populate_physmap(dom->xch, dom->guest_domid,
                                                count, SUPERPAGE_PFN_SHIFT, 0,
                                                extents);
         if ( rc )
@@ -749,7 +749,7 @@ int arch_setup_meminit(struct xc_dom_image *dom)
             if ( allocsz > 1024*1024 )
                 allocsz = 1024*1024;
             rc = xc_domain_memory_populate_physmap(
-                dom->guest_xc, dom->guest_domid, allocsz,
+                dom->xch, dom->guest_domid, allocsz,
                 0, 0, &dom->p2m_host[i]);
         }
     }
@@ -759,7 +759,7 @@ int arch_setup_meminit(struct xc_dom_image *dom)
 
 int arch_setup_bootearly(struct xc_dom_image *dom)
 {
-    xc_dom_printf("%s: doing nothing\n", __FUNCTION__);
+    DOMPRINTF("%s: doing nothing", __FUNCTION__);
     return 0;
 }
 
@@ -786,13 +786,13 @@ int arch_setup_bootlate(struct xc_dom_image *dom)
     {
         /* paravirtualized guest */
         xc_dom_unmap_one(dom, dom->pgtables_seg.pfn);
-        rc = pin_table(dom->guest_xc, pgd_type,
+        rc = pin_table(dom->xch, pgd_type,
                        xc_dom_p2m_host(dom, dom->pgtables_seg.pfn),
                        dom->guest_domid);
         if ( rc != 0 )
         {
-            xc_dom_panic(XC_INTERNAL_ERROR,
-                         "%s: pin_table failed (pfn 0x%" PRIpfn ", rc=%d)\n",
+            xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
+                         "%s: pin_table failed (pfn 0x%" PRIpfn ", rc=%d)",
                          __FUNCTION__, dom->pgtables_seg.pfn, rc);
             return rc;
         }
@@ -809,11 +809,11 @@ int arch_setup_bootlate(struct xc_dom_image *dom)
         xatp.space = XENMAPSPACE_shared_info;
         xatp.idx = 0;
         xatp.gpfn = dom->shared_info_pfn;
-        rc = xc_memory_op(dom->guest_xc, XENMEM_add_to_physmap, &xatp);
+        rc = xc_memory_op(dom->xch, XENMEM_add_to_physmap, &xatp);
         if ( rc != 0 )
         {
-            xc_dom_panic(XC_INTERNAL_ERROR, "%s: mapping shared_info failed "
-                         "(pfn=0x%" PRIpfn ", rc=%d)\n",
+            xc_dom_panic(dom->xch, XC_INTERNAL_ERROR, "%s: mapping"
+                         " shared_info failed (pfn=0x%" PRIpfn ", rc=%d)",
                          __FUNCTION__, xatp.gpfn, rc);
             return rc;
         }
@@ -825,18 +825,17 @@ int arch_setup_bootlate(struct xc_dom_image *dom)
             xatp.space = XENMAPSPACE_grant_table;
             xatp.idx = i;
             xatp.gpfn = dom->total_pages + i;
-            rc = xc_memory_op(dom->guest_xc, XENMEM_add_to_physmap, &xatp);
+            rc = xc_memory_op(dom->xch, XENMEM_add_to_physmap, &xatp);
             if ( rc != 0 )
             {
                 if ( (i > 0) && (errno == EINVAL) )
                 {
-                    xc_dom_printf("%s: %d grant tables mapped\n", __FUNCTION__,
-                                  i);
+                    DOMPRINTF("%s: %d grant tables mapped", __FUNCTION__, i);
                     break;
                 }
-                xc_dom_panic(XC_INTERNAL_ERROR,
+                xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
                              "%s: mapping grant tables failed " "(pfn=0x%"
-                             PRIpfn ", rc=%d)\n", __FUNCTION__, xatp.gpfn, rc);
+                             PRIpfn ", rc=%d)", __FUNCTION__, xatp.gpfn, rc);
                 return rc;
             }
         }
@@ -844,9 +843,9 @@ int arch_setup_bootlate(struct xc_dom_image *dom)
     }
 
     /* setup shared_info page */
-    xc_dom_printf("%s: shared_info: pfn 0x%" PRIpfn ", mfn 0x%" PRIpfn "\n",
-                  __FUNCTION__, dom->shared_info_pfn, dom->shared_info_mfn);
-    shared_info = xc_map_foreign_range(dom->guest_xc, dom->guest_domid,
+    DOMPRINTF("%s: shared_info: pfn 0x%" PRIpfn ", mfn 0x%" PRIpfn "",
+              __FUNCTION__, dom->shared_info_pfn, dom->shared_info_mfn);
+    shared_info = xc_map_foreign_range(dom->xch, dom->guest_domid,
                                        PAGE_SIZE_X86,
                                        PROT_READ | PROT_WRITE,
                                        shinfo);

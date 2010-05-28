@@ -9,7 +9,7 @@
 
 #include "xc_private.h"
 
-int xc_physdev_pci_access_modify(int xc_handle,
+int xc_physdev_pci_access_modify(xc_interface *xch,
                                  uint32_t domid,
                                  int bus,
                                  int dev,
@@ -20,7 +20,7 @@ int xc_physdev_pci_access_modify(int xc_handle,
     return -1;
 }
 
-int xc_physdev_map_pirq(int xc_handle,
+int xc_physdev_map_pirq(xc_interface *xch,
                         int domid,
                         int index,
                         int *pirq)
@@ -37,7 +37,7 @@ int xc_physdev_map_pirq(int xc_handle,
     map.index = index;
     map.pirq = *pirq;
 
-    rc = do_physdev_op(xc_handle, PHYSDEVOP_map_pirq, &map, sizeof(map));
+    rc = do_physdev_op(xch, PHYSDEVOP_map_pirq, &map, sizeof(map));
 
     if ( !rc )
         *pirq = map.pirq;
@@ -45,7 +45,7 @@ int xc_physdev_map_pirq(int xc_handle,
     return rc;
 }
 
-int xc_physdev_map_pirq_msi(int xc_handle,
+int xc_physdev_map_pirq_msi(xc_interface *xch,
                             int domid,
                             int index,
                             int *pirq,
@@ -70,7 +70,7 @@ int xc_physdev_map_pirq_msi(int xc_handle,
     map.entry_nr = entry_nr;
     map.table_base = table_base;
 
-    rc = do_physdev_op(xc_handle, PHYSDEVOP_map_pirq, &map, sizeof(map));
+    rc = do_physdev_op(xch, PHYSDEVOP_map_pirq, &map, sizeof(map));
 
     if ( !rc )
         *pirq = map.pirq;
@@ -78,7 +78,7 @@ int xc_physdev_map_pirq_msi(int xc_handle,
     return rc;
 }
 
-int xc_physdev_unmap_pirq(int xc_handle,
+int xc_physdev_unmap_pirq(xc_interface *xch,
                           int domid,
                           int pirq)
 {
@@ -89,7 +89,7 @@ int xc_physdev_unmap_pirq(int xc_handle,
     unmap.domid = domid;
     unmap.pirq = pirq;
 
-    rc = do_physdev_op(xc_handle, PHYSDEVOP_unmap_pirq, &unmap, sizeof(unmap));
+    rc = do_physdev_op(xch, PHYSDEVOP_unmap_pirq, &unmap, sizeof(unmap));
 
     return rc;
 }

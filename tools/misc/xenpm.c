@@ -34,7 +34,7 @@
 #define CPUFREQ_TURBO_UNSUPPORTED   0
 #define CPUFREQ_TURBO_ENABLED       1
 
-static int xc_fd;
+static xc_interface *xc_handle;
 static int max_cpu_nr;
 
 /* help message */
@@ -95,12 +95,12 @@ static void print_cxstat(int cpuid, struct xc_cx_stat *cxstat)
 }
 
 /* show cpu idle information on CPU cpuid */
-static int get_cxstat_by_cpuid(int xc_fd, int cpuid, struct xc_cx_stat *cxstat)
+static int get_cxstat_by_cpuid(xc_interface *xc_handle, int cpuid, struct xc_cx_stat *cxstat)
 {
     int ret = 0;
     int max_cx_num = 0;
 
-    ret = xc_pm_get_max_cx(xc_fd, cpuid, &max_cx_num);
+    ret = xc_pm_get_max_cx(xc_handle, cpuid, &max_cx_num);
     if ( ret )
         return errno;
 
@@ -117,7 +117,7 @@ static int get_cxstat_by_cpuid(int xc_fd, int cpuid, struct xc_cx_stat *cxstat)
         return -ENOMEM;
     }
 
-    ret = xc_pm_get_cxstat(xc_fd, cpuid, cxstat);
+    ret = xc_pm_get_cxstat(xc_handle, cpuid, cxstat);
     if( ret )
     {
         int temp = errno;
@@ -131,24 +131,24 @@ static int get_cxstat_by_cpuid(int xc_fd, int cpuid, struct xc_cx_stat *cxstat)
     return 0;
 }
 
-static int show_max_cstate(int xc_fd)
+static int show_max_cstate(xc_interface *xc_handle)
 {
     int ret = 0;
     uint32_t value;
 
-    if ( (ret = xc_get_cpuidle_max_cstate(xc_fd, &value)) )
+    if ( (ret = xc_get_cpuidle_max_cstate(xc_handle, &value)) )
         return ret;
 
     printf("Max C-state: C%d\n\n", value);
     return 0;
 }
 
-static int show_cxstat_by_cpuid(int xc_fd, int cpuid)
+static int show_cxstat_by_cpuid(xc_interface *xc_handle, int cpuid)
 {
     int ret = 0;
     struct xc_cx_stat cxstatinfo;
 
-    ret = get_cxstat_by_cpuid(xc_fd, cpuid, &cxstatinfo);
+    ret = get_cxstat_by_cpuid(xc_handle, cpuid, &cxstatinfo);
     if ( ret )
         return ret;
 
@@ -169,18 +169,18 @@ void cxstat_func(int argc, char *argv[])
     if ( cpuid >= max_cpu_nr )
         cpuid = -1;
 
-    show_max_cstate(xc_fd);
+    show_max_cstate(xc_handle);
 
     if ( cpuid < 0 )
     {
         /* show cxstates on all cpus */
         int i;
         for ( i = 0; i < max_cpu_nr; i++ )
-            if ( show_cxstat_by_cpuid(xc_fd, i) == -ENODEV )
+            if ( show_cxstat_by_cpuid(xc_handle, i) == -ENODEV )
                 break;
     }
     else
-        show_cxstat_by_cpuid(xc_fd, cpuid);
+        show_cxstat_by_cpuid(xc_handle, cpuid);
 }
 
 static void print_pxstat(int cpuid, struct xc_px_stat *pxstat)
@@ -209,12 +209,12 @@ static void print_pxstat(int cpuid, struct xc_px_stat *pxstat)
 }
 
 /* show cpu frequency information on CPU cpuid */
-static int get_pxstat_by_cpuid(int xc_fd, int cpuid, struct xc_px_stat *pxstat)
+static int get_pxstat_by_cpuid(xc_interface *xc_handle, int cpuid, struct xc_px_stat *pxstat)
 {
     int ret = 0;
     int max_px_num = 0;
 
-    ret = xc_pm_get_max_px(xc_fd, cpuid, &max_px_num);
+    ret = xc_pm_get_max_px(xc_handle, cpuid, &max_px_num);
     if ( ret )
         return errno;
 
@@ -232,7 +232,7 @@ static int get_pxstat_by_cpuid(int xc_fd, int cpuid, struct xc_px_stat *pxstat)
         return -ENOMEM;
     }
 
-    ret = xc_pm_get_pxstat(xc_fd, cpuid, pxstat);
+    ret = xc_pm_get_pxstat(xc_handle, cpuid, pxstat);
     if( ret )
     {
         int temp = errno;
@@ -247,11 +247,11 @@ static int get_pxstat_by_cpuid(int xc_fd, int cpuid, struct xc_px_stat *pxstat)
 }
 
 /* show cpu actual average freq information on CPU cpuid */
-static int get_avgfreq_by_cpuid(int xc_fd, int cpuid, int *avgfreq)
+static int get_avgfreq_by_cpuid(xc_interface *xc_handle, int cpuid, int *avgfreq)
 {
     int ret = 0;
 
-    ret = xc_get_cpufreq_avgfreq(xc_fd, cpuid, avgfreq);
+    ret = xc_get_cpufreq_avgfreq(xc_handle, cpuid, avgfreq);
     if ( ret )
     {
         return errno;
@@ -260,12 +260,12 @@ static int get_avgfreq_by_cpuid(int xc_fd, int cpuid, int *avgfreq)
     return 0;
 }
 
-static int show_pxstat_by_cpuid(int xc_fd, int cpuid)
+static int show_pxstat_by_cpuid(xc_interface *xc_handle, int cpuid)
 {
     int ret = 0;
     struct xc_px_stat pxstatinfo;
 
-    ret = get_pxstat_by_cpuid(xc_fd, cpuid, &pxstatinfo);
+    ret = get_pxstat_by_cpuid(xc_handle, cpuid, &pxstatinfo);
     if ( ret )
         return ret;
 
@@ -291,11 +291,11 @@ void pxstat_func(int argc, char *argv[])
         /* show pxstates on all cpus */
         int i;
         for ( i = 0; i < max_cpu_nr; i++ )
-            if ( show_pxstat_by_cpuid(xc_fd, i) == -ENODEV )
+            if ( show_pxstat_by_cpuid(xc_handle, i) == -ENODEV )
                 break;
     }
     else
-        show_pxstat_by_cpuid(xc_fd, cpuid);
+        show_pxstat_by_cpuid(xc_handle, cpuid);
 }
 
 static uint64_t usec_start, usec_end;
@@ -317,28 +317,28 @@ static void signal_int_handler(int signo)
     }
     usec_end = tv.tv_sec * 1000000UL + tv.tv_usec;
 
-    if ( get_cxstat_by_cpuid(xc_fd, 0, NULL) != -ENODEV )
+    if ( get_cxstat_by_cpuid(xc_handle, 0, NULL) != -ENODEV )
     {
         cx_cap = 1;
         for ( i = 0; i < max_cpu_nr; i++ )
-            if ( !get_cxstat_by_cpuid(xc_fd, i, &cxstat_end[i]) )
+            if ( !get_cxstat_by_cpuid(xc_handle, i, &cxstat_end[i]) )
                 for ( j = 0; j < cxstat_end[i].nr; j++ )
                     sum_cx[i] += cxstat_end[i].residencies[j] -
                                  cxstat_start[i].residencies[j];
     }
 
-    if ( get_pxstat_by_cpuid(xc_fd, 0, NULL) != -ENODEV )
+    if ( get_pxstat_by_cpuid(xc_handle, 0, NULL) != -ENODEV )
     {
         px_cap = 1;
         for ( i = 0; i < max_cpu_nr; i++ )
-            if ( !get_pxstat_by_cpuid(xc_fd, i , &pxstat_end[i]) )
+            if ( !get_pxstat_by_cpuid(xc_handle, i , &pxstat_end[i]) )
                 for ( j = 0; j < pxstat_end[i].total; j++ )
                     sum_px[i] += pxstat_end[i].pt[j].residency -
                                  pxstat_start[i].pt[j].residency;
     }
 
     for ( i = 0; i < max_cpu_nr; i++ )
-        get_avgfreq_by_cpuid(xc_fd, i, &avgfreq[i]);
+        get_avgfreq_by_cpuid(xc_handle, i, &avgfreq[i]);
 
     printf("Elapsed time (ms): %"PRIu64"\n", (usec_end - usec_start) / 1000UL);
     for ( i = 0; i < max_cpu_nr; i++ )
@@ -386,7 +386,7 @@ static void signal_int_handler(int signo)
     free(pxstat);
     free(sum);
     free(avgfreq);
-    xc_interface_close(xc_fd);
+    xc_interface_close(xc_handle);
     exit(0);
 }
 
@@ -447,8 +447,8 @@ void start_gather_func(int argc, char *argv[])
     pxstat_start = pxstat;
     pxstat_end = pxstat + max_cpu_nr;
 
-    if ( get_cxstat_by_cpuid(xc_fd, 0, NULL) == -ENODEV &&
-         get_pxstat_by_cpuid(xc_fd, 0, NULL) == -ENODEV )
+    if ( get_cxstat_by_cpuid(xc_handle, 0, NULL) == -ENODEV &&
+         get_pxstat_by_cpuid(xc_handle, 0, NULL) == -ENODEV )
     {
         fprintf(stderr, "Xen cpu idle and frequency is disabled!\n");
         return ;
@@ -456,9 +456,9 @@ void start_gather_func(int argc, char *argv[])
 
     for ( i = 0; i < max_cpu_nr; i++ )
     {
-        get_cxstat_by_cpuid(xc_fd, i, &cxstat_start[i]);
-        get_pxstat_by_cpuid(xc_fd, i, &pxstat_start[i]);
-        get_avgfreq_by_cpuid(xc_fd, i, &avgfreq[i]);
+        get_cxstat_by_cpuid(xc_handle, i, &cxstat_start[i]);
+        get_pxstat_by_cpuid(xc_handle, i, &pxstat_start[i]);
+        get_avgfreq_by_cpuid(xc_handle, i, &avgfreq[i]);
     }
 
     if (signal(SIGINT, signal_int_handler) == SIG_ERR)
@@ -556,7 +556,7 @@ static void print_cpufreq_para(int cpuid, struct xc_get_cpufreq_para *p_cpufreq)
 }
 
 /* show cpu frequency parameters information on CPU cpuid */
-static int show_cpufreq_para_by_cpuid(int xc_fd, int cpuid)
+static int show_cpufreq_para_by_cpuid(xc_interface *xc_handle, int cpuid)
 {
     int ret = 0;
     struct xc_get_cpufreq_para cpufreq_para, *p_cpufreq = &cpufreq_para;
@@ -607,7 +607,7 @@ static int show_cpufreq_para_by_cpuid(int xc_fd, int cpuid)
             goto out;
         }
 
-        ret = xc_get_cpufreq_para(xc_fd, cpuid, p_cpufreq);
+        ret = xc_get_cpufreq_para(xc_handle, cpuid, p_cpufreq);
     } while ( ret && errno == EAGAIN );
 
     if ( ret == 0 )
@@ -645,11 +645,11 @@ void cpufreq_para_func(int argc, char *argv[])
         /* show cpu freqency information on all cpus */
         int i;
         for ( i = 0; i < max_cpu_nr; i++ )
-            if ( show_cpufreq_para_by_cpuid(xc_fd, i) == -ENODEV )
+            if ( show_cpufreq_para_by_cpuid(xc_handle, i) == -ENODEV )
                 break;
     }
     else
-        show_cpufreq_para_by_cpuid(xc_fd, cpuid);
+        show_cpufreq_para_by_cpuid(xc_handle, cpuid);
 }
 
 void scaling_max_freq_func(int argc, char *argv[])
@@ -669,12 +669,12 @@ void scaling_max_freq_func(int argc, char *argv[])
     {
         int i;
         for ( i = 0; i < max_cpu_nr; i++ )
-            if ( xc_set_cpufreq_para(xc_fd, i, SCALING_MAX_FREQ, freq) )
+            if ( xc_set_cpufreq_para(xc_handle, i, SCALING_MAX_FREQ, freq) )
                 fprintf(stderr, "[CPU%d] failed to set scaling max freq\n", i);
     }
     else
     {
-        if ( xc_set_cpufreq_para(xc_fd, cpuid, SCALING_MAX_FREQ, freq) )
+        if ( xc_set_cpufreq_para(xc_handle, cpuid, SCALING_MAX_FREQ, freq) )
             fprintf(stderr, "failed to set scaling max freq\n");
     }
 }
@@ -696,12 +696,12 @@ void scaling_min_freq_func(int argc, char *argv[])
     {
         int i;
         for ( i = 0; i < max_cpu_nr; i++ )
-            if ( xc_set_cpufreq_para(xc_fd, i, SCALING_MIN_FREQ, freq) )
+            if ( xc_set_cpufreq_para(xc_handle, i, SCALING_MIN_FREQ, freq) )
                 fprintf(stderr, "[CPU%d] failed to set scaling min freq\n", i);
     }
     else
     {
-        if ( xc_set_cpufreq_para(xc_fd, cpuid, SCALING_MIN_FREQ, freq) )
+        if ( xc_set_cpufreq_para(xc_handle, cpuid, SCALING_MIN_FREQ, freq) )
             fprintf(stderr, "failed to set scaling min freq\n");
     }
 }
@@ -723,12 +723,12 @@ void scaling_speed_func(int argc, char *argv[])
     {
         int i;
         for ( i = 0; i < max_cpu_nr; i++ )
-            if ( xc_set_cpufreq_para(xc_fd, i, SCALING_SETSPEED, speed) )
+            if ( xc_set_cpufreq_para(xc_handle, i, SCALING_SETSPEED, speed) )
                 fprintf(stderr, "[CPU%d] failed to set scaling speed\n", i);
     }
     else
     {
-        if ( xc_set_cpufreq_para(xc_fd, cpuid, SCALING_SETSPEED, speed) )
+        if ( xc_set_cpufreq_para(xc_handle, cpuid, SCALING_SETSPEED, speed) )
             fprintf(stderr, "failed to set scaling speed\n");
     }
 }
@@ -750,13 +750,13 @@ void scaling_sampling_rate_func(int argc, char *argv[])
     {
         int i;
         for ( i = 0; i < max_cpu_nr; i++ )
-            if ( xc_set_cpufreq_para(xc_fd, i, SAMPLING_RATE, rate) )
+            if ( xc_set_cpufreq_para(xc_handle, i, SAMPLING_RATE, rate) )
                 fprintf(stderr,
                         "[CPU%d] failed to set scaling sampling rate\n", i);
     }
     else
     {
-        if ( xc_set_cpufreq_para(xc_fd, cpuid, SAMPLING_RATE, rate) )
+        if ( xc_set_cpufreq_para(xc_handle, cpuid, SAMPLING_RATE, rate) )
             fprintf(stderr, "failed to set scaling sampling rate\n");
     }
 }
@@ -778,13 +778,13 @@ void scaling_up_threshold_func(int argc, char *argv[])
     {
         int i;
         for ( i = 0; i < max_cpu_nr; i++ )
-            if ( xc_set_cpufreq_para(xc_fd, i, UP_THRESHOLD, threshold) )
+            if ( xc_set_cpufreq_para(xc_handle, i, UP_THRESHOLD, threshold) )
                 fprintf(stderr,
                         "[CPU%d] failed to set up scaling threshold\n", i);
     }
     else
     {
-        if ( xc_set_cpufreq_para(xc_fd, cpuid, UP_THRESHOLD, threshold) )
+        if ( xc_set_cpufreq_para(xc_handle, cpuid, UP_THRESHOLD, threshold) )
             fprintf(stderr, "failed to set up scaling threshold\n");
     }
 }
@@ -818,12 +818,12 @@ void scaling_governor_func(int argc, char *argv[])
     {
         int i;
         for ( i = 0; i < max_cpu_nr; i++ )
-            if ( xc_set_cpufreq_gov(xc_fd, i, name) )
+            if ( xc_set_cpufreq_gov(xc_handle, i, name) )
                 fprintf(stderr, "[CPU%d] failed to set governor name\n", i);
     }
     else
     {
-        if ( xc_set_cpufreq_gov(xc_fd, cpuid, name) )
+        if ( xc_set_cpufreq_gov(xc_handle, cpuid, name) )
             fprintf(stderr, "failed to set governor name\n");
     }
 
@@ -848,7 +848,7 @@ void cpu_topology_func(int argc, char *argv[])
     set_xen_guest_handle(info.cpu_to_node, cpu_to_node);
     info.max_cpu_index = MAX_NR_CPU-1;
 
-    if ( xc_topologyinfo(xc_fd, &info) )
+    if ( xc_topologyinfo(xc_handle, &info) )
     {
         printf("Can not get Xen CPU topology: %d\n", errno);
         return;
@@ -890,7 +890,7 @@ void set_sched_smt_func(int argc, char *argv[])
         exit(-1);
     }
 
-    rc = xc_set_sched_opt_smt(xc_fd, value);
+    rc = xc_set_sched_opt_smt(xc_handle, value);
     printf("%s sched_smt_power_savings %s\n", argv[0],
                     rc? "failed":"succeeded" );
 
@@ -915,7 +915,7 @@ void set_vcpu_migration_delay_func(int argc, char *argv[])
         exit(-1);
     }
 
-    rc = xc_set_vcpu_migration_delay(xc_fd, value);
+    rc = xc_set_vcpu_migration_delay(xc_handle, value);
     printf("%s to set vcpu migration delay to %d us\n",
                     rc? "Fail":"Succeed", value );
 
@@ -932,7 +932,7 @@ void get_vcpu_migration_delay_func(int argc, char *argv[])
         exit(-1);
     }
 
-    rc = xc_get_vcpu_migration_delay(xc_fd, &value);
+    rc = xc_get_vcpu_migration_delay(xc_handle, &value);
     if (!rc)
     {
         printf("Schduler vcpu migration delay is %d us\n", value);
@@ -955,7 +955,7 @@ void set_max_cstate_func(int argc, char *argv[])
         exit(-1);
     }
 
-    rc = xc_set_cpuidle_max_cstate(xc_fd, (uint32_t)value);
+    rc = xc_set_cpuidle_max_cstate(xc_handle, (uint32_t)value);
     printf("set max_cstate to C%d %s\n", value,
                     rc? "failed":"succeeded" );
 
@@ -978,10 +978,10 @@ void enable_turbo_mode(int argc, char *argv[])
          * only make effects on dbs governor */
         int i;
         for ( i = 0; i < max_cpu_nr; i++ )
-            xc_enable_turbo(xc_fd, i);
+            xc_enable_turbo(xc_handle, i);
     }
     else
-        xc_enable_turbo(xc_fd, cpuid);
+        xc_enable_turbo(xc_handle, cpuid);
 }
 
 void disable_turbo_mode(int argc, char *argv[])
@@ -1000,10 +1000,10 @@ void disable_turbo_mode(int argc, char *argv[])
          * only make effects on dbs governor */
         int i;
         for ( i = 0; i < max_cpu_nr; i++ )
-            xc_disable_turbo(xc_fd, i);
+            xc_disable_turbo(xc_handle, i);
     }
     else
-        xc_disable_turbo(xc_fd, cpuid);
+        xc_disable_turbo(xc_handle, cpuid);
 }
 
 struct {
@@ -1043,18 +1043,18 @@ int main(int argc, char *argv[])
         return 0;
     }
 
-    xc_fd = xc_interface_open();
-    if ( xc_fd < 0 )
+    xc_handle = xc_interface_open(0,0,0);
+    if ( !xc_handle )
     {
         fprintf(stderr, "failed to get the handler\n");
         return 0;
     }
 
-    ret = xc_physinfo(xc_fd, &physinfo);
+    ret = xc_physinfo(xc_handle, &physinfo);
     if ( ret )
     {
         fprintf(stderr, "failed to get the processor information\n");
-        xc_interface_close(xc_fd);
+        xc_interface_close(xc_handle);
         return 0;
     }
     max_cpu_nr = physinfo.nr_cpus;
@@ -1077,7 +1077,7 @@ int main(int argc, char *argv[])
     else
         show_help();
 
-    xc_interface_close(xc_fd);
+    xc_interface_close(xc_handle);
     return 0;
 }
 

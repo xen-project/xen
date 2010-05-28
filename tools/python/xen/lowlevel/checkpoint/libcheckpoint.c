@@ -47,7 +47,7 @@ char* checkpoint_error(checkpoint_state* s)
 
 void checkpoint_init(checkpoint_state* s)
 {
-    s->xch = -1;
+    s->xch = NULL;
     s->xce = -1;
     s->xsh = NULL;
     s->watching_shutdown = 0;
@@ -74,8 +74,8 @@ int checkpoint_open(checkpoint_state* s, unsigned int domid)
 
     s->domid = domid;
 
-    s->xch = xc_interface_open();
-    if (s->xch < 0) {
+    s->xch = xc_interface_open(0,0,0);
+    if (!s->xch) {
        s->errstr = "could not open control interface (are you root?)";
 
        return -1;
@@ -145,9 +145,9 @@ void checkpoint_close(checkpoint_state* s)
   release_shutdown_watch(s);
   release_suspend_evtchn(s);
 
-  if (s->xch >= 0) {
+  if (s->xch) {
     xc_interface_close(s->xch);
-    s->xch = -1;
+    s->xch = NULL;
   }
   if (s->xce >= 0) {
     xc_evtchn_close(s->xce);
@@ -360,7 +360,7 @@ static void release_suspend_evtchn(checkpoint_state *s)
 {
   /* TODO: teach xen to clean up if port is unbound */
   if (s->xce >= 0 && s->suspend_evtchn >= 0) {
-    xc_suspend_evtchn_release(s->xce, s->domid, s->suspend_evtchn);
+    xc_suspend_evtchn_release(s->xch, s->xce, s->domid, s->suspend_evtchn);
     s->suspend_evtchn = -1;
   }
 }

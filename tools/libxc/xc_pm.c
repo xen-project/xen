@@ -30,7 +30,7 @@
 /*
  * Get PM statistic info
  */
-int xc_pm_get_max_px(int xc_handle, int cpuid, int *max_px)
+int xc_pm_get_max_px(xc_interface *xch, int cpuid, int *max_px)
 {
     DECLARE_SYSCTL;
     int ret;
@@ -38,7 +38,7 @@ int xc_pm_get_max_px(int xc_handle, int cpuid, int *max_px)
     sysctl.cmd = XEN_SYSCTL_get_pmstat;
     sysctl.u.get_pmstat.type = PMSTAT_get_max_px;
     sysctl.u.get_pmstat.cpuid = cpuid;
-    ret = xc_sysctl(xc_handle, &sysctl);
+    ret = xc_sysctl(xch, &sysctl);
     if ( ret )
         return ret;
 
@@ -46,7 +46,7 @@ int xc_pm_get_max_px(int xc_handle, int cpuid, int *max_px)
     return ret;
 }
 
-int xc_pm_get_pxstat(int xc_handle, int cpuid, struct xc_px_stat *pxpt)
+int xc_pm_get_pxstat(xc_interface *xch, int cpuid, struct xc_px_stat *pxpt)
 {
     DECLARE_SYSCTL;
     int max_px, ret;
@@ -54,7 +54,7 @@ int xc_pm_get_pxstat(int xc_handle, int cpuid, struct xc_px_stat *pxpt)
     if ( !pxpt || !(pxpt->trans_pt) || !(pxpt->pt) )
         return -EINVAL;
 
-    if ( (ret = xc_pm_get_max_px(xc_handle, cpuid, &max_px)) != 0)
+    if ( (ret = xc_pm_get_max_px(xch, cpuid, &max_px)) != 0)
         return ret;
 
     if ( (ret = lock_pages(pxpt->trans_pt, 
@@ -76,7 +76,7 @@ int xc_pm_get_pxstat(int xc_handle, int cpuid, struct xc_px_stat *pxpt)
     set_xen_guest_handle(sysctl.u.get_pmstat.u.getpx.pt, 
                         (pm_px_val_t *)pxpt->pt);
 
-    ret = xc_sysctl(xc_handle, &sysctl);
+    ret = xc_sysctl(xch, &sysctl);
     if ( ret )
     {
         unlock_pages(pxpt->trans_pt, max_px * max_px * sizeof(uint64_t));
@@ -95,7 +95,7 @@ int xc_pm_get_pxstat(int xc_handle, int cpuid, struct xc_px_stat *pxpt)
     return ret;
 }
 
-int xc_pm_reset_pxstat(int xc_handle, int cpuid)
+int xc_pm_reset_pxstat(xc_interface *xch, int cpuid)
 {
     DECLARE_SYSCTL;
 
@@ -103,10 +103,10 @@ int xc_pm_reset_pxstat(int xc_handle, int cpuid)
     sysctl.u.get_pmstat.type = PMSTAT_reset_pxstat;
     sysctl.u.get_pmstat.cpuid = cpuid;
 
-    return xc_sysctl(xc_handle, &sysctl);
+    return xc_sysctl(xch, &sysctl);
 }
 
-int xc_pm_get_max_cx(int xc_handle, int cpuid, int *max_cx)
+int xc_pm_get_max_cx(xc_interface *xch, int cpuid, int *max_cx)
 {
     DECLARE_SYSCTL;
     int ret = 0;
@@ -114,14 +114,14 @@ int xc_pm_get_max_cx(int xc_handle, int cpuid, int *max_cx)
     sysctl.cmd = XEN_SYSCTL_get_pmstat;
     sysctl.u.get_pmstat.type = PMSTAT_get_max_cx;
     sysctl.u.get_pmstat.cpuid = cpuid;
-    if ( (ret = xc_sysctl(xc_handle, &sysctl)) != 0 )
+    if ( (ret = xc_sysctl(xch, &sysctl)) != 0 )
         return ret;
 
     *max_cx = sysctl.u.get_pmstat.u.getcx.nr;
     return ret;
 }
 
-int xc_pm_get_cxstat(int xc_handle, int cpuid, struct xc_cx_stat *cxpt)
+int xc_pm_get_cxstat(xc_interface *xch, int cpuid, struct xc_cx_stat *cxpt)
 {
     DECLARE_SYSCTL;
     int max_cx, ret;
@@ -129,7 +129,7 @@ int xc_pm_get_cxstat(int xc_handle, int cpuid, struct xc_cx_stat *cxpt)
     if( !cxpt || !(cxpt->triggers) || !(cxpt->residencies) )
         return -EINVAL;
 
-    if ( (ret = xc_pm_get_max_cx(xc_handle, cpuid, &max_cx)) )
+    if ( (ret = xc_pm_get_max_cx(xch, cpuid, &max_cx)) )
         goto unlock_0;
 
     if ( (ret = lock_pages(cxpt, sizeof(struct xc_cx_stat))) )
@@ -146,7 +146,7 @@ int xc_pm_get_cxstat(int xc_handle, int cpuid, struct xc_cx_stat *cxpt)
     set_xen_guest_handle(sysctl.u.get_pmstat.u.getcx.residencies, 
                          cxpt->residencies);
 
-    if ( (ret = xc_sysctl(xc_handle, &sysctl)) )
+    if ( (ret = xc_sysctl(xch, &sysctl)) )
         goto unlock_3;
 
     cxpt->nr = sysctl.u.get_pmstat.u.getcx.nr;
@@ -163,7 +163,7 @@ unlock_0:
     return ret;
 }
 
-int xc_pm_reset_cxstat(int xc_handle, int cpuid)
+int xc_pm_reset_cxstat(xc_interface *xch, int cpuid)
 {
     DECLARE_SYSCTL;
 
@@ -171,7 +171,7 @@ int xc_pm_reset_cxstat(int xc_handle, int cpuid)
     sysctl.u.get_pmstat.type = PMSTAT_reset_cxstat;
     sysctl.u.get_pmstat.cpuid = cpuid;
 
-    return xc_sysctl(xc_handle, &sysctl);
+    return xc_sysctl(xch, &sysctl);
 }
 
 
@@ -179,7 +179,7 @@ int xc_pm_reset_cxstat(int xc_handle, int cpuid)
  * 1. Get PM parameter
  * 2. Provide user PM control
  */
-int xc_get_cpufreq_para(int xc_handle, int cpuid,
+int xc_get_cpufreq_para(xc_interface *xch, int cpuid,
                         struct xc_get_cpufreq_para *user_para)
 {
     DECLARE_SYSCTL;
@@ -189,7 +189,7 @@ int xc_get_cpufreq_para(int xc_handle, int cpuid,
                      user_para->freq_num &&
                      user_para->gov_num;
 
-    if ( (xc_handle < 0) || !user_para )
+    if ( (xch < 0) || !user_para )
         return -EINVAL;
 
     if ( has_num )
@@ -224,7 +224,7 @@ int xc_get_cpufreq_para(int xc_handle, int cpuid,
     sys_para->freq_num = user_para->freq_num;
     sys_para->gov_num  = user_para->gov_num;
 
-    ret = xc_sysctl(xc_handle, &sysctl);
+    ret = xc_sysctl(xch, &sysctl);
     if ( ret )
     {
         if ( errno == EAGAIN )
@@ -274,12 +274,12 @@ unlock_1:
     return ret;
 }
 
-int xc_set_cpufreq_gov(int xc_handle, int cpuid, char *govname)
+int xc_set_cpufreq_gov(xc_interface *xch, int cpuid, char *govname)
 {
     DECLARE_SYSCTL;
     char *scaling_governor = sysctl.u.pm_op.u.set_gov.scaling_governor;
 
-    if ( (xc_handle < 0) || (!govname) )
+    if ( (xch < 0) || (!govname) )
         return -EINVAL;
 
     sysctl.cmd = XEN_SYSCTL_pm_op;
@@ -288,15 +288,15 @@ int xc_set_cpufreq_gov(int xc_handle, int cpuid, char *govname)
     strncpy(scaling_governor, govname, CPUFREQ_NAME_LEN);
     scaling_governor[CPUFREQ_NAME_LEN - 1] = '\0';
 
-    return xc_sysctl(xc_handle, &sysctl);
+    return xc_sysctl(xch, &sysctl);
 }
 
-int xc_set_cpufreq_para(int xc_handle, int cpuid, 
+int xc_set_cpufreq_para(xc_interface *xch, int cpuid, 
                         int ctrl_type, int ctrl_value)
 {
     DECLARE_SYSCTL;
 
-    if ( xc_handle < 0 )
+    if ( xch < 0 )
         return -EINVAL;
 
     sysctl.cmd = XEN_SYSCTL_pm_op;
@@ -305,21 +305,21 @@ int xc_set_cpufreq_para(int xc_handle, int cpuid,
     sysctl.u.pm_op.u.set_para.ctrl_type = ctrl_type;
     sysctl.u.pm_op.u.set_para.ctrl_value = ctrl_value;
 
-    return xc_sysctl(xc_handle, &sysctl);
+    return xc_sysctl(xch, &sysctl);
 }
 
-int xc_get_cpufreq_avgfreq(int xc_handle, int cpuid, int *avg_freq)
+int xc_get_cpufreq_avgfreq(xc_interface *xch, int cpuid, int *avg_freq)
 {
     int ret = 0;
     DECLARE_SYSCTL;
 
-    if ( (xc_handle < 0) || (!avg_freq) )
+    if ( (xch < 0) || (!avg_freq) )
         return -EINVAL;
 
     sysctl.cmd = XEN_SYSCTL_pm_op;
     sysctl.u.pm_op.cmd = GET_CPUFREQ_AVGFREQ;
     sysctl.u.pm_op.cpuid = cpuid;
-    ret = xc_sysctl(xc_handle, &sysctl);
+    ret = xc_sysctl(xch, &sysctl);
 
     *avg_freq = sysctl.u.pm_op.u.get_avgfreq;
 
@@ -329,7 +329,7 @@ int xc_get_cpufreq_avgfreq(int xc_handle, int cpuid, int *avg_freq)
 /* value:   0 - disable sched_smt_power_savings 
             1 - enable sched_smt_power_savings
  */
-int xc_set_sched_opt_smt(int xc_handle, uint32_t value)
+int xc_set_sched_opt_smt(xc_interface *xch, uint32_t value)
 {
    int rc;
    DECLARE_SYSCTL;
@@ -338,12 +338,12 @@ int xc_set_sched_opt_smt(int xc_handle, uint32_t value)
    sysctl.u.pm_op.cmd = XEN_SYSCTL_pm_op_set_sched_opt_smt;
    sysctl.u.pm_op.cpuid = 0;
    sysctl.u.pm_op.u.set_sched_opt_smt = value;
-   rc = do_sysctl(xc_handle, &sysctl);
+   rc = do_sysctl(xch, &sysctl);
 
    return rc;
 }
 
-int xc_set_vcpu_migration_delay(int xc_handle, uint32_t value)
+int xc_set_vcpu_migration_delay(xc_interface *xch, uint32_t value)
 {
    int rc;
    DECLARE_SYSCTL;
@@ -352,12 +352,12 @@ int xc_set_vcpu_migration_delay(int xc_handle, uint32_t value)
    sysctl.u.pm_op.cmd = XEN_SYSCTL_pm_op_set_vcpu_migration_delay;
    sysctl.u.pm_op.cpuid = 0;
    sysctl.u.pm_op.u.set_vcpu_migration_delay = value;
-   rc = do_sysctl(xc_handle, &sysctl);
+   rc = do_sysctl(xch, &sysctl);
 
    return rc;
 }
 
-int xc_get_vcpu_migration_delay(int xc_handle, uint32_t *value)
+int xc_get_vcpu_migration_delay(xc_interface *xch, uint32_t *value)
 {
    int rc;
    DECLARE_SYSCTL;
@@ -365,7 +365,7 @@ int xc_get_vcpu_migration_delay(int xc_handle, uint32_t *value)
    sysctl.cmd = XEN_SYSCTL_pm_op;
    sysctl.u.pm_op.cmd = XEN_SYSCTL_pm_op_get_vcpu_migration_delay;
    sysctl.u.pm_op.cpuid = 0;
-   rc = do_sysctl(xc_handle, &sysctl);
+   rc = do_sysctl(xch, &sysctl);
 
    if (!rc && value)
        *value = sysctl.u.pm_op.u.get_vcpu_migration_delay;
@@ -373,29 +373,29 @@ int xc_get_vcpu_migration_delay(int xc_handle, uint32_t *value)
    return rc;
 }
 
-int xc_get_cpuidle_max_cstate(int xc_handle, uint32_t *value)
+int xc_get_cpuidle_max_cstate(xc_interface *xch, uint32_t *value)
 {
     int rc;
     DECLARE_SYSCTL;
 
-    if ( xc_handle < 0 || !value )
+    if ( xch < 0 || !value )
         return -EINVAL;
 
     sysctl.cmd = XEN_SYSCTL_pm_op;
     sysctl.u.pm_op.cmd = XEN_SYSCTL_pm_op_get_max_cstate;
     sysctl.u.pm_op.cpuid = 0;
     sysctl.u.pm_op.u.get_max_cstate = 0;
-    rc = do_sysctl(xc_handle, &sysctl);
+    rc = do_sysctl(xch, &sysctl);
     *value = sysctl.u.pm_op.u.get_max_cstate;
 
     return rc;
 }
 
-int xc_set_cpuidle_max_cstate(int xc_handle, uint32_t value)
+int xc_set_cpuidle_max_cstate(xc_interface *xch, uint32_t value)
 {
     DECLARE_SYSCTL;
 
-    if ( xc_handle < 0 )
+    if ( xch < 0 )
         return -EINVAL;
 
     sysctl.cmd = XEN_SYSCTL_pm_op;
@@ -403,31 +403,31 @@ int xc_set_cpuidle_max_cstate(int xc_handle, uint32_t value)
     sysctl.u.pm_op.cpuid = 0;
     sysctl.u.pm_op.u.set_max_cstate = value;
 
-    return do_sysctl(xc_handle, &sysctl);
+    return do_sysctl(xch, &sysctl);
 }
 
-int xc_enable_turbo(int xc_handle, int cpuid)
+int xc_enable_turbo(xc_interface *xch, int cpuid)
 {
     DECLARE_SYSCTL;
 
-    if ( xc_handle < 0 )
+    if ( xch < 0 )
         return -EINVAL;
 
     sysctl.cmd = XEN_SYSCTL_pm_op;
     sysctl.u.pm_op.cmd = XEN_SYSCTL_pm_op_enable_turbo;
     sysctl.u.pm_op.cpuid = cpuid;
-    return do_sysctl(xc_handle, &sysctl);
+    return do_sysctl(xch, &sysctl);
 }
 
-int xc_disable_turbo(int xc_handle, int cpuid)
+int xc_disable_turbo(xc_interface *xch, int cpuid)
 {
     DECLARE_SYSCTL;
 
-    if ( xc_handle < 0 )
+    if ( xch < 0 )
         return -EINVAL;
 
     sysctl.cmd = XEN_SYSCTL_pm_op;
     sysctl.u.pm_op.cmd = XEN_SYSCTL_pm_op_disable_turbo;
     sysctl.u.pm_op.cpuid = cpuid;
-    return do_sysctl(xc_handle, &sysctl);
+    return do_sysctl(xch, &sysctl);
 }

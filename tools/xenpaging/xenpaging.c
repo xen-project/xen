@@ -22,6 +22,7 @@
 
 #include <inttypes.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <xc_private.h>
 
 #include <xen/mem_event.h>
@@ -66,24 +67,24 @@ static void *init_page(void)
     return NULL;
 }
 
-xenpaging_t *xenpaging_init(domid_t domain_id)
+xenpaging_t *xenpaging_init(xc_interface **xch_r, domid_t domain_id)
 {
     xenpaging_t *paging;
+    xc_interface *xch;
     int rc;
 
+    xch = xc_interface_open(0,0,0);
+    if ( !xch ) return NULL;
+
     DPRINTF("xenpaging init\n");
+    *xch_r = xch;
 
     /* Allocate memory */
     paging = malloc(sizeof(xenpaging_t));
     memset(paging, 0, sizeof(xenpaging_t));
 
     /* Open connection to xen */
-    paging->xc_handle = xc_interface_open();
-    if ( paging->xc_handle < 0 )
-    {
-        ERROR("Failed to open connection to Xen");
-        goto err;
-    }
+    paging->xc_handle = xch;
 
     /* Set domain id */
     paging->mem_event.domain_id = domain_id;
@@ -208,7 +209,7 @@ xenpaging_t *xenpaging_init(domid_t domain_id)
     return NULL;
 }
 
-int xenpaging_teardown(xenpaging_t *paging)
+int xenpaging_teardown(xc_interface *xch, xenpaging_t *paging)
 {
     int rc;
 
@@ -248,7 +249,7 @@ int xenpaging_teardown(xenpaging_t *paging)
         ERROR("Error closing connection to xen");
         goto err;
     }
-    paging->xc_handle = -1;
+    paging->xc_handle = NULL;
 
     return 0;
 
@@ -302,7 +303,8 @@ static int put_response(mem_event_t *mem_event, mem_event_response_t *rsp)
     return 0;
 }
 
-int xenpaging_evict_page(xenpaging_t *paging, xenpaging_victim_t *victim, int fd, int i)
+int xenpaging_evict_page(xc_interface *xch, xenpaging_t *paging,
+                         xenpaging_victim_t *victim, int fd, int i)
 {
     void *page;
     unsigned long gfn;
@@ -373,7 +375,8 @@ int xenpaging_resume_page(xenpaging_t *paging, mem_event_response_t *rsp)
     return ret;
 }
 
-int xenpaging_populate_page(xenpaging_t *paging, unsigned long *gfn, int fd, int i)
+int xenpaging_populate_page(xc_interface *xch, xenpaging_t *paging,
+                            unsigned long *gfn, int fd, int i)
 {
     void *page;
     int ret;
@@ -411,7 +414,7 @@ int xenpaging_populate_page(xenpaging_t *paging, unsigned long *gfn, int fd, int
     return ret;
 }
 
-static int evict_victim(xenpaging_t *paging, domid_t domain_id,
+static int evict_victim(xc_interface *xch, xenpaging_t *paging, domid_t domain_id,
                         xenpaging_victim_t *victim, int fd, int i)
 {
     int j = 0;
@@ -419,7 +422,7 @@ static int evict_victim(xenpaging_t *paging, domid_t domain_id,
 
     do
     {
-        ret = policy_choose_victim(paging, domain_id, victim);
+        ret = policy_choose_victim(xch, paging, domain_id, victim);
         if ( ret != 0 )
         {
             ERROR("Error choosing victim");
@@ -429,7 +432,7 @@ static int evict_victim(xenpaging_t *paging, domid_t domain_id,
         ret = xc_mem_paging_nominate(paging->xc_handle,
                                      paging->mem_event.domain_id, victim->gfn);
         if ( ret == 0 )
-            ret = xenpaging_evict_page(paging, victim, fd, i);
+            ret = xenpaging_evict_page(xch, paging, victim, fd, i);
         else
         {
             if ( j++ % 1000 == 0 )
@@ -459,6 +462,7 @@ int main(int argc, char *argv[])
     int i;
     int rc = -1;
     int rc1;
+    xc_interface *xch;
 
     int open_flags = O_CREAT | O_TRUNC | O_RDWR;
     mode_t open_mode = S_IRUSR | S_IRGRP | S_IROTH | S_IWUSR | S_IWGRP | S_IWOTH;
@@ -489,7 +493,7 @@ int main(int argc, char *argv[])
     srand(time(NULL));
 
     /* Initialise domain paging */
-    paging = xenpaging_init(domain_id);
+    paging = xenpaging_init(&xch, domain_id);
     if ( paging == NULL )
     {
         ERROR("Error initialising paging");
@@ -500,7 +504,7 @@ int main(int argc, char *argv[])
     memset(victims, 0, sizeof(xenpaging_victim_t) * num_pages);
     for ( i = 0; i < num_pages; i++ )
     {
-        evict_victim(paging, domain_id, &victims[i], fd, i);
+        evict_victim(xch, paging, domain_id, &victims[i], fd, i);
         if ( i % 100 == 0 )
             DPRINTF("%d pages evicted\n", i);
     }
@@ -511,7 +515,7 @@ int main(int argc, char *argv[])
     while ( 1 )
     {
         /* Wait for Xen to signal that a page needs paged in */
-        rc = xc_wait_for_event_or_timeout(paging->mem_event.xce_handle, 100);
+        rc = xc_wait_for_event_or_timeout(xch, paging->mem_event.xce_handle, 100);
         if ( rc < -1 )
         {
             ERROR("Error getting event");
@@ -549,7 +553,7 @@ int main(int argc, char *argv[])
                 }
                 
                 /* Populate the page */
-                rc = xenpaging_populate_page(paging, &req.gfn, fd, i);
+                rc = xenpaging_populate_page(xch, paging, &req.gfn, fd, i);
                 if ( rc != 0 )
                 {
                     ERROR("Error populating page");
@@ -570,7 +574,7 @@ int main(int argc, char *argv[])
                 }
 
                 /* Evict a new page to replace the one we just paged in */
-                evict_victim(paging, domain_id, &victims[i], fd, i);
+                evict_victim(xch, paging, domain_id, &victims[i], fd, i);
             }
             else
             {
@@ -604,7 +608,7 @@ int main(int argc, char *argv[])
     free(victims);
 
     /* Tear down domain paging */
-    rc1 = xenpaging_teardown(paging);
+    rc1 = xenpaging_teardown(xch, paging);
     if ( rc1 != 0 )
         ERROR("Error tearing down paging");
 

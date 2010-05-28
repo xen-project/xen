@@ -48,7 +48,7 @@ struct pte_backup
 static struct domain_info_context _dinfo;
 static struct domain_info_context *dinfo = &_dinfo;
 
-int xc_mark_page_online(int xc, unsigned long start,
+int xc_mark_page_online(xc_interface *xch, unsigned long start,
                         unsigned long end, uint32_t *status)
 {
     DECLARE_SYSCTL;
@@ -68,14 +68,14 @@ int xc_mark_page_online(int xc, unsigned long start,
     sysctl.u.page_offline.cmd = sysctl_page_online;
     sysctl.u.page_offline.end = end;
     set_xen_guest_handle(sysctl.u.page_offline.status, status);
-    ret = xc_sysctl(xc, &sysctl);
+    ret = xc_sysctl(xch, &sysctl);
 
     unlock_pages(status, sizeof(uint32_t)*(end - start + 1));
 
     return ret;
 }
 
-int xc_mark_page_offline(int xc, unsigned long start,
+int xc_mark_page_offline(xc_interface *xch, unsigned long start,
                           unsigned long end, uint32_t *status)
 {
     DECLARE_SYSCTL;
@@ -95,14 +95,14 @@ int xc_mark_page_offline(int xc, unsigned long start,
     sysctl.u.page_offline.cmd = sysctl_page_offline;
     sysctl.u.page_offline.end = end;
     set_xen_guest_handle(sysctl.u.page_offline.status, status);
-    ret = xc_sysctl(xc, &sysctl);
+    ret = xc_sysctl(xch, &sysctl);
 
     unlock_pages(status, sizeof(uint32_t)*(end - start + 1));
 
     return ret;
 }
 
-int xc_query_page_offline_status(int xc, unsigned long start,
+int xc_query_page_offline_status(xc_interface *xch, unsigned long start,
                                  unsigned long end, uint32_t *status)
 {
     DECLARE_SYSCTL;
@@ -122,7 +122,7 @@ int xc_query_page_offline_status(int xc, unsigned long start,
     sysctl.u.page_offline.cmd = sysctl_query_page_offline;
     sysctl.u.page_offline.end = end;
     set_xen_guest_handle(sysctl.u.page_offline.status, status);
-    ret = xc_sysctl(xc, &sysctl);
+    ret = xc_sysctl(xch, &sysctl);
 
     unlock_pages(status, sizeof(uint32_t)*(end - start + 1));
 
@@ -132,7 +132,7 @@ int xc_query_page_offline_status(int xc, unsigned long start,
  /*
   * There should no update to the grant when domain paused
   */
-static int xc_is_page_granted_v1(int xc_handle, xen_pfn_t gpfn,
+static int xc_is_page_granted_v1(xc_interface *xch, xen_pfn_t gpfn,
                                  grant_entry_v1_t *gnttab, int gnt_num)
 {
     int i = 0;
@@ -148,7 +148,7 @@ static int xc_is_page_granted_v1(int xc_handle, xen_pfn_t gpfn,
    return (i != gnt_num);
 }
 
-static int xc_is_page_granted_v2(int xc_handle, xen_pfn_t gpfn,
+static int xc_is_page_granted_v2(xc_interface *xch, xen_pfn_t gpfn,
                                  grant_entry_v2_t *gnttab, int gnt_num)
 {
     int i = 0;
@@ -173,21 +173,21 @@ static xen_pfn_t pfn_to_mfn(xen_pfn_t pfn, xen_pfn_t *p2m, int gwidth)
                             (((uint32_t *)p2m)[(pfn)]))));
 }
 
-static int get_pt_level(int xc_handle, uint32_t domid,
+static int get_pt_level(xc_interface *xch, uint32_t domid,
                         unsigned int *pt_level,
                         unsigned int *gwidth)
 {
     DECLARE_DOMCTL;
     xen_capabilities_info_t xen_caps = "";
 
-    if (xc_version(xc_handle, XENVER_capabilities, &xen_caps) != 0)
+    if (xc_version(xch, XENVER_capabilities, &xen_caps) != 0)
         return -1;
 
     memset(&domctl, 0, sizeof(domctl));
     domctl.domain = domid;
     domctl.cmd = XEN_DOMCTL_get_address_size;
 
-    if ( do_domctl(xc_handle, &domctl) != 0 )
+    if ( do_domctl(xch, &domctl) != 0 )
         return -1;
 
     *gwidth = domctl.u.address_size.size / 8;
@@ -205,7 +205,7 @@ static int get_pt_level(int xc_handle, uint32_t domid,
     return 0;
 }
 
-static int close_mem_info(int xc_handle, struct domain_mem_info *minfo)
+static int close_mem_info(xc_interface *xch, struct domain_mem_info *minfo)
 {
     if (minfo->pfn_type)
         free(minfo->pfn_type);
@@ -216,7 +216,7 @@ static int close_mem_info(int xc_handle, struct domain_mem_info *minfo)
     return 0;
 }
 
-static int init_mem_info(int xc_handle, int domid,
+static int init_mem_info(xc_interface *xch, int domid,
                  struct domain_mem_info *minfo,
                  xc_dominfo_t *info)
 {
@@ -228,7 +228,7 @@ static int init_mem_info(int xc_handle, int domid,
     if (minfo->pfn_type || minfo->m2p_table || minfo->p2m_table)
         return -EINVAL;
 
-    if ( get_pt_level(xc_handle, domid, &minfo->pt_level,
+    if ( get_pt_level(xch, domid, &minfo->pt_level,
                       &minfo->guest_width) )
     {
         ERROR("Unable to get PT level info.");
@@ -238,7 +238,7 @@ static int init_mem_info(int xc_handle, int domid,
 
     shared_info_frame = info->shared_info_frame;
 
-    live_shinfo = xc_map_foreign_range(xc_handle, domid,
+    live_shinfo = xc_map_foreign_range(xch, domid,
                      PAGE_SIZE, PROT_READ, shared_info_frame);
     if ( !live_shinfo )
     {
@@ -246,7 +246,7 @@ static int init_mem_info(int xc_handle, int domid,
         return -EFAULT;
     }
 
-    if ( (rc = xc_core_arch_map_p2m_writable(xc_handle, minfo->guest_width,
+    if ( (rc = xc_core_arch_map_p2m_writable(xch, minfo->guest_width,
               info, live_shinfo, &minfo->p2m_table,  &minfo->p2m_size)) )
     {
         ERROR("Couldn't map p2m table %x\n", rc);
@@ -257,9 +257,9 @@ static int init_mem_info(int xc_handle, int domid,
 
     dinfo->p2m_size = minfo->p2m_size;
 
-    minfo->max_mfn = xc_memory_op(xc_handle, XENMEM_maximum_ram_page, NULL);
+    minfo->max_mfn = xc_memory_op(xch, XENMEM_maximum_ram_page, NULL);
     if ( !(minfo->m2p_table =
-        xc_map_m2p(xc_handle, minfo->max_mfn, PROT_READ, NULL)) )
+        xc_map_m2p(xch, minfo->max_mfn, PROT_READ, NULL)) )
     {
         ERROR("Failed to map live M2P table");
         goto failed;
@@ -286,7 +286,7 @@ static int init_mem_info(int xc_handle, int domid,
     for (i = 0; i < minfo->p2m_size ; i+=1024)
     {
         int count = ((dinfo->p2m_size - i ) > 1024 ) ? 1024: (dinfo->p2m_size - i);
-        if ( ( rc = xc_get_pfn_type_batch(xc_handle, domid, count,
+        if ( ( rc = xc_get_pfn_type_batch(xch, domid, count,
                   minfo->pfn_type + i)) )
         {
             ERROR("Failed to get pfn_type %x\n", rc);
@@ -340,12 +340,14 @@ static int backup_ptes(xen_pfn_t table_mfn, int offset,
  * 0 when no changes
  * <0 when error happen
  */
-typedef int (*pte_func)(uint64_t pte, uint64_t *new_pte,
+typedef int (*pte_func)(xc_interface *xch,
+                       uint64_t pte, uint64_t *new_pte,
                        unsigned long table_mfn, int table_offset,
                        struct pte_backup *backup,
                        unsigned long no_use);
 
-static int __clear_pte(uint64_t pte, uint64_t *new_pte,
+static int __clear_pte(xc_interface *xch,
+                       uint64_t pte, uint64_t *new_pte,
                        unsigned long table_mfn, int table_offset,
                        struct pte_backup *backup,
                        unsigned long mfn)
@@ -369,7 +371,8 @@ static int __clear_pte(uint64_t pte, uint64_t *new_pte,
     return 0;
 }
 
-static int __update_pte(uint64_t pte, uint64_t *new_pte,
+static int __update_pte(xc_interface *xch,
+                      uint64_t pte, uint64_t *new_pte,
                       unsigned long table_mfn, int table_offset,
                       struct pte_backup *backup,
                       unsigned long new_mfn)
@@ -397,7 +400,7 @@ static int __update_pte(uint64_t pte, uint64_t *new_pte,
     return 0;
 }
 
-static int change_pte(int xc_handle, int domid,
+static int change_pte(xc_interface *xch, int domid,
                      struct domain_mem_info *minfo,
                      struct pte_backup *backup,
                      struct xc_mmu *mmu,
@@ -424,7 +427,7 @@ static int change_pte(int xc_handle, int domid,
 
         if ( minfo->pfn_type[i] & XEN_DOMCTL_PFINFO_LTABTYPE_MASK )
         {
-            content = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
+            content = xc_map_foreign_range(xch, domid, PAGE_SIZE,
                                             PROT_READ, table_mfn);
             if (!content)
                 goto failed;
@@ -436,12 +439,12 @@ static int change_pte(int xc_handle, int domid,
                 else
                     pte = ((const uint64_t*)content)[j];
 
-                rc = func(pte, &new_pte, table_mfn, j, backup, data);
+                rc = func(xch, pte, &new_pte, table_mfn, j, backup, data);
 
                 switch (rc)
                 {
                     case 1:
-                    if ( xc_add_mmu_update(xc_handle, mmu,
+                    if ( xc_add_mmu_update(xch, mmu,
                           table_mfn << PAGE_SHIFT |
                           j * ( (minfo->pt_level == 2) ?
                               sizeof(uint32_t): sizeof(uint64_t)) |
@@ -463,7 +466,7 @@ static int change_pte(int xc_handle, int domid,
         content = NULL;
     }
 
-    if ( xc_flush_mmu_updates(xc_handle, mmu) )
+    if ( xc_flush_mmu_updates(xch, mmu) )
         goto failed;
 
     return 0;
@@ -475,27 +478,27 @@ failed:
     return -1;
 }
 
-static int update_pte(int xc_handle, int domid,
+static int update_pte(xc_interface *xch, int domid,
                      struct domain_mem_info *minfo,
                      struct pte_backup *backup,
                      struct xc_mmu *mmu,
                      unsigned long new_mfn)
 {
-    return change_pte(xc_handle, domid,  minfo, backup, mmu,
+    return change_pte(xch, domid,  minfo, backup, mmu,
                       __update_pte, new_mfn);
 }
 
-static int clear_pte(int xc_handle, int domid,
+static int clear_pte(xc_interface *xch, int domid,
                      struct domain_mem_info *minfo,
                      struct pte_backup *backup,
                      struct xc_mmu *mmu,
                      xen_pfn_t mfn)
 {
-    return change_pte(xc_handle, domid, minfo, backup, mmu,
+    return change_pte(xch, domid, minfo, backup, mmu,
                       __clear_pte, mfn);
 }
 
-static int exchange_page(int xc_handle, xen_pfn_t mfn,
+static int exchange_page(xc_interface *xch, xen_pfn_t mfn,
                      xen_pfn_t *new_mfn, int domid)
 {
     int rc;
@@ -516,7 +519,7 @@ static int exchange_page(int xc_handle, xen_pfn_t mfn,
     set_xen_guest_handle(exchange.in.extent_start, &mfn);
     set_xen_guest_handle(exchange.out.extent_start, &out_mfn);
 
-    rc = xc_memory_op(xc_handle, XENMEM_exchange, &exchange);
+    rc = xc_memory_op(xch, XENMEM_exchange, &exchange);
 
     if (!rc)
         *new_mfn = out_mfn;
@@ -528,7 +531,7 @@ static int exchange_page(int xc_handle, xen_pfn_t mfn,
  * Check if a page can be exchanged successfully
  */
 
-static int is_page_exchangable(int xc_handle, int domid, xen_pfn_t mfn,
+static int is_page_exchangable(xc_interface *xch, int domid, xen_pfn_t mfn,
                                xc_dominfo_t *info)
 {
     uint32_t status;
@@ -547,7 +550,7 @@ static int is_page_exchangable(int xc_handle, int domid, xen_pfn_t mfn,
     }
 
     /* Check if pages are offline pending or not */
-    rc = xc_query_page_offline_status(xc_handle, mfn, mfn, &status);
+    rc = xc_query_page_offline_status(xch, mfn, mfn, &status);
 
     if ( rc || !(status & PG_OFFLINE_STATUS_OFFLINE_PENDING) )
     {
@@ -560,7 +563,7 @@ static int is_page_exchangable(int xc_handle, int domid, xen_pfn_t mfn,
 }
 
 /* The domain should be suspended when called here */
-int xc_exchange_page(int xc_handle, int domid, xen_pfn_t mfn)
+int xc_exchange_page(xc_interface *xch, int domid, xen_pfn_t mfn)
 {
     xc_dominfo_t info;
     struct domain_mem_info minfo;
@@ -575,7 +578,7 @@ int xc_exchange_page(int xc_handle, int domid, xen_pfn_t mfn)
     uint32_t status;
     xen_pfn_t new_mfn, gpfn;
 
-    if ( xc_domain_getinfo(xc_handle, domid, 1, &info) != 1 )
+    if ( xc_domain_getinfo(xch, domid, 1, &info) != 1 )
     {
         ERROR("Could not get domain info");
         return -EFAULT;
@@ -587,7 +590,7 @@ int xc_exchange_page(int xc_handle, int domid, xen_pfn_t mfn)
         return -EINVAL;
     }
 
-    if (!is_page_exchangable(xc_handle, domid, mfn, &info))
+    if (!is_page_exchangable(xch, domid, mfn, &info))
     {
         ERROR("Could not exchange page\n");
         return -EINVAL;
@@ -595,7 +598,7 @@ int xc_exchange_page(int xc_handle, int domid, xen_pfn_t mfn)
 
     /* Get domain's memory information */
     memset(&minfo, 0, sizeof(minfo));
-    init_mem_info(xc_handle, domid, &minfo, &info);
+    init_mem_info(xch, domid, &minfo, &info);
     gpfn = minfo.m2p_table[mfn];
 
     /* Don't exchange CR3 for PAE guest in PAE host environment */
@@ -606,10 +609,10 @@ int xc_exchange_page(int xc_handle, int domid, xen_pfn_t mfn)
             goto failed;
     }
 
-    gnttab_v2 = xc_gnttab_map_table_v2(xc_handle, domid, &gnt_num);
+    gnttab_v2 = xc_gnttab_map_table_v2(xch, domid, &gnt_num);
     if (!gnttab_v2)
     {
-        gnttab_v1 = xc_gnttab_map_table_v1(xc_handle, domid, &gnt_num);
+        gnttab_v1 = xc_gnttab_map_table_v1(xch, domid, &gnt_num);
         if (!gnttab_v1)
         {
             ERROR("Failed to map grant table\n");
@@ -618,8 +621,8 @@ int xc_exchange_page(int xc_handle, int domid, xen_pfn_t mfn)
     }
 
     if (gnttab_v1
-        ? xc_is_page_granted_v1(xc_handle, mfn, gnttab_v1, gnt_num)
-        : xc_is_page_granted_v2(xc_handle, mfn, gnttab_v2, gnt_num))
+        ? xc_is_page_granted_v1(xch, mfn, gnttab_v1, gnt_num)
+        : xc_is_page_granted_v2(xch, mfn, gnttab_v2, gnt_num))
     {
         ERROR("Page %lx is granted now\n", mfn);
         goto failed;
@@ -650,7 +653,7 @@ int xc_exchange_page(int xc_handle, int domid, xen_pfn_t mfn)
         mops.cmd = MMUEXT_UNPIN_TABLE;
         mops.arg1.mfn = mfn;
 
-        if ( xc_mmuext_op(xc_handle, &mops, 1, domid) < 0 )
+        if ( xc_mmuext_op(xch, &mops, 1, domid) < 0 )
         {
             ERROR("Failed to unpin page %lx", mfn);
             goto failed;
@@ -660,7 +663,7 @@ int xc_exchange_page(int xc_handle, int domid, xen_pfn_t mfn)
     }
 
     /* backup the content */
-    old_p = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
+    old_p = xc_map_foreign_range(xch, domid, PAGE_SIZE,
       PROT_READ, mfn);
     if (!old_p)
     {
@@ -671,7 +674,7 @@ int xc_exchange_page(int xc_handle, int domid, xen_pfn_t mfn)
     memcpy(backup, old_p, PAGE_SIZE);
     munmap(old_p, PAGE_SIZE);
 
-    mmu = xc_alloc_mmu_updates(xc_handle, domid);
+    mmu = xc_alloc_mmu_updates(xch, domid);
     if ( mmu == NULL )
     {
         ERROR("%s: failed at %d\n", __FUNCTION__, __LINE__);
@@ -679,7 +682,7 @@ int xc_exchange_page(int xc_handle, int domid, xen_pfn_t mfn)
     }
 
     /* Firstly update all pte to be invalid to remove the reference */
-    rc = clear_pte(xc_handle, domid,  &minfo, &old_ptes, mmu, mfn);
+    rc = clear_pte(xch, domid,  &minfo, &old_ptes, mmu, mfn);
 
     if (rc)
     {
@@ -687,19 +690,19 @@ int xc_exchange_page(int xc_handle, int domid, xen_pfn_t mfn)
         goto failed;
     }
 
-    rc = exchange_page(xc_handle, mfn, &new_mfn, domid);
+    rc = exchange_page(xch, mfn, &new_mfn, domid);
 
     if (rc)
     {
         ERROR("Exchange the page failed\n");
         /* Exchange fail means there are refere to the page still */
-        rc = update_pte(xc_handle, domid, &minfo, &old_ptes, mmu, mfn);
+        rc = update_pte(xch, domid, &minfo, &old_ptes, mmu, mfn);
         if (rc)
             result = -2;
         goto failed;
     }
 
-    rc = update_pte(xc_handle, domid, &minfo, &old_ptes, mmu, new_mfn);
+    rc = update_pte(xch, domid, &minfo, &old_ptes, mmu, new_mfn);
 
     if (rc)
     {
@@ -710,7 +713,7 @@ int xc_exchange_page(int xc_handle, int domid, xen_pfn_t mfn)
     }
 
     /* Check if pages are offlined already */
-    rc = xc_query_page_offline_status(xc_handle, mfn, mfn,
+    rc = xc_query_page_offline_status(xch, mfn, mfn,
                             &status);
 
     if (rc)
@@ -728,7 +731,7 @@ int xc_exchange_page(int xc_handle, int domid, xen_pfn_t mfn)
         /* Update the p2m table */
         minfo.p2m_table[gpfn] = new_mfn;
 
-        new_p = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
+        new_p = xc_map_foreign_range(xch, domid, PAGE_SIZE,
                                      PROT_READ|PROT_WRITE, new_mfn);
         memcpy(new_p, backup, PAGE_SIZE);
         munmap(new_p, PAGE_SIZE);
@@ -763,7 +766,7 @@ failed:
                 break;
         }
 
-        if ( xc_mmuext_op(xc_handle, &mops, 1, domid) < 0 )
+        if ( xc_mmuext_op(xch, &mops, 1, domid) < 0 )
         {
             ERROR("failed to pin the mfn again\n");
             result = -2;
@@ -784,7 +787,7 @@ failed:
     if (gnttab_v2)
         munmap(gnttab_v2, gnt_num / (PAGE_SIZE/sizeof(grant_entry_v2_t)));
 
-    close_mem_info(xc_handle, &minfo);
+    close_mem_info(xch, &minfo);
 
     return result;
 }

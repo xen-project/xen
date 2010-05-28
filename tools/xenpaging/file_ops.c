@@ -22,6 +22,7 @@
 
 
 #include <unistd.h>
+#include <stdarg.h>
 #include <xc_private.h>
 
 

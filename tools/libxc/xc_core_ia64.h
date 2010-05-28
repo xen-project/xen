@@ -41,7 +41,7 @@ xc_core_arch_context_free(struct xc_core_arch_context* arch_ctxt);
 int
 xc_core_arch_context_get(struct xc_core_arch_context* arch_ctxt,
                          vcpu_guest_context_any_t* ctxt,
-                         int xc_handle, uint32_t domid);
+                         xc_interface *xch, uint32_t domid);
 int
 xc_core_arch_context_get_shdr(struct xc_core_arch_context* arch_ctxt, 
                               struct xc_core_section_headers *sheaders,

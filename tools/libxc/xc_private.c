@@ -7,70 +7,83 @@
 #include <inttypes.h>
 #include "xc_private.h"
 #include "xg_private.h"
+#include "xc_dom.h"
 #include <stdarg.h>
 #include <stdlib.h>
 #include <malloc.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <assert.h>
 
-static pthread_key_t last_error_pkey;
-static pthread_once_t last_error_pkey_once = PTHREAD_ONCE_INIT;
+xc_interface *xc_interface_open(xentoollog_logger *logger,
+                                xentoollog_logger *dombuild_logger,
+                                unsigned open_flags) {
+    xc_interface xch_buf, *xch = &xch_buf;
+
+    xch->fd = -1;
+    xch->dombuild_logger_file = 0;
+    xc_clear_last_error(xch);
+
+    xch->error_handler   = logger;           xch->error_handler_tofree   = 0;
+    xch->dombuild_logger = dombuild_logger;  xch->dombuild_logger_tofree = 0;
+
+    if (!xch->error_handler) {
+        xch->error_handler = xch->error_handler_tofree =
+            (xentoollog_logger*)
+            xtl_createlogger_stdiostream(stderr, XTL_PROGRESS, 0);
+        if (!xch->error_handler)
+            goto err;
+    }
+
+    xch = malloc(sizeof(*xch));
+    if (!xch) {
+        xch = &xch_buf;
+        PERROR("Could not allocate new xc_interface struct");
+        goto err;
+    }
+    *xch = xch_buf;
+
+    if (!(open_flags & XC_OPENFLAG_DUMMY)) {
+        xch->fd = xc_interface_open_core(xch);
+        if (xch->fd < 0)
+            goto err;
+    }
+
+    return xch;
+
+ err:
+    if (xch) xtl_logger_destroy(xch->error_handler);
+    if (xch != &xch_buf) free(xch);
+    return 0;
+}
+
+int xc_interface_close(xc_interface *xch)
+{
+    int rc = 0;
+
+    xtl_logger_destroy(xch->dombuild_logger_tofree);
+    xtl_logger_destroy(xch->error_handler_tofree);
+
+    if (xch->fd >= 0) {
+        rc = xc_interface_close_core(xch, xch->fd);
+        if (rc) PERROR("Could not close hypervisor interface");
+    }
+    free(xch);
+    return rc;
+}
 
 static pthread_key_t errbuf_pkey;
 static pthread_once_t errbuf_pkey_once = PTHREAD_ONCE_INIT;
 
-#if DEBUG
-static xc_error_handler error_handler = xc_default_error_handler;
-#else
-static xc_error_handler error_handler = NULL;
-#endif
-
-void xc_default_error_handler(const xc_error *err)
+const xc_error *xc_get_last_error(xc_interface *xch)
 {
-    const char *desc = xc_error_code_to_desc(err->code);
-    fprintf(stderr, "ERROR %s: %s\n", desc, err->message);
+    return &xch->last_error;
 }
 
-static void
-_xc_clean_last_error(void *m)
+void xc_clear_last_error(xc_interface *xch)
 {
-    free(m);
-    pthread_setspecific(last_error_pkey, NULL);
-}
-
-static void
-_xc_init_last_error(void)
-{
-    pthread_key_create(&last_error_pkey, _xc_clean_last_error);
-}
-
-static xc_error *
-_xc_get_last_error(void)
-{
-    xc_error *last_error;
-
-    pthread_once(&last_error_pkey_once, _xc_init_last_error);
-
-    last_error = pthread_getspecific(last_error_pkey);
-    if (last_error == NULL) {
-        last_error = malloc(sizeof(xc_error));
-        pthread_setspecific(last_error_pkey, last_error);
-        xc_clear_last_error();
-    }
-
-    return last_error;
-}
-
-const xc_error *xc_get_last_error(void)
-{
-    return _xc_get_last_error();
-}
-
-void xc_clear_last_error(void)
-{
-    xc_error *last_error = _xc_get_last_error();
-    last_error->code = XC_ERROR_NONE;
-    last_error->message[0] = '\0';
+    xch->last_error.code = XC_ERROR_NONE;
+    xch->last_error.message[0] = '\0';
 }
 
 const char *xc_error_code_to_desc(int code)
@@ -93,40 +106,70 @@ const char *xc_error_code_to_desc(int code)
     return "Unknown error code";
 }
 
-xc_error_handler xc_set_error_handler(xc_error_handler handler)
-{
-    xc_error_handler old = error_handler;
-    error_handler = handler;
-    return old;
-}
-
-static void _xc_set_error(int code, const char *msg)
-{
-    xc_error *last_error = _xc_get_last_error();
-    last_error->code = code;
-    strncpy(last_error->message, msg, XC_MAX_ERROR_MSG_LEN - 1);
-    last_error->message[XC_MAX_ERROR_MSG_LEN-1] = '\0';
-}
-
-void xc_set_error(int code, const char *fmt, ...)
-{
+void xc_reportv(xc_interface *xch, xentoollog_logger *lg,
+                xentoollog_level level, int code,
+                const char *fmt, va_list args) {
     int saved_errno = errno;
-    char msg[XC_MAX_ERROR_MSG_LEN];
-    va_list args;
+    char msgbuf[XC_MAX_ERROR_MSG_LEN];
+    char *msg;
 
-    va_start(args, fmt);
+    /* Strip newlines from messages.
+     * XXX really the messages themselves should have the newlines removed.
+     */
+    char fmt_nonewline[512];
+    int fmt_l;
+
+    fmt_l = strlen(fmt);
+    if (fmt_l && fmt[fmt_l-1]=='\n' && fmt_l < sizeof(fmt_nonewline)) {
+        memcpy(fmt_nonewline, fmt, fmt_l-1);
+        fmt_nonewline[fmt_l-1] = 0;
+        fmt = fmt_nonewline;
+    }
+
+    if ( level >= XTL_ERROR ) {
+        msg = xch->last_error.message;
+        xch->last_error.code = code;
+    } else {
+        msg = msgbuf;
+    }
     vsnprintf(msg, XC_MAX_ERROR_MSG_LEN-1, fmt, args);
     msg[XC_MAX_ERROR_MSG_LEN-1] = '\0';
-    va_end(args);
 
-    _xc_set_error(code, msg);
+    xtl_log(lg, level, -1, "xc",
+            "%s" "%s%s", msg,
+            code?": ":"", code ? xc_error_code_to_desc(code) : "");
 
     errno = saved_errno;
+}
 
-    if ( error_handler != NULL ) {
-        xc_error *last_error = _xc_get_last_error();
-        error_handler(last_error);
-    }
+void xc_report(xc_interface *xch, xentoollog_logger *lg,
+               xentoollog_level level, int code, const char *fmt, ...) {
+    va_list args;
+    va_start(args,fmt);
+    xc_reportv(xch,lg,level,code,fmt,args);
+    va_end(args);
+}
+
+void xc_report_error(xc_interface *xch, int code, const char *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    xc_reportv(xch, xch->error_handler, XTL_ERROR, code, fmt, args);
+    va_end(args);
+}
+
+void xc_report_progress_start(xc_interface *xch, const char *doing,
+                              unsigned long total) {
+    xch->currently_progress_reporting = doing;
+    xtl_progress(xch->error_handler, "xc", xch->currently_progress_reporting,
+                 0, total);
+}
+
+void xc_report_progress_step(xc_interface *xch,
+                             unsigned long done, unsigned long total) {
+    assert(xch->currently_progress_reporting);
+    xtl_progress(xch->error_handler, "xc", xch->currently_progress_reporting,
+                 done, total);
 }
 
 #ifdef __sun__
@@ -244,7 +287,7 @@ void hcall_buf_release(void **addr, size_t len)
 #endif
 
 /* NB: arr must be locked */
-int xc_get_pfn_type_batch(int xc_handle, uint32_t dom,
+int xc_get_pfn_type_batch(xc_interface *xch, uint32_t dom,
                           unsigned int num, xen_pfn_t *arr)
 {
     DECLARE_DOMCTL;
@@ -252,11 +295,11 @@ int xc_get_pfn_type_batch(int xc_handle, uint32_t dom,
     domctl.domain = (domid_t)dom;
     domctl.u.getpageframeinfo3.num = num;
     set_xen_guest_handle(domctl.u.getpageframeinfo3.array, arr);
-    return do_domctl(xc_handle, &domctl);
+    return do_domctl(xch, &domctl);
 }
 
 int xc_mmuext_op(
-    int xc_handle,
+    xc_interface *xch,
     struct mmuext_op *op,
     unsigned int nr_ops,
     domid_t dom)
@@ -276,7 +319,7 @@ int xc_mmuext_op(
     hypercall.arg[2] = (unsigned long)0;
     hypercall.arg[3] = (unsigned long)dom;
 
-    ret = do_xen_hypercall(xc_handle, &hypercall);
+    ret = do_xen_hypercall(xch, &hypercall);
 
     hcall_buf_release((void **)&op, nr_ops*sizeof(*op));
 
@@ -284,7 +327,7 @@ int xc_mmuext_op(
     return ret;
 }
 
-static int flush_mmu_updates(int xc_handle, struct xc_mmu *mmu)
+static int flush_mmu_updates(xc_interface *xch, struct xc_mmu *mmu)
 {
     int err = 0;
     DECLARE_HYPERCALL;
@@ -305,7 +348,7 @@ static int flush_mmu_updates(int xc_handle, struct xc_mmu *mmu)
         goto out;
     }
 
-    if ( do_xen_hypercall(xc_handle, &hypercall) < 0 )
+    if ( do_xen_hypercall(xch, &hypercall) < 0 )
     {
         ERROR("Failure when submitting mmu updates");
         err = 1;
@@ -319,7 +362,7 @@ static int flush_mmu_updates(int xc_handle, struct xc_mmu *mmu)
     return err;
 }
 
-struct xc_mmu *xc_alloc_mmu_updates(int xc_handle, domid_t dom)
+struct xc_mmu *xc_alloc_mmu_updates(xc_interface *xch, domid_t dom)
 {
     struct xc_mmu *mmu = malloc(sizeof(*mmu));
     if ( mmu == NULL )
@@ -329,24 +372,24 @@ struct xc_mmu *xc_alloc_mmu_updates(int xc_handle, domid_t dom)
     return mmu;
 }
 
-int xc_add_mmu_update(int xc_handle, struct xc_mmu *mmu,
+int xc_add_mmu_update(xc_interface *xch, struct xc_mmu *mmu,
                       unsigned long long ptr, unsigned long long val)
 {
     mmu->updates[mmu->idx].ptr = ptr;
     mmu->updates[mmu->idx].val = val;
 
     if ( ++mmu->idx == MAX_MMU_UPDATES )
-        return flush_mmu_updates(xc_handle, mmu);
+        return flush_mmu_updates(xch, mmu);
 
     return 0;
 }
 
-int xc_flush_mmu_updates(int xc_handle, struct xc_mmu *mmu)
+int xc_flush_mmu_updates(xc_interface *xch, struct xc_mmu *mmu)
 {
-    return flush_mmu_updates(xc_handle, mmu);
+    return flush_mmu_updates(xch, mmu);
 }
 
-int xc_memory_op(int xc_handle,
+int xc_memory_op(xc_interface *xch,
                  int cmd,
                  void *arg)
 {
@@ -421,7 +464,7 @@ int xc_memory_op(int xc_handle,
         break;
     }
 
-    ret = do_xen_hypercall(xc_handle, &hypercall);
+    ret = do_xen_hypercall(xch, &hypercall);
 
     switch ( cmd )
     {
@@ -459,14 +502,14 @@ int xc_memory_op(int xc_handle,
 }
 
 
-long long xc_domain_get_cpu_usage( int xc_handle, domid_t domid, int vcpu )
+long long xc_domain_get_cpu_usage( xc_interface *xch, domid_t domid, int vcpu )
 {
     DECLARE_DOMCTL;
 
     domctl.cmd = XEN_DOMCTL_getvcpuinfo;
     domctl.domain = (domid_t)domid;
     domctl.u.getvcpuinfo.vcpu   = (uint16_t)vcpu;
-    if ( (do_domctl(xc_handle, &domctl) < 0) )
+    if ( (do_domctl(xch, &domctl) < 0) )
     {
         PERROR("Could not get info on domain");
         return -1;
@@ -476,7 +519,7 @@ long long xc_domain_get_cpu_usage( int xc_handle, domid_t domid, int vcpu )
 
 
 #ifndef __ia64__
-int xc_get_pfn_list(int xc_handle,
+int xc_get_pfn_list(xc_interface *xch,
                     uint32_t domid,
                     uint64_t *pfn_buf,
                     unsigned long max_pfns)
@@ -498,7 +541,7 @@ int xc_get_pfn_list(int xc_handle,
         return -1;
     }
 
-    ret = do_domctl(xc_handle, &domctl);
+    ret = do_domctl(xch, &domctl);
 
     unlock_pages(pfn_buf, max_pfns * sizeof(*pfn_buf));
 
@@ -506,22 +549,22 @@ int xc_get_pfn_list(int xc_handle,
 }
 #endif
 
-long xc_get_tot_pages(int xc_handle, uint32_t domid)
+long xc_get_tot_pages(xc_interface *xch, uint32_t domid)
 {
     DECLARE_DOMCTL;
     domctl.cmd = XEN_DOMCTL_getdomaininfo;
     domctl.domain = (domid_t)domid;
-    return (do_domctl(xc_handle, &domctl) < 0) ?
+    return (do_domctl(xch, &domctl) < 0) ?
         -1 : domctl.u.getdomaininfo.tot_pages;
 }
 
-int xc_copy_to_domain_page(int xc_handle,
+int xc_copy_to_domain_page(xc_interface *xch,
                            uint32_t domid,
                            unsigned long dst_pfn,
                            const char *src_page)
 {
     void *vaddr = xc_map_foreign_range(
-        xc_handle, domid, PAGE_SIZE, PROT_WRITE, dst_pfn);
+        xch, domid, PAGE_SIZE, PROT_WRITE, dst_pfn);
     if ( vaddr == NULL )
         return -1;
     memcpy(vaddr, src_page, PAGE_SIZE);
@@ -529,12 +572,12 @@ int xc_copy_to_domain_page(int xc_handle,
     return 0;
 }
 
-int xc_clear_domain_page(int xc_handle,
+int xc_clear_domain_page(xc_interface *xch,
                          uint32_t domid,
                          unsigned long dst_pfn)
 {
     void *vaddr = xc_map_foreign_range(
-        xc_handle, domid, PAGE_SIZE, PROT_WRITE, dst_pfn);
+        xch, domid, PAGE_SIZE, PROT_WRITE, dst_pfn);
     if ( vaddr == NULL )
         return -1;
     memset(vaddr, 0, PAGE_SIZE);
@@ -542,17 +585,17 @@ int xc_clear_domain_page(int xc_handle,
     return 0;
 }
 
-int xc_domctl(int xc_handle, struct xen_domctl *domctl)
+int xc_domctl(xc_interface *xch, struct xen_domctl *domctl)
 {
-    return do_domctl(xc_handle, domctl);
+    return do_domctl(xch, domctl);
 }
 
-int xc_sysctl(int xc_handle, struct xen_sysctl *sysctl)
+int xc_sysctl(xc_interface *xch, struct xen_sysctl *sysctl)
 {
-    return do_sysctl(xc_handle, sysctl);
+    return do_sysctl(xch, sysctl);
 }
 
-int xc_version(int xc_handle, int cmd, void *arg)
+int xc_version(xc_interface *xch, int cmd, void *arg)
 {
     int rc, argsize = 0;
 
@@ -586,7 +629,7 @@ int xc_version(int xc_handle, int cmd, void *arg)
         memset(arg, 0, argsize);
 #endif
 
-    rc = do_xen_version(xc_handle, cmd, arg);
+    rc = do_xen_version(xch, cmd, arg);
 
     if ( argsize != 0 )
         unlock_pages(arg, argsize);
@@ -595,20 +638,20 @@ int xc_version(int xc_handle, int cmd, void *arg)
 }
 
 unsigned long xc_make_page_below_4G(
-    int xc_handle, uint32_t domid, unsigned long mfn)
+    xc_interface *xch, uint32_t domid, unsigned long mfn)
 {
     xen_pfn_t old_mfn = mfn;
     xen_pfn_t new_mfn;
 
     if ( xc_domain_memory_decrease_reservation(
-        xc_handle, domid, 1, 0, &old_mfn) != 0 )
+        xch, domid, 1, 0, &old_mfn) != 0 )
     {
         DPRINTF("xc_make_page_below_4G decrease failed. mfn=%lx\n",mfn);
         return 0;
     }
 
     if ( xc_domain_memory_increase_reservation(
-        xc_handle, domid, 1, 0, XENMEMF_address_bits(32), &new_mfn) != 0 )
+        xch, domid, 1, 0, XENMEMF_address_bits(32), &new_mfn) != 0 )
     {
         DPRINTF("xc_make_page_below_4G increase failed. mfn=%lx\n",mfn);
         return 0;

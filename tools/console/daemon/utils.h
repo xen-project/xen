@@ -24,6 +24,7 @@
 #include <stdbool.h>
 #include <syslog.h>
 #include <stdio.h>
+#include <xenctrl.h>
 
 #include "xs.h"
 
@@ -31,7 +32,7 @@ void daemonize(const char *pidfile);
 bool xen_setup(void);
 
 extern struct xs_handle *xs;
-extern int xc;
+extern xc_interface *xc;
 
 #if 1
 #define dolog(val, fmt, ...) do {				\

@@ -18,7 +18,7 @@ typedef enum {
 } checkpoint_domtype;
 
 typedef struct {
-    int xch;               /* xc handle */
+    xc_interface *xch;
     int xce;               /* event channel handle */
     struct xs_handle* xsh; /* xenstore handle */
     int watching_shutdown; /* state of watch on @releaseDomain */

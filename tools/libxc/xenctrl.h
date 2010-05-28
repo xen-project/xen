@@ -35,6 +35,8 @@
 #include <xen/xsm/flask_op.h>
 #include <xen/tmem.h>
 
+#include "xentoollog.h"
+
 #if defined(__i386__) || defined(__x86_64__)
 #include <xen/foreign/x86_32.h>
 #include <xen/foreign/x86_64.h>
@@ -71,6 +73,27 @@
 #error "Define barriers"
 #endif
 
+
+/*
+ *  GENERAL
+ *
+ * Unless otherwise specified, each function here returns zero or a
+ * non-null pointer on success; or in case of failure, sets errno and
+ * returns -1 or a null pointer.
+ *
+ * Unless otherwise specified, errors result in a call to the error
+ * handler function, which by default prints a message to the
+ * FILE* passed as the caller_data, which by default is stderr.
+ * (This is described below as "logging errors".)
+ *
+ * The error handler can safely trash errno, as libxc saves it across
+ * the callback.
+ */
+
+typedef struct xc_interface xc_interface;
+typedef enum xc_error_code xc_error_code;
+
+
 /*
  *  INITIALIZATION FUNCTIONS
  */
@@ -86,20 +109,30 @@
  * This function can fail if the caller does not have superuser permission or
  * if a Xen-enabled kernel is not currently running.
  *
- * @return a handle to the hypervisor interface or -1 on failure
+ * @return a handle to the hypervisor interface
  */
-int xc_interface_open(void);
+xc_interface *xc_interface_open(xentoollog_logger *logger,
+                                xentoollog_logger *dombuild_logger,
+                                unsigned open_flags);
+  /* if logger==NULL, will log to stderr
+   * if dombuild_logger=NULL, will log to a file
+   */
+
+enum xc_open_flags {
+    XC_OPENFLAG_DUMMY =  01, /* do not actually open a xenctrl interface */
+};
 
 /**
  * This function closes an open hypervisor interface.
  *
  * This function can fail if the handle does not represent an open interface or
- * if there were problems closing the interface.
+ * if there were problems closing the interface.  In the latter case
+ * the interface is still closed.
  *
- * @parm xc_handle a handle to an open hypervisor interface
+ * @parm xch a handle to an open hypervisor interface
  * @return 0 on success, -1 otherwise.
  */
-int xc_interface_close(int xc_handle);
+int xc_interface_close(xc_interface *xch);
 
 /*
  * KERNEL INTERFACES
@@ -139,14 +172,14 @@ void xc_register_event_handler(
     td_event_e e);
 
 long xc_ptrace(
-    int xc_handle,
+    xc_interface *xch,
     enum __ptrace_request request,
     uint32_t  domid,
     long addr,
     long data);
 
 int xc_waitdomain(
-    int xc_handle,
+    xc_interface *xch,
     int domain,
     int *status,
     int options);
@@ -205,7 +238,7 @@ typedef union
 } start_info_any_t;
 
 
-int xc_domain_create(int xc_handle,
+int xc_domain_create(xc_interface *xch,
                      uint32_t ssidref,
                      xen_domain_handle_t handle,
                      uint32_t flags,
@@ -217,7 +250,7 @@ int xc_domain_create(int xc_handle,
  *  xc_domain_dumpcore_via_callback - produces a dump, using a specified
  *                                    callback function
  */
-int xc_domain_dumpcore(int xc_handle,
+int xc_domain_dumpcore(xc_interface *xch,
                        uint32_t domid,
                        const char *corename);
 
@@ -227,9 +260,10 @@ int xc_domain_dumpcore(int xc_handle,
  * and passes an opaque object for the use of the function and
  * created by the caller of xc_domain_dumpcore_via_callback.
  */
-typedef int (dumpcore_rtn_t)(void *arg, char *buffer, unsigned int length);
+typedef int (dumpcore_rtn_t)(xc_interface *xch,
+                             void *arg, char *buffer, unsigned int length);
 
-int xc_domain_dumpcore_via_callback(int xc_handle,
+int xc_domain_dumpcore_via_callback(xc_interface *xch,
                                     uint32_t domid,
                                     void *arg,
                                     dumpcore_rtn_t dump_rtn);
@@ -237,12 +271,12 @@ int xc_domain_dumpcore_via_callback(int xc_handle,
 /*
  * This function sets the maximum number of vcpus that a domain may create.
  *
- * @parm xc_handle a handle to an open hypervisor interface.
+ * @parm xch a handle to an open hypervisor interface.
  * @parm domid the domain id in which vcpus are to be created.
  * @parm max the maximum number of vcpus that the domain may create.
  * @return 0 on success, -1 on failure.
  */
-int xc_domain_max_vcpus(int xc_handle,
+int xc_domain_max_vcpus(xc_interface *xch,
                         uint32_t domid,
                         unsigned int max);
 
@@ -250,21 +284,21 @@ int xc_domain_max_vcpus(int xc_handle,
  * This function pauses a domain. A paused domain still exists in memory
  * however it does not receive any timeslices from the hypervisor.
  *
- * @parm xc_handle a handle to an open hypervisor interface
+ * @parm xch a handle to an open hypervisor interface
  * @parm domid the domain id to pause
  * @return 0 on success, -1 on failure.
  */
-int xc_domain_pause(int xc_handle,
+int xc_domain_pause(xc_interface *xch,
                     uint32_t domid);
 /**
  * This function unpauses a domain.  The domain should have been previously
  * paused.
  *
- * @parm xc_handle a handle to an open hypervisor interface
+ * @parm xch a handle to an open hypervisor interface
  * @parm domid the domain id to unpause
  * return 0 on success, -1 on failure
  */
-int xc_domain_unpause(int xc_handle,
+int xc_domain_unpause(xc_interface *xch,
                       uint32_t domid);
 
 /**
@@ -272,11 +306,11 @@ int xc_domain_unpause(int xc_handle,
  * completely from memory.  This function should be called after sending the
  * domain a SHUTDOWN control message to free up the domain resources.
  *
- * @parm xc_handle a handle to an open hypervisor interface
+ * @parm xch a handle to an open hypervisor interface
  * @parm domid the domain id to destroy
  * @return 0 on success, -1 on failure
  */
-int xc_domain_destroy(int xc_handle,
+int xc_domain_destroy(xc_interface *xch,
                       uint32_t domid);
 
 
@@ -284,12 +318,12 @@ int xc_domain_destroy(int xc_handle,
  * This function resumes a suspended domain. The domain should have
  * been previously suspended.
  *
- * @parm xc_handle a handle to an open hypervisor interface
+ * @parm xch a handle to an open hypervisor interface
  * @parm domid the domain id to resume
  * @parm fast use cooperative resume (guest must support this)
  * return 0 on success, -1 on failure
  */
-int xc_domain_resume(int xc_handle,
+int xc_domain_resume(xc_interface *xch,
 		     uint32_t domid,
 		     int fast);
 
@@ -299,21 +333,21 @@ int xc_domain_resume(int xc_handle,
  * sched_op operations in a paravirtualized domain. The caller is
  * expected to give the reason for the shutdown.
  *
- * @parm xc_handle a handle to an open hypervisor interface
+ * @parm xch a handle to an open hypervisor interface
  * @parm domid the domain id to destroy
  * @parm reason is the reason (SHUTDOWN_xxx) for the shutdown
  * @return 0 on success, -1 on failure
  */
-int xc_domain_shutdown(int xc_handle,
+int xc_domain_shutdown(xc_interface *xch,
                        uint32_t domid,
                        int reason);
 
-int xc_vcpu_setaffinity(int xc_handle,
+int xc_vcpu_setaffinity(xc_interface *xch,
                         uint32_t domid,
                         int vcpu,
                         uint64_t *cpumap,
                         int cpusize);
-int xc_vcpu_getaffinity(int xc_handle,
+int xc_vcpu_getaffinity(xc_interface *xch,
                         uint32_t domid,
                         int vcpu,
                         uint64_t *cpumap,
@@ -326,7 +360,7 @@ int xc_vcpu_getaffinity(int xc_handle,
  * one exists. It is, therefore, important in this case to make sure the
  * domain requested was the one returned.
  *
- * @parm xc_handle a handle to an open hypervisor interface
+ * @parm xch a handle to an open hypervisor interface
  * @parm first_domid the first domain to enumerate information from.  Domains
  *                   are currently enumerate in order of creation.
  * @parm max_doms the number of elements in info
@@ -334,7 +368,7 @@ int xc_vcpu_getaffinity(int xc_handle,
  *            the enumerated domains.
  * @return the number of domains enumerated or -1 on error
  */
-int xc_domain_getinfo(int xc_handle,
+int xc_domain_getinfo(xc_interface *xch,
                       uint32_t first_domid,
                       unsigned int max_doms,
                       xc_dominfo_t *info);
@@ -343,13 +377,13 @@ int xc_domain_getinfo(int xc_handle,
 /**
  * This function will set the execution context for the specified vcpu.
  *
- * @parm xc_handle a handle to an open hypervisor interface
+ * @parm xch a handle to an open hypervisor interface
  * @parm domid the domain to set the vcpu context for
  * @parm vcpu the vcpu number for the context
  * @parm ctxt pointer to the the cpu context with the values to set
  * @return the number of domains enumerated or -1 on error
  */
-int xc_vcpu_setcontext(int xc_handle,
+int xc_vcpu_setcontext(xc_interface *xch,
                        uint32_t domid,
                        uint32_t vcpu,
                        vcpu_guest_context_any_t *ctxt);
@@ -358,7 +392,7 @@ int xc_vcpu_setcontext(int xc_handle,
  * single hypercall.  The domain information will be stored into the supplied
  * array of xc_domaininfo_t structures.
  *
- * @parm xc_handle a handle to an open hypervisor interface
+ * @parm xch a handle to an open hypervisor interface
  * @parm first_domain the first domain to enumerate information from.
  *                    Domains are currently enumerate in order of creation.
  * @parm max_domains the number of elements in info
@@ -366,21 +400,21 @@ int xc_vcpu_setcontext(int xc_handle,
  *            the enumerated domains.
  * @return the number of domains enumerated or -1 on error
  */
-int xc_domain_getinfolist(int xc_handle,
+int xc_domain_getinfolist(xc_interface *xch,
                           uint32_t first_domain,
                           unsigned int max_domains,
                           xc_domaininfo_t *info);
 
 /**
  * This function returns information about the context of a hvm domain
- * @parm xc_handle a handle to an open hypervisor interface
+ * @parm xch a handle to an open hypervisor interface
  * @parm domid the domain to get information from
  * @parm ctxt_buf a pointer to a structure to store the execution context of
  *            the hvm domain
  * @parm size the size of ctxt_buf in bytes
  * @return 0 on success, -1 on failure
  */
-int xc_domain_hvm_getcontext(int xc_handle,
+int xc_domain_hvm_getcontext(xc_interface *xch,
                              uint32_t domid,
                              uint8_t *ctxt_buf,
                              uint32_t size);
@@ -388,7 +422,7 @@ int xc_domain_hvm_getcontext(int xc_handle,
 
 /**
  * This function returns one element of the context of a hvm domain
- * @parm xc_handle a handle to an open hypervisor interface
+ * @parm xch a handle to an open hypervisor interface
  * @parm domid the domain to get information from
  * @parm typecode which type of elemnt required 
  * @parm instance which instance of the type
@@ -397,7 +431,7 @@ int xc_domain_hvm_getcontext(int xc_handle,
  * @parm size the size of ctxt_buf (must be >= HVM_SAVE_LENGTH(typecode))
  * @return 0 on success, -1 on failure
  */
-int xc_domain_hvm_getcontext_partial(int xc_handle,
+int xc_domain_hvm_getcontext_partial(xc_interface *xch,
                                      uint32_t domid,
                                      uint16_t typecode,
                                      uint16_t instance,
@@ -407,13 +441,13 @@ int xc_domain_hvm_getcontext_partial(int xc_handle,
 /**
  * This function will set the context for hvm domain
  *
- * @parm xc_handle a handle to an open hypervisor interface
+ * @parm xch a handle to an open hypervisor interface
  * @parm domid the domain to set the hvm domain context for
  * @parm hvm_ctxt pointer to the the hvm context with the values to set
  * @parm size the size of hvm_ctxt in bytes
  * @return 0 on success, -1 on failure
  */
-int xc_domain_hvm_setcontext(int xc_handle,
+int xc_domain_hvm_setcontext(xc_interface *xch,
                              uint32_t domid,
                              uint8_t *hvm_ctxt,
                              uint32_t size);
@@ -422,33 +456,33 @@ int xc_domain_hvm_setcontext(int xc_handle,
  * This function returns information about the execution context of a
  * particular vcpu of a domain.
  *
- * @parm xc_handle a handle to an open hypervisor interface
+ * @parm xch a handle to an open hypervisor interface
  * @parm domid the domain to get information from
  * @parm vcpu the vcpu number
  * @parm ctxt a pointer to a structure to store the execution context of the
  *            domain
  * @return 0 on success, -1 on failure
  */
-int xc_vcpu_getcontext(int xc_handle,
+int xc_vcpu_getcontext(xc_interface *xch,
                        uint32_t domid,
                        uint32_t vcpu,
                        vcpu_guest_context_any_t *ctxt);
 
 typedef xen_domctl_getvcpuinfo_t xc_vcpuinfo_t;
-int xc_vcpu_getinfo(int xc_handle,
+int xc_vcpu_getinfo(xc_interface *xch,
                     uint32_t domid,
                     uint32_t vcpu,
                     xc_vcpuinfo_t *info);
 
-long long xc_domain_get_cpu_usage(int xc_handle,
+long long xc_domain_get_cpu_usage(xc_interface *xch,
                                   domid_t domid,
                                   int vcpu);
 
-int xc_domain_sethandle(int xc_handle, uint32_t domid,
+int xc_domain_sethandle(xc_interface *xch, uint32_t domid,
                         xen_domain_handle_t handle);
 
 typedef xen_domctl_shadow_op_stats_t xc_shadow_op_stats_t;
-int xc_shadow_control(int xc_handle,
+int xc_shadow_control(xc_interface *xch,
                       uint32_t domid,
                       unsigned int sop,
                       unsigned long *dirty_bitmap,
@@ -457,44 +491,44 @@ int xc_shadow_control(int xc_handle,
                       uint32_t mode,
                       xc_shadow_op_stats_t *stats);
 
-int xc_sedf_domain_set(int xc_handle,
+int xc_sedf_domain_set(xc_interface *xch,
                        uint32_t domid,
                        uint64_t period, uint64_t slice,
                        uint64_t latency, uint16_t extratime,
                        uint16_t weight);
 
-int xc_sedf_domain_get(int xc_handle,
+int xc_sedf_domain_get(xc_interface *xch,
                        uint32_t domid,
                        uint64_t* period, uint64_t *slice,
                        uint64_t *latency, uint16_t *extratime,
                        uint16_t *weight);
 
-int xc_sched_credit_domain_set(int xc_handle,
+int xc_sched_credit_domain_set(xc_interface *xch,
                                uint32_t domid,
                                struct xen_domctl_sched_credit *sdom);
 
-int xc_sched_credit_domain_get(int xc_handle,
+int xc_sched_credit_domain_get(xc_interface *xch,
                                uint32_t domid,
                                struct xen_domctl_sched_credit *sdom);
 
-int xc_sched_credit2_domain_set(int xc_handle,
+int xc_sched_credit2_domain_set(xc_interface *xch,
                                uint32_t domid,
                                struct xen_domctl_sched_credit2 *sdom);
 
-int xc_sched_credit2_domain_get(int xc_handle,
+int xc_sched_credit2_domain_get(xc_interface *xch,
                                uint32_t domid,
                                struct xen_domctl_sched_credit2 *sdom);
 
 /**
  * This function sends a trigger to a domain.
  *
- * @parm xc_handle a handle to an open hypervisor interface
+ * @parm xch a handle to an open hypervisor interface
  * @parm domid the domain id to send trigger
  * @parm trigger the trigger type
  * @parm vcpu the vcpu number to send trigger 
  * return 0 on success, -1 on failure
  */
-int xc_domain_send_trigger(int xc_handle,
+int xc_domain_send_trigger(xc_interface *xch,
                            uint32_t domid,
                            uint32_t trigger,
                            uint32_t vcpu);
@@ -502,12 +536,12 @@ int xc_domain_send_trigger(int xc_handle,
 /**
  * This function enables or disable debugging of a domain.
  *
- * @parm xc_handle a handle to an open hypervisor interface
+ * @parm xch a handle to an open hypervisor interface
  * @parm domid the domain id to send trigger
  * @parm enable true to enable debugging
  * return 0 on success, -1 on failure
  */
-int xc_domain_setdebugging(int xc_handle,
+int xc_domain_setdebugging(xc_interface *xch,
                            uint32_t domid,
                            unsigned int enable);
 
@@ -530,7 +564,7 @@ typedef struct xc_cpupoolinfo {
  * @parm sched_id id of scheduler to use for pool
  * return 0 on success, -1 on failure
  */
-int xc_cpupool_create(int xc_handle,
+int xc_cpupool_create(xc_interface *xch,
                       uint32_t *ppoolid,
                       uint32_t sched_id);
 
@@ -541,7 +575,7 @@ int xc_cpupool_create(int xc_handle,
  * @parm poolid id of the cpupool to destroy
  * return 0 on success, -1 on failure
  */
-int xc_cpupool_destroy(int xc_handle,
+int xc_cpupool_destroy(xc_interface *xch,
                        uint32_t poolid);
 
 /**
@@ -553,7 +587,7 @@ int xc_cpupool_destroy(int xc_handle,
  * @parm info pointer to xc_cpupoolinfo_t array
  * return number of cpupool infos
  */
-int xc_cpupool_getinfo(int xc_handle,
+int xc_cpupool_getinfo(xc_interface *xch,
                        uint32_t first_poolid,
                        uint32_t n_max,
                        xc_cpupoolinfo_t *info);
@@ -566,7 +600,7 @@ int xc_cpupool_getinfo(int xc_handle,
  * @parm cpu cpu number to add
  * return 0 on success, -1 on failure
  */
-int xc_cpupool_addcpu(int xc_handle,
+int xc_cpupool_addcpu(xc_interface *xch,
                       uint32_t poolid,
                       int cpu);
 
@@ -578,7 +612,7 @@ int xc_cpupool_addcpu(int xc_handle,
  * @parm cpu cpu number to remove
  * return 0 on success, -1 on failure
  */
-int xc_cpupool_removecpu(int xc_handle,
+int xc_cpupool_removecpu(xc_interface *xch,
                          uint32_t poolid,
                          int cpu);
 
@@ -590,7 +624,7 @@ int xc_cpupool_removecpu(int xc_handle,
  * @parm domid id of the domain to move
  * return 0 on success, -1 on failure
  */
-int xc_cpupool_movedomain(int xc_handle,
+int xc_cpupool_movedomain(xc_interface *xch,
                           uint32_t poolid,
                           uint32_t domid);
 
@@ -601,12 +635,14 @@ int xc_cpupool_movedomain(int xc_handle,
  * @parm cpumap pointer where to store the cpumap
  * return 0 on success, -1 on failure
  */
-int xc_cpupool_freeinfo(int xc_handle,
+int xc_cpupool_freeinfo(xc_interface *xch,
                         uint64_t *cpumap);
 
 
 /*
  * EVENT CHANNEL FUNCTIONS
+ *
+ * None of these do any logging.
  */
 
 /* A port identifier is guaranteed to fit in 31 bits. */
@@ -621,25 +657,27 @@ typedef int evtchn_port_or_error_t;
  * use xc_evtchn_bind_unbound_port(). This function is intended for allocating
  * ports *only* during domain creation.
  *
- * @parm xc_handle a handle to an open hypervisor interface
+ * @parm xch a handle to an open hypervisor interface
  * @parm dom the ID of the local domain (the 'allocatee')
  * @parm remote_dom the ID of the domain who will later bind
  * @return allocated port (in @dom) on success, -1 on failure
  */
 evtchn_port_or_error_t
-xc_evtchn_alloc_unbound(int xc_handle,
+xc_evtchn_alloc_unbound(xc_interface *xch,
                         uint32_t dom,
                         uint32_t remote_dom);
 
-int xc_evtchn_reset(int xc_handle,
+int xc_evtchn_reset(xc_interface *xch,
                     uint32_t dom);
 
 typedef struct evtchn_status xc_evtchn_status_t;
-int xc_evtchn_status(int xc_handle, xc_evtchn_status_t *status);
+int xc_evtchn_status(xc_interface *xch, xc_evtchn_status_t *status);
 
 /*
  * Return a handle to the event channel driver, or -1 on failure, in which case
  * errno will be set appropriately.
+ *
+ * Before Xen pre-4.1 this function would sometimes report errors with perror.
  */
 int xc_evtchn_open(void);
 
@@ -701,19 +739,19 @@ xc_evtchn_pending(int xce_handle);
  */
 int xc_evtchn_unmask(int xce_handle, evtchn_port_t port);
 
-int xc_physdev_pci_access_modify(int xc_handle,
+int xc_physdev_pci_access_modify(xc_interface *xch,
                                  uint32_t domid,
                                  int bus,
                                  int dev,
                                  int func,
                                  int enable);
 
-int xc_readconsolering(int xc_handle,
+int xc_readconsolering(xc_interface *xch,
                        char **pbuffer,
                        unsigned int *pnr_chars,
                        int clear, int incremental, uint32_t *pindex);
 
-int xc_send_debug_keys(int xc_handle, char *keys);
+int xc_send_debug_keys(xc_interface *xch, char *keys);
 
 typedef xen_sysctl_physinfo_t xc_physinfo_t;
 typedef xen_sysctl_topologyinfo_t xc_topologyinfo_t;
@@ -726,109 +764,109 @@ typedef uint64_t xc_node_to_memsize_t;
 typedef uint64_t xc_node_to_memfree_t;
 typedef uint32_t xc_node_to_node_dist_t;
 
-int xc_physinfo(int xc_handle, xc_physinfo_t *info);
-int xc_topologyinfo(int xc_handle, xc_topologyinfo_t *info);
-int xc_numainfo(int xc_handle, xc_numainfo_t *info);
+int xc_physinfo(xc_interface *xch, xc_physinfo_t *info);
+int xc_topologyinfo(xc_interface *xch, xc_topologyinfo_t *info);
+int xc_numainfo(xc_interface *xch, xc_numainfo_t *info);
 
-int xc_sched_id(int xc_handle,
+int xc_sched_id(xc_interface *xch,
                 int *sched_id);
 
 typedef xen_sysctl_cpuinfo_t xc_cpuinfo_t;
-int xc_getcpuinfo(int xc_handle, int max_cpus,
+int xc_getcpuinfo(xc_interface *xch, int max_cpus,
                   xc_cpuinfo_t *info, int *nr_cpus); 
 
-int xc_domain_setmaxmem(int xc_handle,
+int xc_domain_setmaxmem(xc_interface *xch,
                         uint32_t domid,
                         unsigned int max_memkb);
 
-int xc_domain_set_memmap_limit(int xc_handle,
+int xc_domain_set_memmap_limit(xc_interface *xch,
                                uint32_t domid,
                                unsigned long map_limitkb);
 
-int xc_domain_set_time_offset(int xc_handle,
+int xc_domain_set_time_offset(xc_interface *xch,
                               uint32_t domid,
                               int32_t time_offset_seconds);
 
-int xc_domain_set_tsc_info(int xc_handle,
+int xc_domain_set_tsc_info(xc_interface *xch,
                            uint32_t domid,
                            uint32_t tsc_mode,
                            uint64_t elapsed_nsec,
                            uint32_t gtsc_khz,
                            uint32_t incarnation);
 
-int xc_domain_get_tsc_info(int xc_handle,
+int xc_domain_get_tsc_info(xc_interface *xch,
                            uint32_t domid,
                            uint32_t *tsc_mode,
                            uint64_t *elapsed_nsec,
                            uint32_t *gtsc_khz,
                            uint32_t *incarnation);
 
-int xc_domain_disable_migrate(int xc_handle, uint32_t domid);
+int xc_domain_disable_migrate(xc_interface *xch, uint32_t domid);
 
-int xc_domain_memory_increase_reservation(int xc_handle,
+int xc_domain_memory_increase_reservation(xc_interface *xch,
                                           uint32_t domid,
                                           unsigned long nr_extents,
                                           unsigned int extent_order,
                                           unsigned int mem_flags,
                                           xen_pfn_t *extent_start);
 
-int xc_domain_memory_decrease_reservation(int xc_handle,
+int xc_domain_memory_decrease_reservation(xc_interface *xch,
                                           uint32_t domid,
                                           unsigned long nr_extents,
                                           unsigned int extent_order,
                                           xen_pfn_t *extent_start);
 
-int xc_domain_memory_populate_physmap(int xc_handle,
+int xc_domain_memory_populate_physmap(xc_interface *xch,
                                       uint32_t domid,
                                       unsigned long nr_extents,
                                       unsigned int extent_order,
                                       unsigned int mem_flags,
                                       xen_pfn_t *extent_start);
 
-int xc_domain_memory_set_pod_target(int xc_handle,
+int xc_domain_memory_set_pod_target(xc_interface *xch,
                                     uint32_t domid,
                                     uint64_t target_pages,
                                     uint64_t *tot_pages,
                                     uint64_t *pod_cache_pages,
                                     uint64_t *pod_entries);
 
-int xc_domain_memory_get_pod_target(int xc_handle,
+int xc_domain_memory_get_pod_target(xc_interface *xch,
                                     uint32_t domid,
                                     uint64_t *tot_pages,
                                     uint64_t *pod_cache_pages,
                                     uint64_t *pod_entries);
 
-int xc_domain_ioport_permission(int xc_handle,
+int xc_domain_ioport_permission(xc_interface *xch,
                                 uint32_t domid,
                                 uint32_t first_port,
                                 uint32_t nr_ports,
                                 uint32_t allow_access);
 
-int xc_domain_irq_permission(int xc_handle,
+int xc_domain_irq_permission(xc_interface *xch,
                              uint32_t domid,
                              uint8_t pirq,
                              uint8_t allow_access);
 
-int xc_domain_iomem_permission(int xc_handle,
+int xc_domain_iomem_permission(xc_interface *xch,
                                uint32_t domid,
                                unsigned long first_mfn,
                                unsigned long nr_mfns,
                                uint8_t allow_access);
 
-int xc_domain_pin_memory_cacheattr(int xc_handle,
+int xc_domain_pin_memory_cacheattr(xc_interface *xch,
                                    uint32_t domid,
                                    uint64_t start,
                                    uint64_t end,
                                    uint32_t type);
 
-unsigned long xc_make_page_below_4G(int xc_handle, uint32_t domid,
+unsigned long xc_make_page_below_4G(xc_interface *xch, uint32_t domid,
                                     unsigned long mfn);
 
 typedef xen_sysctl_perfc_desc_t xc_perfc_desc_t;
 typedef xen_sysctl_perfc_val_t xc_perfc_val_t;
 /* IMPORTANT: The caller is responsible for mlock()'ing the @desc and @val
    arrays. */
-int xc_perfc_control(int xc_handle,
+int xc_perfc_control(xc_interface *xch,
                      uint32_t op,
                      xc_perfc_desc_t *desc,
                      xc_perfc_val_t *val,
@@ -837,7 +875,7 @@ int xc_perfc_control(int xc_handle,
 
 typedef xen_sysctl_lockprof_data_t xc_lockprof_data_t;
 /* IMPORTANT: The caller is responsible for mlock()'ing the @data array. */
-int xc_lockprof_control(int xc_handle,
+int xc_lockprof_control(xc_interface *xch,
                         uint32_t opcode,
                         uint32_t *n_elems,
                         uint64_t *time,
@@ -852,17 +890,17 @@ int xc_lockprof_control(int xc_handle,
  * the shared_info_frame (from xc_domain_getinfo()) + 2048.  The structure
  * stored there is of type control_if_t.
  *
- * @parm xc_handle a handle on an open hypervisor interface
+ * @parm xch a handle on an open hypervisor interface
  * @parm dom the domain to map memory from
  * @parm size the amount of memory to map (in multiples of page size)
  * @parm prot same flag as in mmap().
  * @parm mfn the frame address to map.
  */
-void *xc_map_foreign_range(int xc_handle, uint32_t dom,
+void *xc_map_foreign_range(xc_interface *xch, uint32_t dom,
                             int size, int prot,
                             unsigned long mfn );
 
-void *xc_map_foreign_pages(int xc_handle, uint32_t dom, int prot,
+void *xc_map_foreign_pages(xc_interface *xch, uint32_t dom, int prot,
                            const xen_pfn_t *arr, int num );
 
 /**
@@ -872,7 +910,7 @@ void *xc_map_foreign_pages(int xc_handle, uint32_t dom, int prot,
  * When a page cannot be mapped, its PFN in @arr is or'ed with
  * 0xF0000000 to indicate the error.
  */
-void *xc_map_foreign_batch(int xc_handle, uint32_t dom, int prot,
+void *xc_map_foreign_batch(xc_interface *xch, uint32_t dom, int prot,
                            xen_pfn_t *arr, int num );
 
 /**
@@ -880,7 +918,7 @@ void *xc_map_foreign_batch(int xc_handle, uint32_t dom, int prot,
  * When a page cannot be mapped, its respective field in @err is
  * set to the corresponding errno value.
  */
-void *xc_map_foreign_bulk(int xc_handle, uint32_t dom, int prot,
+void *xc_map_foreign_bulk(xc_interface *xch, uint32_t dom, int prot,
                           const xen_pfn_t *arr, int *err, unsigned int num);
 
 /**
@@ -888,12 +926,12 @@ void *xc_map_foreign_bulk(int xc_handle, uint32_t dom, int prot,
  * vcpu returning the GFN containing the address (that is, an MFN for 
  * PV guests, a PFN for HVM guests).  Returns 0 for failure.
  *
- * @parm xc_handle a handle on an open hypervisor interface
+ * @parm xch a handle on an open hypervisor interface
  * @parm dom the domain to perform the translation in
  * @parm vcpu the vcpu to perform the translation on
  * @parm virt the virtual address to translate
  */
-unsigned long xc_translate_foreign_address(int xc_handle, uint32_t dom,
+unsigned long xc_translate_foreign_address(xc_interface *xch, uint32_t dom,
                                            int vcpu, unsigned long long virt);
 
 
@@ -901,33 +939,33 @@ unsigned long xc_translate_foreign_address(int xc_handle, uint32_t dom,
  * DEPRECATED.  Avoid using this, as it does not correctly account for PFNs
  * without a backing MFN.
  */
-int xc_get_pfn_list(int xc_handle, uint32_t domid, uint64_t *pfn_buf,
+int xc_get_pfn_list(xc_interface *xch, uint32_t domid, uint64_t *pfn_buf,
                     unsigned long max_pfns);
 
 unsigned long xc_ia64_fpsr_default(void);
 
-int xc_copy_to_domain_page(int xc_handle, uint32_t domid,
+int xc_copy_to_domain_page(xc_interface *xch, uint32_t domid,
                            unsigned long dst_pfn, const char *src_page);
 
-int xc_clear_domain_page(int xc_handle, uint32_t domid,
+int xc_clear_domain_page(xc_interface *xch, uint32_t domid,
                          unsigned long dst_pfn);
 
-long xc_get_max_pages(int xc_handle, uint32_t domid);
+long xc_get_max_pages(xc_interface *xch, uint32_t domid);
 
-int xc_mmuext_op(int xc_handle, struct mmuext_op *op, unsigned int nr_ops,
+int xc_mmuext_op(xc_interface *xch, struct mmuext_op *op, unsigned int nr_ops,
                  domid_t dom);
 
-int xc_memory_op(int xc_handle, int cmd, void *arg);
+int xc_memory_op(xc_interface *xch, int cmd, void *arg);
 
 
 /* Get current total pages allocated to a domain. */
-long xc_get_tot_pages(int xc_handle, uint32_t domid);
+long xc_get_tot_pages(xc_interface *xch, uint32_t domid);
 
 /**
  * This function retrieves the the number of bytes available
  * in the heap in a specific range of address-widths and nodes.
  * 
- * @parm xc_handle a handle to an open hypervisor interface
+ * @parm xch a handle to an open hypervisor interface
  * @parm domid the domain to query
  * @parm min_width the smallest address width to query (0 if don't care)
  * @parm max_width the largest address width to query (0 if don't care)
@@ -935,7 +973,7 @@ long xc_get_tot_pages(int xc_handle, uint32_t domid);
  * @parm *bytes caller variable to put total bytes counted
  * @return 0 on success, <0 on failure.
  */
-int xc_availheap(int xc_handle, int min_width, int max_width, int node,
+int xc_availheap(xc_interface *xch, int min_width, int max_width, int node,
                  uint64_t *bytes);
 
 /*
@@ -945,7 +983,7 @@ int xc_availheap(int xc_handle, int min_width, int max_width, int node,
 /**
  * xc_tbuf_enable - enable tracing buffers
  *
- * @parm xc_handle a handle to an open hypervisor interface
+ * @parm xch a handle to an open hypervisor interface
  * @parm cnt size of tracing buffers to create (in pages)
  * @parm mfn location to store mfn of the trace buffers to
  * @parm size location to store the size (in bytes) of a trace buffer to
@@ -953,13 +991,13 @@ int xc_availheap(int xc_handle, int min_width, int max_width, int node,
  * Gets the machine address of the trace pointer area and the size of the
  * per CPU buffers.
  */
-int xc_tbuf_enable(int xc_handle, unsigned long pages,
+int xc_tbuf_enable(xc_interface *xch, unsigned long pages,
                    unsigned long *mfn, unsigned long *size);
 
 /*
  * Disable tracing buffers.
  */
-int xc_tbuf_disable(int xc_handle);
+int xc_tbuf_disable(xc_interface *xch);
 
 /**
  * This function sets the size of the trace buffers. Setting the size
@@ -967,67 +1005,72 @@ int xc_tbuf_disable(int xc_handle);
  * time or via this interface, not both. The buffer size must be set before
  * enabling tracing.
  *
- * @parm xc_handle a handle to an open hypervisor interface
+ * @parm xch a handle to an open hypervisor interface
  * @parm size the size in pages per cpu for the trace buffers
  * @return 0 on success, -1 on failure.
  */
-int xc_tbuf_set_size(int xc_handle, unsigned long size);
+int xc_tbuf_set_size(xc_interface *xch, unsigned long size);
 
 /**
  * This function retrieves the current size of the trace buffers.
  * Note that the size returned is in terms of bytes, not pages.
 
- * @parm xc_handle a handle to an open hypervisor interface
+ * @parm xch a handle to an open hypervisor interface
  * @parm size will contain the size in bytes for the trace buffers
  * @return 0 on success, -1 on failure.
  */
-int xc_tbuf_get_size(int xc_handle, unsigned long *size);
+int xc_tbuf_get_size(xc_interface *xch, unsigned long *size);
 
-int xc_tbuf_set_cpu_mask(int xc_handle, uint32_t mask);
+int xc_tbuf_set_cpu_mask(xc_interface *xch, uint32_t mask);
 
-int xc_tbuf_set_evt_mask(int xc_handle, uint32_t mask);
+int xc_tbuf_set_evt_mask(xc_interface *xch, uint32_t mask);
 
-int xc_domctl(int xc_handle, struct xen_domctl *domctl);
-int xc_sysctl(int xc_handle, struct xen_sysctl *sysctl);
+int xc_domctl(xc_interface *xch, struct xen_domctl *domctl);
+int xc_sysctl(xc_interface *xch, struct xen_sysctl *sysctl);
 
-int xc_version(int xc_handle, int cmd, void *arg);
+int xc_version(xc_interface *xch, int cmd, void *arg);
 
-int xc_acm_op(int xc_handle, int cmd, void *arg, unsigned long arg_size);
+int xc_acm_op(xc_interface *xch, int cmd, void *arg, unsigned long arg_size);
 
-int xc_flask_op(int xc_handle, flask_op_t *op);
+int xc_flask_op(xc_interface *xch, flask_op_t *op);
 
 /*
  * Subscribe to state changes in a domain via evtchn.
  * Returns -1 on failure, in which case errno will be set appropriately.
  */
 int xc_domain_subscribe_for_suspend(
-    int xc_handle, domid_t domid, evtchn_port_t port);
+    xc_interface *xch, domid_t domid, evtchn_port_t port);
 
 /**************************
  * GRANT TABLE OPERATIONS *
  **************************/
 
 /*
- * Return a handle to the grant table driver, or -1 on failure, in which case
- * errno will be set appropriately.
+ * These functions sometimes log messages as above, but not always.
  */
-int xc_gnttab_open(void);
+
+/*
+ * Return an fd onto the grant table driver.  Logs errors.
+ */
+int xc_gnttab_open(xc_interface *xch);
 
 /*
  * Close a handle previously allocated with xc_gnttab_open().
+ * Never logs errors.
  */
-int xc_gnttab_close(int xcg_handle);
+int xc_gnttab_close(xc_interface *xch, int xcg_handle);
 
 /*
  * Memory maps a grant reference from one domain to a local address range.
- * Mappings should be unmapped with xc_gnttab_munmap.  Returns NULL on failure.
+ * Mappings should be unmapped with xc_gnttab_munmap.  Logs errors.
  *
  * @parm xcg_handle a handle on an open grant table interface
  * @parm domid the domain to map memory from
  * @parm ref the grant reference ID to map
  * @parm prot same flag as in mmap()
  */
-void *xc_gnttab_map_grant_ref(int xcg_handle,
+void *xc_gnttab_map_grant_ref(xc_interface *xch,
+                              int xcg_handle,
                               uint32_t domid,
                               uint32_t ref,
                               int prot);
@@ -1035,7 +1078,7 @@ void *xc_gnttab_map_grant_ref(int xcg_handle,
 /**
  * Memory maps one or more grant references from one or more domains to a
  * contiguous local address range. Mappings should be unmapped with
- * xc_gnttab_munmap.  Returns NULL on failure.
+ * xc_gnttab_munmap.  Logs errors.
  *
  * @parm xcg_handle a handle on an open grant table interface
  * @parm count the number of grant references to be mapped
@@ -1044,7 +1087,8 @@ void *xc_gnttab_map_grant_ref(int xcg_handle,
  * @parm refs an array of @count grant references to be mapped
  * @parm prot same flag as in mmap()
  */
-void *xc_gnttab_map_grant_refs(int xcg_handle,
+void *xc_gnttab_map_grant_refs(xc_interface *xch,
+                               int xcg_handle,
                                uint32_t count,
                                uint32_t *domids,
                                uint32_t *refs,
@@ -1053,7 +1097,7 @@ void *xc_gnttab_map_grant_refs(int xcg_handle,
 /**
  * Memory maps one or more grant references from one domain to a
  * contiguous local address range. Mappings should be unmapped with
- * xc_gnttab_munmap.  Returns NULL on failure.
+ * xc_gnttab_munmap.  Logs errors.
  *
  * @parm xcg_handle a handle on an open grant table interface
  * @parm count the number of grant references to be mapped
@@ -1061,7 +1105,8 @@ void *xc_gnttab_map_grant_refs(int xcg_handle,
  * @parm refs an array of @count grant references to be mapped
  * @parm prot same flag as in mmap()
  */
-void *xc_gnttab_map_domain_grant_refs(int xcg_handle,
+void *xc_gnttab_map_domain_grant_refs(xc_interface *xch,
+                                      int xcg_handle,
                                       uint32_t count,
                                       uint32_t domid,
                                       uint32_t *refs,
@@ -1069,16 +1114,16 @@ void *xc_gnttab_map_domain_grant_refs(int xcg_handle,
 
 /*
  * Unmaps the @count pages starting at @start_address, which were mapped by a
- * call to xc_gnttab_map_grant_ref or xc_gnttab_map_grant_refs. Returns zero
- * on success, otherwise sets errno and returns non-zero.
+ * call to xc_gnttab_map_grant_ref or xc_gnttab_map_grant_refs. Never logs.
  */
-int xc_gnttab_munmap(int xcg_handle,
+int xc_gnttab_munmap(xc_interface *xch,
+                     int xcg_handle,
                      void *start_address,
                      uint32_t count);
 
 /*
  * Sets the maximum number of grants that may be mapped by the given instance
- * to @count.
+ * to @count.  Never logs.
  *
  * N.B. This function must be called after opening the handle, and before any
  *      other functions are invoked on it.
@@ -1087,22 +1132,25 @@ int xc_gnttab_munmap(int xcg_handle,
  *      and it may not be possible to satisfy requests up to the maximum number
  *      of grants.
  */
-int xc_gnttab_set_max_grants(int xcg_handle,
+int xc_gnttab_set_max_grants(xc_interface *xch,
+                             int xcg_handle,
 			     uint32_t count);
 
-int xc_gnttab_op(int xc_handle, int cmd,
+int xc_gnttab_op(xc_interface *xch, int cmd,
                  void * op, int op_size, int count);
+/* Logs iff lock_pages failes, otherwise doesn't. */
 
-int xc_gnttab_get_version(int xc_handle, int domid);
-grant_entry_v1_t *xc_gnttab_map_table_v1(int xc_handle, int domid, int *gnt_num);
-grant_entry_v2_t *xc_gnttab_map_table_v2(int xc_handle, int domid, int *gnt_num);
+int xc_gnttab_get_version(xc_interface *xch, int domid); /* Never logs */
+grant_entry_v1_t *xc_gnttab_map_table_v1(xc_interface *xch, int domid, int *gnt_num);
+grant_entry_v2_t *xc_gnttab_map_table_v2(xc_interface *xch, int domid, int *gnt_num);
+/* Sometimes these don't set errno [fixme], and sometimes they don't log. */
 
-int xc_physdev_map_pirq(int xc_handle,
+int xc_physdev_map_pirq(xc_interface *xch,
                         int domid,
                         int index,
                         int *pirq);
 
-int xc_physdev_map_pirq_msi(int xc_handle,
+int xc_physdev_map_pirq_msi(xc_interface *xch,
                             int domid,
                             int index,
                             int *pirq,
@@ -1111,21 +1159,21 @@ int xc_physdev_map_pirq_msi(int xc_handle,
                             int entry_nr,
                             uint64_t table_base);
 
-int xc_physdev_unmap_pirq(int xc_handle,
+int xc_physdev_unmap_pirq(xc_interface *xch,
                           int domid,
                           int pirq);
 
 int xc_hvm_set_pci_intx_level(
-    int xc_handle, domid_t dom,
+    xc_interface *xch, domid_t dom,
     uint8_t domain, uint8_t bus, uint8_t device, uint8_t intx,
     unsigned int level);
 int xc_hvm_set_isa_irq_level(
-    int xc_handle, domid_t dom,
+    xc_interface *xch, domid_t dom,
     uint8_t isa_irq,
     unsigned int level);
 
 int xc_hvm_set_pci_link_route(
-    int xc_handle, domid_t dom, uint8_t link, uint8_t isa_irq);
+    xc_interface *xch, domid_t dom, uint8_t link, uint8_t isa_irq);
 
 
 /*
@@ -1140,7 +1188,7 @@ int xc_hvm_set_pci_link_route(
  * last call.
  */
 int xc_hvm_track_dirty_vram(
-    int xc_handle, domid_t dom,
+    xc_interface *xch, domid_t dom,
     uint64_t first_pfn, uint64_t nr,
     unsigned long *bitmap);
 
@@ -1148,99 +1196,98 @@ int xc_hvm_track_dirty_vram(
  * Notify that some pages got modified by the Device Model
  */
 int xc_hvm_modified_memory(
-    int xc_handle, domid_t dom, uint64_t first_pfn, uint64_t nr);
+    xc_interface *xch, domid_t dom, uint64_t first_pfn, uint64_t nr);
 
 /*
  * Set a range of memory to a specific type.
  * Allowed types are HVMMEM_ram_rw, HVMMEM_ram_ro, HVMMEM_mmio_dm
  */
 int xc_hvm_set_mem_type(
-    int xc_handle, domid_t dom, hvmmem_type_t memtype, uint64_t first_pfn, uint64_t nr);
+    xc_interface *xch, domid_t dom, hvmmem_type_t memtype, uint64_t first_pfn, uint64_t nr);
 
 
-typedef enum {
+/*
+ *  LOGGING AND ERROR REPORTING
+ */
+
+
+enum xc_error_code {
   XC_ERROR_NONE = 0,
   XC_INTERNAL_ERROR = 1,
   XC_INVALID_KERNEL = 2,
   XC_INVALID_PARAM = 3,
   XC_OUT_OF_MEMORY = 4,
-} xc_error_code;
+  /* new codes need to be added to xc_error_level_to_desc too */
+};
 
 #define XC_MAX_ERROR_MSG_LEN 1024
-typedef struct {
-  int code;
+typedef struct xc_error {
+  enum xc_error_code code;
   char message[XC_MAX_ERROR_MSG_LEN];
 } xc_error;
 
+
 /*
- * Return a pointer to the last error. This pointer and the
- * data pointed to are only valid until the next call to
- * libxc.
+ * Convert an error code or level into a text description.  Return values
+ * are pointers to fixed strings and do not need to be freed.
+ * Do not fail, but return pointers to generic strings if fed bogus input.
  */
-const xc_error *xc_get_last_error(void);
+const char *xc_error_code_to_desc(int code);
+
+
+/*
+ * Return a pointer to the last error with level XC_REPORT_ERROR. This
+ * pointer and the data pointed to are only valid until the next call
+ * to libxc in the same thread.
+ */
+const xc_error *xc_get_last_error(xc_interface *handle);
 
 /*
  * Clear the last error
  */
-void xc_clear_last_error(void);
+void xc_clear_last_error(xc_interface *xch);
 
-typedef void (*xc_error_handler)(const xc_error *err);
 
-/*
- * The default error handler which prints to stderr
- */
-void xc_default_error_handler(const xc_error *err);
-
-/*
- * Convert an error code into a text description
- */
-const char *xc_error_code_to_desc(int code);
-
-/*
- * Registers a callback to handle errors
- */
-xc_error_handler xc_set_error_handler(xc_error_handler handler);
-
-int xc_set_hvm_param(int handle, domid_t dom, int param, unsigned long value);
-int xc_get_hvm_param(int handle, domid_t dom, int param, unsigned long *value);
+int xc_set_hvm_param(xc_interface *handle, domid_t dom, int param, unsigned long value);
+int xc_get_hvm_param(xc_interface *handle, domid_t dom, int param, unsigned long *value);
 
 /* IA64 specific, nvram save */
-int xc_ia64_save_to_nvram(int xc_handle, uint32_t dom);
+int xc_ia64_save_to_nvram(xc_interface *xch, uint32_t dom);
 
 /* IA64 specific, nvram init */
-int xc_ia64_nvram_init(int xc_handle, char *dom_name, uint32_t dom);
+int xc_ia64_nvram_init(xc_interface *xch, char *dom_name, uint32_t dom);
 
 /* IA64 specific, set guest OS type optimizations */
-int xc_ia64_set_os_type(int xc_handle, char *guest_os_type, uint32_t dom);
+int xc_ia64_set_os_type(xc_interface *xch, char *guest_os_type, uint32_t dom);
 
 /* HVM guest pass-through */
-int xc_assign_device(int xc_handle,
+int xc_assign_device(xc_interface *xch,
                      uint32_t domid,
                      uint32_t machine_bdf);
 
-int xc_get_device_group(int xc_handle,
+int xc_get_device_group(xc_interface *xch,
                      uint32_t domid,
                      uint32_t machine_bdf,
                      uint32_t max_sdevs,
                      uint32_t *num_sdevs,
                      uint32_t *sdev_array);
 
-int xc_test_assign_device(int xc_handle,
+int xc_test_assign_device(xc_interface *xch,
                           uint32_t domid,
                           uint32_t machine_bdf);
 
-int xc_deassign_device(int xc_handle,
+int xc_deassign_device(xc_interface *xch,
                      uint32_t domid,
                      uint32_t machine_bdf);
 
-int xc_domain_memory_mapping(int xc_handle,
+int xc_domain_memory_mapping(xc_interface *xch,
                              uint32_t domid,
                              unsigned long first_gfn,
                              unsigned long first_mfn,
                              unsigned long nr_mfns,
                              uint32_t add_mapping);
 
-int xc_domain_ioport_mapping(int xc_handle,
+int xc_domain_ioport_mapping(xc_interface *xch,
                              uint32_t domid,
                              uint32_t first_gport,
                              uint32_t first_mport,
@@ -1248,20 +1295,20 @@ int xc_domain_ioport_mapping(int xc_handle,
                              uint32_t add_mapping);
 
 int xc_domain_update_msi_irq(
-    int xc_handle,
+    xc_interface *xch,
     uint32_t domid,
     uint32_t gvec,
     uint32_t pirq,
     uint32_t gflags,
     uint64_t gtable);
 
-int xc_domain_unbind_msi_irq(int xc_handle,
+int xc_domain_unbind_msi_irq(xc_interface *xch,
                              uint32_t domid,
                              uint32_t gvec,
                              uint32_t pirq,
                              uint32_t gflags);
 
-int xc_domain_bind_pt_irq(int xc_handle,
+int xc_domain_bind_pt_irq(xc_interface *xch,
                           uint32_t domid,
                           uint8_t machine_irq,
                           uint8_t irq_type,
@@ -1270,7 +1317,7 @@ int xc_domain_bind_pt_irq(int xc_handle,
                           uint8_t intx,
                           uint8_t isa_irq);
 
-int xc_domain_unbind_pt_irq(int xc_handle,
+int xc_domain_unbind_pt_irq(xc_interface *xch,
                           uint32_t domid,
                           uint8_t machine_irq,
                           uint8_t irq_type,
@@ -1279,52 +1326,52 @@ int xc_domain_unbind_pt_irq(int xc_handle,
                           uint8_t intx,
                           uint8_t isa_irq);
 
-int xc_domain_bind_pt_pci_irq(int xc_handle,
+int xc_domain_bind_pt_pci_irq(xc_interface *xch,
                               uint32_t domid,
                               uint8_t machine_irq,
                               uint8_t bus,
                               uint8_t device,
                               uint8_t intx);
 
-int xc_domain_bind_pt_isa_irq(int xc_handle,
+int xc_domain_bind_pt_isa_irq(xc_interface *xch,
                               uint32_t domid,
                               uint8_t machine_irq);
 
-int xc_domain_set_machine_address_size(int handle,
+int xc_domain_set_machine_address_size(xc_interface *xch,
 				       uint32_t domid,
 				       unsigned int width);
-int xc_domain_get_machine_address_size(int handle,
+int xc_domain_get_machine_address_size(xc_interface *xch,
 				       uint32_t domid);
 
-int xc_domain_suppress_spurious_page_faults(int handle,
+int xc_domain_suppress_spurious_page_faults(xc_interface *xch,
 					  uint32_t domid);
 
 /* Set the target domain */
-int xc_domain_set_target(int xc_handle,
+int xc_domain_set_target(xc_interface *xch,
                          uint32_t domid,
                          uint32_t target);
 
 /* Control the domain for debug */
-int xc_domain_debug_control(int xc_handle,
+int xc_domain_debug_control(xc_interface *xch,
                             uint32_t domid,
                             uint32_t sop,
                             uint32_t vcpu);
 
 #if defined(__i386__) || defined(__x86_64__)
-int xc_cpuid_check(int xc,
+int xc_cpuid_check(xc_interface *xch,
                    const unsigned int *input,
                    const char **config,
                    char **config_transformed);
-int xc_cpuid_set(int xc,
+int xc_cpuid_set(xc_interface *xch,
                  domid_t domid,
                  const unsigned int *input,
                  const char **config,
                  char **config_transformed);
-int xc_cpuid_apply_policy(int xc,
+int xc_cpuid_apply_policy(xc_interface *xch,
                           domid_t domid);
 void xc_cpuid_to_str(const unsigned int *regs,
                      char **strs);
-int xc_mca_op(int xc_handle, struct xen_mc *mc);
+int xc_mca_op(xc_interface *xch, struct xen_mc *mc);
 #endif
 
 struct xc_px_val {
@@ -1342,9 +1389,9 @@ struct xc_px_stat {
     struct xc_px_val *pt;
 };
 
-int xc_pm_get_max_px(int xc_handle, int cpuid, int *max_px);
-int xc_pm_get_pxstat(int xc_handle, int cpuid, struct xc_px_stat *pxpt);
-int xc_pm_reset_pxstat(int xc_handle, int cpuid);
+int xc_pm_get_max_px(xc_interface *xch, int cpuid, int *max_px);
+int xc_pm_get_pxstat(xc_interface *xch, int cpuid, struct xc_px_stat *pxpt);
+int xc_pm_reset_pxstat(xc_interface *xch, int cpuid);
 
 struct xc_cx_stat {
     uint32_t nr;    /* entry nr in triggers & residencies, including C0 */
@@ -1355,12 +1402,12 @@ struct xc_cx_stat {
 };
 typedef struct xc_cx_stat xc_cx_stat_t;
 
-int xc_pm_get_max_cx(int xc_handle, int cpuid, int *max_cx);
-int xc_pm_get_cxstat(int xc_handle, int cpuid, struct xc_cx_stat *cxpt);
-int xc_pm_reset_cxstat(int xc_handle, int cpuid);
+int xc_pm_get_max_cx(xc_interface *xch, int cpuid, int *max_cx);
+int xc_pm_get_cxstat(xc_interface *xch, int cpuid, struct xc_cx_stat *cxpt);
+int xc_pm_reset_cxstat(xc_interface *xch, int cpuid);
 
-int xc_cpu_online(int xc_handle, int cpu);
-int xc_cpu_offline(int xc_handle, int cpu);
+int xc_cpu_online(xc_interface *xch, int cpu);
+int xc_cpu_offline(xc_interface *xch, int cpu);
 
 /* 
  * cpufreq para name of this structure named 
@@ -1400,83 +1447,85 @@ struct xc_get_cpufreq_para {
     int32_t turbo_enabled;
 };
 
-int xc_get_cpufreq_para(int xc_handle, int cpuid,
+int xc_get_cpufreq_para(xc_interface *xch, int cpuid,
                         struct xc_get_cpufreq_para *user_para);
-int xc_set_cpufreq_gov(int xc_handle, int cpuid, char *govname);
-int xc_set_cpufreq_para(int xc_handle, int cpuid,
+int xc_set_cpufreq_gov(xc_interface *xch, int cpuid, char *govname);
+int xc_set_cpufreq_para(xc_interface *xch, int cpuid,
                         int ctrl_type, int ctrl_value);
-int xc_get_cpufreq_avgfreq(int xc_handle, int cpuid, int *avg_freq);
+int xc_get_cpufreq_avgfreq(xc_interface *xch, int cpuid, int *avg_freq);
 
-int xc_set_sched_opt_smt(int xc_handle, uint32_t value);
-int xc_set_vcpu_migration_delay(int xc_handle, uint32_t value);
-int xc_get_vcpu_migration_delay(int xc_handle, uint32_t *value);
+int xc_set_sched_opt_smt(xc_interface *xch, uint32_t value);
+int xc_set_vcpu_migration_delay(xc_interface *xch, uint32_t value);
+int xc_get_vcpu_migration_delay(xc_interface *xch, uint32_t *value);
 
-int xc_get_cpuidle_max_cstate(int xc_handle, uint32_t *value);
-int xc_set_cpuidle_max_cstate(int xc_handle, uint32_t value);
+int xc_get_cpuidle_max_cstate(xc_interface *xch, uint32_t *value);
+int xc_set_cpuidle_max_cstate(xc_interface *xch, uint32_t value);
 
-int xc_enable_turbo(int xc_handle, int cpuid);
-int xc_disable_turbo(int xc_handle, int cpuid);
+int xc_enable_turbo(xc_interface *xch, int cpuid);
+int xc_disable_turbo(xc_interface *xch, int cpuid);
 /**
  * tmem operations
  */
-int xc_tmem_control(int xc, int32_t pool_id, uint32_t subop, uint32_t cli_id,
+int xc_tmem_control(xc_interface *xch,
+                    int32_t pool_id, uint32_t subop, uint32_t cli_id,
                     uint32_t arg1, uint32_t arg2, uint64_t arg3, void *buf);
-int xc_tmem_auth(int xc_handle, int cli_id, char *uuid_str, int arg1);
-int xc_tmem_save(int xc_handle, int dom, int live, int fd, int field_marker);
-int xc_tmem_save_extra(int xc_handle, int dom, int fd, int field_marker);
-void xc_tmem_save_done(int xc_handle, int dom);
-int xc_tmem_restore(int xc_handle, int dom, int fd);
-int xc_tmem_restore_extra(int xc_handle, int dom, int fd);
+int xc_tmem_auth(xc_interface *xch, int cli_id, char *uuid_str, int arg1);
+int xc_tmem_save(xc_interface *xch, int dom, int live, int fd, int field_marker);
+int xc_tmem_save_extra(xc_interface *xch, int dom, int fd, int field_marker);
+void xc_tmem_save_done(xc_interface *xch, int dom);
+int xc_tmem_restore(xc_interface *xch, int dom, int fd);
+int xc_tmem_restore_extra(xc_interface *xch, int dom, int fd);
 
 /**
  * mem_event operations
  */
-int xc_mem_event_control(int xc_handle, domid_t domain_id, unsigned int op,
+int xc_mem_event_control(xc_interface *xch, domid_t domain_id, unsigned int op,
                          unsigned int mode, void *shared_page,
                           void *ring_page, unsigned long gfn);
 
-int xc_mem_event_enable(int xc_handle, domid_t domain_id,
+int xc_mem_event_enable(xc_interface *xch, domid_t domain_id,
                         void *shared_page, void *ring_page);
-int xc_mem_event_disable(int xc_handle, domid_t domain_id);
+int xc_mem_event_disable(xc_interface *xch, domid_t domain_id);
 
-int xc_mem_paging_nominate(int xc_handle, domid_t domain_id,
+int xc_mem_paging_nominate(xc_interface *xch, domid_t domain_id,
                            unsigned long gfn);
-int xc_mem_paging_evict(int xc_handle, domid_t domain_id, unsigned long gfn);
-int xc_mem_paging_prep(int xc_handle, domid_t domain_id, unsigned long gfn);
-int xc_mem_paging_resume(int xc_handle, domid_t domain_id,
+int xc_mem_paging_evict(xc_interface *xch, domid_t domain_id, unsigned long gfn);
+int xc_mem_paging_prep(xc_interface *xch, domid_t domain_id, unsigned long gfn);
+int xc_mem_paging_resume(xc_interface *xch, domid_t domain_id,
                          unsigned long gfn);
 
 /**
  * memshr operations
  */
-int xc_memshr_control(int xc_handle,
+int xc_memshr_control(xc_interface *xch,
                       uint32_t domid,
                       int enable);
-int xc_memshr_nominate_gfn(int xc_handle,
+int xc_memshr_nominate_gfn(xc_interface *xch,
                            uint32_t domid,
                            unsigned long gfn,
                            uint64_t *handle);
-int xc_memshr_nominate_gref(int xc_handle,
+int xc_memshr_nominate_gref(xc_interface *xch,
                             uint32_t domid,
                             grant_ref_t gref,
                             uint64_t *handle);
-int xc_memshr_share(int xc_handle,
+int xc_memshr_share(xc_interface *xch,
                     uint64_t source_handle,
                     uint64_t client_handle);
-int xc_memshr_domain_resume(int xc_handle,
+int xc_memshr_domain_resume(xc_interface *xch,
                             uint32_t domid);
-int xc_memshr_debug_gfn(int xc_handle,
+int xc_memshr_debug_gfn(xc_interface *xch,
                         uint32_t domid,
                         unsigned long gfn);
-int xc_memshr_debug_mfn(int xc_handle,
+int xc_memshr_debug_mfn(xc_interface *xch,
                         uint32_t domid,
                         unsigned long mfn);
-int xc_memshr_debug_gref(int xc_handle,
+int xc_memshr_debug_gref(xc_interface *xch,
                          uint32_t domid,
                          grant_ref_t gref);
 
 struct elf_binary;
-void xc_elf_set_logfile(struct elf_binary *elf, FILE *f, int verbose);
+void xc_elf_set_logfile(struct xc_interface *xch, struct elf_binary *elf,
+                        int verbose);
 /* Useful for callers who also use libelf. */
 
 #endif /* XENCTRL_H */

@@ -148,7 +148,7 @@ int build_pv(struct libxl_ctx *ctx, uint32_t domid,
     int ret;
     int flags = 0;
 
-    dom = xc_dom_allocate(info->u.pv.cmdline, info->u.pv.features);
+    dom = xc_dom_allocate(ctx->xch, info->u.pv.cmdline, info->u.pv.features);
     if (!dom) {
         XL_LOG_ERRNO(ctx, XL_LOG_ERROR, "xc_dom_allocate failed");
         return -1;
@@ -247,7 +247,7 @@ static int core_suspend_callback(void *data)
             XL_LOG(si->ctx, XL_LOG_ERROR, "xc_evtchn_notify failed ret=%d", ret);
             return 0;
         }
-        ret = xc_await_suspend(si->xce, si->suspend_eventchn);
+        ret = xc_await_suspend(si->ctx->xch, si->xce, si->suspend_eventchn);
         if (ret < 0) {
             XL_LOG(si->ctx, XL_LOG_ERROR, "xc_await_suspend failed ret=%d", ret);
             return 0;
@@ -332,7 +332,7 @@ int core_suspend(struct libxl_ctx *ctx, uint32_t domid, int fd,
                    &core_suspend_switch_qemu_logdirty);
 
     if (si.suspend_eventchn > 0)
-        xc_suspend_evtchn_release(si.xce, domid, si.suspend_eventchn);
+        xc_suspend_evtchn_release(si.ctx->xch, si.xce, domid, si.suspend_eventchn);
     if (si.xce > 0)
         xc_evtchn_close(si.xce);
 

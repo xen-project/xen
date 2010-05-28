@@ -39,7 +39,7 @@
 
 #define TRACE_ENTER /* printf("enter %s\n", __FUNCTION__) */
 
-static int xc_handle;
+static xc_interface *xc_handle;
 
 static inline int
 curvcpuid()

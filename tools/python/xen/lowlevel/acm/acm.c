@@ -43,11 +43,11 @@ static PyObject *acm_error_obj;
 static void *__getssid(int domid, uint32_t *buflen)
 {
     struct acm_getssid getssid;
-    int xc_handle;
+    xc_interface *xc_handle;
     #define SSID_BUFFER_SIZE    4096
     void *buf = NULL;
 
-    if ((xc_handle = xc_interface_open()) < 0) {
+    if ((xc_handle = xc_interface_open(0,0,0)) == 0) {
         goto out1;
     }
     if ((buf = malloc(SSID_BUFFER_SIZE)) == NULL) {
@@ -148,7 +148,8 @@ static PyObject *getdecision(PyObject * self, PyObject * args)
 {
     char *arg1_name, *arg1, *arg2_name, *arg2, *decision = NULL;
     struct acm_getdecision getdecision;
-    int xc_handle, rc;
+    xc_interface *xc_handle;
+    int rc;
     uint32_t hooktype;
 
     if (!PyArg_ParseTuple(args, "ssssi", &arg1_name,
@@ -156,8 +157,8 @@ static PyObject *getdecision(PyObject * self, PyObject * args)
         return NULL;
     }
 
-    if ((xc_handle = xc_interface_open()) <= 0) {
-        PERROR("Could not open xen privcmd device!\n");
+    if ((xc_handle = xc_interface_open(0,0,0)) == 0) {
+        perror("Could not open xen privcmd device!\n");
         return NULL;
     }
 
@@ -209,7 +210,8 @@ const char hv_op_err[] = "Error from hypervisor operation.";
 static PyObject *chgpolicy(PyObject *self, PyObject *args)
 {
     struct acm_change_policy chgpolicy;
-    int xc_handle, rc;
+    xc_interface *xc_handle;
+    int rc;
     char *bin_pol = NULL, *del_arr = NULL, *chg_arr = NULL;
     int bin_pol_len = 0, del_arr_len = 0, chg_arr_len = 0;
     uint errarray_mbrs = 20 * 2;
@@ -236,7 +238,7 @@ static PyObject *chgpolicy(PyObject *self, PyObject *args)
     set_xen_guest_handle(chgpolicy.chg_array, chg_arr);
     set_xen_guest_handle(chgpolicy.err_array, error_array);
 
-    if ((xc_handle = xc_interface_open()) <= 0) {
+    if ((xc_handle = xc_interface_open(0,0,0)) == 0) {
         PyErr_SetString(PyExc_IOError, ctrlif_op);
         return NULL;
     }
@@ -261,7 +263,8 @@ static PyObject *chgpolicy(PyObject *self, PyObject *args)
 static PyObject *getpolicy(PyObject *self, PyObject *args)
 {
     struct acm_getpolicy getpolicy;
-    int xc_handle, rc;
+    xc_interface *xc_handle;
+    int rc;
     uint8_t pull_buffer[8192];
     PyObject *result;
     uint32_t len = sizeof(pull_buffer);
@@ -270,7 +273,7 @@ static PyObject *getpolicy(PyObject *self, PyObject *args)
     set_xen_guest_handle(getpolicy.pullcache, pull_buffer);
     getpolicy.pullcache_size = sizeof(pull_buffer);
 
-    if ((xc_handle = xc_interface_open()) <= 0) {
+    if ((xc_handle = xc_interface_open(0,0,0)) == 0) {
         PyErr_SetString(PyExc_IOError, ctrlif_op);
         return NULL;
     }
@@ -296,7 +299,8 @@ static PyObject *getpolicy(PyObject *self, PyObject *args)
 static PyObject *relabel_domains(PyObject *self, PyObject *args)
 {
     struct acm_relabel_doms reldoms;
-    int xc_handle, rc;
+    xc_interface *xc_handle;
+    int rc;
     char *relabel_rules = NULL;
     int rel_rules_len = 0;
     uint errarray_mbrs = 20 * 2;
@@ -317,7 +321,7 @@ static PyObject *relabel_domains(PyObject *self, PyObject *args)
     set_xen_guest_handle(reldoms.relabel_map, relabel_rules);
     set_xen_guest_handle(reldoms.err_array, error_array);
 
-    if ((xc_handle = xc_interface_open()) <= 0) {
+    if ((xc_handle = xc_interface_open(0,0,0)) == 0) {
         PyErr_SetString(PyExc_IOError, ctrlif_op);
         return NULL;
     }

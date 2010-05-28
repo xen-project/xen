@@ -7,7 +7,7 @@
 #include "xc_private.h"
 #include <xen/hvm/hvm_op.h>
 
-int xc_readconsolering(int xc_handle,
+int xc_readconsolering(xc_interface *xch,
                        char **pbuffer,
                        unsigned int *pnr_chars,
                        int clear, int incremental, uint32_t *pindex)
@@ -31,7 +31,7 @@ int xc_readconsolering(int xc_handle,
     if ( (ret = lock_pages(buffer, nr_chars)) != 0 )
         return ret;
 
-    if ( (ret = do_sysctl(xc_handle, &sysctl)) == 0 )
+    if ( (ret = do_sysctl(xch, &sysctl)) == 0 )
     {
         *pnr_chars = sysctl.u.readconsole.count;
         if ( pindex )
@@ -43,7 +43,7 @@ int xc_readconsolering(int xc_handle,
     return ret;
 }
 
-int xc_send_debug_keys(int xc_handle, char *keys)
+int xc_send_debug_keys(xc_interface *xch, char *keys)
 {
     int ret, len = strlen(keys);
     DECLARE_SYSCTL;
@@ -55,14 +55,14 @@ int xc_send_debug_keys(int xc_handle, char *keys)
     if ( (ret = lock_pages(keys, len)) != 0 )
         return ret;
 
-    ret = do_sysctl(xc_handle, &sysctl);
+    ret = do_sysctl(xch, &sysctl);
 
     unlock_pages(keys, len);
 
     return ret;
 }
 
-int xc_physinfo(int xc_handle,
+int xc_physinfo(xc_interface *xch,
                 xc_physinfo_t *put_info)
 {
     int ret;
@@ -72,7 +72,7 @@ int xc_physinfo(int xc_handle,
 
     memcpy(&sysctl.u.physinfo, put_info, sizeof(*put_info));
 
-    if ( (ret = do_sysctl(xc_handle, &sysctl)) != 0 )
+    if ( (ret = do_sysctl(xch, &sysctl)) != 0 )
         return ret;
 
     memcpy(put_info, &sysctl.u.physinfo, sizeof(*put_info));
@@ -80,7 +80,7 @@ int xc_physinfo(int xc_handle,
     return 0;
 }
 
-int xc_topologyinfo(int xc_handle,
+int xc_topologyinfo(xc_interface *xch,
                 xc_topologyinfo_t *put_info)
 {
     int ret;
@@ -90,7 +90,7 @@ int xc_topologyinfo(int xc_handle,
 
     memcpy(&sysctl.u.topologyinfo, put_info, sizeof(*put_info));
 
-    if ( (ret = do_sysctl(xc_handle, &sysctl)) != 0 )
+    if ( (ret = do_sysctl(xch, &sysctl)) != 0 )
         return ret;
 
     memcpy(put_info, &sysctl.u.topologyinfo, sizeof(*put_info));
@@ -98,7 +98,7 @@ int xc_topologyinfo(int xc_handle,
     return 0;
 }
 
-int xc_numainfo(int xc_handle,
+int xc_numainfo(xc_interface *xch,
                 xc_numainfo_t *put_info)
 {
     int ret;
@@ -108,7 +108,7 @@ int xc_numainfo(int xc_handle,
 
     memcpy(&sysctl.u.numainfo, put_info, sizeof(*put_info));
 
-    if ((ret = do_sysctl(xc_handle, &sysctl)) != 0)
+    if ((ret = do_sysctl(xch, &sysctl)) != 0)
         return ret;
 
     memcpy(put_info, &sysctl.u.numainfo, sizeof(*put_info));
@@ -117,7 +117,7 @@ int xc_numainfo(int xc_handle,
 }
 
 
-int xc_sched_id(int xc_handle,
+int xc_sched_id(xc_interface *xch,
                 int *sched_id)
 {
     int ret;
@@ -125,7 +125,7 @@ int xc_sched_id(int xc_handle,
 
     sysctl.cmd = XEN_SYSCTL_sched_id;
 
-    if ( (ret = do_sysctl(xc_handle, &sysctl)) != 0 )
+    if ( (ret = do_sysctl(xch, &sysctl)) != 0 )
         return ret;
 
     *sched_id = sysctl.u.sched_id.sched_id;
@@ -134,7 +134,7 @@ int xc_sched_id(int xc_handle,
 }
 
 #if defined(__i386__) || defined(__x86_64__)
-int xc_mca_op(int xc_handle, struct xen_mc *mc)
+int xc_mca_op(xc_interface *xch, struct xen_mc *mc)
 {
     int ret = 0;
     DECLARE_HYPERCALL;
@@ -148,13 +148,13 @@ int xc_mca_op(int xc_handle, struct xen_mc *mc)
 
     hypercall.op = __HYPERVISOR_mca;
     hypercall.arg[0] = (unsigned long)mc;
-    ret = do_xen_hypercall(xc_handle, &hypercall);
+    ret = do_xen_hypercall(xch, &hypercall);
     unlock_pages(mc, sizeof(mc));
     return ret;
 }
 #endif
 
-int xc_perfc_control(int xc_handle,
+int xc_perfc_control(xc_interface *xch,
                      uint32_t opcode,
                      xc_perfc_desc_t *desc,
                      xc_perfc_val_t *val,
@@ -169,7 +169,7 @@ int xc_perfc_control(int xc_handle,
     set_xen_guest_handle(sysctl.u.perfc_op.desc, desc);
     set_xen_guest_handle(sysctl.u.perfc_op.val, val);
 
-    rc = do_sysctl(xc_handle, &sysctl);
+    rc = do_sysctl(xch, &sysctl);
 
     if ( nbr_desc )
         *nbr_desc = sysctl.u.perfc_op.nr_counters;
@@ -179,7 +179,7 @@ int xc_perfc_control(int xc_handle,
     return rc;
 }
 
-int xc_lockprof_control(int xc_handle,
+int xc_lockprof_control(xc_interface *xch,
                         uint32_t opcode,
                         uint32_t *n_elems,
                         uint64_t *time,
@@ -193,7 +193,7 @@ int xc_lockprof_control(int xc_handle,
     sysctl.u.lockprof_op.max_elem = n_elems ? *n_elems : 0;
     set_xen_guest_handle(sysctl.u.lockprof_op.data, data);
 
-    rc = do_sysctl(xc_handle, &sysctl);
+    rc = do_sysctl(xch, &sysctl);
 
     if (n_elems)
         *n_elems = sysctl.u.lockprof_op.nr_elem;
@@ -203,7 +203,7 @@ int xc_lockprof_control(int xc_handle,
     return rc;
 }
 
-int xc_getcpuinfo(int xc_handle, int max_cpus,
+int xc_getcpuinfo(xc_interface *xch, int max_cpus,
                   xc_cpuinfo_t *info, int *nr_cpus)
 {
     int rc;
@@ -216,7 +216,7 @@ int xc_getcpuinfo(int xc_handle, int max_cpus,
     if ( (rc = lock_pages(info, max_cpus*sizeof(*info))) != 0 )
         return rc;
 
-    rc = do_sysctl(xc_handle, &sysctl);
+    rc = do_sysctl(xch, &sysctl);
 
     unlock_pages(info, max_cpus*sizeof(*info));
 
@@ -228,7 +228,7 @@ int xc_getcpuinfo(int xc_handle, int max_cpus,
 
 
 int xc_hvm_set_pci_intx_level(
-    int xc_handle, domid_t dom,
+    xc_interface *xch, domid_t dom,
     uint8_t domain, uint8_t bus, uint8_t device, uint8_t intx,
     unsigned int level)
 {
@@ -253,7 +253,7 @@ int xc_hvm_set_pci_intx_level(
     arg->intx   = intx;
     arg->level  = level;
 
-    rc = do_xen_hypercall(xc_handle, &hypercall);
+    rc = do_xen_hypercall(xch, &hypercall);
 
     hcall_buf_release((void **)&arg, sizeof(*arg));
 
@@ -261,7 +261,7 @@ int xc_hvm_set_pci_intx_level(
 }
 
 int xc_hvm_set_isa_irq_level(
-    int xc_handle, domid_t dom,
+    xc_interface *xch, domid_t dom,
     uint8_t isa_irq,
     unsigned int level)
 {
@@ -283,7 +283,7 @@ int xc_hvm_set_isa_irq_level(
     arg->isa_irq = isa_irq;
     arg->level   = level;
 
-    rc = do_xen_hypercall(xc_handle, &hypercall);
+    rc = do_xen_hypercall(xch, &hypercall);
 
     hcall_buf_release((void **)&arg, sizeof(*arg));
 
@@ -291,7 +291,7 @@ int xc_hvm_set_isa_irq_level(
 }
 
 int xc_hvm_set_pci_link_route(
-    int xc_handle, domid_t dom, uint8_t link, uint8_t isa_irq)
+    xc_interface *xch, domid_t dom, uint8_t link, uint8_t isa_irq)
 {
     DECLARE_HYPERCALL;
     struct xen_hvm_set_pci_link_route arg;
@@ -311,7 +311,7 @@ int xc_hvm_set_pci_link_route(
         return rc;
     }
 
-    rc = do_xen_hypercall(xc_handle, &hypercall);
+    rc = do_xen_hypercall(xch, &hypercall);
 
     unlock_pages(&arg, sizeof(arg));
 
@@ -319,7 +319,7 @@ int xc_hvm_set_pci_link_route(
 }
 
 int xc_hvm_track_dirty_vram(
-    int xc_handle, domid_t dom,
+    xc_interface *xch, domid_t dom,
     uint64_t first_pfn, uint64_t nr,
     unsigned long *dirty_bitmap)
 {
@@ -342,7 +342,7 @@ int xc_hvm_track_dirty_vram(
         return rc;
     }
 
-    rc = do_xen_hypercall(xc_handle, &hypercall);
+    rc = do_xen_hypercall(xch, &hypercall);
 
     unlock_pages(&arg, sizeof(arg));
 
@@ -350,7 +350,7 @@ int xc_hvm_track_dirty_vram(
 }
 
 int xc_hvm_modified_memory(
-    int xc_handle, domid_t dom, uint64_t first_pfn, uint64_t nr)
+    xc_interface *xch, domid_t dom, uint64_t first_pfn, uint64_t nr)
 {
     DECLARE_HYPERCALL;
     struct xen_hvm_modified_memory arg;
@@ -370,7 +370,7 @@ int xc_hvm_modified_memory(
         return rc;
     }
 
-    rc = do_xen_hypercall(xc_handle, &hypercall);
+    rc = do_xen_hypercall(xch, &hypercall);
 
     unlock_pages(&arg, sizeof(arg));
 
@@ -378,7 +378,7 @@ int xc_hvm_modified_memory(
 }
 
 int xc_hvm_set_mem_type(
-    int xc_handle, domid_t dom, hvmmem_type_t mem_type, uint64_t first_pfn, uint64_t nr)
+    xc_interface *xch, domid_t dom, hvmmem_type_t mem_type, uint64_t first_pfn, uint64_t nr)
 {
     DECLARE_HYPERCALL;
     struct xen_hvm_set_mem_type arg;
@@ -399,7 +399,7 @@ int xc_hvm_set_mem_type(
         return rc;
     }
 
-    rc = do_xen_hypercall(xc_handle, &hypercall);
+    rc = do_xen_hypercall(xch, &hypercall);
 
     unlock_pages(&arg, sizeof(arg));
 
@@ -412,7 +412,7 @@ void *
 #ifdef __GNUC__
 __attribute__((__weak__))
 #endif
-xc_map_foreign_bulk(int xc_handle, uint32_t dom, int prot,
+xc_map_foreign_bulk(xc_interface *xch, uint32_t dom, int prot,
                     const xen_pfn_t *arr, int *err, unsigned int num)
 {
     xen_pfn_t *pfn;
@@ -431,7 +431,7 @@ xc_map_foreign_bulk(int xc_handle, uint32_t dom, int prot,
     }
 
     memcpy(pfn, arr, num * sizeof(*arr));
-    ret = xc_map_foreign_batch(xc_handle, dom, prot, pfn, num);
+    ret = xc_map_foreign_batch(xch, dom, prot, pfn, num);
 
     if (ret) {
         for (i = 0; i < num; ++i)
@@ -451,7 +451,7 @@ xc_map_foreign_bulk(int xc_handle, uint32_t dom, int prot,
     return ret;
 }
 
-void *xc_map_foreign_pages(int xc_handle, uint32_t dom, int prot,
+void *xc_map_foreign_pages(xc_interface *xch, uint32_t dom, int prot,
                            const xen_pfn_t *arr, int num)
 {
     void *res;
@@ -466,7 +466,7 @@ void *xc_map_foreign_pages(int xc_handle, uint32_t dom, int prot,
     if (!err)
         return NULL;
 
-    res = xc_map_foreign_bulk(xc_handle, dom, prot, arr, err, num);
+    res = xc_map_foreign_bulk(xch, dom, prot, arr, err, num);
     if (res) {
         for (i = 0; i < num; i++) {
             if (err[i]) {

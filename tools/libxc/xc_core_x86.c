@@ -40,9 +40,9 @@ xc_core_arch_gpfn_may_present(struct xc_core_arch_context *arch_ctxt,
 }
 
 
-static int nr_gpfns(int xc_handle, domid_t domid)
+static int nr_gpfns(xc_interface *xch, domid_t domid)
 {
-    return xc_memory_op(xc_handle, XENMEM_maximum_gpfn, &domid) + 1;
+    return xc_memory_op(xch, XENMEM_maximum_gpfn, &domid) + 1;
 }
 
 int
@@ -52,12 +52,12 @@ xc_core_arch_auto_translated_physmap(const xc_dominfo_t *info)
 }
 
 int
-xc_core_arch_memory_map_get(int xc_handle, struct xc_core_arch_context *unused,
+xc_core_arch_memory_map_get(xc_interface *xch, struct xc_core_arch_context *unused,
                             xc_dominfo_t *info, shared_info_any_t *live_shinfo,
                             xc_core_memory_map_t **mapp,
                             unsigned int *nr_entries)
 {
-    unsigned long p2m_size = nr_gpfns(xc_handle, info->domid);
+    unsigned long p2m_size = nr_gpfns(xch, info->domid);
     xc_core_memory_map_t *map;
 
     map = malloc(sizeof(*map));
@@ -76,7 +76,7 @@ xc_core_arch_memory_map_get(int xc_handle, struct xc_core_arch_context *unused,
 }
 
 static int
-xc_core_arch_map_p2m_rw(int xc_handle, struct domain_info_context *dinfo, xc_dominfo_t *info,
+xc_core_arch_map_p2m_rw(xc_interface *xch, struct domain_info_context *dinfo, xc_dominfo_t *info,
                         shared_info_any_t *live_shinfo, xen_pfn_t **live_p2m,
                         unsigned long *pfnp, int rw)
 {
@@ -92,7 +92,7 @@ xc_core_arch_map_p2m_rw(int xc_handle, struct domain_info_context *dinfo, xc_dom
     int err;
     int i;
 
-    dinfo->p2m_size = nr_gpfns(xc_handle, info->domid);
+    dinfo->p2m_size = nr_gpfns(xch, info->domid);
     if ( dinfo->p2m_size < info->nr_pages  )
     {
         ERROR("p2m_size < nr_pages -1 (%lx < %lx", dinfo->p2m_size, info->nr_pages - 1);
@@ -100,7 +100,7 @@ xc_core_arch_map_p2m_rw(int xc_handle, struct domain_info_context *dinfo, xc_dom
     }
 
     live_p2m_frame_list_list =
-        xc_map_foreign_range(xc_handle, dom, PAGE_SIZE, PROT_READ,
+        xc_map_foreign_range(xch, dom, PAGE_SIZE, PROT_READ,
                              GET_FIELD(live_shinfo, arch.pfn_to_mfn_frame_list_list));
 
     if ( !live_p2m_frame_list_list )
@@ -129,7 +129,7 @@ xc_core_arch_map_p2m_rw(int xc_handle, struct domain_info_context *dinfo, xc_dom
             p2m_frame_list_list[i] = ((uint32_t *)p2m_frame_list_list)[i];
 
     live_p2m_frame_list =
-        xc_map_foreign_pages(xc_handle, dom, PROT_READ,
+        xc_map_foreign_pages(xch, dom, PROT_READ,
                              p2m_frame_list_list,
                              P2M_FLL_ENTRIES);
 
@@ -156,7 +156,7 @@ xc_core_arch_map_p2m_rw(int xc_handle, struct domain_info_context *dinfo, xc_dom
         for ( i = P2M_FL_ENTRIES - 1; i >= 0; i-- )
             p2m_frame_list[i] = ((uint32_t *)p2m_frame_list)[i];
 
-    *live_p2m = xc_map_foreign_pages(xc_handle, dom,
+    *live_p2m = xc_map_foreign_pages(xch, dom,
                                     rw ? (PROT_READ | PROT_WRITE) : PROT_READ,
                                     p2m_frame_list,
                                     P2M_FL_ENTRIES);
@@ -191,24 +191,24 @@ out:
 }
 
 int
-xc_core_arch_map_p2m(int xc_handle, unsigned int guest_width, xc_dominfo_t *info,
+xc_core_arch_map_p2m(xc_interface *xch, unsigned int guest_width, xc_dominfo_t *info,
                         shared_info_any_t *live_shinfo, xen_pfn_t **live_p2m,
                         unsigned long *pfnp)
 {
     struct domain_info_context _dinfo = { .guest_width = guest_width };
     struct domain_info_context *dinfo = &_dinfo;
-    return xc_core_arch_map_p2m_rw(xc_handle, dinfo, info,
+    return xc_core_arch_map_p2m_rw(xch, dinfo, info,
                                    live_shinfo, live_p2m, pfnp, 0);
 }
 
 int
-xc_core_arch_map_p2m_writable(int xc_handle, unsigned int guest_width, xc_dominfo_t *info,
+xc_core_arch_map_p2m_writable(xc_interface *xch, unsigned int guest_width, xc_dominfo_t *info,
                               shared_info_any_t *live_shinfo, xen_pfn_t **live_p2m,
                               unsigned long *pfnp)
 {
     struct domain_info_context _dinfo = { .guest_width = guest_width };
     struct domain_info_context *dinfo = &_dinfo;
-    return xc_core_arch_map_p2m_rw(xc_handle, dinfo, info,
+    return xc_core_arch_map_p2m_rw(xch, dinfo, info,
                                    live_shinfo, live_p2m, pfnp, 1);
 }
 /*

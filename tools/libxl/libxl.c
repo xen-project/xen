@@ -47,8 +47,8 @@ int libxl_ctx_init(struct libxl_ctx *ctx, int version)
         return ERROR_NOMEM;
     memset(&ctx->version_info, 0, sizeof(libxl_version_info));
 
-    ctx->xch = xc_interface_open();
-    if (ctx->xch == -1) {
+    ctx->xch = xc_interface_open(0,0,0);
+    if (!ctx->xch) {
         free(ctx->alloc_ptrs);
         return ERROR_FAIL;
     }

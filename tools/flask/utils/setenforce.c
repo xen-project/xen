@@ -27,15 +27,15 @@ static void usage (int argCnt, const char *args[])
 int main (int argCnt, const char *args[])
 {
     int ret = 0;
-    int xch = 0;
+    xc_interface *xch = 0;
     long mode = 0;
     char *end;
 
     if (argCnt != 2)
         usage(argCnt, args);
 
-    xch = xc_interface_open();
-    if ( xch < 0 )
+    xch = xc_interface_open(0,0,0);
+    if ( !xch )
     {
         fprintf(stderr, "Unable to create interface to xenctrl: %s\n",
                 strerror(errno));

@@ -44,7 +44,7 @@ int start_info_ia64(struct xc_dom_image *dom)
     struct xen_ia64_boot_param_ia64 *bp =
         (struct xen_ia64_boot_param_ia64 *)(start_info + 1);
 
-    xc_dom_printf("%s\n", __FUNCTION__);
+    DOMPRINTF_CALLED(dom->xch);
 
     memset(start_info, 0, sizeof(*start_info));
     sprintf(start_info->magic, dom->guest_type);
@@ -84,7 +84,7 @@ int shared_info_ia64(struct xc_dom_image *dom, void *ptr)
     shared_info_ia64_t *shared_info = ptr;
     int i;
 
-    xc_dom_printf("%s: called\n", __FUNCTION__);
+    DOMPRINTF_CALLED(dom->xch);
 
     memset(shared_info, 0, sizeof(*shared_info));
     for (i = 0; i < XEN_LEGACY_MAX_VCPUS; i++)
@@ -101,7 +101,7 @@ static int vcpu_ia64(struct xc_dom_image *dom, void *ptr)
 {
     vcpu_guest_context_ia64_t *ctxt = ptr;
 
-    xc_dom_printf("%s: called\n", __FUNCTION__);
+    DOMPRINTF_CALLED(dom->xch);
 
     /* clear everything */
     memset(ctxt, 0, sizeof(*ctxt));
@@ -193,8 +193,8 @@ static int ia64_setup_memmap(struct xc_dom_image *dom)
     /* setup memmap page */
     memmap_info_num_pages = 1;
     memmap_info_pfn = dom->start_info_pfn - 1;
-    xc_dom_printf("%s: memmap: mfn 0x%" PRIpfn " pages 0x%lx\n",
-                  __FUNCTION__, memmap_info_pfn, memmap_info_num_pages);
+    DOMPRINTF("%s: memmap: mfn 0x%" PRIpfn " pages 0x%lx",
+              __FUNCTION__, memmap_info_pfn, memmap_info_num_pages);
     memmap_info = xc_map_foreign_range(dom->guest_xc, dom->guest_domid,
                                        page_size * memmap_info_num_pages,
                                        PROT_READ | PROT_WRITE,
@@ -244,7 +244,7 @@ int arch_setup_bootearly(struct xc_dom_image *dom)
     DECLARE_DOMCTL;
     int rc;
 
-    xc_dom_printf("%s: setup firmware for %s\n", __FUNCTION__, dom->guest_type);
+    DOMPRINTF("%s: setup firmware for %s", __FUNCTION__, dom->guest_type);
 
     if (dom->guest_type && strcmp(dom->guest_type,
                                   "hvm-3.0-ia64-sioemu") == 0) {
@@ -255,7 +255,7 @@ int arch_setup_bootearly(struct xc_dom_image *dom)
         domctl.cmd = XEN_DOMCTL_arch_setup;
         domctl.domain = dom->guest_domid;
         rc = xc_domctl(dom->guest_xc, &domctl);
-        xc_dom_printf("%s: hvm-3.0-ia64-sioemu: %d\n", __FUNCTION__, rc);
+        DOMPRINTF("%s: hvm-3.0-ia64-sioemu: %d", __FUNCTION__, rc);
         return rc;
     }
 
@@ -296,8 +296,8 @@ int arch_setup_bootlate(struct xc_dom_image *dom)
     shared_info_t *shared_info;
 
     /* setup shared_info page */
-    xc_dom_printf("%s: shared_info: mfn 0x%" PRIpfn "\n",
-                  __FUNCTION__, dom->shared_info_mfn);
+    DOMPRINTF("%s: shared_info: mfn 0x%" PRIpfn "",
+              __FUNCTION__, dom->shared_info_mfn);
     shared_info = xc_map_foreign_range(dom->guest_xc, dom->guest_domid,
                                        page_size,
                                        PROT_READ | PROT_WRITE,

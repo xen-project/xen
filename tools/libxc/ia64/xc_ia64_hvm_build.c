@@ -13,7 +13,7 @@
 #include <xen/hvm/params.h>
 
 static int
-xc_ia64_copy_to_domain_pages(int xc_handle, uint32_t domid, void* src_page,
+xc_ia64_copy_to_domain_pages(xc_interface *xc_handle, uint32_t domid, void* src_page,
                              unsigned long dst_pfn, int nr_pages)
 {
     // N.B. gva should be page aligned
@@ -90,10 +90,10 @@ static int add_nvram_hob(void* hob_buf, unsigned long nvram_addr);
 static int build_hob(void* hob_buf, unsigned long hob_buf_size,
                      unsigned long dom_mem_size, unsigned long vcpus,
                      unsigned long nvram_addr);
-static int load_hob(int xc_handle,uint32_t dom, void *hob_buf);
+static int load_hob(xc_interface *xc_handle,uint32_t dom, void *hob_buf);
 
 static int
-xc_ia64_build_hob(int xc_handle, uint32_t dom,
+xc_ia64_build_hob(xc_interface *xc_handle, uint32_t dom,
                   unsigned long memsize, unsigned long vcpus,
                   unsigned long nvram_addr)
 {
@@ -239,7 +239,7 @@ err_out:
 }
 
 static int
-load_hob(int xc_handle, uint32_t dom, void *hob_buf)
+load_hob(xc_interface *xc_handle, uint32_t dom, void *hob_buf)
 {
     // hob_buf should be page aligned
     int hob_size;
@@ -545,7 +545,7 @@ nvram_init(const char *nvram_path)
 }
 
 static int 
-copy_from_nvram_to_GFW(int xc_handle, uint32_t dom, int nvram_fd)
+copy_from_nvram_to_GFW(xc_interface *xc_handle, uint32_t dom, int nvram_fd)
 {
     unsigned int nr_pages = NVRAM_SIZE >> PAGE_SHIFT;
     struct stat file_stat;
@@ -597,7 +597,7 @@ static int is_valid_address(void *addr)
  * can be got.
  */
 static int
-copy_from_GFW_to_nvram(int xc_handle, uint32_t dom, int nvram_fd)
+copy_from_GFW_to_nvram(xc_interface *xc_handle, uint32_t dom, int nvram_fd)
 {
     xen_pfn_t *pfn_list = NULL;
     char *tmp_ptr = NULL;
@@ -686,7 +686,7 @@ copy_from_GFW_to_nvram(int xc_handle, uint32_t dom, int nvram_fd)
     return 0;
 }
 
-int xc_ia64_save_to_nvram(int xc_handle, uint32_t dom) 
+int xc_ia64_save_to_nvram(xc_interface *xc_handle, uint32_t dom) 
 {
     xc_dominfo_t info;
     uint64_t nvram_fd = 0;
@@ -717,7 +717,7 @@ int xc_ia64_save_to_nvram(int xc_handle, uint32_t dom)
 #define NVRAM_DIR         "/var/lib/xen/nvram/"
 #define NVRAM_FILE_PREFIX "nvram_"
 
-int xc_ia64_nvram_init(int xc_handle, char *dom_name, uint32_t dom)
+int xc_ia64_nvram_init(xc_interface *xc_handle, char *dom_name, uint32_t dom)
 {
     uint64_t nvram_fd;
     char nvram_path[PATH_MAX] = NVRAM_DIR;
@@ -784,7 +784,7 @@ min(unsigned long lhs, unsigned long rhs)
 }
 
 static int
-xc_ia64_setup_memmap_info(int xc_handle, uint32_t dom,
+xc_ia64_setup_memmap_info(xc_interface *xc_handle, uint32_t dom,
                           unsigned long dom_memsize, /* in bytes */
                           unsigned long *pfns_special_pages, 
                           unsigned long nr_special_pages,
@@ -861,7 +861,7 @@ xc_ia64_setup_memmap_info(int xc_handle, uint32_t dom,
 
 /* setup shared_info page */
 static int
-xc_ia64_setup_shared_info(int xc_handle, uint32_t dom,
+xc_ia64_setup_shared_info(xc_interface *xc_handle, uint32_t dom,
                           unsigned long shared_info_pfn,
                           unsigned long memmap_info_pfn,
                           unsigned long memmap_info_num_pages)
@@ -891,7 +891,7 @@ xc_ia64_setup_shared_info(int xc_handle, uint32_t dom,
  * convenient to allocate discontiguous memory with different size.
  */
 static int
-setup_guest(int xc_handle, uint32_t dom, unsigned long memsize,
+setup_guest(xc_interface *xc_handle, uint32_t dom, unsigned long memsize,
             char *image, unsigned long image_size)
 {
     xen_pfn_t *pfn_list;
@@ -1055,7 +1055,7 @@ error_out:
 }
 
 int
-xc_hvm_build(int xc_handle, uint32_t domid, int memsize, const char *image_name)
+xc_hvm_build(xc_interface *xc_handle, uint32_t domid, int memsize, const char *image_name)
 {
     vcpu_guest_context_any_t st_ctxt_any;
     vcpu_guest_context_t *ctxt = &st_ctxt_any.c;
@@ -1105,7 +1105,7 @@ error_out:
  * memsize pages marked populate-on-demand, and with a PoD cache size
  * of target.  If target == memsize, pages are populated normally.
  */
-int xc_hvm_build_target_mem(int xc_handle,
+int xc_hvm_build_target_mem(xc_interface *xc_handle,
                             uint32_t domid,
                             int memsize,
                             int target,
@@ -1131,7 +1131,7 @@ int xc_hvm_build_target_mem(int xc_handle,
 #define _PAGE_AR_RW     (2 <<  9)       /* read & write */
 
 int
-xc_ia64_set_os_type(int xc_handle, char *guest_os_type, uint32_t dom)
+xc_ia64_set_os_type(xc_interface *xc_handle, char *guest_os_type, uint32_t dom)
 {
     DECLARE_DOMCTL;
 

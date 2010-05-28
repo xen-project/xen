@@ -22,7 +22,7 @@ static unsigned long  *page_phys;
 static unsigned long **page_virt;
 
 static vcpu_guest_context_t *
-ptrace_core_get_vcpu_ctxt(unsigned int nr_vcpus)
+ptrace_core_get_vcpu_ctxt(xc_interface *xch, unsigned int nr_vcpus)
 {
     if (nr_vcpus > max_nr_vcpus) {
         void *new;
@@ -47,7 +47,7 @@ ptrace_core_get_vcpu_ctxt(unsigned int nr_vcpus)
         max_nr_vcpus = nr_vcpus;
     }
 
-    return &xc_ptrace_get_vcpu_ctxt(nr_vcpus)->c;
+    return &xc_ptrace_get_vcpu_ctxt(xch, nr_vcpus)->c;
 }
 
 /* Leave the code for the old format as is. */
@@ -71,7 +71,8 @@ map_mtop_offset_compat(unsigned long ma)
 
 
 static void *
-map_domain_va_core_compat(unsigned long domfd, int cpu, void *guest_va)
+map_domain_va_core_compat(xc_interface *xch,
+                          unsigned long domfd, int cpu, void *guest_va)
 {
     unsigned long pde, page;
     unsigned long va = (unsigned long)guest_va;
@@ -87,7 +88,7 @@ map_domain_va_core_compat(unsigned long domfd, int cpu, void *guest_va)
             map_mtop_offset_compat(xen_cr3_to_pfn(cr3_phys[cpu])));
         if (v == MAP_FAILED)
         {
-            perror("mmap failed");
+            PERROR("mmap failed");
             return NULL;
         }
         cr3_virt[cpu] = v;
@@ -133,7 +134,7 @@ map_domain_va_core_compat(unsigned long domfd, int cpu, void *guest_va)
 
 static int
 xc_waitdomain_core_compat(
-    int xc_handle,
+    xc_interface *xch,
     int domfd,
     int *status,
     int options)
@@ -161,7 +162,7 @@ xc_waitdomain_core_compat(
         nr_vcpus = header.xch_nr_vcpus;
         pages_offset_compat = header.xch_pages_offset;
 
-        if ((ctxt = ptrace_core_get_vcpu_ctxt(nr_vcpus)) == NULL)
+        if ((ctxt = ptrace_core_get_vcpu_ctxt(xch, nr_vcpus)) == NULL)
         {
             IPRINTF("Could not allocate vcpu context array\n");
             return -1;
@@ -447,7 +448,8 @@ map_gmfn_to_offset_elf(unsigned long gmfn)
 }
 
 static void *
-map_domain_va_core_elf(unsigned long domfd, int cpu, void *guest_va)
+map_domain_va_core_elf(xc_interface *xch,
+                       unsigned long domfd, int cpu, void *guest_va)
 {
     unsigned long pde, page;
     unsigned long va = (unsigned long)guest_va;
@@ -468,7 +470,7 @@ map_domain_va_core_elf(unsigned long domfd, int cpu, void *guest_va)
         v = mmap(NULL, PAGE_SIZE, PROT_READ, MAP_PRIVATE, domfd, offset);
         if (v == MAP_FAILED)
         {
-            perror("mmap failed");
+            PERROR("mmap failed");
             return NULL;
         }
         cr3_phys[cpu] = cr3[cpu];
@@ -521,7 +523,7 @@ map_domain_va_core_elf(unsigned long domfd, int cpu, void *guest_va)
 
 static int
 xc_waitdomain_core_elf(
-    int xc_handle,
+    xc_interface *xch,
     int domfd,
     int *status,
     int options)
@@ -586,7 +588,7 @@ xc_waitdomain_core_elf(
                 format_version->format_version.version);
     }
 
-    if ((ctxt = ptrace_core_get_vcpu_ctxt(header->header.xch_nr_vcpus)) == NULL)
+    if ((ctxt = ptrace_core_get_vcpu_ctxt(xch, header->header.xch_nr_vcpus)) == NULL)
         goto out;
 
     /* .xen_prstatus: read vcpu_guest_context_t*/
@@ -646,11 +648,12 @@ out:
 
 /* --- interface ----------------------------------------------------------- */
 
-typedef int (*xc_waitdomain_core_t)(int xc_handle,
+typedef int (*xc_waitdomain_core_t)(xc_interface *xch,
                                     int domfd,
                                     int *status,
                                     int options);
-typedef void *(*map_domain_va_core_t)(unsigned long domfd,
+typedef void *(*map_domain_va_core_t)(xc_interface *xch,
+                                      unsigned long domfd,
                                       int cpu,
                                       void *guest_va);
 struct xc_core_format_type {
@@ -668,21 +671,22 @@ static const struct xc_core_format_type format_type[] = {
 static const struct xc_core_format_type* current_format_type = NULL;
 
 void *
-map_domain_va_core(unsigned long domfd, int cpu, void *guest_va)
+map_domain_va_core(xc_interface *xch,
+                   unsigned long domfd, int cpu, void *guest_va)
 {
     if (current_format_type == NULL)
         return NULL;
-    return (current_format_type->map_domain_va_core)(domfd, cpu, guest_va);
+    return (current_format_type->map_domain_va_core)(xch, domfd, cpu, guest_va);
 }
 
 int
-xc_waitdomain_core(int xc_handle, int domfd, int *status, int options)
+xc_waitdomain_core(xc_interface *xch, int domfd, int *status, int options)
 {
     int ret;
     int i;
 
     for (i = 0; i < NR_FORMAT_TYPE; i++) {
-        ret = (format_type[i].waitdomain_core)(xc_handle, domfd, status,
+        ret = (format_type[i].waitdomain_core)(xch, domfd, status,
                                                options);
         if (ret == 0) {
             current_format_type = &format_type[i];

@@ -36,7 +36,7 @@ static void unlock_pages(void *addr, size_t len)
 
 int main(int argc, char *argv[])
 {
-    int                xc_handle;
+    xc_interface      *xc_handle;
     uint32_t           i, j, n;
     uint64_t           time;
     double             l, b, sl, sb;
@@ -51,7 +51,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    if ( (xc_handle = xc_interface_open()) == -1 )
+    if ( (xc_handle = xc_interface_open(0,0,0)) == 0 )
     {
         fprintf(stderr, "Error opening xc interface: %d (%s)\n",
                 errno, strerror(errno));

@@ -23,7 +23,7 @@
 
 #include "xc_private.h"
 
-int xc_mem_event_control(int xc_handle, domid_t domain_id, unsigned int op,
+int xc_mem_event_control(xc_interface *xch, domid_t domain_id, unsigned int op,
                          unsigned int mode, void *shared_page,
                          void *ring_page, unsigned long gfn)
 {
@@ -39,20 +39,20 @@ int xc_mem_event_control(int xc_handle, domid_t domain_id, unsigned int op,
 
     domctl.u.mem_event_op.gfn = gfn;
     
-    return do_domctl(xc_handle, &domctl);
+    return do_domctl(xch, &domctl);
 }
 
-int xc_mem_event_enable(int xc_handle, domid_t domain_id,
+int xc_mem_event_enable(xc_interface *xch, domid_t domain_id,
                         void *shared_page, void *ring_page)
 {
-    return xc_mem_event_control(xc_handle, domain_id,
+    return xc_mem_event_control(xch, domain_id,
                                 XEN_DOMCTL_MEM_EVENT_OP_ENABLE, 0,
                                 shared_page, ring_page, INVALID_MFN);
 }
 
-int xc_mem_event_disable(int xc_handle, domid_t domain_id)
+int xc_mem_event_disable(xc_interface *xch, domid_t domain_id)
 {
-    return xc_mem_event_control(xc_handle, domain_id,
+    return xc_mem_event_control(xch, domain_id,
                                 XEN_DOMCTL_MEM_EVENT_OP_DISABLE, 0,
                                 NULL, NULL, INVALID_MFN);
 }

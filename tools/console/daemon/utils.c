@@ -38,7 +38,7 @@
 #include "utils.h"
 
 struct xs_handle *xs;
-int xc;
+xc_interface *xc;
 
 static void child_exit(int sig)
 {
@@ -116,8 +116,8 @@ bool xen_setup(void)
 		goto out;
 	}
 
-	xc = xc_interface_open();
-	if (xc == -1) {
+	xc = xc_interface_open(0,0,0);
+	if (!xc) {
 		dolog(LOG_ERR, "Failed to contact hypervisor (%m)");
 		goto out;
 	}
@@ -137,7 +137,7 @@ bool xen_setup(void)
  out:
 	if (xs)
 		xs_daemon_close(xs);
-	if (xc != -1)
+	if (xc)
 		xc_interface_close(xc);
 	return false;
 }

@@ -154,9 +154,9 @@ QEMU_REMOTE=http://xenbits.xensource.com/git-http/qemu-xen-unstable.git
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 805ed3b20492d2f4bb465bfda65cedd286e23209
-# Fri May 21 15:46:55 2010 +0100
-# Wait for frontend state Connected before connecting the backend
+QEMU_TAG ?= ffb0cf2ad55e952dae55e6166c4fcea79be6cd30
+# Thu Apr 15 17:01:15 2010 +0100
+# Change callers of libxc to use new libxc API.
 
 # Optional components
 XENSTAT_XENTOP     ?= y

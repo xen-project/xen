@@ -328,10 +328,10 @@ static void wait_for_event(void)
 
 static void get_tbufs(unsigned long *mfn, unsigned long *size)
 {
-    int xc_handle = xc_interface_open();
+    xc_interface *xc_handle = xc_interface_open(0,0,0);
     int ret;
 
-    if ( xc_handle < 0 ) 
+    if ( !xc_handle ) 
     {
         exit(EXIT_FAILURE);
     }
@@ -349,7 +349,7 @@ static void get_tbufs(unsigned long *mfn, unsigned long *size)
 
 static void disable_tracing(void)
 {
-    int xc_handle = xc_interface_open();
+    xc_interface *xc_handle = xc_interface_open(0,0,0);
     xc_tbuf_disable(xc_handle);  
     xc_interface_close(xc_handle);
 }
@@ -365,12 +365,12 @@ static void disable_tracing(void)
 static struct t_struct *map_tbufs(unsigned long tbufs_mfn, unsigned int num,
                                   unsigned long tinfo_size)
 {
-    int xc_handle;
+    xc_interface *xc_handle;
     static struct t_struct tbufs = { 0 };
     int i;
 
-    xc_handle = xc_interface_open();
-    if ( xc_handle < 0 ) 
+    xc_handle = xc_interface_open(0,0,0);
+    if ( !xc_handle ) 
     {
         exit(EXIT_FAILURE);
     }
@@ -434,7 +434,7 @@ static struct t_struct *map_tbufs(unsigned long tbufs_mfn, unsigned int num,
 static unsigned int get_num_cpus(void)
 {
     xc_physinfo_t physinfo = { 0 };
-    int xc_handle = xc_interface_open();
+    xc_interface *xc_handle = xc_interface_open(0,0,0);
     int ret;
 
     ret = xc_physinfo(xc_handle, &physinfo);
@@ -773,7 +773,8 @@ static int indexof(int domid)
 {
     int idx;
     xc_dominfo_t dominfo[NDOMAINS];
-    int xc_handle, ndomains;
+    xc_interface *xc_handle;
+    int ndomains;
   
     if (domid < 0) {	// shouldn't happen
         printf("bad domain id: %d\r\n", domid);
@@ -792,7 +793,7 @@ static int indexof(int domid)
         }
 
     // call domaininfo hypercall to try and garbage collect unused entries
-    xc_handle = xc_interface_open();
+    xc_handle = xc_interface_open(0,0,0);
     ndomains = xc_domain_getinfo(xc_handle, 0, NDOMAINS, dominfo);
     xc_interface_close(xc_handle);
 

@@ -24,7 +24,6 @@
 #include "io.h"
 #include <xs.h>
 #include <xen/io/console.h>
-#include <xenctrl.h>
 
 #include <stdlib.h>
 #include <errno.h>
@@ -68,7 +67,7 @@ static int log_time_hv_needts = 1;
 static int log_time_guest_needts = 1;
 static int log_hv_fd = -1;
 static evtchn_port_or_error_t log_hv_evtchn = -1;
-static int xc_handle = -1;
+static xc_interface *xch; /* why does xenconsoled have two xc handles ? */
 static int xce_handle = -1;
 
 struct buffer {
@@ -932,7 +931,7 @@ static void handle_hv_logs(void)
 	if ((port = xc_evtchn_pending(xce_handle)) == -1)
 		return;
 
-	if (xc_readconsolering(xc_handle, &bufptr, &size, 0, 1, &index) == 0 && size > 0) {
+	if (xc_readconsolering(xch, &bufptr, &size, 0, 1, &index) == 0 && size > 0) {
 		int logret;
 		if (log_time_hv)
 			logret = write_with_timestamp(log_hv_fd, buffer, size,
@@ -972,8 +971,8 @@ void handle_io(void)
 	int ret;
 
 	if (log_hv) {
-		xc_handle = xc_interface_open();
-		if (xc_handle == -1) {
+		xch = xc_interface_open(0,0,0);
+		if (!xch) {
 			dolog(LOG_ERR, "Failed to open xc handle: %d (%s)",
 			      errno, strerror(errno));
 			goto out;
@@ -1124,9 +1123,9 @@ void handle_io(void)
 		close(log_hv_fd);
 		log_hv_fd = -1;
 	}
-	if (xc_handle != -1) {
-		xc_interface_close(xc_handle);
-		xc_handle = -1;
+	if (xch) {
+		xc_interface_close(xch);
+		xch = 0;
 	}
 	if (xce_handle != -1) {
 		xc_evtchn_close(xce_handle);

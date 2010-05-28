@@ -57,7 +57,8 @@ int policy_init(xenpaging_t *paging)
     return rc;
 }
 
-int policy_choose_victim(xenpaging_t *paging, domid_t domain_id,
+int policy_choose_victim(xc_interface *xch,
+                         xenpaging_t *paging, domid_t domain_id,
                          xenpaging_victim_t *victim)
 {
     ASSERT(victim != NULL);

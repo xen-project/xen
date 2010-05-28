@@ -19,7 +19,7 @@ xc_ia64_fpsr_default(void)
 }
 
 static int
-xc_ia64_get_pfn_list(int xc_handle, uint32_t domid, xen_pfn_t *pfn_buf,
+xc_ia64_get_pfn_list(xc_interface *xc_handle, uint32_t domid, xen_pfn_t *pfn_buf,
                      unsigned int start_page, unsigned int nr_pages)
 {
     DECLARE_DOMCTL;
@@ -43,7 +43,7 @@ xc_ia64_get_pfn_list(int xc_handle, uint32_t domid, xen_pfn_t *pfn_buf,
 }
 
 int
-xc_get_pfn_list(int xc_handle, uint32_t domid, uint64_t *pfn_buf,
+xc_get_pfn_list(xc_interface *xc_handle, uint32_t domid, uint64_t *pfn_buf,
                 unsigned long max_pfns)
 {
     return xc_ia64_get_pfn_list(xc_handle, domid, (xen_pfn_t *)pfn_buf,
@@ -51,7 +51,7 @@ xc_get_pfn_list(int xc_handle, uint32_t domid, uint64_t *pfn_buf,
 }
 
 long
-xc_get_max_pages(int xc_handle, uint32_t domid)
+xc_get_max_pages(xc_interface *xc_handle, uint32_t domid)
 {
     struct xen_domctl domctl;
     domctl.cmd = XEN_DOMCTL_getdomaininfo;
@@ -63,7 +63,7 @@ xc_get_max_pages(int xc_handle, uint32_t domid)
 /* It is possible to get memmap_info and memmap by
    foreign domain page mapping. But it's racy. Use hypercall to avoid race. */
 static int
-xc_ia64_get_memmap(int xc_handle,
+xc_ia64_get_memmap(xc_interface *xc_handle,
                    uint32_t domid, char *buf, unsigned long bufsize)
 {
     privcmd_hypercall_t hypercall;
@@ -84,7 +84,7 @@ xc_ia64_get_memmap(int xc_handle,
 }
 
 int
-xc_ia64_copy_memmap(int xc_handle, uint32_t domid, shared_info_t *live_shinfo,
+xc_ia64_copy_memmap(xc_interface *xc_handle, uint32_t domid, shared_info_t *live_shinfo,
                     xen_ia64_memmap_info_t **memmap_info_p,
                     unsigned long *memmap_info_num_pages_p)
 {
@@ -163,7 +163,7 @@ xc_ia64_copy_memmap(int xc_handle, uint32_t domid, shared_info_t *live_shinfo,
 #define PTRS_PER_PTE    (1UL << (PAGE_SHIFT - 3))
 
 static void*
-xc_ia64_map_foreign_p2m(int xc_handle, uint32_t dom,
+xc_ia64_map_foreign_p2m(xc_interface *xc_handle, uint32_t dom,
                         struct xen_ia64_memmap_info *memmap_info,
                         unsigned long flags, unsigned long *p2m_size_p)
 {
@@ -219,7 +219,7 @@ xc_ia64_p2m_init(struct xen_ia64_p2m_table *p2m_table)
 }
 
 int
-xc_ia64_p2m_map(struct xen_ia64_p2m_table *p2m_table, int xc_handle,
+xc_ia64_p2m_map(struct xen_ia64_p2m_table *p2m_table, xc_interface *xc_handle,
                 uint32_t domid, struct xen_ia64_memmap_info *memmap_info,
                 unsigned long flag)
 {

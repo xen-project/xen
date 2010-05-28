@@ -17,7 +17,7 @@
 #include "xc_private.h"
 #include <xen/trace.h>
 
-static int tbuf_enable(int xc_handle, int enable)
+static int tbuf_enable(xc_interface *xch, int enable)
 {
     DECLARE_SYSCTL;
 
@@ -28,10 +28,10 @@ static int tbuf_enable(int xc_handle, int enable)
     else
         sysctl.u.tbuf_op.cmd  = XEN_SYSCTL_TBUFOP_disable;
 
-    return xc_sysctl(xc_handle, &sysctl);
+    return xc_sysctl(xch, &sysctl);
 }
 
-int xc_tbuf_set_size(int xc_handle, unsigned long size)
+int xc_tbuf_set_size(xc_interface *xch, unsigned long size)
 {
     DECLARE_SYSCTL;
 
@@ -40,10 +40,10 @@ int xc_tbuf_set_size(int xc_handle, unsigned long size)
     sysctl.u.tbuf_op.cmd  = XEN_SYSCTL_TBUFOP_set_size;
     sysctl.u.tbuf_op.size = size;
 
-    return xc_sysctl(xc_handle, &sysctl);
+    return xc_sysctl(xch, &sysctl);
 }
 
-int xc_tbuf_get_size(int xc_handle, unsigned long *size)
+int xc_tbuf_get_size(xc_interface *xch, unsigned long *size)
 {
     struct t_info *t_info;
     int rc;
@@ -53,11 +53,11 @@ int xc_tbuf_get_size(int xc_handle, unsigned long *size)
     sysctl.interface_version = XEN_SYSCTL_INTERFACE_VERSION;
     sysctl.u.tbuf_op.cmd  = XEN_SYSCTL_TBUFOP_get_info;
 
-    rc = xc_sysctl(xc_handle, &sysctl);
+    rc = xc_sysctl(xch, &sysctl);
     if ( rc != 0 )
         return rc;
 
-    t_info = xc_map_foreign_range(xc_handle, DOMID_XEN,
+    t_info = xc_map_foreign_range(xch, DOMID_XEN,
                     sysctl.u.tbuf_op.size, PROT_READ | PROT_WRITE,
                     sysctl.u.tbuf_op.buffer_mfn);
 
@@ -69,7 +69,7 @@ int xc_tbuf_get_size(int xc_handle, unsigned long *size)
     return 0;
 }
 
-int xc_tbuf_enable(int xc_handle, unsigned long pages, unsigned long *mfn,
+int xc_tbuf_enable(xc_interface *xch, unsigned long pages, unsigned long *mfn,
                    unsigned long *size)
 {
     DECLARE_SYSCTL;
@@ -80,16 +80,16 @@ int xc_tbuf_enable(int xc_handle, unsigned long pages, unsigned long *mfn,
      * set (since trace buffers cannot be reallocated). If we really have no
      * buffers at all then tbuf_enable() will fail, so this is safe.
      */
-    (void)xc_tbuf_set_size(xc_handle, pages);
+    (void)xc_tbuf_set_size(xch, pages);
 
-    if ( tbuf_enable(xc_handle, 1) != 0 )
+    if ( tbuf_enable(xch, 1) != 0 )
         return -1;
 
     sysctl.cmd = XEN_SYSCTL_tbuf_op;
     sysctl.interface_version = XEN_SYSCTL_INTERFACE_VERSION;
     sysctl.u.tbuf_op.cmd  = XEN_SYSCTL_TBUFOP_get_info;
 
-    rc = xc_sysctl(xc_handle, &sysctl);
+    rc = xc_sysctl(xch, &sysctl);
     if ( rc == 0 )
     {
         *size = sysctl.u.tbuf_op.size;
@@ -99,12 +99,12 @@ int xc_tbuf_enable(int xc_handle, unsigned long pages, unsigned long *mfn,
     return 0;
 }
 
-int xc_tbuf_disable(int xc_handle)
+int xc_tbuf_disable(xc_interface *xch)
 {
-    return tbuf_enable(xc_handle, 0);
+    return tbuf_enable(xch, 0);
 }
 
-int xc_tbuf_set_cpu_mask(int xc_handle, uint32_t mask)
+int xc_tbuf_set_cpu_mask(xc_interface *xch, uint32_t mask)
 {
     DECLARE_SYSCTL;
     int ret = -1;
@@ -126,7 +126,7 @@ int xc_tbuf_set_cpu_mask(int xc_handle, uint32_t mask)
         goto out;
     }
 
-    ret = do_sysctl(xc_handle, &sysctl);
+    ret = do_sysctl(xch, &sysctl);
 
     unlock_pages(&bytemap, sizeof(bytemap));
 
@@ -134,7 +134,7 @@ int xc_tbuf_set_cpu_mask(int xc_handle, uint32_t mask)
     return ret;
 }
 
-int xc_tbuf_set_evt_mask(int xc_handle, uint32_t mask)
+int xc_tbuf_set_evt_mask(xc_interface *xch, uint32_t mask)
 {
     DECLARE_SYSCTL;
 
@@ -143,6 +143,6 @@ int xc_tbuf_set_evt_mask(int xc_handle, uint32_t mask)
     sysctl.u.tbuf_op.cmd  = XEN_SYSCTL_TBUFOP_set_evt_mask;
     sysctl.u.tbuf_op.evt_mask = mask;
 
-    return do_sysctl(xc_handle, &sysctl);
+    return do_sysctl(xch, &sysctl);
 }
 

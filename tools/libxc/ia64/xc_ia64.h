@@ -21,7 +21,7 @@
 #ifndef _XC_IA64_H_
 #define _XC_IA64_H_
 
-int xc_ia64_copy_memmap(int xc_handle, uint32_t domid,
+int xc_ia64_copy_memmap(xc_interface *xc_handle, uint32_t domid,
                         shared_info_t *live_shinfo,
                         xen_ia64_memmap_info_t **memmap_info_p,
                         unsigned long *memmap_info_num_pages_p);
@@ -32,7 +32,7 @@ struct xen_ia64_p2m_table {
 };
 
 void xc_ia64_p2m_init(struct xen_ia64_p2m_table *p2m_table);
-int xc_ia64_p2m_map(struct xen_ia64_p2m_table *p2m_table, int xc_handle,
+int xc_ia64_p2m_map(struct xen_ia64_p2m_table *p2m_table, xc_interface *xc_handle,
                     uint32_t domid, struct xen_ia64_memmap_info *memmap_info,
                     unsigned long flag);
 void xc_ia64_p2m_unmap(struct xen_ia64_p2m_table *p2m_table);

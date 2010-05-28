@@ -18,7 +18,7 @@
 #include <sys/mman.h>
 #include <xen/hvm/hvm_info_table.h>
 
-int hvm_build_set_params(int handle, uint32_t domid,
+int hvm_build_set_params(xc_interface *handle, uint32_t domid,
                          int apic, int acpi, int pae, int nx, int viridian,
                          int vcpus, int store_evtchn, unsigned long *store_mfn)
 {

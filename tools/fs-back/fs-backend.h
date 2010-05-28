@@ -44,6 +44,7 @@ struct fs_mount
     int mount_id;                     /* = backend id */
     grant_ref_t grefs[MAX_RING_SIZE];
     evtchn_port_t remote_evtchn;
+    xc_interface *xch; /* just for error logging, so a dummy */
     int evth;                         /* Handle to the event channel */
     evtchn_port_t local_evtchn;
     int gnth;

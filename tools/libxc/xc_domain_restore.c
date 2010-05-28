@@ -62,7 +62,8 @@ struct restore_ctx {
 #define SUPER_PAGE_TRACKING(pfn) ( (pfn) != INVALID_SUPER_PAGE )
 #define SUPER_PAGE_DONE(pfn)     ( SUPER_PAGE_START(pfn) )
 
-static int super_page_populated(struct restore_ctx *ctx, unsigned long pfn)
+static int super_page_populated(xc_interface *xch,
+                                struct restore_ctx *ctx, unsigned long pfn)
 {
     int i;
     pfn &= ~(SUPERPAGE_NR_PFNS - 1);
@@ -78,7 +79,7 @@ static int super_page_populated(struct restore_ctx *ctx, unsigned long pfn)
  * Break a 2M page and move contents of [extent start, next_pfn-1] to
  * some new allocated 4K pages
  */
-static int break_super_page(int xc_handle,
+static int break_super_page(xc_interface *xch,
                             uint32_t dom,
                             struct restore_ctx *ctx,
                             xen_pfn_t next_pfn)
@@ -118,7 +119,7 @@ static int break_super_page(int xc_handle,
         page_array[i] = start_pfn + i;
     }
 
-    ram_base = xc_map_foreign_pages(xc_handle, dom, PROT_READ,
+    ram_base = xc_map_foreign_pages(xch, dom, PROT_READ,
                                     page_array, tot_pfns);
 
     if ( ram_base == NULL )
@@ -132,7 +133,7 @@ static int break_super_page(int xc_handle,
     munmap(ram_base, tot_pfns * PAGE_SIZE);
 
     /* free the super page */
-    if ( xc_domain_memory_decrease_reservation(xc_handle, dom, 1,
+    if ( xc_domain_memory_decrease_reservation(xch, dom, 1,
                                    SUPERPAGE_PFN_SHIFT, &start_pfn) != 0 )
     {
         ERROR("free 2M page failure @ 0x%ld.\n", next_pfn);
@@ -149,7 +150,7 @@ static int break_super_page(int xc_handle,
     for ( i = start_pfn; i < start_pfn + tot_pfns; i++ )
     {
         mfn = i;
-        if (xc_domain_memory_populate_physmap(xc_handle, dom, 1, 0,
+        if (xc_domain_memory_populate_physmap(xch, dom, 1, 0,
                                               0, &mfn) != 0)
         {
             ERROR("Failed to allocate physical memory.!\n");
@@ -166,7 +167,7 @@ static int break_super_page(int xc_handle,
         page_array[i] = start_pfn + i;
     }
 
-    ram_base = xc_map_foreign_pages(xc_handle, dom, PROT_WRITE,
+    ram_base = xc_map_foreign_pages(xch, dom, PROT_WRITE,
                                     page_array, tot_pfns);
     if ( ram_base == NULL )
     {
@@ -192,7 +193,7 @@ out:
  * If new pages fit the missing one in the 2M extent, do nothing; Else take
  * place of the original 2M page by some 4K pages.
  */
-static int allocate_mfn_list(int xc_handle,
+static int allocate_mfn_list(xc_interface *xch,
                               uint32_t dom,
                               struct restore_ctx *ctx,
                               unsigned long nr_extents,
@@ -221,7 +222,7 @@ static int allocate_mfn_list(int xc_handle,
              !SUPER_PAGE_DONE(sp_pfn))
         {
             /* break previously allocated super page*/
-            if ( break_super_page(xc_handle, dom, ctx, sp_pfn) != 0 )
+            if ( break_super_page(xch, dom, ctx, sp_pfn) != 0 )
             {
                 ERROR("Break previous super page fail!\n");
                 return 1;
@@ -244,13 +245,13 @@ static int allocate_mfn_list(int xc_handle,
         goto normal_page;
 
     pfn = batch_buf[0] & ~XEN_DOMCTL_PFINFO_LTAB_MASK;
-    if  ( super_page_populated(ctx, pfn) )
+    if  ( super_page_populated(xch, ctx, pfn) )
         goto normal_page;
 
     pfn &= ~(SUPERPAGE_NR_PFNS - 1);
     mfn =  pfn;
 
-    if ( xc_domain_memory_populate_physmap(xc_handle, dom, 1,
+    if ( xc_domain_memory_populate_physmap(xch, dom, 1,
                 SUPERPAGE_PFN_SHIFT, 0, &mfn) == 0)
     {
         for ( i = pfn; i < pfn + SUPERPAGE_NR_PFNS; i++, mfn++ )
@@ -279,7 +280,7 @@ normal_page:
         pfn = mfn = batch_buf[i] & ~XEN_DOMCTL_PFINFO_LTAB_MASK;
         if ( ctx->p2m[pfn] == INVALID_P2M_ENTRY )
         {
-            if (xc_domain_memory_populate_physmap(xc_handle, dom, 1, 0,
+            if (xc_domain_memory_populate_physmap(xch, dom, 1, 0,
                         0, &mfn) != 0)
             {
                 ERROR("Failed to allocate physical memory.! pfn=0x%lx, mfn=0x%lx.\n",
@@ -294,7 +295,7 @@ normal_page:
     return 0;
 }
 
-static int allocate_physmem(int xc_handle, uint32_t dom,
+static int allocate_physmem(xc_interface *xch, uint32_t dom,
                             struct restore_ctx *ctx,
                             unsigned long *region_pfn_type, int region_size,
                             unsigned int hvm, xen_pfn_t *region_mfn, int superpages)
@@ -337,7 +338,7 @@ static int allocate_physmem(int xc_handle, uint32_t dom,
         if ( SUPER_PAGE_START(pfn) )
         {
             /* Start of a 2M extent, populate previsous buf */
-            if ( allocate_mfn_list(xc_handle, dom, ctx,
+            if ( allocate_mfn_list(xch, dom, ctx,
                                    batch_buf_len, batch_buf,
                                    &required_pfn, superpages) != 0 )
             {
@@ -359,7 +360,7 @@ static int allocate_physmem(int xc_handle, uint32_t dom,
         else if ( SUPER_PAGE_TRACKING(required_pfn) )
         {
             /* break of a 2M extent, populate previous buf */
-            if ( allocate_mfn_list(xc_handle, dom, ctx,
+            if ( allocate_mfn_list(xch, dom, ctx,
                                    batch_buf_len, batch_buf,
                                    &required_pfn, superpages) != 0 )
             {
@@ -400,7 +401,7 @@ static int allocate_physmem(int xc_handle, uint32_t dom,
 alloc_page:
     if ( batch_buf )
     {
-        if ( allocate_mfn_list(xc_handle, dom, ctx,
+        if ( allocate_mfn_list(xch, dom, ctx,
                     batch_buf_len, batch_buf,
                     &required_pfn,
                     superpages) != 0 )
@@ -493,7 +494,7 @@ static ssize_t read_exact_timed(int fd, void* buf, size_t size)
 ** This function inverts that operation, replacing the pfn values with
 ** the (now known) appropriate mfn values.
 */
-static int uncanonicalize_pagetable(int xc_handle, uint32_t dom, struct restore_ctx *ctx,
+static int uncanonicalize_pagetable(xc_interface *xch, uint32_t dom, struct restore_ctx *ctx,
                                     void *page, int superpages)
 {
     int i, pte_last;
@@ -520,7 +521,7 @@ static int uncanonicalize_pagetable(int xc_handle, uint32_t dom, struct restore_
         if ( ctx->p2m[pfn] == INVALID_P2M_ENTRY )
         {
             unsigned long force_pfn = superpages ? FORCE_SP_MASK : pfn;
-            if (allocate_mfn_list(xc_handle, dom, ctx,
+            if (allocate_mfn_list(xch, dom, ctx,
                         1, &pfn, &force_pfn, superpages) != 0)
                 return 0;
         }
@@ -538,7 +539,8 @@ static int uncanonicalize_pagetable(int xc_handle, uint32_t dom, struct restore_
 
 
 /* Load the p2m frame list, plus potential extended info chunk */
-static xen_pfn_t *load_p2m_frame_list(struct restore_ctx *ctx,
+static xen_pfn_t *load_p2m_frame_list(
+    xc_interface *xch, struct restore_ctx *ctx,
     int io_fd, int *pae_extended_cr3, int *ext_vcpucontext)
 {
     xen_pfn_t *p2m_frame_list;
@@ -685,7 +687,8 @@ typedef struct {
 } tailbuf_t;
 
 /* read stream until EOF, growing buffer as necssary */
-static int compat_buffer_qemu(int fd, struct tailbuf_hvm *buf)
+static int compat_buffer_qemu(xc_interface *xch,
+                              int fd, struct tailbuf_hvm *buf)
 {
     uint8_t *qbuf, *tmp;
     int blen = 0, dlen = 0;
@@ -733,7 +736,8 @@ static int compat_buffer_qemu(int fd, struct tailbuf_hvm *buf)
     return 0;
 }
 
-static int buffer_qemu(int fd, struct tailbuf_hvm *buf)
+static int buffer_qemu(xc_interface *xch,
+                       int fd, struct tailbuf_hvm *buf)
 {
     uint32_t qlen;
     uint8_t *tmp;
@@ -770,7 +774,7 @@ static int buffer_qemu(int fd, struct tailbuf_hvm *buf)
     return 0;
 }
 
-static int dump_qemu(uint32_t dom, struct tailbuf_hvm *buf)
+static int dump_qemu(xc_interface *xch, uint32_t dom, struct tailbuf_hvm *buf)
 {
     int saved_errno;
     char path[256];
@@ -794,7 +798,8 @@ static int dump_qemu(uint32_t dom, struct tailbuf_hvm *buf)
     return 0;
 }
 
-static int buffer_tail_hvm(struct restore_ctx *ctx, struct tailbuf_hvm *buf, int fd,
+static int buffer_tail_hvm(xc_interface *xch, struct restore_ctx *ctx,
+                           struct tailbuf_hvm *buf, int fd,
                            unsigned int max_vcpu_id, uint64_t vcpumap,
                            int ext_vcpucontext)
 {
@@ -846,16 +851,17 @@ static int buffer_tail_hvm(struct restore_ctx *ctx, struct tailbuf_hvm *buf, int
      * until EOF. Remus gets around this by sending a different signature
      * which includes a length prefix */
     if ( !memcmp(qemusig, "QemuDeviceModelRecord", sizeof(qemusig)) )
-        return compat_buffer_qemu(fd, buf);
+        return compat_buffer_qemu(xch, fd, buf);
     else if ( !memcmp(qemusig, "RemusDeviceModelState", sizeof(qemusig)) )
-        return buffer_qemu(fd, buf);
+        return buffer_qemu(xch, fd, buf);
 
     qemusig[20] = '\0';
     ERROR("Invalid QEMU signature: %s", qemusig);
     return -1;
 }
 
-static int buffer_tail_pv(struct restore_ctx *ctx, struct tailbuf_pv *buf, int fd,
+static int buffer_tail_pv(xc_interface *xch, struct restore_ctx *ctx,
+                          struct tailbuf_pv *buf, int fd,
                           unsigned int max_vcpu_id, uint64_t vcpumap,
                           int ext_vcpucontext)
 {
@@ -933,14 +939,15 @@ static int buffer_tail_pv(struct restore_ctx *ctx, struct tailbuf_pv *buf, int f
     return -1;
 }
 
-static int buffer_tail(struct restore_ctx *ctx, tailbuf_t *buf, int fd, unsigned int max_vcpu_id,
+static int buffer_tail(xc_interface *xch, struct restore_ctx *ctx,
+                       tailbuf_t *buf, int fd, unsigned int max_vcpu_id,
                        uint64_t vcpumap, int ext_vcpucontext)
 {
     if ( buf->ishvm )
-        return buffer_tail_hvm(ctx, &buf->u.hvm, fd, max_vcpu_id, vcpumap,
+        return buffer_tail_hvm(xch, ctx, &buf->u.hvm, fd, max_vcpu_id, vcpumap,
                                ext_vcpucontext);
     else
-        return buffer_tail_pv(ctx, &buf->u.pv, fd, max_vcpu_id, vcpumap,
+        return buffer_tail_pv(xch, ctx, &buf->u.pv, fd, max_vcpu_id, vcpumap,
                               ext_vcpucontext);
 }
 
@@ -1011,7 +1018,8 @@ static void pagebuf_free(pagebuf_t* buf)
     }
 }
 
-static int pagebuf_get_one(pagebuf_t* buf, int fd, int xch, uint32_t dom)
+static int pagebuf_get_one(xc_interface *xch,
+                           pagebuf_t* buf, int fd, uint32_t dom)
 {
     int count, countpages, oldcount, i;
     void* ptmp;
@@ -1030,7 +1038,7 @@ static int pagebuf_get_one(pagebuf_t* buf, int fd, int xch, uint32_t dom)
     } else if (count == -1) {
         DPRINTF("Entering page verify mode\n");
         buf->verify = 1;
-        return pagebuf_get_one(buf, fd, xch, dom);
+        return pagebuf_get_one(xch, buf, fd, dom);
     } else if (count == -2) {
         buf->new_ctxt_format = 1;
         if ( read_exact(fd, &buf->max_vcpu_id, sizeof(buf->max_vcpu_id)) ||
@@ -1040,7 +1048,7 @@ static int pagebuf_get_one(pagebuf_t* buf, int fd, int xch, uint32_t dom)
             return -1;
         }
         // DPRINTF("Max VCPU ID: %d, vcpumap: %llx\n", buf->max_vcpu_id, buf->vcpumap);
-        return pagebuf_get_one(buf, fd, xch, dom);
+        return pagebuf_get_one(xch, buf, fd, dom);
     } else if (count == -3) {
         /* Skip padding 4 bytes then read the EPT identity PT location. */
         if ( read_exact(fd, &buf->identpt, sizeof(uint32_t)) ||
@@ -1050,7 +1058,7 @@ static int pagebuf_get_one(pagebuf_t* buf, int fd, int xch, uint32_t dom)
             return -1;
         }
         // DPRINTF("EPT identity map address: %llx\n", buf->identpt);
-        return pagebuf_get_one(buf, fd, xch, dom);
+        return pagebuf_get_one(xch, buf, fd, dom);
     } else if ( count == -4 )  {
         /* Skip padding 4 bytes then read the vm86 TSS location. */
         if ( read_exact(fd, &buf->vm86_tss, sizeof(uint32_t)) ||
@@ -1060,21 +1068,21 @@ static int pagebuf_get_one(pagebuf_t* buf, int fd, int xch, uint32_t dom)
             return -1;
         }
         // DPRINTF("VM86 TSS location: %llx\n", buf->vm86_tss);
-        return pagebuf_get_one(buf, fd, xch, dom);
+        return pagebuf_get_one(xch, buf, fd, dom);
     } else if ( count == -5 ) {
         DPRINTF("xc_domain_restore start tmem\n");
         if ( xc_tmem_restore(xch, dom, fd) ) {
             ERROR("error reading/restoring tmem");
             return -1;
         }
-        return pagebuf_get_one(buf, fd, xch, dom);
+        return pagebuf_get_one(xch, buf, fd, dom);
     }
     else if ( count == -6 ) {
         if ( xc_tmem_restore_extra(xch, dom, fd) ) {
             ERROR("error reading/restoring tmem extra");
             return -1;
         }
-        return pagebuf_get_one(buf, fd, xch, dom);
+        return pagebuf_get_one(xch, buf, fd, dom);
     } else if ( count == -7 ) {
         uint32_t tsc_mode, khz, incarn;
         uint64_t nsec;
@@ -1086,7 +1094,7 @@ static int pagebuf_get_one(pagebuf_t* buf, int fd, int xch, uint32_t dom)
             ERROR("error reading/restoring tsc info");
             return -1;
         }
-        return pagebuf_get_one(buf, fd, xch, dom);
+        return pagebuf_get_one(xch, buf, fd, dom);
     } else if ( (count > MAX_BATCH_SIZE) || (count < 0) ) {
         ERROR("Max batch size exceeded (%d). Giving up.", count);
         return -1;
@@ -1141,14 +1149,14 @@ static int pagebuf_get_one(pagebuf_t* buf, int fd, int xch, uint32_t dom)
     return count;
 }
 
-static int pagebuf_get(pagebuf_t* buf, int fd, int xch, uint32_t dom)
+static int pagebuf_get(xc_interface *xch, pagebuf_t* buf, int fd, uint32_t dom)
 {
     int rc;
 
     buf->nr_physpages = buf->nr_pages = 0;
 
     do {
-        rc = pagebuf_get_one(buf, fd, xch, dom);
+        rc = pagebuf_get_one(xch, buf, fd, dom);
     } while (rc > 0);
 
     if (rc < 0)
@@ -1157,7 +1165,7 @@ static int pagebuf_get(pagebuf_t* buf, int fd, int xch, uint32_t dom)
     return rc;
 }
 
-static int apply_batch(int xc_handle, uint32_t dom, struct restore_ctx *ctx,
+static int apply_batch(xc_interface *xch, uint32_t dom, struct restore_ctx *ctx,
                        xen_pfn_t* region_mfn, unsigned long* pfn_type, int pae_extended_cr3,
                        unsigned int hvm, struct xc_mmu* mmu,
                        pagebuf_t* pagebuf, int curbatch, int superpages)
@@ -1180,7 +1188,7 @@ static int apply_batch(int xc_handle, uint32_t dom, struct restore_ctx *ctx,
     if (j > MAX_BATCH_SIZE)
         j = MAX_BATCH_SIZE;
 
-    if (allocate_physmem(xc_handle, dom, ctx, &pagebuf->pfn_types[curbatch],
+    if (allocate_physmem(xch, dom, ctx, &pagebuf->pfn_types[curbatch],
                          j, hvm, region_mfn, superpages) != 0)
     {
         ERROR("allocate_physmem() failed\n");
@@ -1190,7 +1198,7 @@ static int apply_batch(int xc_handle, uint32_t dom, struct restore_ctx *ctx,
     /* Map relevant mfns */
     pfn_err = calloc(j, sizeof(*pfn_err));
     region_base = xc_map_foreign_bulk(
-        xc_handle, dom, PROT_WRITE, region_mfn, pfn_err, j);
+        xch, dom, PROT_WRITE, region_mfn, pfn_err, j);
 
     if ( region_base == NULL )
     {
@@ -1249,7 +1257,7 @@ static int apply_batch(int xc_handle, uint32_t dom, struct restore_ctx *ctx,
                 pae_extended_cr3 ||
                 (pagetype != XEN_DOMCTL_PFINFO_L1TAB)) {
 
-                if (!uncanonicalize_pagetable(xc_handle, dom, ctx,
+                if (!uncanonicalize_pagetable(xch, dom, ctx,
                                               page, superpages)) {
                     /*
                     ** Failing to uncanonicalize a page table can be ok
@@ -1293,7 +1301,7 @@ static int apply_batch(int xc_handle, uint32_t dom, struct restore_ctx *ctx,
         }
 
         if ( !hvm &&
-             xc_add_mmu_update(xc_handle, mmu,
+             xc_add_mmu_update(xch, mmu,
                                (((unsigned long long)mfn) << PAGE_SHIFT)
                                | MMU_MACHPHYS_UPDATE, pfn) )
         {
@@ -1311,7 +1319,7 @@ static int apply_batch(int xc_handle, uint32_t dom, struct restore_ctx *ctx,
     return rc;
 }
 
-int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
+int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
                       unsigned int store_evtchn, unsigned long *store_mfn,
                       unsigned int console_evtchn, unsigned long *console_mfn,
                       unsigned int hvm, unsigned int pae, int superpages)
@@ -1319,7 +1327,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     DECLARE_DOMCTL;
     int rc = 1, frc, i, j, n, m, pae_extended_cr3 = 0, ext_vcpucontext = 0;
     unsigned long mfn, pfn;
-    unsigned int prev_pc, this_pc;
+    unsigned int prev_pc;
     int nraces = 0;
 
     /* The new domain's shared-info frame number. */
@@ -1386,7 +1394,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     }
     DPRINTF("xc_domain_restore start: p2m_size = %lx\n", dinfo->p2m_size);
 
-    if ( !get_platform_info(xc_handle, dom,
+    if ( !get_platform_info(xch, dom,
                             &ctx->max_mfn, &ctx->hvirt_start, &ctx->pt_levels, &dinfo->guest_width) )
     {
         ERROR("Unable to get platform info.");
@@ -1402,7 +1410,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     if ( !hvm ) 
     {
         /* Load the p2m frame list, plus potential extended info chunk */
-        p2m_frame_list = load_p2m_frame_list(ctx,
+        p2m_frame_list = load_p2m_frame_list(xch, ctx,
             io_fd, &pae_extended_cr3, &ext_vcpucontext);
         if ( !p2m_frame_list )
             goto out;
@@ -1412,7 +1420,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         domctl.domain = dom;
         domctl.cmd    = XEN_DOMCTL_set_address_size;
         domctl.u.address_size.size = dinfo->guest_width * 8;
-        frc = do_domctl(xc_handle, &domctl);
+        frc = do_domctl(xch, &domctl);
         if ( frc != 0 )
         {
             ERROR("Unable to set guest address size.");
@@ -1447,7 +1455,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     /* Get the domain's shared-info frame. */
     domctl.cmd = XEN_DOMCTL_getdomaininfo;
     domctl.domain = (domid_t)dom;
-    if ( xc_domctl(xc_handle, &domctl) < 0 )
+    if ( xc_domctl(xch, &domctl) < 0 )
     {
         ERROR("Could not get information on new domain");
         goto out;
@@ -1458,14 +1466,14 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     for ( pfn = 0; pfn < dinfo->p2m_size; pfn++ )
         ctx->p2m[pfn] = INVALID_P2M_ENTRY;
 
-    mmu = xc_alloc_mmu_updates(xc_handle, dom);
+    mmu = xc_alloc_mmu_updates(xch, dom);
     if ( mmu == NULL )
     {
         ERROR("Could not initialise for MMU updates");
         goto out;
     }
 
-    DPRINTF("Reloading memory pages:   0%%\n");
+    xc_report_progress_start(xch, "Reloading memory pages", dinfo->p2m_size);
 
     /*
      * Now simply read each saved frame into its new machine frame.
@@ -1479,23 +1487,18 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     {
         int j, curbatch;
 
-        this_pc = (n * 100) / dinfo->p2m_size;
-        if ( (this_pc - prev_pc) >= 5 )
-        {
-            PPRINTF("\b\b\b\b%3d%%", this_pc);
-            prev_pc = this_pc;
-        }
+        xc_report_progress_step(xch, n, dinfo->p2m_size);
 
         if ( !completed ) {
             pagebuf.nr_physpages = pagebuf.nr_pages = 0;
-            if ( pagebuf_get_one(&pagebuf, io_fd, xc_handle, dom) < 0 ) {
+            if ( pagebuf_get_one(xch, &pagebuf, io_fd, dom) < 0 ) {
                 ERROR("Error when reading batch\n");
                 goto out;
             }
         }
         j = pagebuf.nr_pages;
 
-        PPRINTF("batch %d\n",j);
+        DPRINTF("batch %d\n",j);
 
         if ( j == 0 ) {
             /* catch vcpu updates */
@@ -1505,9 +1508,9 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
             }
             /* should this be deferred? does it change? */
             if ( pagebuf.identpt )
-                xc_set_hvm_param(xc_handle, dom, HVM_PARAM_IDENT_PT, pagebuf.identpt);
+                xc_set_hvm_param(xch, dom, HVM_PARAM_IDENT_PT, pagebuf.identpt);
             if ( pagebuf.vm86_tss )
-                xc_set_hvm_param(xc_handle, dom, HVM_PARAM_VM86_TSS, pagebuf.vm86_tss);
+                xc_set_hvm_param(xch, dom, HVM_PARAM_VM86_TSS, pagebuf.vm86_tss);
             break;  /* our work here is done */
         }
 
@@ -1516,7 +1519,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         while ( curbatch < j ) {
             int brc;
 
-            brc = apply_batch(xc_handle, dom, ctx, region_mfn, pfn_type,
+            brc = apply_batch(xch, dom, ctx, region_mfn, pfn_type,
                               pae_extended_cr3, hvm, mmu, &pagebuf, curbatch, superpages);
             if ( brc < 0 )
                 goto out;
@@ -1537,7 +1540,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         m += j;
         if ( m > MAX_PAGECACHE_USAGE )
         {
-            discard_file_cache(io_fd, 0 /* no flush */);
+            discard_file_cache(xch, io_fd, 0 /* no flush */);
             m = 0;
         }
     }
@@ -1546,7 +1549,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
      * Ensure we flush all machphys updates before potential PAE-specific
      * reallocations below.
      */
-    if ( !hvm && xc_flush_mmu_updates(xc_handle, mmu) )
+    if ( !hvm && xc_flush_mmu_updates(xch, mmu) )
     {
         ERROR("Error doing flush_mmu_updates()");
         goto out;
@@ -1557,7 +1560,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     if ( !completed ) {
         int flags = 0;
 
-        if ( buffer_tail(ctx, &tailbuf, io_fd, max_vcpu_id, vcpumap,
+        if ( buffer_tail(xch, ctx, &tailbuf, io_fd, max_vcpu_id, vcpumap,
                          ext_vcpucontext) < 0 ) {
             ERROR ("error buffering image tail");
             goto out;
@@ -1571,13 +1574,13 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
 
     // DPRINTF("Buffered checkpoint\n");
 
-    if ( pagebuf_get(&pagebuf, io_fd, xc_handle, dom) ) {
+    if ( pagebuf_get(xch, &pagebuf, io_fd, dom) ) {
         ERROR("error when buffering batch, finishing\n");
         goto finish;
     }
     memset(&tmptail, 0, sizeof(tmptail));
     tmptail.ishvm = hvm;
-    if ( buffer_tail(ctx, &tmptail, io_fd, max_vcpu_id, vcpumap,
+    if ( buffer_tail(xch, ctx, &tmptail, io_fd, max_vcpu_id, vcpumap,
                      ext_vcpucontext) < 0 ) {
         ERROR ("error buffering image tail, finishing");
         goto finish;
@@ -1619,7 +1622,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
                 uint64_t *l3tab;
 
                 l3tab = (uint64_t *)
-                    xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
+                    xc_map_foreign_range(xch, dom, PAGE_SIZE,
                                          PROT_READ, ctx->p2m[i]);
 
                 for ( j = 0; j < 4; j++ )
@@ -1627,7 +1630,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
 
                 munmap(l3tab, PAGE_SIZE);
 
-                new_mfn = xc_make_page_below_4G(xc_handle, dom, ctx->p2m[i]);
+                new_mfn = xc_make_page_below_4G(xch, dom, ctx->p2m[i]);
                 if ( !new_mfn )
                 {
                     ERROR("Couldn't get a page below 4GB :-(");
@@ -1635,7 +1638,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
                 }
 
                 ctx->p2m[i] = new_mfn;
-                if ( xc_add_mmu_update(xc_handle, mmu,
+                if ( xc_add_mmu_update(xch, mmu,
                                        (((unsigned long long)new_mfn)
                                         << PAGE_SHIFT) |
                                        MMU_MACHPHYS_UPDATE, i) )
@@ -1645,7 +1648,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
                 }
 
                 l3tab = (uint64_t *)
-                    xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
+                    xc_map_foreign_range(xch, dom, PAGE_SIZE,
                                          PROT_READ | PROT_WRITE, ctx->p2m[i]);
 
                 for ( j = 0; j < 4; j++ )
@@ -1670,7 +1673,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
             if ( (i == (dinfo->p2m_size-1)) || (j == MAX_BATCH_SIZE) )
             {
                 region_base = xc_map_foreign_pages(
-                    xc_handle, dom, PROT_READ | PROT_WRITE, region_mfn, j);
+                    xch, dom, PROT_READ | PROT_WRITE, region_mfn, j);
                 if ( region_base == NULL )
                 {
                     ERROR("map batch failed");
@@ -1680,7 +1683,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
                 for ( k = 0; k < j; k++ )
                 {
                     if ( !uncanonicalize_pagetable(
-                        xc_handle, dom, ctx,
+                        xch, dom, ctx,
                         region_base + k*PAGE_SIZE, superpages) )
                     {
                         ERROR("failed uncanonicalize pt!");
@@ -1693,7 +1696,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
             }
         }
 
-        if ( xc_flush_mmu_updates(xc_handle, mmu) )
+        if ( xc_flush_mmu_updates(xch, mmu) )
         {
             ERROR("Error doing xc_flush_mmu_updates()");
             goto out;
@@ -1738,7 +1741,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         /* Batch full? Then flush. */
         if ( nr_pins == MAX_PIN_BATCH )
         {
-            if ( xc_mmuext_op(xc_handle, pin, nr_pins, dom) < 0 )
+            if ( xc_mmuext_op(xch, pin, nr_pins, dom) < 0 )
             {
                 ERROR("Failed to pin batch of %d page tables", nr_pins);
                 goto out;
@@ -1748,13 +1751,12 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     }
 
     /* Flush final partial batch. */
-    if ( (nr_pins != 0) && (xc_mmuext_op(xc_handle, pin, nr_pins, dom) < 0) )
+    if ( (nr_pins != 0) && (xc_mmuext_op(xch, pin, nr_pins, dom) < 0) )
     {
         ERROR("Failed to pin batch of %d page tables", nr_pins);
         goto out;
     }
 
-    DPRINTF("\b\b\b\b100%%\n");
     DPRINTF("Memory reloaded (%ld pages)\n", ctx->nr_pfns);
 
     /* Get the list of PFNs that are not in the psuedo-phys map */
@@ -1783,7 +1785,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
             };
             set_xen_guest_handle(reservation.extent_start, tailbuf.u.pv.pfntab);
 
-            if ( (frc = xc_memory_op(xc_handle, XENMEM_decrease_reservation,
+            if ( (frc = xc_memory_op(xch, XENMEM_decrease_reservation,
                                      &reservation)) != nr_frees )
             {
                 ERROR("Could not decrease reservation : %d", frc);
@@ -1831,7 +1833,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
             mfn = ctx->p2m[pfn];
             SET_FIELD(&ctxt, user_regs.edx, mfn);
             start_info = xc_map_foreign_range(
-                xc_handle, dom, PAGE_SIZE, PROT_READ | PROT_WRITE, mfn);
+                xch, dom, PAGE_SIZE, PROT_READ | PROT_WRITE, mfn);
             SET_FIELD(start_info, nr_pages, dinfo->p2m_size);
             SET_FIELD(start_info, shared_info, shared_info_frame<<PAGE_SHIFT);
             SET_FIELD(start_info, flags, 0);
@@ -1906,7 +1908,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         domctl.domain = (domid_t)dom;
         domctl.u.vcpucontext.vcpu = i;
         set_xen_guest_handle(domctl.u.vcpucontext.ctxt, &ctxt.c);
-        frc = xc_domctl(xc_handle, &domctl);
+        frc = xc_domctl(xch, &domctl);
         if ( frc != 0 )
         {
             ERROR("Couldn't build vcpu%d", i);
@@ -1919,7 +1921,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
         vcpup += 128;
         domctl.cmd = XEN_DOMCTL_set_ext_vcpucontext;
         domctl.domain = dom;
-        frc = xc_domctl(xc_handle, &domctl);
+        frc = xc_domctl(xch, &domctl);
         if ( frc != 0 )
         {
             ERROR("Couldn't set extended vcpu%d info\n", i);
@@ -1933,7 +1935,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
 
     /* Restore contents of shared-info page. No checking needed. */
     new_shared_info = xc_map_foreign_range(
-        xc_handle, dom, PAGE_SIZE, PROT_WRITE, shared_info_frame);
+        xch, dom, PAGE_SIZE, PROT_WRITE, shared_info_frame);
 
     /* restore saved vcpu_info and arch specific info */
     MEMCPY_FIELD(new_shared_info, old_shared_info, vcpu_info);
@@ -1963,7 +1965,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     }
 
     /* Copy the P2M we've constructed to the 'live' P2M */
-    if ( !(ctx->live_p2m = xc_map_foreign_pages(xc_handle, dom, PROT_WRITE,
+    if ( !(ctx->live_p2m = xc_map_foreign_pages(xch, dom, PROT_WRITE,
                                            p2m_frame_list, P2M_FL_ENTRIES)) )
     {
         ERROR("Couldn't map p2m table");
@@ -1988,29 +1990,29 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
 
   finish_hvm:
     /* Dump the QEMU state to a state file for QEMU to load */
-    if ( dump_qemu(dom, &tailbuf.u.hvm) ) {
+    if ( dump_qemu(xch, dom, &tailbuf.u.hvm) ) {
         ERROR("Error dumping QEMU state to file");
         goto out;
     }
 
     /* These comms pages need to be zeroed at the start of day */
-    if ( xc_clear_domain_page(xc_handle, dom, tailbuf.u.hvm.magicpfns[0]) ||
-         xc_clear_domain_page(xc_handle, dom, tailbuf.u.hvm.magicpfns[1]) ||
-         xc_clear_domain_page(xc_handle, dom, tailbuf.u.hvm.magicpfns[2]) )
+    if ( xc_clear_domain_page(xch, dom, tailbuf.u.hvm.magicpfns[0]) ||
+         xc_clear_domain_page(xch, dom, tailbuf.u.hvm.magicpfns[1]) ||
+         xc_clear_domain_page(xch, dom, tailbuf.u.hvm.magicpfns[2]) )
     {
         ERROR("error zeroing magic pages");
         goto out;
     }
 
-    if ( (frc = xc_set_hvm_param(xc_handle, dom,
+    if ( (frc = xc_set_hvm_param(xch, dom,
                                  HVM_PARAM_IOREQ_PFN, tailbuf.u.hvm.magicpfns[0]))
-         || (frc = xc_set_hvm_param(xc_handle, dom,
+         || (frc = xc_set_hvm_param(xch, dom,
                                     HVM_PARAM_BUFIOREQ_PFN, tailbuf.u.hvm.magicpfns[1]))
-         || (frc = xc_set_hvm_param(xc_handle, dom,
+         || (frc = xc_set_hvm_param(xch, dom,
                                     HVM_PARAM_STORE_PFN, tailbuf.u.hvm.magicpfns[2]))
-         || (frc = xc_set_hvm_param(xc_handle, dom,
+         || (frc = xc_set_hvm_param(xch, dom,
                                     HVM_PARAM_PAE_ENABLED, pae))
-         || (frc = xc_set_hvm_param(xc_handle, dom,
+         || (frc = xc_set_hvm_param(xch, dom,
                                     HVM_PARAM_STORE_EVTCHN,
                                     store_evtchn)) )
     {
@@ -2019,7 +2021,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
     }
     *store_mfn = tailbuf.u.hvm.magicpfns[2];
 
-    frc = xc_domain_hvm_setcontext(xc_handle, dom, tailbuf.u.hvm.hvmbuf,
+    frc = xc_domain_hvm_setcontext(xch, dom, tailbuf.u.hvm.hvmbuf,
                                    tailbuf.u.hvm.reclen);
     if ( frc )
     {
@@ -2032,14 +2034,14 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
 
  out:
     if ( (rc != 0) && (dom != 0) )
-        xc_domain_destroy(xc_handle, dom);
+        xc_domain_destroy(xch, dom);
     free(mmu);
     free(ctx->p2m);
     free(pfn_type);
     tailbuf_free(&tailbuf);
 
     /* discard cache for save file  */
-    discard_file_cache(io_fd, 1 /*flush*/);
+    discard_file_cache(xch, io_fd, 1 /*flush*/);
 
     DPRINTF("Restore exit with rc=%d\n", rc);
     

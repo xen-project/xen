@@ -66,7 +66,7 @@ struct xc_core_strtab {
 };
 
 static struct xc_core_strtab*
-xc_core_strtab_init(void)
+xc_core_strtab_init(xc_interface *xch)
 {
     struct xc_core_strtab *strtab;
     char *strings;
@@ -99,7 +99,7 @@ xc_core_strtab_free(struct xc_core_strtab *strtab)
 }
 
 static uint16_t
-xc_core_strtab_get(struct xc_core_strtab *strtab, const char *name)
+xc_core_strtab_get(xc_interface *xch, struct xc_core_strtab *strtab, const char *name)
 {
     uint16_t ret = 0;
     uint16_t len = strlen(name) + 1;
@@ -150,7 +150,7 @@ struct xc_core_section_headers {
 #define SHDR_INC        ((uint16_t)4)
 
 static struct xc_core_section_headers*
-xc_core_shdr_init(void)
+xc_core_shdr_init(xc_interface *xch)
 {
     struct xc_core_section_headers *sheaders;
     sheaders = malloc(sizeof(*sheaders));
@@ -176,7 +176,8 @@ xc_core_shdr_free(struct xc_core_section_headers *sheaders)
 }
 
 Elf64_Shdr*
-xc_core_shdr_get(struct xc_core_section_headers *sheaders)
+xc_core_shdr_get(xc_interface *xch,
+                 struct xc_core_section_headers *sheaders)
 {
     Elf64_Shdr *shdr;
 
@@ -203,13 +204,14 @@ xc_core_shdr_get(struct xc_core_section_headers *sheaders)
 }
 
 int
-xc_core_shdr_set(Elf64_Shdr *shdr,
+xc_core_shdr_set(xc_interface *xch,
+                 Elf64_Shdr *shdr,
                  struct xc_core_strtab *strtab,
                  const char *name, uint32_t type,
                  uint64_t offset, uint64_t size,
                  uint64_t addralign, uint64_t entsize)
 {
-    uint64_t name_idx = xc_core_strtab_get(strtab, name);
+    uint64_t name_idx = xc_core_strtab_get(xch, strtab, name);
     if ( name_idx == 0 )
         return -1;
 
@@ -252,44 +254,44 @@ xc_core_ehdr_init(Elf64_Ehdr *ehdr)
 }
 
 static int
-elfnote_fill_xen_version(int xc_handle,
+elfnote_fill_xen_version(xc_interface *xch,
                          struct xen_dumpcore_elfnote_xen_version_desc
                          *xen_version)
 {
     int rc;
     memset(xen_version, 0, sizeof(*xen_version));
 
-    rc = xc_version(xc_handle, XENVER_version, NULL);
+    rc = xc_version(xch, XENVER_version, NULL);
     if ( rc < 0 )
         return rc;
     xen_version->major_version = rc >> 16;
     xen_version->minor_version = rc & ((1 << 16) - 1);
 
-    rc = xc_version(xc_handle, XENVER_extraversion,
+    rc = xc_version(xch, XENVER_extraversion,
                     &xen_version->extra_version);
     if ( rc < 0 )
         return rc;
 
-    rc = xc_version(xc_handle, XENVER_compile_info,
+    rc = xc_version(xch, XENVER_compile_info,
                     &xen_version->compile_info);
     if ( rc < 0 )
         return rc;
 
-    rc = xc_version(xc_handle,
+    rc = xc_version(xch,
                     XENVER_capabilities, &xen_version->capabilities);
     if ( rc < 0 )
         return rc;
 
-    rc = xc_version(xc_handle, XENVER_changeset, &xen_version->changeset);
+    rc = xc_version(xch, XENVER_changeset, &xen_version->changeset);
     if ( rc < 0 )
         return rc;
 
-    rc = xc_version(xc_handle, XENVER_platform_parameters,
+    rc = xc_version(xch, XENVER_platform_parameters,
                     &xen_version->platform_parameters);
     if ( rc < 0 )
         return rc;
 
-    rc = xc_version(xc_handle, XENVER_pagesize, NULL);
+    rc = xc_version(xch, XENVER_pagesize, NULL);
     if ( rc < 0 )
         return rc;
     xen_version->pagesize = rc;
@@ -314,7 +316,7 @@ elfnote_init(struct elfnote *elfnote)
 }
 
 static int
-elfnote_dump_none(void *args, dumpcore_rtn_t dump_rtn)
+elfnote_dump_none(xc_interface *xch, void *args, dumpcore_rtn_t dump_rtn)
 {
     int sts;
     struct elfnote elfnote;
@@ -326,14 +328,15 @@ elfnote_dump_none(void *args, dumpcore_rtn_t dump_rtn)
 
     elfnote.descsz = sizeof(none);
     elfnote.type = XEN_ELFNOTE_DUMPCORE_NONE;
-    sts = dump_rtn(args, (char*)&elfnote, sizeof(elfnote));
+    sts = dump_rtn(xch, args, (char*)&elfnote, sizeof(elfnote));
     if ( sts != 0 )
         return sts;
-    return dump_rtn(args, (char*)&none, sizeof(none));
+    return dump_rtn(xch, args, (char*)&none, sizeof(none));
 }
 
 static int
 elfnote_dump_core_header(
+    xc_interface *xch,
     void *args, dumpcore_rtn_t dump_rtn, const xc_dominfo_t *info,
     int nr_vcpus, unsigned long nr_pages)
 {
@@ -350,15 +353,15 @@ elfnote_dump_core_header(
     header.xch_nr_vcpus = nr_vcpus;
     header.xch_nr_pages = nr_pages;
     header.xch_page_size = PAGE_SIZE;
-    sts = dump_rtn(args, (char*)&elfnote, sizeof(elfnote));
+    sts = dump_rtn(xch, args, (char*)&elfnote, sizeof(elfnote));
     if ( sts != 0 )
         return sts;
-    return dump_rtn(args, (char*)&header, sizeof(header));
+    return dump_rtn(xch, args, (char*)&header, sizeof(header));
 }
 
 static int
-elfnote_dump_xen_version(void *args, dumpcore_rtn_t dump_rtn, int xc_handle,
-                         unsigned int guest_width)
+elfnote_dump_xen_version(xc_interface *xch, void *args,
+                         dumpcore_rtn_t dump_rtn, unsigned int guest_width)
 {
     int sts;
     struct elfnote elfnote;
@@ -369,21 +372,22 @@ elfnote_dump_xen_version(void *args, dumpcore_rtn_t dump_rtn, int xc_handle,
 
     elfnote.descsz = sizeof(xen_version);
     elfnote.type = XEN_ELFNOTE_DUMPCORE_XEN_VERSION;
-    elfnote_fill_xen_version(xc_handle, &xen_version);
+    elfnote_fill_xen_version(xch, &xen_version);
     if (guest_width < sizeof(unsigned long))
     {
         // 32 bit elf file format differs in pagesize's alignment
         char *p = (char *)&xen_version.pagesize;
         memmove(p - 4, p, sizeof(xen_version.pagesize));
     }
-    sts = dump_rtn(args, (char*)&elfnote, sizeof(elfnote));
+    sts = dump_rtn(xch, args, (char*)&elfnote, sizeof(elfnote));
     if ( sts != 0 )
         return sts;
-    return dump_rtn(args, (char*)&xen_version, sizeof(xen_version));
+    return dump_rtn(xch, args, (char*)&xen_version, sizeof(xen_version));
 }
 
 static int
-elfnote_dump_format_version(void *args, dumpcore_rtn_t dump_rtn)
+elfnote_dump_format_version(xc_interface *xch,
+                            void *args, dumpcore_rtn_t dump_rtn)
 {
     int sts;
     struct elfnote elfnote;
@@ -395,14 +399,14 @@ elfnote_dump_format_version(void *args, dumpcore_rtn_t dump_rtn)
     elfnote.descsz = sizeof(format_version);
     elfnote.type = XEN_ELFNOTE_DUMPCORE_FORMAT_VERSION;
     elfnote_fill_format_version(&format_version);
-    sts = dump_rtn(args, (char*)&elfnote, sizeof(elfnote));
+    sts = dump_rtn(xch, args, (char*)&elfnote, sizeof(elfnote));
     if ( sts != 0 )
         return sts;
-    return dump_rtn(args, (char*)&format_version, sizeof(format_version));
+    return dump_rtn(xch, args, (char*)&format_version, sizeof(format_version));
 }
 
 static int
-get_guest_width(int xc_handle,
+get_guest_width(xc_interface *xch,
                 uint32_t domid,
                 unsigned int *guest_width)
 {
@@ -412,7 +416,7 @@ get_guest_width(int xc_handle,
     domctl.domain = domid;
     domctl.cmd = XEN_DOMCTL_get_address_size;
 
-    if ( do_domctl(xc_handle, &domctl) != 0 )
+    if ( do_domctl(xch, &domctl) != 0 )
         return 1;
         
     *guest_width = domctl.u.address_size.size / 8;
@@ -420,7 +424,7 @@ get_guest_width(int xc_handle,
 }
 
 int
-xc_domain_dumpcore_via_callback(int xc_handle,
+xc_domain_dumpcore_via_callback(xc_interface *xch,
                                 uint32_t domid,
                                 void *args,
                                 dumpcore_rtn_t dump_rtn)
@@ -463,7 +467,7 @@ xc_domain_dumpcore_via_callback(int xc_handle,
     struct xc_core_section_headers *sheaders = NULL;
     Elf64_Shdr *shdr;
  
-    if ( get_guest_width(xc_handle, domid, &dinfo->guest_width) != 0 )
+    if ( get_guest_width(xch, domid, &dinfo->guest_width) != 0 )
     {
         PERROR("Could not get address size for domain");
         return sts;
@@ -476,13 +480,13 @@ xc_domain_dumpcore_via_callback(int xc_handle,
         goto out;
     }
 
-    if ( xc_domain_getinfo(xc_handle, domid, 1, &info) != 1 )
+    if ( xc_domain_getinfo(xch, domid, 1, &info) != 1 )
     {
         PERROR("Could not get info for domain");
         goto out;
     }
     /* Map the shared info frame */
-    live_shinfo = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE,
+    live_shinfo = xc_map_foreign_range(xch, domid, PAGE_SIZE,
                                        PROT_READ, info.shared_info_frame);
     if ( !live_shinfo && !info.hvm )
     {
@@ -506,10 +510,10 @@ xc_domain_dumpcore_via_callback(int xc_handle,
 
     for ( i = 0; i <= info.max_vcpu_id; i++ )
     {
-        if ( xc_vcpu_getcontext(xc_handle, domid, i, &ctxt[nr_vcpus]) == 0 )
+        if ( xc_vcpu_getcontext(xch, domid, i, &ctxt[nr_vcpus]) == 0 )
         {
             if ( xc_core_arch_context_get(&arch_ctxt, &ctxt[nr_vcpus],
-                                          xc_handle, domid) )
+                                          xch, domid) )
                 continue;
             nr_vcpus++;
         }
@@ -521,7 +525,7 @@ xc_domain_dumpcore_via_callback(int xc_handle,
     }
 
     /* obtain memory map */
-    sts = xc_core_arch_memory_map_get(xc_handle, &arch_ctxt, &info,
+    sts = xc_core_arch_memory_map_get(xch, &arch_ctxt, &info,
                                       live_shinfo, &memory_map,
                                       &nr_memory_map);
     if ( sts != 0 )
@@ -548,7 +552,7 @@ xc_domain_dumpcore_via_callback(int xc_handle,
             goto out;
         }
 
-        sts = xc_core_arch_map_p2m(xc_handle, dinfo->guest_width, &info, live_shinfo,
+        sts = xc_core_arch_map_p2m(xch, dinfo->guest_width, &info, live_shinfo,
                                    &p2m, &p2m_size);
         if ( sts != 0 )
             goto out;
@@ -567,20 +571,20 @@ xc_domain_dumpcore_via_callback(int xc_handle,
     xc_core_ehdr_init(&ehdr);
 
     /* create section header */
-    strtab = xc_core_strtab_init();
+    strtab = xc_core_strtab_init(xch);
     if ( strtab == NULL )
     {
         PERROR("Could not allocate string table");
         goto out;
     }
-    sheaders = xc_core_shdr_init();
+    sheaders = xc_core_shdr_init(xch);
     if ( sheaders == NULL )
     {
         PERROR("Could not allocate section headers");
         goto out;
     }
     /* null section */
-    shdr = xc_core_shdr_get(sheaders);
+    shdr = xc_core_shdr_get(xch,sheaders);
     if ( shdr == NULL )
     {
         PERROR("Could not get section header for null section");
@@ -588,7 +592,7 @@ xc_domain_dumpcore_via_callback(int xc_handle,
     }
 
     /* .shstrtab */
-    shdr = xc_core_shdr_get(sheaders);
+    shdr = xc_core_shdr_get(xch,sheaders);
     if ( shdr == NULL )
     {
         PERROR("Could not get section header for shstrtab");
@@ -598,7 +602,7 @@ xc_domain_dumpcore_via_callback(int xc_handle,
     /* strtab_shdr.sh_offset, strtab_shdr.sh_size aren't unknown.
      * fill it later
      */
-    sts = xc_core_shdr_set(shdr, strtab, ELF_SHSTRTAB, SHT_STRTAB, 0, 0, 0, 0);
+    sts = xc_core_shdr_set(xch, shdr, strtab, ELF_SHSTRTAB, SHT_STRTAB, 0, 0, 0, 0);
     if ( sts != 0 )
         goto out;
 
@@ -610,27 +614,27 @@ xc_domain_dumpcore_via_callback(int xc_handle,
         sizeof(struct xen_dumpcore_elfnote_header) +       /* core header */
         sizeof(struct xen_dumpcore_elfnote_xen_version) +  /* xen version */
         sizeof(struct xen_dumpcore_elfnote_format_version);/* format version */
-    shdr = xc_core_shdr_get(sheaders);
+    shdr = xc_core_shdr_get(xch,sheaders);
     if ( shdr == NULL )
     {
         PERROR("Could not get section header for note section");
         goto out;
     }
-    sts = xc_core_shdr_set(shdr, strtab, XEN_DUMPCORE_SEC_NOTE, SHT_NOTE,
+    sts = xc_core_shdr_set(xch, shdr, strtab, XEN_DUMPCORE_SEC_NOTE, SHT_NOTE,
                            offset, filesz, 0, 0);
     if ( sts != 0 )
         goto out;
     offset += filesz;
 
     /* prstatus */
-    shdr = xc_core_shdr_get(sheaders);
+    shdr = xc_core_shdr_get(xch,sheaders);
     if ( shdr == NULL )
     {
         PERROR("Could not get section header for .xen_prstatus");
         goto out;
     }
     filesz = sizeof(*ctxt) * nr_vcpus;
-    sts = xc_core_shdr_set(shdr, strtab, XEN_DUMPCORE_SEC_PRSTATUS,
+    sts = xc_core_shdr_set(xch, shdr, strtab, XEN_DUMPCORE_SEC_PRSTATUS,
                            SHT_PROGBITS, offset, filesz,
                            __alignof__(*ctxt), sizeof(*ctxt));
     if ( sts != 0 )
@@ -647,14 +651,14 @@ xc_domain_dumpcore_via_callback(int xc_handle,
     /* shared_info */
     if ( live_shinfo != NULL )
     {
-        shdr = xc_core_shdr_get(sheaders);
+        shdr = xc_core_shdr_get(xch,sheaders);
         if ( shdr == NULL )
         {
             PERROR("Could not get section header for .xen_shared_info");
             goto out;
         }
         filesz = PAGE_SIZE;
-        sts = xc_core_shdr_set(shdr, strtab, XEN_DUMPCORE_SEC_SHARED_INFO,
+        sts = xc_core_shdr_set(xch, shdr, strtab, XEN_DUMPCORE_SEC_SHARED_INFO,
                                SHT_PROGBITS, offset, filesz,
                                __alignof__(*live_shinfo), PAGE_SIZE);
         if ( sts != 0 )
@@ -676,21 +680,21 @@ xc_domain_dumpcore_via_callback(int xc_handle,
     offset += dummy_len;
 
     /* pages */
-    shdr = xc_core_shdr_get(sheaders);
+    shdr = xc_core_shdr_get(xch,sheaders);
     if ( shdr == NULL )
     {
         PERROR("could not get section headers for .xen_pages");
         goto out;
     }
     filesz = (uint64_t)nr_pages * PAGE_SIZE;
-    sts = xc_core_shdr_set(shdr, strtab, XEN_DUMPCORE_SEC_PAGES, SHT_PROGBITS,
+    sts = xc_core_shdr_set(xch, shdr, strtab, XEN_DUMPCORE_SEC_PAGES, SHT_PROGBITS,
                            offset, filesz, PAGE_SIZE, PAGE_SIZE);
     if ( sts != 0 )
         goto out;
     offset += filesz;
 
     /* p2m/pfn table */
-    shdr = xc_core_shdr_get(sheaders);
+    shdr = xc_core_shdr_get(xch,sheaders);
     if ( shdr == NULL )
     {
         PERROR("Could not get section header for .xen_{p2m, pfn} table");
@@ -699,7 +703,7 @@ xc_domain_dumpcore_via_callback(int xc_handle,
     if ( !auto_translated_physmap )
     {
         filesz = (uint64_t)nr_pages * sizeof(p2m_array[0]);
-        sts = xc_core_shdr_set(shdr, strtab, XEN_DUMPCORE_SEC_P2M,
+        sts = xc_core_shdr_set(xch, shdr, strtab, XEN_DUMPCORE_SEC_P2M,
                                SHT_PROGBITS,
                                offset, filesz, __alignof__(p2m_array[0]),
                                sizeof(p2m_array[0]));
@@ -707,7 +711,7 @@ xc_domain_dumpcore_via_callback(int xc_handle,
     else
     {
         filesz = (uint64_t)nr_pages * sizeof(pfn_array[0]);
-        sts = xc_core_shdr_set(shdr, strtab, XEN_DUMPCORE_SEC_PFN,
+        sts = xc_core_shdr_set(xch, shdr, strtab, XEN_DUMPCORE_SEC_PFN,
                                SHT_PROGBITS,
                                offset, filesz, __alignof__(pfn_array[0]),
                                sizeof(pfn_array[0]));
@@ -725,45 +729,45 @@ xc_domain_dumpcore_via_callback(int xc_handle,
     ehdr.e_shnum = sheaders->num;
     ehdr.e_shstrndx = strtab_idx;
     ehdr.e_machine = ELF_ARCH_MACHINE;
-    sts = dump_rtn(args, (char*)&ehdr, sizeof(ehdr));
+    sts = dump_rtn(xch, args, (char*)&ehdr, sizeof(ehdr));
     if ( sts != 0 )
         goto out;
 
     /* section headers */
-    sts = dump_rtn(args, (char*)sheaders->shdrs,
+    sts = dump_rtn(xch, args, (char*)sheaders->shdrs,
                    sheaders->num * sizeof(sheaders->shdrs[0]));
     if ( sts != 0 )
         goto out;
 
     /* elf note section: xen core header */
-    sts = elfnote_dump_none(args, dump_rtn);
+    sts = elfnote_dump_none(xch, args, dump_rtn);
     if ( sts != 0 )
         goto out;
 
     /* elf note section: xen core header */
-    sts = elfnote_dump_core_header(args, dump_rtn, &info, nr_vcpus, nr_pages);
+    sts = elfnote_dump_core_header(xch, args, dump_rtn, &info, nr_vcpus, nr_pages);
     if ( sts != 0 )
         goto out;
 
     /* elf note section: xen version */
-    sts = elfnote_dump_xen_version(args, dump_rtn, xc_handle, dinfo->guest_width);
+    sts = elfnote_dump_xen_version(xch, args, dump_rtn, dinfo->guest_width);
     if ( sts != 0 )
         goto out;
 
     /* elf note section: format version */
-    sts = elfnote_dump_format_version(args, dump_rtn);
+    sts = elfnote_dump_format_version(xch, args, dump_rtn);
     if ( sts != 0 )
         goto out;
 
     /* prstatus: .xen_prstatus */
-    sts = dump_rtn(args, (char *)ctxt, sizeof(*ctxt) * nr_vcpus);
+    sts = dump_rtn(xch, args, (char *)ctxt, sizeof(*ctxt) * nr_vcpus);
     if ( sts != 0 )
         goto out;
 
     if ( live_shinfo != NULL )
     {
         /* shared_info: .xen_shared_info */
-        sts = dump_rtn(args, (char*)live_shinfo, PAGE_SIZE);
+        sts = dump_rtn(xch, args, (char*)live_shinfo, PAGE_SIZE);
         if ( sts != 0 )
             goto out;
     }
@@ -775,7 +779,7 @@ xc_domain_dumpcore_via_callback(int xc_handle,
 
     /* Pad the output data to page alignment. */
     memset(dummy, 0, PAGE_SIZE);
-    sts = dump_rtn(args, dummy, dummy_len);
+    sts = dump_rtn(xch, args, dummy, dummy_len);
     if ( sts != 0 )
         goto out;
 
@@ -835,7 +839,7 @@ xc_domain_dumpcore_via_callback(int xc_handle,
             }
 
             vaddr = xc_map_foreign_range(
-                xc_handle, domid, PAGE_SIZE, PROT_READ, gmfn);
+                xch, domid, PAGE_SIZE, PROT_READ, gmfn);
             if ( vaddr == NULL )
                 continue;
             memcpy(dump_mem, vaddr, PAGE_SIZE);
@@ -844,7 +848,7 @@ xc_domain_dumpcore_via_callback(int xc_handle,
             if ( (j + 1) % DUMP_INCREMENT == 0 )
             {
                 sts = dump_rtn(
-                    args, dump_mem_start, dump_mem - dump_mem_start);
+                    xch, args, dump_mem_start, dump_mem - dump_mem_start);
                 if ( sts != 0 )
                     goto out;
                 dump_mem = dump_mem_start;
@@ -855,7 +859,7 @@ xc_domain_dumpcore_via_callback(int xc_handle,
     }
 
 copy_done:
-    sts = dump_rtn(args, dump_mem_start, dump_mem - dump_mem_start);
+    sts = dump_rtn(xch, args, dump_mem_start, dump_mem - dump_mem_start);
     if ( sts != 0 )
         goto out;
     if ( j < nr_pages )
@@ -866,7 +870,7 @@ copy_done:
         IPRINTF("j (%ld) != nr_pages (%ld)", j, nr_pages);
         memset(dump_mem_start, 0, PAGE_SIZE);
         for (; j < nr_pages; j++) {
-            sts = dump_rtn(args, dump_mem_start, PAGE_SIZE);
+            sts = dump_rtn(xch, args, dump_mem_start, PAGE_SIZE);
             if ( sts != 0 )
                 goto out;
             if ( !auto_translated_physmap )
@@ -882,15 +886,15 @@ copy_done:
     /* p2m/pfn table: .xen_p2m/.xen_pfn */
     if ( !auto_translated_physmap )
         sts = dump_rtn(
-            args, (char *)p2m_array, sizeof(p2m_array[0]) * nr_pages);
+            xch, args, (char *)p2m_array, sizeof(p2m_array[0]) * nr_pages);
     else
         sts = dump_rtn(
-            args, (char *)pfn_array, sizeof(pfn_array[0]) * nr_pages);
+            xch, args, (char *)pfn_array, sizeof(pfn_array[0]) * nr_pages);
     if ( sts != 0 )
         goto out;
 
     /* elf section header string table: .shstrtab */
-    sts = dump_rtn(args, strtab->strings, strtab->length);
+    sts = dump_rtn(xch, args, strtab->strings, strtab->length);
     if ( sts != 0 )
         goto out;
 
@@ -926,7 +930,8 @@ struct dump_args {
 };
 
 /* Callback routine for writing to a local dump file. */
-static int local_file_dump(void *args, char *buffer, unsigned int length)
+static int local_file_dump(xc_interface *xch,
+                           void *args, char *buffer, unsigned int length)
 {
     struct dump_args *da = args;
 
@@ -940,14 +945,14 @@ static int local_file_dump(void *args, char *buffer, unsigned int length)
     {
         // Now dumping pages -- make sure we discard clean pages from
         // the cache after each write
-        discard_file_cache(da->fd, 0 /* no flush */);
+        discard_file_cache(xch, da->fd, 0 /* no flush */);
     }
 
     return 0;
 }
 
 int
-xc_domain_dumpcore(int xc_handle,
+xc_domain_dumpcore(xc_interface *xch,
                    uint32_t domid,
                    const char *corename)
 {
@@ -961,10 +966,10 @@ xc_domain_dumpcore(int xc_handle,
     }
 
     sts = xc_domain_dumpcore_via_callback(
-        xc_handle, domid, &da, &local_file_dump);
+        xch, domid, &da, &local_file_dump);
 
     /* flush and discard any remaining portion of the file from cache */
-    discard_file_cache(da.fd, 1/* flush first*/);
+    discard_file_cache(xch, da.fd, 1/* flush first*/);
 
     close(da.fd);
 

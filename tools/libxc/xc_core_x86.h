@@ -30,7 +30,7 @@ struct xc_core_arch_context {
 
 #define xc_core_arch_context_init(arch_ctxt)            do {} while (0)
 #define xc_core_arch_context_free(arch_ctxt)            do {} while (0)
-#define xc_core_arch_context_get(arch_ctxt, ctxt, xc_handle, domid) \
+#define xc_core_arch_context_get(arch_ctxt, ctxt, xch, domid) \
                                                                 (0)
 #define xc_core_arch_context_dump(arch_ctxt, args, dump_rtn)    (0)
 

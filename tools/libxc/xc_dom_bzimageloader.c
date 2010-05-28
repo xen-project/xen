@@ -43,7 +43,7 @@ static int xc_try_bzip2_decode(
     ret = BZ2_bzDecompressInit(&stream, 0, 0);
     if ( ret != BZ_OK )
     {
-        xc_dom_printf("BZIP2: Error initting stream\n");
+        DOMPRINTF("BZIP2: Error initting stream");
         return -1;
     }
 
@@ -55,7 +55,7 @@ static int xc_try_bzip2_decode(
     out_buf = malloc(outsize);
     if ( out_buf == NULL )
     {
-        xc_dom_printf("BZIP2: Failed to alloc memory\n");
+        DOMPRINTF("BZIP2: Failed to alloc memory");
         goto bzip2_cleanup;
     }
 
@@ -73,7 +73,7 @@ static int xc_try_bzip2_decode(
             tmp_buf = realloc(out_buf, outsize * 2);
             if ( tmp_buf == NULL )
             {
-                xc_dom_printf("BZIP2: Failed to realloc memory\n");
+                DOMPRINTF("BZIP2: Failed to realloc memory");
                 free(out_buf);
                 goto bzip2_cleanup;
             }
@@ -88,18 +88,18 @@ static int xc_try_bzip2_decode(
         {
             if ( ret == BZ_STREAM_END )
             {
-                xc_dom_printf("BZIP2: Saw data stream end\n");
+                DOMPRINTF("BZIP2: Saw data stream end");
                 retval = 0;
                 break;
             }
-            xc_dom_printf("BZIP2: error\n");
+            DOMPRINTF("BZIP2: error");
         }
     }
 
     total = (((uint64_t)stream.total_out_hi32) << 32) | stream.total_out_lo32;
 
-    xc_dom_printf("%s: BZIP2 decompress OK, 0x%zx -> 0x%lx\n",
-                  __FUNCTION__, *size, (long unsigned int) total);
+    DOMPRINTF("%s: BZIP2 decompress OK, 0x%zx -> 0x%lx",
+              __FUNCTION__, *size, (long unsigned int) total);
 
     *blob = out_buf;
     *size = total;
@@ -115,8 +115,8 @@ static int xc_try_bzip2_decode(
 static int xc_try_bzip2_decode(
     struct xc_dom_image *dom, void **blob, size_t *size)
 {
-    xc_dom_printf("%s: BZIP2 decompress support unavailable\n",
-                  __FUNCTION__);
+    DOMPRINTF("%s: BZIP2 decompress support unavailable",
+              __FUNCTION__);
     return -1;
 }
 
@@ -162,7 +162,7 @@ static int xc_try_lzma_decode(
     ret = lzma_alone_decoder(&stream, physmem() / 3);
     if ( ret != LZMA_OK )
     {
-        xc_dom_printf("LZMA: Failed to init stream decoder\n");
+        DOMPRINTF("LZMA: Failed to init stream decoder");
         return -1;
     }
 
@@ -174,7 +174,7 @@ static int xc_try_lzma_decode(
     out_buf = malloc(outsize);
     if ( out_buf == NULL )
     {
-        xc_dom_printf("LZMA: Failed to alloc memory\n");
+        DOMPRINTF("LZMA: Failed to alloc memory");
         goto lzma_cleanup;
     }
 
@@ -192,7 +192,7 @@ static int xc_try_lzma_decode(
             tmp_buf = realloc(out_buf, outsize * 2);
             if ( tmp_buf == NULL )
             {
-                xc_dom_printf("LZMA: Failed to realloc memory\n");
+                DOMPRINTF("LZMA: Failed to realloc memory");
                 free(out_buf);
                 goto lzma_cleanup;
             }
@@ -207,7 +207,7 @@ static int xc_try_lzma_decode(
         {
             if ( ret == LZMA_STREAM_END )
             {
-                xc_dom_printf("LZMA: Saw data stream end\n");
+                DOMPRINTF("LZMA: Saw data stream end");
                 retval = 0;
                 break;
             }
@@ -243,14 +243,14 @@ static int xc_try_lzma_decode(
                 msg = "Internal program error (bug)";
                 break;
             }
-            xc_dom_printf("%s: LZMA decompression error %s\n",
-                          __FUNCTION__, msg);
+            DOMPRINTF("%s: LZMA decompression error %s",
+                      __FUNCTION__, msg);
             break;
         }
     }
 
-    xc_dom_printf("%s: LZMA decompress OK, 0x%zx -> 0x%zx\n",
-                  __FUNCTION__, *size, (size_t)stream.total_out);
+    DOMPRINTF("%s: LZMA decompress OK, 0x%zx -> 0x%zx",
+              __FUNCTION__, *size, (size_t)stream.total_out);
 
     *blob = out_buf;
     *size = stream.total_out;
@@ -266,8 +266,8 @@ static int xc_try_lzma_decode(
 static int xc_try_lzma_decode(
     struct xc_dom_image *dom, void **blob, size_t *size)
 {
-    xc_dom_printf("%s: LZMA decompress support unavailable\n",
-                  __FUNCTION__);
+    DOMPRINTF("%s: LZMA decompress support unavailable",
+              __FUNCTION__);
     return -1;
 }
 
@@ -330,15 +330,15 @@ static int xc_dom_probe_bzimage_kernel(struct xc_dom_image *dom)
 
     if ( dom->kernel_blob == NULL )
     {
-        xc_dom_panic(XC_INTERNAL_ERROR, "%s: no kernel image loaded\n",
-                     __FUNCTION__);
+        xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
+                     "%s: no kernel image loaded", __FUNCTION__);
         return -EINVAL;
     }
 
     if ( dom->kernel_size < sizeof(struct setup_header) )
     {
-        xc_dom_panic(XC_INTERNAL_ERROR, "%s: kernel image too small\n",
-                     __FUNCTION__);
+        xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
+                     "%s: kernel image too small", __FUNCTION__);
         return -EINVAL;
     }
 
@@ -346,15 +346,15 @@ static int xc_dom_probe_bzimage_kernel(struct xc_dom_image *dom)
 
     if ( memcmp(&hdr->header, HDR_MAGIC, HDR_MAGIC_SZ) != 0 )
     {
-        xc_dom_panic(XC_INVALID_KERNEL, "%s: kernel is not a bzImage\n",
-                     __FUNCTION__);
+        xc_dom_panic(dom->xch, XC_INVALID_KERNEL,
+                     "%s: kernel is not a bzImage", __FUNCTION__);
         return -EINVAL;
     }
 
     if ( hdr->version < VERSION(2,8) )
     {
-        xc_dom_panic(XC_INVALID_KERNEL, "%s: boot protocol too old (%04x)\n",
-                     __FUNCTION__, hdr->version);
+        xc_dom_panic(dom->xch, XC_INVALID_KERNEL, "%s: boot protocol"
+                     " too old (%04x)", __FUNCTION__, hdr->version);
         return -EINVAL;
     }
 
@@ -366,9 +366,8 @@ static int xc_dom_probe_bzimage_kernel(struct xc_dom_image *dom)
         ret = xc_dom_try_gunzip(dom, &dom->kernel_blob, &dom->kernel_size);
         if ( ret == -1 )
         {
-            xc_dom_panic(XC_INVALID_KERNEL,
-                         "%s: unable to gzip decompress kernel\n",
-                         __FUNCTION__);
+            xc_dom_panic(dom->xch, XC_INVALID_KERNEL, "%s: unable to"
+                         " gzip decompress kernel", __FUNCTION__);
             return -EINVAL;
         }
     }
@@ -377,7 +376,7 @@ static int xc_dom_probe_bzimage_kernel(struct xc_dom_image *dom)
         ret = xc_try_bzip2_decode(dom, &dom->kernel_blob, &dom->kernel_size);
         if ( ret < 0 )
         {
-            xc_dom_panic(XC_INVALID_KERNEL,
+            xc_dom_panic(dom->xch, XC_INVALID_KERNEL,
                          "%s unable to BZIP2 decompress kernel",
                          __FUNCTION__);
             return -EINVAL;
@@ -388,16 +387,16 @@ static int xc_dom_probe_bzimage_kernel(struct xc_dom_image *dom)
         ret = xc_try_lzma_decode(dom, &dom->kernel_blob, &dom->kernel_size);
         if ( ret < 0 )
         {
-            xc_dom_panic(XC_INVALID_KERNEL,
-                         "%s unable to LZMA decompress kernel\n",
+            xc_dom_panic(dom->xch, XC_INVALID_KERNEL,
+                         "%s unable to LZMA decompress kernel",
                          __FUNCTION__);
             return -EINVAL;
         }
     }
     else
     {
-        xc_dom_panic(XC_INVALID_KERNEL, "%s: unknown compression format\n",
-                     __FUNCTION__);
+        xc_dom_panic(dom->xch, XC_INVALID_KERNEL,
+                     "%s: unknown compression format", __FUNCTION__);
         return -EINVAL;
     }
 

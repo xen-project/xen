@@ -40,7 +40,7 @@
 #include <xen/arch-ia64/debug_op.h>
 #endif
 
-static int xc_handle = 0;
+static xc_interface *xc_handle = 0;
 static int domid = 0;
 static vcpu_guest_context_t *cur_ctx;
 static int cur_vcpu;
@@ -59,7 +59,7 @@ static int cur_vcpu;
 int virt_to_phys (int is_inst, unsigned long vaddr, unsigned long *paddr);
 
 /* wrapper for vcpu_gest_context_any_t */
-static int xc_ia64_vcpu_getcontext(int xc_handle,
+static int xc_ia64_vcpu_getcontext(xc_interface *xc_handle,
                                    uint32_t domid,
                                    uint32_t vcpu,
                                    vcpu_guest_context_t *ctxt)
@@ -660,10 +660,10 @@ void print_tr (vcpu_guest_context_t *ctx)
 
 int lock_pages (void *addr, size_t len);
 void unlock_pages (void *addr, size_t len);
-int do_xen_hypercall (int xc_handle, privcmd_hypercall_t *hypercall);
+int do_xen_hypercall (xc_interface *xc_handle, privcmd_hypercall_t *hypercall);
 
 #ifdef HAVE_DEBUG_OP
-static int do_ia64_debug_op (int xc_handle,
+static int do_ia64_debug_op (xc_interface *xc_handle,
                             unsigned long cmd, unsigned long domain,
                             xen_ia64_debug_op_t *op)
 {
@@ -1663,7 +1663,7 @@ void xenitp (int vcpu)
         }
     }
 
-    xc_interface_close (xc_handle);
+    ret = xc_interface_close (xc_handle);
     if (ret < 0) {
         perror ("xc_interface_close");
         exit (-1);

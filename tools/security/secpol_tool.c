@@ -238,7 +238,7 @@ void acm_dump_policy_buffer(void *buf, int buflen,
 }
 
 /************************** get dom0 ssidref *****************************/
-int acm_get_ssidref(int xc_handle, int domid, uint16_t *chwall_ref,
+int acm_get_ssidref(xc_interface *xc_handle, int domid, uint16_t *chwall_ref,
                     uint16_t *ste_ref)
 {
     int ret;
@@ -262,7 +262,7 @@ int acm_get_ssidref(int xc_handle, int domid, uint16_t *chwall_ref,
 #define PULL_CACHE_SIZE		8192
 uint8_t pull_buffer[PULL_CACHE_SIZE];
 
-int acm_domain_getpolicy(int xc_handle)
+int acm_domain_getpolicy(xc_interface *xc_handle)
 {
     struct acm_getpolicy getpolicy;
     int ret;
@@ -349,7 +349,7 @@ static int acm_domain_dumppolicy(const char *filename, uint32_t ssidref)
 
 /************************ load binary policy ******************************/
 
-int acm_domain_loadpolicy(int xc_handle, const char *filename)
+int acm_domain_loadpolicy(xc_interface *xc_handle, const char *filename)
 {
     int ret;
     off_t len;
@@ -403,7 +403,7 @@ void dump_ste_stats(struct acm_ste_stats_buffer *ste_stats)
 }
 
 #define PULL_STATS_SIZE		8192
-int acm_domain_dumpstats(int xc_handle)
+int acm_domain_dumpstats(xc_interface *xc_handle)
 {
     uint8_t stats_buffer[PULL_STATS_SIZE];
     struct acm_dumpstats dumpstats;
@@ -472,7 +472,7 @@ int acm_domain_dumpstats(int xc_handle)
 int main(int argc, char **argv)
 {
 
-    int xc_handle, ret = 0;
+    xc_interface *xc_handle, ret = 0;
 
     if (argc < 2)
         usage(argv[0]);
@@ -482,7 +482,7 @@ int main(int argc, char **argv)
         if (argc != 2)
             usage(argv[0]);
 
-        if ((xc_handle = xc_interface_open()) <= 0) {
+        if ((xc_handle = xc_interface_open()) == 0) {
             printf("ERROR: Could not open xen privcmd device!\n");
             exit(-1);
         }
@@ -494,7 +494,7 @@ int main(int argc, char **argv)
         if (argc != 3)
             usage(argv[0]);
 
-        if ((xc_handle = xc_interface_open()) <= 0) {
+        if ((xc_handle = xc_interface_open()) == 0) {
             printf("ERROR: Could not open xen privcmd device!\n");
             exit(-1);
         }
@@ -506,7 +506,7 @@ int main(int argc, char **argv)
         if (argc != 2)
             usage(argv[0]);
 
-        if ((xc_handle = xc_interface_open()) <= 0) {
+        if ((xc_handle = xc_interface_open()) == 0) {
             printf("ERROR: Could not open xen privcmd device!\n");
             exit(-1);
         }

@@ -61,7 +61,7 @@ typedef struct {
 } libxl_version_info;
 
 struct libxl_ctx {
-    int xch;
+    xc_interface *xch;
     struct xs_handle *xsh;
     /* errors/debug buf */
     void *log_userdata;

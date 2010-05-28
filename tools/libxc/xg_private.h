@@ -27,8 +27,10 @@
 #endif
 #endif
 
-char *xc_read_image(const char *filename, unsigned long *size);
-char *xc_inflate_buffer(const char *in_buf,
+char *xc_read_image(xc_interface *xch,
+                    const char *filename, unsigned long *size);
+char *xc_inflate_buffer(xc_interface *xch,
+                        const char *in_buf,
                         unsigned long in_size,
                         unsigned long *out_size);
 
@@ -174,7 +176,7 @@ struct domain_info_context {
 #define PAEKERN_extended_cr3 2
 #define PAEKERN_bimodal      3
 
-int pin_table(int xc_handle, unsigned int type, unsigned long mfn,
+int pin_table(xc_interface *xch, unsigned int type, unsigned long mfn,
               domid_t dom);
 
 #endif /* XG_PRIVATE_H */

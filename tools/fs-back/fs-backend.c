@@ -168,8 +168,9 @@ void terminate_mount_request(struct fs_mount *mount)
     }
     xenbus_write_backend_state(mount, STATE_CLOSED);
 
-    xc_gnttab_munmap(mount->gnth, mount->ring.sring, mount->shared_ring_size);
-    xc_gnttab_close(mount->gnth);
+    xc_gnttab_munmap(mount->xch, mount->gnth,
+                     mount->ring.sring, mount->shared_ring_size);
+    xc_gnttab_close(mount->xch, mount->gnth);
     xc_evtchn_unbind(mount->evth, mount->local_evtchn);
     xc_evtchn_close(mount->evth);
 
@@ -213,6 +214,9 @@ static void handle_connection(int frontend_dom_id, int export_id, char *frontend
 
     mount = (struct fs_mount*)malloc(sizeof(struct fs_mount));
     memset(mount, 0, sizeof(struct fs_mount));
+    mount->xch = xc_interface_open(0,0,XC_OPENFLAG_DUMMY);
+    if (!mount->xch) goto error;
+
     mount->dom_id = frontend_dom_id;
     mount->export = export;
     mount->mount_id = mount_id++;
@@ -239,14 +243,14 @@ static void handle_connection(int frontend_dom_id, int export_id, char *frontend
         goto error;
     }
     mount->gnth = -1;
-    mount->gnth = xc_gnttab_open(); 
+    mount->gnth = xc_gnttab_open(mount->xch);
     if (mount->gnth < 0) {
         FS_DEBUG("ERROR: Couldn't open gnttab!\n");
         goto error;
     }
     for(i=0; i<mount->shared_ring_size; i++)
         dom_ids[i] = mount->dom_id;
-    sring = xc_gnttab_map_grant_refs(mount->gnth,
+    sring = xc_gnttab_map_grant_refs(mount->xch, mount->gnth,
                                      mount->shared_ring_size,
                                      dom_ids,
                                      mount->grefs,
@@ -279,13 +283,16 @@ static void handle_connection(int frontend_dom_id, int export_id, char *frontend
 error:
     xenbus_write_backend_state(mount, STATE_CLOSED);
     if (sring)
-        xc_gnttab_munmap(mount->gnth, mount->ring.sring, mount->shared_ring_size);
+        xc_gnttab_munmap(mount->xch, mount->gnth,
+                         mount->ring.sring, mount->shared_ring_size);
     if (mount->gnth > 0)
-        xc_gnttab_close(mount->gnth);
+        xc_gnttab_close(mount->xch, mount->gnth);
     if (mount->local_evtchn > 0)
         xc_evtchn_unbind(mount->evth, mount->local_evtchn);
     if (mount->evth > 0)
         xc_evtchn_close(mount->evth);
+    if (mount->xch)
+        xc_interface_close(mount->xch);
 }
 
 static void await_connections(void)
@@ -472,7 +479,7 @@ int main(void)
     /* Close the connection to XenStore when we are finished with everything */
     xs_daemon_close(xsh);
 #if 0
-    int xc_handle;
+    xc_interface *xc_handle;
     char *shared_page;
     int prot = PROT_READ | PROT_WRITE;
   

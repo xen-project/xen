@@ -14,7 +14,7 @@
 
 #include "xc_private.h"
 
-int xc_acm_op(int xc_handle, int cmd, void *arg, unsigned long arg_size)
+int xc_acm_op(xc_interface *xch, int cmd, void *arg, unsigned long arg_size)
 {
     int ret;
     DECLARE_HYPERCALL;
@@ -88,7 +88,7 @@ int xc_acm_op(int xc_handle, int cmd, void *arg, unsigned long arg_size)
         PERROR("Could not lock memory for Xen hypercall");
         return -EFAULT;
     }
-    if ( (ret = do_xen_hypercall(xc_handle, &hypercall)) < 0)
+    if ( (ret = do_xen_hypercall(xch, &hypercall)) < 0)
     {
         if ( errno == EACCES )
             DPRINTF("acmctl operation failed -- need to"

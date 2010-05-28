@@ -35,7 +35,7 @@ int main (int argCnt, const char *args[])
     void *polMemCp = NULL;
     struct stat info;
     int ret;
-    int xch = 0;
+    xc_interface *xch = 0;
 
     if (argCnt != 2)
         usage(argCnt, args);
@@ -70,8 +70,8 @@ int main (int argCnt, const char *args[])
         goto cleanup;
     }
 
-    xch = xc_interface_open();
-    if ( xch < 0 )
+    xch = xc_interface_open(0,0,0);
+    if ( !xch )
     {
         fprintf(stderr, "Unable to create interface to xenctrl: %s\n",
                 strerror(errno));

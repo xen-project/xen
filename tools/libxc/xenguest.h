@@ -33,12 +33,12 @@ struct save_callbacks {
 /**
  * This function will save a running domain.
  *
- * @parm xc_handle a handle to an open hypervisor interface
+ * @parm xch a handle to an open hypervisor interface
  * @parm fd the file descriptor to save a domain to
  * @parm dom the id of the domain
  * @return 0 on success, -1 on failure
  */
-int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
+int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iters,
                    uint32_t max_factor, uint32_t flags /* XCFLAGS_xxx */,
                    struct save_callbacks* callbacks,
                    int hvm, void (*switch_qemu_logdirty)(int, unsigned)); /* HVM only */
@@ -47,7 +47,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
 /**
  * This function will restore a saved domain.
  *
- * @parm xc_handle a handle to an open hypervisor interface
+ * @parm xch a handle to an open hypervisor interface
  * @parm fd the file descriptor to restore a domain from
  * @parm dom the id of the domain
  * @parm store_evtchn the store event channel for this domain to use
@@ -57,7 +57,7 @@ int xc_domain_save(int xc_handle, int io_fd, uint32_t dom, uint32_t max_iters,
  * @parm superpages non-zero to allocate guest memory with superpages
  * @return 0 on success, -1 on failure
  */
-int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
+int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
                       unsigned int store_evtchn, unsigned long *store_mfn,
                       unsigned int console_evtchn, unsigned long *console_mfn,
                       unsigned int hvm, unsigned int pae, int superpages);
@@ -66,7 +66,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
  * This function will create a domain for a paravirtualized Linux
  * using file names pointing to kernel and ramdisk
  *
- * @parm xc_handle a handle to an open hypervisor interface
+ * @parm xch a handle to an open hypervisor interface
  * @parm domid the id of the domain
  * @parm mem_mb memory size in megabytes
  * @parm image_name name of the kernel image file
@@ -79,7 +79,7 @@ int xc_domain_restore(int xc_handle, int io_fd, uint32_t dom,
  * @parm conole_mfn returned with the mfn of the console page
  * @return 0 on success, -1 on failure
  */
-int xc_linux_build(int xc_handle,
+int xc_linux_build(xc_interface *xch,
                    uint32_t domid,
                    unsigned int mem_mb,
                    const char *image_name,
@@ -94,7 +94,7 @@ int xc_linux_build(int xc_handle,
 
 /** The same interface, but the dom structure is managed by the caller */
 struct xc_dom_image;
-int xc_dom_linux_build(int xc_handle,
+int xc_dom_linux_build(xc_interface *xch,
 		       struct xc_dom_image *dom,
 		       uint32_t domid,
 		       unsigned int mem_mb,
@@ -110,7 +110,7 @@ int xc_dom_linux_build(int xc_handle,
  * This function will create a domain for a paravirtualized Linux
  * using buffers for kernel and initrd
  *
- * @parm xc_handle a handle to an open hypervisor interface
+ * @parm xch a handle to an open hypervisor interface
  * @parm domid the id of the domain
  * @parm mem_mb memory size in megabytes
  * @parm image_buffer buffer containing kernel image
@@ -125,7 +125,7 @@ int xc_dom_linux_build(int xc_handle,
  * @parm conole_mfn returned with the mfn of the console page
  * @return 0 on success, -1 on failure
  */
-int xc_linux_build_mem(int xc_handle,
+int xc_linux_build_mem(xc_interface *xch,
                        uint32_t domid,
                        unsigned int mem_mb,
                        const char *image_buffer,
@@ -140,53 +140,54 @@ int xc_linux_build_mem(int xc_handle,
                        unsigned int console_evtchn,
                        unsigned long *console_mfn);
 
-int xc_hvm_build(int xc_handle,
+int xc_hvm_build(xc_interface *xch,
                  uint32_t domid,
                  int memsize,
                  const char *image_name);
 
-int xc_hvm_build_target_mem(int xc_handle,
+int xc_hvm_build_target_mem(xc_interface *xch,
                             uint32_t domid,
                             int memsize,
                             int target,
                             const char *image_name);
 
-int xc_hvm_build_mem(int xc_handle,
+int xc_hvm_build_mem(xc_interface *xch,
                      uint32_t domid,
                      int memsize,
                      const char *image_buffer,
                      unsigned long image_size);
 
-int xc_suspend_evtchn_release(int xce, int domid, int suspend_evtchn);
+int xc_suspend_evtchn_release(xc_interface *xch, int xce, int domid, int suspend_evtchn);
 
-int xc_suspend_evtchn_init(int xc, int xce, int domid, int port);
+int xc_suspend_evtchn_init(xc_interface *xch, int xce, int domid, int port);
 
-int xc_await_suspend(int xce, int suspend_evtchn);
+int xc_await_suspend(xc_interface *xch, int xce, int suspend_evtchn);
 
-int xc_get_bit_size(const char *image_name, const char *cmdline,
-                      const char *features, int *type);
+int xc_get_bit_size(xc_interface *xch,
+                    const char *image_name, const char *cmdline,
+                    const char *features, int *type);
 
-int xc_mark_page_online(int xc, unsigned long start,
+int xc_mark_page_online(xc_interface *xch, unsigned long start,
                         unsigned long end, uint32_t *status);
 
-int xc_mark_page_offline(int xc, unsigned long start,
+int xc_mark_page_offline(xc_interface *xch, unsigned long start,
                           unsigned long end, uint32_t *status);
 
-int xc_query_page_offline_status(int xc, unsigned long start,
+int xc_query_page_offline_status(xc_interface *xch, unsigned long start,
                                  unsigned long end, uint32_t *status);
 
-int xc_exchange_page(int xc_handle, int domid, xen_pfn_t mfn);
+int xc_exchange_page(xc_interface *xch, int domid, xen_pfn_t mfn);
 
 
 /**
  * This function map m2p table
- * @parm xc_handle a handle to an open hypervisor interface
+ * @parm xch a handle to an open hypervisor interface
  * @parm max_mfn the max pfn
  * @parm prot the flags to map, such as read/write etc
  * @parm mfn0 return the first mfn, can be NULL
  * @return mapped m2p table on success, NULL on failure
  */
-xen_pfn_t *xc_map_m2p(int xc_handle,
+xen_pfn_t *xc_map_m2p(xc_interface *xch,
                       unsigned long max_mfn,
                       int prot,
                       unsigned long *mfn0);

@@ -11,7 +11,8 @@
 
 #include "xg_private.h"
 
-char *xc_read_image(const char *filename, unsigned long *size)
+char *xc_read_image(xc_interface *xch,
+                    const char *filename, unsigned long *size)
 {
     int kernel_fd = -1;
     gzFile kernel_gfd = NULL;
@@ -86,7 +87,8 @@ char *xc_read_image(const char *filename, unsigned long *size)
     return image;
 }
 
-char *xc_inflate_buffer(const char *in_buf, unsigned long in_size,
+char *xc_inflate_buffer(xc_interface *xch,
+                        const char *in_buf, unsigned long in_size,
                         unsigned long *out_size)
 {
     int           sts;
@@ -147,14 +149,14 @@ char *xc_inflate_buffer(const char *in_buf, unsigned long in_size,
 /*******************/
 
 int pin_table(
-    int xc_handle, unsigned int type, unsigned long mfn, domid_t dom)
+    xc_interface *xch, unsigned int type, unsigned long mfn, domid_t dom)
 {
     struct mmuext_op op;
 
     op.cmd = type;
     op.arg1.mfn = mfn;
 
-    if ( xc_mmuext_op(xc_handle, &op, 1, dom) < 0 )
+    if ( xc_mmuext_op(xch, &op, 1, dom) < 0 )
         return 1;
 
     return 0;
@@ -174,7 +176,7 @@ unsigned long csum_page(void *page)
 }
 
 __attribute__((weak)) 
-    int xc_hvm_build(int xc_handle,
+    int xc_hvm_build(xc_interface *xch,
                      uint32_t domid,
                      int memsize,
                      const char *image_name)

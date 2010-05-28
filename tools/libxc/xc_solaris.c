@@ -16,7 +16,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-int xc_interface_open(void)
+int xc_interface_open_core(xc_interface *xch)
 {
     int flags, saved_errno;
     int fd = open("/dev/xen/privcmd", O_RDWR);
@@ -52,17 +52,17 @@ int xc_interface_open(void)
     return -1;
 }
 
-int xc_interface_close(int xc_handle)
+int xc_interface_close(xc_interface *xch, int fd)
 {
-    return close(xc_handle);
+    return close(fd);
 }
 
-void *xc_map_foreign_batch(int xc_handle, uint32_t dom, int prot,
+void *xc_map_foreign_batch(xc_interface *xch, uint32_t dom, int prot,
                            xen_pfn_t *arr, int num)
 {
     privcmd_mmapbatch_t ioctlx;
     void *addr;
-    addr = mmap(NULL, num*PAGE_SIZE, prot, MAP_SHARED, xc_handle, 0);
+    addr = mmap(NULL, num*PAGE_SIZE, prot, MAP_SHARED, xch->fd, 0);
     if ( addr == MAP_FAILED )
         return NULL;
 
@@ -70,10 +70,10 @@ void *xc_map_foreign_batch(int xc_handle, uint32_t dom, int prot,
     ioctlx.dom=dom;
     ioctlx.addr=(unsigned long)addr;
     ioctlx.arr=arr;
-    if ( ioctl(xc_handle, IOCTL_PRIVCMD_MMAPBATCH, &ioctlx) < 0 )
+    if ( ioctl(xch->fd, IOCTL_PRIVCMD_MMAPBATCH, &ioctlx) < 0 )
     {
         int saved_errno = errno;
-        perror("XXXXXXXX");
+        PERROR("XXXXXXXX");
         (void)munmap(addr, num*PAGE_SIZE);
         errno = saved_errno;
         return NULL;
@@ -82,14 +82,14 @@ void *xc_map_foreign_batch(int xc_handle, uint32_t dom, int prot,
 
 }
 
-void *xc_map_foreign_range(int xc_handle, uint32_t dom,
+void *xc_map_foreign_range(xc_interface *xch, uint32_t dom,
                            int size, int prot,
                            unsigned long mfn)
 {
     privcmd_mmap_t ioctlx;
     privcmd_mmap_entry_t entry;
     void *addr;
-    addr = mmap(NULL, size, prot, MAP_SHARED, xc_handle, 0);
+    addr = mmap(NULL, size, prot, MAP_SHARED, xch->fd, 0);
     if ( addr == MAP_FAILED )
         return NULL;
 
@@ -99,7 +99,7 @@ void *xc_map_foreign_range(int xc_handle, uint32_t dom,
     entry.va=(unsigned long) addr;
     entry.mfn=mfn;
     entry.npages=(size+PAGE_SIZE-1)>>PAGE_SHIFT;
-    if ( ioctl(xc_handle, IOCTL_PRIVCMD_MMAP, &ioctlx) < 0 )
+    if ( ioctl(xch->fd, IOCTL_PRIVCMD_MMAP, &ioctlx) < 0 )
     {
         int saved_errno = errno;
         (void)munmap(addr, size);
@@ -109,7 +109,7 @@ void *xc_map_foreign_range(int xc_handle, uint32_t dom,
     return addr;
 }
 
-void *xc_map_foreign_ranges(int xc_handle, uint32_t dom,
+void *xc_map_foreign_ranges(xc_interface *xch, uint32_t dom,
                             size_t size, int prot, size_t chunksize,
                             privcmd_mmap_entry_t entries[], int nentries)
 {
@@ -117,7 +117,7 @@ void *xc_map_foreign_ranges(int xc_handle, uint32_t dom,
     int i, rc;
     void *addr;
 
-    addr = mmap(NULL, size, prot, MAP_SHARED, xc_handle, 0);
+    addr = mmap(NULL, size, prot, MAP_SHARED, xch->fd, 0);
     if (addr == MAP_FAILED)
         goto mmap_failed;
 
@@ -130,7 +130,7 @@ void *xc_map_foreign_ranges(int xc_handle, uint32_t dom,
     ioctlx.dom   = dom;
     ioctlx.entry = entries;
 
-    rc = ioctl(xc_handle, IOCTL_PRIVCMD_MMAP, &ioctlx);
+    rc = ioctl(xch->fd, IOCTL_PRIVCMD_MMAP, &ioctlx);
     if (rc)
         goto ioctl_failed;
 
@@ -139,21 +139,21 @@ void *xc_map_foreign_ranges(int xc_handle, uint32_t dom,
 ioctl_failed:
     rc = munmap(addr, size);
     if (rc == -1)
-        ERROR("%s: error in error path\n", __FUNCTION__);
+        PERROR("%s: error in error path\n", __FUNCTION__);
 
 mmap_failed:
     return NULL;
 }
 
 
-static int do_privcmd(int xc_handle, unsigned int cmd, unsigned long data)
+static int do_privcmd(xc_interface *xch, unsigned int cmd, unsigned long data)
 {
-    return ioctl(xc_handle, cmd, data);
+    return ioctl(xch->fd, cmd, data);
 }
 
-int do_xen_hypercall(int xc_handle, privcmd_hypercall_t *hypercall)
+int do_xen_hypercall(xc_interface *xch, privcmd_hypercall_t *hypercall)
 {
-    return do_privcmd(xc_handle,
+    return do_privcmd(xch,
                       IOCTL_PRIVCMD_HYPERCALL,
                       (unsigned long)hypercall);
 }
@@ -248,19 +248,19 @@ int xc_evtchn_unmask(int xce_handle, evtchn_port_t port)
 }
 
 /* Optionally flush file to disk and discard page cache */
-void discard_file_cache(int fd, int flush) 
+void discard_file_cache(xc_interface *xch, int fd, int flush) 
 {
     // TODO: Implement for Solaris!
 }
 
 grant_entry_v1_t *xc_gnttab_map_table_v1(
-    int xc_handle, int domid, int *gnt_num)
+    xc_interface *xch, int domid, int *gnt_num)
 {
     return NULL;
 }
 
 grant_entry_v2_t *xc_gnttab_map_table_v2(
-    int xc_handle, int domid, int *gnt_num)
+    xc_interface *xch, int domid, int *gnt_num)
 {
     return NULL;
 }

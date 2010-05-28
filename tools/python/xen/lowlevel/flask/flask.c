@@ -23,13 +23,13 @@ static PyObject *xc_error_obj;
 
 typedef struct {
     PyObject_HEAD;
-    int xc_handle;
+    xc_interface *xc_handle;
 } XcObject;
 
 static PyObject *pyflask_context_to_sid(PyObject *self, PyObject *args,
                                                                  PyObject *kwds)
 {
-    int xc_handle;
+    xc_interface *xc_handle;
     char *ctx;
     char *buf;
     uint32_t len;
@@ -52,9 +52,8 @@ static PyObject *pyflask_context_to_sid(PyObject *self, PyObject *args,
     
     memcpy(buf, ctx, len);
     
-    xc_handle = xc_interface_open();
-    if (xc_handle < 0) {
-        errno = xc_handle;
+    xc_handle = xc_interface_open(0,0,0);
+    if (!xc_handle) {
         free(buf);
         return PyErr_SetFromErrno(xc_error_obj);
     }
@@ -76,7 +75,7 @@ static PyObject *pyflask_context_to_sid(PyObject *self, PyObject *args,
 static PyObject *pyflask_sid_to_context(PyObject *self, PyObject *args,
                                                                  PyObject *kwds)
 {
-    int xc_handle;
+    xc_interface *xc_handle;
     uint32_t sid;
     char ctx[CTX_LEN];
     uint32_t ctx_len = CTX_LEN;
@@ -88,9 +87,8 @@ static PyObject *pyflask_sid_to_context(PyObject *self, PyObject *args,
                                       &sid) )
         return NULL;
 
-    xc_handle = xc_interface_open();
-    if (xc_handle < 0) {
-        errno = xc_handle;
+    xc_handle = xc_interface_open(0,0,0);
+    if (!xc_handle) {
         return PyErr_SetFromErrno(xc_error_obj);
     }
     
@@ -108,7 +106,7 @@ static PyObject *pyflask_sid_to_context(PyObject *self, PyObject *args,
 
 static PyObject *pyflask_load(PyObject *self, PyObject *args, PyObject *kwds)
 {
-    int xc_handle;
+    xc_interface *xc_handle;
     char *policy;
     uint32_t len;
     int ret;
@@ -118,9 +116,8 @@ static PyObject *pyflask_load(PyObject *self, PyObject *args, PyObject *kwds)
     if( !PyArg_ParseTupleAndKeywords(args, kwds, "s#", kwd_list, &policy, &len) )
         return NULL;
 
-    xc_handle = xc_interface_open();
-    if (xc_handle < 0) {
-        errno = xc_handle;
+    xc_handle = xc_interface_open(0,0,0);
+    if (!xc_handle) {
         return PyErr_SetFromErrno(xc_error_obj);
     }
 
@@ -138,12 +135,11 @@ static PyObject *pyflask_load(PyObject *self, PyObject *args, PyObject *kwds)
 
 static PyObject *pyflask_getenforce(PyObject *self)
 {
-    int xc_handle;
+    xc_interface *xc_handle;
     int ret;
 
-    xc_handle = xc_interface_open();
-    if (xc_handle < 0) {
-        errno = xc_handle;
+    xc_handle = xc_interface_open(0,0,0);
+    if (!xc_handle) {
         return PyErr_SetFromErrno(xc_error_obj);
     }
     
@@ -162,7 +158,7 @@ static PyObject *pyflask_getenforce(PyObject *self)
 static PyObject *pyflask_setenforce(PyObject *self, PyObject *args,
                                                             PyObject *kwds)
 {
-    int xc_handle;
+    xc_interface *xc_handle;
     int mode;
     int ret;
 
@@ -172,9 +168,8 @@ static PyObject *pyflask_setenforce(PyObject *self, PyObject *args,
                                       &mode) )
         return NULL;
 
-    xc_handle = xc_interface_open();
-    if (xc_handle < 0) {
-        errno = xc_handle;
+    xc_handle = xc_interface_open(0,0,0);
+    if (!xc_handle) {
         return PyErr_SetFromErrno(xc_error_obj);
     }
     
@@ -193,7 +188,7 @@ static PyObject *pyflask_setenforce(PyObject *self, PyObject *args,
 static PyObject *pyflask_access(PyObject *self, PyObject *args,
                                                        PyObject *kwds)
 {
-    int xc_handle;
+    xc_interface *xc_handle;
     char *tcon, *scon;
     uint16_t tclass;
     uint32_t req, allowed, decided, auditallow, auditdeny, seqno;
@@ -209,9 +204,8 @@ static PyObject *pyflask_access(PyObject *self, PyObject *args,
                                       &auditallow, &auditdeny, &seqno) )
         return NULL;
 
-    xc_handle = xc_interface_open();
-    if (xc_handle < 0) {
-        errno = xc_handle;
+    xc_handle = xc_interface_open(0,0,0);
+    if (!xc_handle) {
         return PyErr_SetFromErrno(xc_error_obj);
     }
     

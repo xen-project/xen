@@ -84,7 +84,8 @@
 
 #define NOFILE 32
 extern int xc_evtchn_close(int fd);
-extern int xc_interface_close(int fd);
+struct xc_interface;
+extern int xc_interface_close_core(struct xc_interface*, int fd);
 extern int xc_gnttab_close(int fd);
 
 pthread_mutex_t fd_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -413,7 +414,7 @@ int close(int fd)
 	}
 #endif
 	case FTYPE_XC:
-	    xc_interface_close(fd);
+	    xc_interface_close_core(0,fd);
 	    return 0;
 	case FTYPE_EVTCHN:
             xc_evtchn_close(fd);

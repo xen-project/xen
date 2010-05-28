@@ -9,7 +9,7 @@
 
 #include "xc_private.h"
 
-int xc_flask_op(int xc_handle, flask_op_t *op)
+int xc_flask_op(xc_interface *xch, flask_op_t *op)
 {
     int ret = -1;
     DECLARE_HYPERCALL;
@@ -23,7 +23,7 @@ int xc_flask_op(int xc_handle, flask_op_t *op)
         goto out;
     }
 
-    if ( (ret = do_xen_hypercall(xc_handle, &hypercall)) < 0 )
+    if ( (ret = do_xen_hypercall(xch, &hypercall)) < 0 )
     {
         if ( errno == EACCES )
             fprintf(stderr, "XSM operation failed!\n");

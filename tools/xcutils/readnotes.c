@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <stdarg.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -14,6 +15,8 @@
 #include <xc_dom.h> /* gunzip bits */
 
 #include <xen/libelf/libelf.h>
+
+static xc_interface *xch;
 
 static void print_string_note(const char *prefix, struct elf_binary *elf,
 			      const elf_note *note)
@@ -135,6 +138,8 @@ int main(int argc, char **argv)
 	}
 	f = argv[1];
 
+        xch = xc_interface_open(0,0,XC_OPENFLAG_DUMMY);
+
 	fd = open(f, O_RDONLY);
 	if (fd == -1)
 	{
@@ -156,11 +161,11 @@ int main(int argc, char **argv)
 	}
 	size = st.st_size;
 
-	usize = xc_dom_check_gzip(image, st.st_size);
+	usize = xc_dom_check_gzip(xch, image, st.st_size);
 	if (usize)
 	{
 		tmp = malloc(usize);
-		xc_dom_do_gunzip(image, st.st_size, tmp, usize);
+		xc_dom_do_gunzip(xch, image, st.st_size, tmp, usize);
 		image = tmp;
 		size = usize;
 	}
@@ -170,7 +175,7 @@ int main(int argc, char **argv)
 		fprintf(stderr, "File %s is not an ELF image\n", f);
 		return 1;
 	}
-	xc_elf_set_logfile(&elf, stderr, 0);
+	xc_elf_set_logfile(xch, &elf, 0);
 
 	count = elf_phdr_count(&elf);
 	for ( h=0; h < count; h++)

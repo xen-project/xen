@@ -28,7 +28,7 @@
 typedef struct {
     int     enabled;
     domid_t domid;
-    int     xc_handle;
+    xc_interface *xc_handle;
 } memshr_vbd_info_t;
 
 memshr_vbd_info_t vbd_info = {0, DOMID_INVALID};
@@ -82,7 +82,7 @@ void memshr_daemon_initialize(void)
 
 void memshr_vbd_initialize(void)
 {
-    int xc_handle;
+    xc_interface *xc_handle;
 
     memset(&memshr, 0, sizeof(private_memshr_info_t));
 
@@ -113,7 +113,7 @@ void memshr_vbd_initialize(void)
     if(vbd_info.domid == DOMID_INVALID)
         return;
 
-    if((xc_handle = xc_interface_open()) < 0)
+    if((xc_handle = xc_interface_open(0,0,0)) == 0)
     {
         DPRINTF("Failed to open XC interface.\n");
         return;

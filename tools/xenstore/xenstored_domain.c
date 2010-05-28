@@ -22,6 +22,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <xenctrl.h>
 
 #include "utils.h"
 #include "talloc.h"
@@ -32,7 +33,7 @@
 
 #include <xenctrl.h>
 
-static int *xc_handle;
+static xc_interface **xc_handle;
 static evtchn_port_t virq_port;
 
 int xce_handle = -1; 
@@ -538,7 +539,7 @@ void do_is_domain_introduced(struct connection *conn, const char *domid_str)
 
 static int close_xc_handle(void *_handle)
 {
-	xc_interface_close(*(int *)_handle);
+	xc_interface_close(*(xc_interface**)_handle);
 	return 0;
 }
 
@@ -584,12 +585,12 @@ int domain_init(void)
 {
 	int rc;
 
-	xc_handle = talloc(talloc_autofree_context(), int);
+	xc_handle = talloc(talloc_autofree_context(), xc_interface*);
 	if (!xc_handle)
 		barf_perror("Failed to allocate domain handle");
 
-	*xc_handle = xc_interface_open();
-	if (*xc_handle < 0)
+	*xc_handle = xc_interface_open(0,0,0);
+	if (!*xc_handle)
 		barf_perror("Failed to open connection to hypervisor");
 
 	talloc_set_destructor(xc_handle, close_xc_handle);

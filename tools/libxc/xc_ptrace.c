@@ -48,7 +48,7 @@ static vcpu_guest_context_any_t        *ctxt;
 #define FOREACH_CPU(cpumap, i)  for ( cpumap = online_cpumap; (i = xc_ffs64(cpumap)); cpumap &= ~(1 << (index - 1)) )
 
 static int
-fetch_regs(int xc_handle, int cpu, int *online)
+fetch_regs(xc_interface *xch, int cpu, int *online)
 {
     xc_vcpuinfo_t info;
     int retval = 0;
@@ -57,7 +57,7 @@ fetch_regs(int xc_handle, int cpu, int *online)
         *online = 0;
     if ( !(regs_valid & (1 << cpu)) )
     {
-        retval = xc_vcpu_getcontext(xc_handle, current_domid,
+        retval = xc_vcpu_getcontext(xch, current_domid,
                 cpu, &ctxt[cpu]);
         if ( retval )
             goto done;
@@ -67,7 +67,7 @@ fetch_regs(int xc_handle, int cpu, int *online)
     if ( online == NULL )
         goto done;
 
-    retval = xc_vcpu_getinfo(xc_handle, current_domid, cpu, &info);
+    retval = xc_vcpu_getinfo(xch, current_domid, cpu, &info);
     *online = info.online;
 
  done:
@@ -102,7 +102,8 @@ paging_enabled(vcpu_guest_context_any_t *v)
     return (cr0 & X86_CR0_PE) && (cr0 & X86_CR0_PG);
 }
 
-vcpu_guest_context_any_t *xc_ptrace_get_vcpu_ctxt(unsigned int nr_cpus)
+vcpu_guest_context_any_t *xc_ptrace_get_vcpu_ctxt(xc_interface *xch,
+                              unsigned int nr_cpus)
 {
     if (nr_cpus > nr_vcpu_ids) {
         vcpu_guest_context_any_t *new;
@@ -124,17 +125,17 @@ vcpu_guest_context_any_t *xc_ptrace_get_vcpu_ctxt(unsigned int nr_cpus)
  */
 
 static int
-get_online_cpumap(int xc_handle, struct xen_domctl_getdomaininfo *d,
+get_online_cpumap(xc_interface *xch, struct xen_domctl_getdomaininfo *d,
                   uint64_t *cpumap)
 {
     int i, online;
 
-    if (!xc_ptrace_get_vcpu_ctxt(d->max_vcpu_id + 1))
+    if (!xc_ptrace_get_vcpu_ctxt(xch, d->max_vcpu_id + 1))
         return -ENOMEM;
 
     *cpumap = 0;
     for (i = 0; i <= d->max_vcpu_id; i++) {
-        fetch_regs(xc_handle, i, &online);
+        fetch_regs(xch, i, &online);
         if (online)
             *cpumap |= (1 << i);
     }
@@ -149,7 +150,7 @@ get_online_cpumap(int xc_handle, struct xen_domctl_getdomaininfo *d,
  */
 
 static void
-online_vcpus_changed(uint64_t cpumap)
+online_vcpus_changed(xc_interface *xch, uint64_t cpumap)
 {
     uint64_t changed_cpumap = cpumap ^ online_cpumap;
     int index;
@@ -171,7 +172,7 @@ online_vcpus_changed(uint64_t cpumap)
 
 static void *
 map_domain_va(
-    int xc_handle,
+    xc_interface *xch,
     int cpu,
     void *guest_va,
     int perm)
@@ -184,11 +185,11 @@ map_domain_va(
     if ( (va & ~PAGE_MASK) + sizeof(long) > PAGE_SIZE )
         return NULL;
 
-    mfn = xc_translate_foreign_address(xc_handle, current_domid, cpu, va);
+    mfn = xc_translate_foreign_address(xch, current_domid, cpu, va);
     if ( mfn == 0 )
         return NULL;
 
-    map = xc_map_foreign_range(xc_handle, current_domid, PAGE_SIZE, 
+    map = xc_map_foreign_range(xch, current_domid, PAGE_SIZE, 
                                perm, mfn);
     if (map == NULL)
         return NULL;
@@ -213,7 +214,7 @@ int control_c_pressed_flag = 0;
 
 static int
 __xc_waitdomain(
-    int xc_handle,
+    xc_interface *xch,
     int domain,
     int *status,
     int options)
@@ -230,7 +231,7 @@ __xc_waitdomain(
     domctl.domain = domain;
 
  retry:
-    retval = do_domctl(xc_handle, &domctl);
+    retval = do_domctl(xch, &domctl);
     if ( retval || (domctl.domain != domain) )
     {
         IPRINTF("getdomaininfo failed\n");
@@ -242,7 +243,7 @@ __xc_waitdomain(
         goto done;
 
     if (control_c_pressed_flag) {
-        xc_domain_pause(xc_handle, domain);
+        xc_domain_pause(xch, domain);
         control_c_pressed_flag = 0;
         goto done;
     }
@@ -253,10 +254,10 @@ __xc_waitdomain(
         goto retry;
     }
  done:
-    if (get_online_cpumap(xc_handle, &domctl.u.getdomaininfo, &cpumap))
+    if (get_online_cpumap(xch, &domctl.u.getdomaininfo, &cpumap))
         IPRINTF("get_online_cpumap failed\n");
     if (online_cpumap != cpumap)
-        online_vcpus_changed(cpumap);
+        online_vcpus_changed(xch, cpumap);
     return retval;
 
 }
@@ -264,7 +265,7 @@ __xc_waitdomain(
 
 long
 xc_ptrace(
-    int xc_handle,
+    xc_interface *xch,
     enum __ptrace_request request,
     uint32_t domid_tid,
     long eaddr,
@@ -287,10 +288,10 @@ xc_ptrace(
     case PTRACE_PEEKDATA:
         if (current_isfile)
             guest_va = (unsigned long *)map_domain_va_core(
-                current_domid, cpu, addr);
+                xch, current_domid, cpu, addr);
         else
             guest_va = (unsigned long *)map_domain_va(
-                xc_handle, cpu, addr, PROT_READ);
+                xch, cpu, addr, PROT_READ);
         if ( guest_va == NULL )
             goto out_error;
         retval = *guest_va;
@@ -303,10 +304,10 @@ xc_ptrace(
         /* XXX assume that all CPUs have the same address space */
         if (current_isfile)
             guest_va = (unsigned long *)map_domain_va_core(
-                current_domid, cpu, addr);
+                xch, current_domid, cpu, addr);
         else
             guest_va = (unsigned long *)map_domain_va(
-                xc_handle, cpu, addr, PROT_READ|PROT_WRITE);
+                xch, cpu, addr, PROT_READ|PROT_WRITE);
         if ( guest_va == NULL )
             goto out_error;
         *guest_va = edata;
@@ -315,20 +316,20 @@ xc_ptrace(
         break;
 
     case PTRACE_GETREGS:
-        if (!current_isfile && fetch_regs(xc_handle, cpu, NULL))
+        if (!current_isfile && fetch_regs(xch, cpu, NULL))
             goto out_error;
         SET_PT_REGS(pt, ctxt[cpu].c.user_regs);
         memcpy(data, &pt, sizeof(struct gdb_regs));
         break;
 
     case PTRACE_GETFPREGS:
-        if (!current_isfile && fetch_regs(xc_handle, cpu, NULL)) 
+        if (!current_isfile && fetch_regs(xch, cpu, NULL)) 
                 goto out_error;
         memcpy(data, &ctxt[cpu].c.fpu_ctxt, sizeof (elf_fpregset_t));
         break;
 
     case PTRACE_GETFPXREGS:
-        if (!current_isfile && fetch_regs(xc_handle, cpu, NULL))
+        if (!current_isfile && fetch_regs(xch, cpu, NULL))
                 goto out_error;
         memcpy(data, &ctxt[cpu].c.fpu_ctxt, sizeof(ctxt[cpu].c.fpu_ctxt));
         break;
@@ -337,7 +338,7 @@ xc_ptrace(
         if (current_isfile)
                 goto out_unsupported; /* XXX not yet supported */
         SET_XC_REGS(((struct gdb_regs *)data), ctxt[cpu].c.user_regs);
-        if ((retval = xc_vcpu_setcontext(xc_handle, current_domid, cpu,
+        if ((retval = xc_vcpu_setcontext(xch, current_domid, cpu,
                                 &ctxt[cpu])))
             goto out_error_domctl;
         break;
@@ -352,13 +353,13 @@ xc_ptrace(
          * if no MTF support
          */
         if ( !current_is_hvm ||
-             xc_domain_debug_control(xc_handle,
+             xc_domain_debug_control(xch,
                                      current_domid,
                                      XEN_DOMCTL_DEBUG_OP_SINGLE_STEP_ON,
                                      cpu) )
         {
             ctxt[cpu].c.user_regs.eflags |= PSL_T;
-            if ((retval = xc_vcpu_setcontext(xc_handle, current_domid, cpu,
+            if ((retval = xc_vcpu_setcontext(xch, current_domid, cpu,
                                     &ctxt[cpu])))
                 goto out_error_domctl;
         }
@@ -373,18 +374,18 @@ xc_ptrace(
             FOREACH_CPU(cpumap, index) {
                 cpu = index - 1;
                 if ( !current_is_hvm ||
-                      xc_domain_debug_control(xc_handle,
+                      xc_domain_debug_control(xch,
                                               current_domid,
                                               XEN_DOMCTL_DEBUG_OP_SINGLE_STEP_OFF,
                                               cpu) )
                 {
-                    if (fetch_regs(xc_handle, cpu, NULL))
+                    if (fetch_regs(xch, cpu, NULL))
                         goto out_error;
                     /* Clear trace flag */
                     if ( ctxt[cpu].c.user_regs.eflags & PSL_T )
                     {
                         ctxt[cpu].c.user_regs.eflags &= ~PSL_T;
-                        if ((retval = xc_vcpu_setcontext(xc_handle, current_domid,
+                        if ((retval = xc_vcpu_setcontext(xch, current_domid,
                                         cpu, &ctxt[cpu])))
                             goto out_error_domctl;
                     }
@@ -393,11 +394,11 @@ xc_ptrace(
         }
         if ( request == PTRACE_DETACH )
         {
-            if ((retval = xc_domain_setdebugging(xc_handle, current_domid, 0)))
+            if ((retval = xc_domain_setdebugging(xch, current_domid, 0)))
                 goto out_error_domctl;
         }
         regs_valid = 0;
-        if ((retval = xc_domain_unpause(xc_handle, current_domid > 0 ?
+        if ((retval = xc_domain_unpause(xch, current_domid > 0 ?
                                 current_domid : -current_domid)))
             goto out_error_domctl;
         break;
@@ -409,21 +410,21 @@ xc_ptrace(
             break;
         domctl.cmd = XEN_DOMCTL_getdomaininfo;
         domctl.domain = current_domid;
-        retval = do_domctl(xc_handle, &domctl);
+        retval = do_domctl(xch, &domctl);
         if ( retval || (domctl.domain != current_domid) )
             goto out_error_domctl;
         if ( domctl.u.getdomaininfo.flags & XEN_DOMINF_paused )
             IPRINTF("domain currently paused\n");
-        else if ((retval = xc_domain_pause(xc_handle, current_domid)))
+        else if ((retval = xc_domain_pause(xch, current_domid)))
             goto out_error_domctl;
         current_is_hvm = !!(domctl.u.getdomaininfo.flags&XEN_DOMINF_hvm_guest);
-        if ((retval = xc_domain_setdebugging(xc_handle, current_domid, 1)))
+        if ((retval = xc_domain_setdebugging(xch, current_domid, 1)))
             goto out_error_domctl;
 
-        if (get_online_cpumap(xc_handle, &domctl.u.getdomaininfo, &cpumap))
+        if (get_online_cpumap(xch, &domctl.u.getdomaininfo, &cpumap))
             IPRINTF("get_online_cpumap failed\n");
         if (online_cpumap != cpumap)
-            online_vcpus_changed(cpumap);
+            online_vcpus_changed(xch, cpumap);
         break;
 
     case PTRACE_TRACEME:
@@ -437,7 +438,7 @@ xc_ptrace(
     return retval;
 
  out_error_domctl:
-    perror("domctl failed");
+    PERROR("domctl failed");
  out_error:
     errno = EINVAL;
     return retval;
@@ -453,14 +454,14 @@ xc_ptrace(
 
 int
 xc_waitdomain(
-    int xc_handle,
+    xc_interface *xch,
     int domain,
     int *status,
     int options)
 {
     if (current_isfile)
-        return xc_waitdomain_core(xc_handle, domain, status, options);
-    return __xc_waitdomain(xc_handle, domain, status, options);
+        return xc_waitdomain_core(xch, domain, status, options);
+    return __xc_waitdomain(xch, domain, status, options);
 }
 
 /*
