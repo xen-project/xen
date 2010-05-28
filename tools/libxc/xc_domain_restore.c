@@ -1498,7 +1498,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
         }
         j = pagebuf.nr_pages;
 
-        DPRINTF("batch %d\n",j);
+        DBGPRINTF("batch %d\n",j);
 
         if ( j == 0 ) {
             /* catch vcpu updates */

@@ -77,6 +77,7 @@ void xc_report_progress_step(xc_interface *xch,
 
 #define IPRINTF(_f, _a...) xc_report(xch, xch->error_handler, XTL_INFO,0, _f , ## _a)
 #define DPRINTF(_f, _a...) xc_report(xch, xch->error_handler, XTL_DETAIL,0, _f , ## _a)
+#define DBGPRINTF(_f, _a...) xc_report(xch, xch->error_handler, XTL_DEBUG,0, _f , ## _a)
 
 #define ERROR(_m, _a...)  xc_report_error(xch,XC_INTERNAL_ERROR,_m , ## _a )
 #define PERROR(_m, _a...) xc_report_error(xch,XC_INTERNAL_ERROR,_m \

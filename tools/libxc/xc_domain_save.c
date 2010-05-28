@@ -172,7 +172,7 @@ static inline int outbuf_write(xc_interface *xch,
                                struct outbuf* ob, void* buf, size_t len)
 {
     if ( len > ob->size - ob->pos ) {
-        DPRINTF("outbuf_write: %zu > %zu@%zu\n", len, ob->size - ob->pos, ob->pos);
+        DBGPRINTF("outbuf_write: %zu > %zu@%zu\n", len, ob->size - ob->pos, ob->pos);
         return -1;
     }
 
