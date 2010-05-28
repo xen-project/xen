@@ -27,6 +27,8 @@ CTRL_SRCS-y       += xc_tmem.c
 CTRL_SRCS-y       += xc_mem_event.c
 CTRL_SRCS-y       += xc_mem_paging.c
 CTRL_SRCS-y       += xc_memshr.c
+CTRL_SRCS-y       += xtl_core.c
+CTRL_SRCS-y       += xtl_logger_stdio.c
 CTRL_SRCS-$(CONFIG_X86) += xc_pagetab.c
 CTRL_SRCS-$(CONFIG_Linux) += xc_linux.c
 CTRL_SRCS-$(CONFIG_SunOS) += xc_solaris.c
@@ -105,8 +107,7 @@ install: build
 	$(INSTALL_DATA) libxenctrl.a $(DESTDIR)$(LIBDIR)
 	ln -sf libxenctrl.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)/libxenctrl.so.$(MAJOR)
 	ln -sf libxenctrl.so.$(MAJOR) $(DESTDIR)$(LIBDIR)/libxenctrl.so
-	$(INSTALL_DATA) xenctrl.h $(DESTDIR)$(INCLUDEDIR)
-
+	$(INSTALL_DATA) xenctrl.h xentoollog.h $(DESTDIR)$(INCLUDEDIR)
 	$(INSTALL_PROG) libxenguest.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)
 	$(INSTALL_DATA) libxenguest.a $(DESTDIR)$(LIBDIR)
 	ln -sf libxenguest.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)/libxenguest.so.$(MAJOR)
