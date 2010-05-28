@@ -1532,7 +1532,7 @@ int main_pcidetach(int argc, char **argv)
     while ((opt = getopt(argc, argv, "h")) != -1) {
         switch (opt) {
         case 'h':
-            help("pci-attach");
+            help("pci-detach");
             exit(0);
         default:
             fprintf(stderr, "option not supported\n");
