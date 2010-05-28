@@ -47,7 +47,7 @@ static int modify_returncode(xc_interface *xch, uint32_t domid)
         /* HVM guests have host address width. */
         if ( xc_version(xch, XENVER_capabilities, &caps) != 0 )
         {
-            PERROR("Could not get Xen capabilities\n");
+            PERROR("Could not get Xen capabilities");
             return -1;
         }
         dinfo->guest_width = strstr(caps, "x86_64") ? 8 : 4;

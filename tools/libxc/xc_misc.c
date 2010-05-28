@@ -142,7 +142,7 @@ int xc_mca_op(xc_interface *xch, struct xen_mc *mc)
     mc->interface_version = XEN_MCA_INTERFACE_VERSION;
     if ( lock_pages(mc, sizeof(mc)) )
     {
-        PERROR("Could not lock xen_mc memory\n");
+        PERROR("Could not lock xen_mc memory");
         return -EINVAL;
     }
 

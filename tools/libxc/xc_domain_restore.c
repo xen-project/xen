@@ -124,7 +124,7 @@ static int break_super_page(xc_interface *xch,
 
     if ( ram_base == NULL )
     {
-        PERROR("map batch failed\n");
+        PERROR("map batch failed");
         rc = 1;
         goto out;
     }
@@ -136,7 +136,7 @@ static int break_super_page(xc_interface *xch,
     if ( xc_domain_memory_decrease_reservation(xch, dom, 1,
                                    SUPERPAGE_PFN_SHIFT, &start_pfn) != 0 )
     {
-        PERROR("free 2M page failure @ 0x%ld.\n", next_pfn);
+        PERROR("free 2M page failure @ 0x%ld.", next_pfn);
         rc = 1;
         goto out;
     }
@@ -153,7 +153,7 @@ static int break_super_page(xc_interface *xch,
         if (xc_domain_memory_populate_physmap(xch, dom, 1, 0,
                                               0, &mfn) != 0)
         {
-            PERROR("Failed to allocate physical memory.!\n");
+            PERROR("Failed to allocate physical memory.!");
             errno = ENOMEM;
             rc = 1;
             goto out;
@@ -171,7 +171,7 @@ static int break_super_page(xc_interface *xch,
                                     page_array, tot_pfns);
     if ( ram_base == NULL )
     {
-        PERROR("map batch failed\n");
+        PERROR("map batch failed");
         rc = 1;
         goto out;
     }
@@ -283,7 +283,7 @@ normal_page:
             if (xc_domain_memory_populate_physmap(xch, dom, 1, 0,
                         0, &mfn) != 0)
             {
-                PERROR("Failed to allocate physical memory.! pfn=0x%lx, mfn=0x%lx.\n",
+                PERROR("Failed to allocate physical memory.! pfn=0x%lx, mfn=0x%lx.",
                         pfn, mfn);
                 errno = ENOMEM;
                 return 1;
@@ -1497,7 +1497,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
         if ( !completed ) {
             pagebuf.nr_physpages = pagebuf.nr_pages = 0;
             if ( pagebuf_get_one(xch, &pagebuf, io_fd, dom) < 0 ) {
-                PERROR("Error when reading batch\n");
+                PERROR("Error when reading batch");
                 goto out;
             }
         }
@@ -1929,7 +1929,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
         frc = xc_domctl(xch, &domctl);
         if ( frc != 0 )
         {
-            PERROR("Couldn't set extended vcpu%d info\n", i);
+            PERROR("Couldn't set extended vcpu%d info", i);
             goto out;
         }
     }

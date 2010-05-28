@@ -534,7 +534,7 @@ xc_ia64_hvm_domain_setup(xc_interface *xc_handle, uint32_t dom)
     rc = xc_domain_memory_populate_physmap(xc_handle, dom, nr_pages,
                                            0, 0, &pfn_list[0]);
     if (rc != 0)
-        PERROR("Could not allocate IO page or buffer io page.\n");
+        PERROR("Could not allocate IO page or buffer io page.");
     return rc;
 }
 

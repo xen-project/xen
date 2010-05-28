@@ -948,7 +948,7 @@ int xc_get_device_group(
 
     if ( lock_pages(sdev_array, max_sdevs * sizeof(*sdev_array)) != 0 )
     {
-        PERROR("Could not lock memory for xc_get_device_group\n");
+        PERROR("Could not lock memory for xc_get_device_group");
         return -ENOMEM;
     }
     rc = do_domctl(xch, &domctl);

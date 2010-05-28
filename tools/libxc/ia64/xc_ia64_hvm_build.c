@@ -586,7 +586,7 @@ static int is_valid_address(void *addr)
     if ( p->signature == NVRAM_VALID_SIG )
         return 1;
     else {
-        PERROR("Invalid nvram signature. Nvram save failed!\n");
+        PERROR("Invalid nvram signature. Nvram save failed!");
         return 0;
     }
 }
@@ -613,7 +613,7 @@ copy_from_GFW_to_nvram(xc_interface *xc_handle, uint32_t dom, int nvram_fd)
     pfn_list = (xen_pfn_t *)malloc(sizeof(xen_pfn_t) * nr_pages);
     if ( NULL == pfn_list )
     {
-        PERROR("Cannot allocate memory for nvram save!\n");
+        PERROR("Cannot allocate memory for nvram save!");
         close(nvram_fd);
         return -1;
     }
@@ -630,7 +630,7 @@ copy_from_GFW_to_nvram(xc_interface *xc_handle, uint32_t dom, int nvram_fd)
 
     if ( NULL == tmp_ptr )
     {
-        PERROR("Cannot get nvram data from GFW!\n");
+        PERROR("Cannot get nvram data from GFW!");
         free(pfn_list);
         close(nvram_fd);
         return -1;
@@ -659,7 +659,7 @@ copy_from_GFW_to_nvram(xc_interface *xc_handle, uint32_t dom, int nvram_fd)
                                            pfn_list, nr_pages);
     if ( NULL == tmp_ptr )
     {
-        PERROR("Cannot get nvram data from GFW!\n");
+        PERROR("Cannot get nvram data from GFW!");
         free(pfn_list);
         close(nvram_fd);
         return -1;
@@ -675,7 +675,7 @@ copy_from_GFW_to_nvram(xc_interface *xc_handle, uint32_t dom, int nvram_fd)
     lseek(nvram_fd, 0, SEEK_SET);
     if ( write(nvram_fd, buf, NVRAM_SIZE) != NVRAM_SIZE )
     {
-        PERROR("Save to nvram fail!\n");
+        PERROR("Save to nvram fail!");
         return -1;
     }
 
@@ -703,7 +703,7 @@ int xc_ia64_save_to_nvram(xc_interface *xc_handle, uint32_t dom)
     xc_get_hvm_param(xc_handle, dom, HVM_PARAM_NVRAM_FD, &nvram_fd);
 
     if ( !IS_VALID_NVRAM_FD(nvram_fd) )
-        PERROR("Nvram not initialized. Nvram save failed!\n");
+        PERROR("Nvram not initialized. Nvram save failed!");
     else
         copy_from_GFW_to_nvram(xc_handle, dom, (int)nvram_fd);	
 
@@ -744,7 +744,7 @@ int xc_ia64_nvram_init(xc_interface *xc_handle, char *dom_name, uint32_t dom)
     if ( strlen(nvram_path) + strlen(NVRAM_FILE_PREFIX) +
          strlen(dom_name) + 1 > sizeof(nvram_path) )
     {
-        PERROR("Nvram file path is too long!\n");
+        PERROR("Nvram file path is too long!");
         return -1;
     }
     strcat(nvram_path, NVRAM_FILE_PREFIX);
@@ -800,7 +800,7 @@ xc_ia64_setup_memmap_info(xc_interface *xc_handle, uint32_t dom,
                                        PROT_READ | PROT_WRITE,
                                        memmap_info_pfn);
     if (memmap_info == NULL) {
-        PERROR("Could not map memmmap_info page.\n");
+        PERROR("Could not map memmmap_info page.");
         return -1;
     }
     memset(memmap_info, 0, PAGE_SIZE * memmap_info_num_pages);
@@ -925,7 +925,7 @@ setup_guest(xc_interface *xc_handle, uint32_t dom, unsigned long memsize,
 
     pfn_list = malloc(nr_pages * sizeof(xen_pfn_t));
     if (pfn_list == NULL) {
-        PERROR("Could not allocate memory.\n");
+        PERROR("Could not allocate memory.");
         return -1;
     }
 
@@ -952,7 +952,7 @@ setup_guest(xc_interface *xc_handle, uint32_t dom, unsigned long memsize,
     rc = xc_domain_memory_populate_physmap(xc_handle, dom, nr_pages, 0, 0,
                                            &pfn_list[0]);
     if (rc != 0) {
-        PERROR("Could not allocate normal memory for Vti guest.\n");
+        PERROR("Could not allocate normal memory for Vti guest.");
         goto error_out;
     }
 
@@ -965,7 +965,7 @@ setup_guest(xc_interface *xc_handle, uint32_t dom, unsigned long memsize,
     rc = xc_domain_memory_populate_physmap(xc_handle, dom, GFW_PAGES,
                                            0, 0, &pfn_list[0]);
     if (rc != 0) {
-        PERROR("Could not allocate GFW memory for Vti guest.\n");
+        PERROR("Could not allocate GFW memory for Vti guest.");
         goto error_out;
     }
 
@@ -981,7 +981,7 @@ setup_guest(xc_interface *xc_handle, uint32_t dom, unsigned long memsize,
     rc = xc_domain_memory_populate_physmap(xc_handle, dom, nr_special_pages,
                                            0, 0, &pfn_list[0]);
     if (rc != 0) {
-        PERROR("Could not allocate IO page or store page or buffer io page.\n");
+        PERROR("Could not allocate IO page or store page or buffer io page.");
         goto error_out;
     }
 
@@ -1013,13 +1013,13 @@ setup_guest(xc_interface *xc_handle, uint32_t dom, unsigned long memsize,
     if (xc_ia64_setup_memmap_info(xc_handle, dom, dom_memsize,
                                   pfn_list, nr_special_pages,
                                   memmap_info_pfn, memmap_info_num_pages)) {
-        PERROR("Could not build memmap info\n");
+        PERROR("Could not build memmap info");
         goto error_out;
     }
     if (xc_ia64_setup_shared_info(xc_handle, dom,
                                   domctl.u.getdomaininfo.shared_info_frame,
                                   memmap_info_pfn, memmap_info_num_pages)) {
-        PERROR("Could not setup shared_info\n");
+        PERROR("Could not setup shared_info");
         goto error_out;
     }
 
@@ -1035,7 +1035,7 @@ setup_guest(xc_interface *xc_handle, uint32_t dom, unsigned long memsize,
 
     // Hand-off state passed to guest firmware 
     if (xc_ia64_build_hob(xc_handle, dom, dom_memsize, vcpus, nvram_start) < 0) {
-        PERROR("Could not build hob\n");
+        PERROR("Could not build hob");
         goto error_out;
     }
 

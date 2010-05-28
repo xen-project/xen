@@ -139,7 +139,7 @@ void *xc_map_foreign_ranges(xc_interface *xch, uint32_t dom,
 ioctl_failed:
     rc = munmap(addr, size);
     if (rc == -1)
-        PERROR("%s: error in error path\n", __FUNCTION__);
+        PERROR("%s: error in error path", __FUNCTION__);
 
 mmap_failed:
     return NULL;

@@ -152,13 +152,13 @@ static int setup_guest(xc_interface *xch,
 
     if ( xc_version(xch, XENVER_capabilities, &caps) != 0 )
     {
-        PERROR("Could not get Xen capabilities\n");
+        PERROR("Could not get Xen capabilities");
         goto error_out;
     }
 
     if ( (elf.pstart & (PAGE_SIZE - 1)) != 0 )
     {
-        PERROR("Guest OS must load to a page boundary.\n");
+        PERROR("Guest OS must load to a page boundary.");
         goto error_out;
     }
 
@@ -172,7 +172,7 @@ static int setup_guest(xc_interface *xch,
 
     if ( (page_array = malloc(nr_pages * sizeof(xen_pfn_t))) == NULL )
     {
-        PERROR("Could not allocate memory.\n");
+        PERROR("Could not allocate memory.");
         goto error_out;
     }
 
@@ -317,7 +317,7 @@ static int setup_guest(xc_interface *xch,
 
     if ( rc != 0 )
     {
-        PERROR("Could not allocate memory for HVM guest.\n");
+        PERROR("Could not allocate memory for HVM guest.");
         goto error_out;
     }
 
@@ -362,7 +362,7 @@ static int setup_guest(xc_interface *xch,
         rc = xc_domain_memory_populate_physmap(xch, dom, 1, 0, 0, &pfn);
         if ( rc != 0 )
         {
-            PERROR("Could not allocate %d'th special page.\n", i);
+            PERROR("Could not allocate %d'th special page.", i);
             goto error_out;
         }
         if ( xc_clear_domain_page(xch, dom, special_pfn(i)) )
