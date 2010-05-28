@@ -31,19 +31,38 @@
 #include "libxl_utils.h"
 #include "xl.h"
 
-xentoollog_logger *logger;
+xentoollog_logger_stdiostream *logger;
+
+static xentoollog_level minmsglevel = XTL_PROGRESS;
 
 int main(int argc, char **argv)
 {
-    int i;
+    int opt = 0, i;
+    char *cmd = 0;
 
-    if (argc < 2) {
+    while ((opt = getopt(argc, argv, "+v")) >= 0) {
+        switch (opt) {
+        case 'v':
+            if (minmsglevel > 0) minmsglevel--;
+            break;
+        default:
+            fprintf(stderr, "unknown global option\n");
+            exit(2);
+        }
+    }
+
+    cmd = argv[optind++];
+
+    if (!cmd) {
         help(NULL);
         exit(1);
     }
+    opterr = 0;
 
-    logger = xtl_createlogger_stdiostream(stderr, XTL_PROGRESS,  0);
-    if (libxl_ctx_init(&ctx, LIBXL_VERSION, logger)) {
+    logger = xtl_createlogger_stdiostream(stderr, minmsglevel,  0);
+    if (!logger) exit(1);
+
+    if (libxl_ctx_init(&ctx, LIBXL_VERSION, (xentoollog_logger*)logger)) {
         fprintf(stderr, "cannot init xl context\n");
         exit(1);
     }
@@ -51,16 +70,13 @@ int main(int argc, char **argv)
     srand(time(0));
 
     for (i = 0; i < cmdtable_len; i++) {
-        if (!strcmp(argv[1], cmd_table[i].cmd_name))
-        	cmd_table[i].cmd_impl(argc - 1, argv + 1);
+        if (!strcmp(cmd, cmd_table[i].cmd_name))
+        	cmd_table[i].cmd_impl(argc, argv);
     }
 
     if (i >= cmdtable_len) {
-        if (!strcmp(argv[1], "help")) {
-            if (argc > 2)
-                help(argv[2]);
-            else
-                help(NULL);
+        if (!strcmp(cmd, "help")) {
+            help(argv[1]);
             exit(0);
         } else {
             fprintf(stderr, "command not implemented\n");

@@ -77,6 +77,6 @@ extern struct cmd_spec cmd_table[];
 extern int cmdtable_len;
 
 extern struct libxl_ctx ctx;
-extern xentoollog_logger *logger;
+extern xentoollog_logger_stdiostream *logger;
 
 #endif /* XL_H */
