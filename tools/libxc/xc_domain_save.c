@@ -147,7 +147,9 @@ static int noncached_write(xc_interface *xch,
     if ( write_count >= (MAX_PAGECACHE_USAGE * PAGE_SIZE) )
     {
         /* Time to discard cache - dont care if this fails */
+        int saved_errno = errno;
         discard_file_cache(xch, fd, 0 /* no flush */);
+        errno = saved_errno;
         write_count = 0;
     }
 
@@ -474,7 +476,7 @@ static void *map_frame_list_list(xc_interface *xch, uint32_t dom,
 
     p = xc_map_foreign_range(xch, dom, PAGE_SIZE, PROT_READ, fll);
     if ( p == NULL )
-        ERROR("Couldn't map p2m_frame_list_list (errno %d)", errno);
+        PERROR("Couldn't map p2m_frame_list_list (errno %d)", errno);
 
     return p;
 }
@@ -631,7 +633,7 @@ xen_pfn_t *xc_map_m2p(xc_interface *xch,
     if ( xc_memory_op(xch, XENMEM_machphys_mfn_list, &xmml) ||
          (xmml.nr_extents != m2p_chunks) )
     {
-        ERROR("xc_get_m2p_mfns");
+        PERROR("xc_get_m2p_mfns");
         goto err1;
     }
 
@@ -650,7 +652,7 @@ xen_pfn_t *xc_map_m2p(xc_interface *xch,
 			entries, m2p_chunks);
     if (m2p == NULL)
     {
-        ERROR("xc_mmap_foreign_ranges failed");
+        PERROR("xc_mmap_foreign_ranges failed");
         goto err2;
     }
 
@@ -719,7 +721,7 @@ static xen_pfn_t *map_and_save_p2m_table(xc_interface *xch,
                              P2M_FLL_ENTRIES);
     if ( !live_p2m_frame_list )
     {
-        ERROR("Couldn't map p2m_frame_list");
+        PERROR("Couldn't map p2m_frame_list");
         goto out;
     }
 
@@ -754,7 +756,7 @@ static xen_pfn_t *map_and_save_p2m_table(xc_interface *xch,
                                P2M_FL_ENTRIES);
     if ( !p2m )
     {
-        ERROR("Couldn't map p2m table");
+        PERROR("Couldn't map p2m table");
         goto out;
     }
     ctx->live_p2m = p2m; /* So that translation macros will work */
@@ -784,7 +786,7 @@ static xen_pfn_t *map_and_save_p2m_table(xc_interface *xch,
 
     if ( xc_vcpu_getcontext(xch, dom, 0, &ctxt) )
     {
-        ERROR("Could not get vcpu context");
+        PERROR("Could not get vcpu context");
         goto out;
     }
 
@@ -944,7 +946,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
 
     if ( xc_domain_getinfo(xch, dom, 1, &info) != 1 )
     {
-        ERROR("Could not get domain info");
+        PERROR("Could not get domain info");
         return 1;
     }
 
@@ -957,7 +959,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
                                            PROT_READ, shared_info_frame);
         if ( !live_shinfo )
         {
-            ERROR("Couldn't map live_shinfo");
+            PERROR("Couldn't map live_shinfo");
             goto out;
         }
     }
@@ -992,7 +994,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
             
             if ( frc < 0 )
             {
-                ERROR("Couldn't enable shadow mode (rc %d) (errno %d)", frc, errno );
+                PERROR("Couldn't enable shadow mode (rc %d) (errno %d)", frc, errno );
                 goto out;
             }
         }
@@ -1032,14 +1034,14 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
 
     if ( lock_pages(to_send, BITMAP_SIZE) )
     {
-        ERROR("Unable to lock to_send");
+        PERROR("Unable to lock to_send");
         return 1;
     }
 
     /* (to fix is local only) */
     if ( lock_pages(to_skip, BITMAP_SIZE) )
     {
-        ERROR("Unable to lock to_skip");
+        PERROR("Unable to lock to_skip");
         return 1;
     }
 
@@ -1049,7 +1051,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
         hvm_buf_size = xc_domain_hvm_getcontext(xch, dom, 0, 0);
         if ( hvm_buf_size == -1 )
         {
-            ERROR("Couldn't get HVM context size from Xen");
+            PERROR("Couldn't get HVM context size from Xen");
             goto out;
         }
         hvm_buf = malloc(hvm_buf_size);
@@ -1077,14 +1079,14 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
 
     if ( lock_pages(pfn_type, MAX_BATCH_SIZE * sizeof(*pfn_type)) )
     {
-        ERROR("Unable to lock pfn_type array");
+        PERROR("Unable to lock pfn_type array");
         goto out;
     }
 
     /* Setup the mfn_to_pfn table mapping */
     if ( !(ctx->live_m2p = xc_map_m2p(xch, ctx->max_mfn, PROT_READ, &ctx->m2p_mfn0)) )
     {
-        ERROR("Failed to map live M2P table");
+        PERROR("Failed to map live M2P table");
         goto out;
     }
 
@@ -1103,7 +1105,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
         ctx->live_p2m = map_and_save_p2m_table(xch, io_fd, dom, ctx, live_shinfo);
         if ( ctx->live_p2m == NULL )
         {
-            ERROR("Failed to map/save the p2m frame list");
+            PERROR("Failed to map/save the p2m frame list");
             goto out;
         }
 
@@ -1129,13 +1131,13 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
     tmem_saved = xc_tmem_save(xch, dom, io_fd, live, -5);
     if ( tmem_saved == -1 )
     {
-        ERROR("Error when writing to state file (tmem)");
+        PERROR("Error when writing to state file (tmem)");
         goto out;
     }
 
     if ( !live && save_tsc_info(xch, dom, io_fd) < 0 )
     {
-        ERROR("Error when writing to state file (tsc)");
+        PERROR("Error when writing to state file (tsc)");
         goto out;
     }
 
@@ -1282,7 +1284,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
                 xch, dom, PROT_READ, pfn_type, pfn_err, batch);
             if ( region_base == NULL )
             {
-                ERROR("map batch failed");
+                PERROR("map batch failed");
                 goto out;
             }
 
@@ -1309,7 +1311,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
                 /* Get page types */
                 if ( xc_get_pfn_type_batch(xch, dom, batch, pfn_type) )
                 {
-                    ERROR("get_pfn_type_batch failed");
+                    PERROR("get_pfn_type_batch failed");
                     goto out;
                 }
 
@@ -1376,7 +1378,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
                                        (char*)region_base+(PAGE_SIZE*(j-run)), 
                                        PAGE_SIZE*run) != PAGE_SIZE*run )
                         {
-                            ERROR("Error when writing to state file (4a)"
+                            PERROR("Error when writing to state file (4a)"
                                   " (errno %d)", errno);
                             goto out;
                         }                        
@@ -1406,7 +1408,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
 
                     if ( ratewrite(io_fd, live, page, PAGE_SIZE) != PAGE_SIZE )
                     {
-                        ERROR("Error when writing to state file (4b)"
+                        PERROR("Error when writing to state file (4b)"
                               " (errno %d)", errno);
                         goto out;
                     }
@@ -1425,7 +1427,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
                                (char*)region_base+(PAGE_SIZE*(j-run)), 
                                PAGE_SIZE*run) != PAGE_SIZE*run )
                 {
-                    ERROR("Error when writing to state file (4c)"
+                    PERROR("Error when writing to state file (4c)"
                           " (errno %d)", errno);
                     goto out;
                 }                        
@@ -1491,13 +1493,13 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
                 if ( (tmem_saved > 0) &&
                      (xc_tmem_save_extra(xch,dom,io_fd,-6) == -1) )
                 {
-                        ERROR("Error when writing to state file (tmem)");
+                        PERROR("Error when writing to state file (tmem)");
                         goto out;
                 }
 
                 if ( save_tsc_info(xch, dom, io_fd) < 0 )
                 {
-                    ERROR("Error when writing to state file (tsc)");
+                    PERROR("Error when writing to state file (tsc)");
                     goto out;
                 }
 
@@ -1508,7 +1510,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
                                    XEN_DOMCTL_SHADOW_OP_CLEAN, to_send, 
                                    dinfo->p2m_size, NULL, 0, &stats) != dinfo->p2m_size )
             {
-                ERROR("Error flushing shadow PT");
+                PERROR("Error flushing shadow PT");
                 goto out;
             }
 
@@ -1611,7 +1613,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
         if ( (rec_size = xc_domain_hvm_getcontext(xch, dom, hvm_buf, 
                                                   hvm_buf_size)) == -1 )
         {
-            ERROR("HVM:Could not get hvm buffer");
+            PERROR("HVM:Could not get hvm buffer");
             goto out;
         }
         
@@ -1671,7 +1673,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
 
     if ( xc_vcpu_getcontext(xch, dom, 0, &ctxt) )
     {
-        ERROR("Could not get vcpu context");
+        PERROR("Could not get vcpu context");
         goto out;
     }
 
@@ -1691,7 +1693,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
 
         if ( (i != 0) && xc_vcpu_getcontext(xch, dom, i, &ctxt) )
         {
-            ERROR("No context for VCPU%d", i);
+            PERROR("No context for VCPU%d", i);
             goto out;
         }
 
@@ -1743,7 +1745,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
         domctl.u.ext_vcpucontext.vcpu = i;
         if ( xc_domctl(xch, &domctl) < 0 )
         {
-            ERROR("No extended context for VCPU%d", i);
+            PERROR("No extended context for VCPU%d", i);
             goto out;
         }
         if ( wrexact(io_fd, &domctl.u.ext_vcpucontext, 128) )
@@ -1783,7 +1785,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
 
     /* Flush last write and discard cache for file. */
     if ( outbuf_flush(xch, &ob, io_fd) < 0 ) {
-        ERROR("Error when flushing output buffer\n");
+        PERROR("Error when flushing output buffer\n");
         rc = 1;
     }
 
@@ -1811,7 +1813,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
                                XEN_DOMCTL_SHADOW_OP_CLEAN, to_send,
                                dinfo->p2m_size, NULL, 0, &stats) != dinfo->p2m_size )
         {
-            ERROR("Error flushing shadow PT");
+            PERROR("Error flushing shadow PT");
         }
 
         goto copypages;

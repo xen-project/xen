@@ -226,8 +226,8 @@ int xc_add_mmu_update(xc_interface *xch, struct xc_mmu *mmu,
                    unsigned long long ptr, unsigned long long val);
 int xc_flush_mmu_updates(xc_interface *xch, struct xc_mmu *mmu);
 
-/* Return 0 on success; -1 on error. */
-int read_exact(int fd, void *data, size_t size);
+/* Return 0 on success; -1 on error setting errno. */
+int read_exact(int fd, void *data, size_t size); /* EOF => -1, errno=0 */
 int write_exact(int fd, const void *data, size_t size);
 
 int xc_ffs8(uint8_t x);

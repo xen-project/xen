@@ -741,6 +741,8 @@ int read_exact(int fd, void *data, size_t size)
         len = read(fd, (char *)data + offset, size - offset);
         if ( (len == -1) && (errno == EINTR) )
             continue;
+        if ( len == 0 )
+            errno = 0;
         if ( len <= 0 )
             return -1;
         offset += len;
