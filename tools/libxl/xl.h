@@ -15,6 +15,8 @@
 #ifndef XL_H
 #define XL_H
 
+#include "xentoollog.h"
+
 struct cmd_spec {
     char *cmd_name;
     int (*cmd_impl)(int argc, char **argv);
@@ -75,6 +77,6 @@ extern struct cmd_spec cmd_table[];
 extern int cmdtable_len;
 
 extern struct libxl_ctx ctx;
-extern int logfile;
+extern xentoollog_logger *logger;
 
 #endif /* XL_H */

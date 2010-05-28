@@ -291,7 +291,7 @@ int libxl_devices_destroy(struct libxl_ctx *ctx, uint32_t domid, int force)
     flexarray_t *toremove;
     struct libxl_ctx clone;
 
-    if (libxl_ctx_init(&clone, LIBXL_VERSION)) {
+    if (libxl_ctx_init(&clone, LIBXL_VERSION, ctx->lg)) {
         return -1;
     }
 
@@ -354,7 +354,7 @@ int libxl_device_del(struct libxl_ctx *ctx, libxl_device *dev, int wait)
     int rc;
     struct libxl_ctx clone;
 
-    if (libxl_ctx_init(&clone, LIBXL_VERSION)) {
+    if (libxl_ctx_init(&clone, LIBXL_VERSION, ctx->lg)) {
         return -1;
     }
 

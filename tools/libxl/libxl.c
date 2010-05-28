@@ -36,18 +36,19 @@
 
 #define PAGE_TO_MEMKB(pages) ((pages) * 4)
 
-int libxl_ctx_init(struct libxl_ctx *ctx, int version)
+int libxl_ctx_init(struct libxl_ctx *ctx, int version, xentoollog_logger *lg)
 {
     if (version != LIBXL_VERSION)
         return ERROR_VERSION;
     memset(ctx, 0, sizeof(struct libxl_ctx));
+    ctx->lg = lg;
     ctx->alloc_maxsize = 256;
     ctx->alloc_ptrs = calloc(ctx->alloc_maxsize, sizeof(void *));
     if (!ctx->alloc_ptrs)
         return ERROR_NOMEM;
     memset(&ctx->version_info, 0, sizeof(libxl_version_info));
 
-    ctx->xch = xc_interface_open(0,0,0);
+    ctx->xch = xc_interface_open(lg,lg,0);
     if (!ctx->xch) {
         free(ctx->alloc_ptrs);
         return ERROR_FAIL;
@@ -68,13 +69,6 @@ int libxl_ctx_free(struct libxl_ctx *ctx)
     free(ctx->alloc_ptrs);
     xc_interface_close(ctx->xch);
     if (ctx->xsh) xs_daemon_close(ctx->xsh); 
-    return 0;
-}
-
-int libxl_ctx_set_log(struct libxl_ctx *ctx, libxl_log_callback log_callback, void *log_data)
-{
-    ctx->log_callback = log_callback;
-    ctx->log_userdata = log_data;
     return 0;
 }
 

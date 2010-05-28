@@ -1088,7 +1088,7 @@ start:
                 }
             }
             if (status) {
-                libxl_report_child_exitstatus(&ctx, XL_LOG_ERROR,
+                libxl_report_child_exitstatus(&ctx, XTL_ERROR,
                            "daemonizing child", child1, status);
                 ret = ERROR_FAIL;
                 goto error_out;
@@ -1810,7 +1810,7 @@ static void migration_child_report(pid_t migration_child, int recv_fd) {
 
         if (child == migration_child) {
             if (status)
-                libxl_report_child_exitstatus(&ctx, XL_LOG_INFO,
+                libxl_report_child_exitstatus(&ctx, XTL_INFO,
                                               "migration target process",
                                               migration_child, status);
             break;

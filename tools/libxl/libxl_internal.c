@@ -150,48 +150,40 @@ char *libxl_dirname(struct libxl_ctx *ctx, const char *s)
     return ptr;
 }
 
-void xl_logv(struct libxl_ctx *ctx, int loglevel, int errnoval,
+void xl_logv(struct libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
              const char *file, int line, const char *func,
              char *fmt, va_list ap)
 {
     char *enomem = "[out of memory formatting log message]";
-    char *s;
+    char *base = NULL;
     int rc, esave;
-
-    if (!ctx->log_callback)
-        return;
+    char fileline[256];
 
     esave = errno;
-    
-    rc = vasprintf(&s, fmt, ap);
-    if (rc<0) { s = enomem; goto x; }
 
-    if (errnoval >= 0) {
-        char *errstr, *snew;
-        errstr = strerror(errnoval);
-        if (errstr)
-            rc = asprintf(&snew, "%s: %s", s, errstr);
-        else
-            rc = asprintf(&snew, "%s: unknown error number %d", s, errnoval);
-        free(s);
-        if (rc<0) { s = enomem; goto x; }
-        s = snew;
-    }
+    rc = vasprintf(&base, fmt, ap);
+    if (rc<0) { base = enomem; goto x; }
+
+    fileline[0] = 0;
+    if (file) snprintf(fileline, sizeof(fileline), "%s:%d",file,line);
+    fileline[sizeof(fileline)-1] = 0;
 
  x:
-    ctx->log_callback(ctx->log_userdata, loglevel, file, line, func, s);
-    if (s != enomem)
-        free(s);
+    xtl_log(ctx->lg, msglevel, errnoval, "libxl",
+            "%s%s%s%s" "%s",
+            fileline, func&&file?":":"", func?func:"", func||file?" ":"",
+            base);
+    if (base != enomem) free(base);
     errno = esave;
 }
 
-void xl_log(struct libxl_ctx *ctx, int loglevel, int errnoval,
-            const char *file, int line,
-            const char *func, char *fmt, ...)
+void xl_log(struct libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
+            const char *file, int line, const char *func,
+            char *fmt, ...)
 {
     va_list ap;
     va_start(ap, fmt);
-    xl_logv(ctx, loglevel, errnoval, file, line, func, fmt, ap);
+    xl_logv(ctx, msglevel, errnoval, file, line, func, fmt, ap);
     va_end(ap);
 }
 

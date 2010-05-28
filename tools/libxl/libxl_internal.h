@@ -23,6 +23,7 @@
 
 #include <xs.h>
 #include <xenctrl.h>
+#include "xentoollog.h"
 
 #include "flexarray.h"
 #include "libxl_utils.h"
@@ -50,9 +51,19 @@
   /* all of these macros preserve errno (saving and restoring) */
 
 /* logging */
-void xl_logv(struct libxl_ctx *ctx, int errnoval, int loglevel, const char *file, int line, const char *func, char *fmt, va_list al);
-void xl_log(struct libxl_ctx *ctx, int errnoval, int loglevel, const char *file, int line, const char *func, char *fmt, ...);
-  /* these functions preserve errno (saving and restoring) */
+void xl_logv(struct libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
+             const char *file /* may be 0 */, int line /* ignored if !file */,
+             const char *func /* may be 0 */,
+             char *fmt, va_list al)
+     __attribute__((format(printf,7,0)));
+
+void xl_log(struct libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
+            const char *file /* may be 0 */, int line /* ignored if !file */,
+            const char *func /* may be 0 */,
+            char *fmt, ...)
+     __attribute__((format(printf,7,8)));
+
+     /* these functions preserve errno (saving and restoring) */
 
 
 typedef enum {
@@ -214,6 +225,11 @@ const char *libxl_private_bindir_path(void);
 const char *libxl_xenfirmwaredir_path(void);
 const char *libxl_xen_config_dir_path(void);
 const char *libxl_xen_script_dir_path(void);
+
+#define XL_LOG_DEBUG   XTL_DEBUG
+#define XL_LOG_INFO    XTL_INFO
+#define XL_LOG_WARNING XTL_WARN
+#define XL_LOG_ERROR   XTL_ERROR
 
 #endif
 

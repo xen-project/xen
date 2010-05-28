@@ -57,7 +57,8 @@ void libxl_exec(int stdinfd, int stdoutfd, int stderrfd, char *arg0, char **args
     _exit(-1);
 }
 
-void libxl_report_child_exitstatus(struct libxl_ctx *ctx, int level,
+void libxl_report_child_exitstatus(struct libxl_ctx *ctx,
+                                   xentoollog_level level,
                                    const char *what, pid_t pid, int status)
 {
 

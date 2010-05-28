@@ -31,16 +31,7 @@
 #include "libxl_utils.h"
 #include "xl.h"
 
-void log_callback(
-    void *userdata, int loglevel, const char *file,
-    int line, const char *func, char *s)
-{
-    char str[1024];
-
-    snprintf(str, sizeof(str), "[%d] %s:%d:%s: %s\n",
-             loglevel, file, line, func, s);
-    libxl_write_exactly(NULL, logfile, str, strlen(str), NULL, NULL);
-}
+xentoollog_logger *logger;
 
 int main(int argc, char **argv)
 {
@@ -51,13 +42,10 @@ int main(int argc, char **argv)
         exit(1);
     }
 
-    if (libxl_ctx_init(&ctx, LIBXL_VERSION)) {
+    logger = xtl_createlogger_stdiostream(stderr, XTL_PROGRESS,  0);
+    if (libxl_ctx_init(&ctx, LIBXL_VERSION, logger)) {
         fprintf(stderr, "cannot init xl context\n");
         exit(1);
-    }
-    if (libxl_ctx_set_log(&ctx, log_callback, NULL)) {
-        fprintf(stderr, "cannot set xl log callback\n");
-        exit(-ERROR_FAIL);
     }
 
     srand(time(0));

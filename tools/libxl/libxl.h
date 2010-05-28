@@ -22,8 +22,6 @@
 #include <xs.h>
 #include <sys/wait.h> /* for pid_t */
 
-typedef void (*libxl_log_callback)(void *userdata, int loglevel, const char *file,
-                                   int line, const char *func, char *s);
 struct libxl_dominfo {
     uint8_t uuid[16];
     uint32_t domid;
@@ -61,11 +59,9 @@ typedef struct {
 } libxl_version_info;
 
 struct libxl_ctx {
+    xentoollog_logger *lg;
     xc_interface *xch;
     struct xs_handle *xsh;
-    /* errors/debug buf */
-    void *log_userdata;
-    libxl_log_callback log_callback;
 
     /* mini-GC */
     int alloc_maxsize;
@@ -275,9 +271,9 @@ enum {
 #define LIBXL_VERSION 0
 
 /* context functions */
-int libxl_ctx_init(struct libxl_ctx *ctx, int version);
+int libxl_ctx_init(struct libxl_ctx *ctx, int version, xentoollog_logger*);
 int libxl_ctx_free(struct libxl_ctx *ctx);
-int libxl_ctx_set_log(struct libxl_ctx *ctx, libxl_log_callback log_callback, void *log_data);
+int libxl_ctx_set_log(struct libxl_ctx *ctx, xentoollog_logger*);
 int libxl_ctx_postfork(struct libxl_ctx *ctx);
 
 /* domain related functions */
