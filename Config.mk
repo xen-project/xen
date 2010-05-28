@@ -154,9 +154,9 @@ QEMU_REMOTE=http://xenbits.xensource.com/git-http/qemu-xen-unstable.git
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 01626771cf2e9285fbfddcbded2820fc77745e4b
-# Fri Apr 30 17:41:45 2010 +0100
-# Implement 'xm vcpu-set' command for HVM guest
+QEMU_TAG ?= 805ed3b20492d2f4bb465bfda65cedd286e23209
+# Fri May 21 15:46:55 2010 +0100
+# Wait for frontend state Connected before connecting the backend
 
 # Optional components
 XENSTAT_XENTOP     ?= y
