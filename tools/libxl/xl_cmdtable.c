@@ -12,7 +12,7 @@
  * GNU Lesser General Public License for more details.
  */
 
-#include "xl_cmdtable.h"
+#include "xl.h"
 
 struct cmd_spec cmd_table[] = {
     { "create",

@@ -12,8 +12,16 @@
  * GNU Lesser General Public License for more details.
  */
 
-#ifndef XL_CMDIMPL_H
-#define XL_CMDIMPL_H
+#ifndef XL_H
+#define XL_H
+
+struct cmd_spec {
+    char *cmd_name;
+    int (*cmd_impl)(int argc, char **argv);
+    char *cmd_desc;
+    char *cmd_usage;
+    char *cmd_option;
+};
 
 int main_vcpulist(int argc, char **argv);
 int main_info(int argc, char **argv);
@@ -63,4 +71,7 @@ int main_tmem_shared_auth(int argc, char **argv);
 
 void help(char *command);
 
-#endif /* XL_CMDIMPL_H */
+extern struct cmd_spec cmd_table[];
+extern int cmdtable_len;
+
+#endif /* XL_H */

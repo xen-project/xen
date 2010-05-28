@@ -38,7 +38,7 @@
 #include "libxl.h"
 #include "libxl_utils.h"
 #include "libxlutil.h"
-#include "xl_cmdtable.h"
+#include "xl.h"
 
 #define UUID_FMT "%02hhx%02hhx%02hhx%02hhx-%02hhx%02hhx-%02hhx%02hhx-%02hhx%02hhx-%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx"
 

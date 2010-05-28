@@ -29,8 +29,7 @@
 
 #include "libxl.h"
 #include "libxl_utils.h"
-#include "xl_cmdimpl.h"
-#include "xl_cmdtable.h"
+#include "xl.h"
 
 extern struct libxl_ctx ctx;
 extern int logfile;
