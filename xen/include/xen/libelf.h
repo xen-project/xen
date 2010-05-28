@@ -37,6 +37,13 @@
 #else
 #include <xen/elfnote.h>
 #include <xen/features.h>
+
+#include <stdarg.h>
+
+struct elf_binary;
+typedef void elf_log_callback(struct elf_binary*, void *caller_data,
+                              int iserr, const char *fmt, va_list al);
+
 #endif
 
 /* ------------------------------------------------------------------------ */
@@ -99,7 +106,8 @@ struct elf_binary {
 
 #ifndef __XEN__
     /* misc */
-    FILE *log;
+    elf_log_callback *log_callback;
+    void *log_caller_data;
 #endif
     int verbose;
 };
@@ -183,7 +191,8 @@ int elf_init(struct elf_binary *elf, const char *image, size_t size);
 #ifdef __XEN__
 void elf_set_verbose(struct elf_binary *elf);
 #else
-void elf_set_logfile(struct elf_binary *elf, FILE * log, int verbose);
+void elf_set_log(struct elf_binary *elf, elf_log_callback*,
+                 void *log_caller_pointer, int verbose);
 #endif
 
 void elf_parse_binary(struct elf_binary *elf);

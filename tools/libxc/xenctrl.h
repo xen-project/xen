@@ -19,6 +19,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <xen/xen.h>
 #include <xen/domctl.h>
 #include <xen/physdev.h>
@@ -1473,5 +1474,9 @@ int xc_memshr_debug_mfn(int xc_handle,
 int xc_memshr_debug_gref(int xc_handle,
                          uint32_t domid,
                          grant_ref_t gref);
+
+struct elf_binary;
+void xc_elf_set_logfile(struct elf_binary *elf, FILE *f, int verbose);
+/* Useful for callers who also use libelf. */
 
 #endif /* XENCTRL_H */

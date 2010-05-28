@@ -2,6 +2,8 @@
  * parse and load elf binaries
  */
 
+#include <stdarg.h>
+
 #include "libelf-private.h"
 
 /* ------------------------------------------------------------------------ */
@@ -72,9 +74,25 @@ int elf_init(struct elf_binary *elf, const char *image, size_t size)
 }
 
 #ifndef __XEN__
-void elf_set_logfile(struct elf_binary *elf, FILE * log, int verbose)
+void elf_call_log_callback(struct elf_binary *elf, int iserr,
+                           const char *fmt,...) {
+    va_list al;
+
+    if (!elf->log_callback)
+        return;
+    if (!(iserr || elf->verbose))
+        return;
+
+    va_start(al,fmt);
+    elf->log_callback(elf, elf->log_caller_data, iserr, fmt, al);
+    va_end(al);
+}
+    
+void elf_set_log(struct elf_binary *elf, elf_log_callback *log_callback,
+                 void *log_caller_data, int verbose)
 {
-    elf->log = log;
+    elf->log_callback = log_callback;
+    elf->log_caller_data = log_caller_data;
     elf->verbose = verbose;
 }
 #else

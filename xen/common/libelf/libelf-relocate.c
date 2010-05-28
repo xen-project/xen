@@ -289,7 +289,7 @@ static int elf_reloc_section(struct elf_binary *elf,
         value = elf_uval(elf, sym, st_value);
         value += r_addend;
 
-        if ( elf->log && (elf->verbose > 1) )
+        if ( elf->log_callback && (elf->verbose > 1) )
         {
             uint64_t st_name = elf_uval(elf, sym, st_name);
             const char *name = st_name ? elf->sym_strtab + st_name : "*NONE*";

@@ -9,12 +9,24 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <inttypes.h>
 
 #include "xg_private.h"
 #include "xc_dom.h"
 
 #define XEN_VER "xen-3.0"
+
+/* ------------------------------------------------------------------------ */
+
+static void log_callback(struct elf_binary *elf, void *caller_data,
+                         int iserr, const char *fmt, va_list al) {
+    vfprintf(caller_data,fmt,al);
+}
+
+void xc_elf_set_logfile(struct elf_binary *elf, FILE *f, int verbose) {
+    elf_set_log(elf, log_callback, f, verbose);
+}
 
 /* ------------------------------------------------------------------------ */
 
@@ -137,8 +149,9 @@ static int xc_dom_load_elf_symtab(struct xc_dom_image *dom,
     }
     if ( elf_init(&syms, hdr + sizeof(int), size - sizeof(int)) )
         return -1;
+
     if ( xc_dom_logfile )
-        elf_set_logfile(&syms, xc_dom_logfile, 1);
+        xc_elf_set_logfile(&syms, xc_dom_logfile, 1);
 
     symtab = dom->bsd_symtab_start + sizeof(int);
     maxaddr = elf_round_up(&syms, symtab + elf_size(&syms, syms.ehdr) +
@@ -231,7 +244,7 @@ static int xc_dom_parse_elf_kernel(struct xc_dom_image *dom)
     dom->private_loader = elf;
     rc = elf_init(elf, dom->kernel_blob, dom->kernel_size);
     if ( xc_dom_logfile )
-        elf_set_logfile(elf, xc_dom_logfile, 1);
+        xc_elf_set_logfile(elf, xc_dom_logfile, 1);
     if ( rc != 0 )
     {
         xc_dom_panic(XC_INVALID_KERNEL, "%s: corrupted ELF image\n",

@@ -170,7 +170,7 @@ int main(int argc, char **argv)
 		fprintf(stderr, "File %s is not an ELF image\n", f);
 		return 1;
 	}
-	elf_set_logfile(&elf, stderr, 0);
+	xc_elf_set_logfile(&elf, stderr, 0);
 
 	count = elf_phdr_count(&elf);
 	for ( h=0; h < count; h++)
