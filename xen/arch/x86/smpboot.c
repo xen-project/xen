@@ -858,7 +858,8 @@ void __cpu_disable(void)
     cpu_clear(cpu, cpu_online_map);
     fixup_irqs();
 
-    cpu_disable_scheduler(cpu);
+    if ( cpu_disable_scheduler(cpu) )
+        BUG();
 }
 
 void __cpu_die(unsigned int cpu)
