@@ -1875,11 +1875,6 @@ static void migrate_domain(char *domain_spec, const char *rune,
     save_domain_core_begin(domain_spec, override_config_file,
                            &config_data, &config_len);
 
-    if (!common_domname) {
-        common_domname = libxl_domid_to_name(&ctx, domid);
-        /* libxl_domid_to_name fails ?  don't bother with names then */
-    }
-
     if (!config_len) {
         fprintf(stderr, "No config file stored for running domain and "
                 "none supplied - cannot migrate.\n");
