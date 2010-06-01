@@ -176,6 +176,10 @@ extern u32 vmx_secondary_exec_control;
 
 extern bool_t cpu_has_vmx_ins_outs_instr_info;
 
+extern u64 vmx_ept_vpid_cap;
+
+#define VMX_EPT_SUPERPAGE_2MB                   0x00010000
+
 #define cpu_has_wbinvd_exiting \
     (vmx_secondary_exec_control & SECONDARY_EXEC_WBINVD_EXITING)
 #define cpu_has_vmx_virtualize_apic_accesses \
@@ -190,6 +194,8 @@ extern bool_t cpu_has_vmx_ins_outs_instr_info;
     (vmx_cpu_based_exec_control & CPU_BASED_ACTIVATE_SECONDARY_CONTROLS)
 #define cpu_has_vmx_ept \
     (vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_EPT)
+#define cpu_has_vmx_ept_2mb \
+    (vmx_ept_vpid_cap & VMX_EPT_SUPERPAGE_2MB)
 #define cpu_has_vmx_vpid \
     (vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_VPID)
 #define cpu_has_monitor_trap_flag \

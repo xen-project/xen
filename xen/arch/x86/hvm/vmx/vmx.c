@@ -1444,7 +1444,14 @@ void start_vmx(void)
     }
 
     if ( cpu_has_vmx_ept )
+    {
         vmx_function_table.hap_supported = 1;
+
+        vmx_function_table.hap_capabilities = 0;
+
+        if ( cpu_has_vmx_ept_2mb )
+            vmx_function_table.hap_capabilities |= HVM_HAP_SUPERPAGE_2MB;
+    }
 
     setup_vmcs_dump();
 

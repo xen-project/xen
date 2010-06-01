@@ -903,6 +903,8 @@ void start_svm(struct cpuinfo_x86 *c)
 
     svm_function_table.hap_supported = cpu_has_svm_npt;
 
+    svm_function_table.hap_capabilities = HVM_HAP_SUPERPAGE_2MB;
+
     hvm_enable(&svm_function_table);
 }
 

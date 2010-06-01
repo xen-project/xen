@@ -64,6 +64,7 @@ u32 vmx_cpu_based_exec_control __read_mostly;
 u32 vmx_secondary_exec_control __read_mostly;
 u32 vmx_vmexit_control __read_mostly;
 u32 vmx_vmentry_control __read_mostly;
+u64 vmx_ept_vpid_cap __read_mostly;
 bool_t cpu_has_vmx_ins_outs_instr_info __read_mostly;
 
 static DEFINE_PER_CPU_READ_MOSTLY(struct vmcs_struct *, host_vmcs);
@@ -90,6 +91,9 @@ static void __init vmx_display_features(void)
 
     if ( !printed )
         printk(" - none\n");
+
+    if ( cpu_has_vmx_ept_2mb )
+        printk("EPT supports 2MB super page.\n");
 }
 
 static u32 adjust_vmx_controls(u32 ctl_min, u32 ctl_opt, u32 msr)
@@ -113,6 +117,7 @@ static void vmx_init_vmcs_config(void)
     u32 _vmx_pin_based_exec_control;
     u32 _vmx_cpu_based_exec_control;
     u32 _vmx_secondary_exec_control = 0;
+    u64 _vmx_ept_vpid_cap = 0;
     u32 _vmx_vmexit_control;
     u32 _vmx_vmentry_control;
 
@@ -185,6 +190,11 @@ static void vmx_init_vmcs_config(void)
                   SECONDARY_EXEC_UNRESTRICTED_GUEST);
     }
 
+    /* The IA32_VMX_EPT_VPID_CAP MSR exists only when EPT or VPID available */
+    if ( _vmx_secondary_exec_control &
+         (SECONDARY_EXEC_ENABLE_EPT | SECONDARY_EXEC_ENABLE_VPID) )
+        rdmsrl(MSR_IA32_VMX_EPT_VPID_CAP, _vmx_ept_vpid_cap);
+
     if ( (_vmx_secondary_exec_control & SECONDARY_EXEC_PAUSE_LOOP_EXITING) &&
           ple_gap == 0 )
     {
@@ -219,6 +229,7 @@ static void vmx_init_vmcs_config(void)
         vmx_pin_based_exec_control = _vmx_pin_based_exec_control;
         vmx_cpu_based_exec_control = _vmx_cpu_based_exec_control;
         vmx_secondary_exec_control = _vmx_secondary_exec_control;
+        vmx_ept_vpid_cap           = _vmx_ept_vpid_cap;
         vmx_vmexit_control         = _vmx_vmexit_control;
         vmx_vmentry_control        = _vmx_vmentry_control;
         cpu_has_vmx_ins_outs_instr_info = !!(vmx_basic_msr_high & (1U<<22));
@@ -231,6 +242,7 @@ static void vmx_init_vmcs_config(void)
         BUG_ON(vmx_pin_based_exec_control != _vmx_pin_based_exec_control);
         BUG_ON(vmx_cpu_based_exec_control != _vmx_cpu_based_exec_control);
         BUG_ON(vmx_secondary_exec_control != _vmx_secondary_exec_control);
+        BUG_ON(vmx_ept_vpid_cap != _vmx_ept_vpid_cap);
         BUG_ON(vmx_vmexit_control != _vmx_vmexit_control);
         BUG_ON(vmx_vmentry_control != _vmx_vmentry_control);
         BUG_ON(cpu_has_vmx_ins_outs_instr_info !=

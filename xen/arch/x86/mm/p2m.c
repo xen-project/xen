@@ -1596,8 +1596,8 @@ int set_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
     while ( todo )
     {
         if ( is_hvm_domain(d) && d->arch.hvm_domain.hap_enabled )
-            order = (((gfn | mfn_x(mfn) | todo) & (SUPERPAGE_PAGES - 1)) == 0) ?
-                9 : 0;
+            order = ((((gfn | mfn_x(mfn) | todo) & (SUPERPAGE_PAGES - 1)) == 0)
+                    && hvm_hap_has_2mb(d)) ? 9 : 0;
         else
             order = 0;
         if ( !d->arch.p2m->set_entry(d, gfn, mfn, order, p2mt) )
