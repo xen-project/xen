@@ -378,33 +378,64 @@ int xc_find_device_number(const char *name)
     return makedev(major, minor);
 }
 
-#define EVTCHN_DEV_NAME  "/dev/xen/evtchn"
+#define DEVXEN "/dev/xen"
+
+static int make_dev_xen(void)
+{
+    if ( mkdir(DEVXEN, 0755) != 0 )
+    {
+        struct stat st;
+        if ( (stat(DEVXEN, &st) != 0) || !S_ISDIR(st.st_mode) )
+            return -1;
+    }
+
+    return 0;
+}
+
+static int xendev_open(const char *dev)
+{
+    int fd, devnum;
+    struct stat st;
+    char *devname, *devpath;
+
+    devname = devpath = NULL;
+    fd = -1;
+
+    if ( asprintf(&devname, "xen!%s", dev) == 0 )
+        goto fail;
+
+    if ( asprintf(&devpath, "%s/%s", DEVXEN, dev) == 0 )
+        goto fail;
+
+    devnum = xc_find_device_number(dev);
+    if ( devnum == -1 )
+        devnum = xc_find_device_number(devname);
+
+    /*
+     * If we know what the correct device is and the path doesn't exist or 
+     * isn't a device, then remove it so we can create the device.
+     */
+    if ( (devnum != -1) &&
+         ((stat(devpath, &st) != 0) || !S_ISCHR(st.st_mode)) )
+    {
+        unlink(devpath);
+        if ( (make_dev_xen() == -1) ||
+             (mknod(devpath, S_IFCHR|0600, devnum) != 0) )
+            goto fail;
+    }
+
+    fd = open(devpath, O_RDWR);
+
+ fail:
+    free(devname);
+    free(devpath);
+
+    return fd;
+}
 
 int xc_evtchn_open(void)
 {
-    struct stat st;
-    int fd;
-    int devnum;
-
-    devnum = xc_find_device_number("evtchn");
-
-    /* Make sure any existing device file links to correct device. */
-    if ( (lstat(EVTCHN_DEV_NAME, &st) != 0) || !S_ISCHR(st.st_mode) ||
-         (st.st_rdev != devnum) )
-        (void)unlink(EVTCHN_DEV_NAME);
-
- reopen:
-    if ( (fd = open(EVTCHN_DEV_NAME, O_RDWR)) == -1 )
-    {
-        if ( (errno == ENOENT) &&
-             ((mkdir("/dev/xen", 0755) == 0) || (errno == EEXIST)) &&
-             (mknod(EVTCHN_DEV_NAME, S_IFCHR|0600, devnum) == 0) )
-            goto reopen;
-
-        return -1;
-    }
-
-    return fd;
+    return xendev_open("evtchn");
 }
 
 int xc_evtchn_close(int xce_handle)
@@ -518,34 +549,9 @@ void discard_file_cache(xc_interface *xch, int fd, int flush)
     errno = saved_errno;
 }
 
-#define GNTTAB_DEV_NAME "/dev/xen/gntdev"
-
 int xc_gnttab_open(xc_interface *xch)
 {
-    struct stat st;
-    int fd;
-    int devnum;
-
-    devnum = xc_find_device_number("gntdev");
-
-    /* Make sure any existing device file links to correct device. */
-    if ( (lstat(GNTTAB_DEV_NAME, &st) != 0) || !S_ISCHR(st.st_mode) ||
-         (st.st_rdev != devnum) )
-        (void)unlink(GNTTAB_DEV_NAME);
-
-reopen:
-    if ( (fd = open(GNTTAB_DEV_NAME, O_RDWR)) == -1 )
-    {
-        if ( (errno == ENOENT) &&
-             ((mkdir("/dev/xen", 0755) == 0) || (errno == EEXIST)) &&
-             (mknod(GNTTAB_DEV_NAME, S_IFCHR|0600, devnum) == 0) )
-            goto reopen;
-
-        PERROR("Could not open grant table interface");
-        return -1;
-    }
-
-    return fd;
+    return xendev_open("gntdev");
 }
 
 int xc_gnttab_close(xc_interface *xch, int xcg_handle)
