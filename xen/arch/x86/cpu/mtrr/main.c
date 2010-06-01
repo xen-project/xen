@@ -229,29 +229,32 @@ static inline int types_compatible(mtrr_type type1, mtrr_type type2) {
 static void set_mtrr(unsigned int reg, unsigned long base,
 		     unsigned long size, mtrr_type type)
 {
+	cpumask_t allbutself;
+	unsigned int nr_cpus;
 	struct set_mtrr_data data;
 	unsigned long flags;
+
+	allbutself = cpu_online_map;
+	cpu_clear(smp_processor_id(), allbutself);
+	nr_cpus = cpus_weight(allbutself);
 
 	data.smp_reg = reg;
 	data.smp_base = base;
 	data.smp_size = size;
 	data.smp_type = type;
-	atomic_set(&data.count, num_online_cpus() - 1);
-	/* make sure data.count is visible before unleashing other CPUs */
-	smp_wmb();
+	atomic_set(&data.count, nr_cpus);
 	atomic_set(&data.gate,0);
 
-	/*  Start the ball rolling on other CPUs  */
-	if (smp_call_function(ipi_handler, &data, 0) != 0)
-		panic("mtrr: timed out waiting for other CPUs\n");
+	/* Start the ball rolling on other CPUs */
+	on_selected_cpus(&allbutself, ipi_handler, &data, 0);
 
 	local_irq_save(flags);
 
-	while(atomic_read(&data.count))
+	while (atomic_read(&data.count))
 		cpu_relax();
 
 	/* ok, reset count and toggle gate */
-	atomic_set(&data.count, num_online_cpus() - 1);
+	atomic_set(&data.count, nr_cpus);
 	smp_wmb();
 	atomic_set(&data.gate,1);
 
@@ -271,10 +274,10 @@ static void set_mtrr(unsigned int reg, unsigned long base,
 		mtrr_if->set(reg,base,size,type);
 
 	/* wait for the others */
-	while(atomic_read(&data.count))
+	while (atomic_read(&data.count))
 		cpu_relax();
 
-	atomic_set(&data.count, num_online_cpus() - 1);
+	atomic_set(&data.count, nr_cpus);
 	smp_wmb();
 	atomic_set(&data.gate,0);
 
@@ -282,7 +285,7 @@ static void set_mtrr(unsigned int reg, unsigned long base,
 	 * Wait here for everyone to have seen the gate change
 	 * So we're the last ones to touch 'data'
 	 */
-	while(atomic_read(&data.count))
+	while (atomic_read(&data.count))
 		cpu_relax();
 
 	local_irq_restore(flags);
