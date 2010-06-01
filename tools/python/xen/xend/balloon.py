@@ -174,35 +174,6 @@ def free(need_mem, dominfo):
             free_mem = physinfo['free_memory']
             scrub_mem = physinfo['scrub_memory']
 
-        # Check whethercurrent machine is a numa system and the new 
-        # created hvm has all its vcpus in the same node, if all the 
-        # conditions above are fit. We will wait until all the pages 
-        # in scrub list are freed (if waiting time go beyond 20s, 
-        # we will stop waiting it.)
-        if physinfo['nr_nodes'] > 1 and retries == 0:
-            oldnode = -1
-            waitscrub = 1
-            vcpus = dominfo.info['cpus'][0]
-            for vcpu in vcpus:
-                nodenum = xc.numainfo()['cpu_to_node'][cpu]
-                if oldnode == -1:
-                    oldnode = nodenum
-                elif oldnode != nodenum:
-                    waitscrub = 0
-
-            if waitscrub == 1 and scrub_mem > 0:
-                log.debug("wait for scrub %s", scrub_mem)
-                while scrub_mem > 0 and retries < rlimit:
-                    time.sleep(sleep_time)
-                    physinfo = xc.physinfo()
-                    free_mem = physinfo['free_memory']
-                    scrub_mem = physinfo['scrub_memory']
-                    retries += 1
-                    sleep_time += SLEEP_TIME_GROWTH
-                log.debug("scrub for %d times", retries)
-
-            retries = 0
-            sleep_time = SLEEP_TIME_GROWTH
         while retries < rlimit:
             physinfo = xc.physinfo()
             free_mem = physinfo['free_memory']

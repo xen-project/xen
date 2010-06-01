@@ -239,21 +239,6 @@ def restore(xd, fd, dominfo = None, paused = False, relocating = False):
         dominfo.destroy()
         raise XendError("cannot restore non-migratable domain")
 
-    # repin domain vcpus if a target node number was specified 
-    # this is done prior to memory allocation to aide in memory
-    # distribution for NUMA systems.
-    nodenr = -1
-    for i,l in enumerate(vmconfig):
-        if type(l) == type([]):
-            if l[0] == 'node':
-                nodenr = int(l[1])
-
-    if nodenr >= 0:
-        node_to_cpu = XendNode.instance().xc.physinfo()['node_to_cpu']
-        if nodenr < len(node_to_cpu):
-            for v in range(0, dominfo.info['VCPUs_max']):
-                 xc.vcpu_setaffinity(dominfo.domid, v, node_to_cpu[nodenr])
-
     store_port   = dominfo.getStorePort()
     console_port = dominfo.getConsolePort()
 
