@@ -495,7 +495,7 @@ int libxl_domain_suspend(struct libxl_ctx *ctx, libxl_domain_suspend_info *info,
 {
     int hvm = is_hvm(ctx, domid);
     int live = info != NULL && info->flags & XL_SUSPEND_LIVE;
-    int debug = info != NULL && info->flags & XL_SUSPEND_LIVE;
+    int debug = info != NULL && info->flags & XL_SUSPEND_DEBUG;
 
     core_suspend(ctx, domid, fd, hvm, live, debug);
     if (hvm)
