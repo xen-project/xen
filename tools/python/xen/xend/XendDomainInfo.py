@@ -396,7 +396,7 @@ class XendDomainInfo:
         maxmem = self.info.get('memory_static_max', 0)
         memory = self.info.get('memory_dynamic_max', 0)
 
-        if maxmem > memory:
+        if self.info.is_hvm() and maxmem > memory:
             self.pod_enabled = True
         else:
             self.pod_enabled = False
