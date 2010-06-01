@@ -28,7 +28,7 @@ extern void smp_cpus_done(unsigned int max_cpus);
 /*
  * Call a function on all other processors
  */
-extern int smp_call_function(
+extern void smp_call_function(
     void (*func) (void *info),
     void *info,
     int wait);
@@ -36,7 +36,7 @@ extern int smp_call_function(
 /* 
  * Call a function on a selection of processors
  */
-extern int on_selected_cpus(
+extern void on_selected_cpus(
     const cpumask_t *selected,
     void (*func) (void *info),
     void *info,
@@ -51,12 +51,12 @@ void smp_prepare_boot_cpu(void);
 /*
  * Call a function on all processors
  */
-static inline int on_each_cpu(
+static inline void on_each_cpu(
     void (*func) (void *info),
     void *info,
     int wait)
 {
-    return on_selected_cpus(&cpu_online_map, func, info, wait);
+    on_selected_cpus(&cpu_online_map, func, info, wait);
 }
 
 #define smp_processor_id() raw_smp_processor_id()

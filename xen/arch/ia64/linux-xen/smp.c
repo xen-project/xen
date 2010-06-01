@@ -386,14 +386,14 @@ EXPORT_SYMBOL(smp_call_function_single);
  * You must not call this function with disabled interrupts or from a
  * hardware interrupt handler or from a bottom half handler.
  */
-int
+void
 smp_call_function (void (*func) (void *info), void *info, int wait)
 {
 	struct call_data_struct data;
 	int cpus = num_online_cpus()-1;
 
 	if (!cpus)
-		return 0;
+		return;
 
 	/* Can deadlock when called with interrupts disabled */
 #ifdef XEN
@@ -435,12 +435,11 @@ smp_call_function (void (*func) (void *info), void *info, int wait)
 #if 0 //def XEN
 	printk("smp_call_function: DONE WITH spin_unlock, returning \n");
 #endif
-	return 0;
 }
 EXPORT_SYMBOL(smp_call_function);
 
 #ifdef XEN
-int
+void
 on_selected_cpus(const cpumask_t *selected, void (*func) (void *info),
                  void *info, int wait)
 {
@@ -450,7 +449,7 @@ on_selected_cpus(const cpumask_t *selected, void (*func) (void *info),
 	ASSERT(local_irq_is_enabled());
 
 	if (!nr_cpus)
-		return 0;
+		return;
 
 	data.func = func;
 	data.info = info;
@@ -470,8 +469,6 @@ on_selected_cpus(const cpumask_t *selected, void (*func) (void *info),
 		cpu_relax();
 
 	spin_unlock(&call_lock);
-
-	return 0;
 }
 #endif
 

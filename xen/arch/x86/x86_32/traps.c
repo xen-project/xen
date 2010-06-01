@@ -437,8 +437,8 @@ static long register_guest_callback(struct callback_register *reg)
     case CALLBACKTYPE_sysenter_deprecated:
         if ( !cpu_has_sep )
             ret = -EINVAL;
-        else if ( on_each_cpu(do_update_sysenter, &reg->address, 1) != 0 )
-            ret = -EIO;
+        else
+            on_each_cpu(do_update_sysenter, &reg->address, 1);
         break;
 
     case CALLBACKTYPE_sysenter:

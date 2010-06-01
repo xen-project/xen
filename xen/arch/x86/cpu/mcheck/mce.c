@@ -1356,11 +1356,7 @@ long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)
 			log_cpus = xmalloc_array(xen_mc_logical_cpu_t, nlcpu);
 			if (log_cpus == NULL)
 				return x86_mcerr("do_mca cpuinfo", -ENOMEM);
-
-			if (on_each_cpu(do_mc_get_cpu_info, log_cpus, 1)) {
-				xfree(log_cpus);
-				return x86_mcerr("do_mca cpuinfo", -EIO);
-			}
+			on_each_cpu(do_mc_get_cpu_info, log_cpus, 1);
 			if (!is_pv_32on64_vcpu(v)
 			    ? copy_to_guest(mc_physcpuinfo.nat->info,
 					    log_cpus, nlcpu)

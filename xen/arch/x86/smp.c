@@ -274,17 +274,17 @@ static struct call_data_struct {
     cpumask_t selected;
 } call_data;
 
-int smp_call_function(
+void smp_call_function(
     void (*func) (void *info),
     void *info,
     int wait)
 {
     cpumask_t allbutself = cpu_online_map;
     cpu_clear(smp_processor_id(), allbutself);
-    return on_selected_cpus(&allbutself, func, info, wait);
+    on_selected_cpus(&allbutself, func, info, wait);
 }
 
-int on_selected_cpus(
+void on_selected_cpus(
     const cpumask_t *selected,
     void (*func) (void *info),
     void *info,
@@ -323,7 +323,6 @@ int on_selected_cpus(
 
  out:
     spin_unlock(&call_lock);
-    return 0;
 }
 
 static void __stop_this_cpu(void)
