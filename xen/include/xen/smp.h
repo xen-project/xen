@@ -61,10 +61,6 @@ static inline int on_each_cpu(
 
 #define smp_processor_id() raw_smp_processor_id()
 
-/* No Xen contexts can be preempted by CPU hotplug. */
-#define lock_cpu_hotplug() ((void)0)
-#define unlock_cpu_hotplug() ((void)0)
-
 int alloc_cpu_id(void);
 
 #endif /* __XEN_SMP_H__ */
