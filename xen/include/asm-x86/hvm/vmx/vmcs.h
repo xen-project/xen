@@ -174,10 +174,10 @@ extern u32 vmx_secondary_exec_control;
 
 extern bool_t cpu_has_vmx_ins_outs_instr_info;
 
-extern u8 vmx_ept_super_page_level_limit;
+extern u64 vmx_ept_vpid_cap;
 
-#define VMX_EPT_SUPER_PAGE_2M              0x00010000
-#define VMX_EPT_SUPER_PAGE_1G              0x00020000
+#define VMX_EPT_SUPERPAGE_2MB                   0x00010000
+#define VMX_EPT_SUPERPAGE_1GB                   0x00020000
 
 #define cpu_has_wbinvd_exiting \
     (vmx_secondary_exec_control & SECONDARY_EXEC_WBINVD_EXITING)
@@ -193,6 +193,10 @@ extern u8 vmx_ept_super_page_level_limit;
     (vmx_cpu_based_exec_control & CPU_BASED_ACTIVATE_SECONDARY_CONTROLS)
 #define cpu_has_vmx_ept \
     (vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_EPT)
+#define cpu_has_vmx_ept_1gb \
+    (vmx_ept_vpid_cap & VMX_EPT_SUPERPAGE_1GB)
+#define cpu_has_vmx_ept_2mb \
+    (vmx_ept_vpid_cap & VMX_EPT_SUPERPAGE_2MB)
 #define cpu_has_vmx_vpid \
     (vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_VPID)
 #define cpu_has_monitor_trap_flag \
@@ -206,8 +210,6 @@ extern u8 vmx_ept_super_page_level_limit;
      SECONDARY_EXEC_UNRESTRICTED_GUEST)
 #define cpu_has_vmx_ple \
     (vmx_secondary_exec_control & SECONDARY_EXEC_PAUSE_LOOP_EXITING)
-#define cpu_vmx_ept_super_page_level_limit  \
-    vmx_ept_super_page_level_limit
 
 /* GUEST_INTERRUPTIBILITY_INFO flags. */
 #define VMX_INTR_SHADOW_STI             0x00000001

@@ -1758,10 +1758,9 @@ int set_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
     {
         if ( is_hvm_domain(d) && paging_mode_hap(d) )
             order = ( (((gfn | mfn_x(mfn) | todo) & ((1ul << 18) - 1)) == 0) &&
-                      (hvm_funcs.hap_superpage_level == 2) &&
-                      opt_hap_1gb ) ? 18 :
-                ((((gfn | mfn_x(mfn) | todo) & ((1ul << 9) - 1)) == 0) &&
-                      (hvm_funcs.hap_superpage_level >= 1)) ? 9 : 0;
+                      hvm_hap_has_1gb(d) && opt_hap_1gb ) ? 18 :
+                      ((((gfn | mfn_x(mfn) | todo) & ((1ul << 9) - 1)) == 0) &&
+                      hvm_hap_has_2mb(d)) ? 9 : 0;
         else
             order = 0;
 

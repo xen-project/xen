@@ -62,6 +62,14 @@ enum hvm_intblk {
 #define HVM_INTR_SHADOW_NMI    0x00000008
 
 /*
+ * HAP super page capabilities:
+ * bit0: if 2MB super page is allowed?
+ * bit1: if 1GB super page is allowed?
+ */
+#define HVM_HAP_SUPERPAGE_2MB   0x00000001
+#define HVM_HAP_SUPERPAGE_1GB   0x00000002
+
+/*
  * The hardware virtual machine (HVM) interface abstracts away from the
  * x86/x86_64 CPU virtualization assist specifics. Currently this interface
  * supports Intel's VT-x and AMD's SVM extensions.
@@ -72,11 +80,8 @@ struct hvm_function_table {
     /* Support Hardware-Assisted Paging? */
     int hap_supported;
 
-    /*
-     * Indicate HAP super page level.
-     * 0 -- 4KB, 1 -- 2MB, 2 -- 1GB.
-     */
-    int hap_superpage_level;
+    /* Indicate HAP capabilities. */
+    int hap_capabilities;
 
 
     /*
@@ -175,6 +180,11 @@ int hvm_girq_dest_2_vcpu_id(struct domain *d, uint8_t dest, uint8_t dest_mode);
     (hvm_paging_enabled(v) && ((v)->arch.hvm_vcpu.guest_cr[4] & X86_CR4_PAE))
 #define hvm_nx_enabled(v) \
     (!!((v)->arch.hvm_vcpu.guest_efer & EFER_NX))
+
+#define hvm_hap_has_1gb(d) \
+    (hvm_funcs.hap_capabilities & HVM_HAP_SUPERPAGE_1GB)
+#define hvm_hap_has_2mb(d) \
+    (hvm_funcs.hap_capabilities & HVM_HAP_SUPERPAGE_2MB)
 
 #ifdef __x86_64__
 #define hvm_long_mode_enabled(v) \

@@ -1432,10 +1432,16 @@ struct hvm_function_table * __init start_vmx(void)
     if ( cpu_has_vmx_ept )
     {
         vmx_function_table.hap_supported = 1;
+
+        vmx_function_table.hap_capabilities = 0;
+
+        if ( cpu_has_vmx_ept_2mb )
+            vmx_function_table.hap_capabilities |= HVM_HAP_SUPERPAGE_2MB;
+        if ( cpu_has_vmx_ept_1gb )
+            vmx_function_table.hap_capabilities |= HVM_HAP_SUPERPAGE_1GB;
+
         setup_ept_dump();
     }
-    
-    vmx_function_table.hap_superpage_level = vmx_ept_super_page_level_limit;
 
     setup_vmcs_dump();
 

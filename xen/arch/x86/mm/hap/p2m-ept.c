@@ -308,9 +308,14 @@ ept_set_entry(struct domain *d, unsigned long gfn, mfn_t mfn,
         int num = order / EPT_TABLE_ORDER;
         int level;
         ept_entry_t *split_ept_entry;
-    
-        if ( num >= cpu_vmx_ept_super_page_level_limit )
-            num = cpu_vmx_ept_super_page_level_limit;
+
+        if ( (num >= 2) && hvm_hap_has_1gb(d) )
+            num = 2;
+        else if ( (num >= 1) && hvm_hap_has_2mb(d) )
+            num = 1;
+        else
+            num = 0;
+
         for ( level = split_level; level > num ; level-- )
         {
             rv = ept_split_large_page(d, &table, &index, gfn, level);
