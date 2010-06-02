@@ -646,7 +646,7 @@ static void cpu_smpboot_free(unsigned int cpu)
 
     if ( stack_base[cpu] != NULL )
     {
-        memguard_guard_stack(stack_base[cpu]);
+        memguard_unguard_stack(stack_base[cpu]);
         free_xenheap_pages(stack_base[cpu], STACK_ORDER);
         stack_base[cpu] = NULL;
     }
