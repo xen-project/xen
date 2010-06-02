@@ -316,126 +316,11 @@ int do_xen_hypercall(xc_interface *xch, privcmd_hypercall_t *hypercall)
                       (unsigned long)hypercall);
 }
 
-#define MTAB "/proc/mounts"
-#define MAX_PATH 255
-#define _STR(x) #x
-#define STR(x) _STR(x)
-
-static int find_sysfsdir(char *sysfsdir)
-{
-    FILE *fp;
-    char type[MAX_PATH + 1];
-
-    if ( (fp = fopen(MTAB, "r")) == NULL )
-        return -1;
-
-    while ( fscanf(fp, "%*s %"STR(MAX_PATH)"s %"STR(MAX_PATH)"s %*s %*d %*d\n",
-                   sysfsdir, type) == 2 )
-        if ( strncmp(type, "sysfs", 5) == 0 )
-            break;
-
-    fclose(fp);
-
-    return ((strncmp(type, "sysfs", 5) == 0) ? 0 : -1);
-}
-
-int xc_find_device_number(const char *name)
-{
-    FILE *fp;
-    int i, major, minor;
-    char sysfsdir[MAX_PATH + 1];
-    static char *classlist[] = { "xen", "misc" };
-
-    for ( i = 0; i < (sizeof(classlist) / sizeof(classlist[0])); i++ )
-    {
-        if ( find_sysfsdir(sysfsdir) < 0 )
-            goto not_found;
-
-        /* <base>/class/<classname>/<devname>/dev */
-        strncat(sysfsdir, "/class/", MAX_PATH);
-        strncat(sysfsdir, classlist[i], MAX_PATH);
-        strncat(sysfsdir, "/", MAX_PATH);
-        strncat(sysfsdir, name, MAX_PATH);
-        strncat(sysfsdir, "/dev", MAX_PATH);
-
-        if ( (fp = fopen(sysfsdir, "r")) != NULL )
-            goto found;
-    }
-
- not_found:
-    errno = -ENOENT;
-    return -1;
-
- found:
-    if ( fscanf(fp, "%d:%d", &major, &minor) != 2 )
-    {
-        fclose(fp);
-        goto not_found;
-    }
-
-    fclose(fp);
-
-    return makedev(major, minor);
-}
-
-#define DEVXEN "/dev/xen"
-
-static int make_dev_xen(void)
-{
-    if ( mkdir(DEVXEN, 0755) != 0 )
-    {
-        struct stat st;
-        if ( (stat(DEVXEN, &st) != 0) || !S_ISDIR(st.st_mode) )
-            return -1;
-    }
-
-    return 0;
-}
-
-static int xendev_open(const char *dev)
-{
-    int fd, devnum;
-    struct stat st;
-    char *devname, *devpath;
-
-    devname = devpath = NULL;
-    fd = -1;
-
-    if ( asprintf(&devname, "xen!%s", dev) == 0 )
-        goto fail;
-
-    if ( asprintf(&devpath, "%s/%s", DEVXEN, dev) == 0 )
-        goto fail;
-
-    devnum = xc_find_device_number(dev);
-    if ( devnum == -1 )
-        devnum = xc_find_device_number(devname);
-
-    /*
-     * If we know what the correct device is and the path doesn't exist or 
-     * isn't a device, then remove it so we can create the device.
-     */
-    if ( (devnum != -1) &&
-         ((stat(devpath, &st) != 0) || !S_ISCHR(st.st_mode)) )
-    {
-        unlink(devpath);
-        if ( (make_dev_xen() == -1) ||
-             (mknod(devpath, S_IFCHR|0600, devnum) != 0) )
-            goto fail;
-    }
-
-    fd = open(devpath, O_RDWR);
-
- fail:
-    free(devname);
-    free(devpath);
-
-    return fd;
-}
+#define DEVXEN "/dev/xen/"
 
 int xc_evtchn_open(void)
 {
-    return xendev_open("evtchn");
+    return open(DEVXEN "evtchn", O_RDWR);
 }
 
 int xc_evtchn_close(int xce_handle)
@@ -551,7 +436,7 @@ void discard_file_cache(xc_interface *xch, int fd, int flush)
 
 int xc_gnttab_open(xc_interface *xch)
 {
-    return xendev_open("gntdev");
+    return open(DEVXEN "gntdev", O_RDWR);
 }
 
 int xc_gnttab_close(xc_interface *xch, int xcg_handle)
