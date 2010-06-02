@@ -550,12 +550,12 @@ int libxl_domain_shutdown(struct libxl_ctx *ctx, uint32_t domid, int req)
     shutdown_path = libxl_sprintf(ctx, "%s/control/shutdown", dom_path);
 
     xs_write(ctx->xsh, XBT_NULL, shutdown_path, req_table[req], strlen(req_table[req]));
-    if (/* hvm */ 0) {
+    if (is_hvm(ctx,domid)) {
         unsigned long acpi_s_state = 0;
         unsigned long pvdriver = 0;
         xc_get_hvm_param(ctx->xch, domid, HVM_PARAM_ACPI_S_STATE, &acpi_s_state);
         xc_get_hvm_param(ctx->xch, domid, HVM_PARAM_CALLBACK_IRQ, &pvdriver);
-        if (!pvdriver && acpi_s_state != 0)
+        if (!pvdriver || acpi_s_state != 0)
             xc_domain_shutdown(ctx->xch, domid, req);
     }
     return 0;

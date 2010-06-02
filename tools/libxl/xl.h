@@ -40,6 +40,8 @@ int main_migrate(int argc, char **argv);
 int main_pause(int argc, char **argv);
 int main_unpause(int argc, char **argv);
 int main_destroy(int argc, char **argv);
+int main_shutdown(int argc, char **argv);
+int main_reboot(int argc, char **argv);
 int main_list(int argc, char **argv);
 int main_list_vm(int argc, char **argv);
 int main_create(int argc, char **argv);

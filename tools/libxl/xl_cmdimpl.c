@@ -1160,6 +1160,11 @@ start:
                             free(w1);
                             free(w2);
                             LOG("Done. Rebooting now");
+                            /*
+                             * XXX FIXME: If this sleep is not there then
+                             * domain re-creation fails sometimes.
+                             */
+                            sleep(2);
                             goto start;
                         }
                         LOG("Done. Exiting now");
@@ -1621,6 +1626,22 @@ void destroy_domain(char *p)
     }
     rc = libxl_domain_destroy(&ctx, domid, 0);
     if (rc) { fprintf(stderr,"destroy failed (rc=%d)\n.",rc); exit(-1); }
+}
+
+void shutdown_domain(char *p)
+{
+    int rc;
+    find_domain(p);
+    rc=libxl_domain_shutdown(&ctx, domid, 0);
+    if (rc) { fprintf(stderr,"shutdown failed (rc=%d)\n.",rc);exit(-1); }
+}
+
+void reboot_domain(char *p)
+{
+    int rc;
+    find_domain(p);
+    rc=libxl_domain_shutdown(&ctx, domid, 1);
+    if (rc) { fprintf(stderr,"reboot failed (rc=%d)\n.",rc);exit(-1); }
 }
 
 void list_domains(int verbose)
@@ -2375,6 +2396,57 @@ int main_destroy(int argc, char **argv)
     exit(0);
 }
 
+int main_shutdown(int argc, char **argv)
+{
+    int opt;
+    char *p;
+
+    while ((opt = getopt(argc, argv, "h")) != -1) {
+        switch (opt) {
+        case 'h':
+            help("shutdown");
+            exit(0);
+        default:
+            fprintf(stderr, "option not supported\n");
+            break;
+        }
+    }
+    if (optind >= argc) {
+        help("shutdown");
+        exit(2);
+    }
+
+    p = argv[optind];
+
+    shutdown_domain(p);
+    exit(0);
+}
+
+int main_reboot(int argc, char **argv)
+{
+    int opt;
+    char *p;
+
+    while ((opt = getopt(argc, argv, "h")) != -1) {
+        switch (opt) {
+        case 'h':
+            help("reboot");
+            exit(0);
+        default:
+            fprintf(stderr, "option not supported\n");
+            break;
+        }
+    }
+    if (optind >= argc) {
+        help("reboot");
+        exit(2);
+    }
+
+    p = argv[optind];
+
+    reboot_domain(p);
+    exit(0);
+}
 int main_list(int argc, char **argv)
 {
     int opt, verbose = 0;
