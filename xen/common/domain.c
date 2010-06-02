@@ -847,12 +847,7 @@ long do_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
              (set.timeout_abs_ns < NOW()) )
             return -ETIME;
 
-        if ( v->singleshot_timer.cpu != smp_processor_id() )
-        {
-            stop_timer(&v->singleshot_timer);
-            v->singleshot_timer.cpu = smp_processor_id();
-        }
-
+        migrate_timer(&v->singleshot_timer, smp_processor_id());
         set_timer(&v->singleshot_timer, set.timeout_abs_ns);
 
         break;

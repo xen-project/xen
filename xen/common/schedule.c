@@ -475,18 +475,6 @@ int cpu_disable_scheduler(unsigned int cpu)
                 cpus_setall(v->cpu_affinity);
             }
 
-            /*
-             * Migrate single-shot timers to CPU0. A new cpu will automatically
-             * be chosen when the timer is next re-set.
-             */
-            if ( v->singleshot_timer.cpu == cpu )
-            {
-                int cpu_mig = first_cpu(c->cpu_valid);
-                if ( cpu_mig == cpu )
-                    cpu_mig = next_cpu(cpu_mig, c->cpu_valid);
-                migrate_timer(&v->singleshot_timer, cpu_mig);
-            }
-
             if ( v->processor == cpu )
             {
                 set_bit(_VPF_migrating, &v->pause_flags);
@@ -804,12 +792,7 @@ long do_set_timer_op(s_time_t timeout)
     }
     else
     {
-        if ( v->singleshot_timer.cpu != smp_processor_id() )
-        {
-            stop_timer(&v->singleshot_timer);
-            v->singleshot_timer.cpu = smp_processor_id();
-        }
-
+        migrate_timer(&v->singleshot_timer, smp_processor_id());
         set_timer(&v->singleshot_timer, timeout);
     }
 
@@ -890,8 +873,6 @@ static void vcpu_periodic_timer_work(struct vcpu *v)
     s_time_t now = NOW();
     uint64_t periodic_next_event;
 
-    ASSERT(!active_timer(&v->periodic_timer));
-
     if ( v->periodic_period == 0 )
         return;
 
@@ -904,7 +885,7 @@ static void vcpu_periodic_timer_work(struct vcpu *v)
         periodic_next_event = now + v->periodic_period;
     }
 
-    v->periodic_timer.cpu = smp_processor_id();
+    migrate_timer(&v->periodic_timer, smp_processor_id());
     set_timer(&v->periodic_timer, periodic_next_event);
 }
 

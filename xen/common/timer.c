@@ -35,6 +35,7 @@ struct timers {
     struct timer **heap;
     struct timer  *list;
     struct timer  *running;
+    struct list_head inactive;
 } __cacheline_aligned;
 
 static DEFINE_PER_CPU(struct timers, timers);
@@ -169,8 +170,9 @@ static int add_to_list(struct timer **pprev, struct timer *t)
  * TIMER OPERATIONS.
  */
 
-static int remove_entry(struct timers *timers, struct timer *t)
+static int remove_entry(struct timer *t)
 {
+    struct timers *timers = &per_cpu(timers, t->cpu);
     int rc;
 
     switch ( t->status )
@@ -186,15 +188,16 @@ static int remove_entry(struct timers *timers, struct timer *t)
         BUG();
     }
 
-    t->status = TIMER_STATUS_inactive;
+    t->status = TIMER_STATUS_invalid;
     return rc;
 }
 
-static int add_entry(struct timers *timers, struct timer *t)
+static int add_entry(struct timer *t)
 {
+    struct timers *timers = &per_cpu(timers, t->cpu);
     int rc;
 
-    ASSERT(t->status == TIMER_STATUS_inactive);
+    ASSERT(t->status == TIMER_STATUS_invalid);
 
     /* Try to add to heap. t->heap_offset indicates whether we succeed. */
     t->heap_offset = 0;
@@ -209,18 +212,23 @@ static int add_entry(struct timers *timers, struct timer *t)
     return add_to_list(&timers->list, t);
 }
 
-static inline void __add_timer(struct timer *timer)
+static inline void activate_timer(struct timer *timer)
 {
-    int cpu = timer->cpu;
-    if ( add_entry(&per_cpu(timers, cpu), timer) )
-        cpu_raise_softirq(cpu, TIMER_SOFTIRQ);
+    ASSERT(timer->status == TIMER_STATUS_inactive);
+    timer->status = TIMER_STATUS_invalid;
+    list_del(&timer->inactive);
+
+    if ( add_entry(timer) )
+        cpu_raise_softirq(timer->cpu, TIMER_SOFTIRQ);
 }
 
-static inline void __stop_timer(struct timer *timer)
+static inline void deactivate_timer(struct timer *timer)
 {
-    int cpu = timer->cpu;
-    if ( remove_entry(&per_cpu(timers, cpu), timer) )
-        cpu_raise_softirq(cpu, TIMER_SOFTIRQ);
+    if ( remove_entry(timer) )
+        cpu_raise_softirq(timer->cpu, TIMER_SOFTIRQ);
+
+    timer->status = TIMER_STATUS_inactive;
+    list_add(&timer->inactive, &per_cpu(timers, timer->cpu).inactive);
 }
 
 static inline void timer_lock(struct timer *timer)
@@ -253,6 +261,32 @@ static inline void timer_unlock(struct timer *timer)
     do { timer_unlock(t); local_irq_restore(flags); } while ( 0 )
 
 
+static bool_t active_timer(struct timer *timer)
+{
+    ASSERT(timer->status >= TIMER_STATUS_inactive);
+    ASSERT(timer->status <= TIMER_STATUS_in_list);
+    return (timer->status >= TIMER_STATUS_in_heap);
+}
+
+
+void init_timer(
+    struct timer *timer,
+    void        (*function)(void *),
+    void         *data,
+    unsigned int  cpu)
+{
+    unsigned long flags;
+    memset(timer, 0, sizeof(*timer));
+    timer->function = function;
+    timer->data = data;
+    timer->cpu = cpu;
+    timer->status = TIMER_STATUS_inactive;
+    timer_lock_irqsave(timer, flags);
+    list_add(&timer->inactive, &per_cpu(timers, cpu).inactive);
+    timer_unlock_irqrestore(timer, flags);
+}
+
+
 void set_timer(struct timer *timer, s_time_t expires)
 {
     unsigned long flags;
@@ -260,13 +294,13 @@ void set_timer(struct timer *timer, s_time_t expires)
     timer_lock_irqsave(timer, flags);
 
     if ( active_timer(timer) )
-        __stop_timer(timer);
+        deactivate_timer(timer);
 
     timer->expires = expires;
     timer->expires_end = expires + timer_slop;
 
     if ( likely(timer->status != TIMER_STATUS_killed) )
-        __add_timer(timer);
+        activate_timer(timer);
 
     timer_unlock_irqrestore(timer, flags);
 }
@@ -279,7 +313,7 @@ void stop_timer(struct timer *timer)
     timer_lock_irqsave(timer, flags);
 
     if ( active_timer(timer) )
-        __stop_timer(timer);
+        deactivate_timer(timer);
 
     timer_unlock_irqrestore(timer, flags);
 }
@@ -287,7 +321,8 @@ void stop_timer(struct timer *timer)
 
 void migrate_timer(struct timer *timer, unsigned int new_cpu)
 {
-    int           old_cpu;
+    int old_cpu;
+    bool_t active;
     unsigned long flags;
 
     for ( ; ; )
@@ -313,16 +348,16 @@ void migrate_timer(struct timer *timer, unsigned int new_cpu)
         spin_unlock_irqrestore(&per_cpu(timers, new_cpu).lock, flags);
     }
 
-    if ( active_timer(timer) )
-    {
-        __stop_timer(timer);
-        timer->cpu = new_cpu;
-        __add_timer(timer);
-    }
-    else
-    {
-        timer->cpu = new_cpu;
-    }
+    active = active_timer(timer);
+    if ( active )
+        deactivate_timer(timer);
+
+    list_del(&timer->inactive);
+    timer->cpu = new_cpu;
+    list_add(&timer->inactive, &per_cpu(timers, new_cpu).inactive);
+
+    if ( active )
+        activate_timer(timer);
 
     spin_unlock(&per_cpu(timers, old_cpu).lock);
     spin_unlock_irqrestore(&per_cpu(timers, new_cpu).lock, flags);
@@ -339,7 +374,9 @@ void kill_timer(struct timer *timer)
     timer_lock_irqsave(timer, flags);
 
     if ( active_timer(timer) )
-        __stop_timer(timer);
+        deactivate_timer(timer);
+
+    list_del(&timer->inactive);
     timer->status = TIMER_STATUS_killed;
 
     timer_unlock_irqrestore(timer, flags);
@@ -354,6 +391,9 @@ static void execute_timer(struct timers *ts, struct timer *t)
 {
     void (*fn)(void *) = t->function;
     void *data = t->data;
+
+    t->status = TIMER_STATUS_inactive;
+    list_add(&t->inactive, &ts->inactive);
 
     ts->running = t;
     spin_unlock_irq(&ts->lock);
@@ -401,7 +441,6 @@ static void timer_softirq_action(void)
             ((t = heap[1])->expires < now) )
     {
         remove_from_heap(heap, t);
-        t->status = TIMER_STATUS_inactive;
         execute_timer(ts, t);
     }
 
@@ -409,7 +448,6 @@ static void timer_softirq_action(void)
     while ( ((t = ts->list) != NULL) && (t->expires < now) )
     {
         ts->list = t->list_next;
-        t->status = TIMER_STATUS_inactive;
         execute_timer(ts, t);
     }
 
@@ -419,8 +457,8 @@ static void timer_softirq_action(void)
     while ( unlikely((t = next) != NULL) )
     {
         next = t->list_next;
-        t->status = TIMER_STATUS_inactive;
-        add_entry(ts, t);
+        t->status = TIMER_STATUS_invalid;
+        add_entry(t);
     }
 
     ts->overflow = (ts->list != NULL);
@@ -446,7 +484,7 @@ static void timer_softirq_action(void)
         while ( (GET_HEAP_SIZE(heap) != 0) &&
                 ((t = heap[1])->expires <= end) )
         {
-            remove_entry(ts, t);
+            remove_entry(t);
 
             t->status = TIMER_STATUS_in_list;
             t->list_next = NULL;
@@ -529,13 +567,23 @@ static void migrate_timers_from_cpu(unsigned int cpu)
 
     while ( (t = GET_HEAP_SIZE(ts->heap) ? ts->heap[1] : ts->list) != NULL )
     {
-        remove_entry(ts, t);
+        remove_entry(t);
         t->cpu = 0;
-        __add_timer(t);
+        add_entry(t);
+    }
+
+    while ( !list_empty(&ts->inactive) )
+    {
+        t = list_entry(ts->inactive.next, struct timer, inactive);
+        list_del(&t->inactive);
+        t->cpu = 0;
+        list_add(&t->inactive, &per_cpu(timers, 0).inactive);
     }
 
     spin_unlock(&ts->lock);
     spin_unlock_irq(&per_cpu(timers, 0).lock);
+
+    cpu_raise_softirq(0, TIMER_SOFTIRQ);
 }
 
 static struct timer *dummy_heap;
@@ -549,6 +597,7 @@ static int cpu_callback(
     switch ( action )
     {
     case CPU_UP_PREPARE:
+        INIT_LIST_HEAD(&ts->inactive);
         spin_lock_init(&ts->lock);
         ts->heap = &dummy_heap;
         break;

@@ -11,6 +11,7 @@
 #include <xen/spinlock.h>
 #include <xen/time.h>
 #include <xen/string.h>
+#include <xen/list.h>
 
 struct timer {
     /* System time expiry value (nanoseconds since boot). */
@@ -19,10 +20,12 @@ struct timer {
 
     /* Position in active-timer data structure. */
     union {
-        /* Timer-heap offset. */
+        /* Timer-heap offset (TIMER_STATUS_in_heap). */
         unsigned int heap_offset;
-        /* Linked list. */
+        /* Linked list (TIMER_STATUS_in_list). */
         struct timer *list_next;
+        /* Linked list of inactive timers (TIMER_STATUS_inactive). */
+        struct list_head inactive;
     };
 
     /* On expiry, '(*function)(data)' will be executed in softirq context. */
@@ -33,10 +36,11 @@ struct timer {
     uint16_t cpu;
 
     /* Timer status. */
-#define TIMER_STATUS_inactive 0 /* Not in use; can be activated.    */
-#define TIMER_STATUS_killed   1 /* Not in use; canot be activated.  */
-#define TIMER_STATUS_in_heap  2 /* In use; on timer heap.           */
-#define TIMER_STATUS_in_list  3 /* In use; on overflow linked list. */
+#define TIMER_STATUS_invalid  0 /* Should never see this.           */
+#define TIMER_STATUS_inactive 1 /* Not in use; can be activated.    */
+#define TIMER_STATUS_killed   2 /* Not in use; cannot be activated. */
+#define TIMER_STATUS_in_heap  3 /* In use; on timer heap.           */
+#define TIMER_STATUS_in_list  4 /* In use; on overflow linked list. */
     uint8_t status;
 };
 
@@ -45,67 +49,38 @@ struct timer {
  */
 
 /*
- * Returns TRUE if the given timer is on a timer list.
- * The timer must *previously* have been initialised by init_timer(), or its
- * structure initialised to all-zeroes.
- */
-static inline int active_timer(struct timer *timer)
-{
-    return (timer->status >= TIMER_STATUS_in_heap);
-}
-
-/*
  * Initialise a timer structure with an initial callback CPU, callback
- * function and callback data pointer. This function may be called at any
- * time (and multiple times) on an inactive timer. It must *never* execute
- * concurrently with any other operation on the same timer.
+ * function and callback data pointer. This function must only be called on
+ * a brand new timer, or a killed timer. It must *never* execute concurrently
+ * with any other operation on the same timer.
  */
-static inline void init_timer(
+void init_timer(
     struct timer *timer,
-    void           (*function)(void *),
-    void            *data,
-    unsigned int     cpu)
-{
-    memset(timer, 0, sizeof(*timer));
-    timer->function = function;
-    timer->data     = data;
-    timer->cpu      = cpu;
-}
+    void        (*function)(void *),
+    void         *data,
+    unsigned int  cpu);
 
-/*
- * Set the expiry time and activate a timer. The timer must *previously* have
- * been initialised by init_timer() (so that callback details are known).
- */
-extern void set_timer(struct timer *timer, s_time_t expires);
+/* Set the expiry time and activate a timer. */
+void set_timer(struct timer *timer, s_time_t expires);
 
 /*
  * Deactivate a timer This function has no effect if the timer is not currently
  * active.
- * The timer must *previously* have been initialised by init_timer(), or its
- * structure initialised to all zeroes.
  */
-extern void stop_timer(struct timer *timer);
+void stop_timer(struct timer *timer);
 
-/*
- * Migrate a timer to a different CPU. The timer may be currently active.
- * The timer must *previously* have been initialised by init_timer(), or its
- * structure initialised to all zeroes.
- */
-extern void migrate_timer(struct timer *timer, unsigned int new_cpu);
+/* Migrate a timer to a different CPU. The timer may be currently active. */
+void migrate_timer(struct timer *timer, unsigned int new_cpu);
 
 /*
  * Deactivate a timer and prevent it from being re-set (future calls to
  * set_timer will silently fail). When this function returns it is guaranteed
  * that the timer callback handler is not running on any CPU.
- * The timer must *previously* have been initialised by init_timer(), or its
- * structure initialised to all zeroes.
  */
-extern void kill_timer(struct timer *timer);
+void kill_timer(struct timer *timer);
 
-/*
- * Bootstrap initialisation. Must be called before any other timer function.
- */
-extern void timer_init(void);
+/* Bootstrap initialisation. Must be called before any other timer function. */
+void timer_init(void);
 
 /*
  * Next timer deadline for each CPU.
@@ -115,10 +90,10 @@ DECLARE_PER_CPU(s_time_t, timer_deadline_start);
 DECLARE_PER_CPU(s_time_t, timer_deadline_end);
 
 /* Arch-defined function to reprogram timer hardware for new deadline. */
-extern int reprogram_timer(s_time_t timeout);
+int reprogram_timer(s_time_t timeout);
 
-/* calculate the aligned first tick time for a given periodic timer */ 
-extern s_time_t align_timer(s_time_t firsttick, uint64_t period);
+/* Calculate the aligned first tick time for a given periodic timer. */
+s_time_t align_timer(s_time_t firsttick, uint64_t period);
 
 #endif /* _TIMER_H_ */
 
