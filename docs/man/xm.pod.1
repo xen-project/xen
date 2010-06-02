@@ -40,12 +40,10 @@ Most B<xm> commands require root privileges to run due to the
 communications channels used to talk to the hypervisor.  Running as
 non root will return an error.
 
-Most B<xm> commands act asynchronously, so just because the B<xm>
-command returned doesn't mean the action is complete.  This is
-important, as many operations on domains, like create and shutdown,
-can take considerable time (30 seconds or more) to bring the machine
-into a fully compliant state.  If you want to know when one of these
-actions has finished you must poll through B<xm list> periodically.
+Most B<xm> commands act synchronously, except maybe create, shutdown,
+mem-set and vcpu-set. The fact that the B<xm> command returned doesn't
+necessarily mean that the action is complete and you must poll through
+xm list periodically to detect that the operation completed.
 
 =head1 DOMAIN SUBCOMMANDS
 
