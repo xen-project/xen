@@ -40,6 +40,8 @@ struct timers {
 
 static DEFINE_PER_CPU(struct timers, timers);
 
+static cpumask_t timer_valid_cpumask;
+
 DEFINE_PER_CPU(s_time_t, timer_deadline_start);
 DEFINE_PER_CPU(s_time_t, timer_deadline_end);
 
@@ -238,6 +240,7 @@ static inline void timer_lock(struct timer *timer)
     for ( ; ; )
     {
         cpu = timer->cpu;
+        ASSERT(cpu_isset(cpu, timer_valid_cpumask));
         spin_lock(&per_cpu(timers, cpu).lock);
         if ( likely(timer->cpu == cpu) )
             break;
@@ -329,6 +332,9 @@ void migrate_timer(struct timer *timer, unsigned int new_cpu)
     {
         if ( (old_cpu = timer->cpu) == new_cpu )
             return;
+
+        ASSERT(cpu_isset(old_cpu, timer_valid_cpumask));
+        ASSERT(cpu_isset(new_cpu, timer_valid_cpumask));
 
         if ( old_cpu < new_cpu )
         {
@@ -553,23 +559,27 @@ static struct keyhandler dump_timerq_keyhandler = {
     .desc = "dump timer queues"
 };
 
-static void migrate_timers_from_cpu(unsigned int cpu)
+static unsigned int migrate_timers_from_cpu(unsigned int cpu)
 {
     struct timers *ts;
     struct timer *t;
+    bool_t notify = 0;
+    unsigned int nr_migrated = 0;
+    unsigned long flags;
 
     ASSERT((cpu != 0) && cpu_online(0));
 
     ts = &per_cpu(timers, cpu);
 
-    spin_lock_irq(&per_cpu(timers, 0).lock);
+    spin_lock_irqsave(&per_cpu(timers, 0).lock, flags);
     spin_lock(&ts->lock);
 
     while ( (t = GET_HEAP_SIZE(ts->heap) ? ts->heap[1] : ts->list) != NULL )
     {
         remove_entry(t);
         t->cpu = 0;
-        add_entry(t);
+        notify |= add_entry(t);
+        nr_migrated++;
     }
 
     while ( !list_empty(&ts->inactive) )
@@ -578,12 +588,16 @@ static void migrate_timers_from_cpu(unsigned int cpu)
         list_del(&t->inactive);
         t->cpu = 0;
         list_add(&t->inactive, &per_cpu(timers, 0).inactive);
+        nr_migrated++;
     }
 
     spin_unlock(&ts->lock);
-    spin_unlock_irq(&per_cpu(timers, 0).lock);
+    spin_unlock_irqrestore(&per_cpu(timers, 0).lock, flags);
 
-    cpu_raise_softirq(0, TIMER_SOFTIRQ);
+    if ( notify )
+        cpu_raise_softirq(0, TIMER_SOFTIRQ);
+
+    return nr_migrated;
 }
 
 static struct timer *dummy_heap;
@@ -600,10 +614,17 @@ static int cpu_callback(
         INIT_LIST_HEAD(&ts->inactive);
         spin_lock_init(&ts->lock);
         ts->heap = &dummy_heap;
+        cpu_set(cpu, timer_valid_cpumask);
+        break;
+    case CPU_DYING:
+        cpu_clear(cpu, timer_valid_cpumask);
+        migrate_timers_from_cpu(cpu);
         break;
     case CPU_UP_CANCELED:
     case CPU_DEAD:
-        migrate_timers_from_cpu(cpu);
+        cpu_clear(cpu, timer_valid_cpumask);
+        if ( migrate_timers_from_cpu(cpu) )
+            BUG();
         break;
     default:
         break;
