@@ -3461,11 +3461,11 @@ int main_networklist(int argc, char **argv)
     libxl_nicinfo *nics;
     unsigned int nb;
 
-    if (argc < 2) {
+    if (argc < 3) {
         help("network-list");
         exit(1);
     }
-    while ((opt = getopt(argc, argv, "hl")) != -1) {
+    while ((opt = getopt(argc, argv, "h")) != -1) {
         switch (opt) {
             case 'h':
                 help("network-list");
@@ -3479,7 +3479,7 @@ int main_networklist(int argc, char **argv)
     /*      Idx  BE   MAC   Hdl  Sta  evch txr/rxr  BE-path */
     printf("%-3s %-2s %-17s %-6s %-5s %-6s %5s/%-5s %-30s\n",
            "Idx", "BE", "Mac Addr.", "handle", "state", "evt-ch", "tx-", "rx-ring-ref", "BE-path");
-    for (++argv, --argc; argc > 0; --argc, ++argv) {
+    for (argv += 2, argc -= 2; argc > 0; --argc, ++argv) {
         if (domain_qualifier_to_domid(*argv, &domid, 0) < 0) {
             fprintf(stderr, "%s is an invalid domain identifier\n", *argv);
             continue;
