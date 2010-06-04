@@ -237,6 +237,7 @@
 ^tools/xcutils/xc_restore$
 ^tools/xcutils/xc_save$
 ^tools/xcutils/readnotes$
+^tools/misc/xenwatchdogd$
 ^tools/xenfb/sdlfb$
 ^tools/xenfb/vncfb$
 ^tools/xenmon/xentrace_setmask$

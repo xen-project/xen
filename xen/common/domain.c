@@ -209,8 +209,8 @@ struct domain *domain_create(
     domid_t domid, unsigned int domcr_flags, ssidref_t ssidref)
 {
     struct domain *d, **pd;
-    enum { INIT_xsm = 1u<<0, INIT_rangeset = 1u<<1, INIT_evtchn = 1u<<2,
-           INIT_gnttab = 1u<<3, INIT_arch = 1u<<4 };
+    enum { INIT_xsm = 1u<<0, INIT_watchdog = 1u<<1, INIT_rangeset = 1u<<2,
+           INIT_evtchn = 1u<<3, INIT_gnttab = 1u<<4, INIT_arch = 1u<<5 };
     int init_status = 0;
     int poolid = CPUPOOLID_NONE;
 
@@ -224,6 +224,9 @@ struct domain *domain_create(
     if ( xsm_alloc_security_domain(d) != 0 )
         goto fail;
     init_status |= INIT_xsm;
+
+    watchdog_domain_init(d);
+    init_status |= INIT_watchdog;
 
     atomic_set(&d->refcnt, 1);
     spin_lock_init_prof(d, domain_lock);
@@ -327,6 +330,8 @@ struct domain *domain_create(
     }
     if ( init_status & INIT_rangeset )
         rangeset_domain_destroy(d);
+    if ( init_status & INIT_watchdog )
+        watchdog_domain_destroy(d);
     if ( init_status & INIT_xsm )
         xsm_free_security_domain(d);
     xfree(d->pirq_mask);
@@ -603,6 +608,8 @@ static void complete_domain_destroy(struct rcu_head *head)
     grant_table_destroy(d);
 
     arch_domain_destroy(d);
+
+    watchdog_domain_destroy(d);
 
     rangeset_domain_destroy(d);
 

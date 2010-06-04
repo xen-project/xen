@@ -366,6 +366,34 @@ int xc_vcpu_getcontext(xc_interface *xch,
     return rc;
 }
 
+int xc_watchdog(xc_interface *xch,
+                uint32_t id,
+                uint32_t timeout)
+{
+    int ret = -1;
+    sched_watchdog_t arg;
+    DECLARE_HYPERCALL;
+
+    hypercall.op     = __HYPERVISOR_sched_op;
+    hypercall.arg[0] = (unsigned long)SCHEDOP_watchdog;
+    hypercall.arg[1] = (unsigned long)&arg;
+    arg.id = id;
+    arg.timeout = timeout;
+
+    if ( lock_pages(&arg, sizeof(arg)) != 0 )
+    {
+        PERROR("Could not lock memory for Xen hypercall");
+        goto out1;
+    }
+
+    ret = do_xen_hypercall(xch, &hypercall);
+
+    unlock_pages(&arg, sizeof(arg));
+
+ out1:
+    return ret;
+}
+
 
 int xc_shadow_control(xc_interface *xch,
                       uint32_t domid,

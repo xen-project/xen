@@ -5,6 +5,7 @@
 #include <xen/domain.h>
 #include <xen/delay.h>
 #include <xen/shutdown.h>
+#include <xen/console.h>
 #include <asm/debugger.h>
 #include <public/sched.h>
 
@@ -49,6 +50,14 @@ void dom0_shutdown(u8 reason)
     case SHUTDOWN_reboot:
     {
         printk("Domain 0 shutdown: rebooting machine.\n");
+        machine_restart(0);
+        break; /* not reached */
+    }
+
+    case SHUTDOWN_watchdog:
+    {
+        printk("Domain 0 shutdown: watchdog rebooting machine.\n");
+        kexec_crash();
         machine_restart(0);
         break; /* not reached */
     }

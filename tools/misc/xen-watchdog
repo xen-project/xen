@@ -1,0 +1,59 @@
+#! /bin/bash
+#
+# xen-watchdog
+#
+# chkconfig: 2345 21 79
+# description: Run domain watchdog daemon
+#
+
+# Source function library.
+. /etc/init.d/functions
+
+start() {
+	local r
+	base="watchdogd"
+	echo -n $"Starting domain watchdog daemon: "
+
+	/usr/sbin/xenwatchdogd 30 15
+	r=$?
+	[ "$r" -eq 0 ] && success $"$base startup" || failure $"$base startup"
+	echo
+
+	return $r
+}
+
+stop() {
+	local r
+	base="watchdogd"
+	echo -n $"Stopping domain watchdog daemon: "
+
+	killall -USR1 watchdogd 2>/dev/null
+	r=$?
+	[ "$r" -eq 0 ] && success $"$base stop" || failure $"$base stop"
+	echo
+
+	return $r
+}
+
+case "$1" in
+  start)
+  	start
+	;;
+  stop)
+	stop
+	;;
+  restart)
+	stop
+	start
+	;;
+  status)
+	;;
+  condrestart)
+	stop
+	start
+	;;
+  *)
+	echo $"Usage: $0 {start|stop|status|restart|condrestart}"
+	exit 1
+esac
+

@@ -10,7 +10,7 @@ CFLAGS   += $(INCLUDES)
 
 HDRS     = $(wildcard *.h)
 
-TARGETS-y := xenperf xenpm xen-tmem-list-parse gtraceview gtracestat xenlockprof xen-hptool
+TARGETS-y := xenperf xenpm xen-tmem-list-parse gtraceview gtracestat xenlockprof xen-hptool xenwatchdogd
 TARGETS-$(CONFIG_X86) += xen-detect xen-hvmctx
 TARGETS := $(TARGETS-y)
 
@@ -22,7 +22,7 @@ INSTALL_BIN-y := xencons
 INSTALL_BIN-$(CONFIG_X86) += xen-detect
 INSTALL_BIN := $(INSTALL_BIN-y)
 
-INSTALL_SBIN-y := xm xen-bugtool xen-python-path xend xenperf xsview xenpm xen-tmem-list-parse gtraceview gtracestat xenlockprof xen-hptool
+INSTALL_SBIN-y := xm xen-bugtool xen-python-path xend xenperf xsview xenpm xen-tmem-list-parse gtraceview gtracestat xenlockprof xen-hptool xenwatchdogd
 INSTALL_SBIN-$(CONFIG_X86) += xen-hvmctx
 INSTALL_SBIN := $(INSTALL_SBIN-y)
 
@@ -37,8 +37,10 @@ build: $(TARGETS)
 install: build
 	$(INSTALL_DIR) $(DESTDIR)$(BINDIR)
 	$(INSTALL_DIR) $(DESTDIR)$(SBINDIR)
+	$(INSTALL_DIR) $(DESTDIR)$(CONFIG_DIR)/init.d
 	$(INSTALL_PYTHON_PROG) $(INSTALL_BIN) $(DESTDIR)$(BINDIR)
 	$(INSTALL_PYTHON_PROG) $(INSTALL_SBIN) $(DESTDIR)$(SBINDIR)
+	$(INSTALL_PROG) xen-watchdog $(DESTDIR)$(CONFIG_DIR)/init.d
 	set -e; for d in $(SUBDIRS); do $(MAKE) -C $$d install-recurse; done
 
 .PHONY: clean
@@ -49,7 +51,7 @@ clean:
 %.o: %.c $(HDRS) Makefile
 	$(CC) -c $(CFLAGS) -o $@ $<
 
-xen-hvmctx xenperf xenpm gtracestat xenlockprof xen-hptool: %: %.o Makefile
+xen-hvmctx xenperf xenpm gtracestat xenlockprof xen-hptool xenwatchdogd: %: %.o Makefile
 	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS) $(LDFLAGS_libxenctrl) $(LDFLAGS_libxenguest) $(LDFLAGS_libxenstore)
 
 gtraceview: %: %.o Makefile

@@ -332,6 +332,10 @@ int xc_domain_shutdown(xc_interface *xch,
                        uint32_t domid,
                        int reason);
 
+int xc_watchdog(xc_interface *xch,
+		uint32_t id,
+		uint32_t timeout);
+
 int xc_vcpu_setaffinity(xc_interface *xch,
                         uint32_t domid,
                         int vcpu,

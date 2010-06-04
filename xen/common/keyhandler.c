@@ -241,6 +241,7 @@ static void dump_domains(unsigned char key)
 
     for_each_domain ( d )
     {
+        unsigned int i;
         printk("General information for domain %u:\n", d->domain_id);
         cpuset_print(tmpstr, sizeof(tmpstr), d->domain_dirty_cpumask);
         printk("    refcnt=%d dying=%d nr_pages=%d xenheap_pages=%d "
@@ -254,6 +255,10 @@ static void dump_domains(unsigned char key)
                d->handle[ 8], d->handle[ 9], d->handle[10], d->handle[11],
                d->handle[12], d->handle[13], d->handle[14], d->handle[15],
                d->vm_assist);
+        for (i = 0 ; i < NR_DOMAIN_WATCHDOG_TIMERS; i++)
+            if ( test_bit(i, &d->watchdog_inuse_map) )
+                printk("    watchdog %d expires in %d seconds\n",
+                       i, (u32)((d->watchdog_timer[i].expires - NOW()) >> 30));
 
         arch_dump_domain_info(d);
 

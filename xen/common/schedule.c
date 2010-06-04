@@ -632,6 +632,78 @@ static long do_yield(void)
     return 0;
 }
 
+static void domain_watchdog_timeout(void *data)
+{
+    struct domain *d = data;
+
+    if ( d->is_shutting_down || d->is_dying )
+        return;
+
+    printk("Watchdog timer fired for domain %u\n", d->domain_id);
+    domain_shutdown(d, SHUTDOWN_watchdog);
+}
+
+static long domain_watchdog(struct domain *d, uint32_t id, uint32_t timeout)
+{
+    if ( id > NR_DOMAIN_WATCHDOG_TIMERS )
+        return -EINVAL;
+
+    spin_lock(&d->watchdog_lock);
+
+    if ( id == 0 )
+    {
+        for ( id = 0; id < NR_DOMAIN_WATCHDOG_TIMERS; id++ )
+        {
+            if ( test_and_set_bit(id, &d->watchdog_inuse_map) )
+                continue;
+            set_timer(&d->watchdog_timer[id], NOW() + SECONDS(timeout));
+            break;
+        }
+        spin_unlock(&d->watchdog_lock);
+        return id == NR_DOMAIN_WATCHDOG_TIMERS ? -EEXIST : id + 1;
+    }
+
+    id -= 1;
+    if ( !test_bit(id, &d->watchdog_inuse_map) )
+    {
+        spin_unlock(&d->watchdog_lock);
+        return -EEXIST;
+    }
+
+    if ( timeout == 0 )
+    {
+        stop_timer(&d->watchdog_timer[id]);
+        clear_bit(id, &d->watchdog_inuse_map);
+    }
+    else
+    {
+        set_timer(&d->watchdog_timer[id], NOW() + SECONDS(timeout));
+    }
+
+    spin_unlock(&d->watchdog_lock);
+    return 0;
+}
+
+void watchdog_domain_init(struct domain *d)
+{
+    unsigned int i;
+
+    spin_lock_init(&d->watchdog_lock);
+
+    d->watchdog_inuse_map = 0;
+
+    for ( i = 0; i < NR_DOMAIN_WATCHDOG_TIMERS; i++ )
+        init_timer(&d->watchdog_timer[i], domain_watchdog_timeout, d, 0);
+}
+
+void watchdog_domain_destroy(struct domain *d)
+{
+    unsigned int i;
+
+    for ( i = 0; i < NR_DOMAIN_WATCHDOG_TIMERS; i++ )
+        kill_timer(&d->watchdog_timer[i]);
+}
+
 long do_sched_op_compat(int cmd, unsigned long arg)
 {
     long ret = 0;
@@ -770,6 +842,19 @@ ret_t do_sched_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         rcu_unlock_domain(d);
         ret = 0;
 
+        break;
+    }
+
+    case SCHEDOP_watchdog:
+    {
+        struct sched_watchdog sched_watchdog;
+
+        ret = -EFAULT;
+        if ( copy_from_guest(&sched_watchdog, arg, 1) )
+            break;
+
+        ret = domain_watchdog(
+            current->domain, sched_watchdog.id, sched_watchdog.timeout);
         break;
     }
 

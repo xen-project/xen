@@ -191,7 +191,7 @@ struct mem_event_domain
     /* event channel port (vcpu0 only) */
     int xen_port;
 };
- 
+
 struct domain
 {
     domid_t          domain_id;
@@ -294,6 +294,12 @@ struct domain
     /* OProfile support. */
     struct xenoprof *xenoprof;
     int32_t time_offset_seconds;
+
+    /* Domain watchdog. */
+#define NR_DOMAIN_WATCHDOG_TIMERS 2
+    spinlock_t watchdog_lock;
+    uint32_t watchdog_inuse_map;
+    struct timer watchdog_timer[NR_DOMAIN_WATCHDOG_TIMERS];
 
     struct rcu_head rcu;
 
@@ -597,6 +603,9 @@ uint64_t get_cpu_idle_time(unsigned int cpu);
     (!softirq_pending(cpu) &&                   \
      cpu_online(cpu) &&                         \
      !per_cpu(tasklet_work_to_do, cpu))
+
+void watchdog_domain_init(struct domain *d);
+void watchdog_domain_destroy(struct domain *d);
 
 #define IS_PRIV(_d) ((_d)->is_privileged)
 #define IS_PRIV_FOR(_d, _t) (IS_PRIV(_d) || ((_d)->target && (_d)->target == (_t)))
