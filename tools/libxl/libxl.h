@@ -162,6 +162,8 @@ typedef struct {
     bool usb; /* usb support enabled or disabled */
     char *usbdevice; /* enable usb mouse: tablet for absolute mouse, mouse for PS/2 protocol relative mouse */
     bool apic; /* apic enabled or disabled */
+    int vcpus; /* max number of vcpus */
+    int vcpu_avail; /* vcpus actually available */
     char **extra; /* extra parameters pass directly to qemu, NULL terminated */
     /* Network is missing */
 } libxl_device_model_info;

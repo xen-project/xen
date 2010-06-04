@@ -100,7 +100,7 @@ int build_post(struct libxl_ctx *ctx, uint32_t domid,
     xc_cpuid_apply_policy(ctx->xch, domid);
 #endif
 
-    ents = libxl_calloc(ctx, (12 + info->max_vcpus) * 2, sizeof(char *));
+    ents = libxl_calloc(ctx, 12 + (info->max_vcpus * 2) + 2, sizeof(char *));
     ents[0] = "memory/static-max";
     ents[1] = libxl_sprintf(ctx, "%d", info->max_memkb);
     ents[2] = "memory/target";
@@ -115,7 +115,7 @@ int build_post(struct libxl_ctx *ctx, uint32_t domid,
     ents[11] = libxl_sprintf(ctx, "%lu", state->store_mfn);
     for (i = 0; i < info->max_vcpus; i++) {
         ents[12+(i*2)]   = libxl_sprintf(ctx, "cpu/%d/availability", i);
-        ents[12+(i*2)+1] = (i && info->cur_vcpus && (i >= info->cur_vcpus))
+        ents[12+(i*2)+1] = (i && info->cur_vcpus && !(info->cur_vcpus & (1 << i)))
                             ? "offline" : "online";
     }
 
@@ -182,10 +182,8 @@ int build_hvm(struct libxl_ctx *ctx, uint32_t domid,
         XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, ret, "hvm building failed");
         return ERROR_FAIL;
     }
-    ret = hvm_build_set_params(ctx->xch, domid, info->u.hvm.apic, info->u.hvm.acpi,
-                               info->u.hvm.pae, info->u.hvm.nx, info->u.hvm.viridian,
-                               info->max_vcpus,
-                               state->store_port, &state->store_mfn);
+    ret = hvm_build_set_params(ctx->xch, domid, info, state->store_port,
+                               &state->store_mfn);
     if (ret) {
         XL_LOG_ERRNOVAL(ctx, XL_LOG_ERROR, ret, "hvm build set params failed");
         return ERROR_FAIL;

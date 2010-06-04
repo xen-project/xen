@@ -205,6 +205,8 @@ static void init_dm_info(libxl_device_model_info *dm_info,
     dm_info->device_model = "qemu-dm";
     dm_info->videoram = b_info->video_memkb / 1024;
     dm_info->apic = b_info->u.hvm.apic;
+    dm_info->vcpus = b_info->max_vcpus;
+    dm_info->vcpu_avail = b_info->cur_vcpus;
 
     dm_info->stdvga = 0;
     dm_info->vnc = 1;
@@ -469,8 +471,10 @@ static void parse_config_data(const char *configfile_filename_report,
     init_build_info(b_info, c_info);
 
     /* the following is the actual config parsing with overriding values in the structures */
-    if (!xlu_cfg_get_long (config, "vcpus", &l))
+    if (!xlu_cfg_get_long (config, "vcpus", &l)) {
         b_info->max_vcpus = l;
+        b_info->cur_vcpus = (1 << l) - 1;
+    }
 
     if (!xlu_cfg_get_long (config, "memory", &l)) {
         b_info->max_memkb = l * 1024;

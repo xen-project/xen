@@ -17,10 +17,13 @@
 #include <xenguest.h>
 #include <sys/mman.h>
 #include <xen/hvm/hvm_info_table.h>
+#include <string.h>
+
+#include "libxl.h"
 
 int hvm_build_set_params(xc_interface *handle, uint32_t domid,
-                         int apic, int acpi, int pae, int nx, int viridian,
-                         int vcpus, int store_evtchn, unsigned long *store_mfn)
+                         libxl_domain_build_info *info,
+                         int store_evtchn, unsigned long *store_mfn)
 {
     struct hvm_info_table *va_hvm;
     uint8_t *va_map, sum;
@@ -33,18 +36,19 @@ int hvm_build_set_params(xc_interface *handle, uint32_t domid,
         return -1;
 
     va_hvm = (struct hvm_info_table *)(va_map + HVM_INFO_OFFSET);
-    va_hvm->acpi_enabled = acpi;
-    va_hvm->apic_mode = apic;
-    va_hvm->nr_vcpus = vcpus;
+    va_hvm->acpi_enabled = info->u.hvm.acpi;
+    va_hvm->apic_mode = info->u.hvm.apic;
+    va_hvm->nr_vcpus = info->max_vcpus;
+    memcpy(va_hvm->vcpu_online, &info->cur_vcpus, sizeof(info->cur_vcpus));
     for (i = 0, sum = 0; i < va_hvm->length; i++)
         sum += ((uint8_t *) va_hvm)[i];
     va_hvm->checksum -= sum;
     munmap(va_map, XC_PAGE_SIZE);
 
     xc_get_hvm_param(handle, domid, HVM_PARAM_STORE_PFN, store_mfn);
-    xc_set_hvm_param(handle, domid, HVM_PARAM_PAE_ENABLED, pae);
+    xc_set_hvm_param(handle, domid, HVM_PARAM_PAE_ENABLED, info->u.hvm.pae);
 #if defined(__i386__) || defined(__x86_64__)
-    xc_set_hvm_param(handle, domid, HVM_PARAM_VIRIDIAN, viridian);
+    xc_set_hvm_param(handle, domid, HVM_PARAM_VIRIDIAN, info->u.hvm.viridian);
 #endif
     xc_set_hvm_param(handle, domid, HVM_PARAM_STORE_EVTCHN, store_evtchn);
     return 0;

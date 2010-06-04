@@ -875,6 +875,14 @@ static char ** libxl_build_device_model_args(struct libxl_ctx *ctx,
         if (info->apic) {
             flexarray_set(dm_args, num++, "-acpi");
         }
+        if (info->vcpus > 1) {
+            flexarray_set(dm_args, num++, "-vcpus");
+            flexarray_set(dm_args, num++, libxl_sprintf(ctx, "%d", info->vcpus));
+        }
+        if (info->vcpu_avail) {
+            flexarray_set(dm_args, num++, "-vcpu_avail");
+            flexarray_set(dm_args, num++, libxl_sprintf(ctx, "0x%x", info->vcpu_avail));
+        }
         for (i = 0; i < num_vifs; i++) {
             if (vifs[i].nictype == NICTYPE_IOEMU) {
                 char *smac = libxl_sprintf(ctx, "%02x:%02x:%02x:%02x:%02x:%02x",

@@ -166,8 +166,8 @@ int libxl_device_pci_flr(struct libxl_ctx *ctx, unsigned int domain, unsigned in
 
 /* from xenguest (helper */
 int hvm_build_set_params(xc_interface *handle, uint32_t domid,
-                         int apic, int acpi, int pae, int nx, int viridian,
-                         int vcpus, int store_evtchn, unsigned long *store_mfn);
+                         libxl_domain_build_info *info,
+                         int store_evtchn, unsigned long *store_mfn);
 
 /* xl_exec */
 
