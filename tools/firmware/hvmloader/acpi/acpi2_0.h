@@ -255,6 +255,7 @@ struct acpi_20_fadt {
 #define ACPI_SEALED_CASE    (1 << 11)
 #define ACPI_HEADLESS       (1 << 12)
 #define ACPI_CPU_SW_SLP     (1 << 13)
+#define ACPI_USE_PLATFORM_CLOCK (1 << 15)
 
 /*
  * Firmware ACPI Control Structure (FACS).

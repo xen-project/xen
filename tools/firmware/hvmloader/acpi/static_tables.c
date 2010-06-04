@@ -70,7 +70,8 @@ struct acpi_20_fadt Fadt = {
     .iapc_boot_arch = ACPI_8042,
     .flags = (ACPI_PROC_C1 |
               ACPI_WBINVD |
-              ACPI_FIX_RTC | ACPI_TMR_VAL_EXT),
+              ACPI_FIX_RTC | ACPI_TMR_VAL_EXT |
+              ACPI_USE_PLATFORM_CLOCK),
 
     .reset_reg = {
         .address_space_id    = ACPI_SYSTEM_IO,
