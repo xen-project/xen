@@ -57,7 +57,7 @@ void free_xen_event_channel(
 int guest_enabled_event(struct vcpu *v, int virq);
 
 /* Notify remote end of a Xen-attached event channel.*/
-void notify_via_xen_event_channel(int lport);
+void notify_via_xen_event_channel(struct domain *ld, int lport);
 
 /* Wait on a Xen-attached event channel. */
 #define wait_on_xen_event_channel(port, condition)                      \

@@ -62,7 +62,7 @@ void vmx_send_assist_req(struct vcpu *v)
     }
     wmb();
     p->state = STATE_IOREQ_READY;
-    notify_via_xen_event_channel(v->arch.arch_vmx.xen_port);
+    notify_via_xen_event_channel(v->domain, v->arch.arch_vmx.xen_port);
 
     for (;;) {
         if (p->state != STATE_IOREQ_READY &&
