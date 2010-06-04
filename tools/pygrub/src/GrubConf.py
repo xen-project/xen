@@ -252,6 +252,9 @@ class GrubConfigFile(_GrubConfigFile):
     def __init__(self, fn = None):
         _GrubConfigFile.__init__(self,fn)
         
+    def new_image(self, title, lines):
+        return GrubImage(title, lines)
+
     def parse(self, buf = None):
         if buf is None:
             if self.filename is None:
@@ -345,7 +348,10 @@ class Grub2Image(_GrubImage):
 class Grub2ConfigFile(_GrubConfigFile):
     def __init__(self, fn = None):
         _GrubConfigFile.__init__(self, fn)
-        
+       
+    def new_image(self, title, lines):
+        return Grub2Image(title, lines)
+ 
     def parse(self, buf = None):
         if buf is None:
             if self.filename is None:

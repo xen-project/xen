@@ -119,6 +119,12 @@ class ExtLinuxConfigFile(object):
         if fn is not None:
             self.parse()
 
+    def new_image(self, title, lines):
+        # ExtLinuxImage constructor doesn't have title but since path
+        # is being used by get_{kernel|initrd} functions we pass
+        # empty string rather than None (see lines above)
+        return ExtLinuxImage(lines, "")
+
     def parse(self, buf = None):
         if buf is None:
             if self.filename is None:
