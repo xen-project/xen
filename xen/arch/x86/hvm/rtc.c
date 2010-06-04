@@ -281,8 +281,21 @@ static void rtc_next_second(RTCState *s)
 static void rtc_update_second(void *opaque)
 {
     RTCState *s = opaque;
+    s_time_t now = NOW();
 
     spin_lock(&s->lock);
+
+    /* If we somehow get way out of sync (say, Xen time leaps forward), 
+     * don't livelock the system trying to emulate every second.  Time 
+     * is already in bad trouble, so just skip forward rather than 
+     * trying to sync the RTC registers */
+    if ( unlikely(now - s->next_second_time > SECONDS(86400)) )
+    {
+        dprintk(XENLOG_WARNING, "HVM RTC: dom %u skipping %llu seconds\n",
+                vrtc_domain(s)->domain_id, 
+                (now - s->next_second_time) / SYSTEM_TIME_HZ);
+        s->next_second_time = now;
+    }
 
     /* if the oscillator is not in normal operation, we do not update */
     if ( (s->hw.cmos_data[RTC_REG_A] & RTC_DIV_CTL) != RTC_REF_CLCK_32KHZ )
