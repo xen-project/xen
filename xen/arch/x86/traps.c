@@ -1175,10 +1175,7 @@ static int __spurious_page_fault(
          (l2e_get_flags(l2e) & disallowed_flags) )
         return 0;
     if ( l2e_get_flags(l2e) & _PAGE_PSE )
-    {
-        l1e = l1e_empty(); /* define before use in debug tracing */
-        goto spurious;
-    }
+        return 1;
 
     l1t = map_domain_page(mfn);
     l1e = l1e_read_atomic(&l1t[l1_table_offset(addr)]);
@@ -1188,19 +1185,6 @@ static int __spurious_page_fault(
          (l1e_get_flags(l1e) & disallowed_flags) )
         return 0;
 
- spurious:
-    dprintk(XENLOG_WARNING, "Spurious fault in domain %u:%u "
-            "at addr %lx, e/c %04x\n",
-            current->domain->domain_id, current->vcpu_id,
-            addr, error_code);
-#if CONFIG_PAGING_LEVELS >= 4
-    dprintk(XENLOG_WARNING, " l4e = %"PRIpte"\n", l4e_get_intpte(l4e));
-#endif
-#if CONFIG_PAGING_LEVELS >= 3
-    dprintk(XENLOG_WARNING, " l3e = %"PRIpte"\n", l3e_get_intpte(l3e));
-#endif
-    dprintk(XENLOG_WARNING, " l2e = %"PRIpte"\n", l2e_get_intpte(l2e));
-    dprintk(XENLOG_WARNING, " l1e = %"PRIpte"\n", l1e_get_intpte(l1e));
     return 1;
 }
 
