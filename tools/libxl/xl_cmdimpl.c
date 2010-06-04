@@ -160,6 +160,7 @@ static void init_create_info(libxl_domain_create_info *c_info)
     memset(c_info, '\0', sizeof(*c_info));
     c_info->xsdata = NULL;
     c_info->platformdata = NULL;
+    c_info->hap = 1;
     c_info->hvm = 1;
     c_info->oos = 1;
     c_info->ssidref = 0;
@@ -441,7 +442,9 @@ static void parse_config_data(const char *configfile_filename_report,
         !strncmp(buf, "hvm", strlen(buf)))
         c_info->hvm = 1;
 
-    /* hap is missing */
+    if (!xlu_cfg_get_long (config, "hap", &l))
+        c_info->hap = l;
+
     if (!xlu_cfg_get_string (config, "name", &buf))
         c_info->name = strdup(buf);
     else
