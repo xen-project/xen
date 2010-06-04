@@ -523,6 +523,7 @@ def save_pci_conf_space(devs_string):
     return (pci_list, cfg_list)
 
 def restore_pci_conf_space(pci_cfg_list):
+    time.sleep(1.0)
     pci_list = pci_cfg_list[0]
     cfg_list = pci_cfg_list[1]
     for i in range(0, len(pci_list)):
