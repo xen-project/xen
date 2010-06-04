@@ -65,15 +65,16 @@ struct symbol {
 
 guest_word_t kernel_stext, kernel_etext, kernel_sinittext, kernel_einittext, kernel_hypercallpage;
 
+#if defined (__i386__) 
+unsigned long long kernel_start = 0xc0000000;
+#else
+unsigned long long kernel_start = 0xffffffff80000000UL;
+#endif
+
 static int is_kernel_text(guest_word_t addr)
 {
-#if defined (__i386__) || defined (__x86_64__)
     if (symbol_table == NULL)
-        return (addr > ((guest_word_size == 4) ? 0xc000000 : 0xffffffff80000000ULL));
-#elif defined (__ia64__)
-    if (symbol_table == NULL)
-        return (addr > 0xa000000000000000UL);
-#endif
+        return (addr > kernel_start);
 
     if (addr >= kernel_stext &&
         addr <= kernel_etext)
@@ -909,6 +910,8 @@ static void usage(void)
     printf("  -s SYMTAB, --symbol-table=SYMTAB\n");
     printf("                    read symbol table from SYMTAB.\n");
     printf("  --stack-trace     print a complete stack trace.\n");
+    printf("  -k, --kernel-start\n");
+    printf("                    set user/kernel split. (default 0xc0000000)\n");
 #ifdef __ia64__
     printf("  -r LIST, --regs=LIST  display more registers.\n");
     printf("  -a --all          same as --regs=tlb,cr,ar,br,bk\n");
@@ -920,7 +923,7 @@ static void usage(void)
 int main(int argc, char **argv)
 {
     int ch;
-    static const char *sopts = "fs:ha"
+    static const char *sopts = "fs:hak:"
 #ifdef __ia64__
         "r:"
 #endif
@@ -929,6 +932,7 @@ int main(int argc, char **argv)
         {"stack-trace", 0, NULL, 'S'},
         {"symbol-table", 1, NULL, 's'},
         {"frame-pointers", 0, NULL, 'f'},
+        {"kernel-start", 1, NULL, 'k'},
 #ifdef __ia64__
         {"regs", 1, NULL, 'r'},
 #endif
@@ -988,6 +992,9 @@ int main(int argc, char **argv)
             disp_all = 1;
             break;
 #endif
+        case 'k':
+            kernel_start = strtoull(optarg, NULL, 0);
+            break;
         case 'h':
             usage();
             exit(-1);
