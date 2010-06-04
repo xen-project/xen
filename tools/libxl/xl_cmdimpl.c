@@ -2729,7 +2729,7 @@ int main_vcpulist(int argc, char **argv)
         }
     }
 
-    vcpulist(argc - 1, argv + 1);
+    vcpulist(argc - 2, argv + 2);
     exit(0);
 }
 
@@ -2818,7 +2818,7 @@ int main_vcpupin(int argc, char **argv)
 {
     int opt;
 
-    if (argc != 4) {
+    if (argc != 5) {
         help("vcpu-pin");
         exit(0);
     }
@@ -2833,7 +2833,7 @@ int main_vcpupin(int argc, char **argv)
         }
     }
 
-    vcpupin(argv[1], argv[2] , argv[3]);
+    vcpupin(argv[2], argv[3] , argv[4]);
     exit(0);
 }
 
@@ -2859,7 +2859,7 @@ int main_vcpuset(int argc, char **argv)
 {
     int opt;
 
-    if (argc != 3) {
+    if (argc != 4) {
         help("vcpu-set");
         exit(0);
     }
@@ -2874,7 +2874,7 @@ int main_vcpuset(int argc, char **argv)
         }
     }
 
-    vcpuset(argv[1], argv[2]);
+    vcpuset(argv[2], argv[3]);
     exit(0);
 }
 
