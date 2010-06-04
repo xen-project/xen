@@ -3380,11 +3380,11 @@ int main_networkattach(int argc, char **argv)
     int i;
     unsigned int val;
 
-    if ((argc < 2) || (argc > 11)) {
+    if ((argc < 3) || (argc > 11)) {
         help("network-attach");
         exit(0);
     }
-    while ((opt = getopt(argc, argv, "hl")) != -1) {
+    while ((opt = getopt(argc, argv, "h")) != -1) {
         switch (opt) {
         case 'h':
             help("network-attach");
@@ -3395,12 +3395,12 @@ int main_networkattach(int argc, char **argv)
         }
     }
 
-    if (domain_qualifier_to_domid(argv[1], &domid, 0) < 0) {
-        fprintf(stderr, "%s is an invalid domain identifier\n", argv[1]);
+    if (domain_qualifier_to_domid(argv[2], &domid, 0) < 0) {
+        fprintf(stderr, "%s is an invalid domain identifier\n", argv[2]);
         exit(1);
     }
     init_nic_info(&nic, -1);
-    for (argv += 2, argc -= 2; argc > 0; ++argv, --argc) {
+    for (argv += 3, argc -= 3; argc > 0; ++argv, --argc) {
         if (!strncmp("type=", *argv, 5)) {
             if (!strncmp("vif", (*argv) + 5, 4)) {
                 nic.nictype = NICTYPE_VIF;
