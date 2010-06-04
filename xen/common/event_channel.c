@@ -986,10 +986,10 @@ void free_xen_event_channel(
 }
 
 
-void notify_via_xen_event_channel(int lport)
+void notify_via_xen_event_channel(struct domain *ld, int lport)
 {
     struct evtchn *lchn, *rchn;
-    struct domain *ld = current->domain, *rd;
+    struct domain *rd;
     int            rport;
 
     spin_lock(&ld->event_lock);

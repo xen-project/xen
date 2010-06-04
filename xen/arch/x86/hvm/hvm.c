@@ -930,7 +930,7 @@ bool_t hvm_send_assist_req(struct vcpu *v)
      * prepare_wait_on_xen_event_channel() is an implicit barrier.
      */
     p->state = STATE_IOREQ_READY;
-    notify_via_xen_event_channel(v->arch.hvm_vcpu.xen_port);
+    notify_via_xen_event_channel(v->domain, v->arch.hvm_vcpu.xen_port);
 
     return 1;
 }

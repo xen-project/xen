@@ -35,13 +35,6 @@
 #define MEM_EVENT_RING_THRESHOLD 4
 
 
-static void mem_event_notify(struct domain *d)
-{
-    prepare_wait_on_xen_event_channel(d->mem_event.xen_port);
-    notify_via_xen_event_channel(d->mem_event.xen_port);
-}
-
-
 int mem_event_enable(struct domain *d, mfn_t ring_mfn, mfn_t shared_mfn)
 {
     int rc;
@@ -63,11 +56,6 @@ int mem_event_enable(struct domain *d, mfn_t ring_mfn, mfn_t shared_mfn)
 
     ((mem_event_shared_page_t *)d->mem_event.shared_page)->port = rc;
     d->mem_event.xen_port = rc;
-
-    /* Initialise tasklet */
-    tasklet_init(&d->mem_event.tasklet,
-                 (void(*)(unsigned long))mem_event_notify,
-                 (unsigned long)d);
 
     /* Prepare ring buffer */
     FRONT_RING_INIT(&d->mem_event.front_ring,
@@ -125,7 +113,7 @@ void mem_event_put_request(struct domain *d, mem_event_request_t *req)
 
     mem_event_ring_unlock(d);
 
-    tasklet_schedule(&d->mem_event.tasklet);
+    notify_via_xen_event_channel(d, d->mem_event.xen_port);
 }
 
 void mem_event_get_response(struct domain *d, mem_event_response_t *rsp)

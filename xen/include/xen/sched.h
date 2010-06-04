@@ -190,8 +190,6 @@ struct mem_event_domain
     bool_t enabled;
     /* event channel port (vcpu0 only) */
     int xen_port;
-    /* tasklet */
-    struct tasklet tasklet;
 };
  
 struct domain
