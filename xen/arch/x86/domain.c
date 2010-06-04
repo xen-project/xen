@@ -1323,7 +1323,7 @@ static void update_runstate_area(struct vcpu *v)
         return;
 
 #ifdef CONFIG_COMPAT
-    if ( is_pv_32on64_domain(v->domain) )
+    if ( has_32bit_shinfo(v->domain) )
     {
         struct compat_vcpu_runstate_info info;
 
