@@ -79,31 +79,11 @@ int blktap_interface_create(int ctlfd, int *major, int *minor, blkif_t *blkif)
 
 int blktap_interface_open(void)
 {
-	char *devname;
-	int ret;
 	int ctlfd;
 
-	/* Attach to blktap0 */
-	if (asprintf(&devname,"%s/%s0", BLKTAP_DEV_DIR, BLKTAP_DEV_NAME) == -1)
-		goto open_failed;
-
-	ret = xc_find_device_number("blktap0");
-	if (ret < 0) {
-		DPRINTF("couldn't find device number for 'blktap0'\n");
-		goto open_failed;
-	}
-
-	blktap_major = major(ret);
-	make_blktap_dev(devname,blktap_major, 0);
-
-	ctlfd = open(devname, O_RDWR);
-	if (ctlfd == -1) {
+	ctlfd = open(BLKTAP_DEV_DIR "/" BLKTAP_DEV_NAME "0", O_RDWR);
+	if (ctlfd == -1)
 		DPRINTF("blktap0 open failed\n");
-		goto open_failed;
-	}
 
 	return ctlfd;
-
-open_failed:
-	return -1;
 }
