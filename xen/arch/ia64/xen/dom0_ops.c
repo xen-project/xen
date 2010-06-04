@@ -803,6 +803,50 @@ long arch_do_sysctl(xen_sysctl_t *op, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
     }
     break;
 
+    case XEN_SYSCTL_numainfo:
+    {
+        uint32_t i, j, max_node_index, last_online_node;
+        xen_sysctl_numainfo_t *ni = &op->u.numainfo;
+
+        last_online_node = last_node(node_online_map);
+        max_node_index = min_t(uint32_t, ni->max_node_index, last_online_node);
+        ni->max_node_index = last_online_node;
+
+        for (i = 0; i <= max_node_index; i++) {
+            if (!guest_handle_is_null(ni->node_to_memsize)) {
+                uint64_t memsize = node_online(i) ? 
+                                   node_memblk[i].size << PAGE_SHIFT : 0ul;
+                if (copy_to_guest_offset(ni->node_to_memsize, i, &memsize, 1))
+                    break;
+            }
+            if (!guest_handle_is_null(ni->node_to_memfree)) {
+                uint64_t memfree = node_online(i) ? 
+                                   avail_node_heap_pages(i) << PAGE_SHIFT : 0ul;
+                if (copy_to_guest_offset(ni->node_to_memfree, i, &memfree, 1))
+                    break;
+            }
+
+            if (!guest_handle_is_null(ni->node_to_node_distance)) {
+                for (j = 0; j <= max_node_index; j++) {
+                    uint32_t distance = ~0u;
+                    if (node_online(i) && node_online (j)) 
+                        distance = node_distance(i, j);
+                    
+                    if (copy_to_guest_offset(
+                        ni->node_to_node_distance, 
+                        i*(max_node_index+1) + j, &distance, 1))
+                        break;
+                }
+                if (j <= max_node_index)
+                    break;
+            }
+        }
+
+        ret = ((i <= max_node_index) || copy_to_guest(u_sysctl, op, 1))
+            ? -EFAULT : 0;
+    }
+    break;
+
     default:
         printk("arch_do_sysctl: unrecognized sysctl: %d!!!\n",op->cmd);
         ret = -ENOSYS;
