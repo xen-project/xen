@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copy this file to /etc/profile.d/xl.sh
+# Copy this file to /etc/bash_completion.d/xl.sh
 
 _xl()
 {
