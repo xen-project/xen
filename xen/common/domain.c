@@ -228,10 +228,12 @@ struct domain *domain_create(
     atomic_set(&d->refcnt, 1);
     spin_lock_init_prof(d, domain_lock);
     spin_lock_init_prof(d, page_alloc_lock);
-    spin_lock_init(&d->shutdown_lock);
     spin_lock_init(&d->hypercall_deadlock_mutex);
     INIT_PAGE_LIST_HEAD(&d->page_list);
     INIT_PAGE_LIST_HEAD(&d->xenpage_list);
+
+    spin_lock_init(&d->shutdown_lock);
+    d->shutdown_code = -1;
 
     if ( domcr_flags & DOMCRF_hvm )
         d->is_hvm = 1;
@@ -485,10 +487,14 @@ void domain_shutdown(struct domain *d, u8 reason)
 {
     struct vcpu *v;
 
+    spin_lock(&d->shutdown_lock);
+
+    if ( d->shutdown_code == -1 )
+        d->shutdown_code = reason;
+    reason = d->shutdown_code;
+
     if ( d->domain_id == 0 )
         dom0_shutdown(reason);
-
-    spin_lock(&d->shutdown_lock);
 
     if ( d->is_shutting_down )
     {
@@ -497,7 +503,6 @@ void domain_shutdown(struct domain *d, u8 reason)
     }
 
     d->is_shutting_down = 1;
-    d->shutdown_code = reason;
 
     smp_mb(); /* set shutdown status /then/ check for per-cpu deferrals */
 
@@ -529,6 +534,7 @@ void domain_resume(struct domain *d)
     spin_lock(&d->shutdown_lock);
 
     d->is_shutting_down = d->is_shut_down = 0;
+    d->shutdown_code = -1;
 
     for_each_vcpu ( d, v )
     {

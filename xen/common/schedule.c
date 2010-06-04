@@ -704,6 +704,27 @@ ret_t do_sched_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         break;
     }
 
+    case SCHEDOP_shutdown_code:
+    {
+        struct sched_shutdown sched_shutdown;
+        struct domain *d = current->domain;
+
+        ret = -EFAULT;
+        if ( copy_from_guest(&sched_shutdown, arg, 1) )
+            break;
+
+        TRACE_3D(TRC_SCHED_SHUTDOWN_CODE,
+                 d->domain_id, current->vcpu_id, sched_shutdown.reason);
+
+        spin_lock(&d->shutdown_lock);
+        if ( d->shutdown_code == -1 )
+            d->shutdown_code = (u8)sched_shutdown.reason;
+        spin_unlock(&d->shutdown_lock);
+
+        ret = 0;
+        break;
+    }
+
     case SCHEDOP_poll:
     {
         struct sched_poll sched_poll;
