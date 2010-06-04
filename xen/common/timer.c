@@ -233,35 +233,43 @@ static inline void deactivate_timer(struct timer *timer)
     list_add(&timer->inactive, &per_cpu(timers, timer->cpu).inactive);
 }
 
-static inline void timer_lock(struct timer *timer)
+static inline bool_t timer_lock(struct timer *timer)
 {
     unsigned int cpu;
 
     for ( ; ; )
     {
         cpu = timer->cpu;
+        if ( unlikely(timer->status == TIMER_STATUS_killed) )
+            return 0;
         ASSERT(cpu_isset(cpu, timer_valid_cpumask));
         spin_lock(&per_cpu(timers, cpu).lock);
-        if ( likely(timer->cpu == cpu) )
+        if ( likely(timer->cpu == cpu) &&
+             likely(timer->status != TIMER_STATUS_killed) )
             break;
         spin_unlock(&per_cpu(timers, cpu).lock);
     }
+
+    return 1;
 }
 
-#define timer_lock_irq(t) \
-    do { local_irq_disable(); timer_lock(t); } while ( 0 )
-#define timer_lock_irqsave(t, flags) \
-    do { local_irq_save(flags); timer_lock(t); } while ( 0 )
+#define timer_lock_irqsave(t, flags) ({         \
+    bool_t __x;                                 \
+    local_irq_save(flags);                      \
+    if ( !(__x = timer_lock(t)) )               \
+        local_irq_restore(flags);               \
+    __x;                                        \
+})
 
 static inline void timer_unlock(struct timer *timer)
 {
     spin_unlock(&per_cpu(timers, timer->cpu).lock);
 }
 
-#define timer_unlock_irq(t) \
-    do { timer_unlock(t); local_irq_enable(); } while ( 0 )
-#define timer_unlock_irqrestore(t, flags) \
-    do { timer_unlock(t); local_irq_restore(flags); } while ( 0 )
+#define timer_unlock_irqrestore(t, flags) ({    \
+    timer_unlock(t);                            \
+    local_irq_restore(flags);                   \
+})
 
 
 static bool_t active_timer(struct timer *timer)
@@ -284,7 +292,8 @@ void init_timer(
     timer->data = data;
     timer->cpu = cpu;
     timer->status = TIMER_STATUS_inactive;
-    timer_lock_irqsave(timer, flags);
+    if ( !timer_lock_irqsave(timer, flags) )
+        BUG();
     list_add(&timer->inactive, &per_cpu(timers, cpu).inactive);
     timer_unlock_irqrestore(timer, flags);
 }
@@ -294,7 +303,8 @@ void set_timer(struct timer *timer, s_time_t expires)
 {
     unsigned long flags;
 
-    timer_lock_irqsave(timer, flags);
+    if ( !timer_lock_irqsave(timer, flags) )
+        return;
 
     if ( active_timer(timer) )
         deactivate_timer(timer);
@@ -302,8 +312,7 @@ void set_timer(struct timer *timer, s_time_t expires)
     timer->expires = expires;
     timer->expires_end = expires + timer_slop;
 
-    if ( likely(timer->status != TIMER_STATUS_killed) )
-        activate_timer(timer);
+    activate_timer(timer);
 
     timer_unlock_irqrestore(timer, flags);
 }
@@ -313,7 +322,8 @@ void stop_timer(struct timer *timer)
 {
     unsigned long flags;
 
-    timer_lock_irqsave(timer, flags);
+    if ( !timer_lock_irqsave(timer, flags) )
+        return;
 
     if ( active_timer(timer) )
         deactivate_timer(timer);
@@ -330,7 +340,8 @@ void migrate_timer(struct timer *timer, unsigned int new_cpu)
 
     for ( ; ; )
     {
-        if ( (old_cpu = timer->cpu) == new_cpu )
+        if ( ((old_cpu = timer->cpu) == new_cpu) ||
+             unlikely(timer->status == TIMER_STATUS_killed) )
             return;
 
         ASSERT(cpu_isset(old_cpu, timer_valid_cpumask));
@@ -347,7 +358,8 @@ void migrate_timer(struct timer *timer, unsigned int new_cpu)
             spin_lock(&per_cpu(timers, old_cpu).lock);
         }
 
-        if ( likely(timer->cpu == old_cpu) )
+        if ( likely(timer->cpu == old_cpu) &&
+             likely(timer->status != TIMER_STATUS_killed) )
              break;
 
         spin_unlock(&per_cpu(timers, old_cpu).lock);
@@ -377,7 +389,8 @@ void kill_timer(struct timer *timer)
 
     BUG_ON(this_cpu(timers).running == timer);
 
-    timer_lock_irqsave(timer, flags);
+    if ( !timer_lock_irqsave(timer, flags) )
+        return;
 
     if ( active_timer(timer) )
         deactivate_timer(timer);
