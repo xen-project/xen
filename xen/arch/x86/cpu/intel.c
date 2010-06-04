@@ -29,6 +29,9 @@ extern int trap_init_f00f_bug(void);
 static unsigned int opt_cpuid_mask_ecx, opt_cpuid_mask_edx;
 integer_param("cpuid_mask_ecx", opt_cpuid_mask_ecx);
 integer_param("cpuid_mask_edx", opt_cpuid_mask_edx);
+static unsigned int opt_cpuid_mask_ext_ecx, opt_cpuid_mask_ext_edx;
+integer_param("cpuid_mask_ext_ecx", opt_cpuid_mask_ext_ecx);
+integer_param("cpuid_mask_ext_edx", opt_cpuid_mask_ext_edx);
 
 static int use_xsave = 1;
 boolean_param("xsave", use_xsave);
@@ -40,24 +43,46 @@ boolean_param("xsave", use_xsave);
 struct movsl_mask movsl_mask __read_mostly;
 #endif
 
-static void __devinit set_cpuidmask(void)
+static void __devinit set_cpuidmask(struct cpuinfo_x86 *c)
 {
-	unsigned int eax, ebx, ecx, edx, model;
+	unsigned int model = c->x86_model;
 
-	if (!(opt_cpuid_mask_ecx | opt_cpuid_mask_edx))
+	if (!(opt_cpuid_mask_ecx | opt_cpuid_mask_edx | 
+	      opt_cpuid_mask_ext_ecx | opt_cpuid_mask_ext_edx))
 		return;
 
-	cpuid(0x00000001, &eax, &ebx, &ecx, &edx);
-	model = ((eax & 0xf0000) >> 12) | ((eax & 0xf0) >> 4);
-	if (!((model == 0x1d) || ((model == 0x17) && ((eax & 0xf) >= 4)))) {
+	if (c->x86 != 0x6)	/* Only family 6 supports this feature  */
+		return;
+
+	if ((model == 0x1d) || ((model == 0x17) && (c->x86_mask >= 4))) {
+		wrmsr(MSR_IA32_CPUID_FEATURE_MASK1,
+		      opt_cpuid_mask_ecx ? : ~0u,
+		      opt_cpuid_mask_edx ? : ~0u);
+	}
+/* 
+ * CPU supports this feature if the processor signature meets the following:
+ * (CPUID.(EAX=01h):EAX) > 000106A2h, or
+ * (CPUID.(EAX=01h):EAX) == 000106Exh, 0002065xh, 000206Cxh, 000206Exh, or 000206Fxh
+ *
+ */
+	else if (((model == 0x1a) && (c->x86_mask > 2))
+		 || model == 0x1e
+		 || model == 0x25 
+		 || model == 0x2c 
+		 || model == 0x2e 
+		 || model == 0x2f) {
+		wrmsr(MSR_IA32_CPUID1_FEATURE_MASK,
+		      opt_cpuid_mask_ecx ? : ~0u,
+		      opt_cpuid_mask_edx ? : ~0u);
+		wrmsr(MSR_IA32_CPUID80000001_FEATURE_MASK,
+		      opt_cpuid_mask_ext_ecx ? : ~0u,
+		      opt_cpuid_mask_ext_edx ? : ~0u);
+	}
+	else {
 		printk(XENLOG_ERR "Cannot set CPU feature mask on CPU#%d\n",
 		       smp_processor_id());
 		return;
 	}
-
-	wrmsr(MSR_IA32_CPUID_FEATURE_MASK1,
-	      opt_cpuid_mask_ecx ? : ~0u,
-	      opt_cpuid_mask_edx ? : ~0u);
 }
 
 void __devinit early_intel_workaround(struct cpuinfo_x86 *c)
@@ -179,7 +204,7 @@ static void __devinit init_intel(struct cpuinfo_x86 *c)
 
 	detect_ht(c);
 
-	set_cpuidmask();
+	set_cpuidmask(c);
 
 	/* Work around errata */
 	Intel_errata_workarounds(c);

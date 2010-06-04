@@ -158,6 +158,8 @@
 
 /* MSR for cpuid feature mask */
 #define MSR_IA32_CPUID_FEATURE_MASK1	0x00000478
+#define MSR_IA32_CPUID1_FEATURE_MASK    0x00000130
+#define MSR_IA32_CPUID80000001_FEATURE_MASK 0x00000131
 
 /* MSRs & bits used for VMX enabling */
 #define MSR_IA32_VMX_BASIC                      0x480
