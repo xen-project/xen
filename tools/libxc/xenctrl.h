@@ -135,16 +135,6 @@ enum xc_open_flags {
 int xc_interface_close(xc_interface *xch);
 
 /*
- * KERNEL INTERFACES
- */
-
-/*
- * Resolve a kernel device name (e.g., "evtchn", "blktap0") into a kernel
- * device number. Returns -1 on error (and sets errno).
- */
-int xc_find_device_number(const char *name);
-
-/*
  * DOMAIN DEBUGGING FUNCTIONS
  */
 

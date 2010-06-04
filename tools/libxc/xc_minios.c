@@ -152,12 +152,6 @@ int do_xen_hypercall(xc_interface *xch, privcmd_hypercall_t *hypercall)
     return call.result;
 }
 
-int xc_find_device_number(const char *name)
-{
-    printf("xc_find_device_number(%s)\n", name);
-    do_exit();
-}
-
 int xc_evtchn_open(void)
 {
     int fd = alloc_fd(FTYPE_EVTCHN), i;
