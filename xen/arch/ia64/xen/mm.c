@@ -2897,7 +2897,8 @@ __guest_physmap_add_page(struct domain *d, unsigned long gpfn,
         int i, j;
         j = 1 << (PAGE_SHIFT-PAGE_SHIFT_4K);
         for(i = 0 ; i < j; i++)
-            iommu_map_page(d, gpfn*j + i, mfn*j + i);
+            iommu_map_page(d, gpfn*j + i, mfn*j + i,
+                           IOMMUF_readable|IOMMUF_writable);
     }
 }
 

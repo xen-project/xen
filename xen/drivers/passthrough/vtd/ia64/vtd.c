@@ -108,7 +108,8 @@ static int do_dom0_iommu_mapping(unsigned long start, unsigned long end,
         pfn = page_addr >> PAGE_SHIFT;
         tmp = 1 << (PAGE_SHIFT - PAGE_SHIFT_4K);
         for ( j = 0; j < tmp; j++ )
-            iommu_map_page(d, (pfn*tmp+j), (pfn*tmp+j));
+            iommu_map_page(d, (pfn*tmp+j), (pfn*tmp+j),
+                           IOMMUF_readable|IOMMUF_writable);
 
 	page_addr += PAGE_SIZE;
 

@@ -388,9 +388,6 @@
 #define MAX_AMD_IOMMUS                  32
 #define IOMMU_PAGE_TABLE_LEVEL_3        3
 #define IOMMU_PAGE_TABLE_LEVEL_4        4
-#define IOMMU_IO_WRITE_ENABLED          1
-#define IOMMU_IO_READ_ENABLED           1
-#define HACK_BIOS_SETTINGS                  0
 
 /* interrupt remapping table */
 #define INT_REMAP_INDEX_DM_MASK         0x1C00

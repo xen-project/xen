@@ -172,7 +172,8 @@ static int iommu_populate_page_table(struct domain *d)
         {
             BUG_ON(SHARED_M2P(mfn_to_gmfn(d, page_to_mfn(page))));
             rc = hd->platform_ops->map_page(
-                d, mfn_to_gmfn(d, page_to_mfn(page)), page_to_mfn(page));
+                d, mfn_to_gmfn(d, page_to_mfn(page)), page_to_mfn(page),
+                IOMMUF_readable|IOMMUF_writable);
             if (rc)
             {
                 spin_unlock(&d->page_alloc_lock);
@@ -217,14 +218,15 @@ void iommu_domain_destroy(struct domain *d)
     }
 }
 
-int iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn)
+int iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn,
+                   unsigned int flags)
 {
     struct hvm_iommu *hd = domain_hvm_iommu(d);
 
     if ( !iommu_enabled || !hd->platform_ops )
         return 0;
 
-    return hd->platform_ops->map_page(d, gfn, mfn);
+    return hd->platform_ops->map_page(d, gfn, mfn, flags);
 }
 
 int iommu_unmap_page(struct domain *d, unsigned long gfn)

@@ -68,8 +68,16 @@ int assign_device(struct domain *d, u8 bus, u8 devfn);
 int deassign_device(struct domain *d, u8 bus, u8 devfn);
 int iommu_get_device_group(struct domain *d, u8 bus, u8 devfn,
     XEN_GUEST_HANDLE_64(uint32) buf, int max_sdevs);
-int iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn);
+
+/* iommu_map_page() takes flags to direct the mapping operation. */
+#define _IOMMUF_readable 0
+#define IOMMUF_readable  (1u<<_IOMMUF_readable)
+#define _IOMMUF_writable 1
+#define IOMMUF_writable  (1u<<_IOMMUF_writable)
+int iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn,
+                   unsigned int flags);
 int iommu_unmap_page(struct domain *d, unsigned long gfn);
+
 void iommu_domain_teardown(struct domain *d);
 int hvm_do_IRQ_dpci(struct domain *d, unsigned int irq);
 int dpci_ioport_intercept(ioreq_t *p);
@@ -102,7 +110,8 @@ struct iommu_ops {
     int (*remove_device)(struct pci_dev *pdev);
     int (*assign_device)(struct domain *d, u8 bus, u8 devfn);
     void (*teardown)(struct domain *d);
-    int (*map_page)(struct domain *d, unsigned long gfn, unsigned long mfn);
+    int (*map_page)(struct domain *d, unsigned long gfn, unsigned long mfn,
+                    unsigned int flags);
     int (*unmap_page)(struct domain *d, unsigned long gfn);
     int (*reassign_device)(struct domain *s, struct domain *t,
 			   u8 bus, u8 devfn);
