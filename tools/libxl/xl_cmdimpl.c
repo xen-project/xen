@@ -2206,7 +2206,7 @@ int main_migrate_receive(int argc, char **argv)
     while ((opt = getopt(argc, argv, "hed")) != -1) {
         switch (opt) {
         case 'h':
-            help("restore");
+            help("migrate-receive");
             exit(2);
             break;
         case 'e':
@@ -2222,7 +2222,7 @@ int main_migrate_receive(int argc, char **argv)
     }
 
     if (argc-optind != 0) {
-        help("restore");
+        help("migrate-receive");
         exit(2);
     }
     migrate_receive(debug, daemonize);
@@ -2295,7 +2295,7 @@ int main_migrate(int argc, char **argv)
     }
 
     if (argc-optind < 2 || argc-optind > 2) {
-        help("save");
+        help("migrate");
         exit(2);
     }
 
