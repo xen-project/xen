@@ -42,6 +42,25 @@
 
 #define UUID_FMT "%02hhx%02hhx%02hhx%02hhx-%02hhx%02hhx-%02hhx%02hhx-%02hhx%02hhx-%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx"
 
+#define CHK_ERRNO( call ) ({                                            \
+        int chk_errno = (call);                                         \
+        if (chk_errno < 0) {                                                \
+            fprintf(stderr,"xl: fatal error: %s:%d: %s: %s\n",          \
+                    __FILE__,__LINE__, strerror(chk_errno), #call);     \
+            exit(-ERROR_FAIL);                                          \
+        }                                                               \
+    })
+
+#define MUST( call ) ({                                                 \
+        int must_rc = (call);                                           \
+        if (must_rc < 0) {                                                  \
+            fprintf(stderr,"xl: fatal error: %s:%d, rc=%d: %s\n",       \
+                    __FILE__,__LINE__, must_rc, #call);                 \
+            exit(-must_rc);                                             \
+        }                                                               \
+    })
+
+
 int logfile = 2;
 
 /* every libxl action in xl uses this same libxl context */
@@ -240,7 +259,8 @@ static void init_nic_info(libxl_device_nic *nic_info, int devnum)
     nic_info->mac[5] = 1 + (int) (0xff * (rand() / (RAND_MAX + 1.0)));
     nic_info->ifname = NULL;
     nic_info->bridge = "xenbr0";
-    nic_info->script = "/etc/xen/scripts/vif-bridge";
+    CHK_ERRNO( asprintf(&nic_info->script, "%s/xl-vif-script",
+               libxl_xen_script_dir_path()) );
     nic_info->nictype = NICTYPE_IOEMU;
 }
 
@@ -790,24 +810,6 @@ skip_pci:
 
     xlu_cfg_destroy(config);
 }
-
-#define CHK_ERRNO( call ) ({                                            \
-        int chk_errno = (call);                                         \
-        if (chk_errno) {                                                \
-            fprintf(stderr,"xl: fatal error: %s:%d: %s: %s\n",          \
-                    __FILE__,__LINE__, strerror(chk_errno), #call);     \
-            exit(-ERROR_FAIL);                                          \
-        }                                                               \
-    })
-
-#define MUST( call ) ({                                                 \
-        int must_rc = (call);                                           \
-        if (must_rc) {                                                  \
-            fprintf(stderr,"xl: fatal error: %s:%d, rc=%d: %s\n",       \
-                    __FILE__,__LINE__, must_rc, #call);                 \
-            exit(-must_rc);                                             \
-        }                                                               \
-    })
 
 static void *xmalloc(size_t sz) {
     void *r;

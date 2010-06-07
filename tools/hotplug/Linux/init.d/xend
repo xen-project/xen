@@ -21,6 +21,12 @@
 
 shopt -s extglob
 test -f /etc/sysconfig/xend && . /etc/sysconfig/xend
+test -f /etc/sysconfig/xen_toolstack && . /etc/sysconfig/xen_toolstack
+
+if test "x$xen_toolstack" != "xxend"
+then
+       exit 0
+fi
 
 if   test "x$1" = xstart && \
      test -d /proc/xen && \

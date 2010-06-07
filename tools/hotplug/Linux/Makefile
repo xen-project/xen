@@ -7,10 +7,15 @@ XEND_SYSCONFIG = init.d/sysconfig.xend
 XENDOMAINS_INITD = init.d/xendomains
 XENDOMAINS_SYSCONFIG = init.d/sysconfig.xendomains
 
+XLD_INITD = init.d/xenlightdaemons
+XLD_SYSCONFIG = init.d/sysconfig.xenlightdaemons
+XENTOOLSTACK_SYSCONFIG = init.d/sysconfig.xen_toolstack
+
 # Xen script dir and scripts to go there.
 XEN_SCRIPTS = network-bridge vif-bridge
 XEN_SCRIPTS += network-route vif-route
 XEN_SCRIPTS += network-nat vif-nat
+XEN_SCRIPTS += xl-vif-script
 XEN_SCRIPTS += vif2
 XEN_SCRIPTS += block
 XEN_SCRIPTS += block-enbd block-nbd
@@ -67,6 +72,9 @@ install-initd:
 	$(INSTALL_PROG) $(XEND_SYSCONFIG) $(DESTDIR)$(CONFIG_DIR)/sysconfig/xend
 	$(INSTALL_PROG) $(XENDOMAINS_INITD) $(DESTDIR)$(CONFIG_DIR)/init.d
 	$(INSTALL_PROG) $(XENDOMAINS_SYSCONFIG) $(DESTDIR)$(CONFIG_DIR)/sysconfig/xendomains
+	$(INSTALL_PROG) $(XLD_INITD) $(DESTDIR)$(CONFIG_DIR)/init.d
+	$(INSTALL_PROG) $(XLD_SYSCONFIG) $(DESTDIR)$(CONFIG_DIR)/sysconfig/xenlightdaemons
+	$(INSTALL_PROG) $(XENTOOLSTACK_SYSCONFIG) $(DESTDIR)$(CONFIG_DIR)/sysconfig/xen_toolstack
 
 .PHONY: install-scripts
 install-scripts:

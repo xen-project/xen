@@ -538,5 +538,17 @@ int libxl_tmem_set(struct libxl_ctx *ctx, uint32_t domid, char* name,
                    uint32_t set);
 int libxl_tmem_shared_auth(struct libxl_ctx *ctx, uint32_t domid, char* uuid,
                            int auth);
+
+/* common paths */
+const char *libxl_sbindir_path(void);
+const char *libxl_bindir_path(void);
+const char *libxl_libexec_path(void);
+const char *libxl_libdir_path(void);
+const char *libxl_sharedir_path(void);
+const char *libxl_private_bindir_path(void);
+const char *libxl_xenfirmwaredir_path(void);
+const char *libxl_xen_config_dir_path(void);
+const char *libxl_xen_script_dir_path(void);
+
 #endif /* LIBXL_H */
 

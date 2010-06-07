@@ -215,17 +215,6 @@ void libxl_log_child_exitstatus(struct libxl_ctx *ctx,
 
 char *libxl_abs_path(struct libxl_ctx *ctx, char *s, const char *path);
 
-/* libxl_paths.c */
-const char *libxl_sbindir_path(void);
-const char *libxl_bindir_path(void);
-const char *libxl_libexec_path(void);
-const char *libxl_libdir_path(void);
-const char *libxl_sharedir_path(void);
-const char *libxl_private_bindir_path(void);
-const char *libxl_xenfirmwaredir_path(void);
-const char *libxl_xen_config_dir_path(void);
-const char *libxl_xen_script_dir_path(void);
-
 #define XL_LOG_DEBUG   XTL_DEBUG
 #define XL_LOG_INFO    XTL_INFO
 #define XL_LOG_WARNING XTL_WARN

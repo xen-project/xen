@@ -28,6 +28,13 @@
 #                    boots / shuts down.
 ### END INIT INFO
 
+test -f /etc/sysconfig/xen_toolstack && . /etc/sysconfig/xen_toolstack
+
+if test "x$xen_toolstack" != "xxend"
+then
+	exit 0
+fi
+
 # Correct exit code would probably be 5, but it's enough 
 # if xend complains if we're not running as privileged domain
 if ! [ -e /proc/xen/privcmd ]; then
