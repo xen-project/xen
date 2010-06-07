@@ -1239,9 +1239,9 @@ static int64_t parse_mem_size_kb(char *mem)
         kbytes <<= 10;
     case 'g':
         kbytes <<= 10;
+    case '\0':
     case 'm':
         kbytes <<= 10;
-    case '\0':
     case 'k':
         break;
     case 'b':
@@ -1302,7 +1302,6 @@ int main_memmax(int argc, char **argv)
         exit(1);
     }
 
-    printf("setting domid %d static max memory to : %s\n", domid, mem);
     exit(0);
 }
 
@@ -1318,7 +1317,6 @@ void set_memory_target(char *p, char *mem)
         exit(3);
     }
 
-    printf("setting domid %d memory to : %lld\n", domid, memorykb);
     libxl_set_memory_target(&ctx, domid, memorykb, /* enforce */ 1);
 }
 
