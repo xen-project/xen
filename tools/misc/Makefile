@@ -10,8 +10,9 @@ CFLAGS   += $(INCLUDES)
 
 HDRS     = $(wildcard *.h)
 
-TARGETS-y := xenperf xenpm xen-tmem-list-parse gtraceview gtracestat xenlockprof xen-hptool xenwatchdogd
+TARGETS-y := xenperf xenpm xen-tmem-list-parse gtraceview gtracestat xenlockprof xenwatchdogd
 TARGETS-$(CONFIG_X86) += xen-detect xen-hvmctx
+TARGETS-$(CONFIG_MIGRATE) += xen-hptool
 TARGETS := $(TARGETS-y)
 
 SUBDIRS-$(CONFIG_LOMOUNT) += lomount
@@ -22,8 +23,9 @@ INSTALL_BIN-y := xencons
 INSTALL_BIN-$(CONFIG_X86) += xen-detect
 INSTALL_BIN := $(INSTALL_BIN-y)
 
-INSTALL_SBIN-y := xm xen-bugtool xen-python-path xend xenperf xsview xenpm xen-tmem-list-parse gtraceview gtracestat xenlockprof xen-hptool xenwatchdogd
+INSTALL_SBIN-y := xm xen-bugtool xen-python-path xend xenperf xsview xenpm xen-tmem-list-parse gtraceview gtracestat xenlockprof xenwatchdogd
 INSTALL_SBIN-$(CONFIG_X86) += xen-hvmctx
+INSTALL_SBIN-$(CONFIG_MIGRATE) += xen-hptool
 INSTALL_SBIN := $(INSTALL_SBIN-y)
 
 .PHONY: all
